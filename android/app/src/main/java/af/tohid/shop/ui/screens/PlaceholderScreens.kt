@@ -1,0 +1,29 @@
+package af.tohid.shop.ui.screens
+
+import androidx.compose.runtime.Composable
+
+/*
+ * صفحه‌های در دست ساخت.
+ * پایه‌ی برنامه (پایگاه‌داده، همگام‌سازی، به‌روزرسانی) کامل است؛
+ * این صفحه‌ها یکی‌یکی از نسخه وب منتقل می‌شوند.
+ */
+
+@Composable
+fun SaleScreen() = ScreenScaffold("فروش", "صندوق و اسکن بارکد") {
+    InfoPanel("در دست ساخت", "صفحه فروش در مرحله بعد منتقل می‌شود.")
+}
+
+@Composable
+fun ProductsScreen() = ScreenScaffold("محصولات", "کالاها و موجودی") {
+    InfoPanel("در دست ساخت", "صفحه محصولات در مرحله بعد منتقل می‌شود.")
+}
+
+@Composable
+fun DebtorsScreen() = ScreenScaffold("قرض‌داران", "حساب مشتریان") {
+    InfoPanel("در دست ساخت", "صفحه قرض‌داران در مرحله بعد منتقل می‌شود.")
+}
+
+@Composable
+fun SettingsScreen() = ScreenScaffold("تنظیمات", "پشتیبان‌گیری و تنظیمات برنامه") {
+    InfoPanel("در دست ساخت", "صفحه تنظیمات در مرحله بعد منتقل می‌شود.")
+}

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  سرور خانگی ممکن است http ساده باشد (مثلاً پشت تونل نباشد).
+  https همیشه مجاز است؛ http فقط وقتی کاربر خودش آدرس http بدهد.
+  توصیه: از Cloudflare Tunnel استفاده کنید تا همه‌چیز https باشد.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
