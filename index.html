@@ -25,8 +25,20 @@
   }catch(e){}
 })();
 </script>
+<meta name="theme-color" content="#2c5ce6">
+<meta name="description" content="مدیریت فروش، انبار، قرض‌داران، مصارف و گزارشات فروشگاه — بدون نیاز به اینترنت">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="توحید">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- فونت به‌صورت غیرمسدودکننده بارگذاری می‌شود تا نبودِ اینترنت باز شدن برنامه را کند نکند -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap"></noscript>
 <style>
   :root{
     --bg:#ffffff;
@@ -80,7 +92,7 @@
   *{box-sizing:border-box; margin:0; padding:0;}
   html,body{height:100%;}
   body{
-    font-family:'Vazirmatn', sans-serif;
+    font-family:'Vazirmatn','Vazir','IRANSans','Noto Naskh Arabic','Segoe UI',Tahoma,sans-serif;
     background:var(--bg);
     color:var(--text);
     -webkit-font-smoothing:antialiased;
@@ -1377,6 +1389,72 @@
     width:100%; margin-top:10px; padding:10px; border-radius:var(--radius-sm);
     border:1.4px solid var(--border); background:var(--bg); color:var(--muted); font-size:13px; font-weight:600;
   }
+
+  /* ==========================================================
+     ALERTS CENTER / OFFLINE BADGE / PWA INSTALL
+     ========================================================== */
+  .alerts-wrap{ position:relative; }
+  .alert-badge{
+    position:absolute; top:-3px; inset-inline-end:-3px;
+    min-width:16px; height:16px; padding:0 4px;
+    border-radius:20px; background:var(--danger); color:#fff;
+    font-size:10px; font-weight:800; line-height:16px; text-align:center;
+    border:2px solid var(--bg); display:none;
+  }
+  .alert-badge.show{ display:block; }
+  .alerts-panel{
+    position:absolute; top:calc(100% + 8px); inset-inline-end:0;
+    width:min(330px, calc(100vw - 32px));
+    max-height:min(70vh, 440px); overflow-y:auto;
+    background:var(--bg); border:1px solid var(--border);
+    border-radius:var(--radius-md); box-shadow:var(--shadow-md);
+    padding:8px; z-index:60; display:none;
+  }
+  .alerts-panel.open{ display:block; animation:fadeIn .18s ease; }
+  /* روی گوشی، پنل به لبه‌های صفحه چسبیده تا از کادر بیرون نزند */
+  @media (max-width:560px){
+    .alerts-panel{
+      position:fixed;
+      top:calc(var(--header-h) + 6px);
+      inset-inline-start:12px; inset-inline-end:12px;
+      width:auto;
+    }
+  }
+  .alerts-panel-head{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:6px 8px 10px; font-size:13px; font-weight:800;
+  }
+  .alerts-panel-head span{ font-size:11.5px; font-weight:600; color:var(--muted); }
+  .alert-item{
+    display:flex; gap:9px; align-items:flex-start; width:100%;
+    padding:9px 8px; border:none; background:transparent;
+    border-radius:var(--radius-sm); text-align:start; cursor:pointer;
+  }
+  .alert-item:hover{ background:var(--surface); }
+  .alert-item .ai-dot{
+    width:26px; height:26px; flex:0 0 auto; border-radius:9px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .alert-item .ai-body{ flex:1; min-width:0; }
+  .alert-item .ai-title{ display:block; font-size:12.5px; font-weight:700; color:var(--text); line-height:1.5; }
+  .alert-item .ai-sub{ display:block; font-size:11.5px; color:var(--muted); margin-top:3px; line-height:1.6; }
+  .alerts-empty{ padding:22px 10px; text-align:center; font-size:12.5px; color:var(--muted); }
+
+  .offline-badge{
+    display:none; align-items:center; gap:5px;
+    padding:4px 9px; border-radius:20px;
+    background:var(--warning-tint); color:var(--warning);
+    font-size:11.5px; font-weight:700; white-space:nowrap;
+  }
+  .offline-badge.show{ display:inline-flex; }
+
+  .install-panel-row{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .backup-meta{
+    display:flex; align-items:center; gap:6px;
+    font-size:12px; font-weight:600; margin-bottom:10px;
+  }
+  .backup-meta.warn{ color:var(--warning); }
+  .backup-meta.ok{ color:var(--success); }
 </style>
 </head>
 <body>
@@ -1511,9 +1589,23 @@
     <header class="header">
       <h1 id="page-title">داشبورد</h1>
       <div class="header-right">
-        <button class="icon-btn" aria-label="اعلان‌ها">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-        </button>
+        <span class="offline-badge" id="offline-badge" title="بدون اینترنت — برنامه آفلاین کار می‌کند">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M1 1l22 22"/><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/><path d="M10.71 5.05A16 16 0 0 1 22.58 9"/><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
+          آفلاین
+        </span>
+        <div class="alerts-wrap">
+          <button class="icon-btn" id="btn-alerts" aria-label="اعلان‌ها" aria-expanded="false">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            <span class="alert-badge" id="alerts-badge">0</span>
+          </button>
+          <div class="alerts-panel" id="alerts-panel">
+            <div class="alerts-panel-head">
+              هشدارهای فروشگاه
+              <span id="alerts-count-text">۰ مورد</span>
+            </div>
+            <div id="alerts-list"></div>
+          </div>
+        </div>
         <button class="icon-btn" aria-label="تنظیمات" data-page="settings">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         </button>
@@ -2250,11 +2342,22 @@
           </div>
         </div>
 
-        <div class="seg-toggle" id="reports-tabs" style="margin-bottom:14px; flex-wrap:wrap;">
+        <div class="seg-toggle" id="reports-tabs" style="margin-bottom:10px; flex-wrap:wrap;">
           <button type="button" class="seg-btn active" data-rtab="sales">فروش</button>
           <button type="button" class="seg-btn" data-rtab="products">محصولات</button>
           <button type="button" class="seg-btn" data-rtab="debtors">قرض‌داران</button>
           <button type="button" class="seg-btn" data-rtab="stock">گردش موجودی</button>
+        </div>
+
+        <div class="settings-actions-row" style="margin-bottom:14px;">
+          <button class="btn btn-secondary btn-sm" id="btn-export-report-csv">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+            خروجی اکسل (CSV)
+          </button>
+          <button class="btn btn-secondary btn-sm" id="btn-print-report">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
+            چاپ گزارش
+          </button>
         </div>
 
         <!-- Sales report -->
@@ -2417,10 +2520,27 @@
           </div>
         </div>
 
+        <!-- Install / offline -->
+        <div class="panel">
+          <div class="panel-head">
+            <h2>نصب برنامه روی دستگاه</h2>
+            <span class="settings-badge" id="settings-install-badge">در حال بررسی…</span>
+          </div>
+          <p class="settings-hint">با نصب برنامه، آیکن آن در صفحه اصلی گوشی یا کامپیوتر ساخته می‌شود و برنامه <b>بدون اینترنت</b> هم کامل باز می‌شود. اطلاعات فروشگاه همیشه روی همین دستگاه ذخیره است.</p>
+          <div class="install-panel-row">
+            <button class="btn btn-primary btn-sm" id="btn-install-app" style="display:none;">نصب برنامه</button>
+            <span class="settings-hint" id="settings-install-hint" style="margin:0;"></span>
+          </div>
+        </div>
+
         <!-- Backup -->
         <div class="panel">
           <div class="panel-head"><h2>پشتیبان‌گیری از اطلاعات</h2></div>
           <p class="settings-hint">از تمام اطلاعات فروشگاه (قرض‌داران، محصولات، انبار، فروش‌ها و مصارف) یک فایل پشتیبان بگیرید یا از یک فایل قبلی بازیابی کنید.</p>
+          <div class="backup-meta" id="backup-meta">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            <span id="backup-meta-text">هنوز پشتیبانی گرفته نشده</span>
+          </div>
           <div class="settings-actions-row">
             <button class="btn btn-secondary btn-sm" id="btn-export-backup">دانلود نسخه پشتیبان</button>
             <button class="btn btn-secondary btn-sm" id="btn-import-backup">بازیابی از فایل</button>
@@ -2467,7 +2587,7 @@
         <!-- About -->
         <div class="panel" style="margin-bottom:0;">
           <div class="panel-head"><h2>درباره برنامه</h2></div>
-          <p class="settings-hint" style="margin-bottom:0;">توحید | مدیریت فروشگاه — نسخه ۳ب<br>تمام اطلاعات فقط روی همین دستگاه و در همین مرورگر ذخیره می‌شود.</p>
+          <p class="settings-hint" style="margin-bottom:0;">توحید | مدیریت فروشگاه — نسخه ۴ (قابل نصب و آفلاین)<br>تمام اطلاعات فقط روی همین دستگاه و در همین مرورگر ذخیره می‌شود؛ پس هر چند وقت یک‌بار نسخه پشتیبان بگیرید.</p>
         </div>
       </section>
 
@@ -5732,10 +5852,12 @@
     renderDebtorsReport();
     renderStockLedger();
   }
+  let currentReportTab = 'sales';
   document.getElementById('reports-tabs').addEventListener('click', (e)=>{
     const btn = e.target.closest('.seg-btn');
     if(!btn) return;
     const tab = btn.dataset.rtab;
+    currentReportTab = tab;
     document.querySelectorAll('#reports-tabs .seg-btn').forEach(b=> b.classList.toggle('active', b===btn));
     ['sales','products','debtors','stock'].forEach(t=>{
       document.getElementById('rtab-'+t).style.display = t===tab ? '' : 'none';
@@ -6810,6 +6932,7 @@
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
+    markBackupTaken();
     showToast('فایل پشتیبان دانلود شد');
   });
 
@@ -6911,7 +7034,12 @@
         stockMovements, priceHistory, auditLog
       }));
     }catch(e){ console.error('ذخیره اطلاعات ناموفق بود:', e); }
+    // شمارنده هشدارها بعد از هر تغییر داده تازه شود
+    // (alertsReady در انتهای اسکریپت true می‌شود تا در زمان بوت زودتر از تعریف صدا زده نشود)
+    if(alertsReady) renderAlerts();
   }
+
+  let alertsReady = false;
 
   function loadState(){
     try{
@@ -7128,6 +7256,396 @@
   window.addEventListener('hashchange', ()=>{
     goTo(location.hash.replace('#','') || 'dashboard');
   });
+
+
+  /* ==========================================================
+     بخش چهاردهم — چیزهایی که یک برنامه فروشگاهی لازم دارد:
+       ۱) مرکز هشدارها: موجودی کم/تمام‌شده، بدهی قرض‌داران و بدهی به تامین‌کننده‌ها
+       ۲) نصب روی دستگاه + کار کردن بدون اینترنت (PWA)
+       ۳) خروجی CSV و چاپ برای گزارشات
+       ۴) یادآوری پشتیبان‌گیری (چون داده‌ها فقط روی همین دستگاه است)
+  ========================================================== */
+
+  /* ---------- ۱) مرکز هشدارها ---------- */
+  const DEBT_STALE_DAYS = 30; // قرضی که این‌قدر روز حرکتی نداشته، یادآوری می‌شود
+
+  function daysSince(dateStr){
+    if(!dateStr) return null;
+    const d = new Date(dateStr + 'T00:00:00');
+    if(isNaN(d)) return null;
+    return Math.floor((Date.now() - d.getTime()) / 86400000);
+  }
+
+  function buildAlerts(){
+    const list = [];
+
+    // موجودی تمام‌شده
+    const outProducts = products.filter(p=> getStockStatus(p)==='out');
+    if(outProducts.length){
+      list.push({
+        tone:'danger', page:'products',
+        title:`${outProducts.length.toLocaleString('fa-IR')} کالا تمام شده است`,
+        sub: outProducts.slice(0,3).map(p=>p.name).join('، ') + (outProducts.length>3 ? ' و…' : '')
+      });
+    }
+
+    // موجودی کم
+    const lowProducts = products.filter(p=> getStockStatus(p)==='low');
+    if(lowProducts.length){
+      list.push({
+        tone:'warning', page:'products',
+        title:`${lowProducts.length.toLocaleString('fa-IR')} کالا رو به اتمام است`,
+        sub: lowProducts.slice(0,3).map(p=> `${p.name} (${formatMoney(getProductStock(p.id))} ${p.unit||''})`).join('، ') + (lowProducts.length>3 ? ' و…' : '')
+      });
+    }
+
+    // قرض‌های راکد
+    const staleDebtors = debtors
+      .map(d=>({ d, debt:getDebt(d.id), last:getLastTx(d.id) }))
+      .filter(x=> x.debt>0 && (daysSince(x.last && x.last.date) === null || daysSince(x.last.date) >= DEBT_STALE_DAYS));
+    if(staleDebtors.length){
+      const total = staleDebtors.reduce((s,x)=> s+x.debt, 0);
+      list.push({
+        tone:'danger', page:'debtors',
+        title:`${staleDebtors.length.toLocaleString('fa-IR')} قرض‌دار بیش از ${DEBT_STALE_DAYS.toLocaleString('fa-IR')} روز پرداختی نداشته`,
+        sub:`مجموع ${formatMoney(total)} افغانی — ${staleDebtors.slice(0,3).map(x=>x.d.name).join('، ')}${staleDebtors.length>3 ? ' و…' : ''}`
+      });
+    }
+
+    // بدهی به تامین‌کننده‌ها
+    const owed = suppliers.map(s=>({ s, debt:getSupplierDebt(s.id) })).filter(x=> x.debt>0);
+    if(owed.length){
+      const total = owed.reduce((a,x)=> a+x.debt, 0);
+      list.push({
+        tone:'warning', page:'purchasing',
+        title:`به ${owed.length.toLocaleString('fa-IR')} تامین‌کننده بدهکارید`,
+        sub:`مجموع ${formatMoney(total)} افغانی — ${owed.slice(0,3).map(x=>x.s.name).join('، ')}${owed.length>3 ? ' و…' : ''}`
+      });
+    }
+
+    // یادآوری پشتیبان‌گیری
+    const backupDays = daysSinceLastBackup();
+    if(backupDays === null){
+      list.push({
+        tone:'warning', page:'settings',
+        title:'هنوز نسخه پشتیبان نگرفته‌اید',
+        sub:'اطلاعات فقط روی همین دستگاه است؛ با پاک شدن مرورگر از بین می‌رود.'
+      });
+    } else if(backupDays >= BACKUP_REMIND_DAYS){
+      list.push({
+        tone:'warning', page:'settings',
+        title:`${backupDays.toLocaleString('fa-IR')} روز از آخرین پشتیبان‌گیری گذشته`,
+        sub:'برای اطمینان، یک نسخه پشتیبان تازه بگیرید.'
+      });
+    }
+
+    return list;
+  }
+
+  const ALERT_TONES = {
+    danger:  { bg:'var(--danger-tint)',  fg:'var(--danger)'  },
+    warning: { bg:'var(--warning-tint)', fg:'var(--warning)' },
+    success: { bg:'var(--success-tint)', fg:'var(--success)' }
+  };
+
+  function renderAlerts(){
+    const listEl = document.getElementById('alerts-list');
+    const badge = document.getElementById('alerts-badge');
+    const countText = document.getElementById('alerts-count-text');
+    if(!listEl) return;
+
+    const alerts = buildAlerts();
+    badge.textContent = alerts.length.toLocaleString('fa-IR');
+    badge.classList.toggle('show', alerts.length > 0);
+    countText.textContent = `${alerts.length.toLocaleString('fa-IR')} مورد`;
+
+    if(!alerts.length){
+      listEl.innerHTML = '<div class="alerts-empty">همه‌چیز مرتب است — هشداری وجود ندارد.</div>';
+      return;
+    }
+
+    listEl.innerHTML = alerts.map((a, i)=>{
+      const tone = ALERT_TONES[a.tone] || ALERT_TONES.warning;
+      return `<button type="button" class="alert-item" data-alert-page="${a.page}">
+        <span class="ai-dot" style="background:${tone.bg}; color:${tone.fg};">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
+        </span>
+        <span class="ai-body">
+          <span class="ai-title">${escapeHtml(a.title)}</span>
+          <span class="ai-sub">${escapeHtml(a.sub)}</span>
+        </span>
+      </button>`;
+    }).join('');
+  }
+
+  (function wireAlerts(){
+    const btn = document.getElementById('btn-alerts');
+    const panel = document.getElementById('alerts-panel');
+    if(!btn || !panel) return;
+
+    function closeAlerts(){
+      panel.classList.remove('open');
+      btn.setAttribute('aria-expanded','false');
+    }
+    btn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      const open = !panel.classList.contains('open');
+      if(open) renderAlerts();
+      panel.classList.toggle('open', open);
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+    panel.addEventListener('click', (e)=>{
+      const item = e.target.closest('[data-alert-page]');
+      if(!item) return;
+      closeAlerts();
+      goTo(item.dataset.alertPage);
+      history.replaceState(null,'','#'+item.dataset.alertPage);
+    });
+    // کلیک بیرون از پنل و کلید Esc آن را می‌بندد
+    document.addEventListener('click', (e)=>{
+      if(panel.classList.contains('open') && !panel.contains(e.target) && !btn.contains(e.target)) closeAlerts();
+    });
+    document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') closeAlerts(); });
+  })();
+
+  /* ---------- ۲) نصب روی دستگاه + کار بدون اینترنت ---------- */
+  (function initPWA(){
+    const badge = document.getElementById('settings-install-badge');
+    const installBtn = document.getElementById('btn-install-app');
+    const hint = document.getElementById('settings-install-hint');
+    const offlineBadge = document.getElementById('offline-badge');
+
+    function setOffline(){
+      if(offlineBadge) offlineBadge.classList.toggle('show', !navigator.onLine);
+    }
+    setOffline();
+    window.addEventListener('online', ()=>{ setOffline(); showToast('اینترنت وصل شد'); });
+    window.addEventListener('offline', ()=>{ setOffline(); showToast('اینترنت قطع شد — برنامه آفلاین کار می‌کند', 'warning'); });
+
+    // Service Worker فقط روی https یا localhost کار می‌کند (نه با باز کردن مستقیم فایل)
+    const canServiceWorker = 'serviceWorker' in navigator &&
+      (location.protocol==='https:' || location.hostname==='localhost' || location.hostname==='127.0.0.1');
+
+    if(canServiceWorker){
+      window.addEventListener('load', ()=>{
+        navigator.serviceWorker.register('sw.js').catch((err)=>{
+          console.warn('ثبت Service Worker ناموفق بود:', err);
+        });
+      });
+    }
+
+    const isInstalled = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+    if(badge){
+      if(isInstalled){
+        badge.textContent = 'نصب شده';
+        badge.classList.remove('warn');
+      } else if(canServiceWorker){
+        badge.textContent = 'آماده نصب';
+        badge.classList.remove('warn');
+      } else {
+        badge.textContent = 'نیازمند میزبانی روی سرور';
+        badge.classList.add('warn');
+      }
+    }
+    if(hint){
+      if(isInstalled) hint.textContent = 'برنامه روی این دستگاه نصب شده و بدون اینترنت باز می‌شود.';
+      else if(!canServiceWorker) hint.textContent = 'برای نصب و کارکرد آفلاین، برنامه باید از یک آدرس https (یا localhost) باز شود، نه با باز کردن مستقیم فایل.';
+      else hint.textContent = 'اگر دکمه نصب دیده نمی‌شود، از منوی مرورگر گزینه «افزودن به صفحه اصلی» را بزنید.';
+    }
+
+    let deferredPrompt = null;
+    window.addEventListener('beforeinstallprompt', (e)=>{
+      e.preventDefault();
+      deferredPrompt = e;
+      if(installBtn) installBtn.style.display = '';
+      if(hint) hint.textContent = 'برنامه آماده نصب روی این دستگاه است.';
+    });
+
+    if(installBtn){
+      installBtn.addEventListener('click', async ()=>{
+        if(!deferredPrompt) return;
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        deferredPrompt = null;
+        installBtn.style.display = 'none';
+        if(outcome==='accepted'){
+          showToast('برنامه روی دستگاه نصب شد');
+          if(badge){ badge.textContent = 'نصب شده'; badge.classList.remove('warn'); }
+        }
+      });
+    }
+
+    window.addEventListener('appinstalled', ()=>{
+      if(installBtn) installBtn.style.display = 'none';
+      if(badge){ badge.textContent = 'نصب شده'; badge.classList.remove('warn'); }
+      if(hint) hint.textContent = 'برنامه روی این دستگاه نصب شده و بدون اینترنت باز می‌شود.';
+    });
+  })();
+
+  /* ---------- ۳) خروجی CSV و چاپ گزارشات ---------- */
+  function csvCell(v){
+    const s = String(v === undefined || v === null ? '' : v);
+    return /[",\n;]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
+  }
+  function downloadCsv(filename, rows){
+    // BOM لازم است تا اکسل، متن فارسی را درست نشان دهد
+    const body = rows.map(r=> r.map(csvCell).join(',')).join('\r\n');
+    const blob = new Blob(['﻿' + body], { type:'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function reportRangeDates(){
+    const range = document.getElementById('rep-sales-range').value;
+    const today = todayISO();
+    if(range==='custom'){
+      return {
+        from: document.getElementById('rep-sales-from').value || today,
+        to:   document.getElementById('rep-sales-to').value   || today
+      };
+    }
+    const d = new Date();
+    if(range==='today') return { from: today, to: today };
+    if(range==='week'){ d.setDate(d.getDate()-6); return { from: d.toISOString().slice(0,10), to: today }; }
+    d.setDate(1);
+    return { from: d.toISOString().slice(0,10), to: today };
+  }
+
+  function buildReportCsvRows(tab){
+    if(tab==='sales'){
+      const { from, to } = reportRangeDates();
+      const rows = [['شماره فاکتور','تاریخ','مبلغ کل','تخفیف','مبلغ نهایی','پرداختی','باقی‌مانده','روش پرداخت','وضعیت']];
+      sales
+        .filter(s=> s.date>=from && s.date<=to)
+        .sort((a,b)=> a.createdAt-b.createdAt)
+        .forEach(s=>{
+          rows.push([
+            s.invoiceNumber || '', s.date,
+            Math.round(s.total||0), Math.round(s.discount||0), Math.round(s.finalTotal||0),
+            Math.round(s.paidAmount||0), Math.round(s.remaining||0),
+            s.paymentMethod==='credit' ? 'نسیه' : 'نقدی',
+            s.status==='cancelled' ? 'لغو‌شده' : 'ثبت‌شده'
+          ]);
+        });
+      return { rows, name:`گزارش-فروش-${from}-تا-${to}` };
+    }
+
+    if(tab==='products'){
+      const rows = [['نام محصول','دسته','واحد','قیمت خرید','قیمت فروش','موجودی','حداقل موجودی','وضعیت','تعداد فروخته‌شده','سود']];
+      products.forEach(p=>{
+        const stock = getProductStock(p.id);
+        rows.push([
+          p.name, p.category||'', p.unit||'',
+          Math.round(p.purchasePrice||0), Math.round(p.salePrice||0),
+          stock, p.minStock||0, stockStatusLabel(getStockStatus(p)),
+          getSoldQty(p.id), Math.round(computeProductProfit(p.id).profit)
+        ]);
+      });
+      return { rows, name:`گزارش-محصولات-${todayISO()}` };
+    }
+
+    if(tab==='debtors'){
+      const rows = [['نام قرض‌دار','شماره تماس','بدهی','تاریخ آخرین تراکنش','یادداشت']];
+      debtors.forEach(d=>{
+        const last = getLastTx(d.id);
+        rows.push([d.name, d.phone||'', Math.round(getDebt(d.id)), last ? last.date : '', d.notes||'']);
+      });
+      return { rows, name:`گزارش-قرض‌داران-${todayISO()}` };
+    }
+
+    // گردش موجودی
+    const filterId = document.getElementById('rep-stock-product-filter').value;
+    const rows = [['تاریخ','محصول','نوع حرکت','تعداد','توضیحات']];
+    stockMovements
+      .filter(m=> !filterId || m.productId===filterId)
+      .sort((a,b)=> a.createdAt-b.createdAt)
+      .forEach(m=>{
+        const p = products.find(x=>x.id===m.productId);
+        rows.push([m.date, p ? p.name : '(حذف‌شده)', STOCK_MOVEMENT_LABELS[m.type] || m.type, m.qty, m.notes||'']);
+      });
+    return { rows, name:`گردش-موجودی-${todayISO()}` };
+  }
+
+  document.getElementById('btn-export-report-csv').addEventListener('click', ()=>{
+    const { rows, name } = buildReportCsvRows(currentReportTab);
+    if(rows.length <= 1){ showToast('در این گزارش داده‌ای برای خروجی وجود ندارد', 'warning'); return; }
+    downloadCsv(name + '.csv', rows);
+    showToast(`خروجی CSV با ${(rows.length-1).toLocaleString('fa-IR')} سطر دانلود شد`);
+  });
+
+  document.getElementById('btn-print-report').addEventListener('click', ()=>{
+    const { rows, name } = buildReportCsvRows(currentReportTab);
+    if(rows.length <= 1){ showToast('در این گزارش داده‌ای برای چاپ وجود ندارد', 'warning'); return; }
+    const head = rows[0].map(h=> `<th>${escapeHtml(String(h))}</th>`).join('');
+    const body = rows.slice(1).map(r=> '<tr>' + r.map(c=> `<td>${escapeHtml(String(c))}</td>`).join('') + '</tr>').join('');
+    const store = (appSettings.storeName || 'توحید');
+    const win = window.open('', '_blank');
+    if(!win){ showToast('مرورگر پنجره چاپ را مسدود کرد', 'danger'); return; }
+    win.document.write(`<!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="UTF-8"><title>${escapeHtml(name)}</title>
+      <style>
+        body{font-family:'Vazirmatn',Tahoma,sans-serif; padding:20px; color:#1a2233;}
+        h1{font-size:17px; margin:0 0 4px;}
+        p{font-size:12px; color:#7c8698; margin:0 0 14px;}
+        table{width:100%; border-collapse:collapse; font-size:12px;}
+        th,td{border:1px solid #d8dee9; padding:6px 8px; text-align:start;}
+        th{background:#eef2fa; font-weight:700;}
+        tr:nth-child(even) td{background:#fafbfe;}
+      </style></head><body>
+      <h1>${escapeHtml(store)} — ${escapeHtml(name.replace(/-/g,' '))}</h1>
+      <p>تاریخ چاپ: ${new Date().toLocaleDateString('fa-IR')}</p>
+      <table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>
+      </body></html>`);
+    win.document.close();
+    win.focus();
+    win.print();
+  });
+
+  /* ---------- ۴) یادآوری پشتیبان‌گیری ---------- */
+  const LAST_BACKUP_KEY = 'tohid-shop-last-backup';
+  const BACKUP_REMIND_DAYS = 7;
+
+  function markBackupTaken(){
+    try{ localStorage.setItem(LAST_BACKUP_KEY, todayISO()); }catch(e){}
+    renderBackupMeta();
+    renderAlerts();
+  }
+  function daysSinceLastBackup(){
+    let last = null;
+    try{ last = localStorage.getItem(LAST_BACKUP_KEY); }catch(e){}
+    if(!last) return null;
+    return daysSince(last);
+  }
+  function renderBackupMeta(){
+    const wrap = document.getElementById('backup-meta');
+    const text = document.getElementById('backup-meta-text');
+    if(!wrap || !text) return;
+    const days = daysSinceLastBackup();
+    wrap.classList.remove('warn','ok');
+    if(days === null){
+      text.textContent = 'هنوز پشتیبانی گرفته نشده — اطلاعات فقط روی همین دستگاه است.';
+      wrap.classList.add('warn');
+    } else if(days === 0){
+      text.textContent = 'آخرین پشتیبان‌گیری: امروز';
+      wrap.classList.add('ok');
+    } else if(days < BACKUP_REMIND_DAYS){
+      text.textContent = `آخرین پشتیبان‌گیری: ${days.toLocaleString('fa-IR')} روز پیش`;
+      wrap.classList.add('ok');
+    } else {
+      text.textContent = `آخرین پشتیبان‌گیری: ${days.toLocaleString('fa-IR')} روز پیش — بهتر است نسخه تازه بگیرید.`;
+      wrap.classList.add('warn');
+    }
+  }
+
+  alertsReady = true;
+  renderBackupMeta();
+  renderAlerts();
+
 
   goTo(location.hash.replace('#','') || 'dashboard');
 </script>
