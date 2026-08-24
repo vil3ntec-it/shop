@@ -17,6 +17,16 @@
 (function () {
   'use strict';
 
+  /* ----------------------------------------------------------
+     کلید اصلی: اجرای محدودیت اشتراک
+     false = برنامه دقیقاً مثل قبل کار می‌کند، هیچ قابلیتی قفل نمی‌شود.
+             (لایه اشتراک بارگذاری می‌شود ولی چیزی را نمی‌بندد.)
+     true  = قابلیت‌ها بر اساس License امضاشده قفل/باز می‌شوند.
+
+     تا وقتی روی نسخه اندروید کار نکرده‌ای، این را false بگذار.
+     ---------------------------------------------------------- */
+  const LICENSE_ENFORCED = false;
+
   // ---------- پیکربندی ----------
   const CFG = {
     // کلید عمومی سرور (خروجی `npm run generate-keys`، قالب base64 SPKI).
@@ -277,6 +287,7 @@
   };
 
   function hasFeature(key) {
+    if (!LICENSE_ENFORCED) return true;        // اجرا خاموش است — همه چیز باز
     if (State.core.includes(key)) return true;
     return State.features.includes(key);
   }
@@ -530,6 +541,20 @@
 
     apply() {
       const root = document.documentElement;
+      if (!LICENSE_ENFORCED) {
+        // هر اثری که قبلاً گذاشته شده پاک شود تا برنامه کاملاً آزاد باشد
+        root.removeAttribute('data-lic-state');
+        root.removeAttribute('data-lic-locked');
+        Object.keys(FEATURE_LABELS).forEach(k => root.classList.remove('lic-lock-' + k));
+        $$('.lic-overlay').forEach(el => el.remove());
+        $$('[data-lic-feature]').forEach(el => {
+          el.classList.remove('lic-locked-el');
+          el.removeAttribute('data-lic-feature');
+        });
+        const bar = $('#lic-banner');
+        if (bar) bar.remove();
+        return;
+      }
       const locked = Gate.lockedFeatures();
 
       root.setAttribute('data-lic-state', State.state);
@@ -868,6 +893,7 @@
 
   // ---------- همگام‌سازی خودکار ----------
   async function autoSync(reason) {
+    if (!LICENSE_ENFORCED) return;
     const st = readStore();
     if (!st.accessToken || !getServerUrl()) return;
     if (!navigator.onLine) return;
@@ -908,6 +934,7 @@
 
   // ---------- API عمومی ----------
   window.TohidLicense = {
+    get enforced() { return LICENSE_ENFORCED; },
     get state() { return State; },
     hasFeature, onChange,
     open: (label) => UI.open(label),
