@@ -35,6 +35,7 @@
 <link rel="icon" href="icons/icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="stylesheet" href="license/license-ui.css">
+<link rel="stylesheet" href="license/shop-ui.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <!-- فونت به‌صورت غیرمسدودکننده بارگذاری می‌شود تا نبودِ اینترنت باز شدن برنامه را کند نکند -->
@@ -4506,6 +4507,25 @@
   function getProductCartons(productId){
     return warehouseEntries.filter(w=>w.productId===productId).reduce((s,w)=> s + (w.cartons||0), 0);
   }
+  /**
+   * پیام روشن وقتی موجودی کم می‌آید.
+   * اگر دکان مشترک باشد و کس دیگری همان کالا را فروخته باشد، اسمش را می‌گوید —
+   * چون گیج‌کننده‌ترین حالت همین است: جنس در دکان هست ولی برنامه می‌گوید نیست.
+   */
+  function stockShortMessage(product, wanted, available){
+    const u = product.unit ? ' '+product.unit : '';
+    try{
+      if(window.TohidShop){
+        const sh = window.TohidShop.findShortages().find(x=>x.productId===product.id);
+        if(sh) return window.TohidShop.shortageMessage(sh);
+      }
+    }catch(e){}
+    if(available<=0){
+      return `«${product.name}» در برنامه موجودی ندارد. اگر جنس در دکان هست، اول ورودی انبار را ثبت کنید.`;
+    }
+    return `«${product.name}»: ${formatMoney(available)}${u} موجود است، شما ${formatMoney(wanted)}${u} خواستید.`;
+  }
+
   function getStockStatus(product){
     const stock = getProductStock(product.id);
     if(stock<=0) return 'out';
@@ -6596,7 +6616,7 @@
       if(!p) continue;
       const available = getProductStock(p.id);
       if(item.quantity>available){
-        showToast(`موجودی «${p.name}» کافی نیست (موجودی: ${formatMoney(available)})`, 'danger');
+        showToast(stockShortMessage(p, item.quantity, available), 'danger');
         closeModal('modal-sale-checkout');
         return;
       }
@@ -7716,6 +7736,8 @@
 
 <!-- لایه اشتراک و License — کاملاً افزودنی؛ منطق فروشگاه را تغییر نمی‌دهد -->
 <script src="license/license-client.js" defer></script>
+<script src="license/shop-sync.js" defer></script>
+<script src="license/shop-ui.js" defer></script>
 
 </body>
 </html>

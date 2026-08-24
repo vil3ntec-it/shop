@@ -138,3 +138,75 @@ CREATE TABLE IF NOT EXISTS login_attempts (
   created_at  INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_attempts ON login_attempts(scope, identifier, created_at DESC);
+
+-- ============================================================
+--  حساب مشترک دکان و همگام‌سازی چنددستگاهی
+-- ============================================================
+
+-- ---------- دکان‌ها ----------
+CREATE TABLE IF NOT EXISTS shops (
+  id           TEXT PRIMARY KEY,
+  name         TEXT NOT NULL DEFAULT '',
+  owner_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  max_members  INTEGER NOT NULL DEFAULT 5,
+  created_at   INTEGER NOT NULL,
+  updated_at   INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_shops_owner ON shops(owner_id);
+
+-- ---------- اعضای دکان ----------
+-- role: owner = صاحب دکان (همه‌کاره) | staff = شاگرد
+CREATE TABLE IF NOT EXISTS shop_members (
+  shop_id    TEXT NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+  user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  role       TEXT NOT NULL DEFAULT 'staff' CHECK (role IN ('owner','staff')),
+  status     TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','removed')),
+  joined_at  INTEGER NOT NULL,
+  PRIMARY KEY (shop_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_members_user ON shop_members(user_id);
+
+-- ---------- کدهای دعوت ----------
+CREATE TABLE IF NOT EXISTS shop_invites (
+  code        TEXT PRIMARY KEY,
+  shop_id     TEXT NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+  created_by  TEXT NOT NULL,
+  role        TEXT NOT NULL DEFAULT 'staff' CHECK (role IN ('owner','staff')),
+  expires_at  INTEGER NOT NULL,
+  used_by     TEXT,
+  used_at     INTEGER,
+  created_at  INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_invites_shop ON shop_invites(shop_id);
+
+-- ---------- رکوردهای همگام‌شونده ----------
+-- هر ردیف یک رکورد از برنامه است (یک فروش، یک محصول، یک مصرف …).
+-- rev یک شمارنده‌ی سراسری در هر دکان است؛ دستگاه‌ها فقط رکوردهای
+-- با rev بزرگ‌تر از آخرین rev دیده‌شده را می‌گیرند (همگام‌سازی تفاضلی).
+CREATE TABLE IF NOT EXISTS shop_records (
+  shop_id     TEXT NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+  collection  TEXT NOT NULL,          -- products | sales | saleItems | …
+  record_id   TEXT NOT NULL,
+  rev         INTEGER NOT NULL,       -- شماره‌ی سراسری تغییر در این دکان
+  updated_at  INTEGER NOT NULL,       -- زمان ویرایش سمت کلاینت (برای حل تعارض)
+  deleted     INTEGER NOT NULL DEFAULT 0,
+  device_id   TEXT NOT NULL DEFAULT '',
+  user_id     TEXT NOT NULL DEFAULT '',
+  data        TEXT NOT NULL DEFAULT '{}',
+  PRIMARY KEY (shop_id, collection, record_id)
+);
+CREATE INDEX IF NOT EXISTS idx_records_rev ON shop_records(shop_id, rev);
+
+-- ---------- شمارنده‌ی rev هر دکان ----------
+CREATE TABLE IF NOT EXISTS shop_rev (
+  shop_id   TEXT PRIMARY KEY REFERENCES shops(id) ON DELETE CASCADE,
+  last_rev  INTEGER NOT NULL DEFAULT 0
+);
+
+-- ---------- تنظیمات مشترک دکان (تک‌مقداری) ----------
+CREATE TABLE IF NOT EXISTS shop_settings (
+  shop_id     TEXT PRIMARY KEY REFERENCES shops(id) ON DELETE CASCADE,
+  data        TEXT NOT NULL DEFAULT '{}',
+  rev         INTEGER NOT NULL DEFAULT 0,
+  updated_at  INTEGER NOT NULL
+);

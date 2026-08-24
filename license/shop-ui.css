@@ -1,0 +1,142 @@
+/* ==========================================================
+   دکان مشترک و همگام‌سازی — استایل‌ها
+   همه با پیشوند sync-/shop-/member- تا با برنامه تداخل نکنند.
+   ========================================================== */
+
+/* ---------- نوار پایین صفحه ---------- */
+#sync-toast{
+  position:fixed; z-index:130; inset-inline:14px; bottom:14px;
+  padding:11px 15px; border-radius:var(--radius-md,14px);
+  background:var(--text,#1a2233); color:#fff;
+  font-size:12.5px; font-weight:600; line-height:1.7;
+  box-shadow:0 12px 30px -12px rgba(10,20,50,.5);
+  opacity:0; transform:translateY(12px); pointer-events:none;
+  transition:opacity .2s ease, transform .2s ease;
+}
+#sync-toast.show{ opacity:1; transform:translateY(0); }
+#sync-toast.bad{ background:var(--danger,#e54b4b); }
+@media (min-width:900px){ #sync-toast{ inset-inline-start:auto; max-width:420px; } }
+@media (max-width:899px){ #sync-toast{ bottom:calc(var(--bottomnav-h,66px) + 12px); } }
+
+#sync-reload-bar, #stock-alert-bar{
+  position:fixed; z-index:75; inset-inline:12px; bottom:12px;
+  display:none; align-items:center; justify-content:space-between; gap:12px;
+  padding:10px 14px; border-radius:var(--radius-md,14px);
+  font-size:12.5px; font-weight:600; line-height:1.7;
+  box-shadow:var(--shadow-md,0 6px 20px -8px rgba(30,50,110,.15));
+}
+#sync-reload-bar.show, #stock-alert-bar.show{ display:flex; }
+#sync-reload-bar{ background:var(--primary-tint,#eaf0ff); color:var(--primary-dark,#1f3f9e); }
+#stock-alert-bar{ background:var(--danger-tint,#fdecec); color:var(--danger,#e54b4b); }
+#stock-alert-bar .sa-head{ display:flex; align-items:center; justify-content:space-between; gap:12px; width:100%; }
+@media (min-width:900px){
+  #sync-reload-bar, #stock-alert-bar{ inset-inline-start:auto; max-width:520px; }
+}
+@media (max-width:899px){
+  #sync-reload-bar, #stock-alert-bar{ bottom:calc(var(--bottomnav-h,66px) + 10px); }
+  #stock-alert-bar{ bottom:calc(var(--bottomnav-h,66px) + 62px); }
+}
+
+/* ---------- دکمه ---------- */
+.sync-btn{
+  display:inline-flex; align-items:center; justify-content:center; gap:6px;
+  padding:9px 16px; border:none; border-radius:var(--radius-sm,10px);
+  background:var(--primary,#2c5ce6); color:#fff;
+  font-family:inherit; font-size:13px; font-weight:700; cursor:pointer;
+}
+.sync-btn:hover{ background:var(--primary-dark,#1f3f9e); }
+.sync-btn:disabled{ opacity:.6; cursor:default; }
+.sync-btn-block{ width:100%; margin-top:10px; }
+.sync-btn-sm{ padding:5px 11px; font-size:11.5px; }
+.sync-btn-ghost{ background:var(--surface-2,#eef2fa); color:var(--text,#1a2233); }
+.sync-btn-ghost:hover{ background:var(--border,#e5eaf3); }
+.sync-btn-danger{ background:var(--danger,#e54b4b); }
+
+/* ---------- پنجره ---------- */
+.sync-scrim{
+  position:fixed; inset:0; z-index:125; display:none;
+  align-items:center; justify-content:center; padding:16px;
+  background:rgba(12,18,32,.55);
+}
+.sync-scrim.open{ display:flex; }
+.sync-box{
+  width:100%; max-width:430px; max-height:90vh; overflow-y:auto;
+  background:var(--bg,#fff); border:1px solid var(--border,#e5eaf3);
+  border-radius:var(--radius-lg,20px);
+  box-shadow:0 20px 60px -20px rgba(10,20,50,.45);
+}
+.sync-head{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:16px 18px; border-bottom:1px solid var(--border,#e5eaf3);
+}
+.sync-head h3{ font-size:15px; font-weight:800; color:var(--text,#1a2233); }
+.sync-close{
+  border:none; background:transparent; cursor:pointer;
+  font-size:22px; line-height:1; color:var(--muted,#7c8698); padding:0 4px;
+}
+.sync-body{ padding:16px 18px 20px; }
+.sync-section{ margin-bottom:18px; }
+.sync-label{
+  display:block; font-size:12px; font-weight:700;
+  color:var(--muted,#7c8698); margin:10px 0 5px;
+}
+.sync-input{
+  width:100%; padding:9px 11px; font-family:inherit; font-size:13px;
+  color:var(--text,#1a2233); background:var(--surface,#f6f8fc);
+  border:1.5px solid var(--border,#e5eaf3); border-radius:var(--radius-sm,10px); outline:none;
+}
+.sync-input:focus{ border-color:var(--primary,#2c5ce6); }
+.sync-hint{ font-size:11.5px; color:var(--muted,#7c8698); margin-top:6px; line-height:1.8; }
+
+.sync-tabs{ display:flex; gap:6px; margin-bottom:6px; }
+.sync-tab{
+  flex:1; padding:8px; border:1.5px solid var(--border,#e5eaf3);
+  border-radius:var(--radius-sm,10px); background:var(--surface,#f6f8fc);
+  color:var(--muted,#7c8698); font-family:inherit; font-size:12.5px; font-weight:700; cursor:pointer;
+}
+.sync-tab-on{ background:var(--primary,#2c5ce6); border-color:var(--primary,#2c5ce6); color:#fff; }
+
+.sync-status{
+  padding:12px 14px; margin-bottom:16px;
+  background:var(--surface,#f6f8fc); border-radius:var(--radius-md,14px);
+}
+.sync-row{
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  font-size:12.5px; padding:4px 0; color:var(--muted,#7c8698);
+}
+.sync-row b{ color:var(--text,#1a2233); font-weight:700; }
+.sync-row-between{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+
+.sync-or{
+  text-align:center; font-size:11.5px; color:var(--muted,#7c8698);
+  margin:14px 0 4px; position:relative;
+}
+.sync-msg{ padding:10px 12px; border-radius:var(--radius-sm,10px); font-size:12.5px; line-height:1.8; margin-top:8px; }
+.sync-msg-ok{ background:var(--success-tint,#e8f8f1); color:var(--success,#18a06b); }
+.sync-msg-bad{ background:var(--danger-tint,#fdecec); color:var(--danger,#e54b4b); }
+
+/* ---------- اعضا ---------- */
+.member-row{
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  padding:9px 0; border-bottom:1px dashed var(--border,#e5eaf3);
+}
+.member-row b{ display:block; font-size:12.5px; font-weight:700; color:var(--text,#1a2233); }
+.member-row span{ font-size:11.5px; color:var(--muted,#7c8698); }
+
+.invite-code{
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  margin-top:10px; padding:12px 14px;
+  background:var(--primary-tint,#eaf0ff); border-radius:var(--radius-sm,10px);
+}
+.invite-code span{
+  font-size:19px; font-weight:800; letter-spacing:2px;
+  color:var(--primary-dark,#1f3f9e); direction:ltr;
+}
+
+/* ---------- کسری موجودی ---------- */
+.shortage-item{
+  padding:11px 12px; margin-bottom:9px;
+  background:var(--danger-tint,#fdecec); border-radius:var(--radius-sm,10px);
+}
+.shortage-item b{ display:block; font-size:13px; font-weight:800; color:var(--danger,#e54b4b); margin-bottom:3px; }
+.shortage-item span{ display:block; font-size:12.5px; color:var(--text,#1a2233); line-height:1.9; }

@@ -55,6 +55,7 @@ async function createApp() {
   const api = express.Router();
   api.use('/auth', require('./routes/auth'));
   api.use('/license', require('./routes/license'));
+  api.use('/shop', require('./routes/shop'));
   api.use('/admin', require('./routes/admin'));
 
   /**
