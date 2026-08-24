@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  فقط پایگاه‌داده‌ی دکان پشتیبان گرفته می‌شود.
+  توکن‌ها در sharedpref رمزشده‌اند و به کلید همان دستگاه بسته‌اند،
+  پس اصلاً وارد پشتیبان نمی‌شوند (چون sharedpref include نشده است).
+-->
 <full-backup-content>
     <include domain="database" path="." />
-    <exclude domain="sharedpref" path="tohid_secure_prefs.xml" />
 </full-backup-content>

@@ -2,7 +2,6 @@
 <data-extraction-rules>
     <cloud-backup>
         <include domain="database" path="." />
-        <exclude domain="sharedpref" path="tohid_secure_prefs.xml" />
     </cloud-backup>
     <device-transfer>
         <include domain="database" path="." />
