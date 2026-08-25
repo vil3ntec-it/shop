@@ -34,9 +34,9 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
-<link rel="stylesheet" href="license/license-ui.css">
-<link rel="stylesheet" href="license/shop-ui.css">
-<link rel="stylesheet" href="license/vip.css">
+<link rel="stylesheet" href="license/license-ui.css?v=9">
+<link rel="stylesheet" href="license/shop-ui.css?v=9">
+<link rel="stylesheet" href="license/vip.css?v=9">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <!-- فونت به‌صورت غیرمسدودکننده بارگذاری می‌شود تا نبودِ اینترنت باز شدن برنامه را کند نکند -->
@@ -827,6 +827,15 @@
   .rc-row-amount{font-size:13px; font-weight:800; flex-shrink:0;}
   .rc-row.receive .rc-row-amount{color:var(--success);}
   .rc-row.expense .rc-row-amount{color:var(--warning);}
+
+  /* شماره‌ی نسخه‌ی واقعیِ در حال اجرا — تا معلوم باشد کدام نسخه بالا آمده */
+  .build-stamp{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    margin-top:12px; padding:9px 12px; border-radius:var(--radius-sm);
+    background:var(--surface); font-size:12px;
+  }
+  .build-stamp span{color:var(--muted); font-weight:600;}
+  .build-stamp b{font-weight:800; color:var(--text); letter-spacing:.4px;}
   .checkout-summary-row{display:flex; justify-content:space-between; align-items:center; padding:8px 2px; font-size:13px; color:var(--text-2, var(--text)); border-bottom:1px dashed var(--border);}
   .checkout-summary-row.total{font-size:15px; font-weight:700; color:var(--text); border-bottom:none;}
   .checkout-summary-row b{color:var(--text);}
@@ -3060,7 +3069,12 @@
         <!-- About -->
         <div class="panel" style="margin-bottom:0;">
           <div class="panel-head"><h2>درباره برنامه</h2></div>
-          <p class="settings-hint" style="margin-bottom:0;">توحید | مدیریت فروشگاه — نسخه ۴ (قابل نصب و آفلاین)<br>تمام اطلاعات فقط روی همین دستگاه و در همین مرورگر ذخیره می‌شود؛ پس هر چند وقت یک‌بار نسخه پشتیبان بگیرید.</p>
+          <p class="settings-hint">توحید | مدیریت فروشگاه — نسخه ۴ (قابل نصب و آفلاین)<br>تمام اطلاعات فقط روی همین دستگاه و در همین مرورگر ذخیره می‌شود؛ پس هر چند وقت یک‌بار نسخه پشتیبان بگیرید.</p>
+          <div class="build-stamp">
+            <span>نسخه‌ی نصب‌شده</span>
+            <b id="build-id">—</b>
+          </div>
+          <button class="btn btn-secondary btn-sm" id="btn-force-refresh" style="margin-top:10px;">دریافت آخرین نسخه</button>
         </div>
       </section>
 
@@ -4703,6 +4717,32 @@
   document.getElementById('acc-month').addEventListener('change', (e)=>{
     accMonth = e.target.value; renderAccountPage(currentAccountDebtorId);
   });
+
+/* ---- شماره‌ی نسخه و گرفتن اجباری آخرین نسخه ---- */
+  const APP_BUILD = 'v9';
+  (function showBuild(){
+    const el = document.getElementById('build-id');
+    if(el) el.textContent = APP_BUILD;
+    const btn = document.getElementById('btn-force-refresh');
+    if(!btn) return;
+    btn.addEventListener('click', async ()=>{
+      btn.disabled = true;
+      btn.textContent = 'در حال گرفتن…';
+      try{
+        // کش‌های برنامه پاک شوند تا هیچ فایل قدیمی نماند
+        if(window.caches){
+          const keys = await caches.keys();
+          await Promise.all(keys.map(k=> caches.delete(k)));
+        }
+        if(navigator.serviceWorker){
+          const regs = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(regs.map(r=> r.unregister()));
+        }
+      }catch(e){ /* اگر مرورگر اجازه نداد، باز هم صفحه را تازه می‌کنیم */ }
+      // اطلاعات دکان در localStorage است و با این کار پاک نمی‌شود
+      location.replace(location.pathname + '?fresh=' + Date.now());
+    });
+  })();
 
   function openAccount(id){
     accYear = ''; accMonth = '';   // هر قرض‌دار از حالت «همه» شروع شود
@@ -8929,10 +8969,10 @@
 </script>
 
 <!-- لایه اشتراک و License — کاملاً افزودنی؛ منطق فروشگاه را تغییر نمی‌دهد -->
-<script src="license/license-client.js" defer></script>
-<script src="license/shop-sync.js" defer></script>
-<script src="license/shop-ui.js" defer></script>
-<script src="license/vip.js" defer></script>
+<script src="license/license-client.js?v=9" defer></script>
+<script src="license/shop-sync.js?v=9" defer></script>
+<script src="license/shop-ui.js?v=9" defer></script>
+<script src="license/vip.js?v=9" defer></script>
 
 </body>
 </html>

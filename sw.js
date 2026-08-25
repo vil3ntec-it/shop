@@ -86,16 +86,23 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // ---- بقیه فایل‌های خودِ برنامه: اول کش، بعد شبکه ----
+  /*
+   * بقیه فایل‌های خودِ برنامه: کش را فوری بده تا صفحه سریع باز شود، ولی
+   * هم‌زمان نسخه‌ی تازه را از شبکه بگیر و جای آن بگذار. قبلاً فقط «اول کش»
+   * بود و یک فایل کش‌شده تا عوض شدن نسخه‌ی سرویس‌ورکر هرگز تازه نمی‌شد.
+   */
   if (url.origin === self.location.origin) {
     event.respondWith(
-      caches.match(req).then((hit) => hit || fetch(req).then((res) => {
-        if (res && res.ok) {
-          const copy = res.clone();
-          caches.open(SHELL_CACHE).then((c) => c.put(req, copy)).catch(() => {});
-        }
-        return res;
-      }))
+      caches.match(req).then((hit) => {
+        const fresh = fetch(req).then((res) => {
+          if (res && res.ok) {
+            const copy = res.clone();
+            caches.open(SHELL_CACHE).then((c) => c.put(req, copy)).catch(() => {});
+          }
+          return res;
+        }).catch(() => hit);
+        return hit || fresh;
+      })
     );
   }
 });
