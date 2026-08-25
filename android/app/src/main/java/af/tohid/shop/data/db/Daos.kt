@@ -85,6 +85,7 @@ interface ReturnDao {
 @Dao
 interface DebtorDao {
     @Query("SELECT * FROM debtors ORDER BY name") fun observeAll(): Flow<List<DebtorEntity>>
+    @Query("SELECT * FROM debtors ORDER BY name") suspend fun allOnce(): List<DebtorEntity>
     @Query("SELECT * FROM debtors WHERE id = :id") suspend fun byId(id: String): DebtorEntity?
     @Query("SELECT * FROM debtors WHERE dirty = 1") suspend fun dirty(): List<DebtorEntity>
     @Upsert suspend fun upsert(item: DebtorEntity)

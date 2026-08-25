@@ -15,6 +15,9 @@ interface TohidApi {
     @POST("api/v1/shop/join") suspend fun joinShop(@Body body: JoinShopRequest): ShopWrapper
     @POST("api/v1/shop/invite") suspend fun invite(@Body body: InviteRequest): InviteResponse
 
+    @GET("api/v1/billing/status") suspend fun entitlement(): EntitlementResponse
+    @GET("api/v1/billing/plans") suspend fun plans(): PlansResponse
+
     @POST("api/v1/shop/sync/push") suspend fun push(@Body body: PushRequest): PushResponse
     @GET("api/v1/shop/sync/pull") suspend fun pull(
         @Query("since") since: Long,

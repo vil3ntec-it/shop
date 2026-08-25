@@ -70,3 +70,37 @@ import kotlinx.serialization.json.JsonElement
 
 @Serializable data class ApiErrorBody(val error: ApiErrorDetail? = null)
 @Serializable data class ApiErrorDetail(val code: String = "", val message: String = "")
+
+// ---------- دسترسی و اشتراک ----------
+@Serializable data class TrialDto(
+    val used: Boolean = false, val active: Boolean = false,
+    val startedAt: Long? = null, val endsAt: Long? = null,
+    val daysLeft: Int = 0, val msLeft: Long = 0,
+)
+@Serializable data class EntitlementDto(
+    val source: String = "guest",              // guest | free | trial | subscription
+    val features: List<String> = emptyList(),
+    val free: List<String> = emptyList(),
+    val core: List<String> = emptyList(),
+    val trial: TrialDto = TrialDto(),
+    val isPaid: Boolean = false,
+    val message: String = "",
+    val serverTime: Long = 0,
+)
+@Serializable data class EntitlementResponse(
+    val entitlement: EntitlementDto = EntitlementDto(), val serverTime: Long = 0,
+)
+@Serializable data class PlanDto(
+    val code: String = "", val title: String = "",
+    val amount: Int? = null, val unit: String? = null,
+    val price: Int = 0, val negotiable: Boolean = false,
+    val badge: String = "", val pricePerDay: Double? = null,
+    val whatsappUrl: String = "",
+)
+@Serializable data class WhatsappDto(val number: String = "", val url: String = "")
+@Serializable data class PlansResponse(
+    val plans: List<PlanDto> = emptyList(),
+    val currency: String = "افغانی",
+    val trialDays: Int = 7,
+    val whatsapp: WhatsappDto = WhatsappDto(),
+)

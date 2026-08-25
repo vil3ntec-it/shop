@@ -9,11 +9,6 @@ import androidx.compose.runtime.Composable
  */
 
 @Composable
-fun SaleScreen() = ScreenScaffold("فروش", "صندوق و اسکن بارکد") {
-    InfoPanel("در دست ساخت", "صفحه فروش در مرحله بعد منتقل می‌شود.")
-}
-
-@Composable
 fun ProductsScreen() = ScreenScaffold("محصولات", "کالاها و موجودی") {
     InfoPanel("در دست ساخت", "صفحه محصولات در مرحله بعد منتقل می‌شود.")
 }
