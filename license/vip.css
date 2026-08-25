@@ -200,8 +200,9 @@
 
 /* ---------- کارت‌های مدت ---------- */
 .vip-plans{
-  display:grid; grid-template-columns:repeat(auto-fit,minmax(132px,1fr)); gap:10px;
+  display:grid; grid-template-columns:repeat(3,1fr); gap:10px;
 }
+@media (max-width:400px){ .vip-plans{ grid-template-columns:1fr; } }
 .vip-plan{
   position:relative; display:flex; flex-direction:column; align-items:center; gap:3px;
   padding:16px 10px 12px; cursor:pointer;

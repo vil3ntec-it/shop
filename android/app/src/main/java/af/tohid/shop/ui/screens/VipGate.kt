@@ -84,15 +84,11 @@ private class Spec(val code: String, val title: String, val amount: Int, val uni
 
 private fun fallbackPlans(): PlansResponse {
     val specs = listOf(
-        Spec("w1", "۱ هفته", 1, "week", 100),
-        Spec("m1", "۱ ماه", 1, "month", 300),
-        Spec("m3", "۳ ماه", 3, "month", 800),
-        Spec("m6", "۶ ماه", 6, "month", 1500),
-        Spec("y1", "۱ سال", 1, "year", 2800),
-        Spec("y2", "۲ سال", 2, "year", 5000),
-        Spec("y3", "۳ سال", 3, "year", 6800),
+        Spec("m1", "ماهانه", 1, "month", 500),
+        Spec("m6", "۶ ماهه", 6, "month", 2000),
+        Spec("y1", "۱ ساله", 1, "year", 3000),
     )
-    val badges = mapOf("y1" to "پیشنهاد ما", "y3" to "بیشترین صرفه")
+    val badges = mapOf("m6" to "پیشنهاد ما", "y1" to "بیشترین صرفه")
     val plans = specs.map { p ->
         val days = approxDays(p.amount, p.unit)
         PlanDto(
@@ -101,10 +97,7 @@ private fun fallbackPlans(): PlansResponse {
             pricePerDay = if (days > 0) Math.round(p.price.toDouble() / days * 10) / 10.0 else null,
             whatsappUrl = waUrl(WA_NUMBER, "$WA_TEXT (${p.title})"),
         )
-    } + PlanDto(
-        code = "custom", title = "دلخواه", price = 0, negotiable = true,
-        whatsappUrl = waUrl(WA_NUMBER, "$WA_TEXT (مدت دلخواه)"),
-    )
+    }
     return PlansResponse(
         plans = plans, currency = "افغانی", trialDays = 7,
         whatsapp = WhatsappDto(number = WA_NUMBER, url = waUrl(WA_NUMBER, WA_TEXT)),
@@ -186,21 +179,19 @@ private fun SubscriptionScreen(title: String) {
             if (loading) {
                 LinearProgressIndicator(Modifier.fillMaxWidth())
             } else {
-                data?.plans.orEmpty().chunked(2).forEachIndexed { rowIndex, row ->
-                    Row(
-                        Modifier.fillMaxWidth().padding(bottom = 10.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        row.forEachIndexed { i, plan ->
-                            PlanCard(
-                                plan = plan,
-                                currency = currency,
-                                selected = picked?.code == plan.code,
-                                index = rowIndex * 2 + i,
-                                modifier = Modifier.weight(1f),
-                            ) { picked = plan }
-                        }
-                        if (row.size == 1) Spacer(Modifier.weight(1f))
+                // سه پلن، سه ستون — همان چیدمان نسخه‌ی وب
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(9.dp),
+                ) {
+                    data?.plans.orEmpty().forEachIndexed { i, plan ->
+                        PlanCard(
+                            plan = plan,
+                            currency = currency,
+                            selected = picked?.code == plan.code,
+                            index = i,
+                            modifier = Modifier.weight(1f),
+                        ) { picked = plan }
                     }
                 }
             }

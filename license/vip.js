@@ -137,14 +137,9 @@
   const FALLBACK_WHATSAPP = '0792236008';
   const FALLBACK_MESSAGE = 'سلام، می‌خواهم اشتراک برنامه توحید را بخرم.';
   const FALLBACK_PLANS = [
-    { code: 'w1', title: '۱ هفته', amount: 1, unit: 'week', price: 100 },
-    { code: 'm1', title: '۱ ماه', amount: 1, unit: 'month', price: 300 },
-    { code: 'm3', title: '۳ ماه', amount: 3, unit: 'month', price: 800 },
-    { code: 'm6', title: '۶ ماه', amount: 6, unit: 'month', price: 1500 },
-    { code: 'y1', title: '۱ سال', amount: 1, unit: 'year', price: 2800, badge: 'پیشنهاد ما' },
-    { code: 'y2', title: '۲ سال', amount: 2, unit: 'year', price: 5000 },
-    { code: 'y3', title: '۳ سال', amount: 3, unit: 'year', price: 6800, badge: 'بیشترین صرفه' },
-    { code: 'custom', title: 'دلخواه', amount: null, unit: null, price: 0, negotiable: true },
+    { code: 'm1', title: 'ماهانه', amount: 1, unit: 'month', price: 500 },
+    { code: 'm6', title: '۶ ماهه', amount: 6, unit: 'month', price: 2000, badge: 'پیشنهاد ما' },
+    { code: 'y1', title: '۱ ساله', amount: 1, unit: 'year', price: 3000, badge: 'بیشترین صرفه' },
   ];
 
   function approxDays(amount, unit) {
