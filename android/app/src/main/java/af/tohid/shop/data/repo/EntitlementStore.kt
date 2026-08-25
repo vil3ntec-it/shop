@@ -49,13 +49,21 @@ class EntitlementStore(context: Context, private val session: SessionStore) {
         }
     }
 
+    /**
+     * تا وقتی آدرس سروری تنظیم نشده، هیچ قابلیتی قفل نمی‌شود.
+     * قفلِ سمت برنامه بدون سرور نه قابل اتکاست و نه راهی برای خرید
+     * باقی می‌گذارد — همان رفتاری که نسخه‌ی وب دارد.
+     */
+    private fun enforcing(): Boolean = !session.serverUrl().isNullOrBlank()
+
     fun has(feature: String): Boolean =
-        coreDefaults.contains(feature) || cached.features.contains(feature)
+        coreDefaults.contains(feature) || !enforcing() || cached.features.contains(feature)
 
     /** پیام وضعیت برای نمایش: روزهای باقی‌مانده یا پایان دوره. */
     fun statusText(): String {
         val t = cached.trial
         return when {
+            !enforcing() -> "همه‌ی قابلیت‌ها باز است"
             cached.source == "subscription" -> "اشتراک فعال"
             t.active && t.daysLeft <= 1 -> "کمتر از یک روز از دوره آزمایشی باقی مانده"
             t.active -> "${t.daysLeft} روز از دوره آزمایشی باقی مانده است"

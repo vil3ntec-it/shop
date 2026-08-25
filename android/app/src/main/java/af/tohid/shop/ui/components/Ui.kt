@@ -1,8 +1,12 @@
 package af.tohid.shop.ui.components
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -18,9 +22,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -33,6 +40,37 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import af.tohid.shop.ui.theme.Radius
 import af.tohid.shop.ui.theme.T
+
+/* ================================================================== */
+/*  بازخورد فشار                                                       */
+/* ================================================================== */
+
+/**
+ * هر چیز قابل لمس، هنگام فشار کمی کوچک می‌شود و رها که شد برمی‌گردد.
+ * همان حسی که نسخه‌ی وب با `transform:scale(.96)` می‌دهد.
+ */
+@Composable
+fun Modifier.pressable(
+    enabled: Boolean = true,
+    scaleDown: Float = 0.96f,
+    onClick: () -> Unit,
+): Modifier {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed && enabled) scaleDown else 1f,
+        animationSpec = spring(dampingRatio = 0.55f, stiffness = 900f),
+        label = "press",
+    )
+    return this
+        .scale(scale)
+        .clickable(
+            interactionSource = interaction,
+            indication = null,
+            enabled = enabled,
+            onClick = onClick,
+        )
+}
 
 /* ================================================================== */
 /*  کارت پایه — معادل .panel و .stat-card در نسخه‌ی وب                 */
@@ -50,7 +88,7 @@ fun TCard(
         .background(T.bg)
         .border(1.dp, T.border, RoundedCornerShape(Radius.lg))
     Column(
-        modifier = if (onClick != null) base.clickable { onClick() } else base,
+        modifier = if (onClick != null) base.pressable(scaleDown = 0.985f) { onClick() } else base,
     ) {
         Column(Modifier.padding(padding), content = content)
     }
@@ -248,7 +286,7 @@ fun TButton(
             .clip(RoundedCornerShape(Radius.sm))
             .background(bg.copy(alpha = bg.alpha * alpha))
             .border(1.dp, borderColor, RoundedCornerShape(Radius.sm))
-            .clickable(enabled = enabled) { onClick() }
+            .pressable(enabled = enabled) { onClick() }
             .padding(
                 horizontal = if (small) 12.dp else 18.dp,
                 vertical = if (small) 8.dp else 11.dp,
@@ -392,7 +430,7 @@ fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
             .clip(RoundedCornerShape(Radius.sm))
             .background(if (selected) T.primary else T.surface)
             .border(1.dp, if (selected) T.primary else T.border, RoundedCornerShape(Radius.sm))
-            .clickable { onClick() }
+            .pressable { onClick() }
             .padding(horizontal = 14.dp, vertical = 8.dp),
     ) {
         Text(
