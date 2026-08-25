@@ -55,8 +55,16 @@
     trial: { used: false, active: false, daysLeft: 0 }, isPaid: false, message: '',
   };
 
+  /*
+   * تصمیم نهایی با سرور است. تا وقتی آدرس سروری تنظیم نشده، هیچ چیزی
+   * قفل نمی‌شود: قفلِ سمت مرورگر نه قابل اتکاست و نه راهی برای خرید
+   * باقی می‌گذارد. در این حالت فقط نشان و صفحه‌ی قیمت‌ها دیده می‌شود.
+   */
+  function enforcing() { return !!serverUrl(); }
+
   function hasFeature(key) {
     if (CORE.includes(key)) return true;
+    if (!enforcing()) return true;
     return (ENT.features || []).includes(key);
   }
 
@@ -80,17 +88,77 @@
   }
 
   // ---------- پلن‌ها ----------
+  /*
+   * قیمت‌های پیش‌فرض — همان چیزی که سرور موقع نصب می‌نویسد.
+   * وقتی سرور وصل است، همیشه پاسخ سرور جای این می‌نشیند؛ پس تغییر قیمت
+   * از پنل مدیریت انجام می‌شود و این فهرست فقط برای وقتی است که سرور
+   * در دسترس نیست (مثلاً نسخه‌ی نمایشی روی گیت‌هاب) تا کاربر
+   * دست‌کم بداند اشتراک چند است.
+   */
+  const FALLBACK_CURRENCY = 'افغانی';
+  const FALLBACK_WHATSAPP = '0792236008';
+  const FALLBACK_MESSAGE = 'سلام، می‌خواهم اشتراک برنامه توحید را بخرم.';
+  const FALLBACK_PLANS = [
+    { code: 'w1', title: '۱ هفته', amount: 1, unit: 'week', price: 100 },
+    { code: 'm1', title: '۱ ماه', amount: 1, unit: 'month', price: 300 },
+    { code: 'm3', title: '۳ ماه', amount: 3, unit: 'month', price: 800 },
+    { code: 'm6', title: '۶ ماه', amount: 6, unit: 'month', price: 1500 },
+    { code: 'y1', title: '۱ سال', amount: 1, unit: 'year', price: 2800, badge: 'پیشنهاد ما' },
+    { code: 'y2', title: '۲ سال', amount: 2, unit: 'year', price: 5000 },
+    { code: 'y3', title: '۳ سال', amount: 3, unit: 'year', price: 6800, badge: 'بیشترین صرفه' },
+    { code: 'custom', title: 'دلخواه', amount: null, unit: null, price: 0, negotiable: true },
+  ];
+
+  function approxDays(amount, unit) {
+    if (!amount || !unit) return 0;
+    if (unit === 'day') return amount;
+    if (unit === 'week') return amount * 7;
+    if (unit === 'month') return amount * 30;
+    if (unit === 'year') return amount * 365;
+    return 0;
+  }
+
+  function waUrl(number, text) {
+    const digits = String(number).replace(/[^0-9]/g, '').replace(/^0/, '93');
+    return 'https://wa.me/' + digits + '?text=' + encodeURIComponent(text);
+  }
+
+  function fallbackPlans() {
+    return {
+      currency: FALLBACK_CURRENCY,
+      plans: FALLBACK_PLANS.map(p => {
+        const days = approxDays(p.amount, p.unit);
+        const perDay = (!p.negotiable && days > 0 && p.price > 0)
+          ? Math.round((p.price / days) * 10) / 10 : null;
+        return {
+          code: p.code, title: p.title, amount: p.amount, unit: p.unit,
+          price: p.price, negotiable: !!p.negotiable, badge: p.badge || '',
+          features: PAID.slice(), approxDays: days, pricePerDay: perDay,
+          whatsappUrl: waUrl(
+            FALLBACK_WHATSAPP,
+            FALLBACK_MESSAGE + ' (' + p.title + ')',
+          ),
+        };
+      }),
+      whatsapp: { number: FALLBACK_WHATSAPP, url: waUrl(FALLBACK_WHATSAPP, FALLBACK_MESSAGE) },
+    };
+  }
+
   let PLANS = null;
   async function loadPlans() {
     if (PLANS) return PLANS;
     const base = serverUrl();
-    if (!base) return null;
-    try {
-      const res = await fetch(base + '/api/v1/billing/plans');
-      if (!res.ok) return null;
-      PLANS = await res.json();
-      return PLANS;
-    } catch { return null; }
+    if (base) {
+      try {
+        const res = await fetch(base + '/api/v1/billing/plans');
+        if (res.ok) {
+          PLANS = await res.json();
+          return PLANS;
+        }
+      } catch { /* آفلاین یا سرور خاموش — با قیمت‌های پیش‌فرض ادامه می‌دهیم */ }
+    }
+    PLANS = fallbackPlans();
+    return PLANS;
   }
 
   // ---------- قفل رابط کاربری ----------
@@ -155,7 +223,8 @@
     const t = ENT.trial || {};
 
     let text, tone;
-    if (!loggedIn()) { text = 'حساب رایگان بسازید'; tone = 'promo'; }
+    if (!enforcing()) { text = 'اشتراک و قیمت‌ها'; tone = 'promo'; }
+    else if (!loggedIn()) { text = 'حساب رایگان بسازید'; tone = 'promo'; }
     else if (ENT.source === 'subscription') { text = 'اشتراک فعال'; tone = 'ok'; }
     else if (t.active) {
       text = t.daysLeft <= 1 ? 'کمتر از یک روز' : `${fa(t.daysLeft)} روز آزمایشی`;
