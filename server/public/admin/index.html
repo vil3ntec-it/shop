@@ -155,6 +155,8 @@
   <div class="tabs">
     <button class="tab active" data-tab="users">کاربران</button>
     <button class="tab" data-tab="devices">دستگاه‌ها</button>
+    <button class="tab" data-tab="plans">پلن‌ها و قیمت‌ها</button>
+    <button class="tab" data-tab="requests">درخواست خرید</button>
     <button class="tab" data-tab="audit">سابقه عملیات</button>
   </div>
 
@@ -333,6 +335,52 @@
         <table>
           <thead><tr><th>کاربر</th><th>دستگاه</th><th>وضعیت</th><th>آخرین اتصال</th><th>آخرین Sync</th><th></th></tr></thead>
           <tbody id="devices-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- پلن‌ها -->
+  <section id="tab-plans" class="hidden">
+    <div class="panel">
+      <h2>تنظیمات عمومی</h2>
+      <p class="muted">این‌ها بدون تغییر کد برنامه قابل ویرایش‌اند.</p>
+      <div class="grid grid-3">
+        <div><label>مدت دوره آزمایشی (روز)</label><input type="number" id="cfg-trial" min="0" max="365"></div>
+        <div><label>شماره واتساپ</label><input type="text" id="cfg-wa" dir="ltr"></div>
+        <div><label>واحد پول</label><input type="text" id="cfg-currency"></div>
+      </div>
+      <label>متن پیام واتساپ</label>
+      <input type="text" id="cfg-wamsg">
+      <button class="btn" id="btn-save-cfg" style="margin-top:12px;">ذخیره</button>
+      <div id="cfg-msg"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>پلن‌های اشتراک</h2></div>
+      <p class="muted">قیمت را عوض کنید و «ذخیره» بزنید؛ همان لحظه در برنامه کاربران دیده می‌شود.</p>
+      <div class="table-scroll">
+        <table>
+          <thead><tr>
+            <th>کد</th><th>عنوان</th><th>مدت</th><th>قیمت</th>
+            <th>روزی</th><th>برچسب</th><th>فعال</th><th></th>
+          </tr></thead>
+          <tbody id="plans-body"></tbody>
+        </table>
+      </div>
+      <div id="plans-msg"></div>
+    </div>
+  </section>
+
+  <!-- درخواست خرید -->
+  <section id="tab-requests" class="hidden">
+    <div class="panel">
+      <h2>درخواست‌های خرید اشتراک</h2>
+      <p class="muted">پس از دریافت پول، «تأیید» را بزنید تا اشتراک روی همان حساب فعال شود.</p>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>کاربر</th><th>پلن</th><th>زمان</th><th>وضعیت</th><th></th></tr></thead>
+          <tbody id="requests-body"></tbody>
         </table>
       </div>
     </div>

@@ -113,10 +113,14 @@ $$('.tab').forEach(tab => tab.addEventListener('click', () => {
   $('#tab-users').classList.toggle('hidden', name !== 'users');
   $('#tab-devices').classList.toggle('hidden', name !== 'devices');
   $('#tab-audit').classList.toggle('hidden', name !== 'audit');
+  $('#tab-plans').classList.toggle('hidden', name !== 'plans');
+  $('#tab-requests').classList.toggle('hidden', name !== 'requests');
   $('#tab-user-detail').classList.add('hidden');
   if (name === 'devices') loadDevices();
   if (name === 'audit') loadAudit();
   if (name === 'users') loadUsers();
+  if (name === 'plans') loadPlans();
+  if (name === 'requests') loadRequests();
 }));
 
 $('#btn-refresh').addEventListener('click', () => {
@@ -464,6 +468,85 @@ async function loadAudit() {
     <td dir="ltr">${esc(String(e.target_id).slice(0, 18))}</td>
     <td style="white-space:normal;max-width:340px;"><span class="muted">${esc(String(e.detail).slice(0, 200))}</span></td>
   </tr>`).join('');
+}
+
+// ---------- پلن‌ها و قیمت‌ها ----------
+async function loadPlans() {
+  const r = await api('/plans');
+  const cfg = r.config || {};
+  $('#cfg-trial').value = cfg.trial_days ?? 7;
+  $('#cfg-wa').value = cfg.whatsapp_number ?? '';
+  $('#cfg-currency').value = cfg.currency ?? 'افغانی';
+  $('#cfg-wamsg').value = cfg.whatsapp_message ?? '';
+
+  const body = $('#plans-body');
+  body.innerHTML = r.plans.map(p => `<tr data-code="${esc(p.code)}">
+    <td><code>${esc(p.code)}</code></td>
+    <td>${esc(p.title)}</td>
+    <td>${p.amount ? `${esc(String(p.amount))} ${esc(unitLabel(p.unit))}` : '<span class="muted">—</span>'}</td>
+    <td><input type="number" class="p-price" value="${p.price}" min="0" style="width:110px;"></td>
+    <td>${p.pricePerDay == null ? '<span class="muted">—</span>' : esc(String(p.pricePerDay))}</td>
+    <td><input type="text" class="p-badge" value="${esc(p.badge)}" style="width:120px;"></td>
+    <td><input type="checkbox" class="p-active" ${p.active ? 'checked' : ''}></td>
+    <td><button class="btn btn-sm" data-save-plan>ذخیره</button></td>
+  </tr>`).join('');
+
+  $$('#plans-body [data-save-plan]').forEach(btn => btn.addEventListener('click', () => {
+    const tr = btn.closest('tr');
+    guard(btn, async () => {
+      await api(`/plans/${tr.dataset.code}`, { method: 'PATCH', body: {
+        price: Number($('.p-price', tr).value) || 0,
+        badge: $('.p-badge', tr).value,
+        active: $('.p-active', tr).checked,
+      } });
+      msg('#plans-msg', 'ذخیره شد.', 'ok');
+      await loadPlans();
+    }, '#plans-msg');
+  }));
+}
+
+function unitLabel(u) {
+  return { day: 'روز', week: 'هفته', month: 'ماه', year: 'سال' }[u] || '';
+}
+
+$('#btn-save-cfg').addEventListener('click', () => {
+  guard($('#btn-save-cfg'), async () => {
+    await api('/config', { method: 'PATCH', body: {
+      trial_days: Number($('#cfg-trial').value) || 0,
+      whatsapp_number: $('#cfg-wa').value.trim(),
+      currency: $('#cfg-currency').value.trim(),
+      whatsapp_message: $('#cfg-wamsg').value.trim(),
+    } });
+    msg('#cfg-msg', 'تنظیمات ذخیره شد.', 'ok');
+  }, '#cfg-msg');
+});
+
+// ---------- درخواست‌های خرید ----------
+async function loadRequests() {
+  const r = await api('/purchase-requests');
+  const body = $('#requests-body');
+  if (!r.requests.length) {
+    body.innerHTML = '<tr><td colspan="5" class="muted">درخواستی ثبت نشده است.</td></tr>';
+    return;
+  }
+  const badge = { pending: ['در انتظار', 'b-warn'], approved: ['تأیید شده', 'b-ok'], rejected: ['رد شده', 'b-bad'] };
+  body.innerHTML = r.requests.map(q => {
+    const [lbl, cls] = badge[q.status] || [q.status, 'b-mute'];
+    return `<tr>
+      <td><b>${esc(q.user_name || '—')}</b><br><span class="muted" dir="ltr">${esc(q.user_email || q.user_phone || '')}</span></td>
+      <td><code>${esc(q.plan_code)}</code></td>
+      <td>${fmt(q.created_at)}</td>
+      <td><span class="badge ${cls}">${lbl}</span></td>
+      <td>${q.status === 'pending'
+        ? `<button class="btn btn-sm" data-approve="${esc(q.id)}">تأیید</button>
+           <button class="btn btn-ghost btn-sm" data-reject="${esc(q.id)}">رد</button>` : ''}</td>
+    </tr>`;
+  }).join('');
+
+  $$('#requests-body [data-approve]').forEach(b => b.addEventListener('click', () =>
+    guard(b, async () => { await api(`/purchase-requests/${b.dataset.approve}/approve`, { method: 'POST' }); await loadRequests(); })));
+  $$('#requests-body [data-reject]').forEach(b => b.addEventListener('click', () =>
+    guard(b, async () => { await api(`/purchase-requests/${b.dataset.reject}/reject`, { method: 'POST' }); await loadRequests(); })));
 }
 
 // ---------- شروع ----------
