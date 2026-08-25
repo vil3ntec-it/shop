@@ -151,6 +151,114 @@ class SaleRepository(
         return SaleResult.Success(saleId, invoice, finalTotal)
     }
 
+    /**
+     * لغو فاکتور.
+     *
+     * موجودی خودکار برمی‌گردد، چون محاسبه‌ی «فروش خالص» فاکتورهای لغوشده را
+     * نمی‌شمارد. اگر فروش نسیه بوده، بدهی طرف هم با یک تراکنش جبرانی صفر می‌شود
+     * تا سابقه‌ی حساب دست‌نخورده بماند.
+     */
+    suspend fun cancelSale(saleId: String): OpResult {
+        val sale = db.sales().byId(saleId) ?: return OpResult.Refused("فاکتور پیدا نشد")
+        if (sale.status == "cancelled") return OpResult.Refused("این فاکتور قبلاً لغو شده است")
+
+        val now = System.currentTimeMillis()
+        val me = session.userId()
+        db.sales().upsert(sale.copy(status = "cancelled", updatedAt = now, dirty = true))
+
+        if (sale.debtGiven > 0 && !sale.debtorId.isNullOrBlank()) {
+            db.transactions().upsert(
+                TransactionEntity(
+                    id = Ids.new(), debtorId = sale.debtorId, type = "receive",
+                    amount = sale.debtGiven, date = Format.today(),
+                    notes = "لغو فاکتور #${sale.invoiceNumber}", createdAt = now,
+                    updatedAt = now, dirty = true, ownerUserId = me,
+                )
+            )
+        }
+
+        db.audit().upsert(
+            AuditEntity(
+                id = Ids.new(), type = "sale_cancel", refId = saleId,
+                notes = "لغو فاکتور #${sale.invoiceNumber} به مبلغ ${Format.money(sale.finalTotal)} افغانی",
+                date = Format.today(), createdAt = now, updatedAt = now, dirty = true, ownerUserId = me,
+            )
+        )
+        return OpResult.Ok
+    }
+
+    /**
+     * مرجوعی یک قلم از فاکتور.
+     *
+     * تعداد مرجوعی روی خودِ قلم ثبت می‌شود، پس موجودی خودبه‌خود برمی‌گردد و
+     * سود گزارش‌ها هم درست می‌ماند (قیمت خرید همان قلم اعتبار می‌گیرد).
+     */
+    suspend fun returnItem(saleItemId: String, qty: Double, reason: String): OpResult {
+        if (qty <= 0.0) return OpResult.Refused("تعداد مرجوعی را وارد کنید")
+
+        val item = db.saleItems().all().firstOrNull { it.id == saleItemId }
+            ?: return OpResult.Refused("قلم فاکتور پیدا نشد")
+        val sale = db.sales().byId(item.saleId) ?: return OpResult.Refused("فاکتور پیدا نشد")
+        if (sale.status == "cancelled") return OpResult.Refused("این فاکتور لغو شده است")
+
+        val remaining = item.quantity - item.returnedQty
+        if (qty > remaining) {
+            return OpResult.Refused(
+                "فقط ${Format.number(remaining)} واحد از این قلم قابل مرجوع است."
+            )
+        }
+
+        val now = System.currentTimeMillis()
+        val me = session.userId()
+        val amount = item.unitPrice * qty
+
+        db.saleItems().upsert(
+            item.copy(returnedQty = item.returnedQty + qty, updatedAt = now, dirty = true)
+        )
+        db.returns().upsert(
+            ReturnEntity(
+                id = Ids.new(), saleId = sale.id, saleItemId = item.id, productId = item.productId,
+                quantity = qty, amount = amount, reason = reason, date = Format.today(),
+                createdAt = now, updatedAt = now, dirty = true, ownerUserId = me,
+            )
+        )
+        db.stockMovements().upsert(
+            StockMovementEntity(
+                id = Ids.new(), productId = item.productId, type = "customer_return",
+                qty = qty, date = Format.today(),
+                notes = "مرجوعی فاکتور #${sale.invoiceNumber}", refId = sale.id,
+                createdAt = now, updatedAt = now, dirty = true, ownerUserId = me,
+            )
+        )
+
+        // اگر نسیه بوده، همین‌قدر از بدهی طرف کم می‌شود
+        if (sale.remaining > 0 && !sale.debtorId.isNullOrBlank()) {
+            val credit = minOf(amount, sale.remaining)
+            if (credit > 0) {
+                db.transactions().upsert(
+                    TransactionEntity(
+                        id = Ids.new(), debtorId = sale.debtorId, type = "receive",
+                        amount = credit, date = Format.today(),
+                        notes = "مرجوعی فاکتور #${sale.invoiceNumber}", createdAt = now,
+                        updatedAt = now, dirty = true, ownerUserId = me,
+                    )
+                )
+                db.sales().upsert(
+                    sale.copy(remaining = sale.remaining - credit, updatedAt = now, dirty = true)
+                )
+            }
+        }
+
+        db.audit().upsert(
+            AuditEntity(
+                id = Ids.new(), type = "sale_return", refId = sale.id,
+                notes = "مرجوعی ${Format.number(qty)} واحد از فاکتور #${sale.invoiceNumber}",
+                date = Format.today(), createdAt = now, updatedAt = now, dirty = true, ownerUserId = me,
+            )
+        )
+        return OpResult.Ok
+    }
+
     /** همان پیام روشنی که نسخه وب می‌دهد. */
     private fun shortMessage(product: ProductEntity, available: Double): String {
         val u = if (product.unit.isBlank()) "" else " ${product.unit}"

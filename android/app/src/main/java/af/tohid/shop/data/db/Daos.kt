@@ -74,6 +74,7 @@ interface SaleItemDao {
 
 @Dao
 interface ReturnDao {
+    @Query("SELECT * FROM returns WHERE saleId = :saleId") suspend fun forSale(saleId: String): List<ReturnEntity>
     @Query("SELECT * FROM returns ORDER BY createdAt DESC") suspend fun all(): List<ReturnEntity>
     @Query("SELECT * FROM returns WHERE dirty = 1") suspend fun dirty(): List<ReturnEntity>
     @Upsert suspend fun upsert(item: ReturnEntity)
@@ -98,6 +99,10 @@ interface DebtorDao {
 interface TransactionDao {
     @Query("SELECT * FROM transactions WHERE debtorId = :id ORDER BY createdAt DESC")
     suspend fun forDebtor(id: String): List<TransactionEntity>
+    @Query("SELECT * FROM transactions ORDER BY createdAt DESC")
+    fun observeAll(): Flow<List<TransactionEntity>>
+    @Query("SELECT * FROM transactions WHERE debtorId = :id ORDER BY createdAt DESC")
+    fun observeForDebtor(id: String): Flow<List<TransactionEntity>>
     @Query("""
         SELECT COALESCE(SUM(CASE WHEN type = 'give' THEN amount ELSE -amount END), 0)
         FROM transactions WHERE debtorId = :id
@@ -115,6 +120,8 @@ interface ExpenseDao {
     @Query("SELECT * FROM expenses ORDER BY createdAt DESC") fun observeAll(): Flow<List<ExpenseEntity>>
     @Query("SELECT COALESCE(SUM(amount),0) FROM expenses WHERE date BETWEEN :from AND :to")
     suspend fun totalInRange(from: String, to: String): Double
+    @Query("SELECT * FROM expenses WHERE id = :id") suspend fun byId(id: String): ExpenseEntity?
+    @Query("SELECT * FROM expenses ORDER BY createdAt DESC") suspend fun allOnce(): List<ExpenseEntity>
     @Query("SELECT * FROM expenses WHERE dirty = 1") suspend fun dirty(): List<ExpenseEntity>
     @Upsert suspend fun upsert(item: ExpenseEntity)
     @Upsert suspend fun upsertAll(items: List<ExpenseEntity>)
@@ -125,6 +132,8 @@ interface ExpenseDao {
 @Dao
 interface SupplierDao {
     @Query("SELECT * FROM suppliers ORDER BY name") fun observeAll(): Flow<List<SupplierEntity>>
+    @Query("SELECT * FROM suppliers ORDER BY name") suspend fun allOnce(): List<SupplierEntity>
+    @Query("SELECT * FROM suppliers WHERE id = :id") suspend fun byId(id: String): SupplierEntity?
     @Query("SELECT * FROM suppliers WHERE dirty = 1") suspend fun dirty(): List<SupplierEntity>
     @Upsert suspend fun upsert(item: SupplierEntity)
     @Upsert suspend fun upsertAll(items: List<SupplierEntity>)
@@ -135,6 +144,9 @@ interface SupplierDao {
 @Dao
 interface PurchaseDao {
     @Query("SELECT * FROM purchases ORDER BY createdAt DESC") fun observeAll(): Flow<List<PurchaseEntity>>
+    @Query("SELECT * FROM purchases WHERE supplierId = :id ORDER BY createdAt DESC")
+    suspend fun forSupplier(id: String): List<PurchaseEntity>
+    @Query("SELECT * FROM purchases WHERE id = :id") suspend fun byId(id: String): PurchaseEntity?
     @Query("SELECT * FROM purchases WHERE dirty = 1") suspend fun dirty(): List<PurchaseEntity>
     @Query("SELECT COALESCE(SUM(totalAmount - paidAmount),0) FROM purchases WHERE supplierId = :id")
     suspend fun unpaidFor(id: String): Double
@@ -148,6 +160,8 @@ interface PurchaseDao {
 interface SupplierPaymentDao {
     @Query("SELECT COALESCE(SUM(amount),0) FROM supplier_payments WHERE supplierId = :id")
     suspend fun paidTo(id: String): Double
+    @Query("SELECT * FROM supplier_payments WHERE supplierId = :id ORDER BY createdAt DESC")
+    suspend fun forSupplier(id: String): List<SupplierPaymentEntity>
     @Query("SELECT * FROM supplier_payments WHERE dirty = 1") suspend fun dirty(): List<SupplierPaymentEntity>
     @Upsert suspend fun upsert(item: SupplierPaymentEntity)
     @Upsert suspend fun upsertAll(items: List<SupplierPaymentEntity>)

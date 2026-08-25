@@ -195,7 +195,7 @@ fun ShopScreen() {
         }
 
         message?.let {
-            InfoPanel("پیام", it, Tone.Neutral)
+            InfoPanel("پیام", it, PanelTone.Neutral)
         }
     }
 }
