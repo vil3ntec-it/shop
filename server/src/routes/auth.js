@@ -70,10 +70,14 @@ router.post('/register', authLimit, async (req, res, next) => {
     db.prepare(`INSERT INTO users (id,email,phone,name,password_hash,created_at,updated_at)
                 VALUES (@id,@email,@phone,@name,@password_hash,@created_at,@updated_at)`).run(user);
 
-    audit.log({ actorType: 'user', actorId: user.id, action: 'user.register',
-                targetType: 'user', targetId: user.id, ip: clientIp(req) });
+    // دوره آزمایشی از همین لحظه شروع می‌شود — تاریخ‌ها با ساعت سرور
+    const trial = require('../lib/entitlement').startTrialIfEligible(user.id, t);
 
-    res.status(201).json({ user: publicUser(user) });
+    audit.log({ actorType: 'user', actorId: user.id, action: 'user.register',
+                targetType: 'user', targetId: user.id,
+                detail: { trialEndsAt: trial && trial.endsAt }, ip: clientIp(req) });
+
+    res.status(201).json({ user: publicUser(user), trial });
   } catch (e) { next(e); }
 });
 
@@ -165,11 +169,18 @@ router.post('/change-password', requireUser, authLimit, async (req, res, next) =
 // ---------- پروفایل + وضعیت اشتراک ----------
 router.get('/me', requireUser, (req, res, next) => {
   try {
-    const state = subs.evaluateUser(req.user.id, now());
+    const ent = require('../lib/entitlement').entitlementOf(req.user.id, now());
     const devices = getDb().prepare(
       'SELECT id,device_uid,name,platform,status,created_at,last_seen_at,last_sync_at FROM devices WHERE user_id=? ORDER BY created_at'
     ).all(req.user.id);
-    res.json({ user: publicUser(req.user), subscription: state, devices, serverTime: now() });
+    res.json({
+      user: publicUser(req.user),
+      entitlement: ent,
+      subscription: ent.subscription,
+      trial: ent.trial,
+      devices,
+      serverTime: now(),
+    });
   } catch (e) { next(e); }
 });
 

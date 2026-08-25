@@ -210,3 +210,49 @@ CREATE TABLE IF NOT EXISTS shop_settings (
   rev         INTEGER NOT NULL DEFAULT 0,
   updated_at  INTEGER NOT NULL
 );
+
+-- ============================================================
+--  دوره آزمایشی و پلن‌های اشتراک
+-- ============================================================
+
+-- ---------- پلن‌ها ----------
+-- قیمت‌ها و مدت‌ها از پنل مدیریت قابل تغییرند؛ نیازی به دست زدن به کد نیست.
+CREATE TABLE IF NOT EXISTS plans (
+  id           TEXT PRIMARY KEY,
+  code         TEXT NOT NULL UNIQUE,        -- w1 | m1 | m3 | m6 | y1 | y2 | y3 | custom
+  title        TEXT NOT NULL,
+  amount       INTEGER,                     -- تعداد واحد؛ برای custom خالی
+  unit         TEXT,                        -- day | week | month | year
+  price_afn    INTEGER NOT NULL DEFAULT 0,  -- ۰ یعنی توافقی
+  negotiable   INTEGER NOT NULL DEFAULT 0,
+  features     TEXT NOT NULL DEFAULT '[]',  -- JSON؛ خالی = همه قابلیت‌های اشتراکی
+  max_devices  INTEGER NOT NULL DEFAULT 5,
+  badge        TEXT NOT NULL DEFAULT '',    -- مثلاً «پیشنهاد ما»
+  sort_order   INTEGER NOT NULL DEFAULT 0,
+  active       INTEGER NOT NULL DEFAULT 1,
+  created_at   INTEGER NOT NULL,
+  updated_at   INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_plans_sort ON plans(active, sort_order);
+
+-- ---------- تنظیمات سراسری قابل ویرایش از پنل ----------
+CREATE TABLE IF NOT EXISTS app_config (
+  key         TEXT PRIMARY KEY,
+  value       TEXT NOT NULL,
+  updated_at  INTEGER NOT NULL
+);
+
+-- ---------- درخواست خرید اشتراک ----------
+-- کاربر از داخل برنامه درخواست می‌دهد؛ مدیر بعد از دریافت پول فعالش می‌کند.
+CREATE TABLE IF NOT EXISTS purchase_requests (
+  id          TEXT PRIMARY KEY,
+  user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  plan_code   TEXT NOT NULL,
+  note        TEXT NOT NULL DEFAULT '',
+  status      TEXT NOT NULL DEFAULT 'pending'
+              CHECK (status IN ('pending','approved','rejected')),
+  created_at  INTEGER NOT NULL,
+  handled_at  INTEGER,
+  handled_by  TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_preq_status ON purchase_requests(status, created_at DESC);

@@ -72,17 +72,21 @@ function requireSuperAdmin(req, res, next) {
  */
 function requireFeature(featureKey) {
   return function (req, res, next) {
-    if (!req.user) return next(unauthorized());
     if (isCoreFeature(featureKey)) return next();   // قابلیت پایه همیشه باز است
+    if (!req.user) return next(unauthorized());
 
-    const state = subs.evaluateUser(req.user.id, now());
-    if (!state.active) {
-      return next(forbidden('اشتراک شما فعال نیست', 'subscription_inactive'));
+    // منبع تصمیم: اشتراک فعال، سپس دوره آزمایشی، سپس قابلیت‌های رایگان.
+    // همه با ساعت سرور — ساعت گوشی هیچ اثری ندارد.
+    const ent = require('../lib/entitlement').entitlementOf(req.user.id, now());
+    if (!ent.features.includes(featureKey)) {
+      const err = ent.trial.used && !ent.trial.active
+        ? forbidden('دوره آزمایشی شما به پایان رسیده است. برای ادامه، اشتراک تهیه کنید.', 'trial_expired')
+        : forbidden('این قابلیت نیازمند اشتراک است', 'subscription_required');
+      err.entitlement = { source: ent.source, trial: ent.trial };
+      return next(err);
     }
-    if (!state.features.includes(featureKey)) {
-      return next(forbidden('این قابلیت در اشتراک شما فعال نیست', 'feature_not_allowed'));
-    }
-    req.subscriptionState = state;
+    req.entitlement = ent;
+    req.subscriptionState = ent.subscription;
     next();
   };
 }

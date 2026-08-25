@@ -8,7 +8,8 @@ const tokens = require('../lib/tokens');
 const subs = require('../lib/subscriptions');
 const audit = require('../lib/audit');
 const time = require('../lib/time');
-const { FEATURES, GRANTABLE_KEYS, CORE_KEYS } = require('../lib/features');
+const { FEATURES, GRANTABLE_KEYS, CORE_KEYS, FREE_KEYS, PAID_KEYS } = require('../lib/features');
+const plansLib = require('../lib/plans');
 const { requireAdmin } = require('../middleware/auth');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
 const { badRequest, unauthorized, forbidden, notFound, tooMany } = require('../middleware/errors');
@@ -67,7 +68,7 @@ router.get('/me', (req, res) => {
 
 // ---------- کاتالوگ قابلیت‌ها ----------
 router.get('/features', (req, res) => {
-  res.json({ features: FEATURES, grantable: GRANTABLE_KEYS, core: CORE_KEYS });
+  res.json({ features: FEATURES, grantable: GRANTABLE_KEYS, core: CORE_KEYS, free: FREE_KEYS, paid: PAID_KEYS });
 });
 
 // ---------- آمار کلی ----------
@@ -291,6 +292,110 @@ router.post('/licenses/:id/revoke', (req, res, next) => {
       .run(now(), String(req.body?.reason || 'admin revoke').slice(0, 200), lic.id);
     audit.log({ actorType: 'admin', actorId: req.admin.id, action: 'license.revoke',
                 targetType: 'user', targetId: lic.user_id, detail: { licenseId: lic.id }, ip: clientIp(req) });
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
+// ---------- پلن‌ها و قیمت‌ها (بدون دست زدن به کد) ----------
+router.get('/plans', (req, res, next) => {
+  try {
+    const db = getDb();
+    res.json({
+      plans: plansLib.listPlans(db, { includeInactive: true }),
+      config: plansLib.getConfig(db),
+    });
+  } catch (e) { next(e); }
+});
+
+router.patch('/plans/:code', (req, res, next) => {
+  try {
+    const plan = plansLib.updatePlan(getDb(), req.params.code, req.body || {});
+    if (!plan) throw notFound('پلن پیدا نشد');
+    audit.log({ actorType: 'admin', actorId: req.admin.id, action: 'plan.update',
+                targetType: 'plan', targetId: plan.code,
+                detail: { changes: Object.keys(req.body || {}) }, ip: clientIp(req) });
+    res.json({ plan });
+  } catch (e) { next(e); }
+});
+
+router.post('/plans', (req, res, next) => {
+  try {
+    const plan = plansLib.createPlan(getDb(), req.body || {});
+    audit.log({ actorType: 'admin', actorId: req.admin.id, action: 'plan.create',
+                targetType: 'plan', targetId: plan.code, ip: clientIp(req) });
+    res.status(201).json({ plan });
+  } catch (e) { next(badRequest(e.message)); }
+});
+
+router.delete('/plans/:code', (req, res, next) => {
+  try {
+    if (!plansLib.deletePlan(getDb(), req.params.code)) throw notFound('پلن پیدا نشد');
+    audit.log({ actorType: 'admin', actorId: req.admin.id, action: 'plan.delete',
+                targetType: 'plan', targetId: req.params.code, ip: clientIp(req) });
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
+/** تنظیمات سراسری: مدت دوره آزمایشی، شماره واتساپ، واحد پول. */
+router.patch('/config', (req, res, next) => {
+  try {
+    const db = getDb();
+    const allowed = ['trial_days', 'whatsapp_number', 'whatsapp_message', 'currency'];
+    for (const [k, v] of Object.entries(req.body || {})) {
+      if (allowed.includes(k)) plansLib.setConfig(db, k, v);
+    }
+    audit.log({ actorType: 'admin', actorId: req.admin.id, action: 'config.update',
+                targetType: 'config', targetId: '', detail: req.body || {}, ip: clientIp(req) });
+    res.json({ config: plansLib.getConfig(db) });
+  } catch (e) { next(e); }
+});
+
+// ---------- درخواست‌های خرید اشتراک ----------
+router.get('/purchase-requests', (req, res, next) => {
+  try {
+    const rows = getDb().prepare(`
+      SELECT r.*, u.name AS user_name, u.email AS user_email, u.phone AS user_phone
+      FROM purchase_requests r JOIN users u ON u.id = r.user_id
+      ORDER BY CASE r.status WHEN 'pending' THEN 0 ELSE 1 END, r.created_at DESC LIMIT 200
+    `).all();
+    res.json({ requests: rows });
+  } catch (e) { next(e); }
+});
+
+/** تأیید درخواست: اشتراک همان حساب فعال می‌شود، حساب جدید لازم نیست. */
+router.post('/purchase-requests/:id/approve', (req, res, next) => {
+  try {
+    const db = getDb();
+    const r = db.prepare('SELECT * FROM purchase_requests WHERE id=?').get(req.params.id);
+    if (!r) throw notFound('درخواست پیدا نشد');
+    const plan = plansLib.getPlan(db, r.plan_code);
+    if (!plan) throw badRequest('پلن این درخواست دیگر وجود ندارد');
+    if (!plan.amount || !plan.unit) {
+      throw badRequest('این پلن مدت مشخص ندارد؛ اشتراک را دستی بسازید');
+    }
+
+    const sub = subs.createSubscription(r.user_id, {
+      plan: plan.title, amount: plan.amount, unit: plan.unit,
+      features: plan.features, maxDevices: plan.maxDevices,
+      note: `از درخواست ${r.id}`,
+    }, req.admin.id);
+
+    db.prepare("UPDATE purchase_requests SET status='approved', handled_at=?, handled_by=? WHERE id=?")
+      .run(now(), req.admin.id, r.id);
+
+    audit.log({ actorType: 'admin', actorId: req.admin.id, action: 'billing.approve',
+                targetType: 'user', targetId: r.user_id,
+                detail: { plan: plan.code, subscriptionId: sub.id }, ip: clientIp(req) });
+    res.json({ ok: true, subscription: { ...sub, features: subs.parseFeatures(sub.features) } });
+  } catch (e) { next(e); }
+});
+
+router.post('/purchase-requests/:id/reject', (req, res, next) => {
+  try {
+    const changed = getDb().prepare(
+      "UPDATE purchase_requests SET status='rejected', handled_at=?, handled_by=? WHERE id=? AND status='pending'"
+    ).run(now(), req.admin.id, req.params.id).changes;
+    if (!changed) throw notFound('درخواست در انتظار پیدا نشد');
     res.json({ ok: true });
   } catch (e) { next(e); }
 });

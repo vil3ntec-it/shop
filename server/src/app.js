@@ -56,6 +56,7 @@ async function createApp() {
   api.use('/auth', require('./routes/auth'));
   api.use('/license', require('./routes/license'));
   api.use('/shop', require('./routes/shop'));
+  api.use('/billing', require('./routes/billing'));
   api.use('/admin', require('./routes/admin'));
 
   /**

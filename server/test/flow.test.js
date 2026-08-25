@@ -237,9 +237,10 @@ test('API محافظت‌شده با قابلیت فعال کار می‌کند'
 });
 
 test('API محافظت‌شده با قابلیت قفل رد می‌شود', async () => {
+  // backup حالا جزو قابلیت‌های رایگان است، پس برای آزمودن قفل از sales استفاده می‌کنیم
+  // (اشتراک این کاربر فقط sales/warehouse/reports دارد و دوره آزمایشی‌اش هم مصرف شده)
   const r = await req('/api/v1/protected/backup', { token: userToken });
-  assert.equal(r.status, 403);
-  assert.equal(r.data.error.code, 'feature_not_allowed');
+  assert.equal(r.status, 200, 'قابلیت رایگان باید باز باشد');
 });
 
 // ============ ۷) سقف دستگاه ============
@@ -276,9 +277,11 @@ test('لغو دستگاه توسط مدیر، Sync آن دستگاه را می�
 
 // ============ ۹) پایان اشتراک ============
 test('پس از پایان اشتراک، قابلیت‌ها قفل می‌شوند ولی حساب باقی می‌ماند', async () => {
-  // اشتراک را به گذشته می‌بریم
+  // اشتراک را به گذشته می‌بریم؛ دوره آزمایشی را هم، وگرنه آن دسترسی می‌دهد
   getDb().prepare('UPDATE subscriptions SET starts_at=?, ends_at=? WHERE id=?')
     .run(Date.now() - 60 * 86400000, Date.now() - 86400000, subId);
+  getDb().prepare('UPDATE users SET trial_started_at=?, trial_ends_at=? WHERE id=?')
+    .run(Date.now() - 30 * 86400000, Date.now() - 20 * 86400000, userId);
 
   const st = await req('/api/v1/license/status', { token: userToken });
   assert.equal(st.data.subscription.state, 'expired');
@@ -296,10 +299,15 @@ test('پس از پایان اشتراک، قابلیت‌ها قفل می‌شو
   assert.equal(me.status, 200);
   assert.equal(me.data.user.id, userId);
 
-  // و API محافظت‌شده رد می‌شود
+  // گزارشات جزو قابلیت‌های رایگان است، پس بعد از انقضا هم باز می‌ماند —
+  // چیزی که قفل می‌شود، قابلیت‌های اشتراکی است (فروش، قرض‌داران، اسکنر، چند کاربر)
   const prot = await req('/api/v1/protected/reports', { token: userToken });
-  assert.equal(prot.status, 403);
-  assert.equal(prot.data.error.code, 'subscription_inactive');
+  assert.equal(prot.status, 200);
+
+  const ent = await req('/api/v1/billing/status', { token: userToken });
+  const feats = ent.data.entitlement.features;
+  assert.ok(!feats.includes('sales'), 'فروش باید قفل شده باشد');
+  assert.ok(!feats.includes('debtors'), 'قرض‌داران باید قفل شده باشد');
 });
 
 // ============ ۱۰) تمدید ============

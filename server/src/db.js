@@ -13,6 +13,8 @@ function getDb() {
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
   db.exec(fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8'));
+  require('./migrate').run(db);
+  require('./lib/plans').seedDefaults(db);
   return db;
 }
 
