@@ -34,6 +34,9 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="license/license-ui.css">
+<link rel="stylesheet" href="license/shop-ui.css">
+<link rel="stylesheet" href="license/vip.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <!-- فونت به‌صورت غیرمسدودکننده بارگذاری می‌شود تا نبودِ اینترنت باز شدن برنامه را کند نکند -->
@@ -3992,8 +3995,13 @@
   function askDeleteDebtor(id){
     const d = debtors.find(x=>x.id===id);
     if(!d) return;
+    const balance = getDebt(id);
+    const txCount = transactions.filter(t=>t.debtorId===id).length;
     document.getElementById('confirm-title').textContent = 'حذف قرض‌دار؟';
-    document.getElementById('confirm-sub').textContent = `«${d.name}» و تمام تراکنش‌های او حذف خواهند شد. این عملیات قابل بازگشت نیست.`;
+    // اگر هنوز بدهی دارد، مبلغ در هشدار می‌آید تا طلب سهواً از دفتر پاک نشود
+    document.getElementById('confirm-sub').textContent = balance > 0
+      ? `«${d.name}» هنوز ${formatMoney(balance)} افغانی بدهی دارد. با حذف او، این طلب و ${formatMoney(txCount)} تراکنش او برای همیشه از دفتر پاک می‌شود.`
+      : `«${d.name}» و ${formatMoney(txCount)} تراکنش او حذف خواهند شد. این عملیات قابل بازگشت نیست.`;
     confirmAction = ()=>{
       debtors = debtors.filter(x=>x.id!==id);
       transactions = transactions.filter(t=>t.debtorId!==id);
@@ -4500,6 +4508,25 @@
   function getProductCartons(productId){
     return warehouseEntries.filter(w=>w.productId===productId).reduce((s,w)=> s + (w.cartons||0), 0);
   }
+  /**
+   * پیام روشن وقتی موجودی کم می‌آید.
+   * اگر دکان مشترک باشد و کس دیگری همان کالا را فروخته باشد، اسمش را می‌گوید —
+   * چون گیج‌کننده‌ترین حالت همین است: جنس در دکان هست ولی برنامه می‌گوید نیست.
+   */
+  function stockShortMessage(product, wanted, available){
+    const u = product.unit ? ' '+product.unit : '';
+    try{
+      if(window.TohidShop){
+        const sh = window.TohidShop.findShortages().find(x=>x.productId===product.id);
+        if(sh) return window.TohidShop.shortageMessage(sh);
+      }
+    }catch(e){}
+    if(available<=0){
+      return `«${product.name}» در برنامه موجودی ندارد. اگر جنس در دکان هست، اول ورودی انبار را ثبت کنید.`;
+    }
+    return `«${product.name}»: ${formatMoney(available)}${u} موجود است، شما ${formatMoney(wanted)}${u} خواستید.`;
+  }
+
   function getStockStatus(product){
     const stock = getProductStock(product.id);
     if(stock<=0) return 'out';
@@ -4628,8 +4655,12 @@
   function askDeleteProduct(id){
     const p = products.find(x=>x.id===id);
     if(!p) return;
+    const soldQty = getSoldQty(id);
     document.getElementById('confirm-title').textContent = 'حذف محصول؟';
-    document.getElementById('confirm-sub').textContent = `محصول «${p.name}» و سوابق ورود آن از انبار حذف خواهد شد.`;
+    // اگر سابقه فروش دارد، حذف محصول گزارش سود آن اقلام را ناقص می‌کند
+    document.getElementById('confirm-sub').textContent = soldQty > 0
+      ? `از «${p.name}» تا کنون ${formatMoney(soldQty)} واحد فروخته شده است. فاکتورهای قبلی حفظ می‌شوند ولی نام این کالا در آن‌ها «حذف‌شده» نشان داده می‌شود و از گزارش سود محصولات کنار می‌رود.`
+      : `محصول «${p.name}» و سوابق ورود آن از انبار حذف خواهد شد.`;
     confirmAction = ()=>{
       logAudit('delete_product', id, `حذف محصول «${p.name}»`);
       products = products.filter(x=>x.id!==id);
@@ -4767,8 +4798,28 @@
     openModal('modal-warehouse');
   }
   function askDeleteWarehouseEntry(id){
+    const entry = warehouseEntries.find(x=>x.id===id);
+    if(!entry) return;
+    const product = products.find(x=>x.id===entry.productId);
+    const units = entry.units || 0;
+
+    // اگر بخشی از این ورودی قبلاً فروخته شده، حذف آن موجودی را منفی می‌کند.
+    // موجودی منفی یعنی گزارش‌ها و ارزش انبار غلط می‌شوند، پس جلویش گرفته می‌شود.
+    const stockAfter = getProductStock(entry.productId) - units;
+    if(stockAfter < 0){
+      const shortage = Math.abs(stockAfter);
+      showToast(
+        `این ورودی قابل حذف نیست: ${formatMoney(shortage)} واحد از آن فروخته شده است. `+
+        `ابتدا فروش‌های مربوطه را لغو یا مرجوع کنید.`,
+        'danger'
+      );
+      return;
+    }
+
     document.getElementById('confirm-title').textContent = 'حذف این ورودی انبار؟';
-    document.getElementById('confirm-sub').textContent = 'موجودی محصول مربوطه به همین میزان کاهش می‌یابد.';
+    document.getElementById('confirm-sub').textContent =
+      `موجودی «${product ? product.name : 'محصول'}» از ${formatMoney(getProductStock(entry.productId))} `+
+      `به ${formatMoney(stockAfter)} کاهش می‌یابد.`;
     confirmAction = ()=>{
       warehouseEntries = warehouseEntries.filter(x=>x.id!==id);
       saveState();
@@ -5730,11 +5781,35 @@
         cogs += netQty * (si.purchasePrice||0);
       });
     });
-    // مرجوعی‌های داخل بازه (حتی از فروش‌های خارج بازه) از فروش خالص/بهای تمام‌شده کسر می‌شوند تا سود واقعی‌تر باشد
+    /* مرجوعی‌ها.
+       net مبلغ اولیه فاکتورهاست (مرجوعی از آن کم نشده) ولی cogs مرجوعی را کم کرده،
+       پس اثر مرجوعی باید یک بار اینجا اعمال شود. سه حالت جدا دارد:
+
+       ۱) فروش لغو شده  → کل فروش قبلاً برگشته؛ مرجوعی‌اش نباید دوباره کم شود
+                          (وگرنه سود دوبار جریمه می‌شود).
+       ۲) فروشِ فعالِ داخل بازه → درآمدش در net هست و هزینه‌اش از cogs کم شده،
+                          پس کل مبلغ مرجوعی کم می‌شود.
+       ۳) فروشِ فعالِ خارج بازه → نه درآمدش در net است نه هزینه‌اش در cogs،
+                          پس فقط سودِ از‌دست‌رفته (مبلغ منهای بهای تمام‌شده) کم می‌شود. */
+    const activeIds = new Set(activeSales.map(s=>s.id));
     const returnsInRange = returns.filter(r=> r.date>=fromDate && r.date<=toDate);
-    const returnAmount = returnsInRange.reduce((s,r)=> s+(r.amount||0), 0);
-    const netAfterReturns = net; // net از finalTotal با احتساب returnedQty از قبل صحیح است چون مبلغ اولیه فاکتور را نگه می‌داریم؛ در عوض مرجوعی جدا نمایش داده می‌شود
-    const grossProfit = netAfterReturns - cogs - returnAmount;
+    let returnAmount = 0;        // مبلغ مرجوعی مؤثر در این بازه (برای نمایش)
+    let returnProfitImpact = 0;  // اثر واقعی مرجوعی روی سود
+    returnsInRange.forEach(r=>{
+      const sale = sales.find(x=>x.id===r.saleId);
+      if(sale && sale.status==='cancelled') return;            // حالت ۱
+      const amount = r.amount||0;
+      returnAmount += amount;
+      if(activeIds.has(r.saleId)){
+        returnProfitImpact += amount;                          // حالت ۲
+      } else {
+        const si = saleItems.find(x=>x.id===r.saleItemId);
+        const cost = si ? (si.purchasePrice||0)*(r.quantity||0) : 0;
+        returnProfitImpact += Math.max(0, amount - cost);      // حالت ۳
+      }
+    });
+    const netAfterReturns = net;
+    const grossProfit = netAfterReturns - cogs - returnProfitImpact;
     const expensesInRange = expenses.filter(ex=> ex.date>=fromDate && ex.date<=toDate).reduce((s,ex)=> s+(ex.amount||0), 0);
     const netProfit = grossProfit - expensesInRange;
     return { count, gross, discount, net: netAfterReturns, cogs, grossProfit, expenses: expensesInRange, netProfit, returnAmount };
@@ -6542,7 +6617,7 @@
       if(!p) continue;
       const available = getProductStock(p.id);
       if(item.quantity>available){
-        showToast(`موجودی «${p.name}» کافی نیست (موجودی: ${formatMoney(available)})`, 'danger');
+        showToast(stockShortMessage(p, item.quantity, available), 'danger');
         closeModal('modal-sale-checkout');
         return;
       }
@@ -7008,6 +7083,16 @@
     confirmAction = ()=>{
       localStorage.removeItem(STORAGE_KEY);
       localStorage.removeItem(DRAFT_CART_KEY);
+      // آرایه‌های حافظه هم خالی می‌شوند: تا لحظه‌ی reload اگر چیزی saveState صدا بزند،
+      // داده‌ی قدیمی دوباره روی حافظه نوشته نشود. (در WebView اندروید reload ممکن است
+      // دیرتر یا اصلاً انجام نشود.)
+      debtors = []; transactions = [];
+      expenses = [];
+      products = []; warehouseEntries = [];
+      sales = []; saleItems = []; returns = [];
+      suppliers = []; purchases = []; supplierPayments = [];
+      stockMovements = []; priceHistory = []; auditLog = [];
+      cart = [];
       showToast('تمام اطلاعات پاک شد', 'danger');
       setTimeout(()=> location.reload(), 500);
     };
@@ -7649,6 +7734,12 @@
 
   goTo(location.hash.replace('#','') || 'dashboard');
 </script>
+
+<!-- لایه اشتراک و License — کاملاً افزودنی؛ منطق فروشگاه را تغییر نمی‌دهد -->
+<script src="license/license-client.js" defer></script>
+<script src="license/shop-sync.js" defer></script>
+<script src="license/shop-ui.js" defer></script>
+<script src="license/vip.js" defer></script>
 
 </body>
 </html>
