@@ -773,6 +773,60 @@
   @media (min-width:640px){
     .bulk-grid{grid-template-columns:1fr 1fr 1fr;}
   }
+
+  /* ---------- صفحه‌ی «بیشتر»: کارت‌دار، با توضیح زیر هر عنوان ---------- */
+  .more-grid{display:flex; flex-direction:column; gap:10px;}
+  .more-card{
+    display:flex; align-items:center; gap:12px;
+    padding:14px; border-radius:var(--radius-md);
+    border:1px solid var(--border); background:var(--bg);
+    text-decoration:none; color:inherit;
+    transition:border-color .18s ease, box-shadow .2s ease, transform .12s cubic-bezier(.22,1,.36,1);
+  }
+  .more-card:active{transform:scale(.985);}
+  @media (hover:hover){
+    .more-card:hover{border-color:var(--primary); box-shadow:var(--shadow-md); transform:translateY(-2px);}
+  }
+  .more-card-ic{
+    width:40px; height:40px; flex:0 0 auto; border-radius:var(--radius-sm);
+    display:flex; align-items:center; justify-content:center;
+    background:var(--primary-tint); color:var(--primary);
+  }
+  .more-card-txt{display:flex; flex-direction:column; gap:3px; flex:1; min-width:0;}
+  .more-card-txt b{font-size:13.5px; font-weight:800; color:var(--text);}
+  .more-card-txt i{font-style:normal; font-size:11.5px; color:var(--muted); line-height:1.7;}
+  .more-card-go{flex:0 0 auto; color:var(--muted-2); display:flex;}
+  @media (min-width:720px){
+    .more-grid{display:grid; grid-template-columns:1fr 1fr;}
+  }
+
+  /* ---------- رسیدها: فیلتر سال/ماه ---------- */
+  .rc-filters{display:grid; grid-template-columns:1fr 1fr; gap:9px; margin-bottom:16px;}
+  #rc-who-wrap{grid-column:1 / -1;}
+  .rc-filter label{display:block; font-size:11px; font-weight:700; color:var(--muted); margin-bottom:5px;}
+  .rc-filter .form-input{min-height:42px;}
+  @media (min-width:640px){ .rc-filters{grid-template-columns:2fr 1fr 1fr;} #rc-who-wrap{grid-column:auto;} }
+
+  .rc-group{margin-bottom:14px;}
+  .rc-group:last-child{margin-bottom:0;}
+  .rc-group-head{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:7px 10px; margin-bottom:6px; border-radius:var(--radius-sm);
+    background:var(--surface); font-size:12px; font-weight:800; color:var(--text);
+  }
+  .rc-group-head span{font-size:11.5px; font-weight:700; color:var(--primary);}
+  .rc-row{
+    display:flex; align-items:center; gap:10px;
+    padding:8px 2px; border-bottom:1px solid var(--border);
+  }
+  .rc-row:last-child{border-bottom:none;}
+  .rc-row-main{flex:1; min-width:0;}
+  .rc-row-title{font-size:12.5px; font-weight:700; color:var(--text);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .rc-row-sub{font-size:10.5px; color:var(--muted); margin-top:1px;}
+  .rc-row-amount{font-size:13px; font-weight:800; flex-shrink:0;}
+  .rc-row.receive .rc-row-amount{color:var(--success);}
+  .rc-row.expense .rc-row-amount{color:var(--warning);}
   .checkout-summary-row{display:flex; justify-content:space-between; align-items:center; padding:8px 2px; font-size:13px; color:var(--text-2, var(--text)); border-bottom:1px dashed var(--border);}
   .checkout-summary-row.total{font-size:15px; font-weight:700; color:var(--text); border-bottom:none;}
   .checkout-summary-row b{color:var(--text);}
@@ -855,6 +909,28 @@
     margin-bottom:14px;
   }
   .account-back:hover{color:var(--primary);}
+  /* سربرگ چسبان: وقتی کارت بالا از دید خارج شد، نام و مانده بالای صفحه می‌ماند */
+  .account-sticky{
+    position:sticky; top:0; z-index:15;
+    display:none; align-items:center; gap:9px;
+    margin:0 0 12px; padding:9px 12px;
+    background:var(--bg); border:1px solid var(--border);
+    border-radius:var(--radius-md); box-shadow:var(--shadow-sm);
+  }
+  .account-sticky.show{display:flex;}
+  .acc-sticky-avatar{
+    width:28px; height:28px; border-radius:9px; flex-shrink:0;
+    background:var(--surface-2); color:var(--primary-dark);
+    display:flex; align-items:center; justify-content:center;
+    font-size:12px; font-weight:800;
+  }
+  .acc-sticky-name{
+    flex:1; min-width:0; font-size:13px; font-weight:800; color:var(--text);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .acc-sticky-amount{font-size:13px; font-weight:800; color:var(--danger); flex-shrink:0;}
+  .acc-sticky-amount.settled{color:var(--success);}
+
   .account-head{
     background:var(--bg);
     border:1px solid var(--border);
@@ -920,30 +996,33 @@
     .account-btn{min-height:128px;}
   }
 
-  .tx-list{display:flex; flex-direction:column; gap:2px;}
+  .tx-list{display:flex; flex-direction:column;}
+  /* ردیف کوتاه: تیتر و تاریخ در یک خط، تا فهرست بلند مثل کتابچه نشود */
   .tx-item{
-    display:flex; align-items:center; gap:12px;
-    padding:13px 4px;
+    display:flex; align-items:center; gap:10px;
+    padding:8px 2px;
     border-bottom:1px solid var(--border);
   }
   .tx-item:last-child{border-bottom:none;}
   .tx-ic{
-    width:36px; height:36px; border-radius:10px; flex-shrink:0;
+    width:28px; height:28px; border-radius:9px; flex-shrink:0;
     display:flex; align-items:center; justify-content:center;
   }
+  .tx-ic svg{width:13px; height:13px;}
+  .tx-line{display:flex; align-items:baseline; gap:7px;}
   .tx-item.give .tx-ic{background:var(--danger-tint); color:var(--danger);}
   .tx-item.receive .tx-ic{background:var(--success-tint); color:var(--success);}
   .tx-main{flex:1; min-width:0;}
-  .tx-title{font-size:13px; font-weight:700;}
-  .tx-notes{font-size:11.5px; color:var(--muted); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-  .tx-date{font-size:11px; color:var(--muted-2); margin-top:2px;}
+  .tx-title{font-size:12.5px; font-weight:700;}
+  .tx-notes{font-size:10.5px; color:var(--muted); margin-top:1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .tx-date{font-size:10px; color:var(--muted-2);}
   .tx-side{text-align:end; flex-shrink:0;}
-  .tx-amount{font-size:13.5px; font-weight:800;}
+  .tx-amount{font-size:13px; font-weight:800;}
   .tx-item.give .tx-amount{color:var(--danger);}
   .tx-item.receive .tx-amount{color:var(--success);}
-  .tx-balance{font-size:10.5px; color:var(--muted-2); margin-top:2px;}
+  .tx-balance{font-size:9.5px; color:var(--muted-2); margin-top:1px;}
   .tx-del{
-    width:26px; height:26px; border-radius:7px; border:none; background:transparent;
+    width:24px; height:24px; border-radius:7px; border:none; background:transparent;
     color:var(--muted-2); display:flex; align-items:center; justify-content:center; flex-shrink:0;
   }
   .tx-del:hover{background:var(--danger-tint); color:var(--danger);}
@@ -1024,11 +1103,26 @@
   .cat-input-row .form-input{flex:1;}
 
   /* ---------- Expense multi-row entry ---------- */
-  #expense-rows{display:flex; flex-direction:column; gap:8px;}
-  .exp-row{display:flex; align-items:flex-start; gap:8px;}
-  .exp-row .form-input{margin:0;}
+  #expense-rows{display:flex; flex-direction:column; gap:10px;}
+  /* هر ردیف: بابت + مبلغ در یک خط، دسته‌بندی خودش زیر آن */
+  .exp-row{
+    display:grid; grid-template-columns:1fr auto; gap:7px 8px; align-items:start;
+    padding:9px; border:1px solid var(--border); border-radius:var(--radius-md);
+    background:var(--surface);
+  }
+  .exp-row .form-input{margin:0; background:var(--bg);}
+  .exp-row-main{display:flex; gap:8px; min-width:0;}
+  .exp-row-cat{grid-column:1; min-width:0;}
+  .exp-row-cat .form-input{font-size:12px; min-height:36px;}
+  .exp-row-remove{grid-row:1 / span 2; align-self:center;}
   .exp-row-title{flex:1.5; min-width:0;}
   .exp-row-amount{flex:1; min-width:0;}
+  @media (min-width:640px){
+    .exp-row{grid-template-columns:1.6fr 1fr auto; align-items:center;}
+    .exp-row-main{grid-column:1;}
+    .exp-row-cat{grid-column:2;}
+    .exp-row-remove{grid-row:auto;}
+  }
   .exp-row-remove{
     flex-shrink:0; width:38px; height:38px; margin-top:1px;
     border-radius:var(--radius-sm); border:1px solid var(--border);
@@ -2039,12 +2133,83 @@
         </div>
       </section>
 
+      <!-- RECEIPTS: دریافتی‌ها و مصارف به تفکیک ماه و سال -->
+      <section class="page" id="page-receipts">
+        <a class="account-back" href="#more" data-page="more">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>
+          بازگشت به بیشتر
+        </a>
+
+        <div class="page-toolbar">
+          <div class="page-title-block">
+            <h2>رسیدها</h2>
+            <p id="rc-subtitle">دریافتی‌های قرض‌داران به تفکیک ماه و سال</p>
+          </div>
+        </div>
+
+        <div class="seg-toggle" style="margin-bottom:12px;">
+          <button type="button" class="seg-btn active" data-rc-tab="receipts">رسیدهای قرض‌داران</button>
+          <button type="button" class="seg-btn" data-rc-tab="expenses">مصارف</button>
+        </div>
+
+        <div class="rc-filters">
+          <div class="rc-filter" id="rc-who-wrap">
+            <label for="rc-who">قرض‌دار</label>
+            <select class="form-input" id="rc-who"></select>
+          </div>
+          <div class="rc-filter">
+            <label for="rc-year">سال</label>
+            <select class="form-input" id="rc-year"></select>
+          </div>
+          <div class="rc-filter">
+            <label for="rc-month">ماه</label>
+            <select class="form-input" id="rc-month"></select>
+          </div>
+        </div>
+
+        <div class="stat-grid" style="grid-template-columns:1fr 1fr;">
+          <div class="stat-card">
+            <div class="stat-top">
+              <span class="stat-label" id="rc-count-label">تعداد رسید</span>
+              <div class="stat-icon green">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2.5h12v19l-2-1.4-2 1.4-2-1.4-2 1.4-2-1.4-2 1.4v-19z"/></svg>
+              </div>
+            </div>
+            <div class="stat-value" id="rc-count">۰</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-top">
+              <span class="stat-label" id="rc-total-label">مجموع دریافتی</span>
+              <div class="stat-icon blue">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/></svg>
+              </div>
+            </div>
+            <div class="stat-value" id="rc-total">۰<small>افغانی</small></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h2 id="rc-list-title">فهرست</h2></div>
+          <div id="rc-groups"></div>
+          <div id="rc-empty" class="empty-wrap" style="padding:40px 20px; display:none;">
+            <div class="empty-title">چیزی در این بازه نیست</div>
+            <div class="empty-sub">سال یا ماه دیگری را انتخاب کنید.</div>
+          </div>
+        </div>
+      </section>
+
       <!-- DEBTOR ACCOUNT -->
       <section class="page" id="page-debtor-account">
         <a class="account-back" href="#debtors" data-page="debtors">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>
           بازگشت به قرض‌داران
         </a>
+
+        <div class="account-sticky" id="acc-sticky">
+          <span class="acc-sticky-avatar" id="acc-sticky-avatar">—</span>
+          <span class="acc-sticky-name" id="acc-sticky-name">—</span>
+          <span class="acc-sticky-amount" id="acc-sticky-amount">۰</span>
+        </div>
 
         <div class="account-head">
           <div class="account-avatar" id="acc-avatar">—</div>
@@ -2083,6 +2248,17 @@
           <div class="panel-head">
             <h2>تاریخچه تراکنش‌ها</h2>
           </div>
+          <div class="rc-filters" style="margin-bottom:12px;">
+            <div class="rc-filter">
+              <label for="acc-year">سال</label>
+              <select class="form-input" id="acc-year"></select>
+            </div>
+            <div class="rc-filter">
+              <label for="acc-month">ماه</label>
+              <select class="form-input" id="acc-month"></select>
+            </div>
+          </div>
+          <div id="acc-range-summary" class="rc-group-head" style="display:none;"></div>
           <div class="tx-list" id="tx-list"></div>
           <div id="tx-empty" class="empty-wrap" style="padding:40px 20px; display:none;">
             <div class="empty-title">هنوز تراکنشی ثبت نشده</div>
@@ -2442,6 +2618,10 @@
 
       <!-- SALES HISTORY -->
       <section class="page" id="page-sales">
+        <a class="account-back" href="#more" data-page="more">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>
+          بازگشت به بیشتر
+        </a>
         <div class="page-toolbar">
           <div class="page-title-block">
             <h2>تاریخچه فروش</h2>
@@ -2463,6 +2643,10 @@
 
       <!-- PURCHASING & SUPPLIERS -->
       <section class="page" id="page-purchasing">
+        <a class="account-back" href="#more" data-page="more">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>
+          بازگشت به بیشتر
+        </a>
         <div class="page-toolbar">
           <div class="page-title-block">
             <h2>خرید و تأمین‌کننده</h2>
@@ -2590,6 +2774,10 @@
 
       <!-- REPORTS -->
       <section class="page" id="page-reports">
+        <a class="account-back" href="#more" data-page="more">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>
+          بازگشت به بیشتر
+        </a>
         <div class="page-toolbar">
           <div class="page-title-block">
             <h2>گزارشات</h2>
@@ -2671,6 +2859,10 @@
 
       <!-- AUDIT LOG -->
       <section class="page" id="page-audit-log">
+        <a class="account-back" href="#more" data-page="more">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>
+          بازگشت به بیشتر
+        </a>
         <div class="page-toolbar">
           <div class="page-title-block">
             <h2>سابقه عملیات</h2>
@@ -2694,34 +2886,76 @@
             <p>دسترسی به بخش‌های دیگر برنامه</p>
           </div>
         </div>
-        <div class="panel" style="padding:8px;">
-          <ul class="nav-list" id="more-nav-list" style="list-style:none;">
-            <li><a class="nav-item" data-page="sales" href="#sales">
-              <span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 17V7l8 5-8 5z"/><rect x="3" y="3" width="18" height="18" rx="2"/></svg></span>
-              تاریخچه فروش و فاکتورها
-            </a></li>
-            <li><a class="nav-item" data-page="purchasing" href="#purchasing">
-              <span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="5" height="5" rx="1"/><line x1="3" y1="17" x2="9" y2="17"/><line x1="12" y1="7" x2="21" y2="7"/><line x1="12" y1="12" x2="21" y2="12"/><line x1="12" y1="17" x2="21" y2="17"/></svg></span>
-              خرید و تأمین‌کننده
-            </a></li>
-            <li><a class="nav-item" data-page="reports" href="#reports">
-              <span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 15l4-6 4 3 5-7"/></svg></span>
-              گزارشات
-            </a></li>
-            <li><a class="nav-item" data-page="audit-log" href="#audit-log">
-              <span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></span>
-              سابقه عملیات
-            </a></li>
-            <li><a class="nav-item" data-page="settings" href="#settings">
-              <span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
-              تنظیمات
-            </a></li>
-          </ul>
+        <div class="more-grid" id="more-nav-list">
+          <a class="more-card" data-page="receipts" href="#receipts">
+            <span class="more-card-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2.5h12v19l-2-1.4-2 1.4-2-1.4-2 1.4-2-1.4-2 1.4v-19z"/><path d="M9.5 8h5"/><path d="M9.5 12h5"/></svg></span>
+            <span class="more-card-txt">
+              <b>رسیدها</b>
+              <i>دریافتی‌های هر قرض‌دار به تفکیک ماه و سال</i>
+            </span>
+            <span class="more-card-go">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
+            </span>
+          </a>
+          <a class="more-card" data-page="sales" href="#sales">
+            <span class="more-card-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 17V7l8 5-8 5z"/></svg></span>
+            <span class="more-card-txt">
+              <b>تاریخچه فروش و فاکتورها</b>
+              <i>فاکتورهای ثبت‌شده، مرجوعی و لغو فروش</i>
+            </span>
+            <span class="more-card-go">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
+            </span>
+          </a>
+          <a class="more-card" data-page="purchasing" href="#purchasing">
+            <span class="more-card-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="5" height="5" rx="1"/><line x1="3" y1="17" x2="9" y2="17"/><line x1="12" y1="7" x2="21" y2="7"/><line x1="12" y1="12" x2="21" y2="12"/><line x1="12" y1="17" x2="21" y2="17"/></svg></span>
+            <span class="more-card-txt">
+              <b>خرید و تأمین‌کننده</b>
+              <i>حساب تأمین‌کننده‌ها و بدهی به آن‌ها</i>
+            </span>
+            <span class="more-card-go">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
+            </span>
+          </a>
+          <a class="more-card" data-page="reports" href="#reports">
+            <span class="more-card-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-6 4 3 5-7"/></svg></span>
+            <span class="more-card-txt">
+              <b>گزارشات</b>
+              <i>سود، فروش و مصارف در بازه‌ی دلخواه</i>
+            </span>
+            <span class="more-card-go">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
+            </span>
+          </a>
+          <a class="more-card" data-page="audit-log" href="#audit-log">
+            <span class="more-card-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></span>
+            <span class="more-card-txt">
+              <b>سابقه عملیات</b>
+              <i>هر ثبت، ویرایش و حذفی که انجام شده</i>
+            </span>
+            <span class="more-card-go">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
+            </span>
+          </a>
+          <a class="more-card" data-page="settings" href="#settings">
+            <span class="more-card-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
+            <span class="more-card-txt">
+              <b>تنظیمات</b>
+              <i>پشتیبان‌گیری، نصب و اطلاعات برنامه</i>
+            </span>
+            <span class="more-card-go">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
+            </span>
+          </a>
         </div>
       </section>
 
       <!-- SETTINGS -->
       <section class="page" id="page-settings">
+        <a class="account-back" href="#more" data-page="more">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>
+          بازگشت به بیشتر
+        </a>
         <div class="page-toolbar">
           <div class="page-title-block">
             <h2>تنظیمات</h2>
@@ -2996,18 +3230,18 @@
       </div>
       <div class="form-row-2">
         <div class="form-group" id="fg-product-purchase-price">
-          <label>قیمت خرید (هر واحد)</label>
+          <label id="lbl-product-purchase">قیمت خرید (هر واحد)</label>
           <input class="form-input" id="in-product-purchase-price" type="number" min="0" step="1" placeholder="مثلاً ۶۰">
           <div class="field-error">قیمت خرید معتبر وارد کنید.</div>
         </div>
         <div class="form-group" id="fg-product-sale-price">
-          <label>قیمت فروش (هر واحد)</label>
+          <label id="lbl-product-sale">قیمت فروش (هر واحد)</label>
           <input class="form-input" id="in-product-sale-price" type="number" min="0" step="1" placeholder="مثلاً ۸۰">
           <div class="field-error">قیمت فروش معتبر وارد کنید.</div>
         </div>
       </div>
       <div class="form-group">
-        <label>قیمت عمده (اختیاری)</label>
+        <label id="lbl-product-wholesale">قیمت عمده (اختیاری)</label>
         <input class="form-input" id="in-product-wholesale-price" type="number" min="0" step="1" placeholder="مثلاً ۷۰">
       </div>
       <div class="form-group">
@@ -3349,7 +3583,7 @@
     </div>
     <form id="form-expense">
       <div class="form-group" id="fg-expense-category">
-        <label>دسته‌بندی</label>
+        <label>دسته‌بندی پیش‌فرض <small style="font-weight:500; color:var(--muted-2);">— هر ردیف می‌تواند دسته‌ی خودش را داشته باشد</small></label>
         <select class="form-input" id="in-expense-category"></select>
         <div class="field-error">دسته‌بندی را انتخاب کنید.</div>
       </div>
@@ -3924,6 +4158,8 @@
 
   function uid(){ return 'id'+Date.now().toString(36)+Math.random().toString(36).slice(2,8); }
   function formatMoney(n){ return Math.round(n).toLocaleString('fa-IR'); }
+  /** عدد بدون جداکننده — برای سال و شماره‌هایی که پول نیستند. */
+  function formatPlain(n){ return String(n).replace(/[0-9]/g, d=> '۰۱۲۳۴۵۶۷۸۹'[+d]); }
   function formatDate(iso){
     try{ return new Date(iso+'T00:00:00').toLocaleDateString('fa-IR',{year:'numeric',month:'2-digit',day:'2-digit'}); }
     catch(e){ return iso; }
@@ -4185,20 +4421,22 @@
       amtEl.classList.remove('settled');
     }
 
+    // سربرگ چسبان همان نام و مانده را نگه می‌دارد
+    document.getElementById('acc-sticky-avatar').textContent = initials(d.name);
+    document.getElementById('acc-sticky-name').textContent = d.name;
+    const stickyAmt = document.getElementById('acc-sticky-amount');
+    stickyAmt.textContent = debt<=0 ? 'تسویه' : formatMoney(debt) + ' افغانی';
+    stickyAmt.classList.toggle('settled', debt<=0);
+
     const txs = transactions.filter(t=>t.debtorId===id)
       .sort((a,b)=> new Date(b.date)-new Date(a.date) || b.createdAt-a.createdAt);
     const txList = document.getElementById('tx-list');
     const txEmpty = document.getElementById('tx-empty');
 
-    if(!txs.length){
-      txList.innerHTML='';
-      txList.style.display='none';
-      txEmpty.style.display='';
-      return;
-    }
-    txEmpty.style.display='none';
-    txList.style.display='';
-
+    /*
+     * مانده‌ی دونده روی «همه‌ی» تراکنش‌ها حساب می‌شود، نه فقط آن‌هایی که
+     * فیلتر نشان می‌دهد. وگرنه با انتخاب یک ماه، مانده‌ها غلط می‌شدند.
+     */
     const ascending = txs.slice().sort((a,b)=> new Date(a.date)-new Date(b.date) || a.createdAt-b.createdAt);
     let running=0;
     const balances={};
@@ -4207,17 +4445,46 @@
       balances[t.id]=running;
     });
 
-    txList.innerHTML = txs.map(t=> `
+    accPopulateFilters(txs);
+    const visible = accFilter(txs);
+
+    if(!visible.length){
+      txList.innerHTML='';
+      txList.style.display='none';
+      txEmpty.style.display='';
+      document.getElementById('tx-empty').querySelector('.empty-title').textContent =
+        txs.length ? 'در این بازه تراکنشی نیست' : 'هنوز تراکنشی ثبت نشده';
+      document.getElementById('acc-range-summary').style.display = 'none';
+      return;
+    }
+    txEmpty.style.display='none';
+    txList.style.display='';
+
+    // خلاصه‌ی همان بازه‌ای که انتخاب شده
+    const sumGive = visible.filter(t=>t.type==='give').reduce((s,t)=>s+t.amount,0);
+    const sumRecv = visible.filter(t=>t.type==='receive').reduce((s,t)=>s+t.amount,0);
+    const summaryEl = document.getElementById('acc-range-summary');
+    if(accYear || accMonth){
+      summaryEl.style.display = 'flex';
+      summaryEl.innerHTML = `<b>${formatMoney(visible.length)} تراکنش در این بازه</b>`
+        + `<span>برد ${formatMoney(sumGive)} · رسید ${formatMoney(sumRecv)}</span>`;
+    } else {
+      summaryEl.style.display = 'none';
+    }
+
+    txList.innerHTML = visible.map(t=> `
       <div class="tx-item ${t.type}">
         <div class="tx-ic">${t.type==='give' ? giveIcon : receiveIcon}</div>
         <div class="tx-main">
-          <div class="tx-title">${t.type==='give' ? 'برد' : 'رسید'}</div>
+          <div class="tx-line">
+            <span class="tx-title">${t.type==='give' ? 'برد' : 'رسید'}</span>
+            <span class="tx-date">${formatDate(t.date)}</span>
+          </div>
           ${t.notes ? `<div class="tx-notes">${escapeHtml(t.notes)}</div>` : ''}
-          <div class="tx-date">${formatDate(t.date)}</div>
         </div>
         <div class="tx-side">
           <div class="tx-amount">${t.type==='give' ? '+' : '−'}${formatMoney(t.amount)}</div>
-          <div class="tx-balance">مانده: ${formatMoney(balances[t.id])}</div>
+          <div class="tx-balance">مانده ${formatMoney(balances[t.id])}</div>
         </div>
         <button class="tx-del" data-del-tx="${t.id}" aria-label="حذف تراکنش">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -4225,7 +4492,220 @@
       </div>`).join('');
   }
 
+/* سربرگ چسبان فقط وقتی دیده شود که کارت بالای صفحه از دید رفته باشد */
+  (function watchAccountHeader(){
+    const page = document.getElementById('page-debtor-account');
+    if(!page) return;
+    const sticky = document.getElementById('acc-sticky');
+    const head = page.querySelector('.account-head');
+    if(!sticky || !head) return;
+    function sync(){
+      if(!page.classList.contains('active')){ sticky.classList.remove('show'); return; }
+      sticky.classList.toggle('show', head.getBoundingClientRect().bottom < 60);
+    }
+    window.addEventListener('scroll', sync, { passive:true });
+    document.addEventListener('tohid:page-change', sync);
+    sync();
+  })();
+
+/* ==========================================================
+     رسیدها — دریافتی‌های قرض‌داران و مصارف، به تفکیک ماه و سال
+     ----------------------------------------------------------
+     فیلتر روی سال و ماهِ شمسی انجام می‌شود، نه میلادی، چون کاربر
+     با همان تقویم کار می‌کند. تاریخ‌ها همان‌طور که بودند ذخیره
+     می‌مانند؛ اینجا فقط برای گروه‌بندی تبدیل می‌شوند.
+     ========================================================== */
+  const JALALI_MONTHS = ['حمل','ثور','جوزا','سرطان','اسد','سنبله',
+                         'میزان','عقرب','قوس','جدی','دلو','حوت'];
+
+  const _jalaliFmt = (()=>{
+    try{
+      return new Intl.DateTimeFormat('en-US-u-ca-persian-nu-latn',
+        { year:'numeric', month:'numeric', day:'numeric' });
+    }catch(e){ return null; }
+  })();
+
+  /** تاریخ ISO → {y, m} شمسی. اگر مرورگر پشتیبانی نکند، به میلادی برمی‌گردد. */
+  function jalaliOf(iso){
+    if(!iso) return null;
+    if(_jalaliFmt){
+      try{
+        const parts = _jalaliFmt.formatToParts(new Date(iso+'T12:00:00'));
+        const pick = t => parseInt(parts.find(x=>x.type===t)?.value, 10);
+        const y = pick('year'), m = pick('month');
+        if(y && m) return { y, m };
+      }catch(e){ /* پایین‌تر به میلادی می‌افتیم */ }
+    }
+    const d = new Date(iso+'T12:00:00');
+    if(isNaN(d)) return null;
+    return { y: d.getFullYear(), m: d.getMonth()+1 };
+  }
+
+  let rcTab = 'receipts';       // receipts | expenses
+  let rcWho = '';               // '' = همه‌ی قرض‌داران
+  let rcYear = '';              // '' = همه‌ی سال‌ها
+  let rcMonth = '';             // '' = همه‌ی ماه‌ها
+
+  /** رکوردهای خام تبِ فعال، هرکدام با سال/ماه شمسی‌شان. */
+  function rcRecords(){
+    const out = [];
+    if(rcTab==='receipts'){
+      transactions.forEach(t=>{
+        if(t.type!=='receive') return;
+        const j = jalaliOf(t.date); if(!j) return;
+        const d = debtors.find(x=>x.id===t.debtorId);
+        out.push({ id:t.id, kind:'receive', who:t.debtorId,
+                   title: d ? d.name : 'قرض‌دار حذف‌شده',
+                   note:t.notes||'', amount:t.amount||0, date:t.date, j });
+      });
+    } else {
+      expenses.forEach(x=>{
+        const j = jalaliOf(x.date); if(!j) return;
+        out.push({ id:x.id, kind:'expense', who:'',
+                   title:x.title||'مصرف', note:x.category||'',
+                   amount:x.amount||0, date:x.date, j });
+      });
+    }
+    return out.sort((a,b)=> (b.date>a.date?1:b.date<a.date?-1:0));
+  }
+
+  function rcPopulateFilters(){
+    const all = rcRecords();
+
+    // قرض‌دار — فقط در تب رسیدها معنی دارد
+    const whoWrap = document.getElementById('rc-who-wrap');
+    whoWrap.style.display = rcTab==='receipts' ? '' : 'none';
+    const whoSel = document.getElementById('rc-who');
+    whoSel.innerHTML = '<option value="">همه‌ی قرض‌داران</option>'
+      + debtors.map(d=>`<option value="${escapeHtml(d.id)}">${escapeHtml(d.name)}</option>`).join('');
+    if(rcWho && debtors.some(d=>d.id===rcWho)) whoSel.value = rcWho; else { whoSel.value=''; rcWho=''; }
+
+    // سال‌ها فقط از روی داده‌های واقعی ساخته می‌شوند
+    const years = Array.from(new Set(all.map(r=>r.j.y))).sort((a,b)=> b-a);
+    const yearSel = document.getElementById('rc-year');
+    yearSel.innerHTML = '<option value="">همه‌ی سال‌ها</option>'
+      + years.map(y=>`<option value="${y}">${formatPlain(y)}</option>`).join('');
+    if(rcYear && years.includes(parseInt(rcYear,10))) yearSel.value = rcYear; else { yearSel.value=''; rcYear=''; }
+
+    const monthSel = document.getElementById('rc-month');
+    monthSel.innerHTML = '<option value="">همه‌ی ماه‌ها</option>'
+      + JALALI_MONTHS.map((name,i)=>`<option value="${i+1}">${escapeHtml(name)}</option>`).join('');
+    monthSel.value = rcMonth || '';
+  }
+
+  function rcFiltered(){
+    const y = rcYear ? parseInt(rcYear,10) : null;
+    const m = rcMonth ? parseInt(rcMonth,10) : null;
+    return rcRecords().filter(r=>{
+      if(rcTab==='receipts' && rcWho && r.who!==rcWho) return false;
+      if(y !== null && r.j.y !== y) return false;      // سالِ دیگر هرگز نشان داده نمی‌شود
+      if(m !== null && r.j.m !== m) return false;
+      return true;
+    });
+  }
+
+  function renderReceiptsPage(){
+    rcPopulateFilters();
+    const rows = rcFiltered();
+
+    const isReceipts = rcTab==='receipts';
+    document.getElementById('rc-subtitle').textContent = isReceipts
+      ? 'دریافتی‌های قرض‌داران به تفکیک ماه و سال'
+      : 'مصارف دکان به تفکیک ماه و سال';
+    document.getElementById('rc-count-label').textContent = isReceipts ? 'تعداد رسید' : 'تعداد مصرف';
+    document.getElementById('rc-total-label').textContent = isReceipts ? 'مجموع دریافتی' : 'مجموع مصارف';
+    document.getElementById('rc-list-title').textContent = isReceipts ? 'رسیدها' : 'مصارف';
+
+    const total = rows.reduce((sum,r)=> sum + r.amount, 0);
+    document.getElementById('rc-count').textContent = formatMoney(rows.length);
+    document.getElementById('rc-total').innerHTML = `${formatMoney(total)}<small>افغانی</small>`;
+
+    const wrap = document.getElementById('rc-groups');
+    const empty = document.getElementById('rc-empty');
+    if(!rows.length){ wrap.innerHTML=''; empty.style.display=''; return; }
+    empty.style.display='none';
+
+    // گروه‌بندی بر اساس سال/ماه شمسی
+    const groups = new Map();
+    rows.forEach(r=>{
+      const key = `${r.j.y}-${String(r.j.m).padStart(2,'0')}`;
+      if(!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(r);
+    });
+
+    wrap.innerHTML = Array.from(groups.entries())
+      .sort((a,b)=> a[0] < b[0] ? 1 : -1)
+      .map(([key, list])=>{
+        const [gy, gm] = key.split('-').map(v=>parseInt(v,10));
+        const sum = list.reduce((s,r)=> s + r.amount, 0);
+        return `
+        <div class="rc-group">
+          <div class="rc-group-head">
+            <b>${escapeHtml(JALALI_MONTHS[gm-1] || '')} ${formatPlain(gy)}</b>
+            <span>${formatMoney(sum)} افغانی · ${formatMoney(list.length)} مورد</span>
+          </div>
+          ${list.map(r=>`
+            <div class="rc-row ${r.kind==='receive'?'receive':'expense'}">
+              <div class="rc-row-main">
+                <div class="rc-row-title">${escapeHtml(r.title)}</div>
+                <div class="rc-row-sub">${escapeHtml(formatDate(r.date))}${r.note ? ' · '+escapeHtml(r.note) : ''}</div>
+              </div>
+              <div class="rc-row-amount">${formatMoney(r.amount)}</div>
+            </div>`).join('')}
+        </div>`;
+      }).join('');
+  }
+
+  document.querySelectorAll('[data-rc-tab]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      rcTab = btn.dataset.rcTab;
+      document.querySelectorAll('[data-rc-tab]').forEach(b=> b.classList.toggle('active', b===btn));
+      // بازه‌ای که دیگر در تب تازه وجود ندارد، خودش پاک می‌شود
+      renderReceiptsPage();
+    });
+  });
+  document.getElementById('rc-who').addEventListener('change', (e)=>{ rcWho = e.target.value; renderReceiptsPage(); });
+  document.getElementById('rc-year').addEventListener('change', (e)=>{ rcYear = e.target.value; renderReceiptsPage(); });
+  document.getElementById('rc-month').addEventListener('change', (e)=>{ rcMonth = e.target.value; renderReceiptsPage(); });
+
+/* فیلتر سال/ماه شمسی برای تاریخچه‌ی همین قرض‌دار */
+  let accYear = '', accMonth = '';
+
+  function accPopulateFilters(txs){
+    const years = Array.from(new Set(txs.map(t=> (jalaliOf(t.date)||{}).y).filter(Boolean)))
+      .sort((a,b)=> b-a);
+    const ySel = document.getElementById('acc-year');
+    ySel.innerHTML = '<option value="">همه‌ی سال‌ها</option>'
+      + years.map(y=>`<option value="${y}">${formatPlain(y)}</option>`).join('');
+    if(accYear && years.includes(parseInt(accYear,10))) ySel.value = accYear; else { ySel.value=''; accYear=''; }
+
+    const mSel = document.getElementById('acc-month');
+    mSel.innerHTML = '<option value="">همه‌ی ماه‌ها</option>'
+      + JALALI_MONTHS.map((name,i)=>`<option value="${i+1}">${escapeHtml(name)}</option>`).join('');
+    mSel.value = accMonth || '';
+  }
+
+  function accFilter(txs){
+    const y = accYear ? parseInt(accYear,10) : null;
+    const m = accMonth ? parseInt(accMonth,10) : null;
+    if(y===null && m===null) return txs;
+    return txs.filter(t=>{
+      const j = jalaliOf(t.date); if(!j) return false;
+      if(y!==null && j.y!==y) return false;
+      if(m!==null && j.m!==m) return false;
+      return true;
+    });
+  }
+
+  document.getElementById('acc-year').addEventListener('change', (e)=>{
+    accYear = e.target.value; renderAccountPage(currentAccountDebtorId);
+  });
+  document.getElementById('acc-month').addEventListener('change', (e)=>{
+    accMonth = e.target.value; renderAccountPage(currentAccountDebtorId);
+  });
+
   function openAccount(id){
+    accYear = ''; accMonth = '';   // هر قرض‌دار از حالت «همه» شروع شود
     renderAccountPage(id);
     goTo('debtor-account');
   }
@@ -4463,17 +4943,30 @@
 
   // ---- Expense rows (multi-entry: several "بابت + مبلغ" rows in one save) ----
   let expRowSeq = 0;
-  function expenseRowHTML(title='', amount='', removable=true){
+  /** گزینه‌های دسته‌بندی برای select داخل هر ردیف مصرف. */
+  function expenseCategoryOptions(selected){
+    const list = expenseCategories.slice();
+    if(selected && !list.includes(selected)) list.unshift(selected);
+    return list.map(c=>
+      `<option value="${escapeHtml(c)}"${c===selected?' selected':''}>${escapeHtml(c)}</option>`).join('');
+  }
+
+  function expenseRowHTML(title='', amount='', removable=true, category=''){
     const rid = 'r' + (++expRowSeq);
     return `
     <div class="exp-row" data-row-id="${rid}">
-      <div class="exp-row-title">
-        <input class="form-input" type="text" placeholder="بابت چی؟ مثلاً نان" data-role="title" value="${escapeHtml(title)}">
-        <div class="field-error">بابت را بنویسید.</div>
+      <div class="exp-row-main">
+        <div class="exp-row-title">
+          <input class="form-input" type="text" placeholder="بابت چی؟ مثلاً نان" data-role="title" value="${escapeHtml(title)}">
+          <div class="field-error">بابت را بنویسید.</div>
+        </div>
+        <div class="exp-row-amount">
+          <input class="form-input" type="number" min="1" step="1" placeholder="مبلغ" data-role="amount" value="${amount}">
+          <div class="field-error">مبلغ معتبر وارد کنید.</div>
+        </div>
       </div>
-      <div class="exp-row-amount">
-        <input class="form-input" type="number" min="1" step="1" placeholder="مبلغ" data-role="amount" value="${amount}">
-        <div class="field-error">مبلغ معتبر وارد کنید.</div>
+      <div class="exp-row-cat">
+        <select class="form-input" data-role="category">${expenseCategoryOptions(category)}</select>
       </div>
       <button type="button" class="exp-row-remove" data-remove-row ${removable ? '' : 'disabled'} aria-label="حذف ردیف">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -4486,11 +4979,26 @@
       r.querySelector('[data-remove-row]').disabled = rows.length<=1;
     });
   }
-  function addExpenseRow(title='', amount=''){
-    document.getElementById('expense-rows').insertAdjacentHTML('beforeend', expenseRowHTML(title, amount));
+  function addExpenseRow(title='', amount='', category=''){
+    // ردیف تازه با دسته‌بندی بالای فرم شروع می‌شود، ولی می‌شود عوضش کرد
+    const fallback = category || document.getElementById('in-expense-category').value || expenseCategories[0] || '';
+    const cat = fallback==='__new__' ? (expenseCategories[0]||'') : fallback;
+    document.getElementById('expense-rows').insertAdjacentHTML('beforeend', expenseRowHTML(title, amount, true, cat));
     refreshRowRemoveButtons();
   }
   document.getElementById('btn-add-expense-row').addEventListener('click', ()=> addExpenseRow());
+
+  /** وقتی دسته‌بندی بالای فرم عوض شد، ردیف‌هایی که هنوز دست‌نخورده‌اند همان را بگیرند. */
+  document.getElementById('in-expense-category').addEventListener('change', (e)=>{
+    const val = e.target.value;
+    if(!val || val==='__new__') return;
+    document.querySelectorAll('#expense-rows [data-role="category"]').forEach(sel=>{
+      if(!sel.dataset.touched) sel.value = val;
+    });
+  });
+  document.getElementById('expense-rows').addEventListener('change', (e)=>{
+    if(e.target.matches('[data-role="category"]')) e.target.dataset.touched = '1';
+  });
   document.getElementById('expense-rows').addEventListener('click', (e)=>{
     const btn = e.target.closest('[data-remove-row]');
     if(!btn || btn.disabled) return;
@@ -4522,7 +5030,7 @@
     document.getElementById('new-category-row').style.display = 'none';
     document.getElementById('in-expense-date').value = ex.date;
     document.getElementById('expense-rows').innerHTML = '';
-    addExpenseRow(ex.title, ex.amount);
+    addExpenseRow(ex.title, ex.amount, ex.category);
     // Editing targets a single existing expense — no adding/removing rows here.
     document.getElementById('btn-add-expense-row').style.display = 'none';
     document.querySelector('#expense-rows .exp-row-remove').disabled = true;
@@ -4720,23 +5228,26 @@
     const parsed = rowEls.map(rowEl=>{
       const titleEl = rowEl.querySelector('[data-role="title"]');
       const amtEl = rowEl.querySelector('[data-role="amount"]');
+      const catEl = rowEl.querySelector('[data-role="category"]');
       const title = titleEl.value.trim();
       const amount = parseFloat(amtEl.value);
+      // دسته‌بندی خودِ ردیف؛ اگر خالی بود، همان دسته‌بندی بالای فرم
+      const rowCategory = (catEl && catEl.value) ? catEl.value : category;
       const valid = !!title && amount>0;
       rowEl.classList.toggle('error', !valid);
       if(!valid && !firstInvalid) firstInvalid = titleEl.value.trim() ? amtEl : titleEl;
-      return {title, amount, valid};
+      return {title, amount, valid, category: rowCategory};
     });
     if(firstInvalid){ firstInvalid.focus(); return; }
 
     if(editingExpenseId){
-      const {title, amount} = parsed[0];
+      const {title, amount, category:rowCat} = parsed[0];
       const ex = expenses.find(x=>x.id===editingExpenseId);
-      ex.title=title; ex.category=category; ex.amount=amount; ex.date=date;
+      ex.title=title; ex.category=rowCat || category; ex.amount=amount; ex.date=date;
       showToast('با موفقیت ویرایش شد');
     } else {
-      parsed.forEach(({title, amount})=>{
-        expenses.push({id:uid(), title, category, amount, date, notes:'', createdAt:Date.now()});
+      parsed.forEach(({title, amount, category:rowCat})=>{
+        expenses.push({id:uid(), title, category: rowCat || category, amount, date, notes:'', createdAt:Date.now()});
       });
       showToast(parsed.length>1 ? `${parsed.length} مصرف با موفقیت ثبت شد` : 'با موفقیت ثبت شد');
     }
@@ -4864,7 +5375,28 @@
     return added;
   }
 
-  function populateProductUnitSelect(id, keepValue){
+  /**
+   * واحدهایی که قبلاً برای کالاهای همین دسته‌بندی به کار رفته‌اند،
+   * به‌ترتیبِ بیشترین استفاده. مثلاً وقتی دسته «آب» است، «لیتر» بالا می‌آید.
+   */
+  function unitsUsedInCategory(category){
+    if(!category) return [];
+    const count = new Map();
+    products.forEach(p=>{
+      if(p.category !== category) return;
+      const u = (p.unit||'').trim();
+      if(!u) return;
+      count.set(u, (count.get(u)||0) + 1);
+    });
+    return Array.from(count.entries()).sort((a,b)=> b[1]-a[1]).map(e=>e[0]);
+  }
+
+  /** پیشنهاد واحد برای یک دسته‌بندی: پرکاربردترین واحد همان دسته. */
+  function suggestedUnitFor(category){
+    return unitsUsedInCategory(category)[0] || '';
+  }
+
+  function populateProductUnitSelect(id, keepValue, category){
     const sel = document.getElementById(id);
     const current = keepValue!==undefined ? keepValue : sel.value;
     /*
@@ -4875,8 +5407,23 @@
      */
     const list = productUnits.slice();
     if(current && current!=='__new__' && !list.includes(current)) list.unshift(current);
-    sel.innerHTML = list.map(u=>`<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('')
-      + `<option value="__new__">+ واحد جدید…</option>`;
+
+    /*
+     * وقتی دسته‌بندی معلوم است، واحدهای همان دسته بالا و جدا نشان داده
+     * می‌شوند تا کاربر بین واحدهای بی‌ربط نگردد. هیچ واحدی حذف نمی‌شود؛
+     * بقیه زیر «سایر واحدها» می‌مانند.
+     */
+    const preferred = unitsUsedInCategory(category).filter(u=> list.includes(u));
+    const opt = (u)=> `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`;
+    let html;
+    if(preferred.length){
+      const rest = list.filter(u=> !preferred.includes(u));
+      html = `<optgroup label="واحدهای «${escapeHtml(category)}»">${preferred.map(opt).join('')}</optgroup>`
+           + (rest.length ? `<optgroup label="سایر واحدها">${rest.map(opt).join('')}</optgroup>` : '');
+    } else {
+      html = list.map(opt).join('');
+    }
+    sel.innerHTML = html + `<option value="__new__">+ واحد جدید…</option>`;
     if(list.includes(current) || current==='__new__') sel.value = current;
   }
   function populateWarehouseProductSelect(){
@@ -4923,7 +5470,10 @@
     populateProductCategorySelect();
     document.getElementById('new-product-category-row').style.display = 'none';
     document.getElementById('in-new-product-category').value = '';
-    populateProductUnitSelect('in-product-unit', productUnits[0]);
+    (function(){
+      const cat = document.getElementById('in-product-category').value;
+      populateProductUnitSelect('in-product-unit', suggestedUnitFor(cat) || productUnits[0], cat);
+    })();
     document.getElementById('new-product-unit-row').style.display = 'none';
     document.getElementById('in-new-product-unit').value = '';
     document.getElementById('in-product-barcode').value = '';
@@ -4934,6 +5484,7 @@
     document.getElementById('in-product-min-stock').value = '';
     document.getElementById('in-product-notes').value = '';
     ['fg-product-name','fg-product-category','fg-product-purchase-price','fg-product-sale-price'].forEach(clearFieldError);
+    syncProductPriceLabels();
     openModal('modal-product');
   }
   function openAddProductWithBarcode(code){
@@ -4953,7 +5504,7 @@
     populateProductCategorySelect();
     document.getElementById('in-product-category').value = p.category;
     document.getElementById('new-product-category-row').style.display = 'none';
-    populateProductUnitSelect('in-product-unit', p.unit);
+    populateProductUnitSelect('in-product-unit', p.unit, p.category);
     document.getElementById('new-product-unit-row').style.display = 'none';
     document.getElementById('in-new-product-unit').value = '';
     document.getElementById('in-product-barcode').value = '';
@@ -4964,6 +5515,7 @@
     document.getElementById('in-product-min-stock').value = p.minStock;
     document.getElementById('in-product-notes').value = p.notes || '';
     ['fg-product-name','fg-product-category','fg-product-purchase-price','fg-product-sale-price'].forEach(clearFieldError);
+    syncProductPriceLabels();
     openModal('modal-product');
   }
   function askDeleteProduct(id){
@@ -5314,7 +5866,19 @@
     openModal('modal-confirm');
   });
   document.getElementById('in-product-category').addEventListener('change', (e)=>{
-    document.getElementById('new-product-category-row').style.display = e.target.value==='__new__' ? '' : 'none';
+    const cat = e.target.value;
+    document.getElementById('new-product-category-row').style.display = cat==='__new__' ? '' : 'none';
+    if(cat && cat!=='__new__'){
+      /*
+       * واحدهای همان دسته بالا بیایند، و برای کالای تازه، پرکاربردترین
+       * واحدِ آن دسته از پیش انتخاب شود. روی ویرایش، واحد خودِ کالا دست‌نخورده می‌ماند.
+       */
+      const keep = editingProductId
+        ? document.getElementById('in-product-unit').value
+        : (suggestedUnitFor(cat) || document.getElementById('in-product-unit').value);
+      populateProductUnitSelect('in-product-unit', keep, cat);
+      syncProductPriceLabels();
+    }
   });
   document.getElementById('btn-product-cat-add').addEventListener('click', ()=>{
     const inp = document.getElementById('in-new-product-category');
@@ -5327,9 +5891,26 @@
     document.getElementById('new-product-category-row').style.display = 'none';
     inp.value = '';
   });
+  /**
+   * برچسب قیمت‌ها واحد واقعی کالا را نشان می‌دهد:
+   * «قیمت خرید (هر کیلوگرم)» به‌جای «هر واحد».
+   */
+  function syncProductPriceLabels(){
+    const sel = document.getElementById('in-product-unit');
+    let unit = sel ? sel.value : '';
+    if(unit==='__new__') unit = (document.getElementById('in-new-product-unit').value || '').trim();
+    const suffix = unit ? `هر ${unit}` : 'هر واحد';
+    const set = (id, text)=>{ const el = document.getElementById(id); if(el) el.textContent = text; };
+    set('lbl-product-purchase', `قیمت خرید (${suffix})`);
+    set('lbl-product-sale', `قیمت فروش (${suffix})`);
+    set('lbl-product-wholesale', `قیمت عمده ${unit ? `(${suffix}، اختیاری)` : '(اختیاری)'}`);
+  }
+
   document.getElementById('in-product-unit').addEventListener('change', (e)=>{
     document.getElementById('new-product-unit-row').style.display = e.target.value==='__new__' ? '' : 'none';
+    syncProductPriceLabels();
   });
+  document.getElementById('in-new-product-unit').addEventListener('input', syncProductPriceLabels);
   document.getElementById('btn-product-unit-add').addEventListener('click', ()=>{
     const inp = document.getElementById('in-new-product-unit');
     const val = inp.value.trim();
@@ -5339,6 +5920,7 @@
     populateProductUnitSelect('in-product-unit', val);
     document.getElementById('new-product-unit-row').style.display = 'none';
     inp.value = '';
+    syncProductPriceLabels();
   });
 
   document.getElementById('form-product').addEventListener('submit', (e)=>{
@@ -6789,6 +7371,12 @@
   function renderCart(){
     renderCartDrawer('', true);
     renderCartDrawer('qs-', false);
+    /*
+     * کاشی‌های صفحه‌ی «انتخاب محصول» هم شمارنده‌ی سبد را نشان می‌دهند.
+     * بدون این خط، کم کردن تعداد از سبد روی کاشی اثر نمی‌کرد و عدد
+     * قبلی همان‌جا می‌ماند.
+     */
+    if(document.getElementById('quick-select-grid')) renderQuickSelectGrid();
   }
   // ---- انتخاب محصول (صفحه جداگانه، بدون اسکن): فیلتر بر اساس دسته‌بندی + استپر برای هر محصول ----
   let quickSelectCategory = '';
@@ -7853,7 +8441,7 @@
     }
   });
 
-  const EXTRA_PAGES = ['debtor-account', 'quick-sale', 'supplier-account'];
+  const EXTRA_PAGES = ['debtor-account', 'quick-sale', 'supplier-account', 'receipts'];
 
   function goTo(pageId){
     if(!PAGES.find(p=>p.id===pageId) && !EXTRA_PAGES.includes(pageId)) pageId = 'dashboard';
@@ -7886,6 +8474,9 @@
     } else if(pageId==='audit-log'){
       pageTitle.textContent = 'سابقه عملیات';
       renderAuditLog();
+    } else if(pageId==='receipts'){
+      pageTitle.textContent = 'رسیدها';
+      renderReceiptsPage();
     } else {
       const meta = PAGES.find(p=>p.id===pageId);
       pageTitle.textContent = meta ? meta.label : '';
@@ -7896,6 +8487,7 @@
     if(pageId!=='settings'){ stopSettingsCameraTest(); }
 
     closeFab();
+    document.dispatchEvent(new CustomEvent('tohid:page-change', { detail:{ pageId } }));
   }
 
   // ---- FAB (appearance/interaction only) ----
