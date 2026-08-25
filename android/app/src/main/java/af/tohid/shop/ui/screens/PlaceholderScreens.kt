@@ -22,8 +22,3 @@ fun ProductsScreen() = ScreenScaffold("محصولات", "کالاها و موج�
 fun DebtorsScreen() = ScreenScaffold("قرض‌داران", "حساب مشتریان") {
     InfoPanel("در دست ساخت", "صفحه قرض‌داران در مرحله بعد منتقل می‌شود.")
 }
-
-@Composable
-fun SettingsScreen() = ScreenScaffold("تنظیمات", "پشتیبان‌گیری و تنظیمات برنامه") {
-    InfoPanel("در دست ساخت", "صفحه تنظیمات در مرحله بعد منتقل می‌شود.")
-}

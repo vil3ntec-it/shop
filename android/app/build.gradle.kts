@@ -10,6 +10,22 @@ plugins {
 val versionNameFromCi: String = System.getenv("TOHID_VERSION_NAME") ?: "1.0.0"
 val signingEnabled: Boolean = System.getenv("TOHID_SIGNING") == "true"
 
+/**
+ * versionCode از خودِ نسخه ساخته می‌شود: 1.2.3 → 1_002_003
+ *
+ * چرا مهم است: اندروید فقط وقتی اجازه‌ی نصب روی نسخه‌ی قبلی را می‌دهد که
+ * versionCode بزرگ‌تر باشد. اگر ثابت بماند، به‌روزرسانی اصلاً نصب نمی‌شود.
+ * این فرمول تا نسخه‌ی 2147.999.999 جا دارد — عملاً برای همیشه کافی است.
+ */
+fun versionCodeOf(name: String): Int {
+    val parts = name.trim().removePrefix("v").split('.', '-')
+    val major = parts.getOrNull(0)?.toIntOrNull() ?: 1
+    val minor = parts.getOrNull(1)?.toIntOrNull() ?: 0
+    val patch = parts.getOrNull(2)?.toIntOrNull() ?: 0
+    require(minor < 1000 && patch < 1000) { "شماره نسخه باید کمتر از ۱۰۰۰ باشد: $name" }
+    return major * 1_000_000 + minor * 1_000 + patch
+}
+
 android {
     namespace = "af.tohid.shop"
     compileSdk = 35
@@ -18,7 +34,7 @@ android {
         applicationId = "af.tohid.shop"
         minSdk = 24                 // اندروید ۷ به بالا — تقریباً همه گوشی‌های در گردش
         targetSdk = 35
-        versionCode = 1
+        versionCode = versionCodeOf(versionNameFromCi)
         versionName = versionNameFromCi
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
