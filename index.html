@@ -34,9 +34,9 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
-<link rel="stylesheet" href="license/license-ui.css?v=9">
-<link rel="stylesheet" href="license/shop-ui.css?v=9">
-<link rel="stylesheet" href="license/vip.css?v=9">
+<link rel="stylesheet" href="license/license-ui.css?v=10">
+<link rel="stylesheet" href="license/shop-ui.css?v=10">
+<link rel="stylesheet" href="license/vip.css?v=10">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <!-- فونت به‌صورت غیرمسدودکننده بارگذاری می‌شود تا نبودِ اینترنت باز شدن برنامه را کند نکند -->
@@ -466,6 +466,92 @@
     display:flex; align-items:center; justify-content:center;
     flex-shrink:0;
   }
+  /* ---------- دکمه‌ی شناور صفحه‌ی فروش ----------
+     دکمه‌ی «افزودن» عمومی به لبه‌ی آغازین صفحه چسبیده، پس این یکی
+     به لبه‌ی مقابل می‌رود تا دو دکمه روی هم نیفتند و جلوی دست نباشند. */
+  .sale-fab-wrap{
+    position:fixed;
+    bottom:calc(var(--bottomnav-h) + 16px);
+    inset-inline-end:18px;
+    /* بالاتر از سبد خرید چسبیده به پایین، وگرنه پشت آن پنهان می‌شود */
+    z-index:46;
+    display:none;
+    flex-direction:column; align-items:center; gap:6px;
+  }
+  .sale-fab-wrap.show{ display:flex; }
+  @media(min-width:769px){ .sale-fab-wrap{bottom:24px;} }
+  .sale-fab{
+    width:54px; height:54px; border-radius:50%; border:none;
+    background:linear-gradient(160deg, var(--success), #35c8c0);
+    color:#fff; display:flex; align-items:center; justify-content:center;
+    box-shadow:0 10px 24px -8px rgba(24,160,107,.6);
+    transition:transform .2s ease;
+    animation:fabPop .3s cubic-bezier(.3,1.4,.5,1) both;
+  }
+  .sale-fab:active{ transform:scale(.92); }
+  @media (hover:hover){ .sale-fab:hover{ transform:translateY(-2px); } }
+
+  /* ---------- نوار «به حساب قرض‌دار» بالای سبد خرید ---------- */
+  .cart-debtor-row{
+    display:flex; align-items:center; gap:8px;
+    padding:9px 12px;
+    border-bottom:1px solid var(--border);
+    background:var(--surface);
+  }
+  .cart-debtor-btn{
+    flex:1; display:flex; align-items:center; gap:9px;
+    padding:8px 10px; border-radius:var(--radius-md);
+    border:1.5px dashed var(--border); background:var(--bg);
+    font-family:inherit; font-size:12.5px; font-weight:700; color:var(--muted);
+    cursor:pointer; text-align:start;
+    transition:border-color .18s ease, background-color .18s ease, color .18s ease, transform .12s ease;
+  }
+  .cart-debtor-btn:active{ transform:scale(.985); }
+  @media (hover:hover){ .cart-debtor-btn:hover{ border-color:var(--primary); color:var(--primary); } }
+  .cart-debtor-btn .cd-ic{
+    width:28px; height:28px; flex:0 0 auto; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    background:var(--surface-2); color:var(--muted);
+  }
+  .cart-debtor-row.picked .cart-debtor-btn{
+    border-style:solid; border-color:var(--primary);
+    background:var(--primary-tint); color:var(--primary-dark);
+  }
+  .cart-debtor-row.picked .cd-ic{ background:var(--primary); color:#fff; }
+  .cd-txt{ display:flex; flex-direction:column; gap:2px; min-width:0; }
+  .cd-txt b{ font-size:12.5px; font-weight:800; }
+  .cd-txt i{ font-style:normal; font-size:10.5px; font-weight:700; color:var(--muted); }
+  .cart-debtor-clear{
+    flex:0 0 auto; width:28px; height:28px; border-radius:50%;
+    display:none; align-items:center; justify-content:center;
+    border:1px solid var(--border); background:var(--bg); color:var(--danger);
+    cursor:pointer;
+  }
+  .cart-debtor-row.picked .cart-debtor-clear{ display:flex; }
+
+  /* ---------- انتخاب قرض‌دار ---------- */
+  .pick-debtor-list{ max-height:46vh; overflow-y:auto; margin-top:10px; }
+  .pick-debtor-item{
+    display:flex; align-items:center; gap:10px; width:100%;
+    padding:11px 12px; margin-bottom:7px; border-radius:var(--radius-md);
+    border:1px solid var(--border); background:var(--bg);
+    font-family:inherit; cursor:pointer; text-align:start;
+    transition:border-color .16s ease, background-color .16s ease, transform .12s ease;
+  }
+  .pick-debtor-item:active{ transform:scale(.985); }
+  @media (hover:hover){ .pick-debtor-item:hover{ border-color:var(--primary); background:var(--primary-tint); } }
+  .pick-debtor-av{
+    width:34px; height:34px; flex:0 0 auto; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    background:var(--primary-tint); color:var(--primary);
+    font-size:12.5px; font-weight:800;
+  }
+  .pick-debtor-name{ flex:1; font-size:13px; font-weight:800; color:var(--text); }
+  .pick-debtor-bal{ font-size:11px; font-weight:800; color:var(--danger); white-space:nowrap; }
+  .pick-debtor-bal.credit{ color:var(--success); }
+  .pick-debtor-bal.settled{ color:var(--muted); }
+  .pick-debtor-empty{ padding:24px 10px; text-align:center; font-size:12.5px; color:var(--muted); }
+
   .fab-scrim{
     position:fixed; inset:0;
     background:rgba(15,22,40,.15);
@@ -566,6 +652,9 @@
   .debtor-amount{font-size:14px; font-weight:800; color:var(--danger); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;}
   @media (min-width:820px){ .debtor-amount{font-size:20px;} }
   .debtor-amount.settled{color:var(--success); font-weight:700;}
+  /* پول اضافه‌ی طرف — سبز، ولی با متن «موجودی» تا با تسویه اشتباه نشود */
+  .debtor-amount.credit{color:var(--success); font-size:12.5px;}
+  @media (min-width:820px){ .debtor-amount.credit{font-size:15px;} }
   .debtor-meta{
     font-size:10.5px; font-weight:700; color:var(--muted); margin-top:2px;
     display:flex; gap:6px; flex-wrap:wrap; justify-content:center;
@@ -836,6 +925,138 @@
   }
   .build-stamp span{color:var(--muted); font-weight:600;}
   .build-stamp b{font-weight:800; color:var(--text); letter-spacing:.4px;}
+
+  /* ==========================================================
+     صفحه‌ی ورود
+     ---------------------------------------------------------- */
+  .auth-brand{text-align:center; margin-bottom:24px;}
+  .auth-brand-mark{
+    width:70px; height:70px; margin:0 auto 16px;
+    display:flex; align-items:center; justify-content:center;
+    border-radius:22px; color:#fff;
+    background:linear-gradient(150deg, var(--primary), var(--primary-dark));
+    box-shadow:0 14px 30px -12px rgba(44,92,230,.75);
+  }
+  .auth-brand h1{font-size:24px; font-weight:800; color:var(--text); margin-bottom:7px;}
+  .auth-brand p{font-size:12.5px; color:var(--muted); line-height:1.8;}
+
+  .auth-section-label{font-size:12px; font-weight:800; color:var(--text); margin-bottom:9px;}
+  .auth-saved{margin-bottom:20px;}
+  .auth-saved-item{
+    display:flex; align-items:center; gap:10px;
+    padding:11px 12px; margin-bottom:8px; border-radius:var(--radius-md);
+    border:1px solid var(--border); background:var(--surface); cursor:pointer;
+    transition:border-color .18s ease, background-color .18s ease, transform .12s ease;
+  }
+  .auth-saved-item:active{transform:scale(.985);}
+  @media (hover:hover){ .auth-saved-item:hover{border-color:var(--primary); background:var(--primary-tint);} }
+  .auth-saved-item:nth-child(2n) .auth-saved-ic{background:rgba(24,160,107,.14); color:var(--success);}
+  .auth-saved-item:nth-child(3n) .auth-saved-ic{background:rgba(232,161,58,.16); color:var(--warning);}
+  .auth-saved-ic{
+    width:36px; height:36px; flex:0 0 auto; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    background:var(--primary-tint); color:var(--primary);
+  }
+  .auth-saved-txt{flex:1; min-width:0; display:flex; flex-direction:column; gap:2px;}
+  .auth-saved-txt b{font-size:12px; font-weight:700; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .auth-saved-txt i{font-style:normal; font-size:11px; color:var(--muted);}
+  .auth-saved-del{
+    width:28px; height:28px; flex:0 0 auto; border:none; border-radius:8px;
+    background:transparent; color:var(--muted-2);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .auth-saved-del:hover{background:var(--danger-tint); color:var(--danger);}
+
+  .auth-input-group{margin-bottom:16px;}
+  .auth-label-row{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:7px;}
+  .auth-input-group > label{display:block; font-size:12.5px; font-weight:700; color:var(--text); margin-bottom:7px;}
+  .auth-label-row label{margin:0; font-size:12.5px; font-weight:700; color:var(--text);}
+  .auth-link{
+    border:none; background:none; padding:0; cursor:pointer;
+    font-family:inherit; font-size:11.5px; font-weight:700; color:var(--primary);
+  }
+  .auth-input{
+    display:flex; align-items:center; gap:9px;
+    padding:0 12px; min-height:52px;
+    border:1.5px solid var(--border); border-radius:var(--radius-md);
+    background:var(--surface);
+    transition:border-color .18s ease, background-color .18s ease, box-shadow .18s ease;
+  }
+  .auth-input:focus-within{
+    border-color:var(--primary); background:var(--bg);
+    box-shadow:0 0 0 4px var(--primary-tint);
+  }
+  .auth-input-ic{flex:0 0 auto; color:var(--muted-2); display:flex;}
+  .auth-input input{
+    flex:1; min-width:0; border:none; outline:none; background:transparent;
+    font-family:inherit; font-size:14px; font-weight:600; color:var(--text);
+    padding:0; text-align:end;
+  }
+  .auth-input input::placeholder{color:var(--muted-2); font-weight:500;}
+  .auth-eye{
+    flex:0 0 auto; width:32px; height:32px; border:none; border-radius:8px;
+    background:transparent; color:var(--muted-2); cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .auth-eye.on{color:var(--primary); background:var(--primary-tint);}
+
+  .auth-submit-btn{
+    width:100%; min-height:54px; margin-top:4px;
+    display:flex; align-items:center; justify-content:center; gap:9px;
+    border:none; border-radius:var(--radius-md); cursor:pointer;
+    background:linear-gradient(120deg, var(--primary), var(--primary-dark));
+    color:#fff; font-family:inherit; font-size:15px; font-weight:800;
+    box-shadow:0 14px 30px -14px rgba(44,92,230,.9);
+    transition:transform .13s ease, box-shadow .2s ease, opacity .2s ease;
+  }
+  .auth-submit-btn:active{transform:scale(.985);}
+  .auth-submit-btn.is-busy{opacity:.75; pointer-events:none;}
+  .auth-btn-spinner{
+    display:none; width:16px; height:16px; border-radius:50%;
+    border:2px solid rgba(255,255,255,.45); border-top-color:#fff;
+    animation:authSpin .6s linear infinite;
+  }
+  .auth-submit-btn.is-busy .auth-btn-spinner{display:inline-block;}
+
+  .auth-divider{
+    display:flex; align-items:center; gap:12px;
+    margin:22px 0 16px; color:var(--muted); font-size:12px; font-weight:700;
+  }
+  .auth-divider::before, .auth-divider::after{
+    content:''; flex:1; height:1px; background:var(--border);
+  }
+
+  .auth-roles{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .auth-role{
+    display:flex; flex-direction:column; align-items:center; gap:5px;
+    padding:16px 10px; cursor:pointer; text-align:center;
+    border:1.5px solid var(--border); border-radius:var(--radius-md);
+    background:var(--bg); font-family:inherit;
+    transition:border-color .18s ease, background-color .18s ease, transform .12s ease, box-shadow .2s ease;
+  }
+  .auth-role:active{transform:scale(.97);}
+  @media (hover:hover){
+    .auth-role:hover{border-color:var(--primary); box-shadow:var(--shadow-md); transform:translateY(-2px);}
+  }
+  .auth-role-ic{
+    width:46px; height:46px; border-radius:50%; margin-bottom:3px;
+    display:flex; align-items:center; justify-content:center;
+    background:linear-gradient(150deg, var(--primary), var(--primary-dark)); color:#fff;
+  }
+  /* «ادامه بدون حساب» رنگ سبز دارد تا از «ساخت حساب» جدا دیده شود */
+  .auth-role.ghost .auth-role-ic{background:linear-gradient(150deg, var(--success), #35c8c0);}
+  @media (hover:hover){ .auth-role.ghost:hover{border-color:var(--success);} }
+  .auth-role b{font-size:12.5px; font-weight:800; color:var(--text);}
+  .auth-role i{font-style:normal; font-size:10.5px; color:var(--muted); line-height:1.6;}
+
+  .auth-field-error{
+    display:none; font-size:11.5px; font-weight:700; color:var(--danger); margin-top:6px;
+  }
+  .auth-field-error.show{display:block;}
+  .auth-note{
+    margin-top:18px; text-align:center;
+    font-size:11.5px; color:var(--muted); line-height:1.9;
+  }
   .checkout-summary-row{display:flex; justify-content:space-between; align-items:center; padding:8px 2px; font-size:13px; color:var(--text-2, var(--text)); border-bottom:1px dashed var(--border);}
   .checkout-summary-row.total{font-size:15px; font-weight:700; color:var(--text); border-bottom:none;}
   .checkout-summary-row b{color:var(--text);}
@@ -940,6 +1161,35 @@
   .acc-sticky-amount{font-size:13px; font-weight:800; color:var(--danger); flex-shrink:0;}
   .acc-sticky-amount.settled{color:var(--success);}
 
+
+  /* سربرگ حساب قرض‌دار — یک نوار، نه یک کارت بزرگ تکراری */
+  .acc-bar{
+    position:sticky; top:0; z-index:15;
+    display:flex; align-items:center; gap:10px;
+    margin-bottom:14px; padding:11px 13px;
+    background:var(--bg); border:1px solid var(--border);
+    border-radius:var(--radius-md); box-shadow:var(--shadow-sm);
+  }
+  .acc-bar-avatar{
+    width:38px; height:38px; flex:0 0 auto; border-radius:var(--radius-sm);
+    background:var(--surface-2); color:var(--primary-dark);
+    display:flex; align-items:center; justify-content:center;
+    font-size:14px; font-weight:800;
+  }
+  .acc-bar-id{display:flex; flex-direction:column; gap:2px; flex:1; min-width:0;}
+  .acc-bar-id b{
+    font-size:14px; font-weight:800; color:var(--text);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .acc-bar-id i{font-style:normal; font-size:10.5px; color:var(--muted);}
+  .acc-bar-money{display:flex; flex-direction:column; align-items:flex-end; gap:1px; flex-shrink:0;}
+  .acc-bar-money b{font-size:15px; font-weight:800; color:var(--danger);}
+  .acc-bar-money i{font-style:normal; font-size:10px; font-weight:700; color:var(--muted);}
+  /* طلبکار: پول بیشتری داده، پس موجودی دارد */
+  .acc-bar.credit .acc-bar-money b{color:var(--success);}
+  .acc-bar.credit .acc-bar-money i{color:var(--success);}
+  .acc-bar.settled .acc-bar-money b{color:var(--success); font-size:13.5px;}
+  .acc-bar-actions{display:flex; gap:5px; flex-shrink:0;}
   .account-head{
     background:var(--bg);
     border:1px solid var(--border);
@@ -1113,24 +1363,33 @@
 
   /* ---------- Expense multi-row entry ---------- */
   #expense-rows{display:flex; flex-direction:column; gap:10px;}
-  /* هر ردیف: بابت + مبلغ در یک خط، دسته‌بندی خودش زیر آن */
+  /*
+   * هر ردیف: بابت و مبلغ در خط اول، دسته‌بندی در خط دوم و باریک —
+   * قبلاً select دسته‌بندی تمام عرض را می‌گرفت و دو کادر دیگر له می‌شدند.
+   * دکمه‌ی حذف چسبیده به لبه است تا موقع تایپ زیر انگشت نیفتد.
+   */
   .exp-row{
-    display:grid; grid-template-columns:1fr auto; gap:7px 8px; align-items:start;
-    padding:9px; border:1px solid var(--border); border-radius:var(--radius-md);
+    position:relative;
+    display:flex; flex-direction:column; gap:7px;
+    padding:10px 40px 10px 10px;
+    border:1px solid var(--border); border-radius:var(--radius-md);
     background:var(--surface);
   }
   .exp-row .form-input{margin:0; background:var(--bg);}
   .exp-row-main{display:flex; gap:8px; min-width:0;}
-  .exp-row-cat{grid-column:1; min-width:0;}
+  .exp-row-title{flex:2; min-width:0;}
+  .exp-row-amount{flex:1.1; min-width:0;}
+  .exp-row-cat{max-width:190px; min-width:0;}
   .exp-row-cat .form-input{font-size:12px; min-height:36px;}
-  .exp-row-remove{grid-row:1 / span 2; align-self:center;}
-  .exp-row-title{flex:1.5; min-width:0;}
-  .exp-row-amount{flex:1; min-width:0;}
+  .exp-row-remove{
+    position:absolute; top:8px; inset-inline-end:6px;
+    width:28px; height:28px; margin:0;
+  }
   @media (min-width:640px){
-    .exp-row{grid-template-columns:1.6fr 1fr auto; align-items:center;}
-    .exp-row-main{grid-column:1;}
-    .exp-row-cat{grid-column:2;}
-    .exp-row-remove{grid-row:auto;}
+    .exp-row{flex-direction:row; align-items:center; padding:10px 44px 10px 10px;}
+    .exp-row-main{flex:1;}
+    .exp-row-cat{flex:0 0 170px; max-width:170px;}
+    .exp-row-remove{top:50%; transform:translateY(-50%);}
   }
   .exp-row-remove{
     flex-shrink:0; width:38px; height:38px; margin-top:1px;
@@ -1212,7 +1471,12 @@
 
   /* ---------- Quick-select (separate) page ---------- */
   #page-quick-sale .page-toolbar{margin-bottom:12px;}
+  /*
+   * دکمه‌ی حذف دسته‌بندی به لبه‌ی مقابل رانده می‌شود و از دکمه‌ی «+»
+   * فاصله می‌گیرد؛ قبلاً چسبیده به هم بودند و راحت اشتباهی زده می‌شد.
+   */
   .qs-cat-row{display:flex; align-items:stretch; gap:8px; margin-bottom:10px;}
+  .qs-cat-btn.danger{margin-inline-start:auto;}
   .qs-cat-select{
     width:auto; max-width:60%; flex:0 1 auto;
     font-size:13px; font-weight:700; padding:9px 12px;
@@ -1436,12 +1700,23 @@
   }
   .auth-bg-shape{
     position:absolute; border-radius:50%;
-    background:linear-gradient(160deg, var(--primary), var(--success));
-    opacity:.10; filter:blur(2px);
+    opacity:.13; filter:blur(28px); pointer-events:none;
     animation:authFloat 9s ease-in-out infinite;
   }
-  .auth-bg-shape.s1{ width:260px; height:260px; top:-80px; inset-inline-start:-60px; }
-  .auth-bg-shape.s2{ width:200px; height:200px; bottom:-70px; inset-inline-end:-50px; animation-delay:-4s; animation-duration:11s; }
+  .auth-bg-shape.s1{
+    width:300px; height:300px; top:-90px; inset-inline-start:-70px;
+    background:linear-gradient(160deg, var(--primary), #7b5cf0);
+  }
+  .auth-bg-shape.s2{
+    width:230px; height:230px; bottom:-60px; inset-inline-end:-60px;
+    background:linear-gradient(160deg, var(--success), #35c8c0);
+    animation-delay:-4s; animation-duration:11s;
+  }
+  .auth-bg-shape.s3{
+    width:180px; height:180px; top:38%; inset-inline-end:-90px;
+    background:linear-gradient(160deg, var(--warning), #f2764a);
+    opacity:.10; animation-delay:-7s; animation-duration:13s;
+  }
   @keyframes authFloat{
     0%,100%{ transform:translateY(0) rotate(0deg); }
     50%{ transform:translateY(-22px) rotate(8deg); }
@@ -1815,104 +2090,82 @@
 <div class="auth-screen" id="auth-screen">
   <div class="auth-bg-shape s1"></div>
   <div class="auth-bg-shape s2"></div>
+  <div class="auth-bg-shape s3"></div>
 
   <div class="auth-card" id="auth-card">
-    <button type="button" class="auth-gear-btn" id="auth-gear-btn" aria-label="تنظیم آدرس سرور">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-    </button>
-
-    <div class="auth-logo">
-      <div class="auth-logo-mark">ت</div>
-      <h1>توحید</h1>
-      <p>مدیریت فروشگاه</p>
+    <div class="auth-brand">
+      <span class="auth-brand-mark">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3.5 8.5L12 4l8.5 4.5v7L12 20l-8.5-4.5v-7z"/>
+          <path d="M3.5 8.5L12 13l8.5-4.5"/><path d="M12 13v7"/>
+        </svg>
+      </span>
+      <h1>خوش آمدید</h1>
+      <p>برای استفاده از توحید، وارد حساب خود شوید</p>
     </div>
 
-    <div class="auth-server-panel" id="auth-server-panel">
-      <label for="auth-server-url">آدرس سرور خانگی</label>
-      <div class="auth-server-row">
-        <input type="text" id="auth-server-url" placeholder="ws://192.168.0.102:4700" dir="ltr">
-      </div>
-      <label for="auth-server-token" style="margin-top:8px;">رمز سرور</label>
-      <div class="auth-server-row">
-        <input type="text" id="auth-server-token" placeholder="رمز سرور" dir="ltr">
-      </div>
-      <div class="auth-server-row" style="margin-top:8px;">
-        <button type="button" id="auth-server-save">ذخیره</button>
-        <button type="button" id="auth-server-connect">اتصال به سرور</button>
-      </div>
-      <p class="auth-server-hint" id="auth-server-status">آدرس و رمز سروری که کد ورود را ارسال و تایید می‌کند.</p>
+    <!-- ورودهای ذخیره‌شده روی همین دستگاه -->
+    <div class="auth-saved" id="auth-saved" hidden>
+      <div class="auth-section-label">ورودهای ذخیره شده</div>
+      <div id="auth-saved-list"></div>
     </div>
 
-
-    <!-- Step 1: choose method + enter value -->
-    <div class="auth-step active" data-step="request">
-      <div class="auth-tabs">
-        <button type="button" class="auth-tab active" data-method="phone">شماره موبایل</button>
-        <button type="button" class="auth-tab" data-method="email">ایمیل</button>
-        <span class="auth-tab-indicator pos-1" id="auth-tab-indicator"></span>
+    <form id="auth-login-form" novalidate autocomplete="on">
+      <div class="auth-input-group">
+        <label for="auth-identifier">شماره موبایل یا ایمیل</label>
+        <div class="auth-input">
+          <span class="auth-input-ic">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20v-1.3A4.7 4.7 0 0 1 9.2 14h5.6a4.7 4.7 0 0 1 4.7 4.7V20"/></svg>
+          </span>
+          <input type="text" id="auth-identifier" placeholder="۰۷۸۱۲۳۴۵۶۷۸" dir="ltr" autocomplete="username">
+        </div>
+        <span class="auth-field-error" id="auth-identifier-error"></span>
       </div>
 
-      <form id="auth-request-form" novalidate autocomplete="off">
-        <div class="auth-field active" data-field="phone">
-          <div class="form-field-floating">
-            <input type="tel" inputmode="numeric" id="auth-phone" placeholder=" " autocomplete="tel" dir="ltr">
-            <label for="auth-phone">شماره موبایل</label>
-          </div>
-          <span class="auth-field-error" id="auth-phone-error"></span>
+      <div class="auth-input-group">
+        <div class="auth-label-row">
+          <label for="auth-password">رمز عبور</label>
+          <button type="button" class="auth-link" id="auth-forgot">رمز عبور را فراموش کرده‌اید؟</button>
         </div>
-        <div class="auth-field" data-field="email">
-          <div class="form-field-floating">
-            <input type="email" id="auth-email" placeholder=" " autocomplete="email" dir="ltr">
-            <label for="auth-email">ایمیل</label>
-          </div>
-          <span class="auth-field-error" id="auth-email-error"></span>
+        <div class="auth-input">
+          <span class="auth-input-ic">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="10.5" width="15" height="9.5" rx="2.2"/><path d="M8 10.5V7.8a4 4 0 1 1 8 0v2.7"/></svg>
+          </span>
+          <input type="password" id="auth-password" placeholder="••••••••" dir="ltr" autocomplete="current-password">
+          <button type="button" class="auth-eye" id="auth-eye" aria-label="نمایش رمز">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.8"/></svg>
+          </button>
         </div>
-
-        <div class="form-field-floating">
-          <input type="text" id="auth-name" placeholder=" " autocomplete="name">
-          <label for="auth-name">نام شما (اختیاری)</label>
-        </div>
-
-        <button type="submit" class="auth-submit-btn" id="auth-send-btn">
-          <span class="auth-btn-label">ارسال کد ورود</span>
-          <span class="auth-btn-spinner"></span>
-          <svg class="auth-btn-check" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
-        </button>
-      </form>
-    </div>
-
-    <!-- Step 2: enter the code that was sent -->
-    <div class="auth-step" data-step="verify">
-      <div class="auth-otp-target">
-        <span id="auth-otp-target-value">—</span>
-        <button type="button" id="auth-change-target">تغییر</button>
+        <span class="auth-field-error" id="auth-password-error"></span>
       </div>
 
-      <form id="auth-verify-form" novalidate autocomplete="off">
-        <div class="auth-otp-inputs" id="auth-otp-inputs">
-          <input type="text" inputmode="numeric" maxlength="1" class="auth-otp-box">
-          <input type="text" inputmode="numeric" maxlength="1" class="auth-otp-box">
-          <input type="text" inputmode="numeric" maxlength="1" class="auth-otp-box">
-          <input type="text" inputmode="numeric" maxlength="1" class="auth-otp-box">
-          <input type="text" inputmode="numeric" maxlength="1" class="auth-otp-box">
-          <input type="text" inputmode="numeric" maxlength="1" class="auth-otp-box">
-        </div>
-        <span class="auth-field-error show" id="auth-otp-error" style="text-align:center; display:block;"></span>
+      <button type="submit" class="auth-submit-btn" id="auth-login-btn">
+        <span class="auth-btn-label">ورود به حساب</span>
+        <span class="auth-btn-spinner"></span>
+      </button>
+      <span class="auth-field-error" id="auth-form-error" style="text-align:center; display:block;"></span>
+    </form>
 
-        <div class="auth-resend-row">
-          <span id="auth-resend-hint">ارسال دوباره کد تا <b id="auth-resend-countdown">۰۱:۰۰</b></span>
-          <button type="button" id="auth-resend-btn" style="display:none;">ارسال دوباره کد</button>
-        </div>
+    <div class="auth-divider"><span>ثبت‌نام در توحید</span></div>
 
-        <button type="submit" class="auth-submit-btn" id="auth-verify-btn">
-          <span class="auth-btn-label">تایید و ورود</span>
-          <span class="auth-btn-spinner"></span>
-          <svg class="auth-btn-check" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
-        </button>
-      </form>
+    <div class="auth-roles">
+      <button type="button" class="auth-role" id="auth-role-seller">
+        <span class="auth-role-ic">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 9.5h17l-1 10.5h-15l-1-10.5z"/><path d="M3.5 9.5L5 4h14l1.5 5.5"/><path d="M9 13.5h6"/></svg>
+        </span>
+        <b>فروشنده</b>
+        <i>ساخت حساب دکان</i>
+      </button>
+      <button type="button" class="auth-role ghost" id="auth-skip">
+        <span class="auth-role-ic">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13"/><path d="M13 6l6 6-6 6"/></svg>
+        </span>
+        <b>ادامه بدون حساب</b>
+        <i>همه‌چیز روی همین گوشی</i>
+      </button>
     </div>
 
-    <p class="auth-note">اطلاعات ورود از طریق سرور خودتان تایید می‌شود.</p>
+    <p class="auth-note" id="auth-note">ورود اختیاری است — بدون حساب هم می‌توانید از برنامه استفاده کنید.</p>
   </div>
 </div>
 
@@ -2214,30 +2467,25 @@
           بازگشت به قرض‌داران
         </a>
 
-        <div class="account-sticky" id="acc-sticky">
-          <span class="acc-sticky-avatar" id="acc-sticky-avatar">—</span>
-          <span class="acc-sticky-name" id="acc-sticky-name">—</span>
-          <span class="acc-sticky-amount" id="acc-sticky-amount">۰</span>
-        </div>
-
-        <div class="account-head">
-          <div class="account-avatar" id="acc-avatar">—</div>
-          <div class="account-id">
-            <h2 id="acc-name">—</h2>
-            <p id="acc-phone">—</p>
-          </div>
-          <div class="account-debt">
-            <div class="amount" id="acc-amount">۰</div>
-            <div class="label">افغانی</div>
-          </div>
-          <div class="account-head-actions">
+        <!-- سربرگ حساب: نام، وضعیت و مبلغ — همیشه بالای صفحه می‌ماند -->
+        <div class="acc-bar" id="acc-bar">
+          <span class="acc-bar-avatar" id="acc-avatar">—</span>
+          <span class="acc-bar-id">
+            <b id="acc-name">—</b>
+            <i id="acc-phone">—</i>
+          </span>
+          <span class="acc-bar-money">
+            <b id="acc-amount">۰</b>
+            <i id="acc-state">افغانی</i>
+          </span>
+          <span class="acc-bar-actions">
             <button class="icon-btn-sm" id="btn-edit-account-debtor" aria-label="ویرایش">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
             </button>
             <button class="icon-btn-sm danger" id="btn-del-account-debtor" aria-label="حذف">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
             </button>
-          </div>
+          </span>
         </div>
 
         <div class="account-actions">
@@ -2504,7 +2752,6 @@
             <p>کالا را جلوی دوربین بگیرید تا خودکار به سبد اضافه شود</p>
           </div>
           <div class="toolbar-actions">
-            <a class="btn btn-secondary btn-sm" id="btn-quick-select-entry" data-page="quick-sale" href="#quick-sale">انتخاب محصول</a>
             <button class="btn btn-secondary btn-sm" id="btn-toggle-scanner">توقف دوربین</button>
           </div>
         </div>
@@ -2559,6 +2806,20 @@
           </div>
         </div>
         <div class="cart-drawer" id="cart-drawer" style="display:none;">
+          <div class="cart-debtor-row" id="cart-debtor-row">
+            <button type="button" class="cart-debtor-btn" data-pick-debtor>
+              <span class="cd-ic">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20v-1.3A4.7 4.7 0 0 1 9.2 14h5.6a4.7 4.7 0 0 1 4.7 4.7V20"/></svg>
+              </span>
+              <span class="cd-txt">
+                <b data-cd-name>به حساب قرض‌دار بگذار</b>
+                <i data-cd-sub>برای فروش نسیه، قرض‌دار را انتخاب کنید</i>
+              </span>
+            </button>
+            <button type="button" class="cart-debtor-clear" data-clear-debtor aria-label="حذف قرض‌دار">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
           <div class="cart-drawer-body" id="cart-drawer-body" style="display:none;">
             <div class="exp-list cart-list" id="cart-list"></div>
           </div>
@@ -2609,6 +2870,20 @@
         <div class="quick-select-empty" id="quick-select-empty" style="display:none;">محصولی در این دسته‌بندی نیست</div>
 
         <div class="cart-drawer" id="qs-cart-drawer" style="display:none;">
+          <div class="cart-debtor-row" id="qs-cart-debtor-row">
+            <button type="button" class="cart-debtor-btn" data-pick-debtor>
+              <span class="cd-ic">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20v-1.3A4.7 4.7 0 0 1 9.2 14h5.6a4.7 4.7 0 0 1 4.7 4.7V20"/></svg>
+              </span>
+              <span class="cd-txt">
+                <b data-cd-name>به حساب قرض‌دار بگذار</b>
+                <i data-cd-sub>برای فروش نسیه، قرض‌دار را انتخاب کنید</i>
+              </span>
+            </button>
+            <button type="button" class="cart-debtor-clear" data-clear-debtor aria-label="حذف قرض‌دار">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
           <div class="cart-drawer-body" id="qs-cart-drawer-body" style="display:none;">
             <div class="exp-list cart-list" id="qs-cart-list"></div>
           </div>
@@ -2620,7 +2895,7 @@
               <span>مجموع</span>
               <strong id="qs-cart-total-amount">۰ افغانی</strong>
             </div>
-            <a class="btn btn-primary btn-sm" href="#sale" data-page="sale">ادامه فروش</a>
+            <button type="button" class="btn btn-primary btn-sm" id="btn-qs-finalize-sale">ثبت فروش</button>
           </div>
         </div>
       </section>
@@ -3086,6 +3361,12 @@
 <nav class="bottom-nav" id="bottom-nav"></nav>
 
 <!-- FAB -->
+<div class="sale-fab-wrap" id="sale-fab-wrap">
+  <button type="button" class="sale-fab" id="sale-fab-btn" aria-label="انتخاب محصول" title="انتخاب محصول">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+  </button>
+</div>
+
 <div class="fab-scrim" id="fab-scrim"></div>
 <div class="fab-wrap">
   <button class="fab" id="fab-btn" aria-label="افزودن">
@@ -3596,8 +3877,8 @@
       </button>
     </div>
     <form id="form-expense">
-      <div class="form-group" id="fg-expense-category">
-        <label>دسته‌بندی پیش‌فرض <small style="font-weight:500; color:var(--muted-2);">— هر ردیف می‌تواند دسته‌ی خودش را داشته باشد</small></label>
+      <!-- دسته‌بندی روی خودِ هر ردیف است؛ این‌ها فقط برای سازگاری کد پنهان مانده‌اند -->
+      <div class="form-group" id="fg-expense-category" hidden>
         <select class="form-input" id="in-expense-category"></select>
         <div class="field-error">دسته‌بندی را انتخاب کنید.</div>
       </div>
@@ -3681,6 +3962,24 @@
   </div>
 </div>
 
+<!-- Debtor picker (used from the sale and product-select carts) -->
+<div class="modal-scrim" id="modal-pick-debtor">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3>فروش به حساب کدام قرض‌دار؟</h3>
+      <button class="modal-close" data-close-modal="modal-pick-debtor">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <input class="form-input" id="in-pick-debtor-search" type="text" placeholder="جستجوی نام قرض‌دار…">
+    <div class="pick-debtor-list" id="pick-debtor-list"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-secondary" data-close-modal="modal-pick-debtor">انصراف</button>
+      <button type="button" class="btn btn-primary" id="btn-pick-debtor-new">قرض‌دار جدید</button>
+    </div>
+  </div>
+</div>
+
 <!-- Invoice modal -->
 <div class="modal-scrim" id="modal-invoice">
   <div class="modal-box" id="invoice-modal-box">
@@ -3736,6 +4035,11 @@
   let debtors = [];      // {id, name, phone, notes, createdAt}
   let transactions = []; // {id, debtorId, type:'give'|'receive', amount, date, notes, createdAt}
   let editingDebtorId = null;
+  /* وقتی «قرض‌دار جدید» از داخل سبد خرید ساخته می‌شود، همان‌جا انتخابش کنیم */
+  let onDebtorCreated = null;
+  /* قرض‌داری که فروش فعلی روی حساب او می‌رود (از خود سبد خرید انتخاب می‌شود).
+     بالا اعلام شده چون renderCart() ممکن است قبل از رسیدن به بخش فروش اجرا شود. */
+  let saleDebtorId = null;
   let currentAccountDebtorId = null;
   let currentTxType = null;
   let confirmAction = null;
@@ -3913,249 +4217,167 @@
     });
   }
 
-  // ---- سوییچ موقت: صفحه لاگین خاموشه، مستقیم میره تو برنامه ----
-  // برای روشن کردن دوباره لاگین، این خط رو false کن:
-  const LOGIN_DISABLED = true;
+  // ---- صفحه‌ی ورود ----
+  // ورود اجباری نیست؛ «ادامه بدون حساب» همیشه هست و یک‌بار که زده شود
+  // دیگر این صفحه نمی‌آید. برای خاموش کردن کامل، این خط را true کن.
+  const LOGIN_DISABLED = false;
 
-  function initAuth(){
+  /* ==========================================================
+     ورود
+     ----------------------------------------------------------
+     ورود اختیاری است: بدون حساب هم همه‌ی برنامه کار می‌کند و
+     اطلاعات روی همین دستگاه می‌ماند. حساب فقط برای همگام‌سازی
+     بین گوشی‌ها و اشتراک لازم است، و تأیید آن با سرور خودتان است.
+     ========================================================== */
+  const SAVED_LOGINS_KEY = 'tohid-saved-logins-v1';
+
+  function readSavedLogins(){
+    try{ const v = JSON.parse(localStorage.getItem(SAVED_LOGINS_KEY)); return Array.isArray(v) ? v : []; }
+    catch(e){ return []; }
+  }
+  function writeSavedLogins(list){
+    try{ localStorage.setItem(SAVED_LOGINS_KEY, JSON.stringify(list.slice(0,4))); }catch(e){}
+  }
+  function rememberLogin(identifier, shopName){
+    if(!identifier) return;
+    const list = readSavedLogins().filter(x=> x.identifier !== identifier);
+    list.unshift({ identifier, shop: shopName || '', at: Date.now() });
+    writeSavedLogins(list);
+  }
+
+  function renderSavedLogins(){
+    const wrap = document.getElementById('auth-saved');
+    const listEl = document.getElementById('auth-saved-list');
+    if(!wrap || !listEl) return;
+    const list = readSavedLogins();
+    if(!list.length){ wrap.hidden = true; listEl.innerHTML = ''; return; }
+    wrap.hidden = false;
+    listEl.innerHTML = list.map(x=> `
+      <div class="auth-saved-item" data-saved="${escapeHtml(x.identifier)}">
+        <span class="auth-saved-ic">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20v-1.3A4.7 4.7 0 0 1 9.2 14h5.6a4.7 4.7 0 0 1 4.7 4.7V20"/></svg>
+        </span>
+        <span class="auth-saved-txt">
+          <b dir="ltr">${escapeHtml(x.identifier)}</b>
+          ${x.shop ? `<i>فروشگاه: ${escapeHtml(x.shop)}</i>` : ''}
+        </span>
+        <button type="button" class="auth-saved-del" data-forget="${escapeHtml(x.identifier)}" aria-label="حذف">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>`).join('');
+  }
+
+  function authError(id, message){
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.textContent = message || '';
+    el.classList.toggle('show', !!message);
+  }
+
+  function enterApp(animated){
     const authScreen = document.getElementById('auth-screen');
     const appRoot = document.getElementById('app-root');
+    if(animated){
+      authScreen.classList.add('auth-exit');
+      appRoot.classList.remove('app-hidden');
+      appRoot.classList.add('app-enter');
+      setTimeout(()=> authScreen.classList.add('auth-hidden'), 520);
+    } else {
+      authScreen.classList.add('auth-hidden');
+      appRoot.classList.remove('app-hidden');
+    }
+  }
+
+  function initAuth(){
     const existing = getAuth();
     wireLogoutButton();
+    renderSavedLogins();
 
-    if(LOGIN_DISABLED){
-      authScreen.classList.add('auth-hidden');
-      appRoot.classList.remove('app-hidden');
+    if(LOGIN_DISABLED || existing){
       applyAuthToUI(existing || { name:'کاربر', method:'phone', value:'' });
+      enterApp(false);
       return;
     }
 
-    if(existing){
-      authScreen.classList.add('auth-hidden');
-      appRoot.classList.remove('app-hidden');
-      applyAuthToUI(existing);
-      return;
-    }
+    const form = document.getElementById('auth-login-form');
+    const idEl = document.getElementById('auth-identifier');
+    const passEl = document.getElementById('auth-password');
+    const btn = document.getElementById('auth-login-btn');
 
-    // ---- server address panel ----
-    const gearBtn = document.getElementById('auth-gear-btn');
-    const serverPanel = document.getElementById('auth-server-panel');
-    const serverInput = document.getElementById('auth-server-url');
-    const serverTokenInput = document.getElementById('auth-server-token');
-    const serverSaveBtn = document.getElementById('auth-server-save');
-    const serverConnectBtn = document.getElementById('auth-server-connect');
-    const serverStatusEl = document.getElementById('auth-server-status');
-    serverInput.value = getServerUrl();
-    if(serverTokenInput) serverTokenInput.value = getServerToken();
-    gearBtn.addEventListener('click', ()=> serverPanel.classList.toggle('open'));
-    serverSaveBtn.addEventListener('click', ()=>{
-      saveServerUrl(serverInput.value);
-      if(serverTokenInput) saveServerToken(serverTokenInput.value);
-      showToast && showToast('آدرس و رمز سرور ذخیره شد');
-    });
-    wireConnectButton(serverConnectBtn, serverInput, serverTokenInput, serverStatusEl);
-
-    // ---- step switching ----
-    const steps = document.querySelectorAll('.auth-step');
-    function goStep(name){
-      steps.forEach(s=> s.classList.toggle('active', s.dataset.step===name));
-    }
-
-    // ---- step 1: request code ----
-    const tabs = document.querySelectorAll('.auth-tab');
-    const indicator = document.getElementById('auth-tab-indicator');
-    const fields = document.querySelectorAll('.auth-field');
-    const requestForm = document.getElementById('auth-request-form');
-    const card = document.getElementById('auth-card');
-    const sendBtn = document.getElementById('auth-send-btn');
-    const phoneInput = document.getElementById('auth-phone');
-    const emailInput = document.getElementById('auth-email');
-    const nameInput = document.getElementById('auth-name');
-    const phoneError = document.getElementById('auth-phone-error');
-    const emailError = document.getElementById('auth-email-error');
-
-    tabs.forEach((tab, i)=>{
-      tab.addEventListener('click', ()=>{
-        authMethod = tab.dataset.method;
-        tabs.forEach(t=> t.classList.toggle('active', t===tab));
-        indicator.classList.toggle('pos-1', i===0);
-        indicator.classList.toggle('pos-2', i===1);
-        fields.forEach(f=> f.classList.toggle('active', f.dataset.field===authMethod));
-        phoneError.classList.remove('show');
-        emailError.classList.remove('show');
-      });
+    // چشم رمز
+    document.getElementById('auth-eye').addEventListener('click', (e)=>{
+      const on = passEl.type === 'password';
+      passEl.type = on ? 'text' : 'password';
+      e.currentTarget.classList.toggle('on', on);
     });
 
-    function shakeCard(){
-      card.classList.remove('shake');
-      void card.offsetWidth;
-      card.classList.add('shake');
-    }
-    function shakeOtp(){
-      const box = document.getElementById('auth-otp-inputs');
-      box.classList.remove('shake');
-      void box.offsetWidth;
-      box.classList.add('shake');
-    }
-    function setBtnLoading(btn, on){
-      btn.classList.toggle('loading', on);
-    }
-
-    async function requestCode(){
-      let value = '';
-      let valid = true;
-      phoneError.classList.remove('show');
-      emailError.classList.remove('show');
-
-      if(authMethod==='phone'){
-        value = phoneInput.value.trim();
-        if(!validatePhone(value)){
-          phoneError.textContent = 'شماره موبایل معتبر وارد کنید';
-          phoneError.classList.add('show');
-          valid = false;
-        }
-      } else {
-        value = emailInput.value.trim();
-        if(!validateEmail(value)){
-          emailError.textContent = 'ایمیل معتبر وارد کنید';
-          emailError.classList.add('show');
-          valid = false;
-        }
-      }
-      if(!valid){ shakeCard(); return; }
-
-      setBtnLoading(sendBtn, true);
-      const result = await wsRequest('send-code', { method:authMethod, value, name:nameInput.value.trim() });
-      setBtnLoading(sendBtn, false);
-
-      if(!result.ok){
-        (authMethod==='phone' ? phoneError : emailError).textContent = result.message || 'ارسال کد ناموفق بود.';
-        (authMethod==='phone' ? phoneError : emailError).classList.add('show');
-        shakeCard();
+    // ورودهای ذخیره‌شده
+    document.getElementById('auth-saved-list').addEventListener('click', (e)=>{
+      const forget = e.target.closest('[data-forget]');
+      if(forget){
+        writeSavedLogins(readSavedLogins().filter(x=> x.identifier !== forget.dataset.forget));
+        renderSavedLogins();
         return;
       }
-
-      authPendingValue = value;
-      authPendingName = nameInput.value.trim();
-      document.getElementById('auth-otp-target-value').textContent = value;
-      clearOtpInputs();
-      goStep('verify');
-      startResendTimer();
-      focusFirstOtpBox();
-    }
-
-    requestForm.addEventListener('submit', (e)=>{ e.preventDefault(); if(!sendBtn.classList.contains('loading')) requestCode(); });
-
-    // ---- step 2: verify code ----
-    const verifyForm = document.getElementById('auth-verify-form');
-    const verifyBtn = document.getElementById('auth-verify-btn');
-    const otpError = document.getElementById('auth-otp-error');
-    const otpBoxes = Array.from(document.querySelectorAll('.auth-otp-box'));
-    const resendHint = document.getElementById('auth-resend-hint');
-    const resendCountdown = document.getElementById('auth-resend-countdown');
-    const resendBtn = document.getElementById('auth-resend-btn');
-    const changeTargetBtn = document.getElementById('auth-change-target');
-
-    function clearOtpInputs(){ otpBoxes.forEach(b=> b.value=''); otpError.textContent=''; }
-    function focusFirstOtpBox(){ setTimeout(()=> otpBoxes[0] && otpBoxes[0].focus(), 350); }
-    function getOtpValue(){ return otpBoxes.map(b=> b.value.trim()).join(''); }
-
-    otpBoxes.forEach((box, i)=>{
-      box.addEventListener('input', ()=>{
-        box.value = box.value.replace(/\D/g,'').slice(0,1);
-        if(box.value && i < otpBoxes.length-1) otpBoxes[i+1].focus();
-        if(getOtpValue().length===otpBoxes.length) verifyForm.requestSubmit();
-      });
-      box.addEventListener('keydown', (e)=>{
-        if(e.key==='Backspace' && !box.value && i>0) otpBoxes[i-1].focus();
-      });
-      box.addEventListener('paste', (e)=>{
-        const text = (e.clipboardData.getData('text')||'').replace(/\D/g,'');
-        if(!text) return;
-        e.preventDefault();
-        text.slice(0, otpBoxes.length).split('').forEach((ch, idx)=>{ if(otpBoxes[idx]) otpBoxes[idx].value = ch; });
-        const next = Math.min(text.length, otpBoxes.length-1);
-        otpBoxes[next].focus();
-      });
+      const item = e.target.closest('[data-saved]');
+      if(item){ idEl.value = item.dataset.saved; passEl.focus(); }
     });
 
-    function startResendTimer(){
-      clearInterval(authResendTimer);
-      let remaining = RESEND_SECONDS;
-      resendBtn.style.display = 'none';
-      resendHint.style.display = 'inline';
-      const tick = ()=>{
-        const m = String(Math.floor(remaining/60)).padStart(2,'0');
-        const s = String(remaining%60).padStart(2,'0');
-        resendCountdown.textContent = m+':'+s;
-        if(remaining<=0){
-          clearInterval(authResendTimer);
-          resendHint.style.display = 'none';
-          resendBtn.style.display = 'inline';
-        }
-        remaining--;
-      };
-      tick();
-      authResendTimer = setInterval(tick, 1000);
-    }
-
-    resendBtn.addEventListener('click', async ()=>{
-      resendBtn.disabled = true;
-      const result = await wsRequest('send-code', { method:authMethod, value:authPendingValue, name:authPendingName });
-      resendBtn.disabled = false;
-      if(!result.ok){
-        otpError.textContent = result.message || 'ارسال دوباره کد ناموفق بود.';
-        return;
-      }
-      otpError.textContent = '';
-      clearOtpInputs();
-      startResendTimer();
-      focusFirstOtpBox();
+    document.getElementById('auth-forgot').addEventListener('click', ()=>{
+      authError('auth-form-error',
+        'برای بازیابی رمز، با پشتیبانی تماس بگیرید. اطلاعات دکان شما روی همین گوشی محفوظ است.');
     });
 
-    changeTargetBtn.addEventListener('click', ()=>{
-      clearInterval(authResendTimer);
-      clearOtpInputs();
-      goStep('request');
+    // ثبت‌نام و ادامه بدون حساب
+    document.getElementById('auth-role-seller').addEventListener('click', ()=>{
+      const local = { method:'local', value:'', name:'کاربر', loginAt:Date.now() };
+      saveAuth(local);
+      applyAuthToUI(local);
+      enterApp(true);
+      setTimeout(()=>{ goTo('shop'); }, 300);
+    });
+    document.getElementById('auth-skip').addEventListener('click', ()=>{
+      // بدون حساب: فقط روی همین گوشی. ذخیره می‌کنیم تا دفعه‌ی بعد
+      // دوباره صفحه‌ی ورود جلوی دست کاربر را نگیرد.
+      const local = { method:'local', value:'', name:'کاربر', loginAt:Date.now() };
+      saveAuth(local);
+      applyAuthToUI(local);
+      enterApp(true);
     });
 
-    verifyForm.addEventListener('submit', async (e)=>{
+    form.addEventListener('submit', async (e)=>{
       e.preventDefault();
-      if(verifyBtn.classList.contains('loading') || verifyBtn.classList.contains('success')) return;
-      const code = getOtpValue();
-      if(code.length !== otpBoxes.length){
-        otpError.textContent = 'کد ۶ رقمی را کامل وارد کنید';
-        shakeOtp();
-        return;
-      }
-      otpError.textContent = '';
-      setBtnLoading(verifyBtn, true);
-      const result = await wsRequest('verify-code', { method:authMethod, value:authPendingValue, code, name:authPendingName });
-      setBtnLoading(verifyBtn, false);
+      authError('auth-identifier-error',''); authError('auth-password-error',''); authError('auth-form-error','');
 
-      if(!result.ok){
-        otpError.textContent = result.message || 'کد نادرست است.';
-        shakeOtp();
+      const identifier = idEl.value.trim();
+      const password = passEl.value;
+      if(!identifier){ authError('auth-identifier-error','شماره موبایل یا ایمیل را وارد کنید.'); idEl.focus(); return; }
+      if(!password){ authError('auth-password-error','رمز عبور را وارد کنید.'); passEl.focus(); return; }
+
+      const lic = window.TohidLicense;
+      if(!lic || !lic.getServerUrl()){
+        authError('auth-form-error',
+          'هنوز آدرس سروری تنظیم نشده است. فعلاً «ادامه بدون حساب» را بزنید — همه‌ی بخش‌ها کار می‌کنند.');
         return;
       }
 
-      verifyBtn.classList.add('success');
-      clearInterval(authResendTimer);
-      const authData = {
-        method:authMethod, value:authPendingValue,
-        name:(result.user && result.user.name) || authPendingName,
-        token: result.token || '', loginAt:Date.now()
-      };
-      saveAuth(authData);
-      applyAuthToUI(authData);
-      setTimeout(()=>{
-        authScreen.classList.add('auth-exit');
-        appRoot.classList.remove('app-hidden');
-        appRoot.classList.add('app-enter');
-        setTimeout(()=> authScreen.classList.add('auth-hidden'), 520);
-      }, 500);
+      btn.classList.add('is-busy');
+      try{
+        const r = await lic.login(identifier, password);
+        const name = (r && r.user && (r.user.name || r.user.email || r.user.phone)) || identifier;
+        rememberLogin(identifier, (r && r.shop && r.shop.name) || '');
+        const authData = { method:'phone', value:identifier, name, token:'', loginAt:Date.now() };
+        saveAuth(authData);
+        applyAuthToUI(authData);
+        enterApp(true);
+      }catch(err){
+        authError('auth-form-error', (err && err.message) || 'ورود ناموفق بود. دوباره تلاش کنید.');
+      }finally{
+        btn.classList.remove('is-busy');
+      }
     });
   }
+
   function wireLogoutButton(){
     const logoutBtn = document.getElementById('btn-logout');
     if(!logoutBtn) return;
@@ -4272,9 +4494,11 @@
     list.innerHTML = filtered.map(d=>{
       const debt = getDebt(d.id);
       const last = getLastTx(d.id);
-      const settled = debt<=0;
+      // منفی یعنی بیشتر از بدهی‌اش داده و نزد ما موجودی دارد
+      const credit = debt < 0;
+      const settled = debt === 0;
       return `
-      <div class="debtor-card ${settled ? 'is-settled' : ''}" data-debtor-id="${d.id}">
+      <div class="debtor-card ${settled ? 'is-settled' : ''} ${credit ? 'is-credit' : ''}" data-debtor-id="${d.id}">
         <button class="debtor-card-close" data-del-debtor="${d.id}" aria-label="حذف">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
@@ -4282,7 +4506,11 @@
           <div class="debtor-name">${escapeHtml(d.name)}</div>
         </div>
         <div class="debtor-side">
-          ${settled ? `<span class="debtor-amount settled">تسویه شده</span>` : `<span class="debtor-amount">${formatMoney(debt)} افغانی</span>`}
+          ${settled
+            ? `<span class="debtor-amount settled">تسویه شده</span>`
+            : credit
+              ? `<span class="debtor-amount credit">${formatMoney(-debt)} افغانی موجودی</span>`
+              : `<span class="debtor-amount">${formatMoney(debt)} افغانی</span>`}
           <div class="debtor-meta">${d.phone ? `<span>${escapeHtml(d.phone)}</span>` : ''}</div>
         </div>
         <button class="debtor-card-edit" data-edit-debtor="${d.id}" aria-label="ویرایش">
@@ -4425,22 +4653,30 @@
     document.getElementById('acc-name').textContent = d.name;
     document.getElementById('acc-phone').textContent = d.phone || d.notes || '—';
 
+    /*
+     * getDebt علامت‌دار است: مثبت یعنی او به ما بدهکار است،
+     * منفی یعنی بیشتر از بدهی‌اش پرداخته و نزد ما موجودی دارد.
+     * قبلاً هر مقدار منفی «تسویه شده» نشان داده می‌شد و پول اضافه‌ی
+     * طرف هیچ‌جا دیده نمی‌شد.
+     */
     const debt = getDebt(id);
+    const bar = document.getElementById('acc-bar');
     const amtEl = document.getElementById('acc-amount');
-    if(debt<=0){
-      amtEl.textContent = 'تسویه شده';
-      amtEl.classList.add('settled');
-    } else {
-      amtEl.textContent = formatMoney(debt);
-      amtEl.classList.remove('settled');
-    }
+    const stateEl = document.getElementById('acc-state');
 
-    // سربرگ چسبان همان نام و مانده را نگه می‌دارد
-    document.getElementById('acc-sticky-avatar').textContent = initials(d.name);
-    document.getElementById('acc-sticky-name').textContent = d.name;
-    const stickyAmt = document.getElementById('acc-sticky-amount');
-    stickyAmt.textContent = debt<=0 ? 'تسویه' : formatMoney(debt) + ' افغانی';
-    stickyAmt.classList.toggle('settled', debt<=0);
+    bar.classList.remove('credit','settled');
+    if(debt > 0){
+      amtEl.textContent = formatMoney(debt);
+      stateEl.textContent = 'افغانی بدهکار';
+    } else if(debt < 0){
+      bar.classList.add('credit');
+      amtEl.textContent = formatMoney(-debt);
+      stateEl.textContent = 'افغانی موجودی دارد';
+    } else {
+      bar.classList.add('settled');
+      amtEl.textContent = 'تسویه';
+      stateEl.textContent = 'حساب صاف است';
+    }
 
     const txs = transactions.filter(t=>t.debtorId===id)
       .sort((a,b)=> new Date(b.date)-new Date(a.date) || b.createdAt-a.createdAt);
@@ -4507,21 +4743,6 @@
   }
 
 /* سربرگ چسبان فقط وقتی دیده شود که کارت بالای صفحه از دید رفته باشد */
-  (function watchAccountHeader(){
-    const page = document.getElementById('page-debtor-account');
-    if(!page) return;
-    const sticky = document.getElementById('acc-sticky');
-    const head = page.querySelector('.account-head');
-    if(!sticky || !head) return;
-    function sync(){
-      if(!page.classList.contains('active')){ sticky.classList.remove('show'); return; }
-      sticky.classList.toggle('show', head.getBoundingClientRect().bottom < 60);
-    }
-    window.addEventListener('scroll', sync, { passive:true });
-    document.addEventListener('tohid:page-change', sync);
-    sync();
-  })();
-
 /* ==========================================================
      رسیدها — دریافتی‌های قرض‌داران و مصارف، به تفکیک ماه و سال
      ----------------------------------------------------------
@@ -4719,7 +4940,7 @@
   });
 
 /* ---- شماره‌ی نسخه و گرفتن اجباری آخرین نسخه ---- */
-  const APP_BUILD = 'v9';
+  const APP_BUILD = 'v10';
   (function showBuild(){
     const el = document.getElementById('build-id');
     if(el) el.textContent = APP_BUILD;
@@ -4870,8 +5091,10 @@
       showToast('با موفقیت ویرایش شد');
       if(currentAccountDebtorId===editingDebtorId) renderAccountPage(editingDebtorId);
     } else {
-      debtors.push({id:uid(), name, phone, notes, createdAt:Date.now()});
+      const fresh = {id:uid(), name, phone, notes, createdAt:Date.now()};
+      debtors.push(fresh);
       showToast('با موفقیت ثبت شد');
+      if(onDebtorCreated){ const cb = onDebtorCreated; onDebtorCreated = null; setTimeout(()=>cb(fresh), 0); }
     }
     saveState();
     closeModal('modal-debtor');
@@ -5251,14 +5474,18 @@
   document.getElementById('form-expense').addEventListener('submit', (e)=>{
     e.preventDefault();
 
+    /*
+     * دسته‌بندی روی خودِ هر ردیف است. این مقدار فقط پیش‌فرضِ ردیف‌های تازه
+     * است و دیگر جلوی ثبت را نمی‌گیرد — وگرنه یک فیلد پنهان می‌توانست
+     * بی‌آنکه دیده شود، ذخیره را متوقف کند.
+     */
     let category = document.getElementById('in-expense-category').value;
     if(category==='__new__'){
       category = document.getElementById('in-new-category').value.trim();
       if(category && !expenseCategories.includes(category)) expenseCategories.push(category);
     }
-    const fgc = document.getElementById('fg-expense-category');
-    if(!category){ fgc.classList.add('error'); return; }
-    fgc.classList.remove('error');
+    if(!category) category = expenseCategories[0] || '';
+    document.getElementById('fg-expense-category').classList.remove('error');
 
     const date = document.getElementById('in-expense-date').value || todayISO();
 
@@ -5273,7 +5500,7 @@
       const amount = parseFloat(amtEl.value);
       // دسته‌بندی خودِ ردیف؛ اگر خالی بود، همان دسته‌بندی بالای فرم
       const rowCategory = (catEl && catEl.value) ? catEl.value : category;
-      const valid = !!title && amount>0;
+      const valid = !!title && amount>0 && !!rowCategory;
       rowEl.classList.toggle('error', !valid);
       if(!valid && !firstInvalid) firstInvalid = titleEl.value.trim() ? amtEl : titleEl;
       return {title, amount, valid, category: rowCategory};
@@ -7345,6 +7572,10 @@
     // تا ۳ رقم اعشار، بدون صفرهای اضافی
     return String(Math.round(qty*1000)/1000);
   }
+  /* همان عدد، ولی با رقم فارسی — فقط برای نمایش (نه داخل input عددی) */
+  function formatCartQtyFa(qty, unit){
+    return formatCartQty(qty, unit).replace(/[0-9]/g, d=> '۰۱۲۳۴۵۶۷۸۹'[+d]).replace('.', '٫');
+  }
   function cartTotal(){
     return cart.reduce((s,item)=>{ const p=products.find(x=>x.id===item.productId); return s+(p?p.salePrice*item.quantity:0); }, 0);
   }
@@ -7417,7 +7648,95 @@
      * قبلی همان‌جا می‌ماند.
      */
     if(document.getElementById('quick-select-grid')) renderQuickSelectGrid();
+    renderCartDebtorRow();
   }
+
+  /* ==========================================================
+     فروش نسیه از خود صفحه‌ی فروش / انتخاب محصول
+     ----------------------------------------------------------
+     فقط یک میان‌بر است: قرض‌دار را همین‌جا انتخاب می‌کنید و پنجره‌ی
+     تسویه از قبل روی «نسیه» و همان قرض‌دار تنظیم باز می‌شود. ثبت
+     فروش و حساب قرض‌دار دقیقاً با همان منطق قبلی انجام می‌شود.
+     ========================================================== */
+  function debtStateText(id){
+    const d = getDebt(id);
+    if(d > 0) return { txt:`${formatMoney(d)} افغانی بدهکار`, cls:'' };
+    if(d < 0) return { txt:`${formatMoney(-d)} افغانی موجودی دارد`, cls:'credit' };
+    return { txt:'حساب صاف است', cls:'settled' };
+  }
+
+  function renderCartDebtorRow(){
+    const chosen = saleDebtorId ? debtors.find(d=>d.id===saleDebtorId) : null;
+    if(saleDebtorId && !chosen) saleDebtorId = null;   // قرض‌دار حذف شده
+    ['','qs-'].forEach(prefix=>{
+      const row = document.getElementById(prefix+'cart-debtor-row');
+      if(!row) return;
+      const nameEl = row.querySelector('[data-cd-name]');
+      const subEl = row.querySelector('[data-cd-sub]');
+      row.classList.toggle('picked', !!chosen);
+      if(chosen){
+        nameEl.textContent = `به حساب: ${chosen.name}`;
+        subEl.textContent = debtStateText(chosen.id).txt;
+      } else {
+        nameEl.textContent = 'به حساب قرض‌دار بگذار';
+        subEl.textContent = 'برای فروش نسیه، قرض‌دار را انتخاب کنید';
+      }
+    });
+    ['btn-finalize-sale','btn-qs-finalize-sale'].forEach(id=>{
+      const btn = document.getElementById(id);
+      if(btn) btn.textContent = chosen ? 'ثبت نسیه' : 'ثبت فروش';
+    });
+  }
+
+  function renderPickDebtorList(query){
+    const listEl = document.getElementById('pick-debtor-list');
+    const q = (query||'').trim().toLowerCase();
+    const list = debtors.filter(d=> !q || (d.name||'').toLowerCase().includes(q) || (d.phone||'').includes(q));
+    if(!list.length){
+      listEl.innerHTML = `<div class="pick-debtor-empty">${debtors.length ? 'قرض‌داری با این نام پیدا نشد.' : 'هنوز قرض‌داری ثبت نشده است. «قرض‌دار جدید» را بزنید.'}</div>`;
+      return;
+    }
+    listEl.innerHTML = list.map(d=>{
+      const st = debtStateText(d.id);
+      return `
+      <button type="button" class="pick-debtor-item" data-pick="${d.id}">
+        <span class="pick-debtor-av">${escapeHtml(initials(d.name) || (d.name||'؟')[0])}</span>
+        <span class="pick-debtor-name">${escapeHtml(d.name)}</span>
+        <span class="pick-debtor-bal ${st.cls}">${st.txt}</span>
+      </button>`;
+    }).join('');
+  }
+
+  function openPickDebtor(){
+    document.getElementById('in-pick-debtor-search').value = '';
+    renderPickDebtorList('');
+    openModal('modal-pick-debtor');
+  }
+
+  document.getElementById('in-pick-debtor-search').addEventListener('input', (e)=>{
+    renderPickDebtorList(e.target.value);
+  });
+  document.getElementById('pick-debtor-list').addEventListener('click', (e)=>{
+    const btn = e.target.closest('[data-pick]');
+    if(!btn) return;
+    saleDebtorId = btn.dataset.pick;
+    closeModal('modal-pick-debtor');
+    renderCartDebtorRow();
+    showToast('فروش روی حساب این قرض‌دار ثبت می‌شود');
+  });
+  document.getElementById('btn-pick-debtor-new').addEventListener('click', ()=>{
+    closeModal('modal-pick-debtor');
+    onDebtorCreated = (d)=>{ saleDebtorId = d.id; renderCartDebtorRow(); showToast('فروش روی حساب این قرض‌دار ثبت می‌شود'); };
+    openAddDebtor();
+  });
+  document.addEventListener('click', (e)=>{
+    if(e.target.closest('[data-clear-debtor]')){
+      saleDebtorId = null;
+      renderCartDebtorRow();
+      return;
+    }
+    if(e.target.closest('[data-pick-debtor]')) openPickDebtor();
+  });
   // ---- انتخاب محصول (صفحه جداگانه، بدون اسکن): فیلتر بر اساس دسته‌بندی + استپر برای هر محصول ----
   let quickSelectCategory = '';
   function renderQuickSelectCategoryOptions(){
@@ -7448,7 +7767,7 @@
       <div class="quick-select-tile${qty>0?' has-qty':''}" data-qs-tile="${p.id}">
         <div class="qs-name">${escapeHtml(p.name)}</div>
         <div class="qs-price">${formatMoney(p.salePrice)} افغانی</div>
-        ${qty>0 ? `<div class="qs-qty-badge" data-qs-qty="${p.id}">${formatCartQty(qty, p.unit)} در سبد</div>` : ''}
+        ${qty>0 ? `<div class="qs-qty-badge" data-qs-qty="${p.id}">${formatCartQtyFa(qty, p.unit)} در سبد</div>` : ''}
       </div>`;
     }).join('');
   }
@@ -7525,7 +7844,7 @@
           badge.setAttribute('data-qs-qty', productId);
           tileEl.appendChild(badge);
         }
-        badge.textContent = `${formatCartQty(qtyNow, p ? p.unit : '')} در سبد`;
+        badge.textContent = `${formatCartQtyFa(qtyNow, p ? p.unit : '')} در سبد`;
       } else if(badge){
         badge.remove();
       }
@@ -7566,7 +7885,7 @@
   document.addEventListener('click', (e)=>{
     const bar = e.target.closest('.cart-summary-bar');
     if(!bar) return;
-    if(e.target.closest('#btn-finalize-sale') || e.target.closest('a.btn')) return;
+    if(e.target.closest('#btn-finalize-sale') || e.target.closest('#btn-qs-finalize-sale') || e.target.closest('a.btn')) return;
     const drawer = bar.closest('.cart-drawer');
     if(!drawer) return;
     const body = drawer.querySelector('.cart-drawer-body');
@@ -7798,14 +8117,19 @@
 
   function openSaleCheckoutModal(){
     if(cart.length===0) return;
+    // اگر از سبد خرید قرض‌داری انتخاب شده باشد، پنجره از قبل روی «نسیه»
+    // و همان قرض‌دار باز می‌شود؛ وگرنه دقیقاً مثل قبل «نقدی» است.
+    const preset = saleDebtorId && debtors.some(d=>d.id===saleDebtorId) ? saleDebtorId : null;
     coDiscountType = 'percent';
-    coPaymentType = 'cash';
+    coPaymentType = preset ? 'credit' : 'cash';
     document.querySelectorAll('#co-discount-type .seg-btn').forEach(b=> b.classList.toggle('active', b.dataset.val==='percent'));
-    document.querySelectorAll('#co-payment-type .seg-btn').forEach(b=> b.classList.toggle('active', b.dataset.val==='cash'));
+    document.querySelectorAll('#co-payment-type .seg-btn').forEach(b=> b.classList.toggle('active', b.dataset.val===coPaymentType));
     document.getElementById('co-discount-value').value = 0;
-    document.getElementById('co-debtor-group').style.display = 'none';
+    document.getElementById('co-debtor-group').style.display = preset ? '' : 'none';
     populateCheckoutDebtorSelect();
-    document.getElementById('co-paid-amount').value = cartTotal();
+    if(preset) document.getElementById('co-debtor-select').value = preset;
+    // در نسیه پیش‌فرض چیزی پرداخت نشده تا کل مبلغ روی حساب برود
+    document.getElementById('co-paid-amount').value = preset ? 0 : cartTotal();
     ['co-discount-error','co-debtor-error','co-paid-error'].forEach(id=>{
       document.getElementById(id).closest('.form-group')?.classList.remove('error');
     });
@@ -7814,6 +8138,7 @@
   }
 
   document.getElementById('btn-finalize-sale').addEventListener('click', openSaleCheckoutModal);
+  document.getElementById('btn-qs-finalize-sale').addEventListener('click', openSaleCheckoutModal);
 
   document.getElementById('co-discount-type').addEventListener('click', (e)=>{
     const btn = e.target.closest('.seg-btn');
@@ -7901,6 +8226,7 @@
 
     saveState();
     cart = [];
+    saleDebtorId = null;
     saveDraftCart();
     renderCart();
     renderProducts(); renderWarehouseList(); renderWarehouseDashboard(); renderSalesTrendChart();
@@ -8550,6 +8876,16 @@
     fabScrim.classList.toggle('open', open);
   }
   fabBtn.addEventListener('click', toggleFab);
+
+  // دکمه‌ی شناور «انتخاب محصول» فقط در صفحه‌ی فروش، چسبیده به لبه‌ی مقابل
+  const saleFabWrap = document.getElementById('sale-fab-wrap');
+  document.getElementById('sale-fab-btn').addEventListener('click', ()=>{
+    goTo('quick-sale');
+    history.replaceState(null,'','#quick-sale');
+  });
+  document.addEventListener('tohid:page-change', (e)=>{
+    saleFabWrap.classList.toggle('show', e.detail.pageId === 'sale');
+  });
   fabScrim.addEventListener('click', closeFab);
   fabMenu.querySelectorAll('.fab-menu-item').forEach(btn=>{
     btn.addEventListener('click', closeFab);
@@ -8969,10 +9305,10 @@
 </script>
 
 <!-- لایه اشتراک و License — کاملاً افزودنی؛ منطق فروشگاه را تغییر نمی‌دهد -->
-<script src="license/license-client.js?v=9" defer></script>
-<script src="license/shop-sync.js?v=9" defer></script>
-<script src="license/shop-ui.js?v=9" defer></script>
-<script src="license/vip.js?v=9" defer></script>
+<script src="license/license-client.js?v=10" defer></script>
+<script src="license/shop-sync.js?v=10" defer></script>
+<script src="license/shop-ui.js?v=10" defer></script>
+<script src="license/vip.js?v=10" defer></script>
 
 </body>
 </html>
