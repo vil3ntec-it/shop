@@ -46,20 +46,16 @@ test('پلن‌ها با قیمت‌های درست ساخته می‌شوند',
   const r = await req('/api/v1/billing/plans');
   assert.equal(r.status, 200);
   const byCode = Object.fromEntries(r.data.plans.map(p => [p.code, p]));
-  assert.equal(byCode.w1.price, 100);
-  assert.equal(byCode.m1.price, 300);
-  assert.equal(byCode.m3.price, 800);
-  assert.equal(byCode.m6.price, 1500);
-  assert.equal(byCode.y1.price, 2800);
-  assert.equal(byCode.y2.price, 5000);
-  assert.equal(byCode.y3.price, 6800);
-  assert.equal(byCode.custom.negotiable, true);
+  assert.equal(r.data.plans.length, 3, 'دقیقاً سه اشتراک');
+  assert.equal(byCode.m1.price, 500);
+  assert.equal(byCode.m6.price, 2000);
+  assert.equal(byCode.y1.price, 3000);
   assert.equal(r.data.trialDays, 7);
 });
 
 test('قیمت روزانه هرچه مدت بیشتر شود کمتر می‌شود', async () => {
   const r = await req('/api/v1/billing/plans');
-  const order = ['w1', 'm1', 'm3', 'm6', 'y1', 'y2', 'y3'];
+  const order = ['m1', 'm6', 'y1'];
   const byCode = Object.fromEntries(r.data.plans.map(p => [p.code, p]));
   for (let i = 1; i < order.length; i++) {
     const prev = byCode[order[i - 1]].pricePerDay;
@@ -212,7 +208,7 @@ test('مدیر قیمت را بدون تغییر کد عوض می‌کند', asy
   assert.equal(pub.data.plans.find(p => p.code === 'm1').price, 350);
 
   // برگرداندن
-  await req('/api/v1/admin/plans/m1', { method: 'PATCH', token: adminToken, body: { price: 300 } });
+  await req('/api/v1/admin/plans/m1', { method: 'PATCH', token: adminToken, body: { price: 500 } });
 });
 
 test('مدیر مدت دوره آزمایشی و شماره واتساپ را عوض می‌کند', async () => {

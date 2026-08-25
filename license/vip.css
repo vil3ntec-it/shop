@@ -9,7 +9,8 @@
   font-family:inherit; font-size:11.5px; font-weight:800; cursor:pointer;
   white-space:nowrap;
 }
-.vip-badge-icon{ font-size:12px; line-height:1; }
+.vip-badge-icon{ display:flex; line-height:1; }
+.vip-badge-icon svg{ width:13px; height:13px; }
 .vip-badge-promo{ background:var(--primary-tint,#eaf0ff); color:var(--primary-dark,#1f3f9e); }
 .vip-badge-trial{ background:var(--primary,#2c5ce6); color:#fff; }
 .vip-badge-ok{ background:var(--success-tint,#e8f8f1); color:var(--success,#18a06b); }
@@ -45,12 +46,18 @@
   border-radius:var(--radius-lg,20px); box-shadow:var(--shadow-md,0 6px 20px -8px rgba(30,50,110,.15));
   padding:26px 20px;
 }
-.vip-crown{ font-size:30px; line-height:1; margin-bottom:10px; }
+.vip-crown{
+  width:56px; height:56px; margin:0 auto 14px;
+  display:flex; align-items:center; justify-content:center;
+  border-radius:16px; background:var(--primary-tint,#eaf0ff); color:var(--primary,#2c5ce6);
+}
+.vip-crown svg{ width:26px; height:26px; }
 .vip-card h3{ font-size:15.5px; font-weight:800; margin-bottom:6px; color:var(--text,#1a2233); }
 .vip-card p{ font-size:12.5px; color:var(--muted,#7c8698); margin-bottom:16px; line-height:1.9; }
 
 .vip-locked-el{ opacity:.55; }
-.vip-locked-el::after{ content:'👑'; margin-inline-start:6px; font-size:11px; }
+/* قفل با آیکون دستی در خود دکمه گذاشته می‌شود، نه با ایموجی در CSS */
+.vip-locked-el{ position:relative; }
 
 /* ---------- دکمه ---------- */
 .vip-btn{
@@ -65,35 +72,64 @@
 /* ---------- پنجره ---------- */
 .vip-scrim{
   position:fixed; inset:0; z-index:128; display:none;
-  align-items:center; justify-content:center; padding:16px;
-  background:rgba(12,18,32,.6);
+  align-items:center; justify-content:center; padding:14px;
+  background:rgba(12,18,32,.62);
+  opacity:0; transition:opacity .22s ease;
+  -webkit-backdrop-filter:blur(2px); backdrop-filter:blur(2px);
 }
-.vip-scrim.vip-open{ display:flex; }
-.vip-box{
-  width:100%; max-width:460px; max-height:92vh; overflow-y:auto;
-  background:var(--bg,#fff); border:1px solid var(--border,#e5eaf3);
-  border-radius:var(--radius-lg,20px); box-shadow:0 20px 60px -20px rgba(10,20,50,.5);
-}
-.vip-head{
-  display:flex; align-items:center; justify-content:space-between;
-  padding:16px 18px; border-bottom:1px solid var(--border,#e5eaf3);
-}
-.vip-head h3{
-  display:flex; align-items:center; gap:7px;
-  font-size:15.5px; font-weight:800; color:var(--text,#1a2233);
-}
-.vip-close{
-  border:none; background:transparent; cursor:pointer;
-  font-size:22px; line-height:1; color:var(--muted,#7c8698); padding:0 4px;
-}
-.vip-body{ padding:16px 18px 20px; }
+.vip-scrim.vip-open{ display:flex; opacity:1; }
 
-.vip-status{
-  padding:13px 15px; border-radius:var(--radius-md,14px); margin-bottom:14px;
+.vip-box{
+  position:relative;
+  width:100%; max-width:480px; max-height:94vh; overflow-y:auto;
+  background:var(--bg,#fff);
+  border-radius:24px;
+  box-shadow:0 28px 70px -24px rgba(10,20,50,.55);
+  transform:translateY(22px) scale(.97); opacity:0;
 }
+.vip-scrim.vip-open .vip-box{
+  animation:vip-rise .34s cubic-bezier(.22,1,.36,1) forwards;
+}
+@keyframes vip-rise{ to{ transform:translateY(0) scale(1); opacity:1; } }
+
+.vip-close{
+  position:absolute; top:14px; inset-inline-end:14px; z-index:2;
+  width:34px; height:34px; display:flex; align-items:center; justify-content:center;
+  border:none; border-radius:50%; cursor:pointer; padding:0;
+  background:rgba(255,255,255,.22); color:#fff;
+  transition:background .18s ease, transform .18s ease;
+}
+.vip-close svg{ width:17px; height:17px; }
+.vip-close:hover{ background:rgba(255,255,255,.38); transform:rotate(90deg); }
+
+/* ---------- سرصفحه‌ی رنگی ---------- */
+.vip-hero{
+  padding:30px 22px 26px; text-align:center; color:#fff;
+  background:linear-gradient(160deg, var(--primary,#2c5ce6), var(--primary-dark,#1f3f9e));
+  border-radius:24px 24px 0 0;
+}
+.vip-logo{
+  width:54px; height:54px; margin:0 auto 14px;
+  display:flex; align-items:center; justify-content:center;
+  border-radius:16px; background:rgba(255,255,255,.18); color:#fff;
+}
+.vip-logo svg{ width:28px; height:28px; }
+.vip-hero h2{ font-size:24px; font-weight:800; line-height:1.5; margin-bottom:8px; }
+.vip-hero h2 b{ font-weight:800; color:#bcd0ff; }
+.vip-hero p{ font-size:13px; opacity:.9; }
+
+.vip-body{ padding:18px 18px 22px; }
+
+.vip-section-title{
+  font-size:13.5px; font-weight:800; color:var(--text,#1a2233);
+  text-align:center; margin:20px 0 12px;
+}
+
+/* ---------- وضعیت / یادداشت ---------- */
+.vip-status{ padding:13px 15px; border-radius:var(--radius-md,14px); margin-bottom:14px; }
 .vip-status b{ display:block; font-size:14px; font-weight:800; margin-bottom:3px; }
 .vip-status span{ display:block; font-size:12.5px; line-height:1.9; }
-.vip-status-promo{ background:var(--primary-tint,#eaf0ff); color:var(--primary-dark,#1f3f9e); }
+.vip-status-promo,
 .vip-status-trial{ background:var(--primary-tint,#eaf0ff); color:var(--primary-dark,#1f3f9e); }
 .vip-status-ok{ background:var(--success-tint,#e8f8f1); color:var(--success,#18a06b); }
 .vip-status-end{ background:var(--danger-tint,#fdecec); color:var(--danger,#e54b4b); }
@@ -104,19 +140,88 @@
   font-size:12.5px; font-weight:700;
 }
 
-/* ---------- پلن‌ها ---------- */
-.vip-plans{
-  display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr));
-  gap:9px; margin-bottom:16px;
+/* ---------- دو کارت مقایسه ---------- */
+.vip-tiers{ display:grid; grid-template-columns:1fr 1fr; gap:11px; }
+@media (max-width:430px){ .vip-tiers{ grid-template-columns:1fr; } }
+
+.vip-tier{
+  position:relative; display:flex; flex-direction:column;
+  padding:18px 14px 14px; border-radius:18px;
+  border:1.5px solid var(--border,#e5eaf3); background:var(--bg,#fff);
+  opacity:0; transform:translateY(14px);
+  animation:vip-in .4s cubic-bezier(.22,1,.36,1) forwards;
+  animation-delay:var(--vip-delay,0ms);
 }
+@keyframes vip-in{ to{ opacity:1; transform:translateY(0); } }
+
+.vip-tier-hot{
+  border-color:var(--primary,#2c5ce6); border-width:2px;
+  box-shadow:0 14px 34px -20px rgba(44,92,230,.7);
+}
+.vip-ribbon{
+  position:absolute; top:0; inset-inline:0;
+  padding:5px; border-radius:16px 16px 0 0;
+  background:var(--primary,#2c5ce6); color:#fff;
+  font-size:10.5px; font-weight:800; text-align:center; letter-spacing:.3px;
+}
+.vip-tier-hot > .vip-tier-name{ margin-top:20px; }
+
+.vip-tier-name{ font-size:14.5px; font-weight:800; color:var(--text,#1a2233); text-align:center; }
+.vip-tier-price{
+  font-size:26px; font-weight:800; color:var(--primary,#2c5ce6);
+  text-align:center; margin-top:6px; line-height:1.3;
+}
+.vip-tier-price small{ font-size:12px; font-weight:600; }
+.vip-tier-sub{
+  font-size:11px; color:var(--muted,#7c8698); text-align:center;
+  padding-bottom:12px; margin-bottom:12px; border-bottom:1px solid var(--border,#e5eaf3);
+}
+
+.vip-ticks{ list-style:none; display:flex; flex-direction:column; gap:9px; flex:1; }
+.vip-ticks li{
+  display:flex; align-items:center; gap:8px;
+  font-size:12px; color:var(--text,#1a2233); line-height:1.6;
+}
+.vip-ticks li.off{ color:var(--muted-2,#a4adbd); }
+.vip-tick{
+  flex:0 0 auto; width:17px; height:17px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  background:var(--primary,#2c5ce6); color:#fff;
+}
+.vip-tick svg{ width:11px; height:11px; stroke-width:2.8; }
+.vip-ticks li.off .vip-tick{ background:var(--surface-2,#eef2fa); color:var(--muted-2,#a4adbd); }
+
+.vip-tier-foot{
+  margin-top:14px; padding:8px; border-radius:10px; text-align:center;
+  font-size:11px; font-weight:700;
+  background:var(--surface,#f6f8fc); color:var(--muted,#7c8698);
+}
+.vip-tier-foot.is-now{ background:var(--success-tint,#e8f8f1); color:var(--success,#18a06b); }
+
+/* ---------- کارت‌های مدت ---------- */
+.vip-plans{
+  display:grid; grid-template-columns:repeat(3,1fr); gap:10px;
+}
+@media (max-width:400px){ .vip-plans{ grid-template-columns:1fr; } }
 .vip-plan{
   position:relative; display:flex; flex-direction:column; align-items:center; gap:3px;
-  padding:14px 10px 12px; cursor:pointer;
-  border:1.5px solid var(--border,#e5eaf3); border-radius:var(--radius-md,14px);
-  background:var(--surface,#f6f8fc); font-family:inherit; text-align:center;
+  padding:16px 10px 12px; cursor:pointer;
+  border:1.5px solid var(--border,#e5eaf3); border-radius:16px;
+  background:var(--bg,#fff); font-family:inherit; text-align:center;
+  opacity:0; transform:translateY(12px);
+  animation:vip-in .38s cubic-bezier(.22,1,.36,1) forwards;
+  animation-delay:var(--vip-delay,0ms);
+  transition:border-color .18s ease, box-shadow .18s ease, transform .12s ease;
 }
-.vip-plan:hover{ border-color:var(--primary,#2c5ce6); }
-.vip-plan-on{ border-color:var(--primary,#2c5ce6); background:var(--primary-tint,#eaf0ff); }
+.vip-plan:hover{
+  border-color:var(--primary,#2c5ce6);
+  box-shadow:0 12px 26px -18px rgba(44,92,230,.8);
+}
+.vip-plan:active{ transform:scale(.97); }
+.vip-plan-on{
+  border-color:var(--primary,#2c5ce6); border-width:2px;
+  background:var(--primary-tint,#eaf0ff);
+}
 .vip-plan-badge{ border-color:var(--warning,#e8a13a); }
 .vip-tag{
   position:absolute; top:-9px; inset-inline-start:50%; transform:translateX(50%);
@@ -124,24 +229,79 @@
   background:var(--warning,#e8a13a); color:#fff; font-size:10px; font-weight:800;
 }
 .vip-plan-title{ font-size:13px; font-weight:800; color:var(--text,#1a2233); }
-.vip-plan-price{ font-size:16px; font-weight:800; color:var(--primary,#2c5ce6); }
+.vip-plan-price{ font-size:19px; font-weight:800; color:var(--primary,#2c5ce6); }
 .vip-plan-price small{ font-size:10.5px; font-weight:600; }
 .vip-per{ font-size:10.5px; color:var(--muted,#7c8698); line-height:1.6; }
 
-/* ---------- تماس ---------- */
-.vip-contact{ border-top:1px solid var(--border,#e5eaf3); padding-top:14px; }
-.vip-hint{ font-size:12px; color:var(--muted,#7c8698); line-height:1.9; margin-bottom:10px; }
-.vip-wa{
-  display:flex; align-items:center; justify-content:center; gap:9px;
-  padding:12px; border-radius:var(--radius-sm,10px);
-  background:#25D366; color:#fff; text-decoration:none;
-  font-size:14px; font-weight:800;
+.vip-plan-pick{
+  display:flex; align-items:center; justify-content:center; gap:4px;
+  margin-top:8px; width:100%; padding:5px; border-radius:8px;
+  background:var(--surface,#f6f8fc); color:var(--muted,#7c8698);
+  font-size:10.5px; font-weight:700;
+  transition:background .18s ease, color .18s ease;
 }
-.vip-wa:hover{ background:#1da851; }
-.vip-wa b{ font-weight:800; letter-spacing:.5px; }
+.vip-plan-pick svg{ width:11px; height:11px; stroke-width:2.8; }
+.vip-plan-on .vip-plan-pick{ background:var(--primary,#2c5ce6); color:#fff; }
+
+/* ---------- نوار فراخوان ---------- */
+.vip-cta{
+  display:flex; align-items:center; gap:12px;
+  margin-top:20px; padding:15px 18px; border-radius:16px;
+  background:linear-gradient(120deg, var(--primary,#2c5ce6), var(--primary-dark,#1f3f9e));
+  color:#fff; text-decoration:none;
+  box-shadow:0 14px 30px -18px rgba(44,92,230,.9);
+  transition:transform .14s ease, box-shadow .2s ease;
+}
+.vip-cta:hover{ transform:translateY(-2px); box-shadow:0 18px 36px -18px rgba(44,92,230,1); }
+.vip-cta:active{ transform:scale(.985); }
+.vip-cta-ic{
+  flex:0 0 auto; width:38px; height:38px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  background:#fff; color:var(--primary,#2c5ce6);
+}
+.vip-cta-ic svg{ width:20px; height:20px; }
+.vip-cta b{ font-size:15px; font-weight:800; }
+.vip-cta i{
+  font-style:normal; font-size:11px; opacity:.85; margin-inline-start:auto;
+  text-align:end; line-height:1.6;
+}
+
+/* ---------- کارت‌های تماس ---------- */
+.vip-contact{ display:grid; gap:10px; }
+.vip-ccard{
+  display:flex; align-items:center; gap:11px;
+  padding:13px 14px; border-radius:14px;
+  border:1px solid var(--border,#e5eaf3); background:var(--bg,#fff);
+  text-decoration:none; color:inherit;
+  transition:border-color .18s ease, transform .14s ease;
+}
+a.vip-ccard:hover{ border-color:var(--primary,#2c5ce6); transform:translateY(-1px); }
+.vip-ccard-ic{
+  flex:0 0 auto; width:38px; height:38px; border-radius:11px;
+  display:flex; align-items:center; justify-content:center;
+}
+.vip-ccard-ic svg{ width:19px; height:19px; }
+.vip-ic-wa{ background:#e7f9ee; color:#25D366; }
+.vip-ic-web{ background:var(--primary-tint,#eaf0ff); color:var(--primary,#2c5ce6); }
+.vip-ccard-txt{ display:flex; flex-direction:column; gap:2px; min-width:0; }
+.vip-ccard-txt b{ font-size:12.5px; font-weight:800; color:var(--text,#1a2233); }
+.vip-ccard-txt i{
+  font-style:normal; font-size:11px; color:var(--muted,#7c8698); line-height:1.7;
+  letter-spacing:.3px;
+}
+
+.vip-hint{ font-size:12px; color:var(--muted,#7c8698); line-height:1.9; }
 
 /* ---------- کم‌رنگ کردن منوی قابلیت‌های قفل ---------- */
 html.vip-lock-sales   [data-page="sale"],
 html.vip-lock-sales   [data-page="quick-sale"],
 html.vip-lock-sales   [data-page="sales"],
 html.vip-lock-debtors [data-page="debtors"]{ opacity:.5; }
+
+/* کسانی که حرکت کمتری می‌خواهند، هیچ انیمیشنی نمی‌بینند */
+@media (prefers-reduced-motion:reduce){
+  .vip-box, .vip-tier, .vip-plan, .vip-cta, .vip-close, .vip-ccard{
+    animation:none !important; transition:none !important;
+    opacity:1 !important; transform:none !important;
+  }
+}

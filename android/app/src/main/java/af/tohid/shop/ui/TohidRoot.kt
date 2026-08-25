@@ -1,5 +1,10 @@
 package af.tohid.shop.ui
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -109,7 +114,17 @@ fun TohidRoot() {
                 .background(T.surface),
             contentAlignment = Alignment.TopStart,
         ) {
-            NavHost(navController = nav, startDestination = "dashboard") {
+            NavHost(
+                navController = nav,
+                startDestination = "dashboard",
+                // هر صفحه کمی از پایین بالا می‌آید، مثل نسخه‌ی وب
+                enterTransition = {
+                    fadeIn(tween(220)) + slideInVertically(tween(260)) { it / 22 }
+                },
+                exitTransition = { fadeOut(tween(150)) },
+                popEnterTransition = { fadeIn(tween(200)) },
+                popExitTransition = { fadeOut(tween(150)) },
+            ) {
                 composable("dashboard") { DashboardScreen(onOpen = { nav.navigate(it) }) }
                 composable("sale") { SaleScreen() }
                 composable("debtors") {

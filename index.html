@@ -1458,6 +1458,105 @@
   }
   .backup-meta.warn{ color:var(--warning); }
   .backup-meta.ok{ color:var(--success); }
+  /* ==========================================================
+     حرکت و انیمیشن
+     ----------------------------------------------------------
+     همه‌جا کوتاه و کم‌جلوه: بازخورد فشار روی هر چیز قابل لمس،
+     بالا آمدن پلکانی کارت‌ها هنگام باز شدن صفحه، و جهش کوچک
+     آیکون نوار پایین. هر کس در تنظیمات گوشی «کاهش حرکت» را
+     روشن کرده باشد، هیچ‌کدام را نمی‌بیند.
+     ========================================================== */
+
+  .btn, .icon-btn, .bn-item, .fab, .empty-cta, .seg-btn, .nav-item,
+  .btn-add-row, .scan-repeat-btn, .debtor-card, .exp-card, .quick-select-tile,
+  .stat-card, .exp-stat-card, .panel, .fab-menu-item, .alert-item, .link{
+    transition:transform .13s cubic-bezier(.22,1,.36,1),
+               box-shadow .2s ease, background-color .18s ease,
+               border-color .18s ease, color .18s ease, opacity .18s ease;
+  }
+
+  /* بازخورد فشار */
+  .btn:active, .icon-btn:active, .empty-cta:active, .seg-btn:active,
+  .btn-add-row:active, .scan-repeat-btn:active, .fab-menu-item:active,
+  .quick-select-tile:active, .alert-item:active{ transform:scale(.96); }
+  .debtor-card:active, .exp-card:active, .stat-card:active{ transform:scale(.98); }
+  .fab:active{ transform:scale(.9); }
+  .bn-item:active{ transform:scale(.9); }
+
+  /* روی دسکتاپ کمی بالا می‌آیند */
+  @media (hover:hover){
+    .stat-card:hover, .exp-stat-card:hover, .debtor-card:hover,
+    .exp-card:hover, .quick-select-tile:hover{
+      transform:translateY(-2px); box-shadow:var(--shadow-md);
+    }
+    .btn-primary:hover, .empty-cta:hover{ transform:translateY(-1px); }
+    .fab:hover{ transform:translateY(-2px) scale(1.04); }
+  }
+
+  /* ورود پلکانی کارت‌های صفحه‌ای که تازه باز شده */
+  @keyframes cardIn{
+    from{ opacity:0; transform:translateY(11px); }
+    to{ opacity:1; transform:translateY(0); }
+  }
+  .page.active .stat-card,
+  .page.active .exp-stat-card,
+  .page.active > .panel,
+  .page.active .panels-row > .panel{
+    animation:cardIn .4s cubic-bezier(.22,1,.36,1) both;
+  }
+  .page.active .stat-card:nth-child(1),
+  .page.active .exp-stat-card:nth-child(1){ animation-delay:.02s; }
+  .page.active .stat-card:nth-child(2),
+  .page.active .exp-stat-card:nth-child(2){ animation-delay:.07s; }
+  .page.active .stat-card:nth-child(3),
+  .page.active .exp-stat-card:nth-child(3){ animation-delay:.12s; }
+  .page.active .stat-card:nth-child(4),
+  .page.active .exp-stat-card:nth-child(4){ animation-delay:.17s; }
+  .page.active > .panel:nth-of-type(1){ animation-delay:.10s; }
+  .page.active > .panel:nth-of-type(2){ animation-delay:.16s; }
+  .page.active > .panel:nth-of-type(3){ animation-delay:.22s; }
+  .page.active > .panel:nth-of-type(4){ animation-delay:.28s; }
+
+  /* جهش کوچک آیکون تب فعال */
+  @keyframes navPop{
+    0%{ transform:scale(.82); } 60%{ transform:scale(1.16); } 100%{ transform:scale(1); }
+  }
+  .bn-item.active .ic{ animation:navPop .34s cubic-bezier(.3,1.4,.5,1); }
+
+  /* دکمه شناور موقع ظاهر شدن */
+  @keyframes fabPop{
+    from{ transform:scale(.6); opacity:0; } to{ transform:scale(1); opacity:1; }
+  }
+  .fab{ animation:fabPop .3s cubic-bezier(.3,1.4,.5,1) both; }
+
+  /* پیام کوتاه پایین صفحه */
+  @keyframes toastIn{
+    from{ opacity:0; transform:translateY(14px) scale(.96); }
+    to{ opacity:1; transform:translateY(0) scale(1); }
+  }
+  .toast{ animation:toastIn .3s cubic-bezier(.22,1,.36,1); }
+
+  /* ردیف‌های فهرست، پلکانی */
+  @keyframes rowIn{
+    from{ opacity:0; transform:translateY(8px); } to{ opacity:1; transform:translateY(0); }
+  }
+  .exp-list > .exp-row, .cart-list > *, .alert-item{
+    animation:rowIn .3s ease both;
+  }
+  .exp-list > .exp-row:nth-child(1), .cart-list > *:nth-child(1), .alert-item:nth-child(1){ animation-delay:.02s; }
+  .exp-list > .exp-row:nth-child(2), .cart-list > *:nth-child(2), .alert-item:nth-child(2){ animation-delay:.05s; }
+  .exp-list > .exp-row:nth-child(3), .cart-list > *:nth-child(3), .alert-item:nth-child(3){ animation-delay:.08s; }
+  .exp-list > .exp-row:nth-child(4), .cart-list > *:nth-child(4), .alert-item:nth-child(4){ animation-delay:.11s; }
+  .exp-list > .exp-row:nth-child(5), .cart-list > *:nth-child(5), .alert-item:nth-child(5){ animation-delay:.14s; }
+
+  /* احترام به تنظیم «کاهش حرکت» گوشی */
+  @media (prefers-reduced-motion:reduce){
+    *, *::before, *::after{
+      animation-duration:.001ms !important; animation-iteration-count:1 !important;
+      transition-duration:.001ms !important; scroll-behavior:auto !important;
+    }
+  }
+
 </style>
 </head>
 <body>
@@ -2105,7 +2204,7 @@
             <button type="button" id="last-scan-plus">+</button>
           </div>
           <button type="button" class="btn btn-primary btn-sm" id="last-scan-add-new" style="display:none;">افزودن محصول جدید</button>
-          <button type="button" class="scan-repeat-btn" id="last-scan-repeat">↻ افزودن دوباره همین کالا</button>
+          <button type="button" class="scan-repeat-btn" id="last-scan-repeat"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 11.5a8.5 8.5 0 1 1-2.6-6.1"/><path d="M20.5 3.5v5h-5"/></svg><span class="scan-repeat-label">افزودن دوباره همین کالا</span></button>
         </div>
 
         <div class="page-toolbar" style="margin:6px 0 10px;">
@@ -2562,22 +2661,6 @@
             </div>
           </div>
           <button class="btn btn-secondary btn-sm" id="btn-logout">خروج از حساب</button>
-        </div>
-
-        <!-- Server address -->
-        <div class="panel">
-          <div class="panel-head"><h2>سرور خانگی</h2></div>
-          <p class="settings-hint" id="settings-server-status">آدرس و رمز سروری که ورود با کد یک‌بار مصرف را مدیریت می‌کند.</p>
-          <div class="settings-actions-row">
-            <input type="text" id="settings-server-url" class="form-input" placeholder="ws://192.168.0.102:4700" dir="ltr" style="flex:1; min-width:180px;">
-          </div>
-          <div class="settings-actions-row" style="margin-top:8px;">
-            <input type="text" id="settings-server-token" class="form-input" placeholder="رمز سرور" dir="ltr" style="flex:1; min-width:180px;">
-          </div>
-          <div class="settings-actions-row" style="margin-top:8px;">
-            <button class="btn btn-secondary btn-sm" id="btn-save-server-url">ذخیره</button>
-            <button class="btn btn-secondary btn-sm" id="btn-connect-server">اتصال به سرور</button>
-          </div>
         </div>
 
         <!-- Danger zone -->
@@ -3164,7 +3247,7 @@
     <div id="invoice-print-area"></div>
     <div class="modal-actions" id="invoice-actions">
       <button type="button" class="btn btn-secondary" data-close-modal="modal-invoice">بستن</button>
-      <button type="button" class="btn btn-primary" id="btn-print-invoice">🖶 چاپ فاکتور</button>
+      <button type="button" class="btn btn-primary" id="btn-print-invoice"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 9V3.5h11V9"/><path d="M6.5 17.5h-2a2 2 0 0 1-2-2V11a2 2 0 0 1 2-2h15a2 2 0 0 1 2 2v4.5a2 2 0 0 1-2 2h-2"/><rect x="6.5" y="14" width="11" height="6.5" rx="1"/></svg> چاپ فاکتور</button>
     </div>
   </div>
 </div>
@@ -3193,7 +3276,7 @@
 <!-- Toast -->
 <div class="toast-wrap" id="toast-wrap">
   <div class="toast success" id="toast">
-    <span class="toast-ic" id="toast-ic">✓</span>
+    <span class="toast-ic" id="toast-ic"></span>
     <span id="toast-msg">ذخیره شد</span>
   </div>
 </div>
@@ -3294,7 +3377,7 @@
   function wsRequest(action, payload){
     return new Promise((resolve)=>{
       const base = getServerUrl();
-      if(!base){ resolve({ ok:false, message:'ابتدا آدرس و رمز سرور را از دکمه ⚙ تنظیم کنید.' }); return; }
+      if(!base){ resolve({ ok:false, message:'ابتدا آدرس و رمز سرور را از دکمه تنظیمات وارد کنید.' }); return; }
       if(!/^wss?:\/\//i.test(base)){
         resolve({ ok:false, message:'آدرس سرور باید با ws:// یا wss:// شروع شود.' });
         return;
@@ -3362,7 +3445,7 @@
         finish({ ok:false, message:'آدرس سرور نامعتبر است.' });
         return;
       }
-      ws.addEventListener('open', ()=> finish({ ok:true, message:'✓ به سرور متصل شد.' }));
+      ws.addEventListener('open', ()=> finish({ ok:true, message:'به سرور متصل شد.' }));
       ws.addEventListener('error', ()=> finish({ ok:false, message:'اتصال به سرور ناموفق بود. آدرس، رمز سرور و شبکه را بررسی کنید.' }));
       ws.addEventListener('close', (ev)=>{
         if(!settled) finish({ ok:false, message:(ev && ev.code===1008) ? 'رمز سرور نادرست است.' : 'اتصال به سرور بسته شد.' });
@@ -3384,23 +3467,6 @@
     });
   }
 
-  function wireSettingsServerUrl(){
-    const input = document.getElementById('settings-server-url');
-    const tokenInput = document.getElementById('settings-server-token');
-    const btn = document.getElementById('btn-save-server-url');
-    const connectBtn = document.getElementById('btn-connect-server');
-    const statusEl = document.getElementById('settings-server-status');
-    if(!input || !btn) return;
-    input.value = getServerUrl();
-    if(tokenInput) tokenInput.value = getServerToken();
-    btn.addEventListener('click', ()=>{
-      saveServerUrl(input.value);
-      if(tokenInput) saveServerToken(tokenInput.value);
-      showToast && showToast('آدرس و رمز سرور ذخیره شد');
-    });
-    wireConnectButton(connectBtn, input, tokenInput, statusEl);
-  }
-
   // ---- سوییچ موقت: صفحه لاگین خاموشه، مستقیم میره تو برنامه ----
   // برای روشن کردن دوباره لاگین، این خط رو false کن:
   const LOGIN_DISABLED = true;
@@ -3409,7 +3475,6 @@
     const authScreen = document.getElementById('auth-screen');
     const appRoot = document.getElementById('app-root');
     const existing = getAuth();
-    wireSettingsServerUrl();
     wireLogoutButton();
 
     if(LOGIN_DISABLED){
@@ -3720,7 +3785,9 @@
     const ic=document.getElementById('toast-ic');
     document.getElementById('toast-msg').textContent=msg;
     toast.className = 'toast ' + (type==='danger'?'danger':'success');
-    ic.textContent = type==='danger' ? '✕' : '✓';
+    ic.innerHTML = type==='danger'
+      ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6.2 6.2l11.6 11.6"/><path d="M17.8 6.2L6.2 17.8"/></svg>'
+      : '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.6l4.6 4.6L19.5 6.8"/></svg>';
     wrap.classList.add('open');
     clearTimeout(toastTimer);
     toastTimer=setTimeout(()=> wrap.classList.remove('open'), 2500);
@@ -4162,7 +4229,7 @@
   function populateCategorySelect(){
     const sel = document.getElementById('in-expense-category');
     sel.innerHTML = expenseCategories.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('')
-      + '<option value="__new__">➕ دسته‌بندی جدید…</option>';
+      + '<option value="__new__">افزودن دسته‌بندی جدید…</option>';
   }
   function populateCategoryFilter(){
     const sel = document.getElementById('exp-filter-category');
@@ -4570,7 +4637,7 @@
     const filterSel = document.getElementById('warehouse-filter-product');
     const current = sel.value;
     sel.innerHTML = products.map(p=>`<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('')
-      + `<option value="__new__">➕ محصول جدید…</option>`;
+      + `<option value="__new__">افزودن محصول جدید…</option>`;
     if(products.find(p=>p.id===current) || current==='__new__') sel.value = current;
     const filterCurrent = filterSel.value;
     filterSel.innerHTML = `<option value="">همه محصولات</option>` + products.map(p=>`<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
@@ -4583,7 +4650,7 @@
   function renderProductBarcodeChips(){
     const wrap = document.getElementById('product-barcode-chips');
     wrap.innerHTML = editingProductBarcodes.map(code=> `
-      <span class="barcode-chip">${escapeHtml(code)}<button type="button" data-rm-barcode="${escapeHtml(code)}">✕</button></span>
+      <span class="barcode-chip">${escapeHtml(code)}<button type="button" data-rm-barcode="${escapeHtml(code)}" aria-label="حذف بارکد"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6.2 6.2l11.6 11.6"/><path d="M17.8 6.2L6.2 17.8"/></svg></button></span>
     `).join('');
   }
   function addProductBarcodeFromInput(){
@@ -6368,7 +6435,8 @@
     const btn = document.getElementById('last-scan-repeat');
     if(lastScannedProductId){
       btn.style.display = 'flex';
-      btn.textContent = scanMultiplier>1 ? `↻ افزودن دوباره همین کالا (×${formatMoney(scanMultiplier)})` : '↻ افزودن دوباره همین کالا';
+      const lbl = btn.querySelector('.scan-repeat-label') || btn;
+      lbl.textContent = scanMultiplier>1 ? `افزودن دوباره همین کالا (×${formatMoney(scanMultiplier)})` : 'افزودن دوباره همین کالا';
     } else {
       btn.style.display = 'none';
     }

@@ -12,14 +12,9 @@ const DEFAULT_TRIAL_DAYS = 7;
 
 /** پلن‌های اولیه. فقط یک بار و روی دیتابیس خالی نوشته می‌شوند. */
 const DEFAULT_PLANS = [
-  { code: 'w1',     title: '۱ هفته', amount: 1, unit: 'week',  price: 100,  sort: 10 },
-  { code: 'm1',     title: '۱ ماه',  amount: 1, unit: 'month', price: 300,  sort: 20 },
-  { code: 'm3',     title: '۳ ماه',  amount: 3, unit: 'month', price: 800,  sort: 30 },
-  { code: 'm6',     title: '۶ ماه',  amount: 6, unit: 'month', price: 1500, sort: 40 },
-  { code: 'y1',     title: '۱ سال',  amount: 1, unit: 'year',  price: 2800, sort: 50, badge: 'پیشنهاد ما' },
-  { code: 'y2',     title: '۲ سال',  amount: 2, unit: 'year',  price: 5000, sort: 60 },
-  { code: 'y3',     title: '۳ سال',  amount: 3, unit: 'year',  price: 6800, sort: 70, badge: 'بیشترین صرفه' },
-  { code: 'custom', title: 'دلخواه', amount: null, unit: null, price: 0, sort: 80, negotiable: true },
+  { code: 'm1', title: 'ماهانه', amount: 1, unit: 'month', price: 500,  sort: 10 },
+  { code: 'm6', title: '۶ ماهه', amount: 6, unit: 'month', price: 2000, sort: 20, badge: 'پیشنهاد ما' },
+  { code: 'y1', title: '۱ ساله', amount: 1, unit: 'year',  price: 3000, sort: 30, badge: 'بیشترین صرفه' },
 ];
 
 const DEFAULT_CONFIG = {
