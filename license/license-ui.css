@@ -32,7 +32,7 @@
 
 /* ---------- دکمه‌های قفل‌شده ---------- */
 .lic-locked-el{ opacity:.55; position:relative; }
-.lic-locked-el::after{ content:'🔒'; margin-inline-start:6px; font-size:11px; }
+/* بدون ایموجی: قفل با کم‌رنگ شدن خود عنصر نشان داده می‌شود */
 
 /* ---------- دکمه ---------- */
 .lic-btn{

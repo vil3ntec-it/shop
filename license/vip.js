@@ -48,6 +48,44 @@
   const account = () => read(ACCT_KEY, {});
   const loggedIn = () => !!account().accessToken;
 
+
+  /* ---------- آیکون‌ها ----------
+     همه دستی کشیده شده‌اند (SVG). هیچ ایموجی در برنامه استفاده نمی‌شود،
+     چون ایموجی روی هر گوشی شکل و رنگ متفاوتی دارد و در ویندوز قدیمی
+     اصلاً نمایش داده نمی‌شود. */
+  const SVG = (d, extra) =>
+    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" ` +
+    `stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"${extra || ''}>${d}</svg>`;
+
+  const ICON = {
+    crown: SVG('<path d="M3 8.5l3.6 2.6L12 4l5.4 7.1L21 8.5 19.2 18H4.8L3 8.5z"/>' +
+               '<path d="M4.8 20.5h14.4"/>'),
+    check: SVG('<path d="M4.5 12.6l4.6 4.6L19.5 6.8"/>'),
+    lock: SVG('<rect x="4.5" y="10.5" width="15" height="9.5" rx="2.2"/>' +
+              '<path d="M8 10.5V7.8a4 4 0 1 1 8 0v2.7"/>'),
+    gift: SVG('<path d="M3.5 11.5h17V20a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 20v-8.5z"/>' +
+              '<rect x="2.5" y="7.5" width="19" height="4" rx="1.3"/>' +
+              '<path d="M12 7.5v14"/>' +
+              '<path d="M12 7.5S10.6 2.5 8 2.5a2.5 2.5 0 0 0 0 5"/>' +
+              '<path d="M12 7.5s1.4-5 4-5a2.5 2.5 0 0 1 0 5"/>'),
+    chat: SVG('<path d="M20.5 12.2c0 4-3.8 7.2-8.5 7.2-1 0-2-.15-2.9-.42L4 20.5l1.6-3.9' +
+              'C4.25 15.35 3.5 13.85 3.5 12.2c0-4 3.8-7.2 8.5-7.2s8.5 3.2 8.5 7.2z"/>'),
+    globe: SVG('<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17"/>' +
+               '<path d="M12 3.5c2.2 2.4 3.3 5.4 3.3 8.5S14.2 18.1 12 20.5"/>' +
+               '<path d="M12 3.5C9.8 5.9 8.7 8.9 8.7 12s1.1 6.1 3.3 8.5"/>'),
+    close: SVG('<path d="M6.2 6.2l11.6 11.6"/><path d="M17.8 6.2L6.2 17.8"/>'),
+    users: SVG('<circle cx="9" cy="8" r="3.4"/>' +
+               '<path d="M3 20v-1.2A4.8 4.8 0 0 1 7.8 14h2.4a4.8 4.8 0 0 1 4.8 4.8V20"/>' +
+               '<path d="M16.5 4.9a3.4 3.4 0 0 1 0 6.2"/><path d="M17.6 14h.6A4.8 4.8 0 0 1 23 18.8V20"/>'),
+    cart: SVG('<circle cx="9.5" cy="19.5" r="1.5"/><circle cx="17.5" cy="19.5" r="1.5"/>' +
+              '<path d="M2.5 3.5h2.6l2.4 11.3h11l2-7.8H6.4"/>'),
+    scan: SVG('<path d="M3.5 8V5.5A2 2 0 0 1 5.5 3.5H8"/><path d="M16 3.5h2.5a2 2 0 0 1 2 2V8"/>' +
+              '<path d="M20.5 16v2.5a2 2 0 0 1-2 2H16"/><path d="M8 20.5H5.5a2 2 0 0 1-2-2V16"/>' +
+              '<path d="M3.5 12h17"/>'),
+    box: SVG('<path d="M3.5 7.8L12 3.5l8.5 4.3v8.4L12 20.5 3.5 16.2V7.8z"/>' +
+             '<path d="M3.5 7.8L12 12l8.5-4.2"/><path d="M12 12v8.5"/>'),
+  };
+
   // ---------- وضعیت دسترسی ----------
   // آخرین پاسخ سرور کش می‌شود تا برنامه آفلاین هم بداند چه چیزی باز است.
   let ENT = read(ENT_KEY, null) || {
@@ -186,7 +224,7 @@
         ov.className = 'vip-overlay';
         ov.innerHTML = `
           <div class="vip-card">
-            <div class="vip-crown">👑</div>
+            <div class="vip-crown">${ICON.lock}</div>
             <h3>${esc(LABELS[feature] || feature)}</h3>
             <p>${esc(reasonText())}</p>
             <button type="button" class="vip-btn" data-vip-open>مشاهده اشتراک‌ها</button>
@@ -239,7 +277,7 @@
       header.insertBefore(el, header.firstChild);
     }
     el.className = 'vip-badge vip-badge-' + tone;
-    el.innerHTML = `<span class="vip-badge-icon">👑</span><span>${esc(text)}</span>`;
+    el.innerHTML = `<span class="vip-badge-icon">${ICON.crown}</span><span>${esc(text)}</span>`;
   }
 
   /** نوار هشدار در روزهای آخر دوره آزمایشی و پس از پایان آن. */
@@ -293,20 +331,45 @@
     modal.className = 'vip-scrim';
     modal.innerHTML = `
       <div class="vip-box">
-        <div class="vip-head">
-          <h3><span>👑</span> اشتراک VIP</h3>
-          <button type="button" class="vip-close" aria-label="بستن">&times;</button>
+        <button type="button" class="vip-close" aria-label="بستن">${ICON.close}</button>
+
+        <div class="vip-hero">
+          <div class="vip-logo">${ICON.crown}</div>
+          <h2><b>قیمت ساده</b> برای<br>مدیریت دکان</h2>
+          <p>رایگان شروع کنید. بدون هزینه‌ی پنهان.</p>
         </div>
+
         <div class="vip-body">
           <div id="vip-status"></div>
           <div id="vip-note"></div>
+
+          <div class="vip-tiers" id="vip-tiers"></div>
+
+          <div class="vip-section-title">مدت اشتراک را انتخاب کنید</div>
           <div id="vip-plans" class="vip-plans"></div>
+
+          <a class="vip-cta" id="vip-cta" target="_blank" rel="noopener">
+            <span class="vip-cta-ic">${ICON.gift}</span>
+            <b>گرفتن اشتراک</b>
+            <i>بدون قرارداد. بدون ریسک.</i>
+          </a>
+
+          <div class="vip-section-title">راه‌های تماس</div>
           <div class="vip-contact">
-            <p class="vip-hint">برای خرید اشتراک، پلن مورد نظر را انتخاب کنید تا در واتساپ پیام بدهید.</p>
-            <a class="vip-wa" id="vip-wa" target="_blank" rel="noopener">
-              <span>واتساپ</span>
-              <b dir="ltr" id="vip-wa-num">—</b>
+            <a class="vip-ccard" id="vip-wa" target="_blank" rel="noopener">
+              <span class="vip-ccard-ic vip-ic-wa">${ICON.chat}</span>
+              <span class="vip-ccard-txt">
+                <b>واتساپ</b>
+                <i dir="ltr" id="vip-wa-num">—</i>
+              </span>
             </a>
+            <div class="vip-ccard">
+              <span class="vip-ccard-ic vip-ic-web">${ICON.globe}</span>
+              <span class="vip-ccard-txt">
+                <b>پرداخت بیرون از برنامه</b>
+                <i>هماهنگی و پرداخت از راه واتساپ انجام می‌شود.</i>
+              </span>
+            </div>
           </div>
         </div>
       </div>`;
@@ -344,8 +407,53 @@
     </div>`;
   }
 
+  /* برچسب فارسی هر قابلیت رایگان، برای فهرست تیک‌دار کارت رایگان */
+  const FREE_LABELS = {
+    warehouse: 'انبار و موجودی', expenses: 'مصارف دکان',
+    purchasing: 'خریداری و تأمین‌کننده', reports: 'گزارش‌ها و سود',
+    audit_log: 'دفتر رویدادها', backup: 'پشتیبان‌گیری', csv_export: 'خروجی اکسل',
+  };
+
+  function tick(text, on) {
+    return `<li class="${on ? 'on' : 'off'}">
+      <span class="vip-tick">${on ? ICON.check : ICON.lock}</span>${esc(text)}</li>`;
+  }
+
+  /** دو کارت مقایسه‌ای: رایگان در برابر اشتراک. */
+  function tiersHtml(currency) {
+    const paidNow = ENT.source === 'subscription';
+    const trialNow = !!(ENT.trial && ENT.trial.active);
+
+    const freeList = Object.keys(FREE_LABELS).map(k => tick(FREE_LABELS[k], true)).join('');
+    const paidExtra = PAID.map(k => tick(LABELS[k] || k, true)).join('');
+    const freeLocked = PAID.map(k => tick(LABELS[k] || k, false)).join('');
+
+    return `
+      <div class="vip-tier">
+        <div class="vip-tier-name">رایگان</div>
+        <div class="vip-tier-price">۰ <small>${esc(currency)}</small></div>
+        <div class="vip-tier-sub">همیشه رایگان</div>
+        <ul class="vip-ticks">${freeList}${freeLocked}</ul>
+        <div class="vip-tier-foot${paidNow || trialNow ? '' : ' is-now'}">
+          ${paidNow || trialNow ? 'شامل حال شما نیست' : 'همین حالا فعال است'}
+        </div>
+      </div>
+      <div class="vip-tier vip-tier-hot">
+        <div class="vip-ribbon">پیشنهاد ما</div>
+        <div class="vip-tier-name">اشتراک VIP</div>
+        <div class="vip-tier-price">همه‌چیز</div>
+        <div class="vip-tier-sub">هر مدتی که بخواهید</div>
+        <ul class="vip-ticks">${freeList}${paidExtra}</ul>
+        <div class="vip-tier-foot${paidNow || trialNow ? ' is-now' : ''}">
+          ${paidNow ? 'اشتراک شما فعال است'
+            : trialNow ? 'در دوره‌ی آزمایشی باز است'
+            : 'مدت را از پایین انتخاب کنید'}
+        </div>
+      </div>`;
+  }
+
   function planCard(p, currency) {
-    const per = p.negotiable ? '' :
+    const per = p.negotiable ? '<span class="vip-per">با ما هماهنگ کنید</span>' :
       (p.pricePerDay ? `<span class="vip-per">روزی حدود ${fa(p.pricePerDay)} ${esc(currency)}</span>` : '');
     const price = p.negotiable ? 'توافقی' : `${fa(p.price)} <small>${esc(currency)}</small>`;
     return `<button type="button" class="vip-plan${p.badge ? ' vip-plan-badge' : ''}" data-plan="${esc(p.code)}">
@@ -353,6 +461,7 @@
       <span class="vip-plan-title">${esc(p.title)}</span>
       <span class="vip-plan-price">${price}</span>
       ${per}
+      <span class="vip-plan-pick">${ICON.check}<i>انتخاب</i></span>
     </button>`;
   }
 
@@ -364,21 +473,29 @@
       : '';
 
     const data = await loadPlans();
-    if (!data) {
-      $('#vip-plans', box).innerHTML =
-        '<p class="vip-hint">برای دیدن پلن‌ها، آدرس سرور را در تنظیمات وارد کنید.</p>';
-      return;
-    }
+    $('#vip-tiers', box).innerHTML = tiersHtml(data.currency);
     $('#vip-plans', box).innerHTML = data.plans.map(p => planCard(p, data.currency)).join('');
     $('#vip-wa', box).href = data.whatsapp.url;
     $('#vip-wa-num', box).textContent = data.whatsapp.number;
+    $('#vip-cta', box).href = data.whatsapp.url;
+
+    // ورود پلکانی کارت‌ها — هر کارت کمی بعد از قبلی بالا می‌آید
+    $$('#vip-plans .vip-plan', box).forEach((el, i) => {
+      el.style.setProperty('--vip-delay', (i * 45) + 'ms');
+    });
+    $$('#vip-tiers .vip-tier', box).forEach((el, i) => {
+      el.style.setProperty('--vip-delay', (i * 90) + 'ms');
+    });
 
     $$('#vip-plans [data-plan]', box).forEach(btn => {
       btn.addEventListener('click', () => {
         const plan = data.plans.find(p => p.code === btn.dataset.plan);
         if (!plan) return;
         $$('#vip-plans [data-plan]', box).forEach(b => b.classList.toggle('vip-plan-on', b === btn));
-        $('#vip-wa', box).href = plan.whatsappUrl || data.whatsapp.url;
+        const url = plan.whatsappUrl || data.whatsapp.url;
+        $('#vip-wa', box).href = url;
+        $('#vip-cta', box).href = url;
+        $('#vip-cta b', box).textContent = 'گرفتن اشتراک ' + plan.title;
         if (loggedIn()) requestPlan(plan.code);
       });
     });
