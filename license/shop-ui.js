@@ -37,8 +37,6 @@
           <div id="shop-status"></div>
 
           <div class="sync-section">
-            <label class="sync-label">آدرس سرور</label>
-            <input type="text" id="shop-server" class="sync-input" dir="ltr" placeholder="http://…:4700">
             <p class="sync-hint">آدرسی که از بیرون خانه هم در دسترس باشد، تا شاگرد از خانه‌اش بتواند همگام کند.</p>
           </div>
 
@@ -107,7 +105,6 @@
       $$('[data-tab]', el).forEach(x => x.classList.toggle('sync-tab-on', x === t));
       $$('[data-pane]', el).forEach(p => { p.hidden = p.dataset.pane !== t.dataset.tab; });
     }));
-    $('#shop-server', el).addEventListener('change', e => S().setServerUrl(e.target.value));
 
     $('#shop-login', el).addEventListener('click', () => guard('#shop-login', doLogin));
     $('#shop-register', el).addEventListener('click', () => guard('#shop-register', doRegister));
@@ -135,7 +132,6 @@
   }
 
   async function doLogin() {
-    S().setServerUrl($('#shop-server', el).value);
     const identifier = $('#shop-id', el).value.trim();
     const password = $('#shop-pw', el).value;
     if (!identifier || !password) throw new Error('نام کاربری و رمز عبور را وارد کنید');
@@ -152,7 +148,6 @@
   }
 
   async function doRegister() {
-    S().setServerUrl($('#shop-server', el).value);
     await S().api('/api/v1/auth/register', { method: 'POST', auth: false, body: {
       name: $('#shop-rname', el).value.trim(),
       email: $('#shop-remail', el).value.trim() || undefined,
@@ -212,7 +207,6 @@
     const st = S().state;
     const shop = st.shop;
 
-    $('#shop-server', el).value = S().serverUrl();
     $('#shop-auth', el).hidden = acct.loggedIn;
     $('#shop-setup', el).hidden = !acct.loggedIn || !!shop;
     $('#shop-team', el).hidden = !shop;
@@ -259,8 +253,16 @@
 
   window.TohidShopUI = { open, close, render };
 
-  // دکمه‌ی ورود به پنل، داخل صفحه تنظیمات برنامه
+  /*
+   * پنل «دکان مشترک و همگام‌سازی» دیگر در تنظیمات نمی‌نشیند: کارِ حساب
+   * و کلیدها به پنل «حساب و اشتراک» خودِ برنامه منتقل شد و آن‌جا یک‌جا
+   * دیده می‌شود. خودِ پنجره باقی می‌ماند و با TohidShopUI.open() باز
+   * می‌شود، ولی دکمه‌ای در تنظیمات ندارد.
+   */
+  const MOUNT_IN_SETTINGS = false;
+
   function mountEntry() {
+    if (!MOUNT_IN_SETTINGS) return;
     const settings = document.getElementById('page-settings');
     if (!settings || document.getElementById('shop-entry-panel')) return;
     const panel = document.createElement('div');

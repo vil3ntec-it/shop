@@ -34,9 +34,9 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
-<link rel="stylesheet" href="license/license-ui.css?v=14">
-<link rel="stylesheet" href="license/shop-ui.css?v=14">
-<link rel="stylesheet" href="license/vip.css?v=14">
+<link rel="stylesheet" href="license/license-ui.css?v=15">
+<link rel="stylesheet" href="license/shop-ui.css?v=15">
+<link rel="stylesheet" href="license/vip.css?v=15">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <!-- فونت به‌صورت غیرمسدودکننده بارگذاری می‌شود تا نبودِ اینترنت باز شدن برنامه را کند نکند -->
@@ -1054,6 +1054,19 @@
   .auth-divider::before, .auth-divider::after{
     content:''; flex:1; height:1px; background:var(--border);
   }
+
+  /* ---------- ورود شاگرد با کد ---------- */
+  .auth-staff{margin-bottom:18px;}
+  .auth-staff label{
+    display:block; font-size:12px; font-weight:800; color:var(--text); margin-bottom:7px;
+  }
+  .auth-staff-row{display:flex; gap:8px;}
+  .auth-staff-row .form-input{
+    flex:1; min-width:0; text-align:left;
+    font-size:13px; font-weight:700; letter-spacing:.5px;
+  }
+  .auth-staff-row .btn{flex:0 0 auto;}
+  .auth-staff-hint{font-size:10.5px; color:var(--muted-2); margin-top:6px; line-height:1.7;}
 
   .auth-roles{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
   .auth-role{
@@ -2234,7 +2247,40 @@
   .alert-item .ai-sub{ display:block; font-size:11.5px; color:var(--muted); margin-top:3px; line-height:1.6; }
   .alerts-empty{ padding:22px 10px; text-align:center; font-size:12.5px; color:var(--muted); }
 
-  /* ---------- نوار به‌روزرسانی ---------- */
+  /* ---------- حساب و کلیدها در تنظیمات ---------- */
+  .acct-rows{
+    display:flex; flex-direction:column; gap:1px;
+    border-radius:var(--radius-md); overflow:hidden;
+    background:var(--surface); margin-bottom:16px;
+  }
+  .acct-row{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:10px 12px; background:var(--bg);
+    font-size:12.5px;
+  }
+  .acct-row span{ color:var(--muted); font-weight:600; }
+  .acct-row b{ color:var(--text); font-weight:800; }
+  .settings-key-label{
+    display:block; font-size:12px; font-weight:800; color:var(--text); margin-bottom:7px;
+  }
+  .settings-key{
+    display:flex; align-items:center; gap:8px;
+    padding:10px 11px; margin-bottom:8px;
+    border:1px dashed var(--border); border-radius:var(--radius-md);
+    background:var(--surface);
+  }
+  /* کلید بلند است: به‌جای بریده شدن، در چند خط می‌شکند تا کامل خوانده شود */
+  .settings-key code{
+    flex:1; min-width:0; font-family:inherit;
+    font-size:13px; font-weight:800; letter-spacing:.5px; line-height:1.9;
+    color:var(--primary); user-select:all;
+    direction:ltr; text-align:left;
+    white-space:normal; word-break:break-all; overflow-wrap:anywhere;
+  }
+  @media(max-width:400px){ .settings-key code{ font-size:12px; } }
+  .settings-key .btn{ flex:0 0 auto; }
+
+  /* ---------- نوار به‌روزرسانی ---------- */  /* ---------- نوار به‌روزرسانی ---------- */
   .update-bar{
     position:fixed; z-index:120;
     inset-inline:12px; top:calc(var(--header-h, 60px) + 8px);
@@ -2632,6 +2678,19 @@
       </button>
       <span class="auth-field-error" id="auth-form-error" style="text-align:center; display:block;"></span>
     </form>
+
+    <div class="auth-divider"><span>شاگرد دکان هستید؟</span></div>
+
+    <div class="auth-staff">
+      <label for="auth-staff-code">کد شاگرد</label>
+      <div class="auth-staff-row">
+        <input class="form-input" id="auth-staff-code" type="text" dir="ltr"
+               inputmode="latin" autocapitalize="characters" placeholder="SHG-XXXXX-XXXXX-XXXXX">
+        <button type="button" class="btn btn-secondary btn-sm" id="auth-staff-join">ورود</button>
+      </div>
+      <p class="auth-staff-hint">کدی که صاحب دکان از تنظیمات برنامه‌اش به شما می‌دهد.</p>
+      <div class="auth-field-error" id="auth-staff-error"></div>
+    </div>
 
     <div class="auth-divider"><span>ثبت‌نام در توحید</span></div>
 
@@ -3816,6 +3875,34 @@
           </div>
         </div>
 
+        <!-- حساب، اشتراک و کلیدها -->
+        <div class="panel">
+          <div class="panel-head">
+            <h2>حساب و اشتراک</h2>
+            <span class="settings-badge" id="acct-state-badge">—</span>
+          </div>
+          <div class="acct-rows" id="acct-rows"></div>
+
+          <label class="settings-key-label">کلید حساب شما</label>
+          <div class="settings-key">
+            <code id="settings-api-key" dir="ltr">—</code>
+            <button type="button" class="btn btn-secondary btn-sm" data-copy-key="settings-api-key">کپی</button>
+          </div>
+          <p class="settings-hint">این کلید فقط مالِ همین حساب است و هرگز برای کس دیگری تکرار نمی‌شود. هنگام خرید اشتراک، خودکار همراه پیام واتساپ فرستاده می‌شود تا اشتراک روی حساب خودتان فعال شود.</p>
+
+          <label class="settings-key-label" style="margin-top:16px;">کد شاگرد</label>
+          <div class="settings-key">
+            <code id="settings-staff-code" dir="ltr">—</code>
+            <button type="button" class="btn btn-secondary btn-sm" data-copy-key="settings-staff-code">کپی</button>
+          </div>
+          <p class="settings-hint">این کد را به شاگردهایتان بدهید تا در صفحه‌ی ورود بزنند و روی همین دکان بیایند.</p>
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-new-staff-code" style="margin-top:8px;">ساخت کد تازه</button>
+
+          <div class="settings-actions-row" style="margin-top:16px;">
+            <button type="button" class="btn btn-primary btn-sm" id="btn-open-account">ورود / ثبت‌نام</button>
+          </div>
+        </div>
+
         <!-- Backup -->
         <div class="panel">
           <div class="panel-head"><h2>پشتیبان‌گیری از اطلاعات</h2></div>
@@ -4835,6 +4922,29 @@
         'برای بازیابی رمز، با پشتیبانی تماس بگیرید. اطلاعات دکان شما روی همین گوشی محفوظ است.');
     });
 
+    /*
+     * ورود شاگرد با کد: کد را ذخیره می‌کند و برنامه را باز می‌کند.
+     * وقتی سرور وصل شود، همین کد است که شاگرد را روی دکانِ صاحبش
+     * می‌نشاند؛ تا آن‌وقت روی همین گوشی کار می‌کند.
+     */
+    const STAFF_JOIN_KEY = 'tohid-joined-staff-code-v1';
+    document.getElementById('auth-staff-join').addEventListener('click', ()=>{
+      const el = document.getElementById('auth-staff-code');
+      const code = el.value.trim().toUpperCase();
+      authError('auth-staff-error','');
+      if(!code){ authError('auth-staff-error','کد شاگرد را وارد کنید.'); el.focus(); return; }
+      if(!/^SHG-[A-Z0-9]{5}(-[A-Z0-9]{5}){2}$/.test(code)){
+        authError('auth-staff-error','این کد درست نیست. کد باید مثل SHG-XXXXX-XXXXX-XXXXX باشد.');
+        el.focus(); return;
+      }
+      try{ localStorage.setItem(STAFF_JOIN_KEY, code); }catch(e){}
+      const staff = { method:'staff', value:code, name:'شاگرد', loginAt:Date.now() };
+      saveAuth(staff);
+      applyAuthToUI(staff);
+      enterApp(true);
+      setTimeout(()=> showToast('با کد شاگرد وارد شدید'), 400);
+    });
+
     // ثبت‌نام و ادامه بدون حساب
     document.getElementById('auth-role-seller').addEventListener('click', ()=>{
       const local = { method:'local', value:'', name:'کاربر', loginAt:Date.now() };
@@ -5489,7 +5599,7 @@
   }
 
 /* ---- شماره‌ی نسخه و گرفتن اجباری آخرین نسخه ---- */
-  const APP_BUILD = 'v14';
+  const APP_BUILD = 'v15';
   (function showBuild(){
     const el = document.getElementById('build-id');
     if(el) el.textContent = APP_BUILD;
@@ -8936,7 +9046,7 @@
   function initScanBeep(){
     if(scanBeepAudio) return;
     try{
-      scanBeepAudio = new Audio('sounds/scan-beep.mp3?v=14');
+      scanBeepAudio = new Audio('sounds/scan-beep.mp3?v=15');
       scanBeepAudio.preload = 'auto';
       scanBeepAudio.volume = 0.85;
     }catch(e){ scanBeepAudio = null; }
@@ -9545,6 +9655,92 @@
     refreshHeaderAuth();
     if(window.TohidLicense && window.TohidLicense.onChange){
       window.TohidLicense.onChange(refreshHeaderAuth);
+    }
+  });
+
+  /* ==========================================================
+     پنل حساب و کلیدها در تنظیمات
+     ----------------------------------------------------------
+     وضعیت اشتراک و هر دو کلید همین‌جا دیده می‌شوند، نه داخل پنجره‌ی
+     جداگانه. کلید حساب یکتاست و کد شاگرد را می‌شود عوض کرد.
+     ========================================================== */
+  function renderAccountPanel(){
+    const lic = window.TohidLicense;
+    const rows = document.getElementById('acct-rows');
+    const badge = document.getElementById('acct-state-badge');
+    if(!rows || !badge) return;
+
+    const inAccount = !!(lic && lic.isLoggedIn && lic.isLoggedIn());
+    const st = (lic && lic.state) || {};
+    const label = { active:'اشتراک فعال', grace:'مهلت تمدید', expired:'پایان‌یافته',
+                    invalid:'نامعتبر', revoked:'دستگاه لغو شده',
+                    pending:'شروع نشده', none:'بدون اشتراک' }[st.state] || 'بدون اشتراک';
+    badge.textContent = label;
+    badge.classList.toggle('warn', st.state !== 'active');
+
+    const fmt = (v)=>{
+      if(!v) return '—';
+      try{ return new Date(v).toLocaleDateString('fa-IR'); }catch(e){ return '—'; }
+    };
+    rows.innerHTML = [
+      ['کاربر', inAccount ? (lic.userLabel() || 'وارد شده') : 'وارد نشده‌اید'],
+      ['وضعیت اشتراک', label],
+      ['پایان اشتراک', fmt(st.subEndsAt)],
+    ].map(r=> `<div class="acct-row"><span>${r[0]}</span><b>${escapeHtml(String(r[1]))}</b></div>`).join('');
+
+    const keyEl = document.getElementById('settings-api-key');
+    const staffEl = document.getElementById('settings-staff-code');
+    if(keyEl && lic && lic.getApiKey) keyEl.textContent = lic.getApiKey();
+    if(staffEl && lic && lic.getStaffCode) staffEl.textContent = lic.getStaffCode();
+
+    const btn = document.getElementById('btn-open-account');
+    if(btn) btn.textContent = inAccount ? 'مدیریت حساب' : 'ورود / ثبت‌نام';
+  }
+
+  document.addEventListener('click', async (e)=>{
+    const copyBtn = e.target.closest('[data-copy-key]');
+    if(!copyBtn) return;
+    const el = document.getElementById(copyBtn.dataset.copyKey);
+    if(!el) return;
+    const text = el.textContent.trim();
+    try{
+      await navigator.clipboard.writeText(text);
+      showToast('کپی شد');
+    }catch(err){
+      // روی مرورگرهای بدون https، دست‌کم انتخابش کن
+      const r = document.createRange(); r.selectNodeContents(el);
+      const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+      showToast('انتخاب شد — با نگه‌داشتن انگشت کپی کنید');
+    }
+  });
+
+  document.getElementById('btn-new-staff-code').addEventListener('click', ()=>{
+    document.getElementById('confirm-title').textContent = 'کد شاگرد تازه ساخته شود؟';
+    document.getElementById('confirm-sub').textContent =
+      'کد قبلی دیگر کار نمی‌کند و شاگردهایی که هنوز با آن وارد نشده‌اند، باید کد تازه را بگیرند.';
+    confirmAction = ()=>{
+      const lic = window.TohidLicense;
+      if(lic && lic.rotateStaffCode){
+        document.getElementById('settings-staff-code').textContent = lic.rotateStaffCode();
+        showToast('کد تازه ساخته شد');
+      }
+      closeModal('modal-confirm');
+    };
+    openModal('modal-confirm');
+  });
+
+  document.getElementById('btn-open-account').addEventListener('click', ()=>{
+    const lic = window.TohidLicense;
+    if(lic && lic.open) lic.open();
+  });
+
+  document.addEventListener('tohid:page-change', (e)=>{
+    if(e.detail.pageId === 'settings') renderAccountPanel();
+  });
+  window.addEventListener('load', ()=>{
+    renderAccountPanel();
+    if(window.TohidLicense && window.TohidLicense.onChange){
+      window.TohidLicense.onChange(renderAccountPanel);
     }
   });
 
@@ -10378,10 +10574,10 @@
 </script>
 
 <!-- لایه اشتراک و License — کاملاً افزودنی؛ منطق فروشگاه را تغییر نمی‌دهد -->
-<script src="license/license-client.js?v=14" defer></script>
-<script src="license/shop-sync.js?v=14" defer></script>
-<script src="license/shop-ui.js?v=14" defer></script>
-<script src="license/vip.js?v=14" defer></script>
+<script src="license/license-client.js?v=15" defer></script>
+<script src="license/shop-sync.js?v=15" defer></script>
+<script src="license/shop-ui.js?v=15" defer></script>
+<script src="license/vip.js?v=15" defer></script>
 
 </body>
 </html>

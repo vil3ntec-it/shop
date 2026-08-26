@@ -100,26 +100,83 @@
     try { localStorage.setItem(SERVER_KEY, String(v || '').trim().replace(/\/+$/, '')); } catch {}
   }
 
-  /*
-   * کلید حساب — شناسه‌ای که فروشنده با آن می‌فهمد اشتراک را روی کدام
-   * حساب فعال کند. یک بار ساخته می‌شود و ثابت می‌ماند؛ اگر کاربر وارد
-   * حساب شده باشد به همان حساب گره می‌خورد. هیچ چیز محرمانه‌ای در آن
-   * نیست، فقط یک نشانی است.
-   */
+  /* ==========================================================
+     کلیدهای حساب
+     ----------------------------------------------------------
+     دو کلید متفاوت ساخته می‌شود:
+
+     ۱) کلید حساب (TSH-…) — شناسه‌ی یکتای هر حساب. فروشنده با همین
+        می‌فهمد اشتراک را روی کدام حساب فعال کند و سرور خودش هم با
+        همین کلید حسابِ طرف را می‌شناسد.
+
+     ۲) کد شاگرد (SHG-…) — صاحب دکان این را به شاگردهایش می‌دهد تا
+        در صفحه‌ی ورود بزنند و روی همان دکان بیایند.
+
+     چرا تکراری نمی‌شود:
+     هر کلید از ۱۲۸ بیت تصادفیِ crypto.getRandomValues ساخته می‌شود
+     (۲ به توان ۱۲۸ حالت). حتی با میلیاردها کلید، احتمال برخورد عملاً
+     صفر است. یک بخش زمانی هم اولش می‌آید تا دو دستگاهی که هم‌زمان
+     ساخته نمی‌شوند، هرگز به هم نرسند.
+     ========================================================== */
   const APIKEY_KEY = 'tohid-account-key-v1';
+  const STAFFCODE_KEY = 'tohid-staff-code-v1';
+
+  // بدون I/O/0/1 تا موقع خواندن و گفتن اشتباه نشود
+  const KEY_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+  /** n کاراکترِ تصادفی از الفبای بالا، با بایت‌های امنِ مرورگر. */
+  function randomChars(n) {
+    const bytes = new Uint8Array(n);
+    (self.crypto || window.crypto).getRandomValues(bytes);
+    let out = '';
+    for (let i = 0; i < n; i++) out += KEY_ALPHABET[bytes[i] % KEY_ALPHABET.length];
+    return out;
+  }
+
+  /** زمانِ ساخت، فشرده در ۶ کاراکتر — تا کلیدهای دو زمان متفاوت هم‌ریشه نباشند. */
+  function timeChunk() {
+    let t = Date.now();
+    let out = '';
+    for (let i = 0; i < 6; i++) { out = KEY_ALPHABET[t % KEY_ALPHABET.length] + out; t = Math.floor(t / KEY_ALPHABET.length); }
+    return out;
+  }
+
+  function group(str, size) {
+    const parts = [];
+    for (let i = 0; i < str.length; i += size) parts.push(str.slice(i, i + size));
+    return parts.join('-');
+  }
+
+  const API_KEY_RE  = /^TSH-[A-Z0-9]{5}(-[A-Z0-9]{5}){4}$/;
+  const STAFF_KEY_RE = /^SHG-[A-Z0-9]{5}(-[A-Z0-9]{5}){2}$/;
+
+  /** کلید حساب — ۲۵ کاراکتر (۶ زمانی + ۱۹ تصادفی) در پنج دسته‌ی پنج‌تایی. */
   function getApiKey() {
     let key = '';
     try { key = localStorage.getItem(APIKEY_KEY) || ''; } catch {}
-    if (!/^TSH-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(key)) {
-      const abc = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // بدون I/O/0/1 تا اشتباه خوانده نشود
-      const bytes = new Uint8Array(12);
-      (self.crypto || window.crypto).getRandomValues(bytes);
-      const chunk = (i) => Array.from(bytes.slice(i, i + 4))
-        .map(b => abc[b % abc.length]).join('');
-      key = 'TSH-' + chunk(0) + '-' + chunk(4) + '-' + chunk(8);
+    if (!API_KEY_RE.test(key)) {
+      key = 'TSH-' + group(timeChunk() + randomChars(19), 5);
       try { localStorage.setItem(APIKEY_KEY, key); } catch {}
     }
     return key;
+  }
+
+  /** کد شاگرد — ۱۵ کاراکتر، برای دادن به کارکنانِ همان دکان. */
+  function getStaffCode() {
+    let code = '';
+    try { code = localStorage.getItem(STAFFCODE_KEY) || ''; } catch {}
+    if (!STAFF_KEY_RE.test(code)) {
+      code = 'SHG-' + group(timeChunk() + randomChars(9), 5);
+      try { localStorage.setItem(STAFFCODE_KEY, code); } catch {}
+    }
+    return code;
+  }
+
+  /** کد تازه می‌سازد — وقتی صاحب دکان بخواهد کد قبلی دیگر کار نکند. */
+  function rotateStaffCode() {
+    const code = 'SHG-' + group(timeChunk() + randomChars(9), 5);
+    try { localStorage.setItem(STAFFCODE_KEY, code); } catch {}
+    return code;
   }
 
   /** شناسه‌ی پایدار دستگاه — یک بار ساخته و ذخیره می‌شود. */
@@ -724,15 +781,6 @@
           <div class="lic-body">
             <div class="lic-status" id="lic-status"></div>
 
-            <div class="lic-section">
-              <label class="lic-label">کلید حساب شما</label>
-              <div class="lic-apikey">
-                <code id="lic-apikey" dir="ltr">—</code>
-                <button type="button" class="lic-btn lic-btn-sm" id="lic-copy-key">کپی</button>
-              </div>
-              <p class="lic-hint">این کلید حساب شماست. هنگام خرید اشتراک، همین کلید همراه پیام واتساپ فرستاده می‌شود تا اشتراک روی حساب خودتان فعال شود.</p>
-            </div>
-
             <div class="lic-section" id="lic-auth-section">
               <div class="lic-tabs">
                 <button type="button" class="lic-tab lic-tab-active" data-lic-tab="login">ورود</button>
@@ -750,9 +798,10 @@
               <div data-lic-pane="register" hidden>
                 <label class="lic-label">نام</label>
                 <input type="text" id="lic-reg-name" class="lic-input">
+                <p class="lic-hint">ایمیل یا شماره موبایل — هرکدام را داشتید کافی است، لازم نیست هر دو.</p>
                 <label class="lic-label">ایمیل</label>
                 <input type="email" id="lic-reg-email" class="lic-input" dir="ltr" autocomplete="email">
-                <label class="lic-label">شماره موبایل (اختیاری)</label>
+                <label class="lic-label">شماره موبایل</label>
                 <input type="tel" id="lic-reg-phone" class="lic-input" dir="ltr" autocomplete="tel">
                 <label class="lic-label">رمز عبور (حداقل ۸ کاراکتر)</label>
                 <input type="password" id="lic-reg-password" class="lic-input" dir="ltr" autocomplete="new-password">
@@ -787,19 +836,6 @@
         });
       });
 
-      $('#lic-copy-key', wrap).addEventListener('click', async () => {
-        const key = getApiKey();
-        try {
-          await navigator.clipboard.writeText(key);
-          UI.msg('کلید حساب کپی شد', 'ok');
-        } catch {
-          // روی مرورگرهای قدیمی یا بدون https، دست‌کم انتخابش کن
-          const el = $('#lic-apikey', wrap);
-          const r = document.createRange(); r.selectNodeContents(el);
-          const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
-          UI.msg('کلید انتخاب شد — با نگه‌داشتن انگشت آن را کپی کنید', 'warn');
-        }
-      });
       $('#lic-do-login', wrap).addEventListener('click', UI.doLogin);
       $('#lic-do-register', wrap).addEventListener('click', UI.doRegister);
       $('#lic-do-sync', wrap).addEventListener('click', UI.doSync);
@@ -827,7 +863,6 @@
     render() {
       const wrap = UI.ensure();
       const st = readStore();
-      $('#lic-apikey', wrap).textContent = getApiKey();
 
       const loggedIn = !!st.accessToken;
       $('#lic-auth-section', wrap).hidden = loggedIn;
@@ -898,10 +933,14 @@
       const btn = $('#lic-do-register', UI.el);
       UI.msg('');
       UI.guard(btn, async () => {
+        const email = $('#lic-reg-email', UI.el).value.trim();
+        const phone = $('#lic-reg-phone', UI.el).value.trim();
+        // یکی از این دو کافی است؛ اجبار به هر دو، ثبت‌نام را بی‌دلیل سخت می‌کرد
+        if (!email && !phone) throw new Error('ایمیل یا شماره موبایل را وارد کنید — یکی کافی است');
         await register({
           name: $('#lic-reg-name', UI.el).value.trim(),
-          email: $('#lic-reg-email', UI.el).value.trim() || undefined,
-          phone: $('#lic-reg-phone', UI.el).value.trim() || undefined,
+          email: email || undefined,
+          phone: phone || undefined,
           password: $('#lic-reg-password', UI.el).value,
         });
         UI.msg('حساب ساخته شد. حالا از تب «ورود» وارد شوید.', 'ok');
@@ -973,7 +1012,8 @@
     hasFeature, onChange,
     open: (label) => UI.open(label),
     sync, activate, login, register, logout,
-    getServerUrl, setServerUrl, getDeviceUid, getApiKey,
+    getServerUrl, setServerUrl, getDeviceUid,
+    getApiKey, getStaffCode, rotateStaffCode,
     isLoggedIn: () => !!readStore().accessToken,
     userLabel: () => readStore().userLabel || '',
     verifyLicense, evaluate: evaluateLocal,
