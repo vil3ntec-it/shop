@@ -27,11 +27,37 @@ class SyncEngine(
     suspend fun sync(): Result {
         val api = ApiClient.api(session) ?: throw SyncException("آدرس سرور تنظیم نشده است")
         if (!session.isLoggedIn()) throw SyncException("ابتدا وارد حساب شوید")
+        if (session.shopId().isBlank()) throw SyncException("برای این حساب دکانی ثبت نشده است")
 
         val pushed = pushLocal(api)
         val pulled = pullRemote(api)
         session.setLastSyncAt(System.currentTimeMillis())
         return Result(pushed, pulled, session.rev())
+    }
+
+    /**
+     * پاک کردن دفتر محلی این گوشی.
+     *
+     * فقط وقتی صدا زده می‌شود که کاربر خودش تأیید کرده باشد — مثلاً
+     * شاگردی که به دکان صاحب‌کارش می‌پیوندد و نباید یادداشت‌های
+     * آزمایشی گوشی خودش وارد دفتر دکان شود.
+     */
+    suspend fun wipeLocal() = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        db.clearAllTables()
+        session.setRev(0)
+    }
+
+    /**
+     * برگرداندن کل دفتر از سرور — بعد از نصب دوباره یا روی گوشی تازه.
+     * از rev صفر شروع می‌کند، پس هر چه سرور دارد پایین می‌آید.
+     */
+    suspend fun restoreAll(): Int {
+        val api = ApiClient.api(session) ?: throw SyncException("آدرس سرور تنظیم نشده است")
+        if (!session.isLoggedIn()) throw SyncException("ابتدا وارد حساب شوید")
+        session.setRev(0)
+        val pulled = pullRemote(api)
+        session.setLastSyncAt(System.currentTimeMillis())
+        return pulled
     }
 
     // ---------- فرستادن ----------
@@ -81,11 +107,23 @@ class SyncEngine(
 
         if (changes.isEmpty()) return 0
 
-        api.push(PushRequest(deviceId = session.deviceId(), changes = changes))
+        // شناسه‌ی یکتای این دسته. اگر وسط کار اینترنت قطع شود و برنامه
+        // دوباره بفرستد، سرور همان را تشخیص می‌دهد و رکوردها دو بار ثبت نمی‌شوند.
+        val operationId = java.util.UUID.randomUUID().toString()
+        val res = api.push(
+            PushRequest(
+                deviceId = session.deviceId(),
+                operationId = operationId,
+                changes = changes,
+            )
+        )
 
-        // پس از تأیید سرور، پرچم dirty پاک می‌شود
-        clearDirtyFlags(changes)
-        return changes.size
+        // پس از تأیید سرور، پرچم dirty پاک می‌شود. رکوردهایی که سرور
+        // نپذیرفته (نسخه‌ی قدیمی‌تر یا اجازه‌ی حذف نبوده) dirty می‌مانند
+        // تا در همگام‌سازی بعد، نسخه‌ی سرور جایشان بنشیند.
+        val rejected = res.conflicts.map { it.collection + "/" + it.id }.toSet()
+        clearDirtyFlags(changes.filter { (it.collection + "/" + it.id) !in rejected })
+        return res.applied
     }
 
     private suspend fun clearDirtyFlags(changes: List<SyncChange>) {
@@ -113,7 +151,7 @@ class SyncEngine(
         var guard = 0
 
         while (guard++ < 100) {
-            val page = api.pull(since)
+            val page = api.pull(since = since, limit = 1000, deviceId = session.deviceId())
             if (page.changes.isEmpty()) { since = maxOf(since, page.rev); break }
             total += applyRemote(page.changes)
             since = page.rev

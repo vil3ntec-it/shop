@@ -33,6 +33,8 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -319,6 +321,7 @@ fun TField(
     modifier: Modifier = Modifier,
     placeholder: String = "",
     numeric: Boolean = false,
+    password: Boolean = false,
     error: String? = null,
     singleLine: Boolean = true,
     minHeight: Dp = 44.dp,
@@ -358,8 +361,14 @@ fun TField(
                         fontSize = 13.5.sp,
                     ),
                     cursorBrush = SolidColor(T.primary),
+                    visualTransformation =
+                        if (password) PasswordVisualTransformation() else VisualTransformation.None,
                     keyboardOptions = KeyboardOptions(
-                        keyboardType = if (numeric) KeyboardType.Number else KeyboardType.Text,
+                        keyboardType = when {
+                            password -> KeyboardType.Password
+                            numeric -> KeyboardType.Number
+                            else -> KeyboardType.Text
+                        },
                     ),
                     modifier = Modifier.fillMaxWidth(),
                 )

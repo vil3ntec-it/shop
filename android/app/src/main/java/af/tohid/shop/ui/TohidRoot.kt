@@ -58,7 +58,7 @@ private val titles = mapOf(
     "reports" to "گزارش‌ها",
     "audit" to "دفتر رویدادها",
     "settings" to "تنظیمات",
-    "shop" to "دکان و همگام‌سازی",
+    "account" to "حساب و دکان",
 )
 
 /** صفحه‌هایی که دکمه‌ی شناور «افزودن» دارند. */
@@ -67,6 +67,21 @@ private val fabRoutes = setOf("debtors", "warehouse", "expenses", "products")
 @Composable
 fun TohidRoot() {
     val app = TohidApp.instance
+
+    // صفحه‌ی نخست: تا وقتی کاربر یا وارد شود یا بگوید «بدون حساب ادامه بده»
+    var welcome by remember {
+        mutableStateOf(!app.session.isLoggedIn() && !app.session.authSkipped())
+    }
+    var openAccount by remember { mutableStateOf(false) }
+
+    if (welcome) {
+        WelcomeScreen(
+            onLogin = { openAccount = true; welcome = false },
+            onSkip = { app.session.setAuthSkipped(true); welcome = false },
+        )
+        return
+    }
+
     val nav = rememberNavController()
     val backStack by nav.currentBackStackEntryAsState()
     val route = backStack?.destination?.route
@@ -75,6 +90,14 @@ fun TohidRoot() {
     // درخواست «افزودن» از دکمه‌ی شناور به صفحه‌ی فعال می‌رسد
     var addTick by remember { mutableIntStateOf(0) }
 
+    // اگر کاربر از صفحه‌ی نخست «ورود» را زده باشد، یک‌راست به حساب می‌رود
+    LaunchedEffect(openAccount) {
+        if (openAccount) {
+            openAccount = false
+            nav.navigate("account")
+        }
+    }
+
     val initial = app.session.userLabel().trim().firstOrNull()?.toString()
         ?: app.session.shopName().trim().firstOrNull()?.toString() ?: "ک"
 
@@ -82,11 +105,11 @@ fun TohidRoot() {
         containerColor = T.surface,
         topBar = {
             AppHeader(
-                title = titles[route] ?: "توحید",
+                title = titles[route] ?: "shop",
                 userInitial = initial,
                 onNotifications = { nav.navigate("more") },
                 onSettings = { nav.navigate("settings") },
-                onAccount = { nav.navigate("shop") },
+                onAccount = { nav.navigate("account") },
                 onBack = if (isTopLevel) null else ({ nav.popBackStack(); Unit }),
             )
         },
@@ -143,7 +166,7 @@ fun TohidRoot() {
                 composable("reports") { ReportsScreen() }
                 composable("audit") { AuditLogScreen() }
                 composable("settings") { SettingsScreen() }
-                composable("shop") { ShopScreen() }
+                composable("account") { AccountScreen() }
             }
         }
     }

@@ -1,21 +1,20 @@
 {
-  "name": "tohid-license-server",
-  "version": "1.0.0",
+  "name": "shop-server",
+  "version": "2.0.0",
   "private": true,
-  "description": "سرور اشتراک و License برای برنامه مدیریت فروشگاه توحید",
+  "description": "سرور فروشگاه — احراز هویت، دکان چندکاربره، اشتراک و همگام‌سازی روی PostgreSQL",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "generate-keys": "node scripts/generate-keys.js",
+    "migrate": "node scripts/migrate.js",
     "create-admin": "node scripts/create-admin.js",
-    "seed-demo": "node scripts/seed-demo.js",
-    "test": "node --test test/*.test.js"
+    "backup": "node scripts/backup.js",
+    "restore": "node scripts/restore.js",
+    "test": "node --test --test-concurrency=1 test/*.test.js"
   },
-  "engines": {
-    "node": ">=20"
-  },
+  "engines": { "node": ">=20" },
   "dependencies": {
-    "better-sqlite3": "^12.4.1",
-    "express": "^5.1.0"
+    "express": "^5.1.0",
+    "pg": "^8.13.1"
   }
 }

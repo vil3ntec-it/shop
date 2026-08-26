@@ -1,16 +1,20 @@
 'use strict';
 /**
- * احراز هویت و Authorization.
+ * احراز هویت و کنترل دسترسی.
  *
- * قاعده‌ی کلیدی: شناسه‌ی کاربر همیشه از توکن گرفته می‌شود، نه از پارامتر مسیر
- * یا بدنه‌ی درخواست. به همین دلیل کاربر نمی‌تواند با تغییر user_id به اطلاعات
- * دیگری برسد.
+ * دو قاعده‌ی همیشگی:
+ *   ۱) شناسه‌ی کاربر همیشه از توکن خوانده می‌شود، نه از بدنه یا مسیر.
+ *   ۲) shop_id هم از عضویت همان کاربر پیدا می‌شود، نه از چیزی که گوشی فرستاده.
+ * به همین دلیل کسی نمی‌تواند با عوض کردن یک شناسه در درخواست به اطلاعات
+ * حساب یا دکان دیگری برسد.
  */
 const tokens = require('../lib/tokens');
-const { getDb, now } = require('../db');
-const subs = require('../lib/subscriptions');
+const { one, query, now } = require('../db');
 const { unauthorized, forbidden } = require('./errors');
 const { isCoreFeature } = require('../lib/features');
+const { entitlementOf } = require('../lib/entitlement');
+const { membershipOf } = require('../lib/shops');
+const { can } = require('../lib/permissions');
 
 function bearer(req) {
   const h = req.headers.authorization || '';
@@ -18,77 +22,121 @@ function bearer(req) {
   return m ? m[1].trim() : null;
 }
 
-/** کاربر عادی — توکن دسترسی لازم است. */
-function requireUser(req, res, next) {
-  const token = bearer(req);
-  if (!token) return next(unauthorized());
-  const row = tokens.verify(token, 'access');
-  if (!row) return next(unauthorized('توکن نامعتبر یا منقضی است', 'invalid_token'));
+/** کاربر عادی. */
+async function requireUser(req, res, next) {
+  try {
+    const token = bearer(req);
+    if (!token) return next(unauthorized());
+    const row = await tokens.verify(token, 'access');
+    if (!row) return next(unauthorized('نشست شما منقضی شده است، دوباره وارد شوید', 'invalid_token'));
 
-  const user = getDb().prepare('SELECT * FROM users WHERE id = ?').get(row.subject_id);
-  if (!user) return next(unauthorized('کاربر پیدا نشد', 'invalid_token'));
-  if (user.status !== 'active') return next(forbidden('حساب کاربری غیرفعال است', 'account_disabled'));
+    const user = await one('SELECT * FROM users WHERE id=$1', [row.subject_id]);
+    if (!user) return next(unauthorized('حساب پیدا نشد', 'invalid_token'));
+    if (user.status !== 'active') return next(forbidden('این حساب غیرفعال است', 'account_disabled'));
 
-  // اگر توکن به دستگاهی وابسته است، آن دستگاه باید هنوز فعال باشد
-  if (row.device_id) {
-    const dev = getDb().prepare('SELECT * FROM devices WHERE id = ?').get(row.device_id);
-    if (!dev || dev.status !== 'active') {
-      return next(forbidden('دسترسی این دستگاه لغو شده است', 'device_revoked'));
+    if (row.device_id) {
+      const dev = await one('SELECT * FROM devices WHERE id=$1', [row.device_id]);
+      if (!dev || dev.status !== 'active') {
+        return next(forbidden('دسترسی این دستگاه لغو شده است', 'device_revoked'));
+      }
+      req.device = dev;
+      query('UPDATE devices SET last_seen_at=$2 WHERE id=$1', [dev.id, now()]).catch(() => {});
     }
-    req.device = dev;
-  }
 
-  req.user = user;
-  req.tokenRow = row;
-  next();
+    req.user = user;
+    req.tokenRow = row;
+    next();
+  } catch (err) { next(err); }
 }
 
-/** مدیر سیستم. */
-function requireAdmin(req, res, next) {
-  const token = bearer(req);
-  if (!token) return next(unauthorized());
-  const row = tokens.verify(token, 'admin');
-  if (!row) return next(unauthorized('توکن مدیر نامعتبر یا منقضی است', 'invalid_token'));
-
-  const admin = getDb().prepare('SELECT * FROM admins WHERE id = ?').get(row.subject_id);
-  if (!admin || admin.status !== 'active') {
-    return next(forbidden('حساب مدیر غیرفعال است', 'admin_disabled'));
-  }
-  req.admin = admin;
-  req.tokenRow = row;
-  next();
-}
-
-function requireSuperAdmin(req, res, next) {
-  if (!req.admin) return next(unauthorized());
-  if (req.admin.role !== 'superadmin') return next(forbidden('این عملیات فقط برای مدیر ارشد مجاز است'));
-  next();
-}
-
-/**
- * بررسی دوباره‌ی دسترسی در سمت سرور.
- * حتی اگر کلاینت قفل قابلیت را دور بزند، APIهای وابسته به آن قابلیت
- * اینجا رد می‌شوند — چون منبع تصمیم، دیتابیس سرور است نه License کلاینت.
- */
-function requireFeature(featureKey) {
-  return function (req, res, next) {
-    if (isCoreFeature(featureKey)) return next();   // قابلیت پایه همیشه باز است
+/** عضویت در دکان لازم است — shop_id از همین‌جا می‌آید. */
+async function requireShop(req, res, next) {
+  try {
     if (!req.user) return next(unauthorized());
+    const member = await membershipOf(req.user.id);
+    if (!member) return next(forbidden('برای این حساب دکانی ثبت نشده است', 'no_shop'));
+    req.member = member;
+    req.shopId = member.shop_id;
+    req.role = member.role;
+    next();
+  } catch (err) { next(err); }
+}
 
-    // منبع تصمیم: اشتراک فعال، سپس دوره آزمایشی، سپس قابلیت‌های رایگان.
-    // همه با ساعت سرور — ساعت گوشی هیچ اثری ندارد.
-    const ent = require('../lib/entitlement').entitlementOf(req.user.id, now());
-    if (!ent.features.includes(featureKey)) {
-      const err = ent.trial.used && !ent.trial.active
-        ? forbidden('دوره آزمایشی شما به پایان رسیده است. برای ادامه، اشتراک تهیه کنید.', 'trial_expired')
-        : forbidden('این قابلیت نیازمند اشتراک است', 'subscription_required');
-      err.entitlement = { source: ent.source, trial: ent.trial };
-      return next(err);
+/** عضویت اگر بود، ولی نبودنش خطا نیست (مثلاً صفحه‌ی «من»). */
+async function optionalShop(req, res, next) {
+  try {
+    if (req.user) {
+      const member = await membershipOf(req.user.id);
+      if (member) {
+        req.member = member;
+        req.shopId = member.shop_id;
+        req.role = member.role;
+      }
     }
-    req.entitlement = ent;
-    req.subscriptionState = ent.subscription;
+    next();
+  } catch (err) { next(err); }
+}
+
+/** دسترسی بر پایه‌ی نقش. */
+function requirePermission(permission) {
+  return function (req, res, next) {
+    if (!req.member) return next(forbidden('برای این حساب دکانی ثبت نشده است', 'no_shop'));
+    if (!can(req.member.role, permission)) {
+      return next(forbidden('این کار در حد دسترسی شما نیست', 'permission_denied'));
+    }
     next();
   };
 }
 
-module.exports = { bearer, requireUser, requireAdmin, requireSuperAdmin, requireFeature };
+/**
+ * قابلیت‌های اشتراکی — تصمیم از روی دیتابیس سرور گرفته می‌شود،
+ * حتی اگر گوشی قفل را دور زده باشد.
+ */
+function requireFeature(featureKey) {
+  return async function (req, res, next) {
+    try {
+      if (isCoreFeature(featureKey)) return next();
+      if (!req.user) return next(unauthorized());
+      if (!req.shopId) return next(forbidden('برای این حساب دکانی ثبت نشده است', 'no_shop'));
+
+      const ent = await entitlementOf(req.shopId, now());
+      if (!ent.features.includes(featureKey)) {
+        const err = ent.trial.used && !ent.trial.active
+          ? forbidden('اشتراک این دکان به پایان رسیده است.', 'subscription_expired')
+          : forbidden('این قابلیت نیازمند اشتراک است', 'subscription_required');
+        err.entitlement = { source: ent.source, trial: ent.trial };
+        return next(err);
+      }
+      req.entitlement = ent;
+      next();
+    } catch (err) { next(err); }
+  };
+}
+
+/** مدیر سامانه — کاملاً جدا از کاربران عادی. */
+async function requireAdmin(req, res, next) {
+  try {
+    const token = bearer(req);
+    if (!token) return next(unauthorized());
+    const row = await tokens.verify(token, 'admin');
+    if (!row) return next(unauthorized('نشست مدیر منقضی شده است', 'invalid_token'));
+    const admin = await one('SELECT * FROM admins WHERE id=$1', [row.subject_id]);
+    if (!admin || admin.status !== 'active') {
+      return next(forbidden('حساب مدیر غیرفعال است', 'admin_disabled'));
+    }
+    req.admin = admin;
+    req.tokenRow = row;
+    next();
+  } catch (err) { next(err); }
+}
+
+function requireSuperAdmin(req, res, next) {
+  if (!req.admin) return next(unauthorized());
+  if (req.admin.role !== 'superadmin') return next(forbidden('فقط مدیر ارشد'));
+  next();
+}
+
+module.exports = {
+  bearer, requireUser, requireShop, optionalShop,
+  requirePermission, requireFeature, requireAdmin, requireSuperAdmin,
+};

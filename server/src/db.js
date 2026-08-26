@@ -1,41 +1,101 @@
 'use strict';
-const fs = require('fs');
-const path = require('path');
-const Database = require('better-sqlite3');
+/**
+ * اتصال به PostgreSQL.
+ *
+ * یک Pool مشترک برای همه‌ی درخواست‌ها. هیچ کوئری‌ای با چسباندن رشته
+ * ساخته نمی‌شود؛ همه‌ی مقادیر پارامتری هستند ($1, $2, …) و همین جلوی
+ * SQL Injection را می‌گیرد.
+ */
+const { Pool } = require('pg');
+const { randomBytes } = require('crypto');
 const config = require('./config');
 
-let db = null;
+let pool = null;
+let shuttingDown = false;
 
-function getDb() {
-  if (db) return db;
-  fs.mkdirSync(path.dirname(config.dbPath), { recursive: true });
-  db = new Database(config.dbPath);
-  db.pragma('journal_mode = WAL');
-  db.pragma('foreign_keys = ON');
-  db.exec(fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8'));
-  require('./migrate').run(db);
-  require('./lib/plans').seedDefaults(db);
-  return db;
+function getPool() {
+  if (pool) return pool;
+  pool = new Pool({
+    connectionString: config.db.url,
+    max: config.db.poolMax,
+    idleTimeoutMillis: config.db.idleTimeoutMs,
+    connectionTimeoutMillis: config.db.connectTimeoutMs,
+    ssl: config.db.ssl ? { rejectUnauthorized: false } : undefined,
+  });
+  // یک اتصال خراب نباید کل سرور را بخواباند
+  pool.on('error', (err) => console.error('[db] اتصال بیکار خطا داد:', err.message));
+  return pool;
 }
 
-function closeDb() { if (db) { db.close(); db = null; } }
+/** اجرای یک کوئری پارامتری. */
+async function query(text, params = []) {
+  return getPool().query(text, params);
+}
 
-/** شناسه‌ی یکتا با پیشوند خوانا. */
+/** اولین ردیف یا null. */
+async function one(text, params = []) {
+  const r = await query(text, params);
+  return r.rows[0] || null;
+}
+
+/** همه‌ی ردیف‌ها. */
+async function many(text, params = []) {
+  const r = await query(text, params);
+  return r.rows;
+}
+
+/**
+ * اجرای چند دستور در یک تراکنش.
+ * اگر هر بخشی شکست بخورد، همه‌چیز برمی‌گردد و دیتابیس نیمه‌کاره نمی‌ماند.
+ */
+async function tx(fn) {
+  const client = await getPool().connect();
+  try {
+    await client.query('BEGIN');
+    const out = await fn(client);
+    await client.query('COMMIT');
+    return out;
+  } catch (err) {
+    try { await client.query('ROLLBACK'); } catch { /* اتصال از دست رفته */ }
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+async function healthy() {
+  try {
+    const r = await query('SELECT 1 AS ok');
+    return r.rows[0].ok === 1;
+  } catch {
+    return false;
+  }
+}
+
+async function closeDb() {
+  if (!pool || shuttingDown) return;
+  shuttingDown = true;
+  const p = pool;
+  pool = null;
+  shuttingDown = false;
+  await p.end();
+}
+
+/** شناسه‌ی یکتا با پیشوند خوانا — مستقل از دیتابیس و قابل ساخت در هر جا. */
 function newId(prefix) {
-  const { randomBytes } = require('crypto');
   return `${prefix}_${randomBytes(12).toString('hex')}`;
 }
 
 function now() { return Date.now(); }
 
-/** حذف توکن‌های منقضی — در زمان راه‌اندازی و به‌صورت دوره‌ای صدا زده می‌شود. */
-function pruneExpired() {
-  const d = getDb();
+/** پاک‌سازی داده‌های موقت — هنگام راه‌اندازی و هر چند ساعت یک بار. */
+async function pruneExpired() {
   const cutoff = now();
-  const t = d.prepare('DELETE FROM tokens WHERE expires_at < ?').run(cutoff);
-  const a = d.prepare('DELETE FROM login_attempts WHERE created_at < ?')
-    .run(cutoff - 24 * 60 * 60 * 1000);
-  return { tokens: t.changes, attempts: a.changes };
+  const t = await query('DELETE FROM tokens WHERE expires_at < $1', [cutoff]);
+  const o = await query('DELETE FROM otp_codes WHERE expires_at < $1', [cutoff - 24 * 3600 * 1000]);
+  const a = await query('DELETE FROM login_attempts WHERE created_at < $1', [cutoff - 7 * 24 * 3600 * 1000]);
+  const s = await query('DELETE FROM sync_operations WHERE created_at < $1', [cutoff - 30 * 24 * 3600 * 1000]);
+  return { tokens: t.rowCount, otp: o.rowCount, attempts: a.rowCount, operations: s.rowCount };
 }
 
-module.exports = { getDb, closeDb, newId, now, pruneExpired };
+module.exports = { getPool, query, one, many, tx, healthy, closeDb, newId, now, pruneExpired };

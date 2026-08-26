@@ -1,5 +1,6 @@
 package af.tohid.shop.ui.components
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.animation.core.animateFloatAsState
@@ -19,6 +20,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -59,6 +61,14 @@ fun AppHeader(
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                 if (onBack != null) {
                     IconSquare(Icons.Outlined.ArrowForward, "بازگشت", onBack)
+                    Spacer(Modifier.width(10.dp))
+                } else {
+                    // نشان برنامه، بالای همه‌ی صفحه‌ها
+                    Image(
+                        painter = painterResource(af.tohid.shop.R.drawable.logo_shop),
+                        contentDescription = null,
+                        modifier = Modifier.height(26.dp),
+                    )
                     Spacer(Modifier.width(10.dp))
                 }
                 Text(

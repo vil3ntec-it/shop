@@ -16,6 +16,7 @@ work = "2.10.0"
 datastore = "1.1.1"
 camerax = "1.4.1"
 mlkitBarcode = "17.3.0"
+playServicesAuth = "21.2.0"
 securityCrypto = "1.1.0-alpha06"
 junit = "4.13.2"
 androidxJunit = "1.2.1"
@@ -55,6 +56,7 @@ androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", 
 androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "camerax" }
 androidx-camera-view = { group = "androidx.camera", name = "camera-view", version.ref = "camerax" }
 mlkit-barcode = { group = "com.google.mlkit", name = "barcode-scanning", version.ref = "mlkitBarcode" }
+play-services-auth = { group = "com.google.android.gms", name = "play-services-auth", version.ref = "playServicesAuth" }
 
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxJunit" }

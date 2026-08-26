@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">توحید</string>
-    <string name="app_full_name">توحید | مدیریت فروشگاه</string>
+    <string name="app_name">shop</string>
+    <string name="app_full_name">shop | مدیریت فروشگاه</string>
+    <string name="logo_desc">نشان برنامه</string>
 </resources>

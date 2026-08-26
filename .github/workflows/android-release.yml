@@ -60,19 +60,22 @@ jobs:
           TOHID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           TOHID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
           TOHID_SIGNING: ${{ steps.keystore.outputs.present }}
-        run: ./gradlew assembleRelease --no-daemon --stacktrace
+          # اگر متغیر مخزن SHOP_SERVER_URL تنظیم شده باشد، همان آدرس به‌عنوان
+          # پیش‌فرض داخل نسخه می‌رود؛ کاربر باز هم می‌تواند از داخل برنامه عوضش کند.
+          SHOP_SERVER_URL: ${{ vars.SHOP_SERVER_URL }}
+        run: ./gradlew assembleRelease --no-daemon
 
       - name: Rename APK
         run: |
           mkdir -p out
           find android/app/build/outputs/apk/release -name "*.apk" -exec \
-            cp {} "out/tohid-${{ steps.ver.outputs.value }}.apk" \;
+            cp {} "out/shop-${{ steps.ver.outputs.value }}.apk" \;
           ls -la out
 
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          name: توحید ${{ steps.ver.outputs.value }}
+          name: shop ${{ steps.ver.outputs.value }}
           generate_release_notes: true
           files: out/*.apk

@@ -1,0 +1,101 @@
+'use strict';
+/**
+ * پشتیبان‌گیری و انتقال سرور.
+ *
+ * سناریوی واقعی: سرور خانگی → پشتیبان → سرور تازه → بازیابی.
+ * همه‌چیز باید سر جایش برگردد.
+ */
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('fs/promises');
+const path = require('path');
+const os = require('os');
+const { Client } = require('pg');
+const h = require('./helpers');
+
+const BACKUP_DIR = path.join(os.tmpdir(), `shop-backup-test-${process.pid}`);
+process.env.BACKUP_PATH = BACKUP_DIR;
+
+const config = require('../src/config');
+config.backup.dir = BACKUP_DIR;
+
+const backup = require('../src/lib/backup');
+
+const RESTORE_DB = 'shop_restore_test';
+const adminUrl = process.env.DATABASE_URL.replace(/\/[^/]+$/, '/postgres');
+const restoreUrl = process.env.DATABASE_URL.replace(/\/[^/]+$/, `/${RESTORE_DB}`);
+
+async function sql(url, text) {
+  const c = new Client({ connectionString: url });
+  await c.connect();
+  try { return await c.query(text); } finally { await c.end(); }
+}
+
+test.before(async () => { await h.start(); });
+test.after(async () => {
+  await h.stop();
+  await fs.rm(BACKUP_DIR, { recursive: true, force: true });
+  await sql(adminUrl, `DROP DATABASE IF EXISTS ${RESTORE_DB}`).catch(() => {});
+});
+
+test('پشتیبان بدون رمز ساخته می‌شود و روی سرور تازه بازمی‌گردد', async () => {
+  config.backup.passphrase = '';
+
+  // چند رکورد واقعی می‌سازیم
+  const owner = await h.newUser('صاحب-پشتیبان');
+  const shop = (await h.post('/api/shop', { name: 'دکان پشتیبان' }, { token: owner.accessToken })).body.shop;
+  await h.post('/api/products', { id: 'p-backup', data: { name: 'چای', price: 120 } }, { token: owner.accessToken });
+
+  const out = await backup.run({ kind: 'manual' });
+  assert.ok(out.bytes > 0);
+  const meta = JSON.parse(await fs.readFile(`${out.file}.meta.json`, 'utf8'));
+  assert.equal(meta.encrypted, false);
+  assert.equal(meta.format, 'pg_dump-plain-gzip');
+
+  const sqlText = (await backup.decode(out.file)).toString('utf8');
+  assert.match(sqlText, /CREATE TABLE public\.shops/);
+  assert.match(sqlText, /دکان پشتیبان/);
+
+  // سرور تازه: دیتابیس خالی، بازیابی، بررسی
+  await sql(adminUrl, `DROP DATABASE IF EXISTS ${RESTORE_DB}`);
+  await sql(adminUrl, `CREATE DATABASE ${RESTORE_DB}`);
+  await backup.restore(out.file, { databaseUrl: restoreUrl });
+
+  const shops = await sql(restoreUrl, `SELECT name FROM shops WHERE id = '${shop.id}'`);
+  assert.equal(shops.rows[0].name, 'دکان پشتیبان');
+  const products = await sql(restoreUrl, `SELECT data FROM products WHERE id = 'p-backup'`);
+  assert.equal(products.rows[0].data.name, 'چای');
+  const migrations = await sql(restoreUrl, 'SELECT version FROM schema_migrations ORDER BY version');
+  assert.ok(migrations.rows.length >= 2, 'تاریخچه‌ی Migration هم باید منتقل شود');
+});
+
+test('پشتیبان رمزشده بدون عبارت عبور باز نمی‌شود و با آن باز می‌شود', async () => {
+  config.backup.passphrase = 'یک-عبارت-عبور-طولانی-برای-تست';
+  const out = await backup.run({ kind: 'manual' });
+  assert.equal(out.encrypted, true);
+
+  const raw = await fs.readFile(out.file);
+  assert.equal(raw.subarray(0, 7).toString(), 'SHOPBK1');
+  assert.ok(!raw.includes(Buffer.from('CREATE TABLE')), 'محتوا نباید خوانا باشد');
+
+  const text = (await backup.decode(out.file)).toString('utf8');
+  assert.match(text, /CREATE TABLE public\.users/);
+
+  config.backup.passphrase = 'عبارت-اشتباه';
+  await assert.rejects(() => backup.decode(out.file));
+  config.backup.passphrase = '';
+});
+
+test('نگه‌داری نسخه‌ها: قدیمی‌ها پاک می‌شوند و تازه‌ها می‌مانند', async () => {
+  config.backup.passphrase = '';
+  const dir = backup.dirFor('daily');
+  await fs.mkdir(dir, { recursive: true });
+  for (let i = 1; i <= 6; i++) {
+    await fs.writeFile(path.join(dir, `shop-2024010${i}-000000.sql.gz`), 'x');
+  }
+  config.backup.keepDaily = 3;
+  const removed = await backup.prune('daily');
+  assert.equal(removed, 3);
+  const left = (await fs.readdir(dir)).filter(f => f.endsWith('.sql.gz')).sort();
+  assert.deepEqual(left, ['shop-20240104-000000.sql.gz', 'shop-20240105-000000.sql.gz', 'shop-20240106-000000.sql.gz']);
+});

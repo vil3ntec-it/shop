@@ -1,0 +1,62 @@
+# ------------------------------------------------------------------
+#  کل سرور با یک دستور:   docker compose up -d
+#
+#  اول فایل .env را از روی .env.example بسازید و رمزها را عوض کنید.
+#  همین فایل روی کامپیوتر خانگی، VPS یا سرور اختصاصی کار می‌کند؛
+#  چیزی به مسیر یا نام کامپیوتر خاصی وابسته نیست.
+# ------------------------------------------------------------------
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-shop}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?رمز دیتابیس را در .env بگذارید}
+      POSTGRES_DB: ${POSTGRES_DB:-shop}
+      # زبان و ترتیب حروف ثابت، تا انتقال دیتابیس بین سرورها مشکل نسازد
+      LANG: C.UTF-8
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-shop} -d ${POSTGRES_DB:-shop}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    # پورت دیتابیس عمداً بیرون داده نمی‌شود؛ فقط سرور به آن می‌رسد.
+    # اگر برای کار با pgAdmin لازم شد، این دو خط را باز کنید:
+    # ports:
+    #   - "127.0.0.1:5432:5432"
+
+  api:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgres://${POSTGRES_USER:-shop}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-shop}
+      SERVER_URL: ${SERVER_URL:-}
+      API_SECRET: ${API_SECRET:?API_SECRET را در .env بگذارید}
+      JWT_SECRET: ${JWT_SECRET:-}
+      OTP_SECRET: ${OTP_SECRET:?OTP_SECRET را در .env بگذارید}
+      OTP_PROVIDER: ${OTP_PROVIDER:-log}
+      OTP_WEBHOOK_URL: ${OTP_WEBHOOK_URL:-}
+      OTP_WEBHOOK_KEY: ${OTP_WEBHOOK_KEY:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      CORS_ORIGIN: ${CORS_ORIGIN:-}
+      TRUST_PROXY: ${TRUST_PROXY:-false}
+      BACKUP_ENABLED: ${BACKUP_ENABLED:-true}
+      BACKUP_PATH: /app/data/backups
+      BACKUP_PASSPHRASE: ${BACKUP_PASSPHRASE:-}
+      TRIAL_DAYS: ${TRIAL_DAYS:-14}
+      DEFAULT_COUNTRY_CODE: ${DEFAULT_COUNTRY_CODE:-+93}
+    ports:
+      - "${PORT:-3000}:3000"
+    volumes:
+      # پشتیبان‌ها بیرون از container می‌مانند تا با پاک شدن آن از بین نروند
+      - ${BACKUP_PATH:-./data/backups}:/app/data/backups
+
+volumes:
+  db-data:
