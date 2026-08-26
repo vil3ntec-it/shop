@@ -283,7 +283,13 @@
       header.insertBefore(el, header.firstChild);
     }
     el.className = 'vip-badge vip-badge-' + tone;
-    el.innerHTML = `<span class="vip-badge-icon">${ICON.crown}</span><span>${esc(text)}</span>`;
+    // چند جرقه‌ی ریز که از نشان می‌ریزند — فقط تزئینی
+    el.innerHTML =
+      `<span class="vip-badge-icon">${ICON.crown}</span><span>${esc(text)}</span>` +
+      '<i class="vip-spark s1" aria-hidden="true"></i>' +
+      '<i class="vip-spark s2" aria-hidden="true"></i>' +
+      '<i class="vip-spark s3" aria-hidden="true"></i>' +
+      '<i class="vip-spark s4" aria-hidden="true"></i>';
   }
 
   /** نوار هشدار در روزهای آخر دوره آزمایشی و پس از پایان آن. */

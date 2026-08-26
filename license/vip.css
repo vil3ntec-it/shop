@@ -4,18 +4,58 @@
 
 /* ---------- نشان بالای صفحه ---------- */
 .vip-badge{
+  position:relative; overflow:visible;
   display:inline-flex; align-items:center; gap:5px;
-  padding:5px 11px; border:none; border-radius:20px;
+  padding:6px 12px; border:none; border-radius:20px;
   font-family:inherit; font-size:11.5px; font-weight:800; cursor:pointer;
   white-space:nowrap;
+  /* طلایی، در همه‌ی حالت‌ها */
+  background:linear-gradient(135deg, #f6d36b, #e0a92c 45%, #f8e39a 70%, #d9982a);
+  color:#4a3208;
+  box-shadow:0 6px 18px -8px rgba(214,155,35,.9),
+             inset 0 1px 0 rgba(255,255,255,.55);
+  transition:transform .14s cubic-bezier(.22,1,.36,1), box-shadow .2s ease;
+}
+.vip-badge:active{ transform:scale(.94); }
+@media (hover:hover){
+  .vip-badge:hover{ transform:translateY(-1px); box-shadow:0 10px 22px -8px rgba(214,155,35,1), inset 0 1px 0 rgba(255,255,255,.6); }
 }
 .vip-badge-icon{ display:flex; line-height:1; }
-.vip-badge-icon svg{ width:13px; height:13px; }
-.vip-badge-promo{ background:var(--primary-tint,#eaf0ff); color:var(--primary-dark,#1f3f9e); }
-.vip-badge-trial{ background:var(--primary,#2c5ce6); color:#fff; }
-.vip-badge-ok{ background:var(--success-tint,#e8f8f1); color:var(--success,#18a06b); }
-.vip-badge-warn{ background:var(--warning-tint,#fdf3e4); color:var(--warning,#e8a13a); }
+.vip-badge-icon svg{ width:14px; height:14px; }
+/* تاجِ متحرک */
+.vip-badge-icon{ animation:vip-crown-bob 2.6s ease-in-out infinite; transform-origin:50% 80%; }
+@keyframes vip-crown-bob{
+  0%,100%{ transform:translateY(0) rotate(0deg); }
+  25%    { transform:translateY(-2px) rotate(-9deg); }
+  55%    { transform:translateY(-2px) rotate(9deg); }
+  80%    { transform:translateY(0) rotate(0deg); }
+}
+/* رنگ نشان طلایی است، ولی حالتِ حساب همچنان با تُن متن فرق می‌کند */
+.vip-badge-ok{ color:#1d4a34; }
+.vip-badge-warn{ color:#5a3a06; }
 @media (max-width:520px){ .vip-badge span:not(.vip-badge-icon){ display:none; } }
+
+/* جرقه‌های ریزی که از نشان می‌ریزند */
+.vip-spark{
+  position:absolute; top:70%; width:3px; height:3px; border-radius:50%;
+  background:#ffd970; box-shadow:0 0 5px 1px rgba(255,214,110,.95);
+  opacity:0; pointer-events:none;
+  animation:vip-spark-fall 2.8s linear infinite;
+}
+.vip-spark.s1{ inset-inline-start:16%; animation-delay:0s;    }
+.vip-spark.s2{ inset-inline-start:38%; animation-delay:.7s;   }
+.vip-spark.s3{ inset-inline-start:62%; animation-delay:1.35s; }
+.vip-spark.s4{ inset-inline-start:83%; animation-delay:2.05s; }
+@keyframes vip-spark-fall{
+  0%   { opacity:0; transform:translateY(0)    scale(.5); }
+  12%  { opacity:1; transform:translateY(3px)  scale(1); }
+  70%  { opacity:.85; transform:translateY(15px) scale(.85); }
+  100% { opacity:0; transform:translateY(24px) scale(.3); }
+}
+@media (prefers-reduced-motion:reduce){
+  html:not([data-motion="full"]) .vip-spark{ animation:none; opacity:0; }
+  html:not([data-motion="full"]) .vip-badge-icon{ animation:none; }
+}
 
 /* ---------- نوار دوره آزمایشی ---------- */
 #vip-trial-bar{
