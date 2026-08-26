@@ -34,9 +34,9 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
-<link rel="stylesheet" href="license/license-ui.css?v=13">
-<link rel="stylesheet" href="license/shop-ui.css?v=13">
-<link rel="stylesheet" href="license/vip.css?v=13">
+<link rel="stylesheet" href="license/license-ui.css?v=14">
+<link rel="stylesheet" href="license/shop-ui.css?v=14">
+<link rel="stylesheet" href="license/vip.css?v=14">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <!-- فونت به‌صورت غیرمسدودکننده بارگذاری می‌شود تا نبودِ اینترنت باز شدن برنامه را کند نکند -->
@@ -428,13 +428,21 @@
     gap:10px;
   }
   .fab-wrap .fab-menu{ margin-inline-start:10px; }
+  /* وقتی پنجره‌ای باز است، از سر راه کنار می‌روند */
+  .fab-wrap, .sale-fab-wrap{
+    transition:bottom .22s cubic-bezier(.22,1,.36,1),
+               transform .26s cubic-bezier(.22,1,.36,1), opacity .2s ease;
+  }
+  .fab-wrap.fab-away, .sale-fab-wrap.fab-away{
+    transform:translateX(105%); opacity:0; pointer-events:none;
+  }
   @media(min-width:769px){
     .fab-wrap{bottom:calc(var(--bottom-bar-h, 0px) + 24px);}
   }
   .fab{
-    /* پهن‌تر از نیم‌دایره تا «+» وسطِ قسمتِ دیده‌شده بیفتد */
+    /* لبه‌ی صافش به کنارِ صفحه چسبیده و برجستگی گِرد رو به داخل است */
     width:52px; height:56px;
-    border-radius:0 28px 28px 0;
+    border-radius:28px 0 0 28px;
     padding-inline-end:4px;
     border:none;
     background:linear-gradient(160deg, var(--primary), var(--primary-dark));
@@ -490,7 +498,7 @@
   .sale-fab-wrap.show{ display:flex; }
   @media(min-width:769px){ .sale-fab-wrap{bottom:calc(var(--bottom-bar-h, 0px) + 88px);} }
   .sale-fab{
-    width:52px; height:56px; border-radius:0 28px 28px 0;
+    width:52px; height:56px; border-radius:28px 0 0 28px;
     padding-inline-end:4px; border:none;
     background:linear-gradient(160deg, var(--success), #35c8c0);
     color:#fff; display:flex; align-items:center; justify-content:center;
@@ -498,9 +506,9 @@
     transition:transform .2s ease;
     animation:fabSlideIn .34s cubic-bezier(.22,1,.36,1) both;
   }
-  /* انگار از لبه‌ی کنار سُر خورده تو */
+  /* انگار از لبه‌ی راست سُر خورده تو */
   @keyframes fabSlideIn{
-    from{ transform:translateX(-100%); opacity:0; }
+    from{ transform:translateX(100%); opacity:0; }
     to{ transform:translateX(0); opacity:1; }
   }
   .sale-fab:active{ transform:scale(.92); }
@@ -840,6 +848,12 @@
   .bulk-field label{
     display:block; font-size:10.5px; font-weight:700; color:var(--muted-2); margin-bottom:4px;
   }
+  /* دسته‌بندی فقط به اندازه‌ی نامش جا می‌گیرد، نه تمام عرض ردیف */
+  .bulk-cat .form-input{
+    width:auto; min-width:120px; max-width:100%;
+    min-height:40px; font-size:12.5px;
+    padding-inline-start:10px; padding-inline-end:26px;
+  }
 
   /* انتخاب واحد: تراشه‌های یک‌لمسی به‌جای dropdown */
   .bulk-units{display:flex; flex-wrap:wrap; gap:5px; margin-top:8px;}
@@ -1148,12 +1162,24 @@
   }
 
   /* ---------- Debtor account page ---------- */
+  /* دکمه‌ی بازگشت کادر دارد تا مثل بقیه‌ی دکمه‌ها دیده شود */
   .account-back{
-    display:inline-flex; align-items:center; gap:6px;
-    font-size:12.5px; font-weight:600; color:var(--muted);
-    margin-bottom:14px;
+    display:inline-flex; align-items:center; gap:7px;
+    padding:8px 13px 8px 11px;
+    border:1px solid var(--border); border-radius:999px;
+    background:var(--bg); color:var(--muted);
+    font-size:12.5px; font-weight:700;
+    margin-bottom:14px; text-decoration:none;
+    -webkit-tap-highlight-color:transparent;
+    transition:border-color .16s ease, background-color .16s ease,
+               color .16s ease, transform .12s cubic-bezier(.22,1,.36,1);
   }
-  .account-back:hover{color:var(--primary);}
+  .account-back:active{ transform:scale(.96); }
+  @media (hover:hover){
+    .account-back:hover{
+      border-color:var(--primary); background:var(--primary-tint); color:var(--primary);
+    }
+  }
   /* سربرگ چسبان: وقتی کارت بالا از دید خارج شد، نام و مانده بالای صفحه می‌ماند */
   .account-sticky{
     position:sticky; top:0; z-index:15;
@@ -1771,8 +1797,28 @@
     .cart-ctl-btn.del:hover{ background:var(--danger); border-color:var(--danger); color:#fff; }
   }
 
-  /* ردیف سبد: انتخاب‌شدنی، بدون دکمه */
-  .cart-row{ cursor:pointer; }
+  /* ردیف سبد: نام کنار عکس، تعداد وسط، مبلغ ته ردیف */
+  .cart-row{ cursor:pointer; align-items:center; gap:10px; }
+  .cart-row-name{
+    flex:1 1 auto; min-width:0;
+    font-size:13.5px; font-weight:800; color:var(--text);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .cart-row-qty{
+    flex:0 0 auto; text-align:center; white-space:nowrap;
+    padding:4px 12px; border-radius:999px;
+    background:var(--surface-2); color:var(--text);
+    font-size:12px; font-weight:800;
+  }
+  .cart-row.picked .cart-row-qty{ background:var(--primary); color:#fff; }
+  .cart-row-sum{
+    flex:0 0 auto; min-width:88px; text-align:end; white-space:nowrap;
+    font-size:13px; font-weight:800; color:var(--text);
+  }
+  @media(max-width:400px){
+    .cart-row-sum{ min-width:74px; font-size:12px; }
+    .cart-row-qty{ padding:4px 9px; font-size:11px; }
+  }
   .cart-row.picked{
     border-color:var(--primary);
     background:var(--primary-tint);
@@ -2188,24 +2234,105 @@
   .alert-item .ai-sub{ display:block; font-size:11.5px; color:var(--muted); margin-top:3px; line-height:1.6; }
   .alerts-empty{ padding:22px 10px; text-align:center; font-size:12.5px; color:var(--muted); }
 
-  /* ---------- محصولات: ویرایش و حذف فقط با نگه‌داشتن ---------- */
-  .prod-card{ position:relative; }
-  .prod-card .exp-actions{
-    opacity:0; pointer-events:none;
-    transform:scale(.85);
-    transition:opacity .18s ease, transform .18s cubic-bezier(.22,1,.36,1);
+  /* ---------- نوار به‌روزرسانی ---------- */
+  .update-bar{
+    position:fixed; z-index:120;
+    inset-inline:12px; top:calc(var(--header-h, 60px) + 8px);
+    display:flex; align-items:center; gap:10px;
+    padding:10px 12px; border-radius:var(--radius-md);
+    background:var(--primary); color:#fff;
+    box-shadow:0 14px 32px -14px rgba(44,92,230,.95);
+    animation:toastIn .32s cubic-bezier(.22,1,.36,1) both;
   }
-  .prod-card.show-actions .exp-actions{
-    opacity:1; pointer-events:auto; transform:scale(1);
+  .update-bar[hidden]{ display:none; }
+  .update-bar-ic{ flex:0 0 auto; display:flex; }
+  .update-bar-txt{ flex:1; min-width:0; font-size:12.5px; font-weight:700; }
+  .update-bar .btn{ flex:0 0 auto; background:#fff; color:var(--primary); border:none; }
+  @media(min-width:900px){ .update-bar{ inset-inline-start:auto; max-width:420px; } }
+
+  /* ---------- کارت محصول ---------- */
+  .prod-card{
+    position:relative;
+    flex-direction:column; align-items:stretch; gap:9px;
+    transition:filter .2s ease, transform .18s cubic-bezier(.22,1,.36,1);
   }
-  .prod-card.show-actions{
-    border-color:var(--primary);
-    box-shadow:inset 0 0 0 1px var(--primary);
+  .prod-top{ display:flex; align-items:center; gap:10px; min-width:0; }
+  .prod-name{
+    flex:1; min-width:0;
+    font-size:14px; font-weight:800; color:var(--text); line-height:1.5;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
   }
-  /* روی دسکتاپ، بردن موس روی کارت هم کافی است */
-  @media (hover:hover){
-    .prod-card:hover .exp-actions{ opacity:1; pointer-events:auto; transform:scale(1); }
+  .prod-price{
+    flex:0 0 auto; font-size:15px; font-weight:800; color:var(--text); white-space:nowrap;
   }
+  .prod-price small{ font-size:10.5px; font-weight:600; color:var(--muted); }
+  /* نوشته‌های ریز، همه در یک ردیف پایین کارت */
+  .prod-facts{
+    display:flex; align-items:center; flex-wrap:wrap; gap:6px;
+    padding-top:8px; border-top:1px solid var(--border);
+    font-size:10.5px; font-weight:700; color:var(--muted);
+  }
+  .prod-facts .stock-pill{ margin-inline-start:auto; }
+  /* کارتی که نگه داشته شده، تار می‌شود تا معلوم باشد کدام است */
+  .prod-card.is-held{ filter:blur(2.5px); transform:scale(.98); }
+
+  /* ---------- شیت اقدام محصول ---------- */
+  .prod-sheet-scrim{ align-items:flex-end; }
+  @media(min-width:640px){ .prod-sheet-scrim{ align-items:center; } }
+  .prod-sheet{
+    width:100%; max-width:440px;
+    background:var(--bg); border:1px solid var(--border);
+    border-radius:var(--radius-lg) var(--radius-lg) 0 0;
+    padding:16px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+    display:flex; flex-direction:column; gap:9px;
+    animation:sheetUp .28s cubic-bezier(.22,1,.36,1) both;
+  }
+  @media(min-width:640px){ .prod-sheet{ border-radius:var(--radius-lg); } }
+  @keyframes sheetUp{ from{ transform:translateY(28px); opacity:0; } to{ transform:translateY(0); opacity:1; } }
+  .prod-sheet-head{
+    display:flex; align-items:center; gap:11px;
+    padding-bottom:12px; margin-bottom:3px;
+    border-bottom:1px solid var(--border);
+  }
+  .prod-sheet-thumb{
+    width:46px; height:46px; flex:0 0 auto; border-radius:13px; overflow:hidden;
+    background:var(--surface-2); color:var(--muted);
+    display:flex; align-items:center; justify-content:center;
+    font-size:18px; font-weight:800;
+  }
+  .prod-sheet-thumb img{ width:100%; height:100%; object-fit:cover; }
+  .prod-sheet-id{ display:flex; flex-direction:column; gap:2px; min-width:0; }
+  .prod-sheet-id b{ font-size:14.5px; font-weight:800; color:var(--text); }
+  .prod-sheet-id i{ font-style:normal; font-size:11px; color:var(--muted); }
+  .prod-sheet-act{
+    display:flex; align-items:center; gap:12px; width:100%;
+    padding:13px 14px; border-radius:var(--radius-md);
+    border:1.5px solid var(--border); background:var(--bg);
+    font-family:inherit; text-align:start; cursor:pointer;
+    transition:border-color .16s ease, background-color .16s ease, transform .12s ease;
+  }
+  .prod-sheet-act:active{ transform:scale(.985); }
+  @media (hover:hover){ .prod-sheet-act:hover{ border-color:var(--primary); background:var(--primary-tint); } }
+  .prod-sheet-act.danger:active{ transform:scale(.985); }
+  @media (hover:hover){ .prod-sheet-act.danger:hover{ border-color:var(--danger); background:var(--danger-tint); } }
+  .psa-ic{
+    width:40px; height:40px; flex:0 0 auto; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .psa-ic.edit{ background:var(--primary-tint); color:var(--primary); }
+  .psa-ic.del{ background:var(--danger-tint); color:var(--danger); }
+  .psa-txt{ display:flex; flex-direction:column; gap:2px; min-width:0; }
+  .psa-txt b{ font-size:13.5px; font-weight:800; color:var(--text); }
+  .psa-txt i{ font-style:normal; font-size:10.5px; color:var(--muted); line-height:1.6; }
+  .prod-sheet-back{
+    display:flex; align-items:center; justify-content:center; gap:7px;
+    width:100%; margin-top:4px; padding:12px;
+    border-radius:var(--radius-md); border:none;
+    background:var(--surface); color:var(--muted);
+    font-family:inherit; font-size:12.5px; font-weight:700; cursor:pointer;
+    transition:background-color .16s ease, color .16s ease;
+  }
+  @media (hover:hover){ .prod-sheet-back:hover{ background:var(--surface-2); color:var(--text); } }
 
   /* ---------- عکس محصول ---------- */
   .photo-pick{display:flex; align-items:flex-start; gap:12px;}
@@ -3750,6 +3877,15 @@
   </button>
 </div>
 
+<!-- وقتی نسخه‌ی تازه‌ای روی سایت آمد، همین‌جا خبر می‌دهد -->
+<div class="update-bar" id="update-bar" hidden>
+  <span class="update-bar-ic">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.3"/><path d="M21 3.5V9h-5.5"/></svg>
+  </span>
+  <span class="update-bar-txt">نسخه‌ی تازه‌ی برنامه آماده است</span>
+  <button type="button" class="btn btn-primary btn-sm" id="btn-apply-update">به‌روزرسانی</button>
+</div>
+
 <div class="fab-scrim" id="fab-scrim"></div>
 <div class="fab-wrap">
   <button class="fab" id="fab-btn" aria-label="افزودن">
@@ -3866,6 +4002,35 @@
 </div>
 
 <!-- Add / Edit product modal -->
+<!-- شیت اقدام محصول: با نگه‌داشتن روی کارت باز می‌شود -->
+<div class="modal-scrim prod-sheet-scrim" id="modal-prod-actions">
+  <div class="prod-sheet">
+    <div class="prod-sheet-head">
+      <div class="prod-sheet-thumb" id="prod-sheet-thumb"></div>
+      <div class="prod-sheet-id">
+        <b id="prod-sheet-name">—</b>
+        <i id="prod-sheet-sub">—</i>
+      </div>
+    </div>
+    <button type="button" class="prod-sheet-act" id="prod-sheet-edit">
+      <span class="psa-ic edit">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+      </span>
+      <span class="psa-txt"><b>ویرایش محصول</b><i>نام، قیمت، دسته‌بندی و عکس</i></span>
+    </button>
+    <button type="button" class="prod-sheet-act danger" id="prod-sheet-del">
+      <span class="psa-ic del">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+      </span>
+      <span class="psa-txt"><b>حذف محصول</b><i>از فهرست و انبار برداشته می‌شود</i></span>
+    </button>
+    <button type="button" class="prod-sheet-back" data-close-modal="modal-prod-actions">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>
+      بازگشت — کاری انجام نشود
+    </button>
+  </div>
+</div>
+
 <!-- Quick single-shot barcode scan modal (used from the product form) -->
 <!-- ورود چند کالا به انبار (فرم ردیفی) -->
 <div class="modal-scrim" id="modal-bulk-stock">
@@ -4785,6 +4950,7 @@
   function openModal(id){ document.getElementById(id).classList.add('open'); }
   function closeModal(id){
     document.getElementById(id).classList.remove('open');
+    if(id==='modal-prod-actions') clearHeldProduct();
     if(id==='modal-scan') stopQuickScan();
     if(id==='modal-product' && document.getElementById('page-sale').classList.contains('active')) startSaleScanner();
   }
@@ -5269,8 +5435,61 @@
     accMonth = e.target.value; renderAccountPage(currentAccountDebtorId);
   });
 
+/* ==========================================================
+   به‌روزرسانی از روی سایت
+   ----------------------------------------------------------
+   برنامه از همان آدرس گیت‌هاب خوانده می‌شود، پس هر تغییری که آن‌جا
+   منتشر شود نسخه‌ی تازه است. سرویس‌ورکر آن را می‌گیرد ولی تا وقتی
+   همه‌ی تب‌ها بسته نشوند فعال نمی‌شود — برای همین اینجا خبر می‌دهیم
+   و با یک دکمه همان لحظه اعمالش می‌کنیم. اطلاعات دکان دست نمی‌خورد.
+   ========================================================== */
+  function showUpdateBar(worker){
+    const bar = document.getElementById('update-bar');
+    const btn = document.getElementById('btn-apply-update');
+    if(!bar || !btn) return;
+    bar.hidden = false;
+    btn.onclick = ()=>{
+      btn.disabled = true;
+      btn.textContent = 'در حال نصب…';
+      // سرویس‌ورکرِ تازه بلافاصله جای قبلی را بگیرد
+      try{ worker.postMessage({ type:'SKIP_WAITING' }); }catch(e){}
+      // اگر پیام نرسید، بعد از چند ثانیه خودمان صفحه را تازه می‌کنیم
+      setTimeout(()=> location.reload(), 2500);
+    };
+  }
+
+  function watchForUpdate(reg){
+    if(reg.waiting) showUpdateBar(reg.waiting);
+    reg.addEventListener('updatefound', ()=>{
+      const fresh = reg.installing;
+      if(!fresh) return;
+      fresh.addEventListener('statechange', ()=>{
+        // «installed» با کنترلرِ موجود یعنی نسخه‌ی تازه آماده‌ی جایگزینی است
+        if(fresh.state === 'installed' && navigator.serviceWorker.controller){
+          showUpdateBar(fresh);
+        }
+      });
+    });
+  }
+
+  if('serviceWorker' in navigator){
+    /*
+     * فقط وقتی صفحه تازه می‌شود که «قبلاً» سرویس‌ورکری کنترل را داشته
+     * و حالا نسخه‌ی تازه جایش را گرفته. در اولین باز شدن برنامه هنوز
+     * کنترلری نیست و این رویداد به‌طور طبیعی شلیک می‌شود — اگر آن‌جا
+     * هم رفرش می‌کردیم، هر کاربر بار اول یک بار بی‌دلیل رفرش می‌شد.
+     */
+    const hadController = !!navigator.serviceWorker.controller;
+    let reloaded = false;
+    navigator.serviceWorker.addEventListener('controllerchange', ()=>{
+      if(!hadController || reloaded) return;
+      reloaded = true;
+      location.reload();
+    });
+  }
+
 /* ---- شماره‌ی نسخه و گرفتن اجباری آخرین نسخه ---- */
-  const APP_BUILD = 'v13';
+  const APP_BUILD = 'v14';
   (function showBuild(){
     const el = document.getElementById('build-id');
     if(el) el.textContent = APP_BUILD;
@@ -6136,30 +6355,24 @@
     list.innerHTML = filtered.map(p=>{
       const stock = getProductStock(p.id);
       const status = getStockStatus(p);
+      /* دکمه‌ها روی کارت نیستند؛ با نگه‌داشتن، شیت تمام‌صفحه باز می‌شود.
+         نوشته‌های ریز همه در یک ردیف پایین کارت می‌نشینند. */
       return `
       <div class="exp-card prod-card" data-prod-card="${p.id}">
-        ${p.photo
-          ? `<div class="prod-thumb"><img alt="" data-product-photo="${p.id}"></div>`
-          : `<div class="exp-icon">${escapeHtml((p.name||'؟')[0])}</div>`}
-        <div class="exp-info">
-          <div class="exp-title">${escapeHtml(p.name)}</div>
-          <div class="exp-meta">
-            <span class="exp-cat-pill">${escapeHtml(p.category)}</span>
-            <span>موجودی: ${formatMoney(stock)} ${escapeHtml(p.unit)}</span>
-            <span class="stock-pill ${status}">${stockStatusLabel(status)}</span>
+        <div class="prod-top">
+          ${p.photo
+            ? `<div class="prod-thumb"><img alt="" data-product-photo="${p.id}"></div>`
+            : `<div class="exp-icon">${escapeHtml((p.name||'؟')[0])}</div>`}
+          <div class="prod-name">${escapeHtml(p.name)}</div>
+          <div class="prod-price">
+            ${formatMoney(p.salePrice)} <small>افغانی${p.unit ? ` / ${escapeHtml(p.unit)}` : ''}</small>
           </div>
         </div>
-        <div class="exp-side">
-          <div class="exp-amount">${formatMoney(p.salePrice)} افغانی${p.unit ? ` <small>/ ${escapeHtml(p.unit)}</small>` : ''}</div>
-          <div class="exp-date">خرید: ${formatMoney(p.purchasePrice)} افغانی</div>
-        </div>
-        <div class="exp-actions">
-          <button class="icon-btn-sm" data-edit-product="${p.id}" aria-label="ویرایش">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
-          </button>
-          <button class="icon-btn-sm danger" data-del-product="${p.id}" aria-label="حذف">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
-          </button>
+        <div class="prod-facts">
+          <span class="exp-cat-pill">${escapeHtml(p.category)}</span>
+          <span>موجودی: ${formatMoney(stock)} ${escapeHtml(p.unit)}</span>
+          <span>خرید: ${formatMoney(p.purchasePrice)} افغانی</span>
+          <span class="stock-pill ${status}">${stockStatusLabel(status)}</span>
         </div>
       </div>`;
     }).join('');
@@ -6804,7 +7017,7 @@
           </div>
         </div>
 
-        <div class="bulk-field" style="margin-top:8px;">
+        <div class="bulk-field bulk-cat" style="margin-top:8px;">
           <label>دسته‌بندی</label>
           <select class="form-input" data-bp-cat>${bpCategoryOptions(row.category)}</select>
         </div>
@@ -8213,14 +8426,74 @@
   }
   function addToCart(productId, qty=1){
     const existing = cart.find(c=>c.productId===productId);
-    if(existing) existing.quantity += qty; else cart.push({productId, quantity:qty});
+    if(existing){
+      // کالا از قبل در سبد است: فقط عددش عوض می‌شود، نه کل فهرست
+      existing.quantity += qty;
+      saveDraftCart();
+      patchCartRow(productId);
+      return;
+    }
+    cart.push({productId, quantity:qty});
     saveDraftCart(); renderCart();
   }
+  /*
+   * تغییر تعداد، فهرست را از نو نمی‌سازد.
+   * قبلاً هر بار زدنِ مثبت/منفی کل سبد دوباره ساخته می‌شد؛ ردیف‌ها یک
+   * لحظه می‌پریدند، انیمیشن ورودشان دوباره اجرا می‌شد و عدد انگار با
+   * «رفرش» عوض می‌شد. حالا فقط همان چند نوشته به‌روز می‌شوند.
+   */
   function setCartQty(productId, qty){
     const item = cart.find(c=>c.productId===productId);
     if(!item) return;
-    if(!qty || qty<=0) cart = cart.filter(c=>c.productId!==productId); else item.quantity = qty;
-    saveDraftCart(); renderCart();
+    if(!qty || qty<=0){
+      cart = cart.filter(c=>c.productId!==productId);
+      saveDraftCart(); renderCart();
+      return;
+    }
+    item.quantity = qty;
+    saveDraftCart();
+    patchCartRow(productId);
+  }
+
+  /** فقط عدد و مبلغِ همان ردیف و جمع کل را عوض می‌کند. */
+  function patchCartRow(productId){
+    const item = cart.find(c=>c.productId===productId);
+    const p = products.find(x=>x.id===productId);
+    if(item && p){
+      document.querySelectorAll(`[data-cart-row="${productId}"]`).forEach(row=>{
+        const qtyEl = row.querySelector('[data-cart-qty]');
+        if(qtyEl) qtyEl.textContent = `${formatCartQtyFa(item.quantity, p.unit)} ${p.unit}`;
+        const amtEl = row.querySelector('[data-cart-line]');
+        if(amtEl) amtEl.textContent = formatMoney(p.salePrice*item.quantity)+' افغانی';
+      });
+    }
+    const total = formatMoney(cartTotal())+' افغانی';
+    ['cart-total-amount','qs-cart-total-amount'].forEach(id=>{
+      const el = document.getElementById(id);
+      if(el) el.textContent = total;
+    });
+    patchQuickTile(productId);
+  }
+
+  /** شمارنده‌ی روی کاشیِ انتخاب محصول، بدون ساختن دوباره‌ی شبکه. */
+  function patchQuickTile(productId){
+    const p = products.find(x=>x.id===productId);
+    const qtyNow = quickSelectQtyFor(productId);
+    const tileEl = document.querySelector(`[data-qs-tile="${productId}"]`);
+    if(!tileEl) return;
+    tileEl.classList.toggle('has-qty', qtyNow>0);
+    let badge = tileEl.querySelector('.qs-qty-badge');
+    if(qtyNow>0){
+      if(!badge){
+        badge = document.createElement('div');
+        badge.className = 'qs-qty-badge';
+        badge.setAttribute('data-qs-qty', productId);
+        tileEl.appendChild(badge);
+      }
+      badge.textContent = `${formatCartQtyFa(qtyNow, p ? p.unit : '')} در سبد`;
+    } else if(badge){
+      badge.remove();
+    }
   }
   function removeFromCart(productId){
     cart = cart.filter(c=>c.productId!==productId);
@@ -8235,13 +8508,9 @@
         ${p.photo
           ? `<div class="prod-thumb"><img alt="" data-product-photo="${p.id}"></div>`
           : `<div class="exp-icon">${escapeHtml((p.name||'؟')[0])}</div>`}
-        <div class="exp-info">
-          <div class="exp-title">${escapeHtml(p.name)}</div>
-          <div class="exp-meta"><span>${formatCartQtyFa(item.quantity, p.unit)} ${escapeHtml(p.unit)} × ${formatMoney(p.salePrice)}</span></div>
-        </div>
-        <div class="exp-side">
-          <div class="exp-amount">${formatMoney(lineTotal)} افغانی</div>
-        </div>
+        <div class="cart-row-name">${escapeHtml(p.name)}</div>
+        <div class="cart-row-qty" data-cart-qty>${formatCartQtyFa(item.quantity, p.unit)} ${escapeHtml(p.unit)}</div>
+        <div class="cart-row-sum" data-cart-line>${formatMoney(lineTotal)} افغانی</div>
       </div>`;
   }
   function renderCartDrawer(prefix, hasEmptyPanel){
@@ -8269,6 +8538,7 @@
     const ctl = document.getElementById(prefix+'cart-ctl');
     if(ctl) ctl.hidden = !(selectedCartId && cart.some(c=>c.productId===selectedCartId));
   }
+  /* از نو ساختنِ کامل — فقط وقتی ردیفی اضافه یا کم شده باشد */
   function renderCart(){
     renderCartDrawer('', true);
     renderCartDrawer('qs-', false);
@@ -8304,6 +8574,25 @@
   }
   document.addEventListener('tohid:page-change', syncBottomBarHeight);
   window.addEventListener('resize', syncBottomBarHeight);
+
+  /*
+   * دکمه‌های شناور نباید روی چیزی بیفتند که سرِ جایش ثابت است:
+   *   • نوارهای چسبیده‌ی پایین (سبد خرید، ثبت تراکنش) — با اندازه‌گیری
+   *     ارتفاعشان بالاتر می‌روند.
+   *   • پنجره‌ها و شیت‌ها — تا وقتی بازند، دکمه‌ها کنار می‌روند.
+   * روی کارت‌های فهرست شناور می‌مانند، چون خودِ فهرست زیرشان اسکرول
+   * می‌شود و جای ثابتی نیست.
+   */
+  function updateFabVisibility(){
+    const modalOpen = !!document.querySelector('.modal-scrim.open, .vip-scrim.vip-open, .lic-scrim.lic-open');
+    document.querySelectorAll('.fab-wrap, .sale-fab-wrap').forEach(w=>
+      w.classList.toggle('fab-away', modalOpen));
+  }
+  // هر باز و بسته شدن پنجره را می‌بیند، بدون اینکه به هر کدام وصل شویم
+  new MutationObserver(updateFabVisibility).observe(document.body, {
+    subtree:true, attributes:true, attributeFilter:['class'],
+  });
+
 
   /* ==========================================================
      فروش نسیه از خود صفحه‌ی فروش / انتخاب محصول
@@ -8487,70 +8776,81 @@
     const item = cart.find(c=>c.productId===productId);
     if(item) setCartQty(productId, Math.round((item.quantity+step)*1000)/1000);
     else addToCart(productId, step);
-    const p = products.find(x=>x.id===productId);
-    const qtyNow = quickSelectQtyFor(productId);
-    const tileEl = document.querySelector(`[data-qs-tile="${productId}"]`);
-    if(tileEl){
-      tileEl.classList.toggle('has-qty', qtyNow>0);
-      let badge = tileEl.querySelector('.qs-qty-badge');
-      if(qtyNow>0){
-        if(!badge){
-          badge = document.createElement('div');
-          badge.className = 'qs-qty-badge';
-          badge.setAttribute('data-qs-qty', productId);
-          tileEl.appendChild(badge);
-        }
-        badge.textContent = `${formatCartQtyFa(qtyNow, p ? p.unit : '')} در سبد`;
-      } else if(badge){
-        badge.remove();
-      }
-    }
+    patchQuickTile(productId);
     if(navigator.vibrate) navigator.vibrate(20);
   }
   /*
-   * ویرایش و حذفِ محصول با نگه‌داشتن انگشت روی کارت باز می‌شود، نه
-   * همیشه روی صفحه. این‌طور فهرست تمیز است و اشتباهی هم زده نمی‌شود.
+   * ویرایش و حذفِ محصول روی کارت نیستند: با نگه‌داشتن انگشت، همان کارت
+   * تار می‌شود و یک شیت تمام‌عرض بالا می‌آید. «بازگشت» هم دارد تا اگر
+   * اشتباهی نگه داشته شد، هیچ کاری انجام نشود.
    */
+  let heldProductId = null;
+
+  function openProductActions(id){
+    const p = products.find(x=>x.id===id);
+    if(!p) return;
+    heldProductId = id;
+    document.querySelectorAll('.prod-card').forEach(c=>
+      c.classList.toggle('is-held', c.dataset.prodCard === id));
+
+    const thumb = document.getElementById('prod-sheet-thumb');
+    thumb.innerHTML = escapeHtml((p.name||'؟')[0]);
+    if(p.photo){
+      photoUrl(p.id).then(url=>{
+        if(url && heldProductId === id) thumb.innerHTML = `<img alt="" src="${url}">`;
+      });
+    }
+    document.getElementById('prod-sheet-name').textContent = p.name;
+    document.getElementById('prod-sheet-sub').textContent =
+      `${p.category} · ${formatMoney(p.salePrice)} افغانی / ${p.unit}`;
+    openModal('modal-prod-actions');
+  }
+
+  function clearHeldProduct(){
+    heldProductId = null;
+    document.querySelectorAll('.prod-card.is-held').forEach(c=> c.classList.remove('is-held'));
+  }
+
+  document.getElementById('prod-sheet-edit').addEventListener('click', ()=>{
+    const id = heldProductId;
+    closeModal('modal-prod-actions');
+    clearHeldProduct();
+    if(id) openEditProduct(id);
+  });
+  document.getElementById('prod-sheet-del').addEventListener('click', ()=>{
+    const id = heldProductId;
+    closeModal('modal-prod-actions');
+    clearHeldProduct();
+    if(id) askDeleteProduct(id);
+  });
+
   (function(){
     const list = document.getElementById('product-list');
     if(!list) return;
     let timer = null, startX = 0, startY = 0, longFired = false;
-
-    const clearActions = (except)=>{
-      list.querySelectorAll('.prod-card.show-actions').forEach(c=>{
-        if(c !== except) c.classList.remove('show-actions');
-      });
-    };
     const cancel = ()=>{ if(timer){ clearTimeout(timer); timer = null; } };
 
     list.addEventListener('pointerdown', (e)=>{
       const card = e.target.closest('[data-prod-card]');
       if(!card) return;
-      if(e.target.closest('.exp-actions')) return;   // خودِ دکمه‌ها
       longFired = false;
       startX = e.clientX; startY = e.clientY;
       cancel();
       timer = setTimeout(()=>{
         longFired = true;
-        clearActions(card);
-        card.classList.add('show-actions');
+        openProductActions(card.dataset.prodCard);
         if(navigator.vibrate) navigator.vibrate(18);
       }, 450);
     });
-    // اگر انگشت حرکت کرد یعنی دارد اسکرول می‌کند، نه نگه‌داشتن
+    // حرکت انگشت یعنی اسکرول، نه نگه‌داشتن
     list.addEventListener('pointermove', (e)=>{
       if(!timer) return;
       if(Math.abs(e.clientX-startX) > 10 || Math.abs(e.clientY-startY) > 10) cancel();
     });
     ['pointerup','pointercancel','pointerleave'].forEach(ev=>
       list.addEventListener(ev, cancel));
-
-    // زدن جای دیگر، دکمه‌ها را می‌بندد
-    document.addEventListener('click', (e)=>{
-      if(longFired){ longFired = false; return; }
-      if(e.target.closest('.exp-actions')) return;
-      if(!e.target.closest('[data-prod-card]')) clearActions(null);
-    });
+    // تپ کوتاه نباید چیزی باز کند
+    list.addEventListener('click', (e)=>{ if(longFired){ e.preventDefault(); longFired = false; } });
   })();
 
   document.getElementById('quick-select-grid').addEventListener('click', (e)=>{
@@ -8636,7 +8936,7 @@
   function initScanBeep(){
     if(scanBeepAudio) return;
     try{
-      scanBeepAudio = new Audio('sounds/scan-beep.mp3?v=13');
+      scanBeepAudio = new Audio('sounds/scan-beep.mp3?v=14');
       scanBeepAudio.preload = 'auto';
       scanBeepAudio.volume = 0.85;
     }catch(e){ scanBeepAudio = null; }
@@ -9850,7 +10150,12 @@
 
     if(canServiceWorker){
       window.addEventListener('load', ()=>{
-        navigator.serviceWorker.register('sw.js').catch((err)=>{
+        navigator.serviceWorker.register('sw.js').then((reg)=>{
+          watchForUpdate(reg);
+          // هر بار که برنامه باز می‌شود و هر نیم‌ساعت، سایت را برای
+          // نسخه‌ی تازه چک می‌کند
+          setInterval(()=>{ reg.update().catch(()=>{}); }, 30*60*1000);
+        }).catch((err)=>{
           console.warn('ثبت Service Worker ناموفق بود:', err);
         });
       });
@@ -10073,10 +10378,10 @@
 </script>
 
 <!-- لایه اشتراک و License — کاملاً افزودنی؛ منطق فروشگاه را تغییر نمی‌دهد -->
-<script src="license/license-client.js?v=13" defer></script>
-<script src="license/shop-sync.js?v=13" defer></script>
-<script src="license/shop-ui.js?v=13" defer></script>
-<script src="license/vip.js?v=13" defer></script>
+<script src="license/license-client.js?v=14" defer></script>
+<script src="license/shop-sync.js?v=14" defer></script>
+<script src="license/shop-ui.js?v=14" defer></script>
+<script src="license/vip.js?v=14" defer></script>
 
 </body>
 </html>

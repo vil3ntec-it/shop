@@ -6,7 +6,7 @@
    - فونت‌های گوگل: اولین بار از شبکه، سپس همیشه از کش.
    داده‌های فروشگاه در localStorage است و اصلاً از اینجا عبور نمی‌کند.
    ========================================================== */
-const VERSION = 'tohid-shop-v13';
+const VERSION = 'tohid-shop-v14';
 const SHELL_CACHE = VERSION + '-shell';
 const FONT_CACHE = VERSION + '-fonts';
 
@@ -28,11 +28,15 @@ const SHELL_ASSETS = [
 ];
 
 self.addEventListener('install', (event) => {
+  /*
+   * عمداً skipWaiting اینجا صدا زده نمی‌شود: نسخه‌ی تازه منتظر می‌ماند
+   * تا خودِ برنامه نوار «به‌روزرسانی» را نشان دهد و کاربر دکمه را بزند.
+   * وگرنه وسط کار، صفحه بی‌خبر عوض می‌شد.
+   */
   event.waitUntil(
     caches.open(SHELL_CACHE)
       // هر فایلی که نبود، کل نصب را خراب نکند
       .then((cache) => Promise.allSettled(SHELL_ASSETS.map((url) => cache.add(url))))
-      .then(() => self.skipWaiting())
   );
 });
 
@@ -46,9 +50,10 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// پیام از صفحه: برای اعمال فوری نسخه جدید
+// پیام از صفحه: نسخه‌ی تازه همین حالا جای قبلی را بگیرد
 self.addEventListener('message', (event) => {
-  if (event.data === 'skip-waiting') self.skipWaiting();
+  const d = event.data;
+  if (d === 'skip-waiting' || (d && d.type === 'SKIP_WAITING')) self.skipWaiting();
 });
 
 function isFontRequest(url) {
