@@ -70,6 +70,28 @@ async function createApp({ runMigrations = true } = {}) {
   function apiRouter() {
     const api = express.Router();
     api.get('/health', health);
+
+    /**
+     * تنظیمات عمومی سرور.
+     *
+     * برنامه با این می‌فهمد کدام راه‌های ورود روی این سرور باز است و
+     * لازم نیست برای هر تغییر، نسخه‌ی تازه‌ای از برنامه ساخته شود.
+     * فقط خواندنی است و هیچ راز یا دستوری در آن نیست.
+     */
+    api.get('/config', async (req, res, next) => {
+      try {
+        const cfg = await plans.allConfig();
+        res.json({
+          serverTime: now(),
+          registrationOpen: config.allowRegistration,
+          googleClientId: config.google.clientIds[0] || '',
+          otpEnabled: config.otp.provider !== 'off',
+          trialDays: Number(cfg.trial_days || 0),
+          whatsapp: { number: cfg.whatsapp_number || '', message: cfg.whatsapp_message || '' },
+          minAppVersion: cfg.min_app_version || '',
+        });
+      } catch (err) { next(err); }
+    });
     api.use('/auth', require('./routes/auth'));
     api.use('/me', require('./routes/me'));
     api.use('/shop', require('./routes/shop'));

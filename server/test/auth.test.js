@@ -131,3 +131,13 @@ test('ورودی نامعتبر با پیام فارسی رد می‌شود، ن
   const huge = await h.post('/api/products', { id: 'p-big', data: { blob: 'x'.repeat(70000) } }, { token: u.accessToken });
   assert.equal(huge.status, 400);
 });
+
+test('تنظیمات عمومی سرور بدون ورود در دسترس است و راز ندارد', async () => {
+  const r = await h.get('/api/config');
+  assert.equal(r.status, 200);
+  assert.equal(typeof r.body.registrationOpen, 'boolean');
+  assert.equal(r.body.googleClientId, '');
+  assert.ok(r.body.serverTime > 0);
+  const text = JSON.stringify(r.body);
+  assert.ok(!text.includes('SECRET') && !text.includes('postgres://'));
+});
