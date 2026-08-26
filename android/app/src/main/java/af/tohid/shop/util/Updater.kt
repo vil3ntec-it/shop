@@ -1,11 +1,9 @@
 package af.tohid.shop.util
 
 import af.tohid.shop.BuildConfig
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
 /**
@@ -17,23 +15,6 @@ import java.util.concurrent.TimeUnit
  */
 object Updater {
 
-    @Serializable
-    data class Release(
-        @SerialName("tag_name") val tagName: String = "",
-        val name: String = "",
-        val body: String = "",
-        val prerelease: Boolean = false,
-        val draft: Boolean = false,
-        val assets: List<Asset> = emptyList(),
-    )
-
-    @Serializable
-    data class Asset(
-        val name: String = "",
-        @SerialName("browser_download_url") val downloadUrl: String = "",
-        val size: Long = 0,
-    )
-
     data class Available(
         val version: String,
         val notes: String,
@@ -41,7 +22,6 @@ object Updater {
         val sizeBytes: Long,
     )
 
-    private val json = Json { ignoreUnknownKeys = true }
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
@@ -56,16 +36,22 @@ object Updater {
         client.newCall(req).execute().use { res ->
             if (!res.isSuccessful) return null
             val body = res.body?.string() ?: return null
-            val release = runCatching { json.decodeFromString(Release.serializer(), body) }
-                .getOrNull() ?: return null
-            if (release.draft || release.prerelease) return null
+            val release = runCatching { JSONObject(body) }.getOrNull() ?: return null
+            if (release.optBoolean("draft") || release.optBoolean("prerelease")) return null
 
-            val latest = release.tagName.trimStart('v', 'V')
+            val latest = release.optString("tag_name").trimStart('v', 'V')
             if (!isNewer(latest, currentVersion)) return null
 
-            val apk = release.assets.firstOrNull { it.name.endsWith(".apk", ignoreCase = true) }
-                ?: return null
-            return Available(latest, release.body, apk.downloadUrl, apk.size)
+            val assets = release.optJSONArray("assets") ?: return null
+            for (i in 0 until assets.length()) {
+                val asset = assets.optJSONObject(i) ?: continue
+                val name = asset.optString("name")
+                if (!name.endsWith(".apk", ignoreCase = true)) continue
+                val url = asset.optString("browser_download_url")
+                if (url.isBlank()) continue
+                return Available(latest, release.optString("body"), url, asset.optLong("size"))
+            }
+            return null
         }
     }
 

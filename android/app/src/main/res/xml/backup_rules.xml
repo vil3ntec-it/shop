@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  فقط پایگاه‌داده‌ی دکان پشتیبان گرفته می‌شود.
-  توکن‌ها در sharedpref رمزشده‌اند و به کلید همان دستگاه بسته‌اند،
-  پس اصلاً وارد پشتیبان نمی‌شوند (چون sharedpref include نشده است).
+  دفتر دکان داخل حافظه‌ی خود صفحه (WebView) است؛ همان جایی که در مرورگر
+  localStorage و IndexedDB می‌نشیند. پس همان پوشه پشتیبان گرفته می‌شود تا
+  با عوض شدن گوشی اطلاعات از دست نرود.
 -->
 <full-backup-content>
+    <include domain="root" path="app_webview" />
     <include domain="database" path="." />
 </full-backup-content>

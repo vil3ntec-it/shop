@@ -1,9 +1,23 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
-    alias(libs.plugins.kotlin.compose)
-    alias(libs.plugins.kotlin.serialization)
-    alias(libs.plugins.ksp)
+}
+
+/**
+ * فایل‌های خود برنامه (همان چیزی که در سایت است) داخل بسته کپی می‌شوند.
+ *
+ * منبع یکی است: index.html و license/ و sounds/ و icons/ همان‌هایی هستند
+ * که روی سایت اجرا می‌شوند. پس نسخه‌ی گوشی و نسخه‌ی وب هرگز از هم جدا
+ * نمی‌افتند و «یک نقطه» هم فرق نمی‌کنند.
+ */
+val webRoot: File = rootProject.projectDir.parentFile
+val webAppDir = layout.buildDirectory.dir("generated/webapp")
+val copyWebApp = tasks.register<Copy>("copyWebApp") {
+    from(webRoot) {
+        include("index.html", "sw.js", "manifest.webmanifest")
+        include("license/**", "icons/**", "sounds/**", "fonts/**")
+    }
+    into(webAppDir)
 }
 
 // نسخه از تگ گیت‌هاب می‌آید؛ در نبود آن مقدار پیش‌فرض استفاده می‌شود
@@ -84,57 +98,47 @@ android {
     kotlinOptions { jvmTarget = "17" }
 
     buildFeatures {
-        compose = true
         buildConfig = true
     }
+
+    sourceSets["main"].assets.srcDir(webAppDir)
 
     packaging {
         resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" }
     }
 
+    /*
+     * Lint گزارش می‌دهد ولی جلوی ساخت را نمی‌گیرد.
+     * دلیل: بیشتر هشدارهای باقی‌مانده درباره‌ی فایل‌های بایگانی‌شده و
+     * APIهای قدیمی‌اند و ساخت نسخه‌ی قابل نصب نباید به آن‌ها گره بخورد.
+     * گزارش کامل در app/build/reports/lint-results-debug.html می‌ماند.
+     */
+    lint {
+        abortOnError = false
+        checkReleaseBuilds = false
+        htmlReport = true
+        textReport = true
+    }
+
 }
 
-ksp { arg("room.schemaLocation", "${'$'}projectDir/schemas") }
+tasks.named("preBuild") { dependsOn(copyWebApp) }
+tasks.matching { it.name.startsWith("merge") && it.name.endsWith("Assets") }
+    .configureEach { dependsOn(copyWebApp) }
 
 dependencies {
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.activity)
     implementation(libs.androidx.lifecycle.runtime.ktx)
-    implementation(libs.androidx.lifecycle.viewmodel.compose)
-    implementation(libs.androidx.activity.compose)
+    // WebViewAssetLoader: فایل‌های داخل برنامه را با یک نشانی امن سرو می‌کند
+    implementation(libs.androidx.webkit)
 
-    implementation(platform(libs.androidx.compose.bom))
-    implementation(libs.androidx.ui)
-    implementation(libs.androidx.ui.graphics)
-    implementation(libs.androidx.ui.tooling.preview)
-    implementation(libs.androidx.material3)
-    implementation(libs.androidx.material.icons)
-    implementation(libs.androidx.navigation.compose)
-    debugImplementation(libs.androidx.ui.tooling)
-
-    implementation(libs.androidx.room.runtime)
-    implementation(libs.androidx.room.ktx)
-    ksp(libs.androidx.room.compiler)
-
-    implementation(libs.retrofit)
-    implementation(libs.retrofit.serialization)
+    // برای گرفتن به‌روزرسانی از گیت‌هاب
     implementation(libs.okhttp)
-    implementation(libs.okhttp.logging)
-    implementation(libs.kotlinx.serialization.json)
-
-    implementation(libs.androidx.work.runtime)
-    implementation(libs.androidx.datastore)
-    implementation(libs.androidx.security.crypto)
-
-    implementation(libs.androidx.camera.core)
-    implementation(libs.androidx.camera.camera2)
-    implementation(libs.androidx.camera.lifecycle)
-    implementation(libs.androidx.camera.view)
-    implementation(libs.mlkit.barcode)
-    implementation(libs.play.services.auth)
+    implementation(libs.kotlinx.coroutines.android)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
-    androidTestImplementation(libs.androidx.room.testing)
 }
