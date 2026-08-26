@@ -1,4 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.TohidShop" parent="android:Theme.Material.Light.NoActionBar" />
+    <!--
+      پوسته‌ی پنجره فقط پس‌زمینه را می‌سازد؛ خودِ ظاهر برنامه از همان
+      index.html می‌آید. رنگ پس‌زمینه با رنگ صفحه یکی است تا هنگام باز
+      شدن، یک لحظه سفیدی یا سیاهی دیده نشود.
+    -->
+    <style name="Theme.TohidShop" parent="android:Theme.DeviceDefault.DayNight.NoActionBar">
+        <item name="android:windowBackground">@color/app_background</item>
+        <item name="android:navigationBarColor">@color/app_background</item>
+        <item name="android:statusBarColor">@color/app_background</item>
+    </style>
 </resources>

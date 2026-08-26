@@ -1,19 +1,12 @@
-# kotlinx.serialization — نگه داشتن سریالایزرها
--keepattributes *Annotation*, InnerClasses
--dontnote kotlinx.serialization.**
--keepclassmembers class **$$serializer { *; }
--keepclasseswithmembers class af.tohid.shop.data.remote.** {
-    kotlinx.serialization.KSerializer serializer(...);
+# پل جاوااسکریپت به اندروید (ذخیره‌ی فایل پشتیبان) نباید نامش عوض شود
+-keepclassmembers class af.tohid.shop.MainActivity$SaveBridge {
+    @android.webkit.JavascriptInterface <methods>;
 }
--keep,includedescriptorclasses class af.tohid.shop.data.remote.**$$serializer { *; }
--keepclassmembers class af.tohid.shop.data.remote.** {
-    *** Companion;
+-keepclassmembers class * {
+    @android.webkit.JavascriptInterface <methods>;
 }
 
-# Retrofit
--keepattributes Signature, RuntimeVisibleAnnotations, AnnotationDefault
--keep,allowobfuscation,allowshrinking interface retrofit2.Call
--keep,allowobfuscation,allowshrinking class kotlin.coroutines.Continuation
-
-# Room
--keep class * extends androidx.room.RoomDatabase { <init>(); }
+# OkHttp — هشدارهای بی‌اثر
+-dontwarn okhttp3.**
+-dontwarn okio.**
+-dontwarn org.conscrypt.**

@@ -4,11 +4,22 @@ on:
   push:
     branches: ["**"]
     paths:
+      # خود برنامه (همان فایل‌های سایت) داخل بسته می‌رود، پس تغییر آن‌ها
+      # هم باید بیلد تازه بسازد
       - "android/**"
+      - "index.html"
+      - "license/**"
+      - "sounds/**"
+      - "icons/**"
+      - "fonts/**"
+      - "manifest.webmanifest"
+      - "sw.js"
       - ".github/workflows/android.yml"
   pull_request:
     paths:
       - "android/**"
+      - "index.html"
+      - "license/**"
   workflow_dispatch:
 
 permissions:

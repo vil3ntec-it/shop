@@ -43,6 +43,15 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all'">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap"></noscript>
 <style>
+  /* نسخه‌ی محلی فونت — وقتی اینترنت نیست یا برنامه روی گوشی نصب است،
+     ظاهر دقیقاً همان می‌ماند و به سرور گوگل وابسته نیست. */
+  @font-face{font-family:'Vazirmatn Local';src:url('fonts/Vazirmatn-Regular.ttf') format('truetype');font-weight:400;font-display:swap;}
+  @font-face{font-family:'Vazirmatn Local';src:url('fonts/Vazirmatn-Medium.ttf') format('truetype');font-weight:500;font-display:swap;}
+  @font-face{font-family:'Vazirmatn Local';src:url('fonts/Vazirmatn-SemiBold.ttf') format('truetype');font-weight:600;font-display:swap;}
+  @font-face{font-family:'Vazirmatn Local';src:url('fonts/Vazirmatn-Bold.ttf') format('truetype');font-weight:700;font-display:swap;}
+  @font-face{font-family:'Vazirmatn Local';src:url('fonts/Vazirmatn-ExtraBold.ttf') format('truetype');font-weight:800;font-display:swap;}
+</style>
+<style>
   :root{
     --bg:#ffffff;
     --surface:#f6f8fc;
@@ -95,7 +104,7 @@
   *{box-sizing:border-box; margin:0; padding:0;}
   html,body{height:100%;}
   body{
-    font-family:'Vazirmatn','Vazir','IRANSans','Noto Naskh Arabic','Segoe UI',Tahoma,sans-serif;
+    font-family:'Vazirmatn','Vazirmatn Local','Vazir','IRANSans','Noto Naskh Arabic','Segoe UI',Tahoma,sans-serif;
     background:var(--bg);
     color:var(--text);
     -webkit-font-smoothing:antialiased;
@@ -5600,11 +5609,32 @@
 
 /* ---- شماره‌ی نسخه و گرفتن اجباری آخرین نسخه ---- */
   const APP_BUILD = 'v15';
+
+  /** آیا برنامه داخل اپلیکیشن اندروید اجرا می‌شود؟ */
+  const IN_ANDROID_APP = typeof window.ShopAndroid === 'object'
+    && typeof window.ShopAndroid.checkUpdate === 'function';
+
   (function showBuild(){
     const el = document.getElementById('build-id');
-    if(el) el.textContent = APP_BUILD;
+    if(el){
+      let label = APP_BUILD;
+      if(IN_ANDROID_APP){
+        try{ label = 'اندروید ' + window.ShopAndroid.appVersion() + ' · ' + APP_BUILD; }catch(e){}
+      }
+      el.textContent = label;
+    }
     const btn = document.getElementById('btn-force-refresh');
     if(!btn) return;
+
+    // داخل برنامه‌ی اندروید، «آخرین نسخه» یعنی نسخه‌ی تازه‌ی خود برنامه
+    if(IN_ANDROID_APP){
+      btn.textContent = 'بررسی نسخه‌ی تازه‌ی برنامه';
+      btn.addEventListener('click', ()=>{
+        try{ window.ShopAndroid.checkUpdate(); }catch(e){}
+      });
+      return;
+    }
+
     btn.addEventListener('click', async ()=>{
       btn.disabled = true;
       btn.textContent = 'در حال گرفتن…';

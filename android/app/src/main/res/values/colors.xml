@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- همان رنگ زمینه‌ی برنامه در حالت روشن (var(--surface) در index.html) -->
+    <color name="app_background">#F6F8FC</color>
+</resources>
