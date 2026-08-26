@@ -222,22 +222,28 @@
   border-color:var(--primary,#2c5ce6); border-width:2px;
   background:var(--primary-tint,#eaf0ff);
 }
-.vip-plan-badge{ border-color:var(--warning,#e8a13a); overflow:hidden; }
-/* برق نور روی همان کارتی که پیشنهاد می‌شود، تا چشم را بگیرد */
-.vip-plan-badge::after{
-  content:''; position:absolute; top:0; bottom:0; width:45%;
-  inset-inline-start:-50%;
-  background:linear-gradient(100deg, transparent, rgba(255,255,255,.6), transparent);
-  transform:skewX(-16deg); pointer-events:none;
-  animation:vip-shine 4.2s ease-in-out 1s infinite;
-}
-.vip-cta{ position:relative; overflow:hidden; }
+.vip-plan-badge{ border-color:var(--warning,#e8a13a); }
+/*
+ * برق نور: با جابه‌جا کردن پس‌زمینه کشیده می‌شود، نه با یک لایه‌ی
+ * بیرون‌زده. این‌طور دیگر لازم نیست کارت overflow:hidden داشته باشد
+ * و برچسب «پیشنهاد ما» که کمی بالاتر از لبه می‌نشیند بریده نمی‌شود.
+ */
+.vip-plan-badge::after,
 .vip-cta::after{
-  content:''; position:absolute; top:0; bottom:0; width:40%;
-  inset-inline-start:-45%;
-  background:linear-gradient(100deg, transparent, rgba(255,255,255,.35), transparent);
-  transform:skewX(-16deg); pointer-events:none;
-  animation:vip-shine 5s ease-in-out 1.6s infinite;
+  content:''; position:absolute; inset:0; border-radius:inherit;
+  pointer-events:none;
+  background-repeat:no-repeat; background-size:260% 100%;
+  animation:vip-shine 4.6s ease-in-out 1s infinite;
+}
+.vip-plan-badge::after{
+  background-image:linear-gradient(100deg,
+    transparent 38%, rgba(255,255,255,.62) 50%, transparent 62%);
+}
+.vip-cta{ position:relative; }
+.vip-cta::after{
+  background-image:linear-gradient(100deg,
+    transparent 38%, rgba(255,255,255,.34) 50%, transparent 62%);
+  animation-delay:1.8s; animation-duration:5.2s;
 }
 .vip-crown{ animation:vip-crown-float 3.6s ease-in-out infinite; }
 @keyframes vip-crown-float{
@@ -245,14 +251,13 @@
   50%    { transform:translateY(-4px); }
 }
 @keyframes vip-shine{
-  0%   { inset-inline-start:-50%; opacity:0; }
-  10%  { opacity:1; }
-  35%  { inset-inline-start:120%; opacity:0; }
-  100% { inset-inline-start:120%; opacity:0; }
+  0%       { background-position:210% 0; }
+  38%,100% { background-position:-90% 0; }
 }
 @media (prefers-reduced-motion:reduce){
-  .vip-plan-badge::after, .vip-cta::after{ animation:none; opacity:0; }
-  .vip-crown{ animation:none; }
+  html:not([data-motion="full"]) .vip-plan-badge::after,
+  html:not([data-motion="full"]) .vip-cta::after{ animation:none; opacity:0; }
+  html:not([data-motion="full"]) .vip-crown{ animation:none; }
 }
 .vip-tag{
   position:absolute; top:-9px; inset-inline-start:50%; transform:translateX(50%);
@@ -336,3 +341,28 @@ html.vip-lock-debtors [data-page="debtors"]{ opacity:.5; }
     opacity:1 !important; transform:none !important;
   }
 }
+
+/* ---------- نوار «اول وارد حساب شوید» ---------- */
+.vip-gate{
+  display:flex; align-items:center; gap:11px; width:100%;
+  margin-top:20px; padding:13px 15px; border-radius:14px;
+  border:1.5px solid var(--warning,#e8a13a);
+  background:var(--warning-tint,#fdf3e3);
+  font-family:inherit; text-align:start; cursor:pointer;
+  transition:transform .14s ease, box-shadow .2s ease;
+}
+.vip-gate:active{ transform:scale(.985); }
+.vip-gate:hover{ box-shadow:0 10px 24px -16px rgba(232,161,58,.9); }
+.vip-gate-ic{
+  flex:0 0 auto; width:34px; height:34px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  background:var(--warning,#e8a13a); color:#fff;
+}
+.vip-gate-ic svg{ width:17px; height:17px; }
+.vip-gate-txt{ display:flex; flex-direction:column; gap:2px; min-width:0; }
+.vip-gate-txt b{ font-size:12.5px; font-weight:800; color:var(--text,#1a2233); }
+.vip-gate-txt i{ font-style:normal; font-size:10.5px; color:var(--muted,#7c8698); line-height:1.6; }
+
+/* دکمه‌ی خرید تا وقتی وارد نشده، کم‌رنگ‌تر است */
+.vip-cta-locked{ opacity:.6; }
+.vip-cta-locked::after{ animation:none; }

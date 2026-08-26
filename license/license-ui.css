@@ -160,3 +160,16 @@ html.lic-lock-reports    [data-page="reports"],
 html.lic-lock-audit_log  [data-page="audit-log"]{
   opacity:.45;
 }
+
+/* ---------- کلید حساب ---------- */
+.lic-apikey{
+  display:flex; align-items:center; gap:8px;
+  padding:9px 11px; border-radius:10px;
+  border:1px dashed var(--border,#e5eaf3); background:var(--surface,#f6f8fc);
+}
+.lic-apikey code{
+  flex:1; min-width:0; font-family:inherit;
+  font-size:14px; font-weight:800; letter-spacing:1px;
+  color:var(--primary,#2c5ce6); user-select:all;
+  overflow-x:auto; white-space:nowrap;
+}

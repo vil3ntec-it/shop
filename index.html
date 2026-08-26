@@ -34,9 +34,9 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
-<link rel="stylesheet" href="license/license-ui.css?v=11">
-<link rel="stylesheet" href="license/shop-ui.css?v=11">
-<link rel="stylesheet" href="license/vip.css?v=11">
+<link rel="stylesheet" href="license/license-ui.css?v=12">
+<link rel="stylesheet" href="license/shop-ui.css?v=12">
+<link rel="stylesheet" href="license/vip.css?v=12">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <!-- فونت به‌صورت غیرمسدودکننده بارگذاری می‌شود تا نبودِ اینترنت باز شدن برنامه را کند نکند -->
@@ -418,8 +418,9 @@
      قابل زدن است. منوی «افزودن» با حاشیه برمی‌گردد داخل صفحه. */
   .fab-wrap{
     position:fixed;
-    bottom:calc(var(--bottomnav-h) + 16px);
+    bottom:calc(var(--bottomnav-h) + var(--bottom-bar-h, 0px) + 16px);
     inset-inline-start:-27px;
+    transition:bottom .22s cubic-bezier(.22,1,.36,1);
     z-index:40;
     display:flex;
     flex-direction:column-reverse;
@@ -428,7 +429,7 @@
   }
   .fab-wrap .fab-menu{ margin-inline-start:36px; }
   @media(min-width:769px){
-    .fab-wrap{bottom:24px;}
+    .fab-wrap{bottom:calc(var(--bottom-bar-h, 0px) + 24px);}
   }
   .fab{
     width:54px; height:54px;
@@ -476,15 +477,16 @@
   .sale-fab-wrap{
     position:fixed;
     /* درست بالای دکمه‌ی آبی، روی همان لبه و به همان اندازه بیرون */
-    bottom:calc(var(--bottomnav-h) + 80px);
+    bottom:calc(var(--bottomnav-h) + var(--bottom-bar-h, 0px) + 80px);
     inset-inline-start:-27px;
+    transition:bottom .22s cubic-bezier(.22,1,.36,1);
     /* بالاتر از سبد خرید چسبیده به پایین، وگرنه پشت آن پنهان می‌شود */
     z-index:46;
     display:none;
     flex-direction:column; align-items:flex-start;
   }
   .sale-fab-wrap.show{ display:flex; }
-  @media(min-width:769px){ .sale-fab-wrap{bottom:88px;} }
+  @media(min-width:769px){ .sale-fab-wrap{bottom:calc(var(--bottom-bar-h, 0px) + 88px);} }
   .sale-fab{
     width:54px; height:54px; border-radius:50%; border:none;
     background:linear-gradient(160deg, var(--success), #35c8c0);
@@ -1263,15 +1265,29 @@
   }
 
   /* ---------- نوار «ثبت تراکنش جدید» ---------- */
+  /* مثل سبد خرید، به پایینِ صفحه چسبیده می‌ماند */
   .acc-add-bar{
-    display:flex; align-items:center; gap:11px; width:100%;
-    margin-top:14px; padding:13px 14px;
-    border-radius:var(--radius-lg);
-    border:1.5px solid var(--primary);
+    position:fixed;
+    bottom:var(--bottomnav-h);
+    inset-inline-start:0; inset-inline-end:0;
+    z-index:45;
+    /* پهنا را همان inset ها تعیین می‌کنند؛ width:100% روی دسکتاپ
+       از زیر نوار کناری بیرون می‌زد. */
+    display:flex; align-items:center; gap:11px;
+    margin:0; padding:13px 16px;
+    border:none; border-top:1.5px solid var(--primary);
+    border-radius:var(--radius-lg) var(--radius-lg) 0 0;
     background:linear-gradient(120deg, var(--primary-tint), var(--bg) 70%);
+    box-shadow:0 -6px 20px -8px rgba(20,30,60,.2);
     font-family:inherit; text-align:start; cursor:pointer;
     -webkit-tap-highlight-color:transparent;
     transition:transform .14s cubic-bezier(.22,1,.36,1), box-shadow .2s ease;
+  }
+  @media(min-width:769px){
+    .acc-add-bar{ bottom:0; inset-inline-start:var(--sidebar-w, 0); }
+  }
+  #page-debtor-account.active{
+    padding-bottom:calc(var(--bottom-bar-h, 0px) + 18px);
   }
   .acc-add-bar:active{transform:scale(.985);}
   @media (hover:hover){ .acc-add-bar:hover{box-shadow:var(--shadow-md); transform:translateY(-1px);} }
@@ -1344,9 +1360,13 @@
 
   .tx-list{display:flex; flex-direction:column;}
   /* ردیف کوتاه: تیتر و تاریخ در یک خط، تا فهرست بلند مثل کتابچه نشود */
+  /* ستون‌های ثابت تا تاریخ، توضیحات، نوع و مبلغ در همه‌ی ردیف‌ها
+     دقیقاً زیر هم بیفتند و به هم نچسبند. */
   .tx-item{
-    display:flex; align-items:center; gap:10px;
-    padding:8px 2px;
+    display:grid;
+    grid-template-columns:88px 1fr 54px 92px 24px;
+    align-items:center; gap:12px;
+    padding:10px 2px;
     border-bottom:1px solid var(--border);
   }
   .tx-item:last-child{border-bottom:none;}
@@ -1358,30 +1378,33 @@
   .tx-line{display:flex; align-items:baseline; gap:7px;}
   /* چیدمان ردیف: تاریخ · توضیحات · برد/رسید · مبلغ */
   .tx-date-col{
-    flex:0 0 auto; font-size:10.5px; font-weight:700; color:var(--muted);
-    white-space:nowrap; letter-spacing:.2px;
+    font-size:11px; font-weight:700; color:var(--muted);
+    white-space:nowrap; letter-spacing:.2px; text-align:start;
   }
   .tx-note-col{
-    flex:1; min-width:0; font-size:12px; color:var(--text);
+    min-width:0; font-size:12.5px; color:var(--text); text-align:start;
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
   }
   .tx-note-col.empty{color:var(--muted-2);}
   .tx-kind{
-    flex:0 0 auto; font-size:10.5px; font-weight:800;
-    padding:2px 8px; border-radius:999px; white-space:nowrap;
+    justify-self:center;
+    font-size:10.5px; font-weight:800;
+    padding:3px 0; border-radius:999px; white-space:nowrap;
+    width:100%; text-align:center;
   }
   .tx-item.give .tx-kind{background:var(--danger-tint); color:var(--danger);}
   .tx-item.receive .tx-kind{background:var(--success-tint); color:var(--success);}
   .tx-money{
-    flex:0 0 auto; font-size:13px; font-weight:800; white-space:nowrap;
-    min-width:74px; text-align:end;
+    font-size:13.5px; font-weight:800; white-space:nowrap; text-align:end;
   }
   .tx-item.give .tx-money{color:var(--danger);}
   .tx-item.receive .tx-money{color:var(--success);}
-  @media(max-width:400px){
+  @media(max-width:420px){
+    .tx-item{grid-template-columns:74px 1fr 46px 72px 20px; gap:8px;}
     .tx-date-col{font-size:9.5px;}
     .tx-note-col{font-size:11px;}
-    .tx-money{font-size:12px; min-width:64px;}
+    .tx-kind{font-size:9.5px;}
+    .tx-money{font-size:12px;}
   }
   .tx-item.give .tx-ic{background:var(--danger-tint); color:var(--danger);}
   .tx-item.receive .tx-ic{background:var(--success-tint); color:var(--success);}
@@ -1677,19 +1700,29 @@
   .cart-list .exp-card{padding:8px 9px;}
 
   /* ---------- Cart drawer: sticky at bottom, collapsed by default ---------- */
+  /* سبد خرید به پایینِ صفحه چسبیده است، نه به انتهای فهرست:
+     با اسکرول بالا و پایین نمی‌رود و همیشه جلوی چشم است. */
   .cart-drawer{
-    position:sticky;
+    position:fixed;
     bottom:var(--bottomnav-h);
+    inset-inline-start:0; inset-inline-end:0;
     z-index:45;
-    margin-top:14px;
+    margin:0;
     background:var(--bg);
-    border:1px solid var(--border);
-    border-radius:var(--radius-lg);
-    box-shadow:0 -4px 16px -6px rgba(20,30,60,.14);
+    border-top:1px solid var(--border);
+    border-radius:var(--radius-lg) var(--radius-lg) 0 0;
+    box-shadow:0 -6px 20px -8px rgba(20,30,60,.2);
     overflow:hidden;
   }
   @media(min-width:769px){
-    .cart-drawer{bottom:0;}
+    .cart-drawer{
+      bottom:0;
+      inset-inline-start:var(--sidebar-w, 0);
+    }
+  }
+  /* جای نوارِ چسبیده، تا آخرین ردیف زیرش پنهان نشود */
+  #page-sale.active, #page-quick-sale.active{
+    padding-bottom:calc(var(--bottom-bar-h, 0px) + 18px);
   }
   .cart-drawer-body{
     max-height:46vh;
@@ -1703,10 +1736,8 @@
     padding:12px 14px; box-shadow:none; border-radius:0; margin-top:0;
     cursor:pointer;
   }
-  .cart-drawer-toggle-btn{
-    display:flex; align-items:center; gap:6px; flex-shrink:0;
-    background:transparent; color:var(--text); font-size:12px; font-weight:700;
-  }
+  /* دکمه‌ی فلشِ باز/بسته برداشته شد؛ زدن روی خودِ نوار همان کار را می‌کند */
+  .cart-drawer-toggle-btn{ display:none; }
   .cart-drawer-chevron{transition:transform .18s ease; flex-shrink:0;}
   .cart-drawer.open .cart-drawer-chevron{transform:rotate(180deg);}
   .cart-total{display:flex; flex-direction:column; gap:2px; font-size:11.5px; color:var(--muted); font-weight:600; flex:1; min-width:0;}
@@ -1853,31 +1884,29 @@
     border-radius:var(--radius-lg); box-shadow:var(--shadow-md);
     padding:22px 22px 20px;
     animation:authCardIn .6s cubic-bezier(.2,.8,.2,1) both;
-    overflow:hidden;
   }
   @media(min-width:769px){
     /* روی صفحه‌های بزرگ وسط بماند، آن‌جا جای کافی هست */
     .auth-screen{align-items:center; justify-content:center; padding:24px;}
     .auth-card{padding:32px 26px 26px;}
   }
-  /* برق نور، مثل کارت اشتراک */
+  /* برق نور، مثل کارت اشتراک — با جابه‌جایی پس‌زمینه، تا چیزی از
+     کارت بیرون نزند و لازم نباشد محتوا بریده شود. */
   .auth-card::after{
-    content:''; position:absolute; top:0; bottom:0; width:38%;
-    inset-inline-start:-45%;
-    background:linear-gradient(100deg, transparent, rgba(255,255,255,.55), transparent);
-    transform:skewX(-16deg);
-    animation:authShine 5.5s ease-in-out 1.1s infinite;
+    content:''; position:absolute; inset:0; border-radius:inherit;
     pointer-events:none;
+    background-repeat:no-repeat; background-size:260% 100%;
+    background-image:linear-gradient(100deg,
+      transparent 38%, rgba(255,255,255,.5) 50%, transparent 62%);
+    animation:authShine 5.5s ease-in-out 1.1s infinite;
   }
   @keyframes authShine{
-    0%   { inset-inline-start:-45%; opacity:0; }
-    12%  { opacity:1; }
-    38%  { inset-inline-start:115%; opacity:0; }
-    100% { inset-inline-start:115%; opacity:0; }
+    0%       { background-position:210% 0; }
+    32%,100% { background-position:-90% 0; }
   }
-  :root[data-theme="dark"] .auth-card::after,
-  html.dark .auth-card::after{
-    background:linear-gradient(100deg, transparent, rgba(255,255,255,.12), transparent);
+  :root[data-theme="dark"] .auth-card::after{
+    background-image:linear-gradient(100deg,
+      transparent 38%, rgba(255,255,255,.1) 50%, transparent 62%);
   }
   @keyframes authCardIn{
     from{ opacity:0; transform:translateY(28px) scale(.96); }
@@ -2118,6 +2147,94 @@
   .alert-item .ai-title{ display:block; font-size:12.5px; font-weight:700; color:var(--text); line-height:1.5; }
   .alert-item .ai-sub{ display:block; font-size:11.5px; color:var(--muted); margin-top:3px; line-height:1.6; }
   .alerts-empty{ padding:22px 10px; text-align:center; font-size:12.5px; color:var(--muted); }
+
+  /* ---------- عکس محصول ---------- */
+  .photo-pick{display:flex; align-items:flex-start; gap:12px;}
+  .photo-thumb{
+    position:relative; flex:0 0 auto;
+    width:76px; height:76px; border-radius:var(--radius-md);
+    border:1.5px dashed var(--border); background:var(--surface);
+    display:flex; align-items:center; justify-content:center;
+    overflow:hidden; color:var(--muted-2);
+  }
+  .photo-thumb img{
+    display:none; width:100%; height:100%; object-fit:cover;
+  }
+  .photo-thumb img.has-photo{display:block;}
+  .photo-thumb img.has-photo + .photo-empty{display:none;}
+  .photo-empty{display:flex; align-items:center; justify-content:center;}
+  .photo-actions{display:flex; flex-direction:column; gap:7px; align-items:flex-start; min-width:0;}
+  .btn.danger-text{color:var(--danger);}
+
+  /* عکس روی پنل اسکن، کنار نام کالا */
+  .scan-photo{
+    flex:0 0 auto; width:56px; height:56px; border-radius:var(--radius-md);
+    overflow:hidden; background:var(--surface); border:1px solid var(--border);
+    animation:cardIn .3s cubic-bezier(.22,1,.36,1) both;
+  }
+  .scan-photo img{width:100%; height:100%; object-fit:cover; display:block;}
+
+  /* بندانگشتی در فهرست محصولات و کاشی انتخاب محصول */
+  .prod-thumb{
+    flex:0 0 auto; width:40px; height:40px; border-radius:10px;
+    overflow:hidden; background:var(--surface-2);
+  }
+  .prod-thumb img{width:100%; height:100%; object-fit:cover; display:none;}
+  .prod-thumb img.has-photo{display:block;}
+  .qs-thumb{
+    width:100%; aspect-ratio:16/10; border-radius:10px; overflow:hidden;
+    background:var(--surface-2); margin-bottom:7px; display:none;
+  }
+  .qs-thumb.on{display:block;}
+  .qs-thumb img{width:100%; height:100%; object-fit:cover; display:none;}
+  .qs-thumb img.has-photo{display:block;}
+  /* دکمه‌ی عکس روی ردیف شیت چندردیفه */
+  .bulk-icon-btn.has-photo{border-color:var(--success); color:var(--success);}
+
+  /* ---------- دکمه‌های سربرگ: تم و حساب ---------- */
+  .hdr-theme .hdr-ic-moon{ display:none; }
+  :root[data-theme="dark"] .hdr-theme .hdr-ic-sun{ display:none; }
+  :root[data-theme="dark"] .hdr-theme .hdr-ic-moon{ display:inline; }
+  .hdr-theme svg{ transition:transform .35s cubic-bezier(.3,1.3,.5,1); }
+  .hdr-theme:active svg{ transform:rotate(-40deg) scale(.86); }
+  @media (hover:hover){ .hdr-theme:hover svg{ transform:rotate(18deg); } }
+
+  .hdr-auth{
+    position:relative; overflow:hidden;
+    display:inline-flex; align-items:center; gap:6px;
+    padding:6px 12px 6px 8px; border:none; border-radius:20px;
+    background:linear-gradient(120deg, var(--primary), var(--primary-dark));
+    color:#fff; font-family:inherit; font-size:11.5px; font-weight:800;
+    white-space:nowrap; cursor:pointer;
+    box-shadow:0 8px 18px -10px rgba(44,92,230,.9);
+    transition:transform .14s cubic-bezier(.22,1,.36,1), box-shadow .2s ease;
+  }
+  .hdr-auth:active{ transform:scale(.94); }
+  @media (hover:hover){ .hdr-auth:hover{ transform:translateY(-1px); box-shadow:0 12px 24px -10px rgba(44,92,230,1); } }
+  .hdr-auth-ic{
+    width:20px; height:20px; flex:0 0 auto; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    background:rgba(255,255,255,.22);
+  }
+  /* همان برق نورِ کارت اشتراک، تا دکمه‌ی حساب هم زنده دیده شود */
+  .hdr-auth::after{
+    content:''; position:absolute; inset:0; border-radius:inherit; pointer-events:none;
+    background-repeat:no-repeat; background-size:260% 100%;
+    background-image:linear-gradient(100deg,
+      transparent 38%, rgba(255,255,255,.45) 50%, transparent 62%);
+    animation:authShine 6s ease-in-out 2s infinite;
+  }
+  /* وقتی وارد شده، دکمه آرام و سبز می‌شود */
+  .hdr-auth.is-in{
+    background:var(--success-tint); color:var(--success);
+    box-shadow:none;
+  }
+  .hdr-auth.is-in .hdr-auth-ic{ background:rgba(24,160,107,.2); }
+  .hdr-auth.is-in::after{ animation:none; }
+  @media(max-width:480px){
+    .hdr-auth{ padding:6px 8px; gap:0; font-size:0; }
+    .hdr-auth .hdr-auth-ic{ width:22px; height:22px; }
+  }
 
   .offline-badge{
     display:none; align-items:center; gap:5px;
@@ -2395,6 +2512,16 @@
             <div id="alerts-list"></div>
           </div>
         </div>
+        <button class="icon-btn hdr-theme" id="btn-header-theme" aria-label="تغییر حالت روشن و تاریک" title="روشن / تاریک">
+          <svg class="hdr-ic-sun" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+          <svg class="hdr-ic-moon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
+        <button class="hdr-auth" id="btn-header-auth">
+          <span class="hdr-auth-ic">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.4"/><path d="M4.8 20v-1.2A4.6 4.6 0 0 1 9.4 14.2h5.2a4.6 4.6 0 0 1 4.6 4.6V20"/></svg>
+          </span>
+          <span id="hdr-auth-label">ورود به حساب</span>
+        </button>
         <button class="icon-btn" aria-label="تنظیمات" data-page="settings">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         </button>
@@ -2968,6 +3095,9 @@
         </div>
 
         <div class="panel last-scan-panel" id="last-scan-panel" style="display:none;">
+          <div class="scan-photo" id="last-scan-photo" style="display:none;">
+            <img alt="" id="last-scan-img">
+          </div>
           <div class="last-scan-text">
             <div class="last-scan-name" id="last-scan-name"></div>
             <div class="last-scan-price" id="last-scan-price"></div>
@@ -3754,6 +3884,23 @@
         <input class="form-input" id="in-product-min-stock" type="number" min="0" step="1" placeholder="مثلاً ۱۰">
       </div>
       <div class="form-group">
+        <label>عکس محصول (اختیاری)</label>
+        <div class="photo-pick" id="product-photo-pick">
+          <div class="photo-thumb" id="product-photo-thumb">
+            <img alt="" id="product-photo-img">
+            <span class="photo-empty">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"/><circle cx="8.5" cy="10" r="1.6"/><path d="M21 16l-5-5-9 8"/></svg>
+            </span>
+          </div>
+          <div class="photo-actions">
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-product-photo-pick">انتخاب عکس</button>
+            <button type="button" class="btn btn-secondary btn-sm danger-text" id="btn-product-photo-clear" style="display:none;">حذف عکس</button>
+            <p class="settings-hint" style="margin:0;">عکس پیش از ذخیره کوچک می‌شود تا برنامه سنگین نشود.</p>
+          </div>
+          <input type="file" accept="image/*" id="in-product-photo" hidden>
+        </div>
+      </div>
+      <div class="form-group">
         <label>توضیحات (اختیاری)</label>
         <textarea class="form-textarea" id="in-product-notes" placeholder="یادداشت اضافه…"></textarea>
       </div>
@@ -3818,6 +3965,7 @@
     </div>
 
     <div class="bulk-rows" id="bp-rows"></div>
+    <input type="file" accept="image/*" id="in-bp-photo" hidden>
 
     <button type="button" class="btn-add-row" id="btn-bp-add-row">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -4961,6 +5109,7 @@
       summaryEl.style.display = 'none';
     }
 
+    syncBottomBarHeight();
     // ردیف: تاریخ · توضیحات · برد یا رسید · مبلغ
     txList.innerHTML = visible.map(t=> `
       <div class="tx-item ${t.type}">
@@ -5172,7 +5321,7 @@
   });
 
 /* ---- شماره‌ی نسخه و گرفتن اجباری آخرین نسخه ---- */
-  const APP_BUILD = 'v11';
+  const APP_BUILD = 'v12';
   (function showBuild(){
     const el = document.getElementById('build-id');
     if(el) el.textContent = APP_BUILD;
@@ -5464,8 +5613,7 @@
     <div class="exp-row" data-row-id="${rid}">
       <div class="exp-row-main">
         <div class="exp-row-title">
-          <input class="form-input" type="text" placeholder="بابت چی؟ مثلاً نان" data-role="title" value="${escapeHtml(title)}">
-          <div class="field-error">بابت را بنویسید.</div>
+          <input class="form-input" type="text" placeholder="بابت چی؟ (اختیاری)" data-role="title" value="${escapeHtml(title)}">
         </div>
         <div class="exp-row-amount">
           <input class="form-input" type="number" min="1" step="1" placeholder="مبلغ" data-role="amount" value="${amount}">
@@ -5740,13 +5888,18 @@
       const titleEl = rowEl.querySelector('[data-role="title"]');
       const amtEl = rowEl.querySelector('[data-role="amount"]');
       const catEl = rowEl.querySelector('[data-role="category"]');
-      const title = titleEl.value.trim();
       const amount = parseFloat(amtEl.value);
       // دسته‌بندی خودِ ردیف؛ اگر خالی بود، همان دسته‌بندی بالای فرم
       const rowCategory = (catEl && catEl.value) ? catEl.value : category;
-      const valid = !!title && amount>0 && !!rowCategory;
+      /*
+       * «بابت چی؟» اختیاری است: خودِ دسته‌بندی می‌گوید مصرف برای چه بوده.
+       * اگر خالی بود، نام دسته‌بندی به‌جایش می‌نشیند تا فهرست مصارف
+       * ردیف بی‌عنوان نداشته باشد.
+       */
+      const title = titleEl.value.trim() || rowCategory;
+      const valid = amount>0 && !!rowCategory;
       rowEl.classList.toggle('error', !valid);
-      if(!valid && !firstInvalid) firstInvalid = titleEl.value.trim() ? amtEl : titleEl;
+      if(!valid && !firstInvalid) firstInvalid = amtEl;
       return {title, amount, valid, category: rowCategory};
     });
     if(firstInvalid){ firstInvalid.focus(); return; }
@@ -5996,6 +6149,7 @@
     document.getElementById('in-product-notes').value = '';
     ['fg-product-name','fg-product-category','fg-product-purchase-price','fg-product-sale-price'].forEach(clearFieldError);
     syncProductPriceLabels();
+    setProductPhotoPreview(null);
     openModal('modal-product');
   }
   /** بارکد ناشناس در فروش: پنجره‌ی محصول جدید با همان بارکد پر می‌شود. */
@@ -6024,6 +6178,7 @@
     document.getElementById('in-product-notes').value = p.notes || '';
     ['fg-product-name','fg-product-category','fg-product-purchase-price','fg-product-sale-price'].forEach(clearFieldError);
     syncProductPriceLabels();
+    setProductPhotoPreview(p.photo ? id : null);
     openModal('modal-product');
   }
   function askDeleteProduct(id){
@@ -6037,6 +6192,8 @@
       : `محصول «${p.name}» و سوابق ورود آن از انبار حذف خواهد شد.`;
     confirmAction = ()=>{
       logAudit('delete_product', id, `حذف محصول «${p.name}»`);
+      // عکسش هم برود، وگرنه بی‌صاحب در دیتابیس می‌ماند
+      if(p.photo) removeProductPhoto(id);
       products = products.filter(x=>x.id!==id);
       warehouseEntries = warehouseEntries.filter(w=>w.productId!==id);
       rebuildBarcodeIndex();
@@ -6086,7 +6243,9 @@
       const status = getStockStatus(p);
       return `
       <div class="exp-card">
-        <div class="exp-icon">${escapeHtml((p.name||'؟')[0])}</div>
+        ${p.photo
+          ? `<div class="prod-thumb"><img alt="" data-product-photo="${p.id}"></div>`
+          : `<div class="exp-icon">${escapeHtml((p.name||'؟')[0])}</div>`}
         <div class="exp-info">
           <div class="exp-title">${escapeHtml(p.name)}</div>
           <div class="exp-meta">
@@ -6109,6 +6268,7 @@
         </div>
       </div>`;
     }).join('');
+    hydrateProductPhotos(list);
   }
 
   // ---- Warehouse ----
@@ -6432,6 +6592,89 @@
     syncProductPriceLabels();
   });
 
+  /*
+   * عکس تا وقتی محصول ذخیره نشده در حافظه می‌ماند (چون هنوز شناسه‌ای
+   * ندارد) و هنگام ذخیره روی همان شناسه می‌نشیند.
+   */
+  let pendingProductPhoto = null;   // Blob یا null
+  let productPhotoCleared = false;  // کاربر عکس موجود را حذف کرده
+
+  function setProductPhotoPreview(productId){
+    pendingProductPhoto = null;
+    productPhotoCleared = false;
+    const img = document.getElementById('product-photo-img');
+    const clearBtn = document.getElementById('btn-product-photo-clear');
+    document.getElementById('in-product-photo').value = '';
+    img.removeAttribute('src');
+    img.classList.remove('has-photo');
+    clearBtn.style.display = 'none';
+    if(!productId) return;
+    photoUrl(productId).then(url=>{
+      if(!url) return;
+      img.src = url;
+      img.classList.add('has-photo');
+      clearBtn.style.display = '';
+    });
+  }
+
+  document.getElementById('btn-product-photo-pick').addEventListener('click', ()=>{
+    document.getElementById('in-product-photo').click();
+  });
+
+  document.getElementById('in-product-photo').addEventListener('change', async (e)=>{
+    const file = e.target.files && e.target.files[0];
+    if(!file) return;
+    try{
+      const blob = await compressImage(file);
+      pendingProductPhoto = blob;
+      productPhotoCleared = false;
+      const img = document.getElementById('product-photo-img');
+      const prev = img.dataset.tempUrl;
+      if(prev) { try{ URL.revokeObjectURL(prev); }catch(err){} }
+      const url = URL.createObjectURL(blob);
+      img.dataset.tempUrl = url;
+      img.src = url;
+      img.classList.add('has-photo');
+      document.getElementById('btn-product-photo-clear').style.display = '';
+    }catch(err){
+      showToast('این فایل باز نشد — عکس دیگری انتخاب کنید', 'danger');
+    }
+  });
+
+  document.getElementById('btn-product-photo-clear').addEventListener('click', ()=>{
+    pendingProductPhoto = null;
+    productPhotoCleared = true;
+    const img = document.getElementById('product-photo-img');
+    img.removeAttribute('src');
+    img.classList.remove('has-photo');
+    document.getElementById('in-product-photo').value = '';
+    document.getElementById('btn-product-photo-clear').style.display = 'none';
+  });
+
+  /** عکسِ در انتظار را روی محصول ذخیره‌شده می‌نشاند. */
+  async function commitProductPhoto(productId){
+    try{
+      if(pendingProductPhoto){
+        await photoPut(productId, pendingProductPhoto);
+        photoForget(productId);
+        const p = products.find(x=>x.id===productId);
+        if(p) p.photo = true;
+      } else if(productPhotoCleared){
+        await removeProductPhoto(productId);
+      } else {
+        return;   // چیزی عوض نشده
+      }
+      saveState();
+      renderProducts();
+      if(document.getElementById('quick-select-grid')) renderQuickSelectGrid();
+    }catch(e){
+      showToast('عکس ذخیره نشد، ولی بقیه‌ی اطلاعات محصول ثبت شد', 'danger');
+    } finally {
+      pendingProductPhoto = null;
+      productPhotoCleared = false;
+    }
+  }
+
   document.getElementById('form-product').addEventListener('submit', (e)=>{
     e.preventDefault();
     const nameEl = document.getElementById('in-product-name');
@@ -6476,19 +6719,24 @@
 
     const wholesalePrice = parseFloat(document.getElementById('in-product-wholesale-price').value) || 0;
 
+    let savedId;
     if(editingProductId){
       const p = products.find(x=>x.id===editingProductId);
       if(p.purchasePrice!==purchasePrice) logPriceChange(p.id, p.purchasePrice, purchasePrice);
       p.name=name; p.category=category; p.unit=unit; p.purchasePrice=purchasePrice; p.salePrice=salePrice; p.wholesalePrice=wholesalePrice; p.minStock=minStock; p.notes=notes; p.barcodes=barcodes;
+      savedId = p.id;
       showToast('با موفقیت ویرایش شد');
     } else {
-      products.push({id:uid(), name, category, unit, purchasePrice, salePrice, wholesalePrice, minStock, notes, barcodes, createdAt:Date.now()});
+      const fresh = {id:uid(), name, category, unit, purchasePrice, salePrice, wholesalePrice, minStock, notes, barcodes, createdAt:Date.now()};
+      products.push(fresh);
+      savedId = fresh.id;
       showToast('با موفقیت ثبت شد');
     }
     rebuildBarcodeIndex();
     saveState();
     closeModal('modal-product');
     renderProducts(); renderWarehouseList(); renderWarehouseDashboard();
+    commitProductPhoto(savedId);
   });
 
   document.getElementById('btn-add-product-barcode').addEventListener('click', addProductBarcodeFromInput);
@@ -6695,6 +6943,135 @@
      موجودی، قیمت و گزارش‌ها هیچ تغییری نمی‌کند.
      ========================================================== */
 
+
+  /* ==========================================================
+     عکس محصولات
+     ----------------------------------------------------------
+     عکس‌ها در localStorage ذخیره نمی‌شوند. آن‌جا هم جا کم است
+     (حدود ۵ مگابایت) و هم هر بار ذخیره‌ی اطلاعات، کلِ متن دوباره
+     نوشته می‌شود — یعنی با چند عکس، تمام برنامه کند می‌شد.
+     پس عکس‌ها در IndexedDB می‌نشینند و روی خودِ محصول فقط یک
+     نشانه (photo: true) می‌ماند. هر عکس هم قبل از ذخیره تا ۴۰۰
+     پیکسل کوچک و فشرده می‌شود، یعنی حدود ۲۰ کیلوبایت.
+     ========================================================== */
+  const PHOTO_DB = 'tohid-photos';
+  const PHOTO_STORE = 'products';
+  const PHOTO_MAX = 400;      // بزرگ‌ترین ضلع، به پیکسل
+  const PHOTO_QUALITY = 0.72;
+  let photoDbPromise = null;
+
+  function photoDb(){
+    if(photoDbPromise) return photoDbPromise;
+    photoDbPromise = new Promise((resolve, reject)=>{
+      let req;
+      try{ req = indexedDB.open(PHOTO_DB, 1); }
+      catch(e){ reject(e); return; }
+      req.onupgradeneeded = ()=>{
+        const db = req.result;
+        if(!db.objectStoreNames.contains(PHOTO_STORE)) db.createObjectStore(PHOTO_STORE);
+      };
+      req.onsuccess = ()=> resolve(req.result);
+      req.onerror = ()=> reject(req.error);
+    }).catch(e=>{ photoDbPromise = null; throw e; });
+    return photoDbPromise;
+  }
+
+  function photoTx(mode){
+    return photoDb().then(db=> db.transaction(PHOTO_STORE, mode).objectStore(PHOTO_STORE));
+  }
+  function photoPut(id, blob){
+    return photoTx('readwrite').then(store=> new Promise((res, rej)=>{
+      const r = store.put(blob, id);
+      r.onsuccess = ()=> res(true); r.onerror = ()=> rej(r.error);
+    }));
+  }
+  function photoGet(id){
+    return photoTx('readonly').then(store=> new Promise((res, rej)=>{
+      const r = store.get(id);
+      r.onsuccess = ()=> res(r.result || null); r.onerror = ()=> rej(r.error);
+    })).catch(()=> null);
+  }
+  function photoDelete(id){
+    return photoTx('readwrite').then(store=> new Promise((res)=>{
+      const r = store.delete(id);
+      r.onsuccess = r.onerror = ()=> res(true);
+    })).catch(()=>{});
+  }
+
+  /* آدرس‌های ساخته‌شده نگه داشته می‌شوند تا برای هر بار نمایش،
+     دوباره از دیتابیس خوانده و ساخته نشوند. */
+  const photoUrlCache = new Map();
+  function photoUrl(productId){
+    if(photoUrlCache.has(productId)) return Promise.resolve(photoUrlCache.get(productId));
+    return photoGet(productId).then(blob=>{
+      if(!blob){ photoUrlCache.set(productId, ''); return ''; }
+      const url = URL.createObjectURL(blob);
+      photoUrlCache.set(productId, url);
+      return url;
+    });
+  }
+  function photoForget(productId){
+    const url = photoUrlCache.get(productId);
+    if(url) { try{ URL.revokeObjectURL(url); }catch(e){} }
+    photoUrlCache.delete(productId);
+  }
+
+  /** فایل انتخابی را کوچک و فشرده می‌کند تا برنامه سنگین نشود. */
+  function compressImage(file){
+    return new Promise((resolve, reject)=>{
+      if(!file || !/^image\//.test(file.type)){ reject(new Error('فایل عکس نیست')); return; }
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = ()=>{
+        URL.revokeObjectURL(url);
+        const scale = Math.min(1, PHOTO_MAX / Math.max(img.width, img.height));
+        const w = Math.max(1, Math.round(img.width * scale));
+        const h = Math.max(1, Math.round(img.height * scale));
+        const cv = document.createElement('canvas');
+        cv.width = w; cv.height = h;
+        const ctx = cv.getContext('2d');
+        // پس‌زمینه‌ی سفید، چون JPEG شفافیت ندارد و PNG شفاف سیاه می‌شد
+        ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h);
+        ctx.drawImage(img, 0, 0, w, h);
+        cv.toBlob(b=> b ? resolve(b) : reject(new Error('فشرده‌سازی ناموفق بود')),
+                  'image/jpeg', PHOTO_QUALITY);
+      };
+      img.onerror = ()=>{ URL.revokeObjectURL(url); reject(new Error('عکس باز نشد')); };
+      img.src = url;
+    });
+  }
+
+  /** عکس محصول را می‌گیرد، فشرده می‌کند و ذخیره می‌کند. */
+  async function saveProductPhoto(productId, file){
+    const blob = await compressImage(file);
+    await photoPut(productId, blob);
+    photoForget(productId);
+    const p = products.find(x=>x.id===productId);
+    if(p) p.photo = true;
+    return blob;
+  }
+  async function removeProductPhoto(productId){
+    await photoDelete(productId);
+    photoForget(productId);
+    const p = products.find(x=>x.id===productId);
+    if(p) delete p.photo;
+  }
+
+  /** هر <img data-product-photo="id"> را پر می‌کند. بدون عکس، پنهان می‌شود. */
+  function hydrateProductPhotos(root){
+    const scope = root || document;
+    scope.querySelectorAll('[data-product-photo]').forEach(el=>{
+      const id = el.dataset.productPhoto;
+      if(el.dataset.photoDone === id) return;
+      el.dataset.photoDone = id;
+      photoUrl(id).then(url=>{
+        if(el.dataset.photoDone !== id) return;   // در این فاصله عوض شده
+        if(url){ el.src = url; el.classList.add('has-photo'); }
+        else { el.removeAttribute('src'); el.classList.remove('has-photo'); }
+      });
+    });
+  }
+
   /* ==========================================================
      محصول جدید — چند ردیف یک‌جا
      ----------------------------------------------------------
@@ -6721,6 +7098,9 @@
         <div class="bulk-row-head">
           <span class="bulk-row-no">${formatMoney(index+1)}</span>
           <input class="form-input" data-bp-name type="text" placeholder="نام محصول، مثلاً بیسکویت شکلاتی" value="${escapeHtml(row.name||'')}">
+          <button type="button" class="bulk-icon-btn${row.photo ? ' has-photo' : ''}" data-bp-photo aria-label="عکس محصول">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"/><circle cx="8.5" cy="10" r="1.6"/><path d="M21 16l-5-5-9 8"/></svg>
+          </button>
           <button type="button" class="bulk-icon-btn" data-bp-scan aria-label="اسکن بارکد">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3.5 8V5.5A2 2 0 0 1 5.5 3.5H8"/><path d="M16 3.5h2.5a2 2 0 0 1 2 2V8"/><path d="M20.5 16v2.5a2 2 0 0 1-2 2H16"/><path d="M8 20.5H5.5a2 2 0 0 1-2-2V16"/><path d="M3.5 12h17"/></svg>
           </button>
@@ -6802,6 +7182,7 @@
       key: ++bpKeySeq,
       name:'', purchase:'', sale:'', barcode:'', minStock:'',
       unit: productUnits[0] || 'عدد',
+      photo: null,          // Blobِ فشرده‌شده، تا موقع ذخیره
     }, prefill||{});
   }
 
@@ -6883,6 +7264,13 @@
       }
       return;
     }
+    if(e.target.closest('[data-bp-photo]')){
+      bpPhotoRowKey = row.key;
+      const inp = document.getElementById('in-bp-photo');
+      inp.value = '';
+      inp.click();
+      return;
+    }
     if(e.target.closest('[data-bp-scan]')){
       openQuickScan((code)=>{
         row.barcode = code;
@@ -6890,6 +7278,23 @@
         if(inp) inp.value = code;
         showToast('بارکد ثبت شد');
       });
+    }
+  });
+
+  /* عکسِ ردیف در حافظه می‌ماند و هنگام «ذخیره همه» روی محصول تازه می‌نشیند. */
+  let bpPhotoRowKey = null;
+  document.getElementById('in-bp-photo').addEventListener('change', async (e)=>{
+    const file = e.target.files && e.target.files[0];
+    const row = bpPhotoRowKey != null ? bpRowByKey(bpPhotoRowKey) : null;
+    bpPhotoRowKey = null;
+    if(!file || !row) return;
+    try{
+      row.photo = await compressImage(file);
+      const btn = bpRowEl(row.key)?.querySelector('[data-bp-photo]');
+      if(btn) btn.classList.add('has-photo');
+      showToast('عکس این ردیف انتخاب شد');
+    }catch(err){
+      showToast('این فایل باز نشد — عکس دیگری انتخاب کنید', 'danger');
     }
   });
 
@@ -6914,7 +7319,7 @@
         const barcode = (r.barcode||'').trim();
         // بارکد تکراری، محصول قبلی را خراب می‌کند؛ همان ردیف رد می‌شود
         if(barcode && barcodeIndex.has(barcode)){ skipped++; return; }
-        products.push({
+        const fresh = {
           id: uid(), name, category, unit: r.unit,
           purchasePrice: parseFloat(r.purchase),
           salePrice: parseFloat(r.sale),
@@ -6923,7 +7328,16 @@
           notes: '',
           barcodes: barcode ? [barcode] : [],
           createdAt: Date.now(),
-        });
+        };
+        if(r.photo){
+          fresh.photo = true;
+          // ذخیره‌ی عکس جدا از ذخیره‌ی اطلاعات است تا ثبت محصول را کند نکند
+          photoPut(fresh.id, r.photo).catch(()=>{
+            const p = products.find(x=>x.id===fresh.id);
+            if(p) delete p.photo;
+          });
+        }
+        products.push(fresh);
         rebuildBarcodeIndex();
         saved++;
       });
@@ -8143,7 +8557,27 @@
      */
     if(document.getElementById('quick-select-grid')) renderQuickSelectGrid();
     renderCartDebtorRow();
+    syncBottomBarHeight();
   }
+
+  /*
+   * سبد خرید به پایینِ صفحه چسبیده است، پس دکمه‌های شناور و آخرین
+   * ردیف صفحه باید به همان اندازه بالاتر بیایند. ارتفاع واقعی نوار
+   * اندازه گرفته می‌شود چون با آمدن قرض‌دار یا باز شدن اقلام عوض می‌شود.
+   */
+  function syncBottomBarHeight(){
+    requestAnimationFrame(()=>{
+      const active = document.querySelector('.page.active');
+      let h = 0;
+      if(active){
+        const bar = active.querySelector('.cart-drawer, .acc-add-bar');
+        if(bar && bar.offsetParent !== null) h = Math.round(bar.getBoundingClientRect().height);
+      }
+      document.documentElement.style.setProperty('--bottom-bar-h', h + 'px');
+    });
+  }
+  document.addEventListener('tohid:page-change', syncBottomBarHeight);
+  window.addEventListener('resize', syncBottomBarHeight);
 
   /* ==========================================================
      فروش نسیه از خود صفحه‌ی فروش / انتخاب محصول
@@ -8259,11 +8693,13 @@
       const qty = quickSelectQtyFor(p.id);
       return `
       <div class="quick-select-tile${qty>0?' has-qty':''}" data-qs-tile="${p.id}">
+        ${p.photo ? `<div class="qs-thumb on"><img alt="" data-product-photo="${p.id}"></div>` : ''}
         <div class="qs-name">${escapeHtml(p.name)}</div>
         <div class="qs-price">${formatMoney(p.salePrice)} افغانی</div>
         ${qty>0 ? `<div class="qs-qty-badge" data-qs-qty="${p.id}">${formatCartQtyFa(qty, p.unit)} در سبد</div>` : ''}
       </div>`;
     }).join('');
+    hydrateProductPhotos(grid);
   }
   function renderQuickSelect(){
     renderQuickSelectCategoryOptions();
@@ -8433,7 +8869,7 @@
   function initScanBeep(){
     if(scanBeepAudio) return;
     try{
-      scanBeepAudio = new Audio('sounds/scan-beep.mp3?v=11');
+      scanBeepAudio = new Audio('sounds/scan-beep.mp3?v=12');
       scanBeepAudio.preload = 'auto';
       scanBeepAudio.volume = 0.85;
     }catch(e){ scanBeepAudio = null; }
@@ -8479,10 +8915,24 @@
     panel.style.display = 'flex';
     const productId = barcodeIndex.get(code);
 
+    // عکس محصول، اگر داشته باشد
+    const photoBox = document.getElementById('last-scan-photo');
+    const photoImg = document.getElementById('last-scan-img');
+    photoBox.style.display = 'none';
+    photoImg.removeAttribute('src');
+
     if(productId){
       const p = products.find(x=>x.id===productId);
       panel.classList.remove('unknown');
       document.getElementById('last-scan-name').textContent = p.name;
+      if(p.photo){
+        photoUrl(p.id).then(url=>{
+          // ممکن است در این فاصله کالای دیگری اسکن شده باشد
+          if(!url || lastScannedProductId !== p.id) return;
+          photoImg.src = url;
+          photoBox.style.display = '';
+        });
+      }
       const stock = getProductStock(p.id);
       document.getElementById('last-scan-price').textContent = `${formatMoney(p.salePrice)} افغانی — موجودی: ${formatMoney(stock)} ${p.unit}`;
       document.getElementById('last-scan-stepper').style.display = 'flex';
@@ -9040,6 +9490,38 @@
     appSettings.theme = theme;
     saveSettings();
     applyTheme(theme);
+  });
+
+  /* دکمه‌ی روشن/تاریک روی سربرگ — همان تنظیمِ صفحه‌ی تنظیمات را عوض می‌کند */
+  document.getElementById('btn-header-theme').addEventListener('click', ()=>{
+    const next = (appSettings.theme === 'dark') ? 'light' : 'dark';
+    appSettings.theme = next;
+    saveSettings();
+    applyTheme(next);
+  });
+
+  /* دکمه‌ی حساب روی سربرگ */
+  function refreshHeaderAuth(){
+    const btn = document.getElementById('btn-header-auth');
+    const label = document.getElementById('hdr-auth-label');
+    if(!btn || !label) return;
+    const lic = window.TohidLicense;
+    const inAccount = !!(lic && lic.isLoggedIn && lic.isLoggedIn());
+    btn.classList.toggle('is-in', inAccount);
+    const name = (inAccount && lic.userLabel && lic.userLabel()) || '';
+    label.textContent = inAccount ? (name || 'حساب من') : 'ورود به حساب';
+    btn.setAttribute('aria-label', inAccount ? 'حساب کاربری' : 'ورود به حساب');
+  }
+  document.getElementById('btn-header-auth').addEventListener('click', ()=>{
+    const lic = window.TohidLicense;
+    if(lic && lic.open) lic.open();
+    else goTo('shop');
+  });
+  window.addEventListener('load', ()=>{
+    refreshHeaderAuth();
+    if(window.TohidLicense && window.TohidLicense.onChange){
+      window.TohidLicense.onChange(refreshHeaderAuth);
+    }
   });
 
   document.getElementById('motion-toggle').addEventListener('click', (e)=>{
@@ -9867,10 +10349,10 @@
 </script>
 
 <!-- لایه اشتراک و License — کاملاً افزودنی؛ منطق فروشگاه را تغییر نمی‌دهد -->
-<script src="license/license-client.js?v=11" defer></script>
-<script src="license/shop-sync.js?v=11" defer></script>
-<script src="license/shop-ui.js?v=11" defer></script>
-<script src="license/vip.js?v=11" defer></script>
+<script src="license/license-client.js?v=12" defer></script>
+<script src="license/shop-sync.js?v=12" defer></script>
+<script src="license/shop-ui.js?v=12" defer></script>
+<script src="license/vip.js?v=12" defer></script>
 
 </body>
 </html>

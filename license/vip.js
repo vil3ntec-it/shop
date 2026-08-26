@@ -151,9 +151,20 @@
     return 0;
   }
 
+  /** کلید حساب — از license-client می‌آید تا هر دو یکی باشند. */
+  function apiKey() {
+    try {
+      return (window.TohidLicense && window.TohidLicense.getApiKey)
+        ? window.TohidLicense.getApiKey() : '';
+    } catch { return ''; }
+  }
+
   function waUrl(number, text) {
     const digits = String(number).replace(/[^0-9]/g, '').replace(/^0/, '93');
-    return 'https://wa.me/' + digits + '?text=' + encodeURIComponent(text);
+    // کلید حساب همراه پیام می‌رود تا فروشنده بداند اشتراک را روی کدام حساب فعال کند
+    const key = apiKey();
+    const body = key ? text + '\n\nکلید حساب من: ' + key : text;
+    return 'https://wa.me/' + digits + '?text=' + encodeURIComponent(body);
   }
 
   function fallbackPlans() {
@@ -343,6 +354,14 @@
           <div class="vip-section-title">مدت اشتراک را انتخاب کنید</div>
           <div id="vip-plans" class="vip-plans"></div>
 
+          <button type="button" class="vip-gate" id="vip-login-gate" hidden>
+            <span class="vip-gate-ic">${ICON.lock}</span>
+            <span class="vip-gate-txt">
+              <b>برای خرید اشتراک اول وارد حساب شوید</b>
+              <i>کار رایگان با برنامه حساب نمی‌خواهد — فقط خرید اشتراک لازم دارد.</i>
+            </span>
+          </button>
+
           <a class="vip-cta" id="vip-cta" target="_blank" rel="noopener">
             <span class="vip-cta-ic">${ICON.gift}</span>
             <b>گرفتن اشتراک</b>
@@ -370,6 +389,20 @@
       </div>`;
     document.body.appendChild(modal);
     modal.querySelector('.vip-close').addEventListener('click', close);
+
+    // «اول وارد حساب شوید» → پنجره‌ی حساب باز شود
+    modal.querySelector('#vip-login-gate').addEventListener('click', () => {
+      close();
+      if (window.TohidLicense && window.TohidLicense.open) window.TohidLicense.open();
+    });
+    // تا وارد نشده، زدن روی دکمه‌ی خرید هم به همان‌جا می‌برد
+    modal.querySelector('#vip-cta').addEventListener('click', (e) => {
+      if (!loggedIn()) {
+        e.preventDefault();
+        close();
+        if (window.TohidLicense && window.TohidLicense.open) window.TohidLicense.open();
+      }
+    });
     modal.addEventListener('mousedown', e => { if (e.target === modal) close(); });
     return modal;
   }
@@ -492,8 +525,33 @@
         $('#vip-cta', box).href = url;
         $('#vip-cta b', box).textContent = 'گرفتن اشتراک ' + plan.title;
         if (loggedIn()) requestPlan(plan.code);
+        updateCtaGate();
       });
     });
+
+    updateCtaGate();
+  }
+
+  /*
+   * خرید اشتراک بدون حساب ممکن نیست: اشتراک باید روی یک حساب بنشیند،
+   * وگرنه با پاک شدن حافظه‌ی مرورگر پولِ کاربر از بین می‌رود. کارِ
+   * رایگان همچنان بدون حساب انجام می‌شود؛ این فقط جلوی خرید را می‌گیرد.
+   */
+  function updateCtaGate() {
+    const box = modal;
+    if (!box) return;
+    const cta = $('#vip-cta', box);
+    const gate = $('#vip-login-gate', box);
+    if (!cta || !gate) return;
+    if (loggedIn()) {
+      gate.hidden = true;
+      cta.classList.remove('vip-cta-locked');
+      cta.removeAttribute('aria-disabled');
+    } else {
+      gate.hidden = false;
+      cta.classList.add('vip-cta-locked');
+      cta.setAttribute('aria-disabled', 'true');
+    }
   }
 
   /** ثبت درخواست خرید روی سرور تا مدیر آن را در پنل ببیند. */

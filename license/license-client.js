@@ -100,6 +100,28 @@
     try { localStorage.setItem(SERVER_KEY, String(v || '').trim().replace(/\/+$/, '')); } catch {}
   }
 
+  /*
+   * کلید حساب — شناسه‌ای که فروشنده با آن می‌فهمد اشتراک را روی کدام
+   * حساب فعال کند. یک بار ساخته می‌شود و ثابت می‌ماند؛ اگر کاربر وارد
+   * حساب شده باشد به همان حساب گره می‌خورد. هیچ چیز محرمانه‌ای در آن
+   * نیست، فقط یک نشانی است.
+   */
+  const APIKEY_KEY = 'tohid-account-key-v1';
+  function getApiKey() {
+    let key = '';
+    try { key = localStorage.getItem(APIKEY_KEY) || ''; } catch {}
+    if (!/^TSH-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(key)) {
+      const abc = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // بدون I/O/0/1 تا اشتباه خوانده نشود
+      const bytes = new Uint8Array(12);
+      (self.crypto || window.crypto).getRandomValues(bytes);
+      const chunk = (i) => Array.from(bytes.slice(i, i + 4))
+        .map(b => abc[b % abc.length]).join('');
+      key = 'TSH-' + chunk(0) + '-' + chunk(4) + '-' + chunk(8);
+      try { localStorage.setItem(APIKEY_KEY, key); } catch {}
+    }
+    return key;
+  }
+
   /** شناسه‌ی پایدار دستگاه — یک بار ساخته و ذخیره می‌شود. */
   function getDeviceUid() {
     let uid = '';
@@ -703,10 +725,12 @@
             <div class="lic-status" id="lic-status"></div>
 
             <div class="lic-section">
-              <label class="lic-label">آدرس سرور</label>
-              <input type="text" id="lic-server" class="lic-input" dir="ltr"
-                     placeholder="http://192.168.0.102:4700">
-              <p class="lic-hint">آدرس سرور خانگی که اشتراک‌ها روی آن مدیریت می‌شود.</p>
+              <label class="lic-label">کلید حساب شما</label>
+              <div class="lic-apikey">
+                <code id="lic-apikey" dir="ltr">—</code>
+                <button type="button" class="lic-btn lic-btn-sm" id="lic-copy-key">کپی</button>
+              </div>
+              <p class="lic-hint">این کلید حساب شماست. هنگام خرید اشتراک، همین کلید همراه پیام واتساپ فرستاده می‌شود تا اشتراک روی حساب خودتان فعال شود.</p>
             </div>
 
             <div class="lic-section" id="lic-auth-section">
@@ -763,7 +787,19 @@
         });
       });
 
-      $('#lic-server', wrap).addEventListener('change', (e) => setServerUrl(e.target.value));
+      $('#lic-copy-key', wrap).addEventListener('click', async () => {
+        const key = getApiKey();
+        try {
+          await navigator.clipboard.writeText(key);
+          UI.msg('کلید حساب کپی شد', 'ok');
+        } catch {
+          // روی مرورگرهای قدیمی یا بدون https، دست‌کم انتخابش کن
+          const el = $('#lic-apikey', wrap);
+          const r = document.createRange(); r.selectNodeContents(el);
+          const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+          UI.msg('کلید انتخاب شد — با نگه‌داشتن انگشت آن را کپی کنید', 'warn');
+        }
+      });
       $('#lic-do-login', wrap).addEventListener('click', UI.doLogin);
       $('#lic-do-register', wrap).addEventListener('click', UI.doRegister);
       $('#lic-do-sync', wrap).addEventListener('click', UI.doSync);
@@ -791,7 +827,7 @@
     render() {
       const wrap = UI.ensure();
       const st = readStore();
-      $('#lic-server', wrap).value = getServerUrl();
+      $('#lic-apikey', wrap).textContent = getApiKey();
 
       const loggedIn = !!st.accessToken;
       $('#lic-auth-section', wrap).hidden = loggedIn;
@@ -841,7 +877,6 @@
       const btn = $('#lic-do-login', UI.el);
       UI.msg('');
       UI.guard(btn, async () => {
-        setServerUrl($('#lic-server', UI.el).value);
         const id = $('#lic-identifier', UI.el).value.trim();
         const pass = $('#lic-password', UI.el).value;
         if (!id || !pass) throw new Error('نام کاربری و رمز عبور را وارد کنید');
@@ -863,7 +898,6 @@
       const btn = $('#lic-do-register', UI.el);
       UI.msg('');
       UI.guard(btn, async () => {
-        setServerUrl($('#lic-server', UI.el).value);
         await register({
           name: $('#lic-reg-name', UI.el).value.trim(),
           email: $('#lic-reg-email', UI.el).value.trim() || undefined,
@@ -939,7 +973,9 @@
     hasFeature, onChange,
     open: (label) => UI.open(label),
     sync, activate, login, register, logout,
-    getServerUrl, setServerUrl, getDeviceUid,
+    getServerUrl, setServerUrl, getDeviceUid, getApiKey,
+    isLoggedIn: () => !!readStore().accessToken,
+    userLabel: () => readStore().userLabel || '',
     verifyLicense, evaluate: evaluateLocal,
     _clock: Clock,
   };
