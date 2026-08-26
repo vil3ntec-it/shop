@@ -136,15 +136,16 @@ object ApiClient {
         }
 
         private fun refreshToken(refresh: String): String? {
-            val body = json.encodeToString(RefreshRequest.serializer(), RefreshRequest(refresh))
-                .toRequestBody(JSON_MEDIA)
+            val body = ApiClient.json
+                .encodeToString(RefreshRequest.serializer(), RefreshRequest(refresh))
+                .toRequestBody(ApiClient.JSON_MEDIA)
             val req = Request.Builder().url("${base}api/auth/refresh").post(body).build()
             bare.newCall(req).execute().use { res ->
                 if (!res.isSuccessful) return null
                 val text = res.body?.string().orEmpty()
                 if (text.isBlank()) return null
                 return runCatching {
-                    json.decodeFromString(RefreshResponse.serializer(), text).accessToken
+                    ApiClient.json.decodeFromString(RefreshResponse.serializer(), text).accessToken
                 }.getOrNull()
             }
         }
