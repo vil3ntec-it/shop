@@ -222,7 +222,38 @@
   border-color:var(--primary,#2c5ce6); border-width:2px;
   background:var(--primary-tint,#eaf0ff);
 }
-.vip-plan-badge{ border-color:var(--warning,#e8a13a); }
+.vip-plan-badge{ border-color:var(--warning,#e8a13a); overflow:hidden; }
+/* برق نور روی همان کارتی که پیشنهاد می‌شود، تا چشم را بگیرد */
+.vip-plan-badge::after{
+  content:''; position:absolute; top:0; bottom:0; width:45%;
+  inset-inline-start:-50%;
+  background:linear-gradient(100deg, transparent, rgba(255,255,255,.6), transparent);
+  transform:skewX(-16deg); pointer-events:none;
+  animation:vip-shine 4.2s ease-in-out 1s infinite;
+}
+.vip-cta{ position:relative; overflow:hidden; }
+.vip-cta::after{
+  content:''; position:absolute; top:0; bottom:0; width:40%;
+  inset-inline-start:-45%;
+  background:linear-gradient(100deg, transparent, rgba(255,255,255,.35), transparent);
+  transform:skewX(-16deg); pointer-events:none;
+  animation:vip-shine 5s ease-in-out 1.6s infinite;
+}
+.vip-crown{ animation:vip-crown-float 3.6s ease-in-out infinite; }
+@keyframes vip-crown-float{
+  0%,100%{ transform:translateY(0); }
+  50%    { transform:translateY(-4px); }
+}
+@keyframes vip-shine{
+  0%   { inset-inline-start:-50%; opacity:0; }
+  10%  { opacity:1; }
+  35%  { inset-inline-start:120%; opacity:0; }
+  100% { inset-inline-start:120%; opacity:0; }
+}
+@media (prefers-reduced-motion:reduce){
+  .vip-plan-badge::after, .vip-cta::after{ animation:none; opacity:0; }
+  .vip-crown{ animation:none; }
+}
 .vip-tag{
   position:absolute; top:-9px; inset-inline-start:50%; transform:translateX(50%);
   padding:2px 9px; border-radius:20px; white-space:nowrap;

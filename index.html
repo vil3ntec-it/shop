@@ -9,7 +9,7 @@
   مبتنی بر مراحل قبلی (UI، قرض‌داران، مصارف) — بدون بازسازی از صفر.
 -->
 <!DOCTYPE html>
-<html lang="fa" dir="rtl">
+<html lang="fa" dir="rtl" data-motion="full">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -34,9 +34,9 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
-<link rel="stylesheet" href="license/license-ui.css?v=10">
-<link rel="stylesheet" href="license/shop-ui.css?v=10">
-<link rel="stylesheet" href="license/vip.css?v=10">
+<link rel="stylesheet" href="license/license-ui.css?v=11">
+<link rel="stylesheet" href="license/shop-ui.css?v=11">
+<link rel="stylesheet" href="license/vip.css?v=11">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <!-- فونت به‌صورت غیرمسدودکننده بارگذاری می‌شود تا نبودِ اینترنت باز شدن برنامه را کند نکند -->
@@ -413,16 +413,20 @@
   }
 
   /* ---------- Floating action button ---------- */
+  /* هر دو دکمه‌ی شناور روی لبه‌ی صفحه‌اند و نیمی از دایره بیرون می‌ماند،
+     تا جلوی محتوا و دکمه‌های پایین صفحه را نگیرند. تمام نیمه‌ی دیده‌شده
+     قابل زدن است. منوی «افزودن» با حاشیه برمی‌گردد داخل صفحه. */
   .fab-wrap{
     position:fixed;
     bottom:calc(var(--bottomnav-h) + 16px);
-    inset-inline-start:18px;
+    inset-inline-start:-27px;
     z-index:40;
     display:flex;
     flex-direction:column-reverse;
     align-items:flex-start;
     gap:10px;
   }
+  .fab-wrap .fab-menu{ margin-inline-start:36px; }
   @media(min-width:769px){
     .fab-wrap{bottom:24px;}
   }
@@ -471,15 +475,16 @@
      به لبه‌ی مقابل می‌رود تا دو دکمه روی هم نیفتند و جلوی دست نباشند. */
   .sale-fab-wrap{
     position:fixed;
-    bottom:calc(var(--bottomnav-h) + 16px);
-    inset-inline-end:18px;
+    /* درست بالای دکمه‌ی آبی، روی همان لبه و به همان اندازه بیرون */
+    bottom:calc(var(--bottomnav-h) + 80px);
+    inset-inline-start:-27px;
     /* بالاتر از سبد خرید چسبیده به پایین، وگرنه پشت آن پنهان می‌شود */
     z-index:46;
     display:none;
-    flex-direction:column; align-items:center; gap:6px;
+    flex-direction:column; align-items:flex-start;
   }
   .sale-fab-wrap.show{ display:flex; }
-  @media(min-width:769px){ .sale-fab-wrap{bottom:24px;} }
+  @media(min-width:769px){ .sale-fab-wrap{bottom:88px;} }
   .sale-fab{
     width:54px; height:54px; border-radius:50%; border:none;
     background:linear-gradient(160deg, var(--success), #35c8c0);
@@ -613,7 +618,9 @@
   }
   @media (min-width:820px){ .debtor-card{border-radius:var(--radius-lg); padding:30px 10px 34px;} }
   .debtor-card:hover{box-shadow:var(--shadow-md); transform:translateY(-1px);}
-  .debtor-card.is-settled{background:var(--success-tint); border-color:var(--success);}
+  /* قرمز = بدهکار است. سبز = یا موجودی دارد یا حسابش صاف است. */
+  .debtor-card.is-settled,
+  .debtor-card.is-credit{background:var(--success-tint); border-color:var(--success);}
   .debtor-card-close{
     position:absolute; top:3px; inset-inline-start:3px;
     width:16px; height:16px; border-radius:5px;
@@ -651,10 +658,8 @@
   @media (min-width:820px){ .debtor-side{margin-top:12px; gap:4px;} }
   .debtor-amount{font-size:14px; font-weight:800; color:var(--danger); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;}
   @media (min-width:820px){ .debtor-amount{font-size:20px;} }
-  .debtor-amount.settled{color:var(--success); font-weight:700;}
-  /* پول اضافه‌ی طرف — سبز، ولی با متن «موجودی» تا با تسویه اشتباه نشود */
-  .debtor-amount.credit{color:var(--success); font-size:12.5px;}
-  @media (min-width:820px){ .debtor-amount.credit{font-size:15px;} }
+  /* حالت حساب را رنگِ خودِ کارت می‌گوید، پس متن اضافه لازم نیست */
+  .debtor-amount.settled, .debtor-amount.credit{color:var(--success);}
   .debtor-meta{
     font-size:10.5px; font-weight:700; color:var(--muted); margin-top:2px;
     display:flex; gap:6px; flex-wrap:wrap; justify-content:center;
@@ -929,15 +934,15 @@
   /* ==========================================================
      صفحه‌ی ورود
      ---------------------------------------------------------- */
-  .auth-brand{text-align:center; margin-bottom:24px;}
+  .auth-brand{text-align:center; margin-bottom:18px;}
   .auth-brand-mark{
-    width:70px; height:70px; margin:0 auto 16px;
+    width:58px; height:58px; margin:0 auto 12px;
     display:flex; align-items:center; justify-content:center;
     border-radius:22px; color:#fff;
     background:linear-gradient(150deg, var(--primary), var(--primary-dark));
     box-shadow:0 14px 30px -12px rgba(44,92,230,.75);
   }
-  .auth-brand h1{font-size:24px; font-weight:800; color:var(--text); margin-bottom:7px;}
+  .auth-brand h1{font-size:21px; font-weight:800; color:var(--text); margin-bottom:5px;}
   .auth-brand p{font-size:12.5px; color:var(--muted); line-height:1.8;}
 
   .auth-section-label{font-size:12px; font-weight:800; color:var(--text); margin-bottom:9px;}
@@ -1220,6 +1225,88 @@
     padding:4px 10px; border-radius:999px; margin-top:4px;
   }
   /* دو کارت عمل — کل کارت هدف لمس است، نه فقط آیکون */
+  /* ---------- حساب قرض‌دار: سه سربرگ ---------- */
+  .acc-tools{display:flex; gap:6px; justify-content:flex-end; margin:-4px 0 8px;}
+  .acc-stats{
+    display:grid; grid-template-columns:repeat(3, 1fr); gap:9px;
+    margin-bottom:16px;
+  }
+  .acc-stat{
+    display:flex; flex-direction:column; align-items:center; gap:2px;
+    padding:13px 6px; border-radius:var(--radius-lg);
+    border:1px solid var(--border); background:var(--bg);
+    text-align:center; min-width:0;
+    animation:cardIn .34s cubic-bezier(.2,.8,.2,1) both;
+  }
+  .acc-stat:nth-child(2){animation-delay:.05s;}
+  .acc-stat:nth-child(3){animation-delay:.1s;}
+  .acc-stat i{font-style:normal; font-size:10.5px; font-weight:700; color:var(--muted);}
+  .acc-stat b{
+    font-size:16px; font-weight:800; color:var(--text);
+    direction:rtl; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    max-width:100%;
+  }
+  .acc-stat u{text-decoration:none; font-size:9.5px; font-weight:700; color:var(--muted-2);}
+  .acc-stat.give{border-color:rgba(229,75,75,.3); background:var(--danger-tint);}
+  .acc-stat.give b{color:var(--danger);}
+  .acc-stat.recv{border-color:rgba(24,160,107,.3); background:var(--success-tint);}
+  .acc-stat.recv b{color:var(--success);}
+  .acc-stat.bal{border-color:rgba(229,75,75,.45);}
+  .acc-stat.bal b{color:var(--danger);}
+  .acc-stat.bal.credit{border-color:rgba(24,160,107,.45);}
+  .acc-stat.bal.credit b, .acc-stat.bal.credit u{color:var(--success);}
+  .acc-stat.bal.settled{border-color:rgba(24,160,107,.45);}
+  .acc-stat.bal.settled b{color:var(--success); font-size:14px;}
+  @media(max-width:359px){
+    .acc-stat b{font-size:14px;}
+    .acc-stat{padding:11px 4px;}
+  }
+
+  /* ---------- نوار «ثبت تراکنش جدید» ---------- */
+  .acc-add-bar{
+    display:flex; align-items:center; gap:11px; width:100%;
+    margin-top:14px; padding:13px 14px;
+    border-radius:var(--radius-lg);
+    border:1.5px solid var(--primary);
+    background:linear-gradient(120deg, var(--primary-tint), var(--bg) 70%);
+    font-family:inherit; text-align:start; cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+    transition:transform .14s cubic-bezier(.22,1,.36,1), box-shadow .2s ease;
+  }
+  .acc-add-bar:active{transform:scale(.985);}
+  @media (hover:hover){ .acc-add-bar:hover{box-shadow:var(--shadow-md); transform:translateY(-1px);} }
+  .acc-add-ic{
+    width:38px; height:38px; flex:0 0 auto; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    background:linear-gradient(150deg, var(--primary), var(--primary-dark)); color:#fff;
+  }
+  .acc-add-txt{display:flex; flex-direction:column; gap:2px; min-width:0;}
+  .acc-add-txt b{font-size:13.5px; font-weight:800; color:var(--text);}
+  .acc-add-txt i{font-style:normal; font-size:10.5px; font-weight:600; color:var(--muted);}
+
+  /* ---------- کلید برد / رسید داخل پنجره ---------- */
+  .tx-type-toggle{
+    display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:16px;
+  }
+  .tx-type-opt{
+    display:flex; align-items:center; justify-content:center; gap:8px;
+    padding:11px 8px; border-radius:var(--radius-md);
+    border:1.5px solid var(--border); background:var(--bg);
+    font-family:inherit; cursor:pointer; color:var(--muted);
+    transition:border-color .18s ease, background-color .18s ease,
+               color .18s ease, transform .12s cubic-bezier(.22,1,.36,1);
+  }
+  .tx-type-opt:active{transform:scale(.97);}
+  .tx-type-opt span{display:flex; flex-direction:column; align-items:flex-start; gap:1px;}
+  .tx-type-opt b{font-size:13px; font-weight:800;}
+  .tx-type-opt i{font-style:normal; font-size:9.5px; font-weight:600; opacity:.85;}
+  .tx-type-opt.give.active{
+    border-color:var(--danger); background:var(--danger-tint); color:var(--danger);
+  }
+  .tx-type-opt.recv.active{
+    border-color:var(--success); background:var(--success-tint); color:var(--success);
+  }
+
   .account-actions{display:grid; grid-template-columns:1fr 1fr; gap:11px; margin-bottom:20px;}
   .account-btn{
     display:flex; flex-direction:column; align-items:center; justify-content:center; gap:7px;
@@ -1269,6 +1356,33 @@
   }
   .tx-ic svg{width:13px; height:13px;}
   .tx-line{display:flex; align-items:baseline; gap:7px;}
+  /* چیدمان ردیف: تاریخ · توضیحات · برد/رسید · مبلغ */
+  .tx-date-col{
+    flex:0 0 auto; font-size:10.5px; font-weight:700; color:var(--muted);
+    white-space:nowrap; letter-spacing:.2px;
+  }
+  .tx-note-col{
+    flex:1; min-width:0; font-size:12px; color:var(--text);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .tx-note-col.empty{color:var(--muted-2);}
+  .tx-kind{
+    flex:0 0 auto; font-size:10.5px; font-weight:800;
+    padding:2px 8px; border-radius:999px; white-space:nowrap;
+  }
+  .tx-item.give .tx-kind{background:var(--danger-tint); color:var(--danger);}
+  .tx-item.receive .tx-kind{background:var(--success-tint); color:var(--success);}
+  .tx-money{
+    flex:0 0 auto; font-size:13px; font-weight:800; white-space:nowrap;
+    min-width:74px; text-align:end;
+  }
+  .tx-item.give .tx-money{color:var(--danger);}
+  .tx-item.receive .tx-money{color:var(--success);}
+  @media(max-width:400px){
+    .tx-date-col{font-size:9.5px;}
+    .tx-note-col{font-size:11px;}
+    .tx-money{font-size:12px; min-width:64px;}
+  }
   .tx-item.give .tx-ic{background:var(--danger-tint); color:var(--danger);}
   .tx-item.receive .tx-ic{background:var(--success-tint); color:var(--success);}
   .tx-main{flex:1; min-width:0;}
@@ -1376,20 +1490,30 @@
     background:var(--surface);
   }
   .exp-row .form-input{margin:0; background:var(--bg);}
-  .exp-row-main{display:flex; gap:8px; min-width:0;}
-  .exp-row-title{flex:2; min-width:0;}
-  .exp-row-amount{flex:1.1; min-width:0;}
-  .exp-row-cat{max-width:190px; min-width:0;}
-  .exp-row-cat .form-input{font-size:12px; min-height:36px;}
+  /* «بابت چی؟» و «مبلغ» بزرگ‌اند؛ دسته‌بندی فقط به اندازه‌ی طولانی‌ترین
+     نام دسته جا می‌گیرد («حمل‌ونقل») و بیشتر از آن پهن نمی‌شود. */
+  .exp-row-main{display:flex; gap:9px; min-width:0; flex:1;}
+  .exp-row-title{flex:2.4; min-width:0;}
+  .exp-row-amount{flex:1.2; min-width:0;}
+  .exp-row-title .form-input, .exp-row-amount .form-input{
+    font-size:14px; min-height:46px; font-weight:600;
+  }
+  .exp-row-cat{flex:0 0 auto; width:104px; max-width:104px; min-width:0;}
+  .exp-row-cat .form-input{
+    font-size:11px; min-height:46px;
+    padding-inline-start:8px; padding-inline-end:22px;
+    background-position:left 6px center;
+  }
   .exp-row-remove{
     position:absolute; top:8px; inset-inline-end:6px;
     width:28px; height:28px; margin:0;
   }
+  /* ردیف همیشه دو طبقه می‌ماند: «بابت چی؟» و «مبلغ» تمام پهنا را
+     می‌گیرند و دسته‌بندیِ کوچک زیرشان می‌نشیند. قبلاً روی تبلت هر سه
+     در یک خط بودند و دو کادر اصلی له می‌شدند. */
   @media (min-width:640px){
-    .exp-row{flex-direction:row; align-items:center; padding:10px 44px 10px 10px;}
-    .exp-row-main{flex:1;}
-    .exp-row-cat{flex:0 0 170px; max-width:170px;}
-    .exp-row-remove{top:50%; transform:translateY(-50%);}
+    .exp-row{padding:12px 46px 12px 12px;}
+    .exp-row-title .form-input, .exp-row-amount .form-input{min-height:50px; font-size:15px;}
   }
   .exp-row-remove{
     flex-shrink:0; width:38px; height:38px; margin-top:1px;
@@ -1683,8 +1807,10 @@
   ========================================================== */
   .auth-screen{
     position:fixed; inset:0; z-index:200;
-    display:flex; align-items:center; justify-content:center;
-    padding:20px;
+    /* از بالای صفحه شروع می‌شود تا روی گوشی بدون اسکرول دیده شود */
+    display:flex; align-items:flex-start; justify-content:flex-start;
+    padding:18px;
+    overflow-y:auto;
     background:
       radial-gradient(1200px 600px at 15% -10%, var(--primary-tint), transparent 60%),
       radial-gradient(900px 500px at 110% 110%, var(--success-tint), transparent 55%),
@@ -1725,8 +1851,33 @@
     position:relative; width:100%; max-width:380px;
     background:var(--bg); border:1px solid var(--border);
     border-radius:var(--radius-lg); box-shadow:var(--shadow-md);
-    padding:32px 26px 26px;
+    padding:22px 22px 20px;
     animation:authCardIn .6s cubic-bezier(.2,.8,.2,1) both;
+    overflow:hidden;
+  }
+  @media(min-width:769px){
+    /* روی صفحه‌های بزرگ وسط بماند، آن‌جا جای کافی هست */
+    .auth-screen{align-items:center; justify-content:center; padding:24px;}
+    .auth-card{padding:32px 26px 26px;}
+  }
+  /* برق نور، مثل کارت اشتراک */
+  .auth-card::after{
+    content:''; position:absolute; top:0; bottom:0; width:38%;
+    inset-inline-start:-45%;
+    background:linear-gradient(100deg, transparent, rgba(255,255,255,.55), transparent);
+    transform:skewX(-16deg);
+    animation:authShine 5.5s ease-in-out 1.1s infinite;
+    pointer-events:none;
+  }
+  @keyframes authShine{
+    0%   { inset-inline-start:-45%; opacity:0; }
+    12%  { opacity:1; }
+    38%  { inset-inline-start:115%; opacity:0; }
+    100% { inset-inline-start:115%; opacity:0; }
+  }
+  :root[data-theme="dark"] .auth-card::after,
+  html.dark .auth-card::after{
+    background:linear-gradient(100deg, transparent, rgba(255,255,255,.12), transparent);
   }
   @keyframes authCardIn{
     from{ opacity:0; transform:translateY(28px) scale(.96); }
@@ -2065,18 +2216,51 @@
   @keyframes rowIn{
     from{ opacity:0; transform:translateY(8px); } to{ opacity:1; transform:translateY(0); }
   }
-  .exp-list > .exp-row, .cart-list > *, .alert-item{
+  .exp-list > .exp-row, .cart-list > *, .alert-item,
+  .page.active .debtor-list > .debtor-card,
+  .page.active .quick-select-grid > .quick-select-tile,
+  .page.active .tx-list > .tx-item,
+  .page.active .product-list > *,
+  .modal-scrim.open .bulk-rows > .bulk-row{
     animation:rowIn .3s ease both;
   }
+  /* تاخیر پلکانی تا ده ردیف؛ از آن به بعد همه با هم می‌آیند */
+  .page.active .debtor-list > .debtor-card:nth-child(1),
+  .page.active .quick-select-grid > .quick-select-tile:nth-child(1),
+  .page.active .tx-list > .tx-item:nth-child(1){ animation-delay:.02s; }
+  .page.active .debtor-list > .debtor-card:nth-child(2),
+  .page.active .quick-select-grid > .quick-select-tile:nth-child(2),
+  .page.active .tx-list > .tx-item:nth-child(2){ animation-delay:.05s; }
+  .page.active .debtor-list > .debtor-card:nth-child(3),
+  .page.active .quick-select-grid > .quick-select-tile:nth-child(3),
+  .page.active .tx-list > .tx-item:nth-child(3){ animation-delay:.08s; }
+  .page.active .debtor-list > .debtor-card:nth-child(4),
+  .page.active .quick-select-grid > .quick-select-tile:nth-child(4),
+  .page.active .tx-list > .tx-item:nth-child(4){ animation-delay:.11s; }
+  .page.active .debtor-list > .debtor-card:nth-child(5),
+  .page.active .quick-select-grid > .quick-select-tile:nth-child(5),
+  .page.active .tx-list > .tx-item:nth-child(5){ animation-delay:.14s; }
+  .page.active .debtor-list > .debtor-card:nth-child(6),
+  .page.active .quick-select-grid > .quick-select-tile:nth-child(6),
+  .page.active .tx-list > .tx-item:nth-child(6){ animation-delay:.17s; }
+  .page.active .debtor-list > .debtor-card:nth-child(7),
+  .page.active .quick-select-grid > .quick-select-tile:nth-child(7),
+  .page.active .tx-list > .tx-item:nth-child(7){ animation-delay:.2s; }
+  .page.active .debtor-list > .debtor-card:nth-child(8),
+  .page.active .quick-select-grid > .quick-select-tile:nth-child(8),
+  .page.active .tx-list > .tx-item:nth-child(8){ animation-delay:.23s; }
   .exp-list > .exp-row:nth-child(1), .cart-list > *:nth-child(1), .alert-item:nth-child(1){ animation-delay:.02s; }
   .exp-list > .exp-row:nth-child(2), .cart-list > *:nth-child(2), .alert-item:nth-child(2){ animation-delay:.05s; }
   .exp-list > .exp-row:nth-child(3), .cart-list > *:nth-child(3), .alert-item:nth-child(3){ animation-delay:.08s; }
   .exp-list > .exp-row:nth-child(4), .cart-list > *:nth-child(4), .alert-item:nth-child(4){ animation-delay:.11s; }
   .exp-list > .exp-row:nth-child(5), .cart-list > *:nth-child(5), .alert-item:nth-child(5){ animation-delay:.14s; }
 
-  /* احترام به تنظیم «کاهش حرکت» گوشی */
+  /* احترام به تنظیم «کاهش حرکت» گوشی — مگر کاربر در تنظیمات
+     برنامه خودش گفته باشد انیمیشن‌ها همیشه روشن باشند. */
   @media (prefers-reduced-motion:reduce){
-    *, *::before, *::after{
+    html:not([data-motion="full"]) *,
+    html:not([data-motion="full"]) *::before,
+    html:not([data-motion="full"]) *::after{
       animation-duration:.001ms !important; animation-iteration-count:1 !important;
       transition-duration:.001ms !important; scroll-behavior:auto !important;
     }
@@ -2467,38 +2651,32 @@
           بازگشت به قرض‌داران
         </a>
 
-        <!-- سربرگ حساب: نام، وضعیت و مبلغ — همیشه بالای صفحه می‌ماند -->
-        <div class="acc-bar" id="acc-bar">
-          <span class="acc-bar-avatar" id="acc-avatar">—</span>
-          <span class="acc-bar-id">
-            <b id="acc-name">—</b>
-            <i id="acc-phone">—</i>
-          </span>
-          <span class="acc-bar-money">
-            <b id="acc-amount">۰</b>
-            <i id="acc-state">افغانی</i>
-          </span>
-          <span class="acc-bar-actions">
-            <button class="icon-btn-sm" id="btn-edit-account-debtor" aria-label="ویرایش">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
-            </button>
-            <button class="icon-btn-sm danger" id="btn-del-account-debtor" aria-label="حذف">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
-            </button>
-          </span>
+        <div class="acc-tools">
+          <button class="icon-btn-sm" id="btn-edit-account-debtor" aria-label="ویرایش قرض‌دار">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+          </button>
+          <button class="icon-btn-sm danger" id="btn-del-account-debtor" aria-label="حذف قرض‌دار">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+          </button>
         </div>
 
-        <div class="account-actions">
-          <button type="button" class="account-btn give" id="btn-tx-give">
-            <span class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg></span>
-            <span class="account-btn-title">ثبت برد</span>
-            <span class="account-btn-sub">افزایش بدهی</span>
-          </button>
-          <button type="button" class="account-btn receive" id="btn-tx-receive">
-            <span class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M19 12l-7 7-7-7"/></svg></span>
-            <span class="account-btn-title">ثبت رسید</span>
-            <span class="account-btn-sub">کاهش بدهی</span>
-          </button>
+        <!-- سه سربرگ حساب: کل برد، کل رسید و الباقی -->
+        <div class="acc-stats" id="acc-stats">
+          <div class="acc-stat give">
+            <i>کل برد</i>
+            <b id="acc-sum-give">۰</b>
+            <u>افغانی</u>
+          </div>
+          <div class="acc-stat recv">
+            <i>کل رسید</i>
+            <b id="acc-sum-recv">۰</b>
+            <u>افغانی</u>
+          </div>
+          <div class="acc-stat bal" id="acc-stat-bal">
+            <i>الباقی</i>
+            <b id="acc-amount">۰</b>
+            <u id="acc-state">افغانی</u>
+          </div>
         </div>
 
         <div class="panel">
@@ -2522,6 +2700,17 @@
             <div class="empty-sub">با ثبت برد یا رسید، تاریخچه این حساب اینجا نمایش داده می‌شود.</div>
           </div>
         </div>
+
+        <!-- نوار ثبت: یک دکمه، و نوعِ تراکنش داخل خودِ پنجره عوض می‌شود -->
+        <button type="button" class="acc-add-bar" id="btn-acc-add-tx">
+          <span class="acc-add-ic">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </span>
+          <span class="acc-add-txt">
+            <b>ثبت تراکنش جدید</b>
+            <i>مبلغ را بنویسید و برد یا رسید را انتخاب کنید</i>
+          </span>
+        </button>
       </section>
 
       <!-- WAREHOUSE -->
@@ -3260,6 +3449,18 @@
               تاریک
             </button>
           </div>
+
+          <p class="settings-hint" style="margin-top:14px;">اگر در تنظیمات گوشی «کاهش حرکت» یا حالت ذخیره‌ی باتری روشن باشد، برنامه انیمیشن‌ها را خاموش می‌کند. با این کلید می‌توانید همیشه روشن نگهشان دارید.</p>
+          <div class="theme-toggle" id="motion-toggle" style="margin-top:8px;">
+            <button type="button" class="theme-toggle-btn" data-motion-choice="full">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4.5 13.5H11l-1 8.5 8.5-11.5H12l1-8.5z"/></svg>
+              انیمیشن روشن
+            </button>
+            <button type="button" class="theme-toggle-btn" data-motion-choice="auto">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3.5a8.5 8.5 0 1 1 0 17 8.5 8.5 0 0 1 0-17z"/><path d="M12 8v4.5l3 1.8"/></svg>
+              مثل تنظیم گوشی
+            </button>
+          </div>
         </div>
 
         <!-- Store info -->
@@ -3441,7 +3642,16 @@
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
-    <span class="tx-type-badge" id="tx-type-badge">برد</span>
+    <div class="tx-type-toggle" id="tx-type-toggle">
+      <button type="button" class="tx-type-opt give active" data-tx-type="give">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg>
+        <span><b>برد</b><i>افزایش بدهی</i></span>
+      </button>
+      <button type="button" class="tx-type-opt recv" data-tx-type="receive">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M19 12l-7 7-7-7"/></svg>
+        <span><b>رسید</b><i>کاهش بدهی</i></span>
+      </button>
+    </div>
     <form id="form-tx">
       <div class="form-group" id="fg-tx-amount">
         <label for="in-tx-amount">مبلغ</label>
@@ -3587,6 +3797,41 @@
         <span class="btn-spin" aria-hidden="true"></span>
       </button>
       <button type="button" class="btn btn-secondary" data-close-modal="modal-bulk-stock">انصراف</button>
+    </div>
+  </div>
+</div>
+
+<!-- چند محصول یک‌جا (همان چیدمان «ورود کالا به انبار») -->
+<div class="modal-scrim" id="modal-bulk-product">
+  <div class="modal-box bulk-box">
+    <div class="sheet-grip" aria-hidden="true"></div>
+    <div class="modal-head">
+      <h3>محصول جدید</h3>
+      <button class="modal-close" data-close-modal="modal-bulk-product" aria-label="بستن">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+
+    <div class="bulk-topbar">
+      <label for="in-bp-category">دسته‌بندی همه‌ی ردیف‌ها</label>
+      <select class="form-input" id="in-bp-category"></select>
+    </div>
+
+    <div class="bulk-rows" id="bp-rows"></div>
+
+    <button type="button" class="btn-add-row" id="btn-bp-add-row">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      افزودن ردیف
+    </button>
+
+    <div class="bulk-summary" id="bp-summary"></div>
+
+    <div class="modal-actions">
+      <button type="button" class="btn btn-primary btn-submit" id="btn-bp-save">
+        <span class="btn-label">ذخیره همه</span>
+        <span class="btn-spin" aria-hidden="true"></span>
+      </button>
+      <button type="button" class="btn btn-secondary" data-close-modal="modal-bulk-product">انصراف</button>
     </div>
   </div>
 </div>
@@ -4507,10 +4752,8 @@
         </div>
         <div class="debtor-side">
           ${settled
-            ? `<span class="debtor-amount settled">تسویه شده</span>`
-            : credit
-              ? `<span class="debtor-amount credit">${formatMoney(-debt)} افغانی موجودی</span>`
-              : `<span class="debtor-amount">${formatMoney(debt)} افغانی</span>`}
+            ? `<span class="debtor-amount settled">۰</span>`
+            : `<span class="debtor-amount ${credit ? 'credit' : ''}">${formatMoney(Math.abs(debt))}</span>`}
           <div class="debtor-meta">${d.phone ? `<span>${escapeHtml(d.phone)}</span>` : ''}</div>
         </div>
         <button class="debtor-card-edit" data-edit-debtor="${d.id}" aria-label="ویرایش">
@@ -4625,7 +4868,10 @@
     const rows = top.map(x=> `
       <div class="mini-debtor-row">
         <span class="n">${escapeHtml(x.d.name)}</span>
-        <span class="a">${x.amt>0 ? formatMoney(x.amt)+' افغانی' : 'تسویه شده'}</span>
+        <span class="a"${x.amt<0 ? ' style="color:var(--success);"' : ''}>${
+          x.amt > 0 ? formatMoney(x.amt)+' افغانی'
+          : x.amt < 0 ? formatMoney(-x.amt)+' موجودی'
+          : 'تسویه شده'}</span>
       </div>`).join('');
     const best = topDebtorInfo();
     const oldest = oldestDebtInfo();
@@ -4649,51 +4895,44 @@
     if(!d){ goTo('debtors'); return; }
     currentAccountDebtorId = id;
 
-    document.getElementById('acc-avatar').textContent = initials(d.name);
-    document.getElementById('acc-name').textContent = d.name;
-    document.getElementById('acc-phone').textContent = d.phone || d.notes || '—';
+    /*
+     * سه سربرگ: کل برد، کل رسید و الباقی. هر سه روی «همه‌ی» تراکنش‌های
+     * این شخص حساب می‌شوند، نه فقط بازه‌ی فیلترشده، تا عدد حساب واقعی
+     * با انتخاب یک ماه عوض نشود.
+     */
+    const allTx = transactions.filter(t=>t.debtorId===id);
+    const totalGive = allTx.filter(t=>t.type==='give').reduce((a,t)=>a+t.amount,0);
+    const totalRecv = allTx.filter(t=>t.type==='receive').reduce((a,t)=>a+t.amount,0);
+    document.getElementById('acc-sum-give').textContent = formatMoney(totalGive);
+    document.getElementById('acc-sum-recv').textContent = formatMoney(totalRecv);
 
     /*
      * getDebt علامت‌دار است: مثبت یعنی او به ما بدهکار است،
      * منفی یعنی بیشتر از بدهی‌اش پرداخته و نزد ما موجودی دارد.
-     * قبلاً هر مقدار منفی «تسویه شده» نشان داده می‌شد و پول اضافه‌ی
-     * طرف هیچ‌جا دیده نمی‌شد.
      */
     const debt = getDebt(id);
-    const bar = document.getElementById('acc-bar');
+    const balBox = document.getElementById('acc-stat-bal');
     const amtEl = document.getElementById('acc-amount');
     const stateEl = document.getElementById('acc-state');
 
-    bar.classList.remove('credit','settled');
+    balBox.classList.remove('credit','settled');
     if(debt > 0){
       amtEl.textContent = formatMoney(debt);
       stateEl.textContent = 'افغانی بدهکار';
     } else if(debt < 0){
-      bar.classList.add('credit');
+      balBox.classList.add('credit');
       amtEl.textContent = formatMoney(-debt);
-      stateEl.textContent = 'افغانی موجودی دارد';
+      stateEl.textContent = 'موجودی دارد';
     } else {
-      bar.classList.add('settled');
+      balBox.classList.add('settled');
       amtEl.textContent = 'تسویه';
-      stateEl.textContent = 'حساب صاف است';
+      stateEl.textContent = 'حساب صاف';
     }
 
     const txs = transactions.filter(t=>t.debtorId===id)
       .sort((a,b)=> new Date(b.date)-new Date(a.date) || b.createdAt-a.createdAt);
     const txList = document.getElementById('tx-list');
     const txEmpty = document.getElementById('tx-empty');
-
-    /*
-     * مانده‌ی دونده روی «همه‌ی» تراکنش‌ها حساب می‌شود، نه فقط آن‌هایی که
-     * فیلتر نشان می‌دهد. وگرنه با انتخاب یک ماه، مانده‌ها غلط می‌شدند.
-     */
-    const ascending = txs.slice().sort((a,b)=> new Date(a.date)-new Date(b.date) || a.createdAt-b.createdAt);
-    let running=0;
-    const balances={};
-    ascending.forEach(t=>{
-      running += t.type==='give' ? t.amount : -t.amount;
-      balances[t.id]=running;
-    });
 
     accPopulateFilters(txs);
     const visible = accFilter(txs);
@@ -4722,20 +4961,13 @@
       summaryEl.style.display = 'none';
     }
 
+    // ردیف: تاریخ · توضیحات · برد یا رسید · مبلغ
     txList.innerHTML = visible.map(t=> `
       <div class="tx-item ${t.type}">
-        <div class="tx-ic">${t.type==='give' ? giveIcon : receiveIcon}</div>
-        <div class="tx-main">
-          <div class="tx-line">
-            <span class="tx-title">${t.type==='give' ? 'برد' : 'رسید'}</span>
-            <span class="tx-date">${formatDate(t.date)}</span>
-          </div>
-          ${t.notes ? `<div class="tx-notes">${escapeHtml(t.notes)}</div>` : ''}
-        </div>
-        <div class="tx-side">
-          <div class="tx-amount">${t.type==='give' ? '+' : '−'}${formatMoney(t.amount)}</div>
-          <div class="tx-balance">مانده ${formatMoney(balances[t.id])}</div>
-        </div>
+        <span class="tx-date-col">${formatDate(t.date)}</span>
+        <span class="tx-note-col${t.notes ? '' : ' empty'}">${t.notes ? escapeHtml(t.notes) : '—'}</span>
+        <span class="tx-kind">${t.type==='give' ? 'برد' : 'رسید'}</span>
+        <span class="tx-money">${formatMoney(t.amount)}</span>
         <button class="tx-del" data-del-tx="${t.id}" aria-label="حذف تراکنش">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
@@ -4940,7 +5172,7 @@
   });
 
 /* ---- شماره‌ی نسخه و گرفتن اجباری آخرین نسخه ---- */
-  const APP_BUILD = 'v10';
+  const APP_BUILD = 'v11';
   (function showBuild(){
     const el = document.getElementById('build-id');
     if(el) el.textContent = APP_BUILD;
@@ -5040,12 +5272,24 @@
   }
 
   // ---- Transaction add ----
-  function openTxModal(type){
+  /* نوع تراکنش را در پنجره عوض می‌کند؛ ثبت با همان منطق قبلی انجام می‌شود. */
+  function setTxType(type){
     currentTxType = type;
-    const badge = document.getElementById('tx-type-badge');
-    badge.textContent = type==='give' ? 'برد (افزایش بدهی)' : 'رسید (کاهش بدهی)';
-    badge.className = 'tx-type-badge ' + type;
-    document.getElementById('tx-modal-title').textContent = type==='give' ? 'ثبت برد جدید' : 'ثبت رسید جدید';
+    document.querySelectorAll('#tx-type-toggle .tx-type-opt').forEach(b=>{
+      b.classList.toggle('active', b.dataset.txType === type);
+    });
+    document.getElementById('tx-modal-title').textContent =
+      type==='give' ? 'ثبت برد جدید' : 'ثبت رسید جدید';
+    const submitLabel = document.querySelector('#btn-tx-submit .btn-label');
+    if(submitLabel) submitLabel.textContent = type==='give' ? 'ثبت برد' : 'ثبت رسید';
+  }
+  document.getElementById('tx-type-toggle').addEventListener('click', (e)=>{
+    const btn = e.target.closest('[data-tx-type]');
+    if(btn) setTxType(btn.dataset.txType);
+  });
+
+  function openTxModal(type){
+    setTxType(type);
     document.getElementById('in-tx-amount').value = '';
     document.getElementById('in-tx-date').value = todayISO();
     document.getElementById('in-tx-notes').value = '';
@@ -5066,8 +5310,8 @@
     echo.textContent = (v>0) ? `${formatMoney(v)} افغانی` : '';
   });
 
-  document.getElementById('btn-tx-give').addEventListener('click', ()=>openTxModal('give'));
-  document.getElementById('btn-tx-receive').addEventListener('click', ()=>openTxModal('receive'));
+  // پیش‌فرض «برد» است؛ داخل خودِ پنجره می‌شود به رسید عوضش کرد
+  document.getElementById('btn-acc-add-tx').addEventListener('click', ()=>openTxModal('give'));
   document.getElementById('btn-confirm-ok').addEventListener('click', ()=>{
     if(confirmAction) confirmAction();
     confirmAction = null;
@@ -5754,12 +5998,9 @@
     syncProductPriceLabels();
     openModal('modal-product');
   }
+  /** بارکد ناشناس در فروش: پنجره‌ی محصول جدید با همان بارکد پر می‌شود. */
   function openAddProductWithBarcode(code){
-    openAddProduct();
-    if(code && !editingProductBarcodes.includes(code)){
-      editingProductBarcodes.push(code);
-      renderProductBarcodeChips();
-    }
+    openBulkProduct(code);
   }
   function openEditProduct(id){
     const p = products.find(x=>x.id===id);
@@ -6084,9 +6325,10 @@
   }
 
   // ---- Products & warehouse event wiring ----
-  document.getElementById('btn-add-product-top').addEventListener('click', openAddProduct);
-  document.getElementById('btn-add-product-empty').addEventListener('click', openAddProduct);
-  document.getElementById('fab-add-product').addEventListener('click', openAddProduct);
+  // «محصول جدید» پنجره‌ی چندردیفه را باز می‌کند؛ پنجره‌ی تکی برای ویرایش می‌ماند
+  document.getElementById('btn-add-product-top').addEventListener('click', ()=> openBulkProduct());
+  document.getElementById('btn-add-product-empty').addEventListener('click', ()=> openBulkProduct());
+  document.getElementById('fab-add-product').addEventListener('click', ()=> openBulkProduct());
   document.getElementById('product-search').addEventListener('input', renderProducts);
   document.getElementById('product-filter-category').addEventListener('change', (e)=>{
     document.getElementById('btn-pf-cat-delete').style.display = e.target.value ? '' : 'none';
@@ -6266,9 +6508,10 @@
     });
   });
 
-  document.getElementById('btn-add-warehouse-top').addEventListener('click', openAddWarehouse);
-  document.getElementById('btn-add-warehouse-empty').addEventListener('click', openAddWarehouse);
-  document.getElementById('fab-add-warehouse').addEventListener('click', openAddWarehouse);
+  // «ثبت ورود کالا» هم همان شیت چندردیفه است؛ پنجره‌ی تکی فقط برای ویرایش
+  document.getElementById('btn-add-warehouse-top').addEventListener('click', openBulkStock);
+  document.getElementById('btn-add-warehouse-empty').addEventListener('click', openBulkStock);
+  document.getElementById('fab-add-warehouse').addEventListener('click', openBulkStock);
   document.getElementById('warehouse-search').addEventListener('input', renderWarehouseList);
   document.getElementById('warehouse-filter-product').addEventListener('change', renderWarehouseList);
   document.getElementById('warehouse-filter-category').addEventListener('change', (e)=>{
@@ -6451,6 +6694,253 @@
      می‌ساخت و همان logStockMovement را صدا می‌زند؛ پس محاسبه‌ی
      موجودی، قیمت و گزارش‌ها هیچ تغییری نمی‌کند.
      ========================================================== */
+
+  /* ==========================================================
+     محصول جدید — چند ردیف یک‌جا
+     ----------------------------------------------------------
+     همان چیدمان «ورود کالا به انبار»، تا برای ساختن ده محصول لازم
+     نباشد ده بار پنجره باز و بسته شود. ذخیره دقیقاً با همان
+     products.push قبلی انجام می‌شود؛ هیچ فیلدی از ساختار محصول کم
+     یا زیاد نشده. پنجره‌ی تکی برای «ویرایش» سر جایش است.
+     ========================================================== */
+  let bpRows = [];
+  let bpKeySeq = 0;
+  let bpSaving = false;
+
+  function bpUnitOptions(row){
+    const list = productUnits.slice();
+    if(row.unit && !list.includes(row.unit)) list.unshift(row.unit);
+    return list;
+  }
+
+  function bpRowHtml(row, index){
+    const units = bpUnitOptions(row).map(u=>
+      `<button type="button" class="bulk-unit${row.unit===u?' on':''}" data-bp-unit="${escapeHtml(u)}">${escapeHtml(u)}</button>`).join('');
+    return `
+      <div class="bulk-row" data-bp-key="${row.key}">
+        <div class="bulk-row-head">
+          <span class="bulk-row-no">${formatMoney(index+1)}</span>
+          <input class="form-input" data-bp-name type="text" placeholder="نام محصول، مثلاً بیسکویت شکلاتی" value="${escapeHtml(row.name||'')}">
+          <button type="button" class="bulk-icon-btn" data-bp-scan aria-label="اسکن بارکد">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3.5 8V5.5A2 2 0 0 1 5.5 3.5H8"/><path d="M16 3.5h2.5a2 2 0 0 1 2 2V8"/><path d="M20.5 16v2.5a2 2 0 0 1-2 2H16"/><path d="M8 20.5H5.5a2 2 0 0 1-2-2V16"/><path d="M3.5 12h17"/></svg>
+          </button>
+          <button type="button" class="bulk-icon-btn danger" data-bp-remove aria-label="حذف ردیف">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+          </button>
+        </div>
+
+        <div class="bulk-grid">
+          <div class="bulk-field">
+            <label>قیمت خرید (افغانی)</label>
+            <input class="form-input" data-bp-purchase type="number" inputmode="decimal" min="0" step="0.01" placeholder="مثلاً ۶۰" value="${row.purchase!==''?escapeHtml(String(row.purchase)):''}">
+          </div>
+          <div class="bulk-field">
+            <label>قیمت فروش (افغانی)</label>
+            <input class="form-input" data-bp-sale type="number" inputmode="decimal" min="0" step="0.01" placeholder="مثلاً ۸۰" value="${row.sale!==''?escapeHtml(String(row.sale)):''}">
+          </div>
+        </div>
+
+        <div class="bulk-grid" style="margin-top:8px;">
+          <div class="bulk-field">
+            <label>بارکد (اختیاری)</label>
+            <input class="form-input" data-bp-barcode type="text" dir="ltr" placeholder="اسکن یا تایپ" value="${escapeHtml(row.barcode||'')}">
+          </div>
+          <div class="bulk-field">
+            <label>حداقل موجودی</label>
+            <input class="form-input" data-bp-min type="number" inputmode="decimal" min="0" step="1" placeholder="مثلاً ۱۰" value="${row.minStock!==''?escapeHtml(String(row.minStock)):''}">
+          </div>
+        </div>
+
+        <div class="bulk-units">${units}
+          <button type="button" class="bulk-unit" data-bp-newunit>+ واحد جدید</button>
+        </div>
+
+        <div class="bulk-echo" data-bp-echo></div>
+      </div>`;
+  }
+
+  function bpRowByKey(key){ return bpRows.find(r=> String(r.key)===String(key)); }
+  function bpRowEl(key){ return document.querySelector(`.bulk-row[data-bp-key="${key}"]`); }
+
+  function bpUpdateEcho(row){
+    const el = bpRowEl(row.key);
+    if(!el) return;
+    const echo = el.querySelector('[data-bp-echo]');
+    const name = (row.name||'').trim();
+    if(!name){ echo.textContent=''; echo.classList.remove('warn'); return; }
+    const buy = parseFloat(row.purchase), sell = parseFloat(row.sale);
+    let txt = `${name}${row.unit ? ' — هر ' + row.unit : ''}`;
+    if(buy>=0 && sell>=0 && !isNaN(buy) && !isNaN(sell)){
+      txt += ` · سود هر ${row.unit||'واحد'}: ${formatMoney(sell-buy)} افغانی`;
+    }
+    echo.textContent = txt;
+    echo.classList.toggle('warn', !row.unit);
+  }
+
+  function bpReadyRows(){
+    return bpRows.filter(r=>
+      (r.name||'').trim() && !isNaN(parseFloat(r.purchase)) && parseFloat(r.purchase)>=0
+      && !isNaN(parseFloat(r.sale)) && parseFloat(r.sale)>=0 && r.unit);
+  }
+
+  function bpRenderSummary(){
+    const ready = bpReadyRows();
+    document.getElementById('bp-summary').innerHTML =
+      `<div><span>محصول آماده:</span> <b>${formatMoney(ready.length)}</b></div>` +
+      `<div><span>کل ردیف‌ها:</span> <b>${formatMoney(bpRows.length)}</b></div>`;
+  }
+
+  function bpRender(){
+    const wrap = document.getElementById('bp-rows');
+    wrap.innerHTML = bpRows.map((r,i)=> bpRowHtml(r,i)).join('');
+    bpRows.forEach(r=> bpUpdateEcho(r));
+    bpRenderSummary();
+  }
+
+  function bpNewRow(prefill){
+    return Object.assign({
+      key: ++bpKeySeq,
+      name:'', purchase:'', sale:'', barcode:'', minStock:'',
+      unit: productUnits[0] || 'عدد',
+    }, prefill||{});
+  }
+
+  function bpAddRow(prefill){
+    bpRows.push(bpNewRow(prefill));
+    bpRender();
+    const el = bpRowEl(bpRows[bpRows.length-1].key);
+    if(el) el.scrollIntoView({block:'nearest', behavior:'smooth'});
+  }
+
+  function bpPopulateCategory(){
+    const sel = document.getElementById('in-bp-category');
+    sel.innerHTML = productCategories.map(c=>
+      `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('')
+      + '<option value="__new__">+ دسته‌بندی جدید…</option>';
+  }
+
+  function openBulkProduct(prefillBarcode){
+    bpRows = [];
+    bpKeySeq = 0;
+    bpPopulateCategory();
+    bpAddRow(prefillBarcode ? { barcode: prefillBarcode } : undefined);
+    openModal('modal-bulk-product');
+  }
+
+  document.getElementById('btn-bp-add-row').addEventListener('click', ()=> bpAddRow());
+
+  document.getElementById('in-bp-category').addEventListener('change', (e)=>{
+    if(e.target.value !== '__new__') return;
+    const name = (prompt('نام دسته‌بندی جدید:') || '').trim();
+    if(name){
+      if(!productCategories.includes(name)) productCategories.push(name);
+      saveState();
+      bpPopulateCategory();
+      e.target.value = name;
+    } else {
+      bpPopulateCategory();
+    }
+  });
+
+  document.getElementById('bp-rows').addEventListener('input', (e)=>{
+    const rowEl = e.target.closest('.bulk-row'); if(!rowEl) return;
+    const row = bpRowByKey(rowEl.dataset.bpKey); if(!row) return;
+    if(e.target.matches('[data-bp-name]')) row.name = e.target.value;
+    else if(e.target.matches('[data-bp-purchase]')) row.purchase = e.target.value;
+    else if(e.target.matches('[data-bp-sale]')) row.sale = e.target.value;
+    else if(e.target.matches('[data-bp-barcode]')) row.barcode = e.target.value;
+    else if(e.target.matches('[data-bp-min]')) row.minStock = e.target.value;
+    bpUpdateEcho(row);
+    bpRenderSummary();
+  });
+
+  document.getElementById('bp-rows').addEventListener('click', (e)=>{
+    const rowEl = e.target.closest('.bulk-row'); if(!rowEl) return;
+    const row = bpRowByKey(rowEl.dataset.bpKey); if(!row) return;
+
+    if(e.target.closest('[data-bp-remove]')){
+      if(bpRows.length===1){ showToast('حداقل یک ردیف لازم است'); return; }
+      bpRows = bpRows.filter(r=> r.key!==row.key);
+      bpRender();
+      return;
+    }
+    const unitBtn = e.target.closest('[data-bp-unit]');
+    if(unitBtn){
+      row.unit = unitBtn.dataset.bpUnit;
+      rowEl.querySelectorAll('[data-bp-unit]').forEach(b=>
+        b.classList.toggle('on', b===unitBtn));
+      bpUpdateEcho(row);
+      bpRenderSummary();
+      return;
+    }
+    if(e.target.closest('[data-bp-newunit]')){
+      const u = (prompt('نام واحد جدید:') || '').trim();
+      if(u){
+        if(!productUnits.includes(u)) productUnits.push(u);
+        row.unit = u;
+        saveState();
+        bpRender();
+      }
+      return;
+    }
+    if(e.target.closest('[data-bp-scan]')){
+      openQuickScan((code)=>{
+        row.barcode = code;
+        const inp = bpRowEl(row.key)?.querySelector('[data-bp-barcode]');
+        if(inp) inp.value = code;
+        showToast('بارکد ثبت شد');
+      });
+    }
+  });
+
+  document.getElementById('btn-bp-save').addEventListener('click', ()=>{
+    if(bpSaving) return;
+    const ready = bpReadyRows();
+    if(!ready.length){ showToast('حداقل یک ردیف کامل لازم است', 'danger'); return; }
+
+    let category = document.getElementById('in-bp-category').value;
+    if(category==='__new__' || !category){
+      showToast('دسته‌بندی را انتخاب کنید', 'danger');
+      return;
+    }
+
+    bpSaving = true;
+    const btn = document.getElementById('btn-bp-save');
+    btn.classList.add('is-busy'); btn.disabled = true;
+    try{
+      let saved = 0, skipped = 0;
+      ready.forEach(r=>{
+        const name = r.name.trim();
+        const barcode = (r.barcode||'').trim();
+        // بارکد تکراری، محصول قبلی را خراب می‌کند؛ همان ردیف رد می‌شود
+        if(barcode && barcodeIndex.has(barcode)){ skipped++; return; }
+        products.push({
+          id: uid(), name, category, unit: r.unit,
+          purchasePrice: parseFloat(r.purchase),
+          salePrice: parseFloat(r.sale),
+          wholesalePrice: 0,
+          minStock: parseFloat(r.minStock) || 0,
+          notes: '',
+          barcodes: barcode ? [barcode] : [],
+          createdAt: Date.now(),
+        });
+        rebuildBarcodeIndex();
+        saved++;
+      });
+      rebuildBarcodeIndex();
+      saveState();
+      closeModal('modal-bulk-product');
+      renderProducts(); renderWarehouseList(); renderWarehouseDashboard();
+      if(document.getElementById('quick-select-grid')) renderQuickSelect();
+      showToast(skipped
+        ? `${formatMoney(saved)} محصول ثبت شد — ${formatMoney(skipped)} ردیف بارکد تکراری داشت`
+        : `${formatMoney(saved)} محصول ثبت شد`);
+    } finally {
+      bpSaving = false;
+      btn.classList.remove('is-busy'); btn.disabled = false;
+    }
+  });
+
   let bulkRows = [];          // {key, productId, qty, unit, price, newName, newCategory, newBarcode}
   let bulkKeySeq = 0;
 
@@ -6857,7 +7347,8 @@
             <div class="exp-title">${escapeHtml(product?product.name:'(محصول حذف‌شده)')}</div>
             <div class="exp-meta">
               <span>${formatDate(p.date)}</span>
-              <span class="sale-status-badge ${debt<=0?'cash':'credit'}">${debt<=0?'تسویه شده':'دارای بدهی'}</span>
+              <span class="sale-status-badge ${debt<=0?'cash':'credit'}">${
+                debt > 0 ? 'دارای بدهی' : debt < 0 ? 'موجودی دارد' : 'تسویه شده'}</span>
               ${supplier ? `<span>— ${escapeHtml(supplier.name)}</span>` : ''}
             </div>
           </div>
@@ -7334,7 +7825,10 @@
       <div class="exp-card" style="flex-direction:column; align-items:stretch;">
         <div style="display:flex; justify-content:space-between;">
           <div class="exp-title">${escapeHtml(d.name)}</div>
-          <div class="exp-amount">${remaining>0?formatMoney(remaining)+' افغانی':'تسویه شده'}</div>
+          <div class="exp-amount"${remaining<0 ? ' style="color:var(--success);"' : ''}>${
+            remaining > 0 ? formatMoney(remaining)+' افغانی'
+            : remaining < 0 ? formatMoney(-remaining)+' افغانی موجودی'
+            : 'تسویه شده'}</div>
         </div>
         <div class="exp-meta">فروش نسیه: ${formatMoney(given)} — پرداخت‌شده: ${formatMoney(received)}</div>
       </div>`;
@@ -7927,10 +8421,59 @@
     if(navigator.vibrate) navigator.vibrate(40);
   });
 
+  /* ==========================================================
+     بوق اسکنر
+     ----------------------------------------------------------
+     مرورگرها تا وقتی کاربر روی صفحه کاری نکرده اجازه‌ی پخش صدا
+     نمی‌دهند، پس اولین لمس/کلیک فایل را «باز» می‌کند و از آن به بعد
+     هر اسکن بدون تاخیر بوق می‌زند. اگر پخش نشد، برنامه نباید بایستد.
+     ========================================================== */
+  let scanBeepAudio = null;
+  let scanBeepReady = false;
+  function initScanBeep(){
+    if(scanBeepAudio) return;
+    try{
+      scanBeepAudio = new Audio('sounds/scan-beep.mp3?v=11');
+      scanBeepAudio.preload = 'auto';
+      scanBeepAudio.volume = 0.85;
+    }catch(e){ scanBeepAudio = null; }
+  }
+  function unlockScanBeep(){
+    initScanBeep();
+    if(!scanBeepAudio || scanBeepReady) return;
+    // یک پخش بی‌صدا تا مرورگر فایل را مجاز بداند
+    const prev = scanBeepAudio.volume;
+    scanBeepAudio.volume = 0;
+    const pr = scanBeepAudio.play();
+    const done = ()=>{
+      scanBeepAudio.pause();
+      try{ scanBeepAudio.currentTime = 0; }catch(e){}
+      scanBeepAudio.volume = prev;
+      scanBeepReady = true;
+    };
+    if(pr && pr.then) pr.then(done).catch(()=>{ scanBeepAudio.volume = prev; });
+    else done();
+  }
+  document.addEventListener('pointerdown', unlockScanBeep, { once:true });
+  document.addEventListener('keydown', unlockScanBeep, { once:true });
+
+  function playScanBeep(){
+    initScanBeep();
+    if(!scanBeepAudio) return;
+    try{
+      // اگر پشت سر هم اسکن شد، از اول پخش شود نه اینکه صبر کند
+      scanBeepAudio.currentTime = 0;
+      const pr = scanBeepAudio.play();
+      if(pr && pr.catch) pr.catch(()=>{});
+    }catch(e){}
+  }
+
   function handleBarcodeScanned(code, {skipDedup=false}={}){
     code = (code||'').trim();
     if(!code) return;
     if(!skipDedup && isDuplicateScan(code)) return;
+
+    playScanBeep();
 
     const panel = document.getElementById('last-scan-panel');
     panel.style.display = 'flex';
@@ -8451,7 +8994,7 @@
      SETTINGS — نام فروشگاه، دوربین تست، پشتیبان‌گیری و پاک‌سازی
   ========================================================== */
   const SETTINGS_KEY = 'tohid-shop-settings-v1';
-  let appSettings = { storeName: '', theme: 'light' };
+  let appSettings = { storeName: '', theme: 'light', motion: 'full' };
   function loadSettings(){
     try{
       const raw = localStorage.getItem(SETTINGS_KEY);
@@ -8471,12 +9014,23 @@
       btn.classList.toggle('active', btn.dataset.themeChoice===theme);
     });
   }
+  /* «full» یعنی انیمیشن‌ها حتی با کاهش حرکتِ گوشی هم اجرا شوند. */
+  function applyMotion(mode){
+    const full = mode === 'full';
+    if(full) document.documentElement.setAttribute('data-motion', 'full');
+    else document.documentElement.removeAttribute('data-motion');
+    document.querySelectorAll('#motion-toggle .theme-toggle-btn').forEach(btn=>{
+      btn.classList.toggle('active', btn.dataset.motionChoice === (full ? 'full' : 'auto'));
+    });
+  }
   function applySettingsToUI(){
     const input = document.getElementById('in-settings-store-name');
     if(input) input.value = appSettings.storeName || '';
     const brandEl = document.querySelector('.brand-text b');
     if(brandEl) brandEl.textContent = appSettings.storeName || 'توحید';
     applyTheme(appSettings.theme || 'light');
+    // پیش‌فرض روشن است، چون کاربر انیمیشن‌ها را خواسته
+    applyMotion(appSettings.motion || 'full');
   }
 
   document.getElementById('theme-toggle').addEventListener('click', (e)=>{
@@ -8486,6 +9040,14 @@
     appSettings.theme = theme;
     saveSettings();
     applyTheme(theme);
+  });
+
+  document.getElementById('motion-toggle').addEventListener('click', (e)=>{
+    const btn = e.target.closest('[data-motion-choice]');
+    if(!btn) return;
+    appSettings.motion = btn.dataset.motionChoice;
+    saveSettings();
+    applyMotion(appSettings.motion);
   });
 
   document.getElementById('btn-save-store-name').addEventListener('click', ()=>{
@@ -9305,10 +9867,10 @@
 </script>
 
 <!-- لایه اشتراک و License — کاملاً افزودنی؛ منطق فروشگاه را تغییر نمی‌دهد -->
-<script src="license/license-client.js?v=10" defer></script>
-<script src="license/shop-sync.js?v=10" defer></script>
-<script src="license/shop-ui.js?v=10" defer></script>
-<script src="license/vip.js?v=10" defer></script>
+<script src="license/license-client.js?v=11" defer></script>
+<script src="license/shop-sync.js?v=11" defer></script>
+<script src="license/shop-ui.js?v=11" defer></script>
+<script src="license/vip.js?v=11" defer></script>
 
 </body>
 </html>
