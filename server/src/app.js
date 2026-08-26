@@ -50,6 +50,21 @@ async function createApp({ runMigrations = true } = {}) {
     next();
   });
 
+  // ---- ثبت درخواست‌ها ----
+  // فقط روش، مسیر، وضعیت و زمان پاسخ. هیچ بدنه، رمز، کد یا توکنی نوشته
+  // نمی‌شود؛ حتی مسیرهایی که شناسه دارند کوتاه می‌شوند.
+  app.use((req, res, next) => {
+    const started = Date.now();
+    res.on('finish', () => {
+      const ms = Date.now() - started;
+      if (res.statusCode >= 400 || ms > 1000 || config.env !== 'production') {
+        const path = req.originalUrl.split('?')[0].slice(0, 120);
+        console.log(`${req.method} ${path} ${res.statusCode} ${ms}ms`);
+      }
+    });
+    next();
+  });
+
   app.use(rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'general' }));
 
   // ---- بررسی سلامت ----
