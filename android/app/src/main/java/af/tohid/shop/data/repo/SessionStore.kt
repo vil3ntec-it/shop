@@ -59,17 +59,44 @@ class SessionStore(context: Context) {
         secure.edit().clear().apply()
         plain.edit().remove(KEY_USER_ID).remove(KEY_USER_LABEL)
             .remove(KEY_SHOP_ID).remove(KEY_SHOP_NAME).remove(KEY_ROLE)
-            .remove(KEY_REV).remove(KEY_INVOICE_BLOCK).apply()
+            .remove(KEY_REV).remove(KEY_INVOICE_BLOCK).remove(KEY_PERMISSIONS).apply()
     }
 
     // ---------- دکان ----------
     fun shopId(): String = plain.getString(KEY_SHOP_ID, "") ?: ""
     fun shopName(): String = plain.getString(KEY_SHOP_NAME, "") ?: ""
     fun role(): String = plain.getString(KEY_ROLE, "staff") ?: "staff"
+    fun isOwner(): Boolean = role() == "owner"
     fun saveShop(id: String, name: String, role: String) {
         plain.edit().putString(KEY_SHOP_ID, id).putString(KEY_SHOP_NAME, name)
             .putString(KEY_ROLE, role).apply()
     }
+    fun clearShop() {
+        plain.edit().remove(KEY_SHOP_ID).remove(KEY_SHOP_NAME).remove(KEY_ROLE)
+            .remove(KEY_PERMISSIONS).remove(KEY_REV).apply()
+    }
+
+    /**
+     * دسترسی‌های این نقش، همان‌طور که سرور اعلام کرده است.
+     *
+     * این فقط برای چیدن دکمه‌هاست؛ تصمیم واقعی را سرور می‌گیرد و اگر
+     * کسی از این طرف دور بزند، درخواستش آنجا رد می‌شود.
+     */
+    fun permissions(): Set<String> =
+        plain.getStringSet(KEY_PERMISSIONS, emptySet()) ?: emptySet()
+
+    fun savePermissions(list: Collection<String>) {
+        plain.edit().putStringSet(KEY_PERMISSIONS, list.toSet()).apply()
+    }
+
+    fun can(permission: String): Boolean {
+        val set = permissions()
+        return if (set.isEmpty()) role() == "owner" else set.contains(permission)
+    }
+
+    /** کاربر گفته «فعلاً بدون حساب ادامه بده» — صفحه‌ی ورود دیگر سد راهش نشود. */
+    fun authSkipped(): Boolean = plain.getBoolean(KEY_SKIP_AUTH, false)
+    fun setAuthSkipped(v: Boolean) = plain.edit().putBoolean(KEY_SKIP_AUTH, v).apply()
 
     // ---------- همگام‌سازی ----------
     fun rev(): Long = plain.getLong(KEY_REV, 0L)
@@ -113,5 +140,7 @@ class SessionStore(context: Context) {
         const val KEY_INVOICE_BLOCK = "invoice_block"
         const val KEY_UPDATE_CHECK = "update_check_at"
         const val KEY_SKIP_VERSION = "skip_version"
+        const val KEY_PERMISSIONS = "shop_permissions"
+        const val KEY_SKIP_AUTH = "auth_skipped"
     }
 }

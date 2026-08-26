@@ -82,7 +82,37 @@ private fun approxDays(amount: Int?, unit: String?): Int = when (unit) {
 
 private class Spec(val code: String, val title: String, val amount: Int, val unit: String, val price: Int)
 
-private fun fallbackPlans(): PlansResponse {
+/**
+ * قیمت‌ها از سرور می‌آیند؛ لینک واتساپ و قیمت روزانه را همین‌جا می‌سازیم
+ * تا شماره و متن پیام هم از سرور قابل تغییر باشد.
+ */
+private fun withLinks(res: PlansResponse, shopId: String, who: String): PlansResponse {
+    val number = res.whatsapp.number.ifBlank { WA_NUMBER }
+    val text = res.whatsapp.message.ifBlank { WA_TEXT } + identity(shopId, who)
+    return res.copy(
+        plans = res.plans.map { p ->
+            val days = if (p.days > 0) p.days else approxDays(p.amount, p.unit)
+            p.copy(
+                pricePerDay =
+                    if (days > 0 && p.price > 0) Math.round(p.price.toDouble() / days * 10) / 10.0
+                    else null,
+                whatsappUrl = waUrl(number, "$text (${p.title})"),
+            )
+        },
+        whatsapp = res.whatsapp.copy(number = number, url = waUrl(number, text)),
+    )
+}
+
+/**
+ * شناسه‌ی دکان همراه پیام واتساپ می‌رود تا فروشنده بداند اشتراک را روی
+ * کدام دکان فعال کند. کاربر لازم نیست چیزی را دستی کپی کند.
+ */
+private fun identity(shopId: String, who: String): String {
+    if (shopId.isBlank()) return ""
+    return "\n\nشناسه دکان: $shopId" + (if (who.isNotBlank()) "\nنام: $who" else "")
+}
+
+private fun fallbackPlans(shopId: String, who: String): PlansResponse {
     val specs = listOf(
         Spec("m1", "ماهانه", 1, "month", 500),
         Spec("m6", "۶ ماهه", 6, "month", 2000),
@@ -95,12 +125,15 @@ private fun fallbackPlans(): PlansResponse {
             code = p.code, title = p.title, amount = p.amount, unit = p.unit, price = p.price,
             negotiable = false, badge = badges[p.code].orEmpty(),
             pricePerDay = if (days > 0) Math.round(p.price.toDouble() / days * 10) / 10.0 else null,
-            whatsappUrl = waUrl(WA_NUMBER, "$WA_TEXT (${p.title})"),
+            whatsappUrl = waUrl(WA_NUMBER, "$WA_TEXT (${p.title})" + identity(shopId, who)),
         )
     }
     return PlansResponse(
         plans = plans, currency = "افغانی", trialDays = 7,
-        whatsapp = WhatsappDto(number = WA_NUMBER, url = waUrl(WA_NUMBER, WA_TEXT)),
+        whatsapp = WhatsappDto(
+            number = WA_NUMBER,
+            url = waUrl(WA_NUMBER, WA_TEXT + identity(shopId, who)),
+        ),
     )
 }
 
@@ -129,7 +162,10 @@ private fun SubscriptionScreen(title: String) {
         val fromServer = withContext(Dispatchers.IO) {
             runCatching { ApiClient.api(app.session)?.plans() }.getOrNull()
         }
-        data = fromServer?.takeIf { it.plans.isNotEmpty() } ?: fallbackPlans()
+        val shopId = app.session.shopId()
+        val who = app.session.userLabel()
+        data = fromServer?.takeIf { it.plans.isNotEmpty() }?.let { withLinks(it, shopId, who) }
+            ?: fallbackPlans(shopId, who)
         loading = false
     }
 

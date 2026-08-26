@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  سرور خانگی ممکن است http ساده باشد (مثلاً پشت تونل نباشد).
+  سرور خانگی ممکن است http ساده روی IP محلی باشد.
   https همیشه مجاز است؛ http فقط وقتی کاربر خودش آدرس http بدهد.
-  توصیه: از Cloudflare Tunnel استفاده کنید تا همه‌چیز https باشد.
+  برای دسترسی از بیرون شبکه، https توصیه می‌شود (با هر روشی که دارید:
+  گواهی روی خود سرور، Nginx، یا هر تونل امن).
 -->
 <network-security-config>
     <base-config cleartextTrafficPermitted="true">

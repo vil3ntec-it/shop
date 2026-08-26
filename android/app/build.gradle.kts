@@ -38,8 +38,14 @@ android {
         versionName = versionNameFromCi
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // مسیر پیش‌فرض سرور؛ کاربر می‌تواند در برنامه عوضش کند
-        buildConfigField("String", "DEFAULT_SERVER_URL", "\"\"")
+        // آدرس پیش‌فرض سرور. با -PshopServerUrl=... یا متغیر محیطی
+        // SHOP_SERVER_URL هنگام ساخت پر می‌شود؛ کاربر هم می‌تواند از داخل
+        // برنامه عوضش کند. هیچ آدرسی در کد قفل نیست.
+        val defaultServerUrl: String =
+            (project.findProperty("shopServerUrl") as String?)
+                ?: System.getenv("SHOP_SERVER_URL")
+                ?: ""
+        buildConfigField("String", "DEFAULT_SERVER_URL", "\"$defaultServerUrl\"")
         // مخزن گیت‌هاب برای بررسی نسخه جدید
         buildConfigField("String", "UPDATE_REPO", "\"vil3ntec-it/shop\"")
     }
@@ -124,6 +130,7 @@ dependencies {
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
     implementation(libs.mlkit.barcode)
+    implementation(libs.play.services.auth)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

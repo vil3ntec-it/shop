@@ -18,7 +18,10 @@ class SyncWorker(
 
     override suspend fun doWork(): Result {
         val app = applicationContext as? TohidApp ?: return Result.success()
-        if (!app.session.isLoggedIn() || app.session.serverUrl().isNullOrBlank()) {
+        if (!app.session.isLoggedIn() ||
+            !af.tohid.shop.data.remote.ApiClient.isConfigured(app.session) ||
+            app.session.shopId().isBlank()
+        ) {
             return Result.success()
         }
         return try {

@@ -45,7 +45,7 @@ fun MoreScreen(onOpen: (String) -> Unit) {
         Spacer(Modifier.height(10.dp))
         MoreRow("دفتر رویدادها", "هر تغییری که در دفتر ثبت شده", Icons.Outlined.History) { onOpen("audit") }
         Spacer(Modifier.height(10.dp))
-        MoreRow("دکان و همگام‌سازی", "اتصال به سرور و اعضای دکان", Icons.Outlined.Sync) { onOpen("shop") }
+        MoreRow("حساب و دکان", "ورود، شاگردها و همگام‌سازی", Icons.Outlined.Sync) { onOpen("account") }
         Spacer(Modifier.height(10.dp))
         MoreRow("تنظیمات", "نسخه‌ی برنامه و به‌روزرسانی", Icons.Outlined.Settings) { onOpen("settings") }
 
