@@ -411,14 +411,22 @@ class MainActivity : ComponentActivity() {
         """
 
         /** اگر پنجره‌ای باز است، دکمه‌ی برگشت همان را ببندد، نه برنامه را. */
+        /** اگر پنجره‌ای باز است، دکمه‌ی برگشت همان را ببندد، نه برنامه را. */
         const val BACK_HANDLER = """
             (function(){
-              var open = document.querySelector('.modal.show, .modal.open, .sheet.show, [data-modal].show');
+              // پنجره‌های برنامه با کلاس open باز می‌شوند
+              var open = document.querySelector('.modal-scrim.open, .sheet.open, .drawer.open');
               if (open) {
-                var close = open.querySelector('[data-close], .modal-close, .btn-close');
-                if (close) { close.click(); return true; }
+                if (open.id && typeof window.closeModal === 'function') {
+                  window.closeModal(open.id);
+                  return true;
+                }
+                open.classList.remove('open');
+                return true;
               }
-              if (typeof window.closeTopModal === 'function') { return !!window.closeTopModal(); }
+              // اگر داخل صفحه‌ی فرعی هستیم، به صفحه‌ی قبلی برگردیم
+              var back = document.querySelector('.page.active .account-back');
+              if (back) { back.click(); return true; }
               return false;
             })();
         """
