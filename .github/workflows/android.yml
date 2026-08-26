@@ -46,15 +46,32 @@ jobs:
 
       - name: Unit tests
         working-directory: android
-        run: ./gradlew testDebugUnitTest --no-daemon
+        run: |
+          set -o pipefail
+          ./gradlew testDebugUnitTest --no-daemon 2>&1 | tee tests.log
 
       - name: Lint
         working-directory: android
-        run: ./gradlew lintDebug --no-daemon
+        run: |
+          set -o pipefail
+          ./gradlew lintDebug --no-daemon 2>&1 | tee lint.log
 
       - name: Build debug APK
         working-directory: android
-        run: ./gradlew assembleDebug --no-daemon
+        run: |
+          set -o pipefail
+          ./gradlew assembleDebug --no-daemon 2>&1 | tee build.log
+
+      # وقتی بیلد می‌شکند، فقط همان چند خط خطا را نشان بده
+      - name: Show errors
+        if: failure()
+        working-directory: android
+        run: |
+          echo '--- خطاها ---'
+          grep -hE "^e: |^\s+ERROR|error:|What went wrong|Execution failed|FAILURE:" -A 2 *.log | tail -60 || true
+          for f in app/build/reports/lint-results-debug.txt; do
+            [ -f "$f" ] && grep -E "^(Error|.*: Error)" -A 2 "$f" | head -40
+          done || true
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
