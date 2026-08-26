@@ -75,7 +75,8 @@ jobs:
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
+          # با workflow_dispatch هم درست کار کند: تگ از شماره‌ی نسخه ساخته می‌شود
+          tag_name: v${{ steps.ver.outputs.value }}
           name: shop ${{ steps.ver.outputs.value }}
           generate_release_notes: true
           files: out/*.apk
