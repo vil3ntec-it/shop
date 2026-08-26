@@ -147,12 +147,8 @@ fun AccountScreen() {
                 app = app,
                 busy = busy,
                 config = config,
-                onGoogle = { clientId ->
-                    // در تابع بیرونی راه‌اندازی می‌شود
-                    clientId
-                },
-                submit = { block -> submit(Tone.Green, block) },
                 context = context,
+                submit = { block -> submit(Tone.Green, block) },
             )
         } else {
             AccountCard(app, shopTitle, role)
