@@ -1,183 +1,127 @@
 'use strict';
 /**
- * حساب مشترک دکان.
+ * دکان‌ها و اعضا.
  *
- * یک دکان = یک دفتر مشترک. صاحب دکان آن را می‌سازد و با «کد دعوت»
- * تا سقف تعیین‌شده (پیش‌فرض ۵ نفر) عضو اضافه می‌کند. همه‌ی اعضا روی
- * همان داده کار می‌کنند، هر کدام روی گوشی خودشان.
+ * قاعده‌ی کلیدی: shop_id هرگز از بدنه‌ی درخواست خوانده نمی‌شود.
+ * سرور خودش از روی کاربرِ توکن، عضویت او را پیدا می‌کند. به همین دلیل
+ * کسی نمی‌تواند با فرستادن shop_id دیگری به اطلاعات دکان دیگر برسد.
  */
-const { getDb, newId, now } = require('../db');
-const { randomInt } = require('crypto');
+const { query, one, many, tx, newId, now } = require('../db');
+const { forbidden, notFound, conflict, badRequest } = require('../middleware/errors');
+const { can } = require('./permissions');
 
-const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;   // کد دعوت یک هفته معتبر است
+/** عضویت فعال کاربر — کاربر فقط در یک دکان فعال است. */
+async function membershipOf(userId) {
+  return one(
+    `SELECT m.*, s.name AS shop_name, s.status AS shop_status, s.owner_user_id
+       FROM shop_members m
+       JOIN shops s ON s.id = m.shop_id
+      WHERE m.user_id = $1 AND m.status = 'active' AND s.status = 'active'
+      ORDER BY (m.role = 'owner') DESC, m.created_at ASC
+      LIMIT 1`,
+    [userId]
+  );
+}
 
-class ShopError extends Error {
-  constructor(message, code = 'shop_error', status = 400) {
-    super(message); this.code = code; this.status = status; this.expose = true;
+/** عضویت لازم است؛ اگر نبود خطای روشن می‌دهد. */
+async function requireMembership(userId) {
+  const m = await membershipOf(userId);
+  if (!m) throw notFound('برای این حساب دکانی ثبت نشده است', 'no_shop');
+  return m;
+}
+
+function assertCan(member, permission) {
+  if (!can(member.role, permission)) {
+    throw forbidden('این کار در حد دسترسی شما نیست', 'permission_denied');
   }
 }
 
-/** کد دعوت خوانا: بدون حروف گیج‌کننده (0/O، 1/I). */
-function makeInviteCode() {
-  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let out = '';
-  for (let i = 0; i < 8; i++) out += alphabet[randomInt(alphabet.length)];
-  return out.slice(0, 4) + '-' + out.slice(4);
-}
+/** ساخت دکان — سازنده مالک می‌شود. هر کاربر یک دکان می‌سازد. */
+async function createShop(userId, name) {
+  const existing = await membershipOf(userId);
+  if (existing) throw conflict('این حساب از قبل عضو یک دکان است', 'already_member');
 
-function getShop(shopId) {
-  return getDb().prepare('SELECT * FROM shops WHERE id=?').get(shopId) || null;
-}
-
-/** دکانی که کاربر عضو فعال آن است (هر کاربر فقط یک دکان). */
-function getUserShop(userId) {
-  return getDb().prepare(`
-    SELECT s.*, m.role AS my_role
-    FROM shop_members m JOIN shops s ON s.id = m.shop_id
-    WHERE m.user_id = ? AND m.status = 'active'
-    LIMIT 1
-  `).get(userId) || null;
-}
-
-function getMembership(shopId, userId) {
-  return getDb().prepare(
-    "SELECT * FROM shop_members WHERE shop_id=? AND user_id=? AND status='active'"
-  ).get(shopId, userId) || null;
-}
-
-function listMembers(shopId) {
-  return getDb().prepare(`
-    SELECT m.user_id, m.role, m.joined_at, u.name, u.email, u.phone, u.last_login_at
-    FROM shop_members m JOIN users u ON u.id = m.user_id
-    WHERE m.shop_id = ? AND m.status = 'active'
-    ORDER BY CASE m.role WHEN 'owner' THEN 0 ELSE 1 END, m.joined_at
-  `).all(shopId);
-}
-
-function activeMemberCount(shopId) {
-  return getDb().prepare(
-    "SELECT COUNT(*) n FROM shop_members WHERE shop_id=? AND status='active'"
-  ).get(shopId).n;
-}
-
-/** ساخت دکان. سازنده به‌طور خودکار صاحب آن می‌شود. */
-function createShop(userId, name, maxMembers = 5) {
-  const db = getDb();
-  if (getUserShop(userId)) {
-    throw new ShopError('شما از قبل عضو یک دکان هستید', 'already_in_shop', 409);
-  }
-  const t = now();
-  const shop = {
-    id: newId('shop'),
-    name: String(name || '').trim().slice(0, 80) || 'دکان من',
-    owner_id: userId,
-    max_members: Math.min(20, Math.max(1, Number(maxMembers) || 5)),
-    created_at: t, updated_at: t,
-  };
-  db.transaction(() => {
-    db.prepare(`INSERT INTO shops (id,name,owner_id,max_members,created_at,updated_at)
-                VALUES (@id,@name,@owner_id,@max_members,@created_at,@updated_at)`).run(shop);
-    db.prepare(`INSERT INTO shop_members (shop_id,user_id,role,status,joined_at)
-                VALUES (?,?,'owner','active',?)`).run(shop.id, userId, t);
-    db.prepare('INSERT INTO shop_rev (shop_id,last_rev) VALUES (?,0)').run(shop.id);
-    db.prepare('INSERT INTO shop_settings (shop_id,data,rev,updated_at) VALUES (?,?,0,?)')
-      .run(shop.id, '{}', t);
-  })();
-  return getShop(shop.id);
-}
-
-/** ساخت کد دعوت — فقط صاحب دکان. */
-function createInvite(shopId, byUserId, role = 'staff') {
-  const m = getMembership(shopId, byUserId);
-  if (!m || m.role !== 'owner') {
-    throw new ShopError('فقط صاحب دکان می‌تواند عضو دعوت کند', 'not_owner', 403);
-  }
-  const shop = getShop(shopId);
-  if (activeMemberCount(shopId) >= shop.max_members) {
-    throw new ShopError(
-      `سقف اعضای این دکان ${shop.max_members} نفر است. برای دعوت نفر جدید، یکی از اعضا را حذف کنید.`,
-      'member_limit_reached', 409
+  return tx(async (c) => {
+    const t = now();
+    const shopId = newId('shp');
+    await c.query(
+      `INSERT INTO shops (id, owner_user_id, name, status, created_at, updated_at)
+       VALUES ($1,$2,$3,'active',$4,$4)`,
+      [shopId, userId, name || 'دکان من', t]
     );
-  }
+    await c.query(
+      `INSERT INTO shop_members (id, shop_id, user_id, role, status, created_at, updated_at)
+       VALUES ($1,$2,$3,'owner','active',$4,$4)`,
+      [newId('mem'), shopId, userId, t]
+    );
+    await c.query('INSERT INTO shop_rev (shop_id, last_rev) VALUES ($1, 0)', [shopId]);
+    await c.query(
+      'INSERT INTO shop_settings (shop_id, data, rev, updated_at) VALUES ($1, $2, 0, $3)',
+      [shopId, '{}', t]
+    );
+    return c.query('SELECT * FROM shops WHERE id=$1', [shopId]).then(r => r.rows[0]);
+  });
+}
+
+async function getShop(shopId) {
+  const s = await one('SELECT * FROM shops WHERE id=$1', [shopId]);
+  if (!s) throw notFound('دکان پیدا نشد', 'shop_not_found');
+  return s;
+}
+
+async function updateShop(shopId, patch) {
   const t = now();
-  const code = makeInviteCode();
-  getDb().prepare(`INSERT INTO shop_invites (code,shop_id,created_by,role,expires_at,created_at)
-                   VALUES (?,?,?,?,?,?)`)
-    .run(code, shopId, byUserId, role === 'owner' ? 'owner' : 'staff', t + INVITE_TTL_MS, t);
-  return { code, expiresAt: t + INVITE_TTL_MS, role };
+  const s = await one(
+    'UPDATE shops SET name = COALESCE($2, name), updated_at = $3 WHERE id = $1 RETURNING *',
+    [shopId, patch.name ?? null, t]
+  );
+  if (!s) throw notFound('دکان پیدا نشد', 'shop_not_found');
+  return s;
 }
 
-/** پیوستن با کد دعوت. */
-function joinWithInvite(userId, rawCode) {
-  const db = getDb();
-  const code = String(rawCode || '').trim().toUpperCase().replace(/\s/g, '');
-  const inv = db.prepare('SELECT * FROM shop_invites WHERE code=?').get(code);
-  if (!inv) throw new ShopError('کد دعوت نامعتبر است', 'bad_invite', 404);
-  if (inv.used_by) throw new ShopError('این کد قبلاً استفاده شده است', 'invite_used', 409);
-  if (inv.expires_at < now()) throw new ShopError('این کد منقضی شده است', 'invite_expired', 410);
-
-  const existing = getUserShop(userId);
-  if (existing) {
-    if (existing.id === inv.shop_id) return getShop(inv.shop_id);   // از قبل عضو است
-    throw new ShopError('شما عضو دکان دیگری هستید. اول از آن خارج شوید.', 'already_in_shop', 409);
-  }
-
-  const shop = getShop(inv.shop_id);
-  if (!shop) throw new ShopError('دکان پیدا نشد', 'shop_not_found', 404);
-  if (activeMemberCount(shop.id) >= shop.max_members) {
-    throw new ShopError(`سقف اعضای این دکان ${shop.max_members} نفر است`, 'member_limit_reached', 409);
-  }
-
-  const t = now();
-  db.transaction(() => {
-    // اگر قبلاً حذف شده بود، عضویتش دوباره فعال می‌شود
-    db.prepare(`INSERT INTO shop_members (shop_id,user_id,role,status,joined_at)
-                VALUES (?,?,?,'active',?)
-                ON CONFLICT(shop_id,user_id) DO UPDATE SET status='active', role=excluded.role`)
-      .run(shop.id, userId, inv.role, t);
-    db.prepare('UPDATE shop_invites SET used_by=?, used_at=? WHERE code=?').run(userId, t, code);
-  })();
-  return getShop(shop.id);
+/** اعضای دکان همراه نام و شماره — برای صفحه‌ی «شاگردها». */
+async function members(shopId) {
+  return many(
+    `SELECT m.id, m.user_id, m.role, m.status, m.created_at,
+            u.name, u.phone, u.email, u.last_login_at
+       FROM shop_members m
+       JOIN users u ON u.id = m.user_id
+      WHERE m.shop_id = $1 AND m.status <> 'removed'
+      ORDER BY (m.role='owner') DESC, (m.role='manager') DESC, m.created_at ASC`,
+    [shopId]
+  );
 }
 
-/** حذف عضو — فقط صاحب دکان، و صاحب دکان قابل حذف نیست. */
-function removeMember(shopId, byUserId, targetUserId) {
-  const me = getMembership(shopId, byUserId);
-  if (!me || me.role !== 'owner') {
-    throw new ShopError('فقط صاحب دکان می‌تواند عضو حذف کند', 'not_owner', 403);
-  }
-  const shop = getShop(shopId);
-  if (targetUserId === shop.owner_id) {
-    throw new ShopError('صاحب دکان قابل حذف نیست', 'cannot_remove_owner', 400);
-  }
-  const changed = getDb().prepare(
-    "UPDATE shop_members SET status='removed' WHERE shop_id=? AND user_id=? AND status='active'"
-  ).run(shopId, targetUserId).changes;
-  if (!changed) throw new ShopError('این کاربر عضو دکان نیست', 'not_a_member', 404);
-  return true;
+async function memberCount(shopId) {
+  const r = await one(
+    `SELECT COUNT(*)::int AS n FROM shop_members WHERE shop_id=$1 AND status='active'`, [shopId]
+  );
+  return r.n;
 }
 
-/** خروج داوطلبانه از دکان. صاحب دکان نمی‌تواند خارج شود. */
-function leaveShop(shopId, userId) {
-  const shop = getShop(shopId);
-  if (shop && shop.owner_id === userId) {
-    throw new ShopError('صاحب دکان نمی‌تواند از دکان خارج شود', 'owner_cannot_leave', 400);
-  }
-  getDb().prepare("UPDATE shop_members SET status='removed' WHERE shop_id=? AND user_id=?")
-    .run(shopId, userId);
-  return true;
-}
+/** تغییر وضعیت یا نقش یک عضو — مالک را نمی‌توان حذف یا کم‌دسترسی کرد. */
+async function updateMember(shopId, memberId, patch) {
+  const m = await one('SELECT * FROM shop_members WHERE id=$1 AND shop_id=$2', [memberId, shopId]);
+  if (!m) throw notFound('این عضو در دکان شما نیست', 'member_not_found');
+  if (m.role === 'owner') throw badRequest('صاحب دکان را نمی‌توان تغییر داد', 'owner_immutable');
 
-function renameShop(shopId, byUserId, name) {
-  const m = getMembership(shopId, byUserId);
-  if (!m || m.role !== 'owner') throw new ShopError('فقط صاحب دکان می‌تواند نام را تغییر دهد', 'not_owner', 403);
-  getDb().prepare('UPDATE shops SET name=?, updated_at=? WHERE id=?')
-    .run(String(name || '').trim().slice(0, 80) || 'دکان من', now(), shopId);
-  return getShop(shopId);
+  const role = patch.role && ['manager', 'staff'].includes(patch.role) ? patch.role : m.role;
+  const status = patch.status && ['active', 'suspended', 'removed'].includes(patch.status)
+    ? patch.status : m.status;
+
+  const row = await one(
+    'UPDATE shop_members SET role=$3, status=$4, updated_at=$5 WHERE id=$1 AND shop_id=$2 RETURNING *',
+    [memberId, shopId, role, status, now()]
+  );
+  // با حذف یا تعلیق، نشست‌های آن شخص همان لحظه باطل می‌شوند
+  if (status !== 'active') {
+    await query('UPDATE tokens SET revoked_at=$1 WHERE subject_id=$2 AND revoked_at IS NULL',
+      [now(), m.user_id]);
+  }
+  return row;
 }
 
 module.exports = {
-  ShopError, INVITE_TTL_MS, makeInviteCode,
-  getShop, getUserShop, getMembership, listMembers, activeMemberCount,
-  createShop, createInvite, joinWithInvite, removeMember, leaveShop, renameShop,
+  membershipOf, requireMembership, assertCan, createShop, getShop, updateShop,
+  members, memberCount, updateMember,
 };

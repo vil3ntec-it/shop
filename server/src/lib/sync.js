@@ -1,190 +1,221 @@
 'use strict';
 /**
- * همگام‌سازی تفاضلی داده‌های دکان.
+ * همگام‌سازی تفاضلی دفتر دکان.
  *
  * روش کار:
- *   - هر رکورد برنامه (فروش، محصول، مصرف …) با شناسه‌ی یکتای خودش ذخیره می‌شود.
- *   - سرور برای هر دکان یک شمارنده‌ی سراسری `rev` دارد. هر رکوردی که نوشته
- *     می‌شود rev تازه می‌گیرد.
- *   - دستگاه فقط رکوردهای با rev بزرگ‌تر از آخرین rev دیده‌شده را می‌گیرد.
- *     پس بعد از یک هفته آفلاین بودن هم فقط تفاوت‌ها رد و بدل می‌شود، نه کل دفتر.
+ *   - هر رکورد شناسه‌ی یکتای خودش را دارد؛ پس دو نفر که آفلاین فروخته‌اند
+ *     رکورد یکدیگر را پاک نمی‌کنند و فروش‌ها کنار هم جمع می‌شوند.
+ *   - هر دکان یک شمارنده‌ی سراسری rev دارد. هر نوشتن، rev تازه می‌گیرد.
+ *   - گوشی فقط رکوردهای با rev بزرگ‌تر از آخرین rev دیده‌شده را می‌گیرد؛
+ *     پس بعد از یک هفته آفلاین بودن هم کل دفتر دانلود نمی‌شود.
  *
- * حل تعارض:
- *   رکوردهای این برنامه تقریباً همیشه «فقط افزوده می‌شوند» (فروش، تراکنش،
- *   ورودی انبار). برای مواردی که ویرایش می‌شوند (محصول، قرض‌دار) قانون
- *   «آخرین ویرایش برنده است» بر اساس updatedAt کلاینت اعمال می‌شود.
- *   چون شناسه‌ها یکتا هستند، دو نفر که آفلاین کار کرده‌اند رکوردهای
- *   یکدیگر را پاک نمی‌کنند — فروش‌ها کنار هم جمع می‌شوند.
+ * تعارض:
+ *   داوری با updated_at خود رکورد است (آخرین ویرایش برنده). نسخه‌ی
+ *   قدیمی‌تر رد می‌شود ولی داده‌ی سرور پاک نمی‌شود و همان رکورد در پاسخ
+ *   به گوشی برمی‌گردد تا خودش را اصلاح کند.
  */
-const { getDb, now } = require('../db');
+const { one, many, tx, newId, now } = require('../db');
+const { badRequest, forbidden } = require('../middleware/errors');
+const { can } = require('./permissions');
 
-/** مجموعه‌هایی که همگام می‌شوند. هر چیزی خارج از این فهرست نادیده گرفته می‌شود. */
-const COLLECTIONS = [
-  'debtors', 'transactions',
-  'expenses',
-  'products', 'warehouseEntries',
-  'sales', 'saleItems', 'returns',
-  'suppliers', 'purchases', 'supplierPayments',
-  'stockMovements', 'priceHistory', 'auditLog',
-];
+/** نام مجموعه در برنامه → جدول دیتابیس. هر چیز بیرون این فهرست رد می‌شود. */
+const TABLES = {
+  products:         'products',
+  warehouseEntries: 'inventory',
+  sales:            'sales',
+  saleItems:        'sale_items',
+  returns:          'sale_returns',
+  debtors:          'debtors',
+  transactions:     'payments',
+  expenses:         'expenses',
+  suppliers:        'suppliers',
+  purchases:        'purchases',
+  supplierPayments: 'supplier_payments',
+  stockMovements:   'stock_movements',
+  priceHistory:     'price_history',
+  auditLog:         'shop_audit_log',
+};
+const COLLECTIONS = Object.keys(TABLES);
 
-const MAX_BATCH = 2000;          // سقف رکورد در هر درخواست
+const MAX_BATCH = 2000;
 const MAX_RECORD_BYTES = 64 * 1024;
+const DEFAULT_LIMIT = 1000;
+const MAX_LIMIT = 5000;
 
-class SyncError extends Error {
-  constructor(message, code = 'sync_error', status = 400) {
-    super(message); this.code = code; this.status = status; this.expose = true;
-  }
+/** گرفتن یک بازه‌ی rev برای این دسته از تغییرات. */
+async function reserveRevs(client, shopId, count) {
+  await client.query(
+    'INSERT INTO shop_rev (shop_id, last_rev) VALUES ($1, 0) ON CONFLICT (shop_id) DO NOTHING',
+    [shopId]
+  );
+  const { rows } = await client.query(
+    'UPDATE shop_rev SET last_rev = last_rev + $2 WHERE shop_id = $1 RETURNING last_rev',
+    [shopId, count]
+  );
+  const end = Number(rows[0].last_rev);
+  return end - count;           // revها از start+1 تا start+count
 }
 
-function nextRev(shopId, n = 1) {
-  const db = getDb();
-  db.prepare(`INSERT INTO shop_rev (shop_id,last_rev) VALUES (?,0)
-              ON CONFLICT(shop_id) DO NOTHING`).run(shopId);
-  const row = db.prepare('SELECT last_rev FROM shop_rev WHERE shop_id=?').get(shopId);
-  const start = row.last_rev;
-  db.prepare('UPDATE shop_rev SET last_rev=? WHERE shop_id=?').run(start + n, shopId);
-  return start;   // revها از start+1 تا start+n استفاده می‌شوند
-}
-
-function currentRev(shopId) {
-  const row = getDb().prepare('SELECT last_rev FROM shop_rev WHERE shop_id=?').get(shopId);
-  return row ? row.last_rev : 0;
+async function currentRev(shopId) {
+  const r = await one('SELECT last_rev FROM shop_rev WHERE shop_id=$1', [shopId]);
+  return r ? Number(r.last_rev) : 0;
 }
 
 /**
  * نوشتن تغییرات یک دستگاه.
- * @param {Array} changes [{collection, id, updatedAt, deleted, data}]
- * @returns {{applied:number, skipped:number, rev:number, conflicts:Array}}
+ *
+ * @param {object} ctx {shopId, userId, deviceId, role}
+ * @param {Array}  changes [{collection,id,updatedAt,deleted,data}]
  */
-function pushChanges(shopId, deviceId, userId, changes) {
-  if (!Array.isArray(changes)) throw new SyncError('قالب تغییرات نامعتبر است');
+async function pushChanges(ctx, changes) {
+  const { shopId, userId, deviceId = '', role = 'staff' } = ctx;
+  if (!Array.isArray(changes)) throw badRequest('قالب تغییرات درست نیست', 'bad_changes');
   if (changes.length > MAX_BATCH) {
-    throw new SyncError(`حداکثر ${MAX_BATCH} رکورد در هر درخواست`, 'batch_too_large', 413);
+    throw badRequest(`حداکثر ${MAX_BATCH} رکورد در هر درخواست`, 'batch_too_large');
   }
+  if (!changes.length) {
+    return { applied: 0, skipped: 0, conflicts: [], rev: await currentRev(shopId) };
+  }
+  if (!can(role, 'data.write')) throw forbidden('اجازه‌ی ثبت اطلاعات ندارید', 'permission_denied');
 
-  const db = getDb();
-  const getExisting = db.prepare(
-    'SELECT updated_at, deleted FROM shop_records WHERE shop_id=? AND collection=? AND record_id=?'
-  );
-  const upsert = db.prepare(`
-    INSERT INTO shop_records (shop_id,collection,record_id,rev,updated_at,deleted,device_id,user_id,data)
-    VALUES (@shop_id,@collection,@record_id,@rev,@updated_at,@deleted,@device_id,@user_id,@data)
-    ON CONFLICT(shop_id,collection,record_id) DO UPDATE SET
-      rev=excluded.rev, updated_at=excluded.updated_at, deleted=excluded.deleted,
-      device_id=excluded.device_id, user_id=excluded.user_id, data=excluded.data
-  `);
+  return tx(async (c) => {
+    let rev = await reserveRevs(c, shopId, changes.length);
+    let applied = 0, skipped = 0;
+    const conflicts = [];
+    const t = now();
 
-  let applied = 0, skipped = 0;
-  const conflicts = [];
+    for (const raw of changes) {
+      const collection = String(raw?.collection || '');
+      const table = TABLES[collection];
+      const recordId = String(raw?.id || '');
+      if (!table || !recordId || recordId.length > 80) { skipped++; continue; }
 
-  const tx = db.transaction(() => {
-    let rev = nextRev(shopId, changes.length);
-    for (const ch of changes) {
-      const collection = String(ch && ch.collection || '');
-      const recordId = String(ch && ch.id || '');
-      if (!COLLECTIONS.includes(collection) || !recordId) { skipped++; continue; }
+      const updatedAt = Number(raw.updatedAt) || t;
+      const deleted = raw.deleted === true;
+      const data = deleted ? {} : (raw.data && typeof raw.data === 'object' ? raw.data : {});
+      const json = JSON.stringify(data);
+      if (Buffer.byteLength(json, 'utf8') > MAX_RECORD_BYTES) { skipped++; continue; }
 
-      const updatedAt = Number(ch.updatedAt) || now();
-      const deleted = ch.deleted ? 1 : 0;
-      const json = JSON.stringify(ch.data === undefined ? null : ch.data);
-      if (json.length > MAX_RECORD_BYTES) { skipped++; continue; }
+      // رکورد فعلی سرور را قفل می‌کنیم تا دو دستگاه همزمان روی هم ننویسند
+      const existing = (await c.query(
+        `SELECT updated_at, deleted, version, user_id FROM ${table} WHERE shop_id=$1 AND id=$2 FOR UPDATE`,
+        [shopId, recordId]
+      )).rows[0];
 
-      const prev = getExisting.get(shopId, collection, recordId);
-      // آخرین ویرایش برنده است. مساوی بودن هم رد می‌شود تا نوشتن بی‌دلیل نشود.
-      if (prev && prev.updated_at >= updatedAt) {
-        skipped++;
-        if (prev.deleted !== deleted) {
-          conflicts.push({ collection, id: recordId, reason: 'stale_write' });
+      if (existing) {
+        // شاگرد فقط رکورد خودش را حذف می‌کند
+        if (deleted && !can(role, 'data.delete.any') && existing.user_id !== userId) {
+          conflicts.push({ collection, id: recordId, reason: 'delete_not_allowed' });
+          skipped++;
+          continue;
         }
-        continue;
+        // ویرایش قدیمی‌تر از چیزی که سرور دارد، نوشته نمی‌شود
+        if (Number(existing.updated_at) > updatedAt) {
+          conflicts.push({
+            collection, id: recordId, reason: 'stale',
+            serverUpdatedAt: Number(existing.updated_at),
+            serverVersion: existing.version,
+          });
+          skipped++;
+          continue;
+        }
+      } else if (deleted) {
+        // حذف رکوردی که سرور ندیده — سنگ قبر ثبت می‌شود تا بقیه هم خبردار شوند
       }
 
-      rev += 1;
-      upsert.run({
-        shop_id: shopId, collection, record_id: recordId, rev,
-        updated_at: updatedAt, deleted, device_id: deviceId, user_id: userId, data: json,
-      });
+      rev++;
+      await c.query(
+        `INSERT INTO ${table} (shop_id, id, rev, version, created_at, updated_at, deleted, device_id, user_id, data)
+         VALUES ($1,$2,$3,1,$4,$5,$6,$7,$8,$9::jsonb)
+         ON CONFLICT (shop_id, id) DO UPDATE SET
+           rev = excluded.rev,
+           version = ${table}.version + 1,
+           updated_at = excluded.updated_at,
+           deleted = excluded.deleted,
+           device_id = excluded.device_id,
+           user_id = CASE WHEN ${table}.user_id = '' THEN excluded.user_id ELSE ${table}.user_id END,
+           data = CASE WHEN excluded.deleted THEN ${table}.data ELSE excluded.data END`,
+        [shopId, recordId, rev, t, updatedAt, deleted, deviceId, userId, json]
+      );
       applied++;
     }
-    // اگر بعضی رکوردها رد شدند، revهای رزروشده‌ی اضافی مشکلی ایجاد نمی‌کنند
-    // (فقط شماره‌ها پرش دارند) ولی شمارنده نباید عقب برود.
-    const last = db.prepare('SELECT last_rev FROM shop_rev WHERE shop_id=?').get(shopId).last_rev;
-    if (rev > last) db.prepare('UPDATE shop_rev SET last_rev=? WHERE shop_id=?').run(rev, shopId);
-  });
-  tx();
 
-  return { applied, skipped, conflicts, rev: currentRev(shopId) };
+    return { applied, skipped, conflicts, rev: await (async () => {
+      const r = (await c.query('SELECT last_rev FROM shop_rev WHERE shop_id=$1', [shopId])).rows[0];
+      return Number(r.last_rev);
+    })() };
+  });
+}
+
+/** ساخت پرس‌وجوی خواندن تفاضلی روی همه‌ی مجموعه‌ها. */
+const PULL_SQL = (() => {
+  const parts = COLLECTIONS.map(col => `
+    SELECT '${col}'::text AS collection, id, rev, updated_at, deleted, user_id, device_id, data
+      FROM ${TABLES[col]} WHERE shop_id = $1 AND rev > $2`);
+  return `${parts.join(' UNION ALL ')} ORDER BY rev ASC LIMIT $3`;
+})();
+
+/**
+ * گرفتن تغییرات بعد از since.
+ * @returns {{changes:Array, rev:number, hasMore:boolean}}
+ */
+async function pullChanges(shopId, since = 0, limit = DEFAULT_LIMIT) {
+  const cap = Math.min(Math.max(1, Number(limit) || DEFAULT_LIMIT), MAX_LIMIT);
+  const from = Math.max(0, Number(since) || 0);
+  const rows = await many(PULL_SQL, [shopId, from, cap + 1]);
+  const hasMore = rows.length > cap;
+  const page = hasMore ? rows.slice(0, cap) : rows;
+  const head = await currentRev(shopId);
+
+  return {
+    changes: page.map(r => ({
+      collection: r.collection,
+      id: r.id,
+      rev: Number(r.rev),
+      updatedAt: Number(r.updated_at),
+      deleted: r.deleted,
+      userId: r.user_id,
+      data: r.deleted ? null : r.data,
+    })),
+    rev: page.length ? Number(page[page.length - 1].rev) : head,
+    hasMore,
+    serverRev: head,
+    serverTime: now(),
+  };
 }
 
 /**
- * خواندن تغییرات بعد از یک rev مشخص.
- * @returns {{changes:Array, rev:number, hasMore:boolean}}
+ * اجرای یک عملیات با تضمین «فقط یک بار».
+ *
+ * اگر گوشی به‌خاطر قطع شدن اینترنت همان درخواست را دوباره بفرستد، پاسخ
+ * دفعه‌ی اول برگردانده می‌شود و هیچ رکوردی دو بار ثبت نمی‌شود.
  */
-function pullChanges(shopId, sinceRev, limit = MAX_BATCH) {
-  const lim = Math.min(MAX_BATCH, Math.max(1, Number(limit) || MAX_BATCH));
-  const since = Math.max(0, Number(sinceRev) || 0);
+async function runIdempotent({ shopId, userId, deviceId, operationId }, fn) {
+  if (!operationId) return { result: await fn(), replayed: false };
 
-  const rows = getDb().prepare(`
-    SELECT collection, record_id, rev, updated_at, deleted, device_id, user_id, data
-    FROM shop_records WHERE shop_id=? AND rev>? ORDER BY rev ASC LIMIT ?
-  `).all(shopId, since, lim + 1);
+  const existing = await one(
+    'SELECT response FROM sync_operations WHERE shop_id=$1 AND client_operation_id=$2',
+    [shopId, operationId]
+  );
+  if (existing) return { result: existing.response, replayed: true };
 
-  const hasMore = rows.length > lim;
-  const page = hasMore ? rows.slice(0, lim) : rows;
+  const result = await fn();
 
-  const changes = page.map(r => ({
-    collection: r.collection,
-    id: r.record_id,
-    rev: r.rev,
-    updatedAt: r.updated_at,
-    deleted: !!r.deleted,
-    deviceId: r.device_id,
-    userId: r.user_id,
-    data: safeParse(r.data),
-  }));
-
-  // rev این صفحه، نه rev کل دکان — تا صفحه‌بندی چیزی را جا نیندازد
-  const rev = page.length ? page[page.length - 1].rev : since;
-  return { changes, rev, hasMore, shopRev: currentRev(shopId) };
-}
-
-function safeParse(s) { try { return JSON.parse(s); } catch { return null; } }
-
-/** تنظیمات مشترک دکان (نام فروشگاه، دسته‌ها، واحدها …). */
-function getSettings(shopId) {
-  const row = getDb().prepare('SELECT data, rev, updated_at FROM shop_settings WHERE shop_id=?').get(shopId);
-  if (!row) return { data: {}, rev: 0, updatedAt: 0 };
-  return { data: safeParse(row.data) || {}, rev: row.rev, updatedAt: row.updated_at };
-}
-
-function putSettings(shopId, data, updatedAt) {
-  const cur = getSettings(shopId);
-  const t = Number(updatedAt) || now();
-  if (cur.updatedAt >= t) return cur;     // نسخه‌ی قدیمی‌تر نوشته نمی‌شود
-  const rev = nextRev(shopId, 1) + 1;
-  getDb().prepare(`INSERT INTO shop_settings (shop_id,data,rev,updated_at) VALUES (?,?,?,?)
-                   ON CONFLICT(shop_id) DO UPDATE SET data=excluded.data, rev=excluded.rev, updated_at=excluded.updated_at`)
-    .run(shopId, JSON.stringify(data || {}), rev, t);
-  getDb().prepare('UPDATE shop_rev SET last_rev=? WHERE shop_id=? AND last_rev<?').run(rev, shopId, rev);
-  return getSettings(shopId);
-}
-
-/** آمار کوتاه برای نمایش «چه کسی چه وقت همگام کرده». */
-function shopStats(shopId) {
-  const db = getDb();
-  const perCollection = db.prepare(`
-    SELECT collection, COUNT(*) n FROM shop_records
-    WHERE shop_id=? AND deleted=0 GROUP BY collection
-  `).all(shopId);
-  const lastByUser = db.prepare(`
-    SELECT user_id, MAX(updated_at) last_at, COUNT(*) n
-    FROM shop_records WHERE shop_id=? GROUP BY user_id
-  `).all(shopId);
-  return { rev: currentRev(shopId), perCollection, lastByUser };
+  try {
+    await one(
+      `INSERT INTO sync_operations (id, shop_id, user_id, device_id, client_operation_id, response, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7)
+       ON CONFLICT (shop_id, client_operation_id) DO NOTHING
+       RETURNING id`,
+      [newId('op'), shopId, userId, deviceId || '', operationId, JSON.stringify(result), now()]
+    );
+  } catch (err) {
+    console.error('[sync] ثبت شناسه‌ی عملیات نشد:', err.message);
+  }
+  return { result, replayed: false };
 }
 
 module.exports = {
-  COLLECTIONS, MAX_BATCH, SyncError,
-  pushChanges, pullChanges, currentRev, getSettings, putSettings, shopStats,
+  TABLES, COLLECTIONS, MAX_BATCH, MAX_LIMIT,
+  pushChanges, pullChanges, currentRev, runIdempotent,
 };

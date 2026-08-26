@@ -2,22 +2,24 @@
 const path = require('path');
 const express = require('express');
 const config = require('./config');
-const ck = require('./lib/crypto-keys');
-const { getDb, pruneExpired } = require('./db');
+const { healthy, pruneExpired, now } = require('./db');
+const migrate = require('./migrate');
+const plans = require('./lib/plans');
+const subs = require('./lib/subscriptions');
 const { rateLimit } = require('./middleware/ratelimit');
 const { notFoundHandler, errorHandler } = require('./middleware/errors');
-const { requireUser, requireFeature } = require('./middleware/auth');
+const { requireUser, optionalShop } = require('./middleware/auth');
 
-async function createApp() {
+async function createApp({ runMigrations = true } = {}) {
   const app = express();
   app.disable('x-powered-by');
   if (config.trustProxy) app.set('trust proxy', true);
 
-  getDb();
-  pruneExpired();
-  app.locals.keys = await ck.loadKeyPair(config.privateKeyPath, config.publicKeyPath);
+  if (runMigrations) await migrate.run({ log: (m) => console.log(`[migrate] ${m}`) });
+  await plans.seedDefaults();
+  await pruneExpired();
 
-  app.use(express.json({ limit: '64kb' }));
+  app.use(express.json({ limit: '2mb' }));
 
   // ---- سرآیندهای امنیتی ----
   app.use((req, res, next) => {
@@ -28,18 +30,19 @@ async function createApp() {
     next();
   });
 
-  // ---- CORS: فقط دامنه‌های مجاز ----
+  // ---- CORS ----
+  // برنامه‌ی اندروید به CORS کاری ندارد؛ این فقط برای نسخه‌ی وب است و
+  // تنها دامنه‌هایی که در CORS_ORIGIN آمده‌اند اجازه دارند.
   app.use((req, res, next) => {
     const origin = req.headers.origin;
     if (origin) {
-      if (config.corsOrigins.includes(origin)) {
-        res.set('Access-Control-Allow-Origin', origin);
+      if (config.corsOrigins.includes(origin) || config.corsOrigins.includes('*')) {
+        res.set('Access-Control-Allow-Origin', config.corsOrigins.includes('*') ? '*' : origin);
         res.set('Vary', 'Origin');
-        res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-        res.set('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
+        res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, Idempotency-Key');
+        res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
         res.set('Access-Control-Max-Age', '600');
       } else if (req.method === 'OPTIONS') {
-        // دامنه‌ی ناشناس: سرآیند CORS نمی‌دهیم و مرورگر خودش جلویش را می‌گیرد
         return res.status(403).end();
       }
     }
@@ -49,30 +52,45 @@ async function createApp() {
 
   app.use(rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'general' }));
 
-  // ---- مسیرها ----
-  app.get('/health', (req, res) => res.json({ ok: true, time: Date.now() }));
+  // ---- بررسی سلامت ----
+  const health = async (req, res) => {
+    const db = await healthy();
+    res.status(db ? 200 : 503).json({
+      ok: db,
+      server: 'online',
+      database: db ? 'connected' : 'unavailable',
+      version: require('../package.json').version,
+      time: now(),
+      uptimeSeconds: Math.round(process.uptime()),
+    });
+  };
+  app.get('/health', health);
 
-  const api = express.Router();
-  api.use('/auth', require('./routes/auth'));
-  api.use('/license', require('./routes/license'));
-  api.use('/shop', require('./routes/shop'));
-  api.use('/billing', require('./routes/billing'));
-  api.use('/admin', require('./routes/admin'));
+  // ---- API ----
+  function apiRouter() {
+    const api = express.Router();
+    api.get('/health', health);
+    api.use('/auth', require('./routes/auth'));
+    api.use('/me', require('./routes/me'));
+    api.use('/shop', require('./routes/shop'));
+    api.use('/sync', require('./routes/sync'));
+    api.use('/shop/sync', require('./routes/sync'));   // نام قدیمی
+    api.use('/admin', require('./routes/admin'));
 
-  /**
-   * نمونه‌ی مسیر محافظت‌شده با قابلیت.
-   * هر API آنلاینی که به قابلیت اشتراکی وابسته است باید همین‌طور پشت
-   * requireFeature برود — این همان «بررسی دوباره در سمت سرور» است که
-   * دور زدن قفل در Frontend را بی‌اثر می‌کند.
-   */
-  api.get('/protected/reports', requireUser, requireFeature('reports'), (req, res) => {
-    res.json({ ok: true, message: 'دسترسی گزارشات تأیید شد', subscription: req.subscriptionState });
-  });
-  api.get('/protected/backup', requireUser, requireFeature('backup'), (req, res) => {
-    res.json({ ok: true, message: 'دسترسی پشتیبان‌گیری تأیید شد' });
-  });
+    // نام‌های قدیمی صفحه‌ی اشتراک
+    const me = require('./routes/me');
+    const billing = express.Router();
+    billing.use(requireUser, optionalShop);
+    billing.get('/status', me.subscriptionHandler);
+    billing.get('/plans', me.plansHandler);
+    api.use('/billing', billing);
 
-  app.use('/api/v1', api);
+    api.use('/', require('./routes/data'));
+    return api;
+  }
+
+  app.use('/api', apiRouter());
+  app.use('/api/v1', apiRouter());
 
   // ---- پنل مدیریت ----
   app.use('/admin', express.static(path.join(__dirname, '..', 'public', 'admin'), {
@@ -82,6 +100,15 @@ async function createApp() {
 
   app.use(notFoundHandler);
   app.use(errorHandler);
+
+  // ---- کارهای دوره‌ای ----
+  const housekeeping = setInterval(() => {
+    pruneExpired().catch(err => console.error('[housekeeping]', err.message));
+    subs.expireDue().catch(err => console.error('[subscriptions]', err.message));
+  }, 6 * 60 * 60 * 1000);
+  if (housekeeping.unref) housekeeping.unref();
+  app.locals.housekeeping = housekeeping;
+
   return app;
 }
 

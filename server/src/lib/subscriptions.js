@@ -1,231 +1,143 @@
 'use strict';
 /**
- * منطق اشتراک — تنها مرجع تصمیم‌گیری درباره‌ی «الان این کاربر چه دسترسی‌ای دارد».
- * همیشه با ساعت سرور کار می‌کند، هرگز با زمانی که کلاینت می‌فرستد.
+ * اشتراک — به دکان وصل است، نه به یک نفر.
+ *
+ * همه‌ی اعضای دکان از همان یک اشتراک استفاده می‌کنند؛ لازم نیست برای
+ * هر شاگرد جدا اشتراک خرید.
+ *
+ * زمان همیشه از ساعت سرور خوانده می‌شود. عوض کردن تاریخ گوشی هیچ اثری
+ * روی تمدید یا پایان اشتراک ندارد.
  */
-const { getDb, newId, now } = require('../db');
-const time = require('./time');
+const { query, one, many, newId, now } = require('../db');
+const { badRequest, notFound } = require('../middleware/errors');
 const { sanitizeFeatures } = require('./features');
-const config = require('../config');
+const plans = require('./plans');
 
-const LIVE_STATUSES = ['active', 'suspended'];
+const DAY = 24 * 60 * 60 * 1000;
 
-function parseFeatures(json) {
-  try { const v = JSON.parse(json); return Array.isArray(v) ? v : []; }
-  catch { return []; }
-}
-
-/** اشتراک زنده‌ی کاربر (فعال یا معلق). اشتراک لغوشده/منقضی برنمی‌گردد. */
-function getLiveSubscription(userId) {
-  return getDb().prepare(`
-    SELECT * FROM subscriptions
-    WHERE user_id = ? AND status IN ('active','suspended')
-    ORDER BY created_at DESC LIMIT 1
-  `).get(userId) || null;
-}
-
-function getSubscriptionById(id) {
-  return getDb().prepare('SELECT * FROM subscriptions WHERE id = ?').get(id) || null;
-}
-
-function listSubscriptions(userId) {
-  return getDb().prepare(
-    'SELECT * FROM subscriptions WHERE user_id = ? ORDER BY created_at DESC'
-  ).all(userId);
+/** اشتراک زنده‌ی دکان (active/suspended/pending) — یا null. */
+async function liveOf(shopId) {
+  return one(
+    `SELECT * FROM subscriptions
+      WHERE shop_id=$1 AND status IN ('active','suspended','pending')
+      ORDER BY created_at DESC LIMIT 1`,
+    [shopId]
+  );
 }
 
 /**
- * وضعیت مؤثر اشتراک در لحظه‌ی حال (بر اساس ساعت سرور).
- * خروجی:
- *   state: none | pending | active | grace | expired | suspended | cancelled
- *   features: قابلیت‌هایی که همین حالا مجازند (در حالت غیرفعال آرایه‌ی خالی)
+ * تازه‌ترین اشتراک دکان، حتی اگر تمام شده باشد.
+ * برای نمایش وضعیت لازم است: کاربر باید «اشتراک تمام شد» ببیند،
+ * نه «اشتراکی وجود ندارد».
  */
-function evaluate(sub, atMs = now()) {
-  if (!sub) {
-    return { state: 'none', active: false, features: [], startsAt: null, endsAt: null,
-             graceEndsAt: null, timezone: config.defaults.timezone, plan: null, maxDevices: 0 };
-  }
+async function latestOf(shopId) {
+  return one(
+    `SELECT * FROM subscriptions WHERE shop_id=$1
+      ORDER BY (status IN ('active','suspended','pending')) DESC, ends_at DESC, created_at DESC
+      LIMIT 1`,
+    [shopId]
+  );
+}
 
-  const graceMs = Math.max(0, sub.grace_days || 0) * 24 * 60 * 60 * 1000;
-  const graceEndsAt = sub.ends_at + graceMs;
-  const granted = sanitizeFeatures(parseFeatures(sub.features));
+async function historyOf(shopId) {
+  return many('SELECT * FROM subscriptions WHERE shop_id=$1 ORDER BY created_at DESC LIMIT 50', [shopId]);
+}
 
-  const base = {
-    subscriptionId: sub.id,
+/** وضعیت اشتراک با ساعت سرور. */
+function stateOf(sub, at = now()) {
+  if (!sub) return { status: 'none', active: false, endsAt: 0, startsAt: 0, daysLeft: 0, plan: '' };
+  const endsAt = Number(sub.ends_at);
+  const graceEnd = endsAt + (sub.grace_days || 0) * DAY;
+  let status = sub.status;
+  if (status === 'active' && at > graceEnd) status = 'expired';
+  const active = status === 'active' && at >= Number(sub.starts_at) && at <= graceEnd;
+  return {
+    id: sub.id,
     plan: sub.plan,
-    startsAt: sub.starts_at,
-    endsAt: sub.ends_at,
-    graceEndsAt,
-    timezone: sub.timezone,
+    status,
+    active,
+    startsAt: Number(sub.starts_at),
+    endsAt,
+    graceEndsAt: graceEnd,
+    daysLeft: Math.max(0, Math.ceil((graceEnd - at) / DAY)),
+    features: Array.isArray(sub.features) ? sub.features : [],
     maxDevices: sub.max_devices,
-    licenseTtlDays: sub.license_ttl_days,
-    graceDays: sub.grace_days,
+    note: sub.note || '',
   };
-
-  if (sub.status === 'cancelled') return { ...base, state: 'cancelled', active: false, features: [] };
-  if (sub.status === 'suspended') return { ...base, state: 'suspended', active: false, features: [] };
-  if (sub.status === 'expired')   return { ...base, state: 'expired',   active: false, features: [] };
-
-  if (atMs < sub.starts_at)  return { ...base, state: 'pending', active: false, features: [] };
-  if (atMs <= sub.ends_at)   return { ...base, state: 'active',  active: true,  features: granted };
-  if (atMs <= graceEndsAt)   return { ...base, state: 'grace',   active: true,  features: granted };
-  return { ...base, state: 'expired', active: false, features: [] };
 }
 
-/** وضعیت مؤثر کاربر — همان چیزی که License از روی آن ساخته می‌شود. */
-function evaluateUser(userId, atMs = now()) {
-  return evaluate(getLiveSubscription(userId), atMs);
+/** بستن اشتراک‌هایی که مهلتشان تمام شده — با ساعت سرور. */
+async function expireDue(at = now()) {
+  const r = await query(
+    `UPDATE subscriptions
+        SET status='expired', updated_at=$1
+      WHERE status='active'
+        AND (ends_at + (grace_days * $2::bigint)) < $1`,
+    [at, DAY]
+  );
+  return r.rowCount;
 }
 
 /**
- * ساخت/جایگزینی اشتراک کاربر.
- * اشتراک زنده‌ی قبلی به 'cancelled' می‌رود تا ایندکس یکتا نقض نشود و تاریخچه بماند.
+ * صدور یا تمدید اشتراک برای یک دکان.
+ * اگر اشتراک زنده‌ای باشد، از پایان همان ادامه پیدا می‌کند تا روزهای
+ * باقی‌مانده از بین نرود.
  */
-function createSubscription(userId, input, adminId) {
-  const db = getDb();
+async function grant(shopId, { plan = 'custom', days = null, startsAt = null, endsAt = null,
+  features = [], maxDevices = 10, graceDays = 0, note = '', createdBy = '' } = {}) {
+
+  const shop = await one('SELECT id FROM shops WHERE id=$1', [shopId]);
+  if (!shop) throw notFound('دکان پیدا نشد', 'shop_not_found');
+
   const t = now();
-  const tz = time.isValidTimeZone(input.timezone) ? input.timezone : config.defaults.timezone;
-  const { startsAt, endsAt } = resolvePeriod(input, tz, t);
+  const existing = await liveOf(shopId);
+  const base = existing && Number(existing.ends_at) > t ? Number(existing.ends_at) : t;
 
-  if (endsAt <= startsAt) throw new BadInput('تاریخ پایان باید بعد از تاریخ شروع باشد');
-
-  const sub = {
-    id: newId('sub'),
-    user_id: userId,
-    plan: String(input.plan || 'custom').slice(0, 40),
-    status: 'active',
-    starts_at: startsAt,
-    ends_at: endsAt,
-    timezone: tz,
-    features: JSON.stringify(sanitizeFeatures(input.features)),
-    max_devices: clampInt(input.maxDevices, 1, 100, config.defaults.maxDevices),
-    grace_days: clampInt(input.graceDays, 0, 365, config.defaults.graceDays),
-    license_ttl_days: input.licenseTtlDays === null || input.licenseTtlDays === undefined || input.licenseTtlDays === ''
-      ? null : clampInt(input.licenseTtlDays, 1, 3650, 30),
-    note: String(input.note || '').slice(0, 500),
-    created_at: t,
-    updated_at: t,
-    created_by: adminId || null,
-  };
-
-  const tx = db.transaction(() => {
-    db.prepare(`UPDATE subscriptions SET status='cancelled', updated_at=?
-                WHERE user_id=? AND status IN ('active','suspended')`).run(t, userId);
-    db.prepare(`
-      INSERT INTO subscriptions
-        (id,user_id,plan,status,starts_at,ends_at,timezone,features,max_devices,
-         grace_days,license_ttl_days,note,created_at,updated_at,created_by)
-      VALUES (@id,@user_id,@plan,@status,@starts_at,@ends_at,@timezone,@features,@max_devices,
-              @grace_days,@license_ttl_days,@note,@created_at,@updated_at,@created_by)
-    `).run(sub);
-  });
-  tx();
-  return getSubscriptionById(sub.id);
-}
-
-/** ویرایش اشتراک موجود — فقط فیلدهای داده‌شده تغییر می‌کنند. */
-function updateSubscription(subId, input) {
-  const sub = getSubscriptionById(subId);
-  if (!sub) throw new BadInput('اشتراک پیدا نشد', 404);
-
-  const tz = input.timezone !== undefined && time.isValidTimeZone(input.timezone)
-    ? input.timezone : sub.timezone;
-
-  const patch = { timezone: tz, updated_at: now() };
-
-  if (input.plan !== undefined)     patch.plan = String(input.plan).slice(0, 40);
-  if (input.note !== undefined)     patch.note = String(input.note).slice(0, 500);
-  if (input.features !== undefined) patch.features = JSON.stringify(sanitizeFeatures(input.features));
-  if (input.maxDevices !== undefined) patch.max_devices = clampInt(input.maxDevices, 1, 100, sub.max_devices);
-  if (input.graceDays !== undefined)  patch.grace_days = clampInt(input.graceDays, 0, 365, sub.grace_days);
-  if (input.licenseTtlDays !== undefined) {
-    patch.license_ttl_days = (input.licenseTtlDays === null || input.licenseTtlDays === '')
-      ? null : clampInt(input.licenseTtlDays, 1, 3650, 30);
+  let start = startsAt ? Number(startsAt) : t;
+  let end;
+  if (endsAt) {
+    end = Number(endsAt);
+  } else if (days) {
+    end = base + Number(days) * DAY;
+    start = existing ? Number(existing.starts_at) : start;
+  } else {
+    const p = await plans.getPlan(plan);
+    if (!p || !p.amount || !p.unit) throw badRequest('مدت اشتراک مشخص نیست', 'missing_duration');
+    end = plans.endOfPeriod(base, p.amount, p.unit);
+    start = existing ? Number(existing.starts_at) : start;
+    if (!features.length && Array.isArray(p.features) && p.features.length) features = p.features;
+    maxDevices = maxDevices || p.max_devices;
   }
-  if (input.status !== undefined) {
-    if (!['active', 'suspended', 'cancelled', 'expired'].includes(input.status)) {
-      throw new BadInput('وضعیت اشتراک نامعتبر است');
-    }
-    patch.status = input.status;
-  }
+  if (!Number.isFinite(end) || end <= t) throw badRequest('تاریخ پایان اشتراک معتبر نیست');
 
-  // تاریخ‌ها: یا هر دو دستی، یا با مدت از تاریخ شروع فعلی
-  if (input.startDate !== undefined || input.endDate !== undefined ||
-      input.amount !== undefined || input.unit !== undefined) {
-    const { startsAt, endsAt } = resolvePeriod(
-      { startDate: input.startDate, endDate: input.endDate, amount: input.amount, unit: input.unit },
-      tz, now(), { fallbackStart: sub.starts_at }
+  const clean = sanitizeFeatures(features);
+
+  if (existing) {
+    return one(
+      `UPDATE subscriptions
+          SET plan=$2, status='active', starts_at=$3, ends_at=$4, features=$5::jsonb,
+              max_devices=$6, grace_days=$7, note=$8, updated_at=$9, created_by=$10
+        WHERE id=$1 RETURNING *`,
+      [existing.id, plan, start, end, JSON.stringify(clean), maxDevices, graceDays, note, t, createdBy]
     );
-    if (endsAt <= startsAt) throw new BadInput('تاریخ پایان باید بعد از تاریخ شروع باشد');
-    patch.starts_at = startsAt;
-    patch.ends_at = endsAt;
   }
-
-  const cols = Object.keys(patch);
-  getDb().prepare(`UPDATE subscriptions SET ${cols.map(c => `${c}=@${c}`).join(', ')} WHERE id=@id`)
-    .run({ ...patch, id: subId });
-  return getSubscriptionById(subId);
+  return one(
+    `INSERT INTO subscriptions (id, shop_id, plan, status, starts_at, ends_at, features, max_devices, grace_days, note, created_at, updated_at, created_by)
+     VALUES ($1,$2,$3,'active',$4,$5,$6::jsonb,$7,$8,$9,$10,$10,$11) RETURNING *`,
+    [newId('sub'), shopId, plan, start, end, JSON.stringify(clean), maxDevices, graceDays, note, t, createdBy]
+  );
 }
 
-/** تمدید: پایان اشتراک را به اندازه‌ی مدت داده‌شده جلو می‌برد. */
-function renewSubscription(subId, amount, unit) {
-  const sub = getSubscriptionById(subId);
-  if (!sub) throw new BadInput('اشتراک پیدا نشد', 404);
-  const t = now();
-  // اگر اشتراک منقضی شده، تمدید از «حالا» شروع می‌شود، نه از تاریخ گذشته —
-  // وگرنه تمدید یک‌ماهه‌ی یک اشتراکِ سه‌ماه‌پیش‌منقضی‌شده بی‌اثر می‌ماند.
-  const from = Math.max(sub.ends_at, t);
-  const endsAt = time.addDuration(from, amount, unit, sub.timezone);
-  getDb().prepare(
-    `UPDATE subscriptions SET ends_at=?, status=CASE WHEN status IN ('expired','cancelled') THEN 'active' ELSE status END,
-     updated_at=? WHERE id=?`
-  ).run(endsAt, t, subId);
-  return getSubscriptionById(subId);
-}
-
-/**
- * تبدیل ورودی مدیر به بازه‌ی زمانی.
- * دو حالت: تاریخ شروع/پایان دستی، یا تاریخ شروع + مدت (روز/هفته/ماه/سال).
- */
-function resolvePeriod(input, tz, tNow, opts = {}) {
-  let startsAt;
-  if (input.startDate) {
-    const d = time.parseDateOnly(input.startDate);
-    if (!d) throw new BadInput('تاریخ شروع نامعتبر است (قالب درست: YYYY-MM-DD)');
-    startsAt = time.startOfZonedDay(d, tz);
-  } else if (opts.fallbackStart !== undefined) {
-    startsAt = opts.fallbackStart;
-  } else {
-    startsAt = tNow;
+async function setStatus(subscriptionId, status, by = '') {
+  if (!['active', 'suspended', 'cancelled', 'expired', 'pending'].includes(status)) {
+    throw badRequest('وضعیت اشتراک معتبر نیست');
   }
-
-  let endsAt;
-  if (input.endDate) {
-    const d = time.parseDateOnly(input.endDate);
-    if (!d) throw new BadInput('تاریخ پایان نامعتبر است (قالب درست: YYYY-MM-DD)');
-    endsAt = time.endOfZonedDay(d, tz);   // کل روز پایان جزو اشتراک است
-  } else if (input.amount !== undefined && input.unit) {
-    try { endsAt = time.addDuration(startsAt, input.amount, input.unit, tz); }
-    catch (e) { throw new BadInput(e.message); }
-  } else {
-    throw new BadInput('یا تاریخ پایان را وارد کنید یا مدت اشتراک (amount + unit) را');
-  }
-
-  return { startsAt, endsAt };
+  const row = await one(
+    'UPDATE subscriptions SET status=$2, updated_at=$3, created_by=COALESCE(NULLIF($4,\'\'), created_by) WHERE id=$1 RETURNING *',
+    [subscriptionId, status, now(), by]
+  );
+  if (!row) throw notFound('اشتراک پیدا نشد', 'subscription_not_found');
+  return row;
 }
 
-function clampInt(v, min, max, dflt) {
-  const n = Number(v);
-  if (!Number.isFinite(n)) return dflt;
-  return Math.min(max, Math.max(min, Math.round(n)));
-}
-
-class BadInput extends Error {
-  constructor(message, status = 400) { super(message); this.status = status; this.expose = true; }
-}
-
-module.exports = {
-  LIVE_STATUSES, getLiveSubscription, getSubscriptionById, listSubscriptions,
-  evaluate, evaluateUser, createSubscription, updateSubscription, renewSubscription,
-  resolvePeriod, parseFeatures, BadInput,
-};
+module.exports = { liveOf, latestOf, historyOf, stateOf, expireDue, grant, setStatus, DAY };

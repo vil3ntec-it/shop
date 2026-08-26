@@ -16,9 +16,13 @@ function clientIp(req) {
   return req.socket?.remoteAddress || 'unknown';
 }
 
-function rateLimit({ max, windowMs = config.rateLimit.windowMs, keyPrefix = '' }) {
+/**
+ * @param {object} opts
+ * @param {function} [opts.key] کلید دلخواه (مثلاً شماره‌ی موبایل) به‌جای IP
+ */
+function rateLimit({ max, windowMs = config.rateLimit.windowMs, keyPrefix = '', key: keyFn = null }) {
   return function (req, res, next) {
-    const key = `${keyPrefix}:${clientIp(req)}`;
+    const key = `${keyPrefix}:${keyFn ? (keyFn(req) || clientIp(req)) : clientIp(req)}`;
     const t = Date.now();
     let hits = buckets.get(key);
     if (!hits) { hits = []; buckets.set(key, hits); }
