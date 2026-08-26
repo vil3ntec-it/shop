@@ -2,3 +2,8 @@ node_modules/
 .env
 *.log
 tohid-android.zip
+
+# کلید امضای اندروید — هرگز نباید در مخزن کامیت شود
+*.keystore
+*.jks
+*.p12

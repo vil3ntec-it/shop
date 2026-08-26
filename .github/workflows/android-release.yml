@@ -39,18 +39,35 @@ jobs:
           fi
 
       - name: Decode signing keystore
-        # اگر امضای رسمی تنظیم نشده باشد، بیلد با امضای debug ادامه می‌دهد
-        id: keystore
+        # نسخه‌ی رسمی باید با کلید واقعی امضا شود. اگر امضا تنظیم نشده باشد
+        # همین‌جا می‌ایستیم — قبلاً بی‌صدا با امضای debug رد می‌شد و نسخه‌ای
+        # منتشر می‌شد که روی نسخه‌ی قبلی نصب نمی‌شود.
         env:
           KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          if [ -n "$KEYSTORE_B64" ]; then
-            echo "$KEYSTORE_B64" | base64 -d > android/app/release.keystore
-            echo "present=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "present=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::ANDROID_KEYSTORE_BASE64 تنظیم نشده — خروجی با امضای debug ساخته می‌شود."
+          missing=""
+          [ -n "$KEYSTORE_B64" ]     || missing="$missing ANDROID_KEYSTORE_BASE64"
+          [ -n "$KEYSTORE_PASSWORD" ]|| missing="$missing ANDROID_KEYSTORE_PASSWORD"
+          [ -n "$KEY_ALIAS" ]        || missing="$missing ANDROID_KEY_ALIAS"
+          [ -n "$KEY_PASSWORD" ]     || missing="$missing ANDROID_KEY_PASSWORD"
+          if [ -n "$missing" ]; then
+            echo "::error::این Secretها تنظیم نشده‌اند:$missing"
+            echo "::error::بدون آن‌ها نسخه با امضای debug ساخته می‌شود و روی نسخه‌ی نصب‌شده به‌روزرسانی نمی‌شود."
+            echo "::error::از Settings → Secrets and variables → Actions در همین مخزن اضافه‌شان کنید."
+            exit 1
           fi
+          echo "$KEYSTORE_B64" | base64 -d > android/app/release.keystore
+          # همین‌جا رمز و نام کلید را می‌سنجیم تا خطای واقعی دیده شود،
+          # نه یک خطای گنگ از Gradle.
+          if ! keytool -list -keystore android/app/release.keystore \
+                 -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" > /dev/null 2>&1; then
+            echo "::error::کلید با این رمز یا با این نام (alias) باز نشد. ANDROID_KEYSTORE_PASSWORD و ANDROID_KEY_ALIAS را بررسی کنید."
+            exit 1
+          fi
+          echo "کلید امضا آماده است."
 
       - name: Build release APK
         working-directory: android
@@ -59,7 +76,7 @@ jobs:
           TOHID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           TOHID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           TOHID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-          TOHID_SIGNING: ${{ steps.keystore.outputs.present }}
+          TOHID_SIGNING: "true"
           # اگر متغیر مخزن SHOP_SERVER_URL تنظیم شده باشد، همان آدرس به‌عنوان
           # پیش‌فرض داخل نسخه می‌رود؛ کاربر باز هم می‌تواند از داخل برنامه عوضش کند.
           SHOP_SERVER_URL: ${{ vars.SHOP_SERVER_URL }}
@@ -71,6 +88,17 @@ jobs:
           find android/app/build/outputs/apk/release -name "*.apk" -exec \
             cp {} "out/shop-${{ steps.ver.outputs.value }}.apk" \;
           ls -la out
+
+      - name: Verify APK signature
+        # مطمئن می‌شویم آنچه منتشر می‌شود واقعاً با کلید خودمان امضا شده
+        # و امضای debug نیست.
+        run: |
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -name apksigner | sort -V | tail -1)"
+          "$APKSIGNER" verify --print-certs "out/shop-${{ steps.ver.outputs.value }}.apk" | tee certs.txt
+          if grep -qi "CN=Android Debug" certs.txt; then
+            echo "::error::این APK با امضای debug ساخته شده. منتشر نمی‌شود."
+            exit 1
+          fi
 
       - name: Publish release
         uses: softprops/action-gh-release@v2
