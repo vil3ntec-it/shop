@@ -1,11 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  نسخه‌ی تک‌رنگ نشان برای حالت «آیکن‌های هماهنگ» اندروید ۱۳ به بعد.
-  همان V نشان برنامه است، ساده و یک‌دست.
+  نسخه‌ی تک‌رنگ نشان برای حالت «آیکن‌های هماهنگ» اندروید ۱۳ به بعد:
+  همان کیف خرید با نشان V، ساده و یک‌دست.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
+    <!-- دسته‌ی کیف -->
+    <path android:strokeColor="#FFFFFF" android:strokeWidth="4.5"
+          android:fillColor="#00000000" android:strokeLineCap="round"
+          android:pathData="M45,42 V37 a9,9 0 0 1 18,0 v5" />
+    <!-- بدنه‌ی کیف -->
+    <path android:strokeColor="#FFFFFF" android:strokeWidth="5"
+          android:fillColor="#00000000" android:strokeLineJoin="round"
+          android:pathData="M33,42 h42 v37 a5,5 0 0 1 -5,5 h-32 a5,5 0 0 1 -5,-5 z" />
+    <!-- نشان V -->
     <path android:fillColor="#FFFFFF"
-          android:pathData="M28,30 L44,30 L54,62 L64,30 L80,30 L58,84 L50,84 Z" />
+          android:pathData="M44,52 h7 l3,12 3,-12 h7 l-8,22 h-4 z" />
 </vector>
