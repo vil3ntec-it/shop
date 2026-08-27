@@ -7,6 +7,12 @@
   const S = () => window.TohidShop;
   const $ = (s, r) => (r || document).querySelector(s);
   const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
+  /* بعضی مرورگرها و WebViewها localStorage را می‌بندند (فایل محلی،
+     حالت ناشناس، ذخیره‌سازی خاموش). آن‌جا خواندن خطا می‌دهد و اگر
+     نگیریمش، این لایه وسط کار می‌ایستد. */
+  const lsGet = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
+  const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+  const lsDel = (k) => { try { localStorage.removeItem(k); } catch {} };
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g,
     c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const fa = (n) => Number(n).toLocaleString('fa-IR');
@@ -136,12 +142,12 @@
     const password = $('#shop-pw', el).value;
     if (!identifier || !password) throw new Error('نام کاربری و رمز عبور را وارد کنید');
     const r = await S().api('/api/v1/auth/login', { method: 'POST', auth: false, body: { identifier, password } });
-    const store = JSON.parse(localStorage.getItem('tohid-license-v1') || '{}');
+    const store = JSON.parse(lsGet('tohid-license-v1') || '{}');
     Object.assign(store, {
       accessToken: r.accessToken, refreshToken: r.refreshToken, userId: r.user.id,
       userLabel: r.user.name || r.user.email || r.user.phone || '',
     });
-    localStorage.setItem('tohid-license-v1', JSON.stringify(store));
+    lsSet('tohid-license-v1', JSON.stringify(store));
     $('#shop-pw', el).value = '';
     await S().refreshShopInfo();
     msg('وارد شدید.', 'ok');
@@ -194,9 +200,9 @@
 
   function doLogout() {
     const keep = {};
-    localStorage.setItem('tohid-license-v1', JSON.stringify(keep));
-    localStorage.removeItem('tohid-sync-state-v1');
-    localStorage.removeItem('tohid-sync-shadow-v1');
+    lsSet('tohid-license-v1', JSON.stringify(keep));
+    lsDel('tohid-sync-state-v1');
+    lsDel('tohid-sync-shadow-v1');
     render();
     msg('از حساب خارج شدید. اطلاعات دکان روی این گوشی دست‌نخورده است.', 'ok');
   }

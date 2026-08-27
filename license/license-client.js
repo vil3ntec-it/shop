@@ -87,11 +87,18 @@
   }
   function clearStore() { try { localStorage.removeItem(STORE_KEY); } catch {} }
 
+  /* بعضی مرورگرها و WebViewها localStorage را می‌بندند (فایل محلی،
+     حالت ناشناس، ذخیره‌سازی خاموش). آن‌جا خواندن خطا می‌دهد و اگر
+     نگیریمش، این لایه وسط کار می‌ایستد. */
+  const lsGet = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
+  const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+  const lsDel = (k) => { try { localStorage.removeItem(k); } catch {} };
+
   function getServerUrl() {
     // اگر کاربر قبلاً در تنظیمات خود برنامه آدرس سرور را داده، همان استفاده می‌شود
-    const own = (localStorage.getItem(SERVER_KEY) || '').trim();
+    const own = (lsGet(SERVER_KEY) || '').trim();
     if (own) return own.replace(/\/+$/, '');
-    const legacy = (localStorage.getItem('tohid-shop-server-url') || '').trim();
+    const legacy = (lsGet('tohid-shop-server-url') || '').trim();
     if (!legacy) return '';
     // آدرس قدیمی برای WebSocket بود؛ به http تبدیل می‌شود
     return legacy.replace(/^ws:/i, 'http:').replace(/^wss:/i, 'https:').replace(/\/+$/, '');

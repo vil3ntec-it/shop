@@ -40,9 +40,15 @@
   const fa = (n) => Number(n).toLocaleString('fa-IR');
   const read = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
   const write = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+  /* بعضی مرورگرها و WebViewها localStorage را می‌بندند (فایل محلی،
+     حالت ناشناس، ذخیره‌سازی خاموش). آن‌جا خواندن خطا می‌دهد و اگر
+     نگیریمش، این لایه وسط کار می‌ایستد. */
+  const lsGet = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
+  const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+  const lsDel = (k) => { try { localStorage.removeItem(k); } catch {} };
 
   function serverUrl() {
-    const v = (localStorage.getItem(SERVER_KEY) || '').trim();
+    const v = (lsGet(SERVER_KEY) || '').trim();
     return v ? v.replace(/\/+$/, '') : '';
   }
   const account = () => read(ACCT_KEY, {});
