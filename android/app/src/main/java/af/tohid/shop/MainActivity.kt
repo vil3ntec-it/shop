@@ -414,6 +414,9 @@ class MainActivity : ComponentActivity() {
         /** اگر پنجره‌ای باز است، دکمه‌ی برگشت همان را ببندد، نه برنامه را. */
         const val BACK_HANDLER = """
             (function(){
+              // صفحه‌ی ورود که از داخل برنامه باز شده — برگشت آن را ببندد
+              var authClose = document.getElementById('auth-close');
+              if (authClose && !authClose.hidden) { authClose.click(); return true; }
               // پنجره‌های برنامه با کلاس open باز می‌شوند
               var open = document.querySelector('.modal-scrim.open, .sheet.open, .drawer.open');
               if (open) {
