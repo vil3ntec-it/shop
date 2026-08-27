@@ -845,6 +845,17 @@
     },
 
     open(featureLabel) {
+      /*
+       * تا وارد حساب نشده‌اید، همان صفحه‌ی کامل «خوش آمدید» باز می‌شود —
+       * ورود، ثبت‌نام و کد شاگرد یک‌جا. این پنجره‌ی کوچک فقط برای
+       * مدیریت حسابِ واردشده است.
+       */
+      if (!readStore().accessToken && typeof window.openAuthScreen === 'function') {
+        window.openAuthScreen(featureLabel
+          ? `برای «${featureLabel}» اول وارد حساب شوید یا ثبت‌نام کنید.`
+          : '');
+        return;
+      }
       UI.ensure();
       UI.render();
       if (featureLabel) UI.msg(`قابلیت «${featureLabel}» در اشتراک فعلی شما فعال نیست.`, 'warn');

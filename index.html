@@ -2049,6 +2049,11 @@
     transition:background-color .18s ease, color .18s ease;
   }
   .auth-close[hidden]{display:none;}
+
+  /* پیام زیر دکمه‌ی ورود جای خودش را داشته باشد، نه روی دکمه */
+  #auth-form-error{margin:12px 2px 0; line-height:1.9;}
+  /* پیام راهنما (نه خطا) — مثلاً وقتی از بخش اشتراک آمده‌ایم */
+  .auth-field-error.info{color:var(--primary);}
   @media (hover:hover){ .auth-close:hover{background:var(--danger-tint); color:var(--danger);} }
   /* برق نور، مثل کارت اشتراک — با جابه‌جایی پس‌زمینه، تا چیزی از
      کارت بیرون نزند و لازم نباشد محتوا بریده شود. */
@@ -4931,6 +4936,7 @@
   function authError(id, message){
     const el = document.getElementById(id);
     if(!el) return;
+    el.classList.remove('info');
     el.textContent = message || '';
     el.classList.toggle('show', !!message);
   }
@@ -4956,7 +4962,7 @@
    * حساب» روی سربرگ). چون کاربر از قبل داخل برنامه است، دکمه‌ی بستن هم
    * پیدا می‌شود تا بتواند بدون ورود برگردد.
    */
-  function openAuthScreen(){
+  function openAuthScreen(note){
     const authScreen = document.getElementById('auth-screen');
     const appRoot = document.getElementById('app-root');
     if(!authScreen || !appRoot) return;
@@ -4966,6 +4972,17 @@
     if(passEl){ passEl.value = ''; passEl.type = 'password'; }
     document.getElementById('auth-eye')?.classList.remove('on');
     renderSavedLogins();
+    /* پیام اختیاری — مثلاً وقتی از بخش اشتراک یا یک قابلیت قفل آمده‌ایم */
+    if(note){
+      authError('auth-form-error', note);
+      document.getElementById('auth-form-error')?.classList.add('info');
+    }
+
+    /* هر پنجره‌ای که باز است بسته شود تا روی صفحه‌ی ورود نماند */
+    document.querySelectorAll('.modal-scrim.open').forEach(m=> m.classList.remove('open'));
+    if(window.TohidVip && window.TohidVip.close) window.TohidVip.close();
+    if(window.TohidLicense && window.TohidLicense.close) window.TohidLicense.close();
+    if(window.TohidShopUI && window.TohidShopUI.close) window.TohidShopUI.close();
 
     const closeBtn = document.getElementById('auth-close');
     if(closeBtn) closeBtn.hidden = false;
@@ -9870,6 +9887,8 @@
 
   document.getElementById('btn-open-account').addEventListener('click', ()=>{
     const lic = window.TohidLicense;
+    const inAccount = !!(lic && lic.isLoggedIn && lic.isLoggedIn());
+    if(!inAccount){ openAuthScreen(); return; }
     if(lic && lic.open) lic.open();
   });
 
