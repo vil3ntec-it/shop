@@ -105,7 +105,9 @@ fun AppRoot(
         "audit" -> AuditLogScreen(data)
         "settings" -> SettingsScreen(store, data, snackbar, theme, onTheme)
         "expenses" -> ExpensesScreen(store, data, snackbar)
-        "dashboard" -> DashboardScreen(data) { target -> tab = target; sub = null }
+        "dashboard" -> DashboardScreen(data, theme, onTheme) { target ->
+          if (target == "settings") sub = "settings" else { tab = target; sub = null }
+        }
         "sale" -> VipGate("فروش (صندوق)") {
           SaleScreen(store, cartStore, data, snackbar) { code ->
             pendingBarcode = code

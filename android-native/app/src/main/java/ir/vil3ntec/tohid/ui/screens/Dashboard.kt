@@ -8,7 +8,15 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -32,6 +40,7 @@ import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.qty
 import ir.vil3ntec.tohid.ui.theme.Radius
 import ir.vil3ntec.tohid.ui.theme.Shop
+import ir.vil3ntec.tohid.ui.theme.ThemeChoice
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -49,8 +58,14 @@ private fun todayIso(): String =
  *  عددها هم با همان فرمول‌ها حساب می‌شوند و از موتورهای مشترک می‌آیند، نه
  *  از حسابِ جداگانهٔ این صفحه.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DashboardScreen(d: ShopData, onOpen: (String) -> Unit = {}) {
+fun DashboardScreen(
+  d: ShopData,
+  theme: ThemeChoice = ThemeChoice.SYSTEM,
+  onTheme: (ThemeChoice) -> Unit = {},
+  onOpen: (String) -> Unit = {},
+) {
   val today = todayIso()
   val monthPrefix = today.take(7)
 
@@ -70,6 +85,23 @@ fun DashboardScreen(d: ShopData, onOpen: (String) -> Unit = {}) {
   val warehouse = WarehouseEngine.summary(d)
 
   var vipOpen by remember { mutableStateOf(false) }
+  var alertsOpen by remember { mutableStateOf(false) }
+
+  // همان هشدارهایی که زنگِ نسخهٔ وب نشان می‌دهد
+  val alerts = buildList {
+    outOfStock.forEach {
+      add(Alert("تمام شد", it.name, "کالا موجود نیست", Shop.colors.danger))
+    }
+    lowStock.forEach {
+      add(Alert("موجودی کم", it.name, "${qty(ShopStore.stock(d, it.id))} مانده", Shop.colors.warning))
+    }
+    if (supplierDebt > 0) {
+      add(Alert("بدهی به تأمین‌کننده", "${money(supplierDebt)} افغانی", "پرداخت‌نشده", Shop.colors.warning))
+    }
+    owing.take(3).forEach { (debtor, amount) ->
+      add(Alert("قرض‌دار", debtor.name, "${money(amount)} افغانی", Shop.colors.danger))
+    }
+  }
 
   Column(
     Modifier
@@ -92,9 +124,43 @@ fun DashboardScreen(d: ShopData, onOpen: (String) -> Unit = {}) {
           color = Shop.colors.muted,
         )
       }
-      VipBadge(onClick = { vipOpen = true })
+      Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+      ) {
+        VipBadge(onClick = { vipOpen = true })
+        HeaderButton(Icons.Filled.Notifications, "هشدارها", badge = alerts.size) {
+          alertsOpen = true
+        }
+        HeaderButton(
+          if (theme == ThemeChoice.DARK) Icons.Filled.LightMode else Icons.Filled.DarkMode,
+          "روشن یا تاریک",
+        ) {
+          onTheme(if (theme == ThemeChoice.DARK) ThemeChoice.LIGHT else ThemeChoice.DARK)
+        }
+        HeaderButton(Icons.Filled.Person, "حساب") { onOpen("settings") }
+      }
     }
     if (vipOpen) VipSheet { vipOpen = false }
+    if (alertsOpen) {
+      ModalBottomSheet(onDismissRequest = { alertsOpen = false }, containerColor = Shop.colors.bg) {
+        Column(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, bottom = 28.dp)) {
+          Text(
+            "هشدارهای فروشگاه",
+            style = MaterialTheme.typography.titleMedium,
+            color = Shop.colors.text,
+          )
+          Spacer(Modifier.height(10.dp))
+          if (alerts.isEmpty()) {
+            EmptyNote("همه‌چیز مرتب است — هشداری نیست.")
+          } else {
+            alerts.forEach { alert ->
+              LineRow(alert.title, alert.value, alert.tint, detail = alert.detail)
+            }
+          }
+        }
+      }
+    }
     Spacer(Modifier.height(16.dp))
 
     /* ------------------------ چهار کاشیِ بالا ------------------------ */
@@ -386,5 +452,46 @@ private fun TrendChart(values: List<Double>) {
       }
     }
     points.forEach { p -> drawCircle(color = line, radius = 4f, center = p) }
+  }
+}
+
+
+/** یک هشدار در زنگِ سربرگ */
+private data class Alert(val value: String, val title: String, val detail: String, val tint: Color)
+
+/** دکمه‌های کوچکِ سربرگ — همان آیکن‌های گردِ نسخهٔ وب */
+@Composable
+private fun HeaderButton(
+  icon: androidx.compose.ui.graphics.vector.ImageVector,
+  description: String,
+  badge: Int = 0,
+  onClick: () -> Unit,
+) {
+  Box(contentAlignment = Alignment.TopEnd) {
+    Box(
+      Modifier
+        .size(36.dp)
+        .clip(RoundedCornerShape(12.dp))
+        .background(Shop.colors.surface)
+        .clickable(onClick = onClick),
+      contentAlignment = Alignment.Center,
+    ) {
+      Icon(icon, contentDescription = description, tint = Shop.colors.muted, modifier = Modifier.size(18.dp))
+    }
+    if (badge > 0) {
+      Box(
+        Modifier
+          .size(16.dp)
+          .clip(RoundedCornerShape(8.dp))
+          .background(Shop.colors.danger),
+        contentAlignment = Alignment.Center,
+      ) {
+        Text(
+          badge.coerceAtMost(9).fa(),
+          style = MaterialTheme.typography.labelSmall,
+          color = Color.White,
+        )
+      }
+    }
   }
 }
