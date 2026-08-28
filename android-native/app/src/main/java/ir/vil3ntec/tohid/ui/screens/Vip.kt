@@ -404,3 +404,69 @@ private fun PlanRow(plan: Plan, onClick: () -> Unit) {
     }
   }
 }
+
+/* ============================ قفلِ قابلیت‌ها ============================ */
+
+/**
+ *  همان قاعدهٔ نسخهٔ وب: تا وقتی آدرس سروری تنظیم نشده، هیچ چیزی قفل
+ *  نمی‌شود و تمام برنامه باز است. با سرور، قابلیت‌های پولی (فروش،
+ *  قرض‌داران، اسکنر، چند کاربر) به اشتراکِ فعال گره می‌خورند.
+ *
+ *  قفل، صفحه را پنهان نمی‌کند: می‌گوید چه چیزی بسته است و راهِ باز کردنش
+ *  کجاست. صفحهٔ سفیدِ بی‌توضیح، کاربر را فقط سردرگم می‌کند.
+ */
+@Composable
+fun VipGate(label: String, content: @Composable () -> Unit) {
+  val context = LocalContext.current
+  val state = remember { SyncStore(context) }
+  val enforcing = state.serverUrl.isNotBlank()
+  val status = remember(enforcing) {
+    License.status(state.license, state.publicKey, state.deviceUid, System.currentTimeMillis())
+  }
+  val open = !enforcing ||
+    status.state == License.State.ACTIVE ||
+    status.state == License.State.GRACE
+
+  if (open) {
+    content()
+    return
+  }
+
+  var sheet by remember { mutableStateOf(false) }
+  Column(
+    Modifier.fillMaxSize().padding(24.dp),
+    verticalArrangement = Arrangement.Center,
+    horizontalAlignment = Alignment.Start,
+  ) {
+    Box(
+      Modifier
+        .size(58.dp)
+        .clip(RoundedCornerShape(20.dp))
+        .background(Shop.colors.warningTint),
+      contentAlignment = Alignment.Center,
+    ) {
+      Icon(Icons.Filled.Lock, contentDescription = null, tint = Shop.colors.warning)
+    }
+    Spacer(Modifier.height(14.dp))
+    Text(
+      "«$label» با اشتراک باز می‌شود",
+      style = MaterialTheme.typography.titleMedium,
+      color = Shop.colors.text,
+      fontWeight = FontWeight.Bold,
+    )
+    Spacer(Modifier.height(6.dp))
+    Text(
+      "بقیهٔ برنامه — انبار، مصارف، خرید، گزارش‌ها و پشتیبان‌گیری — باز است و همیشه باز می‌ماند.",
+      style = MaterialTheme.typography.bodySmall,
+      color = Shop.colors.muted,
+    )
+    Spacer(Modifier.height(16.dp))
+    Button(
+      onClick = { sheet = true },
+      colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE0A92C)),
+    ) {
+      Text("اشتراک و قیمت‌ها", color = Color(0xFF3A2705), fontWeight = FontWeight.Bold)
+    }
+  }
+  if (sheet) VipSheet { sheet = false }
+}
