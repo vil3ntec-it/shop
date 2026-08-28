@@ -15,8 +15,8 @@ android {
     applicationId = "ir.vil3ntec.tohid"
     minSdk = 24
     targetSdk = 35
-    versionCode = 11
-    versionName = "3.2.0"
+    versionCode = 12
+    versionName = "3.3.0"
     resourceConfigurations += listOf("fa", "en")
 
     ndk {

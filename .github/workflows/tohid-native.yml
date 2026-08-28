@@ -49,6 +49,29 @@ jobs:
           echo "APK_NAME=Tohid-Native-$version.apk" >> "$GITHUB_ENV"
           echo "APK_MB=$(du -m *.apk | cut -f1)" >> "$GITHUB_ENV"
 
+      - name: نگهبانِ شمارهٔ نسخه
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        working-directory: android-native/out
+        run: |
+          # دو فایلِ متفاوت با یک شماره یعنی کسی که اولی را نصب کرده،
+          # هرگز دومی را نمی‌گیرد: به‌روزرسان شماره‌ها را مقایسه می‌کند و
+          # می‌بیند یکی‌اند. یک بار همین اتفاق افتاد؛ دیگر نباید بی‌صدا بیفتد.
+          gh release download tohid-native --pattern SHA256SUMS.txt \
+            --output old-sums.txt --clobber 2>/dev/null || exit 0
+
+          new_sum=$(cut -d' ' -f1 SHA256SUMS.txt)
+          old_sum=$(grep -F " ${APK_NAME}" old-sums.txt 2>/dev/null | cut -d' ' -f1 || true)
+
+          if [ -n "$old_sum" ] && [ "$old_sum" != "$new_sum" ]; then
+            echo "::error::«${APK_NAME}» قبلاً با محتوای دیگری منتشر شده است."
+            echo "  منتشرشده: $old_sum"
+            echo "  این ساخت:  $new_sum"
+            echo "  versionName را در app/build.gradle.kts بالا ببرید."
+            exit 1
+          fi
+          rm -f old-sums.txt
+
       - uses: actions/upload-artifact@v4
         with:
           name: Tohid-Native

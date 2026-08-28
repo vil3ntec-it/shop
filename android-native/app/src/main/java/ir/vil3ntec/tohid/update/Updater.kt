@@ -55,7 +55,7 @@ object Updater {
           if (apk == null) continue
 
           val release = Release(
-            version = r.getString("tag_name").removePrefix("v"),
+            version = versionOf(apk.getString("name"), r.getString("tag_name")) ?: continue,
             notes = r.optString("body", ""),
             apkUrl = apk.getString("browser_download_url"),
             size = apk.optLong("size"),
@@ -66,6 +66,24 @@ object Updater {
         best?.takeIf { isNewer(it.version, currentVersion) }
       }
     }
+
+  /**
+   * شمارهٔ نسخه — اول از نامِ فایل، بعد از برچسب.
+   *
+   * برچسبِ انتشار غلتان است («tohid-native»)، نه شمارهٔ نسخه. قبلاً شماره
+   * از همان برچسب خوانده می‌شد، پس همیشه رشته‌ای بی‌عدد بود و `isNewer`
+   * هر بار «نه» می‌گفت: به‌روزرسانیِ داخلِ برنامه هیچ‌وقت چیزی پیدا
+   * نمی‌کرد و با اطمینان می‌گفت «نسخهٔ شما تازه‌ترین است».
+   *
+   * نامِ فایل شماره را دارد — `Tohid-Native-3.2.0.apk` — و برچسب فقط
+   * وقتی به کار می‌آید که خودش شماره باشد (مثل `v1.3.0`).
+   */
+  fun versionOf(assetName: String, tagName: String): String? {
+    val number = Regex("""\d+(?:\.\d+)+""")
+    number.find(assetName)?.let { return it.value }
+    val tag = tagName.removePrefix("v")
+    return if (number.matches(tag)) tag else null
+  }
 
   /** ۱.۳.۰ تازه‌تر از ۱.۲.۹ است — مقایسهٔ عددی، نه الفبایی */
   fun isNewer(remote: String, local: String): Boolean {
