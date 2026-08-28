@@ -9,7 +9,16 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.runtime.*
+import androidx.compose.ui.platform.LocalContext
+import ir.vil3ntec.tohid.data.ReportCsv
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,6 +46,27 @@ import ir.vil3ntec.tohid.ui.theme.Shop
  */
 @Composable
 fun ReportsScreen(d: ShopData) {
+  val context = LocalContext.current
+  val scope = rememberCoroutineScope()
+  var pending by remember { mutableStateOf<ReportCsv.Sheet?>(null) }
+
+  // نوشتن فایل با انتخابگر خودِ اندروید — بدون اجازهٔ ذخیره‌سازی
+  val saveCsv = rememberLauncherForActivityResult(
+    ActivityResultContracts.CreateDocument("text/csv")
+  ) { uri ->
+    val sheet = pending
+    pending = null
+    if (uri == null || sheet == null) return@rememberLauncherForActivityResult
+    scope.launch {
+      runCatching {
+        withContext(Dispatchers.IO) {
+          context.contentResolver.openOutputStream(uri)?.use { out ->
+            out.write(ReportCsv.text(sheet).toByteArray(Charsets.UTF_8))
+          } ?: error("فایل ساخته نشد")
+        }
+      }
+    }
+  }
   var range by rememberSaveable { mutableStateOf(ReportEngine.Range.MONTH) }
   var section by rememberSaveable { mutableStateOf("sales") }
   var stockProduct by rememberSaveable { mutableStateOf<String?>(null) }
@@ -66,6 +96,22 @@ fun ReportsScreen(d: ShopData) {
           FilterChip(selected = section == id, onClick = { section = id }, label = { Text(label) })
         }
       }
+
+      Spacer(Modifier.height(10.dp))
+      OutlinedButton(
+        onClick = {
+          val sheet = ReportCsv.of(section, d, from, to, todayIso())
+          if (sheet.isEmpty) return@OutlinedButton
+          pending = sheet
+          saveCsv.launch("${sheet.name}.csv")
+        },
+        modifier = Modifier.fillMaxWidth(),
+      ) {
+        Icon(Icons.Filled.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(8.dp))
+        Text("خروجی CSV این گزارش")
+      }
+
       Spacer(Modifier.height(14.dp))
     }
 

@@ -30,6 +30,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
+import ir.vil3ntec.tohid.data.BackupClock
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.data.ReportEngine
@@ -86,6 +88,8 @@ fun DashboardScreen(
 
   var vipOpen by remember { mutableStateOf(false) }
   var alertsOpen by remember { mutableStateOf(false) }
+  val context = LocalContext.current
+  val backupStale = remember { BackupClock.isStale(context) }
 
   // همان هشدارهایی که زنگِ نسخهٔ وب نشان می‌دهد
   val alerts = buildList {
@@ -97,6 +101,16 @@ fun DashboardScreen(
     }
     if (supplierDebt > 0) {
       add(Alert("بدهی به تأمین‌کننده", "${money(supplierDebt)} افغانی", "پرداخت‌نشده", Shop.colors.warning))
+    }
+    if (backupStale) {
+      add(
+        Alert(
+          "پشتیبان",
+          "از اطلاعات دکان پشتیبان بگیرید",
+          BackupClock.text(context),
+          Shop.colors.warning,
+        )
+      )
     }
     owing.take(3).forEach { (debtor, amount) ->
       add(Alert("قرض‌دار", debtor.name, "${money(amount)} افغانی", Shop.colors.danger))

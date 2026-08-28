@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -132,9 +133,11 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
             }
           }
         } else {
-          items(rows, key = { it.first.id }) { (debtor, balance) ->
+          itemsIndexed(rows, key = { _, row -> row.first.id }) { index, (debtor, balance) ->
+            StaggeredItem(index) {
             DebtorRow(debtor, balance) { openId = debtor.id }
             Spacer(Modifier.height(8.dp))
+          }
           }
         }
       }
