@@ -8,6 +8,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -174,7 +175,8 @@ fun WarehouseScreen(
       } else if (shown.isEmpty()) {
         item { Panel { EmptyNote("کالایی مطابق با این جستجو یا فیلتر پیدا نشد.") } }
       } else {
-        items(shown, key = { it.id }) { p ->
+        itemsIndexed(shown, key = { _, p -> p.id }) { index, p ->
+          StaggeredItem(index) {
           ProductRow(
             d = d,
             product = p,
@@ -187,6 +189,7 @@ fun WarehouseScreen(
             onMovements = { movementsFor = p },
           )
           Spacer(Modifier.height(8.dp))
+        }
         }
       }
     }

@@ -6,6 +6,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -112,7 +113,8 @@ fun SalesHistoryScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostStat
     if (shown.isEmpty()) {
       item { Panel { EmptyNote("فاکتوری با این فیلتر پیدا نشد.") } }
     } else {
-      items(shown, key = { it.id }) { sale ->
+      itemsIndexed(shown, key = { _, s -> s.id }) { index, sale ->
+        StaggeredItem(index) {
         SaleCard(
           d = d,
           sale = sale,
@@ -121,6 +123,7 @@ fun SalesHistoryScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostStat
           onCancel = { cancelFor = sale },
         )
         Spacer(Modifier.height(8.dp))
+      }
       }
     }
   }

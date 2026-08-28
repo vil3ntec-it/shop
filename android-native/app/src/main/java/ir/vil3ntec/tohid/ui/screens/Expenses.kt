@@ -7,6 +7,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -144,13 +145,15 @@ fun ExpensesScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
       if (shown.isEmpty()) {
         item { Panel { EmptyNote("در این ماه مصرفی ثبت نشده است.") } }
       } else {
-        items(shown, key = { it.id }) { expense ->
+        itemsIndexed(shown, key = { _, e -> e.id }) { index, expense ->
+          StaggeredItem(index) {
           ExpenseRow(
             expense = expense,
             onEdit = { form = ExpenseFormState.of(expense) },
             onDelete = { confirmDelete = expense },
           )
           Spacer(Modifier.height(8.dp))
+        }
         }
       }
     }

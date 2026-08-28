@@ -17,6 +17,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.data.ShopData
+import ir.vil3ntec.tohid.data.BackupClock
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.formatDate
 import ir.vil3ntec.tohid.plain
@@ -78,7 +79,10 @@ fun SettingsScreen(
         context.contentResolver.openOutputStream(uri)!!.use { out ->
           out.write(store.exportBackup(storeName).toByteArray(Charsets.UTF_8))
         }
-      }.onSuccess { toast("فایل پشتیبان ساخته شد") }
+      }.onSuccess {
+        BackupClock.mark(context)
+        toast("فایل پشتیبان ساخته شد")
+      }
         .onFailure { toast("فایل پشتیبان ساخته نشد: ${it.message ?: "دلیل نامعلوم"}") }
     }
   }
@@ -139,6 +143,7 @@ fun SettingsScreen(
 
       /* --------------------------- پشتیبان --------------------------- */
       SectionTitle("پشتیبان‌گیری از اطلاعات")
+      InfoLine("آخرین پشتیبان", BackupClock.text(context))
       Panel {
         Text(
           "از تمام اطلاعات فروشگاه (قرض‌داران، محصولات، انبار، فروش‌ها و مصارف) یک فایل پشتیبان بگیرید یا از یک فایل قبلی بازیابی کنید. همین فایل در نسخهٔ وب هم باز می‌شود.",

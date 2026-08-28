@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -96,7 +97,8 @@ fun PurchasingScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState)
       if (d.suppliers.isEmpty()) {
         item { Panel { EmptyNote("هنوز تأمین‌کننده‌ای ثبت نشده است.") } }
       } else {
-        items(d.suppliers, key = { it.id }) { supplier ->
+        itemsIndexed(d.suppliers, key = { _, s -> s.id }) { index, supplier ->
+          StaggeredItem(index) {
           SupplierRow(
             d = d,
             supplier = supplier,
@@ -108,6 +110,7 @@ fun PurchasingScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState)
             onDelete = { confirmDelete = supplier },
           )
           Spacer(Modifier.height(8.dp))
+        }
         }
       }
     }
