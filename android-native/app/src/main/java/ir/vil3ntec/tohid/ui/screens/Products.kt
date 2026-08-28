@@ -6,7 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -184,12 +184,14 @@ fun ProductsScreen(
           }
         }
       } else {
-        items(shown, key = { it.id }) { p ->
-          ProductCard(
-            d = d,
-            product = p,
-            onClick = { actionsFor = p },
-          )
+        itemsIndexed(shown, key = { _, p -> p.id }) { index, p ->
+          StaggeredItem(index) {
+            ProductCard(
+              d = d,
+              product = p,
+              onClick = { actionsFor = p },
+            )
+          }
           Spacer(Modifier.height(10.dp))
         }
       }

@@ -1,6 +1,12 @@
 package ir.vil3ntec.tohid.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -97,7 +103,15 @@ fun AppRoot(
         .fillMaxSize()
         .background(Shop.colors.bg)
     ) {
-      when (sub ?: tab) {
+      AnimatedContent(
+        targetState = sub ?: tab,
+        transitionSpec = {
+          (fadeIn(tween(220)) + slideInVertically(tween(260)) { it / 22 })
+            .togetherWith(fadeOut(tween(150)))
+        },
+        label = "page",
+      ) { current ->
+      when (current) {
         "purchasing" -> PurchasingScreen(store, data, snackbar)
         "sales" -> SalesHistoryScreen(store, data, snackbar)
         "reports" -> ReportsScreen(data)
@@ -124,6 +138,7 @@ fun AppRoot(
           onConsumed = { pendingBarcode = null; pendingProduct = null },
         )
         "more" -> MoreScreen(store, data) { sub = it }
+      }
       }
     }
   }

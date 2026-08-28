@@ -8,6 +8,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -24,6 +25,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -112,31 +115,81 @@ fun VipBadge(onClick: () -> Unit, modifier: Modifier = Modifier) {
     label = "bob",
   )
 
-  Row(
-    modifier
-      .clip(RoundedCornerShape(20.dp))
-      .background(
-        Brush.linearGradient(
-          listOf(Color(0xFFF6D36B), Color(0xFFE0A92C), Color(0xFFF8E39A), Color(0xFFD9982A))
+  // برقِ نوری که روی نشان می‌لغزد — همان انیمیشنِ کارت اشتراکِ وب
+  val shine by motion.animateFloat(
+    initialValue = -0.6f,
+    targetValue = 1.6f,
+    animationSpec = infiniteRepeatable(
+      tween(2600, delayMillis = 900, easing = LinearEasing),
+      RepeatMode.Restart,
+    ),
+    label = "shine",
+  )
+  // چهار جرقهٔ ریز که از نشان می‌ریزد
+  val sparkle by motion.animateFloat(
+    initialValue = 0f,
+    targetValue = 1f,
+    animationSpec = infiniteRepeatable(tween(2800, easing = LinearEasing), RepeatMode.Restart),
+    label = "sparkle",
+  )
+
+  Box(modifier) {
+    Row(
+      Modifier
+        .clip(RoundedCornerShape(20.dp))
+        .background(
+          Brush.linearGradient(
+            listOf(Color(0xFFF6D36B), Color(0xFFE0A92C), Color(0xFFF8E39A), Color(0xFFD9982A))
+          )
         )
+        .drawWithContent {
+          drawContent()
+          // نوارِ نور، مورب، از یک لبه به لبهٔ دیگر
+          val x = size.width * shine
+          drawRect(
+            brush = Brush.linearGradient(
+              colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.55f), Color.Transparent),
+              start = Offset(x - size.width * 0.25f, 0f),
+              end = Offset(x + size.width * 0.25f, size.height),
+            ),
+            size = size,
+          )
+        }
+        .clickable(onClick = onClick)
+        .padding(horizontal = 12.dp, vertical = 7.dp),
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
+      Icon(
+        Icons.Filled.WorkspacePremium,
+        contentDescription = null,
+        tint = Color(0xFF4A3208),
+        modifier = Modifier.size(16.dp).rotate(bob),
       )
-      .clickable(onClick = onClick)
-      .padding(horizontal = 12.dp, vertical = 7.dp),
-    verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(5.dp),
-  ) {
-    Icon(
-      Icons.Filled.WorkspacePremium,
-      contentDescription = null,
-      tint = Color(0xFF4A3208),
-      modifier = Modifier.size(16.dp).rotate(bob),
-    )
-    Text(
-      text,
-      style = MaterialTheme.typography.labelMedium,
-      color = Color(0xFF4A3208),
-      fontWeight = FontWeight.Bold,
-    )
+      Text(
+        text,
+        style = MaterialTheme.typography.labelMedium,
+        color = Color(0xFF4A3208),
+        fontWeight = FontWeight.Bold,
+      )
+    }
+
+    Canvas(Modifier.matchParentSize()) {
+      // هر جرقه با تأخیرِ خودش می‌افتد و محو می‌شود
+      listOf(0.16f, 0.38f, 0.62f, 0.83f).forEachIndexed { i, xRatio ->
+        val phase = (sparkle + i * 0.25f) % 1f
+        val alpha = when {
+          phase < 0.12f -> phase / 0.12f
+          phase > 0.7f -> ((1f - phase) / 0.3f).coerceIn(0f, 1f)
+          else -> 0.9f
+        }
+        drawCircle(
+          color = Color(0xFFFFD970).copy(alpha = alpha * 0.9f),
+          radius = 2.5f + (1f - phase) * 1.5f,
+          center = Offset(size.width * xRatio, size.height * (0.7f + phase * 0.7f)),
+        )
+      }
+    }
   }
 }
 
