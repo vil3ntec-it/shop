@@ -105,7 +105,7 @@ fun AppRoot(
         "audit" -> AuditLogScreen(data)
         "settings" -> SettingsScreen(store, data, snackbar, theme, onTheme)
         "expenses" -> ExpensesScreen(store, data, snackbar)
-        "dashboard" -> DashboardScreen(data)
+        "dashboard" -> DashboardScreen(data) { target -> tab = target; sub = null }
         "sale" -> SaleScreen(store, cartStore, data, snackbar) { code ->
           pendingBarcode = code
           tab = "warehouse"
