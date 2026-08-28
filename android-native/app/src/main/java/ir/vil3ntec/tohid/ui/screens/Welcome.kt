@@ -69,6 +69,7 @@ fun WelcomeScreen(onDone: () -> Unit) {
   var name by rememberSaveable { mutableStateOf("") }
   var email by rememberSaveable { mutableStateOf("") }
   var phone by rememberSaveable { mutableStateOf("") }
+  var staffCode by rememberSaveable { mutableStateOf("") }
   var busy by remember { mutableStateOf(false) }
   var error by remember { mutableStateOf<String?>(null) }
   var note by remember { mutableStateOf<String?>(null) }
@@ -306,6 +307,58 @@ fun WelcomeScreen(onDone: () -> Unit) {
             onClick = onDone,
           )
         }
+
+        /* ---------------------- کد شاگرد ---------------------- */
+        HorizontalDivider(Modifier.padding(vertical = 14.dp), color = Shop.colors.border)
+        Text(
+          "شاگرد دکان هستید؟",
+          style = MaterialTheme.typography.labelLarge,
+          color = Shop.colors.text,
+        )
+        Spacer(Modifier.height(8.dp))
+        Row(
+          verticalAlignment = Alignment.CenterVertically,
+          horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+          OutlinedTextField(
+            value = staffCode,
+            onValueChange = { staffCode = it.uppercase(); error = null },
+            label = { Text("کد شاگرد") },
+            placeholder = { Text("SHG-XXXXX-XXXXX-XXXXX") },
+            singleLine = true,
+            modifier = Modifier.weight(1f),
+          )
+          Button(
+            enabled = !busy && staffCode.isNotBlank(),
+            onClick = {
+              val code = staffCode.trim().uppercase()
+              if (!Regex("^SHG-[A-Z0-9]{5}(-[A-Z0-9]{5}){2}$").matches(code)) {
+                error = "این کد درست نیست. کد باید مثل SHG-XXXXX-XXXXX-XXXXX باشد."
+                return@Button
+              }
+              val token = state.accessToken
+              if (token.isNullOrBlank()) {
+                error = "برای پیوستن به دکان، اول وارد حساب خود شوید."
+                return@Button
+              }
+              busy = true
+              error = null
+              scope.launch {
+                runCatching { ServerClient(state.serverUrl).joinShop(token, code) }
+                  .onSuccess { onDone() }
+                  .onFailure { fail(it) }
+                busy = false
+              }
+            },
+            colors = ButtonDefaults.buttonColors(containerColor = Shop.colors.primary),
+          ) { Text("ورود", color = Color.White) }
+        }
+        Text(
+          "کدی که صاحب دکان از تنظیمات برنامه‌اش به شما می‌دهد.",
+          style = MaterialTheme.typography.labelSmall,
+          color = Shop.colors.muted2,
+          modifier = Modifier.padding(top = 6.dp),
+        )
 
         Spacer(Modifier.height(12.dp))
         Text(

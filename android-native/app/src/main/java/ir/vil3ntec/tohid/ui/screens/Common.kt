@@ -5,7 +5,16 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -105,4 +114,47 @@ fun ComingSoon(title: String, detail: String) {
       textAlign = TextAlign.Center,
     )
   }
+}
+
+/* ============================ حرکت و انیمیشن ============================ */
+
+/**
+ *  ورودِ پلکانیِ ردیف‌ها — همان چیزی که نسخهٔ وب دارد: هر ردیف کمی دیرتر
+ *  از ردیفِ بالایی می‌آید، محو و از پایین.
+ *
+ *  تأخیر سقف دارد؛ وگرنه در فهرستِ صد ردیفی، ردیفِ آخر چند ثانیه بعد
+ *  می‌آمد و کاربر فکر می‌کرد برنامه گیر کرده.
+ */
+@Composable
+fun StaggeredItem(index: Int, content: @Composable () -> Unit) {
+  var shown by remember { mutableStateOf(false) }
+  LaunchedEffect(Unit) {
+    kotlinx.coroutines.delay((index.coerceAtMost(12) * 35).toLong())
+    shown = true
+  }
+  val progress by animateFloatAsState(
+    targetValue = if (shown) 1f else 0f,
+    animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing),
+    label = "entry",
+  )
+  Box(
+    Modifier
+      .graphicsLayer {
+        alpha = progress
+        translationY = (1f - progress) * 26f
+      }
+  ) {
+    content()
+  }
+}
+
+/** فشردنِ ملایمِ دکمه‌ها و کارت‌ها هنگام لمس — مثل :active در وب */
+@Composable
+fun Modifier.pressScale(pressed: Boolean): Modifier {
+  val scale by animateFloatAsState(
+    targetValue = if (pressed) 0.97f else 1f,
+    animationSpec = tween(120, easing = FastOutSlowInEasing),
+    label = "press",
+  )
+  return this.graphicsLayer { scaleX = scale; scaleY = scale }
 }
