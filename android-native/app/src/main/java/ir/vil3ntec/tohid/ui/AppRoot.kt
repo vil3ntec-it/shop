@@ -105,12 +105,16 @@ fun AppRoot(
         "audit" -> AuditLogScreen(data)
         "settings" -> SettingsScreen(store, data, snackbar, theme, onTheme)
         "expenses" -> ExpensesScreen(store, data, snackbar)
-        "dashboard" -> DashboardScreen(data)
-        "sale" -> SaleScreen(store, cartStore, data, snackbar) { code ->
-          pendingBarcode = code
-          tab = "warehouse"
+        "dashboard" -> DashboardScreen(data, theme, onTheme) { target ->
+          if (target == "settings") sub = "settings" else { tab = target; sub = null }
         }
-        "debtors" -> DebtorsScreen(store, data, snackbar)
+        "sale" -> VipGate("فروش (صندوق)") {
+          SaleScreen(store, cartStore, data, snackbar) { code ->
+            pendingBarcode = code
+            tab = "warehouse"
+          }
+        }
+        "debtors" -> VipGate("قرض‌داران") { DebtorsScreen(store, data, snackbar) }
         "products" -> ProductsScreen(store, data, snackbar) { productId ->
           pendingProduct = productId
           tab = "warehouse"
