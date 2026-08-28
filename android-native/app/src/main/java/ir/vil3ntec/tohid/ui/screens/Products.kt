@@ -1,5 +1,8 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -14,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
@@ -26,6 +30,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
+import ir.vil3ntec.tohid.data.PhotoStore
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
@@ -63,6 +69,28 @@ fun ProductsScreen(
   var productForm by remember { mutableStateOf<ProductFormState?>(null) }
   var actionsFor by remember { mutableStateOf<Product?>(null) }
   var confirmDelete by remember { mutableStateOf<Product?>(null) }
+  // محصولی که منتظرِ عکس است، و شمارنده‌ای که کارت‌ها را تازه می‌کند
+  var photoFor by remember { mutableStateOf<String?>(null) }
+  var photoVersion by remember { mutableStateOf(0) }
+  val context = LocalContext.current
+
+  val pickPhoto = rememberLauncherForActivityResult(
+    ActivityResultContracts.PickVisualMedia()
+  ) { uri ->
+    val id = photoFor
+    photoFor = null
+    if (uri == null || id == null) return@rememberLauncherForActivityResult
+    PhotoStore.save(context, id, uri)
+      .onSuccess {
+        // نشانهٔ عکس روی خودِ محصول می‌نشیند، همان فیلدی که وب می‌نویسد
+        scope.launch {
+          store.save(d.copy(products = d.products.map { if (it.id == id) it.copy(photo = true) else it }))
+        }
+        photoVersion++
+        toast("عکس محصول ثبت شد")
+      }
+      .onFailure { toast("عکس ذخیره نشد") }
+  }
 
   fun toast(text: String) {
     scope.launch { snackbar.showSnackbar(text) }
@@ -189,6 +217,7 @@ fun ProductsScreen(
             ProductCard(
               d = d,
               product = p,
+              photoVersion = photoVersion,
               onClick = { actionsFor = p },
             )
           }
@@ -245,6 +274,11 @@ fun ProductsScreen(
           productForm = ProductFormState.of(p)
           actionsFor = null
         }
+        SheetAction(Icons.Filled.Image, "انتخاب عکس محصول") {
+          photoFor = p.id
+          actionsFor = null
+          pickPhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+        }
         SheetAction(Icons.Filled.Inventory2, "دیدن در انبار") {
           val id = p.id
           actionsFor = null
@@ -269,7 +303,10 @@ fun ProductsScreen(
           apply(
             WarehouseEngine.deleteProduct(d, p.id, todayIso(), System.currentTimeMillis(), ::newId),
             "محصول حذف شد",
-          ) { confirmDelete = null }
+          ) {
+            PhotoStore.delete(context, p.id)
+            confirmDelete = null
+          }
         }) { Text("حذف", color = Shop.colors.danger) }
       },
       dismissButton = {
@@ -282,7 +319,7 @@ fun ProductsScreen(
 /* ============================ کارت کالا ============================ */
 
 @Composable
-private fun ProductCard(d: ShopData, product: Product, onClick: () -> Unit) {
+private fun ProductCard(d: ShopData, product: Product, photoVersion: Int, onClick: () -> Unit) {
   val stock = ShopStore.stock(d, product.id)
   val status = ShopStore.stockStatus(d, product)
   val tint = when (status) {
@@ -307,6 +344,8 @@ private fun ProductCard(d: ShopData, product: Product, onClick: () -> Unit) {
       .padding(14.dp)
   ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
+      ProductPhoto(product.id, size = 52.dp, version = photoVersion)
+      Spacer(Modifier.width(12.dp))
       Column(Modifier.weight(1f)) {
         Text(product.name, style = MaterialTheme.typography.titleSmall, color = Shop.colors.text)
         Spacer(Modifier.height(3.dp))
