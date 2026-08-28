@@ -87,9 +87,9 @@ fun ProductsScreen(
           store.save(d.copy(products = d.products.map { if (it.id == id) it.copy(photo = true) else it }))
         }
         photoVersion++
-        toast("عکس محصول ثبت شد")
+        scope.launch { snackbar.showSnackbar("عکس محصول ثبت شد") }
       }
-      .onFailure { toast("عکس ذخیره نشد") }
+      .onFailure { scope.launch { snackbar.showSnackbar("عکس ذخیره نشد") } }
   }
 
   fun toast(text: String) {
