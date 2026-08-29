@@ -115,6 +115,10 @@ fun AppRoot(
           val lic = ir.vil3ntec.tohid.sync.SyncStore(context)
           if (lic.accessToken.isNullOrBlank()) authOpen = true else sub = "settings"
         },
+        onOpen = { target ->
+          // هشدارها به تب‌های اصلی می‌روند، بقیه به زیرصفحه‌ها
+          if (TABS.any { it.id == target }) { tab = target; sub = null } else sub = target
+        },
       )
     },
     snackbarHost = { SnackbarHost(snackbar) },

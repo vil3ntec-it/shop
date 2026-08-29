@@ -33,6 +33,7 @@ import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.formatDate
 import ir.vil3ntec.tohid.plain
 import ir.vil3ntec.tohid.sync.License
+import ir.vil3ntec.tohid.sync.SavedLogins
 import ir.vil3ntec.tohid.sync.ServerClient
 import ir.vil3ntec.tohid.sync.SyncStore
 import ir.vil3ntec.tohid.sync.Syncer
@@ -336,6 +337,7 @@ fun SettingsScreen(
                     state.accessToken = session.accessToken
                     state.refreshToken = session.refreshToken
                     state.accountName = session.name
+                    SavedLogins.remember(context, identifier.trim(), session.name)
                     signedIn = true
                     password = ""
                     toast("وارد شدید")

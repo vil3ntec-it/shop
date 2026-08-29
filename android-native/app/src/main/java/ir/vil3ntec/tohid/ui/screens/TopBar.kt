@@ -45,7 +45,14 @@ import ir.vil3ntec.tohid.ui.theme.ThemeChoice
  */
 
 /** یک هشدارِ زنگ */
-data class Alert(val value: String, val title: String, val detail: String, val tint: Color)
+data class Alert(
+  val value: String,
+  val title: String,
+  val detail: String,
+  val tint: Color,
+  /** صفحه‌ای که این هشدار به آن مربوط است — با زدن روی هشدار همان‌جا باز می‌شود */
+  val target: String,
+)
 
 /** همان هشدارهایی که نسخهٔ وب در زنگ نشان می‌دهد */
 @Composable
@@ -59,17 +66,17 @@ fun rememberAlerts(d: ShopData): List<Alert> {
   return remember(d, backupStale, danger, warning) {
     buildList {
       d.products.filter { ShopStore.stockStatus(d, it) == "out" }.forEach {
-        add(Alert("تمام شد", it.name, "کالا موجود نیست", danger))
+        add(Alert("تمام شد", it.name, "کالا موجود نیست", danger, "products"))
       }
       d.products.filter { ShopStore.stockStatus(d, it) == "low" }.forEach {
-        add(Alert("موجودی کم", it.name, "${qty(ShopStore.stock(d, it.id))} مانده", warning))
+        add(Alert("موجودی کم", it.name, "${qty(ShopStore.stock(d, it.id))} مانده", warning, "products"))
       }
       val supplierDebt = d.suppliers.sumOf { ShopStore.supplierDebt(d, it.id) }
       if (supplierDebt > 0) {
-        add(Alert("بدهی به تأمین‌کننده", "${money(supplierDebt)} افغانی", "پرداخت‌نشده", warning))
+        add(Alert("بدهی به تأمین‌کننده", "${money(supplierDebt)} افغانی", "پرداخت‌نشده", warning, "purchasing"))
       }
       if (backupStale) {
-        add(Alert("پشتیبان", "از اطلاعات دکان پشتیبان بگیرید", BackupClock.text(context), warning))
+        add(Alert("پشتیبان", "از اطلاعات دکان پشتیبان بگیرید", BackupClock.text(context), warning, "settings"))
       }
       d.debtors
         .map { it to ShopStore.debt(d, it.id) }
@@ -77,7 +84,7 @@ fun rememberAlerts(d: ShopData): List<Alert> {
         .sortedByDescending { it.second }
         .take(3)
         .forEach { (debtor, amount) ->
-          add(Alert("قرض‌دار", debtor.name, "${money(amount)} افغانی", danger))
+          add(Alert("قرض‌دار", debtor.name, "${money(amount)} افغانی", danger, "debtors"))
         }
     }
   }
@@ -92,6 +99,7 @@ fun TohidTopBar(
   onTheme: (ThemeChoice) -> Unit,
   onSettings: () -> Unit,
   onAccount: () -> Unit,
+  onOpen: (String) -> Unit,
 ) {
   val context = LocalContext.current
   val state = remember { SyncStore(context) }
@@ -192,8 +200,14 @@ fun TohidTopBar(
           EmptyNote("همه‌چیز مرتب است — هشداری نیست.")
         } else {
           alerts.forEach { alert ->
+            // هشداری که فقط خبر می‌دهد، نصفِ کار است: با زدن روی آن،
+            // همان صفحه‌ای باز می‌شود که کار را می‌شود در آن درست کرد
             Row(
-              Modifier.fillMaxWidth().padding(vertical = 7.dp),
+              Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .clickable { alertsOpen = false; onOpen(alert.target) }
+                .padding(horizontal = 6.dp, vertical = 9.dp),
               verticalAlignment = Alignment.CenterVertically,
               horizontalArrangement = Arrangement.SpaceBetween,
             ) {
