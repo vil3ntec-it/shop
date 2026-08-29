@@ -4,6 +4,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -30,7 +32,6 @@ import ir.vil3ntec.tohid.fa
 import ir.vil3ntec.tohid.formatDate
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.qty
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Groups
@@ -59,6 +60,7 @@ private fun todayIso(): String =
  *  عددها هم با همان فرمول‌ها حساب می‌شوند و از موتورهای مشترک می‌آیند، نه
  *  از حسابِ جداگانهٔ این صفحه.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun DashboardScreen(d: ShopData, onOpen: (String) -> Unit = {}) {
   val context = LocalContext.current
@@ -186,13 +188,13 @@ fun DashboardScreen(d: ShopData, onOpen: (String) -> Unit = {}) {
     // کارهایی که در طول روز بیشتر از همه زده می‌شوند، یک لمس فاصله دارند
     Spacer(Modifier.height(14.dp))
     Row(
-      Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+      Modifier.fillMaxWidth(),
       horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-      ShortcutCard(Icons.Filled.PointOfSale, "فروش سریع", Shop.colors.primary) { onOpen("sale") }
-      ShortcutCard(Icons.Filled.Inventory2, "ورود کالا", Shop.colors.accent) { onOpen("warehouse") }
-      ShortcutCard(Icons.Filled.Groups, "قرض‌داران", Shop.colors.warning) { onOpen("debtors") }
-      ShortcutCard(Icons.Filled.BarChart, "گزارش‌ها", Shop.colors.success) { onOpen("reports") }
+      ShortcutCard(Icons.Filled.PointOfSale, "فروش سریع", Shop.colors.primary, Modifier.weight(1f)) { onOpen("sale") }
+      ShortcutCard(Icons.Filled.Inventory2, "ورود کالا", Shop.colors.accent, Modifier.weight(1f)) { onOpen("warehouse") }
+      ShortcutCard(Icons.Filled.Groups, "قرض‌داران", Shop.colors.warning, Modifier.weight(1f)) { onOpen("debtors") }
+      ShortcutCard(Icons.Filled.BarChart, "گزارش‌ها", Shop.colors.success, Modifier.weight(1f)) { onOpen("reports") }
     }
 
     /* -------------------------- نیاز به توجه -------------------------- */
@@ -400,25 +402,42 @@ private fun LineRow(
   }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ChipRow(items: List<Pair<String, String>>) {
-  Row(
-    Modifier.horizontalScroll(rememberScrollState()),
+  // قبلاً یک ردیفِ افقیِ اسکرول‌شونده بود: روی گوشی نصفش بیرونِ صفحه
+  // می‌ماند و روی تبلت سمتِ چپش خالی. حالا کاشی‌ها می‌شکنند و سطر را پر
+  // می‌کنند — هر اندازه صفحه‌ای که باشد.
+  val perRow = if (isTablet()) 4 else 2
+  FlowRow(
+    Modifier.fillMaxWidth(),
     horizontalArrangement = Arrangement.spacedBy(8.dp),
+    verticalArrangement = Arrangement.spacedBy(8.dp),
+    maxItemsInEachRow = perRow,
   ) {
     items.forEach { (label, value) ->
       Column(
         Modifier
-          .clip(RoundedCornerShape(Radius.sm))
+          .weight(1f)
+          .clip(Shape.chip)
           .background(Shop.colors.surface2)
-          .padding(horizontal = 12.dp, vertical = 8.dp)
+          .padding(horizontal = 14.dp, vertical = 12.dp)
       ) {
-        Text(label, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+        Text(
+          label,
+          style = MaterialTheme.typography.labelSmall,
+          color = Shop.colors.muted,
+          maxLines = 1,
+          overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+        )
+        Spacer(Modifier.height(4.dp))
         Text(
           value,
-          style = MaterialTheme.typography.labelLarge,
+          style = MaterialTheme.typography.titleSmall,
           color = Shop.colors.text,
           fontWeight = FontWeight.Bold,
+          maxLines = 1,
+          overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
         )
       }
     }
@@ -512,11 +531,11 @@ private fun ShortcutCard(
   icon: androidx.compose.ui.graphics.vector.ImageVector,
   label: String,
   tint: Color,
+  modifier: Modifier = Modifier,
   onClick: () -> Unit,
 ) {
   Column(
-    Modifier
-      .width(92.dp)
+    modifier
       .glassSurface(Shape.card, Shop.colors.surface, Shop.colors.sheen, Shop.colors.border)
       .clickable(onClick = onClick)
       .padding(vertical = 14.dp, horizontal = 8.dp),

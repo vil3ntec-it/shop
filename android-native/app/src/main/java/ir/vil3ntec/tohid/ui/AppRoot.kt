@@ -145,7 +145,15 @@ fun AppRoot(
         onOpen = ::open,
       )
     },
-    snackbarHost = { SnackbarHost(snackbar) },
+    // پیام‌ها از پایینِ صفحه بالا می‌آیند و بالای نوارِ ناوبری می‌ایستند
+    snackbarHost = {
+      TohidSnackbar(
+        host = snackbar,
+        modifier = Modifier
+          .windowInsetsPadding(WindowInsets.navigationBars)
+          .padding(bottom = 84.dp),
+      )
+    },
     bottomBar = {
       NavigationBar(
         containerColor = Shop.colors.surface.copy(alpha = 0.92f),

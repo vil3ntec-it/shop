@@ -37,13 +37,13 @@ jobs:
 
       - name: ساخت APK
         working-directory: android-native
-        run: gradle --no-daemon assembleRelease
+        run: gradle --no-daemon assembleRelease -PbuildNumber=${{ github.run_number }}
 
       - name: نام‌گذاری و جمع کنترلی
         working-directory: android-native
         run: |
           mkdir -p out
-          version=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
+          version=$(gradle --no-daemon -q printVersionName -PbuildNumber=${{ github.run_number }} | tail -n1)
           cp app/build/outputs/apk/release/app-release.apk "out/Tohid-Native-$version.apk"
           cd out && sha256sum *.apk > SHA256SUMS.txt && cat SHA256SUMS.txt
           echo "APK_NAME=Tohid-Native-$version.apk" >> "$GITHUB_ENV"
