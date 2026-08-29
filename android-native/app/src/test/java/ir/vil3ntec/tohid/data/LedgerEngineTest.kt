@@ -158,7 +158,7 @@ class LedgerEngineTest {
 
     // دفترچهٔ ثبت
     val audit = r.data.auditLog.single { it.type == "purchase" }
-    assertEquals("ثبت خرید ۱۰۰ کیلو از «شرکت نور» به مبلغ ۲۰٬۰۰۰ افغانی", audit.notes)
+    assertEquals("ثبت خرید 100 کیلو از «شرکت نور» به مبلغ 20,000 افغانی", audit.notes)
   }
 
   @Test
@@ -245,7 +245,7 @@ class LedgerEngineTest {
       LedgerEngine.paySupplier(bought, "su1", 8_000.0, "2026-08-20", "قسط اول", "2026-08-28", 0, ::newId)
     )
     assertEquals(12_000.0, ShopStore.supplierDebt(paid.data, "su1"), 0.0)
-    assertEquals("پرداخت به «شرکت نور» به مبلغ ۸٬۰۰۰ افغانی", paid.data.auditLog.last().notes)
+    assertEquals("پرداخت به «شرکت نور» به مبلغ 8,000 افغانی", paid.data.auditLog.last().notes)
     assertEquals("قسط اول", paid.data.supplierPayments.single().notes)
   }
 

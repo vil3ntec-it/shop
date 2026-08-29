@@ -72,12 +72,12 @@ class DebtorEngineTest {
   fun `هشدار حذف، بدهی باقی مانده را می گوید`() {
     val d = give(base, 5000.0)
     val warning = DebtorEngine.deleteWarning(d, "d1")
-    assertTrue(warning, warning.contains("۵٬۰۰۰ افغانی بدهی دارد"))
-    assertTrue(warning, warning.contains("۱ تراکنش"))
+    assertTrue(warning, warning.contains("5,000 افغانی بدهی دارد"))
+    assertTrue(warning, warning.contains("1 تراکنش"))
 
     // حسابِ صاف، هشدارِ دیگری دارد
     val settled = receive(d, 5000.0)
-    assertTrue(DebtorEngine.deleteWarning(settled, "d1").contains("۲ تراکنش او حذف خواهند شد"))
+    assertTrue(DebtorEngine.deleteWarning(settled, "d1").contains("2 تراکنش او حذف خواهند شد"))
   }
 
   /* ---------------------------- تراکنش‌ها ---------------------------- */
@@ -93,7 +93,7 @@ class DebtorEngineTest {
     // پرداختِ بیشتر از بدهی یعنی موجودی — مانده منفی می‌شود
     d = receive(d, 4000.0)
     assertEquals(-1000.0, ShopStore.debt(d, "d1"), 0.0)
-    assertEquals("۱٬۰۰۰ افغانی موجودی دارد", DebtorEngine.stateText(ShopStore.debt(d, "d1")))
+    assertEquals("1,000 افغانی موجودی دارد", DebtorEngine.stateText(ShopStore.debt(d, "d1")))
   }
 
   @Test
@@ -104,7 +104,7 @@ class DebtorEngineTest {
     val paid = receive(given, 2000.0)
     val entry = paid.auditLog.single()
     assertEquals("customer_payment", entry.type)
-    assertEquals("پرداخت مشتری «احمد» به مبلغ ۲٬۰۰۰ افغانی", entry.notes)
+    assertEquals("پرداخت مشتری «احمد» به مبلغ 2,000 افغانی", entry.notes)
   }
 
   @Test
@@ -181,7 +181,7 @@ class DebtorEngineTest {
     // و پرداختِ دستی همان بدهی را کم می‌کند
     val paid = receive(sold, 1000.0)
     assertEquals(2000.0, ShopStore.debt(paid, "d1"), 0.0)
-    assertEquals("۲٬۰۰۰ افغانی بدهکار", DebtorEngine.stateText(ShopStore.debt(paid, "d1")))
+    assertEquals("2,000 افغانی بدهکار", DebtorEngine.stateText(ShopStore.debt(paid, "d1")))
   }
 
   @Test

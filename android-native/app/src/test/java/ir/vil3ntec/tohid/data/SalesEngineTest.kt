@@ -277,7 +277,7 @@ class SalesEngineTest {
     val entry = r.data.auditLog.single()
     assertEquals("sale", entry.type)
     assertEquals(r.saleId, entry.refId)
-    assertEquals("ثبت فروش فاکتور #1000 به مبلغ ۵۴۰ افغانی", entry.notes)
+    assertEquals("ثبت فروش فاکتور #1000 به مبلغ 540 افغانی", entry.notes)
   }
 
   @Test
