@@ -70,6 +70,7 @@ private val PAGE_TITLES = mapOf(
   "settings" to "تنظیمات",
   "quick" to "انتخاب محصول",
   "product" to "کالا",
+  "vip" to "اشتراک و قیمت‌ها",
 )
 
 /**
@@ -303,7 +304,8 @@ fun AppRoot(
           newBarcode = pendingBarcode,
           onConsumed = { pendingBarcode = null; pendingProduct = null },
         )
-        "more" -> MoreScreen(store, data, ::open)
+        "vip" -> VipScreen { sub = null }
+        "more" -> MoreScreen(store, data, ::open) { authOpen = true }
       }
       }
       }

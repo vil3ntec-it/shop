@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.WorkspacePremium
+import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -215,7 +216,7 @@ fun VipBadge(onClick: () -> Unit, modifier: Modifier = Modifier) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun VipSheet(onDismiss: () -> Unit) {
+fun VipScreen(onDismiss: () -> Unit) {
   val context = LocalContext.current
   val state = remember { SyncStore(context) }
   val status = remember {
@@ -231,14 +232,26 @@ fun VipSheet(onDismiss: () -> Unit) {
     runCatching { context.startActivity(intent) }
   }
 
-  ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Shop.colors.bg) {
+  /*
+   *  صفحهٔ کامل، نه شیتِ پایینِ صفحه.
+   *
+   *  شیت روی صفحهٔ زیرش می‌نشست و بلندیِ محدودی داشت؛ سه کارتِ پلن و
+   *  توضیح‌هایشان در آن جا نمی‌شد و کاربر داخلِ یک پنجرهٔ کوچک اسکرول
+   *  می‌کرد. اشتراک تصمیمِ کوچکی نیست که در گوشهٔ صفحه گرفته شود.
+   */
+  Box(Modifier.fillMaxSize().background(Shop.colors.bg)) {
     Column(
       Modifier
-        .fillMaxWidth()
-        .heightIn(max = 640.dp)
+        .fillMaxSize()
         .verticalScroll(rememberScrollState())
         .padding(start = 16.dp, end = 16.dp, bottom = 28.dp)
     ) {
+      TextButton(onClick = onDismiss, contentPadding = PaddingValues(0.dp)) {
+        Icon(Icons.Filled.ArrowForward, contentDescription = null, tint = Shop.colors.primary)
+        Spacer(Modifier.width(6.dp))
+        Text("بازگشت", color = Shop.colors.primary)
+      }
+      Spacer(Modifier.height(4.dp))
       /* ---------------------- سربرگ ---------------------- */
       Column(
         Modifier
@@ -647,7 +660,7 @@ fun VipGate(label: String, content: @Composable () -> Unit) {
       GoldButton("اشتراک و قیمت‌ها") { sheet = true }
     }
   }
-  if (sheet) VipSheet { sheet = false }
+  if (sheet) VipScreen { sheet = false }
 }
 
 /**
