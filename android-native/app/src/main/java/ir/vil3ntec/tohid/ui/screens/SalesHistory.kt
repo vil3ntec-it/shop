@@ -16,7 +16,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -195,43 +198,67 @@ private fun SaleCard(
       .border(1.dp, Shop.colors.border, RoundedCornerShape(Radius.md))
       .padding(14.dp)
   ) {
-    Row(verticalAlignment = Alignment.Top) {
-      Column(Modifier.weight(1f)) {
-        Text(
-          "فاکتور #${plain(sale.invoiceNumber ?: 0)}",
-          style = MaterialTheme.typography.titleSmall,
-          color = if (cancelled) Shop.colors.muted else Shop.colors.text,
-        )
-        Spacer(Modifier.height(4.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-          Text(formatDate(sale.date), style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
-          Badge(
-            text = when {
-              cancelled -> "لغوشده"
-              sale.paymentMethod == "credit" -> "نسیه"
-              else -> "نقدی"
-            },
-            tint = when {
-              cancelled -> Shop.colors.danger
-              sale.paymentMethod == "credit" -> Shop.colors.warning
-              else -> Shop.colors.success
-            },
-            background = when {
-              cancelled -> Shop.colors.dangerTint
-              sale.paymentMethod == "credit" -> Shop.colors.warningTint
-              else -> Shop.colors.successTint
-            },
-          )
-          if (debtor != null) {
-            Text("— ${debtor.name}", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
-          }
-        }
-      }
+    /*
+     *  ردیف‌های جدولی: شمارهٔ فاکتور بالا، و زیرش چهار ستونِ هم‌تراز —
+     *  تاریخ، نام، نقدی یا نسیه، و مبلغ.
+     *
+     *  قبلاً همه‌چیز در دو خطِ درهم بود و برای مقایسهٔ دو فاکتور باید
+     *  متن خوانده می‌شد. با ستونِ ثابت، چشم از بالا به پایین می‌رود و
+     *  خودش مقایسه می‌کند.
+     */
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
       Text(
-        "${money(sale.finalTotal)} افغانی",
+        "فاکتور #${plain(sale.invoiceNumber ?: 0)}",
         style = MaterialTheme.typography.titleSmall,
         color = if (cancelled) Shop.colors.muted else Shop.colors.text,
         fontWeight = FontWeight.Bold,
+        modifier = Modifier.weight(1f),
+      )
+      Badge(
+        text = when {
+          cancelled -> "لغوشده"
+          sale.paymentMethod == "credit" -> "نسیه"
+          else -> "نقدی"
+        },
+        tint = when {
+          cancelled -> Shop.colors.danger
+          sale.paymentMethod == "credit" -> Shop.colors.warning
+          else -> Shop.colors.success
+        },
+        background = when {
+          cancelled -> Shop.colors.dangerTint
+          sale.paymentMethod == "credit" -> Shop.colors.warningTint
+          else -> Shop.colors.successTint
+        },
+      )
+    }
+
+    Spacer(Modifier.height(10.dp))
+    HorizontalDivider(color = Shop.colors.fieldBorder.copy(alpha = 0.45f))
+    Spacer(Modifier.height(8.dp))
+
+    // سرستون‌ها
+    Row(Modifier.fillMaxWidth()) {
+      InvoiceCell("تاریخ", 1.1f, head = true)
+      InvoiceCell("نام", 1.4f, head = true)
+      InvoiceCell("نوع", 0.8f, head = true)
+      InvoiceCell("مبلغ", 1.2f, head = true, end = true)
+    }
+    Spacer(Modifier.height(4.dp))
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+      InvoiceCell(formatDate(sale.date), 1.1f)
+      InvoiceCell(debtor?.name ?: "مشتری نقدی", 1.4f)
+      InvoiceCell(
+        if (sale.paymentMethod == "credit") "نسیه" else "نقدی",
+        0.8f,
+        tint = if (sale.paymentMethod == "credit") Shop.colors.warning else Shop.colors.success,
+      )
+      InvoiceCell(
+        "${money(sale.finalTotal)} افغانی",
+        1.2f,
+        end = true,
+        tint = if (cancelled) Shop.colors.muted else Shop.colors.text,
+        bold = true,
       )
     }
 
@@ -360,4 +387,31 @@ private fun ReturnDialog(
     }
     }
   }
+}
+
+/**
+ *  یک خانهٔ جدولِ فاکتور.
+ *
+ *  پهنای هر ستون با `weight` است نه با عددِ ثابت: نامِ بلند ستونِ کناری
+ *  را هل نمی‌دهد و ردیف‌ها روی هر پهنای صفحه هم‌تراز می‌مانند.
+ */
+@Composable
+private fun RowScope.InvoiceCell(
+  text: String,
+  weight: Float,
+  head: Boolean = false,
+  end: Boolean = false,
+  tint: Color? = null,
+  bold: Boolean = false,
+) {
+  Text(
+    text,
+    style = if (head) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodySmall,
+    color = tint ?: if (head) Shop.colors.muted2 else Shop.colors.text,
+    fontWeight = if (bold) FontWeight.Bold else null,
+    maxLines = 1,
+    overflow = TextOverflow.Ellipsis,
+    textAlign = if (end) TextAlign.End else TextAlign.Start,
+    modifier = Modifier.weight(weight).padding(end = 6.dp),
+  )
 }
