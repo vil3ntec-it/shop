@@ -35,7 +35,6 @@ import ir.vil3ntec.tohid.formatDate
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.plain
 import ir.vil3ntec.tohid.qty
-import ir.vil3ntec.tohid.toFaDigits
 import ir.vil3ntec.tohid.todayIso
 import ir.vil3ntec.tohid.ui.theme.Radius
 import ir.vil3ntec.tohid.ui.theme.Shop
@@ -454,7 +453,7 @@ private fun ProductRow(
         DetailRow("قیمت خرید", "${money(product.purchasePrice)} افغانی")
         DetailRow("حد کم بودن", qty(product.minStock))
         if (product.barcodes.isNotEmpty()) {
-          DetailRow("بارکد", product.barcodes.joinToString("، ") { it.toFaDigits() })
+          DetailRow("بارکد", product.barcodes.joinToString("، ") { it })
         }
 
         Spacer(Modifier.height(10.dp))

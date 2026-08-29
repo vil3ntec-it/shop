@@ -109,7 +109,7 @@ class SalesReturnTest {
     assertEquals("customer_return", move.type)
     assertEquals(3.0, move.qty, 0.0)
 
-    assertEquals("مرجوعی به مبلغ ۹۰۰ افغانی — فاکتور #1000", returned.data.auditLog.last().notes)
+    assertEquals("مرجوعی به مبلغ 900 افغانی — فاکتور #1000", returned.data.auditLog.last().notes)
   }
 
   @Test

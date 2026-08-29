@@ -43,7 +43,6 @@ import ir.vil3ntec.tohid.data.WarehouseEngine
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.plain
 import ir.vil3ntec.tohid.qty
-import ir.vil3ntec.tohid.toFaDigits
 import ir.vil3ntec.tohid.todayIso
 import ir.vil3ntec.tohid.ui.theme.Radius
 import ir.vil3ntec.tohid.ui.theme.Shop
@@ -143,7 +142,7 @@ fun ProductsScreen(
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
           StatTile(
             label = "قلم کالا",
-            value = d.products.size.toString().toFaDigits(),
+            value = d.products.size.toString(),
             hint = if (category == null) "همهٔ دسته‌ها" else category,
             modifier = Modifier.weight(1f),
           )

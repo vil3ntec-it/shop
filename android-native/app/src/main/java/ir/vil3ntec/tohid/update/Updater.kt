@@ -156,7 +156,7 @@ object Updater {
       readTimeout = 20000
     }
     return try {
-      if (conn.responseCode !in 200..299) throw IllegalStateException("GitHub جواب نداد (${conn.responseCode})")
+      if (conn.responseCode !in 200..299) throw IllegalStateException("سرورِ به‌روزرسانی جواب نداد (${conn.responseCode})")
       conn.inputStream.bufferedReader().readText()
     } finally {
       conn.disconnect()

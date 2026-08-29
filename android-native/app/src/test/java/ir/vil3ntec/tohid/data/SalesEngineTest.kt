@@ -277,7 +277,7 @@ class SalesEngineTest {
     val entry = r.data.auditLog.single()
     assertEquals("sale", entry.type)
     assertEquals(r.saleId, entry.refId)
-    assertEquals("ثبت فروش فاکتور #1000 به مبلغ ۵۴۰ افغانی", entry.notes)
+    assertEquals("ثبت فروش فاکتور #1000 به مبلغ 540 افغانی", entry.notes)
   }
 
   @Test
@@ -328,12 +328,12 @@ class SalesEngineTest {
   /* --------------------------- نوشتنِ عدد --------------------------- */
 
   @Test
-  fun `مبلغ با رقم فارسی و جداکننده ی هزارگان نوشته می شود`() {
-    assertEquals("۰", money(0.0))
-    assertEquals("۹۹۹", money(999.0))
-    assertEquals("۱٬۰۰۰", money(1000.0))
-    assertEquals("۱۲٬۳۴۵٬۶۷۸", money(12345678.0))
-    assertEquals("۱۱۷", money(116.55))   // مثل Math.round نسخهٔ وب
-    assertEquals("-۵۰۰", money(-500.0))
+  fun `مبلغ با رقم لاتین و جداکننده ی هزارگان نوشته می شود`() {
+    assertEquals("0", money(0.0))
+    assertEquals("999", money(999.0))
+    assertEquals("1,000", money(1000.0))
+    assertEquals("12,345,678", money(12345678.0))
+    assertEquals("117", money(116.55))   // مثل Math.round نسخهٔ وب
+    assertEquals("-500", money(-500.0))
   }
 }

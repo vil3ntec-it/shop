@@ -18,7 +18,6 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.formatDate
 import ir.vil3ntec.tohid.plain
-import ir.vil3ntec.tohid.toFaDigits
 import ir.vil3ntec.tohid.ui.theme.Radius
 import ir.vil3ntec.tohid.ui.theme.Shop
 import java.text.SimpleDateFormat
@@ -141,6 +140,6 @@ private fun auditTint(type: String): Color = when (type) {
 private fun timeOf(createdAt: Long): String? {
   if (createdAt <= 0) return null
   return runCatching {
-    SimpleDateFormat("HH:mm", Locale.US).format(Date(createdAt)).toFaDigits()
+    SimpleDateFormat("HH:mm", Locale.US).format(Date(createdAt))
   }.getOrNull()
 }

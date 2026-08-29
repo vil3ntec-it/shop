@@ -107,7 +107,7 @@ class WarehouseEngineTest {
 
     val entry = r.data.auditLog.single()
     assertEquals("price_change", entry.type)
-    assertEquals("تغییر قیمت خرید از ۲۰۰ به ۲۵۰ افغانی", entry.notes)
+    assertEquals("تغییر قیمت خرید از 200 به 250 افغانی", entry.notes)
   }
 
   @Test
@@ -224,7 +224,7 @@ class WarehouseEngineTest {
 
     val audit = r.data.auditLog.single()
     assertEquals("stock_adjustment", audit.type)
-    assertEquals("اصلاح موجودی «برنج» به مقدار −۳ — دلیل: خراب شد", audit.notes)
+    assertEquals("اصلاح موجودی «برنج» به مقدار −3 — دلیل: خراب شد", audit.notes)
   }
 
   @Test
@@ -287,7 +287,7 @@ class WarehouseEngineTest {
       stocked, listOf(SalesEngine.CartLine("p1", 2.0)), SalesEngine.Checkout(), "2026-08-28", 0, ::newId,
     ) as SalesEngine.Result.Ok).data
 
-    assertTrue(WarehouseEngine.deleteWarning(sold, "p1").contains("۲ واحد فروخته"))
+    assertTrue(WarehouseEngine.deleteWarning(sold, "p1").contains("2 واحد فروخته"))
     assertTrue(WarehouseEngine.deleteWarning(base, "p1").contains("سوابق ورود آن"))
   }
 

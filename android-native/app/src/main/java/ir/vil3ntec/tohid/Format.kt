@@ -1,18 +1,21 @@
 package ir.vil3ntec.tohid
 
 /**
- *  عددها همان‌طور که نسخهٔ وب نشان می‌دهد.
+ *  عددها.
  *
- *  در نسخهٔ وب مبلغ با `Math.round(n).toLocaleString('fa-IR')` نوشته می‌شود:
- *  رُند به عددِ درست، رقمِ فارسی، و جداکنندهٔ هزارگانِ فارسی (٬ — نه کاما).
- *  همان کار اینجا هم می‌شود، چون عددِ روی فاکتورِ کاغذی و عددِ روی صفحه
- *  باید مو به مو یکی باشند.
+ *  رقم‌ها **لاتین** نوشته می‌شوند: 123 نه ۱۲۳. متنِ برنامه فارسی است ولی
+ *  عدد لاتین؛ همان چیزی که در دکان روی ماشین‌حساب و روی خودِ اسکناس هم
+ *  دیده می‌شود، و رقمی که کاربر روی صفحه‌کلید می‌زند هم همین است.
+ *
+ *  جداکنندهٔ هزارگان کاما است و اعشار نقطه — هر دو لاتین، تا عددِ روی
+ *  فاکتورِ کاغذی و عددِ روی صفحه یکی باشند و کپی‌کردنش هم عدد بماند.
+ *
+ *  همه‌چیز از همین چند تابع می‌گذرد. هر جای برنامه که عدد نشان می‌دهد،
+ *  یکی از این‌ها را صدا می‌زند؛ پس شکلِ عدد یک جا تعریف شده، نه صد جا.
  */
-private const val FA_DIGITS = "۰۱۲۳۴۵۶۷۸۹"
 
-fun Int.fa(): String = toString().toFaDigits()
-fun Long.fa(): String = toString().toFaDigits()
-fun String.toFaDigits(): String = map { c -> if (c in '0'..'9') FA_DIGITS[c - '0'] else c }.joinToString("")
+fun Int.fa(): String = toString()
+fun Long.fa(): String = toString()
 
 /** مبلغ — رُند شده، با جداکنندهٔ هزارگان. واحد (افغانی) را صدازننده می‌گذارد. */
 fun money(value: Double): String {
@@ -21,8 +24,8 @@ fun money(value: Double): String {
   val digits = kotlin.math.abs(n).toString()
   val out = StringBuilder()
   digits.forEachIndexed { i, c ->
-    if (i > 0 && (digits.length - i) % 3 == 0) out.append('٬')
-    out.append(FA_DIGITS[c - '0'])
+    if (i > 0 && (digits.length - i) % 3 == 0) out.append(',')
+    out.append(c)
   }
   return if (negative) "-$out" else out.toString()
 }
@@ -33,10 +36,9 @@ fun money(value: Double): String {
  */
 fun qty(value: Double): String {
   val rounded = Math.round(value * 1000) / 1000.0
-  val text = if (rounded == Math.floor(rounded)) rounded.toLong().toString()
+  return if (rounded == Math.floor(rounded)) rounded.toLong().toString()
   else rounded.toString().trimEnd('0').trimEnd('.')
-  return text.toFaDigits().replace('.', '٫')
 }
 
 /** عددِ ساده — سال و شمارهٔ فاکتور که پول نیستند و جداکننده نمی‌خواهند */
-fun plain(value: Int): String = value.toString().toFaDigits()
+fun plain(value: Int): String = value.toString()
