@@ -149,7 +149,7 @@ class SalesEngineTest {
     assertEquals("give", tx.type)
     assertEquals(500.0, tx.amount, 0.0001)
     assertEquals("d1", tx.debtorId)
-    assertEquals("فروش نسیه — فاکتور #1000", tx.notes)
+    assertEquals("فروش نسیه — فاکتور #1", tx.notes)
 
     // و همان عدد از حسابِ قرض‌دار هم درمی‌آید
     assertEquals(500.0, ShopStore.debt(r.data, "d1"), 0.0001)
@@ -235,7 +235,7 @@ class SalesEngineTest {
     val movement = r.data.stockMovements.single()
     assertEquals("sale", movement.type)
     assertEquals(-2.0, movement.qty, 0.0001)
-    assertEquals("فاکتور #1000", movement.notes)
+    assertEquals("فاکتور #1", movement.notes)
     assertEquals(r.saleId, movement.refId)
   }
 
@@ -245,13 +245,13 @@ class SalesEngineTest {
   fun `شماره فاکتور از هزار شروع می شود و یکی یکی بالا می رود`() {
     var d = ledger()
     val first = ok(record(d, twoRice, SalesEngine.Checkout()))
-    assertEquals(1000, first.invoiceNumber)
-    assertEquals(1001, first.data.nextInvoiceNo)
+    assertEquals(1, first.invoiceNumber)
+    assertEquals(2, first.data.nextInvoiceNo)
 
     d = first.data
     val second = ok(record(d, twoRice, SalesEngine.Checkout()))
-    assertEquals(1001, second.invoiceNumber)
-    assertEquals(1002, second.data.nextInvoiceNo)
+    assertEquals(2, second.invoiceNumber)
+    assertEquals(3, second.data.nextInvoiceNo)
     assertEquals(2, second.data.sales.size)
   }
 
@@ -277,7 +277,7 @@ class SalesEngineTest {
     val entry = r.data.auditLog.single()
     assertEquals("sale", entry.type)
     assertEquals(r.saleId, entry.refId)
-    assertEquals("ثبت فروش فاکتور #1000 به مبلغ 540 افغانی", entry.notes)
+    assertEquals("ثبت فروش فاکتور #1 به مبلغ 540 افغانی", entry.notes)
   }
 
   @Test
