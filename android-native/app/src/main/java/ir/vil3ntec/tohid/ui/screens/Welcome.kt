@@ -519,7 +519,9 @@ fun WelcomeScreen(onDone: () -> Unit) {
 @Composable
 private fun GradientHeader(title: String, subtitle: String) {
   val colors = Shop.colors
-  val tall = if (isTablet()) 300.dp else 240.dp
+  // روی گوشی کوتاه‌تر: سربرگِ بلند، فرم را می‌راند پایین و کاربر باید
+  // برای رسیدن به کادرِ اول اسکرول کند
+  val tall = if (isTablet()) 280.dp else 196.dp
 
   /*
    *  سربرگ — همان زبانِ نوارِ پایین: تیره و شیشه‌ای، با یک چراغ.
@@ -540,7 +542,7 @@ private fun GradientHeader(title: String, subtitle: String) {
       val w = size.width
       val h = size.height
       val cx = w / 2f
-      listOf(0.9f to 0.10f, 0.6f to 0.13f, 0.35f to 0.16f).forEach { (spread, alpha) ->
+      listOf(0.9f to 0.14f, 0.6f to 0.18f, 0.35f to 0.22f).forEach { (spread, alpha) ->
         drawCircle(
           brush = Brush.radialGradient(
             colors = listOf(
@@ -583,23 +585,30 @@ private fun GradientHeader(title: String, subtitle: String) {
         Modifier
           .widthIn(max = 460.dp)
           .fillMaxWidth()
-          .padding(horizontal = 26.dp, vertical = 30.dp),
+          .padding(horizontal = 26.dp, vertical = if (isTablet()) 28.dp else 18.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
       ) {
         BrandMark()
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(if (isTablet()) 16.dp else 10.dp))
         Text(
           title,
-          style = MaterialTheme.typography.displaySmall,
+          style = if (isTablet()) MaterialTheme.typography.displaySmall
+          else MaterialTheme.typography.headlineMedium,
           color = colors.text,
           fontWeight = FontWeight.Bold,
           textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(6.dp))
+        /*
+         *  توضیحِ زیرِ عنوان با `muted` نوشته می‌شد و روی سطحِ سربرگ —
+         *  که خودش کم‌رنگ است — تقریباً ناپیدا بود؛ در عکس فقط چند نقطه
+         *  دیده می‌شد. متنی که خوانده نمی‌شود، نبودنش بهتر از بودنش
+         *  است، پس یا خوانا باشد یا برداشته شود.
+         */
         Text(
           subtitle,
           style = MaterialTheme.typography.bodyMedium,
-          color = colors.muted,
+          color = colors.text.copy(alpha = 0.78f),
           textAlign = TextAlign.Center,
         )
       }

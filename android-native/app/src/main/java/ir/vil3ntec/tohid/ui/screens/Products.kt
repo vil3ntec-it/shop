@@ -235,14 +235,14 @@ fun ProductsScreen(
       }
     }
 
-    ExtendedFloatingActionButton(
+    FloatingActionButton(
       onClick = { bulkProduct = true },
       containerColor = Shop.colors.primary,
       contentColor = Color.White,
-      icon = { Icon(Icons.Filled.Add, contentDescription = null) },
-      text = { Text("محصول جدید") },
       modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp).popIn(),
-    )
+    ) {
+      Icon(Icons.Filled.Add, contentDescription = "محصول جدید")
+    }
   }
 
   /* ------------------------- کادرها ------------------------- */
