@@ -11,10 +11,21 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
 /**
- *  رنگ‌ها — عیناً همان متغیرهای CSS نسخهٔ وب.
+ *  رنگ‌ها — «آبیِ یخ».
  *
- *  هیچ‌کدام «تقریبی» یا «نزدیک» نیستند؛ همان کدهای رنگ‌اند تا برنامه در دو
- *  نسخه یک‌شکل دیده شود.
+ *  زمینه سرمه‌ای تیره است و نشانِ برنامه یک آبیِ روشنِ یخی؛ همین یک رنگ
+ *  در تمامِ برنامه تکرار می‌شود تا هرجای اپ که باشی، بدانی توحید است.
+ *
+ *  دو تصمیم که عمدی‌اند:
+ *
+ *   • **سطح‌ها شفاف‌اند، نه تخت.** کارت‌ها کمی از زمینه روشن‌ترند و
+ *     حاشیه‌شان آن‌قدر کم‌رنگ است که دیده نشود؛ چیزی که کارت را جدا
+ *     می‌کند، اختلافِ ملایمِ روشنی است نه خطِ دورش. جعبهٔ خط‌کشی‌شده،
+ *     ارزان به نظر می‌رسد.
+ *
+ *   • **بنفش و صورتی هیچ‌جا نیست.** فقط سرمه‌ای، آبیِ یخ و فیروزه‌ای؛
+ *     و سبز و نارنجی و قرمز فقط جایی که معنیِ مالی دارند (سود، هشدار،
+ *     بدهی) — نه برای تزیین.
  */
 data class ShopColors(
   val bg: Color,
@@ -33,51 +44,89 @@ data class ShopColors(
   val warningTint: Color,
   val danger: Color,
   val dangerTint: Color,
+  /** فیروزه‌ای — تأکیدِ دوم، کنارِ آبیِ اصلی */
+  val accent: Color,
+  /** هالهٔ آبیِ ملایمی که زیرِ کارت‌ها و دکمه‌ها می‌نشیند */
+  val glow: Color,
+  /** لبهٔ روشنِ بالای کارت‌های شیشه‌ای */
+  val sheen: Color,
+  /** لکه‌های نورِ زمینه */
+  val auroraOne: Color,
+  val auroraTwo: Color,
 )
 
+/**
+ *  روزِ قطبی — همان هویتِ آبی، روی زمینهٔ روشن.
+ *
+ *  کلیدِ روشن/تاریک قابلیتِ موجودِ برنامه است و برداشته نمی‌شود؛ ولی
+ *  حالتِ روشن هم دیگر سفیدِ خالی نیست: یک سفیدِ آبی‌فام که همان خانواده
+ *  را نگه می‌دارد.
+ */
 val LightColors = ShopColors(
-  bg = Color(0xFFFFFFFF),
-  surface = Color(0xFFF6F8FC),
-  surface2 = Color(0xFFEEF2FA),
-  border = Color(0xFFE5EAF3),
-  text = Color(0xFF1A2233),
-  muted = Color(0xFF7C8698),
-  muted2 = Color(0xFFA4ADBD),
-  primary = Color(0xFF2C5CE6),
-  primaryDark = Color(0xFF1F3F9E),
-  primaryTint = Color(0xFFEAF0FF),
-  success = Color(0xFF18A06B),
-  successTint = Color(0xFFE8F8F1),
-  warning = Color(0xFFE8A13A),
-  warningTint = Color(0xFFFDF3E4),
-  danger = Color(0xFFE54B4B),
-  dangerTint = Color(0xFFFDECEC),
+  bg = Color(0xFFF2F7FD),
+  surface = Color(0xFFFFFFFF),
+  surface2 = Color(0xFFE9F1FB),
+  border = Color(0xFFDCE8F6),
+  text = Color(0xFF0C1626),
+  muted = Color(0xFF5C6E86),
+  muted2 = Color(0xFF93A4BA),
+  primary = Color(0xFF1B7FD4),
+  primaryDark = Color(0xFF115EA3),
+  primaryTint = Color(0xFFDCEEFF),
+  success = Color(0xFF12876B),
+  successTint = Color(0xFFDDF4EE),
+  warning = Color(0xFFC77B18),
+  warningTint = Color(0xFFFBEEDA),
+  danger = Color(0xFFD5453F),
+  dangerTint = Color(0xFFFBE4E3),
+  accent = Color(0xFF12A5B8),
+  glow = Color(0x141B7FD4),
+  sheen = Color(0xB3FFFFFF),
+  auroraOne = Color(0x2263B8F0),
+  auroraTwo = Color(0x1A3FD0DE),
 )
 
+/**
+ *  شبِ قطبی — حالتِ اصلیِ برنامه.
+ *
+ *  زمینه سرمه‌ایِ تقریباً سیاه است تا نورِ آبی روی آن بنشیند. سطح‌ها سه
+ *  پله دارند (زمینه، کارت، کارتِ روی کارت) و اختلافشان کم است؛ عمق از
+ *  همین پله‌ها می‌آید، نه از سایهٔ سنگین.
+ */
 val DarkColors = ShopColors(
-  bg = Color(0xFF0F1420),
-  surface = Color(0xFF161D2C),
-  surface2 = Color(0xFF1C2436),
-  border = Color(0xFF2A3448),
-  text = Color(0xFFE8ECF5),
-  muted = Color(0xFF8B95AB),
-  muted2 = Color(0xFF5F6A82),
-  primary = Color(0xFF5B82F0),
-  primaryDark = Color(0xFF8FABF7),
-  primaryTint = Color(0xFF1B2942),
-  success = Color(0xFF3ECF94),
-  successTint = Color(0xFF12291F),
-  warning = Color(0xFFF0B955),
-  warningTint = Color(0xFF2E2412),
-  danger = Color(0xFFF0685F),
-  dangerTint = Color(0xFF2E1616),
+  bg = Color(0xFF060B14),
+  surface = Color(0xFF0E1725),
+  surface2 = Color(0xFF152134),
+  border = Color(0x1F7FC4F5),
+  text = Color(0xFFEAF3FC),
+  muted = Color(0xFF93A9C4),
+  muted2 = Color(0xFF5D7391),
+  primary = Color(0xFF67C6F5),
+  primaryDark = Color(0xFF9BDCFF),
+  primaryTint = Color(0x2667C6F5),
+  success = Color(0xFF3ED6A8),
+  successTint = Color(0x263ED6A8),
+  warning = Color(0xFFF3BE63),
+  warningTint = Color(0x26F3BE63),
+  danger = Color(0xFFFF7A72),
+  dangerTint = Color(0x26FF7A72),
+  accent = Color(0xFF56E5DA),
+  glow = Color(0x3367C6F5),
+  sheen = Color(0x1FFFFFFF),
+  auroraOne = Color(0x3D2F7FD6),
+  auroraTwo = Color(0x2E23B6C9),
 )
 
-/** گِردیِ گوشه‌ها — همان --radius-sm/md/lg */
+/**
+ *  گِردیِ گوشه‌ها — بزرگ و نرم.
+ *
+ *  گوشهٔ تیز، عنصر را «جعبه» نشان می‌دهد. گِردیِ زیاد همان عنصر را روی
+ *  زمینه شناور می‌کند، که همان حسی است که می‌خواهیم.
+ */
 object Radius {
-  val sm = 10.dp
-  val md = 14.dp
-  val lg = 20.dp
+  val sm = 16.dp
+  val md = 22.dp
+  val lg = 28.dp
 }
 
 val LocalShopColors = staticCompositionLocalOf { LightColors }

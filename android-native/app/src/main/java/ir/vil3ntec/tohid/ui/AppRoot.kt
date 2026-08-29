@@ -25,6 +25,10 @@ import ir.vil3ntec.tohid.data.CartStore
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.data.WarehouseEngine
 import ir.vil3ntec.tohid.ui.screens.*
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
+import ir.vil3ntec.tohid.ui.theme.ArcticBackground
+import ir.vil3ntec.tohid.ui.theme.Shape
 import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.launch
 
@@ -124,8 +128,9 @@ fun AppRoot(
     if (TABS.any { it.id == target }) { tab = target; sub = null } else sub = target
   }
 
+  ArcticBackground(animated = Motion.enabled) {
   Scaffold(
-    containerColor = Shop.colors.bg,
+    containerColor = Color.Transparent,
     topBar = {
       TohidTopBar(
         title = PAGE_TITLES[sub ?: tab] ?: "توحید",
@@ -142,7 +147,13 @@ fun AppRoot(
     },
     snackbarHost = { SnackbarHost(snackbar) },
     bottomBar = {
-      NavigationBar(containerColor = Shop.colors.surface, tonalElevation = 0.dp) {
+      NavigationBar(
+        containerColor = Shop.colors.surface.copy(alpha = 0.92f),
+        tonalElevation = 0.dp,
+        modifier = Modifier
+          .padding(horizontal = 12.dp, vertical = 10.dp)
+          .clip(Shape.cardLarge),
+      ) {
         TABS.forEach { t ->
           NavigationBarItem(
             selected = tab == t.id && sub == null,
@@ -204,7 +215,6 @@ fun AppRoot(
       Modifier
         .padding(padding)
         .fillMaxSize()
-        .background(Shop.colors.bg)
     ) {
       if (!loaded) {
         // دفتر هنوز از دیسک خوانده نشده؛ «چیزی نیست» گفتن در این لحظه
@@ -284,5 +294,6 @@ fun AppRoot(
       }
       }
     }
+  }
   }
 }

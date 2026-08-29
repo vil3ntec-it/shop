@@ -7,6 +7,8 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -34,7 +36,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.money
+import androidx.compose.ui.draw.shadow
 import ir.vil3ntec.tohid.ui.theme.Elevation
+import ir.vil3ntec.tohid.ui.theme.glassSurface
 import ir.vil3ntec.tohid.ui.theme.Shape
 import ir.vil3ntec.tohid.ui.theme.Shop
 import ir.vil3ntec.tohid.ui.theme.Space
@@ -63,15 +67,34 @@ fun TohidButton(
   icon: ImageVector? = null,
   busy: Boolean = false,
 ) {
+  val interaction = remember { MutableInteractionSource() }
+  val pressed by interaction.collectIsPressedAsState()
+  val colors = Shop.colors
+
   Button(
     onClick = onClick,
     enabled = enabled && !busy,
     shape = Shape.button,
+    interactionSource = interaction,
+    contentPadding = PaddingValues(horizontal = Space.lg, vertical = Space.sm),
     colors = ButtonDefaults.buttonColors(
-      containerColor = Shop.colors.primary,
-      contentColor = Color.White,
+      containerColor = Color.Transparent,
+      contentColor = Color(0xFF04121F),
+      disabledContainerColor = Color.Transparent,
+      disabledContentColor = colors.muted2,
     ),
-    modifier = modifier.heightIn(min = 48.dp),
+    modifier = modifier
+      .heightIn(min = 52.dp)
+      .pressScale(pressed)
+      .then(if (enabled && !busy) Modifier.softGlow(Shape.button, colors.glow) else Modifier)
+      .background(
+        brush = if (enabled && !busy) {
+          Brush.horizontalGradient(listOf(colors.primaryDark, colors.primary))
+        } else {
+          Brush.horizontalGradient(listOf(colors.surface2, colors.surface2))
+        },
+        shape = Shape.button,
+      ),
   ) {
     if (busy) {
       CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
@@ -98,9 +121,12 @@ fun TohidSecondaryButton(
     onClick = onClick,
     enabled = enabled,
     shape = Shape.button,
-    colors = ButtonDefaults.outlinedButtonColors(contentColor = Shop.colors.text),
-    border = ButtonDefaults.outlinedButtonBorder.copy(brush = androidx.compose.ui.graphics.SolidColor(Shop.colors.border)),
-    modifier = modifier.heightIn(min = 48.dp),
+    colors = ButtonDefaults.outlinedButtonColors(
+      containerColor = Shop.colors.surface2.copy(alpha = 0.6f),
+      contentColor = Shop.colors.text,
+    ),
+    border = androidx.compose.foundation.BorderStroke(0.8.dp, Shop.colors.border),
+    modifier = modifier.heightIn(min = 52.dp),
   ) {
     if (icon != null) {
       Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -122,9 +148,12 @@ fun TohidDangerButton(
     onClick = onClick,
     enabled = enabled,
     shape = Shape.button,
-    colors = ButtonDefaults.outlinedButtonColors(contentColor = Shop.colors.danger),
-    border = ButtonDefaults.outlinedButtonBorder.copy(brush = androidx.compose.ui.graphics.SolidColor(Shop.colors.danger)),
-    modifier = modifier.heightIn(min = 48.dp),
+    colors = ButtonDefaults.outlinedButtonColors(
+      containerColor = Shop.colors.dangerTint,
+      contentColor = Shop.colors.danger,
+    ),
+    border = androidx.compose.foundation.BorderStroke(0.8.dp, Shop.colors.danger.copy(alpha = 0.45f)),
+    modifier = modifier.heightIn(min = 52.dp),
   ) {
     Text(text, style = MaterialTheme.typography.titleSmall)
   }
@@ -137,18 +166,34 @@ fun TohidDangerButton(
 fun TohidCard(
   modifier: Modifier = Modifier,
   onClick: (() -> Unit)? = null,
+  glow: Boolean = false,
   content: @Composable ColumnScope.() -> Unit,
 ) {
+  val colors = Shop.colors
   Column(
     modifier
-      .clip(Shape.card)
-      .background(Shop.colors.surface)
-      .border(1.dp, Shop.colors.border, Shape.card)
+      .then(if (glow) Modifier.softGlow(Shape.card, colors.glow) else Modifier)
+      .glassSurface(Shape.card, colors.surface, colors.sheen, colors.border)
       .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
       .padding(Space.md),
     content = content,
   )
 }
+
+/**
+ *  هالهٔ آبیِ زیرِ یک سطح.
+ *
+ *  سایهٔ سیاهِ معمولی روی زمینهٔ سرمه‌ای دیده نمی‌شود و فقط عنصر را کدر
+ *  می‌کند. به‌جایش یک هالهٔ آبیِ کم‌رنگ زیرِ کارت گذاشته می‌شود تا انگار
+ *  خودش کمی نور دارد.
+ */
+fun Modifier.softGlow(shape: androidx.compose.ui.graphics.Shape, color: Color): Modifier =
+  this.shadow(
+    elevation = 18.dp,
+    shape = shape,
+    ambientColor = color,
+    spotColor = color,
+  )
 
 /** کاشیِ عدد — یک عدد بزرگ و یک برچسب */
 @Composable
@@ -160,7 +205,7 @@ fun TohidStatCard(
   hint: String? = null,
   onClick: (() -> Unit)? = null,
 ) {
-  TohidCard(modifier = modifier, onClick = onClick) {
+  TohidCard(modifier = modifier, onClick = onClick, glow = true) {
     Text(label, style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
     Spacer(Modifier.height(Space.xxs))
     Text(
@@ -401,35 +446,56 @@ fun TohidErrorState(
  */
 @Composable
 fun TohidLoadingState(rows: Int = 4, modifier: Modifier = Modifier) {
+  val colors = Shop.colors
   val shimmer = rememberInfiniteTransition(label = "shimmer")
-  val alpha by shimmer.animateFloat(
-    initialValue = 0.35f,
-    targetValue = 0.75f,
-    animationSpec = infiniteRepeatable(tween(900, easing = LinearEasing), RepeatMode.Reverse),
-    label = "alpha",
+  val slide by shimmer.animateFloat(
+    initialValue = -1f,
+    targetValue = 2f,
+    animationSpec = infiniteRepeatable(tween(1400, easing = LinearEasing), RepeatMode.Restart),
+    label = "slide",
   )
-  val glow = if (Motion.enabled) alpha else 0.5f
+  val x = if (Motion.enabled) slide else 0.5f
 
-  Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
+  Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Space.sm)) {
     repeat(rows) {
       Box(
         Modifier
           .fillMaxWidth()
-          .height(64.dp)
+          .height(76.dp)
           .clip(Shape.card)
-          .background(
-            Brush.horizontalGradient(
-              listOf(
-                Shop.colors.surface.copy(alpha = glow),
-                Shop.colors.surface2.copy(alpha = glow),
-                Shop.colors.surface.copy(alpha = glow),
+          .background(colors.surface)
+          .drawBehind {
+            // یک نوارِ نورِ یخی که از راست به چپ می‌گذرد
+            val w = size.width
+            drawRect(
+              brush = Brush.horizontalGradient(
+                colors = listOf(Color.Transparent, colors.primary.copy(alpha = 0.16f), Color.Transparent),
+                startX = x * w - w * 0.4f,
+                endX = x * w + w * 0.4f,
               )
             )
-          )
+          }
           .semantics { contentDescription = "در حال بارگذاری" }
       )
     }
   }
+}
+
+/**
+ *  عددی که به مقدارِ تازه‌اش می‌لغزد، نه اینکه بپرد.
+ *
+ *  وقتی فروشی ثبت می‌شود و «فروش امروز» یک‌آن عوض شود، چشم متوجه نمی‌شود
+ *  چه چیزی تغییر کرد. شمردنِ کوتاه، نگاه را همان‌جا نگه می‌دارد.
+ */
+@Composable
+fun animatedMoney(target: Double): Double {
+  if (!Motion.enabled) return target
+  val value by androidx.compose.animation.core.animateFloatAsState(
+    targetValue = target.toFloat(),
+    animationSpec = tween(650, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+    label = "count",
+  )
+  return value.toDouble()
 }
 
 /* ============================== ریزه‌کاری ============================== */
