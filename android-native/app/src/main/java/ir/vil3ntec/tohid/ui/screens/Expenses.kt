@@ -15,6 +15,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.PieChart
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -67,6 +69,8 @@ fun ExpensesScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
     }
   }
 
+  var breakdown by rememberSaveable { mutableStateOf(false) }
+
   // ماه‌هایی که واقعاً مصرفی در آن‌ها ثبت شده، از تازه به کهنه
   val months = remember(d.expenses) {
     (d.expenses.map { it.date.take(7) } + todayIso().take(7)).distinct().sortedDescending()
@@ -93,18 +97,13 @@ fun ExpensesScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
       }
 
       item {
-        Row(
-          Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-          horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-          months.forEach { m ->
-            FilterChip(
-              selected = month == m,
-              onClick = { month = m; category = null },
-              label = { Text(monthLabel(m)) },
-            )
-          }
-        }
+        // ماه‌ها کشویی‌اند، نه یک ردیفِ افقی: با گذشتِ چند ماه، ردیف از
+        // صفحه بیرون می‌زد و معلوم نبود چند ماهِ دیگر مانده
+        MonthPicker(
+          months = months,
+          selected = month,
+          onSelect = { month = it; category = null },
+        )
         Spacer(Modifier.height(12.dp))
       }
 
@@ -121,18 +120,21 @@ fun ExpensesScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
 
       if (byCategory.isNotEmpty()) {
         item {
-          SectionTitle("به تفکیک دسته‌بندی")
-          Panel {
-            byCategory.forEach { (name, amount) ->
-              CategoryBar(
-                name = name,
-                amount = amount,
-                share = if (total > 0) (amount / total).toFloat() else 0f,
-                selected = category == name,
-                onClick = { category = if (category == name) null else name },
-              )
-            }
-          }
+          /*
+           *  تفکیکِ دسته‌بندی رفت به صفحهٔ خودش.
+           *
+           *  اینجا با هر دسته یک نوار اضافه می‌شد و بعد از چند مصرف،
+           *  تمامِ صفحه را می‌گرفت — کاربر باید از رویش رد می‌شد تا به
+           *  خودِ فهرستِ مصارف برسد. حالا یک ردیفِ کوچک است که می‌گوید
+           *  چند دسته هست، و با زدنش باز می‌شود.
+           */
+          SettingsRow(
+            icon = Icons.Filled.PieChart,
+            title = "به تفکیک دسته‌بندی",
+            description = "${plain(byCategory.size)} دسته در ${monthLabel(month)}",
+            tint = Shop.colors.primary,
+            onClick = { breakdown = true },
+          )
           Spacer(Modifier.height(16.dp))
         }
       }
@@ -157,13 +159,26 @@ fun ExpensesScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
       }
     }
 
-    ExtendedFloatingActionButton(
+    // دکمهٔ کوچکِ گِرد، نه دکمهٔ پهنِ متن‌دار: آن یکی روی ردیف‌های
+    // پایینِ فهرست می‌نشست و زیرش قابلِ زدن نبود
+    FloatingActionButton(
       onClick = { form = ExpenseFormState(date = todayIso()) },
-      containerColor = Shop.colors.primary,
+      containerColor = Shop.colors.success,
       contentColor = Color.White,
       modifier = Modifier.align(Alignment.BottomStart).padding(16.dp).popIn(),
-      icon = { Icon(Icons.Filled.Add, contentDescription = null) },
-      text = { Text("مصرف تازه") },
+    ) {
+      Icon(Icons.Filled.Add, contentDescription = "مصرف تازه")
+    }
+  }
+
+  if (breakdown) {
+    BreakdownSheet(
+      title = "مصارف ${monthLabel(month)} به تفکیک دسته",
+      rows = byCategory,
+      total = total,
+      selected = category,
+      onPick = { category = it; breakdown = false },
+      onDismiss = { breakdown = false },
     )
   }
 
@@ -377,3 +392,86 @@ private fun monthLabel(month: String): String {
   return "${JALALI_MONTHS[j.month - 1]} ${plain(j.year)}"
 }
 
+/**
+ *  انتخابِ ماه — کشویی.
+ *
+ *  ردیفِ افقیِ ماه‌ها بعد از یک سال، دوازده تراشه می‌شد که نصفشان بیرونِ
+ *  صفحه می‌ماند و کاربر نمی‌دانست چند تای دیگر هست.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MonthPicker(
+  months: List<String>,
+  selected: String,
+  onSelect: (String) -> Unit,
+) {
+  var open by remember { mutableStateOf(false) }
+  ExposedDropdownMenuBox(
+    expanded = open,
+    onExpandedChange = { open = it },
+    modifier = Modifier.fillMaxWidth(),
+  ) {
+    OutlinedTextField(
+      value = monthLabel(selected),
+      onValueChange = {},
+      readOnly = true,
+      singleLine = true,
+      label = { Text("ماه") },
+      shape = RoundedCornerShape(Radius.sm),
+      trailingIcon = { Icon(Icons.Filled.KeyboardArrowDown, contentDescription = null) },
+      modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
+    )
+    ExposedDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+      months.forEach { m ->
+        DropdownMenuItem(
+          text = { Text(monthLabel(m)) },
+          onClick = { onSelect(m); open = false },
+        )
+      }
+    }
+  }
+}
+
+/**
+ *  تفکیکِ دسته‌بندی، در صفحهٔ خودش.
+ *
+ *  زدنِ هر دسته، همان دسته را در فهرستِ پشتِ سر فیلتر می‌کند و شیت بسته
+ *  می‌شود — همان کاری که نوارهای قبلی می‌کردند، بدونِ اینکه تمامِ صفحه
+ *  را بگیرند.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun BreakdownSheet(
+  title: String,
+  rows: List<Pair<String, Double>>,
+  total: Double,
+  selected: String?,
+  onPick: (String?) -> Unit,
+  onDismiss: () -> Unit,
+) {
+  ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Shop.colors.bg) {
+    Column(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, bottom = 28.dp)) {
+      Text(title, style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
+      Spacer(Modifier.height(4.dp))
+      Text(
+        "روی هر دسته بزنید تا فقط مصارفِ همان دیده شود",
+        style = MaterialTheme.typography.labelSmall,
+        color = Shop.colors.muted2,
+      )
+      Spacer(Modifier.height(14.dp))
+      rows.forEach { (name, amount) ->
+        CategoryBar(
+          name = name,
+          amount = amount,
+          share = if (total > 0) (amount / total).toFloat() else 0f,
+          selected = selected == name,
+          onClick = { onPick(if (selected == name) null else name) },
+        )
+      }
+      if (selected != null) {
+        Spacer(Modifier.height(10.dp))
+        TextButton(onClick = { onPick(null) }) { Text("نمایش همهٔ دسته‌ها") }
+      }
+    }
+  }
+}

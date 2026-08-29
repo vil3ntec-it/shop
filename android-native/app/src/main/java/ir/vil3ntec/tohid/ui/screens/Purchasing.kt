@@ -114,14 +114,14 @@ fun PurchasingScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState)
       }
     }
 
-    ExtendedFloatingActionButton(
+    FloatingActionButton(
       onClick = { supplierForm = SupplierFormState() },
       containerColor = Shop.colors.primary,
       contentColor = Color.White,
       modifier = Modifier.align(Alignment.BottomStart).padding(16.dp).popIn(),
-      icon = { Icon(Icons.Filled.Add, contentDescription = null) },
-      text = { Text("تأمین‌کننده") },
-    )
+    ) {
+      Icon(Icons.Filled.Add, contentDescription = "تأمین‌کننده")
+    }
   }
 
   /* ---------------------------- پنجره‌ها ---------------------------- */

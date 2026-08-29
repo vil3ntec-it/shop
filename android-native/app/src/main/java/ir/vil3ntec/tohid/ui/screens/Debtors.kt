@@ -180,14 +180,14 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
         }
       }
 
-      ExtendedFloatingActionButton(
+      FloatingActionButton(
         onClick = { form = DebtorFormState() },
         containerColor = Shop.colors.primary,
         contentColor = Color.White,
         modifier = Modifier.align(Alignment.BottomStart).padding(16.dp).popIn(),
-        icon = { Icon(Icons.Filled.Add, contentDescription = null) },
-        text = { Text("قرض‌دار تازه") },
-      )
+      ) {
+        Icon(Icons.Filled.Add, contentDescription = "قرض‌دار تازه")
+      }
     }
   }
 
