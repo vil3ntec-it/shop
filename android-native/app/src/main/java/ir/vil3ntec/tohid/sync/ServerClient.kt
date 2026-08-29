@@ -55,6 +55,38 @@ class ServerClient(private val baseUrl: String) {
     )
   }
 
+  /**
+   *  کدِ یک‌بارمصرف برای ورود با شماره.
+   *
+   *  شماره رمز ندارد و نباید داشته باشد: کسی که شمارهٔ خودش را دارد،
+   *  پیامکِ کد را می‌گیرد و همان اثباتِ اوست. رمزِ اضافه فقط یک چیزِ
+   *  دیگر است که فروشنده فراموشش می‌کند.
+   */
+  suspend fun otpRequest(phone: String): JsonObject =
+    post("/api/v1/auth/otp/request", buildJsonObject { put("phone", JsonPrimitive(phone)) })
+
+  /**
+   *  کد را می‌سنجد و وارد می‌کند. اگر این شماره حساب نداشته باشد، سرور
+   *  همان‌جا با همین نام حسابش را می‌سازد — پس «ثبت‌نام» و «ورود» با
+   *  شماره یک راه‌اند، نه دو تا.
+   */
+  suspend fun otpVerify(phone: String, code: String, name: String): Session {
+    val body = post("/api/v1/auth/otp/verify", buildJsonObject {
+      put("phone", JsonPrimitive(phone))
+      put("code", JsonPrimitive(code))
+      put("name", JsonPrimitive(name))
+    })
+    val access = body["accessToken"]?.jsonPrimitive?.content
+      ?: throw ServerError("سرور توکن نداد", "bad_response")
+    val user = body["user"]?.jsonObject
+    return Session(
+      accessToken = access,
+      refreshToken = body["refreshToken"]?.jsonPrimitive?.content,
+      userId = user?.get("id")?.jsonPrimitive?.content.orEmpty(),
+      name = user?.get("name")?.jsonPrimitive?.content.orEmpty(),
+    )
+  }
+
   suspend fun refresh(refreshToken: String): String =
     post("/api/v1/auth/refresh", buildJsonObject { put("refreshToken", JsonPrimitive(refreshToken)) })["accessToken"]
       ?.jsonPrimitive?.content ?: throw ServerError("توکن تازه نشد", "bad_response")

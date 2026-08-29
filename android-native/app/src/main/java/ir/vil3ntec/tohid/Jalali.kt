@@ -102,15 +102,14 @@ object Jalali {
 }
 
 /**
- * تاریخِ خورشیدی با رقمِ فارسی — همان شکلی که نسخهٔ وب نشان می‌داد:
- * `۱۴۰۵/۰۶/۰۶`. اگر تاریخ خوانده نشد، خودِ رشته برگردانده می‌شود تا
- * چیزی گم نشود.
+ * تاریخِ خورشیدی، با رقمِ لاتین: `1405/06/06`. اگر تاریخ خوانده نشد،
+ * خودِ رشته برگردانده می‌شود تا چیزی گم نشود.
  */
 fun formatDate(iso: String): String {
-  val j = Jalali.ofIso(iso) ?: return iso.toFaDigits()
+  val j = Jalali.ofIso(iso) ?: return iso
   val mm = j.month.toString().padStart(2, '0')
   val dd = j.day.toString().padStart(2, '0')
-  return "${j.year}/$mm/$dd".toFaDigits()
+  return "${j.year}/$mm/$dd"
 }
 
 /** تاریخِ امروزِ دستگاه به شکلِ `YYYY-MM-DD` — همان `todayISO` نسخهٔ وب */

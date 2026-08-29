@@ -19,7 +19,6 @@ import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.formatDate
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.plain
-import ir.vil3ntec.tohid.toFaDigits
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -139,7 +138,7 @@ object Receipt {
       sale.paymentMethod == "credit" -> "نسیه"
       else -> "نقدی"
     }
-    line("${formatDate(sale.date)} — ${time.toFaDigits()}   ($kind)", small, Layout.Alignment.ALIGN_CENTER)
+    line("${formatDate(sale.date)} — ${time}   ($kind)", small, Layout.Alignment.ALIGN_CENTER)
 
     rule(thick = true)
 

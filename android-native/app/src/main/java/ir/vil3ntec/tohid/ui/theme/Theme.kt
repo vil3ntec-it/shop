@@ -5,7 +5,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -246,6 +248,16 @@ fun TohidTheme(
   }
 
   CompositionLocalProvider(LocalShopColors provides colors) {
-    MaterialTheme(colorScheme = scheme, typography = ShopTypography, content = content)
+    // متن روی تبلت بزرگ‌تر می‌شود. یک جا حساب می‌شود و همهٔ صفحه‌ها را
+    // می‌گیرد؛ وگرنه باید سربرگِ هر صفحه را جدا بزرگ می‌کردیم و یکی‌شان
+    // جا می‌ماند — همان که جا مانده بود.
+    val width = LocalConfiguration.current.screenWidthDp
+    val scale = when {
+      width >= 900 -> 1.22f
+      width >= 600 -> 1.12f
+      else -> 1f
+    }
+    val type = remember(scale) { shopTypography(scale) }
+    MaterialTheme(colorScheme = scheme, typography = type, content = content)
   }
 }

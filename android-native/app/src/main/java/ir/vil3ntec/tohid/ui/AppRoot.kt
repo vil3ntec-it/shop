@@ -10,6 +10,11 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -31,7 +36,6 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
 import ir.vil3ntec.tohid.ui.theme.ArcticBackground
-import ir.vil3ntec.tohid.ui.theme.Shape
 import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.launch
 
@@ -163,44 +167,11 @@ fun AppRoot(
       )
     },
     bottomBar = {
-      NavigationBar(
-        containerColor = Shop.colors.surface.copy(alpha = 0.92f),
-        tonalElevation = 0.dp,
-        windowInsets = WindowInsets(0, 0, 0, 0),
-        modifier = Modifier
-          .windowInsetsPadding(WindowInsets.navigationBars)
-          .padding(horizontal = 12.dp, vertical = 10.dp)
-          .clip(Shape.cardLarge),
-      ) {
-        TABS.forEach { t ->
-          NavigationBarItem(
-            selected = tab == t.id && sub == null,
-            onClick = { tab = t.id; sub = null },
-            icon = {
-              // تبِ فعال یک تکانِ کوتاه می‌خورد، مثل نوار پایینِ وب
-              val active = tab == t.id && sub == null
-              val scale by animateFloatAsState(
-                targetValue = if (active) 1f else 0.9f,
-                animationSpec = spring(dampingRatio = 0.42f, stiffness = 700f),
-                label = "nav",
-              )
-              Icon(
-                t.icon,
-                contentDescription = t.label,
-                modifier = Modifier.graphicsLayer { scaleX = scale; scaleY = scale },
-              )
-            },
-            label = { Text(t.label, style = MaterialTheme.typography.labelSmall) },
-            colors = NavigationBarItemDefaults.colors(
-              selectedIconColor = Shop.colors.primary,
-              selectedTextColor = Shop.colors.primary,
-              unselectedIconColor = Shop.colors.muted,
-              unselectedTextColor = Shop.colors.muted,
-              indicatorColor = Shop.colors.primaryTint,
-            ),
-          )
-        }
-      }
+      TohidNavBar(
+        tabs = TABS,
+        current = if (sub == null) tab else null,
+        onPick = { tab = it; sub = null },
+      )
     },
   ) { padding ->
     editProduct?.let { form ->
@@ -314,5 +285,108 @@ fun AppRoot(
       }
     }
   }
+  }
+}
+
+/* ============================ نوارِ پایین ============================ */
+
+/**
+ *  نوارِ پایینِ شناور.
+ *
+ *  یک قرصِ گرد که روی محتوا می‌نشیند، نه نواری که به لبهٔ صفحه چسبیده
+ *  باشد. سمتِ راستش نشانِ برنامه است و بقیه‌اش پنج مقصد.
+ *
+ *  تبِ باز، ظرفِ رنگیِ خودش را می‌گیرد و زیرِ اسمش یک نقطه می‌آید. نقطه
+ *  اضافه‌کاری نیست: در حالتِ تاریک، تفاوتِ رنگِ ظرف با زمینه کم است و
+ *  نقطه همان چیزی است که بدونِ دقت هم دیده می‌شود.
+ */
+@Composable
+private fun TohidNavBar(
+  tabs: List<Tab>,
+  current: String?,
+  onPick: (String) -> Unit,
+) {
+  val colors = Shop.colors
+  Row(
+    Modifier
+      .fillMaxWidth()
+      .windowInsetsPadding(WindowInsets.navigationBars)
+      .padding(horizontal = 10.dp, vertical = 10.dp)
+      .clip(RoundedCornerShape(28.dp))
+      .background(colors.surface)
+      .border(1.dp, colors.fieldBorder.copy(alpha = 0.5f), RoundedCornerShape(28.dp))
+      .padding(horizontal = 6.dp, vertical = 6.dp),
+    verticalAlignment = Alignment.CenterVertically,
+  ) {
+    // نشانِ برنامه، سرِ نوار
+    Box(
+      Modifier
+        .size(44.dp)
+        .clip(RoundedCornerShape(22.dp))
+        .background(colors.primary),
+      contentAlignment = Alignment.Center,
+    ) {
+      Icon(
+        Icons.Filled.Storefront,
+        contentDescription = "توحید",
+        tint = Color.White,
+        modifier = Modifier.size(22.dp),
+      )
+    }
+    Spacer(Modifier.width(4.dp))
+
+    tabs.forEach { t ->
+      val active = current == t.id
+      // ظرفِ تبِ باز نرم باز و بسته می‌شود، نه اینکه یک‌آن بپرد
+      val fill by animateFloatAsState(
+        targetValue = if (active) 1f else 0f,
+        animationSpec = tween(if (Motion.enabled) 220 else 0),
+        label = "navFill",
+      )
+      val scale by animateFloatAsState(
+        targetValue = if (active) 1f else 0.92f,
+        animationSpec = spring(dampingRatio = 0.5f, stiffness = 650f),
+        label = "navScale",
+      )
+      val tint = if (active) colors.primary else colors.muted
+
+      Column(
+        Modifier
+          .weight(1f)
+          .clip(RoundedCornerShape(18.dp))
+          .background(colors.primaryTint.copy(alpha = fill))
+          .clickable(
+            interactionSource = remember { MutableInteractionSource() },
+            indication = null,
+            onClick = { onPick(t.id) },
+          )
+          .padding(vertical = 7.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+      ) {
+        Icon(
+          t.icon,
+          contentDescription = t.label,
+          tint = tint,
+          modifier = Modifier
+            .size(21.dp)
+            .graphicsLayer { scaleX = scale; scaleY = scale },
+        )
+        Spacer(Modifier.height(3.dp))
+        Text(
+          t.label,
+          style = MaterialTheme.typography.labelSmall,
+          color = tint,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(Modifier.height(3.dp))
+        Box(
+          Modifier
+            .size(4.dp)
+            .clip(RoundedCornerShape(2.dp))
+            .background(colors.primary.copy(alpha = fill))
+        )
+      }
+    }
   }
 }

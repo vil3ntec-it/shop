@@ -37,7 +37,6 @@ import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.formatDate
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.qty
-import ir.vil3ntec.tohid.toFaDigits
 import ir.vil3ntec.tohid.ui.theme.Shape
 import ir.vil3ntec.tohid.ui.theme.Shop
 import ir.vil3ntec.tohid.ui.theme.Space
@@ -171,7 +170,7 @@ fun ProductDetailScreen(
           if (product.barcodes.isNotEmpty()) {
             Spacer(Modifier.height(4.dp))
             Text(
-              product.barcodes.joinToString("، ") { it.toFaDigits() },
+              product.barcodes.joinToString("، ") { it },
               style = MaterialTheme.typography.labelSmall,
               color = Shop.colors.muted2,
             )

@@ -126,7 +126,7 @@ fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
     }
 
     Spacer(Modifier.height(20.dp))
-    SectionTitle("به‌روزرسانی از گیت‌هاب")
+    SectionTitle("به‌روزرسانی برنامه")
     Panel {
       Text(
         "نسخهٔ تازه از همین‌جا گرفته و نصب می‌شود؛ اطلاعات دکان دست‌نخورده می‌ماند.",
