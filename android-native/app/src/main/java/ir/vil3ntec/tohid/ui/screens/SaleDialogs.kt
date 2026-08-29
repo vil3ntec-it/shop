@@ -85,6 +85,7 @@ fun CheckoutDialog(
   val remaining = (totals.finalTotal - paid).coerceAtLeast(0.0)
 
   Dialog(onDismissRequest = onDismiss) {
+    DialogEntry {
     Surface(
       color = Shop.colors.surface,
       shape = RoundedCornerShape(Radius.lg),
@@ -171,6 +172,7 @@ fun CheckoutDialog(
         }
       }
     }
+    }
   }
 }
 
@@ -241,6 +243,7 @@ fun InvoiceDialog(
   val debtor = sale.debtorId?.let { id -> d.debtors.find { it.id == id } }
 
   Dialog(onDismissRequest = onDismiss) {
+    DialogEntry {
     Surface(
       color = Shop.colors.surface,
       shape = RoundedCornerShape(Radius.lg),
@@ -302,6 +305,7 @@ fun InvoiceDialog(
         }
       }
     }
+    }
   }
 
   if (printer) {
@@ -351,6 +355,7 @@ private fun PrinterDialog(onDismiss: () -> Unit, onPrint: (String, Int) -> Unit)
   var selected by remember { mutableStateOf(prefs.getString("printer_address", null)) }
 
   Dialog(onDismissRequest = onDismiss) {
+    DialogEntry {
     Surface(color = Shop.colors.surface, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
       Column(Modifier.padding(18.dp)) {
         Text("چاپ فاکتور", style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
@@ -417,6 +422,7 @@ private fun PrinterDialog(onDismiss: () -> Unit, onPrint: (String, Int) -> Unit)
           ) { Text("چاپ") }
         }
       }
+    }
     }
   }
 }

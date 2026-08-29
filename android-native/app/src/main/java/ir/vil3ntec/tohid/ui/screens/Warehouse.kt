@@ -198,7 +198,7 @@ fun WarehouseScreen(
       onClick = { productForm = ProductFormState() },
       containerColor = Shop.colors.primary,
       contentColor = Color.White,
-      modifier = Modifier.align(Alignment.BottomStart).padding(16.dp),
+      modifier = Modifier.align(Alignment.BottomStart).padding(16.dp).popIn(),
       icon = { Icon(Icons.Filled.Add, contentDescription = null) },
       text = { Text("کالای تازه") },
     )

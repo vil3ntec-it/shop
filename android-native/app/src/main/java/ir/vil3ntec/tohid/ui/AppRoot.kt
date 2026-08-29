@@ -2,6 +2,8 @@ package ir.vil3ntec.tohid.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -15,6 +17,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -120,7 +123,20 @@ fun AppRoot(
           NavigationBarItem(
             selected = tab == t.id && sub == null,
             onClick = { tab = t.id; sub = null },
-            icon = { Icon(t.icon, contentDescription = t.label) },
+            icon = {
+              // تبِ فعال یک تکانِ کوتاه می‌خورد، مثل نوار پایینِ وب
+              val active = tab == t.id && sub == null
+              val scale by animateFloatAsState(
+                targetValue = if (active) 1f else 0.9f,
+                animationSpec = spring(dampingRatio = 0.42f, stiffness = 700f),
+                label = "nav",
+              )
+              Icon(
+                t.icon,
+                contentDescription = t.label,
+                modifier = Modifier.graphicsLayer { scaleX = scale; scaleY = scale },
+              )
+            },
             label = { Text(t.label, style = MaterialTheme.typography.labelSmall) },
             colors = NavigationBarItemDefaults.colors(
               selectedIconColor = Shop.colors.primary,

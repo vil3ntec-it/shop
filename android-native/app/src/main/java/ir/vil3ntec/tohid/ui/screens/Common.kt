@@ -158,3 +158,49 @@ fun Modifier.pressScale(pressed: Boolean): Modifier {
   )
   return this.graphicsLayer { scaleX = scale; scaleY = scale }
 }
+
+/**
+ *  ظاهر شدنِ دکمه‌های شناور — همان fabPop نسخهٔ وب: از ۰٫۶ برابر باز
+ *  می‌شود و همان‌جا می‌ایستد.
+ */
+@Composable
+fun Modifier.popIn(delayMillis: Int = 0): Modifier {
+  var shown by remember { mutableStateOf(false) }
+  LaunchedEffect(Unit) {
+    kotlinx.coroutines.delay(delayMillis.toLong())
+    shown = true
+  }
+  val scale by animateFloatAsState(
+    targetValue = if (shown) 1f else 0.6f,
+    animationSpec = tween(340, easing = FastOutSlowInEasing),
+    label = "pop",
+  )
+  return this.graphicsLayer {
+    scaleX = scale
+    scaleY = scale
+    alpha = ((scale - 0.6f) / 0.4f).coerceIn(0f, 1f)
+  }
+}
+
+/**
+ *  ورودِ کادرها — همان modalUp وب: کمی از پایین بالا می‌آید و محو باز
+ *  می‌شود. کادری که بی‌مقدمه ظاهر شود، یک‌آن حس می‌دهد صفحه پرید.
+ */
+@Composable
+fun DialogEntry(content: @Composable () -> Unit) {
+  var shown by remember { mutableStateOf(false) }
+  LaunchedEffect(Unit) { shown = true }
+  val progress by animateFloatAsState(
+    targetValue = if (shown) 1f else 0f,
+    animationSpec = tween(240, easing = FastOutSlowInEasing),
+    label = "modal",
+  )
+  Box(
+    Modifier.graphicsLayer {
+      alpha = progress
+      translationY = (1f - progress) * 16.dp.toPx()
+    }
+  ) {
+    content()
+  }
+}

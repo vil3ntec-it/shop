@@ -232,7 +232,7 @@ fun ProductsScreen(
       contentColor = Color.White,
       icon = { Icon(Icons.Filled.Add, contentDescription = null) },
       text = { Text("محصول جدید") },
-      modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
+      modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp).popIn(),
     )
   }
 
