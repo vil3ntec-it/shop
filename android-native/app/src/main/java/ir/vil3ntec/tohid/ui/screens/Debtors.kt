@@ -117,27 +117,33 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
         verticalArrangement = Arrangement.spacedBy(8.dp),
       ) {
         item(span = { GridItemSpan(maxLineSpan) }) {
-          Text("قرض‌داران", style = MaterialTheme.typography.headlineMedium, color = Shop.colors.text)
-          Spacer(Modifier.height(14.dp))
+          // این `Column` لازم است، تزئینی نیست: خانهٔ یک شبکه هرچه داخلش
+          // باشد را **روی هم** می‌گذارد، نه زیرِ هم. بدونش عنوان و کارتِ
+          // جمعِ طلب و کادرِ جستجو هر سه روی هم می‌افتادند و متنشان
+          // درهم می‌شد.
+          Column {
+            Text("قرض‌داران", style = MaterialTheme.typography.headlineMedium, color = Shop.colors.text)
+            Spacer(Modifier.height(14.dp))
 
-          val owed = rows.sumOf { it.second.coerceAtLeast(0.0) }
-          StatTile(
-            label = "جمع طلب از مشتریان",
-            value = "${money(owed)} افغانی",
-            tint = if (owed > 0) Shop.colors.warning else Shop.colors.success,
-            hint = "${plain(d.debtors.size)} قرض‌دار",
-            modifier = Modifier.fillMaxWidth(),
-          )
-          Spacer(Modifier.height(12.dp))
+            val owed = rows.sumOf { it.second.coerceAtLeast(0.0) }
+            StatTile(
+              label = "جمع طلب از مشتریان",
+              value = "${money(owed)} افغانی",
+              tint = if (owed > 0) Shop.colors.warning else Shop.colors.success,
+              hint = "${plain(d.debtors.size)} قرض‌دار",
+              modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(12.dp))
 
-          OutlinedTextField(
-            value = search,
-            onValueChange = { search = it },
-            placeholder = { Text("جستجوی نام یا شماره") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-          )
-          Spacer(Modifier.height(4.dp))
+            OutlinedTextField(
+              value = search,
+              onValueChange = { search = it },
+              placeholder = { Text("جستجوی نام یا شماره") },
+              singleLine = true,
+              modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(4.dp))
+          }
         }
 
         if (rows.isEmpty()) {
@@ -444,21 +450,63 @@ private fun AccountView(
       item { Panel { EmptyNote("هنوز تراکنشی برای این حساب ثبت نشده.") } }
     } else {
       items(account.transactions, key = { it.id }) { tx ->
+        /*
+         *  برد قرمز، رسید سبز — و اسمش روی خودش نوشته.
+         *
+         *  تا حالا هر دو یک کارتِ خاکستریِ یک‌شکل بودند و تنها فرقشان
+         *  علامتِ + و − کنارِ عدد بود. کسی که فهرستِ حسابِ یک مشتری را
+         *  بالا و پایین می‌کند، از روی رنگ می‌فهمد نه از روی یک علامتِ
+         *  ریز؛ و «قرض داده شد» هم همان کلمه‌ای نبود که بالای همین صفحه
+         *  («کل برد» و «کل رسید») نوشته شده.
+         */
         val isGive = tx.type == "give"
+        val tint = if (isGive) Shop.colors.danger else Shop.colors.success
+        val wash = if (isGive) Shop.colors.dangerTint else Shop.colors.successTint
+        val kind = if (isGive) "برد" else "رسید"
+
         Row(
           Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(Radius.sm))
-            .background(Shop.colors.surface)
+            .background(wash)
+            .border(1.dp, tint.copy(alpha = 0.45f), RoundedCornerShape(Radius.sm))
             .padding(12.dp),
           verticalAlignment = Alignment.CenterVertically,
         ) {
+          // نوارِ رنگیِ کنارِ کارت: پیش از خواندنِ هر کلمه‌ای معلوم است
+          // این ردیف برد بوده یا رسید
+          Box(
+            Modifier
+              .width(4.dp)
+              .height(38.dp)
+              .clip(RoundedCornerShape(2.dp))
+              .background(tint)
+          )
+          Spacer(Modifier.width(10.dp))
+
           Column(Modifier.weight(1f)) {
-            Text(
-              if (isGive) "قرض داده شد" else "پول گرفته شد",
-              style = MaterialTheme.typography.bodyMedium,
-              color = Shop.colors.text,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+              Box(
+                Modifier
+                  .clip(RoundedCornerShape(6.dp))
+                  .background(tint)
+                  .padding(horizontal = 8.dp, vertical = 2.dp),
+              ) {
+                Text(
+                  kind,
+                  style = MaterialTheme.typography.labelSmall,
+                  color = Color.White,
+                  fontWeight = FontWeight.Bold,
+                )
+              }
+              Spacer(Modifier.width(8.dp))
+              Text(
+                if (isGive) "جنس یا پول برد" else "پول رساند",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Shop.colors.text,
+              )
+            }
+            Spacer(Modifier.height(3.dp))
             Text(
               "${formatDate(tx.date)}${if (tx.notes.isNotBlank()) " — ${tx.notes}" else ""}",
               style = MaterialTheme.typography.labelSmall,
@@ -468,13 +516,14 @@ private fun AccountView(
           Text(
             "${if (isGive) "+" else "−"}${money(tx.amount)}",
             style = MaterialTheme.typography.titleSmall,
-            color = if (isGive) Shop.colors.warning else Shop.colors.success,
+            color = tint,
+            fontWeight = FontWeight.Bold,
           )
           IconButton(onClick = { onDeleteTx(tx.id) }) {
             Icon(Icons.Filled.DeleteOutline, contentDescription = "حذف تراکنش", tint = Shop.colors.muted2)
           }
         }
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(8.dp))
       }
     }
   }
