@@ -47,13 +47,18 @@ private val PAGE_TITLES = mapOf(
   "quick" to "انتخاب محصول",
 )
 
+/**
+ *  نوارِ پایین — پنج تب و بس.
+ *
+ *  قبلاً هفت تب بود و اسمِ هرکدام آن‌قدر تنگ می‌شد که خوانده نمی‌شد. پنج
+ *  تا همان جاهایی است که فروشنده در طولِ روز می‌رود؛ بقیه — قرض‌داران،
+ *  مصارف، محصولات، خرید، رسیدها، سابقه — از «بیشتر» باز می‌شوند.
+ */
 private val TABS = listOf(
-  Tab("dashboard", "داشبورد", Icons.Filled.GridView),
+  Tab("dashboard", "خانه", Icons.Filled.GridView),
   Tab("sale", "فروش", Icons.Filled.PointOfSale),
-  Tab("debtors", "قرض‌داران", Icons.Filled.Groups),
   Tab("warehouse", "انبار", Icons.Filled.Inventory2),
-  Tab("expenses", "مصارف", Icons.Filled.BarChart),
-  Tab("products", "محصولات", Icons.Filled.ShoppingBag),
+  Tab("reports", "گزارش", Icons.Filled.BarChart),
   Tab("more", "بیشتر", Icons.Filled.MoreHoriz),
 )
 
@@ -102,6 +107,17 @@ fun AppRoot(
     return
   }
 
+  /**
+   *  رفتن به یک صفحه، از هر جای برنامه.
+   *
+   *  یک جا تصمیم می‌گیرد که مقصد تب است یا زیرصفحه — وگرنه هر بار که تبی
+   *  از نوار پایین بیرون می‌رود، باید چند جای دیگر هم عوض شود و یکی‌شان
+   *  فراموش می‌شود.
+   */
+  fun open(target: String) {
+    if (TABS.any { it.id == target }) { tab = target; sub = null } else sub = target
+  }
+
   Scaffold(
     containerColor = Shop.colors.bg,
     topBar = {
@@ -115,10 +131,7 @@ fun AppRoot(
           val lic = ir.vil3ntec.tohid.sync.SyncStore(context)
           if (lic.accessToken.isNullOrBlank()) authOpen = true else sub = "settings"
         },
-        onOpen = { target ->
-          // هشدارها به تب‌های اصلی می‌روند، بقیه به زیرصفحه‌ها
-          if (TABS.any { it.id == target }) { tab = target; sub = null } else sub = target
-        },
+        onOpen = ::open,
       )
     },
     snackbarHost = { SnackbarHost(snackbar) },
@@ -177,9 +190,7 @@ fun AppRoot(
         "audit" -> AuditLogScreen(data)
         "settings" -> SettingsScreen(store, data, snackbar, theme, onTheme) { sub = "more" }
         "expenses" -> ExpensesScreen(store, data, snackbar)
-        "dashboard" -> DashboardScreen(data) { target ->
-          if (target == "settings") sub = "settings" else { tab = target; sub = null }
-        }
+        "dashboard" -> DashboardScreen(data, ::open)
         "quick" -> VipGate("فروش (صندوق)") {
           QuickSaleScreen(store, cartStore, data, snackbar) { sub = null; tab = "sale" }
         }
@@ -193,12 +204,14 @@ fun AppRoot(
           ) { code ->
             pendingBarcode = code
             tab = "warehouse"
+            sub = null
           }
         }
         "debtors" -> VipGate("قرض‌داران") { DebtorsScreen(store, data, snackbar) }
         "products" -> ProductsScreen(store, data, snackbar) { productId ->
           pendingProduct = productId
           tab = "warehouse"
+          sub = null
         }
         "warehouse" -> WarehouseScreen(
           store = store,
@@ -208,7 +221,7 @@ fun AppRoot(
           newBarcode = pendingBarcode,
           onConsumed = { pendingBarcode = null; pendingProduct = null },
         )
-        "more" -> MoreScreen(store, data) { sub = it }
+        "more" -> MoreScreen(store, data, ::open)
       }
       }
     }

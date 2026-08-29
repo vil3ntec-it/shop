@@ -82,66 +82,66 @@ fun DashboardScreen(d: ShopData, onOpen: (String) -> Unit = {}) {
     Text("خلاصهٔ امروزِ دکان", style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
     Spacer(Modifier.height(16.dp))
 
-    /* ------------------------ چهار کاشیِ بالا ------------------------ */
+    /* --------------------- کاشی‌های امروز (KPI) --------------------- */
+    // چهار عددی که فروشنده صبح اول وقت می‌خواهد بداند — نه آمار انبار،
+    // که آن پایین‌تر جای خودش را دارد
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-      StatTile(
-        "وضعیت انبار", d.products.size.fa(),
-        hint = "قلم کالا",
-        modifier = Modifier.weight(1f).clickable { onOpen("products") },
+      TohidStatCard(
+        label = "فروش امروز",
+        value = "${money(todayTotal)} افغانی",
+        hint = "${todaySales.size.fa()} فاکتور",
+        modifier = Modifier.weight(1f),
+        onClick = { onOpen("sales") },
       )
-      StatTile(
-        "قرض‌داران", owing.size.fa(),
-        tint = Shop.colors.warning,
-        hint = "نفر",
-        modifier = Modifier.weight(1f).clickable { onOpen("debtors") },
+      TohidStatCard(
+        label = "سود امروز",
+        value = "${money(todayProfit)} افغانی",
+        tint = if (todayProfit >= 0) Shop.colors.success else Shop.colors.danger,
+        hint = "پس از مصارف",
+        modifier = Modifier.weight(1f),
+        onClick = { onOpen("reports") },
       )
     }
     Spacer(Modifier.height(12.dp))
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-      StatTile(
-        "مجموع بدهی", money(totalDebt),
-        tint = Shop.colors.danger,
-        hint = "افغانی",
-        modifier = Modifier.weight(1f).clickable { onOpen("debtors") },
+      TohidStatCard(
+        label = "طلب از مشتریان",
+        value = "${money(totalDebt)} افغانی",
+        tint = if (totalDebt > 0) Shop.colors.warning else Shop.colors.success,
+        hint = "${owing.size.fa()} قرض‌دار",
+        modifier = Modifier.weight(1f),
+        onClick = { onOpen("debtors") },
       )
-      StatTile(
-        "مصارف این ماه", money(expenseMonth),
-        tint = Shop.colors.success,
-        hint = "افغانی",
-        modifier = Modifier.weight(1f).clickable { onOpen("expenses") },
+      TohidStatCard(
+        label = "بدهی به تأمین‌کننده",
+        value = "${money(supplierDebt)} افغانی",
+        tint = if (supplierDebt > 0) Shop.colors.danger else Shop.colors.success,
+        hint = "پرداخت‌نشده",
+        modifier = Modifier.weight(1f),
+        onClick = { onOpen("purchasing") },
       )
     }
 
-    /* ------------------------ روند معاملات ------------------------ */
-    Spacer(Modifier.height(16.dp))
-    Panel {
-      PanelHead("روند معاملات", "این ماه")
-      Spacer(Modifier.height(12.dp))
-      val monthSales = d.sales.filter { it.status != "cancelled" && it.date.startsWith(monthPrefix) }
-      if (monthSales.isEmpty()) {
-        EmptyNote("هنوز فروشی ثبت نشده")
-      } else {
-        val byDay = monthSales.groupBy { it.date }.mapValues { (_, list) -> list.sumOf { it.finalTotal } }
-        TrendChart(byDay.toSortedMap().values.toList())
-        Spacer(Modifier.height(8.dp))
-        Text(
-          "جمع ماه: ${money(byDay.values.sum())} افغانی",
-          style = MaterialTheme.typography.labelMedium,
-          color = Shop.colors.muted,
-        )
-      }
+    /* -------------------------- نیاز به توجه -------------------------- */
+    // چیزهایی که همین امروز باید یک کاری برایشان کرد. اگر چیزی نیست،
+    // این بخش اصلاً نمی‌آید — پنل خالیِ «همه‌چیز خوب است» فقط جا می‌گیرد.
+    val attention = buildList {
+      outOfStock.take(3).forEach { add(Triple(it.name, "تمام‌شده", "products")) }
+      lowStock.take(3).forEach { add(Triple(it.name, "موجودی کم", "products")) }
+      owing.take(2).forEach { add(Triple(it.first.name, "${money(it.second)} افغانی طلب", "debtors")) }
     }
-
-    /* -------------------------- قرض‌داران -------------------------- */
-    Spacer(Modifier.height(14.dp))
-    Panel {
-      PanelHead("قرض‌داران", "مشاهده همه") { onOpen("debtors") }
-      Spacer(Modifier.height(8.dp))
-      if (owing.isEmpty()) {
-        EmptyNote("هنوز اطلاعاتی ثبت نشده")
-      } else {
-        owing.take(5).forEach { (debtor, amount) ->
-          LineRow(debtor.name, "${money(amount)} افغانی", Shop.colors.danger)
+    if (attention.isNotEmpty()) {
+      Spacer(Modifier.height(16.dp))
+      Panel {
+        PanelHead("نیاز به توجه", "${attention.size.fa()} مورد")
+        Spacer(Modifier.height(10.dp))
+        attention.forEach { (name, note, target) ->
+          LineRow(
+            name,
+            note,
+            if (note == "تمام‌شده") Shop.colors.danger else Shop.colors.warning,
+            onClick = { onOpen(target) },
+          )
         }
       }
     }
@@ -166,23 +166,16 @@ fun DashboardScreen(d: ShopData, onOpen: (String) -> Unit = {}) {
       }
     }
 
-    /* --------------------- مصارف بر اساس دسته --------------------- */
+    /* -------------------------- قرض‌داران -------------------------- */
     Spacer(Modifier.height(14.dp))
     Panel {
-      PanelHead("مصارف بر اساس دسته", "این ماه")
+      PanelHead("قرض‌داران", "مشاهده همه") { onOpen("debtors") }
       Spacer(Modifier.height(8.dp))
-      val byCategory = d.expenses
-        .filter { it.date.startsWith(monthPrefix) }
-        .groupBy { it.category.ifBlank { "بدون دسته" } }
-        .mapValues { (_, list) -> list.sumOf { it.amount } }
-        .toList()
-        .sortedByDescending { it.second }
-      if (byCategory.isEmpty()) {
-        EmptyNote("این ماه مصرفی ثبت نشده")
+      if (owing.isEmpty()) {
+        EmptyNote("هنوز اطلاعاتی ثبت نشده")
       } else {
-        val max = byCategory.first().second
-        byCategory.take(6).forEach { (name, amount) ->
-          CategoryBar(name, amount, if (max > 0) (amount / max).toFloat() else 0f)
+        owing.take(5).forEach { (debtor, amount) ->
+          LineRow(debtor.name, "${money(amount)} افغانی", Shop.colors.danger)
         }
       }
     }
@@ -210,6 +203,47 @@ fun DashboardScreen(d: ShopData, onOpen: (String) -> Unit = {}) {
             if (out) Shop.colors.danger else Shop.colors.warning,
             detail = "${qty(ShopStore.stock(d, p.id))}${if (p.unit.isNotBlank()) " ${p.unit}" else ""}",
           )
+        }
+      }
+    }
+
+    /* ------------------------ روند معاملات ------------------------ */
+    Spacer(Modifier.height(16.dp))
+    Panel {
+      PanelHead("روند معاملات", "این ماه")
+      Spacer(Modifier.height(12.dp))
+      val monthSales = d.sales.filter { it.status != "cancelled" && it.date.startsWith(monthPrefix) }
+      if (monthSales.isEmpty()) {
+        EmptyNote("هنوز فروشی ثبت نشده")
+      } else {
+        val byDay = monthSales.groupBy { it.date }.mapValues { (_, list) -> list.sumOf { it.finalTotal } }
+        TrendChart(byDay.toSortedMap().values.toList())
+        Spacer(Modifier.height(8.dp))
+        Text(
+          "جمع ماه: ${money(byDay.values.sum())} افغانی",
+          style = MaterialTheme.typography.labelMedium,
+          color = Shop.colors.muted,
+        )
+      }
+    }
+
+    /* --------------------- مصارف بر اساس دسته --------------------- */
+    Spacer(Modifier.height(14.dp))
+    Panel {
+      PanelHead("مصارف بر اساس دسته", "این ماه")
+      Spacer(Modifier.height(8.dp))
+      val byCategory = d.expenses
+        .filter { it.date.startsWith(monthPrefix) }
+        .groupBy { it.category.ifBlank { "بدون دسته" } }
+        .mapValues { (_, list) -> list.sumOf { it.amount } }
+        .toList()
+        .sortedByDescending { it.second }
+      if (byCategory.isEmpty()) {
+        EmptyNote("این ماه مصرفی ثبت نشده")
+      } else {
+        val max = byCategory.first().second
+        byCategory.take(6).forEach { (name, amount) ->
+          CategoryBar(name, amount, if (max > 0) (amount / max).toFloat() else 0f)
         }
       }
     }
@@ -263,9 +297,18 @@ private fun PanelHead(title: String, action: String? = null, onAction: (() -> Un
 }
 
 @Composable
-private fun LineRow(title: String, value: String, tint: Color, detail: String? = null) {
+private fun LineRow(
+  title: String,
+  value: String,
+  tint: Color,
+  detail: String? = null,
+  onClick: (() -> Unit)? = null,
+) {
   Row(
-    Modifier.fillMaxWidth().padding(vertical = 7.dp),
+    Modifier
+      .fillMaxWidth()
+      .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+      .padding(vertical = 7.dp),
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.SpaceBetween,
   ) {
