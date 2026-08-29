@@ -39,6 +39,15 @@ import ir.vil3ntec.tohid.sync.License
 import ir.vil3ntec.tohid.sync.SyncStore
 import ir.vil3ntec.tohid.ui.theme.Radius
 import ir.vil3ntec.tohid.ui.theme.Shop
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.graphicsLayer
+import ir.vil3ntec.tohid.ui.theme.Shape
+import ir.vil3ntec.tohid.money
 
 /**
  *  اشتراک و قیمت‌ها — همان چیزی که نسخهٔ وب دارد.
@@ -204,6 +213,8 @@ fun VipSheet(onDismiss: () -> Unit) {
     License.status(state.license, state.publicKey, state.deviceUid, System.currentTimeMillis())
   }
   val signedIn = !state.accessToken.isNullOrBlank()
+  // پیش‌فرض روی «پیشنهاد ما» است؛ کسی که تصمیم ندارد، همان را می‌گیرد
+  var chosenPlan by rememberSaveable { mutableStateOf(PLANS[1].title) }
 
   fun buy(planTitle: String) {
     val text = Uri.encode("$BUY_MESSAGE ($planTitle)")
@@ -325,19 +336,22 @@ fun VipSheet(onDismiss: () -> Unit) {
       )
       Spacer(Modifier.height(10.dp))
 
-      PLANS.forEach { plan ->
-        PlanRow(plan) { buy(plan.title) }
-        Spacer(Modifier.height(10.dp))
+      PLANS.forEachIndexed { index, plan ->
+        PlanCard(
+          plan = plan,
+          selected = chosenPlan == plan.title,
+          onClick = { chosenPlan = plan.title },
+        )
+        if (index < PLANS.lastIndex) Spacer(Modifier.height(10.dp))
       }
 
-      Spacer(Modifier.height(6.dp))
-      Button(
-        onClick = { buy("بدون انتخاب مدت") },
-        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE0A92C)),
-        modifier = Modifier.fillMaxWidth().height(52.dp),
-      ) {
-        Text("گرفتن اشتراک", color = Color(0xFF3A2705), fontWeight = FontWeight.Bold)
-      }
+      Spacer(Modifier.height(16.dp))
+      val picked = PLANS.find { it.title == chosenPlan } ?: PLANS[1]
+      TohidButton(
+        text = "گرفتن اشتراک ${picked.title} — ${plain(picked.price)} افغانی",
+        onClick = { buy(picked.title) },
+        modifier = Modifier.fillMaxWidth(),
+      )
       Spacer(Modifier.height(8.dp))
       Text(
         "هماهنگی و پرداخت از راه واتساپ انجام می‌شود.",
@@ -414,60 +428,134 @@ private fun TierCard(
 }
 
 @Composable
-private fun PlanRow(plan: Plan, onClick: () -> Unit) {
+private fun PlanCard(plan: Plan, selected: Boolean, onClick: () -> Unit) {
+  val colors = Shop.colors
+
+  // کارتِ انتخاب‌شده کمی بزرگ‌تر می‌شود و هاله می‌گیرد — همان بازخوردی که
+  // می‌گوید «این را انتخاب کردی»، بدونِ آنکه چیزی بنویسیم
+  val scale by animateFloatAsState(
+    targetValue = if (selected && Motion.enabled) 1.02f else 1f,
+    animationSpec = tween(240, easing = FastOutSlowInEasing),
+    label = "planScale",
+  )
+  val borderColor by animateColorAsState(
+    targetValue = if (selected) colors.primary else colors.border,
+    animationSpec = tween(240),
+    label = "planBorder",
+  )
+
+  // برقِ ملایمی که فقط روی کارتِ انتخاب‌شده از راست به چپ می‌گذرد
+  val shimmer = rememberInfiniteTransition(label = "planShimmer")
+  val sweep by shimmer.animateFloat(
+    initialValue = -0.6f,
+    targetValue = 1.6f,
+    animationSpec = infiniteRepeatable(tween(2600, easing = LinearEasing), RepeatMode.Restart),
+    label = "sweep",
+  )
+
   Row(
     Modifier
       .fillMaxWidth()
-      .clip(RoundedCornerShape(Radius.md))
-      .background(Shop.colors.surface)
-      .border(1.dp, if (plan.badge.isBlank()) Shop.colors.border else Color(0xFFE0A92C), RoundedCornerShape(Radius.md))
+      .graphicsLayer { scaleX = scale; scaleY = scale }
+      .then(if (selected) Modifier.softGlow(Shape.card, colors.glow) else Modifier)
+      .clip(Shape.card)
+      .background(
+        brush = if (selected) {
+          Brush.horizontalGradient(
+            listOf(colors.primary.copy(alpha = 0.20f), colors.accent.copy(alpha = 0.10f))
+          )
+        } else {
+          Brush.horizontalGradient(listOf(colors.surface, colors.surface))
+        }
+      )
+      .drawBehind {
+        if (selected && Motion.enabled) {
+          drawRect(
+            brush = Brush.horizontalGradient(
+              colors = listOf(Color.Transparent, colors.primary.copy(alpha = 0.14f), Color.Transparent),
+              startX = sweep * size.width - size.width * 0.35f,
+              endX = sweep * size.width + size.width * 0.35f,
+            )
+          )
+        }
+      }
+      .border(if (selected) 1.4.dp else 0.8.dp, borderColor, Shape.card)
       .clickable(onClick = onClick)
-      .padding(14.dp),
+      .padding(16.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
+    // دایرهٔ انتخاب، با تیکی که از وسط باز می‌شود
+    val tick by animateFloatAsState(
+      targetValue = if (selected) 1f else 0f,
+      animationSpec = tween(if (Motion.enabled) 260 else 0, easing = FastOutSlowInEasing),
+      label = "tick",
+    )
+    Box(
+      Modifier
+        .size(26.dp)
+        .clip(CircleShape)
+        .background(if (selected) colors.primary else colors.surface2)
+        .border(1.dp, if (selected) colors.primary else colors.border, CircleShape),
+      contentAlignment = Alignment.Center,
+    ) {
+      if (tick > 0f) {
+        Icon(
+          Icons.Filled.Check,
+          contentDescription = null,
+          tint = Color(0xFF04121F),
+          modifier = Modifier
+            .size(16.dp)
+            .graphicsLayer { scaleX = tick; scaleY = tick; alpha = tick },
+        )
+      }
+    }
+
+    Spacer(Modifier.width(14.dp))
+
     Column(Modifier.weight(1f)) {
-      Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(plan.title, style = MaterialTheme.typography.titleSmall, color = Shop.colors.text)
+      Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+          plan.title,
+          style = MaterialTheme.typography.titleSmall,
+          color = colors.text,
+          fontWeight = FontWeight.Bold,
+        )
         if (plan.badge.isNotBlank()) {
-          Box(
-            Modifier
-              .clip(RoundedCornerShape(8.dp))
-              .background(Color(0xFFFDF3E4))
-              .padding(horizontal = 8.dp, vertical = 2.dp)
-          ) {
-            Text(plan.badge, style = MaterialTheme.typography.labelSmall, color = Color(0xFF8A6412))
-          }
+          Spacer(Modifier.width(8.dp))
+          TohidBadge(
+            text = plan.badge,
+            tint = if (selected) colors.primary else colors.accent,
+            fill = if (selected) colors.primaryTint else colors.surface2,
+          )
         }
       }
       Spacer(Modifier.height(2.dp))
       Text(
-        "حدود ${plain(plan.days)} روز",
+        "${plain(plan.days)} روز",
         style = MaterialTheme.typography.labelSmall,
-        color = Shop.colors.muted,
+        color = colors.muted2,
       )
     }
+
+    // قیمت: عدد بزرگ، واحد کوچک — نگاه اول باید روی رقم بیفتد
     Column(horizontalAlignment = Alignment.End) {
-      Text(
-        plain(plan.price),
-        style = MaterialTheme.typography.titleMedium,
-        color = Shop.colors.primary,
-        fontWeight = FontWeight.Bold,
+      TohidMoneyText(
+        amount = plan.price.toDouble(),
+        tint = if (selected) colors.primary else colors.text,
+        style = MaterialTheme.typography.headlineSmall,
       )
-      Text("افغانی", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+      val perMonth = plan.price / (plan.days / 30.0)
+      if (plan.days > 30) {
+        Text(
+          "ماهی ${money(perMonth)}",
+          style = MaterialTheme.typography.labelSmall,
+          color = colors.success,
+        )
+      }
     }
   }
 }
 
-/* ============================ قفلِ قابلیت‌ها ============================ */
-
-/**
- *  همان قاعدهٔ نسخهٔ وب: تا وقتی آدرس سروری تنظیم نشده، هیچ چیزی قفل
- *  نمی‌شود و تمام برنامه باز است. با سرور، قابلیت‌های پولی (فروش،
- *  قرض‌داران، اسکنر، چند کاربر) به اشتراکِ فعال گره می‌خورند.
- *
- *  قفل، صفحه را پنهان نمی‌کند: می‌گوید چه چیزی بسته است و راهِ باز کردنش
- *  کجاست. صفحهٔ سفیدِ بی‌توضیح، کاربر را فقط سردرگم می‌کند.
- */
 @Composable
 fun VipGate(label: String, content: @Composable () -> Unit) {
   val context = LocalContext.current
