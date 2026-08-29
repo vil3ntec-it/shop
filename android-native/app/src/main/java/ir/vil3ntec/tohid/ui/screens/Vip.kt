@@ -94,6 +94,15 @@ private val PLANS = listOf(
   Plan("۱ ساله", 3000, badge = "بیشترین صرفه", days = 365),
 )
 
+/**
+ *  قفلِ قابلیت‌ها — فعلاً خاموش.
+ *
+ *  تا وقتی روی برنامه کار می‌شود، همه‌چیز باز است تا هر بخش بدونِ حساب و
+ *  اشتراک آزمایش شود. برای برگرداندنِ قفل، همین یک خط `true` شود؛ جای
+ *  دیگری دست نمی‌خواهد.
+ */
+private const val LOCKING = false
+
 /* ============================ نشانِ طلایی ============================ */
 
 /**
@@ -560,7 +569,7 @@ private fun PlanCard(plan: Plan, selected: Boolean, onClick: () -> Unit) {
 fun VipGate(label: String, content: @Composable () -> Unit) {
   val context = LocalContext.current
   val state = remember { SyncStore(context) }
-  val enforcing = state.serverUrl.isNotBlank()
+  val enforcing = LOCKING && state.serverUrl.isNotBlank()
   val status = remember(enforcing) {
     License.status(state.license, state.publicKey, state.deviceUid, System.currentTimeMillis())
   }
@@ -574,40 +583,123 @@ fun VipGate(label: String, content: @Composable () -> Unit) {
   }
 
   var sheet by remember { mutableStateOf(false) }
-  Column(
-    Modifier.fillMaxSize().padding(24.dp),
-    verticalArrangement = Arrangement.Center,
-    horizontalAlignment = Alignment.Start,
-  ) {
-    Box(
+
+  /*
+   *  صفحهٔ قفل، وسطِ صفحه.
+   *
+   *  قبلاً یک ستونِ تمام‌عرض بود با متن‌های چسبیده به یک لبه؛ روی تبلت
+   *  همه‌چیز به یک کنار می‌رفت و وسطِ صفحه خالی می‌ماند. حالا یک کارتِ
+   *  با پهنای محدود است که وسط می‌ایستد — روی گوشی و تبلت یک‌شکل.
+   */
+  Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+    Column(
       Modifier
-        .size(58.dp)
-        .clip(RoundedCornerShape(20.dp))
-        .background(Shop.colors.warningTint),
-      contentAlignment = Alignment.Center,
+        .widthIn(max = 420.dp)
+        .fillMaxWidth()
+        .clip(RoundedCornerShape(Radius.lg))
+        .background(Shop.colors.surface)
+        .border(1.dp, Shop.colors.fieldBorder.copy(alpha = 0.5f), RoundedCornerShape(Radius.lg))
+        .padding(24.dp),
+      horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-      Icon(Icons.Filled.Lock, contentDescription = null, tint = Shop.colors.warning)
-    }
-    Spacer(Modifier.height(14.dp))
-    Text(
-      "«$label» با اشتراک باز می‌شود",
-      style = MaterialTheme.typography.titleMedium,
-      color = Shop.colors.text,
-      fontWeight = FontWeight.Bold,
-    )
-    Spacer(Modifier.height(6.dp))
-    Text(
-      "بقیهٔ برنامه — انبار، مصارف، خرید، گزارش‌ها و پشتیبان‌گیری — باز است و همیشه باز می‌ماند.",
-      style = MaterialTheme.typography.bodySmall,
-      color = Shop.colors.muted,
-    )
-    Spacer(Modifier.height(16.dp))
-    Button(
-      onClick = { sheet = true },
-      colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE0A92C)),
-    ) {
-      Text("اشتراک و قیمت‌ها", color = Color(0xFF3A2705), fontWeight = FontWeight.Bold)
+      // قفلِ نفس‌کشنده — صفحهٔ ساکن، خراب به نظر می‌رسد
+      val motion = rememberInfiniteTransition(label = "gate")
+      val pulse by motion.animateFloat(
+        initialValue = 0.94f,
+        targetValue = 1.06f,
+        animationSpec = infiniteRepeatable(
+          tween(if (Motion.enabled) 1600 else 1, easing = LinearEasing),
+          RepeatMode.Reverse,
+        ),
+        label = "pulse",
+      )
+      Box(
+        Modifier
+          .size(66.dp)
+          .graphicsLayer { scaleX = pulse; scaleY = pulse }
+          .clip(RoundedCornerShape(22.dp))
+          .background(Shop.colors.warningTint),
+        contentAlignment = Alignment.Center,
+      ) {
+        Icon(
+          Icons.Filled.Lock,
+          contentDescription = null,
+          tint = Shop.colors.warning,
+          modifier = Modifier.size(28.dp),
+        )
+      }
+      Spacer(Modifier.height(16.dp))
+      Text(
+        "«$label» با اشتراک باز می‌شود",
+        style = MaterialTheme.typography.titleMedium,
+        color = Shop.colors.text,
+        fontWeight = FontWeight.Bold,
+        textAlign = TextAlign.Center,
+      )
+      Spacer(Modifier.height(8.dp))
+      Text(
+        "بقیهٔ برنامه — انبار، مصارف، خرید، گزارش‌ها و پشتیبان‌گیری — باز است و همیشه باز می‌ماند.",
+        style = MaterialTheme.typography.bodySmall,
+        color = Shop.colors.muted,
+        textAlign = TextAlign.Center,
+      )
+      Spacer(Modifier.height(20.dp))
+      GoldButton("اشتراک و قیمت‌ها") { sheet = true }
     }
   }
   if (sheet) VipSheet { sheet = false }
+}
+
+/**
+ *  دکمهٔ طلاییِ اشتراک — با همان برقی که روی نشانِ بالای صفحه می‌لغزد.
+ *
+ *  دکمهٔ تختِ قبلی کنارِ آن نشانِ متحرک، مرده به نظر می‌رسید: همان کار را
+ *  می‌کرد ولی نمی‌گفت که همان چیز است.
+ */
+@Composable
+private fun GoldButton(text: String, onClick: () -> Unit) {
+  val motion = rememberInfiniteTransition(label = "gold")
+  val shine by motion.animateFloat(
+    initialValue = -0.6f,
+    targetValue = 1.6f,
+    animationSpec = infiniteRepeatable(
+      tween(if (Motion.enabled) 2400 else 1, delayMillis = 700, easing = LinearEasing),
+      RepeatMode.Restart,
+    ),
+    label = "goldShine",
+  )
+  Row(
+    Modifier
+      .clip(RoundedCornerShape(26.dp))
+      .background(
+        Brush.linearGradient(
+          listOf(Color(0xFFF6D36B), Color(0xFFE0A92C), Color(0xFFF8E39A), Color(0xFFD9982A))
+        )
+      )
+      .drawWithContent {
+        drawContent()
+        if (!Motion.enabled) return@drawWithContent
+        val x = size.width * shine
+        drawRect(
+          brush = Brush.linearGradient(
+            colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.55f), Color.Transparent),
+            start = Offset(x - size.width * 0.25f, 0f),
+            end = Offset(x + size.width * 0.25f, size.height),
+          ),
+          size = size,
+        )
+      }
+      .clickable(onClick = onClick)
+      .padding(horizontal = 22.dp, vertical = 13.dp),
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(7.dp),
+  ) {
+    Icon(
+      Icons.Filled.WorkspacePremium,
+      contentDescription = null,
+      tint = Color(0xFF4A3208),
+      modifier = Modifier.size(18.dp),
+    )
+    Text(text, color = Color(0xFF3A2705), fontWeight = FontWeight.Bold)
+  }
 }
