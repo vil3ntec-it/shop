@@ -162,7 +162,7 @@ fun ExpensesScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
       onClick = { form = ExpenseFormState(date = todayIso()) },
       containerColor = Shop.colors.primary,
       contentColor = Color.White,
-      modifier = Modifier.align(Alignment.BottomStart).padding(16.dp),
+      modifier = Modifier.align(Alignment.BottomStart).padding(16.dp).popIn(),
       icon = { Icon(Icons.Filled.Add, contentDescription = null) },
       text = { Text("مصرف تازه") },
     )
@@ -314,6 +314,7 @@ private fun ExpenseDialog(
   var form by remember(state.editingId) { mutableStateOf(state) }
 
   Dialog(onDismissRequest = onDismiss) {
+    DialogEntry {
     Surface(color = Shop.colors.surface, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
       Column(Modifier.padding(18.dp).verticalScroll(rememberScrollState())) {
         Text(
@@ -366,6 +367,7 @@ private fun ExpenseDialog(
           ) { Text("ذخیره") }
         }
       }
+    }
     }
   }
 }

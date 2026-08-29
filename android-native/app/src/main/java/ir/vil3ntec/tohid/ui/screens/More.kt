@@ -29,7 +29,9 @@ fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
   val scope = rememberCoroutineScope()
   val prefs = remember { context.getSharedPreferences("tohid", android.content.Context.MODE_PRIVATE) }
 
-  var repo by remember { mutableStateOf(prefs.getString("update_repo", "vil3ntec-it/shop") ?: "") }
+  // آدرس مخزنِ به‌روزرسانی ثابت است و به کاربر نشان داده نمی‌شود؛ فقط
+  // برای عیب‌یابی می‌شود با همین کلید در تنظیماتِ برنامه عوضش کرد.
+  val repo = remember { prefs.getString("update_repo", "vil3ntec-it/shop") ?: "vil3ntec-it/shop" }
   var status by remember { mutableStateOf<String?>(null) }
   var found by remember { mutableStateOf<Updater.Release?>(null) }
   var progress by remember { mutableStateOf(-1) }
@@ -90,22 +92,12 @@ fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
     SectionTitle("به‌روزرسانی از گیت‌هاب")
     Panel {
       Text(
-        "برای هر تغییر لازم نیست Android Studio باز کنید — نسخهٔ تازه از همین‌جا نصب می‌شود.",
+        "نسخهٔ تازه از همین‌جا گرفته و نصب می‌شود؛ اطلاعات دکان دست‌نخورده می‌ماند.",
         style = MaterialTheme.typography.bodySmall,
         color = Shop.colors.muted,
       )
       Spacer(Modifier.height(12.dp))
 
-      OutlinedTextField(
-        value = repo,
-        onValueChange = { repo = it },
-        label = { Text("مخزن (owner/repo)") },
-        singleLine = true,
-        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Done),
-        modifier = Modifier.fillMaxWidth(),
-      )
-
-      Spacer(Modifier.height(12.dp))
 
       if (progress in 0..100) {
         LinearProgressIndicator(
@@ -127,7 +119,6 @@ fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
         Button(
           enabled = !busy,
           onClick = {
-            prefs.edit().putString("update_repo", repo.trim()).apply()
             busy = true; status = "در حال بررسی…"
             scope.launch {
               Updater.check(repo, BuildConfig.VERSION_NAME)

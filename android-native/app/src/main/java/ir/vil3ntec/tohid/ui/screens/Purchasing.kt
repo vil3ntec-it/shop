@@ -119,7 +119,7 @@ fun PurchasingScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState)
       onClick = { supplierForm = SupplierFormState() },
       containerColor = Shop.colors.primary,
       contentColor = Color.White,
-      modifier = Modifier.align(Alignment.BottomStart).padding(16.dp),
+      modifier = Modifier.align(Alignment.BottomStart).padding(16.dp).popIn(),
       icon = { Icon(Icons.Filled.Add, contentDescription = null) },
       text = { Text("تأمین‌کننده") },
     )
@@ -342,6 +342,7 @@ private fun SupplierDialog(
   var form by remember(state.editingId) { mutableStateOf(state) }
 
   Dialog(onDismissRequest = onDismiss) {
+    DialogEntry {
     Surface(color = Shop.colors.surface, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
       Column(Modifier.padding(18.dp).verticalScroll(rememberScrollState())) {
         Text(
@@ -375,6 +376,7 @@ private fun SupplierDialog(
         }
       }
     }
+    }
   }
 }
 
@@ -404,6 +406,7 @@ private fun PurchaseDialog(
   val remaining = (total - (paid.toDoubleOrNull() ?: 0.0)).coerceAtLeast(0.0)
 
   Dialog(onDismissRequest = onDismiss) {
+    DialogEntry {
     Surface(color = Shop.colors.surface, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
       Column(Modifier.padding(18.dp).verticalScroll(rememberScrollState())) {
         Text("ثبت خرید", style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
@@ -483,6 +486,7 @@ private fun PurchaseDialog(
         }
       }
     }
+    }
   }
 }
 
@@ -498,6 +502,7 @@ private fun PaymentDialog(
   var notes by remember { mutableStateOf("") }
 
   Dialog(onDismissRequest = onDismiss) {
+    DialogEntry {
     Surface(color = Shop.colors.surface, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
       Column(Modifier.padding(18.dp).verticalScroll(rememberScrollState())) {
         Text("پرداخت به تأمین‌کننده", style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
@@ -536,6 +541,7 @@ private fun PaymentDialog(
           ) { Text("ثبت پرداخت") }
         }
       }
+    }
     }
   }
 }

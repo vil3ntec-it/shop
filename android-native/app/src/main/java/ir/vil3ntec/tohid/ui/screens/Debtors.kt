@@ -146,7 +146,7 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
         onClick = { form = DebtorFormState() },
         containerColor = Shop.colors.primary,
         contentColor = Color.White,
-        modifier = Modifier.align(Alignment.BottomStart).padding(16.dp),
+        modifier = Modifier.align(Alignment.BottomStart).padding(16.dp).popIn(),
         icon = { Icon(Icons.Filled.Add, contentDescription = null) },
         text = { Text("قرض‌دار تازه") },
       )
@@ -445,6 +445,7 @@ private fun DebtorDialog(
   var form by remember(state.editingId) { mutableStateOf(state) }
 
   Dialog(onDismissRequest = onDismiss) {
+    DialogEntry {
     Surface(color = Shop.colors.surface, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
       Column(Modifier.padding(18.dp).verticalScroll(rememberScrollState())) {
         Text(
@@ -473,6 +474,7 @@ private fun DebtorDialog(
         }
       }
     }
+    }
   }
 }
 
@@ -493,6 +495,7 @@ private fun TransactionDialog(
   val receiving = chosen == DebtorEngine.Kind.RECEIVE
 
   Dialog(onDismissRequest = onDismiss) {
+    DialogEntry {
     Surface(color = Shop.colors.surface, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
       Column(Modifier.padding(18.dp).verticalScroll(rememberScrollState())) {
         Text(
@@ -553,6 +556,7 @@ private fun TransactionDialog(
           ) { Text(if (receiving) "ثبت رسید" else "ثبت برد") }
         }
       }
+    }
     }
   }
 }

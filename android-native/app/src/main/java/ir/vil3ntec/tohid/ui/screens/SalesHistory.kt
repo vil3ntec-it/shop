@@ -293,6 +293,7 @@ private fun ReturnDialog(
   }
 
   Dialog(onDismissRequest = onDismiss) {
+    DialogEntry {
     Surface(color = Shop.colors.surface, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
       Column(Modifier.padding(18.dp).verticalScroll(rememberScrollState())) {
         Text("مرجوعی — فاکتور #${plain(sale.invoiceNumber ?: 0)}",
@@ -356,6 +357,7 @@ private fun ReturnDialog(
           ) { Text("ثبت مرجوعی") }
         }
       }
+    }
     }
   }
 }

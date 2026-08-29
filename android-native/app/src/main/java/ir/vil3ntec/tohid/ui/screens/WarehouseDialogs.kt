@@ -73,6 +73,7 @@ fun ProductDialog(
   var form by remember(state.editingId, state.barcode) { mutableStateOf(state) }
 
   Dialog(onDismissRequest = onDismiss) {
+    DialogEntry {
     Surface(color = Shop.colors.surface, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
       Column(Modifier.padding(18.dp).verticalScroll(rememberScrollState())) {
         Text(
@@ -164,6 +165,7 @@ fun ProductDialog(
         }
       }
     }
+    }
   }
 }
 
@@ -195,6 +197,7 @@ fun EntryDialog(
   }
 
   Dialog(onDismissRequest = onDismiss) {
+    DialogEntry {
     Surface(color = Shop.colors.surface, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
       Column(Modifier.padding(18.dp).verticalScroll(rememberScrollState())) {
         Text("ثبت ورود کالا", style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
@@ -272,6 +275,7 @@ fun EntryDialog(
         }
       }
     }
+    }
   }
 }
 
@@ -291,6 +295,7 @@ fun AdjustDialog(
   var reason by remember { mutableStateOf("") }
 
   Dialog(onDismissRequest = onDismiss) {
+    DialogEntry {
     Surface(color = Shop.colors.surface, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
       Column(Modifier.padding(18.dp).verticalScroll(rememberScrollState())) {
         Text(
@@ -343,6 +348,7 @@ fun AdjustDialog(
           ) { Text("ثبت") }
         }
       }
+    }
     }
   }
 }
