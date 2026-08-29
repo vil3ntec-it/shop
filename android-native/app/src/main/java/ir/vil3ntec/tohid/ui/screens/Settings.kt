@@ -1,6 +1,5 @@
 package ir.vil3ntec.tohid.ui.screens
 
-import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
@@ -33,6 +32,7 @@ import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.formatDate
 import ir.vil3ntec.tohid.plain
 import ir.vil3ntec.tohid.sync.License
+import ir.vil3ntec.tohid.sync.SavedLogins
 import ir.vil3ntec.tohid.sync.ServerClient
 import ir.vil3ntec.tohid.sync.SyncStore
 import ir.vil3ntec.tohid.sync.Syncer
@@ -84,7 +84,10 @@ fun SettingsScreen(
       ) == android.content.pm.PackageManager.PERMISSION_GRANTED
     )
   }
-  var pendingRestore by remember { mutableStateOf<Uri?>(null) }
+  // فایل خوانده و سنجیده شده، پیش از آنکه دفتر عوض شود
+  var pendingRestore by remember { mutableStateOf<ShopData?>(null) }
+  var restoreError by remember { mutableStateOf<String?>(null) }
+  var canUndo by remember { mutableStateOf(store.hasSafetyCopy()) }
 
   fun toast(text: String) {
     scope.launch { snackbar.showSnackbar(text) }
@@ -110,7 +113,19 @@ fun SettingsScreen(
   }
 
   val pickFile = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-    if (uri != null) pendingRestore = uri
+    if (uri == null) return@rememberLauncherForActivityResult
+    scope.launch {
+      val text = runCatching {
+        context.contentResolver.openInputStream(uri)!!.bufferedReader().use { it.readText() }
+      }.getOrNull()
+      if (text == null) {
+        restoreError = "فایل خوانده نشد"
+        return@launch
+      }
+      store.parseBackup(text)
+        .onSuccess { pendingRestore = it; restoreError = null }
+        .onFailure { restoreError = it.message ?: "فایل پشتیبان معتبر نیست" }
+    }
   }
 
   // اجازهٔ دوربین — همان دکمهٔ «درخواست دسترسی و تست دوربین» نسخهٔ وب
@@ -266,6 +281,28 @@ fun SettingsScreen(
             modifier = Modifier.weight(1f),
           ) { Text("بازیابی از فایل") }
         }
+
+        // بعد از هر بازیابی، راهِ برگشت باز می‌ماند: اگر فایل اشتباهی
+        // بازیابی شود، کارِ چند ماه رفته است
+        if (canUndo) {
+          Spacer(Modifier.height(10.dp))
+          OutlinedButton(
+            onClick = {
+              scope.launch {
+                store.undoRestore()
+                  .onSuccess { canUndo = false; toast("به وضعیت پیش از بازیابی برگشت") }
+                  .onFailure { toast("برگرداندن ممکن نشد") }
+              }
+            },
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = Shop.colors.warning),
+            modifier = Modifier.fillMaxWidth(),
+          ) { Text("برگرداندن به پیش از بازیابی") }
+        }
+
+        restoreError?.let {
+          Spacer(Modifier.height(10.dp))
+          Text(it, style = MaterialTheme.typography.labelMedium, color = Shop.colors.danger)
+        }
       }
 
       Spacer(Modifier.height(20.dp))
@@ -336,6 +373,7 @@ fun SettingsScreen(
                     state.accessToken = session.accessToken
                     state.refreshToken = session.refreshToken
                     state.accountName = session.name
+                    SavedLogins.remember(context, identifier.trim(), session.name)
                     signedIn = true
                     password = ""
                     toast("وارد شدید")
@@ -450,32 +488,35 @@ fun SettingsScreen(
 
   /* ---------------------------- پنجره‌ها ---------------------------- */
 
-  pendingRestore?.let { uri ->
+  pendingRestore?.let { incoming ->
     AlertDialog(
       onDismissRequest = { pendingRestore = null },
       containerColor = Shop.colors.surface,
       title = { Text("بازیابی اطلاعات؟", color = Shop.colors.text) },
       text = {
-        Text(
-          "با بازیابی این فایل، تمام اطلاعات فعلی این دستگاه جایگزین می‌شود. این کار قابل بازگشت نیست.",
-          style = MaterialTheme.typography.bodySmall,
-          color = Shop.colors.muted,
-        )
+        Column {
+          Text(
+            "با بازیابی این فایل، تمام اطلاعات فعلی این دستگاه جایگزین می‌شود. یک نسخه از وضعیت فعلی نگه داشته می‌شود تا اگر اشتباه شد، برگردانده شود.",
+            style = MaterialTheme.typography.bodySmall,
+            color = Shop.colors.muted,
+          )
+          Spacer(Modifier.height(12.dp))
+          RestoreLine("محصولات", d.products.size, incoming.products.size)
+          RestoreLine("فاکتورها", d.sales.size, incoming.sales.size)
+          RestoreLine("قرض‌داران", d.debtors.size, incoming.debtors.size)
+          RestoreLine("مصارف", d.expenses.size, incoming.expenses.size)
+          RestoreLine("ورودهای انبار", d.warehouseEntries.size, incoming.warehouseEntries.size)
+        }
       },
       confirmButton = {
         TextButton(onClick = {
+          val next = incoming
           pendingRestore = null
           scope.launch {
-            val text = runCatching {
-              context.contentResolver.openInputStream(uri)!!.bufferedReader().use { it.readText() }
-            }.getOrNull()
-            if (text == null) {
-              toast("فایل خوانده نشد")
-            } else {
-              store.importJson(text)
-                .onSuccess { toast("اطلاعات با موفقیت بازیابی شد") }
-                .onFailure { toast("فایل پشتیبان معتبر نیست") }
-            }
+            store.keepSafetyCopy()
+            store.save(next)
+            canUndo = true
+            toast("اطلاعات با موفقیت بازیابی شد")
           }
         }) { Text("بازیابی", color = Shop.colors.danger) }
       },
@@ -569,6 +610,27 @@ private fun copyToClipboard(context: android.content.Context, label: String, val
   val manager = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
     as? android.content.ClipboardManager ?: return
   manager.setPrimaryClip(android.content.ClipData.newPlainText(label, value))
+}
+
+/**
+ *  یک ردیفِ خلاصهٔ بازیابی: چند تا الان هست، چند تا بعدش می‌شود.
+ *
+ *  فقط تعدادِ فایل را نشان دادن کافی نیست؛ کاربر باید ببیند چه چیزی را
+ *  دارد از دست می‌دهد — «۱۲۰ محصول ← ۳ محصول» حرفِ خودش را می‌زند.
+ */
+@Composable
+private fun RestoreLine(label: String, now: Int, next: Int) {
+  Row(
+    Modifier.fillMaxWidth().padding(vertical = 3.dp),
+    horizontalArrangement = Arrangement.SpaceBetween,
+  ) {
+    Text(label, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
+    Text(
+      "${plain(now)} ← ${plain(next)}",
+      style = MaterialTheme.typography.bodyMedium,
+      color = if (next < now) Shop.colors.warning else Shop.colors.text,
+    )
+  }
 }
 
 @Composable

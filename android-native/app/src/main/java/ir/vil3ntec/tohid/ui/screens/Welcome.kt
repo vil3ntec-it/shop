@@ -42,6 +42,12 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.sync.ServerClient
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.material.icons.filled.Close
+import ir.vil3ntec.tohid.sync.SavedLogins
 import ir.vil3ntec.tohid.sync.SyncStore
 import ir.vil3ntec.tohid.ui.theme.Radius
 import ir.vil3ntec.tohid.ui.theme.Shop
@@ -73,6 +79,7 @@ fun WelcomeScreen(onDone: () -> Unit) {
   var busy by remember { mutableStateOf(false) }
   var error by remember { mutableStateOf<String?>(null) }
   var note by remember { mutableStateOf<String?>(null) }
+  var saved by remember { mutableStateOf(SavedLogins.read(context)) }
 
   fun fail(e: Throwable) {
     error = (e as? ServerClient.ServerError)?.message ?: "ارتباط با سرور برقرار نشد"
@@ -181,6 +188,29 @@ fun WelcomeScreen(onDone: () -> Unit) {
             modifier = Modifier.fillMaxWidth(),
           )
         } else {
+          // حساب‌هایی که قبلاً از این گوشی وارد شده‌اند — یک لمس، کادر پر
+          if (saved.isNotEmpty()) {
+            Text(
+              "ورود سریع",
+              style = MaterialTheme.typography.labelMedium,
+              color = Shop.colors.muted,
+              modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(6.dp))
+            saved.forEach { entry ->
+              SavedLoginRow(
+                entry = entry,
+                onPick = { identifier = entry.identifier; error = null },
+                onForget = {
+                  SavedLogins.forget(context, entry.identifier)
+                  saved = SavedLogins.read(context)
+                },
+              )
+              Spacer(Modifier.height(6.dp))
+            }
+            Spacer(Modifier.height(6.dp))
+          }
+
           OutlinedTextField(
             value = identifier,
             onValueChange = { identifier = it; error = null },
@@ -251,6 +281,7 @@ fun WelcomeScreen(onDone: () -> Unit) {
                     state.accessToken = session.accessToken
                     state.refreshToken = session.refreshToken
                     state.accountName = session.name
+                    SavedLogins.remember(context, identifier.trim(), session.name)
                     onDone()
                   }
                   .onFailure { fail(it) }
@@ -273,6 +304,18 @@ fun WelcomeScreen(onDone: () -> Unit) {
               style = MaterialTheme.typography.titleSmall,
               color = Color.White,
             )
+          }
+        }
+
+        if (mode == "login") {
+          TextButton(
+            onClick = {
+              note = "برای بازیابی رمز، با پشتیبانی تماس بگیرید. اطلاعات دکان شما روی همین گوشی محفوظ است."
+              error = null
+            },
+            modifier = Modifier.fillMaxWidth(),
+          ) {
+            Text("رمز عبور را فراموش کرده‌اید؟", color = Shop.colors.muted, style = MaterialTheme.typography.labelMedium)
           }
         }
 
@@ -444,5 +487,63 @@ private fun RoleCard(
       color = Shop.colors.muted,
       textAlign = TextAlign.Center,
     )
+  }
+}
+
+/**
+ *  یک حسابِ ذخیره‌شده در فهرستِ ورودِ سریع.
+ *
+ *  شناسه چپ‌به‌راست نوشته می‌شود: شماره و ایمیل در صفحهٔ راست‌به‌چپ
+ *  وارونه دیده می‌شوند و کاربر فکر می‌کند حسابِ دیگری است.
+ */
+@Composable
+private fun SavedLoginRow(
+  entry: SavedLogins.Entry,
+  onPick: () -> Unit,
+  onForget: () -> Unit,
+) {
+  Row(
+    Modifier
+      .fillMaxWidth()
+      .clip(RoundedCornerShape(12.dp))
+      .background(Shop.colors.surface2)
+      .clickable(onClick = onPick)
+      .padding(start = 10.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
+    verticalAlignment = Alignment.CenterVertically,
+  ) {
+    Icon(
+      Icons.Filled.Person,
+      contentDescription = null,
+      tint = Shop.colors.muted,
+      modifier = Modifier.size(18.dp),
+    )
+    Spacer(Modifier.width(8.dp))
+    Column(Modifier.weight(1f)) {
+      CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+        Text(
+          entry.identifier,
+          style = MaterialTheme.typography.bodyMedium,
+          color = Shop.colors.text,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
+        )
+      }
+      if (entry.shop.isNotBlank()) {
+        Text(
+          "فروشگاه: ${entry.shop}",
+          style = MaterialTheme.typography.labelSmall,
+          color = Shop.colors.muted2,
+          maxLines = 1,
+        )
+      }
+    }
+    IconButton(onClick = onForget, modifier = Modifier.size(32.dp)) {
+      Icon(
+        Icons.Filled.Close,
+        contentDescription = "حذف این حساب از فهرست",
+        tint = Shop.colors.muted2,
+        modifier = Modifier.size(15.dp),
+      )
+    }
   }
 }

@@ -64,6 +64,8 @@ fun WarehouseScreen(
 
   var productForm by remember { mutableStateOf<ProductFormState?>(null) }
   var entryFor by remember { mutableStateOf<String?>(null) }
+  var bulkProduct by remember { mutableStateOf(false) }
+  var bulkEntry by remember { mutableStateOf(false) }
   var adjustFor by remember { mutableStateOf<String?>(null) }
   var confirmDelete by remember { mutableStateOf<Product?>(null) }
   var movementsFor by remember { mutableStateOf<Product?>(null) }
@@ -114,6 +116,13 @@ fun WarehouseScreen(
           style = MaterialTheme.typography.bodySmall,
           color = Shop.colors.muted,
         )
+        Spacer(Modifier.height(12.dp))
+        // همان دکمهٔ بالای صفحهٔ انبار در نسخهٔ وب: چند قلم را یک‌جا وارد کن
+        Button(onClick = { bulkEntry = true }, modifier = Modifier.fillMaxWidth()) {
+          Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+          Spacer(Modifier.width(6.dp))
+          Text("ورود کالا به انبار")
+        }
         Spacer(Modifier.height(14.dp))
       }
 
@@ -195,7 +204,7 @@ fun WarehouseScreen(
     }
 
     ExtendedFloatingActionButton(
-      onClick = { productForm = ProductFormState() },
+      onClick = { bulkProduct = true },
       containerColor = Shop.colors.primary,
       contentColor = Color.White,
       modifier = Modifier.align(Alignment.BottomStart).padding(16.dp).popIn(),
@@ -205,6 +214,32 @@ fun WarehouseScreen(
   }
 
   /* ---------------------------- پنجره‌ها ---------------------------- */
+
+  if (bulkProduct) {
+    BulkProductSheet(
+      d = d,
+      onDismiss = { bulkProduct = false },
+      onSave = { drafts ->
+        apply(
+          WarehouseEngine.addProducts(d, drafts, System.currentTimeMillis(), ::newId),
+          "${plain(drafts.size)} کالا ثبت شد",
+        ) { bulkProduct = false }
+      },
+    )
+  }
+
+  if (bulkEntry) {
+    BulkEntrySheet(
+      d = d,
+      onDismiss = { bulkEntry = false },
+      onSave = { rows, date ->
+        apply(
+          WarehouseEngine.addEntries(d, rows, date, System.currentTimeMillis(), ::newId),
+          "${plain(rows.size)} ردیف ثبت شد",
+        ) { bulkEntry = false }
+      },
+    )
+  }
 
   productForm?.let { form ->
     ProductDialog(

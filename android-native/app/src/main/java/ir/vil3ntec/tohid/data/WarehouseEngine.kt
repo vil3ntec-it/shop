@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.data
 
 import ir.vil3ntec.tohid.money
+import ir.vil3ntec.tohid.plain
 
 /**
  *  انبار — ثبتِ کالا، ورودِ جنس، اصلاحِ موجودی.
@@ -343,6 +344,103 @@ object WarehouseEngine {
       ),
       id = id,
     )
+  }
+
+  /* =========================== ثبتِ دسته‌جمعی =========================== */
+
+  /**
+   *  یک ردیفِ «ورود کالا به انبار» در حالتِ دسته‌جمعی.
+   *
+   *  ردیف یا به کالای موجود اشاره می‌کند، یا خودش کالای تازه‌ای می‌سازد —
+   *  همان دو حالتی که فهرستِ کشویی نسخهٔ وب دارد.
+   */
+  data class BulkEntry(val entry: EntryDraft, val newProduct: ProductDraft? = null)
+
+  /**
+   *  چند کالا، یک‌جا.
+   *
+   *  قاعده‌ی مهم: **یا همه ثبت می‌شوند یا هیچ‌کدام.** اگر ردیفِ پنجم ایراد
+   *  داشته باشد، چهار ردیفِ اول هم ثبت نمی‌شوند. نیمه‌کاره ثبت شدن،
+   *  بدترین حالت است: کاربر نمی‌داند کدام رفت و کدام نرفت و دوباره که
+   *  می‌زند، نصفشان تکراری می‌شود.
+   *
+   *  چون هر ردیف روی خروجیِ ردیفِ قبل سوار می‌شود، بارکدِ تکراری *داخلِ
+   *  همین دسته* هم گرفته می‌شود، نه فقط تکرار با کالاهای قدیمی.
+   */
+  fun addProducts(
+    d: ShopData,
+    drafts: List<ProductDraft>,
+    now: Long,
+    newId: () -> String,
+  ): Result {
+    if (drafts.isEmpty()) return Result.Failed("حداقل یک ردیف کامل لازم است")
+    var data = d
+    var lastId = ""
+    drafts.forEachIndexed { index, draft ->
+      when (val step = addProduct(data, draft, now, newId)) {
+        is Result.Failed -> return Result.Failed("ردیف ${plain(index + 1)}: ${step.message}")
+        is Result.Ok -> { data = step.data; lastId = step.id }
+      }
+    }
+    return Result.Ok(data, lastId)
+  }
+
+  /**
+   *  چند ورودِ انبار، یک‌جا — با همان قاعده‌ی «یا همه یا هیچ‌کدام».
+   *
+   *  ردیفی که کالای تازه می‌خواهد، اول کالا را می‌سازد و بعد ورودی را به
+   *  نامِ همان می‌نویسد؛ پس دقیقاً همان زنجیره‌ی فرمِ تک‌ردیفی طی می‌شود:
+   *  کالا → ورودی → حرکتِ انبار.
+   */
+  fun addEntries(
+    d: ShopData,
+    rows: List<BulkEntry>,
+    today: String,
+    now: Long,
+    newId: () -> String,
+  ): Result {
+    if (rows.isEmpty()) return Result.Failed("هیچ ردیف کاملی برای ثبت نیست")
+    var data = d
+    var lastId = ""
+    rows.forEachIndexed { index, row ->
+      val no = plain(index + 1)
+      var productId = row.entry.productId
+      if (row.newProduct != null) {
+        when (val made = addProduct(data, row.newProduct, now, newId)) {
+          is Result.Failed -> return Result.Failed("ردیف $no: ${made.message}")
+          is Result.Ok -> { data = made.data; productId = made.id }
+        }
+      }
+      when (val step = addEntry(data, row.entry.copy(productId = productId), today, now, newId)) {
+        is Result.Failed -> return Result.Failed("ردیف $no: ${step.message}")
+        is Result.Ok -> { data = step.data; lastId = step.id }
+      }
+    }
+    return Result.Ok(data, lastId)
+  }
+
+  /* ---------------------------- دسته‌بندی‌ها ---------------------------- */
+
+  /**
+   *  دسته‌بندیِ تازه. تکراری اضافه نمی‌شود و فاصله‌های اضافه می‌روند.
+   */
+  fun addCategory(d: ShopData, name: String): Result {
+    val v = name.trim()
+    if (v.isEmpty()) return Result.Failed("نام دسته‌بندی را بنویسید")
+    if (d.productCategories.contains(v)) return Result.Ok(d, v)
+    return Result.Ok(d.copy(productCategories = d.productCategories + v), v)
+  }
+
+  /**
+   *  حذفِ دسته‌بندی.
+   *
+   *  کالاهای همان دسته حذف نمی‌شوند — فقط دیگر با این دسته فیلتر نمی‌شوند،
+   *  عیناً همان کاری که نسخهٔ وب می‌کند. نامِ دسته روی خودِ کالا می‌ماند تا
+   *  اگر کاربر دوباره همان دسته را ساخت، کالاها سرِ جایشان برگردند.
+   */
+  fun removeCategory(d: ShopData, name: String): Result {
+    if (!d.productCategories.contains(name)) return Result.Failed("این دسته‌بندی وجود ندارد")
+    return Result.Ok(d.copy(productCategories = d.productCategories.filterNot { it == name }), name)
   }
 
   /* ------------------------------ ریزه‌کاری ------------------------------ */

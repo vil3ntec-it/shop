@@ -44,6 +44,7 @@ private val PAGE_TITLES = mapOf(
   "receipts" to "رسیدها",
   "audit" to "سابقه عملیات",
   "settings" to "تنظیمات",
+  "quick" to "انتخاب محصول",
 )
 
 private val TABS = listOf(
@@ -114,6 +115,10 @@ fun AppRoot(
           val lic = ir.vil3ntec.tohid.sync.SyncStore(context)
           if (lic.accessToken.isNullOrBlank()) authOpen = true else sub = "settings"
         },
+        onOpen = { target ->
+          // هشدارها به تب‌های اصلی می‌روند، بقیه به زیرصفحه‌ها
+          if (TABS.any { it.id == target }) { tab = target; sub = null } else sub = target
+        },
       )
     },
     snackbarHost = { SnackbarHost(snackbar) },
@@ -175,8 +180,17 @@ fun AppRoot(
         "dashboard" -> DashboardScreen(data) { target ->
           if (target == "settings") sub = "settings" else { tab = target; sub = null }
         }
+        "quick" -> VipGate("فروش (صندوق)") {
+          QuickSaleScreen(store, cartStore, data, snackbar) { sub = null; tab = "sale" }
+        }
         "sale" -> VipGate("فروش (صندوق)") {
-          SaleScreen(store, cartStore, data, snackbar) { code ->
+          SaleScreen(
+            store = store,
+            cartStore = cartStore,
+            d = data,
+            snackbar = snackbar,
+            onQuickSale = { sub = "quick" },
+          ) { code ->
             pendingBarcode = code
             tab = "warehouse"
           }

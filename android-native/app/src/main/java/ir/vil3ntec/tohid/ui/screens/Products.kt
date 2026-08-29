@@ -37,6 +37,7 @@ import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.data.WarehouseEngine
 import ir.vil3ntec.tohid.money
+import ir.vil3ntec.tohid.plain
 import ir.vil3ntec.tohid.qty
 import ir.vil3ntec.tohid.toFaDigits
 import ir.vil3ntec.tohid.todayIso
@@ -67,6 +68,7 @@ fun ProductsScreen(
   var search by rememberSaveable { mutableStateOf("") }
   var category by rememberSaveable { mutableStateOf<String?>(null) }
   var productForm by remember { mutableStateOf<ProductFormState?>(null) }
+  var bulkProduct by remember { mutableStateOf(false) }
   var actionsFor by remember { mutableStateOf<Product?>(null) }
   var confirmDelete by remember { mutableStateOf<Product?>(null) }
   // محصولی که منتظرِ عکس است، و شمارنده‌ای که کارت‌ها را تازه می‌کند
@@ -227,7 +229,7 @@ fun ProductsScreen(
     }
 
     ExtendedFloatingActionButton(
-      onClick = { productForm = ProductFormState() },
+      onClick = { bulkProduct = true },
       containerColor = Shop.colors.primary,
       contentColor = Color.White,
       icon = { Icon(Icons.Filled.Add, contentDescription = null) },
@@ -237,6 +239,20 @@ fun ProductsScreen(
   }
 
   /* ------------------------- کادرها ------------------------- */
+
+  // «محصول جدید» در وب همین شیتِ چندردیفی است، نه فرمِ تکی
+  if (bulkProduct) {
+    BulkProductSheet(
+      d = d,
+      onDismiss = { bulkProduct = false },
+      onSave = { drafts ->
+        apply(
+          WarehouseEngine.addProducts(d, drafts, System.currentTimeMillis(), ::newId),
+          "${plain(drafts.size)} کالا ثبت شد",
+        ) { bulkProduct = false }
+      },
+    )
+  }
 
   productForm?.let { form ->
     ProductDialog(
