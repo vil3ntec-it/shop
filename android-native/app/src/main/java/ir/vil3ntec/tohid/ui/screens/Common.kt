@@ -40,7 +40,7 @@ fun Panel(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> 
   val colors = Shop.colors
   Column(
     modifier
-      .glassSurface(Shape.card, colors.surface, colors.sheen, colors.border)
+      .glassSurface(Shape.card, colors.surface, colors.sheen, colors.border, glow = colors.glow)
       .padding(18.dp),
     content = content,
   )
@@ -58,7 +58,7 @@ fun StatTile(
   val colors = Shop.colors
   Column(
     modifier
-      .glassSurface(Shape.card, colors.surface, colors.sheen, colors.border)
+      .glassSurface(Shape.card, colors.surface, colors.sheen, colors.border, glow = colors.glow)
       .padding(16.dp)
   ) {
     Text(label, style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)

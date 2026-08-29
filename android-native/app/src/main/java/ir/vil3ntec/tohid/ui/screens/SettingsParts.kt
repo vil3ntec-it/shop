@@ -65,7 +65,7 @@ fun SettingsSection(
   Column(
     Modifier
       .fillMaxWidth()
-      .glassSurface(Shape.card, colors.surface, colors.sheen, colors.border)
+      .glassSurface(Shape.card, colors.surface, colors.sheen, colors.border, glow = colors.glow)
   ) {
     Row(
       Modifier

@@ -517,7 +517,7 @@ private fun ShortcutCard(
   Column(
     Modifier
       .width(92.dp)
-      .glassSurface(Shape.card, Shop.colors.surface, Shop.colors.sheen, Shop.colors.border)
+      .glassSurface(Shape.card, Shop.colors.surface, Shop.colors.sheen, Shop.colors.border, glow = Shop.colors.glow)
       .clickable(onClick = onClick)
       .padding(vertical = 14.dp, horizontal = 8.dp),
     horizontalAlignment = Alignment.CenterHorizontally,

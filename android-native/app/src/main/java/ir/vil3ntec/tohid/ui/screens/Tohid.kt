@@ -173,8 +173,14 @@ fun TohidCard(
   val colors = Shop.colors
   Column(
     modifier
-      .then(if (glow) Modifier.softGlow(Shape.card, colors.glow) else Modifier)
-      .glassSurface(Shape.card, colors.surface, colors.sheen, colors.border)
+      .glassSurface(
+        shape = Shape.card,
+        tint = colors.surface,
+        sheen = colors.sheen,
+        border = colors.border,
+        strong = glow,
+        glow = colors.glow,
+      )
       .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
       .padding(Space.md),
     content = content,

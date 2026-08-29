@@ -16,6 +16,16 @@ import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.fa
 import ir.vil3ntec.tohid.update.Updater
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.LocalShipping
+import androidx.compose.material.icons.filled.ManageSearch
+import androidx.compose.material.icons.filled.Payments
+import androidx.compose.material.icons.filled.ReceiptLong
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.ShoppingBag
 import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.launch
 
@@ -58,46 +68,64 @@ fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
     Panel {
       MoreCard(
         title = "قرض‌داران",
+        icon = Icons.Filled.Groups,
+        tint = Shop.colors.warning,
         subtitle = "حساب هر قرض‌دار، برد و رسید",
         onClick = { onOpen("debtors") },
       )
       MoreCard(
         title = "محصولات",
+        icon = Icons.Filled.ShoppingBag,
+        tint = Shop.colors.primary,
         subtitle = "فهرست کالاها با عکس، قیمت و سود",
         onClick = { onOpen("products") },
       )
       MoreCard(
         title = "مصارف",
+        icon = Icons.Filled.Payments,
+        tint = Shop.colors.danger,
         subtitle = "خرج‌های دکان به تفکیک دسته",
         onClick = { onOpen("expenses") },
       )
       MoreCard(
         title = "رسیدها",
+        icon = Icons.Filled.ReceiptLong,
+        tint = Shop.colors.success,
         subtitle = "دریافتی‌های هر قرض‌دار به تفکیک ماه و سال",
         onClick = { onOpen("receipts") },
       )
       MoreCard(
         title = "تاریخچه فروش",
+        icon = Icons.Filled.History,
+        tint = Shop.colors.primary,
         subtitle = "فاکتورهای ثبت‌شده، مرجوعی و لغو فروش",
         onClick = { onOpen("sales") },
       )
       MoreCard(
         title = "خرید و تأمین‌کننده",
+        icon = Icons.Filled.LocalShipping,
+        tint = Shop.colors.accent,
         subtitle = "حساب تأمین‌کننده‌ها و بدهی به آن‌ها",
         onClick = { onOpen("purchasing") },
       )
       MoreCard(
         title = "گزارشات",
+        icon = Icons.Filled.BarChart,
+        tint = Shop.colors.success,
         subtitle = "سود، فروش و مصارف در بازهٔ دلخواه",
         onClick = { onOpen("reports") },
       )
       MoreCard(
         title = "سابقه عملیات",
+        icon = Icons.Filled.ManageSearch,
+        tint = Shop.colors.muted,
         subtitle = "هر کاری که در برنامه انجام شده",
         onClick = { onOpen("audit") },
       )
       MoreCard(
         title = "تنظیمات",
+        icon = Icons.Filled.Settings,
+        tint = Shop.colors.primary,
         subtitle = "نام فروشگاه، ظاهر، پشتیبان‌گیری و اتصال به سرور",
         onClick = { onOpen("settings") },
       )
@@ -191,21 +219,23 @@ fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
 }
 
 @Composable
-private fun MoreCard(title: String, subtitle: String, onClick: () -> Unit) {
-  Row(
-    Modifier
-      .fillMaxWidth()
-      .clip(androidx.compose.foundation.shape.RoundedCornerShape(ir.vil3ntec.tohid.ui.theme.Radius.sm))
-      .clickable(onClick = onClick)
-      .padding(vertical = 10.dp, horizontal = 4.dp),
-    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-  ) {
-    Column(Modifier.weight(1f)) {
-      Text(title, style = MaterialTheme.typography.titleSmall, color = Shop.colors.text)
-      Text(subtitle, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
-    }
-    Text("‹", style = MaterialTheme.typography.headlineSmall, color = Shop.colors.muted2)
-  }
+private fun MoreCard(
+  title: String,
+  subtitle: String,
+  icon: androidx.compose.ui.graphics.vector.ImageVector,
+  tint: androidx.compose.ui.graphics.Color,
+  onClick: () -> Unit,
+) {
+  // همان شکلِ ردیف‌های تنظیمات: آیکنِ رنگی در ظرفِ گرد، عنوان، توضیح و
+  // فلش. ردیفِ فقط‌متنی روی زمینهٔ خالی، فهرست را یک تودهٔ خاکستری
+  // می‌کرد که چشم نمی‌توانست اسکنش کند.
+  SettingsRow(
+    icon = icon,
+    title = title,
+    description = subtitle,
+    tint = tint,
+    onClick = onClick,
+  )
 }
 
 @Composable
