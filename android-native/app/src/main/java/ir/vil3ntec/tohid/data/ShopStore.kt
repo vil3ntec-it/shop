@@ -48,13 +48,61 @@ class ShopStore(private val context: Context) {
     }
   }
 
+  /**
+   *  خواندنِ فایلِ پشتیبان — بدونِ نوشتن.
+   *
+   *  جدا از `importJson` است تا بشود پیش از جایگزین کردنِ دفتر، نشان داد
+   *  داخلِ فایل چه چیزی هست. بازیابی کاری است که برنمی‌گردد؛ کاربر باید
+   *  ببیند چه چیزی جای چه چیزی می‌نشیند.
+   *
+   *  فایلی که JSON درستی باشد ولی مالِ این برنامه نباشد، همه‌جا خالی
+   *  می‌خواند و بی‌صدا دفتر را پاک می‌کند. برای همین یک بررسیِ ساده هست:
+   *  فایلِ پشتیبانِ واقعی دستِ‌کم یکی از فهرست‌هایش پر است، یا صریحاً
+   *  مُهرِ `exportedAt` دارد.
+   */
+  fun parseBackup(raw: String): Result<ShopData> = runCatching {
+    val tree = json.parseToJsonElement(raw) as? kotlinx.serialization.json.JsonObject
+      ?: error("فایل پشتیبان معتبر نیست")
+    val parsed = json.decodeFromJsonElement(ShopData.serializer(), tree)
+    val stamped = tree.containsKey("exportedAt")
+    if (!stamped && backupSize(parsed) == 0) error("این فایل، پشتیبانِ توحید نیست")
+    parsed
+  }
+
   /** واردکردنِ داده‌ای که از نسخهٔ وب می‌آید */
   suspend fun importJson(raw: String): Result<ShopData> = withContext(Dispatchers.IO) {
+    parseBackup(raw).onSuccess { save(it) }
+  }
+
+  /* -------------------------- پشتیبانِ ایمنی -------------------------- */
+
+  private val safety = File(context.filesDir, "before-restore.json")
+
+  /**
+   *  یک نسخه از دفترِ فعلی، پیش از بازیابی.
+   *
+   *  اگر کاربر فایلِ اشتباهی را بازیابی کند، کارِ چند ماهش رفته است. این
+   *  نسخه همان‌جا روی گوشی می‌ماند تا یک دکمه بتواند برش گرداند.
+   */
+  suspend fun keepSafetyCopy() = withContext(Dispatchers.IO) {
+    runCatching { safety.writeText(json.encodeToString(_data.value)) }
+    Unit
+  }
+
+  fun hasSafetyCopy(): Boolean = safety.exists()
+
+  /** برگرداندن به لحظهٔ پیش از بازیابی */
+  suspend fun undoRestore(): Result<ShopData> = withContext(Dispatchers.IO) {
     runCatching {
-      val parsed = json.decodeFromString<ShopData>(raw)
+      val parsed = json.decodeFromString<ShopData>(safety.readText())
       save(parsed)
+      safety.delete()
       parsed
     }
+  }
+
+  fun dropSafetyCopy() {
+    runCatching { safety.delete() }
   }
 
   fun hasData(): Boolean = file.exists()
@@ -82,6 +130,12 @@ class ShopStore(private val context: Context) {
   }
 
   companion object {
+
+    /** چند رکورد در این دفتر هست — برای خلاصهٔ پیش از بازیابی */
+    fun backupSize(d: ShopData): Int =
+      d.products.size + d.sales.size + d.debtors.size + d.expenses.size +
+        d.suppliers.size + d.purchases.size + d.warehouseEntries.size + d.transactions.size
+
     /* ------------------------- محاسبه‌ها ------------------------- */
 
     /**
