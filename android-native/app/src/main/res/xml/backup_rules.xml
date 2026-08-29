@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     پشتیبانِ خودکارِ اندروید (اندروید ۱۲ به بالا).
+
+     دفترِ دکان و تنظیمات پشتیبان گرفته می‌شوند تا گوشیِ تازه با همان
+     اطلاعات بالا بیاید. ولی توکنِ ورود نه: توکن مالِ همان دستگاه است و
+     بردنش به دستگاهِ دیگر یعنی نشستنِ یک نشستِ باز روی گوشی‌ای که شاید
+     مالِ کسِ دیگری باشد.
+
+     `exclude` فقط زیرِ چیزی معنی دارد که `include` شده باشد — وگرنه
+     ساخت رد می‌شود. برای همین `sharedpref` هم بالا آمده و بعد یک فایلش
+     کنار گذاشته شده.
+-->
+<data-extraction-rules>
+  <cloud-backup>
+    <include domain="file" path="." />
+    <include domain="sharedpref" path="." />
+    <exclude domain="sharedpref" path="tohid-sync.xml" />
+  </cloud-backup>
+  <device-transfer>
+    <include domain="file" path="." />
+    <include domain="sharedpref" path="." />
+    <exclude domain="sharedpref" path="tohid-sync.xml" />
+  </device-transfer>
+</data-extraction-rules>
