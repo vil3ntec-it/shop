@@ -21,6 +21,8 @@ import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -141,10 +143,21 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
         if (rows.isEmpty()) {
           item(span = { GridItemSpan(maxLineSpan) }) {
             Panel {
-              EmptyNote(
-                if (d.debtors.isEmpty()) "هنوز قرض‌داری ثبت نشده."
-                else "قرض‌داری با این جستجو پیدا نشد."
-              )
+              if (d.debtors.isEmpty()) {
+                TohidEmptyState(
+                  icon = Icons.Filled.Groups,
+                  title = "هنوز قرض‌داری ثبت نشده",
+                  description = "کسانی که از شما نسیه می‌برند را اینجا اضافه کنید تا حساب هرکدام جدا بماند.",
+                  actionText = "قرض‌دار تازه",
+                  onAction = { form = DebtorFormState() },
+                )
+              } else {
+                TohidEmptyState(
+                  icon = Icons.Filled.Search,
+                  title = "چیزی پیدا نشد",
+                  description = "قرض‌داری با این نام یا شماره نیست.",
+                )
+              }
             }
           }
         } else {

@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -207,10 +208,21 @@ fun ProductsScreen(
       if (shown.isEmpty()) {
         item {
           Panel {
-            EmptyNote(
-              if (d.products.isEmpty()) "هنوز کالایی ثبت نشده. با دکمهٔ پایین، اولین کالا را بسازید."
-              else "کالایی مطابق با این جستجو یا فیلتر پیدا نشد."
-            )
+            if (d.products.isEmpty()) {
+              TohidEmptyState(
+                icon = Icons.Filled.ShoppingBag,
+                title = "هنوز کالایی ثبت نشده",
+                description = "کالاهای دکان را یک‌بار ثبت کنید تا در فروش، انبار و گزارش‌ها بیایند.",
+                actionText = "ثبت محصول",
+                onAction = { bulkProduct = true },
+              )
+            } else {
+              TohidEmptyState(
+                icon = Icons.Filled.Search,
+                title = "چیزی پیدا نشد",
+                description = "کالایی مطابق این جستجو یا فیلتر نیست. عبارت دیگری را امتحان کنید.",
+              )
+            }
           }
         }
       } else {

@@ -72,6 +72,7 @@ fun AppRoot(
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
   val data by store.data.collectAsState()
+  val loaded by store.loaded.collectAsState()
   val cartStore = remember { CartStore(context) }
   var tab by rememberSaveable { mutableStateOf("dashboard") }
   var migration by remember { mutableStateOf<String?>(null) }
@@ -174,6 +175,13 @@ fun AppRoot(
         .fillMaxSize()
         .background(Shop.colors.bg)
     ) {
+      if (!loaded) {
+        // دفتر هنوز از دیسک خوانده نشده؛ «چیزی نیست» گفتن در این لحظه
+        // دروغ است — کاربری که صد قلم کالا دارد نباید «خالی» ببیند
+        TohidLoadingState(rows = 5, modifier = Modifier.padding(16.dp))
+        return@Box
+      }
+
       AnimatedContent(
         targetState = sub ?: tab,
         transitionSpec = {

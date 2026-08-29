@@ -353,7 +353,7 @@ fun QuickSaleScreen(
             selectedId = null
             checkout = false
             cartOpen = false
-            ScanFeedback.ok(context)
+            Haptics.success(context)
             toast("فروش به مبلغ ${money(result.data.sales.last().finalTotal)} افغانی ثبت شد")
             invoice = result.data to result.saleId
           }
