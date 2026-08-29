@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.systemBars
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
@@ -98,12 +97,21 @@ fun BulkProductSheet(
   var seq by remember { mutableStateOf(1) }
   var rows by remember { mutableStateOf(listOf(ProductRow(key = 0))) }
   var error by remember { mutableStateOf<String?>(null) }
+  // کلیدِ ردیفی که دوربین برایش باز است. `null` یعنی بسته.
+  var scanFor by remember { mutableStateOf<Int?>(null) }
 
   fun update(key: Int, change: (ProductRow) -> ProductRow) {
     rows = rows.map { if (it.key == key) change(it) else it }
   }
 
   val ready = rows.filter { it.ready }
+
+  scanFor?.let { key ->
+    BarcodeScanSheet(
+      onDismiss = { scanFor = null },
+      onCode = { code -> update(key) { it.copy(barcode = code) } },
+    )
+  }
 
   BulkFrame(
     title = "محصول جدید",
@@ -172,6 +180,7 @@ fun BulkProductSheet(
             placeholder = "اسکن یا تایپ",
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             modifier = Modifier.weight(1f),
+            trailing = { ScanIconButton { scanFor = row.key } },
           )
           EntryNumberField(
             value = row.minStock,
@@ -252,12 +261,51 @@ fun BulkEntrySheet(
   var rows by remember { mutableStateOf(listOf(EntryRow(key = 0, unit = d.products.firstOrNull()?.unit.orEmpty()))) }
   var date by remember { mutableStateOf(todayIso()) }
   var error by remember { mutableStateOf<String?>(null) }
+  // کلیدِ ردیفی که دوربین برایش باز است. `null` یعنی بسته.
+  var scanFor by remember { mutableStateOf<Int?>(null) }
+  var scanMiss by remember { mutableStateOf<String?>(null) }
 
   fun update(key: Int, change: (EntryRow) -> EntryRow) {
     rows = rows.map { if (it.key == key) change(it) else it }
   }
 
   val ready = rows.filter { it.ready }
+
+  // بارکد ← کالا. یک بار ساخته می‌شود، نه برای هر اسکن.
+  val byBarcode = remember(d.products) {
+    buildMap {
+      d.products.forEach { p -> p.barcodes.forEach { code -> put(code.trim(), p) } }
+    }
+  }
+
+  scanFor?.let { key ->
+    BarcodeScanSheet(
+      title = "اسکن بارکد کالا",
+      onDismiss = { scanFor = null },
+      onCode = { code ->
+        val hit = byBarcode[code]
+        if (hit != null) {
+          // کالای شناخته‌شده: همان‌جا انتخاب می‌شود، با واحد و قیمت خریدش —
+          // دقیقاً همان کاری که زدن روی تراشه‌اش می‌کند
+          scanMiss = null
+          update(key) {
+            it.copy(
+              productId = hit.id,
+              newProduct = false,
+              unit = hit.unit.ifBlank { it.unit },
+              price = if (it.price.isBlank() && hit.purchasePrice > 0)
+                hit.purchasePrice.toLong().toString() else it.price,
+            )
+          }
+        } else {
+          // بارکدِ ناشناس گم نمی‌شود: ردیف به حالتِ «محصول جدید» می‌رود و
+          // همان بارکد داخلش می‌نشیند. کاربر فقط نامش را می‌نویسد.
+          scanMiss = code
+          update(key) { it.copy(newProduct = true, productId = "", newBarcode = code) }
+        }
+      },
+    )
+  }
 
   BulkFrame(
     title = "ورود کالا به انبار",
@@ -328,7 +376,7 @@ fun BulkEntrySheet(
         // انتخابِ محصول، یا ساختِ محصولِ تازه — همان دو حالتِ کشویی وب.
         // تراشه‌ها و کارشان دست‌نخورده‌اند؛ فقط داخلِ یک کادر نشسته‌اند تا
         // مثلِ بقیهٔ خانه‌های همین صفحه دیده شوند.
-        EntryFieldBox("انتخاب محصول") {
+        EntryFieldBox("انتخاب محصول", trailing = { ScanIconButton { scanFor = row.key } }) {
           Row(
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -358,6 +406,14 @@ fun BulkEntrySheet(
             )
           }
         }
+        if (scanMiss != null && row.newProduct && row.newBarcode == scanMiss) {
+          Spacer(Modifier.height(6.dp))
+          Text(
+            "این بارکد در دکان نبود — نامش را بنویسید تا ساخته شود",
+            style = MaterialTheme.typography.labelSmall,
+            color = Shop.colors.muted2,
+          )
+        }
 
         if (row.newProduct) {
           Spacer(Modifier.height(10.dp))
@@ -383,6 +439,7 @@ fun BulkEntrySheet(
               placeholder = "اسکن یا تایپ",
               keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
               modifier = Modifier.weight(1f),
+              trailing = { ScanIconButton { scanFor = row.key } },
             )
           }
         }
@@ -446,9 +503,27 @@ private fun BulkFrame(
   header: @Composable ColumnScope.() -> Unit = {},
   rows: androidx.compose.foundation.lazy.LazyListScope.() -> Unit,
 ) {
+  /*
+   *  دکمهٔ «ذخیره همه» زیرِ نوارِ ناوبریِ گوشی می‌رفت و قابلِ زدن نبود.
+   *
+   *  علتش این بود که `Dialog` پنجرهٔ جداگانهٔ خودش را دارد و آنجا
+   *  `WindowInsets.systemBars` صفر گزارش می‌شود — پس فاصله‌ای که داخلِ
+   *  Dialog می‌گذاشتیم هیچ کاری نمی‌کرد.
+   *
+   *  بلندیِ نوارها **بیرونِ** Dialog خوانده می‌شود، جایی که درست است، و
+   *  به شکلِ عدد به داخل برده می‌شود؛ و پنجرهٔ Dialog تمام‌صفحه می‌شود تا
+   *  خودش هم دوباره فاصله نگذارد و دو بار حساب نشود.
+   */
+  val bars = WindowInsets.systemBars.asPaddingValues()
+  val topBar = bars.calculateTopPadding()
+  val bottomBar = bars.calculateBottomPadding()
+
   Dialog(
     onDismissRequest = onDismiss,
-    properties = DialogProperties(usePlatformDefaultWidth = false),
+    properties = DialogProperties(
+      usePlatformDefaultWidth = false,
+      decorFitsSystemWindows = false,
+    ),
   ) {
     Surface(color = Shop.colors.bg, modifier = Modifier.fillMaxSize()) {
       // دو چیز که در عکس‌های دستگاه معلوم بود:
@@ -460,8 +535,9 @@ private fun BulkFrame(
       Column(
         Modifier
           .fillMaxSize()
-          .windowInsetsPadding(WindowInsets.systemBars)
+          .padding(top = topBar)
           .imePadding()
+          .padding(bottom = bottomBar)
           .padding(horizontal = 16.dp)
       ) {
         Spacer(Modifier.height(14.dp))
