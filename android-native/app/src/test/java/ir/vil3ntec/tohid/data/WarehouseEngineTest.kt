@@ -192,7 +192,7 @@ class WarehouseEngineTest {
         "2026-08-28", 0, ::newId,
       )
     )
-    val removed = ok(WarehouseEngine.deleteEntry(added.data, added.id))
+    val removed = ok(WarehouseEngine.deleteEntry(added.data, added.id, "2026-01-01", 1L, ::newId))
     assertEquals(0.0, ShopStore.stock(removed.data, "p1"), 0.0)
     assertTrue(removed.data.stockMovements.isEmpty())
   }
@@ -324,7 +324,7 @@ class WarehouseEngineTest {
     assertEquals("low", ShopStore.stockStatus(d, d.products.single()))
     assertEquals(1, WarehouseEngine.summary(d).low)
 
-    val empty = ok(WarehouseEngine.deleteEntry(d, d.warehouseEntries.single().id)).data
+    val empty = ok(WarehouseEngine.deleteEntry(d, d.warehouseEntries.single().id, "2026-01-01", 1L, ::newId)).data
     assertEquals("out", ShopStore.stockStatus(empty, empty.products.single()))
   }
 

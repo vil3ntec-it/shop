@@ -268,15 +268,54 @@ object WarehouseEngine {
     )
   }
 
-  fun deleteEntry(d: ShopData, id: String): Result {
-    if (d.warehouseEntries.none { it.id == id }) return Result.Failed("ورودی پیدا نشد")
+  /**
+   *  حذفِ یک ورودِ انبار.
+   *
+   *  اگر بخشی از همان جنس قبلاً فروخته شده باشد، حذفِ ورودی موجودی را
+   *  **منفی** می‌کند — و موجودیِ منفی یعنی ارزشِ انبار و گزارشِ سود هر دو
+   *  غلط می‌شوند، بی‌آنکه کسی متوجه شود. پس جلویش گرفته می‌شود، با همان
+   *  جمله‌ای که نسخهٔ وب می‌گوید.
+   *
+   *  حرکتِ انبارِ همان ورودی هم می‌رود: نگه‌داشتنِ خطِ «ورود خرید» برای
+   *  جنسی که هرگز نیامده، دفترِ گردشِ موجودی را دروغ می‌کند. به‌جایش یک
+   *  ردیفِ سابقه ثبت می‌شود تا معلوم بماند چه کسی چه چیزی را برداشت.
+   */
+  fun deleteEntry(d: ShopData, id: String, today: String, now: Long, newId: () -> String): Result {
+    val entry = d.warehouseEntries.find { it.id == id } ?: return Result.Failed("ورودی پیدا نشد")
+
+    val after = ShopStore.stock(d, entry.productId) - entry.units
+    if (after < 0) {
+      val shortage = -after
+      return Result.Failed(
+        "این ورودی قابل حذف نیست: ${money(shortage)} واحد از آن فروخته شده است. " +
+          "ابتدا فروش‌های مربوطه را لغو یا مرجوع کنید."
+      )
+    }
+
+    val product = d.products.find { it.id == entry.productId }
     return Result.Ok(
       d.copy(
         warehouseEntries = d.warehouseEntries.filter { it.id != id },
         stockMovements = d.stockMovements.filter { it.refId != id },
+        auditLog = d.auditLog + AuditEntry(
+          id = newId(),
+          type = "delete_entry",
+          date = today,
+          refId = id,
+          notes = "حذف ورود انبار «${product?.name ?: "محصول حذف‌شده"}» به مقدار ${money(entry.units)}",
+          createdAt = now,
+        ),
       ),
       id = id,
     )
+  }
+
+  /** جملهٔ تأییدِ پیش از حذف — همان چیزی که وب می‌گوید */
+  fun deleteEntryWarning(d: ShopData, id: String): String {
+    val entry = d.warehouseEntries.find { it.id == id } ?: return ""
+    val product = d.products.find { it.id == entry.productId }
+    val now = ShopStore.stock(d, entry.productId)
+    return "موجودی «${product?.name ?: "محصول"}» از ${money(now)} به ${money(now - entry.units)} کاهش می‌یابد."
   }
 
   /* ------------------------- اصلاحِ موجودی ------------------------- */
