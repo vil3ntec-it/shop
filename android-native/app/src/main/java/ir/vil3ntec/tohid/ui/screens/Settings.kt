@@ -16,6 +16,17 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.runtime.CompositionLocalProvider
+import ir.vil3ntec.tohid.BuildConfig
+import ir.vil3ntec.tohid.data.AccountKeys
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.BackupClock
 import ir.vil3ntec.tohid.data.ShopStore
@@ -47,6 +58,7 @@ fun SettingsScreen(
   snackbar: SnackbarHostState,
   theme: ThemeChoice,
   onTheme: (ThemeChoice) -> Unit,
+  onUpdates: () -> Unit,
 ) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
@@ -62,6 +74,16 @@ fun SettingsScreen(
   var signedIn by remember { mutableStateOf(state.accessToken != null) }
   var licenseStatus by remember { mutableStateOf(syncer.status()) }
   var confirmClear by remember { mutableStateOf(false) }
+  var confirmRotate by remember { mutableStateOf(false) }
+  var apiKey by remember { mutableStateOf(AccountKeys.apiKey(context)) }
+  var staffCode by remember { mutableStateOf(AccountKeys.staffCode(context)) }
+  var cameraGranted by remember {
+    mutableStateOf(
+      androidx.core.content.ContextCompat.checkSelfPermission(
+        context, android.Manifest.permission.CAMERA
+      ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+    )
+  }
   var pendingRestore by remember { mutableStateOf<Uri?>(null) }
 
   fun toast(text: String) {
@@ -89,6 +111,14 @@ fun SettingsScreen(
 
   val pickFile = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
     if (uri != null) pendingRestore = uri
+  }
+
+  // اجازهٔ دوربین — همان دکمهٔ «درخواست دسترسی و تست دوربین» نسخهٔ وب
+  val askCamera = rememberLauncherForActivityResult(
+    ActivityResultContracts.RequestPermission()
+  ) { granted ->
+    cameraGranted = granted
+    toast(if (granted) "دوربین آماده است — بارکدخوان کار می‌کند" else "بدون اجازهٔ دوربین، بارکدخوان باز نمی‌شود")
   }
 
   LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
@@ -137,6 +167,75 @@ fun SettingsScreen(
             Text(label, style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text)
           }
         }
+
+        HorizontalDivider(Modifier.padding(vertical = 12.dp), color = Shop.colors.border)
+
+        Text(
+          "اگر در تنظیمات گوشی «کاهش حرکت» یا حالت ذخیرهٔ باتری روشن باشد، برنامه انیمیشن‌ها را خاموش می‌کند. با این کلید می‌توانید همیشه روشن نگهشان دارید.",
+          style = MaterialTheme.typography.bodySmall,
+          color = Shop.colors.muted,
+        )
+        Spacer(Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+          listOf("full" to "انیمیشن روشن", "auto" to "مثل تنظیم گوشی").forEach { (value, label) ->
+            FilterChip(
+              selected = Motion.choice == value,
+              onClick = { Motion.set(context, value) },
+              label = { Text(label) },
+            )
+          }
+        }
+      }
+
+      Spacer(Modifier.height(20.dp))
+
+      /* ----------------------- دوربین بارکدخوان ----------------------- */
+      SectionTitle("دوربین بارکدخوان")
+      Panel {
+        Text(
+          "برنامه برای اسکن بارکد محصولات به دسترسی دوربین دستگاه نیاز دارد. با زدن دکمهٔ زیر، اجازهٔ دوربین گرفته می‌شود.",
+          style = MaterialTheme.typography.bodySmall,
+          color = Shop.colors.muted,
+        )
+        Spacer(Modifier.height(10.dp))
+        InfoLine("وضعیت", if (cameraGranted) "اجازه داده شده" else "هنوز اجازه داده نشده")
+        Spacer(Modifier.height(10.dp))
+        OutlinedButton(
+          onClick = {
+            if (cameraGranted) toast("دوربین آماده است — بارکدخوان کار می‌کند")
+            else askCamera.launch(android.Manifest.permission.CAMERA)
+          },
+          modifier = Modifier.fillMaxWidth(),
+        ) { Text(if (cameraGranted) "آزمایش دوربین" else "درخواست دسترسی دوربین") }
+      }
+
+      Spacer(Modifier.height(20.dp))
+
+      /* ----------------------- کلیدهای حساب ----------------------- */
+      SectionTitle("کلیدهای حساب")
+      Panel {
+        KeyLine("کلید حساب شما", apiKey) {
+          copyToClipboard(context, "کلید حساب", apiKey)
+          toast("کلید حساب کپی شد")
+        }
+        Text(
+          "این کلید فقط مالِ همین حساب است و هرگز برای کس دیگری تکرار نمی‌شود. هنگام خرید اشتراک، همین را برای فروشنده بفرستید تا اشتراک روی حساب خودتان فعال شود.",
+          style = MaterialTheme.typography.labelSmall,
+          color = Shop.colors.muted2,
+        )
+
+        Spacer(Modifier.height(16.dp))
+        KeyLine("کد شاگرد", staffCode) {
+          copyToClipboard(context, "کد شاگرد", staffCode)
+          toast("کد شاگرد کپی شد")
+        }
+        Text(
+          "این کد را به شاگردهایتان بدهید تا در صفحهٔ ورود بزنند و روی همین دکان بیایند.",
+          style = MaterialTheme.typography.labelSmall,
+          color = Shop.colors.muted2,
+        )
+        Spacer(Modifier.height(10.dp))
+        OutlinedButton(onClick = { confirmRotate = true }) { Text("ساخت کد تازه") }
       }
 
       Spacer(Modifier.height(20.dp))
@@ -321,12 +420,30 @@ fun SettingsScreen(
         ) { Text("پاک‌سازی کامل اطلاعات") }
       }
 
-      Spacer(Modifier.height(24.dp))
-      Text(
-        "تمام اطلاعات روی همین گوشی ذخیره می‌شود. هر چند وقت یک‌بار پشتیبان بگیرید.",
-        style = MaterialTheme.typography.labelSmall,
-        color = Shop.colors.muted2,
-      )
+      Spacer(Modifier.height(20.dp))
+
+      /* ------------------------- درباره برنامه ------------------------- */
+      SectionTitle("درباره برنامه")
+      Panel {
+        Text(
+          "توحید | مدیریت فروشگاه — برنامهٔ اندروید",
+          style = MaterialTheme.typography.bodyMedium,
+          color = Shop.colors.text,
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+          "تمام اطلاعات فقط روی همین گوشی ذخیره می‌شود؛ پس هر چند وقت یک‌بار نسخهٔ پشتیبان بگیرید.",
+          style = MaterialTheme.typography.bodySmall,
+          color = Shop.colors.muted,
+        )
+        Spacer(Modifier.height(10.dp))
+        InfoLine("نسخهٔ نصب‌شده", BuildConfig.VERSION_NAME)
+        Spacer(Modifier.height(10.dp))
+        OutlinedButton(onClick = onUpdates, modifier = Modifier.fillMaxWidth()) {
+          Text("دریافت آخرین نسخه")
+        }
+      }
+
       Spacer(Modifier.height(24.dp))
     }
   }
@@ -366,6 +483,29 @@ fun SettingsScreen(
     )
   }
 
+  if (confirmRotate) {
+    AlertDialog(
+      onDismissRequest = { confirmRotate = false },
+      containerColor = Shop.colors.surface,
+      title = { Text("کد شاگرد تازه ساخته شود؟", color = Shop.colors.text) },
+      text = {
+        Text(
+          "کد فعلی از کار می‌افتد و هر شاگردی که با آن وارد شده، دفعهٔ بعد باید کد تازه را بزند.",
+          style = MaterialTheme.typography.bodySmall,
+          color = Shop.colors.muted,
+        )
+      },
+      confirmButton = {
+        TextButton(onClick = {
+          confirmRotate = false
+          staffCode = AccountKeys.rotateStaffCode(context)
+          toast("کد شاگرد تازه ساخته شد")
+        }) { Text("بساز") }
+      },
+      dismissButton = { TextButton(onClick = { confirmRotate = false }) { Text("انصراف") } },
+    )
+  }
+
   if (confirmClear) {
     AlertDialog(
       onDismissRequest = { confirmClear = false },
@@ -390,6 +530,45 @@ fun SettingsScreen(
       dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("انصراف") } },
     )
   }
+}
+
+/**
+ *  یک کلید با دکمهٔ کپی — همان کادرِ `.settings-key` نسخهٔ وب.
+ *
+ *  خودِ کلید چپ‌به‌راست نوشته می‌شود: در صفحهٔ راست‌به‌راست، دسته‌های
+ *  `TSH-…` وارونه دیده می‌شوند و کاربر اشتباه می‌خواندشان.
+ */
+@Composable
+private fun KeyLine(label: String, value: String, onCopy: () -> Unit) {
+  Text(label, style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
+  Spacer(Modifier.height(6.dp))
+  Row(
+    Modifier
+      .fillMaxWidth()
+      .clip(RoundedCornerShape(10.dp))
+      .background(Shop.colors.bg)
+      .border(1.dp, Shop.colors.border, RoundedCornerShape(10.dp))
+      .padding(start = 10.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
+    verticalAlignment = Alignment.CenterVertically,
+  ) {
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+      Text(
+        value,
+        style = MaterialTheme.typography.labelMedium,
+        color = Shop.colors.text,
+        textAlign = TextAlign.Start,
+        modifier = Modifier.weight(1f),
+      )
+    }
+    TextButton(onClick = onCopy) { Text("کپی") }
+  }
+  Spacer(Modifier.height(6.dp))
+}
+
+private fun copyToClipboard(context: android.content.Context, label: String, value: String) {
+  val manager = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
+    as? android.content.ClipboardManager ?: return
+  manager.setPrimaryClip(android.content.ClipData.newPlainText(label, value))
 }
 
 @Composable

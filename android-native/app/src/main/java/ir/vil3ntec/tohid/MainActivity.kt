@@ -11,6 +11,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.lifecycle.lifecycleScope
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.ui.AppRoot
+import ir.vil3ntec.tohid.ui.screens.Motion
 import ir.vil3ntec.tohid.ui.screens.WelcomeScreen
 import ir.vil3ntec.tohid.ui.theme.ThemeChoice
 import ir.vil3ntec.tohid.ui.theme.TohidTheme
@@ -26,6 +27,9 @@ class MainActivity : ComponentActivity() {
 
     store = ShopStore(applicationContext)
     lifecycleScope.launch { store.load() }
+
+    // کلیدِ انیمیشن پیش از اولین کشیدنِ صفحه خوانده می‌شود
+    Motion.load(applicationContext)
 
     setContent {
       // انتخابِ ظاهر بین اجراها می‌ماند

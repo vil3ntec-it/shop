@@ -170,7 +170,7 @@ fun AppRoot(
         "reports" -> ReportsScreen(data)
         "receipts" -> ReceiptsScreen(data)
         "audit" -> AuditLogScreen(data)
-        "settings" -> SettingsScreen(store, data, snackbar, theme, onTheme)
+        "settings" -> SettingsScreen(store, data, snackbar, theme, onTheme) { sub = "more" }
         "expenses" -> ExpensesScreen(store, data, snackbar)
         "dashboard" -> DashboardScreen(data) { target ->
           if (target == "settings") sub = "settings" else { tab = target; sub = null }
