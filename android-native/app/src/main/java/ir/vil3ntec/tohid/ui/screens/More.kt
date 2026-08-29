@@ -18,14 +18,13 @@ import ir.vil3ntec.tohid.fa
 import ir.vil3ntec.tohid.update.Updater
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BarChart
-import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.ManageSearch
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.ShoppingBag
 import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.launch
 
@@ -66,19 +65,14 @@ fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
     Spacer(Modifier.height(20.dp))
     SectionTitle("بخش‌های دیگر")
     Panel {
+      // قرض‌داران و محصولات از اینجا رفتند به نوارِ پایین، و انبار و
+      // گزارش جایشان آمدند
       MoreCard(
-        title = "قرض‌داران",
-        icon = Icons.Filled.Groups,
-        tint = Shop.colors.warning,
-        subtitle = "حساب هر قرض‌دار، برد و رسید",
-        onClick = { onOpen("debtors") },
-      )
-      MoreCard(
-        title = "محصولات",
-        icon = Icons.Filled.ShoppingBag,
-        tint = Shop.colors.primary,
-        subtitle = "فهرست کالاها با عکس، قیمت و سود",
-        onClick = { onOpen("products") },
+        title = "انبار",
+        icon = Icons.Filled.Inventory2,
+        tint = Shop.colors.accent,
+        subtitle = "ورود کالا، موجودی و حرکت هر جنس",
+        onClick = { onOpen("warehouse") },
       )
       MoreCard(
         title = "مصارف",

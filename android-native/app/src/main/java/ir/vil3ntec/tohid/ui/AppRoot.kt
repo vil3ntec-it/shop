@@ -59,15 +59,18 @@ private val PAGE_TITLES = mapOf(
 /**
  *  نوارِ پایین — پنج تب و بس.
  *
- *  قبلاً هفت تب بود و اسمِ هرکدام آن‌قدر تنگ می‌شد که خوانده نمی‌شد. پنج
- *  تا همان جاهایی است که فروشنده در طولِ روز می‌رود؛ بقیه — قرض‌داران،
- *  مصارف، محصولات، خرید، رسیدها، سابقه — از «بیشتر» باز می‌شوند.
+ *  قبلاً هفت تب بود و اسمِ هرکدام آن‌قدر تنگ می‌شد که خوانده نمی‌شد.
+ *
+ *  جای انبار و گزارش با قرض‌داران و محصولات عوض شد. دلیلش ساده است: در
+ *  یک روزِ دکان، قرض‌دار و کالا ده‌ها بار باز می‌شوند و انبار و گزارش
+ *  چند بار — آن دو جای نوارِ پایین را می‌خواهند. انبار و گزارش سرِ
+ *  جایشان هستند، از «بیشتر».
  */
 private val TABS = listOf(
   Tab("dashboard", "خانه", Icons.Filled.GridView),
   Tab("sale", "فروش", Icons.Filled.PointOfSale),
-  Tab("warehouse", "انبار", Icons.Filled.Inventory2),
-  Tab("reports", "گزارش", Icons.Filled.BarChart),
+  Tab("debtors", "قرض‌داران", Icons.Filled.Groups),
+  Tab("products", "محصولات", Icons.Filled.ShoppingBag),
   Tab("more", "بیشتر", Icons.Filled.MoreHoriz),
 )
 
@@ -253,18 +256,19 @@ fun AppRoot(
         "reports" -> ReportsScreen(data)
         "receipts" -> ReceiptsScreen(data)
         "audit" -> AuditLogScreen(data)
-        "settings" -> SettingsScreen(store, data, snackbar, theme, onTheme) { sub = "more" }
+        "settings" -> SettingsScreen(store, data, snackbar, theme, onTheme) { open("more") }
         "expenses" -> ExpensesScreen(store, data, snackbar)
         "dashboard" -> DashboardScreen(data, ::open)
         "product" -> {
           val id = openProduct
           if (id == null) sub = null
           else ProductDetailScreen(
+            store = store,
             d = data,
             productId = id,
             onBack = { sub = null },
             onEdit = { editProduct = data.products.find { it.id == id }?.let { ProductFormState.of(it) } },
-            onEntry = { pendingProduct = id; tab = "warehouse"; sub = null },
+            onEntry = { pendingProduct = id; open("warehouse") },
           )
         }
         "quick" -> VipGate("فروش (صندوق)") {
@@ -279,8 +283,7 @@ fun AppRoot(
             onQuickSale = { sub = "quick" },
           ) { code ->
             pendingBarcode = code
-            tab = "warehouse"
-            sub = null
+            open("warehouse")
           }
         }
         "debtors" -> VipGate("قرض‌داران") { DebtorsScreen(store, data, snackbar) }
@@ -290,8 +293,7 @@ fun AppRoot(
           snackbar = snackbar,
           onOpenWarehouse = { productId ->
             pendingProduct = productId
-            tab = "warehouse"
-            sub = null
+            open("warehouse")
           },
           onOpenProduct = { productId ->
             openProduct = productId

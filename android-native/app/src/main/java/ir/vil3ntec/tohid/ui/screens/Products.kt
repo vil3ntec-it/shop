@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material3.*
@@ -237,6 +238,10 @@ fun ProductsScreen(
               photoVersion = photoVersion,
               onClick = { onOpenProduct(p.id) },
               onLongClick = { actionsFor = p },
+              onPhoto = {
+                photoFor = p.id
+                pickPhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+              },
             )
           }
           Spacer(Modifier.height(10.dp))
@@ -358,6 +363,7 @@ private fun ProductCard(
   photoVersion: Int,
   onClick: () -> Unit,
   onLongClick: () -> Unit,
+  onPhoto: () -> Unit,
 ) {
   val stock = ShopStore.stock(d, product.id)
   val status = ShopStore.stockStatus(d, product)
@@ -383,7 +389,36 @@ private fun ProductCard(
       .padding(14.dp)
   ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-      ProductPhoto(product.id, size = 52.dp, version = photoVersion)
+      /*
+       *  عکس، خودش دکمهٔ عکس گرفتن است.
+       *
+       *  تا حالا این کار فقط پشتِ نگه‌داشتنِ انگشت روی کارت بود؛ کسی که
+       *  نمی‌داند باید نگه دارد، هیچ‌وقت پیدایش نمی‌کند. حالا همان‌جا که
+       *  عکس نیست، نشانِ دوربین هست و یک لمس کافی است.
+       */
+      Box(contentAlignment = Alignment.BottomEnd) {
+        ProductPhoto(
+          product.id,
+          size = 52.dp,
+          version = photoVersion,
+          modifier = Modifier.clickable(onClick = onPhoto),
+        )
+        Box(
+          Modifier
+            .offset(x = (-3).dp, y = (-3).dp)
+            .size(18.dp)
+            .clip(RoundedCornerShape(9.dp))
+            .background(Shop.colors.primary),
+          contentAlignment = Alignment.Center,
+        ) {
+          Icon(
+            Icons.Filled.PhotoCamera,
+            contentDescription = "عکس محصول",
+            tint = Color.White,
+            modifier = Modifier.size(11.dp),
+          )
+        }
+      }
       Spacer(Modifier.width(12.dp))
       Column(Modifier.weight(1f)) {
         Text(product.name, style = MaterialTheme.typography.titleSmall, color = Shop.colors.text)

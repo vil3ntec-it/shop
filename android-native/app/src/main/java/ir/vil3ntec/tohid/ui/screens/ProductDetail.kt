@@ -1,22 +1,36 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.data.PhotoStore
 import ir.vil3ntec.tohid.data.ReportEngine
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
@@ -27,6 +41,7 @@ import ir.vil3ntec.tohid.toFaDigits
 import ir.vil3ntec.tohid.ui.theme.Shape
 import ir.vil3ntec.tohid.ui.theme.Shop
 import ir.vil3ntec.tohid.ui.theme.Space
+import kotlinx.coroutines.launch
 
 /**
  *  صفحهٔ یک کالا.
@@ -40,6 +55,7 @@ import ir.vil3ntec.tohid.ui.theme.Space
  */
 @Composable
 fun ProductDetailScreen(
+  store: ShopStore,
   d: ShopData,
   productId: String,
   onBack: () -> Unit,
@@ -73,6 +89,31 @@ fun ProductDetailScreen(
     else -> "موجودی کافی"
   }
 
+  /* ---------------------------- عکس ---------------------------- */
+  val context = LocalContext.current
+  val scope = rememberCoroutineScope()
+  // با عوض شدنِ عکس، همین عدد بالا می‌رود تا نسخهٔ کش‌شده دور ریخته شود
+  var photoVersion by remember(productId) { mutableStateOf(0) }
+
+  val pickPhoto = rememberLauncherForActivityResult(
+    ActivityResultContracts.PickVisualMedia()
+  ) { uri ->
+    if (uri == null) return@rememberLauncherForActivityResult
+    PhotoStore.save(context, product.id, uri).onSuccess {
+      // نشانهٔ عکس روی خودِ محصول می‌نشیند، همان فیلدی که وب می‌نویسد
+      scope.launch {
+        store.save(
+          d.copy(products = d.products.map { if (it.id == product.id) it.copy(photo = true) else it })
+        )
+      }
+      photoVersion++
+    }
+  }
+
+  fun choosePhoto() {
+    pickPhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+  }
+
   val movements = d.stockMovements
     .filter { it.productId == product.id }
     .sortedByDescending { it.createdAt }
@@ -89,10 +130,33 @@ fun ProductDetailScreen(
 
       /* --------------------------- سربرگ --------------------------- */
       Row(verticalAlignment = Alignment.CenterVertically) {
-        if (product.photo) {
-          ProductPhoto(productId = product.id, size = 72.dp)
-          Spacer(Modifier.width(Space.sm))
+        // عکس همیشه هست، حتی وقتی هنوز عکسی گرفته نشده: جای خالی با
+        // نشانِ دوربین می‌گوید «اینجا می‌شود عکس گذاشت». قبلاً کلاً پنهان
+        // بود و راهِ گذاشتنش فقط نگه‌داشتنِ انگشت روی کارتِ فهرست.
+        Box(contentAlignment = Alignment.BottomEnd) {
+          ProductPhoto(
+            productId = product.id,
+            size = 72.dp,
+            version = photoVersion,
+            modifier = Modifier.clickable { choosePhoto() },
+          )
+          Box(
+            Modifier
+              .offset(x = (-4).dp, y = (-4).dp)
+              .size(22.dp)
+              .clip(RoundedCornerShape(11.dp))
+              .background(Shop.colors.primary),
+            contentAlignment = Alignment.Center,
+          ) {
+            Icon(
+              Icons.Filled.PhotoCamera,
+              contentDescription = "عکس محصول",
+              tint = Color.White,
+              modifier = Modifier.size(13.dp),
+            )
+          }
         }
+        Spacer(Modifier.width(Space.sm))
         Column(Modifier.weight(1f)) {
           Text(
             product.name,
