@@ -23,6 +23,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.data.CartStore
 import ir.vil3ntec.tohid.data.ShopStore
+import ir.vil3ntec.tohid.data.WarehouseEngine
 import ir.vil3ntec.tohid.ui.screens.*
 import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.launch
@@ -45,6 +46,7 @@ private val PAGE_TITLES = mapOf(
   "audit" to "سابقه عملیات",
   "settings" to "تنظیمات",
   "quick" to "انتخاب محصول",
+  "product" to "کالا",
 )
 
 /**
@@ -73,6 +75,9 @@ fun AppRoot(
   val scope = rememberCoroutineScope()
   val data by store.data.collectAsState()
   val loaded by store.loaded.collectAsState()
+  // کالایی که صفحهٔ خودش باز است
+  var openProduct by rememberSaveable { mutableStateOf<String?>(null) }
+  var editProduct by remember { mutableStateOf<ProductFormState?>(null) }
   val cartStore = remember { CartStore(context) }
   var tab by rememberSaveable { mutableStateOf("dashboard") }
   var migration by remember { mutableStateOf<String?>(null) }
@@ -169,6 +174,32 @@ fun AppRoot(
       }
     },
   ) { padding ->
+    editProduct?.let { form ->
+      ProductDialog(
+        d = data,
+        state = form,
+        onDismiss = { editProduct = null },
+        onSave = { draft ->
+          val id = form.editingId
+          val result = if (id == null) {
+            WarehouseEngine.addProduct(data, draft, System.currentTimeMillis(), ::newId)
+          } else {
+            WarehouseEngine.editProduct(
+              data, id, draft, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId,
+            )
+          }
+          when (result) {
+            is WarehouseEngine.Result.Failed ->
+              scope.launch { snackbar.showSnackbar(result.message) }
+            is WarehouseEngine.Result.Ok -> {
+              scope.launch { store.save(result.data) }
+              editProduct = null
+            }
+          }
+        },
+      )
+    }
+
     Box(
       Modifier
         .padding(padding)
@@ -199,6 +230,17 @@ fun AppRoot(
         "settings" -> SettingsScreen(store, data, snackbar, theme, onTheme) { sub = "more" }
         "expenses" -> ExpensesScreen(store, data, snackbar)
         "dashboard" -> DashboardScreen(data, ::open)
+        "product" -> {
+          val id = openProduct
+          if (id == null) sub = null
+          else ProductDetailScreen(
+            d = data,
+            productId = id,
+            onBack = { sub = null },
+            onEdit = { editProduct = data.products.find { it.id == id }?.let { ProductFormState.of(it) } },
+            onEntry = { pendingProduct = id; tab = "warehouse"; sub = null },
+          )
+        }
         "quick" -> VipGate("فروش (صندوق)") {
           QuickSaleScreen(store, cartStore, data, snackbar) { sub = null; tab = "sale" }
         }
@@ -216,11 +258,20 @@ fun AppRoot(
           }
         }
         "debtors" -> VipGate("قرض‌داران") { DebtorsScreen(store, data, snackbar) }
-        "products" -> ProductsScreen(store, data, snackbar) { productId ->
-          pendingProduct = productId
-          tab = "warehouse"
-          sub = null
-        }
+        "products" -> ProductsScreen(
+          store = store,
+          d = data,
+          snackbar = snackbar,
+          onOpenWarehouse = { productId ->
+            pendingProduct = productId
+            tab = "warehouse"
+            sub = null
+          },
+          onOpenProduct = { productId ->
+            openProduct = productId
+            sub = "product"
+          },
+        )
         "warehouse" -> WarehouseScreen(
           store = store,
           d = data,

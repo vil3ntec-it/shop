@@ -5,7 +5,9 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -63,6 +65,7 @@ fun ProductsScreen(
   d: ShopData,
   snackbar: SnackbarHostState,
   onOpenWarehouse: (String) -> Unit = {},
+  onOpenProduct: (String) -> Unit = {},
 ) {
   val scope = rememberCoroutineScope()
 
@@ -232,7 +235,8 @@ fun ProductsScreen(
               d = d,
               product = p,
               photoVersion = photoVersion,
-              onClick = { actionsFor = p },
+              onClick = { onOpenProduct(p.id) },
+              onLongClick = { actionsFor = p },
             )
           }
           Spacer(Modifier.height(10.dp))
@@ -346,8 +350,15 @@ fun ProductsScreen(
 
 /* ============================ کارت کالا ============================ */
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ProductCard(d: ShopData, product: Product, photoVersion: Int, onClick: () -> Unit) {
+private fun ProductCard(
+  d: ShopData,
+  product: Product,
+  photoVersion: Int,
+  onClick: () -> Unit,
+  onLongClick: () -> Unit,
+) {
   val stock = ShopStore.stock(d, product.id)
   val status = ShopStore.stockStatus(d, product)
   val tint = when (status) {
@@ -368,7 +379,7 @@ private fun ProductCard(d: ShopData, product: Product, photoVersion: Int, onClic
       .clip(RoundedCornerShape(Radius.md))
       .background(Shop.colors.surface)
       .border(1.dp, Shop.colors.border, RoundedCornerShape(Radius.md))
-      .clickable(onClick = onClick)
+      .combinedClickable(onClick = onClick, onLongClick = onLongClick)
       .padding(14.dp)
   ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
