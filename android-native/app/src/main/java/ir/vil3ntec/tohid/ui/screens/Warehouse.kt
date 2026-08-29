@@ -66,6 +66,7 @@ fun WarehouseScreen(
   var entryFor by remember { mutableStateOf<String?>(null) }
   var bulkProduct by remember { mutableStateOf(false) }
   var bulkEntry by remember { mutableStateOf(false) }
+  var confirmEntry by remember { mutableStateOf<String?>(null) }
   var adjustFor by remember { mutableStateOf<String?>(null) }
   var confirmDelete by remember { mutableStateOf<Product?>(null) }
   var movementsFor by remember { mutableStateOf<Product?>(null) }
@@ -193,6 +194,7 @@ fun WarehouseScreen(
             onClick = { expanded = if (expanded == p.id) null else p.id },
             onEdit = { productForm = ProductFormState.of(p) },
             onEntry = { entryFor = p.id },
+            onDeleteEntry = { confirmEntry = it },
             onAdjust = { adjustFor = p.id },
             onDelete = { confirmDelete = p },
             onMovements = { movementsFor = p },
@@ -214,6 +216,31 @@ fun WarehouseScreen(
   }
 
   /* ---------------------------- پنجره‌ها ---------------------------- */
+
+  confirmEntry?.let { entryId ->
+    AlertDialog(
+      onDismissRequest = { confirmEntry = null },
+      containerColor = Shop.colors.surface,
+      title = { Text("حذف این ورودی انبار؟", color = Shop.colors.text) },
+      text = {
+        Text(
+          WarehouseEngine.deleteEntryWarning(d, entryId),
+          style = MaterialTheme.typography.bodySmall,
+          color = Shop.colors.muted,
+        )
+      },
+      confirmButton = {
+        TextButton(onClick = {
+          apply(
+            WarehouseEngine.deleteEntry(d, entryId, todayIso(), System.currentTimeMillis(), ::newId),
+            "با موفقیت حذف شد",
+          )
+          confirmEntry = null
+        }) { Text("حذف", color = Shop.colors.danger) }
+      },
+      dismissButton = { TextButton(onClick = { confirmEntry = null }) { Text("انصراف") } },
+    )
+  }
 
   if (bulkProduct) {
     BulkProductSheet(
@@ -361,6 +388,7 @@ private fun ProductRow(
   onAdjust: () -> Unit,
   onDelete: () -> Unit,
   onMovements: () -> Unit,
+  onDeleteEntry: (String) -> Unit,
 ) {
   val stock = ShopStore.stock(d, product.id)
   val status = ShopStore.stockStatus(d, product)
@@ -426,6 +454,53 @@ private fun ProductRow(
             colors = ButtonDefaults.outlinedButtonColors(contentColor = Shop.colors.danger),
           ) { Icon(Icons.Filled.DeleteOutline, contentDescription = "حذف") }
         }
+        // ورودی‌های همین کالا — تا حالا فقط ثبت می‌شدند و هیچ‌جا دیده
+        // نمی‌شدند؛ کاربر نمی‌توانست ورودیِ اشتباه را پیدا و پاک کند
+        val entries = d.warehouseEntries.filter { it.productId == product.id }.sortedByDescending { it.createdAt }
+        if (entries.isNotEmpty()) {
+          Spacer(Modifier.height(12.dp))
+          Text("ورودهای این کالا", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
+          Spacer(Modifier.height(6.dp))
+          entries.take(6).forEach { entry ->
+            Row(
+              Modifier.fillMaxWidth().padding(vertical = 5.dp),
+              verticalAlignment = Alignment.CenterVertically,
+            ) {
+              Column(Modifier.weight(1f)) {
+                Text(
+                  "${qty(entry.units)}${if (entry.unit.isNotBlank()) " ${entry.unit}" else ""} — ${money(entry.price)} افغانی",
+                  style = MaterialTheme.typography.bodySmall,
+                  color = Shop.colors.text,
+                )
+                Text(
+                  buildString {
+                    append(formatDate(entry.date))
+                    if (entry.cartons > 0) append(" — ${qty(entry.cartons)} کارتن × ${qty(entry.perCarton)}")
+                    if (entry.notes.isNotBlank()) append(" — ${entry.notes}")
+                  },
+                  style = MaterialTheme.typography.labelSmall,
+                  color = Shop.colors.muted2,
+                )
+              }
+              IconButton(onClick = { onDeleteEntry(entry.id) }, modifier = Modifier.size(32.dp)) {
+                Icon(
+                  Icons.Filled.DeleteOutline,
+                  contentDescription = "حذف این ورودی",
+                  tint = Shop.colors.danger,
+                  modifier = Modifier.size(16.dp),
+                )
+              }
+            }
+          }
+          if (entries.size > 6) {
+            Text(
+              "و ${plain(entries.size - 6)} ورودِ قدیمی‌تر",
+              style = MaterialTheme.typography.labelSmall,
+              color = Shop.colors.muted2,
+            )
+          }
+        }
+
         Spacer(Modifier.height(4.dp))
         TextButton(onClick = onMovements) { Text("حرکات انبار", color = Shop.colors.primary) }
       }

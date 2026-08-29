@@ -174,10 +174,25 @@ class ShopStore(private val context: Context) {
       d.transactions.filter { it.debtorId == debtorId }
         .sumOf { if (it.type == "give") it.amount else -it.amount }
 
-    /** بدهیِ ما به یک تأمین‌کننده */
-    fun supplierDebt(d: ShopData, supplierId: String): Double =
-      d.purchases.filter { it.supplierId == supplierId }.sumOf { it.debt } -
+    /**
+     *  بدهیِ ما به یک تأمین‌کننده.
+     *
+     *  عمداً از `totalAmount − paidAmount` حساب می‌شود، نه از فیلدِ `debt`
+     *  که روی خودِ خرید نوشته شده — همان کاری که نسخهٔ وب می‌کند.
+     *
+     *  دلیلش یک اشکالِ واقعی است: فایلِ پشتیبانِ نسخه‌های قدیمی فیلدِ
+     *  `debt` را ندارد. آن‌وقت این‌طرف صفر خوانده می‌شد و بدهیِ
+     *  تأمین‌کننده صفر یا حتی منفی درمی‌آمد، در حالی که نسخهٔ وب همان
+     *  فایل را درست می‌خواند. این فرمول از خودِ دو عددِ اصلی حساب می‌کند،
+     *  پس فایلِ ناقص هم درست خوانده می‌شود.
+     */
+    fun supplierDebt(d: ShopData, supplierId: String): Double {
+      val mine = d.purchases.filter { it.supplierId == supplierId }
+      val billed = mine.sumOf { it.totalAmount }
+      val paid = mine.sumOf { it.paidAmount } +
         d.supplierPayments.filter { it.supplierId == supplierId }.sumOf { it.amount }
+      return billed - paid
+    }
 
     fun barcodeIndex(d: ShopData): Map<String, String> = buildMap {
       d.products.forEach { p -> p.barcodes.forEach { code -> put(code, p.id) } }
