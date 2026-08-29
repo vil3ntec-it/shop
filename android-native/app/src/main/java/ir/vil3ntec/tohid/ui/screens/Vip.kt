@@ -47,6 +47,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.graphicsLayer
 import ir.vil3ntec.tohid.ui.theme.Shape
+import ir.vil3ntec.tohid.money
 
 /**
  *  اشتراک و قیمت‌ها — همان چیزی که نسخهٔ وب دارد.
