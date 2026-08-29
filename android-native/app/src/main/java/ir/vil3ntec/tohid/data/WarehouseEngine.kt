@@ -419,6 +419,30 @@ object WarehouseEngine {
     return Result.Ok(data, lastId)
   }
 
+  /* ---------------------------- دسته‌بندی‌ها ---------------------------- */
+
+  /**
+   *  دسته‌بندیِ تازه. تکراری اضافه نمی‌شود و فاصله‌های اضافه می‌روند.
+   */
+  fun addCategory(d: ShopData, name: String): Result {
+    val v = name.trim()
+    if (v.isEmpty()) return Result.Failed("نام دسته‌بندی را بنویسید")
+    if (d.productCategories.contains(v)) return Result.Ok(d, v)
+    return Result.Ok(d.copy(productCategories = d.productCategories + v), v)
+  }
+
+  /**
+   *  حذفِ دسته‌بندی.
+   *
+   *  کالاهای همان دسته حذف نمی‌شوند — فقط دیگر با این دسته فیلتر نمی‌شوند،
+   *  عیناً همان کاری که نسخهٔ وب می‌کند. نامِ دسته روی خودِ کالا می‌ماند تا
+   *  اگر کاربر دوباره همان دسته را ساخت، کالاها سرِ جایشان برگردند.
+   */
+  fun removeCategory(d: ShopData, name: String): Result {
+    if (!d.productCategories.contains(name)) return Result.Failed("این دسته‌بندی وجود ندارد")
+    return Result.Ok(d.copy(productCategories = d.productCategories.filterNot { it == name }), name)
+  }
+
   /* ------------------------------ ریزه‌کاری ------------------------------ */
 
   private fun withCategory(list: List<String>, value: String): List<String> {

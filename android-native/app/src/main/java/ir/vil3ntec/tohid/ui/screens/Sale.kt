@@ -66,6 +66,7 @@ fun SaleScreen(
   cartStore: CartStore,
   d: ShopData,
   snackbar: SnackbarHostState,
+  onQuickSale: () -> Unit,
   onRegisterBarcode: (String) -> Unit,
 ) {
   val context = LocalContext.current
@@ -102,7 +103,6 @@ fun SaleScreen(
   var multiplier by rememberSaveable { mutableStateOf(1) }
   var manual by rememberSaveable { mutableStateOf("") }
   var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
-  var picker by rememberSaveable { mutableStateOf(false) }
   var pickDebtor by rememberSaveable { mutableStateOf(false) }
   var checkout by rememberSaveable { mutableStateOf(false) }
   // عکسِ لحظهٔ ثبت نگه داشته می‌شود، نه فقط شناسه: فاکتور باید همان
@@ -247,7 +247,7 @@ fun SaleScreen(
           verticalAlignment = Alignment.CenterVertically,
         ) {
           Text("سبد خرید", style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
-          TextButton(onClick = { picker = true }) {
+          TextButton(onClick = onQuickSale) {
             Icon(Icons.Filled.GridView, contentDescription = null, tint = Shop.colors.primary)
             Spacer(Modifier.width(6.dp))
             Text("انتخاب محصول", color = Shop.colors.primary)
@@ -314,19 +314,6 @@ fun SaleScreen(
   }
 
   /* --------------------------- پنجره‌ها --------------------------- */
-
-  if (picker) {
-    ProductPicker(
-      d = d,
-      cart = cart,
-      onClose = { picker = false },
-      onAdd = { productId ->
-        cartStore.set(SalesEngine.addToCart(cart, productId, 1.0))
-        selectedId = productId
-      },
-      onSetQty = { productId, q -> cartStore.set(SalesEngine.setCartQty(cart, productId, q)) },
-    )
-  }
 
   if (pickDebtor) {
     DebtorPicker(
@@ -499,7 +486,7 @@ private fun MultiplierChip(value: Int, active: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun CartRow(
+fun CartRow(
   name: String,
   unit: String,
   quantity: Double,
@@ -561,7 +548,7 @@ private fun CartRow(
 }
 
 @Composable
-private fun CartBar(
+fun CartBar(
   total: Double,
   debtorName: String?,
   debtorNote: String?,
