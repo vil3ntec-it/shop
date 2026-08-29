@@ -146,7 +146,15 @@ fun StaggeredItem(index: Int, content: @Composable () -> Unit) {
     animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing),
     label = "entry",
   )
-  Box(
+  /*
+   *  `Column`، نه `Box`.
+   *
+   *  جعبه بچه‌هایش را **روی هم** می‌گذارد. صدازننده‌ها معمولاً یک ردیف و
+   *  بعد یک `Spacer` می‌دهند تا بینِ ردیف‌ها فاصله بیفتد؛ داخلِ جعبه،
+   *  آن فاصله زیرِ خودِ ردیف می‌نشست و کارت‌ها به هم می‌چسبیدند — همان
+   *  چیزی که در انبار دیده می‌شد.
+   */
+  Column(
     Modifier
       .graphicsLayer {
         alpha = progress

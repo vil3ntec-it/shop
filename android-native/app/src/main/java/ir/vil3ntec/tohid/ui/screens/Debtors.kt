@@ -306,7 +306,9 @@ private fun DebtorCard(
       .clickable(onClick = onOpen)
   ) {
     Column(
-      Modifier.fillMaxWidth().padding(start = 6.dp, end = 6.dp, top = 26.dp, bottom = 26.dp),
+      // پایین جای بیشتری می‌خواهد: مدادِ ویرایش در همان گوشه می‌نشیند و
+      // با فاصلهٔ برابر، آخرین خطِ متن زیرش می‌رفت
+      Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, top = 22.dp, bottom = 34.dp),
       horizontalAlignment = Alignment.CenterHorizontally,
     ) {
       Text(
@@ -343,11 +345,12 @@ private fun DebtorCard(
       onClick = onDelete,
       modifier = Modifier.align(Alignment.TopStart).padding(4.dp),
     )
+    // در راست‌به‌چپ، `BottomEnd` همان کنجِ پایین-چپ است
     CornerButton(
       icon = Icons.Filled.Edit,
       description = "ویرایش",
       onClick = onEdit,
-      modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp),
+      modifier = Modifier.align(Alignment.BottomEnd).padding(6.dp),
     )
   }
 }

@@ -52,6 +52,14 @@ data class ShopColors(
   val glow: Color,
   /** لبهٔ روشنِ بالای کارت‌های شیشه‌ای */
   val sheen: Color,
+  /*
+   *  خطِ دورِ کارت‌ها.
+   *
+   *  یک بار کاملاً بی‌رنگ شد تا کارت «فقط با رنگش» دیده شود. نتیجه‌اش
+   *  این بود که چند کارتِ پشتِ سرِ هم یک تودهٔ یکدست می‌شدند و معلوم
+   *  نبود هرکدام تا کجاست. حالا هست، ولی نازک و کم‌رنگ: به‌اندازه‌ای که
+   *  لبه فهمیده شود، نه آن‌قدر که خط به چشم بیاید.
+   */
   /** لکه‌های نورِ زمینه */
   val auroraOne: Color,
   val auroraTwo: Color,
@@ -84,7 +92,7 @@ val LightColors = ShopColors(
   bg = Color(0xFFFFFFFF),
   surface = Color(0xFFEFF5FD),
   surface2 = Color(0xFFDDE9F8),
-  border = Color(0x00000000),
+  border = Color(0x14101C2B),
   text = Color(0xFF0B1420),
   muted = Color(0xFF4E627A),
   muted2 = Color(0xFF7C8FA6),
@@ -122,7 +130,7 @@ val DarkColors = ShopColors(
   bg = Color(0xFF05090F),
   surface = Color(0xFF141F31),
   surface2 = Color(0xFF1F3049),
-  border = Color(0x00000000),
+  border = Color(0x24FFFFFF),
   text = Color(0xFFF2F7FD),
   muted = Color(0xFFB9CADF),
   muted2 = Color(0xFF92A6C0),
