@@ -9,14 +9,26 @@ android {
   namespace = "ir.vil3ntec.tohid"
   compileSdk = 35
 
+  /*
+   *  شمارهٔ نسخه.
+   *
+   *  تا حالا ثابت بود («۳٫۲٫۰») و هر ساختی همان شماره را می‌گرفت؛ پس
+   *  به‌روزرسانیِ داخلِ برنامه هیچ‌وقت چیزی «تازه‌تر» پیدا نمی‌کرد و کاربر
+   *  همیشه «نسخهٔ شما به‌روز است» می‌دید.
+   *
+   *  حالا آخرین رقم از شمارهٔ ساختِ CI می‌آید. روی رایانهٔ خودی صفر است.
+   */
+  val versionBase = "3.2"
+  val buildNumber = (project.findProperty("buildNumber") as String?)?.toIntOrNull() ?: 0
+
   defaultConfig {
     // همان بستهٔ نسخهٔ قبلی: نصب می‌شود *روی* آن، و داده‌های قدیمی
     // سرِ جایشان می‌مانند تا وارد شوند.
     applicationId = "ir.vil3ntec.tohid"
     minSdk = 24
     targetSdk = 35
-    versionCode = 11
-    versionName = "3.2.0"
+    versionCode = 100 + buildNumber
+    versionName = "$versionBase.$buildNumber"
     resourceConfigurations += listOf("fa", "en")
 
     ndk {
@@ -80,4 +92,12 @@ dependencies {
   implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
   testImplementation("junit:junit:4.13.2")
+}
+
+/**
+ *  شمارهٔ نسخه را چاپ می‌کند تا گردشِ کار همان عددی را روی فایل بنویسد که
+ *  واقعاً داخلِ APK است — نه عددی که خودش جداگانه حساب کرده باشد.
+ */
+tasks.register("printVersionName") {
+  doLast { println(android.defaultConfig.versionName) }
 }

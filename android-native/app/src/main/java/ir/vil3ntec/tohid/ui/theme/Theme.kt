@@ -56,66 +56,72 @@ data class ShopColors(
 )
 
 /**
- *  روزِ قطبی — همان هویتِ آبی، روی زمینهٔ روشن.
+ *  روز — زمینهٔ سفید، کارت‌های آبیِ کم‌رنگ.
  *
- *  یک نکته که در نسخهٔ قبل اشتباه بود: زمینه تقریباً سفید بود و کارت‌ها
- *  هم سفید، پس کارت از زمینه جدا نمی‌شد و کاربر فقط یک خطِ نازک می‌دید.
- *  حالا زمینه یک آبیِ یخیِ روشن است و کارت سفیدِ خالص؛ جدایی از **اختلافِ
- *  رنگ** می‌آید، نه از خطِ دورِ کارت.
+ *  دو بار جایشان عوض شد تا درست شود. اولش زمینه سفید بود و کارت هم سفید:
+ *  کارت دیده نمی‌شد. بعد زمینه آبی شد که کارت پیدا شود، ولی زمینهٔ آبی
+ *  خودش تو‌ذوق می‌زد.
+ *
+ *  جوابِ درست وسط این دوتاست: **زمینه سفیدِ خالص، کارت آبیِ خیلی کم‌رنگ.**
+ *  صفحه تمیز می‌ماند و کارت هم رنگِ خودش را دارد، نه خطِ دورش را.
  */
 val LightColors = ShopColors(
-  bg = Color(0xFFDFEAF7),
-  surface = Color(0xFFFFFFFF),
-  surface2 = Color(0xFFECF3FC),
-  // حاشیه تقریباً نامرئی است؛ فقط برای جاهایی که واقعاً خط لازم است
-  border = Color(0x0F1B4F80),
-  text = Color(0xFF0C1626),
-  muted = Color(0xFF56687F),
-  muted2 = Color(0xFF8698AF),
-  primary = Color(0xFF1B7FD4),
-  primaryDark = Color(0xFF115EA3),
-  primaryTint = Color(0xFFD5E9FD),
-  success = Color(0xFF0F7A60),
-  successTint = Color(0xFFD5F1E9),
-  warning = Color(0xFFB86F10),
-  warningTint = Color(0xFFFBE9CE),
-  danger = Color(0xFFCC3B35),
-  dangerTint = Color(0xFFFBDCDA),
-  accent = Color(0xFF0E93A4),
-  glow = Color(0x1F1B7FD4),
+  bg = Color(0xFFFFFFFF),
+  surface = Color(0xFFEFF5FD),
+  surface2 = Color(0xFFDDE9F8),
+  border = Color(0x00000000),
+  text = Color(0xFF0B1420),
+  muted = Color(0xFF4E627A),
+  muted2 = Color(0xFF7C8FA6),
+  primary = Color(0xFF1268BE),
+  primaryDark = Color(0xFF0B4C90),
+  primaryTint = Color(0xFFD5E7FB),
+  success = Color(0xFF0B6E55),
+  successTint = Color(0xFFD3EFE6),
+  warning = Color(0xFFA25E0B),
+  warningTint = Color(0xFFF9E6C7),
+  danger = Color(0xFFBE322D),
+  dangerTint = Color(0xFFF9D8D6),
+  accent = Color(0xFF0A7F8E),
+  glow = Color(0x1A1268BE),
   sheen = Color(0x00FFFFFF),
-  auroraOne = Color(0x2E7FBDF0),
-  auroraTwo = Color(0x2340D3E0),
+  auroraOne = Color(0x140F7FD6),
+  auroraTwo = Color(0x0F23B6C9),
 )
 
 /**
- *  شبِ قطبی — حالتِ اصلیِ برنامه.
+ *  شب — سیاهِ سرمه‌ای، با متنی که واقعاً خوانده می‌شود.
  *
- *  اینجا هم همان قاعده: فاصلهٔ روشنیِ زمینه تا کارت باید آن‌قدر باشد که
- *  بدونِ خطِ دور هم دیده شود. سه پله داریم — زمینه، کارت، کارتِ روی کارت.
+ *  ایرادِ نسخهٔ قبل: رنگِ متن‌های فرعی (`muted` و `muted2`) آن‌قدر تیره
+ *  بودند که روی زمینهٔ تقریباً سیاه محو می‌شدند. برچسبِ زیرِ هر عدد،
+ *  توضیحِ زیرِ هر ردیف، نامِ ماه‌ها — هیچ‌کدام خوانده نمی‌شد.
+ *
+ *  حالا هر سه پلهٔ متن روشن‌تر شده‌اند تا نسبتِ کنتراستشان با زمینه از
+ *  حدِ خوانایی بگذرد: متنِ اصلی تقریباً سفید، متنِ فرعی خاکستریِ روشن، و
+ *  کم‌رنگ‌ترین هم آن‌قدر روشن که دیده شود.
  */
 val DarkColors = ShopColors(
-  bg = Color(0xFF050A12),
-  surface = Color(0xFF121E30),
-  surface2 = Color(0xFF1C2C44),
-  border = Color(0x14A7D6F7),
-  text = Color(0xFFEAF3FC),
-  muted = Color(0xFF9CB0CA),
-  muted2 = Color(0xFF6A80A0),
-  primary = Color(0xFF67C6F5),
-  primaryDark = Color(0xFF9BDCFF),
-  primaryTint = Color(0x2E67C6F5),
-  success = Color(0xFF3ED6A8),
-  successTint = Color(0x2E3ED6A8),
-  warning = Color(0xFFF3BE63),
-  warningTint = Color(0x2EF3BE63),
-  danger = Color(0xFFFF7A72),
-  dangerTint = Color(0x2EFF7A72),
-  accent = Color(0xFF56E5DA),
-  glow = Color(0x3D67C6F5),
-  sheen = Color(0x14FFFFFF),
-  auroraOne = Color(0x3D2F7FD6),
-  auroraTwo = Color(0x2E23B6C9),
+  bg = Color(0xFF05090F),
+  surface = Color(0xFF141F31),
+  surface2 = Color(0xFF1F3049),
+  border = Color(0x00000000),
+  text = Color(0xFFF2F7FD),
+  muted = Color(0xFFB9CADF),
+  muted2 = Color(0xFF92A6C0),
+  primary = Color(0xFF7CD0F7),
+  primaryDark = Color(0xFFB2E4FF),
+  primaryTint = Color(0x3D7CD0F7),
+  success = Color(0xFF56E0B6),
+  successTint = Color(0x3356E0B6),
+  warning = Color(0xFFFFC978),
+  warningTint = Color(0x33FFC978),
+  danger = Color(0xFFFF908A),
+  dangerTint = Color(0x33FF908A),
+  accent = Color(0xFF6EEDE2),
+  glow = Color(0x4D7CD0F7),
+  sheen = Color(0x0FFFFFFF),
+  auroraOne = Color(0x332F7FD6),
+  auroraTwo = Color(0x2623B6C9),
 )
 
 /**

@@ -154,16 +154,57 @@ class ScanGate(private val windowMs: Long = 1200) {
   }
 }
 
-/** بوقِ اسکن + لرزش — بازخوردی که فروشنده بدونِ نگاه‌کردن به صفحه می‌فهمد */
+/**
+ *  بوقِ اسکن + لرزش — بازخوردی که فروشنده بدونِ نگاه‌کردن به صفحه می‌فهمد.
+ *
+ *  صدا همان بوقِ آشنای بارکدخوانِ دکان است (`res/raw/scan_beep.mp3`)، نه
+ *  بوقِ ساختگیِ `ToneGenerator`. فروشنده این صدا را از دکان‌های دیگر
+ *  می‌شناسد؛ شنیدنش یعنی «خواند».
+ *
+ *  پخش‌کننده یک‌بار ساخته و نگه داشته می‌شود: ساختنِ `MediaPlayer` برای هر
+ *  اسکن، چند ده میلی‌ثانیه طول می‌کشد و در اسکنِ پشتِ‌سرِ هم، صدا عقب
+ *  می‌افتاد.
+ */
 object ScanFeedback {
+
+  private var player: android.media.MediaPlayer? = null
+
   fun ok(context: Context) {
-    beep(android.media.ToneGenerator.TONE_PROP_BEEP, 120)
+    playBeep(context)
     vibrate(context, 60)
   }
 
   fun unknown(context: Context) {
+    // بارکدِ ناشناس صدای خودش را دارد تا با «خواند» اشتباه نشود
     beep(android.media.ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 200)
     vibrate(context, 200)
+  }
+
+  private fun playBeep(context: Context) {
+    runCatching {
+      val existing = player
+      if (existing != null) {
+        // اگر هنوز در حال پخش است، از اول شروع کن — دو اسکنِ سریع نباید
+        // صدای هم را بخورند
+        existing.seekTo(0)
+        existing.start()
+        return
+      }
+      val fresh = android.media.MediaPlayer.create(context.applicationContext, ir.vil3ntec.tohid.R.raw.scan_beep)
+        ?: return
+      fresh.setVolume(1f, 1f)
+      player = fresh
+      fresh.start()
+    }.onFailure {
+      // اگر فایل به هر دلیلی پخش نشد، دستِ‌کم یک بوق بزن
+      beep(android.media.ToneGenerator.TONE_PROP_BEEP, 120)
+    }
+  }
+
+  /** وقتی برنامه بسته می‌شود، پخش‌کننده را آزاد کن */
+  fun release() {
+    runCatching { player?.release() }
+    player = null
   }
 
   private fun beep(tone: Int, ms: Int) {

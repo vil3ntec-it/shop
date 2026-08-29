@@ -3,6 +3,10 @@ package ir.vil3ntec.tohid.ui.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
@@ -442,8 +446,20 @@ private fun BulkFrame(
     properties = DialogProperties(usePlatformDefaultWidth = false),
   ) {
     Surface(color = Shop.colors.bg, modifier = Modifier.fillMaxSize()) {
-      Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
-        Spacer(Modifier.height(18.dp))
+      // دو چیز که در عکس‌های دستگاه معلوم بود:
+      //  • دکمهٔ «ذخیره همه» زیرِ نوارِ ناوبریِ گوشی می‌رفت و نصفش بریده
+      //    می‌شد؛ حالا فاصلهٔ نوارهای سیستم کنار گذاشته می‌شود
+      //  • روی تبلت فرم تمام‌عرض کش می‌آمد و دو طرفش خالی می‌ماند؛ حالا
+      //    وسط می‌ماند و پهنایش محدود است
+      PageWidth {
+      Column(
+        Modifier
+          .fillMaxSize()
+          .windowInsetsPadding(WindowInsets.systemBars)
+          .imePadding()
+          .padding(horizontal = 16.dp)
+      ) {
+        Spacer(Modifier.height(14.dp))
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
           Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.titleLarge, color = Shop.colors.text)
@@ -497,10 +513,14 @@ private fun BulkFrame(
         }
 
         Spacer(Modifier.height(10.dp))
-        Button(onClick = onSave, enabled = saveEnabled, modifier = Modifier.fillMaxWidth()) {
-          Text("ذخیره همه")
-        }
-        Spacer(Modifier.height(16.dp))
+        TohidButton(
+          text = "ذخیره همه",
+          onClick = onSave,
+          enabled = saveEnabled,
+          modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(12.dp))
+      }
       }
     }
   }
