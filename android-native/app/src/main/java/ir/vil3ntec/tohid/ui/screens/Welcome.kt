@@ -26,7 +26,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AlternateEmail
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
@@ -99,7 +98,7 @@ fun WelcomeScreen(onDone: () -> Unit) {
   var emailMode by rememberSaveable { mutableStateOf("login") }
 
   var server by rememberSaveable { mutableStateOf(state.serverUrl) }
-  var showServer by rememberSaveable { mutableStateOf(state.serverUrl.isBlank()) }
+  var showMore by rememberSaveable { mutableStateOf(state.serverUrl.isBlank()) }
 
   var name by rememberSaveable { mutableStateOf("") }
   var phone by rememberSaveable { mutableStateOf("") }
@@ -365,7 +364,36 @@ fun WelcomeScreen(onDone: () -> Unit) {
           }
         }
 
-        /* --------------------- حساب‌های این گوشی --------------------- */
+        /* ------------------------ پایینِ صفحه ------------------------ */
+        /*
+         *  صفحه عمداً کوتاه نگه داشته می‌شود.
+         *
+         *  قبلاً کدِ شاگرد و آدرسِ سرور و فهرستِ حساب‌ها همه باز و زیرِ هم
+         *  بودند و صفحه یک ستونِ بلندِ شلوغ می‌شد. کسی که برای اولین بار
+         *  می‌آید فقط دو کادر و یک دکمه لازم دارد؛ بقیه سرِ راهش
+         *  نمی‌ایستد و هر وقت خواست بازش می‌کند.
+         */
+        Spacer(Modifier.height(18.dp))
+        Row(
+          Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.Center,
+          verticalAlignment = Alignment.CenterVertically,
+        ) {
+          Text(
+            "حساب نمی‌خواهید؟",
+            style = MaterialTheme.typography.labelMedium,
+            color = Shop.colors.muted,
+          )
+          TextButton(onClick = onDone, contentPadding = PaddingValues(horizontal = 8.dp)) {
+            Text(
+              "ادامه بدون حساب",
+              style = MaterialTheme.typography.labelLarge,
+              color = Shop.colors.primary,
+              fontWeight = FontWeight.Bold,
+            )
+          }
+        }
+
         if (saved.isNotEmpty()) {
           Spacer(Modifier.height(14.dp))
           Text("ورود سریع", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
@@ -391,85 +419,76 @@ fun WelcomeScreen(onDone: () -> Unit) {
           }
         }
 
-        Spacer(Modifier.height(18.dp))
-        HorizontalDivider(color = Shop.colors.fieldBorder.copy(alpha = 0.6f))
-        Spacer(Modifier.height(16.dp))
+        /* --------------------- گزینه‌های بیشتر --------------------- */
+        Spacer(Modifier.height(10.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+          TextButton(onClick = { showMore = !showMore }) {
+            Icon(
+              Icons.Filled.Tune,
+              contentDescription = null,
+              tint = Shop.colors.muted2,
+              modifier = Modifier.size(15.dp),
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+              if (showMore) "بستن گزینه‌های بیشتر" else "کد شاگرد و تنظیم سرور",
+              style = MaterialTheme.typography.labelMedium,
+              color = Shop.colors.muted2,
+            )
+          }
+        }
 
-        /* ---------------------- ادامه بدون حساب ---------------------- */
-        OutlinedPill(
-          text = "ادامه بدون حساب",
-          detail = "همه‌چیز روی همین گوشی کار می‌کند",
-          icon = Icons.Filled.ArrowBack,
-          onClick = onDone,
-        )
-
-        Spacer(Modifier.height(12.dp))
-
-        /* ------------------------- کد شاگرد ------------------------- */
-        Row(
-          verticalAlignment = Alignment.CenterVertically,
-          horizontalArrangement = Arrangement.spacedBy(8.dp),
+        AnimatedVisibility(
+          visible = showMore,
+          enter = fadeIn() + expandVertically(),
+          exit = shrinkVertically(),
         ) {
-          PillField(
-            value = staffCode,
-            onValueChange = { staffCode = it.uppercase(); error = null },
-            placeholder = "کد شاگرد",
-            icon = Icons.Filled.Storefront,
-            ltr = true,
-            modifier = Modifier.weight(1f),
-          )
-          TextButton(
-            enabled = !busy && staffCode.isNotBlank(),
-            onClick = {
-              val entered = staffCode.trim().uppercase()
-              if (!Regex("^SHG-[A-Z0-9]{5}(-[A-Z0-9]{5}){2}$").matches(entered)) {
-                error = "این کد درست نیست. کد باید مثل SHG-XXXXX-XXXXX-XXXXX باشد."
-                return@TextButton
-              }
-              val token = state.accessToken
-              if (token.isNullOrBlank()) {
-                error = "برای پیوستن به دکان، اول وارد حساب خود شوید."
-                return@TextButton
-              }
-              busy = true; error = null
-              scope.launch {
-                runCatching { ServerClient(state.serverUrl).joinShop(token, entered) }
-                  .onSuccess { onDone() }
-                  .onFailure { fail(it) }
-                busy = false
-              }
-            },
-          ) { Text("پیوستن", color = Shop.colors.primary) }
-        }
-        Text(
-          "کدی که صاحب دکان از تنظیمات برنامه‌اش به شما می‌دهد.",
-          style = MaterialTheme.typography.labelSmall,
-          color = Shop.colors.muted2,
-          modifier = Modifier.padding(top = 6.dp),
-        )
-
-        /* ------------------------- آدرس سرور ------------------------- */
-        Spacer(Modifier.height(14.dp))
-        TextButton(onClick = { showServer = !showServer }) {
-          Icon(
-            Icons.Filled.Tune,
-            contentDescription = null,
-            tint = Shop.colors.muted,
-            modifier = Modifier.size(16.dp),
-          )
-          Spacer(Modifier.width(6.dp))
-          Text(
-            if (showServer) "بستن تنظیم سرور" else "تنظیم سرور",
-            style = MaterialTheme.typography.labelMedium,
-            color = Shop.colors.muted,
-          )
-        }
-        AnimatedVisibility(visible = showServer, enter = fadeIn() + expandVertically(), exit = shrinkVertically()) {
           Column {
+            Spacer(Modifier.height(6.dp))
+            PillField(
+              value = staffCode,
+              onValueChange = { staffCode = it.uppercase(); error = null },
+              placeholder = "کد شاگرد — SHG-XXXXX-XXXXX-XXXXX",
+              icon = Icons.Filled.Storefront,
+              ltr = true,
+              trailing = {
+                TextButton(
+                  enabled = !busy && staffCode.isNotBlank(),
+                  contentPadding = PaddingValues(horizontal = 8.dp),
+                  onClick = {
+                    val entered = staffCode.trim().uppercase()
+                    if (!Regex("^SHG-[A-Z0-9]{5}(-[A-Z0-9]{5}){2}$").matches(entered)) {
+                      error = "این کد درست نیست. کد باید مثل SHG-XXXXX-XXXXX-XXXXX باشد."
+                      return@TextButton
+                    }
+                    val token = state.accessToken
+                    if (token.isNullOrBlank()) {
+                      error = "برای پیوستن به دکان، اول وارد حساب خود شوید."
+                      return@TextButton
+                    }
+                    busy = true; error = null
+                    scope.launch {
+                      runCatching { ServerClient(state.serverUrl).joinShop(token, entered) }
+                        .onSuccess { onDone() }
+                        .onFailure { fail(it) }
+                      busy = false
+                    }
+                  },
+                ) { Text("پیوستن", color = Shop.colors.primary, style = MaterialTheme.typography.labelMedium) }
+              },
+            )
+            Text(
+              "کدی که صاحب دکان از تنظیمات برنامه‌اش به شما می‌دهد.",
+              style = MaterialTheme.typography.labelSmall,
+              color = Shop.colors.muted2,
+              modifier = Modifier.padding(top = 6.dp, start = 4.dp),
+            )
+
+            Spacer(Modifier.height(12.dp))
             PillField(
               value = server,
               onValueChange = { server = it; error = null },
-              placeholder = "https://…",
+              placeholder = "آدرس سرور — https://…",
               icon = Icons.Filled.Tune,
               keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
               ltr = true,
@@ -478,7 +497,7 @@ fun WelcomeScreen(onDone: () -> Unit) {
               "بدون آدرس سرور هم برنامه کامل کار می‌کند؛ سرور فقط برای حساب، اشتراک و همگام‌سازی است.",
               style = MaterialTheme.typography.labelSmall,
               color = Shop.colors.muted2,
-              modifier = Modifier.padding(top = 6.dp),
+              modifier = Modifier.padding(top = 6.dp, start = 4.dp),
             )
           }
         }
@@ -778,39 +797,6 @@ private fun GradientButton(
         style = MaterialTheme.typography.titleMedium,
         color = if (enabled) Color.White else colors.muted2,
       )
-    }
-  }
-}
-
-/** دکمهٔ خطی — «ادامه بدون حساب» */
-@Composable
-private fun OutlinedPill(
-  text: String,
-  detail: String,
-  icon: ImageVector,
-  onClick: () -> Unit,
-) {
-  val colors = Shop.colors
-  Row(
-    Modifier
-      .fillMaxWidth()
-      .clip(RoundedCornerShape(26.dp))
-      .background(colors.surface)
-      .border(1.dp, colors.fieldBorder, RoundedCornerShape(26.dp))
-      .clickable(onClick = onClick)
-      .padding(horizontal = 16.dp, vertical = 13.dp),
-    verticalAlignment = Alignment.CenterVertically,
-  ) {
-    Box(
-      Modifier.size(34.dp).clip(RoundedCornerShape(17.dp)).background(colors.successTint),
-      contentAlignment = Alignment.Center,
-    ) {
-      Icon(icon, contentDescription = null, tint = colors.success, modifier = Modifier.size(17.dp))
-    }
-    Spacer(Modifier.width(12.dp))
-    Column(Modifier.weight(1f)) {
-      Text(text, style = MaterialTheme.typography.labelLarge, color = colors.text)
-      Text(detail, style = MaterialTheme.typography.labelSmall, color = colors.muted)
     }
   }
 }
