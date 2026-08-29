@@ -159,15 +159,7 @@ fun WarehouseScreen(
         )
         if (d.productCategories.isNotEmpty()) {
           Spacer(Modifier.height(8.dp))
-          Row(
-            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-          ) {
-            FilterChip(selected = category == null, onClick = { category = null }, label = { Text("همه") })
-            d.productCategories.forEach { c ->
-              FilterChip(selected = category == c, onClick = { category = c }, label = { Text(c) })
-            }
-          }
+          CategoryPicker(d.productCategories, category) { category = it }
         }
         Spacer(Modifier.height(14.dp))
       }
