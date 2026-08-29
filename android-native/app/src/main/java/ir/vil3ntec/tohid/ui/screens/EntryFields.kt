@@ -149,11 +149,20 @@ fun EntryNumberField(
 fun EntryFieldBox(
   label: String,
   modifier: Modifier = Modifier,
+  trailing: @Composable (() -> Unit)? = null,
   content: @Composable () -> Unit,
 ) {
   val colors = Shop.colors
   Column(modifier) {
-    Text(label, style = MaterialTheme.typography.labelMedium, color = colors.muted)
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+      Text(
+        label,
+        style = MaterialTheme.typography.labelMedium,
+        color = colors.muted,
+        modifier = Modifier.weight(1f),
+      )
+      if (trailing != null) trailing()
+    }
     Spacer(Modifier.height(6.dp))
     Box(
       Modifier
