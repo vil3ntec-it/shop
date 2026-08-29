@@ -13,9 +13,11 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Print
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
 import ir.vil3ntec.tohid.data.ReportCsv
+import ir.vil3ntec.tohid.print.ReportPrint
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -36,6 +38,14 @@ import ir.vil3ntec.tohid.qty
 import ir.vil3ntec.tohid.todayIso
 import ir.vil3ntec.tohid.ui.theme.Radius
 import ir.vil3ntec.tohid.ui.theme.Shop
+
+/** نام بخش‌های گزارش — همان چهار زبانهٔ نسخهٔ وب */
+private val SECTION_TITLES = linkedMapOf(
+  "sales" to "سود و فروش",
+  "products" to "محصولات",
+  "debtors" to "قرض‌داران",
+  "stock" to "گردش موجودی",
+)
 
 /**
  *  گزارش‌ها.
@@ -87,29 +97,37 @@ fun ReportsScreen(d: ShopData) {
         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
       ) {
-        listOf(
-          "sales" to "سود و فروش",
-          "products" to "محصولات",
-          "debtors" to "قرض‌داران",
-          "stock" to "گردش موجودی",
-        ).forEach { (id, label) ->
+        SECTION_TITLES.forEach { (id, label) ->
           FilterChip(selected = section == id, onClick = { section = id }, label = { Text(label) })
         }
       }
 
       Spacer(Modifier.height(10.dp))
-      OutlinedButton(
-        onClick = {
-          val sheet = ReportCsv.of(section, d, from, to, todayIso())
-          if (sheet.isEmpty) return@OutlinedButton
-          pending = sheet
-          saveCsv.launch("${sheet.name}.csv")
-        },
-        modifier = Modifier.fillMaxWidth(),
-      ) {
-        Icon(Icons.Filled.Download, contentDescription = null, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(8.dp))
-        Text("خروجی CSV این گزارش")
+      Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedButton(
+          onClick = {
+            val sheet = ReportCsv.of(section, d, from, to, todayIso())
+            if (sheet.isEmpty) return@OutlinedButton
+            pending = sheet
+            saveCsv.launch("${sheet.name}.csv")
+          },
+          modifier = Modifier.weight(1f),
+        ) {
+          Icon(Icons.Filled.Download, contentDescription = null, modifier = Modifier.size(17.dp))
+          Spacer(Modifier.width(6.dp))
+          Text("خروجی اکسل (CSV)")
+        }
+        OutlinedButton(
+          onClick = {
+            val sheet = ReportCsv.of(section, d, from, to, todayIso())
+            ReportPrint.print(context, sheet, SECTION_TITLES[section] ?: "گزارش")
+          },
+          modifier = Modifier.weight(1f),
+        ) {
+          Icon(Icons.Filled.Print, contentDescription = null, modifier = Modifier.size(17.dp))
+          Spacer(Modifier.width(6.dp))
+          Text("چاپ گزارش")
+        }
       }
 
       Spacer(Modifier.height(14.dp))

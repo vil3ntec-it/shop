@@ -127,6 +127,7 @@ fun ComingSoon(title: String, detail: String) {
  */
 @Composable
 fun StaggeredItem(index: Int, content: @Composable () -> Unit) {
+  if (!Motion.enabled) { content(); return }
   var shown by remember { mutableStateOf(false) }
   LaunchedEffect(Unit) {
     kotlinx.coroutines.delay((index.coerceAtMost(12) * 35).toLong())
@@ -165,6 +166,7 @@ fun Modifier.pressScale(pressed: Boolean): Modifier {
  */
 @Composable
 fun Modifier.popIn(delayMillis: Int = 0): Modifier {
+  if (!Motion.enabled) return this
   var shown by remember { mutableStateOf(false) }
   LaunchedEffect(Unit) {
     kotlinx.coroutines.delay(delayMillis.toLong())
@@ -188,6 +190,7 @@ fun Modifier.popIn(delayMillis: Int = 0): Modifier {
  */
 @Composable
 fun DialogEntry(content: @Composable () -> Unit) {
+  if (!Motion.enabled) { content(); return }
   var shown by remember { mutableStateOf(false) }
   LaunchedEffect(Unit) { shown = true }
   val progress by animateFloatAsState(
