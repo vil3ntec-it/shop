@@ -11,6 +11,12 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -36,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -138,11 +145,22 @@ fun WelcomeScreen(onDone: () -> Unit) {
         else "با ایمیل و رمز وارد شوید",
       )
 
+      /*
+       *  روی تبلت، فرم باید وسطِ صفحه بماند.
+       *
+       *  قبلاً `fillMaxWidth()` و بعد `widthIn(max = …)` پشتِ سرِ هم آمده
+       *  بودند: اولی پهنا را به تمامِ صفحه می‌چسباند و `align` دیگر کاری
+       *  نداشت بکند، و دومی محتوا را داخلِ همان پهنای تمام‌صفحه به لبه
+       *  می‌راند. نتیجه‌اش روی تبلت یک ستونِ باریکِ چسبیده به کنار بود.
+       *
+       *  حالا یک جعبهٔ تمام‌عرض هست که محتوایش را وسط می‌گذارد، و پهنای
+       *  خودِ فرم محدود است.
+       */
+      Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
       Column(
         Modifier
+          .widthIn(max = 460.dp)
           .fillMaxWidth()
-          .widthIn(max = 520.dp)
-          .align(Alignment.CenterHorizontally)
           .padding(horizontal = 22.dp),
       ) {
         Spacer(Modifier.height(6.dp))
@@ -467,6 +485,7 @@ fun WelcomeScreen(onDone: () -> Unit) {
 
         Spacer(Modifier.height(28.dp))
       }
+      }
     }
   }
 }
@@ -482,54 +501,103 @@ fun WelcomeScreen(onDone: () -> Unit) {
 @Composable
 private fun GradientHeader(title: String, subtitle: String) {
   val colors = Shop.colors
+  // روی تبلت سربرگ بلندتر می‌شود، وگرنه یک نوارِ باریک روی صفحهٔ بزرگ است
+  val tall = if (isTablet()) 320.dp else 252.dp
   Box(
     Modifier
       .fillMaxWidth()
-      .height(228.dp)
+      .height(tall)
       .clip(WaveBottom())
-      .background(Brush.linearGradient(listOf(colors.primary, colors.primaryDark)))
-      .windowInsetsPadding(WindowInsets.statusBars),
+      .background(
+        Brush.linearGradient(
+          colors = listOf(colors.primary, colors.primaryDark),
+          start = Offset(0f, 0f),
+          end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY),
+        )
+      ),
   ) {
-    Column(
+    // دو لکهٔ نورِ ملایم روی شیب — رنگِ تخت، تختی‌اش را نشان می‌دهد
+    Box(
       Modifier
-        .align(Alignment.TopStart)
-        .padding(start = 24.dp, end = 24.dp, top = 34.dp),
+        .size(220.dp)
+        .offset(x = (-60).dp, y = (-70).dp)
+        .clip(RoundedCornerShape(110.dp))
+        .background(Color.White.copy(alpha = 0.10f))
+    )
+    Box(
+      Modifier
+        .size(150.dp)
+        .align(Alignment.TopEnd)
+        .offset(x = 50.dp, y = 20.dp)
+        .clip(RoundedCornerShape(75.dp))
+        .background(Color.White.copy(alpha = 0.08f))
+    )
+
+    Box(
+      Modifier
+        .fillMaxWidth()
+        .windowInsetsPadding(WindowInsets.statusBars),
+      contentAlignment = Alignment.TopCenter,
     ) {
-      BrandMark()
-      Spacer(Modifier.height(14.dp))
-      Text(
-        title,
-        style = MaterialTheme.typography.displaySmall,
-        color = Color.White,
-        fontWeight = FontWeight.Bold,
-      )
-      Spacer(Modifier.height(4.dp))
-      Text(
-        subtitle,
-        style = MaterialTheme.typography.bodyMedium,
-        color = Color.White.copy(alpha = 0.86f),
-      )
+      Column(
+        Modifier
+          .widthIn(max = 460.dp)
+          .fillMaxWidth()
+          .padding(horizontal = 26.dp, vertical = 26.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+      ) {
+        BrandMark()
+        Spacer(Modifier.height(16.dp))
+        Text(
+          title,
+          style = MaterialTheme.typography.displaySmall,
+          color = Color.White,
+          fontWeight = FontWeight.Bold,
+          textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+          subtitle,
+          style = MaterialTheme.typography.bodyMedium,
+          color = Color.White.copy(alpha = 0.88f),
+          textAlign = TextAlign.Center,
+        )
+      }
     }
   }
 }
 
-/** لبهٔ پایینِ موجی — یک منحنی از راست به چپ */
+/**
+ *  لبهٔ پایینِ موجی.
+ *
+ *  یک موجِ واقعی، نه یک فرورفتگیِ کم‌رنگ: از یک سو بالا می‌آید و از سوی
+ *  دیگر پایین می‌رود. لبهٔ صاف، سربرگ را یک مستطیلِ چسبانده به بالای
+ *  صفحه نشان می‌دهد؛ همین یک منحنی است که کاری می‌کند رنگ روی صفحه
+ *  «ریخته» باشد نه «چسبانده».
+ */
 private class WaveBottom : Shape {
   override fun createOutline(
     size: androidx.compose.ui.geometry.Size,
     layoutDirection: LayoutDirection,
     density: Density,
   ): Outline {
-    val dip = size.height * 0.16f
+    val w = size.width
+    val h = size.height
+    val dip = h * 0.11f
     val path = Path().apply {
       moveTo(0f, 0f)
-      lineTo(size.width, 0f)
-      lineTo(size.width, size.height - dip)
-      // دو کمانِ پشتِ سرِ هم: یکی پایین می‌رود، یکی بالا
+      lineTo(w, 0f)
+      lineTo(w, h - dip * 2.1f)
+      // سرازیری از راست به چپ، بعد سربالایی — یک S، نه یک گودی
       cubicTo(
-        size.width * 0.72f, size.height + dip * 0.55f,
-        size.width * 0.30f, size.height - dip * 1.9f,
-        0f, size.height - dip * 0.25f,
+        w * 0.80f, h - dip * 2.4f,
+        w * 0.66f, h + dip * 0.55f,
+        w * 0.44f, h - dip * 0.15f,
+      )
+      cubicTo(
+        w * 0.26f, h - dip * 0.75f,
+        w * 0.14f, h - dip * 2.5f,
+        0f, h - dip * 1.7f,
       )
       close()
     }
@@ -611,39 +679,69 @@ private fun PillField(
   trailing: @Composable (() -> Unit)? = null,
 ) {
   val colors = Shop.colors
-  val body: @Composable () -> Unit = {
-    OutlinedTextField(
-      value = value,
-      onValueChange = onValueChange,
-      placeholder = { Text(placeholder, color = colors.muted2) },
-      leadingIcon = {
-        Icon(icon, contentDescription = null, tint = colors.muted, modifier = Modifier.size(19.dp))
-      },
-      trailingIcon = trailing,
-      singleLine = true,
-      enabled = enabled,
-      shape = RoundedCornerShape(26.dp),
-      keyboardOptions = keyboardOptions,
-      visualTransformation = visual,
-      colors = OutlinedTextFieldDefaults.colors(
-        focusedContainerColor = colors.fieldBg,
-        unfocusedContainerColor = colors.fieldBg,
-        disabledContainerColor = colors.fieldBg,
-        focusedBorderColor = colors.primary,
-        unfocusedBorderColor = colors.fieldBorder,
-        disabledBorderColor = colors.fieldBorder,
-        focusedTextColor = colors.text,
-        unfocusedTextColor = colors.text,
-        disabledTextColor = colors.muted,
-      ),
-      modifier = Modifier.fillMaxWidth(),
-    )
+  val interaction = remember { MutableInteractionSource() }
+  val focused by interaction.collectIsFocusedAsState()
+  val line by animateColorAsState(
+    targetValue = if (focused) colors.primary else colors.fieldBorder,
+    animationSpec = tween(if (Motion.enabled) 180 else 0),
+    label = "pillLine",
+  )
+
+  val inner: @Composable () -> Unit = {
+    Row(
+      Modifier
+        .fillMaxWidth()
+        .heightIn(min = 56.dp)
+        .shadow(if (focused) 8.dp else 3.dp, RoundedCornerShape(28.dp), clip = false)
+        .clip(RoundedCornerShape(28.dp))
+        .background(colors.fieldBg)
+        .border(1.dp, line, RoundedCornerShape(28.dp))
+        .padding(horizontal = 18.dp),
+      verticalAlignment = Alignment.CenterVertically,
+    ) {
+      Icon(
+        icon,
+        contentDescription = null,
+        tint = if (focused) colors.primary else colors.muted2,
+        modifier = Modifier.size(19.dp),
+      )
+      Spacer(Modifier.width(12.dp))
+      Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+        if (value.isEmpty()) {
+          Text(placeholder, style = MaterialTheme.typography.bodyMedium, color = colors.muted2)
+        }
+        BasicTextField(
+          value = value,
+          onValueChange = onValueChange,
+          singleLine = true,
+          enabled = enabled,
+          interactionSource = interaction,
+          keyboardOptions = keyboardOptions,
+          visualTransformation = visual,
+          textStyle = MaterialTheme.typography.bodyMedium.copy(
+            color = if (enabled) colors.text else colors.muted,
+          ),
+          cursorBrush = SolidColor(colors.primary),
+          modifier = Modifier.fillMaxWidth(),
+        )
+      }
+      if (trailing != null) {
+        Spacer(Modifier.width(6.dp))
+        trailing()
+      }
+    }
   }
+
+  /*
+   *  شماره و ایمیل و آدرس چپ‌به‌راست نوشته می‌شوند: رشتهٔ لاتین وسطِ
+   *  صفحهٔ راست‌به‌چپ وارونه دیده می‌شود و کاربر فکر می‌کند چیزِ دیگری
+   *  تایپ کرده.
+   */
   Box(modifier.fillMaxWidth()) {
     if (ltr) {
-      CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) { body() }
+      CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) { inner() }
     } else {
-      body()
+      inner()
     }
   }
 }
@@ -665,8 +763,9 @@ private fun GradientButton(
   Box(
     Modifier
       .fillMaxWidth()
-      .height(54.dp)
-      .clip(RoundedCornerShape(27.dp))
+      .height(58.dp)
+      .shadow(if (enabled) 10.dp else 0.dp, RoundedCornerShape(29.dp), clip = false)
+      .clip(RoundedCornerShape(29.dp))
       .background(brush)
       .clickable(enabled = enabled && !busy, onClick = onClick),
     contentAlignment = Alignment.Center,

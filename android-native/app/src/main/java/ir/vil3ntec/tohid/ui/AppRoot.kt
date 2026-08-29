@@ -10,6 +10,12 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -294,12 +300,18 @@ fun AppRoot(
 /**
  *  نوارِ پایینِ شناور.
  *
- *  یک قرصِ گرد که روی محتوا می‌نشیند، نه نواری که به لبهٔ صفحه چسبیده
- *  باشد. سمتِ راستش نشانِ برنامه است و بقیه‌اش پنج مقصد.
+ *  یک قرصِ گرد که روی محتوا می‌نشیند. سرِ آن نشانِ برنامه در یک گودیِ
+ *  گِرد است، و بقیه‌اش پنج مقصد.
  *
- *  تبِ باز، ظرفِ رنگیِ خودش را می‌گیرد و زیرِ اسمش یک نقطه می‌آید. نقطه
- *  اضافه‌کاری نیست: در حالتِ تاریک، تفاوتِ رنگِ ظرف با زمینه کم است و
- *  نقطه همان چیزی است که بدونِ دقت هم دیده می‌شود.
+ *  چیزی که این نوار را از یک ردیفِ آیکنِ ساده جدا می‌کند، همان **خطِ
+ *  رنگیِ روان** است: از کنارِ نشانِ برنامه شروع می‌شود، دورِ تبِ باز
+ *  بالا می‌رود و مثلِ گهواره زیرش می‌نشیند، بعد پایین می‌آید و تا آخرِ
+ *  نوار می‌رود. با عوض شدنِ تب، خودِ خط سُر می‌خورد و جای تازه را
+ *  می‌گیرد — چشم دنبالش می‌رود و می‌فهمد کجاست، بدونِ اینکه چیزی
+ *  بنویسیم.
+ *
+ *  خط با `Canvas` کشیده می‌شود نه با چند `Box`: یک منحنیِ پیوسته با
+ *  جعبه ساخته نمی‌شود، و همین پیوستگی است که کار را می‌کند.
  */
 @Composable
 private fun TohidNavBar(
@@ -308,85 +320,155 @@ private fun TohidNavBar(
   onPick: (String) -> Unit,
 ) {
   val colors = Shop.colors
-  Row(
+  val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+  val brandWidth = 62.dp
+  val barHeight = 68.dp
+
+  val activeIndex = tabs.indexOfFirst { it.id == current }.coerceAtLeast(0)
+  val visible = current != null
+  // جای خط نرم جابه‌جا می‌شود، نه اینکه بپرد
+  val slot by animateFloatAsState(
+    targetValue = activeIndex.toFloat(),
+    animationSpec = tween(if (Motion.enabled) 320 else 0),
+    label = "navSlot",
+  )
+
+  Box(
     Modifier
       .fillMaxWidth()
       .windowInsetsPadding(WindowInsets.navigationBars)
       .padding(horizontal = 10.dp, vertical = 10.dp)
-      .clip(RoundedCornerShape(28.dp))
+      .clip(RoundedCornerShape(percent = 50))
       .background(colors.surface)
-      .border(1.dp, colors.fieldBorder.copy(alpha = 0.5f), RoundedCornerShape(28.dp))
-      .padding(horizontal = 6.dp, vertical = 6.dp),
-    verticalAlignment = Alignment.CenterVertically,
+      .border(1.dp, colors.fieldBorder.copy(alpha = 0.45f), RoundedCornerShape(percent = 50))
+      .height(barHeight),
   ) {
-    // نشانِ برنامه، سرِ نوار
-    Box(
-      Modifier
-        .size(44.dp)
-        .clip(RoundedCornerShape(22.dp))
-        .background(colors.primary),
-      contentAlignment = Alignment.Center,
-    ) {
-      Icon(
-        Icons.Filled.Storefront,
-        contentDescription = "توحید",
-        tint = Color.White,
-        modifier = Modifier.size(22.dp),
-      )
-    }
-    Spacer(Modifier.width(4.dp))
+    /* ----------------------- خطِ روانِ رنگی ----------------------- */
+    if (visible) {
+      val line = colors.primary
+      Canvas(Modifier.fillMaxSize()) {
+        val w = size.width
+        val h = size.height
+        val brand = brandWidth.toPx()
+        val lane = ((w - brand) / tabs.size).coerceAtLeast(1f)
+        val dir = if (rtl) -1f else 1f
+        val brandEdge = if (rtl) w - brand else brand
+        val far = if (rtl) 0f else w
+        val center = brandEdge + dir * ((slot + 0.5f) * lane)
+        val half = lane / 2f
 
-    tabs.forEach { t ->
-      val active = current == t.id
-      // ظرفِ تبِ باز نرم باز و بسته می‌شود، نه اینکه یک‌آن بپرد
-      val fill by animateFloatAsState(
-        targetValue = if (active) 1f else 0f,
-        animationSpec = tween(if (Motion.enabled) 220 else 0),
-        label = "navFill",
-      )
-      val scale by animateFloatAsState(
-        targetValue = if (active) 1f else 0.92f,
-        animationSpec = spring(dampingRatio = 0.5f, stiffness = 650f),
-        label = "navScale",
-      )
-      val tint = if (active) colors.primary else colors.muted
+        val topY = h * 0.16f
+        val botY = h * 0.88f
+        val startY = h * 0.54f
+        val near = center - dir * half
+        val outer = center + dir * half
 
-      Column(
-        Modifier
-          .weight(1f)
-          .clip(RoundedCornerShape(18.dp))
-          .background(colors.primaryTint.copy(alpha = fill))
-          .clickable(
-            interactionSource = remember { MutableInteractionSource() },
-            indication = null,
-            onClick = { onPick(t.id) },
+        val path = Path().apply {
+          moveTo(brandEdge, startY)
+          // بالا رفتن از سمتِ نشانِ برنامه
+          cubicTo(
+            brandEdge + dir * half * 0.45f, startY,
+            near - dir * half * 0.45f, topY,
+            near, topY,
           )
-          .padding(vertical = 7.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+          // گهوارهٔ روی تبِ باز
+          cubicTo(
+            center - dir * half * 0.42f, topY - h * 0.055f,
+            center + dir * half * 0.42f, topY - h * 0.055f,
+            outer, topY,
+          )
+          // پایین آمدن و ادامه تا آخرِ نوار
+          cubicTo(
+            outer + dir * half * 0.55f, topY,
+            outer + dir * half * 0.30f, botY,
+            outer + dir * half * 1.00f, botY,
+          )
+          lineTo(far, botY)
+        }
+
+        // هالهٔ کم‌رنگ زیرِ خط: خطِ یک‌نقطه‌ای روی زمینهٔ تیره گم می‌شود
+        drawPath(path, line.copy(alpha = 0.22f), style = Stroke(6.dp.toPx(), cap = StrokeCap.Round))
+        drawPath(path, line, style = Stroke(1.6.dp.toPx(), cap = StrokeCap.Round))
+      }
+    }
+
+    Row(
+      Modifier.fillMaxSize().padding(horizontal = 5.dp),
+      verticalAlignment = Alignment.CenterVertically,
+    ) {
+      /* ------------------- نشانِ برنامه، در گودی ------------------- */
+      Box(
+        Modifier.width(brandWidth - 10.dp).fillMaxHeight(),
+        contentAlignment = Alignment.Center,
       ) {
-        Icon(
-          t.icon,
-          contentDescription = t.label,
-          tint = tint,
-          modifier = Modifier
-            .size(21.dp)
-            .graphicsLayer { scaleX = scale; scaleY = scale },
-        )
-        Spacer(Modifier.height(3.dp))
-        Text(
-          t.label,
-          style = MaterialTheme.typography.labelSmall,
-          color = tint,
-          maxLines = 1,
-          overflow = TextOverflow.Ellipsis,
-        )
-        Spacer(Modifier.height(3.dp))
         Box(
           Modifier
-            .size(4.dp)
-            .clip(RoundedCornerShape(2.dp))
-            .background(colors.primary.copy(alpha = fill))
+            .size(44.dp)
+            .clip(RoundedCornerShape(22.dp))
+            .background(colors.surface2),
+          contentAlignment = Alignment.Center,
+        ) {
+          Icon(
+            Icons.Filled.Storefront,
+            contentDescription = "توحید",
+            tint = colors.primary,
+            modifier = Modifier.size(21.dp),
+          )
+        }
+      }
+
+      tabs.forEach { t ->
+        val active = current == t.id
+        val fade by animateFloatAsState(
+          targetValue = if (active) 1f else 0f,
+          animationSpec = tween(if (Motion.enabled) 260 else 0),
+          label = "navFade",
         )
+        val lift by animateFloatAsState(
+          targetValue = if (active) 1f else 0.9f,
+          animationSpec = spring(dampingRatio = 0.5f, stiffness = 620f),
+          label = "navLift",
+        )
+        val tint = androidx.compose.ui.graphics.lerp(colors.muted, colors.primary, fade)
+
+        Column(
+          Modifier
+            .weight(1f)
+            .fillMaxHeight()
+            .clip(RoundedCornerShape(20.dp))
+            .clickable(
+              interactionSource = remember { MutableInteractionSource() },
+              indication = null,
+              onClick = { onPick(t.id) },
+            ),
+          horizontalAlignment = Alignment.CenterHorizontally,
+          verticalArrangement = Arrangement.Center,
+        ) {
+          Icon(
+            t.icon,
+            contentDescription = t.label,
+            tint = tint,
+            modifier = Modifier
+              .size(21.dp)
+              .graphicsLayer { scaleX = lift; scaleY = lift },
+          )
+          Spacer(Modifier.height(4.dp))
+          // نقطهٔ زیرِ آیکنِ تبِ باز — همان نشانهٔ کوچکی که در طرح هست
+          Box(
+            Modifier
+              .size(4.dp)
+              .clip(RoundedCornerShape(2.dp))
+              .background(colors.primary.copy(alpha = fade))
+          )
+          Spacer(Modifier.height(3.dp))
+          Text(
+            t.label,
+            style = MaterialTheme.typography.labelSmall,
+            color = tint,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+          )
+        }
       }
     }
   }
