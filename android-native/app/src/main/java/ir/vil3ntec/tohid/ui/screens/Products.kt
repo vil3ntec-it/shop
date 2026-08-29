@@ -185,7 +185,11 @@ fun ProductsScreen(
         )
         if (d.productCategories.isNotEmpty()) {
           Spacer(Modifier.height(10.dp))
-          CategoryFilter(d.productCategories, category) { category = it }
+          CategoryFilter(
+            categories = d.productCategories,
+            selected = category,
+            onSelect = { category = it },
+          )
         }
         Spacer(Modifier.height(14.dp))
       }
