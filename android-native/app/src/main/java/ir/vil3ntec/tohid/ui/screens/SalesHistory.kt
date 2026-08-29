@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -10,6 +11,8 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -116,17 +119,41 @@ fun SalesHistoryScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostStat
     if (shown.isEmpty()) {
       item { Panel { EmptyNote("فاکتوری با این فیلتر پیدا نشد.") } }
     } else {
+      /*
+       *  جدولِ فاکتورها.
+       *
+       *  یک سرستون در بالا و بعد ردیف‌ها — نه یک کارت برای هر فاکتور.
+       *  کارت‌ها هر کدام سرستونِ خودشان را داشتند و برای مقایسهٔ دو
+       *  فاکتور باید متن خوانده می‌شد. با ستونِ ثابت، چشم از بالا به
+       *  پایین می‌رود و خودش مقایسه می‌کند.
+       */
+      item {
+        Row(
+          Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(topStart = Radius.sm, topEnd = Radius.sm))
+            .background(Shop.colors.surface2)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        ) {
+          InvoiceCell("شماره", 0.7f, head = true)
+          InvoiceCell("تاریخ", 1.1f, head = true)
+          InvoiceCell("نام", 1.3f, head = true)
+          InvoiceCell("نوع", 0.8f, head = true)
+          InvoiceCell("مبلغ", 1.2f, head = true, end = true)
+          Spacer(Modifier.width(28.dp))
+        }
+      }
+
       itemsIndexed(shown, key = { _, s -> s.id }) { index, sale ->
-        StaggeredItem(index) {
-        SaleCard(
+        SaleRow(
           d = d,
           sale = sale,
+          striped = index % 2 == 1,
+          last = index == shown.lastIndex,
           onInvoice = { invoiceFor = sale },
           onReturn = { returnFor = sale },
           onCancel = { cancelFor = sale },
         )
-        Spacer(Modifier.height(8.dp))
-      }
       }
     }
   }
@@ -178,10 +205,19 @@ fun SalesHistoryScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostStat
 
 /* ============================ تکه‌ها ============================ */
 
+/**
+ *  یک ردیفِ جدول.
+ *
+ *  زدنِ ردیف، فاکتور را باز می‌کند. مرجوعی و لغو زیرِ دکمهٔ سه‌نقطهٔ
+ *  آخرِ ردیف‌اند: در یک جدول، سه دکمهٔ کنارِ هر ردیف همان شلوغی‌ای را
+ *  برمی‌گرداند که جدول برای رفعش آمده بود.
+ */
 @Composable
-private fun SaleCard(
+private fun SaleRow(
   d: ShopData,
   sale: Sale,
+  striped: Boolean,
+  last: Boolean,
   onInvoice: () -> Unit,
   onReturn: () -> Unit,
   onCancel: () -> Unit,
@@ -189,120 +225,74 @@ private fun SaleCard(
   val cancelled = sale.status == "cancelled"
   val debtor = sale.debtorId?.let { id -> d.debtors.find { it.id == id } }
   val canReturn = !cancelled && d.saleItems.any { it.saleId == sale.id && SalesEngine.returnable(it) > 0 }
+  var menu by remember { mutableStateOf(false) }
 
-  Column(
-    Modifier
-      .fillMaxWidth()
-      .clip(RoundedCornerShape(Radius.md))
-      .background(Shop.colors.surface)
-      .border(1.dp, Shop.colors.border, RoundedCornerShape(Radius.md))
-      .padding(14.dp)
-  ) {
-    /*
-     *  ردیف‌های جدولی: شمارهٔ فاکتور بالا، و زیرش چهار ستونِ هم‌تراز —
-     *  تاریخ، نام، نقدی یا نسیه، و مبلغ.
-     *
-     *  قبلاً همه‌چیز در دو خطِ درهم بود و برای مقایسهٔ دو فاکتور باید
-     *  متن خوانده می‌شد. با ستونِ ثابت، چشم از بالا به پایین می‌رود و
-     *  خودش مقایسه می‌کند.
-     */
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-      Text(
-        "فاکتور #${plain(sale.invoiceNumber ?: 0)}",
-        style = MaterialTheme.typography.titleSmall,
-        color = if (cancelled) Shop.colors.muted else Shop.colors.text,
-        fontWeight = FontWeight.Bold,
-        modifier = Modifier.weight(1f),
-      )
-      Badge(
-        text = when {
+  val kindTint = when {
+    cancelled -> Shop.colors.danger
+    sale.paymentMethod == "credit" -> Shop.colors.warning
+    else -> Shop.colors.success
+  }
+
+  Column {
+    Row(
+      Modifier
+        .fillMaxWidth()
+        .then(
+          if (last) Modifier.clip(RoundedCornerShape(bottomStart = Radius.sm, bottomEnd = Radius.sm))
+          else Modifier
+        )
+        // ردیفِ یکی‌درمیانِ کم‌رنگ: چشم روی جدولِ بلند خط را گم نمی‌کند
+        .background(if (striped) Shop.colors.surface2.copy(alpha = 0.45f) else Shop.colors.surface)
+        .clickable(onClick = onInvoice)
+        .padding(horizontal = 12.dp, vertical = 12.dp),
+      verticalAlignment = Alignment.CenterVertically,
+    ) {
+      InvoiceCell(plain(sale.invoiceNumber ?: 0), 0.7f, bold = true)
+      InvoiceCell(formatDate(sale.date), 1.1f)
+      InvoiceCell(debtor?.name ?: "نقدی", 1.3f)
+      InvoiceCell(
+        when {
           cancelled -> "لغوشده"
           sale.paymentMethod == "credit" -> "نسیه"
           else -> "نقدی"
         },
-        tint = when {
-          cancelled -> Shop.colors.danger
-          sale.paymentMethod == "credit" -> Shop.colors.warning
-          else -> Shop.colors.success
-        },
-        background = when {
-          cancelled -> Shop.colors.dangerTint
-          sale.paymentMethod == "credit" -> Shop.colors.warningTint
-          else -> Shop.colors.successTint
-        },
-      )
-    }
-
-    Spacer(Modifier.height(10.dp))
-    HorizontalDivider(color = Shop.colors.fieldBorder.copy(alpha = 0.45f))
-    Spacer(Modifier.height(8.dp))
-
-    // سرستون‌ها
-    Row(Modifier.fillMaxWidth()) {
-      InvoiceCell("تاریخ", 1.1f, head = true)
-      InvoiceCell("نام", 1.4f, head = true)
-      InvoiceCell("نوع", 0.8f, head = true)
-      InvoiceCell("مبلغ", 1.2f, head = true, end = true)
-    }
-    Spacer(Modifier.height(4.dp))
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-      InvoiceCell(formatDate(sale.date), 1.1f)
-      InvoiceCell(debtor?.name ?: "مشتری نقدی", 1.4f)
-      InvoiceCell(
-        if (sale.paymentMethod == "credit") "نسیه" else "نقدی",
         0.8f,
-        tint = if (sale.paymentMethod == "credit") Shop.colors.warning else Shop.colors.success,
+        tint = kindTint,
       )
       InvoiceCell(
-        "${money(sale.finalTotal)} افغانی",
+        money(sale.finalTotal),
         1.2f,
         end = true,
-        tint = if (cancelled) Shop.colors.muted else Shop.colors.text,
         bold = true,
+        tint = if (cancelled) Shop.colors.muted else Shop.colors.text,
       )
-    }
-
-    if (sale.remaining > 0 && !cancelled) {
-      Spacer(Modifier.height(6.dp))
-      Text(
-        "${money(sale.remaining)} افغانی باقی‌مانده",
-        style = MaterialTheme.typography.labelSmall,
-        color = Shop.colors.warning,
-      )
-    }
-
-    Spacer(Modifier.height(10.dp))
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-      OutlinedButton(onClick = onInvoice, modifier = Modifier.weight(1f)) { Text("فاکتور") }
-      if (canReturn) OutlinedButton(onClick = onReturn, modifier = Modifier.weight(1f)) { Text("مرجوعی") }
-      if (!cancelled) {
-        OutlinedButton(
-          onClick = onCancel,
-          colors = ButtonDefaults.outlinedButtonColors(contentColor = Shop.colors.danger),
-        ) { Text("لغو") }
+      Box {
+        IconButton(onClick = { menu = true }, modifier = Modifier.size(28.dp)) {
+          Icon(
+            Icons.Filled.MoreVert,
+            contentDescription = "کارها",
+            tint = Shop.colors.muted2,
+            modifier = Modifier.size(17.dp),
+          )
+        }
+        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+          DropdownMenuItem(text = { Text("دیدن فاکتور") }, onClick = { menu = false; onInvoice() })
+          if (canReturn) {
+            DropdownMenuItem(text = { Text("مرجوعی") }, onClick = { menu = false; onReturn() })
+          }
+          if (!cancelled) {
+            DropdownMenuItem(
+              text = { Text("لغو فروش", color = Shop.colors.danger) },
+              onClick = { menu = false; onCancel() },
+            )
+          }
+        }
       }
     }
+    if (!last) HorizontalDivider(color = Shop.colors.fieldBorder.copy(alpha = 0.35f))
   }
 }
 
-@Composable
-private fun Badge(text: String, tint: Color, background: Color) {
-  Box(
-    Modifier
-      .clip(RoundedCornerShape(999.dp))
-      .background(background)
-      .padding(horizontal = 8.dp, vertical = 3.dp)
-  ) {
-    Text(text, style = MaterialTheme.typography.labelSmall, color = tint)
-  }
-}
-
-/**
- *  مرجوعیِ جزئی — هر قلم به هر مقدار.
- *
- *  کنارِ هر قلم نوشته می‌شود چقدرش قابلِ برگشت است، تا کسی مقداری بزند که
- *  اصلاً فروخته نشده. اگر بیشتر هم بزند، همان‌جا محدود می‌شود.
- */
 @Composable
 private fun ReturnDialog(
   d: ShopData,
@@ -395,6 +385,7 @@ private fun ReturnDialog(
  *  پهنای هر ستون با `weight` است نه با عددِ ثابت: نامِ بلند ستونِ کناری
  *  را هل نمی‌دهد و ردیف‌ها روی هر پهنای صفحه هم‌تراز می‌مانند.
  */
+
 @Composable
 private fun RowScope.InvoiceCell(
   text: String,

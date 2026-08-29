@@ -10,6 +10,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.text.font.FontWeight
@@ -394,60 +395,80 @@ private fun TohidNavBar(
         val h = size.height
         val cx = centerX
         val yLamp = lampTop.toPx()
-        val yLampEnd = yLamp + lampThick.toPx()
-
-        // نوارِ نور: کمی از خودِ تب باریک‌تر، وسطِ آن
-        val halfLamp = lampWidth * 0.21f
+        val yEnd = yLamp + lampThick.toPx()
+        val halfLamp = lampWidth * 0.20f
 
         /*
          *  مخروطِ نور.
          *
-         *  یک ذوزنقه که از نوار شروع می‌شود و رو به پایین پهن‌تر
-         *  می‌شود، با شیبِ رنگی که پایین به شفافیت می‌رسد. سه لایه روی
-         *  هم — پهن و کم‌رنگ، میانه، باریک و پررنگ — چون یک ذوزنقهٔ
-         *  تنها لبهٔ تیز دارد و نورِ واقعی لبهٔ تیز ندارد.
+         *  هر لایه یک ذوزنقه است که از نوار شروع می‌شود و رو به پایین
+         *  پهن‌تر می‌شود، ولی رنگش **شعاعی** است — از خودِ نوار به بیرون
+         *  کم می‌شود، نه فقط از بالا به پایین. نور واقعی همین‌طور است:
+         *  هرچه از منبع دورتر، کم‌رنگ‌تر، به هر سویی که باشد.
+         *
+         *  شش لایه، چون یک ذوزنقهٔ تنها لبهٔ تیز دارد. با هر لایه که
+         *  پهن‌تر و کم‌رنگ‌تر می‌شود، لبه‌ها در هم می‌روند و آنچه می‌ماند
+         *  یک شیبِ نرم است، نه چند تا خط.
          */
-        fun cone(topHalf: Float, bottomHalf: Float, alpha: Float) {
+        val layers = listOf(
+          1.00f to 0.030f,
+          0.78f to 0.038f,
+          0.58f to 0.046f,
+          0.42f to 0.055f,
+          0.29f to 0.065f,
+          0.18f to 0.080f,
+        )
+        layers.forEach { (spread, alpha) ->
+          val bottomHalf = lampWidth * (0.16f + 0.62f * spread)
+          val topHalf = halfLamp * (0.75f + 0.55f * spread)
           val path = Path().apply {
-            moveTo(cx - topHalf, yLampEnd)
-            lineTo(cx + topHalf, yLampEnd)
+            moveTo(cx - topHalf, yEnd)
+            lineTo(cx + topHalf, yEnd)
             lineTo(cx + bottomHalf, h)
             lineTo(cx - bottomHalf, h)
             close()
           }
           drawPath(
             path,
-            Brush.verticalGradient(
+            Brush.radialGradient(
               colors = listOf(
                 glow.copy(alpha = alpha * on),
-                glow.copy(alpha = alpha * 0.45f * on),
+                glow.copy(alpha = alpha * 0.55f * on),
                 glow.copy(alpha = 0f),
               ),
-              startY = yLampEnd,
-              endY = h,
+              center = Offset(cx, yEnd),
+              radius = h * (0.62f + 0.5f * spread),
             ),
           )
         }
-        cone(halfLamp * 1.15f, lampWidth * 0.62f, 0.07f)
-        cone(halfLamp * 1.00f, lampWidth * 0.44f, 0.09f)
-        cone(halfLamp * 0.85f, lampWidth * 0.28f, 0.11f)
 
-        // هالهٔ گردِ زیرِ نوار — روشن‌ترین جای نور، درست زیرِ چراغ
+        /*
+         *  حبابِ خودِ چراغ — یک بیضیِ پهن و کوتاه، درست زیرِ نوار.
+         *
+         *  همان چیزی است که «روشنایی» را می‌سازد. بدونش، نوار فقط یک خط
+         *  است و مخروط از هوا شروع می‌شود.
+         */
+        withTransform({ scale(1.9f, 0.85f, pivot = Offset(cx, yEnd)) }) {
+          drawCircle(
+            brush = Brush.radialGradient(
+              colors = listOf(
+                glow.copy(alpha = 0.34f * on),
+                glow.copy(alpha = 0.10f * on),
+                glow.copy(alpha = 0f),
+              ),
+              center = Offset(cx, yEnd),
+              radius = lampWidth * 0.40f,
+            ),
+            radius = lampWidth * 0.40f,
+            center = Offset(cx, yEnd),
+          )
+        }
+
+        // هالهٔ نرمِ دورِ آیکن — تا آیکن هم زیرِ نور باشد، نه فقط کنارش
+        val rIcon = 22.dp.toPx()
         drawCircle(
           brush = Brush.radialGradient(
-            colors = listOf(glow.copy(alpha = 0.30f * on), glow.copy(alpha = 0f)),
-            center = Offset(cx, yLampEnd),
-            radius = lampWidth * 0.55f,
-          ),
-          radius = lampWidth * 0.55f,
-          center = Offset(cx, yLampEnd),
-        )
-
-        // هالهٔ نرمِ دورِ آیکن
-        val rIcon = 20.dp.toPx()
-        drawCircle(
-          brush = Brush.radialGradient(
-            colors = listOf(glow.copy(alpha = 0.22f * on), glow.copy(alpha = 0f)),
+            colors = listOf(glow.copy(alpha = 0.20f * on), glow.copy(alpha = 0f)),
             center = Offset(cx, iconCenter.toPx()),
             radius = rIcon,
           ),
@@ -455,23 +476,26 @@ private fun TohidNavBar(
           center = Offset(cx, iconCenter.toPx()),
         )
 
-        // خودِ نوار: هالهٔ کوتاهش، بعد خطِ روشن
+        /*
+         *  نوارِ چراغ — **یکی**، نه دوتا.
+         *
+         *  دو مستطیلِ روی هم (یکی پررنگ، یکی کم‌رنگ‌تر) از دور دو خط
+         *  دیده می‌شدند. حالا یک مستطیل است با شیبِ افقی: وسطش سفیدِ
+         *  داغ، دو سرش در هوا محو می‌شود. رشتهٔ یک لامپ هم همین‌طور
+         *  است — سرهایش دیده نمی‌شوند.
+         */
         drawRoundRect(
           brush = Brush.horizontalGradient(
-            colors = listOf(
-              glow.copy(alpha = 0f),
-              glow.copy(alpha = 0.55f * on),
-              glow.copy(alpha = 0f),
+            colorStops = arrayOf(
+              0f to glow.copy(alpha = 0f),
+              0.22f to glow.copy(alpha = 0.75f * on),
+              0.5f to Color.White.copy(alpha = 0.92f * on),
+              0.78f to glow.copy(alpha = 0.75f * on),
+              1f to glow.copy(alpha = 0f),
             ),
-            startX = cx - halfLamp * 1.9f,
-            endX = cx + halfLamp * 1.9f,
+            startX = cx - halfLamp,
+            endX = cx + halfLamp,
           ),
-          topLeft = Offset(cx - halfLamp * 1.9f, yLamp - 1.dp.toPx()),
-          size = Size(halfLamp * 3.8f, lampThick.toPx() + 2.dp.toPx()),
-          cornerRadius = CornerRadius(lampThick.toPx()),
-        )
-        drawRoundRect(
-          color = glow.copy(alpha = on),
           topLeft = Offset(cx - halfLamp, yLamp),
           size = Size(halfLamp * 2f, lampThick.toPx()),
           cornerRadius = CornerRadius(lampThick.toPx() / 2f),

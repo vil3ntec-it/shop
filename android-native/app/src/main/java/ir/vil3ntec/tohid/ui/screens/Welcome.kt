@@ -10,7 +10,11 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
@@ -41,12 +45,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -57,7 +57,6 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.sync.SavedLogins
@@ -520,37 +519,59 @@ fun WelcomeScreen(onDone: () -> Unit) {
 @Composable
 private fun GradientHeader(title: String, subtitle: String) {
   val colors = Shop.colors
-  // روی تبلت سربرگ بلندتر می‌شود، وگرنه یک نوارِ باریک روی صفحهٔ بزرگ است
-  val tall = if (isTablet()) 320.dp else 252.dp
+  val tall = if (isTablet()) 300.dp else 240.dp
+
+  /*
+   *  سربرگ — همان زبانِ نوارِ پایین: تیره و شیشه‌ای، با یک چراغ.
+   *
+   *  موجِ رنگیِ قبلی یک بلوکِ تخت بود که با بقیهٔ برنامه حرف نمی‌زد.
+   *  حالا زمینه همان سطحِ برنامه است و نور از بالا می‌آید — همان‌طور که
+   *  در نوارِ پایین از بالای تبِ باز می‌آید.
+   */
   Box(
     Modifier
       .fillMaxWidth()
       .height(tall)
-      .clip(WaveBottom())
-      .background(
-        Brush.linearGradient(
-          colors = listOf(colors.primary, colors.primaryDark),
-          start = Offset(0f, 0f),
-          end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY),
-        )
-      ),
+      .clip(RoundedCornerShape(bottomStart = 36.dp, bottomEnd = 36.dp))
+      .background(colors.surface),
   ) {
-    // دو لکهٔ نورِ ملایم روی شیب — رنگِ تخت، تختی‌اش را نشان می‌دهد
-    Box(
-      Modifier
-        .size(220.dp)
-        .offset(x = (-60).dp, y = (-70).dp)
-        .clip(RoundedCornerShape(110.dp))
-        .background(Color.White.copy(alpha = 0.10f))
-    )
-    Box(
-      Modifier
-        .size(150.dp)
-        .align(Alignment.TopEnd)
-        .offset(x = 50.dp, y = 20.dp)
-        .clip(RoundedCornerShape(75.dp))
-        .background(Color.White.copy(alpha = 0.08f))
-    )
+    // چراغِ بالای صفحه، و نورش که رو به پایین محو می‌شود
+    Canvas(Modifier.matchParentSize()) {
+      val w = size.width
+      val h = size.height
+      val cx = w / 2f
+      listOf(0.9f to 0.10f, 0.6f to 0.13f, 0.35f to 0.16f).forEach { (spread, alpha) ->
+        drawCircle(
+          brush = Brush.radialGradient(
+            colors = listOf(
+              colors.primary.copy(alpha = alpha),
+              colors.primary.copy(alpha = alpha * 0.4f),
+              colors.primary.copy(alpha = 0f),
+            ),
+            center = Offset(cx, 0f),
+            radius = h * (0.7f + spread),
+          ),
+          radius = h * (0.7f + spread),
+          center = Offset(cx, 0f),
+        )
+      }
+      // خودِ نوارِ چراغ، بالای صفحه
+      val half = w * 0.16f
+      drawRoundRect(
+        brush = Brush.horizontalGradient(
+          colorStops = arrayOf(
+            0f to colors.primary.copy(alpha = 0f),
+            0.5f to Color.White.copy(alpha = 0.85f),
+            1f to colors.primary.copy(alpha = 0f),
+          ),
+          startX = cx - half,
+          endX = cx + half,
+        ),
+        topLeft = Offset(cx - half, 0f),
+        size = Size(half * 2f, 3.dp.toPx()),
+        cornerRadius = CornerRadius(1.5.dp.toPx()),
+      )
+    }
 
     Box(
       Modifier
@@ -562,7 +583,7 @@ private fun GradientHeader(title: String, subtitle: String) {
         Modifier
           .widthIn(max = 460.dp)
           .fillMaxWidth()
-          .padding(horizontal = 26.dp, vertical = 26.dp),
+          .padding(horizontal = 26.dp, vertical = 30.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
       ) {
         BrandMark()
@@ -570,7 +591,7 @@ private fun GradientHeader(title: String, subtitle: String) {
         Text(
           title,
           style = MaterialTheme.typography.displaySmall,
-          color = Color.White,
+          color = colors.text,
           fontWeight = FontWeight.Bold,
           textAlign = TextAlign.Center,
         )
@@ -578,49 +599,11 @@ private fun GradientHeader(title: String, subtitle: String) {
         Text(
           subtitle,
           style = MaterialTheme.typography.bodyMedium,
-          color = Color.White.copy(alpha = 0.88f),
+          color = colors.muted,
           textAlign = TextAlign.Center,
         )
       }
     }
-  }
-}
-
-/**
- *  لبهٔ پایینِ موجی.
- *
- *  یک موجِ واقعی، نه یک فرورفتگیِ کم‌رنگ: از یک سو بالا می‌آید و از سوی
- *  دیگر پایین می‌رود. لبهٔ صاف، سربرگ را یک مستطیلِ چسبانده به بالای
- *  صفحه نشان می‌دهد؛ همین یک منحنی است که کاری می‌کند رنگ روی صفحه
- *  «ریخته» باشد نه «چسبانده».
- */
-private class WaveBottom : Shape {
-  override fun createOutline(
-    size: androidx.compose.ui.geometry.Size,
-    layoutDirection: LayoutDirection,
-    density: Density,
-  ): Outline {
-    val w = size.width
-    val h = size.height
-    val dip = h * 0.11f
-    val path = Path().apply {
-      moveTo(0f, 0f)
-      lineTo(w, 0f)
-      lineTo(w, h - dip * 2.1f)
-      // سرازیری از راست به چپ، بعد سربالایی — یک S، نه یک گودی
-      cubicTo(
-        w * 0.80f, h - dip * 2.4f,
-        w * 0.66f, h + dip * 0.55f,
-        w * 0.44f, h - dip * 0.15f,
-      )
-      cubicTo(
-        w * 0.26f, h - dip * 0.75f,
-        w * 0.14f, h - dip * 2.5f,
-        0f, h - dip * 1.7f,
-      )
-      close()
-    }
-    return Outline.Generic(path)
   }
 }
 
@@ -804,12 +787,13 @@ private fun GradientButton(
 /** نشانِ برنامه با همان تپشِ ملایمِ نسخهٔ وب */
 @Composable
 private fun BrandMark() {
+  val colors = Shop.colors
   val pulse = rememberInfiniteTransition(label = "brand")
-  val glow by pulse.animateFloat(
-    initialValue = 0.45f,
-    targetValue = 0.9f,
+  val breathe by pulse.animateFloat(
+    initialValue = 0.35f,
+    targetValue = 0.75f,
     animationSpec = infiniteRepeatable(
-      tween(if (Motion.enabled) 1800 else 1, easing = LinearEasing),
+      tween(if (Motion.enabled) 1900 else 1, easing = LinearEasing),
       RepeatMode.Reverse,
     ),
     label = "glow",
@@ -817,23 +801,24 @@ private fun BrandMark() {
   Box(contentAlignment = Alignment.Center) {
     Box(
       Modifier
-        .size(66.dp)
-        .alpha(glow * 0.3f)
-        .clip(RoundedCornerShape(22.dp))
-        .background(Color.White)
+        .size(72.dp)
+        .alpha(breathe * 0.4f)
+        .clip(RoundedCornerShape(24.dp))
+        .background(colors.primary)
     )
+    // شیشه: سطحِ نیمه‌شفاف با یک لبهٔ روشن، نه یک مربعِ توپر
     Box(
       Modifier
-        .size(52.dp)
-        .clip(RoundedCornerShape(18.dp))
-        .background(Color.White.copy(alpha = 0.18f))
-        .border(1.dp, Color.White.copy(alpha = 0.5f), RoundedCornerShape(18.dp)),
+        .size(54.dp)
+        .clip(RoundedCornerShape(19.dp))
+        .background(colors.surface2.copy(alpha = 0.75f))
+        .border(1.dp, colors.primary.copy(alpha = 0.45f), RoundedCornerShape(19.dp)),
       contentAlignment = Alignment.Center,
     ) {
       Icon(
         Icons.Filled.Storefront,
         contentDescription = null,
-        tint = Color.White,
+        tint = colors.primary,
         modifier = Modifier.size(26.dp),
       )
     }
