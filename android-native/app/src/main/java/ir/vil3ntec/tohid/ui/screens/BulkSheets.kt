@@ -139,24 +139,23 @@ fun BulkProductSheet(
           rows = rows.toMutableList().also { it.add(index + 1, copy) }
         },
       ) {
-        OutlinedTextField(
+        EntryField(
           value = row.name,
           onValueChange = { v -> update(row.key) { it.copy(name = v) } },
-          label = { Text("نام محصول") },
-          placeholder = { Text("مثلاً بیسکویت شکلاتی") },
-          singleLine = true,
+          label = "نام محصول",
+          placeholder = "مثلاً بیسکویت شکلاتی",
           modifier = Modifier.fillMaxWidth(),
         )
 
-        Spacer(Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-          NumberField(
+        Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+          EntryNumberField(
             value = row.purchase,
             onValueChange = { v -> update(row.key) { it.copy(purchase = v) } },
             label = "قیمت خرید",
             modifier = Modifier.weight(1f),
           )
-          NumberField(
+          EntryNumberField(
             value = row.sale,
             onValueChange = { v -> update(row.key) { it.copy(sale = v) } },
             label = "قیمت فروش",
@@ -164,17 +163,17 @@ fun BulkProductSheet(
           )
         }
 
-        Spacer(Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-          OutlinedTextField(
+        Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+          EntryField(
             value = row.barcode,
             onValueChange = { v -> update(row.key) { it.copy(barcode = v) } },
-            label = { Text("بارکد") },
-            singleLine = true,
+            label = "بارکد",
+            placeholder = "اسکن یا تایپ",
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             modifier = Modifier.weight(1f),
           )
-          NumberField(
+          EntryNumberField(
             value = row.minStock,
             onValueChange = { v -> update(row.key) { it.copy(minStock = v) } },
             label = "حداقل موجودی",
@@ -305,10 +304,15 @@ fun BulkEntrySheet(
       }
     },
     header = {
-      Text("تاریخ همهٔ ردیف‌ها", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
-      Spacer(Modifier.height(6.dp))
-      DateField(date) { date = it }
-      Spacer(Modifier.height(12.dp))
+      // همان رفتارِ قبلی — «امروز»، «دیروز» و تاریخِ خورشیدیِ زیرِ کادر —
+      // فقط با کادرِ دیدنیِ این دو صفحه
+      EntryDateField(
+        value = date,
+        onValueChange = { date = it },
+        label = "تاریخ همهٔ ردیف‌ها",
+        modifier = Modifier.fillMaxWidth(),
+      )
+      Spacer(Modifier.height(14.dp))
     },
   ) {
     itemsIndexed(rows, key = { _, r -> r.key }) { index, row ->
@@ -321,79 +325,80 @@ fun BulkEntrySheet(
           rows = rows.toMutableList().also { it.add(index + 1, copy) }
         },
       ) {
-        // انتخابِ محصول، یا ساختِ محصولِ تازه — همان دو حالتِ کشویی وب
-        Text("محصول", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
-        Spacer(Modifier.height(6.dp))
-        Row(
-          Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-          horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-          d.products.forEach { p ->
+        // انتخابِ محصول، یا ساختِ محصولِ تازه — همان دو حالتِ کشویی وب.
+        // تراشه‌ها و کارشان دست‌نخورده‌اند؛ فقط داخلِ یک کادر نشسته‌اند تا
+        // مثلِ بقیهٔ خانه‌های همین صفحه دیده شوند.
+        EntryFieldBox("انتخاب محصول") {
+          Row(
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+          ) {
+            d.products.forEach { p ->
+              FilterChip(
+                selected = !row.newProduct && row.productId == p.id,
+                onClick = {
+                  // واحد و قیمت خریدِ همان کالا پیش‌فرض می‌آید
+                  update(row.key) {
+                    it.copy(
+                      productId = p.id,
+                      newProduct = false,
+                      unit = p.unit.ifBlank { it.unit },
+                      price = if (it.price.isBlank() && p.purchasePrice > 0)
+                        p.purchasePrice.toLong().toString() else it.price,
+                    )
+                  }
+                },
+                label = { Text(p.name) },
+              )
+            }
             FilterChip(
-              selected = !row.newProduct && row.productId == p.id,
-              onClick = {
-                // واحد و قیمت خریدِ همان کالا پیش‌فرض می‌آید
-                update(row.key) {
-                  it.copy(
-                    productId = p.id,
-                    newProduct = false,
-                    unit = p.unit.ifBlank { it.unit },
-                    price = if (it.price.isBlank() && p.purchasePrice > 0)
-                      p.purchasePrice.toLong().toString() else it.price,
-                  )
-                }
-              },
-              label = { Text(p.name) },
+              selected = row.newProduct,
+              onClick = { update(row.key) { it.copy(newProduct = !it.newProduct, productId = "") } },
+              label = { Text("+ محصول جدید") },
             )
           }
-          FilterChip(
-            selected = row.newProduct,
-            onClick = { update(row.key) { it.copy(newProduct = !it.newProduct, productId = "") } },
-            label = { Text("+ محصول جدید") },
-          )
         }
 
         if (row.newProduct) {
           Spacer(Modifier.height(10.dp))
-          OutlinedTextField(
+          EntryField(
             value = row.newName,
             onValueChange = { v -> update(row.key) { it.copy(newName = v) } },
-            label = { Text("نام محصول جدید") },
-            singleLine = true,
+            label = "نام محصول جدید",
+            placeholder = "مثلاً برنج",
             modifier = Modifier.fillMaxWidth(),
           )
-          Spacer(Modifier.height(8.dp))
-          Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedTextField(
+          Spacer(Modifier.height(12.dp))
+          Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            EntryField(
               value = row.newCategory,
               onValueChange = { v -> update(row.key) { it.copy(newCategory = v) } },
-              label = { Text("دسته‌بندی") },
-              singleLine = true,
+              label = "دسته‌بندی",
               modifier = Modifier.weight(1f),
             )
-            OutlinedTextField(
+            EntryField(
               value = row.newBarcode,
               onValueChange = { v -> update(row.key) { it.copy(newBarcode = v) } },
-              label = { Text("بارکد") },
-              singleLine = true,
+              label = "بارکد",
+              placeholder = "اسکن یا تایپ",
               keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
               modifier = Modifier.weight(1f),
             )
           }
         }
 
-        Spacer(Modifier.height(10.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-          NumberField(
+        Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+          EntryNumberField(
             value = row.qty,
             onValueChange = { v -> update(row.key) { it.copy(qty = v) } },
             label = "مقدار",
             modifier = Modifier.weight(1f),
           )
-          NumberField(
+          EntryNumberField(
             value = row.price,
             onValueChange = { v -> update(row.key) { it.copy(price = v) } },
-            label = "قیمت خرید",
+            label = "قیمت خرید (افغانی)",
             modifier = Modifier.weight(1f),
           )
         }
