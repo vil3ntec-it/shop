@@ -25,6 +25,9 @@ import ir.vil3ntec.tohid.data.CartStore
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.data.WarehouseEngine
 import ir.vil3ntec.tohid.ui.screens.*
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
 import ir.vil3ntec.tohid.ui.theme.ArcticBackground
@@ -131,6 +134,8 @@ fun AppRoot(
   ArcticBackground(animated = Motion.enabled) {
   Scaffold(
     containerColor = Color.Transparent,
+    // سربرگ و نوارِ پایین خودشان فاصلهٔ نوارهای سیستم را می‌گیرند
+    contentWindowInsets = WindowInsets(0, 0, 0, 0),
     topBar = {
       TohidTopBar(
         title = PAGE_TITLES[sub ?: tab] ?: "توحید",
@@ -158,7 +163,9 @@ fun AppRoot(
       NavigationBar(
         containerColor = Shop.colors.surface.copy(alpha = 0.92f),
         tonalElevation = 0.dp,
+        windowInsets = WindowInsets(0, 0, 0, 0),
         modifier = Modifier
+          .windowInsetsPadding(WindowInsets.navigationBars)
           .padding(horizontal = 12.dp, vertical = 10.dp)
           .clip(Shape.cardLarge),
       ) {
@@ -231,6 +238,7 @@ fun AppRoot(
         return@Box
       }
 
+      PageWidth {
       AnimatedContent(
         targetState = sub ?: tab,
         transitionSpec = {
@@ -299,6 +307,7 @@ fun AppRoot(
           onConsumed = { pendingBarcode = null; pendingProduct = null },
         )
         "more" -> MoreScreen(store, data, ::open)
+      }
       }
       }
     }

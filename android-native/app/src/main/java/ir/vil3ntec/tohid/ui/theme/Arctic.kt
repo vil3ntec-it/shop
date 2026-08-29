@@ -14,6 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -93,12 +94,19 @@ fun ArcticBackground(animated: Boolean = true, content: @Composable () -> Unit) 
 }
 
 /**
- *  سطحِ شیشه‌ای.
+ *  سطحِ کارت.
  *
- *  به‌جای «کادر با حاشیهٔ ضخیم»، یک سطحِ نیمه‌شفاف با لبهٔ روشنِ بالا و
- *  هالهٔ آبیِ زیرش. Compose تارکردنِ واقعیِ پس‌زمینه را ارزان نمی‌دهد، پس
- *  همان حس با سه لایه ساخته می‌شود: تیرگیِ ملایم، شیبِ روشنی از بالا به
- *  پایین، و یک حاشیهٔ بسیار کم‌رنگ.
+ *  اسمش «شیشه‌ای» بود ولی کارِ اصلی‌اش این است: کارت را از زمینه جدا کند
+ *  **بدونِ کشیدنِ خطِ دور**. خطِ دور، کارت را جعبه نشان می‌دهد؛ و بدتر از
+ *  آن، اگر رنگِ کارت و زمینه نزدیک باشند، همان خط تنها چیزی می‌شود که
+ *  دیده می‌شود — دقیقاً همان چیزی که در نسخهٔ قبل اتفاق افتاد.
+ *
+ *  پس جدایی از دو چیز می‌آید:
+ *   ۱) اختلافِ رنگِ کارت با زمینه (که در پالت درست شده)
+ *   ۲) یک سایهٔ آبیِ نرم زیرِ کارت
+ *
+ *  حاشیه فقط یک رگهٔ بسیار کم‌رنگ است تا لبه در حالتِ تاریک کاملاً محو
+ *  نشود؛ در روشنایی عملاً دیده نمی‌شود.
  */
 fun Modifier.glassSurface(
   shape: Shape,
@@ -106,26 +114,27 @@ fun Modifier.glassSurface(
   sheen: Color,
   border: Color,
   strong: Boolean = false,
+  glow: Color = Color(0x1F1B7FD4),
 ): Modifier = this
-  .clip(shape)
-  .background(
-    brush = Brush.verticalGradient(
-      listOf(
-        tint.copy(alpha = if (strong) 0.98f else 0.92f),
-        tint.copy(alpha = if (strong) 0.90f else 0.78f),
-      )
-    ),
+  .shadow(
+    elevation = if (strong) 10.dp else 6.dp,
     shape = shape,
+    ambientColor = glow,
+    spotColor = glow,
   )
+  .clip(shape)
+  .background(color = tint, shape = shape)
   .drawBehind {
-    // لبهٔ روشنِ بالا — همان بازتابی که شیشه دارد
-    drawRect(
-      brush = Brush.verticalGradient(
-        0f to sheen,
-        1f to Color.Transparent,
-        endY = size.height * 0.35f,
-      ),
-      size = Size(size.width, size.height * 0.35f),
-    )
+    // لبهٔ روشنِ بالا — فقط در حالتِ تاریک معنی دارد و آنجا هم بسیار کم
+    if (sheen.alpha > 0f) {
+      drawRect(
+        brush = Brush.verticalGradient(
+          0f to sheen,
+          1f to Color.Transparent,
+          endY = size.height * 0.3f,
+        ),
+        size = Size(size.width, size.height * 0.3f),
+      )
+    }
   }
-  .border(width = if (strong) 1.dp else 0.7.dp, color = border, shape = shape)
+  .border(width = 0.6.dp, color = border, shape = shape)

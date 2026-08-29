@@ -158,25 +158,65 @@ fun TohidTheme(
     ThemeChoice.SYSTEM -> isSystemInDarkTheme()
   }
   val colors = if (dark) DarkColors else LightColors
+  /*
+   *  اجزای آمادهٔ متریال — تراشه، دکمه، کادرِ متن — رنگشان را از همین
+   *  طرح می‌گیرند. تا وقتی این‌ها را ننویسیم، متریال رنگ‌های پیش‌فرضِ
+   *  بنفشِ خودش را می‌گذارد و خطِ خاکستری دورِ تراشه‌ها می‌کشد؛ همان
+   *  چیزی که در صفحهٔ گزارش‌ها دیده می‌شد.
+   */
   val scheme = if (dark) {
     darkColorScheme(
       primary = colors.primary,
+      onPrimary = Color(0xFF04121F),
+      primaryContainer = colors.primaryTint,
+      onPrimaryContainer = colors.primaryDark,
+      secondary = colors.accent,
+      onSecondary = Color(0xFF04121F),
+      secondaryContainer = colors.primaryTint,
+      onSecondaryContainer = colors.primary,
       background = colors.bg,
-      surface = colors.surface,
-      onPrimary = Color.White,
       onBackground = colors.text,
+      surface = colors.surface,
       onSurface = colors.text,
+      surfaceVariant = colors.surface2,
+      onSurfaceVariant = colors.muted,
+      surfaceContainer = colors.surface,
+      surfaceContainerHigh = colors.surface2,
+      surfaceContainerHighest = colors.surface2,
+      outline = colors.border,
+      outlineVariant = colors.border,
       error = colors.danger,
+      onError = Color(0xFF2A0B09),
+      errorContainer = colors.dangerTint,
+      onErrorContainer = colors.danger,
+      scrim = Color(0xCC020509),
     )
   } else {
     lightColorScheme(
       primary = colors.primary,
-      background = colors.bg,
-      surface = colors.surface,
       onPrimary = Color.White,
+      primaryContainer = colors.primaryTint,
+      onPrimaryContainer = colors.primaryDark,
+      secondary = colors.accent,
+      onSecondary = Color.White,
+      secondaryContainer = colors.primaryTint,
+      onSecondaryContainer = colors.primaryDark,
+      background = colors.bg,
       onBackground = colors.text,
+      surface = colors.surface,
       onSurface = colors.text,
+      surfaceVariant = colors.surface2,
+      onSurfaceVariant = colors.muted,
+      surfaceContainer = colors.surface,
+      surfaceContainerHigh = colors.surface2,
+      surfaceContainerHighest = colors.surface2,
+      outline = colors.border,
+      outlineVariant = colors.border,
       error = colors.danger,
+      onError = Color.White,
+      errorContainer = colors.dangerTint,
+      onErrorContainer = colors.danger,
+      scrim = Color(0x990C1626),
     )
   }
 

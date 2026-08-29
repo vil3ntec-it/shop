@@ -4,6 +4,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -118,8 +121,11 @@ fun TohidTopBar(
   Row(
     Modifier
       .fillMaxWidth()
-      .background(Shop.colors.bg)
-      .padding(horizontal = 14.dp, vertical = 8.dp),
+      // سربرگ زیرِ نوارِ وضعیتِ گوشی می‌رفت و ساعت و باتری روی دکمه‌ها
+      // می‌افتاد. این padding همان بلندیِ نوارِ وضعیت را کنار می‌گذارد،
+      // هر اندازه‌ای که روی آن دستگاه باشد — بریدگیِ دوربین هم همین‌طور.
+      .windowInsetsPadding(WindowInsets.statusBars)
+      .padding(horizontal = 14.dp, vertical = 10.dp),
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.SpaceBetween,
   ) {
