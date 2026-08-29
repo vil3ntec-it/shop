@@ -7,6 +7,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -139,32 +141,32 @@ fun ReceiptsScreen(d: ShopData) {
 
     if (years.isNotEmpty()) {
       item {
-        Row(
-          Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-          horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-          FilterChip(selected = year == null, onClick = { year = null; month = null }, label = { Text("همهٔ سال‌ها") })
-          years.forEach { y ->
-            FilterChip(
-              selected = year == y,
-              onClick = { year = if (year == y) null else y },
-              label = { Text(plain(y)) },
-            )
-          }
-        }
-        Spacer(Modifier.height(6.dp))
-        Row(
-          Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-          horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-          FilterChip(selected = month == null, onClick = { month = null }, label = { Text("همهٔ ماه‌ها") })
-          JALALI_MONTHS.forEachIndexed { index, name ->
-            FilterChip(
-              selected = month == index + 1,
-              onClick = { month = if (month == index + 1) null else index + 1 },
-              label = { Text(name) },
-            )
-          }
+        /*
+         *  سال و ماه، دو کادرِ کشویی کنارِ هم.
+         *
+         *  قبلاً دوازده ماه یک ردیفِ افقیِ اسکرول‌شونده بودند: نصفشان
+         *  بیرونِ صفحه می‌ماند، پیدا کردنِ «عقرب» یعنی کشیدن، و معلوم هم
+         *  نبود چندتای دیگر مانده. کادرِ کشویی همه را یک‌جا نشان می‌دهد
+         *  و جای ثابتی می‌گیرد.
+         */
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+          PickerBox(
+            label = "سال",
+            value = year?.let { plain(it) } ?: "همهٔ سال‌ها",
+            options = listOf("همهٔ سال‌ها") + years.map { plain(it) },
+            onPick = { index ->
+              year = if (index == 0) null else years[index - 1]
+              if (year == null) month = null
+            },
+            modifier = Modifier.weight(1f),
+          )
+          PickerBox(
+            label = "ماه",
+            value = month?.let { JALALI_MONTHS[it - 1] } ?: "همهٔ ماه‌ها",
+            options = listOf("همهٔ ماه‌ها") + JALALI_MONTHS,
+            onPick = { index -> month = if (index == 0) null else index },
+            modifier = Modifier.weight(1f),
+          )
         }
         Spacer(Modifier.height(14.dp))
       }
@@ -214,3 +216,46 @@ val JALALI_MONTHS = listOf(
   "حمل", "ثور", "جوزا", "سرطان", "اسد", "سنبله",
   "میزان", "عقرب", "قوس", "جدی", "دلو", "حوت",
 )
+
+/**
+ *  کادرِ کشویی برای فیلترهای این صفحه.
+ *
+ *  انتخاب با **شماره** است نه با متن: دو گزینه ممکن است روزی یک نام
+ *  پیدا کنند و آن‌وقت انتخاب با متن، اشتباهی را برمی‌گرداند که پیدا
+ *  کردنش سخت است.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PickerBox(
+  label: String,
+  value: String,
+  options: List<String>,
+  onPick: (Int) -> Unit,
+  modifier: Modifier = Modifier,
+) {
+  var open by remember { mutableStateOf(false) }
+  ExposedDropdownMenuBox(
+    expanded = open,
+    onExpandedChange = { open = it },
+    modifier = modifier,
+  ) {
+    OutlinedTextField(
+      value = value,
+      onValueChange = {},
+      readOnly = true,
+      singleLine = true,
+      label = { Text(label) },
+      shape = RoundedCornerShape(Radius.sm),
+      trailingIcon = { Icon(Icons.Filled.KeyboardArrowDown, contentDescription = null) },
+      modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
+    )
+    ExposedDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+      options.forEachIndexed { index, option ->
+        DropdownMenuItem(
+          text = { Text(option) },
+          onClick = { onPick(index); open = false },
+        )
+      }
+    }
+  }
+}

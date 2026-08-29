@@ -97,7 +97,8 @@ class LedgerRoundTripTest {
     // نسخه‌های قدیمی‌تر ممکن است بعضی کلیدها را اصلاً نداشته باشند
     val partial = """{"products":[],"debtors":[]}"""
     val decoded = json.decodeFromString<ShopData>(partial)
-    assertEquals(1000, decoded.nextInvoiceNo)
+    // پیش‌فرضِ شمارهٔ فاکتور یک است، نه ۱۰۰۰
+    assertEquals(1, decoded.nextInvoiceNo)
     assertEquals(emptyList<Sale>(), decoded.sales)
   }
 

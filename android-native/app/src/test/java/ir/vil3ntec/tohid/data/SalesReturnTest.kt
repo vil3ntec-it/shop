@@ -56,7 +56,7 @@ class SalesReturnTest {
     assertEquals(1, cancelled.data.sales.size)
     assertEquals("cancelled", cancelled.data.sales.single().status)
     assertEquals(1, cancelled.data.saleItems.size)
-    assertEquals("لغو فروش فاکتور #1000", cancelled.data.auditLog.last().notes)
+    assertEquals("لغو فروش فاکتور #1", cancelled.data.auditLog.last().notes)
   }
 
   @Test
@@ -73,7 +73,7 @@ class SalesReturnTest {
     val back = cancelled.data.transactions.last()
     assertEquals("receive", back.type)
     assertEquals(3000.0, back.amount, 0.0)
-    assertEquals("لغو فروش — فاکتور #1000", back.notes)
+    assertEquals("لغو فروش — فاکتور #1", back.notes)
     assertEquals(3000.0, cancelled.data.sales.single().debtSettled, 0.0)
   }
 
@@ -109,7 +109,7 @@ class SalesReturnTest {
     assertEquals("customer_return", move.type)
     assertEquals(3.0, move.qty, 0.0)
 
-    assertEquals("مرجوعی به مبلغ 900 افغانی — فاکتور #1000", returned.data.auditLog.last().notes)
+    assertEquals("مرجوعی به مبلغ 900 افغانی — فاکتور #1", returned.data.auditLog.last().notes)
   }
 
   @Test
@@ -166,7 +166,7 @@ class SalesReturnTest {
     // ۳۰۰۰ بدهی، ۴ × ۳۰۰ = ۱۲۰۰ مرجوعی → ۱۸۰۰ می‌ماند
     assertEquals(1800.0, ShopStore.debt(returned.data, "d1"), 0.0)
     assertEquals(1200.0, returned.data.sales.single().debtSettled, 0.0)
-    assertEquals("مرجوعی کالا — فاکتور #1000", returned.data.transactions.last().notes)
+    assertEquals("مرجوعی کالا — فاکتور #1", returned.data.transactions.last().notes)
   }
 
   @Test

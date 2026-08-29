@@ -9,6 +9,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -137,8 +138,11 @@ fun SettingsRow(
     modifier
       .fillMaxWidth()
       .clip(Shape.chip)
+      // خطِ دورِ ردیف. کم‌رنگ است ولی هست: بدونش چند ردیفِ پشتِ سرِ هم
+      // یک تودهٔ یکدست می‌شوند و معلوم نیست هرکدام تا کجاست.
+      .border(1.dp, colors.fieldBorder.copy(alpha = 0.45f), Shape.chip)
       .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-      .padding(vertical = Space.sm, horizontal = Space.xs),
+      .padding(vertical = Space.sm, horizontal = Space.sm),
     verticalAlignment = Alignment.CenterVertically,
   ) {
     IconBubble(icon, tint, size = 34.dp)

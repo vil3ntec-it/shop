@@ -218,7 +218,12 @@ data class ShopData(
   val sales: List<Sale> = emptyList(),
   val saleItems: List<SaleItem> = emptyList(),
   @SerialName("returns") val saleReturns: List<SaleReturn> = emptyList(),
-  val nextInvoiceNo: Int = 1000,
+  // شمارهٔ فاکتور از یک شروع می‌شود. قبلاً از ۱۰۰۰ بود — عددی که فقط
+  // «بزرگ‌تر به نظر رسیدن» را می‌ساخت و برای دکان‌داری هیچ معنایی نداشت.
+  // دفترهای موجود شمارهٔ خودشان را نگه می‌دارند: شمارهٔ فاکتور در سابقهٔ
+  // عملیات و در حساب قرض‌داران نوشته شده و عوض کردنش آن ارجاع‌ها را
+  // می‌شکند.
+  val nextInvoiceNo: Int = 1,
   val suppliers: List<Supplier> = emptyList(),
   val purchases: List<Purchase> = emptyList(),
   val supplierPayments: List<SupplierPayment> = emptyList(),

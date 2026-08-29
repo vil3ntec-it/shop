@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -18,8 +19,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -168,6 +167,19 @@ fun AppRoot(
         onOpen = ::open,
       )
     },
+    /*
+     *  دکمهٔ شناور — یک بار، برای همهٔ صفحه‌ها.
+     *
+     *  در `floatingActionButton` اسکافولد می‌نشیند، پس خودِ اسکافولد
+     *  جایش را کنار می‌گذارد و روی کارت‌ها و دکمه‌های صفحه نمی‌افتد.
+     */
+    floatingActionButton = {
+      TohidSpeedDial(
+        onNewProduct = { editProduct = ProductFormState() },
+        onOpen = ::open,
+        modifier = Modifier.padding(bottom = 96.dp),
+      )
+    },
     // پیام‌ها از پایینِ صفحه بالا می‌آیند و بالای نوارِ ناوبری می‌ایستند
     snackbarHost = {
       TohidSnackbar(
@@ -304,19 +316,16 @@ fun AppRoot(
 /**
  *  نوارِ پایینِ شناور.
  *
- *  یک ظرفِ مستقل: یک قرصِ گرد که نشانِ برنامه و هر پنج مقصد داخلِ خودش‌اند
- *  و نشانگرِ نوری هم مالِ همین ظرف است، نه چیزی که رویش کشیده شده باشد.
+ *  یک ظرفِ مستقل: پنج مقصد و نشانگرِ نوری، همه داخلِ همین یک قرص.
  *
  *  **جای نشانگر از خودِ چیدمان خوانده می‌شود، نه از حساب دستی.** هر تب
- *  موقعیت و پهنای واقعی‌اش را با `onGloballyPositioned` گزارش می‌کند و
- *  منحنی از روی همان کشیده می‌شود. نسخهٔ قبلی جای تب‌ها را خودش حساب
- *  می‌کرد — پهنای نشان، فاصله‌های ظرف، وزنِ هر تب — و هر بار که یکی از
- *  آن‌ها عوض می‌شد، حساب با واقعیت فرق پیدا می‌کرد. حالا چیزی برای فرق
- *  کردن نمانده: مقصدِ منحنی همان مستطیلی است که تب واقعاً اشغال کرده.
+ *  موقعیت و پهنای واقعی‌اش را گزارش می‌کند و منحنی از روی همان کشیده
+ *  می‌شود؛ پس با هر پهنای صفحه و هر تعداد تب سرِ جایش است.
  *
- *  و منحنی از دو سرِ قرص فاصله می‌گیرد. سرِ قرص گِرد است؛ خطی که تا
- *  آخرین پیکسل برود، از زیرِ آن گِردی بیرون می‌زند — همان چیزی که در
- *  عکس‌ها بیرونِ نوار دیده می‌شد.
+ *  **ارتفاع‌ها دقیق‌اند، نه کسری از قد نوار.** ریلِ خط و تاجِ منحنی روی
+ *  عددهای مشخصی می‌نشینند و محتوای هر تب هم بینِ همان دو نوار جا
+ *  می‌گیرد. با کسر گرفتن از قدِ نوار، تاج روی آیکن‌ها می‌افتاد — همان
+ *  چیزی که دیده می‌شد.
  */
 @Composable
 private fun TohidNavBar(
@@ -325,29 +334,46 @@ private fun TohidNavBar(
   onPick: (String) -> Unit,
 ) {
   val colors = Shop.colors
-  val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
-  val barHeight = 78.dp
+
+  /*
+   *  چهار ارتفاعِ ثابت، و محتوا بینِ دوتای وسطی:
+   *    ۰ ────────────────────  لبهٔ بالای نوار
+   *   ۱۴ ── تاجِ منحنی
+   *   ۲۶ ── بالای آیکن
+   *   ۷۰ ── پایینِ برچسب
+   *   ۷۸ ── ریلِ خط
+   *   ۹۰ ────────────────────  لبهٔ پایین
+   */
+  val barHeight = 90.dp
+  val crestY = 14.dp
+  val railY = 78.dp
+  val contentTop = 26.dp
+  val contentBottom = barHeight - railY + 8.dp
   val shape = RoundedCornerShape(percent = 50)
 
-  // آنچه چیدمان گزارش می‌کند — همه در دستگاهِ مختصاتِ ریشه، تا ترتیبِ
-  // رسیدنِ گزارش‌ها مهم نباشد
   var barLeft by remember { mutableStateOf(0f) }
-  var brandInner by remember { mutableStateOf(0f) }
   val slots = remember { mutableStateMapOf<Int, Pair<Float, Float>>() }   // شاخص ← (مرکز، پهنا)
 
   val activeIndex = tabs.indexOfFirst { it.id == current }
   val target = slots[activeIndex]
 
-  // جای نشانگر نرم جابه‌جا می‌شود، نه اینکه بپرد
   val centerX by animateFloatAsState(
     targetValue = (target?.first ?: 0f) - barLeft,
-    animationSpec = tween(if (Motion.enabled) 320 else 0),
+    animationSpec = tween(if (Motion.enabled) 340 else 0),
     label = "navCenter",
   )
   val slotWidth by animateFloatAsState(
     targetValue = target?.second ?: 0f,
-    animationSpec = tween(if (Motion.enabled) 320 else 0),
+    animationSpec = tween(if (Motion.enabled) 340 else 0),
     label = "navWidth",
+  )
+  // بارِ اول، خط از کفِ نوار بالا می‌آید و سرِ جایش می‌نشیند
+  var arrived by remember { mutableStateOf(false) }
+  LaunchedEffect(Unit) { arrived = true }
+  val rise by animateFloatAsState(
+    targetValue = if (arrived) 1f else 0f,
+    animationSpec = tween(if (Motion.enabled) 520 else 0),
+    label = "navRise",
   )
 
   Box(
@@ -362,120 +388,84 @@ private fun TohidNavBar(
       .onGloballyPositioned { barLeft = it.positionInRoot().x },
   ) {
     /* ----------------------- نشانگرِ نوری ----------------------- */
-    if (activeIndex >= 0 && target != null && slotWidth > 0f) {
+    if (activeIndex >= 0 && target != null && slotWidth > 0f && rise > 0.01f) {
       val line = colors.primary
-      val brandEdge = brandInner - barLeft
       Canvas(Modifier.matchParentSize()) {
         val w = size.width
         val h = size.height
         val radius = h / 2f
-
-        /*
-         *  فاصله از دو سرِ قرص.
-         *
-         *  در فاصلهٔ `0.55r` از لبه، بلندترین و کوتاه‌ترین نقطهٔ خودِ قرص
-         *  حدودِ `0.11r` از بالا و پایین فاصله دارند؛ پس خطی که در این
-         *  محدوده کشیده شود، از گِردیِ سر بیرون نمی‌زند.
-         */
+        // خط تا سرِ گِردِ قرص نمی‌رود، وگرنه از زیرش بیرون می‌زند
         val inset = radius * 0.55f
 
-        // جهتِ جریان: از نشانِ برنامه به سرِ دیگر
-        val fromRight = brandEdge > w / 2f
-        val dir = if (fromRight) -1f else 1f
-        val head = brandEdge.coerceIn(inset, w - inset)
-        val tail = if (fromRight) inset else w - inset
+        val yRail = railY.toPx()
+        // تاج از کفِ نوار بالا می‌آید — همان بالا آمدنِ بارِ اول
+        val yCrest = yRail - (yRail - crestY.toPx()) * rise
 
-        val cx = centerX.coerceIn(inset, w - inset)
-        // پهنای برجستگی از پهنای واقعیِ همان تب می‌آید
+        val cx = centerX
         val crest = slotWidth * 0.30f
-        val rise = slotWidth * 0.28f
+        val ramp = slotWidth * 0.28f
 
-        val yBot = h * 0.86f
-        val yTop = h * 0.17f
+        val lo = inset + crest + ramp
+        val hi = w - inset - crest - ramp
+        val center = if (lo <= hi) cx.coerceIn(lo, hi) else w / 2f
 
-        // برجستگی باید کامل داخلِ نوار بماند، حتی برای تبِ اولی و آخری
-        val lo = minOf(head, tail) + crest + rise
-        val hi = maxOf(head, tail) - crest - rise
-        val center = if (lo <= hi) cx.coerceIn(lo, hi) else (lo + hi) / 2f
-
-        val inFoot = center - dir * (crest + rise)
-        val inTop = center - dir * crest
-        val outTop = center + dir * crest
-        val outFoot = center + dir * (crest + rise)
+        val inFoot = center - (crest + ramp)
+        val inTop = center - crest
+        val outTop = center + crest
+        val outFoot = center + (crest + ramp)
 
         /*
-         *  نشکستنِ منحنی یک قاعده دارد: در هر چهار نقطهٔ اتصال، مماسِ
-         *  ورودی و خروجی هر دو افقی باشند — یعنی نقطه‌های کنترلِ هر خم
-         *  روی همان ارتفاعِ خودِ نقطه بنشینند.
+         *  در هر چهار نقطهٔ اتصال، مماسِ ورودی و خروجی هر دو افقی‌اند —
+         *  نقطه‌های کنترلِ هر خم روی همان ارتفاعِ خودِ نقطه می‌نشینند.
+         *  همین است که منحنی را بی‌زاویه نگه می‌دارد.
          */
         val path = Path().apply {
-          moveTo(head, yBot)
-          lineTo(inFoot, yBot)
+          moveTo(inset, yRail)
+          lineTo(inFoot, yRail)
           cubicTo(
-            inFoot + dir * rise * 0.55f, yBot,
-            inTop - dir * rise * 0.55f, yTop,
-            inTop, yTop,
+            inFoot + ramp * 0.55f, yRail,
+            inTop - ramp * 0.55f, yCrest,
+            inTop, yCrest,
           )
-          lineTo(outTop, yTop)
+          lineTo(outTop, yCrest)
           cubicTo(
-            outTop + dir * rise * 0.55f, yTop,
-            outFoot - dir * rise * 0.55f, yBot,
-            outFoot, yBot,
+            outTop + ramp * 0.55f, yCrest,
+            outFoot - ramp * 0.55f, yRail,
+            outFoot, yRail,
           )
-          lineTo(tail, yBot)
+          lineTo(w - inset, yRail)
         }
 
-        // دورِ تبِ باز پررنگ، و هرچه دورتر محو‌تر
-        val axis = tail - head
-        fun frac(x: Float) = if (axis == 0f) 0f else ((x - head) / axis).coerceIn(0f, 1f)
-        val f0 = (frac(inFoot) - 0.06f).coerceIn(0.02f, 0.90f)
-        val f1 = (frac(outFoot) + 0.06f).coerceIn(f0 + 0.02f, 0.96f)
+        // دورِ تبِ باز پررنگ، و هرچه دورتر محو‌تر — به هر دو سو
+        val span = (w - 2 * inset).coerceAtLeast(1f)
+        fun frac(x: Float) = ((x - inset) / span).coerceIn(0f, 1f)
+        val f0 = (frac(inFoot) - 0.10f).coerceIn(0f, 1f)
+        val f1 = (frac(outFoot) + 0.10f).coerceIn(f0 + 0.02f, 1f)
 
         fun brush(alpha: Float) = Brush.linearGradient(
           colorStops = arrayOf(
-            0f to line.copy(alpha = alpha * 0.30f),
+            0f to line.copy(alpha = alpha * 0.12f),
             f0 to line.copy(alpha = alpha),
             f1 to line.copy(alpha = alpha),
-            1f to line.copy(alpha = 0f),
+            1f to line.copy(alpha = alpha * 0.12f),
           ),
-          start = Offset(head, 0f),
-          end = Offset(tail, 0f),
+          start = Offset(inset, 0f),
+          end = Offset(w - inset, 0f),
         )
 
-        // هالهٔ کم‌رنگ زیرِ خط: خطِ یک‌نقطه‌ای روی زمینهٔ تیره گم می‌شود
-        drawPath(path, brush(0.20f), style = Stroke(7.dp.toPx(), cap = StrokeCap.Round))
-        drawPath(path, brush(1f), style = Stroke(1.7.dp.toPx(), cap = StrokeCap.Round))
+        // سه لایه: هالهٔ پهن، هالهٔ نزدیک، و خودِ خط. نور از همین
+        // لایه‌لایه بودن می‌آید؛ یک خطِ تنها فقط یک خط است.
+        drawPath(path, brush(0.10f * rise), style = Stroke(14.dp.toPx(), cap = StrokeCap.Round))
+        drawPath(path, brush(0.22f * rise), style = Stroke(6.dp.toPx(), cap = StrokeCap.Round))
+        drawPath(path, brush(1f * rise), style = Stroke(1.8.dp.toPx(), cap = StrokeCap.Round))
       }
     }
 
-    /* -------------------- نشانِ برنامه و تب‌ها -------------------- */
+    /* ---------------------------- تب‌ها ---------------------------- */
     Row(
-      Modifier.fillMaxSize().padding(horizontal = 5.dp),
+      Modifier.fillMaxSize().padding(horizontal = 6.dp),
       verticalAlignment = Alignment.CenterVertically,
     ) {
-      Box(
-        Modifier
-          .size(54.dp)
-          .onGloballyPositioned {
-            // لبهٔ داخلیِ نشان — خط از همین‌جا شروع می‌شود، نه از زیرش.
-            // نشان اولین چیزِ ردیف است، پس در راست‌به‌چپ سمتِ راست
-            // می‌نشیند و لبهٔ داخلی‌اش چپِ خودش است؛ در چپ‌به‌راست
-            // برعکس.
-            val left = it.positionInRoot().x
-            brandInner = if (rtl) left else left + it.size.width
-          }
-          .clip(RoundedCornerShape(27.dp))
-          .background(colors.surface2),
-        contentAlignment = Alignment.Center,
-      ) {
-        Icon(
-          Icons.Filled.Storefront,
-          contentDescription = "توحید",
-          tint = colors.primary,
-          modifier = Modifier.size(21.dp),
-        )
-      }
-
       tabs.forEachIndexed { index, t ->
         val active = current == t.id
         val fade by animateFloatAsState(
@@ -494,20 +484,19 @@ private fun TohidNavBar(
           Modifier
             .weight(1f)
             .fillMaxHeight()
-            // همین یک خط، جای نشانگر را تعیین می‌کند
+            // همین یک خط جای نشانگر را تعیین می‌کند
             .onGloballyPositioned {
               slots[index] = (it.positionInRoot().x + it.size.width / 2f) to it.size.width.toFloat()
             }
-            .clip(RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(22.dp))
             .clickable(
               interactionSource = remember { MutableInteractionSource() },
               indication = null,
               onClick = { onPick(t.id) },
             )
-            // تبِ باز کمی بالا می‌آید تا داخلِ برجستگی بنشیند، نه رویش.
-            // این فاصله داخلِ خانهٔ خودِ تب است، پس جای تب‌های دیگر تکان
-            // نمی‌خورد.
-            .padding(bottom = (9 * fade).dp),
+            // محتوا بینِ تاج و ریل می‌نشیند، پس خط هیچ‌وقت روی آیکن
+            // نمی‌افتد — چه تبِ اول باشد چه آخر
+            .padding(top = contentTop, bottom = contentBottom),
           horizontalAlignment = Alignment.CenterHorizontally,
           verticalArrangement = Arrangement.Center,
         ) {
@@ -520,7 +509,6 @@ private fun TohidNavBar(
               .graphicsLayer { scaleX = lift; scaleY = lift },
           )
           Spacer(Modifier.height(4.dp))
-          // نقطهٔ زیرِ آیکنِ تبِ باز
           Box(
             Modifier
               .size(4.dp)
@@ -537,6 +525,90 @@ private fun TohidNavBar(
           )
         }
       }
+    }
+  }
+}
+
+/* ========================== دکمهٔ شناور ========================== */
+
+/**
+ *  کارهای پرتکرار، از هر صفحه‌ای.
+ *
+ *  تا حالا هر صفحه دکمهٔ افزودنِ خودش را داشت و صفحه‌هایی که نداشتند —
+ *  گزارش، رسیدها، سابقه — هیچ راهِ کوتاهی نداشتند. حالا یک دکمه هست که
+ *  همه‌جا هست و باز که شود، پنج کارِ روزمره را نشان می‌دهد.
+ *
+ *  جایش را اسکافولد تعیین می‌کند، نه ما: به همین دلیل روی کارت‌ها و
+ *  دکمه‌های خودِ صفحه نمی‌افتد و بالای نوارِ پایین می‌ایستد.
+ */
+@Composable
+private fun TohidSpeedDial(
+  onNewProduct: () -> Unit,
+  onOpen: (String) -> Unit,
+  modifier: Modifier = Modifier,
+) {
+  var open by remember { mutableStateOf(false) }
+  val spin by animateFloatAsState(
+    targetValue = if (open) 135f else 0f,
+    animationSpec = tween(if (Motion.enabled) 220 else 0),
+    label = "fabSpin",
+  )
+  val colors = Shop.colors
+
+  Column(modifier, horizontalAlignment = Alignment.End) {
+    AnimatedVisibility(
+      visible = open,
+      enter = fadeIn(tween(160)) + slideInVertically(tween(200)) { it / 3 },
+      exit = fadeOut(tween(120)),
+    ) {
+      Column(horizontalAlignment = Alignment.End) {
+        SpeedAction("فروش سریع", Icons.Filled.PointOfSale, colors.primary) { open = false; onOpen("sale") }
+        SpeedAction("محصول جدید", Icons.Filled.ShoppingBag, colors.accent) { open = false; onNewProduct() }
+        SpeedAction("ورود کالا به انبار", Icons.Filled.Inventory2, colors.success) { open = false; onOpen("warehouse") }
+        SpeedAction("قرض‌دار تازه", Icons.Filled.Groups, colors.warning) { open = false; onOpen("debtors") }
+        SpeedAction("ثبت مصرف", Icons.Filled.Payments, colors.danger) { open = false; onOpen("expenses") }
+        Spacer(Modifier.height(10.dp))
+      }
+    }
+    FloatingActionButton(
+      onClick = { open = !open },
+      containerColor = colors.primary,
+      contentColor = Color.White,
+    ) {
+      Icon(
+        Icons.Filled.Add,
+        contentDescription = if (open) "بستن" else "افزودن",
+        modifier = Modifier.graphicsLayer { rotationZ = spin },
+      )
+    }
+  }
+}
+
+@Composable
+private fun SpeedAction(
+  text: String,
+  icon: ImageVector,
+  tint: Color,
+  onClick: () -> Unit,
+) {
+  val colors = Shop.colors
+  Row(
+    Modifier
+      .padding(bottom = 10.dp)
+      .clip(RoundedCornerShape(24.dp))
+      .background(colors.surface)
+      .border(1.dp, colors.fieldBorder.copy(alpha = 0.5f), RoundedCornerShape(24.dp))
+      .clickable(onClick = onClick)
+      .padding(start = 14.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+    verticalAlignment = Alignment.CenterVertically,
+  ) {
+    Text(text, style = MaterialTheme.typography.labelLarge, color = colors.text)
+    Spacer(Modifier.width(10.dp))
+    Box(
+      Modifier.size(32.dp).clip(RoundedCornerShape(16.dp)).background(tint.copy(alpha = 0.18f)),
+      contentAlignment = Alignment.Center,
+    ) {
+      Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(17.dp))
     }
   }
 }
