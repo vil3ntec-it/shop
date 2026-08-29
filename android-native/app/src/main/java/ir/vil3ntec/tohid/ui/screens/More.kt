@@ -43,7 +43,6 @@ fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
   val repo = remember { prefs.getString("update_repo", "vil3ntec-it/shop") ?: "vil3ntec-it/shop" }
   var status by remember { mutableStateOf<String?>(null) }
   var found by remember { mutableStateOf<Updater.Release?>(null) }
-  var progress by remember { mutableStateOf(-1) }
   var busy by remember { mutableStateOf(false) }
 
   Column(
@@ -136,21 +135,6 @@ fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
       Spacer(Modifier.height(12.dp))
 
 
-      if (progress in 0..100) {
-        LinearProgressIndicator(
-          progress = { progress / 100f },
-          modifier = Modifier.fillMaxWidth(),
-          color = Shop.colors.primary,
-        )
-        Spacer(Modifier.height(6.dp))
-        Text(
-          "در حال دانلود… ${progress.fa()}٪",
-          style = MaterialTheme.typography.labelSmall,
-          color = Shop.colors.muted,
-        )
-        Spacer(Modifier.height(12.dp))
-      }
-
       val release = found
       if (release == null) {
         Button(
@@ -185,21 +169,19 @@ fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
         }
         Spacer(Modifier.height(12.dp))
         Button(
-          enabled = !busy,
           onClick = {
-            busy = true; progress = 0
-            scope.launch {
-              Updater.download(context, release) { progress = it }
-                .onSuccess {
-                  progress = -1
-                  Updater.install(context, it)
-                }
-                .onFailure { status = it.message ?: "دانلود ناموفق بود"; progress = -1 }
-              busy = false
-            }
+            Updater.openDownload(context, release)
+              .onFailure { status = "مرورگری برای گرفتن فایل پیدا نشد" }
           },
           modifier = Modifier.fillMaxWidth(),
-        ) { Text("دانلود و نصب") }
+        ) { Text("گرفتن نسخهٔ تازه") }
+        Spacer(Modifier.height(8.dp))
+        Text(
+          "فایل با مرورگر گرفته می‌شود و بعد از دانلود، روی همان بزنید تا نصب شود. " +
+            "این کار عمداً به مرورگر سپرده شده تا خودِ برنامه اجازهٔ نصبِ برنامهٔ دیگر نخواهد.",
+          style = MaterialTheme.typography.labelSmall,
+          color = Shop.colors.muted2,
+        )
       }
 
       status?.let {

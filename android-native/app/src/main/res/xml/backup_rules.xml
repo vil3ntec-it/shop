@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     پشتیبانِ خودکارِ اندروید (اندروید ۱۲ به بالا).
+
+     دفترِ دکان پشتیبان گرفته می‌شود تا گوشیِ تازه با همان اطلاعات بالا
+     بیاید. ولی توکنِ ورود نه: توکن مالِ همان دستگاه است و بردنش به
+     دستگاهِ دیگر یعنی نشستنِ یک نشستِ باز روی گوشی‌ای که شاید مالِ کسِ
+     دیگری باشد.
+-->
+<data-extraction-rules>
+  <cloud-backup>
+    <include domain="file" path="." />
+    <exclude domain="sharedpref" path="tohid-sync.xml" />
+  </cloud-backup>
+  <device-transfer>
+    <include domain="file" path="." />
+    <exclude domain="sharedpref" path="tohid-sync.xml" />
+  </device-transfer>
+</data-extraction-rules>

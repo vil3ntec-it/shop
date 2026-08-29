@@ -2,19 +2,26 @@ package ir.vil3ntec.tohid.update
 
 import android.content.Context
 import android.content.Intent
-import androidx.core.content.FileProvider
+import android.net.Uri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
-import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- *  به‌روزرسانی از GitHub — بدونِ Android Studio، بدونِ فروشگاه.
+ *  به‌روزرسانی — بدونِ Android Studio، بدونِ فروشگاه.
  *
- *  آخرین Release مخزن خوانده می‌شود، فایلِ APK آن گرفته می‌شود و به خودِ
- *  اندروید داده می‌شود تا نصبش کند.
+ *  آخرین انتشار خوانده می‌شود و اگر تازه‌تر بود، نشانیِ فایلش به مرورگر
+ *  داده می‌شود.
+ *
+ *  **چرا مرورگر و نه نصبِ داخلِ برنامه.** برای اینکه برنامه خودش فایل را
+ *  بنشاند، باید اجازهٔ `REQUEST_INSTALL_PACKAGES` می‌داشت — یعنی «این
+ *  برنامه می‌تواند برنامهٔ دیگری روی گوشی نصب کند». همان اجازه بود که
+ *  گوشی سرِ هر نصب هشدار می‌داد و می‌پرسید از این منبع اجازه هست یا نه،
+ *  و همان الگویی است که سنجشگرهای گوگل به آن حساس‌اند. مرورگر خودش این
+ *  اجازه را دارد؛ کار همان‌قدر انجام می‌شود و برنامهٔ دکان چنین توانی
+ *  ندارد.
  *
  *  دو چیز که عمداً این‌طوری‌اند:
  *    • نسخهٔ پیش‌نمایش هم دیده می‌شود. /releases/latest نسخه‌های پیش‌نمایش را
@@ -96,54 +103,15 @@ object Updater {
   }
 
   /**
-   * دانلود با گزارشِ پیشرفت. فایل در پوشهٔ خودِ برنامه می‌نشیند تا اجازهٔ
-   * حافظهٔ گوشی لازم نشود.
+   *  نشانیِ فایل را به مرورگر می‌دهد.
+   *
+   *  از این‌جا به بعد کارِ مرورگر است: می‌گیردش و خودش به نصب‌کنندهٔ
+   *  اندروید می‌سپاردش. برنامهٔ دکان نه فایل را نگه می‌دارد نه اجازهٔ
+   *  نصبی دارد.
    */
-  suspend fun download(
-    context: Context,
-    release: Release,
-    onProgress: (Int) -> Unit,
-  ): Result<File> = withContext(Dispatchers.IO) {
-    runCatching {
-      val dir = File(context.cacheDir, "updates").apply { mkdirs() }
-      dir.listFiles()?.forEach { it.delete() }          // نسخه‌های قبلی جا نگیرند
-      val out = File(dir, "tohid-${release.version}.apk")
-
-      val conn = (URL(release.apkUrl).openConnection() as HttpURLConnection).apply {
-        instanceFollowRedirects = true
-        connectTimeout = 20000
-        readTimeout = 60000
-      }
-      conn.inputStream.use { input ->
-        out.outputStream().use { output ->
-          val total = if (release.size > 0) release.size else conn.contentLengthLong
-          val buffer = ByteArray(64 * 1024)
-          var done = 0L
-          var last = -1
-          while (true) {
-            val n = input.read(buffer)
-            if (n <= 0) break
-            output.write(buffer, 0, n)
-            done += n
-            if (total > 0) {
-              val pct = ((done * 100) / total).toInt()
-              if (pct != last) { last = pct; onProgress(pct) }
-            }
-          }
-        }
-      }
-      conn.disconnect()
-      if (out.length() < 100_000) throw IllegalStateException("فایل ناقص دانلود شد")
-      out
-    }
-  }
-
-  /** فایل را به نصب‌کنندهٔ اندروید می‌دهد */
-  fun install(context: Context, apk: File) {
-    val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", apk)
-    val intent = Intent(Intent.ACTION_VIEW).apply {
-      setDataAndType(uri, "application/vnd.android.package-archive")
-      addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+  fun openDownload(context: Context, release: Release): Result<Unit> = runCatching {
+    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(release.apkUrl)).apply {
+      addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
     context.startActivity(intent)
   }
