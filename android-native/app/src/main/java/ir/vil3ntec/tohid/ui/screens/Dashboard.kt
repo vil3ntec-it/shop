@@ -130,58 +130,85 @@ fun DashboardScreen(d: ShopData, onOpen: (String) -> Unit = {}) {
       .groupBy { it.date }
       .maxOfOrNull { (_, list) -> list.sumOf { it.finalTotal } } ?: 0.0
 
-    TohidCard(glow = true) {
-      Row(
-        Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceEvenly,
-        verticalAlignment = Alignment.CenterVertically,
-      ) {
-        StatRing(
-          label = "فروش امروز",
-          value = money(animatedMoney(todayTotal)),
-          caption = "افغانی",
-          // نسبت به بهترین روزِ همین ماه — سقفی که خودِ دکان ساخته
-          fraction = if (bestDay > 0) (todayTotal / bestDay).toFloat() else 0f,
-          tint = Shop.colors.primary,
-        )
-        StatRing(
-          label = "سود امروز",
-          value = money(animatedMoney(todayProfit)),
-          caption = "افغانی",
-          fraction = if (todayTotal > 0) (todayProfit / todayTotal).toFloat().coerceAtLeast(0f) else 0f,
-          tint = if (todayProfit >= 0) Shop.colors.success else Shop.colors.danger,
-        )
-      }
-      Spacer(Modifier.height(14.dp))
-      Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(
-          "فروش این ماه",
-          style = MaterialTheme.typography.labelMedium,
-          color = Shop.colors.muted,
-        )
-        TohidMoneyText(amount = monthSalesTotal, tint = Shop.colors.text)
+    /*
+     *  بالای صفحه.
+     *
+     *  روی گوشی زیرِ هم، روی تبلت کنارِ هم. کارتِ حلقه‌ها روی صفحهٔ پهن
+     *  تنها می‌ماند و دو طرفش خالی؛ کنارش گذاشتنِ دو کارتِ طلب و بدهی،
+     *  همان جای خالی را با چیزی پر می‌کند که فروشنده هر روز می‌خواهد
+     *  ببیند.
+     */
+    val rings: @Composable () -> Unit = {
+      TohidCard(glow = true) {
+        Row(
+          Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.SpaceEvenly,
+          verticalAlignment = Alignment.CenterVertically,
+        ) {
+          StatRing(
+            label = "فروش امروز",
+            value = money(animatedMoney(todayTotal)),
+            caption = "افغانی",
+            // نسبت به بهترین روزِ همین ماه — سقفی که خودِ دکان ساخته
+            fraction = if (bestDay > 0) (todayTotal / bestDay).toFloat() else 0f,
+            tint = Shop.colors.primary,
+          )
+          StatRing(
+            label = "سود امروز",
+            value = money(animatedMoney(todayProfit)),
+            caption = "افغانی",
+            fraction = if (todayTotal > 0) (todayProfit / todayTotal).toFloat().coerceAtLeast(0f) else 0f,
+            tint = if (todayProfit >= 0) Shop.colors.success else Shop.colors.danger,
+          )
+        }
+        Spacer(Modifier.height(14.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+          Text(
+            "فروش این ماه",
+            style = MaterialTheme.typography.labelMedium,
+            color = Shop.colors.muted,
+          )
+          TohidMoneyText(amount = monthSalesTotal, tint = Shop.colors.text)
+        }
       }
     }
-    Spacer(Modifier.height(14.dp))
 
-    /* ------------------------ طلب و بدهی ------------------------ */
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    val owedCard: @Composable (Modifier) -> Unit = { m ->
       TohidStatCard(
         label = "طلب از مشتریان",
         value = "${money(animatedMoney(totalDebt))} افغانی",
         tint = if (totalDebt > 0) Shop.colors.warning else Shop.colors.success,
         hint = "${owing.size.fa()} قرض‌دار",
-        modifier = Modifier.weight(1f),
+        modifier = m,
         onClick = { onOpen("debtors") },
       )
+    }
+    val supplierCard: @Composable (Modifier) -> Unit = { m ->
       TohidStatCard(
         label = "بدهی به تأمین‌کننده",
         value = "${money(animatedMoney(supplierDebt))} افغانی",
         tint = if (supplierDebt > 0) Shop.colors.danger else Shop.colors.success,
         hint = "پرداخت‌نشده",
-        modifier = Modifier.weight(1f),
+        modifier = m,
         onClick = { onOpen("purchasing") },
       )
+    }
+
+    if (isTablet()) {
+      Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+        Box(Modifier.weight(1f)) { rings() }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+          owedCard(Modifier.fillMaxWidth())
+          supplierCard(Modifier.fillMaxWidth())
+        }
+      }
+    } else {
+      rings()
+      Spacer(Modifier.height(14.dp))
+      Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        owedCard(Modifier.weight(1f))
+        supplierCard(Modifier.weight(1f))
+      }
     }
 
     /* --------------------------- میان‌برها --------------------------- */
@@ -197,156 +224,197 @@ fun DashboardScreen(d: ShopData, onOpen: (String) -> Unit = {}) {
       ShortcutCard(Icons.Filled.BarChart, "گزارش‌ها", Shop.colors.success, Modifier.weight(1f)) { onOpen("reports") }
     }
 
-    /* -------------------------- نیاز به توجه -------------------------- */
-    // چیزهایی که همین امروز باید یک کاری برایشان کرد. اگر چیزی نیست،
-    // این بخش اصلاً نمی‌آید — پنل خالیِ «همه‌چیز خوب است» فقط جا می‌گیرد.
+    /* ---------------------------- پنل‌ها ---------------------------- */
+    /*
+     *  روی گوشی زیرِ هم، روی تبلت دو ستون.
+     *
+     *  ستونِ یگانه روی صفحهٔ پهن دو ایراد داشت: عنوان و عددِ هر ردیف به
+     *  دو لبهٔ مخالف می‌چسبیدند و وسطشان یک دستِ خالی می‌ماند، و برای
+     *  دیدنِ پنلِ ششم باید خیلی اسکرول می‌شد در حالی که نصفِ صفحه بی‌کار
+     *  بود. دو ستون هر دو را حل می‌کند.
+     */
+    Spacer(Modifier.height(16.dp))
+
     val attention = buildList {
       outOfStock.take(3).forEach { add(Triple(it.name, "تمام‌شده", "products")) }
       lowStock.take(3).forEach { add(Triple(it.name, "موجودی کم", "products")) }
       owing.take(2).forEach { add(Triple(it.first.name, "${money(it.second)} افغانی طلب", "debtors")) }
     }
-    if (attention.isNotEmpty()) {
-      Spacer(Modifier.height(16.dp))
-      Panel {
-        PanelHead("نیاز به توجه", "${attention.size.fa()} مورد")
-        Spacer(Modifier.height(10.dp))
-        attention.forEach { (name, note, target) ->
-          LineRow(
-            name,
-            note,
-            if (note == "تمام‌شده") Shop.colors.danger else Shop.colors.warning,
-            onClick = { onOpen(target) },
+
+    val panels = buildList<@Composable () -> Unit> {
+      // «نیاز به توجه» فقط وقتی می‌آید که واقعاً چیزی هست؛ پنلِ خالیِ
+      // «همه‌چیز خوب است» فقط جا می‌گیرد
+      if (attention.isNotEmpty()) add {
+        Panel {
+          PanelHead("نیاز به توجه", "${attention.size.fa()} مورد")
+          Spacer(Modifier.height(10.dp))
+          attention.forEach { (name, note, target) ->
+            LineRow(
+              name,
+              note,
+              if (note == "تمام‌شده") Shop.colors.danger else Shop.colors.warning,
+              onClick = { onOpen(target) },
+            )
+          }
+        }
+      }
+
+      add {
+        Panel {
+          PanelHead("مصارف اخیر", "مشاهده همه") { onOpen("expenses") }
+          Spacer(Modifier.height(8.dp))
+          val recent = d.expenses.sortedByDescending { it.createdAt }.take(5)
+          if (recent.isEmpty()) {
+            EmptyNote("هنوز اطلاعاتی ثبت نشده")
+          } else {
+            recent.forEach { e ->
+              LineRow(
+                e.title.ifBlank { e.category.ifBlank { "مصرف" } },
+                "${money(e.amount)} افغانی",
+                Shop.colors.warning,
+                detail = formatDate(e.date),
+              )
+            }
+          }
+        }
+      }
+
+      add {
+        Panel {
+          PanelHead("قرض‌داران", "مشاهده همه") { onOpen("debtors") }
+          Spacer(Modifier.height(8.dp))
+          if (owing.isEmpty()) {
+            EmptyNote("هنوز اطلاعاتی ثبت نشده")
+          } else {
+            owing.take(5).forEach { (debtor, amount) ->
+              LineRow(debtor.name, "${money(amount)} افغانی", Shop.colors.danger)
+            }
+          }
+        }
+      }
+
+      add {
+        Panel {
+          PanelHead("وضعیت انبار", "مشاهده همه") { onOpen("products") }
+          Spacer(Modifier.height(10.dp))
+          ChipRow(
+            listOf(
+              "تعداد محصولات" to warehouse.products.fa(),
+              "تعداد کارتن" to qty(warehouse.cartons),
+              "تعداد واحد" to qty(warehouse.units),
+              "ارزش تقریبی موجودی" to "${money(warehouse.value)} افغانی",
+            )
+          )
+          if (lowStock.isNotEmpty() || outOfStock.isNotEmpty()) {
+            Spacer(Modifier.height(10.dp))
+            (outOfStock + lowStock).take(5).forEach { p ->
+              val out = ShopStore.stockStatus(d, p) == "out"
+              LineRow(
+                p.name,
+                if (out) "تمام‌شده" else "موجودی کم",
+                if (out) Shop.colors.danger else Shop.colors.warning,
+                detail = "${qty(ShopStore.stock(d, p.id))}${if (p.unit.isNotBlank()) " ${p.unit}" else ""}",
+              )
+            }
+          }
+        }
+      }
+
+      add {
+        Panel {
+          PanelHead("روند معاملات", "این ماه")
+          Spacer(Modifier.height(12.dp))
+          val monthSales = d.sales.filter { it.status != "cancelled" && it.date.startsWith(monthPrefix) }
+          if (monthSales.isEmpty()) {
+            EmptyNote("هنوز فروشی ثبت نشده")
+          } else {
+            val byDay = monthSales.groupBy { it.date }.mapValues { (_, list) -> list.sumOf { it.finalTotal } }
+            TrendChart(byDay.toSortedMap().values.toList())
+            Spacer(Modifier.height(8.dp))
+            Text(
+              "جمع ماه: ${money(byDay.values.sum())} افغانی",
+              style = MaterialTheme.typography.labelMedium,
+              color = Shop.colors.muted,
+            )
+          }
+        }
+      }
+
+      add {
+        Panel {
+          PanelHead("مصارف بر اساس دسته", "این ماه")
+          Spacer(Modifier.height(8.dp))
+          val byCategory = d.expenses
+            .filter { it.date.startsWith(monthPrefix) }
+            .groupBy { it.category.ifBlank { "بدون دسته" } }
+            .mapValues { (_, list) -> list.sumOf { it.amount } }
+            .toList()
+            .sortedByDescending { it.second }
+          if (byCategory.isEmpty()) {
+            EmptyNote("این ماه مصرفی ثبت نشده")
+          } else {
+            val max = byCategory.first().second
+            byCategory.take(6).forEach { (name, amount) ->
+              CategoryBar(name, amount, if (max > 0) (amount / max).toFloat() else 0f)
+            }
+          }
+        }
+      }
+
+      add {
+        Panel {
+          PanelHead("خلاصه امروز", formatDate(today))
+          Spacer(Modifier.height(10.dp))
+          ChipRow(
+            listOf(
+              "فروش امروز" to "${money(todayTotal)} افغانی",
+              "تعداد فروش امروز" to todaySales.size.fa(),
+              "سود امروز" to "${money(todayProfit)} افغانی",
+              "مصارف امروز" to "${money(todayExpense)} افغانی",
+            )
+          )
+          Spacer(Modifier.height(8.dp))
+          ChipRow(
+            listOf(
+              "بدهی تأمین‌کنندگان" to "${money(supplierDebt)} افغانی",
+              "کالاهای کم‌موجودی" to lowStock.size.fa(),
+              "کالاهای تمام‌شده" to outOfStock.size.fa(),
+            )
           )
         }
       }
     }
 
-    /* ------------------------- مصارف اخیر ------------------------- */
-    Spacer(Modifier.height(14.dp))
-    Panel {
-      PanelHead("مصارف اخیر", "مشاهده همه") { onOpen("expenses") }
-      Spacer(Modifier.height(8.dp))
-      val recent = d.expenses.sortedByDescending { it.createdAt }.take(5)
-      if (recent.isEmpty()) {
-        EmptyNote("هنوز اطلاعاتی ثبت نشده")
-      } else {
-        recent.forEach { e ->
-          LineRow(
-            e.title.ifBlank { e.category.ifBlank { "مصرف" } },
-            "${money(e.amount)} افغانی",
-            Shop.colors.warning,
-            detail = formatDate(e.date),
-          )
-        }
-      }
-    }
+    PanelGrid(panels)
 
-    /* -------------------------- قرض‌داران -------------------------- */
-    Spacer(Modifier.height(14.dp))
-    Panel {
-      PanelHead("قرض‌داران", "مشاهده همه") { onOpen("debtors") }
-      Spacer(Modifier.height(8.dp))
-      if (owing.isEmpty()) {
-        EmptyNote("هنوز اطلاعاتی ثبت نشده")
-      } else {
-        owing.take(5).forEach { (debtor, amount) ->
-          LineRow(debtor.name, "${money(amount)} افغانی", Shop.colors.danger)
-        }
-      }
-    }
-
-    /* ------------------------- وضعیت انبار ------------------------- */
-    Spacer(Modifier.height(14.dp))
-    Panel {
-      PanelHead("وضعیت انبار", "مشاهده همه") { onOpen("products") }
-      Spacer(Modifier.height(10.dp))
-      ChipRow(
-        listOf(
-          "تعداد محصولات" to warehouse.products.fa(),
-          "تعداد کارتن" to qty(warehouse.cartons),
-          "تعداد واحد" to qty(warehouse.units),
-          "ارزش تقریبی موجودی" to "${money(warehouse.value)} افغانی",
-        )
-      )
-      if (lowStock.isNotEmpty() || outOfStock.isNotEmpty()) {
-        Spacer(Modifier.height(10.dp))
-        (outOfStock + lowStock).take(5).forEach { p ->
-          val out = ShopStore.stockStatus(d, p) == "out"
-          LineRow(
-            p.name,
-            if (out) "تمام‌شده" else "موجودی کم",
-            if (out) Shop.colors.danger else Shop.colors.warning,
-            detail = "${qty(ShopStore.stock(d, p.id))}${if (p.unit.isNotBlank()) " ${p.unit}" else ""}",
-          )
-        }
-      }
-    }
-
-    /* ------------------------ روند معاملات ------------------------ */
-    Spacer(Modifier.height(16.dp))
-    Panel {
-      PanelHead("روند معاملات", "این ماه")
-      Spacer(Modifier.height(12.dp))
-      val monthSales = d.sales.filter { it.status != "cancelled" && it.date.startsWith(monthPrefix) }
-      if (monthSales.isEmpty()) {
-        EmptyNote("هنوز فروشی ثبت نشده")
-      } else {
-        val byDay = monthSales.groupBy { it.date }.mapValues { (_, list) -> list.sumOf { it.finalTotal } }
-        TrendChart(byDay.toSortedMap().values.toList())
-        Spacer(Modifier.height(8.dp))
-        Text(
-          "جمع ماه: ${money(byDay.values.sum())} افغانی",
-          style = MaterialTheme.typography.labelMedium,
-          color = Shop.colors.muted,
-        )
-      }
-    }
-
-    /* --------------------- مصارف بر اساس دسته --------------------- */
-    Spacer(Modifier.height(14.dp))
-    Panel {
-      PanelHead("مصارف بر اساس دسته", "این ماه")
-      Spacer(Modifier.height(8.dp))
-      val byCategory = d.expenses
-        .filter { it.date.startsWith(monthPrefix) }
-        .groupBy { it.category.ifBlank { "بدون دسته" } }
-        .mapValues { (_, list) -> list.sumOf { it.amount } }
-        .toList()
-        .sortedByDescending { it.second }
-      if (byCategory.isEmpty()) {
-        EmptyNote("این ماه مصرفی ثبت نشده")
-      } else {
-        val max = byCategory.first().second
-        byCategory.take(6).forEach { (name, amount) ->
-          CategoryBar(name, amount, if (max > 0) (amount / max).toFloat() else 0f)
-        }
-      }
-    }
-
-    /* ------------------------- خلاصهٔ امروز ------------------------- */
-    Spacer(Modifier.height(14.dp))
-    Panel {
-      PanelHead("خلاصه امروز", formatDate(today))
-      Spacer(Modifier.height(10.dp))
-      ChipRow(
-        listOf(
-          "فروش امروز" to "${money(todayTotal)} افغانی",
-          "تعداد فروش امروز" to todaySales.size.fa(),
-          "سود امروز" to "${money(todayProfit)} افغانی",
-          "مصارف امروز" to "${money(todayExpense)} افغانی",
-        )
-      )
-      Spacer(Modifier.height(8.dp))
-      ChipRow(
-        listOf(
-          "بدهی تأمین‌کنندگان" to "${money(supplierDebt)} افغانی",
-          "کالاهای کم‌موجودی" to lowStock.size.fa(),
-          "کالاهای تمام‌شده" to outOfStock.size.fa(),
-        )
-      )
-    }
 
     Spacer(Modifier.height(24.dp))
+  }
+}
+
+/**
+ *  پنل‌ها — روی گوشی یک ستون، روی تبلت دو ستون.
+ *
+ *  پخش‌شدن یکی‌درمیان است نه «نصفِ اول در ستونِ راست»: پنل‌ها قدهای
+ *  متفاوتی دارند و اگر پشتِ سرِ هم در یک ستون بریزند، یک ستون بلند و
+ *  آن یکی کوتاه می‌شود. یکی‌درمیان، دو ستون تقریباً هم‌قد درمی‌آیند.
+ */
+@Composable
+private fun PanelGrid(panels: List<@Composable () -> Unit>) {
+  val gap = 14.dp
+  if (!isTablet()) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(gap)) {
+      panels.forEach { it() }
+    }
+    return
+  }
+  Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(gap)) {
+    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(gap)) {
+      panels.filterIndexed { i, _ -> i % 2 == 0 }.forEach { it() }
+    }
+    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(gap)) {
+      panels.filterIndexed { i, _ -> i % 2 == 1 }.forEach { it() }
+    }
   }
 }
 
@@ -387,6 +455,16 @@ private fun LineRow(
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.SpaceBetween,
   ) {
+    // نشانِ رنگیِ ریزِ سرِ ردیف. در ردیفی که عنوانش یک سر و عددش سرِ
+    // دیگر است، همین نقطه چشم را نگه می‌دارد تا خطِ خالیِ وسط، دو طرف
+    // را از هم جدا نکند.
+    Box(
+      Modifier
+        .size(width = 3.dp, height = 18.dp)
+        .clip(RoundedCornerShape(2.dp))
+        .background(tint.copy(alpha = 0.55f))
+    )
+    Spacer(Modifier.width(10.dp))
     Column(Modifier.weight(1f)) {
       Text(title, style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text)
       if (detail != null) {
