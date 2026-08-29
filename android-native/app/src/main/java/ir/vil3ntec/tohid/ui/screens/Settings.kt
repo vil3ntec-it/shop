@@ -5,6 +5,22 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Badge
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.PersonOutline
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.Storefront
+import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.SystemUpdate
+import androidx.compose.material.icons.filled.Undo
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -136,277 +152,57 @@ fun SettingsScreen(
     toast(if (granted) "دوربین آماده است — بارکدخوان کار می‌کند" else "بدون اجازهٔ دوربین، بارکدخوان باز نمی‌شود")
   }
 
-  LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
+  LazyColumn(
+    Modifier.fillMaxSize(),
+    contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, 32.dp),
+    verticalArrangement = Arrangement.spacedBy(12.dp),
+  ) {
     item {
       Text("تنظیمات", style = MaterialTheme.typography.headlineMedium, color = Shop.colors.text)
-      Spacer(Modifier.height(16.dp))
+      Text(
+        "حساب، ظاهر، داده‌ها و اطلاعات برنامه",
+        style = MaterialTheme.typography.bodySmall,
+        color = Shop.colors.muted,
+      )
+      Spacer(Modifier.height(4.dp))
+    }
 
-      /* ---------------------------- فروشگاه ---------------------------- */
-      SectionTitle("فروشگاه")
-      Panel {
-        Text(
-          "این نام روی سربرگ فاکتور چاپ می‌شود.",
-          style = MaterialTheme.typography.bodySmall,
-          color = Shop.colors.muted,
-        )
-        Spacer(Modifier.height(10.dp))
-        OutlinedTextField(
-          value = storeName,
-          onValueChange = {
-            storeName = it
-            prefs.edit().putString("store_name", it.trim()).apply()
-          },
-          label = { Text("نام فروشگاه") },
-          singleLine = true,
-          keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-          modifier = Modifier.fillMaxWidth(),
-        )
-      }
-
-      Spacer(Modifier.height(20.dp))
-
-      /* ------------------------------ تم ------------------------------ */
-      SectionTitle("ظاهر")
-      Panel {
-        listOf(
-          ThemeChoice.SYSTEM to "مثل گوشی",
-          ThemeChoice.LIGHT to "روشن",
-          ThemeChoice.DARK to "تاریک",
-        ).forEach { (choice, label) ->
-          Row(
-            Modifier.fillMaxWidth().padding(vertical = 2.dp),
-            verticalAlignment = Alignment.CenterVertically,
-          ) {
-            RadioButton(selected = theme == choice, onClick = { onTheme(choice) })
-            Spacer(Modifier.width(6.dp))
-            Text(label, style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text)
-          }
-        }
-
-        HorizontalDivider(Modifier.padding(vertical = 12.dp), color = Shop.colors.border)
-
-        Text(
-          "اگر در تنظیمات گوشی «کاهش حرکت» یا حالت ذخیرهٔ باتری روشن باشد، برنامه انیمیشن‌ها را خاموش می‌کند. با این کلید می‌توانید همیشه روشن نگهشان دارید.",
-          style = MaterialTheme.typography.bodySmall,
-          color = Shop.colors.muted,
-        )
-        Spacer(Modifier.height(10.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-          listOf("full" to "انیمیشن روشن", "auto" to "مثل تنظیم گوشی").forEach { (value, label) ->
-            FilterChip(
-              selected = Motion.choice == value,
-              onClick = { Motion.set(context, value) },
-              label = { Text(label) },
-            )
-          }
-        }
-      }
-
-      Spacer(Modifier.height(20.dp))
-
-      /* ----------------------- دوربین بارکدخوان ----------------------- */
-      SectionTitle("دوربین بارکدخوان")
-      Panel {
-        Text(
-          "برنامه برای اسکن بارکد محصولات به دسترسی دوربین دستگاه نیاز دارد. با زدن دکمهٔ زیر، اجازهٔ دوربین گرفته می‌شود.",
-          style = MaterialTheme.typography.bodySmall,
-          color = Shop.colors.muted,
-        )
-        Spacer(Modifier.height(10.dp))
-        InfoLine("وضعیت", if (cameraGranted) "اجازه داده شده" else "هنوز اجازه داده نشده")
-        Spacer(Modifier.height(10.dp))
-        OutlinedButton(
-          onClick = {
-            if (cameraGranted) toast("دوربین آماده است — بارکدخوان کار می‌کند")
-            else askCamera.launch(android.Manifest.permission.CAMERA)
-          },
-          modifier = Modifier.fillMaxWidth(),
-        ) { Text(if (cameraGranted) "آزمایش دوربین" else "درخواست دسترسی دوربین") }
-      }
-
-      Spacer(Modifier.height(20.dp))
-
-      /* ----------------------- کلیدهای حساب ----------------------- */
-      SectionTitle("کلیدهای حساب")
-      Panel {
-        KeyLine("کلید حساب شما", apiKey) {
-          copyToClipboard(context, "کلید حساب", apiKey)
-          toast("کلید حساب کپی شد")
-        }
-        Text(
-          "این کلید فقط مالِ همین حساب است و هرگز برای کس دیگری تکرار نمی‌شود. هنگام خرید اشتراک، همین را برای فروشنده بفرستید تا اشتراک روی حساب خودتان فعال شود.",
-          style = MaterialTheme.typography.labelSmall,
-          color = Shop.colors.muted2,
-        )
-
-        Spacer(Modifier.height(16.dp))
-        KeyLine("کد شاگرد", staffCode) {
-          copyToClipboard(context, "کد شاگرد", staffCode)
-          toast("کد شاگرد کپی شد")
-        }
-        Text(
-          "این کد را به شاگردهایتان بدهید تا در صفحهٔ ورود بزنند و روی همین دکان بیایند.",
-          style = MaterialTheme.typography.labelSmall,
-          color = Shop.colors.muted2,
-        )
-        Spacer(Modifier.height(10.dp))
-        OutlinedButton(onClick = { confirmRotate = true }) { Text("ساخت کد تازه") }
-      }
-
-      Spacer(Modifier.height(20.dp))
-
-      /* --------------------------- پشتیبان --------------------------- */
-      SectionTitle("پشتیبان‌گیری از اطلاعات")
-      InfoLine("آخرین پشتیبان", BackupClock.text(context))
-      Panel {
-        Text(
-          "از تمام اطلاعات فروشگاه (قرض‌داران، محصولات، انبار، فروش‌ها و مصارف) یک فایل پشتیبان بگیرید یا از یک فایل قبلی بازیابی کنید. همین فایل در نسخهٔ وب هم باز می‌شود.",
-          style = MaterialTheme.typography.bodySmall,
-          color = Shop.colors.muted,
-        )
-        Spacer(Modifier.height(6.dp))
-        Text(
-          "${plain(d.products.size)} کالا — ${plain(d.sales.size)} فاکتور — ${plain(d.debtors.size)} قرض‌دار",
-          style = MaterialTheme.typography.labelSmall,
-          color = Shop.colors.muted2,
-        )
-        Spacer(Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-          Button(
-            onClick = { exportFile.launch("tohid-shop-backup-${todayIso()}.json") },
-            modifier = Modifier.weight(1f),
-          ) { Text("گرفتن پشتیبان") }
-          OutlinedButton(
-            onClick = { pickFile.launch("application/json") },
-            modifier = Modifier.weight(1f),
-          ) { Text("بازیابی از فایل") }
-        }
-
-        // بعد از هر بازیابی، راهِ برگشت باز می‌ماند: اگر فایل اشتباهی
-        // بازیابی شود، کارِ چند ماه رفته است
-        if (canUndo) {
-          Spacer(Modifier.height(10.dp))
-          OutlinedButton(
-            onClick = {
-              scope.launch {
-                store.undoRestore()
-                  .onSuccess { canUndo = false; toast("به وضعیت پیش از بازیابی برگشت") }
-                  .onFailure { toast("برگرداندن ممکن نشد") }
-              }
-            },
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = Shop.colors.warning),
-            modifier = Modifier.fillMaxWidth(),
-          ) { Text("برگرداندن به پیش از بازیابی") }
-        }
-
-        restoreError?.let {
-          Spacer(Modifier.height(10.dp))
-          Text(it, style = MaterialTheme.typography.labelMedium, color = Shop.colors.danger)
-        }
-      }
-
-      Spacer(Modifier.height(20.dp))
-
-      /* ----------------------- حساب و همگام‌سازی ----------------------- */
-      SectionTitle("حساب و همگام‌سازی")
-      Panel {
-        Text(
-          "به سرور خودتان وصل می‌شود — نه به دامنه لازم دارد نه به سرویس بیرونی. همان نشانی‌ای که پنل سرور نشان می‌دهد.",
-          style = MaterialTheme.typography.bodySmall,
-          color = Shop.colors.muted,
-        )
-        Spacer(Modifier.height(12.dp))
-
-        OutlinedTextField(
-          value = serverUrl,
-          onValueChange = { serverUrl = it; state.serverUrl = it },
-          label = { Text("آدرس سرور") },
-          placeholder = { Text("http://192.168.1.10:8080") },
-          singleLine = true,
-          keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
-          modifier = Modifier.fillMaxWidth(),
-        )
-
-        Spacer(Modifier.height(10.dp))
-        OutlinedButton(
-          enabled = !busy && serverUrl.isNotBlank(),
-          onClick = {
-            busy = true
-            scope.launch {
-              runCatching { ServerClient(serverUrl).health() }
-                .onSuccess { toast("سرور جواب داد") }
-                .onFailure { toast((it as? ServerClient.ServerError)?.message ?: "سرور جواب نداد") }
-              busy = false
-            }
-          },
-          modifier = Modifier.fillMaxWidth(),
-        ) { Text("آزمایش اتصال") }
-
-        Spacer(Modifier.height(14.dp))
-
-        if (!signedIn) {
-          OutlinedTextField(
-            value = identifier,
-            onValueChange = { identifier = it },
-            label = { Text("ایمیل یا شماره") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
+    /* ============================== حساب ============================== */
+    item {
+      SettingsSection(
+        icon = Icons.Filled.PersonOutline,
+        title = "حساب",
+        subtitle = if (signedIn) state.accountName.ifBlank { "وارد شده" } else "وارد نشده‌اید",
+        initiallyOpen = !signedIn,
+      ) {
+        if (signedIn) {
+          SettingsRow(
+            icon = Icons.Filled.Badge,
+            title = "حساب من",
+            description = state.accountName.ifBlank { "وارد شده" },
+            value = licenseText(licenseStatus),
           )
-          Spacer(Modifier.height(10.dp))
-          OutlinedTextField(
-            value = password,
-            onValueChange = { password = it },
-            label = { Text("رمز عبور") },
-            singleLine = true,
-            visualTransformation = PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-            modifier = Modifier.fillMaxWidth(),
-          )
-          Spacer(Modifier.height(12.dp))
-          Button(
-            enabled = !busy && serverUrl.isNotBlank() && identifier.isNotBlank() && password.isNotBlank(),
-            onClick = {
-              busy = true
-              scope.launch {
-                runCatching { ServerClient(serverUrl).login(identifier.trim(), password) }
-                  .onSuccess { session ->
-                    state.accessToken = session.accessToken
-                    state.refreshToken = session.refreshToken
-                    state.accountName = session.name
-                    SavedLogins.remember(context, identifier.trim(), session.name)
-                    signedIn = true
-                    password = ""
-                    toast("وارد شدید")
-                    runCatching { licenseStatus = syncer.refreshLicense(android.os.Build.MODEL ?: "گوشی") }
-                  }
-                  .onFailure { toast((it as? ServerClient.ServerError)?.message ?: "ورود ناموفق بود") }
-                busy = false
-              }
-            },
-            modifier = Modifier.fillMaxWidth(),
-          ) { Text("ورود") }
-
-          Spacer(Modifier.height(6.dp))
-          Text(
-            "حساب را در پنل سرور بسازید — بخش «توحید».",
-            style = MaterialTheme.typography.labelSmall,
-            color = Shop.colors.muted2,
-          )
-        } else {
-          InfoLine("حساب", state.accountName.ifBlank { "وارد شده" })
-          InfoLine("اشتراک", licenseText(licenseStatus))
           licenseStatus.payload?.let { p ->
             if (p.subscriptionEndsAt > 0) {
-              InfoLine("تا تاریخ", formatDate(isoOf(p.subscriptionEndsAt)))
+              SettingsRow(
+                icon = Icons.Filled.Event,
+                title = "پایان اشتراک",
+                value = formatDate(isoOf(p.subscriptionEndsAt)),
+                tint = Shop.colors.accent,
+              )
             }
           }
           if (state.lastSyncAt > 0) {
-            InfoLine("آخرین همگام‌سازی", formatDate(isoOf(state.lastSyncAt)))
+            SettingsRow(
+              icon = Icons.Filled.Sync,
+              title = "آخرین همگام‌سازی",
+              value = formatDate(isoOf(state.lastSyncAt)),
+              tint = Shop.colors.accent,
+            )
           }
-
-          Spacer(Modifier.height(12.dp))
-          Button(
-            enabled = !busy,
+          Spacer(Modifier.height(10.dp))
+          TohidButton(
+            text = "همگام‌سازی حالا",
             onClick = {
               busy = true
               scope.launch {
@@ -419,11 +215,12 @@ fun SettingsScreen(
                 busy = false
               }
             },
+            busy = busy,
             modifier = Modifier.fillMaxWidth(),
-          ) { Text("همگام‌سازی حالا") }
-
+          )
           Spacer(Modifier.height(8.dp))
-          OutlinedButton(
+          TohidDangerButton(
+            text = "خروج از حساب",
             onClick = {
               state.signOut()
               signedIn = false
@@ -431,60 +228,279 @@ fun SettingsScreen(
               toast("از حساب خارج شدید — اطلاعات دکان سر جایش است")
             },
             modifier = Modifier.fillMaxWidth(),
-          ) { Text("خروج از حساب") }
-        }
-
-        if (busy) {
+          )
+        } else {
+          Text(
+            "به سرور خودتان وصل می‌شود — نه دامنه لازم دارد نه سرویس بیرونی.",
+            style = MaterialTheme.typography.bodySmall,
+            color = Shop.colors.muted,
+          )
           Spacer(Modifier.height(10.dp))
-          LinearProgressIndicator(Modifier.fillMaxWidth(), color = Shop.colors.primary)
+          TohidTextField(
+            value = serverUrl,
+            onValueChange = { serverUrl = it; state.serverUrl = it },
+            label = "آدرس سرور",
+            placeholder = "http://192.168.1.10:8080",
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Next),
+          )
+          Spacer(Modifier.height(10.dp))
+          TohidTextField(
+            value = identifier,
+            onValueChange = { identifier = it },
+            label = "ایمیل یا شماره",
+          )
+          Spacer(Modifier.height(10.dp))
+          TohidTextField(
+            value = password,
+            onValueChange = { password = it },
+            label = "رمز عبور",
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+          )
+          Spacer(Modifier.height(12.dp))
+          Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            TohidSecondaryButton(
+              text = "آزمایش اتصال",
+              enabled = !busy && serverUrl.isNotBlank(),
+              onClick = {
+                busy = true
+                scope.launch {
+                  runCatching { ServerClient(serverUrl).health() }
+                    .onSuccess { toast("سرور جواب داد") }
+                    .onFailure { toast((it as? ServerClient.ServerError)?.message ?: "سرور جواب نداد") }
+                  busy = false
+                }
+              },
+              modifier = Modifier.weight(1f),
+            )
+            TohidButton(
+              text = "ورود",
+              enabled = !busy && serverUrl.isNotBlank() && identifier.isNotBlank() && password.isNotBlank(),
+              busy = busy,
+              onClick = {
+                busy = true
+                scope.launch {
+                  runCatching { ServerClient(serverUrl).login(identifier.trim(), password) }
+                    .onSuccess { session ->
+                      state.accessToken = session.accessToken
+                      state.refreshToken = session.refreshToken
+                      state.accountName = session.name
+                      SavedLogins.remember(context, identifier.trim(), session.name)
+                      signedIn = true
+                      password = ""
+                      toast("وارد شدید")
+                      runCatching { licenseStatus = syncer.refreshLicense(android.os.Build.MODEL ?: "گوشی") }
+                    }
+                    .onFailure { toast((it as? ServerClient.ServerError)?.message ?: "ورود ناموفق بود") }
+                  busy = false
+                }
+              },
+              modifier = Modifier.weight(1f),
+            )
+          }
         }
       }
+    }
 
-      Spacer(Modifier.height(20.dp))
-
-      /* --------------------------- پاک‌سازی --------------------------- */
-      SectionTitle("پاک‌سازی")
-      Panel {
+    /* ============================= فروشگاه ============================= */
+    item {
+      SettingsSection(
+        icon = Icons.Filled.Storefront,
+        title = "فروشگاه",
+        subtitle = storeName.ifBlank { "نام دکان تنظیم نشده" },
+        tint = Shop.colors.accent,
+      ) {
         Text(
-          "تمام قرض‌داران، محصولات، انبار، فروش‌ها و مصارف ثبت‌شده روی این دستگاه برای همیشه حذف می‌شوند. پیش از پاک‌سازی، حتماً یک نسخه پشتیبان بگیرید.",
+          "این نام روی سربرگ فاکتور چاپ می‌شود.",
+          style = MaterialTheme.typography.bodySmall,
+          color = Shop.colors.muted,
+        )
+        Spacer(Modifier.height(10.dp))
+        TohidTextField(
+          value = storeName,
+          onValueChange = {
+            storeName = it
+            prefs.edit().putString("store_name", it.trim()).apply()
+          },
+          label = "نام فروشگاه",
+          keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+        )
+      }
+    }
+
+    /* ============================== ظاهر ============================== */
+    item {
+      SettingsSection(
+        icon = Icons.Filled.Palette,
+        title = "ظاهر",
+        subtitle = when (theme) {
+          ThemeChoice.LIGHT -> "روشن"
+          ThemeChoice.DARK -> "تاریک"
+          ThemeChoice.SYSTEM -> "مثل گوشی"
+        },
+        tint = Shop.colors.primary,
+      ) {
+        SegmentedChoice(
+          options = listOf(
+            ThemeChoice.LIGHT.name to "روشن",
+            ThemeChoice.DARK.name to "تاریک",
+            ThemeChoice.SYSTEM.name to "مثل گوشی",
+          ),
+          selected = theme.name,
+          onSelect = { onTheme(ThemeChoice.valueOf(it)) },
+        )
+        Spacer(Modifier.height(14.dp))
+        Text(
+          "اگر گوشی «کاهش حرکت» یا حالت ذخیرهٔ باتری روشن باشد، انیمیشن‌ها خاموش می‌شوند. با این کلید همیشه روشن می‌مانند.",
+          style = MaterialTheme.typography.labelSmall,
+          color = Shop.colors.muted2,
+        )
+        Spacer(Modifier.height(8.dp))
+        SegmentedChoice(
+          options = listOf("full" to "انیمیشن روشن", "auto" to "مثل تنظیم گوشی"),
+          selected = Motion.choice,
+          onSelect = { Motion.set(context, it) },
+        )
+      }
+    }
+
+    /* ============================== دوربین ============================== */
+    item {
+      SettingsSection(
+        icon = Icons.Filled.PhotoCamera,
+        title = "دوربین بارکدخوان",
+        subtitle = if (cameraGranted) "اجازه داده شده" else "هنوز اجازه داده نشده",
+        tint = if (cameraGranted) Shop.colors.success else Shop.colors.warning,
+      ) {
+        Text(
+          "برنامه برای اسکن بارکد محصولات به دوربین نیاز دارد.",
           style = MaterialTheme.typography.bodySmall,
           color = Shop.colors.muted,
         )
         Spacer(Modifier.height(12.dp))
-        OutlinedButton(
-          onClick = { confirmClear = true },
-          colors = ButtonDefaults.outlinedButtonColors(contentColor = Shop.colors.danger),
+        TohidSecondaryButton(
+          text = if (cameraGranted) "آزمایش دوربین" else "درخواست دسترسی دوربین",
+          onClick = {
+            if (cameraGranted) toast("دوربین آماده است — بارکدخوان کار می‌کند")
+            else askCamera.launch(android.Manifest.permission.CAMERA)
+          },
           modifier = Modifier.fillMaxWidth(),
-        ) { Text("پاک‌سازی کامل اطلاعات") }
-      }
-
-      Spacer(Modifier.height(20.dp))
-
-      /* ------------------------- درباره برنامه ------------------------- */
-      SectionTitle("درباره برنامه")
-      Panel {
-        Text(
-          "توحید | مدیریت فروشگاه — برنامهٔ اندروید",
-          style = MaterialTheme.typography.bodyMedium,
-          color = Shop.colors.text,
         )
-        Spacer(Modifier.height(4.dp))
+      }
+    }
+
+    /* ============================ کلیدها ============================ */
+    item {
+      SettingsSection(
+        icon = Icons.Filled.Key,
+        title = "کلیدهای حساب",
+        subtitle = "کلید حساب و کد شاگرد",
+        tint = Shop.colors.accent,
+      ) {
+        KeyLine("کلید حساب شما", apiKey) {
+          copyToClipboard(context, "کلید حساب", apiKey)
+          toast("کلید حساب کپی شد")
+        }
         Text(
-          "تمام اطلاعات فقط روی همین گوشی ذخیره می‌شود؛ پس هر چند وقت یک‌بار نسخهٔ پشتیبان بگیرید.",
+          "هنگام خرید اشتراک، همین را برای فروشنده بفرستید تا اشتراک روی حساب خودتان فعال شود.",
+          style = MaterialTheme.typography.labelSmall,
+          color = Shop.colors.muted2,
+        )
+        Spacer(Modifier.height(16.dp))
+        KeyLine("کد شاگرد", staffCode) {
+          copyToClipboard(context, "کد شاگرد", staffCode)
+          toast("کد شاگرد کپی شد")
+        }
+        Text(
+          "این کد را به شاگردهایتان بدهید تا در صفحهٔ ورود بزنند و روی همین دکان بیایند.",
+          style = MaterialTheme.typography.labelSmall,
+          color = Shop.colors.muted2,
+        )
+        Spacer(Modifier.height(12.dp))
+        TohidSecondaryButton(text = "ساخت کد تازه", onClick = { confirmRotate = true })
+      }
+    }
+
+    /* ============================== داده‌ها ============================== */
+    item {
+      SettingsSection(
+        icon = Icons.Filled.Storage,
+        title = "داده‌ها",
+        subtitle = BackupClock.text(context),
+        tint = if (BackupClock.isStale(context)) Shop.colors.warning else Shop.colors.success,
+      ) {
+        Text(
+          "${plain(d.products.size)} کالا — ${plain(d.sales.size)} فاکتور — ${plain(d.debtors.size)} قرض‌دار",
+          style = MaterialTheme.typography.labelSmall,
+          color = Shop.colors.muted2,
+        )
+        Spacer(Modifier.height(12.dp))
+        SettingsRow(
+          icon = Icons.Filled.CloudUpload,
+          title = "گرفتن پشتیبان",
+          description = "یک فایل از تمام اطلاعات دکان",
+          tint = Shop.colors.success,
+          onClick = { exportFile.launch("tohid-shop-backup-${todayIso()}.json") },
+        )
+        SettingsRow(
+          icon = Icons.Filled.CloudDownload,
+          title = "بازیابی از فایل",
+          description = "جایگزینی اطلاعات فعلی با یک پشتیبان",
+          tint = Shop.colors.primary,
+          onClick = { pickFile.launch("application/json") },
+        )
+        if (canUndo) {
+          SettingsRow(
+            icon = Icons.Filled.Undo,
+            title = "برگرداندن به پیش از بازیابی",
+            description = "اگر فایل اشتباهی بازیابی شد",
+            tint = Shop.colors.warning,
+            onClick = {
+              scope.launch {
+                store.undoRestore()
+                  .onSuccess { canUndo = false; toast("به وضعیت پیش از بازیابی برگشت") }
+                  .onFailure { toast("برگرداندن ممکن نشد") }
+              }
+            },
+          )
+        }
+        restoreError?.let {
+          Spacer(Modifier.height(8.dp))
+          Text(it, style = MaterialTheme.typography.labelMedium, color = Shop.colors.danger)
+        }
+        Spacer(Modifier.height(12.dp))
+        TohidDangerButton(
+          text = "پاک‌سازی کامل اطلاعات",
+          onClick = { confirmClear = true },
+          modifier = Modifier.fillMaxWidth(),
+        )
+      }
+    }
+
+    /* ============================ درباره ============================ */
+    item {
+      SettingsSection(
+        icon = Icons.Filled.Info,
+        title = "درباره برنامه",
+        subtitle = "نسخهٔ ${BuildConfig.VERSION_NAME}",
+        tint = Shop.colors.muted,
+      ) {
+        Text(
+          "توحید | مدیریت فروشگاه — برنامهٔ اندروید.\nتمام اطلاعات روی همین گوشی ذخیره می‌شود؛ هر چند وقت یک‌بار پشتیبان بگیرید.",
           style = MaterialTheme.typography.bodySmall,
           color = Shop.colors.muted,
         )
-        Spacer(Modifier.height(10.dp))
-        InfoLine("نسخهٔ نصب‌شده", BuildConfig.VERSION_NAME)
-        Spacer(Modifier.height(10.dp))
-        OutlinedButton(onClick = onUpdates, modifier = Modifier.fillMaxWidth()) {
-          Text("دریافت آخرین نسخه")
-        }
+        Spacer(Modifier.height(12.dp))
+        SettingsRow(
+          icon = Icons.Filled.SystemUpdate,
+          title = "دریافت آخرین نسخه",
+          description = "نسخهٔ نصب‌شده: ${BuildConfig.VERSION_NAME}",
+          tint = Shop.colors.primary,
+          onClick = onUpdates,
+        )
       }
-
-      Spacer(Modifier.height(24.dp))
     }
   }
+
 
   /* ---------------------------- پنجره‌ها ---------------------------- */
 
@@ -630,17 +646,6 @@ private fun RestoreLine(label: String, now: Int, next: Int) {
       style = MaterialTheme.typography.bodyMedium,
       color = if (next < now) Shop.colors.warning else Shop.colors.text,
     )
-  }
-}
-
-@Composable
-private fun InfoLine(label: String, value: String) {
-  Row(
-    Modifier.fillMaxWidth().padding(vertical = 4.dp),
-    horizontalArrangement = Arrangement.SpaceBetween,
-  ) {
-    Text(label, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
-    Text(value, style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text)
   }
 }
 
