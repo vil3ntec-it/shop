@@ -361,54 +361,63 @@ private fun TohidNavBar(
         val center = brandEdge + dir * ((slot + 0.5f) * lane)
         val half = lane / 2f
 
-        val yTop = h * 0.13f     // بلندیِ تاجِ منحنی، بالای آیکنِ تبِ باز
-        val yBot = h * 0.90f     // خطِ کفِ نوار
-        val yStart = h * 0.48f   // جایی که خط از کنارِ نشانِ برنامه درمی‌آید
-
-        // دو شانهٔ تاج. کمی پهن‌تر از خودِ تب، تا آیکن داخلش بنشیند نه رویش.
-        val shoulderIn = center - dir * half * 1.05f
-        val shoulderOut = center + dir * half * 1.05f
-        val settle = shoulderOut + dir * half * 1.30f
+        val yBot = h * 0.86f     // خطِ کفِ نوار — تا دو سر ادامه دارد
+        val yTop = h * 0.17f     // بلندیِ برجستگی، بالای آیکنِ تبِ باز
 
         /*
-         *  منحنی، بدونِ شکستگی.
+         *  یک خطِ کف، با یک برجستگیِ **تنگ** دقیقاً روی تبِ باز.
          *
-         *  رازش این است که در هر دو شانه، مماسِ ورودی و خروجی هر دو
-         *  **افقی** باشند: نقطه‌های کنترلِ دو سرِ هر خم روی همان ارتفاعِ
-         *  خودِ نقطه می‌نشینند. اگر یکی‌شان مورب باشد، درست همان‌جا خط
-         *  زاویه پیدا می‌کند — همان کنجِ تیزی که در عکس دیده می‌شد.
+         *  بارِ قبل منحنی از کنارِ نشانِ برنامه شروع می‌شد و آرام‌آرام تا
+         *  تبِ باز بالا می‌آمد؛ نتیجه‌اش یک S بزرگ بود که نصفِ نوار را
+         *  می‌گرفت و روی چند تب می‌افتاد. برجستگی باید فقط دورِ همان یک
+         *  تب باشد و بقیهٔ نوار زیرش صاف بماند.
+         */
+        val bumpHalf = lane * 0.52f    // نصفِ پهنای برجستگی
+        val riseW = lane * 0.40f       // درازای سربالایی و سرازیری
+
+        val inFoot = center - dir * (bumpHalf + riseW)
+        val inTop = center - dir * bumpHalf
+        val outTop = center + dir * bumpHalf
+        val outFoot = center + dir * (bumpHalf + riseW)
+
+        /*
+         *  رازِ نشکستن: در هر چهار نقطهٔ اتصال، مماسِ ورودی و خروجی هر
+         *  دو **افقی** باشند — یعنی نقطه‌های کنترلِ هر خم روی همان
+         *  ارتفاعِ خودِ نقطه بنشینند. اگر یکی‌شان مورب باشد، درست همان‌جا
+         *  خط زاویه پیدا می‌کند.
          */
         val path = Path().apply {
-          moveTo(brandEdge, yStart)
+          moveTo(brandEdge, yBot)
+          lineTo(inFoot, yBot)
           cubicTo(
-            brandEdge + dir * half * 0.75f, yStart,
-            shoulderIn - dir * half * 0.75f, yTop,
-            shoulderIn, yTop,
+            inFoot + dir * riseW * 0.55f, yBot,
+            inTop - dir * riseW * 0.55f, yTop,
+            inTop, yTop,
           )
-          lineTo(shoulderOut, yTop)          // تاجِ صاف روی تبِ باز
+          lineTo(outTop, yTop)
           cubicTo(
-            shoulderOut + dir * half * 0.75f, yTop,
-            settle - dir * half * 0.55f, yBot,
-            settle, yBot,
+            outTop + dir * riseW * 0.55f, yTop,
+            outFoot - dir * riseW * 0.55f, yBot,
+            outFoot, yBot,
           )
           lineTo(far, yBot)
         }
 
         /*
-         *  خط از سمتِ تبِ باز پررنگ است و هرچه دورتر می‌رود محو می‌شود.
-         *
-         *  خطِ یک‌دستی که تا آخرِ نوار می‌رود، یک زیرخطِ بی‌دلیل زیرِ
-         *  بقیهٔ تب‌ها می‌شود؛ محو شدن، نگاه را همان‌جا که تب باز است
-         *  نگه می‌دارد.
+         *  خط دورِ تبِ باز پررنگ است و هرچه دورتر می‌رود کم‌رنگ‌تر —
+         *  به‌ویژه دنباله‌اش که محو می‌شود. خطِ یک‌دستِ سرتاسری، یک
+         *  زیرخطِ بی‌دلیل زیرِ بقیهٔ تب‌ها می‌شود.
          */
-        val axis = (far - brandEdge)
-        val solid = if (axis == 0f) 0.5f
-        else ((settle - brandEdge) / axis).coerceIn(0.12f, 0.9f)
+        val axis = far - brandEdge
+        fun frac(x: Float) = if (axis == 0f) 0f else ((x - brandEdge) / axis).coerceIn(0f, 1f)
+        val b0 = (frac(inFoot) - 0.06f).coerceIn(0.02f, 0.92f)
+        val b1 = (frac(outFoot) + 0.06f).coerceIn(b0 + 0.02f, 0.96f)
 
         fun brush(alpha: Float) = Brush.linearGradient(
           colorStops = arrayOf(
-            0f to line.copy(alpha = alpha),
-            solid to line.copy(alpha = alpha),
+            0f to line.copy(alpha = alpha * 0.30f),
+            b0 to line.copy(alpha = alpha),
+            b1 to line.copy(alpha = alpha),
             1f to line.copy(alpha = 0f),
           ),
           start = Offset(brandEdge, 0f),
