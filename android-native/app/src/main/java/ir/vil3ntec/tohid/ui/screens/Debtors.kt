@@ -8,12 +8,17 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
@@ -24,6 +29,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import ir.vil3ntec.tohid.data.Debtor
@@ -98,8 +105,16 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
       .sortedByDescending { it.second }
 
     Box(Modifier.fillMaxSize()) {
-      LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, 96.dp)) {
-        item {
+      // شبکهٔ کارت‌ها — همان `.debtor-list` نسخهٔ وب. قرض‌دار در یک نگاه
+      // از رنگِ کارتش شناخته می‌شود، نه از خواندنِ عدد.
+      LazyVerticalGrid(
+        columns = GridCells.Adaptive(minSize = 104.dp),
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, 96.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+      ) {
+        item(span = { GridItemSpan(maxLineSpan) }) {
           Text("قرض‌داران", style = MaterialTheme.typography.headlineMedium, color = Shop.colors.text)
           Spacer(Modifier.height(14.dp))
 
@@ -120,11 +135,11 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
           )
-          Spacer(Modifier.height(14.dp))
+          Spacer(Modifier.height(4.dp))
         }
 
         if (rows.isEmpty()) {
-          item {
+          item(span = { GridItemSpan(maxLineSpan) }) {
             Panel {
               EmptyNote(
                 if (d.debtors.isEmpty()) "هنوز قرض‌داری ثبت نشده."
@@ -135,9 +150,14 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
         } else {
           itemsIndexed(rows, key = { _, row -> row.first.id }) { index, (debtor, balance) ->
             StaggeredItem(index) {
-            DebtorRow(debtor, balance) { openId = debtor.id }
-            Spacer(Modifier.height(8.dp))
-          }
+              DebtorCard(
+                debtor = debtor,
+                balance = balance,
+                onOpen = { openId = debtor.id },
+                onEdit = { form = DebtorFormState.of(debtor) },
+                onDelete = { confirmDelete = debtor },
+              )
+            }
           }
         }
       }
@@ -237,41 +257,101 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
 
 /* ============================ تکه‌ها ============================ */
 
+/**
+ *  کارتِ قرض‌دار — همان `.debtor-card` نسخهٔ وب.
+ *
+ *  رنگ، خودش حرفِ اصلی را می‌زند: قرمز یعنی بدهکار است، سبز یعنی یا
+ *  حسابش صاف است یا نزد ما موجودی دارد. برای همین زیرِ عدد، متنِ اضافه
+ *  نمی‌نویسیم؛ کارت را از دور هم می‌شود خواند.
+ *
+ *  دکمهٔ حذف بالای کارت و دکمهٔ ویرایش پایینِ آن است، درست مثل وب، تا
+ *  انگشت هنگام باز کردنِ حساب اشتباهی رویشان نیفتد.
+ */
 @Composable
-private fun DebtorRow(debtor: Debtor, balance: Double, onClick: () -> Unit) {
-  Row(
+private fun DebtorCard(
+  debtor: Debtor,
+  balance: Double,
+  onOpen: () -> Unit,
+  onEdit: () -> Unit,
+  onDelete: () -> Unit,
+) {
+  val owes = balance > 0
+  val tint = if (owes) Shop.colors.danger else Shop.colors.success
+  val fill = if (owes) Shop.colors.dangerTint else Shop.colors.successTint
+
+  Box(
     Modifier
       .fillMaxWidth()
       .clip(RoundedCornerShape(Radius.md))
-      .background(Shop.colors.surface)
-      .border(1.dp, Shop.colors.border, RoundedCornerShape(Radius.md))
-      .clickable(onClick = onClick)
-      .padding(14.dp),
-    verticalAlignment = Alignment.CenterVertically,
+      .background(fill)
+      .border(1.2.dp, tint, RoundedCornerShape(Radius.md))
+      .clickable(onClick = onOpen)
   ) {
-    Column(Modifier.weight(1f)) {
+    Column(
+      Modifier.fillMaxWidth().padding(start = 6.dp, end = 6.dp, top = 26.dp, bottom = 26.dp),
+      horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
       Text(
         debtor.name.ifBlank { "بی‌نام" },
         style = MaterialTheme.typography.titleSmall,
         color = Shop.colors.text,
+        fontWeight = FontWeight.Bold,
+        textAlign = TextAlign.Center,
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
       )
-      Spacer(Modifier.height(3.dp))
+      Spacer(Modifier.height(6.dp))
       Text(
-        DebtorEngine.stateText(balance),
+        money(kotlin.math.abs(balance)),
+        style = MaterialTheme.typography.titleMedium,
+        color = tint,
+        fontWeight = FontWeight.Bold,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+      )
+      Text(
+        if (debtor.phone.isNotBlank()) debtor.phone else DebtorEngine.stateText(balance),
         style = MaterialTheme.typography.labelSmall,
         color = Shop.colors.muted,
+        textAlign = TextAlign.Center,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
       )
     }
-    Text(
-      "${money(kotlin.math.abs(balance))} افغانی",
-      style = MaterialTheme.typography.titleSmall,
-      color = when {
-        balance > 0 -> Shop.colors.warning
-        balance < 0 -> Shop.colors.success
-        else -> Shop.colors.muted
-      },
-      fontWeight = FontWeight.Bold,
+
+    CornerButton(
+      icon = Icons.Filled.Close,
+      description = "حذف",
+      onClick = onDelete,
+      modifier = Modifier.align(Alignment.TopStart).padding(4.dp),
     )
+    CornerButton(
+      icon = Icons.Filled.Edit,
+      description = "ویرایش",
+      onClick = onEdit,
+      modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp),
+    )
+  }
+}
+
+/** دکمهٔ ریزِ گوشهٔ کارت — همان `.debtor-card-close` و `.debtor-card-edit` */
+@Composable
+private fun CornerButton(
+  icon: androidx.compose.ui.graphics.vector.ImageVector,
+  description: String,
+  onClick: () -> Unit,
+  modifier: Modifier = Modifier,
+) {
+  Box(
+    modifier
+      .size(22.dp)
+      .clip(RoundedCornerShape(7.dp))
+      .background(Shop.colors.bg)
+      .border(1.dp, Shop.colors.border, RoundedCornerShape(7.dp))
+      .clickable(onClick = onClick),
+    contentAlignment = Alignment.Center,
+  ) {
+    Icon(icon, contentDescription = description, tint = Shop.colors.muted, modifier = Modifier.size(12.dp))
   }
 }
 
