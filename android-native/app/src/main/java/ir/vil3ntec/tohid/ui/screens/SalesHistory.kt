@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -291,6 +292,99 @@ private fun SaleRow(
     if (!last) HorizontalDivider(color = Shop.colors.fieldBorder.copy(alpha = 0.35f))
   }
 }
+
+@Composable
+private fun ReturnDialog(
+  d: ShopData,
+  sale: Sale,
+  onDismiss: () -> Unit,
+  onConfirm: (Map<String, Double>, String) -> Unit,
+) {
+  val items = d.saleItems.filter { it.saleId == sale.id && SalesEngine.returnable(it) > 0 }
+  var quantities by remember { mutableStateOf(mapOf<String, String>()) }
+  var reason by remember { mutableStateOf("") }
+
+  val total = items.sumOf { item ->
+    val wanted = (quantities[item.id]?.toDoubleOrNull() ?: 0.0).coerceIn(0.0, SalesEngine.returnable(item))
+    if (item.quantity > 0) Math.round(item.totalPrice / item.quantity * wanted).toDouble() else 0.0
+  }
+
+  Dialog(onDismissRequest = onDismiss) {
+    DialogEntry {
+    Surface(color = Shop.colors.surface, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
+      Column(Modifier.padding(18.dp).verticalScroll(rememberScrollState())) {
+        Text("مرجوعی — فاکتور #${plain(sale.invoiceNumber ?: 0)}",
+          style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
+        Spacer(Modifier.height(12.dp))
+
+        if (items.isEmpty()) {
+          EmptyNote("موردی برای مرجوعی وجود ندارد.")
+        } else {
+          items.forEach { item ->
+            val product = d.products.find { it.id == item.productId }
+            val allowed = SalesEngine.returnable(item)
+            Column(Modifier.padding(bottom = 12.dp)) {
+              Text(
+                "${product?.name ?: "(محصول حذف‌شده)"} — قابل مرجوعی: ${qty(allowed)}${product?.unit?.takeIf { it.isNotBlank() }?.let { " $it" } ?: ""}",
+                style = MaterialTheme.typography.bodySmall,
+                color = Shop.colors.muted,
+              )
+              Spacer(Modifier.height(6.dp))
+              NumberField(
+                value = quantities[item.id].orEmpty(),
+                onValueChange = { quantities = quantities + (item.id to it) },
+                label = "مقدار مرجوعی",
+                modifier = Modifier.fillMaxWidth(),
+              )
+            }
+          }
+
+          if (total > 0) {
+            Panel {
+              Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("مبلغ مرجوعی", style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
+                Text("${money(total)} افغانی", style = MaterialTheme.typography.titleSmall, color = Shop.colors.text)
+              }
+            }
+            Spacer(Modifier.height(10.dp))
+          }
+
+          OutlinedTextField(
+            value = reason,
+            onValueChange = { reason = it },
+            label = { Text("دلیل (اختیاری)") },
+            modifier = Modifier.fillMaxWidth(),
+          )
+        }
+
+        Spacer(Modifier.height(18.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+          OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("انصراف") }
+          Button(
+            enabled = items.isNotEmpty(),
+            onClick = {
+              onConfirm(
+                quantities.mapNotNull { (id, text) ->
+                  text.toDoubleOrNull()?.takeIf { it > 0 }?.let { id to it }
+                }.toMap(),
+                reason.trim(),
+              )
+            },
+            modifier = Modifier.weight(1f),
+          ) { Text("ثبت مرجوعی") }
+        }
+      }
+    }
+    }
+  }
+}
+
+/**
+ *  یک خانهٔ جدولِ فاکتور.
+ *
+ *  پهنای هر ستون با `weight` است نه با عددِ ثابت: نامِ بلند ستونِ کناری
+ *  را هل نمی‌دهد و ردیف‌ها روی هر پهنای صفحه هم‌تراز می‌مانند.
+ */
 
 @Composable
 private fun RowScope.InvoiceCell(
