@@ -4,21 +4,21 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.Canvas
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -314,18 +314,19 @@ fun AppRoot(
 /* ============================ نوارِ پایین ============================ */
 
 /**
- *  نوارِ پایینِ شناور.
+ *  نوارِ پایین — قرصِ تیره، و یک چراغ بالای تبِ باز.
  *
- *  یک ظرفِ مستقل: پنج مقصد و نشانگرِ نوری، همه داخلِ همین یک قرص.
+ *  کارِ نشانگر این است: یک نوارِ باریکِ روشن بالای همان تب می‌نشیند و از
+ *  آن، نور مثلِ یک چراغِ سقفی به پایین می‌تابد — نزدیکِ نوار پررنگ، و
+ *  هرچه پایین‌تر نرم‌تر و محوتر. آیکن و برچسبِ همان تب زیرِ این نور
+ *  روشن‌اند و بقیه تاریک.
  *
- *  **جای نشانگر از خودِ چیدمان خوانده می‌شود، نه از حساب دستی.** هر تب
- *  موقعیت و پهنای واقعی‌اش را گزارش می‌کند و منحنی از روی همان کشیده
- *  می‌شود؛ پس با هر پهنای صفحه و هر تعداد تب سرِ جایش است.
+ *  **هیچ خطی بین تب‌ها کشیده نمی‌شود.** نه موج، نه بریدگی، نه مسیرِ
+ *  تزئینی. فقط همان نوارِ کوچک و نورش.
  *
- *  **ارتفاع‌ها دقیق‌اند، نه کسری از قد نوار.** ریلِ خط و تاجِ منحنی روی
- *  عددهای مشخصی می‌نشینند و محتوای هر تب هم بینِ همان دو نوار جا
- *  می‌گیرد. با کسر گرفتن از قدِ نوار، تاج روی آیکن‌ها می‌افتاد — همان
- *  چیزی که دیده می‌شد.
+ *  **جای نوار از خودِ چیدمان می‌آید.** هر تب موقعیت و پهنای واقعی‌اش را
+ *  گزارش می‌کند و نور از روی همان حساب می‌شود؛ پس روی گوشی و تبلت و هر
+ *  نسبتِ صفحه‌ای سرِ جایش است و راست‌به‌چپ هم خود‌به‌خود درست درمی‌آید.
  */
 @Composable
 private fun TohidNavBar(
@@ -336,44 +337,43 @@ private fun TohidNavBar(
   val colors = Shop.colors
 
   /*
-   *  چهار ارتفاعِ ثابت، و محتوا بینِ دوتای وسطی:
-   *    ۰ ────────────────────  لبهٔ بالای نوار
-   *   ۱۴ ── تاجِ منحنی
-   *   ۲۶ ── بالای آیکن
-   *   ۷۰ ── پایینِ برچسب
-   *   ۷۸ ── ریلِ خط
-   *   ۹۰ ────────────────────  لبهٔ پایین
+   *  ارتفاع‌ها ثابت‌اند، نه کسری از قدِ نوار — وگرنه با هر تغییرِ قد،
+   *  نور و محتوا روی هم می‌افتند.
    */
-  val barHeight = 90.dp
-  val crestY = 14.dp
-  val railY = 78.dp
-  val contentTop = 26.dp
-  val contentBottom = barHeight - railY + 8.dp
+  val barHeight = 76.dp
+  val lampTop = 5.dp        // نوارِ نور
+  val lampThick = 3.dp
+  val contentTop = 18.dp
+  val contentBottom = 10.dp
+  val iconCenter = 32.dp    // مرکزِ آیکن، برای هالهٔ دورش
   val shape = RoundedCornerShape(percent = 50)
 
+  // مختصاتِ واقعیِ تب‌ها؛ ترتیبِ رسیدنِ گزارش‌ها مهم نیست چون همه در
+  // دستگاهِ مختصاتِ ریشه‌اند
   var barLeft by remember { mutableStateOf(0f) }
   val slots = remember { mutableStateMapOf<Int, Pair<Float, Float>>() }   // شاخص ← (مرکز، پهنا)
 
   val activeIndex = tabs.indexOfFirst { it.id == current }
   val target = slots[activeIndex]
 
+  /*
+   *  چراغ نرم جابه‌جا می‌شود، نه اینکه خاموش و روشن شود: همان حسِ
+   *  «منبعِ نور از این تب کنده شد و رفت روی آن یکی».
+   */
   val centerX by animateFloatAsState(
     targetValue = (target?.first ?: 0f) - barLeft,
-    animationSpec = tween(if (Motion.enabled) 340 else 0),
-    label = "navCenter",
+    animationSpec = tween(if (Motion.enabled) 380 else 0),
+    label = "lampX",
   )
-  val slotWidth by animateFloatAsState(
+  val lampWidth by animateFloatAsState(
     targetValue = target?.second ?: 0f,
-    animationSpec = tween(if (Motion.enabled) 340 else 0),
-    label = "navWidth",
+    animationSpec = tween(if (Motion.enabled) 380 else 0),
+    label = "lampW",
   )
-  // بارِ اول، خط از کفِ نوار بالا می‌آید و سرِ جایش می‌نشیند
-  var arrived by remember { mutableStateOf(false) }
-  LaunchedEffect(Unit) { arrived = true }
-  val rise by animateFloatAsState(
-    targetValue = if (arrived) 1f else 0f,
-    animationSpec = tween(if (Motion.enabled) 520 else 0),
-    label = "navRise",
+  val on by animateFloatAsState(
+    targetValue = if (activeIndex >= 0) 1f else 0f,
+    animationSpec = tween(if (Motion.enabled) 300 else 0),
+    label = "lampOn",
   )
 
   Box(
@@ -387,77 +387,95 @@ private fun TohidNavBar(
       .border(1.dp, colors.fieldBorder.copy(alpha = 0.35f), shape)
       .onGloballyPositioned { barLeft = it.positionInRoot().x },
   ) {
-    /* ----------------------- نشانگرِ نوری ----------------------- */
-    if (activeIndex >= 0 && target != null && slotWidth > 0f && rise > 0.01f) {
-      val line = colors.primary
+    /* --------------------------- چراغ --------------------------- */
+    if (target != null && lampWidth > 0f && on > 0.01f) {
+      val glow = colors.primary
       Canvas(Modifier.matchParentSize()) {
-        val w = size.width
         val h = size.height
-        val radius = h / 2f
-        // خط تا سرِ گِردِ قرص نمی‌رود، وگرنه از زیرش بیرون می‌زند
-        val inset = radius * 0.55f
-
-        val yRail = railY.toPx()
-        // تاج از کفِ نوار بالا می‌آید — همان بالا آمدنِ بارِ اول
-        val yCrest = yRail - (yRail - crestY.toPx()) * rise
-
         val cx = centerX
-        val crest = slotWidth * 0.30f
-        val ramp = slotWidth * 0.28f
+        val yLamp = lampTop.toPx()
+        val yLampEnd = yLamp + lampThick.toPx()
 
-        val lo = inset + crest + ramp
-        val hi = w - inset - crest - ramp
-        val center = if (lo <= hi) cx.coerceIn(lo, hi) else w / 2f
-
-        val inFoot = center - (crest + ramp)
-        val inTop = center - crest
-        val outTop = center + crest
-        val outFoot = center + (crest + ramp)
+        // نوارِ نور: کمی از خودِ تب باریک‌تر، وسطِ آن
+        val halfLamp = lampWidth * 0.21f
 
         /*
-         *  در هر چهار نقطهٔ اتصال، مماسِ ورودی و خروجی هر دو افقی‌اند —
-         *  نقطه‌های کنترلِ هر خم روی همان ارتفاعِ خودِ نقطه می‌نشینند.
-         *  همین است که منحنی را بی‌زاویه نگه می‌دارد.
+         *  مخروطِ نور.
+         *
+         *  یک ذوزنقه که از نوار شروع می‌شود و رو به پایین پهن‌تر
+         *  می‌شود، با شیبِ رنگی که پایین به شفافیت می‌رسد. سه لایه روی
+         *  هم — پهن و کم‌رنگ، میانه، باریک و پررنگ — چون یک ذوزنقهٔ
+         *  تنها لبهٔ تیز دارد و نورِ واقعی لبهٔ تیز ندارد.
          */
-        val path = Path().apply {
-          moveTo(inset, yRail)
-          lineTo(inFoot, yRail)
-          cubicTo(
-            inFoot + ramp * 0.55f, yRail,
-            inTop - ramp * 0.55f, yCrest,
-            inTop, yCrest,
+        fun cone(topHalf: Float, bottomHalf: Float, alpha: Float) {
+          val path = Path().apply {
+            moveTo(cx - topHalf, yLampEnd)
+            lineTo(cx + topHalf, yLampEnd)
+            lineTo(cx + bottomHalf, h)
+            lineTo(cx - bottomHalf, h)
+            close()
+          }
+          drawPath(
+            path,
+            Brush.verticalGradient(
+              colors = listOf(
+                glow.copy(alpha = alpha * on),
+                glow.copy(alpha = alpha * 0.45f * on),
+                glow.copy(alpha = 0f),
+              ),
+              startY = yLampEnd,
+              endY = h,
+            ),
           )
-          lineTo(outTop, yCrest)
-          cubicTo(
-            outTop + ramp * 0.55f, yCrest,
-            outFoot - ramp * 0.55f, yRail,
-            outFoot, yRail,
-          )
-          lineTo(w - inset, yRail)
         }
+        cone(halfLamp * 1.15f, lampWidth * 0.62f, 0.07f)
+        cone(halfLamp * 1.00f, lampWidth * 0.44f, 0.09f)
+        cone(halfLamp * 0.85f, lampWidth * 0.28f, 0.11f)
 
-        // دورِ تبِ باز پررنگ، و هرچه دورتر محو‌تر — به هر دو سو
-        val span = (w - 2 * inset).coerceAtLeast(1f)
-        fun frac(x: Float) = ((x - inset) / span).coerceIn(0f, 1f)
-        val f0 = (frac(inFoot) - 0.10f).coerceIn(0f, 1f)
-        val f1 = (frac(outFoot) + 0.10f).coerceIn(f0 + 0.02f, 1f)
-
-        fun brush(alpha: Float) = Brush.linearGradient(
-          colorStops = arrayOf(
-            0f to line.copy(alpha = alpha * 0.12f),
-            f0 to line.copy(alpha = alpha),
-            f1 to line.copy(alpha = alpha),
-            1f to line.copy(alpha = alpha * 0.12f),
+        // هالهٔ گردِ زیرِ نوار — روشن‌ترین جای نور، درست زیرِ چراغ
+        drawCircle(
+          brush = Brush.radialGradient(
+            colors = listOf(glow.copy(alpha = 0.30f * on), glow.copy(alpha = 0f)),
+            center = Offset(cx, yLampEnd),
+            radius = lampWidth * 0.55f,
           ),
-          start = Offset(inset, 0f),
-          end = Offset(w - inset, 0f),
+          radius = lampWidth * 0.55f,
+          center = Offset(cx, yLampEnd),
         )
 
-        // سه لایه: هالهٔ پهن، هالهٔ نزدیک، و خودِ خط. نور از همین
-        // لایه‌لایه بودن می‌آید؛ یک خطِ تنها فقط یک خط است.
-        drawPath(path, brush(0.10f * rise), style = Stroke(14.dp.toPx(), cap = StrokeCap.Round))
-        drawPath(path, brush(0.22f * rise), style = Stroke(6.dp.toPx(), cap = StrokeCap.Round))
-        drawPath(path, brush(1f * rise), style = Stroke(1.8.dp.toPx(), cap = StrokeCap.Round))
+        // هالهٔ نرمِ دورِ آیکن
+        val rIcon = 20.dp.toPx()
+        drawCircle(
+          brush = Brush.radialGradient(
+            colors = listOf(glow.copy(alpha = 0.22f * on), glow.copy(alpha = 0f)),
+            center = Offset(cx, iconCenter.toPx()),
+            radius = rIcon,
+          ),
+          radius = rIcon,
+          center = Offset(cx, iconCenter.toPx()),
+        )
+
+        // خودِ نوار: هالهٔ کوتاهش، بعد خطِ روشن
+        drawRoundRect(
+          brush = Brush.horizontalGradient(
+            colors = listOf(
+              glow.copy(alpha = 0f),
+              glow.copy(alpha = 0.55f * on),
+              glow.copy(alpha = 0f),
+            ),
+            startX = cx - halfLamp * 1.9f,
+            endX = cx + halfLamp * 1.9f,
+          ),
+          topLeft = Offset(cx - halfLamp * 1.9f, yLamp - 1.dp.toPx()),
+          size = Size(halfLamp * 3.8f, lampThick.toPx() + 2.dp.toPx()),
+          cornerRadius = CornerRadius(lampThick.toPx()),
+        )
+        drawRoundRect(
+          color = glow.copy(alpha = on),
+          topLeft = Offset(cx - halfLamp, yLamp),
+          size = Size(halfLamp * 2f, lampThick.toPx()),
+          cornerRadius = CornerRadius(lampThick.toPx() / 2f),
+        )
       }
     }
 
@@ -470,21 +488,17 @@ private fun TohidNavBar(
         val active = current == t.id
         val fade by animateFloatAsState(
           targetValue = if (active) 1f else 0f,
-          animationSpec = tween(if (Motion.enabled) 260 else 0),
-          label = "navFade",
+          animationSpec = tween(if (Motion.enabled) 300 else 0),
+          label = "tabFade",
         )
-        val lift by animateFloatAsState(
-          targetValue = if (active) 1f else 0.9f,
-          animationSpec = spring(dampingRatio = 0.5f, stiffness = 620f),
-          label = "navLift",
-        )
+        // تبِ باز روشن است، بقیه تاریک — همان چیزی که نور می‌کند
         val tint = androidx.compose.ui.graphics.lerp(colors.muted, colors.primary, fade)
 
         Column(
           Modifier
             .weight(1f)
             .fillMaxHeight()
-            // همین یک خط جای نشانگر را تعیین می‌کند
+            // همین یک خط جای چراغ را تعیین می‌کند
             .onGloballyPositioned {
               slots[index] = (it.positionInRoot().x + it.size.width / 2f) to it.size.width.toFloat()
             }
@@ -494,8 +508,8 @@ private fun TohidNavBar(
               indication = null,
               onClick = { onPick(t.id) },
             )
-            // محتوا بینِ تاج و ریل می‌نشیند، پس خط هیچ‌وقت روی آیکن
-            // نمی‌افتد — چه تبِ اول باشد چه آخر
+            // فاصله‌ها ثابت‌اند و به فعال بودن ربطی ندارند، پس روشن شدنِ
+            // یک تب جای بقیه را تکان نمی‌دهد
             .padding(top = contentTop, bottom = contentBottom),
           horizontalAlignment = Alignment.CenterHorizontally,
           verticalArrangement = Arrangement.Center,
@@ -504,22 +518,14 @@ private fun TohidNavBar(
             t.icon,
             contentDescription = t.label,
             tint = tint,
-            modifier = Modifier
-              .size(21.dp)
-              .graphicsLayer { scaleX = lift; scaleY = lift },
+            modifier = Modifier.size(22.dp),
           )
-          Spacer(Modifier.height(4.dp))
-          Box(
-            Modifier
-              .size(4.dp)
-              .clip(RoundedCornerShape(2.dp))
-              .background(colors.primary.copy(alpha = fade))
-          )
-          Spacer(Modifier.height(3.dp))
+          Spacer(Modifier.height(5.dp))
           Text(
             t.label,
             style = MaterialTheme.typography.labelSmall,
             color = tint,
+            fontWeight = if (active) FontWeight.Bold else null,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
           )
