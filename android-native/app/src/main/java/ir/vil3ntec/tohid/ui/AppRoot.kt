@@ -10,6 +10,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.Canvas
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -321,15 +323,17 @@ private fun TohidNavBar(
 ) {
   val colors = Shop.colors
   val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
-  val brandWidth = 62.dp
-  val barHeight = 68.dp
+  val brandWidth = 64.dp
+  // قدِ نوار عمداً بلندتر از محتواست: منحنی جا می‌خواهد. با قدِ کم، خط
+  // مجبور است تند بالا برود و همان جایی است که می‌شکند.
+  val barHeight = 78.dp
 
   val activeIndex = tabs.indexOfFirst { it.id == current }.coerceAtLeast(0)
   val visible = current != null
   // جای خط نرم جابه‌جا می‌شود، نه اینکه بپرد
   val slot by animateFloatAsState(
     targetValue = activeIndex.toFloat(),
-    animationSpec = tween(if (Motion.enabled) 320 else 0),
+    animationSpec = tween(if (Motion.enabled) 340 else 0),
     label = "navSlot",
   )
 
@@ -340,7 +344,7 @@ private fun TohidNavBar(
       .padding(horizontal = 10.dp, vertical = 10.dp)
       .clip(RoundedCornerShape(percent = 50))
       .background(colors.surface)
-      .border(1.dp, colors.fieldBorder.copy(alpha = 0.45f), RoundedCornerShape(percent = 50))
+      .border(1.dp, colors.fieldBorder.copy(alpha = 0.35f), RoundedCornerShape(percent = 50))
       .height(barHeight),
   ) {
     /* ----------------------- خطِ روانِ رنگی ----------------------- */
@@ -357,38 +361,63 @@ private fun TohidNavBar(
         val center = brandEdge + dir * ((slot + 0.5f) * lane)
         val half = lane / 2f
 
-        val topY = h * 0.16f
-        val botY = h * 0.88f
-        val startY = h * 0.54f
-        val near = center - dir * half
-        val outer = center + dir * half
+        val yTop = h * 0.13f     // بلندیِ تاجِ منحنی، بالای آیکنِ تبِ باز
+        val yBot = h * 0.90f     // خطِ کفِ نوار
+        val yStart = h * 0.48f   // جایی که خط از کنارِ نشانِ برنامه درمی‌آید
 
+        // دو شانهٔ تاج. کمی پهن‌تر از خودِ تب، تا آیکن داخلش بنشیند نه رویش.
+        val shoulderIn = center - dir * half * 1.05f
+        val shoulderOut = center + dir * half * 1.05f
+        val settle = shoulderOut + dir * half * 1.30f
+
+        /*
+         *  منحنی، بدونِ شکستگی.
+         *
+         *  رازش این است که در هر دو شانه، مماسِ ورودی و خروجی هر دو
+         *  **افقی** باشند: نقطه‌های کنترلِ دو سرِ هر خم روی همان ارتفاعِ
+         *  خودِ نقطه می‌نشینند. اگر یکی‌شان مورب باشد، درست همان‌جا خط
+         *  زاویه پیدا می‌کند — همان کنجِ تیزی که در عکس دیده می‌شد.
+         */
         val path = Path().apply {
-          moveTo(brandEdge, startY)
-          // بالا رفتن از سمتِ نشانِ برنامه
+          moveTo(brandEdge, yStart)
           cubicTo(
-            brandEdge + dir * half * 0.45f, startY,
-            near - dir * half * 0.45f, topY,
-            near, topY,
+            brandEdge + dir * half * 0.75f, yStart,
+            shoulderIn - dir * half * 0.75f, yTop,
+            shoulderIn, yTop,
           )
-          // گهوارهٔ روی تبِ باز
+          lineTo(shoulderOut, yTop)          // تاجِ صاف روی تبِ باز
           cubicTo(
-            center - dir * half * 0.42f, topY - h * 0.055f,
-            center + dir * half * 0.42f, topY - h * 0.055f,
-            outer, topY,
+            shoulderOut + dir * half * 0.75f, yTop,
+            settle - dir * half * 0.55f, yBot,
+            settle, yBot,
           )
-          // پایین آمدن و ادامه تا آخرِ نوار
-          cubicTo(
-            outer + dir * half * 0.55f, topY,
-            outer + dir * half * 0.30f, botY,
-            outer + dir * half * 1.00f, botY,
-          )
-          lineTo(far, botY)
+          lineTo(far, yBot)
         }
 
+        /*
+         *  خط از سمتِ تبِ باز پررنگ است و هرچه دورتر می‌رود محو می‌شود.
+         *
+         *  خطِ یک‌دستی که تا آخرِ نوار می‌رود، یک زیرخطِ بی‌دلیل زیرِ
+         *  بقیهٔ تب‌ها می‌شود؛ محو شدن، نگاه را همان‌جا که تب باز است
+         *  نگه می‌دارد.
+         */
+        val axis = (far - brandEdge)
+        val solid = if (axis == 0f) 0.5f
+        else ((settle - brandEdge) / axis).coerceIn(0.12f, 0.9f)
+
+        fun brush(alpha: Float) = Brush.linearGradient(
+          colorStops = arrayOf(
+            0f to line.copy(alpha = alpha),
+            solid to line.copy(alpha = alpha),
+            1f to line.copy(alpha = 0f),
+          ),
+          start = Offset(brandEdge, 0f),
+          end = Offset(far, 0f),
+        )
+
         // هالهٔ کم‌رنگ زیرِ خط: خطِ یک‌نقطه‌ای روی زمینهٔ تیره گم می‌شود
-        drawPath(path, line.copy(alpha = 0.22f), style = Stroke(6.dp.toPx(), cap = StrokeCap.Round))
-        drawPath(path, line, style = Stroke(1.6.dp.toPx(), cap = StrokeCap.Round))
+        drawPath(path, brush(0.20f), style = Stroke(7.dp.toPx(), cap = StrokeCap.Round))
+        drawPath(path, brush(1f), style = Stroke(1.7.dp.toPx(), cap = StrokeCap.Round))
       }
     }
 
@@ -440,10 +469,13 @@ private fun TohidNavBar(
               interactionSource = remember { MutableInteractionSource() },
               indication = null,
               onClick = { onPick(t.id) },
-            ),
+            )
+            .padding(bottom = (9 * fade).dp),
           horizontalAlignment = Alignment.CenterHorizontally,
           verticalArrangement = Arrangement.Center,
         ) {
+          // تبِ باز کمی بالا می‌آید تا داخلِ تاجِ منحنی بنشیند، نه رویش
+          Spacer(Modifier.height(0.dp))
           Icon(
             t.icon,
             contentDescription = t.label,
