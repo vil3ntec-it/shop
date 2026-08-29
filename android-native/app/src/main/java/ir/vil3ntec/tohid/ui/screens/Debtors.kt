@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -82,8 +83,7 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
     AccountView(
       account = account,
       onBack = { openId = null },
-      onGive = { txFor = account.debtor.id to DebtorEngine.Kind.GIVE },
-      onReceive = { txFor = account.debtor.id to DebtorEngine.Kind.RECEIVE },
+      onNewTx = { txFor = account.debtor.id to DebtorEngine.Kind.GIVE },
       onEdit = { form = DebtorFormState.of(account.debtor) },
       onDelete = { confirmDelete = account.debtor },
       onDeleteTx = { confirmTx = it },
@@ -178,10 +178,10 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
       balance = ShopStore.debt(d, debtorId),
       kind = kind,
       onDismiss = { txFor = null },
-      onSave = { amount, date, notes ->
+      onSave = { chosenKind, amount, date, notes ->
         apply(
           DebtorEngine.addTransaction(
-            d, debtorId, kind, amount, date, notes, todayIso(), System.currentTimeMillis(), ::newId,
+            d, debtorId, chosenKind, amount, date, notes, todayIso(), System.currentTimeMillis(), ::newId,
           ),
           "با موفقیت ثبت شد",
         ) { txFor = null }
@@ -280,18 +280,32 @@ private fun DebtorRow(debtor: Debtor, balance: Double, onClick: () -> Unit) {
 private fun AccountView(
   account: DebtorEngine.Account,
   onBack: () -> Unit,
-  onGive: () -> Unit,
-  onReceive: () -> Unit,
+  onNewTx: () -> Unit,
   onEdit: () -> Unit,
   onDelete: () -> Unit,
   onDeleteTx: (String) -> Unit,
 ) {
-  LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
+  Box(Modifier.fillMaxSize()) {
+  LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, 96.dp)) {
     item {
-      TextButton(onClick = onBack) {
-        Icon(Icons.Filled.ArrowForward, contentDescription = null, tint = Shop.colors.primary)
-        Spacer(Modifier.width(6.dp))
-        Text("بازگشت به فهرست", color = Shop.colors.primary)
+      Row(
+        Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+      ) {
+        TextButton(onClick = onBack) {
+          Icon(Icons.Filled.ArrowForward, contentDescription = null, tint = Shop.colors.primary)
+          Spacer(Modifier.width(6.dp))
+          Text("بازگشت به قرض‌داران", color = Shop.colors.primary)
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+          IconButton(onClick = onEdit) {
+            Icon(Icons.Filled.Edit, contentDescription = "ویرایش", tint = Shop.colors.muted)
+          }
+          IconButton(onClick = onDelete) {
+            Icon(Icons.Filled.DeleteOutline, contentDescription = "حذف", tint = Shop.colors.danger)
+          }
+        }
       }
       Spacer(Modifier.height(6.dp))
 
@@ -305,35 +319,32 @@ private fun AccountView(
       }
       Spacer(Modifier.height(14.dp))
 
-      StatTile(
-        label = DebtorEngine.stateText(account.balance),
-        value = "${money(kotlin.math.abs(account.balance))} افغانی",
-        tint = when {
-          account.balance > 0 -> Shop.colors.warning
-          account.balance < 0 -> Shop.colors.success
-          else -> Shop.colors.muted
-        },
-        hint = "گرفته: ${money(account.given)} — پس داده: ${money(account.received)}",
-        modifier = Modifier.fillMaxWidth(),
-      )
-
-      Spacer(Modifier.height(12.dp))
-      Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Button(onClick = onReceive, modifier = Modifier.weight(1f)) { Text("پول گرفتم") }
-        OutlinedButton(onClick = onGive, modifier = Modifier.weight(1f)) { Text("قرض دادم") }
-      }
-      Spacer(Modifier.height(6.dp))
-      Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedButton(onClick = onEdit, modifier = Modifier.weight(1f)) { Text("ویرایش") }
-        OutlinedButton(
-          onClick = onDelete,
-          colors = ButtonDefaults.outlinedButtonColors(contentColor = Shop.colors.danger),
-          modifier = Modifier.weight(1f),
-        ) { Text("حذف") }
+      // سه کارتِ بالای حساب — همان چیدمانِ وب: کل برد، کل رسید، الباقی
+      Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        AccountTile(
+          "کل برد", money(account.given), "افغانی",
+          Shop.colors.danger, Shop.colors.dangerTint, Modifier.weight(1f),
+        )
+        AccountTile(
+          "کل رسید", money(account.received), "افغانی",
+          Shop.colors.success, Shop.colors.successTint, Modifier.weight(1f),
+        )
+        AccountTile(
+          "الباقی",
+          if (account.balance == 0.0) "تسویه" else money(kotlin.math.abs(account.balance)),
+          if (account.balance == 0.0) "حساب صاف" else DebtorEngine.stateText(account.balance),
+          when {
+            account.balance > 0 -> Shop.colors.warning
+            account.balance < 0 -> Shop.colors.success
+            else -> Shop.colors.success
+          },
+          Shop.colors.surface,
+          Modifier.weight(1f),
+        )
       }
 
       Spacer(Modifier.height(18.dp))
-      SectionTitle("تراکنش‌ها")
+      SectionTitle("تاریخچهٔ تراکنش‌ها")
     }
 
     if (account.transactions.isEmpty()) {
@@ -373,6 +384,42 @@ private fun AccountView(
         Spacer(Modifier.height(6.dp))
       }
     }
+  }
+
+  // نوارِ پایین برای ثبت تراکنش — همان نوارِ چسبیدهٔ نسخهٔ وب
+  Row(
+    Modifier
+      .align(Alignment.BottomCenter)
+      .fillMaxWidth()
+      .padding(12.dp)
+      .clip(RoundedCornerShape(Radius.md))
+      .background(Shop.colors.surface)
+      .border(1.dp, Shop.colors.primary.copy(alpha = 0.4f), RoundedCornerShape(Radius.md))
+      .clickable(onClick = onNewTx)
+      .padding(horizontal = 14.dp, vertical = 12.dp),
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(12.dp),
+  ) {
+    Box(
+      Modifier.size(38.dp).clip(RoundedCornerShape(19.dp)).background(Shop.colors.primary),
+      contentAlignment = Alignment.Center,
+    ) {
+      Icon(Icons.Filled.Add, contentDescription = null, tint = Color.White)
+    }
+    Column(Modifier.weight(1f)) {
+      Text(
+        "ثبت تراکنش جدید",
+        style = MaterialTheme.typography.titleSmall,
+        color = Shop.colors.text,
+        fontWeight = FontWeight.Bold,
+      )
+      Text(
+        "مبلغ را بنویسید و برد یا رسید را انتخاب کنید",
+        style = MaterialTheme.typography.labelSmall,
+        color = Shop.colors.muted,
+      )
+    }
+  }
   }
 }
 
@@ -435,21 +482,41 @@ private fun TransactionDialog(
   balance: Double,
   kind: DebtorEngine.Kind,
   onDismiss: () -> Unit,
-  onSave: (Double, String, String) -> Unit,
+  onSave: (DebtorEngine.Kind, Double, String, String) -> Unit,
 ) {
   var amount by remember { mutableStateOf("") }
   var date by remember { mutableStateOf(todayIso()) }
   var notes by remember { mutableStateOf("") }
-  val receiving = kind == DebtorEngine.Kind.RECEIVE
+  // نوعِ تراکنش داخلِ همین کادر عوض می‌شود — مثل نسخهٔ وب، که یک کادر
+  // دارد با دو کلید، نه دو دکمهٔ جدا در صفحهٔ حساب
+  var chosen by remember { mutableStateOf(kind) }
+  val receiving = chosen == DebtorEngine.Kind.RECEIVE
 
   Dialog(onDismissRequest = onDismiss) {
     Surface(color = Shop.colors.surface, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
       Column(Modifier.padding(18.dp).verticalScroll(rememberScrollState())) {
         Text(
-          if (receiving) "پول گرفتم" else "قرض دادم",
+          if (receiving) "ثبت رسید جدید" else "ثبت برد جدید",
           style = MaterialTheme.typography.titleMedium,
           color = Shop.colors.text,
         )
+        Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+          KindChoice(
+            title = "برد",
+            detail = "افزایش بدهی",
+            selected = !receiving,
+            tint = Shop.colors.danger,
+            modifier = Modifier.weight(1f),
+          ) { chosen = DebtorEngine.Kind.GIVE }
+          KindChoice(
+            title = "رسید",
+            detail = "کاهش بدهی",
+            selected = receiving,
+            tint = Shop.colors.success,
+            modifier = Modifier.weight(1f),
+          ) { chosen = DebtorEngine.Kind.RECEIVE }
+        }
         if (debtor != null) {
           Spacer(Modifier.height(4.dp))
           Text(
@@ -487,5 +554,65 @@ private fun TransactionDialog(
         }
       }
     }
+  }
+}
+
+
+/** کارتِ رنگیِ بالای حساب — همان سه کارتِ «کل برد / کل رسید / الباقی» وب */
+@Composable
+private fun AccountTile(
+  label: String,
+  value: String,
+  hint: String,
+  tint: Color,
+  background: Color,
+  modifier: Modifier = Modifier,
+) {
+  Column(
+    modifier
+      .clip(RoundedCornerShape(Radius.md))
+      .background(background)
+      .border(1.dp, tint.copy(alpha = 0.35f), RoundedCornerShape(Radius.md))
+      .padding(12.dp),
+    horizontalAlignment = Alignment.CenterHorizontally,
+  ) {
+    Text(label, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+    Spacer(Modifier.height(4.dp))
+    Text(value, style = MaterialTheme.typography.titleMedium, color = tint, fontWeight = FontWeight.Bold)
+    Text(hint, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2)
+  }
+}
+
+
+/** یکی از دو کلیدِ «برد» و «رسید» در کادرِ تراکنش */
+@Composable
+private fun KindChoice(
+  title: String,
+  detail: String,
+  selected: Boolean,
+  tint: Color,
+  modifier: Modifier = Modifier,
+  onClick: () -> Unit,
+) {
+  Column(
+    modifier
+      .clip(RoundedCornerShape(Radius.md))
+      .background(if (selected) tint.copy(alpha = 0.12f) else Shop.colors.surface)
+      .border(
+        if (selected) 1.5.dp else 1.dp,
+        if (selected) tint else Shop.colors.border,
+        RoundedCornerShape(Radius.md),
+      )
+      .clickable(onClick = onClick)
+      .padding(vertical = 10.dp),
+    horizontalAlignment = Alignment.CenterHorizontally,
+  ) {
+    Text(
+      title,
+      style = MaterialTheme.typography.labelLarge,
+      color = if (selected) tint else Shop.colors.text,
+      fontWeight = FontWeight.Bold,
+    )
+    Text(detail, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
   }
 }

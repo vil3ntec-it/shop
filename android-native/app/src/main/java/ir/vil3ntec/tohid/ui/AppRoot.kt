@@ -26,6 +26,23 @@ import kotlinx.coroutines.launch
 
 private data class Tab(val id: String, val label: String, val icon: ImageVector)
 
+/** نامِ صفحه‌ها برای سربرگ — همان عنوان‌هایی که وب بالای صفحه می‌نویسد */
+private val PAGE_TITLES = mapOf(
+  "dashboard" to "داشبورد",
+  "sale" to "فروش",
+  "debtors" to "قرض‌داران",
+  "warehouse" to "انبار",
+  "expenses" to "مصارف",
+  "products" to "محصولات",
+  "more" to "بیشتر",
+  "purchasing" to "خرید و تأمین‌کننده",
+  "sales" to "تاریخچه فروش",
+  "reports" to "گزارشات",
+  "receipts" to "رسیدها",
+  "audit" to "سابقه عملیات",
+  "settings" to "تنظیمات",
+)
+
 private val TABS = listOf(
   Tab("dashboard", "داشبورد", Icons.Filled.GridView),
   Tab("sale", "فروش", Icons.Filled.PointOfSale),
@@ -55,6 +72,8 @@ fun AppRoot(
   var pendingProduct by remember { mutableStateOf<String?>(null) }
   // صفحهٔ فرعیِ باز، اگر باز باشد
   var sub by rememberSaveable { mutableStateOf<String?>(null) }
+  // صفحهٔ ورود، وقتی از دکمهٔ حسابِ سربرگ باز شود
+  var authOpen by rememberSaveable { mutableStateOf(false) }
 
   // یک بار، هنگام اولین اجرا: دفترِ دکان از نسخهٔ قبلی آورده می‌شود
   LaunchedEffect(Unit) {
@@ -74,8 +93,26 @@ fun AppRoot(
     migration?.let { scope.launch { snackbar.showSnackbar(it) } }
   }
 
+  if (authOpen) {
+    WelcomeScreen { authOpen = false }
+    return
+  }
+
   Scaffold(
     containerColor = Shop.colors.bg,
+    topBar = {
+      TohidTopBar(
+        title = PAGE_TITLES[sub ?: tab] ?: "توحید",
+        d = data,
+        theme = theme,
+        onTheme = onTheme,
+        onSettings = { sub = "settings" },
+        onAccount = {
+          val lic = ir.vil3ntec.tohid.sync.SyncStore(context)
+          if (lic.accessToken.isNullOrBlank()) authOpen = true else sub = "settings"
+        },
+      )
+    },
     snackbarHost = { SnackbarHost(snackbar) },
     bottomBar = {
       NavigationBar(containerColor = Shop.colors.surface, tonalElevation = 0.dp) {
@@ -119,7 +156,7 @@ fun AppRoot(
         "audit" -> AuditLogScreen(data)
         "settings" -> SettingsScreen(store, data, snackbar, theme, onTheme)
         "expenses" -> ExpensesScreen(store, data, snackbar)
-        "dashboard" -> DashboardScreen(data, theme, onTheme) { target ->
+        "dashboard" -> DashboardScreen(data) { target ->
           if (target == "settings") sub = "settings" else { tab = target; sub = null }
         }
         "sale" -> VipGate("فروش (صندوق)") {
