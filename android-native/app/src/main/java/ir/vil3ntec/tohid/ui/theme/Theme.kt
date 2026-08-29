@@ -58,61 +58,62 @@ data class ShopColors(
 /**
  *  روزِ قطبی — همان هویتِ آبی، روی زمینهٔ روشن.
  *
- *  کلیدِ روشن/تاریک قابلیتِ موجودِ برنامه است و برداشته نمی‌شود؛ ولی
- *  حالتِ روشن هم دیگر سفیدِ خالی نیست: یک سفیدِ آبی‌فام که همان خانواده
- *  را نگه می‌دارد.
+ *  یک نکته که در نسخهٔ قبل اشتباه بود: زمینه تقریباً سفید بود و کارت‌ها
+ *  هم سفید، پس کارت از زمینه جدا نمی‌شد و کاربر فقط یک خطِ نازک می‌دید.
+ *  حالا زمینه یک آبیِ یخیِ روشن است و کارت سفیدِ خالص؛ جدایی از **اختلافِ
+ *  رنگ** می‌آید، نه از خطِ دورِ کارت.
  */
 val LightColors = ShopColors(
-  bg = Color(0xFFF2F7FD),
+  bg = Color(0xFFDFEAF7),
   surface = Color(0xFFFFFFFF),
-  surface2 = Color(0xFFE9F1FB),
-  border = Color(0xFFDCE8F6),
+  surface2 = Color(0xFFECF3FC),
+  // حاشیه تقریباً نامرئی است؛ فقط برای جاهایی که واقعاً خط لازم است
+  border = Color(0x0F1B4F80),
   text = Color(0xFF0C1626),
-  muted = Color(0xFF5C6E86),
-  muted2 = Color(0xFF93A4BA),
+  muted = Color(0xFF56687F),
+  muted2 = Color(0xFF8698AF),
   primary = Color(0xFF1B7FD4),
   primaryDark = Color(0xFF115EA3),
-  primaryTint = Color(0xFFDCEEFF),
-  success = Color(0xFF12876B),
-  successTint = Color(0xFFDDF4EE),
-  warning = Color(0xFFC77B18),
-  warningTint = Color(0xFFFBEEDA),
-  danger = Color(0xFFD5453F),
-  dangerTint = Color(0xFFFBE4E3),
-  accent = Color(0xFF12A5B8),
-  glow = Color(0x141B7FD4),
-  sheen = Color(0xB3FFFFFF),
-  auroraOne = Color(0x2263B8F0),
-  auroraTwo = Color(0x1A3FD0DE),
+  primaryTint = Color(0xFFD5E9FD),
+  success = Color(0xFF0F7A60),
+  successTint = Color(0xFFD5F1E9),
+  warning = Color(0xFFB86F10),
+  warningTint = Color(0xFFFBE9CE),
+  danger = Color(0xFFCC3B35),
+  dangerTint = Color(0xFFFBDCDA),
+  accent = Color(0xFF0E93A4),
+  glow = Color(0x1F1B7FD4),
+  sheen = Color(0x00FFFFFF),
+  auroraOne = Color(0x2E7FBDF0),
+  auroraTwo = Color(0x2340D3E0),
 )
 
 /**
  *  شبِ قطبی — حالتِ اصلیِ برنامه.
  *
- *  زمینه سرمه‌ایِ تقریباً سیاه است تا نورِ آبی روی آن بنشیند. سطح‌ها سه
- *  پله دارند (زمینه، کارت، کارتِ روی کارت) و اختلافشان کم است؛ عمق از
- *  همین پله‌ها می‌آید، نه از سایهٔ سنگین.
+ *  اینجا هم همان قاعده: فاصلهٔ روشنیِ زمینه تا کارت باید آن‌قدر باشد که
+ *  بدونِ خطِ دور هم دیده شود. سه پله داریم — زمینه، کارت، کارتِ روی کارت.
  */
 val DarkColors = ShopColors(
-  bg = Color(0xFF060B14),
-  surface = Color(0xFF0E1725),
-  surface2 = Color(0xFF152134),
-  border = Color(0x1F7FC4F5),
+  bg = Color(0xFF050A12),
+  surface = Color(0xFF121E30),
+  surface2 = Color(0xFF1C2C44),
+  border = Color(0x14A7D6F7),
   text = Color(0xFFEAF3FC),
-  muted = Color(0xFF93A9C4),
-  muted2 = Color(0xFF5D7391),
+  muted = Color(0xFF9CB0CA),
+  muted2 = Color(0xFF6A80A0),
   primary = Color(0xFF67C6F5),
   primaryDark = Color(0xFF9BDCFF),
-  primaryTint = Color(0x2667C6F5),
+  primaryTint = Color(0x2E67C6F5),
   success = Color(0xFF3ED6A8),
-  successTint = Color(0x263ED6A8),
+  successTint = Color(0x2E3ED6A8),
   warning = Color(0xFFF3BE63),
-  warningTint = Color(0x26F3BE63),
+  warningTint = Color(0x2EF3BE63),
   danger = Color(0xFFFF7A72),
-  dangerTint = Color(0x26FF7A72),
+  dangerTint = Color(0x2EFF7A72),
   accent = Color(0xFF56E5DA),
-  glow = Color(0x3367C6F5),
-  sheen = Color(0x1FFFFFFF),
+  glow = Color(0x3D67C6F5),
+  sheen = Color(0x14FFFFFF),
   auroraOne = Color(0x3D2F7FD6),
   auroraTwo = Color(0x2E23B6C9),
 )
@@ -151,25 +152,65 @@ fun TohidTheme(
     ThemeChoice.SYSTEM -> isSystemInDarkTheme()
   }
   val colors = if (dark) DarkColors else LightColors
+  /*
+   *  اجزای آمادهٔ متریال — تراشه، دکمه، کادرِ متن — رنگشان را از همین
+   *  طرح می‌گیرند. تا وقتی این‌ها را ننویسیم، متریال رنگ‌های پیش‌فرضِ
+   *  بنفشِ خودش را می‌گذارد و خطِ خاکستری دورِ تراشه‌ها می‌کشد؛ همان
+   *  چیزی که در صفحهٔ گزارش‌ها دیده می‌شد.
+   */
   val scheme = if (dark) {
     darkColorScheme(
       primary = colors.primary,
+      onPrimary = Color(0xFF04121F),
+      primaryContainer = colors.primaryTint,
+      onPrimaryContainer = colors.primaryDark,
+      secondary = colors.accent,
+      onSecondary = Color(0xFF04121F),
+      secondaryContainer = colors.primaryTint,
+      onSecondaryContainer = colors.primary,
       background = colors.bg,
-      surface = colors.surface,
-      onPrimary = Color.White,
       onBackground = colors.text,
+      surface = colors.surface,
       onSurface = colors.text,
+      surfaceVariant = colors.surface2,
+      onSurfaceVariant = colors.muted,
+      surfaceContainer = colors.surface,
+      surfaceContainerHigh = colors.surface2,
+      surfaceContainerHighest = colors.surface2,
+      outline = colors.border,
+      outlineVariant = colors.border,
       error = colors.danger,
+      onError = Color(0xFF2A0B09),
+      errorContainer = colors.dangerTint,
+      onErrorContainer = colors.danger,
+      scrim = Color(0xCC020509),
     )
   } else {
     lightColorScheme(
       primary = colors.primary,
-      background = colors.bg,
-      surface = colors.surface,
       onPrimary = Color.White,
+      primaryContainer = colors.primaryTint,
+      onPrimaryContainer = colors.primaryDark,
+      secondary = colors.accent,
+      onSecondary = Color.White,
+      secondaryContainer = colors.primaryTint,
+      onSecondaryContainer = colors.primaryDark,
+      background = colors.bg,
       onBackground = colors.text,
+      surface = colors.surface,
       onSurface = colors.text,
+      surfaceVariant = colors.surface2,
+      onSurfaceVariant = colors.muted,
+      surfaceContainer = colors.surface,
+      surfaceContainerHigh = colors.surface2,
+      surfaceContainerHighest = colors.surface2,
+      outline = colors.border,
+      outlineVariant = colors.border,
       error = colors.danger,
+      onError = Color.White,
+      errorContainer = colors.dangerTint,
+      onErrorContainer = colors.danger,
+      scrim = Color(0x990C1626),
     )
   }
 

@@ -109,7 +109,7 @@ fun QuickSaleScreen(
 
   Box(Modifier.fillMaxSize()) {
     LazyVerticalGrid(
-      columns = GridCells.Adaptive(minSize = 112.dp),
+      columns = GridCells.Adaptive(minSize = gridMinSize(phone = 112.dp, tablet = 140.dp)),
       modifier = Modifier.fillMaxSize(),
       contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, if (cart.isEmpty()) 24.dp else 180.dp),
       horizontalArrangement = Arrangement.spacedBy(8.dp),

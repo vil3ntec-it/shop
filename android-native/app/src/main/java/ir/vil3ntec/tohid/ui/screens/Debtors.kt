@@ -110,7 +110,7 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
       // شبکهٔ کارت‌ها — همان `.debtor-list` نسخهٔ وب. قرض‌دار در یک نگاه
       // از رنگِ کارتش شناخته می‌شود، نه از خواندنِ عدد.
       LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = 104.dp),
+        columns = GridCells.Adaptive(minSize = gridMinSize(phone = 104.dp, tablet = 132.dp)),
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, 96.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
