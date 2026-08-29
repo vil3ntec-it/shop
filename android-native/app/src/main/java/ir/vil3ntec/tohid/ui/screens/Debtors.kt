@@ -122,7 +122,6 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
           // جمعِ طلب و کادرِ جستجو هر سه روی هم می‌افتادند و متنشان
           // درهم می‌شد.
           Column {
-            Text("قرض‌داران", style = MaterialTheme.typography.headlineMedium, color = Shop.colors.text)
             Spacer(Modifier.height(14.dp))
 
             val owed = rows.sumOf { it.second.coerceAtLeast(0.0) }

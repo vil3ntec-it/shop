@@ -43,6 +43,7 @@ import ir.vil3ntec.tohid.data.WarehouseEngine
 import ir.vil3ntec.tohid.ui.screens.*
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
@@ -161,34 +162,33 @@ fun AppRoot(
         theme = theme,
         onTheme = onTheme,
         onSettings = { sub = "settings" },
-        onAccount = {
-          val lic = ir.vil3ntec.tohid.sync.SyncStore(context)
-          if (lic.accessToken.isNullOrBlank()) authOpen = true else sub = "settings"
-        },
         onOpen = ::open,
       )
     },
     /*
-     *  دکمهٔ شناور — یک بار، برای همهٔ صفحه‌ها.
+     *  دکمهٔ شناورِ سراسری برداشته شد.
      *
-     *  در `floatingActionButton` اسکافولد می‌نشیند، پس خودِ اسکافولد
-     *  جایش را کنار می‌گذارد و روی کارت‌ها و دکمه‌های صفحه نمی‌افتد.
+     *  هر صفحه از قبل دکمهٔ افزودنِ خودش را داشت — «محصول جدید»،
+     *  «قرض‌دار تازه»، «مصرف تازه». دکمهٔ مشترک روی همان‌ها می‌نشست و در
+     *  یک صفحه دو یا سه «ثبت» دیده می‌شد، و روی کارت‌های پایینِ فهرست هم
+     *  می‌افتاد. دکمهٔ خودِ هر صفحه، هم جایش درست است هم کارش معلوم.
      */
-    floatingActionButton = {
-      TohidSpeedDial(
-        onNewProduct = { editProduct = ProductFormState() },
-        onOpen = ::open,
-        modifier = Modifier.padding(bottom = 96.dp),
-      )
-    },
-    // پیام‌ها از پایینِ صفحه بالا می‌آیند و بالای نوارِ ناوبری می‌ایستند
+    /*
+     *  پیام‌ها بالای صفحه می‌آیند، نه پایین.
+     *
+     *  کارتِ پایینِ صفحه روی نوارِ ناوبری و روی دکمه‌های خودِ صفحه
+     *  می‌نشست و تا وقتی نرفته بود، زیرش قابلِ زدن نبود. بالا، سرِ راهِ
+     *  هیچ‌چیز نیست.
+     */
     snackbarHost = {
-      TohidSnackbar(
-        host = snackbar,
-        modifier = Modifier
-          .windowInsetsPadding(WindowInsets.navigationBars)
-          .padding(bottom = 84.dp),
-      )
+      Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+        TohidSnackbar(
+          host = snackbar,
+          modifier = Modifier
+            .windowInsetsPadding(WindowInsets.statusBars)
+            .padding(top = 8.dp, start = 12.dp, end = 12.dp),
+        )
+      }
     },
     bottomBar = {
       TohidNavBar(
@@ -555,90 +555,6 @@ private fun TohidNavBar(
           )
         }
       }
-    }
-  }
-}
-
-/* ========================== دکمهٔ شناور ========================== */
-
-/**
- *  کارهای پرتکرار، از هر صفحه‌ای.
- *
- *  تا حالا هر صفحه دکمهٔ افزودنِ خودش را داشت و صفحه‌هایی که نداشتند —
- *  گزارش، رسیدها، سابقه — هیچ راهِ کوتاهی نداشتند. حالا یک دکمه هست که
- *  همه‌جا هست و باز که شود، پنج کارِ روزمره را نشان می‌دهد.
- *
- *  جایش را اسکافولد تعیین می‌کند، نه ما: به همین دلیل روی کارت‌ها و
- *  دکمه‌های خودِ صفحه نمی‌افتد و بالای نوارِ پایین می‌ایستد.
- */
-@Composable
-private fun TohidSpeedDial(
-  onNewProduct: () -> Unit,
-  onOpen: (String) -> Unit,
-  modifier: Modifier = Modifier,
-) {
-  var open by remember { mutableStateOf(false) }
-  val spin by animateFloatAsState(
-    targetValue = if (open) 135f else 0f,
-    animationSpec = tween(if (Motion.enabled) 220 else 0),
-    label = "fabSpin",
-  )
-  val colors = Shop.colors
-
-  Column(modifier, horizontalAlignment = Alignment.End) {
-    AnimatedVisibility(
-      visible = open,
-      enter = fadeIn(tween(160)) + slideInVertically(tween(200)) { it / 3 },
-      exit = fadeOut(tween(120)),
-    ) {
-      Column(horizontalAlignment = Alignment.End) {
-        SpeedAction("فروش سریع", Icons.Filled.PointOfSale, colors.primary) { open = false; onOpen("sale") }
-        SpeedAction("محصول جدید", Icons.Filled.ShoppingBag, colors.accent) { open = false; onNewProduct() }
-        SpeedAction("ورود کالا به انبار", Icons.Filled.Inventory2, colors.success) { open = false; onOpen("warehouse") }
-        SpeedAction("قرض‌دار تازه", Icons.Filled.Groups, colors.warning) { open = false; onOpen("debtors") }
-        SpeedAction("ثبت مصرف", Icons.Filled.Payments, colors.danger) { open = false; onOpen("expenses") }
-        Spacer(Modifier.height(10.dp))
-      }
-    }
-    FloatingActionButton(
-      onClick = { open = !open },
-      containerColor = colors.primary,
-      contentColor = Color.White,
-    ) {
-      Icon(
-        Icons.Filled.Add,
-        contentDescription = if (open) "بستن" else "افزودن",
-        modifier = Modifier.graphicsLayer { rotationZ = spin },
-      )
-    }
-  }
-}
-
-@Composable
-private fun SpeedAction(
-  text: String,
-  icon: ImageVector,
-  tint: Color,
-  onClick: () -> Unit,
-) {
-  val colors = Shop.colors
-  Row(
-    Modifier
-      .padding(bottom = 10.dp)
-      .clip(RoundedCornerShape(24.dp))
-      .background(colors.surface)
-      .border(1.dp, colors.fieldBorder.copy(alpha = 0.5f), RoundedCornerShape(24.dp))
-      .clickable(onClick = onClick)
-      .padding(start = 14.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
-    verticalAlignment = Alignment.CenterVertically,
-  ) {
-    Text(text, style = MaterialTheme.typography.labelLarge, color = colors.text)
-    Spacer(Modifier.width(10.dp))
-    Box(
-      Modifier.size(32.dp).clip(RoundedCornerShape(16.dp)).background(tint.copy(alpha = 0.18f)),
-      contentAlignment = Alignment.Center,
-    ) {
-      Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(17.dp))
     }
   }
 }

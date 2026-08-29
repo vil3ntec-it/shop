@@ -49,7 +49,6 @@ fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
   Column(
     Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)
   ) {
-    Text("بیشتر", style = MaterialTheme.typography.headlineMedium, color = Shop.colors.text)
     Spacer(Modifier.height(16.dp))
 
     SectionTitle("وضعیت")

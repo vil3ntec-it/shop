@@ -572,35 +572,37 @@ private fun BulkFrame(
           )
         }
 
+        /*
+         *  پاورقی — یک ردیف، نه دو بلوک.
+         *
+         *  قبلاً کارتِ خلاصه و دکمهٔ «ذخیره همه» هرکدام یک ردیفِ کامل
+         *  بودند و با پاورقی و فاصله‌ها نزدیکِ صد نقطه از پایینِ صفحه را
+         *  می‌گرفتند. روی گوشی، وقتی صفحه‌کلید هم بالا می‌آمد، از خودِ
+         *  فرم چیزی نمی‌ماند که در آن بنویسی.
+         *
+         *  حالا خلاصه و دکمه در یک ردیف‌اند و خلاصه با نقطه از هم جدا
+         *  می‌شود؛ همان اطلاعات، یک‌سومِ ارتفاع.
+         */
+        Spacer(Modifier.height(8.dp))
         Row(
-          Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(Radius.sm))
-            .background(Shop.colors.surface)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-          horizontalArrangement = Arrangement.SpaceBetween,
+          Modifier.fillMaxWidth(),
+          verticalAlignment = Alignment.CenterVertically,
+          horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-          summary.forEach { (label, value) ->
-            Column {
-              Text(label, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2)
-              Text(
-                value,
-                style = MaterialTheme.typography.labelLarge,
-                color = Shop.colors.text,
-                fontWeight = FontWeight.Bold,
-              )
-            }
-          }
+          Text(
+            summary.joinToString(" · ") { (label, value) -> "$label: $value" },
+            style = MaterialTheme.typography.labelSmall,
+            color = Shop.colors.muted,
+            maxLines = 2,
+            modifier = Modifier.weight(1f),
+          )
+          TohidButton(
+            text = "ذخیره همه",
+            onClick = onSave,
+            enabled = saveEnabled,
+          )
         }
-
         Spacer(Modifier.height(10.dp))
-        TohidButton(
-          text = "ذخیره همه",
-          onClick = onSave,
-          enabled = saveEnabled,
-          modifier = Modifier.fillMaxWidth(),
-        )
-        Spacer(Modifier.height(12.dp))
       }
       }
     }

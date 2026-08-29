@@ -85,7 +85,6 @@ fun ReportsScreen(d: ShopData) {
 
   LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
     item {
-      Text("گزارشات", style = MaterialTheme.typography.headlineMedium, color = Shop.colors.text)
       Text(
         "سود، فروش و مصارف در بازهٔ دلخواه",
         style = MaterialTheme.typography.bodySmall,

@@ -73,7 +73,6 @@ fun PurchasingScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState)
   Box(Modifier.fillMaxSize()) {
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, 96.dp)) {
       item {
-        Text("خرید و تأمین‌کننده", style = MaterialTheme.typography.headlineMedium, color = Shop.colors.text)
         Text(
           "حساب تأمین‌کننده‌ها و بدهی به آن‌ها",
           style = MaterialTheme.typography.bodySmall,

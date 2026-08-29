@@ -68,6 +68,36 @@ object SalesEngine {
     return cart + CartLine(productId, quantity)
   }
 
+  /** نتیجهٔ افزودن به سبد: سبدِ تازه، و اینکه از موجودی جلو افتاد یا نه */
+  data class Added(val cart: List<CartLine>, val capped: Boolean, val available: Double)
+
+  /**
+   *  افزودن به سبد، با نگهبانِ موجودی.
+   *
+   *  تا حالا موجودی فقط لحظهٔ **ثبتِ فروش** سنجیده می‌شد. یعنی فروشنده
+   *  می‌توانست از کالایی که شش تا مانده، هفت تا در سبد بگذارد و کارتِ
+   *  کالا هم بگوید «۷ عدد در سبد» زیرِ «۶ عدد مانده» — و خطا تازه سرِ
+   *  ثبت درمی‌آمد، وقتی مشتری جلوی پیشخوان ایستاده.
+   *
+   *  حالا همان‌جا جلویش گرفته می‌شود و سبد روی موجودی می‌ایستد.
+   */
+  fun addToCartCapped(
+    cart: List<CartLine>,
+    productId: String,
+    quantity: Double,
+    available: Double,
+  ): Added {
+    val inCart = cart.find { it.productId == productId }?.quantity ?: 0.0
+    val room = (available - inCart).coerceAtLeast(0.0)
+    if (room <= 0.0) return Added(cart, capped = true, available = available)
+    val take = minOf(quantity, room)
+    return Added(
+      cart = addToCart(cart, productId, take),
+      capped = take < quantity,
+      available = available,
+    )
+  }
+
   /** تعیینِ تعداد. صفر یا کمتر یعنی حذفِ ردیف. */
   fun setCartQty(cart: List<CartLine>, productId: String, quantity: Double): List<CartLine> {
     if (quantity <= 0) return cart.filter { it.productId != productId }

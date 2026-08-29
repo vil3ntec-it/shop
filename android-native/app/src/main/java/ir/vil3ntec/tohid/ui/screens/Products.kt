@@ -128,7 +128,6 @@ fun ProductsScreen(
   Box(Modifier.fillMaxSize()) {
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, 96.dp)) {
       item {
-        Text("محصولات", style = MaterialTheme.typography.headlineMedium, color = Shop.colors.text)
         Text(
           "کالاهای فروشگاه، قیمت‌ها و سود هر قلم",
           style = MaterialTheme.typography.bodySmall,
@@ -186,23 +185,11 @@ fun ProductsScreen(
         )
         if (d.productCategories.isNotEmpty()) {
           Spacer(Modifier.height(10.dp))
-          Row(
-            Modifier.horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-          ) {
-            FilterChip(
-              selected = category == null,
-              onClick = { category = null },
-              label = { Text("همه") },
-            )
-            d.productCategories.forEach { c ->
-              FilterChip(
-                selected = category == c,
-                onClick = { category = if (category == c) null else c },
-                label = { Text(c) },
-              )
-            }
-          }
+          CategoryFilter(
+            categories = d.productCategories,
+            selected = category,
+            onSelect = { category = it },
+          )
         }
         Spacer(Modifier.height(14.dp))
       }
