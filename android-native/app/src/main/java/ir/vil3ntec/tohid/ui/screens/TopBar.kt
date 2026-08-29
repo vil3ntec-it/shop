@@ -52,20 +52,24 @@ data class Alert(val value: String, val title: String, val detail: String, val t
 fun rememberAlerts(d: ShopData): List<Alert> {
   val context = LocalContext.current
   val backupStale = remember { BackupClock.isStale(context) }
-  return remember(d, backupStale) {
+  // رنگ‌ها از CompositionLocal می‌آیند و خواندنشان فقط داخل بدنهٔ کامپوزبل
+  // مجاز است، نه داخل لامبدای remember — پس همین‌جا گرفته می‌شوند.
+  val danger = Shop.colors.danger
+  val warning = Shop.colors.warning
+  return remember(d, backupStale, danger, warning) {
     buildList {
       d.products.filter { ShopStore.stockStatus(d, it) == "out" }.forEach {
-        add(Alert("تمام شد", it.name, "کالا موجود نیست", Shop.colors.danger))
+        add(Alert("تمام شد", it.name, "کالا موجود نیست", danger))
       }
       d.products.filter { ShopStore.stockStatus(d, it) == "low" }.forEach {
-        add(Alert("موجودی کم", it.name, "${qty(ShopStore.stock(d, it.id))} مانده", Shop.colors.warning))
+        add(Alert("موجودی کم", it.name, "${qty(ShopStore.stock(d, it.id))} مانده", warning))
       }
       val supplierDebt = d.suppliers.sumOf { ShopStore.supplierDebt(d, it.id) }
       if (supplierDebt > 0) {
-        add(Alert("بدهی به تأمین‌کننده", "${money(supplierDebt)} افغانی", "پرداخت‌نشده", Shop.colors.warning))
+        add(Alert("بدهی به تأمین‌کننده", "${money(supplierDebt)} افغانی", "پرداخت‌نشده", warning))
       }
       if (backupStale) {
-        add(Alert("پشتیبان", "از اطلاعات دکان پشتیبان بگیرید", BackupClock.text(context), Shop.colors.warning))
+        add(Alert("پشتیبان", "از اطلاعات دکان پشتیبان بگیرید", BackupClock.text(context), warning))
       }
       d.debtors
         .map { it to ShopStore.debt(d, it.id) }
@@ -73,7 +77,7 @@ fun rememberAlerts(d: ShopData): List<Alert> {
         .sortedByDescending { it.second }
         .take(3)
         .forEach { (debtor, amount) ->
-          add(Alert("قرض‌دار", debtor.name, "${money(amount)} افغانی", Shop.colors.danger))
+          add(Alert("قرض‌دار", debtor.name, "${money(amount)} افغانی", danger))
         }
     }
   }

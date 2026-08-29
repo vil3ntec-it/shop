@@ -548,9 +548,9 @@ private fun TransactionDialog(
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
           OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("انصراف") }
           Button(
-            onClick = { onSave(amount.toDoubleOrNull() ?: 0.0, date, notes) },
+            onClick = { onSave(chosen, amount.toDoubleOrNull() ?: 0.0, date, notes) },
             modifier = Modifier.weight(1f),
-          ) { Text("ثبت") }
+          ) { Text(if (receiving) "ثبت رسید" else "ثبت برد") }
         }
       }
     }
