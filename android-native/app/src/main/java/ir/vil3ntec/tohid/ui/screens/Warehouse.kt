@@ -159,7 +159,7 @@ fun WarehouseScreen(
         )
         if (d.productCategories.isNotEmpty()) {
           Spacer(Modifier.height(8.dp))
-          CategoryPicker(d.productCategories, category) { category = it }
+          CategoryFilter(d.productCategories, category) { category = it }
         }
         Spacer(Modifier.height(14.dp))
       }

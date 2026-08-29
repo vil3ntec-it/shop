@@ -13,7 +13,11 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.ui.theme.Radius
 
 /**
- *  انتخابِ دسته‌بندی.
+ *  فیلترِ دسته‌بندی در بالای فهرست‌ها.
+ *
+ *  با `CategoryPicker` فرق دارد و عمداً نامش جداست: آن یکی برای
+ *  **انتخابِ** دستهٔ یک کالا در فرم است و مقدارِ خالی نمی‌پذیرد؛ این یکی
+ *  فیلتر است و «همه» هم یک حالتِ درست است.
  *
  *  تا چهار دسته، تراشه‌ها کنارِ هم می‌نشینند — یک نگاه و یک لمس. از آن
  *  بیشتر، ردیف از صفحه بیرون می‌زند و کاربر نمی‌داند چند تای دیگر مانده؛
@@ -25,7 +29,7 @@ import ir.vil3ntec.tohid.ui.theme.Radius
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CategoryPicker(
+fun CategoryFilter(
   categories: List<String>,
   selected: String?,
   onSelect: (String?) -> Unit,
