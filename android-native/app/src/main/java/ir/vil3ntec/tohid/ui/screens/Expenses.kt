@@ -84,7 +84,6 @@ fun ExpensesScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
   Box(Modifier.fillMaxSize()) {
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, 96.dp)) {
       item {
-        Text("مصارف", style = MaterialTheme.typography.headlineMedium, color = Shop.colors.text)
         Text(
           "هزینه‌های ثبت‌شده فروشگاه",
           style = MaterialTheme.typography.bodySmall,

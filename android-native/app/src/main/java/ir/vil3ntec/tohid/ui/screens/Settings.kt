@@ -158,7 +158,6 @@ fun SettingsScreen(
     verticalArrangement = Arrangement.spacedBy(12.dp),
   ) {
     item {
-      Text("تنظیمات", style = MaterialTheme.typography.headlineMedium, color = Shop.colors.text)
       Text(
         "حساب، ظاهر، داده‌ها و اطلاعات برنامه",
         style = MaterialTheme.typography.bodySmall,

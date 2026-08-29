@@ -112,7 +112,6 @@ fun WarehouseScreen(
   Box(Modifier.fillMaxSize()) {
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, 96.dp)) {
       item {
-        Text("انبار", style = MaterialTheme.typography.headlineMedium, color = Shop.colors.text)
         Text(
           "موجودی کالاهای فروشگاه",
           style = MaterialTheme.typography.bodySmall,

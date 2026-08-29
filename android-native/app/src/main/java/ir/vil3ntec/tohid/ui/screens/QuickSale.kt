@@ -123,7 +123,6 @@ fun QuickSaleScreen(
             Text("بازگشت به فروش", color = Shop.colors.primary)
           }
           Spacer(Modifier.height(6.dp))
-          Text("انتخاب محصول", style = MaterialTheme.typography.headlineMedium, color = Shop.colors.text)
           Text(
             "روی محصول بزنید تا یک عدد به سبد خرید اضافه شود",
             style = MaterialTheme.typography.bodySmall,
@@ -223,9 +222,21 @@ fun QuickSaleScreen(
               productId = p.id,
               inCart = inCart,
               onClick = {
-                cartStore.set(SalesEngine.addToCart(cart, p.id, SalesEngine.cartStep(p.unit)))
+                // سبد از موجودی جلو نمی‌زند؛ خطا سرِ پیشخوان درنمی‌آید
+                val added = SalesEngine.addToCartCapped(
+                  cart, p.id, SalesEngine.cartStep(p.unit), ShopStore.stock(d, p.id),
+                )
+                if (added.capped) {
+                  scope.launch {
+                    snackbar.showSnackbar(
+                      "${p.name} فقط ${qty(added.available)}${if (p.unit.isNotBlank()) " ${p.unit}" else ""} موجود است"
+                    )
+                  }
+                } else {
+                  ScanFeedback.ok(context)
+                }
+                cartStore.set(added.cart)
                 selectedId = p.id
-                ScanFeedback.ok(context)
               },
             )
           }

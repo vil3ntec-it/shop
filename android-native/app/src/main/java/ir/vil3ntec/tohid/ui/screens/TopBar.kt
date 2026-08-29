@@ -13,7 +13,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -31,7 +30,6 @@ import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.fa
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.qty
-import ir.vil3ntec.tohid.sync.SyncStore
 import ir.vil3ntec.tohid.ui.theme.Shop
 import ir.vil3ntec.tohid.ui.theme.ThemeChoice
 
@@ -101,21 +99,10 @@ fun TohidTopBar(
   theme: ThemeChoice,
   onTheme: (ThemeChoice) -> Unit,
   onSettings: () -> Unit,
-  onAccount: () -> Unit,
   onOpen: (String) -> Unit,
 ) {
   val context = LocalContext.current
-  val state = remember { SyncStore(context) }
-  val signedIn = !state.accessToken.isNullOrBlank()
-  val accountName = state.accountName
-  // نامِ دکان همان‌جایی است که صفحهٔ تنظیمات می‌نویسد
-  val storeName = remember {
-    context.getSharedPreferences("tohid", android.content.Context.MODE_PRIVATE)
-      .getString("store_name", "") ?: ""
-  }
-
   val alerts = rememberAlerts(d)
-  var vipOpen by remember { mutableStateOf(false) }
   var alertsOpen by remember { mutableStateOf(false) }
 
   Row(
@@ -141,8 +128,13 @@ fun TohidTopBar(
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-      VipBadge(onClick = { vipOpen = true })
-
+      /*
+       *  نشانِ اشتراک و دکمهٔ حساب از سربرگ برداشته شدند.
+       *
+       *  در هر صفحه، دو تا از پهن‌ترین چیزهای سربرگ بودند و نامِ صفحه را
+       *  به گوشه می‌راندند؛ روی گوشی جا برای هیچ‌چیزِ دیگر نمی‌ماند. هر
+       *  دو سرِ جای خودشان هستند: «بیشتر ← تنظیمات».
+       */
       BarButton(Icons.Filled.Notifications, "هشدارها", badge = alerts.size) { alertsOpen = true }
 
       BarButton(
@@ -152,51 +144,11 @@ fun TohidTopBar(
         onTheme(if (theme == ThemeChoice.DARK) ThemeChoice.LIGHT else ThemeChoice.DARK)
       }
 
-      // دکمهٔ حساب، با متن — همان دکمهٔ آبیِ سربرگِ وب
-      Row(
-        Modifier
-          .clip(RoundedCornerShape(20.dp))
-          .background(if (signedIn) Shop.colors.success else Shop.colors.primary)
-          .clickable(onClick = onAccount)
-          .padding(horizontal = 12.dp, vertical = 7.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(5.dp),
-      ) {
-        Icon(
-          Icons.Filled.Person,
-          contentDescription = null,
-          tint = Color.White,
-          modifier = Modifier.size(15.dp),
-        )
-        Text(
-          if (signedIn) accountName.ifBlank { "حساب من" } else "ورود به حساب",
-          style = MaterialTheme.typography.labelMedium,
-          color = Color.White,
-          fontWeight = FontWeight.Bold,
-        )
-      }
-
       BarButton(Icons.Filled.Settings, "تنظیمات", onClick = onSettings)
 
-      // نشانِ کاربر — حرف اولِ نام دکان یا حساب
-      Box(
-        Modifier
-          .size(34.dp)
-          .clip(RoundedCornerShape(12.dp))
-          .background(Shop.colors.primaryTint),
-        contentAlignment = Alignment.Center,
-      ) {
-        Text(
-          storeName.ifBlank { accountName }.ifBlank { "ک" }.take(1),
-          style = MaterialTheme.typography.labelLarge,
-          color = Shop.colors.primary,
-          fontWeight = FontWeight.Bold,
-        )
-      }
     }
   }
 
-  if (vipOpen) VipSheet { vipOpen = false }
   if (alertsOpen) {
     ModalBottomSheet(onDismissRequest = { alertsOpen = false }, containerColor = Shop.colors.bg) {
       Column(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, bottom = 28.dp)) {

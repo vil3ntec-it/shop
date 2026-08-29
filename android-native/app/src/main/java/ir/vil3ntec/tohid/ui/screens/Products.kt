@@ -128,7 +128,6 @@ fun ProductsScreen(
   Box(Modifier.fillMaxSize()) {
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, 96.dp)) {
       item {
-        Text("محصولات", style = MaterialTheme.typography.headlineMedium, color = Shop.colors.text)
         Text(
           "کالاهای فروشگاه، قیمت‌ها و سود هر قلم",
           style = MaterialTheme.typography.bodySmall,

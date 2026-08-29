@@ -47,7 +47,6 @@ fun AuditLogScreen(d: ShopData) {
 
   LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
     item {
-      Text("سابقه عملیات", style = MaterialTheme.typography.headlineMedium, color = Shop.colors.text)
       Text(
         "${plain(d.auditLog.size)} رویداد ثبت‌شده",
         style = MaterialTheme.typography.bodySmall,

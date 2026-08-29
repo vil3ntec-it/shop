@@ -85,7 +85,6 @@ fun SalesHistoryScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostStat
 
   LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
     item {
-      Text("تاریخچه فروش", style = MaterialTheme.typography.headlineMedium, color = Shop.colors.text)
       Text(
         "فاکتورهای ثبت‌شده، مرجوعی و لغو فروش",
         style = MaterialTheme.typography.bodySmall,

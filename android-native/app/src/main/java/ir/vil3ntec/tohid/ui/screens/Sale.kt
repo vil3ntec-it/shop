@@ -139,12 +139,21 @@ fun SaleScreen(
       return
     }
     val product = d.products.first { it.id == productId }
-    ScanFeedback.ok(context)
     // از خودِ انبارهٔ سبد خوانده می‌شود، نه از مقدارِ لحظهٔ ترکیب: دو
-    // اسکنِ پشتِ سرِ هم نباید همدیگر را پاک کنند
-    cartStore.set(SalesEngine.addToCart(cartStore.lines.value, productId, multiplier.toDouble()))
+    // اسکنِ پشتِ سرِ هم نباید همدیگر را پاک کنند.
+    // و سبد از موجودی جلو نمی‌زند — خطا نباید سرِ ثبت درآید.
+    val added = SalesEngine.addToCartCapped(
+      cartStore.lines.value, productId, multiplier.toDouble(), ShopStore.stock(d, productId),
+    )
+    cartStore.set(added.cart)
     selectedId = productId
-    toast("${product.name} به سبد اضافه شد")
+    if (added.capped) {
+      ScanFeedback.unknown(context)
+      toast("${product.name} فقط ${qty(added.available)}${if (product.unit.isNotBlank()) " ${product.unit}" else ""} موجود است")
+    } else {
+      ScanFeedback.ok(context)
+      toast("${product.name} به سبد اضافه شد")
+    }
   }
 
   Box(Modifier.fillMaxSize()) {
@@ -159,7 +168,6 @@ fun SaleScreen(
           verticalAlignment = Alignment.CenterVertically,
         ) {
           Column(Modifier.weight(1f)) {
-            Text("فروش جدید", style = MaterialTheme.typography.headlineMedium, color = Shop.colors.text)
             Text(
               "کالا را جلوی دوربین بگیرید تا خودکار به سبد اضافه شود",
               style = MaterialTheme.typography.bodySmall,

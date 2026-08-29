@@ -90,7 +90,6 @@ fun ReceiptsScreen(d: ShopData) {
 
   LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
     item {
-      Text("رسیدها", style = MaterialTheme.typography.headlineMedium, color = Shop.colors.text)
       Text(
         "دریافتی‌های هر قرض‌دار به تفکیک ماه و سال",
         style = MaterialTheme.typography.bodySmall,
