@@ -53,6 +53,19 @@ data class ShopColors(
   /** لکه‌های نورِ زمینه */
   val auroraOne: Color,
   val auroraTwo: Color,
+  /*
+   *  کادرهای ورودی، جدا از کارت‌ها.
+   *
+   *  این سه رنگ عمداً از `border` جدا شده‌اند. `border` حاشیهٔ کارت است و
+   *  نامرئی است — کارت باید با رنگش دیده شود نه با خطش. ولی کادرِ ورودی
+   *  دقیقاً برعکس: کاربر باید ببیند کجا می‌شود نوشت.
+   *
+   *  یک بار این دو را یکی کردم و نتیجه‌اش این شد که حاشیهٔ همهٔ کادرهای
+   *  متن در تمام برنامه نامرئی شد. دیگر یکی نمی‌شوند.
+   */
+  val fieldBg: Color,
+  val fieldBorder: Color,
+  val fieldFocus: Color,
 )
 
 /**
@@ -87,6 +100,9 @@ val LightColors = ShopColors(
   sheen = Color(0x00FFFFFF),
   auroraOne = Color(0x140F7FD6),
   auroraTwo = Color(0x0F23B6C9),
+  fieldBg = Color(0xFFFFFFFF),
+  fieldBorder = Color(0xFFC6D5E6),
+  fieldFocus = Color(0xFF1268BE),
 )
 
 /**
@@ -122,6 +138,9 @@ val DarkColors = ShopColors(
   sheen = Color(0x0FFFFFFF),
   auroraOne = Color(0x332F7FD6),
   auroraTwo = Color(0x2623B6C9),
+  fieldBg = Color(0xFF16233A),
+  fieldBorder = Color(0xFF3C5474),
+  fieldFocus = Color(0xFF7CD0F7),
 )
 
 /**
@@ -183,8 +202,11 @@ fun TohidTheme(
       surfaceContainer = colors.surface,
       surfaceContainerHigh = colors.surface2,
       surfaceContainerHighest = colors.surface2,
-      outline = colors.border,
-      outlineVariant = colors.border,
+      // خطِ دورِ اجزای آمادهٔ متریال (کادر متن، تراشه، دکمهٔ خطی).
+      // این را نباید با حاشیهٔ کارت یکی کرد: حاشیهٔ کارت نامرئی است و
+      // اگر اینجا هم بنشیند، کادرِ متن در کلِ برنامه بی‌خط می‌شود.
+      outline = colors.fieldBorder,
+      outlineVariant = colors.fieldBorder,
       error = colors.danger,
       onError = Color(0xFF2A0B09),
       errorContainer = colors.dangerTint,
@@ -210,8 +232,11 @@ fun TohidTheme(
       surfaceContainer = colors.surface,
       surfaceContainerHigh = colors.surface2,
       surfaceContainerHighest = colors.surface2,
-      outline = colors.border,
-      outlineVariant = colors.border,
+      // خطِ دورِ اجزای آمادهٔ متریال (کادر متن، تراشه، دکمهٔ خطی).
+      // این را نباید با حاشیهٔ کارت یکی کرد: حاشیهٔ کارت نامرئی است و
+      // اگر اینجا هم بنشیند، کادرِ متن در کلِ برنامه بی‌خط می‌شود.
+      outline = colors.fieldBorder,
+      outlineVariant = colors.fieldBorder,
       error = colors.danger,
       onError = Color.White,
       errorContainer = colors.dangerTint,
