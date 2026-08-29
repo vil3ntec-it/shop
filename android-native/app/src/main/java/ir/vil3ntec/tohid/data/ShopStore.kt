@@ -31,10 +31,25 @@ class ShopStore(private val context: Context) {
   private val _data = MutableStateFlow(ShopData())
   val data: StateFlow<ShopData> = _data.asStateFlow()
 
-  suspend fun load() = withContext(Dispatchers.IO) {
-    if (!file.exists()) return@withContext
-    runCatching { json.decodeFromString<ShopData>(file.readText()) }
-      .onSuccess { _data.value = it }
+  /**
+   *  آیا دفتر از روی دیسک خوانده شده؟
+   *
+   *  تا پیش از این، صفحه‌ها پیش از خوانده‌شدنِ فایل با دفترِ خالی کشیده
+   *  می‌شدند و کاربری که صد قلم کالا داشت، یک لحظه «هنوز محصولی ثبت نشده»
+   *  می‌دید. حالا تا وقتی خواندن تمام نشده، اسکلتِ بارگذاری نشان داده
+   *  می‌شود.
+   */
+  private val _loaded = MutableStateFlow(false)
+  val loaded: StateFlow<Boolean> = _loaded.asStateFlow()
+
+  suspend fun load() {
+    withContext(Dispatchers.IO) {
+      if (file.exists()) {
+        runCatching { json.decodeFromString<ShopData>(file.readText()) }
+          .onSuccess { _data.value = it }
+      }
+    }
+    _loaded.value = true
   }
 
   suspend fun save(next: ShopData) = withContext(Dispatchers.IO) {

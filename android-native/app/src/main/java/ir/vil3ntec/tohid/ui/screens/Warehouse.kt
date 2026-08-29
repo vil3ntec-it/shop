@@ -16,6 +16,8 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -176,14 +178,25 @@ fun WarehouseScreen(
       if (d.products.isEmpty()) {
         item {
           Panel {
-            EmptyNote("هنوز اطلاعاتی ثبت نشده.\nکالاهای انبار فروشگاه پس از ثبت، در همین صفحه نمایش داده می‌شوند.")
-            Button(onClick = { productForm = ProductFormState() }, modifier = Modifier.fillMaxWidth()) {
-              Text("ثبت کالای تازه")
-            }
+            TohidEmptyState(
+              icon = Icons.Filled.Inventory2,
+              title = "انبار خالی است",
+              description = "کالاهای دکان را ثبت کنید تا موجودی، ارزش انبار و هشدار کم‌بودن کار کند.",
+              actionText = "ثبت کالای تازه",
+              onAction = { bulkProduct = true },
+            )
           }
         }
       } else if (shown.isEmpty()) {
-        item { Panel { EmptyNote("کالایی مطابق با این جستجو یا فیلتر پیدا نشد.") } }
+        item {
+          Panel {
+            TohidEmptyState(
+              icon = Icons.Filled.Search,
+              title = "چیزی پیدا نشد",
+              description = "کالایی مطابق این جستجو یا فیلتر نیست.",
+            )
+          }
+        }
       } else {
         itemsIndexed(shown, key = { _, p -> p.id }) { index, p ->
           StaggeredItem(index) {

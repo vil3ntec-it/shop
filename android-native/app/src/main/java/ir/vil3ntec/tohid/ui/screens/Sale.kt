@@ -343,7 +343,7 @@ fun SaleScreen(
             cartStore.clear()
             selectedId = null
             checkout = false
-            ScanFeedback.ok(context)
+            Haptics.success(context)
             toast("فروش به مبلغ ${money(result.data.sales.last().finalTotal)} افغانی ثبت شد")
             invoice = result.data to result.saleId
           }

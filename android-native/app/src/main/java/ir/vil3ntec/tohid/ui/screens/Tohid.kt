@@ -509,6 +509,7 @@ fun TohidTransactionRow(
   amount: Double,
   tint: Color,
   modifier: Modifier = Modifier,
+  currency: String = "افغانی",
   onClick: (() -> Unit)? = null,
   trailing: @Composable (() -> Unit)? = null,
 ) {
@@ -538,7 +539,7 @@ fun TohidTransactionRow(
         )
       }
     }
-    TohidMoneyText(amount = amount, tint = tint)
+    TohidMoneyText(amount = amount, tint = tint, currency = currency)
     if (trailing != null) {
       Spacer(Modifier.width(Space.xxs))
       trailing()

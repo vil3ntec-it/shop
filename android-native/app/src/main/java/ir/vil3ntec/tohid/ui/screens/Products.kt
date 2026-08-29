@@ -5,7 +5,9 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -20,6 +22,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -62,6 +65,7 @@ fun ProductsScreen(
   d: ShopData,
   snackbar: SnackbarHostState,
   onOpenWarehouse: (String) -> Unit = {},
+  onOpenProduct: (String) -> Unit = {},
 ) {
   val scope = rememberCoroutineScope()
 
@@ -207,10 +211,21 @@ fun ProductsScreen(
       if (shown.isEmpty()) {
         item {
           Panel {
-            EmptyNote(
-              if (d.products.isEmpty()) "هنوز کالایی ثبت نشده. با دکمهٔ پایین، اولین کالا را بسازید."
-              else "کالایی مطابق با این جستجو یا فیلتر پیدا نشد."
-            )
+            if (d.products.isEmpty()) {
+              TohidEmptyState(
+                icon = Icons.Filled.ShoppingBag,
+                title = "هنوز کالایی ثبت نشده",
+                description = "کالاهای دکان را یک‌بار ثبت کنید تا در فروش، انبار و گزارش‌ها بیایند.",
+                actionText = "ثبت محصول",
+                onAction = { bulkProduct = true },
+              )
+            } else {
+              TohidEmptyState(
+                icon = Icons.Filled.Search,
+                title = "چیزی پیدا نشد",
+                description = "کالایی مطابق این جستجو یا فیلتر نیست. عبارت دیگری را امتحان کنید.",
+              )
+            }
           }
         }
       } else {
@@ -220,7 +235,8 @@ fun ProductsScreen(
               d = d,
               product = p,
               photoVersion = photoVersion,
-              onClick = { actionsFor = p },
+              onClick = { onOpenProduct(p.id) },
+              onLongClick = { actionsFor = p },
             )
           }
           Spacer(Modifier.height(10.dp))
@@ -334,8 +350,15 @@ fun ProductsScreen(
 
 /* ============================ کارت کالا ============================ */
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ProductCard(d: ShopData, product: Product, photoVersion: Int, onClick: () -> Unit) {
+private fun ProductCard(
+  d: ShopData,
+  product: Product,
+  photoVersion: Int,
+  onClick: () -> Unit,
+  onLongClick: () -> Unit,
+) {
   val stock = ShopStore.stock(d, product.id)
   val status = ShopStore.stockStatus(d, product)
   val tint = when (status) {
@@ -356,7 +379,7 @@ private fun ProductCard(d: ShopData, product: Product, photoVersion: Int, onClic
       .clip(RoundedCornerShape(Radius.md))
       .background(Shop.colors.surface)
       .border(1.dp, Shop.colors.border, RoundedCornerShape(Radius.md))
-      .clickable(onClick = onClick)
+      .combinedClickable(onClick = onClick, onLongClick = onLongClick)
       .padding(14.dp)
   ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
