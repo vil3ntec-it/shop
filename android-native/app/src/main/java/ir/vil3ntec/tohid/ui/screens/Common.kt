@@ -22,17 +22,26 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.ui.theme.Radius
+import ir.vil3ntec.tohid.ui.theme.Shape
 import ir.vil3ntec.tohid.ui.theme.Shop
+import ir.vil3ntec.tohid.ui.theme.glassSurface
 
-/** کارت — همان ظاهرِ .panel در نسخهٔ وب */
+/**
+ *  کارت.
+ *
+ *  همان `.panel` سایت، ولی دیگر «جعبهٔ خط‌کشی‌شده» نیست: سطحی نیمه‌شفاف
+ *  با لبهٔ روشنِ بالا که روی زمینهٔ قطبی شناور به نظر می‌رسد.
+ *
+ *  چون بیشترِ صفحه‌های برنامه از همین استفاده می‌کنند، عوض‌شدنِ همین یک
+ *  تابع، ظاهرِ همه‌جا را عوض می‌کند.
+ */
 @Composable
 fun Panel(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+  val colors = Shop.colors
   Column(
     modifier
-      .clip(RoundedCornerShape(Radius.md))
-      .background(Shop.colors.surface)
-      .border(1.dp, Shop.colors.border, RoundedCornerShape(Radius.md))
-      .padding(16.dp),
+      .glassSurface(Shape.card, colors.surface, colors.sheen, colors.border)
+      .padding(18.dp),
     content = content,
   )
 }
@@ -46,12 +55,11 @@ fun StatTile(
   hint: String? = null,
   modifier: Modifier = Modifier,
 ) {
+  val colors = Shop.colors
   Column(
     modifier
-      .clip(RoundedCornerShape(Radius.md))
-      .background(Shop.colors.surface)
-      .border(1.dp, Shop.colors.border, RoundedCornerShape(Radius.md))
-      .padding(14.dp)
+      .glassSurface(Shape.card, colors.surface, colors.sheen, colors.border)
+      .padding(16.dp)
   ) {
     Text(label, style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
     Spacer(Modifier.height(6.dp))

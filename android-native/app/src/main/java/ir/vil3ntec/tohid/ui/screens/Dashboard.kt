@@ -30,7 +30,16 @@ import ir.vil3ntec.tohid.fa
 import ir.vil3ntec.tohid.formatDate
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.qty
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.PointOfSale
+import androidx.compose.ui.platform.LocalContext
 import ir.vil3ntec.tohid.ui.theme.Radius
+import ir.vil3ntec.tohid.ui.theme.Shape
+import ir.vil3ntec.tohid.ui.theme.glassSurface
 import ir.vil3ntec.tohid.ui.theme.Shop
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -51,6 +60,11 @@ private fun todayIso(): String =
  */
 @Composable
 fun DashboardScreen(d: ShopData, onOpen: (String) -> Unit = {}) {
+  val context = LocalContext.current
+  val storeName = remember {
+    context.getSharedPreferences("tohid", android.content.Context.MODE_PRIVATE)
+      .getString("store_name", "") ?: ""
+  }
   val today = todayIso()
   val monthPrefix = today.take(7)
 
@@ -76,37 +90,82 @@ fun DashboardScreen(d: ShopData, onOpen: (String) -> Unit = {}) {
       .verticalScroll(rememberScrollState())
       .padding(16.dp)
   ) {
-    /* ---------------------------- عنوان ---------------------------- */
-    Text("داشبورد", style = MaterialTheme.typography.headlineMedium, color = Shop.colors.text)
-    Spacer(Modifier.height(4.dp))
-    Text("خلاصهٔ امروزِ دکان", style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
-    Spacer(Modifier.height(16.dp))
-
-    /* --------------------- کاشی‌های امروز (KPI) --------------------- */
-    // چهار عددی که فروشنده صبح اول وقت می‌خواهد بداند — نه آمار انبار،
-    // که آن پایین‌تر جای خودش را دارد
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-      TohidStatCard(
-        label = "فروش امروز",
-        value = "${money(todayTotal)} افغانی",
-        hint = "${todaySales.size.fa()} فاکتور",
-        modifier = Modifier.weight(1f),
-        onClick = { onOpen("sales") },
-      )
-      TohidStatCard(
-        label = "سود امروز",
-        value = "${money(todayProfit)} افغانی",
-        tint = if (todayProfit >= 0) Shop.colors.success else Shop.colors.danger,
-        hint = "پس از مصارف",
-        modifier = Modifier.weight(1f),
-        onClick = { onOpen("reports") },
+    /* ---------------------------- سلام ---------------------------- */
+    // اسمِ دکان و وقتِ روز — کوچک است ولی کاری می‌کند که برنامه انگار
+    // برای همین یک نفر ساخته شده، نه برای «کاربر»
+    Row(verticalAlignment = Alignment.CenterVertically) {
+      Column(Modifier.weight(1f)) {
+        Text(
+          greeting(),
+          style = MaterialTheme.typography.bodyMedium,
+          color = Shop.colors.muted,
+        )
+        Spacer(Modifier.height(2.dp))
+        Text(
+          storeName.ifBlank { "دکان شما" },
+          style = MaterialTheme.typography.headlineMedium,
+          color = Shop.colors.text,
+          fontWeight = FontWeight.Bold,
+        )
+      }
+      TohidBadge(
+        text = formatDate(today),
+        tint = Shop.colors.primary,
+        fill = Shop.colors.primaryTint,
       )
     }
-    Spacer(Modifier.height(12.dp))
+    Spacer(Modifier.height(18.dp))
+
+    /* ------------------------- حلقه‌های امروز ------------------------- */
+    // سه عددی که فروشنده صبح اول وقت می‌خواهد بداند، هرکدام با کمانی که
+    // می‌گوید نسبت به این ماه کجاست
+    val monthSalesTotal = d.sales
+      .filter { it.status != "cancelled" && it.date.startsWith(monthPrefix) }
+      .sumOf { it.finalTotal }
+    val bestDay = d.sales
+      .filter { it.status != "cancelled" && it.date.startsWith(monthPrefix) }
+      .groupBy { it.date }
+      .maxOfOrNull { (_, list) -> list.sumOf { it.finalTotal } } ?: 0.0
+
+    TohidCard(glow = true) {
+      Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically,
+      ) {
+        StatRing(
+          label = "فروش امروز",
+          value = money(animatedMoney(todayTotal)),
+          caption = "افغانی",
+          // نسبت به بهترین روزِ همین ماه — سقفی که خودِ دکان ساخته
+          fraction = if (bestDay > 0) (todayTotal / bestDay).toFloat() else 0f,
+          tint = Shop.colors.primary,
+        )
+        StatRing(
+          label = "سود امروز",
+          value = money(animatedMoney(todayProfit)),
+          caption = "افغانی",
+          fraction = if (todayTotal > 0) (todayProfit / todayTotal).toFloat().coerceAtLeast(0f) else 0f,
+          tint = if (todayProfit >= 0) Shop.colors.success else Shop.colors.danger,
+        )
+      }
+      Spacer(Modifier.height(14.dp))
+      Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(
+          "فروش این ماه",
+          style = MaterialTheme.typography.labelMedium,
+          color = Shop.colors.muted,
+        )
+        TohidMoneyText(amount = monthSalesTotal, tint = Shop.colors.text)
+      }
+    }
+    Spacer(Modifier.height(14.dp))
+
+    /* ------------------------ طلب و بدهی ------------------------ */
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
       TohidStatCard(
         label = "طلب از مشتریان",
-        value = "${money(totalDebt)} افغانی",
+        value = "${money(animatedMoney(totalDebt))} افغانی",
         tint = if (totalDebt > 0) Shop.colors.warning else Shop.colors.success,
         hint = "${owing.size.fa()} قرض‌دار",
         modifier = Modifier.weight(1f),
@@ -114,12 +173,25 @@ fun DashboardScreen(d: ShopData, onOpen: (String) -> Unit = {}) {
       )
       TohidStatCard(
         label = "بدهی به تأمین‌کننده",
-        value = "${money(supplierDebt)} افغانی",
+        value = "${money(animatedMoney(supplierDebt))} افغانی",
         tint = if (supplierDebt > 0) Shop.colors.danger else Shop.colors.success,
         hint = "پرداخت‌نشده",
         modifier = Modifier.weight(1f),
         onClick = { onOpen("purchasing") },
       )
+    }
+
+    /* --------------------------- میان‌برها --------------------------- */
+    // کارهایی که در طول روز بیشتر از همه زده می‌شوند، یک لمس فاصله دارند
+    Spacer(Modifier.height(14.dp))
+    Row(
+      Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+      horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+      ShortcutCard(Icons.Filled.PointOfSale, "فروش سریع", Shop.colors.primary) { onOpen("sale") }
+      ShortcutCard(Icons.Filled.Inventory2, "ورود کالا", Shop.colors.accent) { onOpen("warehouse") }
+      ShortcutCard(Icons.Filled.Groups, "قرض‌داران", Shop.colors.warning) { onOpen("debtors") }
+      ShortcutCard(Icons.Filled.BarChart, "گزارش‌ها", Shop.colors.success) { onOpen("reports") }
     }
 
     /* -------------------------- نیاز به توجه -------------------------- */
@@ -417,3 +489,54 @@ private fun TrendChart(values: List<Double>) {
   }
 }
 
+/** سلامِ متناسب با ساعت — همان چیزی که آدم به آدم می‌گوید */
+private fun greeting(): String {
+  val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+  return when {
+    hour < 5 -> "شب بخیر"
+    hour < 12 -> "صبح بخیر"
+    hour < 17 -> "روز بخیر"
+    else -> "شام بخیر"
+  }
+}
+
+/**
+ *  میان‌بُرِ یک کار.
+ *
+ *  آیکنِ رنگی در ظرفِ گرد، و نامِ کار زیرش. کوچک است تا چهارتایش در یک
+ *  ردیف جا شود و اسکرول لازم نباشد.
+ */
+@Composable
+private fun ShortcutCard(
+  icon: androidx.compose.ui.graphics.vector.ImageVector,
+  label: String,
+  tint: Color,
+  onClick: () -> Unit,
+) {
+  Column(
+    Modifier
+      .width(92.dp)
+      .glassSurface(Shape.card, Shop.colors.surface, Shop.colors.sheen, Shop.colors.border)
+      .clickable(onClick = onClick)
+      .padding(vertical = 14.dp, horizontal = 8.dp),
+    horizontalAlignment = Alignment.CenterHorizontally,
+  ) {
+    Box(
+      Modifier
+        .size(40.dp)
+        .clip(Shape.icon)
+        .background(tint.copy(alpha = 0.16f)),
+      contentAlignment = Alignment.Center,
+    ) {
+      Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
+    }
+    Spacer(Modifier.height(8.dp))
+    Text(
+      label,
+      style = MaterialTheme.typography.labelMedium,
+      color = Shop.colors.text,
+      maxLines = 1,
+      textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+    )
+  }
+}
