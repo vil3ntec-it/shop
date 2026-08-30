@@ -31,7 +31,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.unit.Dp
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -95,8 +101,8 @@ private data class Plan(
 
 private val PLANS = listOf(
   Plan("ماهانه", 500, days = 30),
-  Plan("۶ ماهه", 2000, badge = "پیشنهاد ما", days = 180),
-  Plan("۱ ساله", 3000, badge = "بیشترین صرفه", days = 365),
+  Plan("۶ ماهه", 2500, badge = "پیشنهاد ما", days = 180),
+  Plan("۱ ساله", 4000, badge = "بیشترین صرفه", days = 365),
 )
 
 /**
@@ -107,6 +113,143 @@ private val PLANS = listOf(
  *  دیگری دست نمی‌خواهد.
  */
 private const val LOCKING = false
+
+/* ============================== طلا ============================== */
+
+/*
+ *  رنگِ طلا و درخشش‌هایش — یک جا، برای تمامِ این صفحه.
+ *
+ *  نشانِ «پیشنهاد ما» تا حالا رنگش را از `warning` می‌گرفت، و آن رنگ در
+ *  تمِ روشن یک قهوه‌ایِ سوخته است: روی کارت مثلِ لکه دیده می‌شد، نه مثلِ
+ *  نشانِ افتخار. طلا از تم نمی‌آید و نباید بیاید — در تمِ روشن و تاریک
+ *  هر دو باید همان طلا باشد، وگرنه دیگر طلا نیست.
+ */
+private val GOLD_PALE = Color(0xFFFFF3C4)
+private val GOLD_SOFT = Color(0xFFFBE08A)
+private val GOLD = Color(0xFFF6C93F)
+private val GOLD_DEEP = Color(0xFFD79A14)
+private val GOLD_INK = Color(0xFF3A2705)
+
+/** خودِ فلز: روشن، سیر، دوباره روشن — نه یک زردِ تخت */
+private val GOLD_SWEEP = Brush.linearGradient(
+  listOf(GOLD_SOFT, GOLD, GOLD_PALE, GOLD_DEEP)
+)
+
+/** نبضِ آرام — همهٔ درخشش‌های صفحه با یک ضربان می‌زنند، نه هرکدام جدا */
+@Composable
+private fun goldPulse(): Float {
+  val motion = rememberInfiniteTransition(label = "goldPulse")
+  val value by motion.animateFloat(
+    initialValue = 0f,
+    targetValue = 1f,
+    animationSpec = infiniteRepeatable(
+      tween(if (Motion.enabled) 2200 else 1, easing = FastOutSlowInEasing),
+      RepeatMode.Reverse,
+    ),
+    label = "pulse",
+  )
+  return value
+}
+
+/** برقی که از یک لبه به لبهٔ دیگر می‌لغزد */
+@Composable
+private fun goldSweep(period: Int = 2800, delay: Int = 800): Float {
+  val motion = rememberInfiniteTransition(label = "goldSweep")
+  val value by motion.animateFloat(
+    initialValue = -0.5f,
+    targetValue = 1.5f,
+    animationSpec = infiniteRepeatable(
+      tween(if (Motion.enabled) period else 1, delayMillis = delay, easing = LinearEasing),
+      RepeatMode.Restart,
+    ),
+    label = "sweep",
+  )
+  return value
+}
+
+/**
+ *  لبهٔ طلاییِ درخشان.
+ *
+ *  یک خطِ تنها فقط یک خط است؛ درخشش از لایه‌لایه بودن می‌آید — سه هالهٔ
+ *  پهن و کم‌رنگِ بیرون از کادر، و بعد خودِ خط. چون هاله بیرونِ کادر
+ *  کشیده می‌شود، این باید **پیش از** `clip` بیاید وگرنه بریده می‌شود.
+ */
+private fun Modifier.goldEdge(radius: Dp, pulse: Float, strong: Boolean = false): Modifier =
+  drawBehind {
+    val lift = if (strong) 1f else 0.62f
+    listOf(8f to 0.05f, 5f to 0.08f, 2.5f to 0.13f).forEach { (grow, alpha) ->
+      val g = grow.dp.toPx()
+      drawRoundRect(
+        color = GOLD.copy(alpha = alpha * lift * (0.55f + pulse * 0.45f)),
+        topLeft = Offset(-g, -g),
+        size = Size(size.width + g * 2f, size.height + g * 2f),
+        cornerRadius = CornerRadius(radius.toPx() + g, radius.toPx() + g),
+        style = Stroke(width = g),
+      )
+    }
+    val line = (if (strong) 1.8f else 1.2f) + pulse * 0.4f
+    val inset = line / 2f
+    drawRoundRect(
+      brush = Brush.linearGradient(listOf(GOLD_PALE, GOLD_DEEP, GOLD_SOFT, GOLD_DEEP)),
+      topLeft = Offset(inset.dp.toPx(), inset.dp.toPx()),
+      size = Size(size.width - line.dp.toPx(), size.height - line.dp.toPx()),
+      cornerRadius = CornerRadius(radius.toPx(), radius.toPx()),
+      style = Stroke(width = line.dp.toPx()),
+    )
+  }
+
+/** برقی که روی خودِ سطح می‌لغزد — بعد از `clip` بیاید تا داخل بماند */
+private fun Modifier.goldShine(progress: Float, strength: Float = 0.3f): Modifier =
+  drawWithContent {
+    drawContent()
+    if (!Motion.enabled) return@drawWithContent
+    val x = size.width * progress
+    drawRect(
+      brush = Brush.linearGradient(
+        colors = listOf(Color.Transparent, GOLD_PALE.copy(alpha = strength), Color.Transparent),
+        start = Offset(x - size.width * 0.3f, 0f),
+        end = Offset(x + size.width * 0.3f, size.height),
+      ),
+      size = size,
+    )
+  }
+
+/** بلندیِ نوارِ نشان — در همهٔ کارت‌ها یکی، حتی آن‌که نشان ندارد */
+private val BADGE_BAND = 26.dp
+
+/** بلندیِ نوارِ بالای ستونِ مقایسه — همین‌طور، در هر دو ستون یکی */
+private val RIBBON_BAND = 28.dp
+
+/**
+ *  نشانِ طلاییِ بالای کارت — «پیشنهاد ما» و «بیشترین صرفه».
+ */
+@Composable
+private fun GoldBadge(text: String) {
+  val sweep = goldSweep(period = 2200, delay = 400)
+  Row(
+    Modifier
+      .clip(RoundedCornerShape(topStart = 11.dp, topEnd = 11.dp, bottomStart = 3.dp, bottomEnd = 3.dp))
+      .background(GOLD_SWEEP)
+      .goldShine(sweep, strength = 0.55f)
+      .padding(horizontal = 11.dp, vertical = 4.dp),
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(4.dp),
+  ) {
+    Icon(
+      Icons.Filled.WorkspacePremium,
+      contentDescription = null,
+      tint = GOLD_INK,
+      modifier = Modifier.size(12.dp),
+    )
+    Text(
+      text,
+      style = MaterialTheme.typography.labelSmall,
+      color = GOLD_INK,
+      fontWeight = FontWeight.Bold,
+      maxLines = 1,
+    )
+  }
+}
 
 /* ============================ نشانِ طلایی ============================ */
 
@@ -289,8 +432,17 @@ fun VipScreen(onDismiss: () -> Unit) {
 
       Spacer(Modifier.height(14.dp))
 
-      /* ---------------------- دو ستونِ مقایسه ---------------------- */
-      Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+      /*
+       *  دو ستونِ مقایسه.
+       *
+       *  `IntrinsicSize.Min` هست چون دو ستونِ ناهم‌قد، مقایسه را سخت
+       *  می‌کنند: چشم باید بالا و پایین برود تا بفهمد کدام قلم روبه‌روی
+       *  کدام است. حالا هر دو تا یک جا پایین می‌آیند.
+       */
+      Row(
+        Modifier.height(IntrinsicSize.Min),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+      ) {
         TierCard(
           title = "رایگان",
           price = "۰",
@@ -300,7 +452,7 @@ fun VipScreen(onDismiss: () -> Unit) {
           highlighted = false,
           footer = "همین حالا فعال است",
           footerTint = colors.success,
-          modifier = Modifier.weight(1f),
+          modifier = Modifier.weight(1f).fillMaxHeight(),
         )
         TierCard(
           title = "اشتراک VIP",
@@ -311,8 +463,8 @@ fun VipScreen(onDismiss: () -> Unit) {
           highlighted = true,
           ribbon = "پیشنهاد ما",
           footer = "مدت را از پایین انتخاب کنید",
-          footerTint = colors.muted,
-          modifier = Modifier.weight(1f),
+          footerTint = GOLD_DEEP,
+          modifier = Modifier.weight(1f).fillMaxHeight(),
         )
       }
 
@@ -331,16 +483,19 @@ fun VipScreen(onDismiss: () -> Unit) {
        *  مدت‌ها: روی صفحهٔ پهن کنارِ هم، روی گوشی زیرِ هم.
        *
        *  سه کارت در عرضِ یک گوشی یعنی هر کدام کمتر از صد نقطه، و آن‌وقت
-       *  «روزی حدود ۱۶٫۷ افغانی» دو خط می‌شود و کارت‌ها ناهم‌قد.
+       *  «روزی حدود ۱۳٫۹ افغانی» دو خط می‌شود و کارت‌ها ناهم‌قد.
        */
       if (isTablet()) {
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(
+          Modifier.height(IntrinsicSize.Min),
+          horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
           PLANS.forEach { plan ->
             PlanCard(
               plan = plan,
               selected = chosenPlan == plan.title,
               onClick = { chosenPlan = plan.title },
-              modifier = Modifier.weight(1f),
+              modifier = Modifier.weight(1f).fillMaxHeight(),
             )
           }
         }
@@ -394,10 +549,9 @@ fun VipScreen(onDismiss: () -> Unit) {
       /* ---------------------- گرفتنِ اشتراک ---------------------- */
       Spacer(Modifier.height(16.dp))
       val picked = PLANS.find { it.title == chosenPlan } ?: PLANS[1]
-      TohidButton(
+      BuyButton(
         text = "گرفتن اشتراک ${picked.title} — ${plain(picked.price)} افغانی",
         onClick = { buy(picked.title) },
-        modifier = Modifier.fillMaxWidth(),
       )
       Spacer(Modifier.height(8.dp))
       Text(
@@ -446,6 +600,58 @@ fun VipScreen(onDismiss: () -> Unit) {
 }
 
 /**
+ *  دکمهٔ خرید.
+ *
+ *  تا حالا دکمهٔ آبیِ همیشگیِ برنامه بود و متنش خوانده نمی‌شد: رنگِ متنِ
+ *  آن دکمه یک سرمه‌ایِ تقریباً سیاه است که روی زمینهٔ آبیِ تیره‌اش گم
+ *  می‌شود. اینجا زمینه طلاست و متن قهوه‌ایِ تیره — بیشترین اختلافی که
+ *  می‌شد گذاشت — و بلندیِ دکمه هم بسته به متن باز می‌شود، پس عنوانِ
+ *  بلندِ «گرفتن اشتراک ۱ ساله — 4000 افغانی» بریده نمی‌شود.
+ */
+@Composable
+private fun BuyButton(text: String, onClick: () -> Unit) {
+  val sweep = goldSweep(period = 2600, delay = 600)
+  val pulse = goldPulse()
+  val interaction = remember { MutableInteractionSource() }
+  val pressed by interaction.collectIsPressedAsState()
+  val scale by animateFloatAsState(
+    targetValue = if (pressed) 0.97f else 1f,
+    animationSpec = tween(120, easing = FastOutSlowInEasing),
+    label = "press",
+  )
+  val shape = RoundedCornerShape(28.dp)
+
+  Row(
+    Modifier
+      .fillMaxWidth()
+      .graphicsLayer { scaleX = scale; scaleY = scale }
+      .goldEdge(28.dp, pulse, strong = true)
+      .clip(shape)
+      .background(GOLD_SWEEP)
+      .goldShine(sweep, strength = 0.5f)
+      .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+      .padding(horizontal = 18.dp, vertical = 15.dp),
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.Center,
+  ) {
+    Icon(
+      Icons.Filled.WorkspacePremium,
+      contentDescription = null,
+      tint = GOLD_INK,
+      modifier = Modifier.size(19.dp),
+    )
+    Spacer(Modifier.width(8.dp))
+    Text(
+      text,
+      style = MaterialTheme.typography.titleSmall,
+      color = GOLD_INK,
+      fontWeight = FontWeight.Bold,
+      textAlign = TextAlign.Center,
+    )
+  }
+}
+
+/**
  *  یک ستونِ مقایسه — رایگان یا VIP.
  *
  *  قابلیتِ بسته با قفل نشان داده می‌شود، نه با نبودن در فهرست: فهرستی که
@@ -465,41 +671,63 @@ private fun TierCard(
   ribbon: String = "",
 ) {
   val colors = Shop.colors
-  val edge = if (highlighted) colors.primary else colors.border
+  val pulse = goldPulse()
+  val sweep = goldSweep(period = 3400, delay = 1200)
+  val bodyShape =
+    if (ribbon.isNotBlank()) RoundedCornerShape(bottomStart = Radius.md, bottomEnd = Radius.md)
+    else RoundedCornerShape(Radius.md)
 
   Column(modifier) {
+    /*
+     *  نوارِ نشان همیشه جا می‌گیرد، حتی در ستونی که نشان ندارد.
+     *
+     *  وگرنه ستونِ نشان‌دار به‌اندازهٔ همان نوار پایین‌تر شروع می‌شد و دو
+     *  ستون از بالا با هم تراز نبودند — همان چیزی که در عکس دیده می‌شد.
+     */
     if (ribbon.isNotBlank()) {
       Box(
         Modifier
           .fillMaxWidth()
           .clip(RoundedCornerShape(topStart = Radius.md, topEnd = Radius.md))
-          .background(colors.primary)
-          .padding(vertical = 5.dp),
+          .height(RIBBON_BAND)
+          .background(GOLD_SWEEP)
+          .goldShine(sweep, strength = 0.5f),
         contentAlignment = Alignment.Center,
       ) {
-        Text(
-          ribbon,
-          style = MaterialTheme.typography.labelSmall,
-          color = Color.White,
-          fontWeight = FontWeight.Bold,
-        )
+        Row(
+          verticalAlignment = Alignment.CenterVertically,
+          horizontalArrangement = Arrangement.spacedBy(5.dp),
+        ) {
+          Icon(
+            Icons.Filled.WorkspacePremium,
+            contentDescription = null,
+            tint = GOLD_INK,
+            modifier = Modifier.size(13.dp),
+          )
+          Text(
+            ribbon,
+            style = MaterialTheme.typography.labelSmall,
+            color = GOLD_INK,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+          )
+        }
       }
+    } else {
+      Spacer(Modifier.height(RIBBON_BAND))
     }
+
     Column(
       Modifier
         .fillMaxWidth()
-        .clip(
-          if (ribbon.isNotBlank())
-            RoundedCornerShape(bottomStart = Radius.md, bottomEnd = Radius.md)
-          else RoundedCornerShape(Radius.md)
-        )
+        .weight(1f)
+        .then(if (highlighted) Modifier.goldEdge(Radius.md, pulse, strong = true) else Modifier)
+        .clip(bodyShape)
         .background(colors.surface)
-        .border(
-          if (highlighted) 1.5.dp else 1.dp,
-          edge,
-          if (ribbon.isNotBlank())
-            RoundedCornerShape(bottomStart = Radius.md, bottomEnd = Radius.md)
-          else RoundedCornerShape(Radius.md),
+        .then(if (highlighted) Modifier.goldShine(sweep, strength = 0.22f) else Modifier)
+        .then(
+          if (highlighted) Modifier
+          else Modifier.border(1.dp, colors.border, bodyShape)
         )
         .padding(14.dp),
     ) {
@@ -514,7 +742,7 @@ private fun TierCard(
         Text(
           price,
           style = MaterialTheme.typography.headlineSmall,
-          color = colors.primary,
+          color = if (highlighted) GOLD_DEEP else colors.primary,
           fontWeight = FontWeight.Bold,
         )
         if (priceNote.isNotBlank()) {
@@ -525,7 +753,7 @@ private fun TierCard(
       Text(note, style = MaterialTheme.typography.labelSmall, color = colors.muted)
 
       Spacer(Modifier.height(10.dp))
-      HorizontalDivider(color = colors.border)
+      HorizontalDivider(color = if (highlighted) GOLD.copy(alpha = 0.45f) else colors.border)
       Spacer(Modifier.height(10.dp))
 
       features.forEach { (name, on) ->
@@ -533,17 +761,26 @@ private fun TierCard(
           Modifier.fillMaxWidth().padding(vertical = 4.dp),
           verticalAlignment = Alignment.CenterVertically,
         ) {
+          // در ستونِ VIP خودِ تیک‌ها هم طلایی‌اند؛ ستونی که «همه‌چیز» را
+          // می‌دهد نباید با همان آبیِ ستونِ رایگان علامت بخورد
           Box(
             Modifier
               .size(18.dp)
-              .clip(RoundedCornerShape(9.dp))
-              .background(if (on) colors.primary else colors.surface2),
+              .clip(CircleShape)
+              .then(
+                if (on && highlighted) Modifier.background(GOLD_SWEEP)
+                else Modifier.background(if (on) colors.primary else colors.surface2)
+              ),
             contentAlignment = Alignment.Center,
           ) {
             Icon(
               if (on) Icons.Filled.Check else Icons.Filled.Lock,
               contentDescription = null,
-              tint = if (on) Color.White else colors.muted2,
+              tint = when {
+                on && highlighted -> GOLD_INK
+                on -> Color.White
+                else -> colors.muted2
+              },
               modifier = Modifier.size(11.dp),
             )
           }
@@ -558,7 +795,9 @@ private fun TierCard(
         }
       }
 
+      // پاورقی همیشه کفِ کارت می‌نشیند، پس در دو ستونِ هم‌قد روبه‌روی هم است
       Spacer(Modifier.height(12.dp))
+      Spacer(Modifier.weight(1f))
       Box(
         Modifier
           .fillMaxWidth()
@@ -582,8 +821,11 @@ private fun TierCard(
 /**
  *  یک مدتِ اشتراک.
  *
- *  «روزی حدود …» عمداً هست: ۳۰۰۰ افغانی در سال بزرگ به نظر می‌رسد،
- *  ۸ افغانی در روز نه — و هر دو یک عددند.
+ *  «روزی حدود …» عمداً هست: ۴۰۰۰ افغانی در سال بزرگ به نظر می‌رسد،
+ *  ۱۱ افغانی در روز نه — و هر دو یک عددند.
+ *
+ *  کارتِ نشان‌دار طلایی است: لبهٔ درخشان، برقی که روی سطح می‌لغزد، و
+ *  نشانِ طلا بالای آن.
  */
 @Composable
 private fun PlanCard(
@@ -594,32 +836,36 @@ private fun PlanCard(
 ) {
   val colors = Shop.colors
   val perDay = plan.price.toDouble() / plan.days
+  val golden = plan.badge.isNotBlank()
+  val pulse = goldPulse()
+  val sweep = goldSweep(period = 3000, delay = if (golden) 500 else 1500)
+  val shape = RoundedCornerShape(Radius.md)
 
-  Column(modifier) {
-    if (plan.badge.isNotBlank()) {
-      Box(
-        Modifier
-          .clip(RoundedCornerShape(topStart = 10.dp, topEnd = 10.dp))
-          .background(colors.warning)
-          .padding(horizontal = 10.dp, vertical = 3.dp),
-      ) {
-        Text(
-          plan.badge,
-          style = MaterialTheme.typography.labelSmall,
-          color = Color(0xFF2A1D02),
-          fontWeight = FontWeight.Bold,
-        )
-      }
+  Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+    /*
+     *  نوارِ نشان همیشه همین بلندی را می‌گیرد، حتی در کارتی که نشان
+     *  ندارد. کارتِ «ماهانه» نشان ندارد و بدونِ این فاصله، بالاترش
+     *  می‌نشست و با آن دو تای دیگر تراز نبود.
+     */
+    Box(Modifier.height(BADGE_BAND), contentAlignment = Alignment.BottomCenter) {
+      if (golden) GoldBadge(plan.badge)
     }
+
     Column(
       Modifier
         .fillMaxWidth()
-        .clip(RoundedCornerShape(Radius.md))
+        .weight(1f)
+        .then(if (golden) Modifier.goldEdge(Radius.md, pulse, strong = selected) else Modifier)
+        .clip(shape)
         .background(colors.surface)
-        .border(
-          if (selected) 1.6.dp else 1.dp,
-          if (selected) colors.primary else colors.border,
-          RoundedCornerShape(Radius.md),
+        .then(if (golden) Modifier.goldShine(sweep, strength = 0.25f) else Modifier)
+        .then(
+          if (golden) Modifier
+          else Modifier.border(
+            if (selected) 1.6.dp else 1.dp,
+            if (selected) colors.primary else colors.border,
+            shape,
+          )
         )
         .clickable(onClick = onClick)
         .padding(14.dp),
@@ -630,14 +876,16 @@ private fun PlanCard(
         style = MaterialTheme.typography.titleSmall,
         color = colors.text,
         fontWeight = FontWeight.Bold,
+        maxLines = 1,
       )
       Spacer(Modifier.height(6.dp))
       Row(verticalAlignment = Alignment.Bottom) {
         Text(
           plain(plan.price),
           style = MaterialTheme.typography.titleMedium,
-          color = colors.primary,
+          color = if (golden) GOLD_DEEP else colors.primary,
           fontWeight = FontWeight.Bold,
+          maxLines = 1,
         )
         Spacer(Modifier.width(4.dp))
         Text("افغانی", style = MaterialTheme.typography.labelSmall, color = colors.muted)
@@ -648,13 +896,22 @@ private fun PlanCard(
         style = MaterialTheme.typography.labelSmall,
         color = colors.muted2,
         textAlign = TextAlign.Center,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
       )
       Spacer(Modifier.height(10.dp))
+      Spacer(Modifier.weight(1f))
       Row(
         Modifier
           .fillMaxWidth()
           .clip(RoundedCornerShape(Radius.sm))
-          .background(if (selected) colors.primaryTint else colors.surface2)
+          .then(
+            when {
+              selected && golden -> Modifier.background(GOLD_SWEEP)
+              selected -> Modifier.background(colors.primaryTint)
+              else -> Modifier.background(colors.surface2)
+            }
+          )
           .padding(vertical = 8.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
@@ -662,15 +919,24 @@ private fun PlanCard(
         Icon(
           Icons.Filled.Check,
           contentDescription = null,
-          tint = if (selected) colors.primary else colors.muted2,
+          tint = when {
+            selected && golden -> GOLD_INK
+            selected -> colors.primary
+            else -> colors.muted2
+          },
           modifier = Modifier.size(14.dp),
         )
         Spacer(Modifier.width(5.dp))
         Text(
           if (selected) "انتخاب شد" else "انتخاب",
           style = MaterialTheme.typography.labelSmall,
-          color = if (selected) colors.primary else colors.muted,
+          color = when {
+            selected && golden -> GOLD_INK
+            selected -> colors.primary
+            else -> colors.muted
+          },
           fontWeight = FontWeight.Bold,
+          maxLines = 1,
         )
       }
     }
