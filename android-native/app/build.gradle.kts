@@ -43,22 +43,40 @@ android {
   }
 
   /*
-   *  اثرِ انگشتِ گواهیِ امضا، همین‌جا در زمانِ ساخت خوانده می‌شود.
+   *  کلیدِ امضا — از محیط، نه از داخلِ مخزن.
    *
-   *  برنامه هنگامِ اجرا امضای خودش را با همین مقایسه می‌کند. کسی که
-   *  فایل را باز کند، قفلِ اشتراک را بردارد و دوباره ببندد، مجبور است
-   *  با کلیدِ خودش امضا کند — و آن امضا با این یکی نمی‌خواند. پس نسخهٔ
-   *  دست‌کاری‌شده می‌تواند اجرا شود، ولی اشتراک به آن داده نمی‌شود.
+   *  تا امروز خودِ فایلِ کلید و رمزش هر دو در مخزن بودند. هر کسی که به
+   *  مخزن دسترسی داشت می‌توانست نسخه‌ای بسازد که گوشی‌ها آن را «همان
+   *  برنامه» بدانند و روی نصبِ کاربر بنشیند. کلیدِ امضا تنها چیزی است
+   *  که اندروید برای شناختنِ سازنده دارد.
    *
-   *  اگر خواندنِ کلید به هر دلیلی نشد، مقدار خالی می‌ماند و بررسی
-   *  خاموش می‌شود؛ نباید ساختِ برنامه به این گیر کند.
+   *  حالا از متغیرهای محیط خوانده می‌شود. اگر نبودند، همان فایلِ قبلی
+   *  استفاده می‌شود — تا روزی که کلید هنوز به CI منتقل نشده، هیچ ساختی
+   *  نشکند. برداشتنِ آن فایل، آخرین گام است نه اولین.
+   */
+  //  متغیرِ تنظیم‌نشده در GitHub Actions **رشتهٔ خالی** می‌شود، نه
+  //  ناموجود. پس `?:` تنها کافی نیست و خالی هم باید «نبود» حساب شود —
+  //  وگرنه رمزِ خالی به کلید داده می‌شود و امضا می‌شکند.
+  fun env(name: String): String? = System.getenv(name)?.takeIf { it.isNotBlank() }
+
+  val keystorePath: String = env("TOHID_KEYSTORE") ?: "tohid-release.jks"
+  val keystorePass: String = env("TOHID_KEYSTORE_PASSWORD") ?: "tohid-shop"
+  val keystoreAlias: String = env("TOHID_KEY_ALIAS") ?: "tohid"
+  val keystoreKeyPass: String = env("TOHID_KEY_PASSWORD") ?: keystorePass
+
+  /*
+   *  اثرِ انگشتِ گواهی، در زمانِ ساخت خوانده می‌شود.
+   *
+   *  برنامه هنگامِ اجرا امضای خودش را با همین می‌سنجد؛ نسخهٔ دست‌کاری‌شده
+   *  اجرا می‌شود ولی اشتراک نمی‌گیرد. اگر خواندن نشد، خالی می‌ماند و
+   *  بررسی خاموش می‌شود — ساختِ برنامه نباید به این گیر کند.
    */
   val signingFingerprint: String = runCatching {
     val store = KeyStore.getInstance("JKS")
-    file("tohid-release.jks").inputStream().use { input ->
-      store.load(input, "tohid-shop".toCharArray())
+    file(keystorePath).inputStream().use { input ->
+      store.load(input, keystorePass.toCharArray())
     }
-    val cert = store.getCertificate("tohid")
+    val cert = store.getCertificate(keystoreAlias)
     MessageDigest.getInstance("SHA-256")
       .digest(cert.encoded)
       .joinToString("") { byte -> "%02x".format(byte) }
@@ -66,10 +84,10 @@ android {
 
   signingConfigs {
     create("release") {
-      storeFile = file("tohid-release.jks")
-      storePassword = "tohid-shop"
-      keyAlias = "tohid"
-      keyPassword = "tohid-shop"
+      storeFile = file(keystorePath)
+      storePassword = keystorePass
+      keyAlias = keystoreAlias
+      keyPassword = keystoreKeyPass
 
       /*
        *  طرحِ امضا — صریح نوشته شده، نه به امیدِ پیش‌فرض.
