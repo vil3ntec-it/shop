@@ -52,6 +52,8 @@ import ir.vil3ntec.tohid.plain
 import ir.vil3ntec.tohid.sync.License
 import ir.vil3ntec.tohid.sync.LicenseGuard
 import ir.vil3ntec.tohid.sync.SyncStore
+import kotlinx.coroutines.launch
+import ir.vil3ntec.tohid.sync.ServerClient
 import ir.vil3ntec.tohid.ui.theme.Radius
 import ir.vil3ntec.tohid.ui.theme.Shop
 import androidx.compose.animation.animateColorAsState
@@ -403,6 +405,7 @@ fun VipScreen(onDismiss: () -> Unit) {
   val context = LocalContext.current
   val state = remember { SyncStore(context) }
   val signedIn = !state.accessToken.isNullOrBlank()
+  val scope = rememberCoroutineScope()
   // پیش‌فرض روی «پیشنهاد ما» است؛ کسی که تصمیم ندارد، همان را می‌گیرد
   var chosenPlan by rememberSaveable { mutableStateOf(PLANS[1].title) }
 
@@ -569,7 +572,30 @@ fun VipScreen(onDismiss: () -> Unit) {
       val picked = PLANS.find { it.title == chosenPlan } ?: PLANS[1]
       BuyButton(
         text = "گرفتن اشتراک ${picked.title} — ${plain(picked.price)} افغانی",
-        onClick = { buy(picked.title) },
+        onClick = {
+          /*
+           *  درخواستِ خرید، همین‌جا ثبت می‌شود.
+           *
+           *  تا امروز خرید فقط یک پیامِ واتساپ بود: مدیر باید از روی
+           *  پیام می‌فهمید چه کسی چه پلنی خواسته و دستی فعالش می‌کرد.
+           *  سرور از اول `purchase-request` را داشت. حالا اگر کاربر
+           *  وارد شده باشد، درخواست ثبت می‌شود **و** واتساپ هم باز
+           *  می‌شود — پیام برای هماهنگیِ پول لازم است، ولی دیگر تنها
+           *  ردِ ماجرا نیست.
+           */
+          if (signedIn) {
+            scope.launch {
+              val token = state.accessToken
+              if (token != null) {
+                runCatching {
+                  ServerClient(state.serverUrl)
+                    .purchaseRequest(token, picked.title, "از برنامهٔ اندروید")
+                }
+              }
+            }
+          }
+          buy(picked.title)
+        },
       )
       Spacer(Modifier.height(8.dp))
       Text(

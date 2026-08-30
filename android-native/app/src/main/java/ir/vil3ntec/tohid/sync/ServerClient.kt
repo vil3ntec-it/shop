@@ -147,6 +147,73 @@ class ServerClient(private val baseUrl: String) {
   }
 
   /** سلامتِ سرور — برای دکمهٔ «آزمایش اتصال» */
+  /* ---------------------- کارمندان و کدهای شاگرد ---------------------- */
+
+  /*
+   *  «چند کاربر روی یک دکان» قابلیتی است که در صفحهٔ اشتراک فروخته
+   *  می‌شود. سرور از اول همه‌ی این راه‌ها را داشت؛ برنامه هیچ‌کدام را صدا
+   *  نمی‌زد، پس قابلیتی که پولش گرفته می‌شد اصلاً وجود نداشت.
+   */
+
+  suspend fun members(token: String): JsonObject = get("/api/v1/shop/members", token)
+
+  suspend fun removeMember(token: String, memberId: String): JsonObject =
+    request("DELETE", "/api/v1/shop/members/$memberId", null, token)
+
+  suspend fun staffCodes(token: String): JsonObject = get("/api/v1/shop/staff-codes", token)
+
+  /** کدِ تازه. متنِ کد فقط همین یک بار برمی‌گردد و بعد فقط نشانه‌اش می‌ماند. */
+  suspend fun createStaffCode(
+    token: String,
+    role: String = "staff",
+    maxUses: Int = 1,
+    expiresInDays: Int = 0,
+  ): JsonObject = post(
+    "/api/v1/shop/staff-code",
+    buildJsonObject {
+      put("role", JsonPrimitive(role))
+      put("maxUses", JsonPrimitive(maxUses))
+      put("expiresInDays", JsonPrimitive(expiresInDays))
+    },
+    token,
+  )
+
+  suspend fun revokeStaffCode(token: String, codeId: String): JsonObject =
+    request("DELETE", "/api/v1/shop/staff-codes/$codeId", null, token)
+
+  /* ------------------------------ دستگاه‌ها ------------------------------ */
+
+  suspend fun devices(token: String): JsonObject = get("/api/v1/me/devices", token)
+
+  /** بستنِ نشستِ یک دستگاه — برای گوشیِ گم‌شده */
+  suspend fun revokeDevice(token: String, deviceId: String): JsonObject =
+    request("DELETE", "/api/v1/me/devices/$deviceId", null, token)
+
+  /* ------------------------------ حساب ------------------------------ */
+
+  suspend fun changePassword(token: String, current: String, fresh: String): JsonObject =
+    post(
+      "/api/v1/auth/password",
+      buildJsonObject {
+        put("currentPassword", JsonPrimitive(current))
+        put("newPassword", JsonPrimitive(fresh))
+      },
+      token,
+    )
+
+  /** درخواستِ خرید — مدیر بعد از گرفتنِ پول فعالش می‌کند */
+  suspend fun purchaseRequest(token: String, plan: String, note: String): JsonObject =
+    post(
+      "/api/v1/me/purchase-request",
+      buildJsonObject {
+        put("plan", JsonPrimitive(plan))
+        put("note", JsonPrimitive(note))
+      },
+      token,
+    )
+
+  suspend fun subscription(token: String): JsonObject = get("/api/v1/me/subscription", token)
+
   suspend fun health(): JsonObject = get("/api/v1/health")
 
   /* ------------------------------ لایهٔ HTTP ------------------------------ */

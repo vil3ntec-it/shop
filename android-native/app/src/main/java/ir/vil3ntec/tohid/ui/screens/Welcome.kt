@@ -20,6 +20,9 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.ui.layout.layout
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.StrokeCap
@@ -92,6 +95,19 @@ import kotlinx.coroutines.launch
  *  و ورود همچنان اختیاری است: «ادامه بدون حساب» همیشه سرِ جایش هست و
  *  تمامِ برنامه بدونِ حساب روی همین گوشی کار می‌کند.
  */
+/*
+ *  رنگ‌های صفحهٔ ورود.
+ *
+ *  از تم نمی‌آیند و عمداً: این صفحه یک فضای روشن و آبیِ ثابت دارد، مثلِ
+ *  صفحهٔ ورودِ برنامه‌های بانکی. رنگِ تمِ برنامه بعد از ورود شروع می‌شود.
+ *  در تمِ تاریک، خودِ پس‌زمینه تیره کشیده می‌شود و این‌ها روی آن می‌نشینند.
+ */
+private val INK = Color(0xFF17255A)
+private val INK_SOFT = Color(0xFF5C6B90)
+private val BLUE = Color(0xFF2563C9)
+private val BLUE_DEEP = Color(0xFF1B4FA8)
+private val FIELD_LINE = Color(0xFFE1E8F5)
+
 /** طلای همان صفحهٔ اشتراک — تا ورود و اشتراک یک زبان داشته باشند */
 private val GOLD_GLOW = Color(0xFFF6C93F)
 private val GOLD_RING = Color(0xFFFFE9A8)
@@ -140,7 +156,9 @@ fun WelcomeScreen(onDone: () -> Unit) {
 
   val ready = server.isNotBlank()
 
-  Box(Modifier.fillMaxSize().background(Shop.colors.bg)) {
+  Box(Modifier.fillMaxSize()) {
+    // پس‌زمینه کشیده می‌شود، نه بارگذاری: چند مسیر و چند نقطه روی بوم
+    WelcomeBackground()
     Column(
       Modifier
         .fillMaxSize()
@@ -392,16 +410,32 @@ fun WelcomeScreen(onDone: () -> Unit) {
           Text(
             "حساب نمی‌خواهید؟",
             style = MaterialTheme.typography.labelMedium,
-            color = Shop.colors.muted,
+            color = INK_SOFT,
           )
           TextButton(onClick = onDone, contentPadding = PaddingValues(horizontal = 8.dp)) {
             Text(
               "ادامه بدون حساب",
               style = MaterialTheme.typography.labelLarge,
-              color = Shop.colors.primary,
+              color = BLUE,
               fontWeight = FontWeight.Bold,
             )
           }
+        }
+
+        // جداکنندهٔ نازک با «یا» وسطش — مرزِ بینِ راهِ اصلی و کارهای فنی
+        Spacer(Modifier.height(6.dp))
+        Row(
+          Modifier.fillMaxWidth().padding(horizontal = 30.dp),
+          verticalAlignment = Alignment.CenterVertically,
+        ) {
+          HorizontalDivider(Modifier.weight(1f), color = FIELD_LINE)
+          Text(
+            "یا",
+            style = MaterialTheme.typography.labelMedium,
+            color = INK_SOFT,
+            modifier = Modifier.padding(horizontal = 12.dp),
+          )
+          HorizontalDivider(Modifier.weight(1f), color = FIELD_LINE)
         }
 
         if (saved.isNotEmpty()) {
@@ -436,14 +470,14 @@ fun WelcomeScreen(onDone: () -> Unit) {
             Icon(
               Icons.Filled.Tune,
               contentDescription = null,
-              tint = Shop.colors.muted2,
+              tint = INK_SOFT,
               modifier = Modifier.size(15.dp),
             )
             Spacer(Modifier.width(6.dp))
             Text(
               if (showMore) "بستن گزینه‌های بیشتر" else "کد شاگرد و تنظیم سرور",
               style = MaterialTheme.typography.labelMedium,
-              color = Shop.colors.muted2,
+              color = INK_SOFT,
             )
           }
         }
@@ -527,173 +561,109 @@ fun WelcomeScreen(onDone: () -> Unit) {
  *  لبهٔ صاف، سربرگ را یک مستطیلِ چسبانده به بالای صفحه نشان می‌دهد؛ موج
  *  همان یک خط است که کاری می‌کند رنگ روی صفحه «ریخته» باشد نه «چسبانده».
  */
+/**
+ *  سربرگ — نشانِ گرد، عنوان، و یک خط توضیح.
+ *
+ *  دیگر بلوکِ رنگی نیست: پس‌زمینه‌ی خودِ صفحه زیرِ همه‌جا ادامه دارد و
+ *  سربرگ فقط محتواست. بلوکِ تیره‌ی قبلی صفحه را دو تکه می‌کرد و بالای
+ *  آن با پایینش حرف نمی‌زد.
+ */
 @Composable
 private fun GradientHeader(title: String, subtitle: String) {
   val colors = Shop.colors
-  // روی گوشی کوتاه‌تر: سربرگِ بلند، فرم را می‌راند پایین و کاربر باید
-  // برای رسیدن به کادرِ اول اسکرول کند
-  val tall = if (isTablet()) 280.dp else 196.dp
-
-  /*
-   *  سربرگ — همان زبانِ نوارِ پایین: تیره و شیشه‌ای، با یک چراغ.
-   *
-   *  موجِ رنگیِ قبلی یک بلوکِ تخت بود که با بقیهٔ برنامه حرف نمی‌زد.
-   *  حالا زمینه همان سطحِ برنامه است و نور از بالا می‌آید — همان‌طور که
-   *  در نوارِ پایین از بالای تبِ باز می‌آید.
-   */
   Box(
     Modifier
       .fillMaxWidth()
-      .height(tall)
-      .clip(RoundedCornerShape(bottomStart = 36.dp, bottomEnd = 36.dp))
-      .background(colors.surface),
+      .windowInsetsPadding(WindowInsets.statusBars),
+    contentAlignment = Alignment.TopCenter,
   ) {
-    /*
-     *  دو هالهٔ رنگی که آرام در سربرگ می‌چرخند.
-     *
-     *  سربرگِ ساکن، یک بلوکِ تخت است؛ همین حرکتِ کُندِ زیرِ نور است که
-     *  صفحه را زنده نشان می‌دهد بدون اینکه چشم را به خودش بکشد.
-     */
-    val drift = rememberInfiniteTransition(label = "aurora")
-    val flow by drift.animateFloat(
-      initialValue = 0f,
-      targetValue = 1f,
-      animationSpec = infiniteRepeatable(
-        // اینجا `Restart` پرش ندارد: این عدد زاویهٔ یک دورِ کامل است و
-        // نقطهٔ ۱ همان نقطهٔ ۰ است — هاله روی دایره می‌چرخد و برنمی‌گردد
-        tween(if (Motion.enabled) 9000 else 1, easing = LinearEasing),
-        RepeatMode.Restart,
-      ),
-      label = "flow",
-    )
-    val glow by drift.animateFloat(
-      initialValue = 0.7f,
-      targetValue = 1.15f,
-      animationSpec = infiniteRepeatable(
-        tween(if (Motion.enabled) 2600 else 1, easing = EaseInOutSine),
-        RepeatMode.Reverse,
-      ),
-      label = "glow",
-    )
-
-    Canvas(Modifier.matchParentSize()) {
-      val w = size.width
-      val h = size.height
-      val cx = w / 2f
-
-      // هاله‌ها روی یک بیضی می‌چرخند، هرکدام نیم دور جلوتر از آن یکی
-      val angle = flow * 6.2832f
-      listOf(
-        Triple(colors.primary, 0f, 0.55f),
-        Triple(GOLD_GLOW, 3.1416f, 0.42f),
-      ).forEach { (tint, phase, weight) ->
-        val a = angle + phase
-        val center = Offset(cx + kotlin.math.cos(a) * w * 0.26f, h * (0.42f + kotlin.math.sin(a) * 0.18f))
-        val radius = h * 0.72f
-        drawCircle(
-          brush = Brush.radialGradient(
-            colors = listOf(tint.copy(alpha = 0.16f * weight), tint.copy(alpha = 0f)),
-            center = center,
-            radius = radius,
-          ),
-          radius = radius,
-          center = center,
-        )
-      }
-      listOf(0.9f to 0.14f, 0.6f to 0.18f, 0.35f to 0.22f).forEach { (spread, base) ->
-        val alpha = base * glow
-        drawCircle(
-          brush = Brush.radialGradient(
-            colors = listOf(
-              colors.primary.copy(alpha = alpha),
-              colors.primary.copy(alpha = alpha * 0.4f),
-              colors.primary.copy(alpha = 0f),
-            ),
-            center = Offset(cx, 0f),
-            radius = h * (0.7f + spread),
-          ),
-          radius = h * (0.7f + spread),
-          center = Offset(cx, 0f),
-        )
-      }
-      // خودِ نوارِ چراغ، بالای صفحه
-      val half = w * 0.16f
-      drawRoundRect(
-        brush = Brush.horizontalGradient(
-          colorStops = arrayOf(
-            0f to colors.primary.copy(alpha = 0f),
-            0.5f to Color.White.copy(alpha = (0.85f * glow).coerceAtMost(1f)),
-            1f to colors.primary.copy(alpha = 0f),
-          ),
-          startX = cx - half,
-          endX = cx + half,
-        ),
-        topLeft = Offset(cx - half, 0f),
-        size = Size(half * 2f, 3.dp.toPx()),
-        cornerRadius = CornerRadius(1.5.dp.toPx()),
+    Column(
+      Modifier
+        .widthIn(max = 460.dp)
+        .fillMaxWidth()
+        .padding(horizontal = 26.dp)
+        .padding(top = if (isTablet()) 30.dp else 18.dp, bottom = 6.dp),
+      horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+      WelcomeMark(size = if (isTablet()) 138.dp else 112.dp)
+      Spacer(Modifier.height(if (isTablet()) 22.dp else 16.dp))
+      Text(
+        title,
+        style = if (isTablet()) MaterialTheme.typography.displaySmall
+        else MaterialTheme.typography.headlineMedium,
+        color = INK,
+        fontWeight = FontWeight.Bold,
+        textAlign = TextAlign.Center,
+      )
+      Spacer(Modifier.height(10.dp))
+      Text(
+        subtitle,
+        style = MaterialTheme.typography.bodyMedium,
+        color = INK_SOFT,
+        textAlign = TextAlign.Center,
       )
     }
+  }
+}
 
+/**
+ *  انتخابِ راهِ ورود — شماره یا ایمیل.
+ *
+ *  قرصِ انتخاب‌شده **سُر می‌خورد**، ظاهر و ناپدید نمی‌شود: حرکت می‌گوید
+ *  که این دو، دو حالتِ یک چیزند، نه دو دکمهٔ جدا.
+ */
+@Composable
+private fun ChannelSwitch(channel: String, onPick: (String) -> Unit) {
+  val phone = channel == "phone"
+  val slide by animateFloatAsState(
+    targetValue = if (phone) 0f else 1f,
+    animationSpec = tween(if (Motion.enabled) 260 else 0, easing = FastOutSlowInEasing),
+    label = "channelSlide",
+  )
+
+  Box(
+    Modifier
+      .fillMaxWidth()
+      .shadow(6.dp, RoundedCornerShape(30.dp), ambientColor = BLUE, spotColor = BLUE)
+      .clip(RoundedCornerShape(30.dp))
+      .background(Color.White)
+      .padding(5.dp)
+  ) {
+    // قرصِ آبی، پشتِ متن‌ها، روی نیمهٔ انتخاب‌شده
     Box(
       Modifier
-        .fillMaxWidth()
-        .windowInsetsPadding(WindowInsets.statusBars),
-      contentAlignment = Alignment.TopCenter,
-    ) {
-      Column(
-        Modifier
-          .widthIn(max = 460.dp)
-          .fillMaxWidth()
-          .padding(horizontal = 26.dp, vertical = if (isTablet()) 28.dp else 18.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-      ) {
-        BrandMark()
-        Spacer(Modifier.height(if (isTablet()) 16.dp else 10.dp))
-        Text(
-          title,
-          style = if (isTablet()) MaterialTheme.typography.displaySmall
-          else MaterialTheme.typography.headlineMedium,
-          color = colors.text,
-          fontWeight = FontWeight.Bold,
-          textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(6.dp))
-        /*
-         *  توضیحِ زیرِ عنوان با `muted` نوشته می‌شد و روی سطحِ سربرگ —
-         *  که خودش کم‌رنگ است — تقریباً ناپیدا بود؛ در عکس فقط چند نقطه
-         *  دیده می‌شد. متنی که خوانده نمی‌شود، نبودنش بهتر از بودنش
-         *  است، پس یا خوانا باشد یا برداشته شود.
-         */
-        Text(
-          subtitle,
-          style = MaterialTheme.typography.bodyMedium,
-          color = colors.text.copy(alpha = 0.78f),
-          textAlign = TextAlign.Center,
-        )
+        .fillMaxWidth(0.5f)
+        .align(Alignment.CenterStart)
+        .offsetByFraction(slide)
+        .clip(RoundedCornerShape(26.dp))
+        .background(Brush.horizontalGradient(listOf(BLUE_DEEP, BLUE)))
+        .padding(vertical = 13.dp)
+    ) {}
+
+    Row(Modifier.fillMaxWidth()) {
+      ChannelTab("شماره موبایل", Icons.Filled.PhoneAndroid, phone, Modifier.weight(1f)) {
+        onPick("phone")
+      }
+      ChannelTab("ایمیل", Icons.Filled.AlternateEmail, !phone, Modifier.weight(1f)) {
+        onPick("email")
       }
     }
   }
 }
 
-/** انتخابِ راهِ ورود — شماره یا ایمیل */
-@Composable
-private fun ChannelSwitch(channel: String, onPick: (String) -> Unit) {
-  val colors = Shop.colors
-  Row(
-    Modifier
-      .fillMaxWidth()
-      .clip(RoundedCornerShape(26.dp))
-      .background(colors.surface2)
-      .padding(4.dp),
-  ) {
-    ChannelTab("شماره موبایل", Icons.Filled.PhoneAndroid, channel == "phone", Modifier.weight(1f)) {
-      onPick("phone")
-    }
-    ChannelTab("ایمیل", Icons.Filled.AlternateEmail, channel == "email", Modifier.weight(1f)) {
-      onPick("email")
+/**
+ *  جابه‌جاییِ قرص، به‌نسبتِ پهنای خودش.
+ *
+ *  با `offset` بر حسبِ نقطه، روی هر پهنای صفحه‌ای جای دیگری می‌ایستاد؛
+ *  اینجا از پهنای واقعیِ خودِ قرص خوانده می‌شود.
+ */
+private fun Modifier.offsetByFraction(fraction: Float): Modifier =
+  this.layout { measurable, constraints ->
+    val placeable = measurable.measure(constraints)
+    layout(placeable.width, placeable.height) {
+      placeable.placeRelative((placeable.width * fraction).toInt(), 0)
     }
   }
-}
 
 @Composable
 private fun ChannelTab(
@@ -703,27 +673,26 @@ private fun ChannelTab(
   modifier: Modifier = Modifier,
   onClick: () -> Unit,
 ) {
-  val colors = Shop.colors
+  val tint by animateColorAsState(
+    targetValue = if (active) Color.White else INK_SOFT,
+    animationSpec = tween(if (Motion.enabled) 220 else 0),
+    label = "tabTint",
+  )
   Row(
     modifier
-      .clip(RoundedCornerShape(22.dp))
-      .background(if (active) colors.primary else Color.Transparent)
+      .clip(RoundedCornerShape(26.dp))
       .clickable(onClick = onClick)
-      .padding(vertical = 11.dp),
+      .padding(vertical = 13.dp),
     horizontalArrangement = Arrangement.Center,
     verticalAlignment = Alignment.CenterVertically,
   ) {
-    Icon(
-      icon,
-      contentDescription = null,
-      tint = if (active) Color.White else colors.muted,
-      modifier = Modifier.size(17.dp),
-    )
+    Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(17.dp))
     Spacer(Modifier.width(6.dp))
     Text(
       text,
       style = MaterialTheme.typography.labelLarge,
-      color = if (active) Color.White else colors.muted,
+      color = tint,
+      fontWeight = FontWeight.Bold,
       maxLines = 1,
     )
   }
@@ -749,36 +718,51 @@ private fun PillField(
   trailing: @Composable (() -> Unit)? = null,
 ) {
   val colors = Shop.colors
+  val dark = colors.bg != Color(0xFFFFFFFF) && colors.text == Color.White
   val interaction = remember { MutableInteractionSource() }
   val focused by interaction.collectIsFocusedAsState()
+
+  // خطِ دور و سایه هر دو با فوکوس عوض می‌شوند، ولی نرم: پرشِ ناگهانیِ
+  // سایه، کادر را می‌پراند
   val line by animateColorAsState(
-    targetValue = if (focused) colors.primary else colors.fieldBorder,
-    animationSpec = tween(if (Motion.enabled) 180 else 0),
+    targetValue = if (focused) BLUE else FIELD_LINE,
+    animationSpec = tween(if (Motion.enabled) 200 else 0),
     label = "pillLine",
   )
+  val lift by animateDpAsState(
+    targetValue = if (focused) 9.dp else 4.dp,
+    animationSpec = tween(if (Motion.enabled) 200 else 0),
+    label = "pillLift",
+  )
+
+  val face = if (dark) colors.surface else Color.White
+  val ink = if (dark) colors.text else INK
+  val hint = if (dark) colors.muted2 else INK_SOFT
 
   val inner: @Composable () -> Unit = {
     Row(
       Modifier
         .fillMaxWidth()
-        .heightIn(min = 56.dp)
-        .shadow(if (focused) 8.dp else 3.dp, RoundedCornerShape(28.dp), clip = false)
-        .clip(RoundedCornerShape(28.dp))
-        .background(colors.fieldBg)
-        .border(1.dp, line, RoundedCornerShape(28.dp))
-        .padding(horizontal = 18.dp),
+        .heightIn(min = 60.dp)
+        // سایهٔ آبیِ بسیار نرم، نه سیاه: سایهٔ سیاه روی زمینهٔ آبیِ روشن
+        // خاکستری و کثیف دیده می‌شود
+        .shadow(lift, RoundedCornerShape(30.dp), clip = false, ambientColor = BLUE, spotColor = BLUE)
+        .clip(RoundedCornerShape(30.dp))
+        .background(face)
+        .border(if (focused) 1.5.dp else 1.dp, line, RoundedCornerShape(30.dp))
+        .padding(horizontal = 20.dp),
       verticalAlignment = Alignment.CenterVertically,
     ) {
       Icon(
         icon,
         contentDescription = null,
-        tint = if (focused) colors.primary else colors.muted2,
+        tint = if (focused) BLUE else hint,
         modifier = Modifier.size(19.dp),
       )
       Spacer(Modifier.width(12.dp))
       Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
         if (value.isEmpty()) {
-          Text(placeholder, style = MaterialTheme.typography.bodyMedium, color = colors.muted2)
+          Text(placeholder, style = MaterialTheme.typography.bodyMedium, color = hint)
         }
         BasicTextField(
           value = value,
@@ -789,9 +773,9 @@ private fun PillField(
           keyboardOptions = keyboardOptions,
           visualTransformation = visual,
           textStyle = MaterialTheme.typography.bodyMedium.copy(
-            color = if (enabled) colors.text else colors.muted,
+            color = if (enabled) ink else hint,
           ),
-          cursorBrush = SolidColor(colors.primary),
+          cursorBrush = SolidColor(BLUE),
           modifier = Modifier.fillMaxWidth(),
         )
       }
@@ -817,6 +801,13 @@ private fun PillField(
 }
 
 /** دکمهٔ اصلی — قرصِ رنگی با شیب */
+/**
+ *  دکمهٔ اصلی.
+ *
+ *  شیبِ آبی، گوشه‌های کاملاً گرد، و سایه‌ای که رنگش خودِ آبی است نه سیاه.
+ *  فشردن دیده می‌شود (کوچک شدنِ ملایم)، و حالتِ غیرفعال خاکستریِ تخت است
+ *  تا با حالتِ فعال اشتباه نشود.
+ */
 @Composable
 private fun GradientButton(
   text: String,
@@ -824,53 +815,36 @@ private fun GradientButton(
   busy: Boolean,
   onClick: () -> Unit,
 ) {
-  val colors = Shop.colors
-  val brush = if (enabled) {
-    Brush.linearGradient(listOf(colors.primary, colors.primaryDark))
-  } else {
-    Brush.linearGradient(listOf(colors.surface2, colors.surface2))
-  }
-  // برقی که روی دکمه می‌لغزد، و فشردنی که دیده می‌شود
-  val motion = rememberInfiniteTransition(label = "cta")
-  val sheen by motion.animateFloat(
-    initialValue = 0f,
-    targetValue = 1f,
-    animationSpec = infiniteRepeatable(
-      tween(if (Motion.enabled) 2600 else 1, easing = EaseInOutSine),
-      RepeatMode.Reverse,
-    ),
-    label = "sheen",
-  )
   val interaction = remember { MutableInteractionSource() }
   val pressed by interaction.collectIsPressedAsState()
   val scale by animateFloatAsState(
-    targetValue = if (pressed && enabled) 0.97f else 1f,
-    label = "press",
+    targetValue = if (pressed && enabled && !busy) 0.975f else 1f,
+    animationSpec = tween(if (Motion.enabled) 120 else 0, easing = FastOutSlowInEasing),
+    label = "ctaPress",
   )
+
+  val shape = RoundedCornerShape(30.dp)
+  val live = enabled && !busy
 
   Box(
     Modifier
       .fillMaxWidth()
-      .height(58.dp)
+      .height(60.dp)
       .graphicsLayer { scaleX = scale; scaleY = scale }
-      .shadow(if (enabled) 10.dp else 0.dp, RoundedCornerShape(29.dp), clip = false)
-      .clip(RoundedCornerShape(29.dp))
-      .background(brush)
-      .drawWithContent {
-        drawContent()
-        if (!enabled || !Motion.enabled) return@drawWithContent
-        val x = size.width * sheen
-        drawRect(
-          brush = Brush.linearGradient(
-            colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.28f), Color.Transparent),
-            start = Offset(x - size.width * 0.22f, 0f),
-            end = Offset(x + size.width * 0.22f, size.height),
-          ),
-          size = size,
-        )
-      }
+      .shadow(
+        elevation = if (live) 12.dp else 0.dp,
+        shape = shape,
+        clip = false,
+        ambientColor = BLUE,
+        spotColor = BLUE,
+      )
+      .clip(shape)
+      .background(
+        if (live) Brush.horizontalGradient(listOf(BLUE_DEEP, BLUE, Color(0xFF3C7DE0)))
+        else Brush.horizontalGradient(listOf(FIELD_LINE, FIELD_LINE))
+      )
       .clickable(
-        enabled = enabled && !busy,
+        enabled = live,
         interactionSource = interaction,
         indication = null,
         onClick = onClick,
@@ -878,12 +852,13 @@ private fun GradientButton(
     contentAlignment = Alignment.Center,
   ) {
     if (busy) {
-      CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
+      CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(22.dp))
     } else {
       Text(
         text,
         style = MaterialTheme.typography.titleMedium,
-        color = if (enabled) Color.White else colors.muted2,
+        color = if (live) Color.White else INK_SOFT,
+        fontWeight = FontWeight.Bold,
       )
     }
   }

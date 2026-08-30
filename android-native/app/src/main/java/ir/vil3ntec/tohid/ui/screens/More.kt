@@ -18,6 +18,7 @@ import ir.vil3ntec.tohid.fa
 import ir.vil3ntec.tohid.update.UpdateManager
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.LocalShipping
@@ -109,6 +110,13 @@ fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
         tint = Shop.colors.muted,
         subtitle = "هر کاری که در برنامه انجام شده",
         onClick = { onOpen("audit") },
+      )
+      MoreCard(
+        title = "کارمندان دکان",
+        icon = Icons.Filled.Groups,
+        tint = Shop.colors.accent,
+        subtitle = "کد پیوستن بسازید و دسترسی شاگردها را ببندید",
+        onClick = { onOpen("team") },
       )
       MoreCard(
         title = "تنظیمات",

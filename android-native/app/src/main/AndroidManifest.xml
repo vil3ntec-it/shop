@@ -19,6 +19,12 @@
   <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
   <uses-permission android:name="android.permission.CAMERA" />
+
+  <!--
+    یادآوریِ روزانه: موجودیِ تمام‌شده و قرضِ سررسیده. تا امروز هشدارها
+    فقط داخلِ برنامه بودند و تا کسی بازش نمی‌کرد خبردار نمی‌شد.
+  -->
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
   <uses-feature android:name="android.hardware.camera" android:required="false" />
 
   <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />

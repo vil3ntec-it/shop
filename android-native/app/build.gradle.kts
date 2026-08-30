@@ -138,6 +138,10 @@ dependencies {
   implementation("com.google.mlkit:barcode-scanning:17.3.0")
   implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
+  // یادآوریِ روزانه. کارِ زمان‌بندی‌شده باید بعد از خاموش و روشن شدنِ
+  // گوشی هم سرِ جایش باشد؛ `WorkManager` همان را تضمین می‌کند.
+  implementation("androidx.work:work-runtime-ktx:2.9.1")
+
   testImplementation("junit:junit:4.13.2")
 }
 
