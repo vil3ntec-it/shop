@@ -58,9 +58,16 @@ jobs:
           TOHID_KEYSTORE_PASSWORD: ${{ secrets.TOHID_KEYSTORE_PASSWORD }}
           TOHID_KEY_ALIAS: ${{ secrets.TOHID_KEY_ALIAS }}
           TOHID_KEY_PASSWORD: ${{ secrets.TOHID_KEY_PASSWORD }}
-          #  دامنهٔ عمومیِ API. اگر تنظیم نشده باشد خالی می‌ماند و برنامه
-          #  کاملاً آفلاین کار می‌کند — نه خطایی، نه قابلیتی که قفل شود.
-          TOHID_API_BASE: ${{ secrets.TOHID_API_BASE }}
+          #  دامنهٔ عمومیِ API.
+          #
+          #  `vars` است نه `secrets`: این نشانی راز نیست — هر کسی که
+          #  برنامه را باز کند با همین دامنه حرف می‌زند و از روی ترافیک
+          #  دیده می‌شود. راز، چیزهایی است که فقط روی سرور می‌مانند:
+          #  رمز دیتابیس، کلید پیامک، توکن واتساپ، راز مدیر.
+          #
+          #  اگر تنظیم نشده باشد خالی می‌ماند و برنامه کاملاً آفلاین کار
+          #  می‌کند — نه خطایی، نه قابلیتی که قفل شود.
+          TOHID_API_BASE: ${{ vars.TOHID_API_BASE }}
         run: gradle --no-daemon assembleRelease -PbuildNumber=${{ github.run_number }}
 
       - name: نام‌گذاری و جمع کنترلی

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- زمینه‌ی نشان: سرمه‌ای تیره، تا در فهرست برنامه‌ها با برنامه‌ی مشتری اشتباه نشود -->
+  <color name="icon_bg">#0B1020</color>
+  <color name="splash">#0B1020</color>
+</resources>

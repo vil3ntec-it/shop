@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     برنامه‌ی مدیریت هم فقط HTTPS.
+
+     این برنامه توکن مدیر را حمل می‌کند؛ همان توکنی که با آن می‌شود
+     اشتراک هر کسی را عوض کرد. روی `http` ساده فرستادنش یعنی هر کسی روی
+     همان شبکه می‌تواند برش دارد.
+
+     نسخه‌ی آزمایشی پرونده‌ی خودش را دارد.
+-->
+<network-security-config>
+  <base-config cleartextTrafficPermitted="true">
+    <trust-anchors>
+      <certificates src="system" />
+      <certificates src="user" />
+    </trust-anchors>
+  </base-config>
+</network-security-config>

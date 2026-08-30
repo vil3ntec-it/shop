@@ -198,6 +198,18 @@ router.get('/shops/:id', async (req, res, next) => {
   });
 });
 
+/**
+ * دفتر تغییرهای اشتراک یک دکان.
+ *
+ * جدول subscriptions فقط «حالا» را نشان می‌دهد؛ این می‌گوید چه کسی کِی
+ * چه تمدیدی داد و تاریخ پایان از چه به چه رسید.
+ */
+router.get('/shops/:id/history', async (req, res) => {
+  const id = v.id(req.params.id);
+  const limit = v.integer(req.query?.limit, { min: 1, max: 200, def: 50 });
+  res.json({ history: await subs.changeLog(id, limit) });
+});
+
 // ---------- اشتراک‌ها ----------
 router.get('/subscriptions', async (req, res) => {
   await subs.expireDue();

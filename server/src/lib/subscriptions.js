@@ -79,6 +79,17 @@ async function expireDue(at = now()) {
 }
 
 /**
+ * تاریخ شروعی که باید نگه داشته شود.
+ *
+ * تمدیدِ اشتراکِ زنده، شروع را دست نمی‌زند. ولی اگر اشتراک تمام شده باشد
+ * این یک اشتراکِ تازه است و از همین حالا شروع می‌شود.
+ */
+function if_live(existing, at) {
+  if (existing && Number(existing.ends_at) > at) return Number(existing.starts_at);
+  return null;
+}
+
+/**
  * ثبت یک سطر در تاریخچه.
  *
  * هرگز جلوی کار اصلی را نمی‌گیرد: اگر نوشتن تاریخچه شکست بخورد،
@@ -133,12 +144,15 @@ async function grant(shopId, { plan = 'custom', days = null, startsAt = null, en
     end = Number(endsAt);
   } else if (days) {
     end = base + Number(days) * DAY;
-    start = existing ? Number(existing.starts_at) : start;
+    //  اشتراکِ زنده: شروع همان شروعِ قبلی می‌ماند و فقط پایان جلو می‌رود.
+    //  اشتراکِ تمام‌شده: از همین حالا شروع می‌شود، نه از تاریخِ قدیمی —
+    //  وگرنه در گزارش‌ها اشتراکی دیده می‌شد که ماه‌ها پیش شروع شده.
+    start = if_live(existing, t) ?? start;
   } else {
     const p = await plans.getPlan(plan);
     if (!p || !p.amount || !p.unit) throw badRequest('مدت اشتراک مشخص نیست', 'missing_duration');
     end = plans.endOfPeriod(base, p.amount, p.unit);
-    start = existing ? Number(existing.starts_at) : start;
+    start = if_live(existing, t) ?? start;
     if (!features.length && Array.isArray(p.features) && p.features.length) features = p.features;
     maxDevices = maxDevices || p.max_devices;
   }
