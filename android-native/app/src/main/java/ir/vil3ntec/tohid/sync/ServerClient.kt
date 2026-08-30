@@ -66,6 +66,15 @@ class ServerClient(private val baseUrl: String) {
     post("/api/v1/auth/otp/request", destinationBody(destination))
 
   /**
+   *  چند ثانیه تا اجازهٔ ارسالِ دوباره، از روی پاسخِ سرور.
+   *
+   *  ثانیه می‌آید نه زمانِ مطلق، چون ساعتِ گوشی ممکن است با سرور جور
+   *  نباشد. اگر سرورِ قدیمی این را ندهد، دو دقیقه فرض می‌شود.
+   */
+  fun resendSecondsOf(body: JsonObject): Int =
+    body["resendSeconds"]?.jsonPrimitive?.content?.toIntOrNull() ?: 120
+
+  /**
    *  مقصدِ کد — شماره یا ایمیل.
    *
    *  خودِ سرور تصمیم می‌گیرد کد را با پیامک بفرستد یا با ایمیل؛ برنامه

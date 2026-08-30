@@ -170,6 +170,14 @@ fun WelcomeScreen(onDone: () -> Unit) {
   var saved by remember { mutableStateOf(SavedLogins.read(context)) }
 
   /*
+   *  فاصلهٔ ارسال دوباره — روی گوشی نوشته می‌شود، نه در حافظهٔ صفحه.
+   *
+   *  هر پیامک پول دارد. قبلاً شمارش با بستنِ صفحه یا برنامه از صفر شروع
+   *  می‌شد و کاربرِ عجول چند پیامک پشتِ هم می‌گرفت.
+   */
+  val cooldown = remember { ir.vil3ntec.tohid.sync.OtpCooldown(context) }
+
+  /*
    *  ورود با گوگل فقط وقتی نشان داده می‌شود که خودِ سرور بگوید روشن است.
    *
    *  دکمه‌ای که بخورد به خطا، از نبودنِ دکمه بدتر است. آدرسِ سرور هم مدام
@@ -207,18 +215,23 @@ fun WelcomeScreen(onDone: () -> Unit) {
    *  جدا می‌آید که فقط یک کار دارد. منطقِ ورود همان است؛ فقط جایش عوض شده.
    */
   if (codeSent) {
+    val destination = if (channel == "phone") phone.trim() else email.trim()
     CodeScreen(
-      destination = if (channel == "phone") phone.trim() else email.trim(),
+      destination = destination,
       busy = busy,
       error = error,
       note = note,
+      secondsLeft = { cooldown.secondsLeft(destination) },
       onBack = { codeSent = false; code = ""; note = null; error = null },
       onResend = {
         busy = true; error = null
         scope.launch {
-          val to = if (channel == "phone") phone.trim() else email.trim()
-          runCatching { ServerClient(server.trim().trimEnd('/')).otpRequest(to) }
-            .onSuccess { note = "کد دوباره فرستاده شد" }
+          val client = ServerClient(server.trim().trimEnd('/'))
+          runCatching { client.otpRequest(destination) }
+            .onSuccess {
+              cooldown.start(destination, client.resendSecondsOf(it))
+              note = "کد دوباره فرستاده شد"
+            }
             .onFailure { fail(it) }
           busy = false
         }
@@ -380,14 +393,25 @@ fun WelcomeScreen(onDone: () -> Unit) {
           scope.launch {
             val client = ServerClient(base)
             when {
-              channel == "phone" ->
-                runCatching { client.otpRequest(phone.trim()) }
-                  .onSuccess {
-                    state.serverUrl = base
-                    codeSent = true
-                    note = null
-                  }
-                  .onFailure { fail(it) }
+              channel == "phone" -> {
+                //  اگر همین چند لحظه پیش کد گرفته، پیامکِ تازه نمی‌گیریم —
+                //  همان صفحهٔ کد باز می‌شود با شمارشی که ادامه دارد.
+                val to = phone.trim()
+                if (cooldown.secondsLeft(to) > 0) {
+                  state.serverUrl = base
+                  codeSent = true
+                  note = "کد قبلی هنوز معتبر است"
+                } else {
+                  runCatching { client.otpRequest(to) }
+                    .onSuccess {
+                      state.serverUrl = base
+                      cooldown.start(to, client.resendSecondsOf(it))
+                      codeSent = true
+                      note = null
+                    }
+                    .onFailure { fail(it) }
+                }
+              }
 
               emailMode == "register" ->
                 runCatching { client.register(name.trim(), email.trim(), "", password) }
@@ -424,9 +448,22 @@ fun WelcomeScreen(onDone: () -> Unit) {
               busy = true; error = null; note = null
               val base = server.trim().trimEnd('/')
               scope.launch {
-                runCatching { ServerClient(base).otpRequest(email.trim()) }
-                  .onSuccess { state.serverUrl = base; codeSent = true; note = null }
-                  .onFailure { fail(it) }
+                val to = email.trim()
+                if (cooldown.secondsLeft(to) > 0) {
+                  state.serverUrl = base
+                  codeSent = true
+                  note = "کد قبلی هنوز معتبر است"
+                } else {
+                  val client = ServerClient(base)
+                  runCatching { client.otpRequest(to) }
+                    .onSuccess {
+                      state.serverUrl = base
+                      cooldown.start(to, client.resendSecondsOf(it))
+                      codeSent = true
+                      note = null
+                    }
+                    .onFailure { fail(it) }
+                }
                 busy = false
               }
             },
@@ -677,6 +714,7 @@ private fun CodeScreen(
   busy: Boolean,
   error: String?,
   note: String?,
+  secondsLeft: () -> Int,
   onBack: () -> Unit,
   onResend: () -> Unit,
   onSubmit: (String) -> Unit,
@@ -685,11 +723,23 @@ private fun CodeScreen(
   val focus = remember { FocusRequester() }
   val keyboard = LocalSoftwareKeyboardController.current
 
-  //  شمارشِ معکوسِ ارسالِ دوباره — وگرنه کاربر پشتِ هم می‌زند و سرور
-  //  «۶۰ ثانیه دیگر» می‌گوید و او فکر می‌کند خراب است
-  var wait by remember { mutableStateOf(60) }
+  /*
+   *  شمارشِ معکوسِ ارسالِ دوباره.
+   *
+   *  عدد از روی مهلتی می‌آید که روی گوشی نوشته شده، نه از یک شمارندهٔ
+   *  داخلِ همین صفحه. پس چرخاندنِ گوشی، برگشتن و آمدن، و حتی بستن و باز
+   *  کردنِ برنامه، شمارش را از صفر شروع نمی‌کند — و یک پیامکِ اضافه از
+   *  اعتبارِ شما نمی‌رود.
+   */
+  var wait by remember { mutableStateOf(secondsLeft()) }
   LaunchedEffect(Unit) {
-    while (wait > 0) { kotlinx.coroutines.delay(1000); wait -= 1 }
+    //  تا وقتی این صفحه باز است هر ثانیه می‌خوانیم. حلقه نمی‌شکند، چون
+    //  «ارسال دوباره» مهلت را بعد از پاسخِ سرور می‌نویسد و ما باید همان
+    //  لحظه ببینیمش — نه اینکه از قبل ایستاده باشیم.
+    while (true) {
+      wait = secondsLeft()
+      kotlinx.coroutines.delay(1000)
+    }
   }
 
   LaunchedEffect(Unit) { focus.requestFocus(); keyboard?.show() }
@@ -777,7 +827,13 @@ private fun CodeScreen(
       }
 
       Spacer(Modifier.height(10.dp))
-      TextButton(enabled = wait == 0 && !busy, onClick = { wait = 60; onResend() }) {
+      TextButton(
+        enabled = wait == 0 && !busy,
+        //  مهلت را خودِ onResend بعد از پاسخِ سرور می‌نویسد؛ حلقهٔ بالا
+        //  همان ثانیه می‌بیندش. اگر ارسال نشد، مهلتی هم نوشته نمی‌شود و
+        //  کاربر می‌تواند دوباره بزند.
+        onClick = onResend,
+      ) {
         Text(
           if (wait > 0) "ارسال دوبارهٔ کد تا ${wait.faDigits()} ثانیه" else "ارسال دوبارهٔ کد",
           style = MaterialTheme.typography.labelLarge,

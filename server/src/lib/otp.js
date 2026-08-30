@@ -61,11 +61,19 @@ function parseJson(text, label, vars) {
 
 /** پاسخ سرویس را می‌سنجد و اگر خطا بود، متنش را نشان می‌دهد نه فقط شماره. */
 async function check(res) {
+  const body = await res.text().catch(() => '');
   if (!res.ok) {
-    const body = await res.text().catch(() => '');
     throw new Error(`سرویس پیامک پاسخ ${res.status} داد: ${body.slice(0, 200)}`);
   }
-  return { delivered: true, via: 'sms' };
+  //  بعضی سرویس‌ها ۲۰۰ می‌دهند و خطا را داخل بدنه می‌گذارند. اگر این را
+  //  نمی‌سنجیدیم، «فرستاده شد» می‌گفتیم و پیامکی نرفته بود.
+  let parsed = null;
+  try { parsed = JSON.parse(body); } catch { /* بدنه‌ی متنی؛ مشکلی نیست */ }
+  if (parsed && (parsed.error || parsed.Error)) {
+    const detail = parsed.description || parsed.message || JSON.stringify(parsed);
+    throw new Error(`سرویس پیامک قبول نکرد: ${String(detail).slice(0, 200)}`);
+  }
+  return { delivered: true, via: 'sms', response: body.slice(0, 200) };
 }
 
 // ---------- راه‌های ارسال ----------
@@ -256,7 +264,14 @@ async function request(destination, { purpose = 'login', ip = '' } = {}) {
     : `کد ورود شما: ${code}`;
   await sender(destination)(destination, code, message);
 
-  const out = { sent: true, expiresAt, resendAfter: t + config.otp.resendMs };
+  //  `resendSeconds` هم می‌رود چون ساعتِ گوشی ممکن است با سرور جور نباشد.
+  //  با ثانیه، برنامه لازم نیست ساعتش را با سرور تنظیم کند.
+  const out = {
+    sent: true,
+    expiresAt,
+    resendAfter: t + config.otp.resendMs,
+    resendSeconds: Math.ceil(config.otp.resendMs / 1000),
+  };
   // فقط بیرون از حالت production و فقط وقتی راه ارسالی تنظیم نشده
   //  فقط بیرون از production و فقط وقتی هیچ راه ارسالی تنظیم نشده — وگرنه
   //  کد در پاسخ HTTP برمی‌گشت و کسی که شماره‌ی دیگری را می‌زد کدش را می‌دید.

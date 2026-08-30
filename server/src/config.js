@@ -81,7 +81,9 @@ const config = {
     digits:     num(process.env.OTP_DIGITS, 6),
     ttlMs:      num(process.env.OTP_TTL_MIN, 5) * 60 * 1000,
     maxAttempts: num(process.env.OTP_MAX_ATTEMPTS, 5),
-    resendMs:   num(process.env.OTP_RESEND_SECONDS, 60) * 1000,
+    //  دو دقیقه. هر بار «ارسال دوباره» یک پیامک است و پول دارد؛ ۶۰ ثانیه
+    //  آن‌قدر کوتاه بود که کاربرِ بی‌حوصله سه بار می‌زد.
+    resendMs:   num(process.env.OTP_RESEND_SECONDS, 120) * 1000,
     dailyMax:   num(process.env.OTP_DAILY_MAX, 20),
   },
 
