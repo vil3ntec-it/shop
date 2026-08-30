@@ -17,6 +17,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
@@ -46,7 +47,14 @@ fun Panel(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> 
   )
 }
 
-/** کاشیِ عدد — همان .stat-card */
+/**
+ *  کاشیِ عدد — همان .stat-card
+ *
+ *  `compact` برای وقتی است که چند کاشی در یک ردیف می‌نشینند و سهمِ هرکدام
+ *  از عرضِ صفحه کم است: فاصله‌ها و قلم کوچک‌تر می‌شوند و برچسب اجازهٔ دو
+ *  خط شدن دارد. با اندازهٔ معمولی، در چهار کاشیِ یک ردیفِ گوشی، عدد از
+ *  کاشی بیرون می‌زد.
+ */
 @Composable
 fun StatTile(
   label: String,
@@ -54,19 +62,39 @@ fun StatTile(
   tint: Color = Shop.colors.primary,
   hint: String? = null,
   modifier: Modifier = Modifier,
+  compact: Boolean = false,
 ) {
   val colors = Shop.colors
   Column(
     modifier
       .glassSurface(Shape.card, colors.surface, colors.sheen, colors.border, glow = colors.glow)
-      .padding(16.dp)
+      .padding(if (compact) 10.dp else 16.dp)
   ) {
-    Text(label, style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
-    Spacer(Modifier.height(6.dp))
-    Text(value, style = MaterialTheme.typography.headlineSmall, color = tint)
+    Text(
+      label,
+      style = if (compact) MaterialTheme.typography.labelSmall
+      else MaterialTheme.typography.labelMedium,
+      color = Shop.colors.muted,
+      maxLines = 2,
+      overflow = TextOverflow.Ellipsis,
+    )
+    Spacer(Modifier.height(if (compact) 4.dp else 6.dp))
+    Text(
+      value,
+      style = if (compact) MaterialTheme.typography.titleMedium
+      else MaterialTheme.typography.headlineSmall,
+      color = tint,
+      maxLines = 1,
+    )
     if (hint != null) {
       Spacer(Modifier.height(2.dp))
-      Text(hint, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2)
+      Text(
+        hint,
+        style = MaterialTheme.typography.labelSmall,
+        color = Shop.colors.muted2,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+      )
     }
   }
 }

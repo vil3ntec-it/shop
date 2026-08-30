@@ -1,7 +1,9 @@
 package ir.vil3ntec.tohid.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
@@ -159,6 +161,26 @@ val DarkColors = ShopColors(
  *  گوشهٔ تیز، عنصر را «جعبه» نشان می‌دهد. گِردیِ زیاد همان عنصر را روی
  *  زمینه شناور می‌کند، که همان حسی است که می‌خواهیم.
  */
+/**
+ *  گِردیِ اجزای آماده‌ی متریال.
+ *
+ *  تا حالا این را نمی‌دادیم و متریال پیش‌فرضِ خودش را می‌گذاشت: کادرهای
+ *  متن از `extraSmall` رنگ می‌گیرند که **چهار نقطه** است — یعنی عملاً
+ *  کنجِ تیز. همهٔ کارت‌ها و دکمه‌های خودمان گِرد بودند و وسطشان کادرهای
+ *  متن چهارگوش می‌نشستند؛ در صفحهٔ «ثبت برد» و «محصول جدید» همین یک
+ *  تفاوت، فرم را ناجور نشان می‌داد.
+ *
+ *  حالا یک جا داده می‌شود و همهٔ کادرهای متن، کشوها، منوها و کارت‌های
+ *  متریال در تمامِ برنامه گِرد می‌شوند.
+ */
+val ShopShapes = Shapes(
+  extraSmall = RoundedCornerShape(14.dp),
+  small = RoundedCornerShape(16.dp),
+  medium = RoundedCornerShape(18.dp),
+  large = RoundedCornerShape(22.dp),
+  extraLarge = RoundedCornerShape(28.dp),
+)
+
 object Radius {
   val sm = 16.dp
   val md = 22.dp
@@ -266,6 +288,6 @@ fun TohidTheme(
       else -> 1f
     }
     val type = remember(scale) { shopTypography(scale) }
-    MaterialTheme(colorScheme = scheme, typography = type, content = content)
+    MaterialTheme(colorScheme = scheme, typography = type, shapes = ShopShapes, content = content)
   }
 }
