@@ -30,6 +30,44 @@ function randomCode(digits) {
   return s;
 }
 
+/**
+ * جاگذاری‌ها را با مقدارهای واقعی عوض می‌کند.
+ *
+ * `{to}` و `{code}` و … . برای آدرس و query، مقدارها encode می‌شوند تا
+ * شماره یا متن فارسی آدرس را نشکند.
+ */
+function fill(text, vars, encode = false) {
+  return String(text).replace(/\{(to|code|message|sender|key)\}/g, (_, name) => {
+    const value = String(vars[name] ?? '');
+    return encode ? encodeURIComponent(value) : value;
+  });
+}
+
+/** JSON تنظیمات را می‌خواند و جاگذاری‌ها را داخل مقدارها عوض می‌کند. */
+function parseJson(text, label, vars) {
+  if (!text || !String(text).trim()) return {};
+  let raw;
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    throw new Error(`${label} یک JSON درست نیست`);
+  }
+  const out = {};
+  for (const [k, v] of Object.entries(raw)) {
+    out[k] = typeof v === 'string' ? fill(v, vars) : v;
+  }
+  return out;
+}
+
+/** پاسخ سرویس را می‌سنجد و اگر خطا بود، متنش را نشان می‌دهد نه فقط شماره. */
+async function check(res) {
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`سرویس پیامک پاسخ ${res.status} داد: ${body.slice(0, 200)}`);
+  }
+  return { delivered: true, via: 'sms' };
+}
+
 // ---------- راه‌های ارسال ----------
 //
 //  هر راه یک تابع است و از متغیرهای محیطی تنظیم می‌شود. هیچ سرویسی
@@ -60,6 +98,39 @@ const senders = {
     });
     if (!res.ok) throw new Error(`سرویس پیامک پاسخ ${res.status} داد`);
     return { delivered: true, via: 'webhook' };
+  },
+
+  /**
+   * پیامک، با هر سرویسی.
+   *
+   * شکل درخواست از متغیرهای محیطی می‌آید، پس برای هر سرویس تازه لازم
+   * نیست کدی نوشته یا نسخه‌ای منتشر شود: آدرس، سرآیندها و بدنه را از
+   * پنل خود سرویس برمی‌دارید و در .env می‌گذارید.
+   */
+  async sms(to, code, message) {
+    const cfg = config.sms;
+    if (!cfg.url) throw new Error('SMS_API_URL تنظیم نشده است');
+
+    const vars = { to, code, message, sender: cfg.sender, key: cfg.key };
+    const url = fill(cfg.url, vars);
+
+    const headers = { ...parseJson(cfg.headers, 'SMS_API_HEADERS', vars) };
+    const options = { method: cfg.method, headers, signal: AbortSignal.timeout(15000) };
+
+    if (cfg.method === 'GET') {
+      // بدنه در GET معنی ندارد؛ اگر داده شده باشد به آدرس چسبانده می‌شود
+      const query = cfg.body ? fill(cfg.body, vars, true) : '';
+      const full = query ? url + (url.includes('?') ? '&' : '?') + query.replace(/^\?/, '') : url;
+      const res = await fetch(full, options);
+      return check(res);
+    }
+
+    if (cfg.body) {
+      headers['Content-Type'] = headers['Content-Type'] || 'application/json';
+      options.body = JSON.stringify(parseJson(cfg.body, 'SMS_API_BODY', vars));
+    }
+    const res = await fetch(url, options);
+    return check(res);
   },
 
   /**
@@ -178,7 +249,11 @@ async function request(destination, { purpose = 'login', ip = '' } = {}) {
     [newId('otp'), purpose, destination, hashCode(destination, code), config.otp.maxAttempts, expiresAt, t, ip]
   );
 
-  const message = `کد ورود شما: ${code}`;
+  //  متن پیام: اگر سرویس شما قالب تأییدشده می‌خواهد، همان را در
+  //  SMS_TEMPLATE بگذارید با {code} داخلش.
+  const message = config.sms.template
+    ? config.sms.template.replace(/\{code\}/g, code)
+    : `کد ورود شما: ${code}`;
   await sender(destination)(destination, code, message);
 
   const out = { sent: true, expiresAt, resendAfter: t + config.otp.resendMs };
