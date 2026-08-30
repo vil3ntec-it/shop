@@ -111,19 +111,39 @@ object Updater {
   ): Result<File> = withContext(Dispatchers.IO) {
     runCatching {
       val dir = File(context.cacheDir, "updates").apply { mkdirs() }
-      dir.listFiles()?.forEach { it.delete() }          // نسخه‌های قبلی جا نگیرند
       val out = File(dir, "tohid-${release.version}.apk")
+
+      // فقط فایلِ نسخه‌های **دیگر** پاک می‌شوند. قبلاً همه پاک می‌شدند و
+      // نتیجه‌اش این بود که اگر کاربر سرِ پرسشِ نصب «نه» می‌زد، دفعهٔ بعد
+      // همان فایل از صفر گرفته می‌شد.
+      dir.listFiles()?.forEach { if (it.name != out.name) it.delete() }
+
+      // فایلِ کاملِ همین نسخه از قبل هست؟ دوباره گرفته نمی‌شود.
+      if (release.size > 0 && out.length() == release.size) {
+        onProgress(100)
+        return@runCatching out
+      }
+
+      // نیمه‌کاره مانده؟ از همان‌جا ادامه داده می‌شود، نه از اول.
+      val have = if (release.size > 0 && out.length() in 1 until release.size) out.length() else 0L
+      if (have == 0L) out.delete()
 
       val conn = (URL(release.apkUrl).openConnection() as HttpURLConnection).apply {
         instanceFollowRedirects = true
         connectTimeout = 20000
         readTimeout = 60000
+        if (have > 0) setRequestProperty("Range", "bytes=$have-")
       }
+
+      // ۲۰۶ یعنی سرور ادامه را فرستاد؛ ۲۰۰ یعنی از اول فرستاده و آنچه
+      // داریم به درد نمی‌خورد
+      val resuming = have > 0 && conn.responseCode == 206
+      var done = if (resuming) have else 0L
+      val total = if (release.size > 0) release.size else conn.contentLengthLong + done
+
       conn.inputStream.use { input ->
-        out.outputStream().use { output ->
-          val total = if (release.size > 0) release.size else conn.contentLengthLong
+        java.io.FileOutputStream(out, resuming).use { output ->
           val buffer = ByteArray(64 * 1024)
-          var done = 0L
           var last = -1
           while (true) {
             val n = input.read(buffer)
@@ -131,7 +151,7 @@ object Updater {
             output.write(buffer, 0, n)
             done += n
             if (total > 0) {
-              val pct = ((done * 100) / total).toInt()
+              val pct = ((done * 100) / total).toInt().coerceIn(0, 100)
               if (pct != last) { last = pct; onProgress(pct) }
             }
           }
@@ -139,8 +159,18 @@ object Updater {
       }
       conn.disconnect()
       if (out.length() < 100_000) throw IllegalStateException("فایل ناقص دانلود شد")
+      if (release.size > 0 && out.length() != release.size) {
+        // نیمه‌کاره ماند؛ دفعهٔ بعد از همین‌جا ادامه داده می‌شود
+        throw IllegalStateException("دانلود نیمه‌کاره ماند — دوباره بزنید تا ادامه پیدا کند")
+      }
       out
     }
+  }
+
+  /** فایلِ آمادهٔ همین نسخه، اگر از قبل کامل گرفته شده باشد */
+  fun readyFile(context: Context, release: Release): File? {
+    val out = File(File(context.cacheDir, "updates"), "tohid-${release.version}.apk")
+    return out.takeIf { it.isFile && release.size > 0 && it.length() == release.size }
   }
 
   /** فایل را به نصب‌کنندهٔ اندروید می‌دهد */
