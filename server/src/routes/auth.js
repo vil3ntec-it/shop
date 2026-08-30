@@ -171,33 +171,54 @@ router.post('/login', authLimit, async (req, res, next) => {
 });
 
 // ---------- کد یک‌بارمصرف ----------
+/**
+ * مقصد کد: شماره یا ایمیل.
+ *
+ * هر دو یک راه دارند — کاربر چیزی را که بلد است می‌زند و کد به همان
+ * می‌رود. برای شماره پیامک یا واتساپ، برای ایمیل سرویس ایمیل؛ کدام
+ * کدام است را خود سرور تصمیم می‌گیرد، نه برنامه.
+ */
+function destinationOf(body) {
+  const raw = String(body?.phone || body?.email || body?.destination || '').trim();
+  if (!raw) throw badRequest('شماره یا ایمیل لازم است', 'destination_required');
+  return raw.includes('@')
+    ? { kind: 'email', value: v.email(raw, { required: true }) }
+    : { kind: 'phone', value: v.phone(raw, { required: true }) };
+}
+
 router.post('/otp/request', otpLimit, async (req, res, next) => {
-  const phone = v.phone(req.body?.phone, { required: true });
-  const out = await otp.request(phone, { purpose: 'login', ip: clientIp(req) });
-  res.json({ ok: true, phone, ...out });
+  const to = destinationOf(req.body);
+  const out = await otp.request(to.value, { purpose: 'login', ip: clientIp(req) });
+  res.json({ ok: true, [to.kind]: to.value, destination: to.value, ...out });
 });
 
 router.post('/otp/verify', otpLimit, async (req, res, next) => {
-  const phone = v.phone(req.body?.phone, { required: true });
-  await assertNotLocked('otp', phone);
+  const to = destinationOf(req.body);
+  await assertNotLocked('otp', to.value);
 
   try {
-    await otp.verify(phone, req.body?.code, { purpose: 'login' });
+    await otp.verify(to.value, req.body?.code, { purpose: 'login' });
   } catch (err) {
-    await noteAttempt('otp', phone, clientIp(req), false);
+    await noteAttempt('otp', to.value, clientIp(req), false);
     return next(err);
   }
-  await noteAttempt('otp', phone, clientIp(req), true);
+  await noteAttempt('otp', to.value, clientIp(req), true);
 
-  let user = await one('SELECT * FROM users WHERE phone=$1', [phone]);
+  let user = await one(
+    to.kind === 'email' ? 'SELECT * FROM users WHERE email=$1' : 'SELECT * FROM users WHERE phone=$1',
+    [to.value]
+  );
   let created = false;
   if (!user) {
     if (!config.allowRegistration) return next(forbidden('ثبت‌نام روی این سرور بسته است', 'registration_closed'));
     const t = now();
     user = await one(
-      `INSERT INTO users (id, name, phone, status, created_at, updated_at)
-       VALUES ($1,$2,$3,'active',$4,$4) RETURNING *`,
-      [newId('usr'), v.text(req.body?.name, { max: 80 }), phone, t]
+      to.kind === 'email'
+        ? `INSERT INTO users (id, name, email, status, created_at, updated_at)
+           VALUES ($1,$2,$3,'active',$4,$4) RETURNING *`
+        : `INSERT INTO users (id, name, phone, status, created_at, updated_at)
+           VALUES ($1,$2,$3,'active',$4,$4) RETURNING *`,
+      [newId('usr'), v.text(req.body?.name, { max: 80 }), to.value, t]
     );
     created = true;
   }

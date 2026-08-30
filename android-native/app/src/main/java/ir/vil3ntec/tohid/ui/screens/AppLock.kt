@@ -273,3 +273,96 @@ private fun Key(
 }
 
 const val MAX_PIN = 4
+
+
+/**
+ *  گذاشتنِ رمز، درست بعد از ساختنِ حساب.
+ *
+ *  کسی که حساب می‌سازد، دفترِ دکانش دیگر فقط مالِ خودش نیست — روی سرور
+ *  هم هست و از گوشی‌های دیگر هم باز می‌شود. آن‌وقت گوشیِ روی پیشخوان که
+ *  بی‌رمز باز می‌شود، حلقهٔ ضعیفِ همین زنجیر است.
+ *
+ *  اجباری نیست: «فعلاً نه» هست و کارِ کسی را نمی‌خواباند. ولی یک بار
+ *  پرسیده می‌شود، چون کسی که نپرسند سراغِ تنظیمات نمی‌رود.
+ */
+@Composable
+fun LockSetupScreen(onDone: () -> Unit) {
+  val context = LocalContext.current
+  val lock = remember { LockStore(context) }
+  val colors = Shop.colors
+
+  var pin by remember { mutableStateOf("") }
+  var again by remember { mutableStateOf("") }
+  var stage by remember { mutableStateOf("first") }
+  var wrong by remember { mutableStateOf(false) }
+
+  fun press(digit: Char) {
+    if (stage == "first") {
+      if (pin.length < MAX_PIN) {
+        pin += digit
+        if (pin.length == MAX_PIN) { stage = "again" }
+      }
+    } else {
+      if (again.length < MAX_PIN) {
+        again += digit
+        if (again.length == MAX_PIN) {
+          if (again == pin) { lock.set(pin); onDone() }
+          else { wrong = true; pin = ""; again = ""; stage = "first" }
+        }
+      }
+    }
+  }
+
+  Box(Modifier.fillMaxSize().background(colors.bg), contentAlignment = Alignment.Center) {
+    Column(
+      Modifier.widthIn(max = 340.dp).padding(24.dp),
+      horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+      LockMark()
+      Spacer(Modifier.height(18.dp))
+      Text(
+        if (stage == "first") "یک رمز چهار رقمی بگذارید" else "همان رمز را دوباره بزنید",
+        style = MaterialTheme.typography.titleMedium,
+        color = colors.text,
+        fontWeight = FontWeight.Bold,
+        textAlign = TextAlign.Center,
+      )
+      Spacer(Modifier.height(6.dp))
+      Text(
+        if (wrong) "دو بار یکی نبود — از اول"
+        else "هر بار که برنامه باز شود همین را می‌خواهد. اطلاعات دکان روی گوشی می‌ماند و این رمز جلوی دستِ دیگران را می‌گیرد.",
+        style = MaterialTheme.typography.bodySmall,
+        color = if (wrong) colors.danger else colors.muted,
+        textAlign = TextAlign.Center,
+      )
+
+      Spacer(Modifier.height(22.dp))
+      val shown = if (stage == "first") pin else again
+      Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        repeat(MAX_PIN) { index ->
+          Box(
+            Modifier
+              .size(if (index < shown.length) 15.dp else 13.dp)
+              .clip(CircleShape)
+              .background(if (index < shown.length) colors.primary else colors.surface2)
+          )
+        }
+      }
+
+      Spacer(Modifier.height(28.dp))
+      Keypad(
+        onDigit = { press(it) },
+        onBack = {
+          if (stage == "again" && again.isEmpty()) { stage = "first"; pin = pin.dropLast(1) }
+          else if (stage == "again") again = again.dropLast(1)
+          else if (pin.isNotEmpty()) pin = pin.dropLast(1)
+        },
+      )
+
+      Spacer(Modifier.height(14.dp))
+      TextButton(onClick = onDone) {
+        Text("فعلاً نه", style = MaterialTheme.typography.labelLarge, color = colors.muted)
+      }
+    }
+  }
+}

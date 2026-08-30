@@ -58,6 +58,9 @@ jobs:
           TOHID_KEYSTORE_PASSWORD: ${{ secrets.TOHID_KEYSTORE_PASSWORD }}
           TOHID_KEY_ALIAS: ${{ secrets.TOHID_KEY_ALIAS }}
           TOHID_KEY_PASSWORD: ${{ secrets.TOHID_KEY_PASSWORD }}
+          #  دامنهٔ عمومیِ API. اگر تنظیم نشده باشد خالی می‌ماند و برنامه
+          #  کاملاً آفلاین کار می‌کند — نه خطایی، نه قابلیتی که قفل شود.
+          TOHID_API_BASE: ${{ secrets.TOHID_API_BASE }}
         run: gradle --no-daemon assembleRelease -PbuildNumber=${{ github.run_number }}
 
       - name: نام‌گذاری و جمع کنترلی

@@ -31,12 +31,18 @@ function randomCode(digits) {
 }
 
 // ---------- راه‌های ارسال ----------
+//
+//  هر راه یک تابع است و از متغیرهای محیطی تنظیم می‌شود. هیچ سرویسی
+//  داخل کد قفل نشده و هیچ کلیدی داخل برنامه‌ی گوشی نیست — کلیدها فقط
+//  اینجا روی سرور می‌مانند.
+
 const senders = {
   /** چاپ در لاگ سرور — برای سرور خانگی بدون سرویس پیامک. */
   async log(to, code) {
     console.log(`[otp] کد ورود برای ${to}: ${code}`);
     return { delivered: true, via: 'log' };
   },
+
   /**
    * فرستادن به یک آدرس دلخواه (هر سرویس پیامکی که وب‌هوک دارد).
    * بدنه: { to, code, message }
@@ -55,15 +61,92 @@ const senders = {
     if (!res.ok) throw new Error(`سرویس پیامک پاسخ ${res.status} داد`);
     return { delivered: true, via: 'webhook' };
   },
+
+  /**
+   * واتساپ، با API رسمی Meta (WhatsApp Cloud API).
+   *
+   * از شماره‌ی واتساپ شخصی نمی‌شود کد فرستاد؛ این کار حساب Business و
+   * یک قالب پیام تأییدشده می‌خواهد. متن آزاد هم فقط تا ۲۴ ساعت بعد از
+   * پیام خود کاربر مجاز است، برای همین از قالب استفاده می‌شود.
+   */
+  async whatsapp(to, code) {
+    const { token, phoneId, template, language } = config.whatsapp;
+    if (!token || !phoneId) throw new Error('WHATSAPP_TOKEN یا WHATSAPP_PHONE_ID تنظیم نشده است');
+    const res = await fetch(`https://graph.facebook.com/v21.0/${phoneId}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        to: String(to).replace(/[^0-9]/g, ''),
+        type: 'template',
+        template: {
+          name: template,
+          language: { code: language },
+          components: [
+            { type: 'body', parameters: [{ type: 'text', text: code }] },
+            // قالب‌های احراز هویت واتساپ دکمه‌ی کپی دارند و کد را دوباره می‌خواهند
+            { type: 'button', sub_type: 'url', index: '0', parameters: [{ type: 'text', text: code }] },
+          ],
+        },
+      }),
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      throw new Error(`واتساپ پاسخ ${res.status} داد: ${body.slice(0, 200)}`);
+    }
+    return { delivered: true, via: 'whatsapp' };
+  },
+
+  /**
+   * ایمیل، از راه هر سرویسی که API با کلید دارد (Resend، Brevo، Mailgun…).
+   *
+   * بدنه‌ی استاندارد فرستاده می‌شود؛ اگر سرویس شما شکل دیگری می‌خواهد،
+   * یک وب‌هوک کوچک بینشان بگذارید — تا کلید سرویس فقط روی سرور بماند.
+   */
+  async email(to, code, message) {
+    const { url, key, from, subject } = config.email;
+    if (!url) throw new Error('EMAIL_API_URL تنظیم نشده است');
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(key ? { Authorization: `Bearer ${key}` } : {}),
+      },
+      body: JSON.stringify({
+        from,
+        to: [to],
+        subject,
+        text: message,
+        html: `<p style="font-family:sans-serif;font-size:16px">${message}</p>`,
+      }),
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      throw new Error(`سرویس ایمیل پاسخ ${res.status} داد: ${body.slice(0, 200)}`);
+    }
+    return { delivered: true, via: 'email' };
+  },
 };
 
-function sender() {
-  return senders[config.otp.provider] || senders.log;
+/** ایمیل است یا شماره */
+function isEmail(destination) {
+  return String(destination || '').includes('@');
+}
+
+/**
+ * راه ارسال از روی خود مقصد انتخاب می‌شود: ایمیل با سرویس ایمیل، شماره
+ * با پیامک یا واتساپ. هر کدام متغیر خودش را دارد.
+ */
+function sender(destination) {
+  const name = isEmail(destination) ? config.otp.emailProvider : config.otp.provider;
+  return senders[name] || senders.log;
 }
 
 /**
  * ساخت و فرستادن کد.
- * @returns {{sent:boolean, expiresAt:number, resendAfter:number, devCode?:string}}
+ * @param {string} destination شماره یا ایمیل\n * @returns {{sent:boolean, expiresAt:number, resendAfter:number, devCode?:string}}
  */
 async function request(destination, { purpose = 'login', ip = '' } = {}) {
   const t = now();
@@ -84,7 +167,7 @@ async function request(destination, { purpose = 'login', ip = '' } = {}) {
     [destination, t - 24 * 3600 * 1000]
   );
   if (n >= config.otp.dailyMax) {
-    throw tooMany('امروز درخواست کد برای این شماره زیاد بوده است', 'otp_daily_limit');
+    throw tooMany('امروز درخواست کد برای این نشانی زیاد بوده است', 'otp_daily_limit');
   }
 
   const code = randomCode(config.otp.digits);
@@ -96,11 +179,14 @@ async function request(destination, { purpose = 'login', ip = '' } = {}) {
   );
 
   const message = `کد ورود شما: ${code}`;
-  await sender()(destination, code, message);
+  await sender(destination)(destination, code, message);
 
   const out = { sent: true, expiresAt, resendAfter: t + config.otp.resendMs };
   // فقط بیرون از حالت production و فقط وقتی راه ارسالی تنظیم نشده
-  if (config.env !== 'production' && config.otp.provider === 'log') out.devCode = code;
+  //  فقط بیرون از production و فقط وقتی هیچ راه ارسالی تنظیم نشده — وگرنه
+  //  کد در پاسخ HTTP برمی‌گشت و کسی که شماره‌ی دیگری را می‌زد کدش را می‌دید.
+  const via = isEmail(destination) ? config.otp.emailProvider : config.otp.provider;
+  if (config.env !== 'production' && via === 'log') out.devCode = code;
   return out;
 }
 
@@ -130,4 +216,4 @@ async function verify(destination, code, { purpose = 'login' } = {}) {
   return true;
 }
 
-module.exports = { request, verify, hashCode, senders };
+module.exports = { request, verify, hashCode, senders, isEmail };

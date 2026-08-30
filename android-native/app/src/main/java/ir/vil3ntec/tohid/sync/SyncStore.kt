@@ -23,9 +23,19 @@ class SyncStore(context: Context) {
       prefs.edit().putString(DEVICE, it).apply()
     }
 
+  /**
+   *  نشانیِ سرور.
+   *
+   *  اگر نسخه با نشانی ساخته شده باشد، همان است و نوشتن روی آن کاری
+   *  نمی‌کند — نه از تنظیمات، نه از جای دیگر. فقط وقتی نسخه بی‌نشانی
+   *  ساخته شده باشد (ساختِ خودی)، مقدارِ ذخیره‌شده خوانده می‌شود.
+   */
   var serverUrl: String
-    get() = prefs.getString(SERVER, "") ?: ""
-    set(v) = prefs.edit().putString(SERVER, v.trim().trimEnd('/')).apply()
+    get() = if (ApiBase.locked) ApiBase.fixed else prefs.getString(SERVER, "") ?: ""
+    set(v) {
+      if (ApiBase.locked) return
+      prefs.edit().putString(SERVER, v.trim().trimEnd('/')).apply()
+    }
 
   var accessToken: String?
     get() = prefs.getString(ACCESS, null)
@@ -34,6 +44,16 @@ class SyncStore(context: Context) {
   var refreshToken: String?
     get() = prefs.getString(REFRESH, null)
     set(v) = prefs.edit().putString(REFRESH, v).apply()
+
+  /**
+   *  یک بار پرسیدنِ رمزِ برنامه.
+   *
+   *  اگر کاربر «فعلاً نه» زد، دیگر سرِ راهش نمی‌ایستیم. هر وقت خواست،
+   *  از تنظیمات می‌گذارد.
+   */
+  var lockDeclined: Boolean
+    get() = prefs.getBoolean(LOCK_ASKED, false)
+    set(v) = prefs.edit().putBoolean(LOCK_ASKED, v).apply()
 
   var accountName: String
     get() = prefs.getString(NAME, "") ?: ""
@@ -110,6 +130,7 @@ class SyncStore(context: Context) {
     const val ACCESS = "access_token"
     const val REFRESH = "refresh_token"
     const val NAME = "account_name"
+    const val LOCK_ASKED = "lock_asked"
     const val LICENSE = "license"
     const val PUBLIC_KEY = "public_key"
     const val SHADOW = "shadow"

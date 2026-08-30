@@ -62,30 +62,40 @@ class ServerClient(private val baseUrl: String) {
    *  پیامکِ کد را می‌گیرد و همان اثباتِ اوست. رمزِ اضافه فقط یک چیزِ
    *  دیگر است که فروشنده فراموشش می‌کند.
    */
-  suspend fun otpRequest(phone: String): JsonObject =
-    post("/api/v1/auth/otp/request", buildJsonObject { put("phone", JsonPrimitive(phone)) })
+  suspend fun otpRequest(destination: String): JsonObject =
+    post("/api/v1/auth/otp/request", destinationBody(destination))
+
+  /**
+   *  مقصدِ کد — شماره یا ایمیل.
+   *
+   *  خودِ سرور تصمیم می‌گیرد کد را با پیامک بفرستد یا با ایمیل؛ برنامه
+   *  فقط می‌گوید «به این نشانی». هر دو کلیدِ قدیمی هم فرستاده می‌شود تا
+   *  سرورهای قدیمی‌تر هم بفهمند.
+   */
+  private fun destinationBody(destination: String, extra: JsonObject? = null): JsonObject =
+    buildJsonObject {
+      val clean = destination.trim()
+      put("destination", JsonPrimitive(clean))
+      if (clean.contains("@")) put("email", JsonPrimitive(clean))
+      else put("phone", JsonPrimitive(clean))
+      extra?.forEach { (key, value) -> put(key, value) }
+    }
 
   /**
    *  کد را می‌سنجد و وارد می‌کند. اگر این شماره حساب نداشته باشد، سرور
    *  همان‌جا با همین نام حسابش را می‌سازد — پس «ثبت‌نام» و «ورود» با
    *  شماره یک راه‌اند، نه دو تا.
    */
-  suspend fun otpVerify(phone: String, code: String, name: String): Session {
-    val body = post("/api/v1/auth/otp/verify", buildJsonObject {
-      put("phone", JsonPrimitive(phone))
-      put("code", JsonPrimitive(code))
-      put("name", JsonPrimitive(name))
-    })
-    val access = body["accessToken"]?.jsonPrimitive?.content
-      ?: throw ServerError("سرور توکن نداد", "bad_response")
-    val user = body["user"]?.jsonObject
-    return Session(
-      accessToken = access,
-      refreshToken = body["refreshToken"]?.jsonPrimitive?.content,
-      userId = user?.get("id")?.jsonPrimitive?.content.orEmpty(),
-      name = user?.get("name")?.jsonPrimitive?.content.orEmpty(),
+  suspend fun otpVerify(destination: String, code: String, name: String): Session =
+    session(
+      post(
+        "/api/v1/auth/otp/verify",
+        destinationBody(destination, buildJsonObject {
+          put("code", JsonPrimitive(code))
+          put("name", JsonPrimitive(name))
+        }),
+      )
     )
-  }
 
   /**
    *  ورود با گوگل.
@@ -183,6 +193,15 @@ class ServerClient(private val baseUrl: String) {
 
   suspend fun removeMember(token: String, memberId: String): JsonObject =
     request("DELETE", "/api/v1/shop/members/$memberId", null, token)
+
+  /** کد ثابتِ دکان — همیشه همان است تا وقتی صاحبش عوضش کند */
+  suspend fun standingCode(token: String): String =
+    get("/api/v1/shop/staff-code", token)["code"]?.jsonPrimitive?.content.orEmpty()
+
+  /** عوض کردنِ کد ثابت */
+  suspend fun rotateStandingCode(token: String): String =
+    post("/api/v1/shop/staff-code/rotate", buildJsonObject { }, token)["code"]
+      ?.jsonPrimitive?.content.orEmpty()
 
   suspend fun staffCodes(token: String): JsonObject = get("/api/v1/shop/staff-codes", token)
 

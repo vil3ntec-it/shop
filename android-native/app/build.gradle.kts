@@ -24,6 +24,11 @@ android {
   val versionBase = "3.2"
   val buildNumber = (project.findProperty("buildNumber") as String?)?.toIntOrNull() ?: 0
 
+  //  متغیرِ تنظیم‌نشده در GitHub Actions **رشتهٔ خالی** می‌شود، نه
+  //  ناموجود. پس `?:` تنها کافی نیست و خالی هم باید «نبود» حساب شود —
+  //  وگرنه رمزِ خالی به کلید داده می‌شود و امضا می‌شکند.
+  fun env(name: String): String? = System.getenv(name)?.takeIf { it.isNotBlank() }
+
   defaultConfig {
     // همان بستهٔ نسخهٔ قبلی: نصب می‌شود *روی* آن، و داده‌های قدیمی
     // سرِ جایشان می‌مانند تا وارد شوند.
@@ -32,6 +37,22 @@ android {
     targetSdk = 35
     versionCode = 100 + buildNumber
     versionName = "$versionBase.$buildNumber"
+
+    /*
+     *  نشانیِ سرور، در زمانِ ساخت — نه در رابط کاربری.
+     *
+     *  تا امروز یک کادر در تنظیمات بود و هر کسی که برنامه را باز می‌کرد
+     *  نشانیِ سرور را می‌دید و می‌توانست عوضش کند. حالا از متغیرِ
+     *  `TOHID_API_BASE` می‌آید و در فایلِ ساخت می‌نشیند.
+     *
+     *  اینجا باید **دامنهٔ عمومی** باشد (`https://api.example.com`)، نه
+     *  IP و پورتِ واقعیِ سرور: چیزی که در فایلِ برنامه بنشیند، خوانده
+     *  می‌شود.
+     *
+     *  اگر خالی بماند، برنامه به هیچ سروری وصل نمی‌شود و کاملاً آفلاین
+     *  کار می‌کند — همان رفتارِ امروز، بدونِ اینکه چیزی قفل شود.
+     */
+    buildConfigField("String", "API_BASE", "\"${env("TOHID_API_BASE") ?: ""}\"")
     resourceConfigurations += listOf("fa", "en")
 
     ndk {
@@ -54,11 +75,6 @@ android {
    *  استفاده می‌شود — تا روزی که کلید هنوز به CI منتقل نشده، هیچ ساختی
    *  نشکند. برداشتنِ آن فایل، آخرین گام است نه اولین.
    */
-  //  متغیرِ تنظیم‌نشده در GitHub Actions **رشتهٔ خالی** می‌شود، نه
-  //  ناموجود. پس `?:` تنها کافی نیست و خالی هم باید «نبود» حساب شود —
-  //  وگرنه رمزِ خالی به کلید داده می‌شود و امضا می‌شکند.
-  fun env(name: String): String? = System.getenv(name)?.takeIf { it.isNotBlank() }
-
   val keystorePath: String = env("TOHID_KEYSTORE") ?: "tohid-release.jks"
   val keystorePass: String = env("TOHID_KEYSTORE_PASSWORD") ?: "tohid-shop"
   val keystoreAlias: String = env("TOHID_KEY_ALIAS") ?: "tohid"

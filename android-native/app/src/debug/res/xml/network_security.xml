@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     فقط برای نسخهٔ آزمایشی: سرورِ روی رایانهٔ خودی معمولاً گواهی ندارد.
+     این پرونده در نسخهٔ انتشار جایگزینِ سخت‌گیرانه دارد و به دستِ کاربر
+     نمی‌رسد.
+-->
+<network-security-config>
+  <base-config cleartextTrafficPermitted="true">
+    <trust-anchors>
+      <certificates src="system" />
+      <certificates src="user" />
+    </trust-anchors>
+  </base-config>
+</network-security-config>
