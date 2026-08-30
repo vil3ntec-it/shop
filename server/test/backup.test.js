@@ -99,3 +99,27 @@ test('نگه‌داری نسخه‌ها: قدیمی‌ها پاک می‌شون�
   const left = (await fs.readdir(dir)).filter(f => f.endsWith('.sql.gz')).sort();
   assert.deepEqual(left, ['shop-20240104-000000.sql.gz', 'shop-20240105-000000.sql.gz', 'shop-20240106-000000.sql.gz']);
 });
+
+/**
+ * فایلی که وسط راه دست بخورد، نباید باز شود.
+ *
+ * رمزگذاری با AES-GCM برچسب احراز اصالت دارد؛ فایده‌اش همین است. اگر
+ * فقط رمز می‌شد و سنجیده نمی‌شد، فایلِ خرابِ نیمه‌باز روی دیتابیس اجرا
+ * می‌شد — بدتر از نبودنِ پشتیبان.
+ */
+test('پشتیبان دست‌کاری‌شده باز نمی‌شود', async () => {
+  config.backup.passphrase = 'test-passphrase-1234';
+  const out = await backup.run({ kind: 'manual' });
+
+  const buf = await fs.readFile(out.file);
+  buf[buf.length - 40] ^= 0xff;              // یک بایت وسط بدنه
+  const broken = `${out.file}.broken`;
+  await fs.writeFile(broken, buf);
+
+  await assert.rejects(() => backup.decode(broken), 'فایل دست‌خورده باید رد شود');
+
+  // خودِ فایل سالم هنوز باز می‌شود — پس رد شدن به‌خاطر دست‌کاری بود، نه رمز
+  const good = await backup.decode(out.file);
+  assert.match(good.toString('utf8'), /CREATE TABLE/);
+  config.backup.passphrase = '';
+});
