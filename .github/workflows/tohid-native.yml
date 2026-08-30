@@ -31,12 +31,33 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      # کلیدِ امضا از secret می‌آید، نه از داخلِ مخزن.
+      #
+      # تا وقتی secret تنظیم نشده باشد، همان فایلِ داخلِ مخزن استفاده
+      # می‌شود و ساخت نمی‌شکند. بعد از تنظیمِ secret، آن فایل را می‌شود
+      # از مخزن برداشت و از آن لحظه کلید فقط اینجا باز می‌شود.
+      - name: کلیدِ امضا
+        env:
+          KEYSTORE_B64: ${{ secrets.TOHID_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/tohid-release.jks"
+            echo "TOHID_KEYSTORE=$RUNNER_TEMP/tohid-release.jks" >> "$GITHUB_ENV"
+            echo "کلید از secret خوانده شد"
+          else
+            echo "::warning::secret به نام TOHID_KEYSTORE_B64 تنظیم نشده — فعلاً کلیدِ داخلِ مخزن استفاده می‌شود"
+          fi
+
       - name: سنجشِ حساب‌ها
         working-directory: android-native
         run: gradle --no-daemon testReleaseUnitTest
 
       - name: ساخت APK
         working-directory: android-native
+        env:
+          TOHID_KEYSTORE_PASSWORD: ${{ secrets.TOHID_KEYSTORE_PASSWORD }}
+          TOHID_KEY_ALIAS: ${{ secrets.TOHID_KEY_ALIAS }}
+          TOHID_KEY_PASSWORD: ${{ secrets.TOHID_KEY_PASSWORD }}
         run: gradle --no-daemon assembleRelease -PbuildNumber=${{ github.run_number }}
 
       - name: نام‌گذاری و جمع کنترلی
