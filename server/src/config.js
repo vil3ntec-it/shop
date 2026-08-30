@@ -85,6 +85,35 @@ const config = {
     dailyMax:   num(process.env.OTP_DAILY_MAX, 20),
   },
 
+  /*
+   *  سرویس پیامک — هر سرویسی، بدون عوض کردن کد.
+   *
+   *  هر سرویس پیامکی شکل درخواست خودش را دارد: یکی کلید را در سرآیند
+   *  می‌خواهد، یکی در بدنه، یکی اصلاً GET است. به‌جای نوشتن کد برای هر
+   *  کدام، شکل درخواست از همین‌جا تنظیم می‌شود.
+   *
+   *  در URL و سرآیندها و بدنه، این جاگذاری‌ها جایگزین می‌شوند:
+   *    {to}       شماره‌ی گیرنده
+   *    {code}     کد شش‌رقمی
+   *    {message}  متن کامل پیام
+   *    {sender}   شماره‌ی فرستنده (خط خدماتی شما)
+   *    {key}      کلید API
+   *
+   *  کلید فقط اینجا روی سرور می‌ماند و هرگز داخل برنامه‌ی گوشی نمی‌رود.
+   */
+  sms: {
+    url:      process.env.SMS_API_URL || '',
+    method:   (process.env.SMS_API_METHOD || 'POST').toUpperCase(),
+    key:      process.env.SMS_API_KEY || '',
+    sender:   process.env.SMS_SENDER || '',
+    //  JSON: مثلاً {"Authorization":"Bearer {key}"}
+    headers:  process.env.SMS_API_HEADERS || '',
+    //  JSON برای POST، یا رشته‌ی query برای GET
+    body:     process.env.SMS_API_BODY || '',
+    //  متن پیام؛ اگر خالی باشد متن پیش‌فرض می‌رود
+    template: process.env.SMS_TEMPLATE || '',
+  },
+
   //  واتساپ — API رسمی Meta. کلیدها فقط اینجا می‌مانند و هرگز داخل
   //  برنامه‌ی گوشی نمی‌روند.
   whatsapp: {
