@@ -40,7 +40,7 @@
       android:roundIcon="@mipmap/ic_launcher"
       android:label="@string/app_name"
       android:supportsRtl="true"
-      android:usesCleartextTraffic="true"
+      android:networkSecurityConfig="@xml/network_security"
       android:theme="@style/Theme.Tohid">
 
     <activity

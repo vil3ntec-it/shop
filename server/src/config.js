@@ -72,7 +72,10 @@ const config = {
   },
 
   otp: {
-    provider:   process.env.OTP_PROVIDER || 'log',   // log | webhook | console
+    //  راه فرستادن کد برای «شماره»: log | webhook | whatsapp
+    provider:   process.env.OTP_PROVIDER || 'log',
+    //  راه فرستادن کد برای «ایمیل»: log | email
+    emailProvider: process.env.OTP_EMAIL_PROVIDER || 'log',
     webhookUrl: process.env.OTP_WEBHOOK_URL || '',
     webhookKey: process.env.OTP_WEBHOOK_KEY || '',
     digits:     num(process.env.OTP_DIGITS, 6),
@@ -80,6 +83,23 @@ const config = {
     maxAttempts: num(process.env.OTP_MAX_ATTEMPTS, 5),
     resendMs:   num(process.env.OTP_RESEND_SECONDS, 60) * 1000,
     dailyMax:   num(process.env.OTP_DAILY_MAX, 20),
+  },
+
+  //  واتساپ — API رسمی Meta. کلیدها فقط اینجا می‌مانند و هرگز داخل
+  //  برنامه‌ی گوشی نمی‌روند.
+  whatsapp: {
+    token:    process.env.WHATSAPP_TOKEN || '',
+    phoneId:  process.env.WHATSAPP_PHONE_ID || '',
+    template: process.env.WHATSAPP_TEMPLATE || 'otp_login',
+    language: process.env.WHATSAPP_LANG || 'fa',
+  },
+
+  //  ایمیل — هر سرویسی که API با کلید دارد
+  email: {
+    url:     process.env.EMAIL_API_URL || '',
+    key:     process.env.EMAIL_API_KEY || '',
+    from:    process.env.EMAIL_FROM || '',
+    subject: process.env.EMAIL_SUBJECT || 'کد ورود توحید',
   },
 
   google: {

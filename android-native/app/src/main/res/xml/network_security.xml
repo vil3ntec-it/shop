@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     فقط HTTPS.
+
+     تا امروز مانیفست `usesCleartextTraffic="true"` داشت، یعنی برنامه
+     حاضر بود روی `http://` ساده حرف بزند. هر کسی روی همان وای‌فای
+     می‌توانست توکنِ ورود را بخواند و با آن جای کاربر بنشیند.
+
+     نسخهٔ آزمایشی (debug) پروندهٔ خودش را دارد و روی شبکهٔ خانگی
+     `http://` را قبول می‌کند، وگرنه روی رایانهٔ خودی نمی‌شود چیزی را
+     امتحان کرد. آنچه به دستِ کاربر می‌رسد همین است: بسته.
+-->
+<network-security-config>
+  <base-config cleartextTrafficPermitted="false">
+    <trust-anchors>
+      <certificates src="system" />
+    </trust-anchors>
+  </base-config>
+</network-security-config>

@@ -69,6 +69,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.activity.compose.BackHandler
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import ir.vil3ntec.tohid.sync.SavedLogins
 import ir.vil3ntec.tohid.sync.ServerClient
 import ir.vil3ntec.tohid.sync.SyncStore
@@ -147,7 +152,7 @@ fun WelcomeScreen(onDone: () -> Unit) {
   var emailMode by rememberSaveable { mutableStateOf("login") }
 
   var server by rememberSaveable { mutableStateOf(state.serverUrl) }
-  var showMore by rememberSaveable { mutableStateOf(state.serverUrl.isBlank()) }
+  var showMore by rememberSaveable { mutableStateOf(!ir.vil3ntec.tohid.sync.ApiBase.locked && state.serverUrl.isBlank()) }
 
   var name by rememberSaveable { mutableStateOf("") }
   var phone by rememberSaveable { mutableStateOf("") }
@@ -193,6 +198,44 @@ fun WelcomeScreen(onDone: () -> Unit) {
   }
 
   val ready = server.isNotBlank()
+
+  /*
+   *  کدِ شش‌رقمی، در صفحهٔ خودش.
+   *
+   *  قبلاً کادرِ کد زیرِ همان فرم باز می‌شد و صفحه شلوغ می‌ماند: نام و
+   *  شماره و کد و دکمه‌ها همه با هم. حالا وقتی کد فرستاده شد، یک صفحهٔ
+   *  جدا می‌آید که فقط یک کار دارد. منطقِ ورود همان است؛ فقط جایش عوض شده.
+   */
+  if (codeSent) {
+    CodeScreen(
+      destination = if (channel == "phone") phone.trim() else email.trim(),
+      busy = busy,
+      error = error,
+      note = note,
+      onBack = { codeSent = false; code = ""; note = null; error = null },
+      onResend = {
+        busy = true; error = null
+        scope.launch {
+          val to = if (channel == "phone") phone.trim() else email.trim()
+          runCatching { ServerClient(server.trim().trimEnd('/')).otpRequest(to) }
+            .onSuccess { note = "کد دوباره فرستاده شد" }
+            .onFailure { fail(it) }
+          busy = false
+        }
+      },
+      onSubmit = { entered ->
+        busy = true; error = null; note = null
+        scope.launch {
+          val to = if (channel == "phone") phone.trim() else email.trim()
+          runCatching { ServerClient(server.trim().trimEnd('/')).otpVerify(to, entered, name.trim()) }
+            .onSuccess { finish(to, it) }
+            .onFailure { fail(it) }
+          busy = false
+        }
+      },
+    )
+    return
+  }
 
   Box(Modifier.fillMaxSize()) {
     // پس‌زمینه کشیده می‌شود، نه بارگذاری: چند مسیر و چند نقطه روی بوم
@@ -258,50 +301,21 @@ fun WelcomeScreen(onDone: () -> Unit) {
               imeAction = ImeAction.Next,
             ),
             ltr = true,
-            enabled = !codeSent,
           )
 
-          AnimatedVisibility(
-            visible = codeSent,
-            enter = fadeIn() + expandVertically(),
-            exit = shrinkVertically(),
-          ) {
-            Column {
-              Spacer(Modifier.height(12.dp))
-              PillField(
-                value = code,
-                // فقط شش رقم؛ حرف در کدِ پیامکی معنی ندارد
-                onValueChange = { code = it.filter { c -> c.isDigit() }.take(6); error = null },
-                placeholder = "کد شش‌رقمی",
-                icon = Icons.Filled.Lock,
-                keyboardOptions = KeyboardOptions(
-                  keyboardType = KeyboardType.NumberPassword,
-                  imeAction = ImeAction.Done,
-                ),
-                ltr = true,
-              )
-              Spacer(Modifier.height(6.dp))
-              Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                TextButton(onClick = { codeSent = false; code = ""; note = null }) {
-                  Text("شماره را عوض می‌کنم", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
-                }
-                TextButton(
-                  enabled = !busy,
-                  onClick = {
-                    busy = true; error = null
-                    scope.launch {
-                      runCatching { ServerClient(server.trim().trimEnd('/')).otpRequest(phone.trim()) }
-                        .onSuccess { note = "کد دوباره فرستاده شد" }
-                        .onFailure { fail(it) }
-                      busy = false
-                    }
-                  },
-                ) {
-                  Text("ارسال دوبارهٔ کد", style = MaterialTheme.typography.labelMedium, color = Shop.colors.primary)
-                }
-              }
-            }
-          }
+          //  ثبت‌نام با شماره جدا نیست — همان ارسالِ کد است.
+          //
+          //  در سربرگِ ایمیل «حساب ندارید؟ ثبت‌نام کنید» هست و در شماره
+          //  نبود، پس به‌نظر می‌رسید با شماره فقط می‌شود وارد شد. سرور
+          //  از اول این‌طور بود: اگر شماره حساب نداشته باشد، با همان کد
+          //  حساب ساخته می‌شود. فقط کسی این را نگفته بود.
+          Text(
+            "حساب ندارید؟ با همین شماره برایتان ساخته می‌شود — ثبت‌نام جدا لازم نیست.",
+            style = MaterialTheme.typography.labelMedium,
+            color = inkSoft,
+            modifier = Modifier.padding(top = 8.dp, start = 4.dp, end = 4.dp),
+          )
+
         } else {
           PillField(
             value = email,
@@ -351,14 +365,12 @@ fun WelcomeScreen(onDone: () -> Unit) {
 
         /* ------------------------ دکمهٔ اصلی ------------------------ */
         val label = when {
-          channel == "phone" && !codeSent -> "ارسال کد"
-          channel == "phone" -> "ورود"
+          channel == "phone" -> "ارسال کد"
           emailMode == "register" -> "ساخت حساب"
           else -> "ورود به حساب"
         }
         val can = ready && !busy && name.isNotBlank() && when {
-          channel == "phone" && !codeSent -> phone.isNotBlank()
-          channel == "phone" -> code.length == 6
+          channel == "phone" -> phone.isNotBlank()
           else -> email.isNotBlank() && password.isNotBlank()
         }
 
@@ -368,18 +380,13 @@ fun WelcomeScreen(onDone: () -> Unit) {
           scope.launch {
             val client = ServerClient(base)
             when {
-              channel == "phone" && !codeSent ->
+              channel == "phone" ->
                 runCatching { client.otpRequest(phone.trim()) }
                   .onSuccess {
                     state.serverUrl = base
                     codeSent = true
-                    note = "کد به شمارهٔ شما فرستاده شد"
+                    note = null
                   }
-                  .onFailure { fail(it) }
-
-              channel == "phone" ->
-                runCatching { client.otpVerify(phone.trim(), code, name.trim()) }
-                  .onSuccess { finish(phone.trim(), it) }
                   .onFailure { fail(it) }
 
               emailMode == "register" ->
@@ -402,6 +409,36 @@ fun WelcomeScreen(onDone: () -> Unit) {
         }
 
         if (channel == "email") {
+          /*
+           *  ورود با کد برای ایمیل هم.
+           *
+           *  رمز سرِ جایش است و کسی که رمز دارد همان راه را می‌رود؛ این
+           *  یکی برای کسی است که رمزش را فراموش کرده یا اصلاً نگذاشته.
+           *  همان صفحهٔ کد است، همان مسیرِ سرور.
+           */
+          Spacer(Modifier.height(6.dp))
+          TextButton(
+            enabled = ready && !busy && name.isNotBlank() && email.isNotBlank(),
+            modifier = Modifier.fillMaxWidth(),
+            onClick = {
+              busy = true; error = null; note = null
+              val base = server.trim().trimEnd('/')
+              scope.launch {
+                runCatching { ServerClient(base).otpRequest(email.trim()) }
+                  .onSuccess { state.serverUrl = base; codeSent = true; note = null }
+                  .onFailure { fail(it) }
+                busy = false
+              }
+            },
+          ) {
+            Text(
+              "ورود با کد به‌جای رمز",
+              color = BLUE,
+              style = MaterialTheme.typography.labelLarge,
+              fontWeight = FontWeight.Bold,
+            )
+          }
+
           Spacer(Modifier.height(4.dp))
           TextButton(
             onClick = { emailMode = if (emailMode == "login") "register" else "login"; error = null },
@@ -536,7 +573,7 @@ fun WelcomeScreen(onDone: () -> Unit) {
             )
             Spacer(Modifier.width(6.dp))
             Text(
-              if (showMore) "بستن گزینه‌های بیشتر" else "کد شاگرد و تنظیم سرور",
+              if (showMore) "بستن" else if (ir.vil3ntec.tohid.sync.ApiBase.locked) "کد شاگرد دارم" else "کد شاگرد و تنظیم سرور",
               style = MaterialTheme.typography.labelMedium,
               color = inkSoft,
             )
@@ -589,21 +626,30 @@ fun WelcomeScreen(onDone: () -> Unit) {
               modifier = Modifier.padding(top = 6.dp, start = 4.dp),
             )
 
-            Spacer(Modifier.height(12.dp))
-            PillField(
-              value = server,
-              onValueChange = { server = it; error = null },
-              placeholder = "آدرس سرور — https://…",
-              icon = Icons.Filled.Tune,
-              keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-              ltr = true,
-            )
-            Text(
-              "بدون آدرس سرور هم برنامه کامل کار می‌کند؛ سرور فقط برای حساب، اشتراک و همگام‌سازی است.",
-              style = MaterialTheme.typography.labelSmall,
-              color = Shop.colors.muted2,
-              modifier = Modifier.padding(top = 6.dp, start = 4.dp),
-            )
+            /*
+             *  نشانیِ سرور فقط در ساختِ خودی دیده می‌شود.
+             *
+             *  در نسخه‌ای که به دستِ کاربر می‌رسد، نشانی از قبل داخلِ
+             *  برنامه است و این کادر اصلاً ساخته نمی‌شود — نه دیده
+             *  می‌شود، نه می‌شود عوضش کرد.
+             */
+            if (!ir.vil3ntec.tohid.sync.ApiBase.locked) {
+              Spacer(Modifier.height(12.dp))
+              PillField(
+                value = server,
+                onValueChange = { server = it; error = null },
+                placeholder = "آدرس سرور — https://…",
+                icon = Icons.Filled.Tune,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                ltr = true,
+              )
+              Text(
+                "این نسخه به سروری بسته نشده؛ برای آزمایش نشانی را بزنید.",
+                style = MaterialTheme.typography.labelSmall,
+                color = Shop.colors.muted2,
+                modifier = Modifier.padding(top = 6.dp, start = 4.dp),
+              )
+            }
           }
         }
 
@@ -613,6 +659,173 @@ fun WelcomeScreen(onDone: () -> Unit) {
     }
   }
 }
+
+/* ============================== صفحهٔ کد ============================== */
+
+/**
+ *  صفحهٔ کدِ شش‌رقمی.
+ *
+ *  یک کار دارد و فقط همان را نشان می‌دهد. شش خانهٔ جدا، نه یک کادرِ دراز:
+ *  کسی که کد را از پیامک می‌خواند، رقم‌به‌رقم می‌زند و باید ببیند کجاست.
+ *
+ *  صفحه‌کلیدِ عددی خودش بالا می‌آید و با کاملِ شش رقم، خودش می‌فرستد —
+ *  یک زدنِ کمتر.
+ */
+@Composable
+private fun CodeScreen(
+  destination: String,
+  busy: Boolean,
+  error: String?,
+  note: String?,
+  onBack: () -> Unit,
+  onResend: () -> Unit,
+  onSubmit: (String) -> Unit,
+) {
+  var code by rememberSaveable { mutableStateOf("") }
+  val focus = remember { FocusRequester() }
+  val keyboard = LocalSoftwareKeyboardController.current
+
+  //  شمارشِ معکوسِ ارسالِ دوباره — وگرنه کاربر پشتِ هم می‌زند و سرور
+  //  «۶۰ ثانیه دیگر» می‌گوید و او فکر می‌کند خراب است
+  var wait by remember { mutableStateOf(60) }
+  LaunchedEffect(Unit) {
+    while (wait > 0) { kotlinx.coroutines.delay(1000); wait -= 1 }
+  }
+
+  LaunchedEffect(Unit) { focus.requestFocus(); keyboard?.show() }
+
+  BackHandler { onBack() }
+
+  Box(Modifier.fillMaxSize()) {
+    WelcomeBackground()
+    Column(
+      Modifier.fillMaxSize().verticalScroll(rememberScrollState()).imePadding(),
+      horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+      Spacer(Modifier.height(40.dp))
+      BrandMark()
+      Spacer(Modifier.height(22.dp))
+      Text(
+        "کد را بزنید",
+        style = MaterialTheme.typography.headlineSmall,
+        color = ink,
+        fontWeight = FontWeight.Bold,
+      )
+      Spacer(Modifier.height(8.dp))
+      Text(
+        if (destination.contains("@")) "کد شش‌رقمی به $destination فرستاده شد"
+        else "کد شش‌رقمی به $destination فرستاده شد",
+        style = MaterialTheme.typography.bodyMedium,
+        color = inkSoft,
+        textAlign = TextAlign.Center,
+        modifier = Modifier.padding(horizontal = 30.dp),
+      )
+
+      Spacer(Modifier.height(26.dp))
+
+      Box(Modifier.widthIn(max = 400.dp).padding(horizontal = 22.dp)) {
+        //  کادرِ واقعی نامرئی است و شش خانه فقط نمایشِ همان‌اند؛ این‌طور
+        //  کپی و چسباندنِ کد از پیامک هم کار می‌کند
+        BasicTextField(
+          value = code,
+          onValueChange = { raw ->
+            val digits = raw.filter { it.isDigit() }.take(6)
+            code = digits
+            if (digits.length == 6 && !busy) { keyboard?.hide(); onSubmit(digits) }
+          },
+          keyboardOptions = KeyboardOptions(
+            keyboardType = KeyboardType.NumberPassword,
+            imeAction = ImeAction.Done,
+          ),
+          cursorBrush = SolidColor(Color.Transparent),
+          textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.Transparent),
+          modifier = Modifier.fillMaxWidth().height(62.dp).focusRequester(focus).alpha(0.01f),
+        )
+        Row(
+          Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+          //  چپ‌به‌راست، چون خودِ عدد چپ‌به‌راست خوانده می‌شود
+          CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+            repeat(6) { index ->
+              CodeCell(
+                digit = code.getOrNull(index)?.toString().orEmpty(),
+                active = index == code.length,
+                modifier = Modifier.weight(1f),
+              )
+            }
+          }
+        }
+      }
+
+      error?.let {
+        Spacer(Modifier.height(14.dp))
+        Text(it, style = MaterialTheme.typography.labelMedium, color = Shop.colors.danger)
+      }
+      note?.let {
+        Spacer(Modifier.height(14.dp))
+        Text(it, style = MaterialTheme.typography.labelMedium, color = BLUE)
+      }
+
+      Spacer(Modifier.height(24.dp))
+      Box(Modifier.widthIn(max = 400.dp).fillMaxWidth().padding(horizontal = 22.dp)) {
+        GradientButton(
+          text = "ورود",
+          enabled = code.length == 6 && !busy,
+          busy = busy,
+        ) { onSubmit(code) }
+      }
+
+      Spacer(Modifier.height(10.dp))
+      TextButton(enabled = wait == 0 && !busy, onClick = { wait = 60; onResend() }) {
+        Text(
+          if (wait > 0) "ارسال دوبارهٔ کد تا ${wait.faDigits()} ثانیه" else "ارسال دوبارهٔ کد",
+          style = MaterialTheme.typography.labelLarge,
+          color = if (wait == 0) BLUE else inkSoft,
+        )
+      }
+      TextButton(onClick = onBack) {
+        Text(
+          "برگشت و عوض کردن نشانی",
+          style = MaterialTheme.typography.labelMedium,
+          color = inkSoft,
+        )
+      }
+      Spacer(Modifier.height(30.dp))
+    }
+  }
+}
+
+/** یک خانهٔ کد */
+@Composable
+private fun CodeCell(digit: String, active: Boolean, modifier: Modifier = Modifier) {
+  val face = if (isDarkSurface()) Shop.colors.surface else Color.White
+  val edge by animateColorAsState(
+    targetValue = if (active) BLUE else fieldLine,
+    animationSpec = tween(if (Motion.enabled) 160 else 0),
+    label = "cellEdge",
+  )
+  Box(
+    modifier
+      .height(58.dp)
+      .shadow(if (active) 8.dp else 3.dp, RoundedCornerShape(16.dp), ambientColor = BLUE, spotColor = BLUE)
+      .clip(RoundedCornerShape(16.dp))
+      .background(face)
+      .border(if (active) 2.dp else 1.dp, edge, RoundedCornerShape(16.dp)),
+    contentAlignment = Alignment.Center,
+  ) {
+    Text(
+      digit,
+      style = MaterialTheme.typography.headlineSmall,
+      color = ink,
+      fontWeight = FontWeight.Bold,
+    )
+  }
+}
+
+/** رقم‌های فارسی، فقط برای شمارش */
+private fun Int.faDigits(): String =
+  toString().map { c -> if (c.isDigit()) "۰۱۲۳۴۵۶۷۸۹"[c - '0'] else c }.joinToString("")
 
 /* ============================== اجزا ============================== */
 

@@ -242,20 +242,32 @@ fun SettingsScreen(
             modifier = Modifier.fillMaxWidth(),
           )
         } else {
+          /*
+           *  نشانیِ سرور دیگر اینجا نیست.
+           *
+           *  کادرِ نشانی هم نشانِ سرور را به هر کسی که برنامه را باز
+           *  می‌کرد نشان می‌داد، و هم اجازه می‌داد کاربر برنامه را به
+           *  سرورِ دیگری وصل کند. حالا نشانی در زمانِ ساخت داخلِ برنامه
+           *  می‌نشیند. فقط ساختِ خودی (بی‌نشانی) کادر را می‌بیند.
+           */
           Text(
-            "به سرور خودتان وصل می‌شود — نه دامنه لازم دارد نه سرویس بیرونی.",
+            if (ir.vil3ntec.tohid.sync.ApiBase.locked)
+              "به سرورِ توحید وصل می‌شود."
+            else "این نسخه به سروری بسته نشده — نشانی را برای آزمایش بزنید.",
             style = MaterialTheme.typography.bodySmall,
             color = Shop.colors.muted,
           )
           Spacer(Modifier.height(10.dp))
-          TohidTextField(
-            value = serverUrl,
-            onValueChange = { serverUrl = it; state.serverUrl = it },
-            label = "آدرس سرور",
-            placeholder = "http://192.168.1.10:8080",
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Next),
-          )
-          Spacer(Modifier.height(10.dp))
+          if (!ir.vil3ntec.tohid.sync.ApiBase.locked) {
+            TohidTextField(
+              value = serverUrl,
+              onValueChange = { serverUrl = it; state.serverUrl = it },
+              label = "آدرس سرور (فقط ساختِ آزمایشی)",
+              placeholder = "https://api.example.com",
+              keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Next),
+            )
+            Spacer(Modifier.height(10.dp))
+          }
           TohidTextField(
             value = identifier,
             onValueChange = { identifier = it },

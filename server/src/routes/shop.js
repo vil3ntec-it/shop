@@ -121,6 +121,25 @@ router.get('/staff-codes', requireShop, requirePermission('staffcode.view'), asy
   });
 });
 
+/**
+ * کد ثابت دکان.
+ *
+ * یک کد، برای همه‌ی شاگردها، که تا وقتی خودِ صاحب دکان عوضش نکند همان
+ * می‌ماند. برخلاف کدهای یک‌بارمصرف، این هر بار قابل دیدن است چون از
+ * shop_id ساخته می‌شود نه از دیتابیس خوانده.
+ */
+router.get('/staff-code', requireShop, requirePermission('staffcode.view'), async (req, res) => {
+  const out = await staffCodes.standing(req.shopId, req.user.id);
+  res.json({ code: out.code, id: out.id, role: out.role, generation: out.generation, standing: true });
+});
+
+/** عوض کردن کد ثابت — برای وقتی که لو رفته باشد. شاگردهای فعلی می‌مانند. */
+router.post('/staff-code/rotate', requireShop, requirePermission('staffcode.create'), requireFeature('multi_device'), async (req, res) => {
+  const out = await staffCodes.rotateStanding(req.shopId, req.user.id);
+  await audit.log({ shopId: req.shopId, userId: req.user.id, action: 'staff_code.rotated', targetType: 'staff_code', targetId: out.id, detail: { generation: out.generation } });
+  res.json({ code: out.code, id: out.id, role: out.role, generation: out.generation, standing: true });
+});
+
 // «چند کاربر روی یک دکان» قابلیت اشتراکی است؛ بررسی‌اش اینجا سمت سرور
 // انجام می‌شود، نه با پنهان کردن دکمه در گوشی.
 router.post(['/staff-code', '/invite'], requireShop, requirePermission('staffcode.create'), requireFeature('multi_device'), async (req, res) => {

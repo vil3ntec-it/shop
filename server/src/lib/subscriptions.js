@@ -79,6 +79,40 @@ async function expireDue(at = now()) {
 }
 
 /**
+ * ثبت یک سطر در تاریخچه.
+ *
+ * هرگز جلوی کار اصلی را نمی‌گیرد: اگر نوشتن تاریخچه شکست بخورد،
+ * اشتراک کاربر نباید صادر نشود. خطا در لاگ می‌ماند.
+ */
+async function logChange(row) {
+  try {
+    await query(
+      `INSERT INTO subscription_history
+         (id, subscription_id, shop_id, action, plan, prev_status, new_status,
+          prev_ends_at, new_ends_at, actor, note, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+      [
+        newId('sbh'), row.subscriptionId, row.shopId, row.action, row.plan || '',
+        row.prevStatus || '', row.newStatus || '',
+        row.prevEndsAt ?? null, row.newEndsAt ?? null,
+        row.actor || '', row.note || '', now(),
+      ]
+    );
+  } catch (err) {
+    console.error('[subscriptions] تاریخچه ثبت نشد:', err.message);
+  }
+}
+
+/** دفتر تغییرهای اشتراک یک دکان، تازه‌ترین اول */
+async function changeLog(shopId, limit = 50) {
+  return many(
+    `SELECT * FROM subscription_history WHERE shop_id=$1
+      ORDER BY created_at DESC LIMIT $2`,
+    [shopId, Math.min(Number(limit) || 50, 200)]
+  );
+}
+
+/**
  * صدور یا تمدید اشتراک برای یک دکان.
  * اگر اشتراک زنده‌ای باشد، از پایان همان ادامه پیدا می‌کند تا روزهای
  * باقی‌مانده از بین نرود.
@@ -113,31 +147,51 @@ async function grant(shopId, { plan = 'custom', days = null, startsAt = null, en
   const clean = sanitizeFeatures(features);
 
   if (existing) {
-    return one(
+    const row = await one(
       `UPDATE subscriptions
           SET plan=$2, status='active', starts_at=$3, ends_at=$4, features=$5::jsonb,
               max_devices=$6, grace_days=$7, note=$8, updated_at=$9, created_by=$10
         WHERE id=$1 RETURNING *`,
       [existing.id, plan, start, end, JSON.stringify(clean), maxDevices, graceDays, note, t, createdBy]
     );
+    await logChange({
+      subscriptionId: row.id, shopId, action: 'renew', plan,
+      prevStatus: existing.status, newStatus: row.status,
+      prevEndsAt: Number(existing.ends_at), newEndsAt: Number(row.ends_at),
+      actor: createdBy, note,
+    });
+    return row;
   }
-  return one(
+  const row = await one(
     `INSERT INTO subscriptions (id, shop_id, plan, status, starts_at, ends_at, features, max_devices, grace_days, note, created_at, updated_at, created_by)
      VALUES ($1,$2,$3,'active',$4,$5,$6::jsonb,$7,$8,$9,$10,$10,$11) RETURNING *`,
     [newId('sub'), shopId, plan, start, end, JSON.stringify(clean), maxDevices, graceDays, note, t, createdBy]
   );
+  await logChange({
+    subscriptionId: row.id, shopId, action: 'grant', plan,
+    newStatus: row.status, newEndsAt: Number(row.ends_at),
+    actor: createdBy, note,
+  });
+  return row;
 }
 
 async function setStatus(subscriptionId, status, by = '') {
   if (!['active', 'suspended', 'cancelled', 'expired', 'pending'].includes(status)) {
     throw badRequest('وضعیت اشتراک معتبر نیست');
   }
+  const before = await one('SELECT * FROM subscriptions WHERE id=$1', [subscriptionId]);
   const row = await one(
     'UPDATE subscriptions SET status=$2, updated_at=$3, created_by=COALESCE(NULLIF($4,\'\'), created_by) WHERE id=$1 RETURNING *',
     [subscriptionId, status, now(), by]
   );
   if (!row) throw notFound('اشتراک پیدا نشد', 'subscription_not_found');
+  await logChange({
+    subscriptionId: row.id, shopId: row.shop_id, action: 'status', plan: row.plan,
+    prevStatus: before ? before.status : '', newStatus: row.status,
+    prevEndsAt: before ? Number(before.ends_at) : null, newEndsAt: Number(row.ends_at),
+    actor: by,
+  });
   return row;
 }
 
-module.exports = { liveOf, latestOf, historyOf, stateOf, expireDue, grant, setStatus, DAY };
+module.exports = { liveOf, latestOf, historyOf, changeLog, stateOf, expireDue, grant, setStatus, DAY };

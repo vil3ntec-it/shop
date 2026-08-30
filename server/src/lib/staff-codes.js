@@ -73,6 +73,64 @@ async function create(shopId, createdBy, { role = 'staff', expiresAt = null, max
   throw conflict('ساخت کد یکتا ممکن نشد، دوباره تلاش کنید', 'code_generation_failed');
 }
 
+/**
+ * کد ثابتِ یک دکان.
+ *
+ * از shop_id و شماره‌ی نسل با راز سرور ساخته می‌شود — پس همیشه همان است
+ * و لازم نیست جایی به شکل خام نگه داشته شود. صاحب دکان هر بار که نگاه
+ * کند همان کد را می‌بیند و می‌تواند به هر تعداد شاگرد بدهدش.
+ */
+function deriveStanding(shopId, generation) {
+  const raw = createHmac('sha256', pepper())
+    .update(`standing:${shopId}:${generation}`)
+    .digest();
+  let body = '';
+  for (let i = 0; i < GROUPS * GROUP_LEN; i++) body += ALPHABET[raw[i] % ALPHABET.length];
+  return format(body);
+}
+
+/**
+ * کد ثابت را می‌دهد و اگر نبود می‌سازد.
+ *
+ * `max_uses = 0` یعنی بی‌شمار: یک کد برای همه‌ی شاگردها. مهلت هم ندارد.
+ */
+async function standing(shopId, createdBy = '', role = 'staff') {
+  const live = await one(
+    `SELECT * FROM staff_codes WHERE shop_id=$1 AND standing AND status='active'`,
+    [shopId]
+  );
+  if (live) {
+    return { id: live.id, code: deriveStanding(shopId, live.generation), role: live.role, generation: live.generation };
+  }
+
+  const last = await one(
+    'SELECT COALESCE(MAX(generation), 0) AS g FROM staff_codes WHERE shop_id=$1 AND standing',
+    [shopId]
+  );
+  const generation = Number(last ? last.g : 0) + 1;
+  const code = deriveStanding(shopId, generation);
+  const id = newId('stc');
+  await query(
+    `INSERT INTO staff_codes (id, shop_id, code_hash, code_hint, role, created_by, created_at,
+                              expires_at, max_uses, used_count, status, standing, generation)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,NULL,0,0,'active',true,$8)`,
+    [id, shopId, hashCode(code), normalize(code).slice(-4), role, createdBy, now(), generation]
+  );
+  return { id, code, role, generation };
+}
+
+/**
+ * کد ثابت را عوض می‌کند — برای وقتی که لو رفته باشد.
+ * شاگردهای فعلی بیرون نمی‌افتند؛ فقط کد قبلی دیگر کسی را وارد نمی‌کند.
+ */
+async function rotateStanding(shopId, createdBy = '') {
+  await query(
+    `UPDATE staff_codes SET status='revoked' WHERE shop_id=$1 AND standing AND status='active'`,
+    [shopId]
+  );
+  return standing(shopId, createdBy);
+}
+
 async function list(shopId) {
   return many(
     `SELECT id, code_hint, role, created_at, expires_at, max_uses, used_count, status
@@ -174,4 +232,5 @@ async function redeem(rawCode, userId, ip = '') {
   });
 }
 
-module.exports = { create, list, revoke, redeem, normalize, format, hashCode, PREFIX };
+module.exports = {
+  standing, rotateStanding, deriveStanding, create, list, revoke, redeem, normalize, format, hashCode, PREFIX };

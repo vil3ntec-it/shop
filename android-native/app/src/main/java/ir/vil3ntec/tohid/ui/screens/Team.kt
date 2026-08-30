@@ -66,6 +66,10 @@ fun TeamScreen(snackbar: SnackbarHostState) {
   var askNew by remember { mutableStateOf(false) }
   var removing by remember { mutableStateOf<Member?>(null) }
 
+  /** کدِ ثابتِ دکان — همیشه همان است، پس هر بار نشان داده می‌شود */
+  var standing by remember { mutableStateOf("") }
+  var rotating by remember { mutableStateOf(false) }
+
   val signedIn = !state.accessToken.isNullOrBlank() && state.serverUrl.isNotBlank()
 
   suspend fun reload() {
@@ -78,6 +82,10 @@ fun TeamScreen(snackbar: SnackbarHostState) {
 
       val c = client.staffCodes(token)
       codes = c["codes"]?.jsonArray?.map { row -> StaffCode.of(row.jsonObject) }.orEmpty()
+
+      //  کدِ ثابت جدا خوانده می‌شود؛ سرورِ قدیمی این مسیر را ندارد و
+      //  نبودنش نباید بقیهٔ صفحه را خراب کند
+      standing = runCatching { client.standingCode(token) }.getOrDefault("")
       error = null
     }.onFailure {
       error = (it as? ServerClient.ServerError)?.message ?: "فهرست خوانده نشد"
@@ -162,6 +170,79 @@ fun TeamScreen(snackbar: SnackbarHostState) {
         }
       }
       Spacer(Modifier.height(16.dp))
+    }
+
+    /* ---------------------- کدِ ثابتِ دکان ---------------------- */
+    /*
+     *  یک کد، برای همهٔ شاگردها، همیشه همان.
+     *
+     *  قبلاً برای هر شاگرد یک کدِ یک‌بارمصرف ساخته می‌شد و صاحبِ دکان
+     *  باید هر بار می‌آمد اینجا. این کد از شناسهٔ دکان ساخته می‌شود، پس
+     *  هر وقت نگاه کنید همان است — نه جایی نوشته شده، نه گم می‌شود.
+     */
+    if (standing.isNotBlank()) {
+      SectionTitle("کد دکان شما")
+      Panel {
+        Text(
+          "این کد را به هر شاگردی که می‌خواهید بدهید. همیشه همین است و عوض نمی‌شود.",
+          style = MaterialTheme.typography.bodySmall,
+          color = colors.muted,
+        )
+        Spacer(Modifier.height(10.dp))
+        Box(
+          Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(colors.primary.copy(alpha = 0.10f))
+            .padding(vertical = 14.dp),
+          contentAlignment = Alignment.Center,
+        ) {
+          CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+            Text(
+              standing,
+              style = MaterialTheme.typography.titleMedium,
+              color = colors.primary,
+              fontWeight = FontWeight.Bold,
+            )
+          }
+        }
+        Spacer(Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+          TohidSecondaryButton(
+            text = "کپی کد",
+            onClick = {
+              val clip = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
+                as android.content.ClipboardManager
+              clip.setPrimaryClip(android.content.ClipData.newPlainText("کد دکان", standing))
+            },
+            modifier = Modifier.weight(1f),
+          )
+          TohidSecondaryButton(
+            text = if (rotating) "…" else "کد تازه",
+            enabled = !rotating,
+            onClick = {
+              val token = state.accessToken
+              if (!token.isNullOrBlank()) {
+                rotating = true
+                scope.launch {
+                  runCatching { ServerClient(state.serverUrl).rotateStandingCode(token) }
+                    .onSuccess { standing = it }
+                    .onFailure { error = (it as? ServerClient.ServerError)?.message ?: "کد عوض نشد" }
+                  rotating = false
+                }
+              }
+            },
+            modifier = Modifier.weight(1f),
+          )
+        }
+        Text(
+          "«کد تازه» فقط وقتی لازم است که کد لو رفته باشد. شاگردهای فعلی بیرون نمی‌روند؛ فقط کد قبلی دیگر کسی را وارد نمی‌کند.",
+          style = MaterialTheme.typography.labelSmall,
+          color = colors.muted2,
+          modifier = Modifier.padding(top = 8.dp),
+        )
+      }
+      Spacer(Modifier.height(18.dp))
     }
 
     /* -------------------------- کارمندان -------------------------- */

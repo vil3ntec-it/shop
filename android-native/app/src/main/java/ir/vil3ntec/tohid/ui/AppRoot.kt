@@ -192,6 +192,25 @@ fun AppRoot(
     return
   }
 
+  /*
+   *  رمزِ برنامه، یک بار، بعد از ساختنِ حساب.
+   *
+   *  تا حالا قفل فقط برای کسی بود که خودش سراغِ تنظیمات می‌رفت — یعنی
+   *  عملاً هیچ‌کس. حالا کسی که حساب دارد یک بار پرسیده می‌شود، و اگر
+   *  نخواست دیگر پرسیده نمی‌شود.
+   */
+  val syncState = remember { ir.vil3ntec.tohid.sync.SyncStore(context) }
+  var lockAsked by rememberSaveable { mutableStateOf(false) }
+  val hasAccount = !syncState.accessToken.isNullOrBlank()
+  if (hasAccount && !lockStore.enabled && !lockAsked && !syncState.lockDeclined) {
+    LockSetupScreen {
+      lockAsked = true
+      syncState.lockDeclined = true
+      unlocked = true
+    }
+    return
+  }
+
   /**
    *  رفتن به یک صفحه، از هر جای برنامه.
    *
