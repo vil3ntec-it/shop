@@ -154,35 +154,92 @@ class ShopStore(private val context: Context) {
     /* ------------------------- محاسبه‌ها ------------------------- */
 
     /**
+     *  جدولِ موجودی — یک بار ساخته می‌شود، بارها خوانده.
+     *
+     *  این کلاس یک باگِ کندیِ واقعی را می‌بندد. حسابِ قبلی برای **هر
+     *  کالا** کلِ اقلامِ فروش را می‌گشت، و برای **هر قلم** هم کلِ
+     *  فاکتورها را دنبالِ وضعیتِ «لغو» می‌گردید. یعنی هزینه‌اش ضربِ سه
+     *  عدد بود: کالاها × اقلامِ فروش × فاکتورها.
+     *
+     *  صفحهٔ محصولات این را برای همهٔ کالاها صدا می‌زد و با هر حرفی که
+     *  در جستجو زده می‌شد از نو. دکانی با چند صد کالا و چند هزار فاکتور،
+     *  همان‌جا می‌ایستاد.
+     *
+     *  حالا یک بار روی هر سه فهرست رد می‌شویم و سه نگاشت می‌سازیم؛ بعد
+     *  هر پرسش یک خواندن است. نتیجه‌ها مو‌به‌مو همان‌اند — فقط راهش عوض
+     *  شده.
+     */
+    class StockIndex(d: ShopData) {
+      private val entered = HashMap<String, Double>()
+      private val cartonsIn = HashMap<String, Double>()
+      private val sold = HashMap<String, Double>()
+
+      init {
+        d.warehouseEntries.forEach { e ->
+          entered[e.productId] = (entered[e.productId] ?: 0.0) + e.units
+          cartonsIn[e.productId] = (cartonsIn[e.productId] ?: 0.0) + e.cartons
+        }
+        // وضعیتِ فاکتورها یک بار در یک نگاشت می‌نشیند تا برای هر قلم
+        // دوباره جستجو نشود
+        val cancelled = HashSet<String>()
+        d.sales.forEach { if (it.status == "cancelled") cancelled += it.id }
+        d.saleItems.forEach { item ->
+          if (item.saleId in cancelled) return@forEach
+          sold[item.productId] =
+            (sold[item.productId] ?: 0.0) + (item.quantity - item.returnedQty)
+        }
+      }
+
+      fun soldQty(productId: String): Double = sold[productId] ?: 0.0
+
+      fun stock(productId: String): Double =
+        (entered[productId] ?: 0.0) - (sold[productId] ?: 0.0)
+
+      fun cartons(productId: String): Double = cartonsIn[productId] ?: 0.0
+
+      fun status(product: Product): String {
+        val s = stock(product.id)
+        return when {
+          s <= 0 -> "out"
+          s <= product.minStock -> "low"
+          else -> "ok"
+        }
+      }
+    }
+
+    /*
+     *  آخرین جدولِ ساخته‌شده، با همان دفتری که از رویش ساخته شد.
+     *
+     *  `ShopData` تغییرناپذیر است، پس اگر همان شیء باشد جدول هم هنوز
+     *  درست است. یک خانه بس است: در هر لحظه یک دفتر بیشتر روی صفحه
+     *  نیست.
+     */
+    private var indexedData: ShopData? = null
+    private var indexed: StockIndex? = null
+
+    @Synchronized
+    fun index(d: ShopData): StockIndex {
+      val ready = indexed
+      if (ready != null && indexedData === d) return ready
+      val fresh = StockIndex(d)
+      indexedData = d
+      indexed = fresh
+      return fresh
+    }
+
+    /**
      * مقدارِ فروخته‌شدهٔ یک کالا.
      * فروشِ لغوشده و مقدارِ مرجوعی حساب نمی‌شوند — عیناً مثل نسخهٔ وب.
      */
-    fun soldQty(d: ShopData, productId: String): Double =
-      d.saleItems
-        .filter { item ->
-          if (item.productId != productId) return@filter false
-          val sale = d.sales.find { it.id == item.saleId }
-          sale == null || sale.status != "cancelled"
-        }
-        .sumOf { it.quantity - it.returnedQty }
+    fun soldQty(d: ShopData, productId: String): Double = index(d).soldQty(productId)
 
     /** موجودی = آنچه وارد انبار شده، منهای آنچه فروخته شده */
-    fun stock(d: ShopData, productId: String): Double =
-      d.warehouseEntries.filter { it.productId == productId }.sumOf { it.units } -
-        soldQty(d, productId)
+    fun stock(d: ShopData, productId: String): Double = index(d).stock(productId)
 
-    fun cartons(d: ShopData, productId: String): Double =
-      d.warehouseEntries.filter { it.productId == productId }.sumOf { it.cartons }
+    fun cartons(d: ShopData, productId: String): Double = index(d).cartons(productId)
 
     /** تمام‌شده | موجودی کم | موجودی کافی */
-    fun stockStatus(d: ShopData, product: Product): String {
-      val s = stock(d, product.id)
-      return when {
-        s <= 0 -> "out"
-        s <= product.minStock -> "low"
-        else -> "ok"
-      }
-    }
+    fun stockStatus(d: ShopData, product: Product): String = index(d).status(product)
 
     /** بدهیِ یک قرض‌دار: آنچه گرفته منهای آنچه پس داده */
     fun debt(d: ShopData, debtorId: String): Double =
