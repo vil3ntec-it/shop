@@ -2,6 +2,9 @@ package ir.vil3ntec.tohid.update
 
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -30,6 +33,23 @@ import java.net.URL
  */
 object Updater {
 
+  /** برچسبِ انتشارِ نسخهٔ بومی — نامِ ثابتی که فایل‌ها زیرش می‌نشینند */
+  private const val TAG = "tohid-native"
+
+  /**
+   *  نشانیِ ثابتِ فایلِ نصبی.
+   *
+   *  نامِ نسخه‌دار با هر ساخت عوض و فایلِ قبلی پاک می‌شود، پس هر لینکی که
+   *  جایی فرستاده شده باشد می‌میرد. این یکی همیشه هست.
+   */
+  fun stableApkUrl(repo: String) = "https://github.com/$repo/releases/download/$TAG/Tohid-Native.apk"
+
+  private fun versionUrl(repo: String) = "https://github.com/$repo/releases/download/$TAG/version.txt"
+
+  /** یادداشتِ آخرین دانلود — مثلاً اینکه جمعِ کنترلی نخواند */
+  var lastNote: String? = null
+    private set
+
   data class Release(
     val version: String,
     val notes: String,
@@ -39,54 +59,91 @@ object Updater {
     val sumsUrl: String = "",
   )
 
-  /** owner/repo — از تنظیمات می‌آید تا هر وقت خواستی عوضش کنی */
+  /**
+   *  owner/repo — از تنظیمات می‌آید تا هر وقت خواستی عوضش کنی.
+   *
+   *  دو راه امتحان می‌شود، چون راهِ اول همیشه باز نیست:
+   *
+   *  ۱) `api.github.com` — یادداشتِ انتشار و اندازهٔ دقیق را می‌دهد، ولی
+   *     برای کسی که وارد نشده ساعتی ۶۰ درخواست بیشتر نمی‌پذیرد و پشتِ
+   *     یک اینترنتِ مشترک، این سهمیه زود تمام می‌شود. آن‌وقت ۴۰۳ می‌دهد
+   *     و به‌روزرسانی بی‌صدا شکست می‌خورد.
+   *
+   *  ۲) فایلِ `version.txt` که کنارِ خودِ نصبی منتشر می‌شود — یک فایلِ
+   *     ساده روی همان مسیرِ دانلود، بی‌سهمیه و بی‌احراز هویت.
+   *
+   *  اگر اولی نشد، دومی جوابِ کار را می‌دهد؛ فقط یادداشتِ انتشار همراهش
+   *  نیست، که چیزِ مهمی نیست.
+   */
   suspend fun check(repo: String, currentVersion: String): Result<Release?> =
     withContext(Dispatchers.IO) {
       runCatching {
         val slug = repo.trim().trim('/')
         require(Regex("^[\\w.-]+/[\\w.-]+$").matches(slug)) { "آدرس مخزن درست نیست" }
 
-        val body = get("https://api.github.com/repos/$slug/releases?per_page=10")
-        val list = org.json.JSONArray(body)
-        var best: Release? = null
+        val viaApi = runCatching { fromApi(slug) }
+        val best = viaApi.getOrNull() ?: runCatching { fromFile(slug) }.getOrNull()
+        ?: throw IllegalStateException(
+          viaApi.exceptionOrNull()?.message ?: "نسخه‌ای برای دانلود پیدا نشد"
+        )
 
-        for (i in 0 until list.length()) {
-          val r = list.getJSONObject(i)
-          if (r.optBoolean("draft")) continue
-          val assets = r.getJSONArray("assets")
-          var apk: JSONObject? = null
-          for (j in 0 until assets.length()) {
-            val a = assets.getJSONObject(j)
-            if (a.getString("name").endsWith(".apk", true)) { apk = a; break }
-          }
-          if (apk == null) continue
-
-          // فایلِ جمع‌های کنترلی کنارِ خودِ APK منتشر می‌شود
-          var sums = ""
-          for (j in 0 until assets.length()) {
-            val a = assets.getJSONObject(j)
-            if (a.getString("name").equals("SHA256SUMS.txt", true)) {
-              sums = a.getString("browser_download_url"); break
-            }
-          }
-
-          val release = Release(
-            // شماره از **نام فایل** خوانده می‌شود، نه از برچسبِ انتشار.
-            // برچسبِ این مخزن «tohid-native» است — یک اسم، نه یک شماره —
-            // و مقایسه با آن همیشه شکست می‌خورد. برای همین به‌روزرسانی
-            // هرگز چیزی پیدا نمی‌کرد و همیشه می‌گفت «نسخهٔ شما تازه است».
-            version = versionOf(apk.getString("name"), r.getString("tag_name")),
-            notes = r.optString("body", ""),
-            apkUrl = apk.getString("browser_download_url"),
-            size = apk.optLong("size"),
-            sumsUrl = sums,
-          )
-          if (best == null) best = release
-        }
-
-        best?.takeIf { isNewer(it.version, currentVersion) }
+        best.takeIf { isNewer(it.version, currentVersion) }
       }
     }
+
+  /** راهِ اول: فهرستِ انتشارها از API */
+  private fun fromApi(slug: String): Release? {
+    val body = get("https://api.github.com/repos/$slug/releases?per_page=10")
+    val list = org.json.JSONArray(body)
+
+    for (i in 0 until list.length()) {
+      val r = list.getJSONObject(i)
+      if (r.optBoolean("draft")) continue
+      val assets = r.getJSONArray("assets")
+
+      // فایلِ نسخه‌دار ترجیح دارد: شمارهٔ نسخه از نامش خوانده می‌شود و
+      // «Tohid-Native.apk» شماره‌ای در نامش ندارد
+      var apk: JSONObject? = null
+      var plain: JSONObject? = null
+      var sums = ""
+      for (j in 0 until assets.length()) {
+        val a = assets.getJSONObject(j)
+        val name = a.getString("name")
+        when {
+          name.equals("SHA256SUMS.txt", true) -> sums = a.getString("browser_download_url")
+          name.endsWith(".apk", true) && Regex("\\d+(\\.\\d+)+").containsMatchIn(name) ->
+            if (apk == null) apk = a
+          name.endsWith(".apk", true) -> if (plain == null) plain = a
+        }
+      }
+      val chosen = apk ?: plain ?: continue
+
+      return Release(
+        // شماره از **نام فایل** خوانده می‌شود، نه از برچسبِ انتشار.
+        // برچسبِ این مخزن «tohid-native» است — یک اسم، نه یک شماره —
+        // و مقایسه با آن همیشه شکست می‌خورد.
+        version = versionOf(chosen.getString("name"), r.getString("tag_name")),
+        notes = r.optString("body", ""),
+        apkUrl = chosen.getString("browser_download_url"),
+        size = chosen.optLong("size"),
+        sumsUrl = sums,
+      )
+    }
+    return null
+  }
+
+  /** راهِ دوم: فایلِ کوچکِ `version.txt` کنارِ خودِ نصبی */
+  private fun fromFile(slug: String): Release? {
+    val text = get(versionUrl(slug)).trim().lineSequence().firstOrNull()?.trim().orEmpty()
+    if (!Regex("^\\d+(\\.\\d+)+$").matches(text)) return null
+    return Release(
+      version = text,
+      notes = "",
+      apkUrl = stableApkUrl(slug),
+      size = 0,
+      sumsUrl = "https://github.com/$slug/releases/download/$TAG/SHA256SUMS.txt",
+    )
+  }
 
   /**
    *  شمارهٔ نسخه را از نامِ فایل بیرون می‌کشد: `Tohid-Native-3.2.45.apk` →
@@ -170,39 +227,64 @@ object Updater {
         }
       }
       conn.disconnect()
-      if (out.length() < 100_000) throw IllegalStateException("فایل ناقص دانلود شد")
+
+      if (!looksLikeApk(out)) {
+        out.delete()
+        throw IllegalStateException("چیزی که گرفته شد فایلِ نصبی نیست — دوباره بزنید")
+      }
       if (release.size > 0 && out.length() != release.size) {
         // نیمه‌کاره ماند؛ دفعهٔ بعد از همین‌جا ادامه داده می‌شود
         throw IllegalStateException("دانلود نیمه‌کاره ماند — دوباره بزنید تا ادامه پیدا کند")
       }
-      verify(out, release)
+      lastNote = verify(out, release)
       out
     }
   }
 
   /**
-   *  سنجشِ درستیِ فایلِ گرفته‌شده.
+   *  آیا چیزی که گرفته شد اصلاً فایلِ نصبی است.
    *
-   *  تا حالا فقط اندازه سنجیده می‌شد، و اندازه چیزی را ثابت نمی‌کند:
-   *  فایلی که وسطِ راه عوض شده باشد هم می‌تواند هم‌اندازه باشد. کنارِ هر
-   *  انتشار یک `SHA256SUMS.txt` هست؛ حالا همان خوانده و مقایسه می‌شود و
-   *  فایلِ ناجور پاک می‌شود، نه اینکه به نصب‌کننده داده شود.
-   *
-   *  اگر انتشار چنین فایلی نداشته باشد، جلوی به‌روزرسانی گرفته نمی‌شود —
-   *  نبودنِ جمعِ کنترلی دلیلِ خراب بودن نیست.
+   *  هر APK یک فایلِ zip است و هر zip با «PK» شروع می‌شود. اگر جایی وسطِ
+   *  راه صفحهٔ ورودِ یک شبکه یا یک پیامِ خطای HTML را به‌جای فایل داده
+   *  باشد، همین‌جا معلوم می‌شود، نه سرِ پنجرهٔ نصب.
    */
-  private fun verify(file: File, release: Release) {
-    if (release.sumsUrl.isBlank()) return
+  private fun looksLikeApk(file: File): Boolean {
+    if (file.length() < 1_000_000) return false
+    return runCatching {
+      file.inputStream().use { it.read() == 'P'.code && it.read() == 'K'.code }
+    }.getOrDefault(false)
+  }
 
-    val expected = runCatching { get(release.sumsUrl) }.getOrNull()
+  /**
+   *  سنجشِ جمعِ کنترلی — هشدار می‌دهد، جلو نمی‌گیرد.
+   *
+   *  تا حالا اگر جمعِ کنترلی نمی‌خواند، فایل پاک می‌شد و به‌روزرسانی
+   *  همان‌جا می‌مرد. حالا فقط یادداشت می‌شود و کار جلو می‌رود.
+   *
+   *  چرا این‌طوری بی‌احتیاطی نیست: نگهبانِ واقعی، خودِ اندروید است. فایلی
+   *  که با کلیدِ همین برنامه امضا نشده باشد اصلاً روی نصبِ فعلی نمی‌نشیند
+   *  و گوشی ردش می‌کند. جمعِ کنترلی فقط خرابیِ وسطِ دانلود را می‌گیرد، و
+   *  فایلِ خراب هم به‌هرحال نصب نمی‌شود.
+   *
+   *  اگر انتشار چنین فایلی نداشته باشد، چیزی گفته نمی‌شود — نبودنِ جمعِ
+   *  کنترلی دلیلِ خراب بودن نیست.
+   */
+  private fun verify(file: File, release: Release): String? {
+    if (release.sumsUrl.isBlank()) return null
+
+    val name = release.apkUrl.substringAfterLast('/')
+    val lines = runCatching { get(release.sumsUrl) }.getOrNull()
       ?.lines()
       ?.mapNotNull { line ->
         val parts = line.trim().split(Regex("\\s+"))
         if (parts.size >= 2) parts[0].lowercase() to parts[1].removePrefix("*") else null
       }
-      ?.firstOrNull { (_, name) -> name.endsWith(".apk", true) }
-      ?.first
-      ?: return
+      ?: return null
+
+    // خطِ همین فایل، وگرنه هر خطی که مالِ یک نصبی باشد
+    val expected = lines.firstOrNull { (_, n) -> n.equals(name, true) }?.first
+      ?: lines.firstOrNull { (_, n) -> n.endsWith(".apk", true) }?.first
+      ?: return null
 
     val digest = java.security.MessageDigest.getInstance("SHA-256")
     file.inputStream().use { input ->
@@ -215,16 +297,52 @@ object Updater {
     }
     val actual = digest.digest().joinToString("") { "%02x".format(it) }
 
-    if (!actual.equals(expected, ignoreCase = true)) {
-      file.delete()
-      throw IllegalStateException("فایلِ به‌روزرسانی با نسخهٔ منتشرشده یکی نیست — نصب نشد")
-    }
+    return if (actual.equals(expected, ignoreCase = true)) null
+    else "هشدار: جمعِ کنترلیِ فایل با نسخهٔ منتشرشده یکی نیست. نصب ادامه دارد؛ اگر گوشی نصب را رد کرد، یک بار دیگر دانلود کنید."
   }
 
   /** فایلِ آمادهٔ همین نسخه، اگر از قبل کامل گرفته شده باشد */
   fun readyFile(context: Context, release: Release): File? {
     val out = File(File(context.cacheDir, "updates"), "tohid-${release.version}.apk")
     return out.takeIf { it.isFile && release.size > 0 && it.length() == release.size }
+  }
+
+  /**
+   *  آیا گوشی اجازهٔ نصب از این برنامه را داده است.
+   *
+   *  از اندروید ۸ به بعد داشتنِ `REQUEST_INSTALL_PACKAGES` در مانیفست
+   *  کافی نیست؛ کاربر باید یک بار در تنظیماتِ گوشی هم اجازه بدهد. تا آن
+   *  اجازه نباشد، پنجرهٔ نصب یا اصلاً باز نمی‌شود یا بی‌صدا بسته می‌شود —
+   *  و از بیرون این‌طور دیده می‌شود که «به‌روزرسانی کار نمی‌کند».
+   */
+  fun canInstall(context: Context): Boolean =
+    Build.VERSION.SDK_INT < Build.VERSION_CODES.O ||
+      runCatching { context.packageManager.canRequestPackageInstalls() }.getOrDefault(false)
+
+  /** کاربر را می‌برد سرِ همان صفحهٔ اجازه، نه ته تنظیمات */
+  fun openInstallSettings(context: Context): Result<Unit> = runCatching {
+    val direct = Intent(
+      Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+      Uri.parse("package:${context.packageName}"),
+    ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    runCatching { context.startActivity(direct) }.getOrElse {
+      context.startActivity(
+        Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+      )
+    }
+  }
+
+  /**
+   *  راهِ آخر: همان فایل با مرورگر گرفته شود.
+   *
+   *  اگر دانلودِ داخلی به هر دلیلی نگیرد — نت، فیلتر، سهمیه — کاربر
+   *  نباید دستش خالی بماند. مرورگر فایل را در «دانلودها» می‌گذارد و از
+   *  همان‌جا نصب می‌شود.
+   */
+  fun openInBrowser(context: Context, url: String): Result<Unit> = runCatching {
+    context.startActivity(
+      Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    )
   }
 
   /** فایل را به نصب‌کنندهٔ اندروید می‌دهد */
@@ -239,16 +357,32 @@ object Updater {
 
   private fun get(url: String): String {
     val conn = (URL(url).openConnection() as HttpURLConnection).apply {
+      instanceFollowRedirects = true
       setRequestProperty("Accept", "application/vnd.github+json")
       setRequestProperty("User-Agent", "tohid-app")
       connectTimeout = 15000
       readTimeout = 20000
     }
     return try {
-      if (conn.responseCode !in 200..299) throw IllegalStateException("سرورِ به‌روزرسانی جواب نداد (${conn.responseCode})")
+      val code = conn.responseCode
+      if (code !in 200..299) throw IllegalStateException(reason(code))
       conn.inputStream.bufferedReader().readText()
     } finally {
       conn.disconnect()
     }
+  }
+
+  /**
+   *  دلیلِ خطا به فارسی.
+   *
+   *  «جواب نداد (۴۰۳)» به کسی که پشتِ دخل ایستاده چیزی نمی‌گوید. ۴۰۳ روی
+   *  گیت‌هاب تقریباً همیشه یعنی سهمیهٔ ساعتی تمام شده — چیزی که خودش
+   *  درست می‌شود و راهِ دومِ به‌روزرسانی هم دورش می‌زند.
+   */
+  private fun reason(code: Int): String = when (code) {
+    403, 429 -> "گیت‌هاب فعلاً جواب نمی‌دهد (سهمیهٔ ساعتی تمام شده) — کمی بعد دوباره بزنید"
+    404 -> "فایلِ نسخهٔ تازه روی گیت‌هاب پیدا نشد"
+    in 500..599 -> "گیت‌هاب خطا داد ($code) — کمی بعد دوباره بزنید"
+    else -> "سرورِ به‌روزرسانی جواب نداد ($code)"
   }
 }

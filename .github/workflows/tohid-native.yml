@@ -65,10 +65,23 @@ jobs:
         run: |
           mkdir -p out
           version=$(gradle --no-daemon -q printVersionName -PbuildNumber=${{ github.run_number }} | tail -n1)
-          cp app/build/outputs/apk/release/app-release.apk "out/Tohid-Native-$version.apk"
+          apk=app/build/outputs/apk/release/app-release.apk
+          cp "$apk" "out/Tohid-Native-$version.apk"
+          #  همان فایل، یک بار هم با نامِ ثابت.
+          #
+          #  نامِ نسخه‌دار خوب است چون آدم می‌داند چه گرفته، ولی هر ساخت
+          #  فایلِ قبلی را پاک می‌کند و هر لینکی که جایی فرستاده شده باشد
+          #  می‌میرد. این یکی هیچ‌وقت نمی‌میرد.
+          cp "$apk" out/Tohid-Native.apk
+          #  شمارهٔ نسخه، بیرون از API.
+          #
+          #  به‌روزرسانیِ داخلِ برنامه تا حالا فقط از api.github.com
+          #  می‌پرسید و آن سهمیهٔ ساعتی دارد و جاهایی هم بسته است. این
+          #  فایل از همان مسیرِ دانلود خوانده می‌شود، بدون سهمیه.
+          printf '%s\n' "$version" > out/version.txt
           cd out && sha256sum *.apk > SHA256SUMS.txt && cat SHA256SUMS.txt
           echo "APK_NAME=Tohid-Native-$version.apk" >> "$GITHUB_ENV"
-          echo "APK_MB=$(du -m *.apk | cut -f1)" >> "$GITHUB_ENV"
+          echo "APK_MB=$(du -m Tohid-Native.apk | cut -f1)" >> "$GITHUB_ENV"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -99,12 +112,15 @@ jobs:
           files: |
             android-native/out/*.apk
             android-native/out/SHA256SUMS.txt
+            android-native/out/version.txt
           body: |
             ## توحید — نسخهٔ بومی اندروید
 
             بازنویسی کامل با Kotlin و Jetpack Compose. بدون HTML، بدون WebView.
 
-            **دانلود:** `${{ env.APK_NAME }}` (حدود ${{ env.APK_MB }} مگابایت)
+            **دانلود:** [Tohid-Native.apk](https://github.com/${{ github.repository }}/releases/download/tohid-native/Tohid-Native.apk) — نسخهٔ `${{ env.APK_NAME }}`، حدود ${{ env.APK_MB }} مگابایت
+
+            > این لینک همیشه تازه‌ترین نسخه را می‌دهد و با ساختِ بعدی نمی‌میرد.
 
             > این نسخه **در حال ساخت** است. مرحله‌به‌مرحله کامل می‌شود و هر
             > مرحله از داخل خود برنامه به‌روزرسانی می‌گیرد.
@@ -117,9 +133,13 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          #  هر چیزی جز فایل‌های همین ساخت برداشته می‌شود. «Tohid-Native.apk»
+          #  و «version.txt» همیشه می‌مانند — لینکِ ثابت و شمارهٔ نسخه به
+          #  آنها بسته است.
           gh api "repos/${{ github.repository }}/releases/tags/tohid-native" \
             | jq -r '.assets[] | "\(.id) \(.name)"' | while read -r id name; do
-              if [ "$name" != "${{ env.APK_NAME }}" ] && [ "$name" != "SHA256SUMS.txt" ]; then
-                gh api -X DELETE "repos/${{ github.repository }}/releases/assets/$id"
-              fi
+              case "$name" in
+                "${{ env.APK_NAME }}"|Tohid-Native.apk|SHA256SUMS.txt|version.txt) ;;
+                *) gh api -X DELETE "repos/${{ github.repository }}/releases/assets/$id" ;;
+              esac
             done

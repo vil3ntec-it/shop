@@ -54,6 +54,16 @@ object UpdateManager {
   var checked by mutableStateOf(false)
     private set
 
+  /**
+   *  گوشی هنوز اجازهٔ نصب از این برنامه را نداده.
+   *
+   *  این بزرگ‌ترین دلیلِ «به‌روزرسانی کار نمی‌کند» است: فایل کامل گرفته
+   *  می‌شود، پنجرهٔ نصب باز نمی‌شود و هیچ خطایی هم دیده نمی‌شود. حالا
+   *  به‌جای سکوت، دکمه‌ای می‌آید که یک‌راست همان صفحهٔ اجازه را باز کند.
+   */
+  var needsPermission by mutableStateOf(false)
+    private set
+
   fun check(context: Context, repo: String, currentVersion: String) {
     if (busy) return
     val app = context.applicationContext
@@ -98,9 +108,8 @@ object UpdateManager {
         .onSuccess { file ->
           progress = -1
           ready = file
-          // بارِ اول، گوشی می‌پرسد از این منبع اجازهٔ نصب هست یا نه
-          Updater.install(app, file)
-            .onFailure { message = "نصب‌کنندهٔ اندروید باز نشد" }
+          message = Updater.lastNote
+          install(app)
         }
         .onFailure {
           progress = -1
@@ -113,8 +122,31 @@ object UpdateManager {
   /** نصبِ فایلی که از قبل گرفته شده */
   fun install(context: Context) {
     val file = ready ?: return
-    Updater.install(context.applicationContext, file)
+    val app = context.applicationContext
+
+    if (!Updater.canInstall(app)) {
+      needsPermission = true
+      message = "فایل آماده است، ولی گوشی هنوز اجازهٔ نصب از این برنامه را نداده. " +
+        "دکمهٔ زیر را بزنید، «اجازه» را روشن کنید و برگردید."
+      return
+    }
+
+    needsPermission = false
+    Updater.install(app, file)
       .onFailure { message = "نصب‌کنندهٔ اندروید باز نشد" }
+  }
+
+  /** بردنِ کاربر به همان صفحهٔ اجازهٔ نصب */
+  fun allowInstall(context: Context) {
+    Updater.openInstallSettings(context.applicationContext)
+      .onFailure { message = "صفحهٔ تنظیماتِ اجازهٔ نصب باز نشد" }
+  }
+
+  /** راهِ آخر: گرفتنِ همان فایل با مرورگر */
+  fun openInBrowser(context: Context, repo: String) {
+    val url = release?.apkUrl ?: Updater.stableApkUrl(repo)
+    Updater.openInBrowser(context.applicationContext, url)
+      .onFailure { message = "مرورگر باز نشد" }
   }
 
   /** لغو به‌خواستِ کاربر — نیمهٔ گرفته‌شده می‌ماند و دفعهٔ بعد ادامه پیدا می‌کند */
