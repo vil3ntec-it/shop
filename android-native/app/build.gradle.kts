@@ -1,3 +1,6 @@
+import java.security.KeyStore
+import java.security.MessageDigest
+
 plugins {
   id("com.android.application")
   id("org.jetbrains.kotlin.android")
@@ -51,12 +54,14 @@ android {
    *  خاموش می‌شود؛ نباید ساختِ برنامه به این گیر کند.
    */
   val signingFingerprint: String = runCatching {
-    val store = java.security.KeyStore.getInstance("JKS")
-    file("tohid-release.jks").inputStream().use { store.load(it, "tohid-shop".toCharArray()) }
+    val store = KeyStore.getInstance("JKS")
+    file("tohid-release.jks").inputStream().use { input ->
+      store.load(input, "tohid-shop".toCharArray())
+    }
     val cert = store.getCertificate("tohid")
-    java.security.MessageDigest.getInstance("SHA-256")
+    MessageDigest.getInstance("SHA-256")
       .digest(cert.encoded)
-      .joinToString("") { "%02x".format(it) }
+      .joinToString("") { byte -> "%02x".format(byte) }
   }.getOrDefault("")
 
   signingConfigs {
