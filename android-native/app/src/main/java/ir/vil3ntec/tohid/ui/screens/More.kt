@@ -53,6 +53,7 @@ fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
   val progress = UpdateManager.progress
   val busy = UpdateManager.busy
   val ready = UpdateManager.ready
+  val needsPermission = UpdateManager.needsPermission
 
   Column(
     Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)
@@ -199,6 +200,35 @@ fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
           onClick = { UpdateManager.download(context) },
           modifier = Modifier.fillMaxWidth(),
         ) { Text(if (ready != null) "نصب نسخهٔ ${release.version}" else "دانلود و نصب") }
+
+        /*
+         *  اجازهٔ نصب.
+         *
+         *  از اندروید ۸ به بعد، فایل هرچقدر هم سالم گرفته شده باشد، تا
+         *  کاربر در تنظیماتِ گوشی «نصب از این برنامه» را روشن نکند
+         *  پنجرهٔ نصب باز نمی‌شود — و هیچ خطایی هم دیده نمی‌شود. این
+         *  دکمه یک‌راست همان صفحه را باز می‌کند.
+         */
+        if (needsPermission) {
+          Spacer(Modifier.height(8.dp))
+          Button(
+            onClick = { UpdateManager.allowInstall(context) },
+            modifier = Modifier.fillMaxWidth(),
+          ) { Text("باز کردنِ صفحهٔ اجازهٔ نصب") }
+        }
+
+        // راهِ آخر، وقتی دانلودِ داخلی نمی‌گیرد
+        Spacer(Modifier.height(4.dp))
+        TextButton(
+          onClick = { UpdateManager.openInBrowser(context, repo) },
+          modifier = Modifier.fillMaxWidth(),
+        ) {
+          Text(
+            "گرفتن با مرورگر",
+            style = MaterialTheme.typography.labelLarge,
+            color = Shop.colors.muted,
+          )
+        }
       }
 
       status?.let {
