@@ -29,6 +29,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -71,6 +73,7 @@ private val PAGE_TITLES = mapOf(
   "quick" to "انتخاب محصول",
   "product" to "کالا",
   "vip" to "اشتراک و قیمت‌ها",
+  "team" to "کارمندان دکان",
 )
 
 /**
@@ -117,6 +120,16 @@ fun AppRoot(
   // صفحهٔ ورود، وقتی از دکمهٔ حسابِ سربرگ باز شود
   var authOpen by rememberSaveable { mutableStateOf(false) }
 
+  /*
+   *  قفلِ برنامه.
+   *
+   *  اگر رمز گذاشته شده باشد، تا زده نشود هیچ‌چیزِ دکان دیده نمی‌شود.
+   *  `rememberSaveable` است تا چرخاندنِ گوشی دوباره قفلش نکند، ولی با
+   *  بسته شدنِ برنامه از بین می‌رود و دفعهٔ بعد دوباره می‌پرسد.
+   */
+  val lockStore = remember { ir.vil3ntec.tohid.data.LockStore(context) }
+  var unlocked by rememberSaveable { mutableStateOf(false) }
+
   // یک بار، هنگام اولین اجرا: دفترِ دکان از نسخهٔ قبلی آورده می‌شود
   LaunchedEffect(Unit) {
     if (store.hasData()) return@LaunchedEffect
@@ -127,12 +140,51 @@ fun AppRoot(
       .onFailure { migration = "اطلاعات نسخهٔ قبلی خوانده نشد" }
   }
 
+  /*
+   *  همگام‌سازی خودکار.
+   *
+   *  یک بار سرِ باز شدنِ برنامه، و بعد از هر تغییر در دفتر با کمی مکث.
+   *  تا امروز فقط یک دکمهٔ دستی در تنظیمات بود و دو گوشیِ یک دکان تا
+   *  کسی آن را نمی‌زد از هم بی‌خبر بودند.
+   */
+  LaunchedEffect(loaded) {
+    if (loaded) ir.vil3ntec.tohid.sync.AutoSync.now(context, store)
+  }
+
+  /*
+   *  یادآوریِ روزانه.
+   *
+   *  از اندروید ۱۳ اجازهٔ اعلان جدا پرسیده می‌شود. یک بار می‌پرسیم و اگر
+   *  کاربر نخواست، اصراری نیست — کارِ روزانه هم بی‌اجازه چیزی نشان
+   *  نمی‌دهد.
+   */
+  val askNotify = rememberLauncherForActivityResult(
+    ActivityResultContracts.RequestPermission()
+  ) { }
+  LaunchedEffect(Unit) {
+    ir.vil3ntec.tohid.data.Reminders.schedule(context)
+    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+      val granted = androidx.core.content.ContextCompat.checkSelfPermission(
+        context, android.Manifest.permission.POST_NOTIFICATIONS
+      ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+      if (!granted) runCatching { askNotify.launch(android.Manifest.permission.POST_NOTIFICATIONS) }
+    }
+  }
+  LaunchedEffect(data) {
+    if (loaded) ir.vil3ntec.tohid.sync.AutoSync.nudge(context, store)
+  }
+
   // دکمهٔ برگشتِ گوشی از صفحهٔ فرعی برمی‌گردد، نه اینکه برنامه را ببندد
   BackHandler(enabled = sub != null) { sub = null }
 
   val snackbar = remember { SnackbarHostState() }
   LaunchedEffect(migration) {
     migration?.let { scope.launch { snackbar.showSnackbar(it) } }
+  }
+
+  if (lockStore.enabled && !unlocked) {
+    AppLockScreen { unlocked = true }
+    return
   }
 
   if (authOpen) {
@@ -306,6 +358,7 @@ fun AppRoot(
           onConsumed = { pendingBarcode = null; pendingProduct = null },
         )
         "vip" -> VipScreen { sub = null }
+        "team" -> TeamScreen(snackbar)
         "more" -> MoreScreen(store, data, ::open)
       }
       }

@@ -20,6 +20,9 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.Sms
+import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Groups
@@ -28,6 +31,9 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -410,7 +416,18 @@ private fun AccountView(
 
       Text(account.debtor.name, style = MaterialTheme.typography.headlineMedium, color = Shop.colors.text)
       if (account.debtor.phone.isNotBlank()) {
-        Text(account.debtor.phone, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
+        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+          Text(account.debtor.phone, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
+        }
+        Spacer(Modifier.height(10.dp))
+        /*
+         *  یادآوری به قرض‌دار.
+         *
+         *  شماره‌اش را از اول می‌گرفتیم و هیچ کاری با آن نمی‌شد کرد؛
+         *  فروشنده باید شماره را می‌خواند و در برنامهٔ دیگری دستی
+         *  می‌زد. در دکانی که قرض می‌دهد، این کارِ هر روز است.
+         */
+        ReminderRow(account.debtor.name, account.debtor.phone, account.balance)
       }
       if (account.debtor.notes.isNotBlank()) {
         Spacer(Modifier.height(4.dp))
@@ -703,6 +720,75 @@ private fun TransactionDialog(
   }
 }
 
+
+/**
+ *  سه راهِ یادآوری: زنگ، پیامک، واتساپ.
+ *
+ *  متنِ آماده عمدی است — نوشتنِ «سلام، … افغانی طلب دارید» برای هر
+ *  مشتری، همان کاری است که فروشنده از انجامش طفره می‌رود.
+ */
+@Composable
+private fun ReminderRow(name: String, phone: String, balance: Double) {
+  val context = LocalContext.current
+  val clean = remember(phone) { phone.filter { it.isDigit() || it == '+' } }
+  if (clean.isBlank()) return
+
+  val message = remember(name, balance) {
+    if (balance > 0) "سلام $name عزیز، یادآوری می‌کنم که ${money(balance)} افغانی از حساب شما باقی مانده. ممنون."
+    else "سلام $name عزیز،"
+  }
+
+  fun open(uri: String) {
+    runCatching {
+      context.startActivity(
+        android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(uri))
+      )
+    }
+  }
+
+  Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    ReminderChip("زنگ", Icons.Filled.Call, Shop.colors.primary) {
+      runCatching {
+        context.startActivity(
+          android.content.Intent(android.content.Intent.ACTION_DIAL, android.net.Uri.parse("tel:$clean"))
+        )
+      }
+    }
+    ReminderChip("پیامک", Icons.Filled.Sms, Shop.colors.accent) {
+      open("smsto:$clean?body=" + android.net.Uri.encode(message))
+    }
+    ReminderChip("واتساپ", Icons.Filled.Chat, Color(0xFF25D366)) {
+      val number = clean.removePrefix("+")
+      open("https://wa.me/$number?text=" + android.net.Uri.encode(message))
+    }
+  }
+}
+
+@Composable
+private fun ReminderChip(
+  text: String,
+  icon: androidx.compose.ui.graphics.vector.ImageVector,
+  tint: Color,
+  onClick: () -> Unit,
+) {
+  Row(
+    Modifier
+      .clip(RoundedCornerShape(Radius.sm))
+      .background(tint.copy(alpha = 0.13f))
+      .clickable(onClick = onClick)
+      .padding(horizontal = 12.dp, vertical = 7.dp),
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(5.dp),
+  ) {
+    Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(15.dp))
+    Text(
+      text,
+      style = MaterialTheme.typography.labelMedium,
+      color = tint,
+      fontWeight = FontWeight.Bold,
+    )
+  }
+}
 
 /** کارتِ رنگیِ بالای حساب — همان سه کارتِ «کل برد / کل رسید / الباقی» وب */
 @Composable

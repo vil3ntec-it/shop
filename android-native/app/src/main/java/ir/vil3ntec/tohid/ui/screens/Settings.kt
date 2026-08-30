@@ -12,6 +12,9 @@ import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Password
+import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PersonOutline
@@ -33,6 +36,11 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import ir.vil3ntec.tohid.ui.theme.Shape
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -88,6 +96,9 @@ fun SettingsScreen(
   var password by rememberSaveable { mutableStateOf("") }
   var busy by remember { mutableStateOf(false) }
   var signedIn by remember { mutableStateOf(state.accessToken != null) }
+  val lockStore = remember { ir.vil3ntec.tohid.data.LockStore(context) }
+  var lockOn by remember { mutableStateOf(lockStore.enabled) }
+  var askPin by remember { mutableStateOf(false) }
   var licenseStatus by remember { mutableStateOf(syncer.status()) }
   var confirmClear by remember { mutableStateOf(false) }
   var confirmRotate by remember { mutableStateOf(false) }
@@ -389,6 +400,62 @@ fun SettingsScreen(
       }
     }
 
+    /* ========================= قفل برنامه ========================= */
+    item {
+      SettingsSection(
+        icon = Icons.Filled.Lock,
+        title = "قفل برنامه",
+        subtitle = if (lockOn) "روشن — با رمز باز می‌شود" else "خاموش",
+        tint = if (lockOn) Shop.colors.success else Shop.colors.muted,
+      ) {
+        Text(
+          "تا امروز هر کسی گوشی را برمی‌داشت، حساب‌های دکان جلویش باز بود: طلب مشتری‌ها، سود، قیمت خرید. با رمز، تا زده نشود هیچ‌چیز دیده نمی‌شود.",
+          style = MaterialTheme.typography.bodySmall,
+          color = Shop.colors.muted,
+        )
+        Spacer(Modifier.height(12.dp))
+        if (lockOn) {
+          TohidSecondaryButton(
+            text = "برداشتن رمز",
+            onClick = { lockStore.set(""); lockOn = false; toast("قفل برداشته شد") },
+            modifier = Modifier.fillMaxWidth(),
+          )
+        } else {
+          TohidButton(
+            text = "گذاشتن رمز",
+            onClick = { askPin = true },
+            modifier = Modifier.fillMaxWidth(),
+          )
+        }
+      }
+    }
+
+    /* ========================= رمز حساب ========================= */
+    if (signedIn) {
+      item {
+        SettingsSection(
+          icon = Icons.Filled.Password,
+          title = "تغییر رمز حساب",
+          subtitle = "رمزِ ورود به سرور",
+          tint = Shop.colors.primary,
+        ) {
+          PasswordChange(state = state, snackbarToast = ::toast)
+        }
+      }
+
+      /* ======================== دستگاه‌ها ======================== */
+      item {
+        SettingsSection(
+          icon = Icons.Filled.Devices,
+          title = "دستگاه‌های وارد شده",
+          subtitle = "گوشی گم شد؟ نشستش را ببندید",
+          tint = Shop.colors.warning,
+        ) {
+          DeviceList(state = state, snackbarToast = ::toast)
+        }
+      }
+    }
+
     /* ============================ کلیدها ============================ */
     item {
       SettingsSection(
@@ -588,6 +655,18 @@ fun SettingsScreen(
       dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("انصراف") } },
     )
   }
+
+  if (askPin) {
+    PinDialog(
+      onDismiss = { askPin = false },
+      onSet = { pin ->
+        lockStore.set(pin)
+        lockOn = true
+        askPin = false
+        toast("قفل برنامه روشن شد")
+      },
+    )
+  }
 }
 
 /**
@@ -665,4 +744,190 @@ private fun isoOf(millis: Long): String {
   val m = (c.get(java.util.Calendar.MONTH) + 1).toString().padStart(2, '0')
   val d = c.get(java.util.Calendar.DAY_OF_MONTH).toString().padStart(2, '0')
   return "$y-$m-$d"
+}
+
+/* ====================== اجزای تازهٔ صفحهٔ تنظیمات ====================== */
+
+/**
+ *  گذاشتنِ رمزِ برنامه.
+ *
+ *  دو بار پرسیده می‌شود، چون رمزی که اشتباه تایپ شده باشد یعنی قفل شدنِ
+ *  خودِ صاحبِ دکان بیرونِ دفترش.
+ */
+@Composable
+private fun PinDialog(onDismiss: () -> Unit, onSet: (String) -> Unit) {
+  var first by remember { mutableStateOf("") }
+  var again by remember { mutableStateOf("") }
+  val colors = Shop.colors
+  val ready = first.length == MAX_PIN && first == again
+
+  AlertDialog(
+    onDismissRequest = onDismiss,
+    containerColor = colors.surface,
+    title = { Text("رمز برنامه", color = colors.text) },
+    text = {
+      Column {
+        Text(
+          "یک رمزِ چهار رقمی. هر بار که برنامه باز شود همین پرسیده می‌شود.",
+          style = MaterialTheme.typography.bodySmall,
+          color = colors.muted,
+        )
+        Spacer(Modifier.height(14.dp))
+        NumberField(first, { if (it.length <= MAX_PIN) first = it }, "رمز")
+        Spacer(Modifier.height(10.dp))
+        NumberField(again, { if (it.length <= MAX_PIN) again = it }, "دوباره")
+        if (again.isNotBlank() && first != again) {
+          Spacer(Modifier.height(6.dp))
+          Text("دو رمز یکی نیستند", style = MaterialTheme.typography.labelSmall, color = colors.danger)
+        }
+      }
+    },
+    confirmButton = {
+      TextButton(enabled = ready, onClick = { onSet(first) }) {
+        Text("بگذار", color = if (ready) colors.primary else colors.muted2)
+      }
+    },
+    dismissButton = { TextButton(onClick = onDismiss) { Text("انصراف", color = colors.muted) } },
+  )
+}
+
+/** تغییرِ رمزِ حساب — همان راهی که سرور از اول داشت و برنامه صدایش نمی‌زد */
+@Composable
+private fun PasswordChange(state: SyncStore, snackbarToast: (String) -> Unit) {
+  val scope = rememberCoroutineScope()
+  var current by remember { mutableStateOf("") }
+  var fresh by remember { mutableStateOf("") }
+  var busy by remember { mutableStateOf(false) }
+
+  Column {
+    Text(
+      "رمزِ تازه دستِ‌کم هشت نویسه باشد.",
+      style = MaterialTheme.typography.bodySmall,
+      color = Shop.colors.muted,
+    )
+    Spacer(Modifier.height(12.dp))
+    OutlinedTextField(
+      value = current,
+      onValueChange = { current = it },
+      label = { Text("رمز فعلی") },
+      singleLine = true,
+      visualTransformation = PasswordVisualTransformation(),
+      modifier = Modifier.fillMaxWidth(),
+    )
+    Spacer(Modifier.height(10.dp))
+    OutlinedTextField(
+      value = fresh,
+      onValueChange = { fresh = it },
+      label = { Text("رمز تازه") },
+      singleLine = true,
+      visualTransformation = PasswordVisualTransformation(),
+      modifier = Modifier.fillMaxWidth(),
+    )
+    Spacer(Modifier.height(12.dp))
+    TohidButton(
+      text = "تغییر رمز",
+      busy = busy,
+      enabled = fresh.length >= 8,
+      onClick = {
+        busy = true
+        scope.launch {
+          val token = state.accessToken
+          if (token == null) { busy = false; return@launch }
+          runCatching { ServerClient(state.serverUrl).changePassword(token, current, fresh) }
+            .onSuccess { current = ""; fresh = ""; snackbarToast("رمز عوض شد") }
+            .onFailure {
+              snackbarToast((it as? ServerClient.ServerError)?.message ?: "رمز عوض نشد")
+            }
+          busy = false
+        }
+      },
+      modifier = Modifier.fillMaxWidth(),
+    )
+  }
+}
+
+/**
+ *  دستگاه‌هایی که با این حساب وارد شده‌اند.
+ *
+ *  گوشیِ گم‌شده تا امروز راهی برای بسته شدن نداشت: نشستش باز می‌ماند و
+ *  هر کسی که آن را برمی‌داشت، دفترِ دکان را همگام می‌گرفت.
+ */
+@Composable
+private fun DeviceList(state: SyncStore, snackbarToast: (String) -> Unit) {
+  val scope = rememberCoroutineScope()
+  var rows by remember { mutableStateOf<List<Triple<String, String, Boolean>>>(emptyList()) }
+  var loaded by remember { mutableStateOf(false) }
+
+  suspend fun load() {
+    val token = state.accessToken ?: return
+    runCatching { ServerClient(state.serverUrl).devices(token) }
+      .onSuccess { body ->
+        rows = body["devices"]?.jsonArray?.map { row ->
+          val obj = row.jsonObject
+          val id = obj["id"]?.jsonPrimitive?.content.orEmpty()
+          val name = obj["name"]?.jsonPrimitive?.content
+            ?: obj["deviceName"]?.jsonPrimitive?.content ?: "دستگاه"
+          val uid = obj["uid"]?.jsonPrimitive?.content
+            ?: obj["deviceUid"]?.jsonPrimitive?.content.orEmpty()
+          Triple(id, name, uid == state.deviceUid)
+        }.orEmpty()
+        loaded = true
+      }
+      .onFailure { loaded = true }
+  }
+
+  LaunchedEffect(Unit) { load() }
+
+  Column {
+    if (!loaded) {
+      Text("در حال خواندن…", style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
+    } else if (rows.isEmpty()) {
+      Text(
+        "دستگاهی ثبت نشده است.",
+        style = MaterialTheme.typography.bodySmall,
+        color = Shop.colors.muted,
+      )
+    } else {
+      rows.forEach { (id, name, isThis) ->
+        Row(
+          Modifier.fillMaxWidth().padding(vertical = 7.dp),
+          verticalAlignment = Alignment.CenterVertically,
+        ) {
+          Column(Modifier.weight(1f)) {
+            Text(name, style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text)
+            if (isThis) {
+              Text(
+                "همین گوشی",
+                style = MaterialTheme.typography.labelSmall,
+                color = Shop.colors.success,
+              )
+            }
+          }
+          // نشستِ همین گوشی را نمی‌بندیم؛ کاربر خودش را بیرون می‌کرد
+          if (!isThis) {
+            Text(
+              "ببند",
+              style = MaterialTheme.typography.labelMedium,
+              color = Shop.colors.danger,
+              modifier = Modifier
+                .clip(Shape.chip)
+                .clickable {
+                  scope.launch {
+                    val token = state.accessToken ?: return@launch
+                    runCatching { ServerClient(state.serverUrl).revokeDevice(token, id) }
+                      .onSuccess { snackbarToast("نشست بسته شد"); load() }
+                      .onFailure {
+                        snackbarToast(
+                          (it as? ServerClient.ServerError)?.message ?: "بسته نشد"
+                        )
+                      }
+                  }
+                }
+                .padding(horizontal = 10.dp, vertical = 6.dp),
+            )
+          }
+        }
+      }
+    }
+  }
 }

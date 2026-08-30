@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -75,6 +76,7 @@ fun QuickSaleScreen(
   val cartDebtorId by cartStore.debtorId.collectAsState()
 
   var category by rememberSaveable { mutableStateOf<String?>(null) }
+  var scanning by remember { mutableStateOf(false) }
   var search by rememberSaveable { mutableStateOf("") }
   var newCategory by rememberSaveable { mutableStateOf<String?>(null) }
   var confirmDeleteCategory by remember { mutableStateOf<String?>(null) }
@@ -130,11 +132,23 @@ fun QuickSaleScreen(
           )
           Spacer(Modifier.height(12.dp))
 
-          OutlinedTextField(
+          /*
+           *  جستجو با صدا و با دوربین.
+           *
+           *  صفحهٔ فروشِ سریع تا امروز فقط تایپ داشت — در حالی که صفحهٔ
+           *  فروشِ کامل دوربین داشت. فروشنده‌ای که عجله دارد، همان‌جا
+           *  که عجله دارد به بارکدخوان نیاز دارد.
+           */
+          VoiceSearchField(
             value = search,
             onValueChange = { search = it },
-            placeholder = { Text("جستجوی نام کالا یا بارکد…") },
-            singleLine = true,
+            label = "جستجوی نام کالا یا بارکد",
+          )
+          Spacer(Modifier.height(8.dp))
+          TohidSecondaryButton(
+            text = "اسکن بارکد",
+            icon = Icons.Filled.QrCodeScanner,
+            onClick = { scanning = true },
             modifier = Modifier.fillMaxWidth(),
           )
 
@@ -331,6 +345,42 @@ fun QuickSaleScreen(
       },
       dismissButton = {
         TextButton(onClick = { confirmDeleteCategory = null }) { Text("انصراف") }
+      },
+    )
+  }
+
+  /*
+   *  بارکدِ خوانده‌شده.
+   *
+   *  کالای شناخته‌شده یک‌راست به سبد می‌رود — همان کاری که زدن روی
+   *  کارتش می‌کند. بارکدِ ناشناس گم نمی‌شود: در کادرِ جستجو می‌نشیند تا
+   *  کاربر ببیند چه خوانده شده.
+   */
+  if (scanning) {
+    BarcodeScanSheet(
+      onDismiss = { scanning = false },
+      onCode = { code ->
+        scanning = false
+        val found = d.products.firstOrNull { p -> p.barcodes.any { it == code } }
+        if (found == null) {
+          search = code
+          scope.launch { snackbar.showSnackbar("بارکد ناشناس — این کالا هنوز ثبت نشده است") }
+        } else {
+          val added = SalesEngine.addToCartCapped(
+            cart, found.id, SalesEngine.cartStep(found.unit), ShopStore.stock(d, found.id),
+          )
+          if (added.capped) {
+            scope.launch {
+              snackbar.showSnackbar(
+                "${found.name} فقط ${qty(added.available)}${if (found.unit.isNotBlank()) " ${found.unit}" else ""} موجود است"
+              )
+            }
+          } else {
+            ScanFeedback.ok(context)
+          }
+          cartStore.set(added.cart)
+          selectedId = found.id
+        }
       },
     )
   }
