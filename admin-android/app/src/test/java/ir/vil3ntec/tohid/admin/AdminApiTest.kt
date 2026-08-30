@@ -66,6 +66,17 @@ class AdminApiTest {
     assertEquals("https://192.168.0.101", AdminApi.normalizeBase("https://192.168.0.101"))
   }
 
+  /** نشانیِ ثابتِ Tailscale — راهِ داشتنِ آدرسی که با ری‌استارت عوض نمی‌شود */
+  @Test fun `نشانیِ شبکهٔ خصوصیِ مجازی هم خانگی است`() {
+    assertEquals("http://100.101.102.103:4700", AdminApi.normalizeBase("http://100.101.102.103:4700"))
+    assertTrue(AdminApi.isHomeAddress("100.64.0.1"))
+    assertTrue(AdminApi.isHomeAddress("100.127.255.255"))
+    // بیرونِ محدوده، دیگر خصوصی نیست
+    assertTrue(!AdminApi.isHomeAddress("100.63.0.1"))
+    assertTrue(!AdminApi.isHomeAddress("100.128.0.1"))
+    assertEquals("cleartext", errorFor("http://100.128.0.1").code)
+  }
+
   @Test fun `مرزهای شبکهٔ خصوصی`() {
     assertTrue(AdminApi.isHomeAddress("192.168.255.255"))
     assertTrue(AdminApi.isHomeAddress("172.31.0.1"))
