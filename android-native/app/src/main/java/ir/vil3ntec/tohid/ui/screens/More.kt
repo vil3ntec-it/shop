@@ -15,7 +15,7 @@ import ir.vil3ntec.tohid.BuildConfig
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.fa
-import ir.vil3ntec.tohid.update.Updater
+import ir.vil3ntec.tohid.update.UpdateManager
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.History
@@ -26,7 +26,6 @@ import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Settings
 import ir.vil3ntec.tohid.ui.theme.Shop
-import kotlinx.coroutines.launch
 
 /**
  *  بیشتر — وضعیت برنامه، به‌روزرسانی، و راهِ ورود به بخش‌هایی که در
@@ -35,32 +34,29 @@ import kotlinx.coroutines.launch
 @Composable
 fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
   val context = LocalContext.current
-  val scope = rememberCoroutineScope()
   val prefs = remember { context.getSharedPreferences("tohid", android.content.Context.MODE_PRIVATE) }
 
   // آدرس مخزنِ به‌روزرسانی ثابت است و به کاربر نشان داده نمی‌شود؛ فقط
   // برای عیب‌یابی می‌شود با همین کلید در تنظیماتِ برنامه عوضش کرد.
   val repo = remember { prefs.getString("update_repo", "vil3ntec-it/shop") ?: "vil3ntec-it/shop" }
-  var status by remember { mutableStateOf<String?>(null) }
-  var found by remember { mutableStateOf<Updater.Release?>(null) }
-  var progress by remember { mutableStateOf(-1) }
-  var busy by remember { mutableStateOf(false) }
+
+  /*
+   *  وضعیتِ به‌روزرسانی مالِ این صفحه نیست، مالِ خودِ برنامه است.
+   *
+   *  وقتی اینجا نگه داشته می‌شد، بیرون رفتن از صفحه هم دانلود را می‌کشت و
+   *  هم نوارِ پیشرفت را پاک می‌کرد. حالا با برگشتن، همان نوار سرِ جایش
+   *  است و کار ادامه دارد.
+   */
+  val status = UpdateManager.message
+  val found = UpdateManager.release
+  val progress = UpdateManager.progress
+  val busy = UpdateManager.busy
+  val ready = UpdateManager.ready
 
   Column(
     Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)
   ) {
-    Spacer(Modifier.height(20.dp))
-    SectionTitle("وضعیت")
-    Panel {
-      InfoRow("نسخه", BuildConfig.VERSION_NAME)
-      InfoRow("اجناس", d.products.size.fa())
-      InfoRow("فاکتورها", d.sales.size.fa())
-      InfoRow("قرض‌داران", d.debtors.size.fa())
-      InfoRow("مصارف", d.expenses.size.fa())
-      InfoRow("تأمین‌کننده‌ها", d.suppliers.size.fa())
-    }
-
-    Spacer(Modifier.height(20.dp))
+    Spacer(Modifier.height(16.dp))
     SectionTitle("بخش‌های دیگر")
     Panel {
       // قرض‌داران و محصولات از اینجا رفتند به نوارِ پایین، و انبار و
@@ -141,10 +137,27 @@ fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
           color = Shop.colors.primary,
         )
         Spacer(Modifier.height(6.dp))
+        Row(
+          Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+          Text(
+            "در حال دانلود… ${progress.fa()}٪",
+            style = MaterialTheme.typography.labelSmall,
+            color = Shop.colors.muted,
+          )
+          Text(
+            "توقف",
+            style = MaterialTheme.typography.labelSmall,
+            color = Shop.colors.danger,
+            modifier = Modifier.clickable { UpdateManager.cancel() },
+          )
+        }
+        Spacer(Modifier.height(4.dp))
         Text(
-          "در حال دانلود… ${progress.fa()}٪",
+          "می‌توانید به بخش‌های دیگر بروید؛ دانلود قطع نمی‌شود.",
           style = MaterialTheme.typography.labelSmall,
-          color = Shop.colors.muted,
+          color = Shop.colors.muted2,
         )
         Spacer(Modifier.height(12.dp))
       }
@@ -153,18 +166,7 @@ fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
       if (release == null) {
         Button(
           enabled = !busy,
-          onClick = {
-            busy = true; status = "در حال بررسی…"
-            scope.launch {
-              Updater.check(repo, BuildConfig.VERSION_NAME)
-                .onSuccess {
-                  found = it
-                  status = if (it == null) "نسخهٔ شما تازه‌ترین است." else null
-                }
-                .onFailure { status = it.message ?: "بررسی ناموفق بود" }
-              busy = false
-            }
-          },
+          onClick = { UpdateManager.check(context, repo, BuildConfig.VERSION_NAME) },
           modifier = Modifier.fillMaxWidth(),
         ) { Text("بررسی نسخهٔ تازه") }
       } else {
@@ -184,28 +186,36 @@ fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
         Spacer(Modifier.height(12.dp))
         Button(
           enabled = !busy,
-          onClick = {
-            busy = true; progress = 0; status = null
-            scope.launch {
-              Updater.download(context, release) { progress = it }
-                .onSuccess { file ->
-                  progress = -1
-                  // بارِ اول، گوشی می‌پرسد از این منبع اجازهٔ نصب هست یا نه
-                  Updater.install(context, file)
-                    .onFailure { status = "نصب‌کنندهٔ اندروید باز نشد" }
-                }
-                .onFailure { status = it.message ?: "دانلود ناموفق بود"; progress = -1 }
-              busy = false
-            }
-          },
+          // فایلی که از قبل کامل گرفته شده دوباره گرفته نمی‌شود؛ کسی که
+          // سرِ پرسشِ نصب «نه» زده، بارِ بعد یک‌راست به نصب می‌رسد
+          onClick = { UpdateManager.download(context) },
           modifier = Modifier.fillMaxWidth(),
-        ) { Text("دانلود و نصب") }
+        ) { Text(if (ready != null) "نصب نسخهٔ ${release.version}" else "دانلود و نصب") }
       }
 
       status?.let {
         Spacer(Modifier.height(8.dp))
         Text(it, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
       }
+    }
+
+    /*
+     *  «وضعیت» ته صفحه است، نه سرِ آن.
+     *
+     *  شمارشِ اجناس و فاکتورها خواندنی است ولی کاری با آن نمی‌شود کرد؛
+     *  چیزی که کاربر برای آن این صفحه را باز می‌کند، خودِ بخش‌هاست.
+     *  وقتی این پنل بالا بود، فهرستِ بخش‌ها زیرِ خطِ دید می‌افتاد و برای
+     *  رسیدن به «انبار» باید از روی شش عدد رد می‌شد.
+     */
+    Spacer(Modifier.height(20.dp))
+    SectionTitle("وضعیت")
+    Panel {
+      InfoRow("نسخه", BuildConfig.VERSION_NAME)
+      InfoRow("اجناس", d.products.size.fa())
+      InfoRow("فاکتورها", d.sales.size.fa())
+      InfoRow("قرض‌داران", d.debtors.size.fa())
+      InfoRow("مصارف", d.expenses.size.fa())
+      InfoRow("تأمین‌کننده‌ها", d.suppliers.size.fa())
     }
 
     Spacer(Modifier.height(24.dp))

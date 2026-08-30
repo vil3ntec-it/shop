@@ -514,6 +514,7 @@ fun VipScreen(onDismiss: () -> Unit) {
               selected = chosenPlan == plan.title,
               onClick = { chosenPlan = plan.title },
               modifier = Modifier.weight(1f).fillMaxHeight(),
+              stretch = true,
             )
           }
         }
@@ -851,6 +852,15 @@ private fun PlanCard(
   selected: Boolean,
   onClick: () -> Unit,
   modifier: Modifier = Modifier,
+  /**
+   *  آیا این کارت باید تا کفِ ردیف کشیده شود.
+   *
+   *  فقط در ردیفِ کنارِ همِ تبلت. روی گوشی کارت‌ها زیرِ هم و داخلِ یک
+   *  ستونِ اسکرول‌شونده‌اند، و آنجا بلندیِ در دسترس **بی‌نهایت** است:
+   *  `weight` در چنین ستونی به بچه‌اش صفر بلندی می‌دهد و کارت اصلاً
+   *  دیده نمی‌شود — همان چیزی که روی موبایل شد و فقط نشان‌ها ماندند.
+   */
+  stretch: Boolean = false,
 ) {
   val colors = Shop.colors
   val perDay = plan.price.toDouble() / plan.days
@@ -872,7 +882,7 @@ private fun PlanCard(
     Column(
       Modifier
         .fillMaxWidth()
-        .weight(1f)
+        .then(if (stretch) Modifier.weight(1f) else Modifier)
         .then(if (golden) Modifier.goldEdge(Radius.md, pulse, strong = selected) else Modifier)
         .clip(shape)
         .background(colors.surface)
@@ -918,7 +928,7 @@ private fun PlanCard(
         overflow = TextOverflow.Ellipsis,
       )
       Spacer(Modifier.height(10.dp))
-      Spacer(Modifier.weight(1f))
+      if (stretch) Spacer(Modifier.weight(1f))
       Row(
         Modifier
           .fillMaxWidth()
