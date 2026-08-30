@@ -27,6 +27,7 @@ import kotlinx.coroutines.launch
  *  داشبورد برای دیدن، کاربران و دکان‌ها برای کار کردن، سابقه برای
  *  پیگیری.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AdminRoot() {
   val context = LocalContext.current

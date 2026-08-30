@@ -3,7 +3,7 @@ package ir.vil3ntec.tohid.admin.net
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKey
+import androidx.security.crypto.MasterKeys
 
 /**
  *  آنچه بینِ اجراها می‌ماند: نشانیِ سرور و توکنِ مدیر.
@@ -19,13 +19,11 @@ import androidx.security.crypto.MasterKey
 class Session(context: Context) {
 
   private val prefs: SharedPreferences = runCatching {
-    val key = MasterKey.Builder(context)
-      .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-      .build()
+    val alias = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC)
     EncryptedSharedPreferences.create(
-      context,
       "tohid-admin-secure",
-      key,
+      alias,
+      context,
       EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
       EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
     ) as SharedPreferences
