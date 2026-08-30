@@ -138,35 +138,55 @@ fun ProductsScreen(
 
       /* ------------------------- خلاصه ------------------------- */
       item {
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        /*
+         *  هر چهار عدد در یک ردیف.
+         *
+         *  دو در دو بودنشان دو ایراد داشت: نصفِ هر کاشی خالی می‌ماند —
+         *  چون عدد کوتاه است و کاشی به‌اندازهٔ نصفِ صفحه پهن — و چهار
+         *  عددی که با هم معنی دارند، دو طبقه می‌شدند و چشم باید بالا و
+         *  پایین می‌رفت. یک ردیف، هم جای کمتری می‌گیرد هم یکجا خوانده
+         *  می‌شود.
+         *
+         *  روی گوشی سهمِ هر کاشی حدودِ هشتاد نقطه است، پس کاشی‌ها
+         *  جمع‌وجور می‌شوند؛ `IntrinsicSize.Min` هم هر چهار را هم‌قد
+         *  نگه می‌دارد تا برچسبِ دوخطی، کاشیِ خودش را بلندتر نکند.
+         */
+        val tight = !isTablet()
+        Row(
+          Modifier.height(IntrinsicSize.Min),
+          horizontalArrangement = Arrangement.spacedBy(if (tight) 7.dp else 10.dp),
+        ) {
           StatTile(
             label = "قلم کالا",
             value = d.products.size.toString(),
             hint = if (category == null) "همهٔ دسته‌ها" else category,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).fillMaxHeight(),
+            compact = tight,
           )
           StatTile(
             label = "ارزش به قیمت خرید",
             value = money(buyValue),
             tint = Shop.colors.warning,
             hint = "افغانی",
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).fillMaxHeight(),
+            compact = tight,
           )
-        }
-        Spacer(Modifier.height(10.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
           StatTile(
             label = "ارزش به قیمت فروش",
             value = money(sellValue),
             hint = "افغانی",
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).fillMaxHeight(),
+            compact = tight,
           )
           StatTile(
             label = "سود بالقوه",
             value = money(sellValue - buyValue),
             tint = Shop.colors.success,
-            hint = "اگر همه فروخته شود",
-            modifier = Modifier.weight(1f),
+            // روی گوشی «اگر همه فروخته شود» در هشتاد نقطه جا نمی‌شود و
+            // سه‌نقطه می‌خورد؛ آنجا همان واحد نوشته می‌شود
+            hint = if (tight) "افغانی" else "اگر همه فروخته شود",
+            modifier = Modifier.weight(1f).fillMaxHeight(),
+            compact = tight,
           )
         }
         Spacer(Modifier.height(14.dp))
