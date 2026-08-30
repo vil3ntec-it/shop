@@ -39,6 +39,26 @@ android {
     }
   }
 
+  /*
+   *  اثرِ انگشتِ گواهیِ امضا، همین‌جا در زمانِ ساخت خوانده می‌شود.
+   *
+   *  برنامه هنگامِ اجرا امضای خودش را با همین مقایسه می‌کند. کسی که
+   *  فایل را باز کند، قفلِ اشتراک را بردارد و دوباره ببندد، مجبور است
+   *  با کلیدِ خودش امضا کند — و آن امضا با این یکی نمی‌خواند. پس نسخهٔ
+   *  دست‌کاری‌شده می‌تواند اجرا شود، ولی اشتراک به آن داده نمی‌شود.
+   *
+   *  اگر خواندنِ کلید به هر دلیلی نشد، مقدار خالی می‌ماند و بررسی
+   *  خاموش می‌شود؛ نباید ساختِ برنامه به این گیر کند.
+   */
+  val signingFingerprint: String = runCatching {
+    val store = java.security.KeyStore.getInstance("JKS")
+    file("tohid-release.jks").inputStream().use { store.load(it, "tohid-shop".toCharArray()) }
+    val cert = store.getCertificate("tohid")
+    java.security.MessageDigest.getInstance("SHA-256")
+      .digest(cert.encoded)
+      .joinToString("") { "%02x".format(it) }
+  }.getOrDefault("")
+
   signingConfigs {
     create("release") {
       storeFile = file("tohid-release.jks")
@@ -65,8 +85,14 @@ android {
   }
 
   buildTypes {
+    debug {
+      // در نسخهٔ آزمایشی بررسیِ امضا خاموش است، وگرنه هنگامِ توسعه
+      // اشتراک هیچ‌وقت باز نمی‌شود
+      buildConfigField("String", "SIGNING_SHA256", "\"\"")
+    }
     release {
       signingConfig = signingConfigs.getByName("release")
+      buildConfigField("String", "SIGNING_SHA256", "\"$signingFingerprint\"")
       isMinifyEnabled = true
       isShrinkResources = true
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")

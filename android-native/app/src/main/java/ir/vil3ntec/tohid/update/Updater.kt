@@ -35,6 +35,8 @@ object Updater {
     val notes: String,
     val apkUrl: String,
     val size: Long,
+    /** نشانیِ فایلِ جمع‌های کنترلی، اگر انتشار داشته باشدش */
+    val sumsUrl: String = "",
   )
 
   /** owner/repo — از تنظیمات می‌آید تا هر وقت خواستی عوضش کنی */
@@ -59,6 +61,15 @@ object Updater {
           }
           if (apk == null) continue
 
+          // فایلِ جمع‌های کنترلی کنارِ خودِ APK منتشر می‌شود
+          var sums = ""
+          for (j in 0 until assets.length()) {
+            val a = assets.getJSONObject(j)
+            if (a.getString("name").equals("SHA256SUMS.txt", true)) {
+              sums = a.getString("browser_download_url"); break
+            }
+          }
+
           val release = Release(
             // شماره از **نام فایل** خوانده می‌شود، نه از برچسبِ انتشار.
             // برچسبِ این مخزن «tohid-native» است — یک اسم، نه یک شماره —
@@ -68,6 +79,7 @@ object Updater {
             notes = r.optString("body", ""),
             apkUrl = apk.getString("browser_download_url"),
             size = apk.optLong("size"),
+            sumsUrl = sums,
           )
           if (best == null) best = release
         }
@@ -163,7 +175,49 @@ object Updater {
         // نیمه‌کاره ماند؛ دفعهٔ بعد از همین‌جا ادامه داده می‌شود
         throw IllegalStateException("دانلود نیمه‌کاره ماند — دوباره بزنید تا ادامه پیدا کند")
       }
+      verify(out, release)
       out
+    }
+  }
+
+  /**
+   *  سنجشِ درستیِ فایلِ گرفته‌شده.
+   *
+   *  تا حالا فقط اندازه سنجیده می‌شد، و اندازه چیزی را ثابت نمی‌کند:
+   *  فایلی که وسطِ راه عوض شده باشد هم می‌تواند هم‌اندازه باشد. کنارِ هر
+   *  انتشار یک `SHA256SUMS.txt` هست؛ حالا همان خوانده و مقایسه می‌شود و
+   *  فایلِ ناجور پاک می‌شود، نه اینکه به نصب‌کننده داده شود.
+   *
+   *  اگر انتشار چنین فایلی نداشته باشد، جلوی به‌روزرسانی گرفته نمی‌شود —
+   *  نبودنِ جمعِ کنترلی دلیلِ خراب بودن نیست.
+   */
+  private fun verify(file: File, release: Release) {
+    if (release.sumsUrl.isBlank()) return
+
+    val expected = runCatching { get(release.sumsUrl) }.getOrNull()
+      ?.lines()
+      ?.mapNotNull { line ->
+        val parts = line.trim().split(Regex("\\s+"))
+        if (parts.size >= 2) parts[0].lowercase() to parts[1].removePrefix("*") else null
+      }
+      ?.firstOrNull { (_, name) -> name.endsWith(".apk", true) }
+      ?.first
+      ?: return
+
+    val digest = java.security.MessageDigest.getInstance("SHA-256")
+    file.inputStream().use { input ->
+      val buffer = ByteArray(64 * 1024)
+      while (true) {
+        val n = input.read(buffer)
+        if (n <= 0) break
+        digest.update(buffer, 0, n)
+      }
+    }
+    val actual = digest.digest().joinToString("") { "%02x".format(it) }
+
+    if (!actual.equals(expected, ignoreCase = true)) {
+      file.delete()
+      throw IllegalStateException("فایلِ به‌روزرسانی با نسخهٔ منتشرشده یکی نیست — نصب نشد")
     }
   }
 

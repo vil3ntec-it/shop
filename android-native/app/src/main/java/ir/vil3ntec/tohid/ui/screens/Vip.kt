@@ -50,6 +50,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.plain
 import ir.vil3ntec.tohid.sync.License
+import ir.vil3ntec.tohid.sync.LicenseGuard
 import ir.vil3ntec.tohid.sync.SyncStore
 import ir.vil3ntec.tohid.ui.theme.Radius
 import ir.vil3ntec.tohid.ui.theme.Shop
@@ -286,9 +287,7 @@ private fun GoldBadge(text: String) {
 fun VipBadge(onClick: () -> Unit, modifier: Modifier = Modifier) {
   val context = LocalContext.current
   val state = remember { SyncStore(context) }
-  val status = remember {
-    License.status(state.license, state.publicKey, state.deviceUid, System.currentTimeMillis())
-  }
+  val status = remember { LicenseGuard.status(context, state) }
 
   val text = when (status.state) {
     License.State.ACTIVE -> "اشتراک فعال"
@@ -992,9 +991,7 @@ fun VipGate(label: String, content: @Composable () -> Unit) {
   val context = LocalContext.current
   val state = remember { SyncStore(context) }
   val enforcing = LOCKING && state.serverUrl.isNotBlank()
-  val status = remember(enforcing) {
-    License.status(state.license, state.publicKey, state.deviceUid, System.currentTimeMillis())
-  }
+  val status = remember(enforcing) { LicenseGuard.status(context, state) }
   val open = !enforcing ||
     status.state == License.State.ACTIVE ||
     status.state == License.State.GRACE

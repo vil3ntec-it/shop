@@ -15,7 +15,11 @@ import kotlinx.serialization.json.JsonArray
  *  سرور گرفته‌ام دفعهٔ بعد به‌عنوانِ «تغییرِ محلی» دوباره فرستاده می‌شود و
  *  همگام‌سازی هیچ‌وقت آرام نمی‌گیرد.
  */
-class Syncer(private val store: ShopStore, private val state: SyncStore) {
+class Syncer(
+  private val store: ShopStore,
+  private val state: SyncStore,
+  private val context: android.content.Context? = null,
+) {
 
   data class Outcome(val pushed: Int, val pulled: Int, val revision: Long)
 
@@ -75,8 +79,12 @@ class Syncer(private val store: ShopStore, private val state: SyncStore) {
     return status()
   }
 
-  fun status(): License.Status =
-    License.status(state.license, state.publicKey, state.deviceUid, System.currentTimeMillis())
+  /** وضعیتِ اشتراک — با همان نگهبان‌هایی که `LicenseGuard` دارد */
+  fun status(): License.Status {
+    val where = context
+    return if (where != null) LicenseGuard.status(where, state)
+    else License.status(state.license, state.publicKey, state.deviceUid, LicenseGuard.trustedNow(state))
+  }
 
   private fun JsonArray.isNotEmpty(): Boolean = size > 0
 }

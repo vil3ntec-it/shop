@@ -113,6 +113,7 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/sync', require('./routes/sync'));
     api.use('/shop/sync', require('./routes/sync'));   // نام قدیمی
     api.use('/admin', require('./routes/admin'));
+    api.use('/license', require('./routes/license'));
 
     // نام‌های قدیمی صفحه‌ی اشتراک
     const me = require('./routes/me');

@@ -51,6 +51,19 @@ class SyncStore(context: Context) {
     get() = prefs.getLong(REV, 0)
     set(v) = prefs.edit().putLong(REV, v).apply()
 
+  /**
+   *  بالاترین ساعتی که تا حالا دیده‌ایم.
+   *
+   *  ساعتِ گوشی دستِ کاربر است و عقب بردنش یک راهِ ساده برای تمام نشدنِ
+   *  اشتراک بود. این عدد فقط جلو می‌رود؛ اگر ساعتِ گوشی از آن **عقب‌تر**
+   *  بیفتد، معلوم است دست خورده.
+   */
+  var clockSeen: Long
+    get() = prefs.getLong(CLOCK, 0)
+    set(v) {
+      if (v > prefs.getLong(CLOCK, 0)) prefs.edit().putLong(CLOCK, v).apply()
+    }
+
   var lastSyncAt: Long
     get() = prefs.getLong(LAST_SYNC, 0)
     set(v) = prefs.edit().putLong(LAST_SYNC, v).apply()
@@ -102,5 +115,6 @@ class SyncStore(context: Context) {
     const val SHADOW = "shadow"
     const val REV = "rev"
     const val LAST_SYNC = "last_sync"
+    const val CLOCK = "clock_seen"
   }
 }

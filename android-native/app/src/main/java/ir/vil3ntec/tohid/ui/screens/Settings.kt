@@ -80,7 +80,7 @@ fun SettingsScreen(
   val scope = rememberCoroutineScope()
   val prefs = remember { context.getSharedPreferences("tohid", android.content.Context.MODE_PRIVATE) }
   val state = remember { SyncStore(context) }
-  val syncer = remember { Syncer(store, state) }
+  val syncer = remember { Syncer(store, state, context) }
 
   var storeName by remember { mutableStateOf(prefs.getString("store_name", "") ?: "") }
   var serverUrl by remember { mutableStateOf(state.serverUrl) }
@@ -117,9 +117,9 @@ fun SettingsScreen(
     if (uri == null) return@rememberLauncherForActivityResult
     scope.launch {
       runCatching {
-        context.contentResolver.openOutputStream(uri)!!.use { out ->
-          out.write(store.exportBackup(storeName).toByteArray(Charsets.UTF_8))
-        }
+        val out = context.contentResolver.openOutputStream(uri)
+          ?: error("این مسیر برای نوشتن باز نشد")
+        out.use { it.write(store.exportBackup(storeName).toByteArray(Charsets.UTF_8)) }
       }.onSuccess {
         BackupClock.mark(context)
         toast("فایل پشتیبان ساخته شد")
@@ -132,7 +132,9 @@ fun SettingsScreen(
     if (uri == null) return@rememberLauncherForActivityResult
     scope.launch {
       val text = runCatching {
-        context.contentResolver.openInputStream(uri)!!.bufferedReader().use { it.readText() }
+        val input = context.contentResolver.openInputStream(uri)
+          ?: error("این فایل باز نشد")
+        input.bufferedReader().use { it.readText() }
       }.getOrNull()
       if (text == null) {
         restoreError = "فایل خوانده نشد"
