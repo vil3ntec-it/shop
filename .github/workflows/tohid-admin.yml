@@ -1,0 +1,119 @@
+name: توحید مدیریت
+
+on:
+  push:
+    branches: ['claude/**', main]
+    paths:
+      - 'admin-android/**'
+      - '.github/workflows/tohid-admin.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: tohid-admin-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: ساخت برنامهٔ مدیریت
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # همان کلیدِ برنامهٔ مشتری. بسته‌ی این برنامه جداست، پس یک کلید
+      # برای هر دو مشکلی ندارد و یک چیز کمتر برای گم کردن است.
+      - name: کلیدِ امضا
+        env:
+          KEYSTORE_B64: ${{ secrets.TOHID_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/tohid-release.jks"
+            echo "TOHID_KEYSTORE=$RUNNER_TEMP/tohid-release.jks" >> "$GITHUB_ENV"
+            echo "کلید از secret خوانده شد"
+          else
+            echo "::warning::secret به نام TOHID_KEYSTORE_B64 تنظیم نشده — فعلاً کلیدِ داخلِ مخزن استفاده می‌شود"
+          fi
+
+      - name: ساخت APK
+        working-directory: admin-android
+        env:
+          TOHID_KEYSTORE_PASSWORD: ${{ secrets.TOHID_KEYSTORE_PASSWORD }}
+          TOHID_KEY_ALIAS: ${{ secrets.TOHID_KEY_ALIAS }}
+          TOHID_KEY_PASSWORD: ${{ secrets.TOHID_KEY_PASSWORD }}
+        run: gradle --no-daemon assembleRelease -PbuildNumber=${{ github.run_number }}
+
+      # نامِ ثابت کنارِ نامِ نسخه‌دار: لینکِ دانلود با هر ساخت نمی‌میرد.
+      - name: نام‌گذاری و جمع کنترلی
+        working-directory: admin-android
+        run: |
+          mkdir -p out
+          version="1.0.${{ github.run_number }}"
+          apk=app/build/outputs/apk/release/app-release.apk
+          cp "$apk" "out/Tohid-Admin-$version.apk"
+          cp "$apk" out/Tohid-Admin.apk
+          printf '%s\n' "$version" > out/version.txt
+          cd out && sha256sum *.apk > SHA256SUMS.txt && cat SHA256SUMS.txt
+          echo "APK_NAME=Tohid-Admin-$version.apk" >> "$GITHUB_ENV"
+          echo "APK_MB=$(du -m Tohid-Admin.apk | cut -f1)" >> "$GITHUB_ENV"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tohid-admin-apk
+          path: admin-android/out/*.apk
+          retention-days: 30
+
+      - name: جابه‌جا کردن برچسب
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/claude/')
+        run: |
+          git tag -f tohid-admin
+          git push -f origin tohid-admin
+
+      - name: انتشار
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/claude/')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: tohid-admin
+          name: توحید — برنامهٔ مدیریت
+          prerelease: true
+          files: |
+            admin-android/out/*.apk
+            admin-android/out/SHA256SUMS.txt
+            admin-android/out/version.txt
+          body: |
+            ## توحید — برنامهٔ مدیریت
+
+            برنامه‌ی دوم، فقط برای صاحب سامانه. بسته‌اش جداست
+            (`ir.vil3ntec.tohid.admin`) و کنار برنامه‌ی مشتری نصب می‌شود.
+
+            **دانلود:** [Tohid-Admin.apk](https://github.com/${{ github.repository }}/releases/download/tohid-admin/Tohid-Admin.apk) — نسخهٔ `${{ env.APK_NAME }}`، حدود ${{ env.APK_MB }} مگابایت
+
+            > این لینک همیشه تازه‌ترین نسخه را می‌دهد و با ساخت بعدی نمی‌میرد.
+
+            بار اول، آدرس سرور و نام کاربری و رمز مدیر را می‌زنید.
+
+            ---
+            <sub>ساخته‌شده از `${{ github.sha }}`</sub>
+
+      - name: پاک کردن نسخه‌های قبلی
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/claude/')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api "repos/${{ github.repository }}/releases/tags/tohid-admin" \
+            | jq -r '.assets[] | "\(.id) \(.name)"' | while read -r id name; do
+              case "$name" in
+                "${{ env.APK_NAME }}"|Tohid-Admin.apk|SHA256SUMS.txt|version.txt) ;;
+                *) gh api -X DELETE "repos/${{ github.repository }}/releases/assets/$id" ;;
+              esac
+            done
