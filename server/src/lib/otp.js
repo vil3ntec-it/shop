@@ -37,7 +37,7 @@ function randomCode(digits) {
  * شماره یا متن فارسی آدرس را نشکند.
  */
 function fill(text, vars, encode = false) {
-  return String(text).replace(/\{(to|code|message|sender|key)\}/g, (_, name) => {
+  return String(text).replace(/\{(to_plain|to|code|message|sender|key)\}/g, (_, name) => {
     const value = String(vars[name] ?? '');
     return encode ? encodeURIComponent(value) : value;
   });
@@ -61,11 +61,19 @@ function parseJson(text, label, vars) {
 
 /** پاسخ سرویس را می‌سنجد و اگر خطا بود، متنش را نشان می‌دهد نه فقط شماره. */
 async function check(res) {
+  const body = await res.text().catch(() => '');
   if (!res.ok) {
-    const body = await res.text().catch(() => '');
     throw new Error(`سرویس پیامک پاسخ ${res.status} داد: ${body.slice(0, 200)}`);
   }
-  return { delivered: true, via: 'sms' };
+  //  بعضی سرویس‌ها ۲۰۰ می‌دهند و خطا را داخل بدنه می‌گذارند. اگر این را
+  //  نمی‌سنجیدیم، «فرستاده شد» می‌گفتیم و پیامکی نرفته بود.
+  let parsed = null;
+  try { parsed = JSON.parse(body); } catch { /* بدنه‌ی متنی؛ مشکلی نیست */ }
+  if (parsed && (parsed.error || parsed.Error)) {
+    const detail = parsed.description || parsed.message || JSON.stringify(parsed);
+    throw new Error(`سرویس پیامک قبول نکرد: ${String(detail).slice(0, 200)}`);
+  }
+  return { delivered: true, via: 'sms', response: body.slice(0, 200) };
 }
 
 // ---------- راه‌های ارسال ----------
@@ -111,7 +119,17 @@ const senders = {
     const cfg = config.sms;
     if (!cfg.url) throw new Error('SMS_API_URL تنظیم نشده است');
 
-    const vars = { to, code, message, sender: cfg.sender, key: cfg.key };
+    //  `{to}` شماره را همان‌طور که هست می‌دهد: `+93790000000`.
+    //  `{to_plain}` بدون `+` و بدون هر چیزِ غیررقم — چند سرویس (از جمله
+    //  EasySendSMS) `+` را قبول نمی‌کنند و شماره را نامعتبر می‌خوانند.
+    const vars = {
+      to,
+      to_plain: String(to).replace(/\D/g, ''),
+      code,
+      message,
+      sender: cfg.sender,
+      key: cfg.key,
+    };
     const url = fill(cfg.url, vars);
 
     const headers = { ...parseJson(cfg.headers, 'SMS_API_HEADERS', vars) };
@@ -256,7 +274,14 @@ async function request(destination, { purpose = 'login', ip = '' } = {}) {
     : `کد ورود شما: ${code}`;
   await sender(destination)(destination, code, message);
 
-  const out = { sent: true, expiresAt, resendAfter: t + config.otp.resendMs };
+  //  `resendSeconds` هم می‌رود چون ساعتِ گوشی ممکن است با سرور جور نباشد.
+  //  با ثانیه، برنامه لازم نیست ساعتش را با سرور تنظیم کند.
+  const out = {
+    sent: true,
+    expiresAt,
+    resendAfter: t + config.otp.resendMs,
+    resendSeconds: Math.ceil(config.otp.resendMs / 1000),
+  };
   // فقط بیرون از حالت production و فقط وقتی راه ارسالی تنظیم نشده
   //  فقط بیرون از production و فقط وقتی هیچ راه ارسالی تنظیم نشده — وگرنه
   //  کد در پاسخ HTTP برمی‌گشت و کسی که شماره‌ی دیگری را می‌زد کدش را می‌دید.

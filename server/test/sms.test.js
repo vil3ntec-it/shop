@@ -24,9 +24,15 @@ test.before(async () => {
     req.on('data', c => { body += c; });
     req.on('end', () => {
       seen.push({ method: req.method, url: req.url, headers: req.headers, body });
+      if (req.url.includes('/soft-fail')) {
+        // ۲۰۰ ولی خطا در بدنه — رفتار چند سرویس واقعی
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end('{"error":4015,"description":"Insufficient credits."}');
+        return;
+      }
       if (req.url.includes('/fail')) {
         res.writeHead(401, { 'Content-Type': 'application/json' });
-        res.end('{"error":"bad key"}');
+        res.end('{"error":4002,"description":"No API key found in request."}');
         return;
       }
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -121,10 +127,51 @@ test('پاسخ خطا با متنِ خودِ سرویس برمی‌گردد، ن
     () => senders.sms('0790000004', '1', 'x'),
     (err) => {
       assert.match(err.message, /401/);
-      assert.match(err.message, /bad key/);
+      assert.match(err.message, /No API key/);
       return true;
     }
   );
+});
+
+test('پاسخ ۲۰۰ ولی با خطا در بدنه، «فرستاده شد» حساب نمی‌شود', async () => {
+  reset();
+  //  EasySendSMS و چند سرویس دیگر گاهی ۲۰۰ می‌دهند و خطا را داخل بدنه
+  //  می‌گذارند. اگر این را نمی‌سنجیدیم، به کاربر می‌گفتیم کد رفت و نرفته بود.
+  Object.assign(config.sms, {
+    url: `${base}/soft-fail`, method: 'POST', key: 'k', sender: 's',
+    headers: '', body: '{"to":"{to}"}',
+  });
+
+  await assert.rejects(
+    () => senders.sms('0790000005', '1', 'x'),
+    /Insufficient credits/
+  );
+});
+
+test('شکل واقعی EasySendSMS همان‌طور که هست فرستاده می‌شود', async () => {
+  reset();
+  Object.assign(config.sms, {
+    url: `${base}/v1/rest/sms/send`,
+    method: 'POST',
+    key: 'APIKEY-XYZ',
+    sender: 'Tohid',
+    headers: '{"apikey":"{key}","Accept":"application/json"}',
+    body: '{"from":"{sender}","to":"{to_plain}","text":"{message}","type":"1"}',
+  });
+
+  //  سرور شماره را با + نگه می‌دارد؛ EasySendSMS آن را قبول نمی‌کند
+  await senders.sms('+93790000000', '445566', 'کد ورود توحید: 445566');
+
+  const got = seen[0];
+  assert.equal(got.headers.apikey, 'APIKEY-XYZ');
+  assert.equal(got.headers.accept, 'application/json');
+  assert.deepEqual(JSON.parse(got.body), {
+    from: 'Tohid',
+    to: '93790000000',
+    text: 'کد ورود توحید: 445566',
+    //  «۱» یعنی یونیکد. با «۰» متن فارسی به هم می‌ریزد.
+    type: '1',
+  });
 });
 
 test('بدون SMS_API_URL، با پیام روشن رد می‌شود', async () => {
