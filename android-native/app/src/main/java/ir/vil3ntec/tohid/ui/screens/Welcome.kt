@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.EaseInOutSine
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -558,6 +559,8 @@ private fun GradientHeader(title: String, subtitle: String) {
       initialValue = 0f,
       targetValue = 1f,
       animationSpec = infiniteRepeatable(
+        // اینجا `Restart` پرش ندارد: این عدد زاویهٔ یک دورِ کامل است و
+        // نقطهٔ ۱ همان نقطهٔ ۰ است — هاله روی دایره می‌چرخد و برنمی‌گردد
         tween(if (Motion.enabled) 9000 else 1, easing = LinearEasing),
         RepeatMode.Restart,
       ),
@@ -567,7 +570,7 @@ private fun GradientHeader(title: String, subtitle: String) {
       initialValue = 0.7f,
       targetValue = 1.15f,
       animationSpec = infiniteRepeatable(
-        tween(if (Motion.enabled) 2600 else 1, easing = LinearEasing),
+        tween(if (Motion.enabled) 2600 else 1, easing = EaseInOutSine),
         RepeatMode.Reverse,
       ),
       label = "glow",
@@ -830,11 +833,11 @@ private fun GradientButton(
   // برقی که روی دکمه می‌لغزد، و فشردنی که دیده می‌شود
   val motion = rememberInfiniteTransition(label = "cta")
   val sheen by motion.animateFloat(
-    initialValue = -0.4f,
-    targetValue = 1.4f,
+    initialValue = 0f,
+    targetValue = 1f,
     animationSpec = infiniteRepeatable(
-      tween(if (Motion.enabled) 2600 else 1, delayMillis = 900, easing = LinearEasing),
-      RepeatMode.Restart,
+      tween(if (Motion.enabled) 2600 else 1, easing = EaseInOutSine),
+      RepeatMode.Reverse,
     ),
     label = "sheen",
   )
@@ -895,7 +898,7 @@ private fun BrandMark() {
     initialValue = 0.35f,
     targetValue = 0.75f,
     animationSpec = infiniteRepeatable(
-      tween(if (Motion.enabled) 1900 else 1, easing = LinearEasing),
+      tween(if (Motion.enabled) 1900 else 1, easing = EaseInOutSine),
       RepeatMode.Reverse,
     ),
     label = "glow",
@@ -905,6 +908,7 @@ private fun BrandMark() {
     initialValue = 0f,
     targetValue = 360f,
     animationSpec = infiniteRepeatable(
+      // ۳۶۰ درجه همان ۰ درجه است، پس چرخش بی‌درز است
       tween(if (Motion.enabled) 7000 else 1, easing = LinearEasing),
       RepeatMode.Restart,
     ),
