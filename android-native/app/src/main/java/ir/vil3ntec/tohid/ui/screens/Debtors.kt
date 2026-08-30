@@ -134,12 +134,10 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
             )
             Spacer(Modifier.height(12.dp))
 
-            OutlinedTextField(
+            VoiceSearchField(
               value = search,
               onValueChange = { search = it },
-              placeholder = { Text("جستجوی نام یا شماره") },
-              singleLine = true,
-              modifier = Modifier.fillMaxWidth(),
+              label = "جستجوی نام یا شماره",
             )
             Spacer(Modifier.height(4.dp))
           }

@@ -17,6 +17,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -65,18 +66,24 @@ fun StatTile(
   compact: Boolean = false,
 ) {
   val colors = Shop.colors
+  // برچسب، عدد و توضیح هر سه وسطِ کاشی. وقتی چند کاشی کنارِ هم‌اند و
+  // متن‌ها به یک لبه چسبیده‌اند، ردیف ناهماهنگ دیده می‌شود — به‌ویژه
+  // آنجا که یک برچسب دو خط می‌شود و بقیه یک خط.
   Column(
     modifier
       .glassSurface(Shape.card, colors.surface, colors.sheen, colors.border, glow = colors.glow)
-      .padding(if (compact) 10.dp else 16.dp)
+      .padding(if (compact) 10.dp else 16.dp),
+    horizontalAlignment = Alignment.CenterHorizontally,
   ) {
     Text(
       label,
       style = if (compact) MaterialTheme.typography.labelSmall
       else MaterialTheme.typography.labelMedium,
       color = Shop.colors.muted,
+      fontWeight = FontWeight.Medium,
       maxLines = 2,
       overflow = TextOverflow.Ellipsis,
+      textAlign = TextAlign.Center,
     )
     Spacer(Modifier.height(if (compact) 4.dp else 6.dp))
     Text(
@@ -84,7 +91,9 @@ fun StatTile(
       style = if (compact) MaterialTheme.typography.titleMedium
       else MaterialTheme.typography.headlineSmall,
       color = tint,
+      fontWeight = FontWeight.Bold,
       maxLines = 1,
+      textAlign = TextAlign.Center,
     )
     if (hint != null) {
       Spacer(Modifier.height(2.dp))
@@ -94,6 +103,7 @@ fun StatTile(
         color = Shop.colors.muted2,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
+        textAlign = TextAlign.Center,
       )
     }
   }
