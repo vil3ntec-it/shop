@@ -2,7 +2,10 @@ package ir.vil3ntec.tohid.ui.screens
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.animation.core.EaseInOutSine
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.StartOffset
+import androidx.compose.animation.core.StartOffsetType
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -143,7 +146,7 @@ private fun goldPulse(): Float {
     initialValue = 0f,
     targetValue = 1f,
     animationSpec = infiniteRepeatable(
-      tween(if (Motion.enabled) 2200 else 1, easing = FastOutSlowInEasing),
+      tween(if (Motion.enabled) 2200 else 1, easing = EaseInOutSine),
       RepeatMode.Reverse,
     ),
     label = "pulse",
@@ -151,16 +154,29 @@ private fun goldPulse(): Float {
   return value
 }
 
-/** برقی که از یک لبه به لبهٔ دیگر می‌لغزد */
+/**
+ *  برقی که روی سطح می‌لغزد — می‌رود و برمی‌گردد، نمی‌ایستد.
+ *
+ *  نسخهٔ قبلی `Restart` بود با یک مکثِ کوتاه: نور تا لبه می‌رفت، یک‌باره
+ *  به اول می‌پرید و چند صدم ثانیه هم می‌ماند. همان پرش و مکث در چشم
+ *  «ریست شدن» دیده می‌شد، نه حرکت.
+ *
+ *  حالا `Reverse` است و بی‌مکث: نور تا لبه می‌رود، همان‌جا آرام می‌گیرد و
+ *  از همان راه برمی‌گردد. شتابش هم سینوسی است — کندِ لبه‌ها و تندِ وسط —
+ *  چون با شتابِ یکنواخت، لحظهٔ برگشت یک زاویهٔ تیز است و دیده می‌شود.
+ */
 @Composable
-private fun goldSweep(period: Int = 2800, delay: Int = 800): Float {
+private fun goldSweep(period: Int = 2800, delay: Int = 0): Float {
   val motion = rememberInfiniteTransition(label = "goldSweep")
   val value by motion.animateFloat(
-    initialValue = -0.5f,
-    targetValue = 1.5f,
+    initialValue = 0f,
+    targetValue = 1f,
     animationSpec = infiniteRepeatable(
-      tween(if (Motion.enabled) period else 1, delayMillis = delay, easing = LinearEasing),
-      RepeatMode.Restart,
+      tween(if (Motion.enabled) period else 1, easing = EaseInOutSine),
+      RepeatMode.Reverse,
+      // جلو بردنِ ساعت، نه صبر کردن: کارت‌ها هم‌زمان برق نزنند ولی
+      // هیچ‌کدام هم اولِ کار ساکن نماند
+      initialStartOffset = StartOffset(delay, StartOffsetType.FastForward),
     ),
     label = "sweep",
   )
@@ -277,17 +293,17 @@ fun VipBadge(onClick: () -> Unit, modifier: Modifier = Modifier) {
   val bob by motion.animateFloat(
     initialValue = -9f,
     targetValue = 9f,
-    animationSpec = infiniteRepeatable(tween(1300, easing = LinearEasing), RepeatMode.Reverse),
+    animationSpec = infiniteRepeatable(tween(1300, easing = EaseInOutSine), RepeatMode.Reverse),
     label = "bob",
   )
 
   // برقِ نوری که روی نشان می‌لغزد — همان انیمیشنِ کارت اشتراکِ وب
   val shine by motion.animateFloat(
-    initialValue = -0.6f,
-    targetValue = 1.6f,
+    initialValue = 0f,
+    targetValue = 1f,
     animationSpec = infiniteRepeatable(
-      tween(2600, delayMillis = 900, easing = LinearEasing),
-      RepeatMode.Restart,
+      tween(if (Motion.enabled) 2600 else 1, easing = EaseInOutSine),
+      RepeatMode.Reverse,
     ),
     label = "shine",
   )
@@ -295,6 +311,8 @@ fun VipBadge(onClick: () -> Unit, modifier: Modifier = Modifier) {
   val sparkle by motion.animateFloat(
     initialValue = 0f,
     targetValue = 1f,
+    // جرقه‌ها پیش از پایانِ دور کاملاً محو می‌شوند، پس شروعِ دورِ بعد
+    // دیده نمی‌شود — اینجا `Restart` درست است
     animationSpec = infiniteRepeatable(tween(2800, easing = LinearEasing), RepeatMode.Restart),
     label = "sparkle",
   )
@@ -1038,11 +1056,11 @@ fun VipGate(label: String, content: @Composable () -> Unit) {
 private fun GoldButton(text: String, onClick: () -> Unit) {
   val motion = rememberInfiniteTransition(label = "gold")
   val shine by motion.animateFloat(
-    initialValue = -0.6f,
-    targetValue = 1.6f,
+    initialValue = 0f,
+    targetValue = 1f,
     animationSpec = infiniteRepeatable(
-      tween(if (Motion.enabled) 2400 else 1, delayMillis = 700, easing = LinearEasing),
-      RepeatMode.Restart,
+      tween(if (Motion.enabled) 2400 else 1, easing = EaseInOutSine),
+      RepeatMode.Reverse,
     ),
     label = "goldShine",
   )
