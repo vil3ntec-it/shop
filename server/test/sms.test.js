@@ -156,10 +156,11 @@ test('شکل واقعی EasySendSMS همان‌طور که هست فرستاده
     key: 'APIKEY-XYZ',
     sender: 'Tohid',
     headers: '{"apikey":"{key}","Accept":"application/json"}',
-    body: '{"from":"{sender}","to":"{to}","text":"{message}","type":"1"}',
+    body: '{"from":"{sender}","to":"{to_plain}","text":"{message}","type":"1"}',
   });
 
-  await senders.sms('93790000000', '445566', 'کد ورود توحید: 445566');
+  //  سرور شماره را با + نگه می‌دارد؛ EasySendSMS آن را قبول نمی‌کند
+  await senders.sms('+93790000000', '445566', 'کد ورود توحید: 445566');
 
   const got = seen[0];
   assert.equal(got.headers.apikey, 'APIKEY-XYZ');

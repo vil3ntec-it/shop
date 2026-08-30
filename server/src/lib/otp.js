@@ -37,7 +37,7 @@ function randomCode(digits) {
  * شماره یا متن فارسی آدرس را نشکند.
  */
 function fill(text, vars, encode = false) {
-  return String(text).replace(/\{(to|code|message|sender|key)\}/g, (_, name) => {
+  return String(text).replace(/\{(to_plain|to|code|message|sender|key)\}/g, (_, name) => {
     const value = String(vars[name] ?? '');
     return encode ? encodeURIComponent(value) : value;
   });
@@ -119,7 +119,17 @@ const senders = {
     const cfg = config.sms;
     if (!cfg.url) throw new Error('SMS_API_URL تنظیم نشده است');
 
-    const vars = { to, code, message, sender: cfg.sender, key: cfg.key };
+    //  `{to}` شماره را همان‌طور که هست می‌دهد: `+93790000000`.
+    //  `{to_plain}` بدون `+` و بدون هر چیزِ غیررقم — چند سرویس (از جمله
+    //  EasySendSMS) `+` را قبول نمی‌کنند و شماره را نامعتبر می‌خوانند.
+    const vars = {
+      to,
+      to_plain: String(to).replace(/\D/g, ''),
+      code,
+      message,
+      sender: cfg.sender,
+      key: cfg.key,
+    };
     const url = fill(cfg.url, vars);
 
     const headers = { ...parseJson(cfg.headers, 'SMS_API_HEADERS', vars) };
