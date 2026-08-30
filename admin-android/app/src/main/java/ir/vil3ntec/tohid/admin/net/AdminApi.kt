@@ -138,6 +138,35 @@ class AdminApi(private val baseUrl: String) {
 
   /* ------------------------------ لایهٔ HTTP ------------------------------ */
 
+  companion object {
+    /**
+     *  نشانیِ سرور را تمیز می‌کند و اگر به درد نمی‌خورد، **همان‌جا** و با
+     *  دلیل رد می‌کند.
+     *
+     *  چرا `http://` رد می‌شود: این برنامه توکنِ مدیر را می‌برد و می‌آورد؛
+     *  همان توکنی که با آن می‌شود اشتراکِ هر کسی را عوض کرد. روی خطِ باز،
+     *  هر کسی روی همان وای‌فای می‌تواند برش دارد. اندروید هم جلویش را
+     *  می‌گیرد — ولی با یک خطای شبکهٔ گنگ. پیامِ گنگ یعنی کسی که وسطِ
+     *  بازار ایستاده نمی‌فهمد باید چه کار کند، پس دلیل را همین‌جا می‌گوییم.
+     */
+    fun normalizeBase(raw: String): String {
+      val base = raw.trim().trimEnd('/')
+      if (base.isEmpty()) throw ApiError("آدرس سرور تنظیم نشده است", "no_server", 0)
+      if (base.startsWith("http://")) {
+        throw ApiError(
+          "با http نمی‌شود: توکنِ مدیر روی خطِ باز فرستاده نمی‌شود. " +
+            "در پنل، بخشِ توحید، نشانیِ https را بردارید و همان را بزنید.",
+          "cleartext",
+          0,
+        )
+      }
+      if (!base.startsWith("https://")) {
+        throw ApiError("آدرس سرور باید با https:// شروع شود", "bad_server", 0)
+      }
+      return base
+    }
+  }
+
   private fun enc(s: String) = URLEncoder.encode(s, "UTF-8")
 
   private suspend fun get(path: String, token: String?): JSONObject =
@@ -155,11 +184,7 @@ class AdminApi(private val baseUrl: String) {
     body: JSONObject?,
     token: String?,
   ): JSONObject = withContext(Dispatchers.IO) {
-    val base = baseUrl.trim().trimEnd('/')
-    if (base.isEmpty()) throw ApiError("آدرس سرور تنظیم نشده است", "no_server", 0)
-    if (!base.startsWith("http://") && !base.startsWith("https://")) {
-      throw ApiError("آدرس سرور باید با https:// شروع شود", "bad_server", 0)
-    }
+    val base = normalizeBase(baseUrl)
 
     val connection = try {
       URL(base + path).openConnection() as HttpURLConnection

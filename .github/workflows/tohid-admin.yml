@@ -45,6 +45,12 @@ jobs:
             echo "::warning::secret به نام TOHID_KEYSTORE_B64 تنظیم نشده — فعلاً کلیدِ داخلِ مخزن استفاده می‌شود"
           fi
 
+      # آزمون‌ها پیش از ساخت: نشانیِ سرور تنها چیزی است که کاربر تایپ
+      # می‌کند، و اگر آن را غلط بپذیریم برنامه روی گوشی گنگ می‌ماند.
+      - name: آزمون‌ها
+        working-directory: admin-android
+        run: gradle --no-daemon testDebugUnitTest
+
       - name: ساخت APK
         working-directory: admin-android
         env:
