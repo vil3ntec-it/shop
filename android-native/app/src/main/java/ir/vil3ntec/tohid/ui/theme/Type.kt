@@ -44,10 +44,17 @@ fun shopTypography(scale: Float = 1f) = Typography(
   headlineSmall = style(18, FontWeight.SemiBold, 26, scale),
   titleMedium = style(16, FontWeight.SemiBold, 24, scale),
   titleSmall = style(14, FontWeight.Medium, 20, scale),
-  bodyLarge = style(15, FontWeight.Normal, 24, scale),
-  bodyMedium = style(14, FontWeight.Normal, 22, scale),
-  bodySmall = style(12, FontWeight.Normal, 18, scale),
-  labelLarge = style(14, FontWeight.Medium, 20, scale),
-  labelMedium = style(12, FontWeight.Medium, 16, scale),
-  labelSmall = style(11, FontWeight.Medium, 14, scale),
+  // متن‌های بدنه و برچسب یک درجه پُرتر شدند.
+  //
+  // `Normal` روی سطحِ کم‌رنگِ کارت‌ها نازک می‌افتاد و متنِ کوچک — به‌ویژه
+  // فارسی که خطوطش ظریف است — در تمِ تاریک تقریباً محو می‌شد. یک درجه
+  // بالاتر رفتند، نه بیشتر: `Bold` کردنِ متنِ ریز، خطوط را به هم می‌چسباند
+  // و عرضِ متن را زیاد می‌کند، و آن‌وقت همان چیزی از کادر بیرون می‌زند که
+  // می‌خواستیم خوانا شود.
+  bodyLarge = style(15, FontWeight.Medium, 24, scale),
+  bodyMedium = style(14, FontWeight.Medium, 22, scale),
+  bodySmall = style(12, FontWeight.Medium, 18, scale),
+  labelLarge = style(14, FontWeight.SemiBold, 20, scale),
+  labelMedium = style(12, FontWeight.SemiBold, 16, scale),
+  labelSmall = style(11, FontWeight.SemiBold, 14, scale),
 )

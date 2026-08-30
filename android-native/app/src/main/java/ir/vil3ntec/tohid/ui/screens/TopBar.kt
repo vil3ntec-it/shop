@@ -1,6 +1,16 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import androidx.compose.animation.core.EaseInOutSine
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -46,6 +56,12 @@ import ir.vil3ntec.tohid.ui.theme.ThemeChoice
  *  روی صفحه‌های باریک، ردیفِ دکمه‌ها افقی اسکرول می‌شود تا هیچ‌کدام بریده
  *  نشوند.
  */
+
+/** نارنجیِ هشدار — از تم نمی‌آید چون در تمِ روشن و تاریک باید همین باشد */
+private val ALERT_ORANGE = Color(0xFFF08A24)
+
+/** قهوه‌ایِ تیرهٔ روی طلا — همان که در صفحهٔ اشتراک است */
+private val GOLD_INK = Color(0xFF3A2705)
 
 /** یک هشدارِ زنگ */
 data class Alert(
@@ -132,18 +148,18 @@ fun TohidTopBar(
       horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
       /*
-       *  حساب و اشتراک، کنارِ زنگ.
+       *  سه کلیدِ اولِ سربرگ از هم جدا شده‌اند.
        *
-       *  یک بار به شکلِ دکمه‌های پهنِ متن‌دار اینجا بودند و نامِ صفحه را
-       *  به گوشه می‌راندند؛ یک بار هم کاملاً برداشتمشان و نتیجه‌اش این
-       *  شد که راهی برای ورود یا خریدِ اشتراک نماند. حالا هر دو همان
-       *  کادرِ کوچکِ زنگ را دارند: هم پیدا هستند، هم جا نمی‌گیرند.
+       *  تا حالا هر پنج کلید یک کادرِ خاکستریِ یکسان داشتند و کاربر باید
+       *  آیکنِ ریزشان را می‌خواند تا بفهمد کدام است. حالا هرکدام رنگ و
+       *  شکلِ کارِ خودش را دارد: اشتراک طلایی و با نوشتهٔ VIP، حساب آبی و
+       *  با تپش، و هشدارها نارنجی.
        */
-      BarButton(Icons.Filled.WorkspacePremium, "اشتراک و قیمت‌ها") { onOpen("vip") }
+      VipChip { onOpen("vip") }
 
-      BarButton(Icons.Filled.Person, "حساب", onClick = onAccount)
+      AccountChip(onClick = onAccount)
 
-      BarButton(Icons.Filled.Notifications, "هشدارها", badge = alerts.size) { alertsOpen = true }
+      AlertChip(count = alerts.size) { alertsOpen = true }
 
       BarButton(
         if (theme == ThemeChoice.DARK) Icons.Filled.LightMode else Icons.Filled.DarkMode,
@@ -190,6 +206,135 @@ fun TohidTopBar(
             }
           }
         }
+      }
+    }
+  }
+}
+
+/**
+ *  کلیدِ اشتراک — طلایی، با نوشتهٔ VIP.
+ *
+ *  از بقیه کمی بزرگ‌تر است و به‌جای آیکنِ تنها، خودِ کلمه را می‌نویسد:
+ *  «اشتراک» چیزی است که کاربر باید پیدایش کند، نه چیزی که دنبالش
+ *  بگردد. برقِ روی آن همان برقِ صفحهٔ اشتراک است تا یکی بودنشان
+ *  فهمیده شود.
+ */
+@Composable
+private fun VipChip(onClick: () -> Unit) {
+  val motion = rememberInfiniteTransition(label = "vipChip")
+  val shine by motion.animateFloat(
+    initialValue = 0f,
+    targetValue = 1f,
+    animationSpec = infiniteRepeatable(
+      tween(if (Motion.enabled) 2600 else 1, easing = EaseInOutSine),
+      RepeatMode.Reverse,
+    ),
+    label = "shine",
+  )
+  Row(
+    Modifier
+      .height(36.dp)
+      .clip(RoundedCornerShape(13.dp))
+      .background(
+        Brush.linearGradient(
+          listOf(Color(0xFFFBE08A), Color(0xFFF6C93F), Color(0xFFFFF3C4), Color(0xFFD79A14))
+        )
+      )
+      .drawWithContent {
+        drawContent()
+        if (!Motion.enabled) return@drawWithContent
+        val x = size.width * shine
+        drawRect(
+          brush = Brush.linearGradient(
+            colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.5f), Color.Transparent),
+            start = Offset(x - size.width * 0.35f, 0f),
+            end = Offset(x + size.width * 0.35f, size.height),
+          ),
+          size = size,
+        )
+      }
+      .clickable(onClick = onClick)
+      .padding(horizontal = 10.dp),
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(4.dp),
+  ) {
+    Icon(
+      Icons.Filled.WorkspacePremium,
+      contentDescription = "اشتراک و قیمت‌ها",
+      tint = GOLD_INK,
+      modifier = Modifier.size(15.dp),
+    )
+    Text(
+      "VIP",
+      style = MaterialTheme.typography.labelLarge,
+      color = GOLD_INK,
+      fontWeight = FontWeight.Bold,
+    )
+  }
+}
+
+/** کلیدِ حساب — آبی، با هاله‌ای که نفس می‌کشد */
+@Composable
+private fun AccountChip(onClick: () -> Unit) {
+  val colors = Shop.colors
+  val motion = rememberInfiniteTransition(label = "accountChip")
+  val breathe by motion.animateFloat(
+    initialValue = 0.35f,
+    targetValue = 0.85f,
+    animationSpec = infiniteRepeatable(
+      tween(if (Motion.enabled) 2000 else 1, easing = EaseInOutSine),
+      RepeatMode.Reverse,
+    ),
+    label = "breathe",
+  )
+  Box(
+    Modifier
+      .size(34.dp)
+      .clip(RoundedCornerShape(12.dp))
+      .background(colors.primary.copy(alpha = 0.16f))
+      .border(1.2.dp, colors.primary.copy(alpha = breathe), RoundedCornerShape(12.dp))
+      .clickable(onClick = onClick),
+    contentAlignment = Alignment.Center,
+  ) {
+    Icon(
+      Icons.Filled.Person,
+      contentDescription = "حساب",
+      tint = colors.primary,
+      modifier = Modifier.size(18.dp),
+    )
+  }
+}
+
+/** کلیدِ هشدارها — نارنجی، تا در ردیفِ خاکستری دیده شود */
+@Composable
+private fun AlertChip(count: Int, onClick: () -> Unit) {
+  Box(contentAlignment = Alignment.TopEnd) {
+    Box(
+      Modifier
+        .size(34.dp)
+        .clip(RoundedCornerShape(12.dp))
+        .background(ALERT_ORANGE.copy(alpha = 0.18f))
+        .border(1.2.dp, ALERT_ORANGE.copy(alpha = 0.65f), RoundedCornerShape(12.dp))
+        .clickable(onClick = onClick),
+      contentAlignment = Alignment.Center,
+    ) {
+      Icon(
+        Icons.Filled.Notifications,
+        contentDescription = "هشدارها",
+        tint = ALERT_ORANGE,
+        modifier = Modifier.size(18.dp),
+      )
+    }
+    if (count > 0) {
+      Box(
+        Modifier.size(15.dp).clip(RoundedCornerShape(8.dp)).background(Shop.colors.danger),
+        contentAlignment = Alignment.Center,
+      ) {
+        Text(
+          count.coerceAtMost(9).fa(),
+          style = MaterialTheme.typography.labelSmall,
+          color = Color.White,
+        )
       }
     }
   }

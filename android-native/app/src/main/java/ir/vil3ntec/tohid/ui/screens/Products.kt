@@ -29,6 +29,8 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -164,7 +166,7 @@ fun ProductsScreen(
             compact = tight,
           )
           StatTile(
-            label = "ارزش به قیمت خرید",
+            label = "قیمت خرید",
             value = money(buyValue),
             tint = Shop.colors.warning,
             hint = "افغانی",
@@ -172,7 +174,7 @@ fun ProductsScreen(
             compact = tight,
           )
           StatTile(
-            label = "ارزش به قیمت فروش",
+            label = "قیمت فروش",
             value = money(sellValue),
             hint = "افغانی",
             modifier = Modifier.weight(1f).fillMaxHeight(),
@@ -194,14 +196,10 @@ fun ProductsScreen(
 
       /* ------------------------- جستجو و دسته ------------------------- */
       item {
-        OutlinedTextField(
+        VoiceSearchField(
           value = search,
           onValueChange = { search = it },
-          label = { Text("جستجوی نام، دسته یا بارکد") },
-          leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-          singleLine = true,
-          keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-          modifier = Modifier.fillMaxWidth(),
+          label = "جستجوی نام، دسته یا بارکد",
         )
         if (d.productCategories.isNotEmpty()) {
           Spacer(Modifier.height(10.dp))
@@ -448,28 +446,63 @@ private fun ProductCard(
     }
 
     Spacer(Modifier.height(10.dp))
+    /*
+     *  سه کادرِ خرید، فایده و دسته — هم‌اندازه و کشیده تا کلِ عرضِ کارت.
+     *
+     *  تا حالا هرکدام به‌اندازهٔ متنِ خودش بود و کنارِ هم به یک لبه
+     *  می‌چسبیدند؛ باقیِ ردیف خالی می‌ماند و سه کادرِ ناهم‌قواره،
+     *  کارت را نامرتب نشان می‌داد. حالا با `weight` هر سه یک پهنا
+     *  دارند و متنشان وسط است.
+     */
     Row(
-      Modifier.fillMaxWidth(),
+      Modifier.fillMaxWidth().height(IntrinsicSize.Min),
       horizontalArrangement = Arrangement.spacedBy(8.dp),
       verticalAlignment = Alignment.CenterVertically,
     ) {
-      CardChip("خرید", "${money(product.purchasePrice)}", Shop.colors.muted)
-      CardChip("سود هر واحد", money(profit), if (profit < 0) Shop.colors.danger else Shop.colors.success)
-      if (product.category.isNotBlank()) CardChip("دسته", product.category, Shop.colors.muted)
+      CardChip("خرید", money(product.purchasePrice), Shop.colors.muted, Modifier.weight(1f))
+      CardChip(
+        "فایده",
+        money(profit),
+        if (profit < 0) Shop.colors.danger else Shop.colors.success,
+        Modifier.weight(1f),
+      )
+      CardChip(
+        "دسته",
+        product.category.ifBlank { "—" },
+        Shop.colors.muted,
+        Modifier.weight(1f),
+      )
     }
   }
 }
 
 @Composable
-private fun CardChip(label: String, value: String, tint: Color) {
+private fun CardChip(label: String, value: String, tint: Color, modifier: Modifier = Modifier) {
   Column(
-    Modifier
+    modifier
+      .fillMaxHeight()
       .clip(RoundedCornerShape(Radius.sm))
       .background(Shop.colors.surface2)
-      .padding(horizontal = 10.dp, vertical = 6.dp)
+      .padding(horizontal = 8.dp, vertical = 7.dp),
+    horizontalAlignment = Alignment.CenterHorizontally,
+    verticalArrangement = Arrangement.Center,
   ) {
-    Text(label, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2)
-    Text(value, style = MaterialTheme.typography.labelMedium, color = tint, fontWeight = FontWeight.Bold)
+    Text(
+      label,
+      style = MaterialTheme.typography.labelSmall,
+      color = Shop.colors.muted2,
+      maxLines = 1,
+      textAlign = TextAlign.Center,
+    )
+    Text(
+      value,
+      style = MaterialTheme.typography.labelMedium,
+      color = tint,
+      fontWeight = FontWeight.Bold,
+      maxLines = 1,
+      overflow = TextOverflow.Ellipsis,
+      textAlign = TextAlign.Center,
+    )
   }
 }
 
