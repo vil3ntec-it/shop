@@ -242,27 +242,36 @@ private val RIBBON_BAND = 28.dp
 @Composable
 private fun GoldBadge(text: String) {
   val sweep = goldSweep(period = 2200, delay = 400)
+  // روی گوشی نشان باید در عرضِ یک‌سومِ صفحه بنشیند: نه تاجِ کنارِ متن، نه
+  // فاصلهٔ پهن. «بیشترین صرفه» با آن دو، از کارت بیرون می‌زد.
+  val wide = isTablet()
   Row(
     Modifier
       .clip(RoundedCornerShape(topStart = 11.dp, topEnd = 11.dp, bottomStart = 3.dp, bottomEnd = 3.dp))
       .background(GOLD_SWEEP)
       .goldShine(sweep, strength = 0.55f)
-      .padding(horizontal = 11.dp, vertical = 4.dp),
+      .padding(horizontal = if (wide) 11.dp else 7.dp, vertical = 4.dp),
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(4.dp),
   ) {
-    Icon(
-      Icons.Filled.WorkspacePremium,
-      contentDescription = null,
-      tint = GOLD_INK,
-      modifier = Modifier.size(12.dp),
-    )
+    if (wide) {
+      Icon(
+        Icons.Filled.WorkspacePremium,
+        contentDescription = null,
+        tint = GOLD_INK,
+        modifier = Modifier.size(12.dp),
+      )
+    }
     Text(
       text,
       style = MaterialTheme.typography.labelSmall,
       color = GOLD_INK,
       fontWeight = FontWeight.Bold,
       maxLines = 1,
+      // اگر روی صفحه‌ای خیلی باریک هم جا نشد، کوتاه شود؛ سرریز شدن روی
+      // کارتِ بغلی از سه‌نقطه بدتر است
+      overflow = TextOverflow.Ellipsis,
+      softWrap = false,
     )
   }
 }
@@ -498,35 +507,26 @@ fun VipScreen(onDismiss: () -> Unit) {
       Spacer(Modifier.height(12.dp))
 
       /*
-       *  مدت‌ها: روی صفحهٔ پهن کنارِ هم، روی گوشی زیرِ هم.
+       *  هر سه مدت کنارِ هم، روی گوشی هم.
        *
-       *  سه کارت در عرضِ یک گوشی یعنی هر کدام کمتر از صد نقطه، و آن‌وقت
-       *  «روزی حدود ۱۳٫۹ افغانی» دو خط می‌شود و کارت‌ها ناهم‌قد.
+       *  یک بار روی گوشی زیرِ هم گذاشتمشان چون سه کارت در عرضِ یک گوشی
+       *  یعنی هر کدام حدودِ صد نقطه؛ ولی زیرِ هم بودن، مقایسه را از بین
+       *  می‌برد: کاربر باید اسکرول می‌کرد تا قیمتِ دوم را کنارِ اولی
+       *  به‌یاد بیاورد. جایش خودِ کارت روی صفحهٔ باریک جمع‌وجور می‌شود —
+       *  فاصله‌های کمتر، قلمِ کوچک‌تر و «افغانی» زیرِ عدد نه کنارش.
        */
-      if (isTablet()) {
-        Row(
-          Modifier.height(IntrinsicSize.Min),
-          horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-          PLANS.forEach { plan ->
-            PlanCard(
-              plan = plan,
-              selected = chosenPlan == plan.title,
-              onClick = { chosenPlan = plan.title },
-              modifier = Modifier.weight(1f).fillMaxHeight(),
-              stretch = true,
-            )
-          }
-        }
-      } else {
-        PLANS.forEachIndexed { index, plan ->
+      Row(
+        Modifier.height(IntrinsicSize.Min),
+        horizontalArrangement = Arrangement.spacedBy(if (isTablet()) 10.dp else 7.dp),
+      ) {
+        PLANS.forEach { plan ->
           PlanCard(
             plan = plan,
             selected = chosenPlan == plan.title,
             onClick = { chosenPlan = plan.title },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.weight(1f).fillMaxHeight(),
+            stretch = true,
           )
-          if (index < PLANS.lastIndex) Spacer(Modifier.height(10.dp))
         }
       }
 
@@ -853,12 +853,12 @@ private fun PlanCard(
   onClick: () -> Unit,
   modifier: Modifier = Modifier,
   /**
-   *  آیا این کارت باید تا کفِ ردیف کشیده شود.
+   *  آیا این کارت تا کفِ ردیف کشیده شود.
    *
-   *  فقط در ردیفِ کنارِ همِ تبلت. روی گوشی کارت‌ها زیرِ هم و داخلِ یک
-   *  ستونِ اسکرول‌شونده‌اند، و آنجا بلندیِ در دسترس **بی‌نهایت** است:
-   *  `weight` در چنین ستونی به بچه‌اش صفر بلندی می‌دهد و کارت اصلاً
-   *  دیده نمی‌شود — همان چیزی که روی موبایل شد و فقط نشان‌ها ماندند.
+   *  فقط وقتی درست است که ردیف قدِ معلومی داشته باشد — یعنی
+   *  `Modifier.height(IntrinsicSize.Min)`. در ستونی که بلندیِ در دسترسش
+   *  بی‌نهایت است (هر ستونِ اسکرول‌شونده)، `weight` به بچه‌اش **صفر**
+   *  بلندی می‌دهد و کارت اصلاً دیده نمی‌شود.
    */
   stretch: Boolean = false,
 ) {
@@ -868,6 +868,10 @@ private fun PlanCard(
   val pulse = goldPulse()
   val sweep = goldSweep(period = 3000, delay = if (golden) 500 else 1500)
   val shape = RoundedCornerShape(Radius.md)
+
+  // سه کارت در عرضِ یک گوشی یعنی هر کدام حدودِ صد نقطه؛ با فاصله‌های
+  // تبلت، متن‌ها بریده می‌شوند. پس کارت روی صفحهٔ باریک جمع می‌شود.
+  val wide = isTablet()
 
   Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
     /*
@@ -896,35 +900,43 @@ private fun PlanCard(
           )
         )
         .clickable(onClick = onClick)
-        .padding(14.dp),
+        .padding(horizontal = if (wide) 14.dp else 8.dp, vertical = if (wide) 14.dp else 11.dp),
       horizontalAlignment = Alignment.CenterHorizontally,
     ) {
       Text(
         plan.title,
-        style = MaterialTheme.typography.titleSmall,
+        style = if (wide) MaterialTheme.typography.titleSmall
+        else MaterialTheme.typography.labelLarge,
         color = colors.text,
         fontWeight = FontWeight.Bold,
         maxLines = 1,
+        textAlign = TextAlign.Center,
       )
       Spacer(Modifier.height(6.dp))
-      Row(verticalAlignment = Alignment.Bottom) {
-        Text(
-          plain(plan.price),
-          style = MaterialTheme.typography.titleMedium,
-          color = if (golden) GOLD_DEEP else colors.primary,
-          fontWeight = FontWeight.Bold,
-          maxLines = 1,
-        )
-        Spacer(Modifier.width(4.dp))
-        Text("افغانی", style = MaterialTheme.typography.labelSmall, color = colors.muted)
-      }
+      Text(
+        plain(plan.price),
+        style = if (wide) MaterialTheme.typography.titleMedium
+        else MaterialTheme.typography.titleSmall,
+        color = if (golden) GOLD_DEEP else colors.primary,
+        fontWeight = FontWeight.Bold,
+        maxLines = 1,
+      )
+      // «افغانی» روی گوشی زیرِ عدد می‌رود نه کنارش: کنارِ هم بودنشان،
+      // عرضی می‌خواهد که در یک‌سومِ صفحهٔ گوشی نیست
+      Text(
+        "افغانی",
+        style = MaterialTheme.typography.labelSmall,
+        color = colors.muted,
+        maxLines = 1,
+      )
       Spacer(Modifier.height(4.dp))
       Text(
-        "روزی حدود ${money(perDay)} افغانی",
+        // روی گوشی «حدود» برداشته می‌شود؛ همان عدد را می‌گوید با جای کمتر
+        if (wide) "روزی حدود ${money(perDay)} افغانی" else "روزی ${money(perDay)}",
         style = MaterialTheme.typography.labelSmall,
         color = colors.muted2,
         textAlign = TextAlign.Center,
-        maxLines = 1,
+        maxLines = 2,
         overflow = TextOverflow.Ellipsis,
       )
       Spacer(Modifier.height(10.dp))
@@ -944,17 +956,21 @@ private fun PlanCard(
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
       ) {
-        Icon(
-          Icons.Filled.Check,
-          contentDescription = null,
-          tint = when {
-            selected && golden -> GOLD_INK
-            selected -> colors.primary
-            else -> colors.muted2
-          },
-          modifier = Modifier.size(14.dp),
-        )
-        Spacer(Modifier.width(5.dp))
+        // تیک فقط روی صفحهٔ پهن؛ در کارتِ باریک، همان چند نقطه فرقِ جا
+        // شدن و نشدنِ «انتخاب شد» است
+        if (wide) {
+          Icon(
+            Icons.Filled.Check,
+            contentDescription = null,
+            tint = when {
+              selected && golden -> GOLD_INK
+              selected -> colors.primary
+              else -> colors.muted2
+            },
+            modifier = Modifier.size(14.dp),
+          )
+          Spacer(Modifier.width(5.dp))
+        }
         Text(
           if (selected) "انتخاب شد" else "انتخاب",
           style = MaterialTheme.typography.labelSmall,
