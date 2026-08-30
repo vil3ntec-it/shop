@@ -17,6 +17,12 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.ui.draw.shadow
@@ -85,6 +91,10 @@ import kotlinx.coroutines.launch
  *  و ورود همچنان اختیاری است: «ادامه بدون حساب» همیشه سرِ جایش هست و
  *  تمامِ برنامه بدونِ حساب روی همین گوشی کار می‌کند.
  */
+/** طلای همان صفحهٔ اشتراک — تا ورود و اشتراک یک زبان داشته باشند */
+private val GOLD_GLOW = Color(0xFFF6C93F)
+private val GOLD_RING = Color(0xFFFFE9A8)
+
 @Composable
 fun WelcomeScreen(onDone: () -> Unit) {
   val context = LocalContext.current
@@ -537,12 +547,58 @@ private fun GradientHeader(title: String, subtitle: String) {
       .clip(RoundedCornerShape(bottomStart = 36.dp, bottomEnd = 36.dp))
       .background(colors.surface),
   ) {
-    // چراغِ بالای صفحه، و نورش که رو به پایین محو می‌شود
+    /*
+     *  دو هالهٔ رنگی که آرام در سربرگ می‌چرخند.
+     *
+     *  سربرگِ ساکن، یک بلوکِ تخت است؛ همین حرکتِ کُندِ زیرِ نور است که
+     *  صفحه را زنده نشان می‌دهد بدون اینکه چشم را به خودش بکشد.
+     */
+    val drift = rememberInfiniteTransition(label = "aurora")
+    val flow by drift.animateFloat(
+      initialValue = 0f,
+      targetValue = 1f,
+      animationSpec = infiniteRepeatable(
+        tween(if (Motion.enabled) 9000 else 1, easing = LinearEasing),
+        RepeatMode.Restart,
+      ),
+      label = "flow",
+    )
+    val glow by drift.animateFloat(
+      initialValue = 0.7f,
+      targetValue = 1.15f,
+      animationSpec = infiniteRepeatable(
+        tween(if (Motion.enabled) 2600 else 1, easing = LinearEasing),
+        RepeatMode.Reverse,
+      ),
+      label = "glow",
+    )
+
     Canvas(Modifier.matchParentSize()) {
       val w = size.width
       val h = size.height
       val cx = w / 2f
-      listOf(0.9f to 0.14f, 0.6f to 0.18f, 0.35f to 0.22f).forEach { (spread, alpha) ->
+
+      // هاله‌ها روی یک بیضی می‌چرخند، هرکدام نیم دور جلوتر از آن یکی
+      val angle = flow * 6.2832f
+      listOf(
+        Triple(colors.primary, 0f, 0.55f),
+        Triple(GOLD_GLOW, 3.1416f, 0.42f),
+      ).forEach { (tint, phase, weight) ->
+        val a = angle + phase
+        val center = Offset(cx + kotlin.math.cos(a) * w * 0.26f, h * (0.42f + kotlin.math.sin(a) * 0.18f))
+        val radius = h * 0.72f
+        drawCircle(
+          brush = Brush.radialGradient(
+            colors = listOf(tint.copy(alpha = 0.16f * weight), tint.copy(alpha = 0f)),
+            center = center,
+            radius = radius,
+          ),
+          radius = radius,
+          center = center,
+        )
+      }
+      listOf(0.9f to 0.14f, 0.6f to 0.18f, 0.35f to 0.22f).forEach { (spread, base) ->
+        val alpha = base * glow
         drawCircle(
           brush = Brush.radialGradient(
             colors = listOf(
@@ -563,7 +619,7 @@ private fun GradientHeader(title: String, subtitle: String) {
         brush = Brush.horizontalGradient(
           colorStops = arrayOf(
             0f to colors.primary.copy(alpha = 0f),
-            0.5f to Color.White.copy(alpha = 0.85f),
+            0.5f to Color.White.copy(alpha = (0.85f * glow).coerceAtMost(1f)),
             1f to colors.primary.copy(alpha = 0f),
           ),
           startX = cx - half,
@@ -771,14 +827,51 @@ private fun GradientButton(
   } else {
     Brush.linearGradient(listOf(colors.surface2, colors.surface2))
   }
+  // برقی که روی دکمه می‌لغزد، و فشردنی که دیده می‌شود
+  val motion = rememberInfiniteTransition(label = "cta")
+  val sheen by motion.animateFloat(
+    initialValue = -0.4f,
+    targetValue = 1.4f,
+    animationSpec = infiniteRepeatable(
+      tween(if (Motion.enabled) 2600 else 1, delayMillis = 900, easing = LinearEasing),
+      RepeatMode.Restart,
+    ),
+    label = "sheen",
+  )
+  val interaction = remember { MutableInteractionSource() }
+  val pressed by interaction.collectIsPressedAsState()
+  val scale by animateFloatAsState(
+    targetValue = if (pressed && enabled) 0.97f else 1f,
+    label = "press",
+  )
+
   Box(
     Modifier
       .fillMaxWidth()
       .height(58.dp)
+      .graphicsLayer { scaleX = scale; scaleY = scale }
       .shadow(if (enabled) 10.dp else 0.dp, RoundedCornerShape(29.dp), clip = false)
       .clip(RoundedCornerShape(29.dp))
       .background(brush)
-      .clickable(enabled = enabled && !busy, onClick = onClick),
+      .drawWithContent {
+        drawContent()
+        if (!enabled || !Motion.enabled) return@drawWithContent
+        val x = size.width * sheen
+        drawRect(
+          brush = Brush.linearGradient(
+            colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.28f), Color.Transparent),
+            start = Offset(x - size.width * 0.22f, 0f),
+            end = Offset(x + size.width * 0.22f, size.height),
+          ),
+          size = size,
+        )
+      }
+      .clickable(
+        enabled = enabled && !busy,
+        interactionSource = interaction,
+        indication = null,
+        onClick = onClick,
+      ),
     contentAlignment = Alignment.Center,
   ) {
     if (busy) {
@@ -807,6 +900,17 @@ private fun BrandMark() {
     ),
     label = "glow",
   )
+  // حلقهٔ طلایی که آرام دورِ نشان می‌چرخد
+  val spin by pulse.animateFloat(
+    initialValue = 0f,
+    targetValue = 360f,
+    animationSpec = infiniteRepeatable(
+      tween(if (Motion.enabled) 7000 else 1, easing = LinearEasing),
+      RepeatMode.Restart,
+    ),
+    label = "spin",
+  )
+
   Box(contentAlignment = Alignment.Center) {
     Box(
       Modifier
@@ -815,13 +919,27 @@ private fun BrandMark() {
         .clip(RoundedCornerShape(24.dp))
         .background(colors.primary)
     )
+    Canvas(Modifier.size(78.dp).graphicsLayer { rotationZ = spin }) {
+      // یک کمانِ طلایی، نه یک حلقهٔ کامل: حلقهٔ کامل که بچرخد، دیده
+      // نمی‌شود که می‌چرخد
+      drawArc(
+        brush = Brush.sweepGradient(
+          listOf(Color.Transparent, GOLD_RING, GOLD_GLOW, Color.Transparent, Color.Transparent)
+        ),
+        startAngle = 0f,
+        sweepAngle = 220f,
+        useCenter = false,
+        style = Stroke(width = 2.2.dp.toPx(), cap = StrokeCap.Round),
+        alpha = 0.55f + breathe * 0.35f,
+      )
+    }
     // شیشه: سطحِ نیمه‌شفاف با یک لبهٔ روشن، نه یک مربعِ توپر
     Box(
       Modifier
         .size(54.dp)
         .clip(RoundedCornerShape(19.dp))
         .background(colors.surface2.copy(alpha = 0.75f))
-        .border(1.dp, colors.primary.copy(alpha = 0.45f), RoundedCornerShape(19.dp)),
+        .border(1.dp, GOLD_GLOW.copy(alpha = 0.45f), RoundedCornerShape(19.dp)),
       contentAlignment = Alignment.Center,
     ) {
       Icon(
