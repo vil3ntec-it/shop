@@ -4,8 +4,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -51,8 +49,7 @@ fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
   Column(
     Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)
   ) {
-    Spacer(Modifier.height(16.dp))
-
+    Spacer(Modifier.height(20.dp))
     SectionTitle("وضعیت")
     Panel {
       InfoRow("نسخه", BuildConfig.VERSION_NAME)
