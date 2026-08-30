@@ -102,11 +102,34 @@ import kotlinx.coroutines.launch
  *  صفحهٔ ورودِ برنامه‌های بانکی. رنگِ تمِ برنامه بعد از ورود شروع می‌شود.
  *  در تمِ تاریک، خودِ پس‌زمینه تیره کشیده می‌شود و این‌ها روی آن می‌نشینند.
  */
-private val INK = Color(0xFF17255A)
-private val INK_SOFT = Color(0xFF5C6B90)
+private val INK_LIGHT = Color(0xFF17255A)
+private val INK_SOFT_LIGHT = Color(0xFF5C6B90)
 private val BLUE = Color(0xFF2563C9)
 private val BLUE_DEEP = Color(0xFF1B4FA8)
-private val FIELD_LINE = Color(0xFFE1E8F5)
+private val FIELD_LINE_LIGHT = Color(0xFFE1E8F5)
+
+/*
+ *  متنِ روی پس‌زمینه — نه روی کادرها.
+ *
+ *  اولش این‌ها رنگِ ثابت بودند و در تمِ تاریک همان سرمه‌ایِ تیره روی
+ *  زمینهٔ تیره می‌نشستند: عنوان و «یا» و «ادامه بدون حساب» تقریباً خوانده
+ *  نمی‌شدند. داخلِ کادرها مشکلی نبود چون خودِ کادر سفید است — بیرونشان
+ *  بود که می‌سوخت. حالا از تم می‌آیند.
+ */
+private val ink: Color
+  @Composable get() = if (isDarkSurface()) Color.White else INK_LIGHT
+
+private val inkSoft: Color
+  @Composable get() = if (isDarkSurface()) Shop.colors.muted else INK_SOFT_LIGHT
+
+private val fieldLine: Color
+  @Composable get() = if (isDarkSurface()) Shop.colors.fieldBorder else FIELD_LINE_LIGHT
+
+@Composable
+private fun isDarkSurface(): Boolean {
+  val bg = Shop.colors.bg
+  return (0.299f * bg.red + 0.587f * bg.green + 0.114f * bg.blue) < 0.5f
+}
 
 /** طلای همان صفحهٔ اشتراک — تا ورود و اشتراک یک زبان داشته باشند */
 private val GOLD_GLOW = Color(0xFFF6C93F)
@@ -140,6 +163,21 @@ fun WelcomeScreen(onDone: () -> Unit) {
   var error by remember { mutableStateOf<String?>(null) }
   var note by remember { mutableStateOf<String?>(null) }
   var saved by remember { mutableStateOf(SavedLogins.read(context)) }
+
+  /*
+   *  ورود با گوگل فقط وقتی نشان داده می‌شود که خودِ سرور بگوید روشن است.
+   *
+   *  دکمه‌ای که بخورد به خطا، از نبودنِ دکمه بدتر است. آدرسِ سرور هم مدام
+   *  در حالِ تایپ شدن است، پس کمی صبر می‌کنیم تا دست از تایپ بردارد و بعد
+   *  یک بار می‌پرسیم.
+   */
+  var googleId by remember { mutableStateOf("") }
+  LaunchedEffect(server) {
+    val base = server.trim().trimEnd('/')
+    if (base.isBlank()) { googleId = ""; return@LaunchedEffect }
+    kotlinx.coroutines.delay(700)
+    googleId = runCatching { ServerClient(base).googleClientId() }.getOrDefault("")
+  }
 
   fun fail(e: Throwable) {
     error = (e as? ServerClient.ServerError)?.message ?: "ارتباط با سرور برقرار نشد"
@@ -410,7 +448,7 @@ fun WelcomeScreen(onDone: () -> Unit) {
           Text(
             "حساب نمی‌خواهید؟",
             style = MaterialTheme.typography.labelMedium,
-            color = INK_SOFT,
+            color = inkSoft,
           )
           TextButton(onClick = onDone, contentPadding = PaddingValues(horizontal = 8.dp)) {
             Text(
@@ -428,14 +466,37 @@ fun WelcomeScreen(onDone: () -> Unit) {
           Modifier.fillMaxWidth().padding(horizontal = 30.dp),
           verticalAlignment = Alignment.CenterVertically,
         ) {
-          HorizontalDivider(Modifier.weight(1f), color = FIELD_LINE)
+          HorizontalDivider(Modifier.weight(1f), color = fieldLine)
           Text(
             "یا",
             style = MaterialTheme.typography.labelMedium,
-            color = INK_SOFT,
+            color = inkSoft,
             modifier = Modifier.padding(horizontal = 12.dp),
           )
-          HorizontalDivider(Modifier.weight(1f), color = FIELD_LINE)
+          HorizontalDivider(Modifier.weight(1f), color = fieldLine)
+        }
+
+        // ورود با گوگل — فقط اگر سرور آن را باز کرده باشد
+        if (googleId.isNotBlank()) {
+          Spacer(Modifier.height(14.dp))
+          GoogleButton(enabled = ready && !busy) {
+            busy = true; error = null; note = null
+            val base = server.trim().trimEnd('/')
+            scope.launch {
+              runCatching { ir.vil3ntec.tohid.data.GoogleSignIn.pick(context, googleId) }
+                .onSuccess { account ->
+                  if (account == null) {
+                    // کاربر خودش بست — نه خطا، نه پیام
+                  } else {
+                    runCatching { ServerClient(base).googleLogin(account.idToken) }
+                      .onSuccess { finish(account.email, it) }
+                      .onFailure { fail(it) }
+                  }
+                }
+                .onFailure { error = it.message ?: "ورود با گوگل انجام نشد" }
+              busy = false
+            }
+          }
         }
 
         if (saved.isNotEmpty()) {
@@ -470,14 +531,14 @@ fun WelcomeScreen(onDone: () -> Unit) {
             Icon(
               Icons.Filled.Tune,
               contentDescription = null,
-              tint = INK_SOFT,
+              tint = inkSoft,
               modifier = Modifier.size(15.dp),
             )
             Spacer(Modifier.width(6.dp))
             Text(
               if (showMore) "بستن گزینه‌های بیشتر" else "کد شاگرد و تنظیم سرور",
               style = MaterialTheme.typography.labelMedium,
-              color = INK_SOFT,
+              color = inkSoft,
             )
           }
         }
@@ -591,7 +652,7 @@ private fun GradientHeader(title: String, subtitle: String) {
         title,
         style = if (isTablet()) MaterialTheme.typography.displaySmall
         else MaterialTheme.typography.headlineMedium,
-        color = INK,
+        color = ink,
         fontWeight = FontWeight.Bold,
         textAlign = TextAlign.Center,
       )
@@ -599,7 +660,7 @@ private fun GradientHeader(title: String, subtitle: String) {
       Text(
         subtitle,
         style = MaterialTheme.typography.bodyMedium,
-        color = INK_SOFT,
+        color = inkSoft,
         textAlign = TextAlign.Center,
       )
     }
@@ -621,24 +682,34 @@ private fun ChannelSwitch(channel: String, onPick: (String) -> Unit) {
     label = "channelSlide",
   )
 
+  val face = if (isDarkSurface()) Shop.colors.surface else Color.White
+
+  /*
+   *  بلندیِ کادر از خودِ تب‌ها می‌آید.
+   *
+   *  قرصِ آبی قبلاً بلندیِ خودش را از فاصله‌های داخلی می‌گرفت و کوتاه‌تر
+   *  از ردیف درمی‌آمد — به‌همین دلیل وسطِ کادرِ سفید کوچک و بی‌قواره
+   *  دیده می‌شد. حالا ردیف قد را تعیین می‌کند و قرص تا کفِ همان کشیده
+   *  می‌شود.
+   */
   Box(
     Modifier
       .fillMaxWidth()
+      .height(IntrinsicSize.Min)
       .shadow(6.dp, RoundedCornerShape(30.dp), ambientColor = BLUE, spotColor = BLUE)
       .clip(RoundedCornerShape(30.dp))
-      .background(Color.White)
+      .background(face)
       .padding(5.dp)
   ) {
     // قرصِ آبی، پشتِ متن‌ها، روی نیمهٔ انتخاب‌شده
     Box(
       Modifier
         .fillMaxWidth(0.5f)
-        .align(Alignment.CenterStart)
+        .fillMaxHeight()
         .offsetByFraction(slide)
         .clip(RoundedCornerShape(26.dp))
         .background(Brush.horizontalGradient(listOf(BLUE_DEEP, BLUE)))
-        .padding(vertical = 13.dp)
-    ) {}
+    )
 
     Row(Modifier.fillMaxWidth()) {
       ChannelTab("شماره موبایل", Icons.Filled.PhoneAndroid, phone, Modifier.weight(1f)) {
@@ -674,7 +745,7 @@ private fun ChannelTab(
   onClick: () -> Unit,
 ) {
   val tint by animateColorAsState(
-    targetValue = if (active) Color.White else INK_SOFT,
+    targetValue = if (active) Color.White else inkSoft,
     animationSpec = tween(if (Motion.enabled) 220 else 0),
     label = "tabTint",
   )
@@ -725,7 +796,7 @@ private fun PillField(
   // خطِ دور و سایه هر دو با فوکوس عوض می‌شوند، ولی نرم: پرشِ ناگهانیِ
   // سایه، کادر را می‌پراند
   val line by animateColorAsState(
-    targetValue = if (focused) BLUE else FIELD_LINE,
+    targetValue = if (focused) BLUE else fieldLine,
     animationSpec = tween(if (Motion.enabled) 200 else 0),
     label = "pillLine",
   )
@@ -736,8 +807,8 @@ private fun PillField(
   )
 
   val face = if (dark) colors.surface else Color.White
-  val ink = if (dark) colors.text else INK
-  val hint = if (dark) colors.muted2 else INK_SOFT
+  val fieldInk = if (dark) colors.text else INK_LIGHT
+  val hint = if (dark) colors.muted2 else INK_SOFT_LIGHT
 
   val inner: @Composable () -> Unit = {
     Row(
@@ -773,7 +844,7 @@ private fun PillField(
           keyboardOptions = keyboardOptions,
           visualTransformation = visual,
           textStyle = MaterialTheme.typography.bodyMedium.copy(
-            color = if (enabled) ink else hint,
+            color = if (enabled) fieldInk else hint,
           ),
           cursorBrush = SolidColor(BLUE),
           modifier = Modifier.fillMaxWidth(),
@@ -825,6 +896,8 @@ private fun GradientButton(
 
   val shape = RoundedCornerShape(30.dp)
   val live = enabled && !busy
+  // دکمهٔ غیرفعال هم باید در تمِ تاریک دیده شود، نه اینکه در زمینه گم شود
+  val disabledFace = if (isDarkSurface()) Shop.colors.surface2 else FIELD_LINE_LIGHT
 
   Box(
     Modifier
@@ -841,7 +914,7 @@ private fun GradientButton(
       .clip(shape)
       .background(
         if (live) Brush.horizontalGradient(listOf(BLUE_DEEP, BLUE, Color(0xFF3C7DE0)))
-        else Brush.horizontalGradient(listOf(FIELD_LINE, FIELD_LINE))
+        else Brush.horizontalGradient(listOf(disabledFace, disabledFace))
       )
       .clickable(
         enabled = live,
@@ -857,10 +930,85 @@ private fun GradientButton(
       Text(
         text,
         style = MaterialTheme.typography.titleMedium,
-        color = if (live) Color.White else INK_SOFT,
+        color = if (live) Color.White else inkSoft,
         fontWeight = FontWeight.Bold,
       )
     }
+  }
+}
+
+/**
+ *  دکمهٔ «ورود با گوگل».
+ *
+ *  سفید و کم‌رنگ است، نه آبیِ پررنگ: راهِ اصلی همان شماره و ایمیل بالاست
+ *  و این یکی نباید از آن بلندتر حرف بزند.
+ */
+@Composable
+private fun GoogleButton(enabled: Boolean, onClick: () -> Unit) {
+  val interaction = remember { MutableInteractionSource() }
+  val pressed by interaction.collectIsPressedAsState()
+  val scale by animateFloatAsState(
+    targetValue = if (pressed && enabled) 0.975f else 1f,
+    animationSpec = tween(if (Motion.enabled) 120 else 0, easing = FastOutSlowInEasing),
+    label = "googlePress",
+  )
+  val shape = RoundedCornerShape(28.dp)
+  val face = if (isDarkSurface()) Shop.colors.surface else Color.White
+
+  Row(
+    Modifier
+      .fillMaxWidth()
+      .height(54.dp)
+      .graphicsLayer { scaleX = scale; scaleY = scale }
+      .shadow(if (enabled) 6.dp else 0.dp, shape, clip = false, ambientColor = BLUE, spotColor = BLUE)
+      .clip(shape)
+      .background(face)
+      .border(1.dp, fieldLine, shape)
+      .clickable(
+        enabled = enabled,
+        interactionSource = interaction,
+        indication = null,
+        onClick = onClick,
+      )
+      .alpha(if (enabled) 1f else 0.5f),
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.Center,
+  ) {
+    GoogleMark()
+    Spacer(Modifier.width(10.dp))
+    Text(
+      "ورود با حساب گوگل",
+      style = MaterialTheme.typography.titleSmall,
+      color = ink,
+      fontWeight = FontWeight.Bold,
+    )
+  }
+}
+
+/** نشانِ گوگل — کشیده می‌شود، نه اینکه تصویری کنارِ برنامه حمل شود */
+@Composable
+private fun GoogleMark() {
+  Canvas(Modifier.size(21.dp)) {
+    val thickness = size.minDimension * 0.23f
+    val inset = thickness / 2f
+    val corner = Offset(inset, inset)
+    val ring = Size(size.width - thickness, size.height - thickness)
+    val pen = Stroke(width = thickness, cap = StrokeCap.Butt)
+
+    // چهار کمانِ رنگی: راست آبی، پایین سبز، چپ زرد، بالا قرمز
+    drawArc(Color(0xFF4285F4), -32f, 92f, false, corner, ring, style = pen)
+    drawArc(Color(0xFF34A853), 62f, 88f, false, corner, ring, style = pen)
+    drawArc(Color(0xFFFBBC05), 152f, 82f, false, corner, ring, style = pen)
+    drawArc(Color(0xFFEA4335), 236f, 88f, false, corner, ring, style = pen)
+
+    // خطِ افقیِ وسطِ حرفِ G
+    drawLine(
+      color = Color(0xFF4285F4),
+      start = Offset(size.width * 0.52f, size.height * 0.5f),
+      end = Offset(size.width * 0.98f, size.height * 0.5f),
+      strokeWidth = thickness,
+      cap = StrokeCap.Butt,
+    )
   }
 }
 

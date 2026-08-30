@@ -87,6 +87,30 @@ class ServerClient(private val baseUrl: String) {
     )
   }
 
+  /**
+   *  ورود با گوگل.
+   *
+   *  خودِ برنامه هیچ‌چیزی از گوگل را نمی‌سنجد؛ فقط توکنی را که گوشی داده
+   *  دست به دست به سرورِ خودِ کاربر می‌دهد و سرور آن را با کلیدِ گوگل
+   *  می‌سنجد. پس کلیدِ محرمانه‌ای داخلِ برنامه نیست که لو برود.
+   */
+  suspend fun googleLogin(idToken: String): Session =
+    session(post("/api/v1/auth/google", buildJsonObject { put("idToken", JsonPrimitive(idToken)) }))
+
+  /* ------------------------------ تنظیماتِ سرور ------------------------------ */
+
+  /**
+   *  سرور خودش می‌گوید کدام راهِ ورود روی آن باز است.
+   *
+   *  اینجوری اگر مدیرِ سرور ورود با گوگل را روشن یا خاموش کرد، لازم نیست
+   *  نسخهٔ تازه‌ای از برنامه ساخته شود.
+   */
+  suspend fun config(): JsonObject = get("/api/v1/config")
+
+  /** اگر خالی برگردد یعنی ورود با گوگل روی این سرور راه نیفتاده است */
+  suspend fun googleClientId(): String =
+    runCatching { config()["googleClientId"]?.jsonPrimitive?.content.orEmpty() }.getOrDefault("")
+
   suspend fun refresh(refreshToken: String): String =
     post("/api/v1/auth/refresh", buildJsonObject { put("refreshToken", JsonPrimitive(refreshToken)) })["accessToken"]
       ?.jsonPrimitive?.content ?: throw ServerError("توکن تازه نشد", "bad_response")
@@ -217,6 +241,19 @@ class ServerClient(private val baseUrl: String) {
   suspend fun health(): JsonObject = get("/api/v1/health")
 
   /* ------------------------------ لایهٔ HTTP ------------------------------ */
+
+  /** پاسخِ ورود همه‌جا یک شکل است — یک بار خوانده می‌شود */
+  private fun session(body: JsonObject): Session {
+    val access = body["accessToken"]?.jsonPrimitive?.content
+      ?: throw ServerError("سرور توکن نداد", "bad_response")
+    val user = body["user"]?.jsonObject
+    return Session(
+      accessToken = access,
+      refreshToken = body["refreshToken"]?.jsonPrimitive?.content,
+      userId = user?.get("id")?.jsonPrimitive?.content.orEmpty(),
+      name = user?.get("name")?.jsonPrimitive?.content.orEmpty(),
+    )
+  }
 
   private suspend fun get(path: String, token: String? = null): JsonObject =
     request("GET", path, null, token)
