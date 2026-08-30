@@ -35,6 +35,27 @@ class Session(context: Context) {
     get() = prefs.getString(SERVER, "") ?: ""
     set(v) = prefs.edit().putString(SERVER, v.trim().trimEnd('/')).apply()
 
+  /**
+   *  نشانیِ سرور از بیرونِ خانه — خودِ سرور آن را می‌دهد، کاربر تایپش
+   *  نمی‌کند. وقتی در خانه‌اید و با آی‌پیِ داخلی وصل‌اید، برنامه این را
+   *  می‌گیرد و کنار می‌گذارد؛ بیرون از خانه که آی‌پیِ داخلی جواب نمی‌دهد،
+   *  خودش سراغِ همین می‌رود.
+   */
+  var remoteUrl: String
+    get() = prefs.getString(REMOTE, "") ?: ""
+    set(v) = prefs.edit().putString(REMOTE, v.trim().trimEnd('/')).apply()
+
+  /**
+   *  کدام نشانی دفعهٔ پیش جواب داد.
+   *
+   *  بدونِ این، هر بار اولی امتحان می‌شود و بیرون از خانه هر درخواست باید
+   *  اول منتظرِ تمام شدنِ مهلتِ آی‌پیِ داخلی بماند — یعنی هر صفحه چند ثانیه
+   *  دیرتر باز می‌شود.
+   */
+  var lastGoodUrl: String
+    get() = prefs.getString(LAST_GOOD, "") ?: ""
+    set(v) = prefs.edit().putString(LAST_GOOD, v.trim().trimEnd('/')).apply()
+
   var token: String?
     get() = prefs.getString(TOKEN, null)
     set(v) = prefs.edit().putString(TOKEN, v).apply()
@@ -60,6 +81,8 @@ class Session(context: Context) {
 
   private companion object {
     const val SERVER = "server_url"
+    const val REMOTE = "remote_url"
+    const val LAST_GOOD = "last_good_url"
     const val TOKEN = "admin_token"
     const val NAME = "admin_name"
     const val ROLE = "admin_role"

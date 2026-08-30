@@ -35,7 +35,7 @@ fun AuditScreen(session: Session) {
     val token = session.token ?: return
     busy = true
     scope.launch {
-      runCatching { AdminApi(session.serverUrl).audit(token) }
+      runCatching { AdminApi(session).audit(token) }
         .onSuccess { rows = it; error = null }
         .onFailure { error = (it as? AdminApi.ApiError)?.message ?: "خوانده نشد" }
       busy = false

@@ -83,7 +83,7 @@ fun LoginScreen(session: Session, onIn: () -> Unit) {
           Field(
             value = server,
             onValueChange = { server = it; error = null },
-            label = "آدرس سرور — https://…",
+            label = "آدرس سرور — مثلا http://192.168.0.101:4700",
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
           )
           Spacer(Modifier.height(12.dp))
@@ -126,6 +126,11 @@ fun LoginScreen(session: Session, onIn: () -> Unit) {
               runCatching { AdminApi(base).login(username.trim(), password) }
                 .onSuccess {
                   session.serverUrl = base
+                  session.lastGoodUrl = base
+                  // سرور خودش می‌گوید از بیرونِ خانه کجاست؛ نگهش می‌داریم
+                  // تا وقتی صاحبش از خانه دور شد، برنامه بی‌اینکه چیزی
+                  // پرسیده شود سراغِ همان برود.
+                  if (it.remoteUrl.isNotBlank()) session.remoteUrl = it.remoteUrl
                   session.token = it.token
                   session.adminName = it.name
                   session.role = it.role

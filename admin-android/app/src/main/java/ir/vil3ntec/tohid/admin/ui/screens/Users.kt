@@ -44,7 +44,7 @@ fun UsersScreen(session: Session) {
     val token = session.token ?: return@LaunchedEffect
     delay(350)
     busy = true
-    runCatching { AdminApi(session.serverUrl).users(token, query.trim()) }
+    runCatching { AdminApi(session).users(token, query.trim()) }
       .onSuccess { rows = it; error = null }
       .onFailure { error = (it as? AdminApi.ApiError)?.message ?: "فهرست خوانده نشد" }
     busy = false
@@ -116,7 +116,7 @@ private fun UserSheet(session: Session, userId: String, onBack: () -> Unit) {
     val token = session.token ?: return
     busy = true
     scope.launch {
-      runCatching { AdminApi(session.serverUrl).user(token, userId) }
+      runCatching { AdminApi(session).user(token, userId) }
         .onSuccess { data = it; error = null }
         .onFailure { error = (it as? AdminApi.ApiError)?.message ?: "خوانده نشد" }
       busy = false
@@ -206,7 +206,7 @@ private fun UserSheet(session: Session, userId: String, onBack: () -> Unit) {
       busy = true
       scope.launch {
         val next = if (status == "active") "disabled" else "active"
-        runCatching { AdminApi(session.serverUrl).setUserStatus(token, userId, next) }
+        runCatching { AdminApi(session).setUserStatus(token, userId, next) }
           .onSuccess { load() }
           .onFailure { error = (it as? AdminApi.ApiError)?.message ?: "انجام نشد"; busy = false }
       }

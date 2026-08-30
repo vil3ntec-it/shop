@@ -67,7 +67,7 @@ fun AdminRoot() {
             IconButton(onClick = {
               val token = session.token
               scope.launch {
-                if (token != null) runCatching { AdminApi(session.serverUrl).logout(token) }
+                if (token != null) runCatching { AdminApi(session).logout(token) }
                 session.signOut()
                 signedIn = false
               }

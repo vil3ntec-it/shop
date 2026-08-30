@@ -19,11 +19,33 @@ import java.net.URLEncoder
  *  عمداً کتابخانهٔ شبکه‌ای اضافه نشده: `HttpURLConnection` و `org.json`
  *  هر دو داخلِ خودِ اندروید هستند و این برنامه کارِ سنگینی نمی‌کند.
  */
-class AdminApi(private val baseUrl: String) {
+class AdminApi private constructor(
+  private val session: Session?,
+  private val fixedUrl: String?,
+) {
+
+  /** موقعِ ورود، هنوز نشستی نیست — فقط همان نشانی که کاربر زد */
+  constructor(baseUrl: String) : this(null, baseUrl)
+
+  /**
+   *  بعد از ورود: برنامه چند نشانی می‌شناسد و خودش امتحان می‌کند.
+   *
+   *  در خانه آی‌پیِ داخلی جواب می‌دهد، بیرون از خانه نشانیِ تونل. کاربر
+   *  نباید هر بار که از در بیرون می‌رود نشانی عوض کند — این کارِ برنامه است.
+   */
+  constructor(session: Session) : this(session, null)
+
 
   class ApiError(message: String, val code: String, val status: Int) : Exception(message)
 
-  data class Login(val token: String, val name: String, val role: String, val expiresAt: Long)
+  data class Login(
+    val token: String,
+    val name: String,
+    val role: String,
+    val expiresAt: Long,
+    /** نشانیِ همین سرور از بیرونِ خانه — خالی اگر تونل روشن نباشد */
+    val remoteUrl: String,
+  )
 
   /* ------------------------------ ورود ------------------------------ */
 
@@ -35,6 +57,7 @@ class AdminApi(private val baseUrl: String) {
       name = admin?.optString("name").orEmpty(),
       role = admin?.optString("role").orEmpty(),
       expiresAt = body.optLong("expiresAt"),
+      remoteUrl = body.optString("remoteUrl").takeIf { it.startsWith("http") }.orEmpty(),
     )
   }
 
@@ -140,28 +163,63 @@ class AdminApi(private val baseUrl: String) {
 
   companion object {
     /**
+     *  نشانیِ خانگی: آی‌پیِ شبکهٔ داخلی یا خودِ همین دستگاه.
+     *
+     *  محدوده‌ها همان‌هایی است که هیچ‌وقت روی اینترنت مسیر ندارند:
+     *  ۱۰.x، ۱۷۲.۱۶ تا ۱۷۲.۳۱، ۱۹۲.۱۶۸.x، ۱۶۹.۲۵۴.x و لوکال‌هاست.
+     *  نامِ بدونِ نقطه (مثل «server») هم فقط داخلِ همان شبکه معنی دارد.
+     */
+    fun isHomeAddress(host: String): Boolean {
+      val h = host.lowercase().substringBefore(':').trim('[', ']')
+      if (h == "localhost" || h == "::1" || h.startsWith("127.")) return true
+      if (h.endsWith(".local") || h.endsWith(".lan") || h.endsWith(".home") || h.endsWith(".internal")) return true
+      if (!h.contains('.')) return h.isNotEmpty() && !h.contains(':')
+
+      val parts = h.split('.')
+      if (parts.size != 4 || parts.any { it.toIntOrNull() == null }) return false
+      val (a, b) = parts[0].toInt() to parts[1].toInt()
+      return when {
+        a == 10 -> true
+        a == 172 && b in 16..31 -> true
+        a == 192 && b == 168 -> true
+        a == 169 && b == 254 -> true
+        else -> false
+      }
+    }
+
+    /**
      *  نشانیِ سرور را تمیز می‌کند و اگر به درد نمی‌خورد، **همان‌جا** و با
      *  دلیل رد می‌کند.
      *
-     *  چرا `http://` رد می‌شود: این برنامه توکنِ مدیر را می‌برد و می‌آورد؛
-     *  همان توکنی که با آن می‌شود اشتراکِ هر کسی را عوض کرد. روی خطِ باز،
-     *  هر کسی روی همان وای‌فای می‌تواند برش دارد. اندروید هم جلویش را
-     *  می‌گیرد — ولی با یک خطای شبکهٔ گنگ. پیامِ گنگ یعنی کسی که وسطِ
-     *  بازار ایستاده نمی‌فهمد باید چه کار کند، پس دلیل را همین‌جا می‌گوییم.
+     *  دربارهٔ `http://`: این برنامه توکنِ مدیر را می‌برد و می‌آورد؛ همان
+     *  توکنی که با آن می‌شود اشتراکِ هر کسی را عوض کرد. روی اینترنت این را
+     *  روی خطِ باز فرستادن یعنی هر کسی سرِ راه می‌تواند برش دارد — پس آنجا
+     *  رد می‌شود.
+     *
+     *  ولی سرورِ خانگی روی ۱۹۲.۱۶۸.x است و https ندارد و قرار هم نیست
+     *  داشته باشد: گواهیِ معتبر برای یک آی‌پیِ داخلی صادر نمی‌شود. سخت‌گیری
+     *  آنجا از کسی محافظت نمی‌کرد، فقط برنامه را در خانهٔ صاحبش بی‌مصرف
+     *  می‌کرد. پس http برای نشانیِ خانگی باز است و برای بقیه بسته.
      */
     fun normalizeBase(raw: String): String {
       val base = raw.trim().trimEnd('/')
       if (base.isEmpty()) throw ApiError("آدرس سرور تنظیم نشده است", "no_server", 0)
+
       if (base.startsWith("http://")) {
-        throw ApiError(
-          "با http نمی‌شود: توکنِ مدیر روی خطِ باز فرستاده نمی‌شود. " +
-            "در پنل، بخشِ توحید، نشانیِ https را بردارید و همان را بزنید.",
-          "cleartext",
-          0,
-        )
+        val host = base.removePrefix("http://").substringBefore('/')
+        if (!isHomeAddress(host)) {
+          throw ApiError(
+            "با http فقط به سرورِ داخلِ خانه می‌شود وصل شد. برای بیرون از خانه، " +
+              "در پنل بخشِ توحید نشانیِ https را بردارید و همان را بزنید.",
+            "cleartext",
+            0,
+          )
+        }
+        return base
       }
+
       if (!base.startsWith("https://")) {
-        throw ApiError("آدرس سرور باید با https:// شروع شود", "bad_server", 0)
+        throw ApiError("آدرس سرور باید با http:// یا https:// شروع شود", "bad_server", 0)
       }
       return base
     }
@@ -178,14 +236,60 @@ class AdminApi(private val baseUrl: String) {
   private suspend fun put(path: String, body: JSONObject, token: String?): JSONObject =
     request("PUT", path, body, token)
 
+  /** آنچه هست، به ترتیبی که امتحان می‌شود: آخرین نشانیِ موفق، اول */
+  private fun candidates(): List<String> {
+    if (fixedUrl != null) return listOf(fixedUrl)
+    val s = session ?: return emptyList()
+    return listOf(s.lastGoodUrl, s.serverUrl, s.remoteUrl)
+      .map { it.trim().trimEnd('/') }
+      .filter { it.isNotEmpty() }
+      .distinct()
+  }
+
+  /**
+   *  یک درخواست، روی هر نشانی‌ای که در دسترس باشد.
+   *
+   *  فقط وقتی سراغِ نشانیِ بعدی می‌رود که **نرسیده باشیم** — نه وقتی سرور
+   *  جواب داده و جوابش خطا بوده. رمزِ غلط روی نشانیِ اول، رمزِ غلط است؛
+   *  امتحانش روی نشانیِ دوم فقط یک تلاشِ ناموفقِ دیگر روی همان حساب است.
+   */
   private suspend fun request(
     method: String,
     path: String,
     body: JSONObject?,
     token: String?,
-  ): JSONObject = withContext(Dispatchers.IO) {
-    val base = normalizeBase(baseUrl)
+  ): JSONObject {
+    val bases = candidates()
+    if (bases.isEmpty()) throw ApiError("آدرس سرور تنظیم نشده است", "no_server", 0)
 
+    var last: ApiError? = null
+    for (raw in bases) {
+      val base = try {
+        normalizeBase(raw)
+      } catch (e: ApiError) {
+        last = e
+        continue
+      }
+      try {
+        val answer = send(method, base, path, body, token)
+        session?.lastGoodUrl = base
+        return answer
+      } catch (e: ApiError) {
+        // سرور جواب داده — همین جواب است، جای دیگری را نگرد
+        if (e.status != 0) throw e
+        last = e
+      }
+    }
+    throw last ?: ApiError("به سرور نرسیدیم — نت یا آدرس را بررسی کنید", "network", 0)
+  }
+
+  private suspend fun send(
+    method: String,
+    base: String,
+    path: String,
+    body: JSONObject?,
+    token: String?,
+  ): JSONObject = withContext(Dispatchers.IO) {
     val connection = try {
       URL(base + path).openConnection() as HttpURLConnection
     } catch (e: Exception) {

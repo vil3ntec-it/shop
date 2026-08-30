@@ -40,9 +40,16 @@ fun DashboardScreen(session: Session) {
     val token = session.token ?: return
     busy = true
     scope.launch {
-      val api = AdminApi(session.serverUrl)
+      val api = AdminApi(session)
       runCatching { api.stats(token) }
-        .onSuccess { stats = it; error = null }
+        .onSuccess {
+          stats = it
+          error = null
+          // نشانیِ تونل با هر بار روشن شدنِ سرور عوض می‌شود؛ هر بار که
+          // اینجا می‌رسیم تازه‌اش را برمی‌داریم تا وقتی بیرون رفتیم کهنه نباشد
+          val remote = it.optString("remoteUrl")
+          if (remote.startsWith("http")) session.remoteUrl = remote
+        }
         .onFailure { error = (it as? AdminApi.ApiError)?.message ?: "خوانده نشد" }
       serverUp = runCatching { api.health() }.isSuccess
       busy = false

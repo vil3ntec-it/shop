@@ -36,14 +36,45 @@ class AdminApiTest {
     assertEquals("no_server", errorFor("   ").code)
   }
 
-  @Test fun `http رد می‌شود و دلیلش گفته می‌شود`() {
-    val e = errorFor("http://192.168.1.5:8080")
-    assertEquals("cleartext", e.code)
-    assertTrue("پیام باید بگوید چه کار کند: ${e.message}", e.message!!.contains("https"))
-  }
-
   @Test fun `نشانیِ بدونِ پروتکل رد می‌شود`() {
     assertEquals("bad_server", errorFor("192.168.1.5:8080").code)
+  }
+
+  /*
+   *  سرورِ خانگی https ندارد و قرار هم نیست داشته باشد — برای آی‌پیِ
+   *  داخلی گواهی صادر نمی‌شود. پس http در خانه باز است و بیرون از خانه بسته.
+   */
+  @Test fun `http به سرورِ خانگی می‌رسد`() {
+    assertEquals("http://192.168.0.101:4700", AdminApi.normalizeBase("http://192.168.0.101:4700"))
+    assertEquals("http://10.0.0.8:4700", AdminApi.normalizeBase("http://10.0.0.8:4700/"))
+    assertEquals("http://172.16.5.4:80", AdminApi.normalizeBase("http://172.16.5.4:80"))
+    assertEquals("http://127.0.0.1:4700", AdminApi.normalizeBase("http://127.0.0.1:4700"))
+    assertEquals("http://server.local", AdminApi.normalizeBase("http://server.local"))
+  }
+
+  @Test fun `http به نشانیِ اینترنتی رد می‌شود`() {
+    val e = errorFor("http://tohid.example.com")
+    assertEquals("cleartext", e.code)
+    assertTrue("پیام باید راهِ درست را بگوید: ${e.message}", e.message!!.contains("https"))
+    assertEquals("cleartext", errorFor("http://8.8.8.8").code)
+    // ۱۷۲.۳۲ دیگر خصوصی نیست، هرچند شبیهش است
+    assertEquals("cleartext", errorFor("http://172.32.0.1").code)
+  }
+
+  @Test fun `https همه جا باز است`() {
+    assertEquals("https://x.trycloudflare.com", AdminApi.normalizeBase("https://x.trycloudflare.com/"))
+    assertEquals("https://192.168.0.101", AdminApi.normalizeBase("https://192.168.0.101"))
+  }
+
+  @Test fun `مرزهای شبکهٔ خصوصی`() {
+    assertTrue(AdminApi.isHomeAddress("192.168.255.255"))
+    assertTrue(AdminApi.isHomeAddress("172.31.0.1"))
+    assertTrue(AdminApi.isHomeAddress("169.254.1.1"))
+    assertTrue(AdminApi.isHomeAddress("localhost"))
+    assertTrue(AdminApi.isHomeAddress("box"))
+    assertTrue(!AdminApi.isHomeAddress("172.15.0.1"))
+    assertTrue(!AdminApi.isHomeAddress("11.0.0.1"))
+    assertTrue(!AdminApi.isHomeAddress("example.com"))
   }
 
   @Test fun `پورت و مسیر روی https می‌ماند`() {

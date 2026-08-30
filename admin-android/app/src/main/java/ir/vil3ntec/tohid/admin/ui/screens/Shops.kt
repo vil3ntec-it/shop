@@ -48,7 +48,7 @@ fun ShopsScreen(session: Session) {
     val token = session.token ?: return@LaunchedEffect
     delay(350)
     busy = true
-    runCatching { AdminApi(session.serverUrl).shops(token, query.trim()) }
+    runCatching { AdminApi(session).shops(token, query.trim()) }
       .onSuccess { rows = it; error = null }
       .onFailure { error = (it as? AdminApi.ApiError)?.message ?: "فهرست خوانده نشد" }
     busy = false
@@ -130,7 +130,7 @@ private fun ShopSheet(session: Session, shopId: String, onBack: () -> Unit) {
     val token = session.token ?: return
     busy = true
     scope.launch {
-      val api = AdminApi(session.serverUrl)
+      val api = AdminApi(session)
       runCatching { api.shop(token, shopId) }
         .onSuccess { data = it; error = null }
         .onFailure { error = (it as? AdminApi.ApiError)?.message ?: "خوانده نشد" }
@@ -154,7 +154,7 @@ private fun ShopSheet(session: Session, shopId: String, onBack: () -> Unit) {
         val token = session.token ?: return@GrantSheet
         busy = true
         scope.launch {
-          runCatching { AdminApi(session.serverUrl).grant(token, shopId, plan, days, note) }
+          runCatching { AdminApi(session).grant(token, shopId, plan, days, note) }
             .onSuccess { granting = false; done = "اشتراک ثبت شد"; load() }
             .onFailure { error = (it as? AdminApi.ApiError)?.message ?: "ثبت نشد"; busy = false }
         }
@@ -241,7 +241,7 @@ private fun ShopSheet(session: Session, shopId: String, onBack: () -> Unit) {
           busy = true
           scope.launch {
             runCatching {
-              AdminApi(session.serverUrl).setSubscriptionStatus(token, subId, if (suspended) "active" else "suspended")
+              AdminApi(session).setSubscriptionStatus(token, subId, if (suspended) "active" else "suspended")
             }.onSuccess { done = "وضعیت عوض شد"; load() }
               .onFailure { error = (it as? AdminApi.ApiError)?.message ?: "انجام نشد"; busy = false }
           }
@@ -250,7 +250,7 @@ private fun ShopSheet(session: Session, shopId: String, onBack: () -> Unit) {
           val token = session.token ?: return@GhostButton
           busy = true
           scope.launch {
-            runCatching { AdminApi(session.serverUrl).setSubscriptionStatus(token, subId, "cancelled") }
+            runCatching { AdminApi(session).setSubscriptionStatus(token, subId, "cancelled") }
               .onSuccess { done = "اشتراک لغو شد"; load() }
               .onFailure { error = (it as? AdminApi.ApiError)?.message ?: "انجام نشد"; busy = false }
           }
