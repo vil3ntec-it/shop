@@ -35,7 +35,7 @@ import kotlinx.coroutines.launch
  *  نوارِ پایین جا نمی‌شوند.
  */
 @Composable
-fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit, onAccount: () -> Unit) {
+fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
   val prefs = remember { context.getSharedPreferences("tohid", android.content.Context.MODE_PRIVATE) }
@@ -53,32 +53,6 @@ fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit, onAccoun
   ) {
     Spacer(Modifier.height(16.dp))
 
-    /*
-     *  حساب و اشتراک اینجا هستند.
-     *
-     *  از سربرگ برداشته شدند چون در هر صفحه دو تا از پهن‌ترین چیزهای
-     *  نوار بودند و نام صفحه را به گوشه می‌راندند. ولی برداشتن یعنی
-     *  ناپیدا شدن، و کاربر راهی برای ورود یا خریدِ اشتراک نداشت — پس
-     *  همین‌جا، جایی که بقیهٔ بخش‌ها هم هستند.
-     */
-    Panel {
-      MoreCard(
-        title = "ورود به حساب",
-        icon = Icons.Filled.Person,
-        tint = Shop.colors.primary,
-        subtitle = "برای همگام‌سازی بین گوشی‌ها و اشتراک",
-        onClick = onAccount,
-      )
-      MoreCard(
-        title = "اشتراک و قیمت‌ها",
-        icon = Icons.Filled.WorkspacePremium,
-        tint = Shop.colors.warning,
-        subtitle = "پلن‌ها، مدت و راه خرید",
-        onClick = { onOpen("vip") },
-      )
-    }
-
-    Spacer(Modifier.height(20.dp))
     SectionTitle("وضعیت")
     Panel {
       InfoRow("نسخه", BuildConfig.VERSION_NAME)

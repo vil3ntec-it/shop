@@ -14,6 +14,8 @@ import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -99,6 +101,7 @@ fun TohidTopBar(
   theme: ThemeChoice,
   onTheme: (ThemeChoice) -> Unit,
   onSettings: () -> Unit,
+  onAccount: () -> Unit,
   onOpen: (String) -> Unit,
 ) {
   val context = LocalContext.current
@@ -129,12 +132,17 @@ fun TohidTopBar(
       horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
       /*
-       *  نشانِ اشتراک و دکمهٔ حساب از سربرگ برداشته شدند.
+       *  حساب و اشتراک، کنارِ زنگ.
        *
-       *  در هر صفحه، دو تا از پهن‌ترین چیزهای سربرگ بودند و نامِ صفحه را
-       *  به گوشه می‌راندند؛ روی گوشی جا برای هیچ‌چیزِ دیگر نمی‌ماند. هر
-       *  دو سرِ جای خودشان هستند: «بیشتر ← تنظیمات».
+       *  یک بار به شکلِ دکمه‌های پهنِ متن‌دار اینجا بودند و نامِ صفحه را
+       *  به گوشه می‌راندند؛ یک بار هم کاملاً برداشتمشان و نتیجه‌اش این
+       *  شد که راهی برای ورود یا خریدِ اشتراک نماند. حالا هر دو همان
+       *  کادرِ کوچکِ زنگ را دارند: هم پیدا هستند، هم جا نمی‌گیرند.
        */
+      BarButton(Icons.Filled.WorkspacePremium, "اشتراک و قیمت‌ها") { onOpen("vip") }
+
+      BarButton(Icons.Filled.Person, "حساب", onClick = onAccount)
+
       BarButton(Icons.Filled.Notifications, "هشدارها", badge = alerts.size) { alertsOpen = true }
 
       BarButton(
