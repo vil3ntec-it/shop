@@ -21,6 +21,10 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.Chat
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -214,14 +218,21 @@ fun VipBadge(onClick: () -> Unit, modifier: Modifier = Modifier) {
 
 /* ============================ صفحهٔ قیمت‌ها ============================ */
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ *  صفحهٔ اشتراک — همان چیدمانی که در طرح هست.
+ *
+ *  ترتیبش عمدی است: اول «هفت روز رایگان» چون اولین سؤالِ هر کسی این است
+ *  که «باید همین حالا پول بدهم؟»؛ بعد مقایسهٔ رایگان و VIP تا معلوم شود
+ *  دقیقاً چه چیزی باز می‌شود؛ بعد مدت‌ها؛ و آخر راهِ خرید.
+ *
+ *  فهرستِ قابلیت‌ها در هر دو ستون **کامل** است، نه فقط آنچه هر پلن دارد.
+ *  ستونِ رایگان همان چهار قلمِ آخر را با قفل نشان می‌دهد؛ اگر نشانشان
+ *  ندهیم، کاربر نمی‌فهمد با اشتراک چه چیزی به‌دست می‌آورد.
+ */
 @Composable
 fun VipScreen(onDismiss: () -> Unit) {
   val context = LocalContext.current
   val state = remember { SyncStore(context) }
-  val status = remember {
-    License.status(state.license, state.publicKey, state.deviceUid, System.currentTimeMillis())
-  }
   val signedIn = !state.accessToken.isNullOrBlank()
   // پیش‌فرض روی «پیشنهاد ما» است؛ کسی که تصمیم ندارد، همان را می‌گیرد
   var chosenPlan by rememberSaveable { mutableStateOf(PLANS[1].title) }
@@ -232,14 +243,14 @@ fun VipScreen(onDismiss: () -> Unit) {
     runCatching { context.startActivity(intent) }
   }
 
-  /*
-   *  صفحهٔ کامل، نه شیتِ پایینِ صفحه.
-   *
-   *  شیت روی صفحهٔ زیرش می‌نشست و بلندیِ محدودی داشت؛ سه کارتِ پلن و
-   *  توضیح‌هایشان در آن جا نمی‌شد و کاربر داخلِ یک پنجرهٔ کوچک اسکرول
-   *  می‌کرد. اشتراک تصمیمِ کوچکی نیست که در گوشهٔ صفحه گرفته شود.
-   */
-  Box(Modifier.fillMaxSize().background(Shop.colors.bg)) {
+  fun openWhatsApp() {
+    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$WHATSAPP"))
+    runCatching { context.startActivity(intent) }
+  }
+
+  val colors = Shop.colors
+
+  Box(Modifier.fillMaxSize().background(colors.bg)) {
     Column(
       Modifier
         .fillMaxSize()
@@ -247,126 +258,140 @@ fun VipScreen(onDismiss: () -> Unit) {
         .padding(start = 16.dp, end = 16.dp, bottom = 28.dp)
     ) {
       TextButton(onClick = onDismiss, contentPadding = PaddingValues(0.dp)) {
-        Icon(Icons.Filled.ArrowForward, contentDescription = null, tint = Shop.colors.primary)
+        Icon(Icons.Filled.ArrowForward, contentDescription = null, tint = colors.primary)
         Spacer(Modifier.width(6.dp))
-        Text("بازگشت", color = Shop.colors.primary)
+        Text("بازگشت", color = colors.primary)
       }
-      Spacer(Modifier.height(4.dp))
-      /* ---------------------- سربرگ ---------------------- */
+
+      /* ---------------------- هفت روز رایگان ---------------------- */
       Column(
         Modifier
           .fillMaxWidth()
-          .clip(RoundedCornerShape(Radius.lg))
-          .background(
-            Brush.linearGradient(listOf(Shop.colors.primary, Shop.colors.primaryDark))
-          )
-          .padding(20.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+          .clip(RoundedCornerShape(Radius.md))
+          .background(colors.surface)
+          .border(1.dp, colors.primary.copy(alpha = 0.35f), RoundedCornerShape(Radius.md))
+          .padding(16.dp)
       ) {
-        Box(
-          Modifier
-            .size(52.dp)
-            .clip(RoundedCornerShape(18.dp))
-            .background(Color.White.copy(alpha = 0.18f)),
-          contentAlignment = Alignment.Center,
-        ) {
-          Icon(
-            Icons.Filled.WorkspacePremium,
-            contentDescription = null,
-            tint = Color.White,
-            modifier = Modifier.size(26.dp),
-          )
-        }
-        Spacer(Modifier.height(12.dp))
         Text(
-          "قیمت ساده برای مدیریت دکان",
-          style = MaterialTheme.typography.titleLarge,
-          color = Color.White,
+          "۷ روز رایگان",
+          style = MaterialTheme.typography.titleSmall,
+          color = colors.primary,
           fontWeight = FontWeight.Bold,
-          textAlign = TextAlign.Center,
         )
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(6.dp))
         Text(
-          "رایگان شروع کنید. بدون هزینهٔ پنهان.",
+          "حساب بسازید و همهٔ قابلیت‌ها را ۷ روز رایگان امتحان کنید. " +
+            "اطلاعاتی که ثبت می‌کنید در حساب خودتان می‌ماند.",
           style = MaterialTheme.typography.bodySmall,
-          color = Color.White.copy(alpha = 0.85f),
+          color = colors.muted,
         )
       }
 
       Spacer(Modifier.height(14.dp))
 
-      /* ---------------------- وضعیت کنونی ---------------------- */
-      val stateText = when (status.state) {
-        License.State.ACTIVE -> "اشتراک شما فعال است"
-        License.State.GRACE -> "اشتراک تمام شده — مهلت تمدید"
-        License.State.EXPIRED -> "اشتراک پایان یافته"
-        License.State.PENDING -> "اشتراک هنوز شروع نشده"
-        License.State.INVALID -> "مجوز نامعتبر است"
-        License.State.NONE -> if (signedIn) "هنوز اشتراکی ندارید" else "۷ روز رایگان"
-      }
-      val stateDetail = when (status.state) {
-        License.State.NONE ->
-          if (signedIn) "برای باز شدن فروش، قرض‌داران و اسکنر، یکی از پلن‌های زیر را بگیرید."
-          else "حساب بسازید و همهٔ قابلیت‌ها را ۷ روز رایگان امتحان کنید. اطلاعاتی که ثبت می‌کنید در حساب خودتان می‌ماند."
-        else -> "قابلیت‌های پولی با اشتراک باز می‌شوند؛ بقیهٔ برنامه همیشه باز است."
-      }
-      Column(
-        Modifier
-          .fillMaxWidth()
-          .clip(RoundedCornerShape(Radius.md))
-          .background(Shop.colors.primaryTint)
-          .padding(14.dp)
-      ) {
-        Text(
-          stateText,
-          style = MaterialTheme.typography.titleSmall,
-          color = Shop.colors.primaryDark,
-          fontWeight = FontWeight.Bold,
-        )
-        Spacer(Modifier.height(4.dp))
-        Text(stateDetail, style = MaterialTheme.typography.bodySmall, color = Shop.colors.text)
-      }
-
-      Spacer(Modifier.height(16.dp))
-
-      /* ---------------------- دو ستون: رایگان و VIP ---------------------- */
-      Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+      /* ---------------------- دو ستونِ مقایسه ---------------------- */
+      Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         TierCard(
           title = "رایگان",
           price = "۰",
+          priceNote = "افغانی",
           note = "همیشه رایگان",
           features = FREE_FEATURES.map { it to true } + PAID_FEATURES.map { it to false },
           highlighted = false,
+          footer = "همین حالا فعال است",
+          footerTint = colors.success,
           modifier = Modifier.weight(1f),
         )
         TierCard(
           title = "اشتراک VIP",
           price = "همه‌چیز",
+          priceNote = "",
           note = "هر مدتی که بخواهید",
           features = (FREE_FEATURES + PAID_FEATURES).map { it to true },
           highlighted = true,
+          ribbon = "پیشنهاد ما",
+          footer = "مدت را از پایین انتخاب کنید",
+          footerTint = colors.muted,
           modifier = Modifier.weight(1f),
         )
       }
 
-      Spacer(Modifier.height(18.dp))
+      Spacer(Modifier.height(20.dp))
       Text(
         "مدت اشتراک را انتخاب کنید",
         style = MaterialTheme.typography.titleSmall,
-        color = Shop.colors.text,
+        color = colors.text,
         fontWeight = FontWeight.Bold,
+        textAlign = TextAlign.Center,
+        modifier = Modifier.fillMaxWidth(),
       )
-      Spacer(Modifier.height(10.dp))
+      Spacer(Modifier.height(12.dp))
 
-      PLANS.forEachIndexed { index, plan ->
-        PlanCard(
-          plan = plan,
-          selected = chosenPlan == plan.title,
-          onClick = { chosenPlan = plan.title },
-        )
-        if (index < PLANS.lastIndex) Spacer(Modifier.height(10.dp))
+      /*
+       *  مدت‌ها: روی صفحهٔ پهن کنارِ هم، روی گوشی زیرِ هم.
+       *
+       *  سه کارت در عرضِ یک گوشی یعنی هر کدام کمتر از صد نقطه، و آن‌وقت
+       *  «روزی حدود ۱۶٫۷ افغانی» دو خط می‌شود و کارت‌ها ناهم‌قد.
+       */
+      if (isTablet()) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+          PLANS.forEach { plan ->
+            PlanCard(
+              plan = plan,
+              selected = chosenPlan == plan.title,
+              onClick = { chosenPlan = plan.title },
+              modifier = Modifier.weight(1f),
+            )
+          }
+        }
+      } else {
+        PLANS.forEachIndexed { index, plan ->
+          PlanCard(
+            plan = plan,
+            selected = chosenPlan == plan.title,
+            onClick = { chosenPlan = plan.title },
+            modifier = Modifier.fillMaxWidth(),
+          )
+          if (index < PLANS.lastIndex) Spacer(Modifier.height(10.dp))
+        }
       }
 
+      /* ---------------------- هشدارِ ورود ---------------------- */
+      if (!signedIn) {
+        Spacer(Modifier.height(16.dp))
+        Row(
+          Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(Radius.md))
+            .background(colors.warningTint)
+            .border(1.dp, colors.warning.copy(alpha = 0.55f), RoundedCornerShape(Radius.md))
+            .padding(14.dp),
+          verticalAlignment = Alignment.CenterVertically,
+        ) {
+          Box(
+            Modifier.size(36.dp).clip(RoundedCornerShape(18.dp)).background(colors.warning),
+            contentAlignment = Alignment.Center,
+          ) {
+            Icon(Icons.Filled.Lock, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+          }
+          Spacer(Modifier.width(12.dp))
+          Column(Modifier.weight(1f)) {
+            Text(
+              "برای خرید اشتراک اول وارد حساب شوید",
+              style = MaterialTheme.typography.labelLarge,
+              color = colors.text,
+              fontWeight = FontWeight.Bold,
+            )
+            Text(
+              "کار رایگان با برنامه حساب نمی‌خواهد — فقط خرید اشتراک لازم دارد.",
+              style = MaterialTheme.typography.labelSmall,
+              color = colors.muted,
+            )
+          }
+        }
+      }
+
+      /* ---------------------- گرفتنِ اشتراک ---------------------- */
       Spacer(Modifier.height(16.dp))
       val picked = PLANS.find { it.title == chosenPlan } ?: PLANS[1]
       TohidButton(
@@ -376,202 +401,276 @@ fun VipScreen(onDismiss: () -> Unit) {
       )
       Spacer(Modifier.height(8.dp))
       Text(
-        "هماهنگی و پرداخت از راه واتساپ انجام می‌شود.",
+        "بدون قرارداد. بدون ریسک. هماهنگی و پرداخت از راه واتساپ انجام می‌شود.",
         style = MaterialTheme.typography.labelSmall,
-        color = Shop.colors.muted2,
+        color = colors.muted2,
         textAlign = TextAlign.Center,
         modifier = Modifier.fillMaxWidth(),
       )
+
+      /* ---------------------- راه‌های تماس ---------------------- */
+      Spacer(Modifier.height(22.dp))
+      Text(
+        "راه‌های تماس",
+        style = MaterialTheme.typography.titleSmall,
+        color = colors.text,
+        fontWeight = FontWeight.Bold,
+      )
+      Spacer(Modifier.height(10.dp))
+      Row(
+        Modifier
+          .fillMaxWidth()
+          .clip(RoundedCornerShape(Radius.md))
+          .background(colors.surface)
+          .border(1.dp, colors.border, RoundedCornerShape(Radius.md))
+          .clickable { openWhatsApp() }
+          .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+      ) {
+        Box(
+          Modifier.size(38.dp).clip(RoundedCornerShape(19.dp)).background(Color(0xFF25D366)),
+          contentAlignment = Alignment.Center,
+        ) {
+          Icon(Icons.Filled.Chat, contentDescription = null, tint = Color.White, modifier = Modifier.size(19.dp))
+        }
+        Spacer(Modifier.width(12.dp))
+        Column {
+          Text("واتساپ", style = MaterialTheme.typography.labelLarge, color = colors.text)
+          CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+            Text("0792236008", style = MaterialTheme.typography.labelSmall, color = colors.muted)
+          }
+        }
+      }
     }
   }
 }
 
+/**
+ *  یک ستونِ مقایسه — رایگان یا VIP.
+ *
+ *  قابلیتِ بسته با قفل نشان داده می‌شود، نه با نبودن در فهرست: فهرستی که
+ *  کوتاه‌تر است فقط «کمتر» به نظر می‌رسد؛ قفل می‌گوید **چه چیزی** کم است.
+ */
 @Composable
 private fun TierCard(
   title: String,
   price: String,
+  priceNote: String,
   note: String,
   features: List<Pair<String, Boolean>>,
   highlighted: Boolean,
+  footer: String,
+  footerTint: Color,
   modifier: Modifier = Modifier,
+  ribbon: String = "",
 ) {
-  Column(
-    modifier
-      .clip(RoundedCornerShape(Radius.md))
-      .background(Shop.colors.surface)
-      .border(
-        if (highlighted) 2.dp else 1.dp,
-        if (highlighted) Shop.colors.primary else Shop.colors.border,
-        RoundedCornerShape(Radius.md),
-      )
-      .padding(14.dp)
-  ) {
-    if (highlighted) {
+  val colors = Shop.colors
+  val edge = if (highlighted) colors.primary else colors.border
+
+  Column(modifier) {
+    if (ribbon.isNotBlank()) {
       Box(
         Modifier
-          .clip(RoundedCornerShape(8.dp))
-          .background(Shop.colors.primary)
-          .padding(horizontal = 8.dp, vertical = 3.dp)
+          .fillMaxWidth()
+          .clip(RoundedCornerShape(topStart = Radius.md, topEnd = Radius.md))
+          .background(colors.primary)
+          .padding(vertical = 5.dp),
+        contentAlignment = Alignment.Center,
       ) {
-        Text("پیشنهاد ما", style = MaterialTheme.typography.labelSmall, color = Color.White)
-      }
-      Spacer(Modifier.height(8.dp))
-    }
-    Text(title, style = MaterialTheme.typography.titleSmall, color = Shop.colors.text)
-    Spacer(Modifier.height(4.dp))
-    Text(
-      price,
-      style = MaterialTheme.typography.headlineSmall,
-      color = Shop.colors.primary,
-      fontWeight = FontWeight.Bold,
-    )
-    Text(note, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
-    Spacer(Modifier.height(10.dp))
-    features.forEach { (label, on) ->
-      Row(
-        Modifier.padding(vertical = 3.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-      ) {
-        Icon(
-          if (on) Icons.Filled.Check else Icons.Filled.Lock,
-          contentDescription = null,
-          tint = if (on) Shop.colors.success else Shop.colors.muted2,
-          modifier = Modifier.size(14.dp),
-        )
         Text(
-          label,
+          ribbon,
           style = MaterialTheme.typography.labelSmall,
-          color = if (on) Shop.colors.text else Shop.colors.muted2,
+          color = Color.White,
+          fontWeight = FontWeight.Bold,
+        )
+      }
+    }
+    Column(
+      Modifier
+        .fillMaxWidth()
+        .clip(
+          if (ribbon.isNotBlank())
+            RoundedCornerShape(bottomStart = Radius.md, bottomEnd = Radius.md)
+          else RoundedCornerShape(Radius.md)
+        )
+        .background(colors.surface)
+        .border(
+          if (highlighted) 1.5.dp else 1.dp,
+          edge,
+          if (ribbon.isNotBlank())
+            RoundedCornerShape(bottomStart = Radius.md, bottomEnd = Radius.md)
+          else RoundedCornerShape(Radius.md),
+        )
+        .padding(14.dp),
+    ) {
+      Text(
+        title,
+        style = MaterialTheme.typography.titleSmall,
+        color = colors.text,
+        fontWeight = FontWeight.Bold,
+      )
+      Spacer(Modifier.height(8.dp))
+      Row(verticalAlignment = Alignment.Bottom) {
+        Text(
+          price,
+          style = MaterialTheme.typography.headlineSmall,
+          color = colors.primary,
+          fontWeight = FontWeight.Bold,
+        )
+        if (priceNote.isNotBlank()) {
+          Spacer(Modifier.width(4.dp))
+          Text(priceNote, style = MaterialTheme.typography.labelSmall, color = colors.muted)
+        }
+      }
+      Text(note, style = MaterialTheme.typography.labelSmall, color = colors.muted)
+
+      Spacer(Modifier.height(10.dp))
+      HorizontalDivider(color = colors.border)
+      Spacer(Modifier.height(10.dp))
+
+      features.forEach { (name, on) ->
+        Row(
+          Modifier.fillMaxWidth().padding(vertical = 4.dp),
+          verticalAlignment = Alignment.CenterVertically,
+        ) {
+          Box(
+            Modifier
+              .size(18.dp)
+              .clip(RoundedCornerShape(9.dp))
+              .background(if (on) colors.primary else colors.surface2),
+            contentAlignment = Alignment.Center,
+          ) {
+            Icon(
+              if (on) Icons.Filled.Check else Icons.Filled.Lock,
+              contentDescription = null,
+              tint = if (on) Color.White else colors.muted2,
+              modifier = Modifier.size(11.dp),
+            )
+          }
+          Spacer(Modifier.width(8.dp))
+          Text(
+            name,
+            style = MaterialTheme.typography.labelMedium,
+            color = if (on) colors.text else colors.muted2,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+          )
+        }
+      }
+
+      Spacer(Modifier.height(12.dp))
+      Box(
+        Modifier
+          .fillMaxWidth()
+          .clip(RoundedCornerShape(Radius.sm))
+          .background(footerTint.copy(alpha = 0.14f))
+          .padding(vertical = 9.dp),
+        contentAlignment = Alignment.Center,
+      ) {
+        Text(
+          footer,
+          style = MaterialTheme.typography.labelSmall,
+          color = footerTint,
+          fontWeight = FontWeight.Bold,
+          textAlign = TextAlign.Center,
         )
       }
     }
   }
 }
 
+/**
+ *  یک مدتِ اشتراک.
+ *
+ *  «روزی حدود …» عمداً هست: ۳۰۰۰ افغانی در سال بزرگ به نظر می‌رسد،
+ *  ۸ افغانی در روز نه — و هر دو یک عددند.
+ */
 @Composable
-private fun PlanCard(plan: Plan, selected: Boolean, onClick: () -> Unit) {
+private fun PlanCard(
+  plan: Plan,
+  selected: Boolean,
+  onClick: () -> Unit,
+  modifier: Modifier = Modifier,
+) {
   val colors = Shop.colors
+  val perDay = plan.price.toDouble() / plan.days
 
-  // کارتِ انتخاب‌شده کمی بزرگ‌تر می‌شود و هاله می‌گیرد — همان بازخوردی که
-  // می‌گوید «این را انتخاب کردی»، بدونِ آنکه چیزی بنویسیم
-  val scale by animateFloatAsState(
-    targetValue = if (selected && Motion.enabled) 1.02f else 1f,
-    animationSpec = tween(240, easing = FastOutSlowInEasing),
-    label = "planScale",
-  )
-  val borderColor by animateColorAsState(
-    targetValue = if (selected) colors.primary else colors.border,
-    animationSpec = tween(240),
-    label = "planBorder",
-  )
-
-  // برقِ ملایمی که فقط روی کارتِ انتخاب‌شده از راست به چپ می‌گذرد
-  val shimmer = rememberInfiniteTransition(label = "planShimmer")
-  val sweep by shimmer.animateFloat(
-    initialValue = -0.6f,
-    targetValue = 1.6f,
-    animationSpec = infiniteRepeatable(tween(2600, easing = LinearEasing), RepeatMode.Restart),
-    label = "sweep",
-  )
-
-  Row(
-    Modifier
-      .fillMaxWidth()
-      .graphicsLayer { scaleX = scale; scaleY = scale }
-      .then(if (selected) Modifier.softGlow(Shape.card, colors.glow) else Modifier)
-      .clip(Shape.card)
-      .background(
-        brush = if (selected) {
-          Brush.horizontalGradient(
-            listOf(colors.primary.copy(alpha = 0.20f), colors.accent.copy(alpha = 0.10f))
-          )
-        } else {
-          Brush.horizontalGradient(listOf(colors.surface, colors.surface))
-        }
-      )
-      .drawBehind {
-        if (selected && Motion.enabled) {
-          drawRect(
-            brush = Brush.horizontalGradient(
-              colors = listOf(Color.Transparent, colors.primary.copy(alpha = 0.14f), Color.Transparent),
-              startX = sweep * size.width - size.width * 0.35f,
-              endX = sweep * size.width + size.width * 0.35f,
-            )
-          )
-        }
+  Column(modifier) {
+    if (plan.badge.isNotBlank()) {
+      Box(
+        Modifier
+          .clip(RoundedCornerShape(topStart = 10.dp, topEnd = 10.dp))
+          .background(colors.warning)
+          .padding(horizontal = 10.dp, vertical = 3.dp),
+      ) {
+        Text(
+          plan.badge,
+          style = MaterialTheme.typography.labelSmall,
+          color = Color(0xFF2A1D02),
+          fontWeight = FontWeight.Bold,
+        )
       }
-      .border(if (selected) 1.4.dp else 0.8.dp, borderColor, Shape.card)
-      .clickable(onClick = onClick)
-      .padding(16.dp),
-    verticalAlignment = Alignment.CenterVertically,
-  ) {
-    // دایرهٔ انتخاب، با تیکی که از وسط باز می‌شود
-    val tick by animateFloatAsState(
-      targetValue = if (selected) 1f else 0f,
-      animationSpec = tween(if (Motion.enabled) 260 else 0, easing = FastOutSlowInEasing),
-      label = "tick",
-    )
-    Box(
+    }
+    Column(
       Modifier
-        .size(26.dp)
-        .clip(CircleShape)
-        .background(if (selected) colors.primary else colors.surface2)
-        .border(1.dp, if (selected) colors.primary else colors.border, CircleShape),
-      contentAlignment = Alignment.Center,
+        .fillMaxWidth()
+        .clip(RoundedCornerShape(Radius.md))
+        .background(colors.surface)
+        .border(
+          if (selected) 1.6.dp else 1.dp,
+          if (selected) colors.primary else colors.border,
+          RoundedCornerShape(Radius.md),
+        )
+        .clickable(onClick = onClick)
+        .padding(14.dp),
+      horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-      if (tick > 0f) {
+      Text(
+        plan.title,
+        style = MaterialTheme.typography.titleSmall,
+        color = colors.text,
+        fontWeight = FontWeight.Bold,
+      )
+      Spacer(Modifier.height(6.dp))
+      Row(verticalAlignment = Alignment.Bottom) {
+        Text(
+          plain(plan.price),
+          style = MaterialTheme.typography.titleMedium,
+          color = colors.primary,
+          fontWeight = FontWeight.Bold,
+        )
+        Spacer(Modifier.width(4.dp))
+        Text("افغانی", style = MaterialTheme.typography.labelSmall, color = colors.muted)
+      }
+      Spacer(Modifier.height(4.dp))
+      Text(
+        "روزی حدود ${money(perDay)} افغانی",
+        style = MaterialTheme.typography.labelSmall,
+        color = colors.muted2,
+        textAlign = TextAlign.Center,
+      )
+      Spacer(Modifier.height(10.dp))
+      Row(
+        Modifier
+          .fillMaxWidth()
+          .clip(RoundedCornerShape(Radius.sm))
+          .background(if (selected) colors.primaryTint else colors.surface2)
+          .padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+      ) {
         Icon(
           Icons.Filled.Check,
           contentDescription = null,
-          tint = Color(0xFF04121F),
-          modifier = Modifier
-            .size(16.dp)
-            .graphicsLayer { scaleX = tick; scaleY = tick; alpha = tick },
+          tint = if (selected) colors.primary else colors.muted2,
+          modifier = Modifier.size(14.dp),
         )
-      }
-    }
-
-    Spacer(Modifier.width(14.dp))
-
-    Column(Modifier.weight(1f)) {
-      Row(verticalAlignment = Alignment.CenterVertically) {
+        Spacer(Modifier.width(5.dp))
         Text(
-          plan.title,
-          style = MaterialTheme.typography.titleSmall,
-          color = colors.text,
-          fontWeight = FontWeight.Bold,
-        )
-        if (plan.badge.isNotBlank()) {
-          Spacer(Modifier.width(8.dp))
-          TohidBadge(
-            text = plan.badge,
-            tint = if (selected) colors.primary else colors.accent,
-            fill = if (selected) colors.primaryTint else colors.surface2,
-          )
-        }
-      }
-      Spacer(Modifier.height(2.dp))
-      Text(
-        "${plain(plan.days)} روز",
-        style = MaterialTheme.typography.labelSmall,
-        color = colors.muted2,
-      )
-    }
-
-    // قیمت: عدد بزرگ، واحد کوچک — نگاه اول باید روی رقم بیفتد
-    Column(horizontalAlignment = Alignment.End) {
-      TohidMoneyText(
-        amount = plan.price.toDouble(),
-        tint = if (selected) colors.primary else colors.text,
-        style = MaterialTheme.typography.headlineSmall,
-      )
-      val perMonth = plan.price / (plan.days / 30.0)
-      if (plan.days > 30) {
-        Text(
-          "ماهی ${money(perMonth)}",
+          if (selected) "انتخاب شد" else "انتخاب",
           style = MaterialTheme.typography.labelSmall,
-          color = colors.success,
+          color = if (selected) colors.primary else colors.muted,
+          fontWeight = FontWeight.Bold,
         )
       }
     }

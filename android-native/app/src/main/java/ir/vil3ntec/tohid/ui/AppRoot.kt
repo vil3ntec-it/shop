@@ -163,6 +163,7 @@ fun AppRoot(
         theme = theme,
         onTheme = onTheme,
         onSettings = { sub = "settings" },
+        onAccount = { authOpen = true },
         onOpen = ::open,
       )
     },
@@ -305,7 +306,7 @@ fun AppRoot(
           onConsumed = { pendingBarcode = null; pendingProduct = null },
         )
         "vip" -> VipScreen { sub = null }
-        "more" -> MoreScreen(store, data, ::open) { authOpen = true }
+        "more" -> MoreScreen(store, data, ::open)
       }
       }
       }
