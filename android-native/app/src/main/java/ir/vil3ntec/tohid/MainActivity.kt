@@ -1,7 +1,6 @@
 package ir.vil3ntec.tohid
 
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.*
@@ -17,7 +16,15 @@ import ir.vil3ntec.tohid.ui.theme.ThemeChoice
 import ir.vil3ntec.tohid.ui.theme.TohidTheme
 import kotlinx.coroutines.launch
 
-class MainActivity : ComponentActivity() {
+/*
+ *  چرا `FragmentActivity` و نه `ComponentActivity`:
+ *
+ *  `BiometricPrompt` — که قفلِ برنامه با اثر انگشت را ممکن می‌کند —
+ *  اکتیویتی از این نوع می‌خواهد. `FragmentActivity` خودش از
+ *  `ComponentActivity` ارث می‌برد، پس `setContent` و بقیهٔ چیزها دست
+ *  نخورده‌اند؛ فقط یک پله بالاتر در همان زنجیره.
+ */
+class MainActivity : androidx.fragment.app.FragmentActivity() {
 
   private lateinit var store: ShopStore
 

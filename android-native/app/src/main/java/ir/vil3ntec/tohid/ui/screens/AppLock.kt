@@ -16,6 +16,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Backspace
+import androidx.compose.material.icons.filled.Fingerprint
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -46,6 +48,29 @@ fun AppLockScreen(onUnlocked: () -> Unit) {
 
   var pin by remember { mutableStateOf("") }
   var wrong by remember { mutableStateOf(false) }
+
+  /*
+   *  اثر انگشت — میان‌بُر، نه جایگزینِ رمز.
+   *
+   *  به‌محضِ باز شدنِ صفحه یک بار خودش می‌پرسد؛ کسی که هر روز برنامه را
+   *  باز می‌کند، نباید هر بار دکمه بزند. اگر انصراف داد، صفحه‌کلیدِ رمز
+   *  همان‌جا هست و اگر گوشی حسگر نداشته باشد، اصلاً چیزی نشان داده
+   *  نمی‌شود.
+   */
+  val activity = context as? androidx.fragment.app.FragmentActivity
+  val canFinger = remember(activity) {
+    activity != null && ir.vil3ntec.tohid.data.Fingerprint.available(context)
+  }
+  var asked by rememberSaveable { mutableStateOf(false) }
+
+  fun askFinger() {
+    val where = activity ?: return
+    ir.vil3ntec.tohid.data.Fingerprint.ask(where, onOk = onUnlocked)
+  }
+
+  LaunchedEffect(canFinger) {
+    if (canFinger && !asked) { asked = true; askFinger() }
+  }
 
   // تکانِ کوتاه هنگامِ رمزِ غلط — پیامِ متنی را کسی که عجله دارد نمی‌خواند
   val shake by animateFloatAsState(
@@ -129,6 +154,31 @@ fun AppLockScreen(onUnlocked: () -> Unit) {
         },
         onBack = { if (pin.isNotEmpty()) pin = pin.dropLast(1) },
       )
+
+      if (canFinger) {
+        Spacer(Modifier.height(18.dp))
+        Row(
+          Modifier
+            .clip(RoundedCornerShape(22.dp))
+            .clickable { askFinger() }
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+          verticalAlignment = Alignment.CenterVertically,
+          horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+          Icon(
+            Icons.Filled.Fingerprint,
+            contentDescription = null,
+            tint = colors.primary,
+            modifier = Modifier.size(20.dp),
+          )
+          Text(
+            "باز کردن با اثر انگشت",
+            style = MaterialTheme.typography.labelLarge,
+            color = colors.primary,
+            fontWeight = FontWeight.Bold,
+          )
+        }
+      }
     }
   }
 }

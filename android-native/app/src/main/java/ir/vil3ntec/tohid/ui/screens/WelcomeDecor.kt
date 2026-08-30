@@ -53,13 +53,38 @@ private val SKY_TOP = Color(0xFFF7FAFF)
 private val SKY_MID = Color(0xFFEDF3FD)
 private val SKY_LOW = Color(0xFFE3ECFB)
 
-/** موجِ آبی، برای شکل‌های بزرگِ نرم */
-private val WAVE_SOFT = Color(0xFFDCE8FA)
-private val WAVE_DEEP = Color(0xFFCFDFF7)
+/*
+ *  موج‌ها.
+ *
+ *  رنگِ قبلی آن‌قدر کم‌رنگ بود که موج از زمینه جدا نمی‌شد و فقط «یک جای
+ *  کمی روشن‌تر» دیده می‌شد. حالا آبیِ سیرتری دارند و داخلشان یک بازتابِ
+ *  سفید می‌افتد — همان چیزی که به سطح، حجم می‌دهد.
+ */
+private val WAVE_SOFT = Color(0xFFC3D8F5)
+private val WAVE_DEEP = Color(0xFF9DBCEC)
+private val WAVE_EDGE = Color(0xFF7FA6E3)
+
+/** بازتابِ نورِ سفید روی موج */
+private val SHEEN = Color(0xFFFFFFFF)
 
 /** لهجهٔ گرم — فقط چند نقطه، به‌اندازه‌ای که چشم را گرم کند */
 private val ACCENT_AMBER = Color(0xFFF5C33B)
 private val ACCENT_BLUE = Color(0xFF2563C9)
+
+/*
+ *  رنگِ حباب‌ها.
+ *
+ *  همه یک آبی بودند و از دور مثلِ لکه دیده می‌شدند. حالا هر کدام رنگِ
+ *  خودش را دارد — آبی، فیروزه‌ای، بنفشِ ملایم، طلایی — و دامنهٔ حرکتشان
+ *  هم چند برابر شده تا واقعاً «شناور» باشند، نه ساکن.
+ */
+private val BUBBLE_TINTS = listOf(
+  Color(0xFF2563C9),   // آبیِ خودِ برنامه
+  Color(0xFF3FA9D8),   // فیروزه‌ای
+  Color(0xFF7B6BE0),   // بنفشِ ملایم
+  Color(0xFFF5C33B),   // طلایی
+  Color(0xFF4CC3A5),   // سبزِ آبی
+)
 
 /**
  *  پس‌زمینهٔ صفحهٔ ورود.
@@ -107,46 +132,92 @@ fun WelcomeBackground(theme: ThemeChoice? = null, modifier: Modifier = Modifier)
       size = size,
     )
 
-    val soft = if (dark) colors.primary.copy(alpha = 0.05f) else WAVE_SOFT
-    val deep = if (dark) colors.primary.copy(alpha = 0.08f) else WAVE_DEEP
+    val soft = if (dark) colors.primary.copy(alpha = 0.13f) else WAVE_SOFT
+    val deep = if (dark) colors.primary.copy(alpha = 0.20f) else WAVE_DEEP
+    val edge = if (dark) colors.primary.copy(alpha = 0.28f) else WAVE_EDGE
+    val sheen = if (dark) Color.White.copy(alpha = 0.10f) else SHEEN.copy(alpha = 0.85f)
 
-    // ۲) دو موجِ بزرگ — یکی از بالای راست، یکی از پایینِ چپ
+    /*
+     *  ۲) دو موجِ بزرگ.
+     *
+     *  هر موج دو بار کشیده می‌شود: یک بار خودِ سطح با شیبِ آبی، و یک بار
+     *  یک بازتابِ سفید که فقط بالای همان سطح می‌افتد. سطحِ تک‌رنگ تخت
+     *  دیده می‌شود؛ چیزی که به آن حجم می‌دهد همین بازتاب است.
+     */
+    val top = topWave(w, h, flow)
     drawPath(
-      path = topWave(w, h, flow),
+      path = top,
       brush = Brush.linearGradient(
-        colors = listOf(soft, deep.copy(alpha = deep.alpha * 0.35f)),
+        colors = listOf(edge, deep, soft),
         start = Offset(w, 0f),
         end = Offset(w * 0.1f, h * 0.55f),
       ),
     )
     drawPath(
-      path = bottomWave(w, h, flow),
+      path = top,
       brush = Brush.linearGradient(
-        colors = listOf(deep.copy(alpha = deep.alpha * 0.55f), soft.copy(alpha = 0f)),
+        colors = listOf(sheen, sheen.copy(alpha = 0f)),
+        start = Offset(w * 0.72f, 0f),
+        end = Offset(w * 0.42f, h * 0.30f),
+      ),
+    )
+
+    val bottom = bottomWave(w, h, flow)
+    drawPath(
+      path = bottom,
+      brush = Brush.linearGradient(
+        colors = listOf(deep, soft, soft.copy(alpha = 0f)),
         start = Offset(0f, h),
         end = Offset(w * 0.9f, h * 0.45f),
       ),
     )
+    drawPath(
+      path = bottom,
+      brush = Brush.linearGradient(
+        colors = listOf(sheen.copy(alpha = sheen.alpha * 0.7f), sheen.copy(alpha = 0f)),
+        start = Offset(w * 0.10f, h * 0.98f),
+        end = Offset(w * 0.55f, h * 0.74f),
+      ),
+    )
 
-    // ۳) خطوطِ نازکِ سفید — همان انحنا، فقط به‌شکلِ خط
-    val line = if (dark) Color.White.copy(alpha = 0.06f) else Color.White.copy(alpha = 0.75f)
+    // ۳) خطوطِ نازکِ سفید — سفیدِ کامل، وگرنه روی موجِ آبی دیده نمی‌شوند
+    val line = if (dark) Color.White.copy(alpha = 0.16f) else Color.White
     listOf(0f, 0.06f, 0.12f).forEachIndexed { index, shift ->
       drawPath(
         path = curveLine(w, h, flow, shift),
-        color = line.copy(alpha = line.alpha * (1f - index * 0.28f)),
-        style = Stroke(width = (1.4f - index * 0.3f).dp.toPx(), cap = StrokeCap.Round),
+        color = line.copy(alpha = line.alpha * (1f - index * 0.22f)),
+        style = Stroke(width = (2.0f - index * 0.35f).dp.toPx(), cap = StrokeCap.Round),
       )
     }
 
-    // ۴) نقطه‌های شناور — کم، ریز، و بیشترشان آبی
-    dots.forEach { dot ->
-      val angle = (flow + dot.phase) * 6.2832f
+    /*
+     *  ۴) حباب‌های شناور.
+     *
+     *  هر کدام رنگ و سرعتِ خودش را دارد و روی یک بیضی می‌چرخد — نه یک
+     *  دایره، وگرنه همه یک‌جور می‌چرخند و حرکت مصنوعی می‌شود. دامنهٔ
+     *  حرکت هم چند برابرِ قبل است؛ پیش از این آن‌قدر کم بود که تکان
+     *  خوردنشان اصلاً دیده نمی‌شد.
+     */
+    dots.forEachIndexed { index, dot ->
+      val angle = (flow * dot.speed + dot.phase) * 6.2832f
       val x = w * dot.x + cos(angle) * w * dot.sway
-      val y = h * dot.y + sin(angle) * h * dot.sway * 0.6f
-      val tint = if (dot.warm) ACCENT_AMBER else ACCENT_BLUE
+      val y = h * dot.y + sin(angle * 1.3f) * h * dot.sway * 0.75f
+      val tint = BUBBLE_TINTS[index % BUBBLE_TINTS.size]
+      val pulse = 0.85f + 0.3f * sin(angle * 0.7f)
+
+      // هالهٔ نرمِ دورِ حباب — لبهٔ تیزِ یک دایرهٔ تنها، چسبانده به نظر می‌رسد
       drawCircle(
-        color = tint.copy(alpha = dot.alpha * (if (dark) 0.55f else 1f)),
-        radius = dot.radius.dp.toPx() * breathe,
+        brush = Brush.radialGradient(
+          colors = listOf(tint.copy(alpha = dot.alpha * 0.30f), tint.copy(alpha = 0f)),
+          center = Offset(x, y),
+          radius = dot.radius.dp.toPx() * 2.6f * breathe,
+        ),
+        radius = dot.radius.dp.toPx() * 2.6f * breathe,
+        center = Offset(x, y),
+      )
+      drawCircle(
+        color = tint.copy(alpha = dot.alpha * (if (dark) 0.75f else 1f)),
+        radius = dot.radius.dp.toPx() * breathe * pulse,
         center = Offset(x, y),
       )
     }
@@ -221,17 +292,18 @@ private data class Dot(
   val alpha: Float,
   val phase: Float,
   val sway: Float,
-  val warm: Boolean = false,
+  /** ضریبِ سرعت — همه با یک تندی بچرخند، حرکت مصنوعی می‌شود */
+  val speed: Float = 1f,
 )
 
 private val dots = listOf(
-  Dot(x = 0.78f, y = 0.09f, radius = 5.5f, alpha = 0.85f, phase = 0.00f, sway = 0.010f),
-  Dot(x = 0.24f, y = 0.17f, radius = 4.0f, alpha = 0.80f, phase = 0.30f, sway = 0.012f, warm = true),
-  Dot(x = 0.69f, y = 0.26f, radius = 3.5f, alpha = 0.70f, phase = 0.55f, sway = 0.009f, warm = true),
-  Dot(x = 0.18f, y = 0.38f, radius = 4.5f, alpha = 0.75f, phase = 0.72f, sway = 0.011f, warm = true),
-  Dot(x = 0.83f, y = 0.40f, radius = 6.0f, alpha = 0.80f, phase = 0.18f, sway = 0.010f),
-  Dot(x = 0.10f, y = 0.44f, radius = 3.0f, alpha = 0.45f, phase = 0.62f, sway = 0.008f),
-  Dot(x = 0.94f, y = 0.41f, radius = 3.0f, alpha = 0.40f, phase = 0.88f, sway = 0.008f),
+  Dot(x = 0.78f, y = 0.09f, radius = 5.5f, alpha = 0.85f, phase = 0.00f, sway = 0.045f, speed = 1.0f),
+  Dot(x = 0.24f, y = 0.17f, radius = 4.0f, alpha = 0.80f, phase = 0.30f, sway = 0.055f, speed = 1.4f),
+  Dot(x = 0.69f, y = 0.26f, radius = 3.5f, alpha = 0.70f, phase = 0.55f, sway = 0.038f, speed = 0.8f),
+  Dot(x = 0.18f, y = 0.38f, radius = 4.5f, alpha = 0.75f, phase = 0.72f, sway = 0.050f, speed = 1.7f),
+  Dot(x = 0.83f, y = 0.40f, radius = 6.0f, alpha = 0.80f, phase = 0.18f, sway = 0.042f, speed = 1.1f),
+  Dot(x = 0.10f, y = 0.44f, radius = 3.0f, alpha = 0.55f, phase = 0.62f, sway = 0.060f, speed = 2.1f),
+  Dot(x = 0.94f, y = 0.41f, radius = 3.0f, alpha = 0.50f, phase = 0.88f, sway = 0.048f, speed = 1.3f),
 )
 
 /* ------------------------------ نشان ------------------------------ */

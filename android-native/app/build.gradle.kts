@@ -160,6 +160,18 @@ dependencies {
   // گوشی هم سرِ جایش باشد؛ `WorkManager` همان را تضمین می‌کند.
   implementation("androidx.work:work-runtime-ktx:2.9.1")
 
+  // اثر انگشت. `BiometricPrompt` اکتیویتیِ `FragmentActivity` می‌خواهد،
+  // پس `fragment-ktx` هم لازم است — اکتیویتیِ برنامه از آن ارث می‌برد.
+  implementation("androidx.biometric:biometric:1.1.0")
+  implementation("androidx.fragment:fragment-ktx:1.8.5")
+
+  // ورود با گوگل. `credentials` راهِ امروزیِ اندروید است و
+  // `googleid` همان چیزی که توکنِ گوگل را می‌دهد؛ سرور خودش آن توکن را
+  // می‌سنجد، پس هیچ رازی داخلِ برنامه نیست.
+  implementation("androidx.credentials:credentials:1.3.0")
+  implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
+  implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
+
   testImplementation("junit:junit:4.13.2")
 }
 
