@@ -42,6 +42,7 @@ import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.fa
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.qty
+import ir.vil3ntec.tohid.sync.AutoSync
 import ir.vil3ntec.tohid.ui.theme.Shop
 import ir.vil3ntec.tohid.ui.theme.ThemeChoice
 
@@ -155,6 +156,9 @@ fun TohidTopBar(
        *  شکلِ کارِ خودش را دارد: اشتراک طلایی و با نوشتهٔ VIP، حساب آبی و
        *  با تپش، و هشدارها نارنجی.
        */
+      //  نقطهٔ همگام‌سازی، اولین چیزِ ردیف: کوچک، ولی همیشه سرِ جایش
+      SyncDot()
+
       VipChip { onOpen("vip") }
 
       AccountChip(onClick = onAccount)
@@ -208,6 +212,119 @@ fun TohidTopBar(
         }
       }
     }
+  }
+}
+
+/**
+ *  نقطهٔ همگام‌سازی — سبز، زرد، قرمز.
+ *
+ *  ── چه چیزی را می‌بندد ────────────────────────────────────────────
+ *  `AutoSync` وضعیتش را همیشه داشت (`lastOk`، `lastError`، `running`)
+ *  ولی هیچ صفحه‌ای آن را نشان نمی‌داد. فروشنده‌ای که در زیرزمینِ
+ *  بی‌آنتن کار می‌کرد، نمی‌دانست ۳۰ فروشش هنوز روی گوشی است و روی
+ *  سرور ننشسته. تا وقتی گوشی سالم بود کسی نمی‌فهمید؛ روزی که گوشی
+ *  گم می‌شد، تازه معلوم می‌شد.
+ *  ──────────────────────────────────────────────────────────────────
+ *
+ *  فقط وقتی دیده می‌شود که حسابی در کار باشد: برنامه بدونِ سرور هم
+ *  کامل کار می‌کند و آنجا این نقطه معنایی ندارد و فقط سؤال می‌سازد.
+ *
+ *  زدن روی آن، جزئیات را در یک برگهٔ کوچک باز می‌کند: آخرین همگام‌سازی
+ *  کِی بود، چند مورد در انتظار است، و اگر تغییری اعمال نشده چرا.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SyncDot() {
+  val context = LocalContext.current
+  //  «حساب دارد یا نه» با هر بار کشیده شدنِ سربرگ پرسیده نمی‌شود
+  val active = remember { ir.vil3ntec.tohid.data.repo.Backend.isReady(context) }
+  if (!active) return
+
+  var open by remember { mutableStateOf(false) }
+  val health = AutoSync.health
+  val tint = when (health) {
+    AutoSync.Health.OK -> Color(0xFF29A745)
+    AutoSync.Health.WAITING -> ALERT_ORANGE
+    AutoSync.Health.FAILED -> Color(0xFFD64545)
+  }
+
+  Row(
+    Modifier
+      .clip(RoundedCornerShape(999.dp))
+      .background(tint.copy(alpha = 0.12f))
+      .clickable { open = true }
+      .padding(horizontal = 9.dp, vertical = 7.dp),
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(5.dp),
+  ) {
+    Box(Modifier.size(9.dp).clip(RoundedCornerShape(999.dp)).background(tint))
+    //  عدد فقط وقتی می‌آید که واقعاً چیزی مانده باشد — نقطهٔ خالی
+    //  آرام‌تر است و «همه‌چیز رفته» را بهتر می‌گوید
+    if (AutoSync.pendingCount > 0) {
+      Text(
+        AutoSync.pendingCount.fa(),
+        style = MaterialTheme.typography.labelSmall,
+        color = tint,
+        fontWeight = FontWeight.Bold,
+      )
+    }
+  }
+
+  if (open) {
+    ModalBottomSheet(onDismissRequest = { open = false }, containerColor = Shop.colors.bg) {
+      Column(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, bottom = 28.dp)) {
+        Text("همگام‌سازی", style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
+        Spacer(Modifier.height(10.dp))
+
+        val headline = when (health) {
+          AutoSync.Health.OK -> "همه‌چیز روی سرور نشسته"
+          AutoSync.Health.WAITING ->
+            if (AutoSync.running) "در حال فرستادن…"
+            else "${AutoSync.pendingCount.fa()} مورد در انتظار"
+          AutoSync.Health.FAILED -> "آخرین تلاش ناموفق بود"
+        }
+        Text(headline, style = MaterialTheme.typography.bodyMedium, color = tint, fontWeight = FontWeight.Bold)
+
+        Spacer(Modifier.height(6.dp))
+        Text(
+          if (AutoSync.lastOk > 0) "آخرین همگام‌سازی: ${sinceText(AutoSync.lastOk)}"
+          else "هنوز همگام‌سازیِ موفقی انجام نشده",
+          style = MaterialTheme.typography.labelMedium,
+          color = Shop.colors.muted,
+        )
+
+        AutoSync.lastError?.let {
+          Spacer(Modifier.height(8.dp))
+          Text(it, style = MaterialTheme.typography.labelMedium, color = Color(0xFFD64545))
+        }
+
+        //  تعارض‌ها: خطا نیستند، ولی کاربر باید بداند کدام تغییرش
+        //  اعمال نشد — همان چیزی که تا دیروز بی‌صدا گم می‌شد
+        AutoSync.rejectionNote?.let {
+          Spacer(Modifier.height(8.dp))
+          Text(it, style = MaterialTheme.typography.labelMedium, color = ALERT_ORANGE)
+        }
+
+        Spacer(Modifier.height(6.dp))
+        Text(
+          "تغییرها روی گوشی ثبت می‌شوند و خودشان می‌روند؛ نبودنِ اینترنت " +
+            "چیزی را از بین نمی‌برد.",
+          style = MaterialTheme.typography.labelSmall,
+          color = Shop.colors.muted2,
+        )
+      }
+    }
+  }
+}
+
+/** «۳ دقیقه پیش» — نه ساعتِ خام */
+private fun sinceText(at: Long): String {
+  val minutes = ((System.currentTimeMillis() - at) / 60000L).coerceAtLeast(0)
+  return when {
+    minutes < 1 -> "همین حالا"
+    minutes < 60 -> "${minutes.fa()} دقیقه پیش"
+    minutes < 24 * 60 -> "${(minutes / 60).fa()} ساعت پیش"
+    else -> "${(minutes / (24 * 60)).fa()} روز پیش"
   }
 }
 

@@ -27,9 +27,33 @@ import kotlinx.serialization.json.buildJsonObject
  */
 class SyncRepository(private val api: ApiClient) {
 
+  /**
+   *  تعارض — تغییری که سرور قبول نکرد، همراه با آنچه واقعاً آنجا هست.
+   *
+   *  `reason` یکی از این دوتاست:
+   *    • `stale` — نسخهٔ تازه‌تری روی سرور بود (شریک زودتر عوض کرده)
+   *    • `delete_not_allowed` — شاگرد رکوردِ کسِ دیگری را حذف کرده بود
+   *
+   *  `record` نسخهٔ خودِ سرور است؛ با آن، گوشی می‌تواند خودش را اصلاح
+   *  کند. `deleted` یعنی سرور آن رکورد را ندارد.
+   */
+  data class Conflict(
+    val collection: String,
+    val id: String,
+    val reason: String,
+    val deleted: Boolean,
+    val record: JsonObject?,
+  )
+
+  data class PushResult(
+    val applied: Int,
+    val skipped: Int,
+    val conflicts: List<Conflict>,
+  )
+
   /** فرستادنِ تغییرهای محلی */
-  suspend fun push(deviceId: String, changes: JsonArray, settings: JsonObject): JsonObject =
-    api.post(
+  suspend fun push(deviceId: String, changes: JsonArray, settings: JsonObject): PushResult {
+    val body = api.post(
       ApiEndpoints.Sync.PUSH,
       buildJsonObject {
         put("deviceId", JsonPrimitive(deviceId))
@@ -37,6 +61,23 @@ class SyncRepository(private val api: ApiClient) {
         put("settings", settings)
       },
     )
+    return PushResult(
+      applied = ApiJson.long(body, "applied", 0).toInt(),
+      skipped = ApiJson.long(body, "skipped", 0).toInt(),
+      conflicts = (body["conflicts"] as? JsonArray).orEmpty().mapNotNull { element ->
+        val row = element as? JsonObject ?: return@mapNotNull null
+        val collection = ApiJson.text(row, "collection").ifBlank { return@mapNotNull null }
+        val id = ApiJson.text(row, "id").ifBlank { return@mapNotNull null }
+        Conflict(
+          collection = collection,
+          id = id,
+          reason = ApiJson.text(row, "reason").ifBlank { "unknown" },
+          deleted = ApiJson.bool(row, "deleted"),
+          record = row["data"] as? JsonObject,
+        )
+      },
+    )
+  }
 
   data class Page(
     val changes: JsonArray,

@@ -65,6 +65,45 @@ object AutoSync {
   var lastError by mutableStateOf<String?>(null)
     private set
 
+  /**
+   *  چند تغییرِ محلی هنوز روی سرور ننشسته.
+   *
+   *  این عدد چیزی است که نقطهٔ بالای صفحه نشان می‌دهد. تا دیروز هیچ
+   *  صفحه‌ای وضعیت را نشان نمی‌داد: فروشنده‌ای که در زیرزمینِ بی‌آنتن کار
+   *  می‌کرد نمی‌دانست ۳۰ فروشش هنوز روی گوشی است.
+   */
+  var pendingCount by mutableStateOf(0)
+    private set
+
+  /**
+   *  آخرین تغییرهایی که سرور قبول نکرد و نسخهٔ او جایشان نشست.
+   *
+   *  خالی نگه داشتنِ این، همان «بی‌صدا گم شدن» بود. حالا صفحهٔ تنظیمات و
+   *  نقطهٔ وضعیت می‌گویند چند مورد اعمال نشد، و کاربر می‌داند باید نگاهی
+   *  بیندازد.
+   */
+  var lastRejected by mutableStateOf(0)
+    private set
+
+  /** پیامِ فارسیِ آخرین تعارض، برای نشان دادن یک‌باره */
+  var rejectionNote by mutableStateOf<String?>(null)
+    private set
+
+  /** بعد از اینکه کاربر پیام را دید */
+  fun clearRejectionNote() {
+    rejectionNote = null
+  }
+
+  /** یکی از سه حالتِ نقطه */
+  enum class Health { OK, WAITING, FAILED }
+
+  val health: Health
+    get() = when {
+      lastError != null -> Health.FAILED
+      running || pendingCount > 0 -> Health.WAITING
+      else -> Health.OK
+    }
+
   /** تغییرِ محلی هست که هنوز نرفته */
   @Volatile private var unsent = false
 
@@ -152,15 +191,22 @@ object AutoSync {
 
     val state = SyncStore(app)
     running = true
-    val outcome = runCatching { Syncer(store, state, app).run() }
+    val outcome = runCatching {
+      Syncer(store, state, app).apply { onCollected = { pendingCount = it } }.run()
+    }
     running = false
 
     outcome
-      .onSuccess {
+      .onSuccess { done ->
         unsent = false
         attempt = 0
+        pendingCount = 0
         lastOk = System.currentTimeMillis()
         lastError = null
+        //  تعارض‌ها خطا نیستند — همگام‌سازی موفق بوده — ولی کاربر باید
+        //  بداند کدام تغییرش اعمال نشد
+        lastRejected = done.rejected.size
+        rejectionNote = if (done.rejected.isEmpty()) null else conflictNote(done.rejected)
         retrying?.cancel()
         retrying = null
         //  مجوزِ اشتراک هم همین‌جا تازه می‌شود؛ عمرش ده روز است و اگر
@@ -177,6 +223,27 @@ object AutoSync {
         }
         scheduleRetry(app, store)
       }
+  }
+
+  /**
+   *  پیامِ فارسیِ تعارض‌ها.
+   *
+   *  دو حالت جدا می‌شوند چون کاری که کاربر باید بکند فرق دارد: یکی
+   *  «شریکت زودتر عوض کرده» است و آن یکی «اجازه‌ات نمی‌رسد».
+   */
+  private fun conflictNote(
+    rejected: List<ir.vil3ntec.tohid.data.repo.SyncRepository.Conflict>,
+  ): String {
+    val stale = rejected.count { it.reason == "stale" }
+    val denied = rejected.count { it.reason == "delete_not_allowed" }
+    val parts = buildList {
+      if (stale > 0) add("$stale مورد چون نسخهٔ تازه‌تری روی سرور بود")
+      if (denied > 0) add("$denied مورد چون اجازهٔ حذفش را نداشتید")
+      val other = rejected.size - stale - denied
+      if (other > 0) add("$other مورد دیگر")
+    }
+    return "${rejected.size} تغییر اعمال نشد: ${parts.joinToString("، ")}. " +
+      "نسخهٔ سرور جایش نشست."
   }
 
   /**

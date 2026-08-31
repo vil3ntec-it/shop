@@ -15,6 +15,9 @@
 }
 #sync-toast.show{ opacity:1; transform:translateY(0); }
 #sync-toast.bad{ background:var(--danger,#e54b4b); }
+/* تعارض خطا نیست — همگام‌سازی موفق بوده — ولی کاربر باید ببیند کدام
+   تغییرش اعمال نشد. نارنجی، نه قرمز. */
+#sync-toast.warn{ background:var(--warn,#f08a24); color:#2a1c05; }
 @media (min-width:900px){ #sync-toast{ inset-inline-start:auto; max-width:420px; } }
 @media (max-width:899px){ #sync-toast{ bottom:calc(var(--bottomnav-h,66px) + 12px); } }
 

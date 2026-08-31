@@ -211,7 +211,7 @@ fun AppRoot(
     //  تازه وارد شده: دفترِ همین حساب باید همان لحظه پایین بیاید، نه
     //  دفعهٔ بعد که برنامه باز می‌شود. کسی که تازه نصب کرده و وارد
     //  شده، وگرنه دکانِ خالی می‌دید.
-    WelcomeScreen {
+    WelcomeScreen(store) {
       authOpen = false
       ir.vil3ntec.tohid.sync.AutoSync.now(context, store)
     }

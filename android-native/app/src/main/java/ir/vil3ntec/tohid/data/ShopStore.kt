@@ -122,6 +122,53 @@ class ShopStore(private val context: Context) {
 
   fun hasData(): Boolean = file.exists()
 
+  /* ------------------------ دفتر، به نامِ حساب ------------------------ */
+
+  /*
+   *  چرا دفتر باید اسمِ صاحبش را داشته باشد.
+   *
+   *  تا دیروز روی یک گوشی فقط یک فایل بود: `shop-data.json`. خروج از حساب
+   *  توکن را پاک می‌کرد ولی این فایل سرِ جایش می‌ماند. نفرِ بعدی که روی
+   *  همان گوشی وارد می‌شد، «سایه» خالی داشت — یعنی همگام‌سازی همهٔ ردیف‌های
+   *  نفرِ قبلی را «تغییرِ تازه» می‌دید و صاف می‌فرستاد داخلِ دکانِ او.
+   *
+   *  یک گوشیِ مشترک در دکان، یا فروختنِ گوشی، یا حتی امتحان کردنِ دو حساب
+   *  کافی بود.
+   *
+   *  حالا دفترِ هر حساب زیرِ نامِ خودش بایگانی می‌شود. عوض شدنِ حساب یعنی
+   *  دفترِ قبلی می‌رود کنار و دفترِ همین حساب باز می‌شود؛ هیچ ردیفی از یکی
+   *  به دیگری نشت نمی‌کند و هیچ‌کدام هم پاک نمی‌شود.
+   */
+
+  private fun vault(key: String) = File(context.filesDir, "ledger-${safeKey(key)}.json")
+
+  /** بایگانی کردنِ دفترِ فعلی زیرِ نامِ حساب، و خالی کردنِ دفترِ روی میز */
+  suspend fun stashTo(key: String) = withContext(Dispatchers.IO) {
+    runCatching {
+      if (file.exists()) file.copyTo(vault(key), overwrite = true)
+      file.delete()
+    }
+    _data.value = ShopData()
+    Unit
+  }
+
+  /** باز کردنِ دفترِ یک حساب — اگر بایگانی نداشت، دفترِ خالی */
+  suspend fun openFrom(key: String) {
+    withContext(Dispatchers.IO) {
+      val saved = vault(key)
+      runCatching {
+        if (saved.exists()) saved.copyTo(file, overwrite = true) else file.delete()
+      }
+    }
+    _loaded.value = false
+    _data.value = ShopData()
+    load()
+  }
+
+  /** نامِ فایل نباید از کاراکترهای شناسه آسیب ببیند */
+  private fun safeKey(key: String): String =
+    key.map { if (it.isLetterOrDigit()) it else '_' }.joinToString("").take(48).ifBlank { "anon" }
+
   /**
    * فایلِ پشتیبان.
    *

@@ -79,6 +79,8 @@ import ir.vil3ntec.tohid.core.config.AppConfig
 import ir.vil3ntec.tohid.core.model.SessionDto
 import ir.vil3ntec.tohid.core.net.userText
 import ir.vil3ntec.tohid.data.repo.Backend
+import ir.vil3ntec.tohid.data.LedgerOwner
+import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.sync.SavedLogins
 import ir.vil3ntec.tohid.sync.SyncStore
 import ir.vil3ntec.tohid.ui.theme.Shop
@@ -145,7 +147,7 @@ private val GOLD_GLOW = Color(0xFFF6C93F)
 private val GOLD_RING = Color(0xFFFFE9A8)
 
 @Composable
-fun WelcomeScreen(onDone: () -> Unit) {
+fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
   val state = remember { SyncStore(context) }
@@ -226,9 +228,25 @@ fun WelcomeScreen(onDone: () -> Unit) {
    */
   fun finish(identifier: String, session: SessionDto) {
     val display = session.user.name.ifBlank { name.trim() }
-    state.accountName = display
     SavedLogins.remember(context, identifier, display)
-    onDone()
+    /*
+     *  پیش از هر چیز، دفترِ روی گوشی باید مالِ همین حساب باشد.
+     *
+     *  اگر حسابِ دیگری روی این گوشی کار کرده بود، دفترش همین‌جا بایگانی
+     *  می‌شود و دفترِ این حساب باز. بدونِ این، اولین همگام‌سازی همهٔ
+     *  ردیف‌های نفرِ قبلی را داخلِ دکانِ این یکی می‌ریخت.
+     *
+     *  `onDone` عمداً *بعد از* آن صدا زده می‌شود: صدازننده بلافاصله
+     *  همگام‌سازی را راه می‌اندازد و اگر ترتیب برعکس باشد، همان نشتی که
+     *  بسته شد یک بار اتفاق می‌افتد.
+     */
+    scope.launch {
+      runCatching { LedgerOwner.signedIn(context, store, session.user.id) }
+      //  نام *بعد از* آن نوشته می‌شود: جابه‌جاییِ حساب هرچه به حسابِ
+      //  قبلی بسته بوده را پاک می‌کند و نامِ تازه هم قربانی می‌شد
+      state.accountName = display
+      onDone()
+    }
   }
 
   //  «می‌شود به سرور زد یا نه» را پیکربندی می‌گوید
@@ -1400,21 +1418,18 @@ private fun BrandMark() {
         alpha = 0.55f + breathe * 0.35f,
       )
     }
-    // شیشه: سطحِ نیمه‌شفاف با یک لبهٔ روشن، نه یک مربعِ توپر
+    //  مربعِ سفیدِ گردگوشه، با همان نسبتی که آیکنِ روی صفحهٔ گوشی دارد.
+    //  تا دیروز اینجا یک آیکنِ عمومیِ «مغازه» بود؛ کاربر روی صفحهٔ گوشی
+    //  یک نشان می‌دید و داخلِ برنامه نشانِ دیگری.
     Box(
       Modifier
         .size(54.dp)
         .clip(RoundedCornerShape(19.dp))
-        .background(colors.surface2.copy(alpha = 0.75f))
+        .background(Color.White)
         .border(1.dp, GOLD_GLOW.copy(alpha = 0.45f), RoundedCornerShape(19.dp)),
       contentAlignment = Alignment.Center,
     ) {
-      Icon(
-        Icons.Filled.Storefront,
-        contentDescription = null,
-        tint = colors.primary,
-        modifier = Modifier.size(26.dp),
-      )
+      TohidMark(Modifier.size(34.dp))
     }
   }
 }

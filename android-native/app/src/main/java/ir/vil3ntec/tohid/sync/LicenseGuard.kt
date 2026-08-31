@@ -42,6 +42,7 @@ object LicenseGuard {
       state.publicKey,
       state.deviceUid,
       trustedNow(state),
+      state.accountId,
     )
   }
 }

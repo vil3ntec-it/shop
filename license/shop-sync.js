@@ -43,6 +43,9 @@
   const read = (k, dflt) => { try { return JSON.parse(localStorage.getItem(k)) ?? dflt; } catch { return dflt; } };
   const write = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { console.error('[sync] ذخیره ناموفق', e); return false; } };
 
+  const OWNER_KEY  = 'tohid-ledger-owner-v1';    // دفتر روی این مرورگر مال کدام حساب است
+  const VAULT_KEY  = (uid) => 'tohid-ledger-vault-' + String(uid).replace(/[^A-Za-z0-9_-]/g, '_');
+
   const getData = () => read(DATA_KEY, null);
   const setData = (d) => write(DATA_KEY, d);
   const getState = () => read(STATE_KEY, { rev: 0, lastSyncAt: 0, members: [], shop: null, invoiceBlock: null });
@@ -118,6 +121,56 @@
       setAcct({ accessToken: r.accessToken });
       return api(path, opts);
     }
+  }
+
+  /* ---------- دفتر، به نام حساب ----------
+
+     اشکالی که این می‌بندد:
+
+     سرور حساب‌ها را کاملا جدا نگه می‌دارد — آن سمت درست بود. خرابی این
+     طرف بود: روی یک مرورگر فقط یک دفتر وجود داشت و به هیچ حسابی بسته
+     نبود. خروج از حساب توکن را پاک می‌کرد و `tohid-shop-data-v1` را
+     دست‌نخورده می‌گذاشت.
+
+       ۱) احمد وارد می‌شود، ۵۰۰ فروش ثبت می‌کند، خارج می‌شود
+       ۲) محمود روی همان مرورگر وارد می‌شود
+       ۳) سایه خالی است ← همه‌ی ۵۰۰ فروش احمد «تغییر تازه‌ی محمود» دیده
+          می‌شود و صاف می‌رود داخل دکان او
+
+     یک گوشی مشترک در دکان، یا حتی امتحان کردن دو حساب، کافی بود.
+
+     قاعده‌ی حالا: هر دفتر یک صاحب دارد. دفتر بی‌صاحب (کسی که آفلاین
+     شروع کرده و حالا اولین بار وارد می‌شود) به نام او سند می‌خورد —
+     کار چند هفته‌اش را از دست نمی‌دهد. حساب دیگری که وارد شود، دفتر
+     قبلی زیر نام صاحبش بایگانی می‌شود و دفتر خودش باز. هیچ داده‌ای پاک
+     نمی‌شود. */
+
+  /** دفتر روی میز را با حساب فعلی یکی می‌کند. اگر جابه‌جا شد، true. */
+  function alignLedgerToAccount() {
+    const me = String(getAcct().userId || '').trim();
+    if (!me) return false;                      // حسابی در کار نیست
+
+    const owner = String(lsGet(OWNER_KEY) || '').trim();
+    if (owner === me) return false;             // همان حساب — دست نمی‌خوریم
+
+    if (!owner) {                               // دفتر بی‌صاحب: به نام او
+      lsSet(OWNER_KEY, me);
+      return false;
+    }
+
+    // حساب عوض شده — دفتر قبلی می‌رود کنار، دفتر این حساب می‌آید
+    const current = lsGet(DATA_KEY);
+    if (current) lsSet(VAULT_KEY(owner), current); else lsDel(VAULT_KEY(owner));
+
+    const mine = lsGet(VAULT_KEY(me));
+    if (mine) lsSet(DATA_KEY, mine); else lsDel(DATA_KEY);
+
+    // سایه و شماره‌ی تغییر مال دکان قبلی بودند؛ نگه داشتنشان یعنی همان
+    // قاطی‌شدنی که قرار بود بسته شود
+    lsDel(SHADOW_KEY);
+    setState({ rev: 0, lastSyncAt: 0, invoiceBlock: null });
+    lsSet(OWNER_KEY, me);
+    return true;
   }
 
   // ---------- تشخیص تغییرات محلی ----------
@@ -322,13 +375,39 @@
 
     syncing = true;
     try {
+      // ۰) پیش از هر چیز: دفتر روی میز باید مال همین حساب باشد
+      const swapped = alignLedgerToAccount();
+
       // ۱) تغییرات خودم را بفرست
       const { changes, settings } = collectLocalChanges();
+      let rejected = [];
       if (changes.length || settings) {
-        await apiAuth('/api/v1/shop/sync/push', {
+        const pushed = await apiAuth('/api/v1/shop/sync/push', {
           method: 'POST', body: { deviceId: deviceUid(), changes, settings },
         });
         snapshotShadow();
+
+        /* تغییری که سرور رد کرد، بی‌صدا گم نمی‌شود.
+
+           تا دیروز `conflicts` خوانده نمی‌شد. یعنی اگر شریک شما همان
+           فاکتور را زودتر عوض کرده بود، ویرایش شما رد می‌شد، سایه
+           «فرستاده شد» ثبت می‌کرد، و کار شما بی‌هیچ پیامی ناپدید
+           می‌شد — بدتر: چون rev رکورد عوض نشده بود، در pull بعدی هم
+           نمی‌آمد و دو طرف تا ابد ناهمگام می‌ماندند.
+
+           حالا سرور نسخه‌ی خودش را همراه تعارض می‌فرستد؛ همان‌جا جای
+           نسخه‌ی محلی می‌نشیند و کاربر می‌بیند چه چیزی اعمال نشد. */
+        rejected = Array.isArray(pushed && pushed.conflicts) ? pushed.conflicts : [];
+        if (rejected.length) {
+          mergeRemote(
+            rejected
+              .filter(c => c && c.collection && c.id && (c.deleted || c.data))
+              .map(c => ({ collection: c.collection, id: c.id, deleted: !!c.deleted, data: c.data })),
+            null
+          );
+          snapshotShadow();
+          if (!silent) toast(conflictMessage(rejected), 'warn');
+        }
       }
 
       // ۲) تغییرات دیگران را بگیر (صفحه‌به‌صفحه)
@@ -355,8 +434,25 @@
 
       if (total > 0 && reload !== false) offerReload(total);
 
-      return { pushed: changes.length, pulled: total, rev: since, shortages };
+      return { pushed: changes.length, pulled: total, rev: since, shortages, rejected, swapped };
     } finally { syncing = false; }
+  }
+
+  /**
+   * پیام فارسی تعارض‌ها.
+   *
+   * دو حالت جدا می‌شوند چون کاری که کاربر باید بکند فرق دارد: یکی
+   * «شریکت زودتر عوض کرده» است و آن یکی «اجازه‌ات نمی‌رسد».
+   */
+  function conflictMessage(rejected) {
+    const stale = rejected.filter(c => c.reason === 'stale').length;
+    const denied = rejected.filter(c => c.reason === 'delete_not_allowed').length;
+    const other = rejected.length - stale - denied;
+    const parts = [];
+    if (stale) parts.push(`${fa(stale)} مورد چون نسخه‌ی تازه‌تری روی سرور بود`);
+    if (denied) parts.push(`${fa(denied)} مورد چون اجازه‌ی حذفش را نداشتید`);
+    if (other) parts.push(`${fa(other)} مورد دیگر`);
+    return `${fa(rejected.length)} تغییر اعمال نشد: ${parts.join('، ')}. نسخه‌ی سرور جایش نشست.`;
   }
 
   async function refreshShopInfo() {
@@ -517,6 +613,7 @@
     api, apiAuth, serverUrl, setServerUrl, deviceUid,
     findShortages, shortageMessage, stockOf, openShortageModal, offerReload,
     collectLocalChanges, snapshotShadow, mergeRemote, refreshShopInfo,
+    alignLedgerToAccount, conflictMessage,
     _toast: toast,
   };
 

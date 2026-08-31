@@ -56,7 +56,7 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
         // کلِ برنامه راست‌به‌چپ است
         CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
           if (!welcomed) {
-            WelcomeScreen {
+            WelcomeScreen(store) {
               prefs.edit().putBoolean("welcomed", true).apply()
               welcomed = true
             }
