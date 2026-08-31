@@ -192,10 +192,18 @@ private fun salesSection(
 
     val r = ReportEngine.sales(d, from, to)
 
+    /*
+     *  وقتی عدد منفی است، اسمش «ضرر» است نه «سودِ منفی».
+     *
+     *  رنگِ قرمز بود ولی برچسب همان «سود خالص» می‌ماند — و کسی که
+     *  عددها را سریع نگاه می‌کند، «سود» می‌خواند و رد می‌شود. کلمه‌ی
+     *  درست، خودش هشدار است.
+     */
+    val lost = r.netProfit < 0
     StatTile(
-      label = "سود خالص",
-      value = "${money(r.netProfit)} افغانی",
-      tint = if (r.netProfit >= 0) Shop.colors.success else Shop.colors.danger,
+      label = if (lost) "ضرر خالص" else "سود خالص",
+      value = "${money(kotlin.math.abs(r.netProfit))} افغانی",
+      tint = if (lost) Shop.colors.danger else Shop.colors.success,
       hint = "${plain(r.count)} فاکتور",
       modifier = Modifier.fillMaxWidth(),
     )
@@ -208,10 +216,10 @@ private fun salesSection(
       HorizontalDivider(Modifier.padding(vertical = 8.dp), color = Shop.colors.border)
       ReportRow("بهای تمام‌شدهٔ کالا", r.cogs, negative = true)
       if (r.returnAmount > 0) ReportRow("مرجوعی", r.returnAmount, negative = true)
-      ReportRow("سود ناخالص", r.grossProfit, strong = true)
+      ReportRow(if (r.grossProfit < 0) "ضرر ناخالص" else "سود ناخالص", r.grossProfit, strong = true)
       HorizontalDivider(Modifier.padding(vertical = 8.dp), color = Shop.colors.border)
       ReportRow("مصارف", r.expenses, negative = true)
-      ReportRow("سود خالص", r.netProfit, strong = true)
+      ReportRow(if (lost) "ضرر خالص" else "سود خالص", r.netProfit, strong = true)
     }
 
     Spacer(Modifier.height(10.dp))
