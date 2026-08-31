@@ -6,16 +6,17 @@
   فایل روی هر تراکمی تمیز درمی‌آید.
 
   هندسه‌اش مو‌به‌مو همان چیزی است که آیکن‌های رنگی از رویش کشیده شده‌اند،
-  و مثل آن‌ها داخل ناحیه‌ی امن ۷۲ از ۱۰۸ می‌نشیند — پس روی لانچرِ دایره،
-  گردگوشه و قطره یک‌شکل بریده می‌شود.
+  و مثل آن‌ها طوری کوچک شده که دورترین نقطه‌اش — نوکِ بازوی آبی — داخلِ
+  دایره‌ی تضمین‌شده‌ی ۷۲ از ۱۰۸ بماند. پس روی لانچرِ دایره، گردگوشه و
+  قطره هیچ گوشه‌ای بریده نمی‌شود.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
     <!-- بازوی چپ -->
-    <path android:fillColor="#FFFFFF" android:pathData="M23.04,35.49 L37.98,35.49 L58.23,75.33 L51.59,79.81 Z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M26.64,37.64 L39.84,37.64 L57.74,72.85 L51.87,76.81 Z" />
     <!-- بازوی راست -->
-    <path android:fillColor="#FFFFFF" android:pathData="M68.19,28.85 L84.96,28.19 L58.23,57.4 L50.76,46.61 Z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M66.54,31.77 L81.36,31.19 L57.74,57.01 L51.14,47.47 Z" />
     <!-- تیغه‌ی پایین -->
-    <path android:fillColor="#FFFFFF" android:pathData="M72.51,51.26 Q74.34,68.19 53.58,78.65 Q60.06,59.56 72.51,51.26 Z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M70.36,51.58 Q71.97,66.54 53.63,75.79 Q59.35,58.91 70.36,51.58 Z" />
 </vector>
