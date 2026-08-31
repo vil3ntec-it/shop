@@ -27,6 +27,13 @@ async function createApp({ runMigrations = true } = {}) {
     res.set('X-Frame-Options', 'DENY');
     res.set('Referrer-Policy', 'no-referrer');
     res.set('Cross-Origin-Opener-Policy', 'same-origin');
+    //  وقتی درخواست از HTTPS آمده، به مرورگر می‌گوییم از این به بعد
+    //  فقط HTTPS. بدون این، اولین درخواستِ هر بازدید می‌تواند روی HTTP
+    //  ساده برود و توکن همان‌جا دیده شود. فقط پشت TLS فرستاده می‌شود:
+    //  روی شبکه‌ی محلیِ بدون گواهی، این سرآیند دسترسی را می‌بندد.
+    if (req.secure || req.headers['x-forwarded-proto'] === 'https') {
+      res.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    }
     next();
   });
 

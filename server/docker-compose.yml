@@ -53,10 +53,40 @@ services:
       TRIAL_DAYS: ${TRIAL_DAYS:-14}
       DEFAULT_COUNTRY_CODE: ${DEFAULT_COUNTRY_CODE:-+93}
     ports:
-      - "${PORT:-3000}:3000"
+      #  فقط روی خودِ سرور باز می‌شود، نه روی اینترنت.
+      #
+      #  تا دیروز اینجا "3000:3000" بود، یعنی API مستقیم و بدون رمزنگاری
+      #  روی IP سرور شنیده می‌شد — توکن و رمز کاربر روی HTTP ساده. حالا
+      #  راه بیرون فقط از Caddy می‌گذرد که HTTPS دارد. اگر واقعاً خواستید
+      #  بدون گواهی و روی شبکه‌ی محلی کار کنید، BIND را در .env روی
+      #  0.0.0.0 بگذارید.
+      - "${BIND:-127.0.0.1}:${PORT:-3000}:3000"
     volumes:
       # پشتیبان‌ها بیرون از container می‌مانند تا با پاک شدن آن از بین نروند
       - ${BACKUP_PATH:-./data/backups}:/app/data/backups
 
+  #  HTTPS خودکار روی دامنه‌ی خودتان.
+  #
+  #  با profile می‌آید تا کسی که روی شبکه‌ی محلی کار می‌کند مجبور نباشد
+  #  دامنه داشته باشد:  docker compose --profile tls up -d
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    profiles: ["tls"]
+    depends_on: [api]
+    environment:
+      DOMAIN: ${DOMAIN:?برای HTTPS، DOMAIN را در .env بگذارید}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # گواهی‌ها اینجا می‌مانند؛ بدون این، هر بار بالا آمدن یک گواهی
+      # تازه می‌گیرد و Let's Encrypt سقف روزانه دارد
+      - caddy-data:/data
+      - caddy-config:/config
+
 volumes:
   db-data:
+  caddy-data:
+  caddy-config:
