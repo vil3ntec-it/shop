@@ -32,6 +32,8 @@ import androidx.compose.material3.*
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.*
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -143,12 +145,30 @@ fun AppRoot(
   /*
    *  همگام‌سازی خودکار.
    *
-   *  یک بار سرِ باز شدنِ برنامه، و بعد از هر تغییر در دفتر با کمی مکث.
-   *  تا امروز فقط یک دکمهٔ دستی در تنظیمات بود و دو گوشیِ یک دکان تا
-   *  کسی آن را نمی‌زد از هم بی‌خبر بودند.
+   *  هر بار که برنامه جلوی چشم می‌آید — چه سرِ باز شدن، چه برگشت از
+   *  پس‌زمینه — یک بار همه‌چیز تازه می‌شود و بعد تا وقتی باز است،
+   *  تغییرهای دیگران هم گرفته می‌شود. با رفتن به پس‌زمینه خاموش
+   *  می‌شود تا باتری و دیتا الکی نرود.
+   *
+   *  تا دیروز فقط یک بار سرِ باز شدنِ سرد بود: کسی که برنامه را در
+   *  جیبش نگه می‌داشت و دوباره بازش می‌کرد، تغییرِ شریکش را نمی‌دید.
    */
+  LifecycleEventEffect(Lifecycle.Event.ON_START) {
+    if (loaded) {
+      ir.vil3ntec.tohid.sync.AutoSync.now(context, store)
+      ir.vil3ntec.tohid.sync.AutoSync.startPolling(context, store)
+    }
+  }
+  LifecycleEventEffect(Lifecycle.Event.ON_STOP) {
+    ir.vil3ntec.tohid.sync.AutoSync.stopPolling()
+  }
+
+  //  اگر دفتر دیرتر از ON_START آماده شد، همان‌جا شروع می‌کنیم
   LaunchedEffect(loaded) {
-    if (loaded) ir.vil3ntec.tohid.sync.AutoSync.now(context, store)
+    if (loaded) {
+      ir.vil3ntec.tohid.sync.AutoSync.now(context, store)
+      ir.vil3ntec.tohid.sync.AutoSync.startPolling(context, store)
+    }
   }
 
   /*
@@ -188,7 +208,13 @@ fun AppRoot(
   }
 
   if (authOpen) {
-    WelcomeScreen { authOpen = false }
+    //  تازه وارد شده: دفترِ همین حساب باید همان لحظه پایین بیاید، نه
+    //  دفعهٔ بعد که برنامه باز می‌شود. کسی که تازه نصب کرده و وارد
+    //  شده، وگرنه دکانِ خالی می‌دید.
+    WelcomeScreen {
+      authOpen = false
+      ir.vil3ntec.tohid.sync.AutoSync.now(context, store)
+    }
     return
   }
 
