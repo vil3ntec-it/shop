@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-  <color name="icon_bg">#000000</color>
+  <!-- زمینه‌ی آیکن: سفید، مثل مربعِ طرحِ اصلی. لانچرها این مربع را
+       به شکلِ خودشان (دایره، گردگوشه، قطره) می‌بُرند و چون نشان داخلِ
+       ناحیه‌ی امن است، روی همه یک‌جور درمی‌آید. -->
+  <color name="icon_bg">#FFFFFF</color>
   <color name="splash">#0F1420</color>
 </resources>

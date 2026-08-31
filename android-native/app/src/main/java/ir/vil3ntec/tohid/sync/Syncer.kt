@@ -3,6 +3,7 @@ package ir.vil3ntec.tohid.sync
 import ir.vil3ntec.tohid.core.net.ApiFailure
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.data.repo.Backend
+import ir.vil3ntec.tohid.data.repo.SyncRepository
 import kotlinx.serialization.json.JsonArray
 
 /**
@@ -26,7 +27,22 @@ class Syncer(
   /** لایهٔ شبکه از نقطهٔ اتصال می‌آید؛ اینجا نه نشانی ساخته می‌شود نه توکن */
   private val api by lazy { Backend.sync(context) }
 
-  data class Outcome(val pushed: Int, val pulled: Int, val revision: Long)
+  data class Outcome(
+    val pushed: Int,
+    val pulled: Int,
+    val revision: Long,
+    /** تغییرهایی که سرور قبول نکرد و نسخهٔ او جایشان نشست */
+    val rejected: List<SyncRepository.Conflict> = emptyList(),
+  )
+
+  /**
+   *  چند تغییرِ محلی هنوز نرفته — پیش از فرستادن خبر داده می‌شود.
+   *
+   *  `AutoSync` با همین عدد نقطهٔ بالای صفحه را زرد می‌کند و می‌گوید
+   *  «۳ مورد در انتظار». بدون این، کاربر تا وقتی چیزی نمی‌ترکید
+   *  نمی‌فهمید کارش روی گوشی مانده.
+   */
+  var onCollected: (Int) -> Unit = {}
 
   suspend fun run(): Outcome {
     if (!Backend.tokens(context).signedIn) throw ApiFailure.SessionExpired()
@@ -34,9 +50,27 @@ class Syncer(
 
     // ۱) فرستادن
     val outgoing = SyncEngine.collect(store.data.value, state.shadow, System.currentTimeMillis())
+    onCollected(outgoing.changes.size)
+    var rejected: List<SyncRepository.Conflict> = emptyList()
     if (outgoing.changes.isNotEmpty()) {
-      api.push(device, outgoing.changes, outgoing.settings)
+      val result = api.push(device, outgoing.changes, outgoing.settings)
       state.shadow = SyncEngine.snapshot(store.data.value)
+
+      /*
+       *  تغییری که سرور رد کرد، بی‌صدا گم نمی‌شود.
+       *
+       *  تا دیروز `conflicts` خوانده نمی‌شد. یعنی اگر شریکِ شما همان
+       *  فاکتور را زودتر عوض کرده بود، ویرایشِ شما رد می‌شد، سایه
+       *  «فرستاده شد» ثبت می‌کرد، و کارِ شما بی‌هیچ پیامی ناپدید
+       *  می‌شد — بدتر: چون rev رکورد عوض نشده بود، در `pull` بعدی هم
+       *  نمی‌آمد و دو طرف تا ابد ناهمگام می‌ماندند.
+       *
+       *  حالا سرور نسخهٔ خودش را همراه تعارض می‌فرستد و همان‌جا جای
+       *  نسخهٔ محلی می‌نشیند. داورِ نهایی سرور است — همان قاعده‌ای که
+       *  برای بقیهٔ تغییرها هم هست — و کاربر می‌بیند چه چیزی اعمال نشد.
+       */
+      rejected = result.conflicts
+      if (rejected.isNotEmpty()) applyServerVersions(rejected)
     }
 
     // ۲) گرفتن — صفحه‌به‌صفحه، با سقفی که حلقهٔ بی‌پایان نسازد
@@ -59,7 +93,35 @@ class Syncer(
     state.revision = since
     state.lastSyncAt = System.currentTimeMillis()
 
-    return Outcome(pushed = outgoing.changes.size, pulled = pulled, revision = since)
+    onCollected(0)
+    return Outcome(
+      pushed = outgoing.changes.size,
+      pulled = pulled,
+      revision = since,
+      rejected = rejected,
+    )
+  }
+
+  /** نسخهٔ سرور را جای رکوردهای ردشده می‌نشاند */
+  private suspend fun applyServerVersions(conflicts: List<SyncRepository.Conflict>) {
+    val incoming = kotlinx.serialization.json.buildJsonArray {
+      conflicts.forEach { conflict ->
+        //  رکوردی که سرور نفرستاده، چیزی برای نشاندن ندارد؛ دست نمی‌خورد
+        if (!conflict.deleted && conflict.record == null) return@forEach
+        add(
+          kotlinx.serialization.json.buildJsonObject {
+            put("collection", kotlinx.serialization.json.JsonPrimitive(conflict.collection))
+            put("id", kotlinx.serialization.json.JsonPrimitive(conflict.id))
+            put("deleted", kotlinx.serialization.json.JsonPrimitive(conflict.deleted))
+            conflict.record?.let { put("data", it) }
+          }
+        )
+      }
+    }
+    if (incoming.size == 0) return
+    val merged = SyncEngine.merge(store.data.value, incoming, null)
+    if (merged.touched > 0) store.save(merged.data)
+    state.shadow = SyncEngine.snapshot(store.data.value)
   }
 
   /** گرفتن یا تازه‌کردنِ مجوزِ اشتراک */

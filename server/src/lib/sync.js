@@ -97,25 +97,36 @@ async function pushChanges(ctx, changes) {
       if (Buffer.byteLength(json, 'utf8') > MAX_RECORD_BYTES) { skipped++; continue; }
 
       // رکورد فعلی سرور را قفل می‌کنیم تا دو دستگاه همزمان روی هم ننویسند
+      //
+      // `data` هم خوانده می‌شود، نه فقط برای مقایسه: اگر این تغییر رد شود،
+      // نسخه‌ی سرور همراه خودِ تعارض به گوشی برمی‌گردد. بدون آن، گوشی
+      // می‌فهمید «رد شد» ولی نمی‌دانست چه چیزی جای آن نشسته، و چون rev
+      // رکورد عوض نشده بود در pull بعدی هم نمی‌آمد — یعنی دو طرف تا ابد
+      // ناهمگام می‌ماندند.
       const existing = (await c.query(
-        `SELECT updated_at, deleted, version, user_id FROM ${table} WHERE shop_id=$1 AND id=$2 FOR UPDATE`,
+        `SELECT updated_at, deleted, version, user_id, data FROM ${table} WHERE shop_id=$1 AND id=$2 FOR UPDATE`,
         [shopId, recordId]
       )).rows[0];
+
+      /** تعارض، همراه با آنچه سرور واقعاً دارد. */
+      const conflictWith = (reason) => ({
+        collection, id: recordId, reason,
+        serverUpdatedAt: Number(existing.updated_at),
+        serverVersion: existing.version,
+        deleted: existing.deleted === true,
+        data: existing.deleted ? null : existing.data,
+      });
 
       if (existing) {
         // شاگرد فقط رکورد خودش را حذف می‌کند
         if (deleted && !can(role, 'data.delete.any') && existing.user_id !== userId) {
-          conflicts.push({ collection, id: recordId, reason: 'delete_not_allowed' });
+          conflicts.push(conflictWith('delete_not_allowed'));
           skipped++;
           continue;
         }
         // ویرایش قدیمی‌تر از چیزی که سرور دارد، نوشته نمی‌شود
         if (Number(existing.updated_at) > updatedAt) {
-          conflicts.push({
-            collection, id: recordId, reason: 'stale',
-            serverUpdatedAt: Number(existing.updated_at),
-            serverVersion: existing.version,
-          });
+          conflicts.push(conflictWith('stale'));
           skipped++;
           continue;
         }

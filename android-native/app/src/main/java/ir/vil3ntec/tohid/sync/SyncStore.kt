@@ -121,13 +121,32 @@ class SyncStore(context: Context) {
       prefs.edit().putString(SHADOW, tree.toString()).apply()
     }
 
-  /** خروج از حساب — داده‌های دکان دست‌نخورده می‌مانند */
+  /**
+   *  خروج از حساب.
+   *
+   *  دفترِ دکان روی گوشی می‌ماند — کسی که خارج می‌شود باید بتواند آفلاین
+   *  کارش را ببیند. جدا نگه داشتنِ حساب‌ها کارِ `LedgerOwner` است: دفتر
+   *  به نامِ همین حساب سند خورده و اگر حسابِ دیگری وارد شود، همان‌جا
+   *  بایگانی و جایگزین می‌شود.
+   */
   fun signOut() {
     tokens.clear()
     prefs.edit()
       .remove(NAME)
       .remove(LICENSE).remove(SHADOW).remove(REV).remove(LAST_SYNC)
       .apply()
+  }
+
+  /**
+   *  پاک کردنِ حافظهٔ همگام‌سازی، بدونِ دست زدن به توکن.
+   *
+   *  وقتی دفترِ روی میز عوض می‌شود، سایه و شمارهٔ آخرین تغییر دیگر به
+   *  هیچ دردی نمی‌خورند: سایه عکسِ دفترِ حسابِ قبلی است و شمارهٔ تغییر
+   *  مالِ دکانِ دیگری. نگه داشتنشان یعنی همان قاطی‌شدنی که قرار بود
+   *  بسته شود.
+   */
+  fun forgetSyncState() {
+    prefs.edit().remove(SHADOW).remove(REV).remove(LAST_SYNC).apply()
   }
 
   private fun newDeviceUid(): String {

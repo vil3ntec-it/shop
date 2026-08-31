@@ -132,6 +132,43 @@ test('۷ و ۸: فروش صاحب دکان و فروش شاگرد برای هر 
   assert.equal(pull3.body.changes.length, 0);
 });
 
+/*
+ * تغییری که رد می‌شود، نباید بی‌صدا گم شود.
+ *
+ * سرور همیشه تعارض را برمی‌گرداند، ولی تا امروز فقط «رد شد» را می‌گفت.
+ * چون rev رکورد عوض نمی‌شود، آن رکورد در pull بعدی هم نمی‌آمد — یعنی
+ * گوشی هیچ راهی نداشت بفهمد چه چیزی جای ویرایشش نشسته و دو طرف تا ابد
+ * ناهمگام می‌ماندند. حالا نسخه‌ی خود سرور همراه تعارض می‌آید.
+ */
+test('۸-ب: تعارض، نسخه‌ی سرور را هم با خودش برمی‌گرداند', async () => {
+  const owner = await h.newUser('صاحب-تعارض');
+  await h.post('/api/shop', { name: 'دکان تعارض' }, { token: owner.accessToken });
+
+  const late = Date.now() + 60000;
+  const first = await h.post('/api/sync', {
+    deviceId: 'dev-a',
+    changes: [{ collection: 'products', id: 'p-conf', updatedAt: late, data: { name: 'نسخه‌ی سرور' } }],
+  }, { token: owner.accessToken });
+  assert.equal(first.body.applied, 1);
+
+  // ویرایشی که ساعتش عقب‌تر است — سرور قبولش نمی‌کند
+  const second = await h.post('/api/sync', {
+    deviceId: 'dev-b',
+    changes: [{ collection: 'products', id: 'p-conf', updatedAt: late - 30000, data: { name: 'نسخه‌ی قدیمی' } }],
+  }, { token: owner.accessToken });
+
+  assert.equal(second.body.applied, 0);
+  assert.equal(second.body.conflicts.length, 1);
+
+  const conflict = second.body.conflicts[0];
+  assert.equal(conflict.reason, 'stale');
+  assert.equal(conflict.collection, 'products');
+  assert.equal(conflict.id, 'p-conf');
+  assert.equal(conflict.deleted, false);
+  // همین است که گوشی با آن خودش را اصلاح می‌کند
+  assert.equal(conflict.data.name, 'نسخه‌ی سرور');
+});
+
 // ---------- TEST 9: نوشتن همزمان ----------
 test('۹: دو کاربر همزمان ثبت می‌کنند و هیچ رکوردی گم نمی‌شود', async () => {
   const owner = await h.newUser('صاحب۳');
