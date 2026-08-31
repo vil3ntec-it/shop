@@ -813,7 +813,9 @@ private fun PinDialog(onDismiss: () -> Unit, onSet: (String) -> Unit) {
 /** تغییرِ رمزِ حساب — همان راهی که سرور از اول داشت و برنامه صدایش نمی‌زد */
 @Composable
 private fun PasswordChange(state: SyncStore, snackbarToast: (String) -> Unit) {
+  val context = LocalContext.current
   val scope = rememberCoroutineScope()
+  val auth = remember(context) { Backend.auth(context) }
   var current by remember { mutableStateOf("") }
   var fresh by remember { mutableStateOf("") }
   var busy by remember { mutableStateOf(false) }
@@ -850,7 +852,7 @@ private fun PasswordChange(state: SyncStore, snackbarToast: (String) -> Unit) {
       onClick = {
         busy = true
         scope.launch {
-          Backend.auth(context).changePassword(current, fresh)
+          auth.changePassword(current, fresh)
             .onSuccess { current = ""; fresh = ""; snackbarToast("رمز عوض شد") }
             .onFailure { snackbarToast(it.userMessage) }
           busy = false
