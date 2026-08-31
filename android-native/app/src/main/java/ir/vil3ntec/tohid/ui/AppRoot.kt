@@ -190,6 +190,7 @@ fun AppRoot(
     if (loaded) {
       ir.vil3ntec.tohid.sync.AutoSync.now(context, store)
       ir.vil3ntec.tohid.sync.AutoSync.startPolling(context, store)
+      ir.vil3ntec.tohid.sync.ShopNews.flush(context)
     }
   }
   LifecycleEventEffect(Lifecycle.Event.ON_STOP) {
@@ -201,6 +202,7 @@ fun AppRoot(
     if (loaded) {
       ir.vil3ntec.tohid.sync.AutoSync.now(context, store)
       ir.vil3ntec.tohid.sync.AutoSync.startPolling(context, store)
+      ir.vil3ntec.tohid.sync.ShopNews.flush(context)
     }
   }
 
@@ -224,7 +226,13 @@ fun AppRoot(
     }
   }
   LaunchedEffect(data) {
-    if (loaded) ir.vil3ntec.tohid.sync.AutoSync.nudge(context, store)
+    if (loaded) {
+      ir.vil3ntec.tohid.sync.AutoSync.nudge(context, store)
+      //  کالایی که تازه تمام شده، خبرش برای بقیهٔ اعضا می‌رود. فقط
+      //  «تازه»ها — وگرنه هر بار باز کردنِ برنامه همان فهرست را
+      //  دوباره می‌فرستاد.
+      ir.vil3ntec.tohid.sync.ShopNews.checkStock(context, data)
+    }
   }
 
   // دکمهٔ برگشتِ گوشی از صفحهٔ فرعی برمی‌گردد، نه اینکه برنامه را ببندد

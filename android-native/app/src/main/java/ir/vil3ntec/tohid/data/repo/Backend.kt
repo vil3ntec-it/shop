@@ -47,6 +47,7 @@ object Backend {
     val shop = ShopRepository(api)
     val account = AccountRepository(api)
     val sync = SyncRepository(api)
+    val events = EventsRepository(api)
   }
 
   private fun of(context: Context): Wiring =
@@ -57,6 +58,7 @@ object Backend {
   fun shop(context: Context): ShopRepository = of(context).shop
   fun account(context: Context): AccountRepository = of(context).account
   fun sync(context: Context): SyncRepository = of(context).sync
+  fun events(context: Context): EventsRepository = of(context).events
 
   /** آیا برنامه هم نشانی دارد و هم حساب — یعنی اصلاً می‌شود به سرور زد */
   fun isReady(context: Context): Boolean =

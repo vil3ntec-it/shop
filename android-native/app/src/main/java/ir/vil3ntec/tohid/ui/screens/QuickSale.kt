@@ -415,7 +415,13 @@ fun QuickSaleScreen(
             checkout = false
             cartOpen = false
             Haptics.success(context)
-            toast("فروش به مبلغ ${money(result.data.sales.last().finalTotal)} افغانی ثبت شد")
+            val sold = result.data.sales.last()
+            toast("فروش به مبلغ ${money(sold.finalTotal)} افغانی ثبت شد")
+            //  بقیهٔ اعضای دکان همان لحظه خبردار می‌شوند — صاحب دکانی
+            //  که خانه است نباید تا همگام‌سازیِ بعدی بی‌خبر بماند
+            ir.vil3ntec.tohid.sync.ShopNews.sale(
+              context, sold.finalTotal, cart.size,
+            )
             invoice = result.data to result.saleId
           }
         }
