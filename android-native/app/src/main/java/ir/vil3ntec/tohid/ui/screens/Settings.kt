@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.CloudDownload
@@ -51,6 +52,7 @@ import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.BackupClock
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.formatDate
+import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.plain
 import ir.vil3ntec.tohid.sync.License
 import ir.vil3ntec.tohid.core.config.ApiConfig
@@ -95,6 +97,12 @@ fun SettingsScreen(
   val account = remember(context) { Backend.account(context) }
 
   var storeName by remember { mutableStateOf(prefs.getString("store_name", "") ?: "") }
+  var debtLimit by remember {
+    mutableStateOf(ir.vil3ntec.tohid.data.Watchman.debtLimit(context))
+  }
+  var debtLimitText by remember {
+    mutableStateOf(if (debtLimit > 0) debtLimit.toLong().toString() else "")
+  }
   //  فقط برای کادرِ ساختِ آزمایشی؛ در نسخهٔ منتشرشده دیده نمی‌شود
   var serverUrl by remember { mutableStateOf(state.serverUrl) }
   //  «می‌شود به سرور زد یا نه» را پیکربندی می‌گوید، نه خالی نبودنِ یک رشته
@@ -354,6 +362,46 @@ fun SettingsScreen(
           },
           label = "نام فروشگاه",
           keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+        )
+      }
+    }
+
+    /* ============================== هشدارها ============================== */
+    item {
+      SettingsSection(
+        icon = Icons.Filled.NotificationsActive,
+        title = "هشدارها",
+        subtitle = "قرض از ${money(debtLimit)} افغانی به بالا",
+        tint = Shop.colors.warning,
+      ) {
+        Text(
+          "وقتی کالایی تمام شود، قرضِ کسی از این مبلغ بگذرد، یا اشتراک رو " +
+            "به پایان باشد، برنامه خبر می‌دهد — حتی وقتی بسته است.",
+          style = MaterialTheme.typography.bodySmall,
+          color = Shop.colors.muted,
+        )
+        Spacer(Modifier.height(10.dp))
+        TohidTextField(
+          value = debtLimitText,
+          onValueChange = { entered ->
+            //  فقط رقم؛ خالی یعنی «هشدارِ قرض را نمی‌خواهم»
+            val digits = entered.filter { it.isDigit() }
+            debtLimitText = digits
+            val value = digits.toDoubleOrNull() ?: 0.0
+            debtLimit = value
+            ir.vil3ntec.tohid.data.Watchman.setDebtLimit(context, value)
+          },
+          label = "هشدار قرض از این مبلغ به بالا (افغانی)",
+          keyboardOptions = KeyboardOptions(
+            keyboardType = KeyboardType.Number,
+            imeAction = ImeAction.Done,
+          ),
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+          "صفر یعنی هشدارِ قرض خاموش. کالای تمام‌شده و اشتراک سرِ جایشان می‌مانند.",
+          style = MaterialTheme.typography.labelSmall,
+          color = Shop.colors.muted2,
         )
       }
     }

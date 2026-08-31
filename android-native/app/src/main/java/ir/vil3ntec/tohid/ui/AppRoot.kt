@@ -218,6 +218,10 @@ fun AppRoot(
   ) { }
   LaunchedEffect(Unit) {
     ir.vil3ntec.tohid.data.Reminders.schedule(context)
+    //  خلاصهٔ روزانه یک چیز است و خبرِ فوری چیزِ دیگر: کالایی که تمام
+    //  شده، قرضی که از حد گذشته و اشتراکی که رو به پایان است، تا فردا
+    //  صبح صبر نمی‌کنند
+    ir.vil3ntec.tohid.data.Watchman.schedule(context)
     if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
       val granted = androidx.core.content.ContextCompat.checkSelfPermission(
         context, android.Manifest.permission.POST_NOTIFICATIONS
