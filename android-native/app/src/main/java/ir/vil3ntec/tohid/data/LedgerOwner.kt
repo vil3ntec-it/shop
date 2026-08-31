@@ -177,6 +177,7 @@ object LedgerOwner {
     runCatching { AccountVault.switch(context, from, to) }
     runCatching { PhotoStore.stashTo(context, from) }
     runCatching { PhotoStore.openFrom(context, to) }
+    runCatching { ShopRole.forget(context) }
     runCatching { CartStore(context).clear() }
     runCatching { AccountKeys.forget(context) }
 

@@ -167,6 +167,8 @@ fun ShopSetupScreen(store: ShopStore, onDone: () -> Unit) {
         }
         busy = true; error = null
         scope.launch {
+          //  اینجا کاربر از قبل وارد حسابی است (این صفحه بعد از ورود
+          //  می‌آید)، پس همان حساب به دکان می‌پیوندد
           shops.join(entered)
             .onSuccess { settle(it.shop?.id.orEmpty()) }
             .onFailure { error = it.userText("پیوستن به دکان انجام نشد") }

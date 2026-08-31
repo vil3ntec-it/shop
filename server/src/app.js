@@ -117,6 +117,7 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/auth', require('./routes/auth'));
     api.use('/me', require('./routes/me'));
     api.use('/shop', require('./routes/shop'));
+    api.use('/events', require('./routes/events'));
     api.use('/sync', require('./routes/sync'));
     api.use('/shop/sync', require('./routes/sync'));   // نام قدیمی
     api.use('/admin', require('./routes/admin'));

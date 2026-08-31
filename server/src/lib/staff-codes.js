@@ -153,6 +153,33 @@ async function revoke(shopId, codeId) {
  * همه‌ی مرحله‌ها در یک تراکنش‌اند تا اگر جایی خطا داد، نه عضویت نیمه‌کاره
  * بماند و نه شمارنده‌ی استفاده بی‌جهت بالا برود.
  */
+/**
+ * این کد مالِ کدام دکان است — بدون آنکه خرج شود.
+ *
+ * ورودِ شاگرد لازم دارد پیش از ساختنِ حساب بداند دکان کدام است، تا
+ * بتواند هویتِ پایدارِ «همین دستگاه روی همین دکان» را بسازد. اگر برای
+ * این کار `redeem` را صدا می‌زدیم، هر بار یک استفاده از کد می‌خورد.
+ */
+async function shopIdOf(rawCode) {
+  const normalized = normalize(rawCode);
+  if (normalized.length !== PREFIX.length + GROUPS * GROUP_LEN || !normalized.startsWith(PREFIX)) {
+    throw badRequest('قالب کد درست نیست', 'bad_code');
+  }
+  const row = await one('SELECT shop_id FROM staff_codes WHERE code_hash=$1', [hashCode(normalized)]);
+  if (!row) throw notFound('این کد معتبر نیست', 'bad_code');
+  /*
+   * وضعیت کد اینجا سنجیده نمی‌شود، عمداً.
+   *
+   * کدی که «یک بار مصرف» است بعد از اولین ورود `exhausted` می‌شود. اگر
+   * اینجا رد می‌کردیم، شاگرد فردا که برنامه را باز می‌کند دیگر وارد
+   * نمی‌شد — با اینکه عضو فعال همان دکان است.
+   *
+   * سدّ سرِ جایش است: کسی که هنوز عضو نیست از `redeem` رد می‌شود و
+   * آنجا وضعیت، مهلت و تعداد استفاده همه بررسی می‌شوند.
+   */
+  return row.shop_id;
+}
+
 async function redeem(rawCode, userId, ip = '') {
   const normalized = normalize(rawCode);
   if (normalized.length !== PREFIX.length + GROUPS * GROUP_LEN || !normalized.startsWith(PREFIX)) {
@@ -233,4 +260,4 @@ async function redeem(rawCode, userId, ip = '') {
 }
 
 module.exports = {
-  standing, rotateStanding, deriveStanding, create, list, revoke, redeem, normalize, format, hashCode, PREFIX };
+  standing, rotateStanding, deriveStanding, create, list, revoke, redeem, shopIdOf, normalize, format, hashCode, PREFIX };

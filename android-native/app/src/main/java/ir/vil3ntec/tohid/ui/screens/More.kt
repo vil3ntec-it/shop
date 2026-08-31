@@ -36,6 +36,8 @@ import ir.vil3ntec.tohid.ui.theme.Shop
 fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
   val context = LocalContext.current
   val prefs = remember { context.getSharedPreferences("tohid", android.content.Context.MODE_PRIVATE) }
+  //  شاگرد این ردیف‌ها را اصلاً نمی‌بیند
+  val canManage = remember { ir.vil3ntec.tohid.data.ShopRole.canOpenSettings(context) }
 
   // آدرس مخزنِ به‌روزرسانی ثابت است و به کاربر نشان داده نمی‌شود؛ فقط
   // برای عیب‌یابی می‌شود با همین کلید در تنظیماتِ برنامه عوضش کرد.
@@ -112,20 +114,30 @@ fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
         subtitle = "هر کاری که در برنامه انجام شده",
         onClick = { onOpen("audit") },
       )
-      MoreCard(
+      if (canManage) MoreCard(
         title = "کارمندان دکان",
         icon = Icons.Filled.Groups,
         tint = Shop.colors.accent,
         subtitle = "کد پیوستن بسازید و دسترسی شاگردها را ببندید",
         onClick = { onOpen("team") },
       )
-      MoreCard(
-        title = "تنظیمات",
-        icon = Icons.Filled.Settings,
-        tint = Shop.colors.primary,
-        subtitle = "نام فروشگاه، ظاهر، پشتیبان‌گیری و اتصال به سرور",
-        onClick = { onOpen("settings") },
-      )
+      /*
+       *  تنظیمات و «کارکنان» فقط برای صاحب دکان.
+       *
+       *  قرارِ صاحب دکان: شاگرد بفروشد و کار کند، ولی سراغِ تنظیمات
+       *  نرود تا یک وقت خراب‌کاری به سرش نزند. نشان ندادنِ ردیف بهتر
+       *  از نشان دادنِ ردیفی است که با زدنش پیام «اجازه ندارید»
+       *  بیاید — آن یکی فقط کنجکاوی می‌سازد.
+       */
+      if (canManage) {
+        MoreCard(
+          title = "تنظیمات",
+          icon = Icons.Filled.Settings,
+          tint = Shop.colors.primary,
+          subtitle = "نام فروشگاه، ظاهر، پشتیبان‌گیری و اتصال به سرور",
+          onClick = { onOpen("settings") },
+        )
+      }
     }
 
     Spacer(Modifier.height(20.dp))

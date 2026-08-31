@@ -20,6 +20,7 @@ const otp = require('../lib/otp');
 const google = require('../lib/google');
 const audit = require('../lib/audit');
 const { membershipOf } = require('../lib/shops');
+const staffCodes = require('../lib/staff-codes');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
 const { requireUser } = require('../middleware/auth');
 const { badRequest, unauthorized, forbidden, conflict, tooMany, notFound } = require('../middleware/errors');
@@ -27,6 +28,8 @@ const { badRequest, unauthorized, forbidden, conflict, tooMany, notFound } = req
 const router = express.Router();
 
 const authLimit = rateLimit({ max: config.rateLimit.authMax, keyPrefix: 'auth' });
+//  کد شاگرد خودش رمز است، پس مثل رمز محدود می‌شود
+const joinLimit = rateLimit({ max: config.rateLimit.joinMax, keyPrefix: 'staff-login' });
 const otpLimit = rateLimit({
   max: config.rateLimit.otpMax, keyPrefix: 'otp',
   key: (req) => String(req.body?.phone || '').replace(/\D/g, '') || null,
@@ -112,6 +115,89 @@ async function loginPayload(user, session) {
     ...session,
   };
 }
+
+// ---------- ورود شاگرد، فقط با کد ----------
+/**
+ * صاحب دکان کد را به شاگردش می‌دهد؛ شاگرد همان کد را در صفحه‌ی ورود
+ * می‌زند و داخل است. نه ایمیل، نه شماره، نه رمز.
+ *
+ * ── چرا این‌طور ────────────────────────────────────────────────────
+ * تا امروز شاگرد باید اول خودش حساب می‌ساخت (ایمیل یا شماره) و بعد کد
+ * را می‌زد. یعنی صاحب دکان باید یک مرحله‌ی اضافه هم توضیح می‌داد، و
+ * شاگردی که ایمیل ندارد اصلاً وارد نمی‌شد.
+ *
+ * ── همان دستگاه، همان حساب ─────────────────────────────────────────
+ * شناسه‌ی دستگاه با شناسه‌ی دکان یک هویت پایدار می‌سازد
+ * (`user_identities` با provider='staff'). پس شاگردی که فردا دوباره
+ * وارد می‌شود همان حساب قبلی را می‌گیرد، نه یک عضو تازه — وگرنه هر
+ * ورود یک صندلی از ظرفیت دکان می‌خورد و کد هم زودتر تمام می‌شد.
+ *
+ * ── امنیت ──────────────────────────────────────────────────────────
+ * کد خودش رمز است، پس مثل رمز با آن رفتار می‌شود: محدودیت نرخ روی
+ * همین مسیر، و صاحب دکان هر وقت بخواهد کد را باطل یا عوض می‌کند و
+ * دسترسی همان لحظه بسته می‌شود.
+ */
+router.post(['/staff', '/staff-login'], joinLimit, async (req, res, next) => {
+  try {
+    const rawCode = v.text(req.body?.code, { max: 40, required: true, field: 'کد شاگرد' });
+    const name = v.text(req.body?.name, { max: 80 });
+    const device = req.body?.device || {};
+    const deviceUid = v.id(device?.uid || device?.deviceId || '', {
+      field: 'شناسه دستگاه', required: false, max: 64,
+    });
+    const ip = clientIp(req);
+
+    const shopId = await staffCodes.shopIdOf(rawCode);
+    const subject = deviceUid ? `${shopId}:${deviceUid}` : '';
+
+    //  همان دستگاه پیش از این آمده؟ همان حساب را برمی‌گردانیم
+    let user = null;
+    if (subject) {
+      const found = await one(
+        `SELECT u.* FROM user_identities i JOIN users u ON u.id = i.user_id
+          WHERE i.provider='staff' AND i.subject=$1`, [subject]
+      );
+      if (found) user = found;
+    }
+
+    const t = now();
+    if (!user) {
+      user = await one(
+        `INSERT INTO users (id, name, kind, status, created_at, updated_at)
+         VALUES ($1,$2,'staff','active',$3,$3) RETURNING *`,
+        [newId('usr'), name || 'شاگرد', t]
+      );
+      if (subject) {
+        await query(
+          `INSERT INTO user_identities (id, user_id, provider, subject, created_at)
+           VALUES ($1,$2,'staff',$3,$4) ON CONFLICT (provider, subject) DO NOTHING`,
+          [newId('idn'), user.id, subject, t]
+        );
+      }
+    } else if (name && name !== user.name) {
+      await query('UPDATE users SET name=$2, updated_at=$3 WHERE id=$1', [user.id, name, t]);
+      user.name = name;
+    }
+
+    if (user.status !== 'active') {
+      return next(forbidden('این حساب غیرفعال شده است', 'user_disabled'));
+    }
+
+    /*
+     *  عضوِ فعالِ همین دکان است؟ کد دوباره خرج نمی‌شود.
+     *
+     *  بدون این، هر بار باز کردن برنامه یک استفاده از کد می‌خورد و
+     *  کدی که «یک بار مصرف» ساخته شده، دفعه‌ی دوم کار نمی‌کرد.
+     */
+    const member = await membershipOf(user.id);
+    if (!member || member.shop_id !== shopId) {
+      await staffCodes.redeem(rawCode, user.id, ip);
+    }
+
+    const session = await issueSession(user, { ...device, uid: deviceUid }, ip);
+    res.status(201).json(await loginPayload(user, session));
+  } catch (err) { next(err); }
+});
 
 // ---------- ثبت‌نام با رمز ----------
 router.post('/register', authLimit, async (req, res, next) => {

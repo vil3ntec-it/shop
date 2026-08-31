@@ -79,6 +79,7 @@ import ir.vil3ntec.tohid.core.config.AppConfig
 import ir.vil3ntec.tohid.core.model.SessionDto
 import ir.vil3ntec.tohid.core.net.userText
 import ir.vil3ntec.tohid.data.repo.Backend
+import ir.vil3ntec.tohid.data.AccountKeys
 import ir.vil3ntec.tohid.data.LedgerOwner
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.sync.SavedLogins
@@ -229,6 +230,9 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
   fun finish(identifier: String, session: SessionDto) {
     val display = session.user.name.ifBlank { name.trim() }
     SavedLogins.remember(context, identifier, display)
+    //  نقش را همین‌جا می‌دانیم؛ صبر کردن تا اولین پرسشِ سرور یعنی
+    //  شاگرد یک لحظه تنظیمات را باز می‌بیند
+    session.shop?.role?.let { ir.vil3ntec.tohid.data.ShopRole.remember(context, it) }
     /*
      *  پیش از هر چیز، دفترِ روی گوشی باید مالِ همین حساب باشد.
      *
@@ -698,27 +702,64 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
                   contentPadding = PaddingValues(horizontal = 8.dp),
                   onClick = {
                     val entered = staffCode.trim().uppercase()
-                    if (!Regex("^SHG-[A-Z0-9]{5}(-[A-Z0-9]{5}){2}$").matches(entered)) {
+                    if (!AccountKeys.STAFF_RE.matches(entered)) {
                       error = "این کد درست نیست. کد باید مثل SHG-XXXXX-XXXXX-XXXXX باشد."
-                      return@TextButton
-                    }
-                    if (!Backend.tokens(context).signedIn) {
-                      error = "برای پیوستن به دکان، اول وارد حساب خود شوید."
                       return@TextButton
                     }
                     busy = true; error = null
                     scope.launch {
-                      shops.join(entered)
-                        .onSuccess { state ->
-                          //  حساب عوض نشده ولی دکان شده. بدونِ این،
-                          //  دفترِ دکانِ قبلی با اولین همگام‌سازی صاف
-                          //  می‌رفت داخلِ دکانِ تازه.
-                          runCatching {
-                            LedgerOwner.shopChanged(context, store, state.shop?.id.orEmpty())
+                      /*
+                       *  کد خودش اعتبارنامه است.
+                       *
+                       *  تا دیروز اینجا نوشته بود «اول وارد حساب خود
+                       *  شوید» — یعنی صاحب دکان که کد را به شاگردش
+                       *  می‌داد، باید یک مرحلهٔ دیگر هم برایش توضیح
+                       *  می‌داد، و شاگردی که ایمیل و شماره ندارد اصلاً
+                       *  وارد نمی‌شد.
+                       *
+                       *  حالا سرور خودش برای همین دستگاه یک حسابِ
+                       *  شاگرد می‌سازد و روی همان دکان می‌نشاندش. اگر
+                       *  کسی از قبل واردِ حسابی باشد، همان حساب به
+                       *  دکان می‌پیوندد و حسابِ تازه‌ای ساخته نمی‌شود.
+                       */
+                      if (Backend.tokens(context).signedIn) {
+                        //  از قبل واردِ حسابی است — همان حساب به دکان
+                        //  می‌پیوندد و حسابِ تازه‌ای ساخته نمی‌شود
+                        shops.join(entered)
+                          .onSuccess { shopState ->
+                            runCatching {
+                              LedgerOwner.shopChanged(
+                                context, store, shopState.shop?.id.orEmpty(),
+                              )
+                            }
+                            onDone()
                           }
-                          onDone()
-                        }
-                        .onFailure { fail(it) }
+                          .onFailure { fail(it) }
+                      } else {
+                        auth.loginWithStaffCode(
+                          code = entered,
+                          name = name.trim(),
+                          deviceUid = state.deviceUid,
+                          deviceName = android.os.Build.MODEL ?: "گوشی",
+                        )
+                          .onSuccess { session ->
+                            SavedLogins.remember(context, entered, session.user.name)
+                            session.shop?.role?.let {
+                              ir.vil3ntec.tohid.data.ShopRole.remember(context, it)
+                            }
+                            //  دفترِ روی گوشی باید مالِ همین حساب و همین
+                            //  دکان باشد، وگرنه دفترِ قبلی با اولین
+                            //  همگام‌سازی صاف می‌رفت داخلِ دکانِ تازه
+                            runCatching {
+                              LedgerOwner.signedIn(
+                                context, store, session.user.id, session.shop?.id.orEmpty(),
+                              )
+                            }
+                            state.accountName = session.user.name
+                            onDone()
+                          }
+                          .onFailure { fail(it) }
+                      }
                       busy = false
                     }
                   },
@@ -726,7 +767,7 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
               },
             )
             Text(
-              "کدی که صاحب دکان از تنظیمات برنامه‌اش به شما می‌دهد.",
+              "کدی که صاحب دکان از تنظیمات برنامه‌اش به شما می‌دهد. همین کافی است — ایمیل و شماره لازم نیست.",
               style = MaterialTheme.typography.labelSmall,
               color = Shop.colors.muted2,
               modifier = Modifier.padding(top = 6.dp, start = 4.dp),

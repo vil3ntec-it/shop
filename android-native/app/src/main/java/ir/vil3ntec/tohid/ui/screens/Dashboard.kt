@@ -68,6 +68,8 @@ fun DashboardScreen(d: ShopData, onOpen: (String) -> Unit = {}) {
     context.getSharedPreferences("tohid", android.content.Context.MODE_PRIVATE)
       .getString("store_name", "") ?: ""
   }
+  //  شاگرد عددهای مالیِ دکان را نمی‌بیند — سود، ضرر و مصارف
+  val canSeeMoney = remember { ir.vil3ntec.tohid.data.ShopRole.canSeeMoney(context) }
   val today = todayIso()
   val monthPrefix = today.take(7)
 
@@ -153,13 +155,31 @@ fun DashboardScreen(d: ShopData, onOpen: (String) -> Unit = {}) {
             fraction = if (bestDay > 0) (todayTotal / bestDay).toFloat() else 0f,
             tint = Shop.colors.primary,
           )
-          StatRing(
-            label = "سود امروز",
-            value = money(animatedMoney(todayProfit)),
-            caption = "افغانی",
-            fraction = if (todayTotal > 0) (todayProfit / todayTotal).toFloat().coerceAtLeast(0f) else 0f,
-            tint = if (todayProfit >= 0) Shop.colors.success else Shop.colors.danger,
-          )
+          /*
+           *  سود را فقط صاحب دکان می‌بیند.
+           *
+           *  شاگرد می‌فروشد و فروشِ روز را هم می‌بیند — آن عدد کارِ
+           *  خودش است. ولی سودِ دکان یعنی قیمتِ خرید، و آن به او
+           *  مربوط نیست. جایش «تعداد فروش» می‌نشیند تا حلقه خالی
+           *  نماند.
+           */
+          if (canSeeMoney) {
+            StatRing(
+              label = "سود امروز",
+              value = money(animatedMoney(todayProfit)),
+              caption = "افغانی",
+              fraction = if (todayTotal > 0) (todayProfit / todayTotal).toFloat().coerceAtLeast(0f) else 0f,
+              tint = if (todayProfit >= 0) Shop.colors.success else Shop.colors.danger,
+            )
+          } else {
+            StatRing(
+              label = "فروش‌های امروز",
+              value = todaySales.size.fa(),
+              caption = "فاکتور",
+              fraction = if (todaySales.isNotEmpty()) 1f else 0f,
+              tint = Shop.colors.accent,
+            )
+          }
         }
         Spacer(Modifier.height(14.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -366,12 +386,15 @@ fun DashboardScreen(d: ShopData, onOpen: (String) -> Unit = {}) {
           PanelHead("خلاصه امروز", formatDate(today))
           Spacer(Modifier.height(10.dp))
           ChipRow(
-            listOf(
-              "فروش امروز" to "${money(todayTotal)} افغانی",
-              "تعداد فروش امروز" to todaySales.size.fa(),
-              "سود امروز" to "${money(todayProfit)} افغانی",
-              "مصارف امروز" to "${money(todayExpense)} افغانی",
-            )
+            buildList {
+              add("فروش امروز" to "${money(todayTotal)} افغانی")
+              add("تعداد فروش امروز" to todaySales.size.fa())
+              //  سود و مصارف، عددهای مالیِ دکان‌اند — نه کارِ شاگرد
+              if (canSeeMoney) {
+                add("سود امروز" to "${money(todayProfit)} افغانی")
+                add("مصارف امروز" to "${money(todayExpense)} افغانی")
+              }
+            }
           )
           Spacer(Modifier.height(8.dp))
           ChipRow(

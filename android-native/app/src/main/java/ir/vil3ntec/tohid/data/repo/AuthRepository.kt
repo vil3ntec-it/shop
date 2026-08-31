@@ -81,6 +81,38 @@ class AuthRepository(
    *  سرور می‌دهد و سرور با کلیدِ گوگل می‌سنجدش. پس رازی داخلِ برنامه
    *  نیست که لو برود.
    */
+  /**
+   *  ورود شاگرد با کدی که صاحب دکان به او داده.
+   *
+   *  هیچ حسابی از قبل لازم نیست: سرور خودش برای همین دستگاه یک حساب
+   *  شاگرد می‌سازد و روی همان دکان می‌نشاندش. دفعه‌ی بعد که همین
+   *  دستگاه همان کد را بزند، همان حساب برمی‌گردد — نه یک عضو تازه.
+   *
+   *  @param deviceUid همان شناسه‌ای که همگام‌سازی با آن کار می‌کند؛
+   *    همین است که «همان گوشی، همان حساب» را ممکن می‌کند.
+   */
+  suspend fun loginWithStaffCode(
+    code: String,
+    name: String,
+    deviceUid: String,
+    deviceName: String,
+  ): ApiResult<SessionDto> = result {
+    keep(
+      api.postPublic(
+        ApiEndpoints.Auth.STAFF,
+        buildJsonObject {
+          put("code", JsonPrimitive(code.trim().uppercase()))
+          put("name", JsonPrimitive(name.trim()))
+          put("device", buildJsonObject {
+            put("uid", JsonPrimitive(deviceUid))
+            put("name", JsonPrimitive(deviceName))
+            put("platform", JsonPrimitive("android"))
+          })
+        },
+      )
+    )
+  }
+
   suspend fun loginWithGoogle(idToken: String): ApiResult<SessionDto> = result {
     keep(
       api.postPublic(

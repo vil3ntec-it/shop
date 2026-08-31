@@ -129,6 +129,25 @@ fun rememberAlerts(d: ShopData): List<Alert> {
    *  یک بار حساب می‌شود، نه با هر بار کشیده شدنِ صفحه: سنجیدنِ مجوز
    *  یعنی بررسیِ امضای رمزنگاری.
    */
+  /*
+   *  خبرهای دکان — آنچه بقیهٔ اعضا کرده‌اند.
+   *
+   *  هشدارهای زیر از دفترِ **محلی** حساب می‌شوند و فقط همین گوشی را
+   *  می‌بینند. اینها از سرور می‌آیند: فروشی که کریم زد، کالایی که
+   *  دستِ او تمام شد. برای صاحب دکانی که خانه است، همین‌ها مهم‌اند.
+   */
+  var news by remember { mutableStateOf<List<ir.vil3ntec.tohid.data.repo.EventsRepository.Event>>(emptyList()) }
+  LaunchedEffect(Unit) {
+    if (!ir.vil3ntec.tohid.data.repo.Backend.isReady(context)) return@LaunchedEffect
+    ir.vil3ntec.tohid.data.repo.Backend.events(context).feed()
+      .onSuccess { feed ->
+        //  خبرِ خودم برای خودم خبر نیست
+        val me = ir.vil3ntec.tohid.sync.SyncStore(context).accountId
+        news = feed.events.filter { it.userId != me }.take(12)
+      }
+    //  شکست بی‌صداست: نبودنِ اینترنت نباید زنگ را خالی نشان دهد
+  }
+
   val subscription = remember {
     runCatching {
       ir.vil3ntec.tohid.sync.LicenseGuard.status(
@@ -140,10 +159,24 @@ fun rememberAlerts(d: ShopData): List<Alert> {
   // مجاز است، نه داخل لامبدای remember — پس همین‌جا گرفته می‌شوند.
   val danger = Shop.colors.danger
   val warning = Shop.colors.warning
-  return remember(d, backupStale, danger, warning, subscription) {
+  val accent = Shop.colors.accent
+  return remember(d, backupStale, danger, warning, accent, subscription, news) {
     buildList {
       //  اول از همه، چون از هر موجودیِ کمی مهم‌تر است
       subscriptionAlert(subscription, danger, warning)?.let { add(it) }
+
+      //  بعد خبرهای بقیهٔ اعضا — تازه‌ترین بالا
+      news.forEach { event ->
+        add(
+          Alert(
+            value = event.userName.ifBlank { "دکان" },
+            title = event.title,
+            detail = event.body.ifBlank { sinceText(event.at) },
+            tint = if (event.kind == "stock_out") danger else accent,
+            target = if (event.kind == "stock_out") "products" else "sales",
+          )
+        )
+      }
       d.products.filter { ShopStore.stockStatus(d, it) == "out" }.forEach {
         add(Alert("تمام شد", it.name, "کالا موجود نیست", danger, "products"))
       }

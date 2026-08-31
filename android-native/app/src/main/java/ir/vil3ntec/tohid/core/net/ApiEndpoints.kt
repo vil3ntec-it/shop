@@ -27,6 +27,8 @@ object ApiEndpoints {
   object Auth {
     const val REGISTER = "/auth/register"
     const val LOGIN = "/auth/login"
+    //  ورود شاگرد فقط با کد — نه ایمیل، نه شماره، نه رمز
+    const val STAFF = "/auth/staff"
     const val GOOGLE = "/auth/google"
     const val REFRESH = "/auth/refresh"
     const val LOGOUT = "/auth/logout"
@@ -74,6 +76,20 @@ object ApiEndpoints {
   object Sync {
     const val PUSH = "/shop/sync/push"
     const val PULL = "/shop/sync/pull"
+  }
+
+  /* ------------------------------ خبرها ------------------------------ */
+
+  /**
+   *  خبرهای دکان — «در نبودِ من چه گذشت».
+   *
+   *  جدا از همگام‌سازی است، عمداً: همگام‌سازی دفترِ دکان را جابه‌جا
+   *  می‌کند و پشتِ اشتراک است؛ خبر فقط یک پیام است و صاحب دکان باید
+   *  حتی با اشتراکِ تمام‌شده هم ببیندش.
+   */
+  object Events {
+    const val ROOT = "/events"
+    const val SEEN = "/events/seen"
   }
 
   /* ------------------------------ اشتراک ------------------------------ */
