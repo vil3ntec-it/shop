@@ -232,6 +232,7 @@ fun TohidTopBar(
  *  زدن روی آن، جزئیات را در یک برگهٔ کوچک باز می‌کند: آخرین همگام‌سازی
  *  کِی بود، چند مورد در انتظار است، و اگر تغییری اعمال نشده چرا.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SyncDot() {
   val context = LocalContext.current
@@ -259,9 +260,9 @@ private fun SyncDot() {
     Box(Modifier.size(9.dp).clip(RoundedCornerShape(999.dp)).background(tint))
     //  عدد فقط وقتی می‌آید که واقعاً چیزی مانده باشد — نقطهٔ خالی
     //  آرام‌تر است و «همه‌چیز رفته» را بهتر می‌گوید
-    if (AutoSync.pending > 0) {
+    if (AutoSync.pendingCount > 0) {
       Text(
-        AutoSync.pending.fa(),
+        AutoSync.pendingCount.fa(),
         style = MaterialTheme.typography.labelSmall,
         color = tint,
         fontWeight = FontWeight.Bold,
@@ -279,7 +280,7 @@ private fun SyncDot() {
           AutoSync.Health.OK -> "همه‌چیز روی سرور نشسته"
           AutoSync.Health.WAITING ->
             if (AutoSync.running) "در حال فرستادن…"
-            else "${AutoSync.pending.fa()} مورد در انتظار"
+            else "${AutoSync.pendingCount.fa()} مورد در انتظار"
           AutoSync.Health.FAILED -> "آخرین تلاش ناموفق بود"
         }
         Text(headline, style = MaterialTheme.typography.bodyMedium, color = tint, fontWeight = FontWeight.Bold)

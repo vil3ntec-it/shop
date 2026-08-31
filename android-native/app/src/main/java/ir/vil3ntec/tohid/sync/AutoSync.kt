@@ -72,7 +72,7 @@ object AutoSync {
    *  صفحه‌ای وضعیت را نشان نمی‌داد: فروشنده‌ای که در زیرزمینِ بی‌آنتن کار
    *  می‌کرد نمی‌دانست ۳۰ فروشش هنوز روی گوشی است.
    */
-  var pending by mutableStateOf(0)
+  var pendingCount by mutableStateOf(0)
     private set
 
   /**
@@ -100,7 +100,7 @@ object AutoSync {
   val health: Health
     get() = when {
       lastError != null -> Health.FAILED
-      running || pending > 0 -> Health.WAITING
+      running || pendingCount > 0 -> Health.WAITING
       else -> Health.OK
     }
 
@@ -192,7 +192,7 @@ object AutoSync {
     val state = SyncStore(app)
     running = true
     val outcome = runCatching {
-      Syncer(store, state, app).apply { onCollected = { pending = it } }.run()
+      Syncer(store, state, app).apply { onCollected = { pendingCount = it } }.run()
     }
     running = false
 
@@ -200,7 +200,7 @@ object AutoSync {
       .onSuccess { done ->
         unsent = false
         attempt = 0
-        pending = 0
+        pendingCount = 0
         lastOk = System.currentTimeMillis()
         lastError = null
         //  تعارض‌ها خطا نیستند — همگام‌سازی موفق بوده — ولی کاربر باید
