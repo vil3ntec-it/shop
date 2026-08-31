@@ -123,6 +123,37 @@ fun AppRoot(
   var authOpen by rememberSaveable { mutableStateOf(false) }
 
   /*
+   *  دکانِ حساب — پرسیدنش فقط وقتی معلوم شود که ندارد.
+   *
+   *  `askShop` یعنی «یک بار دیگر از سرور بپرس»؛ `needsShop` یعنی
+   *  «سرور گفت ندارد». این دو جدا هستند تا خطای شبکه به‌اشتباه صفحهٔ
+   *  ساختِ دکان را باز نکند.
+   */
+  var askShop by rememberSaveable { mutableStateOf(true) }
+  var needsShop by rememberSaveable { mutableStateOf(false) }
+
+  LaunchedEffect(askShop) {
+    if (!askShop) return@LaunchedEffect
+    askShop = false
+    if (!ir.vil3ntec.tohid.data.repo.Backend.isReady(context)) return@LaunchedEffect
+    ir.vil3ntec.tohid.data.repo.Backend.shop(context).current()
+      .onSuccess { state ->
+        needsShop = !state.hasShop
+        //  دکان دارد: مطمئن شویم دفترِ روی گوشی هم مالِ همین دکان است.
+        //  اگر حساب از دکانی به دکانِ دیگر رفته باشد، همین‌جا جابه‌جا
+        //  می‌شود — وگرنه دفترِ دکانِ قبلی داخلِ دکانِ تازه می‌رفت.
+        if (state.hasShop) {
+          runCatching {
+            ir.vil3ntec.tohid.data.LedgerOwner.shopChanged(
+              context, store, state.shop?.id.orEmpty(),
+            )
+          }
+        }
+      }
+    //  شکست را نادیده می‌گیریم: نبودنِ نت یعنی «نمی‌دانیم»، نه «ندارد»
+  }
+
+  /*
    *  قفلِ برنامه.
    *
    *  اگر رمز گذاشته شده باشد، تا زده نشود هیچ‌چیزِ دکان دیده نمی‌شود.
@@ -213,8 +244,25 @@ fun AppRoot(
     //  شده، وگرنه دکانِ خالی می‌دید.
     WelcomeScreen(store) {
       authOpen = false
+      askShop = true                 // شاید حسابِ تازه هنوز دکانی ندارد
       ir.vil3ntec.tohid.sync.AutoSync.now(context, store)
     }
+    return
+  }
+
+  /*
+   *  «دکانت کدام است؟»
+   *
+   *  سرور بدونِ دکان هیچ داده‌ای نمی‌گیرد و نمی‌دهد — هر دو مسیرِ
+   *  همگام‌سازی `no_shop` می‌دهند و مجوزِ اشتراک هم صادر نمی‌شود. ولی
+   *  هیچ‌جای برنامه دکان ساخته نمی‌شد، پس هر کسی که تازه ثبت‌نام می‌کرد
+   *  بی‌آنکه بفهمد، دفترش هیچ‌وقت روی سرور نمی‌نشست.
+   *
+   *  فقط وقتی پرسیده می‌شود که **مطمئن** باشیم دکانی نیست: خطای شبکه
+   *  جوابِ «نه» نیست و کسی را پشتِ این صفحه گیر نمی‌اندازد.
+   */
+  if (needsShop) {
+    ShopSetupScreen(store) { needsShop = false }
     return
   }
 

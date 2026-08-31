@@ -49,6 +49,10 @@ fun AppLockScreen(onUnlocked: () -> Unit) {
   var pin by remember { mutableStateOf("") }
   var wrong by remember { mutableStateOf(false) }
 
+  //  طول از خودِ رمزِ ذخیره‌شده می‌آید، نه از یک عددِ ثابت: کسی که رمزِ
+  //  چهاررقمیِ نسخهٔ قبل را دارد باید بتواند وارد شود
+  val len = remember { lock.length }
+
   /*
    *  اثر انگشت — میان‌بُر، نه جایگزینِ رمز.
    *
@@ -126,7 +130,7 @@ fun AppLockScreen(onUnlocked: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier.graphicsLayer { translationX = shake * 14f },
       ) {
-        repeat(MAX_PIN) { index ->
+        repeat(len) { index ->
           val filled = index < pin.length
           Box(
             Modifier
@@ -147,9 +151,9 @@ fun AppLockScreen(onUnlocked: () -> Unit) {
 
       Keypad(
         onDigit = { digit ->
-          if (pin.length < MAX_PIN) {
+          if (pin.length < len) {
             pin += digit
-            if (pin.length == MAX_PIN) submit(pin)
+            if (pin.length == len) submit(pin)
           }
         },
         onBack = { if (pin.isNotEmpty()) pin = pin.dropLast(1) },
@@ -272,7 +276,13 @@ private fun Key(
   }
 }
 
-const val MAX_PIN = 4
+/**
+ *  طولِ رمزِ **تازه**.
+ *
+ *  صفحهٔ قفلِ ورود این را نمی‌خواند و از `LockStore.length` می‌پرسد؛
+ *  اینجا فقط برای ساختنِ رمزِ جدید است.
+ */
+const val MAX_PIN = LockStore.NEW_PIN_LEN
 
 
 /**
@@ -321,7 +331,7 @@ fun LockSetupScreen(onDone: () -> Unit) {
       LockMark()
       Spacer(Modifier.height(18.dp))
       Text(
-        if (stage == "first") "یک رمز چهار رقمی بگذارید" else "همان رمز را دوباره بزنید",
+        if (stage == "first") "یک رمز شش رقمی بگذارید" else "همان رمز را دوباره بزنید",
         style = MaterialTheme.typography.titleMedium,
         color = colors.text,
         fontWeight = FontWeight.Bold,

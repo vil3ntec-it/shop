@@ -134,12 +134,32 @@ class Syncer(
 
     val body = api.license(state.deviceUid, deviceName)
     val license = body["license"]?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content }
-    // مجوز پیش از ذخیره بررسی می‌شود تا مجوزِ خراب ذخیره نشود
+
     if (!license.isNullOrBlank()) {
+      // مجوز پیش از ذخیره بررسی می‌شود تا مجوزِ خراب ذخیره نشود
       val key = state.publicKey
-      if (key != null && License.verify(license, key, state.deviceUid, state.accountId) is License.Verdict.Valid) {
+      if (key != null &&
+        License.verify(license, key, state.deviceUid, state.accountId) is License.Verdict.Valid
+      ) {
         state.license = license
       }
+    } else {
+      /*
+       *  سرور صریحاً گفت اشتراکی نیست — پس مجوزِ قدیمی همان‌جا برداشته
+       *  می‌شود.
+       *
+       *  تا دیروز فقط وقتی چیزی نوشته می‌شد که مجوزی آمده باشد. یعنی
+       *  اگر اشتراکی وسطِ دوره لغو می‌شد، مجوزِ قبلی تا روزِ انقضای
+       *  خودش روی گوشی کار می‌کرد. حالا همان لحظه قفل می‌شود.
+       *
+       *  فقط با پاسخِ خودِ سرور — نه با خطای شبکه: اگر درخواست شکست
+       *  بخورد، این تابع اصلاً به اینجا نمی‌رسد و مجوزِ آفلاین سرِ جایش
+       *  می‌ماند تا خودش تمام شود.
+       */
+      val reason = body["reason"]
+        ?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content }
+        .orEmpty()
+      if (reason == "no_subscription" || reason == "no_shop") state.license = null
     }
     return status()
   }
