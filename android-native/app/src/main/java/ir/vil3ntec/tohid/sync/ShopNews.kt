@@ -5,6 +5,9 @@ import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.data.repo.EventsRepository
+//  بدون این، `encodeToString(value)` به نسخهٔ دو-آرگومانی می‌افتد و
+//  خودِ لیست را «سریالایزر» می‌بیند
+import kotlinx.serialization.encodeToString
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
