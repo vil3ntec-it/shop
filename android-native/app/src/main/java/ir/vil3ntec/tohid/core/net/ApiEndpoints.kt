@@ -27,6 +27,8 @@ object ApiEndpoints {
   object Auth {
     const val REGISTER = "/auth/register"
     const val LOGIN = "/auth/login"
+    //  ورود شاگرد فقط با کد — نه ایمیل، نه شماره، نه رمز
+    const val STAFF = "/auth/staff"
     const val GOOGLE = "/auth/google"
     const val REFRESH = "/auth/refresh"
     const val LOGOUT = "/auth/logout"

@@ -20,6 +20,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CreditCardOff
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.WorkspacePremium
@@ -600,6 +601,37 @@ fun VipScreen(onDismiss: () -> Unit) {
         textAlign = TextAlign.Center,
         modifier = Modifier.fillMaxWidth(),
       )
+
+      /*
+       *  پرداخت آنلاین — گفته می‌شود که نیست.
+       *
+       *  کاربری که دنبالِ دکمهٔ «پرداخت با کارت» می‌گردد و پیدایش
+       *  نمی‌کند، فکر می‌کند برنامه ناقص است. یک خط که بگوید «فعلاً
+       *  نیست»، همان سؤال را جواب می‌دهد.
+       */
+      Spacer(Modifier.height(10.dp))
+      Row(
+        Modifier
+          .fillMaxWidth()
+          .clip(RoundedCornerShape(10.dp))
+          .background(colors.surface2.copy(alpha = 0.5f))
+          .padding(horizontal = 12.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
+      ) {
+        Icon(
+          Icons.Filled.CreditCardOff,
+          contentDescription = null,
+          tint = colors.muted2,
+          modifier = Modifier.size(15.dp),
+        )
+        Spacer(Modifier.width(7.dp))
+        Text(
+          "پرداخت آنلاین فعلاً ناموجود است",
+          style = MaterialTheme.typography.labelSmall,
+          color = colors.muted2,
+        )
+      }
 
       /* ---------------------- راه‌های تماس ---------------------- */
       Spacer(Modifier.height(22.dp))

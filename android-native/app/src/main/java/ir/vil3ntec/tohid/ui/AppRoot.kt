@@ -139,6 +139,8 @@ fun AppRoot(
     ir.vil3ntec.tohid.data.repo.Backend.shop(context).current()
       .onSuccess { state ->
         needsShop = !state.hasShop
+        //  نقش از همین‌جا می‌آید؛ درخواستِ جدا لازم نیست
+        state.role?.let { ir.vil3ntec.tohid.data.ShopRole.remember(context, it) }
         //  دکان دارد: مطمئن شویم دفترِ روی گوشی هم مالِ همین دکان است.
         //  اگر حساب از دکانی به دکانِ دیگر رفته باشد، همین‌جا جابه‌جا
         //  می‌شود — وگرنه دفترِ دکانِ قبلی داخلِ دکانِ تازه می‌رفت.
@@ -398,7 +400,15 @@ fun AppRoot(
         "reports" -> ReportsScreen(data)
         "receipts" -> ReceiptsScreen(data)
         "audit" -> AuditLogScreen(data)
-        "settings" -> SettingsScreen(store, data, snackbar, theme, onTheme) { open("more") }
+        //  شاگرد اصلاً واردِ تنظیمات نمی‌شود. ردیفش هم در «بیشتر»
+        //  نشان داده نمی‌شود، ولی این یکی سدِ دوم است: اگر از هر راهِ
+        //  دیگری به این مسیر برسد، باز هم باز نمی‌شود.
+        "settings" ->
+          if (ir.vil3ntec.tohid.data.ShopRole.canOpenSettings(context)) {
+            SettingsScreen(store, data, snackbar, theme, onTheme) { open("more") }
+          } else {
+            LaunchedEffect(Unit) { open("more") }
+          }
         "expenses" -> ExpensesScreen(store, data, snackbar)
         "dashboard" -> DashboardScreen(data, ::open)
         "product" -> {

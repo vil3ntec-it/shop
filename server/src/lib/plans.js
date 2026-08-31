@@ -14,7 +14,7 @@ const DEFAULT_PLANS = [
 ];
 
 const DEFAULT_CONFIG = {
-  trial_days: '14',
+  trial_days: '7',
   whatsapp_number: '0792236008',
   whatsapp_message: 'سلام، می‌خواهم اشتراک برنامه فروشگاه را بخرم.',
   currency: 'افغانی',

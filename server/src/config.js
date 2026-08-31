@@ -169,7 +169,7 @@ const config = {
   trustProxy:        bool(process.env.TRUST_PROXY, false),
   defaults: {
     timezone:  process.env.DEFAULT_TIMEZONE || 'Asia/Kabul',
-    trialDays: num(process.env.TRIAL_DAYS, 14),
+    trialDays: num(process.env.TRIAL_DAYS, 7),
   },
 };
 

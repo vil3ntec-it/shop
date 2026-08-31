@@ -77,8 +77,20 @@ fun ReportsScreen(d: ShopData) {
       }
     }
   }
+  /*
+   *  شاگرد بخشِ «سود و فروش» را نمی‌بیند.
+   *
+   *  آنجا سودِ ناخالص، سودِ خالص، پرسودترین و کم‌سودترین کالا هست —
+   *  یعنی قیمتِ خریدِ دکان. بقیهٔ بخش‌ها (محصولات، قرض‌داران، گردشِ
+   *  موجودی) کارِ روزانهٔ خودش است و باز می‌ماند.
+   */
+  val canSeeMoney = remember { ir.vil3ntec.tohid.data.ShopRole.canSeeMoney(context) }
+  val sections = remember(canSeeMoney) {
+    if (canSeeMoney) SECTION_TITLES else SECTION_TITLES.filterKeys { it != "sales" }
+  }
+
   var range by rememberSaveable { mutableStateOf(ReportEngine.Range.MONTH) }
-  var section by rememberSaveable { mutableStateOf("sales") }
+  var section by rememberSaveable { mutableStateOf(if (canSeeMoney) "sales" else "products") }
   var stockProduct by rememberSaveable { mutableStateOf<String?>(null) }
 
   val (from, to) = ReportEngine.rangeOf(range, todayIso())
@@ -86,7 +98,8 @@ fun ReportsScreen(d: ShopData) {
   LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
     item {
       Text(
-        "سود، فروش و مصارف در بازهٔ دلخواه",
+        if (canSeeMoney) "سود، فروش و مصارف در بازهٔ دلخواه"
+        else "محصولات، قرض‌داران و گردش موجودی در بازهٔ دلخواه",
         style = MaterialTheme.typography.bodySmall,
         color = Shop.colors.muted,
       )
@@ -96,7 +109,7 @@ fun ReportsScreen(d: ShopData) {
         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
       ) {
-        SECTION_TITLES.forEach { (id, label) ->
+        sections.forEach { (id, label) ->
           FilterChip(selected = section == id, onClick = { section = id }, label = { Text(label) })
         }
       }
@@ -133,7 +146,9 @@ fun ReportsScreen(d: ShopData) {
     }
 
     when (section) {
-      "sales" -> salesSection(this, d, range, from, to) { range = it }
+      //  `rememberSaveable` ممکن است «sales» را از اجرای قبلی برگرداند،
+      //  وقتی هنوز نقش معلوم نبود. سدِ دوم همین‌جاست.
+      "sales" -> if (canSeeMoney) salesSection(this, d, range, from, to) { range = it }
       "products" -> productsSection(this, d)
       "debtors" -> debtorsSection(this, d)
       else -> stockSection(this, d, stockProduct) { stockProduct = it }

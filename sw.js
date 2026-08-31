@@ -6,7 +6,7 @@
    - فونت‌های گوگل: اولین بار از شبکه، سپس همیشه از کش.
    داده‌های فروشگاه در localStorage است و اصلاً از اینجا عبور نمی‌کند.
    ========================================================== */
-const VERSION = 'tohid-shop-v18';
+const VERSION = 'tohid-shop-v19';
 const SHELL_CACHE = VERSION + '-shell';
 const FONT_CACHE = VERSION + '-fonts';
 
@@ -14,6 +14,7 @@ const SHELL_ASSETS = [
   './',
   './index.html',
   './manifest.webmanifest',
+  './icons/mark.png',
   './icons/icon-96.png',
   './icons/icon-192.png',
   './icons/icon-512.png',
