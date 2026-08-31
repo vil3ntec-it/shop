@@ -14,12 +14,21 @@ const { many, one, now } = require('../db');
 const v = require('../lib/validate');
 const sync = require('../lib/sync');
 const audit = require('../lib/audit');
-const { requireUser, requireShop, requirePermission } = require('../middleware/auth');
+const { requireUser, requireShop, requirePermission, requireDataWrite } = require('../middleware/auth');
 const { badRequest, notFound, forbidden } = require('../middleware/errors');
 const { can } = require('../lib/permissions');
 
 const router = express.Router();
 router.use(requireUser, requireShop);
+
+/*
+ * نوشتن — هر جور نوشتنی — پشتِ همان قاعده‌ی همگام‌سازی است.
+ *
+ * این مسیرها راهِ دومِ نوشتن روی دفترِ دکان‌اند. اگر فقط `/api/sync`
+ * بسته می‌شد و اینجا باز می‌ماند، بستنِ آن یکی بی‌معنی بود.
+ * خواندن (`GET`) دست نمی‌خورد.
+ */
+const writeGuard = requireDataWrite;
 
 /** نام مسیر → نام مجموعه در برنامه. */
 const ROUTES = {
@@ -111,7 +120,7 @@ for (const [path, collection] of Object.entries(ROUTES)) {
     });
   });
 
-  router.post(`/${path}`, async (req, res, next) => {
+  router.post(`/${path}`, writeGuard, async (req, res, next) => {
     const data = v.payload(req.body?.data ?? req.body, { field: 'داده' });
     const id = recordId(req.body, collection.slice(0, 3));
     delete data.id; delete data.deviceId; delete data.operationId;
@@ -121,7 +130,7 @@ for (const [path, collection] of Object.entries(ROUTES)) {
     res.status(201).json({ id, ...out });
   });
 
-  router.put(`/${path}/:id`, async (req, res) => {
+  router.put(`/${path}/:id`, writeGuard, async (req, res) => {
     const id = v.id(req.params.id);
     const data = v.payload(req.body?.data ?? req.body, { field: 'داده' });
     delete data.id; delete data.deviceId; delete data.operationId;
@@ -131,7 +140,7 @@ for (const [path, collection] of Object.entries(ROUTES)) {
     res.json({ id, ...out });
   });
 
-  router.delete(`/${path}/:id`, async (req, res, next) => {
+  router.delete(`/${path}/:id`, writeGuard, async (req, res, next) => {
     const id = v.id(req.params.id);
     if (!can(req.role, 'data.delete.own')) return next(forbidden('اجازه‌ی حذف ندارید', 'permission_denied'));
     const out = await writeRecords(req, [{ collection, id, updatedAt: now(), deleted: true }]);
@@ -149,7 +158,7 @@ for (const [path, collection] of Object.entries(ROUTES)) {
  * می‌شوند: یا همه ثبت می‌شوند یا هیچ‌کدام. پس هیچ‌وقت فروشی بدون قلم
  * یا انباری بدون فروش نمی‌ماند.
  */
-router.post('/sales/full', async (req, res, next) => {
+router.post('/sales/full', writeGuard, async (req, res, next) => {
   const sale = v.payload(req.body?.sale, { field: 'فروش' });
   const items = Array.isArray(req.body?.items) ? req.body.items : [];
   const movements = Array.isArray(req.body?.stockMovements) ? req.body.stockMovements : [];

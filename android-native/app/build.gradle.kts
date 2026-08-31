@@ -29,6 +29,25 @@ android {
   //  وگرنه رمزِ خالی به کلید داده می‌شود و امضا می‌شکند.
   fun env(name: String): String? = System.getenv(name)?.takeIf { it.isNotBlank() }
 
+  /*
+   *  نشانیِ سرور — یک بار، در خودِ مخزن.
+   *
+   *  تا امروز فقط از متغیرِ محیطی می‌آمد، یعنی از یک تنظیمِ CI. اگر آن
+   *  تنظیم نبود — یا کسی روی رایانه‌ی خودش بیلد می‌گرفت — نسخه بدونِ
+   *  سرور ساخته می‌شد و هر کاربری باید نشانی را دستی تایپ می‌کرد.
+   *  برنامه‌ی حرفه‌ای این کار را نمی‌کند: سرور باید از لحظه‌ی نصب
+   *  سرِ جایش باشد.
+   *
+   *  حالا مقدار در `gradle.properties` است و در مخزن می‌ماند، پس هر
+   *  بیلدی — محلی یا CI — آن را دارد. متغیرِ محیطی هنوز کار می‌کند و
+   *  بالاتر می‌نشیند، برای وقتی که بخواهید یک نسخه‌ی خاص را به سرورِ
+   *  دیگری ببرید بی‌آنکه چیزی در مخزن عوض شود.
+   */
+  fun apiBase(envName: String, propName: String): String =
+    env(envName)
+      ?: (project.findProperty(propName) as String?)?.takeIf { it.isNotBlank() }
+      ?: ""
+
   defaultConfig {
     // همان بستهٔ نسخهٔ قبلی: نصب می‌شود *روی* آن، و داده‌های قدیمی
     // سرِ جایشان می‌مانند تا وارد شوند.
@@ -130,13 +149,13 @@ android {
       buildConfigField("String", "SIGNING_SHA256", "\"\"")
       //  نسخه‌ی خودی: نشانی‌ی رایانه‌ی خودتان، و اگر خالی بود کادرِ
       //  نشانی در برنامه پیدا می‌شود تا دستی بزنید
-      buildConfigField("String", "API_BASE", "\"${env("TOHID_API_BASE_DEV") ?: ""}\"")
+      buildConfigField("String", "API_BASE", "\"${apiBase("TOHID_API_BASE_DEV", "tohid.apiBase.dev")}\"")
     }
     release {
       signingConfig = signingConfigs.getByName("release")
       buildConfigField("String", "SIGNING_SHA256", "\"$signingFingerprint\"")
       //  نسخه‌ی دستِ کاربر: فقط دامنه‌ی عمومی
-      buildConfigField("String", "API_BASE", "\"${env("TOHID_API_BASE") ?: ""}\"")
+      buildConfigField("String", "API_BASE", "\"${apiBase("TOHID_API_BASE", "tohid.apiBase")}\"")
       isMinifyEnabled = true
       isShrinkResources = true
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")

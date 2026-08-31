@@ -77,6 +77,55 @@ async function optionalShop(req, res, next) {
   } catch (err) { next(err); }
 }
 
+/**
+ * نوشتن روی دفتر دکان — وقتی اشتراک لازم است و وقتی نیست.
+ *
+ * ── سوراخی که این می‌بندد ─────────────────────────────────────────
+ * تا امروز `/api/sync` و `/api/data/*` فقط `requireUser, requireShop`
+ * داشتند و هیچ بررسی اشتراکی نبود. یعنی دکانی که نه اشتراک داشت و نه
+ * دوره‌ی آزمایشی (`source: 'free'`)، باز هم می‌توانست بی‌محدودیت
+ * push و pull کند — و «چند کاربر روی یک دکان»، که خودش قابلیت پولی
+ * است، عملاً مجانی بود.
+ *
+ * اشتراک فقط در گوشی اجرا می‌شد؛ و چیزی که فقط در گوشی اجرا شود،
+ * اجرا نشده است.
+ * ──────────────────────────────────────────────────────────────────
+ *
+ * ## قاعده — و چرا این‌طور
+ *
+ * ۱) **خواندن هرگز بسته نمی‌شود.** حتی با اشتراک تمام‌شده. داده‌ی
+ *    فروشنده مالِ خودش است؛ باید بتواند روی گوشی تازه بیاوردش و
+ *    پشتیبان بگیرد. گروگان گرفتن داده، سریع‌ترین راه از دست دادن
+ *    اعتماد است — و `backup` هم در فهرست رایگان هست، پس بستن خواندن
+ *    با خودِ کاتالوگ قابلیت‌ها هم جور درنمی‌آمد.
+ *
+ * ۲) **صاحب دکان همیشه می‌نویسد.** کارِ خودش روی گوشیِ خودش، هیچ‌وقت
+ *    نباید به خاطر تمام شدن اشتراک از بین برود.
+ *
+ * ۳) **شاگرد برای نوشتن، اشتراک لازم دارد.** این دقیقاً همان
+ *    `multi_device` است که در کاتالوگ قابلیت‌ها پولی علامت خورده.
+ *    نوشته‌هایش روی گوشی خودش می‌مانند و لحظه‌ای که دکان تمدید شود
+ *    بالا می‌روند — چیزی گم نمی‌شود، فقط منتظر می‌ماند.
+ */
+function requireDataWrite(req, res, next) {
+  (async () => {
+    if (!req.shopId) return next(forbidden('برای این حساب دکانی ثبت نشده است', 'no_shop'));
+
+    // صاحب دکان و مدیرش همیشه می‌نویسند
+    if (req.role === 'owner' || req.role === 'manager') return next();
+
+    const { entitlementOf } = require('../lib/entitlement');
+    const ent = await entitlementOf(req.shopId);
+    if (ent.features.includes('multi_device')) return next();
+
+    return next(forbidden(
+      'اشتراک این دکان تمام شده است. فروش‌های شما روی همین گوشی می‌مانند و ' +
+      'به‌محض تمدید بالا می‌روند.',
+      'subscription_required'
+    ));
+  })().catch(next);
+}
+
 /** دسترسی بر پایه‌ی نقش. */
 function requirePermission(permission) {
   return function (req, res, next) {
@@ -137,6 +186,6 @@ function requireSuperAdmin(req, res, next) {
 }
 
 module.exports = {
-  bearer, requireUser, requireShop, optionalShop,
+  bearer, requireUser, requireShop, optionalShop, requireDataWrite,
   requirePermission, requireFeature, requireAdmin, requireSuperAdmin,
 };

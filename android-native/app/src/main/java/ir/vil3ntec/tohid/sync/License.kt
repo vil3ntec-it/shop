@@ -56,6 +56,19 @@ object License {
     val reason: String? = null,
   ) {
     val features: List<String> get() = if (state == State.ACTIVE || state == State.GRACE) payload?.features.orEmpty() else emptyList()
+
+    /**
+     *  چند روز تا تمام شدنِ اشتراک — منفی یعنی تمام شده.
+     *
+     *  بالا گرد می‌شود: نیم‌روزِ باقی‌مانده «یک روز» است، نه «صفر روز».
+     *  کسی که «صفر روز» ببیند فکر می‌کند همین حالا تمام شده.
+     */
+    fun daysLeft(now: Long = System.currentTimeMillis()): Int {
+      val ends = payload?.subscriptionEndsAt ?: return 0
+      if (ends <= 0) return 0
+      val ms = ends - now
+      return Math.ceil(ms / (24.0 * 60 * 60 * 1000)).toInt()
+    }
   }
 
   /**

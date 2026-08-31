@@ -74,17 +74,76 @@ data class Alert(
   val target: String,
 )
 
+/**
+ *  هشدارِ اشتراک — فقط وقتی کاری از دستِ کاربر برمی‌آید.
+ *
+ *  اشتراکی که هفته‌ها اعتبار دارد خبری ندارد؛ شلوغ کردنِ زنگ با چیزی
+ *  که کاری نمی‌شود کرد، باعث می‌شود کاربر دیگر زنگ را باز نکند.
+ */
+private fun subscriptionAlert(
+  status: ir.vil3ntec.tohid.sync.License.Status?,
+  danger: Color,
+  warning: Color,
+): Alert? {
+  if (status == null) return null
+  return when (status.state) {
+    ir.vil3ntec.tohid.sync.License.State.EXPIRED,
+    ir.vil3ntec.tohid.sync.License.State.GRACE ->
+      Alert("اشتراک", "اشتراک تمام شده", "برای باز شدن دوباره، تمدید کنید", danger, "vip")
+
+    ir.vil3ntec.tohid.sync.License.State.ACTIVE -> {
+      val left = status.daysLeft()
+      if (left in 0..WARN_DAYS) {
+        Alert(
+          if (left <= 0) "امروز" else "${left.fa()} روز",
+          "اشتراک رو به پایان است",
+          "پیش از تمام شدن تمدید کنید تا صندوق فروش بسته نشود",
+          if (left <= 3) danger else warning,
+          "vip",
+        )
+      } else null
+    }
+
+    //  NONE یعنی هنوز اشتراکی نبوده و INVALID یعنی مجوز خراب است؛
+    //  هیچ‌کدام «رو به پایان» نیستند و جایشان اینجا نیست
+    else -> null
+  }
+}
+
+/** از این تعداد روز به بعد، خبر داده می‌شود */
+private const val WARN_DAYS = 7
+
 /** همان هشدارهایی که نسخهٔ وب در زنگ نشان می‌دهد */
 @Composable
 fun rememberAlerts(d: ShopData): List<Alert> {
   val context = LocalContext.current
   val backupStale = remember { BackupClock.isStale(context) }
+
+  /*
+   *  اشتراک، پیش از آنکه تمام شود.
+   *
+   *  تا امروز هیچ خبری نبود: فروشنده یک روز صبح می‌آمد و صندوقِ فروشش
+   *  قفل بود. برای کسی که دکانش با همین برنامه می‌چرخد، این یعنی یک
+   *  روزِ کاری از دست رفته و یک تماسِ عصبانی — نه یک ناراحتیِ کوچک.
+   *
+   *  یک بار حساب می‌شود، نه با هر بار کشیده شدنِ صفحه: سنجیدنِ مجوز
+   *  یعنی بررسیِ امضای رمزنگاری.
+   */
+  val subscription = remember {
+    runCatching {
+      ir.vil3ntec.tohid.sync.LicenseGuard.status(
+        context, ir.vil3ntec.tohid.sync.SyncStore(context),
+      )
+    }.getOrNull()
+  }
   // رنگ‌ها از CompositionLocal می‌آیند و خواندنشان فقط داخل بدنهٔ کامپوزبل
   // مجاز است، نه داخل لامبدای remember — پس همین‌جا گرفته می‌شوند.
   val danger = Shop.colors.danger
   val warning = Shop.colors.warning
-  return remember(d, backupStale, danger, warning) {
+  return remember(d, backupStale, danger, warning, subscription) {
     buildList {
+      //  اول از همه، چون از هر موجودیِ کمی مهم‌تر است
+      subscriptionAlert(subscription, danger, warning)?.let { add(it) }
       d.products.filter { ShopStore.stockStatus(d, it) == "out" }.forEach {
         add(Alert("تمام شد", it.name, "کالا موجود نیست", danger, "products"))
       }
