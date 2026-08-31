@@ -12,7 +12,7 @@ const { query, now } = require('../db');
 const v = require('../lib/validate');
 const sync = require('../lib/sync');
 const audit = require('../lib/audit');
-const { requireUser, requireShop } = require('../middleware/auth');
+const { requireUser, requireShop, requireDataWrite } = require('../middleware/auth');
 const { entitlementOf } = require('../lib/entitlement');
 
 const router = express.Router();
@@ -67,9 +67,16 @@ router.get('/status', async (req, res) => {
   });
 });
 
-router.post('/', pushHandler);
+/*
+ * خواندن باز است، نوشتن پشتِ اشتراک.
+ *
+ * دلیلش در `requireDataWrite` نوشته شده: داده‌ی فروشنده گروگان گرفته
+ * نمی‌شود، ولی «چند کاربر روی یک دکان» — که قابلیت پولی است — دیگر
+ * مجانی نیست.
+ */
+router.post('/', requireDataWrite, pushHandler);
 router.get('/', pullHandler);
-router.post('/push', pushHandler);
+router.post('/push', requireDataWrite, pushHandler);
 router.get('/pull', pullHandler);
 
 module.exports = router;
