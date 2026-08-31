@@ -130,6 +130,33 @@ class ServerClient(private val baseUrl: String) {
   suspend fun googleClientId(): String =
     runCatching { config()["googleClientId"]?.jsonPrimitive?.content.orEmpty() }.getOrDefault("")
 
+  /* ------------------------ بازیابی رمز ------------------------ */
+
+  /**
+   *  درخواستِ کدِ بازیابی.
+   *
+   *  سرور برای ایمیلِ بی‌حساب هم همان پاسخِ موفق را می‌دهد و کدی
+   *  نمی‌فرستد — وگرنه می‌شد با امتحان کردنِ نشانی‌ها فهمید چه کسانی
+   *  روی این سرور حساب دارند.
+   */
+  suspend fun forgotPassword(email: String): JsonObject =
+    post("/api/v1/auth/password/forgot", buildJsonObject { put("email", JsonPrimitive(email)) })
+
+  /**
+   *  گذاشتنِ رمزِ تازه با کدی که به ایمیل رفته.
+   *
+   *  همان‌جا وارد هم می‌کند، چون کسی که تازه رمز گذاشته نباید دوباره
+   *  بزندش. همهٔ نشست‌های قبلی هم بسته می‌شوند.
+   */
+  suspend fun resetPassword(email: String, code: String, password: String): Session =
+    session(
+      post("/api/v1/auth/password/reset", buildJsonObject {
+        put("email", JsonPrimitive(email))
+        put("code", JsonPrimitive(code))
+        put("password", JsonPrimitive(password))
+      })
+    )
+
   suspend fun refresh(refreshToken: String): String =
     post("/api/v1/auth/refresh", buildJsonObject { put("refreshToken", JsonPrimitive(refreshToken)) })["accessToken"]
       ?.jsonPrimitive?.content ?: throw ServerError("توکن تازه نشد", "bad_response")
