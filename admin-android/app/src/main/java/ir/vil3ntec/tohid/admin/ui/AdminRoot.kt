@@ -8,6 +8,7 @@ import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -23,9 +24,9 @@ import kotlinx.coroutines.launch
 /**
  *  ریشهٔ برنامه: تا وارد نشده‌اید، هیچ‌چیزِ دیگری نیست.
  *
- *  چهار بخش، چون بیشتر از این روی گوشی جا نمی‌شود و لازم هم نیست:
- *  داشبورد برای دیدن، کاربران و دکان‌ها برای کار کردن، سابقه برای
- *  پیگیری.
+ *  پنج بخش: داشبورد برای دیدن، کاربران و دکان‌ها برای کار کردن، سابقه
+ *  برای پیگیری، و تنظیمات برای سرویس پیامک — که تا امروز فقط با دست
+ *  بردن در فایلِ سرور عوض می‌شد.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,6 +54,7 @@ fun AdminRoot() {
         Nav(tab == 1, "کاربران", Icons.Filled.People) { tab = 1 }
         Nav(tab == 2, "دکان‌ها", Icons.Filled.Storefront) { tab = 2 }
         Nav(tab == 3, "سابقه", Icons.Filled.History) { tab = 3 }
+        Nav(tab == 4, "تنظیمات", Icons.Filled.Settings) { tab = 4 }
       }
     },
     topBar = {
@@ -84,7 +86,8 @@ fun AdminRoot() {
         0 -> DashboardScreen(session)
         1 -> UsersScreen(session)
         2 -> ShopsScreen(session)
-        else -> AuditScreen(session)
+        3 -> AuditScreen(session)
+        else -> SmsScreen(session)
       }
     }
   }

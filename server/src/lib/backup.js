@@ -15,6 +15,7 @@ const path = require('path');
 const zlib = require('zlib');
 const { spawn } = require('child_process');
 const { pipeline } = require('stream/promises');
+const { Transform } = require('stream');
 const { createCipheriv, createDecipheriv, randomBytes, scryptSync, createHash } = require('crypto');
 const config = require('../config');
 
@@ -66,23 +67,56 @@ async function run({ kind = 'manual', dir = null } = {}) {
 
   const gzip = zlib.createGzip({ level: 6 });
 
+  /*
+   *  شمارنده‌ی بایت‌های خام.
+   *
+   *  اگر pg_dump چیزی ندهد ولی با کد ۰ تمام شود، فایل خالی می‌شود و
+   *  همه‌چیز سالم به نظر می‌رسد. پشتیبانی که خالی است از نبودنِ پشتیبان
+   *  بدتر است، چون روز خرابی تازه معلوم می‌شود.
+   */
+  let rawBytes = 0;
+  const counter = new Transform({
+    transform(chunk, _enc, cb) { rawBytes += chunk.length; cb(null, chunk); },
+  });
+
+  /*
+   *  هیچ `await`ی بین spawn و وصل شدن به stdout نباید باشد.
+   *
+   *  اینجا یک اشکالِ واقعی بود: در مسیرِ رمزشده، اول سرآیند با
+   *  `await fsp.writeFile` نوشته می‌شد و بعد pipeline به stdout وصل
+   *  می‌شد. اگر pg_dump در همان فاصله تمام می‌شد — که روی دیتابیسِ کوچک
+   *  یا سرورِ تازه راه‌افتاده پیش می‌آید — خروجی‌اش رفته بود و pipeline
+   *  به جریانی وصل می‌شد که قبلاً بسته شده. نتیجه: فایلِ خالی، با کدِ
+   *  خروجِ ۰ و بدون هیچ خطایی.
+   *
+   *  حالا جریانِ نوشتن همان لحظه ساخته می‌شود و سرآیند داخلِ خودش
+   *  می‌نشیند، بی‌آنکه چیزی منتظر بماند.
+   */
+  const file = fs.createWriteStream(tmp);
+
   if (encrypted) {
     const salt = randomBytes(16);
     const iv = randomBytes(12);
     const cipher = createCipheriv('aes-256-gcm', keyFrom(config.backup.passphrase, salt), iv);
     // سرآیند: نشانه + salt + iv؛ با همین، فایل روی هر سرور دیگری هم باز می‌شود
-    await fsp.writeFile(tmp, Buffer.concat([Buffer.from(MAGIC), salt, iv]));
-    await pipeline(dump.stdout, gzip, cipher, fs.createWriteStream(tmp, { flags: 'a' }));
+    file.write(Buffer.concat([Buffer.from(MAGIC), salt, iv]));
+    await pipeline(dump.stdout, counter, gzip, cipher, file);
     // برچسب احراز اصالت در انتها — دست‌کاری فایل لو می‌رود
     await fsp.appendFile(tmp, cipher.getAuthTag());
   } else {
-    await pipeline(dump.stdout, gzip, fs.createWriteStream(tmp));
+    await pipeline(dump.stdout, counter, gzip, file);
   }
 
   const code = await closed;
   if (code !== 0) {
     await fsp.rm(tmp, { force: true });
     throw new Error(`pg_dump شکست خورد: ${stderr.trim().slice(0, 300)}`);
+  }
+
+  //  کدِ خروجِ ۰ کافی نیست؛ باید چیزی هم بیرون آمده باشد
+  if (rawBytes < 100) {
+    await fsp.rm(tmp, { force: true });
+    throw new Error(`pg_dump چیزی نداد — پشتیبان ساخته نشد. ${stderr.trim().slice(0, 300)}`);
   }
 
   await fsp.rename(tmp, target);

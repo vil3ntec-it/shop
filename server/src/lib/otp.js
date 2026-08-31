@@ -12,6 +12,7 @@
 const { createHmac, randomInt, timingSafeEqual } = require('crypto');
 const { query, one, newId, now } = require('../db');
 const config = require('../config');
+const settings = require('./sms-settings');
 const { badRequest, tooMany, forbidden } = require('../middleware/errors');
 
 function pepper() {
@@ -116,8 +117,9 @@ const senders = {
    * پنل خود سرویس برمی‌دارید و در .env می‌گذارید.
    */
   async sms(to, code, message) {
-    const cfg = config.sms;
-    if (!cfg.url) throw new Error('SMS_API_URL تنظیم نشده است');
+    //  تنظیمات از دیتابیس می‌آید (و اگر آنجا نبود، از .env)
+    const cfg = await settings.current();
+    if (!cfg.url) throw new Error('نشانی سرویس پیامک تنظیم نشده است');
 
     //  `{to}` شماره را همان‌طور که هست می‌دهد: `+93790000000`.
     //  `{to_plain}` بدون `+` و بدون هر چیزِ غیررقم — چند سرویس (از جمله
@@ -228,9 +230,11 @@ function isEmail(destination) {
  * راه ارسال از روی خود مقصد انتخاب می‌شود: ایمیل با سرویس ایمیل، شماره
  * با پیامک یا واتساپ. هر کدام متغیر خودش را دارد.
  */
-function sender(destination) {
-  const name = isEmail(destination) ? config.otp.emailProvider : config.otp.provider;
-  return senders[name] || senders.log;
+async function sender(destination) {
+  if (isEmail(destination)) return senders[config.otp.emailProvider] || senders.log;
+  //  راه ارسالِ شماره هم از پنل مدیریت عوض می‌شود، نه فقط از .env
+  const { provider } = await settings.current();
+  return senders[provider] || senders.log;
 }
 
 /**
@@ -269,10 +273,11 @@ async function request(destination, { purpose = 'login', ip = '' } = {}) {
 
   //  متن پیام: اگر سرویس شما قالب تأییدشده می‌خواهد، همان را در
   //  SMS_TEMPLATE بگذارید با {code} داخلش.
-  const message = config.sms.template
-    ? config.sms.template.replace(/\{code\}/g, code)
+  const smsCfg = await settings.current();
+  const message = smsCfg.template
+    ? smsCfg.template.replace(/\{code\}/g, code)
     : `کد ورود شما: ${code}`;
-  await sender(destination)(destination, code, message);
+  await (await sender(destination))(destination, code, message);
 
   //  `resendSeconds` هم می‌رود چون ساعتِ گوشی ممکن است با سرور جور نباشد.
   //  با ثانیه، برنامه لازم نیست ساعتش را با سرور تنظیم کند.
@@ -285,7 +290,7 @@ async function request(destination, { purpose = 'login', ip = '' } = {}) {
   // فقط بیرون از حالت production و فقط وقتی راه ارسالی تنظیم نشده
   //  فقط بیرون از production و فقط وقتی هیچ راه ارسالی تنظیم نشده — وگرنه
   //  کد در پاسخ HTTP برمی‌گشت و کسی که شماره‌ی دیگری را می‌زد کدش را می‌دید.
-  const via = isEmail(destination) ? config.otp.emailProvider : config.otp.provider;
+  const via = isEmail(destination) ? config.otp.emailProvider : smsCfg.provider;
   if (config.env !== 'production' && via === 'log') out.devCode = code;
   return out;
 }

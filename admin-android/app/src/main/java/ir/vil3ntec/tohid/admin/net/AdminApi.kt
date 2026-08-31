@@ -112,6 +112,51 @@ class AdminApi(private val baseUrl: String) {
     get("/api/v1/admin/subscriptions?limit=$limit&status=${enc(status)}", token)
       .optJSONArray("subscriptions") ?: JSONArray()
 
+  /* ------------------------------ پیامک ------------------------------ */
+
+  /**
+   *  تنظیماتِ سرویس پیامک.
+   *
+   *  کلیدِ سرویس هرگز کامل نمی‌آید — سرور فقط چهار رقمِ آخرش را می‌دهد.
+   *  پس این برنامه هم کلید را ندارد و اگر گوشی دستِ کسی بیفتد، چیزی
+   *  گیرش نمی‌آید.
+   */
+  suspend fun smsSettings(token: String): JSONObject =
+    get("/api/v1/admin/sms", token).optJSONObject("sms") ?: JSONObject()
+
+  /**
+   *  ذخیره. کلید فقط وقتی فرستاده می‌شود که مدیر چیزی نوشته باشد؛
+   *  خالی گذاشتنش یعنی «همان قبلی بماند».
+   */
+  suspend fun saveSmsSettings(
+    token: String,
+    provider: String,
+    url: String,
+    method: String,
+    sender: String,
+    headers: String,
+    body: String,
+    template: String,
+    key: String?,
+  ): JSONObject = put(
+    "/api/v1/admin/sms",
+    JSONObject().apply {
+      put("provider", provider)
+      put("url", url)
+      put("method", method)
+      put("sender", sender)
+      put("headers", headers)
+      put("body", body)
+      put("template", template)
+      if (!key.isNullOrBlank()) put("key", key)
+    },
+    token,
+  )
+
+  /** یک پیامکِ آزمایشی به شمارهٔ خودتان. جایی ثبت نمی‌شود و کدش کار نمی‌کند. */
+  suspend fun testSms(token: String, to: String): JSONObject =
+    post("/api/v1/admin/sms/test", JSONObject().put("to", to), token)
+
   /* ------------------------- درخواست‌های خرید ------------------------- */
 
   suspend fun purchaseRequests(token: String): JSONArray =

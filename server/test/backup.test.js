@@ -123,3 +123,29 @@ test('پشتیبان دست‌کاری‌شده باز نمی‌شود', async (
   assert.match(good.toString('utf8'), /CREATE TABLE/);
   config.backup.passphrase = '';
 });
+
+/**
+ * pg_dump که با کد ۰ تمام شود ولی چیزی ندهد، نباید «پشتیبان» حساب شود.
+ *
+ * این حالت واقعاً پیش آمد: در مسیر رمزشده یک `await` بین اجرای pg_dump
+ * و وصل شدن به خروجی‌اش بود، و اگر dump در همان فاصله تمام می‌شد
+ * خروجی‌اش از دست می‌رفت. فایل خالی ساخته می‌شد، کد خروج ۰ بود و
+ * هیچ خطایی نمی‌آمد — یعنی روز خرابی تازه معلوم می‌شد که پشتیبانی نیست.
+ *
+ * `true` یک برنامه‌ی سیستمی است که بی‌درنگ با کد ۰ تمام می‌شود و چیزی
+ * نمی‌نویسد؛ دقیقاً همان حالت.
+ */
+test('پشتیبانِ خالی، پشتیبان حساب نمی‌شود', async () => {
+  const original = config.backup.pgDump;
+  config.backup.pgDump = 'true';
+  try {
+    await assert.rejects(() => backup.run({ kind: 'manual' }), /چیزی نداد/);
+  } finally {
+    config.backup.pgDump = original;
+  }
+
+  // فایل نیمه‌کاره هم نباید جا مانده باشد
+  const left = (await fs.readdir(backup.dirFor('manual')).catch(() => []))
+    .filter(f => f.endsWith('.part'));
+  assert.deepEqual(left, [], 'فایل نیمه‌کاره نباید بماند');
+});

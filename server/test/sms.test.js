@@ -13,6 +13,7 @@ const http = require('node:http');
 process.env.NODE_ENV = 'test';
 const config = require('../src/config');
 const { senders } = require('../src/lib/otp');
+const settings = require('../src/lib/sms-settings');
 
 let server;
 let seen = [];
@@ -47,9 +48,25 @@ test.after(async () => { await new Promise(r => server.close(r)); });
 
 function reset() { seen = []; }
 
+/**
+ * تنظیمات را مستقیم می‌نشانیم، بدون دیتابیس.
+ *
+ * این تست‌ها فقط شکلِ درخواست را می‌سنجند؛ خواندن از دیتابیس جای
+ * دیگری سنجیده می‌شود و اینجا فقط تست را کند و شکننده می‌کرد.
+ */
+function set(patch) {
+  const base = {
+    provider: 'sms', url: '', method: 'POST', key: '', sender: '',
+    headers: '', body: '', template: '',
+  };
+  const value = { ...base, ...patch };
+  value.method = String(value.method).toUpperCase();
+  settings.current = async () => value;
+}
+
 test('POST: کلید در سرآیند و پارامترها در بدنه', async () => {
   reset();
-  Object.assign(config.sms, {
+  set({
     url: `${base}/sendsms`,
     method: 'POST',
     key: 'KEY-123',
@@ -78,7 +95,7 @@ test('POST: کلید در سرآیند و پارامترها در بدنه', asy
 
 test('GET: کلید داخل آدرس و پارامترها در query', async () => {
   reset();
-  Object.assign(config.sms, {
+  set({
     url: `${base}/v1/{key}/send.json`,
     method: 'GET',
     key: 'KEY-456',
@@ -101,7 +118,7 @@ test('GET: کلید داخل آدرس و پارامترها در query', async (
 
 test('کلید می‌تواند داخل خودِ بدنه هم برود', async () => {
   reset();
-  Object.assign(config.sms, {
+  set({
     url: `${base}/sendsms`,
     method: 'POST',
     key: 'KEY-789',
@@ -118,7 +135,7 @@ test('کلید می‌تواند داخل خودِ بدنه هم برود', asyn
 
 test('پاسخ خطا با متنِ خودِ سرویس برمی‌گردد، نه فقط یک شماره', async () => {
   reset();
-  Object.assign(config.sms, {
+  set({
     url: `${base}/fail`, method: 'POST', key: 'x', sender: '1',
     headers: '', body: '{"to":"{to}"}',
   });
@@ -137,7 +154,7 @@ test('پاسخ ۲۰۰ ولی با خطا در بدنه، «فرستاده شد»
   reset();
   //  EasySendSMS و چند سرویس دیگر گاهی ۲۰۰ می‌دهند و خطا را داخل بدنه
   //  می‌گذارند. اگر این را نمی‌سنجیدیم، به کاربر می‌گفتیم کد رفت و نرفته بود.
-  Object.assign(config.sms, {
+  set({
     url: `${base}/soft-fail`, method: 'POST', key: 'k', sender: 's',
     headers: '', body: '{"to":"{to}"}',
   });
@@ -150,7 +167,7 @@ test('پاسخ ۲۰۰ ولی با خطا در بدنه، «فرستاده شد»
 
 test('شکل واقعی EasySendSMS همان‌طور که هست فرستاده می‌شود', async () => {
   reset();
-  Object.assign(config.sms, {
+  set({
     url: `${base}/v1/rest/sms/send`,
     method: 'POST',
     key: 'APIKEY-XYZ',
@@ -174,13 +191,13 @@ test('شکل واقعی EasySendSMS همان‌طور که هست فرستاده
   });
 });
 
-test('بدون SMS_API_URL، با پیام روشن رد می‌شود', async () => {
-  Object.assign(config.sms, { url: '' });
-  await assert.rejects(() => senders.sms('079', '1', 'x'), /SMS_API_URL/);
+test('بدون نشانی سرویس، با پیام روشن رد می‌شود', async () => {
+  set({ url: '' });
+  await assert.rejects(() => senders.sms('079', '1', 'x'), /نشانی سرویس پیامک تنظیم نشده/);
 });
 
 test('JSON خرابِ تنظیمات، با نامِ همان متغیر گفته می‌شود', async () => {
-  Object.assign(config.sms, {
+  set({
     url: `${base}/sendsms`, method: 'POST', key: 'x', sender: '1',
     headers: '{این JSON نیست}', body: '',
   });
