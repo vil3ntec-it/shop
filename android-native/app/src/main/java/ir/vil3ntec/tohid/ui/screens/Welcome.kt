@@ -178,6 +178,15 @@ fun WelcomeScreen(onDone: () -> Unit) {
   val cooldown = remember { ir.vil3ntec.tohid.sync.OtpCooldown(context) }
 
   /*
+   *  بازیابیِ رمزِ فراموش‌شده.
+   *
+   *  تا امروز دکمه‌اش فقط می‌گفت «با پشتیبانی تماس بگیرید» — یعنی کسی
+   *  که رمزش را فراموش می‌کرد عملاً از حسابش بیرون می‌ماند. حالا کد به
+   *  همان ایمیل می‌رود و همان صفحهٔ کد باز می‌شود.
+   */
+  var resetting by rememberSaveable { mutableStateOf(false) }
+
+  /*
    *  ورود با گوگل فقط وقتی نشان داده می‌شود که خودِ سرور بگوید روشن است.
    *
    *  دکمه‌ای که بخورد به خطا، از نبودنِ دکمه بدتر است. آدرسِ سرور هم مدام
@@ -221,13 +230,16 @@ fun WelcomeScreen(onDone: () -> Unit) {
       busy = busy,
       error = error,
       note = note,
+      askPassword = resetting,
       secondsLeft = { cooldown.secondsLeft(destination) },
-      onBack = { codeSent = false; code = ""; note = null; error = null },
+      onBack = { codeSent = false; code = ""; note = null; error = null; resetting = false },
       onResend = {
         busy = true; error = null
         scope.launch {
           val client = ServerClient(server.trim().trimEnd('/'))
-          runCatching { client.otpRequest(destination) }
+          runCatching {
+            if (resetting) client.forgotPassword(destination) else client.otpRequest(destination)
+          }
             .onSuccess {
               cooldown.start(destination, client.resendSecondsOf(it))
               note = "کد دوباره فرستاده شد"
@@ -236,12 +248,16 @@ fun WelcomeScreen(onDone: () -> Unit) {
           busy = false
         }
       },
-      onSubmit = { entered ->
+      onSubmit = { entered, newPassword ->
         busy = true; error = null; note = null
         scope.launch {
-          val to = if (channel == "phone") phone.trim() else email.trim()
-          runCatching { ServerClient(server.trim().trimEnd('/')).otpVerify(to, entered, name.trim()) }
-            .onSuccess { finish(to, it) }
+          val client = ServerClient(server.trim().trimEnd('/'))
+          val done = if (resetting) {
+            runCatching { client.resetPassword(destination, entered, newPassword) }
+          } else {
+            runCatching { client.otpVerify(destination, entered, name.trim()) }
+          }
+          done.onSuccess { resetting = false; finish(destination, it) }
             .onFailure { fail(it) }
           busy = false
         }
@@ -488,15 +504,38 @@ fun WelcomeScreen(onDone: () -> Unit) {
             )
           }
           if (emailMode == "login") {
+            /*
+             *  بازیابیِ رمز.
+             *
+             *  تا امروز این دکمه فقط می‌گفت «با پشتیبانی تماس بگیرید» —
+             *  یعنی کسی که رمزش را فراموش می‌کرد از حسابش بیرون می‌ماند.
+             *  حالا کد به همان ایمیل می‌رود و همان صفحهٔ کد باز می‌شود،
+             *  این بار با کادرِ رمزِ تازه.
+             */
             TextButton(
+              enabled = ready && !busy && email.isNotBlank(),
               onClick = {
-                note = "برای بازیابی رمز با پشتیبانی تماس بگیرید. اطلاعات دکان شما روی همین گوشی محفوظ است."
-                error = null
+                busy = true; error = null; note = null
+                val base = server.trim().trimEnd('/')
+                val to = email.trim()
+                scope.launch {
+                  val client = ServerClient(base)
+                  runCatching { client.forgotPassword(to) }
+                    .onSuccess {
+                      state.serverUrl = base
+                      cooldown.start(to, client.resendSecondsOf(it))
+                      resetting = true
+                      codeSent = true
+                    }
+                    .onFailure { fail(it) }
+                  busy = false
+                }
               },
               modifier = Modifier.fillMaxWidth(),
             ) {
               Text(
-                "رمز عبور را فراموش کرده‌اید؟",
+                if (email.isBlank()) "رمز را فراموش کرده‌اید؟ اول ایمیل را بزنید"
+                else "رمز عبور را فراموش کرده‌اید؟",
                 color = Shop.colors.muted,
                 style = MaterialTheme.typography.labelMedium,
               )
@@ -714,12 +753,15 @@ private fun CodeScreen(
   busy: Boolean,
   error: String?,
   note: String?,
+  askPassword: Boolean,
   secondsLeft: () -> Int,
   onBack: () -> Unit,
   onResend: () -> Unit,
-  onSubmit: (String) -> Unit,
+  onSubmit: (code: String, newPassword: String) -> Unit,
 ) {
   var code by rememberSaveable { mutableStateOf("") }
+  var fresh by rememberSaveable { mutableStateOf("") }
+  var showFresh by rememberSaveable { mutableStateOf(false) }
   val focus = remember { FocusRequester() }
   val keyboard = LocalSoftwareKeyboardController.current
 
@@ -756,14 +798,14 @@ private fun CodeScreen(
       BrandMark()
       Spacer(Modifier.height(22.dp))
       Text(
-        "کد را بزنید",
+        if (askPassword) "رمز تازه" else "کد را بزنید",
         style = MaterialTheme.typography.headlineSmall,
         color = ink,
         fontWeight = FontWeight.Bold,
       )
       Spacer(Modifier.height(8.dp))
       Text(
-        if (destination.contains("@")) "کد شش‌رقمی به $destination فرستاده شد"
+        if (askPassword) "کد به $destination فرستاده شد. آن را بزنید و رمز تازه بگذارید."
         else "کد شش‌رقمی به $destination فرستاده شد",
         style = MaterialTheme.typography.bodyMedium,
         color = inkSoft,
@@ -781,7 +823,9 @@ private fun CodeScreen(
           onValueChange = { raw ->
             val digits = raw.filter { it.isDigit() }.take(6)
             code = digits
-            if (digits.length == 6 && !busy) { keyboard?.hide(); onSubmit(digits) }
+            //  در حالتِ عادی با کاملِ شش رقم خودش می‌فرستد. در بازیابی نه،
+            //  چون رمزِ تازه هم باید نوشته شود.
+            if (digits.length == 6 && !busy && !askPassword) { keyboard?.hide(); onSubmit(digits, "") }
           },
           keyboardOptions = KeyboardOptions(
             keyboardType = KeyboardType.NumberPassword,
@@ -817,13 +861,40 @@ private fun CodeScreen(
         Text(it, style = MaterialTheme.typography.labelMedium, color = BLUE)
       }
 
+      if (askPassword) {
+        Spacer(Modifier.height(18.dp))
+        Box(Modifier.widthIn(max = 400.dp).fillMaxWidth().padding(horizontal = 22.dp)) {
+          PillField(
+            value = fresh,
+            onValueChange = { fresh = it },
+            placeholder = "رمز تازه (حداقل ۸ نویسه)",
+            icon = Icons.Filled.Lock,
+            keyboardOptions = KeyboardOptions(
+              keyboardType = KeyboardType.Password,
+              imeAction = ImeAction.Done,
+            ),
+            visual = if (showFresh) VisualTransformation.None else PasswordVisualTransformation(),
+            trailing = {
+              IconButton(onClick = { showFresh = !showFresh }, modifier = Modifier.size(34.dp)) {
+                Icon(
+                  if (showFresh) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                  contentDescription = if (showFresh) "پنهان کردن رمز" else "نمایش رمز",
+                  tint = Shop.colors.muted,
+                  modifier = Modifier.size(19.dp),
+                )
+              }
+            },
+          )
+        }
+      }
+
       Spacer(Modifier.height(24.dp))
       Box(Modifier.widthIn(max = 400.dp).fillMaxWidth().padding(horizontal = 22.dp)) {
         GradientButton(
-          text = "ورود",
-          enabled = code.length == 6 && !busy,
+          text = if (askPassword) "گذاشتن رمز و ورود" else "ورود",
+          enabled = code.length == 6 && !busy && (!askPassword || fresh.length >= 8),
           busy = busy,
-        ) { onSubmit(code) }
+        ) { onSubmit(code, fresh) }
       }
 
       Spacer(Modifier.height(10.dp))

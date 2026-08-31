@@ -22,7 +22,7 @@ const audit = require('../lib/audit');
 const { membershipOf } = require('../lib/shops');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
 const { requireUser } = require('../middleware/auth');
-const { badRequest, unauthorized, forbidden, conflict, tooMany } = require('../middleware/errors');
+const { badRequest, unauthorized, forbidden, conflict, tooMany, notFound } = require('../middleware/errors');
 
 const router = express.Router();
 
@@ -318,6 +318,79 @@ router.post('/password', requireUser, async (req, res, next) => {
   await query('UPDATE users SET password_hash=$2, updated_at=$3 WHERE id=$1', [req.user.id, hash, now()]);
   await audit.log({ actorType: 'user', userId: req.user.id, action: 'auth.password_changed' });
   res.json({ ok: true });
+});
+
+/* ---------- بازیابی رمز فراموش‌شده ---------- */
+
+/**
+ * درخواست کد بازیابی.
+ *
+ * کد به همان ایمیلی می‌رود که کاربر زده — نه جای دیگر. اگر آن ایمیل
+ * حسابی نداشته باشد، باز هم همان پاسخ موفق برمی‌گردد و کدی فرستاده
+ * نمی‌شود.
+ *
+ * چرا این‌طور: اگر می‌گفتیم «این ایمیل حساب ندارد»، هر کسی می‌توانست
+ * با امتحان کردن نشانی‌ها بفهمد چه کسانی روی این سرور حساب دارند.
+ *
+ * `purpose = 'reset'` جداست از کد ورود، پس کدی که برای ورود صادر شده
+ * به درد عوض کردن رمز نمی‌خورد و برعکس.
+ */
+router.post('/password/forgot', otpLimit, async (req, res, next) => {
+  const raw = String(req.body?.email || req.body?.identifier || '').trim();
+  if (!raw) return next(badRequest('ایمیل لازم است', 'email_required'));
+  const email = v.email(raw, { required: true });
+
+  const user = await one('SELECT id FROM users WHERE email=$1', [email]);
+  let out = {};
+  if (user) {
+    out = await otp.request(email, { purpose: 'reset', ip: clientIp(req) });
+    await audit.log({ actorType: 'user', userId: user.id, action: 'auth.password_reset_requested', ip: clientIp(req) });
+  }
+
+  //  پاسخ برای حسابِ موجود و ناموجود یکی است. `resendSeconds` هم می‌رود
+  //  تا برنامه بتواند شمارش را نشان دهد، چه حساب باشد چه نباشد.
+  res.json({
+    ok: true,
+    sent: true,
+    email,
+    resendSeconds: out.resendSeconds || Math.ceil(config.otp.resendMs / 1000),
+    ...(out.devCode ? { devCode: out.devCode } : {}),
+  });
+});
+
+/**
+ * گذاشتن رمز تازه با کدی که به ایمیل رفته.
+ *
+ * بعد از عوض شدن رمز، همه‌ی نشست‌های باز بسته می‌شوند. اگر کسی رمز را
+ * فراموش کرده چون گوشی‌اش دست دیگری افتاده، آن نشست هم باید برود.
+ */
+router.post('/password/reset', otpLimit, async (req, res, next) => {
+  const email = v.email(req.body?.email, { required: true });
+  const password = typeof req.body?.password === 'string' ? req.body.password : '';
+  const weak = pw.checkStrength(password);
+  if (weak) return next(badRequest(weak, 'weak_password'));
+
+  await assertNotLocked('otp', email);
+  try {
+    await otp.verify(email, req.body?.code, { purpose: 'reset' });
+  } catch (err) {
+    await noteAttempt('otp', email, clientIp(req), false);
+    return next(err);
+  }
+  await noteAttempt('otp', email, clientIp(req), true);
+
+  const user = await one('SELECT * FROM users WHERE email=$1', [email]);
+  if (!user) return next(notFound('حسابی با این ایمیل نیست', 'user_not_found'));
+  if (user.status !== 'active') return next(forbidden('این حساب غیرفعال است', 'account_disabled'));
+
+  const hash = await pw.hashPassword(password);
+  await query('UPDATE users SET password_hash=$2, updated_at=$3 WHERE id=$1', [user.id, hash, now()]);
+  await tokens.revokeAllForSubject(user.id);
+  await audit.log({ actorType: 'user', userId: user.id, action: 'auth.password_reset', ip: clientIp(req) });
+
+  //  و همان‌جا واردش می‌کنیم؛ کسی که تازه رمز گذاشته نباید دوباره بزندش
+  const session = await issueSession(user, req.body?.device, clientIp(req));
+  res.json(await loginPayload(user, session));
 });
 
 module.exports = router;
