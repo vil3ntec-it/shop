@@ -434,6 +434,25 @@ fun SettingsScreen(
         )
         Spacer(Modifier.height(12.dp))
         if (lockOn) {
+          /*
+           *  «عوض کردن رمز» تا دیروز نبود: یا رمز داشتی یا برش می‌داشتی.
+           *  حالا لازم است — رمزِ تازه شش‌رقمی است و کسی که از نسخهٔ قبل
+           *  رمزِ چهاررقمی دارد باید راهی برای بالا بردنش داشته باشد.
+           */
+          if (lockStore.isLegacyLength) {
+            Text(
+              "رمز شما چهار رقمی است. رمزهای تازه شش رقمی‌اند — اگر خواستید عوضش کنید.",
+              style = MaterialTheme.typography.labelSmall,
+              color = Shop.colors.warning,
+            )
+            Spacer(Modifier.height(10.dp))
+          }
+          TohidButton(
+            text = "عوض کردن رمز",
+            onClick = { askPin = true },
+            modifier = Modifier.fillMaxWidth(),
+          )
+          Spacer(Modifier.height(8.dp))
           TohidSecondaryButton(
             text = "برداشتن رمز",
             onClick = { lockStore.set(""); lockOn = false; toast("قفل برداشته شد") },
@@ -679,10 +698,11 @@ fun SettingsScreen(
     PinDialog(
       onDismiss = { askPin = false },
       onSet = { pin ->
+        val had = lockStore.enabled
         lockStore.set(pin)
         lockOn = true
         askPin = false
-        toast("قفل برنامه روشن شد")
+        toast(if (had) "رمز عوض شد" else "قفل برنامه روشن شد")
       },
     )
   }
@@ -787,7 +807,7 @@ private fun PinDialog(onDismiss: () -> Unit, onSet: (String) -> Unit) {
     text = {
       Column {
         Text(
-          "یک رمزِ چهار رقمی. هر بار که برنامه باز شود همین پرسیده می‌شود.",
+          "یک رمزِ شش رقمی. هر بار که برنامه باز شود همین پرسیده می‌شود.",
           style = MaterialTheme.typography.bodySmall,
           color = colors.muted,
         )

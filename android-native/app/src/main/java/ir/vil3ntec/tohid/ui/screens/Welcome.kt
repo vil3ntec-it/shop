@@ -241,7 +241,11 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
      *  بسته شد یک بار اتفاق می‌افتد.
      */
     scope.launch {
-      runCatching { LedgerOwner.signedIn(context, store, session.user.id) }
+      //  دکان هم فرستاده می‌شود: اگر همین حساب دکانش عوض شده باشد،
+      //  دفترِ دکانِ قبلی نباید داخلِ دکانِ تازه برود
+      runCatching {
+        LedgerOwner.signedIn(context, store, session.user.id, session.shop?.id.orEmpty())
+      }
       //  نام *بعد از* آن نوشته می‌شود: جابه‌جاییِ حساب هرچه به حسابِ
       //  قبلی بسته بوده را پاک می‌کند و نامِ تازه هم قربانی می‌شد
       state.accountName = display
@@ -705,7 +709,15 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
                     busy = true; error = null
                     scope.launch {
                       shops.join(entered)
-                        .onSuccess { onDone() }
+                        .onSuccess { state ->
+                          //  حساب عوض نشده ولی دکان شده. بدونِ این،
+                          //  دفترِ دکانِ قبلی با اولین همگام‌سازی صاف
+                          //  می‌رفت داخلِ دکانِ تازه.
+                          runCatching {
+                            LedgerOwner.shopChanged(context, store, state.shop?.id.orEmpty())
+                          }
+                          onDone()
+                        }
                         .onFailure { fail(it) }
                       busy = false
                     }
@@ -1134,7 +1146,13 @@ private fun ChannelTab(
  *  راست‌به‌چپ وارونه دیده می‌شود و کاربر فکر می‌کند چیزِ دیگری تایپ کرده.
  */
 @Composable
-private fun PillField(
+/**
+ *  کادرِ ورودیِ گِردِ صفحهٔ ورود.
+ *
+ *  `internal` است چون صفحهٔ «ساختِ دکان» هم از همین استفاده می‌کند: آن
+ *  صفحه ادامهٔ همین مسیر است و نباید کادرهایش شکلِ دیگری داشته باشد.
+ */
+internal fun PillField(
   value: String,
   onValueChange: (String) -> Unit,
   placeholder: String,

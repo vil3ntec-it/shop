@@ -33,15 +33,31 @@ class LockStore(context: Context) {
    */
   fun set(pin: String) {
     if (pin.isBlank()) {
-      prefs.edit().remove(HASH).remove(SALT).apply()
+      prefs.edit().remove(HASH).remove(SALT).remove(LEN).apply()
       return
     }
     val salt = ByteArray(16).also { SecureRandom().nextBytes(it) }
     prefs.edit()
       .putString(SALT, salt.toHex())
       .putString(HASH, hash(pin, salt))
+      .putInt(LEN, pin.length)
       .apply()
   }
+
+  /**
+   *  چند رقم است.
+   *
+   *  رمزِ تازه شش‌رقمی است، ولی کسی که از نسخهٔ قبل می‌آید رمزِ
+   *  **چهار**رقمی دارد. اگر صفحهٔ قفل بی‌قید و شرط شش رقم می‌خواست،
+   *  آن آدم هیچ‌وقت نمی‌توانست وارد شود — رمزش درست بود و صفحه
+   *  هیچ‌وقت نمی‌پرسیدش. پس طول کنارِ خودِ رمز نوشته می‌شود و
+   *  رمزهای قدیمی که این عدد را ندارند، چهار رقمی خوانده می‌شوند.
+   */
+  val length: Int
+    get() = if (!enabled) NEW_PIN_LEN else prefs.getInt(LEN, LEGACY_PIN_LEN)
+
+  /** رمزِ ذخیره‌شده از نسخهٔ قبل مانده و هنوز شش‌رقمی نشده */
+  val isLegacyLength: Boolean get() = enabled && length != NEW_PIN_LEN
 
   fun matches(pin: String): Boolean {
     val stored = prefs.getString(HASH, null) ?: return true
@@ -66,8 +82,15 @@ class LockStore(context: Context) {
   private fun String.fromHex(): ByteArray =
     ByteArray(length / 2) { substring(it * 2, it * 2 + 2).toInt(16).toByte() }
 
-  private companion object {
-    const val HASH = "pin_hash"
-    const val SALT = "pin_salt"
+  companion object {
+    private const val HASH = "pin_hash"
+    private const val SALT = "pin_salt"
+    private const val LEN = "pin_len"
+
+    /** رمزِ تازه شش رقم است */
+    const val NEW_PIN_LEN = 6
+
+    /** نسخه‌های قبل چهار رقم می‌گرفتند */
+    const val LEGACY_PIN_LEN = 4
   }
 }

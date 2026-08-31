@@ -120,9 +120,26 @@ async function issue({
   // ولی نه دیرتر از پایان اشتراک، وگرنه چند روز مجانی می‌دهد
   const expiresAt = Math.min(at + TOKEN_TTL_MS, subscriptionEndsAt || at + TOKEN_TTL_MS);
 
+  /*
+   * نام فیلدها همان چیزی است که برنامه می‌خواند — نه چیز دیگری.
+   *
+   * تا امروز اینجا `dev` و `acc` نوشته می‌شد، ولی هر دو کلاینت
+   * (اندروید و وب) `duid` و `sub` را می‌خوانند. یعنی `payload.duid`
+   * همیشه undefined بود و مجوز با `device_mismatch` رد می‌شد:
+   * **اشتراک پولی روی هیچ دستگاهی فعال نمی‌شد.**
+   *
+   * تست‌های کلاینت این را نمی‌گرفتند چون خودشان مجوز می‌ساختند و
+   * همان نام‌های درست را می‌گذاشتند؛ هیچ تستی مجوزِ واقعیِ سرور را با
+   * چشمِ کلاینت نگاه نمی‌کرد. حالا می‌کند (`license-format.test.js`).
+   *
+   * `dev` و `acc` هم کنارشان می‌مانند تا اگر ابزاری بیرون از این مخزن
+   * آن‌ها را می‌خواند، نشکند.
+   */
   const payload = {
     iss: ISSUER,
     aud: AUDIENCE,
+    duid: deviceUid,
+    sub: accountId,
     dev: deviceUid,
     dev_name: deviceName,
     acc: accountId,

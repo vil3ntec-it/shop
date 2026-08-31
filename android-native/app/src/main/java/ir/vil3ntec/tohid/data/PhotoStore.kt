@@ -55,6 +55,45 @@ object PhotoStore {
     runCatching { file(context, productId).delete() }
   }
 
+  /* ------------------------ عکس‌ها، به نامِ حساب ------------------------ */
+
+  /*
+   *  عکس‌ها باید با دفتر جابه‌جا شوند.
+   *
+   *  اگر می‌ماندند، دو چیز پیش می‌آمد: پوشه با هر حسابِ تازه بزرگ‌تر
+   *  می‌شد و هیچ‌وقت خالی نمی‌شد، و — چون شناسه‌ی محصول از دفتر می‌آید —
+   *  عکسِ حسابِ قبلی روی گوشی می‌ماند بی‌آنکه چیزی به آن اشاره کند.
+   *
+   *  حالا دقیقاً مثل خودِ دفتر: پوشه‌ی حسابِ قبلی زیرِ نامِ او بایگانی
+   *  می‌شود و پوشه‌ی حسابِ تازه سرِ جایش. احمد که برگردد، عکس‌هایش هم
+   *  با دفترش برمی‌گردند.
+   */
+
+  private fun vault(context: Context, key: String): File =
+    File(context.filesDir, "product-photos-${safeKey(key)}")
+
+  fun stashTo(context: Context, key: String) {
+    runCatching {
+      val live = dir(context)
+      val saved = vault(context, key)
+      saved.deleteRecursively()
+      live.renameTo(saved)
+      live.mkdirs()
+    }
+  }
+
+  fun openFrom(context: Context, key: String) {
+    runCatching {
+      val live = File(context.filesDir, "product-photos")
+      live.deleteRecursively()
+      val saved = vault(context, key)
+      if (saved.exists()) saved.renameTo(live) else live.mkdirs()
+    }
+  }
+
+  private fun safeKey(key: String): String =
+    key.map { if (it.isLetterOrDigit()) it else '_' }.joinToString("").take(48).ifBlank { "anon" }
+
   /** بلندترین ضلع به MAX_EDGE می‌رسد و نسبت‌ها دست‌نخورده می‌ماند */
   private fun shrink(source: Bitmap): Bitmap {
     val longest = maxOf(source.width, source.height)
