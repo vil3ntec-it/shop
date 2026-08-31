@@ -76,6 +76,17 @@ object AccountKeys {
     return rotateStaffCode(context)
   }
 
+  /**
+   *  هر دو کلید را پاک می‌کند — وقتی حسابِ دیگری روی همین گوشی وارد شود.
+   *
+   *  این کلیدها به حساب بسته‌اند، نه به دستگاه. اگر می‌ماندند، نفرِ تازه
+   *  کلیدِ حساب و کدِ شاگردِ نفرِ قبلی را در تنظیمات می‌دید. دفعهٔ بعد که
+   *  لازم شوند، برای خودش ساخته می‌شوند.
+   */
+  fun forget(context: Context) {
+    prefs(context).edit().remove(API_KEY).remove(STAFF_KEY).apply()
+  }
+
   /** کد تازه می‌سازد — وقتی صاحب دکان بخواهد کد قبلی دیگر کار نکند */
   fun rotateStaffCode(context: Context): String {
     val code = newStaffCode()

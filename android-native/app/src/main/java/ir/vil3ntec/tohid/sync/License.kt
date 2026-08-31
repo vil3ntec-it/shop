@@ -64,7 +64,18 @@ object License {
    * @param publicKeySpki کلیدِ عمومیِ سرور، base64 از SPKI DER
    * @param deviceUid شناسهٔ همین دستگاه — مجوزِ دستگاهِ دیگری پذیرفته نمی‌شود
    */
-  fun verify(token: String, publicKeySpki: String, deviceUid: String): Verdict {
+  /**
+   *  @param accountId شناسهٔ حسابی که الان وارد است.
+   *
+   *  خالی یعنی «نمی‌دانیم» و بررسی انجام نمی‌شود — کسی که از نسخهٔ قبل
+   *  به‌روز می‌کند و هنوز شناسه‌اش ثبت نشده، اشتراکش را از دست نمی‌دهد.
+   */
+  fun verify(
+    token: String,
+    publicKeySpki: String,
+    deviceUid: String,
+    accountId: String = "",
+  ): Verdict {
     val parts = token.split('.')
     if (parts.size != 3) return Verdict.Invalid("format")
 
@@ -99,6 +110,17 @@ object License {
     if (payload.text("iss") != ISSUER) return Verdict.Invalid("issuer")
     if (payload.text("aud") != AUDIENCE) return Verdict.Invalid("audience")
     if (payload.text("duid") != deviceUid) return Verdict.Invalid("device_mismatch")
+    /*
+     *  و مالِ همین حساب.
+     *
+     *  تا دیروز فقط دستگاه سنجیده می‌شد. روی یک گوشیِ مشترک این یعنی
+     *  اگر احمد اشتراک خریده بود و محمود روی همان گوشی وارد می‌شد،
+     *  مجوزِ احمد برای او هم معتبر بود و اشتراکِ پولی مجانی به دستش
+     *  می‌رسید. `sub` از اول داخلِ مجوز بود؛ فقط خوانده نمی‌شد.
+     */
+    if (accountId.isNotBlank() && payload.text("sub").let { it.isNotBlank() && it != accountId }) {
+      return Verdict.Invalid("account_mismatch")
+    }
 
     return Verdict.Valid(
       Payload(
@@ -120,10 +142,16 @@ object License {
    * وضعیت بر اساسِ مجوزِ ذخیره‌شده — همان حالت‌هایی که نسخهٔ وب داشت.
    * «مهلت» بازه‌ای است که اشتراک تمام شده ولی هنوز کار می‌کند.
    */
-  fun status(token: String?, publicKeySpki: String?, deviceUid: String, now: Long): Status {
+  fun status(
+    token: String?,
+    publicKeySpki: String?,
+    deviceUid: String,
+    now: Long,
+    accountId: String = "",
+  ): Status {
     if (token.isNullOrBlank() || publicKeySpki.isNullOrBlank()) return Status(State.NONE, reason = "no_license")
 
-    return when (val v = verify(token, publicKeySpki, deviceUid)) {
+    return when (val v = verify(token, publicKeySpki, deviceUid, accountId)) {
       is Verdict.Invalid -> Status(State.INVALID, reason = v.reason)
       is Verdict.Valid -> {
         val p = v.payload

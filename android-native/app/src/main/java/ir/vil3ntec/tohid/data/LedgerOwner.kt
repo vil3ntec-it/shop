@@ -71,19 +71,38 @@ object LedgerOwner {
     val id = userId.trim()
     if (id.isBlank()) return Result.SAME          // شناسه نداریم؛ چیزی را خراب نمی‌کنیم
 
+    val state = SyncStore(context)
     val previous = current(context)
-    if (previous == id) return Result.SAME
+    if (previous == id) {
+      state.accountId = id                        // نسخهٔ قبل این را ثبت نمی‌کرد
+      return Result.SAME
+    }
 
     if (previous.isBlank()) {
+      state.accountId = id
       setCurrent(context, id)
       return Result.ADOPTED
     }
 
     // حسابِ دیگری است — دفترِ قبلی می‌رود کنار
     store.stashTo(previous)
-    val state = SyncStore(context)
-    state.forgetSyncState()
+    state.forgetAccountState()
     store.openFrom(id)
+
+    /*
+     *  چیزهای دیگری هم به حسابِ قبلی بسته بودند و روی گوشی می‌ماندند:
+     *
+     *  • **سبدِ نیمه‌کاره** — فروشی که احمد شروع کرده و تمام نکرده بود،
+     *    جلوی محمود باز می‌شد.
+     *  • **کلیدِ حساب و کدِ شاگرد** — محمود کلیدِ احمد را در تنظیمات
+     *    می‌دید و می‌توانست کدِ شاگردِ او را به کسی بدهد.
+     *
+     *  مجوزِ اشتراک را `forgetAccountState` برداشته است.
+     */
+    runCatching { CartStore(context).clear() }
+    runCatching { AccountKeys.forget(context) }
+
+    state.accountId = id
     setCurrent(context, id)
     return Result.SWITCHED
   }

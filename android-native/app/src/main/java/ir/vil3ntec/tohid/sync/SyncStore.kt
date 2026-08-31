@@ -70,6 +70,17 @@ class SyncStore(context: Context) {
     get() = prefs.getString(NAME, "") ?: ""
     set(v) = prefs.edit().putString(NAME, v).apply()
 
+  /**
+   *  شناسهٔ حسابی که الان وارد است.
+   *
+   *  مجوزِ اشتراک با همین سنجیده می‌شود: مجوز `sub` را از اول داشت ولی
+   *  فقط دستگاه بررسی می‌شد، یعنی روی یک گوشیِ مشترک، اشتراکِ یک نفر
+   *  برای نفرِ بعدی هم باز بود.
+   */
+  var accountId: String
+    get() = prefs.getString(ACCOUNT_ID, "") ?: ""
+    set(v) = prefs.edit().putString(ACCOUNT_ID, v).apply()
+
   var license: String?
     get() = prefs.getString(LICENSE, null)
     set(v) = prefs.edit().putString(LICENSE, v).apply()
@@ -133,6 +144,7 @@ class SyncStore(context: Context) {
     tokens.clear()
     prefs.edit()
       .remove(NAME)
+      .remove(ACCOUNT_ID)
       .remove(LICENSE).remove(SHADOW).remove(REV).remove(LAST_SYNC)
       .apply()
   }
@@ -149,6 +161,20 @@ class SyncStore(context: Context) {
     prefs.edit().remove(SHADOW).remove(REV).remove(LAST_SYNC).apply()
   }
 
+  /**
+   *  همه‌ی آنچه به حسابِ قبلی بسته بود.
+   *
+   *  کنارِ سایه و شماره‌ی تغییر، **مجوز** هم می‌رود: به دستگاه بسته است،
+   *  نه به شخص، پس اگر بماند اشتراکِ نفرِ قبلی برای نفرِ تازه باز
+   *  می‌ماند. دفعه‌ی بعدِ همگام‌سازی، مجوزِ خودِ این حساب می‌آید.
+   */
+  fun forgetAccountState() {
+    prefs.edit()
+      .remove(SHADOW).remove(REV).remove(LAST_SYNC)
+      .remove(LICENSE).remove(NAME)
+      .apply()
+  }
+
   private fun newDeviceUid(): String {
     val bytes = ByteArray(16)
     java.security.SecureRandom().nextBytes(bytes)
@@ -161,6 +187,7 @@ class SyncStore(context: Context) {
     //  نمی‌شوند: اولی در `AppConfig` است و دو تای بعدی در `TokenStore`ِ
     //  رمزشده. مقدارِ به‌جامانده‌شان یک بار خوانده و پاک می‌شود.
     const val NAME = "account_name"
+    const val ACCOUNT_ID = "account_id"
     const val LOCK_ASKED = "lock_asked"
     const val LICENSE = "license"
     const val PUBLIC_KEY = "public_key"

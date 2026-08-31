@@ -228,7 +228,6 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
    */
   fun finish(identifier: String, session: SessionDto) {
     val display = session.user.name.ifBlank { name.trim() }
-    state.accountName = display
     SavedLogins.remember(context, identifier, display)
     /*
      *  پیش از هر چیز، دفترِ روی گوشی باید مالِ همین حساب باشد.
@@ -243,6 +242,9 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
      */
     scope.launch {
       runCatching { LedgerOwner.signedIn(context, store, session.user.id) }
+      //  نام *بعد از* آن نوشته می‌شود: جابه‌جاییِ حساب هرچه به حسابِ
+      //  قبلی بسته بوده را پاک می‌کند و نامِ تازه هم قربانی می‌شد
+      state.accountName = display
       onDone()
     }
   }
@@ -1416,21 +1418,18 @@ private fun BrandMark() {
         alpha = 0.55f + breathe * 0.35f,
       )
     }
-    // شیشه: سطحِ نیمه‌شفاف با یک لبهٔ روشن، نه یک مربعِ توپر
+    //  مربعِ سفیدِ گردگوشه، با همان نسبتی که آیکنِ روی صفحهٔ گوشی دارد.
+    //  تا دیروز اینجا یک آیکنِ عمومیِ «مغازه» بود؛ کاربر روی صفحهٔ گوشی
+    //  یک نشان می‌دید و داخلِ برنامه نشانِ دیگری.
     Box(
       Modifier
         .size(54.dp)
         .clip(RoundedCornerShape(19.dp))
-        .background(colors.surface2.copy(alpha = 0.75f))
+        .background(Color.White)
         .border(1.dp, GOLD_GLOW.copy(alpha = 0.45f), RoundedCornerShape(19.dp)),
       contentAlignment = Alignment.Center,
     ) {
-      Icon(
-        Icons.Filled.Storefront,
-        contentDescription = null,
-        tint = colors.primary,
-        modifier = Modifier.size(26.dp),
-      )
+      TohidMark(Modifier.size(34.dp))
     }
   }
 }

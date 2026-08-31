@@ -137,7 +137,7 @@ class Syncer(
     // مجوز پیش از ذخیره بررسی می‌شود تا مجوزِ خراب ذخیره نشود
     if (!license.isNullOrBlank()) {
       val key = state.publicKey
-      if (key != null && License.verify(license, key, state.deviceUid) is License.Verdict.Valid) {
+      if (key != null && License.verify(license, key, state.deviceUid, state.accountId) is License.Verdict.Valid) {
         state.license = license
       }
     }

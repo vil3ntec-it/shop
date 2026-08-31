@@ -112,6 +112,34 @@ class LicenseTest {
     assertEquals("حرفه‌ای", p.planTitle)
   }
 
+  /*
+   *  مجوز به دستگاه بسته است — ولی نه فقط به دستگاه.
+   *
+   *  روی یک گوشیِ مشترک، اگر احمد اشتراک خریده بود و محمود روی همان
+   *  گوشی وارد می‌شد، مجوزِ احمد برای او هم معتبر بود: `duid` یکی بود و
+   *  `sub` اصلاً خوانده نمی‌شد. یعنی اشتراکِ پولی مجانی به دستِ نفرِ
+   *  بعدی می‌رسید.
+   */
+  @Test
+  fun `مجوز حساب دیگر روی همین گوشی پذیرفته نمی شود`() {
+    val t = token(payload())
+    // حسابِ خودش — درست
+    assertTrue(License.verify(t, publicKeySpki, device, "acc-1") is License.Verdict.Valid)
+    // حسابِ دیگری روی همین دستگاه — رد
+    val other = License.verify(t, publicKeySpki, device, "acc-2")
+    assertTrue(other is License.Verdict.Invalid)
+    assertEquals("account_mismatch", (other as License.Verdict.Invalid).reason)
+  }
+
+  /*
+   *  کسی که از نسخه‌ی قبل به‌روز می‌کند هنوز شناسه‌ی حسابش ثبت نشده.
+   *  آنجا بررسی انجام نمی‌شود، وگرنه اشتراکش بی‌دلیل قطع می‌شد.
+   */
+  @Test
+  fun `وقتی شناسه ی حساب را نمی دانیم مجوز سرِ جایش می ماند`() {
+    assertTrue(License.verify(token(payload()), publicKeySpki, device, "") is License.Verdict.Valid)
+  }
+
   /* ------------------------------ ردها ------------------------------ */
 
   private fun reasonOf(t: String, key: String = publicKeySpki, uid: String = device): String {
