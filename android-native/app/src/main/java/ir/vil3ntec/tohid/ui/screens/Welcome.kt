@@ -74,8 +74,12 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import ir.vil3ntec.tohid.core.config.ApiConfig
+import ir.vil3ntec.tohid.core.config.AppConfig
+import ir.vil3ntec.tohid.core.model.SessionDto
+import ir.vil3ntec.tohid.core.net.userText
+import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.sync.SavedLogins
-import ir.vil3ntec.tohid.sync.ServerClient
 import ir.vil3ntec.tohid.sync.SyncStore
 import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.launch
@@ -151,8 +155,19 @@ fun WelcomeScreen(onDone: () -> Unit) {
   // ایمیل: ورود یا ساختِ حساب
   var emailMode by rememberSaveable { mutableStateOf("login") }
 
+  /*
+   *  نشانیِ سرور فقط در ساختِ آزمایشی دیده می‌شود.
+   *
+   *  با هر تغییر، همان‌جا در پیکربندی می‌نشیند — نه بعد از ورودِ موفق.
+   *  دلیلش این است که لایهٔ شبکه نشانی را از پیکربندی می‌خواند، نه از
+   *  این صفحه؛ همان قاعده‌ای که صفحهٔ تنظیمات هم دارد.
+   */
   var server by rememberSaveable { mutableStateOf(state.serverUrl) }
-  var showMore by rememberSaveable { mutableStateOf(!ir.vil3ntec.tohid.sync.ApiBase.locked && state.serverUrl.isBlank()) }
+  var showMore by rememberSaveable { mutableStateOf(!AppConfig.isLocked && state.serverUrl.isBlank()) }
+
+  //  صفحه هیچ‌وقت خودش کارگزارِ شبکه نمی‌سازد
+  val auth = remember(context) { Backend.auth(context) }
+  val shops = remember(context) { Backend.shop(context) }
 
   var name by rememberSaveable { mutableStateOf("") }
   var phone by rememberSaveable { mutableStateOf("") }
@@ -195,26 +210,29 @@ fun WelcomeScreen(onDone: () -> Unit) {
    */
   var googleId by remember { mutableStateOf("") }
   LaunchedEffect(server) {
-    val base = server.trim().trimEnd('/')
-    if (base.isBlank()) { googleId = ""; return@LaunchedEffect }
+    if (!AppConfig.isConfigured(context)) { googleId = ""; return@LaunchedEffect }
     kotlinx.coroutines.delay(700)
-    googleId = runCatching { ServerClient(base).googleClientId() }.getOrDefault("")
+    googleId = auth.googleClientId()
   }
 
   fun fail(e: Throwable) {
-    error = (e as? ServerClient.ServerError)?.message ?: "ارتباط با سرور برقرار نشد"
+    error = e.userText("ارتباط با سرور برقرار نشد")
   }
 
-  fun finish(identifier: String, session: ServerClient.Session) {
-    state.serverUrl = server.trim().trimEnd('/')
-    state.accessToken = session.accessToken
-    state.refreshToken = session.refreshToken
-    state.accountName = session.name.ifBlank { name.trim() }
-    SavedLogins.remember(context, identifier, session.name.ifBlank { name.trim() })
+  /**
+   *  ورود انجام شد.
+   *
+   *  توکن‌ها را مخزن ذخیره کرده؛ اینجا فقط چیزهای نمایشی می‌ماند.
+   */
+  fun finish(identifier: String, session: SessionDto) {
+    val display = session.user.name.ifBlank { name.trim() }
+    state.accountName = display
+    SavedLogins.remember(context, identifier, display)
     onDone()
   }
 
-  val ready = server.isNotBlank()
+  //  «می‌شود به سرور زد یا نه» را پیکربندی می‌گوید
+  val ready = ApiConfig.isValid(server, AppConfig.allowInsecure)
 
   /*
    *  کدِ شش‌رقمی، در صفحهٔ خودش.
@@ -236,12 +254,11 @@ fun WelcomeScreen(onDone: () -> Unit) {
       onResend = {
         busy = true; error = null
         scope.launch {
-          val client = ServerClient(server.trim().trimEnd('/'))
-          runCatching {
-            if (resetting) client.forgotPassword(destination) else client.otpRequest(destination)
-          }
+          val asked =
+            if (resetting) auth.forgotPassword(destination) else auth.requestOtp(destination)
+          asked
             .onSuccess {
-              cooldown.start(destination, client.resendSecondsOf(it))
+              cooldown.start(destination, it.resendSeconds)
               note = "کد دوباره فرستاده شد"
             }
             .onFailure { fail(it) }
@@ -251,12 +268,9 @@ fun WelcomeScreen(onDone: () -> Unit) {
       onSubmit = { entered, newPassword ->
         busy = true; error = null; note = null
         scope.launch {
-          val client = ServerClient(server.trim().trimEnd('/'))
-          val done = if (resetting) {
-            runCatching { client.resetPassword(destination, entered, newPassword) }
-          } else {
-            runCatching { client.otpVerify(destination, entered, name.trim()) }
-          }
+          val done =
+            if (resetting) auth.resetPassword(destination, entered, newPassword)
+            else auth.verifyOtp(destination, entered, name.trim())
           done.onSuccess { resetting = false; finish(destination, it) }
             .onFailure { fail(it) }
           busy = false
@@ -405,23 +419,19 @@ fun WelcomeScreen(onDone: () -> Unit) {
 
         GradientButton(text = label, enabled = can, busy = busy) {
           busy = true; error = null; note = null
-          val base = server.trim().trimEnd('/')
           scope.launch {
-            val client = ServerClient(base)
             when {
               channel == "phone" -> {
                 //  اگر همین چند لحظه پیش کد گرفته، پیامکِ تازه نمی‌گیریم —
                 //  همان صفحهٔ کد باز می‌شود با شمارشی که ادامه دارد.
                 val to = phone.trim()
                 if (cooldown.secondsLeft(to) > 0) {
-                  state.serverUrl = base
                   codeSent = true
                   note = "کد قبلی هنوز معتبر است"
                 } else {
-                  runCatching { client.otpRequest(to) }
+                  auth.requestOtp(to)
                     .onSuccess {
-                      state.serverUrl = base
-                      cooldown.start(to, client.resendSecondsOf(it))
+                      cooldown.start(to, it.resendSeconds)
                       codeSent = true
                       note = null
                     }
@@ -430,9 +440,8 @@ fun WelcomeScreen(onDone: () -> Unit) {
               }
 
               emailMode == "register" ->
-                runCatching { client.register(name.trim(), email.trim(), "", password) }
+                auth.register(name.trim(), email.trim(), "", password)
                   .onSuccess {
-                    state.serverUrl = base
                     note = "حساب ساخته شد — حالا وارد شوید"
                     emailMode = "login"
                     password = ""
@@ -440,7 +449,7 @@ fun WelcomeScreen(onDone: () -> Unit) {
                   .onFailure { fail(it) }
 
               else ->
-                runCatching { client.login(email.trim(), password) }
+                auth.login(email.trim(), password)
                   .onSuccess { finish(email.trim(), it) }
                   .onFailure { fail(it) }
             }
@@ -462,19 +471,15 @@ fun WelcomeScreen(onDone: () -> Unit) {
             modifier = Modifier.fillMaxWidth(),
             onClick = {
               busy = true; error = null; note = null
-              val base = server.trim().trimEnd('/')
               scope.launch {
                 val to = email.trim()
                 if (cooldown.secondsLeft(to) > 0) {
-                  state.serverUrl = base
                   codeSent = true
                   note = "کد قبلی هنوز معتبر است"
                 } else {
-                  val client = ServerClient(base)
-                  runCatching { client.otpRequest(to) }
+                  auth.requestOtp(to)
                     .onSuccess {
-                      state.serverUrl = base
-                      cooldown.start(to, client.resendSecondsOf(it))
+                      cooldown.start(to, it.resendSeconds)
                       codeSent = true
                       note = null
                     }
@@ -516,14 +521,11 @@ fun WelcomeScreen(onDone: () -> Unit) {
               enabled = ready && !busy && email.isNotBlank(),
               onClick = {
                 busy = true; error = null; note = null
-                val base = server.trim().trimEnd('/')
                 val to = email.trim()
                 scope.launch {
-                  val client = ServerClient(base)
-                  runCatching { client.forgotPassword(to) }
+                  auth.forgotPassword(to)
                     .onSuccess {
-                      state.serverUrl = base
-                      cooldown.start(to, client.resendSecondsOf(it))
+                      cooldown.start(to, it.resendSeconds)
                       resetting = true
                       codeSent = true
                     }
@@ -594,19 +596,18 @@ fun WelcomeScreen(onDone: () -> Unit) {
           Spacer(Modifier.height(14.dp))
           GoogleButton(enabled = ready && !busy) {
             busy = true; error = null; note = null
-            val base = server.trim().trimEnd('/')
             scope.launch {
               runCatching { ir.vil3ntec.tohid.data.GoogleSignIn.pick(context, googleId) }
                 .onSuccess { account ->
                   if (account == null) {
                     // کاربر خودش بست — نه خطا، نه پیام
                   } else {
-                    runCatching { ServerClient(base).googleLogin(account.idToken) }
+                    auth.loginWithGoogle(account.idToken)
                       .onSuccess { finish(account.email, it) }
                       .onFailure { fail(it) }
                   }
                 }
-                .onFailure { error = it.message ?: "ورود با گوگل انجام نشد" }
+                .onFailure { error = it.userText("ورود با گوگل انجام نشد") }
               busy = false
             }
           }
@@ -649,7 +650,7 @@ fun WelcomeScreen(onDone: () -> Unit) {
             )
             Spacer(Modifier.width(6.dp))
             Text(
-              if (showMore) "بستن" else if (ir.vil3ntec.tohid.sync.ApiBase.locked) "کد شاگرد دارم" else "کد شاگرد و تنظیم سرور",
+              if (showMore) "بستن" else if (AppConfig.isLocked) "کد شاگرد دارم" else "کد شاگرد و تنظیم سرور",
               style = MaterialTheme.typography.labelMedium,
               color = inkSoft,
             )
@@ -679,14 +680,13 @@ fun WelcomeScreen(onDone: () -> Unit) {
                       error = "این کد درست نیست. کد باید مثل SHG-XXXXX-XXXXX-XXXXX باشد."
                       return@TextButton
                     }
-                    val token = state.accessToken
-                    if (token.isNullOrBlank()) {
+                    if (!Backend.tokens(context).signedIn) {
                       error = "برای پیوستن به دکان، اول وارد حساب خود شوید."
                       return@TextButton
                     }
                     busy = true; error = null
                     scope.launch {
-                      runCatching { ServerClient(state.serverUrl).joinShop(token, entered) }
+                      shops.join(entered)
                         .onSuccess { onDone() }
                         .onFailure { fail(it) }
                       busy = false
@@ -709,11 +709,11 @@ fun WelcomeScreen(onDone: () -> Unit) {
              *  برنامه است و این کادر اصلاً ساخته نمی‌شود — نه دیده
              *  می‌شود، نه می‌شود عوضش کرد.
              */
-            if (!ir.vil3ntec.tohid.sync.ApiBase.locked) {
+            if (!AppConfig.isLocked) {
               Spacer(Modifier.height(12.dp))
               PillField(
                 value = server,
-                onValueChange = { server = it; error = null },
+                onValueChange = { server = it; state.serverUrl = it; error = null },
                 placeholder = "آدرس سرور — https://…",
                 icon = Icons.Filled.Tune,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),

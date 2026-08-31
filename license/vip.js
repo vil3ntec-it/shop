@@ -47,9 +47,11 @@
   const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
   const lsDel = (k) => { try { localStorage.removeItem(k); } catch {} };
 
+  /* نشانی سرور از `license/api-config.js` می‌آید — یک جا برای همه */
   function serverUrl() {
-    const v = (lsGet(SERVER_KEY) || '').trim();
-    return v ? v.replace(/\/+$/, '') : '';
+    const cfg = window.TohidApiConfig;
+    if (cfg) return cfg.baseUrl();
+    return (lsGet(SERVER_KEY) || '').trim().replace(/\/+$/, '');
   }
   const account = () => read(ACCT_KEY, {});
   const loggedIn = () => !!account().accessToken;

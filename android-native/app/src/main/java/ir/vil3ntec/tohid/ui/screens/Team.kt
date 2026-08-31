@@ -25,16 +25,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.model.MemberDto
+import ir.vil3ntec.tohid.core.model.StaffCodeDto
+import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.plain
-import ir.vil3ntec.tohid.sync.ServerClient
-import ir.vil3ntec.tohid.sync.SyncStore
 import ir.vil3ntec.tohid.ui.theme.Radius
 import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 
 /**
  *  کارمندانِ دکان — همان «چند کاربر روی یک دکان» که در صفحهٔ اشتراک
@@ -52,11 +49,10 @@ fun TeamScreen(snackbar: SnackbarHostState) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
   val clipboard = LocalClipboardManager.current
-  val state = remember { SyncStore(context) }
   val colors = Shop.colors
 
-  var members by remember { mutableStateOf<List<Member>>(emptyList()) }
-  var codes by remember { mutableStateOf<List<StaffCode>>(emptyList()) }
+  var members by remember { mutableStateOf<List<MemberDto>>(emptyList()) }
+  var codes by remember { mutableStateOf<List<StaffCodeDto>>(emptyList()) }
   var maxMembers by remember { mutableStateOf(0) }
   var busy by remember { mutableStateOf(false) }
   var error by remember { mutableStateOf<String?>(null) }
@@ -64,32 +60,30 @@ fun TeamScreen(snackbar: SnackbarHostState) {
   /** کدِ تازه — فقط همین یک بار دیده می‌شود، پس تا بسته نشده روی صفحه می‌ماند */
   var fresh by remember { mutableStateOf<String?>(null) }
   var askNew by remember { mutableStateOf(false) }
-  var removing by remember { mutableStateOf<Member?>(null) }
+  var removing by remember { mutableStateOf<MemberDto?>(null) }
 
   /** کدِ ثابتِ دکان — همیشه همان است، پس هر بار نشان داده می‌شود */
   var standing by remember { mutableStateOf("") }
   var rotating by remember { mutableStateOf(false) }
 
-  val signedIn = !state.accessToken.isNullOrBlank() && state.serverUrl.isNotBlank()
+  //  صفحه نه نشانیِ سرور را می‌داند و نه توکن را؛ فقط مخزن را صدا می‌زند
+  val shops = remember(context) { Backend.shop(context) }
+  val signedIn = Backend.isReady(context)
 
   suspend fun reload() {
-    val token = state.accessToken ?: return
-    val client = ServerClient(state.serverUrl)
-    runCatching {
-      val m = client.members(token)
-      members = m["members"]?.jsonArray?.map { row -> Member.of(row.jsonObject) }.orEmpty()
-      maxMembers = m["maxMembers"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
+    shops.members()
+      .onSuccess { page ->
+        members = page.members
+        maxMembers = page.maxMembers
+        error = null
+      }
+      .onFailure { error = it.userMessage }
 
-      val c = client.staffCodes(token)
-      codes = c["codes"]?.jsonArray?.map { row -> StaffCode.of(row.jsonObject) }.orEmpty()
+    shops.staffCodes().onSuccess { codes = it }
 
-      //  کدِ ثابت جدا خوانده می‌شود؛ سرورِ قدیمی این مسیر را ندارد و
-      //  نبودنش نباید بقیهٔ صفحه را خراب کند
-      standing = runCatching { client.standingCode(token) }.getOrDefault("")
-      error = null
-    }.onFailure {
-      error = (it as? ServerClient.ServerError)?.message ?: "فهرست خوانده نشد"
-    }
+    //  کدِ ثابت جدا خوانده می‌شود؛ سرورِ قدیمی این مسیر را ندارد و
+    //  نبودنش نباید بقیهٔ صفحه را خراب کند
+    standing = shops.standingCode()
   }
 
   LaunchedEffect(signedIn) { if (signedIn) reload() }
@@ -221,15 +215,12 @@ fun TeamScreen(snackbar: SnackbarHostState) {
             text = if (rotating) "…" else "کد تازه",
             enabled = !rotating,
             onClick = {
-              val token = state.accessToken
-              if (!token.isNullOrBlank()) {
-                rotating = true
-                scope.launch {
-                  runCatching { ServerClient(state.serverUrl).rotateStandingCode(token) }
-                    .onSuccess { standing = it }
-                    .onFailure { error = (it as? ServerClient.ServerError)?.message ?: "کد عوض نشد" }
-                  rotating = false
-                }
+              rotating = true
+              scope.launch {
+                shops.rotateStandingCode()
+                  .onSuccess { standing = it.code }
+                  .onFailure { error = it.userMessage }
+                rotating = false
               }
             },
             modifier = Modifier.weight(1f),
@@ -271,14 +262,9 @@ fun TeamScreen(snackbar: SnackbarHostState) {
         codes.forEach { code ->
           CodeRow(code) {
             scope.launch {
-              val token = state.accessToken ?: return@launch
-              runCatching { ServerClient(state.serverUrl).revokeStaffCode(token, code.id) }
+              shops.revokeStaffCode(code.id)
                 .onSuccess { snackbar.showSnackbar("کد باطل شد"); reload() }
-                .onFailure {
-                  snackbar.showSnackbar(
-                    (it as? ServerClient.ServerError)?.message ?: "کد باطل نشد"
-                  )
-                }
+                .onFailure { snackbar.showSnackbar(it.userMessage) }
             }
           }
         }
@@ -305,16 +291,9 @@ fun TeamScreen(snackbar: SnackbarHostState) {
         askNew = false
         busy = true
         scope.launch {
-          val token = state.accessToken
-          if (token == null) { busy = false; return@launch }
-          runCatching {
-            ServerClient(state.serverUrl).createStaffCode(token, role, uses, days)
-          }.onSuccess { body ->
-            fresh = body["code"]?.jsonPrimitive?.content
-            reload()
-          }.onFailure {
-            snackbar.showSnackbar((it as? ServerClient.ServerError)?.message ?: "کد ساخته نشد")
-          }
+          shops.createStaffCode(role, uses, days)
+            .onSuccess { issued -> fresh = issued.code; reload() }
+            .onFailure { snackbar.showSnackbar(it.userMessage) }
           busy = false
         }
       },
@@ -331,12 +310,9 @@ fun TeamScreen(snackbar: SnackbarHostState) {
       onConfirm = {
         removing = null
         scope.launch {
-          val token = state.accessToken ?: return@launch
-          runCatching { ServerClient(state.serverUrl).removeMember(token, member.id) }
+          shops.removeMember(member.id)
             .onSuccess { snackbar.showSnackbar("کارمند برداشته شد"); reload() }
-            .onFailure {
-              snackbar.showSnackbar((it as? ServerClient.ServerError)?.message ?: "برداشته نشد")
-            }
+            .onFailure { snackbar.showSnackbar(it.userMessage) }
         }
       },
     )
@@ -346,7 +322,7 @@ fun TeamScreen(snackbar: SnackbarHostState) {
 /* ============================== ردیف‌ها ============================== */
 
 @Composable
-private fun MemberRow(member: Member, onRemove: () -> Unit) {
+private fun MemberRow(member: MemberDto, onRemove: () -> Unit) {
   val colors = Shop.colors
   Row(
     Modifier.fillMaxWidth().padding(vertical = 8.dp),
@@ -402,7 +378,7 @@ private fun MemberRow(member: Member, onRemove: () -> Unit) {
 }
 
 @Composable
-private fun CodeRow(code: StaffCode, onRevoke: () -> Unit) {
+private fun CodeRow(code: StaffCodeDto, onRevoke: () -> Unit) {
   val colors = Shop.colors
   val spent = code.maxUses > 0 && code.usedCount >= code.maxUses
   val dead = code.status != "active" || spent
@@ -561,50 +537,3 @@ private fun RoleOption(
 }
 
 /* ============================== داده‌ها ============================== */
-
-private data class Member(
-  val id: String,
-  val name: String,
-  val contact: String,
-  val role: String,
-  val status: String,
-) {
-  companion object {
-    fun of(row: JsonObject): Member {
-      fun text(key: String) = row[key]?.jsonPrimitive?.content.orEmpty()
-      val phone = text("phone")
-      val email = text("email")
-      return Member(
-        id = text("id"),
-        name = text("name"),
-        contact = phone.ifBlank { email },
-        role = text("role").ifBlank { "staff" },
-        status = text("status").ifBlank { "active" },
-      )
-    }
-  }
-}
-
-private data class StaffCode(
-  val id: String,
-  val hint: String,
-  val role: String,
-  val status: String,
-  val maxUses: Int,
-  val usedCount: Int,
-) {
-  companion object {
-    fun of(row: JsonObject): StaffCode {
-      fun text(key: String) = row[key]?.jsonPrimitive?.content.orEmpty()
-      fun int(key: String) = text(key).toIntOrNull() ?: 0
-      return StaffCode(
-        id = text("id"),
-        hint = text("hint"),
-        role = text("role").ifBlank { "staff" },
-        status = text("status").ifBlank { "active" },
-        maxUses = int("maxUses"),
-        usedCount = int("usedCount"),
-      )
-    }
-  }
-}

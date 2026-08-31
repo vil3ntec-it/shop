@@ -14,6 +14,22 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>توحید | مدیریت فروشگاه</title>
+
+<!--
+  نشانیِ Backend مرکزی — تنها جایی که در نسخهٔ وب تنظیم می‌شود.
+
+  دامنه بگذارید، نه IP. اگر سرور فردا از رایانهٔ خانه به یک VPS برود، تا
+  وقتی همان دامنه به جای تازه اشاره کند، برنامه نمی‌فهمد چیزی عوض شده و
+  نسخهٔ تازه‌ای لازم نیست.
+
+  خالی گذاشتنش هیچ چیزی را خراب نمی‌کند: برنامه کاملاً آفلاین کار
+  می‌کند و هیچ قابلیتی قفل نمی‌شود، تا وقتی کاربر خودش نشانی را در
+  تنظیمات بزند.
+
+  برای وصل کردن، فقط `content` را پر کنید:
+      <meta name="tohid-api-base" content="https://api.YOURDOMAIN.com">
+-->
+<meta name="tohid-api-base" content="">
 <script>
 (function(){
   try{
@@ -4752,8 +4768,18 @@
   let authPendingName = '';
   let authResendTimer = null;
 
-  function getServerUrl(){ return (localStorage.getItem(SERVER_KEY) || '').trim().replace(/\/+$/,''); }
-  function saveServerUrl(v){ try{ localStorage.setItem(SERVER_KEY, v.trim().replace(/\/+$/,'')); }catch(e){} }
+  /* نشانی سرور از `license/api-config.js` می‌آید. یک جا، برای وب و
+     اندروید و هر Client دیگری که بعداً بیاید. */
+  function getServerUrl(){
+    const cfg = window.TohidApiConfig;
+    if(cfg) return cfg.baseUrl();
+    return (localStorage.getItem(SERVER_KEY) || '').trim().replace(/\/+$/,'');
+  }
+  function saveServerUrl(v){
+    const cfg = window.TohidApiConfig;
+    if(cfg){ cfg.setBaseUrl(v); return; }
+    try{ localStorage.setItem(SERVER_KEY, v.trim().replace(/\/+$/,'')); }catch(e){}
+  }
   function getServerToken(){ return (localStorage.getItem(SERVER_TOKEN_KEY) || '').trim(); }
   function saveServerToken(v){ try{ localStorage.setItem(SERVER_TOKEN_KEY, (v||'').trim()); }catch(e){} }
   function getAuth(){
@@ -10732,6 +10758,7 @@
 </script>
 
 <!-- لایه اشتراک و License — کاملاً افزودنی؛ منطق فروشگاه را تغییر نمی‌دهد -->
+<script src="license/api-config.js?v=16" defer></script>
 <script src="license/license-client.js?v=15" defer></script>
 <script src="license/shop-sync.js?v=15" defer></script>
 <script src="license/shop-ui.js?v=15" defer></script>

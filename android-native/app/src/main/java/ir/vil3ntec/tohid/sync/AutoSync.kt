@@ -1,12 +1,12 @@
 package ir.vil3ntec.tohid.sync
 
 import android.content.Context
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import ir.vil3ntec.tohid.core.net.ApiFailure
 import ir.vil3ntec.tohid.data.ShopStore
+import ir.vil3ntec.tohid.data.repo.Backend
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -52,14 +52,13 @@ object AutoSync {
   /** مکث پس از تغییر — چند تغییرِ پشتِ سرِ هم یک بار فرستاده می‌شوند */
   private const val QUIET_MS = 4_000L
 
-  private fun online(context: Context): Boolean = runCatching {
-    val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-    val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return false
-    caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-  }.getOrDefault(false)
-
-  private fun ready(state: SyncStore): Boolean =
-    state.serverUrl.isNotBlank() && !state.accessToken.isNullOrBlank()
+  /**
+   *  آماده یعنی هم نشانی هست و هم حساب.
+   *
+   *  هر دو را نقطهٔ اتصال می‌داند؛ اینجا دیگر نه نشانی خوانده می‌شود نه
+   *  توکن.
+   */
+  private fun ready(context: Context): Boolean = Backend.isReady(context)
 
   /**
    *  «چیزی عوض شد.»
@@ -69,8 +68,7 @@ object AutoSync {
    */
   fun nudge(context: Context, store: ShopStore) {
     val app = context.applicationContext
-    val state = SyncStore(app)
-    if (!ready(state)) return
+    if (!ready(app)) return
 
     pending?.cancel()
     pending = scope.launch {
@@ -82,16 +80,15 @@ object AutoSync {
   /** همین حالا، بدونِ مکث — برای بازِ شدنِ برنامه */
   fun now(context: Context, store: ShopStore) {
     val app = context.applicationContext
-    val state = SyncStore(app)
-    if (!ready(state)) return
+    if (!ready(app)) return
     scope.launch { runOnce(app, store) }
   }
 
   private suspend fun runOnce(app: Context, store: ShopStore) {
     if (running) return
+    if (!ready(app)) return
+    if (!Backend.isOnline(app)) return   // نبودنِ اینترنت خطا نیست
     val state = SyncStore(app)
-    if (!ready(state)) return
-    if (!online(app)) return          // نبودنِ اینترنت خطا نیست
 
     running = true
     runCatching { Syncer(store, state, app).run() }
@@ -102,7 +99,15 @@ object AutoSync {
         // اگر کاربر هیچ‌وقت دستی نزند، بی‌سروصدا تمام می‌شد
         runCatching { Syncer(store, state, app).refreshLicense(android.os.Build.MODEL ?: "گوشی") }
       }
-      .onFailure { lastError = (it as? ServerClient.ServerError)?.message ?: it.message }
+      .onFailure { failure ->
+        //  «نت نیست» را به کاربر نشان نمی‌دهیم: خطا نیست و دفعهٔ بعد
+        //  خودش می‌رود. بقیه پیامِ فارسیِ خودشان را دارند.
+        lastError = when (failure) {
+          is ApiFailure.Offline -> null
+          is ApiFailure -> failure.userMessage
+          else -> failure.message
+        }
+      }
     running = false
   }
 }

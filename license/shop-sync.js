@@ -57,13 +57,18 @@
   const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
   const lsDel = (k) => { try { localStorage.removeItem(k); } catch {} };
 
+  /* نشانی سرور از `license/api-config.js` می‌آید — یک جا برای همه.
+     اگر آن فایل نبود، خواندنِ سادهٔ قبلی جایگزین می‌شود. */
   function serverUrl() {
-    const v = (lsGet(SERVER_KEY) || '').trim();
-    if (v) return v.replace(/\/+$/, '');
-    const legacy = (lsGet('tohid-shop-server-url') || '').trim();
-    return legacy ? legacy.replace(/^ws/i, 'http').replace(/\/+$/, '') : '';
+    const cfg = window.TohidApiConfig;
+    if (cfg) return cfg.baseUrl();
+    return (lsGet(SERVER_KEY) || '').trim().replace(/\/+$/, '');
   }
-  function setServerUrl(v) { lsSet(SERVER_KEY, String(v || '').trim().replace(/\/+$/, '')); }
+  function setServerUrl(v) {
+    const cfg = window.TohidApiConfig;
+    if (cfg) { cfg.setBaseUrl(v); return; }
+    lsSet(SERVER_KEY, String(v || '').trim().replace(/\/+$/, ''));
+  }
   function deviceUid() {
     let u = lsGet(DEVICE_KEY) || '';
     if (!/^[A-Za-z0-9_-]{8,128}$/.test(u)) {

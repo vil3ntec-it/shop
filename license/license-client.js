@@ -94,17 +94,22 @@
   const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
   const lsDel = (k) => { try { localStorage.removeItem(k); } catch {} };
 
+  /* نشانی سرور از یک جا می‌آید: `license/api-config.js`.
+
+     تا دیروز همین منطق چهار بار در چهار فایل تکرار شده بود و هر بار
+     کمی فرق داشت. اگر آن فایل به هر دلیل بالا نیامده باشد، به همان
+     خواندنِ سادهٔ قبلی برمی‌گردیم تا این لایه وسط کار نایستد. */
+  function apiConfig() { return window.TohidApiConfig || null; }
+
   function getServerUrl() {
-    // اگر کاربر قبلاً در تنظیمات خود برنامه آدرس سرور را داده، همان استفاده می‌شود
-    const own = (lsGet(SERVER_KEY) || '').trim();
-    if (own) return own.replace(/\/+$/, '');
-    const legacy = (lsGet('tohid-shop-server-url') || '').trim();
-    if (!legacy) return '';
-    // آدرس قدیمی برای WebSocket بود؛ به http تبدیل می‌شود
-    return legacy.replace(/^ws:/i, 'http:').replace(/^wss:/i, 'https:').replace(/\/+$/, '');
+    const cfg = apiConfig();
+    if (cfg) return cfg.baseUrl();
+    return (lsGet(SERVER_KEY) || '').trim().replace(/\/+$/, '');
   }
   function setServerUrl(v) {
-    try { localStorage.setItem(SERVER_KEY, String(v || '').trim().replace(/\/+$/, '')); } catch {}
+    const cfg = apiConfig();
+    if (cfg) { cfg.setBaseUrl(v); return; }
+    lsSet(SERVER_KEY, String(v || '').trim().replace(/\/+$/, ''));
   }
 
   /* ==========================================================
