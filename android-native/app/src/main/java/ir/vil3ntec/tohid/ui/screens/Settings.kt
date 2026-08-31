@@ -36,9 +36,6 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import ir.vil3ntec.tohid.ui.theme.Shape
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -56,8 +53,12 @@ import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.formatDate
 import ir.vil3ntec.tohid.plain
 import ir.vil3ntec.tohid.sync.License
+import ir.vil3ntec.tohid.core.config.ApiConfig
+import ir.vil3ntec.tohid.core.config.AppConfig
+import ir.vil3ntec.tohid.core.model.DeviceDto
+import ir.vil3ntec.tohid.core.net.userText
+import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.sync.SavedLogins
-import ir.vil3ntec.tohid.sync.ServerClient
 import ir.vil3ntec.tohid.sync.SyncStore
 import ir.vil3ntec.tohid.sync.Syncer
 import ir.vil3ntec.tohid.todayIso
@@ -89,9 +90,15 @@ fun SettingsScreen(
   val prefs = remember { context.getSharedPreferences("tohid", android.content.Context.MODE_PRIVATE) }
   val state = remember { SyncStore(context) }
   val syncer = remember { Syncer(store, state, context) }
+  //  صفحه هیچ‌وقت خودش کارگزارِ شبکه نمی‌سازد و توکن را دست نمی‌زند
+  val auth = remember(context) { Backend.auth(context) }
+  val account = remember(context) { Backend.account(context) }
 
   var storeName by remember { mutableStateOf(prefs.getString("store_name", "") ?: "") }
+  //  فقط برای کادرِ ساختِ آزمایشی؛ در نسخهٔ منتشرشده دیده نمی‌شود
   var serverUrl by remember { mutableStateOf(state.serverUrl) }
+  //  «می‌شود به سرور زد یا نه» را پیکربندی می‌گوید، نه خالی نبودنِ یک رشته
+  val serverReady = ApiConfig.isValid(serverUrl, AppConfig.allowInsecure)
   var identifier by rememberSaveable { mutableStateOf("") }
   var password by rememberSaveable { mutableStateOf("") }
   var busy by remember { mutableStateOf(false) }
@@ -223,7 +230,7 @@ fun SettingsScreen(
                     toast("همگام‌سازی شد — ${plain(it.pushed)} فرستاده، ${plain(it.pulled)} گرفته")
                     runCatching { licenseStatus = syncer.refreshLicense(android.os.Build.MODEL ?: "گوشی") }
                   }
-                  .onFailure { toast((it as? ServerClient.ServerError)?.message ?: "همگام‌سازی ناموفق بود") }
+                  .onFailure { toast(it.userText("همگام‌سازی ناموفق بود")) }
                 busy = false
               }
             },
@@ -251,14 +258,14 @@ fun SettingsScreen(
            *  می‌نشیند. فقط ساختِ خودی (بی‌نشانی) کادر را می‌بیند.
            */
           Text(
-            if (ir.vil3ntec.tohid.sync.ApiBase.locked)
+            if (AppConfig.isLocked)
               "به سرورِ توحید وصل می‌شود."
             else "این نسخه به سروری بسته نشده — نشانی را برای آزمایش بزنید.",
             style = MaterialTheme.typography.bodySmall,
             color = Shop.colors.muted,
           )
           Spacer(Modifier.height(10.dp))
-          if (!ir.vil3ntec.tohid.sync.ApiBase.locked) {
+          if (!AppConfig.isLocked) {
             TohidTextField(
               value = serverUrl,
               onValueChange = { serverUrl = it; state.serverUrl = it },
@@ -284,13 +291,13 @@ fun SettingsScreen(
           Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             TohidSecondaryButton(
               text = "آزمایش اتصال",
-              enabled = !busy && serverUrl.isNotBlank(),
+              enabled = !busy && serverReady,
               onClick = {
                 busy = true
                 scope.launch {
-                  runCatching { ServerClient(serverUrl).health() }
+                  auth.health()
                     .onSuccess { toast("سرور جواب داد") }
-                    .onFailure { toast((it as? ServerClient.ServerError)?.message ?: "سرور جواب نداد") }
+                    .onFailure { toast(it.userMessage) }
                   busy = false
                 }
               },
@@ -298,23 +305,23 @@ fun SettingsScreen(
             )
             TohidButton(
               text = "ورود",
-              enabled = !busy && serverUrl.isNotBlank() && identifier.isNotBlank() && password.isNotBlank(),
+              enabled = !busy && serverReady && identifier.isNotBlank() && password.isNotBlank(),
               busy = busy,
               onClick = {
                 busy = true
                 scope.launch {
-                  runCatching { ServerClient(serverUrl).login(identifier.trim(), password) }
+                  //  توکن را خودِ مخزن ذخیره می‌کند؛ صفحه فقط نتیجه را
+                  //  می‌بیند
+                  auth.login(identifier.trim(), password)
                     .onSuccess { session ->
-                      state.accessToken = session.accessToken
-                      state.refreshToken = session.refreshToken
-                      state.accountName = session.name
-                      SavedLogins.remember(context, identifier.trim(), session.name)
+                      state.accountName = session.user.name
+                      SavedLogins.remember(context, identifier.trim(), session.user.name)
                       signedIn = true
                       password = ""
                       toast("وارد شدید")
                       runCatching { licenseStatus = syncer.refreshLicense(android.os.Build.MODEL ?: "گوشی") }
                     }
-                    .onFailure { toast((it as? ServerClient.ServerError)?.message ?: "ورود ناموفق بود") }
+                    .onFailure { toast(it.userMessage) }
                   busy = false
                 }
               },
@@ -806,7 +813,9 @@ private fun PinDialog(onDismiss: () -> Unit, onSet: (String) -> Unit) {
 /** تغییرِ رمزِ حساب — همان راهی که سرور از اول داشت و برنامه صدایش نمی‌زد */
 @Composable
 private fun PasswordChange(state: SyncStore, snackbarToast: (String) -> Unit) {
+  val context = LocalContext.current
   val scope = rememberCoroutineScope()
+  val auth = remember(context) { Backend.auth(context) }
   var current by remember { mutableStateOf("") }
   var fresh by remember { mutableStateOf("") }
   var busy by remember { mutableStateOf(false) }
@@ -843,13 +852,9 @@ private fun PasswordChange(state: SyncStore, snackbarToast: (String) -> Unit) {
       onClick = {
         busy = true
         scope.launch {
-          val token = state.accessToken
-          if (token == null) { busy = false; return@launch }
-          runCatching { ServerClient(state.serverUrl).changePassword(token, current, fresh) }
+          auth.changePassword(current, fresh)
             .onSuccess { current = ""; fresh = ""; snackbarToast("رمز عوض شد") }
-            .onFailure {
-              snackbarToast((it as? ServerClient.ServerError)?.message ?: "رمز عوض نشد")
-            }
+            .onFailure { snackbarToast(it.userMessage) }
           busy = false
         }
       },
@@ -866,26 +871,15 @@ private fun PasswordChange(state: SyncStore, snackbarToast: (String) -> Unit) {
  */
 @Composable
 private fun DeviceList(state: SyncStore, snackbarToast: (String) -> Unit) {
+  val context = LocalContext.current
   val scope = rememberCoroutineScope()
-  var rows by remember { mutableStateOf<List<Triple<String, String, Boolean>>>(emptyList()) }
+  val account = remember(context) { Backend.account(context) }
+  var devices by remember { mutableStateOf<List<DeviceDto>>(emptyList()) }
   var loaded by remember { mutableStateOf(false) }
 
   suspend fun load() {
-    val token = state.accessToken ?: return
-    runCatching { ServerClient(state.serverUrl).devices(token) }
-      .onSuccess { body ->
-        rows = body["devices"]?.jsonArray?.map { row ->
-          val obj = row.jsonObject
-          val id = obj["id"]?.jsonPrimitive?.content.orEmpty()
-          val name = obj["name"]?.jsonPrimitive?.content
-            ?: obj["deviceName"]?.jsonPrimitive?.content ?: "دستگاه"
-          val uid = obj["uid"]?.jsonPrimitive?.content
-            ?: obj["deviceUid"]?.jsonPrimitive?.content.orEmpty()
-          Triple(id, name, uid == state.deviceUid)
-        }.orEmpty()
-        loaded = true
-      }
-      .onFailure { loaded = true }
+    account.devices().onSuccess { devices = it }
+    loaded = true
   }
 
   LaunchedEffect(Unit) { load() }
@@ -893,20 +887,22 @@ private fun DeviceList(state: SyncStore, snackbarToast: (String) -> Unit) {
   Column {
     if (!loaded) {
       Text("در حال خواندن…", style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
-    } else if (rows.isEmpty()) {
+    } else if (devices.isEmpty()) {
       Text(
         "دستگاهی ثبت نشده است.",
         style = MaterialTheme.typography.bodySmall,
         color = Shop.colors.muted,
       )
     } else {
-      rows.forEach { (id, name, isThis) ->
+      devices.forEach { device ->
+        //  «همین گوشی» از روی شناسهٔ دستگاه شناخته می‌شود، نه از روی نام
+        val isThis = device.deviceUid.isNotBlank() && device.deviceUid == state.deviceUid
         Row(
           Modifier.fillMaxWidth().padding(vertical = 7.dp),
           verticalAlignment = Alignment.CenterVertically,
         ) {
           Column(Modifier.weight(1f)) {
-            Text(name, style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text)
+            Text(device.label, style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text)
             if (isThis) {
               Text(
                 "همین گوشی",
@@ -925,14 +921,9 @@ private fun DeviceList(state: SyncStore, snackbarToast: (String) -> Unit) {
                 .clip(Shape.chip)
                 .clickable {
                   scope.launch {
-                    val token = state.accessToken ?: return@launch
-                    runCatching { ServerClient(state.serverUrl).revokeDevice(token, id) }
+                    account.revokeDevice(device.id)
                       .onSuccess { snackbarToast("نشست بسته شد"); load() }
-                      .onFailure {
-                        snackbarToast(
-                          (it as? ServerClient.ServerError)?.message ?: "بسته نشد"
-                        )
-                      }
+                      .onFailure { snackbarToast(it.userMessage) }
                   }
                 }
                 .padding(horizontal = 10.dp, vertical = 6.dp),

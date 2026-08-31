@@ -189,6 +189,11 @@ dependencies {
   // ورود با گوگل. `credentials` راهِ امروزیِ اندروید است و
   // `googleid` همان چیزی که توکنِ گوگل را می‌دهد؛ سرور خودش آن توکن را
   // می‌سنجد، پس هیچ رازی داخلِ برنامه نیست.
+  //  نگهداریِ رمزشدهٔ توکن‌ها. توکنِ دسترسی یعنی «هرکس این را دارد،
+  //  همان کاربر است»؛ کنارِ بقیهٔ تنظیمات در حافظهٔ ساده جایش نبود.
+  //  برنامهٔ مدیریت از روزِ اول همین را داشت.
+  implementation("androidx.security:security-crypto:1.0.0")
+
   implementation("androidx.credentials:credentials:1.3.0")
   implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
   implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")

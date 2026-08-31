@@ -1,6 +1,8 @@
 package ir.vil3ntec.tohid.sync
 
+import ir.vil3ntec.tohid.core.net.ApiFailure
 import ir.vil3ntec.tohid.data.ShopStore
+import ir.vil3ntec.tohid.data.repo.Backend
 import kotlinx.serialization.json.JsonArray
 
 /**
@@ -18,20 +20,22 @@ import kotlinx.serialization.json.JsonArray
 class Syncer(
   private val store: ShopStore,
   private val state: SyncStore,
-  private val context: android.content.Context? = null,
+  private val context: android.content.Context,
 ) {
+
+  /** لایهٔ شبکه از نقطهٔ اتصال می‌آید؛ اینجا نه نشانی ساخته می‌شود نه توکن */
+  private val api by lazy { Backend.sync(context) }
 
   data class Outcome(val pushed: Int, val pulled: Int, val revision: Long)
 
   suspend fun run(): Outcome {
-    val token = state.accessToken ?: throw ServerClient.ServerError("ابتدا وارد حساب شوید", "no_account")
-    val client = ServerClient(state.serverUrl)
+    if (!Backend.tokens(context).signedIn) throw ApiFailure.SessionExpired()
     val device = state.deviceUid
 
     // ۱) فرستادن
     val outgoing = SyncEngine.collect(store.data.value, state.shadow, System.currentTimeMillis())
     if (outgoing.changes.isNotEmpty()) {
-      client.push(token, device, outgoing.changes, outgoing.settings)
+      api.push(device, outgoing.changes, outgoing.settings)
       state.shadow = SyncEngine.snapshot(store.data.value)
     }
 
@@ -40,7 +44,7 @@ class Syncer(
     var pulled = 0
     var guard = 0
     while (guard++ < 50) {
-      val page = client.pull(token, since, device)
+      val page = api.pull(since, device)
       if (page.changes.isNotEmpty() || page.settings != null) {
         val merged = SyncEngine.merge(store.data.value, page.changes, page.settings)
         if (merged.touched > 0) store.save(merged.data)
@@ -60,14 +64,13 @@ class Syncer(
 
   /** گرفتن یا تازه‌کردنِ مجوزِ اشتراک */
   suspend fun refreshLicense(deviceName: String): License.Status {
-    val token = state.accessToken ?: return License.Status(License.State.NONE, reason = "no_account")
-    val client = ServerClient(state.serverUrl)
+    if (!Backend.tokens(context).signedIn) return License.Status(License.State.NONE, reason = "no_account")
 
     if (state.publicKey.isNullOrBlank()) {
-      state.publicKey = runCatching { client.publicKey() }.getOrNull()
+      state.publicKey = runCatching { api.publicKey() }.getOrNull()
     }
 
-    val body = client.license(token, state.deviceUid, deviceName)
+    val body = api.license(state.deviceUid, deviceName)
     val license = body["license"]?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content }
     // مجوز پیش از ذخیره بررسی می‌شود تا مجوزِ خراب ذخیره نشود
     if (!license.isNullOrBlank()) {
@@ -80,11 +83,7 @@ class Syncer(
   }
 
   /** وضعیتِ اشتراک — با همان نگهبان‌هایی که `LicenseGuard` دارد */
-  fun status(): License.Status {
-    val where = context
-    return if (where != null) LicenseGuard.status(where, state)
-    else License.status(state.license, state.publicKey, state.deviceUid, LicenseGuard.trustedNow(state))
-  }
+  fun status(): License.Status = LicenseGuard.status(context, state)
 
   private fun JsonArray.isNotEmpty(): Boolean = size > 0
 }

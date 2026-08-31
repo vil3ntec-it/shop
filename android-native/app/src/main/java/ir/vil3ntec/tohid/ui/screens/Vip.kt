@@ -51,9 +51,10 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.plain
 import ir.vil3ntec.tohid.sync.License
 import ir.vil3ntec.tohid.sync.LicenseGuard
+import ir.vil3ntec.tohid.core.config.AppConfig
+import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.sync.SyncStore
 import kotlinx.coroutines.launch
-import ir.vil3ntec.tohid.sync.ServerClient
 import ir.vil3ntec.tohid.ui.theme.Radius
 import ir.vil3ntec.tohid.ui.theme.Shop
 import androidx.compose.animation.animateColorAsState
@@ -584,15 +585,9 @@ fun VipScreen(onDismiss: () -> Unit) {
            *  ردِ ماجرا نیست.
            */
           if (signedIn) {
-            scope.launch {
-              val token = state.accessToken
-              if (token != null) {
-                runCatching {
-                  ServerClient(state.serverUrl)
-                    .purchaseRequest(token, picked.title, "از برنامهٔ اندروید")
-                }
-              }
-            }
+            //  ثبتِ درخواست بی‌صداست: اگر نگرفت، واتساپ همچنان باز
+            //  می‌شود و کاربر سرِ راهش نمی‌ماند
+            scope.launch { Backend.account(context).requestPurchase(picked.title, "از برنامهٔ اندروید") }
           }
           buy(picked.title)
         },
@@ -1016,7 +1011,7 @@ private fun PlanCard(
 fun VipGate(label: String, content: @Composable () -> Unit) {
   val context = LocalContext.current
   val state = remember { SyncStore(context) }
-  val enforcing = LOCKING && state.serverUrl.isNotBlank()
+  val enforcing = LOCKING && AppConfig.isConfigured(context)
   val status = remember(enforcing) { LicenseGuard.status(context, state) }
   val open = !enforcing ||
     status.state == License.State.ACTIVE ||

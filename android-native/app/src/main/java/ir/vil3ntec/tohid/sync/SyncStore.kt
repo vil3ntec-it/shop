@@ -1,6 +1,8 @@
 package ir.vil3ntec.tohid.sync
 
 import android.content.Context
+import ir.vil3ntec.tohid.core.config.AppConfig
+import ir.vil3ntec.tohid.core.net.TokenStore
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -15,7 +17,8 @@ import kotlinx.serialization.json.buildJsonObject
  */
 class SyncStore(context: Context) {
 
-  private val prefs = context.getSharedPreferences("tohid-sync", Context.MODE_PRIVATE)
+  private val app = context.applicationContext
+  private val prefs = app.getSharedPreferences("tohid-sync", Context.MODE_PRIVATE)
   private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
   val deviceUid: String
@@ -26,24 +29,32 @@ class SyncStore(context: Context) {
   /**
    *  نشانیِ سرور.
    *
-   *  اگر نسخه با نشانی ساخته شده باشد، همان است و نوشتن روی آن کاری
-   *  نمی‌کند — نه از تنظیمات، نه از جای دیگر. فقط وقتی نسخه بی‌نشانی
-   *  ساخته شده باشد (ساختِ خودی)، مقدارِ ذخیره‌شده خوانده می‌شود.
+   *  دیگر اینجا نگه داشته نمی‌شود: `AppConfig` تنها جایی است که نشانی از
+   *  آن خوانده می‌شود، و این فقط راهِ رسیدن به آن است تا کدِ موجود
+   *  نشکند. اگر نسخه با دامنه ساخته شده باشد، نوشتن روی آن بی‌اثر است.
    */
   var serverUrl: String
-    get() = if (ApiBase.locked) ApiBase.fixed else prefs.getString(SERVER, "") ?: ""
-    set(v) {
-      if (ApiBase.locked) return
-      prefs.edit().putString(SERVER, v.trim().trimEnd('/')).apply()
-    }
+    get() = AppConfig.baseUrl(app)
+    set(v) { AppConfig.setBaseUrl(app, v) }
+
+  /**
+   *  توکن‌ها — رمزشده در `TokenStore`، نه اینجا.
+   *
+   *  تا دیروز همین‌جا در حافظهٔ ساده می‌نشستند. این دو ویژگی سرِ جایشان
+   *  مانده‌اند تا کدی که از آن‌ها استفاده می‌کند نشکند، ولی مقدارِ واقعی
+   *  از حافظهٔ رمزشده می‌آید. `TokenStore` هنگامِ اولین ساخت، توکنِ
+   *  به‌جامانده از نسخهٔ قبل را خودش می‌آورد و جای قدیمی را پاک می‌کند —
+   *  پس کسی که برنامه را به‌روز می‌کند بیرون نمی‌افتد.
+   */
+  private val tokens: TokenStore by lazy { TokenStore(app) }
 
   var accessToken: String?
-    get() = prefs.getString(ACCESS, null)
-    set(v) = prefs.edit().putString(ACCESS, v).apply()
+    get() = tokens.accessToken
+    set(v) { tokens.accessToken = v }
 
   var refreshToken: String?
-    get() = prefs.getString(REFRESH, null)
-    set(v) = prefs.edit().putString(REFRESH, v).apply()
+    get() = tokens.refreshToken
+    set(v) { tokens.refreshToken = v }
 
   /**
    *  یک بار پرسیدنِ رمزِ برنامه.
@@ -112,8 +123,9 @@ class SyncStore(context: Context) {
 
   /** خروج از حساب — داده‌های دکان دست‌نخورده می‌مانند */
   fun signOut() {
+    tokens.clear()
     prefs.edit()
-      .remove(ACCESS).remove(REFRESH).remove(NAME)
+      .remove(NAME)
       .remove(LICENSE).remove(SHADOW).remove(REV).remove(LAST_SYNC)
       .apply()
   }
@@ -126,9 +138,9 @@ class SyncStore(context: Context) {
 
   private companion object {
     const val DEVICE = "device_uid"
-    const val SERVER = "server_url"
-    const val ACCESS = "access_token"
-    const val REFRESH = "refresh_token"
+    //  `server_url`، `access_token` و `refresh_token` دیگر اینجا نوشته
+    //  نمی‌شوند: اولی در `AppConfig` است و دو تای بعدی در `TokenStore`ِ
+    //  رمزشده. مقدارِ به‌جامانده‌شان یک بار خوانده و پاک می‌شود.
     const val NAME = "account_name"
     const val LOCK_ASKED = "lock_asked"
     const val LICENSE = "license"
