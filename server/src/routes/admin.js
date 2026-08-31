@@ -14,6 +14,8 @@ const tokens = require('../lib/tokens');
 const audit = require('../lib/audit');
 const subs = require('../lib/subscriptions');
 const plans = require('../lib/plans');
+const smsSettings = require('../lib/sms-settings');
+const otp = require('../lib/otp');
 const { entitlementOf } = require('../lib/entitlement');
 const { FEATURES, sanitizeFeatures } = require('../lib/features');
 const { requireAdmin, requireSuperAdmin } = require('../middleware/auth');
@@ -276,6 +278,88 @@ router.post('/subscriptions/:id/status', async (req, res) => {
   const row = await subs.setStatus(id, status, req.admin.id);
   await audit.log({ shopId: row.shop_id, actorType: 'admin', userId: req.admin.id, action: 'admin.subscription_status', targetType: 'subscription', targetId: id, detail: { status } });
   res.json({ subscription: row, state: subs.stateOf(row) });
+});
+
+// ---------- سرویس پیامک ----------
+/**
+ * تنظیمات سرویس پیامک، برای برنامه‌ی مدیریت.
+ *
+ * کلید سرویس هرگز کامل برنمی‌گردد — فقط چهار رقم آخرش. اگر کامل
+ * برمی‌گشت، هر کسی که یک بار به آن گوشی دست پیدا می‌کرد کلید را داشت
+ * و می‌توانست با اعتبار صاحب سامانه پیامک بفرستد.
+ */
+router.get('/sms', async (req, res) => {
+  res.json({ sms: await smsSettings.masked() });
+});
+
+/**
+ * ذخیره‌ی تنظیمات.
+ *
+ * `key` اگر خالی یا نیامده باشد، دست نمی‌خورد: برنامه‌ی مدیریت کلید را
+ * نمی‌بیند، پس نباید بتواند ندانسته پاکش کند. برای پاک کردن عمدی،
+ * `key` را با یک فاصله یا `-` بفرستید… نه: صریح‌تر، `clearKey: true`.
+ */
+router.put('/sms', async (req, res, next) => {
+  const body = req.body || {};
+  const patch = {};
+
+  if (body.provider !== undefined) {
+    patch.provider = v.oneOf(body.provider, ['log', 'sms', 'webhook', 'whatsapp'], { field: 'راه ارسال' });
+  }
+  if (body.method !== undefined) {
+    patch.method = v.oneOf(String(body.method).toUpperCase(), ['POST', 'GET'], { field: 'روش' });
+  }
+  for (const name of ['url', 'sender', 'headers', 'body', 'template']) {
+    if (body[name] !== undefined) patch[name] = v.text(body[name], { max: 2000, field: name });
+  }
+
+  //  کلید فقط وقتی عوض می‌شود که مدیر واقعاً چیزی نوشته باشد
+  if (body.clearKey === true) patch.key = '';
+  else if (typeof body.key === 'string' && body.key.trim()) patch.key = body.key.trim();
+
+  //  JSONهای شکل درخواست پیش از ذخیره سنجیده می‌شوند، وگرنه خرابی‌اش
+  //  وقتی معلوم می‌شد که کاربری منتظر کد مانده بود
+  for (const name of ['headers', 'body']) {
+    const value = patch[name];
+    if (!value) continue;
+    const isJsonish = value.trim().startsWith('{');
+    if (name === 'headers' || isJsonish) {
+      try { JSON.parse(value); } catch { return next(badRequest(`${name} یک JSON درست نیست`, 'bad_json')); }
+    }
+  }
+
+  const saved = await smsSettings.save(patch);
+  await audit.log({
+    actorType: 'admin', userId: req.admin.id, action: 'admin.sms_settings',
+    detail: { provider: saved.provider, url: saved.url, keyChanged: patch.key !== undefined },
+  });
+  res.json({ sms: await smsSettings.masked() });
+});
+
+/**
+ * آزمایش واقعی: یک کد ساختگی به شماره‌ی خود مدیر.
+ *
+ * هیچ چیزی در otp_codes ثبت نمی‌شود و این کد جایی کار نمی‌کند — فقط
+ * می‌سنجد که سرویس پیامک راه افتاده یا نه. پاسخ خام سرویس هم برمی‌گردد
+ * تا اگر نرفت، دلیلش روی همان صفحه دیده شود.
+ */
+router.post('/sms/test', rateLimit({ max: 10, keyPrefix: 'admin-sms-test' }), async (req, res, next) => {
+  const to = v.phone(req.body?.to, { required: true });
+  const cfg = await smsSettings.current();
+  const send = otp.senders[cfg.provider] || otp.senders.log;
+
+  const code = String(Math.floor(100000 + Math.random() * 900000));
+  const message = cfg.template ? cfg.template.replace(/\{code\}/g, code) : `کد آزمایشی توحید: ${code}`;
+
+  try {
+    const out = await send(to, code, message);
+    await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.sms_test', detail: { to, via: cfg.provider } });
+    res.json({ ok: true, via: out.via || cfg.provider, response: out.response || '' });
+  } catch (err) {
+    //  خطای سرویس، خطای سرور ما نیست: ۲۰۰ با ok:false تا برنامه‌ی
+    //  مدیریت بتواند متنش را نشان دهد نه یک «خطای ۵۰۰».
+    res.json({ ok: false, error: String(err.message || err).slice(0, 400) });
+  }
 });
 
 // ---------- پلن‌ها و تنظیمات ----------
