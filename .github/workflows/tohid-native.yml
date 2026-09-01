@@ -53,20 +53,28 @@ jobs:
         run: gradle --no-daemon testReleaseUnitTest
 
       #  ── موقتی ──────────────────────────────────────────────────────
-      #  سنجشِ زنده بودنِ دامنهٔ API. محیطِ کارِ Claude به اینترنتِ آزاد راه
-      #  ندارد، ولی رانرِ گیت‌هاب دارد؛ پس یک بار از اینجا پرسیده می‌شود.
-      #  ساخت را نمی‌شکند: نسخهٔ آفلاین باید ساخته شود حتی اگر سرور خواب
-      #  باشد. بعد از دیدنِ نتیجه، این مرحله برداشته می‌شود.
+      #  سنجشِ دامنهٔ API. محیطِ کارِ Claude به اینترنتِ آزاد راه ندارد، ولی
+      #  رانرِ گیت‌هاب دارد. هم زیردامنه پرسیده می‌شود هم دامنهٔ اصلی، تا
+      #  معلوم شود اشکال کجاست: نبودنِ رکوردِ DNS، یا خواب بودنِ سرور.
+      #  `shell: bash` بدونِ `-e` است تا با اولین خطا نایستد و هر دو را
+      #  بسنجد. بعد از دیدنِ نتیجه، این مرحله برداشته می‌شود.
       - name: سنجشِ دامنهٔ API
         continue-on-error: true
+        shell: bash
         run: |
-          base="https://api.yaqobipump.top"
-          for path in /api/health /api/v1/health /; do
-            echo "--- GET $base$path"
-            curl -sS -m 20 -o /tmp/body.txt -w "http=%{http_code} tls_verify=%{ssl_verify_result} time=%{time_total}s\n" \
-              "$base$path" || echo "درخواست ناموفق"
-            head -c 400 /tmp/body.txt; echo
+          set +e
+          for host in api.yaqobipump.top yaqobipump.top www.yaqobipump.top; do
+            echo "===================== $host"
+            getent hosts "$host" || echo "DNS: حل نشد"
+            for path in /api/health /; do
+              curl -sS -m 15 -o /tmp/body.txt \
+                -w "GET https://$host$path  http=%{http_code} tls=%{ssl_verify_result} time=%{time_total}s\n" \
+                "https://$host$path"
+              echo "--- پاسخ:"; head -c 300 /tmp/body.txt 2>/dev/null; echo
+              rm -f /tmp/body.txt
+            done
           done
+          exit 0
 
       - name: ساخت APK
         working-directory: android-native
