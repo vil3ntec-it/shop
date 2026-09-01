@@ -75,6 +75,7 @@ private val PAGE_TITLES = mapOf(
   "quick" to "انتخاب محصول",
   "product" to "کالا",
   "vip" to "اشتراک و قیمت‌ها",
+  "profile" to "حساب من",
   "team" to "کارمندان دکان",
 )
 
@@ -322,7 +323,9 @@ fun AppRoot(
         theme = theme,
         onTheme = onTheme,
         onSettings = { sub = "settings" },
-        onAccount = { authOpen = true },
+        //  کلیدِ حساب، صفحهٔ حساب را باز می‌کند نه صفحهٔ ورود را.
+        //  کسی که سال‌ها وارد بوده، با زدنش فرمِ ورود می‌دید.
+        onAccount = { sub = "profile" },
         onOpen = ::open,
       )
     },
@@ -473,6 +476,12 @@ fun AppRoot(
           onConsumed = { pendingBarcode = null; pendingProduct = null },
         )
         "vip" -> VipScreen { sub = null }
+        "profile" -> ProfileScreen(
+          snackbar = snackbar,
+          onBack = { sub = null },
+          onSignIn = { authOpen = true },
+          onSubscription = { sub = "vip" },
+        )
         "team" -> TeamScreen(snackbar)
         "more" -> MoreScreen(store, data, ::open)
       }

@@ -250,9 +250,9 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
       runCatching {
         LedgerOwner.signedIn(context, store, session.user.id, session.shop?.id.orEmpty())
       }
-      //  نام *بعد از* آن نوشته می‌شود: جابه‌جاییِ حساب هرچه به حسابِ
+      //  حساب *بعد از* آن نوشته می‌شود: جابه‌جاییِ حساب هرچه به حسابِ
       //  قبلی بسته بوده را پاک می‌کند و نامِ تازه هم قربانی می‌شد
-      state.accountName = display
+      state.rememberAccount(session.user, display)
       onDone()
     }
   }
@@ -755,7 +755,7 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
                                 context, store, session.user.id, session.shop?.id.orEmpty(),
                               )
                             }
-                            state.accountName = session.user.name
+                            state.rememberAccount(session.user)
                             onDone()
                           }
                           .onFailure { fail(it) }

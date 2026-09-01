@@ -111,11 +111,54 @@ router.delete('/devices/:id', async (req, res) => {
   res.json({ ok: true });
 });
 
-/** ویرایش نام حساب. */
+/**
+ * ویرایش حساب — نام، و یک‌بار ثبت شماره.
+ *
+ * ── چه چیزی عوض می‌شود و چه چیزی نه ──────────────────────────────────
+ * نام هر وقت خواست عوض می‌شود؛ اسم آدم نشانه‌ی هویت حساب نیست.
+ *
+ * ایمیل و شماره **راه ورود**اند. عوض کردنشان یعنی حساب از دست صاحبش
+ * در می‌آید: کسی که یک بار توکن گرفته باشد می‌توانست ایمیل را عوض کند
+ * و از آن به بعد بازیابی رمز به ایمیل خودش برود. پس هیچ‌کدام از این
+ * مسیر عوض نمی‌شوند.
+ *
+ * ولی یک حالت مانده بود: کسی که با ایمیل ثبت‌نام کرده و شماره ندارد.
+ * برای او شماره «عوض کردن» نیست، «افزودن» است — و همان یک بار.
+ * ثبتش که شد، دیگر از اینجا دست نمی‌خورد.
+ * ────────────────────────────────────────────────────────────────────
+ */
 router.put('/', async (req, res) => {
   const name = v.text(req.body?.name, { max: 80 });
-  const user = await one('UPDATE users SET name=$2, updated_at=$3 WHERE id=$1 RETURNING *',
-    [req.user.id, name, now()]);
+  const phone = v.phone(req.body?.phone);
+
+  //  شماره‌ای که آمده و کاربر از قبل شماره داشته: بی‌صدا نادیده گرفته
+  //  نمی‌شود، وگرنه برنامه فکر می‌کند ثبت شد
+  if (phone && req.user.phone && phone !== req.user.phone) {
+    return res.status(409).json({
+      error: { code: 'phone_locked', message: 'شماره ثبت‌شده عوض نمی‌شود — با پشتیبانی تماس بگیرید' },
+    });
+  }
+
+  const claiming = phone && !req.user.phone;
+  if (claiming) {
+    const taken = await one('SELECT id FROM users WHERE phone=$1 AND id<>$2', [phone, req.user.id]);
+    if (taken) {
+      return res.status(409).json({
+        error: { code: 'phone_taken', message: 'این شماره روی حساب دیگری ثبت شده' },
+      });
+    }
+  }
+
+  const user = await one(
+    `UPDATE users SET name=$2, phone=COALESCE($3, phone), updated_at=$4
+     WHERE id=$1 RETURNING *`,
+    [req.user.id, name, claiming ? phone : null, now()]
+  );
+  if (claiming) {
+    await audit.log({
+      shopId: req.shopId, userId: req.user.id, action: 'account.phone_added', detail: {},
+    });
+  }
   res.json({ user: publicUser(user) });
 });
 

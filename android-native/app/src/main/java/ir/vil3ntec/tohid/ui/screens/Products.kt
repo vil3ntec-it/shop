@@ -1,8 +1,5 @@
 package ir.vil3ntec.tohid.ui.screens
 
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -82,12 +79,17 @@ fun ProductsScreen(
   var photoVersion by remember { mutableStateOf(0) }
   val context = LocalContext.current
 
-  val pickPhoto = rememberLauncherForActivityResult(
-    ActivityResultContracts.PickVisualMedia()
+  /*
+   *  عکس از دوربین یا از گالری — برگهٔ انتخاب همان را می‌پرسد.
+   *
+   *  تا دیروز یک‌راست گالری باز می‌شد؛ فروشنده‌ای که جنسِ تازه روی
+   *  پیشخوان داشت، باید از برنامه بیرون می‌رفت تا عکس بگیرد.
+   */
+  PhotoSourceSheet(
+    open = photoFor != null,
+    onDismiss = { photoFor = null },
   ) { uri ->
-    val id = photoFor
-    photoFor = null
-    if (uri == null || id == null) return@rememberLauncherForActivityResult
+    val id = photoFor ?: return@PhotoSourceSheet
     PhotoStore.save(context, id, uri)
       .onSuccess {
         // نشانهٔ عکس روی خودِ محصول می‌نشیند، همان فیلدی که وب می‌نویسد
@@ -242,10 +244,7 @@ fun ProductsScreen(
               photoVersion = photoVersion,
               onClick = { onOpenProduct(p.id) },
               onLongClick = { actionsFor = p },
-              onPhoto = {
-                photoFor = p.id
-                pickPhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-              },
+              onPhoto = { photoFor = p.id },
             )
           }
           Spacer(Modifier.height(10.dp))
@@ -318,7 +317,6 @@ fun ProductsScreen(
         SheetAction(Icons.Filled.Image, "انتخاب عکس محصول") {
           photoFor = p.id
           actionsFor = null
-          pickPhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
         }
         SheetAction(Icons.Filled.Inventory2, "دیدن در انبار") {
           val id = p.id

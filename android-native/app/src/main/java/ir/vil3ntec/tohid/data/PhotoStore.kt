@@ -91,6 +91,43 @@ object PhotoStore {
     }
   }
 
+  /* ------------------------ عکسِ خودِ کاربر ------------------------ */
+
+  /*
+   *  عکسِ حساب، به نامِ همان حساب.
+   *
+   *  نامِ فایل شناسهٔ حساب را دارد و برای همین — برعکسِ عکسِ کالاها —
+   *  به بایگانی و جابه‌جایی نیازی نیست: روی یک گوشیِ مشترک، هر حساب
+   *  فایلِ خودش را می‌بیند و عکسِ نفرِ قبلی جای عکسِ نفرِ بعدی نمی‌نشیند.
+   *
+   *  فقط روی گوشی می‌ماند و هیچ‌جا آپلود نمی‌شود؛ پس بدونِ اینترنت هم
+   *  همان‌قدر کار می‌کند.
+   */
+  private fun avatar(context: Context, accountId: String): File =
+    File(context.filesDir, "account-avatar-${safeKey(accountId)}.jpg")
+
+  fun saveAvatar(context: Context, accountId: String, source: Uri): Result<Unit> = runCatching {
+    val bitmap = context.contentResolver.openInputStream(source).use { stream ->
+      requireNotNull(BitmapFactory.decodeStream(stream)) { "عکس خوانده نشد" }
+    }
+    val scaled = shrink(bitmap)
+    avatar(context, accountId).outputStream().use { out ->
+      scaled.compress(Bitmap.CompressFormat.JPEG, QUALITY, out)
+    }
+    if (scaled !== bitmap) scaled.recycle()
+    bitmap.recycle()
+  }
+
+  fun loadAvatar(context: Context, accountId: String): Bitmap? {
+    val f = avatar(context, accountId)
+    if (!f.exists()) return null
+    return runCatching { BitmapFactory.decodeFile(f.absolutePath) }.getOrNull()
+  }
+
+  fun deleteAvatar(context: Context, accountId: String) {
+    runCatching { avatar(context, accountId).delete() }
+  }
+
   private fun safeKey(key: String): String =
     key.map { if (it.isLetterOrDigit()) it else '_' }.joinToString("").take(48).ifBlank { "anon" }
 

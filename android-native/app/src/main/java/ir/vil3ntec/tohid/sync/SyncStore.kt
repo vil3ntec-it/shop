@@ -70,6 +70,55 @@ class SyncStore(context: Context) {
     get() = prefs.getString(NAME, "") ?: ""
     set(v) = prefs.edit().putString(NAME, v).apply()
 
+  /*
+   *  ایمیل، شماره و روزِ ساختنِ حساب.
+   *
+   *  ── چرا روی گوشی نوشته می‌شوند ────────────────────────────────────
+   *  صفحهٔ پروفایل بدونِ اینترنت هم باید همان چیزی را نشان بدهد که با
+   *  اینترنت: برنامه در دکانی کار می‌کند که ممکن است روزها آنتن نداشته
+   *  باشد. اینها با هر ورود و هر بار باز شدنِ پروفایل از سرور تازه
+   *  می‌شوند و همین‌جا می‌مانند.
+   *  ──────────────────────────────────────────────────────────────────
+   *
+   *  با خروج پاک می‌شوند، مثل نام: ایمیلِ نفرِ قبلی نباید در پروفایلِ
+   *  نفرِ بعدی دیده شود.
+   */
+  var accountEmail: String
+    get() = prefs.getString(EMAIL, "") ?: ""
+    set(v) = prefs.edit().putString(EMAIL, v).apply()
+
+  var accountPhone: String
+    get() = prefs.getString(PHONE, "") ?: ""
+    set(v) = prefs.edit().putString(PHONE, v).apply()
+
+  /** ساعتِ ساختنِ حساب — «مدت عضویت» از همین حساب می‌شود */
+  var accountCreatedAt: Long
+    get() = prefs.getLong(CREATED, 0)
+    set(v) = prefs.edit().putLong(CREATED, v).apply()
+
+  /**
+   *  هرچه از حسابِ تازه‌وارد باید روی گوشی بماند — یک جا.
+   *
+   *  سه مسیرِ ورود (رمز، کد، کدِ شاگرد) هر کدام تا دیروز فقط نام را
+   *  می‌نوشتند و بس. با اضافه شدنِ صفحهٔ پروفایل، ایمیل و شماره و روزِ
+   *  ساختنِ حساب هم لازم شد؛ اگر هر مسیر خودش می‌نوشت، یکی‌شان
+   *  فراموش می‌شد و کاربرِ آن راه، پروفایلِ نصفه می‌دید.
+   *
+   *  @param name نامی که نشان داده می‌شود — معمولاً همان نامِ سرور، ولی
+   *    در ورودِ تازه با شماره، نامی است که همان لحظه تایپ شده.
+   */
+  fun rememberAccount(
+    user: ir.vil3ntec.tohid.core.model.UserDto,
+    name: String = user.name,
+  ) {
+    prefs.edit()
+      .putString(NAME, name)
+      .putString(EMAIL, user.email.orEmpty())
+      .putString(PHONE, user.phone.orEmpty())
+      .putLong(CREATED, user.createdAt)
+      .apply()
+  }
+
   /**
    *  شناسهٔ حسابی که الان وارد است.
    *
@@ -143,7 +192,7 @@ class SyncStore(context: Context) {
   fun signOut() {
     tokens.clear()
     prefs.edit()
-      .remove(NAME)
+      .remove(NAME).remove(EMAIL).remove(PHONE).remove(CREATED)
       .remove(ACCOUNT_ID)
       .remove(LICENSE).remove(SHADOW).remove(REV).remove(LAST_SYNC)
       .apply()
@@ -171,7 +220,7 @@ class SyncStore(context: Context) {
   fun forgetAccountState() {
     prefs.edit()
       .remove(SHADOW).remove(REV).remove(LAST_SYNC)
-      .remove(LICENSE).remove(NAME)
+      .remove(LICENSE).remove(NAME).remove(EMAIL).remove(PHONE).remove(CREATED)
       .apply()
   }
 
@@ -187,6 +236,9 @@ class SyncStore(context: Context) {
     //  نمی‌شوند: اولی در `AppConfig` است و دو تای بعدی در `TokenStore`ِ
     //  رمزشده. مقدارِ به‌جامانده‌شان یک بار خوانده و پاک می‌شود.
     const val NAME = "account_name"
+    const val EMAIL = "account_email"
+    const val PHONE = "account_phone"
+    const val CREATED = "account_created"
     const val ACCOUNT_ID = "account_id"
     const val LOCK_ASKED = "lock_asked"
     const val LICENSE = "license"

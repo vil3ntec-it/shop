@@ -57,6 +57,23 @@ data class SessionDto(
   val isValid: Boolean get() = accessToken.isNotBlank()
 }
 
+/**
+ *  پاسخِ `GET /me` — حسابِ همین کاربر و دکانش.
+ *
+ *  ورودِ برنامه از `SessionDto` می‌آید، ولی آن یک عکسِ لحظهٔ ورود است.
+ *  اگر روی گوشیِ دیگری نام یا شماره عوض شده باشد، فقط این می‌داند.
+ */
+@Serializable
+data class MeDto(
+  val user: UserDto = UserDto(),
+  val shop: ShopRefDto? = null,
+  val serverTime: Long = 0,
+)
+
+/** پاسخِ مسیرهایی که فقط حساب را برمی‌گردانند — مثل ویرایشِ پروفایل */
+@Serializable
+data class UserWrapDto(val user: UserDto = UserDto())
+
 /* ------------------------------ کد یک‌بارمصرف ------------------------------ */
 
 @Serializable

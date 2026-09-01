@@ -1,8 +1,5 @@
 package ir.vil3ntec.tohid.ui.screens
 
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -94,10 +91,9 @@ fun ProductDetailScreen(
   // با عوض شدنِ عکس، همین عدد بالا می‌رود تا نسخهٔ کش‌شده دور ریخته شود
   var photoVersion by remember(productId) { mutableStateOf(0) }
 
-  val pickPhoto = rememberLauncherForActivityResult(
-    ActivityResultContracts.PickVisualMedia()
-  ) { uri ->
-    if (uri == null) return@rememberLauncherForActivityResult
+  //  دوربین یا گالری — همان برگه‌ای که صفحهٔ محصولات هم نشان می‌دهد
+  var pickOpen by remember { mutableStateOf(false) }
+  PhotoSourceSheet(open = pickOpen, onDismiss = { pickOpen = false }) { uri ->
     PhotoStore.save(context, product.id, uri).onSuccess {
       // نشانهٔ عکس روی خودِ محصول می‌نشیند، همان فیلدی که وب می‌نویسد
       scope.launch {
@@ -110,7 +106,7 @@ fun ProductDetailScreen(
   }
 
   fun choosePhoto() {
-    pickPhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+    pickOpen = true
   }
 
   val movements = d.stockMovements
