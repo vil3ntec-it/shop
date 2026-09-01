@@ -179,7 +179,6 @@ object LedgerOwner {
     runCatching { PhotoStore.openFrom(context, to) }
     runCatching { ShopRole.forget(context) }
     runCatching { CartStore(context).clear() }
-    runCatching { AccountKeys.forget(context) }
 
     state.accountId = user
     remember(context, user, shop)

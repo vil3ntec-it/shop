@@ -4,14 +4,11 @@ import android.content.Intent
 import android.net.Uri
 import androidx.compose.animation.core.EaseInOutSine
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.StartOffset
-import androidx.compose.animation.core.StartOffsetType
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -35,15 +32,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.Dp
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -59,14 +55,12 @@ import ir.vil3ntec.tohid.sync.SyncStore
 import kotlinx.coroutines.launch
 import ir.vil3ntec.tohid.ui.theme.Radius
 import ir.vil3ntec.tohid.ui.theme.Shop
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.graphicsLayer
-import ir.vil3ntec.tohid.ui.theme.Shape
 import ir.vil3ntec.tohid.fa
 import ir.vil3ntec.tohid.formatMillis
 import ir.vil3ntec.tohid.money
@@ -146,7 +140,13 @@ private val GOLD_SWEEP = Brush.linearGradient(
   listOf(GOLD_SOFT, GOLD, GOLD_PALE, GOLD_DEEP)
 )
 
-/** نبضِ آرام — همهٔ درخشش‌های صفحه با یک ضربان می‌زنند، نه هرکدام جدا */
+/**
+ *  نبضِ آرام — هالهٔ طلاییِ کارت‌ها با یک ضربان نفس می‌کشد.
+ *
+ *  این همان چیزی است که از اول بود و برداشتنش اشتباه بود: خواسته
+ *  «برداشتنِ خطِ نور» بود، نه ساکن کردنِ همه‌چیز. هاله خطی نمی‌کشد،
+ *  فقط کم‌وزیاد می‌شود.
+ */
 @Composable
 private fun goldPulse(): Float {
   val motion = rememberInfiniteTransition(label = "goldPulse")
@@ -163,41 +163,14 @@ private fun goldPulse(): Float {
 }
 
 /**
- *  برقی که روی سطح می‌لغزد — می‌رود و برمی‌گردد، نمی‌ایستد.
- *
- *  نسخهٔ قبلی `Restart` بود با یک مکثِ کوتاه: نور تا لبه می‌رفت، یک‌باره
- *  به اول می‌پرید و چند صدم ثانیه هم می‌ماند. همان پرش و مکث در چشم
- *  «ریست شدن» دیده می‌شد، نه حرکت.
- *
- *  حالا `Reverse` است و بی‌مکث: نور تا لبه می‌رود، همان‌جا آرام می‌گیرد و
- *  از همان راه برمی‌گردد. شتابش هم سینوسی است — کندِ لبه‌ها و تندِ وسط —
- *  چون با شتابِ یکنواخت، لحظهٔ برگشت یک زاویهٔ تیز است و دیده می‌شود.
- */
-@Composable
-private fun goldSweep(period: Int = 2800, delay: Int = 0): Float {
-  val motion = rememberInfiniteTransition(label = "goldSweep")
-  val value by motion.animateFloat(
-    initialValue = 0f,
-    targetValue = 1f,
-    animationSpec = infiniteRepeatable(
-      tween(if (Motion.enabled) period else 1, easing = EaseInOutSine),
-      RepeatMode.Reverse,
-      // جلو بردنِ ساعت، نه صبر کردن: کارت‌ها هم‌زمان برق نزنند ولی
-      // هیچ‌کدام هم اولِ کار ساکن نماند
-      initialStartOffset = StartOffset(delay, StartOffsetType.FastForward),
-    ),
-    label = "sweep",
-  )
-  return value
-}
-
-/**
  *  لبهٔ طلاییِ درخشان.
  *
  *  یک خطِ تنها فقط یک خط است؛ درخشش از لایه‌لایه بودن می‌آید — سه هالهٔ
  *  پهن و کم‌رنگِ بیرون از کادر، و بعد خودِ خط. چون هاله بیرونِ کادر
  *  کشیده می‌شود، این باید **پیش از** `clip` بیاید وگرنه بریده می‌شود.
+ *
  */
+
 private fun Modifier.goldEdge(radius: Dp, pulse: Float, strong: Boolean = false): Modifier =
   drawBehind {
     val lift = if (strong) 1f else 0.62f
@@ -222,22 +195,6 @@ private fun Modifier.goldEdge(radius: Dp, pulse: Float, strong: Boolean = false)
     )
   }
 
-/** برقی که روی خودِ سطح می‌لغزد — بعد از `clip` بیاید تا داخل بماند */
-private fun Modifier.goldShine(progress: Float, strength: Float = 0.3f): Modifier =
-  drawWithContent {
-    drawContent()
-    if (!Motion.enabled) return@drawWithContent
-    val x = size.width * progress
-    drawRect(
-      brush = Brush.linearGradient(
-        colors = listOf(Color.Transparent, GOLD_PALE.copy(alpha = strength), Color.Transparent),
-        start = Offset(x - size.width * 0.3f, 0f),
-        end = Offset(x + size.width * 0.3f, size.height),
-      ),
-      size = size,
-    )
-  }
-
 /** بلندیِ نوارِ نشان — در همهٔ کارت‌ها یکی، حتی آن‌که نشان ندارد */
 private val BADGE_BAND = 26.dp
 
@@ -249,7 +206,6 @@ private val RIBBON_BAND = 28.dp
  */
 @Composable
 private fun GoldBadge(text: String) {
-  val sweep = goldSweep(period = 2200, delay = 400)
   // روی گوشی نشان باید در عرضِ یک‌سومِ صفحه بنشیند: نه تاجِ کنارِ متن، نه
   // فاصلهٔ پهن. «بیشترین صرفه» با آن دو، از کارت بیرون می‌زد.
   val wide = isTablet()
@@ -257,7 +213,6 @@ private fun GoldBadge(text: String) {
     Modifier
       .clip(RoundedCornerShape(topStart = 11.dp, topEnd = 11.dp, bottomStart = 3.dp, bottomEnd = 3.dp))
       .background(GOLD_SWEEP)
-      .goldShine(sweep, strength = 0.55f)
       .padding(horizontal = if (wide) 11.dp else 7.dp, vertical = 4.dp),
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -281,114 +236,6 @@ private fun GoldBadge(text: String) {
       overflow = TextOverflow.Ellipsis,
       softWrap = false,
     )
-  }
-}
-
-/* ============================ نشانِ طلایی ============================ */
-
-/**
- *  نشانِ بالای داشبورد. وضعیت اشتراک را خودش از روی مجوزِ ذخیره‌شده
- *  می‌سنجد، پس هرجا گذاشته شود درست است.
- */
-@Composable
-fun VipBadge(onClick: () -> Unit, modifier: Modifier = Modifier) {
-  val context = LocalContext.current
-  val state = remember { SyncStore(context) }
-  val status = remember { LicenseGuard.status(context, state) }
-
-  val text = when (status.state) {
-    License.State.ACTIVE -> "اشتراک فعال"
-    License.State.GRACE -> "مهلت تمدید"
-    License.State.EXPIRED -> "ارتقا به VIP"
-    else -> "اشتراک و قیمت‌ها"
-  }
-
-  // تاجِ متحرک — همان تکانِ ملایمِ نسخهٔ وب
-  val motion = rememberInfiniteTransition(label = "vip")
-  val bob by motion.animateFloat(
-    initialValue = -9f,
-    targetValue = 9f,
-    animationSpec = infiniteRepeatable(tween(1300, easing = EaseInOutSine), RepeatMode.Reverse),
-    label = "bob",
-  )
-
-  // برقِ نوری که روی نشان می‌لغزد — همان انیمیشنِ کارت اشتراکِ وب
-  val shine by motion.animateFloat(
-    initialValue = 0f,
-    targetValue = 1f,
-    animationSpec = infiniteRepeatable(
-      tween(if (Motion.enabled) 2600 else 1, easing = EaseInOutSine),
-      RepeatMode.Reverse,
-    ),
-    label = "shine",
-  )
-  // چهار جرقهٔ ریز که از نشان می‌ریزد
-  val sparkle by motion.animateFloat(
-    initialValue = 0f,
-    targetValue = 1f,
-    // جرقه‌ها پیش از پایانِ دور کاملاً محو می‌شوند، پس شروعِ دورِ بعد
-    // دیده نمی‌شود — اینجا `Restart` درست است
-    animationSpec = infiniteRepeatable(tween(2800, easing = LinearEasing), RepeatMode.Restart),
-    label = "sparkle",
-  )
-
-  Box(modifier) {
-    Row(
-      Modifier
-        .clip(RoundedCornerShape(20.dp))
-        .background(
-          Brush.linearGradient(
-            listOf(Color(0xFFF6D36B), Color(0xFFE0A92C), Color(0xFFF8E39A), Color(0xFFD9982A))
-          )
-        )
-        .drawWithContent {
-          drawContent()
-          // نوارِ نور، مورب، از یک لبه به لبهٔ دیگر
-          val x = size.width * shine
-          drawRect(
-            brush = Brush.linearGradient(
-              colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.55f), Color.Transparent),
-              start = Offset(x - size.width * 0.25f, 0f),
-              end = Offset(x + size.width * 0.25f, size.height),
-            ),
-            size = size,
-          )
-        }
-        .clickable(onClick = onClick)
-        .padding(horizontal = 12.dp, vertical = 7.dp),
-      verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(5.dp),
-    ) {
-      Icon(
-        Icons.Filled.WorkspacePremium,
-        contentDescription = null,
-        tint = Color(0xFF4A3208),
-        modifier = Modifier.size(16.dp).rotate(bob),
-      )
-      Text(
-        text,
-        style = MaterialTheme.typography.labelMedium,
-        color = Color(0xFF4A3208),
-        fontWeight = FontWeight.Bold,
-      )
-    }
-
-    Canvas(Modifier.matchParentSize()) {
-      // هر جرقه با تأخیرِ خودش می‌افتد و محو می‌شود
-      listOf(0.16f, 0.38f, 0.62f, 0.83f).forEachIndexed { i, xRatio ->
-        val phase = (sparkle + i * 0.25f) % 1f
-        val alpha = when {
-          phase < 0.12f -> phase / 0.12f
-          phase > 0.7f -> ((1f - phase) / 0.3f).coerceIn(0f, 1f)
-          else -> 0.9f
-        }
-        drawCircle(
-          color = Color(0xFFFFD970).copy(alpha = alpha * 0.9f),
-          radius = 2.5f + (1f - phase) * 1.5f,
-          center = Offset(size.width * xRatio, size.height * (0.7f + phase * 0.7f)),
-        )
-      }
-    }
   }
 }
 
@@ -777,7 +624,6 @@ private fun SubscriptionState() {
  */
 @Composable
 private fun BuyButton(text: String, onClick: () -> Unit) {
-  val sweep = goldSweep(period = 2600, delay = 600)
   val pulse = goldPulse()
   val interaction = remember { MutableInteractionSource() }
   val pressed by interaction.collectIsPressedAsState()
@@ -793,9 +639,10 @@ private fun BuyButton(text: String, onClick: () -> Unit) {
       .fillMaxWidth()
       .graphicsLayer { scaleX = scale; scaleY = scale }
       .goldEdge(28.dp, pulse, strong = true)
+      //  تا انگشت روی دکمه است، نور از کناره‌ها می‌آید
+      .edgeSparks(pressed, GOLD)
       .clip(shape)
       .background(GOLD_SWEEP)
-      .goldShine(sweep, strength = 0.5f)
       .clickable(interactionSource = interaction, indication = null, onClick = onClick)
       .padding(horizontal = 18.dp, vertical = 15.dp),
     verticalAlignment = Alignment.CenterVertically,
@@ -839,7 +686,9 @@ private fun TierCard(
 ) {
   val colors = Shop.colors
   val pulse = goldPulse()
-  val sweep = goldSweep(period = 3400, delay = 1200)
+  //  ستونِ VIP تا وقتی انگشت رویش است نور می‌دهد؛ ستونِ رایگان ساکن است
+  val tap = remember { MutableInteractionSource() }
+  val touched by tap.collectIsPressedAsState()
   val bodyShape =
     if (ribbon.isNotBlank()) RoundedCornerShape(bottomStart = Radius.md, bottomEnd = Radius.md)
     else RoundedCornerShape(Radius.md)
@@ -857,8 +706,7 @@ private fun TierCard(
           .fillMaxWidth()
           .clip(RoundedCornerShape(topStart = Radius.md, topEnd = Radius.md))
           .height(RIBBON_BAND)
-          .background(GOLD_SWEEP)
-          .goldShine(sweep, strength = 0.5f),
+          .background(GOLD_SWEEP),
         contentAlignment = Alignment.Center,
       ) {
         Row(
@@ -889,12 +737,20 @@ private fun TierCard(
         .fillMaxWidth()
         .weight(1f)
         .then(if (highlighted) Modifier.goldEdge(Radius.md, pulse, strong = true) else Modifier)
+        .then(if (highlighted) Modifier.edgeSparks(touched, GOLD) else Modifier)
         .clip(bodyShape)
         .background(colors.surface)
-        .then(if (highlighted) Modifier.goldShine(sweep, strength = 0.22f) else Modifier)
         .then(
           if (highlighted) Modifier
           else Modifier.border(1.dp, colors.border, bodyShape)
+        )
+        .then(
+          //  زدنِ این ستون جایی نمی‌برد؛ فقط نورش را روشن می‌کند —
+          //  مدت را کاربر از کارت‌های پایین انتخاب می‌کند
+          if (highlighted) Modifier.clickable(
+            interactionSource = tap, indication = null,
+          ) {}
+          else Modifier
         )
         .padding(14.dp),
     ) {
@@ -1014,7 +870,8 @@ private fun PlanCard(
   val perDay = plan.price.toDouble() / plan.days
   val golden = plan.badge.isNotBlank()
   val pulse = goldPulse()
-  val sweep = goldSweep(period = 3000, delay = if (golden) 500 else 1500)
+  val press = remember { MutableInteractionSource() }
+  val touched by press.collectIsPressedAsState()
   val shape = RoundedCornerShape(Radius.md)
 
   // سه کارت در عرضِ یک گوشی یعنی هر کدام حدودِ صد نقطه؛ با فاصله‌های
@@ -1036,9 +893,10 @@ private fun PlanCard(
         .fillMaxWidth()
         .then(if (stretch) Modifier.weight(1f) else Modifier)
         .then(if (golden) Modifier.goldEdge(Radius.md, pulse, strong = selected) else Modifier)
+        //  تا انگشت روی کارت است، نور از کناره‌هایش می‌آید
+        .edgeSparks(touched, if (golden) GOLD else colors.primary)
         .clip(shape)
         .background(colors.surface)
-        .then(if (golden) Modifier.goldShine(sweep, strength = 0.25f) else Modifier)
         .then(
           if (golden) Modifier
           else Modifier.border(
@@ -1047,7 +905,11 @@ private fun PlanCard(
             shape,
           )
         )
-        .clickable(onClick = onClick)
+        .clickable(
+          interactionSource = press,
+          indication = LocalIndication.current,
+          onClick = onClick,
+        )
         .padding(horizontal = if (wide) 14.dp else 8.dp, vertical = if (wide) 14.dp else 11.dp),
       horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -1219,45 +1081,25 @@ fun VipGate(label: String, content: @Composable () -> Unit) {
 }
 
 /**
- *  دکمهٔ طلاییِ اشتراک — با همان برقی که روی نشانِ بالای صفحه می‌لغزد.
+ *  دکمهٔ طلاییِ اشتراک — با همان جرقه‌ای که کارت‌های اشتراک می‌زنند.
  *
  *  دکمهٔ تختِ قبلی کنارِ آن نشانِ متحرک، مرده به نظر می‌رسید: همان کار را
  *  می‌کرد ولی نمی‌گفت که همان چیز است.
  */
 @Composable
 private fun GoldButton(text: String, onClick: () -> Unit) {
-  val motion = rememberInfiniteTransition(label = "gold")
-  val shine by motion.animateFloat(
-    initialValue = 0f,
-    targetValue = 1f,
-    animationSpec = infiniteRepeatable(
-      tween(if (Motion.enabled) 2400 else 1, easing = EaseInOutSine),
-      RepeatMode.Reverse,
-    ),
-    label = "goldShine",
-  )
+  val press = remember { MutableInteractionSource() }
+  val touched by press.collectIsPressedAsState()
   Row(
     Modifier
+      .edgeSparks(touched, GOLD)
       .clip(RoundedCornerShape(26.dp))
       .background(
         Brush.linearGradient(
           listOf(Color(0xFFF6D36B), Color(0xFFE0A92C), Color(0xFFF8E39A), Color(0xFFD9982A))
         )
       )
-      .drawWithContent {
-        drawContent()
-        if (!Motion.enabled) return@drawWithContent
-        val x = size.width * shine
-        drawRect(
-          brush = Brush.linearGradient(
-            colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.55f), Color.Transparent),
-            start = Offset(x - size.width * 0.25f, 0f),
-            end = Offset(x + size.width * 0.25f, size.height),
-          ),
-          size = size,
-        )
-      }
-      .clickable(onClick = onClick)
+      .clickable(interactionSource = press, indication = LocalIndication.current, onClick = onClick)
       .padding(horizontal = 22.dp, vertical = 13.dp),
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(7.dp),

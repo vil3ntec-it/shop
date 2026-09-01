@@ -152,7 +152,7 @@ fun ShopSetupScreen(store: ShopStore, onDone: () -> Unit) {
     PillField(
       value = code,
       onValueChange = { code = it.uppercase(); error = null },
-      placeholder = "SHG-XXXXX-XXXXX-XXXXX",
+      placeholder = ir.vil3ntec.tohid.data.StaffCode.HINT,
       icon = Icons.Filled.Badge,
       ltr = true,
       keyboardOptions = KeyboardOptions(capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Characters),
@@ -160,9 +160,9 @@ fun ShopSetupScreen(store: ShopStore, onDone: () -> Unit) {
     Spacer(Modifier.height(10.dp))
     OutlinedButton(
       onClick = {
-        val entered = code.trim().uppercase()
-        if (!ir.vil3ntec.tohid.data.AccountKeys.STAFF_RE.matches(entered)) {
-          error = "این کد درست نیست. کد باید مثل SHG-XXXXX-XXXXX-XXXXX باشد."
+        val entered = ir.vil3ntec.tohid.data.StaffCode.clean(code)
+        if (!ir.vil3ntec.tohid.data.StaffCode.looksValid(entered)) {
+          error = "این کد درست نیست. کد باید مثل ${ir.vil3ntec.tohid.data.StaffCode.HINT} باشد."
           return@OutlinedButton
         }
         busy = true; error = null
@@ -170,7 +170,10 @@ fun ShopSetupScreen(store: ShopStore, onDone: () -> Unit) {
           //  اینجا کاربر از قبل وارد حسابی است (این صفحه بعد از ورود
           //  می‌آید)، پس همان حساب به دکان می‌پیوندد
           shops.join(entered)
-            .onSuccess { settle(it.shop?.id.orEmpty()) }
+            .onSuccess {
+              it.role?.let { role -> ir.vil3ntec.tohid.data.ShopRole.remember(context, role) }
+              settle(it.shop?.id.orEmpty())
+            }
             .onFailure { error = it.userText("پیوستن به دکان انجام نشد") }
           busy = false
         }

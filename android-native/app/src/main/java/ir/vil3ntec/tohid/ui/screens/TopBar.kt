@@ -9,10 +9,12 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.WindowInsets
@@ -21,6 +23,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.HourglassBottom
@@ -252,6 +255,11 @@ fun TohidTopBar(
   onSettings: () -> Unit,
   onAccount: () -> Unit,
   onOpen: (String) -> Unit,
+  /**
+   *  راهِ برگشت از زیرصفحه — `null` یعنی همین حالا صفحهٔ اصلیِ یک تب
+   *  باز است و جایی برای برگشتن نیست.
+   */
+  onBack: (() -> Unit)? = null,
 ) {
   val context = LocalContext.current
   val alerts = rememberAlerts(d)
@@ -278,7 +286,10 @@ fun TohidTopBar(
    *  بدهد.
    */
   val screenWidth = LocalConfiguration.current.screenWidthDp
-  val titleMax: Dp = (screenWidth * if (isTablet()) 0.5f else 0.38f).dp
+  //  دکمهٔ برگشت هم از همین سهم برمی‌دارد، وگرنه روی گوشیِ باریک
+  //  مجموعِ «دکمه + نام» از سقف می‌زد بیرون
+  val titleMax: Dp = ((screenWidth * if (isTablet()) 0.5f else 0.38f).dp -
+    (if (onBack != null) 42.dp else 0.dp)).coerceAtLeast(56.dp)
 
   Box(
     Modifier
@@ -298,15 +309,49 @@ fun TohidTopBar(
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-      Text(
-        title,
-        style = MaterialTheme.typography.titleMedium,
-        color = BAR_INK,
-        fontWeight = FontWeight.Bold,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        modifier = Modifier.widthIn(max = titleMax),
-      )
+      Row(verticalAlignment = Alignment.CenterVertically) {
+        /*
+         *  دکمهٔ برگشت — تنها راهِ روی صفحه.
+         *
+         *  ── چه چیزی را می‌بندد ──────────────────────────────────────
+         *  از «بیشتر» که واردِ مصارف یا گزارش‌ها یا خرید می‌شدی، هیچ
+         *  دکمه‌ای برای برگشتن نبود: فقط دکمهٔ سختِ خودِ گوشی کار
+         *  می‌کرد. روی گوشی‌هایی که با اشاره کار می‌کنند — و برای
+         *  کسی که آن اشاره را نمی‌داند — یعنی گیر افتادن در صفحه و
+         *  زدنِ یکی از تب‌های پایین برای فرار.
+         *  ────────────────────────────────────────────────────────────
+         *
+         *  در راست‌به‌چپ، فلشِ برگشت به راست است — همان `ArrowForward`
+         *  که بقیهٔ صفحه‌های برنامه هم برای «بازگشت» می‌گذارند.
+         */
+        if (onBack != null) {
+          Box(
+            Modifier
+              .size(34.dp)
+              .clip(RoundedCornerShape(12.dp))
+              .background(Color.White.copy(alpha = 0.14f))
+              .clickable(onClick = onBack),
+            contentAlignment = Alignment.Center,
+          ) {
+            Icon(
+              Icons.Filled.ArrowForward,
+              contentDescription = "بازگشت",
+              tint = BAR_INK,
+              modifier = Modifier.size(18.dp),
+            )
+          }
+          Spacer(Modifier.width(8.dp))
+        }
+        Text(
+          title,
+          style = MaterialTheme.typography.titleMedium,
+          color = BAR_INK,
+          fontWeight = FontWeight.Bold,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
+          modifier = Modifier.widthIn(max = titleMax),
+        )
+      }
 
       Row(
         Modifier.horizontalScroll(rememberScrollState()),
@@ -402,29 +447,23 @@ private fun hostWindow(context: android.content.Context): android.view.Window? {
 private fun isNightBar(): Boolean = Shop.colors.bg.luminance() < 0.5f
 
 /**
- *  افکتِ سربرگ — نورِ ملایم، نه تزئینِ شلوغ.
+ *  افکتِ سربرگ — نورِ ملایم و **ساکن**.
  *
- *  سه چیز روی آبی می‌نشیند و هر سه‌شان کم‌رنگ‌اند: یک لکهٔ نورِ سفید در
- *  بالای یک سر، یک لکهٔ فیروزه‌ای در پایینِ سرِ دیگر — همان دو رنگی که
- *  کلِ برنامه دارد — و یک نوارِ نورِ مورب که آرام رد می‌شود. آخری فقط
- *  وقتی حرکت می‌کند که کاربر انیمیشن را خاموش نکرده باشد.
+ *  دو لکهٔ نورِ کم‌رنگ روی آبی می‌نشیند: سفید در بالای یک سر و
+ *  فیروزه‌ای در پایینِ سرِ دیگر — همان دو رنگی که کلِ برنامه دارد.
+ *
+ *  ── چه چیزی از اینجا برداشته شد ───────────────────────────────────
+ *  یک نوارِ نورِ مورب هم بود که بی‌وقفه این‌طرف و آن‌طرف می‌رفت. روی
+ *  سربرگی که در همهٔ صفحه‌ها هست، این یعنی یک انیمیشنِ همیشه‌روشن در
+ *  گوشهٔ چشمِ کاربر و باتری‌ای که برای تزئین می‌رفت. جایش نورهای
+ *  نقطه‌ای است که فقط با زدنِ خودِ کاربر می‌آیند (`Sparks.kt`).
+ *  ──────────────────────────────────────────────────────────────────
  *
  *  خطِ نازکِ پایین تزئین نیست: بدونش، سربرگ و محتوای پشتش در تمِ شب به
  *  هم می‌چسبیدند و لبهٔ گِردِ پایین دیده نمی‌شد.
  */
-@Composable
-private fun Modifier.barGlow(): Modifier {
-  val motion = rememberInfiniteTransition(label = "barGlow")
-  val sweep by motion.animateFloat(
-    initialValue = 0f,
-    targetValue = 1f,
-    animationSpec = infiniteRepeatable(
-      tween(if (Motion.enabled) 7000 else 1, easing = EaseInOutSine),
-      RepeatMode.Reverse,
-    ),
-    label = "barSweep",
-  )
-  return drawBehind {
+private fun Modifier.barGlow(): Modifier =
+  drawBehind {
     drawCircle(
       brush = Brush.radialGradient(
         colors = listOf(Color.White.copy(alpha = 0.20f), Color.Transparent),
@@ -443,17 +482,6 @@ private fun Modifier.barGlow(): Modifier {
       radius = size.height * 1.3f,
       center = Offset(size.width * 0.92f, size.height),
     )
-    if (Motion.enabled) {
-      val x = size.width * sweep
-      drawRect(
-        brush = Brush.linearGradient(
-          colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.10f), Color.Transparent),
-          start = Offset(x - size.width * 0.22f, 0f),
-          end = Offset(x + size.width * 0.22f, size.height),
-        ),
-        size = size,
-      )
-    }
     drawLine(
       color = Color.White.copy(alpha = 0.22f),
       start = Offset(0f, size.height - 0.75f),
@@ -461,7 +489,6 @@ private fun Modifier.barGlow(): Modifier {
       strokeWidth = 1.5f,
     )
   }
-}
 
 /**
  *  نقطهٔ همگام‌سازی — سبز، زرد، قرمز.
@@ -599,6 +626,9 @@ private fun sinceText(at: Long): String {
  *  می‌دهد و نشان آرام نفس می‌کشد. قرمز در تمِ روشن و تاریک همان قرمز است:
  *  «تمام شدن» چیزی نیست که با تمِ گوشی عوض شود.
  *
+ *  تا انگشت رویش است، نور از کناره‌هایش بیرون می‌آید — جای آن برقی که
+ *  تا دیروز بی‌وقفه روی نشان می‌لغزید.
+ *
  *  وضعیت یک بار سنجیده می‌شود، نه با هر بار کشیده شدنِ سربرگ —
  *  سنجیدنِ مجوز یعنی بررسیِ امضای رمزنگاری.
  */
@@ -637,31 +667,24 @@ private fun VipChip(onClick: () -> Unit) {
     else -> "VIP"
   }
 
-  val motion = rememberInfiniteTransition(label = "vipChip")
-  val shine by motion.animateFloat(
-    initialValue = 0f,
-    targetValue = 1f,
-    animationSpec = infiniteRepeatable(
-      tween(if (Motion.enabled) 2600 else 1, easing = EaseInOutSine),
-      RepeatMode.Reverse,
-    ),
-    label = "shine",
-  )
-  //  تپشِ قرمز — کندتر از برقِ طلایی، تا هشدار باشد نه چشمک
-  val beat by motion.animateFloat(
-    initialValue = 0.55f,
-    targetValue = 1f,
-    animationSpec = infiniteRepeatable(
-      tween(if (Motion.enabled) 1200 else 1, easing = EaseInOutSine),
-      RepeatMode.Reverse,
-    ),
-    label = "beat",
-  )
+  //  نور تا وقتی می‌آید که انگشت روی نشان است
+  val press = remember { MutableInteractionSource() }
+  val touched by press.collectIsPressedAsState()
+
+  /*
+   *  تپشِ قرمز — تنها حرکتِ همیشگیِ این نشان.
+   *
+   *  و فقط وقتی اشتراک رو به پایان است: آن‌جا دیده شدن خودش کارِ نشان
+   *  است. در حالتِ طلایی هیچ ساعتی کار نمی‌کند — انیمیشن ساخته هم
+   *  نمی‌شود، نه اینکه ساخته شود و دیده نشود.
+   */
+  val beat = if (urgent) urgentBeat() else 1f
 
   val ink = if (urgent) Color.White else GOLD_INK
   Row(
     Modifier
       .height(36.dp)
+      .edgeSparks(touched, if (urgent) Color(0xFFFF9A92) else Color(0xFFFBE08A))
       .clip(RoundedCornerShape(13.dp))
       .background(
         Brush.linearGradient(
@@ -674,20 +697,7 @@ private fun VipChip(onClick: () -> Unit) {
         if (urgent) Color.White.copy(alpha = beat * 0.8f) else Color.Transparent,
         RoundedCornerShape(13.dp),
       )
-      .drawWithContent {
-        drawContent()
-        if (!Motion.enabled || urgent) return@drawWithContent
-        val x = size.width * shine
-        drawRect(
-          brush = Brush.linearGradient(
-            colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.5f), Color.Transparent),
-            start = Offset(x - size.width * 0.35f, 0f),
-            end = Offset(x + size.width * 0.35f, size.height),
-          ),
-          size = size,
-        )
-      }
-      .clickable(onClick = onClick)
+      .clickable(interactionSource = press, indication = null, onClick = onClick)
       .padding(horizontal = 10.dp),
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -726,13 +736,16 @@ private fun AccountChip(onClick: () -> Unit) {
     ),
     label = "breathe",
   )
+  val press = remember { MutableInteractionSource() }
+  val touched by press.collectIsPressedAsState()
   Box(
     Modifier
       .size(34.dp)
+      .edgeSparks(touched, Color.White)
       .clip(RoundedCornerShape(12.dp))
       .background(Color.White.copy(alpha = 0.16f))
       .border(1.2.dp, Color.White.copy(alpha = breathe * 0.75f), RoundedCornerShape(12.dp))
-      .clickable(onClick = onClick),
+      .clickable(interactionSource = press, indication = LocalIndication.current, onClick = onClick),
     contentAlignment = Alignment.Center,
   ) {
     Icon(
@@ -742,6 +755,22 @@ private fun AccountChip(onClick: () -> Unit) {
       modifier = Modifier.size(18.dp),
     )
   }
+}
+
+/** تپشِ آرامِ هشدار — فقط برای نشانِ اشتراکی که رو به پایان است */
+@Composable
+private fun urgentBeat(): Float {
+  val motion = rememberInfiniteTransition(label = "vipUrgent")
+  val beat by motion.animateFloat(
+    initialValue = 0.55f,
+    targetValue = 1f,
+    animationSpec = infiniteRepeatable(
+      tween(if (Motion.enabled) 1200 else 1, easing = EaseInOutSine),
+      RepeatMode.Reverse,
+    ),
+    label = "beat",
+  )
+  return beat
 }
 
 /** کلیدِ هشدارها — نارنجیِ روشن، تا روی آبیِ سربرگ دیده شود */
