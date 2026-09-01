@@ -215,6 +215,11 @@ fun SaleScreen(
                 onCode = { onBarcode(it) },
                 onStatus = { text, isError -> status = text; statusError = isError },
                 modifier = Modifier.fillMaxSize(),
+                //  سدِ خوانشِ دروغین از همین می‌فهمد کجا سخت بگیرد:
+                //  کالای خودِ دکان همان فریمِ اول می‌رود توی سبد، ولی کدی
+                //  که در فهرست نیست باید چند بار یکسان خوانده شود.
+                //  خوانشِ نصفه تقریباً همیشه از دستهٔ دوم است.
+                isKnown = { index.containsKey(it) },
               )
             },
           )
@@ -228,6 +233,25 @@ fun SaleScreen(
               placeholder = { Text("یا بارکد را دستی وارد کنید") },
               singleLine = true,
               keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Search),
+              /*
+               *  ضربدرِ پاک‌کردن.
+               *
+               *  بارکدِ ناشناس خودش در این کادر می‌نشیند تا گم نشود؛ ولی
+               *  تا حالا برای برداشتنش باید رقم‌به‌رقم پاک می‌شد. حالا یک
+               *  زدن بس است. فقط وقتی چیزی نوشته شده نشان داده می‌شود تا
+               *  کادرِ خالی شلوغ نشود.
+               */
+              trailingIcon = {
+                if (manual.isNotEmpty()) {
+                  IconButton(onClick = { manual = "" }) {
+                    Icon(
+                      Icons.Filled.Close,
+                      contentDescription = "پاک کردن بارکد",
+                      tint = Shop.colors.muted,
+                    )
+                  }
+                }
+              },
               modifier = Modifier.weight(1f),
             )
             Spacer(Modifier.width(8.dp))
