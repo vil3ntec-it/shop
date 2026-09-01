@@ -4,14 +4,13 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -26,8 +25,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -135,32 +138,12 @@ fun BarcodeScanSheet(
               onStatus = { text, isError -> status = text; statusError = isError },
               modifier = Modifier.fillMaxSize(),
             )
-            // کادرِ راهنما، همان چیزی که در صفحهٔ فروش هست
-            Box(
+            //  دیگر کادری نیست — فقط خطِ اسکن روی تصویرِ زنده
+            ScanLine(
               Modifier
-                .fillMaxWidth(0.72f)
-                .height(120.dp)
-                .border(2.dp, Color.White.copy(alpha = 0.85f), RoundedCornerShape(Radius.sm)),
-            ) {
-              val sweep = rememberInfiniteTransition(label = "scan")
-              val y by sweep.animateFloat(
-                initialValue = 0.12f,
-                targetValue = 0.88f,
-                animationSpec = infiniteRepeatable(
-                  tween(if (Motion.enabled) 1600 else 1, easing = LinearEasing),
-                  RepeatMode.Reverse,
-                ),
-                label = "scanline",
-              )
-              Box(
-                Modifier
-                  .fillMaxWidth()
-                  .height(2.dp)
-                  .align(Alignment.TopStart)
-                  .graphicsLayer { translationY = y * 120.dp.toPx() }
-                  .background(Shop.colors.primary)
-              )
-            }
+                .fillMaxWidth(0.82f)
+                .height(150.dp)
+            )
             Box(
               Modifier
                 .align(Alignment.BottomCenter)
@@ -220,4 +203,94 @@ fun ScanIconButton(onClick: () -> Unit) {
       modifier = Modifier.size(21.dp),
     )
   }
+}
+
+/**
+ *  خطِ اسکن — تنها چیزی که روی تصویرِ دوربین کشیده می‌شود.
+ *
+ *  ── چه چیزی برداشته شد ────────────────────────────────────────────
+ *  کادرِ سفیدِ دورِ ناحیهٔ اسکن. دو اشکال داشت: تصویرِ دوربین را
+ *  قاب‌بندی می‌کرد و کاربر گمان می‌کرد بارکد **باید** داخلِ همان کادر
+ *  بیفتد، در حالی که خواندن از کلِ فریم است؛ و آن سفیدیِ تندِ دو
+ *  پیکسلی، در رابطِ تیرهٔ برنامه مثل وصله می‌زد.
+ *  ──────────────────────────────────────────────────────────────────
+ *
+ *  ── چه چیزی جایش آمد ──────────────────────────────────────────────
+ *  یک خطِ افقی که نرم بالا و پایین می‌رود و هرگز نمی‌ایستد. سه چیز
+ *  مدرنش می‌کند:
+ *   • **مغزِ سفید و دو سرِ محو.** خط از میانه سفیدِ داغ است و به دو
+ *     کناره می‌رسد و تمام می‌شود؛ پس لبه‌ای ندارد که مثل کادر دیده شود.
+ *   • **هالهٔ نرم.** پشتِ خط یک درخششِ کم‌رنگ به رنگِ برنامه می‌آید،
+ *     مثل نورِ خودِ بارکدخوان روی جنس.
+ *   • **آرام گرفتن سرِ دو سر.** با `FastOutSlowInEasing` و
+ *     `RepeatMode.Reverse` خط سرِ بالا و پایین آرام می‌گیرد و برمی‌گردد،
+ *     نه اینکه بپرد — همان نرمیِ خواسته‌شده.
+ *  ──────────────────────────────────────────────────────────────────
+ *
+ *  و هزینه‌اش: یک `animateFloat` و دو مستطیل در `drawBehind`. نه لایهٔ
+ *  تازه‌ای ساخته می‌شود نه چیدمانی از نو حساب می‌شود، پس فریم‌های دوربین
+ *  و اسکن دست‌نخورده می‌مانند.
+ */
+@Composable
+fun ScanLine(modifier: Modifier = Modifier) {
+  val tint = Shop.colors.primary
+
+  //  انیمیشن خاموش باشد، خط سرِ جایش می‌ماند — نه اینکه ناپدید شود
+  if (!Motion.enabled) {
+    Box(modifier.drawBehind { scanLine(0.5f, tint) })
+    return
+  }
+
+  val glide = rememberInfiniteTransition(label = "scan")
+  val y by glide.animateFloat(
+    initialValue = 0f,
+    targetValue = 1f,
+    animationSpec = infiniteRepeatable(
+      tween(SCAN_SWEEP_MS, easing = FastOutSlowInEasing),
+      RepeatMode.Reverse,
+    ),
+    label = "scanline",
+  )
+  Box(modifier.drawBehind { scanLine(y, tint) })
+}
+
+/** یک رفت یا یک برگشتِ خط، به میلی‌ثانیه */
+private const val SCAN_SWEEP_MS = 2100
+
+/**
+ *  @param pos جای خط، از ۰ (بالا) تا ۱ (پایین)
+ */
+private fun DrawScope.scanLine(pos: Float, tint: Color) {
+  if (size.height <= 0f || size.width <= 0f) return
+
+  //  کمی از بالا و پایین فاصله می‌گیرد تا به لبهٔ تصویر نچسبد
+  val at = size.height * (0.05f + pos.coerceIn(0f, 1f) * 0.90f)
+
+  //  هالهٔ نرم، پشتِ خط
+  val halo = 26.dp.toPx()
+  drawRect(
+    brush = Brush.verticalGradient(
+      0f to Color.Transparent,
+      0.5f to tint.copy(alpha = 0.20f),
+      1f to Color.Transparent,
+      startY = at - halo,
+      endY = at + halo,
+    ),
+    topLeft = Offset(0f, at - halo),
+    size = Size(size.width, halo * 2f),
+  )
+
+  //  خودِ خط: میانه سفید، دو سر محو
+  val core = 2.dp.toPx()
+  drawRect(
+    brush = Brush.horizontalGradient(
+      0f to Color.Transparent,
+      0.16f to tint.copy(alpha = 0.90f),
+      0.5f to Color.White.copy(alpha = 0.95f),
+      0.84f to tint.copy(alpha = 0.90f),
+      1f to Color.Transparent,
+    ),
+    topLeft = Offset(0f, at - core / 2f),
+    size = Size(size.width, core),
+  )
 }

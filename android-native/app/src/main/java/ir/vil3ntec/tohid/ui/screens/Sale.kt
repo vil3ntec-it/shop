@@ -6,11 +6,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -28,7 +23,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -411,32 +405,12 @@ private fun ScannerFrame(
   ) {
     if (on) {
       scanner()
-      // کادرِ راهنما، همان .scanner-guide — با خطِ اسکنِ نسخهٔ وب
-      Box(
+      //  کادرِ سفید برداشته شد؛ فقط خطِ اسکن می‌ماند. شرحش سرِ `ScanLine`.
+      ScanLine(
         Modifier
-          .fillMaxWidth(0.72f)
-          .height(110.dp)
-          .border(2.dp, Color.White.copy(alpha = 0.85f), RoundedCornerShape(Radius.sm)),
-      ) {
-        val sweep = rememberInfiniteTransition(label = "scan")
-        val y by sweep.animateFloat(
-          initialValue = 0.12f,
-          targetValue = 0.88f,
-          animationSpec = infiniteRepeatable(
-            tween(1600, easing = LinearEasing),
-            RepeatMode.Reverse,
-          ),
-          label = "scanline",
-        )
-        Box(
-          Modifier
-            .fillMaxWidth()
-            .height(2.dp)
-            .align(Alignment.TopStart)
-            .graphicsLayer { translationY = y * 110.dp.toPx() }
-            .background(Shop.colors.primary)
-        )
-      }
+          .fillMaxWidth(0.86f)
+          .height(150.dp)
+      )
       Box(
         Modifier
           .align(Alignment.BottomCenter)
