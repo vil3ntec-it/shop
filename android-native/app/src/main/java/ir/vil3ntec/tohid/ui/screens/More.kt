@@ -107,7 +107,14 @@ fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
         subtitle = "سود، فروش و مصارف در بازهٔ دلخواه",
         onClick = { onOpen("reports") },
       )
-      MoreCard(
+      /*
+       *  سابقهٔ عملیات هم مالِ صاحب و مدیر است، نه شاگرد.
+       *
+       *  سرور از اول همین را می‌گفت (`audit.view` فقط owner و manager)
+       *  ولی ردیفش در برنامه برای همه بود؛ یعنی برنامه چیزی را نشان
+       *  می‌داد که سرور برای شاگرد بسته بود.
+       */
+      if (canManage) MoreCard(
         title = "سابقه عملیات",
         icon = Icons.Filled.ManageSearch,
         tint = Shop.colors.muted,

@@ -417,7 +417,11 @@ fun AppRoot(
         "sales" -> SalesHistoryScreen(store, data, snackbar)
         "reports" -> ReportsScreen(data)
         "receipts" -> ReceiptsScreen(data)
-        "audit" -> AuditLogScreen(data)
+        //  مثلِ تنظیمات، سدِ دوم: اگر از هر راهِ دیگری به این مسیر
+        //  برسد هم برای شاگرد باز نمی‌شود
+        "audit" ->
+          if (ir.vil3ntec.tohid.data.ShopRole.canOpenSettings(context)) AuditLogScreen(data)
+          else LaunchedEffect(Unit) { open("more") }
         //  شاگرد اصلاً واردِ تنظیمات نمی‌شود. ردیفش هم در «بیشتر»
         //  نشان داده نمی‌شود، ولی این یکی سدِ دوم است: اگر از هر راهِ
         //  دیگری به این مسیر برسد، باز هم باز نمی‌شود.
