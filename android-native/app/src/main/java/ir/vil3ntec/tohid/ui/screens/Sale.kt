@@ -37,6 +37,7 @@ import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.qty
+import ir.vil3ntec.tohid.data.BarcodeMatch
 import ir.vil3ntec.tohid.scan.CameraScanner
 import ir.vil3ntec.tohid.scan.ScanFeedback
 import ir.vil3ntec.tohid.scan.ScanGate
@@ -116,7 +117,18 @@ fun SaleScreen(
     if (code.isEmpty()) return
     if (!skipDedup && !gate.accept(code)) return
 
-    val productId = index[code]
+    /*
+     *  شناختنِ کالا — کامل، و اگر نشد از نیمهٔ بارکد.
+     *  قاعده‌اش سرِ `BarcodeMatch` نوشته شده؛ خطِ سرخش یکتا بودن است.
+     */
+    val hit = BarcodeMatch.find(code, index)
+    if (hit is BarcodeMatch.Hit.Several) {
+      ScanFeedback.unknown(context)
+      manual = code
+      toast("${hit.count} کالا با این بخشِ بارکد می‌خوانند — کد را کامل کنید یا از فهرست انتخاب کنید")
+      return
+    }
+    val productId = (hit as? BarcodeMatch.Hit.Product)?.id
     if (productId == null) {
       ScanFeedback.unknown(context)
       // بارکد گم نمی‌شود: هم در کادرِ دستی می‌ماند، هم می‌شود همان‌جا
@@ -146,7 +158,10 @@ fun SaleScreen(
       toast("${product.name} فقط ${qty(added.available)}${if (product.unit.isNotBlank()) " ${product.unit}" else ""} موجود است")
     } else {
       ScanFeedback.ok(context)
-      toast("${product.name} به سبد اضافه شد")
+      //  اگر از نیمهٔ بارکد شناخته شد، همان را بگو — فروشنده باید بداند
+      //  که کدِ کامل خوانده نشده، تا اگر کالا آن نبود بفهمد
+      val whole = (hit as? BarcodeMatch.Hit.Product)?.exact ?: true
+      toast(if (whole) "${product.name} به سبد اضافه شد" else "${product.name} — از نیمهٔ بارکد شناخته شد")
     }
   }
 

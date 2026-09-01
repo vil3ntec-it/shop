@@ -3,14 +3,19 @@ package ir.vil3ntec.tohid.scan
 import android.annotation.SuppressLint
 import android.content.Context
 import android.hardware.camera2.CameraCaptureSession
+import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraMetadata
 import android.hardware.camera2.CaptureRequest
 import android.hardware.camera2.CaptureResult
 import android.hardware.camera2.TotalCaptureResult
 import android.util.Log
 import android.util.Size
+import androidx.camera.camera2.interop.Camera2CameraControl
+import androidx.camera.camera2.interop.Camera2CameraInfo
 import androidx.camera.camera2.interop.Camera2Interop
+import androidx.camera.camera2.interop.CaptureRequestOptions
 import androidx.camera.core.CameraControl
+import androidx.camera.core.CameraInfo
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.FocusMeteringAction
 import androidx.camera.core.ImageAnalysis
@@ -148,6 +153,12 @@ private const val ZOOM_RESET_MS = 3500L
 /** فاصلهٔ کمینهٔ دو تغییرِ بزرگ‌نمایی — تا دوربین تلوتلو نخورد */
 private const val ZOOM_GAP_MS = 700L
 
+/** پس از برگشتن از ماکرو، این‌قدر دوباره سراغش نمی‌رویم */
+private const val MACRO_COOLDOWN_MS = 6_000L
+
+/** متنِ حالتِ عادی — از دو جا نوشته می‌شود، پس یک جا تعریف شده */
+private const val READY_TEXT = "آماده اسکن — بارکد را جلوی دوربین بگیرید"
+
 @SuppressLint("UnsafeOptInUsageError")
 @Composable
 fun CameraScanner(
@@ -236,7 +247,10 @@ fun CameraScanner(
           analysis,
         )
       }.onSuccess { camera ->
-        pilot.attach(camera.cameraControl)
+        pilot.attach(
+          camera.cameraControl,
+          macroCapable = macroCapable(camera.cameraInfo),
+        ) { text -> latestStatus(text, false) }
 
         /*
          *  خواننده **پس از** باز شدنِ دوربین ساخته می‌شود، چون سقفِ
@@ -246,6 +260,9 @@ fun CameraScanner(
         val maxZoom = camera.cameraInfo.zoomState.value?.maxZoomRatio ?: 1f
         val client = buildScanner(maxZoom) { wanted -> pilot.zoomTo(wanted) }
         scanner = client
+        //  سدِ خوانشِ دروغین. یکی برای هر بار باز شدنِ دوربین، چون
+        //  شمارشِ تکرارش مالِ همین نشست است.
+        val guard = BarcodeGuard()
 
         analysis.setAnalyzer(executor) { proxy ->
           val media = proxy.image
@@ -256,12 +273,14 @@ fun CameraScanner(
           val image = InputImage.fromMediaImage(media, proxy.imageInfo.rotationDegrees)
           client.process(image)
             .addOnSuccessListener { codes ->
-              val value = codes.firstOrNull()?.rawValue
-              if (!value.isNullOrBlank()) {
-                pilot.readOk()
-                latestCode(value)
-              } else {
+              val value = codes.firstOrNull { !it.rawValue.isNullOrBlank() }?.rawValue
+              if (value == null) {
                 pilot.nothingRead()
+              } else {
+                //  بارکد دیده شد، پس فوکوس سرِ جایش است — چه این خوانش
+                //  پذیرفته شود چه نه
+                pilot.sawBarcode()
+                if (guard.trust(value)) latestCode(value)
               }
             }
             .addOnFailureListener { Log.d("Tohid", "خواندن فریم ناموفق", it) }
@@ -269,7 +288,7 @@ fun CameraScanner(
             .addOnCompleteListener { proxy.close() }
         }
 
-        latestStatus("آماده اسکن — بارکد را حدود ۲۰ سانتی از دوربین بگیرید", false)
+        latestStatus(READY_TEXT, false)
       }.onFailure {
         latestStatus("دوربین باز نشد: ${it.message ?: "دلیل نامعلوم"}", true)
       }
@@ -347,58 +366,104 @@ private fun buildScanner(maxZoom: Float, onZoom: (Float) -> Boolean): MlKitScann
 }
 
 /**
- *  کِی فوکوس بدهیم، کِی دست نگه داریم، و کِی بزرگ‌نمایی کنیم.
+ *  آیا این دوربین حالتِ فوکوسِ **ماکرو** دارد.
  *
- *  ── چرا از رویِ حالِ دوربین، نه از روی ساعت ────────────────────────
+ *  ماکرو یعنی «نزدیک را ببین». روی گوشی‌هایی که دارند، همان چیزی است که
+ *  بارکدِ چسبیده به لنز را ممکن می‌کند؛ روی آن‌هایی که ندارند، فرستادنِ
+ *  این فرمان بی‌فایده است و نباید فرستاده شود. پس از خودِ دوربین پرسیده
+ *  می‌شود، نه فرض.
+ */
+@SuppressLint("UnsafeOptInUsageError")
+private fun macroCapable(info: CameraInfo): Boolean = runCatching {
+  Camera2CameraInfo.from(info)
+    .getCameraCharacteristic(CameraCharacteristics.CONTROL_AF_AVAILABLE_MODES)
+    ?.contains(CameraMetadata.CONTROL_AF_MODE_MACRO) == true
+}.getOrDefault(false)
+
+/**
+ *  کِی فوکوس بدهیم، کِی ماکرو برویم، کِی حرف بزنیم، و کِی دست نگه داریم.
+ *
+ *  ── قاعده ─────────────────────────────────────────────────────────
  *  فرمانِ فوکوس ارزان نیست و — مهم‌تر — در حالتِ پیوسته یعنی «قفل کن».
- *  اگر همین‌طور بی‌حساب فرستاده شود، جست‌وجوی خودِ دوربین بریده می‌شود و
- *  لنز تار قفل می‌ماند؛ همان چیزی که نسخهٔ قبل را کندتر کرد.
+ *  اگر بی‌حساب فرستاده شود، جست‌وجوی خودِ دوربین بریده می‌شود و لنز تار
+ *  قفل می‌ماند؛ همان چیزی که یک نسخه پیش کار را کندتر کرد.
  *
  *  پس تصمیم را از خودِ دوربین می‌پرسیم. `CONTROL_AF_STATE` هر فریم
  *  می‌گوید کجای کار است:
  *
  *   • **در حالِ جست‌وجو** (`PASSIVE_SCAN` / `ACTIVE_SCAN`) → دست نزن.
- *     دارد کارش را می‌کند؛ هر فرمانی همین را می‌بُرد.
  *   • **تیز** (`PASSIVE_FOCUSED` / `FOCUSED_LOCKED`) → کاری لازم نیست.
- *     شمارشِ تلاش‌ها هم صفر می‌شود.
  *   • **خوابیده یا ناموفق** (`INACTIVE` / `PASSIVE_UNFOCUSED` /
- *     `NOT_FOCUSED_LOCKED`) → **حالا** فرمان بجاست: فوکوس روی ناحیهٔ
- *     مرکزی، با فاصلهٔ کمینهٔ ۱٫۲ ثانیه از فرمانِ قبلی.
- *   • **هیچ** (`null`) → این دوربین فوکوسِ متحرک ندارد (لنزِ ثابت). هر
- *     فرمانی بی‌فایده است.
+ *     `NOT_FOCUSED_LOCKED`) → فوکوس روی ناحیهٔ مرکزی، با فاصلهٔ کمینهٔ
+ *     ۱٫۲ ثانیه از فرمانِ قبلی.
+ *   • **هیچ** (`null`) → این دوربین فوکوسِ متحرک ندارد؛ فرمان بی‌فایده.
  *
- *  و چهار تلاشِ ناموفق پشتِ سرِ هم، بس است: یعنی مشکل فوکوس نیست —
- *  کالا نزدیک‌تر از کمترین فاصلهٔ فوکوس است یا بارکد پاک شده. آن‌جا کارِ
- *  بزرگ‌نمایی و انگشتِ کاربر است، نه حلقهٔ فوکوس. یک خواندنِ موفق یا یک
- *  فریمِ تیز، این سهمیه را از نو پر می‌کند.
+ *  ── و اگر چهار بار نشد: نردبانِ سه‌پله ─────────────────────────────
+ *  چهار تلاشِ ناموفق پشتِ سرِ هم یعنی «چیزی این‌جا با فوکوسِ معمولی درست
+ *  نمی‌شود». گزارشِ کاربر هم همین بود: «هرچه نزدیک می‌برم فوکوس نمی‌شود».
+ *  علتش تقریباً همیشه یکی است — کالا نزدیک‌تر از **کمترین فاصلهٔ فوکوسِ**
+ *  لنز است. آن‌جا:
  *
- *  مهلتِ خودرهایی هم روی دو ثانیه است، پس فوکوسِ نقطه‌ای **قفل نمی‌ماند**
- *  و دوربین به جست‌وجوی پیوسته برمی‌گردد. قفل کردنش (`disableAutoCancel`)
- *  دقیقاً همان اشکالی است که کالای بعدی را تار می‌کند.
+ *   ۱. اگر دوربین حالتِ **ماکرو** دارد، می‌رویم روی ماکرو و یک فرمانِ
+ *      فوکوس می‌فرستیم. ماکرو حالتِ تک‌ضرب است، پس فرمان این‌جا سرِ جای
+ *      خودش است — برخلافِ حالتِ پیوسته که فرمان یعنی قفل.
+ *   ۲. اگر ماکرو هم نشد، برمی‌گردیم روی پیوسته و **به کاربر می‌گوییم**
+ *      کالا را عقب‌تر بگیرد. این مهم‌ترین پلهٔ نردبان است: تا دیروز
+ *      تصویر بی‌صدا تار می‌ماند و آدم ده ثانیه منتظر چیزی می‌شد که
+ *      هیچ‌وقت نمی‌آمد. حالا در همان یکی‌دو ثانیه می‌فهمد باید چه کند.
+ *   ۳. و شش ثانیه سراغِ ماکرو نمی‌رویم، وگرنه دوربین بین دو حالت
+ *      تلوتلو می‌خورد.
+ *
+ *  با اولین بارکدی که دیده شود، همه‌ی این‌ها از نو صفر می‌شوند و متنِ
+ *  عادی برمی‌گردد.
+ *
+ *  مهلتِ خودرهایی روی دو ثانیه است، پس فوکوسِ نقطه‌ای **قفل نمی‌ماند**.
+ *  قفل کردنش (`disableAutoCancel`) همان اشکالی است که کالای بعدی را تار
+ *  می‌کند.
  *  ──────────────────────────────────────────────────────────────────
  *
  *  همه‌ی متدها از رشته‌های مختلف صدا زده می‌شوند — فوکوس از رشتهٔ دوربین،
- *  خواندن از رشتهٔ تحلیل، و انگشت از رشتهٔ اصلی — پس هر چه حالت دارد
+ *  خواندن از رشتهٔ تحلیل، انگشت از رشتهٔ اصلی — پس هر چه حالت دارد
  *  `@Volatile` است و هیچ‌کدام کارِ سنگینی نمی‌کنند.
  */
 private class FocusPilot {
 
   @Volatile private var control: CameraControl? = null
+  @Volatile private var hint: ((String) -> Unit)? = null
+
+  @Volatile private var macroReady = false
+  @Volatile private var macroOn = false
+  @Volatile private var macroLeftAt = 0L
+
   @Volatile private var lastFocusAt = 0L
   @Volatile private var lastReadAt = 0L
   @Volatile private var lastZoomAt = 0L
   @Volatile private var zoom = 1f
   @Volatile private var tries = 0
+  @Volatile private var told = false
 
-  fun attach(cameraControl: CameraControl) {
+  fun attach(
+    cameraControl: CameraControl,
+    macroCapable: Boolean,
+    onHint: (String) -> Unit,
+  ) {
     control = cameraControl
+    hint = onHint
+    macroReady = macroCapable
+    macroOn = false
+    macroLeftAt = 0L
     lastReadAt = 0L
     tries = 0
+    told = false
     zoom = 1f
+    focusCenter(cameraControl)
   }
 
   fun detach() {
+    //  حالتِ ماکرو مالِ همین نشست بود؛ با خودش می‌رود
+    if (macroOn) runCatching { setAfMode(null) }
     control = null
+    hint = null
   }
 
   /** حالِ فوکوس، از زبانِ خودِ دوربین — هر فریم یک بار */
@@ -412,25 +477,26 @@ private class FocusPilot {
       CameraMetadata.CONTROL_AF_STATE_FOCUSED_LOCKED,
       -> {
         tries = 0
+        clearHint()
         return
       }
       else -> nudge()
     }
   }
 
-  /** خوانده شد — فوکوس همان است که باید باشد */
-  fun readOk() {
+  /** بارکد دیده شد — فوکوس همان است که باید باشد */
+  fun sawBarcode() {
     lastReadAt = System.currentTimeMillis()
     tries = 0
+    clearHint()
   }
 
   /**
-   *  فریم آمد و چیزی خوانده نشد.
+   *  فریم آمد و بارکدی دیده نشد.
    *
    *  اینجا فقط بزرگ‌نمایی برمی‌گردد سرِ جایش: اگر ML Kit برای یک بارکدِ
    *  ریز نزدیک کرده بود و آن کالا رفته، ماندنِ بزرگ‌نمایی یعنی کالای
-   *  بعدی از کادر بیرون می‌افتد. فوکوس اینجا کاری ندارد؛ تصمیمش از
-   *  `onFocusState` می‌آید.
+   *  بعدی از کادر بیرون می‌افتد. تصمیمِ فوکوس از `onFocusState` می‌آید.
    */
   fun nothingRead() {
     if (zoom <= 1.01f) return
@@ -459,10 +525,11 @@ private class FocusPilot {
     val cameraControl = control ?: return
     lastFocusAt = System.currentTimeMillis()
     tries = 0
+    clearHint()
     runCatching {
       val point = view.meteringPointFactory.createPoint(x, y)
-      val action = FocusMeteringAction
-        .Builder(point, FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE)
+      val flags = FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE
+      val action = FocusMeteringAction.Builder(point, flags)
         .setAutoCancelDuration(TAP_HOLD_SEC, TimeUnit.SECONDS)
         .build()
       cameraControl.startFocusAndMetering(action)
@@ -473,9 +540,70 @@ private class FocusPilot {
     val cameraControl = control ?: return
     val now = System.currentTimeMillis()
     if (now - lastFocusAt < REFOCUS_GAP_MS) return
-    if (tries >= MAX_TRIES) return
+    if (tries >= MAX_TRIES) {
+      escalate(now)
+      return
+    }
     tries++
     lastFocusAt = now
+    focusCenter(cameraControl)
+  }
+
+  /** پلهٔ بعدیِ نردبان: ماکرو، و اگر آن هم نشد، حرف زدن */
+  private fun escalate(now: Long) {
+    val cameraControl = control ?: return
+    if (!macroOn) {
+      if (!macroReady || now - macroLeftAt < MACRO_COOLDOWN_MS) {
+        tellTooClose()
+        return
+      }
+      macroOn = true
+      tries = 0
+      lastFocusAt = now
+      setAfMode(CameraMetadata.CONTROL_AF_MODE_MACRO)
+      focusCenter(cameraControl)
+      return
+    }
+    //  ماکرو هم نتوانست: برگرد سرِ پیوسته و بگو چه کند
+    macroOn = false
+    macroLeftAt = now
+    lastFocusAt = now
+    setAfMode(null)
+    tellTooClose()
+  }
+
+  private fun tellTooClose() {
+    if (told) return
+    told = true
+    hint?.invoke("فوکوس نمی‌شود — کالا را کمی عقب‌تر، حدود ۲۰ سانتی، بگیرید")
+  }
+
+  private fun clearHint() {
+    if (!told) return
+    told = false
+    hint?.invoke(READY_TEXT)
+  }
+
+  /**
+   *  حالتِ فوکوس را در **زمانِ اجرا** عوض می‌کند؛ `null` یعنی دست بردار
+   *  و اختیار را به CameraX برگردان.
+   *
+   *  `setCaptureRequestOptions` هر چه پیش‌تر از این راه گفته شده بود پاک
+   *  می‌کند، و ما از این راه چیزی جز همین یک تنظیم نمی‌گوییم — پس
+   *  سازندهٔ خالی یعنی «هیچ».
+   */
+  @SuppressLint("UnsafeOptInUsageError")
+  private fun setAfMode(mode: Int?) {
+    val cameraControl = control ?: return
+    runCatching {
+      val options = CaptureRequestOptions.Builder()
+      if (mode != null) options.setCaptureRequestOption(CaptureRequest.CONTROL_AF_MODE, mode)
+      Camera2CameraControl.from(cameraControl).setCaptureRequestOptions(options.build())
+    }
+  }
+
+  private fun focusCenter(cameraControl: CameraControl) {
+    lastFocusAt = System.currentTimeMillis()
     runCatching {
       /*
        *  نقطه بر حسبِ کسری از خودِ فریم داده می‌شود، پس نه به اندازهٔ نما
@@ -486,7 +614,8 @@ private class FocusPilot {
       val center = SurfaceOrientedMeteringPointFactory(1f, 1f)
         .createPoint(0.5f, 0.5f, CENTER_REGION)
       //  نور را هم همان‌جا بسنج: بارکدِ سفید زیرِ نورِ تندِ دکان می‌سوزد
-      //  و ناخوانا می‌شود
+      //  و ناخوانا می‌شود — و همین سنجشِ ناحیه‌ای است که وقتی لامپ سرِ
+      //  نصفِ بارکد افتاده، آن نصفِ دیگر را قابلِ خواندن نگه می‌دارد
       val flags = FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE
       val action = FocusMeteringAction.Builder(center, flags)
         .setAutoCancelDuration(AUTO_HOLD_SEC, TimeUnit.SECONDS)
