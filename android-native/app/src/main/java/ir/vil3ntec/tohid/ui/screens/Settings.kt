@@ -322,7 +322,7 @@ fun SettingsScreen(
                   //  می‌بیند
                   auth.login(identifier.trim(), password)
                     .onSuccess { session ->
-                      state.accountName = session.user.name
+                      state.rememberAccount(session.user)
                       SavedLogins.remember(context, identifier.trim(), session.user.name)
                       signedIn = true
                       password = ""

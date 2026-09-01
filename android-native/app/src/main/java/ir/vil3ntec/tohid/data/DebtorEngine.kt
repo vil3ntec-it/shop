@@ -161,6 +161,8 @@ object DebtorEngine {
     val received: Double,
     val balance: Double,
     val transactions: List<DebtTransaction>,
+    /** قدیمی‌ترین قرضِ پس‌داده‌نشده از کِی است — `null` یعنی بدهکار نیست */
+    val since: Long? = null,
   )
 
   fun account(d: ShopData, id: String): Account? {
@@ -172,8 +174,82 @@ object DebtorEngine {
       received = mine.filter { it.type == "receive" }.sumOf { it.amount },
       balance = ShopStore.debt(d, id),
       transactions = mine,
+      since = debtSince(d, id),
     )
   }
+
+  /* ------------------------------ مدتِ قرض ------------------------------ */
+
+  /**
+   *  این قرض از کِی روی گردنِ اوست — یا `null` اگر حسابش بدهکار نیست.
+   *
+   *  ── چرا اولین تراکنش جواب نیست ────────────────────────────────────
+   *  ساده‌ترین راه این بود که تاریخِ اولین «give» را برگردانیم. ولی
+   *  مشتریِ همیشگیِ دکان از سه سال پیش خرید و پس داده و باز خرید؛ با آن
+   *  حساب، قرضِ دیروزش «۳ سال» نشان داده می‌شد و کنارِ کسی می‌نشست که
+   *  واقعاً سه سال پول نداده. آن‌وقت این عدد به هیچ کاری نمی‌آمد.
+   *  ──────────────────────────────────────────────────────────────────
+   *
+   *  پس حساب «اول‌آمده، اول‌رفته» است: هر پولی که می‌گیریم، از قدیمی‌ترین
+   *  قرضِ باز کم می‌شود. آنچه ته می‌ماند، قدیمی‌ترین قرضی است که هنوز
+   *  پس داده نشده و تاریخِ همان، جوابِ «چند وقت است».
+   *
+   *  پیش‌پرداخت هم حساب می‌شود: پولی که پیش از هر قرضی داده شده، روی
+   *  اولین قرضِ بعدی می‌نشیند.
+   */
+  fun debtSince(d: ShopData, debtorId: String): Long? {
+    val mine = d.transactions
+      .filter { it.debtorId == debtorId }
+      .sortedWith(compareBy<DebtTransaction>({ it.date }, { it.createdAt }))
+    if (mine.isEmpty()) return null
+
+    //  (زمانِ قرض، آنچه از آن مانده) — قدیمی‌ترین همیشه اول
+    val open = ArrayDeque<Pair<Long, Double>>()
+    var credit = 0.0
+    for (t in mine) {
+      if (t.amount <= 0) continue
+      if (t.type == "give") {
+        var left = t.amount
+        if (credit > 0) {
+          val used = minOf(credit, left)
+          credit -= used
+          left -= used
+        }
+        if (left > EPSILON) open.addLast(txMillis(t) to left)
+      } else {
+        var pay = t.amount
+        while (pay > EPSILON && open.isNotEmpty()) {
+          val (at, left) = open.removeFirst()
+          if (left - pay > EPSILON) {
+            open.addFirst(at to (left - pay))
+            pay = 0.0
+          } else {
+            pay -= left
+          }
+        }
+        if (pay > EPSILON) credit += pay
+      }
+    }
+    return open.firstOrNull()?.first
+  }
+
+  /** چند روز است که بدهکار است — `null` یعنی بدهکار نیست */
+  fun debtDays(d: ShopData, debtorId: String, now: Long = System.currentTimeMillis()): Long? {
+    val since = debtSince(d, debtorId) ?: return null
+    return ((now - since) / 86_400_000L).coerceAtLeast(0)
+  }
+
+  /**
+   *  ساعتِ یک تراکنش.
+   *
+   *  `createdAt` دقیق‌تر است ولی همیشه نیست: ردیف‌هایی که از فایلِ
+   *  پشتیبانِ نسخه‌های قدیمی یا از نسخهٔ وب آمده‌اند فقط `date` دارند.
+   */
+  private fun txMillis(t: DebtTransaction): Long =
+    if (t.createdAt > 0) t.createdAt else ir.vil3ntec.tohid.isoMillis(t.date)
+
+  /** کسری‌های ریزِ اعشار، «صفر» حساب می‌شوند */
+  private const val EPSILON = 0.001
 
   /** حالِ حساب، با همان جمله‌های نسخهٔ وب */
   fun stateText(balance: Double): String = when {

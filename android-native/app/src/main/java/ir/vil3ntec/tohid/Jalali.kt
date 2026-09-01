@@ -112,6 +112,45 @@ fun formatDate(iso: String): String {
   return "${j.year}/$mm/$dd"
 }
 
+/**
+ *  رشتهٔ `YYYY-MM-DD` به ساعتِ میلی‌ثانیه‌ای — نیمروزِ همان روز.
+ *
+ *  نیمروز، نه نیمه‌شب: تراکنش‌ها فقط روز دارند و اگر ساعتِ صفر گرفته
+ *  شوند، اختلافِ منطقهٔ زمانی می‌تواند روز را یکی عقب ببرد و «۱ روز
+ *  پیش» به «امروز» تبدیل شود.
+ *
+ *  خواندنی نبود؟ صفر برمی‌گردد — صدازننده خودش تصمیم می‌گیرد.
+ */
+fun isoMillis(iso: String): Long {
+  val parts = iso.trim().split('-')
+  if (parts.size < 3) return 0L
+  val y = parts[0].toIntOrNull() ?: return 0L
+  val m = parts[1].toIntOrNull() ?: return 0L
+  val d = parts[2].take(2).toIntOrNull() ?: return 0L
+  return runCatching {
+    java.util.Calendar.getInstance().apply {
+      clear()
+      set(y, m - 1, d, 12, 0, 0)
+    }.timeInMillis
+  }.getOrDefault(0L)
+}
+
+/**
+ *  ساعتِ خام به تاریخِ خورشیدی.
+ *
+ *  چیزهایی که از سرور می‌آیند — پایانِ اشتراک، روزِ ساختنِ حساب — ساعتِ
+ *  میلی‌ثانیه‌ای‌اند، نه رشتهٔ `YYYY-MM-DD`. تبدیل یک جا انجام می‌شود تا
+ *  هر صفحه از نو تقویم نسازد.
+ */
+fun formatMillis(at: Long): String {
+  if (at <= 0) return "—"
+  val c = java.util.Calendar.getInstance().apply { timeInMillis = at }
+  val y = c.get(java.util.Calendar.YEAR)
+  val m = (c.get(java.util.Calendar.MONTH) + 1).toString().padStart(2, '0')
+  val d = c.get(java.util.Calendar.DAY_OF_MONTH).toString().padStart(2, '0')
+  return formatDate("$y-$m-$d")
+}
+
 /** تاریخِ امروزِ دستگاه به شکلِ `YYYY-MM-DD` — همان `todayISO` نسخهٔ وب */
 fun todayIso(): String {
   val c = java.util.Calendar.getInstance()

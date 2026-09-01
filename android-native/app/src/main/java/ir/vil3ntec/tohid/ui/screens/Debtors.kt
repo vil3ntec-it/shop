@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -26,6 +27,8 @@ import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -47,7 +50,10 @@ import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.formatDate
 import ir.vil3ntec.tohid.money
+import ir.vil3ntec.tohid.daysText
+import ir.vil3ntec.tohid.formatMillis
 import ir.vil3ntec.tohid.plain
+import ir.vil3ntec.tohid.spanText
 import ir.vil3ntec.tohid.todayIso
 import ir.vil3ntec.tohid.ui.theme.Radius
 import ir.vil3ntec.tohid.ui.theme.Shop
@@ -65,6 +71,10 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
   val scope = rememberCoroutineScope()
 
   var search by rememberSaveable { mutableStateOf("") }
+  //  ترتیبِ فهرست بین باز و بسته شدنِ صفحه می‌ماند: کسی که «قدیمی‌ترین
+  //  قرض» را انتخاب کرده، هر بار از نو انتخابش نمی‌کند
+  var sortName by rememberSaveable { mutableStateOf(DebtorSort.MOST.name) }
+  val sort = runCatching { DebtorSort.valueOf(sortName) }.getOrDefault(DebtorSort.MOST)
   var openId by rememberSaveable { mutableStateOf<String?>(null) }
   var form by remember { mutableStateOf<DebtorFormState?>(null) }
   var txFor by remember { mutableStateOf<Pair<String, DebtorEngine.Kind>?>(null) }
@@ -104,13 +114,22 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
       onDeleteTx = { confirmTx = it },
     )
   } else {
-    val rows = d.debtors
-      .filter {
-        search.isBlank() || it.name.contains(search.trim(), ignoreCase = true) ||
-          it.phone.contains(search.trim())
-      }
-      .map { it to ShopStore.debt(d, it.id) }
-      .sortedByDescending { it.second }
+    /*
+     *  ردیف‌ها یک بار حساب می‌شوند، نه با هر کشیدنِ فهرست.
+     *
+     *  مدتِ قرضِ هر نفر از همهٔ تراکنش‌هایش حساب می‌شود؛ در دکانی با صد
+     *  قرض‌دار و هزار تراکنش، انجامِ این کار در هر بار کشیده شدنِ صفحه
+     *  اسکرول را کند می‌کرد.
+     */
+    val term = search.trim()
+    val rows = remember(d, term, sort) {
+      d.debtors
+        .filter {
+          term.isBlank() || it.name.contains(term, ignoreCase = true) || it.phone.contains(term)
+        }
+        .map { DebtorRow(it, ShopStore.debt(d, it.id), DebtorEngine.debtDays(d, it.id)) }
+        .sortedWith(sort.order)
+    }
 
     Box(Modifier.fillMaxSize()) {
       // شبکهٔ کارت‌ها — همان `.debtor-list` نسخهٔ وب. قرض‌دار در یک نگاه
@@ -130,7 +149,7 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
           Column {
             Spacer(Modifier.height(14.dp))
 
-            val owed = rows.sumOf { it.second.coerceAtLeast(0.0) }
+            val owed = rows.sumOf { it.balance.coerceAtLeast(0.0) }
             StatTile(
               label = "جمع طلب از مشتریان",
               value = "${money(owed)} افغانی",
@@ -145,6 +164,18 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
               onValueChange = { search = it },
               label = "جستجوی نام یا شماره",
             )
+            Spacer(Modifier.height(10.dp))
+
+            /*
+             *  ترتیبِ فهرست، در دسترسِ همان صفحه.
+             *
+             *  «کی بیشتر برده» و «قرضِ کی مانده‌تر است» دو سؤالِ جدا
+             *  هستند و تا امروز فهرست فقط جوابِ اولی را می‌داد (همیشه
+             *  بیشترین مبلغ اول). دومی را کسی نمی‌توانست ببیند، در حالی
+             *  که در دکان همان مهم‌تر است: قرضِ کوچکی که شش ماه مانده،
+             *  از قرضِ بزرگِ دیروز بدتر است.
+             */
+            DebtorSortRow(current = sort, count = rows.size) { sortName = it.name }
             Spacer(Modifier.height(4.dp))
           }
         }
@@ -170,14 +201,15 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
             }
           }
         } else {
-          itemsIndexed(rows, key = { _, row -> row.first.id }) { index, (debtor, balance) ->
+          itemsIndexed(rows, key = { _, row -> row.debtor.id }) { index, row ->
             StaggeredItem(index) {
               DebtorCard(
-                debtor = debtor,
-                balance = balance,
-                onOpen = { openId = debtor.id },
-                onEdit = { form = DebtorFormState.of(debtor) },
-                onDelete = { confirmDelete = debtor },
+                debtor = row.debtor,
+                balance = row.balance,
+                days = row.days,
+                onOpen = { openId = row.debtor.id },
+                onEdit = { form = DebtorFormState.of(row.debtor) },
+                onDelete = { confirmDelete = row.debtor },
               )
             }
           }
@@ -279,6 +311,93 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
 
 /* ============================ تکه‌ها ============================ */
 
+/** یک ردیفِ فهرست: خودِ قرض‌دار، مانده‌اش، و چند روز است که بدهکار است */
+private data class DebtorRow(
+  val debtor: Debtor,
+  val balance: Double,
+  /** `null` یعنی بدهکار نیست */
+  val days: Long?,
+)
+
+/**
+ *  ترتیبِ فهرستِ قرض‌داران.
+ *
+ *  چهار تا، نه بیشتر: هر ترتیبِ اضافه یک تراشهٔ دیگر در ردیف است و
+ *  انتخاب را سخت‌تر می‌کند، نه آسان‌تر.
+ */
+private enum class DebtorSort(val label: String, val order: Comparator<DebtorRow>) {
+  /** بیشترین مبلغ اول — همان ترتیبی که فهرست از روزِ اول داشت */
+  MOST("بیشترین قرض", compareByDescending<DebtorRow> { it.balance }),
+
+  /** کمترین اول؛ کسی که پیشِ ما موجودی دارد (مانده‌ی منفی) سرِ فهرست */
+  LEAST("کمترین قرض", compareBy<DebtorRow> { it.balance }),
+
+  /**
+   *  قرضی که بیشتر مانده، اول.
+   *
+   *  کسی که بدهکار نیست (`days == null`) ته می‌رود، نه اول: `-1` او را
+   *  از هر مدتی کوچک‌تر می‌کند.
+   */
+  OLDEST(
+    "قدیمی‌ترین قرض",
+    compareByDescending<DebtorRow> { it.days ?: -1L }.thenByDescending { it.balance },
+  ),
+
+  NAME("بر اساس نام", compareBy<DebtorRow> { it.debtor.name }),
+}
+
+/** ردیفِ تراشه‌های ترتیب — روی گوشیِ باریک افقی اسکرول می‌شود */
+@Composable
+private fun DebtorSortRow(current: DebtorSort, count: Int, onPick: (DebtorSort) -> Unit) {
+  val colors = Shop.colors
+  Row(
+    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+    horizontalArrangement = Arrangement.spacedBy(6.dp),
+    verticalAlignment = Alignment.CenterVertically,
+  ) {
+    //  شمارنده تراشه نیست، پس زده نمی‌شود: فقط می‌گوید فهرست چند تاست
+    Text(
+      "${plain(count)} مورد",
+      style = MaterialTheme.typography.labelSmall,
+      color = colors.muted2,
+      modifier = Modifier.padding(end = 2.dp),
+    )
+    DebtorSort.entries.forEach { option ->
+      val picked = option == current
+      Row(
+        Modifier
+          .clip(RoundedCornerShape(999.dp))
+          .background(if (picked) colors.primary else colors.surface)
+          .border(
+            1.dp,
+            if (picked) colors.primary else colors.border,
+            RoundedCornerShape(999.dp),
+          )
+          .clickable { onPick(option) }
+          .padding(horizontal = 11.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+      ) {
+        if (picked) {
+          Icon(
+            Icons.Filled.Check,
+            contentDescription = null,
+            tint = Color.White,
+            modifier = Modifier.size(13.dp),
+          )
+        }
+        Text(
+          option.label,
+          style = MaterialTheme.typography.labelMedium,
+          color = if (picked) Color.White else colors.muted,
+          fontWeight = if (picked) FontWeight.Bold else FontWeight.Normal,
+          maxLines = 1,
+        )
+      }
+    }
+  }
+}
+
 /**
  *  کارتِ قرض‌دار — همان `.debtor-card` نسخهٔ وب.
  *
@@ -293,6 +412,8 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
 private fun DebtorCard(
   debtor: Debtor,
   balance: Double,
+  /** چند روز است که بدهکار است — `null` یعنی نیست */
+  days: Long?,
   onOpen: () -> Unit,
   onEdit: () -> Unit,
   onDelete: () -> Unit,
@@ -341,6 +462,40 @@ private fun DebtorCard(
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
       )
+
+      /*
+       *  چند وقت است که این قرض مانده.
+       *
+       *  مبلغ نصفِ حرف است: «۵۰۰ افغانی» از دیروز یک چیز است و از پنج
+       *  ماه پیش چیزِ دیگری. از یک ماه به بالا پررنگ‌تر می‌شود تا در
+       *  یک نگاه از بقیه جدا باشد.
+       */
+      if (days != null) {
+        Spacer(Modifier.height(5.dp))
+        val stale = days >= 30
+        Row(
+          Modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(if (stale) tint.copy(alpha = 0.16f) else Shop.colors.bg.copy(alpha = 0.7f))
+            .padding(horizontal = 7.dp, vertical = 3.dp),
+          verticalAlignment = Alignment.CenterVertically,
+          horizontalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+          Icon(
+            Icons.Filled.Schedule,
+            contentDescription = null,
+            tint = if (stale) tint else Shop.colors.muted2,
+            modifier = Modifier.size(11.dp),
+          )
+          Text(
+            daysText(days),
+            style = MaterialTheme.typography.labelSmall,
+            color = if (stale) tint else Shop.colors.muted,
+            fontWeight = if (stale) FontWeight.Bold else FontWeight.Normal,
+            maxLines = 1,
+          )
+        }
+      }
     }
 
     CornerButton(
@@ -432,6 +587,31 @@ private fun AccountView(
       if (account.debtor.notes.isNotBlank()) {
         Spacer(Modifier.height(4.dp))
         Text(account.debtor.notes, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2)
+      }
+
+      //  «چند وقت است بدهکار است» — با تاریخِ همان قرض، تا بشود سرش حرف زد
+      account.since?.let { since ->
+        Spacer(Modifier.height(8.dp))
+        Row(
+          Modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(Shop.colors.dangerTint)
+            .padding(horizontal = 10.dp, vertical = 5.dp),
+          verticalAlignment = Alignment.CenterVertically,
+          horizontalArrangement = Arrangement.spacedBy(5.dp),
+        ) {
+          Icon(
+            Icons.Filled.Schedule,
+            contentDescription = null,
+            tint = Shop.colors.danger,
+            modifier = Modifier.size(13.dp),
+          )
+          Text(
+            "${spanText(since)} است که بدهکار است — از ${formatMillis(since)}",
+            style = MaterialTheme.typography.labelMedium,
+            color = Shop.colors.danger,
+          )
+        }
       }
       Spacer(Modifier.height(14.dp))
 

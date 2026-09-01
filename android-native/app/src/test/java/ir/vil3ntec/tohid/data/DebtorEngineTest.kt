@@ -188,4 +188,86 @@ class DebtorEngineTest {
   fun `حساب صاف همان جمله ی نسخه ی وب را می دهد`() {
     assertEquals("حساب صاف است", DebtorEngine.stateText(0.0))
   }
+
+  /* --------------------------- مدتِ قرض --------------------------- */
+
+  private fun tx(
+    d: ShopData,
+    kind: DebtorEngine.Kind,
+    amount: Double,
+    date: String,
+    at: Long,
+  ): ShopData = ok(
+    DebtorEngine.addTransaction(d, "d1", kind, amount, date, "", "2026-08-28", at, ::newId)
+  ).data
+
+  @Test
+  fun `حساب صاف مدت قرض ندارد`() {
+    var d = tx(base, DebtorEngine.Kind.GIVE, 1000.0, "2026-08-01", 100)
+    d = tx(d, DebtorEngine.Kind.RECEIVE, 1000.0, "2026-08-05", 200)
+    assertEquals(null, DebtorEngine.debtSince(d, "d1"))
+    assertEquals(null, DebtorEngine.debtDays(d, "d1"))
+  }
+
+  @Test
+  fun `قرض داری که تراکنشی ندارد مدت هم ندارد`() {
+    assertEquals(null, DebtorEngine.debtSince(base, "d1"))
+  }
+
+  @Test
+  fun `مدت از قدیمی ترین قرضِ پس داده نشده حساب می شود`() {
+    var d = tx(base, DebtorEngine.Kind.GIVE, 1000.0, "2026-08-01", 100)
+    d = tx(d, DebtorEngine.Kind.GIVE, 500.0, "2026-08-20", 200)
+    //  هزار گرفته شد: قرضِ اولِ کامل صاف می‌شود و فقط دومی می‌ماند
+    d = tx(d, DebtorEngine.Kind.RECEIVE, 1000.0, "2026-08-25", 300)
+    assertEquals(500.0, ShopStore.debt(d, "d1"), 0.0)
+    assertEquals(200L, DebtorEngine.debtSince(d, "d1"))
+  }
+
+  @Test
+  fun `پرداختِ نصفه، قرضِ قدیمی را باز نگه می دارد`() {
+    var d = tx(base, DebtorEngine.Kind.GIVE, 1000.0, "2026-08-01", 100)
+    d = tx(d, DebtorEngine.Kind.GIVE, 500.0, "2026-08-20", 200)
+    d = tx(d, DebtorEngine.Kind.RECEIVE, 400.0, "2026-08-25", 300)
+    assertEquals(1100.0, ShopStore.debt(d, "d1"), 0.0)
+    //  از قرضِ اول ۶۰۰ مانده، پس تاریخِ همان است
+    assertEquals(100L, DebtorEngine.debtSince(d, "d1"))
+  }
+
+  @Test
+  fun `پیش پرداخت روی قرضِ بعدی می نشیند`() {
+    var d = tx(base, DebtorEngine.Kind.RECEIVE, 300.0, "2026-08-01", 100)
+    d = tx(d, DebtorEngine.Kind.GIVE, 200.0, "2026-08-10", 200)
+    //  ۳۰۰ پیش داده و ۲۰۰ برده: هنوز بدهکار نیست
+    assertEquals(-100.0, ShopStore.debt(d, "d1"), 0.0)
+    assertEquals(null, DebtorEngine.debtSince(d, "d1"))
+
+    d = tx(d, DebtorEngine.Kind.GIVE, 400.0, "2026-08-15", 300)
+    assertEquals(300.0, ShopStore.debt(d, "d1"), 0.0)
+    assertEquals(300L, DebtorEngine.debtSince(d, "d1"))
+  }
+
+  @Test
+  fun `ردیفِ بدونِ ساعت، از تاریخش خوانده می شود`() {
+    //  ردیف‌های نسخهٔ وب و فایلِ پشتیبانِ قدیمی `createdAt` ندارند
+    val d = base.copy(
+      transactions = listOf(
+        DebtTransaction(id = "t1", debtorId = "d1", type = "give", amount = 900.0, date = "2026-08-01"),
+      )
+    )
+    assertEquals(ir.vil3ntec.tohid.isoMillis("2026-08-01"), DebtorEngine.debtSince(d, "d1"))
+  }
+
+  @Test
+  fun `روزهای قرض از همان تاریخ شمرده می شود`() {
+    val d = base.copy(
+      transactions = listOf(
+        DebtTransaction(id = "t1", debtorId = "d1", type = "give", amount = 900.0, date = "2026-08-01"),
+      )
+    )
+    val since = ir.vil3ntec.tohid.isoMillis("2026-08-01")
+    assertEquals(10L, DebtorEngine.debtDays(d, "d1", since + 10 * 86_400_000L))
+    //  ساعتِ عقب‌رفتهٔ گوشی، عددِ منفی نمی‌دهد
+    assertEquals(0L, DebtorEngine.debtDays(d, "d1", since - 86_400_000L))
+  }
 }

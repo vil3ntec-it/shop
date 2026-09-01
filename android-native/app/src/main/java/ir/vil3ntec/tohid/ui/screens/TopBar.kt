@@ -8,6 +8,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -22,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.HourglassBottom
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Person
@@ -32,10 +34,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowCompat
 import ir.vil3ntec.tohid.data.BackupClock
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
@@ -60,6 +68,32 @@ import ir.vil3ntec.tohid.ui.theme.ThemeChoice
 
 /** نارنجیِ هشدار — از تم نمی‌آید چون در تمِ روشن و تاریک باید همین باشد */
 private val ALERT_ORANGE = Color(0xFFF08A24)
+
+/**
+ *  آبیِ سربرگ.
+ *
+ *  ── چرا در تمِ روشن هم آبیِ تیره ────────────────────────────────────
+ *  سربرگ تا دیروز هم‌رنگِ زمینه بود: در تمِ روشن یک نوارِ سفید با شش
+ *  دکمهٔ ریز که هیچ‌کدام از زمینه جدا نمی‌شدند، و نامِ صفحه هم وسطِ
+ *  همان سفیدی گم می‌شد. آبیِ تیره دو کار می‌کند: بالای صفحه یک «سر»
+ *  پیدا می‌کند که چشم اول سراغش می‌رود، و دکمه‌های رویش — که سفیدِ
+ *  نیم‌شفاف‌اند — بی‌نیاز از خطِ دور دیده می‌شوند.
+ *  ──────────────────────────────────────────────────────────────────
+ *
+ *  در شب کمی تیره‌تر است تا کنارِ زمینهٔ سرمه‌ای، پله‌اش زیاد نباشد.
+ */
+private val BAR_DAY = listOf(Color(0xFF073E78), Color(0xFF0F62B4), Color(0xFF1E86D6))
+private val BAR_NIGHT = listOf(Color(0xFF04121F), Color(0xFF0B2E52), Color(0xFF11487A))
+
+/** جوهرِ روی سربرگ — همیشه روشن، چون زیرش همیشه آبیِ تیره است */
+private val BAR_INK = Color(0xFFF4FAFF)
+private val BAR_INK_SOFT = Color(0xFFC7DEF4)
+
+/** نارنجیِ روی آبی — روشن‌تر از `ALERT_ORANGE` که برای زمینهٔ روشن است */
+private val BAR_ALERT = Color(0xFFFFC06A)
+
+/** قرمزِ «اشتراک دارد تمام می‌شود» — در هر دو تم همین */
+private val URGENT_RED = listOf(Color(0xFFF06A62), Color(0xFFD8352C), Color(0xFFB0231C))
 
 /** قهوه‌ایِ تیرهٔ روی طلا — همان که در صفحهٔ اشتراک است */
 private val GOLD_INK = Color(0xFF3A2705)
@@ -93,7 +127,7 @@ private fun subscriptionAlert(
 
     ir.vil3ntec.tohid.sync.License.State.ACTIVE -> {
       val left = status.daysLeft()
-      if (left in 0..WARN_DAYS) {
+      if (left in 0..SUBSCRIPTION_WARN_DAYS) {
         Alert(
           if (left <= 0) "امروز" else "${left.fa()} روز",
           "اشتراک رو به پایان است",
@@ -110,8 +144,14 @@ private fun subscriptionAlert(
   }
 }
 
-/** از این تعداد روز به بعد، خبر داده می‌شود */
-private const val WARN_DAYS = 7
+/**
+ *  مرزِ «رو به پایان» — یک هفته.
+ *
+ *  یک جا نوشته شده و سه جا خوانده می‌شود: هشدارِ زنگ، رنگِ نشانِ سربرگ،
+ *  و کارتِ وضعیت در صفحهٔ اشتراک. اگر هرکدام عددِ خودش را داشت، کاربر
+ *  نشانِ قرمز می‌دید و در صفحهٔ اشتراک «همه‌چیز مرتب است».
+ */
+const val SUBSCRIPTION_WARN_DAYS = 7
 
 /** همان هشدارهایی که نسخهٔ وب در زنگ نشان می‌دهد */
 @Composable
@@ -217,55 +257,88 @@ fun TohidTopBar(
   val alerts = rememberAlerts(d)
   var alertsOpen by remember { mutableStateOf(false) }
 
-  Row(
+  //  ساعت و باتریِ گوشی روی آبیِ تیره می‌نشینند، پس باید سفید باشند.
+  //  با رفتنِ سربرگ از صفحه، همان‌طور که بود برمی‌گردد — صفحهٔ قفل و
+  //  صفحهٔ ورود زمینهٔ روشن دارند و آنجا آیکنِ سفید دیده نمی‌شود.
+  val view = LocalView.current
+  DisposableEffect(view) {
+    val bars = hostWindow(view.context)?.let { WindowCompat.getInsetsController(it, view) }
+    val before = bars?.isAppearanceLightStatusBars
+    bars?.isAppearanceLightStatusBars = false
+    onDispose { if (bars != null && before != null) bars.isAppearanceLightStatusBars = before }
+  }
+
+  /*
+   *  نامِ صفحه از یک جایی به بعد پهن‌تر نمی‌شود.
+   *
+   *  ردیفِ دکمه‌ها دومین فرزندِ این `Row` است و آنچه از پهنا مانده باشد
+   *  را می‌گیرد. اگر نام سقف نداشت، روی گوشیِ باریک نامِ بلند («خرید و
+   *  تأمین‌کننده») تمامِ عرض را می‌گرفت و ردیفِ دکمه‌ها بیرونِ صفحه
+   *  می‌ماند؛ اسکرولِ افقی هم چیزی را که پهنا نگرفته نمی‌تواند نشان
+   *  بدهد.
+   */
+  val screenWidth = LocalConfiguration.current.screenWidthDp
+  val titleMax: Dp = (screenWidth * if (isTablet()) 0.5f else 0.38f).dp
+
+  Box(
     Modifier
       .fillMaxWidth()
-      // سربرگ زیرِ نوارِ وضعیتِ گوشی می‌رفت و ساعت و باتری روی دکمه‌ها
-      // می‌افتاد. این padding همان بلندیِ نوارِ وضعیت را کنار می‌گذارد،
-      // هر اندازه‌ای که روی آن دستگاه باشد — بریدگیِ دوربین هم همین‌طور.
-      .windowInsetsPadding(WindowInsets.statusBars)
-      .padding(horizontal = 14.dp, vertical = 10.dp),
-    verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.SpaceBetween,
+      .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
+      .background(Brush.linearGradient(if (isNightBar()) BAR_NIGHT else BAR_DAY))
+      .barGlow()
   ) {
-    Text(
-      title,
-      style = MaterialTheme.typography.titleMedium,
-      color = Shop.colors.text,
-      fontWeight = FontWeight.Bold,
-    )
-
     Row(
-      Modifier.horizontalScroll(rememberScrollState()),
+      Modifier
+        .fillMaxWidth()
+        // سربرگ زیرِ نوارِ وضعیتِ گوشی می‌رفت و ساعت و باتری روی دکمه‌ها
+        // می‌افتاد. این padding همان بلندیِ نوارِ وضعیت را کنار می‌گذارد،
+        // هر اندازه‌ای که روی آن دستگاه باشد — بریدگیِ دوربین هم همین‌طور.
+        .windowInsetsPadding(WindowInsets.statusBars)
+        .padding(horizontal = 14.dp, vertical = 10.dp),
       verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(6.dp),
+      horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-      /*
-       *  سه کلیدِ اولِ سربرگ از هم جدا شده‌اند.
-       *
-       *  تا حالا هر پنج کلید یک کادرِ خاکستریِ یکسان داشتند و کاربر باید
-       *  آیکنِ ریزشان را می‌خواند تا بفهمد کدام است. حالا هرکدام رنگ و
-       *  شکلِ کارِ خودش را دارد: اشتراک طلایی و با نوشتهٔ VIP، حساب آبی و
-       *  با تپش، و هشدارها نارنجی.
-       */
-      //  نقطهٔ همگام‌سازی، اولین چیزِ ردیف: کوچک، ولی همیشه سرِ جایش
-      SyncDot()
+      Text(
+        title,
+        style = MaterialTheme.typography.titleMedium,
+        color = BAR_INK,
+        fontWeight = FontWeight.Bold,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier.widthIn(max = titleMax),
+      )
 
-      VipChip { onOpen("vip") }
-
-      AccountChip(onClick = onAccount)
-
-      AlertChip(count = alerts.size) { alertsOpen = true }
-
-      BarButton(
-        if (theme == ThemeChoice.DARK) Icons.Filled.LightMode else Icons.Filled.DarkMode,
-        "روشن یا تاریک",
+      Row(
+        Modifier.horizontalScroll(rememberScrollState()),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
       ) {
-        onTheme(if (theme == ThemeChoice.DARK) ThemeChoice.LIGHT else ThemeChoice.DARK)
+        /*
+         *  کلیدهای سربرگ از هم جدا شده‌اند.
+         *
+         *  تا حالا هر پنج کلید یک کادرِ خاکستریِ یکسان داشتند و کاربر
+         *  باید آیکنِ ریزشان را می‌خواند تا بفهمد کدام است. حالا هرکدام
+         *  رنگ و شکلِ کارِ خودش را دارد: اشتراک طلایی — و قرمز وقتی رو
+         *  به پایان است — حساب و تنظیمات شیشه‌ای، و هشدارها نارنجی.
+         */
+        //  نقطهٔ همگام‌سازی، اولین چیزِ ردیف: کوچک، ولی همیشه سرِ جایش
+        SyncDot()
+
+        VipChip { onOpen("vip") }
+
+        AccountChip(onClick = onAccount)
+
+        AlertChip(count = alerts.size) { alertsOpen = true }
+
+        BarButton(
+          if (theme == ThemeChoice.DARK) Icons.Filled.LightMode else Icons.Filled.DarkMode,
+          "روشن یا تاریک",
+        ) {
+          onTheme(if (theme == ThemeChoice.DARK) ThemeChoice.LIGHT else ThemeChoice.DARK)
+        }
+
+        BarButton(Icons.Filled.Settings, "تنظیمات", onClick = onSettings)
       }
-
-      BarButton(Icons.Filled.Settings, "تنظیمات", onClick = onSettings)
-
     }
   }
 
@@ -308,6 +381,89 @@ fun TohidTopBar(
 }
 
 /**
+ *  پنجرهٔ اکتیویتی، از دلِ هر `Context`ی.
+ *
+ *  `view.context` همیشه خودِ اکتیویتی نیست: کامپوز آن را در یک یا چند
+ *  `ContextWrapper` می‌پیچد (تم، زبان، اندازهٔ قلم). تبدیلِ مستقیم به
+ *  اکتیویتی روی همان دستگاه‌ها `null` می‌داد و رنگِ نوارِ وضعیت بی‌صدا
+ *  عوض نمی‌شد.
+ */
+private fun hostWindow(context: android.content.Context): android.view.Window? {
+  var cursor: android.content.Context? = context
+  while (cursor != null) {
+    if (cursor is android.app.Activity) return cursor.window
+    cursor = (cursor as? android.content.ContextWrapper)?.baseContext
+  }
+  return null
+}
+
+/** شب است یا روز — از روشناییِ زمینهٔ تم فهمیده می‌شود، نه از تنظیمِ جدا */
+@Composable
+private fun isNightBar(): Boolean = Shop.colors.bg.luminance() < 0.5f
+
+/**
+ *  افکتِ سربرگ — نورِ ملایم، نه تزئینِ شلوغ.
+ *
+ *  سه چیز روی آبی می‌نشیند و هر سه‌شان کم‌رنگ‌اند: یک لکهٔ نورِ سفید در
+ *  بالای یک سر، یک لکهٔ فیروزه‌ای در پایینِ سرِ دیگر — همان دو رنگی که
+ *  کلِ برنامه دارد — و یک نوارِ نورِ مورب که آرام رد می‌شود. آخری فقط
+ *  وقتی حرکت می‌کند که کاربر انیمیشن را خاموش نکرده باشد.
+ *
+ *  خطِ نازکِ پایین تزئین نیست: بدونش، سربرگ و محتوای پشتش در تمِ شب به
+ *  هم می‌چسبیدند و لبهٔ گِردِ پایین دیده نمی‌شد.
+ */
+@Composable
+private fun Modifier.barGlow(): Modifier {
+  val motion = rememberInfiniteTransition(label = "barGlow")
+  val sweep by motion.animateFloat(
+    initialValue = 0f,
+    targetValue = 1f,
+    animationSpec = infiniteRepeatable(
+      tween(if (Motion.enabled) 7000 else 1, easing = EaseInOutSine),
+      RepeatMode.Reverse,
+    ),
+    label = "barSweep",
+  )
+  return drawBehind {
+    drawCircle(
+      brush = Brush.radialGradient(
+        colors = listOf(Color.White.copy(alpha = 0.20f), Color.Transparent),
+        center = Offset(size.width * 0.14f, 0f),
+        radius = size.height * 1.5f,
+      ),
+      radius = size.height * 1.5f,
+      center = Offset(size.width * 0.14f, 0f),
+    )
+    drawCircle(
+      brush = Brush.radialGradient(
+        colors = listOf(Color(0xFF6EEDE2).copy(alpha = 0.18f), Color.Transparent),
+        center = Offset(size.width * 0.92f, size.height),
+        radius = size.height * 1.3f,
+      ),
+      radius = size.height * 1.3f,
+      center = Offset(size.width * 0.92f, size.height),
+    )
+    if (Motion.enabled) {
+      val x = size.width * sweep
+      drawRect(
+        brush = Brush.linearGradient(
+          colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.10f), Color.Transparent),
+          start = Offset(x - size.width * 0.22f, 0f),
+          end = Offset(x + size.width * 0.22f, size.height),
+        ),
+        size = size,
+      )
+    }
+    drawLine(
+      color = Color.White.copy(alpha = 0.22f),
+      start = Offset(0f, size.height - 0.75f),
+      end = Offset(size.width, size.height - 0.75f),
+      strokeWidth = 1.5f,
+    )
+  }
+}
+
+/**
  *  نقطهٔ همگام‌سازی — سبز، زرد، قرمز.
  *
  *  ── چه چیزی را می‌بندد ────────────────────────────────────────────
@@ -334,16 +490,18 @@ private fun SyncDot() {
 
   var open by remember { mutableStateOf(false) }
   val health = AutoSync.health
+  //  روی آبیِ سربرگ، سبز و نارنجیِ تیره دیده نمی‌شدند؛ همین رنگ‌ها
+  //  روشن‌تر شده‌اند. داخلِ برگه، رنگِ متن‌ها از تم می‌آید.
   val tint = when (health) {
-    AutoSync.Health.OK -> Color(0xFF29A745)
-    AutoSync.Health.WAITING -> ALERT_ORANGE
-    AutoSync.Health.FAILED -> Color(0xFFD64545)
+    AutoSync.Health.OK -> Color(0xFF5BE39B)
+    AutoSync.Health.WAITING -> BAR_ALERT
+    AutoSync.Health.FAILED -> Color(0xFFFF8B84)
   }
 
   Row(
     Modifier
       .clip(RoundedCornerShape(999.dp))
-      .background(tint.copy(alpha = 0.12f))
+      .background(Color.White.copy(alpha = 0.14f))
       .clickable { open = true }
       .padding(horizontal = 9.dp, vertical = 7.dp),
     verticalAlignment = Alignment.CenterVertically,
@@ -375,7 +533,14 @@ private fun SyncDot() {
             else "${AutoSync.pendingCount.fa()} مورد در انتظار"
           AutoSync.Health.FAILED -> "آخرین تلاش ناموفق بود"
         }
-        Text(headline, style = MaterialTheme.typography.bodyMedium, color = tint, fontWeight = FontWeight.Bold)
+        //  رنگِ داخلِ برگه از تم می‌آید، نه از رنگِ روی سربرگ: زمینهٔ
+        //  برگه روشن است و سبزِ روشن رویش خوانده نمی‌شد
+        val sheetTint = when (health) {
+          AutoSync.Health.OK -> Shop.colors.success
+          AutoSync.Health.WAITING -> Shop.colors.warning
+          AutoSync.Health.FAILED -> Shop.colors.danger
+        }
+        Text(headline, style = MaterialTheme.typography.bodyMedium, color = sheetTint, fontWeight = FontWeight.Bold)
 
         Spacer(Modifier.height(6.dp))
         Text(
@@ -421,15 +586,57 @@ private fun sinceText(at: Long): String {
 }
 
 /**
- *  کلیدِ اشتراک — طلایی، با نوشتهٔ VIP.
+ *  کلیدِ اشتراک — روزهای مانده، و قرمز وقتی کم مانده.
  *
- *  از بقیه کمی بزرگ‌تر است و به‌جای آیکنِ تنها، خودِ کلمه را می‌نویسد:
- *  «اشتراک» چیزی است که کاربر باید پیدایش کند، نه چیزی که دنبالش
- *  بگردد. برقِ روی آن همان برقِ صفحهٔ اشتراک است تا یکی بودنشان
- *  فهمیده شود.
+ *  ── چه چیزی را می‌بندد ────────────────────────────────────────────
+ *  تا دیروز روی این کلید فقط «VIP» نوشته بود؛ یعنی کسی که اشتراکش
+ *  فردا تمام می‌شد و کسی که سه ماه اعتبار داشت، هر دو همان یک نشانِ
+ *  طلایی را می‌دیدند. خبرِ تمام شدن فقط داخلِ زنگ بود و زنگ باز
+ *  نمی‌شد. حالا عددِ روز روی خودِ نشان است.
+ *  ──────────────────────────────────────────────────────────────────
+ *
+ *  از یک هفته به پایین (`SUBSCRIPTION_WARN_DAYS`) طلایی جایش را به قرمز
+ *  می‌دهد و نشان آرام نفس می‌کشد. قرمز در تمِ روشن و تاریک همان قرمز است:
+ *  «تمام شدن» چیزی نیست که با تمِ گوشی عوض شود.
+ *
+ *  وضعیت یک بار سنجیده می‌شود، نه با هر بار کشیده شدنِ سربرگ —
+ *  سنجیدنِ مجوز یعنی بررسیِ امضای رمزنگاری.
  */
 @Composable
 private fun VipChip(onClick: () -> Unit) {
+  val context = LocalContext.current
+  val status = remember {
+    runCatching {
+      ir.vil3ntec.tohid.sync.LicenseGuard.status(
+        context, ir.vil3ntec.tohid.sync.SyncStore(context),
+      )
+    }.getOrNull()
+  }
+  val days = status?.daysLeft() ?: 0
+  val state = status?.state
+
+  //  «کم مانده» یعنی یا تمام شده، یا از یک هفته کمتر مانده
+  val urgent = when (state) {
+    ir.vil3ntec.tohid.sync.License.State.EXPIRED,
+    ir.vil3ntec.tohid.sync.License.State.GRACE -> true
+    ir.vil3ntec.tohid.sync.License.State.ACTIVE -> days <= SUBSCRIPTION_WARN_DAYS
+    else -> false
+  }
+
+  /*
+   *  متنِ کلید.
+   *
+   *  «۰ روز» نوشته نمی‌شود: کسی که آن را ببیند فکر می‌کند همین حالا
+   *  بسته شده. آخرین روز «امروز» است.
+   */
+  val label = when {
+    state == ir.vil3ntec.tohid.sync.License.State.EXPIRED -> "تمدید"
+    state == ir.vil3ntec.tohid.sync.License.State.GRACE -> "مهلت"
+    state == ir.vil3ntec.tohid.sync.License.State.ACTIVE && days > 0 -> "${days.fa()} روز"
+    state == ir.vil3ntec.tohid.sync.License.State.ACTIVE -> "امروز"
+    else -> "VIP"
+  }
+
   val motion = rememberInfiniteTransition(label = "vipChip")
   val shine by motion.animateFloat(
     initialValue = 0f,
@@ -440,18 +647,36 @@ private fun VipChip(onClick: () -> Unit) {
     ),
     label = "shine",
   )
+  //  تپشِ قرمز — کندتر از برقِ طلایی، تا هشدار باشد نه چشمک
+  val beat by motion.animateFloat(
+    initialValue = 0.55f,
+    targetValue = 1f,
+    animationSpec = infiniteRepeatable(
+      tween(if (Motion.enabled) 1200 else 1, easing = EaseInOutSine),
+      RepeatMode.Reverse,
+    ),
+    label = "beat",
+  )
+
+  val ink = if (urgent) Color.White else GOLD_INK
   Row(
     Modifier
       .height(36.dp)
       .clip(RoundedCornerShape(13.dp))
       .background(
         Brush.linearGradient(
-          listOf(Color(0xFFFBE08A), Color(0xFFF6C93F), Color(0xFFFFF3C4), Color(0xFFD79A14))
+          if (urgent) URGENT_RED
+          else listOf(Color(0xFFFBE08A), Color(0xFFF6C93F), Color(0xFFFFF3C4), Color(0xFFD79A14))
         )
+      )
+      .border(
+        1.4.dp,
+        if (urgent) Color.White.copy(alpha = beat * 0.8f) else Color.Transparent,
+        RoundedCornerShape(13.dp),
       )
       .drawWithContent {
         drawContent()
-        if (!Motion.enabled) return@drawWithContent
+        if (!Motion.enabled || urgent) return@drawWithContent
         val x = size.width * shine
         drawRect(
           brush = Brush.linearGradient(
@@ -468,24 +693,29 @@ private fun VipChip(onClick: () -> Unit) {
     horizontalArrangement = Arrangement.spacedBy(4.dp),
   ) {
     Icon(
-      Icons.Filled.WorkspacePremium,
-      contentDescription = "اشتراک و قیمت‌ها",
-      tint = GOLD_INK,
+      if (urgent) Icons.Filled.HourglassBottom else Icons.Filled.WorkspacePremium,
+      contentDescription = if (urgent) "اشتراک رو به پایان — تمدید" else "اشتراک و قیمت‌ها",
+      tint = ink,
       modifier = Modifier.size(15.dp),
     )
     Text(
-      "VIP",
+      label,
       style = MaterialTheme.typography.labelLarge,
-      color = GOLD_INK,
+      color = ink,
       fontWeight = FontWeight.Bold,
+      maxLines = 1,
     )
   }
 }
 
-/** کلیدِ حساب — آبی، با هاله‌ای که نفس می‌کشد */
+/**
+ *  کلیدِ حساب — سفیدِ نیم‌شفاف، با هاله‌ای که نفس می‌کشد.
+ *
+ *  رنگش از تم نمی‌آید: زیرش همیشه آبیِ تیرهٔ سربرگ است و آبیِ تم روی
+ *  آبیِ تیره دیده نمی‌شد.
+ */
 @Composable
 private fun AccountChip(onClick: () -> Unit) {
-  val colors = Shop.colors
   val motion = rememberInfiniteTransition(label = "accountChip")
   val breathe by motion.animateFloat(
     initialValue = 0.35f,
@@ -500,21 +730,21 @@ private fun AccountChip(onClick: () -> Unit) {
     Modifier
       .size(34.dp)
       .clip(RoundedCornerShape(12.dp))
-      .background(colors.primary.copy(alpha = 0.16f))
-      .border(1.2.dp, colors.primary.copy(alpha = breathe), RoundedCornerShape(12.dp))
+      .background(Color.White.copy(alpha = 0.16f))
+      .border(1.2.dp, Color.White.copy(alpha = breathe * 0.75f), RoundedCornerShape(12.dp))
       .clickable(onClick = onClick),
     contentAlignment = Alignment.Center,
   ) {
     Icon(
       Icons.Filled.Person,
       contentDescription = "حساب",
-      tint = colors.primary,
+      tint = BAR_INK,
       modifier = Modifier.size(18.dp),
     )
   }
 }
 
-/** کلیدِ هشدارها — نارنجی، تا در ردیفِ خاکستری دیده شود */
+/** کلیدِ هشدارها — نارنجیِ روشن، تا روی آبیِ سربرگ دیده شود */
 @Composable
 private fun AlertChip(count: Int, onClick: () -> Unit) {
   Box(contentAlignment = Alignment.TopEnd) {
@@ -522,21 +752,21 @@ private fun AlertChip(count: Int, onClick: () -> Unit) {
       Modifier
         .size(34.dp)
         .clip(RoundedCornerShape(12.dp))
-        .background(ALERT_ORANGE.copy(alpha = 0.18f))
-        .border(1.2.dp, ALERT_ORANGE.copy(alpha = 0.65f), RoundedCornerShape(12.dp))
+        .background(BAR_ALERT.copy(alpha = 0.26f))
+        .border(1.2.dp, BAR_ALERT.copy(alpha = 0.85f), RoundedCornerShape(12.dp))
         .clickable(onClick = onClick),
       contentAlignment = Alignment.Center,
     ) {
       Icon(
         Icons.Filled.Notifications,
         contentDescription = "هشدارها",
-        tint = ALERT_ORANGE,
+        tint = BAR_ALERT,
         modifier = Modifier.size(18.dp),
       )
     }
     if (count > 0) {
       Box(
-        Modifier.size(15.dp).clip(RoundedCornerShape(8.dp)).background(Shop.colors.danger),
+        Modifier.size(15.dp).clip(RoundedCornerShape(8.dp)).background(Color(0xFFD8352C)),
         contentAlignment = Alignment.Center,
       ) {
         Text(
@@ -549,7 +779,12 @@ private fun AlertChip(count: Int, onClick: () -> Unit) {
   }
 }
 
-/** دکمهٔ کوچکِ گردِ سربرگ، با شمارندهٔ اختیاری */
+/**
+ *  دکمهٔ کوچکِ گردِ سربرگ، با شمارندهٔ اختیاری.
+ *
+ *  کارتِ شیشه‌ای: سفیدِ نیم‌شفاف روی آبی. رنگِ `surface` تم اینجا کار
+ *  نمی‌کرد — در تمِ روشن سفیدِ پُر بود و روی آبی مثل یک لکه می‌نشست.
+ */
 @Composable
 private fun BarButton(
   icon: ImageVector,
@@ -562,15 +797,16 @@ private fun BarButton(
       Modifier
         .size(34.dp)
         .clip(RoundedCornerShape(12.dp))
-        .background(Shop.colors.surface)
+        .background(Color.White.copy(alpha = 0.14f))
+        .border(1.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(12.dp))
         .clickable(onClick = onClick),
       contentAlignment = Alignment.Center,
     ) {
-      Icon(icon, contentDescription = description, tint = Shop.colors.muted, modifier = Modifier.size(17.dp))
+      Icon(icon, contentDescription = description, tint = BAR_INK_SOFT, modifier = Modifier.size(17.dp))
     }
     if (badge > 0) {
       Box(
-        Modifier.size(15.dp).clip(RoundedCornerShape(8.dp)).background(Shop.colors.danger),
+        Modifier.size(15.dp).clip(RoundedCornerShape(8.dp)).background(Color(0xFFD8352C)),
         contentAlignment = Alignment.Center,
       ) {
         Text(

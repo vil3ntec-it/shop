@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.Chat
+import androidx.compose.material.icons.filled.HourglassBottom
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -66,6 +67,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.graphicsLayer
 import ir.vil3ntec.tohid.ui.theme.Shape
+import ir.vil3ntec.tohid.fa
+import ir.vil3ntec.tohid.formatMillis
 import ir.vil3ntec.tohid.money
 
 /**
@@ -437,6 +440,9 @@ fun VipScreen(onDismiss: () -> Unit) {
         Text("بازگشت", color = colors.primary)
       }
 
+      /* ---------------------- اشتراکِ همین حالا ---------------------- */
+      SubscriptionState()
+
       /* ---------------------- هفت روز رایگان ---------------------- */
       Column(
         Modifier
@@ -665,6 +671,96 @@ fun VipScreen(onDismiss: () -> Unit) {
             Text("0792236008", style = MaterialTheme.typography.labelSmall, color = colors.muted)
           }
         }
+      }
+    }
+  }
+}
+
+/**
+ *  اشتراکِ همین حالا — چند روز مانده، و از کِی.
+ *
+ *  ── چه چیزی را می‌بندد ────────────────────────────────────────────
+ *  صفحهٔ اشتراک فقط قیمت‌ها را نشان می‌داد. کاربری که اشتراک داشت و
+ *  می‌آمد ببیند «چند روز مانده»، هیچ‌جا جوابش را پیدا نمی‌کرد: نه در
+ *  این صفحه، نه در تنظیمات. تنها نشانه، عددِ داخلِ زنگ بود که فقط از
+ *  هفت روز به پایین می‌آمد.
+ *  ──────────────────────────────────────────────────────────────────
+ *
+ *  از یک هفته به پایین کلِ کارت قرمز می‌شود — همان مرزی که نشانِ سربرگ
+ *  هم با آن قرمز می‌شود (`SUBSCRIPTION_WARN_DAYS`)، تا دو جا یک حرف بزنند.
+ */
+@Composable
+private fun SubscriptionState() {
+  val context = LocalContext.current
+  val colors = Shop.colors
+  val status = remember {
+    runCatching { LicenseGuard.status(context, SyncStore(context)) }.getOrNull()
+  } ?: return
+  //  «هیچ اشتراکی نبوده» حالت نیست که کارت بخواهد: قیمت‌های پایینِ
+  //  همین صفحه خودشان جواب‌اند
+  if (status.state == License.State.NONE) return
+
+  val days = status.daysLeft()
+  val ends = status.payload?.subscriptionEndsAt ?: 0L
+  val expired = status.state == License.State.EXPIRED || status.state == License.State.GRACE
+  val urgent = expired || (status.state == License.State.ACTIVE && days <= SUBSCRIPTION_WARN_DAYS)
+
+  val tint = when {
+    urgent -> colors.danger
+    status.state == License.State.ACTIVE -> colors.success
+    else -> colors.warning
+  }
+  val title = when (status.state) {
+    License.State.ACTIVE -> if (urgent) "اشتراک رو به پایان است" else "اشتراک فعال است"
+    License.State.GRACE -> "اشتراک تمام شده — مهلتِ تمدید"
+    License.State.EXPIRED -> "اشتراک تمام شده"
+    License.State.PENDING -> "اشتراک هنوز شروع نشده"
+    else -> "مجوزِ اشتراک خوانده نشد"
+  }
+  val big = when {
+    expired -> "تمدید کنید"
+    status.state == License.State.ACTIVE && days > 0 -> "${days.fa()} روز مانده"
+    status.state == License.State.ACTIVE -> "امروز آخرین روز است"
+    else -> "—"
+  }
+
+  Spacer(Modifier.height(12.dp))
+  Row(
+    Modifier
+      .fillMaxWidth()
+      .clip(RoundedCornerShape(Radius.md))
+      .background(if (urgent) colors.dangerTint else colors.surface)
+      .border(1.dp, tint.copy(alpha = 0.55f), RoundedCornerShape(Radius.md))
+      .padding(14.dp),
+    verticalAlignment = Alignment.CenterVertically,
+  ) {
+    Box(
+      Modifier.size(38.dp).clip(CircleShape).background(tint.copy(alpha = 0.18f)),
+      contentAlignment = Alignment.Center,
+    ) {
+      Icon(
+        if (urgent) Icons.Filled.HourglassBottom else Icons.Filled.WorkspacePremium,
+        contentDescription = null,
+        tint = tint,
+        modifier = Modifier.size(20.dp),
+      )
+    }
+    Spacer(Modifier.width(12.dp))
+    Column(Modifier.weight(1f)) {
+      Text(title, style = MaterialTheme.typography.labelLarge, color = colors.text, fontWeight = FontWeight.Bold)
+      Spacer(Modifier.height(3.dp))
+      Text(big, style = MaterialTheme.typography.titleSmall, color = tint, fontWeight = FontWeight.Bold)
+      if (ends > 0) {
+        Spacer(Modifier.height(3.dp))
+        Text(
+          (if (expired) "پایان: " else "تا تاریخ ") + formatMillis(ends),
+          style = MaterialTheme.typography.labelSmall,
+          color = colors.muted,
+        )
+      }
+      status.payload?.planTitle?.takeIf { it.isNotBlank() }?.let {
+        Spacer(Modifier.height(2.dp))
+        Text("پلن: $it", style = MaterialTheme.typography.labelSmall, color = colors.muted2)
       }
     }
   }

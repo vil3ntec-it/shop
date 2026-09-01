@@ -42,3 +42,34 @@ fun qty(value: Double): String {
 
 /** عددِ ساده — سال و شمارهٔ فاکتور که پول نیستند و جداکننده نمی‌خواهند */
 fun plain(value: Int): String = value.toString()
+
+/**
+ *  یک شمارِ روز به متن — «۱۲ روز»، «۳ ماه»، «۲ سال و ۴ ماه».
+ *
+ *  ماه ۳۰ روز و سال ۳۶۵ روز حساب می‌شود: اینجا حرفِ «چقدر شده» است، نه
+ *  تاریخِ دقیق — و تاریخِ دقیق را همان کنارش می‌نویسیم.
+ */
+fun daysText(days: Long): String {
+  val d = days.coerceAtLeast(0)
+  return when {
+    d < 1 -> "امروز"
+    d < 31 -> "${d.fa()} روز"
+    d < 365 -> "${(d / 30).fa()} ماه"
+    else -> {
+      val years = d / 365
+      val months = (d % 365) / 30
+      if (months == 0L) "${years.fa()} سال" else "${years.fa()} سال و ${months.fa()} ماه"
+    }
+  }
+}
+
+/**
+ *  «چقدر گذشته» — برای مدتِ عضویت و مدتِ قرض.
+ *
+ *  یک جا نوشته شده چون چند جای برنامه همین را می‌خواهند و اگر هر کدام
+ *  خودش حساب می‌کرد، یکی «۲ ماه» می‌گفت و دیگری «۶۵ روز».
+ */
+fun spanText(from: Long, now: Long = System.currentTimeMillis()): String {
+  if (from <= 0) return "—"
+  return daysText((now - from) / 86_400_000L)
+}
