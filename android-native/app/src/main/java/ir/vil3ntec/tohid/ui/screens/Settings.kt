@@ -54,7 +54,6 @@ import ir.vil3ntec.tohid.formatDate
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.plain
 import ir.vil3ntec.tohid.sync.License
-import ir.vil3ntec.tohid.core.config.ApiConfig
 import ir.vil3ntec.tohid.core.config.AppConfig
 import ir.vil3ntec.tohid.core.model.DeviceDto
 import ir.vil3ntec.tohid.core.net.userText
@@ -102,10 +101,20 @@ fun SettingsScreen(
   var debtLimitText by remember {
     mutableStateOf(if (debtLimit > 0) debtLimit.toLong().toString() else "")
   }
-  //  فقط برای کادرِ ساختِ آزمایشی؛ در نسخهٔ منتشرشده دیده نمی‌شود
-  var serverUrl by remember { mutableStateOf(state.serverUrl) }
-  //  «می‌شود به سرور زد یا نه» را پیکربندی می‌گوید، نه خالی نبودنِ یک رشته
-  val serverReady = ApiConfig.isValid(serverUrl, AppConfig.allowInsecure)
+  /*
+   *  نشانیِ سرور هیچ‌جای برنامه دیده و زده نمی‌شود.
+   *
+   *  ── چه چیزی برداشته شد ───────────────────────────────────────────
+   *  یک کادرِ «آدرس سرور» اینجا بود و یکی هم در صفحهٔ ورود. هر کسی که
+   *  برنامه را باز می‌کرد نشانیِ سرور را می‌دید، و هر کسی می‌توانست
+   *  برنامه را به سرورِ دیگری وصل کند — یعنی دفترِ دکان را به جایی
+   *  بفرستد که صاحبش نمی‌داند کجاست.
+   *  ──────────────────────────────────────────────────────────────────
+   *
+   *  نشانی فقط در زمانِ **ساخت** داخلِ برنامه می‌نشیند
+   *  (`tohid.apiBase` در `gradle.properties`) و از آن به بعد قفل است.
+   */
+  val serverReady = AppConfig.isConfigured(context)
   var identifier by rememberSaveable { mutableStateOf("") }
   var password by rememberSaveable { mutableStateOf("") }
   var busy by remember { mutableStateOf(false) }
@@ -283,32 +292,17 @@ fun SettingsScreen(
             modifier = Modifier.fillMaxWidth(),
           )
         } else {
-          /*
-           *  نشانیِ سرور دیگر اینجا نیست.
-           *
-           *  کادرِ نشانی هم نشانِ سرور را به هر کسی که برنامه را باز
-           *  می‌کرد نشان می‌داد، و هم اجازه می‌داد کاربر برنامه را به
-           *  سرورِ دیگری وصل کند. حالا نشانی در زمانِ ساخت داخلِ برنامه
-           *  می‌نشیند. فقط ساختِ خودی (بی‌نشانی) کادر را می‌بیند.
-           */
           Text(
-            if (AppConfig.isLocked)
+            if (serverReady)
               "به سرورِ توحید وصل می‌شود."
-            else "این نسخه به سروری بسته نشده — نشانی را برای آزمایش بزنید.",
+            else
+              "این نسخه به سروری بسته نشده و حساب در آن کار نمی‌کند. " +
+                "دفترِ دکان روی همین گوشی سرِ جایش است و همه‌چیز آفلاین کار " +
+                "می‌کند؛ برای حساب و همگام‌سازی، نسخهٔ منتشرشده را نصب کنید.",
             style = MaterialTheme.typography.bodySmall,
-            color = Shop.colors.muted,
+            color = if (serverReady) Shop.colors.muted else Shop.colors.warning,
           )
           Spacer(Modifier.height(10.dp))
-          if (!AppConfig.isLocked) {
-            TohidTextField(
-              value = serverUrl,
-              onValueChange = { serverUrl = it; state.serverUrl = it },
-              label = "آدرس سرور (فقط ساختِ آزمایشی)",
-              placeholder = "https://api.example.com",
-              keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Next),
-            )
-            Spacer(Modifier.height(10.dp))
-          }
           TohidTextField(
             value = identifier,
             onValueChange = { identifier = it },
@@ -808,8 +802,8 @@ fun SettingsScreen(
 /**
  *  یک کلید با دکمهٔ کپی — همان کادرِ `.settings-key` نسخهٔ وب.
  *
- *  خودِ کلید چپ‌به‌راست نوشته می‌شود: در صفحهٔ راست‌به‌راست، دسته‌های
- *  `TSH-…` وارونه دیده می‌شوند و کاربر اشتباه می‌خواندشان.
+ *  خودِ کد چپ‌به‌راست نوشته می‌شود: در صفحهٔ راست‌به‌راست، دسته‌های
+ *  `SHG-…` وارونه دیده می‌شوند و کاربر اشتباه می‌خواندشان.
  */
 @Composable
 private fun KeyLine(label: String, value: String, onCopy: () -> Unit) {

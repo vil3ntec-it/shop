@@ -154,8 +154,29 @@ android {
     release {
       signingConfig = signingConfigs.getByName("release")
       buildConfigField("String", "SIGNING_SHA256", "\"$signingFingerprint\"")
-      //  نسخه‌ی دستِ کاربر: فقط دامنه‌ی عمومی
-      buildConfigField("String", "API_BASE", "\"${apiBase("TOHID_API_BASE", "tohid.apiBase")}\"")
+      /*
+       *  نسخه‌ی دستِ کاربر: فقط دامنه‌ی عمومی.
+       *
+       *  کادرِ «آدرس سرور» از برنامه برداشته شده، پس این تنها راهِ
+       *  رسیدنِ نشانی به برنامه است. اگر خالی بماند، نسخه‌ای ساخته
+       *  می‌شود که حساب و همگام‌سازی در آن کار نمی‌کند — بقیه‌ی برنامه
+       *  آفلاین کار می‌کند، ولی این را باید **دانسته** انتخاب کرد، نه
+       *  با فراموش کردنِ یک متغیر. پس بلند هشدار داده می‌شود.
+       */
+      val releaseBase = apiBase("TOHID_API_BASE", "tohid.apiBase")
+      if (releaseBase.isBlank()) {
+        logger.warn(
+          "\n" +
+            "──────────────────────────────────────────────────────────────\n" +
+            "  هشدار: این نسخه به هیچ سروری بسته نشده است.\n" +
+            "  حساب، اشتراک و همگام‌سازی در آن کار نمی‌کنند.\n" +
+            "  دامنه را در android-native/gradle.properties بگذارید:\n" +
+            "      tohid.apiBase=https://api.example.com\n" +
+            "  یا در GitHub → Settings → Variables متغیرِ TOHID_API_BASE.\n" +
+            "──────────────────────────────────────────────────────────────"
+        )
+      }
+      buildConfigField("String", "API_BASE", "\"$releaseBase\"")
       isMinifyEnabled = true
       isShrinkResources = true
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
