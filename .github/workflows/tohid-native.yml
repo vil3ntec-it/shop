@@ -52,6 +52,22 @@ jobs:
         working-directory: android-native
         run: gradle --no-daemon testReleaseUnitTest
 
+      #  ── موقتی ──────────────────────────────────────────────────────
+      #  سنجشِ زنده بودنِ دامنهٔ API. محیطِ کارِ Claude به اینترنتِ آزاد راه
+      #  ندارد، ولی رانرِ گیت‌هاب دارد؛ پس یک بار از اینجا پرسیده می‌شود.
+      #  ساخت را نمی‌شکند: نسخهٔ آفلاین باید ساخته شود حتی اگر سرور خواب
+      #  باشد. بعد از دیدنِ نتیجه، این مرحله برداشته می‌شود.
+      - name: سنجشِ دامنهٔ API
+        continue-on-error: true
+        run: |
+          base="https://api.yaqobipump.top"
+          for path in /api/health /api/v1/health /; do
+            echo "--- GET $base$path"
+            curl -sS -m 20 -o /tmp/body.txt -w "http=%{http_code} tls_verify=%{ssl_verify_result} time=%{time_total}s\n" \
+              "$base$path" || echo "درخواست ناموفق"
+            head -c 400 /tmp/body.txt; echo
+          done
+
       - name: ساخت APK
         working-directory: android-native
         env:
