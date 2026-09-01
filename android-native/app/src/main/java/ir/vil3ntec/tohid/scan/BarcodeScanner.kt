@@ -26,13 +26,30 @@ import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.FlashOff
+import androidx.compose.material.icons.filled.FlashOn
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
@@ -106,6 +123,30 @@ import java.util.concurrent.TimeUnit
  *  گفته کجا.
  *  ──────────────────────────────────────────────────────────────────
  *
+ *  ── و دو دستهٔ دستی، چون «هر گوشی فرق دارد» ────────────────────────
+ *  گزارشِ کاربر این بود که اسکنر روی هر گوشی و هر دوربین جورِ دیگری
+ *  رفتار می‌کند. درست هم هست: کمترین فاصلهٔ فوکوس، سقفِ بزرگ‌نمایی و
+ *  حساسیتِ لنز از گوشی تا گوشی فرق دارد و هیچ تنظیمِ خودکاری همهٔ آن‌ها
+ *  را نمی‌پوشاند. پس دو دسته گذاشته شده که همه‌جا یکسان کار می‌کنند:
+ *
+ *   • **دو انگشت** بزرگ‌نمایی را دستِ خودِ فروشنده می‌دهد. کالا در
+ *     فاصلهٔ راحت می‌ماند و کادر نزدیک می‌شود — همان کاری که بزرگ‌نماییِ
+ *     خودکار می‌کند، ولی این‌بار به اندازه‌ای که خودِ آدم می‌بیند.
+ *   • **چراغ** تاریکی را می‌بندد. نورِ کم دو جور ضربه می‌زند: نوردهی
+ *     بلند می‌شود و تکانِ دست تصویر را تار می‌کند، و کنتراستِ خط‌ها کم
+ *     می‌شود و نیمی از کد خوانده می‌شود و نیمِ دیگر نه.
+ *
+ *  تا دوازده ثانیه پس از دو انگشت، بزرگ‌نماییِ خودکار دست به آن نمی‌زند؛
+ *  وگرنه کاربر نزدیک می‌کند و برنامه همان دم برش می‌گرداند.
+ *  ──────────────────────────────────────────────────────────────────
+ *
+ *  ── و آخر: هر چه خوانده شد، خوانده نیست ────────────────────────────
+ *  خوانشِ هر فریم از `BarcodeGuard` رد می‌شود. آنجاست که خوانشِ نصفه و
+ *  کدِ تصادفی گرفته می‌شود — با ساختارِ خودِ قالب و با تکرار. قاعده‌اش
+ *  آنجا نوشته شده؛ همین‌قدر بدانید که **قالبِ** خوانش هم به سد داده
+ *  می‌شود، چون ITF جای دیگری می‌ایستد تا EAN.
+ *  ──────────────────────────────────────────────────────────────────
+ *
  *  و دو تنظیمِ بی‌خطر که تأخیر را کم می‌کنند: لرزش‌گیرِ ویدیو خاموش (چند
  *  فریم تأخیر، و برای اسکن بی‌فایده) و نویزگیر و لبه‌تیزکن روی `FAST`.
  *  این‌ها کارِ ۳A را دست نمی‌گیرند، فقط خطِ لوله را سبک می‌کنند.
@@ -156,15 +197,29 @@ private const val ZOOM_GAP_MS = 700L
 /** پس از برگشتن از ماکرو، این‌قدر دوباره سراغش نمی‌رویم */
 private const val MACRO_COOLDOWN_MS = 6_000L
 
+/**
+ *  پس از بزرگ‌نماییِ دستی (دو انگشت)، این‌قدر دستِ خودکار به آن نمی‌خورد.
+ *
+ *  وگرنه کاربر نزدیک می‌کند و نیم‌ثانیه بعد، خودکار برش می‌گرداند — و
+ *  حس می‌کند برنامه با او لج کرده.
+ */
+private const val MANUAL_ZOOM_HOLD_MS = 12_000L
+
 /** متنِ حالتِ عادی — از دو جا نوشته می‌شود، پس یک جا تعریف شده */
 private const val READY_TEXT = "آماده اسکن — بارکد را جلوی دوربین بگیرید"
 
+/**
+ *  @param isKnown آیا این کد در فهرستِ کالاهای دکان هست. سد از همین
+ *    می‌فهمد کجا سخت بگیرد و کجا نه — شرحش سرِ `BarcodeGuard`. پیش‌فرضش
+ *    «نمی‌دانم» است، پس صفحه‌ای که فهرست ندارد هم کار می‌کند.
+ */
 @SuppressLint("UnsafeOptInUsageError")
 @Composable
 fun CameraScanner(
   onCode: (String) -> Unit,
   onStatus: (String, Boolean) -> Unit,
   modifier: Modifier = Modifier,
+  isKnown: (String) -> Boolean = { false },
 ) {
   val context = LocalContext.current
   val lifecycleOwner = LocalLifecycleOwner.current
@@ -172,6 +227,12 @@ fun CameraScanner(
   // مقدارِ تازهٔ onCode بدونِ بستنِ دوباره‌ی دوربین
   val latestCode by rememberUpdatedState(onCode)
   val latestStatus by rememberUpdatedState(onStatus)
+  val latestKnown by rememberUpdatedState(isKnown)
+
+  //  چراغ فقط وقتی نشان داده می‌شود که این دوربین داشته باشد؛ دکمه‌ای
+  //  که کاری نمی‌کند، بدتر از نبودنش است
+  var flashReady by remember { mutableStateOf(false) }
+  var flashOn by remember { mutableStateOf(false) }
 
   val executor: ExecutorService = remember { Executors.newSingleThreadExecutor() }
   val previewView = remember {
@@ -247,22 +308,29 @@ fun CameraScanner(
           analysis,
         )
       }.onSuccess { camera ->
+        /*
+         *  سقفِ بزرگ‌نمایی را باید از خودِ همین دوربین پرسید — هم ML Kit
+         *  بیش از آن پیشنهاد نمی‌دهد، هم دو انگشتِ کاربر نباید از آن
+         *  بگذرد.
+         */
+        val maxZoom = camera.cameraInfo.zoomState.value?.maxZoomRatio ?: 1f
+
         pilot.attach(
           camera.cameraControl,
           macroCapable = macroCapable(camera.cameraInfo),
+          maxZoom = maxZoom,
         ) { text -> latestStatus(text, false) }
 
-        /*
-         *  خواننده **پس از** باز شدنِ دوربین ساخته می‌شود، چون سقفِ
-         *  بزرگ‌نمایی را باید از خودِ همین دوربین پرسید؛ ML Kit بیش از آن
-         *  پیشنهاد نمی‌دهد.
-         */
-        val maxZoom = camera.cameraInfo.zoomState.value?.maxZoomRatio ?: 1f
+        //  چراغ: اگر این دوربین ندارد، دکمه هم نباید باشد
+        flashReady = runCatching { camera.cameraInfo.hasFlashUnit() }.getOrDefault(false)
+        flashOn = false
+
         val client = buildScanner(maxZoom) { wanted -> pilot.zoomTo(wanted) }
         scanner = client
         //  سدِ خوانشِ دروغین. یکی برای هر بار باز شدنِ دوربین، چون
-        //  شمارشِ تکرارش مالِ همین نشست است.
-        val guard = BarcodeGuard()
+        //  شمارشِ تکرارش مالِ همین نشست است. فهرستِ کالاها را از راهِ
+        //  `latestKnown` می‌پرسد تا با هر تغییرِ کالاها تازه بماند.
+        val guard = BarcodeGuard(known = { code -> latestKnown(code) })
 
         analysis.setAnalyzer(executor) { proxy ->
           val media = proxy.image
@@ -273,14 +341,17 @@ fun CameraScanner(
           val image = InputImage.fromMediaImage(media, proxy.imageInfo.rotationDegrees)
           client.process(image)
             .addOnSuccessListener { codes ->
-              val value = codes.firstOrNull { !it.rawValue.isNullOrBlank() }?.rawValue
+              //  خودِ بارکد نگه داشته می‌شود نه فقط متنش: **قالبِ** خوانش
+              //  مهم‌ترین سرنخِ سد است — ITF جای دیگری می‌ایستد تا EAN
+              val read = codes.firstOrNull { !it.rawValue.isNullOrBlank() }
+              val value = read?.rawValue
               if (value == null) {
                 pilot.nothingRead()
               } else {
                 //  بارکد دیده شد، پس فوکوس سرِ جایش است — چه این خوانش
                 //  پذیرفته شود چه نه
                 pilot.sawBarcode()
-                if (guard.trust(value)) latestCode(value)
+                if (guard.trust(value, kindOf(read.format))) latestCode(value)
               }
             }
             .addOnFailureListener { Log.d("Tohid", "خواندن فریم ناموفق", it) }
@@ -303,24 +374,103 @@ fun CameraScanner(
   }
 
   /*
-   *  زدنِ انگشت روی بارکد، فوکوس را همان‌جا می‌برد.
+   *  دو حرکتِ دست روی تصویر — و هیچ‌کدام اسکرولِ صفحه را نمی‌خورد.
    *
-   *  `detectTapGestures` فقط «زدن» را می‌گیرد و کشیدن را رد می‌کند، پس
-   *  اسکرولِ صفحهٔ فروش که این نما داخلش است دست‌نخورده می‌ماند.
+   *  **زدن** فوکوس را همان‌جا می‌برد. نقطه با
+   *  `previewView.meteringPointFactory` ساخته می‌شود نه دستی: همان است
+   *  که چرخشِ گوشی و بریدگیِ `FILL_CENTER` را حساب می‌کند — یعنی جایی که
+   *  کاربر زده، همان جایی است که دوربین فوکوس می‌کند.
    *
-   *  نقطه با `previewView.meteringPointFactory` ساخته می‌شود نه دستی:
-   *  همان است که چرخشِ گوشی و بریدگیِ `FILL_CENTER` را حساب می‌کند —
-   *  یعنی جایی که کاربر زده، همان جایی است که دوربین فوکوس می‌کند.
+   *  **دو انگشت** بزرگ‌نمایی را دستِ خودِ کاربر می‌دهد. این مهم‌ترین
+   *  چیزی است که به گزارشِ «هر گوشی فرق دارد» جواب می‌دهد: بزرگ‌نماییِ
+   *  خودکار از هر لنزی به اندازهٔ خودش برمی‌آید، ولی دو انگشتِ فروشنده
+   *  همه‌جا یکسان کار می‌کند. و راهِ درستِ خواندنِ بارکدِ ریز همین است —
+   *  **دوربین** نزدیک شود، نه کالا؛ کالا که به لنز بچسبد، زیرِ کمترین
+   *  فاصلهٔ فوکوس می‌رود و هیچ‌وقت تیز نمی‌شود.
    */
   Box(
-    modifier.pointerInput(Unit) {
-      detectTapGestures { at ->
-        pilot.focusOnTap(previewView, at.x, at.y)
+    modifier
+      .pointerInput(Unit) {
+        detectTapGestures { at ->
+          pilot.focusOnTap(previewView, at.x, at.y)
+        }
       }
-    }
+      .pointerInput(Unit) {
+        detectPinch { factor -> pilot.pinch(factor) }
+      }
   ) {
     AndroidView(factory = { previewView }, modifier = Modifier.fillMaxSize())
+
+    /*
+     *  چراغِ دوربین.
+     *
+     *  نورِ کم دو جور به اسکن ضربه می‌زند و هر دو در گزارشِ کاربر بود:
+     *  دوربین برای جبرانِ تاریکی، مدتِ نوردهی را بلند می‌کند و کوچک‌ترین
+     *  تکانِ دست تصویر را **تار** می‌کند؛ و کنتراستِ خط‌های بارکد کم
+     *  می‌شود، پس نیمی از کد خوانده می‌شود و نیمِ دیگرش نه. چراغ هر دو
+     *  را می‌بندد.
+     */
+    if (flashReady) {
+      IconButton(
+        onClick = {
+          flashOn = !flashOn
+          pilot.torch(flashOn)
+        },
+        modifier = Modifier
+          .align(Alignment.TopStart)
+          .padding(8.dp)
+          .size(38.dp)
+          .clip(CircleShape)
+          .background(Color.Black.copy(alpha = 0.45f)),
+      ) {
+        Icon(
+          if (flashOn) Icons.Filled.FlashOn else Icons.Filled.FlashOff,
+          contentDescription = if (flashOn) "خاموش کردن چراغ" else "روشن کردن چراغ",
+          tint = if (flashOn) Color(0xFFFFD54F) else Color.White,
+          modifier = Modifier.size(20.dp),
+        )
+      }
+    }
   }
+}
+
+/**
+ *  بزرگ‌نمایی با دو انگشت — و فقط با دو انگشت.
+ *
+ *  `detectTransformGestures`ِ آماده اینجا به کار نمی‌آید: آن، کشیدنِ
+ *  **تک‌انگشتی** را هم می‌گیرد و مصرف می‌کند، و این نما وسطِ یک فهرستِ
+ *  اسکرول‌شونده است — یعنی صفحهٔ فروش دیگر بالا و پایین نمی‌رفت.
+ *
+ *  اینجا تا وقتی دو انگشت روی صفحه نیامده، هیچ رویدادی مصرف نمی‌شود؛
+ *  پس زدن و اسکرول دست‌نخورده می‌مانند.
+ */
+private suspend fun PointerInputScope.detectPinch(onZoom: (Float) -> Unit) {
+  awaitEachGesture {
+    awaitFirstDown(requireUnconsumed = false)
+    do {
+      val event = awaitPointerEvent()
+      if (event.changes.size >= 2) {
+        val factor = event.calculateZoom()
+        if (factor != 1f) {
+          onZoom(factor)
+          event.changes.forEach { it.consume() }
+        }
+      }
+    } while (event.changes.any { it.pressed })
+  }
+}
+
+/**
+ *  قالبِ ML Kit → خانواده‌ای که سد می‌فهمد.
+ *
+ *  چرا ترجمه لازم است: سد باید روی JVM و بدونِ دوربین سنجیده شود، پس
+ *  نباید به کتابخانهٔ ML Kit بند باشد. تنها جایی که این دو به هم
+ *  می‌رسند همین یک تابع است.
+ */
+private fun kindOf(format: Int): CodeKind = when (format) {
+  Barcode.FORMAT_EAN_13, Barcode.FORMAT_EAN_8, Barcode.FORMAT_UPC_A -> CodeKind.CHECKED
+  Barcode.FORMAT_ITF -> CodeKind.ITF
+  else -> CodeKind.OTHER
 }
 
 /**
@@ -439,12 +589,17 @@ private class FocusPilot {
   @Volatile private var lastReadAt = 0L
   @Volatile private var lastZoomAt = 0L
   @Volatile private var zoom = 1f
+  @Volatile private var maxZoom = 1f
   @Volatile private var tries = 0
   @Volatile private var told = false
+
+  /** تا این لحظه، بزرگ‌نمایی مالِ کاربر است و خودکار به آن دست نمی‌زند */
+  @Volatile private var manualUntil = 0L
 
   fun attach(
     cameraControl: CameraControl,
     macroCapable: Boolean,
+    maxZoom: Float,
     onHint: (String) -> Unit,
   ) {
     control = cameraControl
@@ -456,14 +611,23 @@ private class FocusPilot {
     tries = 0
     told = false
     zoom = 1f
+    this.maxZoom = if (maxZoom > 1f) maxZoom else 1f
+    manualUntil = 0L
     focusCenter(cameraControl)
   }
 
   fun detach() {
     //  حالتِ ماکرو مالِ همین نشست بود؛ با خودش می‌رود
     if (macroOn) runCatching { setAfMode(null) }
+    //  و چراغ هم — روشن ماندنش بعد از بسته شدنِ صفحه، باتری می‌خورد
+    runCatching { control?.enableTorch(false) }
     control = null
     hint = null
+  }
+
+  /** چراغِ دوربین — دستِ کاربر است، نه خودکار */
+  fun torch(on: Boolean) {
+    runCatching { control?.enableTorch(on) }
   }
 
   /** حالِ فوکوس، از زبانِ خودِ دوربین — هر فریم یک بار */
@@ -501,6 +665,8 @@ private class FocusPilot {
   fun nothingRead() {
     if (zoom <= 1.01f) return
     val now = System.currentTimeMillis()
+    //  بزرگ‌نمایی‌ای که خودِ کاربر گذاشته، برگردانده نمی‌شود
+    if (now < manualUntil) return
     if (now - lastReadAt < ZOOM_RESET_MS) return
     if (now - lastZoomAt < ZOOM_GAP_MS) return
     lastZoomAt = now
@@ -512,12 +678,33 @@ private class FocusPilot {
   fun zoomTo(wanted: Float): Boolean {
     val cameraControl = control ?: return false
     val now = System.currentTimeMillis()
+    //  تا وقتی کاربر خودش تنظیم کرده، پیشنهادِ خودکار پس زده می‌شود
+    if (now < manualUntil) return false
     if (now - lastZoomAt < ZOOM_GAP_MS) return false
     lastZoomAt = now
     zoom = wanted
     //  با نزدیک شدنِ کادر، صحنه عوض می‌شود؛ سهمیهٔ فوکوس هم از نو
     tries = 0
     return runCatching { cameraControl.setZoomRatio(wanted) }.isSuccess
+  }
+
+  /**
+   *  دو انگشتِ کاربر.
+   *
+   *  `factor` نسبتِ همین لحظه است نه نسبتِ کل، پس در بزرگ‌نماییِ حالا
+   *  ضرب می‌شود. بینِ یک و سقفِ خودِ دوربین بریده می‌شود — و از این لحظه
+   *  تا `MANUAL_ZOOM_HOLD_MS` بعد، دستِ خودکار به آن نمی‌رسد.
+   */
+  fun pinch(factor: Float) {
+    val cameraControl = control ?: return
+    if (factor <= 0f || !factor.isFinite()) return
+    val wanted = (zoom * factor).coerceIn(1f, maxZoom)
+    manualUntil = System.currentTimeMillis() + MANUAL_ZOOM_HOLD_MS
+    if (kotlin.math.abs(wanted - zoom) < 0.01f) return
+    zoom = wanted
+    //  صحنه عوض شد؛ سهمیهٔ فوکوس از نو
+    tries = 0
+    runCatching { cameraControl.setZoomRatio(wanted) }
   }
 
   /** انگشتِ کاربر روی تصویر: فوکوس و نورسنجی همان نقطه */
