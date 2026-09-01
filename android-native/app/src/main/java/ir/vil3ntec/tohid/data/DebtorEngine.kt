@@ -200,7 +200,7 @@ object DebtorEngine {
   fun debtSince(d: ShopData, debtorId: String): Long? {
     val mine = d.transactions
       .filter { it.debtorId == debtorId }
-      .sortedWith(compareBy({ it.date }, { it.createdAt }))
+      .sortedWith(compareBy<DebtTransaction>({ it.date }, { it.createdAt }))
     if (mine.isEmpty()) return null
 
     //  (زمانِ قرض، آنچه از آن مانده) — قدیمی‌ترین همیشه اول

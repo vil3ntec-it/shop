@@ -49,6 +49,7 @@ import java.io.File
  *  اندروید همان اجازه را برای این کار هم لازم می‌داند. بدونِ این
  *  پرسش، دکمهٔ دوربین روی خیلی از گوشی‌ها بی‌صدا هیچ کاری نمی‌کرد.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PhotoSourceSheet(
   open: Boolean,
