@@ -11,7 +11,10 @@ import androidx.compose.foundation.border
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.WindowInsets
@@ -623,7 +626,7 @@ private fun sinceText(at: Long): String {
  *  می‌دهد و نشان آرام نفس می‌کشد. قرمز در تمِ روشن و تاریک همان قرمز است:
  *  «تمام شدن» چیزی نیست که با تمِ گوشی عوض شود.
  *
- *  با زدنش، نورهای نقطه‌ای از کنج‌هایش بیرون می‌پاشند — جای آن برقی که
+ *  تا انگشت رویش است، نور از کناره‌هایش بیرون می‌آید — جای آن برقی که
  *  تا دیروز بی‌وقفه روی نشان می‌لغزید.
  *
  *  وضعیت یک بار سنجیده می‌شود، نه با هر بار کشیده شدنِ سربرگ —
@@ -664,8 +667,9 @@ private fun VipChip(onClick: () -> Unit) {
     else -> "VIP"
   }
 
-  //  جرقه‌ها با زدنِ خودِ نشان می‌آیند، نه با ساعت
-  val sparks = rememberSparks()
+  //  نور تا وقتی می‌آید که انگشت روی نشان است
+  val press = remember { MutableInteractionSource() }
+  val touched by press.collectIsPressedAsState()
 
   /*
    *  تپشِ قرمز — تنها حرکتِ همیشگیِ این نشان.
@@ -680,7 +684,7 @@ private fun VipChip(onClick: () -> Unit) {
   Row(
     Modifier
       .height(36.dp)
-      .edgeSparks(sparks, if (urgent) Color(0xFFFF9A92) else Color(0xFFFBE08A))
+      .edgeSparks(touched, if (urgent) Color(0xFFFF9A92) else Color(0xFFFBE08A))
       .clip(RoundedCornerShape(13.dp))
       .background(
         Brush.linearGradient(
@@ -693,10 +697,7 @@ private fun VipChip(onClick: () -> Unit) {
         if (urgent) Color.White.copy(alpha = beat * 0.8f) else Color.Transparent,
         RoundedCornerShape(13.dp),
       )
-      .clickable {
-        sparks.fire()
-        onClick()
-      }
+      .clickable(interactionSource = press, indication = null, onClick = onClick)
       .padding(horizontal = 10.dp),
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -718,27 +719,33 @@ private fun VipChip(onClick: () -> Unit) {
 }
 
 /**
- *  کلیدِ حساب — سفیدِ نیم‌شفاف، با جرقه‌ای که با زدن می‌آید.
+ *  کلیدِ حساب — سفیدِ نیم‌شفاف، با هاله‌ای که نفس می‌کشد.
  *
  *  رنگش از تم نمی‌آید: زیرش همیشه آبیِ تیرهٔ سربرگ است و آبیِ تم روی
  *  آبیِ تیره دیده نمی‌شد.
  */
 @Composable
 private fun AccountChip(onClick: () -> Unit) {
-  //  هالهٔ نفس‌کشانِ همیشگی برداشته شد: سربرگ در همهٔ صفحه‌ها هست و یک
-  //  انیمیشنِ بی‌وقفه در گوشهٔ چشم، هم حواس را می‌برد هم باتری را
-  val sparks = rememberSparks()
+  val motion = rememberInfiniteTransition(label = "accountChip")
+  val breathe by motion.animateFloat(
+    initialValue = 0.35f,
+    targetValue = 0.85f,
+    animationSpec = infiniteRepeatable(
+      tween(if (Motion.enabled) 2000 else 1, easing = EaseInOutSine),
+      RepeatMode.Reverse,
+    ),
+    label = "breathe",
+  )
+  val press = remember { MutableInteractionSource() }
+  val touched by press.collectIsPressedAsState()
   Box(
     Modifier
       .size(34.dp)
-      .edgeSparks(sparks, Color.White)
+      .edgeSparks(touched, Color.White)
       .clip(RoundedCornerShape(12.dp))
       .background(Color.White.copy(alpha = 0.16f))
-      .border(1.2.dp, Color.White.copy(alpha = 0.55f), RoundedCornerShape(12.dp))
-      .clickable {
-        sparks.fire()
-        onClick()
-      },
+      .border(1.2.dp, Color.White.copy(alpha = breathe * 0.75f), RoundedCornerShape(12.dp))
+      .clickable(interactionSource = press, indication = LocalIndication.current, onClick = onClick),
     contentAlignment = Alignment.Center,
   ) {
     Icon(

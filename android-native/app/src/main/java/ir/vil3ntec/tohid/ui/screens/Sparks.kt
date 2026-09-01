@@ -1,129 +1,143 @@
 package ir.vil3ntec.tohid.ui.screens
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import kotlin.math.min
+import kotlin.math.PI
+import kotlin.math.sin
 
 /**
- *  نورهای نقطه‌ای — از کنج‌ها و کناره‌ها، فقط وقتی دست می‌خورد.
+ *  نورهای زنده‌ی کناره‌ها — تا وقتی انگشت روی آن است.
  *
- *  ── جای چه چیزی را گرفت ───────────────────────────────────────────
- *  تا دیروز روی کارت‌های اشتراک یک «خطِ نور» بی‌وقفه این‌طرف و آن‌طرف
- *  می‌رفت. دو عیب داشت: یکی اینکه هیچ‌وقت تمام نمی‌شد و چشم را روی
- *  چیزی می‌کشید که خبری نداشت، و دیگری اینکه گوشیِ کاربر برای یک
- *  تزئین، بی‌دلیل بیدار می‌ماند و باتری می‌سوزاند.
+ *  ── این چه چیزی است ───────────────────────────────────────────────
+ *  انگشت که روی کارت می‌نشیند، از دورِ تا دورِ لبه‌ها نور بیرون
+ *  می‌زند: بیست‌وشش نقطه که پشتِ سرِ هم می‌زایند، بیرون می‌روند و محو
+ *  می‌شوند و جایشان تازه‌ها می‌آیند. تا انگشت هست، جریان هست. انگشت
+ *  که برداشته شد، نیم‌ثانیه‌ای آرام خاموش می‌شود.
  *  ──────────────────────────────────────────────────────────────────
  *
- *  حالا هیچ حرکتی نیست تا کاربر خودش کارت را بزند: همان لحظه یک مشت
- *  نقطهٔ نور از کنج‌ها و از میانهٔ هر ضلع بیرون می‌پاشد، دور می‌شود و
- *  محو می‌شود — کمتر از یک ثانیه. بعد از آن صفحه دوباره ساکن است.
- *
- *  ── دو نکتهٔ فنی که اگر رعایت نشوند کار نمی‌کند ────────────────────
- *   • این تغییردهنده باید **پیش از** `clip` بیاید. نقطه‌ها بیرونِ کادر
- *     کشیده می‌شوند و اگر بعد از `clip` بنشیند، همان‌جا بریده می‌شوند و
- *     چیزی دیده نمی‌شود.
- *   • فقط وقتی چیزی کشیده می‌شود که پخش در جریان باشد؛ در حالِ سکون،
- *     نه محاسبه‌ای هست و نه کشیدنی.
+ *  ── دو چیزی که جایش را گرفت ───────────────────────────────────────
+ *   • **خطِ نور**: نواری که بی‌وقفه روی کارت‌ها می‌لغزید. چیزی
+ *     نمی‌گفت، تمام نمی‌شد، و باتری را برای تزئین می‌سوزاند.
+ *   • **جرقه‌ی یک‌بارمصرف**: نسخه‌ی اولِ همین فایل با هر کلیک دوازده
+ *     نقطه می‌پاشید و تمام. کم بود و بی‌جان: می‌آمد و همان لحظه گم
+ *     می‌شد، و کاربر چیزی را که «روی آن است» نمی‌دید.
  *  ──────────────────────────────────────────────────────────────────
+ *
+ *  ── دو نکته‌ی فنی ─────────────────────────────────────────────────
+ *   • **پیش از `clip` بیاید.** نقطه‌ها بیرونِ کادر کشیده می‌شوند و بعد
+ *     از `clip` همان‌جا بریده می‌شوند.
+ *   • **در سکون هیچ چیز نمی‌چرخد.** حلقه‌ی فریم فقط وقتی راه می‌افتد
+ *     که چیزی روشن باشد؛ نه ساعتی، نه محاسبه‌ای، نه کشیدنی.
  */
-class Sparks internal constructor() {
-  /** با هر بار زدن یکی بالا می‌رود؛ پخشِ تازه از همین‌جا شروع می‌شود */
-  internal var shot by mutableStateOf(0)
-    private set
 
-  fun fire() {
-    shot++
+/** چند نقطه هم‌زمان در جریان‌اند */
+private const val COUNT = 26
+
+/** عمرِ هر نقطه، به ثانیه — از زادن تا محو شدن */
+private const val CYCLE = 1.05f
+
+/** روشن شدنِ جریان تند است و خاموش شدنش آرام */
+private const val FADE_IN_MS = 120
+private const val FADE_OUT_MS = 520
+
+/**
+ *  @param active تا وقتی درست است، نور می‌آید — همان حالتِ «انگشت روی
+ *    آن است» که از `MutableInteractionSource.collectIsPressedAsState()`
+ *    می‌آید.
+ *  @param tint رنگِ نورها؛ مغزِ هر نقطه سفیدِ داغ است و هاله‌اش همین رنگ.
+ */
+@Composable
+fun Modifier.edgeSparks(active: Boolean, tint: Color): Modifier {
+  //  شدتِ جریان: ۰ خاموش، ۱ کاملاً روشن
+  val life = remember { Animatable(0f) }
+  //  ساعتِ خودمان، به ثانیه — فقط وقتی چیزی روشن است جلو می‌رود
+  val clock = remember { mutableFloatStateOf(0f) }
+
+  LaunchedEffect(active) {
+    if (active) life.animateTo(1f, tween(if (Motion.enabled) FADE_IN_MS else 0))
+    else life.animateTo(0f, tween(if (Motion.enabled) FADE_OUT_MS else 0))
   }
-}
 
-@Composable
-fun rememberSparks(): Sparks = remember { Sparks() }
-
-/**
- *  زمانِ یک پخش. کوتاه است عمداً: چیزی که با انگشتِ کاربر شروع می‌شود
- *  باید پیش از برداشتنِ انگشت تمام شده باشد، وگرنه به کارِ بعدی‌اش
- *  می‌چسبد.
- */
-private const val BURST_MS = 620
-
-/** نقطه‌ها از این نقطه‌های لنگر بیرون می‌زنند: چهار کنج و میانهٔ ضلع‌ها */
-private val ANCHORS: List<Pair<Offset, Offset>> = listOf(
-  //  کنج‌ها — جهتِ بیرون‌رفتن، مورب
-  Offset(0f, 0f) to Offset(-0.7f, -0.7f),
-  Offset(1f, 0f) to Offset(0.7f, -0.7f),
-  Offset(0f, 1f) to Offset(-0.7f, 0.7f),
-  Offset(1f, 1f) to Offset(0.7f, 0.7f),
-  //  ضلعِ بالا و پایین
-  Offset(0.3f, 0f) to Offset(-0.15f, -1f),
-  Offset(0.7f, 0f) to Offset(0.15f, -1f),
-  Offset(0.3f, 1f) to Offset(-0.15f, 1f),
-  Offset(0.7f, 1f) to Offset(0.15f, 1f),
-  //  ضلعِ چپ و راست
-  Offset(0f, 0.32f) to Offset(-1f, -0.15f),
-  Offset(0f, 0.68f) to Offset(-1f, 0.15f),
-  Offset(1f, 0.32f) to Offset(1f, -0.15f),
-  Offset(1f, 0.68f) to Offset(1f, 0.15f),
-)
-
-/**
- *  @param sparks همان چیزی که با `rememberSparks()` گرفته می‌شود و در
- *    `onClick` صدا زده می‌شود: `sparks.fire()`.
- *  @param tint رنگِ نقطه‌ها — طلایی برای کارت‌های اشتراک، آبی برای بقیه.
- */
-@Composable
-fun Modifier.edgeSparks(sparks: Sparks, tint: Color): Modifier {
-  //  از یک تمام شده شروع می‌شود، پس در اولین کشیدنِ صفحه چیزی پیدا نیست
-  val run = remember { Animatable(1f) }
-
-  LaunchedEffect(sparks.shot) {
-    if (sparks.shot == 0 || !Motion.enabled) return@LaunchedEffect
-    run.snapTo(0f)
-    run.animateTo(1f, tween(BURST_MS, easing = LinearOutSlowInEasing))
+  /*
+   *  حلقه‌ی فریم تا وقتی می‌چرخد که یا انگشت روی کارت باشد یا جریان
+   *  در حالِ خاموش شدن. `withFrameNanos` ساعتِ خودِ کامپوز است، پس با
+   *  نرخِ صفحه‌ی همان گوشی جلو می‌رود — روی ۱۶۵ هرتز هم نرم است.
+   */
+  //  `isRunning` خوانده می‌شود نه `value`: با دومی، صفحه در تمامِ
+  //  نیم‌ثانیهٔ محو شدن فریم‌به‌فریم از نو ساخته می‌شد
+  val running = active || life.isRunning
+  LaunchedEffect(running) {
+    if (!running || !Motion.enabled) return@LaunchedEffect
+    var start = 0L
+    while (true) {
+      withFrameNanos { nanos ->
+        if (start == 0L) start = nanos
+        clock.floatValue = (nanos - start) / 1_000_000_000f
+      }
+    }
   }
 
   return drawWithContent {
     drawContent()
-    val progress = run.value
-    if (progress >= 1f || !Motion.enabled) return@drawWithContent
+    val glow = life.value
+    if (glow <= 0.001f || !Motion.enabled) return@drawWithContent
 
-    val reach = 15.dp.toPx()
-    ANCHORS.forEachIndexed { index, (at, dir) ->
-      /*
-       *  هر نقطه با تأخیرِ کوچکِ خودش راه می‌افتد.
-       *
-       *  با شروعِ هم‌زمان، دوازده نقطه یک حلقهٔ یکدست می‌شدند — مثل موجِ
-       *  انفجار در بازی‌ها، نه مثل جرقه. تأخیرِ پله‌ای از خودِ شماره
-       *  حساب می‌شود، پس تصادفی نیست و هر بار همان است.
-       */
-      val lag = (index % 4) * 0.09f
-      val local = ((progress - lag) / (1f - lag)).coerceIn(0f, 1f)
-      if (local <= 0f || local >= 1f) return@forEachIndexed
+    val t = clock.floatValue
+    if (size.width <= 0f || size.height <= 0f) return@drawWithContent
 
-      //  دورترها کمی بیشتر می‌روند تا حلقه یکدست نباشد
-      val travel = reach * (0.75f + (index % 3) * 0.2f) * local
-      val center = Offset(
-        x = size.width * at.x + dir.x * travel,
-        y = size.height * at.y + dir.y * travel,
-      )
-      //  تندِ روشن شدن، آرامِ محو شدن — جرقه این‌طور دیده می‌شود
-      val alpha = min(local / 0.12f, 1f) * (1f - local)
-      val radius = (2.6f - 1.4f * local).dp.toPx()
+    for (i in 0 until COUNT) {
+      //  جای تولد روی محیط، و اندازه و سرعت — همه از خودِ شماره حساب
+      //  می‌شوند (نسبتِ طلایی، تا کنارِ هم جمع نشوند) و هر بار همان‌اند
+      val seat = frac(i * 0.6180339f)
+      val vary = frac(i * 0.3819660f + 0.17f)
 
-      //  هالهٔ کم‌رنگ زیرِ نقطه: بدونش نقطه یک دانهٔ رنگ است، نه نور
-      drawCircle(color = tint.copy(alpha = alpha * 0.22f), radius = radius * 2.6f, center = center)
-      drawCircle(color = tint.copy(alpha = alpha), radius = radius, center = center)
+      val p = frac(t / (CYCLE * (0.72f + vary * 0.55f)) + seat + vary)
+      //  کندشدنِ آخرِ راه: نور از لبه تند بیرون می‌زند و بعد آرام می‌گیرد
+      val eased = 1f - (1f - p) * (1f - p)
+
+      val reach = (13f + vary * 13f).dp.toPx() * eased
+      val (at, dir) = pointOn(seat, size.width, size.height)
+      val center = Offset(at.x + dir.x * reach, at.y + dir.y * reach)
+
+      //  روشن و محو، نرم — نه ظاهر شدنِ ناگهانی
+      val alpha = glow * sin(PI.toFloat() * p)
+      if (alpha <= 0.02f) continue
+      val radius = (1.7f + vary * 2.1f).dp.toPx() * (1f - 0.4f * p)
+
+      drawCircle(color = tint.copy(alpha = alpha * 0.16f), radius = radius * 3.2f, center = center)
+      drawCircle(color = tint.copy(alpha = alpha * 0.85f), radius = radius, center = center)
+      drawCircle(color = Color.White.copy(alpha = alpha * 0.75f), radius = radius * 0.42f, center = center)
     }
   }
+}
+
+/** بخشِ کسریِ یک عدد — همیشه در بازه‌ی [۰، ۱) */
+private fun frac(v: Float): Float = v - kotlin.math.floor(v)
+
+/**
+ *  نقطه‌ای روی محیطِ کادر، و جهتِ بیرون‌رفتن از همان‌جا.
+ *
+ *  @param t جای نقطه روی محیط، از ۰ تا ۱ — از گوشه‌ی بالا شروع و
+ *    ساعت‌گرد. با پراکنده بودنِ نقطه‌ها، نور از **همه‌ی** کناره‌ها و
+ *    کنج‌ها می‌آید، نه از چند جای معلوم.
+ */
+private fun pointOn(t: Float, w: Float, h: Float): Pair<Offset, Offset> {
+  var d = frac(t) * 2f * (w + h)
+  if (d < w) return Offset(d, 0f) to Offset(0f, -1f)
+  d -= w
+  if (d < h) return Offset(w, d) to Offset(1f, 0f)
+  d -= h
+  if (d < w) return Offset(w - d, h) to Offset(0f, 1f)
+  d -= w
+  return Offset(0f, (h - d).coerceIn(0f, h)) to Offset(-1f, 0f)
 }

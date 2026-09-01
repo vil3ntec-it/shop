@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.ui.screens
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.animation.core.EaseInOutSine
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -36,6 +37,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.Dp
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.ui.graphics.Brush
@@ -139,32 +141,50 @@ private val GOLD_SWEEP = Brush.linearGradient(
 )
 
 /**
+ *  نبضِ آرام — هالهٔ طلاییِ کارت‌ها با یک ضربان نفس می‌کشد.
+ *
+ *  این همان چیزی است که از اول بود و برداشتنش اشتباه بود: خواسته
+ *  «برداشتنِ خطِ نور» بود، نه ساکن کردنِ همه‌چیز. هاله خطی نمی‌کشد،
+ *  فقط کم‌وزیاد می‌شود.
+ */
+@Composable
+private fun goldPulse(): Float {
+  val motion = rememberInfiniteTransition(label = "goldPulse")
+  val value by motion.animateFloat(
+    initialValue = 0f,
+    targetValue = 1f,
+    animationSpec = infiniteRepeatable(
+      tween(if (Motion.enabled) 2200 else 1, easing = EaseInOutSine),
+      RepeatMode.Reverse,
+    ),
+    label = "pulse",
+  )
+  return value
+}
+
+/**
  *  لبهٔ طلاییِ درخشان.
  *
  *  یک خطِ تنها فقط یک خط است؛ درخشش از لایه‌لایه بودن می‌آید — سه هالهٔ
  *  پهن و کم‌رنگِ بیرون از کادر، و بعد خودِ خط. چون هاله بیرونِ کادر
  *  کشیده می‌شود، این باید **پیش از** `clip` بیاید وگرنه بریده می‌شود.
  *
- *  ثابت است، نه نفس‌کشان: نبضِ همیشگی‌اش برداشته شد. حرکتِ این صفحه
- *  فقط وقتی است که کاربر چیزی را بزند.
  */
-/** روشناییِ ثابتِ هاله — جای همان نبضی که بی‌وقفه می‌زد */
-private const val GLOW = 0.8f
 
-private fun Modifier.goldEdge(radius: Dp, strong: Boolean = false): Modifier =
+private fun Modifier.goldEdge(radius: Dp, pulse: Float, strong: Boolean = false): Modifier =
   drawBehind {
     val lift = if (strong) 1f else 0.62f
     listOf(8f to 0.05f, 5f to 0.08f, 2.5f to 0.13f).forEach { (grow, alpha) ->
       val g = grow.dp.toPx()
       drawRoundRect(
-        color = GOLD.copy(alpha = alpha * lift * GLOW),
+        color = GOLD.copy(alpha = alpha * lift * (0.55f + pulse * 0.45f)),
         topLeft = Offset(-g, -g),
         size = Size(size.width + g * 2f, size.height + g * 2f),
         cornerRadius = CornerRadius(radius.toPx() + g, radius.toPx() + g),
         style = Stroke(width = g),
       )
     }
-    val line = (if (strong) 1.8f else 1.2f) + 0.2f
+    val line = (if (strong) 1.8f else 1.2f) + pulse * 0.4f
     val inset = line / 2f
     drawRoundRect(
       brush = Brush.linearGradient(listOf(GOLD_PALE, GOLD_DEEP, GOLD_SOFT, GOLD_DEEP)),
@@ -604,8 +624,7 @@ private fun SubscriptionState() {
  */
 @Composable
 private fun BuyButton(text: String, onClick: () -> Unit) {
-  //  نورهای نقطه‌ای، با خودِ زدنِ دکمه — نه یک برقِ همیشگی
-  val sparks = rememberSparks()
+  val pulse = goldPulse()
   val interaction = remember { MutableInteractionSource() }
   val pressed by interaction.collectIsPressedAsState()
   val scale by animateFloatAsState(
@@ -619,14 +638,12 @@ private fun BuyButton(text: String, onClick: () -> Unit) {
     Modifier
       .fillMaxWidth()
       .graphicsLayer { scaleX = scale; scaleY = scale }
-      .goldEdge(28.dp, strong = true)
-      .edgeSparks(sparks, GOLD)
+      .goldEdge(28.dp, pulse, strong = true)
+      //  تا انگشت روی دکمه است، نور از کناره‌ها می‌آید
+      .edgeSparks(pressed, GOLD)
       .clip(shape)
       .background(GOLD_SWEEP)
-      .clickable(interactionSource = interaction, indication = null) {
-        sparks.fire()
-        onClick()
-      }
+      .clickable(interactionSource = interaction, indication = null, onClick = onClick)
       .padding(horizontal = 18.dp, vertical = 15.dp),
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.Center,
@@ -668,9 +685,10 @@ private fun TierCard(
   ribbon: String = "",
 ) {
   val colors = Shop.colors
-  //  ستونِ VIP با زدن، جرقه می‌زند؛ ستونِ رایگان ساکن است
-  val sparks = rememberSparks()
+  val pulse = goldPulse()
+  //  ستونِ VIP تا وقتی انگشت رویش است نور می‌دهد؛ ستونِ رایگان ساکن است
   val tap = remember { MutableInteractionSource() }
+  val touched by tap.collectIsPressedAsState()
   val bodyShape =
     if (ribbon.isNotBlank()) RoundedCornerShape(bottomStart = Radius.md, bottomEnd = Radius.md)
     else RoundedCornerShape(Radius.md)
@@ -718,8 +736,8 @@ private fun TierCard(
       Modifier
         .fillMaxWidth()
         .weight(1f)
-        .then(if (highlighted) Modifier.goldEdge(Radius.md, strong = true) else Modifier)
-        .then(if (highlighted) Modifier.edgeSparks(sparks, GOLD) else Modifier)
+        .then(if (highlighted) Modifier.goldEdge(Radius.md, pulse, strong = true) else Modifier)
+        .then(if (highlighted) Modifier.edgeSparks(touched, GOLD) else Modifier)
         .clip(bodyShape)
         .background(colors.surface)
         .then(
@@ -727,11 +745,11 @@ private fun TierCard(
           else Modifier.border(1.dp, colors.border, bodyShape)
         )
         .then(
-          //  زدنِ این ستون جایی نمی‌برد؛ فقط جرقه‌اش را روشن می‌کند —
+          //  زدنِ این ستون جایی نمی‌برد؛ فقط نورش را روشن می‌کند —
           //  مدت را کاربر از کارت‌های پایین انتخاب می‌کند
           if (highlighted) Modifier.clickable(
             interactionSource = tap, indication = null,
-          ) { sparks.fire() }
+          ) {}
           else Modifier
         )
         .padding(14.dp),
@@ -851,7 +869,9 @@ private fun PlanCard(
   val colors = Shop.colors
   val perDay = plan.price.toDouble() / plan.days
   val golden = plan.badge.isNotBlank()
-  val sparks = rememberSparks()
+  val pulse = goldPulse()
+  val press = remember { MutableInteractionSource() }
+  val touched by press.collectIsPressedAsState()
   val shape = RoundedCornerShape(Radius.md)
 
   // سه کارت در عرضِ یک گوشی یعنی هر کدام حدودِ صد نقطه؛ با فاصله‌های
@@ -872,8 +892,9 @@ private fun PlanCard(
       Modifier
         .fillMaxWidth()
         .then(if (stretch) Modifier.weight(1f) else Modifier)
-        .then(if (golden) Modifier.goldEdge(Radius.md, strong = selected) else Modifier)
-        .edgeSparks(sparks, if (golden) GOLD else colors.primary)
+        .then(if (golden) Modifier.goldEdge(Radius.md, pulse, strong = selected) else Modifier)
+        //  تا انگشت روی کارت است، نور از کناره‌هایش می‌آید
+        .edgeSparks(touched, if (golden) GOLD else colors.primary)
         .clip(shape)
         .background(colors.surface)
         .then(
@@ -884,10 +905,11 @@ private fun PlanCard(
             shape,
           )
         )
-        .clickable {
-          sparks.fire()
-          onClick()
-        }
+        .clickable(
+          interactionSource = press,
+          indication = LocalIndication.current,
+          onClick = onClick,
+        )
         .padding(horizontal = if (wide) 14.dp else 8.dp, vertical = if (wide) 14.dp else 11.dp),
       horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -1066,20 +1088,18 @@ fun VipGate(label: String, content: @Composable () -> Unit) {
  */
 @Composable
 private fun GoldButton(text: String, onClick: () -> Unit) {
-  val sparks = rememberSparks()
+  val press = remember { MutableInteractionSource() }
+  val touched by press.collectIsPressedAsState()
   Row(
     Modifier
-      .edgeSparks(sparks, GOLD)
+      .edgeSparks(touched, GOLD)
       .clip(RoundedCornerShape(26.dp))
       .background(
         Brush.linearGradient(
           listOf(Color(0xFFF6D36B), Color(0xFFE0A92C), Color(0xFFF8E39A), Color(0xFFD9982A))
         )
       )
-      .clickable {
-        sparks.fire()
-        onClick()
-      }
+      .clickable(interactionSource = press, indication = LocalIndication.current, onClick = onClick)
       .padding(horizontal = 22.dp, vertical = 13.dp),
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(7.dp),
