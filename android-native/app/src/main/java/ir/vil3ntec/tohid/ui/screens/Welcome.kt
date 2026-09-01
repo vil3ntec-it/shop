@@ -74,7 +74,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import ir.vil3ntec.tohid.core.config.ApiConfig
 import ir.vil3ntec.tohid.core.config.AppConfig
 import ir.vil3ntec.tohid.core.model.SessionDto
 import ir.vil3ntec.tohid.core.net.userText
@@ -158,15 +157,9 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
   // ایمیل: ورود یا ساختِ حساب
   var emailMode by rememberSaveable { mutableStateOf("login") }
 
-  /*
-   *  نشانیِ سرور فقط در ساختِ آزمایشی دیده می‌شود.
-   *
-   *  با هر تغییر، همان‌جا در پیکربندی می‌نشیند — نه بعد از ورودِ موفق.
-   *  دلیلش این است که لایهٔ شبکه نشانی را از پیکربندی می‌خواند، نه از
-   *  این صفحه؛ همان قاعده‌ای که صفحهٔ تنظیمات هم دارد.
-   */
-  var server by rememberSaveable { mutableStateOf(state.serverUrl) }
-  var showMore by rememberSaveable { mutableStateOf(!AppConfig.isLocked && state.serverUrl.isBlank()) }
+  //  کشوی پایین فقط «کد شاگرد» است و بسته می‌آید؛ چیزی برای تنظیم
+  //  کردن نمانده که خودش باز شود
+  var showMore by rememberSaveable { mutableStateOf(false) }
 
   //  صفحه هیچ‌وقت خودش کارگزارِ شبکه نمی‌سازد
   val auth = remember(context) { Backend.auth(context) }
@@ -212,9 +205,8 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
    *  یک بار می‌پرسیم.
    */
   var googleId by remember { mutableStateOf("") }
-  LaunchedEffect(server) {
+  LaunchedEffect(Unit) {
     if (!AppConfig.isConfigured(context)) { googleId = ""; return@LaunchedEffect }
-    kotlinx.coroutines.delay(700)
     googleId = auth.googleClientId()
   }
 
@@ -257,8 +249,9 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
     }
   }
 
-  //  «می‌شود به سرور زد یا نه» را پیکربندی می‌گوید
-  val ready = ApiConfig.isValid(server, AppConfig.allowInsecure)
+  //  «می‌شود به سرور زد یا نه» را پیکربندی می‌گوید — نه چیزی که کاربر
+  //  تایپ کرده باشد
+  val ready = AppConfig.isConfigured(context)
 
   /*
    *  کدِ شش‌رقمی، در صفحهٔ خودش.
@@ -676,7 +669,7 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
             )
             Spacer(Modifier.width(6.dp))
             Text(
-              if (showMore) "بستن" else if (AppConfig.isLocked) "کد شاگرد دارم" else "کد شاگرد و تنظیم سرور",
+              if (showMore) "بستن" else "کد شاگرد دارم",
               style = MaterialTheme.typography.labelMedium,
               color = inkSoft,
             )
@@ -780,26 +773,23 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
             )
 
             /*
-             *  نشانیِ سرور فقط در ساختِ خودی دیده می‌شود.
+             *  نشانیِ سرور اینجا نیست و هیچ‌جای دیگر هم نیست.
              *
-             *  در نسخه‌ای که به دستِ کاربر می‌رسد، نشانی از قبل داخلِ
-             *  برنامه است و این کادر اصلاً ساخته نمی‌شود — نه دیده
-             *  می‌شود، نه می‌شود عوضش کرد.
+             *  نشانی در زمانِ ساخت داخلِ برنامه می‌نشیند و قفل است؛ نه
+             *  دیده می‌شود، نه می‌شود برنامه را به سرورِ دیگری برد.
+             *
+             *  اگر نسخه‌ای بی‌نشانی ساخته شود، همین صفحه پایین‌تر
+             *  می‌گوید که حساب کار نمی‌کند — به‌جای کادری که کاربر
+             *  نمی‌داند در آن چه بنویسد.
              */
-            if (!AppConfig.isLocked) {
+            if (!AppConfig.isConfigured(context)) {
               Spacer(Modifier.height(12.dp))
-              PillField(
-                value = server,
-                onValueChange = { server = it; state.serverUrl = it; error = null },
-                placeholder = "آدرس سرور — https://…",
-                icon = Icons.Filled.Tune,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-                ltr = true,
-              )
               Text(
-                "این نسخه به سروری بسته نشده؛ برای آزمایش نشانی را بزنید.",
+                "این نسخه به سروری بسته نشده، پس حساب و همگام‌سازی در آن " +
+                  "کار نمی‌کند. برنامه بدونِ حساب کامل کار می‌کند؛ برای حساب، " +
+                  "نسخهٔ منتشرشده را نصب کنید.",
                 style = MaterialTheme.typography.labelSmall,
-                color = Shop.colors.muted2,
+                color = Shop.colors.warning,
                 modifier = Modifier.padding(top = 6.dp, start = 4.dp),
               )
             }

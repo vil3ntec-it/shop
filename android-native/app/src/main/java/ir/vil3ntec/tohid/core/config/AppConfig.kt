@@ -7,17 +7,14 @@ import ir.vil3ntec.tohid.BuildConfig
  *  پیکربندیِ برنامه — تنها جایی که نشانیِ سرور از آن خوانده می‌شود.
  *
  *  هیچ صفحه‌ای، هیچ مخزنی و هیچ کلاسِ شبکه‌ای نشانی را از جای دیگری
- *  برنمی‌دارد. علتش ساده است: تا دیروز هر صفحه خودش `state.serverUrl` را
- *  می‌خواند و خودش `trim().trimEnd('/')` می‌کرد؛ یعنی همان قاعده هشت جا
- *  تکرار شده بود و اگر یک جا فراموش می‌شد، همان یک صفحه ۴۰۴ می‌گرفت.
+ *  برنمی‌دارد. علتش ساده است: تا دیروز هر صفحه خودش نشانی را می‌خواند و
+ *  خودش `trim().trimEnd('/')` می‌کرد؛ یعنی همان قاعده هشت جا تکرار شده
+ *  بود و اگر یک جا فراموش می‌شد، همان یک صفحه ۴۰۴ می‌گرفت.
  *
- *  ترتیبِ مقدارها:
- *
- *    ۱) `BuildConfig.API_BASE` — دامنه‌ای که هنگامِ ساختِ نسخه گذاشته شده
- *    ۲) مقدارِ ذخیره‌شده — فقط در نسخه‌هایی که بندِ یک خالی است
- *
- *  در نسخهٔ منتشرشده بندِ یک پر است، پس کاربر نه نشانی را می‌بیند و نه
- *  می‌تواند برنامه را به سرورِ دیگری ببرد.
+ *  **یک سرچشمه و بس:** `BuildConfig.API_BASE` — دامنه‌ای که هنگامِ ساختِ
+ *  نسخه داخلش نشسته. کاربر نه آن را می‌بیند و نه می‌تواند برنامه را به
+ *  سرورِ دیگری ببرد؛ کادرِ «آدرس سرور» از هر دو صفحه برداشته شده و راهِ
+ *  نوشتنش هم بسته است.
  *
  *  پیکربندی از منطقِ کار جداست: این کلاس فقط «کجا» را می‌داند، نه اینکه
  *  با آن چه می‌کنند.
@@ -26,9 +23,6 @@ object AppConfig {
 
   /** نشانیِ زمانِ ساخت. خالی یعنی این نسخه به سروری بسته نشده. */
   val buildTimeBaseUrl: String get() = ApiConfig.normalize(BuildConfig.API_BASE)
-
-  /** آیا نشانی در خودِ نسخه نشسته است */
-  val isLocked: Boolean get() = buildTimeBaseUrl.isNotEmpty()
 
   /**
    *  آیا `http://` ساده پذیرفته است.
@@ -40,29 +34,45 @@ object AppConfig {
    */
   val allowInsecure: Boolean get() = BuildConfig.DEBUG
 
-  /** نشانیِ ریشه — بدونِ `/api/v1`، بدونِ `/` آخر */
-  fun baseUrl(context: Context): String =
-    if (isLocked) buildTimeBaseUrl else ApiConfig.normalize(prefs(context).getString(KEY_BASE, ""))
+  /**
+   *  نشانیِ ریشه — بدونِ `/api/v1`، بدونِ `/` آخر.
+   *
+   *  ── تنها سرچشمه ───────────────────────────────────────────────────
+   *  فقط از `BuildConfig` می‌آید. تا دیروز اگر نسخه بی‌نشانی ساخته شده
+   *  بود، مقدارِ ذخیره‌شده روی گوشی هم خوانده می‌شد و کادرهای «آدرس
+   *  سرور» همان را می‌نوشتند. آن کادرها برداشته شدند و این راه هم با
+   *  آن‌ها بسته شد: هیچ چیزی روی گوشی نمی‌تواند برنامه را به سرورِ
+   *  دیگری ببرد.
+   *
+   *  مقدارِ به‌جامانده از نسخه‌های قبل هم یک بار پاک می‌شود، وگرنه
+   *  گوشی‌ای که دیروز دستی تنظیم شده بود همان‌جا می‌ماند.
+   *  ──────────────────────────────────────────────────────────────────
+   */
+  fun baseUrl(context: Context): String {
+    forgetStoredBase(context)
+    return buildTimeBaseUrl
+  }
+
+  /**
+   *  نشانیِ دستیِ نسخه‌های قبل — یک بار پاک می‌شود و دیگر خوانده نمی‌شود.
+   *
+   *  یک بار در هر اجرای برنامه، نه با هر درخواست: `baseUrl` از دلِ
+   *  لایهٔ شبکه صدا زده می‌شود و آن مسیر جای خواندنِ حافظه نیست.
+   */
+  @Volatile private var cleaned = false
+
+  private fun forgetStoredBase(context: Context) {
+    if (cleaned) return
+    cleaned = true
+    runCatching {
+      val prefs = prefs(context)
+      if (prefs.contains(KEY_BASE)) prefs.edit().remove(KEY_BASE).apply()
+    }
+  }
 
   /** آیا برنامه می‌داند به کجا وصل شود */
   fun isConfigured(context: Context): Boolean =
     ApiConfig.isValid(baseUrl(context), allowInsecure)
-
-  /**
-   *  گذاشتنِ نشانی به دست — فقط در نسخهٔ بی‌نشانی.
-   *
-   *  اگر نسخه با دامنه ساخته شده باشد این کار بی‌اثر است و `false`
-   *  برمی‌گرداند؛ بی‌سروصدا نادیده نمی‌گیرد تا صدازننده بفهمد چه شد.
-   */
-  fun setBaseUrl(context: Context, value: String): Boolean {
-    if (isLocked) return false
-    prefs(context).edit().putString(KEY_BASE, ApiConfig.normalize(value)).apply()
-    return true
-  }
-
-  /** چرا نشانیِ فعلی کار نمی‌کند — برای نشان دادن در تنظیمات */
-  fun rejection(context: Context): ApiConfig.Rejection? =
-    ApiConfig.reject(baseUrl(context), allowInsecure)
 
   /**
    *  پیکربندی جداست از داده‌های کار، پس پروندهٔ خودش را دارد.

@@ -1,7 +1,6 @@
 package ir.vil3ntec.tohid.sync
 
 import android.content.Context
-import ir.vil3ntec.tohid.core.config.AppConfig
 import ir.vil3ntec.tohid.core.net.TokenStore
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -25,17 +24,6 @@ class SyncStore(context: Context) {
     get() = prefs.getString(DEVICE, null) ?: newDeviceUid().also {
       prefs.edit().putString(DEVICE, it).apply()
     }
-
-  /**
-   *  نشانیِ سرور.
-   *
-   *  دیگر اینجا نگه داشته نمی‌شود: `AppConfig` تنها جایی است که نشانی از
-   *  آن خوانده می‌شود، و این فقط راهِ رسیدن به آن است تا کدِ موجود
-   *  نشکند. اگر نسخه با دامنه ساخته شده باشد، نوشتن روی آن بی‌اثر است.
-   */
-  var serverUrl: String
-    get() = AppConfig.baseUrl(app)
-    set(v) { AppConfig.setBaseUrl(app, v) }
 
   /**
    *  توکن‌ها — رمزشده در `TokenStore`، نه اینجا.
@@ -232,9 +220,9 @@ class SyncStore(context: Context) {
 
   private companion object {
     const val DEVICE = "device_uid"
-    //  `server_url`، `access_token` و `refresh_token` دیگر اینجا نوشته
-    //  نمی‌شوند: اولی در `AppConfig` است و دو تای بعدی در `TokenStore`ِ
-    //  رمزشده. مقدارِ به‌جامانده‌شان یک بار خوانده و پاک می‌شود.
+    //  `server_url`، `access_token` و `refresh_token` دیگر اینجا نیستند:
+    //  نشانیِ سرور در زمانِ ساخت داخلِ برنامه می‌نشیند و دو تای بعدی در
+    //  `TokenStore`ِ رمزشده‌اند. مقدارِ به‌جامانده‌شان یک بار پاک می‌شود.
     const val NAME = "account_name"
     const val EMAIL = "account_email"
     const val PHONE = "account_phone"
