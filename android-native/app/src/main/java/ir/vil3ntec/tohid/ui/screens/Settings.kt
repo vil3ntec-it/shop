@@ -47,7 +47,6 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.runtime.CompositionLocalProvider
 import ir.vil3ntec.tohid.BuildConfig
-import ir.vil3ntec.tohid.data.AccountKeys
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.BackupClock
 import ir.vil3ntec.tohid.data.ShopStore
@@ -117,8 +116,24 @@ fun SettingsScreen(
   var licenseStatus by remember { mutableStateOf(syncer.status()) }
   var confirmClear by remember { mutableStateOf(false) }
   var confirmRotate by remember { mutableStateOf(false) }
-  var apiKey by remember { mutableStateOf(AccountKeys.apiKey(context)) }
-  var staffCode by remember { mutableStateOf(AccountKeys.staffCode(context)) }
+  /*
+   *  کدِ شاگرد از **سرور** می‌آید.
+   *
+   *  ── چه چیزی اینجا درست شد ────────────────────────────────────────
+   *  تا دیروز برنامه خودش یک کدِ تصادفی می‌ساخت و همین‌جا نشانش
+   *  می‌داد. سرور آن کد را نساخته بود و نمی‌شناختش؛ پس شاگردی که
+   *  همان را می‌زد، جواب می‌گرفت «این کد معتبر نیست». کدِ واقعی همان
+   *  کدِ ثابتِ دکان روی سرور است — همان که صفحهٔ «کارمندان دکان» هم
+   *  نشان می‌دهد.
+   *  ──────────────────────────────────────────────────────────────────
+   *
+   *  «کلید حساب» هم از اینجا برداشته شد: آن هم روی خودِ گوشی ساخته
+   *  می‌شد و هیچ‌جا فرستاده نمی‌شد، پس فرستادنش برای فروشنده هیچ کاری
+   *  نمی‌کرد. اشتراک از پنلِ مدیریت روی خودِ دکان فعال می‌شود.
+   */
+  val shops = remember(context) { Backend.shop(context) }
+  var staffCode by remember { mutableStateOf("") }
+  var staffCodeBusy by remember { mutableStateOf(false) }
   var cameraGranted by remember {
     mutableStateOf(
       androidx.core.content.ContextCompat.checkSelfPermission(
@@ -130,6 +145,17 @@ fun SettingsScreen(
   var pendingRestore by remember { mutableStateOf<ShopData?>(null) }
   var restoreError by remember { mutableStateOf<String?>(null) }
   var canUndo by remember { mutableStateOf(store.hasSafetyCopy()) }
+
+  /*
+   *  یک بار خوانده می‌شود، بی‌صدا.
+   *
+   *  نبودنِ اینترنت یا نبودنِ حساب خطا نیست: کادر خالی می‌ماند و
+   *  همان‌جا نوشته می‌شود چرا.
+   */
+  LaunchedEffect(signedIn) {
+    if (!signedIn || !Backend.isReady(context)) return@LaunchedEffect
+    staffCode = shops.standingCode()
+  }
 
   fun toast(text: String) {
     scope.launch { snackbar.showSnackbar(text) }
@@ -323,6 +349,12 @@ fun SettingsScreen(
                   auth.login(identifier.trim(), password)
                     .onSuccess { session ->
                       state.rememberAccount(session.user)
+                      //  نقش از همین پاسخ می‌آید؛ بدونش کسی که شاگردِ
+                      //  دکانِ دیگری است، تا راه‌اندازیِ بعدیِ برنامه
+                      //  تنظیمات را باز می‌دید
+                      session.shop?.role?.let {
+                        ir.vil3ntec.tohid.data.ShopRole.remember(context, it)
+                      }
                       SavedLogins.remember(context, identifier.trim(), session.user.name)
                       signedIn = true
                       password = ""
@@ -546,31 +578,38 @@ fun SettingsScreen(
     item {
       SettingsSection(
         icon = Icons.Filled.Key,
-        title = "کلیدهای حساب",
-        subtitle = "کلید حساب و کد شاگرد",
+        title = "کد شاگرد",
+        subtitle = "کدی که کارمندتان با آن روی همین دکان می‌آید",
         tint = Shop.colors.accent,
       ) {
-        KeyLine("کلید حساب شما", apiKey) {
-          copyToClipboard(context, "کلید حساب", apiKey)
-          toast("کلید حساب کپی شد")
+        if (staffCode.isNotBlank()) {
+          KeyLine("کد شاگرد", staffCode) {
+            copyToClipboard(context, "کد شاگرد", staffCode)
+            toast("کد شاگرد کپی شد")
+          }
+          Text(
+            "این کد را به شاگردتان بدهید تا در صفحهٔ ورود بزند و روی همین دکان بیاید — " +
+              "ایمیل و شماره لازم نیست. با کد، حسابِ خودش ساخته می‌شود و هر کارش در " +
+              "«سابقه عملیات» به نامِ خودش می‌نشیند. تنظیمات و عددهای سود برای او بسته است.",
+            style = MaterialTheme.typography.labelSmall,
+            color = Shop.colors.muted2,
+          )
+          Spacer(Modifier.height(12.dp))
+          TohidSecondaryButton(
+            text = if (staffCodeBusy) "در حال ساخت…" else "ساخت کد تازه",
+            onClick = { if (!staffCodeBusy) confirmRotate = true },
+          )
+        } else {
+          Text(
+            if (!signedIn)
+              "کد شاگرد روی سرور ساخته می‌شود، پس اول وارد حساب شوید و دکانتان را بسازید."
+            else
+              "کد خوانده نشد — برای گرفتنش به اینترنت نیاز است. " +
+                "همین کد در «بیشتر → کارمندان دکان» هم هست.",
+            style = MaterialTheme.typography.labelSmall,
+            color = Shop.colors.muted2,
+          )
         }
-        Text(
-          "هنگام خرید اشتراک، همین را برای فروشنده بفرستید تا اشتراک روی حساب خودتان فعال شود.",
-          style = MaterialTheme.typography.labelSmall,
-          color = Shop.colors.muted2,
-        )
-        Spacer(Modifier.height(16.dp))
-        KeyLine("کد شاگرد", staffCode) {
-          copyToClipboard(context, "کد شاگرد", staffCode)
-          toast("کد شاگرد کپی شد")
-        }
-        Text(
-          "این کد را به شاگردهایتان بدهید تا در صفحهٔ ورود بزنند و روی همین دکان بیایند.",
-          style = MaterialTheme.typography.labelSmall,
-          color = Shop.colors.muted2,
-        )
-        Spacer(Modifier.height(12.dp))
-        TohidSecondaryButton(text = "ساخت کد تازه", onClick = { confirmRotate = true })
       }
     }
 
@@ -709,8 +748,18 @@ fun SettingsScreen(
       confirmButton = {
         TextButton(onClick = {
           confirmRotate = false
-          staffCode = AccountKeys.rotateStaffCode(context)
-          toast("کد شاگرد تازه ساخته شد")
+          staffCodeBusy = true
+          scope.launch {
+            //  کد روی سرور عوض می‌شود، نه روی گوشی: شاگردی که فردا
+            //  کدِ قبلی را بزند باید همان‌جا رد شود
+            shops.rotateStandingCode()
+              .onSuccess {
+                staffCode = it.code.ifBlank { shops.standingCode() }
+                toast("کد شاگرد تازه ساخته شد")
+              }
+              .onFailure { toast(it.userMessage) }
+            staffCodeBusy = false
+          }
         }) { Text("بساز") }
       },
       dismissButton = { TextButton(onClick = { confirmRotate = false }) { Text("انصراف") } },

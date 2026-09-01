@@ -79,7 +79,7 @@ import ir.vil3ntec.tohid.core.config.AppConfig
 import ir.vil3ntec.tohid.core.model.SessionDto
 import ir.vil3ntec.tohid.core.net.userText
 import ir.vil3ntec.tohid.data.repo.Backend
-import ir.vil3ntec.tohid.data.AccountKeys
+import ir.vil3ntec.tohid.data.StaffCode
 import ir.vil3ntec.tohid.data.LedgerOwner
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.sync.SavedLogins
@@ -693,7 +693,7 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
             PillField(
               value = staffCode,
               onValueChange = { staffCode = it.uppercase(); error = null },
-              placeholder = "کد شاگرد — SHG-XXXXX-XXXXX-XXXXX",
+              placeholder = "کد شاگرد — ${StaffCode.HINT}",
               icon = Icons.Filled.Storefront,
               ltr = true,
               trailing = {
@@ -701,9 +701,9 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
                   enabled = !busy && staffCode.isNotBlank(),
                   contentPadding = PaddingValues(horizontal = 8.dp),
                   onClick = {
-                    val entered = staffCode.trim().uppercase()
-                    if (!AccountKeys.STAFF_RE.matches(entered)) {
-                      error = "این کد درست نیست. کد باید مثل SHG-XXXXX-XXXXX-XXXXX باشد."
+                    val entered = StaffCode.clean(staffCode)
+                    if (!StaffCode.looksValid(entered)) {
+                      error = "این کد درست نیست. کد باید مثل ${StaffCode.HINT} باشد."
                       return@TextButton
                     }
                     busy = true; error = null
@@ -727,6 +727,12 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
                         //  می‌پیوندد و حسابِ تازه‌ای ساخته نمی‌شود
                         shops.join(entered)
                           .onSuccess { shopState ->
+                            //  نقش همین‌جا نوشته می‌شود، نه در تازه‌سازیِ
+                            //  بعدی: کسی که با کد پیوسته «شاگرد» است و
+                            //  نباید حتی یک لحظه تنظیمات را باز ببیند
+                            shopState.role?.let {
+                              ir.vil3ntec.tohid.data.ShopRole.remember(context, it)
+                            }
                             runCatching {
                               LedgerOwner.shopChanged(
                                 context, store, shopState.shop?.id.orEmpty(),
