@@ -73,20 +73,19 @@ fun DashboardScreen(d: ShopData, onOpen: (String) -> Unit = {}) {
   val today = todayIso()
   val monthPrefix = today.take(7)
 
-  val todaySales = d.sales.filter { it.date == today && it.status != "cancelled" }
-  val todayTotal = todaySales.sumOf { it.finalTotal }
-  val todayExpense = d.expenses.filter { it.date == today }.sumOf { it.amount }
-  val todayProfit = ReportEngine.sales(d, today, today).netProfit
-
-  val debtorBalances = d.debtors.map { it to ShopStore.debt(d, it.id) }
-  val owing = debtorBalances.filter { it.second > 0 }.sortedByDescending { it.second }
-  val totalDebt = owing.sumOf { it.second }
-  val expenseMonth = d.expenses.filter { it.date.startsWith(monthPrefix) }.sumOf { it.amount }
-  val supplierDebt = d.suppliers.sumOf { ShopStore.supplierDebt(d, it.id) }.coerceAtLeast(0.0)
-
-  val lowStock = d.products.filter { ShopStore.stockStatus(d, it) == "low" }
-  val outOfStock = d.products.filter { ShopStore.stockStatus(d, it) == "out" }
-  val warehouse = WarehouseEngine.summary(d)
+  /*
+   *  همهٔ حساب‌های این صفحه، **یک بار** به ازای هر دفتر.
+   *
+   *  تا دیروز هیچ‌کدام داخلِ `remember` نبودند. یعنی هر بار که صفحه
+   *  دوباره کشیده می‌شد — یک اسنک‌بار، عوض شدنِ تم، رسیدنِ یک تیکِ
+   *  همگام‌سازی — تمامِ این حساب‌ها از نو انجام می‌شدند: سودِ امروز
+   *  (که خودش کلِ فاکتورها و اقلام را می‌گردد)، بدهیِ تک‌تکِ قرض‌داران،
+   *  بدهی به تک‌تکِ تأمین‌کننده‌ها، و وضعیتِ موجودیِ همهٔ کالاها. روی
+   *  همان صفحه‌ای که بیشترین وقت باز است.
+   *
+   *  `d` تغییرناپذیر است، پس تا وقتی همان دفتر است جواب هم همان است.
+   */
+  val view = remember(d, today) { DashboardNumbers.of(d, today) }
 
 
   Column(
@@ -124,13 +123,6 @@ fun DashboardScreen(d: ShopData, onOpen: (String) -> Unit = {}) {
     /* ------------------------- حلقه‌های امروز ------------------------- */
     // سه عددی که فروشنده صبح اول وقت می‌خواهد بداند، هرکدام با کمانی که
     // می‌گوید نسبت به این ماه کجاست
-    val monthSalesTotal = d.sales
-      .filter { it.status != "cancelled" && it.date.startsWith(monthPrefix) }
-      .sumOf { it.finalTotal }
-    val bestDay = d.sales
-      .filter { it.status != "cancelled" && it.date.startsWith(monthPrefix) }
-      .groupBy { it.date }
-      .maxOfOrNull { (_, list) -> list.sumOf { it.finalTotal } } ?: 0.0
 
     /*
      *  بالای صفحه.
@@ -149,10 +141,10 @@ fun DashboardScreen(d: ShopData, onOpen: (String) -> Unit = {}) {
         ) {
           StatRing(
             label = "فروش امروز",
-            value = money(animatedMoney(todayTotal)),
+            value = money(animatedMoney(view.todayTotal)),
             caption = "افغانی",
             // نسبت به بهترین روزِ همین ماه — سقفی که خودِ دکان ساخته
-            fraction = if (bestDay > 0) (todayTotal / bestDay).toFloat() else 0f,
+            fraction = if (view.bestDay > 0) (view.todayTotal / view.bestDay).toFloat() else 0f,
             tint = Shop.colors.primary,
           )
           /*
@@ -166,17 +158,17 @@ fun DashboardScreen(d: ShopData, onOpen: (String) -> Unit = {}) {
           if (canSeeMoney) {
             StatRing(
               label = "سود امروز",
-              value = money(animatedMoney(todayProfit)),
+              value = money(animatedMoney(view.todayProfit)),
               caption = "افغانی",
-              fraction = if (todayTotal > 0) (todayProfit / todayTotal).toFloat().coerceAtLeast(0f) else 0f,
-              tint = if (todayProfit >= 0) Shop.colors.success else Shop.colors.danger,
+              fraction = if (view.todayTotal > 0) (view.todayProfit / view.todayTotal).toFloat().coerceAtLeast(0f) else 0f,
+              tint = if (view.todayProfit >= 0) Shop.colors.success else Shop.colors.danger,
             )
           } else {
             StatRing(
               label = "فروش‌های امروز",
-              value = todaySales.size.fa(),
+              value = view.todaySales.size.fa(),
               caption = "فاکتور",
-              fraction = if (todaySales.isNotEmpty()) 1f else 0f,
+              fraction = if (view.todaySales.isNotEmpty()) 1f else 0f,
               tint = Shop.colors.accent,
             )
           }
@@ -188,7 +180,7 @@ fun DashboardScreen(d: ShopData, onOpen: (String) -> Unit = {}) {
             style = MaterialTheme.typography.labelMedium,
             color = Shop.colors.muted,
           )
-          TohidMoneyText(amount = monthSalesTotal, tint = Shop.colors.text)
+          TohidMoneyText(amount = view.monthSalesTotal, tint = Shop.colors.text)
         }
       }
     }
@@ -196,9 +188,9 @@ fun DashboardScreen(d: ShopData, onOpen: (String) -> Unit = {}) {
     val owedCard: @Composable (Modifier) -> Unit = { m ->
       TohidStatCard(
         label = "طلب از مشتریان",
-        value = "${money(animatedMoney(totalDebt))} افغانی",
-        tint = if (totalDebt > 0) Shop.colors.warning else Shop.colors.success,
-        hint = "${owing.size.fa()} قرض‌دار",
+        value = "${money(animatedMoney(view.totalDebt))} افغانی",
+        tint = if (view.totalDebt > 0) Shop.colors.warning else Shop.colors.success,
+        hint = "${view.owing.size.fa()} قرض‌دار",
         modifier = m,
         onClick = { onOpen("debtors") },
       )
@@ -206,8 +198,8 @@ fun DashboardScreen(d: ShopData, onOpen: (String) -> Unit = {}) {
     val supplierCard: @Composable (Modifier) -> Unit = { m ->
       TohidStatCard(
         label = "بدهی به تأمین‌کننده",
-        value = "${money(animatedMoney(supplierDebt))} افغانی",
-        tint = if (supplierDebt > 0) Shop.colors.danger else Shop.colors.success,
+        value = "${money(animatedMoney(view.supplierDebt))} افغانی",
+        tint = if (view.supplierDebt > 0) Shop.colors.danger else Shop.colors.success,
         hint = "پرداخت‌نشده",
         modifier = m,
         onClick = { onOpen("purchasing") },
@@ -256,9 +248,9 @@ fun DashboardScreen(d: ShopData, onOpen: (String) -> Unit = {}) {
     Spacer(Modifier.height(16.dp))
 
     val attention = buildList {
-      outOfStock.take(3).forEach { add(Triple(it.name, "تمام‌شده", "products")) }
-      lowStock.take(3).forEach { add(Triple(it.name, "موجودی کم", "products")) }
-      owing.take(2).forEach { add(Triple(it.first.name, "${money(it.second)} افغانی طلب", "debtors")) }
+      view.outOfStock.take(3).forEach { add(Triple(it.name, "تمام‌شده", "products")) }
+      view.lowStock.take(3).forEach { add(Triple(it.name, "موجودی کم", "products")) }
+      view.owing.take(2).forEach { add(Triple(it.first.name, "${money(it.second)} افغانی طلب", "debtors")) }
     }
 
     val panels = buildList<@Composable () -> Unit> {
@@ -303,10 +295,10 @@ fun DashboardScreen(d: ShopData, onOpen: (String) -> Unit = {}) {
         Panel {
           PanelHead("قرض‌داران", "مشاهده همه") { onOpen("debtors") }
           Spacer(Modifier.height(8.dp))
-          if (owing.isEmpty()) {
+          if (view.owing.isEmpty()) {
             EmptyNote("هنوز اطلاعاتی ثبت نشده")
           } else {
-            owing.take(5).forEach { (debtor, amount) ->
+            view.owing.take(5).forEach { (debtor, amount) ->
               LineRow(debtor.name, "${money(amount)} افغانی", Shop.colors.danger)
             }
           }
@@ -319,15 +311,15 @@ fun DashboardScreen(d: ShopData, onOpen: (String) -> Unit = {}) {
           Spacer(Modifier.height(10.dp))
           ChipRow(
             listOf(
-              "تعداد محصولات" to warehouse.products.fa(),
-              "تعداد کارتن" to qty(warehouse.cartons),
-              "تعداد واحد" to qty(warehouse.units),
-              "ارزش تقریبی موجودی" to "${money(warehouse.value)} افغانی",
+              "تعداد محصولات" to view.warehouse.products.fa(),
+              "تعداد کارتن" to qty(view.warehouse.cartons),
+              "تعداد واحد" to qty(view.warehouse.units),
+              "ارزش تقریبی موجودی" to "${money(view.warehouse.value)} افغانی",
             )
           )
-          if (lowStock.isNotEmpty() || outOfStock.isNotEmpty()) {
+          if (view.lowStock.isNotEmpty() || view.outOfStock.isNotEmpty()) {
             Spacer(Modifier.height(10.dp))
-            (outOfStock + lowStock).take(5).forEach { p ->
+            (view.outOfStock + view.lowStock).take(5).forEach { p ->
               val out = ShopStore.stockStatus(d, p) == "out"
               LineRow(
                 p.name,
@@ -387,21 +379,21 @@ fun DashboardScreen(d: ShopData, onOpen: (String) -> Unit = {}) {
           Spacer(Modifier.height(10.dp))
           ChipRow(
             buildList {
-              add("فروش امروز" to "${money(todayTotal)} افغانی")
-              add("تعداد فروش امروز" to todaySales.size.fa())
+              add("فروش امروز" to "${money(view.todayTotal)} افغانی")
+              add("تعداد فروش امروز" to view.todaySales.size.fa())
               //  سود و مصارف، عددهای مالیِ دکان‌اند — نه کارِ شاگرد
               if (canSeeMoney) {
-                add("سود امروز" to "${money(todayProfit)} افغانی")
-                add("مصارف امروز" to "${money(todayExpense)} افغانی")
+                add("سود امروز" to "${money(view.todayProfit)} افغانی")
+                add("مصارف امروز" to "${money(view.todayExpense)} افغانی")
               }
             }
           )
           Spacer(Modifier.height(8.dp))
           ChipRow(
             listOf(
-              "بدهی تأمین‌کنندگان" to "${money(supplierDebt)} افغانی",
-              "کالاهای کم‌موجودی" to lowStock.size.fa(),
-              "کالاهای تمام‌شده" to outOfStock.size.fa(),
+              "بدهی تأمین‌کنندگان" to "${money(view.supplierDebt)} افغانی",
+              "کالاهای کم‌موجودی" to view.lowStock.size.fa(),
+              "کالاهای تمام‌شده" to view.outOfStock.size.fa(),
             )
           )
         }
@@ -659,5 +651,72 @@ private fun ShortcutCard(
       maxLines = 1,
       textAlign = androidx.compose.ui.text.style.TextAlign.Center,
     )
+  }
+}
+
+/**
+ *  عددهای صفحهٔ خانه، یک‌جا و یک‌بار.
+ *
+ *  بیرونِ `@Composable` نوشته شده تا هم داخلِ `remember` بنشیند و هم
+ *  بشود بدونِ گوشی سنجیدش. همهٔ فرمول‌ها همان‌اند که بودند؛ فقط جایشان
+ *  عوض شده و از جدول‌های آمادهٔ `ShopStore` استفاده می‌کنند به‌جای
+ *  پیمایشِ دوباره.
+ */
+data class DashboardNumbers(
+  val todaySales: List<ir.vil3ntec.tohid.data.Sale>,
+  val todayTotal: Double,
+  val todayExpense: Double,
+  val todayProfit: Double,
+  val owing: List<Pair<ir.vil3ntec.tohid.data.Debtor, Double>>,
+  val totalDebt: Double,
+  val expenseMonth: Double,
+  val supplierDebt: Double,
+  val lowStock: List<ir.vil3ntec.tohid.data.Product>,
+  val outOfStock: List<ir.vil3ntec.tohid.data.Product>,
+  val warehouse: WarehouseEngine.Summary,
+  val monthSalesTotal: Double,
+  val bestDay: Double,
+) {
+  companion object {
+    fun of(d: ShopData, today: String): DashboardNumbers {
+      val monthPrefix = today.take(7)
+      val stock = ShopStore.index(d)
+
+      val todaySales = d.sales.filter { it.date == today && it.status != "cancelled" }
+
+      //  یک گذر روی تراکنش‌ها، نه یک پیمایش به ازای هر قرض‌دار
+      val byDebtor = d.transactions.groupBy { it.debtorId }
+      val owing = d.debtors
+        .map { debtor ->
+          var amount = 0.0
+          byDebtor[debtor.id]?.forEach { amount += if (it.type == "give") it.amount else -it.amount }
+          debtor to amount
+        }
+        .filter { it.second > 0 }
+        .sortedByDescending { it.second }
+
+      //  فروشِ ماه یک بار گروه‌بندی می‌شود و هم جمعش از آن در می‌آید هم
+      //  بهترین روزش — نه دو پیمایشِ جدا
+      val monthByDay = d.sales
+        .filter { it.status != "cancelled" && it.date.startsWith(monthPrefix) }
+        .groupBy { it.date }
+        .mapValues { (_, list) -> list.sumOf { it.finalTotal } }
+
+      return DashboardNumbers(
+        todaySales = todaySales,
+        todayTotal = todaySales.sumOf { it.finalTotal },
+        todayExpense = d.expenses.filter { it.date == today }.sumOf { it.amount },
+        todayProfit = ReportEngine.sales(d, today, today).netProfit,
+        owing = owing,
+        totalDebt = owing.sumOf { it.second },
+        expenseMonth = d.expenses.filter { it.date.startsWith(monthPrefix) }.sumOf { it.amount },
+        supplierDebt = d.suppliers.sumOf { ShopStore.supplierDebt(d, it.id) }.coerceAtLeast(0.0),
+        lowStock = d.products.filter { stock.status(it) == "low" },
+        outOfStock = d.products.filter { stock.status(it) == "out" },
+        warehouse = WarehouseEngine.summary(d),
+        monthSalesTotal = monthByDay.values.sum(),
+        bestDay = monthByDay.values.maxOrNull() ?: 0.0,
+      )
+    }
   }
 }

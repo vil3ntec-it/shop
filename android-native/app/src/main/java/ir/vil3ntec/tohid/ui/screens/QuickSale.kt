@@ -103,10 +103,13 @@ fun QuickSaleScreen(
     }
   }
 
-  val shown = d.products.filter { p ->
-    (category == null || p.category == category) &&
-      (search.isBlank() || p.name.contains(search.trim(), ignoreCase = true) ||
-        p.barcodes.any { it.contains(search.trim()) })
+  val term = search.trim()
+  val shown = remember(d, term, category) {
+    d.products.filter { p ->
+      (category == null || p.category == category) &&
+        (term.isBlank() || p.name.contains(term, ignoreCase = true) ||
+          p.barcodes.any { it.contains(term) })
+    }
   }
 
   Box(Modifier.fillMaxSize()) {

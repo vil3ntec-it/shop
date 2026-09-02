@@ -52,6 +52,19 @@ class ShopStore(private val context: Context) {
     _loaded.value = true
   }
 
+  /**
+   *  دفتر خوانده شد و خلاصه‌اش هم تازه شد.
+   *
+   *  با باز شدنِ برنامه یک بار صدا زده می‌شود. اگر خلاصه از دست رفته
+   *  باشد — نسخهٔ تازه روی دفترِ قدیمی، یا پاک شدنِ حافظهٔ برنامه — همین
+   *  یک بار دوباره ساخته می‌شود و کارهای پس‌زمینه از آن به بعد ارزان
+   *  می‌مانند.
+   */
+  suspend fun loadAndSummarize() {
+    load()
+    withContext(Dispatchers.IO) { LedgerSummary.write(context, _data.value) }
+  }
+
   suspend fun save(next: ShopData) = withContext(Dispatchers.IO) {
     _data.value = next
     runCatching {
@@ -61,6 +74,10 @@ class ShopStore(private val context: Context) {
       tmp.writeText(json.encodeToString(next))
       tmp.renameTo(file)
     }
+    //  خلاصهٔ کوچک، کنارِ دفتر. نگهبانِ پس‌زمینه همین را می‌خواند و دیگر
+    //  لازم نیست هر ربع ساعت کلِ دفتر را تجزیه کند — شرحش سرِ
+    //  `LedgerSummary`.
+    LedgerSummary.write(context, next)
   }
 
   /**
@@ -148,6 +165,7 @@ class ShopStore(private val context: Context) {
       if (file.exists()) file.copyTo(vault(key), overwrite = true)
       file.delete()
     }
+    LedgerSummary.clear(context)
     _data.value = ShopData()
     Unit
   }
@@ -162,7 +180,10 @@ class ShopStore(private val context: Context) {
     }
     _loaded.value = false
     _data.value = ShopData()
-    load()
+    //  خلاصهٔ حسابِ قبلی نباید روی حسابِ تازه بماند؛ با خواندنِ دفتر از نو
+    //  ساخته می‌شود
+    LedgerSummary.clear(context)
+    loadAndSummarize()
   }
 
   /** نامِ فایل نباید از کاراکترهای شناسه آسیب ببیند */
@@ -271,6 +292,82 @@ class ShopStore(private val context: Context) {
       val fresh = StockIndex(d)
       indexedData = d
       indexed = fresh
+      return fresh
+    }
+
+    /**
+     *  جدولِ فروش — همان کارِ `StockIndex`، برای سمتِ فاکتورها.
+     *
+     *  ── چه اشکالی را می‌بندد ──────────────────────────────────────
+     *  `ReportEngine` سه جای پیاپی همان اشتباهی را می‌کرد که یک بار در
+     *  `StockIndex` درست شده بود:
+     *
+     *   • گزارشِ بازه، برای **هر فاکتور** کلِ اقلامِ فروش را می‌گشت.
+     *   • گزارشِ سودِ محصولات، برای **هر کالا** کلِ اقلام را می‌گشت و
+     *     برای هر قلمِ پیداشده یک بار هم کلِ فاکتورها را — یعنی ضربِ سه
+     *     عدد: کالاها × اقلام × فاکتورها.
+     *   • مرجوعی‌ها هم برای هر ردیف، فاکتور و قلمش را جستجو می‌کردند.
+     *
+     *  دکانی با سیصد کالا و بیست هزار قلمِ فروش، سرِ باز کردنِ تبِ
+     *  «محصولات» گزارشات می‌ایستاد.
+     *
+     *  حالا یک بار روی دو فهرست رد می‌شویم و چهار نگاشت می‌سازیم؛ بعد
+     *  هر پرسش یک خواندن است. نتیجه‌ها مو‌به‌مو همان‌اند.
+     *  ──────────────────────────────────────────────────────────────
+     */
+    class SalesIndex(d: ShopData) {
+
+      /** فاکتور از روی شناسه */
+      val saleById: Map<String, Sale> = d.sales.associateBy { it.id }
+
+      /** اقلامِ هر فاکتور */
+      val itemsBySale: Map<String, List<SaleItem>> = d.saleItems.groupBy { it.saleId }
+
+      /** قلمِ فروش از روی شناسه — برای ردیف‌های مرجوعی */
+      val itemById: Map<String, SaleItem> = d.saleItems.associateBy { it.id }
+
+      /** تعدادِ خالص و سودِ یک کالا، از آغاز تا حالا */
+      data class Sold(val quantity: Double, val profit: Double)
+
+      //  [۰] = تعداد، [۱] = سود. یک آرایه به‌جای دو نگاشت، چون این جدول
+      //  ممکن است برای چند صد کالا ساخته شود.
+      private val perProduct = HashMap<String, DoubleArray>()
+
+      init {
+        /*
+         *  فاکتورِ لغوشده اصلاً شمرده نمی‌شود. قلمی که فاکتورش در دفتر
+         *  نیست (ردیفِ یتیم از یک دفترِ قدیمی) عمداً شمرده **می‌شود** —
+         *  دقیقاً همان کاری که حسابِ قبلی می‌کرد، تا عددِ گزارش با
+         *  به‌روزرسانی عوض نشود.
+         */
+        val cancelled = HashSet<String>()
+        d.sales.forEach { if (it.status == "cancelled") cancelled += it.id }
+        d.saleItems.forEach { item ->
+          if (item.saleId in cancelled) return@forEach
+          val net = item.quantity - item.returnedQty
+          val slot = perProduct.getOrPut(item.productId) { DoubleArray(2) }
+          slot[0] += net
+          slot[1] += net * (item.unitPrice - item.purchasePrice)
+        }
+      }
+
+      fun product(productId: String): Sold {
+        val slot = perProduct[productId] ?: return Sold(0.0, 0.0)
+        return Sold(slot[0], slot[1])
+      }
+    }
+
+    private var salesIndexedData: ShopData? = null
+    private var salesIndexed: SalesIndex? = null
+
+    /** جدولِ فروش، با همان قاعدهٔ یک‌خانه‌ایِ `index` */
+    @Synchronized
+    fun salesIndex(d: ShopData): SalesIndex {
+      val ready = salesIndexed
+      if (ready != null && salesIndexedData === d) return ready
+      val fresh = SalesIndex(d)
+      salesIndexedData = d
+      salesIndexed = fresh
       return fresh
     }
 

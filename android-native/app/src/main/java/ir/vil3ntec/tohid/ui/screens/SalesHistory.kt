@@ -12,7 +12,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -47,10 +49,21 @@ import kotlinx.coroutines.launch
  *  حسابِ قرض‌دار اثر گذاشته، و برداشتنش آن عددها را عوض می‌کند.
  */
 @Composable
-fun SalesHistoryScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
+fun SalesHistoryScreen(
+  store: ShopStore,
+  cartStore: ir.vil3ntec.tohid.data.CartStore,
+  d: ShopData,
+  snackbar: SnackbarHostState,
+  onEditInCart: () -> Unit,
+) {
   val scope = rememberCoroutineScope()
+  var reopenFor by remember { mutableStateOf<Sale?>(null) }
 
   var filter by rememberSaveable { mutableStateOf("all") }
+  //  جستجو و ماه — بدونِ این دو، پیدا کردنِ فاکتورِ دیروز در دکانی که یک
+  //  سال کار کرده یعنی اسکرول کردنِ هجده هزار ردیف
+  var search by rememberSaveable { mutableStateOf("") }
+  var month by rememberSaveable { mutableStateOf(ALL_MONTHS) }
   var invoiceFor by remember { mutableStateOf<Sale?>(null) }
   var returnFor by remember { mutableStateOf<Sale?>(null) }
   var cancelFor by remember { mutableStateOf<Sale?>(null) }
@@ -70,18 +83,42 @@ fun SalesHistoryScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostStat
     }
   }
 
-  val shown = d.sales
-    .filter {
-      when (filter) {
-        "cash" -> it.status != "cancelled" && it.paymentMethod == "cash"
-        "credit" -> it.status != "cancelled" && it.paymentMethod == "credit"
-        "cancelled" -> it.status == "cancelled"
-        else -> true
-      }
-    }
-    .sortedByDescending { it.createdAt }
+  //  ماه‌هایی که واقعاً فاکتور دارند، تازه‌ترین اول
+  val months = remember(d) {
+    listOf(ALL_MONTHS) + d.sales.map { it.date.take(7) }.filter { it.length == 7 }.distinct().sortedDescending()
+  }
 
-  val active = d.sales.filter { it.status != "cancelled" }
+  val term = search.trim()
+
+  /*
+   *  فهرست، **یک بار** به ازای هر دفتر و هر فیلتر.
+   *
+   *  تا دیروز این مرتب‌سازی بیرونِ `remember` بود و در هر بار کشیده شدنِ
+   *  صفحه از نو انجام می‌شد — روی همهٔ فاکتورهای تاریخِ دکان.
+   */
+  val shown = remember(d, filter, term, month) {
+    val debtorNames = d.debtors.associate { it.id to it.name }
+    d.sales
+      .filter {
+        when (filter) {
+          "cash" -> it.status != "cancelled" && it.paymentMethod == "cash"
+          "credit" -> it.status != "cancelled" && it.paymentMethod == "credit"
+          "cancelled" -> it.status == "cancelled"
+          else -> true
+        }
+      }
+      .filter { month == ALL_MONTHS || it.date.startsWith(month) }
+      .filter { sale ->
+        if (term.isBlank()) return@filter true
+        //  شمارهٔ فاکتور، یا نامِ مشتری
+        val number = sale.invoiceNumber?.toString().orEmpty()
+        number.contains(term) ||
+          debtorNames[sale.debtorId].orEmpty().contains(term, ignoreCase = true)
+      }
+      .sortedByDescending { it.createdAt }
+  }
+
+  val active = remember(d) { d.sales.filter { it.status != "cancelled" } }
 
   LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
     item {
@@ -104,6 +141,25 @@ fun SalesHistoryScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostStat
     }
 
     item {
+      OutlinedTextField(
+        value = search,
+        onValueChange = { search = ir.vil3ntec.tohid.latinDigits(it) },
+        placeholder = { Text("شمارهٔ فاکتور یا نام مشتری") },
+        singleLine = true,
+        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null, tint = Shop.colors.muted) },
+        trailingIcon = {
+          if (search.isNotEmpty()) {
+            IconButton(onClick = { search = "" }) {
+              Icon(Icons.Filled.Close, contentDescription = "پاک کردن جستجو", tint = Shop.colors.muted)
+            }
+          }
+        },
+        modifier = Modifier.fillMaxWidth(),
+      )
+      Spacer(Modifier.height(10.dp))
+    }
+
+    item {
       Row(
         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -112,11 +168,24 @@ fun SalesHistoryScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostStat
           FilterChip(selected = filter == id, onClick = { filter = id }, label = { Text(label) })
         }
       }
+      Spacer(Modifier.height(8.dp))
+      Row(
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+      ) {
+        months.forEach { m ->
+          FilterChip(
+            selected = month == m,
+            onClick = { month = m },
+            label = { Text(if (m == ALL_MONTHS) "همهٔ ماه‌ها" else ir.vil3ntec.tohid.formatMonth(m)) },
+          )
+        }
+      }
       Spacer(Modifier.height(14.dp))
     }
 
     if (shown.isEmpty()) {
-      item { Panel { EmptyNote("فاکتوری با این فیلتر پیدا نشد.") } }
+      item { Panel { EmptyNote("فاکتوری با این جستجو یا فیلتر پیدا نشد.") } }
     } else {
       /*
        *  جدولِ فاکتورها.
@@ -152,6 +221,7 @@ fun SalesHistoryScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostStat
           onInvoice = { invoiceFor = sale },
           onReturn = { returnFor = sale },
           onCancel = { cancelFor = sale },
+          onReopen = { reopenFor = sale },
         )
       }
     }
@@ -174,6 +244,64 @@ fun SalesHistoryScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostStat
           "مرجوعی با موفقیت ثبت شد",
         ) { returnFor = null }
       },
+    )
+  }
+
+  /*
+   *  اصلاحِ فاکتور.
+   *
+   *  ویرایشِ مستقیمِ فاکتورِ ثبت‌شده ممکن نیست و نباید هم باشد: فاکتور
+   *  سند است و شمارهٔ آن در حسابِ قرض‌دار و سابقهٔ عملیات نوشته شده.
+   *
+   *  ولی تا دیروز راهی هم برای اشتباهِ ساده نبود: فروشنده باید فاکتور را
+   *  لغو می‌کرد و کلِ سبد را از نو می‌ساخت. حالا همان کار یک دکمه است —
+   *  فاکتور لغو می‌شود (پس موجودی برمی‌گردد) و اقلامش با همان قیمتِ
+   *  همان فاکتور دوباره در سبد می‌نشینند.
+   */
+  reopenFor?.let { sale ->
+    AlertDialog(
+      onDismissRequest = { reopenFor = null },
+      containerColor = Shop.colors.surface,
+      title = { Text("اصلاح فاکتور؟", color = Shop.colors.text) },
+      text = {
+        Text(
+          "فاکتور #${plain(sale.invoiceNumber ?: 0)} لغو می‌شود و اقلامش با همان قیمت به سبد خرید برمی‌گردند. " +
+            "بعد از اصلاح، فروش را دوباره ثبت کنید — شمارهٔ فاکتور تازه‌ای می‌گیرد.",
+          style = MaterialTheme.typography.bodySmall,
+          color = Shop.colors.muted,
+        )
+      },
+      confirmButton = {
+        TextButton(onClick = {
+          val lines = d.saleItems
+            .filter { it.saleId == sale.id }
+            .mapNotNull { item ->
+              val left = item.quantity - item.returnedQty
+              if (left <= 0) null
+              else if (item.productId.isBlank()) SalesEngine.CartLine(
+                productId = newId(),
+                quantity = left,
+                unitPrice = item.unitPrice,
+                label = item.name.ifBlank { "قلم آزاد" },
+              )
+              else SalesEngine.CartLine(
+                productId = item.productId,
+                quantity = left,
+                unitPrice = item.unitPrice,
+              )
+            }
+          apply(
+            SalesEngine.cancel(d, sale.id, todayIso(), System.currentTimeMillis(), ::newId),
+            "فاکتور لغو شد و اقلامش در سبد است",
+          ) {
+            cartStore.set(lines)
+            cartStore.setDebtor(sale.debtorId)
+            reopenFor = null
+            onEditInCart()
+          }
+        }) { Text("لغو و بردن به سبد") }
+      },
+      dismissButton = { TextButton(onClick = { reopenFor = null }) { Text("بازگشت") } },
     )
   }
 
@@ -220,6 +348,7 @@ private fun SaleRow(
   onInvoice: () -> Unit,
   onReturn: () -> Unit,
   onCancel: () -> Unit,
+  onReopen: () -> Unit,
 ) {
   val cancelled = sale.status == "cancelled"
   val debtor = sale.debtorId?.let { id -> d.debtors.find { it.id == id } }
@@ -280,6 +409,7 @@ private fun SaleRow(
             DropdownMenuItem(text = { Text("مرجوعی") }, onClick = { menu = false; onReturn() })
           }
           if (!cancelled) {
+            DropdownMenuItem(text = { Text("اصلاح فاکتور") }, onClick = { menu = false; onReopen() })
             DropdownMenuItem(
               text = { Text("لغو فروش", color = Shop.colors.danger) },
               onClick = { menu = false; onCancel() },
@@ -324,7 +454,7 @@ private fun ReturnDialog(
             val allowed = SalesEngine.returnable(item)
             Column(Modifier.padding(bottom = 12.dp)) {
               Text(
-                "${product?.name ?: "(محصول حذف‌شده)"} — قابل مرجوعی: ${qty(allowed)}${product?.unit?.takeIf { it.isNotBlank() }?.let { " $it" } ?: ""}",
+                "${SalesEngine.itemName(d, item)} — قابل مرجوعی: ${qty(allowed)}${product?.unit?.takeIf { it.isNotBlank() }?.let { " $it" } ?: ""}",
                 style = MaterialTheme.typography.bodySmall,
                 color = Shop.colors.muted,
               )
@@ -405,3 +535,6 @@ private fun RowScope.InvoiceCell(
     modifier = Modifier.weight(weight).padding(end = 6.dp),
   )
 }
+
+/** «همهٔ ماه‌ها» — کلیدی که هیچ ماهی نمی‌تواند باشد */
+private const val ALL_MONTHS = "*"

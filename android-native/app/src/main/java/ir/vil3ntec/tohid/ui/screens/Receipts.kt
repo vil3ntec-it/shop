@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.Jalali
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.formatDate
+import ir.vil3ntec.tohid.JALALI_MONTHS
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.plain
 import ir.vil3ntec.tohid.ui.theme.Radius
@@ -209,12 +210,6 @@ fun ReceiptsScreen(d: ShopData) {
     }
   }
 }
-
-/** نام ماه‌های خورشیدی — همان فهرستی که نسخهٔ وب دارد */
-val JALALI_MONTHS = listOf(
-  "حمل", "ثور", "جوزا", "سرطان", "اسد", "سنبله",
-  "میزان", "عقرب", "قوس", "جدی", "دلو", "حوت",
-)
 
 /**
  *  کادرِ کشویی برای فیلترهای این صفحه.

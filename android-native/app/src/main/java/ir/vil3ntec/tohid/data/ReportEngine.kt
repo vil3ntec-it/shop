@@ -43,6 +43,10 @@ object ReportEngine {
    *      پس فقط سودِ از‌دست‌رفته (مبلغ منهای بهای تمام‌شده) کم می‌شود.
    */
   fun sales(d: ShopData, from: String, to: String): SalesReport {
+    //  جدولِ فروش یک بار ساخته و بارها خوانده می‌شود؛ شرحش سرِ `SalesIndex`.
+    //  پیش از این، این تابع برای هر فاکتور کلِ اقلامِ فروش را می‌گشت.
+    val index = ShopStore.salesIndex(d)
+
     val active = d.sales.filter { it.date in from..to && it.status != "cancelled" }
     val activeIds = active.mapTo(HashSet()) { it.id }
 
@@ -52,7 +56,7 @@ object ReportEngine {
 
     var cogs = 0.0
     active.forEach { sale ->
-      d.saleItems.filter { it.saleId == sale.id }.forEach { item ->
+      index.itemsBySale[sale.id]?.forEach { item ->
         cogs += (item.quantity - item.returnedQty) * item.purchasePrice
       }
     }
@@ -60,13 +64,13 @@ object ReportEngine {
     var returnAmount = 0.0
     var returnProfitImpact = 0.0
     d.saleReturns.filter { it.date in from..to }.forEach { r ->
-      val sale = d.sales.find { it.id == r.saleId }
+      val sale = index.saleById[r.saleId]
       if (sale != null && sale.status == "cancelled") return@forEach   // حالت ۱
       returnAmount += r.amount
       if (r.saleId in activeIds) {
         returnProfitImpact += r.amount                                 // حالت ۲
       } else {
-        val item = d.saleItems.find { it.id == r.saleItemId }
+        val item = index.itemById[r.saleItemId]
         val cost = if (item != null) item.purchasePrice * r.quantity else 0.0
         returnProfitImpact += max(0.0, r.amount - cost)                // حالت ۳
       }
@@ -99,22 +103,23 @@ object ReportEngine {
    * کالا — وگرنه با هر تغییرِ قیمت، سودِ گذشته هم عوض می‌شد.
    */
   fun productStat(d: ShopData, productId: String): Pair<Double, Double> {
-    var quantity = 0.0
-    var profit = 0.0
-    d.saleItems.forEach { item ->
-      if (item.productId != productId) return@forEach
-      val sale = d.sales.find { it.id == item.saleId }
-      if (sale != null && sale.status == "cancelled") return@forEach
-      val net = item.quantity - item.returnedQty
-      quantity += net
-      profit += net * (item.unitPrice - item.purchasePrice)
-    }
-    return quantity to profit
+    val sold = ShopStore.salesIndex(d).product(productId)
+    return sold.quantity to sold.profit
   }
 
-  fun productStats(d: ShopData): List<ProductStat> = d.products.map { p ->
-    val (quantity, profit) = productStat(d, p.id)
-    ProductStat(p, quantity, profit)
+  /**
+   *  آمارِ همهٔ کالاها.
+   *
+   *  پیش از این برای هر کالا کلِ اقلامِ فروش پیمایش می‌شد و برای هر قلم
+   *  هم کلِ فاکتورها — ضربِ سه فهرست. حالا جدول یک بار ساخته می‌شود و
+   *  هر کالا یک خواندن است.
+   */
+  fun productStats(d: ShopData): List<ProductStat> {
+    val index = ShopStore.salesIndex(d)
+    return d.products.map { p ->
+      val sold = index.product(p.id)
+      ProductStat(p, sold.quantity, sold.profit)
+    }
   }
 
   data class ProductsReport(
@@ -129,11 +134,12 @@ object ReportEngine {
 
   fun products(d: ShopData): ProductsReport {
     val stats = productStats(d)
+    val stock = ShopStore.index(d)
     return ProductsReport(
-      low = d.products.filter { ShopStore.stockStatus(d, it) == "low" },
-      out = d.products.filter { ShopStore.stockStatus(d, it) == "out" },
+      low = d.products.filter { stock.status(it) == "low" },
+      out = d.products.filter { stock.status(it) == "out" },
       // ارزشِ موجودیِ فعلی به بهای خرید — نه به قیمتِ فروش
-      inventoryValue = d.products.sumOf { ShopStore.stock(d, it.id) * it.purchasePrice },
+      inventoryValue = d.products.sumOf { stock.stock(it.id) * it.purchasePrice },
       topSelling = stats.sortedByDescending { it.quantity }.take(5),
       // «کم‌فروش‌ها» فقط بین آن‌هایی که اصلاً فروش داشته‌اند معنی دارد
       slowest = stats.filter { it.quantity > 0 }.sortedBy { it.quantity }.take(5),
@@ -153,14 +159,21 @@ object ReportEngine {
     val remaining: Double,
   )
 
-  fun debtors(d: ShopData): List<DebtorStat> = d.debtors.map { debtor ->
-    val mine = d.transactions.filter { it.debtorId == debtor.id }
-    DebtorStat(
-      debtor = debtor,
-      given = mine.filter { it.type == "give" }.sumOf { it.amount },
-      received = mine.filter { it.type == "receive" }.sumOf { it.amount },
-      remaining = ShopStore.debt(d, debtor.id),
-    )
+  fun debtors(d: ShopData): List<DebtorStat> {
+    //  یک گذر روی تراکنش‌ها، نه یک پیمایشِ کامل به ازای هر قرض‌دار
+    val byDebtor = d.transactions.groupBy { it.debtorId }
+    return d.debtors.map { debtor ->
+      val mine = byDebtor[debtor.id].orEmpty()
+      var given = 0.0
+      var received = 0.0
+      mine.forEach { if (it.type == "give") given += it.amount else received += it.amount }
+      DebtorStat(
+        debtor = debtor,
+        given = given,
+        received = received,
+        remaining = given - received,
+      )
+    }
   }
 
   /* ------------------------- گردشِ موجودی ------------------------- */

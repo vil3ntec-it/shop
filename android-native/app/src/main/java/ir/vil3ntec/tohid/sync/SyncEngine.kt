@@ -140,30 +140,53 @@ object SyncEngine {
     val data = tree(d).toMutableMap()
     var touched = 0
 
+    /*
+     *  تغییرها اول به‌ازای مجموعه دسته می‌شوند و بعد هر مجموعه **یک بار**
+     *  به نگاشتِ «شناسه → رکورد» تبدیل می‌شود.
+     *
+     *  پیش از این، برای هر تغییرِ رسیده یک `indexOfFirst` روی کلِ آن
+     *  مجموعه اجرا می‌شد؛ یعنی ضربِ دو عددِ بزرگ. اولین همگام‌سازیِ یک
+     *  گوشیِ تازه که هزاران رکورد می‌گیرد، همان‌جا می‌ایستاد.
+     *
+     *  `LinkedHashMap` ترتیب را نگه می‌دارد: رکوردِ موجود سرِ جای خودش
+     *  عوض می‌شود و رکوردِ تازه ته صف می‌نشیند — دقیقاً مثل قبل.
+     */
+    val byCollection = LinkedHashMap<String, MutableList<JsonObject>>()
     for (element in changes) {
       val change = element as? JsonObject ?: continue
       val name = change["collection"]?.jsonPrimitive?.contentOrNullSafe() ?: continue
       if (name !in COLLECTIONS) continue
-      val id = change["id"]?.jsonPrimitive?.contentOrNullSafe() ?: continue
-      val deleted = change["deleted"]?.jsonPrimitive?.booleanOrNullSafe() ?: false
+      byCollection.getOrPut(name) { mutableListOf() } += change
+    }
 
-      val rows = (data[name] as? JsonArray)?.toMutableList() ?: mutableListOf()
-      val index = rows.indexOfFirst { it.jsonObject["id"]?.jsonPrimitive?.contentOrNullSafe() == id }
+    for ((name, incoming) in byCollection) {
+      val rows = (data[name] as? JsonArray).orEmpty()
+      val table = LinkedHashMap<String, JsonElement>(rows.size * 2 + 8)
+      //  ردیفِ بی‌شناسه نباید گم شود؛ با کلیدی که هیچ شناسه‌ای نمی‌تواند
+      //  باشد سرِ جایش نگه داشته می‌شود
+      var nameless = 0
+      for (row in rows) {
+        val rowId = row.jsonObject["id"]?.jsonPrimitive?.contentOrNullSafe()
+        if (rowId == null) table["\u0000بی‌شناسه-${nameless++}"] = row else table[rowId] = row
+      }
 
-      if (deleted) {
-        if (index >= 0) {
-          rows.removeAt(index)
-          touched++
+      for (change in incoming) {
+        val id = change["id"]?.jsonPrimitive?.contentOrNullSafe() ?: continue
+        val deleted = change["deleted"]?.jsonPrimitive?.booleanOrNullSafe() ?: false
+        if (deleted) {
+          if (table.remove(id) != null) touched++
+          continue
         }
-      } else {
         val record = change["data"] as? JsonObject ?: continue
         if (record["id"] == null) continue
         // اگر همان چیزی است که داریم (تغییرِ خودمان که برگشته)، عوض نشده
-        val same = index >= 0 && fingerprint(rows[index]) == fingerprint(record)
-        if (index >= 0) rows[index] = record else rows.add(record)
+        val current = table[id]
+        val same = current != null && fingerprint(current) == fingerprint(record)
+        table[id] = record
         if (!same) touched++
       }
-      data[name] = JsonArray(rows)
+
+      data[name] = JsonArray(table.values.toList())
     }
 
     settings?.get("data")?.let { it as? JsonObject }?.let { incoming ->
@@ -179,7 +202,34 @@ object SyncEngine {
     }
 
     val merged = json.decodeFromJsonElement(ShopData.serializer(), JsonObject(data))
-    return Merged(merged, touched)
+    return Merged(withInvoiceCursor(merged), touched)
+  }
+
+  /**
+   *  شمارهٔ فاکتورِ بعدی، بعد از ادغام.
+   *
+   *  ── چه اشکالی را می‌بندد ───────────────────────────────────────────
+   *  `nextInvoiceNo` نه در `COLLECTIONS` است نه در `SETTING_LISTS`، یعنی
+   *  اصلاً همگام نمی‌شود. دو گوشیِ یک دکان هر دو از شمارهٔ خودشان جلو
+   *  می‌رفتند و **فاکتورِ تکراری** می‌ساختند — و چون شمارهٔ فاکتور در
+   *  حسابِ قرض‌داران و سابقهٔ عملیات نوشته می‌شود، بعداً درست کردنش سخت
+   *  است.
+   *
+   *  همگام کردنِ خودِ این عدد جواب نمی‌دهد: عددِ دو گوشی هر لحظه فرق
+   *  دارد و هرکدام دیگری را عقب می‌برد. راهِ درست این است که بعد از هر
+   *  ادغام، شمارنده از **بلندترین شماره‌ای که تا حالا کسی مصرف کرده**
+   *  جلوتر برود. آن‌وقت شماره‌ها به هم می‌رسند و از آن لحظه دیگر تکراری
+   *  ساخته نمی‌شود.
+   *
+   *  **صادقانه:** فاکتورهای تکراری‌ای که پیش از این ساخته شده‌اند با این
+   *  کار درست نمی‌شوند؛ فقط جلوی تکراریِ تازه گرفته می‌شود. شمارهٔ گذشته
+   *  را نمی‌شود عوض کرد، چون جاهای دیگر به آن ارجاع داده‌اند.
+   *  ──────────────────────────────────────────────────────────────────
+   */
+  fun withInvoiceCursor(d: ShopData): ShopData {
+    val highest = d.sales.maxOfOrNull { it.invoiceNumber ?: 0 } ?: 0
+    val next = maxOf(d.nextInvoiceNo, highest + 1)
+    return if (next == d.nextInvoiceNo) d else d.copy(nextInvoiceNo = next)
   }
 
   /* ------------------------------ ریزه‌کاری ------------------------------ */

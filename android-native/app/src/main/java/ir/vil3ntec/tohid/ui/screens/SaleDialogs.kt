@@ -36,6 +36,7 @@ import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.formatDate
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.plain
+import ir.vil3ntec.tohid.qty
 import ir.vil3ntec.tohid.print.PrintJob
 import ir.vil3ntec.tohid.print.ThermalPrinter
 import ir.vil3ntec.tohid.ui.theme.Radius
@@ -122,25 +123,50 @@ fun CheckoutDialog(
           onSelect = { payment = it },
         )
 
-        if (payment == SalesEngine.Payment.CREDIT) {
-          Spacer(Modifier.height(12.dp))
-          Box {
-            OutlinedButton(onClick = { debtorMenu = true }, modifier = Modifier.fillMaxWidth()) {
-              Text(
-                debtorId?.let { id -> d.debtors.find { it.id == id }?.name }
-                  ?: if (d.debtors.isEmpty()) "— ابتدا یک قرض‌دار اضافه کنید —" else "انتخاب قرض‌دار",
-              )
-            }
-            DropdownMenu(expanded = debtorMenu, onDismissRequest = { debtorMenu = false }) {
-              d.debtors.forEach { debtor ->
-                DropdownMenuItem(
-                  text = { Text(debtor.name) },
-                  onClick = { debtorId = debtor.id; debtorMenu = false },
-                )
-              }
-            }
+        /*
+         *  مشتری — در نسیه اجباری، در نقدی اختیاری.
+         *
+         *  تا دیروز فروشِ نقدی به هیچ‌کس وصل نمی‌شد، پس «این مشتری امسال
+         *  چقدر خرید کرده» فقط برای کسانی جواب داشت که نسیه برده بودند.
+         *  حسابِ بدهی از تراکنش‌ها می‌آید نه از این انتخاب، پس مشتریِ
+         *  فاکتورِ نقدی هیچ بدهی‌ای نمی‌سازد — فقط نامش روی فاکتور
+         *  می‌نشیند.
+         *
+         *  فهرست هم دیگر یک `DropdownMenu`ِ بی‌انتها نیست؛ با جستجو.
+         */
+        Spacer(Modifier.height(12.dp))
+        Text(
+          if (payment == SalesEngine.Payment.CREDIT) "قرض‌دار" else "مشتری (اختیاری)",
+          style = MaterialTheme.typography.labelMedium,
+          color = Shop.colors.muted,
+        )
+        Spacer(Modifier.height(6.dp))
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+          OutlinedButton(
+            onClick = { if (d.debtors.isNotEmpty()) debtorMenu = true },
+            modifier = Modifier.weight(1f),
+          ) {
+            Text(
+              debtorId?.let { id -> d.debtors.find { it.id == id }?.name }
+                ?: if (d.debtors.isEmpty()) "— هنوز کسی ثبت نشده —" else "انتخاب",
+            )
           }
+          if (debtorId != null) {
+            TextButton(onClick = { debtorId = null }) { Text("برداشتن") }
+          }
+        }
+        if (debtorMenu) {
+          SearchablePicker(
+            title = if (payment == SalesEngine.Payment.CREDIT) "انتخاب قرض‌دار" else "انتخاب مشتری",
+            options = d.debtors,
+            idOf = { it.id },
+            nameOf = { it.name },
+            onClose = { debtorMenu = false },
+            onPick = { debtorId = it; debtorMenu = false },
+          )
+        }
 
+        if (payment == SalesEngine.Payment.CREDIT) {
           Spacer(Modifier.height(12.dp))
           OutlinedTextField(
             value = paidText,
@@ -265,10 +291,11 @@ fun InvoiceDialog(
         Spacer(Modifier.height(14.dp))
         items.forEach { item ->
           val product = d.products.find { it.id == item.productId }
+          val name = SalesEngine.itemName(d, item)
           Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
             Column(Modifier.weight(1f)) {
               Text(
-                product?.name ?: "(محصول حذف‌شده)",
+                name,
                 style = MaterialTheme.typography.bodyMedium,
                 color = Shop.colors.text,
               )
@@ -487,6 +514,177 @@ fun DebtorPicker(
           if (selected != null) {
             Button(onClick = { onPick(null) }, modifier = Modifier.weight(1f)) { Text("بدون قرض‌دار") }
           }
+        }
+      }
+    }
+  }
+}
+
+/**
+ *  تعداد و قیمتِ یک ردیفِ سبد — با تایپ، نه با زدنِ پیاپیِ «+».
+ *
+ *  دو چیز را با هم حل می‌کند: فروشِ عمده که با دکمهٔ «+» بیست‌وپنج بار
+ *  زدن می‌خواست، و چانه‌زنی که تا دیروز فقط با دستکاریِ تخفیفِ کلِ فاکتور
+ *  ممکن بود — و آن، سودِ همان کالا را در گزارش غلط می‌کرد.
+ */
+@Composable
+fun CartLineDialog(
+  name: String,
+  unit: String,
+  quantity: Double,
+  unitPrice: Double,
+  basePrice: Double,
+  custom: Boolean,
+  onDismiss: () -> Unit,
+  onConfirm: (quantity: Double, price: Double?) -> Unit,
+) {
+  var qtyText by remember { mutableStateOf(qty(quantity)) }
+  var priceText by remember { mutableStateOf(qty(unitPrice)) }
+  var manual by remember { mutableStateOf(custom) }
+
+  val parsedQty = qtyText.toDoubleOrNull()
+  val parsedPrice = priceText.toDoubleOrNull()
+  val ok = parsedQty != null && parsedQty > 0 && (!manual || (parsedPrice != null && parsedPrice >= 0))
+
+  Dialog(onDismissRequest = onDismiss) {
+    Surface(
+      color = Shop.colors.surface,
+      shape = RoundedCornerShape(Radius.lg),
+      modifier = Modifier.fillMaxWidth(),
+    ) {
+      Column(Modifier.padding(18.dp)) {
+        Text(name, style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
+        Spacer(Modifier.height(12.dp))
+
+        NumberField(
+          value = qtyText,
+          onValueChange = { qtyText = it },
+          label = if (unit.isNotBlank()) "تعداد ($unit)" else "تعداد",
+          modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(12.dp))
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+          Checkbox(
+            checked = manual,
+            onCheckedChange = {
+              manual = it
+              if (!it) priceText = qty(basePrice)
+            },
+          )
+          Spacer(Modifier.width(4.dp))
+          Text(
+            "قیمت دستی برای این ردیف",
+            style = MaterialTheme.typography.bodyMedium,
+            color = Shop.colors.text,
+          )
+        }
+
+        if (manual) {
+          Spacer(Modifier.height(6.dp))
+          AmountField(
+            value = priceText,
+            onValueChange = { priceText = it },
+            label = "قیمت هر واحد",
+          )
+          Spacer(Modifier.height(4.dp))
+          Text(
+            "قیمت خودِ کالا ${money(basePrice)} افغانی است. این تغییر فقط روی همین فاکتور اثر دارد.",
+            style = MaterialTheme.typography.labelSmall,
+            color = Shop.colors.muted,
+          )
+        }
+
+        Spacer(Modifier.height(14.dp))
+        val shownPrice = if (manual) (parsedPrice ?: 0.0) else basePrice
+        Text(
+          "جمع این ردیف: ${money((parsedQty ?: 0.0) * shownPrice)} افغانی",
+          style = MaterialTheme.typography.titleSmall,
+          color = Shop.colors.text,
+        )
+
+        Spacer(Modifier.height(16.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.align(Alignment.End)) {
+          TextButton(onClick = onDismiss) { Text("انصراف") }
+          Button(
+            enabled = ok,
+            onClick = { onConfirm(parsedQty ?: 0.0, if (manual) parsedPrice else null) },
+          ) { Text("ثبت") }
+        }
+      }
+    }
+  }
+}
+
+/**
+ *  قلمِ آزاد — چیزی که در فهرستِ کالاها نیست.
+ *
+ *  کیسه، یک جنسِ تک، خدمتی که کالا نیست. تا دیروز راهی نبود جز ساختنِ
+ *  یک کالای واقعی در فهرست، و نتیجه‌اش فهرستِ شلوغی از «متفرقه ۱،
+ *  متفرقه ۲» بود که خودش گزارش‌ها را کند می‌کرد.
+ */
+@Composable
+fun FreeLineDialog(
+  onDismiss: () -> Unit,
+  onConfirm: (label: String, price: Double, quantity: Double) -> Unit,
+) {
+  var label by remember { mutableStateOf("") }
+  var priceText by remember { mutableStateOf("") }
+  var qtyText by remember { mutableStateOf("1") }
+
+  val parsedPrice = priceText.toDoubleOrNull()
+  val parsedQty = qtyText.toDoubleOrNull()
+  val ok = label.isNotBlank() && parsedPrice != null && parsedPrice > 0 &&
+    parsedQty != null && parsedQty > 0
+
+  Dialog(onDismissRequest = onDismiss) {
+    Surface(
+      color = Shop.colors.surface,
+      shape = RoundedCornerShape(Radius.lg),
+      modifier = Modifier.fillMaxWidth(),
+    ) {
+      Column(Modifier.padding(18.dp)) {
+        Text("قلم آزاد", style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
+        Spacer(Modifier.height(4.dp))
+        Text(
+          "چیزی که در فهرست کالاها نیست. روی موجودی اثر نمی‌گذارد و کالای تازه‌ای هم ثبت نمی‌کند.",
+          style = MaterialTheme.typography.bodySmall,
+          color = Shop.colors.muted,
+        )
+        Spacer(Modifier.height(14.dp))
+
+        OutlinedTextField(
+          value = label,
+          onValueChange = { label = it },
+          label = { Text("نام") },
+          placeholder = { Text("مثلاً: کیسه") },
+          singleLine = true,
+          modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(12.dp))
+        AmountField(value = priceText, onValueChange = { priceText = it }, label = "قیمت هر واحد")
+        Spacer(Modifier.height(12.dp))
+        NumberField(
+          value = qtyText,
+          onValueChange = { qtyText = it },
+          label = "تعداد",
+          modifier = Modifier.fillMaxWidth(),
+        )
+
+        Spacer(Modifier.height(14.dp))
+        Text(
+          "جمع: ${money((parsedQty ?: 0.0) * (parsedPrice ?: 0.0))} افغانی",
+          style = MaterialTheme.typography.titleSmall,
+          color = Shop.colors.text,
+        )
+
+        Spacer(Modifier.height(16.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.align(Alignment.End)) {
+          TextButton(onClick = onDismiss) { Text("انصراف") }
+          Button(
+            enabled = ok,
+            onClick = { onConfirm(label.trim(), parsedPrice ?: 0.0, parsedQty ?: 1.0) },
+          ) { Text("افزودن") }
         }
       }
     }

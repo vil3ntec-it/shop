@@ -223,6 +223,9 @@ fun AppRoot(
     //  شده، قرضی که از حد گذشته و اشتراکی که رو به پایان است، تا فردا
     //  صبح صبر نمی‌کنند
     ir.vil3ntec.tohid.data.Watchman.schedule(context)
+    //  و پشتیبانِ شبانه — تا مسئولیتِ کارِ چند سالِ دکان روی حافظهٔ آدمی
+    //  نباشد که سرش شلوغ است
+    ir.vil3ntec.tohid.data.AutoBackup.schedule(context)
     if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
       val granted = androidx.core.content.ContextCompat.checkSelfPermission(
         context, android.Manifest.permission.POST_NOTIFICATIONS
@@ -414,7 +417,7 @@ fun AppRoot(
       ) { current ->
       when (current) {
         "purchasing" -> PurchasingScreen(store, data, snackbar)
-        "sales" -> SalesHistoryScreen(store, data, snackbar)
+        "sales" -> SalesHistoryScreen(store, cartStore, data, snackbar) { sub = null; tab = "sale" }
         "reports" -> ReportsScreen(data)
         "receipts" -> ReceiptsScreen(data)
         //  مثلِ تنظیمات، سدِ دوم: اگر از هر راهِ دیگری به این مسیر

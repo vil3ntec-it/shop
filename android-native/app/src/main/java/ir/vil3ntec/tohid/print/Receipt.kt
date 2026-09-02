@@ -145,7 +145,7 @@ object Receipt {
     /* ------------------------------ اقلام ------------------------------ */
     items.forEach { item ->
       val product = d.products.find { it.id == item.productId }
-      val name = product?.name ?: "(محصول حذف‌شده)"
+      val name = ir.vil3ntec.tohid.data.SalesEngine.itemName(d, item)
       val unit = product?.unit.orEmpty()
       line(name, body)
       val detail = "${money(item.quantity)}${if (unit.isNotBlank()) " $unit" else ""} × ${money(item.unitPrice)}"

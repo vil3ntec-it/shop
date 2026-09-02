@@ -177,6 +177,21 @@ object WarehouseEngine {
       d.copy(
         products = d.products.filter { it.id != id },
         warehouseEntries = d.warehouseEntries.filter { it.productId != id },
+        /*
+         *  ردیف‌های یتیم هم با کالا می‌روند.
+         *
+         *  تا دیروز فقط کالا و ورودی‌های انبارش برداشته می‌شدند و
+         *  `stockMovements` و `priceHistory` که به همان شناسه اشاره
+         *  می‌کنند سرِ جایشان می‌ماندند — برای همیشه، و با همگام‌سازی به
+         *  همهٔ گوشی‌ها هم می‌رفتند. در «گردشِ موجودی» به شکلِ ردیف‌های
+         *  «(حذف‌شده)» دیده می‌شدند و بی‌صدا وزنِ دفتر را زیاد می‌کردند.
+         *
+         *  اقلامِ فروش (`saleItems`) عمداً می‌مانند: فاکتورِ گذشته سند
+         *  است و دست‌خوردنی نیست. همان هشداری که پیش از حذف نشان داده
+         *  می‌شود هم همین را می‌گوید.
+         */
+        stockMovements = d.stockMovements.filter { it.productId != id },
+        priceHistory = d.priceHistory.filter { it.productId != id },
         auditLog = d.auditLog + AuditEntry(
           id = newId(),
           type = "delete_product",

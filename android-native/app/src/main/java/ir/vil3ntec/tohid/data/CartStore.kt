@@ -30,11 +30,11 @@ class CartStore(context: Context) {
     val raw = prefs.getString(KEY, null) ?: return emptyList()
     return runCatching { json.decodeFromString<List<DraftLine>>(raw) }
       .getOrDefault(emptyList())
-      .map { SalesEngine.CartLine(it.productId, it.quantity) }
+      .map { SalesEngine.CartLine(it.productId, it.quantity, it.unitPrice, it.label) }
   }
 
   private fun write(lines: List<SalesEngine.CartLine>) {
-    val draft = lines.map { DraftLine(it.productId, it.quantity) }
+    val draft = lines.map { DraftLine(it.productId, it.quantity, it.unitPrice, it.label) }
     prefs.edit().putString(KEY, json.encodeToString(draft)).apply()
   }
 
@@ -59,13 +59,24 @@ class CartStore(context: Context) {
    */
   fun prune(d: ShopData) {
     val known = d.products.mapTo(HashSet()) { it.id }
-    val kept = _lines.value.filter { it.productId in known }
+    //  قلمِ آزاد کالایی در فهرست ندارد و نباید قربانیِ همین پاک‌سازی شود
+    val kept = _lines.value.filter { it.free || it.productId in known }
     if (kept.size != _lines.value.size) set(kept)
     if (_debtorId.value != null && d.debtors.none { it.id == _debtorId.value }) setDebtor(null)
   }
 
+  /**
+   *  همان شکلی که نسخهٔ وب می‌نویسد، به‌علاوهٔ دو فیلدِ تازه با پیش‌فرض.
+   *  پیش‌نویسِ قدیمی بدونِ آن‌ها خوانده می‌شود و پیش‌نویسِ تازه در نسخهٔ وب
+   *  هم خوانده می‌شود — فقط قیمتِ دستی و قلمِ آزاد را آنجا نمی‌بیند.
+   */
   @kotlinx.serialization.Serializable
-  private data class DraftLine(val productId: String, val quantity: Double)
+  private data class DraftLine(
+    val productId: String,
+    val quantity: Double,
+    val unitPrice: Double? = null,
+    val label: String = "",
+  )
 
   private companion object {
     // همان کلیدِ نسخهٔ وب

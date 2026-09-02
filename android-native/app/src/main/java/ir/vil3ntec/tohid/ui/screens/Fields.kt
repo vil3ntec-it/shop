@@ -1,6 +1,10 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -10,9 +14,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import ir.vil3ntec.tohid.Jalali
 import ir.vil3ntec.tohid.formatDate
+import ir.vil3ntec.tohid.latinDigits
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.todayIso
+import ir.vil3ntec.tohid.ui.theme.Radius
 import ir.vil3ntec.tohid.ui.theme.Shop
 
 /**
@@ -69,28 +77,59 @@ fun AmountField(
 }
 
 /**
- * تاریخ.
+ *  تاریخ — همان چیزی که کاربر می‌بیند، همان چیزی که می‌نویسد.
  *
- * در فایلِ داده میلادی ذخیره می‌شود (همان `YYYY-MM-DD` نسخهٔ وب)، ولی
- * چیزی که کاربر می‌بیند خورشیدی است. تقویمِ آمادهٔ اندروید میلادی است و
- * اینجا بیشتر گیج می‌کرد تا کمک، پس دو دکمهٔ «امروز» و «دیروز» گذاشته شده
- * که نودونه درصدِ کار همان است.
+ *  ── چه اشکالی را می‌بندد ───────────────────────────────────────────
+ *  این کادر راهنمای `۱۴۰۵/۰۶/۰۶` نشان می‌داد — تاریخِ **خورشیدی** با
+ *  اسلش — ولی فیلتر فقط رقم و خط‌تیره را نگه می‌داشت و مقدارِ ذخیره‌شده
+ *  باید **میلادیِ** `YYYY-MM-DD` می‌بود.
+ *
+ *  یعنی کسی که همان چیزی را می‌زد که راهنما نشانش داده بود، رشتهٔ
+ *  بی‌معنیِ `14050606` ذخیره می‌کرد — و آن ردیف بی‌صدا از هر گزارشِ
+ *  بازه‌ای بیرون می‌افتاد. دو دکمهٔ «امروز» و «دیروز» درست کار می‌کردند و
+ *  همین پنهانش کرده بود.
+ *  ──────────────────────────────────────────────────────────────────
+ *
+ *  حالا کادر خورشیدی می‌گیرد و خورشیدی نشان می‌دهد؛ تبدیل به میلادی
+ *  همین‌جا انجام می‌شود و در فایل همان `YYYY-MM-DD`ِ همیشگی می‌نشیند —
+ *  پس داده بین نسخهٔ وب و این نسخه همچنان یکی است. کسی که میلادی بنویسد
+ *  هم پذیرفته می‌شود؛ `Jalali.parseTyped` از روی سالِ چهاررقمی می‌فهمد.
  */
 @Composable
 fun DateField(value: String, onValueChange: (String) -> Unit) {
+  //  کادر متنِ خودش را دارد تا وسطِ تایپ کردن، هر ضربهٔ کلید تاریخِ
+  //  نیمه‌کاره را به بیرون نفرستد
+  var text by remember { mutableStateOf(if (value.isBlank()) "" else formatDate(value)) }
+
+  //  مقدار از بیرون عوض شد (دکمهٔ امروز، یا باز شدنِ فرم روی رکوردِ
+  //  دیگر) — کادر دنبالش می‌آید، ولی نه وقتی خودش همان را نشان می‌دهد
+  LaunchedEffect(value) {
+    if (Jalali.parseTyped(text) != value) {
+      text = if (value.isBlank()) "" else formatDate(value)
+    }
+  }
+
+  val parsed = remember(text) { Jalali.parseTyped(text) }
+  val broken = text.isNotBlank() && parsed == null
+
   Text("تاریخ", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
   Spacer(Modifier.height(6.dp))
   Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
     OutlinedTextField(
-      value = value,
-      onValueChange = { onValueChange(latinDigits(it).filter { c -> c.isDigit() || c == '-' }) },
+      value = text,
+      onValueChange = { raw ->
+        text = latinDigits(raw).filter { c -> c.isDigit() || c == '/' || c == '-' }
+        Jalali.parseTyped(text)?.let(onValueChange)
+      },
       placeholder = { Text("۱۴۰۵/۰۶/۰۶") },
       singleLine = true,
+      isError = broken,
       keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
       supportingText = {
-        if (value.isNotBlank()) {
-          Text(formatDate(value), style = MaterialTheme.typography.labelSmall)
-        }
+        Text(
+          if (broken) "تاریخ خوانده نشد — مثل ۱۴۰۵/۰۶/۰۶ بنویسید" else "تاریخ خورشیدی",
+          style = MaterialTheme.typography.labelSmall,
+        )
       },
       modifier = Modifier.weight(1f),
     )
@@ -157,7 +196,21 @@ fun ChipPicker(
 fun CategoryPicker(options: List<String>, selected: String, onSelect: (String) -> Unit) =
   ChipPicker("دسته‌بندی", options, selected, onSelect, "دسته‌بندی تازه")
 
-/** انتخابِ یکی از چند چیزِ نام‌دار — تأمین‌کننده، محصول، قرض‌دار */
+/**
+ *  انتخابِ یکی از چند چیزِ نام‌دار — تأمین‌کننده، محصول، قرض‌دار.
+ *
+ *  ── چه اشکالی را می‌بندد ───────────────────────────────────────────
+ *  این یک `DropdownMenu`ِ ساده بود که **همهٔ** گزینه‌ها را پشتِ سرِ هم
+ *  می‌ریخت. برای انتخابِ قرض‌دار جای دیگری یک پنجرهٔ جستجودار ساخته شده
+ *  بود، ولی صفحهٔ خرید و تأمین‌کننده از همین فهرستِ بی‌انتها استفاده
+ *  می‌کرد. از حدودِ پنجاه کالا به بعد آزاردهنده می‌شد و با سیصد کالا
+ *  عملاً غیرقابلِ استفاده.
+ *  ──────────────────────────────────────────────────────────────────
+ *
+ *  حالا یک پنجره با کادرِ جستجو باز می‌شود و فهرست با هر حرف کوتاه‌تر
+ *  می‌شود. تا ده گزینه، جستجو اصلاً نشان داده نمی‌شود — کادرِ خالی روی
+ *  فهرستِ کوتاه فقط شلوغی است.
+ */
 @Composable
 fun <T> NamedPicker(
   title: String,
@@ -173,32 +226,92 @@ fun <T> NamedPicker(
 
   Text(title, style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
   Spacer(Modifier.height(6.dp))
-  Box {
-    OutlinedButton(
-      onClick = { if (options.isNotEmpty()) open = true },
+  OutlinedButton(
+    onClick = { if (options.isNotEmpty()) open = true },
+    modifier = Modifier.fillMaxWidth(),
+  ) {
+    Text(current?.let(nameOf) ?: if (options.isEmpty()) emptyNote else "انتخاب کنید")
+  }
+
+  if (open) {
+    SearchablePicker(
+      title = title,
+      options = options,
+      idOf = idOf,
+      nameOf = nameOf,
+      onClose = { open = false },
+      onPick = { onSelect(it); open = false },
+    )
+  }
+}
+
+/** پنجرهٔ انتخاب با جستجو — تنها جایی که فهرستِ بلند قابلِ تحمل می‌شود */
+@Composable
+fun <T> SearchablePicker(
+  title: String,
+  options: List<T>,
+  idOf: (T) -> String,
+  nameOf: (T) -> String,
+  onClose: () -> Unit,
+  onPick: (String) -> Unit,
+) {
+  var search by remember { mutableStateOf("") }
+  val term = search.trim()
+  val shown = remember(options, term) {
+    if (term.isBlank()) options
+    else options.filter { nameOf(it).contains(term, ignoreCase = true) }
+  }
+
+  Dialog(onDismissRequest = onClose) {
+    Surface(
+      color = Shop.colors.surface,
+      shape = RoundedCornerShape(Radius.lg),
       modifier = Modifier.fillMaxWidth(),
     ) {
-      Text(current?.let(nameOf) ?: if (options.isEmpty()) emptyNote else "انتخاب کنید")
-    }
-    DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-      options.forEach { option ->
-        DropdownMenuItem(
-          text = { Text(nameOf(option)) },
-          onClick = { onSelect(idOf(option)); open = false },
-        )
+      Column(Modifier.padding(16.dp).heightIn(max = 520.dp)) {
+        Text(title, style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
+        Spacer(Modifier.height(10.dp))
+
+        if (options.size > 10) {
+          OutlinedTextField(
+            value = search,
+            onValueChange = { search = it },
+            placeholder = { Text("جستجو") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+          )
+          Spacer(Modifier.height(10.dp))
+        }
+
+        if (shown.isEmpty()) {
+          Text(
+            "چیزی با این جستجو پیدا نشد",
+            style = MaterialTheme.typography.bodySmall,
+            color = Shop.colors.muted,
+          )
+        } else {
+          LazyColumn(Modifier.weight(1f, fill = false)) {
+            items(shown, key = { idOf(it) }) { option ->
+              Text(
+                nameOf(option),
+                style = MaterialTheme.typography.bodyMedium,
+                color = Shop.colors.text,
+                modifier = Modifier
+                  .fillMaxWidth()
+                  .clickable { onPick(idOf(option)) }
+                  .padding(vertical = 12.dp),
+              )
+              HorizontalDivider(color = Shop.colors.border)
+            }
+          }
+        }
+
+        Spacer(Modifier.height(8.dp))
+        TextButton(onClick = onClose, modifier = Modifier.align(Alignment.End)) { Text("انصراف") }
       }
     }
   }
 }
-
-private fun latinDigits(text: String): String = text.map { c ->
-  when (c) {
-    in '۰'..'۹' -> '0' + (c - '۰')
-    in '٠'..'٩' -> '0' + (c - '٠')
-    '٫', '٬' -> '.'
-    else -> c
-  }
-}.joinToString("")
 
 private fun yesterdayIso(): String {
   val c = java.util.Calendar.getInstance()

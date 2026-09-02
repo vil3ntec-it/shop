@@ -63,4 +63,83 @@ class JalaliTest {
     val today = todayIso()
     assert(Regex("^\\d{4}-\\d{2}-\\d{2}$").matches(today)) { "شکلِ تاریخ درست نیست: $today" }
   }
+
+  /* ═══════════════ راهِ برگشت: خورشیدی → میلادی ═══════════════ */
+
+  /*
+   *  کادرِ تاریخ راهنمای `۱۴۰۵/۰۶/۰۶` نشان می‌داد ولی میلادی می‌خواست و
+   *  اسلش را دور می‌ریخت — کسی که همان را می‌زد، رشتهٔ بی‌معنیِ
+   *  `14050606` ذخیره می‌کرد و آن ردیف بی‌صدا از هر گزارشِ بازه‌ای بیرون
+   *  می‌افتاد. حالا کادر خورشیدی می‌گیرد؛ این آزمون‌ها همان تبدیل را
+   *  می‌سنجند.
+   */
+
+  @Test
+  fun `رفت و برگشت، هر روزِ ده سال را سرِ جایش برمی‌گرداند`() {
+    var iso = "2020-01-01"
+    var checked = 0
+    repeat(3650) {
+      val j = Jalali.ofIso(iso)!!
+      val back = Jalali.toIso(j.year, j.month, j.day)
+      org.junit.Assert.assertEquals("روزِ $iso برنگشت", iso, back)
+      checked++
+      iso = nextDay(iso)
+    }
+    org.junit.Assert.assertEquals(3650, checked)
+  }
+
+  @Test
+  fun `تاریخِ تایپ‌شده با اسلش و خط‌تیره و رقمِ فارسی، یکی خوانده می‌شود`() {
+    val expected = Jalali.toIso(1405, 6, 6)
+    org.junit.Assert.assertEquals(expected, Jalali.parseTyped("1405/06/06"))
+    org.junit.Assert.assertEquals(expected, Jalali.parseTyped("1405-6-6"))
+    org.junit.Assert.assertEquals(expected, Jalali.parseTyped("۱۴۰۵/۰۶/۰۶"))
+    org.junit.Assert.assertEquals(expected, Jalali.parseTyped("  1405 / 6 / 6  "))
+  }
+
+  @Test
+  fun `کسی که میلادی نوشته، میلادی می‌گیرد`() {
+    org.junit.Assert.assertEquals("2026-09-01", Jalali.parseTyped("2026-09-01"))
+  }
+
+  @Test
+  fun `تاریخِ بی‌معنی خوانده نمی‌شود`() {
+    org.junit.Assert.assertNull(Jalali.parseTyped("14050606"))
+    org.junit.Assert.assertNull(Jalali.parseTyped("1405/13/01"))
+    org.junit.Assert.assertNull(Jalali.parseTyped("1405/07/31"))
+    org.junit.Assert.assertNull(Jalali.parseTyped(""))
+    org.junit.Assert.assertNull(Jalali.parseTyped("سلام"))
+  }
+
+  @Test
+  fun `شش ماهِ اول سی‌ویک روز دارند و شش ماهِ دوم سی`() {
+    (1..6).forEach { org.junit.Assert.assertTrue(Jalali.isValid(1405, it, 31)) }
+    (7..11).forEach {
+      org.junit.Assert.assertTrue(Jalali.isValid(1405, it, 30))
+      org.junit.Assert.assertFalse(Jalali.isValid(1405, it, 31))
+    }
+  }
+
+  @Test
+  fun `برچسبِ ماه از ماهِ میلادی در می‌آید`() {
+    //  پانزدهمِ ماه گرفته می‌شود، پس برچسب همان ماهی است که بیشترِ
+    //  روزهایش در آن است
+    val label = ir.vil3ntec.tohid.formatMonth("2026-09")
+    org.junit.Assert.assertTrue("برچسبِ نامنتظر: $label", label.contains("۱۴۰۵") || label.contains("1405"))
+  }
+
+  /** روزِ بعدِ یک تاریخِ میلادی */
+  private fun nextDay(iso: String): String {
+    val parts = iso.split('-').map { it.toInt() }
+    val c = java.util.Calendar.getInstance().apply {
+      clear()
+      set(parts[0], parts[1] - 1, parts[2])
+      add(java.util.Calendar.DAY_OF_MONTH, 1)
+    }
+    return "%04d-%02d-%02d".format(
+      c.get(java.util.Calendar.YEAR),
+      c.get(java.util.Calendar.MONTH) + 1,
+      c.get(java.util.Calendar.DAY_OF_MONTH),
+    )
+  }
 }
