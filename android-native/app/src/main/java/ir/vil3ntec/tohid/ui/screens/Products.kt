@@ -118,16 +118,29 @@ fun ProductsScreen(
   }
 
   val term = search.trim()
-  val shown = d.products.filter { p ->
-    (category == null || p.category == category) &&
-      (term.isBlank() || p.name.contains(term, ignoreCase = true) ||
-        p.category.contains(term, ignoreCase = true) ||
-        p.barcodes.any { it.contains(term) })
+  //  فیلتر و دو جمعِ انبار، یک بار به ازای هر دفتر و هر عبارتِ جستجو —
+  //  نه در هر بار کشیده شدنِ صفحه
+  val shown = remember(d, term, category) {
+    d.products.filter { p ->
+      (category == null || p.category == category) &&
+        (term.isBlank() || p.name.contains(term, ignoreCase = true) ||
+          p.category.contains(term, ignoreCase = true) ||
+          p.barcodes.any { it.contains(term) })
+    }
   }
 
   // ارزش انبار به دو قیمت، و سودی که اگر همه فروخته شود به دست می‌آید
-  val buyValue = d.products.sumOf { ShopStore.stock(d, it.id) * it.purchasePrice }
-  val sellValue = d.products.sumOf { ShopStore.stock(d, it.id) * it.salePrice }
+  val (buyValue, sellValue) = remember(d) {
+    val stock = ShopStore.index(d)
+    var buy = 0.0
+    var sell = 0.0
+    d.products.forEach {
+      val left = stock.stock(it.id)
+      buy += left * it.purchasePrice
+      sell += left * it.salePrice
+    }
+    buy to sell
+  }
 
   Box(Modifier.fillMaxSize()) {
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, 96.dp)) {

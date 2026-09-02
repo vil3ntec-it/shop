@@ -33,7 +33,7 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
     enableEdgeToEdge()
 
     store = ShopStore(applicationContext)
-    lifecycleScope.launch { store.load() }
+    lifecycleScope.launch { store.loadAndSummarize() }
 
     // کلیدِ انیمیشن پیش از اولین کشیدنِ صفحه خوانده می‌شود
     Motion.load(applicationContext)

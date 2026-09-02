@@ -102,12 +102,15 @@ fun WarehouseScreen(
     }
   }
 
-  val shown = d.products.filter { p ->
-    (category == null || p.category == category) &&
-      (search.isBlank() || p.name.contains(search.trim(), ignoreCase = true) ||
-        p.barcodes.any { it.contains(search.trim()) })
+  val term = search.trim()
+  val shown = remember(d, term, category) {
+    d.products.filter { p ->
+      (category == null || p.category == category) &&
+        (term.isBlank() || p.name.contains(term, ignoreCase = true) ||
+          p.barcodes.any { it.contains(term) })
+    }
   }
-  val summary = WarehouseEngine.summary(d)
+  val summary = remember(d) { WarehouseEngine.summary(d) }
 
   Box(Modifier.fillMaxSize()) {
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, 96.dp)) {

@@ -81,6 +81,8 @@ fun SaleScreen(
   }
   var status by remember { mutableStateOf("در حال آماده‌سازی دوربین…") }
   var statusError by remember { mutableStateOf(false) }
+  //  آخرین باری که چیزی خوانده شد — مبنای خوابیدنِ خودکارِ دوربین
+  var lastScanAt by remember { mutableStateOf(System.currentTimeMillis()) }
 
   val askCamera = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
     granted = ok
@@ -95,6 +97,23 @@ fun SaleScreen(
     if (!granted) askCamera.launch(Manifest.permission.CAMERA)
   }
 
+  /*
+   *  دوربینِ بیکار می‌خوابد.
+   *
+   *  این تب در دکان تمامِ روز باز است و دوربین تا زدنِ «توقف دوربین»
+   *  روشن می‌ماند — حتی وقتی فروشنده دارد سبد را دستی می‌بندد یا با
+   *  مشتری حساب می‌کند. نتیجه‌اش گرم شدنِ گوشی و رفتنِ باتری بود.
+   *
+   *  با هر اسکن، شمارش از نو شروع می‌شود؛ پس وسطِ کار خاموش نمی‌شود.
+   */
+  LaunchedEffect(cameraOn, granted, lastScanAt) {
+    if (!cameraOn || !granted) return@LaunchedEffect
+    kotlinx.coroutines.delay(CAMERA_IDLE_MS)
+    cameraOn = false
+    status = "دوربین بعد از چند دقیقه بی‌کاری خاموش شد"
+    statusError = false
+  }
+
   var multiplier by rememberSaveable { mutableStateOf(1) }
   var manual by rememberSaveable { mutableStateOf("") }
   var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -103,6 +122,10 @@ fun SaleScreen(
   // عکسِ لحظهٔ ثبت نگه داشته می‌شود، نه فقط شناسه: فاکتور باید همان
   // چیزی را نشان دهد که ثبت شد، حتی اگر همان لحظه چیز دیگری عوض شود
   var invoice by remember { mutableStateOf<Pair<ShopData, String>?>(null) }
+
+  //  ردیفی که کادرِ تعداد و قیمتش باز است، و پنجرهٔ قلمِ آزاد
+  var editLine by remember { mutableStateOf<String?>(null) }
+  var freeLine by rememberSaveable { mutableStateOf(false) }
 
   val gate = remember { ScanGate() }
   val index = remember(d.products) { ShopStore.barcodeIndex(d) }
@@ -115,6 +138,8 @@ fun SaleScreen(
   fun onBarcode(raw: String, skipDedup: Boolean = false) {
     val code = raw.trim()
     if (code.isEmpty()) return
+    //  کار در جریان است؛ دوربین نباید بخوابد
+    lastScanAt = System.currentTimeMillis()
     if (!skipDedup && !gate.accept(code)) return
 
     /*
@@ -191,6 +216,7 @@ fun SaleScreen(
             } else {
               cameraOn = true
               gate.reset()
+              lastScanAt = System.currentTimeMillis()
               if (!granted) askCamera.launch(Manifest.permission.CAMERA)
             }
           }) {
@@ -288,10 +314,17 @@ fun SaleScreen(
           verticalAlignment = Alignment.CenterVertically,
         ) {
           Text("سبد خرید", style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
-          TextButton(onClick = onQuickSale) {
-            Icon(Icons.Filled.GridView, contentDescription = null, tint = Shop.colors.primary)
-            Spacer(Modifier.width(6.dp))
-            Text("انتخاب محصول", color = Shop.colors.primary)
+          Row(verticalAlignment = Alignment.CenterVertically) {
+            TextButton(onClick = { freeLine = true }) {
+              Icon(Icons.Filled.AddCircleOutline, contentDescription = null, tint = Shop.colors.primary)
+              Spacer(Modifier.width(6.dp))
+              Text("قلم آزاد", color = Shop.colors.primary)
+            }
+            TextButton(onClick = onQuickSale) {
+              Icon(Icons.Filled.GridView, contentDescription = null, tint = Shop.colors.primary)
+              Spacer(Modifier.width(6.dp))
+              Text("انتخاب محصول", color = Shop.colors.primary)
+            }
           }
         }
         Spacer(Modifier.height(8.dp))
@@ -306,13 +339,37 @@ fun SaleScreen(
       } else {
         items(cart, key = { it.productId }) { line ->
           val product = d.products.find { it.id == line.productId }
-          if (product != null) {
+          //  ردیفِ آزاد کالا ندارد ولی باید دیده شود
+          if (product == null && line.free) {
+            val price = line.unitPrice ?: 0.0
+            CartRow(
+              name = line.label,
+              unit = "",
+              quantity = line.quantity,
+              lineTotal = price * line.quantity,
+              unitPrice = price,
+              selected = selectedId == line.productId,
+              customPrice = true,
+              onClick = { selectedId = if (selectedId == line.productId) null else line.productId },
+              onPlus = { cartStore.set(SalesEngine.setCartQty(cart, line.productId, line.quantity + 1)) },
+              onMinus = { cartStore.set(SalesEngine.setCartQty(cart, line.productId, line.quantity - 1)) },
+              onEdit = { editLine = line.productId },
+              onRemove = {
+                cartStore.set(SalesEngine.setCartQty(cart, line.productId, 0.0))
+                if (selectedId == line.productId) selectedId = null
+              },
+            )
+            Spacer(Modifier.height(8.dp))
+          } else if (product != null) {
+            val price = line.unitPrice ?: product.salePrice
             CartRow(
               name = product.name,
               unit = product.unit,
               quantity = line.quantity,
-              lineTotal = product.salePrice * line.quantity,
-              unitPrice = product.salePrice,
+              lineTotal = price * line.quantity,
+              unitPrice = price,
+              customPrice = line.unitPrice != null,
+              onEdit = { editLine = line.productId },
               selected = selectedId == line.productId,
               onClick = { selectedId = if (selectedId == line.productId) null else line.productId },
               onPlus = {
@@ -362,6 +419,45 @@ fun SaleScreen(
       selected = cartDebtorId,
       onClose = { pickDebtor = false },
       onPick = { id -> cartStore.setDebtor(id); pickDebtor = false },
+    )
+  }
+
+  //  کادرِ تعداد و قیمتِ یک ردیف
+  editLine?.let { id ->
+    val line = cart.find { it.productId == id }
+    if (line == null) editLine = null
+    else {
+      val product = d.products.find { it.id == id }
+      val base = if (line.free) (line.unitPrice ?: 0.0) else (product?.salePrice ?: 0.0)
+      CartLineDialog(
+        name = if (line.free) line.label else (product?.name ?: ""),
+        unit = product?.unit.orEmpty(),
+        quantity = line.quantity,
+        unitPrice = line.unitPrice ?: base,
+        basePrice = base,
+        //  ردیفِ آزاد همیشه قیمتِ خودش را دارد و برگشتی به «قیمتِ کالا» ندارد
+        custom = line.free || line.unitPrice != null,
+        onDismiss = { editLine = null },
+        onConfirm = { quantity, price ->
+          var next = SalesEngine.setCartQty(cart, id, quantity)
+          //  قلمِ آزاد بدونِ قیمت معنی ندارد؛ اگر پاک شد، همان قبلی می‌ماند
+          val wanted = if (line.free) (price ?: line.unitPrice) else price
+          next = SalesEngine.setLinePrice(next, id, wanted)
+          cartStore.set(next)
+          editLine = null
+        },
+      )
+    }
+  }
+
+  if (freeLine) {
+    FreeLineDialog(
+      onDismiss = { freeLine = false },
+      onConfirm = { label, price, quantity ->
+        cartStore.set(SalesEngine.addFreeLine(cart, label, price, quantity, ::newId))
+        freeLine = false
+        ScanFeedback.ok(context)
+      },
     )
   }
 
@@ -518,6 +614,10 @@ fun CartRow(
   onPlus: () -> Unit,
   onMinus: () -> Unit,
   onRemove: () -> Unit,
+  /** باز کردنِ کادرِ تایپِ تعداد و قیمت. `null` یعنی این ردیف ویرایش ندارد. */
+  onEdit: (() -> Unit)? = null,
+  /** قیمتِ این ردیف دستی گذاشته شده — نشانه‌اش روی کارت دیده می‌شود */
+  customPrice: Boolean = false,
 ) {
   Column(
     Modifier
@@ -537,9 +637,10 @@ fun CartRow(
         Text(name, style = MaterialTheme.typography.titleSmall, color = Shop.colors.text)
         Spacer(Modifier.height(3.dp))
         Text(
-          "${qty(quantity)}${if (unit.isNotBlank()) " $unit" else ""} × ${money(unitPrice)}",
+          "${qty(quantity)}${if (unit.isNotBlank()) " $unit" else ""} × ${money(unitPrice)}" +
+            if (customPrice) "  (قیمت دستی)" else "",
           style = MaterialTheme.typography.bodySmall,
-          color = Shop.colors.muted,
+          color = if (customPrice) Shop.colors.primary else Shop.colors.muted,
         )
       }
       Text(
@@ -557,6 +658,13 @@ fun CartRow(
       ) {
         OutlinedButton(onClick = onMinus, modifier = Modifier.weight(1f)) { Text("−") }
         OutlinedButton(onClick = onPlus, modifier = Modifier.weight(1f)) { Text("+") }
+        //  زدنِ ۲۵ بار روی «+» برای فروشِ عمده، بدترین جای ممکن برای کند
+        //  بودن است — اینجا تعداد و قیمت تایپ می‌شوند
+        if (onEdit != null) {
+          OutlinedButton(onClick = onEdit) {
+            Icon(Icons.Filled.Edit, contentDescription = "تعداد و قیمت")
+          }
+        }
         OutlinedButton(
           onClick = onRemove,
           colors = ButtonDefaults.outlinedButtonColors(contentColor = Shop.colors.danger),
@@ -637,3 +745,11 @@ fun CartBar(
     }
   }
 }
+
+/**
+ *  دوربینِ بیکار بعد از این‌قدر می‌خوابد.
+ *
+ *  سه دقیقه: کوتاه‌تر از این، وسطِ حساب کردنِ یک فاکتورِ بزرگ خاموش
+ *  می‌شود و آدم را عصبانی می‌کند؛ بلندتر از این، دیگر صرفه‌جویی نیست.
+ */
+private const val CAMERA_IDLE_MS = 3L * 60L * 1000L

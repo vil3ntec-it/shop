@@ -15,7 +15,45 @@ import kotlin.math.roundToLong
  */
 object SalesEngine {
 
-  data class CartLine(val productId: String, val quantity: Double)
+  /**
+   *  یک ردیفِ سبد.
+   *
+   *  ── دو چیزی که تازه اضافه شده و چرا ──────────────────────────────
+   *  **قیمتِ آزادِ ردیف.** تا دیروز قیمت همیشه از `product.salePrice`
+   *  خوانده می‌شد و تنها اهرمِ چانه‌زنی، تخفیفِ کلِ فاکتور بود. چانه‌زنی
+   *  کارِ روزمرهٔ دکان است؛ فروشنده مجبور می‌شد تخفیفِ کل را دستکاری کند
+   *  تا عددِ یک قلم در بیاید — و بعد گزارشِ سودِ همان کالا غلط از آب
+   *  درمی‌آمد، چون سود از `unitPrice`ِ ثبت‌شده حساب می‌شود. حالا قیمتِ
+   *  همان ردیف عوض می‌شود و سود درست ثبت می‌ماند.
+   *
+   *  **قلمِ آزاد.** هر چیزی که به سبد می‌رفت باید از قبل یک `Product`
+   *  می‌بود. برای فروشِ یک کیسه، یک جنسِ تک، یا خدمتی که کالا نیست، راهی
+   *  نبود جز ساختنِ کالای واقعی در فهرست — و نتیجه‌اش فهرستِ شلوغی از
+   *  «متفرقه ۱، متفرقه ۲» بود. قلمِ آزاد نام و مبلغِ خودش را دارد، روی
+   *  موجودی اثر نمی‌گذارد و در فهرستِ کالاها هم نمی‌نشیند.
+   *  ────────────────────────────────────────────────────────────────
+   *
+   *  @param productId شناسهٔ کالا. برای قلمِ آزاد، شناسهٔ یکتای **همین
+   *    ردیف** است تا کلیدِ فهرست و حذف و جمع‌زدن مثلِ بقیه کار کند.
+   *  @param unitPrice قیمتِ دستیِ همین ردیف؛ `null` یعنی قیمتِ خودِ کالا.
+   *  @param label نامِ قلمِ آزاد. ناخالی بودنش یعنی این ردیف کالا ندارد.
+   */
+  data class CartLine(
+    val productId: String,
+    val quantity: Double,
+    val unitPrice: Double? = null,
+    val label: String = "",
+  ) {
+    /** ردیفی که کالای ثبت‌شده‌ای پشتش نیست */
+    val free: Boolean get() = label.isNotBlank()
+  }
+
+  /** قیمتِ واحدِ یک ردیف — دستی اگر گذاشته شده، وگرنه قیمتِ کالا */
+  fun linePrice(d: ShopData, line: CartLine): Double {
+    line.unitPrice?.let { return it }
+    if (line.free) return 0.0
+    return d.products.find { it.id == line.productId }?.salePrice ?: 0.0
+  }
 
   enum class DiscountType { AMOUNT, PERCENT }
   enum class Payment { CASH, CREDIT }
@@ -26,6 +64,18 @@ object SalesEngine {
     val payment: Payment = Payment.CASH,
     /** فقط وقتی نسیه است معنی دارد */
     val paidAmount: Double = 0.0,
+    /**
+     *  مشتریِ این فاکتور.
+     *
+     *  در فروشِ **نسیه** اجباری است و بدهی به حسابش نوشته می‌شود. در
+     *  فروشِ **نقدی** اختیاری است و فقط اسمِ مشتری روی فاکتور می‌نشیند —
+     *  هیچ بدهی‌ای ساخته نمی‌شود.
+     *
+     *  تا دیروز فروشِ نقدی به هیچ‌کس وصل نمی‌شد، پس «این مشتری امسال چقدر
+     *  خرید کرده» فقط برای کسانی جواب داشت که نسیه برده بودند. حسابِ
+     *  بدهی از `transactions` می‌آید نه از این فیلد، پس وصل کردنِ مشتری
+     *  به فاکتورِ نقدی هیچ عددی را جابه‌جا نمی‌کند.
+     */
     val debtorId: String? = null,
   )
 
@@ -98,6 +148,37 @@ object SalesEngine {
     )
   }
 
+  /**
+   *  افزودنِ یک قلمِ آزاد — چیزی که کالای ثبت‌شده‌ای ندارد.
+   *
+   *  هر بار ردیفِ تازه‌ای ساخته می‌شود و با ردیف‌های دیگر جمع نمی‌شود:
+   *  دو «کیسه»ی جدا ممکن است دو قیمتِ جدا داشته باشند.
+   */
+  fun addFreeLine(
+    cart: List<CartLine>,
+    label: String,
+    unitPrice: Double,
+    quantity: Double,
+    newId: () -> String,
+  ): List<CartLine> {
+    val name = label.trim()
+    if (name.isEmpty()) return cart
+    val price = if (unitPrice.isNaN() || unitPrice < 0) 0.0 else unitPrice
+    val count = if (quantity.isNaN() || quantity <= 0) 1.0 else quantity
+    return cart + CartLine(
+      productId = newId(),
+      quantity = count,
+      unitPrice = price,
+      label = name,
+    )
+  }
+
+  /** قیمتِ دستیِ یک ردیف. `null` یعنی برگشت به قیمتِ خودِ کالا. */
+  fun setLinePrice(cart: List<CartLine>, productId: String, price: Double?): List<CartLine> {
+    val clean = price?.takeIf { !it.isNaN() && it >= 0 }
+    return cart.map { if (it.productId == productId) it.copy(unitPrice = clean) else it }
+  }
+
   /** تعیینِ تعداد. صفر یا کمتر یعنی حذفِ ردیف. */
   fun setCartQty(cart: List<CartLine>, productId: String, quantity: Double): List<CartLine> {
     if (quantity <= 0) return cart.filter { it.productId != productId }
@@ -120,8 +201,13 @@ object SalesEngine {
 
   fun cartTotal(d: ShopData, cart: List<CartLine>): Double =
     cart.sumOf { line ->
-      val p = d.products.find { it.id == line.productId }
-      if (p == null) 0.0 else p.salePrice * line.quantity
+      //  ردیفِ آزاد کالا ندارد ولی مبلغ دارد؛ ردیفِ کالایی که کالایش حذف
+      //  شده، مثلِ قبل صفر حساب می‌شود
+      if (line.free) line.quantity * (line.unitPrice ?: 0.0)
+      else {
+        val p = d.products.find { it.id == line.productId }
+        if (p == null) 0.0 else line.quantity * (line.unitPrice ?: p.salePrice)
+      }
     }
 
   /**
@@ -179,12 +265,20 @@ object SalesEngine {
     paid = min(paid, t.finalTotal)
     val remaining = max(0.0, t.finalTotal - paid)
 
-    var debtorId: String? = null
-    if (checkout.payment == Payment.CREDIT && remaining > 0) {
-      debtorId = checkout.debtorId
-      if (debtorId.isNullOrBlank()) return Result.Failed("برای فروش نسیه، قرض‌دار را انتخاب کنید")
-      if (d.debtors.none { it.id == debtorId }) return Result.Failed("قرض‌دار پیدا نشد")
+    /*
+     *  مشتری. در نسیه اجباری است و بدهی می‌سازد؛ در نقدی اختیاری است و
+     *  فقط نامِ مشتری روی فاکتور می‌نشیند. `debtGiven` پایین‌تر تعیین
+     *  می‌کند که بدهی ساخته شود یا نه — نه خودِ این فیلد.
+     */
+    val debtorId: String? = checkout.debtorId?.takeIf { it.isNotBlank() }
+    if (debtorId != null && d.debtors.none { it.id == debtorId }) {
+      return Result.Failed("قرض‌دار پیدا نشد")
     }
+    if (checkout.payment == Payment.CREDIT && remaining > 0 && debtorId == null) {
+      return Result.Failed("برای فروش نسیه، قرض‌دار را انتخاب کنید")
+    }
+    //  بدهی فقط از فروشِ نسیه‌ای می‌آید که هنوز تسویه نشده
+    val onCredit = checkout.payment == Payment.CREDIT && remaining > 0
 
     val saleId = newId()
     val invoiceNumber = d.nextInvoiceNo
@@ -202,7 +296,7 @@ object SalesEngine {
       paidAmount = paid,
       remaining = remaining,
       status = "completed",
-      debtGiven = if (debtorId != null && remaining > 0) remaining else 0.0,
+      debtGiven = if (onCredit) remaining else 0.0,
       debtSettled = 0.0,
       createdAt = now,
       date = today,
@@ -212,15 +306,38 @@ object SalesEngine {
     val items = mutableListOf<SaleItem>()
     val movements = mutableListOf<StockMovement>()
     cart.forEach { line ->
+      /*
+       *  قلمِ آزاد: نه کالایی دارد، نه حرکتِ انبار می‌سازد، نه بهای
+       *  تمام‌شده. سودش برابرِ کلِ مبلغش حساب می‌شود، چون خریدش جای دیگری
+       *  ثبت شده (یا اصلاً کالا نبوده).
+       */
+      if (line.free) {
+        val price = line.unitPrice ?: 0.0
+        items += SaleItem(
+          id = newId(),
+          saleId = saleId,
+          productId = "",
+          name = line.label,
+          quantity = line.quantity,
+          unitPrice = price,
+          purchasePrice = 0.0,
+          totalPrice = price * line.quantity,
+          returnedQty = 0.0,
+        )
+        return@forEach
+      }
+
       val p = d.products.find { it.id == line.productId } ?: return@forEach
+      //  قیمتِ دستیِ همین ردیف، وگرنه قیمتِ خودِ کالا
+      val unit = line.unitPrice ?: p.salePrice
       items += SaleItem(
         id = newId(),
         saleId = saleId,
         productId = p.id,
         quantity = line.quantity,
-        unitPrice = p.salePrice,
+        unitPrice = unit,
         purchasePrice = p.purchasePrice,
-        totalPrice = p.salePrice * line.quantity,
+        totalPrice = unit * line.quantity,
         returnedQty = 0.0,
       )
       movements += StockMovement(
@@ -235,9 +352,12 @@ object SalesEngine {
       )
     }
 
-    // فروشِ نسیه به حسابِ قرض‌دار می‌رود، با همان منطقِ قرض‌داران
+    //  فروشِ نسیه به حسابِ قرض‌دار می‌رود، با همان منطقِ قرض‌داران.
+    //  مشتریِ فاکتورِ نقدی اینجا نمی‌آید: نامش روی فاکتور هست ولی بدهی
+    //  ندارد.
     val transactions = d.transactions.toMutableList()
-    if (debtorId != null && remaining > 0) {
+    //  `debtorId != null` بالاتر تضمین شده؛ اینجا فقط برای کامپایلر است
+    if (onCredit && debtorId != null) {
       transactions += DebtTransaction(
         id = newId(),
         debtorId = debtorId,
@@ -330,6 +450,19 @@ object SalesEngine {
   fun cancelWarning(sale: Sale): String =
     "فروش #${ir.vil3ntec.tohid.plain(sale.invoiceNumber ?: 0)} لغو می‌شود و موجودی کالاهای آن به انبار برمی‌گردد. سابقه فروش حذف نمی‌شود."
 
+  /**
+   *  نامی که روی یک قلمِ فاکتور نوشته می‌شود.
+   *
+   *  قلمِ معمولی نامش را از خودِ کالا می‌گیرد — پس تغییرِ نامِ کالا در
+   *  فاکتورهای قدیمی هم دیده می‌شود، همان‌طور که تا امروز بوده. قلمِ آزاد
+   *  کالایی ندارد و نامش روی خودِ قلم نوشته شده.
+   */
+  fun itemName(d: ShopData, item: SaleItem): String {
+    if (item.productId.isBlank()) return item.name.ifBlank { "قلم آزاد" }
+    return d.products.find { it.id == item.productId }?.name
+      ?: item.name.ifBlank { "(محصول حذف‌شده)" }
+  }
+
   /** مقداری از یک قلم که هنوز می‌شود برگرداند */
   fun returnable(item: SaleItem): Double = (item.quantity - item.returnedQty).coerceAtLeast(0.0)
 
@@ -385,7 +518,9 @@ object SalesEngine {
         date = today,
         createdAt = now,
       )
-      movements += StockMovement(
+      //  قلمِ آزاد کالایی ندارد، پس حرکتِ انبار هم نمی‌سازد — وگرنه ردیفی
+      //  با شناسهٔ کالای خالی در گردشِ موجودی می‌نشست
+      if (item.productId.isNotBlank()) movements += StockMovement(
         id = newId(),
         productId = item.productId,
         type = "customer_return",

@@ -90,6 +90,74 @@ object Jalali {
     return Date(jy, 7 + k / 30, k % 30 + 1)
   }
 
+  /* ─────────── راهِ برگشت: خورشیدی → میلادی ─────────── */
+
+  /**
+   *  شمارهٔ روزِ مطلق برای یک تاریخِ خورشیدی — عکسِ `of`.
+   *
+   *  تا امروز فقط راهِ رفت بود (میلادی → خورشیدی)، چون تاریخ همیشه از
+   *  فایل می‌آمد و فقط نشان داده می‌شد. حالا کاربر هم تاریخ **می‌نویسد**،
+   *  و آنچه می‌نویسد خورشیدی است.
+   */
+  private fun j2d(jy: Int, jm: Int, jd: Int): Int {
+    val c = cal(jy)
+    return g2d(c.gy, 3, c.march) + (jm - 1) * 31 - (jm / 7) * (jm - 7) + jd - 1
+  }
+
+  private fun d2g(jdn: Int): Triple<Int, Int, Int> {
+    var j = 4 * jdn + 139361631
+    j += (((4 * jdn + 183187720) / 146097) * 3) / 4 * 4 - 3908
+    val i = ((j % 1461) / 4) * 5 + 308
+    val gd = ((i % 153) / 5) + 1
+    val gm = ((i / 153) % 12) + 1
+    val gy = j / 1461 - 100100 + (8 - gm) / 6
+    return Triple(gy, gm, gd)
+  }
+
+  /** آیا این سه عدد اصلاً یک روزِ خورشیدیِ درست‌اند */
+  fun isValid(jy: Int, jm: Int, jd: Int): Boolean {
+    if (jm !in 1..12 || jd < 1) return false
+    val max = when {
+      jm <= 6 -> 31
+      jm <= 11 -> 30
+      else -> if (runCatching { cal(jy).leap == 0 }.getOrDefault(false)) 30 else 29
+    }
+    return jd <= max
+  }
+
+  /**
+   *  تاریخِ خورشیدی به همان `YYYY-MM-DD`ِ میلادی که در فایل ذخیره می‌شود.
+   *  اگر تاریخ درست نباشد، `null`.
+   */
+  fun toIso(jy: Int, jm: Int, jd: Int): String? = runCatching {
+    if (!isValid(jy, jm, jd)) return null
+    val (gy, gm, gd) = d2g(j2d(jy, jm, jd))
+    "%04d-%02d-%02d".format(gy, gm, gd)
+  }.getOrNull()
+
+  /**
+   *  آنچه کاربر نوشته، به تاریخِ فایل.
+   *
+   *  `1405/06/06`، `1405-6-6`، `۱۴۰۵/۰۶/۰۶` — همه یکی‌اند. اگر عدد چهار
+   *  رقمیِ اول بزرگ‌تر از ۱۷۰۰ باشد، خودِ کاربر میلادی نوشته و همان
+   *  برگردانده می‌شود.
+   */
+  fun parseTyped(text: String): String? {
+    val parts = ir.vil3ntec.tohid.latinDigits(text.trim())
+      .split('/', '-', '.', ' ')
+      .filter { it.isNotBlank() }
+    if (parts.size != 3) return null
+    val a = parts[0].toIntOrNull() ?: return null
+    val b = parts[1].toIntOrNull() ?: return null
+    val c = parts[2].toIntOrNull() ?: return null
+    //  کسی که میلادی نوشته، میلادی می‌خواهد
+    if (a >= 1700) {
+      if (b !in 1..12 || c !in 1..31) return null
+      return "%04d-%02d-%02d".format(a, b, c)
+    }
+    return toIso(a, b, c)
+  }
+
   /** از تاریخِ ذخیره‌شده در فایلِ داده: `YYYY-MM-DD` */
   fun ofIso(iso: String): Date? {
     val parts = iso.split('-')
@@ -158,4 +226,24 @@ fun todayIso(): String {
   val m = (c.get(java.util.Calendar.MONTH) + 1).toString().padStart(2, '0')
   val d = c.get(java.util.Calendar.DAY_OF_MONTH).toString().padStart(2, '0')
   return "$y-$m-$d"
+}
+
+/** نامِ ماه‌های خورشیدی — برای برچسبِ ماه، نه برای تاریخِ کامل */
+val JALALI_MONTHS = listOf(
+  "حمل", "ثور", "جوزا", "سرطان", "اسد", "سنبله",
+  "میزان", "عقرب", "قوس", "جدی", "دلو", "حوت",
+)
+
+/**
+ *  برچسبِ یک ماه: از `2026-09` به «سنبله ۱۴۰۵».
+ *
+ *  ماهِ ذخیره‌شده در فایلِ داده میلادی است (همان `date.take(7)`) و یک
+ *  ماهِ میلادی روی دو ماهِ خورشیدی می‌افتد. پانزدهمِ ماه گرفته می‌شود تا
+ *  برچسب همان ماهی باشد که بیشترِ روزهایش در آن است — همان قاعده‌ای که
+ *  صفحهٔ مصارف از اول داشت.
+ */
+fun formatMonth(month: String): String {
+  val j = Jalali.ofIso("$month-15") ?: return month
+  val name = JALALI_MONTHS.getOrNull(j.month - 1) ?: return month
+  return "$name ${j.year}"
 }

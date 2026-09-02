@@ -10,6 +10,9 @@ import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.Compress
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Info
@@ -47,8 +50,13 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.runtime.CompositionLocalProvider
 import ir.vil3ntec.tohid.BuildConfig
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import ir.vil3ntec.tohid.data.ShopData
+import ir.vil3ntec.tohid.data.AutoBackup
+import ir.vil3ntec.tohid.data.BackupBundle
 import ir.vil3ntec.tohid.data.BackupClock
+import ir.vil3ntec.tohid.data.LedgerArchive
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.formatDate
 import ir.vil3ntec.tohid.money
@@ -152,6 +160,13 @@ fun SettingsScreen(
   }
   // فایل خوانده و سنجیده شده، پیش از آنکه دفتر عوض شود
   var pendingRestore by remember { mutableStateOf<ShopData?>(null) }
+  //  چند عکس داخلِ فایلِ پشتیبان بود — پیش از تأیید نشان داده می‌شود
+  var restorePhotos by remember { mutableStateOf(0) }
+  var confirmCompact by remember { mutableStateOf(false) }
+  //  فهرستِ نسخه‌های شبانه و شمارشِ ردیف‌های قابلِ بایگانی — با هر تغییرِ
+  //  دفتر از نو خوانده می‌شوند، نه در هر بار کشیده شدنِ صفحه
+  val autoBackups = remember(d) { AutoBackup.list(context) }
+  val archivePlan = remember(d) { LedgerArchive.plan(d) }
   var restoreError by remember { mutableStateOf<String?>(null) }
   var canUndo by remember { mutableStateOf(store.hasSafetyCopy()) }
 
@@ -172,7 +187,36 @@ fun SettingsScreen(
 
   /* --------------------------- پشتیبان --------------------------- */
 
+  /*
+   *  پشتیبانِ کامل — دفتر **به‌علاوهٔ عکس‌ها**، در یک فایلِ ZIP.
+   *
+   *  تا دیروز فقط دفتر نوشته می‌شد و عکسِ کالاها جا می‌ماند. گوشی که عوض
+   *  می‌شد، کاربر پشتیبانش را برمی‌گرداند و همهٔ عکس‌ها رفته بودند — در
+   *  حالی که برنامه هنوز فکر می‌کرد عکس دارند. شرحش سرِ `BackupBundle`.
+   */
   val exportFile = rememberLauncherForActivityResult(
+    ActivityResultContracts.CreateDocument("application/zip")
+  ) { uri ->
+    if (uri == null) return@rememberLauncherForActivityResult
+    scope.launch {
+      runCatching {
+        val ledger = store.exportBackup(storeName)
+        val out = context.contentResolver.openOutputStream(uri)
+          ?: error("این مسیر برای نوشتن باز نشد")
+        out.use { BackupBundle.write(context, it, ledger).getOrThrow() }
+      }.onSuccess { photos ->
+        BackupClock.mark(context)
+        toast(
+          if (photos > 0) "پشتیبان ساخته شد — با ${plain(photos)} عکس"
+          else "پشتیبان ساخته شد"
+        )
+      }
+        .onFailure { toast("فایل پشتیبان ساخته نشد: ${it.message ?: "دلیل نامعلوم"}") }
+    }
+  }
+
+  /** پشتیبانِ فقط‌دفتر — همان فایلی که نسخهٔ وب می‌خواند */
+  val exportJson = rememberLauncherForActivityResult(
     ActivityResultContracts.CreateDocument("application/json")
   ) { uri ->
     if (uri == null) return@rememberLauncherForActivityResult
@@ -183,27 +227,33 @@ fun SettingsScreen(
         out.use { it.write(store.exportBackup(storeName).toByteArray(Charsets.UTF_8)) }
       }.onSuccess {
         BackupClock.mark(context)
-        toast("فایل پشتیبان ساخته شد")
+        toast("فایل دفتر ساخته شد — بدون عکس‌ها")
       }
-        .onFailure { toast("فایل پشتیبان ساخته نشد: ${it.message ?: "دلیل نامعلوم"}") }
+        .onFailure { toast("فایل ساخته نشد: ${it.message ?: "دلیل نامعلوم"}") }
     }
   }
 
+  //  بازیابی هر دو شکل را می‌شناسد: ZIPِ کامل و JSONِ ساده
   val pickFile = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
     if (uri == null) return@rememberLauncherForActivityResult
     scope.launch {
-      val text = runCatching {
-        val input = context.contentResolver.openInputStream(uri)
-          ?: error("این فایل باز نشد")
-        input.bufferedReader().use { it.readText() }
-      }.getOrNull()
-      if (text == null) {
-        restoreError = "فایل خوانده نشد"
-        return@launch
+      val opened = withContext(Dispatchers.IO) {
+        runCatching {
+          val input = context.contentResolver.openInputStream(uri)
+            ?: error("این فایل باز نشد")
+          input.use { BackupBundle.read(context, it) { text -> store.parseBackup(text) }.getOrThrow() }
+        }
       }
-      store.parseBackup(text)
-        .onSuccess { pendingRestore = it; restoreError = null }
-        .onFailure { restoreError = it.message ?: "فایل پشتیبان معتبر نیست" }
+      opened
+        .onSuccess {
+          pendingRestore = it.data
+          restorePhotos = it.photos
+          restoreError = null
+        }
+        .onFailure {
+          BackupBundle.dropStaging(context)
+          restoreError = it.message ?: "فایل پشتیبان معتبر نیست"
+        }
     }
   }
 
@@ -623,18 +673,76 @@ fun SettingsScreen(
         Spacer(Modifier.height(12.dp))
         SettingsRow(
           icon = Icons.Filled.CloudUpload,
-          title = "گرفتن پشتیبان",
-          description = "یک فایل از تمام اطلاعات دکان",
+          title = "گرفتن پشتیبان کامل",
+          description = "دفتر و عکس‌های کالاها، در یک فایل",
           tint = Shop.colors.success,
-          onClick = { exportFile.launch("tohid-shop-backup-${todayIso()}.json") },
+          onClick = { exportFile.launch("tohid-backup-${todayIso()}.zip") },
+        )
+        SettingsRow(
+          icon = Icons.Filled.Description,
+          title = "پشتیبان فقط دفتر",
+          description = "بدون عکس — همان فایلی که نسخهٔ وب می‌خواند",
+          tint = Shop.colors.muted,
+          onClick = { exportJson.launch("tohid-shop-backup-${todayIso()}.json") },
         )
         SettingsRow(
           icon = Icons.Filled.CloudDownload,
           title = "بازیابی از فایل",
           description = "جایگزینی اطلاعات فعلی با یک پشتیبان",
           tint = Shop.colors.primary,
-          onClick = { pickFile.launch("application/json") },
+          onClick = { pickFile.launch("*/*") },
         )
+
+        /*
+         *  نسخه‌های شبانه.
+         *
+         *  روی خودِ گوشی می‌مانند، پس گوشی که گم شود این‌ها هم می‌روند —
+         *  برای آن، همان پشتیبانِ کامل بالا لازم است. این‌ها جلوی
+         *  چیزهای دیگری را می‌گیرند: پاک شدنِ اشتباهیِ کالا یا فاکتور،
+         *  بازیابیِ فایلِ غلط، خرابیِ دفتر.
+         */
+        if (autoBackups.isNotEmpty()) {
+          Spacer(Modifier.height(12.dp))
+          Text(
+            "نسخه‌های خودکار شبانه",
+            style = MaterialTheme.typography.labelMedium,
+            color = Shop.colors.muted,
+          )
+          autoBackups.forEach { snap ->
+            SettingsRow(
+              icon = Icons.Filled.History,
+              title = ir.vil3ntec.tohid.formatMillis(snap.at),
+              description = "${plain((snap.bytes / 1024).toInt())} کیلوبایت — برای بازگرداندن بزنید",
+              tint = Shop.colors.muted,
+              onClick = {
+                scope.launch {
+                  val opened = withContext(Dispatchers.IO) {
+                    runCatching { store.parseBackup(snap.file.readText()).getOrThrow() }
+                  }
+                  opened
+                    .onSuccess { pendingRestore = it; restorePhotos = 0; restoreError = null }
+                    .onFailure { restoreError = "این نسخه خوانده نشد" }
+                }
+              },
+            )
+          }
+        }
+
+        /*
+         *  فشرده کردنِ دفتر.
+         *
+         *  دستی است و نه خودکار، چون یک‌طرفه است و چون با همگام‌سازی
+         *  درگیر می‌شود — شرحش سرِ `LedgerArchive`.
+         */
+        if (archivePlan.total > 0) {
+          SettingsRow(
+            icon = Icons.Filled.Compress,
+            title = "فشرده کردن دفتر",
+            description = "${plain(archivePlan.total)} ردیف سابقهٔ کهنه به بایگانی می‌رود — دفتر سبک‌تر و ثبت فروش تندتر می‌شود",
+            tint = Shop.colors.warning,
+            onClick = { confirmCompact = true },
+          )
+        }
         if (canUndo) {
           SettingsRow(
             icon = Icons.Filled.Undo,
@@ -693,7 +801,7 @@ fun SettingsScreen(
 
   pendingRestore?.let { incoming ->
     AlertDialog(
-      onDismissRequest = { pendingRestore = null },
+      onDismissRequest = { BackupBundle.dropStaging(context); pendingRestore = null; restorePhotos = 0 },
       containerColor = Shop.colors.surface,
       title = { Text("بازیابی اطلاعات؟", color = Shop.colors.text) },
       text = {
@@ -709,6 +817,13 @@ fun SettingsScreen(
           RestoreLine("قرض‌داران", d.debtors.size, incoming.debtors.size)
           RestoreLine("مصارف", d.expenses.size, incoming.expenses.size)
           RestoreLine("ورودهای انبار", d.warehouseEntries.size, incoming.warehouseEntries.size)
+          Spacer(Modifier.height(8.dp))
+          Text(
+            if (restorePhotos > 0) "${plain(restorePhotos)} عکس هم در این فایل هست"
+            else "این فایل عکسی ندارد — عکس‌های فعلی دست‌نخورده می‌مانند",
+            style = MaterialTheme.typography.labelSmall,
+            color = Shop.colors.muted2,
+          )
         }
       },
       confirmButton = {
@@ -717,13 +832,61 @@ fun SettingsScreen(
           pendingRestore = null
           scope.launch {
             store.keepSafetyCopy()
-            store.save(next)
+            //  اول عکس‌ها سرِ جایشان، بعد پرچمِ `photo` با واقعیتِ دیسک
+            //  یکی می‌شود — وگرنه کاربر جای خالیِ عکس می‌بیند و فکر
+            //  می‌کند برنامه خراب است
+            val moved = withContext(Dispatchers.IO) { BackupBundle.commitPhotos(context) }
+            val fixed = withContext(Dispatchers.IO) { BackupBundle.reconcilePhotoFlags(context, next) }
+            store.save(fixed)
             canUndo = true
-            toast("اطلاعات با موفقیت بازیابی شد")
+            restorePhotos = 0
+            toast(
+              if (moved > 0) "اطلاعات بازیابی شد — با ${plain(moved)} عکس"
+              else "اطلاعات با موفقیت بازیابی شد"
+            )
           }
         }) { Text("بازیابی", color = Shop.colors.danger) }
       },
-      dismissButton = { TextButton(onClick = { pendingRestore = null }) { Text("انصراف") } },
+      dismissButton = {
+        TextButton(onClick = {
+          BackupBundle.dropStaging(context)
+          pendingRestore = null
+          restorePhotos = 0
+        }) { Text("انصراف") }
+      },
+    )
+  }
+
+  if (confirmCompact) {
+    AlertDialog(
+      onDismissRequest = { confirmCompact = false },
+      containerColor = Shop.colors.surface,
+      title = { Text("دفتر فشرده شود؟", color = Shop.colors.text) },
+      text = {
+        Text(
+          "${plain(archivePlan.total)} ردیف از حرکات انبار، سابقهٔ عملیات و تغییرات قیمت که بیش از یک سال " +
+            "از آن‌ها گذشته، به یک فایل بایگانی کنار دفتر منتقل می‌شوند. پاک نمی‌شوند و با پشتیبان کامل " +
+            "هم بیرون می‌روند — فقط از دفتری که هر فروش آن را بازنویسی می‌کند بیرون می‌آیند. " +
+            "فاکتورها، کالاها، قرض‌داران و موجودی دست‌نخورده می‌مانند.",
+          style = MaterialTheme.typography.bodySmall,
+          color = Shop.colors.muted,
+        )
+      },
+      confirmButton = {
+        TextButton(onClick = {
+          confirmCompact = false
+          scope.launch {
+            val done = withContext(Dispatchers.IO) { LedgerArchive.compact(context, d) }
+            done
+              .onSuccess {
+                store.save(it.data)
+                toast("${plain(it.moved.total)} ردیف بایگانی شد")
+              }
+              .onFailure { toast("فشرده کردن انجام نشد: ${it.message ?: "دلیل نامعلوم"}") }
+          }
+        }) { Text("فشرده کن") }
+      },
+      dismissButton = { TextButton(onClick = { confirmCompact = false }) { Text("بازگشت") } },
     )
   }
 

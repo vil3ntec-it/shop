@@ -170,9 +170,8 @@ object Watchman {
    *  فهرستِ خبرداده‌شده ذخیره می‌شود؛ کالایی که دوباره پر شود از فهرست
    *  بیرون می‌آید، پس اگر بار دیگر تمام شد دوباره خبر می‌دهد.
    */
-  fun checkStock(context: Context, d: ShopData) {
-    val index = ShopStore.index(d)
-    val out = d.products.filter { index.status(it) == "out" }
+  fun checkStock(context: Context, summary: LedgerSummary) {
+    val out = summary.outOfStock
     val ids = out.map { it.id }.toSet()
     val known = prefs(context).getStringSet(SEEN_OUT, emptySet()).orEmpty()
 
@@ -190,23 +189,21 @@ object Watchman {
    *  فقط لحظهٔ **گذشتن** خبر می‌دهد، نه هر بار که بالای حد است. کسی که
    *  ده هزار قرض دارد نباید هر ربع ساعت یادآوری بگیرد.
    */
-  fun checkDebt(context: Context, d: ShopData) {
+  fun checkDebt(context: Context, summary: LedgerSummary) {
     val limit = debtLimit(context)
     if (limit <= 0) return
 
-    val over = d.debtors
-      .map { it to ShopStore.debt(d, it.id) }
-      .filter { it.second >= limit }
+    val over = summary.debts.filter { it.amount >= limit }
 
-    val ids = over.map { it.first.id }.toSet()
+    val ids = over.map { it.id }.toSet()
     val known = prefs(context).getStringSet(SEEN_DEBT, emptySet()).orEmpty()
 
-    val fresh = over.filter { it.first.id !in known }
+    val fresh = over.filter { it.id !in known }
     if (fresh.isNotEmpty()) {
-      val title = if (fresh.size == 1) "قرضِ ${fresh[0].first.name} زیاد شد"
+      val title = if (fresh.size == 1) "قرضِ ${fresh[0].name} زیاد شد"
       else "${fresh.size} نفر قرضِ زیاد دارند"
       val text = fresh.take(4).joinToString("، ") {
-        "${it.first.name}: ${money(it.second)} افغانی"
+        "${it.name}: ${money(it.amount)} افغانی"
       }
       notify(context, DEBT, title, text)
     }
@@ -263,12 +260,11 @@ object Watchman {
     override suspend fun doWork(): Result {
       val app = applicationContext
       runCatching {
-        val store = ShopStore(app)
-        store.load()
-        val data = store.data.value
+        //  خلاصهٔ کوچک به‌جای کلِ دفتر — شرحش سرِ `LedgerSummary`
+        val summary = LedgerSummary.require(app)
 
-        checkStock(app, data)
-        checkDebt(app, data)
+        checkStock(app, summary)
+        checkDebt(app, summary)
 
         //  اشتراک از خودِ مجوز خوانده می‌شود، نه از سرور: نبودنِ
         //  اینترنت نباید جلوی هشدارِ اشتراک را بگیرد

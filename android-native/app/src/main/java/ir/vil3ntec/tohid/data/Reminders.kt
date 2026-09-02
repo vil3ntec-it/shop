@@ -89,13 +89,10 @@ object Reminders {
    *
    *  جدا نوشته شده تا بشود بدونِ اندروید هم سنجیدش.
    */
-  fun summary(d: ShopData): Pair<String, String>? {
-    val index = ShopStore.index(d)
-    val out = d.products.filter { index.status(it) == "out" }
-    val low = d.products.filter { index.status(it) == "low" }
-    val owed = d.debtors
-      .map { it to ShopStore.debt(d, it.id) }
-      .filter { it.second > 0 }
+  fun summary(s: LedgerSummary): Pair<String, String>? {
+    val out = s.outOfStock
+    val low = s.lowStock
+    val owed = s.owing
 
     if (out.isEmpty() && low.isEmpty() && owed.isEmpty()) return null
 
@@ -107,9 +104,9 @@ object Reminders {
 
     val lines = buildList {
       out.take(2).forEach { add("${it.name}: تمام شد") }
-      low.take(2).forEach { add("${it.name}: ${qty(index.stock(it.id))} مانده") }
+      low.take(2).forEach { add("${it.name}: ${qty(it.left)} مانده") }
       if (owed.isNotEmpty()) {
-        add("${money(owed.sumOf { it.second })} افغانی طلب از ${owed.size} نفر")
+        add("${money(owed.sumOf { it.amount })} افغانی طلب از ${owed.size} نفر")
       }
     }
     return title to lines.joinToString(" • ")
@@ -117,9 +114,8 @@ object Reminders {
 
   suspend fun check(context: Context) {
     if (!allowed(context)) return
-    val store = ShopStore(context)
-    store.load()
-    val (title, text) = summary(store.data.value) ?: return
+    //  خلاصهٔ کوچک به‌جای کلِ دفتر — شرحش سرِ `LedgerSummary`
+    val (title, text) = summary(LedgerSummary.require(context)) ?: return
 
     ensureChannel(context)
 

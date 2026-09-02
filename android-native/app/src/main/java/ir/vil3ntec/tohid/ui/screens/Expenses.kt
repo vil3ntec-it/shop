@@ -387,10 +387,9 @@ private fun ExpenseDialog(
 }
 
 /** `2026-08` → «سنبله ۱۴۰۵» — ماهِ خورشیدی، چون تاریخ‌ها خورشیدی دیده می‌شوند */
-private fun monthLabel(month: String): String {
-  val j = ir.vil3ntec.tohid.Jalali.ofIso("$month-15") ?: return month
-  return "${JALALI_MONTHS[j.month - 1]} ${plain(j.year)}"
-}
+//  برچسبِ ماه یک جا نوشته شده و از آنجا خوانده می‌شود — تاریخچهٔ فروش
+//  هم همین برچسب را نشان می‌دهد
+private fun monthLabel(month: String): String = ir.vil3ntec.tohid.formatMonth(month)
 
 /**
  *  انتخابِ ماه — کشویی.
