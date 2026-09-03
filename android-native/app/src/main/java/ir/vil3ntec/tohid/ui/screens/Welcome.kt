@@ -56,6 +56,8 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.PathParser
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -542,9 +544,23 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
             )
           }
 
-          Spacer(Modifier.height(4.dp))
-          TextButton(
-            onClick = { emailMode = if (emailMode == "login") "register" else "login"; error = null },
+        }
+        /*
+         *  «ثبت‌نام» و «رمز را فراموش کردم» — بیرونِ شرطِ «ورود با کد».
+         *
+         *  ── چه چیزی خراب شده بود ────────────────────────────────────
+         *  این دو دکمه داخلِ همان `if` بودند که «ورود با کد» را
+         *  می‌ساخت. وقتی آن شرط به `otpReady` بسته شد — و سرور کد
+         *  نمی‌فرستد — این دو هم با آن ناپدید شدند. یعنی هیچ راهی برای
+         *  **ثبت‌نام** روی صفحه نماند. خرابیِ خودم بود.
+         *
+         *  ربطی هم به هم نداشتند: ثبت‌نام با رمز کار می‌کند و به کدِ
+         *  ایمیل هیچ نیازی ندارد.
+         *  ────────────────────────────────────────────────────────────
+         */
+        Spacer(Modifier.height(4.dp))
+        TextButton(
+          onClick = { emailMode = if (emailMode == "login") "register" else "login"; error = null },
             modifier = Modifier.fillMaxWidth(),
           ) {
             Text(
@@ -588,7 +604,6 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
               )
             }
           }
-        }
 
         /* ------------------------ پایینِ صفحه ------------------------ */
         /*
@@ -1405,32 +1420,57 @@ private fun GoogleButton(enabled: Boolean, onClick: () -> Unit) {
   }
 }
 
-/** نشانِ گوگل — کشیده می‌شود، نه اینکه تصویری کنارِ برنامه حمل شود */
+/**
+ *  نشانِ گوگل.
+ *
+ *  ── چه چیزی خراب بود ──────────────────────────────────────────────
+ *  گزارش شد «آن مارک گوگل خراب درآمده». درست بود: نشان با چهار کمانِ
+ *  یک حلقه به‌علاوهٔ یک خطِ افقی کشیده می‌شد — یعنی حدسی از روی شکلِ
+ *  «G» گوگل، نه خودش. کمان‌ها هم‌اندازه بودند و خط از جای درست
+ *  درنمی‌آمد؛ نتیجه یک دایرهٔ چهاررنگِ ناجور بود که هرکسی نشانِ گوگل را
+ *  دیده باشد می‌فهمد بدل است.
+ *  ──────────────────────────────────────────────────────────────────
+ *
+ *  ── چه چیزی جایش آمد ──────────────────────────────────────────────
+ *  همان چهار تکهٔ نشانِ رسمی، عیناً از روی مسیرهای برداریِ خودِ گوگل در
+ *  دستگاهِ ۴۸×۴۸، که با `PathParser` خوانده و به اندازهٔ کلید بزرگ
+ *  می‌شوند. هنوز هیچ تصویری همراهِ برنامه حمل نمی‌شود — فقط چند رشته
+ *  متن — پس حجمِ برنامه دست‌نخورده می‌ماند و نشان در هر تراکمِ صفحه‌ای
+ *  تیز است.
+ *  ──────────────────────────────────────────────────────────────────
+ */
 @Composable
 private fun GoogleMark() {
-  Canvas(Modifier.size(21.dp)) {
-    val thickness = size.minDimension * 0.23f
-    val inset = thickness / 2f
-    val corner = Offset(inset, inset)
-    val ring = Size(size.width - thickness, size.height - thickness)
-    val pen = Stroke(width = thickness, cap = StrokeCap.Butt)
-
-    // چهار کمانِ رنگی: راست آبی، پایین سبز، چپ زرد، بالا قرمز
-    drawArc(Color(0xFF4285F4), -32f, 92f, false, corner, ring, style = pen)
-    drawArc(Color(0xFF34A853), 62f, 88f, false, corner, ring, style = pen)
-    drawArc(Color(0xFFFBBC05), 152f, 82f, false, corner, ring, style = pen)
-    drawArc(Color(0xFFEA4335), 236f, 88f, false, corner, ring, style = pen)
-
-    // خطِ افقیِ وسطِ حرفِ G
-    drawLine(
-      color = Color(0xFF4285F4),
-      start = Offset(size.width * 0.52f, size.height * 0.5f),
-      end = Offset(size.width * 0.98f, size.height * 0.5f),
-      strokeWidth = thickness,
-      cap = StrokeCap.Butt,
+  //  یک بار خوانده می‌شوند، نه با هر بار کشیده شدنِ کلید
+  val marks = remember {
+    listOf(
+      Color(0xFF4285F4) to PathParser().parsePathString(G_BLUE).toPath(),
+      Color(0xFF34A853) to PathParser().parsePathString(G_GREEN).toPath(),
+      Color(0xFFFBBC05) to PathParser().parsePathString(G_YELLOW).toPath(),
+      Color(0xFFEA4335) to PathParser().parsePathString(G_RED).toPath(),
     )
   }
+  Canvas(Modifier.size(20.dp)) {
+    val k = size.minDimension / 48f
+    scale(k, k, pivot = Offset.Zero) {
+      marks.forEach { (tint, path) -> drawPath(path, tint) }
+    }
+  }
 }
+
+//  مسیرهای نشانِ گوگل، در دستگاهِ ۴۸×۴۸
+private const val G_BLUE =
+  "M45.12 24.5c0-1.56-.14-3.06-.4-4.5H24v8.51h11.84c-.51 2.75-2.06 5.08-4.39 6.64v5.52h7.11" +
+    "c4.16-3.83 6.56-9.47 6.56-16.17z"
+private const val G_GREEN =
+  "M24 46c5.94 0 10.92-1.97 14.56-5.33l-7.11-5.52c-1.97 1.32-4.49 2.1-7.45 2.1-5.73 0-10.58-3.87-12.31-9.07" +
+    "H4.34v5.7C7.96 41.07 15.4 46 24 46z"
+private const val G_YELLOW =
+  "M11.69 28.18C11.25 26.86 11 25.45 11 24s.25-2.86.69-4.18v-5.7H4.34C2.85 17.09 2 20.45 2 24" +
+    "s.85 6.91 2.34 9.88l7.35-5.7z"
+private const val G_RED =
+  "M24 10.75c3.23 0 6.13 1.11 8.41 3.29l6.31-6.31C34.91 4.18 29.93 2 24 2 15.4 2 7.96 6.93 4.34 14.12" +
+    "l7.35 5.7c1.73-5.2 6.58-9.07 12.31-9.07z"
 
 /** نشانِ برنامه با همان تپشِ ملایمِ نسخهٔ وب */
 @Composable
