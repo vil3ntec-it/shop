@@ -41,11 +41,14 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import androidx.core.view.WindowCompat
 import ir.vil3ntec.tohid.data.BackupClock
 import ir.vil3ntec.tohid.data.ShopData
@@ -491,38 +494,77 @@ private fun Modifier.barGlow(): Modifier =
   }
 
 /**
- *  نقطهٔ همگام‌سازی — سبز، زرد، قرمز.
+ *  نقطهٔ سربرگ — اول «سرور»، بعد «همگام‌سازی».
  *
  *  ── چه چیزی را می‌بندد ────────────────────────────────────────────
- *  `AutoSync` وضعیتش را همیشه داشت (`lastOk`، `lastError`، `running`)
- *  ولی هیچ صفحه‌ای آن را نشان نمی‌داد. فروشنده‌ای که در زیرزمینِ
- *  بی‌آنتن کار می‌کرد، نمی‌دانست ۳۰ فروشش هنوز روی گوشی است و روی
- *  سرور ننشسته. تا وقتی گوشی سالم بود کسی نمی‌فهمید؛ روزی که گوشی
- *  گم می‌شد، تازه معلوم می‌شد.
+ *  دو چیز که هر دو بی‌صدا بودند:
+ *
+ *   ۱. **آیا سرور بالاست؟** هیچ راهی نبود که صاحب دکان بفهمد. باید
+ *      ثبت‌نام می‌کرد و می‌دید خطا می‌دهد یا نه. حالا رنگِ همین نقطه
+ *      جوابش است و پیش از ورود به حساب هم دیده می‌شود.
+ *
+ *   ۲. **آیا فروش‌ها روی سرور نشسته؟** `AutoSync` وضعیتش را همیشه داشت
+ *      ولی هیچ صفحه‌ای نشانش نمی‌داد. فروشنده‌ای که در زیرزمینِ بی‌آنتن
+ *      کار می‌کرد نمی‌دانست ۳۰ فروشش هنوز روی گوشی است؛ روزی که گوشی
+ *      گم می‌شد، تازه معلوم می‌شد.
  *  ──────────────────────────────────────────────────────────────────
  *
- *  فقط وقتی دیده می‌شود که حسابی در کار باشد: برنامه بدونِ سرور هم
- *  کامل کار می‌کند و آنجا این نقطه معنایی ندارد و فقط سؤال می‌سازد.
+ *  ── ترتیبِ رنگ، از بدترین به بهترین ───────────────────────────────
+ *  یک نقطه است و دو خبر دارد، پس ترتیب مهم است: همیشه **بدترین** خبر
+ *  را نشان می‌دهد، وگرنه نقطهٔ سبز روی سرورِ خوابیده دروغ می‌گوید.
  *
- *  زدن روی آن، جزئیات را در یک برگهٔ کوچک باز می‌کند: آخرین همگام‌سازی
- *  کِی بود، چند مورد در انتظار است، و اگر تغییری اعمال نشده چرا.
+ *   • خاکستری .... در حال سنجش، یا هنوز پرسیده نشده
+ *   • قرمز ....... به سرور نمی‌رسیم — یا آخرین همگام‌سازی شکست خورد
+ *   • نارنجی ..... نتِ گوشی قطع است، یا چیزی در انتظارِ فرستادن است
+ *   • سبز ........ سرور وصل است و چیزی معطل نمانده
+ *
+ *  «نتِ گوشی قطع است» عمداً نارنجی است نه قرمز: اگر گوشی آنتن ندارد،
+ *  سرور بی‌گناه است و قرمز، آدم را به دنبالِ اشکالی می‌فرستد که وجود
+ *  ندارد.
+ *  ──────────────────────────────────────────────────────────────────
+ *
+ *  فقط وقتی دیده می‌شود که این نسخه به سروری بسته باشد. برنامه بدونِ
+ *  سرور هم کامل کار می‌کند و آنجا این نقطه معنایی ندارد و فقط سؤال
+ *  می‌سازد.
+ *
+ *  زدن روی آن، همه‌چیز را در یک برگه باز می‌کند: نشانیِ سرور، وضعیتش،
+ *  دکمهٔ سنجشِ دوباره، و اگر حسابی در کار باشد جزئیاتِ همگام‌سازی.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SyncDot() {
   val context = LocalContext.current
-  //  «حساب دارد یا نه» با هر بار کشیده شدنِ سربرگ پرسیده نمی‌شود
-  val active = remember { ir.vil3ntec.tohid.data.repo.Backend.isReady(context) }
-  if (!active) return
+  //  این نسخه به سروری بسته شده یا نه — یک بار، نه با هر بار کشیده
+  //  شدنِ سربرگ
+  val hasServer = remember { ir.vil3ntec.tohid.core.config.AppConfig.isConfigured(context) }
+  if (!hasServer) return
+  //  «حساب دارد یا نه» تعیین می‌کند که جزئیاتِ همگام‌سازی معنا دارد یا نه
+  val signedIn = remember { ir.vil3ntec.tohid.data.repo.Backend.isReady(context) }
 
   var open by remember { mutableStateOf(false) }
+  val scope = rememberCoroutineScope()
+  val pulse = ServerPulse.state
+
+  //  یک بار با آمدنِ سربرگ سنجیده می‌شود؛ جوابِ تازه دوباره پرسیده
+  //  نمی‌شود، پس رفتن و برگشتن بینِ صفحه‌ها درخواست نمی‌سازد
+  LaunchedEffect(Unit) { ServerPulse.probe(context) }
+
   val health = AutoSync.health
   //  روی آبیِ سربرگ، سبز و نارنجیِ تیره دیده نمی‌شدند؛ همین رنگ‌ها
   //  روشن‌تر شده‌اند. داخلِ برگه، رنگِ متن‌ها از تم می‌آید.
-  val tint = when (health) {
-    AutoSync.Health.OK -> Color(0xFF5BE39B)
-    AutoSync.Health.WAITING -> BAR_ALERT
-    AutoSync.Health.FAILED -> Color(0xFFFF8B84)
+  val green = Color(0xFF5BE39B)
+  val red = Color(0xFFFF8B84)
+  val grey = Color.White.copy(alpha = 0.55f)
+
+  val tint = when {
+    pulse == ServerPulse.State.CHECKING || pulse == ServerPulse.State.UNKNOWN -> grey
+    pulse == ServerPulse.State.DOWN -> red
+    pulse == ServerPulse.State.NO_NET -> BAR_ALERT
+    //  از اینجا پایین، سرور وصل است و خبرِ دوم را می‌گوییم
+    !signedIn -> green
+    health == AutoSync.Health.FAILED -> red
+    health == AutoSync.Health.WAITING -> BAR_ALERT
+    else -> green
   }
 
   Row(
@@ -537,7 +579,7 @@ private fun SyncDot() {
     Box(Modifier.size(9.dp).clip(RoundedCornerShape(999.dp)).background(tint))
     //  عدد فقط وقتی می‌آید که واقعاً چیزی مانده باشد — نقطهٔ خالی
     //  آرام‌تر است و «همه‌چیز رفته» را بهتر می‌گوید
-    if (AutoSync.pendingCount > 0) {
+    if (signedIn && AutoSync.pendingCount > 0) {
       Text(
         AutoSync.pendingCount.fa(),
         style = MaterialTheme.typography.labelSmall,
@@ -550,6 +592,76 @@ private fun SyncDot() {
   if (open) {
     ModalBottomSheet(onDismissRequest = { open = false }, containerColor = Shop.colors.bg) {
       Column(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, bottom = 28.dp)) {
+
+        /* ------------------------- سرور ------------------------- */
+
+        Text("سرور", style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
+        Spacer(Modifier.height(10.dp))
+
+        val serverLine = when (pulse) {
+          ServerPulse.State.UP -> "وصل است"
+          ServerPulse.State.DOWN -> "وصل نمی‌شود"
+          ServerPulse.State.NO_NET -> "نتِ گوشی قطع است"
+          ServerPulse.State.CHECKING -> "در حال سنجش…"
+          ServerPulse.State.UNKNOWN -> "هنوز سنجیده نشده"
+          ServerPulse.State.NO_SERVER -> "این نسخه به سروری بسته نشده"
+        }
+        val serverTint = when (pulse) {
+          ServerPulse.State.UP -> Shop.colors.success
+          ServerPulse.State.DOWN -> Shop.colors.danger
+          ServerPulse.State.NO_NET -> Shop.colors.warning
+          else -> Shop.colors.muted
+        }
+        Text(serverLine, style = MaterialTheme.typography.bodyMedium, color = serverTint, fontWeight = FontWeight.Bold)
+
+        //  نشانی لاتین است و در صفحهٔ راست‌به‌چپ وارونه دیده می‌شود
+        val address = remember { ServerPulse.address(context) }
+        if (address.isNotBlank()) {
+          Spacer(Modifier.height(6.dp))
+          CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+            Text(address, style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
+          }
+        }
+
+        ServerPulse.note?.let {
+          Spacer(Modifier.height(6.dp))
+          Text(it, style = MaterialTheme.typography.labelMedium, color = Shop.colors.danger)
+        }
+
+        if (ServerPulse.at > 0) {
+          Spacer(Modifier.height(4.dp))
+          Text(
+            "آخرین سنجش: ${sinceText(ServerPulse.at)}",
+            style = MaterialTheme.typography.labelSmall,
+            color = Shop.colors.muted2,
+          )
+        }
+
+        Spacer(Modifier.height(4.dp))
+        TextButton(
+          onClick = { scope.launch { ServerPulse.probe(context, force = true) } },
+          enabled = pulse != ServerPulse.State.CHECKING,
+        ) {
+          Text(
+            if (pulse == ServerPulse.State.CHECKING) "در حال سنجش…" else "سنجش دوباره",
+            color = Shop.colors.primary,
+          )
+        }
+
+        /* --------------------- همگام‌سازی --------------------- */
+
+        if (!signedIn) {
+          Spacer(Modifier.height(6.dp))
+          Text(
+            "همگام‌سازی بعد از ورود به حساب شروع می‌شود. تا آن وقت همه‌چیز " +
+              "روی گوشی ثبت می‌شود و دکان کامل کار می‌کند.",
+            style = MaterialTheme.typography.labelSmall,
+            color = Shop.colors.muted2,
+          )
+          return@Column
+        }
+
+        Spacer(Modifier.height(18.dp))
         Text("همگام‌سازی", style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
         Spacer(Modifier.height(10.dp))
 
