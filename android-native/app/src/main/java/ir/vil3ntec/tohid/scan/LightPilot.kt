@@ -61,8 +61,20 @@ class LightPilot(private val torch: (Boolean) -> Unit) {
   @Volatile var state: State = State.OFF
     private set
 
-  /** آخرین باری که رمزگشایی موفق بود — چراغ به کارِ درست‌کار دست نمی‌زند */
+  /**
+   *  آخرین باری که رمزگشایی موفق بود — چراغ به کارِ درست‌کار دست نمی‌زند.
+   *
+   *  `everDecoded` جدا از آن است و بی‌آن، اشکالی داشتیم که سنجه‌ها
+   *  گرفتند: صفرِ اولیه یعنی «لحظهٔ صفرِ ساعت»، و اگر ساعت هم نزدیکِ صفر
+   *  باشد، `now - decodedAt` کوچک در می‌آید و برنامه فکر می‌کند همین
+   *  حالا چیزی خوانده شده. پس چراغ هیچ‌وقت روشن نمی‌شد.
+   *
+   *  روی گوشی پیش نمی‌آمد (ساعتِ واقعی عددِ بزرگی است) و درست همین، آن
+   *  را خطرناک می‌کرد: اشکالی که فقط جایی پیدا می‌شود که کسی نگاه نکند.
+   *  «هرگز» باید حالتِ خودش را داشته باشد، نه عددی که شبیهِ زمان است.
+   */
   private var decodedAt = 0L
+  private var everDecoded = false
 
   /** حالِ ناحیه، درست پیش از روشن کردنِ چراغ */
   private var baseline: Look = Look.NOTHING
@@ -95,11 +107,13 @@ class LightPilot(private val torch: (Boolean) -> Unit) {
   /** بارکدی رمزگشایی شد — یعنی نور هرچه هست، کافی است */
   fun sawCode(now: Long = System.currentTimeMillis()) {
     decodedAt = now
+    everDecoded = true
   }
 
   /** کالا رفت توی سبد؛ کارِ چراغ تمام است */
   fun done(now: Long = System.currentTimeMillis()) {
     decodedAt = now
+    everDecoded = true
     if (state == State.OFF) return
     off(State.OFF)
   }
@@ -128,7 +142,7 @@ class LightPilot(private val torch: (Boolean) -> Unit) {
 
   private fun maybeStart(look: Look, now: Long) {
     //  ۱) چیزی که خوانده می‌شود، دست‌نخورده می‌ماند
-    if (now - decodedAt < DECODE_FRESH_MS) return
+    if (everDecoded && now - decodedAt < DECODE_FRESH_MS) return
     //  ۲) تصمیم با ناحیهٔ بارکد است، نه کلِ کادر
     if (look.roiLuma > DARK_ROI) return
     //  ۳) تاریکِ **پرکنتراست** هم مشکلی ندارد؛ آنچه رمزگشا را می‌کُشد
