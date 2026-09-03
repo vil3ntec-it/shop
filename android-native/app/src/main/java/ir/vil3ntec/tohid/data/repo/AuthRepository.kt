@@ -55,19 +55,40 @@ class AuthRepository(
     )
   }
 
+  /**
+   *  ساختِ حساب.
+   *
+   *  ── چرا این یکی به توکن بند نیست ──────────────────────────────────
+   *  ثبت‌نام تا دیروز مثل ورود رفتار می‌کرد: اگر پاسخِ سرور توکن نداشت،
+   *  کلِ کار «ناموفق» اعلام می‌شد — با پیامِ «توکن نیامد» — در حالی که
+   *  حساب **ساخته شده بود**. کاربر پیامِ خطا می‌دید، دوباره می‌زد، و این
+   *  بار سرور می‌گفت «این ایمیل از قبل ثبت شده است». یعنی یک حسابِ سالم،
+   *  با یک پیامِ غلط، دست‌نیافتنی می‌شد.
+   *
+   *  سرورها هم یکسان جواب نمی‌دهند: نسخهٔ امروزِ سرور با ثبت‌نام نشست هم
+   *  می‌دهد، ولی نسخهٔ قدیمی‌تر (یا نمونه‌ای که با ایمیجِ کهنه بالا آمده)
+   *  فقط حساب را می‌سازد. هیچ‌کدام دلیلِ شکست نیست.
+   *
+   *  پس: توکن آمد، همان‌جا وارد می‌شویم — نیامد، حساب ساخته شده و
+   *  صفحه می‌گوید «حالا وارد شوید». کدام‌یک بود را `isValid` می‌گوید.
+   *  ──────────────────────────────────────────────────────────────────
+   *
+   *  فقط همان شناسه‌ای فرستاده می‌شود که مقدار دارد: سرور می‌گوید «یکی از
+   *  ایمیل یا شماره کافی است» و فرستادنِ رشتهٔ خالی، شناسه به حساب نمی‌آید.
+   */
   suspend fun register(
     name: String,
     email: String,
     phone: String,
     password: String,
   ): ApiResult<SessionDto> = result {
-    keep(
+    keepIfAny(
       api.postPublic(
         ApiEndpoints.Auth.REGISTER,
         buildJsonObject {
           put("name", JsonPrimitive(name.trim()))
-          put("email", JsonPrimitive(email.trim()))
-          put("phone", JsonPrimitive(phone.trim()))
+          if (email.isNotBlank()) put("email", JsonPrimitive(email.trim()))
+          if (phone.isNotBlank()) put("phone", JsonPrimitive(phone.trim()))
           put("password", JsonPrimitive(password))
         },
       )
@@ -218,10 +239,34 @@ class AuthRepository(
 
   /* ------------------------------ درونی ------------------------------ */
 
-  /** نشست را می‌خواند، ذخیره می‌کند و خبر می‌دهد */
+  /**
+   *  نشست را می‌خواند، ذخیره می‌کند و خبر می‌دهد.
+   *
+   *  اگر توکن نبود، پیامِ خطا **می‌گوید سرور چه فرستاده**. پیامِ قبلی
+   *  فقط «توکن نیامد» بود و آدم را سرِ حدس می‌گذاشت: پاسخ خالی بود؟
+   *  سرورِ قدیمی؟ چیزی وسط راه جوابِ دیگری داد؟ حالا کلیدهای پاسخ در
+   *  همان پیام هست و یک نگاه، تکلیف را روشن می‌کند.
+   */
   private fun keep(body: JsonObject): SessionDto {
     val session = ApiJson.decode<SessionDto>(body)
-    if (!session.isValid) throw ApiFailure.InvalidResponse("توکن نیامد")
+    if (!session.isValid) throw ApiFailure.InvalidResponse(
+      if (body.isEmpty()) "پاسخِ سرور خالی بود"
+      else "توکن در پاسخ نبود — سرور فرستاد: ${body.keys.joinToString(", ").take(90)}"
+    )
+    tokens.save(session.accessToken, session.refreshToken, session.accessExpiresAt)
+    runCatching { onSignedIn(session) }
+    return session
+  }
+
+  /**
+   *  مثل `keep`، ولی نبودنِ توکن خطا نیست.
+   *
+   *  برای ثبت‌نام: کارِ اصلی «ساختنِ حساب» است و آن انجام شده. توکن اگر
+   *  آمد، هدیه است — کاربر یک مرحله کمتر دارد.
+   */
+  private fun keepIfAny(body: JsonObject): SessionDto {
+    val session = ApiJson.decode<SessionDto>(body)
+    if (!session.isValid) return session
     tokens.save(session.accessToken, session.refreshToken, session.accessExpiresAt)
     runCatching { onSignedIn(session) }
     return session
