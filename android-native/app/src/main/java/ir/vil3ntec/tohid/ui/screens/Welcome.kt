@@ -635,20 +635,24 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
           }
         }
 
-        // جداکنندهٔ نازک با «یا» وسطش — مرزِ بینِ راهِ اصلی و کارهای فنی
-        Spacer(Modifier.height(6.dp))
-        Row(
-          Modifier.fillMaxWidth().padding(horizontal = 30.dp),
-          verticalAlignment = Alignment.CenterVertically,
-        ) {
-          HorizontalDivider(Modifier.weight(1f), color = fieldLine)
-          Text(
-            "یا",
-            style = MaterialTheme.typography.labelMedium,
-            color = inkSoft,
-            modifier = Modifier.padding(horizontal = 12.dp),
-          )
-          HorizontalDivider(Modifier.weight(1f), color = fieldLine)
+        // جداکنندهٔ نازک با «یا» وسطش — مرزِ بینِ راهِ اصلی و کارهای فنی.
+        // فقط وقتی کشیده می‌شود که زیرش چیزی باشد، وگرنه خطی می‌ماند که
+        // به هیچ‌جا مرز نمی‌زند.
+        if (GOOGLE_LOGIN || saved.isNotEmpty()) {
+          Spacer(Modifier.height(6.dp))
+          Row(
+            Modifier.fillMaxWidth().padding(horizontal = 30.dp),
+            verticalAlignment = Alignment.CenterVertically,
+          ) {
+            HorizontalDivider(Modifier.weight(1f), color = fieldLine)
+            Text(
+              "یا",
+              style = MaterialTheme.typography.labelMedium,
+              color = inkSoft,
+              modifier = Modifier.padding(horizontal = 12.dp),
+            )
+            HorizontalDivider(Modifier.weight(1f), color = fieldLine)
+          }
         }
 
         /*
@@ -659,30 +663,36 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
          *  **اصلاً دیده نمی‌شد** و صاحب دکان نمی‌دانست چنین راهی هست، چه
          *  رسد به اینکه بداند برای بازکردنش باید چه کند.
          *
-         *  حالا همیشه هست. اگر سرور تنظیمش نکرده باشد، زدنش خطا نمی‌دهد —
-         *  می‌گوید کدام مقدار در `.env` جا افتاده. راهنمایی، به‌جای غیبت.
+         *  و حالا یک کلیدِ خاموش/روشن دارد (`GOOGLE_LOGIN`). خواسته شد
+         *  «فعلاً دیده نشود، ولی پاک نشود» — چون تا در Google Cloud
+         *  شناسه‌ای ساخته نشده، این کلید کاری از پیش نمی‌برد و بودنش
+         *  فقط صفحهٔ ورود را شلوغ می‌کند. کدش سرِ جایش است؛ روزی که
+         *  شناسه ساخته شد، `GOOGLE_LOGIN` را `true` کنید و همین کلید
+         *  برمی‌گردد.
          */
-        Spacer(Modifier.height(14.dp))
-        GoogleButton(enabled = ready && !busy) {
-          if (googleId.isBlank()) {
-            note = null
-            error = "ورود با گوگل روی این سرور باز نشده — در پروندهٔ .env مقدار " +
-              "GOOGLE_CLIENT_ID را بگذارید و سرور را دوباره بالا بیاورید"
-          } else {
-            busy = true; error = null; note = null
-            scope.launch {
-              runCatching { ir.vil3ntec.tohid.data.GoogleSignIn.pick(context, googleId) }
-                .onSuccess { account ->
-                  if (account == null) {
-                    // کاربر خودش بست — نه خطا، نه پیام
-                  } else {
-                    auth.loginWithGoogle(account.idToken)
-                      .onSuccess { finish(account.email, it) }
-                      .onFailure { fail(it) }
+        if (GOOGLE_LOGIN) {
+          Spacer(Modifier.height(14.dp))
+          GoogleButton(enabled = ready && !busy) {
+            if (googleId.isBlank()) {
+              note = null
+              error = "ورود با گوگل روی این سرور باز نشده — در پروندهٔ .env مقدار " +
+                "GOOGLE_CLIENT_ID را بگذارید و سرور را دوباره بالا بیاورید"
+            } else {
+              busy = true; error = null; note = null
+              scope.launch {
+                runCatching { ir.vil3ntec.tohid.data.GoogleSignIn.pick(context, googleId) }
+                  .onSuccess { account ->
+                    if (account == null) {
+                      // کاربر خودش بست — نه خطا، نه پیام
+                    } else {
+                      auth.loginWithGoogle(account.idToken)
+                        .onSuccess { finish(account.email, it) }
+                        .onFailure { fail(it) }
+                    }
                   }
-                }
-                .onFailure { error = it.userText("ورود با گوگل انجام نشد") }
-              busy = false
+                  .onFailure { error = it.userText("ورود با گوگل انجام نشد") }
+                busy = false
+              }
             }
           }
         }
@@ -1459,6 +1469,18 @@ private fun GoogleMark() {
 }
 
 //  مسیرهای نشانِ گوگل، در دستگاهِ ۴۸×۴۸
+/**
+ *  کلیدِ «ورود با حساب گوگل» — فعلاً خاموش.
+ *
+ *  گوگل برای این کار دو کلاینت می‌خواهد (Android و Web) و تا آن‌ها در
+ *  Google Cloud ساخته نشوند و `GOOGLE_CLIENT_ID` روی سرور نشیند، زدنِ
+ *  این کلید فقط یک پیامِ خطا می‌دهد. پس تا آن روز دیده نمی‌شود.
+ *
+ *  هیچ کدی پاک نشده: `GoogleButton`، `GoogleMark`، `GoogleSignIn` و
+ *  مسیرِ سرور همه سرِ جایشان‌اند. این را `true` کنید و کلید برمی‌گردد.
+ */
+private const val GOOGLE_LOGIN = false
+
 private const val G_BLUE =
   "M45.12 24.5c0-1.56-.14-3.06-.4-4.5H24v8.51h11.84c-.51 2.75-2.06 5.08-4.39 6.64v5.52h7.11" +
     "c4.16-3.83 6.56-9.47 6.56-16.17z"
