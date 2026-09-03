@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.ui.screens
 
 import androidx.compose.animation.core.EaseInOutSine
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -9,6 +10,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.LocalIndication
@@ -300,6 +302,7 @@ fun TohidTopBar(
       .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
       .background(Brush.linearGradient(if (isNightBar()) BAR_NIGHT else BAR_DAY))
       .barGlow()
+      .barSweep()
   ) {
     Row(
       Modifier
@@ -465,6 +468,50 @@ private fun isNightBar(): Boolean = Shop.colors.bg.luminance() < 0.5f
  *  خطِ نازکِ پایین تزئین نیست: بدونش، سربرگ و محتوای پشتش در تمِ شب به
  *  هم می‌چسبیدند و لبهٔ گِردِ پایین دیده نمی‌شد.
  */
+@Composable
+private fun Modifier.barSweep(): Modifier {
+  /*
+   *  خطِ نورِ لغزانِ سربرگ — برگشت.
+   *
+   *  یک نسخه پیش، همراهِ خط‌های نوریِ بخشِ اشتراک این هم برداشته شد؛
+   *  خواسته این بود که «همه برگردند جز آن سهِ بخشِ اشتراک». پس این
+   *  برگشت و نشانِ اشتراک و کارتِ VIP و کارت‌های مدتِ اشتراک همان‌طور
+   *  ساکن ماندند.
+   *
+   *  و مثل هر حرکتِ دیگرِ برنامه، پشتِ کلیدِ `Motion` است: خاموش باشد،
+   *  نه ساعتی می‌چرخد و نه چیزی کشیده می‌شود.
+   */
+  if (!Motion.enabled) return this
+  val slide = rememberInfiniteTransition(label = "barsweep")
+  val at by slide.animateFloat(
+    initialValue = -0.35f,
+    targetValue = 1.35f,
+    animationSpec = infiniteRepeatable(
+      tween(5200, easing = LinearEasing),
+      RepeatMode.Restart,
+    ),
+    label = "sweep",
+  )
+  return drawWithContent {
+    drawContent()
+    //  نوارِ مورب، نرم و کم‌رنگ: روی سربرگِ آبی دیده می‌شود ولی متن و
+    //  کلیدها را نمی‌خورد
+    val band = size.width * 0.28f
+    val x = size.width * at
+    drawRect(
+      brush = Brush.linearGradient(
+        0f to Color.Transparent,
+        0.5f to Color.White.copy(alpha = 0.13f),
+        1f to Color.Transparent,
+        start = Offset(x, 0f),
+        end = Offset(x + band, size.height),
+      ),
+      topLeft = Offset(x, 0f),
+      size = androidx.compose.ui.geometry.Size(band, size.height),
+    )
+  }
+}
+
 private fun Modifier.barGlow(): Modifier =
   drawBehind {
     drawCircle(
@@ -626,6 +673,27 @@ private fun SyncDot() {
         ServerPulse.note?.let {
           Spacer(Modifier.height(6.dp))
           Text(it, style = MaterialTheme.typography.labelMedium, color = Shop.colors.danger)
+        }
+
+        //  نسخهٔ سرور — همان چیزی که «سرورت قدیمی است» را از حدس در
+        //  می‌آورد. نسخه لاتین است و در صفحهٔ راست‌به‌چپ وارونه دیده می‌شود.
+        if (ServerPulse.version.isNotBlank()) {
+          Spacer(Modifier.height(4.dp))
+          Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+              "نسخهٔ سرور:",
+              style = MaterialTheme.typography.labelSmall,
+              color = Shop.colors.muted2,
+            )
+            Spacer(Modifier.width(5.dp))
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+              Text(
+                ServerPulse.version,
+                style = MaterialTheme.typography.labelSmall,
+                color = Shop.colors.muted2,
+              )
+            }
+          }
         }
 
         if (ServerPulse.at > 0) {

@@ -414,9 +414,43 @@ private fun SubscriptionRow(onClick: () -> Unit) {
   val status = remember {
     runCatching { LicenseGuard.status(context, SyncStore(context)) }.getOrNull()
   }
-  val days = status?.daysLeft() ?: 0
+  val localDays = status?.daysLeft() ?: 0
   val expired = status?.state == License.State.EXPIRED || status?.state == License.State.GRACE
-  val active = status?.state == License.State.ACTIVE
+  val localActive = status?.state == License.State.ACTIVE
+
+  /*
+   *  و اگر مجوزی روی گوشی نیست، از خودِ سرور بپرس.
+   *
+   *  ── چه چیزی را می‌بندد ────────────────────────────────────────────
+   *  گزارش شد: «حساب ساختم و برنامه نمی‌گوید هفت روز آزمایشی دارم» — و
+   *  «بدون اشتراک» نوشته بود. علتش این بود که این ردیف فقط مجوزِ امضاشدهٔ
+   *  روی گوشی را می‌خواند. آن مجوز با همگام‌سازیِ موفق می‌آید، و تا آن
+   *  لحظه — یا اگر همگام‌سازی گیر کرده باشد — کاربر «بدون اشتراک» می‌دید،
+   *  در حالی که سرور دورهٔ آزمایشی‌اش را از همان دقیقهٔ اول باز کرده بود.
+   *
+   *  حالا وضعیت از سرور هم پرسیده می‌شود و اگر سرور بگوید «آزمایشی، N
+   *  روز مانده»، همان نوشته می‌شود. حرفِ سرور مقدم است چون صاحبِ اشتراک
+   *  اوست، نه گوشی.
+   *  ──────────────────────────────────────────────────────────────────
+   */
+  var fromServer by remember { mutableStateOf<ir.vil3ntec.tohid.core.model.SubscriptionDto?>(null) }
+  LaunchedEffect(Unit) {
+    if (!ir.vil3ntec.tohid.data.repo.Backend.isReady(context)) return@LaunchedEffect
+    ir.vil3ntec.tohid.data.repo.Backend.account(context).subscription()
+      .onSuccess { fromServer = it }
+  }
+
+  val serverTrial = fromServer?.takeIf { it.trial && it.daysLeft > 0 }
+  val serverActive = fromServer?.takeIf { it.status == "active" && it.daysLeft > 0 }
+
+  val active = localActive || serverTrial != null || serverActive != null
+  val days = when {
+    localActive -> localDays
+    serverTrial != null -> serverTrial.daysLeft
+    serverActive != null -> serverActive.daysLeft
+    else -> 0
+  }
+  val trial = !localActive && serverTrial != null
   val urgent = expired || (active && days <= SUBSCRIPTION_WARN_DAYS)
 
   InfoRow(
@@ -430,11 +464,16 @@ private fun SubscriptionRow(onClick: () -> Unit) {
     title = "اشتراک",
     value = when {
       expired -> "تمام شده"
+      trial && days > 0 -> "آزمایشی — ${days.fa()} روز مانده"
       active && days > 0 -> "${days.fa()} روز مانده"
       active -> "امروز آخرین روز"
       else -> "بدون اشتراک"
     },
-    detail = if (active || expired) "برای تمدید بزنید" else "برای دیدنِ پلن‌ها بزنید",
+    detail = when {
+      trial -> "دورهٔ آزمایشی؛ برای دیدنِ پلن‌ها بزنید"
+      active || expired -> "برای تمدید بزنید"
+      else -> "برای دیدنِ پلن‌ها بزنید"
+    },
     onClick = onClick,
   )
 }

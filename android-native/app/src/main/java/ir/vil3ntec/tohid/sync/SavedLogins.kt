@@ -30,8 +30,30 @@ object SavedLogins {
 
   private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
+  /**
+   *  @param refresh توکنِ تازه‌سازیِ همان حساب، اگر داشته باشیم.
+   *
+   *  ── چرا اینجا می‌نشیند ──────────────────────────────────────────
+   *  گزارش شد: «از حساب خارج می‌شوم، اسمِ حساب را نشان می‌دهد، رویش
+   *  می‌زنم ولی مرا داخل نمی‌برد و رمز می‌خواهد». درست بود: ردیفِ
+   *  «ورودِ سریع» فقط کادرِ ایمیل را پر می‌کرد. بی توکن هم راهی نبود —
+   *  ورود بدونِ هیچ اعتبارنامه‌ای معنا ندارد.
+   *
+   *  پس همان توکن نگه داشته می‌شود. `SyncStore.signOut` توکن را روی
+   *  سرور باطل نمی‌کند (فقط از گوشی پاکش می‌کند)، پس همان توکن هنوز
+   *  معتبر است و یک زدن، نشست را برمی‌گرداند.
+   *
+   *  کجا می‌نشیند: همان `SharedPreferences`ِ خصوصیِ برنامه که توکنِ
+   *  فعال هم در آن است — پس دستهٔ تازه‌ای از خطر باز نمی‌شود. و
+   *  «فراموش کن» روی ردیف، پاکش می‌کند.
+   */
   @Serializable
-  data class Entry(val identifier: String, val shop: String = "", val at: Long = 0L)
+  data class Entry(
+    val identifier: String,
+    val shop: String = "",
+    val at: Long = 0L,
+    val refresh: String = "",
+  )
 
   private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
@@ -45,11 +67,27 @@ object SavedLogins {
   }
 
   /** بعد از ورودِ موفق صدا زده می‌شود؛ تازه‌ترین حساب همیشه اول فهرست است */
-  fun remember(context: Context, identifier: String, shop: String = "") {
+  fun remember(context: Context, identifier: String, shop: String = "", refresh: String = "") {
     val id = identifier.trim()
     if (id.isEmpty()) return
     val list = read(context).filterNot { it.identifier == id }
-    write(context, listOf(Entry(id, shop, System.currentTimeMillis())) + list)
+    //  توکنِ قبلی را با رشتهٔ خالی خراب نکن: ورودِ تازه گاهی توکن ندارد
+    val old = read(context).firstOrNull { it.identifier == id }
+    //  مقدارِ قبلی را با رشتهٔ خالی خراب نکن: ورودِ سریع نامِ دکان را
+    //  دوباره نمی‌فرستد و توکن هم همیشه همراهش نیست
+    val keep = refresh.ifBlank { old?.refresh.orEmpty() }
+    val label = shop.ifBlank { old?.shop.orEmpty() }
+    write(context, listOf(Entry(id, label, System.currentTimeMillis(), keep)) + list)
+  }
+
+  /** توکنِ تازه‌سازیِ همان حساب را کنارش می‌گذارد — هنگام خروج */
+  fun keepToken(context: Context, identifier: String, refresh: String) {
+    val id = identifier.trim()
+    if (id.isEmpty() || refresh.isBlank()) return
+    val list = read(context)
+    val old = list.firstOrNull { it.identifier == id }
+    val entry = Entry(id, old?.shop.orEmpty(), old?.at ?: System.currentTimeMillis(), refresh)
+    write(context, listOf(entry) + list.filterNot { it.identifier == id })
   }
 
   /** «این حساب را یادت نباشد» */

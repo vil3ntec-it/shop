@@ -65,6 +65,17 @@ object ServerPulse {
   var note by mutableStateOf<String?>(null)
     private set
 
+  /**
+   *  نسخهٔ سروری که جواب داد.
+   *
+   *  چرا مهم است: سه گزارشِ جدا — کدِ شاگرد ساخته نمی‌شود، ورود با گوگل
+   *  نیست، کدِ پیامکی نمی‌آید — هر سه یک ریشه داشتند: ظرفِ سرور با
+   *  ایمیجِ کهنه بالا آمده بود و مسیرهای تازه رویش نبود. هیچ‌جا هم معلوم
+   *  نمی‌شد. حالا نسخه روی همان برگه نوشته می‌شود.
+   */
+  var version by mutableStateOf("")
+    private set
+
   /** تا این مدت، جوابِ قبلی تازه است */
   private const val FRESH_MS = 60_000L
 
@@ -89,11 +100,17 @@ object ServerPulse {
     }
 
     state = State.CHECKING
-    val answer = Backend.auth(context).health()
+    val answer = Backend.auth(context).healthDetail()
     at = System.currentTimeMillis()
-    if (answer.valueOrNull() == true) {
+    val info = answer.valueOrNull()
+    if (info != null) {
       state = State.UP
       note = null
+      version = info.version
+      //  سرور بالاست ولی دیتابیسش نه — این هم «وصل است» نیست
+      if (info.database.isNotBlank() && info.database != "connected") {
+        note = "سرور بالاست ولی دیتابیسش وصل نیست"
+      }
     } else {
       state = State.DOWN
       note = answer.errorMessage()

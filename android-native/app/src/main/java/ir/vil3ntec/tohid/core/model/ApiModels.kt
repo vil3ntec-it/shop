@@ -243,6 +243,22 @@ data class PlansDto(
   val trialDays: Int = 0,
 )
 
+/**
+ *  پاسخِ `/health` — سرور و دیتابیس و **نسخه**.
+ *
+ *  نسخه را برای این می‌خواهیم که «سرورت قدیمی است» از حرفِ ما به چیزی
+ *  تبدیل شود که خودِ برنامه نشان می‌دهد. سه گزارشِ جدا (کد شاگرد،
+ *  ورود با گوگل، کدِ پیامکی) هر سه یک ریشه داشتند — ظرفِ سرور با
+ *  ایمیجِ کهنه بالا آمده بود — و هیچ‌جا معلوم نبود.
+ */
+@Serializable
+data class ServerHealthDto(
+  val ok: Boolean = false,
+  val server: String = "",
+  val database: String = "",
+  val version: String = "",
+)
+
 @Serializable
 data class SubscriptionDto(
   val plan: String? = null,
