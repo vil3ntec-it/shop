@@ -1,9 +1,15 @@
 package ir.vil3ntec.tohid.ui.screens
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.withFrameNanos
@@ -141,3 +147,86 @@ private fun pointOn(t: Float, w: Float, h: Float): Pair<Offset, Offset> {
   d -= w
   return Offset(0f, (h - d).coerceIn(0f, h)) to Offset(-1f, 0f)
 }
+
+/* ============================ نورِ دورِ کارت ============================ */
+
+/**
+ *  نورِ چرخانِ دورِ کارت — «border beam».
+ *
+ *  ── چرا این و نه خطِ لغزان ─────────────────────────────────────────
+ *  خواسته این بود: «به آن سه کارتِ طلاییِ اشتراک بهترین انیمیشن را بده،
+ *  نه فقط خطی — مدل‌های تازه‌تر». خطِ لغزان یک نوار است که از رو می‌گذرد
+ *  و هیچ ربطی به شکلِ کارت ندارد. این یکی دورِ خودِ کارت می‌چرخد: دو
+ *  نقطهٔ نورِ نرم که روی محیط راه می‌روند و رد می‌گذارند. چشم آن را
+ *  «قابِ زنده» می‌بیند، نه «شیئی که رد شد».
+ *
+ *  همان ریاضیِ محیطِ `pointOn` که نورهای کناره‌ها از آن استفاده می‌کنند
+ *  اینجا هم به کار می‌آید، پس چیزِ تازه‌ای اضافه نشد.
+ *  ──────────────────────────────────────────────────────────────────
+ *
+ *  دو نکته که در ساختش رعایت شده:
+ *   • **پیش از `clip` بیاید** — بخشی از هاله بیرونِ کادر کشیده می‌شود.
+ *   • با خاموش بودنِ `Motion` هیچ ساعتی راه نمی‌افتد و هیچ چیز کشیده
+ *     نمی‌شود؛ نه اینکه کشیده شود و دیده نشود.
+ *
+ *  @param tint رنگِ نور؛ مغزِ هر نقطه سفیدِ داغ است.
+ *  @param strong کارتِ انتخاب‌شده نورِ پرنورتری می‌گیرد.
+ */
+@Composable
+fun Modifier.borderBeam(tint: Color, strong: Boolean = false): Modifier {
+  if (!Motion.enabled) return this
+
+  val spin = rememberInfiniteTransition(label = "beam")
+  val t by spin.animateFloat(
+    initialValue = 0f,
+    targetValue = 1f,
+    animationSpec = infiniteRepeatable(
+      tween(BEAM_CYCLE_MS, easing = LinearEasing),
+      RepeatMode.Restart,
+    ),
+    label = "beamAt",
+  )
+
+  return drawWithContent {
+    drawContent()
+    if (size.width <= 0f || size.height <= 0f) return@drawWithContent
+    val power = if (strong) 1f else 0.62f
+
+    //  دو نور، روبه‌روی هم: کارت از دو طرف زنده به نظر می‌رسد و
+    //  فاصله‌ی بینشان هیچ‌وقت تاریکِ کامل نمی‌ماند
+    for (beam in 0 until BEAM_COUNT) {
+      val at = frac(t + beam.toFloat() / BEAM_COUNT)
+      //  رد: چند نقطه‌ی عقب‌تر، هر کدام کم‌رنگ‌تر — دنباله‌ای که حرکت
+      //  را می‌فهماند بدونِ اینکه شبیه خط شود
+      for (tail in 0 until BEAM_TAIL) {
+        val back = frac(at - tail * 0.012f)
+        val fade = (1f - tail.toFloat() / BEAM_TAIL)
+        val (point, _) = pointOn(back, size.width, size.height)
+        val radius = (2.6f - tail * 0.28f).coerceAtLeast(0.8f).dp.toPx()
+        val alpha = power * fade * fade
+        drawCircle(
+          color = tint.copy(alpha = alpha * 0.20f),
+          radius = radius * 3.4f,
+          center = point,
+        )
+        drawCircle(color = tint.copy(alpha = alpha * 0.85f), radius = radius, center = point)
+        if (tail == 0) {
+          drawCircle(
+            color = Color.White.copy(alpha = power * 0.9f),
+            radius = radius * 0.45f,
+            center = point,
+          )
+        }
+      }
+    }
+  }
+}
+
+/** یک دورِ کاملِ نور، به میلی‌ثانیه — آرام، که تزئین باشد نه هشدار */
+private const val BEAM_CYCLE_MS = 4200
+
+/** چند نور روی محیط */
+private const val BEAM_COUNT = 2
+
+/** طولِ رد */
+private const val BEAM_TAIL = 7

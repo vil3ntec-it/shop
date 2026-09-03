@@ -172,6 +172,8 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
 
   var email by rememberSaveable { mutableStateOf("") }
   var password by rememberSaveable { mutableStateOf("") }
+  //  تکرارِ رمز — شرحش سرِ خودِ کادر
+  var password2 by rememberSaveable { mutableStateOf("") }
   var showPassword by rememberSaveable { mutableStateOf(false) }
 
   var staffCode by rememberSaveable { mutableStateOf("") }
@@ -412,6 +414,45 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
               }
             },
           )
+          /*
+           *  تکرارِ رمز — فقط در ثبتِ حسابِ تازه.
+           *
+           *  ── چرا لازم است ────────────────────────────────────────────
+           *  گزارشِ خودِ صاحب مخزن: «اگر دستم اشتباهی خورده باشد، حساب
+           *  رفته تو انبار کاه و رمز می‌شود سوزن». درست است: رمزی که یک
+           *  بار و پنهان تایپ می‌شود، غلطش هیچ‌جا معلوم نمی‌شود — نه
+           *  همان لحظه، نه فردا. سرور هم نمی‌تواند بفهمد؛ برای او آن
+           *  رشته همان رمزِ کاربر است.
+           *
+           *  دفعهٔ بعد که بخواهد وارد شود، رمزی را می‌زند که فکر می‌کند
+           *  گذاشته و کار نمی‌کند. راهِ برگشت هم ایمیل است، و اگر ایمیل
+           *  را هم غلط زده باشد، حساب رفته.
+           *  ──────────────────────────────────────────────────────────
+           */
+          if (emailMode == "register") {
+            Spacer(Modifier.height(12.dp))
+            PillField(
+              value = password2,
+              onValueChange = { password2 = it; error = null },
+              placeholder = "تکرارِ رمز",
+              icon = Icons.Filled.Lock,
+              keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Password,
+                imeAction = ImeAction.Done,
+              ),
+              visual = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
+            )
+            //  پیامِ زنده، نه خطای بعدِ زدنِ دکمه: تا اینجا هستی بفهم
+            if (password2.isNotBlank()) {
+              Spacer(Modifier.height(6.dp))
+              val same = password == password2
+              Text(
+                if (same) "هر دو یکی‌اند" else "دو رمز یکی نیستند",
+                style = MaterialTheme.typography.labelSmall,
+                color = if (same) Shop.colors.success else Shop.colors.danger,
+              )
+            }
+          }
         }
 
         error?.let {
@@ -433,6 +474,9 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
         }
         val can = ready && !busy && name.isNotBlank() && when {
           channel == "phone" -> phone.isNotBlank()
+          //  در ثبت‌نام، تا دو رمز یکی نشوند دکمه باز نمی‌شود
+          emailMode == "register" ->
+            email.isNotBlank() && password.isNotBlank() && password == password2
           else -> email.isNotBlank() && password.isNotBlank()
         }
 
@@ -469,6 +513,7 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
                       note = "حساب ساخته شد — حالا وارد شوید"
                       emailMode = "login"
                       password = ""
+                      password2 = ""
                     }
                   }
                   .onFailure { fail(it) }

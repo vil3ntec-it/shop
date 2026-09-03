@@ -103,6 +103,15 @@ private val BAR_ALERT = Color(0xFFFFC06A)
 /** قرمزِ «اشتراک دارد تمام می‌شود» — در هر دو تم همین */
 private val URGENT_RED = listOf(Color(0xFFF06A62), Color(0xFFD8352C), Color(0xFFB0231C))
 
+/**
+ *  سربرگ در حالتِ «اشتراک رو به پایان».
+ *
+ *  تیره‌تر از نشانِ اشتراک است، چون زمینهٔ تمامِ سربرگ می‌شود و متنِ سفید
+ *  و کلیدهای شیشه‌ای باید رویش خوانده شوند. سرخِ روشن روی این پهنا،
+ *  چشم را می‌زند و متن را می‌خورد.
+ */
+private val BAR_URGENT = listOf(Color(0xFF7A1712), Color(0xFFB02A21), Color(0xFFD1483C))
+
 /** قهوه‌ایِ تیرهٔ روی طلا — همان که در صفحهٔ اشتراک است */
 private val GOLD_INK = Color(0xFF3A2705)
 
@@ -296,11 +305,37 @@ fun TohidTopBar(
   val titleMax: Dp = ((screenWidth * if (isTablet()) 0.5f else 0.38f).dp -
     (if (onBack != null) 42.dp else 0.dp)).coerceAtLeast(56.dp)
 
+  /*
+   *  سربرگ سرخ می‌شود، نه فقط نشانِ اشتراک.
+   *
+   *  خواسته این بود: «وقتی اشتراک به هفت روز رسید، آن کادرِ آبیِ بالا
+   *  قرمز شود». تا دیروز فقط نشانِ کوچکِ اشتراک قرمز می‌شد و کسی که
+   *  نگاهش به نشانِ ریز نمی‌افتاد، هیچ‌وقت نمی‌فهمید. حالا کلِ سربرگ —
+   *  همان چیزی که در هر صفحه‌ای جلوی چشم است — رنگ عوض می‌کند و آرام
+   *  نفس می‌کشد.
+   *
+   *  وضعیت یک بار سنجیده می‌شود، نه با هر بار کشیده شدنِ سربرگ:
+   *  سنجیدنِ مجوز یعنی بررسیِ امضای رمزنگاری.
+   */
+  val barUrgent = remember { subscriptionUrgent(context) }
+  val barBeat = if (barUrgent) urgentBeat() else 1f
+  val barColors = when {
+    barUrgent -> BAR_URGENT
+    isNightBar() -> BAR_NIGHT
+    else -> BAR_DAY
+  }
+
   Box(
     Modifier
       .fillMaxWidth()
       .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
-      .background(Brush.linearGradient(if (isNightBar()) BAR_NIGHT else BAR_DAY))
+      .background(Brush.linearGradient(barColors))
+      //  در حالتِ سرخ، نفسِ آرامِ یک لایهٔ روشن روی زمینه — نه تغییرِ
+      //  خودِ رنگ، که متنِ سفید رویش خوانده نشود
+      .drawBehind {
+        if (!barUrgent) return@drawBehind
+        drawRect(color = Color.White.copy(alpha = (barBeat - 1f).coerceIn(0f, 1f) * 0.5f))
+      }
       .barGlow()
       .barSweep()
   ) {
@@ -471,43 +506,64 @@ private fun isNightBar(): Boolean = Shop.colors.bg.luminance() < 0.5f
 @Composable
 private fun Modifier.barSweep(): Modifier {
   /*
-   *  خطِ نورِ لغزانِ سربرگ — برگشت.
+   *  نورِ آرامِ سربرگ.
    *
-   *  یک نسخه پیش، همراهِ خط‌های نوریِ بخشِ اشتراک این هم برداشته شد؛
-   *  خواسته این بود که «همه برگردند جز آن سهِ بخشِ اشتراک». پس این
-   *  برگشت و نشانِ اشتراک و کارتِ VIP و کارت‌های مدتِ اشتراک همان‌طور
-   *  ساکن ماندند.
+   *  ── چه چیزی عوض شد و چرا ──────────────────────────────────────────
+   *  نسخهٔ قبل یک نوارِ مورب بود که رد می‌شد. روی گوشیِ باریک قابلِ تحمل
+   *  بود و روی تبلت زشت: نوار پهن‌تر از آن است که «نور» به نظر بیاید و
+   *  حرکتش روی آن پهنا کِشیده و بی‌قرار می‌شود. گزارش هم همین بود.
    *
-   *  و مثل هر حرکتِ دیگرِ برنامه، پشتِ کلیدِ `Motion` است: خاموش باشد،
-   *  نه ساعتی می‌چرخد و نه چیزی کشیده می‌شود.
+   *  جایش دو لکهٔ نورِ نرم است که آرام و با دو سرعتِ مختلف می‌لغزند و
+   *  هیچ لبه‌ای ندارند — چیزی که چشم به‌عنوان «تابش» می‌گیرد، نه
+   *  «شیء متحرک». روی زمینهٔ آبی و سرخ، هر دو، سرِ جایش است.
+   *
+   *  و مدتِ حرکت با پهنای صفحه حساب می‌شود: روی تبلت آرام‌تر، تا سرعتِ
+   *  دیده‌شدنِ نور یکی باشد نه سرعتِ پیکسل‌ها.
+   *  ──────────────────────────────────────────────────────────────────
    */
   if (!Motion.enabled) return this
-  val slide = rememberInfiniteTransition(label = "barsweep")
-  val at by slide.animateFloat(
-    initialValue = -0.35f,
-    targetValue = 1.35f,
+
+  //  روی صفحهٔ پهن، نور باید همان‌قدر آرام دیده شود؛ پس مدت با پهنا
+  //  بالا می‌رود، نه سرعتِ ثابتِ پیکسلی
+  val slow = if (isTablet()) 11_000 else 7_500
+  val drift = rememberInfiniteTransition(label = "bardrift")
+  val a by drift.animateFloat(
+    initialValue = 0f,
+    targetValue = 1f,
+    animationSpec = infiniteRepeatable(tween(slow, easing = LinearEasing), RepeatMode.Restart),
+    label = "driftA",
+  )
+  val b by drift.animateFloat(
+    initialValue = 0f,
+    targetValue = 1f,
     animationSpec = infiniteRepeatable(
-      tween(5200, easing = LinearEasing),
+      tween((slow * 1.6f).toInt(), easing = LinearEasing),
       RepeatMode.Restart,
     ),
-    label = "sweep",
+    label = "driftB",
   )
+
   return drawWithContent {
     drawContent()
-    //  نوارِ مورب، نرم و کم‌رنگ: روی سربرگِ آبی دیده می‌شود ولی متن و
-    //  کلیدها را نمی‌خورد
-    val band = size.width * 0.28f
-    val x = size.width * at
-    drawRect(
-      brush = Brush.linearGradient(
-        0f to Color.Transparent,
-        0.5f to Color.White.copy(alpha = 0.13f),
-        1f to Color.Transparent,
-        start = Offset(x, 0f),
-        end = Offset(x + band, size.height),
+    //  لکهٔ اول: بزرگ و کم‌رنگ، از راست به چپ
+    drawCircle(
+      brush = Brush.radialGradient(
+        colors = listOf(Color.White.copy(alpha = 0.10f), Color.Transparent),
+        center = Offset(size.width * (1f - a), size.height * 0.35f),
+        radius = size.height * 1.9f,
       ),
-      topLeft = Offset(x, 0f),
-      size = androidx.compose.ui.geometry.Size(band, size.height),
+      radius = size.height * 1.9f,
+      center = Offset(size.width * (1f - a), size.height * 0.35f),
+    )
+    //  لکهٔ دوم: کوچک‌تر و کندتر، در جهتِ مخالف — با هم «تنفس» می‌سازند
+    drawCircle(
+      brush = Brush.radialGradient(
+        colors = listOf(Color.White.copy(alpha = 0.07f), Color.Transparent),
+        center = Offset(size.width * b, size.height * 0.8f),
+        radius = size.height * 1.3f,
+      ),
+      radius = size.height * 1.3f,
+      center = Offset(size.width * b, size.height * 0.8f),
     )
   }
 }
@@ -778,6 +834,27 @@ private fun SyncDot() {
         )
       }
     }
+  }
+}
+
+/**
+ *  آیا اشتراک رو به پایان است — یک قاعده، سه جا.
+ *
+ *  سربرگ، نشانِ اشتراک و زنگِ هشدار هر سه همین را می‌پرسند. تا دیروز
+ *  هر کدام خودش حساب می‌کرد و همین باعث شد سربرگ عوض نشود در حالی که
+ *  نشان قرمز بود.
+ */
+private fun subscriptionUrgent(context: android.content.Context): Boolean {
+  val status = runCatching {
+    ir.vil3ntec.tohid.sync.LicenseGuard.status(
+      context, ir.vil3ntec.tohid.sync.SyncStore(context),
+    )
+  }.getOrNull() ?: return false
+  return when (status.state) {
+    ir.vil3ntec.tohid.sync.License.State.EXPIRED,
+    ir.vil3ntec.tohid.sync.License.State.GRACE -> true
+    ir.vil3ntec.tohid.sync.License.State.ACTIVE -> status.daysLeft() <= SUBSCRIPTION_WARN_DAYS
+    else -> false
   }
 }
 
