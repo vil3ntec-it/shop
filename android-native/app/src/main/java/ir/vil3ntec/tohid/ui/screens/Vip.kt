@@ -111,13 +111,29 @@ private val PLANS = listOf(
 )
 
 /**
- *  قفلِ قابلیت‌ها — فعلاً خاموش.
+ *  قفلِ قابلیت‌ها — روشن.
  *
- *  تا وقتی روی برنامه کار می‌شود، همه‌چیز باز است تا هر بخش بدونِ حساب و
- *  اشتراک آزمایش شود. برای برگرداندنِ قفل، همین یک خط `true` شود؛ جای
- *  دیگری دست نمی‌خواهد.
+ *  ── قاعده، از زبانِ صاحب مخزن ──────────────────────────────────────
+ *  «کسانی که حساب می‌سازند فقط همان هفت روزِ آزمایشی را داشته باشند، و
+ *  کسانی که حساب ندارند قفل باشند — چون نه اشتراکی دارند نه حسابی.»
+ *
+ *  پس چهار حالت، و هر کدام یک جواب:
+ *
+ *   • نسخه‌ای که به هیچ سروری بسته نیست → **باز**. آن نسخه فروشی نیست و
+ *     قفلش یعنی برنامه‌ای که هیچ‌کس نمی‌تواند استفاده کند.
+ *   • حساب ندارد → **قفل**. همان خواسته.
+ *   • اشتراک یا دورهٔ آزمایشی دارد (`ACTIVE`/`GRACE`) → **باز**.
+ *   • تمام شده یا نامعتبر (`EXPIRED`/`INVALID`) → **قفل**.
+ *  ──────────────────────────────────────────────────────────────────
+ *
+ *  و یک حالتِ پنجم که عمداً **باز** است: حساب دارد ولی هیچ مجوزی از سرور
+ *  نگرفته (`NONE`). این یعنی سرور هنوز مجوز صادر نمی‌کند — مثلاً تازه
+ *  بالا آمده یا نسخه‌اش قدیمی است. قفل کردنِ اینجا، صاحبِ دکان را به‌خاطرِ
+ *  اشکالِ سرورِ خودش از برنامه بیرون می‌اندازد؛ و آن‌وقت راهی هم برای
+ *  درست کردنش ندارد، چون خودِ برنامه قفل است. وقتی سرور مجوزِ آزمایشی را
+ *  درست صادر کرد، همین یک حالت هم بسته می‌شود.
  */
-private const val LOCKING = false
+private const val LOCKING = true
 
 /* ============================== طلا ============================== */
 
@@ -1002,10 +1018,18 @@ fun VipGate(label: String, content: @Composable () -> Unit) {
   val context = LocalContext.current
   val state = remember { SyncStore(context) }
   val enforcing = LOCKING && AppConfig.isConfigured(context)
+  //  «حساب دارد یا نه» یک بار پرسیده می‌شود، نه با هر بار کشیده شدنِ صفحه
+  val signedIn = remember { ir.vil3ntec.tohid.data.repo.Backend.tokens(context).signedIn }
   val status = remember(enforcing) { LicenseGuard.status(context, state) }
-  val open = !enforcing ||
-    status.state == License.State.ACTIVE ||
-    status.state == License.State.GRACE
+  val open = when {
+    !enforcing -> true
+    !signedIn -> false
+    status.state == License.State.ACTIVE -> true
+    status.state == License.State.GRACE -> true
+    //  حساب دارد ولی سرور هنوز مجوزی نداده — شرحش سرِ `LOCKING`
+    status.state == License.State.NONE -> true
+    else -> false
+  }
 
   if (open) {
     content()
@@ -1059,8 +1083,14 @@ fun VipGate(label: String, content: @Composable () -> Unit) {
         )
       }
       Spacer(Modifier.height(16.dp))
+      /*
+       *  «حساب نداری» و «اشتراکت تمام شده» دو چیزِ متفاوت‌اند و کارِ
+       *  بعدیِ کاربر هم در هر دو فرق دارد. یک متنِ مشترک برای هر دو،
+       *  کسی را که فقط باید ثبت‌نام کند سرِ صفحهٔ قیمت‌ها می‌فرستاد.
+       */
       Text(
-        "«$label» با اشتراک باز می‌شود",
+        if (!signedIn) "برای «$label» باید حساب بسازید"
+        else "«$label» با اشتراک باز می‌شود",
         style = MaterialTheme.typography.titleMedium,
         color = Shop.colors.text,
         fontWeight = FontWeight.Bold,
@@ -1068,12 +1098,19 @@ fun VipGate(label: String, content: @Composable () -> Unit) {
       )
       Spacer(Modifier.height(8.dp))
       Text(
-        "بقیهٔ برنامه — انبار، مصارف، خرید، گزارش‌ها و پشتیبان‌گیری — باز است و همیشه باز می‌ماند.",
+        if (!signedIn)
+          "ساختنِ حساب مجانی است و هفت روز آزمایشی دارد — با آن همه‌چیز باز می‌شود. " +
+            "از کلیدِ حساب در بالای صفحه حساب بسازید. بقیهٔ برنامه هم بدونِ حساب باز " +
+            "است: انبار، مصارف، خرید، گزارش‌ها و پشتیبان‌گیری."
+        else
+          "بقیهٔ برنامه — انبار، مصارف، خرید، گزارش‌ها و پشتیبان‌گیری — باز است و همیشه باز می‌ماند.",
         style = MaterialTheme.typography.bodySmall,
         color = Shop.colors.muted,
         textAlign = TextAlign.Center,
       )
       Spacer(Modifier.height(20.dp))
+      //  کلید همان صفحهٔ قیمت‌ها را باز می‌کند؛ ساختنِ حساب از سربرگ است
+      //  و متنِ بالا همان را می‌گوید — کلیدی که جای دیگری ببرد، دروغ است
       GoldButton("اشتراک و قیمت‌ها") { sheet = true }
     }
   }
