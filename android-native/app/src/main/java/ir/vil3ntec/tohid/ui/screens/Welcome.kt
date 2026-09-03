@@ -20,7 +20,6 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.ui.layout.layout
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.ui.draw.drawWithContent
@@ -153,7 +152,6 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
   val state = remember { SyncStore(context) }
 
   // phone | email
-  var channel by rememberSaveable { mutableStateOf("phone") }
   // ایمیل: ورود یا ساختِ حساب
   var emailMode by rememberSaveable { mutableStateOf("login") }
 
@@ -207,9 +205,13 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
    *  یک بار می‌پرسیم.
    */
   var googleId by remember { mutableStateOf("") }
+  //  آیا سرور می‌تواند کد بفرستد — شرحش سرِ کلیدِ «ورود با کد»
+  var otpReady by remember { mutableStateOf(false) }
   LaunchedEffect(Unit) {
     if (!AppConfig.isConfigured(context)) { googleId = ""; return@LaunchedEffect }
     googleId = auth.googleClientId()
+    //  همان یک درخواست، دو جواب: کلیدِ گوگل و اینکه کد فرستادنی است
+    otpReady = auth.otpEnabled()
   }
 
   fun fail(e: Throwable) {
@@ -263,7 +265,8 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
    *  جدا می‌آید که فقط یک کار دارد. منطقِ ورود همان است؛ فقط جایش عوض شده.
    */
   if (codeSent) {
-    val destination = if (channel == "phone") phone.trim() else email.trim()
+    //  یک راهِ ورود مانده و آن ایمیل است؛ شماره اختیاریِ ثبت‌نام است
+    val destination = email.trim()
     CodeScreen(
       destination = destination,
       busy = busy,
@@ -311,10 +314,9 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
         .imePadding(),
     ) {
       GradientHeader(
-        title = if (channel == "phone") "خوش آمدید" else
-          if (emailMode == "login") "خوش آمدید" else "حساب تازه",
-        subtitle = if (channel == "phone") "با شمارهٔ خودتان وارد شوید — رمز لازم نیست"
-        else "با ایمیل و رمز وارد شوید",
+        title = if (emailMode == "login") "خوش آمدید" else "حساب تازه",
+        subtitle = if (emailMode == "login") "با ایمیل و رمز وارد شوید"
+        else "ایمیل و رمز؛ شماره اختیاری است",
       )
 
       /*
@@ -337,13 +339,7 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
       ) {
         Spacer(Modifier.height(6.dp))
 
-        /* ------------------------ راهِ ورود ------------------------ */
-        ChannelSwitch(
-          channel = channel,
-          onPick = { channel = it; error = null; note = null; codeSent = false; code = "" },
-        )
-
-        Spacer(Modifier.height(18.dp))
+        Spacer(Modifier.height(12.dp))
 
         // نام — در هر دو راه، چون حسابِ بی‌نام بعداً فقط یک شماره است
         PillField(
@@ -354,33 +350,7 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
         )
         Spacer(Modifier.height(12.dp))
 
-        if (channel == "phone") {
-          PillField(
-            value = phone,
-            onValueChange = { phone = it; error = null },
-            placeholder = "شماره موبایل",
-            icon = Icons.Filled.PhoneAndroid,
-            keyboardOptions = KeyboardOptions(
-              keyboardType = KeyboardType.Phone,
-              imeAction = ImeAction.Next,
-            ),
-            ltr = true,
-          )
-
-          //  ثبت‌نام با شماره جدا نیست — همان ارسالِ کد است.
-          //
-          //  در سربرگِ ایمیل «حساب ندارید؟ ثبت‌نام کنید» هست و در شماره
-          //  نبود، پس به‌نظر می‌رسید با شماره فقط می‌شود وارد شد. سرور
-          //  از اول این‌طور بود: اگر شماره حساب نداشته باشد، با همان کد
-          //  حساب ساخته می‌شود. فقط کسی این را نگفته بود.
-          Text(
-            "حساب ندارید؟ با همین شماره برایتان ساخته می‌شود — ثبت‌نام جدا لازم نیست.",
-            style = MaterialTheme.typography.labelMedium,
-            color = inkSoft,
-            modifier = Modifier.padding(top = 8.dp, start = 4.dp, end = 4.dp),
-          )
-
-        } else {
+        run {
           PillField(
             value = email,
             onValueChange = { email = it; error = null },
@@ -452,6 +422,27 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
                 color = if (same) Shop.colors.success else Shop.colors.danger,
               )
             }
+
+            /*
+             *  شمارهٔ موبایل — اختیاری، و همین‌جا نوشته شده که اختیاری
+             *  است.
+             *
+             *  سرور از اول یکی از این دو را کافی می‌دانست؛ پس شماره
+             *  چیزی است که اگر بدهی، برای بازیابی و پیامک به کار
+             *  می‌آید، و اگر ندهی جلوی هیچ‌چیز را نمی‌گیرد.
+             */
+            Spacer(Modifier.height(12.dp))
+            PillField(
+              value = phone,
+              onValueChange = { phone = it; error = null },
+              placeholder = "شماره موبایل (اختیاری)",
+              icon = Icons.Filled.PhoneAndroid,
+              keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Phone,
+                imeAction = ImeAction.Done,
+              ),
+              ltr = true,
+            )
           }
         }
 
@@ -467,13 +458,8 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
         Spacer(Modifier.height(18.dp))
 
         /* ------------------------ دکمهٔ اصلی ------------------------ */
-        val label = when {
-          channel == "phone" -> "ارسال کد"
-          emailMode == "register" -> "ساخت حساب"
-          else -> "ورود به حساب"
-        }
+        val label = if (emailMode == "register") "ساخت حساب" else "ورود به حساب"
         val can = ready && !busy && name.isNotBlank() && when {
-          channel == "phone" -> phone.isNotBlank()
           //  در ثبت‌نام، تا دو رمز یکی نشوند دکمه باز نمی‌شود
           emailMode == "register" ->
             email.isNotBlank() && password.isNotBlank() && password == password2
@@ -484,26 +470,8 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
           busy = true; error = null; note = null
           scope.launch {
             when {
-              channel == "phone" -> {
-                //  اگر همین چند لحظه پیش کد گرفته، پیامکِ تازه نمی‌گیریم —
-                //  همان صفحهٔ کد باز می‌شود با شمارشی که ادامه دارد.
-                val to = phone.trim()
-                if (cooldown.secondsLeft(to) > 0) {
-                  codeSent = true
-                  note = "کد قبلی هنوز معتبر است"
-                } else {
-                  auth.requestOtp(to)
-                    .onSuccess {
-                      cooldown.start(to, it.resendSeconds)
-                      codeSent = true
-                      note = null
-                    }
-                    .onFailure { fail(it) }
-                }
-              }
-
               emailMode == "register" ->
-                auth.register(name.trim(), email.trim(), "", password)
+                auth.register(name.trim(), email.trim(), phone.trim(), password)
                   .onSuccess {
                     //  سرور با ثبت‌نام نشست هم می‌دهد؛ آن‌وقت مرحلهٔ دومی
                     //  لازم نیست و همان‌جا داخل می‌شویم
@@ -527,14 +495,21 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
           }
         }
 
-        if (channel == "email") {
-          /*
-           *  ورود با کد برای ایمیل هم.
-           *
-           *  رمز سرِ جایش است و کسی که رمز دارد همان راه را می‌رود؛ این
-           *  یکی برای کسی است که رمزش را فراموش کرده یا اصلاً نگذاشته.
-           *  همان صفحهٔ کد است، همان مسیرِ سرور.
-           */
+        /*
+         *  «ورود با کد» — فقط اگر سرور واقعاً کد می‌فرستد.
+         *
+         *  ── چه چیزی را می‌بندد ──────────────────────────────────────
+         *  گزارش شد: «در صفحهٔ ورود یک چیزی نوشته ورود با کد؛ آن را
+         *  درست کن یا نباشد». درست بود: تا وقتی سرور فرستندهٔ ایمیل یا
+         *  پیامک ندارد (`OTP_PROVIDER=log`)، کد فقط در لاگِ سرور
+         *  می‌نشیند و به دستِ کاربر نمی‌رسد. یعنی آن کلید دربِ بسته بود.
+         *
+         *  حالا خودِ سرور تعیین می‌کند: `/config` می‌گوید `otpEnabled`
+         *  هست یا نه، و کلید فقط آن‌وقت ساخته می‌شود. سرور که فرستنده
+         *  گرفت، کلید خودش پیدا می‌شود — بی نسخهٔ تازه.
+         *  ────────────────────────────────────────────────────────────
+         */
+        if (otpReady) {
           Spacer(Modifier.height(6.dp))
           TextButton(
             enabled = ready && !busy && name.isNotBlank() && email.isNotBlank(),
@@ -721,9 +696,13 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
                  */
                 fun fillIn() {
                   if (entry.identifier.contains("@")) {
-                    channel = "email"; emailMode = "login"; email = entry.identifier
+                    emailMode = "login"
+                    email = entry.identifier
                   } else {
-                    channel = "phone"; phone = entry.identifier; codeSent = false; code = ""
+                    //  حسابی که با شماره ساخته شده بود: کادرِ شماره از
+                    //  صفحهٔ ورود برداشته شده، پس همان‌جا می‌گوییم چه کند
+                    emailMode = "login"
+                    note = "این حساب با شماره ساخته شده بود — با ایمیلِ همان حساب وارد شوید"
                   }
                   if (name.isBlank()) name = entry.shop
                 }
@@ -1170,75 +1149,6 @@ private fun GradientHeader(title: String, subtitle: String) {
     }
   }
 }
-
-/**
- *  انتخابِ راهِ ورود — شماره یا ایمیل.
- *
- *  قرصِ انتخاب‌شده **سُر می‌خورد**، ظاهر و ناپدید نمی‌شود: حرکت می‌گوید
- *  که این دو، دو حالتِ یک چیزند، نه دو دکمهٔ جدا.
- */
-@Composable
-private fun ChannelSwitch(channel: String, onPick: (String) -> Unit) {
-  val phone = channel == "phone"
-  val slide by animateFloatAsState(
-    targetValue = if (phone) 0f else 1f,
-    animationSpec = tween(if (Motion.enabled) 260 else 0, easing = FastOutSlowInEasing),
-    label = "channelSlide",
-  )
-
-  val face = if (isDarkSurface()) Shop.colors.surface else Color.White
-
-  /*
-   *  بلندیِ کادر از خودِ تب‌ها می‌آید.
-   *
-   *  قرصِ آبی قبلاً بلندیِ خودش را از فاصله‌های داخلی می‌گرفت و کوتاه‌تر
-   *  از ردیف درمی‌آمد — به‌همین دلیل وسطِ کادرِ سفید کوچک و بی‌قواره
-   *  دیده می‌شد. حالا ردیف قد را تعیین می‌کند و قرص تا کفِ همان کشیده
-   *  می‌شود.
-   */
-  Box(
-    Modifier
-      .fillMaxWidth()
-      .height(IntrinsicSize.Min)
-      .shadow(6.dp, RoundedCornerShape(30.dp), ambientColor = BLUE, spotColor = BLUE)
-      .clip(RoundedCornerShape(30.dp))
-      .background(face)
-      .padding(5.dp)
-  ) {
-    // قرصِ آبی، پشتِ متن‌ها، روی نیمهٔ انتخاب‌شده
-    Box(
-      Modifier
-        .fillMaxWidth(0.5f)
-        .fillMaxHeight()
-        .offsetByFraction(slide)
-        .clip(RoundedCornerShape(26.dp))
-        .background(Brush.horizontalGradient(listOf(BLUE_DEEP, BLUE)))
-    )
-
-    Row(Modifier.fillMaxWidth()) {
-      ChannelTab("شماره موبایل", Icons.Filled.PhoneAndroid, phone, Modifier.weight(1f)) {
-        onPick("phone")
-      }
-      ChannelTab("ایمیل", Icons.Filled.AlternateEmail, !phone, Modifier.weight(1f)) {
-        onPick("email")
-      }
-    }
-  }
-}
-
-/**
- *  جابه‌جاییِ قرص، به‌نسبتِ پهنای خودش.
- *
- *  با `offset` بر حسبِ نقطه، روی هر پهنای صفحه‌ای جای دیگری می‌ایستاد؛
- *  اینجا از پهنای واقعیِ خودِ قرص خوانده می‌شود.
- */
-private fun Modifier.offsetByFraction(fraction: Float): Modifier =
-  this.layout { measurable, constraints ->
-    val placeable = measurable.measure(constraints)
-    layout(placeable.width, placeable.height) {
-      placeable.placeRelative((placeable.width * fraction).toInt(), 0)
-    }
-  }
 
 @Composable
 private fun ChannelTab(
