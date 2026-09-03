@@ -117,8 +117,8 @@ sealed class ApiFailure(
      */
     fun fromHttp(status: Int, body: String?, authenticated: Boolean): ApiFailure {
       val (parsedMessage, parsedCode) = parse(body)
-      val code = parsedCode ?: "http_$status"
-      val message = parsedMessage ?: generic(status)
+      val code = parsedCode ?: machineCode(parsedMessage) ?: "http_$status"
+      val message = readable(parsedMessage) ?: known(code) ?: generic(status)
 
       return when {
         status == 401 && authenticated && parsedCode != "bad_credentials" -> SessionExpired()
@@ -131,6 +131,54 @@ sealed class ApiFailure(
         status in 500..599 -> ServerFault(message, code)
         else -> InvalidResponse("وضعیت $status")
       }
+    }
+
+    /**
+     *  آیا این رشته «پیام» است یا «کدِ ماشین».
+     *
+     *  ── چه چیزی را می‌بندد ──────────────────────────────────────────
+     *  در دکان، روی صفحه نوشته شد: `not_found`. همین. کاربر فارسی‌زبانِ
+     *  دکان‌دار باید از یک کلمهٔ انگلیسیِ زیرخط‌دار می‌فهمید چه شده.
+     *
+     *  علتش این بود: سرورهای قدیمی‌تر خطا را به شکلِ
+     *  `{"error": "not_found"}` می‌دهند — یعنی یک **رشته**، نه شیئی با
+     *  `message`. لایهٔ خواندنِ خطا همان رشته را «پیامِ سرور» می‌گرفت و
+     *  چون پیامِ سرور همیشه مقدم است، همان را به کاربر نشان می‌داد.
+     *
+     *  حالا اول سنجیده می‌شود: رشته‌ای که فقط حروفِ کوچکِ لاتین و زیرخط
+     *  دارد و فاصله ندارد، پیام نیست — کد است. کد می‌رود سرِ جای خودش
+     *  (`code`) و برای کاربر یک جملهٔ فارسی نوشته می‌شود.
+     *  ──────────────────────────────────────────────────────────────
+     */
+    private fun machineCode(text: String?): String? =
+      text?.takeIf { it.length <= 40 && it.matches(Regex("^[a-z][a-z0-9_]*$")) }
+
+    /** فقط چیزی که واقعاً پیام است به کاربر می‌رسد */
+    private fun readable(text: String?): String? =
+      text?.takeIf { machineCode(it) == null }
+
+    /**
+     *  کدهایی که پیامِ فارسیِ خودشان را دارند.
+     *
+     *  `not_found` روی مسیرِ API معنایش برای دکان‌دار این است که سرورش
+     *  آن قابلیت را ندارد — و تقریباً همیشه یعنی ظرفِ سرور با کدِ کهنه
+     *  بالا آمده. `docker compose up -d` بدونِ `--build` ایمیج را از نو
+     *  نمی‌سازد و همین یک نکته، ساعت‌ها گشتن می‌سازد.
+     */
+    private fun known(code: String): String? = when (code) {
+      "not_found" -> "این قابلیت روی سرورِ شما نیست — سرور را با کدِ تازه بالا بیاورید"
+      "no_shop" -> "برای این حساب دکانی ثبت نشده است"
+      "shop_not_found" -> "دکان پیدا نشد"
+      "code_not_found" -> "این کد پیدا نشد یا از قبل باطل شده است"
+      "registration_closed" -> "ثبت‌نام روی این سرور بسته است"
+      "already_registered" -> "این ایمیل یا شماره از قبل ثبت شده است"
+      "weak_password" -> "رمز ضعیف است"
+      "identifier_required" -> "ایمیل یا شماره موبایل لازم است"
+      "otp_not_found" -> "کدی برای این شماره صادر نشده است"
+      "google_no_email" -> "حساب گوگل ایمیل ندارد"
+      "account_disabled" -> "این حساب غیرفعال است"
+      "feature_locked" -> "این قابلیت در اشتراکِ فعلی نیست"
+      else -> null
     }
 
     /** پیامِ جایگزین، فقط وقتی سرور خودش چیزی نگفته باشد */
