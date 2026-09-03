@@ -661,12 +661,44 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
               entry = entry,
               onPick = {
                 error = null
-                if (entry.identifier.contains("@")) {
-                  channel = "email"; emailMode = "login"; email = entry.identifier
-                } else {
-                  channel = "phone"; phone = entry.identifier; codeSent = false; code = ""
+                /*
+                 *  ورودِ سریع، واقعاً سریع.
+                 *
+                 *  تا دیروز این ردیف فقط کادرِ ایمیل را پر می‌کرد و کاربر
+                 *  باید رمز را از نو می‌زد — گزارش هم همین بود: «اسمِ
+                 *  حسابم را نشان می‌دهد، رویش می‌زنم، ولی مرا داخل
+                 *  نمی‌برد».
+                 *
+                 *  حالا اگر توکنِ همان حساب را داشته باشیم (هنگام خروج
+                 *  کنارش گذاشته می‌شود) نشست همان‌جا برمی‌گردد. اگر سرور
+                 *  ردش کرد — باطل شده یا مهلتش تمام — بی‌صدا به راهِ
+                 *  همیشگی برمی‌گردیم و کادر پر می‌شود.
+                 */
+                fun fillIn() {
+                  if (entry.identifier.contains("@")) {
+                    channel = "email"; emailMode = "login"; email = entry.identifier
+                  } else {
+                    channel = "phone"; phone = entry.identifier; codeSent = false; code = ""
+                  }
+                  if (name.isBlank()) name = entry.shop
                 }
-                if (name.isBlank()) name = entry.shop
+                if (entry.refresh.isBlank() || !ready) {
+                  fillIn()
+                } else {
+                  busy = true
+                  scope.launch {
+                    auth.resume(entry.refresh)
+                      .onSuccess { session ->
+                        //  نشستِ کامل — نام و دکانش از سرور آمده
+                        finish(entry.identifier, session)
+                      }
+                      .onFailure {
+                        fillIn()
+                        note = "برای امنیت، این بار رمز یا کد لازم است"
+                      }
+                    busy = false
+                  }
+                }
               },
               onForget = {
                 SavedLogins.forget(context, entry.identifier)

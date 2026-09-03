@@ -34,6 +34,10 @@ class AuthRepository(
   /** آیا سرور بالاست — برای دکمهٔ «آزمایش اتصال» */
   suspend fun health(): ApiResult<Boolean> = result { api.getPublic(ApiEndpoints.HEALTH); true }
 
+  /** همان سنجش، ولی با نسخهٔ سرور — برای نشان دادن در برگهٔ وضعیت */
+  suspend fun healthDetail(): ApiResult<ir.vil3ntec.tohid.core.model.ServerHealthDto> =
+    result { ApiJson.decode<ir.vil3ntec.tohid.core.model.ServerHealthDto>(api.getPublic(ApiEndpoints.HEALTH)) }
+
   suspend fun serverConfig(): ApiResult<ServerConfigDto> =
     result { ApiJson.decode<ServerConfigDto>(api.getPublic(ApiEndpoints.CONFIG)) }
 
@@ -76,6 +80,45 @@ class AuthRepository(
    *  فقط همان شناسه‌ای فرستاده می‌شود که مقدار دارد: سرور می‌گوید «یکی از
    *  ایمیل یا شماره کافی است» و فرستادنِ رشتهٔ خالی، شناسه به حساب نمی‌آید.
    */
+  /**
+   *  برگرداندنِ نشست با توکنی که از قبل داریم — «ورودِ سریع».
+   *
+   *  `/auth/refresh` فقط توکنِ دسترسیِ تازه می‌دهد، نه یک نشستِ کامل؛ پس
+   *  `keep` به کار نمی‌آید و همان توکنِ تازه‌سازیِ قبلی سرِ جایش می‌ماند.
+   *
+   *  اگر سرور ردش کرد — باطل شده یا مهلتش تمام شده — خطا برمی‌گردد و
+   *  صفحه به راهِ همیشگی (رمز یا کد) برمی‌گردد.
+   */
+  suspend fun resume(refreshToken: String): ApiResult<SessionDto> = result {
+    val body = api.postPublic(
+      ApiEndpoints.Auth.REFRESH,
+      buildJsonObject { put("refreshToken", JsonPrimitive(refreshToken.trim())) },
+    )
+    val access = (body["accessToken"] as? JsonPrimitive)?.content?.takeIf { it.isNotBlank() }
+      ?: throw ApiFailure.SessionExpired()
+    val expires = (body["accessExpiresAt"] as? JsonPrimitive)?.content?.toLongOrNull() ?: 0L
+    tokens.save(access, refreshToken, expires)
+
+    /*
+     *  حساب را از سرور می‌گیریم، نه از حافظه.
+     *
+     *  چرا لازم است: `/auth/refresh` فقط توکن می‌دهد و نام و دکان
+     *  همراهش نیست. اگر نشستِ نصفه — با نام و دکانِ خالی — به صفحه
+     *  برگردد، صفحه همان خالی را «حسابِ تازه» می‌فهمد و نامِ حساب و
+     *  دفترِ دکان را روی گوشی پاک می‌کند. یعنی ورودِ سریع، داده می‌بُرد.
+     */
+    val me = ApiJson.decode<ir.vil3ntec.tohid.core.model.MeDto>(api.get(ApiEndpoints.Me.ROOT))
+    val session = SessionDto(
+      accessToken = access,
+      accessExpiresAt = expires,
+      refreshToken = refreshToken,
+      user = me.user,
+      shop = me.shop,
+    )
+    runCatching { onSignedIn(session) }
+    session
+  }
+
   suspend fun register(
     name: String,
     email: String,

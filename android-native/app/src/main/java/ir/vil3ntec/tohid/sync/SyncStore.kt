@@ -178,6 +178,15 @@ class SyncStore(context: Context) {
    *  بایگانی و جایگزین می‌شود.
    */
   fun signOut() {
+    /*
+     *  پیش از پاک کردن، توکنِ تازه‌سازی را کنارِ نامِ همین حساب می‌گذاریم
+     *  تا «ورودِ سریع» واقعاً سریع باشد. این توکن روی سرور باطل نمی‌شود،
+     *  پس یک زدن، نشست را برمی‌گرداند — شرحش سرِ `SavedLogins.Entry`.
+     */
+    runCatching {
+      val who = accountEmail.ifBlank { accountPhone }
+      tokens.refreshToken?.let { SavedLogins.keepToken(app, who, it) }
+    }
     tokens.clear()
     prefs.edit()
       .remove(NAME).remove(EMAIL).remove(PHONE).remove(CREATED)
