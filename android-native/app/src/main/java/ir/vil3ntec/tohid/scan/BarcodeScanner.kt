@@ -7,6 +7,7 @@ import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraMetadata
 import android.hardware.camera2.CaptureRequest
 import android.hardware.camera2.CaptureResult
+import android.hardware.camera2.params.MeteringRectangle
 import android.hardware.camera2.TotalCaptureResult
 import android.util.Log
 import android.util.Size
@@ -175,18 +176,39 @@ private const val FORMATS = Barcode.FORMAT_EAN_13 or
 private val PREVIEW_FRAME = Size(1920, 1080)
 private val ANALYSIS_FRAME = Size(1280, 720)
 
-/** ناحیهٔ فوکوسِ خودکار: ۲۵٪ میانهٔ کادر — همان‌جا که خطِ اسکن است */
-private const val CENTER_REGION = 0.25f
+/**
+ *  ناحیهٔ فوکوس: میانهٔ کادر، و **فقط** میانهٔ کادر.
+ *
+ *  ── چرا این‌قدر تنگ ────────────────────────────────────────────────
+ *  خواسته این بود: «وقتی نوشته‌ای جلوی دوربین می‌آید، درجا روی همان
+ *  فوکوس شود و هیچ چیزِ دیگری برایش مهم نباشد». تا دیروز دوربین کلِ
+ *  صحنه را می‌سنجید — دستِ فروشنده، پیشخوان، لامپِ سقف — و آن‌وقت روی
+ *  چیزی فوکوس می‌کرد که بارکد نبود.
+ *
+ *  حالا هم ناحیهٔ فوکوس و هم ناحیهٔ نورسنجی روی همین میانهٔ کادر **قفل**
+ *  است، روی درخواستِ تکرارشوندهٔ دوربین. یعنی این «یک بار فوکوس کن»
+ *  نیست؛ قاعدهٔ همیشگیِ دوربین است و هر فریم برجاست.
+ *  ──────────────────────────────────────────────────────────────────
+ */
+private const val CENTER_REGION = 0.22f
+
+/** همان ناحیه، برای قفل کردنش روی حسگر — کسری از پهنا و بلندیِ حسگر */
+private const val SENSOR_BOX = 0.28f
 
 /** مهلتِ خودرهاییِ فوکوسِ خودکار و فوکوسِ با انگشت، به ثانیه */
 private const val AUTO_HOLD_SEC = 2L
 private const val TAP_HOLD_SEC = 4L
 
-/** کمترین فاصلهٔ دو فرمانِ فوکوس، به میلی‌ثانیه */
-private const val REFOCUS_GAP_MS = 1200L
+/**
+ *  کمترین فاصلهٔ دو فرمانِ فوکوس، به میلی‌ثانیه.
+ *
+ *  از ۱۲۰۰ به ۷۰۰ آمد: با قفل شدنِ ناحیه روی میانهٔ کادر، کارِ فوکوس
+ *  ساده‌تر شده و می‌شود تندتر واکنش داد. «درجا» همین است.
+ */
+private const val REFOCUS_GAP_MS = 700L
 
 /** بیش از این‌قدر فرمانِ ناموفق پشتِ سرِ هم، یعنی مشکل جای دیگری است */
-private const val MAX_TRIES = 4
+private const val MAX_TRIES = 5
 
 /** بزرگ‌نمایی پس از این‌قدر بی‌خبری به یک برمی‌گردد */
 private const val ZOOM_RESET_MS = 3500L
@@ -290,6 +312,24 @@ fun CameraScanner(
             pilot.onFocusState(result.get(CaptureResult.CONTROL_AF_STATE))
           }
         })
+
+      /*
+       *  ناحیهٔ میانه را روی حسگر قفل کن.
+       *
+       *  این کار از `startFocusAndMetering` جداست: آن یکی «یک دور»
+       *  فوکوس می‌کند و بعد رها می‌شود، این یکی روی **هر** فریم برجاست.
+       *  پس دوربین هیچ‌وقت سراغِ حاشیهٔ صحنه نمی‌رود — نه برای فوکوس و
+       *  نه برای نورسنجی. همان چیزی که خواسته شد.
+       *
+       *  اگر دوربین ناحیه‌بندی را پشتیبانی نکند، هیچ‌چیز گفته نمی‌شود؛
+       *  فرمانِ بی‌پشتیبانی روی برخی گوشی‌ها کلِ نشست را می‌شکند.
+       */
+      centerRegion(cameraProvider)?.let { box ->
+        val regions = arrayOf(box)
+        Camera2Interop.Extender(previewBuilder)
+          .setCaptureRequestOption(CaptureRequest.CONTROL_AF_REGIONS, regions)
+          .setCaptureRequestOption(CaptureRequest.CONTROL_AE_REGIONS, regions)
+      }
 
       val preview = previewBuilder.build().also { it.setSurfaceProvider(previewView.surfaceProvider) }
 
@@ -514,6 +554,37 @@ private fun buildScanner(maxZoom: Float, onZoom: (Float) -> Boolean): MlKitScann
   }
   return BarcodeScanning.getClient(builder.build())
 }
+
+/**
+ *  مستطیلِ میانهٔ حسگر — یا `null` اگر این دوربین ناحیه‌بندی ندارد.
+ *
+ *  مختصات بر حسبِ خودِ حسگر است، نه صفحه؛ پس اندازهٔ آرایهٔ فعالِ حسگر
+ *  از خودِ دوربین پرسیده می‌شود. با بزرگ‌نمایی هم میانه همان میانه
+ *  می‌ماند، چون برشِ بزرگ‌نمایی از مرکز است.
+ */
+@SuppressLint("UnsafeOptInUsageError")
+private fun centerRegion(provider: ProcessCameraProvider): MeteringRectangle? = runCatching {
+  val info = CameraSelector.DEFAULT_BACK_CAMERA
+    .filter(provider.availableCameraInfos)
+    .firstOrNull() ?: return null
+  val camera2 = Camera2CameraInfo.from(info)
+  //  دوربینی که ناحیهٔ فوکوس نمی‌پذیرد، فرمانش را هم نباید گرفت
+  val maxAf = camera2.getCameraCharacteristic(CameraCharacteristics.CONTROL_MAX_REGIONS_AF) ?: 0
+  if (maxAf < 1) return null
+  val active = camera2.getCameraCharacteristic(
+    CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE,
+  ) ?: return null
+
+  val boxWidth = (active.width() * SENSOR_BOX).toInt().coerceAtLeast(1)
+  val boxHeight = (active.height() * SENSOR_BOX).toInt().coerceAtLeast(1)
+  MeteringRectangle(
+    active.left + (active.width() - boxWidth) / 2,
+    active.top + (active.height() - boxHeight) / 2,
+    boxWidth,
+    boxHeight,
+    MeteringRectangle.METERING_WEIGHT_MAX,
+  )
+}.getOrNull()
 
 /**
  *  آیا این دوربین حالتِ فوکوسِ **ماکرو** دارد.

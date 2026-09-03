@@ -45,6 +45,15 @@ class AuthRepository(
   suspend fun googleClientId(): String =
     serverConfig().valueOrNull()?.googleClientId.orEmpty()
 
+  /**
+   *  آیا این سرور کدِ ورود می‌فرستد.
+   *
+   *  `OTP_PROVIDER=off` یا `log` یعنی کد به دستِ کاربر نمی‌رسد؛ آن‌وقت
+   *  کلیدِ «ورود با کد» یک دربِ بسته است و نباید ساخته شود.
+   */
+  suspend fun otpEnabled(): Boolean =
+    serverConfig().valueOrNull()?.otpEnabled ?: false
+
   /* ------------------------------ ورود ------------------------------ */
 
   suspend fun login(identifier: String, password: String): ApiResult<SessionDto> = result {
