@@ -7,7 +7,6 @@ import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraMetadata
 import android.hardware.camera2.CaptureRequest
 import android.hardware.camera2.CaptureResult
-import android.hardware.camera2.params.MeteringRectangle
 import android.hardware.camera2.TotalCaptureResult
 import android.util.Log
 import android.util.Size
@@ -77,6 +76,40 @@ import java.util.concurrent.TimeUnit
  *    • فقط همان قالب‌های بارکدی خوانده می‌شود که نسخهٔ وب می‌خواند، تا
  *      کالایی که آنجا شناخته می‌شد اینجا هم شناخته شود.
  *    • تصویرِ زنده است و بس؛ هیچ‌جا عکس گرفته نمی‌شود.
+ *
+ *  ── همه‌کاره، در یک فریم ───────────────────────────────────────────
+ *  اسکنر پله‌پله کار نمی‌کند. این ترتیب — «اول فوکوس، بعد چراغ، بعد
+ *  بزرگ‌نمایی، آخر خواندن» — همان چیزی است که اسکنر را کند می‌کند، چون
+ *  هر پله منتظرِ پلهٔ قبل می‌ماند و آدم منتظرِ همه‌شان.
+ *
+ *  اینجا هر فریم که می‌رسد، این‌ها **با هم** پیش می‌روند:
+ *
+ *  ```
+ *   فریمِ دوربین
+ *      ├─ اندازه‌گیریِ نورِ ناحیه (`FrameLook`)  ─┐
+ *      ├─ تصمیمِ چراغ (`LightPilot`)            ─┤ هیچ‌کدام منتظرِ
+ *      ├─ رمزگشایی (ML Kit)                    ─┤ دیگری نمی‌ماند
+ *      ├─ بزرگ‌نماییِ پیشنهادی (ML Kit)          ─┤
+ *      └─ فوکوس، از حالِ واقعیِ دوربین          ─┘
+ *              ↓
+ *   انتخاب از میانِ چند بارکد (`Aim.bestOf`)
+ *              ↓
+ *   سدِ تکرار و رقمِ کنترلی (`BarcodeGuard`)
+ *              ↓
+ *   یافتنِ کالا در دفترِ دکان (`BarcodeMatch`)
+ *  ```
+ *
+ *  و قاعدهٔ سختش این است: **اگر همین فریم خوانده شد، همان لحظه پذیرفته
+ *  می‌شود.** برای فوکوس، برای چراغ، برای بزرگ‌نمایی صبر نمی‌کند. فوکوس و
+ *  چراغ و بزرگ‌نمایی کارِ فریم‌های **بعدی** را آسان می‌کنند، نه کارِ این
+ *  یکی را.
+ *
+ *  در عوض، سرعت هیچ‌جا با خطر عوض نمی‌شود: عددی که تحویل می‌شود از
+ *  رمزگشای واقعی آمده، رقمِ کنترلی‌اش سنجیده شده، چند فریم تکرار شده، و
+ *  در دفترِ دکان پیدا شده. هیچ‌جا حدس نیست — نه نزدیک‌ترین کد، نه کالای
+ *  شبیه. چند بارکدِ هم‌وزن در کادر یعنی «معلوم نیست»، و آن فریم رد
+ *  می‌شود.
+ *  ──────────────────────────────────────────────────────────────────
  *
  *  ── درسِ گران: چرا نسخهٔ قبلی تصویر را **تارتر** کرد ────────────────
  *  در نسخهٔ قبل دو کار کردیم که روی کاغذ درست بود و در واقعیت غلط:
@@ -177,23 +210,21 @@ private val PREVIEW_FRAME = Size(1920, 1080)
 private val ANALYSIS_FRAME = Size(1280, 720)
 
 /**
- *  ناحیهٔ فوکوس: میانهٔ کادر، و **فقط** میانهٔ کادر.
+ *  کمترین اندازهٔ ناحیهٔ فوکوس — کسری از کادر.
  *
- *  ── چرا این‌قدر تنگ ────────────────────────────────────────────────
- *  خواسته این بود: «وقتی نوشته‌ای جلوی دوربین می‌آید، درجا روی همان
- *  فوکوس شود و هیچ چیزِ دیگری برایش مهم نباشد». تا دیروز دوربین کلِ
- *  صحنه را می‌سنجید — دستِ فروشنده، پیشخوان، لامپِ سقف — و آن‌وقت روی
- *  چیزی فوکوس می‌کرد که بارکد نبود.
+ *  ── چه شد که این‌طور شد ────────────────────────────────────────────
+ *  یک نسخه پیش، ناحیهٔ فوکوس و نورسنجی روی میانهٔ **حسگر** قفل شده بود
+ *  تا «هیچ چیزِ دیگری مهم نباشد». دو اشکال داشت: بارکدِ کنارِ کادر
+ *  هیچ‌وقت سهمِ فوکوس نمی‌گرفت، و آن قفل روی هر فرمانِ ناحیه‌ایِ دیگری
+ *  می‌نشست — یعنی زدنِ انگشت روی تصویر بی‌اثر شده بود.
  *
- *  حالا هم ناحیهٔ فوکوس و هم ناحیهٔ نورسنجی روی همین میانهٔ کادر **قفل**
- *  است، روی درخواستِ تکرارشوندهٔ دوربین. یعنی این «یک بار فوکوس کن»
- *  نیست؛ قاعدهٔ همیشگیِ دوربین است و هر فریم برجاست.
+ *  حالا ناحیه **متحرک** است و سراغِ کادرِ همان بارکدی می‌رود که دیده
+ *  شده (`FocusPilot.aimAt`). این عدد فقط کفِ اندازهٔ آن ناحیه است:
+ *  بارکدِ نازک ممکن است از کمترین ناحیهٔ فوکوسِ حسگر باریک‌تر باشد و
+ *  آن‌وقت فرمان بی‌اثر بماند.
  *  ──────────────────────────────────────────────────────────────────
  */
 private const val CENTER_REGION = 0.22f
-
-/** همان ناحیه، برای قفل کردنش روی حسگر — کسری از پهنا و بلندیِ حسگر */
-private const val SENSOR_BOX = 0.28f
 
 /** مهلتِ خودرهاییِ فوکوسِ خودکار و فوکوسِ با انگشت، به ثانیه */
 private const val AUTO_HOLD_SEC = 2L
@@ -227,6 +258,14 @@ private const val MACRO_COOLDOWN_MS = 6_000L
  */
 private const val MANUAL_ZOOM_HOLD_MS = 12_000L
 
+/**
+ *  نشانهٔ فوکوس پس از این‌قدر بی‌بارکدی، برمی‌گردد سرِ میانهٔ کادر.
+ *
+ *  کوتاه‌تر از این، هر لحظه‌ای که بارکد از کادر در برود نشانه می‌پرد؛
+ *  بلندتر از این، دوربین دنبالِ بارکدی می‌ماند که فروشنده کنار گذاشته.
+ */
+private const val AIM_FRESH_MS = 1_400L
+
 /** متنِ حالتِ عادی — از دو جا نوشته می‌شود، پس یک جا تعریف شده */
 private const val READY_TEXT = "آماده اسکن — بارکد را جلوی دوربین بگیرید"
 
@@ -254,6 +293,7 @@ fun CameraScanner(
   //  چراغ فقط وقتی نشان داده می‌شود که این دوربین داشته باشد؛ دکمه‌ای
   //  که کاری نمی‌کند، بدتر از نبودنش است
   var flashReady by remember { mutableStateOf(false) }
+  //  و این فقط **نشانه** است، نه تصمیم: تصمیم را `LightPilot` می‌گیرد
   var flashOn by remember { mutableStateOf(false) }
 
   val executor: ExecutorService = remember { Executors.newSingleThreadExecutor() }
@@ -266,6 +306,23 @@ fun CameraScanner(
   //  ادارهٔ فوکوس و بزرگ‌نمایی. بیرونِ DisposableEffect ساخته می‌شود تا
   //  زدنِ انگشت روی تصویر هم به همین یکی برسد.
   val pilot = remember { FocusPilot() }
+
+  /*
+   *  چراغِ خودکار.
+   *
+   *  بیرونِ `DisposableEffect` ساخته می‌شود تا دکمهٔ روی تصویر هم به
+   *  همین یکی برسد — و آن دکمه دیگر «چراغ» نیست، «کنار برو» است.
+   *
+   *  `onLit` نشانهٔ روی صفحه را تازه می‌کند. از رشتهٔ تحلیل صدا زده
+   *  می‌شود، پس نوشتنِ حالتِ Compose از آنجا لازم است و بی‌خطر است:
+   *  `mutableStateOf` خودش نوشتنِ از رشتهٔ دیگر را به فریمِ بعدی می‌رساند.
+   */
+  val lamp = remember {
+    LightPilot { on ->
+      pilot.torch(on)
+      flashOn = on
+    }
+  }
 
   DisposableEffect(Unit) {
     var provider: ProcessCameraProvider? = null
@@ -314,22 +371,25 @@ fun CameraScanner(
         })
 
       /*
-       *  ناحیهٔ میانه را روی حسگر قفل کن.
+       *  ── ناحیهٔ قفل‌شدهٔ حسگر برداشته شد ─────────────────────────
+       *  تا دیروز اینجا `CONTROL_AF_REGIONS` و `CONTROL_AE_REGIONS` روی
+       *  مستطیلِ میانهٔ حسگر **قفل** می‌شد، روی درخواستِ تکرارشونده.
+       *  قصدش درست بود («فقط میانه را ببین») ولی دو چیز را می‌شکست:
        *
-       *  این کار از `startFocusAndMetering` جداست: آن یکی «یک دور»
-       *  فوکوس می‌کند و بعد رها می‌شود، این یکی روی **هر** فریم برجاست.
-       *  پس دوربین هیچ‌وقت سراغِ حاشیهٔ صحنه نمی‌رود — نه برای فوکوس و
-       *  نه برای نورسنجی. همان چیزی که خواسته شد.
+       *   ۱. هر چه از راهِ `Camera2Interop` گفته شود، بر تنظیمِ خودِ
+       *      CameraX می‌نشیند. یعنی از آن لحظه `startFocusAndMetering`
+       *      دیگر ناحیه‌ای عوض نمی‌کرد — **زدنِ انگشت روی تصویر بی‌اثر
+       *      شده بود**، و فوکوسِ نقطه‌ای هم که در نردبانِ `FocusPilot`
+       *      می‌آید. همان دامی که یک نسخه پیش با `CONTROL_AF_MODE`
+       *      افتادیم، این بار روی ناحیه.
+       *   ۲. بارکدی که کنارِ کادر بیفتد هیچ‌وقت سهمِ فوکوس نمی‌گرفت.
+       *      خواستهٔ تازه صریح است: فوکوس باید روی **خودِ بارکد** برود،
+       *      نه روی نقطه‌ای ثابت.
        *
-       *  اگر دوربین ناحیه‌بندی را پشتیبانی نکند، هیچ‌چیز گفته نمی‌شود؛
-       *  فرمانِ بی‌پشتیبانی روی برخی گوشی‌ها کلِ نشست را می‌شکند.
+       *  حالا ناحیه از راهِ `FocusMeteringAction` گفته می‌شود — همان‌جا
+       *  که CameraX صاحبش است — و نشانه‌اش کادرِ همان بارکدی است که
+       *  تحلیل‌گر دیده. تا بارکدی دیده نشود، میانهٔ کادر.
        */
-      centerRegion(cameraProvider)?.let { box ->
-        val regions = arrayOf(box)
-        Camera2Interop.Extender(previewBuilder)
-          .setCaptureRequestOption(CaptureRequest.CONTROL_AF_REGIONS, regions)
-          .setCaptureRequestOption(CaptureRequest.CONTROL_AE_REGIONS, regions)
-      }
 
       val preview = previewBuilder.build().also { it.setSurfaceProvider(previewView.surfaceProvider) }
 
@@ -372,26 +432,99 @@ fun CameraScanner(
         //  `latestKnown` می‌پرسد تا با هر تغییرِ کالاها تازه بماند.
         val guard = BarcodeGuard(known = { code -> latestKnown(code) })
 
+        /*
+         *  ── یک فریم، همه‌ی کارها با هم ────────────────────────────
+         *  ترتیبِ این چند خط عمدی است و همان «موازی» بودنِ خواسته‌شده را
+         *  می‌سازد:
+         *
+         *   ۱. **اندازه‌گیریِ نور، همین‌جا و همزمان.** پیش از آنکه فریم
+         *      برود دستِ رمزگشا، حالِ ناحیه در پنج عدد گرفته می‌شود
+         *      (`FrameLook`). چند هزار خواندنِ بایت است؛ رمزگشا برای آن
+         *      یک لحظه هم منتظر نمی‌ماند.
+         *   ۲. **تصمیمِ چراغ، بی‌درنگ و بی‌انتظار.** `LightPilot` روی
+         *      همان عددها تصمیم می‌گیرد. اگر چراغ لازم شد روشن می‌شود و
+         *      رمزگشایی **قطع نمی‌شود** — فریمِ بعدی هم مثلِ همین یکی
+         *      خوانده می‌شود.
+         *   ۳. **رمزگشایی.** اگر همین فریم خوانده شد، همان لحظه پذیرفته
+         *      می‌شود؛ نه منتظرِ فوکوس، نه بزرگ‌نمایی، نه چراغ.
+         *   ۴. **فوکوس و ناحیهٔ نورسنجی، پس از پذیرش.** کادرِ بارکد
+         *      نشانهٔ فریمِ بعدی می‌شود. یعنی فوکوس **پیامدِ** دیدنِ بارکد
+         *      است، نه پیش‌شرطش.
+         *
+         *  بافرِ روشنایی با `get(index)` خوانده می‌شود، پس مکان‌نمای بافر
+         *  دست‌نخورده می‌ماند و همین بافر می‌تواند همان لحظه دستِ ML Kit
+         *  هم باشد.
+         */
         analysis.setAnalyzer(executor) { proxy ->
           val media = proxy.image
           if (media == null) {
             proxy.close()
             return@setAnalyzer
           }
-          val image = InputImage.fromMediaImage(media, proxy.imageInfo.rotationDegrees)
+
+          /*
+           *  اندازه‌های فریم **پیش از** رمزگشایی برداشته می‌شوند.
+           *
+           *  عمدی است: پاسخِ ML Kit ناهمگام می‌آید و فریم در
+           *  `addOnCompleteListener` بسته می‌شود. خواندنِ `proxy.width`
+           *  از داخلِ پاسخ یعنی تکیه بر ترتیبِ صدا زدنِ دو شنونده — و
+           *  اگر روزی برعکس شود، خواندنِ فریمِ بسته استثنا می‌دهد.
+           */
+          val frameW = proxy.width
+          val frameH = proxy.height
+          val rotation = proxy.imageInfo.rotationDegrees
+
+          val now = System.currentTimeMillis()
+          val look = runCatching {
+            val plane = media.planes[0]
+            FrameLook.measure(
+              y = plane.buffer,
+              rowStride = plane.rowStride,
+              pixelStride = plane.pixelStride,
+              width = frameW,
+              height = frameH,
+              roi = pilot.roi(),
+            )
+          }.getOrDefault(Look.NOTHING)
+          lamp.onFrame(look, now)
+
+          val image = InputImage.fromMediaImage(media, rotation)
           client.process(image)
             .addOnSuccessListener { codes ->
-              //  خودِ بارکد نگه داشته می‌شود نه فقط متنش: **قالبِ** خوانش
-              //  مهم‌ترین سرنخِ سد است — ITF جای دیگری می‌ایستد تا EAN
-              val read = codes.firstOrNull { !it.rawValue.isNullOrBlank() }
-              val value = read?.rawValue
-              if (value == null) {
+              /*
+               *  از میانِ چند بارکد، آن‌که کاربر قصدش را دارد — و اگر
+               *  معلوم نبود، هیچ‌کدام. قاعده‌اش سرِ `Aim.bestOf`.
+               *
+               *  خودِ بارکد نگه داشته می‌شود نه فقط متنش: **قالبِ** خوانش
+               *  مهم‌ترین سرنخِ سد است — ITF جای دیگری می‌ایستد تا EAN.
+               */
+              val seen = codes.filter { !it.rawValue.isNullOrBlank() }
+              if (seen.isEmpty()) {
                 pilot.nothingRead()
               } else {
-                //  بارکد دیده شد، پس فوکوس سرِ جایش است — چه این خوانش
-                //  پذیرفته شود چه نه
+                /*
+                 *  `rawValue` که آمد، یعنی رمزگشایی **موفق** بوده. پس
+                 *  همین‌جا دو خبر می‌رود:
+                 *   • به فوکوس: سرِ جایت هستی، سهمیه‌ات صفر شد.
+                 *   • به چراغ: نور کافی است، دست نزن (§۹).
+                 *  و این‌ها پیش از انتخاب و پیش از سد گفته می‌شوند، چون
+                 *  به تصمیمِ آن‌ها بند نیستند.
+                 */
                 pilot.sawBarcode()
-                if (guard.trust(value, kindOf(read.format))) latestCode(value)
+                lamp.sawCode(now)
+
+                val read = Aim.bestOf(seen) { box(it, frameW, frameH, rotation) }
+                val value = read?.rawValue
+                if (read != null && value != null) {
+                  //  از این پس، فوکوس و نورسنجی سراغِ همین کادر می‌رود
+                  box(read, frameW, frameH, rotation)?.let { pilot.aimAt(it) }
+                  if (guard.trust(value, kindOf(read.format))) {
+                    lamp.done(now)
+                    latestCode(value)
+                  }
+                }
+                //  `read == null` یعنی چند بارکدِ هم‌وزن در کادر بود و
+                //  معلوم نیست کدام را می‌خواهد؛ همین فریم رد می‌شود.
               }
             }
             .addOnFailureListener { Log.d("Tohid", "خواندن فریم ناموفق", it) }
@@ -406,6 +539,8 @@ fun CameraScanner(
     }, ContextCompat.getMainExecutor(context))
 
     onDispose {
+      //  چراغ، پیش از هر چیز: صفحه‌ای که بسته شده نباید نورش بماند
+      runCatching { lamp.close() }
       runCatching { provider?.unbindAll() }
       runCatching { scanner?.close() }
       pilot.detach()
@@ -442,20 +577,21 @@ fun CameraScanner(
     AndroidView(factory = { previewView }, modifier = Modifier.fillMaxSize())
 
     /*
-     *  چراغِ دوربین.
+     *  دکمهٔ چراغ — که دیگر «چراغ» نیست.
      *
-     *  نورِ کم دو جور به اسکن ضربه می‌زند و هر دو در گزارشِ کاربر بود:
-     *  دوربین برای جبرانِ تاریکی، مدتِ نوردهی را بلند می‌کند و کوچک‌ترین
-     *  تکانِ دست تصویر را **تار** می‌کند؛ و کنتراستِ خط‌های بارکد کم
-     *  می‌شود، پس نیمی از کد خوانده می‌شود و نیمِ دیگرش نه. چراغ هر دو
-     *  را می‌بندد.
+     *  خواسته صریح بود: کاربر نباید چراغ را روشن و خاموش کند. تصمیمش
+     *  حالا با `LightPilot` است و خودش از روی نورِ **ناحیهٔ بارکد**
+     *  می‌گیردش، و اگر چراغ بازتاب انداخت خودش خاموش می‌کند.
+     *
+     *  ولی دکمه برداشته نشد، چون کارش عوض شد: زدنش یعنی «کنار برو» —
+     *  مثلِ دو انگشتِ بزرگ‌نمایی، تصمیمِ خودکار بیست ثانیه دست نگه
+     *  می‌دارد و چراغ همان می‌شود که آدم گفته. کسی که می‌داند چه
+     *  می‌کند نباید با برنامه کشتی بگیرد؛ و نشانِ روی دکمه هم همان
+     *  لحظه می‌گوید چراغ روشن است یا نه.
      */
     if (flashReady) {
       IconButton(
-        onClick = {
-          flashOn = !flashOn
-          pilot.torch(flashOn)
-        },
+        onClick = { lamp.byHand(!flashOn) },
         modifier = Modifier
           .align(Alignment.TopStart)
           .padding(8.dp)
@@ -507,6 +643,31 @@ private suspend fun PointerInputScope.detectPinch(onZoom: (Float) -> Unit) {
  *  نباید به کتابخانهٔ ML Kit بند باشد. تنها جایی که این دو به هم
  *  می‌رسند همین یک تابع است.
  */
+/**
+ *  کادرِ بارکد، از دستگاهِ تصویرِ سرِپا به دستگاهِ بافرِ خام.
+ *
+ *  ML Kit کادر را در همان دستگاهی می‌دهد که تصویر را چرخانده گرفته —
+ *  یعنی همان‌طور که آدم می‌بیند. روی گوشیِ عمودی، پهنا و بلندیِ آن
+ *  دستگاه جابه‌جای بافر است. ترجمه‌اش در `Aim.toBuffer` است و سنجه‌اش
+ *  در `AimTest`؛ اینجا فقط نسبت‌ها ساخته می‌شوند.
+ */
+private fun box(code: Barcode, bufferW: Int, bufferH: Int, rotation: Int): Aim.Box? {
+  val rect = code.boundingBox ?: return null
+  val turn = ((rotation % 360) + 360) % 360
+  val sideways = turn == 90 || turn == 270
+  val width = if (sideways) bufferH else bufferW
+  val height = if (sideways) bufferW else bufferH
+  if (width <= 0 || height <= 0) return null
+  val upright = Aim.Box(
+    left = rect.left.toFloat() / width,
+    top = rect.top.toFloat() / height,
+    right = rect.right.toFloat() / width,
+    bottom = rect.bottom.toFloat() / height,
+  )
+  if (upright.area <= 0f) return null
+  return Aim.toBuffer(upright, turn)
+}
+
 private fun kindOf(format: Int): CodeKind = when (format) {
   Barcode.FORMAT_EAN_13, Barcode.FORMAT_EAN_8, Barcode.FORMAT_UPC_A -> CodeKind.CHECKED
   Barcode.FORMAT_ITF -> CodeKind.ITF
@@ -554,37 +715,6 @@ private fun buildScanner(maxZoom: Float, onZoom: (Float) -> Boolean): MlKitScann
   }
   return BarcodeScanning.getClient(builder.build())
 }
-
-/**
- *  مستطیلِ میانهٔ حسگر — یا `null` اگر این دوربین ناحیه‌بندی ندارد.
- *
- *  مختصات بر حسبِ خودِ حسگر است، نه صفحه؛ پس اندازهٔ آرایهٔ فعالِ حسگر
- *  از خودِ دوربین پرسیده می‌شود. با بزرگ‌نمایی هم میانه همان میانه
- *  می‌ماند، چون برشِ بزرگ‌نمایی از مرکز است.
- */
-@SuppressLint("UnsafeOptInUsageError")
-private fun centerRegion(provider: ProcessCameraProvider): MeteringRectangle? = runCatching {
-  val info = CameraSelector.DEFAULT_BACK_CAMERA
-    .filter(provider.availableCameraInfos)
-    .firstOrNull() ?: return null
-  val camera2 = Camera2CameraInfo.from(info)
-  //  دوربینی که ناحیهٔ فوکوس نمی‌پذیرد، فرمانش را هم نباید گرفت
-  val maxAf = camera2.getCameraCharacteristic(CameraCharacteristics.CONTROL_MAX_REGIONS_AF) ?: 0
-  if (maxAf < 1) return null
-  val active = camera2.getCameraCharacteristic(
-    CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE,
-  ) ?: return null
-
-  val boxWidth = (active.width() * SENSOR_BOX).toInt().coerceAtLeast(1)
-  val boxHeight = (active.height() * SENSOR_BOX).toInt().coerceAtLeast(1)
-  MeteringRectangle(
-    active.left + (active.width() - boxWidth) / 2,
-    active.top + (active.height() - boxHeight) / 2,
-    boxWidth,
-    boxHeight,
-    MeteringRectangle.METERING_WEIGHT_MAX,
-  )
-}.getOrNull()
 
 /**
  *  آیا این دوربین حالتِ فوکوسِ **ماکرو** دارد.
@@ -667,6 +797,21 @@ private class FocusPilot {
   /** تا این لحظه، بزرگ‌نمایی مالِ کاربر است و خودکار به آن دست نمی‌زند */
   @Volatile private var manualUntil = 0L
 
+  /*
+   *  نشانه: کجای بافر را نگاه کنیم.
+   *
+   *  تا دیروز این یک نقطهٔ ثابت بود — میانهٔ کادر — و بارکدی که کنار
+   *  می‌افتاد هیچ‌وقت سهمِ فوکوس نمی‌گرفت. حالا با هر بارکدی که دیده
+   *  شود، نشانه می‌رود سرِ **همان کادر**، و اگر بارکد از تصویر برود،
+   *  پس از `AIM_FRESH_MS` برمی‌گردد سرِ میانه — وگرنه دوربین دنبالِ
+   *  چیزی می‌ماند که رفته.
+   */
+  @Volatile private var aim: Aim.Box = Aim.CENTER
+  @Volatile private var aimAt = 0L
+
+  /** همان نشانه، به شکلی که `FrameLook` می‌خواهد. فقط از رشتهٔ تحلیل */
+  private val roiOut = FloatArray(4)
+
   fun attach(
     cameraControl: CameraControl,
     macroCapable: Boolean,
@@ -684,7 +829,36 @@ private class FocusPilot {
     zoom = 1f
     this.maxZoom = if (maxZoom > 1f) maxZoom else 1f
     manualUntil = 0L
-    focusCenter(cameraControl)
+    aim = Aim.CENTER
+    aimAt = 0L
+    focusHere(cameraControl)
+  }
+
+  /**
+   *  بارکد این‌جا بود — فوکوس و نورسنجیِ فریم‌های بعد سراغِ همین‌جا.
+   *
+   *  از رشتهٔ پاسخِ ML Kit صدا زده می‌شود، پس هیچ کارِ سنگینی نمی‌کند:
+   *  فقط یک کادر می‌نشیند و یک زمان.
+   */
+  fun aimAt(box: Aim.Box) {
+    if (box.area <= 0f) return
+    aim = Aim.padded(box)
+    aimAt = System.currentTimeMillis()
+  }
+
+  /**
+   *  ناحیه‌ای که باید سنجیده شود — کادرِ بارکد اگر تازه باشد، وگرنه
+   *  میانه. آرایه یکی است و جا‌به‌جا پر می‌شود: این تابع هر فریم صدا
+   *  زده می‌شود و تخصیصِ حافظه در آن مسیر، همان چیزی است که به‌تدریج
+   *  زبالهٔ حافظه می‌سازد و فریم می‌اندازد.
+   */
+  fun roi(): FloatArray {
+    val box = if (System.currentTimeMillis() - aimAt > AIM_FRESH_MS) Aim.CENTER else aim
+    roiOut[0] = box.left
+    roiOut[1] = box.top
+    roiOut[2] = box.right
+    roiOut[3] = box.bottom
+    return roiOut
   }
 
   fun detach() {
@@ -754,6 +928,18 @@ private class FocusPilot {
     if (now - lastZoomAt < ZOOM_GAP_MS) return false
     lastZoomAt = now
     zoom = wanted
+    /*
+     *  ── باگی که همین‌جا بود ──────────────────────────────────────
+     *  پیشنهادِ بزرگ‌نماییِ ML Kit یعنی «بارکدی هست، فقط ریز است» —
+     *  یعنی چیزی **دیده شده**. ولی `lastReadAt` فقط با خوانشِ موفق
+     *  تازه می‌شد، پس این دیدن به حساب نمی‌آمد؛ سه‌ونیم ثانیه بعد
+     *  `nothingRead` بزرگ‌نمایی را برمی‌گرداند سرِ یک، ML Kit دوباره
+     *  همان را پیشنهاد می‌داد، و کادر بی‌وقفه جلو و عقب می‌رفت. همان
+     *  «دیر تشخیص داده می‌شود» روی بارکدهای ریز.
+     *
+     *  حالا پیشنهاد هم یک دیدن است و مهلت را از نو می‌اندازد.
+     */
+    lastReadAt = now
     //  با نزدیک شدنِ کادر، صحنه عوض می‌شود؛ سهمیهٔ فوکوس هم از نو
     tries = 0
     return runCatching { cameraControl.setZoomRatio(wanted) }.isSuccess
@@ -804,7 +990,7 @@ private class FocusPilot {
     }
     tries++
     lastFocusAt = now
-    focusCenter(cameraControl)
+    focusHere(cameraControl)
   }
 
   /** پلهٔ بعدیِ نردبان: ماکرو، و اگر آن هم نشد، حرف زدن */
@@ -819,7 +1005,7 @@ private class FocusPilot {
       tries = 0
       lastFocusAt = now
       setAfMode(CameraMetadata.CONTROL_AF_MODE_MACRO)
-      focusCenter(cameraControl)
+      focusHere(cameraControl)
       return
     }
     //  ماکرو هم نتوانست: برگرد سرِ پیوسته و بگو چه کند
@@ -860,17 +1046,24 @@ private class FocusPilot {
     }
   }
 
-  private fun focusCenter(cameraControl: CameraControl) {
+  /**
+   *  فوکوس و نورسنجی، روی همان‌جا که نشانه است.
+   *
+   *  نقطه بر حسبِ کسری از خودِ فریم داده می‌شود، پس نه به اندازهٔ نما بند
+   *  است و نه به چرخشِ گوشی — و از رشتهٔ دوربین هم می‌شود ساختش، برخلافِ
+   *  `meteringPointFactory` که مالِ رشتهٔ اصلی است.
+   *
+   *  اندازهٔ ناحیه از خودِ کادرِ بارکد می‌آید، ولی کمتر از `CENTER_REGION`
+   *  نمی‌شود: بارکدِ نازک ممکن است از کمترین ناحیهٔ فوکوسِ حسگر باریک‌تر
+   *  باشد و آن‌وقت فرمان بی‌اثر می‌ماند.
+   */
+  private fun focusHere(cameraControl: CameraControl) {
     lastFocusAt = System.currentTimeMillis()
+    val box = if (System.currentTimeMillis() - aimAt > AIM_FRESH_MS) Aim.CENTER else aim
     runCatching {
-      /*
-       *  نقطه بر حسبِ کسری از خودِ فریم داده می‌شود، پس نه به اندازهٔ نما
-       *  بند است و نه به چرخشِ گوشی — و از رشتهٔ دوربین هم می‌شود ساختش،
-       *  برخلافِ `meteringPointFactory` که مالِ رشتهٔ اصلی است. میانهٔ کادر
-       *  در هر چرخشی همان میانه است.
-       */
+      val span = maxOf(box.width, box.height).coerceIn(CENTER_REGION, 0.8f)
       val center = SurfaceOrientedMeteringPointFactory(1f, 1f)
-        .createPoint(0.5f, 0.5f, CENTER_REGION)
+        .createPoint(box.cx, box.cy, span)
       //  نور را هم همان‌جا بسنج: بارکدِ سفید زیرِ نورِ تندِ دکان می‌سوزد
       //  و ناخوانا می‌شود — و همین سنجشِ ناحیه‌ای است که وقتی لامپ سرِ
       //  نصفِ بارکد افتاده، آن نصفِ دیگر را قابلِ خواندن نگه می‌دارد
