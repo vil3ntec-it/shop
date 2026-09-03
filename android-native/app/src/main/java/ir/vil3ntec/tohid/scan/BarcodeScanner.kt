@@ -862,26 +862,60 @@ object ScanFeedback {
     vibrate(context, 200)
   }
 
+  /**
+   *  بوقِ اسکن.
+   *
+   *  ── باگی که اینجا بسته شد ────────────────────────────────────────
+   *  گزارش شد «موقعِ اسکن صدا نمی‌دهد». دو راهِ خروجِ **بی‌صدا** در این
+   *  تابع بود:
+   *
+   *   ۱. `MediaPlayer.create(...) ?: return` — این `return` از دلِ
+   *      `runCatching` بیرون می‌پرید و به `onFailure` نمی‌رسید. یعنی اگر
+   *      ساختنِ پخش‌کننده `null` برمی‌گرداند (که پیش می‌آید: خطای کدک،
+   *      کمبودِ منبع، یا گوشی‌ای که آن فایل را باز نمی‌کند)، هیچ صدایی
+   *      پخش نمی‌شد و بوقِ جایگزین هم زده نمی‌شد.
+   *   ۲. `existing.start()` روی پخش‌کننده‌ای که آزاد شده باشد استثنا
+   *      می‌دهد؛ آن استثنا گرفته می‌شد ولی پخش‌کننده‌ی خراب سرِ جایش
+   *      می‌ماند، پس از آن به بعد **هر** اسکن بی‌صدا بود.
+   *
+   *  حالا هر دو راه بسته است: نتیجه‌ی هر تلاش سنجیده می‌شود و اگر نشد،
+   *  پخش‌کننده‌ی خراب دور انداخته می‌شود و بوقِ ساختگی زده می‌شود.
+   *  فروشنده باید بی نگاه کردن به صفحه بفهمد که خوانده شد.
+   *  ──────────────────────────────────────────────────────────────────
+   */
   private fun playBeep(context: Context) {
-    runCatching {
-      val existing = player
-      if (existing != null) {
-        // اگر هنوز در حال پخش است، از اول شروع کن — دو اسکنِ سریع نباید
-        // صدای هم را بخورند
-        existing.seekTo(0)
-        existing.start()
-        return
-      }
-      val fresh = android.media.MediaPlayer.create(context.applicationContext, ir.vil3ntec.tohid.R.raw.scan_beep)
-        ?: return
-      fresh.setVolume(1f, 1f)
-      player = fresh
-      fresh.start()
-    }.onFailure {
-      // اگر فایل به هر دلیلی پخش نشد، دستِ‌کم یک بوق بزن
-      beep(android.media.ToneGenerator.TONE_PROP_BEEP, 120)
-    }
+    if (restart()) return
+    if (fresh(context)) return
+    //  نه فایل، نه پخش‌کننده — دستِ‌کم یک بوق
+    beep(android.media.ToneGenerator.TONE_PROP_BEEP, 120)
   }
+
+  /** پخش‌کننده‌ی موجود را از اول راه بیندازد؛ نشد، دورش می‌اندازد */
+  private fun restart(): Boolean {
+    val existing = player ?: return false
+    //  دو اسکنِ سریع نباید صدای هم را بخورند، پس از اول
+    val ok = runCatching {
+      existing.seekTo(0)
+      existing.start()
+      true
+    }.getOrDefault(false)
+    if (!ok) {
+      runCatching { existing.release() }
+      player = null
+    }
+    return ok
+  }
+
+  /** پخش‌کننده‌ی تازه؛ `false` یعنی این گوشی این فایل را پخش نمی‌کند */
+  private fun fresh(context: Context): Boolean = runCatching {
+    val made = android.media.MediaPlayer.create(
+      context.applicationContext, ir.vil3ntec.tohid.R.raw.scan_beep,
+    ) ?: return false
+    made.setVolume(1f, 1f)
+    player = made
+    made.start()
+    true
+  }.getOrDefault(false)
 
   /** وقتی برنامه بسته می‌شود، پخش‌کننده را آزاد کن */
   fun release() {

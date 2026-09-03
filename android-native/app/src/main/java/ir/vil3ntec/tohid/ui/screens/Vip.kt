@@ -303,31 +303,28 @@ fun VipScreen(onDismiss: () -> Unit) {
         Text("بازگشت", color = colors.primary)
       }
 
-      /* ---------------------- اشتراکِ همین حالا ---------------------- */
-      SubscriptionState()
-
-      /* ---------------------- هفت روز رایگان ---------------------- */
-      Column(
-        Modifier
-          .fillMaxWidth()
-          .clip(RoundedCornerShape(Radius.md))
-          .background(colors.surface)
-          .border(1.dp, colors.primary.copy(alpha = 0.35f), RoundedCornerShape(Radius.md))
-          .padding(16.dp)
-      ) {
-        Text(
-          "۷ روز رایگان",
-          style = MaterialTheme.typography.titleSmall,
-          color = colors.primary,
-          fontWeight = FontWeight.Bold,
-        )
-        Spacer(Modifier.height(6.dp))
-        Text(
-          "حساب بسازید و همهٔ قابلیت‌ها را ۷ روز رایگان امتحان کنید. " +
-            "اطلاعاتی که ثبت می‌کنید در حساب خودتان می‌ماند.",
-          style = MaterialTheme.typography.bodySmall,
-          color = colors.muted,
-        )
+      /*
+       *  یک کارت، نه دو کارتِ متناقض.
+       *
+       *  ── چه چیزی را می‌بندد ────────────────────────────────────────
+       *  بالای این صفحه دو کارت پشتِ سرِ هم می‌نشست: یکی می‌گفت
+       *  «اشتراک رو به پایان است — ۷ روز مانده» و همان زیر، دیگری
+       *  می‌گفت «۷ روز رایگان — حساب بسازید و امتحان کنید». برای کسی
+       *  که حساب دارد و وسطِ دورهٔ آزمایشی‌اش است، این دو با هم یعنی
+       *  هیچ: کدام؟ تازه شروع شده یا تمام می‌شود؟
+       *
+       *  حالا یکی از این دو ساخته می‌شود، نه هر دو: وضعیتِ واقعی اگر
+       *  حسابی در کار باشد، و دعوت به دورهٔ آزمایشی اگر نباشد.
+       *  ────────────────────────────────────────────────────────────
+       */
+      val hasStatus = remember {
+        val st = runCatching { LicenseGuard.status(context, SyncStore(context)) }.getOrNull()
+        st != null && st.state != License.State.NONE
+      }
+      if (hasStatus) {
+        SubscriptionState()
+      } else {
+        TrialInvite()
       }
 
       Spacer(Modifier.height(14.dp))
@@ -552,6 +549,45 @@ fun VipScreen(onDismiss: () -> Unit) {
  *  از یک هفته به پایین کلِ کارت قرمز می‌شود — همان مرزی که نشانِ سربرگ
  *  هم با آن قرمز می‌شود (`SUBSCRIPTION_WARN_DAYS`)، تا دو جا یک حرف بزنند.
  */
+/**
+ *  دعوت به دورهٔ آزمایشی — فقط برای کسی که هنوز حسابی ندارد.
+ *
+ *  حرکتش یک «تنفس» است، نه خطِ لغزان: حاشیه و هالهٔ کارت آرام کم‌وزیاد
+ *  می‌شوند. چیزی که چشم را می‌گیرد ولی نمی‌آزارد، و در صفحه‌ای که کارِ
+ *  اصلی‌اش «انتخاب کن» است، همان اندازه توجه لازم دارد.
+ */
+@Composable
+private fun TrialInvite() {
+  val colors = Shop.colors
+  val pulse = goldPulse()
+  Column(
+    Modifier
+      .fillMaxWidth()
+      .clip(RoundedCornerShape(Radius.md))
+      .background(colors.surface)
+      .border(
+        (1f + pulse * 0.8f).dp,
+        colors.primary.copy(alpha = 0.28f + pulse * 0.34f),
+        RoundedCornerShape(Radius.md),
+      )
+      .padding(16.dp)
+  ) {
+    Text(
+      "۷ روز رایگان",
+      style = MaterialTheme.typography.titleSmall,
+      color = colors.primary,
+      fontWeight = FontWeight.Bold,
+    )
+    Spacer(Modifier.height(6.dp))
+    Text(
+      "حساب بسازید و همهٔ قابلیت‌ها را ۷ روز رایگان امتحان کنید. " +
+        "اطلاعاتی که ثبت می‌کنید در حساب خودتان می‌ماند.",
+      style = MaterialTheme.typography.bodySmall,
+      color = colors.muted,
+    )
+  }
+}
+
 @Composable
 private fun SubscriptionState() {
   val context = LocalContext.current
@@ -909,6 +945,8 @@ private fun PlanCard(
         .fillMaxWidth()
         .then(if (stretch) Modifier.weight(1f) else Modifier)
         .then(if (golden) Modifier.goldEdge(Radius.md, pulse, strong = selected) else Modifier)
+        //  نورِ چرخانِ دورِ کارت‌های طلایی — شرحش سرِ `borderBeam`
+        .then(if (golden) Modifier.borderBeam(GOLD, strong = selected) else Modifier)
         //  تا انگشت روی کارت است، نور از کناره‌هایش می‌آید
         .edgeSparks(touched, if (golden) GOLD else colors.primary)
         .clip(shape)
