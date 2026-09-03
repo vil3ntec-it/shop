@@ -431,26 +431,24 @@ private fun SubscriptionRow(onClick: () -> Unit) {
    *  حالا وضعیت از سرور هم پرسیده می‌شود و اگر سرور بگوید «آزمایشی، N
    *  روز مانده»، همان نوشته می‌شود. حرفِ سرور مقدم است چون صاحبِ اشتراک
    *  اوست، نه گوشی.
+   *
+   *  و همان پاسخ، از همان کَشی خوانده می‌شود که سربرگ می‌خواند
+   *  (`SubscriptionPulse`) — وگرنه باز دو جا دو حرف می‌زدند: همان چیزی
+   *  که باعث شد سربرگ آبی بماند و همین ردیف «۷ روز مانده» بنویسد.
    *  ──────────────────────────────────────────────────────────────────
    */
-  var fromServer by remember { mutableStateOf<ir.vil3ntec.tohid.core.model.SubscriptionDto?>(null) }
-  LaunchedEffect(Unit) {
-    if (!ir.vil3ntec.tohid.data.repo.Backend.isReady(context)) return@LaunchedEffect
-    ir.vil3ntec.tohid.data.repo.Backend.account(context).subscription()
-      .onSuccess { fromServer = it }
-  }
+  LaunchedEffect(Unit) { SubscriptionPulse.refresh(context) }
 
-  val serverTrial = fromServer?.takeIf { it.trial && it.daysLeft > 0 }
-  val serverActive = fromServer?.takeIf { it.status == "active" && it.daysLeft > 0 }
+  val serverOn = SubscriptionPulse.active && SubscriptionPulse.days > 0
+  val serverTrialOn = serverOn && SubscriptionPulse.trial
 
-  val active = localActive || serverTrial != null || serverActive != null
+  val active = localActive || serverOn
   val days = when {
     localActive -> localDays
-    serverTrial != null -> serverTrial.daysLeft
-    serverActive != null -> serverActive.daysLeft
+    serverOn -> SubscriptionPulse.days
     else -> 0
   }
-  val trial = !localActive && serverTrial != null
+  val trial = !localActive && serverTrialOn
   val urgent = expired || (active && days <= SUBSCRIPTION_WARN_DAYS)
 
   InfoRow(

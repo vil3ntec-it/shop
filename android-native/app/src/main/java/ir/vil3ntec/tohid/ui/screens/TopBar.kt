@@ -196,6 +196,9 @@ fun rememberAlerts(d: ShopData): List<Alert> {
   var news by remember { mutableStateOf<List<ir.vil3ntec.tohid.data.repo.EventsRepository.Event>>(emptyList()) }
   LaunchedEffect(Unit) {
     if (!ir.vil3ntec.tohid.data.repo.Backend.isReady(context)) return@LaunchedEffect
+    //  وضعیتِ اشتراک از زبانِ سرور — خودش می‌داند تازه هست یا نه و
+    //  اگر تازه بود، از سرور نمی‌پرسد
+    SubscriptionPulse.refresh(context)
     ir.vil3ntec.tohid.data.repo.Backend.events(context).feed()
       .onSuccess { feed ->
         //  خبرِ خودم برای خودم خبر نیست
@@ -317,7 +320,7 @@ fun TohidTopBar(
    *  وضعیت یک بار سنجیده می‌شود، نه با هر بار کشیده شدنِ سربرگ:
    *  سنجیدنِ مجوز یعنی بررسیِ امضای رمزنگاری.
    */
-  val barUrgent = remember { subscriptionUrgent(context) }
+  val barUrgent = subscriptionUrgent()
   val barBeat = if (barUrgent) urgentBeat() else 1f
   val barColors = when {
     barUrgent -> BAR_URGENT
@@ -844,7 +847,20 @@ private fun SyncDot() {
  *  هر کدام خودش حساب می‌کرد و همین باعث شد سربرگ عوض نشود در حالی که
  *  نشان قرمز بود.
  */
-private fun subscriptionUrgent(context: android.content.Context): Boolean {
+@Composable
+private fun subscriptionUrgent(): Boolean {
+  val context = LocalContext.current
+  //  مجوزِ روی گوشی یک بار سنجیده می‌شود؛ سنجیدنش یعنی بررسیِ امضای
+  //  رمزنگاری و جایش هر بار کشیده شدنِ سربرگ نیست
+  val local = remember { licenceUrgent(context) }
+  //  و حرفِ سرور، که با هر تازه شدنِ `SubscriptionPulse` خودش سربرگ را
+  //  دوباره می‌کشد
+  val server = SubscriptionPulse.active && SubscriptionPulse.days <= SUBSCRIPTION_WARN_DAYS
+  return local || server
+}
+
+/** همان قاعده، اما فقط روی مجوزِ امضاشدهٔ روی گوشی */
+private fun licenceUrgent(context: android.content.Context): Boolean {
   val status = runCatching {
     ir.vil3ntec.tohid.sync.LicenseGuard.status(
       context, ir.vil3ntec.tohid.sync.SyncStore(context),
@@ -899,7 +915,16 @@ private fun VipChip(onClick: () -> Unit) {
       )
     }.getOrNull()
   }
-  val days = status?.daysLeft() ?: 0
+  /*
+   *  مجوزِ امضاشده هنوز نیامده باشد، پاسخِ سرور جایش را می‌گیرد.
+   *
+   *  کسی که تازه حساب ساخته، دورهٔ آزمایشی‌اش را سرور باز کرده و
+   *  مجوزی روی گوشی نیست؛ تا دیروز روی این نشان «VIP» می‌نوشت و
+   *  پروفایل «۷ روز مانده» — دو حرفِ مختلف در یک برنامه.
+   */
+  val serverDays = SubscriptionPulse.days
+  val serverOn = SubscriptionPulse.active && serverDays > 0
+  val days = status?.daysLeft() ?: if (serverOn) serverDays else 0
   val state = status?.state
 
   //  «کم مانده» یعنی یا تمام شده، یا از یک هفته کمتر مانده
@@ -907,7 +932,7 @@ private fun VipChip(onClick: () -> Unit) {
     ir.vil3ntec.tohid.sync.License.State.EXPIRED,
     ir.vil3ntec.tohid.sync.License.State.GRACE -> true
     ir.vil3ntec.tohid.sync.License.State.ACTIVE -> days <= SUBSCRIPTION_WARN_DAYS
-    else -> false
+    else -> serverOn && serverDays <= SUBSCRIPTION_WARN_DAYS
   }
 
   /*
@@ -921,6 +946,8 @@ private fun VipChip(onClick: () -> Unit) {
     state == ir.vil3ntec.tohid.sync.License.State.GRACE -> "مهلت"
     state == ir.vil3ntec.tohid.sync.License.State.ACTIVE && days > 0 -> "${days.fa()} روز"
     state == ir.vil3ntec.tohid.sync.License.State.ACTIVE -> "امروز"
+    //  حرفِ سرور، وقتی مجوزی روی گوشی نیست
+    serverOn -> "${serverDays.fa()} روز"
     else -> "VIP"
   }
 

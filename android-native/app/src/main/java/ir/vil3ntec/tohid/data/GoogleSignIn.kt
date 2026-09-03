@@ -47,9 +47,31 @@ object GoogleSignIn {
     } catch (e: GetCredentialCancellationException) {
       return null
     } catch (e: NoCredentialException) {
-      throw IllegalStateException("روی این گوشی حساب گوگلی ثبت نشده است")
+      throw IllegalStateException(
+        "روی این گوشی حساب گوگلی نیست، یا گوگل حسابی برای این برنامه پیدا نکرد — " +
+          "از تنظیماتِ گوشی یک حساب گوگل اضافه کنید و دوباره بزنید"
+      )
     } catch (e: Exception) {
-      throw IllegalStateException("ورود با گوگل انجام نشد — سرویس‌های گوگل روی این گوشی در دسترس نیست")
+      /*
+       *  پیامِ خامِ گوگل نگه داشته می‌شود، نه اینکه با یک جملهٔ کلی
+       *  پاک شود.
+       *
+       *  گزارش شد «ورود با گوگل کار نمی‌کند» و همین جمله‌ی کلی روی صفحه
+       *  بود؛ از رویش معلوم نمی‌شد اشکال از گوشی است یا از تنظیماتِ
+       *  سرور. تقریباً همیشه یکی از این دو است:
+       *   • شناسهٔ کلاینت با امضای این نسخهٔ برنامه (SHA-1) جور نیست
+       *   • شناسه‌ای که سرور می‌دهد از نوعِ «Web» نیست
+       *  هر دو را از متنِ خودِ گوگل می‌شود فهمید.
+       */
+      val raw = e.message.orEmpty().take(160)
+      throw IllegalStateException(
+        buildString {
+          append("ورود با گوگل انجام نشد")
+          if (raw.isNotBlank()) append(" — ").append(raw)
+          append("\nاگر تکرار شد: شناسهٔ کلاینتِ سرور باید از نوعِ Web باشد و ")
+          append("امضای SHA-1 این برنامه در Google Cloud ثبت شده باشد.")
+        }
+      )
     }
 
     val credential = response.credential

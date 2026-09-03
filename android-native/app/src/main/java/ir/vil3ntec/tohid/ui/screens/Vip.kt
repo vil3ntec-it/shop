@@ -321,10 +321,18 @@ fun VipScreen(onDismiss: () -> Unit) {
         val st = runCatching { LicenseGuard.status(context, SyncStore(context)) }.getOrNull()
         st != null && st.state != License.State.NONE
       }
-      if (hasStatus) {
-        SubscriptionState()
-      } else {
-        TrialInvite()
+      /*
+       *  و اگر مجوزی روی گوشی نیست ولی سرور می‌گوید دورهٔ آزمایشی باز
+       *  است، نه کارتِ وضعیت ساخته می‌شد نه چیزی جز «۷ روز رایگان
+       *  بگیرید» — یعنی به کسی که همین حالا وسطِ همان هفته است،
+       *  پیشنهادِ گرفتنش را می‌داد. حالا حالتِ سومی هست.
+       */
+      LaunchedEffect(Unit) { SubscriptionPulse.refresh(context) }
+      val trialOn = SubscriptionPulse.active && SubscriptionPulse.days > 0
+      when {
+        hasStatus -> SubscriptionState()
+        trialOn -> TrialState(SubscriptionPulse.days, SubscriptionPulse.trial)
+        else -> TrialInvite()
       }
 
       Spacer(Modifier.height(14.dp))
@@ -582,6 +590,54 @@ private fun TrialInvite() {
     Text(
       "حساب بسازید و همهٔ قابلیت‌ها را ۷ روز رایگان امتحان کنید. " +
         "اطلاعاتی که ثبت می‌کنید در حساب خودتان می‌ماند.",
+      style = MaterialTheme.typography.bodySmall,
+      color = colors.muted,
+    )
+  }
+}
+
+/**
+ *  وضعیتِ دورهٔ آزمایشی — از زبانِ سرور، نه از مجوزِ گوشی.
+ *
+ *  همان کارتِ دعوت است، اما به‌جای «بگیرید» می‌گوید «داری، و این‌قدر
+ *  مانده». زیرِ یک هفته سرخ می‌شود، مثل هر جای دیگرِ برنامه
+ *  (`SUBSCRIPTION_WARN_DAYS`).
+ */
+@Composable
+private fun TrialState(days: Int, trial: Boolean) {
+  val colors = Shop.colors
+  val urgent = days <= SUBSCRIPTION_WARN_DAYS
+  val tint = if (urgent) colors.danger else colors.success
+  val pulse = goldPulse()
+  Column(
+    Modifier
+      .fillMaxWidth()
+      .clip(RoundedCornerShape(Radius.md))
+      .background(if (urgent) colors.dangerTint else colors.surface)
+      .border(
+        (1f + pulse * 0.8f).dp,
+        tint.copy(alpha = 0.30f + pulse * 0.34f),
+        RoundedCornerShape(Radius.md),
+      )
+      .padding(16.dp)
+  ) {
+    Text(
+      if (trial) "دورهٔ آزمایشی" else "اشتراک فعال است",
+      style = MaterialTheme.typography.titleSmall,
+      color = tint,
+      fontWeight = FontWeight.Bold,
+    )
+    Spacer(Modifier.height(6.dp))
+    Text(
+      if (days > 0) "${days.fa()} روز مانده" else "امروز آخرین روز است",
+      style = MaterialTheme.typography.headlineSmall,
+      color = colors.text,
+      fontWeight = FontWeight.Bold,
+    )
+    Spacer(Modifier.height(6.dp))
+    Text(
+      if (trial) "تا پایانِ این مدت همهٔ قابلیت‌ها باز است؛ برای ادامه، یکی از پلن‌های پایین را بگیرید."
+      else "برای ادامه، پیش از تمام شدن تمدید کنید.",
       style = MaterialTheme.typography.bodySmall,
       color = colors.muted,
     )
