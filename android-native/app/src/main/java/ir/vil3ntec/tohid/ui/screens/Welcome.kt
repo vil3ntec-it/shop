@@ -461,9 +461,15 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
               emailMode == "register" ->
                 auth.register(name.trim(), email.trim(), "", password)
                   .onSuccess {
-                    note = "حساب ساخته شد — حالا وارد شوید"
-                    emailMode = "login"
-                    password = ""
+                    //  سرور با ثبت‌نام نشست هم می‌دهد؛ آن‌وقت مرحلهٔ دومی
+                    //  لازم نیست و همان‌جا داخل می‌شویم
+                    if (it.isValid) {
+                      finish(email.trim(), it)
+                    } else {
+                      note = "حساب ساخته شد — حالا وارد شوید"
+                      emailMode = "login"
+                      password = ""
+                    }
                   }
                   .onFailure { fail(it) }
 
@@ -610,10 +616,24 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
           HorizontalDivider(Modifier.weight(1f), color = fieldLine)
         }
 
-        // ورود با گوگل — فقط اگر سرور آن را باز کرده باشد
-        if (googleId.isNotBlank()) {
-          Spacer(Modifier.height(14.dp))
-          GoogleButton(enabled = ready && !busy) {
+        /*
+         *  ورود با ایمیلِ گوگلِ خودِ گوشی — بی رمز، بی کد.
+         *
+         *  تا دیروز این کلید فقط وقتی ساخته می‌شد که سرور کلیدِ گوگل را
+         *  داده باشد. نتیجه‌اش این بود که روی سرورِ تازه‌راه‌افتاده، کلید
+         *  **اصلاً دیده نمی‌شد** و صاحب دکان نمی‌دانست چنین راهی هست، چه
+         *  رسد به اینکه بداند برای بازکردنش باید چه کند.
+         *
+         *  حالا همیشه هست. اگر سرور تنظیمش نکرده باشد، زدنش خطا نمی‌دهد —
+         *  می‌گوید کدام مقدار در `.env` جا افتاده. راهنمایی، به‌جای غیبت.
+         */
+        Spacer(Modifier.height(14.dp))
+        GoogleButton(enabled = ready && !busy) {
+          if (googleId.isBlank()) {
+            note = null
+            error = "ورود با گوگل روی این سرور باز نشده — در پروندهٔ .env مقدار " +
+              "GOOGLE_CLIENT_ID را بگذارید و سرور را دوباره بالا بیاورید"
+          } else {
             busy = true; error = null; note = null
             scope.launch {
               runCatching { ir.vil3ntec.tohid.data.GoogleSignIn.pick(context, googleId) }
