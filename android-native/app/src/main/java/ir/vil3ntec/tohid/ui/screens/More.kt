@@ -25,7 +25,6 @@ import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.ManageSearch
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.ReceiptLong
-import androidx.compose.material.icons.filled.Settings
 import ir.vil3ntec.tohid.ui.theme.Shop
 
 /**
@@ -129,22 +128,16 @@ fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
         onClick = { onOpen("team") },
       )
       /*
-       *  تنظیمات و «کارکنان» فقط برای صاحب دکان.
+       *  «تنظیمات» اینجا نیست — عمداً.
        *
-       *  قرارِ صاحب دکان: شاگرد بفروشد و کار کند، ولی سراغِ تنظیمات
-       *  نرود تا یک وقت خراب‌کاری به سرش نزند. نشان ندادنِ ردیف بهتر
-       *  از نشان دادنِ ردیفی است که با زدنش پیام «اجازه ندارید»
-       *  بیاید — آن یکی فقط کنجکاوی می‌سازد.
+       *  گزارشِ صاحب مخزن: «از بخش بیشتر کادر تنظیمات را بردار، آن بالا
+       *  است و این‌جا هم بدهند؛ این‌جا را فقط می‌گیرد». درست است: چرخ‌دنده
+       *  همیشه در سربرگِ هر صفحه هست و همان یک راه بس است. دو راه به یک
+       *  صفحه، فقط فهرست را بلندتر می‌کند.
+       *
+       *  «کارمندان دکان» بالاتر همچنان فقط برای صاحب و مدیر است — شاگرد
+       *  نه ردیفش را می‌بیند و نه سرور برایش بازش می‌کند.
        */
-      if (canManage) {
-        MoreCard(
-          title = "تنظیمات",
-          icon = Icons.Filled.Settings,
-          tint = Shop.colors.primary,
-          subtitle = "نام فروشگاه، ظاهر، پشتیبان‌گیری و اتصال به سرور",
-          onClick = { onOpen("settings") },
-        )
-      }
     }
 
     Spacer(Modifier.height(20.dp))

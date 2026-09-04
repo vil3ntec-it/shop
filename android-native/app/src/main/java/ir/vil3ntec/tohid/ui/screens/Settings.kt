@@ -66,7 +66,6 @@ import ir.vil3ntec.tohid.core.config.AppConfig
 import ir.vil3ntec.tohid.core.model.DeviceDto
 import ir.vil3ntec.tohid.core.net.userText
 import ir.vil3ntec.tohid.data.repo.Backend
-import ir.vil3ntec.tohid.sync.SavedLogins
 import ir.vil3ntec.tohid.sync.SyncStore
 import ir.vil3ntec.tohid.sync.Syncer
 import ir.vil3ntec.tohid.todayIso
@@ -97,7 +96,6 @@ fun SettingsScreen(
   val scope = rememberCoroutineScope()
   val prefs = remember { context.getSharedPreferences("tohid", android.content.Context.MODE_PRIVATE) }
   val state = remember { SyncStore(context) }
-  val syncer = remember { Syncer(store, state, context) }
   //  صفحه هیچ‌وقت خودش کارگزارِ شبکه نمی‌سازد و توکن را دست نمی‌زند
   val auth = remember(context) { Backend.auth(context) }
   val account = remember(context) { Backend.account(context) }
@@ -123,14 +121,11 @@ fun SettingsScreen(
    *  (`tohid.apiBase` در `gradle.properties`) و از آن به بعد قفل است.
    */
   val serverReady = AppConfig.isConfigured(context)
-  var identifier by rememberSaveable { mutableStateOf("") }
-  var password by rememberSaveable { mutableStateOf("") }
   var busy by remember { mutableStateOf(false) }
   var signedIn by remember { mutableStateOf(state.accessToken != null) }
   val lockStore = remember { ir.vil3ntec.tohid.data.LockStore(context) }
   var lockOn by remember { mutableStateOf(lockStore.enabled) }
   var askPin by remember { mutableStateOf(false) }
-  var licenseStatus by remember { mutableStateOf(syncer.status()) }
   var confirmClear by remember { mutableStateOf(false) }
   var confirmRotate by remember { mutableStateOf(false) }
   /*
@@ -272,175 +267,27 @@ fun SettingsScreen(
   ) {
     item {
       Text(
-        "حساب، ظاهر، داده‌ها و اطلاعات برنامه",
+        "هشدارها، ظاهر، داده‌ها و پشتیبان — حساب و نام دکان در «حساب من» است",
         style = MaterialTheme.typography.bodySmall,
         color = Shop.colors.muted,
       )
       Spacer(Modifier.height(4.dp))
     }
 
-    /* ============================== حساب ============================== */
-    item {
-      SettingsSection(
-        icon = Icons.Filled.PersonOutline,
-        title = "حساب",
-        subtitle = if (signedIn) state.accountName.ifBlank { "وارد شده" } else "وارد نشده‌اید",
-        initiallyOpen = !signedIn,
-      ) {
-        if (signedIn) {
-          SettingsRow(
-            icon = Icons.Filled.Badge,
-            title = "حساب من",
-            description = state.accountName.ifBlank { "وارد شده" },
-            value = licenseText(licenseStatus),
-          )
-          licenseStatus.payload?.let { p ->
-            if (p.subscriptionEndsAt > 0) {
-              SettingsRow(
-                icon = Icons.Filled.Event,
-                title = "پایان اشتراک",
-                value = formatDate(isoOf(p.subscriptionEndsAt)),
-                tint = Shop.colors.accent,
-              )
-            }
-          }
-          if (state.lastSyncAt > 0) {
-            SettingsRow(
-              icon = Icons.Filled.Sync,
-              title = "آخرین همگام‌سازی",
-              value = formatDate(isoOf(state.lastSyncAt)),
-              tint = Shop.colors.accent,
-            )
-          }
-          Spacer(Modifier.height(10.dp))
-          TohidButton(
-            text = "همگام‌سازی حالا",
-            onClick = {
-              busy = true
-              scope.launch {
-                runCatching { syncer.run() }
-                  .onSuccess {
-                    toast("همگام‌سازی شد — ${plain(it.pushed)} فرستاده، ${plain(it.pulled)} گرفته")
-                    runCatching { licenseStatus = syncer.refreshLicense(android.os.Build.MODEL ?: "گوشی") }
-                  }
-                  .onFailure { toast(it.userText("همگام‌سازی ناموفق بود")) }
-                busy = false
-              }
-            },
-            busy = busy,
-            modifier = Modifier.fillMaxWidth(),
-          )
-          Spacer(Modifier.height(8.dp))
-          TohidDangerButton(
-            text = "خروج از حساب",
-            onClick = {
-              state.signOut()
-              signedIn = false
-              licenseStatus = License.Status(License.State.NONE)
-              toast("از حساب خارج شدید — اطلاعات دکان سر جایش است")
-            },
-            modifier = Modifier.fillMaxWidth(),
-          )
-        } else {
-          Text(
-            if (serverReady)
-              "به سرورِ توحید وصل می‌شود."
-            else
-              "این نسخه به سروری بسته نشده و حساب در آن کار نمی‌کند. " +
-                "دفترِ دکان روی همین گوشی سرِ جایش است و همه‌چیز آفلاین کار " +
-                "می‌کند؛ برای حساب و همگام‌سازی، نسخهٔ منتشرشده را نصب کنید.",
-            style = MaterialTheme.typography.bodySmall,
-            color = if (serverReady) Shop.colors.muted else Shop.colors.warning,
-          )
-          Spacer(Modifier.height(10.dp))
-          TohidTextField(
-            value = identifier,
-            onValueChange = { identifier = it },
-            label = "ایمیل یا شماره",
-          )
-          Spacer(Modifier.height(10.dp))
-          TohidTextField(
-            value = password,
-            onValueChange = { password = it },
-            label = "رمز عبور",
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-          )
-          Spacer(Modifier.height(12.dp))
-          Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            TohidSecondaryButton(
-              text = "آزمایش اتصال",
-              enabled = !busy && serverReady,
-              onClick = {
-                busy = true
-                scope.launch {
-                  auth.health()
-                    .onSuccess { toast("سرور جواب داد") }
-                    .onFailure { toast(it.userMessage) }
-                  busy = false
-                }
-              },
-              modifier = Modifier.weight(1f),
-            )
-            TohidButton(
-              text = "ورود",
-              enabled = !busy && serverReady && identifier.isNotBlank() && password.isNotBlank(),
-              busy = busy,
-              onClick = {
-                busy = true
-                scope.launch {
-                  //  توکن را خودِ مخزن ذخیره می‌کند؛ صفحه فقط نتیجه را
-                  //  می‌بیند
-                  auth.login(identifier.trim(), password)
-                    .onSuccess { session ->
-                      state.rememberAccount(session.user)
-                      //  نقش از همین پاسخ می‌آید؛ بدونش کسی که شاگردِ
-                      //  دکانِ دیگری است، تا راه‌اندازیِ بعدیِ برنامه
-                      //  تنظیمات را باز می‌دید
-                      session.shop?.role?.let {
-                        ir.vil3ntec.tohid.data.ShopRole.remember(context, it)
-                      }
-                      SavedLogins.remember(context, identifier.trim(), session.user.name)
-                      signedIn = true
-                      password = ""
-                      toast("وارد شدید")
-                      runCatching { licenseStatus = syncer.refreshLicense(android.os.Build.MODEL ?: "گوشی") }
-                    }
-                    .onFailure { toast(it.userMessage) }
-                  busy = false
-                }
-              },
-              modifier = Modifier.weight(1f),
-            )
-          }
-        }
-      }
-    }
-
-    /* ============================= فروشگاه ============================= */
-    item {
-      SettingsSection(
-        icon = Icons.Filled.Storefront,
-        title = "فروشگاه",
-        subtitle = storeName.ifBlank { "نام دکان تنظیم نشده" },
-        tint = Shop.colors.accent,
-      ) {
-        Text(
-          "این نام روی سربرگ فاکتور چاپ می‌شود.",
-          style = MaterialTheme.typography.bodySmall,
-          color = Shop.colors.muted,
-        )
-        Spacer(Modifier.height(10.dp))
-        TohidTextField(
-          value = storeName,
-          onValueChange = {
-            storeName = it
-            prefs.edit().putString("store_name", it.trim()).apply()
-          },
-          label = "نام فروشگاه",
-          keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-        )
-      }
-    }
+    /*
+     *  حساب و نامِ فروشگاه اینجا نیستند — عمداً.
+     *
+     *  ── چه چیزی را می‌بندد ─────────────────────────────────────────
+     *  گزارشِ صاحب مخزن: «کارتِ حساب الان آن بالا یکی است، این معنی
+     *  ندارد؛ نام فروشگاه هم همین‌طور — این‌ها باید توی حساب من باشند
+     *  نه این‌جا». درست بود: نامِ حساب، اشتراک، همگام‌سازی و خروج، هر
+     *  چهار تا هم اینجا بودند و هم در «حساب من». یک چیز در دو جا یعنی
+     *  کاربر باید حدس بزند کدام‌یک اصل است.
+     *
+     *  حالا هر چه به حساب بند است — خودِ حساب، اشتراک، همگام‌سازی،
+     *  خروج و نامِ دکان — یک‌جا در «حساب من» نشسته، و تنظیمات فقط
+     *  تنظیماتِ خودِ برنامه را دارد.
+     */
 
     /* ============================== هشدارها ============================== */
     item {
