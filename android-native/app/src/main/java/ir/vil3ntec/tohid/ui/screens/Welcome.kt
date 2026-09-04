@@ -70,6 +70,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.activity.compose.BackHandler
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.animation.core.Animatable
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.filled.LocationOn
@@ -478,6 +481,7 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
           value = name,
           onValueChange = { name = it; error = null },
           placeholder = "نام شما",
+          label = "نام",
           icon = Icons.Filled.Person,
         )
         Spacer(Modifier.height(12.dp))
@@ -487,6 +491,7 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
             value = email,
             onValueChange = { email = it; error = null },
             placeholder = "ایمیل",
+            label = "ایمیل",
             icon = Icons.Filled.AlternateEmail,
             keyboardOptions = KeyboardOptions(
               keyboardType = KeyboardType.Email,
@@ -499,6 +504,7 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
             value = password,
             onValueChange = { password = it; error = null },
             placeholder = if (emailMode == "register") "رمز عبور (حداقل ۸ نویسه)" else "رمز عبور",
+            label = "رمز عبور",
             icon = Icons.Filled.Lock,
             keyboardOptions = KeyboardOptions(
               keyboardType = KeyboardType.Password,
@@ -506,7 +512,9 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
             ),
             visual = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
             trailing = {
-              IconButton(onClick = { showPassword = !showPassword }, modifier = Modifier.size(34.dp)) {
+              //  ناحیهٔ لمس ۴۴dp، نه ۳۴: انگشتِ آدم ۳۴ را نمی‌گیرد و کاربر دو سه بار
+              //  می‌زند تا رمزش دیده شود
+              IconButton(onClick = { showPassword = !showPassword }, modifier = Modifier.size(44.dp)) {
                 Icon(
                   if (showPassword) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
                   contentDescription = if (showPassword) "پنهان کردن رمز" else "نمایش رمز",
@@ -533,25 +541,30 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
            */
           if (emailMode == "register") {
             Spacer(Modifier.height(12.dp))
+            val same = password == password2
             PillField(
               value = password2,
               onValueChange = { password2 = it; error = null },
               placeholder = "تکرارِ رمز",
+              label = "تکرارِ رمز",
               icon = Icons.Filled.Lock,
               keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Password,
                 imeAction = ImeAction.Done,
               ),
               visual = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
+              //  پیامِ زنده و **چسبیده به همان کادر**، نه یک خطِ جدا که
+              //  معلوم نیست مالِ کدام است
+              error = if (password2.isNotBlank() && !same) "دو رمز یکی نیستند" else null,
             )
-            //  پیامِ زنده، نه خطای بعدِ زدنِ دکمه: تا اینجا هستی بفهم
-            if (password2.isNotBlank()) {
+            //  و وقتی جور شد، همان‌جا تأیید می‌گیرد
+            if (password2.isNotBlank() && same) {
               Spacer(Modifier.height(6.dp))
-              val same = password == password2
               Text(
-                if (same) "هر دو یکی‌اند" else "دو رمز یکی نیستند",
+                "هر دو یکی‌اند",
                 style = MaterialTheme.typography.labelSmall,
-                color = if (same) Shop.colors.success else Shop.colors.danger,
+                color = Shop.colors.success,
+                modifier = Modifier.padding(horizontal = 14.dp),
               )
             }
 
@@ -916,6 +929,7 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
               value = staffCode,
               onValueChange = { staffCode = it.uppercase(); error = null },
               placeholder = "کد پیوستن — ${StaffCode.HINT}",
+              label = "کد پیوستن",
               icon = Icons.Filled.Storefront,
               ltr = true,
               trailing = {
@@ -1167,6 +1181,7 @@ private fun CodeScreen(
             value = fresh,
             onValueChange = { fresh = it },
             placeholder = "رمز تازه (حداقل ۸ نویسه)",
+            label = "رمز تازه",
             icon = Icons.Filled.Lock,
             keyboardOptions = KeyboardOptions(
               keyboardType = KeyboardType.Password,
@@ -1174,7 +1189,7 @@ private fun CodeScreen(
             ),
             visual = if (showFresh) VisualTransformation.None else PasswordVisualTransformation(),
             trailing = {
-              IconButton(onClick = { showFresh = !showFresh }, modifier = Modifier.size(34.dp)) {
+              IconButton(onClick = { showFresh = !showFresh }, modifier = Modifier.size(44.dp)) {
                 Icon(
                   if (showFresh) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
                   contentDescription = if (showFresh) "پنهان کردن رمز" else "نمایش رمز",
@@ -1494,26 +1509,64 @@ private fun TermsLocationScreen(
 @Composable
 private fun CodeCell(digit: String, active: Boolean, modifier: Modifier = Modifier) {
   val face = if (isDarkSurface()) Shop.colors.surface else Color.White
+  val filled = digit.isNotEmpty()
+
+  /*
+   *  سه حال، سه شکل: خالیِ منتظر، خانه‌ای که رقمش نشسته، و خانه‌ای که
+   *  همین حالا نوبتِ اوست.
+   *
+   *  تا دیروز فقط دو حال بود و خانه‌های پرشده با خالی‌ها یکی دیده
+   *  می‌شدند؛ کاربر برای فهمیدنِ اینکه چند رقم زده، باید رقم‌ها را
+   *  می‌شمرد.
+   */
   val edge by animateColorAsState(
-    targetValue = if (active) BLUE else fieldLine,
+    targetValue = when {
+      active -> BLUE
+      filled -> BLUE.copy(alpha = 0.45f)
+      else -> fieldLine
+    },
     animationSpec = tween(if (Motion.enabled) 160 else 0),
     label = "cellEdge",
   )
+  //  خانهٔ فعال کمی بزرگ‌تر است — نشانه‌ای که از گوشهٔ چشم هم دیده می‌شود
+  val grow by animateFloatAsState(
+    targetValue = if (active) 1.04f else 1f,
+    animationSpec = tween(if (Motion.enabled) 160 else 0),
+    label = "cellGrow",
+  )
+
   Box(
     modifier
       .height(58.dp)
-      .shadow(if (active) 8.dp else 3.dp, RoundedCornerShape(16.dp), ambientColor = BLUE, spotColor = BLUE)
+      .graphicsLayer { scaleX = grow; scaleY = grow }
+      .shadow(
+        elevation = if (active) 10.dp else if (filled) 5.dp else 3.dp,
+        shape = RoundedCornerShape(16.dp),
+        ambientColor = BLUE,
+        spotColor = BLUE,
+      )
       .clip(RoundedCornerShape(16.dp))
       .background(face)
       .border(if (active) 2.dp else 1.dp, edge, RoundedCornerShape(16.dp)),
     contentAlignment = Alignment.Center,
   ) {
-    Text(
-      digit,
-      style = MaterialTheme.typography.headlineSmall,
-      color = ink,
-      fontWeight = FontWeight.Bold,
-    )
+    if (filled) {
+      Text(
+        digit,
+        style = MaterialTheme.typography.headlineSmall,
+        color = ink,
+        fontWeight = FontWeight.Bold,
+      )
+    } else {
+      //  خانهٔ خالی یک نقطهٔ کم‌رنگ دارد، نه هیچ: کادرِ کاملاً خالی، در
+      //  کنارِ کادرهای پر، «خراب» به نظر می‌رسد
+      Box(
+        Modifier
+          .size(6.dp)
+          .clip(RoundedCornerShape(3.dp))
+          .background(fieldLine)
+      )
+    }
   }
 }
 
@@ -1630,29 +1683,55 @@ internal fun PillField(
   visual: VisualTransformation = VisualTransformation.None,
   ltr: Boolean = false,
   enabled: Boolean = true,
+  /**
+   *  برچسبِ ریزِ داخلِ کادر — همان چیزی که وقتی کاربر شروع به نوشتن
+   *  می‌کند، جای راهنما را می‌گیرد.
+   *
+   *  ── چه چیزی را می‌بندد ─────────────────────────────────────────────
+   *  در فرمِ ثبت‌نام چهار کادرِ پشتِ سرِ هم هست و دو تای آخر پُر که شوند
+   *  فقط نقطه‌اند: «رمز» و «تکرارِ رمز» از هم جدا نمی‌شوند و راهنما هم
+   *  با اولین حرف ناپدید شده. حالا نامِ کادر بالای مقدار می‌ماند.
+   */
+  label: String? = null,
+  /** پیامِ خطا، درست زیرِ همین کادر — نه ته فرم، نه Toast */
+  error: String? = null,
   trailing: @Composable (() -> Unit)? = null,
 ) {
   val colors = Shop.colors
   val dark = colors.bg != Color(0xFFFFFFFF) && colors.text == Color.White
   val interaction = remember { MutableInteractionSource() }
   val focused by interaction.collectIsFocusedAsState()
+  val focus = remember { FocusRequester() }
+  val bad = !error.isNullOrBlank()
 
   // خطِ دور و سایه هر دو با فوکوس عوض می‌شوند، ولی نرم: پرشِ ناگهانیِ
   // سایه، کادر را می‌پراند
   val line by animateColorAsState(
-    targetValue = if (focused) BLUE else fieldLine,
+    targetValue = when {
+      bad -> colors.danger
+      focused -> BLUE
+      else -> fieldLine
+    },
     animationSpec = tween(if (Motion.enabled) 200 else 0),
     label = "pillLine",
   )
   val lift by animateDpAsState(
-    targetValue = if (focused) 9.dp else 4.dp,
+    targetValue = if (focused) 12.dp else 4.dp,
     animationSpec = tween(if (Motion.enabled) 200 else 0),
     label = "pillLift",
+  )
+  //  ضخامتِ خط هم با فوکوس بالا می‌رود — رنگ به‌تنهایی، روی صفحهٔ روشن
+  //  و در نورِ آفتاب، به‌سختی دیده می‌شود
+  val edge by animateDpAsState(
+    targetValue = if (focused || bad) 1.6.dp else 1.dp,
+    animationSpec = tween(if (Motion.enabled) 200 else 0),
+    label = "pillEdge",
   )
 
   val face = if (dark) colors.surface else Color.White
   val fieldInk = if (dark) colors.text else INK_LIGHT
   val hint = if (dark) colors.muted2 else INK_SOFT_LIGHT
+  val tag = if (bad) colors.danger else if (focused) BLUE else hint
 
   val inner: @Composable () -> Unit = {
     Row(
@@ -1664,35 +1743,67 @@ internal fun PillField(
         .shadow(lift, RoundedCornerShape(30.dp), clip = false, ambientColor = BLUE, spotColor = BLUE)
         .clip(RoundedCornerShape(30.dp))
         .background(face)
-        .border(if (focused) 1.5.dp else 1.dp, line, RoundedCornerShape(30.dp))
+        .border(edge, line, RoundedCornerShape(30.dp))
+        /*
+         *  زدن روی هر جای کادر، کادر را فعال می‌کند.
+         *
+         *  تا دیروز فقط خودِ نوشته گیرندهٔ لمس بود؛ یعنی زدن روی آیکن یا
+         *  فاصلهٔ کنارِ آن هیچ کاری نمی‌کرد و کاربر فکر می‌کرد کادر خراب
+         *  است. ناحیهٔ لمس باید همان چیزی باشد که چشم می‌بیند.
+         */
+        .clickable(
+          enabled = enabled,
+          interactionSource = interaction,
+          indication = null,
+        ) { runCatching { focus.requestFocus() } }
         .padding(horizontal = 20.dp),
       verticalAlignment = Alignment.CenterVertically,
     ) {
       Icon(
         icon,
         contentDescription = null,
-        tint = if (focused) BLUE else hint,
+        tint = tag,
         modifier = Modifier.size(19.dp),
       )
       Spacer(Modifier.width(12.dp))
-      Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-        if (value.isEmpty()) {
-          Text(placeholder, style = MaterialTheme.typography.bodyMedium, color = hint)
+      Column(Modifier.weight(1f)) {
+        //  برچسب فقط وقتی می‌آید که چیزی نوشته شده — کادرِ خالی همان
+        //  راهنمای درشتِ خودش را دارد و دو نوشته با هم شلوغش می‌کند
+        if (label != null && value.isNotEmpty()) {
+          Text(
+            label,
+            style = MaterialTheme.typography.labelSmall,
+            color = tag,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+          )
+          Spacer(Modifier.height(1.dp))
         }
-        BasicTextField(
-          value = value,
-          onValueChange = onValueChange,
-          singleLine = true,
-          enabled = enabled,
-          interactionSource = interaction,
-          keyboardOptions = keyboardOptions,
-          visualTransformation = visual,
-          textStyle = MaterialTheme.typography.bodyMedium.copy(
-            color = if (enabled) fieldInk else hint,
-          ),
-          cursorBrush = SolidColor(BLUE),
-          modifier = Modifier.fillMaxWidth(),
-        )
+        Box(contentAlignment = Alignment.CenterStart) {
+          if (value.isEmpty()) {
+            Text(
+              placeholder,
+              style = MaterialTheme.typography.bodyMedium,
+              color = hint,
+              maxLines = 1,
+              overflow = TextOverflow.Ellipsis,
+            )
+          }
+          BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            singleLine = true,
+            enabled = enabled,
+            interactionSource = interaction,
+            keyboardOptions = keyboardOptions,
+            visualTransformation = visual,
+            textStyle = MaterialTheme.typography.bodyMedium.copy(
+              color = if (enabled) fieldInk else hint,
+            ),
+            cursorBrush = SolidColor(BLUE),
+            modifier = Modifier.fillMaxWidth().focusRequester(focus),
+          )
+        }
       }
       if (trailing != null) {
         Spacer(Modifier.width(6.dp))
@@ -1706,11 +1817,22 @@ internal fun PillField(
    *  صفحهٔ راست‌به‌چپ وارونه دیده می‌شود و کاربر فکر می‌کند چیزِ دیگری
    *  تایپ کرده.
    */
-  Box(modifier.fillMaxWidth()) {
+  Column(modifier.fillMaxWidth()) {
     if (ltr) {
       CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) { inner() }
     } else {
       inner()
+    }
+    //  خطا زیرِ خودِ کادر می‌نشیند، نه ته فرم: کاربر باید بی‌جست‌وجو
+    //  بفهمد کدام کادر ایراد دارد
+    if (bad) {
+      Spacer(Modifier.height(6.dp))
+      Text(
+        error.orEmpty(),
+        style = MaterialTheme.typography.labelMedium,
+        color = colors.danger,
+        modifier = Modifier.padding(horizontal = 14.dp),
+      )
     }
   }
 }
@@ -1732,16 +1854,44 @@ private fun GradientButton(
 ) {
   val interaction = remember { MutableInteractionSource() }
   val pressed by interaction.collectIsPressedAsState()
+  val haptic = LocalHapticFeedback.current
+  val live = enabled && !busy
+
   val scale by animateFloatAsState(
-    targetValue = if (pressed && enabled && !busy) 0.975f else 1f,
+    targetValue = if (pressed && live) 0.975f else 1f,
     animationSpec = tween(if (Motion.enabled) 120 else 0, easing = FastOutSlowInEasing),
     label = "ctaPress",
   )
-
-  val shape = RoundedCornerShape(30.dp)
-  val live = enabled && !busy
+  /*
+   *  گوشه‌ها هم با فشار کمی جمع می‌شوند.
+   *
+   *  کوچک شدنِ تنها، روی دکمهٔ تمام‌عرض به‌سختی دیده می‌شود؛ عوض شدنِ
+   *  شکل، لمس را **حس‌شدنی** می‌کند — همان چیزی که دکمهٔ سخت‌افزاری
+   *  دارد و دکمهٔ روی شیشه ندارد.
+   */
+  val corner by animateDpAsState(
+    targetValue = if (pressed && live) 24.dp else 30.dp,
+    animationSpec = tween(if (Motion.enabled) 120 else 0, easing = FastOutSlowInEasing),
+    label = "ctaCorner",
+  )
+  val shape = RoundedCornerShape(corner)
   // دکمهٔ غیرفعال هم باید در تمِ تاریک دیده شود، نه اینکه در زمینه گم شود
   val disabledFace = if (isDarkSurface()) Shop.colors.surface2 else FIELD_LINE_LIGHT
+
+  /*
+   *  یک برقِ نور، فقط یک بار.
+   *
+   *  دکمهٔ اصلیِ صفحه باید در نگاهِ اول پیدا شود؛ یک بار برق زدن این کار
+   *  را می‌کند. حلقه‌ای بودنش ولی ممنوع است: چیزی که مدام تکان می‌خورد،
+   *  از چشم می‌افتد و باتری هم می‌خورد.
+   */
+  val shine = remember { Animatable(0f) }
+  LaunchedEffect(live) {
+    if (live && Motion.enabled) {
+      shine.snapTo(0f)
+      shine.animateTo(1f, tween(900, easing = FastOutSlowInEasing))
+    }
+  }
 
   Box(
     Modifier
@@ -1749,7 +1899,7 @@ private fun GradientButton(
       .height(60.dp)
       .graphicsLayer { scaleX = scale; scaleY = scale }
       .shadow(
-        elevation = if (live) 12.dp else 0.dp,
+        elevation = if (live) (if (pressed) 6.dp else 14.dp) else 0.dp,
         shape = shape,
         clip = false,
         ambientColor = BLUE,
@@ -1764,10 +1914,31 @@ private fun GradientButton(
         enabled = live,
         interactionSource = interaction,
         indication = null,
-        onClick = onClick,
-      ),
+      ) {
+        //  لرزشِ کوتاه: کاربری که با یک دست کار می‌کند و به صفحه نگاه
+        //  نمی‌کند، باید بفهمد دکمه گرفت
+        runCatching { haptic.performHapticFeedback(HapticFeedbackType.LongPress) }
+        onClick()
+      },
     contentAlignment = Alignment.Center,
   ) {
+    //  خودِ برق: نواری که یک بار از این سر به آن سر می‌رود
+    if (live && shine.value > 0f && shine.value < 1f) {
+      val pass = shine.value
+      Box(
+        Modifier
+          .matchParentSize()
+          .background(
+            Brush.horizontalGradient(
+              colorStops = arrayOf(
+                (pass - 0.18f).coerceIn(0f, 1f) to Color.Transparent,
+                pass.coerceIn(0f, 1f) to Color.White.copy(alpha = 0.22f),
+                (pass + 0.18f).coerceIn(0f, 1f) to Color.Transparent,
+              )
+            )
+          )
+      )
+    }
     if (busy) {
       CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(22.dp))
     } else {
