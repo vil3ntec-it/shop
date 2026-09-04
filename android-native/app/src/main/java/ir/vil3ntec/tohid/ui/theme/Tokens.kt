@@ -29,16 +29,17 @@ object Space {
  *  اگر گوشهٔ تیز داشته باشد، به کلِ صفحه چسبیده به نظر می‌رسد.
  */
 object Shape {
-  val button = RoundedCornerShape(20.dp)
-  val field = RoundedCornerShape(20.dp)
-  val card = RoundedCornerShape(24.dp)
-  val cardLarge = RoundedCornerShape(28.dp)
+  val button = RoundedCornerShape(18.dp)
+  val field = RoundedCornerShape(16.dp)
+  val card = RoundedCornerShape(20.dp)
+  val cardLarge = RoundedCornerShape(24.dp)
   val dialog = RoundedCornerShape(28.dp)
   val sheet = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
-  val chip = RoundedCornerShape(16.dp)
-  val badge = RoundedCornerShape(12.dp)
-  /** ظرفِ گردِ آیکن‌ها در ردیف‌های تنظیمات */
-  val icon = RoundedCornerShape(14.dp)
+  /** تراشه کاملاً قرصی است — نه مستطیلِ گردگوشه */
+  val chip = RoundedCornerShape(999.dp)
+  val badge = RoundedCornerShape(999.dp)
+  /** ظرفِ گردِ آیکن‌ها در ردیف‌ها */
+  val icon = RoundedCornerShape(12.dp)
 }
 
 /**
