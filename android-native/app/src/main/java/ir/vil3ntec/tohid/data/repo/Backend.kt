@@ -26,6 +26,9 @@ import ir.vil3ntec.tohid.core.net.TokenStore
  */
 object Backend {
 
+  /** کلیدِ پیشوندِ کشف‌شدهٔ API روی همین گوشی */
+  private const val PREFIX_KEY = "api-prefix"
+
   @Volatile private var wiring: Wiring? = null
 
   /** وقتی نشست از دست رفت — تا برنامه کاربر را به صفحهٔ ورود ببرد */
@@ -35,10 +38,20 @@ object Backend {
     val app: Context = context.applicationContext
     val tokens = TokenStore(app)
 
+    /*
+     *  پیشوندی که روی این سرور جواب می‌دهد، روی گوشی می‌ماند.
+     *
+     *  بی این، هر بار باز شدنِ برنامه یک درخواستِ ۴۰۴ خرج می‌شد تا دوباره
+     *  همان چیزی کشف شود که دیروز کشف شده بود.
+     */
+    private val prefs = app.getSharedPreferences("tohid-api", Context.MODE_PRIVATE)
+
     val engine = HttpEngine(
       baseUrl = { AppConfig.baseUrl(app) },
       allowInsecure = AppConfig.allowInsecure,
       online = { isOnline(app) },
+      rememberedPrefix = prefs.getString(PREFIX_KEY, null),
+      onPrefixFound = { found -> prefs.edit().putString(PREFIX_KEY, found).apply() },
     )
 
     val api = ApiClient(engine, tokens, onSessionLost = { onSessionLost?.invoke() })
@@ -52,6 +65,9 @@ object Backend {
 
   private fun of(context: Context): Wiring =
     wiring ?: synchronized(this) { wiring ?: Wiring(context).also { wiring = it } }
+
+  /** پیشوندی که همین حالا روی این سرور کار می‌کند — برای برگهٔ وضعیت */
+  fun apiPrefix(context: Context): String = of(context).engine.activePrefix
 
   fun tokens(context: Context): TokenStore = of(context).tokens
   fun auth(context: Context): AuthRepository = of(context).auth

@@ -755,6 +755,28 @@ private fun SyncDot() {
           }
         }
 
+        //  با کدام راه حرف می‌زنیم. سرورهای قدیمی `/api/v1` را به لایهٔ
+        //  اشتباه می‌سپردند و برنامه خودش سراغِ `/api` می‌رود؛ دیدنش
+        //  اینجا یعنی وقتی چیزی کار نکرد، حدس لازم نیست.
+        if (ServerPulse.prefix.isNotBlank()) {
+          Spacer(Modifier.height(4.dp))
+          Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+              "راهِ API:",
+              style = MaterialTheme.typography.labelSmall,
+              color = Shop.colors.muted2,
+            )
+            Spacer(Modifier.width(5.dp))
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+              Text(
+                ServerPulse.prefix,
+                style = MaterialTheme.typography.labelSmall,
+                color = Shop.colors.muted2,
+              )
+            }
+          }
+        }
+
         if (ServerPulse.at > 0) {
           Spacer(Modifier.height(4.dp))
           Text(

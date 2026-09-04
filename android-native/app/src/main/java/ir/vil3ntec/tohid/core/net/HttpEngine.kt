@@ -27,9 +27,39 @@ class HttpEngine(
   private val allowInsecure: Boolean,
   /** آیا دستگاه اصلاً نت دارد — اگر ندارد، بی‌خود به شبکه نمی‌زنیم */
   private val online: () -> Boolean = { true },
+  /** پیشوندی که دفعهٔ پیش روی این سرور جواب داده بود */
+  rememberedPrefix: String? = null,
+  /** تا دفعهٔ بعد لازم نباشد دوباره کشفش کنیم */
+  private val onPrefixFound: (String) -> Unit = {},
 ) {
 
   private val json = Json { ignoreUnknownKeys = true; isLenient = true }
+
+  /*
+   *  ── پیشوندی که روی **این** سرور کار می‌کند ─────────────────────────
+   *  گزارشِ صاحب مخزن: نه حساب ساخته می‌شد، نه کدِ پیوستن، و صفحهٔ
+   *  «کارمندان» می‌گفت این بخش روی سرور نیست — در حالی که سرور همان‌ها
+   *  را داشت.
+   *
+   *  ریشه‌اش در خودِ سرور بود و درست شد (ترتیبِ سوار شدنِ `/api` و
+   *  `/api/v1`)، ولی سرورِ هر دکان‌دار همان روز به‌روز نمی‌شود و تا آن
+   *  روز، برنامهٔ تازه روی سرورِ قدیمی هیچ کاری نمی‌توانست بکند.
+   *
+   *  پس برنامه دیگر فرض نمی‌کند: اگر مسیرِ نسخه‌دار ۴۰۴ یا ۴۰۱ داد،
+   *  **یک بار** همان درخواست را بی‌نسخه می‌فرستد. هر کدام جواب داد،
+   *  همان می‌ماند و روی گوشی نوشته می‌شود تا دفعهٔ بعد این آزمون هم
+   *  لازم نباشد.
+   *
+   *  چرا فقط ۴۰۴ و ۴۰۱: این دو تنها چیزی‌اند که آن اشکالِ سرور تولید
+   *  می‌کرد. بقیهٔ خطاها پاسخِ واقعیِ خودِ مسیرند و دوباره فرستادنشان
+   *  فقط یک درخواستِ اضافه است.
+   */
+  @Volatile private var prefix: String =
+    rememberedPrefix?.takeIf { it == ApiConfig.API_PREFIX || it == ApiConfig.API_PREFIX_PLAIN }
+      ?: ApiConfig.API_PREFIX
+
+  /** پیشوندی که همین حالا با آن کار می‌کنیم — برای صفحهٔ وضعیتِ سرور */
+  val activePrefix: String get() = prefix
 
   /**
    *  یک درخواست.
@@ -63,8 +93,50 @@ class HttpEngine(
     throw ApiFailure.InvalidResponse()
   }
 
-  /** یک تلاش، بدونِ تکرار */
+  /**
+   *  یک تلاش — و اگر لازم شد، یک بار هم با پیشوندِ دیگر.
+   *
+   *  ترتیبش مهم است: اول همان پیشوندی که می‌دانیم کار می‌کند. تنها وقتی
+   *  ۴۰۴/۴۰۱ گرفتیم و پیشوندِ دیگری امتحان‌نشده مانده، دومی می‌رود.
+   */
   private fun once(method: String, path: String, body: JsonObject?, token: String?): JsonObject {
+    val first = prefix
+    try {
+      return attempt(method, path, body, token, first)
+    } catch (failure: ApiFailure) {
+      val worthRetry = failure is ApiFailure.NotFound || failure is ApiFailure.SessionExpired ||
+        (failure is ApiFailure.Unauthorized && token == null)
+      val other =
+        if (first == ApiConfig.API_PREFIX) ApiConfig.API_PREFIX_PLAIN else ApiConfig.API_PREFIX
+      if (!worthRetry) throw failure
+
+      /*
+       *  دوباره فرستادنِ همین درخواست بی‌خطر است — حتی اگر POST باشد.
+       *  ۴۰۴ یعنی مسیری نبود و ۴۰۱ یعنی رد شد؛ در هر دو حالت سرور کاری
+       *  **انجام نداده**. چیزی دو بار ثبت نمی‌شود.
+       */
+      val value = try {
+        attempt(method, path, body, token, other)
+      } catch (_: ApiFailure) {
+        //  دومی هم نشد: خطای **اولی** را می‌گوییم، چون پاسخِ مسیرِ اصلی
+        //  است و پیامش به کار می‌آید
+        throw failure
+      }
+      //  دومی جواب داد؛ از این پس همین است
+      prefix = other
+      runCatching { onPrefixFound(other) }
+      return value
+    }
+  }
+
+  /** یک تلاش با یک پیشوندِ مشخص */
+  private fun attempt(
+    method: String,
+    path: String,
+    body: JsonObject?,
+    token: String?,
+    prefix: String,
+  ): JsonObject {
     val base = baseUrl()
     ApiConfig.reject(base, allowInsecure)?.let { reason ->
       throw if (reason == ApiConfig.Rejection.MISSING) ApiFailure.NotConfigured()
@@ -73,7 +145,7 @@ class HttpEngine(
     //  نت که نیست، رفتن سراغِ شبکه فقط چند ثانیه انتظارِ بی‌فایده است
     if (!online()) throw ApiFailure.Offline()
 
-    val url = runCatching { URL(ApiConfig.urlOf(base, path)) }.getOrNull()
+    val url = runCatching { URL(ApiConfig.urlOf(base, path, prefix)) }.getOrNull()
       ?: throw ApiFailure.BadConfiguration("نشانی سرور درست نیست")
 
     val connection = runCatching { url.openConnection() as HttpURLConnection }.getOrNull()
