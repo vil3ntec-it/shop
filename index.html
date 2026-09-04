@@ -1087,6 +1087,104 @@
     content:''; flex:1; height:1px; background:var(--border);
   }
 
+  /* ==========================================================
+     ثبت‌نام سه‌مرحله‌ای — ایمیل، کد، لوکیشن و شرایط
+     ----------------------------------------------------------
+     قرار صاحب مخزن: شماره‌ی موبایل برداشته شد؛ «همان ایمیل بس است».
+     سه گام، و هر گام روی همان کارتِ ورود می‌نشیند تا کاربر حس نکند
+     صفحه عوض شده.
+     ========================================================== */
+  .signup-steps{
+    display:flex; align-items:center; gap:6px; margin:0 0 20px; padding:0; list-style:none;
+  }
+  .signup-steps li{
+    flex:1; display:flex; flex-direction:column; align-items:center; gap:6px;
+    position:relative; color:var(--muted-2);
+  }
+  .signup-steps li b{
+    width:28px; height:28px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    background:var(--surface); border:1.5px solid var(--border);
+    font-size:12px; font-weight:800; color:var(--muted);
+    transition:background-color .25s ease, color .25s ease, border-color .25s ease;
+  }
+  .signup-steps li span{font-size:10.5px; font-weight:700; text-align:center;}
+  /* خطِ بین گام‌ها — گامِ قبلی سمت راست است، پس خط از همان‌جا می‌آید */
+  .signup-steps li:not(:first-child)::before{
+    content:''; position:absolute; top:13px; inset-inline-end:calc(50% + 18px);
+    width:calc(100% - 30px); height:2px; background:var(--border);
+  }
+  .signup-steps li.on b{
+    background:linear-gradient(120deg, var(--primary), var(--primary-dark));
+    border-color:transparent; color:#fff;
+  }
+  .signup-steps li.on span{color:var(--text);}
+  .signup-steps li.done b{background:var(--success); border-color:transparent; color:#fff;}
+  .signup-steps li.done span{color:var(--muted);}
+
+  /* ---------- کادر لوکیشن ---------- */
+  .signup-loc{
+    display:flex; align-items:center; gap:11px;
+    padding:13px 12px; margin-bottom:14px;
+    border:1.5px solid var(--border); border-radius:var(--radius-md);
+    background:var(--surface);
+    transition:border-color .25s ease, background-color .25s ease;
+  }
+  .signup-loc.ok{border-color:var(--success); background:rgba(24,160,107,.08);}
+  .signup-loc.fail{border-color:var(--warning); background:rgba(232,161,58,.09);}
+  .signup-loc-ic{
+    width:38px; height:38px; flex:0 0 auto; border-radius:12px;
+    display:flex; align-items:center; justify-content:center;
+    background:var(--primary-tint); color:var(--primary);
+  }
+  .signup-loc.ok .signup-loc-ic{background:rgba(24,160,107,.16); color:var(--success);}
+  .signup-loc.fail .signup-loc-ic{background:rgba(232,161,58,.18); color:var(--warning);}
+  .signup-loc-txt{flex:1; min-width:0;}
+  .signup-loc-txt b{display:block; font-size:12.5px; font-weight:800; color:var(--text);}
+  .signup-loc-txt span{font-size:11px; color:var(--muted); line-height:1.7;}
+  .signup-loc-txt span.coords{direction:ltr; display:inline-block; font-weight:700;}
+  .signup-loc-retry{
+    flex:0 0 auto; border:none; border-radius:9px; padding:8px 10px;
+    background:var(--bg); color:var(--primary); font-family:inherit;
+    font-size:11.5px; font-weight:800; cursor:pointer;
+  }
+  /* نقطه‌ی چشمک‌زن وقتی دنبال لوکیشن می‌گردیم */
+  .signup-loc.busy .signup-loc-ic{animation:signupPulse 1.1s ease-in-out infinite;}
+  @keyframes signupPulse{ 50%{ opacity:.35; transform:scale(.94); } }
+
+  /* ---------- کادر شرایط و ضوابط ---------- */
+  .terms-box{
+    border:1.5px solid var(--border); border-radius:var(--radius-md);
+    background:var(--surface); margin-bottom:12px; overflow:hidden;
+  }
+  .terms-box-head{
+    display:flex; align-items:center; gap:8px;
+    padding:11px 12px; border-bottom:1px solid var(--border);
+    font-size:12.5px; font-weight:800; color:var(--text);
+  }
+  .terms-box-head svg{color:var(--primary);}
+  /* بلندی ثابت و اسکرولِ خودش — تا متن، کارت را بی‌انتها نکند */
+  .terms-box-body{
+    max-height:190px; overflow-y:auto; padding:12px;
+    -webkit-overflow-scrolling:touch;
+  }
+  .terms-box-body p{font-size:11.5px; color:var(--muted); line-height:2; margin:0 0 10px;}
+  .terms-box-body p:last-child{margin-bottom:0;}
+  .terms-box-body p b{color:var(--text); font-weight:800;}
+  .terms-agree{
+    display:flex; align-items:flex-start; gap:9px; cursor:pointer;
+    padding:11px 12px; border:1.5px solid var(--border); border-radius:var(--radius-md);
+    background:var(--surface); margin-bottom:14px;
+    transition:border-color .2s ease, background-color .2s ease;
+  }
+  .terms-agree.on{border-color:var(--primary); background:var(--primary-tint);}
+  .terms-agree input{
+    width:18px; height:18px; flex:0 0 auto; margin-top:1px; accent-color:var(--primary);
+  }
+  .terms-agree span{font-size:12px; font-weight:700; color:var(--text); line-height:1.8;}
+  /* کد یک عدد است: خانه‌ی اول سمت چپ، مثل خودِ عدد */
+  #signup-otp-inputs{flex-direction:row;}
+
   /* ---------- ورود شاگرد با کد ---------- */
   .auth-staff{margin-bottom:18px;}
   .auth-staff label{
@@ -2725,7 +2823,7 @@
         <img class="tohid-mark" src="icons/mark.png" width="38" height="38" alt="توحید" decoding="async">
       </span>
       <h1>خوش آمدید</h1>
-      <p>برای استفاده از توحید، وارد حساب خود شوید</p>
+      <p>با ایمیل و رمزتان وارد شوید</p>
     </div>
 
     <!-- ورودهای ذخیره‌شده روی همین دستگاه -->
@@ -2736,12 +2834,13 @@
 
     <form id="auth-login-form" novalidate autocomplete="on">
       <div class="auth-input-group">
-        <label for="auth-identifier">شماره موبایل یا ایمیل</label>
+        <label for="auth-identifier">ایمیل</label>
         <div class="auth-input">
           <span class="auth-input-ic">
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20v-1.3A4.7 4.7 0 0 1 9.2 14h5.6a4.7 4.7 0 0 1 4.7 4.7V20"/></svg>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5.5" width="18" height="13" rx="2.4"/><path d="M3.6 7l8.4 6 8.4-6"/></svg>
           </span>
-          <input type="text" id="auth-identifier" placeholder="۰۷۸۱۲۳۴۵۶۷۸" dir="ltr" autocomplete="username">
+          <input type="email" id="auth-identifier" placeholder="name@gmail.com" dir="ltr"
+                 inputmode="email" autocomplete="username email">
         </div>
         <span class="auth-field-error" id="auth-identifier-error"></span>
       </div>
@@ -2806,6 +2905,152 @@
     </div><!-- /auth-side -->
 
     <p class="auth-note" id="auth-note">ورود اختیاری است — بدون حساب هم می‌توانید از برنامه استفاده کنید.</p>
+  </div>
+</div>
+
+
+<!-- ---------- ثبت‌نام سه‌مرحله‌ای: ایمیل و رمز → کد → لوکیشن و شرایط ---------- -->
+<div class="auth-screen auth-hidden" id="signup-screen">
+  <div class="auth-bg-shape s1"></div>
+  <div class="auth-bg-shape s2"></div>
+
+  <div class="auth-card" id="signup-card">
+    <button type="button" class="auth-close" id="signup-close" aria-label="بستن ثبت‌نام">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+
+    <div class="auth-brand">
+      <span class="auth-brand-mark">
+        <img class="tohid-mark" src="icons/mark.png" width="38" height="38" alt="توحید" decoding="async">
+      </span>
+      <h1>ساخت حساب</h1>
+      <p id="signup-sub">با ایمیل‌تان، در سه گام کوتاه</p>
+    </div>
+
+    <ol class="signup-steps" id="signup-steps">
+      <li class="on" data-step="1"><b>۱</b><span>ایمیل و رمز</span></li>
+      <li data-step="2"><b>۲</b><span>کد تأیید</span></li>
+      <li data-step="3"><b>۳</b><span>لوکیشن و شرایط</span></li>
+    </ol>
+
+    <!-- ---------- گام ۱ ---------- -->
+    <form class="auth-step active" id="signup-step-1" novalidate autocomplete="on">
+      <div class="auth-input-group">
+        <label for="signup-name">نام شما</label>
+        <div class="auth-input">
+          <span class="auth-input-ic">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20v-1.3A4.7 4.7 0 0 1 9.2 14h5.6a4.7 4.7 0 0 1 4.7 4.7V20"/></svg>
+          </span>
+          <input type="text" id="signup-name" placeholder="مثلاً کریم" autocomplete="name">
+        </div>
+        <span class="auth-field-error" id="signup-name-error"></span>
+      </div>
+
+      <div class="auth-input-group">
+        <label for="signup-email">ایمیل</label>
+        <div class="auth-input">
+          <span class="auth-input-ic">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5.5" width="18" height="13" rx="2.4"/><path d="M3.6 7l8.4 6 8.4-6"/></svg>
+          </span>
+          <input type="email" id="signup-email" placeholder="name@gmail.com" dir="ltr" autocomplete="email" inputmode="email">
+        </div>
+        <span class="auth-field-error" id="signup-email-error"></span>
+      </div>
+
+      <div class="auth-input-group">
+        <label for="signup-password">رمز عبور</label>
+        <div class="auth-input">
+          <span class="auth-input-ic">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="10.5" width="15" height="9.5" rx="2.2"/><path d="M8 10.5V7.8a4 4 0 1 1 8 0v2.7"/></svg>
+          </span>
+          <input type="password" id="signup-password" placeholder="••••••••" dir="ltr" autocomplete="new-password">
+          <button type="button" class="auth-eye" id="signup-eye" aria-label="نمایش رمز">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.8"/></svg>
+          </button>
+        </div>
+        <span class="auth-field-error" id="signup-password-error"></span>
+      </div>
+
+      <div class="auth-input-group">
+        <label for="signup-password2">تکرار رمز عبور</label>
+        <div class="auth-input">
+          <span class="auth-input-ic">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="10.5" width="15" height="9.5" rx="2.2"/><path d="M8 10.5V7.8a4 4 0 1 1 8 0v2.7"/><path d="M9.6 15.2l1.7 1.7 3.1-3.4"/></svg>
+          </span>
+          <input type="password" id="signup-password2" placeholder="••••••••" dir="ltr" autocomplete="new-password">
+        </div>
+        <span class="auth-field-error" id="signup-password2-error"></span>
+      </div>
+
+      <button type="submit" class="auth-submit-btn" id="signup-next-1">
+        <span class="auth-btn-label">فرستادن کد به ایمیل</span>
+        <span class="auth-btn-spinner"></span>
+      </button>
+      <span class="auth-field-error" id="signup-error-1" style="text-align:center; display:block;"></span>
+    </form>
+
+    <!-- ---------- گام ۲ ---------- -->
+    <form class="auth-step" id="signup-step-2" novalidate>
+      <div class="auth-otp-target">
+        <span id="signup-otp-target" dir="ltr"></span>
+        <button type="button" id="signup-change-email">تغییر ایمیل</button>
+      </div>
+      <p class="auth-note" style="margin:0 0 14px;">کد شش‌رقمی به همین ایمیل فرستاده شد. اگر در صندوق ورودی نبود، پوشه‌ی هرزنامه (Spam) را هم ببینید.</p>
+
+      <div class="auth-otp-inputs" id="signup-otp-inputs" dir="ltr">
+        <input type="text" inputmode="numeric" maxlength="1" aria-label="رقم ۱" autocomplete="one-time-code">
+        <input type="text" inputmode="numeric" maxlength="1" aria-label="رقم ۲">
+        <input type="text" inputmode="numeric" maxlength="1" aria-label="رقم ۳">
+        <input type="text" inputmode="numeric" maxlength="1" aria-label="رقم ۴">
+        <input type="text" inputmode="numeric" maxlength="1" aria-label="رقم ۵">
+        <input type="text" inputmode="numeric" maxlength="1" aria-label="رقم ۶">
+      </div>
+      <div class="auth-resend-row">
+        <span id="signup-resend-text">کد نیامد؟</span>
+        <button type="button" id="signup-resend" disabled>ارسال دوباره</button>
+      </div>
+
+      <button type="submit" class="auth-submit-btn" id="signup-next-2">
+        <span class="auth-btn-label">تأیید کد</span>
+        <span class="auth-btn-spinner"></span>
+      </button>
+      <span class="auth-field-error" id="signup-error-2" style="text-align:center; display:block;"></span>
+      <button type="button" class="auth-back-btn" data-signup-back="1">بازگشت</button>
+    </form>
+
+    <!-- ---------- گام ۳ ---------- -->
+    <form class="auth-step" id="signup-step-3" novalidate>
+      <div class="signup-loc busy" id="signup-loc">
+        <span class="signup-loc-ic">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11z"/><circle cx="12" cy="10" r="2.6"/></svg>
+        </span>
+        <span class="signup-loc-txt">
+          <b id="signup-loc-title">در حال پیدا کردن لوکیشن…</b>
+          <span id="signup-loc-sub">چند لحظه — لوکیشن دکان‌تان همراه حساب ثبت می‌شود.</span>
+        </span>
+        <button type="button" class="signup-loc-retry" id="signup-loc-retry" hidden>دوباره</button>
+      </div>
+
+      <div class="terms-box">
+        <div class="terms-box-head">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3.5h7.5L19 8v12.5H7z"/><path d="M14 3.5V8h5"/><path d="M9.5 12.5h7M9.5 16h5"/></svg>
+          <span>شرایط و ضوابط استفاده از برنامه</span>
+        </div>
+        <div class="terms-box-body" id="terms-body"></div>
+      </div>
+
+      <label class="terms-agree" id="signup-terms-row">
+        <input type="checkbox" id="signup-terms">
+        <span>شرایط و ضوابط را خوانده‌ام و می‌پذیرم.</span>
+      </label>
+
+      <button type="submit" class="auth-submit-btn" id="signup-next-3">
+        <span class="auth-btn-label">ساخت حساب و ورود</span>
+        <span class="auth-btn-spinner"></span>
+      </button>
+      <span class="auth-field-error" id="signup-error-3" style="text-align:center; display:block;"></span>
+      <button type="button" class="auth-back-btn" data-signup-back="2">بازگشت</button>
+    </form>
   </div>
 </div>
 
@@ -5042,6 +5287,16 @@
     /* دکمه‌های صفحه‌ی ورود همیشه وصل می‌شوند، چون این صفحه بعداً هم
        با دکمه‌ی «ورود به حساب» باز می‌شود. */
     wireAuthScreen();
+    wireSignupScreen();
+
+    /*
+     * لوکیشن، همان اول کار.
+     *
+     * قرار صاحب مخزن: لوکیشن باید روشن باشد و ثبت شود، حتی اگر کاربر
+     * اصلاً ثبت‌نام نکرده باشد. پس اینجاست، نه داخل ثبت‌نام. با کمی
+     * تأخیر تا اولین رسم صفحه کند نشود.
+     */
+    setTimeout(()=> captureAndSendLocation('startup'), 1500);
 
     if(LOGIN_DISABLED || existing){
       applyAuthToUI(existing || { name:'کاربر', method:'phone', value:'' });
@@ -5108,13 +5363,13 @@
       setTimeout(()=> showToast('با کد شاگرد وارد شدید'), 400);
     });
 
-    // ثبت‌نام و ادامه بدون حساب
+    /*
+     * ثبت‌نام: ویزارد سه‌مرحله‌ای باز می‌شود — ایمیل و رمز، کد شش‌رقمی،
+     * بعد لوکیشن و شرایط و ضوابط. تا دیروز این دکمه فقط برنامه را باز
+     * می‌کرد و هیچ حسابی ساخته نمی‌شد.
+     */
     document.getElementById('auth-role-seller').addEventListener('click', ()=>{
-      const local = { method:'local', value:'', name:'کاربر', loginAt:Date.now() };
-      saveAuth(local);
-      applyAuthToUI(local);
-      enterApp(true);
-      setTimeout(()=>{ goTo('shop'); }, 300);
+      openSignupScreen();
     });
     document.getElementById('auth-skip').addEventListener('click', ()=>{
       // بدون حساب: فقط روی همین گوشی. ذخیره می‌کنیم تا دفعه‌ی بعد
@@ -5131,7 +5386,7 @@
 
       const identifier = idEl.value.trim();
       const password = passEl.value;
-      if(!identifier){ authError('auth-identifier-error','شماره موبایل یا ایمیل را وارد کنید.'); idEl.focus(); return; }
+      if(!identifier){ authError('auth-identifier-error','ایمیل‌تان را وارد کنید.'); idEl.focus(); return; }
       if(!password){ authError('auth-password-error','رمز عبور را وارد کنید.'); passEl.focus(); return; }
 
       const lic = window.TohidLicense;
@@ -5155,6 +5410,417 @@
       }finally{
         btn.classList.remove('is-busy');
       }
+    });
+  }
+
+  /* ==========================================================
+     لوکیشن
+     ----------------------------------------------------------
+     قرار صاحب مخزن: «بدون اینکه برنامه برود ثبت‌نام کند هم لوکیشن باید
+     روشن باشد و لوکیشن طرف ثبت شود و به سرور بیاید.»
+
+     پس گرفتن لوکیشن به حساب بند نیست: همان اول کار یک بار گرفته و
+     فرستاده می‌شود. اگر آدرس سروری تنظیم نشده باشد یا کاربر اجازه ندهد،
+     هیچ اتفاقی نمی‌افتد — برنامه بی‌کم‌وکاست کار می‌کند.
+
+     ── چرا سریع ──────────────────────────────────────────────────────
+     `maximumAge` یعنی «اگر مرورگر لوکیشن تازه‌ای دارد، همان را بده».
+     با آن، جوابْ فوری است. دقت بالا (`enableHighAccuracy`) فقط وقتی
+     امتحان می‌شود که راه سریع جواب نداده باشد؛ آن راه به GPS می‌زند و
+     در ساختمان می‌تواند نیم دقیقه طول بکشد.
+     ========================================================== */
+  const LOCATION_KEY = 'tohid-last-location-v1';
+
+  function readLastLocation(){
+    try{ const v = JSON.parse(localStorage.getItem(LOCATION_KEY)); return v && v.lat ? v : null; }
+    catch(e){ return null; }
+  }
+  function writeLastLocation(loc){
+    try{ localStorage.setItem(LOCATION_KEY, JSON.stringify(loc)); }catch(e){}
+  }
+
+  /** یک بار پرسیدن از مرورگر. هیچ‌وقت رد نمی‌شود؛ نشد یعنی null. */
+  function askGeolocation({ highAccuracy=false, timeout=7000, maxAge=600000 } = {}){
+    return new Promise((resolve)=>{
+      if(!navigator.geolocation) return resolve(null);
+      let settled = false;
+      const done = (v)=>{ if(!settled){ settled = true; resolve(v); } };
+      //  زمان‌سنجِ خودمان: بعضی مرورگرها روی گزینه‌ی timeout سهل‌انگارند
+      const t = setTimeout(()=> done(null), timeout + 800);
+      navigator.geolocation.getCurrentPosition(
+        (pos)=>{
+          clearTimeout(t);
+          done({
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            accuracy: Math.round(pos.coords.accuracy || -1),
+            source: highAccuracy ? 'gps' : 'network',
+            at: Date.now(),
+          });
+        },
+        ()=>{ clearTimeout(t); done(null); },
+        { enableHighAccuracy: highAccuracy, timeout, maximumAge: maxAge }
+      );
+    });
+  }
+
+  /**
+   * لوکیشن، سریع.
+   * اول راه سریع؛ اگر نشد یک بار با دقت بالا. جوابِ گرفته‌شده ذخیره
+   * می‌شود تا گام سوم ثبت‌نام لازم نباشد دوباره منتظر بماند.
+   */
+  async function captureLocation({ force=false } = {}){
+    const cached = readLastLocation();
+    if(!force && cached && Date.now() - (cached.at||0) < 10*60*1000) return cached;
+    let loc = await askGeolocation({ highAccuracy:false, timeout:7000, maxAge: force ? 0 : 600000 });
+    if(!loc) loc = await askGeolocation({ highAccuracy:true, timeout:12000, maxAge:0 });
+    if(loc) writeLastLocation(loc);
+    return loc;
+  }
+
+  /** گرفتن و فرستادن — همین یک تابع، چه کاربر حساب داشته باشد چه نه. */
+  async function captureAndSendLocation(source){
+    try{
+      const loc = await captureLocation();
+      if(!loc) return null;
+      const lic = window.TohidLicense;
+      if(lic && lic.sendLocation) lic.sendLocation({ ...loc, source: source || loc.source });
+      return loc;
+    }catch(e){ return null; }
+  }
+  window.TohidLocation = { capture: captureLocation, send: captureAndSendLocation, last: readLastLocation };
+
+  /* ==========================================================
+     ثبت‌نام سه‌مرحله‌ای
+     ----------------------------------------------------------
+     ۱) نام، ایمیل، رمز و تکرارش
+     ۲) کد شش‌رقمی که به همان ایمیل رفته
+     ۳) لوکیشن + پذیرش شرایط و ضوابط → حساب ساخته و همان‌جا وارد می‌شود
+
+     شماره‌ی موبایل هیچ‌جای این مسیر نیست؛ قرار صاحب مخزن همین بود.
+     ========================================================== */
+
+  /** متن شرایط و ضوابط — همان چیزی که روی سرور هم هست (نسخه‌ی ۱). */
+  const TERMS_VERSION = '1';
+  const TERMS = [
+    ['حفظ و محرمانگی اطلاعات', 'اطلاعات فروشگاه، فروش، مشتریان، حساب‌ها، موجودی و سایر اطلاعات ثبت‌شده توسط کاربر محرمانه است و بدون اجازه کاربر در اختیار افراد غیرمجاز قرار نمی‌گیرد؛ مگر در مواردی که ارائه آن طبق قانون الزامی باشد.'],
+    ['پشتیبان‌گیری از اطلاعات', 'از اطلاعات کاربران به‌صورت منظم پشتیبان‌گیری می‌شود تا در صورت بروز مشکل، امکان بازیابی اطلاعات فراهم باشد. با این حال، کاربر نیز مسئول نگهداری نسخه پشتیبان از اطلاعات مهم خود است.'],
+    ['مسئولیت کاربر', 'کاربر مسئول اطلاعاتی است که در برنامه وارد می‌کند و موظف است از حساب و رمز عبور خود محافظت کند. اطلاعات ورود نباید بدون اجازه در اختیار دیگران قرار گیرد.'],
+    ['استفاده غیرقانونی و غیرمجاز', 'هرگونه استفاده غیرقانونی یا غیرمجاز از برنامه، از جمله نفوذ، دسترسی به حساب یا اطلاعات دیگران، دستکاری سیستم یا اطلاعات، سرقت اطلاعات، سوءاستفاده از خدمات و تلاش برای دور زدن محدودیت‌های برنامه ممنوع است. در صورت مشاهده چنین فعالیت‌هایی، حساب کاربر می‌تواند مسدود و دسترسی وی قطع شود.'],
+    ['پشتیبانی', 'خدمات پشتیبانی برنامه به‌صورت ۲۴ ساعته و ۷ روز هفته (۲۴/۷) ارائه می‌شود. کاربران می‌توانند از طریق بخش «پشتیبانی» داخل برنامه یا راه‌های ارتباطی رسمی اعلام‌شده در برنامه با پشتیبانی تماس بگیرند. برای حفظ امنیت حساب، ارسال رمز عبور یا کد ورود برای پشتیبانی ممنوع است.'],
+    ['تمدید و پایان اشتراک', 'در هفته پایانی مدت اشتراک، زمان انقضای اشتراک به کاربر اطلاع‌رسانی خواهد شد تا فرصت لازم برای تمدید داشته باشد. در صورت عدم تمدید تا پایان مدت تعیین‌شده، دسترسی به بخش‌ها و امکاناتی که نیازمند اشتراک فعال هستند ممکن است به‌صورت خودکار محدود، قفل یا غیرفعال شوند. مسئولیت تمدید به‌موقع اشتراک و حفظ دسترسی به امکانات برنامه بر عهده کاربر است.'],
+    ['اختلال سرویس', 'ممکن است به دلیل تعمیرات، به‌روزرسانی، مشکلات فنی، اختلال اینترنت یا عوامل خارج از کنترل، دسترسی به برنامه یا برخی امکانات آن برای مدت محدودی مختل شود.'],
+    ['به‌روزرسانی', 'برای بهبود امنیت، عملکرد و امکانات برنامه، ممکن است نرم‌افزار در طول زمان به‌روزرسانی یا برخی امکانات آن تغییر داده شوند.'],
+    ['پذیرش شرایط', 'استفاده از برنامه، ثبت‌نام یا فعال‌سازی اشتراک به منزله پذیرش این شرایط و ضوابط است.'],
+  ];
+
+  const signupState = { step:1, name:'', email:'', password:'', ticket:'', location:null, resendTimer:null };
+
+  function signupBusy(btn, on){
+    if(btn) btn.classList.toggle('is-busy', !!on);
+  }
+  function signupShowStep(n){
+    signupState.step = n;
+    for(let i=1; i<=3; i++){
+      document.getElementById('signup-step-'+i)?.classList.toggle('active', i === n);
+    }
+    document.querySelectorAll('#signup-steps li').forEach(li=>{
+      const s = Number(li.dataset.step);
+      li.classList.toggle('on', s === n);
+      li.classList.toggle('done', s < n);
+    });
+    document.getElementById('signup-screen').scrollTop = 0;
+  }
+
+  function renderTerms(){
+    const box = document.getElementById('terms-body');
+    if(!box || box.dataset.filled) return;
+    box.innerHTML = TERMS.map(([t, b])=> `<p><b>${escapeHtml(t)}:</b> ${escapeHtml(b)}</p>`).join('');
+    box.dataset.filled = '1';
+  }
+
+  function openSignupScreen(){
+    const screen = document.getElementById('signup-screen');
+    if(!screen) return;
+    renderTerms();
+    ['signup-name-error','signup-email-error','signup-password-error','signup-password2-error',
+     'signup-error-1','signup-error-2','signup-error-3'].forEach(id=> authError(id,''));
+    signupShowStep(1);
+    document.getElementById('auth-screen')?.classList.add('auth-hidden');
+    screen.classList.remove('auth-hidden');
+    setTimeout(()=> document.getElementById('signup-name')?.focus(), 250);
+  }
+  function closeSignupScreen(){
+    document.getElementById('signup-screen')?.classList.add('auth-hidden');
+    const app = document.getElementById('app-root');
+    //  اگر کاربر از داخل برنامه آمده بود، به برنامه برمی‌گردد؛ وگرنه به
+    //  صفحه‌ی ورود. تصمیمش با این است که برنامه پنهان است یا نه.
+    if(app && app.classList.contains('app-hidden')){
+      document.getElementById('auth-screen')?.classList.remove('auth-hidden');
+    }
+    clearInterval(signupState.resendTimer);
+  }
+  window.openSignupScreen = openSignupScreen;
+
+  /** شمارش معکوس دکمه‌ی «ارسال دوباره». */
+  function startResendCountdown(seconds){
+    const btn = document.getElementById('signup-resend');
+    const txt = document.getElementById('signup-resend-text');
+    if(!btn || !txt) return;
+    clearInterval(signupState.resendTimer);
+    let left = Math.max(0, Math.round(seconds || 0));
+    const tick = ()=>{
+      if(left <= 0){
+        clearInterval(signupState.resendTimer);
+        btn.disabled = false;
+        btn.hidden = false;
+        txt.textContent = 'کد نیامد؟';
+        return;
+      }
+      //  تا وقتی شمارش تمام نشده، دکمه‌ی خاموش فقط شلوغی است
+      btn.disabled = true;
+      btn.hidden = true;
+      txt.textContent = `ارسال دوباره تا ${formatPlain(left)} ثانیه`;
+      left -= 1;
+    };
+    tick();
+    signupState.resendTimer = setInterval(tick, 1000);
+  }
+
+  function otpValue(){
+    return Array.from(document.querySelectorAll('#signup-otp-inputs input'))
+      .map(i=> i.value.replace(/\D/g,'')).join('');
+  }
+  function clearOtp(){
+    document.querySelectorAll('#signup-otp-inputs input').forEach(i=> i.value = '');
+    document.querySelector('#signup-otp-inputs input')?.focus();
+  }
+
+  /** سرور تنظیم نشده؟ ثبت‌نام معنی ندارد و باید همان اول گفته شود. */
+  function signupServer(){
+    const lic = window.TohidLicense;
+    if(!lic || !lic.getServerUrl()) return null;
+    return lic;
+  }
+
+  /** نمایش وضعیت لوکیشن در گام سوم. */
+  function paintLocation(state, loc){
+    const box = document.getElementById('signup-loc');
+    const title = document.getElementById('signup-loc-title');
+    const sub = document.getElementById('signup-loc-sub');
+    const retry = document.getElementById('signup-loc-retry');
+    if(!box) return;
+    box.classList.toggle('busy', state === 'busy');
+    box.classList.toggle('ok', state === 'ok');
+    box.classList.toggle('fail', state === 'fail');
+    if(retry) retry.hidden = state === 'busy';
+    if(state === 'busy'){
+      title.textContent = 'در حال پیدا کردن لوکیشن…';
+      sub.textContent = 'چند لحظه — لوکیشن دکان‌تان همراه حساب ثبت می‌شود.';
+    } else if(state === 'ok'){
+      title.textContent = 'لوکیشن پیدا شد';
+      sub.innerHTML = `<span class="coords">${loc.lat.toFixed(5)}, ${loc.lng.toFixed(5)}</span>`
+        + (loc.accuracy > 0 ? ` · دقت حدود ${formatPlain(Math.round(loc.accuracy))} متر` : '');
+    } else {
+      title.textContent = 'لوکیشن پیدا نشد';
+      sub.textContent = 'اجازه‌ی لوکیشن را بدهید یا دوباره بزنید. بدون آن هم می‌توانید حساب بسازید.';
+    }
+  }
+
+  async function findLocationForSignup(force){
+    paintLocation('busy');
+    const loc = await captureLocation({ force: !!force });
+    signupState.location = loc;
+    if(loc){
+      paintLocation('ok', loc);
+      //  همین‌جا هم فرستاده می‌شود؛ اگر کاربر ثبت‌نام را نیمه‌کاره رها کند،
+      //  باز لوکیشن به سرور رسیده است
+      window.TohidLicense?.sendLocation?.({ ...loc, source:'signup' });
+    } else {
+      paintLocation('fail');
+    }
+  }
+
+  function wireSignupScreen(){
+    const screen = document.getElementById('signup-screen');
+    if(!screen) return;
+
+    document.getElementById('signup-close').addEventListener('click', closeSignupScreen);
+    screen.querySelectorAll('[data-signup-back]').forEach(b=>{
+      b.addEventListener('click', ()=> signupShowStep(Number(b.dataset.signupBack)));
+    });
+    document.getElementById('signup-change-email').addEventListener('click', ()=> signupShowStep(1));
+
+    const pass = document.getElementById('signup-password');
+    document.getElementById('signup-eye').addEventListener('click', (e)=>{
+      const on = pass.type === 'password';
+      pass.type = on ? 'text' : 'password';
+      e.currentTarget.classList.toggle('on', on);
+    });
+
+    // ---- خانه‌های کد: تایپ، پاک کردن، چسباندن ----
+    const boxes = Array.from(document.querySelectorAll('#signup-otp-inputs input'));
+    boxes.forEach((box, i)=>{
+      box.addEventListener('input', ()=>{
+        //  رقم فارسی هم قبول است؛ کاربر با صفحه‌کلید فارسی تایپ می‌کند
+        box.value = box.value.replace(/[۰-۹]/g, d=> String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))
+                             .replace(/\D/g,'').slice(0,1);
+        if(box.value && i < boxes.length - 1) boxes[i+1].focus();
+        if(otpValue().length === 6) document.getElementById('signup-next-2').click();
+      });
+      box.addEventListener('keydown', (e)=>{
+        if(e.key === 'Backspace' && !box.value && i > 0) boxes[i-1].focus();
+      });
+      box.addEventListener('paste', (e)=>{
+        const text = (e.clipboardData || window.clipboardData).getData('text') || '';
+        const digits = text.replace(/[۰-۹]/g, d=> String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d))).replace(/\D/g,'').slice(0,6);
+        if(!digits) return;
+        e.preventDefault();
+        boxes.forEach((b, k)=> b.value = digits[k] || '');
+        boxes[Math.min(digits.length, 5)].focus();
+        if(digits.length === 6) document.getElementById('signup-next-2').click();
+      });
+    });
+
+    // ---- گام ۱ ----
+    document.getElementById('signup-step-1').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      ['signup-name-error','signup-email-error','signup-password-error','signup-password2-error','signup-error-1']
+        .forEach(id=> authError(id,''));
+
+      const name = document.getElementById('signup-name').value.trim();
+      const email = document.getElementById('signup-email').value.trim().toLowerCase();
+      const password = document.getElementById('signup-password').value;
+      const confirm = document.getElementById('signup-password2').value;
+
+      if(!name){ authError('signup-name-error','نام‌تان را بنویسید.'); return; }
+      if(!/^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test(email)){
+        authError('signup-email-error','ایمیل درست نیست. مثلاً name@gmail.com'); return;
+      }
+      if(password.length < 8){ authError('signup-password-error','رمز باید دست‌کم ۸ نویسه باشد.'); return; }
+      if(password !== confirm){ authError('signup-password2-error','رمز و تکرارش یکی نیست.'); return; }
+
+      const lic = signupServer();
+      if(!lic){
+        authError('signup-error-1','هنوز آدرس سروری تنظیم نشده است. فعلاً «ادامه بدون حساب» را بزنید — همه‌ی بخش‌ها کار می‌کنند.');
+        return;
+      }
+
+      const btn = document.getElementById('signup-next-1');
+      signupBusy(btn, true);
+      try{
+        const r = await lic.registerStart({ name, email, password, passwordConfirm: confirm });
+        Object.assign(signupState, { name, email, password, ticket:'' });
+        document.getElementById('signup-otp-target').textContent = email;
+        clearOtp();
+        startResendCountdown(r && r.resendSeconds);
+        signupShowStep(2);
+        //  سرورِ آزمایشی که راه ارسالی ندارد، کد را در پاسخ برمی‌گرداند.
+        //  این پیام خطا نیست، پس رنگ خطا هم نمی‌گیرد.
+        if(r && r.devCode){
+          authError('signup-error-2', 'کد آزمایشی: ' + r.devCode);
+          document.getElementById('signup-error-2')?.classList.add('info');
+        }
+        setTimeout(()=> document.querySelector('#signup-otp-inputs input')?.focus(), 250);
+      }catch(err){
+        authError('signup-error-1', (err && err.message) || 'فرستادن کد نشد. دوباره تلاش کنید.');
+      }finally{ signupBusy(btn, false); }
+    });
+
+    // ---- ارسال دوباره‌ی کد ----
+    document.getElementById('signup-resend').addEventListener('click', async ()=>{
+      const lic = signupServer();
+      if(!lic) return;
+      authError('signup-error-2','');
+      try{
+        const r = await lic.registerStart({
+          name: signupState.name, email: signupState.email,
+          password: signupState.password, passwordConfirm: signupState.password,
+        });
+        startResendCountdown(r && r.resendSeconds);
+        showToast('کد دوباره فرستاده شد');
+      }catch(err){
+        authError('signup-error-2', (err && err.message) || 'ارسال دوباره نشد.');
+      }
+    });
+
+    // ---- گام ۲ ----
+    document.getElementById('signup-step-2').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      authError('signup-error-2','');
+      const code = otpValue();
+      if(code.length !== 6){
+        document.getElementById('signup-otp-inputs').classList.add('shake');
+        setTimeout(()=> document.getElementById('signup-otp-inputs').classList.remove('shake'), 500);
+        authError('signup-error-2','کد شش‌رقمی را کامل بزنید.');
+        return;
+      }
+      const lic = signupServer();
+      if(!lic) return;
+
+      const btn = document.getElementById('signup-next-2');
+      if(btn.classList.contains('is-busy')) return;
+      signupBusy(btn, true);
+      try{
+        const r = await lic.registerVerify({ email: signupState.email, code });
+        signupState.ticket = r.ticket;
+        signupShowStep(3);
+        //  لوکیشن همان لحظه‌ی ورود به گام سوم شروع می‌شود، نه با زدن دکمه؛
+        //  تا وقتی کاربر متن شرایط را می‌خواند، پیدا شده باشد
+        findLocationForSignup(false);
+      }catch(err){
+        clearOtp();
+        authError('signup-error-2', (err && err.message) || 'کد درست نبود.');
+      }finally{ signupBusy(btn, false); }
+    });
+
+    // ---- گام ۳ ----
+    document.getElementById('signup-loc-retry').addEventListener('click', ()=> findLocationForSignup(true));
+    const termsBox = document.getElementById('signup-terms');
+    termsBox.addEventListener('change', ()=>{
+      document.getElementById('signup-terms-row').classList.toggle('on', termsBox.checked);
+      if(termsBox.checked) authError('signup-error-3','');
+    });
+
+    document.getElementById('signup-step-3').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      authError('signup-error-3','');
+      if(!termsBox.checked){
+        authError('signup-error-3','برای ساختن حساب باید شرایط و ضوابط را بپذیرید.');
+        return;
+      }
+      const lic = signupServer();
+      if(!lic) return;
+
+      const btn = document.getElementById('signup-next-3');
+      signupBusy(btn, true);
+      try{
+        const r = await lic.registerComplete({
+          ticket: signupState.ticket,
+          name: signupState.name,
+          password: signupState.password,
+          terms: { accepted:true, version: TERMS_VERSION },
+          location: signupState.location,
+        });
+        rememberLogin(signupState.email, (r && r.shop && r.shop.name) || '');
+        const authData = {
+          method:'email', value: signupState.email,
+          name: (r && r.user && (r.user.name || r.user.email)) || signupState.name,
+          token:'', loginAt: Date.now(),
+        };
+        saveAuth(authData);
+        applyAuthToUI(authData);
+        //  رمز از حافظه پاک شود؛ کارش تمام است
+        signupState.password = ''; signupState.ticket = '';
+        document.getElementById('signup-screen').classList.add('auth-hidden');
+        enterApp(true);
+        setTimeout(()=> showToast('حساب شما ساخته شد'), 400);
+      }catch(err){
+        const msg = (err && err.message) || 'ساخت حساب نشد. دوباره تلاش کنید.';
+        authError('signup-error-3', msg);
+        //  بلیت که منقضی شود، از گام یک باید شروع کرد
+        if(err && err.code === 'register_ticket_invalid') signupShowStep(1);
+      }finally{ signupBusy(btn, false); }
     });
   }
 

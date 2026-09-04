@@ -124,13 +124,29 @@ router.get('/users/:id', async (req, res, next) => {
     [id]
   );
   const devices = await many('SELECT * FROM devices WHERE user_id=$1 ORDER BY last_seen_at DESC NULLS LAST', [id]);
+  //  لوکیشن‌های همین حساب — تازه‌ترین اول. اگر دکان جابه‌جا شده باشد،
+  //  از همین فهرست پیداست از کِی.
+  const locations = await many(
+    `SELECT lat, lng, accuracy, source, label, created_at
+       FROM device_locations WHERE user_id=$1 ORDER BY created_at DESC LIMIT 10`,
+    [id]
+  );
   res.json({
     user: {
       id: user.id, name: user.name, email: user.email, phone: user.phone,
       status: user.status, createdAt: Number(user.created_at),
       lastLoginAt: user.last_login_at ? Number(user.last_login_at) : null,
+      termsVersion: user.terms_version || '',
+      termsAcceptedAt: user.terms_accepted_at ? Number(user.terms_accepted_at) : null,
+      lastLocation: user.last_location_at
+        ? { lat: Number(user.last_lat), lng: Number(user.last_lng), at: Number(user.last_location_at) }
+        : null,
     },
     memberships, devices,
+    locations: locations.map(r => ({
+      lat: Number(r.lat), lng: Number(r.lng), accuracy: Number(r.accuracy),
+      source: r.source, label: r.label, at: Number(r.created_at),
+    })),
   });
 });
 
