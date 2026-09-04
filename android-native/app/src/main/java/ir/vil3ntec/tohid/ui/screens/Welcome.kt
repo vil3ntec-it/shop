@@ -368,7 +368,7 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
             .onFailure {
               fail(it)
               //  بلیت که منقضی یا خرج شده باشد، از پلهٔ اول باید شروع کرد
-              if (it is ApiFailure && it.code == "register_ticket_invalid") {
+              if (it.code == "register_ticket_invalid") {
                 signupStep = ""; codeSent = false; ticket = ""
               }
             }
