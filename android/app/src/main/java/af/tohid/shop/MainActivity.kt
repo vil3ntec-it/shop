@@ -55,6 +55,16 @@ class MainActivity : ComponentActivity() {
 
     private var fileCallback: ValueCallback<Array<Uri>>? = null
     private var pendingCamera: PermissionRequest? = null
+    /*
+     *  اجازه‌ی لوکیشن، وقتی خودِ صفحه آن را می‌خواهد.
+     *
+     *  صفحه لوکیشنِ دکان را همان اولِ کار می‌گیرد و به سرور می‌فرستد —
+     *  حتی پیش از ثبت‌نام. داخلِ WebView این کار دو اجازه لازم دارد: یکی
+     *  اجازه‌ی خودِ اندروید و یکی اجازه‌ای که WebView از میزبانش می‌گیرد.
+     *  اینجا هر دو به هم وصل می‌شوند.
+     */
+    private var pendingGeoOrigin: String? = null
+    private var pendingGeoCallback: android.webkit.GeolocationPermissions.Callback? = null
     private var lastBackPress = 0L
 
     /** انتخاب عکس محصول — فقط از گالری، بدون دوربین. */
@@ -88,6 +98,20 @@ class MainActivity : ComponentActivity() {
             request.deny()
             toast("برای اسکن بارکد، اجازه‌ی دوربین لازم است.")
         }
+    }
+
+    /** اجازه‌ی لوکیشن برای صفحه. */
+    private val askLocation = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { granted ->
+        val origin = pendingGeoOrigin
+        val callback = pendingGeoCallback
+        pendingGeoOrigin = null
+        pendingGeoCallback = null
+        if (origin == null || callback == null) return@registerForActivityResult
+        //  «نه» گفتن هیچ بخشی از برنامه را نمی‌بندد؛ فقط لوکیشن ثبت نمی‌شود،
+        //  پس پیام و اصراری هم در کار نیست
+        callback.invoke(origin, granted.values.any { it }, false)
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -145,6 +169,8 @@ class MainActivity : ComponentActivity() {
             setSupportZoom(false)
             allowFileAccess = false
             allowContentAccess = false
+            //  بدون این، `navigator.geolocation` داخلِ اپ همیشه خطا می‌دهد
+            setGeolocationEnabled(true)
             // برنامه از این نشانه می‌فهمد که داخل اپ اجرا می‌شود
             userAgentString = "$userAgentString ShopAndroid/${BuildConfig.VERSION_NAME}"
         }
@@ -184,6 +210,32 @@ class MainActivity : ComponentActivity() {
                     } else {
                         pendingCamera = request
                         askCamera.launch(Manifest.permission.CAMERA)
+                    }
+                }
+            }
+
+            override fun onGeolocationPermissionsShowPrompt(
+                origin: String,
+                callback: android.webkit.GeolocationPermissions.Callback,
+            ) {
+                runOnUiThread {
+                    val granted = ContextCompat.checkSelfPermission(
+                        this@MainActivity, Manifest.permission.ACCESS_COARSE_LOCATION
+                    ) == PackageManager.PERMISSION_GRANTED ||
+                        ContextCompat.checkSelfPermission(
+                            this@MainActivity, Manifest.permission.ACCESS_FINE_LOCATION
+                        ) == PackageManager.PERMISSION_GRANTED
+                    if (granted) {
+                        callback.invoke(origin, true, false)
+                    } else {
+                        pendingGeoOrigin = origin
+                        pendingGeoCallback = callback
+                        askLocation.launch(
+                            arrayOf(
+                                Manifest.permission.ACCESS_COARSE_LOCATION,
+                                Manifest.permission.ACCESS_FINE_LOCATION,
+                            )
+                        )
                     }
                 }
             }
