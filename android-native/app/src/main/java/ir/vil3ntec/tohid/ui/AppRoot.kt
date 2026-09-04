@@ -236,6 +236,20 @@ fun AppRoot(
   val askNotify = rememberLauncherForActivityResult(
     ActivityResultContracts.RequestPermission()
   ) { }
+
+  /*
+   *  لوکیشنِ دکان — همان اولِ کار، حتی بی‌حساب.
+   *
+   *  قرارِ صاحب مخزن: «بدون اینکه برنامه برود ثبت‌نام کند هم لوکیشن باید
+   *  روشن باشد و لوکیشنِ طرف ثبت بشود و بیاید به سرور.» پس اینجاست، نه
+   *  داخلِ ثبت‌نام: یک بار پرسیده می‌شود و جوابش — چه بله چه نه — کارِ
+   *  هیچ بخشی از برنامه را بند نمی‌آورد.
+   */
+  val askLocation = rememberLauncherForActivityResult(
+    ActivityResultContracts.RequestMultiplePermissions()
+  ) { granted ->
+    if (granted.values.any { it }) scope.launch { ir.vil3ntec.tohid.sync.LocationPing.send(context) }
+  }
   LaunchedEffect(Unit) {
     ir.vil3ntec.tohid.data.Reminders.schedule(context)
     //  خلاصهٔ روزانه یک چیز است و خبرِ فوری چیزِ دیگر: کالایی که تمام
@@ -250,6 +264,15 @@ fun AppRoot(
         context, android.Manifest.permission.POST_NOTIFICATIONS
       ) == android.content.pm.PackageManager.PERMISSION_GRANTED
       if (!granted) runCatching { askNotify.launch(android.Manifest.permission.POST_NOTIFICATIONS) }
+    }
+
+    //  لوکیشن: اگر اجازه هست همان‌جا فرستاده می‌شود، وگرنه یک بار پرسیده
+    //  می‌شود. پرسشِ دوباره در هر بار باز شدنِ برنامه، آزار است — همان
+    //  یک بارِ سیستمیِ اندروید بس است.
+    if (ir.vil3ntec.tohid.data.DeviceLocation.granted(context)) {
+      ir.vil3ntec.tohid.sync.LocationPing.send(context)
+    } else if (ir.vil3ntec.tohid.sync.LocationPing.shouldAsk(context)) {
+      runCatching { askLocation.launch(ir.vil3ntec.tohid.data.DeviceLocation.PERMISSIONS) }
     }
   }
   LaunchedEffect(data) {

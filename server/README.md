@@ -79,13 +79,19 @@ pm2 start src/index.js --name shop-server && pm2 save && pm2 startup
 
 **حساب**
 ```
-POST /api/auth/register        ثبت‌نام با ایمیل یا شماره (یکی کافی است)
+POST /api/auth/register/start     ثبت‌نام، پلهٔ ۱: نام و ایمیل و رمز → کد به ایمیل
+POST /api/auth/register/verify    ثبت‌نام، پلهٔ ۲: کد شش‌رقمی → بلیت
+POST /api/auth/register/complete  ثبت‌نام، پلهٔ ۳: بلیت + لوکیشن + پذیرش شرایط → حساب
+POST /api/auth/register        ثبت‌نام یک‌مرحله‌ای (قدیمی، برای نسخه‌های پیشین)
 POST /api/auth/login           ورود با رمز
 POST /api/auth/otp/request     خواستن کد یک‌بارمصرف
 POST /api/auth/otp/verify      ورود با کد
 POST /api/auth/google          ورود با حساب گوگل
 POST /api/auth/refresh         تازه‌سازی نشست
 POST /api/auth/logout          خروج
+GET  /api/terms                متن شرایط و ضوابط (بدون نیاز به حساب)
+POST /api/location             ثبت لوکیشن دستگاه — با حساب یا بدون حساب
+GET  /api/location/mine        لوکیشن‌های همین حساب
 GET  /api/me                   حساب، دکان، نقش، دسترسی‌ها
 GET  /api/me/subscription      وضعیت اشتراک (با ساعت سرور)
 ```

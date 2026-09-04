@@ -111,10 +111,20 @@ async function createApp({ runMigrations = true } = {}) {
           trialDays: Number(cfg.trial_days || 0),
           whatsapp: { number: cfg.whatsapp_number || '', message: cfg.whatsapp_message || '' },
           minAppVersion: cfg.min_app_version || '',
+          //  ثبت‌نام سه‌مرحله‌ای با ایمیل — برنامه با این می‌فهمد این
+          //  سرور مسیرهای /auth/register/* را دارد
+          emailSignup: true,
+          termsVersion: require('./lib/terms').VERSION,
         });
       } catch (err) { next(err); }
     });
+    /** متن شرایط و ضوابط — همان چیزی که موقع ثبت‌نام نشان داده می‌شود. */
+    api.get('/terms', (req, res) => {
+      const terms = require('./lib/terms');
+      res.json({ version: terms.VERSION, title: terms.TITLE, sections: terms.SECTIONS });
+    });
     api.use('/auth', require('./routes/auth'));
+    api.use('/location', require('./routes/location'));
     api.use('/me', require('./routes/me'));
     api.use('/shop', require('./routes/shop'));
     api.use('/events', require('./routes/events'));
@@ -135,8 +145,19 @@ async function createApp({ runMigrations = true } = {}) {
     return api;
   }
 
-  app.use('/api', apiRouter());
+  /*
+   *  ترتیب این دو خط مهم است و اتفاقی نیست.
+   *
+   *  اگر `/api` اول سوار شود، درخواستِ `/api/v1/health` را هم **همان**
+   *  می‌قاپد و داخلش مسیر می‌شود `/v1/health`؛ چون چنین مسیری نیست، به
+   *  آخرین لایه (`routes/data` روی `/`) می‌رسد که توکن می‌خواهد و همه‌چیز
+   *  ۴۰۱ برمی‌گشت. یعنی کل `/api/v1/…` — همان چیزی که برنامه‌ی وب و
+   *  اندروید صدا می‌زنند — بسته بود.
+   *
+   *  پس نشانیِ درازتر اول.
+   */
   app.use('/api/v1', apiRouter());
+  app.use('/api', apiRouter());
 
   // ---- پنل مدیریت ----
   app.use('/admin', express.static(path.join(__dirname, '..', 'public', 'admin'), {

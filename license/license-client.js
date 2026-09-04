@@ -537,6 +537,69 @@
     return api('/api/v1/auth/register', { method: 'POST', auth: false, body: payload });
   }
 
+  /* ==========================================================
+     ثبت‌نام سه‌مرحله‌ای — فقط با ایمیل
+     ----------------------------------------------------------
+     قرار صاحب مخزن: شماره‌ی موبایل برداشته شد؛ «همان ایمیل بس است».
+     سه پله:
+       ۱) نام، ایمیل، رمز و تکرارش → کد به همان ایمیل می‌رود
+       ۲) کد شش‌رقمی → «بلیت» بیست‌دقیقه‌ای
+       ۳) بلیت + لوکیشن + پذیرش شرایط → حساب ساخته و همان‌جا وارد می‌شود
+
+     رمز روی سرور تا پله‌ی سوم نمی‌ماند؛ برنامه خودش تا آن لحظه نگهش
+     می‌دارد. یعنی اگر کاربر وسط کار پنجره را ببندد، هیچ حسابِ نیم‌بندی
+     روی سرور جا نمی‌ماند و ایمیلش هم آزاد می‌ماند.
+     ========================================================== */
+
+  async function registerStart({ name, email, password, passwordConfirm }) {
+    return api('/api/v1/auth/register/start', {
+      method: 'POST', auth: false, body: { name, email, password, passwordConfirm },
+    });
+  }
+
+  async function registerVerify({ email, code }) {
+    return api('/api/v1/auth/register/verify', {
+      method: 'POST', auth: false, body: { email, code, device: devicePayload() },
+    });
+  }
+
+  async function registerComplete({ ticket, name, password, terms, location }) {
+    const r = await api('/api/v1/auth/register/complete', {
+      method: 'POST', auth: false,
+      body: { ticket, name, password, terms, location, device: devicePayload() },
+    });
+    if (r && r.accessToken) {
+      writeStore({
+        accessToken: r.accessToken, accessExpiresAt: r.accessExpiresAt,
+        refreshToken: r.refreshToken, userId: r.user.id,
+        userLabel: r.user.name || r.user.email || '',
+      });
+    }
+    return r;
+  }
+
+  /**
+   * فرستادن لوکیشن به سرور.
+   *
+   * حساب لازم نیست: قرار صاحب مخزن این بود که لوکیشن حتی پیش از ثبت‌نام
+   * هم ثبت شود. اگر توکنی باشد، سرور ردیف را به همان حساب می‌بندد؛ اگر
+   * نباشد، ردیف به شناسه‌ی دستگاه بسته می‌شود و روزی که همان دستگاه حساب
+   * ساخت، به آن حساب می‌چسبد.
+   *
+   * شکست هیچ‌وقت به بیرون پرت نمی‌شود — لوکیشن یک خبر است، نه یک شرط.
+   */
+  async function sendLocation(location) {
+    if (!location || !getServerUrl()) return null;
+    try {
+      return await api('/api/v1/location', {
+        method: 'POST', auth: true, body: { device: devicePayload(), location },
+      });
+    } catch (e) {
+      if (e.code !== 'network') console.warn('[location] ثبت نشد:', e.message);
+      return null;
+    }
+  }
+
   /** فعال‌سازی: دستگاه ثبت و License صادر می‌شود. */
   async function activate() {
     await ensurePublicKey();
@@ -1035,6 +1098,7 @@
     hasFeature, onChange,
     open: (label) => UI.open(label),
     sync, activate, login, register, logout,
+    registerStart, registerVerify, registerComplete, sendLocation,
     getServerUrl, setServerUrl, getDeviceUid,
     getApiKey, getStaffCode, rotateStaffCode,
     isLoggedIn: () => !!readStore().accessToken,

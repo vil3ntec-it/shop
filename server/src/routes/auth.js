@@ -7,6 +7,10 @@
  *   ۲) حساب گوگل
  *   ۳) ایمیل یا شماره + رمز عبور
  *
+ * ثبت‌نامِ تازه سه پله دارد و شماره‌ی موبایل نمی‌خواهد — `/register/start`،
+ * `/register/verify` و `/register/complete`. مسیر قدیمیِ `/register`
+ * سر جایش است تا نسخه‌های قدیمیِ برنامه از کار نیفتند.
+ *
  * ایمیل و شماره فقط «راه ورود»اند؛ شناسه‌ی اصلی همیشه user_id است.
  * حساب‌ها هرگز خودبه‌خود در هم ادغام نمی‌شوند.
  */
@@ -18,6 +22,8 @@ const pw = require('../lib/password');
 const tokens = require('../lib/tokens');
 const otp = require('../lib/otp');
 const google = require('../lib/google');
+const geo = require('../lib/geo');
+const terms = require('../lib/terms');
 const audit = require('../lib/audit');
 const { membershipOf } = require('../lib/shops');
 const staffCodes = require('../lib/staff-codes');
@@ -32,7 +38,14 @@ const authLimit = rateLimit({ max: config.rateLimit.authMax, keyPrefix: 'auth' }
 const joinLimit = rateLimit({ max: config.rateLimit.joinMax, keyPrefix: 'staff-login' });
 const otpLimit = rateLimit({
   max: config.rateLimit.otpMax, keyPrefix: 'otp',
-  key: (req) => String(req.body?.phone || '').replace(/\D/g, '') || null,
+  //  کلید همان مقصد است — شماره یا ایمیل. تا دیروز فقط شماره بود، پس
+  //  ثبت‌نامِ ایمیلی روی IP جمع می‌شد و یک اینترنت مشترک (کافی‌نت، دکانِ
+  //  چند نفره) همه را با هم می‌بست.
+  key: (req) => {
+    const raw = String(req.body?.phone || req.body?.email || req.body?.destination || '').trim();
+    if (!raw) return null;
+    return raw.includes('@') ? raw.toLowerCase() : raw.replace(/\D/g, '') || null;
+  },
 });
 
 // ---------- کمکی‌ها ----------
@@ -230,6 +243,166 @@ router.post('/register', authLimit, async (req, res, next) => {
   const session = await issueSession(user, req.body?.device, clientIp(req));
   await audit.log({ actorType: 'user', userId: user.id, action: 'auth.register', ip: clientIp(req) });
   res.status(201).json(await loginPayload(user, session));
+});
+
+
+/* ==========================================================
+   ثبت‌نام سه‌مرحله‌ای — فقط با ایمیل
+   ----------------------------------------------------------
+   قرار صاحب مخزن: شماره‌ی موبایل از ثبت‌نام برداشته شد. «شماره نباشد،
+   همان ایمیل بس است» — چون پیامک پول دارد، به کشور بند است و کاربری که
+   شماره‌اش عوض می‌شود حسابش را گم می‌کند. ایمیل هیچ‌کدام را ندارد.
+
+   سه پله:
+     ۱) `/register/start`     نام، ایمیل، رمز و تکرارش → کد به ایمیل
+     ۲) `/register/verify`    کد شش‌رقمی → «بلیت ثبت‌نام»
+     ۳) `/register/complete`  بلیت + لوکیشن + پذیرش شرایط → حساب و نشست
+
+   ── چرا حساب در پله‌ی سوم ساخته می‌شود ─────────────────────────────
+   اگر در پله‌ی دوم ساخته می‌شد، هر کسی که کد را می‌زد و پنجره را می‌بست
+   یک حسابِ نیم‌بند بی‌شرایط‌پذیرفته روی سرور جا می‌گذاشت، و ایمیلش هم
+   «قبلاً ثبت شده» می‌شد؛ یعنی دفعه‌ی بعد اصلاً نمی‌توانست ثبت‌نام کند.
+   حالا تا پله‌ی سوم تمام نشود، در جدول `users` چیزی نیست — فقط یک بلیتِ
+   کوتاه‌عمر که ایمیلِ تأییدشده را نگه می‌دارد.
+   ========================================================== */
+
+const REGISTER_TICKET_TTL_MS = 20 * 60 * 1000;
+
+/** ایمیل و رمز را با هم می‌سنجد — همان بررسی در هر سه پله. */
+function registrationInput(body) {
+  const email = v.email(body?.email, { required: true });
+  const password = typeof body?.password === 'string' ? body.password : '';
+  const confirm = typeof body?.passwordConfirm === 'string' ? body.passwordConfirm
+    : (typeof body?.confirm === 'string' ? body.confirm : null);
+  const weak = pw.checkStrength(password);
+  if (weak) throw badRequest(weak, 'weak_password');
+  //  تکرار رمز اگر آمده باشد سنجیده می‌شود. برنامه خودش هم می‌سنجد، ولی
+  //  سنجشِ سمت گوشی فقط برای زودتر خبر دادن است، نه برای اطمینان.
+  if (confirm !== null && confirm !== password) {
+    throw badRequest('رمز و تکرارش یکی نیست', 'password_mismatch');
+  }
+  return { email, password, name: v.text(body?.name, { max: 80 }) };
+}
+
+/** آیا این ایمیل از قبل حساب دارد. */
+async function assertEmailFree(email) {
+  const clash = await one('SELECT id FROM users WHERE email=$1 LIMIT 1', [email]);
+  if (clash) throw conflict('این ایمیل از قبل ثبت شده است', 'already_registered');
+}
+
+// ---------- پله‌ی یک: نام، ایمیل، رمز ----------
+router.post('/register/start', otpLimit, async (req, res, next) => {
+  if (!config.allowRegistration) return next(forbidden('ثبت‌نام روی این سرور بسته است', 'registration_closed'));
+
+  const { email, name } = registrationInput(req.body);
+  await assertEmailFree(email);
+
+  const out = await otp.request(email, { purpose: 'register', ip: clientIp(req) });
+  res.status(201).json({
+    ok: true,
+    email,
+    name,
+    step: 'verify',
+    ...out,
+  });
+});
+
+// ---------- پله‌ی دو: کد شش‌رقمی ----------
+/**
+ * کد درست بود؟ یک بلیت بیست‌دقیقه‌ای برمی‌گردد.
+ *
+ * بلیت خودش یک توکن است (`kind='register'`) و موضوعش همان ایمیل. یعنی
+ * پله‌ی سوم دیگر کد نمی‌خواهد و کاربر لازم نیست موقع گرفتن لوکیشن دوباره
+ * دنبال ایمیلش بگردد.
+ */
+router.post('/register/verify', otpLimit, async (req, res, next) => {
+  if (!config.allowRegistration) return next(forbidden('ثبت‌نام روی این سرور بسته است', 'registration_closed'));
+
+  const email = v.email(req.body?.email, { required: true });
+  await assertEmailFree(email);
+  await assertNotLocked('otp', email);
+
+  try {
+    await otp.verify(email, req.body?.code, { purpose: 'register' });
+  } catch (err) {
+    await noteAttempt('otp', email, clientIp(req), false);
+    return next(err);
+  }
+  await noteAttempt('otp', email, clientIp(req), true);
+
+  const ticket = await tokens.issue({
+    kind: 'register', subjectId: `email:${email}`, ttlMs: REGISTER_TICKET_TTL_MS,
+  });
+  res.json({
+    ok: true,
+    email,
+    step: 'location',
+    ticket: ticket.token,
+    ticketExpiresAt: ticket.expiresAt,
+    terms: { version: terms.VERSION, title: terms.TITLE, sections: terms.SECTIONS },
+  });
+});
+
+// ---------- پله‌ی سه: لوکیشن و شرایط ----------
+/**
+ * اینجا حساب ساخته می‌شود.
+ *
+ * لوکیشن اگر بیاید ثبت می‌شود و لوکیشن‌های بی‌نامِ همین دستگاه هم به
+ * حساب تازه می‌چسبند. اگر گوشی اجازه‌ی لوکیشن نداده باشد، ثبت‌نام باز هم
+ * تمام می‌شود — نبودنِ لوکیشن نباید کسی را پشت در بگذارد.
+ *
+ * پذیرش شرایط ولی اجباری است: بدون آن حسابی ساخته نمی‌شود.
+ */
+router.post('/register/complete', authLimit, async (req, res, next) => {
+  if (!config.allowRegistration) return next(forbidden('ثبت‌نام روی این سرور بسته است', 'registration_closed'));
+
+  const row = await tokens.verify(String(req.body?.ticket || ''), 'register');
+  if (!row) return next(unauthorized('مهلت ثبت‌نام تمام شد، از اول شروع کنید', 'register_ticket_invalid'));
+  const ticketEmail = String(row.subject_id || '').replace(/^email:/, '');
+
+  const { email, password, name } = registrationInput({ ...req.body, email: ticketEmail });
+  await assertEmailFree(email);
+
+  const accepted = req.body?.terms?.accepted ?? req.body?.termsAccepted;
+  if (accepted !== true) return next(badRequest('برای ساختن حساب باید شرایط و ضوابط را بپذیرید', 'terms_required'));
+  const termsVersion = v.text(req.body?.terms?.version || terms.VERSION, { max: 20 });
+
+  const ip = clientIp(req);
+  const hash = await pw.hashPassword(password);
+  const t = now();
+  const user = await one(
+    `INSERT INTO users (id, name, email, password_hash, status, created_at, updated_at,
+                        terms_version, terms_accepted_at)
+     VALUES ($1,$2,$3,$4,'active',$5,$5,$6,$5) RETURNING *`,
+    [newId('usr'), name, email, hash, t, termsVersion]
+  );
+
+  //  بلیت خرج شد؛ با همان بلیت نمی‌شود حساب دوم ساخت
+  await tokens.revoke(req.body.ticket, 'register');
+
+  const deviceUid = v.id(req.body?.device?.uid || req.body?.device?.deviceId || '', {
+    field: 'شناسه دستگاه', required: false, max: 64,
+  });
+  let location = null;
+  try {
+    location = await geo.record({ deviceUid, userId: user.id, ip }, req.body?.location);
+    await geo.claimDevice(deviceUid, user.id);
+  } catch (err) {
+    //  لوکیشنِ خراب نباید ثبت‌نامِ تمام‌شده را باطل کند
+    if (err.code !== 'bad_location' && err.code !== 'device_required') throw err;
+  }
+
+  const session = await issueSession(user, req.body?.device, ip);
+  await audit.log({
+    actorType: 'user', userId: user.id, action: 'auth.register',
+    detail: { method: 'email_3step', terms: termsVersion, located: !!location }, ip,
+  });
+  res.status(201).json({ created: true, location, ...(await loginPayload(user, session)) });
+});
+
+/** متن شرایط و ضوابط — یک‌جا برای وب، اندروید و پنل. */
+router.get('/terms', (req, res) => {
+  res.json({ version: terms.VERSION, title: terms.TITLE, sections: terms.SECTIONS });
 });
 
 // ---------- ورود با رمز ----------

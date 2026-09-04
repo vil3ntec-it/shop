@@ -21,6 +21,21 @@
   <uses-permission android:name="android.permission.CAMERA" />
 
   <!--
+       لوکیشنِ دکان.
+
+       قرارِ صاحب مخزن: لوکیشن باید همان اولِ کار — حتی پیش از ثبت‌نام —
+       گرفته و روی سرور ثبت شود. یک بار پرسیده می‌شود و اگر کاربر نخواست،
+       هیچ بخشی از برنامه بسته نمی‌شود.
+
+       دقتِ شهری (`COARSE`) برای این کار بس است؛ `FINE` هم خواسته شده تا
+       اگر کاربر خودش «دقیق» را انتخاب کرد، لوکیشنِ درست‌تری ثبت شود.
+       هیچ‌کدام در پس‌زمینه دنبال نمی‌شود.
+  -->
+  <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+  <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+  <uses-feature android:name="android.hardware.location" android:required="false" />
+
+  <!--
     یادآوریِ روزانه: موجودیِ تمام‌شده و قرضِ سررسیده. تا امروز هشدارها
     فقط داخلِ برنامه بودند و تا کسی بازش نمی‌کرد خبردار نمی‌شد.
   -->

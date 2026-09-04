@@ -37,6 +37,31 @@ object ApiEndpoints {
     const val PASSWORD = "/auth/password"
     const val PASSWORD_FORGOT = "/auth/password/forgot"
     const val PASSWORD_RESET = "/auth/password/reset"
+
+    /*
+     *  ثبت‌نامِ سه‌مرحله‌ای — فقط با ایمیل.
+     *
+     *  شماره‌ی موبایل از این مسیر برداشته شد؛ قرارِ صاحب مخزن این بود.
+     *  سه پله: نام و ایمیل و رمز، بعد کدِ شش‌رقمیِ همان ایمیل، بعد
+     *  لوکیشن و پذیرشِ شرایط. حساب در پلهٔ سوم ساخته می‌شود، نه زودتر.
+     */
+    const val REGISTER_START = "/auth/register/start"
+    const val REGISTER_VERIFY = "/auth/register/verify"
+    const val REGISTER_COMPLETE = "/auth/register/complete"
+  }
+
+  /* ------------------------------ لوکیشن ------------------------------ */
+
+  /**
+   *  ثبتِ لوکیشن — بی‌نیاز از حساب.
+   *
+   *  قرارِ صاحب مخزن: «بدون اینکه برنامه برود ثبت‌نام کند هم لوکیشن باید
+   *  روشن باشد و به سرور برسد.» پس این مسیر با توکن و بی‌توکن هر دو کار
+   *  می‌کند؛ بی‌توکن، ردیف به شناسهٔ دستگاه بسته می‌شود.
+   */
+  object Location {
+    const val ROOT = "/location"
+    const val MINE = "/location/mine"
   }
 
   /* ------------------------------ حساب ------------------------------ */
