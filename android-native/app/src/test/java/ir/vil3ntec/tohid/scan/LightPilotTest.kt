@@ -170,7 +170,10 @@ class LightPilotTest {
     //  سنجیده شود
     pilot.onFrame(helped(), 5000)
     assertEquals(LightPilot.State.PEEK, pilot.state)
-    assertTrue("نشانِ روی صفحه نباید بابتِ پلک بپرد", lit)
+    //  خودِ لامپ در همان لحظه خاموش است — پلک همین است — ولی نشانِ روی
+    //  صفحه نباید بابتش بپرد
+    assertFalse("لامپ برای سنجش خاموش می‌شود", lit)
+    assertTrue("نشانِ روی صفحه روشن می‌ماند", pilot.lit)
 
     //  و نورِ دکان برگشته: خاموش می‌ماند
     pilot.onFrame(bright(), 5400)
