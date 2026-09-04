@@ -1182,8 +1182,70 @@
     width:18px; height:18px; flex:0 0 auto; margin-top:1px; accent-color:var(--primary);
   }
   .terms-agree span{font-size:12px; font-weight:700; color:var(--text); line-height:1.8;}
+  /* پیام هر گام زیر دکمه جای خودش را دارد، نه روی دکمه */
+  #signup-error-1, #signup-error-2, #signup-error-3{ margin:11px 2px 0; line-height:1.9; }
+
   /* کد یک عدد است: خانه‌ی اول سمت چپ، مثل خودِ عدد */
-  #signup-otp-inputs{flex-direction:row;}
+  #signup-otp-inputs{flex-direction:row; perspective:600px;}
+  /* خانه‌ای که پر شده، خودش روشن می‌ماند — نه فقط آنی که زیر انگشت است */
+  #signup-otp-inputs input.filled{
+    border-color:var(--primary); color:var(--primary);
+    box-shadow:0 0 0 3px var(--primary-tint), 0 0 20px -4px var(--primary);
+  }
+  /* رقم که می‌نشیند، خانه یک تکان کوچک می‌خورد */
+  #signup-otp-inputs input.pop{ animation:otpPop .34s cubic-bezier(.2,.9,.3,1.5); }
+  @keyframes otpPop{
+    40%{ transform:translateY(-4px) scale(1.09); }
+    to{ transform:translateY(0) scale(1); }
+  }
+
+  /* ---------- کد که درست بود: خانه‌ها به هم می‌رسند و یک تیک می‌شوند ---------- */
+  #signup-otp-inputs.merging{ pointer-events:none; }
+  #signup-otp-inputs.merging input{
+    animation:otpMerge .5s cubic-bezier(.5,0,.2,1) forwards;
+    animation-delay:calc(var(--i, 0) * 30ms);
+  }
+  @keyframes otpMerge{
+    to{ transform:translateX(var(--dx, 0px)) scale(.7); opacity:0; filter:blur(3px); }
+  }
+  .signup-verified{
+    display:none; flex-direction:column; align-items:center; gap:14px;
+    padding:10px 0 20px; text-align:center;
+  }
+  .signup-verified.on{ display:flex; }
+  .signup-verified b{
+    font-size:15.5px; font-weight:800; color:var(--text);
+    animation:verifiedText .5s ease both .12s;
+  }
+  @keyframes verifiedText{
+    from{ opacity:0; transform:translateY(6px); filter:blur(4px); }
+    to{ opacity:1; transform:translateY(0); filter:blur(0); }
+  }
+  .signup-verified-badge{
+    width:66px; height:66px; border-radius:22px;
+    display:flex; align-items:center; justify-content:center; color:#fff;
+    background:linear-gradient(160deg, var(--success), #0d8455);
+    box-shadow:0 0 0 5px rgba(24,160,107,.16), 0 0 38px -6px var(--success);
+    animation:verifiedPop .55s cubic-bezier(.2,.9,.3,1.45) both;
+  }
+  @keyframes verifiedPop{
+    from{ opacity:0; transform:scale(.35); }
+    60%{ transform:scale(1.08); }
+    to{ opacity:1; transform:scale(1); }
+  }
+  /* خطِ تیک، مثل قلم که می‌کشدش */
+  .signup-verified-badge path{
+    stroke-dasharray:30; stroke-dashoffset:30;
+    animation:verifiedTick .45s ease forwards .28s;
+  }
+  @keyframes verifiedTick{ to{ stroke-dashoffset:0; } }
+  /* موقع نمایشِ تیک، بقیه‌ی گام دوم کنار می‌رود */
+  #signup-step-2.verified .auth-otp-target,
+  #signup-step-2.verified .auth-note,
+  #signup-step-2.verified .auth-resend-row,
+  #signup-step-2.verified #signup-next-2,
+  #signup-step-2.verified #signup-error-2,
+  #signup-step-2.verified .auth-back-btn{ display:none; }
 
   /* ---------- ورود شاگرد با کد ---------- */
   .auth-staff{margin-bottom:18px;}
@@ -3008,6 +3070,14 @@
       <div class="auth-resend-row">
         <span id="signup-resend-text">کد نیامد؟</span>
         <button type="button" id="signup-resend" disabled>ارسال دوباره</button>
+      </div>
+
+      <!-- کد که درست باشد، خانه‌ها جمع می‌شوند و همین‌جا می‌نشیند -->
+      <div class="signup-verified" id="signup-verified">
+        <b>تأیید شد</b>
+        <span class="signup-verified-badge">
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.6 4.6L19 7.6"/></svg>
+        </span>
       </div>
 
       <button type="submit" class="auth-submit-btn" id="signup-next-2">
@@ -5546,6 +5616,7 @@
     ['signup-name-error','signup-email-error','signup-password-error','signup-password2-error',
      'signup-error-1','signup-error-2','signup-error-3'].forEach(id=> authError(id,''));
     signupShowStep(1);
+    clearOtp();
     document.getElementById('auth-screen')?.classList.add('auth-hidden');
     screen.classList.remove('auth-hidden');
     setTimeout(()=> document.getElementById('signup-name')?.focus(), 250);
@@ -5592,8 +5663,46 @@
       .map(i=> i.value.replace(/\D/g,'')).join('');
   }
   function clearOtp(){
-    document.querySelectorAll('#signup-otp-inputs input').forEach(i=> i.value = '');
+    document.querySelectorAll('#signup-otp-inputs input').forEach(i=>{
+      i.value = '';
+      i.classList.remove('filled','pop');
+      i.style.removeProperty('--dx');
+    });
+    document.getElementById('signup-otp-inputs')?.classList.remove('merging');
+    document.getElementById('signup-step-2')?.classList.remove('verified');
+    document.getElementById('signup-verified')?.classList.remove('on');
     document.querySelector('#signup-otp-inputs input')?.focus();
+  }
+
+  /**
+   * انیمیشنِ «تأیید شد».
+   *
+   * شش خانه به سمت وسط می‌روند و محو می‌شوند، و همان‌جا یک تیک روشن
+   * می‌نشیند. مقدار جابه‌جاییِ هر خانه اینجا حساب می‌شود نه در CSS، چون
+   * اندازه‌ی خانه‌ها با پهنای صفحه فرق می‌کند و عدد ثابت روی گوشیِ کوچک
+   * غلط از آب درمی‌آمد.
+   */
+  function playOtpVerified(){
+    const wrap = document.getElementById('signup-otp-inputs');
+    const step = document.getElementById('signup-step-2');
+    const badge = document.getElementById('signup-verified');
+    if(!wrap || !step || !badge) return Promise.resolve();
+
+    const wrapBox = wrap.getBoundingClientRect();
+    const center = wrapBox.left + wrapBox.width / 2;
+    wrap.querySelectorAll('input').forEach(el=>{
+      const r = el.getBoundingClientRect();
+      el.style.setProperty('--dx', `${Math.round(center - (r.left + r.width / 2))}px`);
+    });
+    wrap.classList.add('merging');
+
+    return new Promise((resolve)=>{
+      setTimeout(()=>{
+        step.classList.add('verified');
+        badge.classList.add('on');
+        setTimeout(resolve, 950);
+      }, 520);
+    });
   }
 
   /** سرور تنظیم نشده؟ ثبت‌نام معنی ندارد و باید همان اول گفته شود. */
@@ -5661,10 +5770,17 @@
     // ---- خانه‌های کد: تایپ، پاک کردن، چسباندن ----
     const boxes = Array.from(document.querySelectorAll('#signup-otp-inputs input'));
     boxes.forEach((box, i)=>{
+      box.style.setProperty('--i', String(i));
       box.addEventListener('input', ()=>{
         //  رقم فارسی هم قبول است؛ کاربر با صفحه‌کلید فارسی تایپ می‌کند
         box.value = box.value.replace(/[۰-۹]/g, d=> String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))
                              .replace(/\D/g,'').slice(0,1);
+        box.classList.toggle('filled', !!box.value);
+        if(box.value){
+          box.classList.remove('pop');
+          void box.offsetWidth;          // تا انیمیشن دوباره از اول برود
+          box.classList.add('pop');
+        }
         if(box.value && i < boxes.length - 1) boxes[i+1].focus();
         if(otpValue().length === 6) document.getElementById('signup-next-2').click();
       });
@@ -5764,6 +5880,8 @@
       try{
         const r = await lic.registerVerify({ email: signupState.email, code });
         signupState.ticket = r.ticket;
+        //  خانه‌ها جمع شوند و تیک بنشیند، بعد گام سوم
+        await playOtpVerified();
         signupShowStep(3);
         //  لوکیشن همان لحظه‌ی ورود به گام سوم شروع می‌شود، نه با زدن دکمه؛
         //  تا وقتی کاربر متن شرایط را می‌خواند، پیدا شده باشد
