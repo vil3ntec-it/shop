@@ -120,6 +120,7 @@ fun ShopSetupScreen(store: ShopStore, onDone: () -> Unit) {
       value = name,
       onValueChange = { name = it; error = null },
       placeholder = "نام دکان — مثلاً «فروشگاه توحید»",
+      label = "نام دکان",
       icon = Icons.Filled.Storefront,
     )
     Spacer(Modifier.height(10.dp))
@@ -153,6 +154,7 @@ fun ShopSetupScreen(store: ShopStore, onDone: () -> Unit) {
       value = code,
       onValueChange = { code = it.uppercase(); error = null },
       placeholder = ir.vil3ntec.tohid.data.StaffCode.HINT,
+      label = "کد پیوستن",
       icon = Icons.Filled.Badge,
       ltr = true,
       keyboardOptions = KeyboardOptions(capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Characters),
