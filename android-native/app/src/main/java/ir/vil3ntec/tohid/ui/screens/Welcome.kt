@@ -86,6 +86,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import ir.vil3ntec.tohid.core.config.AppConfig
 import ir.vil3ntec.tohid.core.model.SessionDto
 import ir.vil3ntec.tohid.core.net.ApiFailure
+import ir.vil3ntec.tohid.core.net.ApiResult
 import ir.vil3ntec.tohid.core.net.userText
 import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.data.DeviceLocation
@@ -226,6 +227,23 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
   var ticket by rememberSaveable { mutableStateOf("") }
 
   /*
+   *  سرورِ قدیمی که مسیرهای سه‌مرحله‌ای را ندارد.
+   *
+   *  ── چه چیزی را می‌بندد ─────────────────────────────────────────────
+   *  گزارشِ صاحب مخزن: در پلهٔ اولِ ثبت‌نام نوشته می‌شد «این قابلیت روی
+   *  سرورِ شما نیست» و کار همان‌جا می‌ایستاد. یعنی برنامهٔ تازه روی
+   *  سرورِ به‌روزنشده اصلاً حساب نمی‌ساخت — و دکان‌دار هم نمی‌فهمید چه
+   *  باید بکند.
+   *
+   *  حالا ۴۰۴ آخرِ خط نیست: برنامه می‌فهمد این سرور کدِ تأیید ندارد، از
+   *  پلهٔ کد رد می‌شود و همان صفحهٔ لوکیشن و شرایط را نشان می‌دهد؛ حساب
+   *  با مسیرِ قدیمیِ `/auth/register` ساخته می‌شود. پذیرشِ شرایط و
+   *  گرفتنِ لوکیشن سرِ جایشان می‌مانند — چیزی که از دست می‌رود فقط
+   *  تأییدِ ایمیل است، که روی سرورِ بی‌فرستنده اصلاً ممکن نبود.
+   */
+  var legacySignup by rememberSaveable { mutableStateOf(false) }
+
+  /*
    *  ورود با گوگل فقط وقتی نشان داده می‌شود که خودِ سرور بگوید روشن است.
    *
    *  دکمه‌ای که بخورد به خطا، از نبودنِ دکمه بدتر است. آدرسِ سرور هم مدام
@@ -302,25 +320,50 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
     TermsLocationScreen(
       busy = busy,
       error = error,
-      onBack = { signupStep = "code"; error = null },
+      //  سرورِ قدیمی پلهٔ کد ندارد؛ برگشتش به همان فرمِ اول است
+      onBack = { signupStep = if (legacySignup) "" else "code"; codeSent = !legacySignup; error = null },
       onSubmit = { fix ->
         busy = true; error = null; note = null
         scope.launch {
-          auth.registerComplete(
-            ticket = ticket,
-            name = name.trim(),
-            password = password,
-            termsVersion = ir.vil3ntec.tohid.data.Terms.VERSION,
-            deviceUid = state.deviceUid,
-            deviceName = android.os.Build.MODEL ?: "گوشی",
-            location = fix,
-          )
+          val done =
+            if (legacySignup) {
+              //  سرورِ قدیمی: حساب با مسیرِ قدیمی ساخته می‌شود و لوکیشن
+              //  جدا فرستاده می‌شود — نبودنش هم کار را متوقف نمی‌کند
+              val made = auth.register(name.trim(), email.trim(), "", password)
+              if (made is ApiResult.Success && fix != null) {
+                auth.sendLocation(fix, state.deviceUid, android.os.Build.MODEL ?: "گوشی")
+              }
+              made
+            } else auth.registerComplete(
+              ticket = ticket,
+              name = name.trim(),
+              password = password,
+              termsVersion = ir.vil3ntec.tohid.data.Terms.VERSION,
+              deviceUid = state.deviceUid,
+              deviceName = android.os.Build.MODEL ?: "گوشی",
+              location = fix,
+            )
+          done
             .onSuccess { session ->
               val who = email.trim()
-              //  رمز از حافظهٔ صفحه پاک شود؛ کارش تمام است
-              password = ""; password2 = ""; ticket = ""
-              signupStep = ""; codeSent = false; code = ""
-              finish(who, session)
+              signupStep = ""; codeSent = false; code = ""; ticket = ""
+              if (session.isValid) {
+                //  رمز از حافظهٔ صفحه پاک شود؛ کارش تمام است
+                password = ""; password2 = ""
+                finish(who, session)
+              } else {
+                /*
+                 *  سرورِ قدیمی حساب را ساخت ولی نشست نداد.
+                 *
+                 *  کارِ اصلی انجام شده و پیامِ خطا اینجا دروغ است؛ فقط
+                 *  یک ورودِ ساده مانده. رمز هم پاک نمی‌شود تا کاربر
+                 *  لازم نباشد دوباره بنویسدش.
+                 */
+                emailMode = "login"
+                password2 = ""
+                legacySignup = false
+                note = "حساب ساخته شد — حالا وارد شوید"
+              }
             }
             .onFailure {
               fail(it)
@@ -558,12 +601,20 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
               emailMode == "register" ->
                 auth.registerStart(name.trim(), email.trim(), password)
                   .onSuccess {
+                    legacySignup = false
                     cooldown.start(email.trim(), it.resendSeconds)
                     it.devCode?.let { c -> note = "کد آزمایشی: $c" }
                     signupStep = "code"
                     codeSent = true
                   }
-                  .onFailure { fail(it) }
+                  .onFailure { e ->
+                    if (e is ApiFailure.NotFound) {
+                      //  سرور کدِ تأیید ندارد؛ یک پله کمتر، نه یک دربِ بسته
+                      legacySignup = true
+                      ticket = ""
+                      signupStep = "terms"
+                    } else fail(e)
+                  }
 
               else ->
                 auth.login(email.trim(), password)
@@ -864,7 +915,7 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
             PillField(
               value = staffCode,
               onValueChange = { staffCode = it.uppercase(); error = null },
-              placeholder = "کد شاگرد — ${StaffCode.HINT}",
+              placeholder = "کد پیوستن — ${StaffCode.HINT}",
               icon = Icons.Filled.Storefront,
               ltr = true,
               trailing = {
@@ -873,8 +924,11 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
                   contentPadding = PaddingValues(horizontal = 8.dp),
                   onClick = {
                     val entered = StaffCode.clean(staffCode)
-                    if (!StaffCode.looksValid(entered)) {
-                      error = "این کد درست نیست. کد باید مثل ${StaffCode.HINT} باشد."
+                    //  قالبِ کد را سرور می‌شناسد، نه گوشی. اینجا فقط
+                    //  «چیزی زده شده؟» سنجیده می‌شود؛ بقیه‌اش با سرور
+                    //  است و پیامِ ردّش هم از همان‌جا می‌آید.
+                    if (!StaffCode.usable(entered)) {
+                      error = "کد را کامل بزنید."
                       return@TextButton
                     }
                     busy = true; error = null

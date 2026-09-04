@@ -2939,7 +2939,7 @@
       <label for="auth-staff-code">کد شاگرد</label>
       <div class="auth-staff-row">
         <input class="form-input" id="auth-staff-code" type="text" dir="ltr"
-               inputmode="latin" autocapitalize="characters" placeholder="SHG-XXXXX-XXXXX-XXXXX">
+               inputmode="latin" autocapitalize="characters" placeholder="کدی که صاحب دکان داده">
         <button type="button" class="btn btn-secondary btn-sm" id="auth-staff-join">ورود</button>
       </div>
       <p class="auth-staff-hint">کدی که صاحب دکان از تنظیمات برنامه‌اش به شما می‌دهد.</p>
@@ -5420,11 +5420,16 @@
       const el = document.getElementById('auth-staff-code');
       const code = el.value.trim().toUpperCase();
       authError('auth-staff-error','');
-      if(!code){ authError('auth-staff-error','کد شاگرد را وارد کنید.'); el.focus(); return; }
-      if(!/^SHG-[A-Z0-9]{5}(-[A-Z0-9]{5}){2}$/.test(code)){
-        authError('auth-staff-error','این کد درست نیست. کد باید مثل SHG-XXXXX-XXXXX-XXXXX باشد.');
-        el.focus(); return;
-      }
+      if(!code){ authError('auth-staff-error','کد پیوستن را وارد کنید.'); el.focus(); return; }
+      /*
+       * قالبِ کد را سرور تعیین می‌کند، نه این صفحه.
+       *
+       * تا دیروز اینجا الگوی `SHG-XXXXX-…` سنجیده می‌شد و کدی که سرور
+       * ساخته بود (`F6D75A07`) پیش از رسیدن به سرور رد می‌شد — کدِ زنده،
+       * با پیامِ «این کد درست نیست». سرورها یکسان نیستند و قالبشان هم
+       * عوض می‌شود؛ حدس زدنش کارِ گوشی نیست.
+       */
+      if(code.length < 4){ authError('auth-staff-error','کد را کامل بزنید.'); el.focus(); return; }
       try{ localStorage.setItem(STAFF_JOIN_KEY, code); }catch(e){}
       const staff = { method:'staff', value:code, name:'شاگرد', loginAt:Date.now() };
       saveAuth(staff);

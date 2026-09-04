@@ -529,6 +529,7 @@ fun AppRoot(
         )
         "vip" -> VipScreen { sub = null }
         "profile" -> ProfileScreen(
+          store = store,
           snackbar = snackbar,
           onBack = { sub = null },
           onSignIn = { authOpen = true },

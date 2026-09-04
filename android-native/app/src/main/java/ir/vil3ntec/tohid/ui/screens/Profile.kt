@@ -18,6 +18,8 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Storefront
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -42,7 +44,9 @@ import ir.vil3ntec.tohid.formatMillis
 import ir.vil3ntec.tohid.spanText
 import ir.vil3ntec.tohid.sync.License
 import ir.vil3ntec.tohid.sync.LicenseGuard
+import ir.vil3ntec.tohid.core.net.userText
 import ir.vil3ntec.tohid.sync.SyncStore
+import ir.vil3ntec.tohid.sync.Syncer
 import ir.vil3ntec.tohid.ui.theme.Radius
 import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.Dispatchers
@@ -76,6 +80,7 @@ import kotlinx.coroutines.withContext
  */
 @Composable
 fun ProfileScreen(
+  store: ir.vil3ntec.tohid.data.ShopStore,
   snackbar: SnackbarHostState,
   onBack: () -> Unit,
   onSignIn: () -> Unit,
@@ -93,6 +98,20 @@ fun ProfileScreen(
   var createdAt by remember { mutableStateOf(state.accountCreatedAt) }
   var newPhone by remember { mutableStateOf("") }
   var busy by remember { mutableStateOf(false) }
+  var syncing by remember { mutableStateOf(false) }
+  var lastSyncAt by remember { mutableStateOf(state.lastSyncAt) }
+  var confirmSignOut by remember { mutableStateOf(false) }
+
+  /*
+   *  نامِ دکان — همان‌جایی که تنظیمات هم از آن می‌خواند
+   *  (`SharedPreferences("tohid")`، کلیدِ `store_name`).
+   *
+   *  چرا اینجا: قرارِ صاحب مخزن بود که نامِ فروشگاه کنارِ حساب بنشیند نه
+   *  در تنظیمات. راست هم می‌گوید — نامِ دکان مالِ همین حساب است و روی
+   *  سربرگِ فاکتورِ همین دکان چاپ می‌شود.
+   */
+  val prefs = remember { context.getSharedPreferences("tohid", android.content.Context.MODE_PRIVATE) }
+  var shopName by remember { mutableStateOf(prefs.getString("store_name", "").orEmpty()) }
 
   //  عکسِ حساب — با هر تغییر این عدد بالا می‌رود تا نسخهٔ کش‌شده دور
   //  ریخته شود
@@ -303,6 +322,9 @@ fun ProfileScreen(
           toast("نام را بنویسید")
           return@Button
         }
+        //  نامِ دکان همین‌جا و همان لحظه می‌نشیند؛ روی گوشی است و
+        //  اینترنت نمی‌خواهد
+        prefs.edit().putString("store_name", shopName.trim()).apply()
         val claim = newPhone.trim()
         busy = true
         scope.launch {
@@ -341,6 +363,107 @@ fun ProfileScreen(
     ) {
       Text(if (busy) "در حال ذخیره…" else "ذخیره تغییرات", color = Color.White)
     }
+
+    /* ------------------------- دکان ------------------------- */
+    Spacer(Modifier.height(20.dp))
+    SectionTitle("دکان")
+    OutlinedTextField(
+      value = shopName,
+      onValueChange = {
+        shopName = it
+        prefs.edit().putString("store_name", it.trim()).apply()
+      },
+      label = { Text("نام فروشگاه") },
+      leadingIcon = { Icon(Icons.Filled.Storefront, contentDescription = null, tint = colors.muted) },
+      singleLine = true,
+      modifier = Modifier.fillMaxWidth(),
+    )
+    Spacer(Modifier.height(4.dp))
+    Text(
+      "این نام روی سربرگ فاکتور چاپ می‌شود.",
+      style = MaterialTheme.typography.labelSmall,
+      color = colors.muted2,
+    )
+
+    /* ------------------------- همگام‌سازی ------------------------- */
+    Spacer(Modifier.height(20.dp))
+    SectionTitle("همگام‌سازی")
+    InfoRow(
+      icon = Icons.Filled.Sync,
+      tint = colors.accent,
+      title = "آخرین همگام‌سازی",
+      value = if (lastSyncAt > 0) formatMillis(lastSyncAt) else "هنوز انجام نشده",
+      detail = "دفترِ دکان روی سرور پشتیبان می‌گیرد و روی گوشیِ دیگر هم می‌آید",
+    )
+    Spacer(Modifier.height(10.dp))
+    Button(
+      onClick = {
+        syncing = true
+        scope.launch {
+          runCatching { Syncer(store, state, context).run() }
+            .onSuccess {
+              lastSyncAt = state.lastSyncAt
+              toast("همگام‌سازی شد — ${it.pushed.fa()} فرستاده، ${it.pulled.fa()} گرفته")
+            }
+            .onFailure { toast(it.userText("همگام‌سازی ناموفق بود")) }
+          syncing = false
+        }
+      },
+      enabled = !syncing,
+      colors = ButtonDefaults.buttonColors(containerColor = colors.primary),
+      modifier = Modifier.fillMaxWidth(),
+    ) {
+      Text(if (syncing) "در حال همگام‌سازی…" else "همگام‌سازی حالا", color = Color.White)
+    }
+
+    /*
+     *  خروج از حساب — ته صفحه، و با یک پرسش.
+     *
+     *  گزارشِ صاحب مخزن: این صفحه اصلاً خروج نداشت و برای بیرون آمدن
+     *  باید سراغِ تنظیمات می‌رفت. حالا همین‌جاست، ولی نه چسبیده به
+     *  «ذخیره تغییرات»: خروجِ ناخواسته یعنی دوباره وارد شدن و دوباره
+     *  همگام‌سازی.
+     */
+    Spacer(Modifier.height(22.dp))
+    OutlinedButton(
+      onClick = { confirmSignOut = true },
+      colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.danger),
+      border = androidx.compose.foundation.BorderStroke(1.dp, colors.danger.copy(alpha = 0.6f)),
+      modifier = Modifier.fillMaxWidth(),
+    ) { Text("خروج از حساب") }
+    Spacer(Modifier.height(6.dp))
+    Text(
+      "دفترِ دکان روی همین گوشی می‌ماند و پاک نمی‌شود.",
+      style = MaterialTheme.typography.labelSmall,
+      color = colors.muted2,
+      textAlign = TextAlign.Center,
+      modifier = Modifier.fillMaxWidth(),
+    )
+  }
+
+  if (confirmSignOut) {
+    AlertDialog(
+      onDismissRequest = { confirmSignOut = false },
+      containerColor = colors.bg,
+      title = { Text("خروج از حساب؟", color = colors.text) },
+      text = {
+        Text(
+          "برای برگشتن، ایمیل و رمزتان را دوباره می‌زنید. دفترِ دکان روی همین گوشی سرِ جایش می‌ماند.",
+          color = colors.muted,
+        )
+      },
+      confirmButton = {
+        TextButton(onClick = {
+          confirmSignOut = false
+          state.signOut()
+          toast("از حساب خارج شدید")
+          onBack()
+        }) { Text("خروج", color = colors.danger) }
+      },
+      dismissButton = {
+        TextButton(onClick = { confirmSignOut = false }) { Text("ماندن", color = colors.muted) }
+      },
+    )
   }
 }
 

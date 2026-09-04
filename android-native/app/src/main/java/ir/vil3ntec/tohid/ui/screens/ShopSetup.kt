@@ -161,8 +161,9 @@ fun ShopSetupScreen(store: ShopStore, onDone: () -> Unit) {
     OutlinedButton(
       onClick = {
         val entered = ir.vil3ntec.tohid.data.StaffCode.clean(code)
-        if (!ir.vil3ntec.tohid.data.StaffCode.looksValid(entered)) {
-          error = "این کد درست نیست. کد باید مثل ${ir.vil3ntec.tohid.data.StaffCode.HINT} باشد."
+        //  سنجشِ قالب کارِ سرور است؛ گوشی فقط می‌بیند خالی نباشد
+        if (!ir.vil3ntec.tohid.data.StaffCode.usable(entered)) {
+          error = "کد را کامل بزنید."
           return@OutlinedButton
         }
         busy = true; error = null
