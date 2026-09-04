@@ -76,6 +76,17 @@ object ServerPulse {
   var version by mutableStateOf("")
     private set
 
+  /**
+   *  کدام پیشوند روی این سرور کار می‌کند: `/api/v1` یا `/api`.
+   *
+   *  سرورهای پیش از شهریور، مسیرهای `/api/v1` را به لایهٔ اشتباه می‌سپردند و
+   *  همه‌چیز ۴۰۴ می‌گرفت. برنامه خودش پیشوندِ کارآمد را پیدا می‌کند، ولی
+   *  دیدنش اینجا یعنی وقتی چیزی کار نکرد، معلوم است با کدام راه حرف
+   *  می‌زنیم.
+   */
+  var prefix by mutableStateOf("")
+    private set
+
   /** تا این مدت، جوابِ قبلی تازه است */
   private const val FRESH_MS = 60_000L
 
@@ -107,6 +118,7 @@ object ServerPulse {
       state = State.UP
       note = null
       version = info.version
+      prefix = Backend.apiPrefix(context)
       //  سرور بالاست ولی دیتابیسش نه — این هم «وصل است» نیست
       if (info.database.isNotBlank() && info.database != "connected") {
         note = "سرور بالاست ولی دیتابیسش وصل نیست"

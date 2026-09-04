@@ -6,6 +6,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -72,6 +73,15 @@ fun QuickSaleScreen(
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
 
+  /*
+   *  دکمهٔ برگشتِ خودِ گوشی، به فروش برمی‌گردد.
+   *
+   *  پیشتر این کار را دکمهٔ «بازگشت به فروش» در بالای فهرست می‌کرد که
+   *  برداشته شد (پیکانِ سربرگ همان است). ولی دکمهٔ سخت‌افزاریِ گوشی هم
+   *  باید همان‌جا برساند، نه یک تبِ دیگر.
+   */
+  BackHandler(onBack = onBack)
+
   val cart by cartStore.lines.collectAsState()
   val cartDebtorId by cartStore.debtorId.collectAsState()
 
@@ -122,12 +132,15 @@ fun QuickSaleScreen(
     ) {
       item(span = { GridItemSpan(maxLineSpan) }) {
         Column {
-          TextButton(onClick = onBack, contentPadding = PaddingValues(0.dp)) {
-            Icon(Icons.Filled.ArrowForward, contentDescription = null, tint = Shop.colors.primary)
-            Spacer(Modifier.width(6.dp))
-            Text("بازگشت به فروش", color = Shop.colors.primary)
-          }
-          Spacer(Modifier.height(6.dp))
+          /*
+           *  دکمهٔ «بازگشت به فروش» اینجا نیست — عمداً.
+           *
+           *  گزارشِ صاحب مخزن: «این یکی دو تا برگشت دارد، در حالی که آن
+           *  بالا کنج وجود دارد». درست است: پیکانِ سربرگ همیشه سرِ جایش
+           *  است و همان کار را می‌کند. دو دکمه برای یک کار، فقط بالای
+           *  فهرست را شلوغ می‌کند و کاربر را به شک می‌اندازد که این دو
+           *  فرقی دارند یا نه.
+           */
           Text(
             "روی محصول بزنید تا یک عدد به سبد خرید اضافه شود",
             style = MaterialTheme.typography.bodySmall,
