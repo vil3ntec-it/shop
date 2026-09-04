@@ -124,6 +124,7 @@ class LightPilotTest {
 
     var t = 1000L
     repeat(300) {
+      //  همان بستهٔ براق، با همان روشناییِ پیش از چراغ
       pilot.onFrame(dark(), t)
       t += 100
     }
@@ -145,13 +146,61 @@ class LightPilotTest {
   }
 
   @Test
-  fun `اسکنِ موفق، چراغ را خاموش می‌کند`() {
+  fun `اسکنِ موفق چراغ را خاموش نمی‌کند`() {
+    /*
+     *  گزارشِ صاحب مخزن: «اگر هم شانس بیاورم و اسکن بشود، در جا خاموش
+     *  می‌شود». نورِ دکان با اسکن عوض نمی‌شود و کالای بعدی هم همان‌قدر
+     *  تاریک است؛ خاموش کردن یعنی چشمکِ چراغ سرِ هر کالا.
+     */
     pilot.onFrame(dark(), 0)
     pilot.onFrame(helped(), 600)
     assertTrue(lit)
     pilot.done(700)
-    assertFalse("کارِ چراغ با رفتنِ کالا به سبد تمام است", lit)
+    assertTrue("چراغ باید برای کالای بعدی روشن بماند", lit)
+    assertEquals(LightPilot.State.ON, pilot.state)
+  }
+
+  @Test
+  fun `نور که برگردد، پلکِ سنجش چراغ را خاموش می‌کند`() {
+    pilot.onFrame(dark(), 0)
+    pilot.onFrame(helped(), 600)
+    assertEquals(LightPilot.State.ON, pilot.state)
+
+    //  چند ثانیه بعد، چراغ یک چشم‌برهم‌زدن خاموش می‌شود تا نورِ واقعی
+    //  سنجیده شود
+    pilot.onFrame(helped(), 5000)
+    assertEquals(LightPilot.State.PEEK, pilot.state)
+    assertTrue("نشانِ روی صفحه نباید بابتِ پلک بپرد", lit)
+
+    //  و نورِ دکان برگشته: خاموش می‌ماند
+    pilot.onFrame(bright(), 5400)
     assertEquals(LightPilot.State.OFF, pilot.state)
+    assertFalse(lit)
+  }
+
+  @Test
+  fun `اگر هنوز تاریک بود، پلک چراغ را برمی‌گرداند`() {
+    pilot.onFrame(dark(), 0)
+    pilot.onFrame(helped(), 600)
+    pilot.onFrame(helped(), 5000)
+    assertEquals(LightPilot.State.PEEK, pilot.state)
+
+    pilot.onFrame(dark(), 5400)
+    assertEquals("تاریک است؛ چراغ برمی‌گردد", LightPilot.State.ON, pilot.state)
+    assertTrue(lit)
+  }
+
+  @Test
+  fun `نزدیک شدنِ کالا، چراغ را پس نمی‌کشد`() {
+    /*
+     *  گزارشِ صاحب مخزن: «محصول را که جلویش می‌آورم خاموش می‌شود».
+     *  کالا که نزدیک می‌آید کمی روشن‌تر و کمی سوخته می‌شود — این
+     *  «بازتاب» نیست.
+     */
+    pilot.onFrame(dark(), 0)
+    val closer = Look(luma = 150, roiLuma = 165, roiSpread = 70, roiClipped = 0.12f, samples = 4096)
+    pilot.onFrame(closer, 600)
+    assertTrue("نزدیک شدنِ عادی نباید چراغ را ببرد", lit)
   }
 
   @Test
