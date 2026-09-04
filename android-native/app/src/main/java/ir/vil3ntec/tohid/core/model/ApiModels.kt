@@ -129,7 +129,8 @@ data class ServerConfigDto(
   val otpEnabled: Boolean = true,
   val trialDays: Int = 0,
   val minAppVersion: String = "",
-  /** آیا این سرور مسیرهای `/auth/register/*` را دارد */
+  //  آیا این سرور ثبت‌نامِ سه‌مرحله‌ایِ ایمیلی را دارد
+  //  (`/auth/register/start` و دو پلهٔ بعدش)
   val emailSignup: Boolean = false,
   val termsVersion: String = "",
 )

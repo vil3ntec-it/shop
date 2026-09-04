@@ -5706,6 +5706,8 @@
   }
 
   /** سرور تنظیم نشده؟ ثبت‌نام معنی ندارد و باید همان اول گفته شود. */
+  const SIGNUP_NO_SERVER =
+    'هنوز آدرس سروری تنظیم نشده است. فعلاً «ادامه بدون حساب» را بزنید — همه‌ی بخش‌ها کار می‌کنند.';
   function signupServer(){
     const lic = window.TohidLicense;
     if(!lic || !lic.getServerUrl()) return null;
@@ -5817,10 +5819,7 @@
       if(password !== confirm){ authError('signup-password2-error','رمز و تکرارش یکی نیست.'); return; }
 
       const lic = signupServer();
-      if(!lic){
-        authError('signup-error-1','هنوز آدرس سروری تنظیم نشده است. فعلاً «ادامه بدون حساب» را بزنید — همه‌ی بخش‌ها کار می‌کنند.');
-        return;
-      }
+      if(!lic){ authError('signup-error-1', SIGNUP_NO_SERVER); return; }
 
       const btn = document.getElementById('signup-next-1');
       signupBusy(btn, true);
@@ -5872,7 +5871,7 @@
         return;
       }
       const lic = signupServer();
-      if(!lic) return;
+      if(!lic){ authError('signup-error-2', SIGNUP_NO_SERVER); return; }
 
       const btn = document.getElementById('signup-next-2');
       if(btn.classList.contains('is-busy')) return;
@@ -5908,7 +5907,7 @@
         return;
       }
       const lic = signupServer();
-      if(!lic) return;
+      if(!lic){ authError('signup-error-3', SIGNUP_NO_SERVER); return; }
 
       const btn = document.getElementById('signup-next-3');
       signupBusy(btn, true);
