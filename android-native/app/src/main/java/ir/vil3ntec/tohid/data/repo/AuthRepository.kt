@@ -1,6 +1,8 @@
 package ir.vil3ntec.tohid.data.repo
 
 import ir.vil3ntec.tohid.core.model.OtpChallengeDto
+import ir.vil3ntec.tohid.core.model.RegisterTicketDto
+import ir.vil3ntec.tohid.data.LocationFix
 import ir.vil3ntec.tohid.core.model.ServerConfigDto
 import ir.vil3ntec.tohid.core.model.SessionDto
 import ir.vil3ntec.tohid.core.net.ApiClient
@@ -145,6 +147,117 @@ class AuthRepository(
         },
       )
     )
+  }
+
+  /* ------------------------------ ثبت‌نامِ سه‌مرحله‌ای ------------------------------ */
+
+  /*
+   *  شماره‌ی موبایل از ثبت‌نام برداشته شد؛ قرارِ صاحب مخزن: «همان ایمیل
+   *  بس است، شماره فقط دردسر است».
+   *
+   *      ۱) registerStart     نام، ایمیل، رمز و تکرارش → کد به ایمیل
+   *      ۲) registerVerify    کدِ شش‌رقمی → بلیت
+   *      ۳) registerComplete  بلیت + لوکیشن + پذیرشِ شرایط → حساب و نشست
+   *
+   *  رمز تا پلهٔ سوم روی سرور نمی‌ماند؛ خودِ برنامه نگهش می‌دارد. پس رها
+   *  کردنِ ثبت‌نام هیچ حسابِ نیم‌بندی جا نمی‌گذارد.
+   */
+
+  suspend fun registerStart(
+    name: String,
+    email: String,
+    password: String,
+  ): ApiResult<OtpChallengeDto> = result {
+    ApiJson.decode<OtpChallengeDto>(
+      api.postPublic(
+        ApiEndpoints.Auth.REGISTER_START,
+        buildJsonObject {
+          put("name", JsonPrimitive(name.trim()))
+          put("email", JsonPrimitive(email.trim()))
+          put("password", JsonPrimitive(password))
+          put("passwordConfirm", JsonPrimitive(password))
+        },
+      )
+    )
+  }
+
+  suspend fun registerVerify(email: String, code: String): ApiResult<RegisterTicketDto> = result {
+    ApiJson.decode<RegisterTicketDto>(
+      api.postPublic(
+        ApiEndpoints.Auth.REGISTER_VERIFY,
+        buildJsonObject {
+          put("email", JsonPrimitive(email.trim()))
+          put("code", JsonPrimitive(code.trim()))
+        },
+      )
+    )
+  }
+
+  /**
+   *  پلهٔ سوم — و تنها جایی که حساب ساخته می‌شود.
+   *
+   *  لوکیشن اگر باشد همراهش می‌رود و اگر نباشد ثبت‌نام باز هم تمام
+   *  می‌شود: گوشی‌ای که اجازهٔ لوکیشن نداده، نباید صاحبش را پشتِ در
+   *  بگذارد. پذیرشِ شرایط ولی اجباری است و سرور هم بدونِ آن حساب
+   *  نمی‌سازد.
+   */
+  suspend fun registerComplete(
+    ticket: String,
+    name: String,
+    password: String,
+    termsVersion: String,
+    deviceUid: String,
+    deviceName: String,
+    location: LocationFix? = null,
+  ): ApiResult<SessionDto> = result {
+    keep(
+      api.postPublic(
+        ApiEndpoints.Auth.REGISTER_COMPLETE,
+        buildJsonObject {
+          put("ticket", JsonPrimitive(ticket))
+          put("name", JsonPrimitive(name.trim()))
+          put("password", JsonPrimitive(password))
+          put("terms", buildJsonObject {
+            put("accepted", JsonPrimitive(true))
+            put("version", JsonPrimitive(termsVersion))
+          })
+          location?.let { put("location", it.json()) }
+          put("device", buildJsonObject {
+            put("uid", JsonPrimitive(deviceUid))
+            put("name", JsonPrimitive(deviceName))
+            put("platform", JsonPrimitive("android"))
+          })
+        },
+      )
+    )
+  }
+
+  /* ------------------------------ لوکیشن ------------------------------ */
+
+  /**
+   *  فرستادنِ لوکیشن — با حساب یا بی‌حساب.
+   *
+   *  `postPublic` عمداً: این مسیر توکن لازم ندارد. اگر کاربر وارد شده
+   *  باشد `post` توکن را هم می‌برد و سرور ردیف را به همان حساب می‌بندد؛
+   *  اگر نه، ردیف به شناسهٔ دستگاه بسته می‌ماند تا روزی که همان دستگاه
+   *  حساب بسازد.
+   */
+  suspend fun sendLocation(
+    fix: LocationFix,
+    deviceUid: String,
+    deviceName: String,
+  ): ApiResult<Unit> = result {
+    val body = buildJsonObject {
+      put("location", fix.json())
+      put("device", buildJsonObject {
+        put("uid", JsonPrimitive(deviceUid))
+        put("name", JsonPrimitive(deviceName))
+        put("platform", JsonPrimitive("android"))
+      })
+    }
+    if (tokens.signedIn) api.post(ApiEndpoints.Location.ROOT, body)
+    else api.postPublic(ApiEndpoints.Location.ROOT, body)
+    Unit
   }
 
   /**

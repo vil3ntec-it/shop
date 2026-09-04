@@ -42,7 +42,6 @@ import androidx.compose.material.icons.filled.AlternateEmail
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Visibility
@@ -71,15 +70,28 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.LocationOff
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import ir.vil3ntec.tohid.core.config.AppConfig
 import ir.vil3ntec.tohid.core.model.SessionDto
+import ir.vil3ntec.tohid.core.net.ApiFailure
 import ir.vil3ntec.tohid.core.net.userText
 import ir.vil3ntec.tohid.data.repo.Backend
+import ir.vil3ntec.tohid.data.DeviceLocation
+import ir.vil3ntec.tohid.data.LocationFix
 import ir.vil3ntec.tohid.data.StaffCode
+import ir.vil3ntec.tohid.data.Terms
 import ir.vil3ntec.tohid.data.LedgerOwner
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.sync.SavedLogins
@@ -153,8 +165,7 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
   val scope = rememberCoroutineScope()
   val state = remember { SyncStore(context) }
 
-  // phone | email
-  // ایمیل: ورود یا ساختِ حساب
+  //  ایمیل: ورود یا ساختِ حساب. راهِ سومی نیست — شماره برداشته شد.
   var emailMode by rememberSaveable { mutableStateOf("login") }
 
   //  کشوی پایین فقط «کد شاگرد» است و بسته می‌آید؛ چیزی برای تنظیم
@@ -166,7 +177,6 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
   val shops = remember(context) { Backend.shop(context) }
 
   var name by rememberSaveable { mutableStateOf("") }
-  var phone by rememberSaveable { mutableStateOf("") }
   var code by rememberSaveable { mutableStateOf("") }
   var codeSent by rememberSaveable { mutableStateOf(false) }
 
@@ -198,6 +208,22 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
    *  همان ایمیل می‌رود و همان صفحهٔ کد باز می‌شود.
    */
   var resetting by rememberSaveable { mutableStateOf(false) }
+
+  /*
+   *  ثبت‌نام، سه پله.
+   *
+   *  قرارِ صاحب مخزن: شماره‌ی موبایل از ثبت‌نام برداشته شد — «همان ایمیل
+   *  یا جی‌میل بس است». پله‌ها:
+   *
+   *      ""      نام و ایمیل و رمز و تکرارش
+   *      "code"  کدِ شش‌رقمی که به همان ایمیل رفته
+   *      "terms" لوکیشن و پذیرشِ شرایط و ضوابط
+   *
+   *  «بلیت» چیزی است که پلهٔ دوم می‌دهد و پلهٔ سوم خرجش می‌کند؛ تا آن
+   *  لحظه هیچ حسابی روی سرور ساخته نشده.
+   */
+  var signupStep by rememberSaveable { mutableStateOf("") }
+  var ticket by rememberSaveable { mutableStateOf("") }
 
   /*
    *  ورود با گوگل فقط وقتی نشان داده می‌شود که خودِ سرور بگوید روشن است.
@@ -266,9 +292,56 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
    *  شماره و کد و دکمه‌ها همه با هم. حالا وقتی کد فرستاده شد، یک صفحهٔ
    *  جدا می‌آید که فقط یک کار دارد. منطقِ ورود همان است؛ فقط جایش عوض شده.
    */
+  /*
+   *  پلهٔ سومِ ثبت‌نام: لوکیشن و شرایط و ضوابط.
+   *
+   *  حساب همین‌جا ساخته می‌شود — نه زودتر. لوکیشن اگر پیدا نشود ثبت‌نام
+   *  باز هم تمام می‌شود، ولی پذیرشِ شرایط اجباری است.
+   */
+  if (signupStep == "terms") {
+    TermsLocationScreen(
+      busy = busy,
+      error = error,
+      onBack = { signupStep = "code"; error = null },
+      onSubmit = { fix ->
+        busy = true; error = null; note = null
+        scope.launch {
+          auth.registerComplete(
+            ticket = ticket,
+            name = name.trim(),
+            password = password,
+            termsVersion = ir.vil3ntec.tohid.data.Terms.VERSION,
+            deviceUid = state.deviceUid,
+            deviceName = android.os.Build.MODEL ?: "گوشی",
+            location = fix,
+          )
+            .onSuccess { session ->
+              val who = email.trim()
+              //  رمز از حافظهٔ صفحه پاک شود؛ کارش تمام است
+              password = ""; password2 = ""; ticket = ""
+              signupStep = ""; codeSent = false; code = ""
+              finish(who, session)
+            }
+            .onFailure {
+              fail(it)
+              //  بلیت که منقضی یا خرج شده باشد، از پلهٔ اول باید شروع کرد
+              if (it is ApiFailure && it.code == "register_ticket_invalid") {
+                signupStep = ""; codeSent = false; ticket = ""
+              }
+            }
+          busy = false
+        }
+      },
+    )
+    return
+  }
+
   if (codeSent) {
-    //  یک راهِ ورود مانده و آن ایمیل است؛ شماره اختیاریِ ثبت‌نام است
+    //  یک راهِ ورود مانده و آن ایمیل است
     val destination = email.trim()
+    //  ثبت‌نام، بازیابیِ رمز و ورود با کد هر سه به همین صفحه می‌رسند و
+    //  فرقشان فقط در این است که کدِ درست را به کجا می‌برند
+    val registering = signupStep == "code"
     CodeScreen(
       destination = destination,
       busy = busy,
@@ -276,12 +349,18 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
       note = note,
       askPassword = resetting,
       secondsLeft = { cooldown.secondsLeft(destination) },
-      onBack = { codeSent = false; code = ""; note = null; error = null; resetting = false },
+      onBack = {
+        codeSent = false; code = ""; note = null; error = null
+        resetting = false; signupStep = ""
+      },
       onResend = {
         busy = true; error = null
         scope.launch {
-          val asked =
-            if (resetting) auth.forgotPassword(destination) else auth.requestOtp(destination)
+          val asked = when {
+            registering -> auth.registerStart(name.trim(), destination, password)
+            resetting -> auth.forgotPassword(destination)
+            else -> auth.requestOtp(destination)
+          }
           asked
             .onSuccess {
               cooldown.start(destination, it.resendSeconds)
@@ -294,11 +373,19 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
       onSubmit = { entered, newPassword ->
         busy = true; error = null; note = null
         scope.launch {
-          val done =
-            if (resetting) auth.resetPassword(destination, entered, newPassword)
-            else auth.verifyOtp(destination, entered, name.trim())
-          done.onSuccess { resetting = false; finish(destination, it) }
-            .onFailure { fail(it) }
+          if (registering) {
+            //  کد که درست بود، حساب هنوز ساخته نشده: بلیت می‌گیریم و
+            //  می‌رویم سراغِ لوکیشن و شرایط
+            auth.registerVerify(destination, entered)
+              .onSuccess { ticket = it.ticket; signupStep = "terms" }
+              .onFailure { fail(it) }
+          } else {
+            val done =
+              if (resetting) auth.resetPassword(destination, entered, newPassword)
+              else auth.verifyOtp(destination, entered, name.trim())
+            done.onSuccess { resetting = false; finish(destination, it) }
+              .onFailure { fail(it) }
+          }
           busy = false
         }
       },
@@ -318,7 +405,7 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
       GradientHeader(
         title = if (emailMode == "login") "خوش آمدید" else "حساب تازه",
         subtitle = if (emailMode == "login") "با ایمیل و رمز وارد شوید"
-        else "ایمیل و رمز؛ شماره اختیاری است",
+        else "در سه گام: ایمیل و رمز، کد تأیید، لوکیشن و شرایط",
       )
 
       /*
@@ -426,25 +513,14 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
             }
 
             /*
-             *  شمارهٔ موبایل — اختیاری، و همین‌جا نوشته شده که اختیاری
-             *  است.
+             *  شمارهٔ موبایل از اینجا برداشته شد.
              *
-             *  سرور از اول یکی از این دو را کافی می‌دانست؛ پس شماره
-             *  چیزی است که اگر بدهی، برای بازیابی و پیامک به کار
-             *  می‌آید، و اگر ندهی جلوی هیچ‌چیز را نمی‌گیرد.
+             *  قرارِ صاحب مخزن: «شماره را بردار، لازم نیست، فقط دردسر
+             *  است — همان ایمیل یا جی‌میل بس است». راست هم هست: پیامک
+             *  پول دارد، به کشور بند است، و شماره‌ای که عوض شود حساب را
+             *  با خودش می‌برد. ایمیل هیچ‌کدام را ندارد و کدِ تأیید هم
+             *  از همان راه می‌رود.
              */
-            Spacer(Modifier.height(12.dp))
-            PillField(
-              value = phone,
-              onValueChange = { phone = it; error = null },
-              placeholder = "شماره موبایل (اختیاری)",
-              icon = Icons.Filled.PhoneAndroid,
-              keyboardOptions = KeyboardOptions(
-                keyboardType = KeyboardType.Phone,
-                imeAction = ImeAction.Done,
-              ),
-              ltr = true,
-            )
           }
         }
 
@@ -472,19 +548,20 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
           busy = true; error = null; note = null
           scope.launch {
             when {
+              /*
+               *  ثبت‌نام دیگر یک درخواست نیست، سه پله است.
+               *
+               *  اینجا فقط پلهٔ اول است: سرور ایمیل و رمز را می‌سنجد و
+               *  کدِ شش‌رقمی را به همان ایمیل می‌فرستد. حساب در پلهٔ
+               *  سوم — بعد از لوکیشن و پذیرشِ شرایط — ساخته می‌شود.
+               */
               emailMode == "register" ->
-                auth.register(name.trim(), email.trim(), phone.trim(), password)
+                auth.registerStart(name.trim(), email.trim(), password)
                   .onSuccess {
-                    //  سرور با ثبت‌نام نشست هم می‌دهد؛ آن‌وقت مرحلهٔ دومی
-                    //  لازم نیست و همان‌جا داخل می‌شویم
-                    if (it.isValid) {
-                      finish(email.trim(), it)
-                    } else {
-                      note = "حساب ساخته شد — حالا وارد شوید"
-                      emailMode = "login"
-                      password = ""
-                      password2 = ""
-                    }
+                    cooldown.start(email.trim(), it.resendSeconds)
+                    it.devCode?.let { c -> note = "کد آزمایشی: $c" }
+                    signupStep = "code"
+                    codeSent = true
                   }
                   .onFailure { fail(it) }
 
@@ -1087,6 +1164,274 @@ private fun CodeScreen(
         )
       }
       Spacer(Modifier.height(30.dp))
+    }
+  }
+}
+
+
+/* ============================== پلهٔ سومِ ثبت‌نام ============================== */
+
+/**
+ *  لوکیشن و شرایط و ضوابط — آخرین پله پیش از ساخته شدنِ حساب.
+ *
+ *  ── چرا لوکیشن اینجاست ─────────────────────────────────────────────
+ *  قرارِ صاحب مخزن: لوکیشنِ دکان همراهِ حساب ثبت شود، و «خیلی زود پیدا و
+ *  ثبت بشود، خیلی طول نکشد». پس جست‌وجو با باز شدنِ همین صفحه شروع
+ *  می‌شود، نه با زدنِ یک دکمه: تا کاربر متنِ شرایط را می‌خواند، نقطه پیدا
+ *  شده است.
+ *
+ *  ── و اگر پیدا نشد ─────────────────────────────────────────────────
+ *  ثبت‌نام باز هم تمام می‌شود. گوشیِ بدونِ اجازه، لوکیشنِ خاموش، یا
+ *  ساختمانی که سیگنال ندارد نباید صاحبِ دکان را پشتِ در بگذارد. آنچه
+ *  اجباری است پذیرشِ شرایط است، نه لوکیشن.
+ */
+@Composable
+private fun TermsLocationScreen(
+  busy: Boolean,
+  error: String?,
+  onBack: () -> Unit,
+  onSubmit: (LocationFix?) -> Unit,
+) {
+  val context = LocalContext.current
+  val scope = rememberCoroutineScope()
+
+  var fix by remember { mutableStateOf<LocationFix?>(null) }
+  var looking by remember { mutableStateOf(true) }
+  var accepted by rememberSaveable { mutableStateOf(false) }
+  var showTermsError by remember { mutableStateOf(false) }
+
+  fun look(force: Boolean) {
+    looking = true
+    scope.launch {
+      fix = DeviceLocation.current(context, force = force)
+      looking = false
+    }
+  }
+
+  //  اجازه اگر نبود، همین‌جا یک بار پرسیده می‌شود. جوابِ «نه» هم راه را
+  //  نمی‌بندد؛ فقط کادر می‌گوید پیدا نشد.
+  val ask = rememberLauncherForActivityResult(
+    ActivityResultContracts.RequestMultiplePermissions()
+  ) { granted -> if (granted.values.any { it }) look(true) else looking = false }
+
+  LaunchedEffect(Unit) {
+    if (DeviceLocation.granted(context)) look(false)
+    else ask.launch(DeviceLocation.PERMISSIONS)
+  }
+
+  BackHandler { onBack() }
+
+  Box(Modifier.fillMaxSize()) {
+    WelcomeBackground()
+    Column(
+      Modifier.fillMaxSize().verticalScroll(rememberScrollState()).imePadding(),
+      horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+      Spacer(Modifier.height(36.dp))
+      BrandMark()
+      Spacer(Modifier.height(20.dp))
+      Text(
+        "یک قدم مانده",
+        style = MaterialTheme.typography.headlineSmall,
+        color = ink,
+        fontWeight = FontWeight.Bold,
+      )
+      Spacer(Modifier.height(8.dp))
+      Text(
+        "لوکیشن دکان‌تان و پذیرش شرایط",
+        style = MaterialTheme.typography.bodyMedium,
+        color = inkSoft,
+        textAlign = TextAlign.Center,
+      )
+
+      Spacer(Modifier.height(22.dp))
+
+      Column(Modifier.widthIn(max = 460.dp).fillMaxWidth().padding(horizontal = 22.dp)) {
+
+        /* ---------------- کادرِ لوکیشن ---------------- */
+        val found = fix != null
+        val edge = when {
+          looking -> fieldLine
+          found -> Shop.colors.success
+          else -> Shop.colors.warning
+        }
+        Row(
+          Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(if (isDarkSurface()) Shop.colors.surface else Color.White)
+            .border(1.5.dp, edge, RoundedCornerShape(18.dp))
+            .padding(14.dp),
+          verticalAlignment = Alignment.CenterVertically,
+        ) {
+          Box(
+            Modifier
+              .size(42.dp)
+              .clip(RoundedCornerShape(14.dp))
+              .background(edge.copy(alpha = 0.14f)),
+            contentAlignment = Alignment.Center,
+          ) {
+            if (looking) {
+              CircularProgressIndicator(
+                modifier = Modifier.size(20.dp),
+                strokeWidth = 2.dp,
+                color = BLUE,
+              )
+            } else {
+              Icon(
+                if (found) Icons.Filled.LocationOn else Icons.Filled.LocationOff,
+                contentDescription = null,
+                tint = edge,
+                modifier = Modifier.size(21.dp),
+              )
+            }
+          }
+          Spacer(Modifier.width(12.dp))
+          Column(Modifier.weight(1f)) {
+            Text(
+              when {
+                looking -> "در حال پیدا کردن لوکیشن…"
+                found -> "لوکیشن پیدا شد"
+                else -> "لوکیشن پیدا نشد"
+              },
+              style = MaterialTheme.typography.labelLarge,
+              color = ink,
+              fontWeight = FontWeight.Bold,
+            )
+            Spacer(Modifier.height(3.dp))
+            val detail = fix
+            if (detail != null) {
+              CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                Text(
+                  String.format(java.util.Locale.US, "%.5f, %.5f", detail.lat, detail.lng),
+                  style = MaterialTheme.typography.labelSmall,
+                  color = inkSoft,
+                )
+              }
+            } else {
+              Text(
+                if (looking) "چند لحظه — همراه حساب ثبت می‌شود"
+                else "بدون آن هم می‌توانید حساب بسازید",
+                style = MaterialTheme.typography.labelSmall,
+                color = inkSoft,
+                overflow = TextOverflow.Ellipsis,
+              )
+            }
+          }
+          if (!looking) {
+            TextButton(onClick = {
+              if (DeviceLocation.granted(context)) look(true) else ask.launch(DeviceLocation.PERMISSIONS)
+            }) {
+              Text("دوباره", style = MaterialTheme.typography.labelMedium, color = BLUE)
+            }
+          }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        /* ---------------- کادرِ شرایط و ضوابط ---------------- */
+        Column(
+          Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(if (isDarkSurface()) Shop.colors.surface else Color.White)
+            .border(1.dp, fieldLine, RoundedCornerShape(18.dp)),
+        ) {
+          Row(
+            Modifier.fillMaxWidth().padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+          ) {
+            Icon(
+              Icons.Filled.Description,
+              contentDescription = null,
+              tint = BLUE,
+              modifier = Modifier.size(18.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+              Terms.TITLE,
+              style = MaterialTheme.typography.labelLarge,
+              color = ink,
+              fontWeight = FontWeight.Bold,
+            )
+          }
+          HorizontalDivider(color = fieldLine)
+          //  بلندیِ ثابت و اسکرولِ خودش: متن بلند است و اگر باز باشد،
+          //  دکمهٔ «ساخت حساب» را ته یک صفحهٔ دراز می‌برد
+          Column(
+            Modifier
+              .fillMaxWidth()
+              .height(210.dp)
+              .verticalScroll(rememberScrollState())
+              .padding(14.dp),
+          ) {
+            Terms.SECTIONS.forEachIndexed { index, (title, body) ->
+              if (index > 0) Spacer(Modifier.height(12.dp))
+              Text(
+                title,
+                style = MaterialTheme.typography.labelMedium,
+                color = ink,
+                fontWeight = FontWeight.Bold,
+              )
+              Spacer(Modifier.height(4.dp))
+              Text(body, style = MaterialTheme.typography.labelSmall, color = inkSoft)
+            }
+          }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        /* ---------------- پذیرش ---------------- */
+        Row(
+          Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(if (accepted) BLUE.copy(alpha = 0.08f) else Color.Transparent)
+            .border(1.5.dp, if (accepted) BLUE else fieldLine, RoundedCornerShape(16.dp))
+            .clickable { accepted = !accepted; if (accepted) showTermsError = false }
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+          verticalAlignment = Alignment.CenterVertically,
+        ) {
+          Checkbox(
+            checked = accepted,
+            onCheckedChange = { accepted = it; if (it) showTermsError = false },
+          )
+          Spacer(Modifier.width(4.dp))
+          Text(
+            "شرایط و ضوابط را خوانده‌ام و می‌پذیرم.",
+            style = MaterialTheme.typography.labelLarge,
+            color = ink,
+          )
+        }
+
+        if (showTermsError) {
+          Spacer(Modifier.height(8.dp))
+          Text(
+            "برای ساختن حساب باید شرایط و ضوابط را بپذیرید.",
+            style = MaterialTheme.typography.labelMedium,
+            color = Shop.colors.danger,
+          )
+        }
+        error?.let {
+          Spacer(Modifier.height(10.dp))
+          Text(it, style = MaterialTheme.typography.labelMedium, color = Shop.colors.danger)
+        }
+
+        Spacer(Modifier.height(18.dp))
+        GradientButton(
+          text = "ساخت حساب و ورود",
+          enabled = !busy,
+          busy = busy,
+        ) {
+          if (!accepted) showTermsError = true else onSubmit(fix)
+        }
+
+        Spacer(Modifier.height(6.dp))
+        TextButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) {
+          Text("برگشت", style = MaterialTheme.typography.labelMedium, color = inkSoft)
+        }
+        Spacer(Modifier.height(28.dp))
+      }
     }
   }
 }
