@@ -55,6 +55,9 @@ import ir.vil3ntec.tohid.sync.SyncStore
 import kotlinx.coroutines.launch
 import ir.vil3ntec.tohid.ui.theme.Radius
 import ir.vil3ntec.tohid.ui.theme.Shop
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.snap
+import androidx.compose.ui.draw.shadow
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.shape.CircleShape
@@ -164,14 +167,18 @@ private val GOLD_SWEEP = Brush.linearGradient(
  */
 @Composable
 private fun goldPulse(): Float {
-  val motion = rememberInfiniteTransition(label = "goldPulse")
-  val value by motion.animateFloat(
-    initialValue = 0f,
-    targetValue = 1f,
-    animationSpec = infiniteRepeatable(
-      tween(if (Motion.enabled) 2200 else 1, easing = EaseInOutSine),
-      RepeatMode.Reverse,
-    ),
+  /*
+   *  ── درخشش، یک بار ────────────────────────────────────────────────
+   *  هاله‌ی کارت‌ها بی‌وقفه کم‌وزیاد می‌شد. حرکتِ همیشگی روی صفحه‌ای که
+   *  کارش «انتخاب کن» است، حواس را می‌برد و ارزان به نظر می‌رسد؛
+   *  برنامه‌های گران، یک بار درخشش می‌دهند و بعد آرام می‌مانند.
+   *  ──────────────────────────────────────────────────────────────────
+   */
+  var lit by remember { mutableStateOf(false) }
+  LaunchedEffect(Unit) { lit = true }
+  val value by animateFloatAsState(
+    targetValue = if (lit) 1f else 0f,
+    animationSpec = tween(if (Motion.enabled) 1100 else 1, easing = EaseInOutSine),
     label = "pulse",
   )
   return value
@@ -334,7 +341,11 @@ fun VipScreen(onDismiss: () -> Unit) {
         else -> TrialInvite()
       }
 
-      Spacer(Modifier.height(14.dp))
+      Spacer(Modifier.height(16.dp))
+
+      VipHero()
+
+      Spacer(Modifier.height(18.dp))
 
       /*
        *  دو ستونِ مقایسه.
@@ -999,6 +1010,7 @@ private fun PlanCard(
       Modifier
         .fillMaxWidth()
         .then(if (stretch) Modifier.weight(1f) else Modifier)
+        .selectScale(selected)
         .then(if (golden) Modifier.goldEdge(Radius.md, pulse, strong = selected) else Modifier)
         //  نورِ چرخانِ دورِ کارت‌های طلایی — شرحش سرِ `borderBeam`
         .then(if (golden) Modifier.borderBeam(GOLD, strong = selected) else Modifier)
@@ -1149,30 +1161,34 @@ fun VipGate(label: String, content: @Composable () -> Unit) {
         .padding(24.dp),
       horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-      // قفلِ نفس‌کشنده — صفحهٔ ساکن، خراب به نظر می‌رسد
-      val motion = rememberInfiniteTransition(label = "gate")
-      val pulse by motion.animateFloat(
-        initialValue = 0.94f,
-        targetValue = 1.06f,
-        animationSpec = infiniteRepeatable(
-          tween(if (Motion.enabled) 1600 else 1, easing = LinearEasing),
-          RepeatMode.Reverse,
-        ),
-        label = "pulse",
+      /*
+       *  قفلِ خاکستریِ نفس‌کشنده رفت.
+       *
+       *  این صفحه خبرِ بد نمی‌دهد؛ می‌گوید چه چیزی با اشتراک باز می‌شود.
+       *  پس همان نشانِ صفحه‌ی اشتراک، با یک بار باز شدنِ نرم — نه تپشِ
+       *  همیشگیِ یک قفلِ خاکستری.
+       */
+      var lit by remember { mutableStateOf(false) }
+      LaunchedEffect(Unit) { lit = true }
+      val grow by animateFloatAsState(
+        targetValue = if (lit) 1f else 0.84f,
+        animationSpec = if (Motion.enabled) spring(dampingRatio = 0.6f, stiffness = 320f) else snap(),
+        label = "gateGrow",
       )
       Box(
         Modifier
+          .graphicsLayer { scaleX = grow; scaleY = grow }
           .size(66.dp)
-          .graphicsLayer { scaleX = pulse; scaleY = pulse }
+          .shadow(20.dp, RoundedCornerShape(22.dp), ambientColor = GOLD, spotColor = GOLD)
           .clip(RoundedCornerShape(22.dp))
-          .background(Shop.colors.warningTint),
+          .background(Brush.linearGradient(listOf(GOLD_SOFT, GOLD, GOLD_DEEP))),
         contentAlignment = Alignment.Center,
       ) {
         Icon(
-          Icons.Filled.Lock,
+          Icons.Filled.WorkspacePremium,
           contentDescription = null,
-          tint = Shop.colors.warning,
-          modifier = Modifier.size(28.dp),
+          tint = Color.White,
+          modifier = Modifier.size(29.dp),
         )
       }
       Spacer(Modifier.height(16.dp))
@@ -1241,5 +1257,75 @@ private fun GoldButton(text: String, onClick: () -> Unit) {
       modifier = Modifier.size(18.dp),
     )
     Text(text, color = Color(0xFF3A2705), fontWeight = FontWeight.Bold)
+  }
+}
+
+
+/* ==================== هیروی صفحه‌ی اشتراک ==================== */
+
+/**
+ *  بالای صفحه، پیش از قیمت‌ها: اول بگو چه می‌فروشی.
+ *
+ *  یک مربعِ نرمِ گرادینتی با تاجِ سفید و هاله‌ی بنفشِ زیرش، و دو خط زیرِ
+ *  آن. همان چیزی که در برنامه‌های گران، صفحه‌ی اشتراک با آن باز می‌شود:
+ *  یک نشانِ بزرگ و یک جمله، نه یک جدولِ قیمت.
+ */
+@Composable
+private fun VipHero() {
+  val colors = Shop.colors
+  //  ورودِ نرم: نشان از ۰٫۸ باز می‌شود و متن کمی از پایین بالا می‌آید —
+  //  یک بار، هنگام آمدنِ صفحه
+  var shown by remember { mutableStateOf(false) }
+  LaunchedEffect(Unit) { shown = true }
+  val grow by animateFloatAsState(
+    targetValue = if (shown) 1f else 0.82f,
+    animationSpec = if (Motion.enabled) spring(dampingRatio = 0.62f, stiffness = 320f) else snap(),
+    label = "heroGrow",
+  )
+  val rise by animateFloatAsState(
+    targetValue = if (shown) 0f else 14f,
+    animationSpec = if (Motion.enabled) tween(420, easing = FastOutSlowInEasing) else snap(),
+    label = "heroRise",
+  )
+
+  Column(
+    Modifier.fillMaxWidth(),
+    horizontalAlignment = Alignment.CenterHorizontally,
+  ) {
+    Box(
+      Modifier
+        .graphicsLayer { scaleX = grow; scaleY = grow }
+        .size(66.dp)
+        .shadow(22.dp, RoundedCornerShape(24.dp), ambientColor = GOLD, spotColor = GOLD)
+        .clip(RoundedCornerShape(24.dp))
+        .background(Brush.linearGradient(listOf(GOLD_SOFT, GOLD, GOLD_DEEP))),
+      contentAlignment = Alignment.Center,
+    ) {
+      Icon(
+        Icons.Filled.WorkspacePremium,
+        contentDescription = null,
+        tint = Color.White,
+        modifier = Modifier.size(31.dp),
+      )
+    }
+    Spacer(Modifier.height(14.dp))
+    Column(
+      Modifier.graphicsLayer { translationY = rise; alpha = if (rise > 0.5f) 0.6f else 1f },
+      horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+      Text(
+        "دکان بدون محدودیت",
+        style = MaterialTheme.typography.headlineSmall,
+        color = colors.text,
+        fontWeight = FontWeight.Bold,
+      )
+      Spacer(Modifier.height(5.dp))
+      Text(
+        "فروش، قرض‌داران و بارکد — همه باز",
+        style = MaterialTheme.typography.bodySmall,
+        color = colors.muted,
+        textAlign = TextAlign.Center,
+      )
+    }
   }
 }

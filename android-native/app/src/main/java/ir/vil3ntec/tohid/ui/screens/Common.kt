@@ -70,13 +70,20 @@ fun StatTile(
   compact: Boolean = false,
 ) {
   val colors = Shop.colors
-  val tint = if (richGlass()) colors.surface else colors.surfaceSolid
+  /*
+   *  اسمش `fill` است نه `tint`.
+   *
+   *  یک بار `tint` صدایش کردم و همان، پارامترِ `tint` را — که رنگِ عدد
+   *  است — پوشاند: عددِ کاشی رنگِ شیشه گرفت و در تمِ شب اصلاً دیده
+   *  نمی‌شد. نامِ تکراری در کاتلین خطا نیست، فقط ساکت اشتباه می‌کند.
+   */
+  val fill = if (richGlass()) colors.surface else colors.surfaceSolid
   // برچسب، عدد و توضیح هر سه وسطِ کاشی. وقتی چند کاشی کنارِ هم‌اند و
   // متن‌ها به یک لبه چسبیده‌اند، ردیف ناهماهنگ دیده می‌شود — به‌ویژه
   // آنجا که یک برچسب دو خط می‌شود و بقیه یک خط.
   Column(
     modifier
-      .glassSurface(Shape.card, tint, colors.sheen, colors.border, glow = colors.glow)
+      .glassSurface(Shape.card, fill, colors.sheen, colors.border, glow = colors.glow)
       .padding(if (compact) 10.dp else 16.dp),
     horizontalAlignment = Alignment.CenterHorizontally,
   ) {
