@@ -37,7 +37,7 @@
   const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g,
     c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const fa = (n) => Number(n).toLocaleString('fa-IR');
+  const fa = (n) => Number(n).toLocaleString('en-US');
   const read = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
   const write = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
   /* بعضی مرورگرها و WebViewها localStorage را می‌بندند (فایل محلی،
@@ -146,8 +146,8 @@
   const FALLBACK_MESSAGE = 'سلام، می‌خواهم اشتراک برنامه توحید را بخرم.';
   const FALLBACK_PLANS = [
     { code: 'm1', title: 'ماهانه', amount: 1, unit: 'month', price: 500 },
-    { code: 'm6', title: '۶ ماهه', amount: 6, unit: 'month', price: 2000, badge: 'پیشنهاد ما' },
-    { code: 'y1', title: '۱ ساله', amount: 1, unit: 'year', price: 3000, badge: 'بیشترین صرفه' },
+    { code: 'm6', title: '6 ماهه', amount: 6, unit: 'month', price: 2000, badge: 'پیشنهاد ما' },
+    { code: 'y1', title: '1 ساله', amount: 1, unit: 'year', price: 3000, badge: 'بیشترین صرفه' },
   ];
 
   function approxDays(amount, unit) {
@@ -262,7 +262,7 @@
 
   function reasonText() {
     const t = ENT.trial || {};
-    if (!loggedIn()) return 'برای استفاده از این بخش، حساب بسازید و ۷ روز رایگان امتحان کنید.';
+    if (!loggedIn()) return 'برای استفاده از این بخش، حساب بسازید و 7 روز رایگان امتحان کنید.';
     if (t.used && !t.active) return 'دوره آزمایشی شما به پایان رسیده است. برای ادامه استفاده، یک اشتراک انتخاب کنید.';
     return 'این بخش نیازمند اشتراک است.';
   }
@@ -425,13 +425,13 @@
     const t = ENT.trial || {};
     if (!loggedIn()) {
       return `<div class="vip-status vip-status-promo">
-        <b>۷ روز رایگان</b>
-        <span>حساب بسازید و همه‌ی قابلیت‌ها را ۷ روز رایگان امتحان کنید. اطلاعاتی که ثبت می‌کنید در حساب خودتان می‌ماند.</span>
+        <b>7 روز رایگان</b>
+        <span>حساب بسازید و همه‌ی قابلیت‌ها را 7 روز رایگان امتحان کنید. اطلاعاتی که ثبت می‌کنید در حساب خودتان می‌ماند.</span>
       </div>`;
     }
     if (ENT.source === 'subscription') {
       const s = ENT.subscription || {};
-      const end = s.endsAt ? new Date(s.endsAt).toLocaleDateString('fa-IR') : '—';
+      const end = s.endsAt ? new Date(s.endsAt).toLocaleDateString('fa-IR-u-nu-latn') : '—';
       return `<div class="vip-status vip-status-ok">
         <b>اشتراک فعال</b>
         <span>تا تاریخ ${esc(end)}</span>
@@ -473,7 +473,7 @@
     return `
       <div class="vip-tier">
         <div class="vip-tier-name">رایگان</div>
-        <div class="vip-tier-price">۰ <small>${esc(currency)}</small></div>
+        <div class="vip-tier-price">0 <small>${esc(currency)}</small></div>
         <div class="vip-tier-sub">همیشه رایگان</div>
         <ul class="vip-ticks">${freeList}${freeLocked}</ul>
         <div class="vip-tier-foot${paidNow || trialNow ? '' : ' is-now'}">

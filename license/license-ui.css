@@ -61,7 +61,7 @@
 #lic-banner .lic-banner-text{ flex:1; min-width:0; }
 @media (min-width:900px){ #lic-banner{ inset-inline-start:auto; max-width:520px; } }
 /* روی موبایل بالای نوار پایین بنشیند */
-@media (max-width:899px){ #lic-banner{ bottom:calc(var(--bottomnav-h, 66px) + 10px); } }
+@media (max-width:899px){ #lic-banner{ bottom:calc(var(--bottomnav-space, 76px) + 10px); } }
 
 /* ---------- پنجره اشتراک ---------- */
 .lic-scrim{

@@ -15,7 +15,7 @@
   const lsDel = (k) => { try { localStorage.removeItem(k); } catch {} };
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g,
     c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const fa = (n) => Number(n).toLocaleString('fa-IR');
+  const fa = (n) => Number(n).toLocaleString('en-US');
 
   function fmtWhen(ms) {
     if (!ms) return 'هرگز';
@@ -66,7 +66,7 @@
               <input type="email" id="shop-remail" class="sync-input" dir="ltr">
               <label class="sync-label">شماره موبایل (اختیاری)</label>
               <input type="tel" id="shop-rphone" class="sync-input" dir="ltr">
-              <label class="sync-label">رمز عبور (حداقل ۸ کاراکتر)</label>
+              <label class="sync-label">رمز عبور (حداقل 8 کاراکتر)</label>
               <input type="password" id="shop-rpw" class="sync-input" dir="ltr" autocomplete="new-password">
               <button type="button" class="sync-btn sync-btn-block" id="shop-register">ساخت حساب</button>
             </div>

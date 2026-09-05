@@ -22,8 +22,11 @@
 }
 .vip-badge-icon{ display:flex; line-height:1; }
 .vip-badge-icon svg{ width:14px; height:14px; }
-/* تاجِ متحرک */
-.vip-badge-icon{ animation:vip-crown-bob 2.6s ease-in-out infinite; transform-origin:50% 80%; }
+/* تاجِ نشان — یک تکانِ خوش‌آمد و بعد آرام.
+   حرکتِ بی‌وقفه روی سربرگ حواس را می‌برد و ارزان به نظر می‌رسد؛
+   برنامه‌های گران یک بار سلام می‌کنند و بعد ساکت می‌مانند.
+   (همان قاعده‌ی goldPulse در Vip.kt) */
+.vip-badge-icon{ animation:vip-crown-bob 1.6s cubic-bezier(.22,1,.36,1) .4s 1 both; transform-origin:50% 80%; }
 @keyframes vip-crown-bob{
   0%,100%{ transform:translateY(0) rotate(0deg); }
   25%    { transform:translateY(-2px) rotate(-9deg); }
@@ -40,7 +43,7 @@
   position:absolute; top:70%; width:3px; height:3px; border-radius:50%;
   background:#ffd970; box-shadow:0 0 5px 1px rgba(255,214,110,.95);
   opacity:0; pointer-events:none;
-  animation:vip-spark-fall 2.8s linear infinite;
+  animation:vip-spark-fall 2.2s cubic-bezier(.3,.7,.4,1) 1 both;
 }
 .vip-spark.s1{ inset-inline-start:16%; animation-delay:0s;    }
 .vip-spark.s2{ inset-inline-start:38%; animation-delay:.7s;   }
@@ -69,7 +72,7 @@
 #vip-trial-bar.vip-bar-danger{ background:var(--danger-tint,#fdecec); color:var(--danger,#e54b4b); }
 #vip-trial-bar span{ flex:1; min-width:0; }
 @media (min-width:900px){ #vip-trial-bar{ inset-inline-start:auto; max-width:520px; } }
-@media (max-width:899px){ #vip-trial-bar{ bottom:calc(var(--bottomnav-h,66px) + 10px); } }
+@media (max-width:899px){ #vip-trial-bar{ bottom:calc(var(--bottomnav-space, 76px) + 10px); } }
 
 /* ---------- پوشش صفحه‌های قفل ---------- */
 .vip-overlay{
@@ -273,7 +276,7 @@
   content:''; position:absolute; inset:0; border-radius:inherit;
   pointer-events:none;
   background-repeat:no-repeat; background-size:260% 100%;
-  animation:vip-shine 4.6s ease-in-out 1s infinite;
+  animation:vip-shine 2.6s ease-in-out .5s 2 both;
 }
 .vip-plan-badge::after{
   background-image:linear-gradient(100deg,
@@ -283,12 +286,13 @@
 .vip-cta::after{
   background-image:linear-gradient(100deg,
     transparent 38%, rgba(255,255,255,.34) 50%, transparent 62%);
-  animation-delay:1.8s; animation-duration:5.2s;
+  animation-delay:1.2s; animation-duration:3s;
 }
-.vip-crown{ animation:vip-crown-float 3.6s ease-in-out infinite; }
-@keyframes vip-crown-float{
-  0%,100%{ transform:translateY(0); }
-  50%    { transform:translateY(-4px); }
+.vip-crown{ animation:vip-crown-rise .9s cubic-bezier(.22,1,.36,1) .15s 1 both; }
+@keyframes vip-crown-rise{
+  0%  { transform:translateY(10px) scale(.86); opacity:0; }
+  60% { transform:translateY(-3px) scale(1.04); opacity:1; }
+  100%{ transform:translateY(0)    scale(1);    opacity:1; }
 }
 @keyframes vip-shine{
   0%       { background-position:210% 0; }

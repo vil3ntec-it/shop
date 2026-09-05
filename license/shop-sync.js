@@ -357,7 +357,7 @@
            `یعنی ورودی انبارش ثبت نشده. اگر جنس در دکان هست، ورودی انبار ثبت کنید.`;
   }
 
-  const fa = (n) => Number(n).toLocaleString('fa-IR');
+  const fa = (n) => Number(n).toLocaleString('en-US');
 
   // ---------- همگام‌سازی ----------
   let syncing = false;

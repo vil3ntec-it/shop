@@ -41,7 +41,8 @@
   }catch(e){}
 })();
 </script>
-<meta name="theme-color" content="#2c5ce6">
+<!-- نوارِ وضعیتِ گوشی هم‌رنگِ سربرگ می‌شود — همان آبیِ نیتیو، در هر تم -->
+<meta name="theme-color" id="meta-theme-color" content="#0F62B4">
 <meta name="description" content="مدیریت فروش، انبار، قرض‌داران، مصارف و گزارشات فروشگاه — بدون نیاز به اینترنت">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -113,6 +114,11 @@
     --sidebar-w:220px;
     --header-h:64px;
     --bottomnav-h:66px;
+    /* نوارِ پایین یک قرصِ شناور است: ۱۰ پیکسل از ته و از دو پهلو فاصله
+       دارد. هرچه بالای آن می‌نشیند از این متغیر حساب می‌شود، نه از قدِ
+       خودِ نوار — وگرنه دکمه‌ی شناور و نوارِ سبد رویش می‌افتند. */
+    --bottomnav-gap:10px;
+    --bottomnav-space:calc(var(--bottomnav-h) + var(--bottomnav-gap) + env(safe-area-inset-bottom));
   }
   /*
      شبِ برنامه: زمینه‌ی بنفشِ بسیار تیره (نه سیاهِ خالص، که با نور
@@ -288,37 +294,78 @@
   }
 
   /* ---------- Header ---------- */
+  /* ==========================================================
+     سربرگ — همان نوارِ آبیِ برنامه‌ی نیتیو (TopBar.kt)
+
+     تا دیروز سربرگ هم‌رنگِ زمینه بود: در تمِ روشن یک نوارِ سفید با
+     شش دکمه‌ی ریز که هیچ‌کدام از زمینه جدا نمی‌شدند. آبیِ تیره دو
+     کار می‌کند — بالای صفحه یک «سر» پیدا می‌کند که چشم اول سراغش
+     می‌رود، و دکمه‌های سفیدِ نیم‌شفافِ رویش بی‌نیاز از خطِ دور دیده
+     می‌شوند. در شب کمی تیره‌تر است تا پله‌اش کنارِ زمینه زیاد نباشد.
+
+     رنگ‌ها عددبه‌عدد از BAR_DAY و BAR_NIGHT می‌آیند.
+     ========================================================== */
   .header{
+    --bar-ink:#F4FAFF;
+    --bar-ink-soft:#C7DEF4;
     height:var(--header-h);
     display:flex;
     align-items:center;
     justify-content:space-between;
-    padding:0 20px;
-    border-bottom:1px solid var(--border);
-    background:var(--surface);
+    padding:0 16px;
+    gap:10px;
+    border-bottom:none;
+    background:linear-gradient(120deg,#073E78,#0F62B4 55%,#1E86D6);
     -webkit-backdrop-filter:blur(16px);
     backdrop-filter:blur(16px);
     position:sticky;
     top:0;
     z-index:20;
   }
+  html[data-theme="dark"] .header{
+    background:linear-gradient(120deg,#04121F,#0B2E52 55%,#11487A);
+  }
   .header h1{
     font-size:17px;
     font-weight:700;
+    color:var(--bar-ink);
+    white-space:nowrap;
   }
   .header .header-right{
-    display:flex; align-items:center; gap:12px;
+    display:flex; align-items:center; gap:8px;
+    overflow-x:auto; scrollbar-width:none;
+  }
+  .header .header-right::-webkit-scrollbar{ display:none; }
+  /* کلیدهای شیشه‌ای روی آبی — همان جوهرِ روشن در هر دو تم */
+  .header .icon-btn{
+    border-color:rgba(255,255,255,.18);
+    background:rgba(255,255,255,.10);
+    color:var(--bar-ink);
+  }
+  .header .icon-btn:active{ background:rgba(255,255,255,.20); }
+  .header .avatar{
+    border-color:rgba(255,255,255,.18);
+    background:rgba(255,255,255,.14);
+    color:var(--bar-ink);
+  }
+  /* نشانِ زنگ روی نوارِ آبی، نه روی زمینه‌ی صفحه */
+  .header .alert-badge{ border-color:#0F62B4; }
+  html[data-theme="dark"] .header .alert-badge{ border-color:#0B2E52; }
+  /* «آفلاین» روی آبی: زردِ روشن، نه نارنجیِ زمینه‌ی روشن */
+  .header .offline-badge{
+    background:rgba(255,192,106,.18); color:#FFC06A;
   }
   .icon-btn{
-    width:36px; height:36px;
+    width:36px; height:36px; flex:0 0 auto;
     border-radius:10px;
     border:1px solid var(--border);
     background:var(--surface);
     display:flex; align-items:center; justify-content:center;
     color:var(--muted);
+    transition:background .14s ease;
   }
   .avatar{
-    width:36px; height:36px;
+    width:36px; height:36px; flex:0 0 auto;
     border-radius:10px;
     background:var(--surface-2);
     display:flex; align-items:center; justify-content:center;
@@ -330,7 +377,7 @@
   /* ---------- Content ---------- */
   .content{
     flex:1;
-    padding:20px 16px calc(var(--bottomnav-h) + 32px);
+    padding:20px 16px calc(var(--bottomnav-space) + 32px);
   }
   @media(min-width:769px){
     .content{padding:28px 32px;}
@@ -562,18 +609,70 @@
   .search-clear-btn:hover{ background:var(--danger); color:#fff; }
 
   /* ---------- Bottom navigation (mobile) ---------- */
+  /* ==========================================================
+     نوارِ پایین — همان نوارِ شناورِ برنامه‌ی نیتیو (TohidNavBar).
+
+     نوار یک قرصِ گِردِ جدا از لبه‌ی صفحه است، نه خطی که به ته چسبیده،
+     و روی تبِ فعال یک «چراغ» دارد: یک نوارِ نازکِ نور بالای تب، و
+     مخروطی که از همان‌جا رو به پایین پهن و کم‌رنگ می‌شود.
+
+     چراغ نرم جابه‌جا می‌شود، نه اینکه خاموش و روشن شود — همان حسِ
+     «منبعِ نور از این تب کنده شد و رفت روی آن یکی». جابه‌جایی با
+     transition روی دو متغیرِ CSS انجام می‌شود که فقط موقعِ عوض‌شدنِ
+     صفحه یک بار نوشته می‌شوند؛ هیچ کارِ هر-فریمی در JS نیست.
+     ========================================================== */
   .bottom-nav{
+    --lamp-x:50%;
+    --lamp-w:0px;
+    --lamp-on:0;
     position:fixed;
-    bottom:0; inset-inline:0;
+    bottom:calc(var(--bottomnav-gap) + env(safe-area-inset-bottom));
+    inset-inline:var(--bottomnav-gap);
     height:var(--bottomnav-h);
     background:var(--surface);
     -webkit-backdrop-filter:blur(16px);
     backdrop-filter:blur(16px);
-    border-top:1px solid var(--border);
+    border:1px solid var(--border);
+    border-radius:calc(var(--bottomnav-h) / 2);
+    box-shadow:var(--shadow-md);
     display:flex;
     z-index:30;
-    padding-bottom:env(safe-area-inset-bottom);
+    overflow:hidden;
+    isolation:isolate;
   }
+  /* نوارِ نور — درست بالای تبِ فعال */
+  .bottom-nav::before{
+    content:''; position:absolute; z-index:1; pointer-events:none;
+    top:5px; height:3px; border-radius:3px;
+    inset-inline-start:calc(var(--lamp-x) - var(--lamp-w) * .20);
+    width:calc(var(--lamp-w) * .40);
+    background:var(--primary);
+    opacity:var(--lamp-on);
+    transition:inset-inline-start .38s cubic-bezier(.22,1,.36,1),
+               width .38s cubic-bezier(.22,1,.36,1), opacity .3s ease;
+  }
+  /* مخروطِ نور — از همان نوار به پایین باز می‌شود و محو می‌شود */
+  .bottom-nav::after{
+    content:''; position:absolute; z-index:0; pointer-events:none;
+    top:8px; bottom:0;
+    inset-inline-start:calc(var(--lamp-x) - var(--lamp-w) * 1.2);
+    width:calc(var(--lamp-w) * 2.4);
+    opacity:var(--lamp-on);
+    /* دو لایه: حبابِ خودِ چراغ درست زیرِ نوار، و مخروطی که پایین‌تر می‌رود.
+       هر دو خیلی قبل از لبه‌ی جعبه محو می‌شوند تا مخروط لبه‌ی تیز نگیرد. */
+    background:
+      radial-gradient(ellipse 26% 34% at 50% 0%,
+        color-mix(in srgb, var(--primary) 42%, transparent) 0%,
+        color-mix(in srgb, var(--primary) 14%, transparent) 45%,
+        transparent 78%),
+      radial-gradient(ellipse 46% 108% at 50% 0%,
+        color-mix(in srgb, var(--primary) 22%, transparent) 0%,
+        color-mix(in srgb, var(--primary) 9%, transparent) 34%,
+        transparent 76%);
+    transition:inset-inline-start .38s cubic-bezier(.22,1,.36,1),
+               width .38s cubic-bezier(.22,1,.36,1), opacity .3s ease;
+  }
+  .bn-item{ position:relative; z-index:2; }
   .bn-item{
     flex:1;
     display:flex; flex-direction:column; align-items:center; justify-content:center;
@@ -581,6 +680,7 @@
     color:var(--muted-2);
     font-size:10.5px;
     font-weight:600;
+    text-decoration:none;
   }
   .bn-item .ic{width:21px; height:21px; display:flex; align-items:center; justify-content:center;}
   .bn-item.active{color:var(--primary);}
@@ -597,7 +697,7 @@
      فقط سمتِ چسبیده گِرد نیست. منوی «افزودن» با حاشیه داخل می‌ماند. */
   .fab-wrap{
     position:fixed;
-    bottom:calc(var(--bottomnav-h) + var(--bottom-bar-h, 0px) + 16px);
+    bottom:calc(var(--bottomnav-space) + var(--bottom-bar-h, 0px) + 16px);
     inset-inline-start:0;
     transition:bottom .22s cubic-bezier(.22,1,.36,1);
     z-index:40;
@@ -666,7 +766,7 @@
   .sale-fab-wrap{
     position:fixed;
     /* درست بالای دکمه‌ی آبی، روی همان لبه و به همان اندازه بیرون */
-    bottom:calc(var(--bottomnav-h) + var(--bottom-bar-h, 0px) + 82px);
+    bottom:calc(var(--bottomnav-space) + var(--bottom-bar-h, 0px) + 82px);
     inset-inline-start:0;
     transition:bottom .22s cubic-bezier(.22,1,.36,1);
     /* بالاتر از سبد خرید چسبیده به پایین، وگرنه پشت آن پنهان می‌شود */
@@ -1661,7 +1761,7 @@
   /* مثل سبد خرید، به پایینِ صفحه چسبیده می‌ماند */
   .acc-add-bar{
     position:fixed;
-    bottom:var(--bottomnav-h);
+    bottom:var(--bottomnav-space);
     inset-inline-start:0; inset-inline-end:0;
     z-index:45;
     /* پهنا را همان inset ها تعیین می‌کنند؛ width:100% روی دسکتاپ
@@ -2089,7 +2189,7 @@
      با اسکرول بالا و پایین نمی‌رود و همیشه جلوی چشم است. */
   .cart-drawer{
     position:fixed;
-    bottom:var(--bottomnav-h);
+    bottom:var(--bottomnav-space);
     inset-inline-start:0; inset-inline-end:0;
     z-index:45;
     margin:0;
@@ -2864,8 +2964,22 @@
     background:var(--success-tint); color:var(--success);
     box-shadow:none;
   }
-  .hdr-auth.is-in .hdr-auth-ic{ background:rgba(24,160,107,.2); }
+  .hdr-auth.is-in .hdr-auth-ic{ background:rgba(255,255,255,.22); }
   .hdr-auth.is-in::after{ animation:none; }
+  /* روی نوارِ آبی، دکمه‌ی حساب هم مثل نیتیو شیشه‌ای است — نه یک قرصِ بنفشِ
+     رقیب که وسطِ آبی می‌نشیند. برقِ نور می‌ماند تا زنده دیده شود. */
+  .header .hdr-auth{
+    background:rgba(255,255,255,.14);
+    border:1px solid rgba(255,255,255,.20);
+    color:var(--bar-ink);
+    box-shadow:none;
+  }
+  .header .hdr-auth .hdr-auth-ic{ background:rgba(255,255,255,.22); }
+  @media (hover:hover){ .header .hdr-auth:hover{ box-shadow:0 8px 18px -10px rgba(0,0,0,.6); } }
+  .header .hdr-auth.is-in{
+    background:rgba(255,255,255,.14); color:#8FF3C6;
+    border:1px solid rgba(255,255,255,.18);
+  }
   @media(max-width:480px){
     .hdr-auth{ padding:6px 8px; gap:0; font-size:0; }
     .hdr-auth .hdr-auth-ic{ width:22px; height:22px; }
@@ -4325,6 +4439,26 @@
           </div>
         </div>
         <div class="more-grid" id="more-nav-list">
+          <a class="more-card" data-page="warehouse" href="#warehouse">
+            <span class="more-card-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8L12 3 3 8v8l9 5 9-5V8z"/><path d="M3 8l9 5 9-5"/><path d="M12 13v8"/></svg></span>
+            <span class="more-card-txt">
+              <b>انبار</b>
+              <i>ورودِ کارتن و واحد، و ارزشِ موجودی</i>
+            </span>
+            <span class="more-card-go">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
+            </span>
+          </a>
+          <a class="more-card" data-page="expenses" href="#expenses">
+            <span class="more-card-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V10M18 20V4M6 20v-4"/></svg></span>
+            <span class="more-card-txt">
+              <b>مصارف</b>
+              <i>کرایه، برق و هر خرجِ دیگرِ دکان</i>
+            </span>
+            <span class="more-card-go">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
+            </span>
+          </a>
           <a class="more-card" data-page="receipts" href="#receipts">
             <span class="more-card-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2.5h12v19l-2-1.4-2 1.4-2-1.4-2 1.4-2-1.4-2 1.4v-19z"/><path d="M9.5 8h5"/><path d="M9.5 12h5"/></svg></span>
             <span class="more-card-txt">
@@ -10872,6 +11006,9 @@
   }
   function applyTheme(theme){
     document.documentElement.setAttribute('data-theme', theme==='dark' ? 'dark' : 'light');
+    // نوارِ وضعیتِ گوشی هم‌رنگِ سربرگ بماند — همان آبیِ نیتیو
+    const mtc = document.getElementById('meta-theme-color');
+    if(mtc) mtc.setAttribute('content', theme==='dark' ? '#0B2E52' : '#0F62B4');
     document.querySelectorAll('#theme-toggle .theme-toggle-btn').forEach(btn=>{
       btn.classList.toggle('active', btn.dataset.themeChoice===theme);
     });
@@ -11309,15 +11446,18 @@
 
   // ---- Page registry (extensible for later phases) ----
   const PAGES = [
-    { id:'dashboard', label:'داشبورد', inSidebar:true, inBottomNav:true,
+    /* نوارِ پایین پنج تب دارد و بس — دقیقاً همان‌هایی که در برنامه‌ی نیتیو
+       (TABS در AppRoot.kt) هست. هفت تب آن‌قدر تنگ می‌شد که اسم‌ها خوانده
+       نمی‌شدند. انبار و مصارف سرِ جایشان‌اند، از «بیشتر». */
+    { id:'dashboard', label:'خانه', title:'داشبورد', inSidebar:true, inBottomNav:true,
       icon:'<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>' },
     { id:'sale', label:'فروش', inSidebar:true, inBottomNav:true,
       icon:'<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="5" height="5" rx="1"/><line x1="3" y1="17" x2="9" y2="17"/><line x1="12" y1="7" x2="21" y2="7"/><line x1="12" y1="12" x2="21" y2="12"/><line x1="12" y1="17" x2="21" y2="17"/></svg>' },
     { id:'debtors', label:'قرض‌داران', inSidebar:true, inBottomNav:true,
       icon:'<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>' },
-    { id:'warehouse', label:'انبار', inSidebar:true, inBottomNav:true,
+    { id:'warehouse', label:'انبار', inSidebar:true, inBottomNav:false,
       icon:'<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 8L12 3 3 8v8l9 5 9-5V8z"/><path d="M3 8l9 5 9-5"/><path d="M12 13v8"/></svg>' },
-    { id:'expenses', label:'مصارف', inSidebar:true, inBottomNav:true,
+    { id:'expenses', label:'مصارف', inSidebar:true, inBottomNav:false,
       icon:'<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20V10M18 20V4M6 20v-4"/></svg>' },
     { id:'products', label:'محصولات', inSidebar:true, inBottomNav:true,
       icon:'<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a4 4 0 0 1 8 0v2"/></svg>' },
@@ -11342,7 +11482,7 @@
   PAGES.forEach(p=>{
     if(p.inSidebar){
       const li = document.createElement('li');
-      li.innerHTML = `<a class="nav-item" data-page="${p.id}" href="#${p.id}"><span class="ic">${p.icon}</span>${p.label}</a>`;
+      li.innerHTML = `<a class="nav-item" data-page="${p.id}" href="#${p.id}"><span class="ic">${p.icon}</span>${p.title || p.label}</a>`;
       sidebarNav.appendChild(li);
     }
     if(p.inBottomNav){
@@ -11357,6 +11497,29 @@
 
   const EXTRA_PAGES = ['debtor-account', 'quick-sale', 'supplier-account', 'receipts'];
 
+  /**
+   *  چراغِ نوارِ پایین را می‌برد روی تبِ فعال.
+   *
+   *  فقط دو متغیرِ CSS می‌نویسد و بس؛ خودِ جابه‌جایی را transition انجام
+   *  می‌دهد، پس هیچ کارِ هر-فریمی در JS نیست. اگر صفحه‌ی باز در نوارِ
+   *  پایین نباشد (مثلاً «گزارشات»)، چراغ خاموش می‌شود.
+   */
+  function moveNavLamp(){
+    if(!bottomNav) return;
+    const on = bottomNav.querySelector('.bn-item.active');
+    if(!on){ bottomNav.style.setProperty('--lamp-on','0'); return; }
+    const bar = bottomNav.getBoundingClientRect();
+    const it  = on.getBoundingClientRect();
+    // فاصله از لبه‌ی آغازِ نوار — در راست‌به‌چپ یعنی از راست
+    const rtl = getComputedStyle(bottomNav).direction === 'rtl';
+    const start = rtl ? (bar.right - it.right) : (it.left - bar.left);
+    bottomNav.style.setProperty('--lamp-x', (start + it.width/2) + 'px');
+    bottomNav.style.setProperty('--lamp-w', it.width + 'px');
+    bottomNav.style.setProperty('--lamp-on','1');
+  }
+  // اگر پهنای صفحه عوض شد، چراغ سرِ جایش برگردد
+  window.addEventListener('resize', moveNavLamp);
+
   function goTo(pageId){
     if(!PAGES.find(p=>p.id===pageId) && !EXTRA_PAGES.includes(pageId)) pageId = 'dashboard';
 
@@ -11366,6 +11529,7 @@
     document.querySelectorAll('.nav-item, .bn-item').forEach(el=>{
       el.classList.toggle('active', el.dataset.page===pageId);
     });
+    moveNavLamp();
 
     if(pageId==='debtor-account'){
       const d = debtors.find(x=>x.id===currentAccountDebtorId);
@@ -11393,7 +11557,9 @@
       renderReceiptsPage();
     } else {
       const meta = PAGES.find(p=>p.id===pageId);
-      pageTitle.textContent = meta ? meta.label : '';
+      // برچسبِ نوارِ پایین کوتاه است («خانه») ولی سربرگ نامِ کاملِ صفحه را
+      // می‌نویسد — همان جدایی که در نیتیو بین TABS و PAGE_TITLES هست.
+      pageTitle.textContent = meta ? (meta.title || meta.label) : '';
     }
 
     // دوربین فقط داخل صفحه «فروش» فعال بماند تا باتری/CPU هدر نرود
