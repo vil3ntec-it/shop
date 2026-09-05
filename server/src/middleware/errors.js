@@ -12,6 +12,10 @@ const forbidden    = (m = 'دسترسی مجاز نیست', c = 'forbidden') => 
 const notFound     = (m = 'پیدا نشد', c = 'not_found') => new ApiError(404, c, m);
 const conflict     = (m, c = 'conflict') => new ApiError(409, c, m);
 const tooMany      = (m = 'تعداد درخواست بیش از حد مجاز است', c = 'rate_limited') => new ApiError(429, c, m);
+//  سرویسِ بیرونی (پیامک، ایمیل) نشد — نه اشکالِ کاربر است و نه خرابیِ
+//  ما. پیامش نمایش داده می‌شود تا کاربر بداند دوباره تلاش کند و مدیر
+//  بداند کجا را درست کند.
+const upstream     = (m, c = 'delivery_failed') => new ApiError(502, c, m);
 
 function notFoundHandler(req, res) {
   res.status(404).json({ error: { code: 'not_found', message: 'این مسیر وجود ندارد' } });
@@ -30,4 +34,4 @@ function errorHandler(err, req, res, _next) {
   });
 }
 
-module.exports = { ApiError, badRequest, unauthorized, forbidden, notFound, conflict, tooMany, notFoundHandler, errorHandler };
+module.exports = { ApiError, badRequest, unauthorized, forbidden, notFound, conflict, tooMany, upstream, notFoundHandler, errorHandler };

@@ -167,6 +167,21 @@
     } catch { return ''; }
   }
 
+  /**
+   * توکنِ نشست — همان که در سرآیندِ Authorization می‌رود.
+   *
+   * `apiKey()` بالا «کلید حساب» است و فقط برای نشان دادن و گذاشتن در
+   * پیامِ واتساپ؛ با آن هر درخواستی ۴۰۱ می‌گیرد.
+   */
+  function sessionToken() {
+    try {
+      if (window.TohidLicense && window.TohidLicense.getAccessToken) {
+        return window.TohidLicense.getAccessToken();
+      }
+    } catch { /* هنوز بالا نیامده */ }
+    return account().accessToken || '';
+  }
+
   function waUrl(number, text) {
     const digits = String(number).replace(/[^0-9]/g, '').replace(/^0/, '93');
     // کلید حساب همراه پیام می‌رود تا فروشنده بداند اشتراک را روی کدام حساب فعال کند
@@ -197,20 +212,91 @@
   }
 
   let PLANS = null;
+
+  /**
+   * قیمت‌ها از سرور.
+   *
+   * ── چه چیزی این را می‌شکست ────────────────────────────────────────
+   * تا امروز `/billing/plans` صدا زده می‌شد — مسیری که **توکن می‌خواهد**
+   * — و بی‌توکن. یعنی همیشه ۴۰۱ می‌گرفت و بی‌صدا به فهرستِ قیمتِ داخلِ
+   * همین فایل برمی‌گشت. نتیجه: هر تغییرِ قیمتی که در پنل مدیریت داده
+   * می‌شد، روی سایت دیده نمی‌شد، و تخفیف هم هیچ‌وقت نمی‌رسید.
+   *
+   * حالا `/plans` که باز است. اگر سرورِ قدیمی آن را نداشت، همان مسیرِ
+   * قبلی با توکن امتحان می‌شود — پس نسخه‌ی تازه‌ی سایت روی سرورِ
+   * به‌روزنشده هم کار می‌کند.
+   */
   async function loadPlans() {
     if (PLANS) return PLANS;
     const base = serverUrl();
     if (base) {
-      try {
-        const res = await fetch(base + '/api/v1/billing/plans');
-        if (res.ok) {
-          PLANS = await res.json();
-          return PLANS;
-        }
-      } catch { /* آفلاین یا سرور خاموش — با قیمت‌های پیش‌فرض ادامه می‌دهیم */ }
+      //  توکنِ نشست، نه «کلید حساب» — آن یکی فقط برای نمایش است و
+      //  با آن، مسیرِ قدیمی همیشه ۴۰۱ می‌گرفت
+      const tok = sessionToken();
+      const tries = [
+        { url: base + '/api/v1/plans', headers: {} },
+        {
+          url: base + '/api/v1/billing/plans',
+          headers: tok ? { Authorization: 'Bearer ' + tok } : {},
+        },
+      ];
+      for (const t of tries) {
+        try {
+          const res = await fetch(t.url, { headers: t.headers });
+          if (!res.ok) continue;
+          const body = await res.json();
+          if (body && Array.isArray(body.plans) && body.plans.length) {
+            PLANS = normalizePlans(body);
+            return PLANS;
+          }
+        } catch { /* آفلاین یا سرور خاموش — مسیر بعدی، بعد پیش‌فرض */ }
+      }
     }
     PLANS = fallbackPlans();
     return PLANS;
+  }
+
+  /**
+   * هرچه سرور داد را به همان شکلی می‌آورد که این صفحه می‌فهمد.
+   *
+   * سرورِ تازه `pricePerDay` و `whatsappUrl` را خودش می‌سازد؛ سرورِ
+   * قدیمی نمی‌سازد و بی این، لینکِ واتساپ `undefined` می‌شد و قیمتِ
+   * روزانه اصلاً نمی‌آمد.
+   */
+  function normalizePlans(body) {
+    const currency = body.currency || FALLBACK_CURRENCY;
+    const number = (body.whatsapp && body.whatsapp.number) || FALLBACK_WHATSAPP;
+    const message = (body.whatsapp && body.whatsapp.message) || FALLBACK_MESSAGE;
+    return {
+      currency,
+      trialDays: body.trialDays || 0,
+      plans: body.plans.map(p => {
+        const days = p.days || approxDays(p.amount, p.unit);
+        const full = (p.fullPrice === undefined || p.fullPrice === null) ? p.price : p.fullPrice;
+        return {
+          code: p.code,
+          title: p.title || p.name || p.code,
+          amount: p.amount, unit: p.unit,
+          price: p.price,
+          fullPrice: full,
+          //  تخفیف فقط وقتی «هست» که واقعاً عدد را پایین آورده باشد
+          discount: (p.discount && full > p.price) ? p.discount : null,
+          negotiable: !!p.negotiable,
+          badge: p.badge || '',
+          features: p.features && p.features.length ? p.features : PAID.slice(),
+          approxDays: days,
+          pricePerDay: p.pricePerDay !== undefined && p.pricePerDay !== null
+            ? p.pricePerDay
+            : (!p.negotiable && days > 0 && p.price > 0
+              ? Math.round((p.price / days) * 10) / 10 : null),
+          whatsappUrl: p.whatsappUrl || waUrl(number, message + ' (' + (p.title || p.code) + ')'),
+        };
+      }),
+      whatsapp: {
+        number,
+        url: (body.whatsapp && body.whatsapp.url) || waUrl(number, message),
+      },
+    };
   }
 
   // ---------- قفل رابط کاربری ----------
@@ -382,6 +468,40 @@
             <i>بدون قرارداد. بدون ریسک.</i>
           </a>
 
+          <!--
+            کد اشتراک.
+
+            تا دیروز تنها راهِ گرفتنِ اشتراک این بود که کاربر واتساپ بزند
+            و صاحب سامانه هم همان لحظه پشتِ پنل باشد. حالا او یک کدِ
+            شش‌رقمی به ایمیلِ کاربر می‌فرستد و کاربر هر وقت خواست
+            همین‌جا می‌زند — بی واسطه، بی انتظار.
+          -->
+          <div class="vip-code" id="vip-code">
+            <button type="button" class="vip-code-head" id="vip-code-toggle">
+              <span class="vip-code-ic">${ICON.gift}</span>
+              <span class="vip-code-txt">
+                <b>کد اشتراک دارم</b>
+                <i>کدِ شش‌رقمی که به ایمیلتان آمده</i>
+              </span>
+              <span class="vip-code-more">وارد کردن</span>
+            </button>
+            <div class="vip-code-body" hidden>
+              <!--
+                عمداً maxlength ندارد.
+
+                با maxlength=6، چسباندنِ کدی که فاصله یا حرفی همراهش
+                آمده (مثلاً از داخلِ متنِ ایمیل) اول به شش نویسه بریده
+                می‌شد و بعد پاک‌سازی می‌شد — یعنی چند رقمِ آخر از دست
+                می‌رفت. حالا اول حرف‌ها برداشته می‌شوند و بعد شش رقمِ اول
+                نگه داشته می‌شود؛ کارِ همان یک خطِ JS پایین.
+              -->
+              <input type="text" id="vip-code-input" inputmode="numeric"
+                     placeholder="۶ رقم" autocomplete="one-time-code" dir="ltr">
+              <button type="button" class="vip-btn" id="vip-code-go">فعال کردن</button>
+              <p class="vip-code-note" id="vip-code-note" hidden></p>
+            </div>
+          </div>
+
           <div class="vip-section-title">راه‌های تماس</div>
           <div class="vip-contact">
             <a class="vip-ccard" id="vip-wa" target="_blank" rel="noopener">
@@ -417,6 +537,69 @@
         if (window.TohidLicense && window.TohidLicense.open) window.TohidLicense.open();
       }
     });
+    /* ---------------------- کد اشتراک ---------------------- */
+    const codeBox = modal.querySelector('#vip-code');
+    const codeBody = codeBox.querySelector('.vip-code-body');
+    const codeInput = codeBox.querySelector('#vip-code-input');
+    const codeNote = codeBox.querySelector('#vip-code-note');
+    const codeGo = codeBox.querySelector('#vip-code-go');
+
+    function say(text, ok) {
+      codeNote.hidden = false;
+      codeNote.textContent = text;
+      codeNote.className = 'vip-code-note' + (ok ? ' vip-code-ok' : ' vip-code-bad');
+    }
+
+    codeBox.querySelector('#vip-code-toggle').addEventListener('click', () => {
+      codeBody.hidden = !codeBody.hidden;
+      codeBox.querySelector('.vip-code-more').textContent = codeBody.hidden ? 'وارد کردن' : 'بستن';
+      if (!codeBody.hidden) codeInput.focus();
+    });
+
+    //  فقط رقم، و حداکثر شش‌تا — چه تایپ شود چه چسبانده
+    codeInput.addEventListener('input', () => {
+      codeInput.value = codeInput.value.replace(/[^0-9]/g, '').slice(0, 6);
+      codeNote.hidden = true;
+    });
+
+    codeGo.addEventListener('click', async () => {
+      const code = codeInput.value.replace(/[^0-9]/g, '');
+      if (code.length !== 6) { say('کد باید شش رقم باشد.', false); return; }
+      if (!loggedIn()) {
+        say('اول وارد حساب شوید — اشتراک روی دکانِ شما می‌نشیند.', false);
+        return;
+      }
+      const base = serverUrl();
+      if (!base) { say('نشانی سرور تنظیم نشده است.', false); return; }
+
+      codeGo.disabled = true;
+      codeGo.textContent = 'کمی صبر…';
+      try {
+        const res = await fetch(base + '/api/v1/vip/redeem', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + sessionToken() },
+          body: JSON.stringify({ code }),
+        });
+        const body = await res.json().catch(() => ({}));
+        if (res.ok) {
+          say(body.message || 'اشتراک شما فعال شد.', true);
+          codeInput.value = '';
+          //  وضعیت همان لحظه تازه می‌شود، وگرنه صفحه هنوز
+          //  «اشتراک ندارید» نشان می‌داد
+          if (window.TohidLicense && window.TohidLicense.sync) {
+            await window.TohidLicense.sync();
+          }
+          await render();
+        } else {
+          say((body.error && body.error.message) || 'این کد کار نکرد.', false);
+        }
+      } catch {
+        say('به سرور نرسیدیم — اینترنت را بررسی کنید.', false);
+      }
+      codeGo.disabled = false;
+      codeGo.textContent = 'فعال کردن';
+    });
+
     modal.addEventListener('mousedown', e => { if (e.target === modal) close(); });
     return modal;
   }
@@ -498,9 +681,22 @@
     const per = p.negotiable ? '<span class="vip-per">با ما هماهنگ کنید</span>' :
       (p.pricePerDay ? `<span class="vip-per">روزی حدود ${fa(p.pricePerDay)} ${esc(currency)}</span>` : '');
     const price = p.negotiable ? 'توافقی' : `${fa(p.price)} <small>${esc(currency)}</small>`;
-    return `<button type="button" class="vip-plan${p.badge ? ' vip-plan-badge' : ''}" data-plan="${esc(p.code)}">
-      ${p.badge ? `<span class="vip-tag">${esc(p.badge)}</span>` : ''}
+
+    /*
+     * تخفیف تا وقتی عددِ قبلی دیده نشود، تخفیف نیست — فقط یک قیمتِ
+     * دیگر است. پس قیمتِ پیش از تخفیف خط‌خورده بالای آن می‌نشیند، و
+     * نشانِ گوشه‌ی کارت می‌گوید چقدر کمتر شده.
+     */
+    const off = p.discount
+      ? `<span class="vip-plan-was">${fa(p.fullPrice)}</span>` : '';
+    const tag = p.discount
+      ? `<span class="vip-tag vip-tag-off">${esc(p.discount.label || ('٪' + fa(p.discount.percent) + ' تخفیف'))}</span>`
+      : (p.badge ? `<span class="vip-tag">${esc(p.badge)}</span>` : '');
+
+    return `<button type="button" class="vip-plan${(p.badge || p.discount) ? ' vip-plan-badge' : ''}${p.discount ? ' vip-plan-off' : ''}" data-plan="${esc(p.code)}">
+      ${tag}
       <span class="vip-plan-title">${esc(p.title)}</span>
+      ${off}
       <span class="vip-plan-price">${price}</span>
       ${per}
       <span class="vip-plan-pick">${ICON.check}<i>انتخاب</i></span>

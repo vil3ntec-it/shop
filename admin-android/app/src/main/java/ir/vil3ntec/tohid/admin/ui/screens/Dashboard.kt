@@ -32,6 +32,7 @@ fun DashboardScreen(session: Session) {
   val scope = rememberCoroutineScope()
 
   var stats by remember { mutableStateOf<JSONObject?>(null) }
+  var overview by remember { mutableStateOf<JSONObject?>(null) }
   var serverUp by remember { mutableStateOf<Boolean?>(null) }
   var busy by remember { mutableStateOf(false) }
   var error by remember { mutableStateOf<String?>(null) }
@@ -44,6 +45,8 @@ fun DashboardScreen(session: Session) {
       runCatching { api.stats(token) }
         .onSuccess { stats = it; error = null }
         .onFailure { error = (it as? AdminApi.ApiError)?.message ?: "خوانده نشد" }
+      //  خلاصه — اشتراک‌های رو به پایان، پیام‌های خوانده‌نشده، وضعیت ایمیل
+      runCatching { api.overview(token) }.onSuccess { overview = it }
       serverUp = runCatching { api.health() }.isSuccess
       busy = false
     }
@@ -94,6 +97,91 @@ fun DashboardScreen(session: Session) {
         Tile("درخواست خرید", s.optInt("pendingRequests"), c.warn, Modifier.weight(1f))
       }
 
+      /*
+       *  ── چیزهایی که باید *امروز* ببینید ────────────────────────────
+       *  عددهای بالا وضعیت را می‌گویند؛ این‌ها کار را. اشتراکی که دارد
+       *  تمام می‌شود و پیامی که جواب نگرفته، تا وقتی روی صفحهٔ اول
+       *  نباشند، همیشه دیر دیده می‌شوند.
+       */
+      overview?.let { ov ->
+        val expiring = ov.optJSONArray("expiring")
+        val soon = (0 until (expiring?.length() ?: 0))
+          .mapNotNull { expiring?.optJSONObject(it) }
+        val unread = ov.optInt("supportUnread")
+
+        if (unread > 0) {
+          Spacer(Modifier.height(14.dp))
+          Alert(
+            title = "${unread.fa()} پیام پشتیبانیِ بی‌پاسخ",
+            body = "کسی منتظر جواب است. از تبِ پشتیبانی ببینیدشان.",
+            tint = c.warn,
+          )
+        }
+
+        if (soon.isNotEmpty()) {
+          Spacer(Modifier.height(14.dp))
+          Panel {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+              Text(
+                "اشتراک‌های رو به پایان",
+                style = MaterialTheme.typography.titleSmall,
+                color = c.text, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f),
+              )
+              StatusChip(soon.size.fa(), c.warn)
+            }
+            Spacer(Modifier.height(8.dp))
+            soon.take(6).forEach { e ->
+              val left = e.optInt("daysLeft")
+              Row2(
+                e.optString("shopName").ifBlank { e.optString("ownerName") },
+                when {
+                  left < 0 -> "${(-left).fa()} روز گذشته"
+                  left == 0 -> "امروز"
+                  else -> "${left.fa()} روز مانده"
+                },
+              )
+            }
+            if (soon.size > 6) {
+              Text(
+                "و ${(soon.size - 6).fa()} تای دیگر — در تبِ دکان‌ها.",
+                style = MaterialTheme.typography.labelSmall, color = c.muted,
+                modifier = Modifier.padding(top = 6.dp),
+              )
+            }
+            Spacer(Modifier.height(10.dp))
+            GhostButton("خبر دادن به همه‌شان", Modifier.fillMaxWidth(), tint = c.primary) {
+              val token = session.token ?: return@GhostButton
+              scope.launch {
+                runCatching { AdminApi(session.serverUrl).notifyExpiring(token) }
+                  .onSuccess { load() }
+                  .onFailure { error = (it as? AdminApi.ApiError)?.message ?: "نشد" }
+              }
+            }
+          }
+        }
+
+        //  ایمیلِ تنظیم‌نشده یعنی هیچ کدِ ثبت‌نامی به کسی نمی‌رسد — این
+        //  را نباید در یک صفحهٔ تنظیماتِ دور دفن کرد
+        val email = ov.optJSONObject("email")
+        if (email != null && !email.optBoolean("ready")) {
+          Spacer(Modifier.height(14.dp))
+          Alert(
+            title = "ایمیل تنظیم نیست",
+            body = "کدِ ثبت‌نام و کدِ اشتراک به کسی نمی‌رسد. از «ایمیل و پوش» درستش کنید.",
+            tint = c.danger,
+          )
+        }
+
+        val visitors = ov.optJSONObject("visitors")
+        if (visitors != null) {
+          Spacer(Modifier.height(14.dp))
+          Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Tile("بازدیدکننده", visitors.optInt("total"), c.primary, Modifier.weight(1f))
+            Tile("مهمان", visitors.optInt("guests"), c.warn, Modifier.weight(1f))
+          }
+        }
+      }
+
       Spacer(Modifier.height(16.dp))
       Panel {
         SectionTitle("ساعت سرور")
@@ -115,6 +203,23 @@ fun DashboardScreen(session: Session) {
     Spacer(Modifier.height(16.dp))
     GhostButton("تازه کردن", Modifier.fillMaxWidth(), enabled = !busy) { load() }
     Spacer(Modifier.height(24.dp))
+  }
+}
+
+/** کارتِ هشدار — چیزی که باید همین حالا دیده شود */
+@Composable
+private fun Alert(title: String, body: String, tint: Color) {
+  val c = Admin.colors
+  Column(
+    Modifier
+      .fillMaxWidth()
+      .clip(RoundedCornerShape(16.dp))
+      .background(tint.copy(alpha = 0.12f))
+      .padding(14.dp),
+  ) {
+    Text(title, style = MaterialTheme.typography.titleSmall, color = tint, fontWeight = FontWeight.Bold)
+    Spacer(Modifier.height(4.dp))
+    Text(body, style = MaterialTheme.typography.bodySmall, color = c.muted)
   }
 }
 

@@ -65,16 +65,75 @@ async function seedDefaults() {
   }
 }
 
+/**
+ * تخفیفِ یک پلن، همین حالا.
+ *
+ * ── چرا قیمتِ اصلی دست نمی‌خورد ────────────────────────────────────
+ * تخفیف کنارِ قیمت می‌نشیند، نه به‌جایش. پس وقتی مهلتِ تخفیف تمام شد،
+ * قیمتِ خودش برمی‌گردد و کسی لازم نیست عددِ قبلی را به یاد داشته باشد.
+ * برنامه هم می‌تواند هر دو را نشان بدهد: خط‌خورده و تازه.
+ *
+ * دو راه هست و اگر هر دو پر باشند، «قیمتِ تخفیفی» می‌چربد — چون عددِ
+ * صریح از درصد روشن‌تر است و اشتباهِ گِردکردن ندارد.
+ */
+function discountOf(row, at = Date.now()) {
+  const price = Number(row.price_afn) || 0;
+  const until = row.discount_until === null || row.discount_until === undefined
+    ? null : Number(row.discount_until);
+  const expired = until !== null && until < at;
+  const percent = Number(row.discount_percent) || 0;
+  const fixed = row.discount_price === null || row.discount_price === undefined
+    ? null : Number(row.discount_price);
+
+  if (expired || (percent <= 0 && fixed === null)) {
+    return { price, finalPrice: price, discounted: false, percent: 0, savings: 0, label: '', until };
+  }
+
+  const finalPrice = fixed !== null
+    ? Math.max(0, fixed)
+    : Math.max(0, Math.round(price * (100 - percent) / 100));
+
+  //  اگر «تخفیف» گران‌تر یا مساوی درآمد، تخفیفی در کار نیست
+  if (finalPrice >= price) {
+    return { price, finalPrice: price, discounted: false, percent: 0, savings: 0, label: '', until };
+  }
+
+  return {
+    price,
+    finalPrice,
+    discounted: true,
+    //  درصدِ واقعی، حتی وقتی مدیر قیمتِ ثابت گذاشته — برای نشانِ «٪۲۰»
+    percent: price > 0 ? Math.round((price - finalPrice) * 100 / price) : 0,
+    savings: price - finalPrice,
+    label: row.discount_label || '',
+    until,
+  };
+}
+
+function shapePlan(row, at = Date.now()) {
+  const d = discountOf(row, at);
+  return {
+    code: row.code, title: row.title, amount: row.amount, unit: row.unit,
+    //  `price` همان چیزی است که باید پرداخت شود؛ قیمتِ پیش از تخفیف
+    //  جداگانه می‌آید. این‌طور برنامه‌های قدیمی که تخفیف را نمی‌شناسند
+    //  هم عددِ درست را نشان می‌دهند، نه قیمتِ گران‌ترِ بی‌تخفیف.
+    price: d.finalPrice,
+    fullPrice: d.price,
+    discount: d.discounted
+      ? { percent: d.percent, savings: d.savings, label: d.label, until: d.until }
+      : null,
+    negotiable: row.negotiable, badge: row.badge,
+    features: row.features, maxDevices: row.max_devices, active: row.active,
+    days: approxDays(row.amount, row.unit),
+  };
+}
+
 async function listPlans({ activeOnly = true } = {}) {
   const rows = await many(
     `SELECT * FROM plans ${activeOnly ? 'WHERE active = true' : ''} ORDER BY sort_order ASC, created_at ASC`
   );
-  return rows.map(r => ({
-    code: r.code, title: r.title, amount: r.amount, unit: r.unit,
-    price: r.price_afn, negotiable: r.negotiable, badge: r.badge,
-    features: r.features, maxDevices: r.max_devices, active: r.active,
-    days: approxDays(r.amount, r.unit),
-  }));
+  const at = Date.now();
+  return rows.map(r => shapePlan(r, at));
 }
 
 async function getPlan(code) {
@@ -102,4 +161,5 @@ async function allConfig() {
 module.exports = {
   DEFAULT_PLANS, DEFAULT_CONFIG, approxDays, endOfPeriod,
   seedDefaults, listPlans, getPlan, getConfig, setConfig, allConfig,
+  discountOf, shapePlan,
 };

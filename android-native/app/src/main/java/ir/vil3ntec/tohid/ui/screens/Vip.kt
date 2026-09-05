@@ -11,6 +11,9 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.material.icons.filled.Redeem
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -25,6 +28,7 @@ import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.HourglassBottom
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.material3.*
@@ -100,17 +104,43 @@ private val PAID_FEATURES = listOf(
   "چند کاربر روی یک دکان",
 )
 
+/**
+ *  یک پلن، همان‌طور که روی صفحه دیده می‌شود.
+ *
+ *  `fullPrice` قیمتِ پیش از تخفیف است. اگر با `price` یکی باشد تخفیفی
+ *  در کار نیست و چیزی خط‌خورده نشان داده نمی‌شود.
+ */
 private data class Plan(
+  val code: String,
   val title: String,
   val price: Int,
+  val fullPrice: Int = price,
   val badge: String = "",
   val days: Int,
-)
+  val discountLabel: String = "",
+) {
+  val discounted: Boolean get() = fullPrice > price
+  val offPercent: Int get() =
+    if (!discounted || fullPrice <= 0) 0 else ((fullPrice - price) * 100 / fullPrice)
+}
 
-private val PLANS = listOf(
-  Plan("ماهانه", 500, days = 30),
-  Plan("۶ ماهه", 2500, badge = "پیشنهاد ما", days = 180),
-  Plan("۱ ساله", 4000, badge = "بیشترین صرفه", days = 365),
+/**
+ *  پلن‌های پیش‌فرض — فقط تا وقتی که سرور جواب بدهد.
+ *
+ *  ── چرا هنوز اینجا هستند ──────────────────────────────────────────
+ *  برنامه باید آفلاین هم چیزی نشان بدهد؛ صفحهٔ خالیِ «قیمت‌ها خوانده
+ *  نشد» بدتر از یک قیمتِ تقریبی است.
+ *
+ *  ── چرا دیگر تنها منبع نیستند ─────────────────────────────────────
+ *  تا دیروز همین سه خط، تنها جای قیمت بودند. یعنی صاحب سامانه قیمت را
+ *  در پنل عوض می‌کرد و روی گوشیِ هیچ‌کس چیزی تغییر نمی‌کرد — چون گوشی
+ *  هرگز نمی‌پرسید. حالا اول از سرور خوانده می‌شود و این‌ها فقط
+ *  جانشین‌اند.
+ */
+private val FALLBACK_PLANS = listOf(
+  Plan("m1", "ماهانه", 500, days = 30),
+  Plan("m6", "۶ ماهه", 2500, badge = "پیشنهاد ما", days = 180),
+  Plan("y1", "۱ ساله", 4000, badge = "بیشترین صرفه", days = 365),
 )
 
 /**
@@ -280,8 +310,51 @@ fun VipScreen(onDismiss: () -> Unit) {
   val state = remember { SyncStore(context) }
   val signedIn = !state.accessToken.isNullOrBlank()
   val scope = rememberCoroutineScope()
+  /*
+   *  ── قیمت‌ها از سرور ───────────────────────────────────────────────
+   *  تا دیروز این فهرست در خودِ کد بود و هیچ‌وقت از سرور خوانده نمی‌شد.
+   *  یعنی عوض کردنِ قیمت در پنل مدیریت روی گوشیِ هیچ‌کس اثری نداشت، و
+   *  تخفیف اصلاً راهی برای رسیدن نداشت.
+   *
+   *  حالا اول از سرور، و اگر نرسید همان پیش‌فرض‌ها — پس آفلاین هم صفحه
+   *  خالی نمی‌ماند.
+   */
+  var plans by remember { mutableStateOf(FALLBACK_PLANS) }
+  var currency by remember { mutableStateOf("؋") }
+  LaunchedEffect(Unit) {
+    Backend.account(context).plans().onSuccess { dto ->
+      val fresh = dto.plans
+        .filter { it.active && it.days > 0 }
+        .map { p ->
+          Plan(
+            code = p.code,
+            title = p.title.ifBlank { p.code },
+            price = p.price.toInt(),
+            fullPrice = (if (p.fullPrice > 0) p.fullPrice else p.price).toInt(),
+            badge = p.badge,
+            days = p.days,
+            discountLabel = p.discount?.label.orEmpty(),
+          )
+        }
+      if (fresh.isNotEmpty()) plans = fresh
+      if (dto.currency.isNotBlank()) currency = dto.currency
+    }
+  }
+
   // پیش‌فرض روی «پیشنهاد ما» است؛ کسی که تصمیم ندارد، همان را می‌گیرد
-  var chosenPlan by rememberSaveable { mutableStateOf(PLANS[1].title) }
+  var chosenPlan by rememberSaveable { mutableStateOf("") }
+  //  اگر فهرست از سرور آمد و انتخابِ قبلی دیگر در آن نیست، به نشان‌دار
+  //  برمی‌گردیم — وگرنه دکمهٔ خرید به پلنی اشاره می‌کرد که وجود ندارد
+  val picked = plans.find { it.title == chosenPlan }
+    ?: plans.find { it.badge.isNotBlank() }
+    ?: plans.first()
+
+  //  کدِ اشتراک — پایینِ صفحه
+  var codeOpen by rememberSaveable { mutableStateOf(false) }
+  var code by rememberSaveable { mutableStateOf("") }
+  var codeBusy by remember { mutableStateOf(false) }
+  var codeNote by remember { mutableStateOf<String?>(null) }
+  var codeOk by remember { mutableStateOf(false) }
 
   fun buy(planTitle: String) {
     val text = Uri.encode("$BUY_MESSAGE ($planTitle)")
@@ -407,10 +480,10 @@ fun VipScreen(onDismiss: () -> Unit) {
         Modifier.height(IntrinsicSize.Min),
         horizontalArrangement = Arrangement.spacedBy(if (isTablet()) 10.dp else 7.dp),
       ) {
-        PLANS.forEach { plan ->
+        plans.forEach { plan ->
           PlanCard(
             plan = plan,
-            selected = chosenPlan == plan.title,
+            selected = picked.title == plan.title,
             onClick = { chosenPlan = plan.title },
             modifier = Modifier.weight(1f).fillMaxHeight(),
             stretch = true,
@@ -455,9 +528,8 @@ fun VipScreen(onDismiss: () -> Unit) {
 
       /* ---------------------- گرفتنِ اشتراک ---------------------- */
       Spacer(Modifier.height(16.dp))
-      val picked = PLANS.find { it.title == chosenPlan } ?: PLANS[1]
       BuyButton(
-        text = "گرفتن اشتراک ${picked.title} — ${plain(picked.price)} ؋",
+        text = "گرفتن اشتراک ${picked.title} — ${plain(picked.price)} $currency",
         onClick = {
           /*
            *  درخواستِ خرید، همین‌جا ثبت می‌شود.
@@ -472,7 +544,17 @@ fun VipScreen(onDismiss: () -> Unit) {
           if (signedIn) {
             //  ثبتِ درخواست بی‌صداست: اگر نگرفت، واتساپ همچنان باز
             //  می‌شود و کاربر سرِ راهش نمی‌ماند
-            scope.launch { Backend.account(context).requestPurchase(picked.title, "از برنامهٔ اندروید") }
+            /*
+             *  کدِ پلن می‌رود، نه عنوانش.
+             *
+             *  سرور با همین کد پلن را پیدا می‌کند و مدت را از رویش حساب
+             *  می‌کند. تا دیروز عنوانِ فارسی («ماهانه») فرستاده می‌شد و
+             *  هیچ پلنی با آن نام پیدا نمی‌شد — یعنی درخواستِ خرید ثبت
+             *  می‌شد ولی موقعِ تأیید، مدتش معلوم نبود.
+             */
+            scope.launch {
+              Backend.account(context).requestPurchase(picked.code, "از برنامهٔ اندروید — ${picked.title}")
+            }
           }
           buy(picked.title)
         },
@@ -485,6 +567,112 @@ fun VipScreen(onDismiss: () -> Unit) {
         textAlign = TextAlign.Center,
         modifier = Modifier.fillMaxWidth(),
       )
+
+      /* ---------------------- کد اشتراک ---------------------- */
+      /*
+       *  ── چرا این هست ──────────────────────────────────────────────
+       *  تا دیروز تنها راهِ گرفتنِ اشتراک این بود که کاربر واتساپ بزند و
+       *  صاحب سامانه هم همان لحظه پشتِ پنل باشد و دستی فعالش کند. حالا
+       *  صاحب سامانه یک کدِ شش‌رقمی به ایمیلِ او می‌فرستد و او هر وقت
+       *  خواست همین‌جا می‌زند — بی واسطه، بی انتظار.
+       */
+      Spacer(Modifier.height(12.dp))
+      Column(
+        Modifier
+          .fillMaxWidth()
+          .clip(RoundedCornerShape(Radius.md))
+          .background(colors.surface)
+          .border(1.dp, colors.border, RoundedCornerShape(Radius.md))
+          .padding(14.dp),
+      ) {
+        Row(
+          Modifier.fillMaxWidth().clickable { codeOpen = !codeOpen },
+          verticalAlignment = Alignment.CenterVertically,
+        ) {
+          Icon(Icons.Filled.Redeem, contentDescription = null, tint = colors.primary, modifier = Modifier.size(18.dp))
+          Spacer(Modifier.width(9.dp))
+          Column(Modifier.weight(1f)) {
+            Text(
+              "کد اشتراک دارم",
+              style = MaterialTheme.typography.labelLarge,
+              color = colors.text,
+              fontWeight = FontWeight.Bold,
+            )
+            Text(
+              "کدِ شش‌رقمی که به ایمیلتان آمده",
+              style = MaterialTheme.typography.labelSmall,
+              color = colors.muted,
+            )
+          }
+          Text(
+            if (codeOpen) "بستن" else "وارد کردن",
+            style = MaterialTheme.typography.labelSmall,
+            color = colors.primary,
+            fontWeight = FontWeight.Bold,
+          )
+        }
+
+        if (codeOpen) {
+          Spacer(Modifier.height(12.dp))
+          OutlinedTextField(
+            value = code,
+            onValueChange = { codeNote = null; code = it.filter { ch -> ch.isDigit() }.take(6) },
+            label = { Text("کد شش‌رقمی") },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            shape = RoundedCornerShape(Radius.sm),
+            modifier = Modifier.fillMaxWidth(),
+          )
+          Spacer(Modifier.height(10.dp))
+          Button(
+            onClick = {
+              codeBusy = true
+              codeNote = null
+              scope.launch {
+                Backend.support(context).redeemVip(code)
+                  .onSuccess {
+                    codeOk = true
+                    codeNote = it.message.ifBlank { "اشتراک شما فعال شد." }
+                    code = ""
+                    //  وضعیتِ اشتراک همان لحظه تازه می‌شود، وگرنه صفحه
+                    //  هنوز «اشتراک ندارید» نشان می‌داد
+                    SubscriptionPulse.refresh(context)
+                  }
+                  .onFailure {
+                    codeOk = false
+                    codeNote = it.userMessage
+                  }
+                codeBusy = false
+              }
+            },
+            enabled = !codeBusy && code.length == 6 && signedIn,
+            shape = RoundedCornerShape(Radius.sm),
+            modifier = Modifier.fillMaxWidth().height(46.dp),
+          ) {
+            if (codeBusy) {
+              CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
+            } else {
+              Text("فعال کردن", fontWeight = FontWeight.Bold)
+            }
+          }
+          if (!signedIn) {
+            Spacer(Modifier.height(6.dp))
+            Text(
+              "برای فعال کردنِ کد، اول وارد حساب شوید — اشتراک روی دکانِ شما می‌نشیند.",
+              style = MaterialTheme.typography.labelSmall,
+              color = colors.muted,
+            )
+          }
+          codeNote?.let { note ->
+            Spacer(Modifier.height(8.dp))
+            Text(
+              note,
+              style = MaterialTheme.typography.labelSmall,
+              color = if (codeOk) colors.success else colors.danger,
+            )
+          }
+        }
+      }
 
       /*
        *  پرداخت آنلاین — گفته می‌شود که نیست.
@@ -1003,7 +1191,14 @@ private fun PlanCard(
      *  می‌نشست و با آن دو تای دیگر تراز نبود.
      */
     Box(Modifier.height(BADGE_BAND), contentAlignment = Alignment.BottomCenter) {
-      if (golden) GoldBadge(plan.badge)
+      //  تخفیف بر نشانِ همیشگی می‌چربد: «٪۲۰ کمتر» خبرِ تازه است،
+      //  «پیشنهاد ما» همیشه بوده
+      when {
+        plan.discounted -> GoldBadge(
+          plan.discountLabel.ifBlank { "٪${plan.offPercent.fa()} تخفیف" }
+        )
+        golden -> GoldBadge(plan.badge)
+      }
     }
 
     Column(
@@ -1044,11 +1239,31 @@ private fun PlanCard(
         textAlign = TextAlign.Center,
       )
       Spacer(Modifier.height(6.dp))
+      /*
+       *  قیمتِ قبلی، خط‌خورده.
+       *
+       *  تخفیف تا وقتی عددِ قبلی دیده نشود، تخفیف نیست — فقط یک قیمتِ
+       *  دیگر است. پس هر دو نشان داده می‌شوند، و نشانِ «٪۲۰» بالای
+       *  کارت می‌گوید چقدر.
+       */
+      if (plan.discounted) {
+        Text(
+          plain(plan.fullPrice),
+          style = MaterialTheme.typography.labelSmall,
+          color = colors.muted2,
+          textDecoration = TextDecoration.LineThrough,
+          maxLines = 1,
+        )
+      }
       Text(
         plain(plan.price),
         style = if (wide) MaterialTheme.typography.titleMedium
         else MaterialTheme.typography.titleSmall,
-        color = if (golden) GOLD_DEEP else colors.primary,
+        color = when {
+          plan.discounted -> colors.success
+          golden -> GOLD_DEEP
+          else -> colors.primary
+        },
         fontWeight = FontWeight.Bold,
         maxLines = 1,
       )

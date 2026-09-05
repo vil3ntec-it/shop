@@ -76,6 +76,7 @@ private val PAGE_TITLES = mapOf(
   "quick" to "انتخاب محصول",
   "product" to "کالا",
   "vip" to "اشتراک و قیمت‌ها",
+  "support" to "پشتیبانی",
   "profile" to "حساب من",
   "team" to "کارمندان دکان",
 )
@@ -275,6 +276,10 @@ fun AppRoot(
     } else if (ir.vil3ntec.tohid.sync.LocationPing.shouldAsk(context)) {
       runCatching { askLocation.launch(ir.vil3ntec.tohid.data.DeviceLocation.PERMISSIONS) }
     }
+
+    //  «من آمدم» — تا صاحب سامانه بداند چند نفر آمده‌اند، نه فقط چند
+    //  نفر ثبت‌نام کرده‌اند. هیچ داده‌ای از دفترِ دکان نمی‌رود.
+    ir.vil3ntec.tohid.sync.VisitPing.send(context)
   }
   LaunchedEffect(data) {
     if (loaded) {
@@ -538,6 +543,7 @@ fun AppRoot(
           onConsumed = { pendingBarcode = null; pendingProduct = null },
         )
         "vip" -> VipScreen { sub = null }
+        "support" -> SupportScreen { sub = null }
         "profile" -> ProfileScreen(
           store = store,
           snackbar = snackbar,

@@ -13,7 +13,7 @@ const { createHmac, randomInt, timingSafeEqual } = require('crypto');
 const { query, one, newId, now } = require('../db');
 const config = require('../config');
 const settings = require('./sms-settings');
-const { badRequest, tooMany, forbidden } = require('../middleware/errors');
+const { badRequest, tooMany, forbidden, upstream } = require('../middleware/errors');
 
 function pepper() {
   return config.secrets.otp || config.secrets.api || 'shop-otp-pepper';
@@ -190,33 +190,26 @@ const senders = {
   },
 
   /**
-   * ایمیل، از راه هر سرویسی که API با کلید دارد (Resend، Brevo، Mailgun…).
+   * ایمیل — از راه تنظیماتی که در برنامه‌ی مدیریت گذاشته شده.
    *
-   * بدنه‌ی استاندارد فرستاده می‌شود؛ اگر سرویس شما شکل دیگری می‌خواهد،
-   * یک وب‌هوک کوچک بینشان بگذارید — تا کلید سرویس فقط روی سرور بماند.
+   * کارِ فرستادن در `lib/mailer` است: SMTP خودمان یا سرویسِ HTTP. اینجا
+   * فقط متنِ کد ساخته می‌شود، با قالبی که در پنل قابل عوض کردن است.
    */
   async email(to, code, message) {
-    const { url, key, from, subject } = config.email;
-    if (!url) throw new Error('EMAIL_API_URL تنظیم نشده است');
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(key ? { Authorization: `Bearer ${key}` } : {}),
-      },
-      body: JSON.stringify({
-        from,
-        to: [to],
-        subject,
-        text: message,
-        html: `<p style="font-family:sans-serif;font-size:16px">${message}</p>`,
-      }),
-      signal: AbortSignal.timeout(10000),
+    const mailer = require('./mailer');
+    const cfg = await mailer.current();
+    const subject = (cfg.otpSubject || 'کد ورود توحید').replace(/\{code\}/g, code);
+    const text = cfg.otpTemplate
+      ? cfg.otpTemplate.replace(/\{code\}/g, code)
+      : `کد شما: ${code}\n\nاین کد تا چند دقیقه‌ی دیگر کار می‌کند. اگر شما درخواستش نکرده‌اید، همین ایمیل را نادیده بگیرید.`;
+    const html = mailer.card({
+      title: 'کد ورود شما',
+      lead: 'این کد را در برنامه یا سایت بزنید:',
+      code,
+      body: 'کد تا چند دقیقه‌ی دیگر کار می‌کند و فقط یک بار.',
+      footer: 'اگر شما درخواستش نکرده‌اید، این ایمیل را نادیده بگیرید — حسابی ساخته نمی‌شود.',
     });
-    if (!res.ok) {
-      const body = await res.text().catch(() => '');
-      throw new Error(`سرویس ایمیل پاسخ ${res.status} داد: ${body.slice(0, 200)}`);
-    }
+    await mailer.send({ to, subject, text, html });
     return { delivered: true, via: 'email' };
   },
 };
@@ -231,7 +224,13 @@ function isEmail(destination) {
  * با پیامک یا واتساپ. هر کدام متغیر خودش را دارد.
  */
 async function sender(destination) {
-  if (isEmail(destination)) return senders[config.otp.emailProvider] || senders.log;
+  if (isEmail(destination)) {
+    //  راهِ ایمیل هم مثل پیامک از پنل می‌آید، نه فقط از .env. تا وقتی
+    //  چیزی تنظیم نشده باشد `log` است و کد فقط در لاگِ سرور می‌نشیند.
+    const mailer = require('./mailer');
+    const cfg = await mailer.current();
+    return cfg.provider === 'log' ? senders.log : senders.email;
+  }
   //  راه ارسالِ شماره هم از پنل مدیریت عوض می‌شود، نه فقط از .env
   const { provider } = await settings.current();
   return senders[provider] || senders.log;
@@ -265,10 +264,11 @@ async function request(destination, { purpose = 'login', ip = '' } = {}) {
 
   const code = randomCode(config.otp.digits);
   const expiresAt = t + config.otp.ttlMs;
+  const codeRow = newId('otp');
   await query(
     `INSERT INTO otp_codes (id, purpose, destination, code_hash, attempts, max_attempts, expires_at, created_at, ip)
      VALUES ($1,$2,$3,$4,0,$5,$6,$7,$8)`,
-    [newId('otp'), purpose, destination, hashCode(destination, code), config.otp.maxAttempts, expiresAt, t, ip]
+    [codeRow, purpose, destination, hashCode(destination, code), config.otp.maxAttempts, expiresAt, t, ip]
   );
 
   //  متن پیام: اگر سرویس شما قالب تأییدشده می‌خواهد، همان را در
@@ -277,7 +277,30 @@ async function request(destination, { purpose = 'login', ip = '' } = {}) {
   const message = smsCfg.template
     ? smsCfg.template.replace(/\{code\}/g, code)
     : `کد ورود شما: ${code}`;
-  await (await sender(destination))(destination, code, message);
+
+  /*
+   *  ── چرا این try اینجاست ──────────────────────────────────────────
+   *  اگر تنظیماتِ ایمیل یا پیامک خراب باشد، اینجا خطا می‌داد و کاربر
+   *  یک «خطای داخلی سرور» می‌دید — بی هیچ نشانی از اینکه کد اصلاً
+   *  بیرون نرفته. یعنی دقیقاً همان چیزی که ثبت‌نام را بی‌صدا می‌شکست.
+   *
+   *  حالا: کدِ ساخته‌شده پاک می‌شود (وگرنه مهلتِ «ارسال دوباره» را
+   *  می‌گرفت و کاربر تا دو دقیقه حتی نمی‌توانست دوباره تلاش کند) و
+   *  خطایی برمی‌گردد که هم کاربر می‌فهمد و هم مدیر می‌داند کجا را
+   *  درست کند.
+   */
+  try {
+    await (await sender(destination))(destination, code, message);
+  } catch (err) {
+    await query('DELETE FROM otp_codes WHERE id=$1', [codeRow]);
+    console.error('[otp] فرستادن کد نشد:', err.message);
+    throw upstream(
+      isEmail(destination)
+        ? 'کد به ایمیل شما فرستاده نشد. کمی بعد دوباره تلاش کنید؛ اگر باز هم نشد، سرویس ایمیل سرور تنظیم نیست.'
+        : 'کد فرستاده نشد. کمی بعد دوباره تلاش کنید؛ اگر باز هم نشد، سرویس پیامک سرور تنظیم نیست.',
+      'delivery_failed'
+    );
+  }
 
   //  `resendSeconds` هم می‌رود چون ساعتِ گوشی ممکن است با سرور جور نباشد.
   //  با ثانیه، برنامه لازم نیست ساعتش را با سرور تنظیم کند.
@@ -290,7 +313,9 @@ async function request(destination, { purpose = 'login', ip = '' } = {}) {
   // فقط بیرون از حالت production و فقط وقتی راه ارسالی تنظیم نشده
   //  فقط بیرون از production و فقط وقتی هیچ راه ارسالی تنظیم نشده — وگرنه
   //  کد در پاسخ HTTP برمی‌گشت و کسی که شماره‌ی دیگری را می‌زد کدش را می‌دید.
-  const via = isEmail(destination) ? config.otp.emailProvider : smsCfg.provider;
+  const via = isEmail(destination)
+    ? (await require('./mailer').current()).provider
+    : smsCfg.provider;
   if (config.env !== 'production' && via === 'log') out.devCode = code;
   return out;
 }
