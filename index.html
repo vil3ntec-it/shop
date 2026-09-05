@@ -72,52 +72,114 @@
   @font-face{font-family:'Vazirmatn Local';src:url('fonts/Vazirmatn-ExtraBold.ttf') format('truetype');font-weight:800;font-display:swap;}
 </style>
 <style>
+  /* ==========================================================
+     پالت — همان پالتِ برنامه‌ی نیتیو، عددبه‌عدد.
+     ----------------------------------------------------------
+     قرار صاحب مخزن: وب و برنامه باید یکی دیده شوند. پس رنگ‌ها از
+     `ui/theme/Theme.kt` آمده‌اند، نه از سلیقه‌ی جدا. هر تغییری آنجا،
+     همین‌جا هم باید بیفتد.
+
+     سطح‌ها **مات**اند نه شفاف: شیشه‌ی کم‌رنگ، محتوای پشتش را نشان
+     می‌دهد و صفحه را تودرتو می‌کند.
+     ========================================================== */
   :root{
-    --bg:#ffffff;
-    --surface:#f6f8fc;
-    --surface-2:#eef2fa;
-    --border:#e5eaf3;
-    --text:#1a2233;
-    --muted:#7c8698;
-    --muted-2:#a4adbd;
-    --primary:#2c5ce6;
-    --primary-dark:#1f3f9e;
-    --primary-tint:#eaf0ff;
-    --success:#18a06b;
-    --success-tint:#e8f8f1;
-    --warning:#e8a13a;
-    --warning-tint:#fdf3e4;
-    --danger:#e54b4b;
-    --danger-tint:#fdecec;
-    --radius-sm:10px;
-    --radius-md:14px;
-    --radius-lg:20px;
-    --shadow-sm:0 1px 2px rgba(20,30,60,.05);
-    --shadow-md:0 6px 20px -8px rgba(30,50,110,.15);
+    --bg:#f2f0fa;
+    --surface:rgba(255,255,255,.95);
+    --surface-2:rgba(255,255,255,.98);
+    --surface-solid:#fbfaff;
+    --border:rgba(25,22,39,.10);
+    --text:#191627;
+    --muted:#635c86;
+    --muted-2:#8a83ac;
+    --primary:#7c5cff;
+    --primary-dark:#5b3fe0;
+    --primary-tint:rgba(124,92,255,.12);
+    --accent:#00c39a;
+    --success:#0fa98a;
+    --success-tint:rgba(15,169,138,.12);
+    --warning:#b87708;
+    --warning-tint:rgba(184,119,8,.12);
+    --danger:#d93b3b;
+    --danger-tint:rgba(217,59,59,.12);
+    /* لکه‌های نورِ زمینه — همان سه لکه‌ی آرورا */
+    --aurora-1:rgba(124,92,255,.30);
+    --aurora-2:rgba(0,195,154,.24);
+    --aurora-3:rgba(255,95,162,.20);
+    --radius-sm:16px;
+    --radius-md:20px;
+    --radius-lg:24px;
+    --shadow-sm:0 1px 2px rgba(25,22,39,.05);
+    --shadow-md:0 10px 30px -12px rgba(124,92,255,.35);
     --sidebar-w:220px;
     --header-h:64px;
     --bottomnav-h:66px;
   }
+  /*
+     شبِ برنامه: زمینه‌ی بنفشِ بسیار تیره (نه سیاهِ خالص، که با نور
+     لکه‌دار می‌شود)، و کارتی که فقط چند درصد از زمینه روشن‌تر است.
+     رنگ برای چیزهایی می‌ماند که معنی دارند: پول، هشدار، دکمه.
+  */
   html[data-theme="dark"]{
-    --bg:#0f1420;
-    --surface:#161d2c;
-    --surface-2:#1c2436;
-    --border:#2a3448;
-    --text:#e8ecf5;
-    --muted:#8b95ab;
-    --muted-2:#5f6a82;
-    --primary:#5b82f0;
-    --primary-dark:#8fabf7;
-    --primary-tint:#1b2942;
-    --success:#3ecf94;
-    --success-tint:#12291f;
-    --warning:#f0b955;
-    --warning-tint:#2e2412;
-    --danger:#f0685f;
-    --danger-tint:#2e1616;
-    --shadow-sm:0 1px 2px rgba(0,0,0,.35);
-    --shadow-md:0 6px 20px -8px rgba(0,0,0,.6);
+    --bg:#0b0a14;
+    --surface:rgba(20,18,33,.94);
+    --surface-2:rgba(28,25,48,.96);
+    --surface-solid:#171526;
+    --border:rgba(255,255,255,.10);
+    --text:#f0eef8;
+    --muted:#a8a3bc;
+    --muted-2:#7e7995;
+    --primary:#a78bff;
+    --primary-dark:#7c5cff;
+    --primary-tint:rgba(167,139,255,.20);
+    --accent:#5ce0bc;
+    --success:#5ce0bc;
+    --success-tint:rgba(92,224,188,.18);
+    --warning:#f5b54a;
+    --warning-tint:rgba(245,181,74,.18);
+    --danger:#ff7a7a;
+    --danger-tint:rgba(255,122,122,.18);
+    --aurora-1:rgba(124,92,255,.55);
+    --aurora-2:rgba(0,195,154,.38);
+    --aurora-3:rgba(255,95,162,.34);
+    --shadow-sm:0 1px 2px rgba(0,0,0,.4);
+    --shadow-md:0 10px 30px -12px rgba(0,0,0,.7);
   }
+  /* ==========================================================
+     زمینه‌ی آرورا — سه لکه‌ی نور، ساکن.
+     ----------------------------------------------------------
+     ── چرا ساکن و چرا با یک لایه ─────────────────────────────
+     این باید روی گوشیِ ارزان هم بی‌هزینه باشد. پس:
+       • یک `::before` روی `body`، نه سه المان جدا
+       • `position:fixed` تا با اسکرول دوباره کشیده نشود
+       • بدون انیمیشن — نورِ متحرک یعنی هر فریم دوباره رنگ‌آمیزی
+       • `pointer-events:none` تا جلوی لمس را نگیرد
+     مرورگر این را یک بار می‌کشد و بعد فقط جابه‌جا می‌کند.
+     ========================================================== */
+  body::before{
+    content:"";
+    position:fixed;
+    inset:-10%;
+    z-index:-1;
+    pointer-events:none;
+    background:
+      radial-gradient(42% 32% at 85% 8%,  var(--aurora-1) 0%, transparent 70%),
+      radial-gradient(38% 30% at 8% 45%,  var(--aurora-2) 0%, transparent 70%),
+      radial-gradient(44% 34% at 88% 92%, var(--aurora-3) 0%, transparent 70%);
+  }
+
+  /* ==========================================================
+     شیشه — سطحِ مات با لبه‌ی روشن.
+     ----------------------------------------------------------
+     `backdrop-filter` فقط جایی می‌آید که یک لایه است و همیشه سرِ جایش:
+     سربرگ و نوارِ پایین. روی همه‌ی کارت‌ها گذاشتنش، هر اسکرول را به
+     یک بازمحاسبه‌ی تمام‌صفحه تبدیل می‌کند. کارت‌ها ماتی‌شان را از خودِ
+     رنگ می‌گیرند، که هیچ هزینه‌ای ندارد.
+     ========================================================== */
+  .glass{
+    background:var(--surface);
+    border:1px solid var(--border);
+  }
+
   html, body, .header, .sidebar, .form-input, .form-textarea{
     transition:background-color .2s ease, border-color .2s ease, color .2s ease;
   }
@@ -143,7 +205,7 @@
   .sidebar{
     width:var(--sidebar-w);
     flex-shrink:0;
-    background:var(--bg);
+    background:var(--surface);
     border-inline-start:1px solid var(--border);
     padding:24px 16px;
     display:none;
@@ -233,7 +295,9 @@
     justify-content:space-between;
     padding:0 20px;
     border-bottom:1px solid var(--border);
-    background:var(--bg);
+    background:var(--surface);
+    -webkit-backdrop-filter:blur(16px);
+    backdrop-filter:blur(16px);
     position:sticky;
     top:0;
     z-index:20;
@@ -249,7 +313,7 @@
     width:36px; height:36px;
     border-radius:10px;
     border:1px solid var(--border);
-    background:var(--bg);
+    background:var(--surface);
     display:flex; align-items:center; justify-content:center;
     color:var(--muted);
   }
@@ -287,7 +351,7 @@
     .stat-grid{grid-template-columns:repeat(4,1fr); gap:16px;}
   }
   .stat-card{
-    background:var(--bg);
+    background:var(--surface);
     border:1px solid var(--border);
     border-radius:var(--radius-lg);
     padding:16px;
@@ -314,9 +378,9 @@
 
   /* ---------- Panels ---------- */
   .panel{
-    background:var(--bg);
+    background:var(--surface);
     border:1px solid var(--border);
-    border-radius:var(--radius-lg);
+    border-radius:var(--radius-md);
     padding:18px;
     margin-bottom:16px;
     box-shadow:var(--shadow-sm);
@@ -420,7 +484,9 @@
     position:fixed;
     bottom:0; inset-inline:0;
     height:var(--bottomnav-h);
-    background:var(--bg);
+    background:var(--surface);
+    -webkit-backdrop-filter:blur(16px);
+    backdrop-filter:blur(16px);
     border-top:1px solid var(--border);
     display:flex;
     z-index:30;
@@ -496,7 +562,7 @@
   .fab-menu.open{opacity:1; transform:translateY(0); pointer-events:auto;}
   .fab-menu-item{
     display:flex; align-items:center; gap:10px;
-    background:var(--bg);
+    background:var(--surface-solid);
     border:1px solid var(--border);
     box-shadow:var(--shadow-md);
     border-radius:999px;
@@ -555,7 +621,7 @@
   .cart-debtor-btn{
     flex:1; display:flex; align-items:center; gap:9px;
     padding:8px 10px; border-radius:var(--radius-md);
-    border:1.5px dashed var(--border); background:var(--bg);
+    border:1.5px dashed var(--border); background:var(--surface);
     font-family:inherit; font-size:12.5px; font-weight:700; color:var(--muted);
     cursor:pointer; text-align:start;
     transition:border-color .18s ease, background-color .18s ease, color .18s ease, transform .12s ease;
@@ -578,7 +644,7 @@
   .cart-debtor-clear{
     flex:0 0 auto; width:28px; height:28px; border-radius:50%;
     display:none; align-items:center; justify-content:center;
-    border:1px solid var(--border); background:var(--bg); color:var(--danger);
+    border:1px solid var(--border); background:var(--surface); color:var(--danger);
     cursor:pointer;
   }
   .cart-debtor-row.picked .cart-debtor-clear{ display:flex; }
@@ -588,7 +654,7 @@
   .pick-debtor-item{
     display:flex; align-items:center; gap:10px; width:100%;
     padding:11px 12px; margin-bottom:7px; border-radius:var(--radius-md);
-    border:1px solid var(--border); background:var(--bg);
+    border:1px solid var(--border); background:var(--surface);
     font-family:inherit; cursor:pointer; text-align:start;
     transition:border-color .16s ease, background-color .16s ease, transform .12s ease;
   }
@@ -634,7 +700,13 @@
     transition:filter .15s ease, transform .1s ease;
   }
   .btn:active{transform:scale(.97);}
-  .btn-primary{background:var(--primary); color:#fff; box-shadow:var(--shadow-sm);}
+  /* دکمه‌ی اصلی گرادینتی است — همان بنفش‌به‌نعناییِ برنامه */
+  .btn-primary{
+    background:linear-gradient(135deg, var(--primary-dark), var(--primary) 55%, var(--accent));
+    color:#fff;
+    box-shadow:var(--shadow-md);
+    border:none;
+  }
   .btn-primary:hover{filter:brightness(1.06);}
   .btn-secondary{background:var(--surface); color:var(--text); border-color:var(--border);}
   .btn-secondary:hover{background:var(--surface-2);}
@@ -674,7 +746,7 @@
     position:absolute; top:3px; inset-inline-start:3px;
     width:16px; height:16px; border-radius:5px;
     border:1px solid var(--border);
-    background:var(--bg); color:var(--muted);
+    background:var(--surface); color:var(--muted);
     display:flex; align-items:center; justify-content:center;
     font-size:10px; line-height:1; padding:0;
   }
@@ -686,7 +758,7 @@
     position:absolute; bottom:3px; inset-inline-end:3px;
     width:16px; height:16px; border-radius:5px;
     border:1px solid var(--border);
-    background:var(--bg); color:var(--muted);
+    background:var(--surface); color:var(--muted);
     display:flex; align-items:center; justify-content:center;
     padding:0;
   }
@@ -719,7 +791,7 @@
     width:30px; height:30px;
     border-radius:8px;
     border:1px solid var(--border);
-    background:var(--bg);
+    background:var(--surface);
     display:flex; align-items:center; justify-content:center;
     color:var(--muted);
     flex-shrink:0;
@@ -743,7 +815,7 @@
     .modal-scrim{align-items:center; padding:20px;}
   }
   .modal-box{
-    background:var(--bg);
+    background:var(--surface-solid);
     width:100%;
     max-width:420px;
     border-radius:20px 20px 0 0;
@@ -776,7 +848,7 @@
     color:var(--text);
     background:var(--surface);
   }
-  .form-input:focus, .form-textarea:focus{outline:none; border-color:var(--primary); background:var(--bg);}
+  .form-input:focus, .form-textarea:focus{outline:none; border-color:var(--primary); background:var(--surface-solid);}
   .form-textarea{resize:vertical; min-height:70px;}
   .form-row-2{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
   .modal-actions{display:flex; gap:10px; margin-top:18px;}
@@ -842,13 +914,13 @@
     padding:10px 12px; border-radius:var(--radius-md); background:var(--surface);
   }
   .bulk-topbar label{font-size:12px; font-weight:700; color:var(--muted); white-space:nowrap;}
-  .bulk-topbar .form-input{min-height:40px; background:var(--bg);}
+  .bulk-topbar .form-input{min-height:40px; background:var(--surface-solid);}
 
   .bulk-rows{display:flex; flex-direction:column; gap:10px;}
   .bulk-row{
     position:relative;
     border:1.5px solid var(--border); border-radius:var(--radius-md);
-    background:var(--bg); padding:12px;
+    background:var(--surface); padding:12px;
     animation:cardIn .28s cubic-bezier(.22,1,.36,1) both;
   }
   .bulk-row-head{
@@ -908,7 +980,7 @@
     background:var(--primary-tint); display:none;
   }
   .bulk-newprod.open{display:block;}
-  .bulk-newprod .form-input{min-height:40px; margin-bottom:7px; background:var(--bg);}
+  .bulk-newprod .form-input{min-height:40px; margin-bottom:7px; background:var(--surface-solid);}
   .bulk-newprod .form-input:last-of-type{margin-bottom:9px;}
 
   .bulk-summary{
@@ -928,7 +1000,7 @@
   .more-card{
     display:flex; align-items:center; gap:12px;
     padding:14px; border-radius:var(--radius-md);
-    border:1px solid var(--border); background:var(--bg);
+    border:1px solid var(--border); background:var(--surface);
     text-decoration:none; color:inherit;
     transition:border-color .18s ease, box-shadow .2s ease, transform .12s cubic-bezier(.22,1,.36,1);
   }
@@ -1044,7 +1116,7 @@
     transition:border-color .18s ease, background-color .18s ease, box-shadow .18s ease;
   }
   .auth-input:focus-within{
-    border-color:var(--primary); background:var(--bg);
+    border-color:var(--primary); background:var(--surface-solid);
     box-shadow:0 0 0 4px var(--primary-tint);
   }
   .auth-input-ic{flex:0 0 auto; color:var(--muted-2); display:flex;}
@@ -1145,7 +1217,7 @@
   .signup-loc-txt span.coords{direction:ltr; display:inline-block; font-weight:700;}
   .signup-loc-retry{
     flex:0 0 auto; border:none; border-radius:9px; padding:8px 10px;
-    background:var(--bg); color:var(--primary); font-family:inherit;
+    background:var(--surface); color:var(--primary); font-family:inherit;
     font-size:11.5px; font-weight:800; cursor:pointer;
   }
   /* نقطه‌ی چشمک‌زن وقتی دنبال لوکیشن می‌گردیم */
@@ -1265,7 +1337,7 @@
     display:flex; flex-direction:column; align-items:center; gap:5px;
     padding:16px 10px; cursor:pointer; text-align:center;
     border:1.5px solid var(--border); border-radius:var(--radius-md);
-    background:var(--bg); font-family:inherit;
+    background:var(--surface); font-family:inherit;
     transition:border-color .18s ease, background-color .18s ease, transform .12s ease, box-shadow .2s ease;
   }
   .auth-role:active{transform:scale(.97);}
@@ -1372,7 +1444,7 @@
     display:inline-flex; align-items:center; gap:7px;
     padding:8px 13px 8px 11px;
     border:1px solid var(--border); border-radius:999px;
-    background:var(--bg); color:var(--muted);
+    background:var(--surface); color:var(--muted);
     font-size:12.5px; font-weight:700;
     margin-bottom:14px; text-decoration:none;
     -webkit-tap-highlight-color:transparent;
@@ -1390,7 +1462,7 @@
     position:sticky; top:0; z-index:15;
     display:none; align-items:center; gap:9px;
     margin:0 0 12px; padding:9px 12px;
-    background:var(--bg); border:1px solid var(--border);
+    background:var(--surface-solid); border:1px solid var(--border);
     border-radius:var(--radius-md); box-shadow:var(--shadow-sm);
   }
   .account-sticky.show{display:flex;}
@@ -1413,7 +1485,7 @@
     position:sticky; top:0; z-index:15;
     display:flex; align-items:center; gap:10px;
     margin-bottom:14px; padding:11px 13px;
-    background:var(--bg); border:1px solid var(--border);
+    background:var(--surface-solid); border:1px solid var(--border);
     border-radius:var(--radius-md); box-shadow:var(--shadow-sm);
   }
   .acc-bar-avatar{
@@ -1437,7 +1509,7 @@
   .acc-bar.settled .acc-bar-money b{color:var(--success); font-size:13.5px;}
   .acc-bar-actions{display:flex; gap:5px; flex-shrink:0;}
   .account-head{
-    background:var(--bg);
+    background:var(--surface-solid);
     border:1px solid var(--border);
     border-radius:var(--radius-lg);
     padding:20px;
@@ -1475,7 +1547,7 @@
   .acc-stat{
     display:flex; flex-direction:column; align-items:center; gap:2px;
     padding:13px 6px; border-radius:var(--radius-lg);
-    border:1px solid var(--border); background:var(--bg);
+    border:1px solid var(--border); background:var(--surface);
     text-align:center; min-width:0;
     animation:cardIn .34s cubic-bezier(.2,.8,.2,1) both;
   }
@@ -1546,7 +1618,7 @@
   .tx-type-opt{
     display:flex; align-items:center; justify-content:center; gap:8px;
     padding:11px 8px; border-radius:var(--radius-md);
-    border:1.5px solid var(--border); background:var(--bg);
+    border:1.5px solid var(--border); background:var(--surface);
     font-family:inherit; cursor:pointer; color:var(--muted);
     transition:border-color .18s ease, background-color .18s ease,
                color .18s ease, transform .12s cubic-bezier(.22,1,.36,1);
@@ -1568,7 +1640,7 @@
     min-height:118px; padding:16px 10px;
     border-radius:var(--radius-lg);
     border:1.5px solid var(--border);
-    background:var(--bg);
+    background:var(--surface);
     text-align:center; cursor:pointer;
     -webkit-tap-highlight-color:transparent;
     transition:border-color .18s ease, background-color .18s ease,
@@ -1685,7 +1757,7 @@
   }
   @media(min-width:640px){ .exp-stat-grid{grid-template-columns:repeat(4,1fr); gap:14px;} }
   .exp-stat-card{
-    background:var(--bg); border:1px solid var(--border); border-radius:var(--radius-md);
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md);
     padding:13px 14px; box-shadow:var(--shadow-sm);
   }
   .exp-stat-card .l{font-size:11px; color:var(--muted); font-weight:500; margin-bottom:6px;}
@@ -1709,7 +1781,7 @@
   }
   .exp-card{
     display:flex; align-items:center; gap:8px;
-    background:var(--bg); border:1px solid var(--border); border-radius:var(--radius-sm);
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm);
     padding:7px 9px;
     min-width:0;
   }
@@ -1751,7 +1823,7 @@
     border:1px solid var(--border); border-radius:var(--radius-md);
     background:var(--surface);
   }
-  .exp-row .form-input{margin:0; background:var(--bg);}
+  .exp-row .form-input{margin:0; background:var(--surface-solid);}
   /* «بابت چی؟» و «مبلغ» بزرگ‌اند؛ دسته‌بندی فقط به اندازه‌ی طولانی‌ترین
      نام دسته جا می‌گیرد («حمل‌ونقل») و بیشتر از آن پهن نمی‌شود. */
   .exp-row-main{display:flex; gap:9px; min-width:0; flex:1;}
@@ -1780,7 +1852,7 @@
   .exp-row-remove{
     flex-shrink:0; width:38px; height:38px; margin-top:1px;
     border-radius:var(--radius-sm); border:1px solid var(--border);
-    background:var(--bg); color:var(--muted);
+    background:var(--surface); color:var(--muted);
     display:flex; align-items:center; justify-content:center;
   }
   .exp-row-remove:hover{color:var(--danger); border-color:var(--danger);}
@@ -1809,7 +1881,7 @@
   .barcode-chip button{
     width:16px; height:16px; border-radius:50%;
     display:flex; align-items:center; justify-content:center;
-    background:var(--bg); color:var(--muted); font-size:11px; line-height:1;
+    background:var(--surface); color:var(--muted); font-size:11px; line-height:1;
   }
   .barcode-chip button:hover{background:var(--danger-tint); color:var(--danger);}
 
@@ -1845,7 +1917,7 @@
   .scan-mult-btns{display:flex; gap:6px; flex:1;}
   .scan-mult-btn{
     flex:1; padding:8px 4px; border-radius:10px;
-    border:1.5px solid var(--border); background:var(--bg); color:var(--text);
+    border:1.5px solid var(--border); background:var(--surface); color:var(--text);
     font-weight:700; font-size:13px; transition:all .12s ease;
   }
   .scan-mult-btn.active{border-color:var(--primary); background:var(--primary-tint); color:var(--primary-dark);}
@@ -1893,7 +1965,7 @@
   .qs-qty-badge{
     align-self:flex-start; margin-top:2px;
     font-size:11px; font-weight:800; color:var(--primary-dark);
-    background:var(--bg); border:1px solid var(--primary); border-radius:999px;
+    background:var(--surface); border:1px solid var(--primary); border-radius:999px;
     padding:2px 10px;
   }
   .quick-select-empty{
@@ -1907,7 +1979,7 @@
   .qty-stepper{display:flex; align-items:center; gap:10px; flex-shrink:0;}
   .qty-stepper button{
     width:32px; height:32px; border-radius:9px; border:1px solid var(--border);
-    background:var(--bg); font-size:17px; font-weight:700; color:var(--text);
+    background:var(--surface-solid); font-size:17px; font-weight:700; color:var(--text);
     display:flex; align-items:center; justify-content:center;
   }
   .qty-stepper button:active{transform:scale(.94);}
@@ -1918,7 +1990,7 @@
   .cart-qty-num{font-size:13px; font-weight:800; min-width:16px; text-align:center;}
   .cart-qty-input{
     width:44px; text-align:center; font-size:13px; font-weight:800;
-    border:1px solid var(--border); border-radius:7px; background:var(--bg);
+    border:1px solid var(--border); border-radius:7px; background:var(--surface-solid);
     color:var(--text); padding:4px 2px;
   }
   .cart-qty-input:focus{outline:none; border-color:var(--primary);}
@@ -1939,7 +2011,7 @@
     inset-inline-start:0; inset-inline-end:0;
     z-index:45;
     margin:0;
-    background:var(--bg);
+    background:var(--surface-solid);
     border-top:1px solid var(--border);
     border-radius:var(--radius-lg) var(--radius-lg) 0 0;
     box-shadow:0 -6px 20px -8px rgba(20,30,60,.2);
@@ -1963,7 +2035,7 @@
   }
   .cart-summary-bar{
     display:flex; align-items:center; justify-content:space-between; gap:10px;
-    background:var(--bg);
+    background:var(--surface-solid);
     padding:12px 14px; box-shadow:none; border-radius:0; margin-top:0;
     cursor:pointer;
   }
@@ -1982,7 +2054,7 @@
   .cart-ctl-btn{
     width:44px; height:44px; flex:0 0 auto;
     border-radius:14px; border:1.5px solid var(--border);
-    background:var(--bg); color:var(--text);
+    background:var(--surface); color:var(--text);
     display:flex; align-items:center; justify-content:center;
     font-family:inherit; font-size:24px; font-weight:800; line-height:1;
     cursor:pointer; padding:0;
@@ -2118,7 +2190,7 @@
   .theme-toggle-btn{
     flex:1; display:flex; align-items:center; justify-content:center; gap:7px;
     padding:12px; border-radius:var(--radius-sm); border:1.4px solid var(--border);
-    background:var(--bg); color:var(--muted); font-size:13.5px; font-weight:600;
+    background:var(--surface); color:var(--muted); font-size:13.5px; font-weight:600;
   }
   .theme-toggle-btn.active{
     background:var(--primary-tint); border-color:var(--primary); color:var(--primary-dark); font-weight:700;
@@ -2173,7 +2245,7 @@
   .auth-card{
     position:relative; width:100%; max-width:380px;
     margin:auto;                     /* وسطِ عمودی و افقی، بدون بریدن محتوا */
-    background:var(--bg); border:1px solid var(--border);
+    background:var(--surface-solid); border:1px solid var(--border);
     border-radius:var(--radius-lg); box-shadow:var(--shadow-md);
     padding:22px 22px 20px;
     animation:authCardIn .6s cubic-bezier(.2,.8,.2,1) both;
@@ -2400,7 +2472,7 @@
   .auth-server-row{ display:flex; gap:8px; }
   .auth-server-row input{
     flex:1; padding:10px 12px; font-size:13px; font-family:inherit; direction:ltr; text-align:left;
-    border:1.4px solid var(--border); border-radius:8px; background:var(--bg); color:var(--text); outline:none;
+    border:1.4px solid var(--border); border-radius:8px; background:var(--surface-solid); color:var(--text); outline:none;
   }
   .auth-server-row input:focus{ border-color:var(--primary); }
   .auth-server-row button{
@@ -2443,7 +2515,7 @@
   .auth-back-btn{
     display:flex; align-items:center; justify-content:center; gap:6px;
     width:100%; margin-top:10px; padding:10px; border-radius:var(--radius-sm);
-    border:1.4px solid var(--border); background:var(--bg); color:var(--muted); font-size:13px; font-weight:600;
+    border:1.4px solid var(--border); background:var(--surface); color:var(--muted); font-size:13px; font-weight:600;
   }
 
   /* ==========================================================
@@ -2462,7 +2534,7 @@
     position:absolute; top:calc(100% + 8px); inset-inline-end:0;
     width:min(330px, calc(100vw - 32px));
     max-height:min(70vh, 440px); overflow-y:auto;
-    background:var(--bg); border:1px solid var(--border);
+    background:var(--surface-solid); border:1px solid var(--border);
     border-radius:var(--radius-md); box-shadow:var(--shadow-md);
     padding:8px; z-index:60; display:none;
   }
@@ -2504,7 +2576,7 @@
   }
   .acct-row{
     display:flex; align-items:center; justify-content:space-between; gap:10px;
-    padding:10px 12px; background:var(--bg);
+    padding:10px 12px; background:var(--surface);
     font-size:12.5px;
   }
   .acct-row span{ color:var(--muted); font-weight:600; }
@@ -2576,7 +2648,7 @@
   @media(min-width:640px){ .prod-sheet-scrim{ align-items:center; } }
   .prod-sheet{
     width:100%; max-width:440px;
-    background:var(--bg); border:1px solid var(--border);
+    background:var(--surface-solid); border:1px solid var(--border);
     border-radius:var(--radius-lg) var(--radius-lg) 0 0;
     padding:16px 16px calc(16px + env(safe-area-inset-bottom, 0px));
     display:flex; flex-direction:column; gap:9px;
@@ -2602,7 +2674,7 @@
   .prod-sheet-act{
     display:flex; align-items:center; gap:12px; width:100%;
     padding:13px 14px; border-radius:var(--radius-md);
-    border:1.5px solid var(--border); background:var(--bg);
+    border:1.5px solid var(--border); background:var(--surface-solid);
     font-family:inherit; text-align:start; cursor:pointer;
     transition:border-color .16s ease, background-color .16s ease, transform .12s ease;
   }
