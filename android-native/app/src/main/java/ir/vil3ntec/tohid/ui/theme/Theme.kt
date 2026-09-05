@@ -119,8 +119,12 @@ val LightColors = ShopColors(
   //  رویش دیده شود. سفیدِ خالص، شیشه را نامرئی می‌کند.
   bg = Color(0xFFF2F0FA),
   //  شیشه: سفیدِ نیمه‌شفاف. زیرش آروراست، پس پنل «شناور» دیده می‌شود
-  surface = Color(0xA6FFFFFF),
-  surface2 = Color(0xD9FFFFFF),
+  //  شیشه‌ی مه‌آلود، نه شیشه‌ی ساده: آن‌قدر مات که محتوای پشتِ کارت از
+  //  داخلش خوانده نشود، و آن‌قدر شفاف که رنگِ نورِ پشت‌زمینه از زیرش
+  //  بزند. تارکردنِ واقعی روی این نسخه‌ی کامپوز نیست، پس ماتی جایش را
+  //  می‌گیرد — کاری که چشم هم همان را «شیشه» می‌بیند.
+  surface = Color(0xF2FFFFFF),
+  surface2 = Color(0xFAFFFFFF),
   border = Color(0xE6FFFFFF),
   text = Color(0xFF191627),
   muted = Color(0xFF635C86),
@@ -159,8 +163,10 @@ val DarkColors = ShopColors(
   //  شبِ بنفش‌فام، نه سیاهِ خالص: سیاهِ خالص با نورِ آرورا لکه‌دار
   //  می‌شود و شیشه رویش کثیف به نظر می‌رسد
   bg = Color(0xFF0B0A14),
-  surface = Color(0x12FFFFFF),
-  surface2 = Color(0x1FFFFFFF),
+  //  در شب، سفیدِ کم‌رنگ روی زمینه‌ی تیره یعنی «هرچه پشتش هست پیداست».
+  //  جایش یک بنفشِ شبِ مات می‌نشیند که هنوز از زمینه روشن‌تر است.
+  surface = Color(0xF01A1730),
+  surface2 = Color(0xF7231F3D),
   border = Color(0x2EFFFFFF),
   text = Color(0xFFF0EEF8),
   muted = Color(0xFFA9A3C4),
