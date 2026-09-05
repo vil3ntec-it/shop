@@ -350,6 +350,88 @@
   @media(min-width:640px){
     .stat-grid{grid-template-columns:repeat(4,1fr); gap:16px;}
   }
+  /* ==========================================================
+     سرِ داشبورد — برابر با برنامه‌ی نیتیو
+     ========================================================== */
+  .dash-hello{
+    display:flex; align-items:center; gap:12px;
+    margin-bottom:14px;
+  }
+  .dash-hello-text{flex:1; min-width:0;}
+  .dash-greet{font-size:12px; color:var(--muted);}
+  .dash-shop{font-size:16px; font-weight:700; color:var(--text); margin-top:2px;}
+  .dash-avatar{
+    width:36px; height:36px; flex:none;
+    border-radius:12px;
+    background:linear-gradient(135deg, var(--primary), var(--accent));
+    color:#fff; font-weight:700; font-size:15px;
+    display:flex; align-items:center; justify-content:center;
+  }
+
+  /* کارتِ قهرمان: بنفش → آبی → نعنایی، با هاله‌ی زیرش */
+  .dash-hero{
+    border-radius:var(--radius-lg);
+    padding:18px;
+    margin-bottom:12px;
+    color:#fff;
+    background:linear-gradient(120deg, var(--primary-dark), var(--primary) 40%, #4f8be8 70%, var(--accent));
+    box-shadow:var(--shadow-md);
+  }
+  .dash-hero-label{font-size:12px; opacity:.86;}
+  .dash-hero-value{display:flex; align-items:baseline; gap:6px; margin-top:6px;}
+  .dash-hero-value span{font-size:28px; font-weight:700; line-height:1.2;}
+  .dash-hero-value small{font-size:14px; opacity:.86;}
+  .dash-hero-story{font-size:11.5px; opacity:.9; margin-top:8px;}
+
+  /*
+     کارتِ اقدام: ظرفش هم‌رنگِ خبر است، نه خنثی. «۵ قرض عقب‌افتاده» روی
+     کارتِ معمولی یک ردیفِ دیگر است؛ روی زمینه‌ی کم‌رنگِ قرمز، از دو
+     متری معلوم است.
+  */
+  .dash-action{
+    border-radius:var(--radius-md);
+    padding:16px;
+    margin-bottom:16px;
+    border:1px solid transparent;
+  }
+  .dash-action.tone-danger{background:var(--danger-tint); border-color:var(--danger);}
+  .dash-action.tone-warning{background:var(--warning-tint); border-color:var(--warning);}
+  .dash-action.tone-brand{background:var(--primary-tint); border-color:var(--primary);}
+  .dash-action-row{display:flex; align-items:center; gap:10px;}
+  .dash-action-icon{
+    width:38px; height:38px; flex:none;
+    border-radius:13px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .dash-action-title{font-size:14px; font-weight:600; color:var(--text);}
+  .dash-action-detail{font-size:11px; color:var(--muted); margin-top:2px;}
+  .dash-action-btn{
+    display:block; width:100%;
+    margin-top:12px;
+    padding:13px 0;
+    border:none; border-radius:var(--radius-sm);
+    color:#fff; font-size:14px; font-weight:700; font-family:inherit;
+    cursor:pointer;
+    transition:transform .12s ease;
+  }
+  .dash-action-btn:active{transform:scale(.985);}
+  /* گرادینت در همان رنگِ خبر می‌ماند — دو سرِ روشن و تیره‌ی یک رنگ، نه دو رنگِ رقیب */
+  .dash-action-btn.tone-danger{background:linear-gradient(135deg,#F0554E,#C0342E); box-shadow:0 6px 16px rgba(224,76,68,.30);}
+  .dash-action-btn.tone-warning{background:linear-gradient(135deg,#F2A93B,#D07E10); box-shadow:0 6px 16px rgba(230,150,40,.30);}
+  .dash-action-btn.tone-brand{background:linear-gradient(135deg, var(--primary), var(--primary-dark) 60%, var(--accent)); box-shadow:0 6px 16px rgba(124,92,255,.30);}
+
+  /* وضعیت دکان: ردیف‌های فشرده با جداکننده‌ی نازک */
+  .dash-status{margin-bottom:16px;}
+  .dash-status-title{font-size:13px; font-weight:700; color:var(--text); margin-bottom:4px;}
+  .dash-status-row{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:11px 0;
+    border-bottom:1px solid var(--border);
+  }
+  .dash-status-row:last-child{border-bottom:none;}
+  .dash-status-row .lbl{font-size:13px; color:var(--muted);}
+  .dash-status-row .val{font-size:15px; font-weight:700;}
+
   .stat-card{
     background:var(--surface);
     border:1px solid var(--border);
@@ -3062,9 +3144,9 @@
     </div>
 
     <ol class="signup-steps" id="signup-steps">
-      <li class="on" data-step="1"><b>۱</b><span>ایمیل و رمز</span></li>
-      <li data-step="2"><b>۲</b><span>کد تأیید</span></li>
-      <li data-step="3"><b>۳</b><span>لوکیشن و شرایط</span></li>
+      <li class="on" data-step="1"><b>1</b><span>ایمیل و رمز</span></li>
+      <li data-step="2"><b>2</b><span>کد تأیید</span></li>
+      <li data-step="3"><b>3</b><span>لوکیشن و شرایط</span></li>
     </ol>
 
     <!-- ---------- گام ۱ ---------- -->
@@ -3132,12 +3214,12 @@
       <p class="auth-note" style="margin:0 0 14px;">کد شش‌رقمی به همین ایمیل فرستاده شد. اگر در صندوق ورودی نبود، پوشه‌ی هرزنامه (Spam) را هم ببینید.</p>
 
       <div class="auth-otp-inputs" id="signup-otp-inputs" dir="ltr">
-        <input type="text" inputmode="numeric" maxlength="1" aria-label="رقم ۱" autocomplete="one-time-code">
-        <input type="text" inputmode="numeric" maxlength="1" aria-label="رقم ۲">
-        <input type="text" inputmode="numeric" maxlength="1" aria-label="رقم ۳">
-        <input type="text" inputmode="numeric" maxlength="1" aria-label="رقم ۴">
-        <input type="text" inputmode="numeric" maxlength="1" aria-label="رقم ۵">
-        <input type="text" inputmode="numeric" maxlength="1" aria-label="رقم ۶">
+        <input type="text" inputmode="numeric" maxlength="1" aria-label="رقم 1" autocomplete="one-time-code">
+        <input type="text" inputmode="numeric" maxlength="1" aria-label="رقم 2">
+        <input type="text" inputmode="numeric" maxlength="1" aria-label="رقم 3">
+        <input type="text" inputmode="numeric" maxlength="1" aria-label="رقم 4">
+        <input type="text" inputmode="numeric" maxlength="1" aria-label="رقم 5">
+        <input type="text" inputmode="numeric" maxlength="1" aria-label="رقم 6">
       </div>
       <div class="auth-resend-row">
         <span id="signup-resend-text">کد نیامد؟</span>
@@ -3233,7 +3315,7 @@
           <div class="alerts-panel" id="alerts-panel">
             <div class="alerts-panel-head">
               هشدارهای فروشگاه
-              <span id="alerts-count-text">۰ مورد</span>
+              <span id="alerts-count-text">0 مورد</span>
             </div>
             <div id="alerts-list"></div>
           </div>
@@ -3259,6 +3341,40 @@
 
       <!-- DASHBOARD -->
       <section class="page active" id="page-dashboard">
+        <!-- ==========================================================
+             سرِ داشبورد — همان چیدمانِ برنامه‌ی نیتیو.
+             ----------------------------------------------------------
+             ترتیب عمدی است و همان است که در برنامه دیده می‌شود:
+               ۱) سلام و نامِ دکان، با آواتارِ حرفی
+               ۲) کارتِ قهرمانِ گرادینتی: فروشِ امروز + یک جمله‌ی روایت
+               ۳) **یک** اقدامِ غالب که با وضعیتِ واقعیِ دکان عوض می‌شود
+               ۴) «وضعیت دکان» — ردیف‌های فشرده، نه کاشی‌های رنگیِ رقیب
+             پنل‌های قدیمی زیرِ همین‌ها می‌مانند؛ چیزی از وب کم نشده.
+             ========================================================== -->
+        <div class="dash-hello">
+          <div class="dash-hello-text">
+            <div class="dash-greet" id="dash-greet">صبح بخیر</div>
+            <div class="dash-shop" id="dash-shop-name">دکان شما</div>
+          </div>
+          <div class="dash-avatar" id="dash-avatar">د</div>
+        </div>
+
+        <div class="dash-hero">
+          <div class="dash-hero-label">فروش امروز</div>
+          <div class="dash-hero-value">
+            <span id="dash-hero-amount">0</span>
+            <small>افغانی</small>
+          </div>
+          <div class="dash-hero-story" id="dash-hero-story">این هفته هنوز فروشی ثبت نشده</div>
+        </div>
+
+        <div class="dash-action" id="dash-action"></div>
+
+        <div class="dash-status">
+          <h2 class="dash-status-title">وضعیت دکان</h2>
+          <div id="dash-status-rows"></div>
+        </div>
+
         <div class="stat-grid">
           <div class="stat-card">
             <div class="stat-top">
@@ -3363,10 +3479,10 @@
             <a class="link" href="#products" data-page="products">مشاهده همه</a>
           </div>
           <div class="wh-summary-row" style="margin-bottom:14px;">
-            <div class="wh-summary-chip">تعداد محصولات<b id="dash-wh-products">۰</b></div>
-            <div class="wh-summary-chip">تعداد کارتن<b id="dash-wh-cartons">۰</b></div>
-            <div class="wh-summary-chip">تعداد واحد<b id="dash-wh-units">۰</b></div>
-            <div class="wh-summary-chip">ارزش تقریبی موجودی<b id="dash-wh-value">۰ افغانی</b></div>
+            <div class="wh-summary-chip">تعداد محصولات<b id="dash-wh-products">0</b></div>
+            <div class="wh-summary-chip">تعداد کارتن<b id="dash-wh-cartons">0</b></div>
+            <div class="wh-summary-chip">تعداد واحد<b id="dash-wh-units">0</b></div>
+            <div class="wh-summary-chip">ارزش تقریبی موجودی<b id="dash-wh-value">0 افغانی</b></div>
           </div>
           <div id="dash-warehouse-panel">
             <div class="placeholder-block" style="height:140px;">
@@ -3381,13 +3497,13 @@
             <h2>خلاصه امروز</h2>
           </div>
           <div class="wh-summary-row">
-            <div class="wh-summary-chip">فروش امروز<b id="dash-today-sales">۰ افغانی</b></div>
-            <div class="wh-summary-chip">تعداد فروش امروز<b id="dash-today-count">۰</b></div>
-            <div class="wh-summary-chip">سود امروز<b id="dash-today-profit">۰ افغانی</b></div>
-            <div class="wh-summary-chip">مصارف امروز<b id="dash-today-expenses">۰ افغانی</b></div>
-            <div class="wh-summary-chip">بدهی تأمین‌کنندگان<b id="dash-supplier-debt">۰ افغانی</b></div>
-            <div class="wh-summary-chip">کالاهای کم‌موجودی<b id="dash-low-stock">۰</b></div>
-            <div class="wh-summary-chip">کالاهای تمام‌شده<b id="dash-out-stock">۰</b></div>
+            <div class="wh-summary-chip">فروش امروز<b id="dash-today-sales">0 افغانی</b></div>
+            <div class="wh-summary-chip">تعداد فروش امروز<b id="dash-today-count">0</b></div>
+            <div class="wh-summary-chip">سود امروز<b id="dash-today-profit">0 افغانی</b></div>
+            <div class="wh-summary-chip">مصارف امروز<b id="dash-today-expenses">0 افغانی</b></div>
+            <div class="wh-summary-chip">بدهی تأمین‌کنندگان<b id="dash-supplier-debt">0 افغانی</b></div>
+            <div class="wh-summary-chip">کالاهای کم‌موجودی<b id="dash-low-stock">0</b></div>
+            <div class="wh-summary-chip">کالاهای تمام‌شده<b id="dash-out-stock">0</b></div>
           </div>
         </div>
       </section>
@@ -3474,7 +3590,7 @@
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2.5h12v19l-2-1.4-2 1.4-2-1.4-2 1.4-2-1.4-2 1.4v-19z"/></svg>
               </div>
             </div>
-            <div class="stat-value" id="rc-count">۰</div>
+            <div class="stat-value" id="rc-count">0</div>
           </div>
           <div class="stat-card">
             <div class="stat-top">
@@ -3483,7 +3599,7 @@
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/></svg>
               </div>
             </div>
-            <div class="stat-value" id="rc-total">۰<small>افغانی</small></div>
+            <div class="stat-value" id="rc-total">0<small>افغانی</small></div>
           </div>
         </div>
 
@@ -3517,17 +3633,17 @@
         <div class="acc-stats" id="acc-stats">
           <div class="acc-stat give">
             <i>کل برد</i>
-            <b id="acc-sum-give">۰</b>
+            <b id="acc-sum-give">0</b>
             <u>افغانی</u>
           </div>
           <div class="acc-stat recv">
             <i>کل رسید</i>
-            <b id="acc-sum-recv">۰</b>
+            <b id="acc-sum-recv">0</b>
             <u>افغانی</u>
           </div>
           <div class="acc-stat bal" id="acc-stat-bal">
             <i>الباقی</i>
-            <b id="acc-amount">۰</b>
+            <b id="acc-amount">0</b>
             <u id="acc-state">افغانی</u>
           </div>
         </div>
@@ -3588,10 +3704,10 @@
         </div>
 
         <div class="wh-summary-row">
-          <div class="wh-summary-chip">تعداد محصولات<b id="wh-sum-products">۰</b></div>
-          <div class="wh-summary-chip">تعداد کارتن<b id="wh-sum-cartons">۰</b></div>
-          <div class="wh-summary-chip">تعداد واحد<b id="wh-sum-units">۰</b></div>
-          <div class="wh-summary-chip">ارزش تقریبی موجودی<b id="wh-sum-value">۰ افغانی</b></div>
+          <div class="wh-summary-chip">تعداد محصولات<b id="wh-sum-products">0</b></div>
+          <div class="wh-summary-chip">تعداد کارتن<b id="wh-sum-cartons">0</b></div>
+          <div class="wh-summary-chip">تعداد واحد<b id="wh-sum-units">0</b></div>
+          <div class="wh-summary-chip">ارزش تقریبی موجودی<b id="wh-sum-value">0 افغانی</b></div>
         </div>
 
         <div class="exp-filters">
@@ -3658,15 +3774,15 @@
         <div class="exp-stat-grid">
           <div class="exp-stat-card">
             <div class="l">مصرف امروز</div>
-            <div class="v" id="exp-stat-today">۰<small>افغانی</small></div>
+            <div class="v" id="exp-stat-today">0<small>افغانی</small></div>
           </div>
           <div class="exp-stat-card">
             <div class="l">مصرف این هفته</div>
-            <div class="v" id="exp-stat-week">۰<small>افغانی</small></div>
+            <div class="v" id="exp-stat-week">0<small>افغانی</small></div>
           </div>
           <div class="exp-stat-card">
             <div class="l">مصرف این ماه</div>
-            <div class="v" id="exp-stat-month">۰<small>افغانی</small></div>
+            <div class="v" id="exp-stat-month">0<small>افغانی</small></div>
           </div>
           <div class="exp-stat-card">
             <div class="l">بیشترین دسته مصرف</div>
@@ -3812,10 +3928,10 @@
           <div class="scan-mult-row">
             <span class="scan-mult-label">هر اسکن:</span>
             <div class="scan-mult-btns" id="scan-mult-btns">
-              <button type="button" class="scan-mult-btn active" data-mult="1">×۱</button>
-              <button type="button" class="scan-mult-btn" data-mult="2">×۲</button>
-              <button type="button" class="scan-mult-btn" data-mult="5">×۵</button>
-              <button type="button" class="scan-mult-btn" data-mult="10">×۱۰</button>
+              <button type="button" class="scan-mult-btn active" data-mult="1">×1</button>
+              <button type="button" class="scan-mult-btn" data-mult="2">×2</button>
+              <button type="button" class="scan-mult-btn" data-mult="5">×5</button>
+              <button type="button" class="scan-mult-btn" data-mult="10">×10</button>
             </div>
           </div>
         </div>
@@ -3854,7 +3970,7 @@
           <div class="cart-summary-bar" id="cart-summary-bar">
             <div class="cart-total">
               <span>مجموع</span>
-              <strong id="cart-total-amount">۰ افغانی</strong>
+              <strong id="cart-total-amount">0 افغانی</strong>
             </div>
             <!-- کنترل‌های کالای انتخاب‌شده؛ با زدن روی هر ردیفِ سبد پر می‌شود -->
             <div class="cart-ctl" id="cart-ctl" hidden>
@@ -3923,7 +4039,7 @@
           <div class="cart-summary-bar" id="qs-cart-summary-bar">
             <div class="cart-total">
               <span>مجموع</span>
-              <strong id="qs-cart-total-amount">۰ افغانی</strong>
+              <strong id="qs-cart-total-amount">0 افغانی</strong>
             </div>
             <!-- کنترل‌های کالای انتخاب‌شده؛ با زدن روی هر ردیفِ سبد پر می‌شود -->
             <div class="cart-ctl" id="qs-cart-ctl" hidden>
@@ -4058,7 +4174,7 @@
             <p id="sacc-phone">—</p>
           </div>
           <div class="account-debt">
-            <div class="amount" id="sacc-amount">۰</div>
+            <div class="amount" id="sacc-amount">0</div>
             <div class="label">افغانی</div>
           </div>
           <div class="account-head-actions">
@@ -4140,23 +4256,23 @@
             <input class="form-input" id="rep-sales-to" type="date" style="flex:1; min-width:120px;">
           </div>
           <div class="exp-stat-grid">
-            <div class="exp-stat-card"><div class="l">تعداد فروش</div><div class="v" id="rep-s-count">۰</div></div>
-            <div class="exp-stat-card"><div class="l">فروش ناخالص</div><div class="v" id="rep-s-gross">۰<small>افغانی</small></div></div>
-            <div class="exp-stat-card"><div class="l">تخفیف</div><div class="v" id="rep-s-discount">۰<small>افغانی</small></div></div>
-            <div class="exp-stat-card"><div class="l">فروش خالص</div><div class="v" id="rep-s-net">۰<small>افغانی</small></div></div>
-            <div class="exp-stat-card"><div class="l">بهای کالای فروخته‌شده</div><div class="v" id="rep-s-cogs">۰<small>افغانی</small></div></div>
-            <div class="exp-stat-card"><div class="l">سود ناخالص</div><div class="v" id="rep-s-gp">۰<small>افغانی</small></div></div>
-            <div class="exp-stat-card"><div class="l">مصارف</div><div class="v" id="rep-s-exp">۰<small>افغانی</small></div></div>
-            <div class="exp-stat-card"><div class="l">سود خالص</div><div class="v cat" id="rep-s-np">۰<small>افغانی</small></div></div>
+            <div class="exp-stat-card"><div class="l">تعداد فروش</div><div class="v" id="rep-s-count">0</div></div>
+            <div class="exp-stat-card"><div class="l">فروش ناخالص</div><div class="v" id="rep-s-gross">0<small>افغانی</small></div></div>
+            <div class="exp-stat-card"><div class="l">تخفیف</div><div class="v" id="rep-s-discount">0<small>افغانی</small></div></div>
+            <div class="exp-stat-card"><div class="l">فروش خالص</div><div class="v" id="rep-s-net">0<small>افغانی</small></div></div>
+            <div class="exp-stat-card"><div class="l">بهای کالای فروخته‌شده</div><div class="v" id="rep-s-cogs">0<small>افغانی</small></div></div>
+            <div class="exp-stat-card"><div class="l">سود ناخالص</div><div class="v" id="rep-s-gp">0<small>افغانی</small></div></div>
+            <div class="exp-stat-card"><div class="l">مصارف</div><div class="v" id="rep-s-exp">0<small>افغانی</small></div></div>
+            <div class="exp-stat-card"><div class="l">سود خالص</div><div class="v cat" id="rep-s-np">0<small>افغانی</small></div></div>
           </div>
         </div>
 
         <!-- Products report -->
         <div id="rtab-products" style="display:none;">
           <div class="wh-summary-row">
-            <div class="wh-summary-chip">تعداد اقلام کم‌موجودی<b id="rep-p-low">۰</b></div>
-            <div class="wh-summary-chip">تعداد اقلام تمام‌شده<b id="rep-p-out">۰</b></div>
-            <div class="wh-summary-chip">ارزش موجودی<b id="rep-p-value">۰ افغانی</b></div>
+            <div class="wh-summary-chip">تعداد اقلام کم‌موجودی<b id="rep-p-low">0</b></div>
+            <div class="wh-summary-chip">تعداد اقلام تمام‌شده<b id="rep-p-out">0</b></div>
+            <div class="wh-summary-chip">ارزش موجودی<b id="rep-p-value">0 افغانی</b></div>
           </div>
           <div class="panel"><div class="panel-head"><h2>پرفروش‌ترین محصولات</h2></div><div class="exp-list" id="rep-p-top"></div></div>
           <div class="panel"><div class="panel-head"><h2>کم‌فروش‌ترین محصولات</h2></div><div class="exp-list" id="rep-p-bottom"></div></div>
@@ -4504,7 +4620,7 @@
       </div>
       <div class="form-group">
         <label>شماره تلفن</label>
-        <input class="form-input" id="in-debtor-phone" type="tel" placeholder="۰۷۹۰۰۰۰۰۰۰">
+        <input class="form-input" id="in-debtor-phone" type="tel" placeholder="0790000000">
       </div>
       <div class="form-group">
         <label>توضیحات (اختیاری)</label>
@@ -4542,7 +4658,7 @@
       <div class="form-group" id="fg-tx-amount">
         <label for="in-tx-amount">مبلغ</label>
         <div class="input-affix">
-          <input class="form-input" id="in-tx-amount" type="number" inputmode="numeric" min="1" step="1" placeholder="۰">
+          <input class="form-input" id="in-tx-amount" type="number" inputmode="numeric" min="1" step="1" placeholder="0">
           <span class="affix">افغانی</span>
         </div>
         <div class="amount-echo" id="tx-amount-echo"></div>
@@ -4703,7 +4819,7 @@
         <input class="form-input" id="in-new-wh-product-name" type="text" placeholder="مثلاً بیسکویت شکلاتی" style="margin-bottom:8px;">
         <label>قیمت فروش (هر واحد)</label>
         <div class="cat-input-row">
-          <input class="form-input" id="in-new-wh-product-price" type="number" min="0" step="1" placeholder="مثلاً ۸۰">
+          <input class="form-input" id="in-new-wh-product-price" type="number" min="0" step="1" placeholder="مثلاً 80">
           <button type="button" class="btn btn-secondary btn-sm" id="btn-wh-product-add">افزودن محصول</button>
         </div>
         <div class="field-error" id="wh-new-product-error" style="display:none; margin-top:6px;">نام محصول و قیمت فروش را وارد کنید.</div>
@@ -4719,7 +4835,7 @@
         </div>
         <div class="form-group" id="fg-warehouse-units">
           <label>تعداد واحد</label>
-          <input class="form-input" id="in-warehouse-units" type="number" min="0" step="0.01" placeholder="مثلاً ۲۴۰">
+          <input class="form-input" id="in-warehouse-units" type="number" min="0" step="0.01" placeholder="مثلاً 240">
           <div class="field-error">تعداد واحد معتبر وارد کنید.</div>
         </div>
       </div>
@@ -4738,7 +4854,7 @@
       <div class="form-row-2">
         <div class="form-group" id="fg-warehouse-price">
           <label>قیمت خرید (هر واحد)</label>
-          <input class="form-input" id="in-warehouse-price" type="number" min="0" step="1" placeholder="مثلاً ۶۰">
+          <input class="form-input" id="in-warehouse-price" type="number" min="0" step="1" placeholder="مثلاً 60">
           <div class="field-error">قیمت خرید معتبر وارد کنید.</div>
         </div>
         <div class="form-group">
@@ -4775,7 +4891,7 @@
       </div>
       <div class="form-group">
         <label>شماره تلفن</label>
-        <input class="form-input" id="in-supplier-phone" type="tel" placeholder="۰۷۹۰۰۰۰۰۰۰">
+        <input class="form-input" id="in-supplier-phone" type="tel" placeholder="0790000000">
       </div>
       <div class="form-group">
         <label>آدرس</label>
@@ -4816,7 +4932,7 @@
       <div class="form-row-2">
         <div class="form-group" id="fg-purchase-qty">
           <label>تعداد</label>
-          <input class="form-input" id="in-purchase-qty" type="number" min="0.01" step="0.01" placeholder="مثلاً ۱۰۰">
+          <input class="form-input" id="in-purchase-qty" type="number" min="0.01" step="0.01" placeholder="مثلاً 100">
           <div class="field-error">تعداد معتبر وارد کنید.</div>
         </div>
         <div class="form-group">
@@ -4827,7 +4943,7 @@
       <div class="form-row-2">
         <div class="form-group" id="fg-purchase-price">
           <label>قیمت خرید (هر واحد)</label>
-          <input class="form-input" id="in-purchase-price" type="number" min="0" step="1" placeholder="مثلاً ۶۰">
+          <input class="form-input" id="in-purchase-price" type="number" min="0" step="1" placeholder="مثلاً 60">
           <div class="field-error">قیمت خرید معتبر وارد کنید.</div>
         </div>
         <div class="form-group">
@@ -4864,7 +4980,7 @@
     <form id="form-supplier-payment">
       <div class="form-group" id="fg-sp-amount">
         <label>مبلغ (افغانی)</label>
-        <input class="form-input" id="in-sp-amount" type="number" min="1" step="1" placeholder="مثلاً ۵۰۰">
+        <input class="form-input" id="in-sp-amount" type="number" min="1" step="1" placeholder="مثلاً 500">
         <div class="field-error">مبلغ معتبر وارد کنید.</div>
       </div>
       <div class="form-group">
@@ -4907,7 +5023,7 @@
       </div>
       <div class="form-group" id="fg-adj-qty">
         <label>مقدار</label>
-        <input class="form-input" id="in-adj-qty" type="number" min="0.01" step="0.01" placeholder="مثلاً ۵">
+        <input class="form-input" id="in-adj-qty" type="number" min="0.01" step="0.01" placeholder="مثلاً 5">
         <div class="field-error">مقدار معتبر وارد کنید.</div>
       </div>
       <div class="form-group" id="fg-adj-reason">
@@ -4994,7 +5110,7 @@
       </button>
     </div>
     <form id="form-sale-checkout">
-      <div class="checkout-summary-row"><span>جمع اقلام (Subtotal)</span><b id="co-subtotal">۰ افغانی</b></div>
+      <div class="checkout-summary-row"><span>جمع اقلام (Subtotal)</span><b id="co-subtotal">0 افغانی</b></div>
 
       <div class="form-group">
         <label>تخفیف</label>
@@ -5007,8 +5123,8 @@
         <input class="form-input" id="co-discount-value" type="number" min="0" step="0.01" placeholder="مقدار تخفیف را وارد کنید (اختیاری)" value="0">
         <div class="field-error" id="co-discount-error">مقدار تخفیف نامعتبر است.</div>
       </div>
-      <div class="checkout-summary-row"><span>تخفیف</span><b id="co-discount-amount">۰ افغانی</b></div>
-      <div class="checkout-summary-row total"><span>مبلغ نهایی</span><b id="co-final-total">۰ افغانی</b></div>
+      <div class="checkout-summary-row"><span>تخفیف</span><b id="co-discount-amount">0 افغانی</b></div>
+      <div class="checkout-summary-row total"><span>مبلغ نهایی</span><b id="co-final-total">0 افغانی</b></div>
 
       <div class="form-group">
         <label>نوع فروش</label>
@@ -5027,7 +5143,7 @@
         <input class="form-input" id="co-paid-amount" type="number" min="0" step="1">
         <div class="field-error" id="co-paid-error">مبلغ پرداختی نامعتبر است.</div>
       </div>
-      <div class="checkout-summary-row"><span>باقی‌مانده</span><b id="co-remaining">۰ افغانی</b></div>
+      <div class="checkout-summary-row"><span>باقی‌مانده</span><b id="co-remaining">0 افغانی</b></div>
 
       <div class="modal-actions">
         <button type="button" class="btn btn-secondary" data-close-modal="modal-sale-checkout">انصراف</button>
@@ -6033,11 +6149,11 @@
   }
 
   function uid(){ return 'id'+Date.now().toString(36)+Math.random().toString(36).slice(2,8); }
-  function formatMoney(n){ return Math.round(n).toLocaleString('fa-IR'); }
+  function formatMoney(n){ return Math.round(n).toLocaleString('en-US'); }
   /** عدد بدون جداکننده — برای سال و شماره‌هایی که پول نیستند. */
-  function formatPlain(n){ return String(n).replace(/[0-9]/g, d=> '۰۱۲۳۴۵۶۷۸۹'[+d]); }
+  function formatPlain(n){ return String(n); }
   function formatDate(iso){
-    try{ return new Date(iso+'T00:00:00').toLocaleDateString('fa-IR',{year:'numeric',month:'2-digit',day:'2-digit'}); }
+    try{ return new Date(iso+'T00:00:00').toLocaleDateString('fa-IR-u-nu-latn',{year:'numeric',month:'2-digit',day:'2-digit'}); }
     catch(e){ return iso; }
   }
   function todayISO(){
@@ -6148,7 +6264,7 @@
         </div>
         <div class="debtor-side">
           ${settled
-            ? `<span class="debtor-amount settled">۰</span>`
+            ? `<span class="debtor-amount settled">0</span>`
             : `<span class="debtor-amount ${credit ? 'credit' : ''}">${formatMoney(Math.abs(debt))}</span>`}
           <div class="debtor-meta">${d.phone ? `<span>${escapeHtml(d.phone)}</span>` : ''}</div>
         </div>
@@ -6189,7 +6305,7 @@
     const bars = totals.map((v,i)=>{
       const h = v>0 ? Math.max(6, Math.round((v/max)*100)) : 2;
       const isToday = i===totals.length-1;
-      const label = days[i].toLocaleDateString('fa-IR', {weekday:'short'});
+      const label = days[i].toLocaleDateString('fa-IR-u-nu-latn', {weekday:'short'});
       return `
         <div class="chart-bar-col" title="${formatMoney(v)} افغانی">
           <div class="chart-bar-track"><div class="chart-bar-fill${isToday?' today':''}" style="height:${h}%"></div></div>
@@ -6240,12 +6356,130 @@
       <div class="chart-legend">${legend}</div>`;
   }
 
+  /* ==========================================================
+     سرِ داشبورد — همان حساب‌هایی که برنامه‌ی نیتیو می‌کند.
+     ----------------------------------------------------------
+     هیچ موتور تازه‌ای ساخته نشده: همه از همان `sales`، `debtors` و
+     `products` که صفحه‌های دیگر هم از آن‌ها می‌خوانند.
+     ========================================================== */
+  const DASH_DAY = 24*60*60*1000;
+
+  /** جمله‌ای که می‌گوید عددِ امروز خوب است یا بد */
+  function dashWeekStory(){
+    const now = Date.now();
+    let week = 0, before = 0;
+    sales.filter(s=> s.status!=='cancelled').forEach(s=>{
+      const age = Math.floor((now - new Date(s.date+'T12:00:00').getTime()) / DASH_DAY);
+      if(age>=0 && age<=6) week += (s.finalTotal||0);
+      else if(age>=7 && age<=13) before += (s.finalTotal||0);
+    });
+    if(week<=0 && before<=0) return 'این هفته هنوز فروشی ثبت نشده';
+    if(before<=0) return `این هفته ${formatMoney(week)} افغانی فروختی — هفتهٔ گذشته چیزی ثبت نشده بود`;
+    const change = Math.round((week-before)/before*100);
+    if(change>0) return `این هفته ${change.toLocaleString('en-US')}٪ بیشتر از هفتهٔ گذشته فروختی`;
+    if(change<0) return `این هفته ${(-change).toLocaleString('en-US')}٪ کمتر از هفتهٔ گذشته فروختی`;
+    return 'این هفته اندازهٔ هفتهٔ گذشته فروختی';
+  }
+
+  /**
+   *  قرضِ «عقب‌افتاده» — همان تعریفِ برنامه.
+   *
+   *  دفترِ قرض تاریخِ وعده ندارد، پس ملاک سکوت است: قرضی که باز است و
+   *  بیش از سی روز هیچ حرکتی — نه قرضِ تازه، نه پرداخت — رویش نبوده.
+   */
+  function dashOverdue(){
+    const now = Date.now();
+    const out = [];
+    debtors.forEach(d=>{
+      const amt = getDebt(d.id);
+      if(amt<=0) return;
+      const mine = transactions.filter(t=> t.debtorId===d.id);
+      if(!mine.length) return;
+      const last = Math.max(...mine.map(t=> new Date(t.date+'T12:00:00').getTime()));
+      const days = Math.floor((now-last)/DASH_DAY);
+      if(days>30) out.push({ name:d.name, amt, days });
+    });
+    return out;
+  }
+
+  function renderDashboardHead(){
+    const hello = document.getElementById('dash-greet');
+    if(!hello) return;
+    const h = new Date().getHours();
+    hello.textContent = h<12 ? 'صبح بخیر' : (h<17 ? 'ظهر بخیر' : 'شب بخیر');
+
+    const name = (appSettings.storeName || '').trim() || 'دکان شما';
+    document.getElementById('dash-shop-name').textContent = name;
+    document.getElementById('dash-avatar').textContent = name.charAt(0) || 'د';
+
+    const today = todayISO();
+    const r = computeSalesReport(today, today);
+    document.getElementById('dash-hero-amount').textContent = formatMoney(r.net);
+    document.getElementById('dash-hero-story').textContent = dashWeekStory();
+
+    /* ---- یک اقدامِ غالب، بر اساس وضعیتِ واقعیِ دکان ---- */
+    const overdue = dashOverdue();
+    const short = products.filter(p=>{ const st = getStockStatus(p); return st==='low' || st==='out'; }).length;
+    let tone, title, detail, action, target;
+    if(overdue.length){
+      const sum = overdue.reduce((a,x)=> a+x.amt, 0);
+      const oldest = Math.max(...overdue.map(x=>x.days));
+      tone='danger';
+      title = `${overdue.length.toLocaleString('en-US')} قرض عقب‌افتاده`;
+      detail = `مجموع ${formatMoney(sum)} افغانی — قدیمی‌ترین ${oldest.toLocaleString('en-US')} روز`;
+      action='پیگیری قرض‌ها'; target='debtors';
+    } else if(short){
+      tone='warning';
+      title = `${short.toLocaleString('en-US')} جنس رو به ختم است`;
+      detail = 'پیش از تمام‌شدن سفارش بده';
+      action='سفارش بده'; target='inventory';
+    } else {
+      tone='brand';
+      title='دکان مرتب است';
+      detail='نه قرضِ خوابیده، نه جنسِ رو به ختم';
+      action='فاکتور جدید'; target='sale';
+    }
+    const warn = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+    const cart = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>';
+    const tint = tone==='danger' ? 'var(--danger)' : tone==='warning' ? 'var(--warning)' : 'var(--primary)';
+    const box = document.getElementById('dash-action');
+    box.className = 'dash-action tone-'+tone;
+    box.innerHTML = `
+      <div class="dash-action-row">
+        <div class="dash-action-icon" style="background:${tint}22; color:${tint};">${tone==='brand' ? cart : warn}</div>
+        <div style="flex:1; min-width:0;">
+          <div class="dash-action-title">${escapeHtml(title)}</div>
+          <div class="dash-action-detail">${escapeHtml(detail)}</div>
+        </div>
+      </div>
+      <button type="button" class="dash-action-btn tone-${tone}" data-page="${target}">${escapeHtml(action)}</button>`;
+    const btn = box.querySelector('button');
+    if(btn) btn.addEventListener('click', ()=> goTo(target));
+
+    /* ---- وضعیت دکان: ردیف‌های فشرده ---- */
+    const month = today.slice(0,7);
+    const monthReport = computeSalesReport(month+'-01', today);
+    const stockValue = products.reduce((sum,p)=> sum + (getProductStock(p.id) * (p.purchasePrice||0)), 0);
+    const outDebt = debtors.reduce((sum,d)=> sum + Math.max(0, getDebt(d.id)), 0);
+    const rows = [
+      ['مفاد خالص ماه', formatMoney(monthReport.netProfit ?? monthReport.grossProfit), 'var(--success)'],
+      ['فروش ماه', formatMoney(monthReport.net), 'var(--text)'],
+      ['ارزش انبار', formatMoney(stockValue), 'var(--warning)'],
+      ['قرض بیرون', formatMoney(outDebt), 'var(--danger)'],
+      ['اجناس رو به ختم', short.toLocaleString('en-US'), 'var(--warning)'],
+    ];
+    document.getElementById('dash-status-rows').innerHTML = rows.map(([lbl,val,color])=>
+      `<div class="dash-status-row"><span class="lbl">${lbl}</span><span class="val" style="color:${color};">${val}</span></div>`
+    ).join('');
+  }
+
   function renderDashboard(){
+    renderDashboardHead();
     renderDashboardExtra();
     renderSalesTrendChart();
     const count = debtors.length;
     const countEl = document.getElementById('dash-debtor-count');
-    countEl.innerHTML = count>0 ? `${count.toLocaleString('fa-IR')}<small>نفر</small>` : `—<small>نفر</small>`;
+    countEl.innerHTML = count>0 ? `${count.toLocaleString('en-US')}<small>نفر</small>` : `—<small>نفر</small>`;
 
     const totalDebt = debtors.reduce((s,d)=> s+getDebt(d.id), 0);
     const sumEl = document.getElementById('dash-debtor-sum');
@@ -8152,11 +8386,11 @@
         <div class="bulk-grid">
           <div class="bulk-field">
             <label>قیمت خرید (افغانی)</label>
-            <input class="form-input" data-bp-purchase type="number" inputmode="decimal" min="0" step="0.01" placeholder="مثلاً ۶۰" value="${row.purchase!==''?escapeHtml(String(row.purchase)):''}">
+            <input class="form-input" data-bp-purchase type="number" inputmode="decimal" min="0" step="0.01" placeholder="مثلاً 60" value="${row.purchase!==''?escapeHtml(String(row.purchase)):''}">
           </div>
           <div class="bulk-field">
             <label>قیمت فروش (افغانی)</label>
-            <input class="form-input" data-bp-sale type="number" inputmode="decimal" min="0" step="0.01" placeholder="مثلاً ۸۰" value="${row.sale!==''?escapeHtml(String(row.sale)):''}">
+            <input class="form-input" data-bp-sale type="number" inputmode="decimal" min="0" step="0.01" placeholder="مثلاً 80" value="${row.sale!==''?escapeHtml(String(row.sale)):''}">
           </div>
         </div>
 
@@ -8167,7 +8401,7 @@
           </div>
           <div class="bulk-field">
             <label>حداقل موجودی</label>
-            <input class="form-input" data-bp-min type="number" inputmode="decimal" min="0" step="1" placeholder="مثلاً ۱۰" value="${row.minStock!==''?escapeHtml(String(row.minStock)):''}">
+            <input class="form-input" data-bp-min type="number" inputmode="decimal" min="0" step="1" placeholder="مثلاً 10" value="${row.minStock!==''?escapeHtml(String(row.minStock)):''}">
           </div>
         </div>
 
@@ -8483,11 +8717,11 @@
         <div class="bulk-grid">
           <div class="bulk-field">
             <label>مقدار</label>
-            <input class="form-input" data-bulk-qty type="number" inputmode="decimal" min="0" step="0.01" placeholder="۰" value="${row.qty!==''?escapeHtml(String(row.qty)):''}">
+            <input class="form-input" data-bulk-qty type="number" inputmode="decimal" min="0" step="0.01" placeholder="0" value="${row.qty!==''?escapeHtml(String(row.qty)):''}">
           </div>
           <div class="bulk-field">
             <label>قیمت خرید (افغانی)</label>
-            <input class="form-input" data-bulk-price type="number" inputmode="decimal" min="0" step="0.01" placeholder="۰" value="${row.price!==''?escapeHtml(String(row.price)):''}">
+            <input class="form-input" data-bulk-price type="number" inputmode="decimal" min="0" step="0.01" placeholder="0" value="${row.price!==''?escapeHtml(String(row.price)):''}">
           </div>
         </div>
 
@@ -9266,7 +9500,7 @@
     else if(range==='month'){ const d=new Date(); from=new Date(d.getFullYear(),d.getMonth(),1).toISOString().slice(0,10); to=today; }
     else { from = document.getElementById('rep-sales-from').value || today; to = document.getElementById('rep-sales-to').value || today; }
     const r = computeSalesReport(from, to);
-    document.getElementById('rep-s-count').textContent = r.count.toLocaleString('fa-IR');
+    document.getElementById('rep-s-count').textContent = r.count.toLocaleString('en-US');
     document.getElementById('rep-s-gross').innerHTML = formatMoney(r.gross)+'<small>افغانی</small>';
     document.getElementById('rep-s-discount').innerHTML = formatMoney(r.discount)+'<small>افغانی</small>';
     document.getElementById('rep-s-net').innerHTML = formatMoney(r.net)+'<small>افغانی</small>';
@@ -9294,8 +9528,8 @@
   function renderProductsReport(){
     const lowList = products.filter(p=> getStockStatus(p)==='low');
     const outList = products.filter(p=> getStockStatus(p)==='out');
-    document.getElementById('rep-p-low').textContent = lowList.length.toLocaleString('fa-IR');
-    document.getElementById('rep-p-out').textContent = outList.length.toLocaleString('fa-IR');
+    document.getElementById('rep-p-low').textContent = lowList.length.toLocaleString('en-US');
+    document.getElementById('rep-p-out').textContent = outList.length.toLocaleString('en-US');
     const invValue = products.reduce((s,p)=> s + getProductStock(p.id)*(p.purchasePrice||0), 0);
     document.getElementById('rep-p-value').textContent = formatMoney(invValue)+' افغانی';
 
@@ -9414,13 +9648,13 @@
     const elOut = document.getElementById('dash-out-stock');
     if(!elSales) return; // صفحه هنوز رندر نشده
     elSales.textContent = formatMoney(r.net)+' افغانی';
-    elCount.textContent = r.count.toLocaleString('fa-IR');
+    elCount.textContent = r.count.toLocaleString('en-US');
     elProfit.textContent = formatMoney(r.grossProfit)+' افغانی';
     elExp.textContent = formatMoney(r.expenses)+' افغانی';
     const supplierDebtTotal = suppliers.reduce((s,sup)=> s+Math.max(0,getSupplierDebt(sup.id)), 0);
     elSupplierDebt.textContent = formatMoney(supplierDebtTotal)+' افغانی';
-    elLow.textContent = products.filter(p=> getStockStatus(p)==='low').length.toLocaleString('fa-IR');
-    elOut.textContent = products.filter(p=> getStockStatus(p)==='out').length.toLocaleString('fa-IR');
+    elLow.textContent = products.filter(p=> getStockStatus(p)==='low').length.toLocaleString('en-US');
+    elOut.textContent = products.filter(p=> getStockStatus(p)==='out').length.toLocaleString('en-US');
   }
 
   /* ==========================================================
@@ -9571,9 +9805,9 @@
     // تا ۳ رقم اعشار، بدون صفرهای اضافی
     return String(Math.round(qty*1000)/1000);
   }
-  /* همان عدد، ولی با رقم فارسی — فقط برای نمایش (نه داخل input عددی) */
+  /* همان عدد — رقم‌ها لاتین‌اند، مثل برنامه‌ی نیتیو */
   function formatCartQtyFa(qty, unit){
-    return formatCartQty(qty, unit).replace(/[0-9]/g, d=> '۰۱۲۳۴۵۶۷۸۹'[+d]).replace('.', '٫');
+    return formatCartQty(qty, unit);
   }
   function cartTotal(){
     return cart.reduce((s,item)=>{ const p=products.find(x=>x.id===item.productId); return s+(p?p.salePrice*item.quantity:0); }, 0);
@@ -10429,7 +10663,7 @@
       </tr>`;
     }).join('');
     const dt = new Date(sale.createdAt || Date.now());
-    const timeStr = dt.toLocaleTimeString('fa-IR', {hour:'2-digit', minute:'2-digit'});
+    const timeStr = dt.toLocaleTimeString('fa-IR-u-nu-latn', {hour:'2-digit', minute:'2-digit'});
     return `
       <div class="invoice-head">
         <h4>${escapeHtml(appSettings.storeName || 'فروشگاه')}</h4>
@@ -10728,7 +10962,7 @@
 
     const fmt = (v)=>{
       if(!v) return '—';
-      try{ return new Date(v).toLocaleDateString('fa-IR'); }catch(e){ return '—'; }
+      try{ return new Date(v).toLocaleDateString('fa-IR-u-nu-latn'); }catch(e){ return '—'; }
     };
     rows.innerHTML = [
       ['کاربر', inAccount ? (lic.userLabel() || 'وارد شده') : 'وارد نشده‌اید'],
@@ -11252,7 +11486,7 @@
     if(outProducts.length){
       list.push({
         tone:'danger', page:'products',
-        title:`${outProducts.length.toLocaleString('fa-IR')} کالا تمام شده است`,
+        title:`${outProducts.length.toLocaleString('en-US')} کالا تمام شده است`,
         sub: outProducts.slice(0,3).map(p=>p.name).join('، ') + (outProducts.length>3 ? ' و…' : '')
       });
     }
@@ -11262,7 +11496,7 @@
     if(lowProducts.length){
       list.push({
         tone:'warning', page:'products',
-        title:`${lowProducts.length.toLocaleString('fa-IR')} کالا رو به اتمام است`,
+        title:`${lowProducts.length.toLocaleString('en-US')} کالا رو به اتمام است`,
         sub: lowProducts.slice(0,3).map(p=> `${p.name} (${formatMoney(getProductStock(p.id))} ${p.unit||''})`).join('، ') + (lowProducts.length>3 ? ' و…' : '')
       });
     }
@@ -11275,7 +11509,7 @@
       const total = staleDebtors.reduce((s,x)=> s+x.debt, 0);
       list.push({
         tone:'danger', page:'debtors',
-        title:`${staleDebtors.length.toLocaleString('fa-IR')} قرض‌دار بیش از ${DEBT_STALE_DAYS.toLocaleString('fa-IR')} روز پرداختی نداشته`,
+        title:`${staleDebtors.length.toLocaleString('en-US')} قرض‌دار بیش از ${DEBT_STALE_DAYS.toLocaleString('en-US')} روز پرداختی نداشته`,
         sub:`مجموع ${formatMoney(total)} افغانی — ${staleDebtors.slice(0,3).map(x=>x.d.name).join('، ')}${staleDebtors.length>3 ? ' و…' : ''}`
       });
     }
@@ -11286,7 +11520,7 @@
       const total = owed.reduce((a,x)=> a+x.debt, 0);
       list.push({
         tone:'warning', page:'purchasing',
-        title:`به ${owed.length.toLocaleString('fa-IR')} تامین‌کننده بدهکارید`,
+        title:`به ${owed.length.toLocaleString('en-US')} تامین‌کننده بدهکارید`,
         sub:`مجموع ${formatMoney(total)} افغانی — ${owed.slice(0,3).map(x=>x.s.name).join('، ')}${owed.length>3 ? ' و…' : ''}`
       });
     }
@@ -11302,7 +11536,7 @@
     } else if(backupDays >= BACKUP_REMIND_DAYS){
       list.push({
         tone:'warning', page:'settings',
-        title:`${backupDays.toLocaleString('fa-IR')} روز از آخرین پشتیبان‌گیری گذشته`,
+        title:`${backupDays.toLocaleString('en-US')} روز از آخرین پشتیبان‌گیری گذشته`,
         sub:'برای اطمینان، یک نسخه پشتیبان تازه بگیرید.'
       });
     }
@@ -11323,9 +11557,9 @@
     if(!listEl) return;
 
     const alerts = buildAlerts();
-    badge.textContent = alerts.length.toLocaleString('fa-IR');
+    badge.textContent = alerts.length.toLocaleString('en-US');
     badge.classList.toggle('show', alerts.length > 0);
-    countText.textContent = `${alerts.length.toLocaleString('fa-IR')} مورد`;
+    countText.textContent = `${alerts.length.toLocaleString('en-US')} مورد`;
 
     if(!alerts.length){
       listEl.innerHTML = '<div class="alerts-empty">همه‌چیز مرتب است — هشداری وجود ندارد.</div>';
@@ -11549,7 +11783,7 @@
     const { rows, name } = buildReportCsvRows(currentReportTab);
     if(rows.length <= 1){ showToast('در این گزارش داده‌ای برای خروجی وجود ندارد', 'warning'); return; }
     downloadCsv(name + '.csv', rows);
-    showToast(`خروجی CSV با ${(rows.length-1).toLocaleString('fa-IR')} سطر دانلود شد`);
+    showToast(`خروجی CSV با ${(rows.length-1).toLocaleString('en-US')} سطر دانلود شد`);
   });
 
   document.getElementById('btn-print-report').addEventListener('click', ()=>{
@@ -11571,7 +11805,7 @@
         tr:nth-child(even) td{background:#fafbfe;}
       </style></head><body>
       <h1>${escapeHtml(store)} — ${escapeHtml(name.replace(/-/g,' '))}</h1>
-      <p>تاریخ چاپ: ${new Date().toLocaleDateString('fa-IR')}</p>
+      <p>تاریخ چاپ: ${new Date().toLocaleDateString('fa-IR-u-nu-latn')}</p>
       <table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>
       </body></html>`);
     win.document.close();
@@ -11607,10 +11841,10 @@
       text.textContent = 'آخرین پشتیبان‌گیری: امروز';
       wrap.classList.add('ok');
     } else if(days < BACKUP_REMIND_DAYS){
-      text.textContent = `آخرین پشتیبان‌گیری: ${days.toLocaleString('fa-IR')} روز پیش`;
+      text.textContent = `آخرین پشتیبان‌گیری: ${days.toLocaleString('en-US')} روز پیش`;
       wrap.classList.add('ok');
     } else {
-      text.textContent = `آخرین پشتیبان‌گیری: ${days.toLocaleString('fa-IR')} روز پیش — بهتر است نسخه تازه بگیرید.`;
+      text.textContent = `آخرین پشتیبان‌گیری: ${days.toLocaleString('en-US')} روز پیش — بهتر است نسخه تازه بگیرید.`;
       wrap.classList.add('warn');
     }
   }
