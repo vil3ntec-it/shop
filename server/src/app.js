@@ -115,6 +115,12 @@ async function createApp({ runMigrations = true } = {}) {
           //  سرور مسیرهای /auth/register/* را دارد
           emailSignup: true,
           termsVersion: require('./lib/terms').VERSION,
+          //  برنامه با این می‌فهمد این سرور چت پشتیبانی، کد وی‌آی‌پی و
+          //  تپشِ بازدید دارد — پس نسخه‌های قدیمِ سرور نمی‌شکنند و
+          //  نسخه‌ی تازه‌ی برنامه هم دکمه‌ای را نشان نمی‌دهد که مسیرش نیست
+          support: true,
+          vipCodes: true,
+          visitPing: true,
         });
       } catch (err) { next(err); }
     });
@@ -132,6 +138,11 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/shop/sync', require('./routes/sync'));   // نام قدیمی
     api.use('/admin', require('./routes/admin'));
     api.use('/license', require('./routes/license'));
+    //  پشتیبانی و تپشِ بازدید عمداً توکن اجباری ندارند: همان کسی که
+    //  هنوز حساب نساخته، بیشتر از همه به هر دو نیاز دارد.
+    api.use('/support', require('./routes/support'));
+    api.use('/visit', require('./routes/visit'));
+    api.use('/vip', require('./routes/vip'));
 
     // نام‌های قدیمی صفحه‌ی اشتراک
     const me = require('./routes/me');
@@ -175,6 +186,13 @@ async function createApp({ runMigrations = true } = {}) {
   const housekeeping = setInterval(() => {
     pruneExpired().catch(err => console.error('[housekeeping]', err.message));
     subs.expireDue().catch(err => console.error('[subscriptions]', err.message));
+    //  خبر دادن به کسی که اشتراکش دارد تمام می‌شود — پیش از آنکه قفل
+    //  شود، نه بعدش. هر آستانه فقط یک بار، پس تکراری نمی‌رود.
+    subs.notifyExpiring().catch(err => console.error('[expiry-notice]', err.message));
+    //  سلامتِ برنامه‌ها و سایت‌های دیگر، از سرور سنجیده می‌شود نه از
+    //  گوشیِ مدیر که ممکن است پشت فیلتر باشد
+    require('./lib/managed-apps').checkHealth()
+      .catch(err => console.error('[app-health]', err.message));
   }, 6 * 60 * 60 * 1000);
   if (housekeeping.unref) housekeeping.unref();
   app.locals.housekeeping = housekeeping;

@@ -208,4 +208,94 @@ async function setStatus(subscriptionId, status, by = '') {
   return row;
 }
 
-module.exports = { liveOf, latestOf, historyOf, changeLog, stateOf, expireDue, grant, setStatus, DAY };
+/**
+ * اشتراک‌هایی که دارند تمام می‌شوند.
+ *
+ * ── چرا این لازم شد ────────────────────────────────────────────────
+ * برنامه‌ی مدیریت می‌گفت کدام اشتراک فعال است و کدام تمام شده، ولی
+ * نمی‌گفت کدام **دارد** تمام می‌شود. یعنی صاحب سامانه همیشه دیر
+ * می‌فهمید: وقتی که دکان‌دار قفل شده بود و زنگ می‌زد.
+ *
+ * `daysLeft` منفی هم می‌تواند باشد (تازه‌تمام‌شده‌ها) تا همان فهرست
+ * «تازه از دست رفتند» را هم بدهد — کسانی که هنوز می‌شود برشان گرداند.
+ */
+async function expiringSoon({ withinDays = 7, includeExpired = 3, limit = 100 } = {}) {
+  const at = now();
+  const until = at + withinDays * DAY;
+  const from = at - includeExpired * DAY;
+  const rows = await many(
+    `SELECT sub.*, s.name AS shop_name, s.owner_user_id,
+            u.name AS owner_name, u.email AS owner_email, u.phone AS owner_phone
+       FROM subscriptions sub
+       JOIN shops s ON s.id = sub.shop_id
+       JOIN users u ON u.id = s.owner_user_id
+      WHERE sub.status IN ('active','suspended','expired')
+        AND (sub.ends_at + (sub.grace_days * $1::bigint)) BETWEEN $2 AND $3
+      ORDER BY (sub.ends_at + (sub.grace_days * $1::bigint)) ASC
+      LIMIT $4`,
+    [DAY, from, until, limit]
+  );
+  return rows.map(r => {
+    const state = stateOf(r, at);
+    return {
+      subscriptionId: r.id,
+      shopId: r.shop_id,
+      shopName: r.shop_name,
+      ownerUserId: r.owner_user_id,
+      ownerName: r.owner_name,
+      ownerEmail: r.owner_email || '',
+      ownerPhone: r.owner_phone || '',
+      plan: r.plan,
+      status: state.status,
+      endsAt: state.endsAt,
+      graceEndsAt: state.graceEndsAt,
+      //  روزهای مانده؛ منفی یعنی همین‌قدر روز است که تمام شده
+      daysLeft: Math.ceil((state.graceEndsAt - at) / DAY),
+      note: r.note || '',
+    };
+  });
+}
+
+/**
+ * خبر دادن به دکان‌دارهایی که اشتراکشان نزدیک پایان است.
+ *
+ * پیام در همان چت پشتیبانیِ خودشان می‌نشیند (پس در برنامه و سایت هر دو
+ * دیده می‌شود) و اگر پوش تنظیم باشد، گوشیِ بسته را هم بیدار می‌کند.
+ *
+ * برای هر اشتراک فقط یک بار در هر «آستانه» فرستاده می‌شود — با یک کلید
+ * در app_config. بدون این، هر بار که سرور این را صدا می‌زد یک پیام
+ * تکراری می‌رفت و کاربر پشتیبانی را می‌بست.
+ */
+async function notifyExpiring({ thresholds = [7, 3, 1] } = {}) {
+  const support = require('./support');
+  const rows = await expiringSoon({ withinDays: Math.max(...thresholds), includeExpired: 0, limit: 500 });
+  let sent = 0;
+  for (const row of rows) {
+    //  نزدیک‌ترین آستانه‌ای که رد شده
+    const hit = thresholds.filter(d => row.daysLeft <= d).sort((a, b) => a - b)[0];
+    if (hit === undefined || row.daysLeft < 0) continue;
+    const key = `subnotice_${row.subscriptionId}_${hit}`;
+    const already = await plans.getConfig(key, '');
+    if (already) continue;
+    try {
+      await support.systemMessage({
+        userId: row.ownerUserId,
+        shopId: row.shopId,
+        who: row.ownerName,
+        body: row.daysLeft <= 0
+          ? 'اشتراک دکان شما امروز تمام می‌شود. برای اینکه قابلیت‌ها بسته نشوند، تمدیدش کنید.'
+          : `اشتراک دکان شما ${row.daysLeft} روز دیگر تمام می‌شود. اگر بخواهید، همین‌جا بگویید تا تمدید شود.`,
+      });
+      await plans.setConfig(key, String(now()));
+      sent++;
+    } catch (err) {
+      console.error('[subscriptions:notify]', err.message);
+    }
+  }
+  return { sent, checked: rows.length };
+}
+
+module.exports = {
+  liveOf, latestOf, historyOf, changeLog, stateOf, expireDue, grant, setStatus,
+  expiringSoon, notifyExpiring, DAY,
+};
