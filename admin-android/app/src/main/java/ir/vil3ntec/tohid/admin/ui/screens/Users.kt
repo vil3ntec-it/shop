@@ -107,6 +107,7 @@ fun UsersScreen(session: Session) {
 private fun UserSheet(session: Session, userId: String, onBack: () -> Unit) {
   val c = Admin.colors
   val scope = rememberCoroutineScope()
+  val context = androidx.compose.ui.platform.LocalContext.current
 
   var data by remember { mutableStateOf<JSONObject?>(null) }
   var busy by remember { mutableStateOf(false) }
@@ -174,6 +175,57 @@ private fun UserSheet(session: Session, userId: String, onBack: () -> Unit) {
         for (i in 0 until memberships.length()) {
           val m = memberships.optJSONObject(i) ?: continue
           Row2(m.optString("shop_name").ifBlank { "دکان" }, roleName(m.optString("role")))
+        }
+      }
+    }
+
+    /*
+     *  ── لوکیشن ────────────────────────────────────────────────────
+     *  سرور از روز اول این را ذخیره می‌کرد، ولی هیچ‌جا نشان داده
+     *  نمی‌شد — یعنی «دکانِ این کجاست» جوابی نداشت مگر با پرسیدن.
+     *
+     *  تازه‌ترین نقطه بالاست و با یک زدن روی نقشه باز می‌شود. اگر دکان
+     *  جابه‌جا شده باشد، از همین فهرست پیداست از کِی.
+     */
+    Spacer(Modifier.height(14.dp))
+    SectionTitle("لوکیشن")
+    val places = d.optJSONArray("locations") ?: JSONArray()
+    Panel {
+      if (places.length() == 0) {
+        Text(
+          "لوکیشنی نفرستاده — یا اجازه‌اش را نداده.",
+          style = MaterialTheme.typography.bodySmall, color = c.muted,
+        )
+      } else {
+        for (i in 0 until places.length()) {
+          val p = places.optJSONObject(i) ?: continue
+          val lat = p.optDouble("lat")
+          val lng = p.optDouble("lng")
+          Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+              Text(
+                if (i == 0) "تازه‌ترین نقطه" else jalali(p.optLong("at")),
+                style = MaterialTheme.typography.bodyMedium, color = c.text, fontWeight = FontWeight.Medium,
+              )
+              Text(
+                listOfNotNull(
+                  String.format(java.util.Locale.US, "%.5f, %.5f", lat, lng),
+                  p.optString("label").ifBlank { null },
+                  p.optDouble("accuracy", -1.0).takeIf { it >= 0 }?.let { "±${it.toInt().fa()} متر" },
+                  if (i == 0) jalali(p.optLong("at")) else null,
+                ).joinToString(" · "),
+                style = MaterialTheme.typography.labelSmall, color = c.muted,
+              )
+            }
+            TextButton(onClick = {
+              val name = user.optString("name").ifBlank { "دکان" }
+              val uri = android.net.Uri.parse("geo:$lat,$lng?q=$lat,$lng($name)")
+              runCatching { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, uri)) }
+            }) {
+              Text("نقشه", style = MaterialTheme.typography.labelSmall, color = c.primary)
+            }
+          }
+          if (i < places.length() - 1) HorizontalDivider(color = c.border)
         }
       }
     }

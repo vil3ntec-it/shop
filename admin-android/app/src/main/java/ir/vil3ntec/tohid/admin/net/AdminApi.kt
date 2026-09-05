@@ -181,6 +181,215 @@ class AdminApi(private val baseUrl: String) {
 
   suspend fun health(): JSONObject = get("/api/v1/health", null)
 
+  /* ==========================================================
+     بخش‌های تازه
+     ========================================================== */
+
+  /**
+   *  خلاصهٔ خانه — یک درخواست به‌جای هفت‌تا.
+   *
+   *  روی نتِ ضعیف، صفحهٔ خانه هفت بار منتظر می‌ماند؛ این‌طور یک بار.
+   */
+  suspend fun overview(token: String): JSONObject = get("/api/v1/admin/overview", token)
+
+  /* ------------------------------ تخفیف ------------------------------ */
+
+  /**
+   *  گذاشتنِ تخفیف روی یک پلن.
+   *
+   *  دو راه: درصد، یا قیمتِ ثابتِ تخفیفی. قیمتِ اصلی دست نمی‌خورد — پس
+   *  وقتی مهلت تمام شد، خودش برمی‌گردد و لازم نیست عددِ قبلی را جایی
+   *  یادداشت کنید.
+   */
+  suspend fun setDiscount(
+    token: String,
+    code: String,
+    percent: Int?,
+    price: Int?,
+    label: String,
+    until: Long?,
+  ): JSONObject = put(
+    "/api/v1/admin/plans/$code/discount",
+    JSONObject().apply {
+      if (percent != null) put("percent", percent)
+      if (price != null) put("price", price)
+      if (label.isNotBlank()) put("label", label)
+      if (until != null) put("until", until)
+    },
+    token,
+  )
+
+  suspend fun clearDiscount(token: String, code: String): JSONObject =
+    request("DELETE", "/api/v1/admin/plans/$code/discount", null, token)
+
+  /** عوض کردنِ خودِ نرخ (نه تخفیف) — قیمت، عنوان، مدت. */
+  suspend fun savePlan(
+    token: String,
+    code: String,
+    title: String,
+    price: Int,
+    amount: Int,
+    unit: String,
+    badge: String,
+    active: Boolean,
+  ): JSONObject = request(
+    "PATCH",
+    "/api/v1/admin/plans/$code",
+    JSONObject().apply {
+      put("title", title)
+      put("price", price)
+      put("amount", amount)
+      put("unit", unit)
+      put("badge", badge)
+      put("active", active)
+    },
+    token,
+  )
+
+  /* --------------------------- کد وی‌آی‌پی --------------------------- */
+
+  suspend fun vipCodes(token: String): JSONArray =
+    get("/api/v1/admin/vip-codes", token).optJSONArray("codes") ?: JSONArray()
+
+  /**
+   *  ساختِ کد و — اگر ایمیل بدهید — فرستادنش.
+   *
+   *  کدِ خام فقط در همین یک پاسخ می‌آید؛ بعد از آن حتی سرور هم نمی‌تواند
+   *  نشانش بدهد. اگر ایمیل داده باشید، لازم نیست خودتان کد را برسانید.
+   */
+  suspend fun createVipCode(
+    token: String,
+    plan: String,
+    days: Int?,
+    email: String,
+    note: String,
+    shopId: String?,
+    expiresInDays: Int,
+  ): JSONObject = post(
+    "/api/v1/admin/vip-codes",
+    JSONObject().apply {
+      put("plan", plan)
+      if (days != null) put("days", days)
+      if (email.isNotBlank()) put("email", email)
+      if (note.isNotBlank()) put("note", note)
+      if (!shopId.isNullOrBlank()) put("shopId", shopId)
+      put("expiresInDays", expiresInDays)
+    },
+    token,
+  )
+
+  suspend fun revokeVipCode(token: String, id: String): JSONObject =
+    post("/api/v1/admin/vip-codes/$id/revoke", JSONObject(), token)
+
+  /* ------------------------- بازدیدکننده‌ها ------------------------- */
+
+  /**
+   *  کسانی که آمده‌اند — چه حساب ساخته باشند چه نه.
+   *
+   *  `onlyGuests` همان چیزی است که تا امروز اصلاً دیده نمی‌شد: کسی که
+   *  برنامه را باز کرده ولی هنوز ثبت‌نام نکرده.
+   */
+  suspend fun visitors(token: String, app: String = "", onlyGuests: Boolean = false, query: String = ""): JSONObject =
+    get(
+      "/api/v1/admin/visitors?limit=200&app=${enc(app)}&guests=${if (onlyGuests) 1 else 0}&q=${enc(query)}",
+      token,
+    )
+
+  /* --------------------------- پشتیبانی --------------------------- */
+
+  suspend fun supportThreads(token: String, status: String = "", query: String = ""): JSONObject =
+    get("/api/v1/admin/support/threads?status=${enc(status)}&q=${enc(query)}", token)
+
+  suspend fun supportThread(token: String, id: String, after: Long = 0): JSONObject =
+    get("/api/v1/admin/support/threads/$id?after=$after", token)
+
+  suspend fun supportReply(token: String, id: String, body: String): JSONObject =
+    post("/api/v1/admin/support/threads/$id/messages", JSONObject().put("body", body), token)
+
+  suspend fun supportStatus(token: String, id: String, status: String): JSONObject =
+    post("/api/v1/admin/support/threads/$id/status", JSONObject().put("status", status), token)
+
+  /** پیام همگانی — به کسانی که اشتراکشان رو به پایان است، یا به همه. */
+  suspend fun broadcast(token: String, body: String, target: String): JSONObject =
+    post(
+      "/api/v1/admin/support/broadcast",
+      JSONObject().put("body", body).put("target", target),
+      token,
+    )
+
+  /* --------------------- اشتراک‌های رو به پایان --------------------- */
+
+  suspend fun expiring(token: String, days: Int = 7): JSONArray =
+    get("/api/v1/admin/subscriptions/expiring?days=$days", token)
+      .optJSONArray("expiring") ?: JSONArray()
+
+  suspend fun notifyExpiring(token: String): JSONObject =
+    post("/api/v1/admin/subscriptions/notify-expiring", JSONObject(), token)
+
+  /* ------------------------ برنامه‌های دیگر ------------------------ */
+
+  suspend fun apps(token: String): JSONArray =
+    get("/api/v1/admin/apps", token).optJSONArray("apps") ?: JSONArray()
+
+  suspend fun createApp(
+    token: String,
+    slug: String,
+    title: String,
+    kind: String,
+    url: String,
+    healthUrl: String,
+  ): JSONObject = post(
+    "/api/v1/admin/apps",
+    JSONObject().put("slug", slug).put("title", title).put("kind", kind)
+      .put("url", url).put("healthUrl", healthUrl),
+    token,
+  )
+
+  suspend fun updateApp(token: String, id: String, patch: JSONObject): JSONObject =
+    put("/api/v1/admin/apps/$id", patch, token)
+
+  suspend fun archiveApp(token: String, id: String): JSONObject =
+    request("DELETE", "/api/v1/admin/apps/$id", null, token)
+
+  /**
+   *  کلیدِ تازه برای یک برنامه. خام فقط همین یک بار برمی‌گردد؛ بعد از آن
+   *  حتی سرور هم نمی‌تواند نشانش بدهد.
+   */
+  suspend fun rotateAppKey(token: String, id: String): String =
+    post("/api/v1/admin/apps/$id/key", JSONObject(), token).optString("key")
+
+  /** سنجیدنِ سلامتِ همه — از سرور، نه از این گوشی که ممکن است پشت فیلتر باشد. */
+  suspend fun checkApps(token: String): JSONArray =
+    post("/api/v1/admin/apps/health", JSONObject(), token).optJSONArray("apps") ?: JSONArray()
+
+  /* --------------------------- ایمیل --------------------------- */
+
+  /** تنظیماتِ ایمیل. رمز و کلید هرگز کامل برنمی‌گردند. */
+  suspend fun emailSettings(token: String): JSONObject =
+    get("/api/v1/admin/email", token).optJSONObject("email") ?: JSONObject()
+
+  suspend fun saveEmailSettings(token: String, patch: JSONObject): JSONObject =
+    put("/api/v1/admin/email", patch, token).optJSONObject("email") ?: JSONObject()
+
+  /** یک ایمیل واقعی به نشانیِ خودتان — تا معلوم شود راه افتاده یا نه. */
+  suspend fun testEmail(token: String, to: String): JSONObject =
+    post("/api/v1/admin/email/test", JSONObject().put("to", to), token)
+
+  /* ---------------------------- پوش ---------------------------- */
+
+  suspend fun pushSettings(token: String): JSONObject =
+    get("/api/v1/admin/push", token).optJSONObject("push") ?: JSONObject()
+
+  suspend fun savePushSettings(token: String, enabled: Boolean, serviceAccount: String?): JSONObject =
+    put(
+      "/api/v1/admin/push",
+      JSONObject().apply {
+        put("enabled", enabled)
+        if (!serviceAccount.isNullOrBlank()) put("serviceAccount", serviceAccount)
+      },
+      token,
+    ).optJSONObject("push") ?: JSONObject()
+
   /* ------------------------------ لایهٔ HTTP ------------------------------ */
 
   private fun enc(s: String) = URLEncoder.encode(s, "UTF-8")
