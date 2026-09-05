@@ -264,6 +264,7 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
         }
       }
     }
+  }
 
   /* ---------------------------- پنجره‌ها ---------------------------- */
 
