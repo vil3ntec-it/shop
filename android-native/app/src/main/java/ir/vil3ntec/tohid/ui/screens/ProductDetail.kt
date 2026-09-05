@@ -214,17 +214,17 @@ fun ProductDetailScreen(
 
       /* -------------------------- قیمت‌ها -------------------------- */
       TohidCard {
-        DetailLine("قیمت فروش", "${money(product.salePrice)} افغانی")
-        DetailLine("قیمت خرید", "${money(product.purchasePrice)} افغانی")
+        DetailLine("قیمت فروش", "${money(product.salePrice)} ؋")
+        DetailLine("قیمت خرید", "${money(product.purchasePrice)} ؋")
         HorizontalDivider(Modifier.padding(vertical = Space.xs), color = Shop.colors.border)
         DetailLine(
           "سود هر ${product.unit.ifBlank { "واحد" }}",
-          "${money(unitProfit)} افغانی",
+          "${money(unitProfit)} ؋",
           tint = if (unitProfit >= 0) Shop.colors.success else Shop.colors.danger,
         )
         DetailLine(
           "سود موجودی فعلی",
-          "${money(potential)} افغانی",
+          "${money(potential)} ؋",
           tint = if (potential >= 0) Shop.colors.success else Shop.colors.danger,
         )
         DetailLine("حداقل موجودی", qty(product.minStock))
@@ -242,7 +242,7 @@ fun ProductDetailScreen(
         )
         TohidStatCard(
           label = "سود کسب‌شده",
-          value = "${money(profit)} افغانی",
+          value = "${money(profit)} ؋",
           tint = if (profit >= 0) Shop.colors.success else Shop.colors.danger,
           hint = "پس از مرجوعی",
           modifier = Modifier.weight(1f),

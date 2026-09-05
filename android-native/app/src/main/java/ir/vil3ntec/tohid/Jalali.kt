@@ -1,5 +1,8 @@
 package ir.vil3ntec.tohid
 
+import ir.vil3ntec.tohid.util.PERSIAN_MONTHS
+import ir.vil3ntec.tohid.util.faDigits
+
 /**
  *  تبدیلِ تاریخ میلادی به خورشیدی.
  *
@@ -175,9 +178,10 @@ object Jalali {
  */
 fun formatDate(iso: String): String {
   val j = Jalali.ofIso(iso) ?: return iso
-  val mm = j.month.toString().padStart(2, '0')
-  val dd = j.day.toString().padStart(2, '0')
-  return "${j.year}/$mm/$dd"
+  //  «۱۴ سنبله ۱۴۰۵»، نه «1405/06/14». عددِ ماه را باید در ذهن به نام
+  //  ترجمه کرد؛ نام را نه. منطقِ تبدیل همان است، فقط شکلِ نمایش عوض شد.
+  val name = JALALI_MONTHS.getOrNull(j.month - 1) ?: return iso
+  return "${j.day} $name ${j.year}".faDigits()
 }
 
 /**
@@ -229,10 +233,7 @@ fun todayIso(): String {
 }
 
 /** نامِ ماه‌های خورشیدی — برای برچسبِ ماه، نه برای تاریخِ کامل */
-val JALALI_MONTHS = listOf(
-  "حمل", "ثور", "جوزا", "سرطان", "اسد", "سنبله",
-  "میزان", "عقرب", "قوس", "جدی", "دلو", "حوت",
-)
+val JALALI_MONTHS = PERSIAN_MONTHS
 
 /**
  *  برچسبِ یک ماه: از `2026-09` به «سنبله ۱۴۰۵».
@@ -245,5 +246,5 @@ val JALALI_MONTHS = listOf(
 fun formatMonth(month: String): String {
   val j = Jalali.ofIso("$month-15") ?: return month
   val name = JALALI_MONTHS.getOrNull(j.month - 1) ?: return month
-  return "$name ${j.year}"
+  return "$name ${j.year}".faDigits()
 }

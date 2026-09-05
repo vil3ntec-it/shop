@@ -241,7 +241,7 @@ private fun MoneyRow(label: String, amount: Double, strong: Boolean = false, tin
       color = if (strong) Shop.colors.text else Shop.colors.muted,
     )
     Text(
-      "${money(amount)} افغانی",
+      "${money(amount)} ؋",
       style = if (strong) MaterialTheme.typography.titleSmall else MaterialTheme.typography.bodyMedium,
       color = tint ?: Shop.colors.text,
       fontWeight = if (strong) FontWeight.Bold else FontWeight.Normal,
@@ -589,7 +589,7 @@ fun CartLineDialog(
           )
           Spacer(Modifier.height(4.dp))
           Text(
-            "قیمت خودِ کالا ${money(basePrice)} افغانی است. این تغییر فقط روی همین فاکتور اثر دارد.",
+            "قیمت خودِ کالا ${money(basePrice)} ؋ است. این تغییر فقط روی همین فاکتور اثر دارد.",
             style = MaterialTheme.typography.labelSmall,
             color = Shop.colors.muted,
           )
@@ -598,7 +598,7 @@ fun CartLineDialog(
         Spacer(Modifier.height(14.dp))
         val shownPrice = if (manual) (parsedPrice ?: 0.0) else basePrice
         Text(
-          "جمع این ردیف: ${money((parsedQty ?: 0.0) * shownPrice)} افغانی",
+          "جمع این ردیف: ${money((parsedQty ?: 0.0) * shownPrice)} ؋",
           style = MaterialTheme.typography.titleSmall,
           color = Shop.colors.text,
         )
@@ -673,7 +673,7 @@ fun FreeLineDialog(
 
         Spacer(Modifier.height(14.dp))
         Text(
-          "جمع: ${money((parsedQty ?: 0.0) * (parsedPrice ?: 0.0))} افغانی",
+          "جمع: ${money((parsedQty ?: 0.0) * (parsedPrice ?: 0.0))} ؋",
           style = MaterialTheme.typography.titleSmall,
           color = Shop.colors.text,
         )

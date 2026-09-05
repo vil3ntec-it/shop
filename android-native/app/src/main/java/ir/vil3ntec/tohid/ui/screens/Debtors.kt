@@ -781,7 +781,7 @@ private fun TransactionDialog(
 /**
  *  سه راهِ یادآوری: زنگ، پیامک، واتساپ.
  *
- *  متنِ آماده عمدی است — نوشتنِ «سلام، … افغانی طلب دارید» برای هر
+ *  متنِ آماده عمدی است — نوشتنِ «سلام، … ؋ طلب دارید» برای هر
  *  مشتری، همان کاری است که فروشنده از انجامش طفره می‌رود.
  */
 @Composable
@@ -791,7 +791,7 @@ private fun ReminderRow(name: String, phone: String, balance: Double) {
   if (clean.isBlank()) return
 
   val message = remember(name, balance) {
-    if (balance > 0) "سلام $name عزیز، یادآوری می‌کنم که ${money(balance)} افغانی از حساب شما باقی مانده. ممنون."
+    if (balance > 0) "سلام $name عزیز، یادآوری می‌کنم که ${money(balance)} ؋ از حساب شما باقی مانده. ممنون."
     else "سلام $name عزیز،"
   }
 

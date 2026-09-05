@@ -68,7 +68,7 @@ fun AmountField(
     if (parsed != null && parsed > 0) {
       Spacer(Modifier.height(4.dp))
       Text(
-        "${money(parsed)} افغانی",
+        "${money(parsed)} ؋",
         style = MaterialTheme.typography.labelSmall,
         color = Shop.colors.muted,
       )

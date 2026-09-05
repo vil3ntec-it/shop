@@ -247,7 +247,7 @@ fun rememberAlerts(d: ShopData): List<Alert> {
       }
       val supplierDebt = d.suppliers.sumOf { ShopStore.supplierDebt(d, it.id) }
       if (supplierDebt > 0) {
-        add(Alert("بدهی به تأمین‌کننده", "${money(supplierDebt)} افغانی", "پرداخت‌نشده", warning, "purchasing"))
+        add(Alert("بدهی به تأمین‌کننده", "${money(supplierDebt)} ؋", "پرداخت‌نشده", warning, "purchasing"))
       }
       if (backupStale) {
         add(Alert("پشتیبان", "از اطلاعات دکان پشتیبان بگیرید", BackupClock.text(context), warning, "settings"))
@@ -258,7 +258,7 @@ fun rememberAlerts(d: ShopData): List<Alert> {
         .sortedByDescending { it.second }
         .take(3)
         .forEach { (debtor, amount) ->
-          add(Alert("قرض‌دار", debtor.name, "${money(amount)} افغانی", danger, "debtors"))
+          add(Alert("قرض‌دار", debtor.name, "${money(amount)} ؋", danger, "debtors"))
         }
     }
   }

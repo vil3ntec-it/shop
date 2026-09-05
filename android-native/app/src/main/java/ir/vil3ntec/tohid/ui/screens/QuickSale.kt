@@ -432,7 +432,7 @@ fun QuickSaleScreen(
             cartOpen = false
             Haptics.success(context)
             val sold = result.data.sales.last()
-            toast("فروش به مبلغ ${money(sold.finalTotal)} افغانی ثبت شد")
+            toast("فروش به مبلغ ${money(sold.finalTotal)} ؋ ثبت شد")
             //  بقیهٔ اعضای دکان همان لحظه خبردار می‌شوند — صاحب دکانی
             //  که خانه است نباید تا همگام‌سازیِ بعدی بی‌خبر بماند
             ir.vil3ntec.tohid.sync.ShopNews.sale(
@@ -501,7 +501,7 @@ private fun QuickTile(
     )
     Spacer(Modifier.height(4.dp))
     Text(
-      "${money(price)} افغانی",
+      "${money(price)} ؋",
       style = MaterialTheme.typography.labelMedium,
       color = Shop.colors.primary,
       maxLines = 1,

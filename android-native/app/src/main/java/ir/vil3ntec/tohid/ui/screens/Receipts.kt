@@ -111,7 +111,7 @@ fun ReceiptsScreen(d: ShopData) {
 
       StatTile(
         label = "جمع",
-        value = "${money(shown.sumOf { it.amount })} افغانی",
+        value = "${money(shown.sumOf { it.amount })} ؋",
         tint = if (tab == "receipts") Shop.colors.success else Shop.colors.danger,
         hint = "${plain(shown.size)} ردیف",
         modifier = Modifier.fillMaxWidth(),
@@ -200,7 +200,7 @@ fun ReceiptsScreen(d: ShopData) {
             )
           }
           Text(
-            "${money(row.amount)} افغانی",
+            "${money(row.amount)} ؋",
             style = MaterialTheme.typography.titleSmall,
             color = if (tab == "receipts") Shop.colors.success else Shop.colors.danger,
           )

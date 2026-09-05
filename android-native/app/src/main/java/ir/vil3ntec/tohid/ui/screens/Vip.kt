@@ -983,8 +983,8 @@ private fun TierCard(
 /**
  *  یک مدتِ اشتراک.
  *
- *  «روزی حدود …» عمداً هست: ۴۰۰۰ افغانی در سال بزرگ به نظر می‌رسد،
- *  ۱۱ افغانی در روز نه — و هر دو یک عددند.
+ *  «روزی حدود …» عمداً هست: ۴۰۰۰ ؋ در سال بزرگ به نظر می‌رسد،
+ *  ۱۱ ؋ در روز نه — و هر دو یک عددند.
  *
  *  کارتِ نشان‌دار طلایی است: لبهٔ درخشان، برقی که روی سطح می‌لغزد، و
  *  نشانِ طلا بالای آن.
@@ -1071,7 +1071,7 @@ private fun PlanCard(
       // «افغانی» روی گوشی زیرِ عدد می‌رود نه کنارش: کنارِ هم بودنشان،
       // عرضی می‌خواهد که در یک‌سومِ صفحهٔ گوشی نیست
       Text(
-        "افغانی",
+        "؋",
         style = MaterialTheme.typography.labelSmall,
         color = colors.muted,
         maxLines = 1,
@@ -1079,7 +1079,7 @@ private fun PlanCard(
       Spacer(Modifier.height(4.dp))
       Text(
         // روی گوشی «حدود» برداشته می‌شود؛ همان عدد را می‌گوید با جای کمتر
-        if (wide) "روزی حدود ${money(perDay)} افغانی" else "روزی ${money(perDay)}",
+        if (wide) "روزی حدود ${money(perDay)} ؋" else "روزی ${money(perDay)}",
         style = MaterialTheme.typography.labelSmall,
         color = colors.muted2,
         textAlign = TextAlign.Center,

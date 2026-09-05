@@ -481,7 +481,7 @@ fun SaleScreen(
             selectedId = null
             checkout = false
             Haptics.success(context)
-            toast("فروش به مبلغ ${money(result.data.sales.last().finalTotal)} افغانی ثبت شد")
+            toast("فروش به مبلغ ${money(result.data.sales.last().finalTotal)} ؋ ثبت شد")
             invoice = result.data to result.saleId
           }
         }
@@ -505,8 +505,8 @@ fun newId(): String =
 fun debtStateText(d: ShopData, debtorId: String): String {
   val amount = ShopStore.debt(d, debtorId)
   return when {
-    amount > 0 -> "${money(amount)} افغانی بدهکار"
-    amount < 0 -> "${money(-amount)} افغانی موجودی دارد"
+    amount > 0 -> "${money(amount)} ؋ بدهکار"
+    amount < 0 -> "${money(-amount)} ؋ موجودی دارد"
     else -> "حساب صاف است"
   }
 }
@@ -644,7 +644,7 @@ fun CartRow(
         )
       }
       Text(
-        "${money(lineTotal)} افغانی",
+        "${money(lineTotal)} ؋",
         style = MaterialTheme.typography.titleSmall,
         color = Shop.colors.text,
       )
@@ -732,7 +732,7 @@ fun CartBar(
         Column(Modifier.weight(1f)) {
           Text("مجموع", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
           Text(
-            "${money(total)} افغانی",
+            "${money(total)} ؋",
             style = MaterialTheme.typography.headlineSmall,
             color = Shop.colors.text,
             fontWeight = FontWeight.Bold,

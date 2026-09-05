@@ -139,7 +139,7 @@ fun WarehouseScreen(
           Chip("قلم کالا", plain(summary.products))
           Chip("کارتن", qty(summary.cartons))
           Chip("واحد", qty(summary.units))
-          Chip("ارزش تقریبی", "${money(summary.value)} افغانی")
+          Chip("ارزش تقریبی", "${money(summary.value)} ؋")
         }
         Spacer(Modifier.height(10.dp))
         if (summary.low > 0 || summary.out > 0) {
@@ -428,7 +428,7 @@ private fun ProductRow(
         Spacer(Modifier.height(3.dp))
         Text(
           buildString {
-            append("${money(product.salePrice)} افغانی")
+            append("${money(product.salePrice)} ؋")
             if (product.category.isNotBlank()) append(" — ${product.category}")
           },
           style = MaterialTheme.typography.labelSmall,
@@ -448,7 +448,7 @@ private fun ProductRow(
 
     AnimatedVisibility(visible = open) {
       Column(Modifier.padding(top = 12.dp)) {
-        DetailRow("قیمت خرید", "${money(product.purchasePrice)} افغانی")
+        DetailRow("قیمت خرید", "${money(product.purchasePrice)} ؋")
         DetailRow("حد کم بودن", qty(product.minStock))
         if (product.barcodes.isNotEmpty()) {
           DetailRow("بارکد", product.barcodes.joinToString("، ") { it })
@@ -478,7 +478,7 @@ private fun ProductRow(
             ) {
               Column(Modifier.weight(1f)) {
                 Text(
-                  "${qty(entry.units)}${if (entry.unit.isNotBlank()) " ${entry.unit}" else ""} — ${money(entry.price)} افغانی",
+                  "${qty(entry.units)}${if (entry.unit.isNotBlank()) " ${entry.unit}" else ""} — ${money(entry.price)} ؋",
                   style = MaterialTheme.typography.bodySmall,
                   color = Shop.colors.text,
                 )

@@ -154,7 +154,7 @@ fun DashboardScreen(d: ShopData, onOpen: (String) -> Unit = {}) {
     val attention = buildList {
       view.outOfStock.take(3).forEach { add(Triple(it.name, "تمام‌شده", "products")) }
       view.lowStock.take(3).forEach { add(Triple(it.name, "موجودی کم", "products")) }
-      view.owing.take(2).forEach { add(Triple(it.first.name, "${money(it.second)} افغانی طلب", "debtors")) }
+      view.owing.take(2).forEach { add(Triple(it.first.name, "${money(it.second)} ؋ طلب", "debtors")) }
     }
 
     val panels = buildList<@Composable () -> Unit> {
@@ -186,7 +186,7 @@ fun DashboardScreen(d: ShopData, onOpen: (String) -> Unit = {}) {
             recent.forEach { e ->
               LineRow(
                 e.title.ifBlank { e.category.ifBlank { "مصرف" } },
-                "${money(e.amount)} افغانی",
+                "${money(e.amount)} ؋",
                 Shop.colors.warning,
                 detail = formatDate(e.date),
               )
@@ -203,7 +203,7 @@ fun DashboardScreen(d: ShopData, onOpen: (String) -> Unit = {}) {
             EmptyNote("هنوز اطلاعاتی ثبت نشده")
           } else {
             view.owing.take(5).forEach { (debtor, amount) ->
-              LineRow(debtor.name, "${money(amount)} افغانی", Shop.colors.danger)
+              LineRow(debtor.name, "${money(amount)} ؋", Shop.colors.danger)
             }
           }
         }
@@ -218,7 +218,7 @@ fun DashboardScreen(d: ShopData, onOpen: (String) -> Unit = {}) {
               "تعداد محصولات" to view.warehouse.products.fa(),
               "تعداد کارتن" to qty(view.warehouse.cartons),
               "تعداد واحد" to qty(view.warehouse.units),
-              "ارزش تقریبی موجودی" to "${money(view.warehouse.value)} افغانی",
+              "ارزش تقریبی موجودی" to "${money(view.warehouse.value)} ؋",
             )
           )
           if (view.lowStock.isNotEmpty() || view.outOfStock.isNotEmpty()) {
@@ -248,7 +248,7 @@ fun DashboardScreen(d: ShopData, onOpen: (String) -> Unit = {}) {
             TrendChart(byDay.toSortedMap().values.toList())
             Spacer(Modifier.height(8.dp))
             Text(
-              "جمع ماه: ${money(byDay.values.sum())} افغانی",
+              "جمع ماه: ${money(byDay.values.sum())} ؋",
               style = MaterialTheme.typography.labelMedium,
               color = Shop.colors.muted,
             )
@@ -283,19 +283,19 @@ fun DashboardScreen(d: ShopData, onOpen: (String) -> Unit = {}) {
           Spacer(Modifier.height(10.dp))
           ChipRow(
             buildList {
-              add("فروش امروز" to "${money(view.todayTotal)} افغانی")
+              add("فروش امروز" to "${money(view.todayTotal)} ؋")
               add("تعداد فروش امروز" to view.todaySales.size.fa())
               //  سود و مصارف، عددهای مالیِ دکان‌اند — نه کارِ شاگرد
               if (canSeeMoney) {
-                add("سود امروز" to "${money(view.todayProfit)} افغانی")
-                add("مصارف امروز" to "${money(view.todayExpense)} افغانی")
+                add("سود امروز" to "${money(view.todayProfit)} ؋")
+                add("مصارف امروز" to "${money(view.todayExpense)} ؋")
               }
             }
           )
           Spacer(Modifier.height(8.dp))
           ChipRow(
             listOf(
-              "بدهی تأمین‌کنندگان" to "${money(view.supplierDebt)} افغانی",
+              "بدهی تأمین‌کنندگان" to "${money(view.supplierDebt)} ؋",
               "کالاهای کم‌موجودی" to view.lowStock.size.fa(),
               "کالاهای تمام‌شده" to view.outOfStock.size.fa(),
             )
@@ -447,7 +447,7 @@ private fun CategoryBar(name: String, amount: Double, ratio: Float) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
       Text(name, style = MaterialTheme.typography.labelMedium, color = Shop.colors.text)
       Text(
-        "${money(amount)} افغانی",
+        "${money(amount)} ؋",
         style = MaterialTheme.typography.labelSmall,
         color = Shop.colors.muted,
       )
