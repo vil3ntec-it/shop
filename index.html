@@ -467,6 +467,50 @@
   .dash-action-btn.tone-warning{background:linear-gradient(135deg,#F2A93B,#D07E10); box-shadow:0 6px 16px rgba(230,150,40,.30);}
   .dash-action-btn.tone-brand{background:linear-gradient(135deg, var(--primary), var(--primary-dark) 60%, var(--accent)); box-shadow:0 6px 16px rgba(124,92,255,.30);}
 
+  /* ---------- صفحه‌ی یک کالا ---------- */
+  .pd-head{display:flex; align-items:center; gap:12px; margin-bottom:16px;}
+  .pd-thumb{
+    width:64px; height:64px; flex:0 0 auto;
+    border-radius:var(--radius-sm); overflow:hidden;
+    background:var(--primary-tint); color:var(--primary);
+    display:flex; align-items:center; justify-content:center;
+    font-size:24px; font-weight:800;
+  }
+  .pd-thumb img{width:100%; height:100%; object-fit:cover;}
+  .pd-head-txt{flex:1; min-width:0;}
+  .pd-head-txt b{display:block; font-size:18px; font-weight:800; color:var(--text);}
+  .pd-head-txt i{
+    display:block; font-style:normal; font-size:12px; color:var(--muted); margin-top:3px;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  /* موجودی بزرگ و هم‌رنگِ وضعیت — اولین چیزی که می‌پرسند */
+  .pd-stock{
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  }
+  .pd-stock-lbl{font-size:12.5px; color:var(--muted);}
+  .pd-stock-val{
+    font-size:26px; font-weight:800; color:var(--text);
+    margin-inline-start:auto;
+  }
+  .pd-stock.out .pd-stock-val{color:var(--danger);}
+  .pd-stock.low .pd-stock-val{color:var(--warning);}
+  .pd-stock.ok  .pd-stock-val{color:var(--success);}
+  .pd-move{
+    display:flex; align-items:center; gap:10px;
+    padding:11px 0; border-bottom:1px solid var(--border);
+  }
+  .pd-move:last-child{border-bottom:none;}
+  .pd-move-txt{flex:1; min-width:0;}
+  .pd-move-txt b{display:block; font-size:13px; font-weight:700; color:var(--text);}
+  .pd-move-txt i{
+    display:block; font-style:normal; font-size:11.5px; color:var(--muted); margin-top:2px;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .pd-move-qty{flex:0 0 auto; font-size:13.5px; font-weight:800; direction:ltr; unicode-bidi:isolate;}
+  .pd-move-qty.in{color:var(--success);}
+  .pd-move-qty.out{color:var(--danger);}
+  .pd-empty{font-size:12.5px; color:var(--muted); padding:10px 0;}
+
   /* ---------- کارمندان دکان ---------- */
   .team-row{
     display:flex; align-items:center; gap:10px;
@@ -4596,6 +4640,69 @@
       </section>
 
       <!-- SETTINGS -->
+      <!-- ==========================================================
+           صفحه‌ی یک کالا.
+
+           تا حالا برای دیدنِ وضعیتِ یک کالا باید چند جا سر می‌زدی:
+           قیمتش در محصولات، موجودی‌اش در انبار، فروشش در گزارش‌ها.
+           اینجا همه‌اش یک‌جاست.
+
+           عددی که بیشتر از همه لازم است و هیچ‌جا نبود، «سودِ بالقوه‌ی
+           موجودی» است: اگر همه‌ی آنچه در انبار مانده به قیمتِ امروز
+           فروخته شود، چقدر سود می‌ماند. فروشنده با همین عدد تصمیم
+           می‌گیرد قیمت را دست بزند یا نه.
+           ========================================================== -->
+      <section class="page" id="page-product">
+        <a class="account-back" href="#products" data-page="products">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>
+          بازگشت به محصولات
+        </a>
+
+        <div class="panel" id="pd-gone" hidden>
+          <div class="panel-head"><h2>این کالا دیگر نیست</h2></div>
+          <p class="settings-hint">شاید حذف شده باشد. به فهرست برگردید.</p>
+          <button type="button" class="btn btn-secondary" data-page="products" style="margin-top:12px;">فهرست محصولات</button>
+        </div>
+
+        <div id="pd-body" hidden>
+          <div class="pd-head">
+            <div class="pd-thumb" id="pd-thumb"></div>
+            <div class="pd-head-txt">
+              <b id="pd-name">—</b>
+              <i id="pd-category">—</i>
+              <i id="pd-barcodes" dir="ltr" hidden></i>
+            </div>
+            <button type="button" class="icon-btn" id="pd-edit" title="ویرایش" aria-label="ویرایش کالا">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+            </button>
+          </div>
+
+          <!-- موجودی: بزرگ و هم‌رنگِ وضعیت، چون اولین چیزی است که می‌پرسند -->
+          <div class="panel pd-stock" id="pd-stock-panel">
+            <span class="pd-stock-lbl">موجودی فعلی</span>
+            <span class="pd-stock-val" id="pd-stock">—</span>
+            <span class="stock-pill" id="pd-stock-pill">—</span>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head"><h2>قیمت و سود</h2></div>
+            <div class="dash-status" style="margin-bottom:0;"><div id="pd-money"></div></div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head"><h2>از آغاز تا امروز</h2></div>
+            <div class="dash-status" style="margin-bottom:0;"><div id="pd-life"></div></div>
+          </div>
+
+          <button type="button" class="btn btn-primary" id="pd-entry" style="width:100%; margin-bottom:16px;">ورود کالا به انبار</button>
+
+          <div class="panel">
+            <div class="panel-head"><h2>حرکت‌های اخیر</h2></div>
+            <div id="pd-moves"></div>
+          </div>
+        </div>
+      </section>
+
       <!-- ==========================================================
            حساب من — کیستم، از کِی، و تا کِی.
 
@@ -10594,8 +10701,14 @@
     });
     ['pointerup','pointercancel','pointerleave'].forEach(ev=>
       list.addEventListener(ev, cancel));
-    // تپ کوتاه نباید چیزی باز کند
-    list.addEventListener('click', (e)=>{ if(longFired){ e.preventDefault(); longFired = false; } });
+    /* تپِ کوتاه صفحه‌ی کالا را باز می‌کند، نگه‌داشتن شیتِ کارها را —
+       همان‌طور که در برنامه‌ی نیتیو است. تا دیروز تپ هیچ کاری نمی‌کرد و
+       تنها راهِ دیدنِ یک کالا نگه‌داشتن بود، که کسی حدس نمی‌زد. */
+    list.addEventListener('click', (e)=>{
+      if(longFired){ e.preventDefault(); longFired = false; return; }
+      const card = e.target.closest('[data-prod-card]');
+      if(card) openProductDetail(card.dataset.prodCard);
+    });
   })();
 
   document.getElementById('quick-select-grid').addEventListener('click', (e)=>{
@@ -11721,7 +11834,7 @@
     }
   });
 
-  const EXTRA_PAGES = ['debtor-account', 'quick-sale', 'supplier-account', 'receipts', 'profile', 'team'];
+  const EXTRA_PAGES = ['debtor-account', 'quick-sale', 'supplier-account', 'receipts', 'profile', 'team', 'product'];
 
   /**
    *  چراغِ نوارِ پایین را می‌برد روی تبِ فعال.
@@ -12052,6 +12165,137 @@
     });
   }
 
+
+  /* ==========================================================
+     صفحه‌ی یک کالا — همان چیزی که ProductDetailScreen نشان می‌دهد.
+
+     همه‌ی عددها همین‌جا از داده‌ی محلی حساب می‌شوند، پس بی‌اینترنت هم
+     کامل کار می‌کند.
+     ========================================================== */
+  let currentProductId = null;
+  const PD = {};
+  function pdEl(id){ return PD[id] || (PD[id] = document.getElementById(id)); }
+
+  function pdRow(label, value, color){
+    return `<div class="dash-status-row"><span class="lbl">${escapeHtml(label)}</span>`
+         + `<span class="val" style="color:${color || 'var(--text)'};">${escapeHtml(value)}</span></div>`;
+  }
+
+  /**
+   *  سودی که این کالا تا امروز واقعاً داده.
+   *
+   *  فروشِ لغوشده اصلاً حساب نمی‌شود و مقدارِ مرجوعی‌شده از تعداد کم
+   *  می‌شود — همان قاعده‌ای که `getSoldQty` دارد، وگرنه سودِ کالایی که
+   *  پس آمده هم به حساب می‌آمد.
+   */
+  function productEarnedProfit(productId){
+    return saleItems.reduce((sum, si)=>{
+      if(si.productId !== productId) return sum;
+      const sale = sales.find(x=> x.id === si.saleId);
+      if(sale && sale.status === 'cancelled') return sum;
+      const net = (si.quantity||0) - (si.returnedQty||0);
+      return sum + net * ((si.price||0) - (si.purchasePrice||0));
+    }, 0);
+  }
+
+  /** ورود یا خروج؟ رنگ و علامت از همین می‌آید */
+  const PD_MOVE_IN = { purchase_in:true, customer_return:true };
+
+  function openProductDetail(id){
+    currentProductId = id;
+    goTo('product');
+  }
+
+  function renderProductDetail(){
+    const p = products.find(x=> x.id === currentProductId);
+    pdEl('pd-gone').hidden = !!p;
+    pdEl('pd-body').hidden = !p;
+    if(!p) return;
+
+    const unit = p.unit || '';
+    const suffix = unit ? ' ' + unit : '';
+
+    /* ---- سرِ صفحه ---- */
+    pdEl('pd-name').textContent = p.name || '—';
+    pdEl('pd-category').textContent = p.category || '—';
+    const bc = pdEl('pd-barcodes');
+    bc.hidden = !(p.barcodes && p.barcodes.length);
+    if(!bc.hidden) bc.textContent = p.barcodes.join('، ');
+    pdEl('pd-thumb').innerHTML = p.photo
+      ? `<img alt="عکس محصول" data-product-photo="${escapeHtml(p.id)}">`
+      : escapeHtml((p.name || '؟')[0]);
+    hydrateProductPhotos(pdEl('pd-thumb'));
+
+    /* ---- موجودی ---- */
+    const stock  = getProductStock(p.id);
+    const status = getStockStatus(p);
+    pdEl('pd-stock-panel').className = 'panel pd-stock ' + status;
+    pdEl('pd-stock').textContent = formatMoney(stock) + suffix;
+    const pill = pdEl('pd-stock-pill');
+    pill.className = 'stock-pill ' + status;
+    pill.textContent = stockStatusLabel(status);
+
+    /* ---- قیمت و سود ---- */
+    const unitProfit = (p.salePrice||0) - (p.purchasePrice||0);
+    const potential  = stock * unitProfit;
+    const profitTint = v => v > 0 ? 'var(--success)' : (v < 0 ? 'var(--danger)' : 'var(--muted)');
+    pdEl('pd-money').innerHTML = [
+      pdRow('قیمت فروش', formatMoney(p.salePrice||0) + ' افغانی'),
+      pdRow('قیمت خرید', formatMoney(p.purchasePrice||0) + ' افغانی'),
+      pdRow('سود هر ' + (unit || 'واحد'), formatMoney(unitProfit) + ' افغانی', profitTint(unitProfit)),
+      //  عددی که هیچ‌جای دیگر نبود: اگر همه‌ی موجودی به قیمتِ امروز
+      //  فروخته شود، چقدر سود می‌ماند
+      pdRow('سود موجودی فعلی', formatMoney(potential) + ' افغانی', profitTint(potential)),
+      pdRow('حداقل موجودی', formatMoney(p.minStock||0) + suffix, 'var(--muted)'),
+    ].join('');
+
+    /* ---- از آغاز ---- */
+    const sold    = getSoldQty(p.id);
+    const earned  = productEarnedProfit(p.id);
+    const cartons = getProductCartons(p.id);
+    pdEl('pd-life').innerHTML = [
+      pdRow('فروخته‌شده', formatMoney(sold) + suffix),
+      pdRow('سود کسب‌شده', formatMoney(earned) + ' افغانی', profitTint(earned)),
+      pdRow('کارتنِ واردشده', formatMoney(cartons), 'var(--muted)'),
+    ].join('');
+
+    /* ---- حرکت‌های اخیر ---- */
+    const moves = stockMovements
+      .filter(m=> m.productId === p.id)
+      .sort((a,b)=> (b.createdAt||0) - (a.createdAt||0))
+      .slice(0, 20);
+    pdEl('pd-moves').innerHTML = moves.length
+      ? moves.map(m=>{
+          const into = !!PD_MOVE_IN[m.type];
+          const qty = (into ? '+' : '−') + formatMoney(Math.abs(m.qty||0));
+          return `<div class="pd-move">
+            <span class="pd-move-txt">
+              <b>${escapeHtml(STOCK_MOVEMENT_LABELS[m.type] || m.type)}</b>
+              <i>${escapeHtml(formatDate(m.date))}${m.notes ? ' — ' + escapeHtml(m.notes) : ''}</i>
+            </span>
+            <span class="pd-move-qty ${into ? 'in' : 'out'}">${escapeHtml(qty)}</span>
+          </div>`;
+        }).join('')
+      : '<p class="pd-empty">هنوز حرکتی ثبت نشده. ورود کالا، فروش و مرجوعیِ این کالا اینجا فهرست می‌شود.</p>';
+  }
+
+  function wireProductDetail(){
+    if(!document.getElementById('page-product')) return;
+    pdEl('pd-edit').addEventListener('click', ()=>{
+      if(currentProductId) openEditProduct(currentProductId);
+    });
+    pdEl('pd-entry').addEventListener('click', ()=>{
+      openAddWarehouse();
+      //  کالای همین صفحه از پیش انتخاب شود — کسی که از اینجا می‌آید
+      //  می‌داند برای کدام کالا آمده
+      const sel = document.getElementById('in-warehouse-product');
+      if(sel && currentProductId){
+        sel.value = currentProductId;
+        sel.dispatchEvent(new Event('change'));
+      }
+    });
+  }
+
   function goTo(pageId){
     if(!PAGES.find(p=>p.id===pageId) && !EXTRA_PAGES.includes(pageId)) pageId = 'dashboard';
 
@@ -12093,6 +12337,10 @@
     } else if(pageId==='team'){
       pageTitle.textContent = 'کارمندان دکان';
       teamRefresh();
+    } else if(pageId==='product'){
+      const p = products.find(x=> x.id === currentProductId);
+      pageTitle.textContent = p ? p.name : 'کالا';
+      renderProductDetail();
     } else {
       const meta = PAGES.find(p=>p.id===pageId);
       // برچسبِ نوارِ پایین کوتاه است («خانه») ولی سربرگ نامِ کاملِ صفحه را
@@ -12101,7 +12349,7 @@
     }
 
     document.body.classList.toggle('no-fab',
-      pageId==='profile' || pageId==='team' || pageId==='settings');
+      pageId==='profile' || pageId==='team' || pageId==='settings' || pageId==='product');
 
     // دوربین فقط داخل صفحه «فروش» فعال بماند تا باتری/CPU هدر نرود
     if(pageId==='sale'){ startSaleScanner(); } else { stopSaleScanner(); }
@@ -12148,6 +12396,7 @@
 
   wireProfile();
   wireTeam();
+  wireProductDetail();
 
   document.addEventListener('click', (e)=>{
     const link = e.target.closest('[data-page]');
