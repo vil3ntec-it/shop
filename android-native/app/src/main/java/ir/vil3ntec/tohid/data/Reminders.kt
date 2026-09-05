@@ -17,8 +17,8 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
-import ir.vil3ntec.tohid.moneyPlain
-import ir.vil3ntec.tohid.qtyPlain
+import ir.vil3ntec.tohid.money
+import ir.vil3ntec.tohid.qty
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
 
@@ -104,9 +104,9 @@ object Reminders {
 
     val lines = buildList {
       out.take(2).forEach { add("${it.name}: تمام شد") }
-      low.take(2).forEach { add("${it.name}: ${qtyPlain(it.left)} مانده") }
+      low.take(2).forEach { add("${it.name}: ${qty(it.left)} مانده") }
       if (owed.isNotEmpty()) {
-        add("${moneyPlain(owed.sumOf { it.amount })} افغانی طلب از ${owed.size} نفر")
+        add("${money(owed.sumOf { it.amount })} افغانی طلب از ${owed.size} نفر")
       }
     }
     return title to lines.joinToString(" • ")

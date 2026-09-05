@@ -264,7 +264,7 @@ fun <T> SearchablePicker(
 
   Dialog(onDismissRequest = onClose) {
     Surface(
-      color = Shop.colors.surface,
+      color = Shop.colors.surfaceSolid,
       shape = RoundedCornerShape(Radius.lg),
       modifier = Modifier.fillMaxWidth(),
     ) {

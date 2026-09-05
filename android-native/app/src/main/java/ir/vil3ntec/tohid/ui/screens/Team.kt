@@ -468,7 +468,7 @@ private fun NewCodeDialog(
 
   AlertDialog(
     onDismissRequest = onDismiss,
-    containerColor = colors.surface,
+    containerColor = colors.surfaceSolid,
     title = { Text("کد پیوستن تازه", color = colors.text) },
     text = {
       Column {

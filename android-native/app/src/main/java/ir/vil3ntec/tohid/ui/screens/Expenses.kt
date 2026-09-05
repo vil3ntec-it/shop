@@ -203,7 +203,7 @@ fun ExpensesScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
   confirmDelete?.let { expense ->
     AlertDialog(
       onDismissRequest = { confirmDelete = null },
-      containerColor = Shop.colors.surface,
+      containerColor = Shop.colors.surfaceSolid,
       title = { Text("حذف مصرف؟", color = Shop.colors.text) },
       text = {
         Text(
@@ -329,7 +329,7 @@ private fun ExpenseDialog(
 
   Dialog(onDismissRequest = onDismiss) {
     DialogEntry {
-    Surface(color = Shop.colors.surface, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
+    Surface(color = Shop.colors.surfaceSolid, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
       Column(Modifier.padding(18.dp).verticalScroll(rememberScrollState())) {
         Text(
           if (form.editingId == null) "مصرف تازه" else "ویرایش مصرف",

@@ -634,7 +634,7 @@ fun TohidConfirmDialog(
 ) {
   AlertDialog(
     onDismissRequest = onDismiss,
-    containerColor = Shop.colors.surface,
+    containerColor = Shop.colors.surfaceSolid,
     shape = Shape.dialog,
     title = { Text(title, color = Shop.colors.text) },
     text = {

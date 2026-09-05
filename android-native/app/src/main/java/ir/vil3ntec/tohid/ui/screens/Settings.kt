@@ -649,7 +649,7 @@ fun SettingsScreen(
   pendingRestore?.let { incoming ->
     AlertDialog(
       onDismissRequest = { BackupBundle.dropStaging(context); pendingRestore = null; restorePhotos = 0 },
-      containerColor = Shop.colors.surface,
+      containerColor = Shop.colors.surfaceSolid,
       title = { Text("بازیابی اطلاعات؟", color = Shop.colors.text) },
       text = {
         Column {
@@ -707,7 +707,7 @@ fun SettingsScreen(
   if (confirmCompact) {
     AlertDialog(
       onDismissRequest = { confirmCompact = false },
-      containerColor = Shop.colors.surface,
+      containerColor = Shop.colors.surfaceSolid,
       title = { Text("دفتر فشرده شود؟", color = Shop.colors.text) },
       text = {
         Text(
@@ -740,7 +740,7 @@ fun SettingsScreen(
   if (confirmRotate) {
     AlertDialog(
       onDismissRequest = { confirmRotate = false },
-      containerColor = Shop.colors.surface,
+      containerColor = Shop.colors.surfaceSolid,
       title = { Text("کد شاگرد تازه ساخته شود؟", color = Shop.colors.text) },
       text = {
         Text(
@@ -773,7 +773,7 @@ fun SettingsScreen(
   if (confirmClear) {
     AlertDialog(
       onDismissRequest = { confirmClear = false },
-      containerColor = Shop.colors.surface,
+      containerColor = Shop.colors.surfaceSolid,
       title = { Text("پاک‌سازی کامل اطلاعات؟", color = Shop.colors.text) },
       text = {
         Text(
@@ -903,7 +903,7 @@ private fun PinDialog(onDismiss: () -> Unit, onSet: (String) -> Unit) {
 
   AlertDialog(
     onDismissRequest = onDismiss,
-    containerColor = colors.surface,
+    containerColor = colors.surfaceSolid,
     title = { Text("رمز برنامه", color = colors.text) },
     text = {
       Column {

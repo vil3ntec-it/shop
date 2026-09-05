@@ -4,8 +4,6 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -45,12 +43,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.ui.window.Dialog
 import ir.vil3ntec.tohid.data.Debtor
 import ir.vil3ntec.tohid.data.DebtorEngine
@@ -81,8 +73,8 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
   var search by rememberSaveable { mutableStateOf("") }
   //  ترتیبِ فهرست بین باز و بسته شدنِ صفحه می‌ماند: کسی که «قدیمی‌ترین
   //  قرض» را انتخاب کرده، هر بار از نو انتخابش نمی‌کند
-  var sortName by rememberSaveable { mutableStateOf(SORT_MOST.name) }
-  val sort = DEBTOR_SORTS.firstOrNull { it.name == sortName } ?: SORT_MOST
+  var sortName by rememberSaveable { mutableStateOf(DebtorSort.MOST.name) }
+  val sort = runCatching { DebtorSort.valueOf(sortName) }.getOrDefault(DebtorSort.MOST)
   var openId by rememberSaveable { mutableStateOf<String?>(null) }
   var form by remember { mutableStateOf<DebtorFormState?>(null) }
   var txFor by remember { mutableStateOf<Pair<String, DebtorEngine.Kind>?>(null) }
@@ -131,72 +123,74 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
      */
     val term = search.trim()
     val rows = remember(d, term, sort) {
-      val byDebtor = d.transactions.groupBy { it.debtorId }
       d.debtors
         .filter {
           term.isBlank() || it.name.contains(term, ignoreCase = true) || it.phone.contains(term)
         }
-        .map { debtor ->
-          val mine = byDebtor[debtor.id].orEmpty()
-          DebtorRow(
-            debtor = debtor,
-            balance = ShopStore.debt(d, debtor.id),
-            days = DebtorEngine.debtDays(d, debtor.id),
-            given = mine.filter { it.type == "give" }.sumOf { it.amount },
-            received = mine.filter { it.type == "receive" }.sumOf { it.amount },
-          )
-        }
+        .map { DebtorRow(it, ShopStore.debt(d, it.id), DebtorEngine.debtDays(d, it.id)) }
         .sortedWith(sort.order)
     }
 
-    /*
-     *  عقب‌افتاده‌ها همیشه بالای فهرست‌اند، هر ترتیبی که انتخاب شده
-     *  باشد. کسی که یک ماه است خبری ازش نیست، پایینِ فهرست فراموش
-     *  می‌شود — و فراموش‌شدن، همان چیزی است که این صفحه باید جلویش را
-     *  بگیرد. حساب‌های صاف هم ته می‌روند و جمع می‌شوند.
-     */
-    //  ترتیبِ انتخاب‌شده در یک متغیر می‌نشیند و بعد استفاده می‌شود.
-    //  خواندنِ `sort.order` از داخلِ یک لامبدا، کامپایلرِ K2 را با یک
-    //  خطای داخلی می‌انداخت (FirUninitializedEnumChecker).
-    val chosen: Comparator<DebtorRow> = sort.order
-    val owing = rows.filter { it.balance > 0 }
-      .sortedWith(compareByDescending<DebtorRow> { (it.days ?: 0L) >= 30 }.then(chosen))
-    val settled = rows.filter { it.balance <= 0 }
-
-    var settledOpen by rememberSaveable { mutableStateOf(false) }
-
     Box(Modifier.fillMaxSize()) {
-      LazyColumn(
+      // شبکهٔ کارت‌ها — همان `.debtor-list` نسخهٔ وب. قرض‌دار در یک نگاه
+      // از رنگِ کارتش شناخته می‌شود، نه از خواندنِ عدد.
+      LazyVerticalGrid(
+        columns = GridCells.Adaptive(minSize = gridMinSize(phone = 104.dp, tablet = 132.dp)),
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp, 14.dp, 16.dp, 96.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, 96.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
       ) {
-        item {
-          DebtorsHero(
-            owed = owing.sumOf { it.balance },
-            people = owing.size,
-            late = owing.count { (it.days ?: 0L) >= 30 },
-            collected = remember(d) {
-              val month = todayIso().take(7)
-              d.transactions.filter { it.type == "receive" && it.date.startsWith(month) }.sumOf { it.amount }
-            },
-          )
-        }
+        item(span = { GridItemSpan(maxLineSpan) }) {
+          // این `Column` لازم است، تزئینی نیست: خانهٔ یک شبکه هرچه داخلش
+          // باشد را **روی هم** می‌گذارد، نه زیرِ هم. بدونش عنوان و کارتِ
+          // جمعِ طلب و کادرِ جستجو هر سه روی هم می‌افتادند و متنشان
+          // درهم می‌شد.
+          Column {
+            Spacer(Modifier.height(14.dp))
 
-        item {
-          VoiceSearchField(
-            value = search,
-            onValueChange = { search = it },
-            label = "جستجوی نام یا شماره",
-          )
-        }
+            /*
+             *  سربرگِ کوتاه، سه عددِ هم‌وزن.
+             *
+             *  پیش‌تر یک عددِ بزرگ بود با عنوانِ «جمع طلب از مشتریان» که
+             *  نصفِ بالای صفحه را می‌گرفت و همان عدد پایین‌تر هم تکرار
+             *  می‌شد. حالا سه چیزی که دکاندار می‌خواهد بداند، کنارِ هم و
+             *  هم‌اندازه‌ی متنِ صفحه: چند نفر، جمعِ قرض، و چقدر وصول شده.
+             */
+            val owed = rows.sumOf { it.balance.coerceAtLeast(0.0) }
+            val received = remember(d) {
+              d.transactions.filter { it.type == "receive" }.sumOf { it.amount }
+            }
+            DebtorsSummary(
+              people = d.debtors.size,
+              owed = owed,
+              received = received,
+            )
+            Spacer(Modifier.height(12.dp))
 
-        item {
-          DebtorSortRow(current = sort, count = rows.size) { sortName = it.name }
+            VoiceSearchField(
+              value = search,
+              onValueChange = { search = it },
+              label = "جستجوی نام یا شماره",
+            )
+            Spacer(Modifier.height(10.dp))
+
+            /*
+             *  ترتیبِ فهرست، در دسترسِ همان صفحه.
+             *
+             *  «کی بیشتر برده» و «قرضِ کی مانده‌تر است» دو سؤالِ جدا
+             *  هستند و تا امروز فهرست فقط جوابِ اولی را می‌داد (همیشه
+             *  بیشترین مبلغ اول). دومی را کسی نمی‌توانست ببیند، در حالی
+             *  که در دکان همان مهم‌تر است: قرضِ کوچکی که شش ماه مانده،
+             *  از قرضِ بزرگِ دیروز بدتر است.
+             */
+            DebtorSortRow(current = sort, count = rows.size) { sortName = it.name }
+            Spacer(Modifier.height(4.dp))
+          }
         }
 
         if (rows.isEmpty()) {
-          item {
+          item(span = { GridItemSpan(maxLineSpan) }) {
             Panel {
               if (d.debtors.isEmpty()) {
                 TohidEmptyState(
@@ -216,52 +210,28 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
             }
           }
         } else {
-          //  یک پنلِ شیشه‌ای که ردیف‌ها داخلش‌اند — نه یک شیشه به ازای
-          //  هر ردیف. صد کارتِ شناور، فهرست را به هم می‌ریزد.
-          item {
-            Panel(Modifier.fillMaxWidth()) {
-              owing.forEachIndexed { index, row ->
-                DebtorLine(
-                  row = row,
-                  onOpen = { openId = row.debtor.id },
-                  onSwipedAway = {
-                    val before = d
-                    apply(DebtorEngine.delete(d, row.debtor.id), "${row.debtor.name.ifBlank { "قرض‌دار" }} حذف شد") {
-                      scope.launch {
-                        val answer = snackbar.showSnackbar(
-                          message = "${row.debtor.name.ifBlank { "قرض‌دار" }} حذف شد",
-                          actionLabel = "واگرد",
-                          duration = SnackbarDuration.Short,
-                        )
-                        if (answer == SnackbarResult.ActionPerformed) store.save(before)
-                      }
-                    }
-                  },
-                )
-                if (index != owing.lastIndex) RowDivider()
-              }
-
-              if (owing.isEmpty()) {
-                EmptyNote("کسی بدهکار نیست — همهٔ حساب‌ها صاف است.")
-              }
-
-              /*
-               *  حساب‌های صاف، هم‌وزنِ بدهکارها نیستند.
-               *
-               *  کسی که پولش را داده، دیگر کارِ امروزِ دکاندار نیست؛ ولی
-               *  باید بشود پیدایش کرد. پس یک ردیفِ جمع‌شده ته پنل.
-               */
-              if (settled.isNotEmpty()) {
-                if (owing.isNotEmpty()) RowDivider()
-                SettledSection(settled, settledOpen, { settledOpen = !settledOpen }) { openId = it }
-              }
+          itemsIndexed(rows, key = { _, row -> row.debtor.id }) { index, row ->
+            StaggeredItem(index) {
+              DebtorCard(
+                debtor = row.debtor,
+                balance = row.balance,
+                days = row.days,
+                onOpen = { openId = row.debtor.id },
+                onEdit = { form = DebtorFormState.of(row.debtor) },
+                onDelete = { confirmDelete = row.debtor },
+              )
             }
           }
         }
+      }
 
-        item {
-          GradientWideButton("+ قرض‌دار جدید") { form = DebtorFormState() }
-        }
+      FloatingActionButton(
+        onClick = { form = DebtorFormState() },
+        containerColor = Shop.colors.primary,
+        contentColor = Color.White,
+        modifier = Modifier.align(Alignment.BottomStart).padding(16.dp).popIn(),
+      ) {
+        Icon(Icons.Filled.Add, contentDescription = "قرض‌دار تازه")
       }
     }
   }
@@ -305,7 +275,7 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
   confirmDelete?.let { debtor ->
     AlertDialog(
       onDismissRequest = { confirmDelete = null },
-      containerColor = Shop.colors.surface,
+      containerColor = Shop.colors.surfaceSolid,
       title = { Text("حذف قرض‌دار؟", color = Shop.colors.text) },
       text = {
         Text(
@@ -329,7 +299,7 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
   confirmTx?.let { txId ->
     AlertDialog(
       onDismissRequest = { confirmTx = null },
-      containerColor = Shop.colors.surface,
+      containerColor = Shop.colors.surfaceSolid,
       title = { Text("حذف تراکنش؟", color = Shop.colors.text) },
       text = {
         Text(
@@ -356,61 +326,34 @@ private data class DebtorRow(
   val balance: Double,
   /** `null` یعنی بدهکار نیست */
   val days: Long?,
-  /** جمعِ قرضِ داده‌شده و پولِ گرفته‌شده — برای نوارِ نسبتِ پرداخت */
-  val given: Double = 0.0,
-  val received: Double = 0.0,
-)
-
-/*
- *  ── چرا enum نیست ──────────────────────────────────────────────────
- *  این‌ها تا دیروز عضوهای یک `enum class` بودند. کامپایلرِ K2 روی این
- *  فایل با یک خطای داخلی می‌شکست (`FirUninitializedEnumChecker`: سعی
- *  می‌کرد نشانه‌ی هر عضوِ کلاسِ enum را «عضوِ enum» بداند و نمی‌شد) و هیچ
- *  شکلی از دورزدن — `entries`، `values()`، `valueOf` — جوابش نبود.
- *
- *  یک کلاسِ ساده همان کار را می‌کند: `name` برای ذخیره شدن بین باز و
- *  بسته شدنِ صفحه، `label` برای تراشه، و `order` برای مرتب‌سازی.
- *  ────────────────────────────────────────────────────────────────────
- */
-private class DebtorSort(
-  val name: String,
-  val label: String,
-  val order: Comparator<DebtorRow>,
-)
-
-/** بیشترین مبلغ اول — همان ترتیبی که فهرست از روزِ اول داشت */
-private val SORT_MOST = DebtorSort(
-  "MOST", "بیشترین قرض", compareByDescending<DebtorRow> { it.balance },
-)
-
-/** کمترین اول؛ کسی که پیشِ ما موجودی دارد (مانده‌ی منفی) سرِ فهرست */
-private val SORT_LEAST = DebtorSort(
-  "LEAST", "کمترین قرض", compareBy<DebtorRow> { it.balance },
 )
 
 /**
- *  قرضی که بیشتر مانده، اول.
+ *  ترتیبِ فهرستِ قرض‌داران.
  *
- *  کسی که بدهکار نیست (`days == null`) ته می‌رود، نه اول: `-1` او را از
- *  هر مدتی کوچک‌تر می‌کند.
+ *  چهار تا، نه بیشتر: هر ترتیبِ اضافه یک تراشهٔ دیگر در ردیف است و
+ *  انتخاب را سخت‌تر می‌کند، نه آسان‌تر.
  */
-private val SORT_OLDEST = DebtorSort(
-  "OLDEST",
-  "قدیمی‌ترین قرض",
-  compareByDescending<DebtorRow> { it.days ?: -1L }.thenByDescending { it.balance },
-)
+private enum class DebtorSort(val label: String, val order: Comparator<DebtorRow>) {
+  /** بیشترین مبلغ اول — همان ترتیبی که فهرست از روزِ اول داشت */
+  MOST("بیشترین قرض", compareByDescending<DebtorRow> { it.balance }),
 
-private val SORT_NAME = DebtorSort(
-  "NAME", "بر اساس نام", compareBy<DebtorRow> { it.debtor.name },
-)
+  /** کمترین اول؛ کسی که پیشِ ما موجودی دارد (مانده‌ی منفی) سرِ فهرست */
+  LEAST("کمترین قرض", compareBy<DebtorRow> { it.balance }),
 
-/**
- *  ترتیب‌های فهرست — چهار تا، نه بیشتر.
- *
- *  هر ترتیبِ اضافه یک تراشه‌ی دیگر در ردیف است و انتخاب را سخت‌تر
- *  می‌کند، نه آسان‌تر.
- */
-private val DEBTOR_SORTS = listOf(SORT_MOST, SORT_LEAST, SORT_OLDEST, SORT_NAME)
+  /**
+   *  قرضی که بیشتر مانده، اول.
+   *
+   *  کسی که بدهکار نیست (`days == null`) ته می‌رود، نه اول: `-1` او را
+   *  از هر مدتی کوچک‌تر می‌کند.
+   */
+  OLDEST(
+    "قدیمی‌ترین قرض",
+    compareByDescending<DebtorRow> { it.days ?: -1L }.thenByDescending { it.balance },
+  ),
+
+  NAME("بر اساس نام", compareBy<DebtorRow> { it.debtor.name }),
+}
 
 /** ردیفِ تراشه‌های ترتیب — روی گوشیِ باریک افقی اسکرول می‌شود */
 @Composable
@@ -428,7 +371,7 @@ private fun DebtorSortRow(current: DebtorSort, count: Int, onPick: (DebtorSort) 
       color = colors.muted2,
       modifier = Modifier.padding(end = 2.dp),
     )
-    DEBTOR_SORTS.forEach { option ->
+    DebtorSort.entries.forEach { option ->
       val picked = option == current
       Row(
         Modifier
@@ -464,8 +407,144 @@ private fun DebtorSortRow(current: DebtorSort, count: Int, onPick: (DebtorSort) 
   }
 }
 
+/**
+ *  کارتِ قرض‌دار — همان `.debtor-card` نسخهٔ وب.
+ *
+ *  رنگ، خودش حرفِ اصلی را می‌زند: قرمز یعنی بدهکار است، سبز یعنی یا
+ *  حسابش صاف است یا نزد ما موجودی دارد. برای همین زیرِ عدد، متنِ اضافه
+ *  نمی‌نویسیم؛ کارت را از دور هم می‌شود خواند.
+ *
+ *  دکمهٔ حذف بالای کارت و دکمهٔ ویرایش پایینِ آن است، درست مثل وب، تا
+ *  انگشت هنگام باز کردنِ حساب اشتباهی رویشان نیفتد.
+ */
+@Composable
+private fun DebtorCard(
+  debtor: Debtor,
+  balance: Double,
+  /** چند روز است که بدهکار است — `null` یعنی نیست */
+  days: Long?,
+  onOpen: () -> Unit,
+  onEdit: () -> Unit,
+  onDelete: () -> Unit,
+) {
+  val owes = balance > 0
+  val tint = if (owes) Shop.colors.danger else Shop.colors.success
+  val fill = if (owes) Shop.colors.dangerTint else Shop.colors.successTint
+
+  Box(
+    Modifier
+      .fillMaxWidth()
+      .clip(RoundedCornerShape(Radius.md))
+      .background(fill)
+      .border(1.2.dp, tint, RoundedCornerShape(Radius.md))
+      .clickable(onClick = onOpen)
+  ) {
+    Column(
+      // پایین جای بیشتری می‌خواهد: مدادِ ویرایش در همان گوشه می‌نشیند و
+      // با فاصلهٔ برابر، آخرین خطِ متن زیرش می‌رفت
+      Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, top = 22.dp, bottom = 34.dp),
+      horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+      Text(
+        debtor.name.ifBlank { "بی‌نام" },
+        style = MaterialTheme.typography.titleSmall,
+        color = Shop.colors.text,
+        fontWeight = FontWeight.Bold,
+        textAlign = TextAlign.Center,
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
+      )
+      Spacer(Modifier.height(6.dp))
+      Text(
+        money(kotlin.math.abs(balance)),
+        style = MaterialTheme.typography.titleMedium,
+        color = tint,
+        fontWeight = FontWeight.Bold,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+      )
+      Text(
+        if (debtor.phone.isNotBlank()) debtor.phone else DebtorEngine.stateText(balance),
+        style = MaterialTheme.typography.labelSmall,
+        color = Shop.colors.muted,
+        textAlign = TextAlign.Center,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+      )
+
+      /*
+       *  چند وقت است که این قرض مانده.
+       *
+       *  مبلغ نصفِ حرف است: «۵۰۰ افغانی» از دیروز یک چیز است و از پنج
+       *  ماه پیش چیزِ دیگری. از یک ماه به بالا پررنگ‌تر می‌شود تا در
+       *  یک نگاه از بقیه جدا باشد.
+       */
+      if (days != null) {
+        Spacer(Modifier.height(5.dp))
+        val stale = days >= 30
+        Row(
+          Modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(if (stale) tint.copy(alpha = 0.16f) else Shop.colors.bg.copy(alpha = 0.7f))
+            .padding(horizontal = 7.dp, vertical = 3.dp),
+          verticalAlignment = Alignment.CenterVertically,
+          horizontalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+          Icon(
+            Icons.Filled.Schedule,
+            contentDescription = null,
+            tint = if (stale) tint else Shop.colors.muted2,
+            modifier = Modifier.size(11.dp),
+          )
+          Text(
+            daysText(days),
+            style = MaterialTheme.typography.labelSmall,
+            color = if (stale) tint else Shop.colors.muted,
+            fontWeight = if (stale) FontWeight.Bold else FontWeight.Normal,
+            maxLines = 1,
+          )
+        }
+      }
+    }
+
+    CornerButton(
+      icon = Icons.Filled.Close,
+      description = "حذف",
+      onClick = onDelete,
+      modifier = Modifier.align(Alignment.TopStart).padding(4.dp),
+    )
+    // در راست‌به‌چپ، `BottomEnd` همان کنجِ پایین-چپ است
+    CornerButton(
+      icon = Icons.Filled.Edit,
+      description = "ویرایش",
+      onClick = onEdit,
+      modifier = Modifier.align(Alignment.BottomEnd).padding(6.dp),
+    )
+  }
+}
+
+/** دکمهٔ ریزِ گوشهٔ کارت — همان `.debtor-card-close` و `.debtor-card-edit` */
+@Composable
+private fun CornerButton(
+  icon: androidx.compose.ui.graphics.vector.ImageVector,
+  description: String,
+  onClick: () -> Unit,
+  modifier: Modifier = Modifier,
+) {
+  Box(
+    modifier
+      .size(22.dp)
+      .clip(RoundedCornerShape(7.dp))
+      .background(Shop.colors.bg)
+      .border(1.dp, Shop.colors.border, RoundedCornerShape(7.dp))
+      .clickable(onClick = onClick),
+    contentAlignment = Alignment.Center,
+  ) {
+    Icon(icon, contentDescription = description, tint = Shop.colors.muted, modifier = Modifier.size(12.dp))
+  }
+}
+
 /** حسابِ یک نفر — مانده، دکمه‌ها، و همهٔ تراکنش‌هایش */
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun AccountView(
   account: DebtorEngine.Account,
@@ -545,40 +624,28 @@ private fun AccountView(
       }
       Spacer(Modifier.height(14.dp))
 
-      /*
-       *  یک عددِ اصلی، نه سه کارتِ رنگیِ رقیب.
-       *
-       *  «کل برد» و «کل رسید» هم‌اندازه‌ی «الباقی» بودند و چشم نمی‌دانست
-       *  کدام را بخواند؛ در حالی که تنها عددی که کارِ امروزِ دکاندار است،
-       *  باقی‌مانده است. اسم‌ها هم روشن شدند: «قرض گرفته» و «پرداخت
-       *  کرده».
-       */
-      Panel(Modifier.fillMaxWidth()) {
-        Text("باقی مانده", fontSize = 12.sp, color = Shop.colors.muted)
-        Spacer(Modifier.height(6.dp))
-        Row(verticalAlignment = Alignment.Bottom) {
-          Text(
-            if (account.balance == 0.0) "تسویه" else money(kotlin.math.abs(account.balance)),
-            fontSize = 26.sp,
-            fontWeight = FontWeight.Bold,
-            color = when {
-              account.balance > 0 -> Shop.colors.danger
-              else -> Shop.colors.success
-            },
-          )
-          if (account.balance != 0.0) {
-            Spacer(Modifier.width(4.dp))
-            Text("؋", fontSize = 15.sp, color = Shop.colors.muted)
-          }
-        }
-        Spacer(Modifier.height(2.dp))
-        Text(DebtorEngine.stateText(account.balance), fontSize = 11.sp, color = Shop.colors.muted2)
-        Spacer(Modifier.height(12.dp))
-        Row(Modifier.fillMaxWidth()) {
-          HeroStat("قرض گرفته", money(account.given), Shop.colors.muted, Modifier.weight(1f))
-          HeroDivider()
-          HeroStat("پرداخت کرده", money(account.received), Shop.colors.muted, Modifier.weight(1f))
-        }
+      // سه کارتِ بالای حساب — همان چیدمانِ وب: کل برد، کل رسید، الباقی
+      Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        AccountTile(
+          "کل برد", money(account.given), "؋",
+          Shop.colors.danger, Shop.colors.dangerTint, Modifier.weight(1f),
+        )
+        AccountTile(
+          "کل رسید", money(account.received), "؋",
+          Shop.colors.success, Shop.colors.successTint, Modifier.weight(1f),
+        )
+        AccountTile(
+          "الباقی",
+          if (account.balance == 0.0) "تسویه" else money(kotlin.math.abs(account.balance)),
+          if (account.balance == 0.0) "حساب صاف" else DebtorEngine.stateText(account.balance),
+          when {
+            account.balance > 0 -> Shop.colors.warning
+            account.balance < 0 -> Shop.colors.success
+            else -> Shop.colors.success
+          },
+          Shop.colors.surface,
+          Modifier.weight(1f),
+        )
       }
 
       Spacer(Modifier.height(18.dp))
@@ -600,70 +667,106 @@ private fun AccountView(
          */
         val isGive = tx.type == "give"
         val tint = if (isGive) Shop.colors.danger else Shop.colors.success
+        val wash = if (isGive) Shop.colors.dangerTint else Shop.colors.successTint
+        val kind = if (isGive) "برد" else "رسید"
 
-        /*
-         *  تایم‌لاین، نه فهرستِ کارت.
-         *
-         *  هر تراکنش یک نقطه روی یک خطِ عمودی است — همان شکلی که آدم
-         *  حسابِ یک نفر را در ذهنش می‌چیند: از بالا به پایین، جدیدترین
-         *  اول. آیکنِ حذف از کنارِ هر ردیف برداشته شد؛ نگه‌داشتنِ انگشت
-         *  روی ردیف همان کار را می‌کند بدونِ اینکه همیشه زیرِ دست باشد.
-         */
         Row(
           Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .combinedClickable(onClick = {}, onLongClick = { onDeleteTx(tx.id) })
-            .padding(vertical = 6.dp),
+            .clip(RoundedCornerShape(Radius.sm))
+            .background(wash)
+            .border(1.dp, tint.copy(alpha = 0.45f), RoundedCornerShape(Radius.sm))
+            .padding(12.dp),
           verticalAlignment = Alignment.CenterVertically,
         ) {
-          //  خطِ عمودی و نقطه‌ی رنگی
-          Box(Modifier.width(18.dp).height(46.dp), contentAlignment = Alignment.Center) {
-            Box(
-              Modifier
-                .width(1.dp)
-                .fillMaxHeight()
-                .background(Shop.colors.border.copy(alpha = Shop.colors.border.alpha * 0.7f))
-            )
-            Box(
-              Modifier
-                .size(9.dp)
-                .clip(RoundedCornerShape(5.dp))
-                .background(tint)
-            )
-          }
+          // نوارِ رنگیِ کنارِ کارت: پیش از خواندنِ هر کلمه‌ای معلوم است
+          // این ردیف برد بوده یا رسید
+          Box(
+            Modifier
+              .width(4.dp)
+              .height(38.dp)
+              .clip(RoundedCornerShape(2.dp))
+              .background(tint)
+          )
           Spacer(Modifier.width(10.dp))
+
           Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+              Box(
+                Modifier
+                  .clip(RoundedCornerShape(6.dp))
+                  .background(tint)
+                  .padding(horizontal = 8.dp, vertical = 2.dp),
+              ) {
+                Text(
+                  kind,
+                  style = MaterialTheme.typography.labelSmall,
+                  color = Color.White,
+                  fontWeight = FontWeight.Bold,
+                )
+              }
+              Spacer(Modifier.width(8.dp))
+              Text(
+                if (isGive) "جنس یا پول برد" else "پول رساند",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Shop.colors.text,
+              )
+            }
+            Spacer(Modifier.height(3.dp))
             Text(
-              if (isGive) "قرض گرفت" else "پرداخت کرد",
-              fontSize = 13.sp,
-              fontWeight = FontWeight.Medium,
-              color = Shop.colors.text,
-            )
-            Spacer(Modifier.height(2.dp))
-            Text(
-              "${formatDate(tx.date)}${if (tx.notes.isNotBlank()) " · ${tx.notes}" else ""}",
-              fontSize = 10.5.sp,
-              color = Shop.colors.muted2,
-              maxLines = 1,
-              overflow = TextOverflow.Ellipsis,
+              "${formatDate(tx.date)}${if (tx.notes.isNotBlank()) " — ${tx.notes}" else ""}",
+              style = MaterialTheme.typography.labelSmall,
+              color = Shop.colors.muted,
             )
           }
           Text(
             "${if (isGive) "+" else "−"}${money(tx.amount)}",
-            fontSize = 14.sp,
+            style = MaterialTheme.typography.titleSmall,
             color = tint,
             fontWeight = FontWeight.Bold,
           )
+          IconButton(onClick = { onDeleteTx(tx.id) }) {
+            Icon(Icons.Filled.DeleteOutline, contentDescription = "حذف تراکنش", tint = Shop.colors.muted2)
+          }
         }
+        Spacer(Modifier.height(8.dp))
       }
     }
   }
 
-  //  یک اقدامِ اصلی ته صفحه — همان کاری که آدم روی حسابِ یک قرض‌دار
-  //  می‌کند: پولی که داده را ثبت می‌کند
-  Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(12.dp)) {
-    GradientWideButton("ثبت پرداخت", onNewTx)
+  // نوارِ پایین برای ثبت تراکنش — همان نوارِ چسبیدهٔ نسخهٔ وب
+  Row(
+    Modifier
+      .align(Alignment.BottomCenter)
+      .fillMaxWidth()
+      .padding(12.dp)
+      .clip(RoundedCornerShape(Radius.md))
+      .background(Shop.colors.surface)
+      .border(1.dp, Shop.colors.primary.copy(alpha = 0.4f), RoundedCornerShape(Radius.md))
+      .clickable(onClick = onNewTx)
+      .padding(horizontal = 14.dp, vertical = 12.dp),
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(12.dp),
+  ) {
+    Box(
+      Modifier.size(38.dp).clip(RoundedCornerShape(19.dp)).background(Shop.colors.primary),
+      contentAlignment = Alignment.Center,
+    ) {
+      Icon(Icons.Filled.Add, contentDescription = null, tint = Color.White)
+    }
+    Column(Modifier.weight(1f)) {
+      Text(
+        "ثبت تراکنش جدید",
+        style = MaterialTheme.typography.titleSmall,
+        color = Shop.colors.text,
+        fontWeight = FontWeight.Bold,
+      )
+      Text(
+        "مبلغ را بنویسید و برد یا رسید را انتخاب کنید",
+        style = MaterialTheme.typography.labelSmall,
+        color = Shop.colors.muted,
+      )
+    }
   }
   }
 }
@@ -691,7 +794,7 @@ private fun DebtorDialog(
 
   Dialog(onDismissRequest = onDismiss) {
     DialogEntry {
-    Surface(color = Shop.colors.surface, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
+    Surface(color = Shop.colors.surfaceSolid, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
       Column(Modifier.padding(18.dp).verticalScroll(rememberScrollState())) {
         Text(
           if (form.editingId == null) "قرض‌دار تازه" else "ویرایش قرض‌دار",
@@ -741,7 +844,7 @@ private fun TransactionDialog(
 
   Dialog(onDismissRequest = onDismiss) {
     DialogEntry {
-    Surface(color = Shop.colors.surface, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
+    Surface(color = Shop.colors.surfaceSolid, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
       Column(Modifier.padding(18.dp).verticalScroll(rememberScrollState())) {
         Text(
           if (receiving) "ثبت رسید جدید" else "ثبت برد جدید",
@@ -810,7 +913,7 @@ private fun TransactionDialog(
 /**
  *  سه راهِ یادآوری: زنگ، پیامک، واتساپ.
  *
- *  متنِ آماده عمدی است — نوشتنِ «سلام، … ؋ طلب دارید» برای هر
+ *  متنِ آماده عمدی است — نوشتنِ «سلام، … افغانی طلب دارید» برای هر
  *  مشتری، همان کاری است که فروشنده از انجامش طفره می‌رود.
  */
 @Composable
@@ -820,7 +923,7 @@ private fun ReminderRow(name: String, phone: String, balance: Double) {
   if (clean.isBlank()) return
 
   val message = remember(name, balance) {
-    if (balance > 0) "سلام $name عزیز، یادآوری می‌کنم که ${money(balance)} ؋ از حساب شما باقی مانده. ممنون."
+    if (balance > 0) "سلام $name عزیز، یادآوری می‌کنم که ${money(balance)} افغانی از حساب شما باقی مانده. ممنون."
     else "سلام $name عزیز،"
   }
 
@@ -935,266 +1038,55 @@ private fun KindChoice(
   }
 }
 
-/* ==================== ردیف‌های تازه‌ی فهرست ==================== */
-
-/** کارتِ قهرمانِ بالای فهرست — جمعِ طلب و سه عددِ کنارش */
-@Composable
-private fun DebtorsHero(owed: Double, people: Int, late: Int, collected: Double) {
-  val colors = Shop.colors
-  Panel(Modifier.fillMaxWidth()) {
-    Text("جمع طلب از مشتریان", fontSize = 12.sp, color = colors.muted)
-    Spacer(Modifier.height(6.dp))
-    Row(verticalAlignment = Alignment.Bottom) {
-      Text(
-        money(owed),
-        fontSize = 26.sp,
-        fontWeight = FontWeight.Bold,
-        color = if (owed > 0) colors.danger else colors.success,
-      )
-      Spacer(Modifier.width(4.dp))
-      Text("؋", fontSize = 15.sp, color = colors.muted)
-    }
-    Spacer(Modifier.height(12.dp))
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-      HeroStat("قرض‌دار", plain(people), colors.text, Modifier.weight(1f))
-      HeroDivider()
-      HeroStat("وعده گذشته", plain(late), colors.danger, Modifier.weight(1f))
-      HeroDivider()
-      HeroStat("وصول این ماه", money(collected), colors.success, Modifier.weight(1f))
-    }
-  }
-}
-
-@Composable
-private fun HeroStat(label: String, value: String, tint: Color, modifier: Modifier = Modifier) {
-  Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-    Text(value, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = tint, maxLines = 1)
-    Spacer(Modifier.height(2.dp))
-    Text(label, fontSize = 10.sp, color = Shop.colors.muted2, maxLines = 1)
-  }
-}
-
-@Composable
-private fun HeroDivider() {
-  Box(
-    Modifier
-      .height(24.dp)
-      .width(1.dp)
-      .background(Shop.colors.border.copy(alpha = Shop.colors.border.alpha * 0.7f))
-  )
-}
-
-/** خطِ جداکننده‌ی بینِ ردیف‌های داخلِ یک پنل */
-@Composable
-private fun RowDivider() {
-  Box(
-    Modifier
-      .fillMaxWidth()
-      .height(1.dp)
-      .background(Shop.colors.border.copy(alpha = Shop.colors.border.alpha * 0.5f))
-  )
-}
 
 /**
- *  یک قرض‌دار، در یک ردیف.
+ *  سه عددِ بالای فهرستِ قرض‌داران.
  *
- *  ── چرا کارت رفت و ردیف آمد ───────────────────────────────────────
- *  کارتِ مربعی، عرضِ صفحه را به دو ستون می‌شکست و در هر کارت دو دکمه‌ی
- *  ریز — حذف و ویرایش — همیشه زیرِ انگشت بود؛ همان دو دکمه‌ای که اگر
- *  اشتباهی زده شوند، حسابِ یک نفر پاک می‌شود. حالا حذف با کشیدنِ ردیف
- *  است و پنج ثانیه فرصتِ واگرد دارد، و ویرایش داخلِ خودِ حساب.
- *  ──────────────────────────────────────────────────────────────────
- *
- *  رنگِ نوارِ کنارِ ردیف، حرفِ اصلی را می‌زند: قرمز یعنی از وعده گذشته،
- *  نارنجی یعنی نزدیک است، نعنایی یعنی منظم.
+ *  هیچ‌کدام بزرگ‌تر از دیگری نیست: هر سه یک ردیف‌اند با همان اندازه‌ی
+ *  متنِ صفحه، تا سربرگ جای فهرست را نگیرد.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DebtorLine(row: DebtorRow, onOpen: () -> Unit, onSwipedAway: () -> Unit) {
+private fun DebtorsSummary(people: Int, owed: Double, received: Double) {
   val colors = Shop.colors
-  val days = row.days ?: 0L
-  val tint = when {
-    days >= 30 -> colors.danger
-    days >= 14 -> colors.warning
-    else -> colors.success
-  }
-  val state = rememberSwipeToDismissBoxState(
-    confirmValueChange = { value ->
-      if (value == SwipeToDismissBoxValue.EndToStart) { onSwipedAway(); true } else false
-    },
-  )
-
-  SwipeToDismissBox(
-    state = state,
-    enableDismissFromStartToEnd = false,
-    enableDismissFromEndToStart = true,
-    backgroundContent = {
-      Box(
-        Modifier
-          .fillMaxSize()
-          .clip(RoundedCornerShape(14.dp))
-          .background(colors.danger.copy(alpha = 0.14f))
-          .padding(horizontal = 18.dp),
-        contentAlignment = Alignment.CenterStart,
-      ) {
-        Icon(Icons.Filled.Close, contentDescription = "حذف", tint = colors.danger, modifier = Modifier.size(18.dp))
-      }
-    },
-  ) {
-    Row(
-      Modifier
-        .fillMaxWidth()
-        .background(colors.surface.copy(alpha = 0f))
-        .clickable(onClick = onOpen)
-        .padding(vertical = 10.dp),
-      verticalAlignment = Alignment.CenterVertically,
-    ) {
-      //  نوارِ رنگیِ سمتِ راستِ ردیف — در راست‌به‌چپ، اولین فرزندِ Row
-      Box(Modifier.width(3.dp).height(38.dp).clip(RoundedCornerShape(2.dp)).background(tint))
-      Spacer(Modifier.width(10.dp))
-      LetterAvatar(row.debtor.name.ifBlank { "؟" }, 40.dp, 13.dp)
-      Spacer(Modifier.width(10.dp))
-      Column(Modifier.weight(1f)) {
-        Text(
-          row.debtor.name.ifBlank { "بی‌نام" },
-          fontSize = 14.sp,
-          fontWeight = FontWeight.Medium,
-          color = colors.text,
-          maxLines = 1,
-          overflow = TextOverflow.Ellipsis,
-        )
-        Spacer(Modifier.height(2.dp))
-        Text(
-          when {
-            row.days == null -> DebtorEngine.stateText(row.balance)
-            days >= 30 -> "${daysText(days)} از وعده گذشته"
-            else -> "${daysText(days)} است که مانده"
-          },
-          fontSize = 11.sp,
-          color = if (days >= 30) colors.danger else colors.muted2,
-          maxLines = 1,
-        )
-        if (row.given > 0) {
-          Spacer(Modifier.height(6.dp))
-          ProgressLine((row.received / row.given).toFloat().coerceIn(0f, 1f), tint)
-        }
-      }
-      Spacer(Modifier.width(8.dp))
-      Column(horizontalAlignment = Alignment.End) {
-        Text(
-          money(kotlin.math.abs(row.balance)),
-          fontSize = 16.sp,
-          fontWeight = FontWeight.Bold,
-          color = if (row.balance > 0) tint else colors.success,
-          maxLines = 1,
-        )
-        if (row.given > 0) {
-          Text("از ${money(row.given)}", fontSize = 10.sp, color = colors.muted2, maxLines = 1)
-        }
-      }
+  Panel(Modifier.fillMaxWidth()) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+      SummaryCell("تعداد قرض‌داران", plain(people), colors.text, Modifier.weight(1f))
+      SummaryDivider()
+      SummaryCell("جمع تمام قرض‌ها", money(owed), if (owed > 0) colors.danger else colors.success, Modifier.weight(1f))
+      SummaryDivider()
+      SummaryCell("رسیدهای همه", money(received), colors.success, Modifier.weight(1f))
     }
   }
 }
 
-/** نوارِ نسبتِ پرداخت‌شده — یک بار، هنگام آمدنِ ردیف */
 @Composable
-private fun ProgressLine(ratio: Float, tint: Color) {
-  var shown by remember { mutableStateOf(false) }
-  LaunchedEffect(Unit) { shown = true }
-  val width by animateFloatAsState(
-    targetValue = if (shown) ratio else 0f,
-    animationSpec = Springs.progress,
-    label = "paid",
-  )
-  Box(
-    Modifier
-      .fillMaxWidth()
-      .height(5.dp)
-      .clip(RoundedCornerShape(3.dp))
-      .background(Shop.colors.border.copy(alpha = Shop.colors.border.alpha * 0.5f))
-  ) {
-    Box(
-      Modifier
-        .fillMaxWidth(width)
-        .height(5.dp)
-        .clip(RoundedCornerShape(3.dp))
-        .background(Brush.horizontalGradient(listOf(tint, Shop.colors.accent)))
+private fun SummaryCell(label: String, value: String, tint: Color, modifier: Modifier = Modifier) {
+  Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+    Text(
+      value,
+      style = MaterialTheme.typography.titleSmall,
+      color = tint,
+      fontWeight = FontWeight.Bold,
+      maxLines = 1,
+      overflow = TextOverflow.Ellipsis,
+    )
+    Spacer(Modifier.height(2.dp))
+    Text(
+      label,
+      style = MaterialTheme.typography.labelSmall,
+      color = Shop.colors.muted2,
+      maxLines = 1,
+      textAlign = TextAlign.Center,
     )
   }
 }
 
-/** حساب‌های صاف — جمع‌شده، تا هم‌وزنِ بدهکارها نباشند */
 @Composable
-private fun SettledSection(
-  settled: List<DebtorRow>,
-  open: Boolean,
-  onToggle: () -> Unit,
-  onOpen: (String) -> Unit,
-) {
-  val colors = Shop.colors
-  val turn by animateFloatAsState(
-    targetValue = if (open) 180f else 0f,
-    animationSpec = Springs.press,
-    label = "chevron",
-  )
-  Column(Modifier.fillMaxWidth().animateContentSize(Springs.size)) {
-    Row(
-      Modifier.fillMaxWidth().clickable(onClick = onToggle).padding(vertical = 12.dp),
-      verticalAlignment = Alignment.CenterVertically,
-    ) {
-      Text(
-        "حساب‌های صاف (${plain(settled.size)}) — ${settled.take(2).joinToString("، ") { it.debtor.name.ifBlank { "بی‌نام" } }}",
-        fontSize = 12.sp,
-        color = colors.muted2,
-        modifier = Modifier.weight(1f),
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-      )
-      Icon(
-        Icons.Filled.ExpandMore,
-        contentDescription = null,
-        tint = colors.muted2,
-        modifier = Modifier.size(18.dp).graphicsLayer { rotationZ = turn },
-      )
-    }
-    if (open) {
-      settled.forEach { row ->
-        Row(
-          Modifier.fillMaxWidth().clickable { onOpen(row.debtor.id) }.padding(vertical = 9.dp),
-          verticalAlignment = Alignment.CenterVertically,
-        ) {
-          Text(
-            row.debtor.name.ifBlank { "بی‌نام" },
-            fontSize = 13.sp,
-            color = colors.text,
-            modifier = Modifier.weight(1f),
-            maxLines = 1,
-          )
-          Text(DebtorEngine.stateText(row.balance), fontSize = 11.sp, color = colors.success)
-        }
-      }
-    }
-  }
-}
-
-/** دکمه‌ی گرادینتیِ تمام‌عرضِ ته صفحه */
-@Composable
-private fun GradientWideButton(text: String, onClick: () -> Unit) {
-  val colors = Shop.colors
-  var pressed by remember { mutableStateOf(false) }
+private fun SummaryDivider() {
   Box(
     Modifier
-      .fillMaxWidth()
-      .height(52.dp)
-      .pressScale(pressed)
-      .clip(RoundedCornerShape(Radius.sm))
-      .background(Brush.linearGradient(listOf(colors.primary, colors.accent)))
-      .clickable { pressed = true; onClick() },
-    contentAlignment = Alignment.Center,
-  ) {
-    Text(text, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White)
-  }
-  LaunchedEffect(pressed) {
-    if (pressed) { kotlinx.coroutines.delay(120); pressed = false }
-  }
+      .height(22.dp)
+      .width(1.dp)
+      .background(Shop.colors.border)
+  )
 }

@@ -1,6 +1,6 @@
 package ir.vil3ntec.tohid.data
 
-import ir.vil3ntec.tohid.moneyPlain
+import ir.vil3ntec.tohid.money
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToLong
@@ -196,7 +196,7 @@ object SalesEngine {
     if (available <= 0) {
       return "«${product.name}» در برنامه موجودی ندارد. اگر جنس در دکان هست، اول ورودی انبار را ثبت کنید."
     }
-    return "«${product.name}»: ${moneyPlain(available)}$u موجود است، شما ${moneyPlain(wanted)}$u خواستید."
+    return "«${product.name}»: ${money(available)}$u موجود است، شما ${money(wanted)}$u خواستید."
   }
 
   fun cartTotal(d: ShopData, cart: List<CartLine>): Double =
@@ -374,7 +374,7 @@ object SalesEngine {
       type = "sale",
       date = today,
       refId = saleId,
-      notes = "ثبت فروش فاکتور #$invoiceNumber به مبلغ ${moneyPlain(t.finalTotal)} افغانی",
+      notes = "ثبت فروش فاکتور #$invoiceNumber به مبلغ ${money(t.finalTotal)} افغانی",
       createdAt = now,
     )
 
@@ -570,7 +570,7 @@ object SalesEngine {
           type = "return",
           date = today,
           refId = saleId,
-          notes = "مرجوعی به مبلغ ${moneyPlain(totalAmount)} افغانی — فاکتور #${sale.invoiceNumber ?: 0}",
+          notes = "مرجوعی به مبلغ ${money(totalAmount)} افغانی — فاکتور #${sale.invoiceNumber ?: 0}",
           createdAt = now,
         ),
       ),
