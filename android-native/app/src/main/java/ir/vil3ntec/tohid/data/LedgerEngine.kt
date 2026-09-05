@@ -1,6 +1,6 @@
 package ir.vil3ntec.tohid.data
 
-import ir.vil3ntec.tohid.money
+import ir.vil3ntec.tohid.moneyPlain
 
 /**
  *  مصارف، خرید و تأمین‌کننده‌ها.
@@ -207,7 +207,7 @@ object LedgerEngine {
         type = "price_change",
         date = today,
         refId = product.id,
-        notes = "تغییر قیمت خرید از ${money(product.purchasePrice)} به ${money(draft.purchasePrice)} افغانی",
+        notes = "تغییر قیمت خرید از ${moneyPlain(product.purchasePrice)} به ${moneyPlain(draft.purchasePrice)} افغانی",
         createdAt = now,
       )
       products = products.map {
@@ -220,7 +220,7 @@ object LedgerEngine {
       type = "purchase",
       date = date,
       refId = purchaseId,
-      notes = "ثبت خرید ${money(draft.quantity)} $unit از «${supplier.name}» به مبلغ ${money(totalAmount)} افغانی",
+      notes = "ثبت خرید ${moneyPlain(draft.quantity)} $unit از «${supplier.name}» به مبلغ ${moneyPlain(totalAmount)} افغانی",
       createdAt = now,
     )
 
@@ -303,7 +303,7 @@ object LedgerEngine {
           type = "supplier_payment",
           date = when_,
           refId = id,
-          notes = "پرداخت به «${supplier.name}» به مبلغ ${money(amount)} افغانی",
+          notes = "پرداخت به «${supplier.name}» به مبلغ ${moneyPlain(amount)} افغانی",
           createdAt = now,
         ),
       ),
