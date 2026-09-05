@@ -467,6 +467,56 @@
   .dash-action-btn.tone-warning{background:linear-gradient(135deg,#F2A93B,#D07E10); box-shadow:0 6px 16px rgba(230,150,40,.30);}
   .dash-action-btn.tone-brand{background:linear-gradient(135deg, var(--primary), var(--primary-dark) 60%, var(--accent)); box-shadow:0 6px 16px rgba(124,92,255,.30);}
 
+  /* ---------- کارمندان دکان ---------- */
+  .team-row{
+    display:flex; align-items:center; gap:10px;
+    padding:11px 0;
+    border-bottom:1px solid var(--border);
+  }
+  .team-row:last-child{border-bottom:none;}
+  .team-ava{
+    width:36px; height:36px; flex:0 0 auto; border-radius:50%;
+    background:var(--primary-tint, rgba(124,92,255,.14)); color:var(--primary);
+    display:flex; align-items:center; justify-content:center;
+    font-size:14px; font-weight:800;
+  }
+  .team-txt{flex:1; min-width:0;}
+  .team-txt b{display:block; font-size:13.5px; font-weight:700; color:var(--text);}
+  .team-txt i{
+    display:block; font-style:normal; font-size:11.5px; color:var(--muted); margin-top:2px;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .team-tag{
+    flex:0 0 auto; padding:3px 9px; border-radius:20px;
+    font-size:10.5px; font-weight:700;
+    background:var(--surface-2); color:var(--muted);
+  }
+  .team-tag.owner{background:var(--success-tint); color:var(--success);}
+  .team-tag.gone{background:var(--danger-tint); color:var(--danger);}
+  .team-empty{font-size:12.5px; color:var(--muted); padding:10px 0;}
+
+  /* ---------- حساب من ---------- */
+  .prof-hero{
+    display:flex; align-items:center; gap:14px;
+    margin-bottom:16px;
+  }
+  .prof-avatar{
+    width:72px; height:72px; flex:0 0 auto;
+    border-radius:50%;
+    background:linear-gradient(135deg, var(--primary), var(--accent));
+    color:#fff; font-size:28px; font-weight:800;
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:var(--shadow-md);
+  }
+  .prof-hero-txt{min-width:0;}
+  .prof-hero-txt b{display:block; font-size:19px; font-weight:800; color:var(--text);}
+  .prof-hero-txt i{
+    display:block; font-style:normal; font-size:12.5px;
+    color:var(--muted); margin-top:3px;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .form-input:disabled{ opacity:.7; cursor:not-allowed; }
+
   /* وضعیت دکان: ردیف‌های فشرده با جداکننده‌ی نازک */
   .dash-status{margin-bottom:16px;}
   .dash-status-title{font-size:13px; font-weight:700; color:var(--text); margin-bottom:4px;}
@@ -707,6 +757,9 @@
     gap:10px;
   }
   .fab-wrap .fab-menu{ margin-inline-start:10px; }
+  /* صفحه‌هایی که «افزودن» رویشان معنی ندارد — دکمه‌ی شناور آنجا فقط
+     جلوی محتوا را می‌گیرد، چنان‌که روی «ساخت کد» در کارمندان می‌افتاد */
+  body.no-fab .fab-wrap{ display:none; }
   /* وقتی پنجره‌ای باز است، از سر راه کنار می‌روند */
   .fab-wrap, .sale-fab-wrap{
     transition:bottom .22s cubic-bezier(.22,1,.36,1),
@@ -3447,7 +3500,7 @@
         <button class="icon-btn" aria-label="تنظیمات" data-page="settings">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         </button>
-        <div class="avatar" id="user-avatar">ف</div>
+        <div class="avatar" id="user-avatar" data-page="profile" role="button" tabindex="0" title="حساب من">ف</div>
       </div>
     </header>
 
@@ -4439,6 +4492,26 @@
           </div>
         </div>
         <div class="more-grid" id="more-nav-list">
+          <a class="more-card" data-page="profile" href="#profile">
+            <span class="more-card-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M4.8 20v-1.2A4.6 4.6 0 0 1 9.4 14.2h5.2a4.6 4.6 0 0 1 4.6 4.6V20"/></svg></span>
+            <span class="more-card-txt">
+              <b>حساب من</b>
+              <i>نام، ایمیل، عضویت و اشتراک</i>
+            </span>
+            <span class="more-card-go">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
+            </span>
+          </a>
+          <a class="more-card" data-page="team" href="#team">
+            <span class="more-card-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+            <span class="more-card-txt">
+              <b>کارمندان دکان</b>
+              <i>کد شاگرد بسازید و دسترسی‌ها را ببندید</i>
+            </span>
+            <span class="more-card-go">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
+            </span>
+          </a>
           <a class="more-card" data-page="warehouse" href="#warehouse">
             <span class="more-card-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8L12 3 3 8v8l9 5 9-5V8z"/><path d="M3 8l9 5 9-5"/><path d="M12 13v8"/></svg></span>
             <span class="more-card-txt">
@@ -4523,6 +4596,156 @@
       </section>
 
       <!-- SETTINGS -->
+      <!-- ==========================================================
+           حساب من — کیستم، از کِی، و تا کِی.
+
+           تا امروز کلیدِ «حساب» در سربرگ، برای کسی که وارد بود پنجره‌ی
+           اشتراک را باز می‌کرد. یعنی هیچ‌جای سایت نمی‌شد دید نامِ حساب
+           چیست، با کدام ایمیل وارد شده‌ای، شماره‌ات ثبت شده یا نه، و از
+           کِی عضوی — و نام اگر غلط بود، غلط می‌ماند.
+
+           سه قاعده، همان‌های Profile.kt:
+             • نام عوض می‌شود — اسمِ آدم شناسه‌ی حساب نیست
+             • ایمیل قفل است — راهِ ورود و بازیابیِ رمز است
+             • شماره یک بار ثبت می‌شود و بعد قفل (سرور هم همین را می‌سنجد)
+
+           بی‌اینترنت هم باز می‌شود: هرچه نشان می‌دهد از حافظه می‌آید و
+           اگر آنتن بود همان لحظه از سرور تازه می‌شود.
+           ========================================================== -->
+      <section class="page" id="page-profile">
+        <a class="account-back" href="#more" data-page="more">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>
+          بازگشت به بیشتر
+        </a>
+
+        <div class="prof-hero">
+          <div class="prof-avatar" id="prof-avatar">؟</div>
+          <div class="prof-hero-txt">
+            <b id="prof-name-big">حساب من</b>
+            <i id="prof-contact">—</i>
+          </div>
+        </div>
+
+        <div class="panel" id="prof-guest" hidden>
+          <div class="panel-head"><h2>هنوز وارد نشده‌اید</h2></div>
+          <p class="settings-hint">برنامه بدون حساب هم کامل کار می‌کند. حساب برای همگام‌سازی بین گوشی‌ها و اشتراک لازم است — و همان حسابی است که در برنامه‌ی اندروید دارید.</p>
+          <button type="button" class="btn btn-primary" id="prof-login-btn" style="margin-top:12px;">ورود یا ثبت‌نام</button>
+        </div>
+
+        <div id="prof-in" hidden>
+          <div class="panel">
+            <div class="panel-head"><h2>مشخصات حساب</h2></div>
+            <div class="form-group">
+              <label for="prof-name">نام و نام خانوادگی</label>
+              <input class="form-input" id="prof-name" type="text" autocomplete="name" placeholder="نامِ شما">
+            </div>
+            <div class="form-group">
+              <label for="prof-email">ایمیل</label>
+              <input class="form-input" id="prof-email" type="email" disabled>
+              <p class="settings-hint" style="margin-top:6px;">ایمیل عوض نمی‌شود — راهِ ورود و بازیابیِ رمز است.</p>
+            </div>
+            <div class="form-group">
+              <label for="prof-phone">شماره موبایل</label>
+              <input class="form-input" id="prof-phone" type="tel" inputmode="tel" placeholder="0790000000">
+              <p class="settings-hint" id="prof-phone-hint" style="margin-top:6px;">یک بار ثبت می‌شود و بعد قفل می‌ماند.</p>
+            </div>
+            <p class="settings-hint" id="prof-save-msg" hidden></p>
+            <button type="button" class="btn btn-primary" id="prof-save">ذخیره تغییرات</button>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head"><h2>عضویت و اشتراک</h2></div>
+            <div class="dash-status" style="margin-bottom:0;">
+              <div id="prof-rows"></div>
+            </div>
+            <button type="button" class="btn btn-secondary" id="prof-vip" style="margin-top:12px;">دیدن قیمت‌ها</button>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head"><h2>همگام‌سازی</h2></div>
+            <p class="settings-hint" id="prof-sync-when">هنوز همگام نشده است.</p>
+            <button type="button" class="btn btn-secondary" id="prof-sync" style="margin-top:12px;">همگام‌سازی حالا</button>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head"><h2>خروج از حساب</h2></div>
+            <p class="settings-hint">اطلاعاتِ روی همین دستگاه پاک نمی‌شود؛ فقط دسترسیِ حساب بسته می‌شود.</p>
+            <button type="button" class="btn btn-danger" id="prof-logout" style="margin-top:12px;">خروج از حساب</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==========================================================
+           کارمندان دکان — همان «چند کاربر روی یک دکان» که در صفحه‌ی
+           اشتراک فروخته می‌شود.
+
+           سرور از اول همه‌ی کارها را می‌توانست — ساختنِ کد، فهرستِ
+           کارمندان، برداشتنشان — ولی هیچ‌جای سایت صدایشان نمی‌زد.
+           یعنی قابلیتی که پولش گرفته می‌شد، روی وب در عمل نبود.
+
+           کارِ صاحبِ دکان اینجا سه چیز است: کدی بسازد، به شاگردش بدهد،
+           و هر وقت خواست دسترسی‌اش را ببندد. بقیه‌اش — نقش‌ها و
+           اجازه‌ها — کارِ سرور است.
+           ========================================================== -->
+      <section class="page" id="page-team">
+        <a class="account-back" href="#more" data-page="more">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>
+          بازگشت به بیشتر
+        </a>
+        <div class="page-toolbar">
+          <div class="page-title-block">
+            <h2>کارمندان دکان</h2>
+            <p>کد بسازید، به شاگردتان بدهید، و هر وقت خواستید ببندید</p>
+          </div>
+        </div>
+
+        <div class="panel" id="team-gate" hidden>
+          <div class="panel-head"><h2 id="team-gate-title">وارد نشده‌اید</h2></div>
+          <p class="settings-hint" id="team-gate-note">برای مدیریت کارمندان باید وارد حساب شوید و دکان داشته باشید.</p>
+          <button type="button" class="btn btn-primary" id="team-gate-btn" style="margin-top:12px;">ورود یا ثبت‌نام</button>
+        </div>
+
+        <div id="team-in" hidden>
+          <!-- کدِ تازه فقط همین یک بار دیده می‌شود، پس تا بسته نشده می‌ماند -->
+          <div class="panel" id="team-new-code" hidden>
+            <div class="panel-head"><h2>کد تازه ساخته شد</h2></div>
+            <p class="settings-hint">این کد <b>فقط همین یک بار</b> دیده می‌شود. همین حالا به شاگردتان بدهید.</p>
+            <div class="settings-key" style="margin-top:10px;">
+              <code id="team-new-code-value" dir="ltr">—</code>
+              <button type="button" class="btn btn-secondary btn-sm" id="team-copy">کپی</button>
+            </div>
+            <button type="button" class="btn btn-secondary" id="team-new-code-close" style="margin-top:12px;">فهمیدم، ببند</button>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <h2>کارمندان</h2>
+              <span class="settings-hint" id="team-count">—</span>
+            </div>
+            <div id="team-members"></div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head"><h2>کد شاگرد تازه</h2></div>
+            <p class="settings-hint">شاگرد این کد را در صفحه‌ی ورود می‌زند و روی همین دکان می‌آید.</p>
+            <div class="form-group" style="margin-top:12px;">
+              <label for="team-role">نقش</label>
+              <select class="form-input" id="team-role">
+                <option value="staff">شاگرد — فروش و قرض‌داران</option>
+                <option value="manager">مدیر — همه‌چیز به جز حساب دکان</option>
+              </select>
+            </div>
+            <p class="settings-hint" id="team-make-msg" hidden></p>
+            <button type="button" class="btn btn-primary" id="team-make">ساخت کد</button>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head"><h2>کدهای ساخته‌شده</h2></div>
+            <div id="team-codes"></div>
+          </div>
+        </div>
+      </section>
+
       <section class="page" id="page-settings">
         <a class="account-back" href="#more" data-page="more">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>
@@ -11065,10 +11288,13 @@
     const lic = window.TohidLicense;
     const inAccount = !!(lic && lic.isLoggedIn && lic.isLoggedIn());
     /* وارد نشده‌اید: همان صفحه‌ی کاملِ «خوش آمدید» باز شود، نه پنجره‌ی
-       کوچکِ اشتراک. آن پنجره فقط برای مدیریت حسابِ واردشده است. */
+       کوچکِ اشتراک. */
     if(!inAccount){ openAuthScreen(); return; }
-    if(lic && lic.open) lic.open();
-    else goTo('settings');
+    /* وارد شده‌اید: «حساب من» — نه پنجره‌ی اشتراک. کسی که سال‌ها وارد
+       بوده باید بتواند ببیند نامش چیست و با کدام ایمیل آمده، همان‌طور
+       که در برنامه‌ی نیتیو می‌بیند. قیمت‌ها از داخل همان صفحه یک کلیک
+       فاصله دارند. */
+    goTo('profile');
   });
   window.addEventListener('load', ()=>{
     refreshHeaderAuth();
@@ -11495,7 +11721,7 @@
     }
   });
 
-  const EXTRA_PAGES = ['debtor-account', 'quick-sale', 'supplier-account', 'receipts'];
+  const EXTRA_PAGES = ['debtor-account', 'quick-sale', 'supplier-account', 'receipts', 'profile', 'team'];
 
   /**
    *  چراغِ نوارِ پایین را می‌برد روی تبِ فعال.
@@ -11519,6 +11745,312 @@
   }
   // اگر پهنای صفحه عوض شد، چراغ سرِ جایش برگردد
   window.addEventListener('resize', moveNavLamp);
+
+
+  /* ==========================================================
+     حساب من — همان چیزی که ProfileScreen در نیتیو نشان می‌دهد.
+
+     اول از حافظه پر می‌شود تا بی‌اینترنت هم چیزی برای دیدن باشد،
+     بعد اگر آنتن بود از `/me` تازه می‌شود.
+     ========================================================== */
+  const PROF = {};
+  function profEl(id){ return PROF[id] || (PROF[id] = document.getElementById(id)); }
+
+  /** آنچه بی‌اینترنت هم می‌دانیم */
+  function profLocal(){
+    const lic = window.TohidLicense;
+    const sh  = window.TohidShop;
+    return {
+      loggedIn: !!(lic && lic.isLoggedIn && lic.isLoggedIn()),
+      label: (lic && lic.userLabel && lic.userLabel()) || '',
+      shop: (sh && sh.state && sh.state.shop) || null,
+      lastSyncAt: (sh && sh.state && sh.state.lastSyncAt) || 0,
+    };
+  }
+
+  function profRow(label, value, color){
+    return `<div class="dash-status-row"><span class="lbl">${escapeHtml(label)}</span>`
+         + `<span class="val" style="color:${color || 'var(--text)'};">${escapeHtml(value)}</span></div>`;
+  }
+
+  /** تاریخِ خوانا از یک ISO یا میلی‌ثانیه؛ خالی یعنی «—» */
+  function profWhen(v){
+    if(!v) return '—';
+    try{ return new Date(v).toLocaleDateString('fa-IR-u-nu-latn', {year:'numeric', month:'2-digit', day:'2-digit'}); }
+    catch{ return '—'; }
+  }
+
+  function profPaint(me){
+    const local = profLocal();
+    const inAcc = local.loggedIn;
+    profEl('prof-guest').hidden = inAcc;
+    profEl('prof-in').hidden = !inAcc;
+
+    const user = (me && me.user) || {};
+    const name = user.name || local.label || 'حساب من';
+    profEl('prof-name-big').textContent = name;
+    profEl('prof-avatar').textContent = (name.trim()[0] || '؟');
+    profEl('prof-contact').textContent = inAcc
+      ? (user.email || user.phone || local.label || '—')
+      : 'بدون حساب — همه‌چیز روی همین دستگاه';
+    if(!inAcc) return;
+
+    profEl('prof-name').value  = user.name || '';
+    profEl('prof-email').value = user.email || '';
+    const phoneEl = profEl('prof-phone');
+    phoneEl.value = user.phone || '';
+    //  شماره‌ی ثبت‌شده قفل است — سرور هم همین را جدا می‌سنجد،
+    //  این فقط جلوی وارد کردنِ بی‌فایده را می‌گیرد
+    phoneEl.disabled = !!user.phone;
+    profEl('prof-phone-hint').textContent = user.phone
+      ? 'شماره ثبت شده و عوض نمی‌شود — برای تغییر با پشتیبانی تماس بگیرید.'
+      : 'یک بار ثبت می‌شود و بعد قفل می‌ماند.';
+
+    const shop = (me && me.shop) || local.shop || null;
+    const sub  = me && me.entitlement && me.entitlement.subscription;
+    const tri  = me && me.entitlement && me.entitlement.trial;
+    const rows = [
+      ['دکان', shop ? (shop.name || '—') : 'دکانی ساخته نشده', shop ? 'var(--text)' : 'var(--muted)'],
+      ['نقشِ شما', shop && shop.isOwner ? 'صاحب دکان' : (shop && shop.role ? shop.role : '—'), 'var(--text)'],
+      ['عضو از', profWhen(user.createdAt), 'var(--text)'],
+    ];
+    if(sub && sub.active){
+      rows.push(['اشتراک', sub.plan || 'فعال', 'var(--success)']);
+      rows.push(['تا تاریخ', profWhen(sub.endsAt), 'var(--text)']);
+    } else if(tri && tri.active){
+      rows.push(['دوره‌ی آزمایشی', 'فعال', 'var(--warning)']);
+      rows.push(['تا تاریخ', profWhen(tri.endsAt), 'var(--text)']);
+    } else {
+      rows.push(['اشتراک', 'بدون اشتراک', 'var(--muted)']);
+    }
+    profEl('prof-rows').innerHTML = rows.map(r=> profRow(r[0], r[1], r[2])).join('');
+
+    profEl('prof-sync-when').textContent = local.lastSyncAt
+      ? ('آخرین همگام‌سازی: ' + new Date(local.lastSyncAt).toLocaleString('fa-IR-u-nu-latn'))
+      : 'هنوز همگام نشده است.';
+  }
+
+  /** تازه کردن از سرور — بی‌صدا شکست می‌خورد چون صفحه از قبل پر است */
+  async function profRefresh(){
+    profPaint(null);
+    const sh = window.TohidShop;
+    if(!sh || !profLocal().loggedIn) return;
+    try{
+      const me = await sh.apiAuth('/api/v1/me');
+      profPaint(me);
+    }catch{ /* بی‌اینترنت: همان چیزی که از حافظه آمد می‌ماند */ }
+  }
+
+  function profMsg(text, bad){
+    const el = profEl('prof-save-msg');
+    el.hidden = !text;
+    el.textContent = text || '';
+    el.style.color = bad ? 'var(--danger)' : 'var(--success)';
+  }
+
+  function wireProfile(){
+    if(!document.getElementById('page-profile')) return;
+
+    profEl('prof-login-btn').addEventListener('click', ()=> openAuthScreen());
+    profEl('prof-vip').addEventListener('click', ()=>{
+      const lic = window.TohidLicense;
+      if(lic && lic.open) lic.open();
+    });
+
+    profEl('prof-save').addEventListener('click', async (e)=>{
+      const btn = e.currentTarget;
+      const name  = profEl('prof-name').value.trim();
+      const phone = profEl('prof-phone').value.trim();
+      if(!name){ profMsg('نام نمی‌تواند خالی باشد.', true); return; }
+      btn.disabled = true; profMsg('');
+      try{
+        const body = { name };
+        if(phone && !profEl('prof-phone').disabled) body.phone = phone;
+        await window.TohidShop.apiAuth('/api/v1/me', { method:'PUT', body });
+        profMsg('ذخیره شد.');
+        await profRefresh();
+        refreshHeaderAuth();
+      }catch(err){
+        //  پیامِ خودِ سرور روشن‌تر از هر پیامِ عمومی است
+        profMsg((err && err.message) || 'ذخیره نشد — اتصال را بررسی کنید.', true);
+      }finally{ btn.disabled = false; }
+    });
+
+    profEl('prof-sync').addEventListener('click', async (e)=>{
+      const btn = e.currentTarget;
+      btn.disabled = true;
+      const was = btn.textContent;
+      btn.textContent = 'در حال همگام‌سازی…';
+      try{ await window.TohidShop.sync('manual'); await profRefresh(); }
+      catch{ showToast('همگام‌سازی نشد — اتصال را بررسی کنید.', 'error'); }
+      finally{ btn.disabled = false; btn.textContent = was; }
+    });
+
+    profEl('prof-logout').addEventListener('click', async ()=>{
+      if(!confirm('از حساب خارج می‌شوید؟ اطلاعاتِ روی همین دستگاه پاک نمی‌شود.')) return;
+      try{ await window.TohidLicense.logout(); }catch{}
+      refreshHeaderAuth();
+      profRefresh();
+      goTo('dashboard');
+    });
+  }
+
+
+  /* ==========================================================
+     کارمندان دکان — همان کاری که TeamScreen در نیتیو می‌کند.
+
+     هر سنجشی که مهم است سمتِ سرور انجام می‌شود: «چند کاربر روی یک
+     دکان» یک قابلیتِ اشتراکی است و سرور با `requireFeature` جلویش را
+     می‌گیرد، نه پنهان‌کردنِ دکمه در این صفحه. اینجا فقط پیامِ سرور
+     روشن نشان داده می‌شود.
+     ========================================================== */
+  const TEAM = {};
+  function teamEl(id){ return TEAM[id] || (TEAM[id] = document.getElementById(id)); }
+
+  const TEAM_ROLES = { owner:'صاحب دکان', manager:'مدیر', staff:'شاگرد' };
+
+  function teamGate(title, note, btn){
+    teamEl('team-gate').hidden = false;
+    teamEl('team-in').hidden = true;
+    teamEl('team-gate-title').textContent = title;
+    teamEl('team-gate-note').textContent = note;
+    teamEl('team-gate-btn').hidden = !btn;
+    if(btn) teamEl('team-gate-btn').textContent = btn;
+  }
+
+  function teamPaintMembers(data){
+    const list = (data && data.members) || [];
+    const live = list.filter(m=> m.status !== 'removed');
+    teamEl('team-count').textContent = data && data.maxMembers
+      ? `${live.length} از ${data.maxMembers} نفر`
+      : `${live.length} نفر`;
+    if(!live.length){
+      teamEl('team-members').innerHTML = '<p class="team-empty">هنوز کسی به دکان نپیوسته است.</p>';
+      return;
+    }
+    teamEl('team-members').innerHTML = live.map(m=>{
+      const name = m.name || m.email || m.phone || 'بی‌نام';
+      const role = TEAM_ROLES[m.role] || m.role;
+      const owner = m.role === 'owner';
+      //  صاحب دکان را نمی‌شود برداشت — سرور هم همین را می‌گوید
+      const kill = owner ? '' :
+        `<button type="button" class="icon-btn-sm danger" data-team-remove="${escapeHtml(m.id)}" title="بستن دسترسی" aria-label="بستن دسترسی">`
+        + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>';
+      return `<div class="team-row">
+        <span class="team-ava">${escapeHtml(name.trim()[0] || '؟')}</span>
+        <span class="team-txt"><b>${escapeHtml(name)}</b><i>${escapeHtml(m.email || m.phone || '—')}</i></span>
+        <span class="team-tag${owner ? ' owner' : ''}">${escapeHtml(role)}</span>
+        ${kill}
+      </div>`;
+    }).join('');
+
+    teamEl('team-members').querySelectorAll('[data-team-remove]').forEach(b=>{
+      b.addEventListener('click', async ()=>{
+        if(!confirm('دسترسیِ این نفر به دکان بسته شود؟')) return;
+        try{
+          await window.TohidShop.apiAuth('/api/v1/shop/members/' + b.dataset.teamRemove, { method:'DELETE' });
+          showToast('دسترسی بسته شد.');
+          teamRefresh();
+        }catch(err){ showToast((err && err.message) || 'نشد — اتصال را بررسی کنید.', 'error'); }
+      });
+    });
+  }
+
+  function teamPaintCodes(data){
+    const codes = (data && data.codes) || [];
+    const open = codes.filter(c=> c.status === 'active');
+    if(!open.length){
+      teamEl('team-codes').innerHTML = '<p class="team-empty">کدِ بازی نیست.</p>';
+      return;
+    }
+    teamEl('team-codes').innerHTML = open.map(c=>{
+      const used = `${c.usedCount || 0}${c.maxUses ? ' از ' + c.maxUses : ''} بار`;
+      return `<div class="team-row">
+        <span class="team-txt"><b dir="ltr">${escapeHtml(c.hint || '—')}</b><i>${escapeHtml(TEAM_ROLES[c.role] || c.role)} · ${escapeHtml(used)}</i></span>
+        <button type="button" class="icon-btn-sm danger" data-team-revoke="${escapeHtml(c.id)}" title="باطل کردن" aria-label="باطل کردن">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>`;
+    }).join('');
+    teamEl('team-codes').querySelectorAll('[data-team-revoke]').forEach(b=>{
+      b.addEventListener('click', async ()=>{
+        if(!confirm('این کد باطل شود؟ کسانی که قبلاً با آن آمده‌اند می‌مانند.')) return;
+        try{
+          await window.TohidShop.apiAuth('/api/v1/shop/staff-codes/' + b.dataset.teamRevoke, { method:'DELETE' });
+          showToast('کد باطل شد.');
+          teamRefresh();
+        }catch(err){ showToast((err && err.message) || 'نشد — اتصال را بررسی کنید.', 'error'); }
+      });
+    });
+  }
+
+  async function teamRefresh(){
+    const lic = window.TohidLicense;
+    const sh  = window.TohidShop;
+    if(!lic || !lic.isLoggedIn || !lic.isLoggedIn()){
+      teamGate('وارد نشده‌اید', 'برای مدیریت کارمندان باید وارد حساب شوید و دکان داشته باشید.', 'ورود یا ثبت‌نام');
+      return;
+    }
+    if(!sh || !sh.state || !sh.state.shop){
+      teamGate('هنوز دکانی نساخته‌اید', 'کارمندان روی یک دکان تعریف می‌شوند. اول از «حساب من» دکان بسازید.', 'رفتن به حساب من');
+      return;
+    }
+    teamEl('team-gate').hidden = true;
+    teamEl('team-in').hidden = false;
+    try{
+      teamPaintMembers(await sh.apiAuth('/api/v1/shop/members'));
+    }catch(err){
+      teamEl('team-members').innerHTML =
+        `<p class="team-empty">${escapeHtml((err && err.message) || 'فهرست نیامد — اتصال را بررسی کنید.')}</p>`;
+    }
+    try{
+      teamPaintCodes(await sh.apiAuth('/api/v1/shop/staff-codes'));
+    }catch{
+      teamEl('team-codes').innerHTML = '<p class="team-empty">فهرستِ کدها نیامد.</p>';
+    }
+  }
+
+  function wireTeam(){
+    if(!document.getElementById('page-team')) return;
+
+    teamEl('team-gate-btn').addEventListener('click', ()=>{
+      const lic = window.TohidLicense;
+      if(lic && lic.isLoggedIn && lic.isLoggedIn()) goTo('profile');
+      else openAuthScreen();
+    });
+
+    teamEl('team-make').addEventListener('click', async (e)=>{
+      const btn = e.currentTarget;
+      const msg = teamEl('team-make-msg');
+      btn.disabled = true; msg.hidden = true;
+      try{
+        const r = await window.TohidShop.apiAuth('/api/v1/shop/staff-code', {
+          method:'POST',
+          body:{ role: teamEl('team-role').value, maxUses: 1 },
+        });
+        teamEl('team-new-code-value').textContent = r.code || '—';
+        teamEl('team-new-code').hidden = false;
+        teamEl('team-new-code').scrollIntoView({ behavior:'smooth', block:'nearest' });
+        teamRefresh();
+      }catch(err){
+        //  «قابلیتِ اشتراکی» را سرور رد می‌کند؛ پیامِ خودش را نشان می‌دهیم
+        msg.hidden = false;
+        msg.style.color = 'var(--danger)';
+        msg.textContent = (err && err.message) || 'کد ساخته نشد — اتصال را بررسی کنید.';
+      }finally{ btn.disabled = false; }
+    });
+
+    teamEl('team-copy').addEventListener('click', async ()=>{
+      const code = teamEl('team-new-code-value').textContent.trim();
+      try{ await navigator.clipboard.writeText(code); showToast('کد کپی شد.'); }
+      catch{ showToast('کپی نشد — دستی برداریدش.', 'error'); }
+    });
+
+    teamEl('team-new-code-close').addEventListener('click', ()=>{
+      teamEl('team-new-code').hidden = true;
+      teamEl('team-new-code-value').textContent = '—';
+    });
+  }
 
   function goTo(pageId){
     if(!PAGES.find(p=>p.id===pageId) && !EXTRA_PAGES.includes(pageId)) pageId = 'dashboard';
@@ -11555,12 +12087,21 @@
     } else if(pageId==='receipts'){
       pageTitle.textContent = 'رسیدها';
       renderReceiptsPage();
+    } else if(pageId==='profile'){
+      pageTitle.textContent = 'حساب من';
+      profRefresh();
+    } else if(pageId==='team'){
+      pageTitle.textContent = 'کارمندان دکان';
+      teamRefresh();
     } else {
       const meta = PAGES.find(p=>p.id===pageId);
       // برچسبِ نوارِ پایین کوتاه است («خانه») ولی سربرگ نامِ کاملِ صفحه را
       // می‌نویسد — همان جدایی که در نیتیو بین TABS و PAGE_TITLES هست.
       pageTitle.textContent = meta ? (meta.title || meta.label) : '';
     }
+
+    document.body.classList.toggle('no-fab',
+      pageId==='profile' || pageId==='team' || pageId==='settings');
 
     // دوربین فقط داخل صفحه «فروش» فعال بماند تا باتری/CPU هدر نرود
     if(pageId==='sale'){ startSaleScanner(); } else { stopSaleScanner(); }
@@ -11604,6 +12145,9 @@
   fabMenu.querySelectorAll('.fab-menu-item').forEach(btn=>{
     btn.addEventListener('click', closeFab);
   });
+
+  wireProfile();
+  wireTeam();
 
   document.addEventListener('click', (e)=>{
     const link = e.target.closest('[data-page]');
