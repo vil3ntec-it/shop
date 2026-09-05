@@ -27,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -47,6 +48,11 @@ import ir.vil3ntec.tohid.sync.LicenseGuard
 import ir.vil3ntec.tohid.core.net.userText
 import ir.vil3ntec.tohid.sync.SyncStore
 import ir.vil3ntec.tohid.sync.Syncer
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.ui.unit.sp
+import ir.vil3ntec.tohid.ui.theme.Shape
 import ir.vil3ntec.tohid.ui.theme.Radius
 import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.Dispatchers
@@ -85,6 +91,7 @@ fun ProfileScreen(
   onBack: () -> Unit,
   onSignIn: () -> Unit,
   onSubscription: () -> Unit,
+  onSettings: () -> Unit = {},
 ) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
@@ -159,10 +166,37 @@ fun ProfileScreen(
       .padding(start = 16.dp, end = 16.dp, bottom = 28.dp)
       .imePadding(),
   ) {
-    TextButton(onClick = onBack, contentPadding = PaddingValues(0.dp)) {
-      Icon(Icons.Filled.ArrowForward, contentDescription = null, tint = colors.primary)
+    /*
+     *  یک راهِ برگشت، نه دو تا.
+     *
+     *  لینکِ «بازگشت» زیرِ سربرگِ برنامه تکراری بود — پیکانِ سربرگ همان
+     *  کار را می‌کرد. جایش سربرگِ خودِ صفحه است: پیکان، نام، و
+     *  چرخ‌دنده‌ی تنظیمات که از نوارِ بالا به اینجا آمد.
+     */
+    Row(
+      Modifier.fillMaxWidth().padding(vertical = 6.dp),
+      verticalAlignment = Alignment.CenterVertically,
+    ) {
+      Icon(
+        Icons.Filled.ChevronRight,
+        contentDescription = "بازگشت",
+        tint = colors.muted,
+        modifier = Modifier.size(22.dp).clickable(onClick = onBack),
+      )
       Spacer(Modifier.width(6.dp))
-      Text("بازگشت", color = colors.primary)
+      Text(
+        "حساب من",
+        fontSize = 17.sp,
+        fontWeight = FontWeight.Bold,
+        color = colors.text,
+        modifier = Modifier.weight(1f),
+      )
+      Icon(
+        Icons.Filled.Settings,
+        contentDescription = "تنظیمات",
+        tint = colors.muted,
+        modifier = Modifier.size(20.dp).clickable(onClick = onSettings),
+      )
     }
 
     /* ------------------------- عکس و نام ------------------------- */
@@ -244,8 +278,12 @@ fun ProfileScreen(
 
     /* ------------------------ عضویت و اشتراک ------------------------ */
     Spacer(Modifier.height(14.dp))
-    MembershipRow(createdAt)
-    Spacer(Modifier.height(8.dp))
+    //  ردیفِ شکسته نشان داده نمی‌شود: اگر روزِ ساختنِ حساب معلوم نیست،
+    //  «— معلوم نیست» چیزی به کسی نمی‌گوید، فقط یک خطِ خالی است
+    if (createdAt > 0) {
+      MembershipRow(createdAt)
+      Spacer(Modifier.height(8.dp))
+    }
     SubscriptionRow(onClick = onSubscription)
 
     /* -------------------------- ویرایش -------------------------- */
@@ -299,9 +337,9 @@ fun ProfileScreen(
       )
       Spacer(Modifier.height(4.dp))
       Text(
-        "شماره پس از ثبت قفل می‌شود و از برنامه عوض نمی‌شود.",
-        style = MaterialTheme.typography.labelSmall,
-        color = colors.warning,
+        "ایمیل و شماره پس از ثبت قفل می‌شوند — راه ورود و بازیابی رمز همین‌هاست.",
+        fontSize = 10.5.sp,
+        color = colors.muted2,
       )
     } else {
       LockedRow(
@@ -388,33 +426,67 @@ fun ProfileScreen(
     /* ------------------------- همگام‌سازی ------------------------- */
     Spacer(Modifier.height(20.dp))
     SectionTitle("همگام‌سازی")
-    InfoRow(
-      icon = Icons.Filled.Sync,
-      tint = colors.accent,
-      title = "آخرین همگام‌سازی",
-      value = if (lastSyncAt > 0) formatMillis(lastSyncAt) else "هنوز انجام نشده",
-      detail = "دفترِ دکان روی سرور پشتیبان می‌گیرد و روی گوشیِ دیگر هم می‌آید",
-    )
-    Spacer(Modifier.height(10.dp))
-    Button(
-      onClick = {
-        syncing = true
-        scope.launch {
-          runCatching { Syncer(store, state, context).run() }
-            .onSuccess {
-              lastSyncAt = state.lastSyncAt
-              toast("همگام‌سازی شد — ${it.pushed.fa()} فرستاده، ${it.pulled.fa()} گرفته")
-            }
-            .onFailure { toast(it.userText("همگام‌سازی ناموفق بود")) }
-          syncing = false
+    /*
+     *  یک ردیف، نه یک دکمه‌ی رقیبِ «ذخیره تغییرات».
+     *
+     *  دو دکمه‌ی هم‌شکل و هم‌رنگ در یک صفحه یعنی کاربر باید متنشان را
+     *  بخواند تا بفهمد کدام کارِ اوست. همگام‌سازی یک کارِ گاه‌به‌گاه است،
+     *  پس ردیف است نه دکمه.
+     */
+    Row(
+      Modifier
+        .fillMaxWidth()
+        .clip(Shape.card)
+        .background(colors.surface)
+        .border(1.dp, colors.border, Shape.card)
+        .clickable(enabled = !syncing) {
+          syncing = true
+          scope.launch {
+            runCatching { Syncer(store, state, context).run() }
+              .onSuccess {
+                lastSyncAt = state.lastSyncAt
+                toast("همگام‌سازی شد — ${it.pushed.fa()} فرستاده، ${it.pulled.fa()} گرفته")
+              }
+              .onFailure { toast(it.userText("همگام‌سازی ناموفق بود")) }
+            syncing = false
+          }
         }
-      },
-      enabled = !syncing,
-      colors = ButtonDefaults.buttonColors(containerColor = colors.primary),
-      modifier = Modifier.fillMaxWidth(),
+        .padding(horizontal = 14.dp, vertical = 12.dp),
+      verticalAlignment = Alignment.CenterVertically,
     ) {
-      Text(if (syncing) "در حال همگام‌سازی…" else "همگام‌سازی حالا", color = Color.White)
+      Box(
+        Modifier.size(36.dp).clip(RoundedCornerShape(13.dp)).background(colors.primaryTint),
+        contentAlignment = Alignment.Center,
+      ) {
+        Icon(Icons.Filled.Sync, contentDescription = null, tint = colors.primary, modifier = Modifier.size(18.dp))
+      }
+      Spacer(Modifier.width(12.dp))
+      Column(Modifier.weight(1f)) {
+        Text(
+          if (syncing) "در حال همگام‌سازی…" else "همگام‌سازی حالا",
+          fontSize = 13.sp,
+          fontWeight = FontWeight.Bold,
+          color = colors.text,
+        )
+        Text(
+          if (lastSyncAt > 0) "آخرین بار: ${formatMillis(lastSyncAt)}" else "هنوز انجام نشده",
+          fontSize = 10.5.sp,
+          color = colors.muted2,
+        )
+      }
+      Icon(
+        Icons.Filled.ChevronLeft,
+        contentDescription = null,
+        tint = colors.muted2,
+        modifier = Modifier.size(18.dp),
+      )
     }
+    Spacer(Modifier.height(4.dp))
+    Text(
+      "دفترِ دکان روی سرور پشتیبان می‌گیرد و روی گوشی دیگر هم می‌آید.",
+      fontSize = 10.5.sp,
+      color = colors.muted2,
+    )
 
     /*
      *  خروج از حساب — ته صفحه، و با یک پرسش.
@@ -425,12 +497,16 @@ fun ProfileScreen(
      *  همگام‌سازی.
      */
     Spacer(Modifier.height(22.dp))
-    OutlinedButton(
-      onClick = { confirmSignOut = true },
-      colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.danger),
-      border = androidx.compose.foundation.BorderStroke(1.dp, colors.danger.copy(alpha = 0.6f)),
-      modifier = Modifier.fillMaxWidth(),
-    ) { Text("خروج از حساب") }
+    Text(
+      "خروج از حساب",
+      fontSize = 14.sp,
+      color = colors.danger,
+      textAlign = TextAlign.Center,
+      modifier = Modifier
+        .fillMaxWidth()
+        .clickable { confirmSignOut = true }
+        .padding(vertical = 10.dp),
+    )
     Spacer(Modifier.height(6.dp))
     Text(
       "دفترِ دکان روی همین گوشی می‌ماند و پاک نمی‌شود.",
@@ -484,12 +560,14 @@ private fun Avatar(accountId: String, version: Int, modifier: Modifier = Modifie
     bitmap = withContext(Dispatchers.IO) { PhotoStore.loadAvatar(context, accountId) }
   }
 
+  //  مربعِ نرمِ گرادینتی، نه دایره‌ی خاکستری: همان شکلی که آواتارِ
+  //  داشبورد و ردیف‌های قرض‌داران دارند
+  val shape = RoundedCornerShape(30.dp)
   Box(
     modifier
-      .size(96.dp)
-      .clip(CircleShape)
-      .background(colors.primaryTint)
-      .border(2.dp, colors.primary.copy(alpha = 0.5f), CircleShape),
+      .size(88.dp)
+      .clip(shape)
+      .background(Brush.linearGradient(listOf(colors.primary, colors.accent))),
     contentAlignment = Alignment.Center,
   ) {
     val image = bitmap
@@ -498,14 +576,14 @@ private fun Avatar(accountId: String, version: Int, modifier: Modifier = Modifie
         bitmap = image.asImageBitmap(),
         contentDescription = null,
         contentScale = ContentScale.Crop,
-        modifier = Modifier.size(96.dp),
+        modifier = Modifier.size(88.dp),
       )
     } else {
       Icon(
         Icons.Filled.Person,
         contentDescription = null,
-        tint = colors.primary,
-        modifier = Modifier.size(46.dp),
+        tint = Color.White,
+        modifier = Modifier.size(42.dp),
       )
     }
   }

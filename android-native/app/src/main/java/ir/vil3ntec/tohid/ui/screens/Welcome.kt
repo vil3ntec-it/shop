@@ -132,8 +132,11 @@ import kotlinx.coroutines.launch
  */
 private val INK_LIGHT = Color(0xFF17255A)
 private val INK_SOFT_LIGHT = Color(0xFF5C6B90)
-private val BLUE = Color(0xFF2563C9)
-private val BLUE_DEEP = Color(0xFF1B4FA8)
+//  رنگِ کادرها و دکمه‌های صفحه‌ی ورود، هم‌رنگِ برندِ تازه.
+//  پس‌زمینه‌ی این صفحه (`WelcomeDecor.kt`) رنگِ خودش را جدا دارد و
+//  یک نقطه هم عوض نشده — خواسته‌ی صاحب مخزن همین بود.
+private val BLUE = Color(0xFF7C5CFF)
+private val BLUE_DEEP = Color(0xFF5B3FE0)
 private val FIELD_LINE_LIGHT = Color(0xFFE1E8F5)
 
 /*
@@ -474,17 +477,94 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
       ) {
         Spacer(Modifier.height(6.dp))
 
+        /*
+         *  ورودِ سریع، بالای فرم.
+         *
+         *  کسی که قبلاً وارد شده، کارش یک لمس است — نه پر کردنِ دوباره‌ی
+         *  دو کادر. تا دیروز این فهرست زیرِ فرم و زیرِ دکمه‌ی گوگل بود و
+         *  دیده نمی‌شد.
+         */
+        if (saved.isNotEmpty()) {
+          Spacer(Modifier.height(4.dp))
+          Text("ورود سریع", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
+          Spacer(Modifier.height(8.dp))
+          saved.forEach { entry ->
+            SavedLoginRow(
+              entry = entry,
+              onPick = {
+                error = null
+                /*
+                 *  ورودِ سریع، واقعاً سریع.
+                 *
+                 *  تا دیروز این ردیف فقط کادرِ ایمیل را پر می‌کرد و کاربر
+                 *  باید رمز را از نو می‌زد — گزارش هم همین بود: «اسمِ
+                 *  حسابم را نشان می‌دهد، رویش می‌زنم، ولی مرا داخل
+                 *  نمی‌برد».
+                 *
+                 *  حالا اگر توکنِ همان حساب را داشته باشیم (هنگام خروج
+                 *  کنارش گذاشته می‌شود) نشست همان‌جا برمی‌گردد. اگر سرور
+                 *  ردش کرد — باطل شده یا مهلتش تمام — بی‌صدا به راهِ
+                 *  همیشگی برمی‌گردیم و کادر پر می‌شود.
+                 */
+                fun fillIn() {
+                  if (entry.identifier.contains("@")) {
+                    emailMode = "login"
+                    email = entry.identifier
+                  } else {
+                    //  حسابی که با شماره ساخته شده بود: کادرِ شماره از
+                    //  صفحهٔ ورود برداشته شده، پس همان‌جا می‌گوییم چه کند
+                    emailMode = "login"
+                    note = "این حساب با شماره ساخته شده بود — با ایمیلِ همان حساب وارد شوید"
+                  }
+                  if (name.isBlank()) name = entry.shop
+                }
+                if (entry.refresh.isBlank() || !ready) {
+                  fillIn()
+                } else {
+                  busy = true
+                  scope.launch {
+                    auth.resume(entry.refresh)
+                      .onSuccess { session ->
+                        //  نشستِ کامل — نام و دکانش از سرور آمده
+                        finish(entry.identifier, session)
+                      }
+                      .onFailure {
+                        fillIn()
+                        note = "برای امنیت، این بار رمز یا کد لازم است"
+                      }
+                    busy = false
+                  }
+                }
+              },
+              onForget = {
+                SavedLogins.forget(context, entry.identifier)
+                saved = SavedLogins.read(context)
+              },
+            )
+            Spacer(Modifier.height(6.dp))
+          }
+        }
+
+
         Spacer(Modifier.height(12.dp))
 
-        // نام — در هر دو راه، چون حسابِ بی‌نام بعداً فقط یک شماره است
-        PillField(
-          value = name,
-          onValueChange = { name = it; error = null },
-          placeholder = "نام شما",
-          label = "نام",
-          icon = Icons.Filled.Person,
-        )
-        Spacer(Modifier.height(12.dp))
+        /*
+         *  نام فقط در ثبتِ حسابِ تازه.
+         *
+         *  در فرمِ ورود، نام هیچ کاری نمی‌کرد: سرور با ایمیل و رمز
+         *  می‌شناسدت. یک کادرِ اضافه سرِ راهِ کسی که فقط می‌خواهد وارد
+         *  شود، یعنی یک قدمِ بی‌دلیل.
+         */
+        if (emailMode == "register") {
+          PillField(
+            value = name,
+            onValueChange = { name = it; error = null },
+            placeholder = "نام شما",
+            label = "نام",
+            icon = Icons.Filled.Person,
+          )
+          Spacer(Modifier.height(12.dp))
+        }
 
         run {
           PillField(
@@ -755,23 +835,34 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
          *  می‌آید فقط دو کادر و یک دکمه لازم دارد؛ بقیه سرِ راهش
          *  نمی‌ایستد و هر وقت خواست بازش می‌کند.
          */
-        Spacer(Modifier.height(18.dp))
+        /*
+         *  دو راهِ فرعی، کنارِ هم و کم‌وزن.
+         *
+         *  «ادامه بدون حساب» و «کد شاگرد» هیچ‌کدام راهِ اصلی نیستند؛ زیرِ
+         *  هم و پررنگ که بودند، به‌اندازه‌ی دکمه‌ی ورود جلب توجه می‌کردند.
+         */
+        Spacer(Modifier.height(14.dp))
         Row(
           Modifier.fillMaxWidth(),
           horizontalArrangement = Arrangement.Center,
           verticalAlignment = Alignment.CenterVertically,
         ) {
-          Text(
-            "حساب نمی‌خواهید؟",
-            style = MaterialTheme.typography.labelMedium,
-            color = inkSoft,
-          )
           TextButton(onClick = onDone, contentPadding = PaddingValues(horizontal = 8.dp)) {
             Text(
               "ادامه بدون حساب",
-              style = MaterialTheme.typography.labelLarge,
-              color = BLUE,
-              fontWeight = FontWeight.Bold,
+              style = MaterialTheme.typography.labelMedium,
+              color = inkSoft,
+            )
+          }
+          Text("·", style = MaterialTheme.typography.labelMedium, color = inkSoft)
+          TextButton(
+            onClick = { showMore = !showMore },
+            contentPadding = PaddingValues(horizontal = 8.dp),
+          ) {
+            Text(
+              if (showMore) "بستن" else "کد شاگرد",
+              style = MaterialTheme.typography.labelMedium,
+              color = inkSoft,
             )
           }
         }
@@ -779,7 +870,9 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
         // جداکنندهٔ نازک با «یا» وسطش — مرزِ بینِ راهِ اصلی و کارهای فنی.
         // فقط وقتی کشیده می‌شود که زیرش چیزی باشد، وگرنه خطی می‌ماند که
         // به هیچ‌جا مرز نمی‌زند.
-        if (GOOGLE_LOGIN || saved.isNotEmpty()) {
+        //  فهرستِ «ورود سریع» بالای فرم رفت، پس این مرز فقط وقتی معنی
+        //  دارد که کلیدِ گوگل زیرش باشد
+        if (GOOGLE_LOGIN) {
           Spacer(Modifier.height(6.dp))
           Row(
             Modifier.fillMaxWidth().padding(horizontal = 30.dp),
@@ -838,86 +931,7 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
           }
         }
 
-        if (saved.isNotEmpty()) {
-          Spacer(Modifier.height(14.dp))
-          Text("ورود سریع", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
-          Spacer(Modifier.height(8.dp))
-          saved.forEach { entry ->
-            SavedLoginRow(
-              entry = entry,
-              onPick = {
-                error = null
-                /*
-                 *  ورودِ سریع، واقعاً سریع.
-                 *
-                 *  تا دیروز این ردیف فقط کادرِ ایمیل را پر می‌کرد و کاربر
-                 *  باید رمز را از نو می‌زد — گزارش هم همین بود: «اسمِ
-                 *  حسابم را نشان می‌دهد، رویش می‌زنم، ولی مرا داخل
-                 *  نمی‌برد».
-                 *
-                 *  حالا اگر توکنِ همان حساب را داشته باشیم (هنگام خروج
-                 *  کنارش گذاشته می‌شود) نشست همان‌جا برمی‌گردد. اگر سرور
-                 *  ردش کرد — باطل شده یا مهلتش تمام — بی‌صدا به راهِ
-                 *  همیشگی برمی‌گردیم و کادر پر می‌شود.
-                 */
-                fun fillIn() {
-                  if (entry.identifier.contains("@")) {
-                    emailMode = "login"
-                    email = entry.identifier
-                  } else {
-                    //  حسابی که با شماره ساخته شده بود: کادرِ شماره از
-                    //  صفحهٔ ورود برداشته شده، پس همان‌جا می‌گوییم چه کند
-                    emailMode = "login"
-                    note = "این حساب با شماره ساخته شده بود — با ایمیلِ همان حساب وارد شوید"
-                  }
-                  if (name.isBlank()) name = entry.shop
-                }
-                if (entry.refresh.isBlank() || !ready) {
-                  fillIn()
-                } else {
-                  busy = true
-                  scope.launch {
-                    auth.resume(entry.refresh)
-                      .onSuccess { session ->
-                        //  نشستِ کامل — نام و دکانش از سرور آمده
-                        finish(entry.identifier, session)
-                      }
-                      .onFailure {
-                        fillIn()
-                        note = "برای امنیت، این بار رمز یا کد لازم است"
-                      }
-                    busy = false
-                  }
-                }
-              },
-              onForget = {
-                SavedLogins.forget(context, entry.identifier)
-                saved = SavedLogins.read(context)
-              },
-            )
-            Spacer(Modifier.height(6.dp))
-          }
-        }
-
-        /* --------------------- گزینه‌های بیشتر --------------------- */
-        Spacer(Modifier.height(10.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-          TextButton(onClick = { showMore = !showMore }) {
-            Icon(
-              Icons.Filled.Tune,
-              contentDescription = null,
-              tint = inkSoft,
-              modifier = Modifier.size(15.dp),
-            )
-            Spacer(Modifier.width(6.dp))
-            Text(
-              if (showMore) "بستن" else "کد شاگرد دارم",
-              style = MaterialTheme.typography.labelMedium,
-              color = inkSoft,
-            )
-          }
-        }
-
+        /* --------------------- کدِ شاگرد --------------------- */
         AnimatedVisibility(
           visible = showMore,
           enter = fadeIn() + expandVertically(),
@@ -1875,8 +1889,14 @@ private fun GradientButton(
     label = "ctaCorner",
   )
   val shape = RoundedCornerShape(corner)
-  // دکمهٔ غیرفعال هم باید در تمِ تاریک دیده شود، نه اینکه در زمینه گم شود
-  val disabledFace = if (isDarkSurface()) Shop.colors.surface2 else FIELD_LINE_LIGHT
+  /*
+   *  دکمه‌ی اصلی هرگز خاکستری نمی‌شود.
+   *
+   *  دکمه‌ی خاکستری یعنی «این کار شدنی نیست» و کاربر دنبالِ راهِ دیگری
+   *  می‌گردد؛ در حالی که فقط باید یک کادر را پر کند. پس همان گرادینتِ
+   *  برند می‌ماند، فقط کم‌جان‌تر.
+   */
+  val disabledFace = BLUE.copy(alpha = 0.38f)
 
   /*
    *  یک برقِ نور، فقط یک بار.
@@ -1907,8 +1927,8 @@ private fun GradientButton(
       )
       .clip(shape)
       .background(
-        if (live) Brush.horizontalGradient(listOf(BLUE_DEEP, BLUE, Color(0xFF3C7DE0)))
-        else Brush.horizontalGradient(listOf(disabledFace, disabledFace))
+        if (live) Brush.horizontalGradient(listOf(BLUE_DEEP, BLUE, Color(0xFF00C39A)))
+        else Brush.horizontalGradient(listOf(disabledFace, BLUE.copy(alpha = 0.28f)))
       )
       .clickable(
         enabled = live,
