@@ -252,7 +252,6 @@ data class DevicesDto(val devices: List<DeviceDto> = emptyList())
 
 /* ------------------------------ اشتراک ------------------------------ */
 
-@Serializable
 /**
  *  یک پلنِ اشتراک، همان‌طور که سرور می‌دهد.
  *
