@@ -243,7 +243,7 @@
   function fmtDate(ms, tz) {
     if (!ms) return '—';
     try {
-      return new Intl.DateTimeFormat('fa-IR', {
+      return new Intl.DateTimeFormat('fa-IR-u-nu-latn', {
         timeZone: tz || 'Asia/Kabul', year: 'numeric', month: '2-digit', day: '2-digit',
       }).format(new Date(ms));
     } catch { return new Date(ms).toISOString().slice(0, 10); }
@@ -804,7 +804,7 @@
       } else if (State.state === 'active' && State.subEndsAt) {
         const left = daysBetween(State.clock.effective, State.subEndsAt);
         if (left <= 7) {
-          text = `${left.toLocaleString('fa-IR')} روز تا پایان اشتراک باقی مانده است.`;
+          text = `${left.toLocaleString('en-US')} روز تا پایان اشتراک باقی مانده است.`;
           tone = 'warning'; show = true;
         }
       }
@@ -878,7 +878,7 @@
                 <input type="email" id="lic-reg-email" class="lic-input" dir="ltr" autocomplete="email">
                 <label class="lic-label">شماره موبایل</label>
                 <input type="tel" id="lic-reg-phone" class="lic-input" dir="ltr" autocomplete="tel">
-                <label class="lic-label">رمز عبور (حداقل ۸ کاراکتر)</label>
+                <label class="lic-label">رمز عبور (حداقل 8 کاراکتر)</label>
                 <input type="password" id="lic-reg-password" class="lic-input" dir="ltr" autocomplete="new-password">
                 <button type="button" class="lic-btn lic-btn-block" id="lic-do-register">ساخت حساب</button>
               </div>

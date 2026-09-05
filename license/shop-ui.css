@@ -19,7 +19,7 @@
    تغییرش اعمال نشد. نارنجی، نه قرمز. */
 #sync-toast.warn{ background:var(--warn,#f08a24); color:#2a1c05; }
 @media (min-width:900px){ #sync-toast{ inset-inline-start:auto; max-width:420px; } }
-@media (max-width:899px){ #sync-toast{ bottom:calc(var(--bottomnav-h,66px) + 12px); } }
+@media (max-width:899px){ #sync-toast{ bottom:calc(var(--bottomnav-space, 76px) + 12px); } }
 
 #sync-reload-bar, #stock-alert-bar{
   position:fixed; z-index:75; inset-inline:12px; bottom:12px;
@@ -36,8 +36,8 @@
   #sync-reload-bar, #stock-alert-bar{ inset-inline-start:auto; max-width:520px; }
 }
 @media (max-width:899px){
-  #sync-reload-bar, #stock-alert-bar{ bottom:calc(var(--bottomnav-h,66px) + 10px); }
-  #stock-alert-bar{ bottom:calc(var(--bottomnav-h,66px) + 62px); }
+  #sync-reload-bar, #stock-alert-bar{ bottom:calc(var(--bottomnav-space, 76px) + 10px); }
+  #stock-alert-bar{ bottom:calc(var(--bottomnav-space, 76px) + 62px); }
 }
 
 /* ---------- دکمه ---------- */
