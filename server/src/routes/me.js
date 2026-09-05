@@ -80,10 +80,18 @@ async function plansHandler(req, res) {
 router.get('/subscription', subscriptionHandler);
 router.get('/plans', plansHandler);
 
-/** ثبت درخواست خرید — مدیر بعد از دریافت پول فعالش می‌کند. */
-router.post('/purchase-request', async (req, res) => {
+/**
+ * ثبت درخواست خرید — مدیر بعد از دریافت پول فعالش می‌کند.
+ *
+ * نامِ فیلد هم `plan` پذیرفته می‌شود هم `planCode`: نسخه‌ی وب از روز اول
+ * `planCode` می‌فرستاد و اینجا فقط `plan` خوانده می‌شد، یعنی هر درخواستِ
+ * خریدی که از سایت می‌آمد با «پلن لازم است» رد می‌شد. نامِ درست `plan`
+ * است ولی نسخه‌های منتشرشده‌ی وب روی گوشیِ مردم‌اند و به‌روز نمی‌شوند،
+ * پس هر دو نام قبول است.
+ */
+async function purchaseRequestHandler(req, res) {
   if (!req.shopId) return res.status(403).json({ error: { code: 'no_shop', message: 'اول دکان بسازید' } });
-  const planCode = v.text(req.body?.plan, { max: 20, required: true, field: 'پلن' });
+  const planCode = v.text(req.body?.plan ?? req.body?.planCode, { max: 20, required: true, field: 'پلن' });
   const note = v.text(req.body?.note, { max: 300 });
   const { newId } = require('../db');
   const row = await one(
@@ -93,7 +101,8 @@ router.post('/purchase-request', async (req, res) => {
   );
   await audit.log({ shopId: req.shopId, userId: req.user.id, action: 'subscription.requested', detail: { plan: planCode } });
   res.status(201).json({ request: { id: row.id, plan: row.plan_code, status: row.status } });
-});
+}
+router.post('/purchase-request', purchaseRequestHandler);
 
 /** دستگاه‌های این حساب. */
 router.get('/devices', async (req, res) => {
@@ -165,3 +174,4 @@ router.put('/', async (req, res) => {
 module.exports = router;
 module.exports.subscriptionHandler = subscriptionHandler;
 module.exports.plansHandler = plansHandler;
+module.exports.purchaseRequestHandler = purchaseRequestHandler;
