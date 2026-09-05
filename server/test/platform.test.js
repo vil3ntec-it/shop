@@ -253,6 +253,20 @@ test('تنظیمات ناقص، «آماده» شمرده نمی‌شود و م�
   assert.ok(out.body.email.missing.includes('رمز'));
 });
 
+test('ایمیلِ خاموش هم «آماده» نیست — وگرنه هیچ هشداری داده نمی‌شد', async () => {
+  const t = await adminToken();
+  //  `log` پیش‌فرضِ سرورِ تازه‌نصب است و کد را به هیچ صندوقی نمی‌رساند
+  await h.put('/api/admin/email', { provider: 'log' }, { token: t });
+
+  const out = await h.get('/api/admin/email', { token: t });
+  assert.equal(out.body.email.ready, false);
+  assert.ok(out.body.email.missing.length > 0);
+
+  //  و صفحه‌ی خانه‌ی برنامه‌ی مدیریت هم همین را می‌گوید
+  const overview = await h.get('/api/admin/overview', { token: t });
+  assert.equal(overview.body.email.ready, false);
+});
+
 test('ایمیلِ خراب، ثبت‌نام را با «خطای داخلی» نمی‌شکند', async () => {
   const t = await adminToken();
   //  تنظیماتی که به جایی نمی‌رسد — همان حالتی که تا امروز ۵۰۰ می‌داد
