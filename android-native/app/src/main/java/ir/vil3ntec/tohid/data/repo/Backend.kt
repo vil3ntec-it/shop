@@ -61,6 +61,10 @@ object Backend {
     val account = AccountRepository(api)
     val sync = SyncRepository(api)
     val events = EventsRepository(api)
+
+    //  پشتیبانی و تپشِ بازدید بی‌حساب هم کار می‌کنند، پس باید بدانند
+    //  همین حالا حسابی هست یا نه
+    val support = SupportRepository(api) { tokens.signedIn }
   }
 
   private fun of(context: Context): Wiring =
@@ -75,6 +79,7 @@ object Backend {
   fun account(context: Context): AccountRepository = of(context).account
   fun sync(context: Context): SyncRepository = of(context).sync
   fun events(context: Context): EventsRepository = of(context).events
+  fun support(context: Context): SupportRepository = of(context).support
 
   /** آیا برنامه هم نشانی دارد و هم حساب — یعنی اصلاً می‌شود به سرور زد */
   fun isReady(context: Context): Boolean =

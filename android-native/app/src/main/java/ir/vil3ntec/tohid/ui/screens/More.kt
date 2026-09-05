@@ -17,6 +17,7 @@ import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.fa
 import ir.vil3ntec.tohid.update.UpdateManager
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.History
@@ -126,6 +127,19 @@ fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
         tint = Shop.colors.accent,
         subtitle = "کد پیوستن بسازید و دسترسی شاگردها را ببندید",
         onClick = { onOpen("team") },
+      )
+      /*
+       *  پشتیبانی — برای همه، نه فقط صاحب دکان.
+       *
+       *  شاگردی که گیر کرده هم باید بتواند بپرسد؛ و کسی که هنوز حساب
+       *  نساخته، بیشتر از همه. سرور برای هر دو باز است.
+       */
+      MoreCard(
+        title = "پشتیبانی",
+        icon = Icons.AutoMirrored.Filled.Chat,
+        tint = Shop.colors.primary,
+        subtitle = "سؤال یا مشکلتان را بنویسید — همین‌جا جواب می‌گیرید",
+        onClick = { onOpen("support") },
       )
       /*
        *  «تنظیمات» اینجا نیست — عمداً.

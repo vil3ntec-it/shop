@@ -253,11 +253,44 @@ data class DevicesDto(val devices: List<DeviceDto> = emptyList())
 /* ------------------------------ اشتراک ------------------------------ */
 
 @Serializable
+/**
+ *  یک پلنِ اشتراک، همان‌طور که سرور می‌دهد.
+ *
+ *  ── چرا این کلاس عوض شد ──────────────────────────────────────────
+ *  نام‌های اینجا (`name`، `months`) هیچ‌وقت با آنچه سرور می‌فرستاد
+ *  (`title`، `amount`، `unit`، `days`) جور نبودند. یعنی هر پلنی که از
+ *  سرور می‌آمد بی‌نام و صفرروزه خوانده می‌شد — و به همین دلیل صفحهٔ
+ *  اشتراک هرگز از سرور نخواند و قیمت‌ها را در خودِ کد نگه داشت. نتیجه:
+ *  عوض کردنِ قیمت در پنل مدیریت هیچ اثری روی گوشیِ کسی نداشت.
+ *
+ *  ── تخفیف ─────────────────────────────────────────────────────────
+ *  `price` همان چیزی است که باید پرداخت شود؛ `fullPrice` قیمتِ پیش از
+ *  تخفیف. اگر برابر باشند تخفیفی در کار نیست. این‌طور نسخه‌های قدیمِ
+ *  برنامه هم عددِ درست را نشان می‌دهند، نه قیمتِ گران‌ترِ بی‌تخفیف.
+ */
+@Serializable
+data class PlanDiscountDto(
+  val percent: Int = 0,
+  val savings: Long = 0,
+  val label: String = "",
+  val until: Long? = null,
+)
+
+@Serializable
 data class PlanDto(
   val code: String = "",
-  val name: String = "",
+  val title: String = "",
   val price: Long = 0,
-  val months: Int = 0,
+  /** قیمت پیش از تخفیف — اگر با `price` یکی بود، تخفیفی نیست */
+  val fullPrice: Long = 0,
+  val discount: PlanDiscountDto? = null,
+  /** مثلاً ۶ به‌همراه unit = "month" */
+  val amount: Int = 0,
+  val unit: String = "",
+  val days: Int = 0,
+  val badge: String = "",
+  val negotiable: Boolean = false,
+  val active: Boolean = true,
   val features: List<String> = emptyList(),
 )
 
@@ -266,6 +299,60 @@ data class PlansDto(
   val plans: List<PlanDto> = emptyList(),
   val currency: String = "افغانی",
   val trialDays: Int = 0,
+)
+
+/* ============================== کد اشتراک ============================== */
+
+/** پاسخِ خرج کردنِ کدِ شش‌رقمی */
+@Serializable
+data class VipRedeemDto(
+  val ok: Boolean = false,
+  val message: String = "",
+)
+
+/* ============================== پشتیبانی ============================== */
+
+@Serializable
+data class SupportMessageDto(
+  val id: String = "",
+  /** user | admin | system */
+  val sender: String = "user",
+  val senderName: String = "",
+  val body: String = "",
+  val kind: String = "text",
+  val createdAt: Long = 0,
+)
+
+@Serializable
+data class SupportThreadDto(
+  val id: String = "",
+  val status: String = "open",
+  val unreadUser: Int = 0,
+  val lastMessage: String = "",
+  val updatedAt: Long = 0,
+)
+
+@Serializable
+data class SupportViewDto(
+  val thread: SupportThreadDto = SupportThreadDto(),
+  val messages: List<SupportMessageDto> = emptyList(),
+  val greeting: String = "",
+  val serverTime: Long = 0,
+)
+
+@Serializable
+data class SupportSendDto(
+  val message: SupportMessageDto = SupportMessageDto(),
+)
+
+/* ============================== تپشِ بازدید ============================== */
+
+@Serializable
+data class VisitDto(
+  val ok: Boolean = true,
+  val serverTime: Long = 0,
+  /** چند پیامِ پشتیبانیِ خوانده‌نشده — برای نقطهٔ قرمز */
+  val supportUnread: Int = 0,
 )
 
 /**
