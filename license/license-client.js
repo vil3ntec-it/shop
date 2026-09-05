@@ -1101,6 +1101,15 @@
     registerStart, registerVerify, registerComplete, sendLocation,
     getServerUrl, setServerUrl, getDeviceUid,
     getApiKey, getStaffCode, rotateStaffCode,
+    /*
+     *  توکنِ نشست — چیزی که در سرآیندِ Authorization می‌رود.
+     *
+     *  با `getApiKey` اشتباه نشود: آن یکی «کلید حساب» است، فقط برای
+     *  نشان دادن به کاربر و گذاشتن در پیامِ واتساپ. تا امروز همان یکی
+     *  در دسترس بود و هر فایلِ تازه‌ای که می‌خواست به سرور بزند، همان را
+     *  برمی‌داشت و ۴۰۱ می‌گرفت. این یکی همان توکنِ واقعی است.
+     */
+    getAccessToken: () => readStore().accessToken || '',
     isLoggedIn: () => !!readStore().accessToken,
     userLabel: () => readStore().userLabel || '',
     verifyLicense, evaluate: evaluateLocal,

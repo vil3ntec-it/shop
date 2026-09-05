@@ -297,6 +297,25 @@ test('خلاصه‌ی خانه، همه‌چیز را در یک درخواست �
   assert.ok(Array.isArray(out.body.apps));
 });
 
+test('قیمت‌ها بی‌نیاز به ورود دیده می‌شوند — با تخفیف و لینک واتساپ', async () => {
+  const t = await adminToken();
+  await h.put('/api/admin/plans/m1/discount', { percent: 25, label: 'عید' }, { token: t });
+
+  //  هیچ توکنی — همان کاری که سایت می‌کند
+  const out = await h.get('/api/plans');
+  assert.equal(out.status, 200);
+  const p = out.body.plans.find(x => x.code === 'm1');
+  assert.ok(p, 'پلنی برنگشت');
+  assert.equal(p.discount.percent, 25);
+  assert.equal(p.price, Math.round(p.fullPrice * 0.75));
+  assert.ok(p.pricePerDay > 0, 'قیمت روزانه حساب نشد');
+  assert.ok(p.whatsappUrl.startsWith('https://wa.me/'), 'لینک واتساپ ساخته نشد');
+  assert.ok(out.body.whatsapp.url.startsWith('https://wa.me/'));
+  assert.equal(typeof out.body.currency, 'string');
+
+  await h.del('/api/admin/plans/m1/discount', { token: t });
+});
+
 test('سرور در /config می‌گوید کدام قابلیت‌ها را دارد', async () => {
   const cfg = await h.get('/api/config');
   assert.equal(cfg.body.support, true);

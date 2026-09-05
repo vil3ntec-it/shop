@@ -124,6 +124,49 @@ async function createApp({ runMigrations = true } = {}) {
         });
       } catch (err) { next(err); }
     });
+    /**
+     * فهرست پلن‌ها و قیمت‌ها — **بی‌نیاز به ورود**.
+     *
+     * ── چه چیزی این را لازم کرد ──────────────────────────────────────
+     * تنها راهِ گرفتنِ قیمت‌ها `/me/plans` بود که توکن می‌خواهد. نسخه‌ی وب
+     * آن را بی‌توکن صدا می‌زد، همیشه ۴۰۱ می‌گرفت و بی‌صدا به فهرستِ
+     * قیمتِ داخلِ خودش برمی‌گشت. یعنی هر تغییرِ قیمتی که در پنل داده
+     * می‌شد، روی سایت دیده نمی‌شد — و تخفیف هم هرگز نمی‌رسید.
+     *
+     * قیمت راز نیست: هر کسی که صفحه‌ی اشتراک را باز کند باید ببیندش،
+     * چه حساب داشته باشد چه نه. پس اینجا باز است.
+     *
+     * نامِ واتساپ و لینکش هم آماده می‌آید تا هر برنامه‌ای خودش نسازدش.
+     */
+    api.get('/plans', async (req, res, next) => {
+      try {
+        const cfg = await plans.allConfig();
+        const number = cfg.whatsapp_number || '';
+        const message = cfg.whatsapp_message || '';
+        const digits = String(number).replace(/[^0-9]/g, '').replace(/^0/, '93');
+        const list = await plans.listPlans();
+        res.json({
+          plans: list.map(p => ({
+            ...p,
+            //  قیمتِ روزانه اینجا حساب می‌شود، نه در سه برنامه‌ی جدا
+            pricePerDay: p.days > 0 && p.price > 0
+              ? Math.round((p.price / p.days) * 10) / 10 : null,
+            whatsappUrl: digits
+              ? `https://wa.me/${digits}?text=${encodeURIComponent(`${message} (${p.title})`)}`
+              : '',
+          })),
+          currency: cfg.currency || 'افغانی',
+          trialDays: Number(cfg.trial_days || 0),
+          whatsapp: {
+            number,
+            message,
+            url: digits ? `https://wa.me/${digits}?text=${encodeURIComponent(message)}` : '',
+          },
+          serverTime: now(),
+        });
+      } catch (err) { next(err); }
+    });
+
     /** متن شرایط و ضوابط — همان چیزی که موقع ثبت‌نام نشان داده می‌شود. */
     api.get('/terms', (req, res) => {
       const terms = require('./lib/terms');

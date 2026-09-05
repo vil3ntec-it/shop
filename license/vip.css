@@ -309,6 +309,20 @@
   background:var(--warning,#e8a13a); color:#fff; font-size:10px; font-weight:800;
 }
 .vip-plan-title{ font-size:13px; font-weight:800; color:var(--text,#1a2233); }
+
+/*
+ *  تخفیف — قیمتِ قبلی خط‌خورده، و نشانِ سبز به‌جای نشانِ همیشگی.
+ *
+ *  رنگِ سبز عمدی است: نشانِ نارنجی «پیشنهاد ما» را می‌گوید که همیشه
+ *  هست؛ سبز خبرِ تازه است و باید از آن جدا دیده شود.
+ */
+.vip-plan-was{
+  font-size:11px; font-weight:700; color:var(--muted,#7c8698);
+  text-decoration:line-through; line-height:1.4;
+}
+.vip-tag-off{ background:var(--success,#0fa98a); }
+.vip-plan-off .vip-plan-price{ color:var(--success,#0fa98a); }
+
 .vip-plan-price{ font-size:19px; font-weight:800; color:var(--primary,#7c5cff); }
 .vip-plan-price small{ font-size:10.5px; font-weight:600; }
 .vip-per{ font-size:10.5px; color:var(--muted,#7c8698); line-height:1.6; }
@@ -410,3 +424,48 @@ html.vip-lock-debtors [data-page="debtors"]{ opacity:.5; }
 /* دکمه‌ی خرید تا وقتی وارد نشده، کم‌رنگ‌تر است */
 .vip-cta-locked{ opacity:.6; }
 .vip-cta-locked::after{ animation:none; }
+
+
+/* ============================== کد اشتراک ==============================
+ *
+ *  کارتِ جمع‌وجمعی که بسته می‌آید. باز کردنش یک زدن است و بستنش هم.
+ *  عمداً پایینِ صفحه و پایینِ دکمه‌ی خرید است: راهِ اصلی خرید است، این
+ *  راهِ کسی است که کد دارد.
+ */
+.vip-code{
+  margin-top:14px; border-radius:14px;
+  border:1px solid var(--border,#e6e9f2);
+  background:var(--surface,#fff); overflow:hidden;
+}
+.vip-code-head{
+  display:flex; align-items:center; gap:10px; width:100%;
+  padding:12px 14px; background:none; border:0; cursor:pointer;
+  text-align:start; font:inherit; color:inherit;
+}
+.vip-code-ic{
+  display:grid; place-items:center; width:32px; height:32px; flex:0 0 auto;
+  border-radius:10px; background:var(--primary-tint,rgba(124,92,255,.14));
+  color:var(--primary,#7c5cff);
+}
+.vip-code-ic svg{ width:17px; height:17px; }
+.vip-code-txt{ flex:1 1 auto; display:flex; flex-direction:column; gap:2px; min-width:0; }
+.vip-code-txt b{ font-size:13px; font-weight:800; color:var(--text,#1a2233); }
+.vip-code-txt i{ font-size:11px; font-style:normal; color:var(--muted,#7c8698); }
+.vip-code-more{ font-size:11px; font-weight:800; color:var(--primary,#7c5cff); flex:0 0 auto; }
+
+.vip-code-body{
+  display:flex; flex-wrap:wrap; gap:8px; align-items:center;
+  padding:0 14px 14px;
+}
+#vip-code-input{
+  flex:1 1 140px; min-width:0; padding:10px 12px;
+  border-radius:10px; border:1px solid var(--border,#e6e9f2);
+  background:var(--bg,#f6f8fc); color:var(--text,#1a2233);
+  font-size:17px; font-weight:800; letter-spacing:5px; text-align:center;
+}
+#vip-code-input:focus{ outline:none; border-color:var(--primary,#7c5cff); }
+#vip-code-go{ flex:0 0 auto; }
+
+.vip-code-note{ flex:1 1 100%; margin:2px 0 0; font-size:11.5px; line-height:1.8; }
+.vip-code-ok{ color:var(--success,#0fa98a); }
+.vip-code-bad{ color:var(--danger,#d93b3b); }
