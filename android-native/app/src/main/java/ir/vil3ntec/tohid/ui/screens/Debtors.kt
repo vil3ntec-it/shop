@@ -82,7 +82,7 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
   //  ترتیبِ فهرست بین باز و بسته شدنِ صفحه می‌ماند: کسی که «قدیمی‌ترین
   //  قرض» را انتخاب کرده، هر بار از نو انتخابش نمی‌کند
   var sortName by rememberSaveable { mutableStateOf(DebtorSort.MOST.name) }
-  val sort = runCatching { DebtorSort.valueOf(sortName) }.getOrDefault(DebtorSort.MOST)
+  val sort = DEBTOR_SORTS.firstOrNull { it.name == sortName } ?: DebtorSort.MOST
   var openId by rememberSaveable { mutableStateOf<String?>(null) }
   var form by remember { mutableStateOf<DebtorFormState?>(null) }
   var txFor by remember { mutableStateOf<Pair<String, DebtorEngine.Kind>?>(null) }
@@ -387,6 +387,21 @@ private enum class DebtorSort(val label: String, val order: Comparator<DebtorRow
   NAME("بر اساس نام", compareBy<DebtorRow> { it.debtor.name }),
 }
 
+/*
+ *  فهرستِ ترتیب‌ها، دستی نوشته شده — نه `entries` و نه `values()`.
+ *
+ *  هر دوی آن‌ها «عضوِ ایستایِ کلاسِ enum»اند و کامپایلرِ K2 در این فایل
+ *  رویشان با یک خطای داخلی می‌شکست (`FirUninitializedEnumChecker` سعی
+ *  می‌کند نشانه را عضوِ enum بداند و نمی‌شود). اشاره به خودِ عضوها این
+ *  دام را ندارد. اگر ترتیبِ تازه‌ای اضافه شد، اینجا هم اضافه شود.
+ */
+private val DEBTOR_SORTS = listOf(
+  DebtorSort.MOST,
+  DebtorSort.LEAST,
+  DebtorSort.OLDEST,
+  DebtorSort.NAME,
+)
+
 /** ردیفِ تراشه‌های ترتیب — روی گوشیِ باریک افقی اسکرول می‌شود */
 @Composable
 private fun DebtorSortRow(current: DebtorSort, count: Int, onPick: (DebtorSort) -> Unit) {
@@ -403,8 +418,7 @@ private fun DebtorSortRow(current: DebtorSort, count: Int, onPick: (DebtorSort) 
       color = colors.muted2,
       modifier = Modifier.padding(end = 2.dp),
     )
-    //  `values()` نه `entries`: همان دامِ کامپایلر، همین‌جا هم بود
-    DebtorSort.values().forEach { option ->
+    DEBTOR_SORTS.forEach { option ->
       val picked = option == current
       Row(
         Modifier
