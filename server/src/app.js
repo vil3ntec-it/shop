@@ -139,6 +139,9 @@ async function createApp({ runMigrations = true } = {}) {
     billing.use(requireUser, optionalShop);
     billing.get('/status', me.subscriptionHandler);
     billing.get('/plans', me.plansHandler);
+    //  نسخه‌ی وب این را صدا می‌زند و تا امروز اینجا نبود، یعنی هر درخواستِ
+    //  خریدی که از سایت می‌آمد ۴۰۴ می‌گرفت و بی‌صدا گم می‌شد.
+    billing.post('/request', me.purchaseRequestHandler);
     api.use('/billing', billing);
 
     api.use('/', require('./routes/data'));

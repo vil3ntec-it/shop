@@ -577,7 +577,7 @@
       await fetch(base + '/api/v1/billing/request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + a.accessToken },
-        body: JSON.stringify({ planCode: code }),
+        body: JSON.stringify({ plan: code, planCode: code }),
       });
     } catch { /* بی‌صدا: خرید از راه واتساپ انجام می‌شود */ }
   }
