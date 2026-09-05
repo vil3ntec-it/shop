@@ -81,8 +81,8 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
   var search by rememberSaveable { mutableStateOf("") }
   //  ترتیبِ فهرست بین باز و بسته شدنِ صفحه می‌ماند: کسی که «قدیمی‌ترین
   //  قرض» را انتخاب کرده، هر بار از نو انتخابش نمی‌کند
-  var sortName by rememberSaveable { mutableStateOf(DebtorSort.MOST.name) }
-  val sort = DEBTOR_SORTS.firstOrNull { it.name == sortName } ?: DebtorSort.MOST
+  var sortName by rememberSaveable { mutableStateOf(SORT_MOST.name) }
+  val sort = DEBTOR_SORTS.firstOrNull { it.name == sortName } ?: SORT_MOST
   var openId by rememberSaveable { mutableStateOf<String?>(null) }
   var form by remember { mutableStateOf<DebtorFormState?>(null) }
   var txFor by remember { mutableStateOf<Pair<String, DebtorEngine.Kind>?>(null) }
@@ -360,47 +360,56 @@ private data class DebtorRow(
   val received: Double = 0.0,
 )
 
-/**
- *  ترتیبِ فهرستِ قرض‌داران.
- *
- *  چهار تا، نه بیشتر: هر ترتیبِ اضافه یک تراشهٔ دیگر در ردیف است و
- *  انتخاب را سخت‌تر می‌کند، نه آسان‌تر.
- */
-private enum class DebtorSort(val label: String, val order: Comparator<DebtorRow>) {
-  /** بیشترین مبلغ اول — همان ترتیبی که فهرست از روزِ اول داشت */
-  MOST("بیشترین قرض", compareByDescending<DebtorRow> { it.balance }),
-
-  /** کمترین اول؛ کسی که پیشِ ما موجودی دارد (مانده‌ی منفی) سرِ فهرست */
-  LEAST("کمترین قرض", compareBy<DebtorRow> { it.balance }),
-
-  /**
-   *  قرضی که بیشتر مانده، اول.
-   *
-   *  کسی که بدهکار نیست (`days == null`) ته می‌رود، نه اول: `-1` او را
-   *  از هر مدتی کوچک‌تر می‌کند.
-   */
-  OLDEST(
-    "قدیمی‌ترین قرض",
-    compareByDescending<DebtorRow> { it.days ?: -1L }.thenByDescending { it.balance },
-  ),
-
-  NAME("بر اساس نام", compareBy<DebtorRow> { it.debtor.name }),
-}
-
 /*
- *  فهرستِ ترتیب‌ها، دستی نوشته شده — نه `entries` و نه `values()`.
+ *  ── چرا enum نیست ──────────────────────────────────────────────────
+ *  این‌ها تا دیروز عضوهای یک `enum class` بودند. کامپایلرِ K2 روی این
+ *  فایل با یک خطای داخلی می‌شکست (`FirUninitializedEnumChecker`: سعی
+ *  می‌کرد نشانه‌ی هر عضوِ کلاسِ enum را «عضوِ enum» بداند و نمی‌شد) و هیچ
+ *  شکلی از دورزدن — `entries`، `values()`، `valueOf` — جوابش نبود.
  *
- *  هر دوی آن‌ها «عضوِ ایستایِ کلاسِ enum»اند و کامپایلرِ K2 در این فایل
- *  رویشان با یک خطای داخلی می‌شکست (`FirUninitializedEnumChecker` سعی
- *  می‌کند نشانه را عضوِ enum بداند و نمی‌شود). اشاره به خودِ عضوها این
- *  دام را ندارد. اگر ترتیبِ تازه‌ای اضافه شد، اینجا هم اضافه شود.
+ *  یک کلاسِ ساده همان کار را می‌کند: `name` برای ذخیره شدن بین باز و
+ *  بسته شدنِ صفحه، `label` برای تراشه، و `order` برای مرتب‌سازی.
+ *  ────────────────────────────────────────────────────────────────────
  */
-private val DEBTOR_SORTS = listOf(
-  DebtorSort.MOST,
-  DebtorSort.LEAST,
-  DebtorSort.OLDEST,
-  DebtorSort.NAME,
+private class DebtorSort(
+  val name: String,
+  val label: String,
+  val order: Comparator<DebtorRow>,
 )
+
+/** بیشترین مبلغ اول — همان ترتیبی که فهرست از روزِ اول داشت */
+private val SORT_MOST = DebtorSort(
+  "MOST", "بیشترین قرض", compareByDescending<DebtorRow> { it.balance },
+)
+
+/** کمترین اول؛ کسی که پیشِ ما موجودی دارد (مانده‌ی منفی) سرِ فهرست */
+private val SORT_LEAST = DebtorSort(
+  "LEAST", "کمترین قرض", compareBy<DebtorRow> { it.balance },
+)
+
+/**
+ *  قرضی که بیشتر مانده، اول.
+ *
+ *  کسی که بدهکار نیست (`days == null`) ته می‌رود، نه اول: `-1` او را از
+ *  هر مدتی کوچک‌تر می‌کند.
+ */
+private val SORT_OLDEST = DebtorSort(
+  "OLDEST",
+  "قدیمی‌ترین قرض",
+  compareByDescending<DebtorRow> { it.days ?: -1L }.thenByDescending { it.balance },
+)
+
+private val SORT_NAME = DebtorSort(
+  "NAME", "بر اساس نام", compareBy<DebtorRow> { it.debtor.name },
+)
+
+/**
+ *  ترتیب‌های فهرست — چهار تا، نه بیشتر.
+ *
+ *  هر ترتیبِ اضافه یک تراشه‌ی دیگر در ردیف است و انتخاب را سخت‌تر
+ *  می‌کند، نه آسان‌تر.
+ */
+private val DEBTOR_SORTS = listOf(SORT_MOST, SORT_LEAST, SORT_OLDEST, SORT_NAME)
 
 /** ردیفِ تراشه‌های ترتیب — روی گوشیِ باریک افقی اسکرول می‌شود */
 @Composable
