@@ -75,13 +75,32 @@ const del = (p, o) => api('DELETE', p, o);
 let seq = 0;
 async function newUser(name = 'کاربر') {
   seq += 1;
-  const phone = `07900000${String(seq).padStart(2, '0')}`;
-  const r = await post('/api/auth/register', {
-    name, phone, password: 'Passw0rd!test',
-    device: { deviceId: `dev-${seq}`, name: 'تست', platform: 'test' },
+  const email = `user${seq}@test.local`;
+  const password = 'Passw0rd!test';
+  const device = { deviceId: `dev-${seq}`, name: 'تست', platform: 'test' };
+
+  /*
+   *  همان سه پله‌ای که برنامه می‌رود — نه یک میان‌بر.
+   *
+   *  پیش‌تر این کمکی `/auth/register` را صدا می‌زد؛ همان مسیری که حساب
+   *  را **بدونِ تأییدِ ایمیل** می‌ساخت و حالا بسته شده. اگر تست‌ها از
+   *  میان‌بر بروند، هیچ‌وقت معلوم نمی‌شود راهِ واقعی سالم است یا نه.
+   */
+  const started = await post('/api/auth/register/start', { name, email, password });
+  if (started.status >= 300) throw new Error(`پله‌ی یک نشد: ${JSON.stringify(started.body)}`);
+  const code = started.body.devCode;
+  if (!code) throw new Error('کدِ آزمایشی برنگشت — سرور در حالتِ log نیست؟');
+
+  const verified = await post('/api/auth/register/verify', { email, code });
+  if (verified.status >= 300) throw new Error(`پله‌ی دو نشد: ${JSON.stringify(verified.body)}`);
+
+  const done = await post('/api/auth/register/complete', {
+    ticket: verified.body.ticket,
+    name, password, device,
+    terms: { accepted: true },
   });
-  if (r.status !== 201) throw new Error(`ثبت‌نام نشد: ${JSON.stringify(r.body)}`);
-  return { ...r.body, phone, password: 'Passw0rd!test' };
+  if (done.status >= 300) throw new Error(`ثبت‌نام نشد: ${JSON.stringify(done.body)}`);
+  return { ...done.body, email, phone: done.body.user?.phone ?? null, password };
 }
 
 module.exports = { start, stop, resetDatabase, api, get, post, put, patch, del, newUser, query };

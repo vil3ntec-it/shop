@@ -216,34 +216,23 @@ router.post(['/staff', '/staff-login'], joinLimit, async (req, res, next) => {
 router.post('/register', authLimit, async (req, res, next) => {
   if (!config.allowRegistration) return next(forbidden('ثبت‌نام روی این سرور بسته است', 'registration_closed'));
 
-  const name = v.text(req.body?.name, { max: 80 });
-  const email = v.email(req.body?.email);
-  const phone = v.phone(req.body?.phone);
-  const password = typeof req.body?.password === 'string' ? req.body.password : '';
-
-  // یکی از این دو کافی است — نه هر دو
-  if (!email && !phone) return next(badRequest('ایمیل یا شماره موبایل لازم است', 'identifier_required'));
-  const weak = pw.checkStrength(password);
-  if (weak) return next(badRequest(weak, 'weak_password'));
-
-  const clash = await one(
-    'SELECT id FROM users WHERE (email IS NOT NULL AND email=$1) OR (phone IS NOT NULL AND phone=$2) LIMIT 1',
-    [email, phone]
-  );
-  if (clash) return next(conflict('این ایمیل یا شماره از قبل ثبت شده است', 'already_registered'));
-
-  const hash = await pw.hashPassword(password);
-  const t = now();
-  const user = await one(
-    `INSERT INTO users (id, name, email, phone, password_hash, status, created_at, updated_at)
-     VALUES ($1,$2,$3,$4,$5,'active',$6,$6) RETURNING *`,
-    [newId('usr'), name, email, phone, hash, t]
-  );
-
-  const session = await issueSession(user, req.body?.device, clientIp(req));
-  await audit.log({ actorType: 'user', userId: user.id, action: 'auth.register', ip: clientIp(req) });
-  res.status(201).json(await loginPayload(user, session));
+  /*
+   *  ── این در بسته شد ────────────────────────────────────────────────
+   *  این مسیر حساب را **بدونِ تأییدِ ایمیل** می‌ساخت. یعنی هر کسی با
+   *  ایمیلِ هر کسِ دیگری حساب می‌گرفت، و برنامه‌ای که مسیرِ سه‌پله را
+   *  پیدا نمی‌کرد هم به همین‌جا می‌افتاد. قرار این شد: کد نیامد،
+   *  ثبت‌نامی هم نیست.
+   *
+   *  مسیر خودش می‌ماند (نسخه‌های قدیمِ برنامه هنوز صدایش می‌زنند) ولی
+   *  جوابش روشن است: از راهِ سه‌پله برو.
+   *  ──────────────────────────────────────────────────────────────────
+   */
+  return next(forbidden(
+    'ثبت‌نام بدونِ تأییدِ ایمیل ممکن نیست — برنامه را به‌روز کنید',
+    'verification_required',
+  ));
 });
+
 
 
 /* ==========================================================

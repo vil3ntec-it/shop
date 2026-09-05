@@ -163,14 +163,24 @@ val DarkColors = ShopColors(
   //  شبِ بنفش‌فام، نه سیاهِ خالص: سیاهِ خالص با نورِ آرورا لکه‌دار
   //  می‌شود و شیشه رویش کثیف به نظر می‌رسد
   bg = Color(0xFF0B0A14),
-  //  در شب، سفیدِ کم‌رنگ روی زمینه‌ی تیره یعنی «هرچه پشتش هست پیداست».
-  //  جایش یک بنفشِ شبِ مات می‌نشیند که هنوز از زمینه روشن‌تر است.
-  surface = Color(0xF01A1730),
-  surface2 = Color(0xF7231F3D),
-  border = Color(0x2EFFFFFF),
+  /*
+   *  ── کارت در شب: یک پله روشن‌تر، نه یک رنگِ دیگر ────────────────────
+   *  کارتِ بنفشِ پررنگ، کارت را «رنگی» نشان می‌دهد نه «بالاتر». برنامه‌های
+   *  گران در تمِ شب همه یک کار می‌کنند: سطحِ کارت فقط چند درصد از زمینه
+   *  روشن‌تر است و تقریباً بی‌رنگ؛ عمق از همان اختلافِ کم و یک لبه‌ی
+   *  بسیار کم‌رنگ می‌آید، نه از رنگ. رنگ برای چیزهایی می‌ماند که معنی
+   *  دارند: پول، هشدار، دکمه.
+   *
+   *  مات هم هست (۹۴٪) تا نورِ زمینه از داخلِ کارت خوانده نشود.
+   *  ──────────────────────────────────────────────────────────────────
+   */
+  surface = Color(0xF0141221),
+  surface2 = Color(0xF61C1930),
+  //  لبه‌ی کم‌رنگ‌تر: خطِ پررنگ دورِ کارت، جعبه می‌سازد نه سطح
+  border = Color(0x1AFFFFFF),
   text = Color(0xFFF0EEF8),
-  muted = Color(0xFFA9A3C4),
-  muted2 = Color(0xFF8B84AB),
+  muted = Color(0xFFA8A3BC),
+  muted2 = Color(0xFF7E7995),
   primary = Color(0xFFA78BFF),
   primaryDark = Color(0xFF7C5CFF),
   primaryTint = Color(0x33A78BFF),
@@ -186,9 +196,9 @@ val DarkColors = ShopColors(
   auroraOne = Color(0x8C7C5CFF),
   auroraTwo = Color(0x6600C39A),
   auroraThree = Color(0x59FF5FA2),
-  surfaceSolid = Color(0xFF15132A),
-  fieldBg = Color(0x0FFFFFFF),
-  fieldBorder = Color(0x38FFFFFF),
+  surfaceSolid = Color(0xFF171526),
+  fieldBg = Color(0x14FFFFFF),
+  fieldBorder = Color(0x26FFFFFF),
   fieldFocus = Color(0xFFA78BFF),
 )
 

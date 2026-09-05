@@ -122,9 +122,29 @@ class SyncStore(context: Context) {
     get() = prefs.getString(LICENSE, null)
     set(v) = prefs.edit().putString(LICENSE, v).apply()
 
+  /**
+   *  کلیدِ عمومیِ مجوز.
+   *
+   *  ── چرا خواندنش از این‌جا شروع نمی‌شود ────────────────────────────
+   *  اگر نسخه کلیدِ سنجاق‌شده داشته باشد (`BuildConfig.LICENSE_PUBLIC_KEY`)
+   *  همان ملاک است و آنچه روی گوشی نوشته شده اصلاً خوانده نمی‌شود.
+   *  وگرنه هر کسی که به فایل‌های برنامه دست داشت می‌توانست کلیدِ خودش
+   *  را بگذارد و مجوزی که خودش امضا کرده جای مجوزِ سرور بنشیند.
+   *
+   *  حافظه‌ی گوشی فقط برای نسخه‌ی خودی می‌ماند، جایی که سرورِ محلی هر
+   *  بار کلیدِ تازه می‌سازد و سنجاق‌کردن ممکن نیست.
+   *  ──────────────────────────────────────────────────────────────────
+   */
   var publicKey: String?
-    get() = prefs.getString(PUBLIC_KEY, null)
-    set(v) = prefs.edit().putString(PUBLIC_KEY, v).apply()
+    get() = PINNED_PUBLIC_KEY ?: prefs.getString(PUBLIC_KEY, null)
+    set(v) {
+      //  کلیدِ سنجاق‌شده عوض نمی‌شود؛ نوشتنش بی‌اثر است
+      if (PINNED_PUBLIC_KEY != null) return
+      prefs.edit().putString(PUBLIC_KEY, v).apply()
+    }
+
+  /** آیا کلید از خودِ نسخه می‌آید، نه از گوشی */
+  val publicKeyPinned: Boolean get() = PINNED_PUBLIC_KEY != null
 
   var revision: Long
     get() = prefs.getLong(REV, 0)
@@ -228,6 +248,16 @@ class SyncStore(context: Context) {
   }
 
   private companion object {
+    /**
+     *  کلیدِ عمومیِ سنجاق‌شده در خودِ نسخه — `null` یعنی سنجاق نشده.
+     *
+     *  کلیدِ عمومی راز نیست؛ فقط نباید عوض شود. همین که داخلِ APK باشد،
+     *  ساختنِ مجوزِ جعلی را ناممکن می‌کند: کلیدِ **خصوصی** فقط روی سرور
+     *  است و بی آن، امضایی که این کلید بپذیرد ساخته نمی‌شود.
+     */
+    val PINNED_PUBLIC_KEY: String? =
+      ir.vil3ntec.tohid.BuildConfig.LICENSE_PUBLIC_KEY.takeIf { it.isNotBlank() }
+
     const val DEVICE = "device_uid"
     //  `server_url`، `access_token` و `refresh_token` دیگر اینجا نیستند:
     //  نشانیِ سرور در زمانِ ساخت داخلِ برنامه می‌نشیند و دو تای بعدی در

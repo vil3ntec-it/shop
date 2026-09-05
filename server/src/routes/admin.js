@@ -210,8 +210,31 @@ router.get('/shops/:id', async (req, res, next) => {
     const r = await one(`SELECT COUNT(*)::int n FROM ${table} WHERE shop_id=$1 AND deleted=false`, [id]);
     counts[col] = r.n;
   }
+  /*
+   *  لوکیشنِ دکان — آخرین نقطه‌ای که از صاحبش رسیده.
+   *
+   *  دکان خودش ستونِ لوکیشن ندارد؛ نقطه‌ها به کاربر بسته‌اند (همان‌هایی
+   *  که هنگام ثبت‌نام و بعدش فرستاده می‌شوند). پس آخرینِ صاحبِ دکان را
+   *  می‌دهیم — همان چیزی که مدیر می‌خواهد بداند: این دکان کجاست.
+   */
+  const place = await one(
+    `SELECT lat, lng, accuracy, source, label, created_at
+       FROM device_locations WHERE user_id=$1 ORDER BY created_at DESC LIMIT 1`,
+    [shop.owner_user_id]
+  );
+
   res.json({
     shop: { id: shop.id, name: shop.name, status: shop.status, createdAt: Number(shop.created_at), ownerUserId: shop.owner_user_id },
+    location: place
+      ? {
+        lat: Number(place.lat),
+        lng: Number(place.lng),
+        accuracy: place.accuracy === null ? null : Number(place.accuracy),
+        source: place.source,
+        label: place.label,
+        at: Number(place.created_at),
+      }
+      : null,
     members, entitlement: ent, subscriptions: history, counts,
   });
 });

@@ -48,6 +48,28 @@ android {
       ?: (project.findProperty(propName) as String?)?.takeIf { it.isNotBlank() }
       ?: ""
 
+  /*
+   *  کلیدِ عمومیِ مجوز — همان که سرور با جفتِ خصوصی‌اش مجوز را امضا می‌کند.
+   *
+   *  ── چرا باید داخلِ خودِ برنامه باشد ───────────────────────────────
+   *  تا دیروز برنامه این کلید را از سرور می‌گرفت و روی گوشی ذخیره
+   *  می‌کرد. یعنی هر کسی که به فایل‌های برنامه دست داشت، می‌توانست
+   *  کلیدِ خودش را بگذارد و مجوزی که خودش امضا کرده بود جای مجوزِ
+   *  واقعی بنشیند — اشتراکِ همیشگی، بی هیچ پرداختی.
+   *
+   *  کلیدِ **عمومی** مخفی نیست و پنهان‌کردنش هم لازم نیست؛ مهم این است
+   *  که عوض نشود. پس داخلِ نسخه می‌نشیند و کلیدِ روی گوشی فقط وقتی
+   *  خوانده می‌شود که اینجا خالی باشد (نسخه‌ی خودی).
+   *
+   *  مقدارش را از `GET /api/v1/license/public-key` بگیرید و در
+   *  gradle.properties بگذارید:  tohid.licenseKey=MFkwEwYHKoZI…
+   *  ──────────────────────────────────────────────────────────────────
+   */
+  fun licenseKey(): String =
+    env("TOHID_LICENSE_PUBLIC_KEY")
+      ?: (project.findProperty("tohid.licenseKey") as String?)?.takeIf { it.isNotBlank() }
+      ?: ""
+
   defaultConfig {
     // همان بستهٔ نسخهٔ قبلی: نصب می‌شود *روی* آن، و داده‌های قدیمی
     // سرِ جایشان می‌مانند تا وارد شوند.
@@ -150,6 +172,9 @@ android {
       //  نسخه‌ی خودی: نشانی‌ی رایانه‌ی خودتان، و اگر خالی بود کادرِ
       //  نشانی در برنامه پیدا می‌شود تا دستی بزنید
       buildConfigField("String", "API_BASE", "\"${apiBase("TOHID_API_BASE_DEV", "tohid.apiBase.dev")}\"")
+      //  نسخه‌ی خودی کلیدِ سنجاق‌شده ندارد: سرورِ محلی هر بار کلیدِ تازه
+      //  می‌سازد و سنجاق‌کردنش یعنی هیچ مجوزی قبول نشود
+      buildConfigField("String", "LICENSE_PUBLIC_KEY", "\"\"")
     }
     release {
       signingConfig = signingConfigs.getByName("release")
@@ -177,6 +202,23 @@ android {
         )
       }
       buildConfigField("String", "API_BASE", "\"$releaseBase\"")
+
+      val pinnedKey = licenseKey()
+      if (pinnedKey.isBlank() && releaseBase.isNotBlank()) {
+        logger.warn(
+          "\n" +
+            "──────────────────────────────────────────────────────────────\n" +
+            "  هشدار: کلیدِ عمومیِ مجوز در این نسخه سنجاق نشده است.\n" +
+            "  برنامه ناچار کلید را از سرور می‌گیرد و روی گوشی نگه می‌دارد؛\n" +
+            "  کسی که به فایل‌های برنامه دست داشته باشد می‌تواند عوضش کند.\n" +
+            "  کلید را از GET /api/v1/license/public-key بگیرید و بگذارید در\n" +
+            "  android-native/gradle.properties:  tohid.licenseKey=…\n" +
+            "  یا در GitHub → Settings → Variables: TOHID_LICENSE_PUBLIC_KEY\n" +
+            "──────────────────────────────────────────────────────────────"
+        )
+      }
+      buildConfigField("String", "LICENSE_PUBLIC_KEY", "\"$pinnedKey\"")
+
       isMinifyEnabled = true
       isShrinkResources = true
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")

@@ -7,27 +7,33 @@ const h = require('./helpers');
 test.before(async () => { await h.start(); });
 test.after(async () => { await h.stop(); });
 
-test('ثبت‌نام فقط با ایمیل یا فقط با شماره هر دو کار می‌کند', async () => {
-  const onlyEmail = await h.post('/api/auth/register', { name: 'ایمیلی', email: 'a@b.com', password: 'Passw0rd!1' });
-  assert.equal(onlyEmail.status, 201);
-  assert.equal(onlyEmail.body.user.phone, null);
+test('ثبت‌نام بدون تأیید ایمیل بسته است — مسیر قدیمی حساب نمی‌سازد', async () => {
+  /*
+   *  این مسیر حساب را بدونِ کدِ تأیید می‌ساخت: هر کسی با ایمیلِ هر کسِ
+   *  دیگری. قرار صاحب مخزن: «کد نیامد، ثبت‌نامی هم نیست».
+   */
+  const tried = await h.post('/api/auth/register', {
+    name: 'بی‌کد', email: 'nocode@b.com', password: 'Passw0rd!1',
+  });
+  assert.equal(tried.status, 403);
+  assert.equal(tried.body.error.code, 'verification_required');
 
-  const onlyPhone = await h.post('/api/auth/register', { name: 'شماره‌ای', phone: '0791111111', password: 'Passw0rd!1' });
-  assert.equal(onlyPhone.status, 201);
-  assert.equal(onlyPhone.body.user.email, null);
-
-  const neither = await h.post('/api/auth/register', { name: 'هیچ', password: 'Passw0rd!1' });
-  assert.equal(neither.status, 400);
-  assert.equal(neither.body.error.code, 'identifier_required');
+  //  و واقعاً حسابی ساخته نشده
+  const login = await h.post('/api/auth/login', { identifier: 'nocode@b.com', password: 'Passw0rd!1' });
+  assert.notEqual(login.status, 200);
 });
 
 test('شماره در هر قالبی نوشته شود، یک حساب است', async () => {
-  await h.post('/api/auth/register', { name: 'یک', phone: '0792236008', password: 'Passw0rd!1' });
-  const again = await h.post('/api/auth/register', { name: 'دو', phone: '+93 792 236 008', password: 'Passw0rd!1' });
-  assert.equal(again.status, 409);
+  //  حساب با کدِ یک‌بارمصرف ساخته می‌شود — تنها راهی که شماره از آن
+  //  واردِ سیستم می‌شود
+  const asked = await h.post('/api/auth/otp/request', { phone: '0792236008' });
+  await h.post('/api/auth/otp/verify', { phone: '0792236008', code: asked.body.devCode, name: 'یک' });
 
-  const login = await h.post('/api/auth/login', { identifier: '0093792236008', password: 'Passw0rd!1' });
-  assert.equal(login.status, 200);
+  //  همان شماره با قالبِ دیگر، همان حساب است — نه حسابِ تازه
+  const again = await h.post('/api/auth/otp/request', { phone: '+93 792 236 008' });
+  const back = await h.post('/api/auth/otp/verify', { phone: '0093792236008', code: again.body.devCode });
+  assert.equal(back.status, 200, 'حسابِ موجود، نه ساختِ تازه');
+  assert.equal(back.body.created, false);
 });
 
 test('ورود با کد یک‌بارمصرف: کد اشتباه رد و کد درست قبول می‌شود', async () => {
@@ -63,7 +69,7 @@ test('توکن نامعتبر، حساب غیرفعال و خروج، همه ب�
   await h.post('/api/auth/logout', { refreshToken: u.refreshToken }, { token: u.accessToken });
   assert.equal((await h.get('/api/me', { token: u.accessToken })).status, 401);
 
-  const back = await h.post('/api/auth/login', { identifier: u.phone, password: u.password });
+  const back = await h.post('/api/auth/login', { identifier: u.email, password: u.password });
   assert.equal(back.status, 200);
 });
 
