@@ -155,8 +155,12 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
      *  می‌شود — و فراموش‌شدن، همان چیزی است که این صفحه باید جلویش را
      *  بگیرد. حساب‌های صاف هم ته می‌روند و جمع می‌شوند.
      */
+    //  ترتیبِ انتخاب‌شده در یک متغیر می‌نشیند و بعد استفاده می‌شود.
+    //  خواندنِ `sort.order` از داخلِ یک لامبدا، کامپایلرِ K2 را با یک
+    //  خطای داخلی می‌انداخت (FirUninitializedEnumChecker).
+    val chosen: Comparator<DebtorRow> = sort.order
     val owing = rows.filter { it.balance > 0 }
-      .sortedWith(compareByDescending<DebtorRow> { (it.days ?: 0L) >= 30 }.thenComparator { x, y -> sort.order.compare(x, y) })
+      .sortedWith(compareByDescending<DebtorRow> { (it.days ?: 0L) >= 30 }.then(chosen))
     val settled = rows.filter { it.balance <= 0 }
 
     var settledOpen by rememberSaveable { mutableStateOf(false) }
@@ -399,7 +403,8 @@ private fun DebtorSortRow(current: DebtorSort, count: Int, onPick: (DebtorSort) 
       color = colors.muted2,
       modifier = Modifier.padding(end = 2.dp),
     )
-    DebtorSort.entries.forEach { option ->
+    //  `values()` نه `entries`: همان دامِ کامپایلر، همین‌جا هم بود
+    DebtorSort.values().forEach { option ->
       val picked = option == current
       Row(
         Modifier
