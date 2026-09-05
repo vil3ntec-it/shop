@@ -29,7 +29,7 @@
   box-shadow:var(--shadow-md,0 6px 20px -8px rgba(30,50,110,.15));
 }
 #sync-reload-bar.show, #stock-alert-bar.show{ display:flex; }
-#sync-reload-bar{ background:var(--primary-tint,#eaf0ff); color:var(--primary-dark,#1f3f9e); }
+#sync-reload-bar{ background:var(--primary-tint,rgba(124,92,255,.12)); color:var(--primary-dark,#5b3fe0); }
 #stock-alert-bar{ background:var(--danger-tint,#fdecec); color:var(--danger,#e54b4b); }
 #stock-alert-bar .sa-head{ display:flex; align-items:center; justify-content:space-between; gap:12px; width:100%; }
 @media (min-width:900px){
@@ -44,10 +44,10 @@
 .sync-btn{
   display:inline-flex; align-items:center; justify-content:center; gap:6px;
   padding:9px 16px; border:none; border-radius:var(--radius-sm,10px);
-  background:var(--primary,#2c5ce6); color:#fff;
+  background:var(--primary,#7c5cff); color:#fff;
   font-family:inherit; font-size:13px; font-weight:700; cursor:pointer;
 }
-.sync-btn:hover{ background:var(--primary-dark,#1f3f9e); }
+.sync-btn:hover{ background:var(--primary-dark,#5b3fe0); }
 .sync-btn:disabled{ opacity:.6; cursor:default; }
 .sync-btn-block{ width:100%; margin-top:10px; }
 .sync-btn-sm{ padding:5px 11px; font-size:11.5px; }
@@ -88,7 +88,7 @@
   color:var(--text,#1a2233); background:var(--surface,#f6f8fc);
   border:1.5px solid var(--border,#e5eaf3); border-radius:var(--radius-sm,10px); outline:none;
 }
-.sync-input:focus{ border-color:var(--primary,#2c5ce6); }
+.sync-input:focus{ border-color:var(--primary,#7c5cff); }
 .sync-hint{ font-size:11.5px; color:var(--muted,#7c8698); margin-top:6px; line-height:1.8; }
 
 .sync-tabs{ display:flex; gap:6px; margin-bottom:6px; }
@@ -97,7 +97,7 @@
   border-radius:var(--radius-sm,10px); background:var(--surface,#f6f8fc);
   color:var(--muted,#7c8698); font-family:inherit; font-size:12.5px; font-weight:700; cursor:pointer;
 }
-.sync-tab-on{ background:var(--primary,#2c5ce6); border-color:var(--primary,#2c5ce6); color:#fff; }
+.sync-tab-on{ background:var(--primary,#7c5cff); border-color:var(--primary,#7c5cff); color:#fff; }
 
 .sync-status{
   padding:12px 14px; margin-bottom:16px;
@@ -129,11 +129,11 @@
 .invite-code{
   display:flex; align-items:center; justify-content:space-between; gap:10px;
   margin-top:10px; padding:12px 14px;
-  background:var(--primary-tint,#eaf0ff); border-radius:var(--radius-sm,10px);
+  background:var(--primary-tint,rgba(124,92,255,.12)); border-radius:var(--radius-sm,10px);
 }
 .invite-code span{
   font-size:19px; font-weight:800; letter-spacing:2px;
-  color:var(--primary-dark,#1f3f9e); direction:ltr;
+  color:var(--primary-dark,#5b3fe0); direction:ltr;
 }
 
 /* ---------- کسری موجودی ---------- */
