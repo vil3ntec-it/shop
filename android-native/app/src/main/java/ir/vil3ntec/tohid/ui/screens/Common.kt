@@ -27,6 +27,7 @@ import ir.vil3ntec.tohid.ui.theme.Radius
 import ir.vil3ntec.tohid.ui.theme.Shape
 import ir.vil3ntec.tohid.ui.theme.Shop
 import ir.vil3ntec.tohid.ui.theme.glassSurface
+import ir.vil3ntec.tohid.ui.theme.richGlass
 
 /**
  *  کارت.
@@ -40,9 +41,12 @@ import ir.vil3ntec.tohid.ui.theme.glassSurface
 @Composable
 fun Panel(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
   val colors = Shop.colors
+  //  روی گوشیِ ضعیف، سطحِ نیمه‌شفاف روی زمینه‌ی شلوغ خوانا نیست چون مه
+  //  ندارد؛ آنجا همان کارت با سطحِ توپر و همان لبه‌ی روشن کشیده می‌شود.
+  val tint = if (richGlass()) colors.surface else colors.surfaceSolid
   Column(
     modifier
-      .glassSurface(Shape.card, colors.surface, colors.sheen, colors.border, glow = colors.glow)
+      .glassSurface(Shape.card, tint, colors.sheen, colors.border, glow = colors.glow)
       .padding(18.dp),
     content = content,
   )
@@ -66,12 +70,13 @@ fun StatTile(
   compact: Boolean = false,
 ) {
   val colors = Shop.colors
+  val tint = if (richGlass()) colors.surface else colors.surfaceSolid
   // برچسب، عدد و توضیح هر سه وسطِ کاشی. وقتی چند کاشی کنارِ هم‌اند و
   // متن‌ها به یک لبه چسبیده‌اند، ردیف ناهماهنگ دیده می‌شود — به‌ویژه
   // آنجا که یک برچسب دو خط می‌شود و بقیه یک خط.
   Column(
     modifier
-      .glassSurface(Shape.card, colors.surface, colors.sheen, colors.border, glow = colors.glow)
+      .glassSurface(Shape.card, tint, colors.sheen, colors.border, glow = colors.glow)
       .padding(if (compact) 10.dp else 16.dp),
     horizontalAlignment = Alignment.CenterHorizontally,
   ) {

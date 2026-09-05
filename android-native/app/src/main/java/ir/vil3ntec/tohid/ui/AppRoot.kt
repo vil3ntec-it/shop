@@ -51,7 +51,8 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
-import ir.vil3ntec.tohid.ui.theme.ArcticBackground
+import ir.vil3ntec.tohid.ui.theme.AuroraBackground
+import ir.vil3ntec.tohid.ui.theme.AuroraTone
 import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.launch
 
@@ -356,7 +357,16 @@ fun AppRoot(
     if (TABS.any { it.id == target }) { tab = target; sub = null } else sub = target
   }
 
-  ArcticBackground(animated = Motion.enabled) {
+  //  رنگِ غالبِ زمینه از خودِ صفحه می‌آید: قرض‌داران صورتی، پول نعنایی،
+  //  انبار نارنجی، بقیه بنفشِ برند. رنگ‌ها یکی‌اند، فقط ترتیبشان عوض می‌شود.
+  val tone = when (sub ?: tab) {
+    "debtors" -> AuroraTone.Debt
+    "reports", "expenses", "sales" -> AuroraTone.Cash
+    "warehouse", "products", "purchasing" -> AuroraTone.Stock
+    else -> AuroraTone.Brand
+  }
+
+  AuroraBackground(tone = tone, animated = Motion.enabled) {
   Scaffold(
     containerColor = Color.Transparent,
     // سربرگ و نوارِ پایین خودشان فاصلهٔ نوارهای سیستم را می‌گیرند
