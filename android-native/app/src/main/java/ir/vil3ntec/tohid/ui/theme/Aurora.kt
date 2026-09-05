@@ -184,36 +184,49 @@ fun Modifier.glassSurface(
   border: Color,
   strong: Boolean = false,
   glow: Color = Color(0x1F7C5CFF),
-): Modifier = this
-  .shadow(
-    elevation = if (strong) 14.dp else 8.dp,
-    shape = shape,
-    ambientColor = glow,
-    spotColor = glow,
-  )
-  .clip(shape)
-  .background(color = tint, shape = shape)
-  .drawBehind {
-    if (sheen.alpha > 0f) {
-      drawRect(
-        brush = Brush.verticalGradient(
-          0f to sheen,
-          1f to Color.Transparent,
-          endY = size.height * 0.35f,
-        ),
-        size = Size(size.width, size.height * 0.35f),
-      )
+): Modifier {
+  /*
+   *  ── چرا سایه فقط روی سطحِ توپر ──────────────────────────────────
+   *  سایه‌ی کامپوز **پشتِ** کارت کشیده می‌شود. تا وقتی سطحِ کارت توپر بود
+   *  کسی نمی‌دیدش؛ ولی سطحِ شیشه‌ای نیمه‌شفاف است و همان سایه از داخلِ
+   *  کارت دیده می‌شد — همان «مربعِ تیره داخلِ هر کادر» که در تمِ شب
+   *  خودش را نشان می‌داد. روی شیشه، جدایی را لبه‌ی روشن می‌سازد نه سایه.
+   *  ────────────────────────────────────────────────────────────────
+   */
+  val solid = tint.alpha > 0.98f
+  return this
+    .then(
+      if (solid) Modifier.shadow(
+        elevation = if (strong) 14.dp else 8.dp,
+        shape = shape,
+        ambientColor = glow,
+        spotColor = glow,
+      ) else Modifier
+    )
+    .clip(shape)
+    .background(color = tint, shape = shape)
+    .drawBehind {
+      if (sheen.alpha > 0f) {
+        drawRect(
+          brush = Brush.verticalGradient(
+            0f to sheen,
+            1f to Color.Transparent,
+            endY = size.height * 0.35f,
+          ),
+          size = Size(size.width, size.height * 0.35f),
+        )
+      }
     }
-  }
-  .border(
-    width = 1.dp,
-    //  لبه از بالا-چپ روشن شروع می‌شود و پایین محو می‌شود — همان چیزی
-    //  که شیشه را «شیشه» نشان می‌دهد نه یک لکه‌ی تار
-    brush = Brush.linearGradient(
-      listOf(
-        border.copy(alpha = (border.alpha * 1.9f).coerceAtMost(1f)),
-        border.copy(alpha = border.alpha * 0.3f),
+    .border(
+      width = 1.dp,
+      //  لبه از بالا روشن شروع می‌شود و پایین محو می‌شود — همان چیزی که
+      //  شیشه را «شیشه» نشان می‌دهد
+      brush = Brush.linearGradient(
+        listOf(
+          border.copy(alpha = (border.alpha * 1.9f).coerceAtMost(1f)),
+          border.copy(alpha = border.alpha * 0.3f),
+        ),
       ),
-    ),
-    shape = shape,
-  )
+      shape = shape,
+    )
+}

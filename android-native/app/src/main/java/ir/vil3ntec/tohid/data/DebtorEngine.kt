@@ -1,6 +1,6 @@
 package ir.vil3ntec.tohid.data
 
-import ir.vil3ntec.tohid.moneyPlain
+import ir.vil3ntec.tohid.money
 
 /**
  *  قرض‌داران.
@@ -89,9 +89,9 @@ object DebtorEngine {
     val balance = ShopStore.debt(d, id)
     val count = d.transactions.count { it.debtorId == id }
     return if (balance > 0) {
-      "«${debtor.name}» هنوز ${moneyPlain(balance)} افغانی بدهی دارد. با حذف او، این طلب و ${moneyPlain(count.toDouble())} تراکنش او برای همیشه از دفتر پاک می‌شود."
+      "«${debtor.name}» هنوز ${money(balance)} افغانی بدهی دارد. با حذف او، این طلب و ${money(count.toDouble())} تراکنش او برای همیشه از دفتر پاک می‌شود."
     } else {
-      "«${debtor.name}» و ${moneyPlain(count.toDouble())} تراکنش او حذف خواهند شد. این عملیات قابل بازگشت نیست."
+      "«${debtor.name}» و ${money(count.toDouble())} تراکنش او حذف خواهند شد. این عملیات قابل بازگشت نیست."
     }
   }
 
@@ -135,7 +135,7 @@ object DebtorEngine {
         type = "customer_payment",
         date = when_,
         refId = id,
-        notes = "پرداخت مشتری «${debtor.name}» به مبلغ ${moneyPlain(amount)} افغانی",
+        notes = "پرداخت مشتری «${debtor.name}» به مبلغ ${money(amount)} افغانی",
         createdAt = now,
       )
     } else {
@@ -253,8 +253,8 @@ object DebtorEngine {
 
   /** حالِ حساب، با همان جمله‌های نسخهٔ وب */
   fun stateText(balance: Double): String = when {
-    balance > 0 -> "${moneyPlain(balance)} افغانی بدهکار"
-    balance < 0 -> "${moneyPlain(-balance)} افغانی موجودی دارد"
+    balance > 0 -> "${money(balance)} افغانی بدهکار"
+    balance < 0 -> "${money(-balance)} افغانی موجودی دارد"
     else -> "حساب صاف است"
   }
 }

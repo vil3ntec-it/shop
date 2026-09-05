@@ -261,7 +261,7 @@ fun SalesHistoryScreen(
   reopenFor?.let { sale ->
     AlertDialog(
       onDismissRequest = { reopenFor = null },
-      containerColor = Shop.colors.surface,
+      containerColor = Shop.colors.surfaceSolid,
       title = { Text("اصلاح فاکتور؟", color = Shop.colors.text) },
       text = {
         Text(
@@ -308,7 +308,7 @@ fun SalesHistoryScreen(
   cancelFor?.let { sale ->
     AlertDialog(
       onDismissRequest = { cancelFor = null },
-      containerColor = Shop.colors.surface,
+      containerColor = Shop.colors.surfaceSolid,
       title = { Text("لغو فروش؟", color = Shop.colors.text) },
       text = {
         Text(
@@ -440,7 +440,7 @@ private fun ReturnDialog(
 
   Dialog(onDismissRequest = onDismiss) {
     DialogEntry {
-    Surface(color = Shop.colors.surface, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
+    Surface(color = Shop.colors.surfaceSolid, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
       Column(Modifier.padding(18.dp).verticalScroll(rememberScrollState())) {
         Text("مرجوعی — فاکتور #${plain(sale.invoiceNumber ?: 0)}",
           style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)

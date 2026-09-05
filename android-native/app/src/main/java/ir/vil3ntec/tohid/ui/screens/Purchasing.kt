@@ -172,7 +172,7 @@ fun PurchasingScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState)
   confirmDelete?.let { supplier ->
     AlertDialog(
       onDismissRequest = { confirmDelete = null },
-      containerColor = Shop.colors.surface,
+      containerColor = Shop.colors.surfaceSolid,
       title = { Text("حذف تأمین‌کننده؟", color = Shop.colors.text) },
       text = {
         Text(
@@ -342,7 +342,7 @@ private fun SupplierDialog(
 
   Dialog(onDismissRequest = onDismiss) {
     DialogEntry {
-    Surface(color = Shop.colors.surface, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
+    Surface(color = Shop.colors.surfaceSolid, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
       Column(Modifier.padding(18.dp).verticalScroll(rememberScrollState())) {
         Text(
           if (form.editingId == null) "تأمین‌کنندهٔ تازه" else "ویرایش تأمین‌کننده",
@@ -406,7 +406,7 @@ private fun PurchaseDialog(
 
   Dialog(onDismissRequest = onDismiss) {
     DialogEntry {
-    Surface(color = Shop.colors.surface, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
+    Surface(color = Shop.colors.surfaceSolid, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
       Column(Modifier.padding(18.dp).verticalScroll(rememberScrollState())) {
         Text("ثبت خرید", style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
         Spacer(Modifier.height(4.dp))
@@ -502,7 +502,7 @@ private fun PaymentDialog(
 
   Dialog(onDismissRequest = onDismiss) {
     DialogEntry {
-    Surface(color = Shop.colors.surface, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
+    Surface(color = Shop.colors.surfaceSolid, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
       Column(Modifier.padding(18.dp).verticalScroll(rememberScrollState())) {
         Text("پرداخت به تأمین‌کننده", style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
         if (supplier != null) {

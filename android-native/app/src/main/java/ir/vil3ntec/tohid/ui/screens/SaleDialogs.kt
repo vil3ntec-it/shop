@@ -88,7 +88,7 @@ fun CheckoutDialog(
   Dialog(onDismissRequest = onDismiss) {
     DialogEntry {
     Surface(
-      color = Shop.colors.surface,
+      color = Shop.colors.surfaceSolid,
       shape = RoundedCornerShape(Radius.lg),
       modifier = Modifier.fillMaxWidth(),
     ) {
@@ -271,7 +271,7 @@ fun InvoiceDialog(
   Dialog(onDismissRequest = onDismiss) {
     DialogEntry {
     Surface(
-      color = Shop.colors.surface,
+      color = Shop.colors.surfaceSolid,
       shape = RoundedCornerShape(Radius.lg),
       modifier = Modifier.fillMaxWidth(),
     ) {
@@ -383,7 +383,7 @@ private fun PrinterDialog(onDismiss: () -> Unit, onPrint: (String, Int) -> Unit)
 
   Dialog(onDismissRequest = onDismiss) {
     DialogEntry {
-    Surface(color = Shop.colors.surface, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
+    Surface(color = Shop.colors.surfaceSolid, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
       Column(Modifier.padding(18.dp)) {
         Text("چاپ فاکتور", style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
         Spacer(Modifier.height(12.dp))
@@ -468,7 +468,7 @@ fun DebtorPicker(
   val shown = d.debtors.filter { search.isBlank() || it.name.contains(search.trim(), ignoreCase = true) }
 
   Dialog(onDismissRequest = onClose) {
-    Surface(color = Shop.colors.surface, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
+    Surface(color = Shop.colors.surfaceSolid, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
       Column(Modifier.padding(16.dp).heightIn(max = 520.dp)) {
         Text("انتخاب قرض‌دار", style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
         Spacer(Modifier.height(10.dp))
@@ -548,7 +548,7 @@ fun CartLineDialog(
 
   Dialog(onDismissRequest = onDismiss) {
     Surface(
-      color = Shop.colors.surface,
+      color = Shop.colors.surfaceSolid,
       shape = RoundedCornerShape(Radius.lg),
       modifier = Modifier.fillMaxWidth(),
     ) {
@@ -639,7 +639,7 @@ fun FreeLineDialog(
 
   Dialog(onDismissRequest = onDismiss) {
     Surface(
-      color = Shop.colors.surface,
+      color = Shop.colors.surfaceSolid,
       shape = RoundedCornerShape(Radius.lg),
       modifier = Modifier.fillMaxWidth(),
     ) {

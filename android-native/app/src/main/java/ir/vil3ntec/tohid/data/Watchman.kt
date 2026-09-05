@@ -17,7 +17,7 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
-import ir.vil3ntec.tohid.moneyPlain
+import ir.vil3ntec.tohid.money
 import java.util.concurrent.TimeUnit
 
 /**
@@ -203,7 +203,7 @@ object Watchman {
       val title = if (fresh.size == 1) "قرضِ ${fresh[0].name} زیاد شد"
       else "${fresh.size} نفر قرضِ زیاد دارند"
       val text = fresh.take(4).joinToString("، ") {
-        "${it.name}: ${moneyPlain(it.amount)} افغانی"
+        "${it.name}: ${money(it.amount)} افغانی"
       }
       notify(context, DEBT, title, text)
     }

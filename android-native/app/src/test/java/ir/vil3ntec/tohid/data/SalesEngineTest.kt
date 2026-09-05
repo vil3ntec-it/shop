@@ -329,11 +329,11 @@ class SalesEngineTest {
 
   @Test
   fun `مبلغ با رقم لاتین و جداکننده ی هزارگان نوشته می شود`() {
-    assertEquals("۰", money(0.0))
-    assertEquals("۹۹۹", money(999.0))
-    assertEquals("۱,۰۰۰", money(1000.0))
-    assertEquals("۱۲,۳۴۵,۶۷۸", money(12345678.0))
-    assertEquals("۱۱۷", money(116.55))   // مثل Math.round نسخهٔ وب
-    assertEquals("-۵۰۰", money(-500.0))
+    assertEquals("0", money(0.0))
+    assertEquals("999", money(999.0))
+    assertEquals("1,000", money(1000.0))
+    assertEquals("12,345,678", money(12345678.0))
+    assertEquals("117", money(116.55))   // مثل Math.round نسخهٔ وب
+    assertEquals("-500", money(-500.0))
   }
 }

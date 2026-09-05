@@ -56,7 +56,7 @@ class BulkEntryTest {
       listOf(product("چای"), product(""), product("روغن")),
       1L, ::newId,
     ))
-    assertTrue(r, r.startsWith("ردیف ۲"))
+    assertTrue(r, r.startsWith("ردیف 2"))
   }
 
   @Test
@@ -66,13 +66,13 @@ class BulkEntryTest {
       listOf(product("چای", "999"), product("قند", "999")),
       1L, ::newId,
     ))
-    assertTrue(r, r.startsWith("ردیف ۲"))
+    assertTrue(r, r.startsWith("ردیف 2"))
   }
 
   @Test
   fun `بارکد تکراری با کالای قدیمی هم گرفته می شود`() {
     val r = failed(WarehouseEngine.addProducts(base, listOf(product("چای", "111")), 1L, ::newId))
-    assertTrue(r, r.startsWith("ردیف ۱"))
+    assertTrue(r, r.startsWith("ردیف 1"))
   }
 
   @Test
@@ -104,7 +104,7 @@ class BulkEntryTest {
       listOf(entry("p1", 10.0), entry("p1", 0.0)),
       "2026-01-01", 1L, ::newId,
     ))
-    assertTrue(r, r.startsWith("ردیف ۲"))
+    assertTrue(r, r.startsWith("ردیف 2"))
     // دفترِ اصلی دست‌نخورده مانده
     assertEquals(0.0, ShopStore.stock(base, "p1"), 0.001)
     assertEquals(0, base.warehouseEntries.size)
@@ -141,7 +141,7 @@ class BulkEntryTest {
       ),
       "2026-01-01", 1L, ::newId,
     ))
-    assertTrue(r, r.startsWith("ردیف ۲"))
+    assertTrue(r, r.startsWith("ردیف 2"))
     assertEquals(1, base.products.size)
   }
 }

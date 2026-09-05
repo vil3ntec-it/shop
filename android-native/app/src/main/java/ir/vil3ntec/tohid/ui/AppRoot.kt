@@ -544,7 +544,6 @@ fun AppRoot(
           onBack = { sub = null },
           onSignIn = { authOpen = true },
           onSubscription = { sub = "vip" },
-          onSettings = { sub = "settings" },
         )
         "team" -> TeamScreen(snackbar)
         "more" -> MoreScreen(store, data, ::open)

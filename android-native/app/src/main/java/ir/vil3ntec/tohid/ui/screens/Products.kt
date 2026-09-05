@@ -312,7 +312,7 @@ fun ProductsScreen(
   actionsFor?.let { p ->
     ModalBottomSheet(
       onDismissRequest = { actionsFor = null },
-      containerColor = Shop.colors.surface,
+      containerColor = Shop.colors.surfaceSolid,
     ) {
       Column(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, bottom = 28.dp)) {
         Text(p.name, style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
@@ -347,7 +347,7 @@ fun ProductsScreen(
   confirmDelete?.let { p ->
     AlertDialog(
       onDismissRequest = { confirmDelete = null },
-      containerColor = Shop.colors.surface,
+      containerColor = Shop.colors.surfaceSolid,
       title = { Text("حذف «${p.name}»؟", color = Shop.colors.text) },
       text = { Text(WarehouseEngine.deleteWarning(d, p.id), color = Shop.colors.muted) },
       confirmButton = {

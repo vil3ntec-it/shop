@@ -191,13 +191,14 @@ fun AppLockScreen(onUnlocked: () -> Unit) {
 @Composable
 private fun LockMark() {
   val colors = Shop.colors
-  //  هاله یک بار هنگام آمدنِ صفحه باز می‌شود و همان‌جا می‌ماند؛
-  //  نفس‌کشیدنِ دائمی، چشم را روی صفحه‌ای که کارِ دیگری ندارد خسته می‌کند
-  var lit by remember { mutableStateOf(false) }
-  LaunchedEffect(Unit) { lit = true }
-  val breathe by animateFloatAsState(
-    targetValue = if (lit) 0.6f else 0.25f,
-    animationSpec = tween(if (Motion.enabled) 900 else 1, easing = EaseInOutSine),
+  val motion = rememberInfiniteTransition(label = "lock")
+  val breathe by motion.animateFloat(
+    initialValue = 0.25f,
+    targetValue = 0.6f,
+    animationSpec = infiniteRepeatable(
+      tween(if (Motion.enabled) 2200 else 1, easing = EaseInOutSine),
+      RepeatMode.Reverse,
+    ),
     label = "breathe",
   )
   Box(contentAlignment = Alignment.Center) {

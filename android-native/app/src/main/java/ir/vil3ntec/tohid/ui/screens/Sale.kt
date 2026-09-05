@@ -686,7 +686,7 @@ fun CartBar(
   onFinalize: () -> Unit,
 ) {
   Surface(
-    color = Shop.colors.surface,
+    color = Shop.colors.surfaceSolid,
     tonalElevation = 0.dp,
     shadowElevation = 12.dp,
     modifier = Modifier.fillMaxWidth(),

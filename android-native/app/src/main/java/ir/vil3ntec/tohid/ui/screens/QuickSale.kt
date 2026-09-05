@@ -342,7 +342,7 @@ fun QuickSaleScreen(
   confirmDeleteCategory?.let { name ->
     AlertDialog(
       onDismissRequest = { confirmDeleteCategory = null },
-      containerColor = Shop.colors.surface,
+      containerColor = Shop.colors.surfaceSolid,
       title = { Text("حذف دسته‌بندی؟", color = Shop.colors.text) },
       text = {
         Text(

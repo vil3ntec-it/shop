@@ -230,7 +230,7 @@ fun WarehouseScreen(
   confirmEntry?.let { entryId ->
     AlertDialog(
       onDismissRequest = { confirmEntry = null },
-      containerColor = Shop.colors.surface,
+      containerColor = Shop.colors.surfaceSolid,
       title = { Text("حذف این ورودی انبار؟", color = Shop.colors.text) },
       text = {
         Text(
@@ -332,7 +332,7 @@ fun WarehouseScreen(
   confirmDelete?.let { p ->
     AlertDialog(
       onDismissRequest = { confirmDelete = null },
-      containerColor = Shop.colors.surface,
+      containerColor = Shop.colors.surfaceSolid,
       title = { Text("حذف محصول؟", color = Shop.colors.text) },
       text = {
         Text(
@@ -532,7 +532,7 @@ private fun MovementsDialog(d: ShopData, product: Product, onDismiss: () -> Unit
   val moves = d.stockMovements.filter { it.productId == product.id }.sortedByDescending { it.createdAt }
 
   androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
-    Surface(color = Shop.colors.surface, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
+    Surface(color = Shop.colors.surfaceSolid, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
       Column(Modifier.padding(16.dp).heightIn(max = 520.dp)) {
         Text("حرکات انبار — ${product.name}", style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
         Spacer(Modifier.height(12.dp))
