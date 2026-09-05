@@ -7,6 +7,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -17,6 +18,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.admin.net.AdminApi
 import ir.vil3ntec.tohid.admin.net.Session
@@ -125,6 +129,7 @@ private fun ShopSheet(session: Session, shopId: String, onBack: () -> Unit) {
   var error by remember { mutableStateOf<String?>(null) }
   var done by remember { mutableStateOf<String?>(null) }
   var granting by remember { mutableStateOf(false) }
+  val context = LocalContext.current
 
   fun load() {
     val token = session.token ?: return
@@ -191,6 +196,55 @@ private fun ShopSheet(session: Session, shopId: String, onBack: () -> Unit) {
       Spacer(Modifier.height(8.dp))
       Row2("شناسه", shop.optString("id"))
       Row2("ساخته شده", jalali(shop.optLong("createdAt")))
+    }
+
+    /* ---------------------------- لوکیشن ---------------------------- */
+    /*
+     *  کجاست این دکان.
+     *
+     *  آخرین نقطه‌ای که از صاحبِ دکان رسیده — همان که هنگام ثبت‌نام
+     *  گرفته می‌شود. عددِ خام به کسی چیزی نمی‌گوید، پس زدنش نقشه‌ی خودِ
+     *  گوشی را روی همان نقطه باز می‌کند.
+     */
+    val place = d.optJSONObject("location")
+    Spacer(Modifier.height(14.dp))
+    SectionTitle("لوکیشن")
+    Panel {
+      if (place == null) {
+        Text(
+          "لوکیشنی برای این دکان ثبت نشده.",
+          style = MaterialTheme.typography.bodySmall,
+          color = c.muted,
+        )
+      } else {
+        val lat = place.optDouble("lat")
+        val lng = place.optDouble("lng")
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+          Column(Modifier.weight(1f)) {
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+              Text(
+                String.format(java.util.Locale.US, "%.5f, %.5f", lat, lng),
+                style = MaterialTheme.typography.titleSmall,
+                color = c.text,
+                fontWeight = FontWeight.Bold,
+              )
+            }
+            Spacer(Modifier.height(2.dp))
+            Text(
+              "ثبت شده در ${jalali(place.optLong("at"))}" +
+                (place.optDouble("accuracy").takeIf { !it.isNaN() && it > 0 }
+                  ?.let { " · دقتِ ${it.toInt()} متر" } ?: ""),
+              style = MaterialTheme.typography.labelSmall,
+              color = c.muted,
+            )
+          }
+          TextButton(onClick = { openOnMap(context, lat, lng, shop.optString("name")) }) {
+            Icon(Icons.Filled.Place, contentDescription = null, tint = c.primary, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(4.dp))
+            Text("روی نقشه", color = c.primary)
+          }
+        }
+      }
     }
 
     Spacer(Modifier.height(14.dp))
@@ -446,4 +500,29 @@ private fun actionName(action: String): String = when (action) {
   "status" -> "تغییر وضعیت"
   "expire" -> "انقضا"
   else -> action
+}
+
+
+/**
+ *  نقطه را روی نقشه‌ی خودِ گوشی باز می‌کند.
+ *
+ *  `geo:` را هر برنامه‌ی نقشه‌ای می‌فهمد؛ اگر روی گوشی هیچ نقشه‌ای نبود،
+ *  نشانیِ وب باز می‌شود که مرورگر هم بلد است.
+ */
+private fun openOnMap(context: android.content.Context, lat: Double, lng: Double, label: String) {
+  val point = String.format(java.util.Locale.US, "%f,%f", lat, lng)
+  val name = label.ifBlank { "دکان" }
+  val geo = android.content.Intent(
+    android.content.Intent.ACTION_VIEW,
+    android.net.Uri.parse("geo:$point?q=$point(${android.net.Uri.encode(name)})"),
+  )
+  if (runCatching { context.startActivity(geo); true }.getOrDefault(false)) return
+  runCatching {
+    context.startActivity(
+      android.content.Intent(
+        android.content.Intent.ACTION_VIEW,
+        android.net.Uri.parse("https://www.google.com/maps/search/?api=1&query=$point"),
+      )
+    )
+  }
 }

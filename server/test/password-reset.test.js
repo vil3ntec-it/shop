@@ -14,15 +14,27 @@ test.before(async () => { await h.start(); });
 test.after(async () => { await h.stop(); });
 
 let seq = 0;
+/**
+ *  حساب می‌سازد — از همان سه پله‌ای که برنامه می‌رود.
+ *
+ *  مسیرِ یک‌مرحله‌ای بسته شد (حساب بدونِ تأییدِ ایمیل ساخته می‌شد)، پس
+ *  این کمکی هم مثل خودِ برنامه کد می‌گیرد و بعد حساب می‌سازد.
+ */
 async function makeUser(email) {
-  //  شناسه‌ی دستگاه فقط حرف و رقم می‌پذیرد؛ ایمیل داخلش رد می‌شود
   seq += 1;
-  const r = await h.post('/api/auth/register', {
-    name: 'صاحب حساب', email, password: 'Passw0rd!test',
+  const password = 'Passw0rd!test';
+  const started = await h.post('/api/auth/register/start', { name: 'صاحب حساب', email, password });
+  assert.ok(started.status < 300, JSON.stringify(started.body));
+  const verified = await h.post('/api/auth/register/verify', { email, code: started.body.devCode });
+  assert.ok(verified.status < 300, JSON.stringify(verified.body));
+  const done = await h.post('/api/auth/register/complete', {
+    ticket: verified.body.ticket,
+    name: 'صاحب حساب', password,
+    terms: { accepted: true },
     device: { deviceId: `dev-reset-${seq}`, name: 'تست', platform: 'test' },
   });
-  assert.equal(r.status, 201);
-  return r.body;
+  assert.ok(done.status < 300, JSON.stringify(done.body));
+  return done.body;
 }
 
 test('کد بازیابی به همان ایمیل می‌رود و رمز تازه می‌نشیند', async () => {

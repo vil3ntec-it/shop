@@ -20,7 +20,7 @@ test('۱ و ۲: دو کاربر ثبت‌نام می‌کنند و اطلاعا�
   const meB = await h.get('/api/me', { token: b.accessToken });
   assert.equal(meA.body.user.id, a.user.id);
   assert.equal(meB.body.user.id, b.user.id);
-  assert.notEqual(meA.body.user.phone, meB.body.user.phone);
+  assert.notEqual(meA.body.user.email, meB.body.user.email);
 });
 
 // ---------- TEST 3: دو دکان جدا ----------
@@ -261,7 +261,7 @@ test('۱۲: بعد از حذف برنامه و ورود دوباره، همه چ
 
   // گوشی جدید: همان حساب، دستگاه دیگر، دیتابیس محلی خالی
   const relogin = await h.post('/api/auth/login', {
-    identifier: owner.phone, password: owner.password,
+    identifier: owner.email, password: owner.password,
     device: { deviceId: 'new-phone', name: 'گوشی نو', platform: 'android' },
   });
   assert.equal(relogin.status, 200);

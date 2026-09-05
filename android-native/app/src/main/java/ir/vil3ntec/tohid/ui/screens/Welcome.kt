@@ -69,6 +69,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.activity.compose.BackHandler
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -80,6 +81,9 @@ import androidx.compose.material.icons.filled.LocationOff
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
+import ir.vil3ntec.tohid.plain
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.CompositionLocalProvider
@@ -247,7 +251,6 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
    *  گرفتنِ لوکیشن سرِ جایشان می‌مانند — چیزی که از دست می‌رود فقط
    *  تأییدِ ایمیل است، که روی سرورِ بی‌فرستنده اصلاً ممکن نبود.
    */
-  var legacySignup by rememberSaveable { mutableStateOf(false) }
 
   /*
    *  ورود با گوگل فقط وقتی نشان داده می‌شود که خودِ سرور بگوید روشن است.
@@ -327,20 +330,13 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
       busy = busy,
       error = error,
       //  سرورِ قدیمی پلهٔ کد ندارد؛ برگشتش به همان فرمِ اول است
-      onBack = { signupStep = if (legacySignup) "" else "code"; codeSent = !legacySignup; error = null },
+      onBack = { signupStep = "code"; codeSent = true; error = null },
       onSubmit = { fix ->
         busy = true; error = null; note = null
         scope.launch {
+          //  فقط یک راه: بلیتی که از کدِ تأییدشده آمده
           val done =
-            if (legacySignup) {
-              //  سرورِ قدیمی: حساب با مسیرِ قدیمی ساخته می‌شود و لوکیشن
-              //  جدا فرستاده می‌شود — نبودنش هم کار را متوقف نمی‌کند
-              val made = auth.register(name.trim(), email.trim(), "", password)
-              if (made is ApiResult.Success && fix != null) {
-                auth.sendLocation(fix, state.deviceUid, android.os.Build.MODEL ?: "گوشی")
-              }
-              made
-            } else auth.registerComplete(
+            auth.registerComplete(
               ticket = ticket,
               name = name.trim(),
               password = password,
@@ -367,7 +363,6 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
                  */
                 emailMode = "login"
                 password2 = ""
-                legacySignup = false
                 note = "حساب ساخته شد — حالا وارد شوید"
               }
             }
@@ -617,18 +612,25 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
               emailMode == "register" ->
                 auth.registerStart(name.trim(), email.trim(), password)
                   .onSuccess {
-                    legacySignup = false
                     cooldown.start(email.trim(), it.resendSeconds)
                     it.devCode?.let { c -> note = "کد آزمایشی: $c" }
                     signupStep = "code"
                     codeSent = true
                   }
                   .onFailure { e ->
+                    /*
+                     *  ── کد نیامد، ثبت‌نامی هم نیست ──────────────────
+                     *  تا دیروز اگر سرور مسیرِ کد را نداشت، برنامه به
+                     *  راهِ قدیمی می‌افتاد و حساب را **بدونِ کد** می‌ساخت.
+                     *  یعنی هر کسی با هر ایمیلی — حتی ایمیلِ کسِ دیگر —
+                     *  حساب می‌ساخت، چون هیچ‌جا ثابت نمی‌شد آن ایمیل
+                     *  مالِ خودش است. آن راه بسته شد: تأییدِ ایمیل شرطِ
+                     *  ساختنِ حساب است، نه یک پله‌ی اختیاری.
+                     *  ────────────────────────────────────────────────
+                     */
                     if (e is ApiFailure.NotFound) {
-                      //  سرور کدِ تأیید ندارد؛ یک پله کمتر، نه یک دربِ بسته
-                      legacySignup = true
-                      ticket = ""
-                      signupStep = "terms"
+                      error = "سرورِ این دکان هنوز کدِ تأیید نمی‌فرستد؛ " +
+                        "تا وقتی به‌روز نشود، ثبت‌نام از برنامه ممکن نیست."
                     } else fail(e)
                   }
 
@@ -1271,6 +1273,18 @@ private fun TermsLocationScreen(
   var looking by remember { mutableStateOf(true) }
   var accepted by rememberSaveable { mutableStateOf(false) }
   var showTermsError by remember { mutableStateOf(false) }
+  var termsOpen by rememberSaveable { mutableStateOf(false) }
+
+  //  صفحه‌ی کاملِ شرایط، روی همه‌چیز. برگشت هم با پیکانِ خودِ گوشی
+  if (termsOpen) {
+    BackHandler { termsOpen = false }
+    TermsFullScreen(
+      accepted = accepted,
+      onAccept = { accepted = true; showTermsError = false; termsOpen = false },
+      onClose = { termsOpen = false },
+    )
+    return
+  }
 
   fun look(force: Boolean) {
     looking = true
@@ -1333,6 +1347,12 @@ private fun TermsLocationScreen(
             .clip(RoundedCornerShape(18.dp))
             .background(if (isDarkSurface()) Shop.colors.surface else Color.White)
             .border(1.5.dp, edge, RoundedCornerShape(18.dp))
+            //  لوکیشن که پیدا شد، زدنش نقشه را باز می‌کند: عددِ خام به
+            //  کسی نمی‌گوید کجاست، نقشه می‌گوید
+            .then(
+              if (found) Modifier.clickable { fix?.let { openOnMap(context, it.lat, it.lng) } }
+              else Modifier
+            )
             .padding(14.dp),
           verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -1375,7 +1395,7 @@ private fun TermsLocationScreen(
             if (detail != null) {
               CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
                 Text(
-                  String.format(java.util.Locale.US, "%.5f, %.5f", detail.lat, detail.lng),
+                  String.format(java.util.Locale.US, "%.5f, %.5f · روی نقشه ببینید", detail.lat, detail.lng),
                   style = MaterialTheme.typography.labelSmall,
                   color = inkSoft,
                 )
@@ -1401,54 +1421,52 @@ private fun TermsLocationScreen(
 
         Spacer(Modifier.height(16.dp))
 
-        /* ---------------- کادرِ شرایط و ضوابط ---------------- */
-        Column(
+        /* ---------------- شرایط و ضوابط ---------------- */
+        /*
+         *  ── چرا صفحه‌ی جدا و نه یک کادرِ کوچک ─────────────────────────
+         *  متن نُه بند است و در یک کادرِ ۲۱۰ نقطه‌ای، سه خطِ آن دیده
+         *  می‌شد و بقیه‌اش پشتِ یک اسکرولِ ریز می‌ماند. چیزی که کاربر
+         *  باید بپذیرد، باید بتواند بخواند. حالا یک ردیف است و با زدنش
+         *  متن تمام‌صفحه باز می‌شود — همان‌جا هم می‌شود پذیرفت.
+         *  ────────────────────────────────────────────────────────────
+         */
+        Row(
           Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(18.dp))
             .background(if (isDarkSurface()) Shop.colors.surface else Color.White)
-            .border(1.dp, fieldLine, RoundedCornerShape(18.dp)),
+            .border(1.dp, fieldLine, RoundedCornerShape(18.dp))
+            .clickable { termsOpen = true }
+            .padding(14.dp),
+          verticalAlignment = Alignment.CenterVertically,
         ) {
-          Row(
-            Modifier.fillMaxWidth().padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-          ) {
-            Icon(
-              Icons.Filled.Description,
-              contentDescription = null,
-              tint = BLUE,
-              modifier = Modifier.size(18.dp),
-            )
-            Spacer(Modifier.width(8.dp))
+          Icon(
+            Icons.Filled.Description,
+            contentDescription = null,
+            tint = BLUE,
+            modifier = Modifier.size(20.dp),
+          )
+          Spacer(Modifier.width(10.dp))
+          Column(Modifier.weight(1f)) {
             Text(
               Terms.TITLE,
               style = MaterialTheme.typography.labelLarge,
               color = ink,
               fontWeight = FontWeight.Bold,
             )
+            Spacer(Modifier.height(2.dp))
+            Text(
+              "برای خواندنِ کاملش بزنید — ${Terms.SECTIONS.size} بند",
+              style = MaterialTheme.typography.labelSmall,
+              color = inkSoft,
+            )
           }
-          HorizontalDivider(color = fieldLine)
-          //  بلندیِ ثابت و اسکرولِ خودش: متن بلند است و اگر باز باشد،
-          //  دکمهٔ «ساخت حساب» را ته یک صفحهٔ دراز می‌برد
-          Column(
-            Modifier
-              .fillMaxWidth()
-              .height(210.dp)
-              .verticalScroll(rememberScrollState())
-              .padding(14.dp),
-          ) {
-            Terms.SECTIONS.forEachIndexed { index, (title, body) ->
-              if (index > 0) Spacer(Modifier.height(12.dp))
-              Text(
-                title,
-                style = MaterialTheme.typography.labelMedium,
-                color = ink,
-                fontWeight = FontWeight.Bold,
-              )
-              Spacer(Modifier.height(4.dp))
-              Text(body, style = MaterialTheme.typography.labelSmall, color = inkSoft)
-            }
-          }
+          Icon(
+            Icons.Filled.ChevronLeft,
+            contentDescription = null,
+            tint = inkSoft,
+            modifier = Modifier.size(20.dp),
+          )
         }
 
         Spacer(Modifier.height(12.dp))
@@ -2186,5 +2204,138 @@ private fun SavedLoginRow(
         modifier = Modifier.size(15.dp),
       )
     }
+  }
+}
+
+
+/**
+ *  شرایط و ضوابط — تمام‌صفحه.
+ *
+ *  متن باید خوانده شود، پس جای خواندن هم باید داشته باشد: عنوانِ ثابت
+ *  بالا، بندها با شماره‌ی خودشان، و ته صفحه یک دکمه که هم می‌پذیرد و هم
+ *  برمی‌گردد. کسی که فقط آمده ببیند، با پیکانِ بالا بیرون می‌رود.
+ */
+@Composable
+private fun TermsFullScreen(
+  accepted: Boolean,
+  onAccept: () -> Unit,
+  onClose: () -> Unit,
+) {
+  val colors = Shop.colors
+  Column(
+    Modifier
+      .fillMaxSize()
+      .background(colors.bg)
+      .windowInsetsPadding(WindowInsets.systemBars),
+  ) {
+    Row(
+      Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
+      verticalAlignment = Alignment.CenterVertically,
+    ) {
+      Icon(
+        Icons.Filled.ChevronRight,
+        contentDescription = "بستن",
+        tint = colors.muted,
+        modifier = Modifier.size(24.dp).clickable(onClick = onClose),
+      )
+      Spacer(Modifier.width(8.dp))
+      Text(
+        Terms.TITLE,
+        style = MaterialTheme.typography.titleMedium,
+        color = colors.text,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.weight(1f),
+      )
+      Text(
+        "نسخهٔ ${Terms.VERSION}",
+        style = MaterialTheme.typography.labelSmall,
+        color = colors.muted2,
+      )
+    }
+    HorizontalDivider(color = colors.border)
+
+    Column(
+      Modifier
+        .weight(1f)
+        .fillMaxWidth()
+        .verticalScroll(rememberScrollState())
+        .padding(horizontal = 18.dp, vertical = 16.dp),
+    ) {
+      Terms.SECTIONS.forEachIndexed { index, (title, body) ->
+        if (index > 0) Spacer(Modifier.height(18.dp))
+        Row(verticalAlignment = Alignment.Top) {
+          //  شماره‌ی بند، تا بشود سرِ حرف گفت «بندِ چهار»
+          Box(
+            Modifier
+              .size(24.dp)
+              .clip(RoundedCornerShape(8.dp))
+              .background(colors.primaryTint),
+            contentAlignment = Alignment.Center,
+          ) {
+            Text(
+              plain(index + 1),
+              style = MaterialTheme.typography.labelSmall,
+              color = colors.primary,
+              fontWeight = FontWeight.Bold,
+            )
+          }
+          Spacer(Modifier.width(10.dp))
+          Column {
+            Text(
+              title,
+              style = MaterialTheme.typography.labelLarge,
+              color = colors.text,
+              fontWeight = FontWeight.Bold,
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+              body,
+              style = MaterialTheme.typography.bodySmall,
+              color = colors.muted,
+              lineHeight = 22.sp,
+            )
+          }
+        }
+      }
+      Spacer(Modifier.height(24.dp))
+    }
+
+    HorizontalDivider(color = colors.border)
+    Column(Modifier.fillMaxWidth().padding(16.dp)) {
+      GradientButton(
+        text = if (accepted) "خواندم — بستن" else "می‌پذیرم",
+        enabled = true,
+        busy = false,
+        onClick = { if (accepted) onClose() else onAccept() },
+      )
+    }
+  }
+}
+
+
+/**
+ *  باز کردنِ یک نقطه روی نقشه‌ی خودِ گوشی.
+ *
+ *  ── چرا نقشه‌ی گوشی و نه نقشه‌ی داخلِ برنامه ──────────────────────────
+ *  نقشه‌ی توکار یعنی یک SDK، یک کلیدِ API، و چند مگابایت به حجمِ برنامه —
+ *  برای کاری که هر گوشی‌ای خودش بلد است. `geo:` را هر برنامه‌ی نقشه‌ای
+ *  می‌فهمد؛ اگر هیچ‌کدام نبود، نشانیِ وب باز می‌شود که مرورگر هم دارد.
+ *  ──────────────────────────────────────────────────────────────────
+ */
+internal fun openOnMap(context: android.content.Context, lat: Double, lng: Double, label: String = "دکان") {
+  val point = String.format(java.util.Locale.US, "%f,%f", lat, lng)
+  val geo = android.content.Intent(
+    android.content.Intent.ACTION_VIEW,
+    android.net.Uri.parse("geo:$point?q=$point(${android.net.Uri.encode(label)})"),
+  )
+  val opened = runCatching { context.startActivity(geo); true }.getOrDefault(false)
+  if (opened) return
+  runCatching {
+    context.startActivity(
+      android.content.Intent(
+        android.content.Intent.ACTION_VIEW,
+        android.net.Uri.parse("https://www.google.com/maps/search/?api=1&query=$point"),
+      )
+    )
   }
 }

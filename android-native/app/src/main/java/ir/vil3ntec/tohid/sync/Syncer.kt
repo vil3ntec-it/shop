@@ -128,7 +128,9 @@ class Syncer(
   suspend fun refreshLicense(deviceName: String): License.Status {
     if (!Backend.tokens(context).signedIn) return License.Status(License.State.NONE, reason = "no_account")
 
-    if (state.publicKey.isNullOrBlank()) {
+    //  کلیدِ سنجاق‌شده از سرور پرسیده نمی‌شود: سرور — یا هر کسی که خود
+    //  را جای سرور جا بزند — نباید بتواند کلیدِ سنجشِ امضا را عوض کند
+    if (!state.publicKeyPinned && state.publicKey.isNullOrBlank()) {
       state.publicKey = runCatching { api.publicKey() }.getOrNull()
     }
 
