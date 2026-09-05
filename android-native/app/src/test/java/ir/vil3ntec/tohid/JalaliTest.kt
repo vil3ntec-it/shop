@@ -51,9 +51,9 @@ class JalaliTest {
   }
 
   @Test
-  fun `تاریخ برای نمایش با رقم لاتین و دو رقمی نوشته می شود`() {
-    assertEquals("1405/06/06", formatDate("2026-08-28"))
-    assertEquals("1405/01/01", formatDate("2026-03-21"))
+  fun `تاریخ برای نمایش با رقم فارسی و نام ماه نوشته می شود`() {
+    assertEquals("۶ سنبله ۱۴۰۵", formatDate("2026-08-28"))
+    assertEquals("۱ حمل ۱۴۰۵", formatDate("2026-03-21"))
     // تاریخِ ناخوانا گم نمی‌شود — خودش برگردانده می‌شود
     assertEquals("چیزی-نیست", formatDate("چیزی-نیست"))
   }

@@ -85,7 +85,7 @@ fun PurchasingScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState)
         val owed = d.suppliers.sumOf { ShopStore.supplierDebt(d, it.id).coerceAtLeast(0.0) }
         StatTile(
           label = "جمع بدهی ما به تأمین‌کننده‌ها",
-          value = "${money(owed)} افغانی",
+          value = "${money(owed)} ؋",
           tint = if (owed > 0) Shop.colors.warning else Shop.colors.success,
           hint = "${plain(d.suppliers.size)} تأمین‌کننده — ${plain(d.purchases.size)} خرید",
           modifier = Modifier.fillMaxWidth(),
@@ -230,7 +230,7 @@ private fun SupplierRow(
       }
       Column(horizontalAlignment = Alignment.End) {
         Text(
-          "${money(kotlin.math.abs(debt))} افغانی",
+          "${money(kotlin.math.abs(debt))} ؋",
           style = MaterialTheme.typography.titleSmall,
           color = when {
             debt > 0 -> Shop.colors.warning
@@ -275,8 +275,8 @@ private fun SupplierRow(
             HistoryLine(
               title = "${product?.name ?: "(محصول حذف‌شده)"} — ${qty(purchase.quantity)} ${purchase.unit}",
               detail = formatDate(purchase.date) +
-                if (purchase.debt > 0) " — ${money(purchase.debt)} افغانی باقی" else " — تسویه",
-              amount = "${money(purchase.totalAmount)} افغانی",
+                if (purchase.debt > 0) " — ${money(purchase.debt)} ؋ باقی" else " — تسویه",
+              amount = "${money(purchase.totalAmount)} ؋",
               tint = Shop.colors.text,
             )
           }
@@ -297,7 +297,7 @@ private fun SupplierRow(
             HistoryLine(
               title = payment.notes.ifBlank { "پرداخت" },
               detail = formatDate(payment.date),
-              amount = "${money(payment.amount)} افغانی",
+              amount = "${money(payment.amount)} ؋",
               tint = Shop.colors.success,
             )
           }
@@ -439,12 +439,12 @@ private fun PurchaseDialog(
           Panel {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
               Text("جمع خرید", style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
-              Text("${money(total)} افغانی", style = MaterialTheme.typography.titleSmall, color = Shop.colors.text)
+              Text("${money(total)} ؋", style = MaterialTheme.typography.titleSmall, color = Shop.colors.text)
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
               Text("باقی‌مانده", style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
               Text(
-                "${money(remaining)} افغانی",
+                "${money(remaining)} ؋",
                 style = MaterialTheme.typography.bodySmall,
                 color = if (remaining > 0) Shop.colors.warning else Shop.colors.success,
               )
@@ -508,7 +508,7 @@ private fun PaymentDialog(
         if (supplier != null) {
           Spacer(Modifier.height(4.dp))
           Text(
-            "${supplier.name} — ${money(debt.coerceAtLeast(0.0))} افغانی بدهکاریم",
+            "${supplier.name} — ${money(debt.coerceAtLeast(0.0))} ؋ بدهکاریم",
             style = MaterialTheme.typography.bodySmall,
             color = Shop.colors.muted,
           )

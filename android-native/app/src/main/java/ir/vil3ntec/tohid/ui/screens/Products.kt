@@ -184,14 +184,14 @@ fun ProductsScreen(
             label = "قیمت خرید",
             value = money(buyValue),
             tint = Shop.colors.warning,
-            hint = "افغانی",
+            hint = "؋",
             modifier = Modifier.weight(1f).fillMaxHeight(),
             compact = tight,
           )
           StatTile(
             label = "قیمت فروش",
             value = money(sellValue),
-            hint = "افغانی",
+            hint = "؋",
             modifier = Modifier.weight(1f).fillMaxHeight(),
             compact = tight,
           )
@@ -201,7 +201,7 @@ fun ProductsScreen(
             tint = Shop.colors.success,
             // روی گوشی «اگر همه فروخته شود» در هشتاد نقطه جا نمی‌شود و
             // سه‌نقطه می‌خورد؛ آنجا همان واحد نوشته می‌شود
-            hint = if (tight) "افغانی" else "اگر همه فروخته شود",
+            hint = if (tight) "؋" else "اگر همه فروخته شود",
             modifier = Modifier.weight(1f).fillMaxHeight(),
             compact = tight,
           )
@@ -317,7 +317,7 @@ fun ProductsScreen(
       Column(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, bottom = 28.dp)) {
         Text(p.name, style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
         Text(
-          "${money(p.salePrice)} افغانی" + if (p.category.isNotBlank()) " — ${p.category}" else "",
+          "${money(p.salePrice)} ؋" + if (p.category.isNotBlank()) " — ${p.category}" else "",
           style = MaterialTheme.typography.bodySmall,
           color = Shop.colors.muted,
         )
@@ -439,7 +439,7 @@ private fun ProductCard(
         Text(product.name, style = MaterialTheme.typography.titleSmall, color = Shop.colors.text)
         Spacer(Modifier.height(3.dp))
         Text(
-          "${money(product.salePrice)} افغانی",
+          "${money(product.salePrice)} ؋",
           style = MaterialTheme.typography.titleMedium,
           color = Shop.colors.primary,
           fontWeight = FontWeight.Bold,

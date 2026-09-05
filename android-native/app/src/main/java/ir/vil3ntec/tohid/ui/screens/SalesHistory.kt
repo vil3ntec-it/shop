@@ -133,7 +133,7 @@ fun SalesHistoryScreen(
     item {
       StatTile(
         label = "جمع فروش",
-        value = "${money(active.sumOf { it.finalTotal })} افغانی",
+        value = "${money(active.sumOf { it.finalTotal })} ؋",
         hint = "${plain(active.size)} فاکتور — ${plain(d.sales.size - active.size)} لغوشده",
         modifier = Modifier.fillMaxWidth(),
       )
@@ -472,7 +472,7 @@ private fun ReturnDialog(
             Panel {
               Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("مبلغ مرجوعی", style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
-                Text("${money(total)} افغانی", style = MaterialTheme.typography.titleSmall, color = Shop.colors.text)
+                Text("${money(total)} ؋", style = MaterialTheme.typography.titleSmall, color = Shop.colors.text)
               }
             }
             Spacer(Modifier.height(10.dp))

@@ -2,6 +2,13 @@ package ir.vil3ntec.tohid.ui.screens
 
 import android.content.Context
 import android.provider.Settings
+import androidx.compose.animation.core.FiniteAnimationSpec
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -51,4 +58,42 @@ object Motion {
     val scale = Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f)
     scale == 0f
   }.getOrDefault(false)
+}
+
+
+/**
+ *  فنرهای برنامه.
+ *
+ *  Compose‌ی این پروژه `MaterialExpressiveTheme` ندارد، ولی همان رفتار را
+ *  می‌شود با فنر ساخت: هر حرکتی در برنامه یکی از این سه است، تا حرکت‌ها
+ *  با هم بخوانند و هر صفحه فنرِ خودش را از خودش درنیاورد.
+ *
+ *  وقتی کاربر انیمیشن را خاموش کرده، همه‌ی این‌ها `snap` می‌شوند — یعنی
+ *  همان حالتِ پایانی، بدون حرکت.
+ */
+object Springs {
+
+  /** فشار و انتخاب — تند و کمی سرکش */
+  val press: FiniteAnimationSpec<Float>
+    get() = if (Motion.enabled) spring(dampingRatio = 0.55f, stiffness = 900f) else snap()
+
+  /** ورودِ کارت و باز شدنِ بخش — نرم و بدون پرش */
+  val enter: FiniteAnimationSpec<Float>
+    get() = if (Motion.enabled) spring(dampingRatio = 0.80f, stiffness = 380f) else snap()
+
+  /** رنگ و تم — تغییرِ روز و شب نباید ناگهانی باشد */
+  val effect: FiniteAnimationSpec<Color>
+    get() = if (Motion.enabled) tween(280, easing = FastOutSlowInEasing) else snap()
+
+  /** شمارنده‌ی عددِ قهرمان */
+  val counter: FiniteAnimationSpec<Int>
+    get() = if (Motion.enabled) tween(700, easing = FastOutSlowInEasing) else snap()
+
+  /** باز و بسته شدنِ بخشِ جمع‌شده */
+  val size: FiniteAnimationSpec<IntSize>
+    get() = if (Motion.enabled) spring(dampingRatio = 0.80f, stiffness = 380f) else snap()
+
+  /** نوارِ پیشرفت — با کمی مکث تا بعد از نشستنِ کارت راه بیفتد */
+  val progress: FiniteAnimationSpec<Float>
+    get() = if (Motion.enabled) tween(600, delayMillis = 120, easing = FastOutSlowInEasing) else snap()
 }

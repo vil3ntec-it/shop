@@ -110,7 +110,7 @@ fun ExpensesScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
       item {
         StatTile(
           label = "جمع مصارف ${monthLabel(month)}",
-          value = "${money(total)} افغانی",
+          value = "${money(total)} ؋",
           tint = Shop.colors.danger,
           hint = "${plain(shown.size)} ردیف",
           modifier = Modifier.fillMaxWidth(),
@@ -207,7 +207,7 @@ fun ExpensesScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
       title = { Text("حذف مصرف؟", color = Shop.colors.text) },
       text = {
         Text(
-          "«${expense.title}» به مبلغ ${money(expense.amount)} افغانی حذف می‌شود.",
+          "«${expense.title}» به مبلغ ${money(expense.amount)} ؋ حذف می‌شود.",
           style = MaterialTheme.typography.bodySmall,
           color = Shop.colors.muted,
         )
@@ -245,7 +245,7 @@ private fun ExpenseRow(expense: Expense, onEdit: () -> Unit, onDelete: () -> Uni
       )
     }
     Text(
-      "${money(expense.amount)} افغانی",
+      "${money(expense.amount)} ؋",
       style = MaterialTheme.typography.titleSmall,
       color = Shop.colors.danger,
     )
@@ -277,7 +277,7 @@ private fun CategoryBar(
   ) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
       Text(name, style = MaterialTheme.typography.bodySmall, color = Shop.colors.text)
-      Text("${money(amount)} افغانی", style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
+      Text("${money(amount)} ؋", style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
     }
     Spacer(Modifier.height(5.dp))
     Box(

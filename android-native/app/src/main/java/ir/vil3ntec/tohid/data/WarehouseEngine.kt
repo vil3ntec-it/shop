@@ -1,6 +1,6 @@
 package ir.vil3ntec.tohid.data
 
-import ir.vil3ntec.tohid.money
+import ir.vil3ntec.tohid.moneyPlain
 import ir.vil3ntec.tohid.plain
 
 /**
@@ -147,7 +147,7 @@ object WarehouseEngine {
         type = "price_change",
         date = today,
         refId = id,
-        notes = "تغییر قیمت خرید از ${money(existing.purchasePrice)} به ${money(draft.purchasePrice)} افغانی",
+        notes = "تغییر قیمت خرید از ${moneyPlain(existing.purchasePrice)} به ${moneyPlain(draft.purchasePrice)} افغانی",
         createdAt = now,
       )
     }
@@ -210,7 +210,7 @@ object WarehouseEngine {
     val product = d.products.find { it.id == id } ?: return ""
     val sold = ShopStore.soldQty(d, id)
     return if (sold > 0) {
-      "از «${product.name}» تا کنون ${money(sold)} واحد فروخته شده است. فاکتورهای قبلی حفظ می‌شوند ولی نام این کالا در آن‌ها «حذف‌شده» نشان داده می‌شود و از گزارش سود محصولات کنار می‌رود."
+      "از «${product.name}» تا کنون ${moneyPlain(sold)} واحد فروخته شده است. فاکتورهای قبلی حفظ می‌شوند ولی نام این کالا در آن‌ها «حذف‌شده» نشان داده می‌شود و از گزارش سود محصولات کنار می‌رود."
     } else {
       "محصول «${product.name}» و سوابق ورود آن از انبار حذف خواهد شد."
     }
@@ -302,7 +302,7 @@ object WarehouseEngine {
     if (after < 0) {
       val shortage = -after
       return Result.Failed(
-        "این ورودی قابل حذف نیست: ${money(shortage)} واحد از آن فروخته شده است. " +
+        "این ورودی قابل حذف نیست: ${moneyPlain(shortage)} واحد از آن فروخته شده است. " +
           "ابتدا فروش‌های مربوطه را لغو یا مرجوع کنید."
       )
     }
@@ -317,7 +317,7 @@ object WarehouseEngine {
           type = "delete_entry",
           date = today,
           refId = id,
-          notes = "حذف ورود انبار «${product?.name ?: "محصول حذف‌شده"}» به مقدار ${money(entry.units)}",
+          notes = "حذف ورود انبار «${product?.name ?: "محصول حذف‌شده"}» به مقدار ${moneyPlain(entry.units)}",
           createdAt = now,
         ),
       ),
@@ -330,7 +330,7 @@ object WarehouseEngine {
     val entry = d.warehouseEntries.find { it.id == id } ?: return ""
     val product = d.products.find { it.id == entry.productId }
     val now = ShopStore.stock(d, entry.productId)
-    return "موجودی «${product?.name ?: "محصول"}» از ${money(now)} به ${money(now - entry.units)} کاهش می‌یابد."
+    return "موجودی «${product?.name ?: "محصول"}» از ${moneyPlain(now)} به ${moneyPlain(now - entry.units)} کاهش می‌یابد."
   }
 
   /* ------------------------- اصلاحِ موجودی ------------------------- */
@@ -392,7 +392,7 @@ object WarehouseEngine {
           type = if (kind == AdjustKind.SUPPLIER_RETURN) "supplier_return" else "stock_adjustment",
           date = date,
           refId = id,
-          notes = "$label «${product.name}» به مقدار ${if (increase) "+" else "−"}${money(quantity)} — دلیل: $why",
+          notes = "$label «${product.name}» به مقدار ${if (increase) "+" else "−"}${moneyPlain(quantity)} — دلیل: $why",
           createdAt = now,
         ),
       ),

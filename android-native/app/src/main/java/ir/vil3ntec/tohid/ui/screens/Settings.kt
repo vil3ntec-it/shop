@@ -294,7 +294,7 @@ fun SettingsScreen(
       SettingsSection(
         icon = Icons.Filled.NotificationsActive,
         title = "هشدارها",
-        subtitle = "قرض از ${money(debtLimit)} افغانی به بالا",
+        subtitle = "قرض از ${money(debtLimit)} ؋ به بالا",
         tint = Shop.colors.warning,
       ) {
         Text(

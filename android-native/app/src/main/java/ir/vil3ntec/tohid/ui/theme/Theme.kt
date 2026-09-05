@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.theme
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -7,29 +8,45 @@ import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import ir.vil3ntec.tohid.ui.screens.Springs
 import androidx.compose.ui.unit.dp
 
 /**
- *  رنگ‌ها — «آبیِ یخ».
+ *  رنگ‌ها — «شیشه روی نورِ آرورا».
  *
- *  زمینه سرمه‌ای تیره است و نشانِ برنامه یک آبیِ روشنِ یخی؛ همین یک رنگ
- *  در تمامِ برنامه تکرار می‌شود تا هرجای اپ که باشی، بدانی توحید است.
+ *  سه لایه، و ترتیبشان تمامِ ظاهرِ برنامه است:
  *
- *  دو تصمیم که عمدی‌اند:
+ *      نورِ آرورا (سه لکهٔ رنگ، پشتِ همه‌چیز)
+ *          ↓
+ *      پنل‌های شیشه‌ای (سفیدِ نیمه‌شفاف + لبهٔ روشن)
+ *          ↓
+ *      محتوا، بدونِ زمینهٔ خودش
  *
- *   • **سطح‌ها شفاف‌اند، نه تخت.** کارت‌ها کمی از زمینه روشن‌ترند و
- *     حاشیه‌شان آن‌قدر کم‌رنگ است که دیده نشود؛ چیزی که کارت را جدا
- *     می‌کند، اختلافِ ملایمِ روشنی است نه خطِ دورش. جعبهٔ خط‌کشی‌شده،
- *     ارزان به نظر می‌رسد.
+ *  ── چرا عوض شد ─────────────────────────────────────────────────────
+ *  پالتِ پیشین «آبیِ یخ» بود: کارتِ خاکستری-آبیِ توپر روی زمینهٔ سفید.
+ *  ظاهرش سالمِ متریالِ پیش‌فرض بود و همین ایرادش بود — از هر برنامهٔ
+ *  دیگری قابلِ تشخیص نبود. قرارِ صاحب مخزن این شد که ظاهر در سطحِ
+ *  برنامه‌های مالیِ امروز باشد، نه متریالِ خام.
  *
- *   • **بنفش و صورتی هیچ‌جا نیست.** فقط سرمه‌ای، آبیِ یخ و فیروزه‌ای؛
- *     و سبز و نارنجی و قرمز فقط جایی که معنیِ مالی دارند (سود، هشدار،
- *     بدهی) — نه برای تزیین.
+ *  سه قاعده که شکسته نمی‌شوند:
+ *
+ *   • **سطح‌ها شیشه‌اند، نه رنگِ توپر.** `surface` یک سفیدِ نیمه‌شفاف
+ *     است؛ چیزی که پنل را جدا می‌کند، نورِ پشتش و لبهٔ روشنش است.
+ *     پنجره‌ها ولی توپرند (`surfaceSolid`) — متنِ پنجره نباید روی
+ *     محتوای پشتش بیفتد.
+ *
+ *   • **بنفش نشانِ برنامه است، نعنایی و صورتی و نارنجی معنا دارند.**
+ *     نعنایی: دخل و موفقیت · قرمز: خرج و قرض · نارنجی: هشدار. رنگ
+ *     هیچ‌جا تزیین نیست.
+ *
+ *   • **در هر صفحه فقط یک المانِ گرادینتی** — دکمهٔ اصلی یا FAB. دو
+ *     گرادینت در یک صفحه یعنی هیچ‌کدام مهم نیست.
  */
 data class ShopColors(
   val bg: Color,
@@ -62,9 +79,19 @@ data class ShopColors(
    *  نبود هرکدام تا کجاست. حالا هست، ولی نازک و کم‌رنگ: به‌اندازه‌ای که
    *  لبه فهمیده شود، نه آن‌قدر که خط به چشم بیاید.
    */
-  /** لکه‌های نورِ زمینه */
+  /** لکه‌های نورِ زمینه — سه لکه، به ترتیبِ غلبه */
   val auroraOne: Color,
   val auroraTwo: Color,
+  val auroraThree: Color,
+  /**
+   *  سطحِ **توپر** — برای پنجره‌ها، کشوها و منوها.
+   *
+   *  `surface` از این پس شیشه است: سفیدِ کم‌رنگی که زمینهٔ آرورا از پشتش
+   *  پیداست. برای کارت درست است و برای پنجره فاجعه — متنِ پنجره روی
+   *  محتوای پشتش می‌افتد و هیچ‌کدام خوانده نمی‌شود. پس هرجا که چیزی
+   *  **روی** برنامه می‌نشیند، این یکی به کار می‌رود.
+   */
+  val surfaceSolid: Color,
   /*
    *  کادرهای ورودی، جدا از کارت‌ها.
    *
@@ -81,78 +108,82 @@ data class ShopColors(
 )
 
 /**
- *  روز — زمینهٔ سفید، کارت‌های آبیِ کم‌رنگ.
+ *  روز — نورِ آرورا روی زمینهٔ بسیار روشن، شیشهٔ سفید رویش.
  *
- *  دو بار جایشان عوض شد تا درست شود. اولش زمینه سفید بود و کارت هم سفید:
- *  کارت دیده نمی‌شد. بعد زمینه آبی شد که کارت پیدا شود، ولی زمینهٔ آبی
- *  خودش تو‌ذوق می‌زد.
- *
- *  جوابِ درست وسط این دوتاست: **زمینه سفیدِ خالص، کارت آبیِ خیلی کم‌رنگ.**
- *  صفحه تمیز می‌ماند و کارت هم رنگِ خودش را دارد، نه خطِ دورش را.
+ *  زمینه عمداً سفیدِ خالص نیست: روی سفیدِ خالص، هم لکه‌های نور بی‌رمق
+ *  می‌شوند و هم پنلِ سفیدِ نیمه‌شفاف اصلاً دیده نمی‌شود. یک بنفشِ خیلی
+ *  کم‌رنگ، هر دو را حل می‌کند.
  */
 val LightColors = ShopColors(
-  bg = Color(0xFFFFFFFF),
-  surface = Color(0xFFEFF5FD),
-  surface2 = Color(0xFFDDE9F8),
-  border = Color(0x14101C2B),
-  text = Color(0xFF0B1420),
-  muted = Color(0xFF4E627A),
-  muted2 = Color(0xFF7C8FA6),
-  primary = Color(0xFF1268BE),
-  primaryDark = Color(0xFF0B4C90),
-  primaryTint = Color(0xFFD5E7FB),
-  success = Color(0xFF0B6E55),
-  successTint = Color(0xFFD3EFE6),
-  warning = Color(0xFFA25E0B),
-  warningTint = Color(0xFFF9E6C7),
-  danger = Color(0xFFBE322D),
-  dangerTint = Color(0xFFF9D8D6),
-  accent = Color(0xFF0A7F8E),
-  glow = Color(0x1A1268BE),
-  sheen = Color(0x00FFFFFF),
-  auroraOne = Color(0x140F7FD6),
-  auroraTwo = Color(0x0F23B6C9),
-  fieldBg = Color(0xFFFFFFFF),
-  fieldBorder = Color(0xFFC6D5E6),
-  fieldFocus = Color(0xFF1268BE),
+  //  زمینهٔ روز: سفیدِ خالص نه — یک بنفشِ بسیار کم‌رنگ، تا نورِ آرورا
+  //  رویش دیده شود. سفیدِ خالص، شیشه را نامرئی می‌کند.
+  bg = Color(0xFFF2F0FA),
+  //  شیشه: سفیدِ نیمه‌شفاف. زیرش آروراست، پس پنل «شناور» دیده می‌شود
+  surface = Color(0xA6FFFFFF),
+  surface2 = Color(0xD9FFFFFF),
+  border = Color(0xE6FFFFFF),
+  text = Color(0xFF191627),
+  muted = Color(0xFF635C86),
+  muted2 = Color(0xFF8A83AC),
+  primary = Color(0xFF7C5CFF),
+  primaryDark = Color(0xFF5B3FE0),
+  primaryTint = Color(0x1F7C5CFF),
+  success = Color(0xFF0FA98A),
+  successTint = Color(0x1F0FA98A),
+  warning = Color(0xFFB87708),
+  warningTint = Color(0x1FF0A32B),
+  danger = Color(0xFFD93B3B),
+  dangerTint = Color(0x1FD93B3B),
+  accent = Color(0xFF0FA98A),
+  glow = Color(0x1F7C5CFF),
+  sheen = Color(0x59FFFFFF),
+  auroraOne = Color(0x4D7C5CFF),
+  auroraTwo = Color(0x3D00C39A),
+  auroraThree = Color(0x33FF5FA2),
+  surfaceSolid = Color(0xFFFBFAFF),
+  fieldBg = Color(0xCCFFFFFF),
+  fieldBorder = Color(0x1F191627),
+  fieldFocus = Color(0xFF7C5CFF),
 )
 
 /**
- *  شب — سیاهِ سرمه‌ای، با متنی که واقعاً خوانده می‌شود.
+ *  شب — بنفشِ تیره، نه سیاه.
  *
- *  ایرادِ نسخهٔ قبل: رنگِ متن‌های فرعی (`muted` و `muted2`) آن‌قدر تیره
- *  بودند که روی زمینهٔ تقریباً سیاه محو می‌شدند. برچسبِ زیرِ هر عدد،
- *  توضیحِ زیرِ هر ردیف، نامِ ماه‌ها — هیچ‌کدام خوانده نمی‌شد.
+ *  سیاهِ خالص با لکه‌های نور، لکه‌دار و کثیف دیده می‌شود؛ یک بنفشِ بسیار
+ *  تیره همان عمق را می‌دهد و نور رویش تمیز می‌نشیند.
  *
- *  حالا هر سه پلهٔ متن روشن‌تر شده‌اند تا نسبتِ کنتراستشان با زمینه از
- *  حدِ خوانایی بگذرد: متنِ اصلی تقریباً سفید، متنِ فرعی خاکستریِ روشن، و
- *  کم‌رنگ‌ترین هم آن‌قدر روشن که دیده شود.
+ *  درسی که از پالتِ قبلی نگه داشته شد: متن‌های فرعی نباید تیره باشند.
+ *  هر سه پلهٔ متن آن‌قدر روشن‌اند که روی شیشهٔ کم‌رنگ هم خوانده شوند.
  */
 val DarkColors = ShopColors(
-  bg = Color(0xFF05090F),
-  surface = Color(0xFF141F31),
-  surface2 = Color(0xFF1F3049),
-  border = Color(0x24FFFFFF),
-  text = Color(0xFFF2F7FD),
-  muted = Color(0xFFB9CADF),
-  muted2 = Color(0xFF92A6C0),
-  primary = Color(0xFF7CD0F7),
-  primaryDark = Color(0xFFB2E4FF),
-  primaryTint = Color(0x3D7CD0F7),
-  success = Color(0xFF56E0B6),
-  successTint = Color(0x3356E0B6),
-  warning = Color(0xFFFFC978),
-  warningTint = Color(0x33FFC978),
-  danger = Color(0xFFFF908A),
-  dangerTint = Color(0x33FF908A),
-  accent = Color(0xFF6EEDE2),
-  glow = Color(0x4D7CD0F7),
-  sheen = Color(0x0FFFFFFF),
-  auroraOne = Color(0x332F7FD6),
-  auroraTwo = Color(0x2623B6C9),
-  fieldBg = Color(0xFF16233A),
-  fieldBorder = Color(0xFF3C5474),
-  fieldFocus = Color(0xFF7CD0F7),
+  //  شبِ بنفش‌فام، نه سیاهِ خالص: سیاهِ خالص با نورِ آرورا لکه‌دار
+  //  می‌شود و شیشه رویش کثیف به نظر می‌رسد
+  bg = Color(0xFF0B0A14),
+  surface = Color(0x12FFFFFF),
+  surface2 = Color(0x1FFFFFFF),
+  border = Color(0x2EFFFFFF),
+  text = Color(0xFFF0EEF8),
+  muted = Color(0xFFA9A3C4),
+  muted2 = Color(0xFF8B84AB),
+  primary = Color(0xFFA78BFF),
+  primaryDark = Color(0xFF7C5CFF),
+  primaryTint = Color(0x33A78BFF),
+  success = Color(0xFF5CE0BC),
+  successTint = Color(0x335CE0BC),
+  warning = Color(0xFFF5B54A),
+  warningTint = Color(0x33F5B54A),
+  danger = Color(0xFFFF7A7A),
+  dangerTint = Color(0x33FF7A7A),
+  accent = Color(0xFF5CE0BC),
+  glow = Color(0x4D7C5CFF),
+  sheen = Color(0x1FFFFFFF),
+  auroraOne = Color(0x8C7C5CFF),
+  auroraTwo = Color(0x6600C39A),
+  auroraThree = Color(0x59FF5FA2),
+  surfaceSolid = Color(0xFF15132A),
+  fieldBg = Color(0x0FFFFFFF),
+  fieldBorder = Color(0x38FFFFFF),
+  fieldFocus = Color(0xFFA78BFF),
 )
 
 /**
@@ -174,16 +205,23 @@ val DarkColors = ShopColors(
  *  متریال در تمامِ برنامه گِرد می‌شوند.
  */
 val ShopShapes = Shapes(
-  extraSmall = RoundedCornerShape(14.dp),
+  extraSmall = RoundedCornerShape(12.dp),
   small = RoundedCornerShape(16.dp),
   medium = RoundedCornerShape(18.dp),
-  large = RoundedCornerShape(22.dp),
+  large = RoundedCornerShape(20.dp),
   extraLarge = RoundedCornerShape(28.dp),
 )
 
+/**
+ *  گِردی، به تفکیکِ نقش.
+ *
+ *  پنل از دکمه گِردتر است و دکمه از کادرِ ورودی: هرچه چیزی بزرگ‌تر
+ *  باشد، برای اینکه «شناور» به نظر برسد گِردیِ بیشتری لازم دارد. کادرِ
+ *  ورودیِ خیلی گِرد، بی‌جا شلوغ می‌شود.
+ */
 object Radius {
   val sm = 16.dp
-  val md = 22.dp
+  val md = 20.dp
   val lg = 28.dp
 }
 
@@ -208,7 +246,13 @@ fun TohidTheme(
     ThemeChoice.DARK -> true
     ThemeChoice.SYSTEM -> isSystemInDarkTheme()
   }
-  val colors = if (dark) DarkColors else LightColors
+  val target = if (dark) DarkColors else LightColors
+  //  عوض‌شدنِ روز و شب نباید مثل خاموش‌وروشنِ چراغ باشد: سه رنگِ اصلی
+  //  نرم جابه‌جا می‌شوند و بقیه دنبالشان می‌آیند
+  val bg by animateColorAsState(target.bg, Springs.effect, label = "themeBg")
+  val surface by animateColorAsState(target.surface, Springs.effect, label = "themeSurface")
+  val text by animateColorAsState(target.text, Springs.effect, label = "themeText")
+  val colors = target.copy(bg = bg, surface = surface, text = text)
   /*
    *  اجزای آمادهٔ متریال — تراشه، دکمه، کادرِ متن — رنگشان را از همین
    *  طرح می‌گیرند. تا وقتی این‌ها را ننویسیم، متریال رنگ‌های پیش‌فرضِ
@@ -227,13 +271,15 @@ fun TohidTheme(
       onSecondaryContainer = colors.primary,
       background = colors.bg,
       onBackground = colors.text,
-      surface = colors.surface,
+      //  پنجره و کشو و منو، سطحِ **توپر** می‌گیرند نه شیشه: متنِ پنجره
+      //  نباید روی محتوای پشتش بیفتد
+      surface = colors.surfaceSolid,
       onSurface = colors.text,
-      surfaceVariant = colors.surface2,
+      surfaceVariant = colors.surfaceSolid,
       onSurfaceVariant = colors.muted,
-      surfaceContainer = colors.surface,
-      surfaceContainerHigh = colors.surface2,
-      surfaceContainerHighest = colors.surface2,
+      surfaceContainer = colors.surfaceSolid,
+      surfaceContainerHigh = colors.surfaceSolid,
+      surfaceContainerHighest = colors.surfaceSolid,
       // خطِ دورِ اجزای آمادهٔ متریال (کادر متن، تراشه، دکمهٔ خطی).
       // این را نباید با حاشیهٔ کارت یکی کرد: حاشیهٔ کارت نامرئی است و
       // اگر اینجا هم بنشیند، کادرِ متن در کلِ برنامه بی‌خط می‌شود.
@@ -257,13 +303,15 @@ fun TohidTheme(
       onSecondaryContainer = colors.primaryDark,
       background = colors.bg,
       onBackground = colors.text,
-      surface = colors.surface,
+      //  پنجره و کشو و منو، سطحِ **توپر** می‌گیرند نه شیشه: متنِ پنجره
+      //  نباید روی محتوای پشتش بیفتد
+      surface = colors.surfaceSolid,
       onSurface = colors.text,
-      surfaceVariant = colors.surface2,
+      surfaceVariant = colors.surfaceSolid,
       onSurfaceVariant = colors.muted,
-      surfaceContainer = colors.surface,
-      surfaceContainerHigh = colors.surface2,
-      surfaceContainerHighest = colors.surface2,
+      surfaceContainer = colors.surfaceSolid,
+      surfaceContainerHigh = colors.surfaceSolid,
+      surfaceContainerHighest = colors.surfaceSolid,
       // خطِ دورِ اجزای آمادهٔ متریال (کادر متن، تراشه، دکمهٔ خطی).
       // این را نباید با حاشیهٔ کارت یکی کرد: حاشیهٔ کارت نامرئی است و
       // اگر اینجا هم بنشیند، کادرِ متن در کلِ برنامه بی‌خط می‌شود.

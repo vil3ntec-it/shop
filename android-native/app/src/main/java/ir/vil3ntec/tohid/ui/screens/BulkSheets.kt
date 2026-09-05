@@ -217,7 +217,7 @@ fun BulkProductSheet(
             append(row.name.trim())
             if (row.unit.isNotBlank()) append(" — هر ${row.unit}")
             if (buy != null && sell != null && buy >= 0 && sell >= 0) {
-              append(" · سود هر ${row.unit.ifBlank { "واحد" }}: ${money(sell - buy)} افغانی")
+              append(" · سود هر ${row.unit.ifBlank { "واحد" }}: ${money(sell - buy)} ؋")
             }
           }
           RowEcho(text, warn = row.unit.isBlank() || row.category.isBlank())
@@ -314,7 +314,7 @@ fun BulkEntrySheet(
     summary = listOf(
       "ردیف آماده" to plain(ready.size),
       "مجموع مقدار" to money(ready.sumOf { it.amount }),
-      "ارزش کل" to "${money(ready.sumOf { it.value })} افغانی",
+      "ارزش کل" to "${money(ready.sumOf { it.value })} ؋",
     ),
     saveEnabled = ready.isNotEmpty(),
     onAddRow = { rows = rows + EntryRow(key = seq++, unit = d.products.firstOrNull()?.unit.orEmpty()) },
@@ -473,7 +473,7 @@ fun BulkEntrySheet(
           Spacer(Modifier.height(10.dp))
           val text = buildString {
             append("${money(row.amount)} ${row.unit}".trim())
-            if (row.value > 0) append(" · ارزش ${money(row.value)} افغانی")
+            if (row.value > 0) append(" · ارزش ${money(row.value)} ؋")
           }
           RowEcho(text, warn = row.unit.isBlank())
         }

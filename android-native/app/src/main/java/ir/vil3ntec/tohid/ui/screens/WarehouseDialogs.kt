@@ -230,7 +230,7 @@ fun EntryDialog(
         if (units.toDoubleOrNull() != null && price.toDoubleOrNull() != null) {
           Spacer(Modifier.height(6.dp))
           Text(
-            "جمع: ${money(units.toDouble() * price.toDouble())} افغانی",
+            "جمع: ${money(units.toDouble() * price.toDouble())} ؋",
             style = MaterialTheme.typography.labelSmall,
             color = Shop.colors.muted,
           )

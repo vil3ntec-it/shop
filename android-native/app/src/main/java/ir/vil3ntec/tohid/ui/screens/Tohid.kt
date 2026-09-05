@@ -554,7 +554,7 @@ fun TohidMoneyText(
   modifier: Modifier = Modifier,
   tint: Color = Shop.colors.text,
   style: androidx.compose.ui.text.TextStyle = MaterialTheme.typography.titleSmall,
-  currency: String = "افغانی",
+  currency: String = "؋",
   bold: Boolean = true,
 ) {
   Row(modifier, verticalAlignment = Alignment.Bottom) {
@@ -582,7 +582,7 @@ fun TohidTransactionRow(
   amount: Double,
   tint: Color,
   modifier: Modifier = Modifier,
-  currency: String = "افغانی",
+  currency: String = "؋",
   onClick: (() -> Unit)? = null,
   trailing: @Composable (() -> Unit)? = null,
 ) {

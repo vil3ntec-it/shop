@@ -1,24 +1,37 @@
 package ir.vil3ntec.tohid
 
+import ir.vil3ntec.tohid.util.faDigits
+
 /**
  *  عددها.
  *
- *  رقم‌ها **لاتین** نوشته می‌شوند: 123 نه ۱۲۳. متنِ برنامه فارسی است ولی
- *  عدد لاتین؛ همان چیزی که در دکان روی ماشین‌حساب و روی خودِ اسکناس هم
- *  دیده می‌شود، و رقمی که کاربر روی صفحه‌کلید می‌زند هم همین است.
+ *  رقم‌ها **فارسی** نوشته می‌شوند: ۱۲۳ نه 123. متنِ برنامه فارسی است و
+ *  عددِ لاتین وسطِ آن، مثلِ چیزی از یک برنامه‌ی دیگر دیده می‌شود.
  *
- *  جداکنندهٔ هزارگان کاما است و اعشار نقطه — هر دو لاتین، تا عددِ روی
- *  فاکتورِ کاغذی و عددِ روی صفحه یکی باشند و کپی‌کردنش هم عدد بماند.
+ *  جداکنندهٔ هزارگان کاما می‌ماند و اعشار نقطه.
+ *
+ *  این فقط **نمایش** است: آنچه کاربر می‌نویسد با `latinDigits()` خوانده
+ *  می‌شود و خروجیِ CSV هم از این راه نمی‌گذرد.
  *
  *  همه‌چیز از همین چند تابع می‌گذرد. هر جای برنامه که عدد نشان می‌دهد،
  *  یکی از این‌ها را صدا می‌زند؛ پس شکلِ عدد یک جا تعریف شده، نه صد جا.
  */
 
-fun Int.fa(): String = toString()
-fun Long.fa(): String = toString()
+fun Int.fa(): String = toString().faDigits()
+fun Long.fa(): String = toString().faDigits()
 
 /** مبلغ — رُند شده، با جداکنندهٔ هزارگان. واحد (افغانی) را صدازننده می‌گذارد. */
-fun money(value: Double): String {
+fun money(value: Double): String = moneyPlain(value).faDigits()
+
+/**
+ *  همان مبلغ، ولی با رقمِ لاتین.
+ *
+ *  برای متنی که **ذخیره** می‌شود، نه متنی که نشان داده می‌شود: یادداشتِ
+ *  دفترچهٔ ثبت، شرحِ تراکنش، پیامِ خطای موتورها. آن رشته‌ها روی گوشی
+ *  می‌مانند و به سرور می‌روند؛ عوض‌کردنِ رقمشان یعنی دفترِ قدیمی و تازه
+ *  دو شکل داشته باشند. شکلِ نمایش کارِ لایهٔ رابط کاربری است.
+ */
+fun moneyPlain(value: Double): String {
   val n = if (value.isNaN() || value.isInfinite()) 0L else Math.round(value)
   val negative = n < 0
   val digits = kotlin.math.abs(n).toString()
@@ -34,14 +47,17 @@ fun money(value: Double): String {
  * مقدار — کیلو و لیتر و گرم اعشار دارند، دانه ندارد. تا سه رقمِ اعشار،
  * بدونِ صفرهای اضافی؛ همان `formatCartQty` نسخهٔ وب.
  */
-fun qty(value: Double): String {
+fun qty(value: Double): String = qtyPlain(value).faDigits()
+
+/** همان مقدار با رقمِ لاتین — برای متنِ ذخیره‌شونده. شرحش سرِ `moneyPlain` */
+fun qtyPlain(value: Double): String {
   val rounded = Math.round(value * 1000) / 1000.0
   return if (rounded == Math.floor(rounded)) rounded.toLong().toString()
   else rounded.toString().trimEnd('0').trimEnd('.')
 }
 
 /** عددِ ساده — سال و شمارهٔ فاکتور که پول نیستند و جداکننده نمی‌خواهند */
-fun plain(value: Int): String = value.toString()
+fun plain(value: Int): String = value.toString().faDigits()
 
 /**
  *  یک شمارِ روز به متن — «۱۲ روز»، «۳ ماه»، «۲ سال و ۴ ماه».

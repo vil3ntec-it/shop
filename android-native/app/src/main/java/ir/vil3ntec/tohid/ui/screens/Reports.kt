@@ -202,7 +202,7 @@ private fun salesSection(
     val lost = r.netProfit < 0
     StatTile(
       label = if (lost) "ضرر خالص" else "سود خالص",
-      value = "${money(kotlin.math.abs(r.netProfit))} افغانی",
+      value = "${money(kotlin.math.abs(r.netProfit))} ؋",
       tint = if (lost) Shop.colors.danger else Shop.colors.success,
       hint = "${plain(r.count)} فاکتور",
       modifier = Modifier.fillMaxWidth(),
@@ -240,7 +240,7 @@ private fun ReportRow(label: String, amount: Double, strong: Boolean = false, ne
       color = if (strong) Shop.colors.text else Shop.colors.muted,
     )
     Text(
-      "${if (negative && amount > 0) "−" else ""}${money(amount)} افغانی",
+      "${if (negative && amount > 0) "−" else ""}${money(amount)} ؋",
       style = if (strong) MaterialTheme.typography.titleSmall else MaterialTheme.typography.bodyMedium,
       color = when {
         strong && amount < 0 -> Shop.colors.danger
@@ -268,15 +268,15 @@ private fun productsSection(
     Spacer(Modifier.height(8.dp))
     StatTile(
       "ارزش موجودی (به بهای خرید)",
-      "${money(r.inventoryValue)} افغانی",
+      "${money(r.inventoryValue)} ؋",
       modifier = Modifier.fillMaxWidth(),
     )
     Spacer(Modifier.height(16.dp))
 
     RankPanel("پرفروش‌ترین", r.topSelling) { "${qty(it.quantity)} فروخته‌شده" }
     RankPanel("کم‌فروش‌ترین", r.slowest) { "${qty(it.quantity)} فروخته‌شده" }
-    RankPanel("پرسودترین", r.mostProfitable) { "${money(it.profit)} افغانی" }
-    RankPanel("کم‌سودترین", r.leastProfitable) { "${money(it.profit)} افغانی" }
+    RankPanel("پرسودترین", r.mostProfitable) { "${money(it.profit)} ؋" }
+    RankPanel("کم‌سودترین", r.leastProfitable) { "${money(it.profit)} ؋" }
 
     if (r.out.isNotEmpty() || r.low.isNotEmpty()) {
       SectionTitle("نیاز به توجه")
@@ -334,7 +334,7 @@ private fun debtorsSection(
   item {
     StatTile(
       "جمع طلب از مشتریان",
-      "${money(rows.sumOf { it.remaining.coerceAtLeast(0.0) })} افغانی",
+      "${money(rows.sumOf { it.remaining.coerceAtLeast(0.0) })} ؋",
       Shop.colors.warning,
       modifier = Modifier.fillMaxWidth(),
     )
@@ -357,8 +357,8 @@ private fun debtorsSection(
           Text(row.debtor.name, style = MaterialTheme.typography.titleSmall, color = Shop.colors.text)
           Text(
             when {
-              row.remaining > 0 -> "${money(row.remaining)} افغانی"
-              row.remaining < 0 -> "${money(-row.remaining)} افغانی موجودی"
+              row.remaining > 0 -> "${money(row.remaining)} ؋"
+              row.remaining < 0 -> "${money(-row.remaining)} ؋ موجودی"
               else -> "تسویه شده"
             },
             style = MaterialTheme.typography.titleSmall,
