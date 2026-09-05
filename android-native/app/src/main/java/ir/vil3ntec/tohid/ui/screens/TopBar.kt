@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
@@ -50,6 +51,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import androidx.core.view.WindowCompat
 import ir.vil3ntec.tohid.data.BackupClock
@@ -378,7 +380,7 @@ fun TohidTopBar(
             contentAlignment = Alignment.Center,
           ) {
             Icon(
-              Icons.Filled.ArrowForward,
+              Icons.Filled.ChevronRight,
               contentDescription = "بازگشت",
               tint = BAR_INK,
               modifier = Modifier.size(18.dp),
@@ -389,6 +391,7 @@ fun TohidTopBar(
         Text(
           title,
           style = MaterialTheme.typography.titleMedium,
+          fontSize = 17.sp,
           color = BAR_INK,
           fontWeight = FontWeight.Bold,
           maxLines = 1,
@@ -397,36 +400,26 @@ fun TohidTopBar(
         )
       }
 
+      /*
+       *  فقط دو کنترل.
+       *
+       *  ── چه چیزی از اینجا رفت و کجا نشست ───────────────────────────
+       *  شش کلید بود و در هر صفحه‌ای تکرار می‌شد؛ کاربر باید آیکنِ ریز
+       *  را می‌خواند تا بفهمد کدام است. حالا:
+       *   · نشانِ اشتراک → یک ردیف در «حساب من»
+       *   · نقطهٔ همگام‌سازی → بخشِ همگام‌سازیِ تنظیمات و «حساب من»
+       *   · روز/شب و تنظیمات → صفحهٔ تنظیمات (از چرخ‌دندهٔ «حساب من»)
+       *  منطقِ هشدارها و اشتراک دست‌نخورده است؛ فقط جای نمایشش عوض شد.
+       *  ──────────────────────────────────────────────────────────────
+       */
       Row(
-        Modifier.horizontalScroll(rememberScrollState()),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
       ) {
-        /*
-         *  کلیدهای سربرگ از هم جدا شده‌اند.
-         *
-         *  تا حالا هر پنج کلید یک کادرِ خاکستریِ یکسان داشتند و کاربر
-         *  باید آیکنِ ریزشان را می‌خواند تا بفهمد کدام است. حالا هرکدام
-         *  رنگ و شکلِ کارِ خودش را دارد: اشتراک طلایی — و قرمز وقتی رو
-         *  به پایان است — حساب و تنظیمات شیشه‌ای، و هشدارها نارنجی.
-         */
-        //  نقطهٔ همگام‌سازی، اولین چیزِ ردیف: کوچک، ولی همیشه سرِ جایش
-        SyncDot()
-
-        VipChip { onOpen("vip") }
+        //  هشدار وقتی هشداری هست — نه یک کلیدِ همیشگیِ صفرِ خاموش
+        if (alerts.isNotEmpty()) AlertChip(count = alerts.size) { alertsOpen = true }
 
         AccountChip(onClick = onAccount)
-
-        AlertChip(count = alerts.size) { alertsOpen = true }
-
-        BarButton(
-          if (theme == ThemeChoice.DARK) Icons.Filled.LightMode else Icons.Filled.DarkMode,
-          "روشن یا تاریک",
-        ) {
-          onTheme(if (theme == ThemeChoice.DARK) ThemeChoice.LIGHT else ThemeChoice.DARK)
-        }
-
-        BarButton(Icons.Filled.Settings, "تنظیمات", onClick = onSettings)
       }
     }
   }
@@ -524,27 +517,13 @@ private fun Modifier.barSweep(): Modifier {
    *  دیده‌شدنِ نور یکی باشد نه سرعتِ پیکسل‌ها.
    *  ──────────────────────────────────────────────────────────────────
    */
-  if (!Motion.enabled) return this
-
-  //  روی صفحهٔ پهن، نور باید همان‌قدر آرام دیده شود؛ پس مدت با پهنا
-  //  بالا می‌رود، نه سرعتِ ثابتِ پیکسلی
-  val slow = if (isTablet()) 11_000 else 7_500
-  val drift = rememberInfiniteTransition(label = "bardrift")
-  val a by drift.animateFloat(
-    initialValue = 0f,
-    targetValue = 1f,
-    animationSpec = infiniteRepeatable(tween(slow, easing = LinearEasing), RepeatMode.Restart),
-    label = "driftA",
-  )
-  val b by drift.animateFloat(
-    initialValue = 0f,
-    targetValue = 1f,
-    animationSpec = infiniteRepeatable(
-      tween((slow * 1.6f).toInt(), easing = LinearEasing),
-      RepeatMode.Restart,
-    ),
-    label = "driftB",
-  )
+  //  ── نور، دیگر نمی‌لغزد ────────────────────────────────────────────
+  //  دو لکه‌ی نور بی‌وقفه این‌سر و آن‌سرِ سربرگ می‌رفتند. سربرگ در همه‌ی
+  //  صفحه‌ها هست، یعنی یک انیمیشنِ همیشه‌روشن در گوشه‌ی چشم و باتریِ
+  //  رفته برای تزئین. حالا همان دو لکه ساکن‌اند: تنها حرکتِ بی‌پایانِ
+  //  برنامه، زمینه‌ی آروراست.
+  val a = 0.35f
+  val b = 0.62f
 
   return drawWithContent {
     drawContent()

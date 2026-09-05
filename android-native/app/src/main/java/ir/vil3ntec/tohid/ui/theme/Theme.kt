@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.theme
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -7,11 +8,13 @@ import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import ir.vil3ntec.tohid.ui.screens.Springs
 import androidx.compose.ui.unit.dp
 
 /**
@@ -243,7 +246,13 @@ fun TohidTheme(
     ThemeChoice.DARK -> true
     ThemeChoice.SYSTEM -> isSystemInDarkTheme()
   }
-  val colors = if (dark) DarkColors else LightColors
+  val target = if (dark) DarkColors else LightColors
+  //  عوض‌شدنِ روز و شب نباید مثل خاموش‌وروشنِ چراغ باشد: سه رنگِ اصلی
+  //  نرم جابه‌جا می‌شوند و بقیه دنبالشان می‌آیند
+  val bg by animateColorAsState(target.bg, Springs.effect, label = "themeBg")
+  val surface by animateColorAsState(target.surface, Springs.effect, label = "themeSurface")
+  val text by animateColorAsState(target.text, Springs.effect, label = "themeText")
+  val colors = target.copy(bg = bg, surface = surface, text = text)
   /*
    *  اجزای آمادهٔ متریال — تراشه، دکمه، کادرِ متن — رنگشان را از همین
    *  طرح می‌گیرند. تا وقتی این‌ها را ننویسیم، متریال رنگ‌های پیش‌فرضِ

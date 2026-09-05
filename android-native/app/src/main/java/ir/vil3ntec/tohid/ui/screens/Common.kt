@@ -181,7 +181,7 @@ fun StaggeredItem(index: Int, content: @Composable () -> Unit) {
   if (!Motion.enabled) { content(); return }
   var shown by remember { mutableStateOf(false) }
   LaunchedEffect(Unit) {
-    kotlinx.coroutines.delay((index.coerceAtMost(12) * 35).toLong())
+    kotlinx.coroutines.delay((index.coerceAtMost(12) * 40).toLong())
     shown = true
   }
   val progress by animateFloatAsState(
@@ -201,7 +201,7 @@ fun StaggeredItem(index: Int, content: @Composable () -> Unit) {
     Modifier
       .graphicsLayer {
         alpha = progress
-        translationY = (1f - progress) * 26f
+        translationY = (1f - progress) * 12.dp.toPx()
       }
   ) {
     content()
@@ -213,8 +213,24 @@ fun StaggeredItem(index: Int, content: @Composable () -> Unit) {
 fun Modifier.pressScale(pressed: Boolean): Modifier {
   val scale by animateFloatAsState(
     targetValue = if (pressed) 0.97f else 1f,
-    animationSpec = tween(120, easing = FastOutSlowInEasing),
+    animationSpec = Springs.press,
     label = "press",
+  )
+  return this.graphicsLayer { scaleX = scale; scaleY = scale }
+}
+
+/**
+ *  بزرگ‌شدنِ چیزی که انتخاب شده — چیپ، پلن، کارت.
+ *
+ *  فرقش با `pressScale` این است که این یکی «حالت» را نشان می‌دهد نه
+ *  «لمس»: تا وقتی انتخاب است، بزرگ می‌ماند.
+ */
+@Composable
+fun Modifier.selectScale(selected: Boolean, scaleTo: Float = 1.03f): Modifier {
+  val scale by animateFloatAsState(
+    targetValue = if (selected) scaleTo else 1f,
+    animationSpec = Springs.press,
+    label = "select",
   )
   return this.graphicsLayer { scaleX = scale; scaleY = scale }
 }
