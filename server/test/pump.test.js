@@ -286,3 +286,86 @@ test('اشتراکِ دکان، پمپِ همان آدم را باز نمی‌ک
   await plans.setConfig('pump_trial_days', '14');
   await plans.setConfig('trial_days', '14');
 });
+
+// ── ۷) رمزِ فقط‌خواندنی — «کارمند هیچ‌چیز نمی‌پرسد» ────────────────
+
+test('برنامه نشانی و رمزِ فقط‌خواندنی را می‌سپارد و عضو هر دو را می‌گیرد', async () => {
+  const owner = await userWithStation('سپرده', 'pump-key');
+
+  const put = await h.post('/api/pump/home', {
+    homeUrl: 'https://key.example.ir', readKey: 'rk_secret_123',
+  }, { token: owner.accessToken });
+  assert.equal(put.status, 200);
+
+  //  صاحب که خودش سپرده، می‌گیردش
+  const me = await h.get('/api/pump/me', { token: owner.accessToken });
+  assert.equal(me.body.home.url, 'https://key.example.ir');
+  assert.equal(me.body.home.readKey, 'rk_secret_123');
+  assert.equal(me.body.home.station, 'pump-key');
+
+  //  و کارمندِ همان پمپ هم — همین است که کیو‌آر را بی‌کار می‌کند
+  const staff = await h.newUser('کارمندِ کلید');
+  await query(
+    `INSERT INTO station_members (id, station_id, user_id, role, status, created_at, updated_at)
+     VALUES ($1,$2,$3,'staff','active',$4,$4)`,
+    [newId('mem'), owner.stationId, staff.user.id, now()]
+  );
+  const his = await h.get('/api/pump/me', { token: staff.accessToken });
+  assert.equal(his.body.home.readKey, 'rk_secret_123');
+  assert.equal(his.body.home.url, 'https://key.example.ir');
+});
+
+test('رمزِ پمپ به کسی که عضوش نیست نمی‌رسد', async () => {
+  const a = await userWithStation('کلیددار', 'pump-key-a');
+  await h.post('/api/pump/home',
+    { homeUrl: 'https://a.example.ir', readKey: 'rk_a' }, { token: a.accessToken });
+
+  const b = await userWithStation('غریبه', 'pump-key-b');
+  const his = await h.get('/api/pump/me', { token: b.accessToken });
+  //  پمپِ خودش را می‌بیند، نه پمپِ a را
+  assert.equal(his.body.station.code, 'pump-key-b');
+  assert.notEqual(his.body.home.readKey, 'rk_a');
+  assert.equal(his.body.home.readKey, '');
+});
+
+test('رمز در دیتابیس به شکلِ خام نیست', async () => {
+  const owner = await userWithStation('رمزی', 'pump-key-enc');
+  await h.post('/api/pump/home',
+    { homeUrl: 'https://enc.example.ir', readKey: 'rk_plain_text_key' },
+    { token: owner.accessToken });
+
+  const row = await require('../src/db').one(
+    'SELECT read_key_enc FROM stations WHERE id=$1', [owner.stationId]
+  );
+  assert.ok(row.read_key_enc.startsWith('v1.'), 'باید رمزگذاری‌شده باشد');
+  assert.ok(!row.read_key_enc.includes('rk_plain_text_key'), 'رمزِ خام نباید در ردیف باشد');
+});
+
+test('رمز در پاسخِ پنلِ مدیریت نمی‌آید — فقط «دارد یا ندارد»', async () => {
+  const t = await adminToken();
+  const owner = await userWithStation('پنلی', 'pump-key-panel');
+  await h.post('/api/pump/home',
+    { homeUrl: 'https://panel.example.ir', readKey: 'rk_never_shown' },
+    { token: owner.accessToken });
+
+  const seen = await h.get(`/api/admin/pump/stations/${owner.stationId}`, { token: t });
+  assert.equal(seen.status, 200);
+  assert.equal(seen.body.station.hasReadKey, true);
+  assert.ok(!JSON.stringify(seen.body).includes('rk_never_shown'),
+    'رمز نباید هیچ‌جای پاسخِ پنل باشد');
+});
+
+test('ثبتِ نشانی بی رمز هم کار می‌کند و رمزِ قبلی را پاک نمی‌کند', async () => {
+  const owner = await userWithStation('بی‌رمز', 'pump-key-keep');
+  await h.post('/api/pump/home',
+    { homeUrl: 'https://one.example.ir', readKey: 'rk_keep' }, { token: owner.accessToken });
+
+  //  سرورِ خانگیِ به‌روزنشده رمزِ جدا ندارد و فقط نشانی می‌فرستد
+  const again = await h.post('/api/pump/home',
+    { homeUrl: 'https://two.example.ir' }, { token: owner.accessToken });
+  assert.equal(again.status, 200);
+
+  const me = await h.get('/api/pump/me', { token: owner.accessToken });
+  assert.equal(me.body.home.url, 'https://two.example.ir');
+  assert.equal(me.body.home.readKey, 'rk_keep', 'رمزِ قبلی باید بماند');
+});

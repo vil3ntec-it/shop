@@ -63,6 +63,22 @@ router.get('/me', optionalStation, async (req, res, next) => {
     res.json({
       station: stations.shape(st),
       role: req.stationRole,
+      /*
+       *  همان دو چیزی که تا دیروز روی کاغذِ کیو‌آر می‌رفت و دستِ چند نفر
+       *  می‌گشت: نشانیِ سرورِ خانگی و رمزِ فقط‌خواندنی‌اش.
+       *
+       *  این‌جا فقط به عضوِ همین پمپ می‌رسد (`requireStation` بالاتر
+       *  سنجیده) و روی کانالِ رمزگذاری‌شده — نه روی کاغذ. به همین دلیل
+       *  اپِ کارمند دیگر هیچ‌چیز نمی‌پرسد.
+       */
+      home: {
+        url: st.home_url || '',
+        //  رمزِ **فقط‌خواندنی**. سرورِ خانگی مستقلاً جلوی نوشتن را
+        //  می‌گیرد، پس این نه به کسی اجازهٔ تغییر می‌دهد و نه باید بدهد.
+        readKey: stations.readKeyOf(st),
+        station: st.code,
+        seenAt: st.home_seen_at ? Number(st.home_seen_at) : null,
+      },
       entitlement: ent,
       serverTime: now(),
     });
@@ -117,7 +133,13 @@ router.post('/home', requireStationOwner, async (req, res, next) => {
     const homeUrl = v.text(req.body?.homeUrl ?? req.body?.url, {
       max: 300, required: true, field: 'نشانیِ سرورِ خانگی',
     });
-    const st = await stations.updateStation(req.stationId, { homeUrl });
+    //  رمزِ فقط‌خواندنی اختیاری است: سرورِ خانگیِ به‌روزنشده هنوز رمزِ
+    //  جدا ندارد و نباید به همین خاطر ثبتِ نشانی شکست بخورد.
+    const patch = { homeUrl };
+    if (req.body?.readKey !== undefined) {
+      patch.readKey = v.text(req.body.readKey, { max: 200 });
+    }
+    const st = await stations.updateStation(req.stationId, patch);
     res.json({ station: stations.shape(st), serverTime: now() });
   } catch (err) { next(err); }
 });
