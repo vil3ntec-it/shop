@@ -522,5 +522,7 @@ router.post('/backups', requireSuperAdmin, async (req, res, next) => {
    `requireAdmin` بالا سوارند — پس قاعده‌ی دسترسی همان یکی است.
    ========================================================== */
 router.use('/', require('./admin-platform'));
+//  بخشِ پمپ‌بنزین — زیر همان `requireAdmin`، ولی روی دفترِ خودش
+router.use('/pump', require('./admin-pump'));
 
 module.exports = router;
