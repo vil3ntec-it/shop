@@ -19,36 +19,107 @@ const { can } = require('./permissions');
    سرورِ خانگیِ پمپ نشان می‌دهد. پس هشِ یک‌طرفه به کار نمی‌آید و
    رمزگذاریِ برگشت‌پذیر لازم است.
 
-   کلید از `API_SECRET` ساخته می‌شود و هیچ‌جای دیتابیس نیست — یک نسخهٔ
-   لو رفتهٔ دیتابیس، به تنهایی، رمزِ هیچ پمپی را نمی‌دهد.
-
    AES-256-GCM: هم پنهان می‌کند هم دست‌کاری را لو می‌دهد. اگر ردیفی
    دست‌کاری شده باشد، رمزگشایی می‌افتد و ما رشتهٔ خالی برمی‌گردانیم —
    نه چیزی که ممکن است نیمه‌درست باشد.
+
+   ── کلید کجاست، و چرا آن‌جا ─────────────────────────────────────
+   در `app_config`، دقیقاً همان‌جا که کلیدِ خصوصیِ مجوز می‌نشیند
+   (`lib/license.js`) — و به همان دلیل.
+
+   اولین نسخه کلید را از `API_SECRET` می‌ساخت. آن یک تله بود: صاحب
+   سامانه دیتابیس را پشتیبان می‌گرفت، روی کامپیوترِ دیگری برمی‌گرداند،
+   و چون `API_SECRET`ِ تازه‌ای می‌ساخت، رمزِ **همهٔ** پمپ‌ها ناخوانا
+   می‌شد. دیتابیس سالم، ولی هیچ اپِ کارمندی دیگر وصل نمی‌شد — و هیچ
+   خطایی هم نمی‌گفت چرا.
+
+   حالا کلید با همان `pg_dump` سفر می‌کند. یک بار ساخته می‌شود و
+   می‌ماند؛ `STATION_KEY` در محیط، اگر باشد، جایش را می‌گیرد (برای
+   وقتی که چند سرور باید یک کلید داشته باشند).
+
+   ⚠️ پس پشتیبانِ دیتابیس خودش رمزها را هم دارد. این آگاهانه است:
+   بی آن، «سرور را جابه‌جا کن» کار نمی‌کرد. خودِ فایلِ پشتیبان است که
+   باید محافظت شود — `BACKUP_PASSPHRASE` همین کار را می‌کند.
    ────────────────────────────────────────────────────────────────── */
-function secretKey() {
+const KEY_STATION = 'station_read_key';
+
+let cachedKey = null;
+
+/** کلیدِ رمزگذاری. یک بار ساخته و در `app_config` نگه داشته می‌شود. */
+async function secretKey() {
+  if (cachedKey) return cachedKey;
+
+  const fromEnv = process.env.STATION_KEY;
+  if (fromEnv && fromEnv.trim()) {
+    cachedKey = crypto.createHash('sha256').update(fromEnv.trim()).digest();
+    return cachedKey;
+  }
+
+  const plans = require('./plans');
+  let stored = await plans.getConfig(KEY_STATION, '');
+
+  if (!stored) {
+    /*
+     *  ⚠️ ساختنِ کلید باید اتمی باشد، و `setConfig` نیست: آن روی‌نویسی
+     *  می‌کند. روی سرورِ تازه، دو درخواستِ هم‌زمان هر کدام کلیدی
+     *  می‌ساختند و دومی اولی را پاک می‌کرد — و رمزِ هر پمپی که با کلیدِ
+     *  اول نوشته شده بود برای همیشه ناخوانا می‌شد، بی هیچ خطایی.
+     *
+     *  `DO NOTHING` یعنی فقط اولی می‌نشیند؛ بعد همان را می‌خوانیم، نه
+     *  چیزی را که خودمان ساختیم.
+     */
+    await query(
+      `INSERT INTO app_config (key, value, updated_at) VALUES ($1,$2,$3)
+       ON CONFLICT (key) DO NOTHING`,
+      [KEY_STATION, crypto.randomBytes(32).toString('base64'), now()]
+    );
+    stored = await plans.getConfig(KEY_STATION, '');
+    if (!stored) throw new Error('کلیدِ رمزگذاریِ پمپ ساخته نشد');
+  }
+
+  cachedKey = crypto.createHash('sha256').update(stored).digest();
+  return cachedKey;
+}
+
+/**
+ * کلیدِ نسلِ اول — از `API_SECRET`.
+ *
+ * فقط برای خواندنِ ردیف‌هایی که پیش از این تغییر نوشته شده‌اند. نوشتنِ
+ * تازه هرگز با این انجام نمی‌شود.
+ */
+function legacyKey() {
   const raw = config.secrets.api || config.secrets.jwt || 'shop-station-read-key';
   return crypto.createHash('sha256').update(String(raw)).digest();
 }
 
-function encryptKey(plain) {
-  const s = String(plain || '');
-  if (!s) return '';
+function seal(key, plain) {
   const iv = crypto.randomBytes(12);
-  const c = crypto.createCipheriv('aes-256-gcm', secretKey(), iv);
-  const body = Buffer.concat([c.update(s, 'utf8'), c.final()]);
+  const c = crypto.createCipheriv('aes-256-gcm', key, iv);
+  const body = Buffer.concat([c.update(plain, 'utf8'), c.final()]);
   return `v1.${iv.toString('base64url')}.${body.toString('base64url')}.${c.getAuthTag().toString('base64url')}`;
 }
 
-function decryptKey(stored) {
+function open(key, stored) {
+  const [, ivB, bodyB, tagB] = stored.split('.');
+  const d = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(ivB, 'base64url'));
+  d.setAuthTag(Buffer.from(tagB, 'base64url'));
+  return Buffer.concat([d.update(Buffer.from(bodyB, 'base64url')), d.final()]).toString('utf8');
+}
+
+async function encryptKey(plain) {
+  const s = String(plain || '');
+  if (!s) return '';
+  return seal(await secretKey(), s);
+}
+
+async function decryptKey(stored) {
   const s = String(stored || '');
   if (!s.startsWith('v1.')) return '';
   try {
-    const [, ivB, bodyB, tagB] = s.split('.');
-    const d = crypto.createDecipheriv('aes-256-gcm', secretKey(), Buffer.from(ivB, 'base64url'));
-    d.setAuthTag(Buffer.from(tagB, 'base64url'));
-    return Buffer.concat([d.update(Buffer.from(bodyB, 'base64url')), d.final()]).toString('utf8');
+    return open(await secretKey(), s);
   } catch {
+    //  شاید با کلیدِ نسلِ اول نوشته شده باشد
+    try { return open(legacyKey(), s); } catch { /* نه */ }
     //  کلید عوض شده یا ردیف دست‌کاری شده. هر دو یعنی «نداریم».
     return '';
   }
@@ -148,7 +219,7 @@ async function byCode(code) {
 async function updateStation(stationId, patch = {}) {
   const t = now();
   //  رمز فقط وقتی عوض می‌شود که آمده باشد؛ `undefined` یعنی «دست نزن»
-  const encKey = patch.readKey === undefined ? null : encryptKey(patch.readKey);
+  const encKey = patch.readKey === undefined ? null : await encryptKey(patch.readKey);
   const s = await one(
     `UPDATE stations
         SET name      = COALESCE($2, name),
@@ -170,7 +241,7 @@ async function updateStation(stationId, patch = {}) {
  * پیش از صدا زدن سنجیده‌اند (`requireStation`)، ولی خودِ این تابع
  * چیزی نمی‌سنجد — پس جای دیگری صدایش نزنید.
  */
-function readKeyOf(stationRow) {
+async function readKeyOf(stationRow) {
   return decryptKey(stationRow && stationRow.read_key_enc);
 }
 
@@ -237,7 +308,17 @@ function shape(s) {
   };
 }
 
+/**
+ * فراموش کردنِ کلیدِ در حافظه.
+ *
+ * فقط برای آزمونِ «سرور را جابه‌جا کن»: کامپیوترِ تازه حافظه‌ای ندارد و
+ * باید کلید را از دیتابیس پیدا کند. بی این، آزمون همان چیزی را که
+ * می‌خواهد ثابت کند فرض می‌گرفت.
+ */
+function _forgetKey() { cachedKey = null; }
+
 module.exports = {
+  _forgetKey,
   cleanCode, membershipOf, requireMembership, assertCan, createStation,
   getStation, byCode, updateStation, members, memberCount, updateMember, shape,
   readKeyOf, encryptKey, decryptKey,
