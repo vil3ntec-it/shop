@@ -40,6 +40,7 @@
 
   <nav class="tabs">
     <button class="tab active" data-tab="shops">دکان‌ها</button>
+    <button class="tab" data-tab="pump">پمپ‌بنزین‌ها</button>
     <button class="tab" data-tab="users">کاربران</button>
     <button class="tab" data-tab="subs">اشتراک‌ها</button>
     <button class="tab" data-tab="requests">درخواست‌های خرید</button>
@@ -109,6 +110,120 @@
 
       <h2 style="margin-top:16px;">اطلاعات ثبت‌شده</h2>
       <div id="shop-counts" class="feat-grid"></div>
+    </div>
+  </section>
+
+  <!--
+    پمپ‌بنزین‌ها — همان کارهایی که در بخشِ دکان‌ها هست، روی دفترِ جدا:
+    فهرست و جست‌وجو · یکِ پمپ با اعضا و پوشه‌اش · اشتراک دادن و گرفتن ·
+    کدِ شش‌رقمی.
+  -->
+  <section id="tab-pump" class="hidden">
+    <div class="stats" id="pump-stats"></div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>پمپ‌بنزین‌ها</h2></div>
+      <div class="row">
+        <input type="search" id="pump-q" placeholder="جست‌وجو با نام پمپ، کد، نام صاحب یا شماره" style="flex:1;min-width:220px;">
+        <button class="btn btn-sm" id="btn-pump-search">جست‌وجو</button>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr>
+            <th>پمپ</th><th>کد</th><th>صاحب</th><th>اعضا</th>
+            <th>سرورِ خانگی</th><th>اشتراک</th><th>پایان</th><th></th>
+          </tr></thead>
+          <tbody id="pump-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel hidden" id="pump-detail">
+      <div class="panel-head">
+        <h2 id="pump-title">پمپ</h2>
+        <button class="btn btn-ghost btn-sm" id="btn-close-pump">بستن</button>
+      </div>
+      <div id="pump-summary"></div>
+
+      <h2 style="margin-top:16px;">اعضا</h2>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>نام</th><th>شماره</th><th>نقش</th><th>وضعیت</th><th>عضویت</th></tr></thead>
+          <tbody id="pump-members"></tbody>
+        </table>
+      </div>
+
+      <h2 style="margin-top:16px;">اشتراک</h2>
+      <div class="grid grid-3">
+        <div>
+          <label>پلن</label>
+          <select id="pump-plan"></select>
+        </div>
+        <div>
+          <label>مدت (روز)</label>
+          <input type="number" id="pump-days" min="1" max="3650" placeholder="خالی = مدت پلن">
+        </div>
+        <div>
+          <label>مهلت پس از پایان (روز)</label>
+          <input type="number" id="pump-grace" min="0" max="90" value="0">
+        </div>
+      </div>
+      <label>بخش‌هایی که باز می‌شوند</label>
+      <div id="pump-feats" class="feat-grid"></div>
+      <label>یادداشت</label>
+      <input type="text" id="pump-note" placeholder="مثلاً: نقدی گرفته شد">
+      <div class="row" style="margin-top:12px;">
+        <button class="btn btn-sm" id="btn-pump-grant">فعال‌سازی / تمدید</button>
+        <button class="btn btn-warn btn-sm" id="btn-pump-suspend">تعلیق</button>
+        <button class="btn btn-ghost btn-sm" id="btn-pump-activate">فعال‌سازی دوباره</button>
+        <button class="btn btn-danger btn-sm" id="btn-pump-cancel">لغو</button>
+      </div>
+      <div id="pump-msg"></div>
+
+      <h2 style="margin-top:16px;">پوشهٔ این پمپ</h2>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>فایل</th><th>اندازه</th><th>آخرین تغییر</th></tr></thead>
+          <tbody id="pump-files"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!--
+      کدِ شش‌رقمی — همان چیزی که بخشِ دکان دارد. کدِ خام فقط همان یک بار
+      دیده می‌شود؛ بعد از آن حتی سرور هم نمی‌تواند نشانش بدهد.
+    -->
+    <div class="panel">
+      <div class="panel-head"><h2>کدهای اشتراکِ پمپ</h2></div>
+      <div class="grid grid-3">
+        <div>
+          <label>پلن</label>
+          <select id="pvip-plan"></select>
+        </div>
+        <div>
+          <label>مدت (روز)</label>
+          <input type="number" id="pvip-days" min="1" max="3650" placeholder="خالی = مدت پلن">
+        </div>
+        <div>
+          <label>ایمیلِ گیرنده (اختیاری)</label>
+          <input type="email" id="pvip-email" placeholder="سرور خودش می‌فرستد">
+        </div>
+      </div>
+      <label>یادداشت</label>
+      <input type="text" id="pvip-note" placeholder="برای چه کسی و چرا">
+      <div class="row" style="margin-top:12px;">
+        <button class="btn btn-sm" id="btn-pvip-make">ساختِ کد</button>
+      </div>
+      <div id="pvip-msg"></div>
+      <div class="table-scroll" style="margin-top:12px;">
+        <table>
+          <thead><tr>
+            <th>کد</th><th>پلن</th><th>روز</th><th>ایمیل</th>
+            <th>وضعیت</th><th>ساخت</th><th></th>
+          </tr></thead>
+          <tbody id="pvip-body"></tbody>
+        </table>
+      </div>
     </div>
   </section>
 
