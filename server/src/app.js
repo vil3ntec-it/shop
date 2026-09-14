@@ -107,6 +107,8 @@ async function createApp({ runMigrations = true } = {}) {
           serverTime: now(),
           registrationOpen: config.allowRegistration,
           googleClientId: config.google.clientIds[0] || '',
+          //  برنامه‌ی کامپیوتر شناسه‌ی خودش را برمی‌دارد، نه شناسه‌ی سایت.
+          googleDesktopClientId: config.google.desktopClientId || '',
           otpEnabled: config.otp.provider !== 'off',
           trialDays: Number(cfg.trial_days || 0),
           whatsapp: { number: cfg.whatsapp_number || '', message: cfg.whatsapp_message || '' },

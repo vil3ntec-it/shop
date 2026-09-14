@@ -134,7 +134,20 @@ const config = {
   },
 
   google: {
-    clientIds: list(process.env.GOOGLE_CLIENT_ID),
+    //  همه‌ی شناسه‌های پذیرفته‌شده — سنجشِ توکن هر کدام را قبول می‌کند.
+    //  شناسه‌ی Desktop هم این‌جاست، وگرنه توکنی که خودِ ما خواستیم
+    //  در سنجش رد می‌شد (‎aud‎ آن با هیچ‌کدام نمی‌خواند).
+    clientIds: [
+      ...list(process.env.GOOGLE_CLIENT_ID),
+      ...list(process.env.GOOGLE_DESKTOP_CLIENT_ID),
+    ].filter((id, i, all) => all.indexOf(id) === i),
+    //  ⚠️ شناسه‌ی «برنامه‌ی کامپیوتر» جداست و باید جدا بماند.
+    //  گوگل برای برنامه‌ی نصبی نوعِ Desktop می‌خواهد (ورود روی
+    //  127.0.0.1 با PKCE)؛ شناسه‌ی Web آن‌جا کار نمی‌کند. پس
+    //  ‎/config‎ باید هر کدام را به صاحبِ خودش بدهد، وگرنه برنامه‌ی
+    //  کامپیوتر شناسه‌ی سایت را برمی‌دارد و ورود با خطای
+    //  ‎invalid_client‎ می‌افتد.
+    desktopClientId: (process.env.GOOGLE_DESKTOP_CLIENT_ID || '').trim(),
     certsUrl:  process.env.GOOGLE_CERTS_URL || 'https://www.googleapis.com/oauth2/v3/certs',
   },
 
