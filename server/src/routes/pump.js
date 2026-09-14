@@ -134,6 +134,40 @@ router.post('/', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+/**
+ * پیوستن به پمپی که برنامهٔ کامپیوترش با کد فعال شده.
+ *
+ * آن پمپ هیچ حسابِ گوگلی ندارد؛ برنامهٔ کامپیوتر یک کدِ کوتاه نشان
+ * می‌دهد و کارمند همان را این‌جا می‌زند. اولین کسی که می‌آید **صاحب**
+ * می‌شود، بقیه همان نقشی را می‌گیرند که کد می‌گوید.
+ *
+ * ⚠️ پیش از `requireStation` است — کسی که هنوز عضوِ هیچ پمپی نیست هم
+ * باید بتواند صدایش بزند.
+ */
+router.post(
+  '/claim',
+  rateLimit({ max: config.rateLimit.joinMax, keyPrefix: 'pump-claim' }),
+  async (req, res, next) => {
+    try {
+      const code = v.text(req.body?.code, { max: 20, required: true, field: 'کد' });
+      const out = await require('../lib/station-devices').redeemJoinCode(code, req.user.id);
+      await audit.log({
+        userId: req.user.id, action: 'pump.joined',
+        detail: { stationId: out.stationId, role: out.role }, ip: clientIp(req),
+      });
+      const st = await stations.getStation(out.stationId);
+      res.status(201).json({
+        ok: true,
+        message: out.becameOwner ? 'این پمپ حالا مالِ حسابِ شماست.' : 'به این پمپ پیوستید.',
+        station: stations.shape(st),
+        role: out.role,
+        entitlement: await entitlementOf(out.stationId),
+        serverTime: now(),
+      });
+    } catch (err) { next(err); }
+  }
+);
+
 router.use(requireStation);
 
 /** نامِ پمپ و نشانیِ سرورِ خانگی‌اش. */

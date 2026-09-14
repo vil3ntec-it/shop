@@ -199,6 +199,31 @@ async function createStation(userId, { name = '', code = '' } = {}) {
   });
 }
 
+/**
+ * پمپی که برنامهٔ کامپیوتر با کد ساخته — هنوز بی صاحبِ گوگل.
+ *
+ * ⚠️ `owner_user_id` خالی می‌ماند و این عمدی است: برنامهٔ کامپیوتر هیچ
+ * حسابی ندارد. اولین کسی که با کدِ پیوستن می‌آید صاحب می‌شود
+ * (`station-devices.redeemJoinCode`).
+ */
+async function createStationForDevice({ code = '', name = '' } = {}) {
+  const stationId = newId('stn');
+  const wanted = code ? cleanCode(code) : `p${stationId.slice(-8).toLowerCase()}`;
+  if (await one('SELECT 1 FROM stations WHERE code=$1', [wanted])) {
+    throw conflict('این کد قبلاً گرفته شده است', 'code_taken');
+  }
+  return tx(async (c) => {
+    const t = now();
+    await c.query(
+      `INSERT INTO stations (id, owner_user_id, code, name, status, created_at, updated_at)
+       VALUES ($1, NULL, $2, $3, 'active', $4, $4)`,
+      [stationId, wanted, name || 'پمپ من', t]
+    );
+    await c.query('INSERT INTO station_rev (station_id, last_rev) VALUES ($1, 0)', [stationId]);
+    return c.query('SELECT * FROM stations WHERE id=$1', [stationId]).then(r => r.rows[0]);
+  });
+}
+
 async function getStation(stationId) {
   const s = await one('SELECT * FROM stations WHERE id=$1', [stationId]);
   if (!s) throw notFound('پمپ پیدا نشد', 'station_not_found');
@@ -319,7 +344,7 @@ function _forgetKey() { cachedKey = null; }
 
 module.exports = {
   _forgetKey,
-  cleanCode, membershipOf, requireMembership, assertCan, createStation,
+  cleanCode, createStationForDevice, membershipOf, requireMembership, assertCan, createStation,
   getStation, byCode, updateStation, members, memberCount, updateMember, shape,
   readKeyOf, encryptKey, decryptKey,
 };
