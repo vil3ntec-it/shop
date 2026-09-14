@@ -138,6 +138,50 @@
       </div>
     </div>
 
+    <!-- ══ افراد ══════════════════════════════════════════════════
+         خواستهٔ صاحب مخزن: «ببینم افراد رو، اشتراک‌هاشون و غیره؛
+         بخشِ فروشگاه خیلی تکمیل است، شبیه همون باشه.»
+
+         ⚠️ این فهرست فقط کسانی را می‌آورد که به یک پمپ وصل‌اند.
+         کسی که فقط دکان دارد این‌جا نیست — دو دفترِ جدا. -->
+    <div class="panel">
+      <div class="panel-head"><h2>افرادِ پمپ‌ها</h2></div>
+      <div class="row">
+        <input type="search" id="pu-q" placeholder="نامِ شخص، ایمیل، شماره، یا نام/کدِ پمپ" style="flex:1;min-width:220px;">
+        <button class="btn btn-sm" id="btn-pu-search">جست‌وجو</button>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr>
+            <th>نام</th><th>ایمیل / شماره</th><th>پمپ</th>
+            <th>نقش</th><th>اشتراک</th><th>پایان</th>
+          </tr></thead>
+          <tbody id="pu-body"></tbody>
+        </table>
+      </div>
+      <div id="pu-count" class="muted" style="margin-top:8px;"></div>
+    </div>
+
+    <!-- ══ اشتراک‌ها ═══════════════════════════════════════════════
+         همتای همان فهرستی که بخشِ دکان دارد: همهٔ اشتراک‌ها یک‌جا،
+         و جدا، آن‌هایی که دارند تمام می‌شوند. -->
+    <div class="panel">
+      <div class="panel-head">
+        <h2>اشتراک‌های پمپ</h2>
+        <button class="btn btn-ghost btn-sm" id="btn-psub-expiring">رو به پایان</button>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr>
+            <th>پمپ</th><th>پلن</th><th>وضعیت</th>
+            <th>شروع</th><th>پایان</th><th>روزِ مانده</th>
+          </tr></thead>
+          <tbody id="psub-body"></tbody>
+        </table>
+      </div>
+      <div id="psub-msg" class="muted" style="margin-top:8px;"></div>
+    </div>
+
     <div class="panel hidden" id="pump-detail">
       <div class="panel-head">
         <h2 id="pump-title">پمپ</h2>

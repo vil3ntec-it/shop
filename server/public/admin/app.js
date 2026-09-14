@@ -315,7 +315,104 @@ async function loadPump() {
     tr.appendChild(td);
     body.appendChild(tr);
   }
-  await Promise.all([loadPumpStats(), loadPumpCodes()]);
+  await Promise.all([loadPumpStats(), loadPumpCodes(), loadPumpUsers(), loadPumpSubs()]);
+}
+
+/* ----------------------------------------------------------
+   افرادِ پمپ‌ها
+
+   خواستهٔ صاحب مخزن: «ببینم افراد رو، اشتراک‌هاشون و غیره.»
+
+   ⚠️ یک ردیف به ازای هر عضویت، نه هر شخص: یک نفر می‌تواند چند پمپ
+   داشته باشد و حالِ اشتراکِ هر پمپ جداست.
+   ---------------------------------------------------------- */
+async function loadPumpUsers() {
+  const q = encodeURIComponent(($('pu-q').value || '').trim());
+  const out = await call('GET', `/admin/pump/users?limit=100&q=${q}`);
+  const body = $('pu-body');
+  body.innerHTML = '';
+
+  for (const u of out.users) {
+    const tr = el('tr');
+    tr.appendChild(el('td', null, u.name || '—'));
+
+    const contact = el('td', null, u.email || u.phone || '—');
+    contact.dir = 'ltr';
+    tr.appendChild(contact);
+
+    tr.appendChild(el('td', null, u.station_name
+      ? `${u.station_name} (${u.station_code})` : '—'));
+    tr.appendChild(el('td', null, PUMP_ROLE_FA[u.role] || u.role || '—'));
+
+    const sub = el('td');
+    sub.appendChild(badge(u.sub_status || 'none'));
+    tr.appendChild(sub);
+
+    tr.appendChild(el('td', null, date(u.sub_ends_at)));
+    body.appendChild(tr);
+  }
+
+  if (!out.users.length) {
+    const tr = el('tr');
+    const td = el('td', 'muted', 'کسی پیدا نشد');
+    td.colSpan = 6;
+    tr.appendChild(td);
+    body.appendChild(tr);
+  }
+  $('pu-count').textContent = `${fa(out.users.length)} از ${fa(out.total)} نفر`;
+}
+
+/* ----------------------------------------------------------
+   اشتراک‌های پمپ — همه، و آن‌هایی که دارند تمام می‌شوند
+   ---------------------------------------------------------- */
+async function loadPumpSubs(expiring = false) {
+  const path = expiring ? '/admin/pump/subscriptions/expiring' : '/admin/pump/subscriptions?limit=100';
+  const out = await call('GET', path);
+  const rows = out.subscriptions || [];
+  const body = $('psub-body');
+  body.innerHTML = '';
+
+  const day = 86400000;
+  for (const s of rows) {
+    /*  ⚠️ دو مسیر، دو شکلِ نام:
+     *    /subscriptions          → station_name · ends_at   (ستونِ خامِ SQL)
+     *    /subscriptions/expiring → tenantName   · endsAt    (نگاشت‌شده)
+     *  یکی‌شان را فرض نکنید؛ هر دو را بخوانید، وگرنه یکی از دو نما خالی
+     *  می‌شود و کسی هم خطایی نمی‌بیند. */
+    const name = s.station_name || s.tenantName || '';
+    const code = s.station_code || '';
+    const endsAt = s.ends_at ?? s.endsAt ?? null;
+    const startsAt = s.starts_at ?? s.startsAt ?? null;
+
+    const tr = el('tr');
+    tr.appendChild(el('td', null, name
+      ? (code ? `${name} (${code})` : name)
+      : (s.station_id || s.tenantId || '—')));
+    tr.appendChild(el('td', null, s.plan || '—'));
+
+    const st = el('td');
+    st.appendChild(badge(s.status));
+    tr.appendChild(st);
+
+    tr.appendChild(el('td', null, date(startsAt)));
+    tr.appendChild(el('td', null, date(endsAt)));
+
+    //  روزِ مانده را خودِ صفحه حساب می‌کند تا با ساعتِ همین لحظه بخواند
+    const left = endsAt ? Math.max(0, Math.ceil((Number(endsAt) - Date.now()) / day)) : null;
+    tr.appendChild(el('td', null, left === null ? '—' : fa(left)));
+    body.appendChild(tr);
+  }
+
+  if (!rows.length) {
+    const tr = el('tr');
+    const td = el('td', 'muted', expiring ? 'هیچ اشتراکی رو به پایان نیست' : 'هنوز اشتراکی نیست');
+    td.colSpan = 6;
+    tr.appendChild(td);
+    body.appendChild(tr);
+  }
+  $('psub-msg').textContent = expiring
+    ? 'فقط اشتراک‌هایی که نزدیکِ پایان‌اند.'
+    : `${fa(rows.length)} اشتراک`;
 }
 
 async function openStation(id) {
@@ -719,6 +816,14 @@ document.addEventListener('DOMContentLoaded', () => {
   $('shop-q').addEventListener('keydown', (e) => { if (e.key === 'Enter') loadShops(); });
   //  پمپ‌بنزین‌ها
   $('btn-pump-search').onclick = () => loadPump();
+  $('btn-pu-search').onclick = () => loadPumpUsers();
+  //  دکمه بینِ «همه» و «رو به پایان» می‌چرخد تا جای اضافه نگیرد
+  $('btn-psub-expiring').onclick = (e) => {
+    const showAll = e.target.dataset.mode === 'expiring';
+    e.target.dataset.mode = showAll ? '' : 'expiring';
+    e.target.textContent = showAll ? 'رو به پایان' : 'همه';
+    loadPumpSubs(!showAll);
+  };
   $('pump-q').addEventListener('keydown', (e) => { if (e.key === 'Enter') loadPump(); });
   $('btn-close-pump').onclick = () => {
     $('pump-detail').classList.add('hidden');

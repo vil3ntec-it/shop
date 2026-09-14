@@ -49,13 +49,19 @@ router.get('/stations', async (req, res) => {
             sub.id AS subscription_id, sub.plan, sub.status AS sub_status,
             sub.starts_at, sub.ends_at
        FROM stations s
-       JOIN users u ON u.id = s.owner_user_id
+       --  LEFT، نه JOIN. پمپی که با کدِ شش‌رقمی فعال شده صاحب ندارد
+       --  (owner_user_id خالی). با JOINِ ساده چنین پمپی از فهرست
+       --  می‌افتاد — و چون همهٔ پمپ‌های فعال‌شده با کد همین‌طورند،
+       --  کلِ صفحه خالی می‌ماند در حالی که total عددِ درست را
+       --  می‌گفت. همان «بخشِ پمپ هیچی نداره».
+       LEFT JOIN users u ON u.id = s.owner_user_id
        LEFT JOIN LATERAL (
          SELECT * FROM station_subscriptions x WHERE x.station_id = s.id
           ORDER BY (x.status IN ('active','suspended','pending')) DESC, x.created_at DESC LIMIT 1
        ) sub ON true
       WHERE ($1 = '' OR lower(s.name) LIKE $2 OR lower(s.code) LIKE $2
-             OR lower(u.name) LIKE $2 OR coalesce(u.phone,'') LIKE $2)
+             OR lower(coalesce(u.name,'')) LIKE $2
+             OR coalesce(u.phone,'') LIKE $2)
       ORDER BY s.created_at DESC LIMIT $3 OFFSET $4`,
     [q, like, limit, offset]
   );
@@ -259,6 +265,63 @@ router.post('/vip-codes/:id/revoke', async (req, res, next) => {
       action: 'admin.pump_vip_code_revoked', targetId: row.id,
     });
     res.json({ vipCode: row });
+  } catch (err) { next(err); }
+});
+
+/* ==========================================================
+   افراد — چه کسانی به پمپ‌ها وصل‌اند و حالِ اشتراکشان چیست
+
+   خواستهٔ صاحب مخزن: «ببینم افراد رو، اشتراک‌هاشون و غیره؛ بخشِ
+   فروشگاه خیلی تکمیل است، شبیه همون باشه.»
+
+   ⚠️ همتای ‎/admin/users‎ی بخشِ دکان است، ولی از درِ ‎station_members‎
+   می‌آید نه ‎shop_members‎ — دو دفترِ جدا، همان‌طور که باید بماند.
+   کسی که فقط دکان دارد این‌جا پیدا نمی‌شود.
+   ========================================================== */
+router.get('/users', async (req, res, next) => {
+  try {
+    const limit = v.integer(req.query?.limit, { min: 1, max: 200, def: 50 });
+    const offset = v.integer(req.query?.offset, { min: 0, max: 1e6, def: 0 });
+    const q = v.text(req.query?.q, { max: 60 });
+    const like = `%${q.toLowerCase()}%`;
+
+    //  یک ردیف به ازای هر عضویت: یک نفر می‌تواند چند پمپ داشته باشد.
+    const rows = await many(
+      `SELECT u.id, u.name, u.email, u.phone, u.status, u.created_at, u.last_login_at,
+              m.station_id, m.role, m.status AS member_status, m.created_at AS joined_at,
+              st.name AS station_name, st.code AS station_code,
+              sub.status AS sub_status, sub.plan AS sub_plan, sub.ends_at AS sub_ends_at
+         FROM users u
+         JOIN station_members m ON m.user_id = u.id
+         JOIN stations st ON st.id = m.station_id
+         LEFT JOIN LATERAL (
+           SELECT status, plan, ends_at FROM station_subscriptions
+            WHERE station_id = st.id ORDER BY ends_at DESC LIMIT 1
+         ) sub ON true
+        WHERE ($1 = '' OR lower(u.name) LIKE $2
+                      OR lower(coalesce(u.email,'')) LIKE $2
+                      OR coalesce(u.phone,'') LIKE $2
+                      OR lower(st.name) LIKE $2
+                      OR lower(st.code) LIKE $2)
+        ORDER BY u.created_at DESC
+        LIMIT $3 OFFSET $4`,
+      [q, like, limit, offset]
+    );
+
+    const total = await one(
+      `SELECT COUNT(*)::int n
+         FROM users u
+         JOIN station_members m ON m.user_id = u.id
+         JOIN stations st ON st.id = m.station_id
+        WHERE ($1 = '' OR lower(u.name) LIKE $2
+                      OR lower(coalesce(u.email,'')) LIKE $2
+                      OR coalesce(u.phone,'') LIKE $2
+                      OR lower(st.name) LIKE $2
+                      OR lower(st.code) LIKE $2)`,
+      [q, like]
+    );
+
+    res.json({ users: rows, total: total.n, limit, offset });
   } catch (err) { next(err); }
 });
 
