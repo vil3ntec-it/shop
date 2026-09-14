@@ -292,3 +292,66 @@ test('کسی که عضوِ پمپِ دیگری است، به پمپِ دوم ن�
   const twice = await h.post('/api/pump/claim', { code: codeB }, { token: u.accessToken });
   assert.equal(twice.status, 409);
 });
+
+/* ==========================================================
+   پمپِ بی‌صاحب هم باید در «رو به پایان» دیده شود
+
+   پمپی که با کدِ شش‌رقمی فعال شده `owner_user_id` خالی دارد. تا
+   دیروز `expiringSoon` با یک JOINِ ساده به `users` می‌رفت، پس چنین
+   پمپی از فهرست می‌افتاد و اشتراکش بی‌صدا تمام می‌شد.
+   ========================================================== */
+test('اشتراکِ پمپِ بی‌صاحب هم در فهرستِ رو به پایان می‌آید', async () => {
+  const t = await adminToken();
+  const code = await pumpCode(t, { days: 2 });   // دو روزه: همین حالا رو به پایان است
+
+  const r = await h.post('/api/pump/device/activate', {
+    code,
+    device: dev('pc-ownerless-expiring'),
+    station: { code: 'dev-ownerless', name: 'پمپِ بی‌صاحب' },
+  });
+  assert.equal(r.status, 201, JSON.stringify(r.body));
+
+  const row = await one('SELECT owner_user_id FROM stations WHERE id=$1', [r.body.station.id]);
+  assert.equal(row.owner_user_id, null, 'این پمپ باید بی‌صاحب باشد');
+
+  const soon = await h.get('/api/admin/pump/subscriptions/expiring?days=7', { token: t });
+  assert.equal(soon.status, 200, JSON.stringify(soon.body));
+  const mine = soon.body.subscriptions.find((s) => s.tenantId === r.body.station.id);
+  assert.ok(mine, 'پمپِ بی‌صاحب نباید از فهرست بیفتد');
+  assert.equal(mine.ownerUserId, null);
+});
+
+test('و خبر دادنِ خودکار روی پمپِ بی‌صاحب نمی‌شکند', async () => {
+  //  کسی نیست که پیام به او برسد، پس فقط باید بی‌صدا رد شود
+  const subs = require('../src/lib/subscriptions').pump;
+  //  مهم این است که پرتاب نکند: پیش از نگهبانِ ownerUserId، این‌جا
+  //  پیامی بی‌گیرنده ساخته می‌شد.
+  const out = await subs.notifyExpiring();
+  assert.ok(out !== undefined, 'باید بی‌خطا برگردد');
+});
+
+test('⚠️ پمپِ بی‌صاحب در فهرستِ پنل دیده می‌شود — نه صفحهٔ خالی', async () => {
+  //  علتِ «بخشِ پمپ هیچی نداره»: فهرست با JOINِ ساده به users می‌رفت،
+  //  پس هر پمپی که با کدِ شش‌رقمی فعال شده بود (و صاحب نداشت) از
+  //  فهرست می‌افتاد — در حالی که `total` عددِ درست را می‌گفت.
+  const t = await adminToken();
+  const code = await pumpCode(t, { days: 30 });
+  const made = await h.post('/api/pump/device/activate', {
+    code,
+    device: dev('pc-panel-visible'),
+    station: { code: 'dev-panel-visible', name: 'پمپِ پنل' },
+  });
+  assert.equal(made.status, 201);
+
+  const list = await h.get('/api/admin/pump/stations?limit=200', { token: t });
+  assert.equal(list.status, 200);
+
+  const mine = list.body.stations.find((s) => s.id === made.body.station.id);
+  assert.ok(mine, 'پمپِ بی‌صاحب باید در فهرست باشد');
+  assert.equal(mine.code, 'dev-panel-visible');
+
+  //  و شمارشِ ردیف‌ها نباید از total کمتر بیفتد — همان ناسازگاری که
+  //  صفحه را خالی نشان می‌داد.
+  assert.ok(list.body.stations.length >= 1);
+  assert.ok(list.body.stations.length <= list.body.total);
+});

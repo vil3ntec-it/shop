@@ -247,7 +247,11 @@ function build(T) {
               u.name AS owner_name, u.email AS owner_email, u.phone AS owner_phone
          FROM ${TBL} sub
          JOIN ${TEN} s ON s.id = sub.${KEY}
-         JOIN users u ON u.id = s.owner_user_id
+         --  ⚠️ LEFT، نه JOIN: پمپی که با کدِ شش‌رقمی فعال شده صاحب
+         --  ندارد (owner_user_id خالی است). با JOINِ ساده چنین پمپی
+         --  از فهرستِ «رو به پایان» می‌افتاد و خبرِ پایانِ اشتراکش هم
+         --  هیچ‌وقت نمی‌رفت — یعنی بی‌صدا تمام می‌شد.
+         LEFT JOIN users u ON u.id = s.owner_user_id
         WHERE sub.status IN ('active','suspended','expired')
           AND (sub.ends_at + (sub.grace_days * $1::bigint)) BETWEEN $2 AND $3
         ORDER BY (sub.ends_at + (sub.grace_days * $1::bigint)) ASC
@@ -297,6 +301,10 @@ function build(T) {
       //  نزدیک‌ترین آستانه‌ای که رد شده
       const hit = thresholds.filter(d => row.daysLeft <= d).sort((a, b) => a - b)[0];
       if (hit === undefined || row.daysLeft < 0) continue;
+      //  ⚠️ پمپی که با کدِ شش‌رقمی فعال شده صاحب ندارد، پس کسی نیست که
+      //  خبر به او برسد. در فهرستِ پنل می‌آید (و باید بیاید)، ولی این‌جا
+      //  رد می‌شود — وگرنه پیامی بی‌گیرنده ساخته می‌شد.
+      if (!row.ownerUserId) continue;
       const key = `subnotice_${row.subscriptionId}_${hit}`;
       const already = await plans.getConfig(key, '');
       if (already) continue;

@@ -371,3 +371,47 @@ test('ثبتِ نشانی بی رمز هم کار می‌کند و رمزِ قب
   assert.equal(me.body.home.url, 'https://two.example.ir');
   assert.equal(me.body.home.readKey, 'rk_keep', 'رمزِ قبلی باید بماند');
 });
+
+/* ==========================================================
+   افرادِ پمپ در پنلِ مدیریت
+
+   خواستهٔ صاحب مخزن: «ببینم افراد رو، اشتراک‌هاشون و غیره؛ بخشِ
+   فروشگاه خیلی تکمیل است، شبیه همون باشه.»
+   ========================================================== */
+
+test('پنل افرادِ پمپ و حالِ اشتراکشان را نشان می‌دهد', async () => {
+  const t = await adminToken();
+  const owner = await userWithStation('کریمِ پنل', 'pump-users-1');
+
+  const r = await h.get('/api/admin/pump/users', { token: t });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+
+  const mine = r.body.users.find((u) => u.station_id === owner.stationId);
+  assert.ok(mine, 'صاحبِ پمپ باید در فهرست باشد');
+  assert.equal(mine.role, 'owner');
+  assert.ok(mine.station_name, 'نامِ پمپ هم باید بیاید');
+  //  ستونِ اشتراک هست حتی وقتی هنوز اشتراکی نخریده — یعنی null، نه غایب
+  assert.ok('sub_status' in mine, 'ستونِ حالِ اشتراک باید باشد');
+});
+
+test('جست‌وجو هم با نامِ شخص کار می‌کند هم با نامِ پمپ', async () => {
+  const t = await adminToken();
+  await userWithStation('نصرالله', 'pump-users-search');
+
+  const byPerson = await h.get('/api/admin/pump/users?q=نصرالله', { token: t });
+  assert.equal(byPerson.status, 200);
+  assert.ok(byPerson.body.users.length >= 1, 'با نامِ شخص پیدا شود');
+
+  const byStation = await h.get('/api/admin/pump/users?q=pump-users-search', { token: t });
+  assert.ok(byStation.body.users.length >= 1, 'با کدِ پمپ هم پیدا شود');
+});
+
+test('⚠️ کسی که فقط دکان دارد در افرادِ پمپ پیدا نمی‌شود', async () => {
+  const t = await adminToken();
+  //  یک کاربرِ بخشِ دکان، بی هیچ پمپی
+  const shopOnly = await h.newUser('فقط‌دکان', 'shop');
+
+  const r = await h.get('/api/admin/pump/users', { token: t });
+  const found = r.body.users.find((u) => u.id === shopOnly.user.id);
+  assert.equal(found, undefined, 'دو دفتر جدا هستند و باید جدا بمانند');
+});
