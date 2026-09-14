@@ -6,9 +6,53 @@
  * نمی‌شود. سرور خودش از روی کاربرِ توکن، عضویت او را پیدا می‌کند. به
  * همین دلیل کسی نمی‌تواند با عوض کردن یک شناسه به دفترِ پمپِ دیگری برسد.
  */
+const crypto = require('crypto');
 const { query, one, many, tx, newId, now } = require('../db');
+const config = require('../config');
 const { forbidden, notFound, conflict, badRequest } = require('../middleware/errors');
 const { can } = require('./permissions');
+
+/* ──────────────────────────────────────────────────────────────────
+   رمزِ فقط‌خواندنیِ سرورِ خانگی
+
+   برخلافِ کدِ شش‌رقمی، این یکی باید **پس داده شود**: کارمند آن را به
+   سرورِ خانگیِ پمپ نشان می‌دهد. پس هشِ یک‌طرفه به کار نمی‌آید و
+   رمزگذاریِ برگشت‌پذیر لازم است.
+
+   کلید از `API_SECRET` ساخته می‌شود و هیچ‌جای دیتابیس نیست — یک نسخهٔ
+   لو رفتهٔ دیتابیس، به تنهایی، رمزِ هیچ پمپی را نمی‌دهد.
+
+   AES-256-GCM: هم پنهان می‌کند هم دست‌کاری را لو می‌دهد. اگر ردیفی
+   دست‌کاری شده باشد، رمزگشایی می‌افتد و ما رشتهٔ خالی برمی‌گردانیم —
+   نه چیزی که ممکن است نیمه‌درست باشد.
+   ────────────────────────────────────────────────────────────────── */
+function secretKey() {
+  const raw = config.secrets.api || config.secrets.jwt || 'shop-station-read-key';
+  return crypto.createHash('sha256').update(String(raw)).digest();
+}
+
+function encryptKey(plain) {
+  const s = String(plain || '');
+  if (!s) return '';
+  const iv = crypto.randomBytes(12);
+  const c = crypto.createCipheriv('aes-256-gcm', secretKey(), iv);
+  const body = Buffer.concat([c.update(s, 'utf8'), c.final()]);
+  return `v1.${iv.toString('base64url')}.${body.toString('base64url')}.${c.getAuthTag().toString('base64url')}`;
+}
+
+function decryptKey(stored) {
+  const s = String(stored || '');
+  if (!s.startsWith('v1.')) return '';
+  try {
+    const [, ivB, bodyB, tagB] = s.split('.');
+    const d = crypto.createDecipheriv('aes-256-gcm', secretKey(), Buffer.from(ivB, 'base64url'));
+    d.setAuthTag(Buffer.from(tagB, 'base64url'));
+    return Buffer.concat([d.update(Buffer.from(bodyB, 'base64url')), d.final()]).toString('utf8');
+  } catch {
+    //  کلید عوض شده یا ردیف دست‌کاری شده. هر دو یعنی «نداریم».
+    return '';
+  }
+}
 
 /**
  * کدِ پمپ — همان چیزی که برنامهٔ کامپیوتر و اپِ کارمند با آن خودشان را
@@ -103,17 +147,31 @@ async function byCode(code) {
  */
 async function updateStation(stationId, patch = {}) {
   const t = now();
+  //  رمز فقط وقتی عوض می‌شود که آمده باشد؛ `undefined` یعنی «دست نزن»
+  const encKey = patch.readKey === undefined ? null : encryptKey(patch.readKey);
   const s = await one(
     `UPDATE stations
         SET name      = COALESCE($2, name),
             home_url  = COALESCE($3, home_url),
+            read_key_enc = COALESCE($5, read_key_enc),
             home_seen_at = CASE WHEN $3 IS NULL THEN home_seen_at ELSE $4 END,
             updated_at = $4
       WHERE id = $1 RETURNING *`,
-    [stationId, patch.name ?? null, patch.homeUrl ?? null, t]
+    [stationId, patch.name ?? null, patch.homeUrl ?? null, t, encKey]
   );
   if (!s) throw notFound('پمپ پیدا نشد', 'station_not_found');
   return s;
+}
+
+/**
+ * رمزِ فقط‌خواندنیِ این پمپ، به شکلِ خام.
+ *
+ * ⚠️ فقط برای کسی صدا زده شود که عضوِ همین پمپ است. مسیرها این را
+ * پیش از صدا زدن سنجیده‌اند (`requireStation`)، ولی خودِ این تابع
+ * چیزی نمی‌سنجد — پس جای دیگری صدایش نزنید.
+ */
+function readKeyOf(stationRow) {
+  return decryptKey(stationRow && stationRow.read_key_enc);
 }
 
 /** اعضای پمپ همراه نام و شماره — برای صفحه‌ی «کارمندها». */
@@ -169,6 +227,9 @@ function shape(s) {
     name: s.name || '',
     homeUrl: s.home_url || '',
     homeSeenAt: s.home_seen_at ? Number(s.home_seen_at) : null,
+    //  فقط «دارد یا ندارد». خودِ رمز هرگز از این تابع بیرون نمی‌رود —
+    //  `shape` در پنلِ مدیریت هم به کار می‌رود.
+    hasReadKey: !!(s.read_key_enc || ''),
     status: s.status,
     ownerUserId: s.owner_user_id,
     createdAt: Number(s.created_at),
@@ -179,4 +240,5 @@ function shape(s) {
 module.exports = {
   cleanCode, membershipOf, requireMembership, assertCan, createStation,
   getStation, byCode, updateStation, members, memberCount, updateMember, shape,
+  readKeyOf, encryptKey, decryptKey,
 };
