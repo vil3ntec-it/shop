@@ -108,7 +108,7 @@ function build(T) {
     const forTenant = tenantId ?? shopId ?? null;
     let finalDays = days;
     if (finalDays === null || finalDays === undefined) {
-      const p = await plans.getPlan(plan);
+      const p = await plans.getPlan(plan, T.app);
       if (p) finalDays = plans.approxDays(p.amount, p.unit);
     }
     if (!finalDays || finalDays < 1) finalDays = 30;
@@ -149,7 +149,7 @@ function build(T) {
     if (!row.email) return shape(row);
 
     const days = Number(row.days) || 30;
-    const planTitle = title || (await plans.getPlan(row.plan))?.title || row.plan;
+    const planTitle = title || (await plans.getPlan(row.plan, T.app))?.title || row.plan;
     const subject = `کد اشتراک ${appName}`;
     const text = [
       'سلام،',

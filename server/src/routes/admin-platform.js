@@ -43,7 +43,11 @@ const router = express.Router();
 router.put('/plans/:code/discount', async (req, res, next) => {
   try {
     const code = v.text(req.params.code, { max: 20, required: true, field: 'کد پلن' });
-    const p = await plans.getPlan(code);
+    //  ⚠️ بخش هم لازم است: بی آن، تخفیفی که برای دکان‌ها گذاشته می‌شد
+    //  روی پلنِ هم‌نامِ پمپ هم می‌نشست.
+    const app = String(req.query?.app || req.body?.app || '').trim().toLowerCase() === 'pump'
+      ? 'pump' : 'shop';
+    const p = await plans.getPlan(code, app);
     if (!p) return next(notFound('پلن پیدا نشد'));
 
     const percent = v.integer(req.body?.percent, { field: 'درصد تخفیف', min: 0, max: 95, def: 0 });
@@ -61,8 +65,8 @@ router.put('/plans/:code/discount', async (req, res, next) => {
 
     const row = await one(
       `UPDATE plans SET discount_percent=$2, discount_price=$3, discount_label=$4,
-              discount_until=$5, updated_at=$6 WHERE code=$1 RETURNING *`,
-      [code, percent, price, label, until, now()]
+              discount_until=$5, updated_at=$6 WHERE code=$1 AND app=$7 RETURNING *`,
+      [code, percent, price, label, until, now(), app]
     );
     await audit.log({
       actorType: 'admin', userId: req.admin.id, action: 'admin.plan_discount',
@@ -76,10 +80,12 @@ router.put('/plans/:code/discount', async (req, res, next) => {
 router.delete('/plans/:code/discount', async (req, res, next) => {
   try {
     const code = v.text(req.params.code, { max: 20, required: true, field: 'کد پلن' });
+    const app = String(req.query?.app || req.body?.app || '').trim().toLowerCase() === 'pump'
+      ? 'pump' : 'shop';
     const row = await one(
       `UPDATE plans SET discount_percent=0, discount_price=NULL, discount_label='',
-              discount_until=NULL, updated_at=$2 WHERE code=$1 RETURNING *`,
-      [code, now()]
+              discount_until=NULL, updated_at=$2 WHERE code=$1 AND app=$3 RETURNING *`,
+      [code, now(), app]
     );
     if (!row) return next(notFound('پلن پیدا نشد'));
     await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.plan_discount_cleared', targetId: code });

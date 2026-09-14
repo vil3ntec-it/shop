@@ -22,13 +22,44 @@ function bearer(req) {
   return m ? m[1].trim() : null;
 }
 
-/** کاربر عادی. */
+/**
+ * کاربر عادیِ یک بخش.
+ *
+ * ── چرا بخش هم لازم است ───────────────────────────────────────────
+ * خواستهٔ صاحب مخزن: «شاپ و پمپ ربطی به هم نداشته باشند، حتی یک ذره.»
+ *
+ * توکنی که برای بخشِ دکان صادر شده، این‌جا — روی مسیرهای پمپ —
+ * **پیدا نمی‌شود**. پس دو بخش از دیدِ دسترسی هم دو چیزِ جدا هستند، نه
+ * یک چیز با دو در.
+ */
+function requireUserOf(app) {
+  return async function (req, res, next) {
+    try {
+      const token = bearer(req);
+      if (!token) return next(unauthorized());
+      const row = await tokens.verify(token, 'access', app);
+      if (!row) return next(unauthorized('نشست شما منقضی شده است، دوباره وارد شوید', 'invalid_token'));
+      req.appSection = app;
+      return userFromToken(req, res, next, row);
+    } catch (err) { next(err); }
+  };
+}
+
+/** کاربر عادی — بخشِ دکان، همان‌جا که همیشه بود. */
 async function requireUser(req, res, next) {
   try {
     const token = bearer(req);
     if (!token) return next(unauthorized());
-    const row = await tokens.verify(token, 'access');
+    const row = await tokens.verify(token, 'access', 'shop');
     if (!row) return next(unauthorized('نشست شما منقضی شده است، دوباره وارد شوید', 'invalid_token'));
+    req.appSection = 'shop';
+    return userFromToken(req, res, next, row);
+  } catch (err) { next(err); }
+}
+
+/** بدنهٔ مشترکِ هر دو — از روی ردیفِ توکن، کاربر و دستگاه را می‌آورد. */
+async function userFromToken(req, res, next, row) {
+  try {
 
     const user = await one('SELECT * FROM users WHERE id=$1', [row.subject_id]);
     if (!user) return next(unauthorized('حساب پیدا نشد', 'invalid_token'));
@@ -48,6 +79,9 @@ async function requireUser(req, res, next) {
     next();
   } catch (err) { next(err); }
 }
+
+/** کاربرِ بخشِ پمپ. */
+const requirePumpUser = requireUserOf('pump');
 
 /** عضویت در دکان لازم است — shop_id از همین‌جا می‌آید. */
 async function requireShop(req, res, next) {
@@ -251,7 +285,7 @@ function requireSuperAdmin(req, res, next) {
 }
 
 module.exports = {
-  bearer, requireUser, requireShop, optionalShop, requireDataWrite,
+  bearer, requireUser, requireUserOf, requirePumpUser, requireShop, optionalShop, requireDataWrite,
   requirePermission, requireFeature, requireAdmin, requireSuperAdmin,
   //  بخشِ پمپ‌بنزین
   requireStation, optionalStation, requireStationFeature,

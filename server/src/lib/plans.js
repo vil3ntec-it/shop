@@ -47,13 +47,23 @@ function endOfPeriod(startMs, amount, unit) {
 
 async function seedDefaults() {
   const t = now();
-  const { n } = await one('SELECT COUNT(*)::int AS n FROM plans');
-  if (n === 0) {
+  /*
+   *  هر بخش پلن‌های خودش را دارد.
+   *
+   *  ── چرا ────────────────────────────────────────────────────────
+   *  خواستهٔ صاحب مخزن: «شاپ و پمپ ربطی به هم نداشته باشند، حتی یک
+   *  ذره.» تا دیروز جدول یکی بود، یعنی **قیمتِ دکان همان قیمتِ پمپ
+   *  بود** و تخفیفی که برای دکان‌ها گذاشته می‌شد روی پمپ‌ها هم
+   *  می‌نشست. این از هر اشتراکِ نشتی‌ای بدتر است: مستقیم روی پول.
+   */
+  for (const app of ['shop', 'pump']) {
+    const { n } = await one('SELECT COUNT(*)::int AS n FROM plans WHERE app=$1', [app]);
+    if (n > 0) continue;
     for (const p of DEFAULT_PLANS) {
       await query(
-        `INSERT INTO plans (id,code,title,amount,unit,price_afn,negotiable,features,max_devices,badge,sort_order,active,created_at,updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6,false,'[]'::jsonb,10,$7,$8,true,$9,$9)`,
-        [newId('plan'), p.code, p.title, p.amount, p.unit, p.price, p.badge, p.sort, t]
+        `INSERT INTO plans (id,code,title,amount,unit,price_afn,negotiable,features,max_devices,badge,sort_order,active,created_at,updated_at,app)
+         VALUES ($1,$2,$3,$4,$5,$6,false,'[]'::jsonb,10,$7,$8,true,$9,$9,$10)`,
+        [newId('plan'), p.code, p.title, p.amount, p.unit, p.price, p.badge, p.sort, t, app]
       );
     }
   }
@@ -128,16 +138,24 @@ function shapePlan(row, at = Date.now()) {
   };
 }
 
-async function listPlans({ activeOnly = true } = {}) {
+/**
+ * پلن‌های یک بخش.
+ *
+ * `app` نیامده یعنی `shop` — پس هر کدی که از قبل این را بی‌آرگومان
+ * صدا می‌زد، همان پلن‌های دکان را می‌گیرد و چیزی عوض نشده.
+ */
+async function listPlans({ activeOnly = true, app = 'shop' } = {}) {
   const rows = await many(
-    `SELECT * FROM plans ${activeOnly ? 'WHERE active = true' : ''} ORDER BY sort_order ASC, created_at ASC`
+    `SELECT * FROM plans WHERE app=$1 ${activeOnly ? 'AND active = true' : ''}
+      ORDER BY sort_order ASC, created_at ASC`,
+    [app]
   );
   const at = Date.now();
   return rows.map(r => shapePlan(r, at));
 }
 
-async function getPlan(code) {
-  return one('SELECT * FROM plans WHERE code=$1', [code]);
+async function getPlan(code, app = 'shop') {
+  return one('SELECT * FROM plans WHERE code=$1 AND app=$2', [code, app]);
 }
 
 async function getConfig(key, def = '') {

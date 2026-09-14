@@ -27,7 +27,7 @@ const audit = require('../lib/audit');
 const plans = require('../lib/plans');
 const { catalogOf } = require('../lib/features');
 const { entitlementOf } = require('../lib/entitlement').pump;
-const { requireUser, requireStation, optionalStation } = require('../middleware/auth');
+const { requirePumpUser, requireStation, optionalStation } = require('../middleware/auth');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
 const { badRequest, forbidden, notFound } = require('../middleware/errors');
 
@@ -39,7 +39,36 @@ router.get('/features', (req, res) => {
   res.json({ features: PUMP.FEATURES, free: PUMP.FREE_KEYS, core: PUMP.CORE_KEYS });
 });
 
-router.use(requireUser);
+/**
+ * پلن و قیمتِ بخشِ پمپ — **باز**، مثل `/plans`ی دکان.
+ *
+ * قیمت راز نیست: هر کسی که صفحهٔ اشتراک را باز کند باید ببیندش، چه
+ * حساب داشته باشد چه نه.
+ *
+ * ⚠️ این‌ها پلن‌های **پمپ**اند، نه دکان. تا دیروز جدول یکی بود و
+ * قیمتِ دکان همان قیمتِ پمپ بود — و تخفیفِ دکان‌ها روی پمپ‌ها هم
+ * می‌نشست.
+ */
+router.get('/plans', async (req, res, next) => {
+  try {
+    const cfg = await plans.allConfig();
+    res.json({
+      plans: await plans.listPlans({ app: 'pump' }),
+      currency: cfg.currency || 'افغانی',
+      trialDays: Number(cfg.pump_trial_days || 0),
+      serverTime: now(),
+    });
+  } catch (err) { next(err); }
+});
+
+/*
+ *  ⚠️ `requirePumpUser` و نه `requireUser`.
+ *
+ *  توکنی که برای بخشِ دکان صادر شده، این‌جا **پیدا نمی‌شود** — نه
+ *  «دسترسی نداری»، بلکه «چنین نشستی نیست». خواستهٔ صاحب مخزن همین بود:
+ *  دو بخش حتی یک ذره به هم ربط نداشته باشند.
+ */
+router.use(requirePumpUser);
 
 /** نوشتن روی پمپ فقط کارِ صاحب و مدیر است. */
 function requireStationOwner(req, res, next) {
@@ -104,6 +133,40 @@ router.post('/', async (req, res, next) => {
     res.status(201).json({ station: stations.shape(st), entitlement: ent, serverTime: now() });
   } catch (err) { next(err); }
 });
+
+/**
+ * پیوستن به پمپی که برنامهٔ کامپیوترش با کد فعال شده.
+ *
+ * آن پمپ هیچ حسابِ گوگلی ندارد؛ برنامهٔ کامپیوتر یک کدِ کوتاه نشان
+ * می‌دهد و کارمند همان را این‌جا می‌زند. اولین کسی که می‌آید **صاحب**
+ * می‌شود، بقیه همان نقشی را می‌گیرند که کد می‌گوید.
+ *
+ * ⚠️ پیش از `requireStation` است — کسی که هنوز عضوِ هیچ پمپی نیست هم
+ * باید بتواند صدایش بزند.
+ */
+router.post(
+  '/claim',
+  rateLimit({ max: config.rateLimit.joinMax, keyPrefix: 'pump-claim' }),
+  async (req, res, next) => {
+    try {
+      const code = v.text(req.body?.code, { max: 20, required: true, field: 'کد' });
+      const out = await require('../lib/station-devices').redeemJoinCode(code, req.user.id);
+      await audit.log({
+        userId: req.user.id, action: 'pump.joined',
+        detail: { stationId: out.stationId, role: out.role }, ip: clientIp(req),
+      });
+      const st = await stations.getStation(out.stationId);
+      res.status(201).json({
+        ok: true,
+        message: out.becameOwner ? 'این پمپ حالا مالِ حسابِ شماست.' : 'به این پمپ پیوستید.',
+        station: stations.shape(st),
+        role: out.role,
+        entitlement: await entitlementOf(out.stationId),
+        serverTime: now(),
+      });
+    } catch (err) { next(err); }
+  }
+);
 
 router.use(requireStation);
 
@@ -246,6 +309,8 @@ router.post('/license', async (req, res, next) => {
       plan: ent.subscription.plan || (ent.source === 'trial' ? 'trial' : ''),
       planTitle: ent.source === 'trial' ? 'دوره‌ی آزمایشی' : (ent.subscription.plan || ''),
       audience: license.AUDIENCE_PUMP,
+      //  مجوز به همین پمپ بسته می‌شود، نه فقط به دستگاه
+      tenantId: req.stationId,
       at,
     });
 
@@ -320,6 +385,34 @@ router.put('/files/:path', async (req, res, next) => {
     const isInbox = path === 'inbox.json';
     if (!isInbox && req.stationRole !== 'owner' && req.stationRole !== 'manager') {
       throw forbidden('فقط برنامهٔ خودِ پمپ روی این فایل می‌نویسد', 'read_only');
+    }
+
+    /*
+     *  ⚠️ سوراخی که این می‌بندد ────────────────────────────────────
+     *
+     *  تا امروز این مسیر فقط نقش را می‌سنجید و هیچ بررسیِ اشتراکی
+     *  نداشت. یعنی پمپی که نه اشتراک داشت و نه دورهٔ آزمایشی، باز هم
+     *  بی‌محدودیت روی پوشهٔ ابری می‌نوشت — و «پوشهٔ ابری و پشتیبان»
+     *  خودش در کاتالوگ **پولی** علامت خورده.
+     *
+     *  اشتراک فقط در برنامه اجرا می‌شد؛ و چیزی که فقط در برنامه اجرا
+     *  شود، اجرا نشده است. هر کسی که برنامه را باز می‌کرد یا
+     *  درخواست را دستی می‌ساخت، از کنارش رد می‌شد.
+     *
+     *  ── چرا فقط نوشتن ───────────────────────────────────────────
+     *  خواندن هرگز بسته نمی‌شود، حتی با اشتراکِ تمام‌شده. دادهٔ پمپ
+     *  مالِ خودش است؛ باید بتواند بیاوردش و پشتیبان بگیرد. گروگان
+     *  گرفتنِ داده سریع‌ترین راهِ از دست دادنِ اعتماد است.
+     */
+    const ent = await entitlementOf(req.stationId);
+    if (!ent.features.includes('cloud')) {
+      const err = forbidden(
+        'اشتراک این پمپ تمام شده است. دفترِ شما روی کامپیوترِ خودتان سالم '
+        + 'می‌ماند و به‌محض تمدید بالا می‌رود.',
+        'subscription_required'
+      );
+      err.entitlement = { source: ent.source, trial: ent.trial };
+      throw err;
     }
 
     const data = req.body?.data;

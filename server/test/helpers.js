@@ -71,9 +71,15 @@ const put = (p, body, o = {}) => api('PUT', p, { ...o, body });
 const patch = (p, body, o = {}) => api('PATCH', p, { ...o, body });
 const del = (p, o) => api('DELETE', p, o);
 
-/** ساخت یک کاربر تازه با رمز و برگرداندن نشست او. */
+/**
+ * ساخت یک کاربر تازه با رمز و برگرداندن نشست او.
+ *
+ * `app` می‌گوید نشست مالِ کدام بخش است. توکنِ یک بخش روی مسیرهای بخشِ
+ * دیگر اصلاً پیدا نمی‌شود، پس آزمونِ پمپ باید `'pump'` بدهد — همان
+ * کاری که خودِ برنامهٔ پمپ می‌کند.
+ */
 let seq = 0;
-async function newUser(name = 'کاربر') {
+async function newUser(name = 'کاربر', app = 'shop') {
   seq += 1;
   const email = `user${seq}@test.local`;
   const password = 'Passw0rd!test';
@@ -96,11 +102,31 @@ async function newUser(name = 'کاربر') {
 
   const done = await post('/api/auth/register/complete', {
     ticket: verified.body.ticket,
-    name, password, device,
+    name, password, device, app,
     terms: { accepted: true },
   });
   if (done.status >= 300) throw new Error(`ثبت‌نام نشد: ${JSON.stringify(done.body)}`);
-  return { ...done.body, email, phone: done.body.user?.phone ?? null, password };
+  return { ...done.body, email, phone: done.body.user?.phone ?? null, password, app };
 }
 
-module.exports = { start, stop, resetDatabase, api, get, post, put, patch, del, newUser, query };
+/**
+ * نشستِ دوم برای همان آدم، در بخشِ دیگر.
+ *
+ * از وقتی توکن به بخشش مهر می‌خورد، یک نشست هر دو بخش را باز نمی‌کند —
+ * و این عمدی است. آدمی که هم دکان دارد هم پمپ، در هر برنامه جدا وارد
+ * می‌شود، دقیقاً مثلِ دو برنامهٔ بی‌ربط.
+ */
+async function signIn(user, app = 'shop') {
+  const r = await post('/api/auth/login', {
+    identifier: user.email,
+    password: user.password,
+    device: { deviceId: `dev-${app}-${user.email.replace(/[^A-Za-z0-9]/g, '-')}`, name: 'تست', platform: 'test' },
+    app,
+  });
+  if (r.status >= 300) throw new Error(`ورود نشد: ${JSON.stringify(r.body)}`);
+  return { ...user, ...r.body, app };
+}
+
+module.exports = {
+  start, stop, resetDatabase, api, get, post, put, patch, del, newUser, signIn, query,
+};

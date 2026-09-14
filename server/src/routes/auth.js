@@ -91,14 +91,29 @@ async function upsertDevice(userId, device, ip) {
   return row;
 }
 
+/**
+ * بخشی که این درخواست از آن آمده.
+ *
+ * خواستهٔ صاحب مخزن: «شاپ و پمپ ربطی به هم نداشته باشند، حتی یک ذره.»
+ * پس توکن به بخشش مهر می‌خورد و در بخشِ دیگر اصلاً پیدا نمی‌شود.
+ *
+ * ⚠️ نیامدنش یعنی `shop` — هر برنامه‌ای که امروز در دستِ کاربران است
+ * چیزی نمی‌فرستد و مالِ بخشِ دکان است. پس هیچ‌کس بیرون نمی‌افتد.
+ */
+function appOf(req) {
+  return String(req.body?.app || '').trim().toLowerCase() === 'pump' ? 'pump' : 'shop';
+}
+
 /** ساخت نشست تازه (توکن دسترسی + توکن تازه‌سازی). */
-async function issueSession(user, device, ip) {
+async function issueSession(user, device, ip, app = 'shop') {
   const dev = await upsertDevice(user.id, device, ip);
   const access = await tokens.issue({
-    kind: 'access', subjectId: user.id, deviceId: dev?.id || null, ttlMs: config.tokens.accessTtlMs,
+    kind: 'access', subjectId: user.id, deviceId: dev?.id || null,
+    ttlMs: config.tokens.accessTtlMs, app,
   });
   const refresh = await tokens.issue({
-    kind: 'refresh', subjectId: user.id, deviceId: dev?.id || null, ttlMs: config.tokens.refreshTtlMs,
+    kind: 'refresh', subjectId: user.id, deviceId: dev?.id || null,
+    ttlMs: config.tokens.refreshTtlMs, app,
   });
   await query('UPDATE users SET last_login_at=$2 WHERE id=$1', [user.id, now()]);
   return {
@@ -207,7 +222,9 @@ router.post(['/staff', '/staff-login'], joinLimit, async (req, res, next) => {
       await staffCodes.redeem(rawCode, user.id, ip);
     }
 
-    const session = await issueSession(user, { ...device, uid: deviceUid }, ip);
+    //  کدِ شاگرد مالِ دفترِ دکان است، پس نشستش هم همان بخش است.
+    //  بخشِ پمپ راهِ پیوستنِ خودش را دارد.
+    const session = await issueSession(user, { ...device, uid: deviceUid }, ip, 'shop');
     res.status(201).json(await loginPayload(user, session));
   } catch (err) { next(err); }
 });
@@ -381,7 +398,7 @@ router.post('/register/complete', authLimit, async (req, res, next) => {
     if (err.code !== 'bad_location' && err.code !== 'device_required') throw err;
   }
 
-  const session = await issueSession(user, req.body?.device, ip);
+  const session = await issueSession(user, req.body?.device, ip, appOf(req));
   await audit.log({
     actorType: 'user', userId: user.id, action: 'auth.register',
     detail: { method: 'email_3step', terms: termsVersion, located: !!location }, ip,
@@ -413,7 +430,7 @@ router.post('/login', authLimit, async (req, res, next) => {
   if (!ok) return next(unauthorized('ایمیل/شماره یا رمز درست نیست', 'bad_credentials'));
   if (user.status !== 'active') return next(forbidden('این حساب غیرفعال است', 'account_disabled'));
 
-  const session = await issueSession(user, req.body?.device, clientIp(req));
+  const session = await issueSession(user, req.body?.device, clientIp(req), appOf(req));
   await audit.log({ actorType: 'user', userId: user.id, action: 'auth.login', detail: { method: 'password' }, ip: clientIp(req) });
   res.json(await loginPayload(user, session));
 });
@@ -472,7 +489,7 @@ router.post('/otp/verify', otpLimit, async (req, res, next) => {
   }
   if (user.status !== 'active') return next(forbidden('این حساب غیرفعال است', 'account_disabled'));
 
-  const session = await issueSession(user, req.body?.device, clientIp(req));
+  const session = await issueSession(user, req.body?.device, clientIp(req), appOf(req));
   await audit.log({ actorType: 'user', userId: user.id, action: created ? 'auth.register' : 'auth.login', detail: { method: 'otp' }, ip: clientIp(req) });
   res.status(created ? 201 : 200).json({ created, ...(await loginPayload(user, session)) });
 });
@@ -515,7 +532,7 @@ router.post('/google', authLimit, async (req, res, next) => {
     [newId('idn'), user.id, profile.sub, profile.email || '', now()]
   );
 
-  const session = await issueSession(user, req.body?.device, clientIp(req));
+  const session = await issueSession(user, req.body?.device, clientIp(req), appOf(req));
   await audit.log({ actorType: 'user', userId: user.id, action: created ? 'auth.register' : 'auth.login', detail: { method: 'google' }, ip: clientIp(req) });
   res.status(created ? 201 : 200).json({ created, ...(await loginPayload(user, session)) });
 });
@@ -523,14 +540,18 @@ router.post('/google', authLimit, async (req, res, next) => {
 // ---------- تازه‌سازی نشست ----------
 router.post('/refresh', async (req, res, next) => {
   const token = String(req.body?.refreshToken || req.body?.refresh_token || '');
-  const row = await tokens.verify(token, 'refresh');
+  //  `null` یعنی «هر بخشی» — بخشِ درست را از خودِ ردیف برمی‌داریم،
+  //  نه از چیزی که درخواست ادعا می‌کند. وگرنه یک توکنِ تازه‌سازیِ
+  //  دکان می‌توانست توکنِ دسترسیِ پمپ بسازد.
+  const row = await tokens.verify(token, 'refresh', null);
   if (!row) return next(unauthorized('نشست منقضی شده است، دوباره وارد شوید', 'invalid_token'));
 
   const user = await one('SELECT * FROM users WHERE id=$1', [row.subject_id]);
   if (!user || user.status !== 'active') return next(unauthorized('حساب در دسترس نیست', 'invalid_token'));
 
   const access = await tokens.issue({
-    kind: 'access', subjectId: user.id, deviceId: row.device_id, ttlMs: config.tokens.accessTtlMs,
+    kind: 'access', subjectId: user.id, deviceId: row.device_id,
+    ttlMs: config.tokens.accessTtlMs, app: row.app || 'shop',
   });
   res.json({ accessToken: access.token, accessExpiresAt: access.expiresAt });
 });
@@ -637,7 +658,7 @@ router.post('/password/reset', otpLimit, async (req, res, next) => {
   await audit.log({ actorType: 'user', userId: user.id, action: 'auth.password_reset', ip: clientIp(req) });
 
   //  و همان‌جا واردش می‌کنیم؛ کسی که تازه رمز گذاشته نباید دوباره بزندش
-  const session = await issueSession(user, req.body?.device, clientIp(req));
+  const session = await issueSession(user, req.body?.device, clientIp(req), appOf(req));
   res.json(await loginPayload(user, session));
 });
 

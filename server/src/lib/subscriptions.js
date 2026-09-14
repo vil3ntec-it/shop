@@ -168,7 +168,7 @@ function build(T) {
       //  وگرنه در گزارش‌ها اشتراکی دیده می‌شد که ماه‌ها پیش شروع شده.
       start = if_live(existing, t) ?? start;
     } else {
-      const p = await plans.getPlan(plan);
+      const p = await plans.getPlan(plan, T.app);
       if (!p || !p.amount || !p.unit) throw badRequest('مدت اشتراک مشخص نیست', 'missing_duration');
       end = plans.endOfPeriod(base, p.amount, p.unit);
       start = if_live(existing, t) ?? start;

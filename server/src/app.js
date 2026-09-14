@@ -176,7 +176,21 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/location', require('./routes/location'));
     api.use('/me', require('./routes/me'));
     api.use('/shop', require('./routes/shop'));
-    //  بخشِ پمپ‌بنزین — دفترِ جدا، همان دستگاهِ اشتراک
+    /*
+     *  بخشِ پمپ‌بنزین — دفترِ جدا، همان دستگاهِ اشتراک.
+     *
+     *  ⚠️ ترتیبِ این دو خط مهم است و اتفاقی نیست — همان تله‌ای که
+     *  بالاتر برای `/api/v1` و `/api` نوشته شده.
+     *
+     *  `/pump` یک `router.use(requirePumpUser)` سراسری دارد که روی
+     *  **هر** مسیرِ زیرِ خودش می‌نشیند. اگر اول سوار می‌شد،
+     *  `/pump/device/activate` — که عمداً بی‌توکن است، چون هنوز هیچ
+     *  توکنی وجود ندارد — پیش از رسیدن به مقصد ۴۰۱ می‌گرفت و
+     *  فعال‌سازی با کدِ شش‌رقمی اصلاً ممکن نبود.
+     *
+     *  پس نشانیِ درازتر اول.
+     */
+    api.use('/pump/device', require('./routes/pump-device'));
     api.use('/pump', require('./routes/pump'));
     api.use('/events', require('./routes/events'));
     api.use('/sync', require('./routes/sync'));

@@ -39,7 +39,7 @@ async function adminToken() {
 
 /** یک آدم با پمپِ خودش. */
 async function owner(name, code) {
-  const u = await h.newUser(name);
+  const u = await h.newUser(name, 'pump');
   const made = await h.post('/api/pump', { name: `پمپ ${name}`, code }, { token: u.accessToken });
   assert.equal(made.status, 201, JSON.stringify(made.body));
   return { ...u, stationId: made.body.station.id, code: made.body.station.code };
@@ -47,7 +47,7 @@ async function owner(name, code) {
 
 /** کارمندی که عضوِ پمپِ داده‌شده می‌شود. */
 async function staffOf(stationId, name) {
-  const u = await h.newUser(name);
+  const u = await h.newUser(name, 'pump');
   await query(
     `INSERT INTO station_members (id, station_id, user_id, role, status, created_at, updated_at)
      VALUES ($1,$2,$3,'staff','active',$4,$4)`,
@@ -209,11 +209,27 @@ test('یک آدم، هم دکان هم پمپ: دو دفترِ کاملاً جد
   await plans.setConfig('pump_trial_days', '0');
   await plans.setConfig('trial_days', '0');
 
-  const u = await h.newUser('دوکاره');
+  /*
+   *  ⚠️ یک آدم، **دو نشست**.
+   *
+   *  از وقتی توکن به بخشش مهر می‌خورد، یک توکن هر دو بخش را باز
+   *  نمی‌کند. این خودش بخشی از همان «هیچ ربطی به هم نداشته باشند»
+   *  است: در هر برنامه جدا وارد می‌شوی، مثلِ دو برنامهٔ بی‌ربط.
+   */
+  const u = await h.newUser('دوکاره', 'shop');
+  const asPump = await h.signIn(u, 'pump');
+
   const shop = await h.post('/api/shop', { name: 'دکانِ من' }, { token: u.accessToken });
-  const pump = await h.post('/api/pump', { code: 'both-one' }, { token: u.accessToken });
+  const pump = await h.post('/api/pump', { code: 'both-one' }, { token: asPump.accessToken });
   assert.equal(shop.status, 201);
   assert.equal(pump.status, 201);
+
+  //  و این مرزِ تازه را همین‌جا می‌سنجیم: توکنِ دکان روی پمپ «نشستی
+  //  نیست»، نه «دسترسی نداری»
+  const wrongWay = await h.get('/api/pump/me', { token: u.accessToken });
+  assert.equal(wrongWay.status, 401, 'توکنِ دکان نباید روی پمپ شناخته شود');
+  const otherWay = await h.get('/api/me', { token: asPump.accessToken });
+  assert.equal(otherWay.status, 401, 'توکنِ پمپ نباید روی دکان شناخته شود');
 
   //  یک حساب، دو مستأجرِ جدا
   assert.ok(shop.body.shop.id.startsWith('shp'));
@@ -227,16 +243,16 @@ test('یک آدم، هم دکان هم پمپ: دو دفترِ کاملاً جد
   await h.post('/api/vip/redeem', { code: shopCode.body.code }, { token: u.accessToken });
 
   const shopState = await h.get('/api/me/subscription', { token: u.accessToken });
-  const pumpState = await h.get('/api/pump/subscription', { token: u.accessToken });
+  const pumpState = await h.get('/api/pump/subscription', { token: asPump.accessToken });
   assert.equal(shopState.body.source, 'subscription');
   assert.equal(pumpState.body.entitlement.source, 'free',
     'اشتراکِ دکان نباید پمپِ همان آدم را باز کند');
 
   //  حالا فقط پمپ اشتراک می‌گیرد
   const pCode = await pumpCode(t, { days: 30 });
-  await h.post('/api/pump/vip/redeem', { code: pCode }, { token: u.accessToken });
+  await h.post('/api/pump/vip/redeem', { code: pCode }, { token: asPump.accessToken });
 
-  const pumpAfter = await h.get('/api/pump/subscription', { token: u.accessToken });
+  const pumpAfter = await h.get('/api/pump/subscription', { token: asPump.accessToken });
   assert.equal(pumpAfter.body.entitlement.source, 'subscription');
 
   //  و دفترِ اشتراک‌ها واقعاً دو ردیفِ جدا در دو جدولِ جداست
@@ -253,9 +269,10 @@ test('یک آدم، هم دکان هم پمپ: دو دفترِ کاملاً جد
 
 test('کدِ پمپ روی دکان کار نمی‌کند، و کدِ دکان روی پمپ', async () => {
   const t = await adminToken();
-  const u = await h.newUser('مرزی');
+  const u = await h.newUser('مرزی', 'shop');
+  const asPump = await h.signIn(u, 'pump');
   await h.post('/api/shop', { name: 'دکانِ مرزی' }, { token: u.accessToken });
-  await h.post('/api/pump', { code: 'cross-line' }, { token: u.accessToken });
+  await h.post('/api/pump', { code: 'cross-line' }, { token: asPump.accessToken });
 
   const pCode = await pumpCode(t, { days: 30 });
   const onShop = await h.post('/api/vip/redeem', { code: pCode }, { token: u.accessToken });
@@ -263,16 +280,17 @@ test('کدِ پمپ روی دکان کار نمی‌کند، و کدِ دکان 
 
   const sCode = await h.post('/api/admin/vip-codes', { plan: 'custom', days: 30 }, { token: t });
   const onPump = await h.post('/api/pump/vip/redeem',
-    { code: sCode.body.code }, { token: u.accessToken });
+    { code: sCode.body.code }, { token: asPump.accessToken });
   assert.equal(onPump.status, 404, 'کدِ دکان در دفترِ کدهای پمپ اصلاً وجود ندارد');
 });
 
 test('پوشهٔ پمپ از راهِ مسیرهای دکان در دسترس نیست', async () => {
-  const u = await h.newUser('کنجکاو');
+  const u = await h.newUser('کنجکاو', 'shop');
+  const asPump = await h.signIn(u, 'pump');
   await h.post('/api/shop', { name: 'دکانِ کنجکاو' }, { token: u.accessToken });
-  await h.post('/api/pump', { code: 'nocross' }, { token: u.accessToken });
+  await h.post('/api/pump', { code: 'nocross' }, { token: asPump.accessToken });
   await h.put('/api/pump/files/live.json',
-    { data: { رازِ‌پمپ: 'نباید در دکان دیده شود' } }, { token: u.accessToken });
+    { data: { رازِ‌پمپ: 'نباید در دکان دیده شود' } }, { token: asPump.accessToken });
 
   //  همگام‌سازیِ دکان هیچ‌چیزِ پمپ را برنمی‌گرداند
   const pull = await h.get('/api/sync/pull?since=0', { token: u.accessToken });
@@ -284,16 +302,17 @@ test('پوشهٔ پمپ از راهِ مسیرهای دکان در دسترس ن
 
 test('پمپِ خاموش‌شده، دکانِ همان آدم را از کار نمی‌اندازد', async () => {
   const t = await adminToken();
-  const u = await h.newUser('نیمه‌خاموش');
+  const u = await h.newUser('نیمه‌خاموش', 'shop');
+  const asPump = await h.signIn(u, 'pump');
   const shop = await h.post('/api/shop', { name: 'دکانِ زنده' }, { token: u.accessToken });
-  const pump = await h.post('/api/pump', { code: 'half-off' }, { token: u.accessToken });
+  const pump = await h.post('/api/pump', { code: 'half-off' }, { token: asPump.accessToken });
 
   const off = await h.post(`/api/admin/pump/stations/${pump.body.station.id}/status`,
     { status: 'disabled' }, { token: t });
   assert.equal(off.status, 200);
 
   //  پمپ رفت
-  const pumpMe = await h.get('/api/pump/me', { token: u.accessToken });
+  const pumpMe = await h.get('/api/pump/me', { token: asPump.accessToken });
   assert.equal(pumpMe.body.station, null);
 
   //  ولی دکان سرِ جایش است
@@ -303,9 +322,10 @@ test('پمپِ خاموش‌شده، دکانِ همان آدم را از کار
 });
 
 test('مجوزِ دکان و مجوزِ پمپ دو شنوندهٔ جدا دارند', async () => {
-  const u = await h.newUser('دومجوزه');
+  const u = await h.newUser('دومجوزه', 'shop');
+  const asPump = await h.signIn(u, 'pump');
   const shop = await h.post('/api/shop', { name: 'دکانِ مجوز' }, { token: u.accessToken });
-  const pump = await h.post('/api/pump', { code: 'two-aud' }, { token: u.accessToken });
+  const pump = await h.post('/api/pump', { code: 'two-aud' }, { token: asPump.accessToken });
 
   await require('../src/lib/subscriptions').grant(shop.body.shop.id, { plan: 'custom', days: 30 });
   await require('../src/lib/subscriptions').pump.grant(pump.body.station.id,
@@ -314,7 +334,7 @@ test('مجوزِ دکان و مجوزِ پمپ دو شنوندهٔ جدا دار
   const sLic = await h.post('/api/license/sync',
     { device: { uid: 'dev-x' } }, { token: u.accessToken });
   const pLic = await h.post('/api/pump/license',
-    { device: { uid: 'dev-x' } }, { token: u.accessToken });
+    { device: { uid: 'dev-x' } }, { token: asPump.accessToken });
 
   const aud = (tok) => JSON.parse(Buffer.from(tok.split('.')[1], 'base64').toString('utf8')).aud;
   assert.equal(aud(sLic.body.license), 'tohid-shop-app');
@@ -512,4 +532,135 @@ test('کلید حتی با ساختِ هم‌زمان هم یکی می‌مان�
 
   const rows = await one(`SELECT COUNT(*)::int n FROM app_config WHERE key='station_read_key'`);
   assert.equal(rows.n, 1, 'فقط یک کلید باید ساخته شده باشد');
+});
+
+// ════════════════════════════════════════════════════════════════════
+//  ۴) «حتی یک ذره ربط نداشته باشند» — و «نتوانند دور بزنند»
+// ════════════════════════════════════════════════════════════════════
+
+test('توکنِ هر بخش در بخشِ دیگر انگار وجود ندارد', async () => {
+  const u = await h.newUser('دوتوکنه', 'shop');
+  const asPump = await h.signIn(u, 'pump');
+
+  //  توکنِ دکان روی مسیرهای پمپ
+  for (const path of ['/api/pump/me', '/api/pump/subscription', '/api/pump/files']) {
+    const r = await h.get(path, { token: u.accessToken });
+    assert.equal(r.status, 401, `${path} نباید توکنِ دکان را بشناسد`);
+  }
+
+  //  و توکنِ پمپ روی مسیرهای دکان
+  for (const path of ['/api/me', '/api/me/subscription', '/api/sync/pull?since=0']) {
+    const r = await h.get(path, { token: asPump.accessToken });
+    assert.equal(r.status, 401, `${path} نباید توکنِ پمپ را بشناسد`);
+  }
+});
+
+test('توکنِ تازه‌سازی هم بخشش را عوض نمی‌کند', async () => {
+  /*
+   *  اگر `refresh` بخش را از بدنهٔ درخواست می‌گرفت، کسی می‌توانست با
+   *  توکنِ تازه‌سازیِ دکان، توکنِ دسترسیِ پمپ بسازد — یعنی همان مرزی که
+   *  تازه گذاشتیم را از پشت دور بزند.
+   */
+  const u = await h.newUser('تازه‌شونده', 'shop');
+  const r = await h.post('/api/auth/refresh', {
+    refreshToken: u.refreshToken,
+    app: 'pump',                    // ادعای دروغ
+    device: { deviceId: 'dev-refresh-1' },
+  });
+  assert.equal(r.status, 200);
+
+  //  توکنِ تازه باید هنوز مالِ دکان باشد، نه پمپ
+  const onPump = await h.get('/api/pump/me', { token: r.body.accessToken });
+  assert.equal(onPump.status, 401, 'ادعای بخش در بدنه نباید کارگر باشد');
+  const onShop = await h.get('/api/me', { token: r.body.accessToken });
+  assert.equal(onShop.status, 200);
+});
+
+test('قیمت و پلنِ دو بخش یکی نیست', async () => {
+  const t = await adminToken();
+
+  //  پلنِ دکان را عوض می‌کنیم
+  const before = await h.get('/api/pump/plans');
+  assert.equal(before.status, 200);
+  const pumpPlan = before.body.plans[0];
+  assert.ok(pumpPlan, 'بخشِ پمپ باید پلن داشته باشد');
+
+  const changed = await h.patch(`/api/admin/plans/${pumpPlan.code}`,
+    { price: 99999 }, { token: t });
+  assert.equal(changed.status, 200, JSON.stringify(changed.body));
+
+  //  قیمتِ پمپ نباید تکان خورده باشد
+  const afterPump = await h.get('/api/pump/plans');
+  const samePlan = afterPump.body.plans.find(p => p.code === pumpPlan.code);
+  assert.equal(samePlan.price, pumpPlan.price,
+    'عوض کردنِ قیمتِ دکان نباید قیمتِ پمپ را عوض کند');
+
+  //  و قیمتِ دکان واقعاً عوض شده
+  const shopPlans = await h.get('/api/plans');
+  const shopPlan = shopPlans.body.plans.find(p => p.code === pumpPlan.code);
+  assert.equal(shopPlan.price, 99999);
+});
+
+test('اشتراکِ تمام‌شده روی پوشهٔ ابری نمی‌نویسد', async () => {
+  /*
+   *  همان «دور زدن». تا دیروز این مسیر فقط نقش را می‌سنجید، پس پمپی
+   *  بی اشتراک و بی دورهٔ آزمایشی هم بی‌محدودیت می‌نوشت — و «پوشهٔ
+   *  ابری» خودش در کاتالوگ پولی علامت خورده.
+   */
+  const plans = require('../src/lib/plans');
+  await plans.setConfig('pump_trial_days', '0');
+  const o = await owner('بی‌اشتراک', 'bypass-1');
+
+  const blocked = await h.put('/api/pump/files/live.json',
+    { data: { safe: 1 } }, { token: o.accessToken });
+  assert.equal(blocked.status, 403);
+  assert.equal(blocked.body.error.code, 'subscription_required');
+
+  //  ولی خواندن باز است — دادهٔ پمپ مالِ خودش است
+  const read = await h.get('/api/pump/files', { token: o.accessToken });
+  assert.equal(read.status, 200);
+
+  //  و با اشتراک، همان لحظه باز می‌شود
+  await require('../src/lib/subscriptions').pump.grant(o.stationId,
+    { plan: 'custom', days: 30 });
+  const ok = await h.put('/api/pump/files/live.json',
+    { data: { safe: 1 } }, { token: o.accessToken });
+  assert.equal(ok.status, 200);
+
+  await plans.setConfig('pump_trial_days', '14');
+});
+
+test('کارمند هم بی اشتراک در صندوقِ ورودی نمی‌نویسد', async () => {
+  const plans = require('../src/lib/plans');
+  await plans.setConfig('pump_trial_days', '0');
+  const o = await owner('صاحبِ بی‌اشتراک', 'bypass-2');
+  const staff = await staffOf(o.stationId, 'کارمندِ بی‌اشتراک');
+
+  const blocked = await h.put('/api/pump/files/inbox.json',
+    { data: { m: [] } }, { token: staff.accessToken });
+  assert.equal(blocked.status, 403);
+  assert.equal(blocked.body.error.code, 'subscription_required');
+
+  await plans.setConfig('pump_trial_days', '14');
+});
+
+test('مجوز به همان پمپ بسته است، نه فقط به دستگاه', async () => {
+  /*
+   *  بی این، کسی که دو پمپ را روی یک کامپیوتر اداره می‌کند می‌توانست
+   *  مجوزِ پمپِ اشتراک‌دار را روی پمپِ بی‌اشتراک بگذارد: امضا درست،
+   *  دستگاه درست، و برنامه هیچ دلیلی برای ردش نداشت.
+   */
+  const a = await owner('مجوزِ الف', 'lic-a');
+  await require('../src/lib/subscriptions').pump.grant(a.stationId,
+    { plan: 'custom', days: 30 });
+
+  const r = await h.post('/api/pump/license',
+    { device: { uid: 'same-pc' } }, { token: a.accessToken });
+  assert.equal(r.status, 200);
+
+  const payload = JSON.parse(
+    Buffer.from(r.body.license.split('.')[1], 'base64').toString('utf8')
+  );
+  assert.equal(payload.stn, a.stationId, 'مجوز باید شناسهٔ پمپ را در خود داشته باشد');
+  assert.equal(payload.aud, 'tohid-pump-app');
 });
