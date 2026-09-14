@@ -62,6 +62,71 @@ async function requireShop(req, res, next) {
   } catch (err) { next(err); }
 }
 
+/**
+ * عضویت در پمپ لازم است — `station_id` از همین‌جا می‌آید.
+ *
+ * قرینه‌ی `requireShop`، و به همان دلیل: شناسه هرگز از بدنه‌ی درخواست
+ * خوانده نمی‌شود، پس کسی نمی‌تواند با عوض کردنش به دفترِ پمپِ دیگری برسد.
+ */
+async function requireStation(req, res, next) {
+  try {
+    if (!req.user) return next(unauthorized());
+    const { membershipOf } = require('../lib/stations');
+    const member = await membershipOf(req.user.id);
+    if (!member) return next(forbidden('برای این حساب پمپی ثبت نشده است', 'no_station'));
+    req.stationMember = member;
+    req.stationId = member.station_id;
+    req.stationRole = member.role;
+    next();
+  } catch (err) { next(err); }
+}
+
+/** عضویتِ پمپ اگر بود، ولی نبودنش خطا نیست. */
+async function optionalStation(req, res, next) {
+  try {
+    if (req.user) {
+      const { membershipOf } = require('../lib/stations');
+      const member = await membershipOf(req.user.id);
+      if (member) {
+        req.stationMember = member;
+        req.stationId = member.station_id;
+        req.stationRole = member.role;
+      }
+    }
+    next();
+  } catch (err) { next(err); }
+}
+
+/**
+ * قابلیتِ پولیِ بخشِ پمپ — تصمیم از روی دیتابیس سرور، نه از روی گوشی.
+ *
+ * قرینه‌ی `requireFeature`، ولی روی کاتالوگ و دفترِ پمپ. یکی کردنشان
+ * وسوسه‌انگیز بود، ولی آن‌وقت یک `req.shopId`ِ جامانده می‌توانست
+ * قابلیتِ پمپ را با اشتراکِ دکان باز کند.
+ */
+function requireStationFeature(featureKey) {
+  return async function (req, res, next) {
+    try {
+      const { catalogOf } = require('../lib/features');
+      const cat = catalogOf('pump');
+      if (cat.CORE_KEYS.includes(featureKey)) return next();
+      if (!req.user) return next(unauthorized());
+      if (!req.stationId) return next(forbidden('برای این حساب پمپی ثبت نشده است', 'no_station'));
+
+      const ent = await require('../lib/entitlement').pump.entitlementOf(req.stationId, now());
+      if (!ent.features.includes(featureKey)) {
+        const err = ent.trial.used && !ent.trial.active
+          ? forbidden('اشتراک این پمپ به پایان رسیده است.', 'subscription_expired')
+          : forbidden('این قابلیت نیازمند اشتراک است', 'subscription_required');
+        err.entitlement = { source: ent.source, trial: ent.trial };
+        return next(err);
+      }
+      req.stationEntitlement = ent;
+      next();
+    } catch (err) { next(err); }
+  };
+}
+
 /** عضویت اگر بود، ولی نبودنش خطا نیست (مثلاً صفحه‌ی «من»). */
 async function optionalShop(req, res, next) {
   try {
@@ -188,4 +253,6 @@ function requireSuperAdmin(req, res, next) {
 module.exports = {
   bearer, requireUser, requireShop, optionalShop, requireDataWrite,
   requirePermission, requireFeature, requireAdmin, requireSuperAdmin,
+  //  بخشِ پمپ‌بنزین
+  requireStation, optionalStation, requireStationFeature,
 };

@@ -176,6 +176,8 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/location', require('./routes/location'));
     api.use('/me', require('./routes/me'));
     api.use('/shop', require('./routes/shop'));
+    //  بخشِ پمپ‌بنزین — دفترِ جدا، همان دستگاهِ اشتراک
+    api.use('/pump', require('./routes/pump'));
     api.use('/events', require('./routes/events'));
     api.use('/sync', require('./routes/sync'));
     api.use('/shop/sync', require('./routes/sync'));   // نام قدیمی
@@ -232,6 +234,10 @@ async function createApp({ runMigrations = true } = {}) {
     //  خبر دادن به کسی که اشتراکش دارد تمام می‌شود — پیش از آنکه قفل
     //  شود، نه بعدش. هر آستانه فقط یک بار، پس تکراری نمی‌رود.
     subs.notifyExpiring().catch(err => console.error('[expiry-notice]', err.message));
+    //  و همان دو کار برای بخشِ پمپ. جا انداختنشان یعنی اشتراکِ پمپ
+    //  هیچ‌وقت خودش تمام نمی‌شود — تا ابد فعال می‌ماند.
+    subs.pump.expireDue().catch(err => console.error('[pump:subscriptions]', err.message));
+    subs.pump.notifyExpiring().catch(err => console.error('[pump:expiry-notice]', err.message));
     //  سلامتِ برنامه‌ها و سایت‌های دیگر، از سرور سنجیده می‌شود نه از
     //  گوشیِ مدیر که ممکن است پشت فیلتر باشد
     require('./lib/managed-apps').checkHealth()

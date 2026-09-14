@@ -27,6 +27,15 @@ const plans = require('./plans');
 
 const ISSUER = 'tohid-license-server';
 const AUDIENCE = 'tohid-shop-app';
+/*
+ *  شنوندهٔ مجوزِ بخشِ پمپ جداست.
+ *
+ *  هر دو بخش یک کلید خصوصی دارند — کلید مالِ سرور است نه مالِ برنامه.
+ *  ولی اگر `aud` هم یکی بود، مجوزی که برای دکانی صادر شده روی برنامهٔ
+ *  پمپ هم می‌نشست: امضا درست، دستگاه درست، و برنامه هیچ دلیلی برای رد
+ *  کردنش نداشت. یک اشتراکِ دکان، یک اشتراکِ پمپ را هم مجانی می‌کرد.
+ */
+const AUDIENCE_PUMP = 'tohid-pump-app';
 
 /** عمر خود مجوز (نه اشتراک): ده روز */
 const TOKEN_TTL_MS = 10 * 24 * 60 * 60 * 1000;
@@ -110,6 +119,7 @@ async function issue({
   subscriptionEndsAt = 0,
   plan = '',
   planTitle = '',
+  audience = AUDIENCE,
   at = Date.now(),
 }) {
   const { privateKey } = await keys();
@@ -137,7 +147,7 @@ async function issue({
    */
   const payload = {
     iss: ISSUER,
-    aud: AUDIENCE,
+    aud: audience,
     duid: deviceUid,
     sub: accountId,
     dev: deviceUid,
@@ -169,4 +179,4 @@ async function issue({
   };
 }
 
-module.exports = { issue, publicKey, ISSUER, AUDIENCE, TOKEN_TTL_MS };
+module.exports = { issue, publicKey, ISSUER, AUDIENCE, AUDIENCE_PUMP, TOKEN_TTL_MS };
