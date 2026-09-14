@@ -31,7 +31,7 @@ async function adminToken() {
 
 /** یک کاربر که پمپِ خودش را دارد. */
 async function userWithStation(name = 'پمپ‌دار', code = '') {
-  const u = await h.newUser(name);
+  const u = await h.newUser(name, 'pump');
   const made = await h.post('/api/pump', { name: `پمپ ${name}`, code }, { token: u.accessToken });
   assert.equal(made.status, 201, JSON.stringify(made.body));
   return { ...u, stationId: made.body.station.id, code: made.body.station.code };
@@ -45,7 +45,7 @@ async function grantPump(stationId, days = 30) {
 // ── ۱) پمپ و حساب ────────────────────────────────────────────────
 
 test('حساب تازه پمپ ندارد و سرور این را خطا نمی‌داند', async () => {
-  const u = await h.newUser('بی‌پمپ');
+  const u = await h.newUser('بی‌پمپ', 'pump');
   const me = await h.get('/api/pump/me', { token: u.accessToken });
   assert.equal(me.status, 200);
   assert.equal(me.body.station, null);
@@ -60,14 +60,14 @@ test('هر حساب یک پمپ می‌سازد و کدش یکتاست', async (
   assert.equal(again.status, 409);
 
   //  و حسابِ دیگری همان کد را نمی‌گیرد
-  const b = await h.newUser('ب');
+  const b = await h.newUser('ب', 'pump');
   const clash = await h.post('/api/pump', { code: 'pump-alef' }, { token: b.accessToken });
   assert.equal(clash.status, 409);
   assert.equal(clash.body.error.code, 'code_taken');
 });
 
 test('کدِ پمپ پاک‌سازی می‌شود و حرفِ بی‌جا نمی‌پذیرد', async () => {
-  const u = await h.newUser('کددار');
+  const u = await h.newUser('کددار', 'pump');
   const made = await h.post('/api/pump', { code: '  Pump 2 ی  ' }, { token: u.accessToken });
   assert.equal(made.status, 201);
   //  فاصله و حرفِ غیرانگلیسی به خط تیره، و همه کوچک
@@ -189,7 +189,7 @@ test('نامِ فایلِ بدقواره پذیرفته نمی‌شود', async 
 
 test('کارمند فقط در صندوقِ ورودی می‌نویسد، نه در دفتر', async () => {
   const owner = await userWithStation('صاحب', 'pump-staff');
-  const staff = await h.newUser('کارمند');
+  const staff = await h.newUser('کارمند', 'pump');
 
   //  کارمند را عضوِ همین پمپ می‌کنیم
   await query(
@@ -265,14 +265,16 @@ test('اشتراکِ دکان، پمپِ همان آدم را باز نمی‌ک
   await plans.setConfig('pump_trial_days', '0');
   await plans.setConfig('trial_days', '0');
 
-  const u = await h.newUser('دوکاره');
+  //  یک آدم، دو نشست — توکنِ هر بخش فقط همان بخش را باز می‌کند
+  const u = await h.newUser('دوکاره', 'shop');
+  const asPump = await h.signIn(u, 'pump');
   const shop = await h.post('/api/shop', { name: 'دکانِ دوکاره' }, { token: u.accessToken });
-  const station = await h.post('/api/pump', { code: 'pump-both' }, { token: u.accessToken });
+  const station = await h.post('/api/pump', { code: 'pump-both' }, { token: asPump.accessToken });
 
   //  فقط دکان اشتراک می‌گیرد
   await require('../src/lib/subscriptions').grant(shop.body.shop.id, { plan: 'custom', days: 30 });
 
-  const pumpState = await h.get('/api/pump/subscription', { token: u.accessToken });
+  const pumpState = await h.get('/api/pump/subscription', { token: asPump.accessToken });
   assert.equal(pumpState.body.entitlement.source, 'free',
     'اشتراکِ دکان نباید پمپ را باز کند');
 
@@ -304,7 +306,7 @@ test('برنامه نشانی و رمزِ فقط‌خواندنی را می‌س
   assert.equal(me.body.home.station, 'pump-key');
 
   //  و کارمندِ همان پمپ هم — همین است که کیو‌آر را بی‌کار می‌کند
-  const staff = await h.newUser('کارمندِ کلید');
+  const staff = await h.newUser('کارمندِ کلید', 'pump');
   await query(
     `INSERT INTO station_members (id, station_id, user_id, role, status, created_at, updated_at)
      VALUES ($1,$2,$3,'staff','active',$4,$4)`,

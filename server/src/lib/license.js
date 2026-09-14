@@ -120,6 +120,7 @@ async function issue({
   plan = '',
   planTitle = '',
   audience = AUDIENCE,
+  tenantId = '',
   at = Date.now(),
 }) {
   const { privateKey } = await keys();
@@ -161,6 +162,16 @@ async function issue({
     core,
     plan,
     plan_title: planTitle,
+    /*
+     *  به کدام پمپ/دکان بسته است.
+     *
+     *  ⚠️ بی این، مجوزی که برای پمپِ الف صادر شده روی پمپِ ب هم
+     *  می‌نشست اگر همان دستگاه بود: امضا درست، `duid` درست، و برنامه
+     *  هیچ دلیلی برای ردش نداشت. یعنی یک اشتراک، چند پمپ را باز
+     *  می‌کرد — روی یک کامپیوتر که چند پمپ را اداره می‌کند، دقیقاً
+     *  همان کاری که کسی برای دور زدن می‌کند.
+     */
+    stn: tenantId,
   };
 
   const signing =

@@ -402,18 +402,42 @@ router.post('/sms/test', rateLimit({ max: 10, keyPrefix: 'admin-sms-test' }), as
 });
 
 // ---------- پلن‌ها و تنظیمات ----------
+/**
+ * پلن‌های یک بخش.
+ *
+ * `?app=pump` پلن‌های پمپ را می‌دهد. نیامدنش یعنی دکان، پس پنلِ فعلی
+ * دست‌نخورده کار می‌کند.
+ */
+function appOf(req) {
+  return String(req.query?.app || req.body?.app || '').trim().toLowerCase() === 'pump'
+    ? 'pump' : 'shop';
+}
+
 router.get('/plans', async (req, res) => {
-  res.json({ plans: await plans.listPlans({ activeOnly: false }), config: await plans.allConfig() });
+  res.json({
+    plans: await plans.listPlans({ activeOnly: false, app: appOf(req) }),
+    app: appOf(req),
+    config: await plans.allConfig(),
+  });
 });
 
 router.patch('/plans/:code', async (req, res, next) => {
   const code = v.text(req.params.code, { max: 20, required: true, field: 'کد پلن' });
-  const p = await plans.getPlan(code);
+  const app = appOf(req);
+  const p = await plans.getPlan(code, app);
   if (!p) return next(notFound('پلن پیدا نشد'));
+  /*
+   *  ⚠️ `AND app=$13` — و این تازه اضافه شده.
+   *
+   *  تا دیروز شرط فقط `WHERE code=$1` بود، یعنی عوض کردنِ قیمتِ «m1»ی
+   *  دکان، قیمتِ «m1»ی پمپ را هم عوض می‌کرد. دو بخش یک جدول داشتند و
+   *  همین یک خط، قیمتشان را به هم گره زده بود — بدترین جای ممکن برای
+   *  قاطی شدن، چون مستقیم روی پول است.
+   */
   const row = await one(
     `UPDATE plans SET title=$2, amount=$3, unit=$4, price_afn=$5, negotiable=$6,
             badge=$7, sort_order=$8, active=$9, max_devices=$10, features=$11::jsonb, updated_at=$12
-      WHERE code=$1 RETURNING *`,
+      WHERE code=$1 AND app=$13 RETURNING *`,
     [code,
       v.text(req.body?.title, { max: 60 }) || p.title,
       req.body?.amount === undefined ? p.amount : v.integer(req.body.amount, { min: 1, max: 120 }),
@@ -424,8 +448,8 @@ router.patch('/plans/:code', async (req, res, next) => {
       req.body?.sortOrder === undefined ? p.sort_order : v.integer(req.body.sortOrder, { min: 0, max: 999 }),
       v.bool(req.body?.active, p.active),
       req.body?.maxDevices === undefined ? p.max_devices : v.integer(req.body.maxDevices, { min: 1, max: 100 }),
-      JSON.stringify(req.body?.features ? sanitizeFeatures(req.body.features) : p.features),
-      now()]
+      JSON.stringify(req.body?.features ? sanitizeFeatures(req.body.features, app) : p.features),
+      now(), app]
   );
   res.json({ plan: row });
 });
