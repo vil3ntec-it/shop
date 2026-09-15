@@ -123,6 +123,9 @@ async function createApp({ runMigrations = true } = {}) {
           support: true,
           vipCodes: true,
           visitPing: true,
+          //  چتِ پشتیبانیِ مشتریِ کیو‌آر با صاحبِ پمپ — و کلیدِ عمومیِ پوش
+          pumpChat: true,
+          pumpChatVapid: await require('./lib/station-chat').publicKey(),
         });
       } catch (err) { next(err); }
     });

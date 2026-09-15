@@ -279,6 +279,40 @@ POST /api/pump/device/activate        ← تنها مسیرِ بی‌توکن
   سراسری دارد.
 - آزمون: `test/pump-public.test.js`.
 
+### چتِ پشتیبانی — مشتریِ کیو‌آر ↔ صاحبِ پمپ
+
+خواستهٔ صاحب مخزن: «داخلِ کیو‌آر یک چتِ پشتیبانی با من داشته باشد… عینِ
+واتساپ: اسمش دیده شود، پیام‌ها پاک شوند، عکس و ویدیو و صدا، بلاک، و حتی
+مرورگرش بسته باشد پیام برایش برود.»
+
+هویتِ مشتری همان رمزِ کیو‌آرِ زنده (`k`) است؛ هیچ حسابی نمی‌سازد. پیام‌ها و
+رسانه در همین دیتابیس‌اند (`station_chat_*`، مهاجرتِ ۰۱۳). پاک کردن نرم است
+(جای پیام می‌ماند، متن و رسانه می‌رود). بلاک یعنی مشتری نمی‌نویسد ولی می‌خواند.
+رسانه: عکس/صدا تا ۸ مگ، ویدیو تا ۲۵ مگ، خام با `Content-Type` خودش.
+
+| مسیر (مشتری، با `?k=`) | چه می‌کند |
+|---|---|
+| `GET /api/pump/public/:code/acct/:id/chat?after=` | پیام‌ها + `blocked` + `vapid` |
+| `POST …/chat` `{name, text}` یا `{name, kind, mediaId}` | پیامِ مشتری |
+| `POST …/chat/media` (بدنهٔ خام) | بالا بردنِ رسانه ⇒ `mediaId` |
+| `GET …/chat/media/:mid` | خودِ رسانه |
+| `DELETE …/chat/:msg` | پاک کردنِ پیامِ خودش |
+| `POST …/chat/seen` `{seq}` · `POST …/chat/push` `{subscription, url}` | خوانده شد · اشتراکِ پوش |
+
+| مسیر (برنامهٔ کامپیوتر، توکنِ دستگاه) | چه می‌کند |
+|---|---|
+| `GET /api/pump/device/chat/threads` | گفت‌وگوها با نخوانده‌ها |
+| `GET /api/pump/device/chat/inbox?after=` | همهٔ پیام‌های تازه |
+| `GET /api/pump/device/chat/:acct?after=` · `POST /api/pump/device/chat/:acct` | یک گفت‌وگو · جوابِ پمپ (⇒ پوش به مشتری) |
+| `POST /api/pump/device/chat/:acct/media` · `GET /api/pump/device/chat/media/:mid` | رسانه |
+| `DELETE /api/pump/device/chat/message/:id` | پاک کردنِ هر پیام |
+| `POST`/`DELETE /api/pump/device/chat/:acct/block` · `POST …/seen` | بلاک · خوانده شد |
+
+- **پوش**: کلیدهای VAPID از محیط (`VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT`)
+  یا یک بار ساخته و در جدولِ پیکربندی می‌مانند؛ کلیدِ عمومی در `/api/config`
+  (`pumpChatVapid`). اشتراکِ مرده (۴۰۴/۴۱۰) خودش پاک می‌شود.
+- آزمون: `test/pump-chat.test.js`.
+
 ### پنلِ مدیریت — `/api/admin/pump/…`
 
 `stations` · `stations/:id` · `stations/:id/status` · `subscriptions` ·

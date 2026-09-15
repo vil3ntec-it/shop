@@ -344,4 +344,107 @@ router.put('/files/:path', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+/* ══════════════════════════════════════════════════════════════════
+   چتِ پشتیبانی — از دیدِ صاحبِ پمپ (برنامهٔ کامپیوتر)
+   ══════════════════════════════════════════════════════════════════ */
+const chat = require('../lib/station-chat');
+
+function acctParam(req) {
+  const a = chat.cleanAcct(req.params.acct);
+  if (!a) throw badRequest('شناسهٔ حساب معتبر نیست', 'bad_acct');
+  return a;
+}
+
+/** همهٔ گفت‌وگوها با نخوانده‌ها — همان چیزی که فهرستِ سمتِ چپ نشان می‌دهد. */
+router.get('/chat/threads', async (req, res, next) => {
+  try { res.json({ ok: true, threads: await chat.threads(req.stationId), serverTime: now() }); }
+  catch (err) { next(err); }
+});
+
+/** پیام‌های تازهٔ همهٔ گفت‌وگوها بعد از ‎after‎ — برای حلقهٔ چندثانیه‌ای برنامه. */
+router.get('/chat/inbox', async (req, res, next) => {
+  try {
+    const after = Number(req.query.after) || 0;
+    const rows = await query(
+      `SELECT * FROM station_chat_messages WHERE station_id=$1 AND seq > $2 ORDER BY seq ASC LIMIT 500`,
+      [req.stationId, after]
+    );
+    res.json({ ok: true, messages: rows.rows.map(r => ({ ...chat.shape(r), acct: r.acct })), serverTime: now() });
+  } catch (err) { next(err); }
+});
+
+router.get('/chat/media/:mid', async (req, res, next) => {
+  try {
+    const m = await chat.getMedia({ stationId: req.stationId, acct: null, id: String(req.params.mid || '') });
+    if (!m) throw notFound('رسانه پیدا نشد', 'not_found');
+    res.set('Content-Type', m.mime);
+    res.set('Content-Length', String(m.size));
+    res.end(m.data);
+  } catch (err) { next(err); }
+});
+
+router.get('/chat/:acct', async (req, res, next) => {
+  try {
+    const acct = acctParam(req);
+    const th = await chat.thread(req.stationId, acct);
+    res.json({
+      ok: true,
+      messages: await chat.list({ stationId: req.stationId, acct, afterSeq: req.query.after, limit: 300 }),
+      blocked: !!(th && th.blocked_at), name: th ? th.name : '',
+      serverTime: now(),
+    });
+  } catch (err) { next(err); }
+});
+
+router.post('/chat/:acct/media', express.raw({ type: () => true, limit: '26mb' }), async (req, res, next) => {
+  try {
+    const acct = acctParam(req);
+    const out = await chat.putMedia({
+      stationId: req.stationId, acct,
+      mime: req.headers['content-type'] || '', buf: Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0),
+    });
+    res.status(201).json({ ok: true, ...out });
+  } catch (err) { next(err); }
+});
+
+/** پیامِ صاحبِ پمپ — و همان لحظه پوش به مرورگرِ مشتری. */
+router.post('/chat/:acct', async (req, res, next) => {
+  try {
+    const acct = acctParam(req);
+    const b = req.body || {};
+    const kind = String(b.kind || 'text');
+    const msg = await chat.post({
+      stationId: req.stationId, acct, from: 'o', name: b.name || 'پمپ',
+      kind: ['text', 'image', 'video', 'audio'].includes(kind) ? kind : 'text',
+      text: b.text, mediaId: b.mediaId || null,
+    });
+    const station = await stations.getStation(req.stationId);
+    const preview = msg.kind === 'text' ? msg.text.slice(0, 120)
+      : msg.kind === 'image' ? '📷 عکس' : msg.kind === 'video' ? '🎥 ویدیو' : '🎤 پیامِ صوتی';
+    const pushed = await chat.pushTo(req.stationId, acct, {
+      title: (station && station.name) || 'پمپ', body: preview, tag: 'chat-' + acct,
+    });
+    res.status(201).json({ ok: true, message: msg, pushed });
+  } catch (err) { next(err); }
+});
+
+router.delete('/chat/message/:id', async (req, res, next) => {
+  try {
+    res.json({ ok: true, message: await chat.remove({ stationId: req.stationId, acct: null, id: String(req.params.id || ''), by: 'o' }) });
+  } catch (err) { next(err); }
+});
+
+router.post('/chat/:acct/block', async (req, res, next) => {
+  try { await chat.setBlocked(req.stationId, acctParam(req), true); res.json({ ok: true, blocked: true }); }
+  catch (err) { next(err); }
+});
+router.delete('/chat/:acct/block', async (req, res, next) => {
+  try { await chat.setBlocked(req.stationId, acctParam(req), false); res.json({ ok: true, blocked: false }); }
+  catch (err) { next(err); }
+});
+router.post('/chat/:acct/seen', async (req, res, next) => {
+  try { await chat.seen(req.stationId, acctParam(req), 'o', req.body?.seq); res.json({ ok: true }); }
+  catch (err) { next(err); }
+});
+
 module.exports = router;

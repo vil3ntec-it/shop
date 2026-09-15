@@ -1,6 +1,6 @@
 {
   "name": "shop-server",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "private": true,
   "description": "سرور فروشگاه — احراز هویت، دکان چندکاربره، اشتراک و همگام‌سازی روی PostgreSQL",
   "main": "src/index.js",
@@ -12,9 +12,12 @@
     "restore": "node scripts/restore.js",
     "test": "node --test --test-concurrency=1 test/*.test.js"
   },
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "dependencies": {
     "express": "^5.1.0",
-    "pg": "^8.13.1"
+    "pg": "^8.13.1",
+    "web-push": "^3.6.7"
   }
 }
