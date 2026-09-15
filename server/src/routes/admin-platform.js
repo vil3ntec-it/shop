@@ -119,6 +119,9 @@ router.post('/vip-codes', async (req, res, next) => {
   try {
     const email = v.text(req.body?.email, { max: 160 });
     if (email && !email.includes('@')) return next(badRequest('نشانی ایمیل درست نیست', 'bad_email'));
+    //  شمارهٔ موبایل ⇒ کد همان لحظه پیامک می‌شود (همان سرویسِ کدِ ورود)
+    const phone = v.text(req.body?.phone, { max: 30 }).replace(/[\s-]/g, '');
+    if (phone && !/^\+?\d{7,15}$/.test(phone)) return next(badRequest('شمارهٔ موبایل درست نیست', 'bad_phone'));
 
     const { code, row } = await vip.create({
       plan: v.text(req.body?.plan, { max: 20 }) || 'custom',
@@ -128,6 +131,7 @@ router.post('/vip-codes', async (req, res, next) => {
       maxDevices: v.integer(req.body?.maxDevices, { field: 'تعداد دستگاه', min: 1, max: 100, def: 10 }),
       note: v.text(req.body?.note, { max: 300 }),
       email: email ? email.toLowerCase() : '',
+      phone,
       shopId: req.body?.shopId ? v.id(req.body.shopId) : null,
       expiresInDays: v.integer(req.body?.expiresInDays, { field: 'مهلت', min: 0, max: 365, def: 30 }),
       createdBy: req.admin.id,
@@ -136,7 +140,8 @@ router.post('/vip-codes', async (req, res, next) => {
     //  ایمیل همین‌جا و همین حالا. نتیجه‌اش — رفت یا نرفت و چرا — در همان
     //  ردیف می‌نشیند، پس مدیر «ساخته شد» نمی‌بیند در حالی که چیزی بیرون
     //  نرفته.
-    const finalRow = email ? await vip.mail(row.id, code) : row;
+    let finalRow = email ? await vip.mail(row.id, code) : vip.shape(row);
+    if (phone) finalRow = await vip.sms(row.id, code);
 
     await audit.log({
       actorType: 'admin', userId: req.admin.id, action: 'admin.vip_code_created',
@@ -149,6 +154,8 @@ router.post('/vip-codes', async (req, res, next) => {
       vipCode: finalRow,
       emailStatus: finalRow.emailStatus,
       emailError: finalRow.emailError,
+      smsStatus: finalRow.smsStatus,
+      smsError: finalRow.smsError,
     });
   } catch (err) { next(err); }
 });

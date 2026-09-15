@@ -192,6 +192,7 @@ async function createApp({ runMigrations = true } = {}) {
      *
      *  پس نشانیِ درازتر اول.
      */
+    api.use('/pump/public', require('./routes/pump-public'));   // کیو‌آرِ زندهٔ مشتری — بی‌توکن
     api.use('/pump/device', require('./routes/pump-device'));
     api.use('/pump', require('./routes/pump'));
     api.use('/events', require('./routes/events'));
