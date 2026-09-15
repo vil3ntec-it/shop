@@ -30,6 +30,7 @@ const { query, one, many, tx, newId, now } = require('../db');
 const config = require('../config');
 const plans = require('./plans');
 const mailer = require('./mailer');
+const otp = require('./otp');
 const { sanitizeFeatures } = require('./features');
 const tenancy = require('./tenancy');
 const { badRequest, notFound, forbidden, conflict } = require('../middleware/errors');
@@ -82,6 +83,10 @@ function build(T) {
       emailStatus: row.email_status,
       emailError: row.email_error,
       emailSentAt: row.email_sent_at ? Number(row.email_sent_at) : null,
+      phone: row.phone || '',
+      smsStatus: row.sms_status || 'none',
+      smsError: row.sms_error || '',
+      smsSentAt: row.sms_sent_at ? Number(row.sms_sent_at) : null,
       tenantId: row[KEY] || '',
       usedTenantId: row[USED] || '',
       //  نام‌های قدیمی، تا پنلِ فعلی نشکند
@@ -103,7 +108,7 @@ function build(T) {
    */
   async function create({
     plan = 'custom', days = null, features = [], maxDevices = 10, note = '',
-    email = '', shopId = null, tenantId = null, expiresInDays = 30, createdBy = '',
+    email = '', phone = '', shopId = null, tenantId = null, expiresInDays = 30, createdBy = '',
   } = {}) {
     const forTenant = tenantId ?? shopId ?? null;
     let finalDays = days;
@@ -124,12 +129,14 @@ function build(T) {
       const id = newId('vip');
       const row = await one(
         `INSERT INTO ${TBL} (id, code_hash, code_hint, plan, days, features, max_devices, note,
-                             email, email_status, ${KEY}, created_by, created_at, expires_at, status)
-         VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9,$10,$11,$12,$13,$14,'active') RETURNING *`,
+                             email, email_status, phone, sms_status, ${KEY}, created_by, created_at, expires_at, status)
+         VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,'active') RETURNING *`,
         [id, codeHash, code.slice(-2), plan, finalDays,
           JSON.stringify(sanitizeFeatures(features, T.app)),
           maxDevices, note, String(email || '').trim().toLowerCase(),
-          email ? 'queued' : 'none', forTenant || null, createdBy, t, expiresAt]
+          email ? 'queued' : 'none',
+          String(phone || '').trim(), phone ? 'queued' : 'none',
+          forTenant || null, createdBy, t, expiresAt]
       );
       //  کد خام فقط همین یک بار برمی‌گردد
       return { code, row: shape(row) };
@@ -187,6 +194,36 @@ function build(T) {
     } catch (err) {
       const saved = await one(
         `UPDATE ${TBL} SET email_status='failed', email_error=$2 WHERE id=$1 RETURNING *`,
+        [id, String(err.message || err).slice(0, 400)]
+      );
+      return shape(saved);
+    }
+  }
+
+  /**
+   * پیامکِ کد به شماره‌ای که هنگامِ ساخت داده شده — همان سرویسی که کدِ ورود
+   * را می‌فرستد (‎senders.sms‎ با تنظیماتِ ‎SMS_API_*‎). خودِ کد ذخیره
+   * نمی‌شود؛ فقط «رفت / نرفت» و چرا.
+   */
+  async function sms(id, code, { title = '', appName = 'توحید' } = {}) {
+    const row = await one(`SELECT * FROM ${TBL} WHERE id=$1`, [id]);
+    if (!row) throw notFound('کد پیدا نشد');
+    if (!row.phone) return shape(row);
+
+    const days = Number(row.days) || 30;
+    const planTitle = title || (await plans.getPlan(row.plan, T.app))?.title || row.plan;
+    const message = `کد اشتراک ${appName}: ${code}\n${planTitle} — ${days} روز. برنامه را باز کنید و همین کد را در بخش اشتراک بزنید.`;
+
+    try {
+      await otp.senders.sms(row.phone, code, message);
+      const saved = await one(
+        `UPDATE ${TBL} SET sms_status='sent', sms_sent_at=$2, sms_error='' WHERE id=$1 RETURNING *`,
+        [id, now()]
+      );
+      return shape(saved);
+    } catch (err) {
+      const saved = await one(
+        `UPDATE ${TBL} SET sms_status='failed', sms_error=$2 WHERE id=$1 RETURNING *`,
         [id, String(err.message || err).slice(0, 400)]
       );
       return shape(saved);
@@ -274,7 +311,7 @@ function build(T) {
     }
   }
 
-  return { create, mail, list, revoke, redeem, shape, tenancy: T };
+  return { create, mail, sms, list, revoke, redeem, shape, tenancy: T };
 }
 
 const shop = build(tenancy.SHOP);

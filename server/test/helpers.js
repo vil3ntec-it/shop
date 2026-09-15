@@ -62,7 +62,7 @@ async function api(method, path, { body = null, token = null, headers = {} } = {
   let json = null;
   const text = await res.text();
   try { json = text ? JSON.parse(text) : null; } catch { json = { raw: text }; }
-  return { status: res.status, body: json };
+  return { status: res.status, body: json, headers: res.headers };
 }
 
 const get = (p, o) => api('GET', p, o);

@@ -585,15 +585,20 @@ async function makePumpCode() {
       plan: $('pvip-plan').value,
       days: days ? Number(days) : null,
       email: $('pvip-email').value.trim(),
+      phone: $('pvip-phone').value.trim(),
       note: $('pvip-note').value.trim(),
     });
     //  کدِ خام فقط همین یک بار دیده می‌شود
-    const sent = out.emailStatus === 'sent'
+    const sent = (out.emailStatus === 'sent'
       ? ' و به ایمیل فرستاده شد.'
-      : out.emailStatus === 'failed' ? ` ولی ایمیل نرفت: ${out.emailError}` : '';
+      : out.emailStatus === 'failed' ? ` ولی ایمیل نرفت: ${out.emailError}` : '')
+      + (out.smsStatus === 'sent'
+      ? ' پیامک هم رفت.'
+      : out.smsStatus === 'failed' ? ` ولی پیامک نرفت: ${out.smsError}` : '');
     msg(node, `کد: ${out.code} — همین حالا برش دارید، دیگر نشان داده نمی‌شود${sent}`,
-      out.emailStatus === 'failed' ? 'warn' : 'ok');
+      out.emailStatus === 'failed' || out.smsStatus === 'failed' ? 'warn' : 'ok');
     $('pvip-email').value = '';
+    $('pvip-phone').value = '';
     $('pvip-note').value = '';
     await loadPumpCodes();
   } catch (err) {

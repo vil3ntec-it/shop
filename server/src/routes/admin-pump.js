@@ -226,6 +226,9 @@ router.post('/vip-codes', async (req, res, next) => {
   try {
     const email = v.text(req.body?.email, { max: 160 });
     if (email && !email.includes('@')) return next(badRequest('نشانی ایمیل درست نیست', 'bad_email'));
+    //  شمارهٔ موبایل ⇒ کد همان لحظه پیامک می‌شود (همان سرویسِ کدِ ورود)
+    const phone = v.text(req.body?.phone, { max: 30 }).replace(/[\s-]/g, '');
+    if (phone && !/^\+?\d{7,15}$/.test(phone)) return next(badRequest('شمارهٔ موبایل درست نیست', 'bad_phone'));
 
     const { code, row } = await vip.create({
       plan: v.text(req.body?.plan, { max: 20 }) || 'custom',
@@ -235,17 +238,19 @@ router.post('/vip-codes', async (req, res, next) => {
       maxDevices: v.integer(req.body?.maxDevices, { field: 'تعداد دستگاه', min: 1, max: 100, def: 10 }),
       note: v.text(req.body?.note, { max: 300 }),
       email: email ? email.toLowerCase() : '',
+      phone,
       tenantId: req.body?.stationId ? v.id(req.body.stationId) : null,
       expiresInDays: v.integer(req.body?.expiresInDays, { field: 'مهلت', min: 0, max: 365, def: 30 }),
       createdBy: req.admin.id,
     });
 
-    const finalRow = email ? await vip.mail(row.id, code, { appName: 'پمپ' }) : row;
+    let finalRow = email ? await vip.mail(row.id, code, { appName: 'پمپ' }) : vip.shape(row);
+    if (phone) finalRow = await vip.sms(row.id, code, { appName: 'پمپ' });
 
     await audit.log({
       actorType: 'admin', userId: req.admin.id, action: 'admin.pump_vip_code_created',
       targetType: 'vip_code', targetId: row.id,
-      detail: { plan: row.plan, days: row.days, email: email ? 'yes' : 'no' },
+      detail: { plan: row.plan, days: row.days, email: email ? 'yes' : 'no', sms: phone ? 'yes' : 'no' },
     });
 
     res.status(201).json({
@@ -253,6 +258,8 @@ router.post('/vip-codes', async (req, res, next) => {
       vipCode: finalRow,
       emailStatus: finalRow.emailStatus,
       emailError: finalRow.emailError,
+      smsStatus: finalRow.smsStatus,
+      smsError: finalRow.smsError,
     });
   } catch (err) { next(err); }
 });
