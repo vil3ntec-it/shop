@@ -129,4 +129,5 @@ async function signIn(user, app = 'shop') {
 
 module.exports = {
   start, stop, resetDatabase, api, get, post, put, patch, del, newUser, signIn, query,
+  base: () => base,
 };

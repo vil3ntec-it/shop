@@ -78,4 +78,104 @@ router.get(
   }
 );
 
+/* ══════════════════════════════════════════════════════════════════
+   چتِ پشتیبانی — مشتری با رمزِ همان حساب (‎k‎)
+   ══════════════════════════════════════════════════════════════════ */
+const chat = require('../lib/station-chat');
+
+const chatLimit = rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'pump-chat' });
+
+/** همان قفلِ کیو‌آر؛ نشد ⇒ ۴۰۴ (پمپ/حساب/رمز همه یکی). */
+async function openChat(req, res, next) {
+  try {
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Cache-Control', 'no-store');
+    const ctx = await chat.openWithKey(req.params.code, req.params.id, req.query.k);
+    if (!ctx) throw notFound('چنین حسابی نیست', 'not_found');
+    req.chat = ctx;
+    next();
+  } catch (err) { next(err); }
+}
+
+router.get('/:code/acct/:id/chat', chatLimit, openChat, async (req, res, next) => {
+  try {
+    const { station, acct } = req.chat;
+    const th = await chat.thread(station.id, acct);
+    const messages = await chat.list({ stationId: station.id, acct, afterSeq: req.query.after, limit: 300 });
+    res.json({
+      ok: true,
+      messages,
+      blocked: !!(th && th.blocked_at),
+      name: th ? th.name : '',
+      ownerSeenSeq: th ? Number(th.owner_seen_seq) : 0,
+      vapid: await chat.publicKey(),
+      serverTime: now(),
+    });
+  } catch (err) { next(err); }
+});
+
+router.post('/:code/acct/:id/chat', chatLimit, openChat, async (req, res, next) => {
+  try {
+    const { station, acct, snapshotName } = req.chat;
+    const b = req.body || {};
+    const name = String(b.name || '').trim() || snapshotName;
+    const kind = String(b.kind || 'text');
+    const msg = await chat.post({
+      stationId: station.id, acct, from: 'c', name,
+      kind: ['text', 'image', 'video', 'audio'].includes(kind) ? kind : 'text',
+      text: b.text, mediaId: b.mediaId || null,
+    });
+    res.status(201).json({ ok: true, message: msg });
+  } catch (err) { next(err); }
+});
+
+router.post('/:code/acct/:id/chat/media', chatLimit, openChat,
+  express.raw({ type: () => true, limit: '26mb' }),
+  async (req, res, next) => {
+    try {
+      const { station, acct } = req.chat;
+      const out = await chat.putMedia({
+        stationId: station.id, acct,
+        mime: req.headers['content-type'] || '', buf: Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0),
+      });
+      res.status(201).json({ ok: true, ...out });
+    } catch (err) { next(err); }
+  });
+
+router.get('/:code/acct/:id/chat/media/:mid', chatLimit, openChat, async (req, res, next) => {
+  try {
+    const { station, acct } = req.chat;
+    const m = await chat.getMedia({ stationId: station.id, acct, id: String(req.params.mid || '') });
+    if (!m) throw notFound('رسانه پیدا نشد', 'not_found');
+    res.set('Content-Type', m.mime);
+    res.set('Content-Length', String(m.size));
+    res.set('Cache-Control', 'private, max-age=3600');
+    res.end(m.data);
+  } catch (err) { next(err); }
+});
+
+router.delete('/:code/acct/:id/chat/:msg', chatLimit, openChat, async (req, res, next) => {
+  try {
+    const { station, acct } = req.chat;
+    res.json({ ok: true, message: await chat.remove({ stationId: station.id, acct, id: String(req.params.msg || ''), by: 'c' }) });
+  } catch (err) { next(err); }
+});
+
+router.post('/:code/acct/:id/chat/seen', chatLimit, openChat, async (req, res, next) => {
+  try {
+    const { station, acct } = req.chat;
+    await chat.seen(station.id, acct, 'c', req.body?.seq);
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
+/** اشتراکِ پوشِ مرورگر — تا با مرورگرِ بسته هم پیامِ صاحبِ پمپ برسد. */
+router.post('/:code/acct/:id/chat/push', chatLimit, openChat, async (req, res, next) => {
+  try {
+    const { station, acct } = req.chat;
+    await chat.savePush(station.id, acct, req.body?.subscription, req.body?.url);
+    res.status(201).json({ ok: true });
+  } catch (err) { next(err); }
+});
+
 module.exports = router;
