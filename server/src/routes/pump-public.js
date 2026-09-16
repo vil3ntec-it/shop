@@ -79,6 +79,83 @@ router.get(
 );
 
 /* ══════════════════════════════════════════════════════════════════
+   درِ اپِ کارمندان — «هر کسی که برنامه را نصب می‌کند باید کد را بزند»
+   ══════════════════════════════════════════════════════════════════
+
+   خواستهٔ صاحب مخزن: «ادرسِ همان پمپ را در برنامه بزنم، حساب‌های همان
+   پمپ را نشان بدهد… با پمپ‌های دیگر قاطی نشود — این را خیلی جدی بگیر.»
+
+   گوشی کدِ هشت‌حرفیِ پمپ را می‌فرستد و در جواب فقط سه چیزِ **همان یک
+   پمپ** را می‌گیرد: کد و نامش، نشانیِ سرورِ خانگی، و رمزِ فقط‌خواندنی.
+   هیچ حسابی لازم نیست؛ همین کد هویت است. رمزِ برنامهٔ کامپیوتر (قفلِ
+   اپ) جداست و همان‌طور که بود از ‎live.gate‎ سنجیده می‌شود.
+
+   ⚠️ کدِ غلط و پمپِ بسته یک جواب دارند (۴۰۴) و درِ عمومی محدودیتِ نرخ
+   دارد؛ کد ۲^۴۰ حالت دارد، پس حدس زدنش شدنی نیست.
+
+   ‎GET /live?code=…‎ همان عکسی است که برنامهٔ کامپیوتر هر ده دقیقه به
+   پوشهٔ ابری می‌فرستد (‎live.json‎) — برای وقتی که سرورِ خانگی از راهِ
+   دور در دسترس نیست. تازگی‌اش را ‎updatedAt‎ می‌گوید. */
+const access = require('../lib/station-access');
+
+const joinLimit = rateLimit({ max: 30, keyPrefix: 'pump-join' });
+
+async function stationByAccessCode(raw) {
+  const code = String(raw || '').trim();
+  if (!code) return null;
+  return access.byCode(code);
+}
+
+router.post('/join', joinLimit, async (req, res, next) => {
+  try {
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Cache-Control', 'no-store');
+    const st = await stationByAccessCode(req.body && req.body.code);
+    if (!st) throw notFound('این کد به هیچ پمپی نمی‌رسد', 'bad_access_code');
+    const live = await one(
+      `SELECT updated_at FROM station_files WHERE station_id=$1 AND path='live.json'`, [st.id]
+    );
+    res.json({
+      ok: true,
+      station: { code: st.code, name: st.name || '' },
+      home: {
+        url: st.home_url || '',
+        readKey: await stations.readKeyOf(st),
+        station: st.code,
+        seenAt: st.home_seen_at ? Number(st.home_seen_at) : null,
+      },
+      cloudLiveAt: live ? Number(live.updated_at) : null,
+      serverTime: now(),
+    });
+  } catch (err) { next(err); }
+});
+
+router.options('/join', (req, res) => {
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type');
+  res.status(204).end();
+});
+
+router.get(
+  '/live',
+  rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'pump-public-live' }),
+  async (req, res, next) => {
+    try {
+      res.set('Access-Control-Allow-Origin', '*');
+      res.set('Cache-Control', 'no-store');
+      const st = await stationByAccessCode(req.query.code);
+      if (!st) throw notFound('این کد به هیچ پمپی نمی‌رسد', 'bad_access_code');
+      const row = await one(
+        `SELECT data, updated_at FROM station_files WHERE station_id=$1 AND path='live.json'`, [st.id]
+      );
+      if (!row) throw notFound('برنامهٔ کامپیوتر هنوز چیزی به ابر نفرستاده', 'no_live');
+      res.json({ ok: true, updatedAt: Number(row.updated_at), live: row.data, serverTime: now() });
+    } catch (err) { next(err); }
+  }
+);
+
+/* ══════════════════════════════════════════════════════════════════
    چتِ پشتیبانی — مشتری با رمزِ همان حساب (‎k‎)
    ══════════════════════════════════════════════════════════════════ */
 const chat = require('../lib/station-chat');

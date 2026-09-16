@@ -278,6 +278,39 @@ router.post('/join-code', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+/**
+ * ══ کدِ دسترسیِ پمپ — همان کدی که کارمند در اپِ گوشی می‌زند ══════════
+ *
+ * خواستهٔ صاحب مخزن: «هر کسی که برنامه را نصب می‌کند باید آن کد را
+ * بزند تا بتواند بیاید توی حساب‌ها.» برنامهٔ کامپیوتر همین را نشان
+ * می‌دهد و کارمند در اپ می‌زندش (‎POST /pump/public/join‎).
+ *
+ * دائمی است و حساب نمی‌خواهد — برخلافِ کدِ پیوستنِ شش‌رقمیِ بالا که
+ * موقت است و به حسابِ گوگل نقش می‌دهد. «عوض کردن» کدِ قبلی را همان
+ * لحظه بی‌اثر می‌کند؛ گوشی‌هایی که از قبل وصل شده‌اند نشانی و رمز را
+ * دارند و تا رمزِ خواندنِ سرورِ خانگی عوض نشود، کار می‌کنند.
+ */
+const access = require('../lib/station-access');
+
+router.get('/access-code', async (req, res, next) => {
+  try {
+    const code = await access.ensure(req.stationId);
+    const st = await stations.getStation(req.stationId);
+    res.json({ code, display: access.format(code), station: st.code, serverTime: now() });
+  } catch (err) { next(err); }
+});
+
+router.post('/access-code/rotate', async (req, res, next) => {
+  try {
+    const code = await access.rotate(req.stationId);
+    await audit.log({
+      userId: `device:${req.stationDevice.device_uid}`, action: 'pump.access_code.rotated',
+      detail: { stationId: req.stationId }, ip: clientIp(req),
+    });
+    res.status(201).json({ code, display: access.format(code), serverTime: now() });
+  } catch (err) { next(err); }
+});
+
 /* ── پوشهٔ ابری ────────────────────────────────────────────────── */
 
 function cleanPath(raw) {
