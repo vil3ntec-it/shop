@@ -207,6 +207,31 @@ router.post('/home', requireStationOwner, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+/**
+ * کدِ دسترسیِ پمپ از دیدِ صاحبی که با گوگل وارد شده — همان کدی که
+ * برنامهٔ کامپیوتر نشان می‌دهد (‎/pump/device/access-code‎). فقط صاحب و
+ * مدیر؛ کارمند خودش با همین کد آمده و لازم نیست به بقیه بدهدش.
+ */
+const access = require('../lib/station-access');
+
+router.get('/access-code', requireStationOwner, async (req, res, next) => {
+  try {
+    const code = await access.ensure(req.stationId);
+    res.json({ code, display: access.format(code), serverTime: now() });
+  } catch (err) { next(err); }
+});
+
+router.post('/access-code/rotate', requireStationOwner, async (req, res, next) => {
+  try {
+    const code = await access.rotate(req.stationId);
+    await audit.log({
+      userId: req.user.id, action: 'pump.access_code.rotated',
+      detail: { stationId: req.stationId }, ip: clientIp(req),
+    });
+    res.status(201).json({ code, display: access.format(code), serverTime: now() });
+  } catch (err) { next(err); }
+});
+
 /** اعضای پمپ. */
 router.get('/members', async (req, res, next) => {
   try {

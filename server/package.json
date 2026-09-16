@@ -1,6 +1,6 @@
 {
   "name": "shop-server",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "private": true,
   "description": "سرور فروشگاه — احراز هویت، دکان چندکاربره، اشتراک و همگام‌سازی روی PostgreSQL",
   "main": "src/index.js",

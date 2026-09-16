@@ -91,6 +91,8 @@ router.get('/stations/:id', async (req, res, next) => {
     );
     res.json({
       station: stations.shape(st),
+      //  کدِ اپِ کارمندان — تا مدیر بتواند به صاحبِ پمپی که کدش را گم کرده بگوید
+      accessCode: st.access_code ? require('../lib/station-access').format(st.access_code) : '',
       owner: await one('SELECT id, name, email, phone, status FROM users WHERE id=$1',
         [st.owner_user_id]),
       members: await stations.members(id),
