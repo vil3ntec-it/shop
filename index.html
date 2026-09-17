@@ -5759,6 +5759,8 @@
               <option value="58">۵۸ میلی‌متر</option>
               <option value="a4">کاغذ معمولی</option>
             </select>
+            <button type="button" class="btn btn-secondary" id="btn-print-bt" hidden>چاپ با بلوتوث</button>
+            <button type="button" class="btn btn-secondary" id="btn-print-usb" hidden>چاپ با سیم</button>
             <button type="button" class="btn btn-primary" id="btn-print-invoice"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 9V3.5h11V9"/><path d="M6.5 17.5h-2a2 2 0 0 1-2-2V11a2 2 0 0 1 2-2h15a2 2 0 0 1 2 2v4.5a2 2 0 0 1-2 2h-2"/><rect x="6.5" y="14" width="11" height="6.5" rx="1"/></svg> چاپ فاکتور</button>
     </div>
   </div>
@@ -11474,6 +11476,121 @@
   });
 
   /* ==========================================================
+     چاپِ مستقیم روی چاپگرِ حرارتی
+     ----------------------------------------------------------
+     برنامه‌ی اندروید فاکتور را مستقیم به چاپگر می‌فرستد؛ اینجا هم
+     همان کار انجام می‌شود، تا جایی که خودِ مرورگر اجازه می‌دهد.
+
+     ⚠️ روی **آیفون** هیچ راهی برای چاپِ مستقیم نیست — Safari نه
+     Web Bluetooth دارد نه WebUSB. این کم‌کاریِ برنامه نیست. راهِ
+     آیفون «چاپ معمولی» است و AirPrint، و به همین دلیل قطعِ کاغذ
+     بالاتر درست شد. پس این دو دکمه روی آیفون **ساخته نمی‌شوند** —
+     دکمه‌ای که بخورد به «مرورگر شما این را ندارد» از نبودنش بدتر است.
+
+     شرحِ کامل و جدولِ «کدام مرورگر چه می‌تواند» سرِ
+     `license/thermal-print.js`.
+     ========================================================== */
+  function invoiceReceipt(sale){
+    const items = saleItems.filter(si=> si.saleId===sale.id);
+    const debtor = sale.debtorId ? debtors.find(d=>d.id===sale.debtorId) : null;
+    const dt = new Date(sale.createdAt || Date.now());
+    const timeStr = dt.toLocaleTimeString('fa-IR-u-nu-latn', {hour:'2-digit', minute:'2-digit'});
+
+    const rows = [];
+    items.forEach(si=>{
+      const p = products.find(x=>x.id===si.productId);
+      const name = p ? p.name : '(محصول حذف‌شده)';
+      const unit = p && p.unit ? ' ' + p.unit : '';
+      rows.push({
+        right: name,
+        left: formatMoney(si.totalPrice),
+      });
+      //  تعداد و قیمتِ واحد زیرِ نامِ کالا — روی نوارِ باریک، یک سطر
+      //  برای هر دو جا نمی‌شود
+      rows.push({
+        right: '   ' + formatMoney(si.quantity) + unit + ' × ' + formatMoney(si.unitPrice),
+        left: '',
+      });
+    });
+
+    /*
+     *  همان ردیف‌هایی که روی صفحه دیده می‌شود و با همان نام‌ها —
+     *  کاغذ و صفحه نباید دو چیزِ متفاوت بگویند. (`invoiceHtml` بالاتر
+     *  همین‌هاست.)
+     */
+    const totals = [{ right:'جمع اقلام', left: formatMoney(sale.total) }];
+    if(sale.discount) totals.push({ right:'تخفیف', left: formatMoney(sale.discount) });
+    totals.push({ right:'مبلغ نهایی', left: formatMoney(sale.finalTotal), strong:true });
+    if(sale.paidAmount) totals.push({ right:'پرداختی', left: formatMoney(sale.paidAmount) });
+    if(sale.remaining) totals.push({ right:'باقی‌مانده', left: formatMoney(sale.remaining) });
+    totals.push({
+      right: 'نوع فروش',
+      left: sale.paymentMethod==='credit' ? 'نسیه' : 'نقدی',
+    });
+    if(debtor) totals.push({ right:'قرض‌دار', left: debtor.name });
+
+    return {
+      title: appSettings.storeName || 'فروشگاه',
+      meta: [
+        'فاکتور فروش #' + (sale.invoiceNumber ?? '—'),
+        formatDate(sale.date) + ' — ' + timeStr,
+        sale.status==='cancelled' ? 'لغو شده' : '',
+      ].filter(Boolean),
+      rows,
+      totals,
+      footer: ['ممنون از خرید شما'],
+    };
+  }
+
+  function paperDots(){
+    const T = window.TohidThermal;
+    if(!T) return 384;
+    //  «کاغذ معمولی» برای چاپگرِ حرارتی معنا ندارد؛ آنجا ۸۰ بهترین حدس است
+    const choice = document.getElementById('sel-paper');
+    return (choice && choice.value === '58') ? T.WIDTH_58MM : T.WIDTH_80MM;
+  }
+
+  async function printDirect(how){
+    const T = window.TohidThermal;
+    if(!T || !currentInvoiceSaleId) return;
+    const sale = sales.find(s=> s.id===currentInvoiceSaleId);
+    if(!sale) return;
+
+    const btn = document.getElementById(how==='usb' ? 'btn-print-usb' : 'btn-print-bt');
+    if(btn) btn.disabled = true;
+    try{
+      await T.print(invoiceReceipt(sale), paperDots(), how);
+      showToast('فاکتور به چاپگر فرستاده شد', 'ok');
+    }catch(err){
+      /*
+       *  کاربر که خودش پنجرهٔ انتخابِ دستگاه را ببندد، خطا نیست و
+       *  نباید پیامِ قرمز بگیرد.
+       */
+      const msg = (err && err.message) || 'چاپ نشد';
+      if(!/cancel|NotFound|User denied|chooser/i.test(msg)){
+        showToast(msg, 'danger');
+      }
+    }finally{
+      if(btn) btn.disabled = false;
+    }
+  }
+
+  (function wireDirectPrint(){
+    const bt = document.getElementById('btn-print-bt');
+    const usb = document.getElementById('btn-print-usb');
+    if(!bt || !usb) return;
+    //  `defer` یعنی ممکن است هنوز بار نشده باشد
+    const show = ()=>{
+      const caps = (window.TohidThermal && window.TohidThermal.capabilities()) || {};
+      bt.hidden = !caps.bluetooth;
+      usb.hidden = !caps.usb;
+    };
+    if(window.TohidThermal) show(); else window.addEventListener('load', show);
+    bt.addEventListener('click', ()=> printDirect('bluetooth'));
+    usb.addEventListener('click', ()=> printDirect('usb'));
+  })();
+
+  /* ==========================================================
      تاریخچه فروش — لیست، لغو فروش، مرجوعی
   ========================================================== */
   function saleCardHtml(sale){
@@ -13127,6 +13244,7 @@
 <script src="license/shop-ui.js?v=15" defer></script>
 <script src="license/vip.js?v=16" defer></script>
 <script src="license/support.js?v=16" defer></script>
+<script src="license/thermal-print.js?v=1" defer></script>
 
 </body>
 </html>
