@@ -471,8 +471,14 @@ fun GrantSheet(
   }
 }
 
+/**
+ *  یک ردیفِ انتخابِ پلن.
+ *
+ *  ⚠️ عمومی است چون بخشِ پمپ هم همین را به کار می‌برد (کدهای اشتراکِ
+ *  پمپ). کپیِ دومش روزی از این یکی جدا می‌افتاد.
+ */
 @Composable
-private fun PlanRow(title: String, subtitle: String, selected: Boolean, onPick: () -> Unit) {
+fun PlanRow(title: String, subtitle: String, selected: Boolean, onPick: () -> Unit) {
   val c = Admin.colors
   Row(
     Modifier
@@ -496,7 +502,7 @@ private fun PlanRow(title: String, subtitle: String, selected: Boolean, onPick: 
   }
 }
 
-private fun periodText(amount: Int, unit: String): String {
+fun periodText(amount: Int, unit: String): String {
   if (amount <= 0) return ""
   val name = when (unit) {
     "day" -> "روز"; "month" -> "ماه"; "year" -> "سال"; else -> unit
@@ -507,6 +513,10 @@ private fun periodText(amount: Int, unit: String): String {
 fun planName(code: String): String = when (code) {
   "custom" -> "دلخواه"
   "trial" -> "آزمایشی"
+  //  پلن‌های بخشِ پمپ — همان سه تایی که صاحب سامانه گذاشته
+  "std" -> "استاندارد"
+  "vip" -> "وی‌آی‌پی"
+  "perm" -> "دائمی"
   "" -> "—"
   else -> code
 }

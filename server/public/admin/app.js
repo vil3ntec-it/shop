@@ -18,6 +18,8 @@ const el = (tag, cls, text) => {
 
 let token = sessionStorage.getItem(TOKEN_KEY) || '';
 let plans = [];
+//  پلن‌های بخشِ پمپ — جدا، چون قیمت و مرزِ دو بخش یکی نیست
+let pumpPlans = [];
 let currentShop = null;
 
 // ---------- ابزار ----------
@@ -282,8 +284,21 @@ async function loadPump() {
       pumpFeatures = (await call('GET', '/admin/pump/features')).features || [];
     } catch { pumpFeatures = []; }
   }
-  fillPlanSelect($('pump-plan'));
-  fillPlanSelect($('pvip-plan'));
+  /*
+   *  ⛔ پلن‌های **پمپ**، نه پلن‌های دکان.
+   *
+   *  تا دیروز هر دو کادر از `plans`ِ دکان پر می‌شدند، یعنی مدیر
+   *  «۶ ماهه — ۲۰۰۰» را می‌دید و `m6` را به یک پمپ می‌داد. آن کد روی
+   *  پمپ پلنِ خاموشی با فهرستِ خالی است، و فهرستِ خالی یعنی «پلنِ
+   *  کامل» — پس هر اشتراکی که از پنل به پمپ داده می‌شد، عملاً
+   *  وی‌آی‌پی بود. قیمتش هم قیمتِ افغانیِ دکان بود، نه دالرِ پمپ.
+   */
+  if (!pumpPlans.length) {
+    try { pumpPlans = (await call('GET', '/admin/plans?app=pump')).plans || []; }
+    catch { pumpPlans = []; }
+  }
+  fillPlanSelect($('pump-plan'), pumpPlans);
+  fillPlanSelect($('pvip-plan'), pumpPlans);
 
   const q = encodeURIComponent($('pump-q').value.trim());
   const out = await call('GET', `/admin/pump/stations?limit=100&q=${q}`);
@@ -636,11 +651,11 @@ async function loadRequests() {
  * همان فهرست را ببینند — پس یک تابع، نه سه تکهٔ کپی‌شده که روزی از هم
  * جدا بیفتند.
  */
-function fillPlanSelect(sel) {
+function fillPlanSelect(sel, list) {
   if (!sel) return;
   const keep = sel.value;
   sel.innerHTML = '';
-  for (const p of plans) {
+  for (const p of (list || plans)) {
     const o = el('option', null, `${p.title} — ${fa(p.price)}`);
     o.value = p.code;
     sel.appendChild(o);
@@ -656,11 +671,34 @@ async function loadPlans() {
   plans = out.plans;
   fillPlanSelect($('in-plan'));
   fillPlanSelect($('svip-plan'));
+  renderPlanTable($('plans-body'), plans, 'shop', $('plans-msg'));
 
-  const body = $('plans-body');
-  body.innerHTML = '';
+  //  و پلن‌های پمپ، در جدولِ خودشان — قیمتِ دالری و مرزِ خودش
+  const pout = await call('GET', '/admin/plans?app=pump');
+  pumpPlans = pout.plans;
+  renderPlanTable($('pump-plans-body'), pumpPlans, 'pump', $('pump-plans-msg'));
+
+  const cfg = out.config || {};
+  $('cfg-trial').value = cfg.trial_days || '';
+  $('cfg-wa').value = cfg.whatsapp_number || '';
+  $('cfg-currency').value = cfg.currency || '';
+  $('cfg-pump-currency').value = cfg.pump_currency || '';
+  $('cfg-pump-trial').value = cfg.pump_trial_days || '';
+  $('cfg-wamsg').value = cfg.whatsapp_message || '';
+}
+
+/**
+ * جدولِ ویرایشِ پلن‌های یک بخش.
+ *
+ * ⚠️ `app` در نشانی می‌رود، وگرنه `PATCH /admin/plans/<code>` پیش‌فرضش
+ * دکان است و ویرایشِ پلنِ پمپ یا ۴۰۴ می‌گیرد یا — بدتر — پلنِ هم‌کدِ
+ * دکان را عوض می‌کند.
+ */
+function renderPlanTable(body, list, app, msgNode) {
+  if (!body) return;
   const UNIT = { day: 'روز', week: 'هفته', month: 'ماه', year: 'سال' };
-  for (const p of plans) {
+  body.innerHTML = '';
+  for (const p of list) {
     const tr = el('tr');
     tr.appendChild(el('td', null, p.code));
     const title = el('input'); title.value = p.title; title.style.width = '120px';
@@ -675,22 +713,16 @@ async function loadPlans() {
     const save = el('button', 'btn btn-sm', 'ذخیره');
     save.onclick = async () => {
       try {
-        await call('PATCH', `/admin/plans/${p.code}`, {
+        await call('PATCH', `/admin/plans/${p.code}?app=${app}`, {
           title: title.value, price: Number(price.value),
           badge: badgeIn.value, active: active.checked,
         });
-        msg($('plans-msg'), `پلن ${p.title} ذخیره شد.`, 'ok');
-      } catch (err) { msg($('plans-msg'), err.message, 'bad'); }
+        msg(msgNode, `پلن ${p.title} ذخیره شد.`, 'ok');
+      } catch (err) { msg(msgNode, err.message, 'bad'); }
     };
     tr.appendChild(el('td')).appendChild(save);
     body.appendChild(tr);
   }
-
-  const cfg = out.config || {};
-  $('cfg-trial').value = cfg.trial_days || '';
-  $('cfg-wa').value = cfg.whatsapp_number || '';
-  $('cfg-currency').value = cfg.currency || '';
-  $('cfg-wamsg').value = cfg.whatsapp_message || '';
 }
 
 // ---------- پشتیبان‌ها ----------
@@ -1193,6 +1225,8 @@ document.addEventListener('DOMContentLoaded', () => {
         whatsapp_number: $('cfg-wa').value,
         whatsapp_message: $('cfg-wamsg').value,
         currency: $('cfg-currency').value,
+        pump_currency: $('cfg-pump-currency').value,
+        pump_trial_days: $('cfg-pump-trial').value,
       });
       msg($('cfg-msg'), 'ذخیره شد.', 'ok');
     } catch (err) { msg($('cfg-msg'), err.message, 'bad'); }

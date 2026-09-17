@@ -311,6 +311,7 @@ private fun PumpCodesSheet(session: Session, onBack: () -> Unit) {
 
   var codes by remember { mutableStateOf<JSONArray?>(null) }
   var plans by remember { mutableStateOf<JSONArray?>(null) }
+  var picked by rememberSaveable { mutableStateOf("") }
   var days by rememberSaveable { mutableStateOf("") }
   var email by rememberSaveable { mutableStateOf("") }
   var phone by rememberSaveable { mutableStateOf("") }
@@ -325,6 +326,8 @@ private fun PumpCodesSheet(session: Session, onBack: () -> Unit) {
     val api = AdminApi(session.serverUrl)
     runCatching { api.pumpVipCodes(token) }.onSuccess { codes = it }
     plans = runCatching { api.pumpPlans(token) }.getOrNull()
+    //  پلنِ پیش‌فرض همان اولی است، تا کادر هیچ‌وقت بی‌انتخاب نماند
+    if (picked.isBlank()) picked = plans?.optJSONObject(0)?.optString("code").orEmpty()
   }
 
   Column(
@@ -353,7 +356,41 @@ private fun PumpCodesSheet(session: Session, onBack: () -> Unit) {
     }
 
     SectionTitle("کدِ تازه")
+    /*
+     *  ⛔ انتخابِ پلن اجباری شد، و این یک اصلاحِ واقعی است نه آرایش.
+     *
+     *  تا دیروز این صفحه هیچ کادرِ پلنی نداشت: اگر روزی نوشته می‌شد
+     *  پلن `custom` می‌رفت، و پلنِ `custom` هیچ فهرستِ قابلیتی ندارد —
+     *  و فهرستِ خالی روی سرور یعنی «پلنِ کامل». پس هر کدی که با روزِ
+     *  دستی ساخته می‌شد، عملاً **وی‌آی‌پی** بود، حتی وقتی صاحب سامانه
+     *  می‌خواست «استاندارد» بفروشد. مستقیم روی پول.
+     *
+     *  حالا پلن انتخاب می‌شود و «روز» فقط مدت را جلو می‌برد، نه مرزِ
+     *  قابلیت‌ها را.
+     */
     Panel {
+      if (plans == null || plans?.length() == 0) {
+        Text("پلنی از سرور خوانده نشد.", style = MaterialTheme.typography.bodySmall, color = c.muted)
+      } else {
+        val list = plans
+        if (list != null) {
+          for (i in 0 until list.length()) {
+            val p = list.optJSONObject(i) ?: continue
+            val code = p.optString("code")
+            PlanRow(
+              title = p.optString("title").ifBlank { planName(code) },
+              subtitle = periodText(p.optInt("amount"), p.optString("unit")),
+              selected = picked == code,
+            ) { picked = code }
+          }
+        }
+      }
+      PlanRow(
+        title = "مدت دلخواه — همهٔ قابلیت‌ها",
+        subtitle = "بی مرزِ پلن؛ فقط وقتی که خودتان می‌خواهید",
+        selected = picked == "custom",
+      ) { picked = "custom" }
+      Spacer(Modifier.height(10.dp))
       Field(
         value = days,
         onValueChange = { days = it.filter { ch -> ch.isDigit() }.take(4) },
@@ -381,12 +418,12 @@ private fun PumpCodesSheet(session: Session, onBack: () -> Unit) {
         error = null
         scope.launch {
           runCatching {
-            //  روزِ دستی ⇒ «دلخواه». وگرنه اولین پلنِ **پمپ** —
-            //  همان کاری که پنلِ وب می‌کند.
+            //  ⚠️ پلنِ **انتخاب‌شده** می‌رود، نه «دلخواه». مرزِ
+            //  قابلیت‌ها از همان پلن می‌آید و روزِ دستی فقط مدت است.
             val firstPlan = plans?.optJSONObject(0)?.optString("code").orEmpty()
             AdminApi(session.serverUrl).createPumpVipCode(
               token,
-              plan = if (days.isNotBlank() || firstPlan.isBlank()) "custom" else firstPlan,
+              plan = picked.ifBlank { firstPlan.ifBlank { "custom" } },
               days = days.toIntOrNull(),
               email = email.trim(),
               phone = phone.trim(),

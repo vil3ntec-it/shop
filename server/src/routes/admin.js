@@ -455,7 +455,16 @@ router.patch('/plans/:code', async (req, res, next) => {
 });
 
 router.patch('/config', async (req, res) => {
-  const allowed = ['trial_days', 'whatsapp_number', 'whatsapp_message', 'currency'];
+  /*
+   *  ⚠️ بخشِ پمپ کلیدهای خودش را دارد و باید داشته باشد: قیمتِ پلن‌های
+   *  پمپ دالری است و دورهٔ آزمایشی‌اش هم جدا (`entitlement.js` از
+   *  `pump_trial_days` می‌خواند). بی این دو، پنل نمی‌توانست عوضشان کند
+   *  و «۱۲۰» با واحدِ افغانیِ دکان نشان داده می‌شد.
+   */
+  const allowed = [
+    'trial_days', 'whatsapp_number', 'whatsapp_message', 'currency',
+    'pump_trial_days', 'pump_currency',
+  ];
   for (const key of allowed) {
     if (req.body?.[key] !== undefined) await plans.setConfig(key, v.text(req.body[key], { max: 300 }));
   }

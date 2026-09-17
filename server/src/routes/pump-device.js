@@ -39,6 +39,7 @@ const license = require('../lib/license');
 const audit = require('../lib/audit');
 const { catalogOf } = require('../lib/features');
 const { entitlementOf } = require('../lib/entitlement').pump;
+const { requirePumpUser } = require('../middleware/auth');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
 const { badRequest, forbidden, notFound, unauthorized } = require('../middleware/errors');
 
@@ -135,6 +136,86 @@ router.post(
         createdStation: created,
         entitlement: ent,
         subscription: subs.stateOf(out.subscription),
+        ...issued,
+        serverTime: now(),
+      });
+    } catch (err) { next(err); }
+  }
+);
+
+/* ══════════════════════════════════════════════════════════════════
+   بند شدن از راهِ **حساب** — بی هیچ کدی
+   ══════════════════════════════════════════════════════════════════ */
+
+/**
+ * ⛔ «هیچ کدِ اشتراکی در کار نیست.»
+ *
+ * جملهٔ صریحِ صاحب مخزن (ریپوی پمپ، `native/docs/PLANS-fa.md`): «من یادم
+ * نمیاد که برای اشتراک کدی گفته باشم… اشتراک رو من به حسابِ یارو از
+ * سرور می‌دم اینترنتی و تو برنامه تو حسابِ همون ثبت می‌شن.»
+ *
+ * تا امروز تنها راهِ بند شدنِ یک نصبِ تازه به پمپ، `/activate` بود — و آن
+ * **حتماً** یک کدِ شش‌رقمی می‌خواهد و خرجش می‌کند. یعنی کسی که اشتراکش را
+ * مدیر مستقیم روی حسابش گذاشته بود، باز هم بی کد نمی‌توانست برنامه را
+ * راه بیندازد. این مسیر همان جای خالی است:
+ *
+ *     ورود با ایمیل/گوگل ⇒ توکنِ حساب ⇒ POST /pump/device/bind
+ *                        ⇒ توکنِ دستگاه + همان مجوزِ امضاشدهٔ `activate`
+ *
+ * ⚠️ سه قیدِ امنیتیِ `activate` این‌جا هم هست و هیچ‌کدام نیفتاده:
+ *   ۱) پمپ از روی **حسابِ توکن** پیدا می‌شود (`membershipOf`)، نه از روی
+ *      چیزی که کلاینت می‌فرستد — وگرنه عوض کردنِ یک شناسه، دفترِ پمپِ
+ *      دیگری را باز می‌کرد.
+ *   ۲) مجوز با همان کلیدِ ES256 و همان `aud = tohid-pump-app` امضا
+ *      می‌شود، پس مجوزِ بخشِ دکان روی این برنامه نمی‌نشیند.
+ *   ۳) `duid` همان شناسهٔ دستگاه است، پس کپیِ پوشهٔ برنامه روی
+ *      کامپیوترِ دیگر اشتراک را با خودش نمی‌برد.
+ *
+ * ⚠️ و این مسیر **اشتراک نمی‌سازد**. اگر حساب اشتراک نداشته باشد،
+ * `entitlement.source` همان `free` است و مجوزی صادر نمی‌شود — دستگاه
+ * بند می‌شود ولی قفل‌ها بسته می‌مانند. باز کردنشان کارِ پنلِ مدیریت است،
+ * نه کارِ این درخواست.
+ */
+router.post(
+  '/bind',
+  rateLimit({ max: config.rateLimit.joinMax, keyPrefix: 'pump-device-bind' }),
+  requirePumpUser,
+  async (req, res, next) => {
+    try {
+      const deviceUid = v.text(req.body?.device?.uid ?? req.body?.deviceUid, {
+        max: 120, required: true, field: 'شناسهٔ دستگاه',
+      });
+      const deviceName = v.text(req.body?.device?.name, { max: 80 });
+      const platform = v.text(req.body?.device?.platform, { max: 40 });
+
+      //  ⛔ پمپ از حسابِ توکن، هرگز از بدنهٔ درخواست
+      const member = await stations.membershipOf(req.user.id);
+      if (!member) throw notFound('برای این حساب پمپی ثبت نشده است', 'no_station');
+
+      const stationId = member.station_id;
+      const reg = await devices.register(stationId, {
+        uid: deviceUid, name: deviceName, platform, ip: clientIp(req),
+      });
+
+      const st = await stations.getStation(stationId);
+      const ent = await entitlementOf(stationId);
+      const issued = await signFor(st, ent, deviceUid, deviceName);
+
+      await audit.log({
+        userId: req.user.id, action: 'pump.device_bound',
+        detail: { stationId, source: ent.source }, ip: clientIp(req),
+      });
+
+      res.status(201).json({
+        ok: true,
+        message: ent.source === 'free'
+          ? 'دستگاه به پمپ بند شد. اشتراکِ این حساب هنوز فعال نیست.'
+          : 'دستگاه به پمپ بند شد.',
+        deviceToken: reg.token,          // فقط همین یک بار
+        station: stations.shape(st),
+        role: member.role,
+        entitlement: ent,
+        subscription: ent.subscription,
         ...issued,
         serverTime: now(),
       });

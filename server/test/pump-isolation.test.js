@@ -579,26 +579,51 @@ test('توکنِ تازه‌سازی هم بخشش را عوض نمی‌کند',
 test('قیمت و پلنِ دو بخش یکی نیست', async () => {
   const t = await adminToken();
 
-  //  پلنِ دکان را عوض می‌کنیم
-  const before = await h.get('/api/pump/plans');
-  assert.equal(before.status, 200);
-  const pumpPlan = before.body.plans[0];
-  assert.ok(pumpPlan, 'بخشِ پمپ باید پلن داشته باشد');
+  /*
+   *  ⚠️ این سنجه تا دیروز فرض می‌کرد کدِ پلن‌های دو بخش یکی است
+   *  (`m1`/`m6`/`y1` در هر دو) و همان کد را روی دکان `PATCH` می‌کرد.
+   *  از ۱۴۰۵/۰۶/۳۱ پلن‌های پمپ کدِ خودشان را دارند (`std`/`vip`/`perm`
+   *  با قیمتِ دالری)، پس فرضِ قدیمی ۴۰۴ می‌گرفت.
+   *
+   *  حالا جداییِ واقعی سنجیده می‌شود، و در **هر دو جهت**: عوض کردنِ
+   *  قیمتِ یک بخش نباید هیچ پلنِ بخشِ دیگر را تکان بدهد.
+   */
+  const pumpBefore = await h.get('/api/pump/plans');
+  const shopBefore = await h.get('/api/plans');
+  assert.equal(pumpBefore.status, 200);
+  assert.equal(shopBefore.status, 200);
+  assert.ok(pumpBefore.body.plans.length, 'بخشِ پمپ باید پلن داشته باشد');
+  assert.ok(shopBefore.body.plans.length, 'بخشِ دکان باید پلن داشته باشد');
 
-  const changed = await h.patch(`/api/admin/plans/${pumpPlan.code}`,
+  const shopPlan = shopBefore.body.plans[0];
+  const pumpPlan = pumpBefore.body.plans[0];
+
+  //  ۱) قیمتِ دکان عوض می‌شود ⇒ پمپ نباید تکان بخورد
+  const onShop = await h.patch(`/api/admin/plans/${shopPlan.code}`,
     { price: 99999 }, { token: t });
-  assert.equal(changed.status, 200, JSON.stringify(changed.body));
+  assert.equal(onShop.status, 200, JSON.stringify(onShop.body));
 
-  //  قیمتِ پمپ نباید تکان خورده باشد
-  const afterPump = await h.get('/api/pump/plans');
-  const samePlan = afterPump.body.plans.find(p => p.code === pumpPlan.code);
-  assert.equal(samePlan.price, pumpPlan.price,
-    'عوض کردنِ قیمتِ دکان نباید قیمتِ پمپ را عوض کند');
+  const pumpAfter = await h.get('/api/pump/plans');
+  for (const p of pumpBefore.body.plans) {
+    const same = pumpAfter.body.plans.find(x => x.code === p.code);
+    assert.ok(same, `پلنِ ${p.code} باید سرِ جایش باشد`);
+    assert.equal(same.price, p.price, 'قیمتِ دکان نباید قیمتِ پمپ را عوض کند');
+  }
+  const shopAfter = await h.get('/api/plans');
+  assert.equal(shopAfter.body.plans.find(p => p.code === shopPlan.code).price, 99999);
 
-  //  و قیمتِ دکان واقعاً عوض شده
-  const shopPlans = await h.get('/api/plans');
-  const shopPlan = shopPlans.body.plans.find(p => p.code === pumpPlan.code);
-  assert.equal(shopPlan.price, 99999);
+  //  ۲) و برعکس: قیمتِ پمپ عوض می‌شود ⇒ دکان نباید تکان بخورد
+  const onPump = await h.patch(`/api/admin/plans/${pumpPlan.code}?app=pump`,
+    { price: 77777 }, { token: t });
+  assert.equal(onPump.status, 200, JSON.stringify(onPump.body));
+
+  const shopAgain = await h.get('/api/plans');
+  for (const p of shopAfter.body.plans) {
+    const same = shopAgain.body.plans.find(x => x.code === p.code);
+    assert.equal(same.price, p.price, 'قیمتِ پمپ نباید قیمتِ دکان را عوض کند');
+  }
+  const pumpAgain = await h.get('/api/pump/plans');
+  assert.equal(pumpAgain.body.plans.find(p => p.code === pumpPlan.code).price, 77777);
 });
 
 test('اشتراکِ تمام‌شده روی پوشهٔ ابری نمی‌نویسد', async () => {

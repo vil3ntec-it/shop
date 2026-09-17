@@ -308,6 +308,69 @@ await step('فایلِ حساب سرویسِ خراب، پیامِ آدمیزا�
   consoleErrors.length = 0;
 });
 
+// ── ۷ب) پلن‌های پمپ — جدولِ خودش، و کادرِ پلنِ اشتراکِ پمپ ─────────
+/*
+ *  ⛔ دو باگی که تا امروز هیچ‌جا قرمز نمی‌شدند، چون هر دو در مرورگر
+ *  بودند:
+ *    ۱) جدولِ پلن‌های پمپ اصلاً وجود نداشت — استاندارد/وی‌آی‌پی/دائمی
+ *       نه دیده می‌شدند و نه ویرایش.
+ *    ۲) کادرِ «پلن»ِ اشتراکِ پمپ از فهرستِ **دکان** پر می‌شد، پس مدیر
+ *       `m6`ی دکان را به یک پمپ می‌داد؛ آن کد روی پمپ فهرستِ خالی
+ *       دارد و فهرستِ خالی یعنی «پلنِ کامل» — یعنی هر اشتراکی که از
+ *       پنل به پمپ داده می‌شد عملاً وی‌آی‌پی بود.
+ */
+await step('جدولِ پلن‌های پمپ سه پلنِ واقعی را نشان می‌دهد', async () => {
+  await openTab('plans');
+  await page.waitForFunction(
+    () => document.querySelectorAll('#pump-plans-body tr').length > 0,
+    null, { timeout: 10_000 }
+  );
+  const codes = await page.$$eval('#pump-plans-body tr td:first-child',
+    (tds) => tds.map((t) => t.textContent.trim()));
+  for (const want of ['std', 'vip', 'perm']) {
+    assert.ok(codes.includes(want), `پلنِ ${want} باید در جدولِ پمپ باشد`);
+  }
+  //  و جدولِ دکان پلن‌های خودش را دارد، نه پلن‌های پمپ
+  const shopCodes = await page.$$eval('#plans-body tr td:first-child',
+    (tds) => tds.map((t) => t.textContent.trim()));
+  assert.ok(!shopCodes.includes('std'), 'پلنِ پمپ نباید در جدولِ دکان بیاید');
+});
+
+await step('ویرایشِ قیمتِ پلنِ پمپ روی خودِ پمپ می‌نشیند، نه روی دکان', async () => {
+  const before = await one(`SELECT price_afn FROM plans WHERE app='shop' AND code='m1'`);
+
+  const row = await page.$('#pump-plans-body tr');
+  const codeCell = await row.$eval('td:first-child', (t) => t.textContent.trim());
+  await row.$eval('td:nth-child(4) input', (i) => { i.value = '131'; });
+  await row.$eval('td:last-child button', (b) => b.click());
+  await page.waitForFunction(
+    () => (document.querySelector('#pump-plans-msg')?.textContent || '').includes('ذخیره'),
+    null, { timeout: 10_000 }
+  );
+
+  const pumpRow = await one('SELECT price_afn FROM plans WHERE app=$1 AND code=$2', ['pump', codeCell]);
+  assert.equal(Number(pumpRow.price_afn), 131, 'قیمتِ پلنِ پمپ باید عوض شده باشد');
+  const after = await one(`SELECT price_afn FROM plans WHERE app='shop' AND code='m1'`);
+  assert.equal(Number(after.price_afn), Number(before.price_afn),
+    'ویرایشِ پلنِ پمپ نباید قیمتِ دکان را تکان بدهد');
+});
+
+await step('کادرِ پلنِ اشتراکِ پمپ از فهرستِ پمپ پر می‌شود', async () => {
+  await openTab('pump');
+  await page.waitForFunction(
+    () => document.querySelectorAll('#pump-plan option').length > 1,
+    null, { timeout: 10_000 }
+  );
+  const opts = await page.$$eval('#pump-plan option', (o) => o.map((x) => x.value));
+  assert.ok(opts.includes('vip'), 'پلنِ وی‌آی‌پیِ پمپ باید در فهرست باشد');
+  assert.ok(!opts.includes('m6'), 'پلنِ دکان نباید در فهرستِ پمپ باشد');
+
+  //  کدِ اشتراکِ پمپ هم همان فهرست را می‌بیند
+  const vipOpts = await page.$$eval('#pvip-plan option', (o) => o.map((x) => x.value));
+  assert.ok(vipOpts.includes('std'), 'کدِ پمپ باید پلنِ استاندارد را داشته باشد');
+  assert.ok(!vipOpts.includes('m1'), 'کدِ پمپ نباید پلنِ دکان را نشان بدهد');
+});
+
 // ── ۸) هیچ خطای جاوااسکریپتی در کلِ نشست ──────────────────────────
 await step('در کلِ این نشست هیچ خطای صفحه‌ای نبود', async () => {
   assert.deepEqual(consoleErrors, [], consoleErrors.join(' | '));

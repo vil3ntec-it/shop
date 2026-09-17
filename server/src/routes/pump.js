@@ -54,7 +54,8 @@ router.get('/plans', async (req, res, next) => {
     const cfg = await plans.allConfig();
     res.json({
       plans: await plans.listPlans({ app: 'pump' }),
-      currency: cfg.currency || 'افغانی',
+      //  واحدِ پولِ خودِ پمپ (دالر)، نه واحدِ دکان
+      currency: cfg.pump_currency || cfg.currency || 'افغانی',
       trialDays: Number(cfg.pump_trial_days || 0),
       serverTime: now(),
     });
