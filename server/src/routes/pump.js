@@ -470,4 +470,31 @@ router.put('/files/:path', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+/*
+ *  پشتیبانیِ صاحبِ پمپ — `/api/pump/support`.
+ *
+ *  ⚠️ این با `/pump/device/chat` یکی نیست: آن گفت‌وگوی **مشتریِ کیوآر**
+ *  با صاحبِ پمپ است، این گفت‌وگوی صاحبِ پمپ با مدیرِ سامانه.
+ */
+router.use('/support', require('./pump-support').makeRouter((req) => ({
+  stationId: req.stationId || '',
+  userId: req.user ? req.user.id : '',
+  who: req.user ? (req.user.name || '') : '',
+  contact: req.user ? (req.user.email || req.user.phone || '') : '',
+})));
+
+/*
+ *  پشتیبانِ همین پمپ — `/api/pump/backups`، از دیدِ صاحبِ حساب.
+ *
+ *  ⚠️ پایینِ `router.use(requireStation)` است، پس `req.stationId`
+ *  همیشه از عضویتِ همین کاربر می‌آید و هیچ‌وقت از بدنهٔ درخواست.
+ *  همان فهرستی که برنامهٔ کامپیوتر با توکنِ **دستگاه** می‌بیند —
+ *  یک پوشه، دو در.
+ */
+router.use('/backups', require('./account-backups').makeRouter(
+  'pump',
+  (req) => req.stationId || '',
+  { actor: (req) => ({ userId: req.user ? req.user.id : '' }) }
+));
+
 module.exports = router;

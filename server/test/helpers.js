@@ -11,6 +11,13 @@ process.env.DATABASE_URL = process.env.TEST_DATABASE_URL
 process.env.API_SECRET = 'test-secret-test-secret-test-sec';
 process.env.OTP_SECRET = 'test-otp-secret-test-otp-secret1';
 process.env.BACKUP_ENABLED = 'false';
+/*
+ *  پشتیبانِ هر حساب روی دیسک می‌نشیند، پس آزمون باید پوشه‌ی خودش را
+ *  داشته باشد — وگرنه فایل‌های آزمون در پوشه‌ی واقعیِ سرور می‌مانند.
+ */
+process.env.BACKUP_PATH = require('path').join(
+  require('os').tmpdir(), `shop-test-backups-${process.pid}`
+);
 process.env.RATE_GENERAL_MAX = '100000';
 process.env.RATE_AUTH_MAX = '10000';
 process.env.RATE_OTP_MAX = '10000';
@@ -20,6 +27,9 @@ process.env.LOGIN_LOCKOUT_TRIES = '10000';
 //  غلط می‌زنند همدیگر را می‌بندند — همه از یک IP می‌آیند (127.0.0.1)
 process.env.LOGIN_LOCKOUT_GLOBAL_TRIES = '10000';
 process.env.OTP_RESEND_SECONDS = '0';
+//  پیامِ همگانی سقفِ ۵تایی دارد و چند آزمون پشتِ سرِ هم می‌زنندش؛
+//  خودِ سقف در `pump-support.test.js` جدا و با عددِ کوچک سنجیده می‌شود.
+process.env.RATE_BROADCAST_MAX = '10000';
 
 const { createApp } = require('../src/app');
 const { query, closeDb } = require('../src/db');
@@ -66,6 +76,39 @@ async function api(method, path, { body = null, token = null, headers = {} } = {
   const text = await res.text();
   try { json = text ? JSON.parse(text) : null; } catch { json = { raw: text }; }
   return { status: res.status, body: json, headers: res.headers };
+}
+
+/**
+ * درخواست با بدنه‌ی **خام** — برای مسیرهایی که JSON نمی‌گیرند.
+ *
+ * ⚠️ `Content-Type` عمداً `application/octet-stream` است: اگر
+ * `application/json` بود، `express.json`ِ سراسری بدنه را می‌خورد و
+ * مسیر یک بافرِ خالی می‌دید. همین یک سرآیند فرقِ «کار می‌کند» و
+ * «بی‌صدا خالی می‌آید» است.
+ */
+async function raw(method, path, buffer, { token = null, headers = {} } = {}) {
+  const res = await fetch(`${base}${path}`, {
+    method,
+    headers: {
+      'Content-Type': 'application/octet-stream',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...headers,
+    },
+    body: buffer,
+  });
+  const text = await res.text();
+  let json = null;
+  try { json = text ? JSON.parse(text) : null; } catch { json = { raw: text }; }
+  return { status: res.status, body: json, headers: res.headers };
+}
+
+/** دانلودِ بدنه‌ی دودویی — همان بایت‌هایی که سرور داد، دست‌نخورده. */
+async function download(path, { token = null } = {}) {
+  const res = await fetch(`${base}${path}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  const buf = Buffer.from(await res.arrayBuffer());
+  return { status: res.status, buffer: buf, headers: res.headers };
 }
 
 const get = (p, o) => api('GET', p, o);
@@ -131,6 +174,6 @@ async function signIn(user, app = 'shop') {
 }
 
 module.exports = {
-  start, stop, resetDatabase, api, get, post, put, patch, del, newUser, signIn, query,
+  start, stop, resetDatabase, api, get, post, put, patch, del, raw, download, newUser, signIn, query,
   base: () => base,
 };

@@ -97,8 +97,14 @@ fun ShopsScreen(session: Session) {
   }
 }
 
+/**
+ *  برچسبِ وضعیتِ اشتراک.
+ *
+ *  ⚠️ `private` نیست و نباید باشد: بخشِ پمپ هم همین را می‌خواهد و
+ *  کپی کردنش یعنی روزی که رنگی یا حالتی اضافه شود، یکی‌شان جا بماند.
+ */
 @Composable
-private fun SubChip(status: String, endsAt: Long) {
+fun SubChip(status: String, endsAt: Long) {
   val c = Admin.colors
   when (status) {
     "active" -> StatusChip("فعال تا ${jalali(endsAt)}", c.success)
@@ -248,6 +254,9 @@ private fun ShopSheet(session: Session, shopId: String, onBack: () -> Unit) {
     }
 
     Spacer(Modifier.height(14.dp))
+    AccountBackupsPanel(session, "shop", shopId)
+
+    Spacer(Modifier.height(14.dp))
     SectionTitle("اشتراک")
     Panel {
       if (live == null) {
@@ -367,11 +376,19 @@ private fun ShopSheet(session: Session, shopId: String, onBack: () -> Unit) {
  *
  *  «مدتِ دلخواه» هم هست، برای وقتی که با کسی جور دیگری حساب کرده‌اید.
  */
+/**
+ *  صفحهٔ دادنِ اشتراک — یکی برای هر دو بخش.
+ *
+ *  `noun` می‌گوید متن دربارهٔ «دکان» است یا «پمپ». کپی کردنِ کلِ صفحه
+ *  فقط برای عوض کردنِ یک کلمه، یعنی دو صفحه‌ای که روزی از هم جدا
+ *  می‌افتند.
+ */
 @Composable
-private fun GrantSheet(
+fun GrantSheet(
   plans: JSONArray?,
   current: JSONObject?,
   busy: Boolean,
+  noun: String = "دکان",
   onBack: () -> Unit,
   onGrant: (plan: String, days: Int?, note: String) -> Unit,
 ) {
@@ -397,7 +414,7 @@ private fun GrantSheet(
       Spacer(Modifier.height(8.dp))
       Panel {
         Text(
-          "این دکان تا ${jalali(current.optLong("ends_at"))} اشتراک دارد. مدتِ تازه به همان اضافه می‌شود، نه از امروز.",
+          "این $noun تا ${jalali(current.optLong("ends_at"))} اشتراک دارد. مدتِ تازه به همان اضافه می‌شود، نه از امروز.",
           style = MaterialTheme.typography.bodySmall,
           color = c.muted,
         )

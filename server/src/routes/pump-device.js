@@ -480,4 +480,33 @@ router.post('/chat/:acct/seen', async (req, res, next) => {
   catch (err) { next(err); }
 });
 
+/*
+ *  پشتیبانیِ کامپیوترِ پمپ با مدیرِ سامانه — `/api/pump/device/support`.
+ *
+ *  ⚠️ همان رشته‌ای که گوشیِ صاحبِ پمپ می‌بیند، چون کلیدش `station_id`
+ *  است. یک پمپ، یک گفت‌وگو.
+ */
+router.use('/support', require('./pump-support').makeRouter((req) => ({
+  stationId: req.stationId || '',
+  deviceUid: req.stationDevice ? req.stationDevice.device_uid : '',
+  who: req.stationDevice ? (req.stationDevice.name || 'کامپیوترِ پمپ') : '',
+})));
+
+/*
+ *  پشتیبانِ همین پمپ — `/api/pump/device/backups`، با توکنِ **دستگاه**.
+ *
+ *  ⚠️ برنامهٔ کامپیوترِ پمپ حساب ندارد (قاعدهٔ `CLAUDE.md`): با کدِ
+ *  شش‌رقمی فعال می‌شود و توکنِ دستگاه می‌گیرد. پس اگر پشتیبان فقط از
+ *  درِ حساب می‌رفت، همان برنامه‌ای که پشتیبان را **می‌سازد** راهی
+ *  برای فرستادنش نداشت.
+ *
+ *  `req.stationId` از `requireDevice` می‌آید — از ردیفِ خودِ توکن،
+ *  نه از چیزی که فرستاده شده.
+ */
+router.use('/backups', require('./account-backups').makeRouter(
+  'pump',
+  (req) => req.stationId || '',
+  { actor: (req) => ({ deviceId: req.stationDevice ? req.stationDevice.id : '' }) }
+));
+
 module.exports = router;

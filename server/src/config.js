@@ -161,6 +161,29 @@ const config = {
     passphrase: process.env.BACKUP_PASSPHRASE || '',   // اگر پر باشد، پشتیبان رمز می‌شود
     pgDump:     process.env.PG_DUMP_BIN || 'pg_dump',
     pgRestore:  process.env.PSQL_BIN || 'psql',
+
+    /*
+     *  پشتیبانِ **هر حساب** — چیزی جدا از `pg_dump`ِ بالا.
+     *
+     *  بالایی مالِ صاحبِ سامانه است و کلِ دیتابیس را می‌گیرد. این یکی
+     *  مالِ خودِ دکان‌دار و پمپ‌دار است: فایلِ خودش، پوشهٔ خودش.
+     *
+     *  ⚠️ **سهم دو پله دارد و این عمدی است.** دیسک پول است و حسابی که
+     *  هیچ‌وقت اشتراک نخریده نباید بتواند چند گیگابایت از آن را بگیرد.
+     *  ولی بستنِ کاملش هم غلط است — همان کسی که اشتراک ندارد، بیشتر
+     *  از همه ممکن است گوشی‌اش را گم کند. پس پلهٔ رایگان کوچک است،
+     *  نه صفر. `Tier` در `lib/account-backups.js` تصمیم می‌گیرد.
+     */
+    account: {
+      //  بزرگ‌ترین فایلی که یک بار فرستاده می‌شود
+      maxBytes:   num(process.env.BACKUP_ACCOUNT_MAX_MB, 64) * 1024 * 1024,
+      //  حسابِ بی‌اشتراک
+      freeKeep:   num(process.env.BACKUP_ACCOUNT_FREE_KEEP, 3),
+      freeBytes:  num(process.env.BACKUP_ACCOUNT_FREE_MB, 32) * 1024 * 1024,
+      //  حسابی که اشتراک یا دورهٔ آزمایشی دارد
+      paidKeep:   num(process.env.BACKUP_ACCOUNT_KEEP, 20),
+      paidBytes:  num(process.env.BACKUP_ACCOUNT_MB, 1024) * 1024 * 1024,
+    },
   },
 
   rateLimit: {
@@ -172,6 +195,10 @@ const config = {
     //  است (ساعتی یک بار) و یک دکانِ چندگوشی‌ای پشتِ یک اینترنت
     //  نباید همدیگر را ببندند.
     sessionMax:   num(process.env.RATE_SESSION_MAX, 120),
+    //  پیامِ همگانی — عمداً تنگ: یک اشتباه نباید هزار پیام بفرستد.
+    //  از محیط خوانده می‌شود تا آزمون‌ها بتوانند چند بار بزنند و
+    //  خودِ سقف هم جدا سنجیده شود.
+    broadcastMax: num(process.env.RATE_BROADCAST_MAX, 5),
     generalMax:   num(process.env.RATE_GENERAL_MAX, 600),
     adminMax:     num(process.env.RATE_ADMIN_MAX, 60),
     //  تلاشِ ناموفق از **یک IP** روی یک حساب — کسی که رمز را حدس

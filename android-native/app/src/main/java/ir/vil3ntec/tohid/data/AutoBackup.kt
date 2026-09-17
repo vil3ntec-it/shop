@@ -107,9 +107,61 @@ object AutoBackup {
     list(context).drop(KEEP).forEach { runCatching { it.file.delete() } }
   }
 
+  /**
+   *  فرستادنِ تازه‌ترین نسخه به سرور.
+   *
+   *  ── چرا این‌جا و نه یک کارِ جدا ─────────────────────────────────
+   *  نسخهٔ همین حالا ساخته‌شده همان چیزی است که باید برود. کارِ دوم
+   *  یعنی یک بیدارباشِ دیگر روی گوشیِ کاربر برای فرستادنِ فایلی که
+   *  ممکن است تا آن موقع عوض شده باشد.
+   *
+   *  ⛔ **هیچ‌وقت استثنا بیرون نمی‌دهد و هیچ‌وقت کارِ شبانه را نمی‌شکند.**
+   *  نسخهٔ محلی گرفته شده و سرِ جایش است؛ نرفتنِ ابری یک «دفعهٔ بعد»
+   *  است، نه یک خطا. نت نبودن، اشتراک تمام شدن، سرور خواب بودن — هیچ‌کدام
+   *  نباید باعث شوند پشتیبانِ **محلی** هم گرفته نشود.
+   *
+   *  ⚠️ **همان ZIPی می‌رود که کاربر دستی می‌گیرد** (`BackupBundle`)، نه
+   *  فقط دفترِ JSON: وگرنه برگرداندنِ پشتیبانِ ابری همهٔ عکس‌ها را
+   *  می‌انداخت — همان اشکالی که یک بار در پشتیبانِ دستی بود.
+   */
+  suspend fun push(context: Context, manual: Boolean = false): Boolean {
+    if (!ir.vil3ntec.tohid.data.repo.Backend.isReady(context)) return false
+    if (!ir.vil3ntec.tohid.data.repo.Backend.isOnline(context)) return false
+    return runCatching {
+      /*
+       *  ⚠️ **خودِ فایلِ دفتر خوانده می‌شود، نه سریالایزِ دوباره.**
+       *
+       *  کارِ شبانه در `WorkManager` می‌دود و هیچ `ShopStore`ی در دست
+       *  ندارد؛ ساختنِ یکی فقط برای پشتیبان یعنی خواندنِ کلِ دفتر در
+       *  حافظه، دو بار. و همین بایت‌ها همان چیزی‌اند که `take()` برای
+       *  نسخهٔ محلی کپی می‌کند، پس هر دو نسخه دقیقاً یکی‌اند.
+       */
+      val ledger = File(context.filesDir, "shop-data.json")
+      if (!ledger.exists() || ledger.length() == 0L) return false
+      val ledgerJson = ledger.readText(Charsets.UTF_8)
+
+      val bytes = java.io.ByteArrayOutputStream().use { out ->
+        BackupBundle.write(context, out, ledgerJson).getOrThrow()
+        out.toByteArray()
+      }
+      if (bytes.isEmpty()) return false
+      ir.vil3ntec.tohid.data.repo.Backend.backups(context)
+        .upload(
+          bytes = bytes,
+          manual = manual,
+          appVersion = ir.vil3ntec.tohid.BuildConfig.VERSION_NAME,
+          ext = "zip",
+        )
+        .isSuccess
+    }.getOrDefault(false)
+  }
+
   class Worker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
       runCatching { take(applicationContext, ir.vil3ntec.tohid.todayIso()) }
+      //  ⚠️ بعد از نسخهٔ محلی، نه به‌جای آن. اگر ترتیب برعکس بود، یک
+      //  خطای شبکه می‌توانست شبی را بی هیچ پشتیبانی بگذارد.
+      runCatching { push(applicationContext) }
       return Result.success()
     }
   }
