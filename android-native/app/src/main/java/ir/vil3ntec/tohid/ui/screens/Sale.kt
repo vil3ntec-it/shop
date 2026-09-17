@@ -23,7 +23,16 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.foundation.focusable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.utf16CodePoint
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -38,6 +47,7 @@ import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.qty
 import ir.vil3ntec.tohid.data.BarcodeMatch
+import ir.vil3ntec.tohid.scan.HidScan
 import ir.vil3ntec.tohid.scan.CameraScanner
 import ir.vil3ntec.tohid.scan.ScanFeedback
 import ir.vil3ntec.tohid.scan.ScanGate
@@ -190,7 +200,62 @@ fun SaleScreen(
     }
   }
 
-  Box(Modifier.fillMaxSize()) {
+  /*
+   *  بارکدخوانِ سخت‌افزاری — کابلی یا بلوتوثی.
+   *
+   *  ── چرا اینجا و این‌شکلی ──────────────────────────────────────────
+   *  این دستگاه‌ها خودشان را **صفحه‌کلید** معرفی می‌کنند و رقم‌ها را
+   *  تایپ می‌کنند. پس باید جایی گرفته شوند که رویدادِ کلید می‌آید.
+   *
+   *  `onKeyEvent` است نه `onPreviewKeyEvent`، و این عمدی است:
+   *  `onKeyEvent` روی یک نیای بالادست **فقط وقتی** صدا زده می‌شود که
+   *  فرزندِ فوکوس‌دار خودش رویداد را برنداشته باشد. یعنی اگر فروشنده
+   *  داخلِ کادرِ «بارکد دستی» یا نامِ مشتری تایپ می‌کند، نویسه‌ها به
+   *  همان کادر می‌روند و اصلاً به اینجا نمی‌رسند — دقیقاً همان قاعده‌ای
+   *  که نسخهٔ وب دارد (آنجا با دیدنِ `document.activeElement`).
+   *
+   *  با `preview` برعکس می‌شد: هر نویسه اول اینجا می‌آمد و نامِ مشتری
+   *  را می‌بلعید.
+   *
+   *  `focusable` روی همین جعبه لازم است تا وقتی هیچ کادری باز نیست،
+   *  رویدادِ کلید اصلاً به درختِ صفحه برسد.
+   */
+  val hid = remember { HidScan() }
+  val hidFocus = remember { FocusRequester() }
+  LaunchedEffect(Unit) { runCatching { hidFocus.requestFocus() } }
+  DisposableEffect(Unit) { onDispose { hid.reset() } }
+
+  Box(
+    Modifier
+      .fillMaxSize()
+      .focusRequester(hidFocus)
+      .focusable()
+      .onKeyEvent { event ->
+        if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
+        val now = System.currentTimeMillis()
+
+        if (event.key == Key.Enter || event.key == Key.NumPadEnter) {
+          val code = hid.submit(now)
+          if (code != null) {
+            //  از بارکدخوان آمده: کامل، یک‌باره و از دستگاهی که اشتباه
+            //  نمی‌خواند. سدِ تکرارِ دوربین اینجا به کار نمی‌آید و فقط
+            //  جلوی اسکنِ دوبارهٔ همان کالا را می‌گرفت — که خودش یعنی
+            //  «دو تا».
+            onBarcode(code, skipDedup = true)
+            return@onKeyEvent true
+          }
+          return@onKeyEvent false
+        }
+
+        val ch = event.utf16CodePoint
+        //  فقط نویسه‌های دیدنی؛ کلیدهای کنترلی به کارِ بارکد نمی‌آیند
+        if (ch in 32..126) {
+          hid.feed(ch.toChar(), now)
+          return@onKeyEvent true
+        }
+        false
+      }
+  ) {
     LazyColumn(
       Modifier.fillMaxSize(),
       contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, if (cart.isEmpty()) 24.dp else 200.dp),

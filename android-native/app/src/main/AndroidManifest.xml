@@ -47,6 +47,16 @@
   <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
   <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
 
+  <!--
+    چاپگرِ حرارتیِ وصل با کابل (OTG).
+
+    اجازه‌ای لازم نیست: اندروید خودش هنگامِ اولین چاپ یک پنجرهٔ اجازه
+    نشان می‌دهد. این خط فقط می‌گوید برنامه از میزبانیِ USB سر درمی‌آورد —
+    و `required=false` چون گوشیِ بی‌OTG هم باید برنامه را نصب کند و
+    بقیهٔ راه‌های چاپ (بلوتوث و شبکه) سرِ جایشان باشند.
+  -->
+  <uses-feature android:name="android.hardware.usb.host" android:required="false" />
+
   <application
       android:allowBackup="true"
       android:dataExtractionRules="@xml/backup_rules"

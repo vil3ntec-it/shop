@@ -1693,10 +1693,37 @@
   .sale-status-badge.cash{background:var(--success, #18a06b); color:#fff;}
   .sale-card-actions{display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;}
   .sale-card-actions .btn{flex:1; min-width:80px;}
+  /* ==========================================================
+     چاپ — روی کاغذِ حرارتی، نه A4
+     ----------------------------------------------------------
+     تا دیروز اینجا هیچ `@page`ی نبود، یعنی مرورگر فاکتور را روی
+     قطعِ پیش‌فرضِ خودش (A4) می‌ریخت. روی چاپگرِ حرارتیِ ۵۸ میلی‌متری
+     نتیجه‌اش یک فاکتورِ ریزِ چپ‌چین در گوشهٔ کاغذ بود — یا چند
+     سانتی‌متر کاغذِ سفیدِ هدررفته.
+
+     حالا قطعِ کاغذ از روی `data-paper` روی <html> خوانده می‌شود و
+     فروشنده همان‌جا کنارِ دکمهٔ چاپ انتخابش می‌کند. `auto` در ارتفاع
+     عمدی است: فاکتورِ حرارتی ته ندارد و به‌اندازهٔ خودش کاغذ می‌برد.
+     ========================================================== */
   @media print{
     body *{visibility:hidden;}
     #invoice-print-area, #invoice-print-area *{visibility:visible;}
     #invoice-print-area{position:fixed; top:0; right:0; left:0; padding:10px;}
+  }
+
+  /* ۸۰ میلی‌متر — چاپگرهای پیشخان */
+  @media print{
+    html[data-paper="80"] #invoice-print-area{
+      width:72mm; padding:2mm; font-size:11px; line-height:1.55;
+    }
+    html[data-paper="80"] #invoice-print-area *{max-width:100%;}
+  }
+  /* ۵۸ میلی‌متر — چاپگرهای کوچکِ سیار */
+  @media print{
+    html[data-paper="58"] #invoice-print-area{
+      width:50mm; padding:1.5mm; font-size:9.5px; line-height:1.5;
+    }
+    html[data-paper="58"] #invoice-print-area *{max-width:100%;}
   }
 
   /* transaction type selector inside modal */
@@ -5745,7 +5772,12 @@
     <div id="invoice-print-area"></div>
     <div class="modal-actions" id="invoice-actions">
       <button type="button" class="btn btn-secondary" data-close-modal="modal-invoice">بستن</button>
-      <button type="button" class="btn btn-primary" id="btn-print-invoice"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 9V3.5h11V9"/><path d="M6.5 17.5h-2a2 2 0 0 1-2-2V11a2 2 0 0 1 2-2h15a2 2 0 0 1 2 2v4.5a2 2 0 0 1-2 2h-2"/><rect x="6.5" y="14" width="11" height="6.5" rx="1"/></svg> چاپ فاکتور</button>
+      <select class="form-input" id="sel-paper" style="max-width:130px; margin-inline-end:8px;" aria-label="قطع کاغذ">
+              <option value="80">۸۰ میلی‌متر</option>
+              <option value="58">۵۸ میلی‌متر</option>
+              <option value="a4">کاغذ معمولی</option>
+            </select>
+            <button type="button" class="btn btn-primary" id="btn-print-invoice"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 9V3.5h11V9"/><path d="M6.5 17.5h-2a2 2 0 0 1-2-2V11a2 2 0 0 1 2-2h15a2 2 0 0 1 2 2v4.5a2 2 0 0 1-2 2h-2"/><rect x="6.5" y="14" width="11" height="6.5" rx="1"/></svg> چاپ فاکتور</button>
     </div>
   </div>
 </div>
@@ -11108,6 +11140,23 @@
   // بسیار سریع پشت‌سرهم می‌فرستند و در پایان Enter می‌زنند.
   let hwBuffer = '', hwLastKeyTime = 0;
   function handleHardwareScannerKeydown(e){
+    /*
+     *  ── چه چیزی خراب بود ────────────────────────────────────────────
+     *  این شنونده فقط داخلِ `startSaleScanner` وصل می‌شد و در
+     *  `stopSaleScanner` برداشته می‌شد. یعنی بارکدخوانِ سخت‌افزاری فقط
+     *  وقتی کار می‌کرد که **دوربین روشن** باشد.
+     *
+     *  دکانی که یک بارکدخوانِ رومیزی خریده دقیقاً برای این است که
+     *  دوربین را روشن نکند: دوربین باتری می‌خورد، دستِ فروشنده را
+     *  می‌گیرد و کندتر هم هست. پس رایج‌ترین حالتِ استفاده، همانی بود
+     *  که اصلاً کار نمی‌کرد.
+     *
+     *  حالا شنونده همیشه وصل است و خودش می‌بیند که صفحهٔ فروش باز
+     *  است یا نه.
+     *  ────────────────────────────────────────────────────────────────
+     */
+    const sale = document.getElementById('page-sale');
+    if(!sale || !sale.classList.contains('active')) return;
     const tag = document.activeElement && document.activeElement.tagName;
     if(tag==='INPUT' || tag==='TEXTAREA' || tag==='SELECT') return;
     const now = Date.now();
@@ -11134,12 +11183,13 @@
     });
     saleScannerEngine.start();
     document.getElementById('btn-toggle-scanner').textContent = 'توقف دوربین';
-    document.addEventListener('keydown', handleHardwareScannerKeydown);
   }
   function stopSaleScanner(){
     if(saleScannerEngine){ saleScannerEngine.stop(); saleScannerEngine = null; }
-    document.removeEventListener('keydown', handleHardwareScannerKeydown);
   }
+
+  //  بارکدخوانِ سخت‌افزاری به دوربین بند نیست — شرحش سرِ خودِ تابع
+  document.addEventListener('keydown', handleHardwareScannerKeydown);
   document.getElementById('btn-toggle-scanner').addEventListener('click', ()=>{
     if(saleScannerEngine){
       stopSaleScanner();
@@ -11396,6 +11446,47 @@
     document.getElementById('invoice-print-area').innerHTML = invoiceHtml(sale);
     openModal('modal-invoice');
   }
+  /* ==========================================================
+     قطعِ کاغذ برای چاپ
+     ----------------------------------------------------------
+     چاپگرِ حرارتی کاغذِ ۵۸ یا ۸۰ میلی‌متری دارد، نه A4. بدونِ گفتنِ
+     این به مرورگر، فاکتور روی قطعِ پیش‌فرض ریخته می‌شد و روی نوارِ
+     باریکِ حرارتی یا ریز در می‌آمد یا بریده می‌شد.
+
+     `@page` را نمی‌شود با صفتِ HTML شرطی کرد، پس همین‌جا نوشته
+     می‌شود. ارتفاع `auto` است چون فاکتورِ حرارتی ته ندارد و باید
+     به‌اندازهٔ خودش کاغذ ببرد، نه یک برگِ کامل.
+     ========================================================== */
+  const PAPER_KEY = 'tohid-paper-width-v1';
+  const paperSel = document.getElementById('sel-paper');
+
+  function applyPaper(choice){
+    const paper = (choice==='58' || choice==='80') ? choice : 'a4';
+    document.documentElement.setAttribute('data-paper', paper);
+    try{ localStorage.setItem(PAPER_KEY, paper); }catch(e){}
+
+    let tag = document.getElementById('paper-page-rule');
+    if(!tag){
+      tag = document.createElement('style');
+      tag.id = 'paper-page-rule';
+      document.head.appendChild(tag);
+    }
+    //  حاشیه‌ی صفر روی کاغذِ حرارتی عمدی است: این چاپگرها خودشان
+    //  حاشیه‌ی فیزیکی دارند و حاشیه‌ی نرم‌افزاری روی آن، متن را از
+    //  وسط می‌اندازد
+    tag.textContent = paper==='a4'
+      ? '@page{ margin:10mm; }'
+      : `@page{ size:${paper}mm auto; margin:0; }`;
+  }
+
+  if(paperSel){
+    let startPaper = 'a4';
+    try{ startPaper = localStorage.getItem(PAPER_KEY) || 'a4'; }catch(e){}
+    paperSel.value = startPaper;
+    applyPaper(startPaper);
+    paperSel.addEventListener('change', ()=> applyPaper(paperSel.value));
+  }
+
   document.getElementById('btn-print-invoice').addEventListener('click', ()=>{
     window.print();
   });

@@ -353,16 +353,41 @@ fun InvoiceDialog(
 /* ============================ چاپگر ============================ */
 
 /**
- *  انتخابِ چاپگر.
+ *  انتخابِ چاپگر — با هر سه راهی که چاپگرِ دکان ممکن است وصل باشد.
  *
- *  فقط چاپگرهایی نشان داده می‌شوند که واقعاً در تنظیماتِ بلوتوثِ گوشی جفت
- *  شده‌اند — فهرستِ ساختگی ساخته نمی‌شود. اگر چیزی جفت نشده، همین گفته
- *  می‌شود، نه اینکه دکمهٔ چاپ بی‌صدا کاری نکند.
+ *  ── چرا سه راه ────────────────────────────────────────────────────
+ *  تا دیروز فقط بلوتوث بود. ولی چاپگرِ هر دکان یک‌جور وصل می‌شود:
+ *
+ *    • **بلوتوث** — چاپگرهای کوچکِ سیار
+ *    • **وای‌فای** — چاپگرهای ۸۰ میلی‌متریِ روی پیشخان، با یک IP
+ *    • **سیم** — چاپگر با کابلِ OTG
+ *
+ *  هیچ فهرستِ ساختگی ساخته نمی‌شود: بلوتوث فقط جفت‌شده‌ها را نشان
+ *  می‌دهد و سیم فقط دستگاهی که واقعاً چاپگر است. اگر چیزی نبود، همین
+ *  گفته می‌شود — نه اینکه دکمهٔ چاپ بی‌صدا کاری نکند.
  */
 @Composable
 private fun PrinterDialog(onDismiss: () -> Unit, onPrint: (String, Int) -> Unit) {
   val context = LocalContext.current
   val prefs = remember { context.getSharedPreferences("tohid", android.content.Context.MODE_PRIVATE) }
+
+  //  چاپگرِ دفعهٔ قبل — تا فروشنده هر بار از نو انتخاب نکند
+  val saved = remember { ThermalPrinter.Link.parse(prefs.getString("printer_address", null)) }
+
+  var width by remember { mutableStateOf(prefs.getInt("printer_width", ThermalPrinter.WIDTH_58MM)) }
+
+  //  همان راهی که دفعهٔ قبل کار می‌کرد، باز هم اول باز می‌شود
+  var kind by remember {
+    mutableStateOf(
+      when (saved) {
+        is ThermalPrinter.Link.Network -> "net"
+        is ThermalPrinter.Link.Usb -> "usb"
+        else -> "bt"
+      }
+    )
+  }
+
+  /* ---------------------------- بلوتوث ---------------------------- */
 
   var granted by remember {
     mutableStateOf(
@@ -373,18 +398,68 @@ private fun PrinterDialog(onDismiss: () -> Unit, onPrint: (String, Int) -> Unit)
   }
   val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted = it }
 
-  var printers by remember { mutableStateOf(emptyList<ThermalPrinter.Printer>()) }
-  LaunchedEffect(granted) {
-    printers = if (granted) ThermalPrinter.paired(context) else emptyList()
+  var paired by remember { mutableStateOf(emptyList<ThermalPrinter.Printer>()) }
+  LaunchedEffect(granted, kind) {
+    paired = if (granted && kind == "bt") ThermalPrinter.paired(context) else emptyList()
+  }
+  var btAddress by remember {
+    mutableStateOf((saved as? ThermalPrinter.Link.Bluetooth)?.address)
   }
 
-  var width by remember { mutableStateOf(prefs.getInt("printer_width", ThermalPrinter.WIDTH_58MM)) }
-  var selected by remember { mutableStateOf(prefs.getString("printer_address", null)) }
+  /* ---------------------------- وای‌فای ---------------------------- */
+
+  var host by remember {
+    mutableStateOf((saved as? ThermalPrinter.Link.Network)?.host.orEmpty())
+  }
+  var port by remember {
+    mutableStateOf(
+      ((saved as? ThermalPrinter.Link.Network)?.port ?: ThermalPrinter.RAW_PORT).toString()
+    )
+  }
+
+  /* ---------------------------- سیم ---------------------------- */
+
+  var usbList by remember { mutableStateOf(emptyList<ThermalPrinter.Printer>()) }
+  var usbName by remember { mutableStateOf((saved as? ThermalPrinter.Link.Usb)?.deviceName) }
+  //  با هر بار باز شدنِ برگه دوباره نگاه می‌کنیم: کابل ممکن است همین
+  //  حالا وصل شده باشد
+  LaunchedEffect(kind) {
+    if (kind == "usb") usbList = ThermalPrinter.usbPrinters(context)
+  }
+
+  /**
+   *  اجازهٔ دسترسی به چاپگرِ سیمی.
+   *
+   *  اندروید این را با یک پنجرهٔ خودش می‌گیرد و جوابش به شکلِ یک
+   *  Broadcast برمی‌گردد. بدونِ اجازه `openDevice` خالی برمی‌گردد و
+   *  چاپ بی‌آنکه معلوم شود چرا، نمی‌شود.
+   */
+  fun askUsb(deviceName: String) {
+    val manager = ThermalPrinter.usbManager(context) ?: return
+    val device = ThermalPrinter.usbDevice(context, deviceName) ?: return
+    if (manager.hasPermission(device)) return
+    val intent = android.app.PendingIntent.getBroadcast(
+      context, 0,
+      android.content.Intent(USB_PERMISSION_ACTION).setPackage(context.packageName),
+      android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_MUTABLE,
+    )
+    runCatching { manager.requestPermission(device, intent) }
+  }
+
+  /* ---------------------------- کدام چاپگر انتخاب شده ---------------------------- */
+
+  val link: ThermalPrinter.Link? = when (kind) {
+    "bt" -> btAddress?.let { ThermalPrinter.Link.Bluetooth(it) }
+    "net" -> host.trim().takeIf { it.isNotBlank() }?.let {
+      ThermalPrinter.Link.Network(it, port.trim().toIntOrNull() ?: ThermalPrinter.RAW_PORT)
+    }
+    else -> usbName?.let { ThermalPrinter.Link.Usb(it) }
+  }
 
   Dialog(onDismissRequest = onDismiss) {
     DialogEntry {
     Surface(color = Shop.colors.surfaceSolid, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
-      Column(Modifier.padding(18.dp)) {
+      Column(Modifier.padding(18.dp).verticalScroll(rememberScrollState())) {
         Text("چاپ فاکتور", style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
         Spacer(Modifier.height(12.dp))
 
@@ -397,40 +472,102 @@ private fun PrinterDialog(onDismiss: () -> Unit, onPrint: (String, Int) -> Unit)
         )
 
         Spacer(Modifier.height(16.dp))
-        Text("چاپگر", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
+        Text("چاپگر با چه چیزی وصل است؟", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
         Spacer(Modifier.height(6.dp))
+        Segmented(
+          options = listOf("بلوتوث" to "bt", "وای‌فای" to "net", "سیم" to "usb"),
+          selected = kind,
+          onSelect = { kind = it },
+        )
 
-        if (!granted) {
-          Text(
-            "برای دیدن چاپگرها، اجازهٔ بلوتوث لازم است.",
-            style = MaterialTheme.typography.bodySmall,
-            color = Shop.colors.muted,
-          )
-          Spacer(Modifier.height(8.dp))
-          Button(onClick = { ask.launch(Manifest.permission.BLUETOOTH_CONNECT) }) { Text("اجازه دادن") }
-        } else if (printers.isEmpty()) {
-          Text(
-            "چاپگری پیدا نشد. اول چاپگر را در تنظیمات بلوتوث گوشی جفت کنید، بعد اینجا برگردید.",
-            style = MaterialTheme.typography.bodySmall,
-            color = Shop.colors.muted,
-          )
-        } else {
-          printers.forEach { p ->
-            Row(
-              Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(Radius.sm))
-                .background(if (selected == p.address) Shop.colors.primaryTint else Color.Transparent)
-                .clickable { selected = p.address }
-                .padding(10.dp),
-              verticalAlignment = Alignment.CenterVertically,
-            ) {
-              RadioButton(selected = selected == p.address, onClick = { selected = p.address })
-              Spacer(Modifier.width(6.dp))
-              Column {
-                Text(p.name, style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text)
-                Text(p.address, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2)
+        Spacer(Modifier.height(16.dp))
+
+        when (kind) {
+          /* ---------------- بلوتوث ---------------- */
+          "bt" -> {
+            if (!granted) {
+              Text(
+                "برای دیدن چاپگرها، اجازهٔ بلوتوث لازم است.",
+                style = MaterialTheme.typography.bodySmall,
+                color = Shop.colors.muted,
+              )
+              Spacer(Modifier.height(8.dp))
+              Button(onClick = { ask.launch(Manifest.permission.BLUETOOTH_CONNECT) }) { Text("اجازه دادن") }
+            } else if (paired.isEmpty()) {
+              Text(
+                "چاپگری پیدا نشد. اول چاپگر را در تنظیمات بلوتوث گوشی جفت کنید، بعد اینجا برگردید.",
+                style = MaterialTheme.typography.bodySmall,
+                color = Shop.colors.muted,
+              )
+            } else {
+              paired.forEach { p ->
+                PrinterRow(
+                  title = p.name,
+                  subtitle = p.address,
+                  selected = btAddress == p.address,
+                  onSelect = { btAddress = p.address },
+                )
               }
+            }
+          }
+
+          /* ---------------- وای‌فای ---------------- */
+          "net" -> {
+            Text(
+              "نشانیِ چاپگر در شبکهٔ دکان. روی خودِ چاپگر یا در برگهٔ تنظیماتش نوشته شده.",
+              style = MaterialTheme.typography.bodySmall,
+              color = Shop.colors.muted,
+            )
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+              value = host,
+              onValueChange = { host = it },
+              label = { Text("نشانیِ IP") },
+              placeholder = { Text("192.168.1.50") },
+              singleLine = true,
+              keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+              modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+              value = port,
+              onValueChange = { port = it.filter { c -> c.isDigit() }.take(5) },
+              label = { Text("درگاه") },
+              singleLine = true,
+              keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+              modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+              "تقریباً همهٔ چاپگرها روی ۹۱۰۰ گوش می‌دهند؛ تا وقتی چاپگرتان چیزِ دیگری نگفته، دست نزنید.",
+              style = MaterialTheme.typography.labelSmall,
+              color = Shop.colors.muted2,
+            )
+          }
+
+          /* ---------------- سیم ---------------- */
+          else -> {
+            if (usbList.isEmpty()) {
+              Text(
+                "چاپگرِ سیمی پیدا نشد. کابل را وصل کنید و همین برگه را دوباره باز کنید.",
+                style = MaterialTheme.typography.bodySmall,
+                color = Shop.colors.muted,
+              )
+            } else {
+              usbList.forEach { p ->
+                PrinterRow(
+                  title = p.name,
+                  subtitle = p.address.substringAfterLast('/'),
+                  selected = usbName == p.address,
+                  onSelect = { usbName = p.address; askUsb(p.address) },
+                )
+              }
+              Spacer(Modifier.height(6.dp))
+              Text(
+                "اولین بار اندروید اجازه می‌خواهد؛ «همیشه» را بزنید تا هر بار نپرسد.",
+                style = MaterialTheme.typography.labelSmall,
+                color = Shop.colors.muted2,
+              )
             }
           }
         }
@@ -439,17 +576,41 @@ private fun PrinterDialog(onDismiss: () -> Unit, onPrint: (String, Int) -> Unit)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
           OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("انصراف") }
           Button(
-            enabled = selected != null,
+            enabled = link != null,
             onClick = {
-              val address = selected ?: return@Button
-              prefs.edit().putString("printer_address", address).apply()
-              onPrint(address, width)
+              val chosen = link ?: return@Button
+              prefs.edit().putString("printer_address", chosen.save()).apply()
+              onPrint(chosen.save(), width)
             },
             modifier = Modifier.weight(1f),
           ) { Text("چاپ") }
         }
       }
     }
+    }
+  }
+}
+
+/** نامِ کارِ اجازهٔ USB — فقط داخلِ همین برنامه معنا دارد */
+private const val USB_PERMISSION_ACTION = "ir.vil3ntec.tohid.USB_PERMISSION"
+
+/** یک ردیف از فهرستِ چاپگرها — بلوتوث و سیم هر دو همین شکل را دارند */
+@Composable
+private fun PrinterRow(title: String, subtitle: String, selected: Boolean, onSelect: () -> Unit) {
+  Row(
+    Modifier
+      .fillMaxWidth()
+      .clip(RoundedCornerShape(Radius.sm))
+      .background(if (selected) Shop.colors.primaryTint else Color.Transparent)
+      .clickable { onSelect() }
+      .padding(10.dp),
+    verticalAlignment = Alignment.CenterVertically,
+  ) {
+    RadioButton(selected = selected, onClick = onSelect)
+    Spacer(Modifier.width(6.dp))
+    Column {
+      Text(title, style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text)
+      Text(subtitle, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2)
     }
   }
 }
