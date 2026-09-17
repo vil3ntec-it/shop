@@ -49,6 +49,22 @@ android {
       ?: ""
 
   /*
+   *  شناسه‌ی این برنامه نزدِ سرورِ مرکزی.
+   *
+   *  سرور یکی است و چند برنامه از آن احراز هویت می‌گیرند؛ هر درخواست
+   *  می‌گوید مالِ کدام است. همان راهِ نشانیِ سرور را می‌رود: متغیرِ
+   *  محیطی بالاتر از `gradle.properties` می‌نشیند.
+   *
+   *  اگر هیچ‌کدام نبود `shop` می‌ماند — همان چیزی که این برنامه از
+   *  روزِ اول بوده. پس بیلدِ کسی که `gradle.properties`ِ قدیمی دارد
+   *  هم درست کار می‌کند.
+   */
+  val appId: String =
+    env("TOHID_APP_ID")
+      ?: (project.findProperty("tohid.appId") as String?)?.takeIf { it.isNotBlank() }
+      ?: "shop"
+
+  /*
    *  کلیدِ عمومیِ مجوز — همان که سرور با جفتِ خصوصی‌اش مجوز را امضا می‌کند.
    *
    *  ── چرا باید داخلِ خودِ برنامه باشد ───────────────────────────────
@@ -172,6 +188,7 @@ android {
       //  نسخه‌ی خودی: نشانی‌ی رایانه‌ی خودتان، و اگر خالی بود کادرِ
       //  نشانی در برنامه پیدا می‌شود تا دستی بزنید
       buildConfigField("String", "API_BASE", "\"${apiBase("TOHID_API_BASE_DEV", "tohid.apiBase.dev")}\"")
+      buildConfigField("String", "APP_ID", "\"$appId\"")
       //  نسخه‌ی خودی کلیدِ سنجاق‌شده ندارد: سرورِ محلی هر بار کلیدِ تازه
       //  می‌سازد و سنجاق‌کردنش یعنی هیچ مجوزی قبول نشود
       buildConfigField("String", "LICENSE_PUBLIC_KEY", "\"\"")
@@ -202,6 +219,7 @@ android {
         )
       }
       buildConfigField("String", "API_BASE", "\"$releaseBase\"")
+      buildConfigField("String", "APP_ID", "\"$appId\"")
 
       val pinnedKey = licenseKey()
       if (pinnedKey.isBlank() && releaseBase.isNotBlank()) {

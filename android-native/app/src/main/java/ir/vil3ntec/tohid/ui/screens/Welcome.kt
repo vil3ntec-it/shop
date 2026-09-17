@@ -170,6 +170,29 @@ private fun isDarkSurface(): Boolean {
 private val GOLD_GLOW = Color(0xFFF6C93F)
 private val GOLD_RING = Color(0xFFFFE9A8)
 
+/**
+ *  ایمیل به چشمِ صفحه درست است یا نه — و اگر نه، چرا.
+ *
+ *  ⚠️ این **امنیت نیست**، ادبِ صفحه است. کارش فقط این است که کاربر
+ *  پیش از دیدنِ یک رفت‌وبرگشتِ شبکه بفهمد `ali@gmail` نصفه است. حرفِ
+ *  آخر همیشه با سرور است (`lib/validate.js`) و اگر روزی این تابع
+ *  اشتباه کند، هیچ درِ بسته‌ای باز نمی‌شود.
+ *
+ *  الگو عمداً همان الگوی سرور است، نه یکی سخت‌گیرتر: کادری که چیزی را
+ *  رد کند که سرور قبولش دارد، خودش یک در بسته است.
+ */
+private val EMAIL_SHAPE = Regex("^[^\\s@]+@[^\\s@.]+(\\.[^\\s@.]+)+$")
+
+private fun emailValidationError(raw: String): String? {
+  val s = raw.trim()
+  return when {
+    s.isEmpty() -> "ایمیل را وارد کنید"
+    s.length > 190 -> "این ایمیل خیلی بلند است"
+    !EMAIL_SHAPE.matches(s) -> "ایمیل کامل نیست — مثل name@example.com"
+    else -> null
+  }
+}
+
 @Composable
 fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
   val context = LocalContext.current
@@ -201,6 +224,24 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
   var busy by remember { mutableStateOf(false) }
   var error by remember { mutableStateOf<String?>(null) }
   var note by remember { mutableStateOf<String?>(null) }
+
+  /*
+   *  خطای هر کادر، چسبیده به خودِ کادر.
+   *
+   *  ── چه چیزی خراب بود ──────────────────────────────────────────────
+   *  تا دیروز تنها کاری که صفحه با کادرِ خالی یا ایمیلِ بدقالب می‌کرد،
+   *  **خاموش نگه داشتنِ دکمه** بود. یعنی کاربر دکمه را می‌زد، هیچ اتفاقی
+   *  نمی‌افتاد، و هیچ‌جا نوشته نمی‌شد چرا. برای کسی که ایمیلش را
+   *  `ali@gmail` نوشته، این یک دکمهٔ خراب است، نه یک خطای ورودی.
+   *
+   *  ⚠️ این سنجش فقط برای **تجربهٔ کاربر** است. حرفِ آخر را سرور
+   *  می‌زند: `v.email` همان‌جا دوباره می‌سنجد و رد می‌کند. هیچ‌وقت به
+   *  سنجشِ این طرف تکیه نمی‌شود — کسی که بخواهد، اصلاً از این صفحه
+   *  نمی‌آید.
+   *  ──────────────────────────────────────────────────────────────────
+   */
+  var emailError by remember { mutableStateOf<String?>(null) }
+  var passwordError by remember { mutableStateOf<String?>(null) }
   var saved by remember { mutableStateOf(SavedLogins.read(context)) }
 
   /*
@@ -487,7 +528,7 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
         run {
           PillField(
             value = email,
-            onValueChange = { email = it; error = null },
+            onValueChange = { email = it; error = null; emailError = null },
             placeholder = "ایمیل",
             label = "ایمیل",
             icon = Icons.Filled.AlternateEmail,
@@ -496,11 +537,13 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
               imeAction = ImeAction.Next,
             ),
             ltr = true,
+            error = emailError,
           )
           Spacer(Modifier.height(12.dp))
           PillField(
             value = password,
-            onValueChange = { password = it; error = null },
+            onValueChange = { password = it; error = null; passwordError = null },
+            error = passwordError,
             placeholder = if (emailMode == "register") "رمز عبور (حداقل ۸ نویسه)" else "رمز عبور",
             label = "رمز عبور",
             icon = Icons.Filled.Lock,
@@ -591,14 +634,47 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
 
         /* ------------------------ دکمهٔ اصلی ------------------------ */
         val label = if (emailMode == "register") "ساخت حساب" else "ورود به حساب"
-        val can = ready && !busy && name.isNotBlank() && when {
+        /*
+         *  ── نامی که جلوی ورود را گرفته بود ────────────────────────────
+         *  اینجا `name.isNotBlank()` روی **هر دو** راه بود. یعنی کسی که
+         *  حسابش را ماه‌ها پیش ساخته و فقط می‌خواهد وارد شود، تا وقتی
+         *  کادرِ «نام» را پر نمی‌کرد دکمهٔ ورود خاموش می‌ماند — بی آنکه
+         *  جایی گفته شود چرا. و آن نام هیچ‌جا هم نمی‌رفت: `auth.login`
+         *  فقط ایمیل و رمز می‌فرستد.
+         *
+         *  نام فقط برای **ساختنِ** حساب لازم است، چون حسابِ بی‌نام بعداً
+         *  فقط یک نشانیِ ایمیل است.
+         *  ──────────────────────────────────────────────────────────────
+         */
+        val can = ready && !busy && when {
           //  در ثبت‌نام، تا دو رمز یکی نشوند دکمه باز نمی‌شود
           emailMode == "register" ->
-            email.isNotBlank() && password.isNotBlank() && password == password2
+            name.isNotBlank() && email.isNotBlank() && password.isNotBlank() && password == password2
           else -> email.isNotBlank() && password.isNotBlank()
         }
 
         GradientButton(text = label, enabled = can, busy = busy) {
+          /*
+           *  جلوی چند بار زدن.
+           *
+           *  دکمه با `busy` خاموش می‌شود، ولی بینِ لمس و رسیدنِ حالتِ
+           *  تازه به صفحه یک پنجرهٔ کوچک هست و انگشتِ بی‌حوصله همان را
+           *  می‌گیرد. این سنجش همان پنجره را می‌بندد — دو درخواستِ ورود
+           *  یعنی دو نشست، دو ردیف در شمارندهٔ تلاش، و دو سهم از سقفِ
+           *  نرخِ سرور.
+           */
+          if (busy) return@GradientButton
+
+          //  سنجشِ ورودی پیش از هر درخواستِ شبکه — سرور بی‌خود مشغول
+          //  نشود و کاربر همان‌جا بفهمد چه کم است
+          emailError = emailValidationError(email)
+          passwordError = when {
+            password.isBlank() -> "رمز عبور را وارد کنید"
+            emailMode == "register" && password.length < 8 -> "رمز باید حداقل ۸ نویسه باشد"
+            else -> null
+          }
+          if (emailError != null || passwordError != null) return@GradientButton
+
           busy = true; error = null; note = null
           scope.launch {
             when {
@@ -660,9 +736,14 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
         if (otpReady) {
           Spacer(Modifier.height(6.dp))
           TextButton(
-            enabled = ready && !busy && name.isNotBlank() && email.isNotBlank(),
+            //  نام اینجا هم لازم نیست: کد به **ایمیل** می‌رود. برای
+            //  حسابی که تازه ساخته می‌شود سرور خودش نامِ خالی را
+            //  می‌پذیرد و کاربر بعداً در پروفایل می‌نویسدش.
+            enabled = ready && !busy && email.isNotBlank(),
             modifier = Modifier.fillMaxWidth(),
             onClick = {
+              val bad = emailValidationError(email)
+              if (bad != null) { emailError = bad; return@TextButton }
               busy = true; error = null; note = null
               scope.launch {
                 val to = email.trim()
@@ -706,7 +787,12 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
          */
         Spacer(Modifier.height(4.dp))
         TextButton(
-          onClick = { emailMode = if (emailMode == "login") "register" else "login"; error = null },
+          onClick = {
+            emailMode = if (emailMode == "login") "register" else "login"
+            //  خطای کادرها هم با عوض شدنِ راه پاک می‌شود: «رمز حداقل ۸
+            //  نویسه» مالِ ثبت‌نام است و نباید بالای فرمِ ورود بماند
+            error = null; emailError = null; passwordError = null
+          },
             modifier = Modifier.fillMaxWidth(),
           ) {
             Text(
@@ -727,6 +813,10 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
             TextButton(
               enabled = ready && !busy && email.isNotBlank(),
               onClick = {
+                //  کدِ بازیابی به همین ایمیل می‌رود؛ اگر بدقالب باشد
+                //  درخواست بی‌خود فرستاده شده و سقفِ نرخ هم خرج شده
+                val bad = emailValidationError(email)
+                if (bad != null) { emailError = bad; return@TextButton }
                 busy = true; error = null; note = null
                 val to = email.trim()
                 scope.launch {
@@ -853,47 +943,33 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
               onPick = {
                 error = null
                 /*
-                 *  ورودِ سریع، واقعاً سریع.
+                 *  ورودِ سریع: کادر را پر می‌کند، رمز را می‌خواهد.
                  *
-                 *  تا دیروز این ردیف فقط کادرِ ایمیل را پر می‌کرد و کاربر
-                 *  باید رمز را از نو می‌زد — گزارش هم همین بود: «اسمِ
-                 *  حسابم را نشان می‌دهد، رویش می‌زنم، ولی مرا داخل
-                 *  نمی‌برد».
+                 *  ── چرا دیگر بی‌رمز وارد نمی‌شود ────────────────────
+                 *  تا دیروز این ردیف توکنِ تازه‌سازیِ همان حساب را هم
+                 *  کنارِ خودش داشت و یک لمس، بی‌رمز، نشست را برمی‌گرداند.
+                 *  قیمتش این بود که «خروج از حساب» دیگر خروج نبود: یک
+                 *  کلیدِ زندهٔ نودروزه، رمزنشده، روی گوشی می‌ماند و هر
+                 *  کسی که گوشی دستش می‌افتاد با یک لمس داخل بود — همان
+                 *  چیزی که «خروج» قرار بود جلویش را بگیرد.
                  *
-                 *  حالا اگر توکنِ همان حساب را داشته باشیم (هنگام خروج
-                 *  کنارش گذاشته می‌شود) نشست همان‌جا برمی‌گردد. اگر سرور
-                 *  ردش کرد — باطل شده یا مهلتش تمام — بی‌صدا به راهِ
-                 *  همیشگی برمی‌گردیم و کادر پر می‌شود.
+                 *  چیزی که این ردیف واقعاً حل می‌کند سرِ جایش است:
+                 *  کسی که هر روز صبح دکان را باز می‌کند، نشانیِ کاملش
+                 *  را دوباره تایپ نمی‌کند. فقط رمز می‌ماند — دقیقاً
+                 *  همان کاری که نسخهٔ وب از روزِ اول می‌کرد.
+                 *  ────────────────────────────────────────────────────
                  */
-                fun fillIn() {
-                  if (entry.identifier.contains("@")) {
-                    emailMode = "login"
-                    email = entry.identifier
-                  } else {
-                    //  حسابی که با شماره ساخته شده بود: کادرِ شماره از
-                    //  صفحهٔ ورود برداشته شده، پس همان‌جا می‌گوییم چه کند
-                    emailMode = "login"
-                    note = "این حساب با شماره ساخته شده بود — با ایمیلِ همان حساب وارد شوید"
-                  }
-                  if (name.isBlank()) name = entry.shop
-                }
-                if (entry.refresh.isBlank() || !ready) {
-                  fillIn()
+                emailMode = "login"
+                if (entry.identifier.contains("@")) {
+                  email = entry.identifier
+                  emailError = null
+                  note = null
                 } else {
-                  busy = true
-                  scope.launch {
-                    auth.resume(entry.refresh)
-                      .onSuccess { session ->
-                        //  نشستِ کامل — نام و دکانش از سرور آمده
-                        finish(entry.identifier, session)
-                      }
-                      .onFailure {
-                        fillIn()
-                        note = "برای امنیت، این بار رمز یا کد لازم است"
-                      }
-                    busy = false
-                  }
+                  //  حسابی که با شماره ساخته شده بود: کادرِ شماره از
+                  //  صفحهٔ ورود برداشته شده، پس همان‌جا می‌گوییم چه کند
+                  note = "این حساب با شماره ساخته شده بود — با ایمیلِ همان حساب وارد شوید"
                 }
+                if (name.isBlank()) name = entry.shop
               },
               onForget = {
                 SavedLogins.forget(context, entry.identifier)

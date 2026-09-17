@@ -30,6 +30,28 @@
       <meta name="tohid-api-base" content="https://api.YOURDOMAIN.com">
 -->
 <meta name="tohid-api-base" content="https://api.vill3n.top">
+
+<!--
+  شناسهٔ این برنامه نزدِ سرورِ مرکزی.
+
+  سرور یکی است و چند برنامه از آن احراز هویت می‌گیرند. هر درخواستی که
+  نشست می‌سازد می‌گوید مالِ کدام است، و سرور توکن را به همان بخش مهر
+  می‌زند — توکنِ یک برنامه در برنامهٔ دیگر اصلاً پیدا نمی‌شود.
+
+  تا دیروز این نسخه هیچ‌وقت نمی‌گفت کیست و به پیش‌فرضِ سرور تکیه می‌کرد
+  («نگفتی، پس دکانی»). یعنی درستیِ کار به یک سکوت بند بود: روزی که
+  پیش‌فرض عوض شود یا برنامهٔ سومی بیاید، این نسخه بی‌صدا به بخشِ اشتباه
+  وصل می‌شد.
+
+  مقدارهایی که سرور امروز می‌شناسد (`server/src/lib/tenancy.js`):
+      shop   دکان — همین برنامه
+      pump   پمپ‌بنزین
+
+  برنامهٔ اندروید همین را از `tohid.appId` در gradle.properties می‌گیرد؛
+  هر دو باید یکی باشند، وگرنه وب و گوشی به دو بخشِ جدا وصل می‌شوند و
+  حسابِ یک نفر در دو برنامه دو نشستِ بی‌ربط می‌شود.
+-->
+<meta name="tohid-app-id" content="shop">
 <script>
 (function(){
   try{
@@ -3297,6 +3319,52 @@
       <span class="auth-field-error" id="auth-form-error" style="text-align:center; display:block;"></span>
     </form>
 
+    <!--
+      بازیابی رمز فراموش‌شده.
+
+      تا دیروز دکمه‌ی «رمز را فراموش کرده‌اید؟» فقط می‌گفت «با پشتیبانی
+      تماس بگیرید» — یعنی کاربرِ آیفون، که فقط همین نسخه را دارد، با
+      فراموش کردنِ رمز از حسابش بیرون می‌ماند. سرور و برنامه‌ی اندروید
+      از مدت‌ها پیش این راه را داشتند.
+
+      همان کلاس‌های فرمِ ورود به کار رفته، پس هیچ CSSِ تازه‌ای لازم نشد
+      و شکلش دقیقاً همان است.
+    -->
+    <form id="auth-reset-form" novalidate hidden>
+      <p class="auth-note" style="margin:0 0 14px;">
+        کد شش‌رقمی به <b id="auth-reset-target" dir="ltr"></b> فرستاده شد.
+        اگر در صندوق ورودی نبود، پوشه‌ی هرزنامه (Spam) را هم ببینید.
+      </p>
+
+      <div class="auth-input-group">
+        <label for="auth-reset-code">کد تأیید</label>
+        <div class="auth-input">
+          <input type="text" id="auth-reset-code" placeholder="۶ رقم" dir="ltr"
+                 inputmode="numeric" maxlength="6" autocomplete="one-time-code">
+        </div>
+        <span class="auth-field-error" id="auth-reset-code-error"></span>
+      </div>
+
+      <div class="auth-input-group">
+        <label for="auth-reset-pass">رمز تازه</label>
+        <div class="auth-input">
+          <input type="password" id="auth-reset-pass" placeholder="حداقل ۸ نویسه" dir="ltr"
+                 autocomplete="new-password">
+          <button type="button" class="auth-eye" id="auth-reset-eye" aria-label="نمایش رمز">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.8"/></svg>
+          </button>
+        </div>
+        <span class="auth-field-error" id="auth-reset-pass-error"></span>
+      </div>
+
+      <button type="submit" class="auth-submit-btn" id="auth-reset-btn">
+        <span class="auth-btn-label">گذاشتن رمز تازه و ورود</span>
+        <span class="auth-btn-spinner"></span>
+      </button>
+      <span class="auth-field-error" id="auth-reset-error" style="text-align:center; display:block;"></span>
+      <button type="button" class="auth-back-btn" id="auth-reset-back">بازگشت به ورود</button>
+    </form>
+
     <!-- ستون دوم روی تبلتِ خوابیده؛ روی گوشی فقط یک بلوک ساده است -->
     <div class="auth-side">
     <div class="auth-divider"><span>شاگرد دکان هستید؟</span></div>
@@ -5933,6 +6001,27 @@
       </div>`).join('');
   }
 
+  /*
+   *  سنجشِ ایمیل — همان الگویی که برنامهٔ نیتیو و سرور دارند.
+   *
+   *  ⚠️ این **امنیت نیست**، ادبِ صفحه است: کاربر پیش از یک رفت‌وبرگشتِ
+   *  شبکه بفهمد `ali@gmail` نصفه است. حرفِ آخر همیشه با سرور است
+   *  (`lib/validate.js`) و اگر روزی این تابع اشتباه کند، هیچ درِ
+   *  بسته‌ای باز نمی‌شود.
+   *
+   *  الگو عمداً همان الگوی سرور است، نه سخت‌گیرتر: کادری که چیزی را رد
+   *  کند که سرور قبولش دارد، خودش یک درِ بسته است.
+   */
+  const EMAIL_SHAPE = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/;
+
+  function emailProblem(raw){
+    const s = (raw || '').trim();
+    if(!s) return 'ایمیل‌تان را وارد کنید.';
+    if(s.length > 190) return 'این ایمیل خیلی بلند است.';
+    if(!EMAIL_SHAPE.test(s)) return 'ایمیل کامل نیست — مثل name@example.com';
+    return null;
+  }
+
   function authError(id, message){
     const el = document.getElementById(id);
     if(!el) return;
@@ -6058,9 +6147,112 @@
       if(item){ idEl.value = item.dataset.saved; passEl.focus(); }
     });
 
-    document.getElementById('auth-forgot').addEventListener('click', ()=>{
-      authError('auth-form-error',
-        'برای بازیابی رمز، با پشتیبانی تماس بگیرید. اطلاعات دکان شما روی همین گوشی محفوظ است.');
+    /* ==========================================================
+       بازیابی رمز فراموش‌شده
+       ----------------------------------------------------------
+       تا دیروز این دکمه فقط می‌گفت «با پشتیبانی تماس بگیرید» — یعنی
+       کاربرِ آیفون، که فقط همین نسخه را دارد، با فراموش کردنِ رمز از
+       حسابش بیرون می‌ماند. سرور و برنامه‌ی اندروید از مدت‌ها پیش این
+       راه را داشتند؛ فقط همین‌جا وصل نشده بود.
+
+       قاعده‌ی صاحب مخزن: «وب و نیتیو یک برنامه‌اند».
+       ========================================================== */
+    const resetForm = document.getElementById('auth-reset-form');
+    const resetCodeEl = document.getElementById('auth-reset-code');
+    const resetPassEl = document.getElementById('auth-reset-pass');
+    const resetBtn = document.getElementById('auth-reset-btn');
+    let resetEmail = '';
+
+    /* یک پرچم برای هر فرم: جلوی چند بار فرستادن را می‌گیرد.
+
+       کلاسِ `is-busy` دکمه را غیرقابل‌کلیک می‌کند، ولی `Enter` روی فرم
+       از کنارِ دکمه رد می‌شود و باز هم `submit` می‌دهد. یعنی نگه داشتنِ
+       انگشت روی Enter چند درخواستِ ورود می‌فرستاد: چند نشستِ ناخواسته،
+       چند ردیف در شمارنده‌ی تلاش، و چند سهم از سقفِ نرخِ سرور. */
+    let loginBusy = false;
+    let resetBusy = false;
+
+    function showReset(on){
+      resetForm.hidden = !on;
+      form.hidden = on;
+      const savedWrap = document.getElementById('auth-saved');
+      if(savedWrap && on) savedWrap.hidden = true;
+      if(on){ resetCodeEl.value = ''; resetPassEl.value = ''; resetCodeEl.focus(); }
+      else { renderSavedLogins(); }
+    }
+
+    document.getElementById('auth-reset-eye').addEventListener('click', (e)=>{
+      const on = resetPassEl.type === 'password';
+      resetPassEl.type = on ? 'text' : 'password';
+      e.currentTarget.classList.toggle('on', on);
+    });
+
+    document.getElementById('auth-reset-back').addEventListener('click', ()=>{
+      authError('auth-reset-error','');
+      showReset(false);
+    });
+
+    document.getElementById('auth-forgot').addEventListener('click', async ()=>{
+      authError('auth-identifier-error',''); authError('auth-form-error','');
+
+      const email = idEl.value.trim();
+      const bad = emailProblem(email);
+      if(bad){ authError('auth-identifier-error', bad); idEl.focus(); return; }
+
+      const lic = window.TohidLicense;
+      if(!lic || !lic.getServerUrl()){
+        authError('auth-form-error',
+          'هنوز آدرس سروری تنظیم نشده است، پس بازیابی رمز ممکن نیست. «ادامه بدون حساب» را بزنید — همه‌ی بخش‌ها کار می‌کنند.');
+        return;
+      }
+
+      try{
+        await lic.forgotPassword(email);
+        /*
+         *  پاسخ برای ایمیلِ بی‌حساب هم «موفق» است و عمداً همین‌طور:
+         *  وگرنه هر کسی با امتحان کردنِ نشانی‌ها می‌فهمید چه کسانی روی
+         *  این سرور حساب دارند. پس اینجا هم همان یک جمله گفته می‌شود،
+         *  چه حساب باشد چه نباشد.
+         */
+        resetEmail = email;
+        document.getElementById('auth-reset-target').textContent = email;
+        showReset(true);
+      }catch(err){
+        authError('auth-form-error', (err && err.message) || 'درخواست بازیابی فرستاده نشد. دوباره تلاش کنید.');
+      }
+    });
+
+    resetForm.addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      if(resetBusy) return;
+      authError('auth-reset-code-error',''); authError('auth-reset-pass-error','');
+      authError('auth-reset-error','');
+
+      const code = resetCodeEl.value.replace(/\D/g,'');
+      const pass = resetPassEl.value;
+      if(code.length < 4){ authError('auth-reset-code-error','کد را کامل بزنید.'); resetCodeEl.focus(); return; }
+      //  سنجشِ رمز فقط برای اینکه کاربر زودتر بفهمد؛ قاعده‌ی واقعی
+      //  (`checkStrength`) روی سرور است و همان تصمیم می‌گیرد
+      if(pass.length < 8){ authError('auth-reset-pass-error','رمز باید حداقل ۸ نویسه باشد.'); resetPassEl.focus(); return; }
+
+      resetBusy = true;
+      resetBtn.classList.add('is-busy');
+      try{
+        const r = await window.TohidLicense.resetPassword({ email: resetEmail, code, password: pass });
+        const name = (r && r.user && (r.user.name || r.user.email)) || resetEmail;
+        rememberLogin(resetEmail, (r && r.shop && r.shop.name) || '');
+        const authData = { method:'phone', value:resetEmail, name, token:'', loginAt:Date.now() };
+        saveAuth(authData);
+        applyAuthToUI(authData);
+        showReset(false);
+        enterApp(true);
+        setTimeout(()=> showToast('رمز تازه نشست و وارد شدید'), 400);
+      }catch(err){
+        authError('auth-reset-error', (err && err.message) || 'رمز عوض نشد. دوباره تلاش کنید.');
+      }finally{
+        resetBusy = false;
+        resetBtn.classList.remove('is-busy');
+      }
     });
 
     /*
@@ -6110,11 +6302,18 @@
 
     form.addEventListener('submit', async (e)=>{
       e.preventDefault();
+      //  کلاسِ `is-busy` فقط جلوی **کلیک** را می‌گیرد؛ `Enter` از کنارش
+      //  رد می‌شود و باز هم `submit` می‌دهد. این پرچم همان راه را می‌بندد.
+      if(loginBusy) return;
       authError('auth-identifier-error',''); authError('auth-password-error',''); authError('auth-form-error','');
 
       const identifier = idEl.value.trim();
       const password = passEl.value;
-      if(!identifier){ authError('auth-identifier-error','ایمیل‌تان را وارد کنید.'); idEl.focus(); return; }
+      //  قالبِ ایمیل هم سنجیده می‌شود، نه فقط خالی نبودنش: تا دیروز
+      //  `ali@gmail` صاف به سرور می‌رفت و کاربر یک «۴۰۰» می‌گرفت بدون
+      //  اینکه بداند کدام کادر ایراد دارد
+      const bad = emailProblem(identifier);
+      if(bad){ authError('auth-identifier-error', bad); idEl.focus(); return; }
       if(!password){ authError('auth-password-error','رمز عبور را وارد کنید.'); passEl.focus(); return; }
 
       const lic = window.TohidLicense;
@@ -6124,6 +6323,7 @@
         return;
       }
 
+      loginBusy = true;
       btn.classList.add('is-busy');
       try{
         const r = await lic.login(identifier, password);
@@ -6136,6 +6336,7 @@
       }catch(err){
         authError('auth-form-error', (err && err.message) || 'ورود ناموفق بود. دوباره تلاش کنید.');
       }finally{
+        loginBusy = false;
         btn.classList.remove('is-busy');
       }
     });

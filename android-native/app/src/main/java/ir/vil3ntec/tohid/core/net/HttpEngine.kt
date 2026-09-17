@@ -104,8 +104,32 @@ class HttpEngine(
     try {
       return attempt(method, path, body, token, first)
     } catch (failure: ApiFailure) {
+      /*
+       *  ── چرا رمزِ غلط از این آزمون بیرون است ────────────────────────
+       *  «رمز اشتباه است» هم یک ۴۰۱ بی‌توکن است، پس تا دیروز درست
+       *  می‌افتاد داخلِ همین شرط و هر ورودِ ناموفق **دو بار** فرستاده
+       *  می‌شد. سه چیز از آن درمی‌آمد:
+       *
+       *    ۱) سقفِ نرخِ سرور نصف می‌شد — ده تلاش در ربع ساعت، عملاً پنج
+       *    ۲) شمارندهٔ قفلِ حساب دو برابر می‌شمرد: کاربر بعد از چهار
+       *       اشتباه قفل می‌شد، نه هشت تا
+       *    ۳) هر اشتباه دو ردیف در `login_attempts` می‌نوشت
+       *
+       *  یعنی وصله‌ای که برای یک اشکالِ سرورِ قدیمی گذاشته شده بود، به
+       *  محدودیت‌های ضدِ حدسِ رمز شلیک می‌کرد.
+       *
+       *  تفاوتشان روشن است: آن اشکالِ سرور ۴۰۱هایی می‌ساخت که از لایهٔ
+       *  «توکن لازم است» می‌آمدند (`unauthorized` و `invalid_token`) —
+       *  یعنی مسیر اصلاً پیدا نشده بود. `bad_credentials` پاسخِ **خودِ
+       *  مسیرِ ورود** است: مسیر هست، پیدا شده، و جوابش را داده. دوباره
+       *  فرستادنش فقط خرج است.
+       *  ──────────────────────────────────────────────────────────────
+       */
+      val routeMaybeMissing = failure is ApiFailure.Unauthorized &&
+        (failure.code == "unauthorized" || failure.code == "invalid_token" || failure.code == "http_401")
+
       val worthRetry = failure is ApiFailure.NotFound || failure is ApiFailure.SessionExpired ||
-        (failure is ApiFailure.Unauthorized && token == null)
+        (routeMaybeMissing && token == null)
       val other =
         if (first == ApiConfig.API_PREFIX) ApiConfig.API_PREFIX_PLAIN else ApiConfig.API_PREFIX
       if (!worthRetry) throw failure

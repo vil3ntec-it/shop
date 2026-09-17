@@ -21,6 +21,37 @@ async function createApp({ runMigrations = true } = {}) {
 
   app.use(express.json({ limit: '2mb' }));
 
+  /*
+   *  بدنه‌ای که JSON نیست.
+   *
+   *  ── چه چیزی را می‌بندد ──────────────────────────────────────────
+   *  خواننده‌ی JSON خودش خطا می‌سازد و آن خطا `expose` دارد، پس پیامش
+   *  همان‌طور که هست بیرون می‌رفت:
+   *
+   *      Unexpected token } in JSON at position 42
+   *
+   *  یعنی یک جمله‌ی انگلیسیِ داخلیِ Node، با شماره‌ی بایت، به دستِ
+   *  کاربرِ فارسی‌زبان. نه او می‌فهمید چه شده، نه ما می‌خواستیم درونِ
+   *  کتابخانه‌مان را نشان بدهیم. بدنه‌ی بزرگ‌تر از سقف هم همین‌طور.
+   *
+   *  حالا هر دو یک پاسخِ تمیز می‌گیرند و جزئیات فقط در لاگِ خودمان
+   *  می‌ماند — بی بدنه، چون بدنه ممکن است رمز داشته باشد.
+   *  ──────────────────────────────────────────────────────────────
+   */
+  app.use((err, req, res, next) => {
+    if (!err || (err.type !== 'entity.parse.failed' && err.type !== 'entity.too.large')) {
+      return next(err);
+    }
+    const tooBig = err.type === 'entity.too.large';
+    console.warn(`[body] ${req.method} ${req.path.slice(0, 120)} — ${err.type}`);
+    res.status(tooBig ? 413 : 400).json({
+      error: {
+        code: tooBig ? 'body_too_large' : 'bad_json',
+        message: tooBig ? 'حجم درخواست بیش از حد مجاز است' : 'بدنه‌ی درخواست درست نبود',
+      },
+    });
+  });
+
   // ---- سرآیندهای امنیتی ----
   app.use((req, res, next) => {
     res.set('X-Content-Type-Options', 'nosniff');

@@ -34,6 +34,18 @@ const { badRequest, unauthorized, forbidden, conflict, tooMany, notFound } = req
 const router = express.Router();
 
 const authLimit = rateLimit({ max: config.rateLimit.authMax, keyPrefix: 'auth' });
+/*
+ *  تازه‌سازی و خروج — تا دیروز هیچ سقفی نداشتند.
+ *
+ *  هر دو بی‌توکن‌اند (توکن در بدنه می‌آید) و هر دو به دیتابیس می‌زنند،
+ *  پس یک حلقهٔ ساده می‌توانست سرور را مشغول نگه دارد بی‌آنکه حتی حسابی
+ *  داشته باشد. حدس زدنِ خودِ توکن شدنی نیست — ۳۲ بایتِ تصادفی است — ولی
+ *  «شدنی نیست» جوابِ «چرا سقف ندارد» نیست.
+ *
+ *  سقف عمداً از ورود بازتر است: یک گوشی ساعتی یک بار تازه می‌کند و یک
+ *  دکانِ چند‌گوشی‌ای پشتِ یک اینترنت نباید به هم بخورد.
+ */
+const sessionLimit = rateLimit({ max: config.rateLimit.sessionMax, keyPrefix: 'session' });
 //  کد شاگرد خودش رمز است، پس مثل رمز محدود می‌شود
 const joinLimit = rateLimit({ max: config.rateLimit.joinMax, keyPrefix: 'staff-login' });
 const otpLimit = rateLimit({
@@ -55,6 +67,23 @@ async function noteAttempt(scope, identifier, ip, ok) {
   await query(
     'INSERT INTO login_attempts (scope, identifier, ip, ok, created_at) VALUES ($1,$2,$3,$4,$5)',
     [scope, identifier, ip, ok, now()]
+  );
+}
+
+/**
+ *  ورودِ درست، ردِ تلاش‌های ناموفق را پاک می‌کند.
+ *
+ *  بی این، شمارنده فقط با گذشتِ زمان خالی می‌شد: کسی که هفت بار رمز را
+ *  غلط زده و هشتمی را درست زده، هنوز یک تلاشِ ناموفق با قفل فاصله دارد.
+ *  یعنی همان کاربرِ سالم، ساعتی بعد با یک اشتباهِ ساده قفل می‌شد — در
+ *  حالی که همین حالا ثابت کرده صاحبِ حساب است.
+ *
+ *  امنیتی از دست نمی‌رود: کسی که رمز را دارد، قفل هم جلویش را نمی‌گرفت.
+ */
+async function clearAttempts(scope, identifier) {
+  await query(
+    'DELETE FROM login_attempts WHERE scope=$1 AND identifier=$2 AND ok=false',
+    [scope, identifier]
   );
 }
 
@@ -416,6 +445,10 @@ router.post('/login', authLimit, async (req, res, next) => {
   const raw = String(req.body?.identifier || req.body?.email || req.body?.phone || '').trim();
   if (!raw) return next(badRequest('ایمیل یا شماره موبایل لازم است', 'identifier_required'));
   const password = typeof req.body?.password === 'string' ? req.body.password : '';
+  //  رمزِ خالی اصلاً درخواستِ ورود نیست. زودتر ردش می‌کنیم تا نه جای
+  //  قفل را بگیرد و نه یک scrypt بی‌خود اجرا شود. چیزی هم لو نمی‌دهد:
+  //  جواب به این ربطی ندارد که آن ایمیل حساب دارد یا نه.
+  if (!password) return next(badRequest('رمز عبور لازم است', 'password_required'));
 
   const isEmail = raw.includes('@');
   const identifier = isEmail ? v.email(raw, { required: true }) : v.phone(raw, { required: true });
@@ -425,9 +458,14 @@ router.post('/login', authLimit, async (req, res, next) => {
     isEmail ? 'SELECT * FROM users WHERE email=$1' : 'SELECT * FROM users WHERE phone=$1',
     [identifier]
   );
-  const ok = user && user.password_hash && await pw.verifyPassword(password, user.password_hash);
-  await noteAttempt('user', identifier, clientIp(req), !!ok);
+  //  حساب نبود؟ باز هم همان‌قدر وقت می‌گیرد — شرحش سرِ `pw.burnTime`
+  let ok = false;
+  if (user && user.password_hash) ok = await pw.verifyPassword(password, user.password_hash);
+  else await pw.burnTime(password);
+
+  await noteAttempt('user', identifier, clientIp(req), ok);
   if (!ok) return next(unauthorized('ایمیل/شماره یا رمز درست نیست', 'bad_credentials'));
+  await clearAttempts('user', identifier);
   if (user.status !== 'active') return next(forbidden('این حساب غیرفعال است', 'account_disabled'));
 
   const session = await issueSession(user, req.body?.device, clientIp(req), appOf(req));
@@ -468,6 +506,8 @@ router.post('/otp/verify', otpLimit, async (req, res, next) => {
     return next(err);
   }
   await noteAttempt('otp', to.value, clientIp(req), true);
+  //  کدِ درست هم مثل رمزِ درست، ردِ تلاش‌های ناموفق را پاک می‌کند
+  await clearAttempts('otp', to.value);
 
   let user = await one(
     to.kind === 'email' ? 'SELECT * FROM users WHERE email=$1' : 'SELECT * FROM users WHERE phone=$1',
@@ -538,7 +578,7 @@ router.post('/google', authLimit, async (req, res, next) => {
 });
 
 // ---------- تازه‌سازی نشست ----------
-router.post('/refresh', async (req, res, next) => {
+router.post('/refresh', sessionLimit, async (req, res, next) => {
   const token = String(req.body?.refreshToken || req.body?.refresh_token || '');
   //  `null` یعنی «هر بخشی» — بخشِ درست را از خودِ ردیف برمی‌داریم،
   //  نه از چیزی که درخواست ادعا می‌کند. وگرنه یک توکنِ تازه‌سازیِ
@@ -557,7 +597,7 @@ router.post('/refresh', async (req, res, next) => {
 });
 
 // ---------- خروج ----------
-router.post('/logout', async (req, res) => {
+router.post('/logout', sessionLimit, async (req, res) => {
   const refresh = String(req.body?.refreshToken || req.body?.refresh_token || '');
   const access = (req.headers.authorization || '').replace(/^Bearer\s+/i, '').trim();
   if (refresh) await tokens.revoke(refresh, 'refresh');

@@ -168,6 +168,10 @@ const config = {
     authMax:      num(process.env.RATE_AUTH_MAX, 10),
     otpMax:       num(process.env.RATE_OTP_MAX, 5),
     joinMax:      num(process.env.RATE_JOIN_MAX, 10),
+    //  تازه‌سازیِ نشست و خروج. بازتر از ورود چون کارِ روزمره‌ی هر گوشی
+    //  است (ساعتی یک بار) و یک دکانِ چندگوشی‌ای پشتِ یک اینترنت
+    //  نباید همدیگر را ببندند.
+    sessionMax:   num(process.env.RATE_SESSION_MAX, 120),
     generalMax:   num(process.env.RATE_GENERAL_MAX, 600),
     adminMax:     num(process.env.RATE_ADMIN_MAX, 60),
     lockoutTries: num(process.env.LOGIN_LOCKOUT_TRIES, 8),
