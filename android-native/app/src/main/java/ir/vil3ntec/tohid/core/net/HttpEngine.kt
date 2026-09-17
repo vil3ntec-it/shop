@@ -74,13 +74,14 @@ class HttpEngine(
     body: JsonObject? = null,
     token: String? = null,
     idempotent: Boolean = method == "GET",
+    raw: RawBody? = null,
   ): JsonObject = withContext(Dispatchers.IO) {
     var attempt = 0
     var wait = ApiConfig.RETRY_BACKOFF_MS
 
     while (true) {
       try {
-        return@withContext once(method, path, body, token)
+        return@withContext once(method, path, body, token, raw)
       } catch (failure: ApiFailure) {
         val canRetry = idempotent && failure.retryable && attempt < ApiConfig.MAX_RETRIES
         if (!canRetry) throw failure
@@ -99,10 +100,16 @@ class HttpEngine(
    *  ترتیبش مهم است: اول همان پیشوندی که می‌دانیم کار می‌کند. تنها وقتی
    *  ۴۰۴/۴۰۱ گرفتیم و پیشوندِ دیگری امتحان‌نشده مانده، دومی می‌رود.
    */
-  private fun once(method: String, path: String, body: JsonObject?, token: String?): JsonObject {
+  private fun once(
+    method: String,
+    path: String,
+    body: JsonObject?,
+    token: String?,
+    raw: RawBody? = null,
+  ): JsonObject {
     val first = prefix
     try {
-      return attempt(method, path, body, token, first)
+      return attempt(method, path, body, token, first, raw)
     } catch (failure: ApiFailure) {
       /*
        *  ── چرا رمزِ غلط از این آزمون بیرون است ────────────────────────
@@ -160,6 +167,7 @@ class HttpEngine(
     body: JsonObject?,
     token: String?,
     prefix: String,
+    raw: RawBody? = null,
   ): JsonObject {
     val base = baseUrl()
     ApiConfig.reject(base, allowInsecure)?.let { reason ->
@@ -182,7 +190,25 @@ class HttpEngine(
       connection.setRequestProperty("Accept", "application/json")
       if (token != null) connection.setRequestProperty("Authorization", "Bearer $token")
 
-      if (body != null) {
+      /*
+       *  ⚠️ **بدنهٔ خام، نه JSON.**
+       *
+       *  پشتیبان یک فایل است، نه یک شیء. اگر داخلِ JSON می‌رفت باید
+       *  base64 می‌شد: یک‌سوم بزرگ‌تر، و کلِ فایل دو بار در حافظهٔ
+       *  گوشی — برای دفترِ چندمگابایتیِ یک دکانِ چندساله، همان‌جا
+       *  `OutOfMemory`.
+       *
+       *  `Content-Type` هم عمداً JSON نیست: `express.json`ِ سرور فقط
+       *  `application/json` را می‌خواند، پس فایل دست‌نخورده رد می‌شود و
+       *  `express.raw`ِ خودِ مسیر برش می‌دارد.
+       */
+      if (raw != null) {
+        connection.doOutput = true
+        connection.setRequestProperty("Content-Type", raw.contentType)
+        raw.headers.forEach { (k, v) -> connection.setRequestProperty(k, v) }
+        connection.setFixedLengthStreamingMode(raw.bytes.size)
+        connection.outputStream.use { it.write(raw.bytes) }
+      } else if (body != null) {
         connection.doOutput = true
         connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
         connection.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
@@ -209,4 +235,23 @@ class HttpEngine(
       runCatching { connection.disconnect() }
     }
   }
+}
+
+/**
+ *  بدنه‌ای که JSON نیست — پشتیبان، عکس، هر فایلی.
+ *
+ *  ⚠️ `headers` برای چیزهایی است که **کنارِ** فایل باید بروند و جایی
+ *  داخلش ندارند: نسخهٔ برنامه، برچسبِ کاربر. بی این، تنها راه چسباندنشان
+ *  به نشانی بود و نشانی جای داده نیست.
+ */
+data class RawBody(
+  val bytes: ByteArray,
+  val contentType: String = "application/octet-stream",
+  val headers: Map<String, String> = emptyMap(),
+) {
+  //  ⚠️ `ByteArray` در `data class` برابریِ ارجاعی دارد؛ کاتلین برای
+  //  همین هشدار می‌دهد. این دو تا فقط آن هشدار را می‌بندند — هیچ‌جا
+  //  دو `RawBody` مقایسه نمی‌شود.
+  override fun equals(other: Any?): Boolean = this === other
+  override fun hashCode(): Int = System.identityHashCode(this)
 }

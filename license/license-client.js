@@ -485,6 +485,92 @@
     constructor(message, code) { super(message); this.code = code; }
   }
 
+  /**
+   *  درخواستی که بدنه‌اش **فایل** است، نه JSON.
+   *
+   *  ⚠️ چرا جدا از `api()`: پشتیبانِ یک دکانِ چندساله چند مگابایت است.
+   *  داخلِ JSON باید base64 می‌شد — یک‌سوم بزرگ‌تر، و کلِ فایل دوباره در
+   *  حافظهٔ مرورگر. و `Content-Type` هم عمداً JSON نیست: `express.json`ِ
+   *  سرور فقط `application/json` را می‌خواند، پس فایل دست‌نخورده رد
+   *  می‌شود و `express.raw`ِ خودِ مسیر برش می‌دارد.
+   */
+  async function apiRaw(path, { method = 'POST', body, contentType = 'application/octet-stream', extra = {} } = {}) {
+    const base = getServerUrl();
+    if (!base) throw new ApiError('آدرس سرور تنظیم نشده است', 'no_server');
+    const st = readStore();
+    const headers = { 'Content-Type': contentType, ...extra };
+    if (st.accessToken) headers.Authorization = 'Bearer ' + st.accessToken;
+
+    const ctrl = new AbortController();
+    //  ⚠️ سقفِ زمانِ معمول برای یک فایلِ چندمگابایتی روی نتِ ضعیف کم
+    //  است؛ این یکی پنج برابر است.
+    const timer = setTimeout(() => ctrl.abort(), CFG.REQUEST_TIMEOUT_MS * 5);
+    let res;
+    try {
+      res = await fetch(base + path, { method, headers, body, signal: ctrl.signal });
+    } catch (e) {
+      throw new ApiError(
+        e.name === 'AbortError' ? 'سرور پاسخ نداد (زمان تمام شد)' : 'اتصال به سرور برقرار نشد',
+        'network'
+      );
+    } finally { clearTimeout(timer); }
+
+    let data = null;
+    try { data = await res.json(); } catch { /* ۲۰۴ یا بدنهٔ خالی */ }
+    if (!res.ok) {
+      const err = new ApiError(
+        (data && data.error && data.error.message) || `خطای سرور (${res.status})`,
+        (data && data.error && data.error.code) || 'http_' + res.status
+      );
+      err.status = res.status;
+      throw err;
+    }
+    return data || {};
+  }
+
+  /* ==========================================================
+     پشتیبانِ ابری — «گوشی که رفت، دفتر نرود»
+     ----------------------------------------------------------
+     ⛔ تا امروز نسخهٔ وب هیچ پشتیبانِ سروری نداشت: فقط دکمهٔ «دانلودِ
+     فایل» بود، یعنی هر چه بود روی همان یک دستگاه می‌ماند. کسی که
+     مرورگرش را پاک می‌کرد یا گوشی‌اش را عوض می‌کرد، چیزی نداشت.
+
+     ⚠️ فهرست مالِ **همین دکان** است؛ شناسه‌اش از توکن می‌آید، نه از
+     درخواست، پس هیچ دکانی پشتیبانِ دکانِ دیگری را نمی‌بیند.
+     ========================================================== */
+  const Backups = {
+    async list() {
+      const out = await apiWithRefresh('/api/v1/me/backups', { method: 'GET' });
+      return { items: out.backups || [], stats: out.stats || {} };
+    },
+
+    /**
+     *  فرستادنِ یک پشتیبان.
+     *  @param {Blob|ArrayBuffer|string} data خودِ فایل
+     */
+    async upload(data, { label = '', manual = false, ext = 'json' } = {}) {
+      const q = new URLSearchParams({ ext, kind: manual ? 'manual' : 'auto', label });
+      const body = typeof data === 'string' ? new Blob([data], { type: 'application/octet-stream' }) : data;
+      try {
+        return await apiRaw(`/api/v1/me/backups?${q}`, { body });
+      } catch (e) {
+        //  توکنِ پیر — یک بار تازه و یک بار دوباره، مثلِ `apiWithRefresh`
+        if (e.code !== 'invalid_token' && e.status !== 401) throw e;
+        const st = readStore();
+        if (!st.refreshToken) throw e;
+        const r = await api('/api/v1/auth/refresh', {
+          method: 'POST', auth: false, body: { refreshToken: st.refreshToken },
+        });
+        writeStore({ accessToken: r.accessToken, accessExpiresAt: r.accessExpiresAt });
+        return apiRaw(`/api/v1/me/backups?${q}`, { body });
+      }
+    },
+
+    async remove(id) {
+      return apiWithRefresh(`/api/v1/me/backups/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    },
+  };
+
   /** تازه‌سازی خودکار توکن دسترسی در صورت انقضا. */
   async function apiWithRefresh(path, opts) {
     try {
@@ -1205,6 +1291,8 @@
     isLoggedIn: () => !!readStore().accessToken,
     userLabel: () => readStore().userLabel || '',
     verifyLicense, evaluate: evaluateLocal,
+    //  پشتیبانِ ابری — همان چیزی که برنامهٔ اندروید هم دارد
+    backups: Backups,
     _clock: Clock,
   };
 

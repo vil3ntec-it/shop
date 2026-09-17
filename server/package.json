@@ -12,7 +12,8 @@
     "restore": "node scripts/restore.js",
     "test": "node --test --test-concurrency=1 test/*.test.js",
     "test:panel": "node test/admin-panel.mjs",
-    "test:all": "npm test && npm run test:panel"
+    "test:all": "npm test && npm run test:panel && npm run test:web",
+    "test:web": "node test/web-backup.mjs"
   },
   "engines": {
     "node": ">=20"
