@@ -81,6 +81,80 @@ class ApiPrefixFallbackTest {
     assertEquals(ApiConfig.API_PREFIX, engine.activePrefix)
   }
 
+  /**
+   *  رمزِ غلط، یک بار فرستاده می‌شود — نه دو بار.
+   *
+   *  ── چه چیزی را نگه می‌دارد ────────────────────────────────────────
+   *  «رمز اشتباه است» هم یک ۴۰۱ بی‌توکن است و تا دیروز درست می‌افتاد
+   *  داخلِ آزمونِ پیشوند: هر ورودِ ناموفق دو بار به سرور می‌رفت. یعنی
+   *  سقفِ نرخِ سرور نصف می‌شد و شمارندهٔ قفلِ حساب دو برابر می‌شمرد —
+   *  کاربر بعد از چهار اشتباه قفل می‌شد، نه هشت تا.
+   *
+   *  اگر روزی کسی شرطِ `once` را دوباره باز کند، همین‌جا قرمز می‌شود.
+   */
+  @Test
+  fun `رمزِ غلط دوباره فرستاده نمی‌شود`() {
+    server.on("/api/v1${ApiEndpoints.Auth.LOGIN}") {
+      401 to """{"error":{"code":"bad_credentials","message":"ایمیل/شماره یا رمز درست نیست"}}"""
+    }
+    server.on("/api${ApiEndpoints.Auth.LOGIN}") {
+      401 to """{"error":{"code":"bad_credentials","message":"ایمیل/شماره یا رمز درست نیست"}}"""
+    }
+    val engine = engine()
+
+    val failure = runCatching {
+      kotlinx.coroutines.runBlocking {
+        engine.send(
+          "POST",
+          ApiEndpoints.Auth.LOGIN,
+          body = kotlinx.serialization.json.buildJsonObject {
+            put("identifier", kotlinx.serialization.json.JsonPrimitive("a@b.co"))
+            put("password", kotlinx.serialization.json.JsonPrimitive("غلط"))
+          },
+          token = null,
+          idempotent = false,
+        )
+      }
+    }.exceptionOrNull()
+
+    assertTrue("رمزِ غلط یعنی Unauthorized", failure is ApiFailure.Unauthorized)
+    assertEquals("bad_credentials", (failure as ApiFailure).code)
+    assertEquals("یک بار، نه بیشتر", 1, server.hits("/api/v1${ApiEndpoints.Auth.LOGIN}"))
+    assertEquals("راهِ دوم اصلاً امتحان نشده", 0, server.hits("/api${ApiEndpoints.Auth.LOGIN}"))
+    //  و پیشوند هم جابه‌جا نشده
+    assertEquals(ApiConfig.API_PREFIX, engine.activePrefix)
+  }
+
+  /**
+   *  ولی ۴۰۱ـی که از «توکن لازم است» می‌آید، هنوز آزمون را راه می‌اندازد.
+   *
+   *  همان اشکالِ سرورهای قدیمی که کلِ این سازوکار برایش هست: مسیرِ
+   *  `/api/v1/…` پیدا نمی‌شد و به لایهٔ توکن‌خواه می‌رسید.
+   */
+  @Test
+  fun `۴۰۱ِ مسیرِ گمشده هنوز راهِ دوم را امتحان می‌کند`() {
+    server.on("/api/v1${ApiEndpoints.Auth.LOGIN}") {
+      401 to """{"error":{"code":"unauthorized","message":"احراز هویت لازم است"}}"""
+    }
+    server.on("/api${ApiEndpoints.Auth.LOGIN}") { 200 to """{"accessToken":"tk"}""" }
+    val engine = engine()
+
+    val body = kotlinx.coroutines.runBlocking {
+      engine.send(
+        "POST",
+        ApiEndpoints.Auth.LOGIN,
+        body = kotlinx.serialization.json.buildJsonObject {
+          put("identifier", kotlinx.serialization.json.JsonPrimitive("a@b.co"))
+          put("password", kotlinx.serialization.json.JsonPrimitive("درست"))
+        },
+        token = null,
+        idempotent = false,
+      )
+    }
+    assertTrue(body.containsKey("accessToken"))
+    assertEquals(ApiConfig.API_PREFIX_PLAIN, engine.activePrefix)
+  }
+
   @Test
   fun `ساختنِ حساب هم از همین راه می‌رود`() {
     //  همان چیزی که کار نمی‌کرد: POST، نه GET

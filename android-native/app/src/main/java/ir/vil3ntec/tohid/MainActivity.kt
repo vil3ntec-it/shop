@@ -35,6 +35,19 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
     store = ShopStore(applicationContext)
     lifecycleScope.launch { store.loadAndSummarize() }
 
+    /*
+     *  شستنِ توکن‌هایی که نسخه‌های قبلی روی گوشی جا گذاشته‌اند.
+     *
+     *  تا دیروز فهرستِ «ورودِ سریع» کنارِ نامِ هر حساب، توکنِ تازه‌سازیِ
+     *  همان حساب را هم — رمزنشده — نگه می‌داشت. آن راه بسته شد، ولی
+     *  بستنش فقط جلوی نوشتنِ تازه را می‌گیرد؛ آنچه از قبل روی گوشیِ
+     *  کاربر نوشته شده تا ابد آنجا می‌ماند مگر کسی پاکش کند.
+     *
+     *  اینجا، چون پیش از هر صفحه‌ای یک بار اجرا می‌شود. کارش چند
+     *  میلی‌ثانیه است و اگر چیزی برای پاک کردن نباشد، هیچ.
+     */
+    runCatching { ir.vil3ntec.tohid.sync.SavedLogins.purgeTokens(applicationContext) }
+
     // کلیدِ انیمیشن پیش از اولین کشیدنِ صفحه خوانده می‌شود
     Motion.load(applicationContext)
 

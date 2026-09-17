@@ -37,6 +37,32 @@ async function verifyPassword(plain, stored) {
   }
 }
 
+/**
+ *  همان‌قدر وقت گرفتن، وقتی حسابی در کار نیست.
+ *
+ *  ── چه چیزی را می‌بندد ─────────────────────────────────────────────
+ *  مسیرِ ورود برای ایمیلِ ناشناس و رمزِ غلط یک پیام می‌دهد، ولی یک
+ *  **زمان** نمی‌داد: اگر حساب نبود، هیچ scrypt‌ای اجرا نمی‌شد و پاسخ
+ *  چند میلی‌ثانیه‌ای برمی‌گشت؛ اگر حساب بود، scrypt اجرا می‌شد و پاسخ
+ *  ده‌ها برابر دیرتر می‌آمد. یعنی همان چیزی که پیامِ یکسان پنهان کرده
+ *  بود، ساعتِ پاسخ لو می‌داد: هر کسی با یک فهرست ایمیل می‌توانست
+ *  بفهمد کدام‌یک روی این سرور حساب دارد.
+ *
+ *  حالا وقتی حسابی پیدا نشد، همان scrypt روی یک هشِ ساختگی اجرا
+ *  می‌شود. نتیجه‌اش دور ریخته می‌شود؛ فقط زمانش به کار می‌آید.
+ *  ──────────────────────────────────────────────────────────────────
+ *
+ *  هشِ ساختگی یک بار ساخته می‌شود و همان **قول** نگه داشته می‌شود، نه
+ *  مقدارش: اگر ده درخواست با هم برسند، هر ده تا منتظرِ همان یک ساخت
+ *  می‌مانند، نه اینکه هرکدام یکی بسازد.
+ */
+let dummyHash = null;
+
+async function burnTime(plain) {
+  if (!dummyHash) dummyHash = hashPassword(randomBytes(24).toString('base64'));
+  await verifyPassword(typeof plain === 'string' ? plain : '', await dummyHash);
+}
+
 /** بررسی حداقل قدرت رمز — جلوی رمزهای بدیهی را می‌گیرد. */
 function checkStrength(plain) {
   if (typeof plain !== 'string' || plain.length < 8) return 'رمز عبور باید حداقل ۸ کاراکتر باشد';
@@ -46,4 +72,4 @@ function checkStrength(plain) {
   return null;
 }
 
-module.exports = { hashPassword, verifyPassword, checkStrength };
+module.exports = { hashPassword, verifyPassword, burnTime, checkStrength };

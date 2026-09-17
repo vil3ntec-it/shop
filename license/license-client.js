@@ -538,6 +538,46 @@
   }
 
   /* ==========================================================
+     بازیابی رمز فراموش‌شده
+     ----------------------------------------------------------
+     قاعدهٔ صاحب مخزن: «وب و نیتیو یک برنامه‌اند». برنامهٔ اندروید از
+     مردادماه این را داشت و همین‌جا، روی مرورگر، دکمهٔ «رمز را فراموش
+     کرده‌ام» فقط می‌گفت «با پشتیبانی تماس بگیرید» — یعنی کاربرِ آیفون،
+     که فقط همین نسخه را دارد، با فراموش کردنِ رمز از حسابش بیرون
+     می‌ماند. سرور از همان روز هر دو مسیر را داشت.
+
+     کد به ایمیل می‌رود، پنج دقیقه عمر دارد، یک‌بارمصرف است، و با
+     نشستنِ رمزِ تازه همهٔ نشست‌های باز بسته می‌شوند — همهٔ این‌ها کارِ
+     سرور است، نه این فایل.
+
+     ⚠️ پاسخِ `forgot` برای ایمیلی که حساب ندارد هم «موفق» است و عمداً
+     همین‌طور است: وگرنه هر کسی با امتحان کردنِ نشانی‌ها می‌فهمید چه
+     کسانی روی این سرور حساب دارند. پس این‌جا هم نباید چیزی به آن
+     اضافه کرد.
+     ========================================================== */
+
+  async function forgotPassword(email) {
+    return api('/api/v1/auth/password/forgot', {
+      method: 'POST', auth: false, body: { email },
+    });
+  }
+
+  /** رمزِ تازه با کدی که به ایمیل رفته — و همان‌جا ورود */
+  async function resetPassword({ email, code, password }) {
+    const r = await api('/api/v1/auth/password/reset', {
+      method: 'POST', auth: false, body: { email, code, password },
+    });
+    if (r && r.accessToken) {
+      writeStore({
+        accessToken: r.accessToken, accessExpiresAt: r.accessExpiresAt,
+        refreshToken: r.refreshToken, userId: r.user.id,
+        userLabel: r.user.name || r.user.email || r.user.phone || '',
+      });
+    }
+    return r;
+  }
+
+  /* ==========================================================
      ثبت‌نام سه‌مرحله‌ای — فقط با ایمیل
      ----------------------------------------------------------
      قرار صاحب مخزن: شماره‌ی موبایل برداشته شد؛ «همان ایمیل بس است».
@@ -669,7 +709,38 @@
     notify();
   }
 
+  /**
+   *  خروج از حساب.
+   *
+   *  ── چه چیزی خراب بود ────────────────────────────────────────────
+   *  اینجا فقط `clearStore()` بود: توکن از `localStorage` پاک می‌شد و
+   *  سرور هیچ خبری نمی‌شد. یعنی همان نشست تا نود روز روی سرور **باز**
+   *  می‌ماند. روی یک مرورگرِ مشترک — کافی‌نت، رایانهٔ دکان — کافی بود
+   *  کسی پیش از پاک شدنِ حافظه توکن را بردارد تا بعد از «خروج» هم
+   *  واردِ حساب باشد.
+   *
+   *  حالا اول به سرور می‌گوییم هر دو توکن را باطل کند.
+   *
+   *  ⚠️ `await` عمداً نیست و خطا هم بلعیده می‌شود: کسی که «خروج» زده
+   *  باید همین حالا خارج شود، حتی اگر نت نباشد یا سرور بالا نباشد.
+   *  پاک کردنِ محلی هیچ‌وقت منتظرِ شبکه نمی‌ماند.
+   */
   function logout() {
+    const st = readStore();
+    if (st && (st.accessToken || st.refreshToken)) {
+      /*
+       *  بی‌صدا و بی‌انتظار — نتیجه‌اش کارِ کاربر را عوض نمی‌کند.
+       *
+       *  `auth: true` عمدی است: توکنِ دسترسی را از همان حافظه در
+       *  سرآیند می‌گذارد و توکنِ تازه‌سازی در بدنه می‌رود. سرور هر دو
+       *  را باطل می‌کند. ترتیب هم مهم است — این پیش از `clearStore()`
+       *  صدا زده می‌شود، وگرنه چیزی برای فرستادن نمی‌ماند.
+       */
+      api('/api/v1/auth/logout', {
+        method: 'POST',
+        body: { refreshToken: st.refreshToken || '' },
+      }).catch(() => {});
+    }
     clearStore();
     resetPublicKey();
     Object.assign(State, { licenseValid: false, payload: null, state: 'none', features: [], reason: 'no_license' });
@@ -1098,6 +1169,7 @@
     hasFeature, onChange,
     open: (label) => UI.open(label),
     sync, activate, login, register, logout,
+    forgotPassword, resetPassword,
     registerStart, registerVerify, registerComplete, sendLocation,
     getServerUrl, setServerUrl, getDeviceUid,
     getApiKey, getStaffCode, rotateStaffCode,
