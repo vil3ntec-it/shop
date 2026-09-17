@@ -176,12 +176,21 @@ async function createApp({ runMigrations = true } = {}) {
      */
     api.get('/plans', async (req, res, next) => {
       try {
+        /*
+         *  ⚠️ `?app=pump` پلن‌های پمپ را می‌دهد، با واحدِ پولِ خودش
+         *  (`pump_currency`، دالر). بی این، هر کسی که این مسیرِ باز را
+         *  می‌خواند فهرستِ **دکان** را می‌گرفت — و صفحه‌ای که قیمتِ پمپ
+         *  را نشان می‌داد سه پلنِ اشتباه چاپ می‌کرد. نیامدنش همان
+         *  دکان است، پس سایتِ امروز دست‌نخورده می‌ماند.
+         */
+        const app = require('./lib/tenancy').sectionOf(req.query?.app) || 'shop';
         const cfg = await plans.allConfig();
         const number = cfg.whatsapp_number || '';
         const message = cfg.whatsapp_message || '';
         const digits = String(number).replace(/[^0-9]/g, '').replace(/^0/, '93');
-        const list = await plans.listPlans();
+        const list = await plans.listPlans({ app });
         res.json({
+          app,
           plans: list.map(p => ({
             ...p,
             //  قیمتِ روزانه اینجا حساب می‌شود، نه در سه برنامه‌ی جدا
@@ -191,8 +200,8 @@ async function createApp({ runMigrations = true } = {}) {
               ? `https://wa.me/${digits}?text=${encodeURIComponent(`${message} (${p.title})`)}`
               : '',
           })),
-          currency: cfg.currency || 'افغانی',
-          trialDays: Number(cfg.trial_days || 0),
+          currency: (app === 'pump' ? cfg.pump_currency : cfg.currency) || cfg.currency || 'افغانی',
+          trialDays: Number((app === 'pump' ? cfg.pump_trial_days : cfg.trial_days) || 0),
           whatsapp: {
             number,
             message,

@@ -66,11 +66,47 @@ async function revoke(token, kind) {
   return r.rowCount > 0;
 }
 
-/** خروج از همه‌ی دستگاه‌ها. */
-async function revokeAllForSubject(subjectId, kind = null) {
-  const r = kind
-    ? await query('UPDATE tokens SET revoked_at=$1 WHERE subject_id=$2 AND kind=$3 AND revoked_at IS NULL', [now(), subjectId, kind])
-    : await query('UPDATE tokens SET revoked_at=$1 WHERE subject_id=$2 AND revoked_at IS NULL', [now(), subjectId]);
+/**
+ * خروج از همه‌ی دستگاه‌ها.
+ *
+ * ⚠️ `app` اگر داده شود فقط نشست‌های همان بخش می‌روند.
+ *
+ * ⛔ **و باید داده شود، از هر مسیری.** تا دیروز «خروج از همه‌ی
+ * دستگاه‌ها» در برنامهٔ دکان، نشستِ **پمپِ** همان آدم را هم می‌کشت —
+ * در حالی که کلِ قرارِ این سرور این است که دو بخش دو چیزِ جدا باشند و
+ * توکنِ یکی در دیگری اصلاً پیدا نشود. توکنِ دکان هم که لو برود به
+ * پمپ نمی‌رسد، پس بستنِ آن یکی هیچ چیزی را امن‌تر نمی‌کند و فقط
+ * کاربر را از برنامهٔ دیگرش بیرون می‌اندازد.
+ *
+ * `app = null` یعنی «هر بخشی» و جای درستش عوض شدنِ رمز و بازیابی
+ * است: آن‌جا خودِ **هویت** عوض شده، نه یک نشست.
+ */
+async function revokeAllForSubject(subjectId, kind = null, app = null) {
+  const args = [now(), subjectId];
+  let sql = 'UPDATE tokens SET revoked_at=$1 WHERE subject_id=$2 AND revoked_at IS NULL';
+  if (kind) { args.push(kind); sql += ` AND kind=$${args.length}`; }
+  if (app) { args.push(app); sql += ` AND COALESCE(app,'shop')=$${args.length}`; }
+  const r = await query(sql, args);
+  return r.rowCount;
+}
+
+/**
+ * خروج از **بقیه‌ی** دستگاه‌ها — همان که بعد از عوض کردنِ رمز لازم است.
+ *
+ * ⛔ تا دیروز عوض کردنِ رمز از داخلِ برنامه **هیچ نشستی را نمی‌بست**.
+ * یعنی کسی که رمزش را عوض می‌کرد چون گمان می‌کرد لو رفته، همان
+ * نشستِ لو‌رفته تا نود روز (عمرِ توکنِ تازه‌سازی) زنده می‌ماند. هر
+ * سرورِ حرفه‌ای این را می‌بندد.
+ *
+ * ⚠️ نشستِ **خودِ همین دستگاه** می‌ماند، وگرنه کاربر با عوض کردنِ رمز
+ * از برنامهٔ خودش هم بیرون می‌افتاد و گمان می‌کرد کار خراب شد.
+ */
+async function revokeOthersForSubject(subjectId, { keepDeviceId = null, keepTokenHash = null } = {}) {
+  const args = [now(), subjectId];
+  let sql = 'UPDATE tokens SET revoked_at=$1 WHERE subject_id=$2 AND revoked_at IS NULL';
+  if (keepDeviceId) { args.push(keepDeviceId); sql += ` AND COALESCE(device_id,'') <> $${args.length}`; }
+  else if (keepTokenHash) { args.push(keepTokenHash); sql += ` AND token_hash <> $${args.length}`; }
+  const r = await query(sql, args);
   return r.rowCount;
 }
 
@@ -90,5 +126,5 @@ function safeEqual(a, b) {
 
 module.exports = {
   generateToken, hashToken, issue, verify, revoke,
-  revokeAllForSubject, revokeAllForDevice, safeEqual,
+  revokeAllForSubject, revokeOthersForSubject, revokeAllForDevice, safeEqual,
 };

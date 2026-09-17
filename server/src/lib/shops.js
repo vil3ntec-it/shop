@@ -100,9 +100,25 @@ async function memberCount(shopId) {
 }
 
 /** تغییر وضعیت یا نقش یک عضو — مالک را نمی‌توان حذف یا کم‌دسترسی کرد. */
+/**
+ * عضو را با شناسه‌ی **عضویت** یا شناسه‌ی **کاربر** پیدا می‌کند.
+ *
+ * ⛔ تا امروز فقط شناسه‌ی عضویت را می‌پذیرفت — در حالی که فهرستِ
+ * `‎/shop/members‎` هر دو را می‌دهد و نسخه‌ی وب دکمه‌ی «حذف» را به
+ * `userId` می‌بندد. یعنی هر حذفی از سایت «این عضو در دکان شما نیست»
+ * می‌گرفت، بی آن‌که هیچ‌کدامشان اشتباه کرده باشند.
+ */
+async function findMember(shopId, idOrUserId) {
+  return one(
+    'SELECT * FROM shop_members WHERE shop_id=$2 AND (id=$1 OR user_id=$1)',
+    [idOrUserId, shopId]
+  );
+}
+
 async function updateMember(shopId, memberId, patch) {
-  const m = await one('SELECT * FROM shop_members WHERE id=$1 AND shop_id=$2', [memberId, shopId]);
+  const m = await findMember(shopId, memberId);
   if (!m) throw notFound('این عضو در دکان شما نیست', 'member_not_found');
+  memberId = m.id;
   if (m.role === 'owner') throw badRequest('صاحب دکان را نمی‌توان تغییر داد', 'owner_immutable');
 
   const role = patch.role && ['manager', 'staff'].includes(patch.role) ? patch.role : m.role;
@@ -123,5 +139,5 @@ async function updateMember(shopId, memberId, patch) {
 
 module.exports = {
   membershipOf, requireMembership, assertCan, createShop, getShop, updateShop,
-  members, memberCount, updateMember,
+  members, memberCount, updateMember, findMember,
 };

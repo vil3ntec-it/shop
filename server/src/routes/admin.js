@@ -408,9 +408,9 @@ router.post('/sms/test', rateLimit({ max: 10, keyPrefix: 'admin-sms-test' }), as
  * `?app=pump` پلن‌های پمپ را می‌دهد. نیامدنش یعنی دکان، پس پنلِ فعلی
  * دست‌نخورده کار می‌کند.
  */
+const { sectionOf } = require('../lib/tenancy');
 function appOf(req) {
-  return String(req.query?.app || req.body?.app || '').trim().toLowerCase() === 'pump'
-    ? 'pump' : 'shop';
+  return sectionOf(req.query?.app) || sectionOf(req.body?.app) || 'shop';
 }
 
 router.get('/plans', async (req, res) => {

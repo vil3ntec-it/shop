@@ -498,4 +498,17 @@ router.use('/backups', require('./account-backups').makeRouter(
   { actor: (req) => ({ userId: req.user ? req.user.id : '' }) }
 ));
 
+/*
+ *  خبرهای همین پمپ — `/api/pump/events`، از دیدِ صاحبِ حساب.
+ *
+ *  ⚠️ همان دفتری که کامپیوترِ پمپ با توکنِ **دستگاه** پرش می‌کند
+ *  (`/api/pump/device/events`)؛ کلیدش `station_id` است، پس یک پمپ یک
+ *  دفترِ خبر دارد و صاحبش همان را روی گوشی می‌بیند.
+ */
+router.use('/events', require('./pump-events').makeRouter((req) => ({
+  stationId: req.stationId || '',
+  userId: req.user ? req.user.id : '',
+  who: req.user ? (req.user.name || '') : '',
+})));
+
 module.exports = router;

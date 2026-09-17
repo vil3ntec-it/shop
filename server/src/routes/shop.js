@@ -93,12 +93,24 @@ router.patch('/members/:id', requireShop, requirePermission('members.role'), asy
   res.json({ member: { id: row.id, role: row.role, status: row.status } });
 });
 
-router.delete('/members/:id', requireShop, requirePermission('members.manage'), async (req, res) => {
+/**
+ * برداشتنِ یک عضو.
+ *
+ * ⚠️ **دو نشانی، یک کار.** `DELETE /members/<شناسه>` از روزِ اول بود،
+ * ولی نسخه‌ی وب `POST /members/<شناسه>/remove` را صدا می‌زند (چون
+ * `fetch`ِ داخلِ `apiAuth` بدنه‌بردار است و DELETE نمی‌زند) و همیشه
+ * ۴۰۴ می‌گرفت. شناسه هم می‌تواند شناسه‌ی عضویت باشد و هم شناسه‌ی
+ * کاربر — `shops.findMember` هر دو را می‌شناسد.
+ */
+async function removeMember(req, res) {
   const id = v.id(req.params.id, { field: 'شناسه عضو' });
   await shops.updateMember(req.shopId, id, { status: 'removed' });
   await audit.log({ shopId: req.shopId, userId: req.user.id, action: 'member.removed', targetType: 'member', targetId: id });
   res.json({ ok: true });
-});
+}
+
+router.delete('/members/:id', requireShop, requirePermission('members.manage'), removeMember);
+router.post('/members/:id/remove', requireShop, requirePermission('members.manage'), removeMember);
 
 /** خروج داوطلبانه‌ی شاگرد از دکان. */
 router.post('/leave', requireShop, async (req, res, next) => {

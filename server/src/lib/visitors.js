@@ -42,7 +42,7 @@ const VISIT_GAP_MS = 30 * 60 * 1000;
 
 async function touch({
   app = 'shop', deviceUid = '', platform = '', appVersion = '',
-  userId = '', shopId = '', name = '', ip = '', userAgent = '', language = '',
+  userId = '', shopId = '', stationId = '', name = '', ip = '', userAgent = '', language = '',
   location = null,
 } = {}) {
   const uid = cut(deviceUid, 64).trim();
@@ -57,11 +57,12 @@ async function touch({
 
   if (!existing) {
     const row = await one(
-      `INSERT INTO app_visitors (id, app, device_uid, platform, app_version, user_id, shop_id, name,
+      `INSERT INTO app_visitors (id, app, device_uid, platform, app_version, user_id, shop_id, station_id, name,
                                  ip, user_agent, language, lat, lng, accuracy, place,
                                  first_seen_at, last_seen_at, visits)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$16,1) RETURNING *`,
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$17,1) RETURNING *`,
       [newId('vis'), slug, uid, cut(platform, 20), cut(appVersion, 30), cut(userId, 40), cut(shopId, 40),
+        cut(stationId, 40),
         cut(name, 80), cut(ip, 60), cut(userAgent, 300), cut(language, 20),
         hasPlace ? lat : null, hasPlace ? lng : null,
         hasPlace ? num(location.accuracy) : null, cut(location?.label, 120), t]
@@ -76,18 +77,20 @@ async function touch({
         app_version = CASE WHEN $4 <> '' THEN $4 ELSE app_version END,
         user_id     = CASE WHEN $5 <> '' THEN $5 ELSE user_id END,
         shop_id     = CASE WHEN $6 <> '' THEN $6 ELSE shop_id END,
-        name        = CASE WHEN $7 <> '' THEN $7 ELSE name END,
-        ip          = CASE WHEN $8 <> '' THEN $8 ELSE ip END,
-        user_agent  = CASE WHEN $9 <> '' THEN $9 ELSE user_agent END,
-        language    = CASE WHEN $10 <> '' THEN $10 ELSE language END,
-        lat         = COALESCE($11, lat),
-        lng         = COALESCE($12, lng),
-        accuracy    = COALESCE($13, accuracy),
-        place       = CASE WHEN $14 <> '' THEN $14 ELSE place END,
-        last_seen_at = $15,
-        visits      = visits + $16
+        station_id  = CASE WHEN $7 <> '' THEN $7 ELSE station_id END,
+        name        = CASE WHEN $8 <> '' THEN $8 ELSE name END,
+        ip          = CASE WHEN $9 <> '' THEN $9 ELSE ip END,
+        user_agent  = CASE WHEN $10 <> '' THEN $10 ELSE user_agent END,
+        language    = CASE WHEN $11 <> '' THEN $11 ELSE language END,
+        lat         = COALESCE($12, lat),
+        lng         = COALESCE($13, lng),
+        accuracy    = COALESCE($14, accuracy),
+        place       = CASE WHEN $15 <> '' THEN $15 ELSE place END,
+        last_seen_at = $16,
+        visits      = visits + $17
       WHERE id=$1 AND app=$2 RETURNING *`,
     [existing.id, slug, cut(platform, 20), cut(appVersion, 30), cut(userId, 40), cut(shopId, 40),
+      cut(stationId, 40),
       cut(name, 80), cut(ip, 60), cut(userAgent, 300), cut(language, 20),
       hasPlace ? lat : null, hasPlace ? lng : null,
       hasPlace ? num(location.accuracy) : null, cut(location?.label, 120), t, bump]
@@ -115,6 +118,9 @@ function shape(r) {
     appVersion: r.app_version,
     userId: r.user_id || '',
     shopId: r.shop_id || '',
+    //  ⚠️ پمپِ همان دستگاه. بی این، تپشِ برنامهٔ پمپ در پنل به شکلِ
+    //  «مهمانِ بی‌حساب» می‌نشست و مدیر نمی‌دید کدام پمپ زنده است.
+    stationId: r.station_id || '',
     name: r.name || '',
     ip: r.ip || '',
     language: r.language || '',
@@ -142,10 +148,12 @@ function shape(r) {
 async function list({ app = '', onlyGuests = false, q = '', limit = 100, offset = 0 } = {}) {
   const like = `%${String(q || '').toLowerCase()}%`;
   const rows = await many(
-    `SELECT v.*, u.name AS account_name, u.email AS account_email, s.name AS shop_name
+    `SELECT v.*, u.name AS account_name, u.email AS account_email, s.name AS shop_name,
+            st.name AS station_name, st.code AS station_code
        FROM app_visitors v
        LEFT JOIN users u ON u.id = v.user_id
        LEFT JOIN shops s ON s.id = v.shop_id
+       LEFT JOIN stations st ON st.id = v.station_id
       WHERE ($1 = '' OR v.app = $1)
         AND ($2 = false OR v.user_id = '')
         AND ($3 = '' OR lower(v.name) LIKE $4 OR lower(coalesce(u.name,'')) LIKE $4
@@ -158,6 +166,8 @@ async function list({ app = '', onlyGuests = false, q = '', limit = 100, offset 
     accountName: r.account_name || '',
     accountEmail: r.account_email || '',
     shopName: r.shop_name || '',
+    stationName: r.station_name || '',
+    stationCode: r.station_code || '',
   }));
 }
 
