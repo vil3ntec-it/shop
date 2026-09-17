@@ -12,14 +12,20 @@ const { query, one, now } = require('../db');
 function generateToken() { return randomBytes(32).toString('base64url'); }
 function hashToken(token) { return createHash('sha256').update(String(token)).digest('hex'); }
 
-async function issue({ kind, subjectId, deviceId = null, ttlMs, app = 'shop' }) {
+/**
+ *  @param appVersion نسخه‌ی برنامه‌ای که این نشست را می‌سازد.
+ *
+ *  خالی یعنی «نگفت» — نسخه‌های امروزِ دستِ کاربر چیزی نمی‌فرستند و
+ *  نباید هم از کار بیفتند. شرحش سرِ `migrations/015`.
+ */
+async function issue({ kind, subjectId, deviceId = null, ttlMs, app = 'shop', appVersion = '' }) {
   const token = generateToken();
   const issuedAt = now();
   const expiresAt = issuedAt + ttlMs;
   await query(
-    `INSERT INTO tokens (token_hash, kind, subject_id, device_id, issued_at, expires_at, app)
-     VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-    [hashToken(token), kind, subjectId, deviceId, issuedAt, expiresAt, app]
+    `INSERT INTO tokens (token_hash, kind, subject_id, device_id, issued_at, expires_at, app, app_version)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+    [hashToken(token), kind, subjectId, deviceId, issuedAt, expiresAt, app, String(appVersion || '').slice(0, 32)]
   );
   return { token, expiresAt, app };
 }

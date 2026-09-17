@@ -174,7 +174,21 @@ const config = {
     sessionMax:   num(process.env.RATE_SESSION_MAX, 120),
     generalMax:   num(process.env.RATE_GENERAL_MAX, 600),
     adminMax:     num(process.env.RATE_ADMIN_MAX, 60),
+    //  تلاشِ ناموفق از **یک IP** روی یک حساب — کسی که رمز را حدس
+    //  می‌زند بسته می‌شود، و فقط خودش
     lockoutTries: num(process.env.LOGIN_LOCKOUT_TRIES, 8),
+    /*
+     *  تلاشِ ناموفق روی یک حساب از **همه‌ی** IPها.
+     *
+     *  پشتوانه‌ی حمله‌ی پخش‌شده. عمداً خیلی بالاتر از بالایی است، چون
+     *  همین شمارنده است که می‌تواند علیهِ صاحبِ حساب به کار رود: تا
+     *  دیروز تنها شمارنده بود و هشت رمزِ غلط از یک غریبه، حسابِ یک
+     *  نفرِ دیگر را یک ربع می‌بست.
+     *
+     *  رسیدن به چهل از یک IP ممکن نیست — `authMax` (ده در ربع ساعت)
+     *  زودتر جلویش را می‌گیرد. پس چهل یعنی چند IP هماهنگ.
+     */
+    lockoutGlobalTries: num(process.env.LOGIN_LOCKOUT_GLOBAL_TRIES, 40),
     lockoutMs:    num(process.env.LOGIN_LOCKOUT_MIN, 15) * 60 * 1000,
   },
 

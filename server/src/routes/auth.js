@@ -87,15 +87,53 @@ async function clearAttempts(scope, identifier) {
   );
 }
 
-/** اگر پشت سر هم اشتباه زده شده، چند دقیقه صبر لازم است. */
-async function assertNotLocked(scope, identifier) {
+/**
+ *  اگر پشت سر هم اشتباه زده شده، چند دقیقه صبر لازم است.
+ *
+ *  ── چه چیزی عوض شد و چرا ──────────────────────────────────────────
+ *  تا دیروز فقط **شناسه** شمرده می‌شد، از هر کجا که آمده باشد. یعنی
+ *  هر کسی که ایمیلِ شما را می‌دانست، با هشت رمزِ غلط از گوشیِ خودش
+ *  حسابِ شما را یک ربع می‌بست. برای بستنِ حسابِ یک رقیب — یا آزارِ یک
+ *  نفر — هشت کلیک لازم بود. قفلی که قرار بود از حساب محافظت کند،
+ *  خودش سلاحِ علیهِ همان حساب شده بود.
+ *
+ *  حالا دو شمارنده، با دو کار:
+ *
+ *    ۱) **شناسه + IP** (`lockoutTries`، هشت): کسی که دارد رمز را حدس
+ *       می‌زند بسته می‌شود — و فقط خودش. صاحبِ حساب از گوشیِ خودش
+ *       دست‌نخورده وارد می‌شود.
+ *
+ *    ۲) **شناسه، از همه‌جا** (`lockoutGlobalTries`، چهل): پشتوانه‌ی
+ *       حمله‌ی پخش‌شده روی چند IP. عمداً خیلی بالاتر است، چون همین
+ *       شمارنده است که می‌تواند سوءاستفاده شود. رسیدن به چهل از یک
+ *       IP ممکن نیست: محدودیتِ نرخ (`authMax`، ده در ربع ساعت) زودتر
+ *       جلویش را می‌گیرد. پس چهل یعنی چند IP واقعاً هماهنگ — که دیگر
+ *       بستنِ حساب، درست‌ترین کار است.
+ *
+ *  ⚠️ `ip` که نیاید، فقط شمارنده‌ی دوم می‌ماند — یعنی همان رفتارِ
+ *  سخت‌گیرِ قبلی، نه بازتر از آن.
+ *  ──────────────────────────────────────────────────────────────────
+ */
+async function assertNotLocked(scope, identifier, ip = '') {
   const since = now() - config.rateLimit.lockoutMs;
-  const r = await one(
+
+  if (ip) {
+    const mine = await one(
+      `SELECT COUNT(*)::int AS n FROM login_attempts
+        WHERE scope=$1 AND identifier=$2 AND ip=$3 AND ok=false AND created_at > $4`,
+      [scope, identifier, ip, since]
+    );
+    if (mine.n >= config.rateLimit.lockoutTries) {
+      throw tooMany('تلاش ناموفق زیاد بود، چند دقیقه بعد دوباره امتحان کنید', 'locked_out');
+    }
+  }
+
+  const all = await one(
     `SELECT COUNT(*)::int AS n FROM login_attempts
       WHERE scope=$1 AND identifier=$2 AND ok=false AND created_at > $3`,
     [scope, identifier, since]
   );
-  if (r.n >= config.rateLimit.lockoutTries) {
+  if (all.n >= config.rateLimit.lockoutGlobalTries) {
     throw tooMany('تلاش ناموفق زیاد بود، چند دقیقه بعد دوباره امتحان کنید', 'locked_out');
   }
 }
@@ -133,16 +171,32 @@ function appOf(req) {
   return String(req.body?.app || '').trim().toLowerCase() === 'pump' ? 'pump' : 'shop';
 }
 
+/**
+ *  نسخه‌ی برنامه‌ای که این درخواست از آن آمده.
+ *
+ *  فقط ثبت می‌شود، هیچ تصمیمی با آن گرفته نمی‌شود — نه دری باز می‌کند
+ *  و نه می‌بندد. پس دروغ گفتنش هم چیزی به دستِ کسی نمی‌دهد و لازم
+ *  نیست به آن اعتماد شود.
+ *
+ *  به کار می‌آید وقتی گزارشی می‌رسد و باید فهمید آن گوشی چه نسخه‌ای
+ *  داشت، و برای دیدنِ اینکه چند نفر هنوز زیرِ `min_app_version`اند.
+ *
+ *  خالی یعنی «نگفت»؛ نسخه‌های امروزِ دستِ کاربر چیزی نمی‌فرستند.
+ */
+function appVersionOf(req) {
+  return v.text(req.body?.appVersion || req.body?.app_version, { max: 32 });
+}
+
 /** ساخت نشست تازه (توکن دسترسی + توکن تازه‌سازی). */
-async function issueSession(user, device, ip, app = 'shop') {
+async function issueSession(user, device, ip, app = 'shop', appVersion = '') {
   const dev = await upsertDevice(user.id, device, ip);
   const access = await tokens.issue({
     kind: 'access', subjectId: user.id, deviceId: dev?.id || null,
-    ttlMs: config.tokens.accessTtlMs, app,
+    ttlMs: config.tokens.accessTtlMs, app, appVersion,
   });
   const refresh = await tokens.issue({
     kind: 'refresh', subjectId: user.id, deviceId: dev?.id || null,
-    ttlMs: config.tokens.refreshTtlMs, app,
+    ttlMs: config.tokens.refreshTtlMs, app, appVersion,
   });
   await query('UPDATE users SET last_login_at=$2 WHERE id=$1', [user.id, now()]);
   return {
@@ -355,7 +409,7 @@ router.post('/register/verify', otpLimit, async (req, res, next) => {
 
   const email = v.email(req.body?.email, { required: true });
   await assertEmailFree(email);
-  await assertNotLocked('otp', email);
+  await assertNotLocked('otp', email, clientIp(req));
 
   try {
     await otp.verify(email, req.body?.code, { purpose: 'register' });
@@ -427,7 +481,7 @@ router.post('/register/complete', authLimit, async (req, res, next) => {
     if (err.code !== 'bad_location' && err.code !== 'device_required') throw err;
   }
 
-  const session = await issueSession(user, req.body?.device, ip, appOf(req));
+  const session = await issueSession(user, req.body?.device, ip, appOf(req), appVersionOf(req));
   await audit.log({
     actorType: 'user', userId: user.id, action: 'auth.register',
     detail: { method: 'email_3step', terms: termsVersion, located: !!location }, ip,
@@ -452,7 +506,7 @@ router.post('/login', authLimit, async (req, res, next) => {
 
   const isEmail = raw.includes('@');
   const identifier = isEmail ? v.email(raw, { required: true }) : v.phone(raw, { required: true });
-  await assertNotLocked('user', identifier);
+  await assertNotLocked('user', identifier, clientIp(req));
 
   const user = await one(
     isEmail ? 'SELECT * FROM users WHERE email=$1' : 'SELECT * FROM users WHERE phone=$1',
@@ -468,7 +522,7 @@ router.post('/login', authLimit, async (req, res, next) => {
   await clearAttempts('user', identifier);
   if (user.status !== 'active') return next(forbidden('این حساب غیرفعال است', 'account_disabled'));
 
-  const session = await issueSession(user, req.body?.device, clientIp(req), appOf(req));
+  const session = await issueSession(user, req.body?.device, clientIp(req), appOf(req), appVersionOf(req));
   await audit.log({ actorType: 'user', userId: user.id, action: 'auth.login', detail: { method: 'password' }, ip: clientIp(req) });
   res.json(await loginPayload(user, session));
 });
@@ -497,7 +551,7 @@ router.post('/otp/request', otpLimit, async (req, res, next) => {
 
 router.post('/otp/verify', otpLimit, async (req, res, next) => {
   const to = destinationOf(req.body);
-  await assertNotLocked('otp', to.value);
+  await assertNotLocked('otp', to.value, clientIp(req));
 
   try {
     await otp.verify(to.value, req.body?.code, { purpose: 'login' });
@@ -529,7 +583,7 @@ router.post('/otp/verify', otpLimit, async (req, res, next) => {
   }
   if (user.status !== 'active') return next(forbidden('این حساب غیرفعال است', 'account_disabled'));
 
-  const session = await issueSession(user, req.body?.device, clientIp(req), appOf(req));
+  const session = await issueSession(user, req.body?.device, clientIp(req), appOf(req), appVersionOf(req));
   await audit.log({ actorType: 'user', userId: user.id, action: created ? 'auth.register' : 'auth.login', detail: { method: 'otp' }, ip: clientIp(req) });
   res.status(created ? 201 : 200).json({ created, ...(await loginPayload(user, session)) });
 });
@@ -572,7 +626,7 @@ router.post('/google', authLimit, async (req, res, next) => {
     [newId('idn'), user.id, profile.sub, profile.email || '', now()]
   );
 
-  const session = await issueSession(user, req.body?.device, clientIp(req), appOf(req));
+  const session = await issueSession(user, req.body?.device, clientIp(req), appOf(req), appVersionOf(req));
   await audit.log({ actorType: 'user', userId: user.id, action: created ? 'auth.register' : 'auth.login', detail: { method: 'google' }, ip: clientIp(req) });
   res.status(created ? 201 : 200).json({ created, ...(await loginPayload(user, session)) });
 });
@@ -679,7 +733,7 @@ router.post('/password/reset', otpLimit, async (req, res, next) => {
   const weak = pw.checkStrength(password);
   if (weak) return next(badRequest(weak, 'weak_password'));
 
-  await assertNotLocked('otp', email);
+  await assertNotLocked('otp', email, clientIp(req));
   try {
     await otp.verify(email, req.body?.code, { purpose: 'reset' });
   } catch (err) {
@@ -698,11 +752,15 @@ router.post('/password/reset', otpLimit, async (req, res, next) => {
   await audit.log({ actorType: 'user', userId: user.id, action: 'auth.password_reset', ip: clientIp(req) });
 
   //  و همان‌جا واردش می‌کنیم؛ کسی که تازه رمز گذاشته نباید دوباره بزندش
-  const session = await issueSession(user, req.body?.device, clientIp(req), appOf(req));
+  const session = await issueSession(user, req.body?.device, clientIp(req), appOf(req), appVersionOf(req));
   res.json(await loginPayload(user, session));
 });
 
 module.exports = router;
 module.exports.issueSession = issueSession;
+//  برای سنجه‌ها: قفل با آستانه‌های واقعی از راهِ مسیرها سنجیده نمی‌شود،
+//  چون `helpers.js` عمداً آستانه‌ها را بالا می‌برد تا دویست سنجه‌ی دیگر
+//  همدیگر را نبندند
+module.exports.assertNotLocked = assertNotLocked;
 module.exports.publicUser = publicUser;
 module.exports.loginPayload = loginPayload;

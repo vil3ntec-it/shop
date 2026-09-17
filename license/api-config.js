@@ -136,9 +136,26 @@
     return baseUrl() + PREFIX + (clean.startsWith('/') ? clean : '/' + clean);
   }
 
+  /**
+   * نسخهٔ این نسخهٔ وب — قرینهٔ `versionName` در برنامهٔ اندروید.
+   *
+   * مثلِ شناسه، از `<meta>` می‌آید:
+   *
+   *     <meta name="tohid-app-version" content="3.2">
+   *
+   * فقط ثبت می‌شود و هیچ تصمیمی با آن گرفته نمی‌شود. نبودنش هم اشکالی
+   * ندارد: سرور خالی را «نگفت» می‌فهمد.
+   */
+  function appVersion() {
+    try {
+      const tag = document.querySelector('meta[name="tohid-app-version"]');
+      return (tag && tag.getAttribute('content') || '').trim();
+    } catch { return ''; }
+  }
+
   window.TohidApiConfig = {
     VERSION, PREFIX,
     normalize, baseUrl, setBaseUrl, isConfigured, isLocked, url,
-    appId,
+    appId, appVersion,
   };
 })();
