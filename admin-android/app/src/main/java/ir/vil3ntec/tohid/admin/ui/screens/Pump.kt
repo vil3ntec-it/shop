@@ -53,14 +53,19 @@ fun PumpScreen(session: Session) {
   var open by remember { mutableStateOf<String?>(null) }
   var codes by rememberSaveable { mutableStateOf(false) }
   var reloadKey by remember { mutableIntStateOf(0) }
+  //  یک نگاهِ کلی، مثلِ بالای همان تبِ پنل
+  var stats by remember { mutableStateOf<JSONObject?>(null) }
 
   LaunchedEffect(query, reloadKey) {
     val token = session.token ?: return@LaunchedEffect
     delay(350)
     busy = true
-    runCatching { AdminApi(session.serverUrl).stations(token, query.trim()) }
+    val api = AdminApi(session.serverUrl)
+    runCatching { api.stations(token, query.trim()) }
       .onSuccess { rows = it; error = null }
       .onFailure { error = (it as? AdminApi.ApiError)?.message ?: "فهرست خوانده نشد" }
+    //  ⚠️ نبودنش صفحه را نمی‌شکند: سرورِ به‌روزنشده ستونِ خبرها را ندارد
+    stats = runCatching { api.pumpStats(token) }.getOrNull()
     busy = false
   }
 
@@ -80,6 +85,17 @@ fun PumpScreen(session: Session) {
     GhostButton(text = "کدهای اشتراکِ پمپ", modifier = Modifier.fillMaxWidth()) { codes = true }
     Spacer(Modifier.height(12.dp))
     ErrorNote(error)
+
+    stats?.let { st ->
+      Panel {
+        Row2("پمپ‌ها", "${st.optInt("stations").fa()} — ${st.optInt("active_stations").fa()} فعال")
+        Row2("اشتراکِ فعال", st.optInt("active_subs").fa())
+        Row2("کدِ باز", st.optInt("open_codes").fa())
+        //  خبرهایی که برنامه‌های پمپ به ابر فرستاده‌اند
+        Row2("خبرهای رسیده", st.optInt("events").fa())
+      }
+      Spacer(Modifier.height(12.dp))
+    }
 
     val list = rows
     if (list == null || list.length() == 0) {
