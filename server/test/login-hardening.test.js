@@ -429,6 +429,67 @@ test('رمزِ تازه هم هش می‌شود — هیچ رمزِ خامی د�
   assert.equal(anywhere.rows[0].n, 0);
 });
 
+/* ============================ شناسه‌ی برنامه ============================ */
+
+/*
+ *  سرورِ مرکزی یکی است و چند برنامه از آن احراز هویت می‌گیرند. این سه
+ *  سنجه ثابت می‌کنند که گفتنِ شناسه واقعاً اثر دارد — وگرنه فرستادنش
+ *  از سمتِ برنامه فقط یک کلیدِ تزئینی در بدنه بود.
+ */
+
+test('ورود با شناسه‌ی برنامه، نشست را به همان بخش مهر می‌زند', async () => {
+  const user = await h.newUser('شناسه‌دار');
+
+  const r = await h.post('/api/auth/login', {
+    identifier: user.email, password: user.password, app: 'shop',
+  });
+  assert.equal(r.status, 200);
+
+  const row = await h.query(
+    `SELECT app FROM tokens WHERE kind='access' AND subject_id=$1 ORDER BY issued_at DESC LIMIT 1`,
+    [user.user.id]
+  );
+  assert.equal(row.rows[0].app, 'shop');
+});
+
+test('نگفتنِ شناسه همان «دکان» است — نسخه‌های قدیمی بیرون نمی‌افتند', async () => {
+  const user = await h.newUser('بی‌شناسه');
+
+  const withId = await h.post('/api/auth/login', {
+    identifier: user.email, password: user.password, app: 'shop',
+  });
+  const without = await h.post('/api/auth/login', {
+    identifier: user.email, password: user.password,
+  });
+  assert.equal(withId.status, 200);
+  assert.equal(without.status, 200);
+
+  //  هر دو نشست یک کار می‌کنند
+  assert.equal((await h.get('/api/me', { token: withId.body.accessToken })).status, 200);
+  assert.equal((await h.get('/api/me', { token: without.body.accessToken })).status, 200);
+});
+
+test('توکنِ یک برنامه در برنامه‌ی دیگر اصلاً پیدا نمی‌شود', async () => {
+  const user = await h.newUser('دو برنامه');
+
+  const shop = await h.post('/api/auth/login', {
+    identifier: user.email, password: user.password, app: 'shop',
+  });
+  const pump = await h.post('/api/auth/login', {
+    identifier: user.email, password: user.password, app: 'pump',
+  });
+  assert.equal(shop.status, 200);
+  assert.equal(pump.status, 200);
+  assert.notEqual(shop.body.accessToken, pump.body.accessToken);
+
+  //  همان آدم، ولی هر نشست فقط درِ خودش را باز می‌کند
+  assert.equal((await h.get('/api/me', { token: shop.body.accessToken })).status, 200);
+  assert.equal(
+    (await h.get('/api/me', { token: pump.body.accessToken })).status, 401,
+    'نشستِ پمپ روی مسیرهای دکان پیدا نمی‌شود'
+  );
+});
+
 /* ============================ لاگ ============================ */
 
 test('کدِ بازیابی در لاگِ سرورِ واقعی نوشته نمی‌شود', async () => {

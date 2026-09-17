@@ -256,7 +256,7 @@
     btn.disabled = true;
     try {
       await call('POST', '/support/messages', {
-        app: 'shop',
+        app: (window.TohidApiConfig && window.TohidApiConfig.appId) ? window.TohidApiConfig.appId() : 'shop',
         deviceUid: deviceUid(),
         name: myName(),
         body,
@@ -327,7 +327,7 @@
 
     try {
       const data = await call('POST', '/visit', {
-        app: 'shop',
+        app: (window.TohidApiConfig && window.TohidApiConfig.appId) ? window.TohidApiConfig.appId() : 'shop',
         deviceUid: uid,
         platform: 'web',
         language: (navigator.language || 'fa').slice(0, 20),

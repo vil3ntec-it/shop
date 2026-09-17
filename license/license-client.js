@@ -521,9 +521,22 @@
     resetPublicKey();
   }
 
+  /**
+   *  شناسهٔ این برنامه نزدِ سرورِ مرکزی.
+   *
+   *  روی هر درخواستی که **نشست می‌سازد** می‌رود. تا دیروز این نسخه
+   *  هیچ‌وقت نمی‌گفت کیست و به پیش‌فرضِ سرور تکیه می‌کرد؛ یعنی درستیِ
+   *  کار به یک سکوت بند بود. شرحِ کامل سرِ `api-config.js`.
+   */
+  function appId() {
+    return (window.TohidApiConfig && window.TohidApiConfig.appId)
+      ? window.TohidApiConfig.appId()
+      : 'shop';
+  }
+
   async function login(identifier, password) {
     const r = await api('/api/v1/auth/login', {
-      method: 'POST', auth: false, body: { identifier, password },
+      method: 'POST', auth: false, body: { identifier, password, app: appId() },
     });
     writeStore({
       accessToken: r.accessToken, accessExpiresAt: r.accessExpiresAt,
@@ -565,7 +578,7 @@
   /** رمزِ تازه با کدی که به ایمیل رفته — و همان‌جا ورود */
   async function resetPassword({ email, code, password }) {
     const r = await api('/api/v1/auth/password/reset', {
-      method: 'POST', auth: false, body: { email, code, password },
+      method: 'POST', auth: false, body: { email, code, password, app: appId() },
     });
     if (r && r.accessToken) {
       writeStore({
@@ -606,7 +619,7 @@
   async function registerComplete({ ticket, name, password, terms, location }) {
     const r = await api('/api/v1/auth/register/complete', {
       method: 'POST', auth: false,
-      body: { ticket, name, password, terms, location, device: devicePayload() },
+      body: { ticket, name, password, terms, location, device: devicePayload(), app: appId() },
     });
     if (r && r.accessToken) {
       writeStore({

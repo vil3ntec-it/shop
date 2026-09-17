@@ -65,6 +65,7 @@ class AuthRepository(
         buildJsonObject {
           put("identifier", JsonPrimitive(identifier.trim()))
           put("password", JsonPrimitive(password))
+          putApp()
         },
       )
     )
@@ -156,6 +157,7 @@ class AuthRepository(
           if (email.isNotBlank()) put("email", JsonPrimitive(email.trim()))
           if (phone.isNotBlank()) put("phone", JsonPrimitive(phone.trim()))
           put("password", JsonPrimitive(password))
+          putApp()
         },
       )
     )
@@ -229,6 +231,7 @@ class AuthRepository(
           put("ticket", JsonPrimitive(ticket))
           put("name", JsonPrimitive(name.trim()))
           put("password", JsonPrimitive(password))
+          putApp()
           put("terms", buildJsonObject {
             put("accepted", JsonPrimitive(true))
             put("version", JsonPrimitive(termsVersion))
@@ -301,6 +304,7 @@ class AuthRepository(
         buildJsonObject {
           put("code", JsonPrimitive(code.trim().uppercase()))
           put("name", JsonPrimitive(name.trim()))
+          putApp()
           put("device", buildJsonObject {
             put("uid", JsonPrimitive(deviceUid))
             put("name", JsonPrimitive(deviceName))
@@ -315,7 +319,7 @@ class AuthRepository(
     keep(
       api.postPublic(
         ApiEndpoints.Auth.GOOGLE,
-        buildJsonObject { put("idToken", JsonPrimitive(idToken)) },
+        buildJsonObject { put("idToken", JsonPrimitive(idToken)); putApp() },
       )
     )
   }
@@ -348,6 +352,7 @@ class AuthRepository(
           destinationBody(destination) {
             put("code", JsonPrimitive(code.trim()))
             put("name", JsonPrimitive(name.trim()))
+            putApp()
           },
         )
       )
@@ -374,6 +379,7 @@ class AuthRepository(
             put("email", JsonPrimitive(email.trim()))
             put("code", JsonPrimitive(code.trim()))
             put("password", JsonPrimitive(password))
+            putApp()
           },
         )
       )
@@ -447,6 +453,29 @@ class AuthRepository(
     tokens.save(session.accessToken, session.refreshToken, session.accessExpiresAt)
     runCatching { onSignedIn(session) }
     return session
+  }
+
+  /**
+   *  شناسه‌ی این برنامه، روی هر درخواستی که **نشست می‌سازد**.
+   *
+   *  ── چه چیزی را می‌بندد ──────────────────────────────────────────────
+   *  سرورِ مرکزی یکی است و چند برنامه از آن احراز هویت می‌گیرند. سرور
+   *  از روزِ اول می‌فهمید درخواست مالِ کدام است (`appOf(req)`) و نشست
+   *  را به همان بخش مهر می‌زد — توکنِ یک برنامه در برنامه‌ی دیگر اصلاً
+   *  پیدا نمی‌شود. ولی این برنامه هیچ‌وقت نمی‌گفت کیست و به پیش‌فرضِ
+   *  سرور تکیه می‌کرد: «نگفتی، پس دکانی».
+   *
+   *  یعنی درستیِ کار به یک **سکوت** بند بود. روزی که پیش‌فرضِ سرور
+   *  عوض شود، یا برنامه‌ی سومی بیاید، این برنامه بی‌صدا به بخشِ
+   *  اشتباه وصل می‌شود و کسی تا وقتی اشتراکِ یکی برای دیگری باز نشده
+   *  خبردار نمی‌شود.
+   *
+   *  مقدار از `AppConfig` می‌آید، نه از رشته‌ای داخلِ کد؛ و چون امروز
+   *  همان `shop` است، رفتار مو‌به‌مو همان دیروز می‌ماند.
+   *  ──────────────────────────────────────────────────────────────────
+   */
+  private fun kotlinx.serialization.json.JsonObjectBuilder.putApp() {
+    put("app", JsonPrimitive(ir.vil3ntec.tohid.core.config.AppConfig.appId))
   }
 
   private inline fun destinationBody(

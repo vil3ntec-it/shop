@@ -25,6 +25,15 @@ import kotlinx.serialization.json.buildJsonObject
  *  کسی که گوشی‌اش را عوض می‌کند، همان گفت‌وگو را دارد. سرور خودش تصمیم
  *  می‌گیرد؛ اینجا فقط هر دو را می‌فرستیم.
  */
+/*
+ *  ⚠️ شناسه‌ی برنامه از `AppConfig.appId` می‌آید، نه از رشته‌ای داخلِ کد.
+ *
+ *  تا دیروز در همین فایل سه بار `"shop"` مستقیم نوشته شده بود. یعنی اگر
+ *  روزی این برنامه شناسه‌ی دیگری می‌گرفت، سه جا باید پیدا و عوض می‌شد و
+ *  فراموش شدنِ یکی‌شان یعنی پیام‌های پشتیبانی و تپشِ بازدید به دفترِ
+ *  برنامه‌ی دیگری می‌رفت. حالا یک سرچشمه است، همان که صفحه‌ی ورود هم از
+ *  آن می‌خواند.
+ */
 class SupportRepository(private val api: ApiClient, private val signedIn: () -> Boolean) {
 
   /**
@@ -52,7 +61,7 @@ class SupportRepository(private val api: ApiClient, private val signedIn: () -> 
   suspend fun thread(deviceUid: String, after: Long = 0): ApiResult<SupportViewDto> = result {
     val path = ApiEndpoints.withQuery(
       ApiEndpoints.Support.THREAD,
-      mapOf("deviceUid" to deviceUid, "after" to after.takeIf { it > 0 }, "app" to "shop"),
+      mapOf("deviceUid" to deviceUid, "after" to after.takeIf { it > 0 }, "app" to ir.vil3ntec.tohid.core.config.AppConfig.appId),
     )
     ApiJson.decode<SupportViewDto>(send("GET", path, null))
   }
@@ -64,7 +73,7 @@ class SupportRepository(private val api: ApiClient, private val signedIn: () -> 
         ApiEndpoints.Support.MESSAGES,
         buildJsonObject {
           put("deviceUid", JsonPrimitive(deviceUid))
-          put("app", JsonPrimitive("shop"))
+          put("app", JsonPrimitive(ir.vil3ntec.tohid.core.config.AppConfig.appId))
           put("body", JsonPrimitive(body.trim()))
           if (name.isNotBlank()) put("name", JsonPrimitive(name.trim()))
         },
@@ -119,7 +128,7 @@ class SupportRepository(private val api: ApiClient, private val signedIn: () -> 
         ApiEndpoints.VISIT,
         buildJsonObject {
           put("deviceUid", JsonPrimitive(deviceUid))
-          put("app", JsonPrimitive("shop"))
+          put("app", JsonPrimitive(ir.vil3ntec.tohid.core.config.AppConfig.appId))
           put("platform", JsonPrimitive(platform))
           put("version", JsonPrimitive(version))
           put("language", JsonPrimitive("fa"))
