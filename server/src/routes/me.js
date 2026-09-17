@@ -172,6 +172,42 @@ router.put('/', async (req, res) => {
 });
 
 /*
+ *  ══ توکنِ پوش — «برنامه بسته باشد هم خبر بگیرد» ═══════════════════
+ *
+ *  ⚠️ تا امروز تنها جای ثبتِ توکن `/api/support/push` بود — یعنی برای
+ *  گرفتنِ خبرِ «کالا تمام شد» باید از درِ **پشتیبانی** وارد می‌شدی.
+ *  اسمش هیچ ربطی به کارش نداشت، و هیچ برنامه‌ای هم پیدایش نکرده بود.
+ *
+ *  آن یکی سرِ جایش ماند (نسخه‌های امروزِ دستِ کاربر نباید بشکنند) ولی
+ *  جای درستش این‌جاست.
+ */
+router.post('/push', async (req, res, next) => {
+  try {
+    await require('../lib/push').register({
+      app: req.appSection || 'shop',
+      token: v.text(req.body?.token, { max: 500, required: true, field: 'توکن پوش' }),
+      provider: v.oneOf(req.body?.provider, ['fcm', 'webpush'], { field: 'سرویس', def: 'fcm' }),
+      userId: req.user.id,
+      //  ⚠️ دکان هم ثبت می‌شود: خبرِ «کالا تمام شد» مالِ دکان است نه
+      //  مالِ یک نفر، و باید به هر گوشی‌ای که به آن دکان وصل است برسد
+      shopId: req.shopId || '',
+      deviceUid: req.device ? (req.device.device_uid || req.device.id) : '',
+      platform: v.text(req.body?.platform, { max: 20 }),
+    });
+    res.status(201).json({ ok: true });
+  } catch (err) { next(err); }
+});
+
+router.delete('/push', async (req, res, next) => {
+  try {
+    await require('../lib/push').unregister(v.text(req.body?.token || req.query?.token, {
+      max: 500, required: true, field: 'توکن پوش',
+    }));
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
+/*
  *  پشتیبانِ همین دکان — `/api/me/backups`.
  *
  *  ⚠️ بالاتر `optionalShop` است، نه `requireShop`: صفحهٔ «من» برای

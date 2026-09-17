@@ -97,6 +97,9 @@ function makeRouter(idOf) {
         token: v.text(req.body?.token, { max: 500, required: true, field: 'توکن پوش' }),
         provider: v.oneOf(req.body?.provider, ['fcm', 'webpush'], { field: 'سرویس', def: 'fcm' }),
         userId: id.userId || '',
+        //  ⚠️ بی این، ردیفِ کامپیوترِ پمپ با `user_id` خالی می‌نشست و
+        //  هیچ پرس‌وجویی به آن نمی‌رسید — ثبتِ بی‌فایده
+        stationId: id.stationId,
         deviceUid: id.deviceUid || '',
         platform: v.text(req.body?.platform, { max: 20 }),
       });

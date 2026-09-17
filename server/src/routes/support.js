@@ -134,6 +134,9 @@ router.post('/push', async (req, res, next) => {
       token,
       provider: v.oneOf(req.body?.provider, ['fcm', 'webpush'], { field: 'سرویس', def: 'fcm' }),
       userId: id.userId,
+      //  دکان هم ثبت می‌شود تا خبرِ «کالا تمام شد» به همهٔ گوشی‌های
+      //  همان دکان برسد، نه فقط به کسی که توکن را ثبت کرده
+      shopId: id.shopId,
       deviceUid: id.deviceUid,
       platform: v.text(req.body?.platform, { max: 20 }),
     });

@@ -219,8 +219,18 @@ async function post(threadId, { sender = 'user', senderId = '', senderName = '',
         body: `${senderName || thread.who || 'یک کاربر'}: ${text.slice(0, 90)}`,
         data: { type: 'support', threadId },
       });
-    } else if (thread.user_id) {
-      await push.sendTo({ userId: thread.user_id, app: thread.app }, {
+    } else if (thread.user_id || thread.station_id) {
+      /*
+       *  ⚠️ `station_id` هم گیرنده است و بی آن نیمی از پمپ‌ها ساکت
+       *  می‌ماندند: پمپی که با کدِ شش‌رقمی فعال شده `user_id` ندارد،
+       *  پس جوابِ مدیر و خبرِ پایانِ اشتراکش به هیچ دستگاهی نمی‌رسید —
+       *  فقط دفعهٔ بعد که کسی برنامه را باز می‌کرد دیده می‌شد.
+       */
+      await push.sendTo({
+        userId: thread.user_id || '',
+        stationId: thread.station_id || '',
+        app: thread.app,
+      }, {
         title: 'پاسخ پشتیبانی',
         body: text.slice(0, 120),
         data: { type: 'support', threadId },

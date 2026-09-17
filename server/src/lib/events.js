@@ -19,10 +19,37 @@
  * را می‌خواهد: می‌خواهد بداند در نبودش چه گذشت.
  */
 const { query, one, many, newId, now } = require('../db');
+const push = require('./push');
 const { badRequest } = require('../middleware/errors');
 
 /** نوع‌هایی که می‌شناسیم. هر چیز دیگری رد می‌شود. */
 const KINDS = ['sale', 'stock_out', 'low_stock', 'expense', 'debt', 'note'];
+
+/**
+ * ⛔ **کدام خبر ارزشِ بیدار کردنِ گوشی را دارد.**
+ *
+ * خواستهٔ صاحب مخزن: «هر اتفاقی که در برنامه بیفتد — کم‌بودی یا هر چه —
+ * به سرور برود و سرور، وقتی برنامه‌ها بسته هم هستند، پیام را برایشان
+ * بفرستد، اگر کاربر نت داشت.»
+ *
+ * ولی **همه‌ی** خبرها را پوش کردن یعنی هر فروشِ شاگرد یک زنگ روی گوشیِ
+ * صاحبِ دکان. روزِ اول جالب است، روزِ دوم اعلان‌ها را خاموش می‌کند — و
+ * آن‌وقت خبرِ مهم هم دیگر نمی‌رسد. پس فقط این سه:
+ *
+ *   • `stock_out` کالا تمام شد — مشتری آمده و دست خالی می‌رود
+ *   • `low_stock` دارد تمام می‌شود — هنوز وقت هست سفارش داد
+ *   • `debt`      قرض از حد گذشت — هرچه دیرتر، سخت‌تر وصول می‌شود
+ *
+ * همان سه‌تایی که `Watchman`ِ برنامه هم روی گوشی می‌پاید. فروش و مصرف
+ * و یادداشت در فهرست می‌نشینند و با باز شدنِ برنامه دیده می‌شوند.
+ */
+const PUSH_KINDS = ['stock_out', 'low_stock', 'debt'];
+
+const PUSH_TITLE = {
+  stock_out: 'کالا تمام شد',
+  low_stock: 'کالا رو به اتمام',
+  debt: 'قرضِ از حد گذشته',
+};
 
 const MAX_BATCH = 50;
 const MAX_TEXT = 300;
@@ -67,7 +94,46 @@ async function record(ctx, items) {
     );
     if (row) saved.push(shape(row));
   }
+
+  await notify(shopId, userId, saved);
   return { saved: saved.length, events: saved };
+}
+
+/**
+ * بیدار کردنِ گوشی‌های همان دکان.
+ *
+ * ⚠️ **یک پیام برای یک دسته، نه یکی برای هر خبر.** گوشی‌ای که آفلاین
+ * بوده صفِ بیست خبر را یک‌جا می‌فرستد؛ بی این، بیست زنگ پشتِ سرِ هم
+ * می‌خورد.
+ *
+ * ⚠️ **کسی که خودش این کار را کرده خبر نمی‌گیرد** (`exceptUserId`).
+ * فروشنده‌ای که کالا را تمام کرده، لازم نیست روی گوشیِ خودش زنگ
+ * بشنود.
+ *
+ * ⚠️ **هیچ‌وقت استثنا بیرون نمی‌دهد.** ثبتِ خبر کارِ اصلی است و پوش
+ * رفاه؛ نرسیدنِ زنگ نباید باعث شود خبر اصلاً ثبت نشود.
+ */
+async function notify(shopId, userId, saved) {
+  const worthy = saved.filter(e => PUSH_KINDS.includes(e.kind));
+  if (!worthy.length) return { sent: 0, skipped: 'nothing_worthy' };
+  try {
+    const first = worthy[0];
+    const more = worthy.length - 1;
+    return await push.sendTo(
+      { shopId, app: 'shop', exceptUserId: userId },
+      {
+        title: PUSH_TITLE[first.kind] || 'خبرِ دکان',
+        body: more > 0
+          ? `${first.title || first.body || ''} و ${more} خبرِ دیگر`
+          : (first.title || first.body || ''),
+        channel: 'events',
+        data: { type: 'event', kind: first.kind, count: String(worthy.length) },
+      }
+    );
+  } catch (err) {
+    console.error('[events:push]', err.message);
+    return { sent: 0, error: err.message };
+  }
 }
 
 function shape(r) {
@@ -128,4 +194,4 @@ async function unreadCount(shopId, userId) {
   return r ? r.n : 0;
 }
 
-module.exports = { record, list, seenAt, markSeen, unreadCount, KINDS };
+module.exports = { record, list, seenAt, markSeen, unreadCount, notify, KINDS, PUSH_KINDS };
