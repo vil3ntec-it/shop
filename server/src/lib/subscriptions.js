@@ -172,10 +172,31 @@ function build(T) {
       if (!p || !p.amount || !p.unit) throw badRequest('مدت اشتراک مشخص نیست', 'missing_duration');
       end = plans.endOfPeriod(base, p.amount, p.unit);
       start = if_live(existing, t) ?? start;
-      if (!features.length && Array.isArray(p.features) && p.features.length) features = p.features;
       maxDevices = maxDevices || p.max_devices;
     }
     if (!Number.isFinite(end) || end <= t) throw badRequest('تاریخ پایان اشتراک معتبر نیست');
+
+    /*
+     *  ── قابلیت‌های پلن ─────────────────────────────────────────────
+     *  ⛔ این‌جا **بیرونِ** آن `else` است، و بودنش داخلِ آن یک باگِ
+     *  واقعی بود که مستقیم روی پول می‌نشست.
+     *
+     *  تا دیروز فهرستِ پلن فقط وقتی برداشته می‌شد که مدت هم از خودِ پلن
+     *  درمی‌آمد. ولی پنلِ مدیریت همیشه `days` را هم می‌فرستد («پلنِ
+     *  استاندارد، ۳۶۵ روز»). پس `features` خالی می‌ماند — و
+     *  `entitlementOf` فهرستِ خالی را «نسلِ اول ⇒ پلنِ کامل» می‌خواند.
+     *
+     *  یعنی مدیر «استاندارد» می‌داد و مشتری **وی‌آی‌پی** می‌گرفت:
+     *  کیو‌آر، اپِ کارمندان، مفاد/ضرر، تاریخچه‌ها و داشبورد، همه باز.
+     *
+     *  ⚠️ فهرستِ صریح همچنان می‌چربد (مدیر می‌تواند پلن را دستی عوض
+     *  کند)، و پلنی که خودش فهرست ندارد (`[]`) هیچ چیزی را عوض
+     *  نمی‌کند — پس اشتراک‌های امروزیِ `m1`/`m6`/`y1` دست‌نخورده‌اند.
+     */
+    if (!features.length) {
+      const p = await plans.getPlan(plan, T.app);
+      if (p && Array.isArray(p.features) && p.features.length) features = p.features;
+    }
 
     const clean = sanitizeFeatures(features, T.app);
 

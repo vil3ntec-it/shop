@@ -414,7 +414,16 @@
       <div class="grid grid-3">
         <div><label>مدت دوره آزمایشی (روز)</label><input type="number" id="cfg-trial" min="0" max="365"></div>
         <div><label>شماره واتساپ</label><input type="text" id="cfg-wa" dir="ltr"></div>
-        <div><label>واحد پول</label><input type="text" id="cfg-currency"></div>
+        <div><label>واحد پول (دکان)</label><input type="text" id="cfg-currency"></div>
+      </div>
+      <!--
+        ⚠️ بخشِ پمپ واحدِ پول و دورهٔ آزمایشیِ **خودش** را دارد.
+        قیمتِ پلن‌های پمپ دالری است (۱۲۰ · ۱۵۰ · ۶۰۰) و با واحدِ
+        مشترک، صفحهٔ اشتراکِ پمپ «۱۲۰ افغانی» می‌نوشت.
+      -->
+      <div class="grid grid-3">
+        <div><label>مدت دوره آزمایشی پمپ (روز)</label><input type="number" id="cfg-pump-trial" min="0" max="365"></div>
+        <div><label>واحد پول (پمپ)</label><input type="text" id="cfg-pump-currency"></div>
       </div>
       <label>متن پیام واتساپ</label>
       <input type="text" id="cfg-wamsg">
@@ -423,7 +432,7 @@
     </div>
 
     <div class="panel">
-      <div class="panel-head"><h2>پلن‌های اشتراک</h2></div>
+      <div class="panel-head"><h2>پلن‌های اشتراکِ دکان</h2></div>
       <div class="table-scroll">
         <table>
           <thead><tr><th>کد</th><th>عنوان</th><th>مدت</th><th>قیمت</th><th>برچسب</th><th>فعال</th><th></th></tr></thead>
@@ -431,6 +440,24 @@
         </table>
       </div>
       <div id="plans-msg"></div>
+    </div>
+
+    <!--
+      پلن‌های پمپ — جدول جدا، چون بخش جداست.
+
+      ⛔ تا امروز پنل فقط پلن‌های دکان را نشان می‌داد. یعنی پلن‌های پمپ
+      (استاندارد · وی‌آی‌پی · دائمی) هیچ‌جای پنل دیده و ویرایش نمی‌شدند،
+      و کادرِ «پلن»ِ اشتراکِ پمپ هم از فهرستِ دکان پر می‌شد.
+    -->
+    <div class="panel">
+      <div class="panel-head"><h2>پلن‌های اشتراکِ پمپ‌بنزین</h2></div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>کد</th><th>عنوان</th><th>مدت</th><th>قیمت</th><th>برچسب</th><th>فعال</th><th></th></tr></thead>
+          <tbody id="pump-plans-body"></tbody>
+        </table>
+      </div>
+      <div id="pump-plans-msg"></div>
     </div>
   </section>
 
