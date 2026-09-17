@@ -51,6 +51,10 @@ fun SupportScreen(session: Session, onUnreadChange: (Int) -> Unit = {}) {
   var threads by remember { mutableStateOf<List<JSONObject>>(emptyList()) }
   var unread by remember { mutableIntStateOf(0) }
   var filter by rememberSaveable { mutableStateOf("") }
+  //  ⚠️ بی این صافی، گفت‌وگوهای دکان و پمپ در یک فهرست قاطی می‌شدند —
+  //  و رشتهٔ پمپ نامِ کاربر ندارد (پمپِ فعال‌شده با کد حساب ندارد)، پس
+  //  از هم قابلِ تشخیص نبودند.
+  var appFilter by rememberSaveable { mutableStateOf("") }
   var query by rememberSaveable { mutableStateOf("") }
   var busy by remember { mutableStateOf(false) }
   var error by remember { mutableStateOf<String?>(null) }
@@ -60,7 +64,7 @@ fun SupportScreen(session: Session, onUnreadChange: (Int) -> Unit = {}) {
   suspend fun load() {
     val token = session.token ?: return
     busy = true
-    runCatching { AdminApi(session.serverUrl).supportThreads(token, filter, query.trim()) }
+    runCatching { AdminApi(session.serverUrl).supportThreads(token, filter, query.trim(), appFilter) }
       .onSuccess { body ->
         val arr = body.optJSONArray("threads")
         threads = (0 until (arr?.length() ?: 0)).mapNotNull { arr?.optJSONObject(it) }
@@ -72,7 +76,7 @@ fun SupportScreen(session: Session, onUnreadChange: (Int) -> Unit = {}) {
     busy = false
   }
 
-  LaunchedEffect(filter, query) { delay(300); load() }
+  LaunchedEffect(filter, query, appFilter) { delay(300); load() }
 
   //  تا وقتی این صفحه باز است، هر ده ثانیه یک بار نگاه می‌کنیم
   LaunchedEffect(open) {
@@ -110,6 +114,13 @@ fun SupportScreen(session: Session, onUnreadChange: (Int) -> Unit = {}) {
 
     Spacer(Modifier.height(10.dp))
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+      Chip("هر دو بخش", appFilter == "") { appFilter = "" }
+      Chip("دکان", appFilter == "shop") { appFilter = "shop" }
+      Chip("پمپ", appFilter == "pump") { appFilter = "pump" }
+    }
+
+    Spacer(Modifier.height(8.dp))
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
       Chip("همه", filter == "") { filter = "" }
       Chip("باز", filter == "open") { filter = "open" }
       Chip("بسته", filter == "closed") { filter = "closed" }
@@ -130,12 +141,21 @@ fun SupportScreen(session: Session, onUnreadChange: (Int) -> Unit = {}) {
       Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
         Panel {
           threads.forEachIndexed { i, t ->
+            /*
+             *  ⚠️ نامِ پمپ هم شمرده می‌شود و باید پیش از «مهمان»
+             *  بیاید: رشتهٔ یک پمپِ فعال‌شده با کد نه `accountName`
+             *  دارد نه `who`، پس بی این همه‌شان «مهمان» دیده می‌شدند
+             *  و مدیر نمی‌دانست پیام از کدام پمپ است.
+             */
             val name = t.optString("accountName").ifBlank {
-              t.optString("who").ifBlank { "مهمان" }
+              t.optString("who").ifBlank {
+                t.optString("stationName").ifBlank { "مهمان" }
+              }
             }
-            val guest = t.optString("userId").isBlank()
+            val isPump = t.optString("app") == "pump"
+            val guest = t.optString("userId").isBlank() && !isPump
             ClickRow(
-              title = if (guest) "$name (مهمان)" else name,
+              title = (if (isPump) "⛽ " else "") + (if (guest) "$name (مهمان)" else name),
               subtitle = t.optString("lastMessage").take(60).ifBlank { "—" },
               trailing = {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -334,6 +354,10 @@ private fun BroadcastSheet(session: Session, onBack: () -> Unit) {
   val scope = rememberCoroutineScope()
   var body by rememberSaveable { mutableStateOf("") }
   var target by rememberSaveable { mutableStateOf("expiring") }
+  //  ⛔ تا امروز این نبود و سرور هم فقط `shops` را می‌گرفت: هر پیامِ
+  //  همگانی‌ای که فرستاده می‌شد به **هیچ پمپ‌بنزینی** نمی‌رسید، و
+  //  عددِ «به N نفر رفت» هم فقط دکان‌ها را می‌شمرد.
+  var app by rememberSaveable { mutableStateOf("shop") }
   var busy by remember { mutableStateOf(false) }
   var result by remember { mutableStateOf<String?>(null) }
   var error by remember { mutableStateOf<String?>(null) }
@@ -350,6 +374,13 @@ private fun BroadcastSheet(session: Session, onBack: () -> Unit) {
 
     Spacer(Modifier.height(12.dp))
     Panel {
+      SectionTitle("به کدام بخش")
+      Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Chip("دکان‌ها", app == "shop") { app = "shop" }
+        Chip("پمپ‌بنزین‌ها", app == "pump") { app = "pump" }
+        Chip("هر دو", app == "both") { app = "both" }
+      }
+      Spacer(Modifier.height(12.dp))
       SectionTitle("به چه کسانی")
       Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Chip("رو به پایان", target == "expiring") { target = "expiring" }
@@ -357,15 +388,28 @@ private fun BroadcastSheet(session: Session, onBack: () -> Unit) {
         Chip("همه", target == "all") { target = "all" }
       }
       Spacer(Modifier.height(8.dp))
+      val who = when (app) {
+        "pump" -> "پمپ‌بنزین"
+        "both" -> "دکان و پمپ"
+        else -> "دکان"
+      }
       Text(
         when (target) {
-          "expiring" -> "کسانی که اشتراکشان تا هفت روز دیگر تمام می‌شود."
-          "active" -> "همهٔ دکان‌هایی که الان اشتراک فعال دارند."
-          else -> "همهٔ دکان‌ها. با این یکی محتاط باشید."
+          "expiring" -> "هر $who که اشتراکش تا هفت روز دیگر تمام می‌شود."
+          "active" -> "هر $who که الان اشتراک فعال دارد."
+          else -> "همهٔ ${who}ها. با این یکی محتاط باشید."
         },
         style = MaterialTheme.typography.labelSmall,
         color = if (target == "all") c.warn else c.muted,
       )
+      if (app != "shop") {
+        Spacer(Modifier.height(6.dp))
+        Text(
+          "پمپی که با کدِ شش‌رقمی فعال شده صاحب ندارد؛ پیام روی خودِ برنامهٔ کامپیوترش دیده می‌شود.",
+          style = MaterialTheme.typography.labelSmall,
+          color = c.muted,
+        )
+      }
     }
 
     Spacer(Modifier.height(12.dp))
@@ -381,9 +425,13 @@ private fun BroadcastSheet(session: Session, onBack: () -> Unit) {
       val token = session.token ?: return@PrimaryButton
       busy = true
       scope.launch {
-        runCatching { AdminApi(session.serverUrl).broadcast(token, body.trim(), target) }
+        runCatching { AdminApi(session.serverUrl).broadcast(token, body.trim(), target, app) }
           .onSuccess {
-            result = "به ${it.optInt("sent").fa()} نفر رفت."
+            //  ⚠️ «نرسیده»ها هم گفته می‌شوند. «به ۴۲ نفر رفت» در حالی
+            //  که ده‌تا نرسیده، بدترین جور گزارش است.
+            val failed = it.optInt("failed")
+            result = "به ${it.optInt("sent").fa()} از ${it.optInt("targets").fa()} رفت" +
+              (if (failed > 0) " — ${failed.fa()} نرسید." else ".")
             body = ""
             error = null
           }

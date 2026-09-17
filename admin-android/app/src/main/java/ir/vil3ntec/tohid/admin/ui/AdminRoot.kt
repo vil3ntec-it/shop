@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.LocalOffer
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.MoreHoriz
@@ -126,6 +127,7 @@ fun AdminRoot() {
       val page = more
       if (tab == 4 && page != null) {
         when (page) {
+          "pump" -> PumpScreen(session)
           "pricing" -> PricingScreen(session)
           "visitors" -> VisitorsScreen(session)
           "apps" -> AppsScreen(session)
@@ -161,6 +163,18 @@ private fun MoreScreen(onOpen: (String) -> Unit) {
     Spacer(Modifier.height(14.dp))
 
     Panel {
+      /*
+       *  ⛔ بخشِ پمپ تا امروز در این برنامه **نبود**. مسیرهایش از
+       *  مدت‌ها پیش روی سرور بودند و فقط پنلِ وب بلدشان بود، یعنی
+       *  صاحبِ سامانه با گوشی‌اش به هیچ پمپی نمی‌توانست اشتراک بدهد.
+       *
+       *  ⚠️ بالای فهرست است چون کارِ روزمره است، نه ماهانه.
+       */
+      MoreRow(
+        Icons.Filled.LocalGasStation, "پمپ‌بنزین‌ها",
+        "اشتراکِ هر پمپ، کدهای شش‌رقمی، و پشتیبان‌هایش",
+      ) { onOpen("pump") }
+      HorizontalDivider(color = c.border)
       MoreRow(
         Icons.Filled.LocalOffer, "نرخ‌ها و تخفیف",
         "قیمت اشتراک‌ها، تخفیف، و کدهای شش‌رقمیِ اشتراک",
