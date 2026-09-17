@@ -490,6 +490,140 @@ test('توکنِ یک برنامه در برنامه‌ی دیگر اصلاً پ
   );
 });
 
+/* ============================ قفلِ حساب ============================ */
+
+/*
+ *  `helpers.js` هر دو شمارنده‌ی قفل را عمداً بسیار بالا می‌گذارد، وگرنه
+ *  دویست سنجه‌ی دیگر — که همه از ۱۲۷٫۰٫۰٫۱ می‌آیند — همدیگر را می‌بستند.
+ *  پس اینجا خودِ تابع با آستانه‌های واقعی صدا زده می‌شود.
+ */
+
+test('قفل، حدس‌زننده را می‌بندد نه صاحبِ حساب', async () => {
+  const auth = require('../src/routes/auth');
+  const config = require('../src/config');
+  const { query, now } = require('../src/db');
+
+  const victim = `victim-${Date.now()}@test.local`;
+  const attackerIp = '203.0.113.7';
+  const ownerIp = '198.51.100.20';
+
+  //  مهاجم از IP خودش، هشت بار رمزِ غلط می‌زند
+  for (let i = 0; i < 8; i += 1) {
+    await query(
+      'INSERT INTO login_attempts (scope, identifier, ip, ok, created_at) VALUES ($1,$2,$3,$4,$5)',
+      ['user', victim, attackerIp, false, now()]
+    );
+  }
+
+  const real = { tries: config.rateLimit.lockoutTries, global: config.rateLimit.lockoutGlobalTries };
+  config.rateLimit.lockoutTries = 8;
+  config.rateLimit.lockoutGlobalTries = 40;
+  try {
+    //  مهاجم بسته است
+    await assert.rejects(
+      () => auth.assertNotLocked('user', victim, attackerIp),
+      (e) => e.code === 'locked_out',
+      'IP مهاجم باید بسته باشد'
+    );
+
+    /*
+     *  و مهم‌ترین بخش: صاحبِ حساب از گوشیِ خودش دست‌نخورده وارد
+     *  می‌شود. تا دیروز همین‌جا بسته می‌شد — یعنی هشت کلیکِ یک غریبه،
+     *  حسابِ یک نفرِ دیگر را یک ربع می‌بست.
+     */
+    await auth.assertNotLocked('user', victim, ownerIp);
+  } finally {
+    config.rateLimit.lockoutTries = real.tries;
+    config.rateLimit.lockoutGlobalTries = real.global;
+  }
+});
+
+test('حمله‌ی پخش‌شده روی چند IP باز هم حساب را می‌بندد', async () => {
+  const auth = require('../src/routes/auth');
+  const config = require('../src/config');
+  const { query, now } = require('../src/db');
+
+  const victim = `spread-${Date.now()}@test.local`;
+
+  //  چهل تلاشِ ناموفق از چهل IP جدا — هیچ‌کدام به تنهایی به هشت نمی‌رسد
+  for (let i = 0; i < 40; i += 1) {
+    await query(
+      'INSERT INTO login_attempts (scope, identifier, ip, ok, created_at) VALUES ($1,$2,$3,$4,$5)',
+      ['user', victim, `203.0.113.${i + 1}`, false, now()]
+    );
+  }
+
+  const real = { tries: config.rateLimit.lockoutTries, global: config.rateLimit.lockoutGlobalTries };
+  config.rateLimit.lockoutTries = 8;
+  config.rateLimit.lockoutGlobalTries = 40;
+  try {
+    await assert.rejects(
+      () => auth.assertNotLocked('user', victim, '198.51.100.99'),
+      (e) => e.code === 'locked_out',
+      'پشتوانه‌ی حمله‌ی پخش‌شده باید بگیرد'
+    );
+  } finally {
+    config.rateLimit.lockoutTries = real.tries;
+    config.rateLimit.lockoutGlobalTries = real.global;
+  }
+});
+
+/* ============================ نسخه‌ی برنامه ============================ */
+
+test('نسخه‌ی برنامه روی نشست ثبت می‌شود', async () => {
+  const user = await h.newUser('نسخه‌دار');
+
+  const r = await h.post('/api/auth/login', {
+    identifier: user.email, password: user.password,
+    app: 'shop', appVersion: '3.2.7',
+  });
+  assert.equal(r.status, 200);
+
+  const row = await h.query(
+    `SELECT app, app_version FROM tokens
+      WHERE kind='access' AND subject_id=$1 ORDER BY issued_at DESC LIMIT 1`,
+    [user.user.id]
+  );
+  assert.equal(row.rows[0].app, 'shop');
+  assert.equal(row.rows[0].app_version, '3.2.7');
+});
+
+test('نگفتنِ نسخه خطا نیست — نسخه‌های امروزِ دستِ کاربر بیرون نمی‌افتند', async () => {
+  const user = await h.newUser('بی‌نسخه');
+
+  const r = await h.post('/api/auth/login', { identifier: user.email, password: user.password });
+  assert.equal(r.status, 200);
+
+  const row = await h.query(
+    `SELECT app_version FROM tokens
+      WHERE kind='access' AND subject_id=$1 ORDER BY issued_at DESC LIMIT 1`,
+    [user.user.id]
+  );
+  assert.equal(row.rows[0].app_version, '');
+});
+
+test('نسخه‌ی دستکاری‌شده هیچ دری باز نمی‌کند و سرور را نمی‌ترکاند', async () => {
+  const user = await h.newUser('نسخه‌ی بدخواه');
+
+  //  رشته‌ی خیلی بلند، و چیزی که شبیهِ تزریق است
+  const r = await h.post('/api/auth/login', {
+    identifier: user.email, password: user.password,
+    appVersion: "x'; DROP TABLE tokens; --" + 'y'.repeat(500),
+  });
+  assert.equal(r.status, 200, 'ورود سرِ جایش است');
+
+  const row = await h.query(
+    `SELECT app_version FROM tokens
+      WHERE kind='access' AND subject_id=$1 ORDER BY issued_at DESC LIMIT 1`,
+    [user.user.id]
+  );
+  assert.ok(row.rows[0].app_version.length <= 32, 'بریده شده');
+
+  //  و جدول سرِ جایش است
+  const alive = await h.query('SELECT COUNT(*)::int AS n FROM tokens');
+  assert.ok(alive.rows[0].n > 0);
+});
+
 /* ============================ لاگ ============================ */
 
 test('کدِ بازیابی در لاگِ سرورِ واقعی نوشته نمی‌شود', async () => {

@@ -16,6 +16,9 @@ process.env.RATE_AUTH_MAX = '10000';
 process.env.RATE_OTP_MAX = '10000';
 process.env.RATE_JOIN_MAX = '10000';
 process.env.LOGIN_LOCKOUT_TRIES = '10000';
+//  شمارنده‌ی دومِ قفل هم باید باز باشد، وگرنه سنجه‌هایی که عمداً رمزِ
+//  غلط می‌زنند همدیگر را می‌بندند — همه از یک IP می‌آیند (127.0.0.1)
+process.env.LOGIN_LOCKOUT_GLOBAL_TRIES = '10000';
 process.env.OTP_RESEND_SECONDS = '0';
 
 const { createApp } = require('../src/app');

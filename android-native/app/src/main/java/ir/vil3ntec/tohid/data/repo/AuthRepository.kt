@@ -476,6 +476,10 @@ class AuthRepository(
    */
   private fun kotlinx.serialization.json.JsonObjectBuilder.putApp() {
     put("app", JsonPrimitive(ir.vil3ntec.tohid.core.config.AppConfig.appId))
+    //  نسخه فقط **ثبت** می‌شود؛ سرور با آن هیچ دری را باز یا بسته
+    //  نمی‌کند. به کار می‌آید وقتی گزارشی می‌رسد و باید فهمید آن گوشی
+    //  چه نسخه‌ای داشت.
+    put("appVersion", JsonPrimitive(ir.vil3ntec.tohid.core.config.AppConfig.appVersion))
   }
 
   private inline fun destinationBody(

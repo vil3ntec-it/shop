@@ -534,9 +534,16 @@
       : 'shop';
   }
 
+  /** نسخهٔ این نسخهٔ وب — فقط ثبت می‌شود، تصمیمی با آن گرفته نمی‌شود */
+  function appVersion() {
+    return (window.TohidApiConfig && window.TohidApiConfig.appVersion)
+      ? window.TohidApiConfig.appVersion()
+      : '';
+  }
+
   async function login(identifier, password) {
     const r = await api('/api/v1/auth/login', {
-      method: 'POST', auth: false, body: { identifier, password, app: appId() },
+      method: 'POST', auth: false, body: { identifier, password, app: appId(), appVersion: appVersion() },
     });
     writeStore({
       accessToken: r.accessToken, accessExpiresAt: r.accessExpiresAt,
@@ -578,7 +585,7 @@
   /** رمزِ تازه با کدی که به ایمیل رفته — و همان‌جا ورود */
   async function resetPassword({ email, code, password }) {
     const r = await api('/api/v1/auth/password/reset', {
-      method: 'POST', auth: false, body: { email, code, password, app: appId() },
+      method: 'POST', auth: false, body: { email, code, password, app: appId(), appVersion: appVersion() },
     });
     if (r && r.accessToken) {
       writeStore({
@@ -619,7 +626,7 @@
   async function registerComplete({ ticket, name, password, terms, location }) {
     const r = await api('/api/v1/auth/register/complete', {
       method: 'POST', auth: false,
-      body: { ticket, name, password, terms, location, device: devicePayload(), app: appId() },
+      body: { ticket, name, password, terms, location, device: devicePayload(), app: appId(), appVersion: appVersion() },
     });
     if (r && r.accessToken) {
       writeStore({
