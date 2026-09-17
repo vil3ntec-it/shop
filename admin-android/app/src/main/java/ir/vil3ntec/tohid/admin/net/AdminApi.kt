@@ -297,8 +297,15 @@ class AdminApi(private val baseUrl: String) {
 
   /* --------------------------- پشتیبانی --------------------------- */
 
-  suspend fun supportThreads(token: String, status: String = "", query: String = ""): JSONObject =
-    get("/api/v1/admin/support/threads?status=${enc(status)}&q=${enc(query)}", token)
+  /**
+   *  گفت‌وگوها.
+   *
+   *  ⚠️ `app` از امروز هست و بی آن گفت‌وگوهای دکان و پمپ در یک فهرست
+   *  قاطی می‌شدند — و از آن‌جا که رشتهٔ پمپ نامِ کاربر ندارد (پمپِ
+   *  فعال‌شده با کدِ شش‌رقمی حساب ندارد)، تشخیصشان از هم ممکن نبود.
+   */
+  suspend fun supportThreads(token: String, status: String = "", query: String = "", app: String = ""): JSONObject =
+    get("/api/v1/admin/support/threads?status=${enc(status)}&q=${enc(query)}&app=${enc(app)}", token)
 
   suspend fun supportThread(token: String, id: String, after: Long = 0): JSONObject =
     get("/api/v1/admin/support/threads/$id?after=$after", token)
@@ -309,11 +316,18 @@ class AdminApi(private val baseUrl: String) {
   suspend fun supportStatus(token: String, id: String, status: String): JSONObject =
     post("/api/v1/admin/support/threads/$id/status", JSONObject().put("status", status), token)
 
-  /** پیام همگانی — به کسانی که اشتراکشان رو به پایان است، یا به همه. */
-  suspend fun broadcast(token: String, body: String, target: String): JSONObject =
+  /**
+   *  پیام همگانی — به کسانی که اشتراکشان رو به پایان است، یا به همه.
+   *
+   *  ⛔ تا امروز `app` نداشت و سرور هم فقط `shops` را می‌گرفت: هر
+   *  پیامی که فرستاده می‌شد به **هیچ پمپ‌بنزینی** نمی‌رسید، و پاسخ هم
+   *  عددی می‌گفت که فقط دکان‌ها را می‌شمرد. پس مدیر خیالش راحت بود که
+   *  همه خبر دارند.
+   */
+  suspend fun broadcast(token: String, body: String, target: String, app: String = "shop"): JSONObject =
     post(
       "/api/v1/admin/support/broadcast",
-      JSONObject().put("body", body).put("target", target),
+      JSONObject().put("body", body).put("target", target).put("app", app),
       token,
     )
 
@@ -390,6 +404,105 @@ class AdminApi(private val baseUrl: String) {
       token,
     ).optJSONObject("push") ?: JSONObject()
 
+  /* ---------------------------- پمپ‌بنزین‌ها ----------------------------
+   *
+   *  ⛔ تا امروز اپِ مدیریت هیچ بخشِ پمپی نداشت: مسیرهایش روی سرور
+   *  بودند و فقط پنلِ وب بلدشان بود. یعنی صاحبِ سامانه با گوشی‌اش
+   *  نمی‌توانست به یک پمپ اشتراک بدهد — همان کاری که برای دکان‌ها
+   *  از روزِ اول می‌توانست.
+   *
+   *  ⚠️ دفترِ پمپ **جداست**: `/admin/pump/…` روی `stations` و
+   *  `station_subscriptions` کار می‌کند، نه روی `shops`. قاطی کردنشان
+   *  یعنی اشتراکی که برای یک پمپ خریده شده، دکانی را باز کند.
+   */
+
+  suspend fun stations(token: String, query: String = "", limit: Int = 50): JSONArray =
+    get("/api/v1/admin/pump/stations?limit=$limit&q=${enc(query)}", token)
+      .optJSONArray("stations") ?: JSONArray()
+
+  suspend fun station(token: String, id: String): JSONObject =
+    get("/api/v1/admin/pump/stations/$id", token)
+
+  suspend fun stationHistory(token: String, id: String): JSONArray =
+    get("/api/v1/admin/pump/stations/$id/history", token).optJSONArray("history") ?: JSONArray()
+
+  /**
+   *  پلن‌های **پمپ**.
+   *
+   *  ⚠️ همان مسیرِ `/admin/plans` است با `app=pump` — نه مسیرِ جدا.
+   *  جدول یکی است و ستونِ `app` می‌گوید هر ردیف مالِ کدام بخش است؛
+   *  بی این پارامتر، قیمت‌های **دکان** برمی‌گشت و مدیر ناخواسته
+   *  پلنِ دکان را به یک پمپ می‌داد.
+   */
+  suspend fun pumpPlans(token: String): JSONArray =
+    get("/api/v1/admin/plans?app=pump", token).optJSONArray("plans") ?: JSONArray()
+
+  /** اشتراکِ یک پمپ — دادن یا تمدید. */
+  suspend fun grantStation(
+    token: String,
+    stationId: String,
+    plan: String,
+    days: Int?,
+    note: String,
+  ): JSONObject = post(
+    "/api/v1/admin/pump/subscriptions",
+    JSONObject().apply {
+      put("stationId", stationId)
+      put("plan", plan)
+      if (days != null) put("days", days)
+      if (note.isNotBlank()) put("note", note)
+    },
+    token,
+  )
+
+  suspend fun setStationSubStatus(token: String, subscriptionId: String, status: String): JSONObject =
+    post(
+      "/api/v1/admin/pump/subscriptions/$subscriptionId/status",
+      JSONObject().put("status", status),
+      token,
+    )
+
+  suspend fun pumpVipCodes(token: String): JSONArray =
+    get("/api/v1/admin/pump/vip-codes?limit=100", token).optJSONArray("codes") ?: JSONArray()
+
+  suspend fun createPumpVipCode(
+    token: String,
+    plan: String,
+    days: Int?,
+    email: String,
+    phone: String,
+    note: String,
+  ): JSONObject = post(
+    "/api/v1/admin/pump/vip-codes",
+    JSONObject().apply {
+      put("plan", plan)
+      if (days != null) put("days", days)
+      if (email.isNotBlank()) put("email", email)
+      if (phone.isNotBlank()) put("phone", phone)
+      if (note.isNotBlank()) put("note", note)
+    },
+    token,
+  )
+
+  suspend fun revokePumpVipCode(token: String, id: String): JSONObject =
+    post("/api/v1/admin/pump/vip-codes/$id/revoke", JSONObject(), token)
+
+  /* --------------------- پشتیبانِ هر حساب ---------------------
+   *
+   *  ⚠️ با «پشتیبان‌های سامانه» یکی نیست: آن یکی `pg_dump`ِ کلِ
+   *  دیتابیس است و مالِ صاحبِ سامانه؛ این یکی فایلی است که خودِ
+   *  برنامهٔ همان دکان یا پمپ فرستاده و با آن می‌شود **همان یکی** را
+   *  برگرداند.
+   *
+   *  `app` یا `"shop"` است یا `"pump"` — سرور هر نامِ دیگری را رد
+   *  می‌کند، پس دفترِ اشتباهی خوانده نمی‌شود.
+   */
+  suspend fun accountBackups(token: String, app: String, tenantId: String): JSONObject =
+    get("/api/v1/admin/accounts/$app/$tenantId/backups", token)
+
+  suspend fun deleteAccountBackup(token: String, app: String, tenantId: String, id: String): JSONObject =
+    delete("/api/v1/admin/accounts/$app/$tenantId/backups/$id", token)
+
   /* ------------------------------ لایهٔ HTTP ------------------------------ */
 
   private fun enc(s: String) = URLEncoder.encode(s, "UTF-8")
@@ -402,6 +515,9 @@ class AdminApi(private val baseUrl: String) {
 
   private suspend fun put(path: String, body: JSONObject, token: String?): JSONObject =
     request("PUT", path, body, token)
+
+  private suspend fun delete(path: String, token: String?): JSONObject =
+    request("DELETE", path, null, token)
 
   private suspend fun request(
     method: String,

@@ -1,6 +1,6 @@
 {
   "name": "shop-server",
-  "version": "2.4.0",
+  "version": "2.5.4",
   "private": true,
   "description": "سرور فروشگاه — احراز هویت، دکان چندکاربره، اشتراک و همگام‌سازی روی PostgreSQL",
   "main": "src/index.js",
@@ -10,7 +10,10 @@
     "create-admin": "node scripts/create-admin.js",
     "backup": "node scripts/backup.js",
     "restore": "node scripts/restore.js",
-    "test": "node --test --test-concurrency=1 test/*.test.js"
+    "test": "node --test --test-concurrency=1 test/*.test.js",
+    "test:panel": "node test/admin-panel.mjs",
+    "test:all": "npm test && npm run test:panel && npm run test:web",
+    "test:web": "node test/web-backup.mjs"
   },
   "engines": {
     "node": ">=20"

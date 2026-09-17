@@ -45,6 +45,8 @@
     <button class="tab" data-tab="subs">اشتراک‌ها</button>
     <button class="tab" data-tab="requests">درخواست‌های خرید</button>
     <button class="tab" data-tab="plans">پلن‌ها و تنظیمات</button>
+    <button class="tab" data-tab="support">پشتیبانی و پیام</button>
+    <button class="tab" data-tab="delivery">ایمیل و پوش</button>
     <button class="tab" data-tab="backups">پشتیبان‌ها</button>
     <button class="tab" data-tab="audit">سابقه</button>
   </nav>
@@ -110,6 +112,66 @@
 
       <h2 style="margin-top:16px;">اطلاعات ثبت‌شده</h2>
       <div id="shop-counts" class="feat-grid"></div>
+
+      <!--
+        پشتیبانِ همین دکان — فایل‌هایی که خودِ برنامه فرستاده.
+        این با تبِ «پشتیبان‌ها» یکی نیست: آن یکی `pg_dump`ِ کلِ دیتابیس
+        است و مالِ صاحبِ سامانه؛ این یکی دفترِ همین یک دکان است.
+      -->
+      <h2 style="margin-top:16px;">پشتیبان‌های این دکان</h2>
+      <p class="muted" id="shop-bak-stats"></p>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>زمان</th><th>حجم</th><th>نوع</th><th>یادداشت</th><th>نسخه</th><th></th></tr></thead>
+          <tbody id="shop-bak-body"></tbody>
+        </table>
+      </div>
+      <div id="shop-bak-msg"></div>
+    </div>
+
+    <!--
+      کدِ شش‌رقمیِ دکان.
+
+      ⛔ تا امروز این کارت فقط برای **پمپ** بود. مسیرِ سرور
+      (`/admin/vip-codes`) از روزِ اول وجود داشت ولی هیچ دکمه‌ای در پنل
+      نداشت — یعنی صاحبِ سامانه از پنل هیچ راهی برای دادنِ اشتراک به یک
+      دکان‌دار نداشت مگر این‌که دکانش را پیدا کند و دستی تمدید بزند.
+    -->
+    <div class="panel">
+      <div class="panel-head"><h2>کدهای اشتراکِ دکان</h2></div>
+      <div class="grid grid-3">
+        <div>
+          <label>پلن</label>
+          <select id="svip-plan"></select>
+        </div>
+        <div>
+          <label>مدت (روز)</label>
+          <input type="number" id="svip-days" min="1" max="3650" placeholder="خالی = مدت پلن">
+        </div>
+        <div>
+          <label>ایمیلِ گیرنده (اختیاری)</label>
+          <input type="email" id="svip-email" placeholder="سرور خودش می‌فرستد">
+        </div>
+        <div>
+          <label>موبایلِ گیرنده (اختیاری)</label>
+          <input type="tel" id="svip-phone" dir="ltr" placeholder="+93790000000 — کد پیامک می‌شود">
+        </div>
+      </div>
+      <label>یادداشت</label>
+      <input type="text" id="svip-note" placeholder="برای چه کسی و چرا">
+      <div class="row" style="margin-top:12px;">
+        <button class="btn btn-sm" id="btn-svip-make">ساختِ کد</button>
+      </div>
+      <div id="svip-msg"></div>
+      <div class="table-scroll" style="margin-top:12px;">
+        <table>
+          <thead><tr>
+            <th>کد</th><th>پلن</th><th>روز</th><th>ایمیل</th>
+            <th>وضعیت</th><th>ساخت</th><th></th>
+          </tr></thead>
+          <tbody id="svip-body"></tbody>
+        </table>
+      </div>
     </div>
   </section>
 
@@ -231,6 +293,21 @@
           <tbody id="pump-files"></tbody>
         </table>
       </div>
+
+      <!--
+        ⚠️ «پوشهٔ این پمپ» بالا، عکسِ زندهٔ حساب‌هاست. این یکی پشتیبانِ
+        خودِ دفتر است — فایلی که برنامهٔ کامپیوتر هر شش ساعت می‌فرستد و
+        با آن می‌شود کلِ پمپ را روی کامپیوترِ تازه برگرداند.
+      -->
+      <h2 style="margin-top:16px;">پشتیبان‌های این پمپ</h2>
+      <p class="muted" id="pump-bak-stats"></p>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>زمان</th><th>حجم</th><th>نوع</th><th>یادداشت</th><th>نسخه</th><th></th></tr></thead>
+          <tbody id="pump-bak-body"></tbody>
+        </table>
+      </div>
+      <div id="pump-bak-msg"></div>
     </div>
 
     <!--
@@ -337,7 +414,16 @@
       <div class="grid grid-3">
         <div><label>مدت دوره آزمایشی (روز)</label><input type="number" id="cfg-trial" min="0" max="365"></div>
         <div><label>شماره واتساپ</label><input type="text" id="cfg-wa" dir="ltr"></div>
-        <div><label>واحد پول</label><input type="text" id="cfg-currency"></div>
+        <div><label>واحد پول (دکان)</label><input type="text" id="cfg-currency"></div>
+      </div>
+      <!--
+        ⚠️ بخشِ پمپ واحدِ پول و دورهٔ آزمایشیِ **خودش** را دارد.
+        قیمتِ پلن‌های پمپ دالری است (۱۲۰ · ۱۵۰ · ۶۰۰) و با واحدِ
+        مشترک، صفحهٔ اشتراکِ پمپ «۱۲۰ افغانی» می‌نوشت.
+      -->
+      <div class="grid grid-3">
+        <div><label>مدت دوره آزمایشی پمپ (روز)</label><input type="number" id="cfg-pump-trial" min="0" max="365"></div>
+        <div><label>واحد پول (پمپ)</label><input type="text" id="cfg-pump-currency"></div>
       </div>
       <label>متن پیام واتساپ</label>
       <input type="text" id="cfg-wamsg">
@@ -346,7 +432,7 @@
     </div>
 
     <div class="panel">
-      <div class="panel-head"><h2>پلن‌های اشتراک</h2></div>
+      <div class="panel-head"><h2>پلن‌های اشتراکِ دکان</h2></div>
       <div class="table-scroll">
         <table>
           <thead><tr><th>کد</th><th>عنوان</th><th>مدت</th><th>قیمت</th><th>برچسب</th><th>فعال</th><th></th></tr></thead>
@@ -354,6 +440,207 @@
         </table>
       </div>
       <div id="plans-msg"></div>
+    </div>
+
+    <!--
+      پلن‌های پمپ — جدول جدا، چون بخش جداست.
+
+      ⛔ تا امروز پنل فقط پلن‌های دکان را نشان می‌داد. یعنی پلن‌های پمپ
+      (استاندارد · وی‌آی‌پی · دائمی) هیچ‌جای پنل دیده و ویرایش نمی‌شدند،
+      و کادرِ «پلن»ِ اشتراکِ پمپ هم از فهرستِ دکان پر می‌شد.
+    -->
+    <div class="panel">
+      <div class="panel-head"><h2>پلن‌های اشتراکِ پمپ‌بنزین</h2></div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>کد</th><th>عنوان</th><th>مدت</th><th>قیمت</th><th>برچسب</th><th>فعال</th><th></th></tr></thead>
+          <tbody id="pump-plans-body"></tbody>
+        </table>
+      </div>
+      <div id="pump-plans-msg"></div>
+    </div>
+  </section>
+
+  <!--
+    پشتیبانی و پیامِ همگانی.
+
+    ⛔ تا امروز هیچ‌کدام در پنل نبودند: مسیرهایشان روی سرور بود و فقط
+    اپِ اندرویدِ مدیریت بلدشان بود. یعنی صاحبِ سامانه پشتِ کامپیوتر
+    نمی‌توانست پیامِ کسی را ببیند، چه رسد به جواب دادن.
+  -->
+  <section id="tab-support" class="hidden">
+    <div class="panel">
+      <div class="panel-head">
+        <h2>گفت‌وگوها</h2>
+        <span class="muted" id="sup-unread"></span>
+      </div>
+      <div class="row">
+        <select id="sup-app" style="width:150px;">
+          <option value="">هر دو بخش</option>
+          <option value="shop">دکان</option>
+          <option value="pump">پمپ</option>
+        </select>
+        <select id="sup-status" style="width:150px;">
+          <option value="">هر وضعیت</option>
+          <option value="open">باز</option>
+          <option value="pending">در انتظار</option>
+          <option value="closed">بسته</option>
+        </select>
+        <input type="search" id="sup-q" placeholder="نام، ایمیل یا متنِ پیام" style="flex:1;min-width:200px;">
+        <button class="btn btn-sm" id="btn-sup-search">جست‌وجو</button>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr>
+            <th>از</th><th>بخش</th><th>آخرین پیام</th><th>نخوانده</th>
+            <th>وضعیت</th><th>زمان</th><th></th>
+          </tr></thead>
+          <tbody id="sup-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel hidden" id="sup-detail">
+      <div class="panel-head">
+        <h2 id="sup-title">گفت‌وگو</h2>
+        <button class="btn btn-ghost btn-sm" id="btn-sup-close">بستن</button>
+      </div>
+      <div id="sup-messages" style="max-height:340px;overflow-y:auto;"></div>
+      <label style="margin-top:10px;">پاسخ</label>
+      <textarea id="sup-reply" rows="3" placeholder="جوابتان را بنویسید"></textarea>
+      <div class="row" style="margin-top:10px;">
+        <button class="btn btn-sm" id="btn-sup-send">فرستادن</button>
+        <button class="btn btn-ghost btn-sm" id="btn-sup-pending">در انتظار</button>
+        <button class="btn btn-warn btn-sm" id="btn-sup-closed">بستنِ گفت‌وگو</button>
+        <button class="btn btn-ghost btn-sm" id="btn-sup-reopen">باز کردن</button>
+      </div>
+      <div id="sup-msg"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>پیامِ همگانی</h2></div>
+      <p class="muted">
+        در همان چتِ پشتیبانیِ هر کس می‌نشیند، پس هم در برنامه دیده می‌شود
+        هم روی سایت — و اگر گوشی پوش داشته باشد، بسته هم که باشد زنگ می‌زند.
+      </p>
+      <div class="grid grid-3">
+        <div>
+          <label>به کدام بخش</label>
+          <select id="bc-app">
+            <option value="shop">دکان‌ها</option>
+            <option value="pump">پمپ‌بنزین‌ها</option>
+            <option value="both">هر دو</option>
+          </select>
+        </div>
+        <div>
+          <label>به چه کسانی</label>
+          <select id="bc-target">
+            <option value="expiring">اشتراکشان رو به پایان</option>
+            <option value="active">اشتراکِ فعال دارند</option>
+            <option value="all">همه</option>
+          </select>
+        </div>
+        <div>
+          <label>حداکثر گیرنده</label>
+          <input type="number" id="bc-limit" min="1" max="500" value="200">
+        </div>
+      </div>
+      <label>متنِ پیام</label>
+      <textarea id="bc-body" rows="3" placeholder="مثلاً: فردا از ساعت ۲ تا ۳ سرور خاموش است"></textarea>
+      <div class="row" style="margin-top:10px;">
+        <button class="btn btn-sm" id="btn-bc-send">فرستادن</button>
+      </div>
+      <div id="bc-msg"></div>
+    </div>
+  </section>
+
+  <!--
+    ایمیل و پوش.
+
+    ⛔ تا امروز فقط در اپِ اندروید بود. یعنی اگر SMTP تنظیم نشده بود،
+    `provider` روی `log` می‌ماند و کدِ شش‌رقمیِ ثبت‌نام فقط در لاگِ سرور
+    چاپ می‌شد — و از پنل هیچ راهی برای درست کردنش نبود.
+  -->
+  <section id="tab-delivery" class="hidden">
+    <div class="panel">
+      <div class="panel-head">
+        <h2>ایمیل — کدِ شش‌رقمی و کدِ اشتراک از این‌جا می‌روند</h2>
+        <span class="muted" id="mail-state"></span>
+      </div>
+      <div class="grid grid-2">
+        <div>
+          <label>راهِ ارسال</label>
+          <select id="mail-provider">
+            <option value="log">فقط در لاگِ سرور (بی ایمیل)</option>
+            <option value="smtp">SMTP — سرورِ ایمیلِ خودتان، Gmail، Zoho…</option>
+            <option value="api">API — Resend، Brevo و مانندشان</option>
+          </select>
+        </div>
+        <div>
+          <label>فرستنده (From)</label>
+          <input type="email" id="mail-from" placeholder="noreply@example.com">
+        </div>
+        <div>
+          <label>نامِ فرستنده</label>
+          <input type="text" id="mail-fromname" placeholder="توحید">
+        </div>
+        <div>
+          <label>موضوعِ ایمیلِ کد</label>
+          <input type="text" id="mail-subject" placeholder="کد ورود توحید">
+        </div>
+      </div>
+
+      <h2 style="margin-top:16px;">SMTP</h2>
+      <div class="grid grid-3">
+        <div><label>میزبان</label><input type="text" id="mail-host" dir="ltr" placeholder="smtp.gmail.com"></div>
+        <div><label>پورت</label><input type="number" id="mail-port" dir="ltr" placeholder="587"></div>
+        <div>
+          <label>رمزنگاری</label>
+          <select id="mail-secure">
+            <option value="starttls">STARTTLS (۵۸۷)</option>
+            <option value="ssl">SSL/TLS (۴۶۵)</option>
+            <option value="none">بدون رمزنگاری</option>
+          </select>
+        </div>
+        <div><label>نامِ کاربری</label><input type="text" id="mail-user" dir="ltr" autocomplete="off"></div>
+        <div><label>رمز</label><input type="password" id="mail-pass" dir="ltr" autocomplete="new-password" placeholder="خالی = دست نخورد"></div>
+      </div>
+
+      <h2 style="margin-top:16px;">API</h2>
+      <div class="grid grid-2">
+        <div><label>نشانی</label><input type="url" id="mail-url" dir="ltr" placeholder="https://api.resend.com/emails"></div>
+        <div><label>کلید</label><input type="password" id="mail-key" dir="ltr" autocomplete="new-password" placeholder="خالی = دست نخورد"></div>
+      </div>
+
+      <div class="row" style="margin-top:12px;">
+        <button class="btn btn-sm" id="btn-mail-save">ذخیره</button>
+        <input type="email" id="mail-test-to" placeholder="ایمیلِ آزمایشی" style="flex:1;min-width:200px;">
+        <button class="btn btn-ghost btn-sm" id="btn-mail-test">فرستادنِ آزمایشی</button>
+      </div>
+      <div id="mail-msg"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h2>پوش — خبری که به گوشیِ بسته هم می‌رسد</h2>
+        <span class="muted" id="push-state"></span>
+      </div>
+      <p class="muted">
+        فایلِ «حساب سرویس» را از کنسول Firebase بگیرید و همان‌طور که هست
+        این‌جا بچسبانید. بی این، پیام‌ها گم نمی‌شوند — فقط زنگ نمی‌زنند و
+        دفعهٔ بعد که برنامه باز شد دیده می‌شوند.
+      </p>
+      <div class="row">
+        <label style="display:flex;align-items:center;gap:6px;">
+          <input type="checkbox" id="push-enabled"> روشن
+        </label>
+      </div>
+      <label>فایلِ حساب سرویس (JSON)</label>
+      <textarea id="push-sa" rows="5" dir="ltr" placeholder='{"type":"service_account", …}'></textarea>
+      <div class="row" style="margin-top:10px;">
+        <button class="btn btn-sm" id="btn-push-save">ذخیره</button>
+      </div>
+      <div id="push-msg"></div>
     </div>
   </section>
 

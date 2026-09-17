@@ -197,6 +197,9 @@ router.get('/support/threads', async (req, res, next) => {
       threads: await support.list({
         status: v.text(req.query?.status, { max: 20 }),
         q: v.text(req.query?.q, { max: 60 }),
+        //  ⚠️ بی این، گفت‌وگوهای پمپ و دکان در یک فهرست قاطی می‌شدند و
+        //  مدیر نمی‌توانست فقط پمپ‌ها را ببیند
+        app: v.oneOf(req.query?.app, ['shop', 'pump'], { field: 'بخش', def: '' }),
         limit: v.integer(req.query?.limit, { min: 1, max: 200, def: 100 }),
         offset: v.integer(req.query?.offset, { min: 0, max: 1e6, def: 0 }),
       }),
@@ -224,9 +227,7 @@ router.get('/support/threads/:id', async (req, res, next) => {
 router.post('/support/threads/:id/messages', async (req, res, next) => {
   try {
     const id = v.id(req.params.id);
-    const body = v.text(req.body?.body ?? req.body?.text, {
-      max: support.MAX_BODY, required: true, field: 'پیام',
-    });
+    const body = support.cleanBody(req.body?.body ?? req.body?.text);
     const message = await support.post(id, {
       sender: 'admin',
       senderId: req.admin.id,
@@ -247,22 +248,35 @@ router.post('/support/threads/:id/status', async (req, res, next) => {
 });
 
 /**
- * پیام همگانی — به همه‌ی دکان‌دارها یا به گروهی از آن‌ها.
+ * پیام همگانی — به دکان‌دارها، به پمپ‌دارها، یا به هر دو.
  *
- * محدود شده به دکان‌هایی که مدیر انتخاب می‌کند؛ «همه» هم سقف دارد تا
+ * ⛔ **تا امروز فقط `shops` را می‌گرفت.** یعنی هر پیامی که مدیر
+ * می‌فرستاد — «سرور فردا خاموش است»، «قیمت‌ها عوض شد» — به هیچ
+ * پمپ‌بنزینی نمی‌رسید، و هیچ‌جا هم گفته نمی‌شد که نرسیده. مدیر
+ * «۴۲ نفر» می‌دید و خیالش راحت بود.
+ *
+ * ⚠️ **پمپی که صاحب ندارد هم پیام می‌گیرد.** برنامهٔ کامپیوترِ پمپ
+ * حساب ندارد (`owner_user_id` می‌تواند خالی باشد) و رشته‌اش به
+ * `station_id` بسته است، نه به آدم. اگر فقط پمپ‌های صاحب‌دار را
+ * می‌گرفتیم، تازه‌ترین مشتری‌ها — همان‌هایی که هنوز گوشی وصل نکرده‌اند —
+ * هیچ‌وقت خبر نمی‌شدند.
+ *
+ * محدود شده به همان‌هایی که مدیر انتخاب می‌کند؛ «همه» هم سقف دارد تا
  * یک اشتباه، هزار پیام نفرستد.
  */
-router.post('/support/broadcast', rateLimit({ max: 5, keyPrefix: 'admin-broadcast' }), async (req, res, next) => {
+router.post('/support/broadcast', rateLimit({ max: require('../config').rateLimit.broadcastMax, keyPrefix: 'admin-broadcast' }), async (req, res, next) => {
   try {
-    const body = v.text(req.body?.body, { max: support.MAX_BODY, required: true, field: 'پیام' });
+    const body = support.cleanBody(req.body?.body);
     const target = v.oneOf(req.body?.target, ['expiring', 'active', 'all'], { field: 'گیرنده', def: 'expiring' });
+    const app = v.oneOf(req.body?.app, ['shop', 'pump', 'both'], { field: 'بخش', def: 'shop' });
     const limit = v.integer(req.body?.limit, { min: 1, max: 500, def: 200 });
 
-    let owners = [];
-    if (target === 'expiring') {
-      const rows = await subs.expiringSoon({ withinDays: 7, includeExpired: 3, limit });
-      owners = rows.map(r => ({ userId: r.ownerUserId, shopId: r.shopId, name: r.ownerName }));
-    } else {
+    /** گیرنده‌های بخشِ دکان. */
+    async function shopTargets() {
+      if (target === 'expiring') {
+        const rows = await subs.expiringSoon({ withinDays: 7, includeExpired: 3, limit });
+        return rows.map(r => ({ app: 'shop', userId: r.ownerUserId, shopId: r.shopId, who: r.ownerName }));
+      }
       const rows = await many(
         `SELECT s.id AS shop_id, s.owner_user_id, u.name
            FROM shops s JOIN users u ON u.id = s.owner_user_id
@@ -273,23 +287,61 @@ router.post('/support/broadcast', rateLimit({ max: 5, keyPrefix: 'admin-broadcas
           ORDER BY s.created_at DESC LIMIT $2`,
         [target, limit]
       );
-      owners = rows.map(r => ({ userId: r.owner_user_id, shopId: r.shop_id, name: r.name }));
+      return rows.map(r => ({ app: 'shop', userId: r.owner_user_id, shopId: r.shop_id, who: r.name }));
     }
 
+    /** گیرنده‌های بخشِ پمپ — با یا بی صاحب. */
+    async function pumpTargets() {
+      if (target === 'expiring') {
+        const rows = await subs.pump.expiringSoon({ withinDays: 7, includeExpired: 3, limit });
+        return rows.map(r => ({
+          app: 'pump', userId: r.ownerUserId || '', stationId: r.tenantId, who: r.ownerName || r.tenantName || '',
+        }));
+      }
+      const rows = await many(
+        `SELECT st.id AS station_id, st.owner_user_id, st.name, u.name AS owner_name
+           FROM stations st
+           LEFT JOIN users u ON u.id = st.owner_user_id
+          WHERE st.status='active'
+            AND ($1 = 'all' OR EXISTS (
+                  SELECT 1 FROM station_subscriptions x
+                   WHERE x.station_id = st.id AND x.status='active'))
+          ORDER BY st.created_at DESC LIMIT $2`,
+        [target, limit]
+      );
+      return rows.map(r => ({
+        app: 'pump', userId: r.owner_user_id || '', stationId: r.station_id,
+        who: r.owner_name || r.name || '',
+      }));
+    }
+
+    const owners = [
+      ...(app === 'shop' || app === 'both' ? await shopTargets() : []),
+      ...(app === 'pump' || app === 'both' ? await pumpTargets() : []),
+    ];
+
     let sent = 0;
+    const failed = [];
     for (const o of owners) {
       try {
-        await support.systemMessage({ userId: o.userId, shopId: o.shopId, who: o.name, body });
+        await support.systemMessage({
+          app: o.app, userId: o.userId || '', shopId: o.shopId || '',
+          stationId: o.stationId || '', who: o.who || '', body,
+        });
         sent++;
       } catch (err) {
+        //  ⚠️ نرسیدن به یکی، نباید جلوی بقیه را بگیرد — ولی بی‌صدا هم
+        //  نمی‌ماند: شمارِ نرسیده‌ها در پاسخ می‌آید تا مدیر «همه رفت»
+        //  نبیند در حالی که نرفته.
+        failed.push(o.stationId || o.shopId || o.userId);
         console.error('[broadcast]', err.message);
       }
     }
     await audit.log({
       actorType: 'admin', userId: req.admin.id, action: 'admin.broadcast',
-      detail: { target, sent },
+      detail: { target, app, sent, failed: failed.length },
     });
-    res.json({ sent, targets: owners.length });
+    res.json({ sent, targets: owners.length, failed: failed.length, app, target });
   } catch (err) { next(err); }
 });
 
@@ -438,6 +490,66 @@ router.post('/email/test', rateLimit({ max: 10, keyPrefix: 'admin-email-test' })
     } catch (err) {
       res.json({ ok: false, error: String(err.message || err).slice(0, 400) });
     }
+  } catch (err) { next(err); }
+});
+
+/* ==========================================================
+   پشتیبانِ هر حساب — از دیدِ مدیر
+   ----------------------------------------------------------
+   ⚠️ این با `/admin/backups` یکی **نیست** و نباید یکی شود.
+   آن یکی `pg_dump`ِ کلِ دیتابیس است و مالِ صاحبِ سامانه؛ این یکی
+   فایلِ خودِ یک دکان یا یک پمپ است. برگرداندنِ یکی از آن یکی یعنی
+   برگرداندنِ همهٔ مشتری‌ها به دیروز — کاری که هیچ‌کس نمی‌کند.
+
+   ⚠️ `app` از مسیر می‌آید ولی خطرناک نیست: `forApp` فقط دو نام را
+   می‌شناسد و هر چیز دیگری به بخشِ دکان می‌افتد، پس نامِ جدول و پوشه
+   هیچ‌وقت از درخواست ساخته نمی‌شود.
+   ========================================================== */
+const acctBackups = require('../lib/account-backups');
+
+function backupStore(req) {
+  const app = String(req.params.app || '').toLowerCase();
+  if (app !== 'shop' && app !== 'pump') throw badRequest('بخش معتبر نیست', 'bad_app');
+  return acctBackups.forApp(app);
+}
+
+router.get('/accounts/:app/:tenantId/backups', async (req, res, next) => {
+  try {
+    const store = backupStore(req);
+    const id = v.text(req.params.tenantId, { max: 64, required: true, field: 'شناسهٔ حساب' });
+    res.json({
+      app: store.app,
+      backups: await store.list(id, { limit: v.integer(req.query?.limit, { min: 1, max: 500, def: 100 }) }),
+      stats: await store.stats(id),
+    });
+  } catch (err) { next(err); }
+});
+
+router.get('/accounts/:app/:tenantId/backups/:id', async (req, res, next) => {
+  try {
+    const store = backupStore(req);
+    const { row, data } = await store.read(
+      v.text(req.params.tenantId, { max: 64, required: true, field: 'شناسهٔ حساب' }),
+      v.text(req.params.id, { max: 64, required: true, field: 'شناسه' })
+    );
+    res.set('Content-Type', 'application/octet-stream');
+    res.set('Content-Length', String(data.length));
+    res.set('Content-Disposition', `attachment; filename="${row.name}"`);
+    res.set('X-Backup-Sha256', row.sha256);
+    res.send(data);
+  } catch (err) { next(err); }
+});
+
+router.delete('/accounts/:app/:tenantId/backups/:id', requireSuperAdmin, async (req, res, next) => {
+  try {
+    const store = backupStore(req);
+    const tenantId = v.text(req.params.tenantId, { max: 64, required: true, field: 'شناسهٔ حساب' });
+    const gone = await store.remove(tenantId, v.text(req.params.id, { max: 64, required: true, field: 'شناسه' }));
+    await audit.log({
+      actorType: 'admin', userId: req.admin.id, action: 'admin.account_backup_deleted',
+      targetType: 'account_backup', targetId: gone.id, detail: { app: store.app, tenantId },
+    });
+    res.json({ ok: true, backup: gone, stats: await store.stats(tenantId) });
   } catch (err) { next(err); }
 });
 

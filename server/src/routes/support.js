@@ -92,9 +92,9 @@ router.get('/thread', async (req, res, next) => {
 router.post('/messages', writeLimit, async (req, res, next) => {
   try {
     const id = await who(req);
-    const body = v.text(req.body?.body ?? req.body?.text, {
-      max: support.MAX_BODY, required: true, field: 'پیام',
-    });
+    //  ⚠️ `support.cleanBody` و نه `v.text`: آن یکی می‌بُرد، این یکی
+    //  می‌گوید بلند است. پیامِ نصفه‌ی بی‌خبر بدتر از پیامِ نرفته است.
+    const body = support.cleanBody(req.body?.body ?? req.body?.text);
     const thread = await support.threadFor({
       ...id,
       subject: v.text(req.body?.subject, { max: 120 }),
@@ -134,6 +134,9 @@ router.post('/push', async (req, res, next) => {
       token,
       provider: v.oneOf(req.body?.provider, ['fcm', 'webpush'], { field: 'سرویس', def: 'fcm' }),
       userId: id.userId,
+      //  دکان هم ثبت می‌شود تا خبرِ «کالا تمام شد» به همهٔ گوشی‌های
+      //  همان دکان برسد، نه فقط به کسی که توکن را ثبت کرده
+      shopId: id.shopId,
       deviceUid: id.deviceUid,
       platform: v.text(req.body?.platform, { max: 20 }),
     });

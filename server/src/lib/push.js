@@ -145,7 +145,10 @@ async function googleToken(sa) {
  * پس صاحبش هم به‌روز می‌شود — وگرنه پیامِ یک نفر به گوشی نفرِ قبلی
  * می‌رفت.
  */
-async function register({ app = 'shop', token, provider = 'fcm', userId = '', adminId = '', deviceUid = '', platform = '' }) {
+async function register({
+  app = 'shop', token, provider = 'fcm',
+  userId = '', adminId = '', shopId = '', stationId = '', deviceUid = '', platform = '',
+}) {
   const clean = String(token || '').trim();
   if (!clean || clean.length > 500) return null;
   const t = now();
@@ -153,17 +156,17 @@ async function register({ app = 'shop', token, provider = 'fcm', userId = '', ad
   if (existing) {
     await query(
       `UPDATE push_tokens SET user_id=$2, admin_id=$3, device_uid=$4, platform=$5,
-              status='active', updated_at=$6 WHERE id=$1`,
-      [existing.id, userId, adminId, deviceUid, platform, t]
+              shop_id=$6, station_id=$7, status='active', updated_at=$8 WHERE id=$1`,
+      [existing.id, userId, adminId, deviceUid, platform, shopId, stationId, t]
     );
     return existing.id;
   }
   const id = newId('psh');
   await query(
-    `INSERT INTO push_tokens (id, app, token, provider, user_id, admin_id, device_uid, platform,
-                              status, created_at, updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'active',$9,$9)`,
-    [id, app, clean, provider, userId, adminId, deviceUid, platform, t]
+    `INSERT INTO push_tokens (id, app, token, provider, user_id, admin_id, shop_id, station_id,
+                              device_uid, platform, status, created_at, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'active',$11,$11)`,
+    [id, app, clean, provider, userId, adminId, shopId, stationId, deviceUid, platform, t]
   );
   return id;
 }
@@ -181,24 +184,64 @@ async function unregister(token) {
  * وگرنه فهرست پر می‌شد از گوشی‌هایی که برنامه از رویشان پاک شده و هر
  * پیام چند خطای بی‌فایده می‌داد.
  */
-async function sendTo({ userId = '', adminId = '', app = '', allAdmins = false }, message) {
+/**
+ * گیرنده‌های یک پیام — جدا از فرستادن، تا بشود سنجیدش.
+ *
+ * ⚠️ `stationId` و `shopId` از امروز هستند و بی آن‌ها نیمی از
+ * گیرنده‌ها دیده نمی‌شدند: برنامهٔ کامپیوترِ پمپ حساب ندارد، و
+ * شاگردِ یک دکان `user_id`ِ دیگری دارد ولی باید خبرِ همان دکان را
+ * بگیرد.
+ */
+async function targetsFor({ userId = '', adminId = '', shopId = '', stationId = '', deviceUid = '', app = '', allAdmins = false, exceptUserId = '' }) {
+  const where = [];
+  const args = [];
+  if (userId)    { args.push(userId);    where.push(`user_id = $${args.length}`); }
+  if (adminId)   { args.push(adminId);   where.push(`admin_id = $${args.length}`); }
+  if (shopId)    { args.push(shopId);    where.push(`shop_id = $${args.length}`); }
+  if (stationId) { args.push(stationId); where.push(`station_id = $${args.length}`); }
+  if (deviceUid) { args.push(deviceUid); where.push(`device_uid = $${args.length}`); }
+  if (allAdmins) where.push(`admin_id <> ''`);
+  if (!where.length) return [];
+  let sql = `SELECT * FROM push_tokens WHERE status='active' AND (${where.join(' OR ')})`;
+  if (app) { args.push(app); sql += ` AND app = $${args.length}`; }
+  //  ⚠️ کسی که خودش کاری کرده، نباید خبرِ کارِ خودش را بگیرد. بی این،
+  //  فروشنده با هر فروش یک زنگ روی گوشیِ خودش می‌شنید و همان روزِ اول
+  //  اعلان‌ها را خاموش می‌کرد.
+  if (exceptUserId) { args.push(exceptUserId); sql += ` AND user_id <> $${args.length}`; }
+  return many(sql, args);
+}
+
+/**
+ * درِ فرستادن — تا آزمون بتواند جایش بنشیند.
+ *
+ * ⚠️ بی این، هیچ سنجه‌ای نمی‌توانست ثابت کند پوش به **چه کسی** می‌رود:
+ * FCM از ماشینِ آزمون در دسترس نیست و هر سنجه‌ای یا باید شبکه بزند یا
+ * سبزِ دروغ بدهد. با این، خودِ تصمیم سنجیده می‌شود و شبکه بیرون می‌ماند.
+ *
+ * ⛔ در کارِ عادی هیچ‌وقت مقدار نمی‌گیرد: فقط `test/*.test.js` آن را
+ * می‌نشاند و همان‌جا هم برش می‌دارد.
+ */
+let deliver = null;
+function setDeliver(fn) { deliver = typeof fn === 'function' ? fn : null; }
+
+async function sendTo(target, message) {
+  //  راهِ آزمون: تنظیماتِ ابر و گوگل اصلاً لمس نمی‌شوند
+  if (deliver) {
+    const rows = await targetsFor(target);
+    if (!rows.length) return { sent: 0, skipped: 'no_devices' };
+    for (const row of rows) await deliver(row, message);
+    return { sent: rows.length, total: rows.length };
+  }
+
   const cfg = await current();
   if (!cfg.enabled || !cfg.serviceAccount) return { sent: 0, skipped: 'push_off' };
 
   let sa;
   try { sa = JSON.parse(cfg.serviceAccount); } catch { return { sent: 0, skipped: 'bad_service_account' }; }
 
-  const where = [];
-  const args = [];
-  if (userId) { args.push(userId); where.push(`user_id = $${args.length}`); }
-  if (adminId) { args.push(adminId); where.push(`admin_id = $${args.length}`); }
-  if (allAdmins) where.push(`admin_id <> ''`);
-  if (!where.length) return { sent: 0, skipped: 'no_target' };
-  let sql = `SELECT * FROM push_tokens WHERE status='active' AND (${where.join(' OR ')})`;
-  if (app) { args.push(app); sql += ` AND app = $${args.length}`; }
-
-  const rows = await many(sql, args);
-  if (!rows.length) return { sent: 0, skipped: 'no_devices' };
+  const rows = await targetsFor(target);
+  if (!rows.length) return { sent: 0, skipped: target.userId || target.adminId || target.shopId
+    || target.stationId || target.deviceUid || target.allAdmins ? 'no_devices' : 'no_target' };
 
   let bearer;
   try { bearer = await googleToken(sa); } catch (err) { return { sent: 0, error: err.message }; }
@@ -243,4 +286,4 @@ async function sendTo({ userId = '', adminId = '', app = '', allAdmins = false }
   return { sent, total: rows.length };
 }
 
-module.exports = { current, save, masked, invalidate, register, unregister, sendTo };
+module.exports = { current, save, masked, invalidate, register, unregister, sendTo, targetsFor, setDeliver };

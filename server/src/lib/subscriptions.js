@@ -172,10 +172,31 @@ function build(T) {
       if (!p || !p.amount || !p.unit) throw badRequest('مدت اشتراک مشخص نیست', 'missing_duration');
       end = plans.endOfPeriod(base, p.amount, p.unit);
       start = if_live(existing, t) ?? start;
-      if (!features.length && Array.isArray(p.features) && p.features.length) features = p.features;
       maxDevices = maxDevices || p.max_devices;
     }
     if (!Number.isFinite(end) || end <= t) throw badRequest('تاریخ پایان اشتراک معتبر نیست');
+
+    /*
+     *  ── قابلیت‌های پلن ─────────────────────────────────────────────
+     *  ⛔ این‌جا **بیرونِ** آن `else` است، و بودنش داخلِ آن یک باگِ
+     *  واقعی بود که مستقیم روی پول می‌نشست.
+     *
+     *  تا دیروز فهرستِ پلن فقط وقتی برداشته می‌شد که مدت هم از خودِ پلن
+     *  درمی‌آمد. ولی پنلِ مدیریت همیشه `days` را هم می‌فرستد («پلنِ
+     *  استاندارد، ۳۶۵ روز»). پس `features` خالی می‌ماند — و
+     *  `entitlementOf` فهرستِ خالی را «نسلِ اول ⇒ پلنِ کامل» می‌خواند.
+     *
+     *  یعنی مدیر «استاندارد» می‌داد و مشتری **وی‌آی‌پی** می‌گرفت:
+     *  کیو‌آر، اپِ کارمندان، مفاد/ضرر، تاریخچه‌ها و داشبورد، همه باز.
+     *
+     *  ⚠️ فهرستِ صریح همچنان می‌چربد (مدیر می‌تواند پلن را دستی عوض
+     *  کند)، و پلنی که خودش فهرست ندارد (`[]`) هیچ چیزی را عوض
+     *  نمی‌کند — پس اشتراک‌های امروزیِ `m1`/`m6`/`y1` دست‌نخورده‌اند.
+     */
+    if (!features.length) {
+      const p = await plans.getPlan(plan, T.app);
+      if (p && Array.isArray(p.features) && p.features.length) features = p.features;
+    }
 
     const clean = sanitizeFeatures(features, T.app);
 
@@ -301,20 +322,37 @@ function build(T) {
       //  نزدیک‌ترین آستانه‌ای که رد شده
       const hit = thresholds.filter(d => row.daysLeft <= d).sort((a, b) => a - b)[0];
       if (hit === undefined || row.daysLeft < 0) continue;
-      //  ⚠️ پمپی که با کدِ شش‌رقمی فعال شده صاحب ندارد، پس کسی نیست که
-      //  خبر به او برسد. در فهرستِ پنل می‌آید (و باید بیاید)، ولی این‌جا
-      //  رد می‌شود — وگرنه پیامی بی‌گیرنده ساخته می‌شد.
-      if (!row.ownerUserId) continue;
+      /*
+       *  ⛔ **پمپِ بی‌صاحب هم خبر می‌گیرد — از امروز.**
+       *
+       *  تا دیروز این‌جا `if (!row.ownerUserId) continue;` بود: پمپی که
+       *  با کدِ شش‌رقمی فعال شده `owner_user_id` خالی دارد، پس هیچ
+       *  خبری از پایانِ اشتراکش نمی‌رفت و یک روز صبح فقط قفل می‌شد.
+       *  حالا رشتهٔ پشتیبانی به **خودِ پمپ** بسته است (`station_id`)،
+       *  پس برنامهٔ کامپیوترش پیام را می‌بیند حتی اگر هیچ گوشی‌ای وصل
+       *  نشده باشد.
+       *
+       *  برای بخشِ دکان هیچ عوض نشده: دکان همیشه صاحب دارد.
+       */
+      if (!row.ownerUserId && T === tenancy.SHOP) continue;
       const key = `subnotice_${row.subscriptionId}_${hit}`;
       const already = await plans.getConfig(key, '');
       if (already) continue;
       try {
         await support.systemMessage({
-          userId: row.ownerUserId,
-          //  چتِ پشتیبانی به دکان بسته است؛ برای پمپ فقط به خودِ کاربر
-          //  می‌رسد و همان کافی است — صاحبِ پمپ همان کسی است که باید بداند.
+          /*
+           *  ⛔ **`app` این‌جا جا افتاده بود و بدجا می‌نشست.**
+           *
+           *  `systemMessage` پیش‌فرضش `'shop'` است، پس خبرِ پایانِ
+           *  اشتراکِ **پمپ** در گفت‌وگوی **دکانِ** همان آدم می‌نشست —
+           *  و پمپ‌داری که دکان نداشت، رشته‌ای با برچسبِ غلط می‌گرفت
+           *  که در فهرستِ پمپِ مدیر هیچ‌وقت دیده نمی‌شد.
+           */
+          app: T.app,
+          userId: row.ownerUserId || '',
           shopId: T === tenancy.SHOP ? row.tenantId : '',
-          who: row.ownerName,
+          stationId: T === tenancy.SHOP ? '' : row.tenantId,
+          who: row.ownerName || row.tenantName || '',
           body: row.daysLeft <= 0
             ? `اشتراک ${T.expiryNoun} امروز تمام می‌شود. برای اینکه قابلیت‌ها بسته نشوند، تمدیدش کنید.`
             : `اشتراک ${T.expiryNoun} ${row.daysLeft} روز دیگر تمام می‌شود. اگر بخواهید، همین‌جا بگویید تا تمدید شود.`,

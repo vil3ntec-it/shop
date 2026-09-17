@@ -59,6 +59,27 @@ class ApiClient(
   suspend fun delete(path: String): JsonObject = authorized("DELETE", path, null, idempotent = false)
 
   /**
+   *  فرستادنِ یک **فایل** — نه یک شیء.
+   *
+   *  ⚠️ چرا جدا: پشتیبانِ یک دکانِ چندساله چند مگابایت است. داخلِ JSON
+   *  باید base64 می‌شد (یک‌سومِ بزرگ‌تر) و کلِ فایل دو بار در حافظهٔ
+   *  گوشی می‌نشست — همان‌جا `OutOfMemory`.
+   *
+   *  ⚠️ `idempotent = false`: فرستادنِ دوباره یک نسخهٔ **دوم** می‌سازد،
+   *  پس تلاشِ خودکار نباید بزند. اگر نرفت، دورِ بعدِ خودِ `AutoBackup`
+   *  می‌فرستدش.
+   */
+  suspend fun postBytes(
+    path: String,
+    bytes: ByteArray,
+    contentType: String = "application/octet-stream",
+    headers: Map<String, String> = emptyMap(),
+  ): JsonObject = authorized(
+    "POST", path, null, idempotent = false,
+    raw = RawBody(bytes, contentType, headers),
+  )
+
+  /**
    *  درخواست با توکن — و اگر توکن پیر بود، یک بار تازه‌سازی و تکرار.
    *
    *  «یک بار» عمدی است: اگر بعد از توکنِ تازه هم ۴۰۱ آمد، مشکل از پیریِ
@@ -69,16 +90,17 @@ class ApiClient(
     path: String,
     body: JsonObject?,
     idempotent: Boolean,
+    raw: RawBody? = null,
   ): JsonObject {
     val token = tokens.accessToken ?: throw ApiFailure.SessionExpired()
 
     try {
-      return engine.send(method, path, body, token, idempotent)
+      return engine.send(method, path, body, token, idempotent, raw)
     } catch (failure: ApiFailure) {
       if (failure !is ApiFailure.SessionExpired) throw failure
 
       val fresh = renew(usedToken = token)
-      return engine.send(method, path, body, fresh, idempotent)
+      return engine.send(method, path, body, fresh, idempotent, raw)
     }
   }
 

@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.Compress
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
@@ -66,6 +67,7 @@ import ir.vil3ntec.tohid.core.config.AppConfig
 import ir.vil3ntec.tohid.core.model.DeviceDto
 import ir.vil3ntec.tohid.core.net.userText
 import ir.vil3ntec.tohid.data.repo.Backend
+import ir.vil3ntec.tohid.data.repo.BackupRepository
 import ir.vil3ntec.tohid.sync.SyncStore
 import ir.vil3ntec.tohid.sync.Syncer
 import ir.vil3ntec.tohid.todayIso
@@ -161,6 +163,17 @@ fun SettingsScreen(
   //  فهرستِ نسخه‌های شبانه و شمارشِ ردیف‌های قابلِ بایگانی — با هر تغییرِ
   //  دفتر از نو خوانده می‌شوند، نه در هر بار کشیده شدنِ صفحه
   val autoBackups = remember(d) { AutoBackup.list(context) }
+  /*
+   *  پشتیبان‌های **ابری** — همان‌هایی که روی سرور نشسته‌اند.
+   *
+   *  ⚠️ با نسخه‌های شبانه یکی نیستند: آن‌ها روی خودِ گوشی‌اند و با گم
+   *  شدنِ گوشی می‌روند. این‌ها روی سرورند و از گوشیِ تازه هم دیده
+   *  می‌شوند — همان چیزی که تا امروز اصلاً وجود نداشت.
+   */
+  var cloudBackups by remember { mutableStateOf<BackupRepository.Listing?>(null) }
+  var cloudBusy by remember { mutableStateOf(false) }
+  var cloudNote by remember { mutableStateOf<String?>(null) }
+  var cloudReload by remember { mutableIntStateOf(0) }
   val archivePlan = remember(d) { LedgerArchive.plan(d) }
   var restoreError by remember { mutableStateOf<String?>(null) }
   var canUndo by remember { mutableStateOf(store.hasSafetyCopy()) }
@@ -174,6 +187,17 @@ fun SettingsScreen(
   LaunchedEffect(signedIn) {
     if (!signedIn || !Backend.isReady(context)) return@LaunchedEffect
     staffCode = shops.standingCode()
+  }
+
+  /*
+   *  فهرستِ ابری — بی‌صدا. نبودنِ حساب یا نت خطا نیست؛ کادر همان
+   *  «هنوز چیزی نرفته» را نشان می‌دهد و می‌گوید چرا.
+   */
+  LaunchedEffect(signedIn, cloudReload) {
+    if (!signedIn || !Backend.isReady(context)) { cloudBackups = null; return@LaunchedEffect }
+    Backend.backups(context).list()
+      .onSuccess { cloudBackups = it }
+      .onFailure { cloudBackups = null }
   }
 
   fun toast(text: String) {
@@ -573,6 +597,70 @@ fun SettingsScreen(
               },
             )
           }
+        }
+
+        /*
+         *  ── پشتیبانِ ابری ───────────────────────────────────────────
+         *
+         *  ⛔ **این تا امروز نبود.** نسخه‌های شبانه روی خودِ گوشی‌اند و
+         *  پشتیبانِ دستی هم به حافظهٔ آدمی بسته بود که سرش شلوغ است.
+         *  گوشی که گم یا آب می‌شد، کارِ چند سال با آن می‌رفت.
+         *
+         *  ⚠️ فهرست مالِ **همین دکان** است؛ شناسه‌اش از توکن می‌آید،
+         *  نه از درخواست، پس هیچ دکانی پشتیبانِ دکانِ دیگری را نمی‌بیند.
+         */
+        Spacer(Modifier.height(12.dp))
+        Text(
+          "پشتیبان روی سرور",
+          style = MaterialTheme.typography.labelMedium,
+          color = Shop.colors.muted,
+        )
+        val cloud = cloudBackups
+        SettingsRow(
+          icon = Icons.Filled.CloudUpload,
+          title = if (cloudBusy) "در حال فرستادن…" else "همین حالا روی سرور بگذار",
+          description = when {
+            !signedIn -> "برای این کار باید وارد حساب شده باشید"
+            cloud == null -> "هنوز چیزی نرفته — یا نت نیست"
+            cloud.stats.count == 0 -> "هنوز چیزی نرفته"
+            else -> "${plain(cloud.stats.count)} نسخه روی سرور · " +
+              "${plain((cloud.stats.usedBytes / 1024 / 1024).toInt())} از " +
+              "${plain((cloud.stats.quotaBytes / 1024 / 1024).toInt())} مگابایت"
+          },
+          tint = Shop.colors.primary,
+          onClick = {
+            if (cloudBusy) return@SettingsRow
+            if (!signedIn) { toast("اول وارد حساب شوید"); return@SettingsRow }
+            scope.launch {
+              cloudBusy = true
+              cloudNote = null
+              val sent = AutoBackup.push(context, manual = true)
+              cloudBusy = false
+              cloudReload += 1
+              toast(
+                if (sent) "پشتیبان روی سرور نشست"
+                else "نرفت — نت یا حساب را ببینید. نسخهٔ روی گوشی سرِ جایش است."
+              )
+            }
+          },
+        )
+        cloudNote?.let {
+          Text(it, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+        }
+        cloud?.items?.take(5)?.forEach { b ->
+          SettingsRow(
+            icon = Icons.Filled.CloudDone,
+            title = ir.vil3ntec.tohid.formatMillis(b.createdAt),
+            description = "${plain((b.bytes / 1024).toInt())} کیلوبایت · " +
+              (if (b.kind == "manual") "دستی" else "خودکار"),
+            tint = Shop.colors.muted,
+            onClick = {
+              //  ⚠️ برگرداندن از ابر عمداً این‌جا نیست: بازیابی کاری
+              //  است که برنمی‌گردد و باید از همان درِ «بازیابی از فایل»
+              //  برود تا کاربر اول ببیند داخلش چیست.
+              toast("برای برگرداندن، فایل را از پنل بگیرید و «بازیابی از فایل» را بزنید")
+            },
+          )
         }
 
         /*

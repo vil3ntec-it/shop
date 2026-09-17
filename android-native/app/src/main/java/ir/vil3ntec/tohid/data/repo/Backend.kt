@@ -65,6 +65,9 @@ object Backend {
     //  پشتیبانی و تپشِ بازدید بی‌حساب هم کار می‌کنند، پس باید بدانند
     //  همین حالا حسابی هست یا نه
     val support = SupportRepository(api) { tokens.signedIn }
+
+    //  پشتیبانِ ابری — فهرست و فرستادنِ فایلِ همین دکان
+    val backups = BackupRepository(api)
   }
 
   private fun of(context: Context): Wiring =
@@ -80,6 +83,7 @@ object Backend {
   fun sync(context: Context): SyncRepository = of(context).sync
   fun events(context: Context): EventsRepository = of(context).events
   fun support(context: Context): SupportRepository = of(context).support
+  fun backups(context: Context): BackupRepository = of(context).backups
 
   /** آیا برنامه هم نشانی دارد و هم حساب — یعنی اصلاً می‌شود به سرور زد */
   fun isReady(context: Context): Boolean =

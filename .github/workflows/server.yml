@@ -1,0 +1,94 @@
+name: سرور
+
+# ⛔ تا امروز `server/` هیچ ورک‌فلویی نداشت.
+#
+# یعنی سیصد و چند آزمونِ سرور فقط وقتی می‌دویدند که کسی دستی
+# `npm test` بزند — و قاعدهٔ خودِ صاحب مخزن («اگر تست رد شده، مرج
+# نشود») عملاً هیچ‌وقت سنجیده نمی‌شد. هر PRای سبز به‌نظر می‌رسید
+# چون هیچ‌چیزی آن را نمی‌سنجید.
+
+on:
+  push:
+    branches: ['claude/**', main]
+    paths:
+      - 'server/**'
+      - 'index.html'
+      - 'license/**'
+      - '.github/workflows/server.yml'
+  pull_request:
+    paths:
+      - 'server/**'
+      - 'index.html'
+      - 'license/**'
+      - '.github/workflows/server.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: server-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: آزمون‌های سرور
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    # آزمون‌ها روی PostgreSQL **واقعی** می‌دوند، نه روی ساختگی —
+    # همان قاعده‌ای که `test/helpers.js` نوشته: چیزی که باید ثابت شود
+    # «این سیستم واقعاً کار می‌کند» است.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: shop
+          POSTGRES_PASSWORD: shoppass
+          POSTGRES_DB: shop_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      TEST_DATABASE_URL: postgres://shop:shoppass@127.0.0.1:5432/shop_test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: نصبِ وابستگی‌ها
+        working-directory: server
+        run: npm ci || npm install
+
+      - name: آزمون‌های سرور
+        working-directory: server
+        run: npm test
+
+      # پنل جاوااسکریپتِ مرورگر است و هیچ آزمونِ سمتِ سروری آن را
+      # نمی‌سنجد: یک `onclick`ِ جانشانده یا یک شناسه‌ی غلط فقط وقتی
+      # پیدا می‌شد که صاحبِ سامانه دکمه را می‌زد و هیچ اتفاقی نمی‌افتاد.
+      # ⚠️ سراسری نصب می‌شود، نه در `server/`: سرور عمداً فقط دو
+      # وابستگی دارد و یک `devDependency`ی چندصد مگابایتی همان قاعده
+      # را می‌شکست. خودِ سنجه از `npm root -g` پیدایش می‌کند.
+      - name: کرومیوم برای آزمونِ پنل
+        run: |
+          npm install -g playwright@1.56.1
+          npx playwright install --with-deps chromium
+
+      - name: آزمونِ پنلِ مدیریت
+        working-directory: server
+        run: npm run test:panel
+
+      # نسخهٔ وب همان برنامه است روی مرورگر — نه یک نسخهٔ ساده‌شده.
+      # کاربرانِ آیفون فقط همین را دارند، پس نبودنِ سنجه برای آن یعنی
+      # نصفِ کاربرها بی‌آزمون می‌مانند.
+      - name: آزمونِ نسخهٔ وب
+        working-directory: server
+        run: npm run test:web
