@@ -22,12 +22,34 @@ const { badRequest, notFound } = require('../middleware/errors');
 
 const MAX_BODY = 4000;
 
+/**
+ * متنِ یک پیام، پیش از آن‌که جایی بنشیند.
+ *
+ * ⛔ **چرا این‌جا و نه با `v.text`**: `v.text` هر چیزی را که از سقف
+ * بلندتر باشد **می‌بُرد** و همان بریده را برمی‌گرداند. برای یک نام یا
+ * یک یادداشت اشکالی ندارد؛ برای پیامِ پشتیبانی یعنی کاربر جمله‌اش را
+ * می‌نویسد، «فرستاده شد» می‌بیند، و هزار نویسهٔ آخرش — همان‌جا که
+ * معمولاً توضیحِ اصلی است — بی این‌که کسی بفهمد رفته.
+ *
+ * نتیجه‌اش این بود که نگهبانِ `message_too_long` در `post` هیچ‌وقت
+ * شلیک نمی‌کرد: هر چهار مسیر پیش از رسیدن به آن، متن را بریده بودند.
+ */
+function cleanBody(raw, { field = 'پیام' } = {}) {
+  const text = String(raw == null ? '' : raw).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '').trim();
+  if (!text) throw badRequest(`${field} خالی است`, 'empty_message');
+  if (text.length > MAX_BODY) {
+    throw badRequest(`${field} خیلی بلند است — حداکثر ${MAX_BODY} نویسه`, 'message_too_long');
+  }
+  return text;
+}
+
 function shapeThread(r) {
   return {
     id: r.id,
     app: r.app,
     userId: r.user_id || '',
     shopId: r.shop_id || '',
+    stationId: r.station_id || '',
     deviceUid: r.device_uid || '',
     subject: r.subject || '',
     who: r.who || '',
@@ -43,6 +65,7 @@ function shapeThread(r) {
     ...(r.account_name !== undefined ? { accountName: r.account_name || '' } : {}),
     ...(r.account_email !== undefined ? { accountEmail: r.account_email || '' } : {}),
     ...(r.shop_name !== undefined ? { shopName: r.shop_name || '' } : {}),
+    ...(r.station_name !== undefined ? { stationName: r.station_name || '' } : {}),
   };
 }
 
@@ -67,12 +90,50 @@ function shapeMessage(r) {
  * می‌سازد، همان رشته‌ی قبلی‌اش را دارد و مجبور نیست دوباره از اول
  * توضیح بدهد.
  */
-async function threadFor({ app = 'shop', userId = '', shopId = '', deviceUid = '', who = '', contact = '', subject = '' }) {
-  if (!userId && !deviceUid) throw badRequest('برای پشتیبانی، شناسه‌ی دستگاه یا حساب لازم است', 'identity_required');
+async function threadFor({ app = 'shop', userId = '', shopId = '', stationId = '', deviceUid = '', who = '', contact = '', subject = '' }) {
+  if (!userId && !deviceUid && !stationId) {
+    throw badRequest('برای پشتیبانی، شناسه‌ی دستگاه یا حساب لازم است', 'identity_required');
+  }
 
-  let row = userId
-    ? await one(`SELECT * FROM support_threads WHERE app=$1 AND user_id=$2 ORDER BY updated_at DESC LIMIT 1`, [app, userId])
+  /*
+   *  ⚠️ برای پمپ، کلید **خودِ پمپ** است نه آدم و نه دستگاه.
+   *
+   *  برنامهٔ کامپیوترِ پمپ حساب ندارد و یک پمپ می‌تواند چند کامپیوتر
+   *  داشته باشد. اگر کلید `device_uid` بود، هر کامپیوتر یک گفت‌وگوی
+   *  جدا می‌ساخت و مدیر نمی‌فهمید هر سه یک پمپ‌اند — و صاحبِ پمپ که
+   *  از گوشی می‌نویسد، جوابِ کامپیوترش را نمی‌دید.
+   *
+   *  پس: یک پمپ، یک گفت‌وگو. هر دری که باز شود، به همان می‌رسد.
+   */
+  let row = stationId
+    ? await one(
+        `SELECT * FROM support_threads WHERE app=$1 AND station_id=$2 ORDER BY updated_at DESC LIMIT 1`,
+        [app, stationId]
+      )
     : null;
+
+  //  رشته‌ای که پیش از داشتنِ پمپ ساخته شده بود، حالا به پمپ می‌چسبد —
+  //  همان کاری که برای مهمانِ بی‌حساب می‌کنیم
+  if (!row && stationId && userId) {
+    row = await one(
+      `SELECT * FROM support_threads WHERE app=$1 AND user_id=$2 AND station_id=''
+        ORDER BY updated_at DESC LIMIT 1`,
+      [app, userId]
+    );
+    if (row) {
+      row = await one(
+        `UPDATE support_threads SET station_id=$2, updated_at=$3 WHERE id=$1 RETURNING *`,
+        [row.id, stationId, now()]
+      );
+    }
+  }
+
+  if (!row && userId) {
+    row = await one(
+      `SELECT * FROM support_threads WHERE app=$1 AND user_id=$2 ORDER BY updated_at DESC LIMIT 1`,
+      [app, userId]
+    );
+  }
 
   if (!row && deviceUid) {
     row = await one(
@@ -90,14 +151,16 @@ async function threadFor({ app = 'shop', userId = '', shopId = '', deviceUid = '
 
   if (row) {
     //  نام و دکان ممکن است از دفعه‌ی قبل عوض شده باشد
-    if ((shopId && row.shop_id !== shopId) || (who && row.who !== who) || (contact && row.contact !== contact)) {
+    if ((shopId && row.shop_id !== shopId) || (who && row.who !== who)
+        || (contact && row.contact !== contact) || (stationId && row.station_id !== stationId)) {
       row = await one(
         `UPDATE support_threads SET
             shop_id = CASE WHEN $2 <> '' THEN $2 ELSE shop_id END,
             who     = CASE WHEN $3 <> '' THEN $3 ELSE who END,
-            contact = CASE WHEN $4 <> '' THEN $4 ELSE contact END
+            contact = CASE WHEN $4 <> '' THEN $4 ELSE contact END,
+            station_id = CASE WHEN $5 <> '' THEN $5 ELSE station_id END
           WHERE id=$1 RETURNING *`,
-        [row.id, shopId, who, contact]
+        [row.id, shopId, who, contact, stationId]
       );
     }
     return row;
@@ -105,10 +168,11 @@ async function threadFor({ app = 'shop', userId = '', shopId = '', deviceUid = '
 
   const t = now();
   return one(
-    `INSERT INTO support_threads (id, app, user_id, shop_id, device_uid, subject, who, contact,
+    `INSERT INTO support_threads (id, app, user_id, shop_id, station_id, device_uid, subject, who, contact,
                                   status, created_at, updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'open',$9,$9) RETURNING *`,
-    [newId('thr'), app, userId, shopId, deviceUid, subject.slice(0, 120), who.slice(0, 80), contact.slice(0, 120), t]
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'open',$10,$10) RETURNING *`,
+    [newId('thr'), app, userId, shopId, stationId, deviceUid,
+     subject.slice(0, 120), who.slice(0, 80), contact.slice(0, 120), t]
   );
 }
 
@@ -191,19 +255,28 @@ async function markRead(threadId, side) {
 }
 
 /** فهرست برای مدیر — تازه‌ترین و خوانده‌نشده‌ها بالا. */
-async function list({ status = '', q = '', limit = 100, offset = 0 } = {}) {
+async function list({ status = '', q = '', app = '', limit = 100, offset = 0 } = {}) {
   const like = `%${String(q || '').toLowerCase()}%`;
+  /*
+   *  ⚠️ `stations` هم `LEFT JOIN` می‌شود، وگرنه رشتهٔ یک پمپ در فهرستِ
+   *  مدیر فقط یک شناسه بود: نه نامی، نه کدی. مدیری که نداند پیام از
+   *  کدام پمپ است، نمی‌تواند جواب بدهد.
+   */
   const rows = await many(
-    `SELECT t.*, u.name AS account_name, u.email AS account_email, s.name AS shop_name
+    `SELECT t.*, u.name AS account_name, u.email AS account_email,
+            s.name AS shop_name, st.name AS station_name
        FROM support_threads t
        LEFT JOIN users u ON u.id = t.user_id
        LEFT JOIN shops s ON s.id = t.shop_id
+       LEFT JOIN stations st ON st.id = t.station_id
       WHERE ($1 = '' OR t.status = $1)
         AND ($2 = '' OR lower(t.who) LIKE $3 OR lower(coalesce(u.name,'')) LIKE $3
-             OR lower(coalesce(u.email,'')) LIKE $3 OR lower(t.last_message) LIKE $3)
+             OR lower(coalesce(u.email,'')) LIKE $3 OR lower(t.last_message) LIKE $3
+             OR lower(coalesce(st.name,'')) LIKE $3)
+        AND ($6 = '' OR t.app = $6)
       ORDER BY (t.unread_admin > 0) DESC, t.updated_at DESC
       LIMIT $4 OFFSET $5`,
-    [String(status || ''), String(q || ''), like, limit, offset]
+    [String(status || ''), String(q || ''), like, limit, offset, String(app || '')]
   );
   return rows.map(shapeThread);
 }
@@ -229,12 +302,12 @@ async function unreadForAdmin() {
  * برای خبرهایی مثل «اشتراکت دارد تمام می‌شود». همان رشته‌ی همیشگیِ طرف
  * را می‌گیرد تا خبر جای دیگری گم نشود.
  */
-async function systemMessage({ app = 'shop', userId, shopId = '', who = '', body, kind = 'notice' }) {
-  const thread = await threadFor({ app, userId, shopId, who });
+async function systemMessage({ app = 'shop', userId = '', shopId = '', stationId = '', who = '', body, kind = 'notice' }) {
+  const thread = await threadFor({ app, userId, shopId, stationId, who });
   return post(thread.id, { sender: 'system', senderName: 'توحید', body, kind });
 }
 
 module.exports = {
   threadFor, post, messages, markRead, list, setStatus, unreadForAdmin, systemMessage,
-  shapeThread, shapeMessage, MAX_BODY,
+  shapeThread, shapeMessage, MAX_BODY, cleanBody,
 };

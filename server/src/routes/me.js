@@ -171,6 +171,20 @@ router.put('/', async (req, res) => {
   res.json({ user: publicUser(user) });
 });
 
+/*
+ *  پشتیبانِ همین دکان — `/api/me/backups`.
+ *
+ *  ⚠️ بالاتر `optionalShop` است، نه `requireShop`: صفحهٔ «من» برای
+ *  کسی که هنوز دکان نساخته هم باز می‌شود. پس `req.shopId` می‌تواند
+ *  خالی باشد و خودِ مسیرِ پشتیبان همان‌جا `no_shop` می‌گوید — نه
+ *  این‌که کلِ `/me` برای او ۴۰۳ شود.
+ */
+router.use('/backups', require('./account-backups').makeRouter(
+  'shop',
+  (req) => req.shopId || '',
+  { actor: (req) => ({ userId: req.user ? req.user.id : '', deviceId: req.device ? req.device.id : '' }) }
+));
+
 module.exports = router;
 module.exports.subscriptionHandler = subscriptionHandler;
 module.exports.plansHandler = plansHandler;
