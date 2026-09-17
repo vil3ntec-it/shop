@@ -108,6 +108,27 @@ router.get('/stations/:id', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+/**
+ * دفترِ خبرِ همین پمپ — همان چیزی که برنامه فرستاده.
+ *
+ * ⚠️ فقط **دیدن**. مدیر این‌جا خبری نمی‌سازد و چیزی پاک نمی‌کند؛ این
+ * پنجره برای وقتی است که صاحبِ پمپ می‌گوید «خبر نگرفتم» و باید معلوم
+ * شود خبر به ابر رسیده بود یا نه.
+ */
+router.get('/stations/:id/events', async (req, res, next) => {
+  try {
+    const id = v.id(req.params.id);
+    const st = await one('SELECT id FROM stations WHERE id=$1', [id]);
+    if (!st) return next(notFound('پمپ پیدا نشد', 'station_not_found'));
+    res.json({
+      events: await require('../lib/events').pump.list(id, {
+        limit: v.integer(req.query?.limit, { min: 1, max: 200, def: 50 }),
+      }),
+      serverTime: now(),
+    });
+  } catch (err) { next(err); }
+});
+
 router.get('/stations/:id/history', async (req, res, next) => {
   try {
     res.json({ history: await subs.changeLog(v.id(req.params.id), 100) });
@@ -346,7 +367,8 @@ router.get('/stats', async (req, res, next) => {
          (SELECT COUNT(*)::int FROM station_subscriptions
            WHERE status='active' AND ends_at > $1) AS active_subs,
          (SELECT COUNT(*)::int FROM station_vip_codes WHERE status='active') AS open_codes,
-         (SELECT COUNT(*)::int FROM station_files) AS files`,
+         (SELECT COUNT(*)::int FROM station_files) AS files,
+         (SELECT COUNT(*)::int FROM station_events) AS events`,
       [now()]
     );
     res.json({ stats: s, serverTime: now() });

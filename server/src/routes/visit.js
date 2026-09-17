@@ -36,16 +36,29 @@ router.post('/', visitLimit, async (req, res, next) => {
     const header = (req.headers.authorization || '').replace(/^Bearer\s+/i, '').trim();
     let userId = '';
     let shopId = '';
+    let stationId = '';
     let name = '';
     if (header) {
-      const row = await tokens.verify(header, 'access');
+      /*
+       *  ⚠️ `null` یعنی «توکنِ هر بخشی». تپش یک شمارنده است و دری باز
+       *  نمی‌کند، پس نشستِ پمپ هم باید این‌جا شناخته شود — وگرنه
+       *  برنامهٔ پمپ همیشه «مهمانِ بی‌حساب» شمرده می‌شد، حتی وقتی
+       *  صاحبش وارد شده بود.
+       */
+      const row = await tokens.verify(header, 'access', null);
       if (row) {
         const user = await one('SELECT * FROM users WHERE id=$1', [row.subject_id]);
         if (user) {
           userId = user.id;
           name = user.name || '';
-          const member = await membershipOf(user.id);
-          if (member) shopId = member.shop_id;
+          //  عضویت را از دفترِ همان بخش می‌پرسیم، نه همیشه از دکان
+          if ((row.app || 'shop') === 'pump') {
+            const st = await require('../lib/stations').membershipOf(user.id);
+            if (st) stationId = st.station_id;
+          } else {
+            const member = await membershipOf(user.id);
+            if (member) shopId = member.shop_id;
+          }
         }
       }
     }
@@ -59,7 +72,7 @@ router.post('/', visitLimit, async (req, res, next) => {
       deviceUid,
       platform: v.text(req.body?.platform, { max: 20 }),
       appVersion: v.text(req.body?.version, { max: 30 }),
-      userId, shopId,
+      userId, shopId, stationId,
       name: name || v.text(req.body?.name, { max: 80 }),
       ip,
       userAgent: String(req.headers['user-agent'] || '').slice(0, 300),

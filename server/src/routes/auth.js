@@ -28,7 +28,7 @@ const audit = require('../lib/audit');
 const { membershipOf } = require('../lib/shops');
 const staffCodes = require('../lib/staff-codes');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
-const { requireUser } = require('../middleware/auth');
+const { requireAnyUser } = require('../middleware/auth');
 const { badRequest, unauthorized, forbidden, conflict, tooMany, notFound } = require('../middleware/errors');
 
 const router = express.Router();
@@ -166,10 +166,14 @@ async function upsertDevice(userId, device, ip) {
  *
  * ⚠️ نیامدنش یعنی `shop` — هر برنامه‌ای که امروز در دستِ کاربران است
  * چیزی نمی‌فرستد و مالِ بخشِ دکان است. پس هیچ‌کس بیرون نمی‌افتد.
+ *
+ * ⚠️ **خودِ قاعده یک جاست**: `lib/tenancy.appOfRequest`. تا دیروز
+ * این‌جا فقط `req.body.app` خوانده می‌شد و هدرِ `X-App-Id` — که
+ * برنامهٔ پمپ روی **هر** درخواستی دارد — نادیده می‌رفت. اپِ کارمندان
+ * که با گوگل وارد می‌شود بدنه‌اش `app` ندارد، پس نشستش به بخشِ دکان
+ * مهر می‌خورد و همان لحظه `/api/pump/me` می‌گفت «چنین نشستی نیست».
  */
-function appOf(req) {
-  return String(req.body?.app || '').trim().toLowerCase() === 'pump' ? 'pump' : 'shop';
-}
+const appOf = require('../lib/tenancy').appOfRequest;
 
 /**
  *  نسخه‌ی برنامه‌ای که این درخواست از آن آمده.
@@ -659,15 +663,22 @@ router.post('/logout', sessionLimit, async (req, res) => {
   res.json({ ok: true });
 });
 
-/** خروج از همه‌ی دستگاه‌ها. */
-router.post('/logout-all', requireUser, async (req, res) => {
-  const n = await tokens.revokeAllForSubject(req.user.id);
-  await audit.log({ actorType: 'user', userId: req.user.id, action: 'auth.logout_all', detail: { sessions: n } });
-  res.json({ ok: true, sessions: n });
+/**
+ * خروج از همه‌ی دستگاه‌ها — **در همین بخش**.
+ *
+ * ⚠️ `req.appSection` از روی خودِ توکن می‌آید (`requireAnyUser` می‌نشاندش)،
+ * نه از بدنه. پس «خروج از همه» در برنامهٔ دکان نشستِ پمپِ همان آدم را
+ * دست نمی‌زند و برعکس — همان قاعدهٔ «دو بخش، دو دفتر».
+ */
+router.post('/logout-all', requireAnyUser, async (req, res) => {
+  const app = req.appSection || 'shop';
+  const n = await tokens.revokeAllForSubject(req.user.id, null, app);
+  await audit.log({ actorType: 'user', userId: req.user.id, action: 'auth.logout_all', detail: { sessions: n, app } });
+  res.json({ ok: true, sessions: n, app });
 });
 
 /** گذاشتن یا عوض کردن رمز عبور (برای کسی که با کد وارد شده). */
-router.post('/password', requireUser, async (req, res, next) => {
+router.post('/password', requireAnyUser, async (req, res, next) => {
   const next_ = typeof req.body?.newPassword === 'string' ? req.body.newPassword : '';
   const weak = pw.checkStrength(next_);
   if (weak) return next(badRequest(weak, 'weak_password'));
@@ -679,8 +690,26 @@ router.post('/password', requireUser, async (req, res, next) => {
   }
   const hash = await pw.hashPassword(next_);
   await query('UPDATE users SET password_hash=$2, updated_at=$3 WHERE id=$1', [req.user.id, hash, now()]);
-  await audit.log({ actorType: 'user', userId: req.user.id, action: 'auth.password_changed' });
-  res.json({ ok: true });
+  /*
+   *  ⛔ و نشست‌های **دیگر** بسته می‌شوند.
+   *
+   *  تا دیروز عوض کردنِ رمز از داخلِ برنامه هیچ نشستی را نمی‌بست: کسی
+   *  که رمزش را عوض می‌کرد چون گمان می‌کرد لو رفته، همان نشستِ
+   *  لو‌رفته تا نود روز زنده می‌ماند. مسیرِ «رمزِ فراموش‌شده» این را از
+   *  قبل درست انجام می‌داد؛ این یکی جا مانده بود.
+   *
+   *  نشستِ خودِ همین دستگاه می‌ماند، وگرنه کاربر با عوض کردنِ رمز از
+   *  برنامهٔ خودش هم بیرون می‌افتاد.
+   */
+  const closed = await tokens.revokeOthersForSubject(req.user.id, {
+    keepDeviceId: req.tokenRow?.device_id || null,
+    keepTokenHash: req.tokenRow?.token_hash || null,
+  });
+  await audit.log({
+    actorType: 'user', userId: req.user.id, action: 'auth.password_changed',
+    detail: { closedSessions: closed },
+  });
+  res.json({ ok: true, closedSessions: closed });
 });
 
 /* ---------- بازیابی رمز فراموش‌شده ---------- */

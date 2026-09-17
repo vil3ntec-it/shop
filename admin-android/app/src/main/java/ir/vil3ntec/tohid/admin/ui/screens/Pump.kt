@@ -126,6 +126,8 @@ private fun StationSheet(session: Session, stationId: String, onBack: () -> Unit
   var error by remember { mutableStateOf<String?>(null) }
   var done by remember { mutableStateOf<String?>(null) }
   var granting by remember { mutableStateOf(false) }
+  //  خبرهایی که خودِ برنامه فرستاده — «خبر نگرفتم» را همین‌جا می‌شود سنجید
+  var events by remember { mutableStateOf<JSONArray?>(null) }
 
   fun load() {
     val token = session.token ?: return
@@ -138,6 +140,8 @@ private fun StationSheet(session: Session, stationId: String, onBack: () -> Unit
       //  ⚠️ پلن‌های **پمپ**، نه دکان. جدول یکی است و ستونِ `app` جدایشان
       //  می‌کند؛ بی آن، قیمتِ دکان به یک پمپ داده می‌شد.
       plans = runCatching { api.pumpPlans(token) }.getOrNull()
+      //  ⚠️ نبودنش صفحه را نمی‌شکند: سرورِ به‌روزنشده این مسیر را ندارد
+      events = runCatching { api.stationEvents(token, stationId) }.getOrNull()
       busy = false
     }
   }
@@ -278,6 +282,28 @@ private fun StationSheet(session: Session, stationId: String, onBack: () -> Unit
       }
     }
 
+    //  ⛔ روشن و خاموش کردنِ خودِ پمپ — تا امروز فقط در پنلِ وب بود.
+    //  پمپی که خاموش شود، برنامه‌اش دیگر روی پوشهٔ ابری نمی‌نویسد.
+    Spacer(Modifier.height(12.dp))
+    val stationOff = st.optString("status") == "disabled"
+    GhostButton(
+      text = if (stationOff) "روشن کردنِ پمپ" else "خاموش کردنِ پمپ",
+      modifier = Modifier.fillMaxWidth(),
+      enabled = !busy,
+      tint = if (stationOff) c.success else c.danger,
+    ) {
+      val token = session.token ?: return@GhostButton
+      busy = true
+      scope.launch {
+        runCatching {
+          AdminApi(session.serverUrl)
+            .setStationStatus(token, stationId, if (stationOff) "active" else "disabled")
+        }
+          .onSuccess { done = if (stationOff) "پمپ روشن شد" else "پمپ خاموش شد"; load() }
+          .onFailure { error = (it as? AdminApi.ApiError)?.message ?: "نشد"; busy = false }
+      }
+    }
+
     val members = d.optJSONArray("members")
     if (members != null && members.length() > 0) {
       Spacer(Modifier.height(14.dp))
@@ -286,6 +312,29 @@ private fun StationSheet(session: Session, stationId: String, onBack: () -> Unit
         for (i in 0 until members.length()) {
           val m = members.optJSONObject(i) ?: continue
           Row2(m.optString("name").ifBlank { "—" }, roleFa(m.optString("role")))
+        }
+      }
+    }
+
+    /*
+     *  خبرهای همین پمپ.
+     *
+     *  ⛔ تا امروز هیچ‌جا دیده نمی‌شدند — چون اصلاً به ابر نمی‌رفتند.
+     *  «اضافه برد» و «کم مانده» فقط روی سرورِ خانگیِ خودِ پمپ می‌ماندند،
+     *  پس وقتی صاحبِ پمپ می‌گفت «خبر نگرفتم»، هیچ راهی نبود که معلوم شود
+     *  خبر ساخته شده بود یا نه.
+     */
+    val evs = events
+    if (evs != null && evs.length() > 0) {
+      Spacer(Modifier.height(14.dp))
+      SectionTitle("خبرهای این پمپ")
+      Panel {
+        for (i in 0 until minOf(evs.length(), 20)) {
+          val e = evs.optJSONObject(i) ?: continue
+          Row2(
+            e.optString("title").ifBlank { eventFa(e.optString("kind")) },
+            jalali(e.optLong("at")),
+          )
         }
       }
     }
@@ -493,6 +542,17 @@ private fun PumpCodesSheet(session: Session, onBack: () -> Unit) {
     }
     Spacer(Modifier.height(30.dp))
   }
+}
+
+/** نامِ فارسیِ نوعِ خبر — همان شش نوعی که سرور می‌شناسد. */
+private fun eventFa(s: String): String = when (s) {
+  "sale" -> "فروش"
+  "stock_out" -> "تمام شد"
+  "low_stock" -> "کم مانده"
+  "expense" -> "مصرف"
+  "debt" -> "قرض"
+  "note" -> "یادداشت"
+  else -> s
 }
 
 private fun statusFa(s: String): String = when (s) {

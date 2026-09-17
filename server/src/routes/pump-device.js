@@ -590,4 +590,19 @@ router.use('/backups', require('./account-backups').makeRouter(
   { actor: (req) => ({ deviceId: req.stationDevice ? req.stationDevice.id : '' }) }
 ));
 
+/*
+ *  خبرهای همین پمپ — `/api/pump/device/events`، با توکنِ **دستگاه**.
+ *
+ *  خواستهٔ صاحب مخزن: «برنامه‌ها جوری باشند که بسته هم باشند، هر
+ *  اتفاقی که در برنامه بیفتد به سرور برود و سرور وقتی برنامه‌ها بسته
+ *  هم هستند پیام را برایشان بدهد.» برنامهٔ کامپیوترِ پمپ حساب ندارد،
+ *  پس اگر خبر فقط از درِ حساب می‌رفت، همان برنامه‌ای که خبر را
+ *  **می‌سازد** راهی برای فرستادنش نداشت.
+ */
+router.use('/events', require('./pump-events').makeRouter((req) => ({
+  stationId: req.stationId || '',
+  deviceUid: req.stationDevice ? req.stationDevice.device_uid : '',
+  who: req.stationDevice ? (req.stationDevice.name || 'کامپیوترِ پمپ') : '',
+})));
+
 module.exports = router;

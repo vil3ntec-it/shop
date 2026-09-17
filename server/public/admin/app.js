@@ -436,6 +436,40 @@ async function loadPumpSubs(expiring = false) {
     : `${fa(rows.length)} اشتراک`;
 }
 
+/**
+ *  خبرهای یک پمپ — همان چیزی که برنامه به ابر فرستاده.
+ *
+ *  ⚠️ فقط **دیدن**. این پنجره برای وقتی است که صاحبِ پمپ می‌گوید «خبر
+ *  نگرفتم» و باید معلوم شود خبر به ابر رسیده بود یا نه.
+ */
+const EVENT_FA = {
+  sale: 'فروش', stock_out: 'تمام شد', low_stock: 'کم مانده',
+  expense: 'مصرف', debt: 'قرض', note: 'یادداشت',
+};
+
+async function loadStationEvents(id) {
+  const body = $('pump-events');
+  if (!body) return;
+  body.innerHTML = '';
+  const d = await call('GET', `/admin/pump/stations/${id}/events?limit=50`);
+  for (const e of d.events || []) {
+    const tr = el('tr');
+    tr.appendChild(el('td', null, dateTime(e.at)));
+    tr.appendChild(el('td', null, EVENT_FA[e.kind] || e.kind));
+    tr.appendChild(el('td', null, e.title || e.body || '—'));
+    //  کامپیوترِ پمپ حساب ندارد، پس شناسهٔ دستگاهش نشان داده می‌شود
+    tr.appendChild(el('td', 'muted', e.userName || e.deviceUid || '—'));
+    body.appendChild(tr);
+  }
+  if (!(d.events || []).length) {
+    const tr = el('tr');
+    const td = el('td', 'muted', 'هنوز خبری از برنامهٔ این پمپ نرسیده است');
+    td.colSpan = 4;
+    tr.appendChild(td);
+    body.appendChild(tr);
+  }
+}
+
 async function openStation(id) {
   const d = await call('GET', `/admin/pump/stations/${id}`);
   currentStation = d;
@@ -516,6 +550,8 @@ async function openStation(id) {
     tr.appendChild(td);
     files.appendChild(tr);
   }
+
+  loadStationEvents(id).catch(err => console.error(err));
 
   $('pump-detail').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }

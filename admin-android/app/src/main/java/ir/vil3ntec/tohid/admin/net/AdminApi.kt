@@ -427,6 +427,30 @@ class AdminApi(private val baseUrl: String) {
     get("/api/v1/admin/pump/stations/$id/history", token).optJSONArray("history") ?: JSONArray()
 
   /**
+   *  خبرهایی که خودِ برنامهٔ پمپ به ابر فرستاده — «اضافه برد»، «کم مانده»،
+   *  «تیل تمام شد».
+   *
+   *  ⚠️ فقط **دیدن** است. این پنجره برای وقتی است که صاحبِ پمپ می‌گوید
+   *  «خبر نگرفتم» و باید معلوم شود خبر اصلاً به سرور رسیده بود یا نه.
+   */
+  suspend fun stationEvents(token: String, id: String, limit: Int = 50): JSONArray =
+    get("/api/v1/admin/pump/stations/$id/events?limit=$limit", token)
+      .optJSONArray("events") ?: JSONArray()
+
+  /** روشن و خاموش کردنِ یک پمپ — همان کاری که پنل می‌کند. */
+  suspend fun setStationStatus(token: String, id: String, status: String): JSONObject =
+    post("/api/v1/admin/pump/stations/$id/status", JSONObject().put("status", status), token)
+
+  /** یک نگاهِ کلی به بخشِ پمپ — شمارها برای بالای صفحه. */
+  suspend fun pumpStats(token: String): JSONObject =
+    get("/api/v1/admin/pump/stats", token).optJSONObject("stats") ?: JSONObject()
+
+  /** افرادی که به پمپ‌ها وصل‌اند — همتای `/admin/users`ِ بخشِ دکان. */
+  suspend fun pumpUsers(token: String, query: String = "", limit: Int = 50): JSONArray =
+    get("/api/v1/admin/pump/users?limit=$limit&q=${enc(query)}", token)
+      .optJSONArray("users") ?: JSONArray()
+
+  /**
    *  پلن‌های **پمپ**.
    *
    *  ⚠️ همان مسیرِ `/admin/plans` است با `app=pump` — نه مسیرِ جدا.

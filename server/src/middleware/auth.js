@@ -83,6 +83,34 @@ async function userFromToken(req, res, next, row) {
 /** کاربرِ بخشِ پمپ. */
 const requirePumpUser = requireUserOf('pump');
 
+/**
+ * کاربرِ **هر** بخشی — فقط برای کارهایی که مالِ خودِ هویت‌اند.
+ *
+ * ── چه چیزی این را لازم کرد ────────────────────────────────────────
+ * ⛔ `‎/api/auth/logout-all‎` و `‎/api/auth/password‎` هر دو
+ * `requireUser` داشتند، یعنی **فقط توکنِ دکان** را می‌شناختند. پس
+ * برنامهٔ پمپ نه می‌توانست رمزش را عوض کند و نه از همهٔ دستگاه‌ها بیرون
+ * بیاید: هر دو ۴۰۱ می‌گرفتند و پیامش هم می‌گفت «نشست منقضی شده،
+ * دوباره وارد شوید» — در حالی که نشست سالم بود.
+ *
+ * رمز و هویت **مشترک**‌اند (یک `users` برای هر دو بخش)، پس این دو کار
+ * باید از هر دو در باز باشند. دادهٔ هر بخش همچنان پشتِ توکنِ همان بخش
+ * است و این تابع هیچ دری به دفترها باز نمی‌کند.
+ *
+ * ⚠️ `req.appSection` از روی **ردیفِ توکن** پر می‌شود، نه از درخواست —
+ * تا «خروج از همهٔ دستگاه‌ها» بداند کدام بخش را ببندد.
+ */
+async function requireAnyUser(req, res, next) {
+  try {
+    const token = bearer(req);
+    if (!token) return next(unauthorized());
+    const row = await tokens.verify(token, 'access', null);
+    if (!row) return next(unauthorized('نشست شما منقضی شده است، دوباره وارد شوید', 'invalid_token'));
+    req.appSection = row.app || 'shop';
+    return userFromToken(req, res, next, row);
+  } catch (err) { next(err); }
+}
+
 /** عضویت در دکان لازم است — shop_id از همین‌جا می‌آید. */
 async function requireShop(req, res, next) {
   try {
@@ -285,7 +313,7 @@ function requireSuperAdmin(req, res, next) {
 }
 
 module.exports = {
-  bearer, requireUser, requireUserOf, requirePumpUser, requireShop, optionalShop, requireDataWrite,
+  bearer, requireUser, requireUserOf, requireAnyUser, requirePumpUser, requireShop, optionalShop, requireDataWrite,
   requirePermission, requireFeature, requireAdmin, requireSuperAdmin,
   //  بخشِ پمپ‌بنزین
   requireStation, optionalStation, requireStationFeature,

@@ -120,6 +120,43 @@ await fetch(`${base}/api/me/backups?ext=json&kind=manual&label=از%20آزمون
   body: Buffer.from(JSON.stringify({ products: [] })),
 });
 
+/**
+ *  یک پمپِ واقعی با یک خبر — تا جدولِ «خبرهای این پمپ» چیزی داشته باشد.
+ *
+ *  ⛔ همان چیزی که تا امروز هیچ‌جا دیده نمی‌شد: خبرهای برنامهٔ پمپ
+ *  («اضافه برد»، «کم مانده») اصلاً به ابر نمی‌رفتند، پس وقتی صاحبِ پمپ
+ *  می‌گفت «خبر نگرفتم»، مدیر هیچ راهی برای دیدنش نداشت.
+ */
+async function makeStationWithEvent(name) {
+  const email = `${name}@panel.local`;
+  const password = 'Passw0rd!test';
+  const post = async (p, b, t) => {
+    const r = await fetch(base + p, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(t ? { Authorization: `Bearer ${t}` } : {}) },
+      body: JSON.stringify(b),
+    });
+    return { status: r.status, body: await r.json().catch(() => null) };
+  };
+  const started = await post('/api/auth/register/start', { name, email, password });
+  const verified = await post('/api/auth/register/verify', { email, code: started.body.devCode });
+  const done = await post('/api/auth/register/complete', {
+    ticket: verified.body.ticket, name, password,
+    device: { deviceId: `dev-${name}`, name: 'تست', platform: 'test' },
+    //  ⚠️ نشستِ بخشِ **پمپ** — توکنِ دکان روی مسیرهای پمپ پیدا نمی‌شود
+    app: 'pump', terms: { accepted: true },
+  });
+  const token = done.body.accessToken;
+  const st = await post('/api/pump', { name: `پمپِ ${name}` }, token);
+  const bound = await post('/api/pump/device/bind', { device: { uid: `pc-${name}` } }, token);
+  await post('/api/pump/device/events',
+    { events: [{ kind: 'debt', title: 'کریم اضافه برد', clientId: 'panel-1' }] },
+    bound.body.deviceToken);
+  return { stationId: st.body.station.id, name: `پمپِ ${name}` };
+}
+
+const station = await makeStationWithEvent('panelpump');
+
 const browser = await chromium.launch();
 const page = await browser.newPage();
 const consoleErrors = [];
@@ -372,6 +409,37 @@ await step('کادرِ پلنِ اشتراکِ پمپ از فهرستِ پمپ �
 });
 
 // ── ۸) هیچ خطای جاوااسکریپتی در کلِ نشست ──────────────────────────
+// ── ۷ج) خبرهای پمپ — «خبر نگرفتم» را همین‌جا می‌شود سنجید ────────
+await step('خبرهای یک پمپ در پروندهٔ همان پمپ دیده می‌شوند', async () => {
+  await openTab('pump');
+  await page.waitForFunction(
+    () => document.querySelectorAll('#pump-body tr').length > 0,
+    null, { timeout: 10_000 }
+  );
+  //  دکمهٔ «مدیریت»ِ همان پمپ
+  const clicked = await page.evaluate((wanted) => {
+    for (const tr of document.querySelectorAll('#pump-body tr')) {
+      if (tr.textContent.includes(wanted)) {
+        tr.querySelector('button')?.click();
+        return true;
+      }
+    }
+    return false;
+  }, station.name);
+  assert.ok(clicked, 'پمپِ آزمون باید در فهرست باشد');
+
+  await page.waitForFunction(
+    () => document.querySelectorAll('#pump-events tr').length > 0,
+    null, { timeout: 10_000 }
+  );
+  const rows = await page.$$eval('#pump-events tr', (trs) => trs.map((t) => t.textContent));
+  assert.ok(rows.some((r) => r.includes('کریم اضافه برد')),
+    `خبر باید در جدول باشد — ${JSON.stringify(rows)}`);
+  //  و کامپیوترِ پمپ حساب ندارد، پس نامِ خودِ دستگاه نشان داده می‌شود
+  assert.ok(rows.some((r) => r.includes('کامپیوترِ پمپ')),
+    `فرستنده باید دیده شود — ${JSON.stringify(rows)}`);
+});
+
 await step('در کلِ این نشست هیچ خطای صفحه‌ای نبود', async () => {
   assert.deepEqual(consoleErrors, [], consoleErrors.join(' | '));
 });
