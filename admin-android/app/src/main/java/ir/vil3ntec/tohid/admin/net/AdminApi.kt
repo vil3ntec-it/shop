@@ -445,10 +445,6 @@ class AdminApi(private val baseUrl: String) {
   suspend fun pumpStats(token: String): JSONObject =
     get("/api/v1/admin/pump/stats", token).optJSONObject("stats") ?: JSONObject()
 
-  /** افرادی که به پمپ‌ها وصل‌اند — همتای `/admin/users`ِ بخشِ دکان. */
-  suspend fun pumpUsers(token: String, query: String = "", limit: Int = 50): JSONArray =
-    get("/api/v1/admin/pump/users?limit=$limit&q=${enc(query)}", token)
-      .optJSONArray("users") ?: JSONArray()
 
   /**
    *  پلن‌های **پمپ**.
