@@ -170,7 +170,6 @@ private fun isDarkSurface(): Boolean {
 private val GOLD_GLOW = Color(0xFFF6C93F)
 private val GOLD_RING = Color(0xFFFFE9A8)
 
-@Composable
 /**
  *  ایمیل به چشمِ صفحه درست است یا نه — و اگر نه، چرا.
  *
@@ -194,6 +193,7 @@ private fun emailValidationError(raw: String): String? {
   }
 }
 
+@Composable
 fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
