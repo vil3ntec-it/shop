@@ -447,3 +447,15 @@ ADMIN_BOOTSTRAP_USER / ADMIN_BOOTSTRAP_PASSWORD
 - ⚠️ `pglite:` را در `DATABASE_URL`ِ استقرارِ داکری ننویسید؛ آن‌جا PostgreSQL
   همان است که بود.
 
+
+## ✉️ `SMTP_HOST` در محیط یعنی راهِ ارسالِ پیش‌فرض `smtp` است (از ۱۴۰۵/۰۷/۰۲)
+
+پنلِ سرورِ خانگی (ریپوی `server`، `account/supervisor.js`) SMTPِ «کدهای
+شش‌رقمی»ِ خودش را به‌شکلِ `SMTP_HOST/PORT/USER/PASS/SECURE` و
+`EMAIL_FROM(_NAME)` به این سرور می‌دهد. تا پیش از این با SMTPِ آماده هم
+پیش‌فرضِ `lib/mailer.js` «log» بود و کدِ ثبت‌نام فقط در لاگ چاپ می‌شد —
+یعنی هیچ‌کس نمی‌توانست ثبت‌نام کند. حالا `provider` با `SMTP_HOST` پیش‌فرضش
+`smtp` است؛ مقدارِ ذخیره‌شده در پنلِ مدیریت همچنان جلوتر است.
+انتشارِ اپِ اندروید (`tohid-native.yml`) هم فایل‌ها را یکی‌یکی و `version.txt`
+را آخر می‌فرستد — پیش از این آپلودِ هم‌زمان «Error saving asset» می‌داد و
+`version.txt`ِ تازه بی `Tohid-Native.apk` روی انتشار می‌ماند (دانلودِ ۴۰۴).

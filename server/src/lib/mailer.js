@@ -37,9 +37,12 @@ const PREFIX = 'email_';
  *   api     — سرویس‌های HTTP مثل Resend و Brevo
  */
 const FIELDS = {
-  provider:  () => (config.email.url ? 'api' : 'log'),
+  //  ⚠️ اگر SMTP در محیط هست (SMTP_HOST)، پیش‌فرض همان است نه «log»: پنلِ
+  //  سرورِ خانگی همین‌ها را برای فرزندش می‌فرستد و بی این خط، کدِ ثبت‌نام با
+  //  SMTPِ آماده همچنان فقط در لاگ چاپ می‌شد. مقدارِ ذخیره‌شده در پنل جلوتر است.
+  provider:  () => (config.email.url ? 'api' : process.env.SMTP_HOST ? 'smtp' : 'log'),
   from:      () => config.email.from,
-  fromName:  () => 'توحید',
+  fromName:  () => process.env.EMAIL_FROM_NAME || 'توحید',
   //  SMTP
   host:      () => process.env.SMTP_HOST || '',
   port:      () => process.env.SMTP_PORT || '587',
