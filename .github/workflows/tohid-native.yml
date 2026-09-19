@@ -111,6 +111,17 @@ jobs:
               -f ref='refs/tags/tohid-native' -f sha='${{ github.sha }}' >/dev/null
           fi
 
+      # ⚠️ چرا فایل‌ها با خودِ action-gh-release نمی‌روند: آن action همهٔ
+      # فایل‌ها را **هم‌زمان** می‌فرستد و پیش از هر کدام فایلِ هم‌نامِ قبلی را
+      # پاک می‌کند. دو بار (۳.۲.۲۵۳ و ۳.۲.۲۵۵) وسطِ همین کار «Error saving
+      # asset» داد و نتیجه‌اش بدترین حالت بود: `version.txt`ِ تازه روی
+      # انتشار نشست ولی `Tohid-Native.apk` پاک شده و دوباره نیامده بود — پس
+      # برنامهٔ روی گوشی «نسخهٔ تازه هست» می‌دید و دانلودش ۴۰۴ می‌گرفت.
+      # («برای برنامهٔ فروشگاه آپدیتی نیومد.»)
+      #
+      # این‌جا فایل‌ها **یکی‌یکی** و با ترتیبِ درست می‌روند: اول خودِ نصبی‌ها،
+      # آخر از همه `version.txt` — تا هیچ لحظه‌ای شماره‌ای اعلام نشود که
+      # فایلش هنوز نیامده. هر فایل تا سه بار تلاش می‌شود.
       - name: انتشار
         uses: softprops/action-gh-release@v2
         with:
@@ -118,11 +129,6 @@ jobs:
           name: توحید — نسخهٔ بومی اندروید
           prerelease: true
           target_commitish: ${{ github.sha }}
-          overwrite_files: true
-          files: |
-            android-native/out/*.apk
-            android-native/out/SHA256SUMS.txt
-            android-native/out/version.txt
           body: |
             ## توحید — نسخهٔ بومی اندروید
 
@@ -137,6 +143,32 @@ jobs:
 
             ---
             <sub>ساخته‌شده از `${{ github.sha }}`</sub>
+
+      - name: فرستادنِ فایل‌ها — یکی‌یکی، version.txt آخر
+        working-directory: android-native/out
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          up() {
+            for i in 1 2 3; do
+              if gh release upload tohid-native "$1" --clobber -R "${{ github.repository }}"; then return 0; fi
+              echo "::warning::فرستادنِ $1 نشد (تلاش $i) — دوباره"
+              sleep $((i * 5))
+            done
+            echo "::error::فرستادنِ $1 بعد از سه تلاش نشد"
+            return 1
+          }
+          up "${{ env.APK_NAME }}"
+          up Tohid-Native.apk
+          up SHA256SUMS.txt
+          up version.txt
+          #  و از خودِ گیت‌هاب بپرس که هر سه واقعاً روی انتشار نشسته‌اند
+          names=$(gh api "repos/${{ github.repository }}/releases/tags/tohid-native" | jq -r '.assets[].name')
+          for f in "${{ env.APK_NAME }}" Tohid-Native.apk SHA256SUMS.txt version.txt; do
+            echo "$names" | grep -qx "$f" || { echo "::error::$f روی انتشار نیست"; exit 1; }
+          done
+          echo "هر چهار فایل روی انتشار است"
 
       - name: پاک کردن نسخه‌های قبلی
         if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
