@@ -293,6 +293,39 @@ test('ایمیلِ خراب، ثبت‌نام را با «خطای داخلی» 
   assert.equal(again.status, 201);
 });
 
+/**
+ *  پنلِ سرورِ خانگی SMTPِ خودش را به‌شکلِ SMTP_HOST/… به این سرور می‌دهد.
+ *  تا پیش از این با SMTPِ آماده هم پیش‌فرض «log» بود و کدِ ثبت‌نام فقط در
+ *  لاگ چاپ می‌شد. و آن‌چه در پنلِ مدیریت ذخیره شود همچنان جلوتر است.
+ */
+test('SMTP در محیط یعنی پیش‌فرضِ راهِ ارسال smtp است، نه log', async () => {
+  const mailer = require('../src/lib/mailer');
+  const plans = require('../src/lib/plans');
+  const prev = { host: process.env.SMTP_HOST, name: process.env.EMAIL_FROM_NAME };
+  process.env.SMTP_HOST = 'smtp.example.com';
+  process.env.EMAIL_FROM_NAME = 'کدهای پنل';
+  try {
+    //  مقدارِ ذخیره‌شده خالی ⇒ پیش‌فرض دیده می‌شود
+    //  (میزبان هم، چون آزمونِ «ایمیلِ خراب» ۱۲۷.۰.۰.۱ را ذخیره کرده)
+    await plans.setConfig('email_provider', '');
+    await plans.setConfig('email_host', '');
+    await plans.setConfig('email_fromName', '');
+    const s = await mailer.save({});
+    assert.equal(s.provider, 'smtp');
+    assert.equal(s.host, 'smtp.example.com');
+    assert.equal(s.fromName, 'کدهای پنل');
+
+    //  و آن‌چه در پنلِ مدیریت ذخیره شود جلوتر از محیط است
+    await plans.setConfig('email_provider', 'log');
+    assert.equal((await mailer.save({})).provider, 'log');
+  } finally {
+    if (prev.host === undefined) delete process.env.SMTP_HOST; else process.env.SMTP_HOST = prev.host;
+    if (prev.name === undefined) delete process.env.EMAIL_FROM_NAME; else process.env.EMAIL_FROM_NAME = prev.name;
+    await plans.setConfig('email_provider', 'log');
+    await mailer.save({});
+  }
+});
+
 test('کاربر عادی به تنظیمات ایمیل نمی‌رسد', async () => {
   const u = await h.newUser('کنجکاو۲');
   assert.equal((await h.get('/api/admin/email', { token: u.accessToken })).status, 401);
