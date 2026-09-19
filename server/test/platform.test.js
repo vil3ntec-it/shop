@@ -306,7 +306,9 @@ test('SMTP در محیط یعنی پیش‌فرضِ راهِ ارسال smtp ا�
   process.env.EMAIL_FROM_NAME = 'کدهای پنل';
   try {
     //  مقدارِ ذخیره‌شده خالی ⇒ پیش‌فرض دیده می‌شود
+    //  (میزبان هم، چون آزمونِ «ایمیلِ خراب» ۱۲۷.۰.۰.۱ را ذخیره کرده)
     await plans.setConfig('email_provider', '');
+    await plans.setConfig('email_host', '');
     await plans.setConfig('email_fromName', '');
     const s = await mailer.save({});
     assert.equal(s.provider, 'smtp');
