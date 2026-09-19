@@ -420,3 +420,30 @@ npm run test:web    نسخهٔ وب در کرومیومِ واقعی
 - سنجهٔ سالم بودنِ زنجیره: `https://api.vill3n.top/api/health` باید
   `"server":"online"` و نسخهٔ همین `package.json` را بدهد. JSONِ `control-center`
   یعنی درگاه خاموش/کهنه است؛ ۵۰۳ِ `account_server_down` یعنی این سرور بالا نیست.
+
+## 🧩 راه‌اندازِ PGlite — همان سرور، بی PostgreSQL (از ۱۴۰۵/۰۷/۰۲)
+
+کامپیوترِ خانگیِ صاحبِ سامانه ویندوز است؛ «docker compose up -d» هیچ‌وقت آن‌جا
+دویده بود و هر سه برنامه «سرورِ حساب روی سرورِ خانگی روشن نیست» می‌دیدند. حالا
+پنلِ سرورِ خانگی این سرور را خودش بالا می‌آورد، با:
+
+```
+DATABASE_URL=pglite:<پوشه>      (یا pglite:memory برای آزمون)
+ADMIN_BOOTSTRAP_USER / ADMIN_BOOTSTRAP_PASSWORD
+```
+
+- ⛔ **`src/db.js` تنها جای فرقِ دو راه‌انداز است.** کدِ بالاتر نه `pg` را
+  می‌شناسد نه PGlite را. سه فرق همان‌جا پوشانده می‌شود: bigint ⇒ رشته (مثلِ
+  pg، نه BigInt)، bytea ⇒ Buffer، و تراکنش با `AsyncLocalStorage` — پرس‌وجوی
+  سراسری داخلِ `tx` به همان تراکنش می‌رود، وگرنه پشتِ قفلِ تک‌اتصالیِ PGlite
+  تا ابد می‌ماند (سنجه‌اش در `pglite-driver.test.js`).
+- ⛔ **هیچ SQLی برای PGlite عوض نشد** و نباید بشود: `npm run test:pglite` همان
+  ۴۰۲ آزمون است روی `pglite:memory` (فقط `backup` و `pump-isolation` که خودِ
+  `pg_dump`/`psql` را صدا می‌زنند رد می‌شوند). CI هر دو را می‌دواند.
+- ⛔ پشتیبانِ PGlite `dumpDataDir` است (`.pglite.tar.gz`، همان رمزنگاری و
+  meta)؛ `restore` روی PGlite عمداً خطا می‌دهد و راه را می‌گوید.
+- ⛔ `ADMIN_BOOTSTRAP_*` مرجع است: مدیرِ نبوده ساخته، رمزِ متفاوت به همان
+  برگردانده می‌شود. کسی که آن دو را دارد صاحبِ همان کامپیوتر است.
+- ⚠️ `pglite:` را در `DATABASE_URL`ِ استقرارِ داکری ننویسید؛ آن‌جا PostgreSQL
+  همان است که بود.
+
