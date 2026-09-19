@@ -2,7 +2,7 @@
 const path = require('path');
 const express = require('express');
 const config = require('./config');
-const { healthy, pruneExpired, now } = require('./db');
+const { healthy, pruneExpired, now, driverName } = require('./db');
 const migrate = require('./migrate');
 const plans = require('./lib/plans');
 const subs = require('./lib/subscriptions');
@@ -18,6 +18,12 @@ async function createApp({ runMigrations = true } = {}) {
   if (runMigrations) await migrate.run({ log: (m) => console.log(`[migrate] ${m}`) });
   await plans.seedDefaults();
   await pruneExpired();
+  //  مدیر از محیط — نصبی که پنلِ خانگی خودش بالا می‌آورد و ترمینالی در کار نیست
+  await require('./lib/admin-bootstrap').ensureAdmin({
+    username: process.env.ADMIN_BOOTSTRAP_USER,
+    password: process.env.ADMIN_BOOTSTRAP_PASSWORD,
+    log: (m) => console.log(`[admin] ${m}`),
+  });
 
   app.use(express.json({ limit: '2mb' }));
 

@@ -9,7 +9,7 @@
  */
 const config = require('./config');
 const { createApp } = require('./app');
-const { closeDb, healthy } = require('./db');
+const { closeDb, healthy, isPglite, pgliteDir, driverName } = require('./db');
 const backup = require('./lib/backup');
 
 async function main() {
@@ -21,14 +21,16 @@ async function main() {
   }
 
   if (!(await healthy())) {
-    console.error('اتصال به PostgreSQL برقرار نشد. DATABASE_URL را بررسی کنید.');
+    console.error(isPglite()
+      ? `دیتابیسِ درون‌فرآیندی (PGlite) باز نشد. پوشه: ${pgliteDir() || 'حافظه'}`
+      : 'اتصال به PostgreSQL برقرار نشد. DATABASE_URL را بررسی کنید.');
     process.exit(1);
   }
 
   const app = await createApp();
   const server = app.listen(config.port, config.host, () => {
     const where = config.serverUrl || `http://${config.host}:${config.port}`;
-    console.log(`سرور فروشگاه روی ${where} بالا آمد (${config.env})`);
+    console.log(`سرور فروشگاه روی ${where} بالا آمد (${config.env}، دیتابیس: ${driverName()})`);
     console.log(`بررسی سلامت: ${where.replace(/\/$/, '')}/api/health`);
   });
   server.keepAliveTimeout = 65_000;

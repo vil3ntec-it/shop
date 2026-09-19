@@ -18,6 +18,7 @@ const { pipeline } = require('stream/promises');
 const { Transform } = require('stream');
 const { createCipheriv, createDecipheriv, randomBytes, scryptSync, createHash } = require('crypto');
 const config = require('../config');
+const db = require('../db');
 
 const KINDS = ['daily', 'weekly', 'monthly', 'manual'];
 const MAGIC = 'SHOPBK1';
@@ -47,6 +48,7 @@ async function run({ kind = 'manual', dir = null } = {}) {
   await ensureDirs();
 
   const encrypted = !!config.backup.passphrase;
+  if (db.isPglite()) return runPglite({ kind, dir, encrypted });
   const base = `shop-${stamp()}.sql.gz${encrypted ? '.enc' : ''}`;
   const target = path.join(dir || dirFor(kind), base);
   const tmp = `${target}.part`;
@@ -131,6 +133,41 @@ async function run({ kind = 'manual', dir = null } = {}) {
   return { file: target, bytes: stat.size, kind, createdAt: Date.now(), encrypted, sha256: sha };
 }
 
+/**
+ * پشتیبان روی راه‌اندازِ PGlite — کلِ پوشهٔ دیتابیس، همان‌طور که خودِ PGlite
+ * بیرون می‌دهد (tar.gz). pg_dump این‌جا نیست و لازم هم نیست: این فایل با
+ * `PGlite.create({ loadDataDir })` عیناً همان دیتابیس می‌شود.
+ *
+ * ⚠️ همان رمزنگاری و همان meta.json، تا فهرست و دانلودِ پنل فرقی نبیند؛
+ * فقط پسوند `.pglite.tar.gz` است، نه `.sql.gz`، چون SQLِ متنی نیست.
+ */
+async function runPglite({ kind, dir, encrypted }) {
+  const base = `shop-${stamp()}.pglite.tar.gz${encrypted ? '.enc' : ''}`;
+  const target = path.join(dir || dirFor(kind), base);
+  const tmp = `${target}.part`;
+
+  const raw = await db.dumpPglite();
+  if (raw.length < 100) throw new Error('PGlite چیزی نداد — پشتیبان ساخته نشد.');
+
+  let out = raw;
+  if (encrypted) {
+    const salt = randomBytes(16);
+    const iv = randomBytes(12);
+    const cipher = createCipheriv('aes-256-gcm', keyFrom(config.backup.passphrase, salt), iv);
+    out = Buffer.concat([Buffer.from(MAGIC), salt, iv, cipher.update(raw), cipher.final(), cipher.getAuthTag()]);
+  }
+  await fsp.writeFile(tmp, out);
+  await fsp.rename(tmp, target);
+  const stat = await fsp.stat(target);
+  const sha = createHash('sha256').update(out).digest('hex');
+  await fsp.writeFile(`${target}.meta.json`, JSON.stringify({
+    file: base, kind, createdAt: Date.now(), bytes: stat.size,
+    encrypted, sha256: sha, format: 'pglite-datadir-tar-gzip', app: 'shop-server', version: 2,
+  }, null, 2));
+  await prune(kind);
+  return { file: target, bytes: stat.size, kind, createdAt: Date.now(), encrypted, sha256: sha };
+}
+
 /** نگه داشتن تعداد مشخصی از هر نوع و پاک کردن قدیمی‌ترها. */
 async function prune(kind) {
   const keep = {
@@ -195,6 +232,12 @@ async function decode(file) {
  * (روی دیتابیسِ پر، اول باید خالی شود — این کار عمداً دستی است.)
  */
 async function restore(file, { databaseUrl = config.db.url } = {}) {
+  if (db.isPglite() || /\.pglite\.tar\.gz(\.enc)?$/.test(String(file))) {
+    throw new Error(
+      'پشتیبانِ PGlite از داخلِ سرورِ روشن برنمی‌گردد: سرور را خاموش کنید، پوشهٔ دیتابیس را ' +
+      'خالی کنید و فایل را با PGlite.create({ loadDataDir }) بار کنید — یا پوشهٔ pg را از یک نسخهٔ قبلی جایگزین کنید.'
+    );
+  }
   const sql = await decode(file);
   return new Promise((resolve, reject) => {
     const psql = spawn(config.backup.pgRestore, [databaseUrl, '-v', 'ON_ERROR_STOP=1', '-q', '-f', '-'],
