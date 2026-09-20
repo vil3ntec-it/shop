@@ -26,6 +26,7 @@
  * معنا همان است، فقط ساعت تندتر می‌گردد.
  */
 const { query, one, many, now } = require('../db');
+const { notifyPanel } = require('./panel-live');
 const config = require('../config');
 
 const num = (k, d) => { const v = Number(process.env[k]); return Number.isFinite(v) && v > 0 ? v : d; };
@@ -164,6 +165,7 @@ function backoffMs(attempt) { return BACKOFF_MS * Math.pow(2, Math.max(0, attemp
  * نشان می‌دهد باید همان را بگوید، نه «رفت».
  */
 async function markSent(id, reason = '') {
+  notifyPanel('logins');
   const t = now();
   await query(
     `UPDATE otp_outbox SET status='sent', sent_at=$2, locked_at=NULL, reason=$3, last_error='', updated_at=$2 WHERE id=$1`,
@@ -171,6 +173,7 @@ async function markSent(id, reason = '') {
   );
 }
 async function markFailed(id, reason, lastError = '') {
+  notifyPanel('logins');
   const t = now();
   await query(
     `UPDATE otp_outbox SET status='failed', failed_at=$2, locked_at=NULL, reason=$3, last_error=$4, updated_at=$2 WHERE id=$1`,
@@ -178,6 +181,7 @@ async function markFailed(id, reason, lastError = '') {
   );
 }
 async function requeue(id, attempt, reason, lastError = '') {
+  notifyPanel('logins');
   const t = now();
   await query(
     `UPDATE otp_outbox SET status='queued', next_attempt_at=$2, locked_at=NULL, reason=$3, last_error=$4, updated_at=$5 WHERE id=$1`,

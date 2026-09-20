@@ -42,35 +42,64 @@ object AutoBackup {
   private const val PREFIX = "auto-"
   private const val SUFFIX = ".json"
 
-  /** چند نسخه نگه داشته شود */
-  const val KEEP = 3
+  /**
+   *  چند نسخه روی خودِ گوشی نگه داشته شود.
+   *
+   *  ⚠️ با دو نسخه در روز، شش تا یعنی همان **سه روز** پوششی که نسخهٔ
+   *  شبانه داشت. کم گذاشتنش یعنی «خرابی دو روز بعد دیده شود و نسخهٔ
+   *  سالمی نمانده باشد» — همان چیزی که این کار برایش هست.
+   */
+  const val KEEP = 6
 
   data class Snapshot(val file: File, val at: Long, val bytes: Long)
 
-  /** برنامه‌ریزیِ کارِ شبانه. صدا زدنش چند بار بی‌ضرر است. */
+  /** هر دوازده ساعت یک نسخه — خواستهٔ صریحِ صاحب سامانه */
+  val EVERY_HOURS = 12L
+
+  /**
+   *  برنامه‌ریزیِ کارِ خودکار. صدا زدنش چند بار بی‌ضرر است.
+   *
+   *  ⚠️ **`UPDATE` است نه `KEEP`.**
+   *
+   *  با `KEEP`، گوشی‌ای که نسخهٔ قبلیِ برنامه را داشته کارِ **شبانهٔ**
+   *  ثبت‌شده‌اش را تا ابد نگه می‌داشت و این دوره‌ی تازه هیچ‌وقت روی آن
+   *  نمی‌نشست — یعنی همهٔ مشتری‌های امروز بی‌صدا روی یک‌بار‌در‌روز
+   *  می‌ماندند و هیچ‌کس نمی‌فهمید.
+   */
   fun schedule(context: Context) {
-    val request = PeriodicWorkRequestBuilder<Worker>(1, TimeUnit.DAYS)
-      .setInitialDelay(untilNight(), TimeUnit.MILLISECONDS)
-      //  باتریِ کم را دست نمی‌زنیم؛ پشتیبان فردا هم گرفته می‌شود
+    val request = PeriodicWorkRequestBuilder<Worker>(EVERY_HOURS, TimeUnit.HOURS)
+      .setInitialDelay(untilNextSlot(), TimeUnit.MILLISECONDS)
+      //  باتریِ کم را دست نمی‌زنیم؛ پشتیبانِ بعدی دوازده ساعت دیگر است
       .setConstraints(Constraints.Builder().setRequiresBatteryNotLow(true).build())
       .build()
     runCatching {
       WorkManager.getInstance(context)
-        .enqueueUniquePeriodicWork(WORK, ExistingPeriodicWorkPolicy.KEEP, request)
+        .enqueueUniquePeriodicWork(WORK, ExistingPeriodicWorkPolicy.UPDATE, request)
     }
   }
 
-  /** تا یازدهِ شبِ بعدی چقدر مانده — وقتی دکان بسته است و گوشی بیکار */
-  private fun untilNight(): Long {
-    val now = Calendar.getInstance()
-    val target = Calendar.getInstance().apply {
-      set(Calendar.HOUR_OF_DAY, 23)
-      set(Calendar.MINUTE, 0)
-      set(Calendar.SECOND, 0)
-      set(Calendar.MILLISECOND, 0)
-      if (before(now)) add(Calendar.DAY_OF_MONTH, 1)
+  /**
+   *  تا نوبتِ بعدی چقدر مانده — یازدهِ شب یا یازدهِ صبح.
+   *
+   *  ⚠️ ساعتِ ثابت، نه «دوازده ساعت از حالا»: دو نسخه‌ای که هر دو ظهر
+   *  گرفته شوند یعنی شبی که هیچ نسخه‌ای ندارد. با ساعتِ ثابت، هر گوشی
+   *  یکی برای پایانِ روزِ کاری دارد و یکی برای میانِ روز.
+   */
+  internal fun untilNextSlot(nowMs: Long = System.currentTimeMillis()): Long {
+    var best = Long.MAX_VALUE
+    for (hour in intArrayOf(11, 23)) {
+      val target = Calendar.getInstance().apply {
+        timeInMillis = nowMs
+        set(Calendar.HOUR_OF_DAY, hour)
+        set(Calendar.MINUTE, 0)
+        set(Calendar.SECOND, 0)
+        set(Calendar.MILLISECOND, 0)
+        if (timeInMillis <= nowMs) add(Calendar.DAY_OF_MONTH, 1)
+      }
+      val gap = target.timeInMillis - nowMs
+      if (gap in 1 until best) best = gap
     }
-    return (target.timeInMillis - now.timeInMillis).coerceAtLeast(60_000)
+    return best.coerceAtLeast(60_000)
   }
 
   fun dir(context: Context): File =
@@ -94,8 +123,16 @@ object AutoBackup {
     val ledger = File(context.filesDir, "shop-data.json")
     if (!ledger.exists() || ledger.length() == 0L) return@runCatching null
 
-    val target = File(dir(context), "$PREFIX$today$SUFFIX")
-    val tmp = File(dir(context), "$PREFIX$today$SUFFIX.tmp")
+    /*
+     *  ⚠️ نامِ فایل **نوبت** را هم دارد.
+     *
+     *  با دو نسخه در روز و نامی که فقط تاریخ داشت، نسخهٔ دوم روی اولی
+     *  می‌نشست و عملاً همان یکی‌در‌روزِ قبلی می‌ماند — فقط با دو برابر
+     *  کار. «ب» برای پیش از ظهر، «ش» برای بعدش.
+     */
+    val slot = if (Calendar.getInstance().get(Calendar.HOUR_OF_DAY) < 12) "b" else "sh"
+    val target = File(dir(context), "$PREFIX$today-$slot$SUFFIX")
+    val tmp = File(dir(context), "$PREFIX$today-$slot$SUFFIX.tmp")
     ledger.copyTo(tmp, overwrite = true)
     tmp.renameTo(target)
     prune(context)

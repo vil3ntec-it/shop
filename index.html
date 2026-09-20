@@ -12087,6 +12087,30 @@
    *  برنمی‌گردد و باید از همان درِ «بازیابی از فایل» برود تا کاربر اول
    *  ببیند داخلش چیست.
    */
+  /*
+   *  پشتیبانِ ابریِ خودکار — هر دوازده ساعت، بی هیچ تاییدی.
+   *
+   *  ⛔ تا امروز نسخهٔ وب **هیچ** پشتیبانِ خودکاری نداشت و تنها راهش
+   *  دکمهٔ دستی بود؛ یعنی کاربرِ آیفون، که فقط همین را دارد، اگر یادش
+   *  می‌رفت هیچ نسخه‌ای روی سرور نداشت.
+   *
+   *  ⚠️ خودِ `auto-backup.js` از ساختارِ دفتر هیچ نمی‌داند و نباید بداند —
+   *  فقط همین تابع را صدا می‌زند.
+   */
+  /*
+   *  ⚠️ **بعد از بارِ صفحه**، نه همین‌جا: `auto-backup.js` با `defer`
+   *  بار می‌شود و تا پایانِ تجزیهٔ سند اجرا نشده، پس `window.TohidAutoBackup`
+   *  در این لحظه هنوز وجود ندارد. (بارِ اول همین‌جا نوشته شد و بی‌صدا
+   *  هیچ کاری نمی‌کرد — بدترین شکلِ خرابی برای یک پشتیبان.)
+   */
+  (function startAutoBackup(){
+    const go = () => {
+      if (window.TohidAutoBackup) window.TohidAutoBackup.start(() => JSON.stringify(backupPayload()));
+    };
+    if (document.readyState === 'loading') window.addEventListener('DOMContentLoaded', go, { once: true });
+    else go();
+  })();
+
   function backupPayload(){
     return {
       exportedAt: new Date().toISOString(),
@@ -13509,6 +13533,7 @@
 <script src="license/vip.js?v=16" defer></script>
 <script src="license/support.js?v=16" defer></script>
 <script src="license/account-ui.js?v=1" defer></script>
+<script src="license/auto-backup.js?v=1" defer></script>
 <script src="license/thermal-print.js?v=1" defer></script>
 
 </body>
