@@ -43,7 +43,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Storefront
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
@@ -433,6 +432,7 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
       error = error,
       note = note,
       askPassword = resetting,
+      step = if (registering) 2 else null,
       secondsLeft = { cooldown.secondsLeft(destination) },
       onBack = {
         codeSent = false; code = ""; note = null; error = null
@@ -487,10 +487,19 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
         .verticalScroll(rememberScrollState())
         .imePadding(),
     ) {
+      /*
+       *  عنوان و زیرعنوان، هم‌زبان با نسخهٔ وب.
+       *
+       *  زیرعنوانِ قبلیِ ثبت‌نام یک جملهٔ بلند بود («در سه گام: ایمیل و
+       *  رمز، کد تأیید، لوکیشن و شرایط») که همان لحظه هم شلوغ بود و هم
+       *  نمی‌گفت کاربر **کجای** کار است. حالا آن سه گام نوار خودشان را
+       *  دارند و زیرعنوان یک خطِ کوتاه است — همان چیزی که `signup-card`
+       *  در `index.html` از قبل داشت.
+       */
       GradientHeader(
-        title = if (emailMode == "login") "خوش آمدید" else "حساب تازه",
-        subtitle = if (emailMode == "login") "با ایمیل و رمز وارد شوید"
-        else "در سه گام: ایمیل و رمز، کد تأیید، لوکیشن و شرایط",
+        title = if (emailMode == "login") "خوش آمدید" else "ساخت حساب",
+        subtitle = if (emailMode == "login") "با ایمیل و رمزتان وارد شوید"
+        else "با ایمیل‌تان، در سه گام کوتاه",
       )
 
       /*
@@ -511,25 +520,73 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
           .fillMaxWidth()
           .padding(horizontal = 22.dp),
       ) {
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(10.dp))
 
-        Spacer(Modifier.height(12.dp))
+        /*
+         *  ورود یا ساختِ حساب — یک کلیدِ دوتکه، بالای خودِ فرم.
+         *
+         *  ── چه چیزی خراب بود ──────────────────────────────────────────
+         *  عوض کردنِ راه، یک دکمهٔ متنیِ تمام‌عرض **زیرِ** فرم بود
+         *  («حساب ندارید؟ ثبت‌نام کنید») و کنارش سه دکمهٔ متنیِ دیگر با
+         *  همان شکل و همان اندازه. چهار خطِ هم‌شکل زیرِ هم، که هیچ‌کدام
+         *  نمی‌گفت کدام مهم‌تر است و کاربر باید هر چهار تا را می‌خواند تا
+         *  بفهمد کجاست.
+         *
+         *  حالا انتخابِ راه بالای فرم است و **حالِ امروز را نشان می‌دهد**،
+         *  نه یک پیشنهاد. زیرِ فرم فقط دکمهٔ اصلی می‌ماند.
+         *  ──────────────────────────────────────────────────────────────
+         */
+        ModeSwitch(login = emailMode == "login") { picked ->
+          if (picked != emailMode) {
+            emailMode = picked
+            //  خطای کادرها هم با عوض شدنِ راه پاک می‌شود: «رمز حداقل ۸
+            //  نویسه» مالِ ثبت‌نام است و نباید بالای فرمِ ورود بماند
+            error = null; emailError = null; passwordError = null; note = null
+            //  تکرارِ رمز فقط در ثبت‌نام معنی دارد
+            if (picked == "login") password2 = ""
+          }
+        }
 
-        // نام — در هر دو راه، چون حسابِ بی‌نام بعداً فقط یک شماره است
-        PillField(
-          value = name,
-          onValueChange = { name = it; error = null },
-          placeholder = "نام شما",
-          label = "نام",
-          icon = Icons.Filled.Person,
-        )
-        Spacer(Modifier.height(12.dp))
+        //  نوارِ سه گام — همان `signup-steps`ِ نسخهٔ وب، با همان واژه‌ها
+        if (emailMode == "register") {
+          Spacer(Modifier.height(16.dp))
+          SignupSteps(active = 1)
+        }
+
+        Spacer(Modifier.height(18.dp))
+
+        /*
+         *  نام فقط در ساختِ حساب.
+         *
+         *  ── چه چیزی خراب بود ──────────────────────────────────────────
+         *  گزارشِ صاحب مخزن با عکس: کادرِ «نام شما» بالای **فرمِ ورود**
+         *  هم بود. آن کادر در ورود هیچ‌جا نمی‌رفت — `auth.login` فقط
+         *  ایمیل و رمز می‌فرستد — و فقط یک خانهٔ دیگر بود که کاربر
+         *  می‌دید و نمی‌دانست باید پرش کند یا نه. نسخهٔ وب از روزِ اول
+         *  درست بود: `auth-login-form` نام ندارد و `signup-step-1` دارد.
+         *
+         *  ⚠️ کادرِ نام از برنامه برداشته نشد، جابه‌جا شد: در ساختِ حساب
+         *  سرِ جایش است و در «کد شاگرد» هم هست (شاگرد حساب ندارد و نامش
+         *  تنها چیزی است که صاحبِ دکان در فهرست می‌بیند). هیچ درخواستی
+         *  به سرور عوض نشد.
+         *  ──────────────────────────────────────────────────────────────
+         */
+        if (emailMode == "register") {
+          PillField(
+            value = name,
+            onValueChange = { name = it; error = null },
+            placeholder = "مثلاً کریم",
+            label = "نام شما",
+            icon = Icons.Filled.Person,
+          )
+          Spacer(Modifier.height(12.dp))
+        }
 
         run {
           PillField(
             value = email,
             onValueChange = { email = it; error = null; emailError = null },
-            placeholder = "ایمیل",
+            placeholder = "name@gmail.com",
             label = "ایمیل",
             icon = Icons.Filled.AlternateEmail,
             keyboardOptions = KeyboardOptions(
@@ -544,7 +601,7 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
             value = password,
             onValueChange = { password = it; error = null; passwordError = null },
             error = passwordError,
-            placeholder = if (emailMode == "register") "رمز عبور (حداقل ۸ نویسه)" else "رمز عبور",
+            placeholder = if (emailMode == "register") "حداقل ۸ نویسه" else "رمز عبور",
             label = "رمز عبور",
             icon = Icons.Filled.Lock,
             keyboardOptions = KeyboardOptions(
@@ -586,8 +643,8 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
             PillField(
               value = password2,
               onValueChange = { password2 = it; error = null },
-              placeholder = "تکرارِ رمز",
-              label = "تکرارِ رمز",
+              placeholder = "همان رمز، دوباره",
+              label = "تکرار رمز عبور",
               icon = Icons.Filled.Lock,
               keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Password,
@@ -621,6 +678,54 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
           }
         }
 
+        /*
+         *  «رمز را فراموش کرده‌اید؟» — یک خطِ ریز، چسبیده به کادرِ رمز.
+         *
+         *  ── چه چیزی خراب بود ──────────────────────────────────────────
+         *  دکمه‌ای تمام‌عرض بود، هم‌اندازهٔ «ثبت‌نام» و «ورود با کد»، و
+         *  وقتی ایمیل خالی بود نوشته‌اش می‌شد «رمز را فراموش کرده‌اید؟
+         *  اول ایمیل را بزنید» — یعنی یک **دستور** روی دکمه‌ای که
+         *  خاموش بود. حالا همیشه فعال است و اگر ایمیل نداشته باشیم،
+         *  خطا زیرِ خودِ کادرِ ایمیل می‌نشیند؛ همان‌جایی که باید.
+         *
+         *  جایش هم همان جایی است که `auth-label-row` در `index.html`
+         *  دارد: کنارِ برچسبِ رمز، نه ته صفحه.
+         *  ──────────────────────────────────────────────────────────────
+         */
+        if (emailMode == "login") {
+          Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            TextButton(
+              enabled = ready && !busy,
+              contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
+              onClick = {
+                //  کدِ بازیابی به همین ایمیل می‌رود؛ اگر بدقالب — یا
+                //  اصلاً خالی — باشد، درخواست بی‌خود فرستاده شده و سقفِ
+                //  نرخ هم خرج شده
+                val bad = emailValidationError(email)
+                if (bad != null) { emailError = bad; return@TextButton }
+                busy = true; error = null; note = null
+                val to = email.trim()
+                scope.launch {
+                  auth.forgotPassword(to)
+                    .onSuccess {
+                      cooldown.start(to, it.resendSeconds)
+                      resetting = true
+                      codeSent = true
+                    }
+                    .onFailure { fail(it) }
+                  busy = false
+                }
+              },
+            ) {
+              Text(
+                "رمز عبور را فراموش کرده‌اید؟",
+                color = inkSoft,
+                style = MaterialTheme.typography.labelMedium,
+              )
+            }
+          }
+        }
+
         error?.let {
           Spacer(Modifier.height(10.dp))
           Text(it, style = MaterialTheme.typography.labelMedium, color = Shop.colors.danger)
@@ -630,7 +735,7 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
           Text(it, style = MaterialTheme.typography.labelMedium, color = Shop.colors.primary)
         }
 
-        Spacer(Modifier.height(18.dp))
+        Spacer(Modifier.height(if (emailMode == "login") 12.dp else 18.dp))
 
         /* ------------------------ دکمهٔ اصلی ------------------------ */
         val label = if (emailMode == "register") "ساخت حساب" else "ورود به حساب"
@@ -720,7 +825,7 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
         }
 
         /*
-         *  «ورود با کد» — فقط اگر سرور واقعاً کد می‌فرستد.
+         *  «ورود با کد» — فقط در ورود، و فقط اگر سرور واقعاً کد می‌فرستد.
          *
          *  ── چه چیزی را می‌بندد ──────────────────────────────────────
          *  گزارش شد: «در صفحهٔ ورود یک چیزی نوشته ورود با کد؛ آن را
@@ -731,19 +836,23 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
          *  حالا خودِ سرور تعیین می‌کند: `/config` می‌گوید `otpEnabled`
          *  هست یا نه، و کلید فقط آن‌وقت ساخته می‌شود. سرور که فرستنده
          *  گرفت، کلید خودش پیدا می‌شود — بی نسخهٔ تازه.
+         *
+         *  ⚠️ و در **ثبت‌نام** دیگر ساخته نمی‌شود: آنجا راهِ کار همان سه
+         *  گامِ بالاست و یک راهِ دومِ هم‌اندازه فقط گیج می‌کرد. منطقش
+         *  دست نخورد — همان `requestOtp` است، فقط در راهِ خودش.
          *  ────────────────────────────────────────────────────────────
          */
-        if (otpReady) {
-          Spacer(Modifier.height(6.dp))
-          TextButton(
-            //  نام اینجا هم لازم نیست: کد به **ایمیل** می‌رود. برای
+        if (otpReady && emailMode == "login") {
+          Spacer(Modifier.height(10.dp))
+          GhostButton(
+            text = "ورود با کد به‌جای رمز",
+            //  نام اینجا لازم نیست: کد به **ایمیل** می‌رود. برای
             //  حسابی که تازه ساخته می‌شود سرور خودش نامِ خالی را
             //  می‌پذیرد و کاربر بعداً در پروفایل می‌نویسدش.
-            enabled = ready && !busy && email.isNotBlank(),
-            modifier = Modifier.fillMaxWidth(),
+            enabled = ready && !busy,
             onClick = {
               val bad = emailValidationError(email)
-              if (bad != null) { emailError = bad; return@TextButton }
+              if (bad != null) { emailError = bad; return@GhostButton }
               busy = true; error = null; note = null
               scope.launch {
                 val to = email.trim()
@@ -762,120 +871,19 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
                 busy = false
               }
             },
-          ) {
-            Text(
-              "ورود با کد به‌جای رمز",
-              color = BLUE,
-              style = MaterialTheme.typography.labelLarge,
-              fontWeight = FontWeight.Bold,
-            )
-          }
-
-        }
-        /*
-         *  «ثبت‌نام» و «رمز را فراموش کردم» — بیرونِ شرطِ «ورود با کد».
-         *
-         *  ── چه چیزی خراب شده بود ────────────────────────────────────
-         *  این دو دکمه داخلِ همان `if` بودند که «ورود با کد» را
-         *  می‌ساخت. وقتی آن شرط به `otpReady` بسته شد — و سرور کد
-         *  نمی‌فرستد — این دو هم با آن ناپدید شدند. یعنی هیچ راهی برای
-         *  **ثبت‌نام** روی صفحه نماند. خرابیِ خودم بود.
-         *
-         *  ربطی هم به هم نداشتند: ثبت‌نام با رمز کار می‌کند و به کدِ
-         *  ایمیل هیچ نیازی ندارد.
-         *  ────────────────────────────────────────────────────────────
-         */
-        Spacer(Modifier.height(4.dp))
-        TextButton(
-          onClick = {
-            emailMode = if (emailMode == "login") "register" else "login"
-            //  خطای کادرها هم با عوض شدنِ راه پاک می‌شود: «رمز حداقل ۸
-            //  نویسه» مالِ ثبت‌نام است و نباید بالای فرمِ ورود بماند
-            error = null; emailError = null; passwordError = null
-          },
-            modifier = Modifier.fillMaxWidth(),
-          ) {
-            Text(
-              if (emailMode == "login") "حساب ندارید؟ ثبت‌نام کنید" else "حساب دارم — برگرد به ورود",
-              color = Shop.colors.primary,
-              style = MaterialTheme.typography.labelLarge,
-            )
-          }
-          if (emailMode == "login") {
-            /*
-             *  بازیابیِ رمز.
-             *
-             *  تا امروز این دکمه فقط می‌گفت «با پشتیبانی تماس بگیرید» —
-             *  یعنی کسی که رمزش را فراموش می‌کرد از حسابش بیرون می‌ماند.
-             *  حالا کد به همان ایمیل می‌رود و همان صفحهٔ کد باز می‌شود،
-             *  این بار با کادرِ رمزِ تازه.
-             */
-            TextButton(
-              enabled = ready && !busy && email.isNotBlank(),
-              onClick = {
-                //  کدِ بازیابی به همین ایمیل می‌رود؛ اگر بدقالب باشد
-                //  درخواست بی‌خود فرستاده شده و سقفِ نرخ هم خرج شده
-                val bad = emailValidationError(email)
-                if (bad != null) { emailError = bad; return@TextButton }
-                busy = true; error = null; note = null
-                val to = email.trim()
-                scope.launch {
-                  auth.forgotPassword(to)
-                    .onSuccess {
-                      cooldown.start(to, it.resendSeconds)
-                      resetting = true
-                      codeSent = true
-                    }
-                    .onFailure { fail(it) }
-                  busy = false
-                }
-              },
-              modifier = Modifier.fillMaxWidth(),
-            ) {
-              Text(
-                if (email.isBlank()) "رمز را فراموش کرده‌اید؟ اول ایمیل را بزنید"
-                else "رمز عبور را فراموش کرده‌اید؟",
-                color = Shop.colors.muted,
-                style = MaterialTheme.typography.labelMedium,
-              )
-            }
-          }
-
-        /* ------------------------ پایینِ صفحه ------------------------ */
-        /*
-         *  صفحه عمداً کوتاه نگه داشته می‌شود.
-         *
-         *  قبلاً کدِ شاگرد و آدرسِ سرور و فهرستِ حساب‌ها همه باز و زیرِ هم
-         *  بودند و صفحه یک ستونِ بلندِ شلوغ می‌شد. کسی که برای اولین بار
-         *  می‌آید فقط دو کادر و یک دکمه لازم دارد؛ بقیه سرِ راهش
-         *  نمی‌ایستد و هر وقت خواست بازش می‌کند.
-         */
-        Spacer(Modifier.height(18.dp))
-        Row(
-          Modifier.fillMaxWidth(),
-          horizontalArrangement = Arrangement.Center,
-          verticalAlignment = Alignment.CenterVertically,
-        ) {
-          Text(
-            "حساب نمی‌خواهید؟",
-            style = MaterialTheme.typography.labelMedium,
-            color = inkSoft,
           )
-          TextButton(onClick = onDone, contentPadding = PaddingValues(horizontal = 8.dp)) {
-            Text(
-              "ادامه بدون حساب",
-              style = MaterialTheme.typography.labelLarge,
-              color = BLUE,
-              fontWeight = FontWeight.Bold,
-            )
-          }
         }
 
-        // جداکنندهٔ نازک با «یا» وسطش — مرزِ بینِ راهِ اصلی و کارهای فنی.
-        // فقط وقتی کشیده می‌شود که زیرش چیزی باشد، وگرنه خطی می‌ماند که
-        // به هیچ‌جا مرز نمی‌زند.
-        if (GOOGLE_LOGIN || saved.isNotEmpty()) {
-          Spacer(Modifier.height(6.dp))
+        /*
+         *  ورود با ایمیلِ گوگلِ خودِ گوشی — بی رمز، بی کد.
+         *
+         *  خاموش است (`GOOGLE_LOGIN`) چون تا در Google Cloud شناسه‌ای
+         *  ساخته نشده، این کلید کاری از پیش نمی‌برد و بودنش فقط صفحهٔ
+         *  ورود را شلوغ می‌کند. کدش سرِ جایش است؛ روزی که شناسه ساخته
+         *  شد، `GOOGLE_LOGIN` را `true` کنید و همین کلید برمی‌گردد.
+         */
+        if (GOOGLE_LOGIN) {
+          Spacer(Modifier.height(16.dp))
           Row(
             Modifier.fillMaxWidth().padding(horizontal = 30.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -889,24 +897,6 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
             )
             HorizontalDivider(Modifier.weight(1f), color = fieldLine)
           }
-        }
-
-        /*
-         *  ورود با ایمیلِ گوگلِ خودِ گوشی — بی رمز، بی کد.
-         *
-         *  تا دیروز این کلید فقط وقتی ساخته می‌شد که سرور کلیدِ گوگل را
-         *  داده باشد. نتیجه‌اش این بود که روی سرورِ تازه‌راه‌افتاده، کلید
-         *  **اصلاً دیده نمی‌شد** و صاحب دکان نمی‌دانست چنین راهی هست، چه
-         *  رسد به اینکه بداند برای بازکردنش باید چه کند.
-         *
-         *  و حالا یک کلیدِ خاموش/روشن دارد (`GOOGLE_LOGIN`). خواسته شد
-         *  «فعلاً دیده نشود، ولی پاک نشود» — چون تا در Google Cloud
-         *  شناسه‌ای ساخته نشده، این کلید کاری از پیش نمی‌برد و بودنش
-         *  فقط صفحهٔ ورود را شلوغ می‌کند. کدش سرِ جایش است؛ روزی که
-         *  شناسه ساخته شد، `GOOGLE_LOGIN` را `true` کنید و همین کلید
-         *  برمی‌گردد.
-         */
-        if (GOOGLE_LOGIN) {
           Spacer(Modifier.height(14.dp))
           GoogleButton(enabled = ready && !busy) {
             if (googleId.isBlank()) {
@@ -933,9 +923,22 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
           }
         }
 
-        if (saved.isNotEmpty()) {
-          Spacer(Modifier.height(14.dp))
-          Text("ورود سریع", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
+        /*
+         *  حساب‌هایی که روی همین گوشی وارد شده‌اند.
+         *
+         *  ⚠️ فقط در **ورود** دیده می‌شوند: در فرمِ ساختِ حسابِ تازه،
+         *  فهرستِ حساب‌های قبلی هیچ کاری نمی‌کند جز بلند کردنِ صفحه.
+         *  عنوانش هم همان عنوانِ نسخهٔ وب شد («ورودهای ذخیره شده»)، و
+         *  جداکنندهٔ «یا» برداشته شد — آن خط مرزِ بینِ راهِ اصلی و
+         *  **ورود با گوگل** بود، و گوگل امروز خاموش است.
+         */
+        if (saved.isNotEmpty() && emailMode == "login") {
+          Spacer(Modifier.height(20.dp))
+          Text(
+            "ورودهای ذخیره شده",
+            style = MaterialTheme.typography.labelMedium,
+            color = inkSoft,
+          )
           Spacer(Modifier.height(8.dp))
           saved.forEach { entry ->
             SavedLoginRow(
@@ -980,20 +983,41 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
           }
         }
 
-        /* --------------------- گزینه‌های بیشتر --------------------- */
-        Spacer(Modifier.height(10.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-          TextButton(onClick = { showMore = !showMore }) {
-            Icon(
-              Icons.Filled.Tune,
-              contentDescription = null,
-              tint = inkSoft,
-              modifier = Modifier.size(15.dp),
+        /* ------------------------ پایینِ صفحه ------------------------ */
+        /*
+         *  دو راهِ فرعی، در **یک** خط.
+         *
+         *  قبلاً هر کدام یک دکمهٔ تمام‌عرضِ جدا بودند و با «ثبت‌نام» و
+         *  «فراموشی رمز» چهار خطِ هم‌شکل زیرِ هم می‌ساختند. این دو تا با
+         *  هم فرق دارند ولی هم‌وزن‌اند: هیچ‌کدام راهِ اصلی نیست و
+         *  هیچ‌کدام هم نباید گم شود.
+         */
+        Spacer(Modifier.height(18.dp))
+        Row(
+          Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.Center,
+          verticalAlignment = Alignment.CenterVertically,
+        ) {
+          TextButton(onClick = onDone, contentPadding = PaddingValues(horizontal = 8.dp)) {
+            Text(
+              "ادامه بدون حساب",
+              style = MaterialTheme.typography.labelLarge,
+              color = BLUE,
+              fontWeight = FontWeight.Bold,
             )
-            Spacer(Modifier.width(6.dp))
+          }
+          Text(
+            "·",
+            style = MaterialTheme.typography.labelLarge,
+            color = inkSoft,
+          )
+          TextButton(
+            onClick = { showMore = !showMore; error = null },
+            contentPadding = PaddingValues(horizontal = 8.dp),
+          ) {
             Text(
               if (showMore) "بستن" else "کد شاگرد دارم",
-              style = MaterialTheme.typography.labelMedium,
+              style = MaterialTheme.typography.labelLarge,
               color = inkSoft,
             )
           }
@@ -1005,7 +1029,24 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
           exit = shrinkVertically(),
         ) {
           Column {
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(10.dp))
+            /*
+             *  نامِ شاگرد، همین‌جا.
+             *
+             *  ⚠️ این همان `name`ِ بالاست و هیچ حالتِ تازه‌ای نیست:
+             *  `loginWithStaffCode` از روزِ اول `name.trim()` را
+             *  می‌فرستاده و تنها کادرش بالای فرمِ ورود بود. حالا که آن
+             *  کادر از ورود برداشته شد، اینجا می‌نشیند — همان‌جایی که
+             *  واقعاً به کار می‌آید. درخواستِ سرور یک نقطه هم عوض نشد.
+             */
+            PillField(
+              value = name,
+              onValueChange = { name = it; error = null },
+              placeholder = "مثلاً کریم",
+              label = "نام شما",
+              icon = Icons.Filled.Person,
+            )
+            Spacer(Modifier.height(10.dp))
             PillField(
               value = staffCode,
               onValueChange = { staffCode = it.uppercase(); error = null },
@@ -1093,7 +1134,7 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
               },
             )
             Text(
-              "کدی که صاحب دکان از تنظیمات برنامه‌اش به شما می‌دهد. همین کافی است — ایمیل و شماره لازم نیست.",
+              "کدی که صاحب دکان از تنظیمات برنامه‌اش به شما می‌دهد. همین کافی است — ایمیل و رمز لازم نیست.",
               style = MaterialTheme.typography.labelSmall,
               color = Shop.colors.muted2,
               modifier = Modifier.padding(top = 6.dp, start = 4.dp),
@@ -1148,6 +1189,13 @@ private fun CodeScreen(
   error: String?,
   note: String?,
   askPassword: Boolean,
+  /**
+   *  گامِ چندمِ ثبت‌نام — و `null` یعنی «این صفحه بخشی از ثبت‌نام نیست».
+   *
+   *  همین صفحه سه ارباب دارد (ثبت‌نام، بازیابیِ رمز، ورود با کد) و فقط
+   *  یکی‌شان گام دارد؛ نوارِ سه‌گامی بالای دو تای دیگر دروغ می‌شد.
+   */
+  step: Int? = null,
   secondsLeft: () -> Int,
   onBack: () -> Unit,
   onResend: () -> Unit,
@@ -1206,6 +1254,14 @@ private fun CodeScreen(
         textAlign = TextAlign.Center,
         modifier = Modifier.padding(horizontal = 30.dp),
       )
+
+      //  همان نوارِ سه گامِ فرمِ اول — تا کاربر بداند کجای کار است
+      if (step != null) {
+        Spacer(Modifier.height(20.dp))
+        Box(Modifier.widthIn(max = 460.dp).padding(horizontal = 22.dp)) {
+          SignupSteps(active = step)
+        }
+      }
 
       Spacer(Modifier.height(26.dp))
 
@@ -1405,6 +1461,12 @@ private fun TermsLocationScreen(
         color = inkSoft,
         textAlign = TextAlign.Center,
       )
+
+      //  گامِ سوم و آخر
+      Spacer(Modifier.height(20.dp))
+      Box(Modifier.widthIn(max = 460.dp).padding(horizontal = 22.dp)) {
+        SignupSteps(active = 3)
+      }
 
       Spacer(Modifier.height(22.dp))
 
@@ -1724,8 +1786,35 @@ private fun GradientHeader(title: String, subtitle: String) {
   }
 }
 
+/* ===================== کلیدِ «ورود / ساخت حساب» ===================== */
+
+/**
+ *  یک کلیدِ دوتکه، بالای خودِ فرم.
+ *
+ *  جانشینِ دکمهٔ متنیِ تمام‌عرضِ «حساب ندارید؟ ثبت‌نام کنید» است که زیرِ
+ *  فرم می‌نشست. فرقشان فقط شکل نیست: آن یکی یک **پیشنهاد** بود و این
+ *  یکی **حالِ امروز** را نشان می‌دهد — کاربر با یک نگاه می‌بیند در کدام
+ *  راه است، نه اینکه از روی نوشتهٔ دکمه حدس بزند.
+ */
 @Composable
-private fun ChannelTab(
+private fun ModeSwitch(login: Boolean, onPick: (String) -> Unit) {
+  val track = if (isDarkSurface()) Shop.colors.surface2 else Color.White.copy(alpha = 0.66f)
+  Row(
+    Modifier
+      .fillMaxWidth()
+      .clip(RoundedCornerShape(30.dp))
+      .background(track)
+      .border(1.dp, fieldLine, RoundedCornerShape(30.dp))
+      .padding(4.dp),
+    verticalAlignment = Alignment.CenterVertically,
+  ) {
+    ModeTab("ورود", Icons.Filled.Lock, login, Modifier.weight(1f)) { onPick("login") }
+    ModeTab("ساخت حساب", Icons.Filled.Person, !login, Modifier.weight(1f)) { onPick("register") }
+  }
+}
+
+@Composable
+private fun ModeTab(
   text: String,
   icon: ImageVector,
   active: Boolean,
@@ -1737,15 +1826,23 @@ private fun ChannelTab(
     animationSpec = tween(if (Motion.enabled) 220 else 0),
     label = "tabTint",
   )
+  //  تکهٔ فعال رنگ می‌گیرد، تکهٔ دیگر شفاف می‌ماند: دو رنگِ پررنگ کنارِ
+  //  هم یعنی هیچ‌کدام انتخاب‌شده به نظر نمی‌آید
+  val face by animateColorAsState(
+    targetValue = if (active) BLUE else Color.Transparent,
+    animationSpec = tween(if (Motion.enabled) 220 else 0),
+    label = "tabFace",
+  )
   Row(
     modifier
       .clip(RoundedCornerShape(26.dp))
+      .background(face)
       .clickable(onClick = onClick)
-      .padding(vertical = 13.dp),
+      .padding(vertical = 12.dp),
     horizontalArrangement = Arrangement.Center,
     verticalAlignment = Alignment.CenterVertically,
   ) {
-    Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(17.dp))
+    Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(16.dp))
     Spacer(Modifier.width(6.dp))
     Text(
       text,
@@ -1753,6 +1850,92 @@ private fun ChannelTab(
       color = tint,
       fontWeight = FontWeight.Bold,
       maxLines = 1,
+    )
+  }
+}
+
+/**
+ *  نوارِ سه گامِ ثبت‌نام.
+ *
+ *  همان `<ol class="signup-steps">`ِ نسخهٔ وب، با همان سه واژه و همان
+ *  ترتیب — چون یک برنامه‌اند و کسی که روی مرورگر ثبت‌نام کرده نباید روی
+ *  گوشی چیزِ دیگری ببیند.
+ *
+ *  ⚠️ هیچ منطقی این‌جا نیست: شمارهٔ گام را صدازننده می‌گوید و خودِ نوار
+ *  فقط نقاشی است.
+ */
+@Composable
+private fun SignupSteps(active: Int) {
+  val labels = listOf("ایمیل و رمز", "کد تأیید", "لوکیشن و شرایط")
+  Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+    labels.forEachIndexed { i, text ->
+      val n = i + 1
+      val on = n <= active
+      if (i > 0) {
+        HorizontalDivider(
+          Modifier.weight(1f).padding(horizontal = 6.dp),
+          color = if (on) BLUE.copy(alpha = 0.45f) else fieldLine,
+        )
+      }
+      Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+          Modifier
+            .size(24.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (on) BLUE else Color.Transparent)
+            .border(1.dp, if (on) BLUE else fieldLine, RoundedCornerShape(12.dp)),
+          contentAlignment = Alignment.Center,
+        ) {
+          Text(
+            n.faDigits(),
+            style = MaterialTheme.typography.labelSmall,
+            color = if (on) Color.White else inkSoft,
+            fontWeight = FontWeight.Bold,
+          )
+        }
+        Spacer(Modifier.height(5.dp))
+        Text(
+          text,
+          style = MaterialTheme.typography.labelSmall,
+          color = if (n == active) ink else inkSoft,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
+        )
+      }
+    }
+  }
+}
+
+/**
+ *  دکمهٔ درجه‌دو — خطِ دور دارد، پُر نیست.
+ *
+ *  راهِ دومِ ورود («با کد به‌جای رمز») باید دیده شود ولی نباید هم‌وزنِ
+ *  دکمهٔ اصلی باشد. دکمهٔ متنیِ تمام‌عرضِ قبلی دقیقاً همان اشتباه را
+ *  می‌کرد از طرفِ دیگر: آن‌قدر کم‌رنگ بود که با سه لینکِ دیگرِ زیرش یکی
+ *  می‌شد.
+ */
+@Composable
+private fun GhostButton(text: String, enabled: Boolean, onClick: () -> Unit) {
+  val face = if (isDarkSurface()) Shop.colors.surface else Color.White
+  Box(
+    Modifier
+      .fillMaxWidth()
+      .height(54.dp)
+      .clip(RoundedCornerShape(28.dp))
+      .background(face)
+      .border(
+        1.4.dp,
+        if (enabled) BLUE.copy(alpha = 0.55f) else fieldLine,
+        RoundedCornerShape(28.dp),
+      )
+      .clickable(enabled = enabled, onClick = onClick),
+    contentAlignment = Alignment.Center,
+  ) {
+    Text(
+      text,
+      style = MaterialTheme.typography.titleSmall,
+      color = if (enabled) BLUE else inkSoft,
+      fontWeight = FontWeight.Bold,
     )
   }
 }
