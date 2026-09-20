@@ -28,6 +28,7 @@ import ir.vil3ntec.tohid.data.repo.CodeLoginRepository
 import ir.vil3ntec.tohid.fa
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import ir.vil3ntec.tohid.ui.theme.Shop
 
 /**
  *  ورود با ایمیل و کدِ شش‌رقمی — بندِ ۲۱٫۴.
