@@ -119,17 +119,32 @@ CREATE TABLE IF NOT EXISTS app_schema (
 );
 
 -- ---------- گزارشِ خطای برنامه‌ها ----------
+--  ⛔ **یک جدول، دو نویسنده.** هم مسیرِ `/api/errors` (پروتکلِ Sync، بندِ
+--  ۲۰.۸) و هم `/api/portal/errors` (که SDK صدا می‌زند) این‌جا می‌نویسند.
+--  یک بار دو تعریفِ جدا برای همین نام نوشته شد و چون `IF NOT EXISTS` بی‌صدا
+--  رد می‌شود، دومی هیچ‌وقت ساخته نمی‌شد و `INSERT`ش سرِ ستونِ نبوده
+--  می‌شکست. هر ستونی که یکی از دو نویسنده لازم دارد باید همین‌جا باشد.
 CREATE TABLE IF NOT EXISTS client_errors (
-  id              bigserial PRIMARY KEY,
+  id              text    PRIMARY KEY,
   app             text    NOT NULL,
+  --  از پروتکلِ Sync
   account_kind    text    NOT NULL DEFAULT '',
   account_id      text    NOT NULL DEFAULT '',
   device_id       text    NOT NULL DEFAULT '',
   app_version     text    NOT NULL DEFAULT '',
   schema_version  integer NOT NULL DEFAULT 0,
+  log_tail        text    NOT NULL DEFAULT '',
+  --  از پورتال و SDK
+  user_id         text    NOT NULL DEFAULT '',
+  tenant_id       text    NOT NULL DEFAULT '',
+  version         text    NOT NULL DEFAULT '',
+  platform        text    NOT NULL DEFAULT '',
+  context         jsonb   NOT NULL DEFAULT '{}'::jsonb,
+  --  مشترک
   message         text    NOT NULL DEFAULT '',
   stack           text    NOT NULL DEFAULT '',
-  log_tail        text    NOT NULL DEFAULT '',
-  at              bigint  NOT NULL
+  at              bigint  NOT NULL,
+  created_at      bigint  NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_client_errors_at ON client_errors(app, at DESC);
+CREATE INDEX IF NOT EXISTS idx_client_errors_user ON client_errors(user_id, at DESC);

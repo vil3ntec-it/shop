@@ -50,6 +50,10 @@ async function main() {
   live.attach(server);
 
   const backupTimer = backup.schedule();
+  //  زمان‌بندِ مرکزِ اعلان: هر دقیقه اعلان‌های وقت‌رسیده، و روزی یک بار
+  //  «رو به پایان / منقضی»
+  const notices = require('./lib/notices');
+  notices.startRunner();
 
   let closing = false;
   async function shutdown(signal) {
@@ -58,6 +62,7 @@ async function main() {
     console.log(`[${signal}] در حال خاموش شدن…`);
     if (backupTimer) clearInterval(backupTimer);
     outbox.stop();
+    notices.stopRunner();
     server.close(async () => {
       await closeDb();
       console.log('خاموش شد.');

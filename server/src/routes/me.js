@@ -36,9 +36,26 @@ router.get('/', async (req, res) => {
       source: ent.source, features: ent.features,
       subscription: ent.subscription, trial: ent.trial,
     } : null,
+    //  انتخابِ خودِ مشتری — همگام‌سازیِ ابری روشن است یا نه
+    settings: { cloudSync: req.shopId ? await portal.cloudSyncOf('shop', req.shopId) : false },
     serverTime: now(),
   });
 });
+
+/*
+ *  ══ اعلان‌های من · پرداخت‌های من · تنظیماتِ من ══════════════════════
+ *  منطق در `routes/portal.js` است (همان که پورتالِ وب هم می‌خواند)؛
+ *  این‌جا فقط با هویتِ نشستِ **دکان** صدا زده می‌شود.
+ */
+const portal = require('./portal');
+router.get('/notices', (req, res, next) => portal.noticesHandler('shop', req, res, next));
+router.post('/notices/:id/read', (req, res, next) => portal.readNoticeHandler('shop', req, res, next));
+router.get('/payments', (req, res, next) => portal.paymentsHandler('shop', req, res, next));
+router.get('/settings', (req, res, next) => portal.settingsHandler('shop', req, res, next));
+router.put('/settings', (req, res, next) => portal.saveSettingsHandler('shop', req, res, next));
+router.post('/redeem', (req, res, next) => portal.redeemHandler('shop', req, res, next));
+router.get('/heartbeat', (req, res, next) => portal.heartbeatHandler('shop', req, res, next));
+router.post('/errors', (req, res, next) => portal.reportErrorHandler('shop', req, res, next));
 
 /** وضعیت اشتراک — همیشه با ساعت سرور. */
 async function subscriptionHandler(req, res) {

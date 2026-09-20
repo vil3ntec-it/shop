@@ -16,7 +16,7 @@
  *  ⚠️ سقفِ نرخ دارد، وگرنه یک حلقهٔ خطا در یک برنامه دفتر را پر می‌کند.
  */
 const express = require('express');
-const { query, now } = require('../db');
+const { query, now, newId } = require('../db');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
 const { resolveToken, tokenOf } = require('../lib/sync-v1-auth');
 const { sectionOf } = require('../lib/tenancy');
@@ -53,10 +53,11 @@ router.post(
         || 'shop';
 
       await query(
-        `INSERT INTO client_errors (app, account_kind, account_id, device_id, app_version, schema_version,
-                                    message, stack, log_tail, at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+        `INSERT INTO client_errors (id, app, account_kind, account_id, device_id, app_version, schema_version,
+                                    message, stack, log_tail, at, created_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$11)`,
         [
+          newId('cer'),
           app,
           ctx?.accountKind || '',
           ctx?.accountId || '',

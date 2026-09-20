@@ -334,7 +334,7 @@ test('گزارشِ خطا ثبت می‌شود و راز در آن نمی‌ما
     },
   });
   assert.equal(r.status, 202);
-  const row = await one('SELECT * FROM client_errors ORDER BY id DESC LIMIT 1');
+  const row = await one('SELECT * FROM client_errors ORDER BY at DESC, id DESC LIMIT 1');
   assert.ok(!row.message.includes('ahmad@gmail.com'), 'ایمیل باید پوشانده شود');
   assert.ok(!row.message.includes('abcdefghijklmnopqrstuvwxyz0123456789'), 'توکن باید پوشانده شود');
   assert.ok(!row.log_tail.includes('0700123456'), 'شماره باید پوشانده شود');
