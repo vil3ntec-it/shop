@@ -77,6 +77,36 @@ async function plansHandler(req, res) {
   });
 }
 
+/**
+ * تپشِ هر پانزده دقیقه — بندِ ۲۰.۷ پرامپت.
+ *
+ * یک درخواستِ ارزان که همهٔ آن‌چه برنامه لازم دارد را یک‌جا می‌دهد:
+ * وضعیتِ اشتراک، روزهای مانده، قابلیت‌ها، آخرین نسخه و زمانِ سرور.
+ * برنامه نتیجه را کش می‌کند و بخشِ «اشتراکِ من» از همان می‌خواند — پس
+ * صفحهٔ اشتراک آفلاین هم چیزی برای نشان دادن دارد.
+ */
+router.get('/heartbeat', async (req, res, next) => {
+  try {
+    const ent = req.shopId ? await entitlementOf(req.shopId) : null;
+    const sub = ent?.subscription || {};
+    const endsMs = Number(sub.endsAt || 0);
+    res.json({
+      ok: true,
+      user: { id: req.user.id, email: req.user.email || null, name: req.user.name || '' },
+      subscription: {
+        status: ent?.active ? 'active' : (sub.status || 'none'),
+        plan: sub.plan || null,
+        ends_at: endsMs ? Math.floor(endsMs / 1000) : null,
+        days_left: endsMs ? Math.max(0, Math.ceil((endsMs - now()) / 86400000)) : 0,
+        permanent: Boolean(sub.permanent) || Boolean(ent?.active && !endsMs),
+        source: ent?.source || '',
+      },
+      features: ent?.features || [],
+      server_time: now(),
+    });
+  } catch (err) { next(err); }
+});
+
 router.get('/subscription', subscriptionHandler);
 router.get('/plans', plansHandler);
 

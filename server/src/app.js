@@ -112,23 +112,55 @@ async function createApp({ runMigrations = true } = {}) {
   app.use(rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'general' }));
 
   // ---- بررسی سلامت ----
+  /*
+   *  بندِ ۲.۱ پرامپتِ ورود: **همیشه سریع و بی دیتابیس**.
+   *
+   *  چرا: برنامه پیش از هر کاری این را با مهلتِ سه ثانیه می‌زند تا همان
+   *  لحظه بگوید «سرور در دسترس نیست». اگر این مسیر به دیتابیس دست بزند و
+   *  دیتابیس کند باشد، تایم‌اوت می‌خورد و برنامه «سرور خاموش است» می‌گوید
+   *  در حالی که سرور سالم است. حالِ دیتابیس جدا و بی‌وقفه می‌آید.
+   */
   const health = async (req, res) => {
-    const db = await healthy();
-    res.status(db ? 200 : 503).json({
-      ok: db,
+    let worker = 'down';
+    try { worker = require('./lib/login-outbox').workerStatus(); } catch { worker = 'down'; }
+    res.json({
+      ok: true,
+      service: 'vill3n-auth',
       server: 'online',
-      database: db ? 'connected' : 'unavailable',
+      //  حالِ دیتابیس از آخرین سنجشِ پس‌زمینه می‌آید، نه از یک پرس‌وجوی تازه
+      database: lastDbState ? 'connected' : 'unavailable',
+      email_worker: worker,
       version: require('../package.json').version,
       time: now(),
       uptimeSeconds: Math.round(process.uptime()),
     });
   };
+
+  /*
+   *  سنجشِ دیتابیس در پس‌زمینه — تا `/health` هیچ‌وقت منتظرِ آن نماند.
+   *  `unref` یعنی این تیک جلوی بسته شدنِ فرآیند را نمی‌گیرد (آزمون‌ها).
+   */
+  let lastDbState = true;
+  const dbTick = setInterval(() => { healthy().then((ok) => { lastDbState = ok; }).catch(() => { lastDbState = false; }); }, 5000);
+  if (dbTick.unref) dbTick.unref();
+  healthy().then((ok) => { lastDbState = ok; }).catch(() => { lastDbState = false; });
+
+  /** حالِ کاملِ دیتابیس — برای مدیر و برای پنلِ خانگی، نه برای مسیرِ داغِ ورود. */
+  const ready = async (req, res) => {
+    const db = await healthy();
+    res.status(db ? 200 : 503).json({
+      ok: db, database: db ? 'connected' : 'unavailable',
+      version: require('../package.json').version, time: now(),
+    });
+  };
   app.get('/health', health);
+  app.get('/ready', ready);
 
   // ---- API ----
   function apiRouter() {
     const api = express.Router();
     api.get('/health', health);
+    api.get('/ready', ready);
 
     /**
      * تنظیمات عمومی سرور.
@@ -223,7 +255,19 @@ async function createApp({ runMigrations = true } = {}) {
       const terms = require('./lib/terms');
       res.json({ version: terms.VERSION, title: terms.TITLE, sections: terms.SECTIONS });
     });
+    /*
+     *  قراردادِ ورودِ کدِ ایمیلی (پرامپتِ «ورودِ بی‌نقص»).
+     *
+     *  ⚠️ **پس از `/auth` سوار می‌شود، نه پیش از آن.** `/auth/:app` یک
+     *  الگوی پارامتری است و `/api/auth/login` را هم می‌گیرد (با
+     *  `app='login'`). چون مسیرهای ثابتِ `routes/auth.js` اول می‌آیند،
+     *  ورودِ امروزِ کاربران دست‌نخورده می‌ماند و فقط آن‌چه هیچ‌کس نگرفته
+     *  به این‌جا می‌رسد.
+     */
     api.use('/auth', require('./routes/auth'));
+    api.use('/auth/:app', require('./routes/app-auth'));
+    api.use('/sync/v1', require('./routes/sync-v1'));
+    api.use('/errors', require('./routes/errors'));
     api.use('/location', require('./routes/location'));
     api.use('/me', require('./routes/me'));
     api.use('/shop', require('./routes/shop'));

@@ -554,6 +554,8 @@ router.post('/backups', requireSuperAdmin, async (req, res, next) => {
    در فایل جدا نوشته شده‌اند تا این فایل خوانا بماند، ولی زیر همان
    `requireAdmin` بالا سوارند — پس قاعده‌ی دسترسی همان یکی است.
    ========================================================== */
+router.use('/logins', require('./admin-logins'));
+router.use('/sync', require('./admin-sync'));
 router.use('/', require('./admin-platform'));
 //  بخشِ پمپ‌بنزین — زیر همان `requireAdmin`، ولی روی دفترِ خودش
 router.use('/pump', require('./admin-pump'));
