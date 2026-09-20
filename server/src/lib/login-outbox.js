@@ -149,9 +149,26 @@ async function claimDue() {
 
 function backoffMs(attempt) { return BACKOFF_MS * Math.pow(2, Math.max(0, attempt - 1)); }
 
-async function markSent(id) {
+/**
+ * رفت.
+ *
+ * ⛔ **`via: 'log'` رفتن نیست.** با راهِ ارسالِ «log» هیچ ایمیلی از این
+ * کامپیوتر بیرون نمی‌رود؛ کد فقط در لاگِ سرور چاپ می‌شود. ولی `mailer.send`
+ * آن‌جا هم بی استثنا برمی‌گشت، پس ردیف `sent` مهر می‌خورد و میزِ «ورودها»
+ * سبزِ پررنگ نشان می‌داد — برای کدی که هیچ‌وقت فرستاده نشده. صاحبِ سامانه
+ * دقیقاً همین را دید: برنامه «کد فرستاده شد»، پنل «رفت»، و صندوقِ ایمیل
+ * خالی.
+ *
+ * حالا حالش همان `sent` می‌ماند (چیزی برای تلاشِ دوباره نیست — سرورِ ایمیلی
+ * در کار نیست)، ولی `reason` می‌گوید `log_only` و هر جایی که این ردیف را
+ * نشان می‌دهد باید همان را بگوید، نه «رفت».
+ */
+async function markSent(id, reason = '') {
   const t = now();
-  await query(`UPDATE otp_outbox SET status='sent', sent_at=$2, locked_at=NULL, reason='', last_error='', updated_at=$2 WHERE id=$1`, [id, t]);
+  await query(
+    `UPDATE otp_outbox SET status='sent', sent_at=$2, locked_at=NULL, reason=$3, last_error='', updated_at=$2 WHERE id=$1`,
+    [id, t, String(reason || '')]
+  );
 }
 async function markFailed(id, reason, lastError = '') {
   const t = now();
@@ -233,9 +250,10 @@ async function deliver(row) {
   const timeout = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
   try {
     sendCalls += 1;
-    await mailer.send({ ...buildMail({ app: row.app, email: row.email, code, requestId: row.id }), signal: ctrl.signal });
+    const out = await mailer.send({ ...buildMail({ app: row.app, email: row.email, code, requestId: row.id }), signal: ctrl.signal });
     breaker.success();
-    await markSent(row.id);
+    //  «log» یعنی هیچ ایمیلی بیرون نرفت — همان‌جا نوشته می‌شود، نه اینکه سبزِ ساده بماند
+    await markSent(row.id, out && out.via === 'log' ? 'log_only' : '');
     return 'sent';
   } catch (err) {
     if (err && err.invalidRecipient) {
