@@ -426,6 +426,61 @@ router.post('/apps/health', async (req, res, next) => {
    تنظیمات ایمیل
    ========================================================== */
 
+/* ==========================================================
+   مهرها — «آخرین باری که هر دفتر عوض شد»
+   ========================================================== */
+
+/**
+ * تورِ ایمنیِ زنده بودنِ پنلِ سرورِ خانگی.
+ *
+ * ── چرا هست ─────────────────────────────────────────────────────────
+ * راهِ اصلی pushِ خودِ این سرور است (`lib/panel-live.js`): تا چیزی عوض
+ * می‌شود، پنل همان لحظه خبردار می‌شود. ولی اگر آن یک درخواست گم شود —
+ * یا پنلِ تازه با سرورِ حسابِ قدیمی کار کند — پنل باید راهِ دومی داشته
+ * باشد که نه داده می‌خواهد و نه سنگین است.
+ *
+ * ⛔ **این مسیر هیچ داده‌ای نمی‌دهد، فقط عدد.** بیشینهٔ زمانِ هر دفتر.
+ *    پس هرچند تب در پنل باز باشد، بارِ این سرور همان یکی است.
+ *
+ * ⚠️ و هر پرس‌وجو سبک است: `MAX(<ستونِ زمان>)` روی همان ایندکسی که از
+ *    قبل هست. جدولِ نبوده صفر می‌دهد، نه خطا — سرورِ تازه‌تر از مهاجرت.
+ */
+router.get('/stamps', async (req, res, next) => {
+  const stamp = async (sql) => {
+    try {
+      const row = await one(sql);
+      return Number(row?.t || 0) || 0;
+    } catch { return 0; }
+  };
+
+  try {
+    const [logins, support, customers, plansAt, notices, sales, sync] = await Promise.all([
+      stamp('SELECT MAX(created_at) AS t FROM login_requests'),
+      stamp('SELECT MAX(created_at) AS t FROM support_messages'),
+      stamp('SELECT MAX(created_at) AS t FROM subscriptions'),
+      stamp('SELECT MAX(changed_at) AS t FROM plan_price_history'),
+      stamp('SELECT MAX(created_at) AS t FROM notices'),
+      stamp('SELECT MAX(created_at) AS t FROM sub_payments'),
+      stamp('SELECT MAX(created_at) AS t FROM client_errors'),
+    ]);
+    res.json({
+      ok: true,
+      stamps: {
+        //  ⚠️ «کدها» و «ورودها» یک دفتر دارند و عمداً هر دو همان مهر را
+        //  می‌گیرند: صفحهٔ کدهای پنل هر دو سرچشمه را نشان می‌دهد.
+        codes: logins,
+        logins,
+        support,
+        customers,
+        plans: plansAt,
+        notices,
+        sales,
+        sync,
+      },
+    });
+  } catch (err) { next(err); }
+});
+
 router.get('/email', async (req, res, next) => {
   try {
     res.json({ email: await mailer.masked() });

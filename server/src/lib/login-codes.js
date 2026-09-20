@@ -24,6 +24,7 @@
  * `routes/app-auth.js` همان را می‌فرستد.
  */
 const { randomInt, randomBytes, createHmac, createHash, createCipheriv, createDecipheriv, timingSafeEqual } = require('crypto');
+const { notifyPanel } = require('./panel-live');
 const { query, one, many, now } = require('../db');
 const config = require('../config');
 const { sectionOf } = require('./tenancy');
@@ -214,6 +215,9 @@ async function requestCode({ app, email, ip = '', deviceId = '', deviceName = ''
       String(deviceId || '').slice(0, 64), String(deviceName || '').slice(0, 80), String(appVersion || '').slice(0, 32),
       String(ip || '').slice(0, 64), String(clientRequestId || '').slice(0, 64)]
   );
+  //  میزِ «ورودها» و «کدهای زنده»ی پنل همان لحظه می‌بینندش
+  notifyPanel('logins');
+  notifyPanel('codes');
   return {
     ok: true, request_id, email, expires_in: CODE_TTL_S, resend_after: RESEND_S, masked_email: mask(email), code,
   };
@@ -264,6 +268,9 @@ async function verifyCode({ app, requestId, code }) {
   await query(
     `UPDATE login_requests SET consumed_at=$2, code_sealed='' WHERE request_id=$1`, [rec.request_id, t]
   );
+  //  «مصرف شد» هم یک تغییر است — چراغِ همان ردیف روی صفحه عوض می‌شود
+  notifyPanel('logins');
+  notifyPanel('codes');
   return { ok: true, email: rec.email, request: rec };
 }
 

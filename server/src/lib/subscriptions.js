@@ -17,6 +17,7 @@
  * `subs.grant(shopId, …)` می‌نوشت دست‌نخورده کار می‌کند.
  */
 const { query, one, many, newId, now } = require('../db');
+const { notifyPanel } = require('./panel-live');
 const { badRequest, notFound } = require('../middleware/errors');
 const { sanitizeFeatures } = require('./features');
 const plans = require('./plans');
@@ -252,6 +253,9 @@ function build(T) {
      *  و `onSubscription` خودش هر چیزی را می‌بلعد.
      */
     await require('./notices').onSubscription({ app: T.app, action: existing ? 'renew' : 'grant', row });
+    //  صفحهٔ «مشتری‌ها» و «فروش»ِ پنل همان لحظه عدد تازه می‌گیرند
+    notifyPanel('customers');
+    notifyPanel('sales');
     return row;
   }
 

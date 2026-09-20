@@ -17,6 +17,7 @@
  * نمی‌شود؛ فقط زنگ نمی‌زند و دفعه‌ی بعد دیده می‌شود.
  */
 const { query, one, many, newId, now } = require('../db');
+const { notifyPanel } = require('./panel-live');
 const push = require('./push');
 const { badRequest, notFound } = require('../middleware/errors');
 
@@ -197,6 +198,9 @@ async function post(threadId, { sender = 'user', senderId = '', senderName = '',
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
     [newId('msg'), threadId, sender, senderId, senderName.slice(0, 80), text, kind, t]
   );
+
+  //  صندوقِ پشتیبانیِ پنل زنده است: پیامِ تازه وسطِ باز بودنِ همان گفت‌وگو می‌نشیند
+  notifyPanel('support');
 
   const toAdmin = sender === 'user' ? 1 : 0;
   const toUser = sender === 'user' ? 0 : 1;

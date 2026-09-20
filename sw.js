@@ -6,7 +6,7 @@
    - فونت‌های گوگل: اولین بار از شبکه، سپس همیشه از کش.
    داده‌های فروشگاه در localStorage است و اصلاً از اینجا عبور نمی‌کند.
    ========================================================== */
-const VERSION = 'tohid-shop-v21';
+const VERSION = 'tohid-shop-v22';
 const SHELL_CACHE = VERSION + '-shell';
 const FONT_CACHE = VERSION + '-fonts';
 
@@ -43,6 +43,13 @@ const SHELL_ASSETS = [
   './license/sync-engine.js',
   './license/account-ui.js',
   './license/account-ui.css',
+  //  پشتیبانِ ابریِ خودکارِ هر دوازده ساعت — بی این، نصبِ روی گوشی آن را ندارد
+  './license/auto-backup.js',
+  /*
+   *  ⚠️ این یکی از قبل جا افتاده بود و کسی ندیده بود: چاپِ مستقیمِ حرارتی
+   *  روی نصبِ آفلاین اصلاً بار نمی‌شد. همان تله‌ای که همین بالا نوشته شده.
+   */
+  './license/thermal-print.js',
   './sounds/scan-beep.mp3',
 ];
 
