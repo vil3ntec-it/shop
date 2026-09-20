@@ -1646,28 +1646,39 @@
   .auth-staff-row .btn{flex:0 0 auto;}
   .auth-staff-hint{font-size:10.5px; color:var(--muted-2); margin-top:6px; line-height:1.7;}
 
-  .auth-roles{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
-  .auth-role{
-    display:flex; flex-direction:column; align-items:center; gap:5px;
-    padding:16px 10px; cursor:pointer; text-align:center;
-    border:1.5px solid var(--border); border-radius:var(--radius-md);
-    background:var(--surface); font-family:inherit;
-    transition:border-color .18s ease, background-color .18s ease, transform .12s ease, box-shadow .2s ease;
+  /*  کلیدِ دوتکه‌ی «ورود / ساخت حساب» — همان `ModeSwitch`ِ برنامه‌ی
+      اندروید، عددبه‌عدد همان چیدمان.
+
+      ── چه چیزی را جانشین شد ─────────────────────────────────────────
+      پیش از این، ساختِ حساب یک **کارتِ نقش** ته صفحه بود («فروشنده»)
+      کنارِ کارتِ «ادامه بدون حساب»، زیرِ یک جداکننده‌ی «ثبت‌نام در
+      توحید». یعنی مهم‌ترین انتخابِ صفحه — ورود یا ثبت‌نام — ته‌ترین
+      چیزِ کارت بود و هم‌وزنِ «بی‌حساب ادامه بده». حالا بالای فرم است و
+      حالِ امروز را نشان می‌دهد، نه یک پیشنهاد.
+      ────────────────────────────────────────────────────────────────── */
+  .auth-modes{
+    display:flex; gap:4px; padding:4px; margin-bottom:18px;
+    border:1px solid var(--border); border-radius:999px; background:var(--surface);
   }
-  .auth-role:active{transform:scale(.97);}
-  @media (hover:hover){
-    .auth-role:hover{border-color:var(--primary); box-shadow:var(--shadow-md); transform:translateY(-2px);}
+  .auth-mode{
+    flex:1; min-width:0; padding:10px 8px; cursor:pointer;
+    border:none; border-radius:999px; background:transparent;
+    font-family:inherit; font-size:13px; font-weight:800; color:var(--muted);
+    transition:background-color .2s ease, color .2s ease;
   }
-  .auth-role-ic{
-    width:46px; height:46px; border-radius:50%; margin-bottom:3px;
-    display:flex; align-items:center; justify-content:center;
-    background:linear-gradient(150deg, var(--primary), var(--primary-dark)); color:#fff;
+  .auth-mode.on{background:var(--primary); color:#fff;}
+  @media (hover:hover){ .auth-mode:not(.on):hover{color:var(--text);} }
+
+  /*  دو راهِ فرعیِ ته صفحه، در یک خط — نه دو کارتِ درشت */
+  .auth-quiet{
+    display:flex; align-items:center; justify-content:center; gap:6px;
+    margin-top:16px;
   }
-  /* «ادامه بدون حساب» رنگ سبز دارد تا از «ساخت حساب» جدا دیده شود */
-  .auth-role.ghost .auth-role-ic{background:linear-gradient(150deg, var(--success), #35c8c0);}
-  @media (hover:hover){ .auth-role.ghost:hover{border-color:var(--success);} }
-  .auth-role b{font-size:12.5px; font-weight:800; color:var(--text);}
-  .auth-role i{font-style:normal; font-size:10.5px; color:var(--muted); line-height:1.6;}
+  .auth-quiet button{
+    border:none; background:none; cursor:pointer; padding:6px 8px;
+    font-family:inherit; font-size:12.5px; font-weight:800; color:var(--primary);
+  }
+  @media (hover:hover){ .auth-quiet button:hover{text-decoration:underline;} }
 
   .auth-field-error{
     display:none; font-size:11.5px; font-weight:700; color:var(--danger); margin-top:6px;
@@ -2608,10 +2619,8 @@
     .auth-staff label{font-size:13px;}
     .auth-staff-row .form-input{font-size:14px;}
     .auth-staff-hint{font-size:11.5px;}
-    .auth-role{padding:18px 12px;}
-    .auth-role-ic{width:52px; height:52px;}
-    .auth-role b{font-size:13.5px;}
-    .auth-role i{font-size:11.5px;}
+    .auth-mode{font-size:14px; padding:12px 8px;}
+    .auth-quiet button{font-size:13.5px;}
     .auth-note{font-size:12.5px;}
   }
   @media(min-width:900px){
@@ -2625,10 +2634,12 @@
       align-items:start;
     }
     .auth-card > .auth-brand{grid-column:1 / -1; grid-row:1;}
-    .auth-card > .auth-saved{grid-column:1; grid-row:2;}
-    .auth-card > #auth-login-form{grid-column:1; grid-row:3;}
-    .auth-card > .auth-side{grid-column:2; grid-row:2 / span 2;}
-    .auth-card > .auth-note{grid-column:1 / -1; grid-row:4;}
+    .auth-card > .auth-modes{grid-column:1; grid-row:2;}
+    .auth-card > .auth-saved{grid-column:1; grid-row:3;}
+    .auth-card > #auth-login-form{grid-column:1; grid-row:4;}
+    .auth-card > .auth-side{grid-column:2; grid-row:2 / span 3;}
+    .auth-card > .auth-quiet{grid-column:1 / -1; grid-row:5;}
+    .auth-card > .auth-note{grid-column:1 / -1; grid-row:6;}
     .auth-side .auth-divider:first-child{margin-top:0;}
   }
   /* تبلت خوابیده: کارت به بالای صفحه بچسبد تا اسکرولش کوتاه بماند */
@@ -3315,6 +3326,12 @@
       <p>با ایمیل و رمزتان وارد شوید</p>
     </div>
 
+    <!-- ورود یا ساخت حساب — همان کلیدِ دوتکه‌ی برنامه‌ی اندروید -->
+    <div class="auth-modes" role="tablist" aria-label="ورود یا ساخت حساب">
+      <button type="button" class="auth-mode on" id="auth-mode-login" role="tab" aria-selected="true">ورود</button>
+      <button type="button" class="auth-mode" id="auth-mode-signup" role="tab" aria-selected="false">ساخت حساب</button>
+    </div>
+
     <!-- ورودهای ذخیره‌شده روی همین دستگاه -->
     <div class="auth-saved" id="auth-saved" hidden>
       <div class="auth-section-label">ورودهای ذخیره شده</div>
@@ -3419,25 +3436,16 @@
       <div class="auth-field-error" id="auth-staff-error"></div>
     </div>
 
-    <div class="auth-divider"><span>ثبت‌نام در توحید</span></div>
-
-    <div class="auth-roles">
-      <button type="button" class="auth-role" id="auth-role-seller">
-        <span class="auth-role-ic">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 9.5h17l-1 10.5h-15l-1-10.5z"/><path d="M3.5 9.5L5 4h14l1.5 5.5"/><path d="M9 13.5h6"/></svg>
-        </span>
-        <b>فروشنده</b>
-        <i>ساخت حساب دکان</i>
-      </button>
-      <button type="button" class="auth-role ghost" id="auth-skip">
-        <span class="auth-role-ic">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13"/><path d="M13 6l6 6-6 6"/></svg>
-        </span>
-        <b>ادامه بدون حساب</b>
-        <i>همه‌چیز روی همین گوشی</i>
-      </button>
-    </div>
     </div><!-- /auth-side -->
+
+    <!--
+      «ادامه بدون حساب» یک خطِ آرام است، نه یک کارتِ درشتِ هم‌وزنِ
+      ثبت‌نام: راهِ اصلی نیست، ولی نباید هم گم شود. ساختِ حساب رفت بالا،
+      روی کلیدِ دوتکه — همان کاری که برنامه‌ی اندروید هم کرد.
+    -->
+    <div class="auth-quiet">
+      <button type="button" id="auth-skip">ادامه بدون حساب</button>
+    </div>
 
     <p class="auth-note" id="auth-note">ورود اختیاری است — بدون حساب هم می‌توانید از برنامه استفاده کنید.</p>
   </div>
@@ -6374,8 +6382,13 @@
      * بعد لوکیشن و شرایط و ضوابط. تا دیروز این دکمه فقط برنامه را باز
      * می‌کرد و هیچ حسابی ساخته نمی‌شد.
      */
-    document.getElementById('auth-role-seller').addEventListener('click', ()=>{
+    document.getElementById('auth-mode-signup').addEventListener('click', ()=>{
       openSignupScreen();
+    });
+    //  «ورود» همین صفحه است؛ زدنش فقط خطاها را پاک می‌کند
+    document.getElementById('auth-mode-login').addEventListener('click', ()=>{
+      authError('auth-identifier-error',''); authError('auth-password-error','');
+      authError('auth-form-error','');
     });
     document.getElementById('auth-skip').addEventListener('click', ()=>{
       // بدون حساب: فقط روی همین گوشی. ذخیره می‌کنیم تا دفعه‌ی بعد

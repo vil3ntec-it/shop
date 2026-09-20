@@ -525,6 +525,55 @@ await step('شش خانهٔ کد: پرشِ خودکار، Paste، ارقامِ �
   await fresh.close();
 });
 
+/* ---- صفحهٔ ورود: مرتب، سخت‌گیر، و بی کادرِ بی‌کار ---- */
+await step('صفحهٔ ورود: کلیدِ دوتکه، بی کادرِ نام، و بی کارتِ نقش', async () => {
+  const fresh = await browser.newPage();
+  fresh.on('pageerror', (e) => pageErrors.push('welcome: ' + String(e.message)));
+  await fresh.goto(`${siteBase}/`, { waitUntil: 'domcontentloaded' });
+  await fresh.waitForSelector('#auth-login-form', { timeout: 15_000 });
+
+  const look = await fresh.evaluate(() => {
+    const q = (sel) => document.querySelector(sel);
+    const form = q('#auth-login-form');
+    return {
+      modes: Array.from(document.querySelectorAll('.auth-modes .auth-mode')).map(b => b.textContent.trim()),
+      activeMode: (q('.auth-mode.on') || {}).id || '',
+      //  کادرهای خودِ فرمِ ورود — نه کلِ کارت
+      loginFields: Array.from(form.querySelectorAll('input')).map(i => i.id),
+      //  «فراموشی رمز» باید کنارِ برچسبِ رمز باشد، نه یک دکمهٔ جدا ته فرم
+      forgotInLabelRow: !!q('.auth-label-row #auth-forgot'),
+      skip: (q('#auth-quiet-probe') || q('.auth-quiet #auth-skip') || {}).textContent || '',
+      //  چیزهایی که باید رفته باشند
+      roles: document.querySelectorAll('.auth-role, .auth-roles').length,
+      seller: !!q('#auth-role-seller'),
+      //  قاعدهٔ همیشگی: هیچ کادرِ نشانیِ سرور، هیچ‌جای این صفحه
+      serverBox: /آدرس سرور/.test(q('#auth-card').textContent),
+    };
+  });
+
+  assert.deepEqual(look.modes, ['ورود', 'ساخت حساب'], 'کلیدِ دوتکه باید دو تکه باشد');
+  assert.equal(look.activeMode, 'auth-mode-login', 'روی صفحهٔ ورود، تکهٔ «ورود» روشن است');
+  //  ⛔ نام در فرمِ ورود هیچ‌جا نمی‌رود (`auth.login` فقط ایمیل و رمز
+  //  می‌فرستد)، پس کادرش هم نباید باشد — همان چیزی که در برنامهٔ
+  //  اندروید بود و برداشته شد
+  assert.deepEqual(look.loginFields, ['auth-identifier', 'auth-password'],
+    `کادرهای فرمِ ورود: ${look.loginFields.join('، ')}`);
+  assert.equal(look.forgotInLabelRow, true, '«فراموشی رمز» کنارِ برچسبِ رمز می‌نشیند');
+  assert.ok(look.skip.includes('ادامه بدون حساب'), 'راهِ بی‌حساب باید سرِ جایش باشد');
+  assert.equal(look.roles, 0, 'کارت‌های نقش برداشته شدند');
+  assert.equal(look.seller, false, '«فروشنده» جایش را به کلیدِ دوتکه داد');
+  assert.equal(look.serverBox, false, '⛔ هیچ کادرِ نشانیِ سرور، هیچ‌جای صفحهٔ ورود');
+
+  //  و کلید واقعاً کار می‌کند: «ساخت حساب» صفحهٔ سه‌گامی را باز می‌کند
+  await fresh.click('#auth-mode-signup');
+  await fresh.waitForSelector('#signup-screen:not(.auth-hidden)', { timeout: 10_000 });
+  const steps = await fresh.evaluate(() =>
+    Array.from(document.querySelectorAll('#signup-steps li span')).map(x => x.textContent.trim()));
+  assert.deepEqual(steps, ['ایمیل و رمز', 'کد تأیید', 'لوکیشن و شرایط'],
+    'سه گامِ ثبت‌نام همان‌هایی‌اند که برنامهٔ اندروید هم نشان می‌دهد');
+  await fresh.close();
+});
+
 await step('در کلِ این نشست هیچ خطای صفحه‌ای نبود', async () => {
   //  ⚠️ خطاهای سرویس‌ورکر و آیکونِ نبوده شمرده نمی‌شوند: آن‌ها مالِ
   //  محیطِ آزمون‌اند نه کد
