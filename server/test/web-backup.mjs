@@ -256,6 +256,275 @@ await step('پشتیبانِ فرستاده‌شده از صفحه، مالِ ه
   assert.ok(rows.rows.every(r => r.tenant_id === shopId), 'همه باید مالِ همین دکان باشند');
 });
 
+/* ══════════════════════════════════════════════════════════
+   Sync v1 و ورود با کدِ شش‌رقمی — بندِ ۲۱، در کرومیومِ واقعی
+   ----------------------------------------------------------
+   ⚠️ هر بند از **دیتابیس** سنجیده می‌شود، نه از متنِ روی صفحه.
+   ══════════════════════════════════════════════════════════ */
+
+await step('لایه‌های Sync v1 در صفحه بالا آمده‌اند', async () => {
+  const out = await page.evaluate(() => ({
+    core: !!window.TohidSyncCore,
+    account: !!window.TohidAccount,
+    sync: !!window.TohidSync,
+    ui: !!window.TohidAccountUI,
+    schema: window.TohidSyncCore && window.TohidSyncCore.SCHEMA_VERSION,
+    ulid: window.TohidSyncCore ? window.TohidSyncCore.ulid().length : 0,
+  }));
+  assert.equal(out.core, true, 'sync-core.js');
+  assert.equal(out.account, true, 'account-code.js');
+  assert.equal(out.sync, true, 'sync-engine.js');
+  assert.equal(out.ui, true, 'account-ui.js');
+  assert.equal(out.schema, 2, 'نسخهٔ schema باید با سرور یکی باشد');
+  assert.equal(out.ulid, 26, 'شناسهٔ ردیف باید ULID باشد');
+});
+
+await step('چراغِ همگام‌سازی در نوارِ بالا هست و رنگ دارد', async () => {
+  await page.waitForSelector('#sync-dot-btn', { timeout: 10_000 });
+  const dot = await page.getAttribute('#sync-dot-btn', 'data-dot');
+  assert.ok(['green', 'yellow', 'grey', 'red'].includes(dot), `رنگِ چراغ: ${dot}`);
+});
+
+await step('ثبتِ یک قرض‌دار از خودِ فرم ⇒ op ⇒ ردیف روی سرور', async () => {
+  await page.evaluate(() => {
+    document.getElementById('app-root')?.classList.remove('app-hidden');
+    document.querySelectorAll('.page').forEach((el) => el.classList.remove('active'));
+    document.getElementById('page-debtors')?.classList.add('active');
+    document.getElementById('modal-debtor')?.classList.add('open');
+  });
+  await page.fill('#in-debtor-name', 'احمدِ سنجه');
+  await page.fill('#in-debtor-phone', '0700111222');
+  await page.$eval('#form-debtor', (f) => f.requestSubmit ? f.requestSubmit() : f.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true })));
+
+  //  خودِ موتور با ۵۰۰ms تأخیر می‌فرستد؛ صبر می‌کنیم تا ردیف واقعاً بنشیند
+  const deadline = Date.now() + 20_000;
+  let row = null;
+  while (Date.now() < deadline) {
+    row = await one(
+      `SELECT data, row_id FROM sync_rows WHERE app='shop' AND account_id=$1
+         AND table_name='debtors' AND data->>'name'='احمدِ سنجه'`, [shopId],
+    );
+    if (row) break;
+    await page.waitForTimeout(400);
+  }
+  assert.ok(row, 'ردیفِ قرض‌دار باید روی سرور نشسته باشد');
+  assert.equal(row.data.phone, '0700111222');
+  assert.match(row.row_id, /^[0-9A-HJKMNP-TV-Z]{26}$/, 'شناسهٔ ردیفِ تازه باید ULID باشد');
+
+  const op = await one(
+    `SELECT op_type, fields FROM oplog WHERE app='shop' AND account_id=$1 AND row_id=$2
+      ORDER BY server_seq ASC LIMIT 1`, [shopId, row.row_id],
+  );
+  assert.equal(op.op_type, 'insert');
+  assert.equal(op.fields.name, 'احمدِ سنجه');
+  assert.equal(op.fields.id, undefined, 'شناسه نباید داخلِ fields تکرار شود');
+});
+
+await step('ویرایشِ یک فیلد فقط همان یک فیلد را می‌فرستد', async () => {
+  const before = await one(
+    `SELECT row_id FROM sync_rows WHERE app='shop' AND account_id=$1
+       AND table_name='debtors' AND data->>'name'='احمدِ سنجه'`, [shopId],
+  );
+  await page.evaluate(() => {
+    document.getElementById('modal-debtor')?.classList.add('open');
+  });
+  //  همان دکمهٔ «ویرایش» را برنامه با شناسهٔ ردیف صدا می‌زند؛ این‌جا
+  //  فرمِ ویرایش را از خودِ فهرست باز می‌کنیم
+  await page.evaluate((id) => {
+    const btn = document.querySelector(`[data-edit-debtor="${id}"]`);
+    if (btn) btn.click();
+  }, before.row_id);
+  await page.fill('#in-debtor-phone', '0799888777');
+  await page.$eval('#form-debtor', (f) => f.requestSubmit ? f.requestSubmit() : f.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true })));
+
+  const deadline = Date.now() + 20_000;
+  let op = null;
+  while (Date.now() < deadline) {
+    op = await one(
+      `SELECT op_type, fields FROM oplog WHERE app='shop' AND account_id=$1 AND row_id=$2
+         AND op_type='update' ORDER BY server_seq DESC LIMIT 1`, [shopId, before.row_id],
+    );
+    if (op) break;
+    await page.waitForTimeout(400);
+  }
+  assert.ok(op, 'opِ ویرایش باید رسیده باشد');
+  assert.deepEqual(Object.keys(op.fields), ['phone'], `فقط فیلدِ عوض‌شده: ${JSON.stringify(op.fields)}`);
+  assert.equal(op.fields.phone, '0799888777');
+});
+
+await step('«اشتراکِ من» از تپشِ سرور پر می‌شود و رنگش از سرور می‌آید', async () => {
+  await page.evaluate(() => window.TohidAccount.heartbeat());
+  await page.evaluate(() => window.TohidAccountUI.openPlan());
+  await page.waitForSelector('#acct-plan.open .plan-bar', { timeout: 10_000 });
+  const out = await page.evaluate(() => {
+    const bar = document.querySelector('#acct-plan .plan-bar');
+    const days = document.querySelector('#acct-plan .plan-days');
+    const chip = document.querySelector('#acct-plan .plan-chip');
+    return {
+      color: bar && bar.getAttribute('data-color'),
+      label: days && days.textContent.trim(),
+      plan: chip && chip.textContent.trim(),
+      body: document.querySelector('#acct-plan .acct-body').textContent,
+    };
+  });
+  assert.ok(['green', 'yellow', 'red'].includes(out.color), `رنگ: ${out.color}`);
+  assert.ok(out.label && out.label.length > 0, 'برچسبِ روزهای مانده باید از سرور آمده باشد');
+  assert.ok(out.body.includes('دستگاه‌های فعال'), 'میزِ دستگاه‌ها باید باشد');
+  assert.ok(out.body.includes('پرداخت‌ها'), 'میزِ پرداخت‌ها باید باشد');
+  await page.evaluate(() => document.getElementById('acct-plan').classList.remove('open'));
+});
+
+await step('پنجرهٔ «همگام‌سازی» آخرین موفق، صف و نسخهٔ Schema را می‌گوید', async () => {
+  await page.evaluate(() => window.TohidAccountUI.openSync());
+  await page.waitForSelector('#acct-sync.open', { timeout: 10_000 });
+  const text = await page.textContent('#acct-sync .acct-body');
+  for (const needle of ['آخرین همگام‌سازیِ موفق', 'در صف', 'نسخهٔ Schema', 'گزارشِ خطا']) {
+    assert.ok(text.includes(needle), `«${needle}» باید در پنجرهٔ همگام‌سازی باشد`);
+  }
+  //  ⛔ کادرِ نشانیِ سرور نباید ساخته شده باشد — قاعدهٔ قفلِ نشانی
+  assert.ok(!text.includes('آدرس سرور'), 'کادرِ نشانیِ سرور نباید باشد');
+  await page.evaluate(() => document.getElementById('acct-sync').classList.remove('open'));
+});
+
+await step('قفلِ نرم: اشتراکِ تمام‌شده فقط‌خواندنی می‌کند و خروجی را نمی‌بندد', async () => {
+  const out = await page.evaluate(() => {
+    localStorage.setItem('tohid-heartbeat-v1', JSON.stringify({
+      subscription: { status: 'expired', active: false, plan: 'm1', color: 'red', label: 'منقضی', daysLeft: 0, endsAt: 1, permanent: false },
+      at: Date.now(),
+    }));
+    localStorage.removeItem('tohid-banner-seen-v1');
+    window.TohidAccountUI._applySubscription();
+    const banner = document.getElementById('acct-banner');
+    //  دکمهٔ نوشتن باید بسته شود و دکمهٔ خروجی نه
+    let writeBlocked = false;
+    let exportAllowed = true;
+    const write = document.getElementById('btn-add-debtor-top');
+    const exp = document.getElementById('btn-export-backup');
+    if (write) {
+      const ev = new MouseEvent('click', { bubbles: true, cancelable: true });
+      write.dispatchEvent(ev);
+      writeBlocked = ev.defaultPrevented;
+    }
+    if (exp) {
+      const ev2 = new MouseEvent('click', { bubbles: true, cancelable: true });
+      exp.dispatchEvent(ev2);
+      exportAllowed = !ev2.defaultPrevented;
+    }
+    return {
+      locked: window.TohidAccountUI.isSoftLocked(),
+      bannerShown: !!banner && banner.classList.contains('show'),
+      bannerText: banner ? banner.textContent : '',
+      writeBlocked, exportAllowed,
+      ledgerRows: (JSON.parse(localStorage.getItem('tohid-shop-data-v1') || '{}').debtors || []).length,
+    };
+  });
+  assert.equal(out.locked, true, 'باید فقط‌خواندنی شده باشد');
+  assert.equal(out.bannerShown, true, 'بنرِ سرخ باید دیده شود');
+  assert.ok(out.bannerText.includes('فقط‌خواندنی'), out.bannerText.slice(0, 80));
+  assert.equal(out.writeBlocked, true, 'دکمهٔ «قرض‌دار جدید» باید بسته باشد');
+  assert.equal(out.exportAllowed, true, '⛔ خروجی و چاپ هیچ‌وقت بسته نمی‌شوند');
+  assert.ok(out.ledgerRows > 0, '⛔ هیچ داده‌ای پاک نمی‌شود');
+
+  //  بنرِ زرد، هفت روز پیش از پایان
+  const warn = await page.evaluate(() => {
+    localStorage.setItem('tohid-heartbeat-v1', JSON.stringify({
+      subscription: { status: 'active', active: true, plan: 'm1', color: 'yellow', label: '۵ روز مانده', daysLeft: 5, endsAt: Date.now() + 5 * 86400000, permanent: false },
+      at: Date.now(),
+    }));
+    localStorage.removeItem('tohid-banner-seen-v1');
+    window.TohidAccountUI._applySubscription();
+    const b = document.getElementById('acct-banner');
+    return { locked: window.TohidAccountUI.isSoftLocked(), kind: b.className, text: b.textContent };
+  });
+  assert.equal(warn.locked, false, 'هفت روز پیش از پایان هنوز قفل نیست');
+  assert.ok(warn.kind.includes('warn'), 'بنر باید زرد باشد');
+  assert.ok(warn.text.includes('تا پایانِ اشتراک'), warn.text.slice(0, 80));
+});
+
+/* ---- ورود با کدِ شش‌رقمی، روی یک مرورگرِ تازه و بی نشست ---- */
+await step('شش خانهٔ کد: پرشِ خودکار، Paste، ارقامِ فارسی و ارسالِ خودکار', async () => {
+  const fresh = await browser.newPage();
+  fresh.on('pageerror', (e) => pageErrors.push('login: ' + String(e.message)));
+  await fresh.addInitScript(() => { localStorage.setItem('tohid-unlocked-v1', '1'); });
+  await fresh.goto(`${siteBase}/`, { waitUntil: 'domcontentloaded' });
+  await fresh.waitForFunction(() => !!window.TohidAccountUI, null, { timeout: 15_000 });
+
+  await fresh.evaluate(() => window.TohidAccountUI.openLogin());
+  await fresh.waitForSelector('#acct-login.open #lg-email', { state: 'visible', timeout: 10_000 });
+  const boxCount = await fresh.evaluate(() => document.querySelectorAll('#lg-boxes .code-box').length);
+  assert.equal(boxCount, 6, 'کادرِ کد باید شش خانه باشد');
+
+  //  پله‌ی ایمیل ⇒ پله‌ی کد، با یک درخواستِ واقعی
+  const loginEmail = `wpe1.web.${Date.now()}@example.com`;
+  await fresh.fill('#lg-email', loginEmail);
+  await fresh.click('#lg-send');
+  await fresh.waitForSelector('#lg-step-code:not([hidden])', { timeout: 20_000 });
+
+  //  ارقامِ فارسی در خانهٔ اول ⇒ باید انگلیسی شوند و خودشان پخش شوند
+  await fresh.evaluate(() => {
+    const b = document.querySelectorAll('#lg-boxes .code-box');
+    b[0].value = '۱۲۳';
+    b[0].dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  let filled = await fresh.evaluate(() =>
+    Array.from(document.querySelectorAll('#lg-boxes .code-box')).map(x => x.value).join(''));
+  assert.equal(filled, '123', `ارقامِ فارسی باید انگلیسی شوند: «${filled}»`);
+
+  //  Backspace در خانهٔ خالی ⇒ برگشت به خانهٔ قبل
+  await fresh.evaluate(() => {
+    const b = document.querySelectorAll('#lg-boxes .code-box');
+    b[3].focus();
+    b[3].dispatchEvent(new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true }));
+  });
+  filled = await fresh.evaluate(() =>
+    Array.from(document.querySelectorAll('#lg-boxes .code-box')).map(x => x.value).join(''));
+  assert.equal(filled, '12', 'Backspace باید رقمِ قبلی را پاک کند');
+
+  //  شمارشِ معکوسِ شصت ثانیه
+  const timer = await fresh.textContent('#lg-timer');
+  assert.ok(/ثانیه/.test(timer), `شمارشِ معکوس: ${timer}`);
+  const resendDisabled = await fresh.evaluate(() => document.getElementById('lg-resend').disabled);
+  assert.equal(resendDisabled, true, 'تا پایانِ شصت ثانیه، «فرستادنِ دوباره» بسته است');
+
+  //  و حالا کدِ واقعی — از دفترِ خودِ سرور، نه از حدس
+  const req = await one(
+    'SELECT request_id, code_sealed FROM login_requests WHERE email=$1 ORDER BY created_at DESC LIMIT 1',
+    [loginEmail],
+  );
+  assert.ok(req, 'درخواستِ کد باید در دفتر نشسته باشد');
+  const codes = require('../src/lib/login-codes');
+  const realCode = codes.unseal(req.code_sealed);
+
+  //  رقم‌به‌رقم، همان کاری که آدم می‌کند — ارسالِ خودکار پس از رقمِ ششم
+  await fresh.evaluate((code) => {
+    const b = document.querySelectorAll('#lg-boxes .code-box');
+    b.forEach((x) => { x.value = ''; });
+    b[0].focus();
+    for (let i = 0; i < 6; i++) {
+      const box = document.activeElement.classList.contains('code-box') ? document.activeElement : b[i];
+      box.value = code[i];
+      box.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  }, realCode);
+
+  await fresh.waitForFunction(() => {
+    try { return !!(JSON.parse(localStorage.getItem('tohid-license-v1') || '{}').accessToken); }
+    catch { return false; }
+  }, null, { timeout: 20_000 });
+
+  const session = await fresh.evaluate(() => {
+    const a = JSON.parse(localStorage.getItem('tohid-license-v1') || '{}');
+    return { hasAccess: !!a.accessToken, hasRefresh: !!a.refreshToken, email: a.userEmail };
+  });
+  assert.equal(session.hasAccess, true, 'پس از رقمِ ششم باید خودکار وارد شده باشد');
+  assert.equal(session.hasRefresh, true, 'توکنِ تازه‌سازی هم باید نشسته باشد');
+  assert.equal(session.email, loginEmail);
+
+  const user = await one('SELECT id FROM users WHERE email=$1', [loginEmail]);
+  assert.ok(user, 'حساب باید روی سرور ساخته شده باشد — ثبت‌نام و ورود یکی‌اند');
+  await fresh.close();
+});
+
 await step('در کلِ این نشست هیچ خطای صفحه‌ای نبود', async () => {
   //  ⚠️ خطاهای سرویس‌ورکر و آیکونِ نبوده شمرده نمی‌شوند: آن‌ها مالِ
   //  محیطِ آزمون‌اند نه کد

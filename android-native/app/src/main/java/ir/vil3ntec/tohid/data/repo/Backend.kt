@@ -46,17 +46,37 @@ object Backend {
      */
     private val prefs = app.getSharedPreferences("tohid-api", Context.MODE_PRIVATE)
 
+    /*
+     *  شناسهٔ دستگاه یک بار ساخته می‌شود و دیگر عوض نمی‌شود؛ همان که
+     *  `SyncStore` نگه می‌دارد، تا سرور و برنامه یک «دستگاه» را
+     *  بشناسند.
+     */
+    private val deviceUid: String by lazy {
+      runCatching { ir.vil3ntec.tohid.sync.SyncStore(app).deviceUid }.getOrDefault("")
+    }
+
     val engine = HttpEngine(
       baseUrl = { AppConfig.baseUrl(app) },
       allowInsecure = AppConfig.allowInsecure,
       online = { isOnline(app) },
       rememberedPrefix = prefs.getString(PREFIX_KEY, null),
       onPrefixFound = { found -> prefs.edit().putString(PREFIX_KEY, found).apply() },
+      identity = {
+        mapOf(
+          "X-App" to AppConfig.appId,
+          "X-App-Id" to AppConfig.appId,
+          "X-Device" to deviceUid,
+          "X-App-Version" to AppConfig.appVersion,
+        )
+      },
     )
 
     val api = ApiClient(engine, tokens, onSessionLost = { onSessionLost?.invoke() })
 
     val auth = AuthRepository(api, tokens)
+
+    //  ورود با کدِ شش‌رقمیِ ایمیلی — کنارِ `auth`، نه جایش
+    val codeLogin = CodeLoginRepository(api, tokens)
     val shop = ShopRepository(api)
     val account = AccountRepository(api)
     val sync = SyncRepository(api)
@@ -76,8 +96,17 @@ object Backend {
   /** پیشوندی که همین حالا روی این سرور کار می‌کند — برای برگهٔ وضعیت */
   fun apiPrefix(context: Context): String = of(context).engine.activePrefix
 
+  /**
+   *  کارگزارِ API — برای لایه‌هایی که مخزنِ آماده ندارند (Sync v1).
+   *
+   *  ⚠️ همان یک نمونه است، نه یکی تازه: قفلِ تازه‌سازیِ توکن باید بینِ
+   *  همهٔ صدازننده‌ها مشترک بماند.
+   */
+  fun api(context: Context): ApiClient = of(context).api
+
   fun tokens(context: Context): TokenStore = of(context).tokens
   fun auth(context: Context): AuthRepository = of(context).auth
+  fun codeLogin(context: Context): CodeLoginRepository = of(context).codeLogin
   fun shop(context: Context): ShopRepository = of(context).shop
   fun account(context: Context): AccountRepository = of(context).account
   fun sync(context: Context): SyncRepository = of(context).sync

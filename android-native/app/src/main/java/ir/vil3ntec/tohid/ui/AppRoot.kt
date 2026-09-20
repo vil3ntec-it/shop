@@ -76,6 +76,9 @@ private val PAGE_TITLES = mapOf(
   "quick" to "انتخاب محصول",
   "product" to "کالا",
   "vip" to "اشتراک و قیمت‌ها",
+  //  «اشتراکِ من» با «اشتراک و قیمت‌ها» یکی نیست: آن یکی پلن‌ها و
+  //  قیمت‌های سرور را نشان می‌دهد، این یکی حالِ اشتراکِ خودِ این حساب.
+  "myplan" to "اشتراکِ من",
   "support" to "پشتیبانی",
   "profile" to "حساب من",
   "team" to "کارمندان دکان",
@@ -377,6 +380,12 @@ fun AppRoot(
     // سربرگ و نوارِ پایین خودشان فاصلهٔ نوارهای سیستم را می‌گیرند
     contentWindowInsets = WindowInsets(0, 0, 0, 0),
     topBar = {
+      /*
+       *  ⚠️ **Column لازم است.** جایگاهِ `topBar` یک محتوا را سرِ جایش
+       *  می‌گذارد؛ دو تا روی هم می‌افتند. یک بار بنر را همین‌طور کنارِ
+       *  سربرگ گذاشتم و روی دکمه‌های سربرگ نشست.
+       */
+      Column {
       TohidTopBar(
         title = PAGE_TITLES[sub ?: tab] ?: "توحید",
         d = data,
@@ -391,6 +400,15 @@ fun AppRoot(
         //  اصلی جایی برای برگشتن نیست و دکمه هم ساخته نمی‌شود
         onBack = if (sub != null) ({ sub = null }) else null,
       )
+      /*
+       *  بنرِ اشتراک — بندِ ۲۱٫۸.
+       *
+       *  زرد از هفت روز پیش از پایان، سرخ پس از آن. ⛔ هیچ داده‌ای پاک
+       *  نمی‌شود و خروجی و چاپ باز می‌مانند؛ همین را هم صریح می‌گوید،
+       *  وگرنه کاربر گمان می‌کند دفترش رفته.
+       */
+      SubscriptionBanner { sub = "myplan" }
+      }
     },
     /*
      *  دکمهٔ شناورِ سراسری برداشته شد.
@@ -543,6 +561,7 @@ fun AppRoot(
           onConsumed = { pendingBarcode = null; pendingProduct = null },
         )
         "vip" -> VipScreen { sub = null }
+        "myplan" -> MySubscriptionScreen()
         "support" -> SupportScreen { sub = null }
         "profile" -> ProfileScreen(
           store = store,

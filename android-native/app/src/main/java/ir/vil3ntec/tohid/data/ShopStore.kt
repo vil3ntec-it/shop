@@ -1,6 +1,9 @@
 package ir.vil3ntec.tohid.data
 
 import android.content.Context
+import ir.vil3ntec.tohid.sync.v1.SoftLock
+import ir.vil3ntec.tohid.sync.v1.SyncV1Engine
+import ir.vil3ntec.tohid.sync.v1.SyncV1Worker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -65,7 +68,66 @@ class ShopStore(private val context: Context) {
     withContext(Dispatchers.IO) { LedgerSummary.write(context, _data.value) }
   }
 
-  suspend fun save(next: ShopData) = withContext(Dispatchers.IO) {
+  /**
+   *  ذخیرهٔ دفتر — تنها درِ نوشتن.
+   *
+   *  ⛔ با اشتراکِ تمام‌شده **نمی‌نویسد** (قفلِ نرمِ بندِ ۲۱٫۸): دفتر
+   *  دست‌نخورده می‌ماند و صفحه همان چیزی را نشان می‌دهد که روی دیسک
+   *  است. هیچ چیزی پاک نمی‌شود و خروجی و چاپ و پشتیبان باز می‌مانند.
+   *
+   *  @return آیا نوشته شد. `false` یعنی قفلِ نرم — صفحه باید بگوید چرا.
+   */
+  suspend fun save(next: ShopData): Boolean = withContext(Dispatchers.IO) {
+    if (SoftLock.isLocked(context)) {
+      SoftLock.noteBlocked()
+      return@withContext false
+    }
+    writeInternal(next)
+    true
+  }
+
+  /**
+   *  بازیابیِ پشتیبان — بیرونِ قفلِ نرم.
+   *
+   *  ⛔ دادهٔ خودِ کاربر است و گروگان گرفتنش سریع‌ترین راهِ از دست دادنِ
+   *  اعتماد. همان قاعده‌ای که برای خروجی و چاپ هم هست.
+   */
+  suspend fun applyRestore(next: ShopData) = writeInternal(next)
+
+  /** نوشتنی که قفلِ نرم جلویش را نمی‌گیرد: بازیابی و جابه‌جاییِ دفتر. */
+  private suspend fun writeInternal(next: ShopData) = withContext(Dispatchers.IO) {
+    writeToDisk(next)
+    /*
+     *  ⛔ **تنها درِ نوشتن در دفتر همین‌جاست** و هر تغییری از همین‌جا رد
+     *  می‌شود. پس دفترِ تغییرات (Sync v1) هم همین‌جا نوشته می‌شود:
+     *  `record` تفاضلِ دفتر را با سایهٔ آخرین حالتِ همگام‌شده می‌گیرد و
+     *  برای هر ردیفِ عوض‌شده یک op می‌سازد.
+     *
+     *  یعنی «نوشتنی که op نسازد» از نظرِ **ساختاری** ممکن نیست — نه
+     *  اینکه یادمان باشد در هر یک از صدها جای نوشتن یک خط اضافه کنیم.
+     *  شرح در `sync/v1/LedgerDiff.kt`.
+     *
+     *  ⚠️ هیچ خطایی از این‌جا بالا نمی‌رود: نرفتنِ همگام‌سازی نباید
+     *  جلوی ذخیرهٔ دفترِ خودِ دکان‌دار را بگیرد.
+     */
+    runCatching {
+      val made = SyncV1Engine.of(context).record(next)
+      if (made > 0) SyncV1Worker.now(context)
+    }
+  }
+
+  /**
+   *  نشاندنِ دفتری که از **سرور** آمده.
+   *
+   *  ⚠️ عمداً `save()` را صدا نمی‌زند: آن یکی دوباره تفاضل می‌گرفت و
+   *  همان ردیف‌هایی که تازه از سرور آمده‌اند را به سرور پس می‌فرستاد.
+   *  سایه را خودِ موتور در همان لحظه جلو می‌برد.
+   */
+  suspend fun applyFromServer(next: ShopData) = withContext(Dispatchers.IO) {
+    writeToDisk(next)
+  }
+
+  private fun writeToDisk(next: ShopData) {
     _data.value = next
     runCatching {
       // اول در فایلِ کنارى، بعد جابه‌جایی: اگر وسطِ نوشتن برق برود،
@@ -102,8 +164,14 @@ class ShopStore(private val context: Context) {
   }
 
   /** واردکردنِ داده‌ای که از نسخهٔ وب می‌آید */
+  /**
+   *  واردکردنِ داده‌ای که از نسخهٔ وب می‌آید.
+   *
+   *  ⚠️ قفلِ نرم جلوی این را نمی‌گیرد: بازیابیِ پشتیبان همان دادهٔ خودِ
+   *  کاربر است و بستنش یعنی گروگان گرفتنِ دفترِ خودش.
+   */
   suspend fun importJson(raw: String): Result<ShopData> = withContext(Dispatchers.IO) {
-    parseBackup(raw).onSuccess { save(it) }
+    parseBackup(raw).onSuccess { writeInternal(it) }
   }
 
   /* -------------------------- پشتیبانِ ایمنی -------------------------- */
@@ -127,7 +195,7 @@ class ShopStore(private val context: Context) {
   suspend fun undoRestore(): Result<ShopData> = withContext(Dispatchers.IO) {
     runCatching {
       val parsed = json.decodeFromString<ShopData>(safety.readText())
-      save(parsed)
+      writeInternal(parsed)
       safety.delete()
       parsed
     }

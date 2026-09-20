@@ -277,6 +277,22 @@ dependencies {
   implementation("com.google.mlkit:barcode-scanning:17.3.0")
   implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
+  /*
+   *  سوکتِ زندهٔ Sync v1 — تنها وابستگیِ تازهٔ این کار.
+   *
+   *  ── چرا ─────────────────────────────────────────────────────────
+   *  اندروید کلاینتِ WebSocket ندارد و `HttpURLConnection` — که کلِ
+   *  لایهٔ شبکهٔ این برنامه روی آن است — نمی‌تواند ارتقا به WebSocket
+   *  بدهد. دو راه بود: نوشتنِ RFC 6455 با دست روی `SSLSocket`، یا
+   *  همین. دستی‌اش حدود صد و پنجاه خطِ ظریف است (ماسک، قطعه‌بندی،
+   *  ping/pong، بستنِ تمیز) که یک اشتباهش سوکتی می‌سازد که «گاهی» کار
+   *  می‌کند — و بندِ ۲۱٫۳ پرامپت هم صریح همین کتابخانه را نام برده.
+   *
+   *  ⚠️ **فقط برای سوکت است.** هیچ مسیرِ HTTPی به آن نرفت؛
+   *  `HttpEngine` همان است که بود.
+   */
+  implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
   // یادآوریِ روزانه. کارِ زمان‌بندی‌شده باید بعد از خاموش و روشن شدنِ
   // گوشی هم سرِ جایش باشد؛ `WorkManager` همان را تضمین می‌کند.
   implementation("androidx.work:work-runtime-ktx:2.9.1")

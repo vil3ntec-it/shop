@@ -28,6 +28,9 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
 
   private lateinit var store: ShopStore
 
+  /** سوکتِ «چیزی عوض شد» — با بسته شدنِ صفحه بسته می‌شود */
+  private var live: ir.vil3ntec.tohid.sync.v1.LiveSocket? = null
+
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     enableEdgeToEdge()
@@ -50,6 +53,23 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
 
     // کلیدِ انیمیشن پیش از اولین کشیدنِ صفحه خوانده می‌شود
     Motion.load(applicationContext)
+
+    /*
+     *  ── Sync v1: کارِ پس‌زمینه و سوکتِ زنده ──────────────────────────
+     *  `schedule` کارِ دورهٔ پانزده‌دقیقه‌ای را ثبت می‌کند (از قبل ثبت
+     *  شده باشد، `KEEP` دست نمی‌زند). سوکت فقط «چیزی عوض شد» را
+     *  می‌آورد و خودِ Pull کارِ همان Worker است.
+     *
+     *  ⚠️ هیچ‌کدام خطا بیرون نمی‌دهند: برنامه باید بی‌اینترنت و بی‌حساب
+     *  هم کامل بالا بیاید.
+     */
+    runCatching {
+      ir.vil3ntec.tohid.sync.v1.SyncV1Worker.schedule(applicationContext)
+      live = ir.vil3ntec.tohid.sync.v1.LiveSocket(applicationContext) {
+        ir.vil3ntec.tohid.sync.v1.SyncV1Worker.now(applicationContext)
+      }
+      live?.connect()
+    }
 
     setContent {
       // انتخابِ ظاهر بین اجراها می‌ماند
@@ -86,5 +106,10 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
         }
       }
     }
+  }
+
+  override fun onDestroy() {
+    runCatching { live?.disconnect() }
+    super.onDestroy()
   }
 }

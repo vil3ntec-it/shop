@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.ManageSearch
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.ReceiptLong
+import androidx.compose.material.icons.filled.WorkspacePremium
 import ir.vil3ntec.tohid.ui.theme.Shop
 
 /**
@@ -134,6 +135,20 @@ fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
        *  شاگردی که گیر کرده هم باید بتواند بپرسد؛ و کسی که هنوز حساب
        *  نساخته، بیشتر از همه. سرور برای هر دو باز است.
        */
+      /*
+       *  «اشتراکِ من» — حالِ اشتراکِ همین حساب، از تپشِ کش‌شده.
+       *
+       *  با «اشتراک و قیمت‌ها»ی سربرگ یکی نیست: آن یکی پلن‌ها و
+       *  قیمت‌های سرور را نشان می‌دهد، این یکی روزهای مانده، دستگاه‌ها،
+       *  پرداخت‌ها و پیام‌های مدیر را.
+       */
+      MoreCard(
+        title = "اشتراکِ من",
+        icon = Icons.Filled.WorkspacePremium,
+        tint = Shop.colors.warning,
+        subtitle = "روزهای مانده، دستگاه‌ها، پرداخت‌ها و پیام‌های مدیر",
+        onClick = { onOpen("myplan") },
+      )
       MoreCard(
         title = "پشتیبانی",
         icon = Icons.AutoMirrored.Filled.Chat,

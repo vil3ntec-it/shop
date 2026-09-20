@@ -772,7 +772,9 @@ fun SettingsScreen(
             //  می‌کند برنامه خراب است
             val moved = withContext(Dispatchers.IO) { BackupBundle.commitPhotos(context) }
             val fixed = withContext(Dispatchers.IO) { BackupBundle.reconcilePhotoFlags(context, next) }
-            store.save(fixed)
+            //  ⚠️ بازیابیِ پشتیبان دادهٔ خودِ کاربر است؛ قفلِ نرمِ
+            //  پایانِ اشتراک نباید گروگانش بگیرد.
+            store.applyRestore(fixed)
             canUndo = true
             restorePhotos = 0
             toast(

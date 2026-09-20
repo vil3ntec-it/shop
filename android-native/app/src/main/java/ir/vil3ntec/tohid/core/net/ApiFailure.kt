@@ -32,6 +32,19 @@ sealed class ApiFailure(
   val retryable: Boolean = false,
 ) : Exception(userMessage) {
 
+  /*
+   *  کدِ HTTPی که این خطا از آن ساخته شد — صفر یعنی «از شبکه نیامده».
+   *
+   *  ⚠️ برای همه‌جا نیست: فقط جایی به کار می‌آید که خودِ **عدد** معنا
+   *  دارد و کدِ متنی کافی نیست. نمونه‌اش ۴۲۶ی Sync v1 است: «سرور از
+   *  برنامه عقب‌تر است ⇒ opها را نگه دار» — که با هیچ ۴۰۰ی دیگری یکی
+   *  نیست و اشتباه گرفتنش یعنی دادهٔ دورریخته.
+   */
+  var status: Int = 0
+    private set
+
+  internal fun withStatus(code: Int): ApiFailure { status = code; return this }
+
   /** هنوز نشانی سروری تنظیم نشده — برنامه کاملاً آفلاین کار می‌کند */
   class NotConfigured : ApiFailure("نشانی سرور تنظیم نشده است", "not_configured")
 
@@ -130,7 +143,7 @@ sealed class ApiFailure(
         status in 400..499 -> Invalid(message, code)
         status in 500..599 -> ServerFault(message, code)
         else -> InvalidResponse("وضعیت $status")
-      }
+      }.withStatus(status)
     }
 
     /**

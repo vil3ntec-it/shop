@@ -55,6 +55,8 @@ import androidx.core.view.WindowCompat
 import ir.vil3ntec.tohid.data.BackupClock
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
+import ir.vil3ntec.tohid.sync.v1.SyncV1Engine
+import ir.vil3ntec.tohid.sync.v1.SyncDot as SyncDotState
 import ir.vil3ntec.tohid.fa
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.qty
@@ -662,16 +664,27 @@ private fun SyncDot() {
   val red = Color(0xFFFF8B84)
   val grey = Color.White.copy(alpha = 0.55f)
 
+  /*
+   *  حالِ دفترِ تغییرات (Sync v1) — بندِ ۲۱٫۱۲.
+   *
+   *  ⚠️ این چراغ حالا **دو** چیز را با هم می‌گوید: سرور وصل هست یا نه،
+   *  و صفِ opها خالی هست یا نه. قاعدهٔ رنگ یک جاست
+   *  (`SyncDot.of`) و وب هم همان را می‌خواند، وگرنه روزی گوشی سبز
+   *  می‌دید و سایت زرد.
+   */
+  val v1 by SyncV1Engine.of(context).status.collectAsState()
+
   val tint = when {
     pulse == ServerPulse.State.CHECKING || pulse == ServerPulse.State.UNKNOWN -> grey
     pulse == ServerPulse.State.DOWN -> red
     pulse == ServerPulse.State.NO_NET -> BAR_ALERT
     //  از اینجا پایین، سرور وصل است و خبرِ دوم را می‌گوییم
     !signedIn -> green
-    health == AutoSync.Health.FAILED -> red
-    health == AutoSync.Health.WAITING -> BAR_ALERT
+    v1.dot == SyncDotState.RED || health == AutoSync.Health.FAILED -> red
+    v1.dot == SyncDotState.YELLOW || health == AutoSync.Health.WAITING -> BAR_ALERT
     else -> green
   }
+  val pending = AutoSync.pendingCount + v1.queued
 
   Row(
     Modifier
@@ -685,9 +698,9 @@ private fun SyncDot() {
     Box(Modifier.size(9.dp).clip(RoundedCornerShape(999.dp)).background(tint))
     //  عدد فقط وقتی می‌آید که واقعاً چیزی مانده باشد — نقطهٔ خالی
     //  آرام‌تر است و «همه‌چیز رفته» را بهتر می‌گوید
-    if (signedIn && AutoSync.pendingCount > 0) {
+    if (signedIn && pending > 0) {
       Text(
-        AutoSync.pendingCount.fa(),
+        pending.fa(),
         style = MaterialTheme.typography.labelSmall,
         color = tint,
         fontWeight = FontWeight.Bold,
@@ -857,6 +870,55 @@ private fun SyncDot() {
           style = MaterialTheme.typography.labelSmall,
           color = Shop.colors.muted2,
         )
+
+        /* ------------------ دفترِ تغییرات (Sync v1) ------------------ */
+
+        Spacer(Modifier.height(18.dp))
+        Text("دفترِ تغییرات", style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
+        Spacer(Modifier.height(8.dp))
+        Text(
+          if (v1.queued > 0) "${v1.queued.fa()} تغییر در صف" else "هیچ تغییری در صف نیست",
+          style = MaterialTheme.typography.bodyMedium,
+          color = if (v1.queued > 0) Shop.colors.warning else Shop.colors.success,
+          fontWeight = FontWeight.Bold,
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+          if (v1.lastOkAt > 0) "آخرین همگام‌سازیِ موفق: ${sinceText(v1.lastOkAt)}"
+          else "هنوز همگام‌سازیِ موفقی انجام نشده",
+          style = MaterialTheme.typography.labelMedium,
+          color = Shop.colors.muted,
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+          "نسخهٔ Schema: ${v1.schemaVersion.fa()}" +
+            (if (v1.serverSchema > 0) " · سرور ${v1.serverSchema.fa()}" else ""),
+          style = MaterialTheme.typography.labelSmall,
+          color = Shop.colors.muted2,
+        )
+        if (v1.holding) {
+          Spacer(Modifier.height(8.dp))
+          //  ⛔ «نگه داشته شد» با «گم شد» یکی نیست و کاربر باید فرقشان
+          //  را بداند
+          Text(
+            "سرورِ حساب از برنامه عقب‌تر است. تغییرها روی همین گوشی نگه " +
+              "داشته می‌شوند و هیچ‌کدام گم نمی‌شود؛ با به‌روز شدنِ سرور خودشان می‌روند.",
+            style = MaterialTheme.typography.labelMedium,
+            color = ALERT_ORANGE,
+          )
+        }
+        if (v1.dropped > 0) {
+          Spacer(Modifier.height(8.dp))
+          Text(
+            "${v1.dropped.fa()} تغییر را سرور نپذیرفت — در دفترِ کنار ثبت شده است.",
+            style = MaterialTheme.typography.labelMedium,
+            color = ALERT_ORANGE,
+          )
+        }
+        if (v1.lastError.isNotBlank()) {
+          Spacer(Modifier.height(8.dp))
+          Text(v1.lastError, style = MaterialTheme.typography.labelMedium, color = Shop.colors.danger)
+        }
       }
     }
   }

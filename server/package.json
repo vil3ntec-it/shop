@@ -15,7 +15,8 @@
     "test:panel": "node test/admin-panel.mjs",
     "test:all": "npm test && npm run test:panel && npm run test:web",
     "test:web": "node test/web-backup.mjs",
-    "test:login": "node --test --test-concurrency=1 test/login-contract.test.js test/sync-v1.test.js"
+    "test:login": "node --test --test-concurrency=1 test/login-contract.test.js test/sync-v1.test.js",
+    "test:mail": "node test/mail-delivery.js"
   },
   "engines": {
     "node": ">=20"
