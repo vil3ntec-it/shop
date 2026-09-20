@@ -43,6 +43,30 @@
 
   var io = { read: readJson, write: writeJson };
 
+  /* ==========================================================
+     شمارشِ صف — کش‌شده، عمداً
+     ----------------------------------------------------------
+     ⚠️ **قاعدهٔ سرعتِ مخزن.** `queue().size()` کلِ دفترِ صف را از
+     `localStorage` می‌خواند و تجزیه می‌کند. این عدد هم در تیکِ
+     دوثانیه‌ای لازم است و هم در هر `announce()` (یعنی با هر تغییرِ
+     کاربر). با صفِ چندهزارتاییِ یک دکانِ سه‌روز‌آفلاین، همین یک خط
+     می‌شد یک تجزیهٔ چندمگابایتی هر دو ثانیه — و صفحه همان‌جا تکان
+     می‌خورد.
+     پس عدد کش می‌شود و فقط وقتی دوباره خوانده می‌شود که صف واقعاً دست
+     خورده باشد.
+     ⛔ هر جایی که به صف می‌نویسد باید `forgetCounts()` را صدا بزند.
+     ========================================================== */
+  var counts = null;
+
+  function forgetCounts() { counts = null; }
+
+  function queueCounts() {
+    if (counts) return counts;
+    var q = queue();
+    counts = { queued: q.size(), dropped: q.dropped().length };
+    return counts;
+  }
+
   /** کلیدهای این حساب. حسابِ نبوده هم کلیدِ خودش را دارد («anon»). */
   function keyOf(suffix) {
     var uid = String(acc.account().userId || 'anon').replace(/[^A-Za-z0-9_-]/g, '_');
@@ -97,14 +121,14 @@
 
   function status() {
     var st = state();
-    var q = queue();
+    var n = queueCounts();
     return {
       configured: acc.configured(),
       signedIn: acc.isSignedIn(),
       online: navigator.onLine !== false,
       busy: busy,
-      queued: q.size(),
-      dropped: q.dropped().length,
+      queued: n.queued,
+      dropped: n.dropped,
       cursor: Number(st.cursor || 0),
       lastOkAt: Number(st.lastOkAt || 0),
       lastPushAt: Number(st.lastPushAt || 0),
@@ -121,7 +145,7 @@
       dot: core.dotOf({
         error: !!st.lastError, online: navigator.onLine !== false,
         signedIn: acc.isSignedIn(), configured: acc.configured(),
-        queued: q.size(), busy: busy,
+        queued: n.queued, busy: busy,
       }),
     };
   }
@@ -151,6 +175,7 @@
     var out = core.diff(base, data);
     if (!out.ops.length) return 0;
     queue().push(out.ops);
+    forgetCounts();
     setShadow(data);
     announce();
     schedulePush(reason);
@@ -175,6 +200,7 @@
     if (!data) return 0;
     var out = core.diff({}, data);
     if (out.ops.length) queue().push(out.ops);
+    forgetCounts();
     setShadow(data);
     announce();
     schedulePush();
@@ -252,7 +278,7 @@
       if (res.status === 'applied' || res.status === 'duplicate') ok.push(res.op_id);
       else bad.push(res);
     }
-    if (ok.length) q.ack(ok);
+    if (ok.length) { q.ack(ok); forgetCounts(); }
     if (bad.length) {
       //  ردشده‌ها از صف بیرون می‌روند — وگرنه صف تا ابد گیر می‌کند —
       //  ولی بی‌صدا نه: دلیلِ هر کدام در دفترِ کنار می‌ماند و در
@@ -267,6 +293,7 @@
       }
       q.drop(list, 'rejected');
       q.ack(ids);
+      forgetCounts();
     }
     patchState({ lastPushAt: Date.now() });
     return { sent: batch.length, applied: ok.length, rejected: bad.length, head: Number(r.cursor || r.head || 0) };
@@ -445,7 +472,8 @@
     started = true;
 
     //  صفِ مانده از نشستِ قبلی — همان «سه روز آفلاین» — اول می‌رود
-    tickTimer = setInterval(function () { if (queue().size()) pump(); }, PUSH_TICK_MS);
+    //  ⚠️ عددِ کش‌شده، نه خواندنِ دوبارهٔ حافظه هر دو ثانیه
+    tickTimer = setInterval(function () { if (queueCounts().queued) pump(); }, PUSH_TICK_MS);
     pullTimer = setInterval(function () { if (!socketOpen) pump(); }, PULL_EVERY_MS);
     beatTimer = setInterval(function () {
       if (acc.isSignedIn() && navigator.onLine !== false) acc.heartbeat().catch(function () { });
@@ -458,7 +486,7 @@
       if (!document.hidden && acc.isSignedIn()) pump();
     });
 
-    acc.on('signed-out', function () { disconnectLive(); announce(); });
+    acc.on('signed-out', function () { disconnectLive(); forgetCounts(); announce(); });
 
     if (acc.isSignedIn()) {
       firstSync().catch(function () { }).then(function () { pump(); connectLive(); });
@@ -471,6 +499,8 @@
   /** پس از ورودِ تازه صدا زده می‌شود. */
   function onSignedIn() {
     attempt = 0;
+    //  کلیدهای این حساب فرق دارند، پس شمارشِ کش‌شده هم بی‌اعتبار است
+    forgetCounts();
     patchState({ lastError: '' });
     firstSync().catch(function () { }).then(function () { pump(); connectLive(); });
     acc.heartbeat().catch(function () { });
@@ -488,7 +518,7 @@
     firstSync: firstSync,
     status: status,
     onChange: onChange,
-    queueSize: function () { return queue().size(); },
+    queueSize: function () { return queueCounts().queued; },
     dropped: function () { return queue().dropped(); },
     clearError: function () { patchState({ lastError: '' }); announce(); },
     connectLive: connectLive,

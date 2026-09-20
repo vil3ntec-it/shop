@@ -34,11 +34,31 @@ class OpQueue(context: Context, accountKey: String) {
   private val file = File(dir, "oplog-$safe.json")
   private val dropFile = File(dir, "oplog-$safe-dropped.json")
 
+  /*
+   *  ── شمارشِ کش‌شده، عمداً ────────────────────────────────────────
+   *  ⚠️ **قاعدهٔ سرعت.** `size()` در هر `publish()` خوانده می‌شود، یعنی
+   *  با هر ذخیرهٔ دفتر. خواندن و تجزیهٔ کلِ فایلِ صف در آن مسیر، برای
+   *  دکانی که سه روز آفلاین بوده، یعنی چند مگابایت تجزیه با هر ردیفی
+   *  که فروشنده می‌زند.
+   *  ⛔ هر نوشتنی روی فایل باید کش را باطل کند — کارِ خودِ `write()`.
+   */
+  @Volatile private var cachedSize: Int = -1
+  @Volatile private var cachedDropped: Int = -1
+
   @Synchronized
   fun all(): List<SyncOp> = read(file).mapNotNull { SyncOp.fromJson(it) }
 
   @Synchronized
-  fun size(): Int = read(file).size
+  fun size(): Int {
+    if (cachedSize < 0) cachedSize = read(file).size
+    return cachedSize
+  }
+
+  @Synchronized
+  fun droppedCount(): Int {
+    if (cachedDropped < 0) cachedDropped = read(dropFile).size
+    return cachedDropped
+  }
 
   @Synchronized
   fun push(ops: List<SyncOp>) {
@@ -121,6 +141,7 @@ class OpQueue(context: Context, accountKey: String) {
   }.getOrDefault(emptyList())
 
   private fun write(f: File, list: List<JsonObject>) {
+    if (f == file) cachedSize = list.size else cachedDropped = list.size
     runCatching {
       val tmp = File(f.parentFile, "${f.name}.tmp")
       tmp.writeText(JsonArray(list).toString())

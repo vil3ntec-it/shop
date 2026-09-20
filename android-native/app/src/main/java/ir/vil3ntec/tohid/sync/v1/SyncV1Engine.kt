@@ -267,7 +267,7 @@ class SyncV1Engine private constructor(context: Context) {
         busy = busy,
       ),
       queued = queued,
-      dropped = runCatching { queue.dropped().size }.getOrDefault(0),
+      dropped = runCatching { queue.droppedCount() }.getOrDefault(0),
       cursor = state.cursor,
       lastOkAt = state.lastOkAt,
       lastError = state.lastError,
