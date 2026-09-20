@@ -279,12 +279,33 @@ router.post('/subscriptions', async (req, res, next) => {
   const graceDays = v.integer(req.body?.graceDays, { field: 'مهلت', min: 0, max: 90, def: 0 });
   const note = v.text(req.body?.note, { max: 300 });
 
+  /*
+   *  قیمت و کدِ تخفیف — اختیاری. کدِ تخفیف اول سنجیده می‌شود (مهلت،
+   *  سقف، یک‌بار برای هر مشتری) و قیمتِ نهایی‌اش روی خودِ اشتراک
+   *  می‌نشیند؛ بعد از صدور، خرجِ کد ثبت می‌شود.
+   */
+  const discounts = require('../lib/discounts');
+  let price = req.body?.price === undefined || req.body?.price === null || req.body?.price === ''
+    ? null : v.integer(req.body.price, { field: 'قیمت', min: 0, max: 1e9 });
+  let quoted = null;
+  if (req.body?.discountCode) {
+    const shop = await one('SELECT owner_user_id FROM shops WHERE id=$1', [shopId]);
+    quoted = await discounts.quote(req.body.discountCode, { app: 'shop', plan, userId: shop ? shop.owner_user_id : '' });
+    if (quoted.finalPrice !== null) price = quoted.finalPrice;
+  }
+
   const sub = await subs.grant(shopId, {
-    plan, days, features, maxDevices, graceDays, note, createdBy: req.admin.id,
+    plan, days, features, maxDevices, graceDays, note, createdBy: req.admin.id, price,
     startsAt: v.timestamp(req.body?.startsAt), endsAt: v.timestamp(req.body?.endsAt),
   });
-  await audit.log({ shopId, actorType: 'admin', userId: req.admin.id, action: 'admin.subscription_granted', targetType: 'subscription', targetId: sub.id, detail: { plan, days } });
-  res.status(201).json({ subscription: sub, state: subs.stateOf(sub) });
+  if (quoted) {
+    await discounts.useCode(quoted.code.id, {
+      app: 'shop', userId: (await one('SELECT owner_user_id FROM shops WHERE id=$1', [shopId]))?.owner_user_id || '',
+      tenantId: shopId, subscriptionId: sub.id, price: quoted.price || 0, finalPrice: quoted.finalPrice || 0,
+    });
+  }
+  await audit.log({ shopId, actorType: 'admin', userId: req.admin.id, action: 'admin.subscription_granted', targetType: 'subscription', targetId: sub.id, detail: { plan, days, price } });
+  res.status(201).json({ subscription: sub, state: subs.stateOf(sub), discount: quoted });
 });
 
 /** ویرایش اشتراک (تاریخ پایان، قابلیت‌ها، یادداشت). */
@@ -451,6 +472,13 @@ router.patch('/plans/:code', async (req, res, next) => {
       JSON.stringify(req.body?.features ? sanitizeFeatures(req.body.features, app) : p.features),
       now(), app]
   );
+  //  تاریخچهٔ قیمت — هر بار که عدد واقعاً عوض شد یک ردیف. اشتراک‌های
+  //  قبلی قیمتِ خودشان را دارند و از این تغییر اثر نمی‌گیرند.
+  if (row && Number(row.price_afn) !== Number(p.price_afn)) {
+    await require('../lib/discounts').recordPrice({
+      app, plan: code, prevPrice: Number(p.price_afn), price: Number(row.price_afn), changedBy: req.admin.id,
+    });
+  }
   res.json({ plan: row });
 });
 

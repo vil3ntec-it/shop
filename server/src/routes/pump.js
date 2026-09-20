@@ -511,4 +511,19 @@ router.use('/events', require('./pump-events').makeRouter((req) => ({
   who: req.user ? (req.user.name || '') : '',
 })));
 
+/*
+ *  ══ اعلان‌های من · پرداخت‌های من · تنظیماتِ من — بخشِ پمپ ═════════════
+ *  همان منطقِ `routes/portal.js`، با هویتِ نشستِ **پمپ** (توکنِ دکان
+ *  این‌جا پیدا نمی‌شود — `requirePumpUser` بالاتر).
+ */
+const portal = require('./portal');
+router.get('/notices', (req, res, next) => portal.noticesHandler('pump', req, res, next));
+router.post('/notices/:id/read', (req, res, next) => portal.readNoticeHandler('pump', req, res, next));
+router.get('/payments', (req, res, next) => portal.paymentsHandler('pump', req, res, next));
+router.get('/settings', (req, res, next) => portal.settingsHandler('pump', req, res, next));
+router.put('/settings', (req, res, next) => portal.saveSettingsHandler('pump', req, res, next));
+router.post('/redeem', (req, res, next) => portal.redeemHandler('pump', req, res, next));
+router.get('/heartbeat', (req, res, next) => portal.heartbeatHandler('pump', req, res, next));
+router.post('/errors', (req, res, next) => portal.reportErrorHandler('pump', req, res, next));
+
 module.exports = router;

@@ -17,6 +17,8 @@ async function createApp({ runMigrations = true } = {}) {
 
   if (runMigrations) await migrate.run({ log: (m) => console.log(`[migrate] ${m}`) });
   await plans.seedDefaults();
+  //  قالب‌های آمادهٔ مرکزِ اعلان (خوش‌آمد، رو به پایان، تمدید شد، …)
+  await require('./lib/notices').seedTemplates();
   await pruneExpired();
   //  مدیر از محیط — نصبی که پنلِ خانگی خودش بالا می‌آورد و ترمینالی در کار نیست
   await require('./lib/admin-bootstrap').ensureAdmin({
@@ -266,6 +268,21 @@ async function createApp({ runMigrations = true } = {}) {
     billing.post('/request', me.purchaseRequestHandler);
     api.use('/billing', billing);
 
+    /*
+     *  ══ مرکزِ اعلان · فروش · پورتالِ مشتری · SDK ═══════════════════
+     *  دو روترِ مدیر زیرِ همان `/admin` می‌نشینند: `requireAdmin`ِ
+     *  `routes/admin.js` پیش از این‌ها می‌دود و مسیرِ پیدا‌نشده به
+     *  این‌ها می‌رسد؛ خودشان هم `requireAdmin` دارند تا به تنهایی هم
+     *  بسته باشند.
+     *  ⚠️ پیش از `routes/data` — آن روتر روی `/` است و روی **هر** مسیری
+     *  `requireUser, requireShop` می‌زند؛ هر چیزی که بعدش سوار شود برای
+     *  توکنِ پمپ یا مهمان هیچ‌وقت دیده نمی‌شود (همان تلهٔ `/api/v1`).
+     */
+    api.use('/admin', require('./routes/admin-notices'));
+    api.use('/admin', require('./routes/admin-sales'));
+    api.use('/portal', require('./routes/portal'));
+    api.get('/downloads', require('./routes/portal').downloadsHandler);
+
     api.use('/', require('./routes/data'));
     return api;
   }
@@ -289,6 +306,12 @@ async function createApp({ runMigrations = true } = {}) {
     index: 'index.html', maxAge: 0, etag: true,
   }));
   app.get('/', (req, res) => res.redirect('/admin/'));
+
+  // ---- پورتالِ مشتری و SDK ----
+  app.use('/portal', express.static(path.join(__dirname, '..', 'public', 'portal'), {
+    index: 'index.html', maxAge: 0, etag: true,
+  }));
+  app.use('/sdk', express.static(path.join(__dirname, '..', 'public', 'sdk'), { maxAge: 0, etag: true }));
 
   app.use(notFoundHandler);
   app.use(errorHandler);

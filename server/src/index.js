@@ -37,6 +37,10 @@ async function main() {
   server.headersTimeout = 70_000;
 
   const backupTimer = backup.schedule();
+  //  زمان‌بندِ مرکزِ اعلان: هر دقیقه اعلان‌های وقت‌رسیده، و روزی یک بار
+  //  «رو به پایان / منقضی»
+  const notices = require('./lib/notices');
+  notices.startRunner();
 
   let closing = false;
   async function shutdown(signal) {
@@ -44,6 +48,7 @@ async function main() {
     closing = true;
     console.log(`[${signal}] در حال خاموش شدن…`);
     if (backupTimer) clearInterval(backupTimer);
+    notices.stopRunner();
     server.close(async () => {
       await closeDb();
       console.log('خاموش شد.');
