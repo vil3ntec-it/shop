@@ -85,7 +85,16 @@ async function createApp({ runMigrations = true } = {}) {
       if (config.corsOrigins.includes(origin) || config.corsOrigins.includes('*')) {
         res.set('Access-Control-Allow-Origin', config.corsOrigins.includes('*') ? '*' : origin);
         res.set('Vary', 'Origin');
-        res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, Idempotency-Key');
+        /*
+         *  ⚠️ سرآیندهای قراردادِ ورود و Sync v1 هم باید مجاز باشند.
+         *  نسخهٔ وب `X-App` · `X-Device` · `X-App-Version` ·
+         *  `X-Request-Id` را روی **هر** درخواست می‌فرستد؛ بی این‌ها
+         *  پیش‌پروازِ CORS بی‌صدا می‌میرد و مرورگر فقط
+         *  «net::ERR_FAILED» می‌گوید — نه ۴۰۰، نه ۴۰۳، هیچ.
+         *  همان تله‌ای که یک بار اپِ کارمندانِ پمپ را خواباند.
+         */
+        res.set('Access-Control-Allow-Headers',
+          'Content-Type, Authorization, Idempotency-Key, X-App, X-App-Id, X-Device, X-App-Version, X-Request-Id');
         res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
         res.set('Access-Control-Max-Age', '600');
       } else if (req.method === 'OPTIONS') {

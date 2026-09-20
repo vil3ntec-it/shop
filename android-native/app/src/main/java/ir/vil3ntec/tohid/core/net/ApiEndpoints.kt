@@ -22,6 +22,9 @@ object ApiEndpoints {
   /** تنظیماتِ باز سرور: کدام راهِ ورود روشن است، کمینهٔ نسخه، … */
   const val CONFIG = "/config"
 
+  /** گزارشِ خطای برنامه — با اجازهٔ کاربر (بندِ ۲۰.۸). توکن اختیاری است. */
+  const val ERRORS = "/errors"
+
   /* ------------------------------ ورود ------------------------------ */
 
   object Auth {
@@ -48,6 +51,34 @@ object ApiEndpoints {
     const val REGISTER_START = "/auth/register/start"
     const val REGISTER_VERIFY = "/auth/register/verify"
     const val REGISTER_COMPLETE = "/auth/register/complete"
+
+    /*
+     *  ورود با کدِ شش‌رقمیِ ایمیلی — قراردادِ `docs/LOGIN-fa.md`.
+     *
+     *  ⚠️ `{app}` همان `AppConfig.appId` است و داخلِ خودِ هشِ کد
+     *  می‌نشیند: کدِ یک برنامه در برنامهٔ دیگر بی‌معناست.
+     */
+    fun requestCode(app: String) = "/auth/$app/request-code"
+    fun requestStatus(app: String, requestId: String) =
+      "/auth/$app/request-status?request_id=$requestId"
+    fun verifyCode(app: String) = "/auth/$app/verify"
+  }
+
+  /* --------------------------- Sync v1 (بندِ ۲۰) --------------------------- */
+
+  /**
+   *  ⚠️ این‌ها با `Shop.Sync` یکی **نیستند**. آن یکی همگام‌سازیِ
+   *  رکوردیِ امروز است (`rev` و «آخرین ویرایش برنده»)؛ این یکی
+   *  پروتکلِ مشترکِ بندِ ۲۰ است با دفترِ تغییرات و تعارضِ سطحِ فیلد.
+   *  هر دو می‌مانند تا هیچ مشتریِ امروزی نشکند.
+   */
+  object SyncV1 {
+    const val PUSH = "/sync/v1/push"
+    const val SNAPSHOT = "/sync/v1/snapshot"
+    const val STATUS = "/sync/v1/status"
+    fun pull(deviceId: String, since: Long) = "/sync/v1/pull?device_id=$deviceId&since=$since"
+    /** مسیرِ سوکتِ زنده — نسبت به ریشهٔ سرور، نه به پیشوندِ API. */
+    const val LIVE_PATH = "/api/sync/v1/live"
   }
 
   /* ------------------------------ لوکیشن ------------------------------ */
@@ -72,6 +103,17 @@ object ApiEndpoints {
     const val SUBSCRIPTION = "/me/subscription"
     const val PLANS = "/me/plans"
     const val PURCHASE_REQUEST = "/me/purchase-request"
+
+    /**
+     *  تپشِ هر پانزده دقیقه — بندِ ۲۰.۷.
+     *
+     *  همهٔ آن‌چه «اشتراکِ من» لازم دارد در یک درخواست: پلن، روزهای
+     *  مانده، رنگ، قابلیت‌ها، اعلان‌های نخوانده و ساعتِ سرور. نتیجه کش
+     *  می‌شود تا آن صفحه آفلاین هم چیزی برای نشان دادن داشته باشد.
+     */
+    const val HEARTBEAT = "/me/heartbeat"
+    const val NOTICES = "/me/notices"
+    const val PAYMENTS = "/me/payments"
 
     fun device(id: String) = "$DEVICES/${enc(id)}"
   }

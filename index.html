@@ -92,6 +92,7 @@
 <link rel="stylesheet" href="license/shop-ui.css?v=15">
 <link rel="stylesheet" href="license/vip.css?v=16">
 <link rel="stylesheet" href="license/support.css?v=16">
+<link rel="stylesheet" href="license/account-ui.css?v=1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <!-- فونت به‌صورت غیرمسدودکننده بارگذاری می‌شود تا نبودِ اینترنت باز شدن برنامه را کند نکند -->
@@ -4972,6 +4973,28 @@
           </div>
         </div>
 
+        <!-- ==========================================================
+             حساب، اشتراک و همگام‌سازی — بندهای ۲۱٫۴ · ۲۱٫۵ · ۲۱٫۹ · ۲۱٫۱۱
+             ----------------------------------------------------------
+             ⛔ کادرِ «آدرس سرور» این‌جا **نیست** و نباید بیاید. نشانی در
+             `<meta name="tohid-api-base">` قفل است و `api-config.js`
+             نشانیِ دستی را نادیده می‌گیرد؛ قاعدهٔ صاحبِ مخزن است، نه
+             سلیقه. شرح در `docs/SYNC-CLIENT-fa.md`.
+             ========================================================== -->
+        <div class="panel" id="panel-account-sync">
+          <div class="panel-head"><h2>حساب و همگام‌سازی</h2></div>
+          <p class="settings-hint">
+            با ایمیل وارد شوید تا دفترِ دکان روی سرور بماند و روی هر گوشی و روی
+            همین سایت یکی باشد. تا وقتی وارد نشده‌اید، برنامه کاملاً آفلاین کار
+            می‌کند و هیچ قابلیتی قفل نمی‌شود.
+          </p>
+          <div class="settings-actions" style="display:grid;gap:10px;margin-top:12px;">
+            <button type="button" class="btn-secondary" id="btn-acct-login">ورود با ایمیل</button>
+            <button type="button" class="btn-secondary" id="btn-acct-plan">اشتراکِ من</button>
+            <button type="button" class="btn-secondary" id="btn-acct-sync">حالِ همگام‌سازی</button>
+          </div>
+        </div>
+
         <!-- Appearance -->
         <div class="panel">
           <div class="panel-head"><h2>ظاهر برنامه</h2></div>
@@ -6877,7 +6900,30 @@
     });
   }
 
-  function uid(){ return 'id'+Date.now().toString(36)+Math.random().toString(36).slice(2,8); }
+  /*
+   *  شناسهٔ ردیف — از امروز ULID.
+   *
+   *  ── چرا عوض شد ──────────────────────────────────────────────
+   *  شکلِ قبلی (`id` + زمانِ base36 + شش نویسه از `Math.random`) در
+   *  یک میلی‌ثانیه فقط ۳۶⁶ حالت داشت و `Math.random` هم تصادفِ امن
+   *  نیست. دو گوشیِ آفلاین که در یک لحظه ردیف می‌سازند، می‌توانستند
+   *  به یک شناسه برسند — و در دفترِ مشترک یعنی یک ردیف روی دیگری.
+   *
+   *  ULID زمان را در ۱۰ نویسهٔ اولش دارد (پس ترتیب حفظ می‌شود) و
+   *  هشتاد بیتِ تصادفیِ امن در بقیه.
+   *
+   *  ⛔ شناسه‌های امروزِ مشتری‌ها **دست نمی‌خورند**. تبدیلشان یعنی
+   *  بازنویسیِ همهٔ ارجاع‌ها (`saleId`، `productId`، `debtorId`،
+   *  `purchaseId`، `warehouseEntryId`، `refId`) روی خودِ گوشی و بی
+   *  هیچ نسخهٔ پشتیبانی روی سرور — همان کاری که «داده گم نشود» منعش
+   *  می‌کند. شرح در `docs/SYNC-CLIENT-fa.md`.
+   */
+  function uid(){
+    const core = window.TohidSyncCore;
+    if(core && core.ulid) return core.ulid();
+    // هستهٔ همگام‌سازی بالا نیامده: همان شکلِ دیروز، تا برنامه نایستد
+    return 'id'+Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+  }
   function formatMoney(n){ return Math.round(n).toLocaleString('en-US'); }
   /** عدد بدون جداکننده — برای سال و شماره‌هایی که پول نیستند. */
   function formatPlain(n){ return String(n); }
@@ -6948,6 +6994,9 @@
     clearTimeout(toastTimer);
     toastTimer=setTimeout(()=> wrap.classList.remove('open'), 2500);
   }
+  /* لایه‌های `license/` پیامِ خودشان را از همین یکی می‌دهند تا دو
+     شکلِ متفاوتِ توست روی یک صفحه نباشد. */
+  window.showToast = showToast;
 
   // ---- Rendering: debtors list ----
   function renderDebtors(filter=''){
@@ -12211,6 +12260,19 @@
         stockMovements, priceHistory, auditLog
       }));
     }catch(e){ console.error('ذخیره اطلاعات ناموفق بود:', e); }
+    /*
+     *  ⛔ **تنها درِ نوشتن در دفتر همین‌جاست** و هر تغییری از همین‌جا
+     *  رد می‌شود. پس `recordChange` تفاضلِ دفتر را با سایهٔ آخرین
+     *  حالتِ همگام‌شده می‌گیرد و برای هر ردیفِ عوض‌شده یک op می‌سازد.
+     *
+     *  یعنی «نوشتنی که op نسازد» از نظرِ ساختاری ممکن نیست — نه اینکه
+     *  یادمان باشد در هر یک از صدها جای نوشتن یک خط اضافه کنیم.
+     *  شرح در `license/sync-core.js`.
+     */
+    if(window.TohidSync && window.TohidSync.recordChange){
+      try{ window.TohidSync.recordChange(); }
+      catch(e){ console.error('دفترِ تغییرات نوشته نشد:', e); }
+    }
     // شمارنده هشدارها بعد از هر تغییر داده تازه شود
     // (alertsReady در انتهای اسکریپت true می‌شود تا در زمان بوت زودتر از تعریف صدا زده نشود)
     if(alertsReady) renderAlerts();
@@ -12278,11 +12340,112 @@
     });
   })();
 
+  /* دکمه‌های پنلِ «حساب و همگام‌سازی» — پنجره‌هایشان را
+     `license/account-ui.js` می‌سازد. */
+  (function wireAccountPanel(){
+    const go = (id, pick)=>{
+      const b = document.getElementById(id);
+      if(!b) return;
+      b.addEventListener('click', ()=>{
+        const ui = window.TohidAccountUI;
+        if(!ui){ showToast('لایهٔ حساب بالا نیامده است', 'danger'); return; }
+        pick(ui);
+      });
+    };
+    go('btn-acct-login', (ui)=> ui.openLogin());
+    go('btn-acct-plan',  (ui)=> ui.openPlan());
+    go('btn-acct-sync',  (ui)=> ui.openSync());
+  })();
+
   initAuth();
   loadState();
   loadSettings();
   rebuildBarcodeIndex();
   loadDraftCart();
+
+  /* ==========================================================
+     پلِ Sync v1 — دفتر کجاست و بعد از هر دریافت چه کشیده شود
+     ----------------------------------------------------------
+     موتورِ همگام‌سازی (`license/sync-engine.js`) شکلِ داخلیِ این صفحه
+     را نمی‌شناسد و نباید بشناسد؛ فقط دو تابع می‌گیرد: بخوان، بنویس.
+
+     ⚠️ `applyServerLedger` عمداً `saveState()` را صدا **نمی‌زند**:
+     آن یکی دوباره تفاضل می‌گرفت و همان ردیف‌هایی که تازه از سرور
+     آمده‌اند را به سرور پس می‌فرستاد. نوشتنِ مستقیم در حافظه کارِ
+     خودِ موتور است که سایه را هم در همان لحظه جلو می‌برد.
+     ========================================================== */
+  function readLedger(){
+    return {
+      debtors, transactions,
+      expenses, expenseCategories,
+      products, productCategories, productUnits,
+      warehouseEntries,
+      sales, saleItems, returns, nextInvoiceNo,
+      suppliers, purchases, supplierPayments,
+      stockMovements, priceHistory, auditLog
+    };
+  }
+
+  function applyServerLedger(next){
+    if(!next) return;
+    const put = (v, dflt)=> Array.isArray(v) ? v : dflt;
+    debtors          = put(next.debtors, debtors);
+    transactions     = put(next.transactions, transactions);
+    expenses         = put(next.expenses, expenses);
+    products         = put(next.products, products);
+    warehouseEntries = put(next.warehouseEntries, warehouseEntries);
+    sales            = put(next.sales, sales);
+    saleItems        = put(next.saleItems, saleItems);
+    returns          = put(next.returns, returns);
+    suppliers        = put(next.suppliers, suppliers);
+    purchases        = put(next.purchases, purchases);
+    supplierPayments = put(next.supplierPayments, supplierPayments);
+    stockMovements   = put(next.stockMovements, stockMovements);
+    priceHistory     = put(next.priceHistory, priceHistory);
+    auditLog         = put(next.auditLog, auditLog);
+
+    /* فقط روی دیسک می‌نشیند — بی تفاضلِ دوباره */
+    try{
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(readLedger()));
+    }catch(e){ console.error('نوشتنِ دفترِ رسیده ناموفق بود:', e); }
+
+    rebuildBarcodeIndex();
+    repaintLedger();
+  }
+
+  /* همان چیزهایی که سرِ بالا آمدنِ برنامه کشیده می‌شوند — یک جا، تا
+     ردیفی که از گوشیِ دیگر آمده همان لحظه دیده شود. */
+  function repaintLedger(){
+    try{
+      renderDebtors();
+      renderDashboard();
+      renderExpenses();
+      renderExpenseDashboard();
+      renderProducts();
+      renderWarehouseList();
+      renderWarehouseDashboard();
+      renderSalesPage();
+      renderSuppliers();
+      renderPurchaseList();
+      renderDashboardExtra();
+      if(alertsReady) renderAlerts();
+    }catch(e){ console.error('رسمِ دوباره ناموفق بود:', e); }
+  }
+
+  /*
+   *  ⚠️ این اسکریپتِ درون‌خطی **پیش از** فایل‌های `defer` اجرا می‌شود،
+   *  پس همین‌جا `window.TohidSync` هنوز وجود ندارد. فایل‌های `defer`
+   *  دقیقاً پیش از `DOMContentLoaded` اجرا می‌شوند و این شنونده هم
+   *  زودتر از شنوندهٔ `account-ui.js` ثبت شده، پس ترتیب درست است:
+   *  اول پل بسته می‌شود، بعد موتور راه می‌افتد.
+   */
+  function bindSyncBridge(){
+    if(window.TohidSync && window.TohidSync.bind){
+      window.TohidSync.bind({ read: readLedger, write: applyServerLedger });
+    }
+  }
+  if(window.TohidSync) bindSyncBridge();
+  else document.addEventListener('DOMContentLoaded', bindSyncBridge);
 
   // Initial paint
   renderDebtors();
@@ -13334,11 +13497,18 @@
 
 <!-- لایه اشتراک و License — کاملاً افزودنی؛ منطق فروشگاه را تغییر نمی‌دهد -->
 <script src="license/api-config.js?v=16" defer></script>
+<!-- Sync v1 — هستهٔ بی‌مرورگر اول، بعد ورود، بعد موتور، بعد ظاهر.
+     ترتیب عمدی است: موتور به `TohidSyncCore` و `TohidAccount` تکیه دارد و
+     اگر پیش از آن‌ها بیاید، بی‌صدا هیچ کاری نمی‌کند. -->
+<script src="license/sync-core.js?v=1" defer></script>
+<script src="license/account-code.js?v=1" defer></script>
+<script src="license/sync-engine.js?v=1" defer></script>
 <script src="license/license-client.js?v=15" defer></script>
 <script src="license/shop-sync.js?v=15" defer></script>
 <script src="license/shop-ui.js?v=15" defer></script>
 <script src="license/vip.js?v=16" defer></script>
 <script src="license/support.js?v=16" defer></script>
+<script src="license/account-ui.js?v=1" defer></script>
 <script src="license/thermal-print.js?v=1" defer></script>
 
 </body>

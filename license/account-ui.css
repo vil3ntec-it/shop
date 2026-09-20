@@ -1,0 +1,156 @@
+/* ==========================================================
+   توحید | ورود با کد، «اشتراکِ من» و چراغِ همگام‌سازی — ظاهر
+   ----------------------------------------------------------
+   رنگ‌ها همه از متغیرهای خودِ صفحه می‌آیند (`:root` و
+   `[data-theme="dark"]`)، که خودشان عددبه‌عدد از
+   `ui/theme/Theme.kt` آمده‌اند. هیچ رنگِ تازه‌ای این‌جا ساخته نشده،
+   پس شب و روزِ برنامه بی هیچ کارِ اضافه‌ای درست است.
+
+   ⛔ `backdrop-filter` این‌جا **نیست** — قاعدهٔ سرعتِ مخزن: فقط سربرگ
+   و نوارِ پایین. لایه‌های این فایل مات‌اند، از خودِ رنگ.
+   ⛔ هیچ انیمیشنِ بی‌پایانی هم نیست؛ تنها حرکت، ظاهر شدنِ یک‌بارهٔ
+   پنجره است.
+   ========================================================== */
+
+/* ---------- چراغِ همگام‌سازی در نوارِ بالا ---------- */
+.sync-dot-btn{
+  display:inline-flex; align-items:center; gap:6px;
+  height:34px; padding:0 10px;
+  border:1px solid var(--border); border-radius:999px;
+  background:var(--surface-solid); color:var(--muted);
+  font-size:12px; font-weight:600; line-height:1;
+}
+.sync-dot-btn .sync-dot{
+  width:9px; height:9px; border-radius:50%;
+  background:var(--muted-2); flex:0 0 auto;
+}
+.sync-dot-btn[data-dot="green"]  .sync-dot{ background:var(--success); }
+.sync-dot-btn[data-dot="yellow"] .sync-dot{ background:var(--warning); }
+.sync-dot-btn[data-dot="red"]    .sync-dot{ background:var(--danger); }
+.sync-dot-btn[data-dot="grey"]   .sync-dot{ background:var(--muted-2); }
+.sync-dot-btn .sync-dot-text{ display:none; }
+@media (min-width:820px){ .sync-dot-btn .sync-dot-text{ display:inline; } }
+
+/* ---------- پوششِ مشترکِ پنجره‌ها ---------- */
+.acct-scrim{
+  position:fixed; inset:0; z-index:1200;
+  background:rgba(10,8,20,.55);
+  display:none; align-items:flex-end; justify-content:center;
+  padding:0;
+}
+.acct-scrim.open{ display:flex; }
+@media (min-width:640px){ .acct-scrim{ align-items:center; padding:24px; } }
+
+.acct-sheet{
+  width:100%; max-width:520px; max-height:92vh; overflow:auto;
+  background:var(--surface-solid); color:var(--text);
+  border:1px solid var(--border);
+  border-radius:var(--radius-lg) var(--radius-lg) 0 0;
+  box-shadow:var(--shadow-md);
+  padding:20px 18px calc(20px + env(safe-area-inset-bottom));
+}
+@media (min-width:640px){ .acct-sheet{ border-radius:var(--radius-lg); padding:24px; } }
+
+.acct-head{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; }
+.acct-title{ font-size:17px; font-weight:800; }
+.acct-x{
+  width:32px; height:32px; border-radius:50%;
+  border:1px solid var(--border); background:var(--surface-2); color:var(--muted);
+  font-size:18px; line-height:1;
+}
+.acct-sub{ font-size:13px; color:var(--muted); line-height:1.9; }
+.acct-row{
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  padding:10px 0; border-bottom:1px solid var(--border); font-size:13.5px;
+}
+.acct-row:last-child{ border-bottom:0; }
+.acct-row b{ font-weight:700; }
+.acct-k{ color:var(--muted); }
+
+.acct-btn{
+  width:100%; height:48px; border:0; border-radius:var(--radius-sm);
+  background:var(--primary); color:#fff; font-size:15px; font-weight:700;
+}
+.acct-btn:disabled{ opacity:.55; }
+.acct-btn.ghost{ background:var(--surface-2); color:var(--text); border:1px solid var(--border); }
+.acct-btn.danger{ background:var(--danger-tint); color:var(--danger); border:1px solid var(--border); }
+.acct-btns{ display:grid; gap:10px; margin-top:14px; }
+
+.acct-field{
+  width:100%; height:48px; padding:0 14px;
+  border:1px solid var(--border); border-radius:var(--radius-sm);
+  background:var(--surface-2); color:var(--text); font-size:15px;
+  font-family:inherit; direction:ltr; text-align:center;
+}
+.acct-field:focus{ outline:2px solid var(--primary); outline-offset:-1px; }
+
+.acct-msg{ margin-top:10px; font-size:13px; line-height:1.9; min-height:1px; }
+.acct-msg.err{ color:var(--danger); }
+.acct-msg.ok{ color:var(--success); }
+.acct-msg.info{ color:var(--muted); }
+
+/* ---------- شش خانهٔ کد ---------- */
+.code-boxes{
+  display:grid; grid-template-columns:repeat(6, 1fr); gap:8px;
+  direction:ltr; margin:6px 0 4px;
+}
+.code-box{
+  height:56px; width:100%;
+  border:1.5px solid var(--border); border-radius:14px;
+  background:var(--surface-2); color:var(--text);
+  font-size:24px; font-weight:800; text-align:center;
+  font-family:inherit; padding:0;
+}
+.code-box:focus{ outline:none; border-color:var(--primary); box-shadow:0 0 0 3px var(--primary-tint); }
+.code-box.filled{ border-color:var(--primary); }
+.code-boxes.locked .code-box{ opacity:.5; }
+
+.code-timer{ font-size:12.5px; color:var(--muted); text-align:center; margin-top:8px; }
+.code-resend{
+  background:none; border:0; color:var(--primary);
+  font-size:13px; font-weight:700; font-family:inherit; padding:4px 2px;
+}
+.code-resend:disabled{ color:var(--muted-2); }
+
+/* ---------- نوارِ اشتراک ---------- */
+.plan-bar{
+  height:10px; border-radius:999px; background:var(--border);
+  overflow:hidden; margin:10px 0 6px;
+}
+.plan-bar i{ display:block; height:100%; border-radius:999px; background:var(--success); }
+.plan-bar[data-color="yellow"] i{ background:var(--warning); }
+.plan-bar[data-color="red"] i{ background:var(--danger); }
+.plan-days{ font-size:15px; font-weight:800; }
+.plan-days[data-color="yellow"]{ color:var(--warning); }
+.plan-days[data-color="red"]{ color:var(--danger); }
+.plan-days[data-color="green"]{ color:var(--success); }
+.plan-chip{
+  display:inline-block; padding:3px 10px; border-radius:999px;
+  font-size:12px; font-weight:700;
+  background:var(--primary-tint); color:var(--primary-dark);
+}
+.acct-section-title{
+  font-size:13px; font-weight:800; color:var(--muted);
+  margin:18px 0 6px;
+}
+.acct-empty{ font-size:13px; color:var(--muted-2); padding:8px 0; }
+
+/* ---------- بنرِ اعلان و قفلِ نرم ---------- */
+.acct-banner{
+  display:none; align-items:flex-start; gap:10px;
+  margin:10px 14px 0; padding:11px 13px;
+  border:1px solid var(--border); border-radius:var(--radius-sm);
+  background:var(--surface-solid); font-size:13px; line-height:1.85;
+}
+.acct-banner.show{ display:flex; }
+.acct-banner.warn{ background:var(--warning-tint); border-color:transparent; color:var(--warning); }
+.acct-banner.bad{ background:var(--danger-tint); border-color:transparent; color:var(--danger); }
+.acct-banner b{ font-weight:800; }
+.acct-banner .acct-banner-x{
+  margin-inline-start:auto; background:none; border:0;
+  color:inherit; font-size:16px; line-height:1; opacity:.7;
+}
+.acct-banner-body{ flex:1; min-width:0; }
+
+/* ردیفِ فقط‌خواندنی: دکمه‌های نوشتن کم‌رنگ می‌شوند تا کاربر بداند چرا */
+html[data-soft-lock="1"] .dash-action{ opacity:.6; }

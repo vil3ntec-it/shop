@@ -31,6 +31,20 @@ class HttpEngine(
   rememberedPrefix: String? = null,
   /** تا دفعهٔ بعد لازم نباشد دوباره کشفش کنیم */
   private val onPrefixFound: (String) -> Unit = {},
+  /*
+   *  ── هویتِ برنامه روی **هر** درخواست ───────────────────────────────
+   *  قراردادِ `docs/LOGIN-fa.md`: `X-App` · `X-Device` · `X-App-Version`
+   *  · `X-Request-Id`.
+   *
+   *  ⚠️ `X-App` فقط یک برچسب نیست: سرور نشستِ تازه را به همان بخش مهر
+   *  می‌زند و توکنِ یک بخش در بخشِ دیگر **پیدا نمی‌شود**. نگفتنش یعنی
+   *  تکیه بر پیش‌فرضِ سرور — همان چیزی که یک بار اپِ کارمندانِ پمپ را
+   *  کاملاً مرده کرد.
+   *
+   *  ⛔ هیچ چیزِ شناسایی‌کنندهٔ **کاربر** در سرآیند نمی‌رود: نه ایمیل،
+   *  نه نامِ گوشی. فقط شناسهٔ دستگاه که خودِ برنامه ساخته است.
+   */
+  private val identity: () -> Map<String, String> = { emptyMap() },
 ) {
 
   private val json = Json { ignoreUnknownKeys = true; isLenient = true }
@@ -189,6 +203,9 @@ class HttpEngine(
       connection.readTimeout = ApiConfig.READ_TIMEOUT_MS
       connection.setRequestProperty("Accept", "application/json")
       if (token != null) connection.setRequestProperty("Authorization", "Bearer $token")
+      runCatching { identity() }.getOrNull()?.forEach { (k, v) ->
+        if (v.isNotBlank()) connection.setRequestProperty(k, v)
+      }
 
       /*
        *  ⚠️ **بدنهٔ خام، نه JSON.**

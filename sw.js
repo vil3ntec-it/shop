@@ -6,7 +6,7 @@
    - فونت‌های گوگل: اولین بار از شبکه، سپس همیشه از کش.
    داده‌های فروشگاه در localStorage است و اصلاً از اینجا عبور نمی‌کند.
    ========================================================== */
-const VERSION = 'tohid-shop-v20';
+const VERSION = 'tohid-shop-v21';
 const SHELL_CACHE = VERSION + '-shell';
 const FONT_CACHE = VERSION + '-fonts';
 
@@ -31,6 +31,18 @@ const SHELL_ASSETS = [
   './license/vip.css',
   './license/support.js',
   './license/support.css',
+  /*
+   *  لایهٔ Sync v1 و ورودِ کدِ ایمیلی.
+   *
+   *  ⚠️ با هر فایلِ تازه‌ای که به `index.html` اضافه می‌شود، همین فهرست
+   *  و شمارهٔ `VERSION` هم باید عوض شوند — وگرنه نصبِ روی گوشی فایلِ
+   *  تازه را ندارد و آفلاین نصفه بالا می‌آید.
+   */
+  './license/sync-core.js',
+  './license/account-code.js',
+  './license/sync-engine.js',
+  './license/account-ui.js',
+  './license/account-ui.css',
   './sounds/scan-beep.mp3',
 ];
 

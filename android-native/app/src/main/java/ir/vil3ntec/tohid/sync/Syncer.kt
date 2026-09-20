@@ -81,7 +81,9 @@ class Syncer(
       val page = api.pull(since, device)
       if (page.changes.isNotEmpty() || page.settings != null) {
         val merged = SyncEngine.merge(store.data.value, page.changes, page.settings)
-        if (merged.touched > 0) store.save(merged.data)
+        //  ⚠️ دادهٔ **سرور** است، نه نوشتنِ تازهٔ کاربر: قفلِ نرمِ
+        //  پایانِ اشتراک نباید جلویش را بگیرد.
+        if (merged.touched > 0) store.applyFromServer(merged.data)
         pulled += merged.touched
       }
       since = page.rev
@@ -120,7 +122,7 @@ class Syncer(
     }
     if (incoming.size == 0) return
     val merged = SyncEngine.merge(store.data.value, incoming, null)
-    if (merged.touched > 0) store.save(merged.data)
+    if (merged.touched > 0) store.applyFromServer(merged.data)
     state.shadow = SyncEngine.snapshot(store.data.value)
   }
 
