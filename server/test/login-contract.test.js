@@ -67,6 +67,8 @@ const get = (path, headers = HEAD) => h.api('GET', path, { headers });
 const sent = [];
 let failNext = 0;
 let hangNext = 0;
+//  «log» یعنی هیچ ایمیلی بیرون نرفت — سنجهٔ ۷ب همین را می‌خواهد
+let logNext = 0;
 const realSend = mailer.send;
 mailer.send = async function testSend(mail) {
   sent.push({ to: mail.to, subject: mail.subject, at: Date.now() });
@@ -85,6 +87,7 @@ mailer.send = async function testSend(mail) {
     return { ok: true };
   }
   if (failNext > 0) { failNext--; throw new Error('email_http_500'); }
+  if (logNext > 0) { logNext--; return { delivered: true, via: 'log' }; }
   return { ok: true };
 };
 
@@ -239,6 +242,34 @@ test('۷) سرویسِ ایمیل که جواب نمی‌دهد ⇒ ناموفق
   assert.equal(status.body.state, 'failed', 'برنامه باید بتواند بپرسد و بفهمد نرفته');
   assert.ok(outbox.recentAlerts.length > 0, 'شکستِ نهایی باید به مدیر خبر بدهد');
   outbox.breaker.reset?.();
+});
+
+test('۷ب) راهِ ارسالِ «log» سبزِ ساده نمی‌دهد — دلیلش log_only است', async () => {
+  /*
+   *  ⛔ «رفت» با «در لاگ چاپ شد» یکی نیست.
+   *
+   *  با راهِ ارسالِ `log` هیچ ایمیلی از این کامپیوتر بیرون نمی‌رود، ولی
+   *  `mailer.send` بی استثنا برمی‌گشت و ردیف `sent`ِ خالی مهر می‌خورد —
+   *  پس میزِ «ورودها» سبزِ پررنگ نشان می‌داد برای کدی که هیچ‌وقت فرستاده
+   *  نشده. گزارشِ واقعیِ صاحب سامانه دقیقاً همین بود: برنامه «کد فرستاده
+   *  شد»، پنل «رفت»، و صندوقِ ایمیل خالی.
+   *
+   *  ⚠️ حالش همان `sent` می‌ماند و این عمدی است: سرورِ ایمیلی در کار نیست،
+   *  پس چیزی برای تلاشِ دوباره وجود ندارد و `failed` کردنش فقط صف را
+   *  بیهوده می‌چرخاند. آن‌چه عوض شد، **دلیل** است.
+   */
+  const email = freshEmail();
+  const req = await post(`/api/auth/${APP}/request-code`, { email });
+  const id = req.body.request_id;
+
+  logNext = 1;
+  await query('UPDATE otp_outbox SET next_attempt_at = 0, locked_at = NULL WHERE id=$1', [id]);
+  await outbox.processById(id);
+  logNext = 0;
+
+  const st = await outbox.statusOf(id);
+  assert.equal(st.state, 'sent', 'چیزی برای تلاشِ دوباره نیست');
+  assert.equal(st.reason, 'log_only', 'ولی باید بگوید که هیچ ایمیلی نرفته');
 });
 
 test('۸) مهلتِ سرویسِ ایمیل ⇒ دلیلِ email_service_timeout', async () => {
