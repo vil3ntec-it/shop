@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>پورتال مشتری | VILL3N</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="portal.css">
+</head>
+<body>
+
+<!-- ورود با ایمیل + کدِ شش‌رقمی -->
+<div class="login-wrap" id="login-view">
+  <div class="panel">
+    <div class="brand">VILL3N</div>
+    <h2>پورتال مشتری</h2>
+    <p class="muted">با همان ایمیلی که در برنامه دارید وارد شوید؛ یک کدِ شش‌رقمی به ایمیلتان می‌رود.</p>
+    <label>برنامه</label>
+    <select id="in-app">
+      <option value="shop">دکان</option>
+      <option value="pump">پمپ‌بنزین</option>
+    </select>
+    <label>ایمیل</label>
+    <input type="email" id="in-email" dir="ltr" autocomplete="email" placeholder="you@example.com">
+    <button class="btn btn-block" id="btn-request" style="margin-top:14px;">فرستادنِ کد</button>
+    <div id="code-box" class="hidden">
+      <label>کدِ شش‌رقمی</label>
+      <input type="text" id="in-code" dir="ltr" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="123456">
+      <button class="btn btn-block" id="btn-verify" style="margin-top:14px;">ورود</button>
+    </div>
+    <div id="login-msg"></div>
+  </div>
+</div>
+
+<div class="wrap hidden" id="app-view">
+  <header class="top">
+    <div>
+      <div class="brand small">VILL3N</div>
+      <h1 id="who">پورتال مشتری</h1>
+    </div>
+    <div class="top-right">
+      <button class="btn btn-ghost btn-sm" id="btn-theme" title="روشن / تاریک">🌗</button>
+      <button class="btn btn-ghost btn-sm" id="btn-refresh">تازه‌سازی</button>
+      <button class="btn btn-ghost btn-sm" id="btn-logout">خروج</button>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab active" data-tab="subs">اشتراک‌ها</button>
+    <button class="tab" data-tab="payments">پرداخت‌ها</button>
+    <button class="tab" data-tab="devices">دستگاه‌ها</button>
+    <button class="tab" data-tab="support">پشتیبانی</button>
+    <button class="tab" data-tab="notices">اعلان‌ها <span class="pill hidden" id="notice-count"></span></button>
+    <button class="tab" data-tab="downloads">دانلود</button>
+  </nav>
+
+  <section id="tab-subs">
+    <div id="subs-list"></div>
+  </section>
+
+  <section id="tab-payments" class="hidden">
+    <div class="panel">
+      <h2>پرداخت‌ها و رسیدها</h2>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>تاریخ</th><th>برنامه</th><th>مبلغ</th><th>روش</th><th>شمارهٔ رسید</th><th></th></tr></thead>
+          <tbody id="payments-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section id="tab-devices" class="hidden">
+    <div class="panel">
+      <h2>دستگاه‌های وصل به این حساب</h2>
+      <p class="muted">دستگاهی که دیگر دستِ شما نیست را «آزاد» کنید — نشستش همان لحظه بسته می‌شود.</p>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>نام</th><th>سیستم</th><th>آخرین اتصال</th><th>وضعیت</th><th></th></tr></thead>
+          <tbody id="devices-body"></tbody>
+        </table>
+      </div>
+      <div id="devices-msg"></div>
+    </div>
+  </section>
+
+  <section id="tab-support" class="hidden">
+    <div class="panel">
+      <h2>پشتیبانی</h2>
+      <div class="chat" id="chat-box"></div>
+      <div class="row" style="margin-top:10px;">
+        <input type="text" id="chat-in" placeholder="پیامتان را بنویسید…" style="flex:1;min-width:200px;">
+        <button class="btn btn-sm" id="btn-chat-send">فرستادن</button>
+      </div>
+      <div id="chat-msg"></div>
+    </div>
+  </section>
+
+  <section id="tab-notices" class="hidden">
+    <div class="panel">
+      <h2>اعلان‌ها</h2>
+      <div id="notices-list"></div>
+    </div>
+  </section>
+
+  <section id="tab-downloads" class="hidden">
+    <div class="panel">
+      <h2>آخرین نسخهٔ برنامه‌ها</h2>
+      <div id="downloads-list"></div>
+    </div>
+  </section>
+</div>
+
+<script src="portal.js"></script>
+</body>
+</html>

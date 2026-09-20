@@ -278,9 +278,25 @@ test('توکنِ تازه‌سازی، توکنِ دسترسی می‌سازد �
   const fresh = await h.post('/api/auth/refresh', { refreshToken: user.refreshToken });
   assert.equal(fresh.status, 200);
   assert.ok(fresh.body.accessToken);
-  //  و در پاسخِ تازه‌سازی هیچ توکنِ تازه‌سازیِ تازه‌ای نمی‌آید
-  assert.equal(fresh.body.refreshToken, undefined);
   assert.equal((await h.get('/api/me', { token: fresh.body.accessToken })).status, 200);
+
+  /*
+   *  ⚠️ این بند عوض شد و عمدی است.
+   *
+   *  تا دیروز این‌جا نوشته بود «در پاسخِ تازه‌سازی هیچ توکنِ تازه‌سازیِ
+   *  تازه‌ای نمی‌آید». پرامپتِ ورود (بندِ ۲.۵) خلافش را می‌خواهد:
+   *  تازه‌سازی **چرخشی** است — توکنِ تازه می‌آید و قبلی باطل می‌شود.
+   *  دلیلش امنیت است، نه راحتی: توکنِ نودروزه‌ای که تا ابد همان می‌ماند،
+   *  اگر یک بار لو برود تا نود روز کار می‌کند.
+   *
+   *  آن‌چه این سنجه از روزِ اول می‌خواست سرِ جایش است و همین بالا سنجیده
+   *  شد: توکنِ تازه‌سازی **کلیدِ در نیست** و روی مسیرهای معمولی ۴۰۱
+   *  می‌گیرد.
+   */
+  assert.ok(fresh.body.refreshToken, 'تازه‌سازی چرخشی است و توکنِ تازه می‌دهد');
+  assert.notEqual(fresh.body.refreshToken, user.refreshToken, 'و همان قبلی نیست');
+  assert.equal((await h.get('/api/me', { token: fresh.body.refreshToken })).status, 401,
+    'توکنِ تازه‌سازیِ تازه هم کلیدِ در نیست');
 });
 
 test('شناسه از توکن خوانده می‌شود، نه از بدنه — درخواستِ دستکاری‌شده بی‌اثر است', async () => {

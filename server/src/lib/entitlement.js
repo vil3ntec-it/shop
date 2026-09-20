@@ -63,11 +63,15 @@ function build(T) {
     const trial = await trialState(tenant, at);
 
     if (state.active) {
+      //  ⛔ قاعدهٔ «فهرستِ خالی = پلنِ کامل» دست نمی‌خورد؛ افزونه فقط
+      //  **به** فهرست اضافه می‌شود (Feature Flag روی همین اشتراک).
       const granted = state.features.length ? state.features : cat.PAID_KEYS;
+      const addons = await require('./discounts').addonKeysOf(T.app, sub.id);
       return {
         app: T.app,
         source: 'subscription',
-        features: uniq([...cat.CORE_KEYS, ...cat.FREE_KEYS, ...granted]),
+        features: uniq([...cat.CORE_KEYS, ...cat.FREE_KEYS, ...granted, ...addons]),
+        addons,
         subscription: state,
         trial,
       };

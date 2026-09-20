@@ -43,6 +43,10 @@
     <button class="tab" data-tab="pump">پمپ‌بنزین‌ها</button>
     <button class="tab" data-tab="users">کاربران</button>
     <button class="tab" data-tab="subs">اشتراک‌ها</button>
+    <button class="tab" data-tab="sales">فروش</button>
+    <button class="tab" data-tab="payments">پرداخت‌ها</button>
+    <button class="tab" data-tab="discounts">تخفیف‌ها و کمپین</button>
+    <button class="tab" data-tab="notices">مرکز اعلان</button>
     <button class="tab" data-tab="requests">درخواست‌های خرید</button>
     <button class="tab" data-tab="plans">پلن‌ها و تنظیمات</button>
     <button class="tab" data-tab="support">پشتیبانی و پیام</button>
@@ -482,6 +486,321 @@
     اپِ اندرویدِ مدیریت بلدشان بود. یعنی صاحبِ سامانه پشتِ کامپیوتر
     نمی‌توانست پیامِ کسی را ببیند، چه رسد به جواب دادن.
   -->
+
+  <!-- ══ فروش (۱۱.۴) ══════════════════════════════════════════════ -->
+  <section id="tab-sales" class="hidden">
+    <div class="panel">
+      <div class="panel-head"><h2>درآمد</h2></div>
+      <p class="muted">⛔ هر ارز جدا شمرده می‌شود — دالرِ پمپ با افغانیِ دکان جمع نمی‌شود.</p>
+      <div class="stats" id="sales-stats"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>رشدِ دوازده ماه</h2></div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>ماه</th><th>دکان</th><th>پمپ</th><th>شمارِ پرداخت</th></tr></thead>
+          <tbody id="sales-series"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>اشتراک‌ها</h2></div>
+      <div class="row">
+        <select id="sal-app" style="width:150px;">
+          <option value="">هر دو بخش</option>
+          <option value="shop">دکان</option>
+          <option value="pump">پمپ‌بنزین</option>
+        </select>
+        <select id="sal-status" style="width:150px;">
+          <option value="">هر وضعیت</option>
+          <option value="active">فعال</option>
+          <option value="suspended">معلق</option>
+          <option value="expired">تمام‌شده</option>
+        </select>
+        <input type="search" id="sal-city" placeholder="شهر" style="width:150px;">
+        <button class="btn btn-sm" id="btn-sal-filter">نمایش</button>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>برنامه</th><th>حساب</th><th>صاحب</th><th>شهر</th><th>پلن</th><th>وضعیت</th>
+            <th>پایان</th><th>مانده</th><th>قیمت</th><th>پرداخت‌شده</th><th></th></tr></thead>
+          <tbody id="sales-subs"></tbody>
+        </table>
+      </div>
+      <div id="sales-msg"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>رو به پایان</h2></div>
+      <div class="row">
+        <label>تا چند روز</label>
+        <input type="number" id="exp-days" value="7" min="1" max="90" style="width:90px;">
+        <button class="btn btn-sm" id="btn-exp-show">نمایش</button>
+        <button class="btn btn-warn btn-sm" id="btn-exp-remind">یادآوری ایمیلی به همه</button>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>برنامه</th><th>حساب</th><th>صاحب</th><th>پلن</th><th>مانده</th></tr></thead>
+          <tbody id="sales-expiring"></tbody>
+        </table>
+      </div>
+      <div id="exp-msg"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>بدهی‌ها</h2></div>
+      <p class="muted">اشتراکِ فعالی که پرداختش کم‌تر از قیمتِ خودش است.</p>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>برنامه</th><th>حساب</th><th>صاحب</th><th>قیمت</th><th>پرداخت‌شده</th><th>بدهی</th></tr></thead>
+          <tbody id="sales-debts"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>نشانیِ دانلود و آخرین نسخه</h2></div>
+      <p class="muted">همین را پورتال و SDK می‌خوانند (<code dir="ltr">GET /api/downloads</code>).</p>
+      <div class="grid grid-3">
+        <div><label>برنامه</label>
+          <select id="dl-app"><option value="shop">دکان</option><option value="pump">پمپ‌بنزین</option></select></div>
+        <div><label>نسخه</label><input type="text" id="dl-version" dir="ltr" placeholder="2.6.1"></div>
+        <div><label>نشانیِ دانلود</label><input type="text" id="dl-url" dir="ltr" placeholder="https://…"></div>
+      </div>
+      <label>یادداشتِ نسخه</label>
+      <input type="text" id="dl-notes" placeholder="چه چیزی تازه شد">
+      <div class="row" style="margin-top:10px;"><button class="btn btn-sm" id="btn-dl-save">ذخیره</button></div>
+      <div id="dl-msg"></div>
+    </div>
+  </section>
+
+  <!-- ══ پرداخت‌ها ════════════════════════════════════════════════ -->
+  <section id="tab-payments" class="hidden">
+    <div class="panel">
+      <div class="panel-head"><h2>ثبتِ پرداخت</h2></div>
+      <div class="grid grid-3">
+        <div><label>برنامه</label>
+          <select id="pay-app"><option value="shop">دکان</option><option value="pump">پمپ‌بنزین</option></select></div>
+        <div><label>شناسهٔ حساب (دکان یا پمپ)</label><input type="text" id="pay-tenant" dir="ltr"></div>
+        <div><label>شناسهٔ اشتراک (اختیاری)</label><input type="text" id="pay-sub" dir="ltr"></div>
+        <div><label>مبلغ</label><input type="number" id="pay-amount" min="0"></div>
+        <div><label>ارز</label>
+          <select id="pay-currency"><option value="AFN">افغانی</option><option value="USD">دالر</option></select></div>
+        <div><label>روش</label>
+          <select id="pay-method">
+            <option value="cash">نقد</option><option value="hawala">حواله</option><option value="exchange">صرافی</option>
+          </select></div>
+        <div><label>شمارهٔ رسید (خالی = خودکار)</label><input type="text" id="pay-receipt" dir="ltr"></div>
+        <div><label>یادداشت</label><input type="text" id="pay-note"></div>
+      </div>
+      <div class="row" style="margin-top:10px;"><button class="btn btn-sm" id="btn-pay-add">ثبت</button></div>
+      <div id="pay-msg"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>پرداخت‌ها</h2></div>
+      <div class="row">
+        <select id="pay-filter-app" style="width:150px;">
+          <option value="">هر دو بخش</option>
+          <option value="shop">دکان</option>
+          <option value="pump">پمپ‌بنزین</option>
+        </select>
+        <button class="btn btn-sm" id="btn-pay-refresh">نمایش</button>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>تاریخ</th><th>برنامه</th><th>حساب</th><th>صاحب</th><th>مبلغ</th>
+            <th>روش</th><th>رسید</th><th></th></tr></thead>
+          <tbody id="payments-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ تخفیف‌ها و کمپین (۱۱.۳.۲) ═══════════════════════════════ -->
+  <section id="tab-discounts" class="hidden">
+    <div class="panel">
+      <div class="panel-head"><h2>کدِ تخفیف تازه</h2></div>
+      <p class="muted">⛔ کد به بخش بسته است: همان رشته در دکان و پمپ دو کدِ جدا است.</p>
+      <div class="grid grid-3">
+        <div><label>برنامه</label>
+          <select id="dc-app"><option value="shop">دکان</option><option value="pump">پمپ‌بنزین</option></select></div>
+        <div><label>کد (خالی = خودکار)</label><input type="text" id="dc-code" dir="ltr" placeholder="EID20"></div>
+        <div><label>نوع</label>
+          <select id="dc-kind"><option value="percent">درصدی</option><option value="amount">مبلغی</option></select></div>
+        <div><label>مقدار</label><input type="number" id="dc-value" min="1"></div>
+        <div><label>پلن (خالی = همه)</label><select id="dc-plan"></select></div>
+        <div><label>مشتری (شناسهٔ کاربر، خالی = همه)</label><input type="text" id="dc-user" dir="ltr"></div>
+        <div><label>سقفِ استفاده (خالی = بی‌سقف)</label><input type="number" id="dc-max" min="1"></div>
+        <div><label>مهلت</label><input type="date" id="dc-until"></div>
+        <div><label>یادداشت</label><input type="text" id="dc-note"></div>
+      </div>
+      <div class="row" style="margin-top:10px;">
+        <label class="feat"><input type="checkbox" id="dc-once" checked> یک‌بار برای هر مشتری</label>
+        <button class="btn btn-sm" id="btn-dc-make">ساختن</button>
+      </div>
+      <div id="dc-msg"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>کدها</h2></div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>کد</th><th>برنامه</th><th>تخفیف</th><th>پلن</th><th>مهلت</th>
+            <th>استفاده</th><th>وضعیت</th><th></th></tr></thead>
+          <tbody id="dc-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>کمپین</h2></div>
+      <p class="muted">فیلتر ⇒ کدِ تخفیف ⇒ اعلان، در یک کلیک. کمپینِ «هر دو» برای هر بخش کدِ خودش را می‌سازد.</p>
+      <div class="grid grid-3">
+        <div><label>نام</label><input type="text" id="cmp-name" placeholder="تخفیفِ عید"></div>
+        <div><label>برنامه</label>
+          <select id="cmp-app">
+            <option value="shop">دکان</option><option value="pump">پمپ‌بنزین</option><option value="both">هر دو</option>
+          </select></div>
+        <div><label>گیرنده</label>
+          <select id="cmp-audience">
+            <option value="all">همه</option>
+            <option value="expiring">رو به پایان</option>
+            <option value="expired">منقضی</option>
+            <option value="permanent">دائمی</option>
+          </select></div>
+        <div><label>تا چند روزِ مانده (فقط «رو به پایان»)</label><input type="number" id="cmp-days" value="30" min="1" max="365"></div>
+        <div><label>شهر (اختیاری)</label><input type="text" id="cmp-city"></div>
+        <div><label>کدِ تخفیف (خالی = خودکار)</label><input type="text" id="cmp-code" dir="ltr"></div>
+        <div><label>نوعِ تخفیف</label>
+          <select id="cmp-kind"><option value="percent">درصدی</option><option value="amount">مبلغی</option></select></div>
+        <div><label>مقدار</label><input type="number" id="cmp-value" min="1" value="20"></div>
+        <div><label>مهلتِ کد</label><input type="date" id="cmp-until"></div>
+      </div>
+      <label>عنوانِ اعلان</label>
+      <input type="text" id="cmp-title" placeholder="تخفیفِ عید">
+      <label>متنِ اعلان — متغیرها: {نام} {برنامه} {روز-مانده} {قیمت} {کد-تخفیف}</label>
+      <textarea id="cmp-body" rows="3" placeholder="سلام {نام}، کدِ تخفیفِ شما: {کد-تخفیف}"></textarea>
+      <div class="row" style="margin-top:10px;">
+        <label class="feat"><input type="checkbox" id="cmp-inapp" checked> داخلِ برنامه</label>
+        <label class="feat"><input type="checkbox" id="cmp-email" checked> ایمیل</label>
+        <label class="feat"><input type="checkbox" id="cmp-push"> پوش</label>
+        <button class="btn btn-sm" id="btn-cmp-make">ساختن و فرستادن</button>
+      </div>
+      <div id="cmp-msg"></div>
+      <div class="table-scroll" style="margin-top:12px;">
+        <table>
+          <thead><tr><th>نام</th><th>برنامه</th><th>ساخت</th><th>وضعیت</th><th></th></tr></thead>
+          <tbody id="cmp-body-list"></tbody>
+        </table>
+      </div>
+      <div id="cmp-stats"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>تاریخچهٔ قیمت</h2></div>
+      <p class="muted">⛔ اشتراک‌های فروخته‌شده قیمتِ روزِ خودشان را دارند و با این تغییر عوض نمی‌شوند.</p>
+      <div class="row">
+        <select id="ph-app" style="width:150px;">
+          <option value="shop">دکان</option><option value="pump">پمپ‌بنزین</option>
+        </select>
+        <button class="btn btn-sm" id="btn-ph-show">نمایش</button>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>پلن</th><th>از</th><th>به</th><th>ارز</th><th>زمان</th></tr></thead>
+          <tbody id="ph-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ مرکز اعلان (۱۱.۳.۳) ═════════════════════════════════════ -->
+  <section id="tab-notices" class="hidden">
+    <div class="panel">
+      <div class="panel-head"><h2>اعلانِ تازه</h2></div>
+      <div class="grid grid-3">
+        <div><label>برنامه</label>
+          <select id="nt-app">
+            <option value="shop">دکان</option><option value="pump">پمپ‌بنزین</option><option value="both">هر دو</option>
+          </select></div>
+        <div><label>گیرنده</label>
+          <select id="nt-kind">
+            <option value="all">همه</option>
+            <option value="filter">با فیلتر</option>
+            <option value="user">یک نفر</option>
+          </select></div>
+        <div><label>قالبِ آماده</label><select id="nt-template"><option value="">—</option></select></div>
+        <div><label>شهر</label><input type="text" id="nt-city"></div>
+        <div><label>پلن</label><input type="text" id="nt-plan" dir="ltr"></div>
+        <div><label>رو به پایان تا چند روز</label><input type="number" id="nt-days" min="0" max="365"></div>
+        <div><label>شناسهٔ کاربر (برای «یک نفر»)</label><input type="text" id="nt-user" dir="ltr"></div>
+        <div><label>زمانِ ارسال (خالی = همین حالا)</label><input type="datetime-local" id="nt-when"></div>
+        <div><label>تکرار</label>
+          <select id="nt-repeat"><option value="none">بی تکرار</option><option value="monthly">هر ماه</option></select></div>
+      </div>
+      <div class="row">
+        <label class="feat"><input type="checkbox" id="nt-expired"> فقط منقضی‌ها</label>
+        <label class="feat"><input type="checkbox" id="nt-permanent"> فقط دائمی‌ها</label>
+        <button class="btn btn-ghost btn-sm" id="btn-nt-count">چند نفر؟</button>
+        <span id="nt-count" class="muted"></span>
+      </div>
+      <label>عنوان</label>
+      <input type="text" id="nt-title" placeholder="عنوانِ اعلان">
+      <label>متن — متغیرها: {نام} {برنامه} {روز-مانده} {قیمت} {کد-تخفیف}</label>
+      <textarea id="nt-body" rows="4" placeholder="سلام {نام}، …"></textarea>
+      <div class="row" style="margin-top:10px;">
+        <label class="feat"><input type="checkbox" id="nt-inapp" checked> داخلِ برنامه</label>
+        <label class="feat"><input type="checkbox" id="nt-email" checked> ایمیل</label>
+        <label class="feat"><input type="checkbox" id="nt-push"> پوش</label>
+        <button class="btn btn-sm" id="btn-nt-save">ذخیرهٔ پیش‌نویس</button>
+        <button class="btn btn-ghost btn-sm" id="btn-nt-preview">پیش‌نمایش</button>
+        <input type="text" id="nt-test-to" dir="ltr" placeholder="ایمیل برای ارسالِ آزمایشی" style="width:220px;">
+        <button class="btn btn-ghost btn-sm" id="btn-nt-test">ارسالِ آزمایشی</button>
+        <button class="btn btn-warn btn-sm" id="btn-nt-send">فرستادن</button>
+      </div>
+      <div id="nt-msg"></div>
+      <div id="nt-preview"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>اعلان‌ها</h2></div>
+      <div class="row">
+        <select id="nt-filter" style="width:170px;">
+          <option value="">همه</option>
+          <option value="draft">پیش‌نویس</option>
+          <option value="scheduled">زمان‌بندی‌شده</option>
+          <option value="sent">فرستاده‌شده</option>
+          <option value="failed">ناموفق</option>
+        </select>
+        <button class="btn btn-sm" id="btn-nt-list">نمایش</button>
+        <button class="btn btn-ghost btn-sm" id="btn-nt-system">اجرای بررسیِ خودکار</button>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>عنوان</th><th>برنامه</th><th>گیرنده</th><th>کانال</th><th>وضعیت</th>
+            <th>زمان‌بندی</th><th>گزارش</th><th></th></tr></thead>
+          <tbody id="nt-body-list"></tbody>
+        </table>
+      </div>
+      <div id="nt-report"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>قالب‌های آماده</h2></div>
+      <p class="muted">متنِ اعلان‌های خودکارِ سامانه (خوش‌آمد، رو به پایان، تمدید شد، …) از همین‌جا عوض می‌شود.</p>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>کلید</th><th>برنامه</th><th>عنوان</th><th>متن</th><th></th></tr></thead>
+          <tbody id="nt-templates"></tbody>
+        </table>
+      </div>
+      <div id="tpl-msg"></div>
+    </div>
+  </section>
+
   <section id="tab-support" class="hidden">
     <div class="panel">
       <div class="panel-head">

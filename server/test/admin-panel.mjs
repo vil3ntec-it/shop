@@ -180,8 +180,9 @@ const openTab = async (name) => {
 };
 
 // ── ۲) هر تب باز می‌شود و خطای جاوااسکریپت نمی‌دهد ────────────────
-await step('هر هشت تب بی خطا باز می‌شود', async () => {
-  for (const t of ['shops', 'pump', 'users', 'subs', 'requests', 'plans', 'support', 'delivery', 'backups', 'audit']) {
+await step('هر تب بی خطا باز می‌شود', async () => {
+  for (const t of ['shops', 'pump', 'users', 'subs', 'sales', 'payments', 'discounts', 'notices',
+    'requests', 'plans', 'support', 'delivery', 'backups', 'audit']) {
     await openTab(t);
   }
   assert.deepEqual(consoleErrors, [], `خطای صفحه: ${consoleErrors.join(' | ')}`);
@@ -311,8 +312,12 @@ await step('ذخیرهٔ تنظیماتِ ایمیل واقعاً می‌نشی�
 
   const host = await one("SELECT value FROM app_config WHERE key='email_host'");
   assert.equal(host.value, 'smtp.example.com');
-  const state = await page.textContent('#mail-state');
-  assert.ok(!state.includes('فقط لاگ'), 'دیگر روی حالتِ لاگ نیست');
+  //  ⚠️ «ذخیره شد» پیش از تمام شدنِ `loadDelivery()` می‌آید، پس کارتِ حال
+  //  یک لحظه هنوز کهنه است — منتظرش بمانید، وگرنه سنجه گاهی سرخ می‌شود.
+  await page.waitForFunction(
+    () => !document.getElementById('mail-state').textContent.includes('فقط لاگ'),
+    null, { timeout: 10_000 }
+  );
 });
 
 await step('رمزِ ایمیل با ذخیرهٔ بعدی پاک نمی‌شود', async () => {
@@ -438,6 +443,144 @@ await step('خبرهای یک پمپ در پروندهٔ همان پمپ دید�
   //  و کامپیوترِ پمپ حساب ندارد، پس نامِ خودِ دستگاه نشان داده می‌شود
   assert.ok(rows.some((r) => r.includes('کامپیوترِ پمپ')),
     `فرستنده باید دیده شود — ${JSON.stringify(rows)}`);
+});
+
+
+/* ══════════════════════════════════════════════════════════════════
+   بخش‌های تازه: فروش · پرداخت · تخفیف · مرکزِ اعلان
+   ------------------------------------------------------------------
+   همان دلیلِ بالای این فایل: این چهار بخش جاوااسکریپتِ مرورگرند و یک
+   شناسهٔ غلط فقط وقتی پیدا می‌شود که صاحبِ سامانه دکمه را بزند و هیچ
+   اتفاقی نیفتد. پس این‌جا واقعاً کلیک می‌شود و نتیجه از **دیتابیس**
+   سنجیده می‌شود.
+   ══════════════════════════════════════════════════════════════════ */
+
+await step('ثبتِ پرداخت از پنل واقعاً ردیف می‌سازد', async () => {
+  await openTab('payments');
+  const before = (await one('SELECT COUNT(*)::int n FROM sub_payments')).n;
+  await page.selectOption('#pay-app', 'shop');
+  await page.fill('#pay-tenant', owner.shopId);
+  await page.fill('#pay-amount', '2500');
+  await page.selectOption('#pay-method', 'hawala');
+  await page.fill('#pay-note', 'از پنل');
+  await page.click('#btn-pay-add');
+  //  ⚠️ منتظرِ **پیامِ موفقیت** بمانید، نه شمارِ ردیف‌ها: جدولِ خالی خودش
+  //  یک ردیفِ «پرداختی ثبت نشده است» دارد، پس `length > 0` همان لحظه هم
+  //  درست است و سنجه پیش از رسیدنِ درخواست می‌خواند (سبزِ دروغ).
+  await page.waitForFunction(
+    () => /ثبت شد/.test(document.getElementById('pay-msg').textContent), null, { timeout: 10_000 }
+  );
+  const after = (await one('SELECT COUNT(*)::int n FROM sub_payments')).n;
+  assert.equal(after, before + 1, 'پرداخت باید در دیتابیس نشسته باشد');
+  const row = await one(`SELECT * FROM sub_payments ORDER BY created_at DESC LIMIT 1`);
+  assert.equal(row.tenant_id, owner.shopId);
+  assert.equal(Number(row.amount), 2500);
+  assert.equal(row.method, 'hawala');
+  assert.ok(row.receipt_no, 'شمارهٔ رسیدِ خودکار');
+});
+
+await step('داشبوردِ فروش همان پرداخت را نشان می‌دهد', async () => {
+  await openTab('sales');
+  await page.waitForFunction(
+    () => document.querySelectorAll('#sales-stats .stat').length > 0, null, { timeout: 10_000 }
+  );
+  const cards = await page.$$eval('#sales-stats .stat', (ns) => ns.map((n) => n.textContent));
+  assert.ok(cards.some((c) => c.includes('امروز') && c.includes('دکان')), `کارتِ درآمد: ${JSON.stringify(cards)}`);
+  assert.ok(cards.join(' ').includes('افغانی'), 'مبلغ با واحدِ خودش دیده می‌شود');
+  const series = await page.$$eval('#sales-series tr', (ns) => ns.length);
+  assert.equal(series, 12, 'نمودارِ رشد دوازده ماه است');
+});
+
+await step('کدِ تخفیف از پنل ساخته می‌شود و در دیتابیس می‌نشیند', async () => {
+  await openTab('discounts');
+  await page.selectOption('#dc-app', 'shop');
+  await page.fill('#dc-code', 'PANEL25');
+  await page.selectOption('#dc-kind', 'percent');
+  await page.fill('#dc-value', '25');
+  await page.click('#btn-dc-make');
+  await page.waitForFunction(
+    () => /PANEL25/.test(document.getElementById('dc-body').textContent), null, { timeout: 10_000 }
+  );
+  const row = await one(`SELECT * FROM discount_codes WHERE code='PANEL25'`);
+  assert.ok(row, 'کد باید ساخته شده باشد');
+  assert.equal(row.app, 'shop', '⛔ کد به بخشِ خودش بسته است');
+  assert.equal(Number(row.value), 25);
+});
+
+await step('کمپین از پنل: کد + اعلان، در یک کلیک', async () => {
+  await openTab('discounts');
+  await page.fill('#cmp-name', 'کمپینِ پنل');
+  await page.selectOption('#cmp-app', 'shop');
+  await page.selectOption('#cmp-audience', 'all');
+  await page.fill('#cmp-code', 'PANELCMP');
+  await page.fill('#cmp-value', '15');
+  await page.fill('#cmp-title', 'خبرِ کمپین');
+  await page.fill('#cmp-body', 'کدِ شما: {کد-تخفیف}');
+  await page.uncheck('#cmp-email');
+  await page.click('#btn-cmp-make');
+  await page.waitForFunction(
+    () => /کمپینِ پنل/.test(document.getElementById('cmp-body-list').textContent), null, { timeout: 15_000 }
+  );
+  const camp = await one(`SELECT * FROM campaigns WHERE name='کمپینِ پنل'`);
+  assert.ok(camp, 'کمپین باید ساخته شده باشد');
+  const code = await one(`SELECT * FROM discount_codes WHERE code='PANELCMP'`);
+  assert.ok(code, 'کدِ کمپین ساخته شد');
+  //  و اعلانش واقعاً رفت — همان متن، با کدِ پرشده
+  const deliv = await one(
+    `SELECT * FROM notice_deliveries WHERE notice_id=$1 AND channel='inapp' LIMIT 1`, [camp.notice_id]);
+  assert.ok(deliv, 'اعلانِ کمپین باید فرستاده شده باشد');
+  assert.ok(deliv.body.includes('PANELCMP'), `متغیر باید پر شده باشد — ${deliv.body}`);
+});
+
+await step('مرکزِ اعلان: شمارِ گیرنده، ساختن و فرستادن، و گزارش', async () => {
+  await openTab('notices');
+  await page.selectOption('#nt-app', 'shop');
+  await page.selectOption('#nt-kind', 'all');
+  await page.click('#btn-nt-count');
+  await page.waitForFunction(
+    () => /گیرنده/.test(document.getElementById('nt-count').textContent), null, { timeout: 10_000 }
+  );
+
+  await page.fill('#nt-title', 'اعلانِ آزمونِ پنل');
+  await page.fill('#nt-body', 'سلام {نام}، این یک آزمون است.');
+  await page.uncheck('#nt-email');
+  page.once('dialog', (d) => d.accept());
+  await page.click('#btn-nt-send');
+  //  ⚠️ منتظرِ پیامِ **پایانِ ارسال** بمانید، نه دیده شدنِ ردیف: ردیف با
+  //  ذخیرهٔ پیش‌نویس (پیش از ارسال) هم می‌آید و آن‌وقت وضعیت هنوز
+  //  `sending` است — همین یک بار سنجه را سرخِ دروغ کرد.
+  await page.waitForFunction(
+    () => /گیرنده/.test(document.getElementById('nt-msg').textContent),
+    null, { timeout: 15_000 }
+  );
+
+  const n = await one(`SELECT * FROM notices WHERE title='اعلانِ آزمونِ پنل'`);
+  assert.ok(n, 'اعلان باید ساخته شده باشد');
+  assert.equal(n.status, 'sent');
+  const deliv = await one(
+    `SELECT * FROM notice_deliveries WHERE notice_id=$1 LIMIT 1`, [n.id]);
+  assert.ok(deliv, '⛔ یک ردیفِ تحویل برای هر گیرنده در هر کانال');
+  assert.ok(deliv.title.includes('اعلانِ آزمونِ پنل'));
+  assert.ok(deliv.body.includes('سلام'), 'متغیرها پر شده‌اند');
+});
+
+await step('قالبِ آمادهٔ اعلان از پنل ویرایش می‌شود', async () => {
+  await openTab('notices');
+  await page.waitForFunction(
+    () => document.querySelectorAll('#nt-templates tr').length > 0, null, { timeout: 10_000 }
+  );
+  const rowIndex = await page.$$eval('#nt-templates tr', (trs) =>
+    trs.findIndex((t) => t.children[0].textContent.trim() === 'welcome'));
+  assert.ok(rowIndex >= 0, 'قالبِ welcome باید در جدول باشد');
+  const sel = `#nt-templates tr:nth-child(${rowIndex + 1})`;
+  await page.fill(`${sel} input`, 'خوش آمدی از پنل');
+  await page.click(`${sel} button`);
+  await page.waitForFunction(
+    () => /ذخیره شد/.test(document.getElementById('tpl-msg').textContent), null, { timeout: 10_000 }
+  );
+  const row = await one(`SELECT * FROM notice_templates WHERE key='welcome' ORDER BY app LIMIT 1`);
+  assert.ok(row.title.includes('خوش آمدی از پنل') || row.title === 'خوش آمدی از پنل',
+    `عنوانِ قالب باید عوض شده باشد — ${row.title}`);
 });
 
 await step('در کلِ این نشست هیچ خطای صفحه‌ای نبود', async () => {

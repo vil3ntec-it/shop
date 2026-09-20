@@ -148,7 +148,7 @@ function build(T) {
    * باقی‌مانده از بین نرود.
    */
   async function grant(tenantId, { plan = 'custom', days = null, startsAt = null, endsAt = null,
-    features = [], maxDevices = 10, graceDays = 0, note = '', createdBy = '' } = {}) {
+    features = [], maxDevices = 10, graceDays = 0, note = '', createdBy = '', price = null } = {}) {
 
     const tenant = await one(`SELECT id FROM ${TEN} WHERE id=$1`, [tenantId]);
     if (!tenant) throw notFound(T.notFoundMessage, T.notFoundCode);
@@ -200,13 +200,31 @@ function build(T) {
 
     const clean = sanitizeFeatures(features, T.app);
 
+    /*
+     *  ── قیمتِ خودِ اشتراک ──────────────────────────────────────────
+     *  «مشتری‌های فعلی تا پایانِ دوره‌شان با قیمتِ قبلی هستند» فقط
+     *  وقتی شدنی است که قیمتِ روزِ خرید روی خودِ اشتراک بنشیند. پس
+     *  این‌جا قیمتِ **روز**ِ پلن (با تخفیفِ خودش) عکس گرفته می‌شود —
+     *  یا عددی که مدیر صریح داد (تخفیفِ مستقیم، کدِ تخفیف).
+     *  ⚠️ هیچ عددِ ثابتی در کد نیست؛ همه از جدولِ `plans` است.
+     */
+    let snapPrice = price === null || price === undefined || price === '' ? null : Math.round(Number(price));
+    if (snapPrice === null) {
+      const p = await plans.getPlan(plan, T.app);
+      snapPrice = p ? plans.discountOf(p, t).finalPrice : null;
+    }
+    const currency = T.app === 'pump' ? 'USD' : 'AFN';
+
+    let row;
     if (existing) {
-      const row = await one(
+      row = await one(
         `UPDATE ${TBL}
             SET plan=$2, status='active', starts_at=$3, ends_at=$4, features=$5::jsonb,
-                max_devices=$6, grace_days=$7, note=$8, updated_at=$9, created_by=$10
+                max_devices=$6, grace_days=$7, note=$8, updated_at=$9, created_by=$10,
+                price=$11, currency=$12
           WHERE id=$1 RETURNING *`,
-        [existing.id, plan, start, end, JSON.stringify(clean), maxDevices, graceDays, note, t, createdBy]
+        [existing.id, plan, start, end, JSON.stringify(clean), maxDevices, graceDays, note, t, createdBy,
+          snapPrice, currency]
       );
       await logChange({
         subscriptionId: row.id, tenantId, action: 'renew', plan,
@@ -214,18 +232,26 @@ function build(T) {
         prevEndsAt: Number(existing.ends_at), newEndsAt: Number(row.ends_at),
         actor: createdBy, note,
       });
-      return row;
+    } else {
+      row = await one(
+        `INSERT INTO ${TBL} (id, ${KEY}, plan, status, starts_at, ends_at, features, max_devices, grace_days, note,
+                             created_at, updated_at, created_by, price, currency)
+         VALUES ($1,$2,$3,'active',$4,$5,$6::jsonb,$7,$8,$9,$10,$10,$11,$12,$13) RETURNING *`,
+        [newId('sub'), tenantId, plan, start, end, JSON.stringify(clean), maxDevices, graceDays, note, t, createdBy,
+          snapPrice, currency]
+      );
+      await logChange({
+        subscriptionId: row.id, tenantId, action: 'grant', plan,
+        newStatus: row.status, newEndsAt: Number(row.ends_at),
+        actor: createdBy, note,
+      });
     }
-    const row = await one(
-      `INSERT INTO ${TBL} (id, ${KEY}, plan, status, starts_at, ends_at, features, max_devices, grace_days, note, created_at, updated_at, created_by)
-       VALUES ($1,$2,$3,'active',$4,$5,$6::jsonb,$7,$8,$9,$10,$10,$11) RETURNING *`,
-      [newId('sub'), tenantId, plan, start, end, JSON.stringify(clean), maxDevices, graceDays, note, t, createdBy]
-    );
-    await logChange({
-      subscriptionId: row.id, tenantId, action: 'grant', plan,
-      newStatus: row.status, newEndsAt: Number(row.ends_at),
-      actor: createdBy, note,
-    });
+    /*
+     *  اعلانِ «تمدید شد» — از مرکزِ اعلان، با قالبِ قابلِ ویرایش.
+     *  ⚠️ خبر رفاه است، اشتراک اصل: هیچ خطایی از این‌جا بیرون نمی‌آید
+     *  و `onSubscription` خودش هر چیزی را می‌بلعد.
+     */
+    await require('./notices').onSubscription({ app: T.app, action: existing ? 'renew' : 'grant', row });
     return row;
   }
 
@@ -245,6 +271,10 @@ function build(T) {
       prevEndsAt: before ? Number(before.ends_at) : null, newEndsAt: Number(row.ends_at),
       actor: by,
     });
+    //  «معلق شد» هم خبر دارد — همان قالبِ قابلِ ویرایشِ مرکزِ اعلان
+    if (status === 'suspended') {
+      await require('./notices').onSubscription({ app: T.app, action: 'suspended', row });
+    }
     return row;
   }
 

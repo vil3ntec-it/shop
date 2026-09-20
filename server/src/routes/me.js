@@ -36,9 +36,26 @@ router.get('/', async (req, res) => {
       source: ent.source, features: ent.features,
       subscription: ent.subscription, trial: ent.trial,
     } : null,
+    //  انتخابِ خودِ مشتری — همگام‌سازیِ ابری روشن است یا نه
+    settings: { cloudSync: req.shopId ? await portal.cloudSyncOf('shop', req.shopId) : false },
     serverTime: now(),
   });
 });
+
+/*
+ *  ══ اعلان‌های من · پرداخت‌های من · تنظیماتِ من ══════════════════════
+ *  منطق در `routes/portal.js` است (همان که پورتالِ وب هم می‌خواند)؛
+ *  این‌جا فقط با هویتِ نشستِ **دکان** صدا زده می‌شود.
+ */
+const portal = require('./portal');
+router.get('/notices', (req, res, next) => portal.noticesHandler('shop', req, res, next));
+router.post('/notices/:id/read', (req, res, next) => portal.readNoticeHandler('shop', req, res, next));
+router.get('/payments', (req, res, next) => portal.paymentsHandler('shop', req, res, next));
+router.get('/settings', (req, res, next) => portal.settingsHandler('shop', req, res, next));
+router.put('/settings', (req, res, next) => portal.saveSettingsHandler('shop', req, res, next));
+router.post('/redeem', (req, res, next) => portal.redeemHandler('shop', req, res, next));
+router.get('/heartbeat', (req, res, next) => portal.heartbeatHandler('shop', req, res, next));
+router.post('/errors', (req, res, next) => portal.reportErrorHandler('shop', req, res, next));
 
 /** وضعیت اشتراک — همیشه با ساعت سرور. */
 async function subscriptionHandler(req, res) {
@@ -76,6 +93,36 @@ async function plansHandler(req, res) {
     trialDays: Number(cfg.trial_days || 0),
   });
 }
+
+/**
+ * تپشِ هر پانزده دقیقه — بندِ ۲۰.۷ پرامپت.
+ *
+ * یک درخواستِ ارزان که همهٔ آن‌چه برنامه لازم دارد را یک‌جا می‌دهد:
+ * وضعیتِ اشتراک، روزهای مانده، قابلیت‌ها، آخرین نسخه و زمانِ سرور.
+ * برنامه نتیجه را کش می‌کند و بخشِ «اشتراکِ من» از همان می‌خواند — پس
+ * صفحهٔ اشتراک آفلاین هم چیزی برای نشان دادن دارد.
+ */
+router.get('/heartbeat', async (req, res, next) => {
+  try {
+    const ent = req.shopId ? await entitlementOf(req.shopId) : null;
+    const sub = ent?.subscription || {};
+    const endsMs = Number(sub.endsAt || 0);
+    res.json({
+      ok: true,
+      user: { id: req.user.id, email: req.user.email || null, name: req.user.name || '' },
+      subscription: {
+        status: ent?.active ? 'active' : (sub.status || 'none'),
+        plan: sub.plan || null,
+        ends_at: endsMs ? Math.floor(endsMs / 1000) : null,
+        days_left: endsMs ? Math.max(0, Math.ceil((endsMs - now()) / 86400000)) : 0,
+        permanent: Boolean(sub.permanent) || Boolean(ent?.active && !endsMs),
+        source: ent?.source || '',
+      },
+      features: ent?.features || [],
+      server_time: now(),
+    });
+  } catch (err) { next(err); }
+});
 
 router.get('/subscription', subscriptionHandler);
 router.get('/plans', plansHandler);

@@ -58,6 +58,68 @@ async function verify(token, kind, app = 'shop') {
   return row;
 }
 
+/**
+ * تازه‌سازیِ **چرخشی** — بندِ ۲.۵ پرامپتِ ورود.
+ *
+ * توکنِ تازه‌سازیِ قبلی باطل می‌شود و جانشینش را در خودش نگه می‌دارد. اگر
+ * برنامه دو بار هم‌زمان تازه‌سازی بزند (که پیش می‌آید: دو درخواستِ موازی
+ * هر دو ۴۰۱ می‌گیرند)، توکنِ قبلی تا **سی ثانیه** هنوز پذیرفته می‌شود و
+ * همان جفتِ تازه را برمی‌گرداند — وگرنه کاربر بی‌دلیل بیرون می‌افتاد.
+ *
+ * ⚠️ نام‌گذاری: چیزی که برمی‌گردد `reused` یعنی «این همان چرخشِ قبلی بود»،
+ * نه یک نشستِ تازه. بی این، هر بار دو توکنِ تازه ساخته می‌شد.
+ */
+const GRACE_MS = Number(process.env.REFRESH_GRACE_MS || 30_000);
+//  سقفِ دنبال کردنِ زنجیره — تا یک حلقهٔ خراب به گردشِ بی‌پایان نرسد
+const GRACE_MAX_HOPS = 12;
+
+async function findRefresh(token) {
+  const hash = hashToken(token);
+  const row = await one('SELECT * FROM tokens WHERE token_hash=$1 AND kind=$2', [hash, 'refresh']);
+  if (!row) return { row: null, hash };
+  return { row, hash };
+}
+
+async function rotateRefresh(token, { app = null } = {}) {
+  const { row, hash } = await findRefresh(token);
+  if (!row) return null;
+
+  /*
+   *  پنجرهٔ ارفاق — و **زنجیره‌اش دنبال می‌شود، نه یک گام**.
+   *
+   *  ⚠️ این یک باگِ واقعی بود که PGlite لوش داد: کاربری که در همان سی
+   *  ثانیه سه بار تازه‌سازی می‌زد (اینترنتِ لرزان، دو درخواستِ موازی و
+   *  بعد یک تلاشِ دستی) بارِ سوم ۴۰۱ می‌گرفت، چون جانشینِ اول خودش
+   *  چرخیده بود و ما همان‌جا می‌ایستادیم. PostgreSQL پنهانش می‌کرد چون
+   *  درخواست‌های موازی را واقعاً هم‌زمان می‌دواند.
+   *
+   *  ⚠️ توکنِ خامِ جانشین را نداریم (فقط هشش ذخیره می‌شود)، پس «همان
+   *  جفتِ قبلی» پس داده نمی‌شود؛ از **آخرین حلقهٔ زنده** می‌چرخیم.
+   */
+  if (row.revoked_at) {
+    let node = row;
+    for (let hop = 0; hop < GRACE_MAX_HOPS; hop++) {
+      if (!node.rotated_to || !node.grace_until || Number(node.grace_until) < now()) return null;
+      const heir = await one('SELECT * FROM tokens WHERE token_hash=$1 AND kind=$2', [node.rotated_to, 'refresh']);
+      if (!heir || Number(heir.expires_at) < now()) return null;
+      if (!heir.revoked_at) return { reused: true, row: heir, hash: node.rotated_to };
+      node = heir;   //  این یکی هم چرخیده — یک حلقه جلوتر را نگاه کن
+    }
+    return null;
+  }
+  if (Number(row.expires_at) < now()) return null;
+  if (app !== null && (row.app || 'shop') !== app) return null;
+  return { reused: false, row, hash };
+}
+
+/** توکنِ قبلی را باطل می‌کند و می‌گوید جانشینش کیست (برای پنجرهٔ ارفاق). */
+async function markRotated(previousHash, newToken) {
+  await query(
+    'UPDATE tokens SET revoked_at=$2, rotated_to=$3, grace_until=$4 WHERE token_hash=$1 AND revoked_at IS NULL',
+    [previousHash, now(), hashToken(newToken), now() + GRACE_MS]
+  );
+}
+
 async function revoke(token, kind) {
   const r = await query(
     'UPDATE tokens SET revoked_at = $1 WHERE token_hash = $2 AND kind = $3 AND revoked_at IS NULL',
@@ -125,6 +187,7 @@ function safeEqual(a, b) {
 }
 
 module.exports = {
+  rotateRefresh, markRotated, findRefresh, GRACE_MS,
   generateToken, hashToken, issue, verify, revoke,
   revokeAllForSubject, revokeOthersForSubject, revokeAllForDevice, safeEqual,
 };

@@ -641,8 +641,9 @@ router.post('/refresh', sessionLimit, async (req, res, next) => {
   //  `null` یعنی «هر بخشی» — بخشِ درست را از خودِ ردیف برمی‌داریم،
   //  نه از چیزی که درخواست ادعا می‌کند. وگرنه یک توکنِ تازه‌سازیِ
   //  دکان می‌توانست توکنِ دسترسیِ پمپ بسازد.
-  const row = await tokens.verify(token, 'refresh', null);
-  if (!row) return next(unauthorized('نشست منقضی شده است، دوباره وارد شوید', 'invalid_token'));
+  const found = await tokens.rotateRefresh(token, { app: null });
+  if (!found) return next(unauthorized('نشست منقضی شده است، دوباره وارد شوید', 'invalid_token'));
+  const row = found.row;
 
   const user = await one('SELECT * FROM users WHERE id=$1', [row.subject_id]);
   if (!user || user.status !== 'active') return next(unauthorized('حساب در دسترس نیست', 'invalid_token'));
@@ -651,7 +652,30 @@ router.post('/refresh', sessionLimit, async (req, res, next) => {
     kind: 'access', subjectId: user.id, deviceId: row.device_id,
     ttlMs: config.tokens.accessTtlMs, app: row.app || 'shop',
   });
-  res.json({ accessToken: access.token, accessExpiresAt: access.expiresAt });
+
+  /*
+   *  تازه‌سازیِ چرخشی (بندِ ۲.۵). در پنجرهٔ ارفاق توکنِ تازه‌ای ساخته
+   *  نمی‌شود؛ همان جانشینِ قبلی برمی‌گردد، وگرنه دو درخواستِ موازی دو
+   *  زنجیرهٔ جدا می‌ساختند و یکی‌شان فردا بی‌دلیل باطل می‌شد.
+   */
+  const fresh = await tokens.issue({
+    kind: 'refresh', subjectId: user.id, deviceId: row.device_id,
+    ttlMs: config.tokens.refreshTtlMs, app: row.app || 'shop',
+  });
+  await tokens.markRotated(found.hash, fresh.token);
+  const refreshToken = fresh.token;
+  const refreshExpiresAt = fresh.expiresAt;
+
+  res.json({
+    ok: true,
+    accessToken: access.token, accessExpiresAt: access.expiresAt,
+    refreshToken, refreshExpiresAt,
+    //  نام‌های قراردادِ پرامپت، کنارِ نام‌های امروز
+    access_token: access.token,
+    access_expires_in: Math.round(config.tokens.accessTtlMs / 1000),
+    refresh_token: refreshToken,
+    refresh_expires_in: Math.max(0, Math.round((refreshExpiresAt - Date.now()) / 1000)),
+  });
 });
 
 // ---------- خروج ----------

@@ -1,6 +1,6 @@
 {
   "name": "shop-server",
-  "version": "2.6.1",
+  "version": "2.7.0",
   "private": true,
   "description": "سرور فروشگاه — احراز هویت، دکان چندکاربره، اشتراک و همگام‌سازی روی PostgreSQL (یا PGlite، بی نصب)",
   "main": "src/index.js",
@@ -14,7 +14,8 @@
     "test:pglite": "node scripts/test-pglite.js",
     "test:panel": "node test/admin-panel.mjs",
     "test:all": "npm test && npm run test:panel && npm run test:web",
-    "test:web": "node test/web-backup.mjs"
+    "test:web": "node test/web-backup.mjs",
+    "test:login": "node --test --test-concurrency=1 test/login-contract.test.js test/sync-v1.test.js"
   },
   "engines": {
     "node": ">=20"
@@ -23,6 +24,7 @@
     "@electric-sql/pglite": "^0.5.8",
     "express": "^5.1.0",
     "pg": "^8.13.1",
-    "web-push": "^3.6.7"
+    "web-push": "^3.6.7",
+    "ws": "^8.21.3"
   }
 }
