@@ -508,6 +508,64 @@ function shapeRow(r) {
   };
 }
 
+/**
+ * فرستادنِ **دوبارهٔ همان کد** — نه کدِ تازه.
+ *
+ * ⛔ **همان کد، و این عمدی است.** اگر کدِ تازه می‌ساختیم، کدی که همین
+ * حالا دستِ مشتری است باطل می‌شد — یعنی مدیر برای کمک کردن، کارِ او را
+ * خراب می‌کرد. مهرومومِ روی همان ردیف برای همین دو کار نگه داشته می‌شود.
+ *
+ * ⛔ **و با رباتِ `log` اصلاً تلاش نمی‌کند.** فرستادنِ دوباره به رباتِ
+ * تنظیم‌نشده یعنی یک ردیفِ «فرستادم» و صفر ایمیل — همان «کلکِ دروغ»ی که
+ * یک بار کاربر را ساعت‌ها دنبالِ ایمیلی فرستاد که هیچ‌وقت نرفته بود.
+ *
+ * ⛔ **مهلتِ «ارسالِ دوباره» را هم دست نمی‌زند**: آن مهلت برای جلوگیری از
+ * کوبیدنِ دکمه توسطِ **کاربر** است، نه برای خودِ مدیر. و چون کدِ تازه‌ای
+ * ساخته نمی‌شود، سقفِ روزانه هم تکان نمی‌خورد.
+ *
+ * @returns {{ok:true, via:string} | {ok:false, error:string, message:string}}
+ */
+async function resend(id) {
+  const row = await one('SELECT * FROM otp_codes WHERE id=$1', [String(id || '').slice(0, 80)]);
+  if (!row) return null;
+
+  const t = now();
+  if (row.consumed_at || Number(row.expires_at) <= t) {
+    return { ok: false, error: 'code_unavailable', message: 'این کد دیگر زنده نیست — کدِ تازه بفرستید' };
+  }
+  const code = unseal(row.code_sealed);
+  if (!code) {
+    return { ok: false, error: 'code_unavailable', message: 'خودِ کد دیگر نگه داشته نشده — کدِ تازه بفرستید' };
+  }
+
+  const send = await sender(row.destination);
+  if (send === senders.log) {
+    return {
+      ok: false,
+      error: 'delivery_not_configured',
+      message: 'رباتِ ارسال تنظیم نیست، پس این کد به دستِ کسی نمی‌رسد. SMTP را تنظیم کنید.',
+    };
+  }
+
+  const smsCfg = await settings.current();
+  const message = smsCfg.template
+    ? smsCfg.template.replace(/\{code\}/g, code)
+    : `کد ورود شما: ${code}`;
+  try {
+    await send(row.destination, code, message);
+  } catch (err) {
+    return { ok: false, error: 'delivery_failed', message: String(err?.message || err).slice(0, 200) };
+  }
+
+  const via = isEmail(row.destination)
+    ? (await require('./mailer').current()).provider
+    : smsCfg.provider;
+  //  ⚠️ `sent_at` جلو می‌رود تا میزِ مدیر بداند آخرین تلاش کِی بود
+  await query('UPDATE otp_codes SET via=$2, sent_at=$3 WHERE id=$1', [row.id, String(via || ''), now()])
+    .catch(() => {});
+  return { ok: true, via: String(via || '') };
+}
+
 /** یک ردیف با شناسه — بی خودِ کد. */
 async function requestById(id) {
   const r = await one('SELECT * FROM otp_codes WHERE id=$1', [String(id || '').slice(0, 80)]);
@@ -537,5 +595,5 @@ async function reveal(id) {
 
 module.exports = {
   request, verify, hashCode, senders, isEmail,
-  listRequests, requestById, reveal, mask,
+  listRequests, requestById, reveal, resend, mask,
 };
