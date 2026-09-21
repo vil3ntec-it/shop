@@ -24,6 +24,16 @@ const DEFAULT_CONFIG = {
    *  مستقیم روی پول.
    */
   pump_currency: 'دالر',
+  /*
+   *  ⛔ **یک ماه رایگان برای پمپِ تازه** — خواستهٔ صریحِ صاحب سامانه
+   *  (۱۴۰۵/۰۷/۰۸). تا دیروز این کلید اصلاً **کاشته نمی‌شد**، یعنی
+   *  `/api/pump/plans` صفر می‌گفت در حالی که `entitlement.js` از
+   *  پیش‌فرضِ خودش دوره را باز نگه می‌داشت — دو حرفِ جدا از یک سرور.
+   *
+   *  ⚠️ `ON CONFLICT DO NOTHING` است، پس نصبی که خودش عددی نوشته
+   *  دست نمی‌خورد.
+   */
+  pump_trial_days: '30',
   whatsapp_number: '0792236008',
   whatsapp_message: 'سلام، می‌خواهم اشتراک برنامه فروشگاه را بخرم.',
   currency: 'افغانی',
@@ -167,6 +177,36 @@ async function getPlan(code, app = 'shop') {
   return one('SELECT * FROM plans WHERE code=$1 AND app=$2', [code, app]);
 }
 
+/**
+ * ⛔ **دورهٔ آزمایشی — یک جا، نه سه جا.**
+ *
+ * خواستهٔ صریحِ صاحب سامانه (۱۴۰۵/۰۷/۰۸): «برای کسایی که تازه حساب
+ * افتتاح می‌کنن هم یک ماه رایگان داده بشه.» پس پمپ یک ماه است و دکان
+ * همان دو هفتهٔ همیشگی (دربارهٔ دکان چیزی گفته نشده بود).
+ *
+ * ⚠️ **و چرا این‌جا و نه کنارِ هر `getConfig`**: پیش از این عددِ پیش‌فرض
+ * در **سه** فایل نوشته شده بود (`entitlement.js` · `admin-pump.js` ·
+ * `pump.js`) و هر کدام می‌توانست جدا عوض شود. یعنی فهرستِ مدیر
+ * می‌توانست «آزمایشی تمام شد» بگوید در حالی که خودِ برنامه هنوز باز
+ * بود — همان «دو دفتر، دو حقیقت».
+ *
+ * ⚠️ این فقط پیش‌فرض است: مقدارِ نوشته‌شده در تنظیمات همیشه جلوتر است،
+ * پس نصبی که خودش عددی گذاشته با به‌روزرسانی چیزی‌اش عوض نمی‌شود.
+ */
+const TRIAL_DEFAULT = { shop: '14', pump: '30' };
+
+/** کلید و پیش‌فرضِ دورهٔ آزمایشیِ یک بخش — تنها جای تصمیم. */
+function trialConfig(app = 'shop') {
+  const key = app === 'shop' ? 'trial_days' : `${app}_trial_days`;
+  return { key, def: TRIAL_DEFAULT[app] || '14' };
+}
+
+/** روزهای دورهٔ آزمایشیِ یک بخش، از تنظیمات یا پیش‌فرض. */
+async function trialDaysOf(app = 'shop') {
+  const { key, def } = trialConfig(app);
+  return Number(await getConfig(key, def)) || 0;
+}
+
 async function getConfig(key, def = '') {
   const r = await one('SELECT value FROM app_config WHERE key=$1', [key]);
   return r ? r.value : def;
@@ -188,5 +228,6 @@ async function allConfig() {
 module.exports = {
   DEFAULT_PLANS, DEFAULT_CONFIG, approxDays, endOfPeriod,
   seedDefaults, listPlans, getPlan, getConfig, setConfig, allConfig,
+  TRIAL_DEFAULT, trialConfig, trialDaysOf,
   discountOf, shapePlan,
 };
