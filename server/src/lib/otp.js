@@ -9,10 +9,13 @@
  * راه ارسال پیامک از بیرون تعیین می‌شود (OTP_PROVIDER) و با عوض کردن
  * یک متغیر محیطی به سرویس دیگری می‌رود؛ هیچ سرویسی داخل کد قفل نشده.
  */
-const { createHmac, randomInt, timingSafeEqual } = require('crypto');
-const { query, one, newId, now } = require('../db');
+const {
+  createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, randomInt, timingSafeEqual,
+} = require('crypto');
+const { query, one, many, newId, now } = require('../db');
 const config = require('../config');
 const settings = require('./sms-settings');
+const { sectionOf } = require('./tenancy');
 const { badRequest, tooMany, forbidden, upstream } = require('../middleware/errors');
 
 function pepper() {
@@ -21,6 +24,47 @@ function pepper() {
 
 function hashCode(destination, code) {
   return createHmac('sha256', pepper()).update(`${destination}:${code}`).digest('hex');
+}
+
+/*
+ *  ── کد کجاست ──────────────────────────────────────────────────────────
+ *    `code_hash`   HMAC-SHA256(pepper, "destination:code") — برای سنجش
+ *    `code_sealed` AES-256-GCM با کلیدِ مشتق از همان راز — فقط برای دو
+ *                  کار: خودِ ارسال، و «نمایشِ کد به مدیر» وقتی ایمیلِ
+ *                  مشتری خراب است. با مصرف یا انقضا پاک می‌شود.
+ *                  **هیچ‌وقت در لاگ نمی‌آید.**
+ *
+ *  ⚠️ همان الگوی `login-codes.js` است و عمداً همان: دو دفترِ کد باید یک
+ *  رفتار داشته باشند، وگرنه باز هم «دو حقیقت» می‌شود. فقط برچسبِ کلید
+ *  جداست تا مهروموم‌های یک دفتر در دفترِ دیگر باز نشوند.
+ */
+function sealKey() {
+  return createHash('sha256').update(`${pepper()}:otp-code-seal`).digest();
+}
+function seal(code) {
+  const iv = randomBytes(12);
+  const c = createCipheriv('aes-256-gcm', sealKey(), iv);
+  const ct = Buffer.concat([c.update(String(code), 'utf8'), c.final()]);
+  return `${iv.toString('base64url')}.${c.getAuthTag().toString('base64url')}.${ct.toString('base64url')}`;
+}
+function unseal(sealed) {
+  if (!sealed) return '';
+  const [iv, tag, ct] = String(sealed).split('.');
+  if (!iv || !tag || !ct) return '';
+  try {
+    const d = createDecipheriv('aes-256-gcm', sealKey(), Buffer.from(iv, 'base64url'));
+    d.setAuthTag(Buffer.from(tag, 'base64url'));
+    return Buffer.concat([d.update(Buffer.from(ct, 'base64url')), d.final()]).toString('utf8');
+  } catch { return ''; }
+}
+
+/** `ahmad@gmail.com` ⇒ `ah***@gmail.com` — شماره هم همین‌طور کوتاه می‌شود. */
+function mask(destination) {
+  const s = String(destination || '');
+  const at = s.indexOf('@');
+  if (at < 0) return s.length <= 4 ? '***' : `***${s.slice(-4)}`;
+  const name = s.slice(0, at), host = s.slice(at + 1);
+  return `${name.slice(0, name.length > 2 ? 2 : 1)}***@${host}`;
 }
 
 function randomCode(digits) {
@@ -286,7 +330,7 @@ async function sender(destination) {
  * ساخت و فرستادن کد.
  * @param {string} destination شماره یا ایمیل\n * @returns {{sent:boolean, expiresAt:number, resendAfter:number, devCode?:string}}
  */
-async function request(destination, { purpose = 'login', ip = '' } = {}) {
+async function request(destination, { purpose = 'login', ip = '', app = '' } = {}) {
   const t = now();
 
   // فاصله‌ی ارسال دوباره
@@ -312,9 +356,11 @@ async function request(destination, { purpose = 'login', ip = '' } = {}) {
   const expiresAt = t + config.otp.ttlMs;
   const codeRow = newId('otp');
   await query(
-    `INSERT INTO otp_codes (id, purpose, destination, code_hash, attempts, max_attempts, expires_at, created_at, ip)
-     VALUES ($1,$2,$3,$4,0,$5,$6,$7,$8)`,
-    [codeRow, purpose, destination, hashCode(destination, code), config.otp.maxAttempts, expiresAt, t, ip]
+    `INSERT INTO otp_codes (id, purpose, destination, code_hash, code_sealed, app,
+                            attempts, max_attempts, expires_at, created_at, ip)
+     VALUES ($1,$2,$3,$4,$5,$6,0,$7,$8,$9,$10)`,
+    [codeRow, purpose, destination, hashCode(destination, code), seal(code),
+     sectionOf(app) || '', config.otp.maxAttempts, expiresAt, t, ip]
   );
 
   //  متن پیام: اگر سرویس شما قالب تأییدشده می‌خواهد، همان را در
@@ -348,6 +394,21 @@ async function request(destination, { purpose = 'login', ip = '' } = {}) {
     );
   }
 
+  /*
+   *  ⛔ «ساخته شد» با «رفت» یکی نیست — و یک بار همین، کاربر را ساعت‌ها
+   *  دنبالِ ایمیلی فرستاد که هیچ‌وقت فرستاده نشده بود. راهی که واقعاً به
+   *  کار رفت روی همان ردیف مهر می‌خورد تا میزِ مدیر بتواند `log` را از
+   *  `smtp` جدا کند.
+   *
+   *  ⚠️ و نشستنش اجباری نیست: اگر این `UPDATE` هم نشود، کد از قبل رفته
+   *  و ثبت‌نامِ کاربر نباید به‌خاطرِ یک ستونِ گزارشی بشکند.
+   */
+  const via = isEmail(destination)
+    ? (await require('./mailer').current()).provider
+    : smsCfg.provider;
+  await query('UPDATE otp_codes SET via=$2, sent_at=$3 WHERE id=$1', [codeRow, String(via || ''), now()])
+    .catch(() => {});
+
   //  `resendSeconds` هم می‌رود چون ساعتِ گوشی ممکن است با سرور جور نباشد.
   //  با ثانیه، برنامه لازم نیست ساعتش را با سرور تنظیم کند.
   const out = {
@@ -359,9 +420,6 @@ async function request(destination, { purpose = 'login', ip = '' } = {}) {
   // فقط بیرون از حالت production و فقط وقتی راه ارسالی تنظیم نشده
   //  فقط بیرون از production و فقط وقتی هیچ راه ارسالی تنظیم نشده — وگرنه
   //  کد در پاسخ HTTP برمی‌گشت و کسی که شماره‌ی دیگری را می‌زد کدش را می‌دید.
-  const via = isEmail(destination)
-    ? (await require('./mailer').current()).provider
-    : smsCfg.provider;
   if (config.env !== 'production' && via === 'log') out.devCode = code;
   return out;
 }
@@ -388,8 +446,96 @@ async function verify(destination, code, { purpose = 'login' } = {}) {
   const ok = expected.length === actual.length && timingSafeEqual(expected, actual);
   if (!ok) throw forbidden('کد درست نیست', 'otp_wrong');
 
-  await query('UPDATE otp_codes SET consumed_at=$2 WHERE id=$1', [row.id, now()]);
+  //  ⛔ مصرف‌شده یعنی کد دیگر نه لازم است و نه باید بشود دیدش
+  await query('UPDATE otp_codes SET consumed_at=$2, code_sealed=NULL WHERE id=$1', [row.id, now()]);
   return true;
 }
 
-module.exports = { request, verify, hashCode, senders, isEmail };
+/* ========================================================================= */
+/*  میزِ مدیر — «کدهای شش‌رقمی»                                              */
+/* ========================================================================= */
+
+/**
+ * چند ده کدِ آخرِ همین دفتر، با حالشان.
+ *
+ * ⛔ **خودِ کد در فهرست نمی‌آید** — همان قاعدهٔ `login_requests`. نمایش یک
+ * کارِ جدا و ثبت‌شده است (`reveal`)، وگرنه هر تازه شدنِ صفحه یک ردیفِ
+ * «کد دیده شد» برای هر مشتری می‌ساخت و آن دفتر بی‌معنا می‌شد.
+ */
+async function listRequests({ destination = '', app = '', purpose = '', limit = 50 } = {}) {
+  const args = [];
+  const where = [];
+  if (destination) { args.push(String(destination).trim().toLowerCase()); where.push(`lower(destination) = $${args.length}`); }
+  //  نصبِ کهنه `app` ندارد، پس ردیفِ بی‌برنامه با فیلترِ برنامه هم می‌آید —
+  //  وگرنه کدهای پیش از این مهاجرت برای همیشه ناپدید می‌شدند
+  if (app) { args.push(String(app)); where.push(`(app = $${args.length} OR app = '')`); }
+  if (purpose) { args.push(String(purpose)); where.push(`purpose = $${args.length}`); }
+  args.push(Math.min(200, Number(limit) || 50));
+
+  const rows = await many(
+    `SELECT id, purpose, destination, app, attempts, max_attempts, expires_at, consumed_at,
+            created_at, ip, via, sent_at, (code_sealed IS NOT NULL) AS has_code
+       FROM otp_codes
+       ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+      ORDER BY created_at DESC
+      LIMIT $${args.length}`,
+    args
+  );
+  return rows.map(shapeRow);
+}
+
+/** یک ردیفِ دفتر به شکلی که میزِ مدیر می‌خواند — **بی خودِ کد**. */
+function shapeRow(r) {
+  const t = now();
+  const hasCode = 'has_code' in r ? Boolean(r.has_code) : r.code_sealed != null;
+  return {
+    id: r.id,
+    purpose: r.purpose,
+    app: r.app || '',
+    destination: r.destination,
+    masked_destination: mask(r.destination),
+    attempts: Number(r.attempts || 0),
+    max_attempts: Number(r.max_attempts || 0),
+    created_at: Number(r.created_at),
+    expires_at: Number(r.expires_at),
+    consumed_at: r.consumed_at ? Number(r.consumed_at) : null,
+    sent_at: r.sent_at ? Number(r.sent_at) : null,
+    via: r.via || '',
+    //  ⛔ `log` یعنی هیچ ایمیلی بیرون نرفته و کد فقط در لاگ چاپ شده
+    log_only: (r.via || '') === 'log',
+    active: !r.consumed_at && Number(r.expires_at) > t && Number(r.attempts || 0) < Number(r.max_attempts || 0),
+    can_reveal: hasCode && !r.consumed_at && Number(r.expires_at) > t,
+  };
+}
+
+/** یک ردیف با شناسه — بی خودِ کد. */
+async function requestById(id) {
+  const r = await one('SELECT * FROM otp_codes WHERE id=$1', [String(id || '').slice(0, 80)]);
+  return r ? shapeRow(r) : null;
+}
+
+/**
+ * کد را به مدیر نشان بده — برای وقتی ایمیلِ مشتری واقعاً خراب است و باید
+ * تلفنی گفته شود.
+ *
+ * ⛔ فقط کدِ **زنده**، و ثبتِ رخداد کارِ خودِ مسیر است (همان‌جا که
+ * `requireSuperAdmin` هم هست) — این تابع هیچ HTTPی نمی‌داند.
+ */
+async function reveal(id) {
+  const row = await one('SELECT * FROM otp_codes WHERE id=$1', [String(id || '').slice(0, 80)]);
+  if (!row) return null;
+  const t = now();
+  const expired = Boolean(row.consumed_at) || Number(row.expires_at) <= t;
+  const code = expired ? '' : unseal(row.code_sealed);
+  return {
+    expired,
+    code,
+    expires_in: expired ? 0 : Math.max(0, Math.round((Number(row.expires_at) - t) / 1000)),
+    request: shapeRow(row),
+  };
+}
+
+module.exports = {
+  request, verify, hashCode, senders, isEmail,
+  listRequests, requestById, reveal, mask,
+};
