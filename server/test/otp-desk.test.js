@@ -159,3 +159,22 @@ test('۷) هر ۵۰۰ کدِ پیگیری دارد — «خطای داخلی س�
   assert.equal(sent[0].body.error.message, 'ایمیل لازم است');
   assert.equal(sent[0].body.error.ref, undefined);
 });
+
+test('۸) نبضِ زنده هر دو دفترِ کد را می‌بیند', async () => {
+  const token = await adminToken();
+  const before = (await h.get('/api/admin/stamps', { token })).body.stamps;
+
+  //  کدی که **فقط** در دفترِ دوم می‌نشیند (ثبت‌نام)
+  await h.post('/api/auth/register/start', { name: 'ن', email: 'pulse@test.local', password: 'Passw0rd!test' });
+
+  const after = (await h.get('/api/admin/stamps', { token })).body.stamps;
+  /*
+   *  ⛔ این بندِ اصلی است: تا ۲.۸.۳ مهرِ `codes` فقط از `login_requests`
+   *  می‌آمد، پس کدِ ثبت‌نام گذرگاهِ زنده را بیدار نمی‌کرد و صفحهٔ پنل تا
+   *  تازه کردنِ دستی هیچ نمی‌دانست. میز را ساخته بودیم، زنده‌اش نکرده بودیم.
+   */
+  assert.ok(after.codes > before.codes,
+    `مهرِ کدها باید جلو برود — پیش ${before.codes}، پس ${after.codes}`);
+  //  ⚠️ و «ورودها» دفترِ خودش است و نباید با این تکان بخورد
+  assert.equal(after.logins, before.logins, 'مهرِ ورودها دفترِ خودش را می‌گوید');
+});

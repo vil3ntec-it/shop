@@ -454,8 +454,20 @@ router.get('/stamps', async (req, res, next) => {
   };
 
   try {
-    const [logins, support, customers, plansAt, notices, sales, sync] = await Promise.all([
+    const [logins, otp, support, customers, plansAt, notices, sales, sync] = await Promise.all([
       stamp('SELECT MAX(created_at) AS t FROM login_requests'),
+      /*
+       *  ⛔ **دفترِ دومِ کدها هم مهر می‌خورد.**
+       *
+       *  تا ۲.۸.۳ این مهر فقط از `login_requests` می‌آمد، پس کدِ
+       *  **ثبت‌نام** و **رمزِ فراموش‌شده** (که در `otp_codes` می‌نشینند)
+       *  هیچ‌وقت گذرگاهِ زنده را بیدار نمی‌کردند: کد ساخته می‌شد و صفحهٔ
+       *  «کدهای شش‌رقمی» تا تازه کردنِ دستی هیچ نمی‌دانست.
+       *
+       *  یعنی میزش را در ۲.۸.۳ ساختیم ولی **زنده‌اش نکردیم** — همان درس،
+       *  این بار از سمتِ نبض.
+       */
+      stamp('SELECT MAX(created_at) AS t FROM otp_codes'),
       stamp('SELECT MAX(created_at) AS t FROM support_messages'),
       stamp('SELECT MAX(created_at) AS t FROM subscriptions'),
       stamp('SELECT MAX(changed_at) AS t FROM plan_price_history'),
@@ -466,9 +478,9 @@ router.get('/stamps', async (req, res, next) => {
     res.json({
       ok: true,
       stamps: {
-        //  ⚠️ «کدها» و «ورودها» یک دفتر دارند و عمداً هر دو همان مهر را
-        //  می‌گیرند: صفحهٔ کدهای پنل هر دو سرچشمه را نشان می‌دهد.
-        codes: logins,
+        //  ⚠️ «کدها» تازه‌ترینِ **هر دو** دفتر است، چون صفحهٔ کدهای پنل هر
+        //  دو سرچشمه را نشان می‌دهد؛ «ورودها» فقط دفترِ خودش.
+        codes: Math.max(logins, otp),
         logins,
         support,
         customers,
