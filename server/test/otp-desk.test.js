@@ -281,3 +281,63 @@ test('۱۲) و راهِ سبز هم سنجیده می‌شود — با ربات
   const ok = await h.post('/api/auth/register/verify', { email, code });
   assert.equal(ok.status, 200);
 });
+
+test('۱۳) کدِ بازیابیِ رمز از میزِ مدیر می‌رود — و رمز از آن‌جا عوض نمی‌شود', async () => {
+  const u = await h.newUser('بازیاب', 'pump');
+  const token = await adminToken();
+
+  const sent = await h.post('/api/admin/otp/password-reset', { email: u.email, app: 'pump' }, { token });
+  assert.equal(sent.status, 201, JSON.stringify(sent.body));
+  assert.equal(sent.body.email, u.email);
+  //  ⛔ خودِ کد در پاسخ برنمی‌گردد — میزِ کدها و `/reveal` کارِ خودشان را دارند
+  assert.equal(sent.body.code, undefined);
+
+  //  و همان کد در دفترِ سوم می‌نشیند، با هدفِ درست
+  const list = await h.get(`/api/admin/otp?destination=${encodeURIComponent(u.email)}&purpose=reset`, { token });
+  assert.equal(list.body.requests.length, 1);
+  assert.equal(list.body.requests[0].purpose, 'reset');
+  assert.equal(list.body.requests[0].can_reveal, true);
+
+  /*
+   *  ⛔ **و بندِ اصلی: رمزِ تازه را خودِ کاربر می‌گذارد، نه مدیر.**
+   *  کدِ نشان‌داده‌شده در همان `password/reset`ِ عمومی کار می‌کند.
+   */
+  const shown = await h.post(`/api/admin/otp/${list.body.requests[0].id}/reveal`, {}, { token });
+  const fresh = 'Tazeh!Ramz-1405';
+  const done = await h.post('/api/auth/password/reset', { email: u.email, code: shown.body.code, password: fresh });
+  assert.equal(done.status, 200, JSON.stringify(done.body));
+
+  //  و رمزِ تازه واقعاً کار می‌کند
+  const inAgain = await h.post('/api/auth/login', {
+    identifier: u.email, password: fresh, app: 'pump',
+    device: { deviceId: 'dev-reset', name: 'تست', platform: 'test' },
+  });
+  assert.equal(inAgain.status, 200, JSON.stringify(inAgain.body));
+});
+
+test('۱۴) و «حساب نیست» به مدیر گفته می‌شود، نه ۲۰۰ِ خالی', async () => {
+  const token = await adminToken();
+  /*
+   *  ⚠️ مسیرِ **عمومی** عمداً برای نشانیِ ناموجود هم ۲۰۰ می‌دهد تا کسی با
+   *  امتحانِ نشانی‌ها نفهمد چه کسانی حساب دارند. ولی مدیر از قبل فهرستِ
+   *  حساب‌ها را دارد — پنهان کردنش از او فقط گیجش می‌کند.
+   */
+  const r = await h.post('/api/admin/otp/password-reset', { email: 'nobody@test.local' }, { token });
+  assert.equal(r.status, 404);
+  assert.equal(r.body.error.code, 'user_not_found');
+
+  //  و همان نشانی از درِ عمومی همچنان ۲۰۰ می‌گیرد — آن قاعده دست نخورد
+  const pub = await h.post('/api/auth/password/forgot', { email: 'nobody@test.local' });
+  assert.equal(pub.status, 200);
+});
+
+test('۱۵) و رمز از میزِ مدیر عوض نمی‌شود — هیچ مسیری برایش نیست', async () => {
+  const token = await adminToken();
+  /*
+   *  ⛔ مدیری که بتواند رمزِ کسی را عوض کند می‌تواند جای او وارد شود؛
+   *  آن یک درِ پشتی است نه یک قابلیت. کدِ بازیابی می‌رود، رمز نه.
+   */
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'src', 'routes', 'admin-otp.js'), 'utf8');
+  assert.ok(!/password_hash/.test(src), 'میزِ کدها هیچ‌جا رمز نمی‌نویسد');
+  assert.ok(!/hashPassword/.test(src), 'و رمزی هم نمی‌سازد');
+});
