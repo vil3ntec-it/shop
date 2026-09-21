@@ -390,7 +390,7 @@ router.post('/register/start', otpLimit, async (req, res, next) => {
   const { email, name } = registrationInput(req.body);
   await assertEmailFree(email);
 
-  const out = await otp.request(email, { purpose: 'register', ip: clientIp(req) });
+  const out = await otp.request(email, { purpose: 'register', ip: clientIp(req), app: appOf(req) });
   res.status(201).json({
     ok: true,
     email,
@@ -549,7 +549,7 @@ function destinationOf(body) {
 
 router.post('/otp/request', otpLimit, async (req, res, next) => {
   const to = destinationOf(req.body);
-  const out = await otp.request(to.value, { purpose: 'login', ip: clientIp(req) });
+  const out = await otp.request(to.value, { purpose: 'login', ip: clientIp(req), app: appOf(req) });
   res.json({ ok: true, [to.kind]: to.value, destination: to.value, ...out });
 });
 
@@ -759,7 +759,7 @@ router.post('/password/forgot', otpLimit, async (req, res, next) => {
   const user = await one('SELECT id FROM users WHERE email=$1', [email]);
   let out = {};
   if (user) {
-    out = await otp.request(email, { purpose: 'reset', ip: clientIp(req) });
+    out = await otp.request(email, { purpose: 'reset', ip: clientIp(req), app: appOf(req) });
     await audit.log({ actorType: 'user', userId: user.id, action: 'auth.password_reset_requested', ip: clientIp(req) });
   }
 
