@@ -178,3 +178,106 @@ test('۸) نبضِ زنده هر دو دفترِ کد را می‌بیند', asy
   //  ⚠️ و «ورودها» دفترِ خودش است و نباید با این تکان بخورد
   assert.equal(after.logins, before.logins, 'مهرِ ورودها دفترِ خودش را می‌گوید');
 });
+
+test('۹) فرستادنِ دوباره همان کد را می‌فرستد، نه کدِ تازه', async () => {
+  const email = 'again@test.local';
+  await h.post('/api/auth/register/start', { name: 'ن', email, password: 'Passw0rd!test' });
+  const token = await adminToken();
+  const row = (await h.get(`/api/admin/otp?destination=${encodeURIComponent(email)}`, { token })).body.requests[0];
+  const first = await h.post(`/api/admin/otp/${row.id}/reveal`, {}, { token });
+  const code = first.body.code;
+
+  /*
+   *  ⛔ با رباتِ `log` باید **رد** کند، نه این‌که ۲۰۰ بدهد.
+   *  آزمون‌ها روی راهِ `log` می‌دوند، پس همین حالِ واقعی است.
+   */
+  const r = await h.post(`/api/admin/otp/${row.id}/resend`, {}, { token });
+  assert.equal(r.status, 409, JSON.stringify(r.body));
+  assert.equal(r.body.error.code, 'delivery_not_configured');
+  assert.match(r.body.error.message, /SMTP/);
+
+  //  ⛔ و مهم‌ترین بند: کدِ تازه‌ای ساخته نشده و همان کدِ قبلی کار می‌کند
+  const after = (await h.get(`/api/admin/otp?destination=${encodeURIComponent(email)}`, { token })).body.requests;
+  assert.equal(after.length, 1, 'ردیفِ دومی ساخته نشده باشد');
+  const ok = await h.post('/api/auth/register/verify', { email, code });
+  assert.equal(ok.status, 200, 'همان کدِ قبلی باید هنوز بپذیرد');
+});
+
+test('۱۰) کدِ مصرف‌شده دوباره فرستاده نمی‌شود', async () => {
+  const email = 'again2@test.local';
+  await h.post('/api/auth/register/start', { name: 'ن', email, password: 'Passw0rd!test' });
+  const token = await adminToken();
+  const row = (await h.get(`/api/admin/otp?destination=${encodeURIComponent(email)}`, { token })).body.requests[0];
+  const shown = await h.post(`/api/admin/otp/${row.id}/reveal`, {}, { token });
+  await h.post('/api/auth/register/verify', { email, code: shown.body.code });
+
+  const r = await h.post(`/api/admin/otp/${row.id}/resend`, {}, { token });
+  assert.equal(r.status, 409);
+  assert.equal(r.body.error.code, 'code_unavailable');
+});
+
+test('۱۱) و هر تلاشِ فرستادنِ دوباره ثبت می‌شود — حتی نرفته‌اش', async () => {
+  const email = 'again3@test.local';
+  await h.post('/api/auth/register/start', { name: 'ن', email, password: 'Passw0rd!test' });
+  const token = await adminToken();
+  const row = (await h.get(`/api/admin/otp?destination=${encodeURIComponent(email)}`, { token })).body.requests[0];
+  await h.post(`/api/admin/otp/${row.id}/resend`, {}, { token });
+
+  const logged = await require('../src/db').one(
+    `SELECT * FROM audit_logs WHERE action='otp.resend' AND target_id=$1`, [row.id]
+  );
+  assert.ok(logged, 'تلاشِ نرفته هم باید در دفترِ رخدادها باشد');
+  //  ⛔ و نشانیِ کامل در دفتر نمی‌نشیند
+  assert.ok(!JSON.stringify(logged).includes(email));
+});
+
+test('۱۲) و راهِ سبز هم سنجیده می‌شود — با رباتِ تنظیم‌شده واقعاً می‌رود', async () => {
+  /*
+   *  ⛔ **چرا این بند لازم است.** بندهای ۹ و ۱۰ فقط راهِ **رد** را
+   *  می‌سنجند. اگر همین‌جا می‌ایستادیم، فردا کسی می‌توانست `resend` را
+   *  کاملاً خراب کند و هیچ‌جا قرمز نمی‌شد — همان درسی که یک بار در ریپوی
+   *  خواهر گران تمام شد: «سنجه‌ای که فقط حالتِ نه را می‌بیند، نیمِ سنجه است».
+   *
+   *  ⚠️ خودِ گفت‌وگوی SMTP این‌جا سنجیده نمی‌شود و لازم هم نیست:
+   *  `test/mail-delivery.js` با یک صندوقِ SMTPِ **واقعی** همان را دارد.
+   *  آن‌چه این‌جا قفل می‌شود **تصمیمِ ما** است: همان کد برداشته شود، به
+   *  همان نشانی برود، مهرِ زمان جلو برود، و ردیفِ دومی ساخته نشود.
+   */
+  const mailer = require('../src/lib/mailer');
+  const email = 'green@test.local';
+  await h.post('/api/auth/register/start', { name: 'ن', email, password: 'Passw0rd!test' });
+
+  const token = await adminToken();
+  const row = (await h.get(`/api/admin/otp?destination=${encodeURIComponent(email)}`, { token })).body.requests[0];
+  const shown = await h.post(`/api/admin/otp/${row.id}/reveal`, {}, { token });
+  const code = shown.body.code;
+
+  await mailer.save({ provider: 'smtp', host: '127.0.0.1', port: '2525', user: 'u', pass: 'p' });
+  const sent = [];
+  const realSend = mailer.send;
+  mailer.send = async (m) => { sent.push(m); return { ok: true }; };
+  let out;
+  try {
+    out = await h.post(`/api/admin/otp/${row.id}/resend`, {}, { token });
+  } finally {
+    mailer.send = realSend;
+    await mailer.save({ provider: 'log' });
+  }
+
+  assert.equal(out.status, 200, JSON.stringify(out.body));
+  assert.equal(out.body.ok, true);
+  assert.equal(sent.length, 1, 'دقیقاً یک نامه');
+  assert.equal(sent[0].to, email, 'به همان نشانی');
+  //  ⛔ و **همان** کد در متنِ نامه، نه یک کدِ تازه
+  assert.ok(String(sent[0].text || '').includes(code) || String(sent[0].html || '').includes(code),
+    'متنِ نامه باید همان کدِ قبلی را داشته باشد');
+
+  const after = (await h.get(`/api/admin/otp?destination=${encodeURIComponent(email)}`, { token })).body.requests;
+  assert.equal(after.length, 1, 'ردیفِ دومی ساخته نشده باشد');
+  assert.ok(after[0].sent_at >= row.sent_at, 'مهرِ آخرین تلاش جلو رفته باشد');
+  assert.equal(after[0].log_only, false, 'و دیگر «فقط در لاگ» نیست');
+
+  //  و همان کد هنوز کار می‌کند
+  const ok = await h.post('/api/auth/register/verify', { email, code });
+  assert.equal(ok.status, 200);
+});
