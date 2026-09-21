@@ -130,3 +130,32 @@ test('۶) میز پشتِ ورودِ مدیر است', async () => {
   const anon = await h.get('/api/admin/otp');
   assert.ok(anon.status === 401 || anon.status === 403, `بی توکن باید بسته باشد، شد ${anon.status}`);
 });
+
+test('۷) هر ۵۰۰ کدِ پیگیری دارد — «خطای داخلی سرور» بی نشانی نمی‌ماند', async () => {
+  const { errorHandler } = require('../src/middleware/errors');
+  const sent = [];
+  const res = {
+    status(c) { this._c = c; return this; },
+    json(b) { sent.push({ status: this._c, body: b }); return this; },
+  };
+  const quiet = console.error;
+  console.error = () => {};
+  try {
+    errorHandler(new Error('ستونی که وجود ندارد'), { method: 'POST', path: '/api/pump' }, res, () => {});
+  } finally { console.error = quiet; }
+
+  const out = sent[0];
+  assert.equal(out.status, 500);
+  //  ⛔ پیامِ خام هیچ‌وقت بیرون نمی‌رود
+  assert.ok(!out.body.error.message.includes('ستونی که وجود ندارد'));
+  //  ⛔ ولی بی نشانی هم نمی‌ماند — وگرنه عکسِ «خطای داخلی سرور» به هیچ سطرِ لاگی وصل نمی‌شود
+  assert.match(out.body.error.ref, /^e[a-z0-9]{6,}$/);
+  assert.ok(out.body.error.message.includes(out.body.error.ref));
+
+  //  و خطای ۴xx دست‌نخورده می‌ماند: پیامِ خودش، بی کدِ پیگیری
+  sent.length = 0;
+  errorHandler(require('../src/middleware/errors').badRequest('ایمیل لازم است'), { method: 'POST', path: '/x' }, res, () => {});
+  assert.equal(sent[0].status, 400);
+  assert.equal(sent[0].body.error.message, 'ایمیل لازم است');
+  assert.equal(sent[0].body.error.ref, undefined);
+});
