@@ -56,7 +56,11 @@ router.get('/plans', async (req, res, next) => {
       plans: await plans.listPlans({ app: 'pump' }),
       //  واحدِ پولِ خودِ پمپ (دالر)، نه واحدِ دکان
       currency: cfg.pump_currency || cfg.currency || 'افغانی',
-      trialDays: Number(cfg.pump_trial_days || 0),
+      //  ⛔ `cfg.pump_trial_days || 0` بود و **دروغ می‌گفت**: نصبی که
+      //  هیچ‌وقت این تنظیم را ننوشته صفر می‌گرفت، در حالی که
+      //  `entitlement.js` همان لحظه پیش‌فرض را می‌داد و دوره واقعاً باز
+      //  بود. پس یک جا، همان جا که تصمیم گرفته می‌شود.
+      trialDays: await plans.trialDaysOf('pump'),
       serverTime: now(),
     });
   } catch (err) { next(err); }

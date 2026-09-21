@@ -59,8 +59,13 @@ router.get('/stations', async (req, res) => {
          SELECT * FROM station_subscriptions x WHERE x.station_id = s.id
           ORDER BY (x.status IN ('active','suspended','pending')) DESC, x.created_at DESC LIMIT 1
        ) sub ON true
+      --  ⛔ **ایمیل هم گشته می‌شود.** خواستهٔ صریحِ صاحب سامانه
+      --  (۱۴۰۵/۰۷/۰۸): «به حسابِ مورد نظر یا ایمیلِ مد نظر اشتراک بدم».
+      --  بی این، تنها راهِ پیدا کردنِ یک پمپ نامِ پمپ یا نامِ صاحبش بود —
+      --  و صاحبِ سامانه معمولاً فقط ایمیلِ طرف را دارد.
       WHERE ($1 = '' OR lower(s.name) LIKE $2 OR lower(s.code) LIKE $2
              OR lower(coalesce(u.name,'')) LIKE $2
+             OR lower(coalesce(u.email,'')) LIKE $2
              OR coalesce(u.phone,'') LIKE $2)
       ORDER BY s.created_at DESC LIMIT $3 OFFSET $4`,
     [q, like, limit, offset]
@@ -69,7 +74,7 @@ router.get('/stations', async (req, res) => {
   //  پمپی که هنوز اشتراک نخریده ولی در دورهٔ آزمایشی است، «آزمایشی»
   //  نشان داده شود — وگرنه در فهرست بی‌اشتراک به نظر می‌رسد و مدیر
   //  بی‌دلیل سراغش می‌رود.
-  const trialDays = Number(await plans.getConfig('pump_trial_days', '14')) || 0;
+  const trialDays = await plans.trialDaysOf('pump');
   const t = now();
   const list = rows.map(r => {
     if (r.sub_status) return r;

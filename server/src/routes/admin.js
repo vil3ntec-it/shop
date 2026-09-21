@@ -178,13 +178,17 @@ router.get('/shops', async (req, res) => {
          SELECT * FROM subscriptions x WHERE x.shop_id = s.id
           ORDER BY (x.status IN ('active','suspended','pending')) DESC, x.created_at DESC LIMIT 1
        ) sub ON true
-      WHERE ($1 = '' OR lower(s.name) LIKE $2 OR lower(u.name) LIKE $2 OR coalesce(u.phone,'') LIKE $2)
+      --  ⛔ ایمیل هم گشته می‌شود — همان قاعدهٔ admin-pump.js: صاحبِ
+      --  سامانه معمولاً فقط ایمیلِ طرف را دارد، نه نامِ دکانش.
+      WHERE ($1 = '' OR lower(s.name) LIKE $2 OR lower(u.name) LIKE $2
+             OR lower(coalesce(u.email,'')) LIKE $2
+             OR coalesce(u.phone,'') LIKE $2)
       ORDER BY s.created_at DESC LIMIT $3 OFFSET $4`,
     [q, like, limit, offset]
   );
   const total = await one('SELECT COUNT(*)::int n FROM shops');
   // دکانی که هنوز اشتراک نخریده ولی در دوره‌ی آزمایشی است، «آزمایشی» نشان داده شود
-  const trialDays = Number(await plans.getConfig('trial_days', '14')) || 0;
+  const trialDays = await plans.trialDaysOf('shop');
   const t = now();
   const shops = rows.map(r => {
     if (r.sub_status) return r;

@@ -24,10 +24,11 @@ function build(T) {
   const ledger = subs.forApp(T.app);
   //  دوره‌ی آزمایشی هر بخش کلید خودش را دارد، وگرنه عوض کردنِ آن برای
   //  دکان‌ها ناخواسته پمپ‌ها را هم عوض می‌کرد.
-  const trialKey = T.app === 'shop' ? 'trial_days' : `${T.app}_trial_days`;
-
+  //  ⛔ کلید و پیش‌فرض از `plans.trialConfig` می‌آیند، نه از این‌جا —
+  //  شرحش آن‌جا. سه جا نوشته شدنشان یعنی فهرستِ مدیر و خودِ برنامه
+  //  می‌توانستند دو حرفِ جدا بزنند.
   async function trialState(tenant, at = now()) {
-    const days = Number(await plans.getConfig(trialKey, '14')) || 0;
+    const days = await plans.trialDaysOf(T.app);
     if (!days) return { enabled: false, active: false, used: true, endsAt: 0, daysLeft: 0 };
     const startedAt = Number(tenant.created_at);
     const endsAt = startedAt + days * DAY;
