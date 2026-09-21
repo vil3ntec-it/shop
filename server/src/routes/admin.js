@@ -587,6 +587,11 @@ router.post('/backups', requireSuperAdmin, async (req, res, next) => {
    `requireAdmin` بالا سوارند — پس قاعده‌ی دسترسی همان یکی است.
    ========================================================== */
 router.use('/logins', require('./admin-logins'));
+//  میزِ «فروشگاه» — بندهای ۴.۲ و ۴.۳ سندِ ریمیک. فقط می‌خواند.
+router.use('/shop-desk', require('./admin-shop-desk'));
+//  میزِ «کدِ شاگرد» — بندِ ۴.۴ سندِ ریمیک. ⛔ زیرِ `/shops/:id` می‌نشیند تا
+//  همان `v.id` و همان مرزِ دکان را داشته باشد، نه یک درِ موازی.
+router.use('/shops/:id/staff-codes', require('./admin-staff-codes'));
 /*
  *  ⚠️ **دو دفترِ کد هست و هر دو میز می‌خواهند.** `/logins` مالِ
  *  `login_requests` است (ورود با کدِ ایمیلی) و `/otp` مالِ `otp_codes`
