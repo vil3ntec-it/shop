@@ -97,6 +97,21 @@ async function rotateRefresh(token, { app = null } = {}) {
    *  جفتِ قبلی» پس داده نمی‌شود؛ از **آخرین حلقهٔ زنده** می‌چرخیم.
    */
   if (row.revoked_at) {
+    /*
+     *  ⛔ **بازپخشِ توکنِ چرخیده، پس از پنجرهٔ ارفاق = دزدی.**
+     *
+     *  توکنی که یک بار چرخیده (`rotated_to` دارد) و حالا — بیرون از سی
+     *  ثانیه — دوباره آمده، یعنی دو نفر یک زنجیره را دارند: صاحبش و کسی
+     *  که آن را برداشته. تا ۲.۹.۰ فقط `null` برمی‌گشت، پس دزد که زودتر
+     *  چرخانده بود با زنجیرهٔ زنده تا نود روز می‌ماند و صاحب بیرون
+     *  می‌افتاد. حالا صدا زننده کلِ خانوادهٔ آن نشست را می‌بندد.
+     *
+     *  ⚠️ توکنی که با «خروج» باطل شده `rotated_to` ندارد و این‌جا نمی‌رسد:
+     *  آن فقط یک ۴۰۱ِ ساده است، نه نشانهٔ دزدی.
+     */
+    if (row.rotated_to && (!row.grace_until || Number(row.grace_until) < now())) {
+      return { stolen: true, row, hash };
+    }
     let node = row;
     for (let hop = 0; hop < GRACE_MAX_HOPS; hop++) {
       if (!node.rotated_to || !node.grace_until || Number(node.grace_until) < now()) return null;
@@ -114,10 +129,26 @@ async function rotateRefresh(token, { app = null } = {}) {
 
 /** توکنِ قبلی را باطل می‌کند و می‌گوید جانشینش کیست (برای پنجرهٔ ارفاق). */
 async function markRotated(previousHash, newToken) {
-  await query(
+  //  ⚠️ شمارِ ردیف برمی‌گردد: صفر یعنی درخواستِ هم‌زمانِ دیگری همین توکن را
+  //  زودتر چرخانده، و صدا زننده نباید زنجیرهٔ دومی زنده نگه دارد.
+  const r = await query(
     'UPDATE tokens SET revoked_at=$2, rotated_to=$3, grace_until=$4 WHERE token_hash=$1 AND revoked_at IS NULL',
     [previousHash, now(), hashToken(newToken), now() + GRACE_MS]
   );
+  return r.rowCount || 0;
+}
+
+/**
+ * بستنِ کلِ خانوادهٔ یک نشست — همان دستگاه، همان بخش، همهٔ توکن‌ها.
+ * بی `device_id` (نسخه‌های کهنه)، همهٔ نشست‌های همان بخشِ آن شخص.
+ */
+async function revokeFamily(row) {
+  const args = [now(), row.subject_id, row.app || 'shop'];
+  let sql = `UPDATE tokens SET revoked_at=$1
+              WHERE subject_id=$2 AND COALESCE(app,'shop')=$3 AND revoked_at IS NULL`;
+  if (row.device_id) { args.push(row.device_id); sql += ` AND device_id=$${args.length}`; }
+  const r = await query(sql, args);
+  return r.rowCount || 0;
 }
 
 async function revoke(token, kind) {
@@ -187,7 +218,7 @@ function safeEqual(a, b) {
 }
 
 module.exports = {
-  rotateRefresh, markRotated, findRefresh, GRACE_MS,
+  rotateRefresh, markRotated, revokeFamily, findRefresh, GRACE_MS,
   generateToken, hashToken, issue, verify, revoke,
   revokeAllForSubject, revokeOthersForSubject, revokeAllForDevice, safeEqual,
 };

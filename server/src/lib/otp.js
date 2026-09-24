@@ -439,15 +439,26 @@ async function verify(destination, code, { purpose = 'login' } = {}) {
   if (Number(row.expires_at) < now()) throw forbidden('مهلت این کد تمام شده است', 'otp_expired');
   if (row.attempts >= row.max_attempts) throw forbidden('تعداد تلاش بیش از حد بود', 'otp_locked');
 
-  await query('UPDATE otp_codes SET attempts = attempts + 1 WHERE id=$1', [row.id]);
+  //  ⛔ یک خانه از سقف، اتمی و **پیش از** سنجیدن — وگرنه درخواست‌های
+  //  هم‌زمان همه از زیرِ سقف رد می‌شدند (همان قاعدهٔ `login-codes.js`).
+  const claim = await one(
+    'UPDATE otp_codes SET attempts = attempts + 1 WHERE id=$1 AND attempts < max_attempts RETURNING id',
+    [row.id]
+  );
+  if (!claim) throw forbidden('تعداد تلاش بیش از حد بود', 'otp_locked');
 
   const expected = Buffer.from(row.code_hash, 'hex');
   const actual = Buffer.from(hashCode(destination, clean), 'hex');
   const ok = expected.length === actual.length && timingSafeEqual(expected, actual);
   if (!ok) throw forbidden('کد درست نیست', 'otp_wrong');
 
-  //  ⛔ مصرف‌شده یعنی کد دیگر نه لازم است و نه باید بشود دیدش
-  await query('UPDATE otp_codes SET consumed_at=$2, code_sealed=NULL WHERE id=$1', [row.id, now()]);
+  //  ⛔ مصرف‌شده یعنی کد دیگر نه لازم است و نه باید بشود دیدش — و فقط یک
+  //  بار: دو درخواستِ هم‌زمان با کدِ درست هر دو «درست» نمی‌گیرند.
+  const used = await one(
+    'UPDATE otp_codes SET consumed_at=$2, code_sealed=NULL WHERE id=$1 AND consumed_at IS NULL RETURNING id',
+    [row.id, now()]
+  );
+  if (!used) throw forbidden('این کد قبلاً به کار رفته است', 'otp_used');
   return true;
 }
 

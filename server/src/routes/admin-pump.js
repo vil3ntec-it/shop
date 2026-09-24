@@ -101,6 +101,9 @@ router.get('/stations/:id', async (req, res, next) => {
       owner: await one('SELECT id, name, email, phone, status FROM users WHERE id=$1',
         [st.owner_user_id]),
       members: await stations.members(id),
+      //  کامپیوترهای این پمپ — تا مدیر ببیند چندتا و کدام‌ها، و جدا کند
+      devices: await require('../lib/station-devices').list(id),
+      deviceLimit: await require('../lib/station-devices').deviceLimitOf(id),
       entitlement: ent,
       subscription: ent.subscription,
       //  پوشهٔ همین پمپ — فقط فهرست و اندازه. خودِ داده مالِ صاحبش
@@ -137,6 +140,31 @@ router.get('/stations/:id/events', async (req, res, next) => {
 router.get('/stations/:id/history', async (req, res, next) => {
   try {
     res.json({ history: await subs.changeLog(v.id(req.params.id), 100) });
+  } catch (err) { next(err); }
+});
+
+/**
+ * جدا کردن و برگرداندنِ یک کامپیوترِ پمپ — کارِ اضطراریِ مدیر.
+ *
+ * ⚠️ همیشه با ثبت در دفترِ رخدادها؛ هیچ دستگاهی بی‌ردّ جدا یا زنده نمی‌شود.
+ * و **هیچ داده‌ای پاک نمی‌شود**: فقط راهِ آن کامپیوتر به سرور بسته می‌شود.
+ */
+router.post('/stations/:id/devices/:deviceId/:action', async (req, res, next) => {
+  try {
+    const id = v.id(req.params.id);
+    const deviceId = v.id(req.params.deviceId);
+    const action = String(req.params.action || '');
+    if (!['revoke', 'restore'].includes(action)) {
+      return next(notFound('این مسیر وجود ندارد', 'not_found'));
+    }
+    const devs = require('../lib/station-devices');
+    const device = action === 'revoke' ? await devs.revoke(id, deviceId) : await devs.restore(id, deviceId);
+    await audit.log({
+      actorType: 'admin', userId: req.admin.id,
+      action: action === 'revoke' ? 'admin.pump_device_revoked' : 'admin.pump_device_restored',
+      targetType: 'station_device', targetId: device.id, detail: { stationId: id },
+    });
+    res.json({ device, serverTime: now() });
   } catch (err) { next(err); }
 });
 
@@ -187,12 +215,15 @@ router.post('/subscriptions', async (req, res, next) => {
       plan: v.text(req.body?.plan, { max: 20 }) || 'custom',
       days: req.body?.days === undefined || req.body?.days === null || req.body?.days === ''
         ? null : v.integer(req.body.days, { field: 'روزها', min: 1, max: 3650 }),
-      endsAt: req.body?.endsAt ? Number(req.body.endsAt) : null,
+      //  ⚠️ همان `v.timestamp`ِ بخشِ دکان: عددِ بی‌حد یا متن یک ۵۰۰ِ bigint یا اشتراکِ عملاً ابدی می‌ساخت
+      endsAt: req.body?.endsAt ? v.timestamp(req.body.endsAt) : null,
       features: Array.isArray(req.body?.features) ? req.body.features : [],
       maxDevices: v.integer(req.body?.maxDevices, { field: 'تعداد دستگاه', min: 1, max: 100, def: 10 }),
       graceDays: v.integer(req.body?.graceDays, { field: 'مهلت', min: 0, max: 90, def: 0 }),
       note: v.text(req.body?.note, { max: 300 }),
       createdBy: req.admin.id,
+      //  مدیر صریح اشتراک می‌دهد؛ تعلیقِ قبلی با همین تصمیمِ او برداشته می‌شود
+      allowUnsuspend: true,
     });
     await audit.log({
       actorType: 'admin', userId: req.admin.id, action: 'admin.pump_subscription_granted',

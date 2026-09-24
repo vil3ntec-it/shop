@@ -227,6 +227,10 @@ test('پمپِ دیگری پوشهٔ این پمپ را نمی‌بیند', asyn
 test('مجوزِ پمپ شنونده‌ی خودش را دارد', async () => {
   const owner = await userWithStation('مجوزدار', 'pump-lic');
   await grantPump(owner.stationId, 60);
+  //  ⛔ مجوز فقط برای کامپیوترِ ثبت‌شده — اول بند می‌شود
+  const bound = await h.post('/api/pump/device/bind',
+    { device: { uid: 'pc-1', name: 'کامپیوترِ پمپ' } }, { token: owner.accessToken });
+  assert.equal(bound.status, 201, JSON.stringify(bound.body));
 
   const r = await h.post('/api/pump/license',
     { device: { uid: 'pc-1', name: 'کامپیوترِ پمپ' } }, { token: owner.accessToken });
@@ -247,6 +251,7 @@ test('بی‌اشتراک و بی‌آزمایش، مجوزی صادر نمی‌
   const plans = require('../src/lib/plans');
   await plans.setConfig('pump_trial_days', '0');
   const owner = await userWithStation('بی‌مجوز', 'pump-nolic');
+  await h.post('/api/pump/device/bind', { device: { uid: 'pc-2' } }, { token: owner.accessToken });
 
   const r = await h.post('/api/pump/license',
     { device: { uid: 'pc-2' } }, { token: owner.accessToken });
@@ -256,6 +261,15 @@ test('بی‌اشتراک و بی‌آزمایش، مجوزی صادر نمی‌
   //  ولی بخش‌های همیشه‌باز سرِ جایشان‌اند
   assert.ok(r.body.features.includes('debtors'));
   await plans.setConfig('pump_trial_days', '14');
+});
+
+test('⛔ برای کامپیوترِ ثبت‌نشده مجوزی امضا نمی‌شود — سقفِ دستگاه از این در دور نمی‌خورد', async () => {
+  const owner = await userWithStation('بی‌دستگاه', 'pump-nodev');
+  await grantPump(owner.stationId, 60);
+  const r = await h.post('/api/pump/license',
+    { device: { uid: 'pc-made-up-1' } }, { token: owner.accessToken });
+  assert.equal(r.status, 403);
+  assert.equal(r.body.error.code, 'device_not_registered');
 });
 
 // ── ۶) مرزِ دو بخش ───────────────────────────────────────────────

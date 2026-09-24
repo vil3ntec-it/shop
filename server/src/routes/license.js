@@ -82,10 +82,14 @@ router.post('/sync', async (req, res, next) => {
       features: ent.features,
       core: [...CORE_KEYS],
       subscriptionEndsAt: endsAt,
+      activeUntil: ent.source === 'trial' ? endsAt : Number(ent.subscription.graceEndsAt || endsAt),
       plan: ent.subscription.plan || (ent.source === 'trial' ? 'trial' : ''),
       planTitle: ent.source === 'trial' ? 'دوره‌ی آزمایشی' : (ent.subscription.plan || ''),
       at,
     });
+    if (!issued) {
+      return res.json({ license: null, reason: 'expired', source: ent.source, features: ent.features, serverTime: at });
+    }
 
     res.json({
       license: issued.token,

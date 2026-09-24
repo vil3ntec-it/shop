@@ -311,6 +311,8 @@ async function updateMember(stationId, memberId, patch = {}) {
   if (status !== 'active') {
     await query('UPDATE tokens SET revoked_at=$1 WHERE subject_id=$2 AND revoked_at IS NULL',
       [now(), m.user_id]);
+    //  ⛔ و کامپیوتری که خودِ او بند کرده بود — توکنِ دستگاه انقضا ندارد
+    await require('./station-devices').revokeBoundBy(stationId, m.user_id);
   }
   return row;
 }

@@ -16,14 +16,33 @@
  * صادراتِ پیش‌فرضِ این پرونده همان بخشِ دکان است، پس هر کدی که از قبل
  * `subs.grant(shopId, …)` می‌نوشت دست‌نخورده کار می‌کند.
  */
-const { query, one, many, newId, now } = require('../db');
+const { query, one, many, newId, now, tx } = require('../db');
 const { notifyPanel } = require('./panel-live');
-const { badRequest, notFound } = require('../middleware/errors');
+const { badRequest, notFound, forbidden } = require('../middleware/errors');
 const { sanitizeFeatures } = require('./features');
 const plans = require('./plans');
 const tenancy = require('./tenancy');
 
 const DAY = 24 * 60 * 60 * 1000;
+
+/**
+ * نقشهٔ گذارهای مجازِ وضعیتِ اشتراک — تنها جای این قاعده.
+ *
+ *   pending ──▶ active ──▶ suspended ──▶ active
+ *      │          │  │         │
+ *      └──▶ cancelled ◀────────┘
+ *                 │  └──▶ expired
+ *
+ * `cancelled` و `expired` پایانی‌اند: برگشت از آن‌ها فقط با `grant` است که
+ * مدت و پرداخت و ردِ خودش را دارد.
+ */
+const TRANSITIONS = Object.freeze({
+  pending: ['active', 'cancelled'],
+  active: ['suspended', 'cancelled', 'expired'],
+  suspended: ['active', 'cancelled'],
+  cancelled: [],
+  expired: [],
+});
 
 /** وضعیت اشتراک با ساعت سرور. برای هر دو بخش یکی است، پس بیرونِ build. */
 function stateOf(sub, at = now()) {
@@ -148,14 +167,50 @@ function build(T) {
    * اگر اشتراک زنده‌ای باشد، از پایان همان ادامه پیدا می‌کند تا روزهای
    * باقی‌مانده از بین نرود.
    */
-  async function grant(tenantId, { plan = 'custom', days = null, startsAt = null, endsAt = null,
-    features = [], maxDevices = 10, graceDays = 0, note = '', createdBy = '', price = null } = {}) {
+  /*
+   *  ⛔ «بخوان، حساب کن، بنویس» زیرِ قفلِ همان مشتری.
+   *
+   *  تا ۲.۹.۰ `grant` بی هیچ قفلی `liveOf` را می‌خواند و بعد می‌نوشت. دو
+   *  تمدیدِ هم‌زمان (دو کد، یا کد و دکمهٔ مدیر) هر دو همان `ends_at` را
+   *  پایه می‌گرفتند: هر دو کد خرج می‌شد و فقط **یک** دوره اضافه می‌شد —
+   *  پولِ یک دوره از مشتری رفته بود. قفلِ `pg_advisory_xact_lock` مالِ
+   *  همان تراکنش است و با پایانش آزاد می‌شود.
+   *
+   *  ⚠️ خبرِ «تمدید شد» **بعد از** آزاد شدنِ قفل می‌رود: فرستادنِ ایمیل
+   *  نباید تمدیدِ بعدیِ همان مشتری را پشتِ خودش نگه دارد.
+   */
+  async function grant(tenantId, opts = {}) {
+    const out = await tx(async (c) => {
+      await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`sub-grant:${T.app}:${tenantId}`]);
+      return grantLocked(tenantId, opts);
+    });
+    await require('./notices').onSubscription({ app: T.app, action: out.existing ? 'renew' : 'grant', row: out.row });
+    //  صفحهٔ «مشتری‌ها» و «فروش»ِ پنل همان لحظه عدد تازه می‌گیرند
+    notifyPanel('customers');
+    notifyPanel('sales');
+    return out.row;
+  }
+
+  async function grantLocked(tenantId, { plan = 'custom', days = null, startsAt = null, endsAt = null,
+    features = [], maxDevices = 10, graceDays = 0, note = '', createdBy = '', price = null,
+    allowUnsuspend = false } = {}) {
 
     const tenant = await one(`SELECT id FROM ${TEN} WHERE id=$1`, [tenantId]);
     if (!tenant) throw notFound(T.notFoundMessage, T.notFoundCode);
 
     const t = now();
     const existing = await liveOf(tenantId);
+    /*
+     *  ⛔ اشتراکِ **معلق** با یک کد باز نمی‌شود.
+     *
+     *  تعلیق تصمیمِ مدیر است (پرداختِ برگشتی، سوءاستفاده). تا ۲.۹.۰ همین
+     *  `UPDATE … status='active'` هر اشتراکِ معلقی را با خرج کردنِ هر کدِ
+     *  آزادی بی‌صدا زنده می‌کرد. حالا فقط مسیرِ خودِ مدیر
+     *  (`allowUnsuspend`) آن را برمی‌گرداند.
+     */
+    if (existing && existing.status === 'suspended' && !allowUnsuspend) {
+      throw forbidden('اشتراکِ این حساب معلق است؛ با پشتیبانی تماس بگیرید', 'subscription_suspended');
+    }
     const base = existing && Number(existing.ends_at) > t ? Number(existing.ends_at) : t;
 
     let start = startsAt ? Number(startsAt) : t;
@@ -248,15 +303,11 @@ function build(T) {
       });
     }
     /*
-     *  اعلانِ «تمدید شد» — از مرکزِ اعلان، با قالبِ قابلِ ویرایش.
-     *  ⚠️ خبر رفاه است، اشتراک اصل: هیچ خطایی از این‌جا بیرون نمی‌آید
+     *  اعلانِ «تمدید شد» در خودِ `grant` می‌رود، بیرونِ قفل.
+     *  ⚠️ خبر رفاه است، اشتراک اصل: هیچ خطایی از آن‌جا بیرون نمی‌آید
      *  و `onSubscription` خودش هر چیزی را می‌بلعد.
      */
-    await require('./notices').onSubscription({ app: T.app, action: existing ? 'renew' : 'grant', row });
-    //  صفحهٔ «مشتری‌ها» و «فروش»ِ پنل همان لحظه عدد تازه می‌گیرند
-    notifyPanel('customers');
-    notifyPanel('sales');
-    return row;
+    return { row, existing };
   }
 
   async function setStatus(subscriptionId, status, by = '') {
@@ -264,6 +315,17 @@ function build(T) {
       throw badRequest('وضعیت اشتراک معتبر نیست');
     }
     const before = await one(`SELECT * FROM ${TBL} WHERE id=$1`, [subscriptionId]);
+    if (!before) throw notFound('اشتراک پیدا نشد', 'subscription_not_found');
+    /*
+     *  ⛔ گذارِ نامعتبر پذیرفته نمی‌شود — `TRANSITIONS` تنها نقشهٔ آن است.
+     *  تا ۲.۹.۰ هر وضعیتی به هر وضعیتی می‌رفت: اشتراکِ لغوشده یا
+     *  منقضی‌شده با یک کلیک «فعال» می‌شد (بی هیچ مدت و پرداختی)، و اگر
+     *  اشتراکِ زندهٔ دیگری بود، ایندکسِ یکتا یک ۵۰۰ِ گنگ می‌داد. برگرداندنِ
+     *  اشتراکِ تمام‌شده کارِ `grant` است، با مدت و ردِ خودش.
+     */
+    if (before.status !== status && !(TRANSITIONS[before.status] || []).includes(status)) {
+      throw badRequest(`اشتراکِ «${before.status}» را نمی‌توان «${status}» کرد`, 'bad_transition');
+    }
     const row = await one(
       `UPDATE ${TBL} SET status=$2, updated_at=$3, created_by=COALESCE(NULLIF($4,''), created_by) WHERE id=$1 RETURNING *`,
       [subscriptionId, status, now(), by]
@@ -402,7 +464,7 @@ function build(T) {
 
   return {
     tenancy: T,
-    liveOf, latestOf, historyOf, changeLog, stateOf, expireDue, grant, setStatus,
+    liveOf, latestOf, historyOf, changeLog, stateOf, expireDue, grant, setStatus, TRANSITIONS,
     expiringSoon, notifyExpiring, DAY,
   };
 }

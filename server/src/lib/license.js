@@ -95,6 +95,20 @@ async function publicKey() {
   return (await keys()).publicSpki;
 }
 
+/**
+ * شناسهٔ کلید (`kid`) — ۱۶ نویسهٔ اولِ SHA-256ِ خودِ کلیدِ عمومی.
+ *
+ * ⛔ تا ۲.۹.۰ مجوز هیچ `kid`ی نداشت، پس برنامه فقط یک کلید را می‌شناخت و
+ * عوض کردنِ کلید (مثلاً پس از لو رفتنش) یعنی همهٔ نصب‌ها یک‌شبه قفل
+ * می‌شدند. با `kid` برنامه می‌تواند چند کلید را بشناسد و کلیدِ تازه پیش از
+ * جابه‌جایی در برنامه بنشیند. از خودِ کلید ساخته می‌شود، پس هیچ تنظیمی
+ * نمی‌خواهد و دو سرور با یک کلید یک `kid` دارند.
+ */
+async function keyId() {
+  const spki = await publicKey();
+  return crypto.createHash('sha256').update(Buffer.from(spki, 'base64')).digest('hex').slice(0, 16);
+}
+
 function b64url(buf) {
   return Buffer.from(buf).toString('base64')
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -117,6 +131,7 @@ async function issue({
   features = [],
   core = [],
   subscriptionEndsAt = 0,
+  activeUntil = 0,
   plan = '',
   planTitle = '',
   audience = AUDIENCE,
@@ -125,11 +140,17 @@ async function issue({
 }) {
   const { privateKey } = await keys();
 
-  const header = { alg: 'ES256', typ: 'TLIC' };
+  const header = { alg: 'ES256', typ: 'TLIC', kid: await keyId() };
 
   // مجوز از خود اشتراک زودتر تمام می‌شود تا لغو اشتراک زود اثر کند —
-  // ولی نه دیرتر از پایان اشتراک، وگرنه چند روز مجانی می‌دهد
-  const expiresAt = Math.min(at + TOKEN_TTL_MS, subscriptionEndsAt || at + TOKEN_TTL_MS);
+  // ولی نه دیرتر از پایان اشتراک، وگرنه چند روز مجانی می‌دهد.
+  //  ⚠️ `activeUntil` پایانِ **مهلتِ** اشتراک است (`graceEndsAt`): تا ۲.۹.۰
+  //  سقف همان `ends_at`ِ خام بود، پس در روزهای مهلت سرور «فعال» می‌گفت و
+  //  مجوزی می‌داد که همان لحظه منقضی بود.
+  const cap = Number(activeUntil) || Number(subscriptionEndsAt) || at + TOKEN_TTL_MS;
+  const expiresAt = Math.min(at + TOKEN_TTL_MS, cap);
+  //  مجوزی که پیش از صدور منقضی است امضا نمی‌شود
+  if (expiresAt <= at) return null;
 
   /*
    * نام فیلدها همان چیزی است که برنامه می‌خواند — نه چیز دیگری.
@@ -190,4 +211,4 @@ async function issue({
   };
 }
 
-module.exports = { issue, publicKey, ISSUER, AUDIENCE, AUDIENCE_PUMP, TOKEN_TTL_MS };
+module.exports = { issue, publicKey, keyId, ISSUER, AUDIENCE, AUDIENCE_PUMP, TOKEN_TTL_MS };
