@@ -8,10 +8,22 @@ const { tooMany } = require('./errors');
 
 const buckets = new Map();
 
+/**
+ * IPِ کاربر برای سقفِ نرخ.
+ *
+ * ⛔ **راست‌ترین** بخشِ `X-Forwarded-For`، نه چپ‌ترین. چپ‌ترین همان
+ * چیزی است که خودِ کاربر می‌فرستد؛ هر پروکسیِ مطمئن IPِ **دیده‌شده** را
+ * ته فهرست اضافه می‌کند. پس با چپ‌ترین، هر کسی با یک سرآیندِ ساختگی هر
+ * بار IPِ تازه‌ای می‌شد و سقفِ ورود و کد را دور می‌زد. درگاهِ پنلِ خانگی
+ * کلِ سرآیند را با IPِ واقعی **بازنویسی** می‌کند، پس آن‌جا هر دو یکی‌اند.
+ */
 function clientIp(req) {
   if (config.trustProxy) {
     const fwd = req.headers['x-forwarded-for'];
-    if (typeof fwd === 'string' && fwd.length) return fwd.split(',')[0].trim();
+    if (typeof fwd === 'string' && fwd.length) {
+      const parts = fwd.split(',').map((x) => x.trim()).filter(Boolean);
+      if (parts.length) return parts[parts.length - 1];
+    }
   }
   return req.socket?.remoteAddress || 'unknown';
 }

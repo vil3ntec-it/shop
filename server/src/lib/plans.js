@@ -225,9 +225,39 @@ async function allConfig() {
   return Object.fromEntries(rows.map(r => [r.key, r.value]));
 }
 
+/**
+ * ⛔ تنها چیزی از `app_config` که از درِ مدیریت بیرون می‌رود.
+ *
+ * `app_config` جای **رازها** هم هست: کلیدِ خصوصیِ امضای مجوز
+ * (`license_private_key`)، کلیدِ خصوصیِ پوش (`vapid_private`)، رمزِ SMTP
+ * (`email_pass`)، کلیدِ پیامک و رمزِ خواندنِ پمپ‌ها. تا امروز
+ * `GET /api/admin/plans` و `PATCH /api/admin/config` کلِ جدول را
+ * (`allConfig()`) در پاسخ می‌گذاشتند — یعنی کلیدِ امضای مجوز به مرورگرِ هر
+ * مدیری، و از راهِ پنلِ خانگی به هر کاربرِ واردشدهٔ آن پنل، می‌رسید. با آن
+ * کلید هر کسی برای هر دستگاهی مجوزِ دلخواه امضا می‌کرد.
+ *
+ * پس فهرستِ **سفید** است، نه فهرستِ سیاه: کلیدِ تازه‌ای که فردا در
+ * `app_config` بنشیند تا کسی صریح این‌جا ننویسدش بیرون نمی‌رود.
+ * `allConfig()` برای مصرفِ **داخلیِ** سرور سرِ جایش است.
+ */
+const PUBLIC_CONFIG_KEYS = Object.freeze([
+  'trial_days', 'pump_trial_days',
+  'whatsapp_number', 'whatsapp_message',
+  'currency', 'pump_currency',
+  'min_app_version', 'brand_name',
+]);
+
+async function publicConfig() {
+  const all = await allConfig();
+  const out = {};
+  for (const k of PUBLIC_CONFIG_KEYS) if (all[k] !== undefined) out[k] = all[k];
+  return out;
+}
+
 module.exports = {
   DEFAULT_PLANS, DEFAULT_CONFIG, approxDays, endOfPeriod,
   seedDefaults, listPlans, getPlan, getConfig, setConfig, allConfig,
+  publicConfig, PUBLIC_CONFIG_KEYS,
   TRIAL_DEFAULT, trialConfig, trialDaysOf,
   discountOf, shapePlan,
 };

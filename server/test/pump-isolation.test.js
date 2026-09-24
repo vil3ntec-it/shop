@@ -333,6 +333,8 @@ test('مجوزِ دکان و مجوزِ پمپ دو شنوندهٔ جدا دار
 
   const sLic = await h.post('/api/license/sync',
     { device: { uid: 'dev-x' } }, { token: u.accessToken });
+  //  ⛔ مجوزِ پمپ فقط برای کامپیوترِ ثبت‌شده — اول بند می‌شود
+  await h.post('/api/pump/device/bind', { device: { uid: 'dev-x' } }, { token: asPump.accessToken });
   const pLic = await h.post('/api/pump/license',
     { device: { uid: 'dev-x' } }, { token: asPump.accessToken });
 
@@ -679,6 +681,8 @@ test('مجوز به همان پمپ بسته است، نه فقط به دستگ�
   await require('../src/lib/subscriptions').pump.grant(a.stationId,
     { plan: 'custom', days: 30 });
 
+  //  ⛔ مجوزِ پمپ فقط برای کامپیوترِ ثبت‌شده — اول بند می‌شود
+  await h.post('/api/pump/device/bind', { device: { uid: 'same-pc' } }, { token: a.accessToken });
   const r = await h.post('/api/pump/license',
     { device: { uid: 'same-pc' } }, { token: a.accessToken });
   assert.equal(r.status, 200);

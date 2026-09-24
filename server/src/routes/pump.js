@@ -253,6 +253,56 @@ router.patch('/members/:id', requireStationOwner, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+/*
+ * ── دستگاه‌های پمپ ─────────────────────────────────────────────────
+ *
+ * ⛔ تا ۲.۹.۰ هیچ راهی برای جدا کردنِ یک کامپیوتر از پمپ نبود — نه برای
+ * صاحبِ پمپ و نه برای مدیرِ سامانه. `revoke` در کتابخانه بود و هیچ مسیری
+ * صدایش نمی‌زد. پس کامپیوترِ دزدیده‌شده یا فروخته‌شده تا ابد به پوشه و
+ * چتِ مشتری‌های پمپ دست داشت.
+ *
+ * دیدن برای هر عضو؛ جدا کردن برای صاحب و مدیر؛ برگرداندن فقط صاحب.
+ */
+router.get('/devices', async (req, res, next) => {
+  try {
+    const devs = require('../lib/station-devices');
+    res.json({
+      devices: await devs.list(req.stationId),
+      limit: await devs.deviceLimitOf(req.stationId),
+      serverTime: now(),
+    });
+  } catch (err) { next(err); }
+});
+
+router.post('/devices/:id/revoke', requireStationOwner, async (req, res, next) => {
+  try {
+    const device = await require('../lib/station-devices')
+      .revoke(req.stationId, v.id(req.params.id));
+    await audit.log({
+      userId: req.user.id, action: 'pump.device_revoked',
+      targetType: 'station_device', targetId: device.id,
+      detail: { stationId: req.stationId }, ip: clientIp(req),
+    });
+    res.json({ device, serverTime: now() });
+  } catch (err) { next(err); }
+});
+
+router.post('/devices/:id/restore', requireStationOwner, async (req, res, next) => {
+  try {
+    if (req.stationRole !== 'owner') {
+      throw forbidden('برگرداندنِ کامپیوترِ جداشده فقط کارِ صاحبِ پمپ است', 'permission_denied');
+    }
+    const device = await require('../lib/station-devices')
+      .restore(req.stationId, v.id(req.params.id));
+    await audit.log({
+      userId: req.user.id, action: 'pump.device_restored',
+      targetType: 'station_device', targetId: device.id,
+      detail: { stationId: req.stationId }, ip: clientIp(req),
+    });
+    res.json({ device, serverTime: now() });
+  } catch (err) { next(err); }
+});
+
 // ──────────────────────────────────────────────────────────────────
 //  اشتراک
 // ──────────────────────────────────────────────────────────────────
@@ -315,6 +365,20 @@ router.post('/license', async (req, res, next) => {
     const deviceUid = v.text(raw, { max: 120, required: true, field: 'شناسه‌ی دستگاه' });
     const deviceName = v.text(req.body?.device?.name ?? req.body?.deviceName, { max: 120 });
 
+    /*
+     *  ⛔ مجوز فقط برای کامپیوتری که واقعاً روی همین پمپ ثبت شده و جدا
+     *  نشده. تا ۲.۹.۰ این مسیر برای **هر** `deviceUid`ی که کلاینت می‌فرستاد
+     *  امضا می‌کرد — یعنی هر عضوِ پمپ با یک حلقه برای هزار کامپیوترِ ساختگی
+     *  مجوز می‌گرفت و سقفِ دستگاه (`device_limit`) از این در دور می‌خورد.
+     */
+    const devRow = await one(
+      `SELECT status FROM station_devices WHERE station_id=$1 AND device_uid=$2`,
+      [req.stationId, deviceUid]
+    );
+    if (!devRow || devRow.status !== 'active') {
+      throw forbidden('این کامپیوتر روی پمپ ثبت نشده است', 'device_not_registered');
+    }
+
     const ent = await entitlementOf(req.stationId);
     const at = now();
 
@@ -336,6 +400,7 @@ router.post('/license', async (req, res, next) => {
       features: ent.features,
       core: [...PUMP.CORE_KEYS],
       subscriptionEndsAt: endsAt,
+      activeUntil: ent.source === 'trial' ? endsAt : Number(ent.subscription.graceEndsAt || endsAt),
       plan: ent.subscription.plan || (ent.source === 'trial' ? 'trial' : ''),
       planTitle: ent.source === 'trial' ? 'دوره‌ی آزمایشی' : (ent.subscription.plan || ''),
       audience: license.AUDIENCE_PUMP,
@@ -343,6 +408,9 @@ router.post('/license', async (req, res, next) => {
       tenantId: req.stationId,
       at,
     });
+    if (!issued) {
+      return res.json({ license: null, reason: 'expired', source: ent.source, features: ent.features, serverTime: at });
+    }
 
     res.json({
       license: issued.token,

@@ -301,6 +301,7 @@ router.post('/subscriptions', async (req, res, next) => {
   const sub = await subs.grant(shopId, {
     plan, days, features, maxDevices, graceDays, note, createdBy: req.admin.id, price,
     startsAt: v.timestamp(req.body?.startsAt), endsAt: v.timestamp(req.body?.endsAt),
+    allowUnsuspend: true,
   });
   if (quoted) {
     await discounts.useCode(quoted.code.id, {
@@ -442,7 +443,7 @@ router.get('/plans', async (req, res) => {
   res.json({
     plans: await plans.listPlans({ activeOnly: false, app: appOf(req) }),
     app: appOf(req),
-    config: await plans.allConfig(),
+    config: await plans.publicConfig(),
   });
 });
 
@@ -501,7 +502,7 @@ router.patch('/config', async (req, res) => {
     if (req.body?.[key] !== undefined) await plans.setConfig(key, v.text(req.body[key], { max: 300 }));
   }
   await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.config_updated' });
-  res.json({ config: await plans.allConfig() });
+  res.json({ config: await plans.publicConfig() });
 });
 
 // ---------- درخواست‌های خرید ----------
@@ -524,7 +525,7 @@ router.post('/purchase-requests/:id/approve', async (req, res, next) => {
   if (!reqRow) return next(notFound('درخواست پیدا نشد'));
   const days = req.body?.days ? v.integer(req.body.days, { min: 1, max: 3650 }) : null;
   const sub = await subs.grant(reqRow.shop_id, {
-    plan: reqRow.plan_code, days, createdBy: req.admin.id, note: reqRow.note,
+    plan: reqRow.plan_code, days, createdBy: req.admin.id, note: reqRow.note, allowUnsuspend: true,
   });
   await query(`UPDATE purchase_requests SET status='approved', handled_at=$2, handled_by=$3 WHERE id=$1`,
     [id, now(), req.admin.id]);

@@ -641,30 +641,50 @@ router.post('/refresh', sessionLimit, async (req, res, next) => {
   //  `null` یعنی «هر بخشی» — بخشِ درست را از خودِ ردیف برمی‌داریم،
   //  نه از چیزی که درخواست ادعا می‌کند. وگرنه یک توکنِ تازه‌سازیِ
   //  دکان می‌توانست توکنِ دسترسیِ پمپ بسازد.
-  const found = await tokens.rotateRefresh(token, { app: null });
+  let found = await tokens.rotateRefresh(token, { app: null });
+  if (found?.stolen) {
+    const n = await tokens.revokeFamily(found.row);
+    await audit.log({
+      actorType: 'user', userId: found.row.subject_id, action: 'auth.refresh_reused',
+      detail: { sessions: n, app: found.row.app || 'shop' }, ip: clientIp(req),
+    });
+    return next(unauthorized('این نشست جای دیگری هم به کار رفته و بسته شد؛ دوباره وارد شوید', 'refresh_reused'));
+  }
   if (!found) return next(unauthorized('نشست منقضی شده است، دوباره وارد شوید', 'invalid_token'));
-  const row = found.row;
-
-  const user = await one('SELECT * FROM users WHERE id=$1', [row.subject_id]);
-  if (!user || user.status !== 'active') return next(unauthorized('حساب در دسترس نیست', 'invalid_token'));
-
-  const access = await tokens.issue({
-    kind: 'access', subjectId: user.id, deviceId: row.device_id,
-    ttlMs: config.tokens.accessTtlMs, app: row.app || 'shop',
-  });
 
   /*
-   *  تازه‌سازیِ چرخشی (بندِ ۲.۵). در پنجرهٔ ارفاق توکنِ تازه‌ای ساخته
-   *  نمی‌شود؛ همان جانشینِ قبلی برمی‌گردد، وگرنه دو درخواستِ موازی دو
-   *  زنجیرهٔ جدا می‌ساختند و یکی‌شان فردا بی‌دلیل باطل می‌شد.
+   *  تازه‌سازیِ چرخشی (بندِ ۲.۵). در پنجرهٔ ارفاق از آخرین حلقهٔ زنده
+   *  می‌چرخیم. ⛔ و اگر درخواستِ هم‌زمانِ دیگری همین لحظه همین توکن را
+   *  چرخاند (`markRotated` ⇒ صفر)، جفتِ ما دور ریخته می‌شود و یک بار از
+   *  نو — این بار از راهِ ارفاق — می‌چرخیم؛ وگرنه دو زنجیرهٔ زنده از یک
+   *  توکن می‌ماند.
    */
-  const fresh = await tokens.issue({
-    kind: 'refresh', subjectId: user.id, deviceId: row.device_id,
-    ttlMs: config.tokens.refreshTtlMs, app: row.app || 'shop',
-  });
-  await tokens.markRotated(found.hash, fresh.token);
-  const refreshToken = fresh.token;
-  const refreshExpiresAt = fresh.expiresAt;
+  let access = null;
+  let refreshToken = '';
+  let refreshExpiresAt = 0;
+  for (let attempt = 0; attempt < 8 && found; attempt++) {
+    const row = found.row;
+    const user = await one('SELECT * FROM users WHERE id=$1', [row.subject_id]);
+    if (!user || user.status !== 'active') return next(unauthorized('حساب در دسترس نیست', 'invalid_token'));
+
+    const acc = await tokens.issue({
+      kind: 'access', subjectId: user.id, deviceId: row.device_id,
+      ttlMs: config.tokens.accessTtlMs, app: row.app || 'shop',
+    });
+    const fresh = await tokens.issue({
+      kind: 'refresh', subjectId: user.id, deviceId: row.device_id,
+      ttlMs: config.tokens.refreshTtlMs, app: row.app || 'shop',
+    });
+    if (await tokens.markRotated(found.hash, fresh.token)) {
+      access = acc; refreshToken = fresh.token; refreshExpiresAt = fresh.expiresAt;
+      break;
+    }
+    await tokens.revoke(acc.token, 'access');
+    await tokens.revoke(fresh.token, 'refresh');
+    found = await tokens.rotateRefresh(token, { app: null });
+    if (found?.stolen) found = null;
+  }
+  if (!access) return next(unauthorized('نشست منقضی شده است، دوباره وارد شوید', 'invalid_token'));
 
   res.json({
     ok: true,

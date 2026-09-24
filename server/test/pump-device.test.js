@@ -91,16 +91,39 @@ test('همان کامپیوتر با کدِ تازه، همان پمپ را تم
   });
   assert.equal(first.status, 201);
 
+  //  ⛔ تمدیدِ «همان پمپ» با توکنِ همان دستگاه — اثباتِ مالکیت، نه فقط شناسه
   const again = await h.post('/api/pump/device/activate', {
     code: await pumpCode(t, { days: 30 }),
     device: dev('pc-renew'), station: { code: 'dev-renew-other' },
-  });
+  }, { token: first.body.deviceToken });
   assert.equal(again.status, 201, JSON.stringify(again.body));
   assert.equal(again.body.station.id, first.body.station.id, 'باید همان پمپ بماند');
   assert.equal(again.body.createdStation, false);
 
   //  و روزها روی هم می‌آیند
   assert.ok(again.body.subscription.endsAt > first.body.subscription.endsAt);
+});
+
+test('⛔ شناسهٔ کامپیوترِ کسِ دیگری، بی توکنش، پمپِ او را نمی‌گیرد', async () => {
+  const t = await adminToken();
+  const victim = await h.post('/api/pump/device/activate', {
+    code: await pumpCode(t, { days: 30 }),
+    device: dev('pc-victim'), station: { code: 'dev-victim' },
+  });
+  assert.equal(victim.status, 201);
+
+  //  کسی که فقط `deviceUid` را می‌داند (در هر مجوز هست) و یک کدِ آزاد دارد
+  const thief = await h.post('/api/pump/device/activate', {
+    code: await pumpCode(t, { days: 30 }), device: dev('pc-victim'),
+  });
+  assert.equal(thief.status, 201, JSON.stringify(thief.body));
+  assert.notEqual(thief.body.station.id, victim.body.station.id, 'نباید به پمپِ قربانی برسد');
+  assert.equal(thief.body.createdStation, true);
+
+  //  و توکنِ قربانی هنوز زنده است — جایگزین نشده
+  const me = await h.get('/api/pump/device/me', { token: victim.body.deviceToken });
+  assert.equal(me.status, 200, 'توکنِ صاحبِ واقعی نباید بیفتد');
+  assert.equal(me.body.station.id, victim.body.station.id);
 });
 
 test('کدی که به نامِ پمپِ مشخصی صادر شده، روی همان می‌نشیند', async () => {

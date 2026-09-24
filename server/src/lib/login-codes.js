@@ -250,24 +250,54 @@ async function verifyCode({ app, requestId, code }) {
     return fail(400, 'CODE_EXPIRED', 'کد منقضی شده است. کد جدید بگیرید.');
   }
 
+  /*
+   *  ⛔ **یک تلاش پیش از سنجیدن گرفته می‌شود، و اتمی.**
+   *
+   *  تا ۲.۹.۰ شمارنده خوانده می‌شد و بعد یک عددِ مطلق نوشته می‌شد. پس ده‌ها
+   *  درخواستِ هم‌زمان همه `attempts=0` را می‌دیدند و همه کدشان سنجیده
+   *  می‌شد — سقفِ «پنج بار» عملاً صدها حدس بود، و کد با همین به حسابِ کسِ
+   *  دیگری می‌رسید. حالا هر حدس اول یک خانه از سقف را **در خودِ
+   *  دیتابیس** برمی‌دارد؛ حدسی که خانه‌ای نگرفت اصلاً سنجیده نمی‌شود.
+   */
+  const max = Number(rec.max_attempts || MAX_WRONG);
+  const claim = await one(
+    `UPDATE login_requests SET attempts = attempts + 1
+      WHERE request_id=$1 AND consumed_at IS NULL AND superseded_at IS NULL
+        AND expires_at >= $2 AND attempts < $3
+      RETURNING attempts`,
+    [rec.request_id, t, max]
+  );
+  if (!claim) {
+    //  یا سقف پر شد، یا همین لحظه کسِ دیگری مصرفش کرد/منقضی شد
+    const cur = await one('SELECT attempts FROM login_requests WHERE request_id=$1', [rec.request_id]);
+    if (cur && Number(cur.attempts) >= max) {
+      await lock(app, rec.email);
+      return fail(423, 'LOCKED', '۵ بار اشتباه — ۱۵ دقیقه قفل شد.', LOCK_S, { attempts_left: 0 });
+    }
+    return fail(400, 'CODE_EXPIRED', 'کد منقضی شده است. کد جدید بگیرید.');
+  }
+  const attempts = Number(claim.attempts);
+
   if (!safeEq(rec.code_hash, hashCode(app, rec.email, clean))) {
-    const attempts = Number(rec.attempts) + 1;
-    if (attempts >= Number(rec.max_attempts || MAX_WRONG)) {
+    if (attempts >= max) {
       await query(
-        `UPDATE login_requests SET attempts=$2, superseded_at=$3, code_sealed='' WHERE request_id=$1`,
-        [rec.request_id, attempts, t]
+        `UPDATE login_requests SET superseded_at=$2, code_sealed='' WHERE request_id=$1`,
+        [rec.request_id, t]
       );
       await lock(app, rec.email);
       return fail(423, 'LOCKED', '۵ بار اشتباه — ۱۵ دقیقه قفل شد.', LOCK_S, { attempts_left: 0 });
     }
-    await query('UPDATE login_requests SET attempts=$2 WHERE request_id=$1', [rec.request_id, attempts]);
-    return fail(400, 'CODE_WRONG', 'کد اشتباه است.', 0, { attempts_left: Number(rec.max_attempts || MAX_WRONG) - attempts });
+    return fail(400, 'CODE_WRONG', 'کد اشتباه است.', 0, { attempts_left: max - attempts });
   }
 
-  //  یک‌بارمصرف: مصرف شد و کدِ مهروموم هم پاک می‌شود
-  await query(
-    `UPDATE login_requests SET consumed_at=$2, code_sealed='' WHERE request_id=$1`, [rec.request_id, t]
+  //  یک‌بارمصرف: مصرف شد و کدِ مهروموم هم پاک می‌شود.
+  //  ⚠️ `consumed_at IS NULL` در خودِ شرط: دو درخواستِ هم‌زمان با کدِ درست
+  //  فقط یکی نشست می‌گیرد.
+  const used = await one(
+    `UPDATE login_requests SET consumed_at=$2, code_sealed=''
+      WHERE request_id=$1 AND consumed_at IS NULL RETURNING request_id`, [rec.request_id, t]
   );
+  if (!used) return fail(400, 'CODE_EXPIRED', 'کد منقضی شده است. کد جدید بگیرید.');
   //  «مصرف شد» هم یک تغییر است — چراغِ همان ردیف روی صفحه عوض می‌شود
   notifyPanel('logins');
   notifyPanel('codes');

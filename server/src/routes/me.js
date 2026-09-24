@@ -162,8 +162,13 @@ router.get('/devices', async (req, res) => {
 
 router.delete('/devices/:id', async (req, res) => {
   const id = v.id(req.params.id, { field: 'شناسه دستگاه' });
-  await query(`UPDATE devices SET status='revoked' WHERE id=$1 AND user_id=$2`, [id, req.user.id]);
-  await query('UPDATE tokens SET revoked_at=$1 WHERE device_id=$2 AND revoked_at IS NULL', [now(), id]);
+  const r = await query(`UPDATE devices SET status='revoked' WHERE id=$1 AND user_id=$2`, [id, req.user.id]);
+  //  ⛔ نشست‌ها فقط وقتی دستگاه واقعاً مالِ همین کاربر بود — وگرنه هر کسی با
+  //  شناسهٔ دستگاهِ دیگری نشستِ او را می‌کشت
+  if (r.rowCount) {
+    await query('UPDATE tokens SET revoked_at=$1 WHERE device_id=$2 AND subject_id=$3 AND revoked_at IS NULL',
+      [now(), id, req.user.id]);
+  }
   res.json({ ok: true });
 });
 

@@ -46,6 +46,13 @@ const { badRequest, forbidden, notFound, unauthorized } = require('../middleware
 const router = express.Router();
 const PUMP = catalogOf('pump');
 
+/** توکنِ دستگاهی که همراهِ درخواست آمده — یا null. هیچ‌وقت خطا نمی‌دهد. */
+async function deviceOfRequest(req) {
+  const m = /^Bearer\s+(pd_\S+)$/i.exec(String(req.headers.authorization || '').trim());
+  if (!m) return null;
+  try { return await devices.bySecret(m[1]); } catch { return null; }
+}
+
 /* ══════════════════════════════════════════════════════════════════
    فعال‌سازی — تنها مسیرِ بی‌توکن
    ══════════════════════════════════════════════════════════════════ */
@@ -81,15 +88,22 @@ router.post(
        *  حالتِ اول همان چیزی است که «تمدید» را ساده می‌کند: سالِ بعد
        *  همان برنامه، کدِ تازه، همان پمپ — نه پمپِ دومِ خالی.
        */
-      const known = await one(
-        `SELECT d.station_id FROM station_devices d
-           JOIN stations s ON s.id = d.station_id
-          WHERE d.device_uid=$1 AND d.status='active' AND s.status='active'
-          ORDER BY d.created_at DESC LIMIT 1`,
-        [deviceUid]
-      );
-
-      let stationId = known?.station_id || null;
+      /*
+       *  ⛔ «این دستگاه از قبل جایی ثبت شده» فقط با **اثباتِ مالکیت**.
+       *
+       *  تا ۲.۹.۰ این‌جا پمپ را از روی خودِ `deviceUid` پیدا می‌کردیم — و
+       *  این مسیر بی‌توکن است. `deviceUid` راز نیست (در هر مجوز هست،
+       *  در پنل دیده می‌شود، از روی نامِ کامپیوتر ساخته می‌شود)، پس هر
+       *  کسی با شناسهٔ کامپیوترِ یک پمپ و یک کدِ آزاد، به همان پمپ
+       *  می‌رسید و `register` توکنِ دستگاهِ صاحبش را **جایگزین** می‌کرد:
+       *  صاحب بیرون می‌افتاد و او با دسترسیِ کاملِ دستگاه جایش می‌نشست.
+       *
+       *  حالا تمدیدِ «همان پمپ» فقط با توکنِ همان دستگاه (`Authorization`)
+       *  است — و برنامهٔ امروز تمدید را از `/device/redeem` می‌زند که
+       *  همین توکن را دارد. بی توکن: پمپِ خودِ کد، یا پمپِ تازه.
+       */
+      const proof = await deviceOfRequest(req);
+      let stationId = proof?.station_id || null;
 
       if (!stationId) {
         const clean = String(code).replace(/\D/g, '');
@@ -99,6 +113,9 @@ router.post(
           [require('../lib/vip-codes').hashCode(clean)]
         );
         if (!peek) throw notFound('این کد معتبر نیست', 'bad_code');
+        //  ⚠️ کدِ خرج‌شده یا باطل پمپِ یتیم نمی‌سازد — همان دو پاسخِ `redeem`
+        if (peek.status === 'used') throw forbidden('این کد قبلاً استفاده شده است', 'code_used');
+        if (peek.status !== 'active') throw forbidden('این کد دیگر کار نمی‌کند', 'code_inactive');
         stationId = peek.station_id || null;
       }
 
@@ -113,10 +130,16 @@ router.post(
 
       //  اشتراک: همان کد را خرج می‌کند. اگر کد بد باشد این‌جا می‌افتد و
       //  پمپِ تازه‌ساخته بی‌اشتراک می‌ماند — که درست است، نه نیمه‌کاره.
+      //  ⚠️ سقفِ دستگاه **پیش از** خرج کردنِ کد: وگرنه کدی که پول داده شده
+      //  خرج می‌شد و بعد `register` با `device_limit` می‌افتاد. خودِ
+      //  `register` دوباره و زیرِ قفل می‌سنجد؛ این فقط کد را نگه می‌دارد.
+      if (!created) await devices.assertRoom(stationId, deviceUid);
+
       const out = await vip.redeem(code, { userId: `device:${deviceUid}`, tenantId: stationId });
 
       const reg = await devices.register(stationId, {
         uid: deviceUid, name: deviceName, platform, ip: clientIp(req),
+        maxDevices: await devices.deviceLimitOf(stationId),
       });
 
       const st = await stations.getStation(stationId);
@@ -192,9 +215,22 @@ router.post(
       const member = await stations.membershipOf(req.user.id);
       if (!member) throw notFound('برای این حساب پمپی ثبت نشده است', 'no_station');
 
+      /*
+       *  ⛔ فقط صاحب و مدیر. توکنِ دستگاه دسترسیِ کاملِ پمپ است (پوشهٔ
+       *  ابری، چتِ مشتری‌ها، عوض کردنِ کدِ اپِ کارمندان) و تاریخِ انقضا
+       *  ندارد؛ پس کارمندی که با حسابِ خودش یک کامپیوتر را بند می‌کرد، از
+       *  دسترسیِ «فقط‌خواندنیِ» خودش بالاتر می‌رفت — و با اخراج هم
+       *  نمی‌افتاد. حالا هم نقش سنجیده می‌شود و هم کسی که بند کرد ثبت
+       *  می‌شود (`bound_by_user_id`) تا با رفتنش، دستگاهش هم برود.
+       */
+      if (!['owner', 'manager'].includes(member.role)) {
+        throw forbidden('فقط صاحب یا مدیرِ پمپ می‌تواند این کامپیوتر را به پمپ بند کند', 'not_allowed');
+      }
+
       const stationId = member.station_id;
       const reg = await devices.register(stationId, {
         uid: deviceUid, name: deviceName, platform, ip: clientIp(req),
+        maxDevices: await devices.deviceLimitOf(stationId), boundBy: req.user.id,
       });
 
       const st = await stations.getStation(stationId);
@@ -262,11 +298,13 @@ async function signFor(station, ent, deviceUid, deviceName = '') {
     features: ent.features,
     core: [...PUMP.CORE_KEYS],
     subscriptionEndsAt: endsAt,
+    activeUntil: ent.source === 'trial' ? endsAt : Number(ent.subscription.graceEndsAt || endsAt),
     plan: ent.subscription.plan || (ent.source === 'trial' ? 'trial' : ''),
     planTitle: ent.source === 'trial' ? 'دوره‌ی آزمایشی' : (ent.subscription.plan || ''),
     audience: license.AUDIENCE_PUMP,
     tenantId: station.id,
   });
+  if (!issued) return { license: null, reason: 'expired', features: ent.features };
   return {
     license: issued.token,
     publicKey: await license.publicKey(),
@@ -351,7 +389,9 @@ router.post(
 router.post('/join-code', async (req, res, next) => {
   try {
     const out = await devices.mintJoinCode(req.stationId, {
-      role: v.text(req.body?.role, { max: 10 }) || 'staff',
+      //  ⛔ کامپیوتر نقشِ «صاحب» نمی‌بخشد: صاحب همان کسی است که اولین بار
+      //  می‌پیوندد (`redeemJoinCode`)، نه هر کسی که کدِ این دستگاه را دارد.
+      role: ['manager', 'staff'].includes(String(req.body?.role || '')) ? String(req.body.role) : 'staff',
       hours: v.integer(req.body?.hours, { min: 1, max: 720, def: 24 }),
       maxUses: v.integer(req.body?.maxUses, { min: 1, max: 100, def: 10 }),
     });
