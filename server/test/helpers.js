@@ -20,7 +20,8 @@ process.env.BACKUP_PATH = require('path').join(
 );
 process.env.RATE_GENERAL_MAX = '100000';
 process.env.RATE_AUTH_MAX = '10000';
-process.env.RATE_OTP_MAX = '10000';
+process.env.RATE_OTP_MAX ||= '10000';
+process.env.RATE_VERIFY_MAX ||= '10000';
 process.env.RATE_JOIN_MAX = '10000';
 process.env.LOGIN_LOCKOUT_TRIES = '10000';
 //  شمارنده‌ی دومِ قفل هم باید باز باشد، وگرنه سنجه‌هایی که عمداً رمزِ

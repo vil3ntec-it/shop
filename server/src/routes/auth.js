@@ -60,6 +60,17 @@ const otpLimit = rateLimit({
   },
 });
 
+//  ⛔ زدنِ کد سطلِ خودش را دارد — شرح بالای `verifyMax` در `config.js`.
+//  کلید همان ایمیل/شماره است، مثلِ `otpLimit`.
+const verifyLimit = rateLimit({
+  max: config.rateLimit.verifyMax, keyPrefix: 'otp-verify',
+  key: (req) => {
+    const raw = String(req.body?.phone || req.body?.email || req.body?.destination || '').trim();
+    if (!raw) return null;
+    return raw.includes('@') ? raw.toLowerCase() : raw.replace(/\D/g, '') || null;
+  },
+});
+
 // ---------- کمکی‌ها ----------
 
 /** ثبت تلاش ورود — پایه‌ی قفل موقت حساب. */
@@ -408,7 +419,7 @@ router.post('/register/start', otpLimit, async (req, res, next) => {
  * پله‌ی سوم دیگر کد نمی‌خواهد و کاربر لازم نیست موقع گرفتن لوکیشن دوباره
  * دنبال ایمیلش بگردد.
  */
-router.post('/register/verify', otpLimit, async (req, res, next) => {
+router.post('/register/verify', verifyLimit, async (req, res, next) => {
   if (!config.allowRegistration) return next(forbidden('ثبت‌نام روی این سرور بسته است', 'registration_closed'));
 
   const email = v.email(req.body?.email, { required: true });
@@ -553,7 +564,7 @@ router.post('/otp/request', otpLimit, async (req, res, next) => {
   res.json({ ok: true, [to.kind]: to.value, destination: to.value, ...out });
 });
 
-router.post('/otp/verify', otpLimit, async (req, res, next) => {
+router.post('/otp/verify', verifyLimit, async (req, res, next) => {
   const to = destinationOf(req.body);
   await assertNotLocked('otp', to.value, clientIp(req));
 
@@ -800,7 +811,7 @@ router.post('/password/forgot', otpLimit, async (req, res, next) => {
  * بعد از عوض شدن رمز، همه‌ی نشست‌های باز بسته می‌شوند. اگر کسی رمز را
  * فراموش کرده چون گوشی‌اش دست دیگری افتاده، آن نشست هم باید برود.
  */
-router.post('/password/reset', otpLimit, async (req, res, next) => {
+router.post('/password/reset', verifyLimit, async (req, res, next) => {
   const email = v.email(req.body?.email, { required: true });
   const password = typeof req.body?.password === 'string' ? req.body.password : '';
   const weak = pw.checkStrength(password);
