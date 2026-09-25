@@ -20,6 +20,8 @@ async function createApp({ runMigrations = true } = {}) {
   //  قالب‌های آمادهٔ مرکزِ اعلان (خوش‌آمد، رو به پایان، تمدید شد، …)
   await require('./lib/notices').seedTemplates();
   await pruneExpired();
+  //  سرور فقط رلهٔ پیام است: پیام و رسانهٔ کهنه‌تر از CHAT_RELAY_DAYS می‌رود
+  await require('./lib/chat-relay').sweep().catch(err => console.error('[chat-relay]', err.message));
   //  مدیر از محیط — نصبی که پنلِ خانگی خودش بالا می‌آورد و ترمینالی در کار نیست
   await require('./lib/admin-bootstrap').ensureAdmin({
     username: process.env.ADMIN_BOOTSTRAP_USER,
@@ -372,6 +374,9 @@ async function createApp({ runMigrations = true } = {}) {
   // ---- کارهای دوره‌ای ----
   const housekeeping = setInterval(() => {
     pruneExpired().catch(err => console.error('[housekeeping]', err.message));
+    //  پیام‌ها و رسانه‌های چت فقط CHAT_RELAY_DAYS روز روی سرور می‌مانند؛
+    //  برنامهٔ پمپ رونوشتِ خودش را دارد
+    require('./lib/chat-relay').sweep().catch(err => console.error('[chat-relay]', err.message));
     subs.expireDue().catch(err => console.error('[subscriptions]', err.message));
     //  خبر دادن به کسی که اشتراکش دارد تمام می‌شود — پیش از آنکه قفل
     //  شود، نه بعدش. هر آستانه فقط یک بار، پس تکراری نمی‌رود.
