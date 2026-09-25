@@ -31,19 +31,32 @@ test('۱) هر دو قالب هستند، و همان فایل‌های صاحب
   assert.ok(fs.readFileSync(path.join(t.DIR, t.FILES.shop), 'utf8').includes(SPANS(t.SAMPLE)));
 });
 
-test('۲) ⛔ ایمیلِ کدِ ورود با فایل فقط در شش رقم فرق دارد', () => {
+test('۲) ⛔ ایمیلِ کدِ ورود با فایل فقط در شش رقم فرق دارد — و یک خطِ پیش‌نمایشِ نامرئی', () => {
+  const pre = t.preheader(t.PREVIEW.code);
   for (const app of ['pump', 'shop']) {
     const raw = fs.readFileSync(path.join(t.DIR, t.FILES[app]), 'utf8');
     const html = t.codeHtml({ app, code: '735102' });
     assert.ok(html, 'رندر شد');
     assert.ok(!html.includes(t.SAMPLE), 'رقمِ نمونه نمانده');
-    //  همان فایل، با رقمِ تازه به‌جای نمونه — و **هیچ** فرقِ دیگری
+    //  ⛔ خطِ پیش‌نمایش (۱۴۰۵/۰۷/۱۳، «توی اعلانات کدی نباشد») فقط در سرِ فایل
+    //  است، پنهان است، و **کد در آن نیست**
+    assert.ok(html.startsWith(pre), 'خطِ پیش‌نمایش سرِ نامه');
+    assert.ok(/display:none/.test(pre) && !pre.includes('735102'), 'پنهان و بی کد');
+    //  بقیه همان فایل، با رقمِ تازه به‌جای نمونه — و **هیچ** فرقِ دیگری
     const expected = app === 'pump'
       ? raw.replace(`id="code" dir="ltr">${t.SAMPLE}<`, 'id="code" dir="ltr">735102<')
       : raw.replace(SPANS(t.SAMPLE), SPANS('735102'));
-    assert.equal(html, expected, `${app}: فقط رقم‌ها عوض شده‌اند`);
-    assert.equal(html.length, raw.length, 'حتی یک بایت هم کم و زیاد نشده');
+    const body = html.slice(pre.length);
+    assert.equal(body, expected, `${app}: فقط رقم‌ها عوض شده‌اند`);
+    assert.equal(body.length, raw.length, 'حتی یک بایت از خودِ فایل کم و زیاد نشده');
   }
+});
+
+test('۲ب) ⛔ عنوانِ ایمیل همان <title>ِ فایل است و کد ندارد؛ فرستنده نامِ برنامه', () => {
+  assert.equal(t.titleOf('pump'), 'کد ورود ویلن');
+  assert.equal(t.titleOf('shop'), 'کد ورود VILL3N Shop');
+  assert.equal(t.brandOf('pump'), 'ویلن');
+  assert.equal(t.brandOf('shop'), 'VILL3N Shop');
 });
 
 test('۳) کدِ اشتراک و بازیابیِ رمز همان مدل با عنوانِ خودشان — بی دست زدن به بقیه', () => {

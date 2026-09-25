@@ -66,6 +66,44 @@ function paragraphs(body) {
     .map((p) => `<p>${escapeHtml(p).replace(/\n/g, '<br>')}</p>`).join('\n');
 }
 
+/**
+ * خطِ پیش‌نمایش — همان یک خطی که گوشی در **اعلان** و فهرستِ ایمیل‌ها نشان
+ * می‌دهد.
+ *
+ * ⛔ خواستهٔ صاحب سامانه (۱۴۰۵/۰۷/۱۳، با عکسِ اعلانِ جیمیل): «کد ده جا نوشته
+ * شده و یارو اصلاً لازم نیست بیاید توی ایمیل ببیند؛ توی اعلانات کدی نباشد و
+ * روی ایمیل که کلیک کند، کد آن‌جا نشان داده شود.» قالب‌ها خطِ پیش‌نمایش
+ * ندارند، پس جیمیل از نخستین نوشته‌ها یکی می‌سازد و به کد می‌رسد.
+ *
+ * ⚠️ **نامرئی است** و ظاهر و نوشته‌های قالب را عوض نمی‌کند: یک `div`ِ پنهان
+ * در همان ابتدای فایل، و نویسه‌های پُرکنندهٔ استاندارد تا جیمیل از آن‌ها
+ * جلوتر نرود.
+ */
+const PREVIEW = Object.freeze({
+  code: 'کدِ شما آماده است — برای دیدنش همین ایمیل را باز کنید.',
+});
+const FILLER = '&#847;&zwnj;&nbsp;'.repeat(90);
+function preheader(line) {
+  return '<div style="display:none;max-height:0;max-width:0;overflow:hidden;opacity:0;'
+    + 'mso-hide:all;font-size:1px;line-height:1px;color:transparent">'
+    + `${escapeHtml(line)}${FILLER}</div>\n`;
+}
+
+/**
+ * عنوانِ ایمیل — همان `<title>`ِ فایلِ صاحبِ سامانه («کد ورود ویلن»،
+ * «کد ورود VILL3N Shop»). ⛔ **کد در عنوان نمی‌آید**: عنوان هم در اعلان دیده
+ * می‌شود.
+ */
+function titleOf(app) {
+  const m = /<title>([^<]*)<\/title>/.exec(raw(app) || '');
+  return m ? m[1].trim() : '';
+}
+
+/** نامِ برنامه برای «فرستنده» — همان عنوانِ قالب بی «کد ورود» («ویلن»، «VILL3N Shop»). */
+function brandOf(app) {
+  return titleOf(app).replace(/^کد\s*ورود\s*/, '').trim();
+}
+
 /** یک جاگیریِ **دقیقاً یک‌باره** — نبودنش یعنی قالب چیزِ دیگری است، پس `null`. */
 function once(text, from, to) {
   if (text === null) return null;
@@ -117,7 +155,7 @@ function codeHtml({ app, code, title = '', lead = '' } = {}) {
         `<p class="sub">${escapeHtml(lead)}</p>`);
     }
   }
-  return html;
+  return html === null ? null : preheader(PREVIEW.code) + html;
 }
 
 /**
@@ -149,7 +187,9 @@ function messageHtml({ app, title, body } = {}) {
   if (html === null) return null;
   //  دکمهٔ کپی رفته، پس اسکریپتش هم بی‌کار است
   html = cut(html, '<script>', '</script>');
-  return html;
+  if (html === null) return null;
+  //  پیش‌نمایشِ پیام همان عنوانِ خودِ پیام است
+  return preheader(title || '') + html;
 }
 
 /** قالبِ این برنامه هست؟ (برای سنجه‌ها و صفحهٔ مدیر) */
@@ -157,4 +197,4 @@ function available(app) {
   return raw(app) !== null;
 }
 
-module.exports = { codeHtml, messageHtml, available, appOf, SAMPLE, FILES, DIR };
+module.exports = { codeHtml, messageHtml, available, appOf, titleOf, brandOf, preheader, PREVIEW, SAMPLE, FILES, DIR };

@@ -79,7 +79,7 @@ const config = {
     webhookUrl: process.env.OTP_WEBHOOK_URL || '',
     webhookKey: process.env.OTP_WEBHOOK_KEY || '',
     digits:     num(process.env.OTP_DIGITS, 6),
-    ttlMs:      num(process.env.OTP_TTL_MIN, 5) * 60 * 1000,
+    ttlMs:      num(process.env.OTP_TTL_MIN, 10) * 60 * 1000,   // ⚠️ ده دقیقه — همان که قالبِ ایمیل می‌گوید، و ایمیل دیر هم می‌رسد
     maxAttempts: num(process.env.OTP_MAX_ATTEMPTS, 5),
     //  دو دقیقه. هر بار «ارسال دوباره» یک پیامک است و پول دارد؛ ۶۰ ثانیه
     //  آن‌قدر کوتاه بود که کاربرِ بی‌حوصله سه بار می‌زد.
@@ -130,7 +130,8 @@ const config = {
     url:     process.env.EMAIL_API_URL || '',
     key:     process.env.EMAIL_API_KEY || '',
     from:    process.env.EMAIL_FROM || '',
-    subject: process.env.EMAIL_SUBJECT || 'کد ورود توحید',
+    //  ⚠️ خالی = عنوانِ قالبِ همان برنامه («کد ورود ویلن»، «کد ورود VILL3N Shop») — lib/otp.js
+    subject: process.env.EMAIL_SUBJECT || '',
   },
 
   google: {

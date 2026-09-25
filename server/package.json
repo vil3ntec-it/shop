@@ -1,6 +1,6 @@
 {
   "name": "shop-server",
-  "version": "2.10.2",
+  "version": "2.10.3",
   "private": true,
   "description": "سرور فروشگاه — احراز هویت، دکان چندکاربره، اشتراک و همگام‌سازی روی PostgreSQL (یا PGlite، بی نصب)",
   "main": "src/index.js",
