@@ -110,7 +110,7 @@ router.get('/me', optionalStation, async (req, res, next) => {
         //  رمزِ **فقط‌خواندنی**. سرورِ خانگی مستقلاً جلوی نوشتن را
         //  می‌گیرد، پس این نه به کسی اجازهٔ تغییر می‌دهد و نه باید بدهد.
         readKey: await stations.readKeyOf(st),
-        station: st.code,
+        station: stations.homeStationOf(st),
         seenAt: st.home_seen_at ? Number(st.home_seen_at) : null,
       },
       entitlement: ent,
