@@ -429,3 +429,44 @@ test('⚠️ کسی که فقط دکان دارد در افرادِ پمپ پی�
   const found = r.body.users.find((u) => u.id === shopOnly.user.id);
   assert.equal(found, undefined, 'دو دفتر جدا هستند و باید جدا بمانند');
 });
+
+/* ==========================================================
+   ⛔ حسابِ پمپی که هنوز پمپ ندارد هم در پنل دیده می‌شود (مهاجرتِ ۰۳۰)
+
+   گزارشِ صاحب سامانه: «حسابی که در برنامهٔ پمپ ساختم در پنل دیده
+   نمی‌شود.» فهرست فقط از `station_members` می‌آمد.
+   ========================================================== */
+
+test('⛔ حسابِ پمپ بی پمپ در افراد هست — با station_id خالی و no_station', async () => {
+  const t = await adminToken();
+  const lone = await h.newUser('بی‌پمپِ پنل', 'pump');
+
+  const r = await h.get('/api/admin/pump/users', { token: t });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  const found = r.body.users.find((u) => u.id === lone.user.id);
+  assert.ok(found, 'حسابِ تازهٔ پمپ باید دیده شود حتی بی پمپ');
+  assert.equal(found.station_id, null);
+  assert.equal(found.no_station, true);
+  assert.ok(r.body.total >= r.body.users.length, 'شمارِ کل همان قاعده را دارد');
+
+  //  با ایمیل هم پیدا می‌شود
+  const byEmail = await h.get(`/api/admin/pump/users?q=${encodeURIComponent(lone.user.email)}`, { token: t });
+  assert.ok(byEmail.body.users.some((u) => u.id === lone.user.id), 'با ایمیل پیدا شود');
+});
+
+test('⛔ و وقتی پمپ ساخت، یک ردیف با پمپ می‌ماند — ردیفِ بی‌پمپ نه', async () => {
+  const t = await adminToken();
+  const owner = await userWithStation('پمپ‌ساز', 'pump-users-once');
+  const r = await h.get('/api/admin/pump/users', { token: t });
+  const rows = r.body.users.filter((u) => u.id === owner.user.id);
+  assert.equal(rows.length, 1, JSON.stringify(rows));
+  assert.equal(rows[0].station_id, owner.stationId);
+  assert.equal(rows[0].no_station, false);
+});
+
+test('⛔ حسابِ دکان که یک بار هم از پمپ نیامده، هنوز در افرادِ پمپ نیست', async () => {
+  const t = await adminToken();
+  const shopOnly = await h.newUser('فقط‌دکانِ دوم', 'shop');
+  const r = await h.get('/api/admin/pump/users', { token: t });
+  assert.equal(r.body.users.find((u) => u.id === shopOnly.user.id), undefined);
+});
