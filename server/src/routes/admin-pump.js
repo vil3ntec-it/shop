@@ -352,40 +352,39 @@ router.get('/users', async (req, res, next) => {
     const like = `%${q.toLowerCase()}%`;
 
     //  یک ردیف به ازای هر عضویت: یک نفر می‌تواند چند پمپ داشته باشد.
+    //  ⛔ و حسابی که از برنامهٔ پمپ آمده ولی هنوز پمپی ندارد هم یک ردیف
+    //  می‌گیرد (`station_id` خالی) — `user_apps`، مهاجرتِ ۰۳۰. بی این،
+    //  کسی که حساب ساخته و گامِ پمپ را رها کرده هیچ‌جای پنل دیده نمی‌شد.
+    const joins = `
+         FROM users u
+         LEFT JOIN station_members m ON m.user_id = u.id
+         LEFT JOIN stations st ON st.id = m.station_id`;
+    const where = `
+        WHERE (m.user_id IS NOT NULL
+               OR EXISTS (SELECT 1 FROM user_apps ua WHERE ua.user_id = u.id AND ua.app = 'pump'))
+          AND ($1 = '' OR lower(u.name) LIKE $2
+                      OR lower(coalesce(u.email,'')) LIKE $2
+                      OR coalesce(u.phone,'') LIKE $2
+                      OR lower(coalesce(st.name,'')) LIKE $2
+                      OR lower(coalesce(st.code,'')) LIKE $2)`;
     const rows = await many(
       `SELECT u.id, u.name, u.email, u.phone, u.status, u.created_at, u.last_login_at,
               m.station_id, m.role, m.status AS member_status, m.created_at AS joined_at,
               st.name AS station_name, st.code AS station_code,
-              sub.status AS sub_status, sub.plan AS sub_plan, sub.ends_at AS sub_ends_at
-         FROM users u
-         JOIN station_members m ON m.user_id = u.id
-         JOIN stations st ON st.id = m.station_id
+              sub.status AS sub_status, sub.plan AS sub_plan, sub.ends_at AS sub_ends_at,
+              (m.user_id IS NULL) AS no_station
+        ${joins}
          LEFT JOIN LATERAL (
            SELECT status, plan, ends_at FROM station_subscriptions
             WHERE station_id = st.id ORDER BY ends_at DESC LIMIT 1
          ) sub ON true
-        WHERE ($1 = '' OR lower(u.name) LIKE $2
-                      OR lower(coalesce(u.email,'')) LIKE $2
-                      OR coalesce(u.phone,'') LIKE $2
-                      OR lower(st.name) LIKE $2
-                      OR lower(st.code) LIKE $2)
+        ${where}
         ORDER BY u.created_at DESC
         LIMIT $3 OFFSET $4`,
       [q, like, limit, offset]
     );
 
-    const total = await one(
-      `SELECT COUNT(*)::int n
-         FROM users u
-         JOIN station_members m ON m.user_id = u.id
-         JOIN stations st ON st.id = m.station_id
-        WHERE ($1 = '' OR lower(u.name) LIKE $2
-                      OR lower(coalesce(u.email,'')) LIKE $2
-                      OR coalesce(u.phone,'') LIKE $2
-                      OR lower(st.name) LIKE $2
-                      OR lower(st.code) LIKE $2)`,
-      [q, like]
-    );
+    const total = await one(`SELECT COUNT(*)::int n ${joins} ${where}`, [q, like]);
 
     res.json({ users: rows, total: total.n, limit, offset });
   } catch (err) { next(err); }

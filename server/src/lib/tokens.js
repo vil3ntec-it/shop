@@ -27,7 +27,27 @@ async function issue({ kind, subjectId, deviceId = null, ttlMs, app = 'shop', ap
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
     [hashToken(token), kind, subjectId, deviceId, issuedAt, expiresAt, app, String(appVersion || '').slice(0, 32)]
   );
+  if (kind === 'access' || kind === 'refresh') await rememberApp(subjectId, app, issuedAt);
   return { token, expiresAt, app };
+}
+
+/**
+ * «این شخص از این برنامه آمده» — `user_apps` (مهاجرتِ ۰۳۰).
+ *
+ * فهرستِ افرادِ هر بخش از همین می‌خواند، پس حسابی که در برنامهٔ پمپ
+ * ساخته شده ولی هنوز پمپی ندارد هم در پنل دیده می‌شود. ⚠️ شناسهٔ دستگاه
+ * هم با همین تابع توکن می‌گیرد؛ `WHERE EXISTS` آن را کنار می‌گذارد.
+ * ⚠️ نشدنش هرگز ورود را نمی‌خواباند — این فقط برای دیدنِ مدیر است.
+ */
+async function rememberApp(subjectId, app, at) {
+  try {
+    await query(
+      `INSERT INTO user_apps (user_id, app, first_seen_at, last_seen_at)
+       SELECT $1, $2, $3, $3 WHERE EXISTS (SELECT 1 FROM users WHERE id = $1)
+       ON CONFLICT (user_id, app) DO UPDATE SET last_seen_at = EXCLUDED.last_seen_at`,
+      [subjectId, app || 'shop', at]
+    );
+  } catch { /* فقط نمایشی است */ }
 }
 
 /**
