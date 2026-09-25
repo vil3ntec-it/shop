@@ -581,3 +581,147 @@ test('نوشته‌های کمکی: رقمِ فارسی، ایمیل، فرما�
   assert.equal(telegram.parseCommand('/start@Other', 'bot'), null);
   assert.equal(telegram.parseCommand('سلام', 'bot'), null);
 });
+
+/* ══════════════════════════════════════════════════════════════════
+   ۱۴۰۵/۰۷/۱۳ — عکس‌های صاحب سامانه: دو بار، منو، کانال، «کد نرفت»
+   ══════════════════════════════════════════════════════════════════ */
+
+const tick = (ms) => new Promise((r) => setTimeout(r, ms));
+
+test('⛔ ذخیرهٔ دوبارهٔ رمز در پنل ⇒ هر پیام **یک** پاسخ، نه دو (حلقهٔ دوم زنده نمی‌ماند)', async () => {
+  const token = await adminToken();
+  await h.put('/api/admin/telegram', { token: TOKEN, enabled: true }, { token });
+  updateId += 1;
+  const id = updateId;
+  let release;
+  const gate = new Promise((r) => { release = r; });
+  let firstPoll = true;
+  //  هر getUpdatesی که پیش از ذخیره شدنِ شماره بیاید، همان پیام را می‌گیرد —
+  //  درست مثلِ خودِ تلگرام
+  responder = async (m, p) => {
+    if (m !== 'getUpdates') return null;
+    if (firstPoll) { firstPoll = false; await gate; }
+    else await tick(20);
+    return Number(p.offset) <= id
+      ? { ok: true, result: [{ update_id: id, message: { message_id: 1, chat: { id: 9201, type: 'private' }, text: '/start' } }] }
+      : { ok: true, result: [] };
+  };
+  clear();
+  telegram.start();
+  await tick(50);
+  //  همان کاری که «ذخیره» در پنل می‌کند، وسطِ getUpdatesِ حلقهٔ نخست
+  await h.put('/api/admin/telegram', { enabled: true }, { token });
+  telegram.reload();
+  release();
+  await tick(400);
+  telegram.stop();
+  responder = null;
+  const replies = sent().filter(c => c.params.chat_id === '9201');
+  assert.equal(replies.length, 1, `پاسخ‌ها: ${replies.length}`);
+  //  و منو: فرمان‌ها به تلگرام گفته شدند
+  const cmds = calls.filter(c => c.method === 'setMyCommands');
+  assert.ok(cmds.some(c => c.params.scope?.type === 'all_private_chats'
+    && ['menu', 'status', 'group', 'channel', 'help', 'stop'].every(n => c.params.commands.some(x => x.command === n))),
+  'فرمان‌های «منو»');
+  assert.ok(calls.some(c => c.method === 'setChatMenuButton'), 'دکمهٔ منو');
+});
+
+test('⛔ یک به‌روزرسانی دو بار پاسخ نمی‌گیرد، حتی اگر دو بار برسد', async () => {
+  updateId += 1;
+  const u = { update_id: updateId, message: { message_id: 1, chat: { id: 9202, type: 'private' }, text: '/help' } };
+  clear();
+  await telegram.handleUpdate(u);
+  await telegram.handleUpdate(u);
+  assert.equal(sent().filter(c => c.params.chat_id === '9202').length, 1);
+});
+
+test('منو برای کسی که هنوز وصل نیست هم هست: راهنما و دکمه‌هایش', async () => {
+  clear();
+  await msg(9203, '/start');
+  const kb = JSON.stringify(lastTo(9203).params.reply_markup);
+  assert.ok(kb.includes('"help"'), 'دکمهٔ راهنما');
+  await press(9203, 'help');
+  const text = lastTo(9203).params.text;
+  assert.ok(text.includes('کانال') && text.includes('گروه'), 'راهنما کانال و گروه را می‌گوید');
+});
+
+test('📣 کانال: صاحبِ وصل‌شده بات را مدیر می‌کند ⇒ کانال وصل و هشدار آن‌جا منتشر می‌شود', async () => {
+  const owner = await pumpOwner('کانال');
+  const dev = await bindDevice(owner, 'pc-ch');
+  await linkPrivate(9301, owner);
+  clear();
+  await press(9301, 'channel');
+  const how = lastTo(9301);
+  assert.ok(JSON.stringify(how.params.reply_markup).includes('startchannel'), 'دکمهٔ «افزودن به کانال»');
+
+  updateId += 1;
+  clear();
+  await telegram.handleUpdate({
+    update_id: updateId,
+    my_chat_member: {
+      chat: { id: -1009301, type: 'channel', title: 'کانالِ پمپ' },
+      from: { id: 9301, is_bot: false, first_name: 'صاحب' },
+      old_chat_member: { status: 'left' },
+      new_chat_member: { status: 'administrator', can_post_messages: true },
+    },
+  });
+  const row = await one('SELECT * FROM telegram_chats WHERE chat_id=$1', ['-1009301']);
+  assert.equal(row.kind, 'channel');
+  assert.equal(row.station_id, owner.stationId);
+  const inChannel = lastTo(-1009301);
+  assert.ok(inChannel && inChannel.params.text.includes('وصل شد'), 'خودِ کانال خبر گرفت');
+  assert.equal(inChannel.params.reply_markup, undefined, '⛔ در کانال دکمه نیست');
+  assert.ok(lastTo(9301).params.text.includes('کانالِ پمپ'), 'صاحب هم خبر گرفت');
+
+  await alert(dev, [{ kind: 'stock_out', title: 'مخزنِ دیزل تمام شد', clientId: 'ch-1', data: {} }]);
+  const q = await one('SELECT COUNT(*)::int AS n FROM telegram_outbox WHERE chat_id=$1', ['-1009301']);
+  assert.equal(q.n, 1, 'هشدار به صفِ کانال رفت');
+
+  updateId += 1;
+  await telegram.handleUpdate({
+    update_id: updateId,
+    my_chat_member: {
+      chat: { id: -1009301, type: 'channel', title: 'کانالِ پمپ' },
+      from: { id: 9301 }, new_chat_member: { status: 'left' },
+    },
+  });
+  assert.equal(await one('SELECT * FROM telegram_chats WHERE chat_id=$1', ['-1009301']), null, 'برداشتن ⇒ جدا');
+});
+
+test('⛔ کسی که وصل نیست نمی‌تواند کانالی را به پمپی ببندد — فقط به خودش گفته می‌شود', async () => {
+  updateId += 1;
+  clear();
+  await telegram.handleUpdate({
+    update_id: updateId,
+    my_chat_member: {
+      chat: { id: -1009302, type: 'channel', title: 'کانالِ غریبه' },
+      from: { id: 9302 }, new_chat_member: { status: 'administrator', can_post_messages: true },
+    },
+  });
+  const row = await one('SELECT * FROM telegram_chats WHERE chat_id=$1', ['-1009302']);
+  assert.ok(!row || !row.station_id, 'وصل نشد');
+  assert.equal(lastTo(-1009302), undefined, 'در کانال چیزی نوشته نشد');
+  assert.ok(lastTo(9302)?.params.text.includes('وصل نیستید'), 'به خودش گفته شد');
+});
+
+test('⛔ ایمیلی که حسابِ پمپ ندارد: پاسخِ بات همان است، ولی خودِ صندوق می‌گوید چرا کدی نیامد', async () => {
+  const mailer = require('../src/lib/mailer');
+  const orig = mailer.send;
+  const mails = [];
+  mailer.send = async (m) => { mails.push(m); return { delivered: true }; };
+  try {
+    clear();
+    await msg(9401, '/start');
+    await msg(9401, 'nobody-pump@example.com');
+    await tick(50);
+    const reply = lastTo(9401).params.text;
+    assert.ok(reply.includes('اگر') && reply.includes('حسابِ پمپ داشته باشد'), 'پاسخِ یکسان (قیدِ ۲)');
+    const m = mails.find(x => x.to === 'nobody-pump@example.com');
+    assert.ok(m, 'نامه رفت');
+    assert.equal(m.subject, 'این ایمیل به هیچ پمپی وصل نیست');
+    assert.ok(m.html.includes('این ایمیل به هیچ پمپی وصل نیست'), 'همان مدلِ ایمیلِ پمپ');
+    assert.ok(!/\d{6}/.test(m.subject), 'کدی در کار نیست');
+  } finally {
+    mailer.send = orig;
+  }
+});

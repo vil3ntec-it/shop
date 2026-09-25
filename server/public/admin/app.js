@@ -1189,7 +1189,7 @@ async function loadTelegram() {
     ? '⚠️ رمزِ بات داده نشده — هیچ هشداری به تلگرام نمی‌رود'
     : !t.enabled ? '⚠️ خاموش'
     : `${t.lastError ? `⚠️ ${t.lastError}` : '✅ روشن'} · ${fa(t.chats?.private || 0)} گفت‌وگو · `
-      + `${fa(t.chats?.groups || 0)} گروه · ${fa(t.outbox?.sent24h || 0)} پیام در ۲۴ ساعت`
+      + `${fa(t.chats?.groups || 0)} گروه · ${fa(t.chats?.channels || 0)} کانال · ${fa(t.outbox?.sent24h || 0)} پیام در ۲۴ ساعت`
       + (t.outbox?.pending ? ` · ${fa(t.outbox.pending)} در صف` : '');
 }
 
