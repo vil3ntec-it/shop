@@ -140,3 +140,40 @@ test('صاحبِ گوگلی کد را می‌بیند، کارمند نه', asyn
   assert.equal((await h.post('/api/pump/claim', { code: minted.body.code }, { token: staff.accessToken })).status, 201);
   assert.equal((await h.get('/api/pump/access-code', { token: staff.accessToken })).status, 403);
 });
+
+/*
+ *  ══ پوشهٔ واقعیِ سرورِ خانگی (۱۴۰۵/۰۷/۱۳) ═══════════════════════════════
+ *  برنامهٔ پمپ دیگر با «pump1»ِ مشترک ثبت نمی‌شود: پوشه‌اش کدِ همان حساب است،
+ *  و اگر آن گرفته بود یک جایگزینِ مالِ همان حساب. گوشی باید همان پوشه را
+ *  بپرسد، نه `stations.code` را کورکورانه.
+ */
+test('گوشی همان پوشه‌ای را می‌گیرد که برنامهٔ کامپیوتر واقعاً رویش می‌نویسد', async () => {
+  const a = await activated('pc-hs-1', 'hs-one');
+
+  //  برنامه هنوز پوشه‌ای نگفته ⇒ همان کدِ پمپ، مثلِ همیشه
+  await h.post('/api/pump/device/home', { homeUrl: 'wss://h.example', readKey: 'read-h' }, { token: a.token });
+  const code = (await h.get('/api/pump/device/access-code', { token: a.token })).body.code;
+  let joined = await h.post('/api/pump/public/join', { code });
+  assert.equal(joined.body.home.station, 'hs-one');
+
+  //  برنامه پوشهٔ جایگزین را می‌گوید ⇒ گوشی همان را می‌گیرد
+  const r = await h.post('/api/pump/device/home',
+    { homeUrl: 'wss://h.example', readKey: 'read-h', station: 'HS-one-89abcdef' }, { token: a.token });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  joined = await h.post('/api/pump/public/join', { code });
+  assert.equal(joined.body.home.station, 'hs-one-89abcdef');
+  //  ⛔ و کدِ خودِ پمپ (کیو‌آر و کدِ ابر) دست نخورد
+  assert.equal(joined.body.station.code, 'hs-one');
+
+  //  خالی ⇒ «دست نزن»، نه «پاکش کن»
+  await h.post('/api/pump/device/home', { homeUrl: 'wss://h.example', station: '' }, { token: a.token });
+  joined = await h.post('/api/pump/public/join', { code });
+  assert.equal(joined.body.home.station, 'hs-one-89abcdef');
+
+  //  ⛔ کدِ بدشکل (مسیر، فاصله) رد می‌شود و چیزی نمی‌نشیند
+  const bad = await h.post('/api/pump/device/home',
+    { homeUrl: 'wss://h.example', station: '../other' }, { token: a.token });
+  assert.equal(bad.status, 400, JSON.stringify(bad.body));
+  joined = await h.post('/api/pump/public/join', { code });
+  assert.equal(joined.body.home.station, 'hs-one-89abcdef');
+});

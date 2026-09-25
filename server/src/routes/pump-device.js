@@ -350,6 +350,8 @@ router.post('/home', async (req, res, next) => {
     });
     const patch = { homeUrl };
     if (req.body?.readKey !== undefined) patch.readKey = v.text(req.body.readKey, { max: 200 });
+    //  کدِ پوشهٔ واقعیِ همین پمپ روی سرورِ خانگی — تا گوشی همان را بپرسد
+    if (req.body?.station !== undefined) patch.homeStation = req.body.station;
     const st = await stations.updateStation(req.stationId, patch);
     res.json({ station: stations.shape(st), serverTime: now() });
   } catch (err) { next(err); }

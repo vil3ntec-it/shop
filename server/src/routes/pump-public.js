@@ -121,7 +121,7 @@ router.post('/join', joinLimit, async (req, res, next) => {
       home: {
         url: st.home_url || '',
         readKey: await stations.readKeyOf(st),
-        station: st.code,
+        station: stations.homeStationOf(st),
         seenAt: st.home_seen_at ? Number(st.home_seen_at) : null,
       },
       cloudLiveAt: live ? Number(live.updated_at) : null,

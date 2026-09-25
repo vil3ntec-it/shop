@@ -245,18 +245,41 @@ async function updateStation(stationId, patch = {}) {
   const t = now();
   //  رمز فقط وقتی عوض می‌شود که آمده باشد؛ `undefined` یعنی «دست نزن»
   const encKey = patch.readKey === undefined ? null : await encryptKey(patch.readKey);
+  const home = patch.homeStation === undefined ? null : cleanHomeStation(patch.homeStation);
   const s = await one(
     `UPDATE stations
         SET name      = COALESCE($2, name),
             home_url  = COALESCE($3, home_url),
             read_key_enc = COALESCE($5, read_key_enc),
+            home_station = COALESCE($6, home_station),
             home_seen_at = CASE WHEN $3 IS NULL THEN home_seen_at ELSE $4 END,
             updated_at = $4
       WHERE id = $1 RETURNING *`,
-    [stationId, patch.name ?? null, patch.homeUrl ?? null, t, encKey]
+    [stationId, patch.name ?? null, patch.homeUrl ?? null, t, encKey, home]
   );
   if (!s) throw notFound('پمپ پیدا نشد', 'station_not_found');
   return s;
+}
+
+/**
+ * کدِ پوشهٔ سرورِ خانگی — همان شکلی که سرورِ خانگی می‌پذیرد
+ * (`[a-z0-9_-]`، تا ۶۴). خالی ⇒ `null` یعنی «دست نزن»، نه «پاکش کن».
+ */
+function cleanHomeStation(raw) {
+  const s = String(raw ?? '').trim().toLowerCase();
+  if (!s) return null;
+  if (!/^[a-z0-9_-]{2,64}$/.test(s)) {
+    throw badRequest('کدِ پوشهٔ سرورِ خانگی نامعتبر است', 'bad_home_station');
+  }
+  return s;
+}
+
+/**
+ * پوشه‌ای که گوشی روی سرورِ خانگی باید بپرسد. ⛔ همانی که برنامهٔ کامپیوتر
+ * گفته رویش می‌نویسد؛ تا نگفته، همان کدِ پمپ.
+ */
+function homeStationOf(s) {
+  return (s && s.home_station) || (s && s.code) || '';
 }
 
 /**
@@ -346,7 +369,7 @@ function _forgetKey() { cachedKey = null; }
 
 module.exports = {
   _forgetKey,
-  cleanCode, createStationForDevice, membershipOf, requireMembership, assertCan, createStation,
+  cleanCode, cleanHomeStation, homeStationOf, createStationForDevice, membershipOf, requireMembership, assertCan, createStation,
   getStation, byCode, updateStation, members, memberCount, updateMember, shape,
   readKeyOf, encryptKey, decryptKey,
 };
