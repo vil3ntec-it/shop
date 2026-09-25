@@ -14,6 +14,29 @@ const { getPool } = require('./db');
 
 const DIR = path.join(__dirname, '..', 'migrations');
 
+/**
+ * اثرِ انگشتِ یک Migration — **بی‌اعتنا به پایانِ خط**.
+ *
+ * ⛔ ریشهٔ «سرورِ حساب پس از به‌روزرسانی بالا نیامد (کد ۱)» (۱۴۰۵/۰۷/۱۳،
+ * عکسِ صاحب سامانه): سرورِ حسابی که داخلِ نصابِ ویندوزِ مرکز فرمان می‌آمد
+ * روی رانرِ ویندوز کلون می‌شد، جایی که گیت فایل‌ها را CRLF می‌کند؛ بستهٔ
+ * جدا روی لینوکس ساخته می‌شود و LF است. همان SQL، بایت‌های دیگر، اثرِ
+ * انگشتِ دیگر — و سرور با «فایل بعد از اجرا تغییر کرده است» هرگز بالا
+ * نمی‌آمد. پس اثرِ انگشت روی متنِ LF حساب می‌شود، و اثرِ انگشتِ قدیمیِ
+ * CRLF یا خام هم پذیرفته می‌شود (`sameMigration`).
+ *
+ * ⚠️ نگهبانِ «Migration را بعد از اجرا دست نزنید» ضعیف نشد: هر تغییرِ
+ * واقعی در خودِ متن همچنان همان خطا را می‌دهد.
+ */
+const hash = (b) => createHash('sha256').update(b).digest('hex').slice(0, 32);
+function checksums(text) {
+  const lf = text.replace(/\r\n/g, '\n');
+  return { canonical: hash(lf), forms: new Set([hash(lf), hash(lf.replace(/\n/g, '\r\n')), hash(text)]) };
+}
+function sameMigration(stored, text) {
+  return checksums(text).forms.has(stored);
+}
+
 function files() {
   if (!fs.existsSync(DIR)) return [];
   return fs.readdirSync(DIR).filter(f => f.endsWith('.sql')).sort();
@@ -40,9 +63,9 @@ async function run({ log = () => {} } = {}) {
     const done = [];
     for (const f of files()) {
       const sql = fs.readFileSync(path.join(DIR, f), 'utf8');
-      const sum = createHash('sha256').update(sql).digest('hex').slice(0, 32);
+      const sum = checksums(sql).canonical;
       if (applied.has(f)) {
-        if (applied.get(f) !== sum) {
+        if (!sameMigration(applied.get(f), sql)) {
           throw new Error(`فایل Migration «${f}» بعد از اجرا تغییر کرده است. فایل تازه بسازید، این را دست نزنید.`);
         }
         continue;
@@ -69,4 +92,4 @@ async function run({ log = () => {} } = {}) {
   }
 }
 
-module.exports = { run, files };
+module.exports = { run, files, checksums, sameMigration };

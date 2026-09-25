@@ -255,7 +255,12 @@ function menuKeyboard(row) {
     [{ text: '📊 وضعیت و آخرین هشدارها', callback_data: 'status' }],
     downloadRow(),
   ];
-  if (row.kind === 'private') kb.push([{ text: '👥 وصل کردنِ گروهِ تلگرام', callback_data: 'group' }]);
+  if (row.kind === 'private') {
+    kb.push([
+      { text: '👥 وصل کردنِ گروه', callback_data: 'group' },
+      { text: '📣 وصل کردنِ کانال', callback_data: 'channel' },
+    ]);
+  }
   kb.push([{
     text: row.only_out ? '🔔 «کم مانده» را هم بفرست' : '🔕 فقط «تمام شد» را بفرست',
     callback_data: 'toggle',
@@ -355,6 +360,20 @@ const WELCOME =
   + '✉️ برای وصل شدن، ایمیلِ حسابِ پمپتان را بفرستید (همان که در برنامهٔ پمپ با آن وارد شده‌اید).\n'
   + 'یک کدِ شش‌رقمی به همان ایمیل می‌رود؛ کد را همین‌جا بفرستید و تمام.';
 
+/** راهنما — برای کسی که هنوز وصل نیست هم هست (خواستهٔ صاحب سامانه: «منو نداره»). */
+const HELP =
+  '📖 راهنمای بات\n\n'
+  + '۱) ✉️ ایمیلِ حسابِ پمپ را بفرستید و کدِ شش‌رقمیِ ایمیل را همین‌جا بزنید.\n'
+  + '۲) 📊 «وضعیت» آخرین هشدارها را نشان می‌دهد.\n'
+  + '۳) 👥 «وصل کردنِ گروه»: هشدارها در گروهِ تلگرامِ شما هم می‌آید.\n'
+  + '۴) 📣 «وصل کردنِ کانال»: بات را مدیرِ کانال کنید تا هشدارها آن‌جا منتشر شود.\n'
+  + '۵) 🔕 می‌توانید فقط «تمام شد» را بگیرید و «کم مانده» را نه.\n\n'
+  + 'فرمان‌ها از دکمهٔ «منو» پایینِ صفحه هم هستند.';
+
+function welcomeKeyboard() {
+  return [downloadRow(), [{ text: '❓ راهنما', callback_data: 'help' }]];
+}
+
 async function sendMenu(row, lead = '') {
   const link = await linkOf(row);
   if (!link) {
@@ -363,7 +382,7 @@ async function sendMenu(row, lead = '') {
       await setState(row.chat_id, 'email');
       return send(row.chat_id,
         (isLinked(row) ? 'این گفت‌وگو دیگر به هیچ پمپی وصل نیست — حساب از آن پمپ بیرون شده است.\n\n' : '')
-        + WELCOME, [downloadRow()]);
+        + WELCOME, welcomeKeyboard());
     }
     return send(row.chat_id,
       'این گروه به هیچ پمپی وصل نیست. در گفت‌وگوی خصوصی با بات، «👥 وصل کردنِ گروهِ تلگرام» را بزنید.');
@@ -371,7 +390,8 @@ async function sendMenu(row, lead = '') {
   const text = (lead ? `${lead}\n\n` : '')
     + `⛽ پمپِ «${link.station_name}»\n`
     + (row.only_out ? '🔕 فقط هشدارهای «تمام شد» می‌آید.' : '🔔 همهٔ هشدارها می‌آید: «تمام شد» و «کم مانده».');
-  return send(row.chat_id, text, menuKeyboard(row));
+  //  ⚠️ در کانال دکمه نمی‌گذاریم: هر خواننده‌ای می‌دیدش
+  return send(row.chat_id, text, row.kind === 'channel' ? null : menuKeyboard(row));
 }
 
 async function sendStatus(row) {
@@ -427,6 +447,15 @@ async function onEmail(row, text) {
 
   const user = await one("SELECT id FROM users WHERE email=$1 AND status='active'", [email]);
   const member = user ? await stations.membershipOf(user.id) : null;
+  if (!member) {
+    /*
+     *  ⛔ گزارشِ صاحب سامانه (۱۴۰۵/۰۷/۱۳): «سرور کد را ارسال نکرد.» ایمیلی
+     *  که حسابِ پمپ ندارد تا امروز **هیچ** نامه‌ای نمی‌گرفت و کاربر نمی‌دانست
+     *  چرا. پاسخِ بات همان می‌ماند (قیدِ ۲ — دفترچهٔ ایمیل‌ها نشویم)، ولی خودِ
+     *  صندوقِ همان ایمیل می‌گوید چه شد: فقط صاحبِ همان صندوق آن را می‌بیند.
+     */
+    tellNoAccount(email, Boolean(user)).catch((e) => console.error('[telegram] نامهٔ «حساب نیست» نرفت:', e.message));
+  }
   if (member) {
     try {
       await require('./otp').request(email, { purpose: PURPOSE, app: 'pump' });
@@ -446,6 +475,21 @@ async function onEmail(row, text) {
     `اگر «${email}» حسابِ پمپ داشته باشد، یک کدِ شش‌رقمی همین حالا به آن رفت `
     + '(پوشهٔ اسپم را هم ببینید).\n\n🔢 کد را همین‌جا بفرستید.',
     [[{ text: '✉️ ایمیلِ دیگر', callback_data: 'reset' }]]);
+}
+
+/** نامه به همان صندوق: «با این ایمیل حسابِ پمپی نیست» — همان مدلِ ایمیلِ پمپ. */
+async function tellNoAccount(email, hasUser) {
+  const mailer = require('./mailer');
+  const templates = require('./mail-templates');
+  const title = 'این ایمیل به هیچ پمپی وصل نیست';
+  const body = (hasUser
+    ? 'کسی در باتِ تلگرامِ پمپ خواست با همین ایمیل وصل شود، ولی این حساب هنوز عضوِ هیچ پمپی نیست.'
+    : 'کسی در باتِ تلگرامِ پمپ خواست با همین ایمیل وصل شود، ولی با این ایمیل هیچ حسابی ساخته نشده است.')
+    + '\n\nاول در برنامهٔ پمپ با همین ایمیل حساب بسازید و پمپتان را بسازید، بعد دوباره در بات همین ایمیل را بفرستید.'
+    + '\n\nاگر شما نبودید، این نامه را نادیده بگیرید.';
+  const html = templates.messageHtml({ app: 'pump', title, body })
+    || mailer.card({ title, lead: body });
+  await mailer.send({ to: email, subject: title, text: `${title}\n\n${body}`, html, fromName: templates.brandOf('pump') || undefined });
 }
 
 /** گامِ کد. ⛔ حسابِ ناموجود هم فقط «کد درست نیست» می‌گیرد. */
@@ -495,11 +539,14 @@ async function onPrivate(chat, cmd, text) {
       await setState(row.chat_id, linked ? '' : 'email');
       return linked ? sendMenu(row) : send(row.chat_id, 'باشد. هر وقت خواستید ایمیلِ حسابِ پمپ را بفرستید.');
     }
+    if (cmd.name === 'help') return send(row.chat_id, HELP, linked ? menuKeyboard(row) : welcomeKeyboard());
     if (cmd.name === 'status' && linked) return sendStatus(row);
+    if (cmd.name === 'group' && linked) return groupLink(row);
+    if (cmd.name === 'channel' && linked) return channelLink(row);
     if (cmd.name === 'stop' && linked) return askUnlink(row);
     if (linked) return sendMenu(row);
     await setState(row.chat_id, 'email');
-    return send(row.chat_id, WELCOME, [downloadRow()]);
+    return send(row.chat_id, WELCOME, welcomeKeyboard());
   }
 
   if (linked) return sendMenu(row);
@@ -547,6 +594,56 @@ async function groupLink(row) {
     + '۱) دکمهٔ زیر را بزنید\n۲) گروه را برگزینید\n۳) تمام — بات خودش خبر می‌دهد.\n\n'
     + '⏳ این دکمه پانزده دقیقه و فقط یک بار کار می‌کند.',
     [[{ text: '➕ افزودن به گروه', url: `https://t.me/${name}?startgroup=${raw}` }]]);
+}
+
+/**
+ * کانال — «نمی‌دانم چطور ربات را به کانالِ خودم وصل کنم».
+ *
+ * تلگرام در کانال هیچ `/start`ی نمی‌فرستد؛ فقط `my_chat_member` می‌آید با
+ * **کسی که بات را مدیر کرد** (`from`). پس ملاک همان است: اگر گفت‌وگوی
+ * خصوصیِ همان شخص با بات به پمپی وصل است، کانال به همان پمپ وصل می‌شود.
+ * ⛔ کسِ دیگری نمی‌تواند کانالی را به پمپِ شما ببندد: باید خودش وصل باشد.
+ */
+async function channelLink(row) {
+  const link = await linkOf(row);
+  if (!link) return sendMenu(row);
+  const name = await username();
+  if (!name) return send(row.chat_id, 'نامِ بات هنوز از تلگرام نیامده است؛ چند لحظه بعد دوباره بزنید.');
+  return send(row.chat_id,
+    `📣 کانالی که می‌خواهید هشدارهای پمپِ «${link.station_name}» در آن منتشر شود:\n\n`
+    + '۱) دکمهٔ زیر را بزنید\n۲) کانال را برگزینید\n۳) بات را «مدیر» کنید — فقط «ارسالِ پیام» کافی است\n'
+    + '۴) تمام — بات همین‌جا و در خودِ کانال خبر می‌دهد.\n\n'
+    + 'راهِ دستی: در تنظیماتِ کانال ← مدیران ← افزودنِ مدیر ← نامِ همین بات.',
+    [[{ text: '➕ افزودن به کانال', url: `https://t.me/${name}?startchannel&admin=post_messages` }]]);
+}
+
+async function onChannelAdmin(u) {
+  const chat = u.chat;
+  const who = u.from?.id ? await chatRow(u.from.id) : null;
+  const owner = who && who.kind === 'private' ? await linkOf(who) : null;
+  if (!owner) {
+    //  کسی که وصل نیست: فقط به خودش می‌گوییم، نه در کانال
+    if (u.from?.id) {
+      await send(u.from.id,
+        `بات مدیرِ کانالِ «${titleOf(chat)}» شد، ولی شما هنوز به هیچ پمپی وصل نیستید. `
+        + 'اول همین‌جا ایمیلِ حسابِ پمپ را بفرستید و وصل شوید، بعد بات را یک بار از کانال بردارید و دوباره مدیر کنید.');
+    }
+    return null;
+  }
+  const row = await ensureChat(chat, 'channel');
+  const t = now();
+  await query(
+    `UPDATE telegram_chats SET station_id=$2, user_id=$3, linked_at=$4, updated_at=$4 WHERE chat_id=$1`,
+    [row.chat_id, who.station_id, who.user_id, t]
+  );
+  await require('./audit').log({
+    actorType: 'user', userId: who.user_id, action: 'pump.telegram_link',
+    targetType: 'station', targetId: who.station_id, detail: { kind: 'channel' },
+  });
+  await sendMenu(await chatRow(row.chat_id), '✅ این کانال وصل شد. هشدارهای پمپ از این به بعد همین‌جا منتشر می‌شود.');
+  return send(who.chat_id,
+    `✅ کانالِ «${titleOf(chat)}» به پمپِ «${owner.station_name}» وصل شد.\nبرای جدا کردن، بات را از مدیرانِ کانال بردارید.`,
+    menuKeyboard(who));
 }
 
 async function onGroup(chat, cmd) {
@@ -612,6 +709,8 @@ async function onCallback(q) {
     case 'menu': return sendMenu(row);
     case 'status': return sendStatus(row);
     case 'group': return row.kind === 'private' ? groupLink(row) : null;
+    case 'channel': return row.kind === 'private' ? channelLink(row) : null;
+    case 'help': return row.kind === 'private' ? send(row.chat_id, HELP, isLinked(row) ? menuKeyboard(row) : welcomeKeyboard()) : null;
     case 'toggle': {
       if (!isLinked(row)) return sendMenu(row);
       await query('UPDATE telegram_chats SET only_out = NOT only_out, updated_at=$2 WHERE chat_id=$1',
@@ -635,15 +734,36 @@ async function onCallback(q) {
   }
 }
 
-/** بات را از گروه بیرون کردند، یا کاربر بات را بست. */
+/** بات را از گروه بیرون کردند، یا کاربر بات را بست — یا مدیرِ کانال شد. */
 async function onMembership(u) {
   const status = u.new_chat_member?.status;
   if (status === 'left' || status === 'kicked') return forgetChat(u.chat.id);
+  if (u.chat?.type === 'channel') {
+    //  مدیر شد و می‌تواند بنویسد ⇒ وصل؛ مدیری بی «ارسالِ پیام» ⇒ فراموش
+    const canPost = status === 'administrator' && u.new_chat_member?.can_post_messages !== false;
+    return canPost ? onChannelAdmin(u) : forgetChat(u.chat.id);
+  }
   return null;
+}
+
+/*
+ *  ⛔ **هر به‌روزرسانی یک بار** — گزارشِ صاحب سامانه (۱۴۰۵/۰۷/۱۳، با عکس):
+ *  «پیام‌ها را دو بار ارسال می‌کند.» ریشه در `start`/`reload` بود (پایین را
+ *  ببینید)؛ این فقط کمربندِ دوم است: شمارهٔ به‌روزرسانی‌های اخیر نگه داشته
+ *  می‌شود و تکراری همان‌جا رد می‌شود.
+ */
+const seenUpdates = new Set();
+function firstTime(id) {
+  if (id === undefined || id === null) return true;
+  if (seenUpdates.has(id)) return false;
+  seenUpdates.add(id);
+  if (seenUpdates.size > 500) seenUpdates.delete(seenUpdates.values().next().value);
+  return true;
 }
 
 /** یک «به‌روزرسانی»ِ تلگرام. هر خطا همین‌جا می‌ماند و بقیه را نمی‌شکند. */
 async function handleUpdate(u) {
+  if (!firstTime(u?.update_id)) return null;
   try {
     if (u.message) return await onMessage(u.message);
     if (u.callback_query) return await onCallback(u.callback_query);
@@ -852,17 +972,53 @@ function sleep(ms) {
 
 let outboxTimer = null;
 
+/*
+ *  ⛔ **یک حلقه، نه دو** — ریشهٔ «پیام‌ها دو بار می‌روند».
+ *
+ *  `reload()` (ذخیرهٔ رمز یا روشن/خاموش در پنل) `stop()` و بی‌درنگ
+ *  `start()` می‌زد. حلقهٔ قبلی هنوز وسطِ `getUpdates` بود؛ `start()`
+ *  `bot.running` را دوباره راست می‌کرد، پس حلقهٔ قبلی هم **زنده** ادامه
+ *  می‌داد — دو حلقه، یک صندوق، هر پیام دو پاسخ. حالا هر حلقه شمارهٔ نسلِ
+ *  خودش را دارد و با `start()`ِ تازه کنار می‌رود.
+ */
+let generation = 0;
+
+/** فرمان‌های دکمهٔ «منو»ی تلگرام — «منو نداره». */
+async function setCommands() {
+  await call('setMyCommands', {
+    scope: { type: 'all_private_chats' },
+    commands: [
+      { command: 'menu', description: 'منو' },
+      { command: 'status', description: 'وضعیت و آخرین هشدارها' },
+      { command: 'group', description: 'وصل کردنِ گروهِ تلگرام' },
+      { command: 'channel', description: 'وصل کردنِ کانالِ تلگرام' },
+      { command: 'help', description: 'راهنما' },
+      { command: 'stop', description: 'جدا شدن از پمپ' },
+    ],
+  });
+  await call('setMyCommands', {
+    scope: { type: 'all_group_chats' },
+    commands: [
+      { command: 'menu', description: 'منو' },
+      { command: 'status', description: 'وضعیت و آخرین هشدارها' },
+    ],
+  });
+  await call('setChatMenuButton', { menu_button: { type: 'commands' } });
+}
+
 /** راه‌اندازی — از `index.js`. تا رمز داده نشده، فقط هر چند ثانیه نگاه می‌کند. */
 function start() {
   if (bot.running) return;
   bot.running = true;
   bot.startedAt = now();
   stopper = new AbortController();
+  const mine = ++generation;
+  const alive = () => bot.running && mine === generation;
 
   (async () => {
     let backoff = 2000;
     let prepared = '';
-    while (bot.running) {
+    while (alive()) {
       try {
         if (!(await active())) { await sleep(10_000); continue; }
         const tok = await token();
@@ -871,12 +1027,14 @@ function start() {
           await call('deleteWebhook', { drop_pending_updates: false });
           const me = await refreshMe();
           if (!me.ok) throw new Error(me.description || 'رمزِ بات پذیرفته نشد');
+          await setCommands().catch(() => {});
           prepared = tok;
         }
+        if (!alive()) break;
         await pollOnce();
         backoff = 2000;
       } catch (err) {
-        if (!bot.running) break;
+        if (!alive()) break;
         bot.lastError = hide(err.message);
         await sleep(backoff);
         backoff = Math.min(backoff * 2, 60_000);
@@ -890,6 +1048,7 @@ function start() {
 
 function stop() {
   bot.running = false;
+  generation++;
   stopper.abort();
   if (outboxTimer) clearInterval(outboxTimer);
   outboxTimer = null;
@@ -912,7 +1071,8 @@ async function status() {
   const [chats, outbox] = await Promise.all([
     one(`SELECT
            COUNT(*) FILTER (WHERE kind='private' AND linked_at IS NOT NULL)::int AS private,
-           COUNT(*) FILTER (WHERE kind='group' AND linked_at IS NOT NULL)::int AS groups
+           COUNT(*) FILTER (WHERE kind='group' AND linked_at IS NOT NULL)::int AS groups,
+           COUNT(*) FILTER (WHERE kind='channel' AND linked_at IS NOT NULL)::int AS channels
          FROM telegram_chats`),
     one(`SELECT
            COUNT(*) FILTER (WHERE sent_at IS NULL AND failed_at IS NULL)::int AS pending,
@@ -931,7 +1091,7 @@ async function status() {
     link: name ? `https://t.me/${name}` : '',
     lastError: bot.lastError,
     lastOkAt: bot.lastOkAt,
-    chats: { private: chats?.private || 0, groups: chats?.groups || 0 },
+    chats: { private: chats?.private || 0, groups: chats?.groups || 0, channels: chats?.channels || 0 },
     outbox: { pending: outbox?.pending || 0, sent24h: outbox?.sent || 0, failed24h: outbox?.failed || 0 },
     links: appLinks(),
   };
@@ -984,6 +1144,7 @@ async function publicInfo() {
 
 /** فقط آزمون: همه‌چیزِ حافظه از نو. */
 function _reset() {
+  seenUpdates.clear();
   tokenCache = null;
   bot.username = '';
   bot.lastError = '';

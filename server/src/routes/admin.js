@@ -160,6 +160,31 @@ router.post('/users/:id/status', async (req, res, next) => {
   res.json({ user });
 });
 
+/*
+ *  ⛔ **حذفِ کامل — «از ریشه»** (۱۴۰۵/۰۷/۱۳). شرحِ آن‌چه می‌رود و نمی‌رود:
+ *  `lib/user-delete.js`. پیش‌نمایش برای هر مدیر؛ خودِ حذف فقط مدیرِ ارشد و
+ *  فقط با تایپِ دقیقِ ایمیلِ همان حساب.
+ */
+router.get('/users/:id/delete-preview', async (req, res, next) => {
+  const id = v.id(req.params.id);
+  const out = await require('../lib/user-delete').preview(id);
+  if (!out) return next(notFound('کاربر پیدا نشد'));
+  res.json(out);
+});
+
+router.delete('/users/:id', requireSuperAdmin, async (req, res, next) => {
+  const id = v.id(req.params.id);
+  const confirmEmail = v.text(req.body?.confirmEmail ?? req.query?.confirmEmail, { max: 200 });
+  const out = await require('../lib/user-delete').remove(id, { confirmEmail });
+  if (!out.ok && out.code === 'not_found') return next(notFound('کاربر پیدا نشد'));
+  if (!out.ok) return next(badRequest('برای حذف، ایمیلِ همین حساب را دقیق بنویسید', 'confirm_mismatch'));
+  await audit.log({
+    actorType: 'admin', userId: req.admin.id, action: 'admin.user_deleted', targetType: 'user', targetId: id,
+    detail: { email: out.user.email, stations: out.stations, shops: out.shops, rows: out.rows },
+  });
+  res.json(out);
+});
+
 // ---------- دکان‌ها ----------
 router.get('/shops', async (req, res) => {
   await subs.expireDue();

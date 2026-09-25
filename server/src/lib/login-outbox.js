@@ -191,14 +191,18 @@ async function requeue(id, attempt, reason, lastError = '') {
 
 // ---------- خودِ ارسال ----------
 
-/** قالبِ ایمیل: کد در عنوان، RTL، متنِ ساده هم همراهش. */
+/** قالبِ ایمیل: RTL، متنِ ساده هم همراهش. ⛔ کد در عنوان نیست. */
 function buildMail({ app, email, code, requestId }) {
   const { APPS } = require('./login-codes');
   const name = (APPS[app] || {}).displayName || 'برنامه';
   const spaced = code.split('').join(' ');
-  const subject = `کد ورود ${name}: ${code}`;
+  //  ⛔ کد نه در عنوان و نه در خطِ اول: هر دو در اعلانِ گوشی دیده می‌شوند
+  //  (خواستهٔ صاحب سامانه، ۱۴۰۵/۰۷/۱۳ — «کد ده جا نوشته شده»).
+  const subject = require('./mail-templates').titleOf(app) || `کد ورود ${name}`;
   const text = [
-    `کد ورود ${name}: ${code}`,
+    `کد ورود ${name}`,
+    '',
+    code,
     '',
     'این کد ۵ دقیقه اعتبار دارد و فقط یک بار کار می‌کند.',
     'اگر شما درخواست نکرده‌اید، این ایمیل را نادیده بگیرید — هیچ حسابی ساخته نمی‌شود.',
@@ -214,8 +218,11 @@ function buildMail({ app, email, code, requestId }) {
     <p style="margin:20px 0 0;font-size:12px;color:#94a3b8;line-height:2">اگر شما درخواست نکرده‌اید، این ایمیل را نادیده بگیرید — هیچ حسابی ساخته نمی‌شود.</p>
   </div>
 </div>`;
+  //  ⛔ قالبِ همان برنامه، عیناً فایلِ صاحبِ سامانه (`lib/mail-templates`) —
+  //  فقط شش رقم جای نمونه می‌نشیند. نبودِ قالب ⇒ همان کارتِ سادهٔ بالا.
+  const styled = require('./mail-templates').codeHtml({ app, code });
   return {
-    to: email, subject, text, html, fromName: name,
+    to: email, subject, text, html: styled || html, fromName: require('./mail-templates').brandOf(app) || name,
     replyTo: process.env.EMAIL_REPLY_TO || 'vil3ntec@gmail.com',
     idempotencyKey: requestId,
   };

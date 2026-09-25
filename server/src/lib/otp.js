@@ -285,21 +285,39 @@ const senders = {
    * کارِ فرستادن در `lib/mailer` است: SMTP خودمان یا سرویسِ HTTP. اینجا
    * فقط متنِ کد ساخته می‌شود، با قالبی که در پنل قابل عوض کردن است.
    */
-  async email(to, code, message) {
+  async email(to, code, message, { app = '', purpose = 'login' } = {}) {
     const mailer = require('./mailer');
     const cfg = await mailer.current();
-    const subject = (cfg.otpSubject || 'کد ورود توحید').replace(/\{code\}/g, code);
+    const templates = require('./mail-templates');
+    /*
+     *  ⛔ **کد در عنوان نمی‌آید** — عنوان در اعلانِ گوشی دیده می‌شود
+     *  (خواستهٔ صاحب سامانه، ۱۴۰۵/۰۷/۱۳: «توی اعلانات کدی نباشد؛ روی ایمیل
+     *  که کلیک کند، کد آن‌جا نشان داده شود»). عنوانِ پیش‌فرض همان `<title>`ِ
+     *  قالبِ همان برنامه است؛ عنوانی که مدیر نوشته و `{code}` دارد، بی کد.
+     */
+    const custom = String(cfg.otpSubject || '').replace(/[:：\-–—]?\s*\{code\}\s*/g, ' ').replace(/\s+/g, ' ').trim();
+    const subject = (purpose === 'reset' ? 'کد بازیابیِ رمز' : '')
+      || custom || templates.titleOf(app) || 'کد ورود توحید';
     const text = cfg.otpTemplate
       ? cfg.otpTemplate.replace(/\{code\}/g, code)
-      : `کد شما: ${code}\n\nاین کد تا چند دقیقه‌ی دیگر کار می‌کند. اگر شما درخواستش نکرده‌اید، همین ایمیل را نادیده بگیرید.`;
-    const html = mailer.card({
-      title: 'کد ورود شما',
-      lead: 'این کد را در برنامه یا سایت بزنید:',
-      code,
-      body: 'کد تا چند دقیقه‌ی دیگر کار می‌کند و فقط یک بار.',
-      footer: 'اگر شما درخواستش نکرده‌اید، این ایمیل را نادیده بگیرید — حسابی ساخته نمی‌شود.',
-    });
-    await mailer.send({ to, subject, text, html });
+      : `کد ورود شما در ادامه است.\n\n${code}\n\nاین کد تا ده دقیقه‌ی دیگر کار می‌کند. اگر شما درخواستش نکرده‌اید، همین ایمیل را نادیده بگیرید.`;
+    /*
+     *  ⛔ قالبِ ایمیل همان فایلِ خودِ صاحبِ سامانه برای همان برنامه است
+     *  (`lib/mail-templates`): برای کدِ ورود و ثبت‌نام **هیچ نوشته‌ای عوض
+     *  نمی‌شود**؛ فقط کدِ بازیابیِ رمز عنوانِ درستِ خودش را می‌گیرد، چون
+     *  «کدِ ورود» برای رمزِ فراموش‌شده دروغ است. قالب که نبود، کارتِ ساده.
+     */
+    const html = templates.codeHtml(purpose === 'reset'
+      ? { app, code, title: 'کد بازیابیِ رمز', lead: 'برای گذاشتنِ رمزِ تازه، این کد شش‌رقمی را در برنامه وارد کنید.' }
+      : { app, code })
+      || mailer.card({
+        title: 'کد ورود شما',
+        lead: 'این کد را در برنامه یا سایت بزنید:',
+        code,
+        body: 'کد تا چند دقیقه‌ی دیگر کار می‌کند و فقط یک بار.',
+        footer: 'اگر شما درخواستش نکرده‌اید، این ایمیل را نادیده بگیرید — حسابی ساخته نمی‌شود.',
+      });
+    await mailer.send({ to, subject, text, html, fromName: templates.brandOf(app) || undefined });
     return { delivered: true, via: 'email' };
   },
 };
@@ -382,7 +400,7 @@ async function request(destination, { purpose = 'login', ip = '', app = '' } = {
    *  درست کند.
    */
   try {
-    await (await sender(destination))(destination, code, message);
+    await (await sender(destination))(destination, code, message, { app: sectionOf(app) || '', purpose });
   } catch (err) {
     await query('DELETE FROM otp_codes WHERE id=$1', [codeRow]);
     console.error('[otp] فرستادن کد نشد:', err.message);
@@ -429,14 +447,30 @@ async function verify(destination, code, { purpose = 'login' } = {}) {
   const clean = String(code || '').replace(/\D/g, '');
   if (!clean) throw badRequest('کد را وارد کنید', 'otp_required');
 
-  const row = await one(
+  /*
+   *  ⛔ **هر کدِ زندهٔ همین نشانی پذیرفته می‌شود، نه فقط تازه‌ترین.**
+   *
+   *  گزارشِ صاحب سامانه (۱۴۰۵/۰۷/۱۳): «کدِ شش‌رقمی آمد اما برنامه و سرور
+   *  آن را نمی‌بینند.» ایمیل‌ها دیر می‌رسند؛ کاربری که یک بار دیگر «بفرست»
+   *  زده، ایمیلِ **نخست** را زودتر باز می‌کند و همان را می‌زند — و سرور فقط
+   *  تازه‌ترین را می‌سنجید و «کد درست نیست» می‌گفت. کدی که خودمان فرستاده‌ایم
+   *  و هنوز وقت دارد، کدِ درست است.
+   *
+   *  ⚠️ سقفِ حدس زدن ضعیف نشد: هر تلاش یک خانه از سقفِ **تازه‌ترین** ردیف
+   *  برمی‌دارد (همان شمارنده‌ای که پیش از این بود)، و با پذیرفته شدنِ یکی،
+   *  بقیهٔ کدهای زندهٔ همان نشانی هم باطل می‌شوند.
+   */
+  const live = await many(
     `SELECT * FROM otp_codes
       WHERE destination=$1 AND purpose=$2 AND consumed_at IS NULL
-      ORDER BY created_at DESC LIMIT 1`,
+      ORDER BY created_at DESC LIMIT 3`,
     [destination, purpose]
   );
+  const row = live[0];
   if (!row) throw forbidden('کدی برای این شماره صادر نشده است', 'otp_not_found');
-  if (Number(row.expires_at) < now()) throw forbidden('مهلت این کد تمام شده است', 'otp_expired');
+  const t0 = now();
+  const fresh = live.filter((r) => Number(r.expires_at) >= t0);
+  if (!fresh.length) throw forbidden('مهلت این کد تمام شده است', 'otp_expired');
   if (row.attempts >= row.max_attempts) throw forbidden('تعداد تلاش بیش از حد بود', 'otp_locked');
 
   //  ⛔ یک خانه از سقف، اتمی و **پیش از** سنجیدن — وگرنه درخواست‌های
@@ -447,18 +481,26 @@ async function verify(destination, code, { purpose = 'login' } = {}) {
   );
   if (!claim) throw forbidden('تعداد تلاش بیش از حد بود', 'otp_locked');
 
-  const expected = Buffer.from(row.code_hash, 'hex');
   const actual = Buffer.from(hashCode(destination, clean), 'hex');
-  const ok = expected.length === actual.length && timingSafeEqual(expected, actual);
-  if (!ok) throw forbidden('کد درست نیست', 'otp_wrong');
+  const match = fresh.find((r) => {
+    const expected = Buffer.from(r.code_hash, 'hex');
+    return expected.length === actual.length && timingSafeEqual(expected, actual);
+  });
+  if (!match) throw forbidden('کد درست نیست', 'otp_wrong');
 
   //  ⛔ مصرف‌شده یعنی کد دیگر نه لازم است و نه باید بشود دیدش — و فقط یک
   //  بار: دو درخواستِ هم‌زمان با کدِ درست هر دو «درست» نمی‌گیرند.
   const used = await one(
     'UPDATE otp_codes SET consumed_at=$2, code_sealed=NULL WHERE id=$1 AND consumed_at IS NULL RETURNING id',
-    [row.id, now()]
+    [match.id, now()]
   );
   if (!used) throw forbidden('این کد قبلاً به کار رفته است', 'otp_used');
+  //  کدهای زندهٔ دیگرِ همین نشانی دیگر به کاری نمی‌آیند
+  await query(
+    `UPDATE otp_codes SET consumed_at=$3, code_sealed=NULL
+      WHERE destination=$1 AND purpose=$2 AND consumed_at IS NULL`,
+    [destination, purpose, now()]
+  );
   return true;
 }
 
@@ -563,7 +605,7 @@ async function resend(id) {
     ? smsCfg.template.replace(/\{code\}/g, code)
     : `کد ورود شما: ${code}`;
   try {
-    await send(row.destination, code, message);
+    await send(row.destination, code, message, { app: row.app || '', purpose: row.purpose || 'login' });
   } catch (err) {
     return { ok: false, error: 'delivery_failed', message: String(err?.message || err).slice(0, 200) };
   }

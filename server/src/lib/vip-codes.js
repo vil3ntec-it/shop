@@ -170,7 +170,13 @@ function build(T) {
       row.note ? `\n${row.note}` : '',
     ].filter(Boolean).join('\n');
 
-    const html = mailer.card({
+    //  همان مدلِ ایمیلِ برنامه (`lib/mail-templates`)، با عنوانِ درستِ خودش —
+    //  «کدِ ورود» برای کدِ اشتراک دروغ است. قالب که نبود، کارتِ ساده.
+    const html = require('./mail-templates').codeHtml({
+      app: T.app, code,
+      title: 'کد اشتراک شما',
+      lead: `یک اشتراک ${planTitle} به مدت ${days} روز برای شما در نظر گرفته شده. برنامه را باز کنید، به بخش اشتراک بروید و همین کد را وارد کنید.`,
+    }) || mailer.card({
       title: 'اشتراک شما آماده است',
       lead: `یک اشتراک <b>${planTitle}</b> به مدت <b>${days} روز</b> برای شما در نظر گرفته شده. این کد را در برنامه یا سایت وارد کنید:`,
       code,

@@ -390,8 +390,12 @@ async function send(mail) {
   const ready = readiness(cfg);
   if (!ready.ok) throw new Error(`تنظیمات ایمیل کامل نیست: ${ready.missing.join('، ')}`);
 
-  if (cfg.provider === 'api') return apiSend(cfg, { ...mail, to });
-  return smtpSend(cfg, { ...mail, to });
+  //  ⛔ نامِ فرستنده به‌ازای هر نامه (نامِ برنامه، مثلاً «ویلن») — تا پیش از
+  //  این `mail.fromName` بی‌صدا دور ریخته می‌شد و همهٔ کدها با یک نامِ ثابت
+  //  می‌رفتند. نشانیِ فرستنده همان است؛ فقط نامِ نمایشی.
+  const eff = mail.fromName ? { ...cfg, fromName: String(mail.fromName) } : cfg;
+  if (cfg.provider === 'api') return apiSend(eff, { ...mail, to });
+  return smtpSend(eff, { ...mail, to });
 }
 
 /**
