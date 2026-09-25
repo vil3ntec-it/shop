@@ -1,0 +1,2 @@
+# ⛔ Migrationها همیشه LF — اثرِ انگشتشان در دیتابیس ثبت می‌شود (server/src/migrate.js)
+*.sql text eol=lf
