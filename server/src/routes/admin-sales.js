@@ -302,7 +302,13 @@ async function subscriptionsOf(app, { status = '', city = '', kind = '', limit =
       ownerName: r.owner_name || '', ownerEmail: r.owner_email || '', ownerPhone: r.owner_phone || '',
       city: r.owner_city || r.loc_label || '',
       plan: r.plan, planTitle: titles[r.plan] || r.plan, status: state.status, active: state.active,
-      startsAt: state.startsAt, endsAt: state.endsAt, daysLeft: Math.ceil((state.graceEndsAt - at) / DAY),
+      //  ⛔ اشتراکِ لغوشده یا منقضی «۳۶۵ روز مانده» ندارد — تا ۱۴۰۵/۰۷/۱۳
+      //  همین عدد پس از لغو هم می‌آمد و پنل «لغو · ۳۶۵ روز مانده» نشان
+      //  می‌داد. تعلیق عمداً روزهایش را نگه می‌دارد: با برگرداندن، همان
+      //  روزها برمی‌گردند.
+      startsAt: state.startsAt, endsAt: state.endsAt,
+      daysLeft: state.status === 'cancelled' || state.status === 'expired'
+        ? 0 : Math.max(0, Math.ceil((state.graceEndsAt - at) / DAY)),
       permanent, price: r.price === null || r.price === undefined ? null : Number(r.price), currency: r.currency,
       paid: Number(r.paid), features: r.features, note: r.note || '',
     };

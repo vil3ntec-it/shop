@@ -105,6 +105,62 @@ test('و پس از یک ماه خودش می‌بندد — بی هیچ کارِ
   }
 });
 
+/*
+ *  ⛔ گزارشِ صاحبِ سامانه (۱۴۰۵/۰۷/۱۳): «نمی‌توانم اشتراکِ حسابی را حذف
+ *  کنم.» لغوِ اشتراکِ حسابِ تازه، دورهٔ آزمایشی را برمی‌گرداند و برنامه
+ *  شصت ثانیه بعد همهٔ قابلیت‌ها را داشت.
+ */
+test('⛔ اشتراکی که لغو شد، دورهٔ آزمایشی را برنمی‌گرداند', async () => {
+  const token = await adminToken();
+  const u = await h.newUser('trial-cancel', 'pump');
+  const made = await h.post('/api/pump', { name: 'پمپِ لغوشده' }, { token: u.accessToken });
+  const stationId = made.body.station.id;
+
+  const g = await h.post('/api/admin/pump/subscriptions', { stationId, plan: 'vip' }, { token });
+  assert.equal(g.status, 201, JSON.stringify(g.body));
+  let ent = (await h.get('/api/pump/me', { token: u.accessToken })).body.entitlement;
+  assert.equal(ent.source, 'subscription');
+
+  const c = await h.post(`/api/admin/pump/subscriptions/${g.body.subscription.id}/status`,
+    { status: 'cancelled' }, { token });
+  assert.equal(c.status, 200, JSON.stringify(c.body));
+
+  ent = (await h.get('/api/pump/me', { token: u.accessToken })).body.entitlement;
+  assert.equal(ent.source, 'free', 'پس از لغو، «آزمایشی» نه');
+  assert.equal(ent.trial.active, false);
+  for (const key of require('../src/lib/features').catalogOf('pump').PAID_KEYS) {
+    assert.ok(!ent.features.includes(key), `${key} پس از لغو باید بسته باشد`);
+  }
+
+  //  و فهرستِ مدیر هم «۰ روز» می‌گوید، نه روزهای اشتراکِ لغوشده
+  const list = await h.get('/api/admin/sales/subscriptions?app=pump', { token });
+  const row = list.body.subscriptions.find((r) => r.tenantId === stationId);
+  assert.equal(row.status, 'cancelled');
+  assert.equal(row.daysLeft, 0);
+});
+
+test('⛔ تعلیق هم در ماهِ اول واقعاً تعلیق است، و برگرداندن همان روزها را دارد', async () => {
+  const token = await adminToken();
+  const u = await h.newUser('trial-suspend', 'pump');
+  const made = await h.post('/api/pump', { name: 'پمپِ تعلیقی' }, { token: u.accessToken });
+  const stationId = made.body.station.id;
+  const g = await h.post('/api/admin/pump/subscriptions', { stationId, plan: 'vip' }, { token });
+  const id = g.body.subscription.id;
+
+  await h.post(`/api/admin/pump/subscriptions/${id}/status`, { status: 'suspended' }, { token });
+  let ent = (await h.get('/api/pump/me', { token: u.accessToken })).body.entitlement;
+  assert.notEqual(ent.source, 'trial');
+  assert.notEqual(ent.source, 'subscription');
+
+  const list = await h.get('/api/admin/sales/subscriptions?app=pump', { token });
+  const row = list.body.subscriptions.find((r) => r.tenantId === stationId);
+  assert.ok(row.daysLeft > 300, 'تعلیق روزهایش را نگه می‌دارد');
+
+  await h.post(`/api/admin/pump/subscriptions/${id}/status`, { status: 'active' }, { token });
+  ent = (await h.get('/api/pump/me', { token: u.accessToken })).body.entitlement;
+  assert.equal(ent.source, 'subscription');
+});
+
 test('تنظیمِ نوشته‌شده جلوتر از پیش‌فرض است', async () => {
   const token = await adminToken();
   const saved = await h.patch('/api/admin/config', { pump_trial_days: '3' }, { token });
