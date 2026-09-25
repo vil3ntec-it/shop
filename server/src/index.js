@@ -54,6 +54,9 @@ async function main() {
   //  «رو به پایان / منقضی»
   const notices = require('./lib/notices');
   notices.startRunner();
+  //  باتِ تلگرامِ پمپ — تا رمزش از پنل داده نشده، فقط هر چند ثانیه نگاه می‌کند
+  const telegram = require('./lib/telegram');
+  if (config.telegram.autoStart) telegram.start();
 
   let closing = false;
   async function shutdown(signal) {
@@ -63,6 +66,7 @@ async function main() {
     if (backupTimer) clearInterval(backupTimer);
     outbox.stop();
     notices.stopRunner();
+    telegram.stop();
     server.close(async () => {
       await closeDb();
       console.log('خاموش شد.');

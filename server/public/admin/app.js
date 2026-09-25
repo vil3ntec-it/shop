@@ -1094,6 +1094,8 @@ async function loadDelivery() {
     call('GET', '/admin/email'),
     call('GET', '/admin/push'),
   ]);
+  //  ⚠️ کارتِ تلگرام جدا بار می‌شود: خطای آن نباید ایمیل و پوش را خالی بگذارد
+  loadTelegram().catch((err) => msg($('tg-msg'), err.message, 'bad'));
   const m = mail.email || mail;
   $('mail-provider').value = m.provider || 'log';
   $('mail-from').value = m.from || '';
@@ -1160,6 +1162,46 @@ async function testMail() {
     const out = await call('POST', '/admin/email/test', { to });
     msg(node, out.ok === false ? `نرفت: ${out.error || ''}` : 'رفت — صندوقتان را ببینید.',
       out.ok === false ? 'bad' : 'ok');
+  } catch (err) { msg(node, err.message, 'bad'); }
+}
+
+/* ==========================================================
+   باتِ تلگرامِ پمپ
+   ⛔ رمز هرگز برنمی‌گردد — کادرِ خالی یعنی «دست نخورد».
+   ========================================================== */
+async function loadTelegram() {
+  const out = await call('GET', '/admin/telegram');
+  const t = out.telegram || out;
+  $('tg-enabled').checked = !!t.enabled;
+  $('tg-token').value = '';
+  $('tg-token').placeholder = t.configured
+    ? `${t.tokenHint}${t.fromEnv ? ' (از محیطِ سرور)' : ''} — خالی = دست نخورد`
+    : '123456:ABC… — خالی = دست نخورد';
+  const link = $('tg-link');
+  if (t.link) {
+    link.href = t.link;
+    link.textContent = `@${t.username}`;
+    link.classList.remove('hidden');
+  } else {
+    link.classList.add('hidden');
+  }
+  $('tg-state').textContent = !t.configured
+    ? '⚠️ رمزِ بات داده نشده — هیچ هشداری به تلگرام نمی‌رود'
+    : !t.enabled ? '⚠️ خاموش'
+    : `${t.lastError ? `⚠️ ${t.lastError}` : '✅ روشن'} · ${fa(t.chats?.private || 0)} گفت‌وگو · `
+      + `${fa(t.chats?.groups || 0)} گروه · ${fa(t.outbox?.sent24h || 0)} پیام در ۲۴ ساعت`
+      + (t.outbox?.pending ? ` · ${fa(t.outbox.pending)} در صف` : '');
+}
+
+async function saveTelegram() {
+  const node = $('tg-msg');
+  try {
+    const patch = { enabled: $('tg-enabled').checked };
+    const tok = $('tg-token').value.trim();
+    if (tok) patch.token = tok;
+    const out = await call('PUT', '/admin/telegram', patch);
+    msg(node, out.warning || 'ذخیره شد.', out.warning ? 'warn' : 'ok');
+    await loadTelegram();
   } catch (err) { msg(node, err.message, 'bad'); }
 }
 
@@ -1854,6 +1896,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-mail-save').onclick = saveMail;
   $('btn-mail-test').onclick = testMail;
   $('btn-push-save').onclick = savePush;
+  $('btn-tg-save').onclick = saveTelegram;
   $('btn-user-search').onclick = () => loadUsers();
   $('btn-sub-filter').onclick = () => loadSubs();
   $('btn-close-shop').onclick = () => { $('shop-detail').classList.add('hidden'); currentShop = null; };
