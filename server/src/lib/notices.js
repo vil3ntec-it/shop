@@ -192,7 +192,15 @@ function escapeHtml(s) {
  * «لوگو» یک کادرِ متنی است که جایش با تنظیمِ `brand_logo_url` (اختیاری)
  * می‌تواند تصویر بگیرد.
  */
-function emailHtml({ title, body, brand = 'VILL3N', logoUrl = '', footer = '' }) {
+function emailHtml({ title, body, brand = 'VILL3N', logoUrl = '', footer = '', app = '' }) {
+  /*
+   *  ⛔ «اگه می‌خواستم برای کسی ایمیل بزنم، باز هم همین مدل باشه اما با
+   *  تفاوت که پیام است نه کد» (۱۴۰۵/۰۷/۱۳). پس اعلانِ ایمیلی همان قالبِ
+   *  برنامهٔ گیرنده است (`lib/mail-templates.messageHtml`)؛ کارتِ سادهٔ
+   *  زیر فقط وقتی می‌ماند که قالب نباشد.
+   */
+  const styled = require('./mail-templates').messageHtml({ app, title, body });
+  if (styled) return styled;
   const paragraphs = String(body || '').split(/\n{2,}/).map(p =>
     `<p style="margin:0 0 12px;font-size:15px;line-height:2;color:#334155">${escapeHtml(p).replace(/\n/g, '<br>')}</p>`
   ).join('');
@@ -505,7 +513,7 @@ async function deliverOne(n, r, channel, { run, title, body, b }) {
       try {
         const out = await mailer.send({
           to: r.email, subject: title, text: body,
-          html: emailHtml({ title, body, brand: b.brand, logoUrl: b.logoUrl }),
+          html: emailHtml({ title, body, brand: b.brand, logoUrl: b.logoUrl, app: r.app }),
         });
         status = out && out.delivered ? 'sent' : 'error';
         sentAt = status === 'sent' ? now() : null;
@@ -611,7 +619,7 @@ async function sendTest(id, to) {
   const title = render(n.title, vars);
   const body = render(n.body, vars);
   const out = await mailer.send({ to: address, subject: `[آزمایشی] ${title}`, text: body,
-    html: emailHtml({ title, body, brand: b.brand, logoUrl: b.logoUrl }) });
+    html: emailHtml({ title, body, brand: b.brand, logoUrl: b.logoUrl, app: sample.app }) });
   return { ok: true, via: out.via, title, body };
 }
 

@@ -285,20 +285,30 @@ const senders = {
    * کارِ فرستادن در `lib/mailer` است: SMTP خودمان یا سرویسِ HTTP. اینجا
    * فقط متنِ کد ساخته می‌شود، با قالبی که در پنل قابل عوض کردن است.
    */
-  async email(to, code, message) {
+  async email(to, code, message, { app = '', purpose = 'login' } = {}) {
     const mailer = require('./mailer');
     const cfg = await mailer.current();
     const subject = (cfg.otpSubject || 'کد ورود توحید').replace(/\{code\}/g, code);
     const text = cfg.otpTemplate
       ? cfg.otpTemplate.replace(/\{code\}/g, code)
       : `کد شما: ${code}\n\nاین کد تا چند دقیقه‌ی دیگر کار می‌کند. اگر شما درخواستش نکرده‌اید، همین ایمیل را نادیده بگیرید.`;
-    const html = mailer.card({
-      title: 'کد ورود شما',
-      lead: 'این کد را در برنامه یا سایت بزنید:',
-      code,
-      body: 'کد تا چند دقیقه‌ی دیگر کار می‌کند و فقط یک بار.',
-      footer: 'اگر شما درخواستش نکرده‌اید، این ایمیل را نادیده بگیرید — حسابی ساخته نمی‌شود.',
-    });
+    /*
+     *  ⛔ قالبِ ایمیل همان فایلِ خودِ صاحبِ سامانه برای همان برنامه است
+     *  (`lib/mail-templates`): برای کدِ ورود و ثبت‌نام **هیچ نوشته‌ای عوض
+     *  نمی‌شود**؛ فقط کدِ بازیابیِ رمز عنوانِ درستِ خودش را می‌گیرد، چون
+     *  «کدِ ورود» برای رمزِ فراموش‌شده دروغ است. قالب که نبود، کارتِ ساده.
+     */
+    const templates = require('./mail-templates');
+    const html = templates.codeHtml(purpose === 'reset'
+      ? { app, code, title: 'کد بازیابیِ رمز', lead: 'برای گذاشتنِ رمزِ تازه، این کد شش‌رقمی را در برنامه وارد کنید.' }
+      : { app, code })
+      || mailer.card({
+        title: 'کد ورود شما',
+        lead: 'این کد را در برنامه یا سایت بزنید:',
+        code,
+        body: 'کد تا چند دقیقه‌ی دیگر کار می‌کند و فقط یک بار.',
+        footer: 'اگر شما درخواستش نکرده‌اید، این ایمیل را نادیده بگیرید — حسابی ساخته نمی‌شود.',
+      });
     await mailer.send({ to, subject, text, html });
     return { delivered: true, via: 'email' };
   },
@@ -382,7 +392,7 @@ async function request(destination, { purpose = 'login', ip = '', app = '' } = {
    *  درست کند.
    */
   try {
-    await (await sender(destination))(destination, code, message);
+    await (await sender(destination))(destination, code, message, { app: sectionOf(app) || '', purpose });
   } catch (err) {
     await query('DELETE FROM otp_codes WHERE id=$1', [codeRow]);
     console.error('[otp] فرستادن کد نشد:', err.message);
@@ -563,7 +573,7 @@ async function resend(id) {
     ? smsCfg.template.replace(/\{code\}/g, code)
     : `کد ورود شما: ${code}`;
   try {
-    await send(row.destination, code, message);
+    await send(row.destination, code, message, { app: row.app || '', purpose: row.purpose || 'login' });
   } catch (err) {
     return { ok: false, error: 'delivery_failed', message: String(err?.message || err).slice(0, 200) };
   }

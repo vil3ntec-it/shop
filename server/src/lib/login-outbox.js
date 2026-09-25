@@ -214,8 +214,11 @@ function buildMail({ app, email, code, requestId }) {
     <p style="margin:20px 0 0;font-size:12px;color:#94a3b8;line-height:2">اگر شما درخواست نکرده‌اید، این ایمیل را نادیده بگیرید — هیچ حسابی ساخته نمی‌شود.</p>
   </div>
 </div>`;
+  //  ⛔ قالبِ همان برنامه، عیناً فایلِ صاحبِ سامانه (`lib/mail-templates`) —
+  //  فقط شش رقم جای نمونه می‌نشیند. نبودِ قالب ⇒ همان کارتِ سادهٔ بالا.
+  const styled = require('./mail-templates').codeHtml({ app, code });
   return {
-    to: email, subject, text, html, fromName: name,
+    to: email, subject, text, html: styled || html, fromName: name,
     replyTo: process.env.EMAIL_REPLY_TO || 'vil3ntec@gmail.com',
     idempotencyKey: requestId,
   };
