@@ -137,6 +137,22 @@ router.options('/join', (req, res) => {
   res.status(204).end();
 });
 
+/**
+ * باتِ تلگرامِ پمپ هست؟ نامش چیست؟ — برای برنامهٔ پمپ و اپِ کارمندان.
+ *
+ * ⛔ فقط نامِ عمومیِ بات (همان که در تلگرام دیده می‌شود). رمزِ بات هیچ‌وقت.
+ */
+router.get(
+  '/telegram',
+  rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'pump-public-tg' }),
+  async (req, res, next) => {
+    try {
+      res.set('Access-Control-Allow-Origin', '*');
+      res.json(await require('../lib/telegram').publicInfo());
+    } catch (err) { next(err); }
+  }
+);
+
 router.get(
   '/live',
   rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'pump-public-live' }),

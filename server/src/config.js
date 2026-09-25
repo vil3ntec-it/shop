@@ -221,6 +221,24 @@ const config = {
 
   // CORS_ORIGIN چند دامنه را با کاما می‌پذیرد. برنامه‌ی اندروید به CORS
   // نیازی ندارد؛ این فقط برای نسخه‌ی وب است.
+  /**
+   * باتِ تلگرامِ پمپ (`lib/telegram.js`).
+   *
+   * ⚠️ رمزِ بات معمولاً از پنلِ مدیر می‌آید (رمزشده در `app_config`)؛
+   * `TELEGRAM_BOT_TOKEN` در محیط، اگر باشد، جلوتر است — برای استقرارِ داکر.
+   * ⛔ رمزِ بات هیچ‌وقت داخلِ برنامهٔ کامپیوتر یا گوشی نیست: هر کسی آن را
+   * از فایلِ برنامه بیرون می‌کشید و از طرفِ پمپ پیام می‌داد.
+   */
+  telegram: {
+    token:   process.env.TELEGRAM_BOT_TOKEN || '',
+    apiBase: (process.env.TELEGRAM_API_BASE || 'https://api.telegram.org').replace(/\/$/, ''),
+    //  دامنهٔ خودِ پمپ — لینکِ فایلِ نصبِ اندروید و صفحهٔ آیفون از همین
+    //  ساخته می‌شود، همان که `KarLink.ApkUrl`/`IphoneUrl`ِ برنامهٔ پمپ دارد.
+    pumpSite: (process.env.PUMP_SITE_URL || 'https://yaqobipump.top').replace(/\/$/, ''),
+    //  در آزمون خاموش است: حلقهٔ گرفتنِ پیام نباید به اینترنت برود.
+    autoStart: bool(process.env.TELEGRAM_AUTOSTART, (process.env.NODE_ENV || '') !== 'test'),
+  },
+
   corsOrigins: list(process.env.CORS_ORIGIN || process.env.CORS_ORIGINS),
 
   allowRegistration: bool(process.env.ALLOW_REGISTRATION, true),

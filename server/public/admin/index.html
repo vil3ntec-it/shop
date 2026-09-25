@@ -975,6 +975,35 @@
       </div>
       <div id="push-msg"></div>
     </div>
+
+    <!--
+      باتِ تلگرامِ پمپ — هشدارِ «حسابِ قرض‌دار» و «مخزن» در تلگرام.
+      ⛔ رمزِ بات فقط همین‌جا گرفته می‌شود و هرگز کامل برنمی‌گردد.
+    -->
+    <div class="panel">
+      <div class="panel-head">
+        <h2>باتِ تلگرامِ پمپ — هشدارِ قرض‌دار و مخزن در تلگرام</h2>
+        <span class="muted" id="tg-state"></span>
+      </div>
+      <p class="muted">
+        در تلگرام به <b dir="ltr">@BotFather</b> بروید، <b dir="ltr">/newbot</b> را بزنید و رمزی
+        را که می‌دهد این‌جا بچسبانید. صاحبانِ پمپ در بات «Start» را می‌زنند، ایمیلِ
+        حسابشان را می‌فرستند و با کدی که به همان ایمیل می‌رود وصل می‌شوند — پس
+        سرویسِ ایمیلِ بالا باید روشن باشد.
+      </p>
+      <div class="row">
+        <label style="display:flex;align-items:center;gap:6px;">
+          <input type="checkbox" id="tg-enabled"> روشن
+        </label>
+        <a id="tg-link" href="#" target="_blank" rel="noopener" class="hidden" dir="ltr"></a>
+      </div>
+      <label>رمزِ بات</label>
+      <input type="password" id="tg-token" dir="ltr" autocomplete="new-password" placeholder="123456:ABC… — خالی = دست نخورد">
+      <div class="row" style="margin-top:10px;">
+        <button class="btn btn-sm" id="btn-tg-save">ذخیره</button>
+      </div>
+      <div id="tg-msg"></div>
+    </div>
   </section>
 
   <!-- پشتیبان‌ها -->

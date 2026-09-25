@@ -350,6 +350,28 @@ await step('فایلِ حساب سرویسِ خراب، پیامِ آدمیزا�
   consoleErrors.length = 0;
 });
 
+await step('باتِ تلگرامِ پمپ: بی رمز «داده نشده» می‌گوید و رمزِ بدشکل ذخیره نمی‌شود', async () => {
+  await page.waitForFunction(
+    () => (document.getElementById('tg-state')?.textContent || '').length > 0,
+    null, { timeout: 10_000 }
+  );
+  const state = await page.textContent('#tg-state');
+  assert.ok(state.includes('داده نشده'), `بی رمز، کارت باید همین را بگوید — گفت: ${state}`);
+
+  await page.fill('#tg-token', 'این-رمز-نیست');
+  await page.click('#btn-tg-save');
+  await page.waitForFunction(
+    () => (document.querySelector('#tg-msg')?.textContent || '').length > 0,
+    null, { timeout: 10_000 }
+  );
+  const text = await page.textContent('#tg-msg');
+  assert.ok(text.includes('BotFather'), `پیامِ رمزِ بدشکل باید بگوید رمز از کجا می‌آید — رسید: ${text}`);
+  const row = await one("SELECT value FROM app_config WHERE key='telegram_token'");
+  assert.ok(!row || !row.value, 'رمزِ بدشکل نباید ذخیره شود');
+  //  همان ۴۰۰ِ خواسته — بالا را ببینید
+  consoleErrors.length = 0;
+});
+
 // ── ۷ب) پلن‌های پمپ — جدولِ خودش، و کادرِ پلنِ اشتراکِ پمپ ─────────
 /*
  *  ⛔ دو باگی که تا امروز هیچ‌جا قرمز نمی‌شدند، چون هر دو در مرورگر

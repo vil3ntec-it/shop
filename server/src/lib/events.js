@@ -155,6 +155,12 @@ function build(T) {
   async function notify(tenantId, userId, saved) {
     const worthy = saved.filter(e => PUSH_KINDS.includes(e.kind));
     if (!worthy.length) return { sent: 0, skipped: 'nothing_worthy' };
+    /*
+     *  ⛔ باتِ تلگرام — فقط پمپ، و با **همین** فهرستِ ارزشمند. قاعدهٔ جدا
+     *  نیست: همان سه نوعی که پوش می‌شوند. خودش هیچ‌وقت استثنا بیرون
+     *  نمی‌دهد، و پوش را هم منتظر نمی‌گذارد (فقط در صف می‌نشاند).
+     */
+    if (T.app === 'pump') await require('./telegram').notifyStation(tenantId, worthy);
     try {
       const first = worthy[0];
       const more = worthy.length - 1;
