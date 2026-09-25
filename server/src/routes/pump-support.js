@@ -23,6 +23,7 @@ const express = require('express');
 const { one, now } = require('../db');
 const v = require('../lib/validate');
 const support = require('../lib/support');
+const relay = require('../lib/chat-relay');
 const push = require('../lib/push');
 const { rateLimit } = require('../middleware/ratelimit');
 const { forbidden } = require('../middleware/errors');
@@ -52,6 +53,7 @@ function makeRouter(idOf) {
           after: v.integer(req.query?.after, { min: 0, max: 1e15, def: 0 }),
         }),
         greeting: 'سلام. هر مشکلی یا سؤالی دربارهٔ برنامهٔ پمپ دارید همین‌جا بنویسید.',
+        relayDays: relay.relayDays(),
         serverTime: now(),
       });
     } catch (err) { next(err); }

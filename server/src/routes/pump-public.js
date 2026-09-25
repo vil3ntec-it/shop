@@ -175,6 +175,7 @@ router.get(
    چتِ پشتیبانی — مشتری با رمزِ همان حساب (‎k‎)
    ══════════════════════════════════════════════════════════════════ */
 const chat = require('../lib/station-chat');
+const relay = require('../lib/chat-relay');
 
 const chatLimit = rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'pump-chat' });
 
@@ -202,6 +203,7 @@ router.get('/:code/acct/:id/chat', chatLimit, openChat, async (req, res, next) =
       name: th ? th.name : '',
       ownerSeenSeq: th ? Number(th.owner_seen_seq) : 0,
       vapid: await chat.publicKey(),
+      relayDays: relay.relayDays(),
       serverTime: now(),
     });
   } catch (err) { next(err); }
@@ -239,7 +241,7 @@ router.get('/:code/acct/:id/chat/media/:mid', chatLimit, openChat, async (req, r
   try {
     const { station, acct } = req.chat;
     const m = await chat.getMedia({ stationId: station.id, acct, id: String(req.params.mid || '') });
-    if (!m) throw notFound('رسانه پیدا نشد', 'not_found');
+    if (!m) throw notFound(relay.GONE_MESSAGE, 'media_gone');
     res.set('Content-Type', m.mime);
     res.set('Content-Length', String(m.size));
     res.set('Cache-Control', 'private, max-age=3600');

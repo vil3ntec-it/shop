@@ -504,6 +504,7 @@ router.put('/files/:path', async (req, res, next) => {
    چتِ پشتیبانی — از دیدِ صاحبِ پمپ (برنامهٔ کامپیوتر)
    ══════════════════════════════════════════════════════════════════ */
 const chat = require('../lib/station-chat');
+const relay = require('../lib/chat-relay');
 
 function acctParam(req) {
   const a = chat.cleanAcct(req.params.acct);
@@ -513,7 +514,7 @@ function acctParam(req) {
 
 /** همهٔ گفت‌وگوها با نخوانده‌ها — همان چیزی که فهرستِ سمتِ چپ نشان می‌دهد. */
 router.get('/chat/threads', async (req, res, next) => {
-  try { res.json({ ok: true, threads: await chat.threads(req.stationId), serverTime: now() }); }
+  try { res.json({ ok: true, threads: await chat.threads(req.stationId), relayDays: relay.relayDays(), serverTime: now() }); }
   catch (err) { next(err); }
 });
 
@@ -525,14 +526,14 @@ router.get('/chat/inbox', async (req, res, next) => {
       `SELECT * FROM station_chat_messages WHERE station_id=$1 AND seq > $2 ORDER BY seq ASC LIMIT 500`,
       [req.stationId, after]
     );
-    res.json({ ok: true, messages: rows.rows.map(r => ({ ...chat.shape(r), acct: r.acct })), serverTime: now() });
+    res.json({ ok: true, messages: rows.rows.map(r => ({ ...chat.shape(r), acct: r.acct })), relayDays: relay.relayDays(), serverTime: now() });
   } catch (err) { next(err); }
 });
 
 router.get('/chat/media/:mid', async (req, res, next) => {
   try {
     const m = await chat.getMedia({ stationId: req.stationId, acct: null, id: String(req.params.mid || '') });
-    if (!m) throw notFound('رسانه پیدا نشد', 'not_found');
+    if (!m) throw notFound(relay.GONE_MESSAGE, 'media_gone');
     res.set('Content-Type', m.mime);
     res.set('Content-Length', String(m.size));
     res.end(m.data);
@@ -547,6 +548,7 @@ router.get('/chat/:acct', async (req, res, next) => {
       ok: true,
       messages: await chat.list({ stationId: req.stationId, acct, afterSeq: req.query.after, limit: 300 }),
       blocked: !!(th && th.blocked_at), name: th ? th.name : '',
+      relayDays: relay.relayDays(),
       serverTime: now(),
     });
   } catch (err) { next(err); }
