@@ -68,7 +68,58 @@ const CODE_MAX_PER_WINDOW = 5;
 const MAX_ATTEMPTS = 8;
 const GIVE_UP_MS = 24 * 3600 * 1000;
 const KEEP_MS = 7 * 24 * 3600 * 1000;
-const MAX_LINES = 15;
+/**
+ * ⛔ «محدودیت هم نداشته باشه» (۱۴۰۵/۰۷/۱۴): هیچ فهرستی بریده نمی‌شود —
+ * نه هشدارها، نه نتیجهٔ جست‌وجو. تلگرام یک پیام را تا ۴۰۹۶ نویسه می‌پذیرد،
+ * پس متنِ بلند به چند پیامِ پشتِ سرِ هم شکسته می‌شود (`chunks`)، همیشه سرِ
+ * مرزِ یک بند یا یک خط — هیچ نامی وسطش بریده نمی‌شود.
+ */
+const CHUNK = 3800;
+
+/** متنِ بلند ⇒ تکه‌های ≤ CHUNK، سرِ مرزِ بند (خطِ خالی) و بعد خط. */
+function chunks(text, max = CHUNK) {
+  const out = [];
+  let cur = '';
+  const push = (piece, sep) => {
+    if (!cur) { cur = piece; return; }
+    if (cur.length + sep.length + piece.length <= max) { cur += sep + piece; return; }
+    out.push(cur); cur = piece;
+  };
+  for (const block of String(text).split('\n\n')) {
+    if (block.length <= max) { push(block, '\n\n'); continue; }
+    //  بندی که خودش بلند است: خط‌به‌خط
+    let first = true;
+    for (const line of block.split('\n')) {
+      const safe = line.length > max ? line.slice(0, max) : line;
+      push(safe, first ? '\n\n' : '\n');
+      first = false;
+    }
+  }
+  if (cur || !out.length) out.push(cur);
+  return out;
+}
+
+/** چند پیامِ پشتِ سرِ هم برای یک متنِ بلند. */
+async function sendLong(chatId, text) {
+  let res = null;
+  for (const part of chunks(text)) {
+    res = await send(chatId, part);
+    if (!res.ok) break;
+  }
+  return res;
+}
+
+/** یک متن ⇒ چند ردیفِ صف، به ترتیب (created_at پشتِ سرِ هم). */
+async function queueLong(chatId, stationId, text, t) {
+  const parts = chunks(text);
+  for (let i = 0; i < parts.length; i++) {
+    await query(
+      `INSERT INTO telegram_outbox (id, chat_id, station_id, body, next_at, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6)`,
+      [newId('tgo'), chatId, stationId, parts[i], t, t + i]
+    );
+  }
+}
 
 /* ══════════════════════════════════════════════════════════════════
    درگاهِ تلگرام
@@ -395,7 +446,24 @@ async function rememberMenu(chatId, messageId) {
  * ⚠️ «message is not modified» خطا نیست: کاربر دوبار روی همان دکمه زده.
  */
 async function show(chatId, text, keyboard, editId = 0) {
-  const body = String(text).slice(0, 4000);
+  const parts = chunks(text);
+  if (parts.length > 1) {
+    //  متنِ بلند: تکهٔ اول جای همان پیام، میانی‌ها پیامِ تازه، و دکمه‌ها زیرِ آخری
+    if (editId) {
+      await call('editMessageText', {
+        chat_id: String(chatId), message_id: Number(editId), text: parts[0],
+        disable_web_page_preview: true, reply_markup: { inline_keyboard: [] },
+      });
+    } else {
+      await send(chatId, parts[0]);
+    }
+    for (const mid of parts.slice(1, -1)) await send(chatId, mid);
+    const last = parts[parts.length - 1];
+    const res = await send(chatId, last, keyboard && keyboard.length ? keyboard : null);
+    if (res.ok && keyboard && keyboard.length) await rememberMenu(chatId, res.result?.message_id);
+    return res;
+  }
+  const body = parts[0];
   const markup = { inline_keyboard: keyboard || [] };
   if (editId) {
     const res = await call('editMessageText', {
@@ -526,12 +594,8 @@ async function statusText(link) {
 
   parts.push('');
   if (state.alerts.length) {
-    const shown = state.alerts.slice(0, MAX_LINES);
     parts.push(`🚨 هشدارهای باز (${faNum(state.alerts.length)}):`);
-    for (const a of shown) parts.push(alertLine(a));
-    if (state.alerts.length > shown.length) {
-      parts.push(`… و ${faNum(state.alerts.length - shown.length)} هشدارِ دیگر`);
-    }
+    for (const a of state.alerts) parts.push(alertLine(a));
   } else {
     parts.push('✅ همین حالا هیچ هشدارِ بازی نیست.');
   }
@@ -543,7 +607,7 @@ async function sendStatus(row, editId = 0) {
   if (!link) return notLinked(row, editId);
   const kb = row.kind === 'channel' ? null
     : [[{ text: '🔄 تازه کن', callback_data: 'status' }, BACK]];
-  if (!kb) return send(row.chat_id, await statusText(link));
+  if (!kb) return sendLong(row.chat_id, await statusText(link));
   return show(row.chat_id, await statusText(link), kb, editId);
 }
 
@@ -599,9 +663,8 @@ async function searchText(link, q) {
     const rb = normName(b.n) === query_ ? 0 : (normName(b.n).startsWith(query_) ? 1 : 2);
     return ra - rb || a.n.localeCompare(b.n, 'fa');
   });
-  const shown = hits.slice(0, 6);
-  return `🔎 پمپِ «${link.station_name}»\n\n${shown.map(debtorLines).join('\n\n')}`
-    + (hits.length > shown.length ? `\n\n… و ${faNum(hits.length - shown.length)} نفرِ دیگر — نام را کامل‌تر بنویسید.` : '')
+  const count = hits.length > 1 ? ` — ${faNum(hits.length)} نفر` : '';
+  return `🔎 پمپِ «${link.station_name}»${count}\n\n${hits.map(debtorLines).join('\n\n')}`
     + `\n\n🕒 ${ago(state.debtorsAt || state.updatedAt)}`;
 }
 
@@ -867,7 +930,7 @@ async function onSearch(row, q) {
       ? '🔎 نامِ قرض‌دار را بنویسید.'
       : '🔎 بعد از /find نامِ قرض‌دار را بنویسید؛ مثلاً: /find کریم');
   }
-  return send(row.chat_id, await searchText(link, q));
+  return sendLong(row.chat_id, await searchText(link, q));
 }
 
 /* ── دسترسی در گروه ───────────────────────────────────────────── */
@@ -1121,9 +1184,7 @@ function iconOf(e) {
 
 /** متنِ یک پیام برای یک دسته هشدار — یک پیام، نه یکی برای هر هشدار. */
 function formatAlert(stationName, items) {
-  const shown = items.slice(0, MAX_LINES);
-  const lines = shown.map(e => `${iconOf(e)} ${e.title || e.body || ''}`);
-  if (items.length > shown.length) lines.push(`… و ${faNum(items.length - shown.length)} هشدارِ دیگر`);
+  const lines = items.map(e => `${iconOf(e)} ${e.title || e.body || ''}`);
   //  ⚠️ بی دکمه (قاعدهٔ ۳): هشدار خبر است، نه منو. راهِ جزئیات یک فرمان است.
   return `🚨 هشدارِ پمپِ «${stationName}»\n\n${lines.join('\n')}\n\n📊 همهٔ هشدارهای باز: /status`;
 }
@@ -1163,15 +1224,10 @@ async function notifyResolved(stationId, closed) {
     for (const c of chats) {
       const mine = c.only_out ? items.filter(a => a.s === 'out') : items;
       if (!mine.length) continue;
-      const lines = mine.slice(0, MAX_LINES).map((a) => (String(a.k).startsWith('tank-')
+      const lines = mine.map((a) => (String(a.k).startsWith('tank-')
         ? `🛢️🟢 ${a.n || 'مخزن'} — دیگر کم نیست`
         : `👤🟢 ${a.n}${a.f ? ` — ${a.f}` : ''}: دیگر هشدار ندارد`));
-      if (mine.length > MAX_LINES) lines.push(`… و ${faNum(mine.length - MAX_LINES)} مورد دیگر`);
-      await query(
-        `INSERT INTO telegram_outbox (id, chat_id, station_id, body, next_at, created_at)
-         VALUES ($1,$2,$3,$4,$5,$5)`,
-        [newId('tgo'), c.chat_id, stationId, `✅ برطرف شد — پمپِ «${c.station_name}»\n\n${lines.join('\n')}`, t]
-      );
+      await queueLong(c.chat_id, stationId, `✅ برطرف شد — پمپِ «${c.station_name}»\n\n${lines.join('\n')}`, t);
       queued += 1;
     }
     if (queued) kick();
@@ -1211,11 +1267,7 @@ async function notifyStation(stationId, saved) {
     for (const c of chats) {
       const items = c.only_out ? worthy.filter(isOut) : worthy;
       if (!items.length) continue;
-      await query(
-        `INSERT INTO telegram_outbox (id, chat_id, station_id, body, next_at, created_at)
-         VALUES ($1,$2,$3,$4,$5,$5)`,
-        [newId('tgo'), c.chat_id, stationId, formatAlert(c.station_name, items), t]
-      );
+      await queueLong(c.chat_id, stationId, formatAlert(c.station_name, items), t);
       queued += 1;
     }
     if (queued) kick();
@@ -1548,6 +1600,6 @@ module.exports = {
   PURPOSE, ALERT_KINDS,
   setTransport, handleUpdate, pollOnce, flushOutbox, notifyStation,
   start, stop, reload, status, configure, publicInfo, appLinks,
-  formatAlert, parseCommand, asciiDigits, normEmail, normName, notifyResolved, searchText,
+  formatAlert, parseCommand, asciiDigits, normEmail, normName, notifyResolved, searchText, chunks,
   _reset,
 };
