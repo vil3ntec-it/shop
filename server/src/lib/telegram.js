@@ -590,14 +590,8 @@ async function statusText(link) {
     ? `⚠️ برنامهٔ کامپیوتر ${ago(state.updatedAt)} آخرین بار خبر داد — شاید بسته است.`
     : `🖥️ برنامهٔ کامپیوتر ${ago(state.updatedAt)} خبر داد.`);
 
-  const tanks = [];
-  for (const [key, label] of [['petrol', 'پطرول'], ['diesel', 'دیزل']]) {
-    const t = state.tank?.[key];
-    if (!t) continue;
-    const mark = t.low ? '🔴' : (t.near ? '🟡' : '🟢');
-    tanks.push(`${mark} ${label}: ${fmtNum(t.show)} لیتر`);
-  }
-  if (tanks.length) parts.push(`🛢️ مخزن — ${tanks.join(' · ')}`);
+  const tanks = tankLines(state.tank);
+  if (tanks.length) parts.push('', '🛢️ مخزن:', ...tanks);
 
   parts.push('');
   if (state.alerts.length) {
@@ -606,7 +600,35 @@ async function statusText(link) {
   } else {
     parts.push('✅ همین حالا هیچ هشدارِ بازی نیست.');
   }
+  const owe = oweLines(state.owe);
+  if (owe.length) parts.push('', '💼 بدهیِ پمپ به شرکت‌ها:', ...owe);
+  const todo = actionLines(state.alerts.map(a => a.a));
+  if (todo.length) parts.push('', '📋 دستورِ کار:', ...todo);
   return parts.join('\n');
+}
+
+/** هر مخزن در یک خط: چند لیتر مانده و حدِ هشدار — نه فقط یک عدد. */
+function tankLines(tank) {
+  const out = [];
+  for (const [key, label] of [['petrol', 'پطرول'], ['diesel', 'دیزل']]) {
+    const t = tank?.[key];
+    if (!t) continue;
+    const mark = t.low ? '🔴' : (t.near ? '🟡' : '🟢');
+    const word = Number(t.show) <= 0 ? 'خالی است' : (t.low ? 'کم است' : (t.near ? 'نزدیکِ حد است' : 'پُر است'));
+    const lim = Number(t.threshold) > 0 ? ` (حدِ هشدار ${fmtNum(t.threshold)} لیتر)` : '';
+    out.push(`${mark} ${label}: ${fmtNum(t.show)} لیتر مانده — ${word}${lim}`);
+  }
+  return out;
+}
+
+/** بدهیِ پمپ به هر شرکت — همان الباقی‌ای که برنامه حساب کرده. */
+function oweLines(owe) {
+  return (Array.isArray(owe) ? owe : []).map((o) => {
+    const parts = [];
+    if (Number(o.afn) > 0) parts.push(`${fmtNum(o.afn)} افغانی`);
+    if (Number(o.usd) > 0) parts.push(`${fmtNum(o.usd)} دالر`);
+    return `▫️ ${o.n}: ${parts.join(' · ')}`;
+  });
 }
 
 async function sendStatus(row, editId = 0) {
@@ -1200,16 +1222,38 @@ function iconOf(e) {
   return `${who}${out ? '🔴' : '🟡'}`;
 }
 
+/**
+ * «📋 دستورِ کار» — کارهایی که همین حالا باید انجام شود.
+ *
+ * ⛔ هیچ قاعده‌ای این‌جا ساخته نمی‌شود: هر خط همان `a`ی است که برنامهٔ
+ * پمپ کنارِ هر هشدار فرستاده (`StationSnapshot.Alerts`). این‌جا فقط کنارِ
+ * هم چیده و تکراری‌ها یکی می‌شوند.
+ */
+function actionLines(actions) {
+  const seen = new Set();
+  const out = [];
+  for (const a of actions) {
+    const v = String(a || '').trim();
+    if (!v || seen.has(v)) continue;
+    seen.add(v);
+    out.push(`▫️ ${v}`);
+  }
+  return out;
+}
+
 /** متنِ یک پیام برای یک دسته هشدار — یک پیام، نه یکی برای هر هشدار. */
 function formatAlert(stationName, items) {
   const lines = items.map(e => `${iconOf(e)} ${e.title || e.body || ''}`);
+  const todo = actionLines(items.map(e => e.data?.action));
   //  ⚠️ بی دکمه (قاعدهٔ ۳): هشدار خبر است، نه منو. راهِ جزئیات یک فرمان است.
-  return `🚨 هشدارِ پمپِ «${stationName}»\n\n${lines.join('\n')}\n\n📊 همهٔ هشدارهای باز: /status`;
+  return `🚨 هشدارِ پمپِ «${stationName}»\n\n${lines.join('\n')}`
+    + (todo.length ? `\n\n📋 دستورِ کار:\n${todo.join('\n')}` : '')
+    + '\n\n📊 همهٔ هشدارهای باز: /status';
 }
 
-/** کلیدِ یک هشدار بی حالش — «d7-stP-out» و «d7-stP-low» یک حساب‌اند. */
+/** کلیدِ یک هشدار بی حالش — همان `pump-state.subjectOf`. */
 function subjectOf(key) {
-  return String(key || '').replace(/-(out|low)$/, '');
+  return require('./pump-state').subjectOf(key);
 }
 
 /**
@@ -1239,7 +1283,7 @@ function subjectOf(key) {
  */
 function alertChats(stationId) {
   return many(
-    `SELECT c.chat_id, c.only_out, s.name AS station_name
+    `SELECT c.chat_id, c.only_out, c.announced_day, s.name AS station_name
        FROM telegram_chats c
        JOIN stations s ON s.id=c.station_id AND s.status='active'
        JOIN station_members m ON m.station_id=c.station_id AND m.user_id=c.user_id AND m.status='active'
@@ -1318,6 +1362,105 @@ async function notifyStation(stationId, saved) {
     return { queued };
   } catch (err) {
     console.error('[telegram:notify]', hide(err.message));
+    return { queued: 0, error: err.message };
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   📢 اعلامیهٔ صبح — «یکم ریس‌مدلی»
+   ══════════════════════════════════════════════════════════════════
+
+   خواستهٔ صاحب سامانه (۱۴۰۵/۰۷/۱۴): «یک اعلامیه بده که تیل بگیرید یا به
+   یارو تیل ندید یا از شرکت انقد قرض‌دار استین… یکم به فکرِ پمپ هم باش.»
+
+   هر روز یک بار، از ساعتِ ۸ صبحِ کابل، به همان گفت‌وگوهایی که هشدار
+   می‌گیرند (`alertChats` — گروهِ وصل ⇒ فقط گروه). ⛔ هیچ عددی این‌جا حساب
+   نمی‌شود: مخزن، هشدارها و بدهیِ شرکت‌ها همه از حالِ زنده‌ای است که
+   برنامهٔ پمپ فرستاده؛ این‌جا فقط چیده می‌شوند. */
+
+const ANNOUNCE_HOUR = 8;
+const KABUL_MS = 4.5 * 3600 * 1000;
+const kabulDay = (t) => new Date(t + KABUL_MS).toISOString().slice(0, 10);
+const kabulHour = (t) => new Date(t + KABUL_MS).getUTCHours();
+
+/** حالِ یک هشدارِ قرض‌دار از کلیدش — همان پسوندهای `StationSnapshot.Alerts`. */
+function levelOf(k) {
+  const m = /-(out|low|w70|w90|over)$/.exec(String(k || ''));
+  return m ? m[1] : '';
+}
+
+function announcementText(stationName, state, t = now()) {
+  const parts = [`📢 اعلامیهٔ امروزِ پمپِ «${stationName}»`, 'صبح بخیر، تیم! اول این‌ها را ببینید:'];
+  if (t - state.updatedAt > STALE_MS) {
+    parts.push('', `⚠️ برنامهٔ کامپیوتر ${ago(state.updatedAt)} آخرین بار خبر داد — اول آن را روشن کنید تا عددها تازه باشند.`);
+  }
+  const tanks = tankLines(state.tank);
+  if (tanks.length) parts.push('', '🛢️ مخزن:', ...tanks);
+
+  const debts = state.alerts.filter(a => !String(a.k).startsWith('tank-'));
+  const groups = [
+    ['over', '🔴 بیشتر از حسابشان تیل/پول برده‌اند — بازپرسی شود:'],
+    ['out', '🔴 حسابشان تمام شده — دیگر ندهید:'],
+    ['w90', '🟡 ۹۰٪ِ حسابشان رفته — بگویید حساب را پر کنند:'],
+    ['low', '🟡 حسابشان کم مانده:'],
+    ['w70', '🟡 ۷۰٪ِ حسابشان رفته — متوجه باشید:'],
+  ];
+  const debtParts = [];
+  for (const [lv, label] of groups) {
+    const names = debts.filter(a => levelOf(a.k) === lv).map(a => `${a.n}${a.f ? ` (${a.f})` : ''}`);
+    if (names.length) debtParts.push(label, `   ${names.join('، ')}`);
+  }
+  if (debtParts.length) parts.push('', '👥 قرض‌داران:', ...debtParts);
+
+  const owe = oweLines(state.owe);
+  if (owe.length) parts.push('', '💼 بدهیِ پمپ به شرکت‌ها:', ...owe);
+
+  const todo = actionLines(state.alerts.map(a => a.a));
+  if (owe.length) todo.push('▫️ بدهیِ شرکت‌ها را فراموش نکنید؛ پیش از خریدِ تازه، تسویه را برنامه بریزید.');
+  if (todo.length) {
+    parts.push('', '📋 دستورِ کارِ امروز:', ...todo);
+    parts.push('', '💪 با دقت کار کنید — هر لیتر حساب دارد.');
+  } else {
+    parts.push('', '✅ همه‌چیز رو‌به‌راه است: مخزن‌ها سالم‌اند و هیچ قرض‌داری از حسابش بیرون نزده. همین‌طور ادامه بدهید.');
+  }
+  return parts.join('\n');
+}
+
+let lastAnnounceTry = 0;
+
+/**
+ * اعلامیهٔ صبح برای هر گفت‌وگویی که امروز هنوز نگرفته است.
+ * ⛔ هیچ‌وقت استثنا بیرون نمی‌دهد. `t` فقط برای آزمون.
+ */
+async function announceTick(t = now()) {
+  try {
+    if (!(await active())) return { queued: 0, skipped: 'off' };
+    if (kabulHour(t) < ANNOUNCE_HOUR) return { queued: 0, skipped: 'early' };
+    const day = kabulDay(t);
+    const stations = await many('SELECT station_id FROM station_live_state');
+    const ps = require('./pump-state');
+    let queued = 0;
+    for (const { station_id: sid } of stations) {
+      const chats = (await alertChats(sid)).filter(c => c.announced_day !== day);
+      if (!chats.length) continue;
+      const state = await ps.get(sid);
+      if (!state) continue;
+      for (const c of chats) {
+        //  ⚠️ اول مُهر، بعد صف: دو دورِ هم‌زمان هرگز دو اعلامیه نمی‌سازند
+        const took = await one(
+          `UPDATE telegram_chats SET announced_day=$2
+            WHERE chat_id=$1 AND announced_day IS DISTINCT FROM $2 RETURNING chat_id`,
+          [c.chat_id, day]
+        );
+        if (!took) continue;
+        await queueLong(c.chat_id, sid, announcementText(c.station_name, state, t), now());
+        queued += 1;
+      }
+    }
+    if (queued) kick();
+    return { queued };
+  } catch (err) {
+    console.error('[telegram:announce]', hide(err.message));
     return { queued: 0, error: err.message };
   }
 }
@@ -1530,7 +1673,11 @@ function start() {
     }
   })();
 
-  outboxTimer = setInterval(() => { flushOutbox().catch(() => {}); }, 5000);
+  outboxTimer = setInterval(() => {
+    flushOutbox().catch(() => {});
+    //  اعلامیهٔ صبح — دقیقه‌ای یک بار سنجیده می‌شود، روزی یک بار می‌رود
+    if (now() - lastAnnounceTry >= 60_000) { lastAnnounceTry = now(); announceTick().catch(() => {}); }
+  }, 5000);
   outboxTimer.unref?.();
 }
 
@@ -1644,6 +1791,6 @@ module.exports = {
   PURPOSE, ALERT_KINDS,
   setTransport, handleUpdate, pollOnce, flushOutbox, notifyStation,
   start, stop, reload, status, configure, publicInfo, appLinks,
-  formatAlert, parseCommand, asciiDigits, normEmail, normName, notifyResolved, searchText, chunks,
+  formatAlert, announcementText, announceTick, parseCommand, asciiDigits, normEmail, normName, notifyResolved, searchText, chunks,
   _reset,
 };
