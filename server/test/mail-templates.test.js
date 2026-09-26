@@ -19,6 +19,7 @@ const SPANS = (s) => s.split('').map((d) => `<span>${d}</span>`).join('');
 test('۱) هر دو قالب هستند، و همان فایل‌های صاحبِ سامانه‌اند (نه بازنویسی)', () => {
   for (const app of ['pump', 'shop']) {
     assert.ok(t.available(app), `قالبِ ${app}`);
+    assert.ok(fs.existsSync(path.join(t.DIR, t.EMAIL_FILES[app])), 'نسخهٔ فرستادنی');
     const raw = fs.readFileSync(path.join(t.DIR, t.FILES[app]), 'utf8');
     //  نشانه‌های خودِ فایل‌ها — اگر کسی فایل را «تمیز» کند، این‌جا می‌افتد
     assert.ok(raw.includes('<title>کد ورود'), 'عنوانِ خودِ فایل');
@@ -31,25 +32,62 @@ test('۱) هر دو قالب هستند، و همان فایل‌های صاحب
   assert.ok(fs.readFileSync(path.join(t.DIR, t.FILES.shop), 'utf8').includes(SPANS(t.SAMPLE)));
 });
 
-test('۲) ⛔ ایمیلِ کدِ ورود با فایل فقط در شش رقم فرق دارد — و یک خطِ پیش‌نمایشِ نامرئی', () => {
+test('۲) ⛔ ایمیلِ کدِ ورود با نسخهٔ فرستادنی فقط در شش رقم فرق دارد — و یک خطِ پیش‌نمایشِ نامرئی', () => {
   const pre = t.preheader(t.PREVIEW.code);
   for (const app of ['pump', 'shop']) {
-    const raw = fs.readFileSync(path.join(t.DIR, t.FILES[app]), 'utf8');
+    const raw = fs.readFileSync(path.join(t.DIR, t.EMAIL_FILES[app]), 'utf8');
     const html = t.codeHtml({ app, code: '735102' });
     assert.ok(html, 'رندر شد');
-    assert.ok(!html.includes(t.SAMPLE), 'رقمِ نمونه نمانده');
-    //  ⛔ خطِ پیش‌نمایش (۱۴۰۵/۰۷/۱۳، «توی اعلانات کدی نباشد») فقط در سرِ فایل
-    //  است، پنهان است، و **کد در آن نیست**
-    assert.ok(html.startsWith(pre), 'خطِ پیش‌نمایش سرِ نامه');
+    //  ⛔ خطِ پیش‌نمایش (۱۴۰۵/۰۷/۱۳، «توی اعلانات کدی نباشد») درست پس از <body>
+    const at = html.indexOf(pre);
+    assert.ok(at > html.indexOf('<body') && at < html.indexOf('<table'), 'خطِ پیش‌نمایش سرِ بدنه');
     assert.ok(/display:none/.test(pre) && !pre.includes('735102'), 'پنهان و بی کد');
-    //  بقیه همان فایل، با رقمِ تازه به‌جای نمونه — و **هیچ** فرقِ دیگری
+    const body = html.slice(0, at) + html.slice(at + pre.length + 1);
     const expected = app === 'pump'
-      ? raw.replace(`id="code" dir="ltr">${t.SAMPLE}<`, 'id="code" dir="ltr">735102<')
-      : raw.replace(SPANS(t.SAMPLE), SPANS('735102'));
-    const body = html.slice(pre.length);
+      ? raw.replace(`">${t.SAMPLE}</div>`, '">735102</div>')
+      : raw.replace(/<!--digits-->[^]*?<!--\/digits-->/, (b) => { let k = 0; return b.replace(/>(\d)<\/td>/g, () => `>${'735102'[k++]}</td>`); });
+    assert.notEqual(expected, raw, 'رقمِ نمونه پیدا شد');
     assert.equal(body, expected, `${app}: فقط رقم‌ها عوض شده‌اند`);
-    assert.equal(body.length, raw.length, 'حتی یک بایت از خودِ فایل کم و زیاد نشده');
   }
+});
+
+/**
+ * ⛔ گزارشِ صاحبِ سامانه با عکسِ جیمیل (۱۴۰۵/۰۷/۱۳): «اصلاً ظاهرش رو دیدی؟»
+ * نامه متنِ خام می‌رسید، چون فایلِ او صفحهٔ وب است و جیمیل <style>، متغیرِ
+ * CSS، flex/grid، SVG و اسکریپت را دور می‌ریزد. نسخهٔ فرستادنی هیچ‌کدام را
+ * ندارد — و **نوشته‌اش واژه‌به‌واژه همان فایلِ اوست**.
+ */
+test('۲الف) ⛔ نسخهٔ فرستادنی: همان نوشته‌ها، بی چیزی که جیمیل دور می‌ریزد', () => {
+  const text = (h) => h.replace(/<!--[^]*?-->/g, '').replace(/<(script|style|title|head)[^]*?<\/\1>/gi, '')
+    .replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+  for (const app of ['pump', 'shop']) {
+    const orig = fs.readFileSync(path.join(t.DIR, t.FILES[app]), 'utf8');
+    const mail = fs.readFileSync(path.join(t.DIR, t.EMAIL_FILES[app]), 'utf8');
+    assert.equal(text(mail), text(orig), `${app}: نوشته‌ها همان فایلِ صاحبِ سامانه`);
+    for (const bad of ['<style', '<script', 'var(--', '<svg', 'display:flex', 'display:grid', 'fonts.googleapis', 'class="']) {
+      assert.ok(!mail.includes(bad), `${app}: «${bad}» در نامه نیست`);
+    }
+    //  هر تصویر پیوستِ درون‌خطی است و فایلش هست
+    const cids = [...mail.matchAll(/src="([^"]+)"/g)].map((m) => m[1]);
+    assert.ok(cids.length > 10);
+    for (const c of cids) assert.ok(/^cid:(pump|shop)-[a-z0-9]+@vill3n$/.test(c), c);
+    const parts = t.inlineParts(mail);
+    assert.equal(parts.length, new Set(cids).size, `${app}: هر cid یک PNG`);
+    for (const p of parts) assert.equal(p.data.subarray(1, 4).toString(), 'PNG');
+  }
+});
+
+test('۲ج) نامهٔ دارای تصویر multipart/related است و هر تصویر Content-IDِ خودش را دارد', () => {
+  const { buildMessage } = require('../src/lib/mailer');
+  const html = t.codeHtml({ app: 'pump', code: '735102' });
+  const msg = buildMessage({ from: 'a@b.c', fromName: 'ویلن' }, { to: 'x@y.z', subject: 'کد ورود ویلن', text: '735102', html });
+  assert.match(msg, /Content-Type: multipart\/related; type="multipart\/alternative"; boundary="/);
+  assert.match(msg, /Content-Type: multipart\/alternative; boundary="a/);
+  for (const p of t.inlineParts(html)) assert.ok(msg.includes(`Content-ID: <${p.cid}>`), p.cid);
+  //  نامهٔ بی تصویر همان alternativeِ ساده می‌ماند
+  const plain = buildMessage({ from: 'a@b.c' }, { to: 'x@y.z', subject: 's', text: 't', html: '<p>t</p>' });
+  assert.match(plain, /Content-Type: multipart\/alternative; boundary="b/);
+  assert.ok(!plain.includes('Content-ID'));
 });
 
 test('۲ب) ⛔ عنوانِ ایمیل همان <title>ِ فایل است و کد ندارد؛ فرستنده نامِ برنامه', () => {
@@ -75,21 +113,22 @@ test('۴) ایمیلِ پیام: همان مدل، کارتِ کد جایش پی
   for (const app of ['pump', 'shop']) {
     const html = t.messageHtml({ app, title: 'اشتراکِ شما رو به پایان است', body: 'سلام،\nهفت روز مانده.\n\nبرای تمدید با ما تماس بگیرید.' });
     assert.ok(html, 'رندر شد');
-    assert.ok(html.includes('<h2>اشتراکِ شما رو به پایان است</h2>') || html.includes('<h3>اشتراکِ شما رو به پایان است</h3>'), 'عنوان');
-    assert.ok(html.includes('<p>سلام،<br>هفت روز مانده.</p>'), 'خطِ تازه ⇒ <br>');
-    assert.ok(html.includes('<p>برای تمدید با ما تماس بگیرید.</p>'), 'خطِ خالی ⇒ پاراگرافِ تازه');
+    assert.ok(/">اشتراکِ شما رو به پایان است<\/h[23]>/.test(html), 'عنوان');
+    assert.ok(html.includes('">سلام،<br>هفت روز مانده.</p>'), 'خطِ تازه ⇒ <br>');
+    assert.ok(html.includes('">برای تمدید با ما تماس بگیرید.</p>'), 'خطِ خالی ⇒ پاراگرافِ تازه');
     assert.ok(!html.includes(t.SAMPLE), 'هیچ کدی در پیام نیست');
     assert.ok(!html.includes('copyBtn') && !html.includes('<script'), 'دکمهٔ کپی و اسکریپتش رفته');
     assert.ok(!html.includes('کد ورود شما'), 'عنوانِ کارتِ کد رفته');
     assert.ok(html.includes('چرا ویلن') && html.includes('مشخصات برنامه'), 'بقیهٔ صفحه سرِ جایش');
-    assert.ok(html.includes('<style>') && html.includes('fonts.googleapis.com'), 'ظاهر همان است');
+    assert.ok(html.includes('cid:') && !html.includes('<style'), 'ظاهر همان نسخهٔ فرستادنی است');
   }
   //  پمپ: کادرِ کد، دو نشانِ «اعتبار» و هشدارِ سرخ هم مالِ کد بودند
   const pump = t.messageHtml({ app: 'pump', title: 'x', body: 'y' });
-  assert.ok(!pump.includes('class="code-box"') && !pump.includes('class="meta"') && !pump.includes('class="warn"'));
+  assert.ok(!pump.includes('<!--code-box-->') && !pump.includes('<!--meta-->') && !pump.includes('<!--warn-->'));
+  assert.ok(!pump.includes('cid:pump-copy@') && !pump.includes('اعتبار: ۵ دقیقه'));
   //  دکان: شش خانهٔ رقم
   const shop = t.messageHtml({ app: 'shop', title: 'x', body: 'y' });
-  assert.ok(!shop.includes('id="digits"'));
+  assert.ok(!shop.includes('<!--digits-->') && !shop.includes('کپی کردن کد'));
 });
 
 test('۵) ورودیِ بد ⇒ null، نه ایمیلِ نصفه', () => {
