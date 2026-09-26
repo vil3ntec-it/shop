@@ -68,9 +68,8 @@ val replaced = listOf(
   "data/Fingerprint.kt",
   "data/GoogleSignIn.kt",
   "data/Migration.kt",
-  "print/Receipt.kt",
-  "print/ReportPrint.kt",
   "scan/BarcodeScanner.kt",
+  "sync/Integrity.kt",
   "update/Updater.kt",
 ).map { "ir/vil3ntec/tohid/$it" }
 
