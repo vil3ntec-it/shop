@@ -45,7 +45,8 @@ async function activated(uid, code) {
   return { token: r.body.deviceToken, code: r.body.station.code, stationId: r.body.station.id };
 }
 
-const CODE_RE = /^[A-HJ-NP-Z2-9]{8}$/;
+//  ⛔ از ۲.۱۱.۶ کدِ پمپ هشت رقم است (رقمِ اول صفر نیست)
+const CODE_RE = /^[1-9][0-9]{7}$/;
 
 test('برنامه کدش را می‌گیرد و گوشی با همان کد فقط به همان پمپ می‌رسد', async () => {
   const a = await activated('pc-ac-1', 'ac-one');

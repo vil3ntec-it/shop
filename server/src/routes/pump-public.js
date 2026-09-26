@@ -117,7 +117,9 @@ router.post('/join', joinLimit, async (req, res, next) => {
     );
     res.json({
       ok: true,
-      station: { code: st.code, name: st.name || '' },
+      //  ⛔ کدِ امروزیِ پمپ هم برمی‌گردد: گوشی‌ای که با کدِ حرفیِ پیشین آمده
+      //  همان‌جا کدِ هشت‌رقمی را برمی‌دارد و دیگر به کدِ کهنه تکیه ندارد
+      station: { code: st.code, name: st.name || '', accessCode: access.format(st.access_code || '') },
       home: {
         url: st.home_url || '',
         readKey: await stations.readKeyOf(st),

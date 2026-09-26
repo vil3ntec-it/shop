@@ -391,6 +391,8 @@ async function createApp({ runMigrations = true } = {}) {
     subs.pump.notifyExpiring().catch(err => console.error('[pump:expiry-notice]', err.message));
     //  رباتِ دورهٔ آزمایشی: هر پمپی که آغازِ دوره ندارد (شرحش در `lib/trial-sweep.js`)
     require('./lib/trial-sweep').sweep().catch(err => console.error('[trial-sweep]', err.message));
+    //  رباتِ کدها: هر پمپی که هنوز کدِ هشت‌رقمیِ اپِ گوشی ندارد (`lib/station-access.js`)
+    require('./lib/station-access').sweep().catch(err => console.error('[access-sweep]', err.message));
     //  سلامتِ برنامه‌ها و سایت‌های دیگر، از سرور سنجیده می‌شود نه از
     //  گوشیِ مدیر که ممکن است پشت فیلتر باشد
     require('./lib/managed-apps').checkHealth()
@@ -399,6 +401,7 @@ async function createApp({ runMigrations = true } = {}) {
   if (housekeeping.unref) housekeeping.unref();
   //  ⚠️ سرِ بالا آمدن هم — شش ساعت صبر برای پمپی که همین حالا بی‌مُهر است زیاد است
   setImmediate(() => require('./lib/trial-sweep').sweep().catch(err => console.error('[trial-sweep]', err.message)));
+  setImmediate(() => require('./lib/station-access').sweep().catch(err => console.error('[access-sweep]', err.message)));
   app.locals.housekeeping = housekeeping;
 
   return app;
