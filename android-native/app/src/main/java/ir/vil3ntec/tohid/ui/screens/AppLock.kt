@@ -24,6 +24,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.focusable
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.utf16CodePoint
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
@@ -226,9 +234,34 @@ private fun LockMark() {
   }
 }
 
+/**
+ *  صفحه‌کلیدِ رمز.
+ *
+ *  رقم‌های **صفحه‌کلیدِ سخت‌افزاری** هم پذیرفته می‌شوند (ردیفِ بالا،
+ *  بخشِ عددی، و رقم‌های فارسی) و Backspace یکی پاک می‌کند. روی
+ *  برنامهٔ کامپیوتر این تنها راهِ طبیعی است، و روی گوشی/تبلتی که
+ *  صفحه‌کلید وصل دارد هم همان کار را می‌کند.
+ */
 @Composable
 private fun Keypad(onDigit: (Char) -> Unit, onBack: () -> Unit) {
+  val focus = remember { androidx.compose.ui.focus.FocusRequester() }
+  LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
   Column(
+    Modifier
+      .focusRequester(focus)
+      .focusable()
+      .onKeyEvent { e ->
+        if (e.type != KeyEventType.KeyDown) return@onKeyEvent false
+        if (e.key == Key.Backspace || e.key == Key.Delete) { onBack(); return@onKeyEvent true }
+        val c = e.utf16CodePoint.toChar()
+        val digit = when (c) {
+          in '0'..'9' -> c
+          in '۰'..'۹' -> '0' + (c - '۰')
+          in '٠'..'٩' -> '0' + (c - '٠')
+          else -> null
+        }
+        if (digit != null) { onDigit(digit); true } else false
+      },
     verticalArrangement = Arrangement.spacedBy(10.dp),
     horizontalAlignment = Alignment.CenterHorizontally,
   ) {

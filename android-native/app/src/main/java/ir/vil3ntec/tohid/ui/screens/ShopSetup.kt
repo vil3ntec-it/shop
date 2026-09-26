@@ -86,6 +86,10 @@ fun ShopSetupScreen(store: ShopStore, onDone: () -> Unit) {
       .background(colors.bg)
       .verticalScroll(rememberScrollState())
       .imePadding()
+      //  روی تبلت و پنجرهٔ پهنِ کامپیوتر کادرها تا لبهٔ صفحه کشیده
+      //  می‌شدند؛ همان پهنای کارتِ صفحهٔ ورود بس است. روی گوشی بی‌اثر.
+      .wrapContentWidth(Alignment.CenterHorizontally)
+      .widthIn(max = 560.dp)
       .padding(horizontal = 24.dp, vertical = 36.dp),
     horizontalAlignment = Alignment.CenterHorizontally,
   ) {

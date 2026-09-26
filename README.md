@@ -1,22 +1,24 @@
 # shop
 
-برنامه‌ی مدیریت فروشگاه — نسخه‌ی وب، برنامه‌ی اندروید و سرور.
+برنامه‌ی مدیریت فروشگاه — نسخه‌ی وب، برنامه‌ی اندروید، برنامه‌ی کامپیوتر و سرور.
 
 ```
-برنامه اندروید ─┐
-                ├─→  REST API  →  Node.js  →  PostgreSQL
-نسخه وب ────────┘
+برنامه اندروید ──┐
+برنامه کامپیوتر ─┼─→  REST API  →  Node.js  →  PostgreSQL
+نسخه وب ─────────┘
 ```
 
 | پوشه | چیست |
 |---|---|
 | `index.html` و `license/` | نسخه‌ی وب (PWA)، روی GitHub Pages |
 | `android/` | برنامه‌ی بومی اندروید (Kotlin + Compose) |
+| `desktop/` | برنامه‌ی بومی کامپیوتر (ویندوز، مک، لینوکس) — همان کدِ `android-native` روی Compose Desktop |
 | `server/` | سرور: حساب، دکان چندکاربره، اشتراک، همگام‌سازی، پشتیبان |
 
 - سایت: https://vil3ntec-it.github.io/shop/
 - راه‌اندازی سرور: [`server/README.md`](server/README.md)
 - ساخت برنامه‌ی اندروید: [`android/README.md`](android/README.md)
+- برنامه‌ی کامپیوتر: [`docs/DESKTOP-fa.md`](docs/DESKTOP-fa.md) — دانلود از انتشارِ [`tohid-desktop`](https://github.com/vil3ntec-it/shop/releases/tag/tohid-desktop)
 
 ## در یک نگاه
 
