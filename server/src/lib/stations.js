@@ -182,7 +182,7 @@ async function createStation(userId, { name = '', code = '' } = {}) {
   const taken = await one('SELECT 1 FROM stations WHERE code=$1', [wanted]);
   if (taken) throw conflict('این کد قبلاً گرفته شده است', 'code_taken');
 
-  return tx(async (c) => {
+  await tx(async (c) => {
     const t = now();
     await c.query(
       //  ⛔ آغازِ دورهٔ آزمایشی همین لحظه، روی خودِ سرور (مهاجرتِ ۰۳۲)
@@ -196,8 +196,8 @@ async function createStation(userId, { name = '', code = '' } = {}) {
       [newId('mem'), stationId, userId, t]
     );
     await c.query('INSERT INTO station_rev (station_id, last_rev) VALUES ($1, 0)', [stationId]);
-    return c.query('SELECT * FROM stations WHERE id=$1', [stationId]).then(r => r.rows[0]);
   });
+  return withAccessCode(stationId);
 }
 
 /**
@@ -213,7 +213,7 @@ async function createStationForDevice({ code = '', name = '' } = {}) {
   if (await one('SELECT 1 FROM stations WHERE code=$1', [wanted])) {
     throw conflict('این کد قبلاً گرفته شده است', 'code_taken');
   }
-  return tx(async (c) => {
+  await tx(async (c) => {
     const t = now();
     await c.query(
       `INSERT INTO stations (id, owner_user_id, code, name, status, created_at, updated_at, trial_started_at)
@@ -221,8 +221,19 @@ async function createStationForDevice({ code = '', name = '' } = {}) {
       [stationId, wanted, name || 'پمپ من', t]
     );
     await c.query('INSERT INTO station_rev (station_id, last_rev) VALUES ($1, 0)', [stationId]);
-    return c.query('SELECT * FROM stations WHERE id=$1', [stationId]).then(r => r.rows[0]);
   });
+  return withAccessCode(stationId);
+}
+
+/**
+ * ⛔ هر پمپ کدِ هشت‌رقمیِ اپِ گوشی را **همان لحظهٔ ساختن** می‌گیرد (۱۴۰۵/۰۷/۱۴):
+ * «برای هر حساب کاربری یک کد هشت‌رقمی درست بشه». نشدنش ساختنِ پمپ را
+ * نمی‌شکند — `station-access.sweep()` و `ensure()` بعداً می‌سازندش.
+ */
+async function withAccessCode(stationId) {
+  try { await require('./station-access').ensure(stationId); }
+  catch (err) { console.error('[access-code]', stationId, err.message); }
+  return one('SELECT * FROM stations WHERE id=$1', [stationId]);
 }
 
 async function getStation(stationId) {
