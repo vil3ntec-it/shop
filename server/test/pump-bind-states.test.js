@@ -39,7 +39,7 @@ test('هر حالِ اشتراک و دستگاه ⇒ بند شدن بی ۵۰۰',
     grace: (s) => give(s, { plan: 'std', days: 1, graceDays: 3 }),
     cancelled: (s) => setStatus(s, 'cancelled'),
     suspended: (s) => setStatus(s, 'suspended'),
-    trialOver: (s) => query('UPDATE stations SET created_at=$2 WHERE id=$1', [s, now() - 90 * 86400000]),
+    trialOver: (s) => query('UPDATE stations SET created_at=$2, trial_started_at=$2 WHERE id=$1', [s, now() - 90 * 86400000]),
   };
   const bad = [];
   let i = 0;

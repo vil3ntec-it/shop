@@ -379,7 +379,7 @@ test('پمپِ بی‌اشتراک هم خبر می‌فرستد و می‌خو�
   const deviceToken = await bindDevice(owner, 'pc-20');
 
   //  اشتراکی روی این پمپ نیست و دورهٔ آزمایشی هم تمام‌شده فرض می‌شود
-  await h.query('UPDATE stations SET created_at=$2 WHERE id=$1',
+  await h.query('UPDATE stations SET created_at=$2, trial_started_at=$2 WHERE id=$1',
     [owner.stationId, Date.now() - 400 * 24 * 3600 * 1000]);
 
   const sent = await h.post('/api/pump/device/events', { kind: 'stock_out', title: 'تیل تمام' },

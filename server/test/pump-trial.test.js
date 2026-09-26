@@ -93,7 +93,7 @@ test('و پس از یک ماه خودش می‌بندد — بی هیچ کارِ
 
   //  ⚠️ ساعتِ سرور عقب برده نمی‌شود؛ **تاریخِ ساختِ پمپ** به گذشته
   //  می‌رود. همان کاری که گذرِ زمان می‌کند، بی دست‌کاریِ زمان.
-  await query('UPDATE stations SET created_at=$1 WHERE id=$2', [now() - 31 * DAY, id]);
+  await query('UPDATE stations SET created_at=$1, trial_started_at=$1 WHERE id=$2', [now() - 31 * DAY, id]);
 
   const me = await h.get('/api/pump/me', { token: u.accessToken });
   const ent = me.body.entitlement;
