@@ -26,3 +26,6 @@ class Configuration(
 }
 
 val LocalConfiguration = compositionLocalOf { Configuration(1200, 800) }
+
+/** `LocalView` — روی کامپیوتر نمایی با همان `DesktopContext` */
+val LocalView = staticCompositionLocalOf<android.view.View> { error("LocalView فراهم نشده") }

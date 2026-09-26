@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 
 open class Activity {
+  val window: android.view.Window? get() = null
   companion object { const val RESULT_OK = -1; const val RESULT_CANCELED = 0 }
 }
 

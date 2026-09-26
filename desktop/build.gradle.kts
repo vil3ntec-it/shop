@@ -170,7 +170,7 @@ kotlin {
 compose.desktop {
   application {
     mainClass = "ir.vil3ntec.tohid.desktop.MainKt"
-    jvmArgs += listOf("-Dfile.encoding=UTF-8", "-Dsun.java2d.uiScale.enabled=true")
+    jvmArgs += listOf("-Dfile.encoding=UTF-8", "-Dsun.jnu.encoding=UTF-8")
     nativeDistributions {
       targetFormats(TargetFormat.Msi, TargetFormat.Dmg, TargetFormat.Deb)
       packageName = "Tohid"
@@ -217,4 +217,10 @@ tasks.register("resolveDeps") {
     listOf("compileClasspath", "runtimeClasspath", "testCompileClasspath", "testRuntimeClasspath")
       .forEach { configurations.getByName(it).resolve() }
   }
+}
+
+/** برای اجرای مستقیم با `java -cp` (سنجشِ چشمی در CI) */
+tasks.register("printRuntimeClasspath") {
+  dependsOn("classes")
+  doLast { println((sourceSets.main.get().runtimeClasspath).asPath) }
 }

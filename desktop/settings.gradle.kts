@@ -1,20 +1,25 @@
 /*
  *  برنامهٔ کامپیوترِ فروشگاه — Compose Desktop.
  *
- *  ⚠️ مخزنِ گوگل از `maven.google.com` خوانده می‌شود نه `google()`: همان
- *  مخزن است، ولی بعضی شبکه‌ها `dl.google.com` را می‌بندند.
+ *  ⚠️ `TOHID_OFFLINE_M2`: پوشهٔ یک مخزنِ Maven با بسته‌های `androidx.*`
+ *  (همان بستهٔ «ساختِ آفلاین» که CI می‌سازد)، برای شبکه‌ای که مخزنِ گوگل
+ *  را نمی‌رساند. اگر تنظیم شده باشد، **اول** همان خوانده می‌شود.
  */
+val offline = System.getenv("TOHID_OFFLINE_M2")?.takeIf { it.isNotBlank() }
+
 pluginManagement {
   repositories {
+    System.getenv("TOHID_OFFLINE_M2")?.takeIf { it.isNotBlank() }?.let { maven(it) }
     gradlePluginPortal()
     mavenCentral()
-    maven("https://maven.google.com")
+    google()
   }
 }
 dependencyResolutionManagement {
   repositories {
+    offline?.let { maven(it) }
     mavenCentral()
-    maven("https://maven.google.com")
+    google()
   }
 }
 rootProject.name = "TohidDesktop"
