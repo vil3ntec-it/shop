@@ -218,7 +218,8 @@ tasks.named("processResources") { dependsOn(copyRes) }
 
 dependencies {
   implementation(compose.desktop.currentOs)
-  implementation(compose.material3)
+  //  نسخهٔ پایدار — نام‌مستعارِ `compose.material3` هنوز بتا می‌آورد
+  implementation("org.jetbrains.compose.material3:material3:1.9.0")
   implementation(compose.materialIconsExtended)
   //  `LifecycleEventEffect` و `LocalLifecycleOwner` — همان API اندروید
   implementation("org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose:2.9.4")
@@ -260,8 +261,12 @@ compose.desktop {
       description = "توحید — دفترِ فروشگاه"
       vendor = "VIL3NTEC"
       copyright = "© VIL3NTEC"
-      //  ماژول‌های JDK که برنامه لازم دارد (شبکه، چاپ، رمزنگاری، SQL نه)
-      modules("java.net.http", "java.desktop", "java.prefs", "jdk.crypto.ec", "jdk.unsupported", "java.naming")
+      //  ماژول‌های JDK که برنامه لازم دارد: شبکه، چاپ (javax.print در java.desktop)،
+      //  رمزنگاری (TLS با EC)، و `jdk.charsets`/`jdk.localedata` برای متنِ فارسی
+      modules(
+        "java.net.http", "java.desktop", "java.prefs", "java.naming", "java.instrument", "java.management",
+        "jdk.crypto.ec", "jdk.unsupported", "jdk.charsets", "jdk.localedata", "jdk.accessibility",
+      )
       windows {
         menu = true
         menuGroup = "Tohid"
