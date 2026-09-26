@@ -54,7 +54,14 @@ val buildNumber = (project.findProperty("buildNumber") as String?)?.toIntOrNull(
 val appVersion = "$versionBase.$buildNumber"
 version = appVersion
 
-val apiBase = env("TOHID_API_BASE") ?: prop("tohid.apiBase")
+/*
+ *  `-Pdev=true` — همان «debug»ِ اندروید: نشانیِ رایانهٔ خودتان
+ *  (`TOHID_API_BASE_DEV` یا `tohid.apiBase.dev`) و http پذیرفته. نسخهٔ
+ *  دستِ کاربر هرگز با آن ساخته نمی‌شود.
+ */
+val dev = (project.findProperty("dev") as String?) == "true"
+val apiBase = if (dev) (env("TOHID_API_BASE_DEV") ?: prop("tohid.apiBase.dev"))
+  else (env("TOHID_API_BASE") ?: prop("tohid.apiBase"))
 val appId = env("TOHID_APP_ID") ?: prop("tohid.appId").ifBlank { "shop" }
 val licenseKey = env("TOHID_LICENSE_PUBLIC_KEY") ?: prop("tohid.licenseKey")
 
@@ -84,6 +91,7 @@ val generateConfig by tasks.registering {
   inputs.property("appId", appId)
   inputs.property("version", appVersion)
   inputs.property("licenseKey", licenseKey)
+  inputs.property("dev", dev)
   outputs.dir(out)
   doLast {
     val dir = out.get().asFile.resolve("ir/vil3ntec/tohid").apply { mkdirs() }
@@ -94,13 +102,13 @@ val generateConfig by tasks.registering {
       |package ir.vil3ntec.tohid
       |
       |object BuildConfig {
-      |  const val DEBUG: Boolean = false
+      |  const val DEBUG: Boolean = $dev
       |  const val APPLICATION_ID: String = "ir.vil3ntec.tohid"
       |  const val VERSION_NAME: String = ${q(appVersion)}
       |  const val VERSION_CODE: Int = ${100 + buildNumber}
       |  const val API_BASE: String = ${q(apiBase)}
       |  const val APP_ID: String = ${q(appId)}
-      |  const val LICENSE_PUBLIC_KEY: String = ${q(licenseKey)}
+      |  const val LICENSE_PUBLIC_KEY: String = ${q(if (dev) "" else licenseKey)}
       |  const val SIGNING_SHA256: String = ""
       |  /** این نسخه روی کامپیوتر است — برای جاهایی که باید بدانند. */
       |  const val DESKTOP: Boolean = true

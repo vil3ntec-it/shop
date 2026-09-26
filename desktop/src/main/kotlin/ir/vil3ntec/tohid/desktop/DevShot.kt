@@ -31,10 +31,9 @@ object DevShot {
         if (script.isNullOrBlank()) {
           for (i in 1..count) { Thread.sleep(every); shot("shot-$i") }
         } else {
-          //  فرمان‌ها: wait:ms · click:x,y (روی صفحه) · type:متن · key:ENTER|ESCAPE|TAB · shot:نام
+          //  فرمان‌ها: wait:ms · click:x,y (روی صفحه) · type:متن · typecmd:فرمانِ پوسته (خروجی‌اش تایپ می‌شود) · key:ENTER|ESCAPE|TAB · shot:نام
           Thread.sleep(every)
-          java.awt.EventQueue.invokeAndWait { win()?.setLocation(0, 0) }
-          Thread.sleep(500)
+          repeat(4) { java.awt.EventQueue.invokeAndWait { win()?.setLocation(0, 0) }; Thread.sleep(250) }
           for (cmd in script.split(';').map { it.trim() }.filter { it.isNotEmpty() }) {
             val (op, arg) = cmd.substringBefore(':') to cmd.substringAfter(':', "")
             when (op) {
@@ -47,8 +46,10 @@ object DevShot {
                 robot.mouseRelease(java.awt.event.InputEvent.BUTTON1_DOWN_MASK)
                 Thread.sleep(400)
               }
-              "type" -> {
-                val sel = java.awt.datatransfer.StringSelection(arg)
+              "type", "typecmd" -> {
+                val text = if (op == "type") arg
+                  else ProcessBuilder("sh", "-c", arg).start().inputStream.bufferedReader().readText().trim()
+                val sel = java.awt.datatransfer.StringSelection(text)
                 java.awt.Toolkit.getDefaultToolkit().systemClipboard.setContents(sel, null)
                 Thread.sleep(300)
                 robot.keyPress(java.awt.event.KeyEvent.VK_CONTROL); robot.keyPress(java.awt.event.KeyEvent.VK_V)

@@ -29,6 +29,10 @@ jobs:
     name: کامپایل و آزمون
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      #  نامِ آزمون‌ها فارسی است؛ بی UTF-8 کامپایلر نامِ فایلِ کلاس را نمی‌سازد
+      LC_ALL: C.UTF-8
+      LANG: C.UTF-8
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -39,7 +43,7 @@ jobs:
 
       - name: وابستگی‌ها
         working-directory: desktop
-        run: gradle --no-daemon -q resolveDeps
+        run: ./gradlew --no-daemon -q resolveDeps
 
       #  مخزنِ گوگل (`androidx.*`) از بعضی شبکه‌ها بسته است. این بسته همان
       #  فایل‌ها را به‌شکلِ یک مخزنِ Maven می‌دهد تا بشود بی آن مخزن هم ساخت.
@@ -78,13 +82,13 @@ jobs:
 
       - name: کامپایل
         working-directory: desktop
-        run: gradle --no-daemon compileKotlin
+        run: ./gradlew --no-daemon compileKotlin
 
       #  همان آزمون‌های `android-native/app/src/test` — این‌جا روی JVMِ
       #  کامپیوتر، به‌علاوهٔ آزمون‌های خودِ لایهٔ کامپیوتری.
       - name: آزمون
         working-directory: desktop
-        run: gradle --no-daemon test
+        run: ./gradlew --no-daemon test
 
   package:
     name: نصاب ${{ matrix.label }}
@@ -128,7 +132,7 @@ jobs:
         shell: bash
         env:
           TOHID_API_BASE: ${{ vars.TOHID_API_BASE }}
-        run: gradle --no-daemon ${{ matrix.task }} -PbuildNumber=${{ github.run_number }}
+        run: ./gradlew --no-daemon ${{ matrix.task }} -PbuildNumber=${{ github.run_number }}
 
       - name: نام‌گذاری
         working-directory: desktop
@@ -137,7 +141,7 @@ jobs:
           mkdir -p out
           f=$(ls ${{ matrix.glob }} | head -n1)
           cp "$f" "out/${{ matrix.fixed }}"
-          gradle --no-daemon -q printVersionName -PbuildNumber=${{ github.run_number }} | tail -n1 > out/version.txt
+          ./gradlew --no-daemon -q printVersionName -PbuildNumber=${{ github.run_number }} | tail -n1 > out/version.txt
 
       - uses: actions/upload-artifact@v4
         with:
