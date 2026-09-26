@@ -520,7 +520,7 @@ test('پیامِ همگانی به دکان و پمپ، هر دو می‌رسد'
 
 test('پشتیبانیِ صاحبِ پمپ حتی بی اشتراک باز است', async () => {
   const p = await pumpOwner('گیرِکرده');
-  await h.query('UPDATE stations SET created_at=$2 WHERE id=$1',
+  await h.query('UPDATE stations SET created_at=$2, trial_started_at=$2 WHERE id=$1',
     [p.stationId, Date.now() - 400 * 24 * 3600 * 1000]);
 
   const asked = await h.post('/api/pump/support/messages', { body: 'چرا قفل شد؟' },

@@ -30,7 +30,10 @@ function build(T) {
   async function trialState(tenant, at = now()) {
     const days = await plans.trialDaysOf(T.app);
     if (!days) return { enabled: false, active: false, used: true, endsAt: 0, daysLeft: 0 };
-    const startedAt = Number(tenant.created_at);
+    //  ⛔ پمپ آغازِ دوره‌اش را در ستونِ خودش دارد (`trial_started_at`، مهاجرتِ
+    //  ۰۳۲ — همهٔ حساب‌های پیشین یک بار بررسی شدند)؛ دکان همان `created_at`.
+    //  ⚠️ فقط از خودِ سرور — هیچ برنامه‌ای این تاریخ را نمی‌فرستد.
+    const startedAt = Number(tenant.trial_started_at ?? tenant.created_at);
     const endsAt = startedAt + days * DAY;
     const active = at < endsAt;
     return {

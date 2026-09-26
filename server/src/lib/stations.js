@@ -185,8 +185,9 @@ async function createStation(userId, { name = '', code = '' } = {}) {
   return tx(async (c) => {
     const t = now();
     await c.query(
-      `INSERT INTO stations (id, owner_user_id, code, name, status, created_at, updated_at)
-       VALUES ($1,$2,$3,$4,'active',$5,$5)`,
+      //  ⛔ آغازِ دورهٔ آزمایشی همین لحظه، روی خودِ سرور (مهاجرتِ ۰۳۲)
+      `INSERT INTO stations (id, owner_user_id, code, name, status, created_at, updated_at, trial_started_at)
+       VALUES ($1,$2,$3,$4,'active',$5,$5,$5)`,
       [stationId, userId, wanted, name || 'پمپ من', t]
     );
     await c.query(
@@ -215,8 +216,8 @@ async function createStationForDevice({ code = '', name = '' } = {}) {
   return tx(async (c) => {
     const t = now();
     await c.query(
-      `INSERT INTO stations (id, owner_user_id, code, name, status, created_at, updated_at)
-       VALUES ($1, NULL, $2, $3, 'active', $4, $4)`,
+      `INSERT INTO stations (id, owner_user_id, code, name, status, created_at, updated_at, trial_started_at)
+       VALUES ($1, NULL, $2, $3, 'active', $4, $4, $4)`,
       [stationId, wanted, name || 'پمپ من', t]
     );
     await c.query('INSERT INTO station_rev (station_id, last_rev) VALUES ($1, 0)', [stationId]);

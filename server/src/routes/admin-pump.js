@@ -40,7 +40,7 @@ router.get('/stations', async (req, res) => {
   const q = v.text(req.query?.q, { max: 60 });
   const like = `%${q.toLowerCase()}%`;
   const rows = await many(
-    `SELECT s.id, s.code, s.name, s.status, s.created_at, s.owner_user_id,
+    `SELECT s.id, s.code, s.name, s.status, s.created_at, s.trial_started_at, s.owner_user_id,
             s.home_url, s.home_seen_at,
             u.name AS owner_name, u.phone AS owner_phone, u.email AS owner_email,
             (SELECT COUNT(*)::int FROM station_members m
@@ -78,7 +78,8 @@ router.get('/stations', async (req, res) => {
   const t = now();
   const list = rows.map(r => {
     if (r.sub_status) return r;
-    const trialEnds = Number(r.created_at) + trialDays * 24 * 3600 * 1000;
+    //  همان آغازِ `entitlement.js` — دو قاعده نشود
+    const trialEnds = Number(r.trial_started_at ?? r.created_at) + trialDays * 24 * 3600 * 1000;
     return trialEnds > t ? { ...r, sub_status: 'trial', ends_at: trialEnds } : r;
   });
   res.json({ stations: list, total: total.n, limit, offset });
