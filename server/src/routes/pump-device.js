@@ -228,30 +228,49 @@ router.post(
       }
 
       const stationId = member.station_id;
-      const reg = await devices.register(stationId, {
+      /*
+       *  ⛔ **گامِ نامِ‌دار** (۱۴۰۵/۰۷/۱۳): صاحبِ سامانه روی همین مسیر «خطای
+       *  داخلیِ سرور (کدِ پیگیری: …)» دید و هیچ سنجه‌ای بازسازی‌اش نکرد
+       *  (به‌روزرسانی از ۲.۷ تا ۲.۱۰، هر حالِ اشتراک، جداشده/برگشته، هم‌زمانی،
+       *  PGliteِ روی دیسک). پس هر گام نامِ خودش را روی خطا می‌گذارد تا همان
+       *  کدِ پیگیری در لاگِ «سرورِ حساب» بگوید **کجا** شکست.
+       */
+      const step = (name, p) => p.catch((e) => { e.step = `bind.${name}`; throw e; });
+      const reg = await step('register', (async () => devices.register(stationId, {
         uid: deviceUid, name: deviceName, platform, ip: clientIp(req),
         maxDevices: await devices.deviceLimitOf(stationId), boundBy: req.user.id,
-      });
+      }))());
 
-      const st = await stations.getStation(stationId);
-      const ent = await entitlementOf(stationId);
-      const issued = await signFor(st, ent, deviceUid, deviceName);
-
-      await audit.log({
+      /*
+       *  ⛔ **از این‌جا به بعد، دستگاه بند شده است** — و توکنش فقط همین یک بار
+       *  برمی‌گردد. شکستِ مجوز یا گزارش نباید آن را دور بریزد: کامپیوتری که
+       *  ثبت شده ولی توکنش را نگرفته، تا ثبتِ دوباره «ثبت نشده» می‌ماند. مجوز
+       *  را برنامه خودش از `device/license` دوباره می‌گیرد.
+       */
+      const st = await step('station', stations.getStation(stationId));
+      let ent = null;
+      let issued = { license: null, reason: 'license_error' };
+      try {
+        ent = await entitlementOf(stationId);
+        issued = await signFor(st, ent, deviceUid, deviceName);
+      } catch (e) {
+        console.error('[error] bind.license', stationId, e);
+      }
+      audit.log({
         userId: req.user.id, action: 'pump.device_bound',
-        detail: { stationId, source: ent.source }, ip: clientIp(req),
-      });
+        detail: { stationId, source: ent?.source || '' }, ip: clientIp(req),
+      }).catch((e) => console.error('[error] bind.audit', e));
 
       res.status(201).json({
         ok: true,
-        message: ent.source === 'free'
+        message: ent?.source === 'free'
           ? 'دستگاه به پمپ بند شد. اشتراکِ این حساب هنوز فعال نیست.'
           : 'دستگاه به پمپ بند شد.',
         deviceToken: reg.token,          // فقط همین یک بار
         station: stations.shape(st),
         role: member.role,
         entitlement: ent,
-        subscription: ent.subscription,
+        subscription: ent?.subscription || null,
         ...issued,
         serverTime: now(),
       });
@@ -648,5 +667,28 @@ router.use('/events', require('./pump-events').makeRouter((req) => ({
   deviceUid: req.stationDevice ? req.stationDevice.device_uid : '',
   who: req.stationDevice ? (req.stationDevice.name || 'کامپیوترِ پمپ') : '',
 })));
+
+/*
+ *  حالِ زندهٔ همین پمپ — `/api/pump/device/state`، با توکنِ **دستگاه**.
+ *
+ *  برنامه **همهٔ** هشدارهای بازِ همین حالا را می‌فرستد، نه فقط تازه‌ها؛
+ *  سرور خودش می‌سنجد چه باز شد و چه بسته شد (`lib/pump-state.js`). پس
+ *  بستن و باز کردنِ برنامه دیگر همان هشدارها را دوباره «تازه» نمی‌کند،
+ *  و بات همیشه می‌داند همین حالا چه باز است.
+ *
+ *  ⚠️ سقفِ بدنه همان دو مگابایتِ سراسری است؛ خلاصهٔ پنج هزار قرض‌دار
+ *  (نام، حال و الباقی) چند صد کیلوبایت است و در آن جا می‌شود.
+ */
+const stateLimit = rateLimit({ max: 300, keyPrefix: 'pump-state-write', key: (req) => req.stationId || '' });
+router.post('/state', stateLimit, async (req, res, next) => {
+  try {
+    const out = await require('../lib/pump-state').publish({
+      stationId: req.stationId || '',
+      deviceUid: req.stationDevice ? req.stationDevice.device_uid : '',
+      who: req.stationDevice ? (req.stationDevice.name || 'کامپیوترِ پمپ') : '',
+    }, req.body || {});
+    res.json({ ok: true, ...out, serverTime: now() });
+  } catch (err) { next(err); }
+});
 
 module.exports = router;

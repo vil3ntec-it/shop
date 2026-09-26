@@ -29,6 +29,10 @@ async function createApp({ runMigrations = true } = {}) {
     log: (m) => console.log(`[admin] ${m}`),
   });
 
+  //  ⚠️ حالِ زندهٔ پمپ فهرستِ **همهٔ** قرض‌داران را هم دارد (جست‌وجوی بات، بی
+  //  هیچ سقفی بر شمارِ حساب‌ها) — پس سقفِ خودش را می‌گیرد، پیش از پارسرِ همگانی
+  //  (پارسرِ اول بدنه را می‌خواند و دومی کاری نمی‌کند).
+  app.use(['/api/pump/device/state', '/api/v1/pump/device/state'], express.json({ limit: '4mb' }));
   app.use(express.json({ limit: '2mb' }));
 
   /*
