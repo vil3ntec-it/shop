@@ -15,7 +15,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const h = require('./helpers');
-const { query, one, newId, now } = require('../src/db');
+const { query, one, many, newId, now } = require('../src/db');
 const telegram = require('../src/lib/telegram');
 const otp = require('../src/lib/otp');
 
@@ -625,4 +625,134 @@ test('اعلامیهٔ صبح: از ساعتِ ۸ کابل، روزی یک با�
   await telegram.flushOutbox();
   assert.equal(sent().filter(c => c.params.chat_id === '9003').length, 0, '⛔ هم خصوصی هم گروه');
   assert.equal(sent().filter(c => c.params.chat_id === '-1009003').length, 1);
+});
+
+/* ══════════════════════════════════════════════════════════════════
+   ۱۰) «چندین شعبه توی یک گروه — پیام‌ها و حساب‌ها قاطی نشن»
+   ══════════════════════════════════════════════════════════════════ */
+
+test('چند شعبه در یک گروه و یک خصوصی: هر شعبه جدا، هم‌نامی یکی نمی‌شود', async () => {
+  const a = await pumpOwner('شعبهٔ الف');
+  const b = await pumpOwner('شعبهٔ ب');
+  const devA = await bindDevice(a, 'pc-br-a');
+  const devB = await bindDevice(b, 'pc-br-b');
+
+  //  خصوصی: اول الف، بعد «افزودنِ شعبه» ⇒ ب — الف دست نمی‌خورد
+  await linkPrivate(9101, a);
+  await press(9101, 'settings');
+  assert.ok(JSON.stringify(rows(lastTo(9101))).includes('"addacct"'), 'دکمهٔ «افزودنِ شعبه» نیست');
+  await press(9101, 'addacct');
+  await msg(9101, b.email);
+  const code = await one(
+    'SELECT id FROM otp_codes WHERE destination=$1 AND purpose=$2 ORDER BY created_at DESC LIMIT 1',
+    [b.email, telegram.PURPOSE]
+  );
+  clear();
+  await msg(9101, (await otp.reveal(code.id)).code);
+  assert.match(lastTo(9101).params.text, /شعبهٔ تازه اضافه شد/);
+  const priv = await many('SELECT station_id FROM telegram_chat_links WHERE chat_id=$1 ORDER BY linked_at', ['9101']);
+  assert.deepEqual(priv.map(r => r.station_id), [a.stationId, b.stationId], 'هر دو شعبه، به ترتیب');
+  assert.equal((await one('SELECT station_id FROM telegram_chats WHERE chat_id=$1', ['9101'])).station_id, a.stationId,
+    'نخستین شعبه جابه‌جا شد');
+  assert.match(lastTo(9101).params.text, new RegExp(a.stationName));
+  assert.match(lastTo(9101).params.text, new RegExp(b.stationName));
+
+  //  «کریم»ِ الف و «کریم»ِ ب دو حسابِ جدا با یک کلید (d1)
+  await state(devA, {
+    alerts: [debtOut(1, 'کریم')],
+    debtors: [{ n: 'کریم', sp: 'out', sd: 'none', sm: 'none', p: -40, d: 0, m: 0 }],
+  });
+  await state(devB, {
+    alerts: [],
+    debtors: [{ n: 'کریم', sp: 'ok', sd: 'none', sm: 'none', p: 900, d: 0, m: 0 }],
+  });
+  await telegram.flushOutbox();
+
+  //  گروه: یک دکمه ⇒ هر دو شعبه
+  clear();
+  await linkGroup(-1009101, 9101);
+  const gl = await many('SELECT station_id FROM telegram_chat_links WHERE chat_id=$1', ['-1009101']);
+  assert.equal(gl.length, 2, 'هر دو شعبه به گروه نرفت');
+
+  //  هشدار: هر شعبه پیامِ خودش را، با نامِ خودش؛ خصوصی ساکت
+  clear();
+  await state(devB, {
+    alerts: [debtOut(1, 'کریم')],
+    debtors: [{ n: 'کریم', sp: 'out', sd: 'none', sm: 'none', p: -5, d: 0, m: 0 }],
+  });
+  await telegram.flushOutbox();
+  const g = sent().filter(c => c.params.chat_id === '-1009101').map(c => c.params.text);
+  assert.equal(g.length, 1, 'فقط هشدارِ شعبهٔ ب باید بیاید');
+  assert.ok(g[0].includes(`«${b.stationName}»`));
+  assert.ok(!g[0].includes(`«${a.stationName}»`), '⛔ نامِ شعبهٔ الف روی هشدارِ ب');
+  assert.equal(sent().filter(c => c.params.chat_id === '9101').length, 0, '⛔ هم خصوصی هم گروه');
+
+  //  وضعیت: هر شعبه بخشِ خودش
+  clear();
+  await msg(-1009101, `/status@${BOT}`, { type: 'supergroup', from: { id: 9101 } });
+  const st = to(-1009101).map(c => c.params.text).join('\n');
+  const parts = st.split('━━━━━━━━━━');
+  assert.equal(parts.length, 2, 'دو بخش برای دو شعبه');
+  //  هر بخش نامِ دقیقاً یک شعبه را دارد (ترتیب مهم نیست)
+  const only = (t, x, y) => t.includes(`«${x}»`) && !t.includes(`«${y}»`);
+  assert.ok(parts.some(t => only(t, a.stationName, b.stationName)), 'بخشِ الف');
+  assert.ok(parts.some(t => only(t, b.stationName, a.stationName)), 'بخشِ ب');
+
+  //  جست‌وجو: دو «کریم»، هر کدام زیرِ شعبهٔ خودش، با عددِ خودش
+  clear();
+  await msg(-1009101, `/find@${BOT} کریم`, { type: 'supergroup', from: { id: 9101 } });
+  const f = to(-1009101).map(c => c.params.text).join('\n');
+  const secs = f.split('━━━━━━━━━━');
+  assert.equal(secs.length, 2, 'دو کریم در دو بخش');
+  const fa = secs.find(t => t.includes(`«${a.stationName}»`)) || '';
+  const fb = secs.find(t => t.includes(`«${b.stationName}»`)) || '';
+  assert.ok(fa !== fb && fa.includes('−۴۰'), 'کریمِ الف با عددِ خودش');
+  assert.ok(fb.includes('−۵'), 'کریمِ ب با عددِ خودش');
+  assert.ok(!fa.includes('−۵ ') && !fb.includes('−۴۰'), '⛔ حسابِ دو کریم قاطی شد');
+
+  //  برطرف شدنِ الف فقط برای الف
+  clear();
+  await state(devA, { alerts: [] });
+  await telegram.flushOutbox();
+  const fixed = sent().filter(c => c.params.chat_id === '-1009101').map(c => c.params.text);
+  assert.equal(fixed.length, 1);
+  assert.ok(fixed[0].includes(`«${a.stationName}»`));
+  assert.ok(!fixed[0].includes(`«${b.stationName}»`));
+
+  //  اعلامیهٔ صبح: هر شعبه یکی
+  const nine = Date.UTC(2032, 5, 7) + 4.5 * 3600e3;
+  clear();
+  await telegram.announceTick(nine);
+  await telegram.flushOutbox();
+  const ann = sent().filter(c => c.params.chat_id === '-1009101').map(c => c.params.text);
+  assert.equal(ann.length, 2, 'اعلامیهٔ هر شعبه جدا');
+  assert.ok(ann.some(t => t.includes(`«${a.stationName}»`)) && ann.some(t => t.includes(`«${b.stationName}»`)));
+  clear();
+  await telegram.announceTick(nine + 3600e3);
+  await telegram.flushOutbox();
+  assert.equal(sent().filter(c => c.params.chat_id === '-1009101').length, 0, 'اعلامیه دو بار آمد');
+
+  //  کدِ پمپِ هر شعبه دکمهٔ خودش؛ شناسهٔ پمپِ بیگانه پذیرفته نمی‌شود
+  responder = (m) => (m === 'getChatMember' ? { ok: true, result: { status: 'creator' } } : null);
+  const stranger = await pumpOwner('بیگانه');
+  clear();
+  await press(-1009101, `code:${stranger.stationId}`, { type: 'supergroup', from: { id: 555 } });
+  const ans = calls.filter(c => c.method === 'answerCallbackQuery').map(c => c.params.text || '').join('\n');
+  assert.ok(!ans.includes('کدِ پمپِ'), '⛔ کدِ پمپِ بیگانه نشان داده شد');
+
+  //  جدا کردنِ یک شعبه از گروه ⇒ آن شعبه دوباره در خصوصی، دیگری در گروه می‌ماند
+  await press(-1009101, `rmy:${b.stationId}`, { type: 'supergroup', from: { id: 555 } });
+  responder = null;
+  const left = await many('SELECT station_id FROM telegram_chat_links WHERE chat_id=$1', ['-1009101']);
+  assert.deepEqual(left.map(r => r.station_id), [a.stationId]);
+  clear();
+  await state(devB, { alerts: [debtOut(1, 'کریم'), debtOut(2, 'نصیر')] });
+  await state(devA, { alerts: [debtOut(3, 'بشیر')] });
+  await telegram.flushOutbox();
+  const pv = sent().filter(c => c.params.chat_id === '9101').map(c => c.params.text).join('\n');
+  const gv = sent().filter(c => c.params.chat_id === '-1009101').map(c => c.params.text).join('\n');
+  assert.match(pv, /نصیر/, 'شعبهٔ جداشده به خصوصی برنگشت');
+  assert.doesNotMatch(pv, /بشیر/, '⛔ شعبهٔ الف هم در خصوصی');
+  assert.match(gv, /بشیر/);
+  assert.doesNotMatch(gv, /نصیر/, '⛔ شعبهٔ جداشده هنوز در گروه');
 });

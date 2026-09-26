@@ -371,23 +371,77 @@ async function setState(chatId, stateName, email = '') {
 }
 
 /**
- * پمپ و حسابی که این گفت‌وگو به آن وصل است — **فقط اگر هنوز معتبر باشد**.
+ * پمپ‌هایی (شعبه‌هایی) که این گفت‌وگو به آن‌ها وصل است — **فقط آن‌هایی که
+ * هنوز معتبرند**.
  *
- * ⛔ همان سنجشِ قیدِ ۳: عضوِ فعال، پمپِ فعال، حسابِ فعال.
+ * خواستهٔ صاحب سامانه (۱۴۰۵/۰۷/۱۴): «یکی شاید چندین شعبه داشته باشه و
+ * می‌خواد همه رو توی همون گروه یا کانال ببینه… حساب‌هاشون قاطی نشن.» هر
+ * پیوند یک ردیفِ `telegram_chat_links` است با کلیدِ (گفت‌وگو، پمپ)؛ پس هر
+ * شعبه جداست و هیچ پاسخی دادهٔ دو شعبه را یکی نمی‌کند.
+ *
+ * ⛔ همان سنجشِ قیدِ ۳: عضوِ فعال، پمپِ فعال، حسابِ فعال — برای هر پیوند.
  */
-async function linkOf(row) {
-  if (!isLinked(row)) return null;
-  return one(
-    `SELECT s.id AS station_id, s.name AS station_name, u.email, m.role
-       FROM stations s
-       JOIN station_members m ON m.station_id=s.id AND m.user_id=$2 AND m.status='active'
-       JOIN users u ON u.id=m.user_id AND u.status='active'
-      WHERE s.id=$1 AND s.status='active'`,
-    [row.station_id, row.user_id]
+async function linksOf(row) {
+  if (!row || !row.chat_id) return [];
+  return many(
+    `SELECT l.station_id, l.user_id, s.name AS station_name, u.email, m.role
+       FROM telegram_chat_links l
+       JOIN stations s ON s.id=l.station_id AND s.status='active'
+       JOIN station_members m ON m.station_id=l.station_id AND m.user_id=l.user_id AND m.status='active'
+       JOIN users u ON u.id=l.user_id AND u.status='active'
+      WHERE l.chat_id=$1
+      ORDER BY l.linked_at, l.station_id`,
+    [String(row.chat_id)]
   );
 }
 
+/** نخستین شعبهٔ معتبر — برای جاهایی که یکی کافی است. */
+async function linkOf(row) {
+  if (!isLinked(row)) return null;
+  return (await linksOf(row))[0] || null;
+}
+
+/** `telegram_chats.station_id/user_id` همیشه نخستین پیوند است (سازگاری). */
+async function syncPrimary(chatId) {
+  const id = String(chatId);
+  const first = await one(
+    `SELECT station_id, user_id, linked_at FROM telegram_chat_links
+      WHERE chat_id=$1 ORDER BY linked_at, station_id LIMIT 1`,
+    [id]
+  );
+  await query(
+    'UPDATE telegram_chats SET station_id=$2, user_id=$3, linked_at=$4, updated_at=$5 WHERE chat_id=$1',
+    [id, first ? first.station_id : null, first ? first.user_id : null, first ? first.linked_at : null, now()]
+  );
+}
+
+/** یک شعبه به این گفت‌وگو — شعبه‌های دیگرش دست نمی‌خورند. `true` یعنی تازه بود. */
+async function addLink(chatId, stationId, userId, t = now()) {
+  const had = await one('SELECT 1 FROM telegram_chat_links WHERE chat_id=$1 AND station_id=$2',
+    [String(chatId), stationId]);
+  await query(
+    `INSERT INTO telegram_chat_links (chat_id, station_id, user_id, linked_at)
+     VALUES ($1,$2,$3,$4)
+     ON CONFLICT (chat_id, station_id) DO UPDATE SET user_id=excluded.user_id`,
+    [String(chatId), stationId, userId, t]
+  );
+  await syncPrimary(chatId);
+  return !had;
+}
+
+/** یک شعبه از این گفت‌وگو جدا — بقیه می‌مانند. */
+async function removeLink(chatId, stationId) {
+  await query('DELETE FROM telegram_chat_links WHERE chat_id=$1 AND station_id=$2', [String(chatId), stationId]);
+  await query(
+    `DELETE FROM telegram_outbox
+      WHERE chat_id=$1 AND station_id=$2 AND sent_at IS NULL AND failed_at IS NULL`,
+    [String(chatId), stationId]
+  );
+  await syncPrimary(chatId);
+}
+
 async function unlink(chatId) {
+  await query('DELETE FROM telegram_chat_links WHERE chat_id=$1', [String(chatId)]);
   await query(
     `UPDATE telegram_chats
         SET station_id=NULL, user_id=NULL, linked_at=NULL, state='', pending_email='', updated_at=$2
@@ -525,11 +579,25 @@ async function whereText(row) {
   return row.only_out ? '🔕 فقط هشدارهای «تمام شد» می‌آید.' : '🔔 همهٔ هشدارها می‌آید: «تمام شد» و «کم مانده».';
 }
 
-async function menuText(row, link) {
-  const state = await require('./pump-state').get(link.station_id);
-  const open = state ? state.alerts.length : 0;
-  return `⛽ پمپِ «${link.station_name}»\n`
-    + (open ? `🚨 ${faNum(open)} هشدارِ باز — «📊 وضعیت» را بزنید.\n` : '✅ همین حالا هشدارِ بازی نیست.\n')
+async function menuText(row, links) {
+  const ps = require('./pump-state');
+  let head;
+  if (links.length === 1) {
+    const state = await ps.get(links[0].station_id);
+    const open = state ? state.alerts.length : 0;
+    head = `⛽ پمپِ «${links[0].station_name}»\n`
+      + (open ? `🚨 ${faNum(open)} هشدارِ باز — «📊 وضعیت» را بزنید.\n` : '✅ همین حالا هشدارِ بازی نیست.\n');
+  } else {
+    //  چند شعبه: هر کدام خطِ خودش — هیچ عددی با هم جمع نمی‌شود
+    const lines = [`⛽ ${faNum(links.length)} شعبه در همین ${row.kind === 'private' ? 'گفت‌وگو' : (row.kind === 'channel' ? 'کانال' : 'گروه')}:`];
+    for (const l of links) {
+      const state = await ps.get(l.station_id);
+      const open = state ? state.alerts.length : 0;
+      lines.push(`🏷️ «${l.station_name}» — ${open ? `🚨 ${faNum(open)} هشدارِ باز` : '✅ بی هشدار'}`);
+    }
+    head = `${lines.join('\n')}\n`;
+  }
+  return head
     + await whereText(row)
     + (row.kind === 'private'
       ? '\n\n🔎 برای جست‌وجو، نامِ قرض‌دار را همین‌جا بنویسید.'
@@ -537,9 +605,9 @@ async function menuText(row, link) {
 }
 
 async function sendMenu(row, lead = '', editId = 0) {
-  const link = await linkOf(row);
-  if (!link) return notLinked(row, editId);
-  const text = (lead ? `${lead}\n\n` : '') + await menuText(row, link);
+  const links = isLinked(row) ? await linksOf(row) : [];
+  if (!links.length) return notLinked(row, editId);
+  const text = (lead ? `${lead}\n\n` : '') + await menuText(row, links);
   //  ⚠️ در کانال دکمه نمی‌گذاریم: هر خواننده‌ای می‌دیدش
   if (row.kind === 'channel') return send(row.chat_id, text);
   return show(row.chat_id, text, menuKeyboard(row), editId);
@@ -631,13 +699,19 @@ function oweLines(owe) {
   });
 }
 
+/** میانِ دو شعبه — تا هیچ خطی از یک شعبه زیرِ شعبهٔ دیگر خوانده نشود. */
+const BRANCH_SEP = '\n\n━━━━━━━━━━\n\n';
+
 async function sendStatus(row, editId = 0) {
-  const link = await linkOf(row);
-  if (!link) return notLinked(row, editId);
+  const links = isLinked(row) ? await linksOf(row) : [];
+  if (!links.length) return notLinked(row, editId);
+  const texts = [];
+  for (const l of links) texts.push(await statusText(l));
+  const text = texts.join(BRANCH_SEP);
   const kb = row.kind === 'channel' ? null
     : [[{ text: '🔄 تازه کن', callback_data: 'status' }, BACK]];
-  if (!kb) return sendLong(row.chat_id, await statusText(link));
-  return show(row.chat_id, await statusText(link), kb, editId);
+  if (!kb) return sendLong(row.chat_id, text);
+  return show(row.chat_id, text, kb, editId);
 }
 
 /* ── جست‌وجوی قرض‌دار ─────────────────────────────────────────── */
@@ -676,25 +750,56 @@ function debtorLines(d) {
  * قرض‌دار در برنامه نشان می‌دهد (`StationSnapshot`). اگر برنامه فهرست را
  * نفرستاده، همین گفته می‌شود — «پیدا نشد»ِ دروغ نه.
  */
-async function searchText(link, q) {
-  const query_ = normName(q);
-  if (query_.length < 2) return '🔎 دستِ‌کم دو حرف از نامِ قرض‌دار را بنویسید.';
+async function branchHits(link, qn) {
   const state = await require('./pump-state').get(link.station_id);
-  if (!state || !Array.isArray(state.debtors)) {
-    return '🔎 برنامهٔ کامپیوترِ این پمپ هنوز فهرستِ قرض‌داران را به سرور نفرستاده است — '
-      + 'برنامهٔ پمپ را به‌روز و روشن کنید؛ چند دقیقه بعد جست‌وجو کار می‌کند.';
-  }
-  const hits = state.debtors.filter(d => normName(d.n).includes(query_));
-  if (!hits.length) return `🔎 «${String(q).trim().slice(0, 60)}» در قرض‌دارانِ پمپِ «${link.station_name}» پیدا نشد.`;
+  if (!state || !Array.isArray(state.debtors)) return null;
+  const hits = state.debtors.filter(d => normName(d.n).includes(qn));
   //  دقیق‌ترین اول: نامِ برابر، بعد آن‌که با همین آغاز می‌شود
   hits.sort((a, b) => {
-    const ra = normName(a.n) === query_ ? 0 : (normName(a.n).startsWith(query_) ? 1 : 2);
-    const rb = normName(b.n) === query_ ? 0 : (normName(b.n).startsWith(query_) ? 1 : 2);
+    const ra = normName(a.n) === qn ? 0 : (normName(a.n).startsWith(qn) ? 1 : 2);
+    const rb = normName(b.n) === qn ? 0 : (normName(b.n).startsWith(qn) ? 1 : 2);
     return ra - rb || a.n.localeCompare(b.n, 'fa');
   });
-  const count = hits.length > 1 ? ` — ${faNum(hits.length)} نفر` : '';
-  return `🔎 پمپِ «${link.station_name}»${count}\n\n${hits.map(debtorLines).join('\n\n')}`
-    + `\n\n🕒 ${ago(state.debtorsAt || state.updatedAt)}`;
+  return { hits, at: state.debtorsAt || state.updatedAt };
+}
+
+/**
+ * ⚠️ چند شعبه: هر شعبه جدا جست‌وجو و جدا نوشته می‌شود. «کریم»ِ شعبهٔ الف و
+ * «کریم»ِ شعبهٔ ب دو حسابِ جدا هستند — هم‌نامی دلیلِ یکی بودن نیست، پس هرگز
+ * با هم جمع یا یکی نمی‌شوند.
+ */
+async function searchText(links, q) {
+  const list = Array.isArray(links) ? links : [links];
+  const qn = normName(q);
+  if (qn.length < 2) return '🔎 دستِ‌کم دو حرف از نامِ قرض‌دار را بنویسید.';
+  const shown = String(q).trim().slice(0, 60);
+  const NOT_SENT = 'برنامهٔ کامپیوترِ این پمپ هنوز فهرستِ قرض‌داران را به سرور نفرستاده است — '
+    + 'برنامهٔ پمپ را به‌روز و روشن کنید؛ چند دقیقه بعد جست‌وجو کار می‌کند.';
+
+  if (list.length === 1) {
+    const link = list[0];
+    const r = await branchHits(link, qn);
+    if (!r) return `🔎 ${NOT_SENT}`;
+    if (!r.hits.length) return `🔎 «${shown}» در قرض‌دارانِ پمپِ «${link.station_name}» پیدا نشد.`;
+    const count = r.hits.length > 1 ? ` — ${faNum(r.hits.length)} نفر` : '';
+    return `🔎 پمپِ «${link.station_name}»${count}\n\n${r.hits.map(debtorLines).join('\n\n')}`
+      + `\n\n🕒 ${ago(r.at)}`;
+  }
+
+  const sections = [];
+  const missing = [];
+  for (const link of list) {
+    const r = await branchHits(link, qn);
+    if (!r) { missing.push(link.station_name); continue; }
+    if (!r.hits.length) continue;
+    sections.push(`🏷️ شعبهٔ «${link.station_name}» — ${faNum(r.hits.length)} نفر\n\n`
+      + `${r.hits.map(debtorLines).join('\n\n')}\n\n🕒 ${ago(r.at)}`);
+  }
+  const note = missing.length ? `\n\n⚠️ ${missing.map(n => `«${n}»`).join('، ')}: ${NOT_SENT}` : '';
+  if (!sections.length) {
+    return `🔎 «${shown}» در قرض‌دارانِ هیچ‌کدام از ${faNum(list.length)} شعبه پیدا نشد.${note}`;
+  }
+  return `🔎 «${shown}»\n\n${sections.join(BRANCH_SEP)}${note}`;
 }
 
 /* ── اپ و کدِ پمپ ────────────────────────────────────────────── */
@@ -715,22 +820,34 @@ async function accessCodeOf(stationId) {
 }
 
 async function sendApp(row, editId = 0) {
-  const link = await linkOf(row);
-  if (!link) return notLinked(row, editId);
+  const links = isLinked(row) ? await linksOf(row) : [];
+  if (!links.length) return notLinked(row, editId);
   const common = '📱 اپِ کارمندانِ پمپ\n\n'
     + '۱) اپ را نصب کنید: اندروید (فایلِ نصب) یا آیفون (در Safari باز کنید و «افزودن به صفحهٔ اصلی»).\n'
     + '۲) کدِ پمپ را در اپ بزنید — حساب‌های همین پمپ باز می‌شود و با پمپ‌های دیگر قاطی نمی‌شود.\n'
     + '۳) رمزِ اپ همان رمزِ برنامهٔ کامپیوتر است.';
   if (row.kind === 'private') {
-    const code = await accessCodeOf(link.station_id);
+    if (links.length === 1) {
+      const code = await accessCodeOf(links[0].station_id);
+      return show(row.chat_id,
+        `${common}\n\n🔑 کدِ پمپِ «${links[0].station_name}»:  ${code}\n\n`
+        + '⚠️ این کد را فقط به کارمندانِ همین پمپ بدهید. عوض کردنش: برنامهٔ کامپیوتر ← پروفایل.',
+        [downloadRow(), [BACK]], editId);
+    }
+    //  ⛔ هر شعبه کدِ خودش — کارمندِ یک شعبه حساب‌های شعبهٔ دیگر را نمی‌بیند
+    const lines = [];
+    for (const l of links) lines.push(`🔑 «${l.station_name}»:  ${await accessCodeOf(l.station_id)}`);
     return show(row.chat_id,
-      `${common}\n\n🔑 کدِ پمپِ «${link.station_name}»:  ${code}\n\n`
-      + '⚠️ این کد را فقط به کارمندانِ همین پمپ بدهید. عوض کردنش: برنامهٔ کامپیوتر ← پروفایل.',
+      `${common}\n\nهر شعبه کدِ خودش را دارد:\n${lines.join('\n')}\n\n`
+      + '⚠️ کدِ هر شعبه را فقط به کارمندانِ همان شعبه بدهید. عوض کردنش: برنامهٔ کامپیوترِ همان شعبه ← پروفایل.',
       [downloadRow(), [BACK]], editId);
   }
+  const codeRows = links.length === 1
+    ? [[{ text: '🔑 کدِ پمپ (مدیر)', callback_data: 'code' }, BACK]]
+    : [...links.map(l => [{ text: `🔑 کدِ «${l.station_name}» (مدیر)`.slice(0, 60), callback_data: `code:${l.station_id}` }]), [BACK]];
   return show(row.chat_id,
     `${common}\n\n🔑 کدِ پمپ را مدیرِ گروه با دکمهٔ زیر می‌بیند (فقط برای خودش نشان داده می‌شود).`,
-    [downloadRow(), [{ text: '🔑 کدِ پمپ (مدیر)', callback_data: 'code' }, BACK]], editId);
+    [downloadRow(), ...codeRows], editId);
 }
 
 /* ── گروه و کانال ─────────────────────────────────────────────── */
@@ -740,51 +857,106 @@ async function sendApp(row, editId = 0) {
  *
  * `t.me/<بات>?startgroup=<نشانه>` ⇒ کاربر گروه را برمی‌گزیند ⇒ تلگرام در
  * همان گروه `/start <نشانه>` را برای بات می‌فرستد.
+ *
+ * ⚠️ نشانه به **همین گفت‌وگو** بسته است (`from_chat`)، پس هر شعبه‌ای که این
+ * گفت‌وگو دارد به گروه می‌رود. گروهی که از قبل شعبه‌ای دارد، شعبهٔ تازه را
+ * **اضافه** می‌کند — هیچ شعبه‌ای جای دیگری را نمی‌گیرد.
  */
 async function sendShare(row, editId = 0) {
-  const link = await linkOf(row);
-  if (!link) return notLinked(row, editId);
+  const links = isLinked(row) ? await linksOf(row) : [];
+  if (!links.length) return notLinked(row, editId);
   const name = await username();
   if (!name) return show(row.chat_id, 'نامِ بات هنوز از تلگرام نیامده است؛ چند لحظه بعد دوباره بزنید.', [[BACK]], editId);
 
   const raw = crypto.randomBytes(18).toString('base64url');
   const t = now();
   await query(
-    `INSERT INTO telegram_link_tokens (token_hash, station_id, user_id, expires_at, created_at)
-     VALUES ($1,$2,$3,$4,$5)`,
-    [hashToken(raw), row.station_id, row.user_id, t + LINK_TTL_MS, t]
+    `INSERT INTO telegram_link_tokens (token_hash, station_id, user_id, expires_at, created_at, from_chat)
+     VALUES ($1,$2,$3,$4,$5,$6)`,
+    [hashToken(raw), links[0].station_id, links[0].user_id, t + LINK_TTL_MS, t, String(row.chat_id)]
   );
   //  نشانه‌های کهنه همان‌جا جارو می‌شوند — این جدول نباید بزرگ شود
   await query('DELETE FROM telegram_link_tokens WHERE expires_at < $1', [t - LINK_TTL_MS]);
 
+  const what = links.length === 1
+    ? `پمپِ «${links[0].station_name}»`
+    : `هر ${faNum(links.length)} شعبه (${links.map(l => `«${l.station_name}»`).join('، ')})`;
+  const kb = [
+    [{ text: '➕ افزودن به گروه', url: `https://t.me/${name}?startgroup=${raw}` }],
+    [{ text: '📣 افزودن به کانال', url: `https://t.me/${name}?startchannel&admin=post_messages` }],
+  ];
+  if (await myChannels(row)) kb.push([{ text: '📣 شعبه‌ها را به کانالِ وصل‌شده هم بفرست', callback_data: 'chansync' }]);
+  kb.push([BACK]);
   return show(row.chat_id,
-    `👥 هشدارهای پمپِ «${link.station_name}» در گروه یا کانالِ شما:\n\n`
+    `👥 هشدارهای ${what} در گروه یا کانالِ شما:\n\n`
     + 'گروه: دکمهٔ «افزودن به گروه» ⇒ گروه را برگزینید ⇒ تمام، بات خودش خبر می‌دهد.\n'
+    + 'گروهی که از قبل شعبهٔ دیگری دارد، این شعبه‌ها را هم اضافه می‌گیرد؛ هر شعبه با نامِ خودش می‌آید.\n'
     + '⏳ این دکمه پانزده دقیقه و فقط یک بار کار می‌کند.\n\n'
     + 'کانال: دکمهٔ «افزودن به کانال» ⇒ کانال را برگزینید ⇒ بات را «مدیر» کنید '
     + '(فقط «ارسالِ پیام» کافی است).\n\n'
     + '⚙️ در گروه، فقط مدیرانِ گروه تنظیمات را عوض می‌کنند.',
-    [
-      [{ text: '➕ افزودن به گروه', url: `https://t.me/${name}?startgroup=${raw}` }],
-      [{ text: '📣 افزودن به کانال', url: `https://t.me/${name}?startchannel&admin=post_messages` }],
-      [BACK],
-    ], editId);
+    kb, editId);
+}
+
+/** کانال‌هایی که یکی از حساب‌های همین گفت‌وگوی خصوصی وصل کرده است. */
+async function myChannels(row) {
+  if (!row || row.kind !== 'private') return [];
+  const list = await many(
+    `SELECT DISTINCT c.chat_id, c.title
+       FROM telegram_chat_links p
+       JOIN telegram_chat_links g ON g.user_id=p.user_id
+       JOIN telegram_chats c ON c.chat_id=g.chat_id AND c.kind='channel'
+      WHERE p.chat_id=$1`,
+    [String(row.chat_id)]
+  );
+  return list.length ? list : null;
+}
+
+/** هر شعبهٔ این گفت‌وگوی خصوصی ⇒ هر کانالی که یکی از همین حساب‌ها وصل کرده. */
+async function syncChannels(row) {
+  const links = await linksOf(row);
+  const chans = (await myChannels(row)) || [];
+  let added = 0;
+  const t = now();
+  for (const c of chans) {
+    for (const l of links) {
+      if (await addLink(c.chat_id, l.station_id, l.user_id, t)) added += 1;
+    }
+  }
+  return { added, channels: chans };
 }
 
 /* ── تنظیمات ──────────────────────────────────────────────────── */
 
 async function sendSettings(row, editId = 0, lead = '') {
-  const link = await linkOf(row);
-  if (!link) return notLinked(row, editId);
-  const text = (lead ? `${lead}\n\n` : '') + `⚙️ تنظیماتِ این ${row.kind === 'private' ? 'گفت‌وگو' : 'گروه'}\n\n`
+  const links = isLinked(row) ? await linksOf(row) : [];
+  if (!links.length) return notLinked(row, editId);
+  const place = row.kind === 'private' ? 'گفت‌وگو' : (row.kind === 'channel' ? 'کانال' : 'گروه');
+  let text = (lead ? `${lead}\n\n` : '') + `⚙️ تنظیماتِ این ${place}\n\n`
     + (row.only_out
       ? '🔕 الان فقط هشدارهای «تمام شد» می‌آید.'
       : '🔔 الان همهٔ هشدارها می‌آید: «تمام شد» و «کم مانده».');
-  return show(row.chat_id, text, [
-    [{ text: row.only_out ? '🔔 «کم مانده» را هم بفرست' : '🔕 فقط «تمام شد» را بفرست', callback_data: 'toggle' }],
-    [{ text: row.kind === 'private' ? '🔌 جدا شدن از پمپ' : '🔌 جدا کردنِ این گروه', callback_data: 'unlink' }],
-    [BACK],
-  ], editId);
+  text += `\n\n🏷️ شعبه‌های وصل (${faNum(links.length)}):\n${links.map(l => `▫️ ${l.station_name}`).join('\n')}`;
+  if (row.kind === 'private') {
+    text += '\n\n➕ شعبهٔ دیگری دارید (حسابِ پمپِ دیگر، با ایمیلِ دیگر)؟ «افزودنِ شعبه» را بزنید — هر شعبه جدا می‌ماند.';
+  } else {
+    text += '\n\n➕ افزودنِ شعبهٔ دیگر به همین گروه: در گفت‌وگوی خصوصی با بات، با حسابِ همان شعبه «👥 گروه و کانال» ⇐ «افزودن به گروه» ⇐ همین گروه.';
+  }
+  const kb = [[{ text: row.only_out ? '🔔 «کم مانده» را هم بفرست' : '🔕 فقط «تمام شد» را بفرست', callback_data: 'toggle' }]];
+  if (row.kind === 'private') kb.push([{ text: '➕ افزودنِ شعبه (حسابِ دیگر)', callback_data: 'addacct' }]);
+  if (links.length > 1) {
+    for (const l of links) {
+      kb.push([{ text: `🔌 جدا کردنِ «${l.station_name}»`.slice(0, 60), callback_data: `rm:${l.station_id}` }]);
+    }
+  }
+  kb.push([{
+    text: links.length > 1
+      ? '🔌 جدا شدن از همهٔ شعبه‌ها'
+      : (row.kind === 'private' ? '🔌 جدا شدن از پمپ' : '🔌 جدا کردنِ این گروه'),
+    callback_data: 'unlink',
+  }]);
+  kb.push([BACK]);
+  return show(row.chat_id, text, kb, editId);
 }
 
 function askUnlink(row, editId = 0) {
@@ -904,18 +1076,20 @@ async function onCode(row, text) {
   }
 
   const t = now();
-  await query(
-    `UPDATE telegram_chats
-        SET station_id=$2, user_id=$3, linked_at=$4, state='', pending_email='', updated_at=$4
-      WHERE chat_id=$1`,
-    [row.chat_id, member.station_id, user.id, t]
-  );
+  const before = isLinked(row) ? (await linksOf(row)).length : 0;
+  //  ⛔ شعبهٔ تازه **اضافه** می‌شود؛ شعبه‌های پیشینِ همین گفت‌وگو دست نمی‌خورند
+  const fresh = await addLink(row.chat_id, member.station_id, user.id, t);
+  await setState(row.chat_id, '');
   await require('./audit').log({
     actorType: 'user', userId: user.id, action: 'pump.telegram_link',
     targetType: 'station', targetId: member.station_id, detail: { kind: 'private' },
   });
-  return sendMenu(await chatRow(row.chat_id),
-    '✅ وصل شد. از این به بعد هشدارهای همین پمپ این‌جا می‌آید — حتی وقتی برنامه بسته است.');
+  const lead = !before
+    ? '✅ وصل شد. از این به بعد هشدارهای همین پمپ این‌جا می‌آید — حتی وقتی برنامه بسته است.'
+    : (fresh
+      ? '✅ شعبهٔ تازه اضافه شد. هر شعبه با نامِ خودش جدا می‌آید و حساب‌هایشان با هم قاطی نمی‌شود.'
+      : 'این شعبه از قبل در همین گفت‌وگو وصل بود.');
+  return sendMenu(await chatRow(row.chat_id), lead);
 }
 
 async function onPrivate(chat, cmd, text) {
@@ -943,8 +1117,9 @@ async function onPrivate(chat, cmd, text) {
     return show(row.chat_id, WELCOME, welcomeKeyboard());
   }
 
-  //  ⛔ وصل‌شده: هر نوشته‌ای جست‌وجو است، نه یک منوی دیگر (قاعدهٔ ۳).
-  if (linked) return onSearch(row, text);
+  //  ⛔ وصل‌شده: هر نوشته‌ای جست‌وجو است، نه یک منوی دیگر (قاعدهٔ ۳) —
+  //  مگر همین حالا در حالِ افزودنِ شعبهٔ دیگر باشد (ایمیل ⇐ کد).
+  if (linked && row.state !== 'email' && row.state !== 'code') return onSearch(row, text);
   //  ایمیلِ تازه در گامِ کد یعنی «این یکی را می‌خواهم»
   if (row.state === 'code' && !normEmail(text)) return onCode(row, text);
   row = { ...row, state: 'email' };
@@ -952,14 +1127,14 @@ async function onPrivate(chat, cmd, text) {
 }
 
 async function onSearch(row, q) {
-  const link = await linkOf(row);
-  if (!link) return notLinked(row);
+  const links = isLinked(row) ? await linksOf(row) : [];
+  if (!links.length) return notLinked(row);
   if (!String(q || '').trim()) {
     return send(row.chat_id, row.kind === 'private'
       ? '🔎 نامِ قرض‌دار را بنویسید.'
       : '🔎 بعد از /find نامِ قرض‌دار را بنویسید؛ مثلاً: /find کریم');
   }
-  return sendLong(row.chat_id, await searchText(link, q));
+  return sendLong(row.chat_id, await searchText(links, q));
 }
 
 /* ── دسترسی در گروه ───────────────────────────────────────────── */
@@ -980,9 +1155,14 @@ async function canManage(row, from) {
   if (row.kind === 'private') return true;
   const uid = from?.id;
   if (!uid) return false;
+  //  وصل‌کنندهٔ **یکی از** شعبه‌های همین گروه
   const own = await one(
-    `SELECT 1 FROM telegram_chats WHERE chat_id=$1 AND kind='private' AND user_id=$2 AND linked_at IS NOT NULL`,
-    [String(uid), row.user_id || '']
+    `SELECT 1 FROM telegram_chat_links p
+       JOIN telegram_chats pc ON pc.chat_id=p.chat_id AND pc.kind='private'
+      WHERE p.chat_id=$1
+        AND p.user_id IN (SELECT user_id FROM telegram_chat_links WHERE chat_id=$2)
+      LIMIT 1`,
+    [String(uid), String(row.chat_id)]
   );
   if (own) return true;
   const key = `${row.chat_id}:${uid}`;
@@ -1004,8 +1184,8 @@ async function canManage(row, from) {
 async function onChannelAdmin(u) {
   const chat = u.chat;
   const who = u.from?.id ? await chatRow(u.from.id) : null;
-  const owner = who && who.kind === 'private' ? await linkOf(who) : null;
-  if (!owner) {
+  const owned = who && who.kind === 'private' && isLinked(who) ? await linksOf(who) : [];
+  if (!owned.length) {
     //  کسی که وصل نیست: فقط به خودش می‌گوییم، نه در کانال
     if (u.from?.id) {
       await send(u.from.id,
@@ -1016,18 +1196,20 @@ async function onChannelAdmin(u) {
   }
   const row = await ensureChat(chat, 'channel');
   const t = now();
-  await query(
-    `UPDATE telegram_chats SET station_id=$2, user_id=$3, linked_at=$4, updated_at=$4 WHERE chat_id=$1`,
-    [row.chat_id, who.station_id, who.user_id, t]
-  );
-  await require('./audit').log({
-    actorType: 'user', userId: who.user_id, action: 'pump.telegram_link',
-    targetType: 'station', targetId: who.station_id, detail: { kind: 'channel' },
-  });
-  await send(row.chat_id, `✅ این کانال به پمپِ «${owner.station_name}» وصل شد. هشدارهای پمپ از این به بعد همین‌جا منتشر می‌شود.`);
+  //  ⛔ هر شعبهٔ همان شخص — اضافه، نه جایگزین
+  for (const l of owned) {
+    await addLink(row.chat_id, l.station_id, l.user_id, t);
+    await require('./audit').log({
+      actorType: 'user', userId: l.user_id, action: 'pump.telegram_link',
+      targetType: 'station', targetId: l.station_id, detail: { kind: 'channel' },
+    });
+  }
+  const names = owned.map(l => `«${l.station_name}»`).join('، ');
+  const what = owned.length === 1 ? `پمپِ ${names}` : `${faNum(owned.length)} شعبه (${names})`;
+  await send(row.chat_id, `✅ این کانال به ${what} وصل شد. هشدارهای پمپ از این به بعد همین‌جا منتشر می‌شود.`);
   //  ⚠️ بی دکمه: خبرِ «وصل شد» یک خبر است، نه منو (قاعدهٔ ۳)
   return send(who.chat_id,
-    `✅ کانالِ «${titleOf(chat)}» به پمپِ «${owner.station_name}» وصل شد. از این پس هشدارها در همان کانال می‌آید، نه این‌جا.\nبرای جدا کردن، بات را از مدیرانِ کانال بردارید — هشدارها دوباره همین‌جا می‌آید.`);
+    `✅ کانالِ «${titleOf(chat)}» به ${what} وصل شد. از این پس هشدارها در همان کانال می‌آید، نه این‌جا.\nبرای جدا کردن، بات را از مدیرانِ کانال بردارید — هشدارها دوباره همین‌جا می‌آید.`);
 }
 
 async function onGroup(chat, cmd, from) {
@@ -1039,38 +1221,63 @@ async function onGroup(chat, cmd, from) {
     const tok = await one(
       `UPDATE telegram_link_tokens SET used_at=$2
         WHERE token_hash=$1 AND used_at IS NULL AND expires_at > $2
-        RETURNING station_id, user_id`,
+        RETURNING station_id, user_id, from_chat`,
       [hashToken(cmd.arg), t]
     );
     if (!tok) {
       return send(row.chat_id,
         'این دکمه باطل یا کهنه شده است. در گفت‌وگوی خصوصی با بات دوباره «👥 گروه و کانال» را بزنید.');
     }
-    const probe = { ...row, station_id: tok.station_id, user_id: tok.user_id, linked_at: t };
-    if (!(await linkOf(probe))) {
+    //  شعبه‌هایی که می‌آیند: همهٔ شعبه‌های گفت‌وگوی خصوصیِ سازندهٔ دکمه
+    //  (نشانهٔ کهنه‌تر از این نسخه: همان یک پمپ) — هر کدام همین لحظه سنجیده.
+    let incoming = [];
+    if (tok.from_chat) {
+      const src = await chatRow(tok.from_chat);
+      if (src && src.kind === 'private' && isLinked(src)) incoming = await linksOf(src);
+    } else {
+      const v = await one(
+        `SELECT s.id AS station_id, s.name AS station_name, m.user_id
+           FROM stations s
+           JOIN station_members m ON m.station_id=s.id AND m.user_id=$2 AND m.status='active'
+           JOIN users u ON u.id=m.user_id AND u.status='active'
+          WHERE s.id=$1 AND s.status='active'`,
+        [tok.station_id, tok.user_id]
+      );
+      if (v) incoming = [v];
+    }
+    if (!incoming.length) {
       return send(row.chat_id, 'حسابی که این دکمه را ساخت دیگر عضوِ آن پمپ نیست.');
     }
-    await query(
-      `UPDATE telegram_chats SET station_id=$2, user_id=$3, linked_at=$4, updated_at=$4 WHERE chat_id=$1`,
-      [row.chat_id, tok.station_id, tok.user_id, t]
-    );
-    await require('./audit').log({
-      actorType: 'user', userId: tok.user_id, action: 'pump.telegram_link',
-      targetType: 'station', targetId: tok.station_id, detail: { kind: 'group' },
-    });
-    const priv = await one(
-      `SELECT chat_id FROM telegram_chats
-        WHERE kind='private' AND user_id=$1 AND station_id=$2 AND linked_at IS NOT NULL`,
-      [tok.user_id, tok.station_id]
-    );
+    const had = isLinked(row) ? (await linksOf(row)).length : 0;
+    for (const l of incoming) {
+      await addLink(row.chat_id, l.station_id, l.user_id, t);
+      await require('./audit').log({
+        actorType: 'user', userId: l.user_id, action: 'pump.telegram_link',
+        targetType: 'station', targetId: l.station_id, detail: { kind: 'group' },
+      });
+    }
+    const names = incoming.map(l => `«${l.station_name}»`).join('، ');
     //  ⚠️ بی دکمه: خبر است، نه منو. و می‌گوید چرا خصوصی ساکت می‌شود (alertChats).
-    if (priv) {
-      await send(priv.chat_id,
-        `✅ گروهِ «${titleOf(chat)}» وصل شد. از این پس هشدارها در همان گروه می‌آید، نه این‌جا.\n`
+    if (tok.from_chat) {
+      await send(tok.from_chat,
+        `✅ گروهِ «${titleOf(chat)}» وصل شد (${names}). از این پس هشدارها در همان گروه می‌آید، نه این‌جا.\n`
         + 'اگر گروه را جدا کنید، هشدارها دوباره همین‌جا می‌آید.');
+    } else {
+      const priv = await one(
+        `SELECT chat_id FROM telegram_chats
+          WHERE kind='private' AND user_id=$1 AND station_id=$2 AND linked_at IS NOT NULL`,
+        [tok.user_id, tok.station_id]
+      );
+      if (priv) {
+        await send(priv.chat_id,
+          `✅ گروهِ «${titleOf(chat)}» وصل شد. از این پس هشدارها در همان گروه می‌آید، نه این‌جا.\n`
+          + 'اگر گروه را جدا کنید، هشدارها دوباره همین‌جا می‌آید.');
+      }
     }
     return sendMenu(await chatRow(row.chat_id),
-      '✅ این گروه وصل شد. هشدارهای پمپ از این به بعد همین‌جا برای همه می‌آید.\n'
+      (had
+        ? `✅ شعبهٔ تازه به این گروه اضافه شد (${names}). هر شعبه با نامِ خودش جدا می‌آید.\n`
+        : '✅ این گروه وصل شد. هشدارهای پمپ از این به بعد همین‌جا برای همه می‌آید.\n')
       + 'تنظیمات فقط در دستِ مدیرانِ گروه است.');
   }
 
@@ -1103,7 +1310,7 @@ async function onMessage(m) {
 }
 
 /** کارهایی که در گروه فقط مدیر (یا وصل‌کننده) می‌کند. */
-const MANAGE = new Set(['settings', 'toggle', 'unlink', 'unlink_yes', 'code']);
+const MANAGE = new Set(['settings', 'toggle', 'unlink', 'unlink_yes', 'code', 'rm', 'rmy', 'addacct', 'chansync']);
 
 async function onCallback(q) {
   const answer = (text = '', alert = false) => call('answerCallbackQuery', {
@@ -1115,15 +1322,28 @@ async function onCallback(q) {
   if (!row) return answer();
   const editId = Number(q.message?.message_id) || 0;
 
-  if (MANAGE.has(q.data) && !(await canManage(row, q.from))) {
+  //  دکمه‌های هر شعبه شناسهٔ همان پمپ را پشتِ «:» دارند (`code:<id>`)
+  const [act, arg = ''] = String(q.data || '').split(':');
+  if (MANAGE.has(act) && !(await canManage(row, q.from))) {
     return answer('⛔ فقط مدیرانِ همین گروه این را عوض می‌کنند.', true);
   }
+  //  ⛔ شعبه‌ای که به همین گفت‌وگو وصل نیست هیچ‌وقت از روی دکمه پذیرفته نمی‌شود
+  const branch = async () => {
+    const links = isLinked(row) ? await linksOf(row) : [];
+    return links.find(l => l.station_id === arg) || null;
+  };
 
-  switch (q.data) {
+  switch (act) {
     case 'menu': await answer(); return sendMenu(row, '', editId);
     case 'status': await answer(); return sendStatus(row, editId);
     case 'app': await answer(); return sendApp(row, editId);
     case 'code': {
+      if (arg) {
+        //  ⛔ شعبهٔ بیگانه یا جداشده: فقط «نیست» — هرگز جدا کردنِ کلِ گفت‌وگو
+        const l = await branch();
+        if (!l) return answer('این شعبه به این گفت‌وگو وصل نیست.', true);
+        return answer(`🔑 کدِ پمپِ «${l.station_name}»:  ${await accessCodeOf(l.station_id)}`, true);
+      }
       const link = await linkOf(row);
       if (!link) { await answer(); return notLinked(row, editId); }
       //  ⚠️ فقط برای همان کسی که زد — پنجرهٔ خصوصیِ تلگرام، نه پیامِ گروه
@@ -1160,9 +1380,50 @@ async function onCallback(q) {
     }
     case 'reset': {
       await answer();
-      if (row.kind !== 'private' || isLinked(row)) return null;
+      if (row.kind !== 'private' || (isLinked(row) && !row.state)) return null;
       await setState(row.chat_id, 'email');
       return show(row.chat_id, '✉️ ایمیلِ حسابِ پمپ را بفرستید.', null, editId);
+    }
+    case 'addacct': {
+      //  شعبهٔ دیگر = حسابِ پمپِ دیگر: همان ایمیل ⇐ کدِ همان ایمیل
+      await answer();
+      if (row.kind !== 'private' || !isLinked(row)) return null;
+      await setState(row.chat_id, 'email');
+      return show(row.chat_id,
+        '➕ ایمیلِ حسابِ پمپِ شعبهٔ دیگر را بفرستید. یک کدِ شش‌رقمی به همان ایمیل می‌رود.\n'
+        + 'شعبه‌های فعلی دست نمی‌خورند؛ هر شعبه با نامِ خودش جدا می‌آید.\n\n(انصراف: /cancel)',
+        null, editId);
+    }
+    case 'rm': {
+      await answer();
+      const l = await branch();
+      if (!l) return sendSettings(row, editId);
+      return show(row.chat_id,
+        `شعبهٔ «${l.station_name}» از این ${row.kind === 'private' ? 'گفت‌وگو' : 'گروه'} جدا شود؟ شعبه‌های دیگر می‌مانند.`,
+        [[
+          { text: '🔌 بله، جدا کن', callback_data: `rmy:${l.station_id}` },
+          { text: 'نه', callback_data: 'settings' },
+        ]], editId);
+    }
+    case 'rmy': {
+      await answer();
+      const l = await branch();
+      if (!l) return sendSettings(row, editId);
+      await removeLink(row.chat_id, l.station_id);
+      const left = await chatRow(row.chat_id);
+      if (!isLinked(left)) return notLinked(left, editId);
+      return sendSettings(left, editId, `🔌 شعبهٔ «${l.station_name}» جدا شد.`);
+    }
+    case 'chansync': {
+      await answer();
+      if (row.kind !== 'private' || !isLinked(row)) return null;
+      const r = await syncChannels(row);
+      const where = (r.channels || []).map(c => `«${c.title || 'کانال'}»`).join('، ');
+      return show(row.chat_id,
+        r.added
+          ? `✅ ${faNum(r.added)} پیوندِ تازه — هر شعبهٔ این گفت‌وگو حالا در ${where} هم می‌آید.`
+          : `همهٔ شعبه‌ها از قبل در ${where || 'کانال'} بودند.`,
+        [[BACK]], editId);
     }
     default: return answer();
   }
@@ -1283,28 +1544,31 @@ function subjectOf(key) {
  */
 function alertChats(stationId) {
   return many(
-    `SELECT c.chat_id, c.only_out, c.announced_day, s.name AS station_name
-       FROM telegram_chats c
-       JOIN stations s ON s.id=c.station_id AND s.status='active'
-       JOIN station_members m ON m.station_id=c.station_id AND m.user_id=c.user_id AND m.status='active'
-       JOIN users u ON u.id=c.user_id AND u.status='active'
-      WHERE c.station_id=$1 AND c.linked_at IS NOT NULL
+    `SELECT c.chat_id, c.kind, c.only_out, l.announced_day, s.name AS station_name
+       FROM telegram_chat_links l
+       JOIN telegram_chats c ON c.chat_id=l.chat_id
+       JOIN stations s ON s.id=l.station_id AND s.status='active'
+       JOIN station_members m ON m.station_id=l.station_id AND m.user_id=l.user_id AND m.status='active'
+       JOIN users u ON u.id=l.user_id AND u.status='active'
+      WHERE l.station_id=$1
         AND NOT (c.kind='private' AND EXISTS (
-          SELECT 1 FROM telegram_chats g
-           WHERE g.station_id=c.station_id AND g.user_id=c.user_id
-             AND g.kind IN ('group','channel') AND g.linked_at IS NOT NULL))`,
+          SELECT 1 FROM telegram_chat_links g
+            JOIN telegram_chats gc ON gc.chat_id=g.chat_id AND gc.kind IN ('group','channel')
+           WHERE g.station_id=l.station_id AND g.user_id=l.user_id))`,
     [stationId]
   );
 }
 
-/** نامِ نخستین گروه/کانالی که این نفر برای این پمپ وصل کرده — یا تهی. */
+/** نامِ نخستین گروه/کانالی که یکی از شعبه‌های این گفت‌وگوی خصوصی را دارد — یا تهی. */
 async function groupOfUser(row) {
-  if (!row || row.kind !== 'private' || !row.user_id || !row.station_id) return null;
+  if (!row || row.kind !== 'private' || !isLinked(row)) return null;
   const g = await one(
-    `SELECT title FROM telegram_chats
-      WHERE station_id=$1 AND user_id=$2 AND kind IN ('group','channel') AND linked_at IS NOT NULL
-      ORDER BY linked_at LIMIT 1`,
-    [row.station_id, row.user_id]
+    `SELECT gc.title FROM telegram_chat_links p
+       JOIN telegram_chat_links g ON g.station_id=p.station_id AND g.user_id=p.user_id
+       JOIN telegram_chats gc ON gc.chat_id=g.chat_id AND gc.kind IN ('group','channel')
+      WHERE p.chat_id=$1
+      ORDER BY g.linked_at LIMIT 1`,
+    [String(row.chat_id)]
   );
   return g ? (g.title || 'گروهِ شما') : null;
 }
@@ -1447,10 +1711,11 @@ async function announceTick(t = now()) {
       if (!state) continue;
       for (const c of chats) {
         //  ⚠️ اول مُهر، بعد صف: دو دورِ هم‌زمان هرگز دو اعلامیه نمی‌سازند
+        //  ⚠️ مُهر روی **هر شعبه** است: گروهی با سه شعبه سه اعلامیهٔ جدا می‌گیرد
         const took = await one(
-          `UPDATE telegram_chats SET announced_day=$2
-            WHERE chat_id=$1 AND announced_day IS DISTINCT FROM $2 RETURNING chat_id`,
-          [c.chat_id, day]
+          `UPDATE telegram_chat_links SET announced_day=$3
+            WHERE chat_id=$1 AND station_id=$2 AND announced_day IS DISTINCT FROM $3 RETURNING chat_id`,
+          [c.chat_id, sid, day]
         );
         if (!took) continue;
         await queueLong(c.chat_id, sid, announcementText(c.station_name, state, t), now());
