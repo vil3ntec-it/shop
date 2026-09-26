@@ -472,3 +472,51 @@ test('⛔ یک بات، ولی هر حساب فقط حسابِ خودش: هم‌
   await msg(8801, 'رحیم');
   assert.doesNotMatch(sent().map(c => c.params.text).join('\n'), /الباقی/, '⛔ عضوِ بیرون‌شده هنوز حساب را دید');
 });
+
+/* ══════════════════════════════════════════════════════════════════
+   ۸) «هم توی بات پیام میاد هم توی گروه» — گروه وصل ⇒ فقط گروه
+   ══════════════════════════════════════════════════════════════════ */
+
+test('گروه وصل ⇒ هشدار فقط در گروه؛ بی گروه ⇒ در خصوصی؛ جدا کردنِ گروه ⇒ دوباره خصوصی', async () => {
+  const owner = await pumpOwner('یک‌جا');
+  const dev = await bindDevice(owner, 'pc-one');
+  await linkPrivate(8901, owner);
+
+  //  بی گروه ⇒ خصوصی
+  clear();
+  await state(dev, { alerts: [debtOut(1, 'ولی')] });
+  await telegram.flushOutbox();
+  assert.equal(sent().filter(c => c.params.chat_id === '8901').length, 1, 'بی گروه، خصوصی خبر نگرفت');
+
+  //  گروه وصل شد ⇒ خصوصی خبر می‌گیرد که از این پس کجا
+  clear();
+  await linkGroup(-1008901, 8901);
+  const told = sent().filter(c => c.params.chat_id === '8901').map(c => c.params.text).join('\n');
+  assert.match(told, /از این پس هشدارها در همان گروه/);
+
+  //  هشدارِ تازه و برطرف شدن ⇒ فقط گروه
+  clear();
+  await state(dev, { alerts: [debtOut(1, 'ولی'), debtOut(2, 'جلال')] });
+  await telegram.flushOutbox();
+  assert.equal(sent().filter(c => c.params.chat_id === '8901').length, 0, '⛔ هم خصوصی هم گروه');
+  const g = sent().filter(c => c.params.chat_id === '-1008901').map(c => c.params.text);
+  assert.equal(g.length, 1);
+  assert.match(g[0], /جلال/);
+  assert.match(g[0], /🚨/);
+  assert.ok(!g[0].includes('ولی'), 'هشدارِ قدیمی دوباره آمد');
+
+  //  منوی خصوصی راستش را می‌گوید
+  clear();
+  await msg(8901, '/menu');
+  assert.match(lastTo(8901).params.text, /در «.*» می‌آیند، نه این‌جا/);
+
+  //  جدا کردنِ گروه ⇒ دوباره خصوصی
+  responder = (m) => (m === 'getChatMember' ? { ok: true, result: { status: 'creator' } } : null);
+  await press(-1008901, 'unlink_yes', { type: 'supergroup', from: { id: 8901 } });
+  responder = null;
+  clear();
+  await state(dev, { alerts: [debtOut(1, 'ولی'), debtOut(2, 'جلال'), debtOut(3, 'کاظم')] });
+  await telegram.flushOutbox();
+  assert.equal(sent().filter(c => c.params.chat_id === '-1008901').length, 0, 'گروهِ جداشده خبر گرفت');
+  assert.equal(sent().filter(c => c.params.chat_id === '8901').length, 1, 'پس از جدا کردنِ گروه، خصوصی ساکت ماند');
+});
