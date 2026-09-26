@@ -311,6 +311,14 @@ function dotStuff(text) {
 function buildMessage(cfg, mail) {
   const boundary = `b${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
   const from = cfg.fromName ? `${mimeWord(cfg.fromName)} <${cfg.from}>` : cfg.from;
+  /*
+   *  ⛔ تصویرهای قالب (`cid:`) **پیوستِ درون‌خطی**‌اند، نه نشانیِ بیرونی و نه
+   *  `data:` — جیمیل هیچ‌کدامِ آن دو را نشان نمی‌دهد (و نشانیِ بیرونی یعنی
+   *  نامه‌ای که با خاموش بودنِ سرور بی‌شکل می‌شود). پس نامه‌ای که `cid:` دارد
+   *  `multipart/related` می‌شود: متن و HTML در یک `alternative`، و PNGها کنارش.
+   */
+  const inline = require('./mail-templates').inlineParts(mail.html || '');
+  const alt = inline.length ? `a${boundary}` : boundary;
   const head = [
     `From: ${from}`,
     `To: <${mail.to}>`,
@@ -318,26 +326,48 @@ function buildMessage(cfg, mail) {
     `Date: ${new Date().toUTCString()}`,
     `Message-ID: <${boundary}@${hostnameOf(cfg.from) || 'localhost'}>`,
     'MIME-Version: 1.0',
-    `Content-Type: multipart/alternative; boundary="${boundary}"`,
+    inline.length
+      ? `Content-Type: multipart/related; type="multipart/alternative"; boundary="${boundary}"`
+      : `Content-Type: multipart/alternative; boundary="${boundary}"`,
     '',
   ].join('\r\n');
 
-  const text = [
-    `--${boundary}`,
+  const alternative = [
+    `--${alt}`,
     'Content-Type: text/plain; charset=UTF-8',
     'Content-Transfer-Encoding: base64',
     '',
     chunk64(Buffer.from(mail.text || '', 'utf8').toString('base64')),
-    `--${boundary}`,
+    `--${alt}`,
     'Content-Type: text/html; charset=UTF-8',
     'Content-Transfer-Encoding: base64',
     '',
     chunk64(Buffer.from(mail.html || mail.text || '', 'utf8').toString('base64')),
-    `--${boundary}--`,
+    `--${alt}--`,
     '',
   ].join('\r\n');
 
-  return dotStuff(head + text);
+  if (!inline.length) return dotStuff(head + alternative);
+
+  const parts = [
+    `--${boundary}`,
+    `Content-Type: multipart/alternative; boundary="${alt}"`,
+    '',
+    alternative,
+  ];
+  for (const f of inline) {
+    parts.push(
+      `--${boundary}`,
+      `Content-Type: ${f.contentType}; name="${f.filename}"`,
+      'Content-Transfer-Encoding: base64',
+      `Content-ID: <${f.cid}>`,
+      `Content-Disposition: inline; filename="${f.filename}"`,
+      '',
+      chunk64(f.data.toString('base64')),
+    );
+  }
+  parts.push(`--${boundary}--`, '');
+  return dotStuff(head + parts.join('\r\n'));
 }
 
 /** base64 در ایمیل باید خطهای کوتاه داشته باشد. */
@@ -361,7 +391,9 @@ async function apiSend(cfg, mail) {
       to: [mail.to],
       subject: mail.subject,
       text: mail.text,
-      html: mail.html || mail.text,
+      //  ⚠️ سرویس‌های API پیوستِ درون‌خطی را هر کدام به شکلِ خودشان می‌خواهند؛
+      //  تصویرِ `cid:`ِ نرسیده نشانِ «تصویرِ شکسته» می‌شود، پس برداشته می‌شود.
+      html: String(mail.html || mail.text || '').replace(/<img[^>]*src="cid:[^"]*"[^>]*>/g, ''),
     }),
     signal: AbortSignal.timeout(20000),
   });
@@ -425,4 +457,4 @@ function card({ title, lead = '', code = '', body = '', footer = '' }) {
 </div>`;
 }
 
-module.exports = { current, save, masked, invalidate, send, card, readiness, FIELDS };
+module.exports = { current, save, masked, invalidate, send, card, readiness, FIELDS, buildMessage };

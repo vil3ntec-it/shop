@@ -123,7 +123,55 @@ function cut(text, open, close) {
 }
 
 /**
- * ایمیلِ **کد** — همان فایل، با شش رقمِ واقعی.
+ * ⛔ **نسخهٔ فرستادنی** (`*-code.email.html`) — همان طرح و همان نوشته، به
+ * زبانی که برنامهٔ ایمیل می‌فهمد.
+ *
+ * گزارشِ صاحبِ سامانه با عکسِ جیمیل (۱۴۰۵/۰۷/۱۳): «سایتِ ایمیلی که من
+ * تحویل دادم و تو چی تحویلِ مردم می‌دی… اصلاً ظاهرش رو دیدی؟» — حق داشت:
+ * فایلِ او یک **صفحهٔ وب** است (متغیرِ CSS، flex/grid، SVG، اسکریپت، قلمِ
+ * بیرونی) و جیمیل همهٔ این‌ها را دور می‌ریزد؛ نامه متنِ خامِ بی‌رنگ می‌رسید.
+ * پس فایلِ او **دست نخورده** مرجع می‌ماند و نامه از نسخهٔ جدول‌بندی‌شده با
+ * سبکِ درون‌خطی می‌رود؛ شکل‌ها همان SVGهایند به PNG (`*-img/`، پیوستِ
+ * `cid:`). آزمون می‌سنجد که **نوشتهٔ** دو فایل واژه‌به‌واژه یکی است.
+ */
+const EMAIL_FILES = Object.freeze({ pump: 'pump-code.email.html', shop: 'shop-code.email.html' });
+const emailCache = new Map();
+
+function rawEmail(app) {
+  const key = appOf(app);
+  if (emailCache.has(key)) return emailCache.get(key);
+  let text = null;
+  try { text = fs.readFileSync(path.join(DIR, EMAIL_FILES[key]), 'utf8'); } catch { text = null; }
+  emailCache.set(key, text);
+  return text;
+}
+
+/** خطِ پیش‌نمایش درست پس از `<body …>` (پیش از doctype جایش نیست). */
+function withPreheader(html, line) {
+  if (html === null) return null;
+  const m = /<body[^>]*>/.exec(html);
+  if (!m) return null;
+  const at = m.index + m[0].length;
+  return html.slice(0, at) + '\n' + preheader(line) + html.slice(at);
+}
+
+/** متنِ پیام ⇒ پاراگراف‌های درون‌خطی به همان رنگ و قلمِ متنِ کارت. */
+function emailParagraphs(body, color) {
+  return String(body ?? '').trim().split(/\n{2,}/).filter(Boolean)
+    .map((p, i) => `<p style="margin:${i ? 10 : 9}px 0 0;font-size:14.5px;line-height:2.05;color:${color};">`
+      + `${escapeHtml(p).replace(/\n/g, '<br>')}</p>`).join('\n');
+}
+
+/** بلوکِ میانِ `<!--name-->` و `<!--/name-->` (با خودِ نشان‌ها) برداشته می‌شود. */
+function drop(text, name) {
+  return cut(text, `<!--${name}-->`, `<!--/${name}-->`);
+}
+
+/** یک جاگیری که فقط **پس از** `anchor` می‌گردد و باید یک‌باره باشد. */
+function onceIn(text, from, to) { return once(text, from, to); }
+
+/**
+ * ایمیلِ **کد** — همان طرح، با شش رقمِ واقعی.
  *
  * `title`/`lead` فقط برای ایمیل‌هایی که کدِ ورود نیستند (کدِ اشتراک، کدِ
  * بازیابیِ رمز) و می‌خواهند همان مدل را با عنوانِ درست بفرستند. برای کدِ
@@ -133,29 +181,30 @@ function codeHtml({ app, code, title = '', lead = '' } = {}) {
   const digits = String(code ?? '').replace(/\D/g, '');
   if (digits.length !== 6) return null;
   const key = appOf(app);
-  let html = raw(key);
+  let html = rawEmail(key);
   if (html === null) return null;
 
   if (key === 'pump') {
-    html = once(html, `<div class="code" id="code" dir="ltr">${SAMPLE}</div>`,
-      `<div class="code" id="code" dir="ltr">${digits}</div>`);
-    if (title) html = once(html, '<h2>کد ورود شما</h2>', `<h2>${escapeHtml(title)}</h2>`);
+    html = onceIn(html, `">${SAMPLE}</div>`, `">${digits}</div>`);
+    if (title) html = onceIn(html, '">کد ورود شما</h2>', `">${escapeHtml(title)}</h2>`);
     if (lead) {
-      html = once(html,
-        '<p>سلام. برای ورود به حساب‌تان در ویلن، این کد شش‌رقمی را در برنامه وارد کنید.</p>',
-        `<p>${escapeHtml(lead)}</p>`);
+      html = onceIn(html, '">سلام. برای ورود به حساب‌تان در ویلن، این کد شش‌رقمی را در برنامه وارد کنید.</p>',
+        `">${escapeHtml(lead)}</p>`);
     }
   } else {
-    const spans = SAMPLE.split('').map((d) => `<span>${d}</span>`).join('');
-    html = once(html, spans, digits.split('').map((d) => `<span>${d}</span>`).join(''));
-    if (title) html = once(html, '<h3>کد ورود شما</h3>', `<h3>${escapeHtml(title)}</h3>`);
+    const m = /<!--digits-->[^]*?<!--\/digits-->/.exec(html);
+    if (!m) return null;
+    let k = 0;
+    const block = m[0].replace(/>(\d)<\/td>/g, () => `>${digits[k++]}</td>`);
+    if (k !== 6) return null;
+    html = html.slice(0, m.index) + block + html.slice(m.index + m[0].length);
+    if (title) html = onceIn(html, '">کد ورود شما</h3>', `">${escapeHtml(title)}</h3>`);
     if (lead) {
-      html = once(html,
-        '<p class="sub">این کد برای ۱۰ دقیقه معتبر است و فقط یک بار قابل استفاده می‌باشد.</p>',
-        `<p class="sub">${escapeHtml(lead)}</p>`);
+      html = onceIn(html, '">این کد برای ۱۰ دقیقه معتبر است و فقط یک بار قابل استفاده می‌باشد.</p>',
+        `">${escapeHtml(lead)}</p>`);
     }
   }
-  return html === null ? null : preheader(PREVIEW.code) + html;
+  return withPreheader(html, PREVIEW.code);
 }
 
 /**
@@ -163,38 +212,54 @@ function codeHtml({ app, code, title = '', lead = '' } = {}) {
  */
 function messageHtml({ app, title, body } = {}) {
   const key = appOf(app);
-  let html = raw(key);
+  let html = rawEmail(key);
   if (html === null) return null;
   const h = escapeHtml(title || '');
-  const p = paragraphs(body);
 
   if (key === 'pump') {
-    html = once(html, '<h2>کد ورود شما</h2>', `<h2>${h}</h2>`);
-    html = once(html,
-      '<p>سلام. برای ورود به حساب‌تان در ویلن، این کد شش‌رقمی را در برنامه وارد کنید.</p>',
-      p);
-    html = cut(html, '<div class="code-box">', '</div>\n\n');
-    html = cut(html, '<div class="meta">', '</div>\n    </div>\n');
-    html = cut(html, '<p class="warn">', '</p>\n');
+    html = onceIn(html, '">کد ورود شما</h2>', `">${h}</h2>`);
+    const lead = /<p style="[^"]*">سلام\. برای ورود به حساب‌تان در ویلن، این کد شش‌رقمی را در برنامه وارد کنید\.<\/p>/.exec(html || '');
+    html = lead ? html.replace(lead[0], emailParagraphs(body, '#3A2E1C')) : null;
+    html = drop(html, 'code-box');
+    html = drop(html, 'meta');
+    html = drop(html, 'warn');
   } else {
-    html = once(html, '<h3>کد ورود شما</h3>', `<h3>${h}</h3>`);
-    html = once(html,
-      '<p class="sub">این کد برای ۱۰ دقیقه معتبر است و فقط یک بار قابل استفاده می‌باشد.</p>',
-      `<div class="sub" style="text-align:right">${p}</div>`);
-    html = cut(html, '<div class="digits" id="digits" dir="ltr">', '</div>\n');
-    html = cut(html, '<button type="button" class="copy" id="copyBtn">', '</button>\n');
+    html = onceIn(html, '">کد ورود شما</h3>', `">${h}</h3>`);
+    const sub = /<p style="[^"]*">این کد برای ۱۰ دقیقه معتبر است و فقط یک بار قابل استفاده می‌باشد\.<\/p>/.exec(html || '');
+    html = sub
+      ? html.replace(sub[0], `<div style="margin:6px 0 4px;text-align:right;">${emailParagraphs(body, '#3A2E1C')}</div>`)
+      : null;
+    html = drop(html, 'digits');
+    html = drop(html, 'copy');
   }
-  if (html === null) return null;
-  //  دکمهٔ کپی رفته، پس اسکریپتش هم بی‌کار است
-  html = cut(html, '<script>', '</script>');
-  if (html === null) return null;
   //  پیش‌نمایشِ پیام همان عنوانِ خودِ پیام است
-  return preheader(title || '') + html;
+  return withPreheader(html, title || '');
+}
+
+/**
+ * پیوست‌های درون‌خطیِ یک نامه — هر `cid:<app>-<نام>@vill3n` که در HTML آمده،
+ * همان PNGِ کنارِ قالب. فرستنده (`mailer`) آن‌ها را در یک `multipart/related`
+ * می‌گذارد. نامی که فایلش نیست نادیده گرفته می‌شود (تصویرِ خالی بهتر از
+ * نامهٔ نرفته است).
+ */
+function inlineParts(html) {
+  const out = [];
+  const seen = new Set();
+  for (const m of String(html || '').matchAll(/cid:(pump|shop)-([a-z0-9]+)@vill3n/g)) {
+    const cid = `${m[1]}-${m[2]}@vill3n`;
+    if (seen.has(cid)) continue;
+    seen.add(cid);
+    try {
+      out.push({ cid, filename: `${m[2]}.png`, contentType: 'image/png',
+        data: fs.readFileSync(path.join(DIR, `${m[1]}-img`, `${m[2]}.png`)) });
+    } catch { /* نیست ⇒ بی تصویر */ }
+  }
+  return out;
 }
 
 /** قالبِ این برنامه هست؟ (برای سنجه‌ها و صفحهٔ مدیر) */
 function available(app) {
-  return raw(app) !== null;
+  return raw(app) !== null && rawEmail(app) !== null;
 }
 
-module.exports = { codeHtml, messageHtml, available, appOf, titleOf, brandOf, preheader, PREVIEW, SAMPLE, FILES, DIR };
+module.exports = { codeHtml, messageHtml, inlineParts, available, EMAIL_FILES, appOf, titleOf, brandOf, preheader, PREVIEW, SAMPLE, FILES, DIR };
