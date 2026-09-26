@@ -93,7 +93,7 @@ jobs:
             task: packageDmg
             glob: 'build/compose/binaries/main/dmg/*.dmg'
             fixed: Tohid-Mac-AppleSilicon.dmg
-          - os: macos-13
+          - os: macos-15-intel
             label: مک (Intel)
             task: packageDmg
             glob: 'build/compose/binaries/main/dmg/*.dmg'

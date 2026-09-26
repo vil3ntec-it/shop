@@ -110,7 +110,7 @@ cd desktop
 ## انتشار
 
 `.github/workflows/tohid-desktop.yml`: کامپایل و آزمون ⇒ نصاب روی
-`windows-2022` (MSI)، `macos-14` و `macos-13` (DMG) و `ubuntu-22.04`
+`windows-2022` (MSI)، `macos-14` و `macos-15-intel` (DMG) و `ubuntu-22.04`
 (DEB) ⇒ فقط از `main`، روی برچسبِ `tohid-desktop`، فایل‌ها یکی‌یکی و
 `version.txt` آخر (همان درسِ «Error saving asset»).
 
