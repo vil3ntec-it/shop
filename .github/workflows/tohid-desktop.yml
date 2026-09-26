@@ -134,6 +134,12 @@ jobs:
           TOHID_API_BASE: ${{ vars.TOHID_API_BASE }}
         run: ./gradlew --no-daemon ${{ matrix.task }} -PbuildNumber=${{ github.run_number }}
 
+      - name: گزارشِ jpackage
+        if: ${{ failure() }}
+        working-directory: desktop
+        shell: bash
+        run: find build/compose/logs -type f -name '*.txt' -exec sh -c 'echo "== $1"; tail -n 60 "$1"' _ {} \;
+
       - name: نام‌گذاری
         working-directory: desktop
         shell: bash

@@ -258,7 +258,9 @@ compose.desktop {
       targetFormats(TargetFormat.Msi, TargetFormat.Dmg, TargetFormat.Deb)
       packageName = "Tohid"
       packageVersion = appVersion
-      description = "توحید — دفترِ فروشگاه"
+      //  ⚠️ لاتین: WiX (نصابِ MSI) متنِ بیرون از صفحه‌کدِ ۱۲۵۲ را نمی‌پذیرد
+      //  و ساختِ نصابِ ویندوز با توضیحِ فارسی می‌شکند
+      description = "Tohid - shop ledger"
       vendor = "VIL3NTEC"
       copyright = "© VIL3NTEC"
       //  ماژول‌های JDK که برنامه لازم دارد: شبکه، چاپ (javax.print در java.desktop)،
