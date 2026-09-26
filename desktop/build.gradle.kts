@@ -306,3 +306,9 @@ tasks.register("printRuntimeClasspath") {
   dependsOn("classes")
   doLast { println((sourceSets.main.get().runtimeClasspath).asPath) }
 }
+
+tasks.test {
+  //  پوشهٔ دادهٔ جدا — آزمون هرگز به دادهٔ واقعیِ کامپیوتر دست نمی‌زند
+  environment("TOHID_DATA_DIR", layout.buildDirectory.dir("test-data").get().asFile.absolutePath)
+  jvmArgs("-Djava.awt.headless=true", "-Dfile.encoding=UTF-8", "-Dsun.jnu.encoding=UTF-8")
+}
