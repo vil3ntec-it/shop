@@ -35,7 +35,7 @@ const { one, query, now } = require('../db');
 const { badRequest } = require('../middleware/errors');
 
 const MAX_ALERTS = 300;
-const MAX_DEBTORS = 5000;
+const MAX_DEBTORS = 30000; // ≈ ۳ مگابایت؛ پمپی با این‌همه قرض‌دار هم کامل جست‌وجو می‌شود
 
 function str(v, max) {
   return String(v == null ? '' : v).trim().slice(0, max);
@@ -181,9 +181,11 @@ async function publish(ctx, body) {
     //  هشدار در همان دوره هرگز دو ردیف نمی‌شود.
     if (opened.length) {
       const events = require('./events').pump;
-      await events.record({
+      //  ⚠️ دفترِ خبر در هر درخواست حداکثر ۵۰ خبر می‌پذیرد؛ «بی سقف» یعنی دسته‌دسته، نه بریدن
+      const batch = events.MAX_BATCH || 50;
+      for (let i = 0; i < opened.length; i += batch) await events.record({
         tenantId: stationId, userId: '', userName: ctx.who || '', deviceUid: ctx.deviceUid || '',
-      }, opened.map(a => ({
+      }, opened.slice(i, i + batch).map(a => ({
         kind: a.kind,
         title: a.t,
         clientId: `ls:${a.k}:${a.since}`,
