@@ -61,10 +61,36 @@ function cleanAlert(a) {
     k,
     kind: kindOf(k, s),
     s,
-    t: str(a?.t, 160),
+    t: str(a?.t, 200),
+    //  دستورِ کار — «به او دیگر تیل ندهید»، «امروز دیزل سفارش بدهید». از خودِ برنامه.
+    a: str(a?.a, 200),
     n: str(a?.n, 80),
     f: str(a?.f, 20),
   };
+}
+
+const MAX_OWE = 200;
+
+/** بدهیِ پمپ به هر شرکت — همان الباقی‌ای که برنامه حساب کرده. */
+function cleanOwe(list) {
+  if (!Array.isArray(list)) return [];
+  const out = [];
+  for (const o of list.slice(0, MAX_OWE)) {
+    const n = str(o?.n, 80);
+    const afn = num(o?.afn);
+    const usd = num(o?.usd);
+    if (!n || (afn <= 0 && usd <= 0)) continue;
+    out.push({ n, afn, usd });
+  }
+  return out;
+}
+
+/**
+ * کلیدِ یک هشدار بی حالش — «d7-stP-w70» و «d7-stP-over» یک حساب‌اند.
+ * ⚠️ همان فهرستِ حال‌های `StationSnapshot.Alerts`ِ برنامهٔ پمپ.
+ */
+function subjectOf(key) {
+  return String(key || '').replace(/-(out|low|w70|w90|over)$/, '');
 }
 
 function cleanTank(raw) {
@@ -104,6 +130,7 @@ async function get(stationId) {
     tank: r.tank && typeof r.tank === 'object' ? r.tank : {},
     debtors: Array.isArray(r.debtors) ? r.debtors : null,
     debtorsAt: r.debtors_at ? Number(r.debtors_at) : 0,
+    owe: Array.isArray(r.owe) ? r.owe : [],
     updatedAt: Number(r.updated_at),
   };
 }
@@ -161,19 +188,21 @@ async function publish(ctx, body) {
 
     const tank = body.tank === undefined && prev ? prev.tank : cleanTank(body.tank);
     const debtors = body.debtors === undefined ? undefined : cleanDebtors(body.debtors);
+    const owe = body.owe === undefined ? (prev?.owe || []) : cleanOwe(body.owe);
 
     await query(
-      `INSERT INTO station_live_state (station_id, alerts, tank, debtors, debtors_at, updated_at)
-       VALUES ($1, $2::jsonb, $3::jsonb, $4::jsonb, $5, $6)
+      `INSERT INTO station_live_state (station_id, alerts, tank, debtors, debtors_at, updated_at, owe)
+       VALUES ($1, $2::jsonb, $3::jsonb, $4::jsonb, $5, $6, $8::jsonb)
        ON CONFLICT (station_id) DO UPDATE SET
          alerts = excluded.alerts,
          tank = excluded.tank,
+         owe = excluded.owe,
          debtors = CASE WHEN $7 THEN excluded.debtors ELSE station_live_state.debtors END,
          debtors_at = CASE WHEN $7 THEN excluded.debtors_at ELSE station_live_state.debtors_at END,
          updated_at = excluded.updated_at`,
       [stationId, JSON.stringify(alerts), JSON.stringify(tank || {}),
         debtors === undefined ? null : JSON.stringify(debtors),
-        debtors === undefined ? null : t, t, debtors !== undefined]
+        debtors === undefined ? null : t, t, debtors !== undefined, JSON.stringify(owe)]
     );
 
     //  ⚠️ خبرِ تازه از همان درِ همیشگی می‌رود — پوش و تلگرام هر دو از
@@ -189,12 +218,12 @@ async function publish(ctx, body) {
         kind: a.kind,
         title: a.t,
         clientId: `ls:${a.k}:${a.since}`,
-        data: { key: a.k, who: a.n, fuel: a.f, state: a.s },
+        data: { key: a.k, who: a.n, fuel: a.f, state: a.s, action: a.a || '' },
       })));
     }
     //  ⚠️ «تمام شد ⇒ کم مانده» برطرف شدن نیست: همان حساب هنوز هشدار دارد
     //  (کلیدش فقط حالش را عوض کرده). برطرف یعنی آن حساب دیگر هیچ هشداری ندارد.
-    const subject = (k) => String(k).replace(/-(out|low)$/, '');
+    const subject = subjectOf;
     const stillOpen = new Set(alerts.map(a => subject(a.k)));
     const resolved = closed.filter(a => !stillOpen.has(subject(a.k)));
     if (resolved.length) {
@@ -204,4 +233,4 @@ async function publish(ctx, body) {
   });
 }
 
-module.exports = { publish, get, cleanAlert, cleanDebtors, kindOf, MAX_ALERTS, MAX_DEBTORS };
+module.exports = { publish, get, cleanAlert, cleanDebtors, cleanOwe, subjectOf, kindOf, MAX_ALERTS, MAX_DEBTORS, MAX_OWE };

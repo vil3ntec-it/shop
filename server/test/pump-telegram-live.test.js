@@ -520,3 +520,109 @@ test('گروه وصل ⇒ هشدار فقط در گروه؛ بی گروه ⇒ د
   assert.equal(sent().filter(c => c.params.chat_id === '-1008901').length, 0, 'گروهِ جداشده خبر گرفت');
   assert.equal(sent().filter(c => c.params.chat_id === '8901').length, 1, 'پس از جدا کردنِ گروه، خصوصی ساکت ماند');
 });
+
+/* ══════════════════════════════════════════════════════════════════
+   ۹) «دقیق‌تر: چند لیتر مانده، ۷۰ و ۹۰ درصد، تمام شد، اضافه داد — و اعلامیه»
+   ══════════════════════════════════════════════════════════════════ */
+
+const lv = (id, name, level, t, a) => ({
+  k: `d${id}-stP-${level}`, n: name, f: 'پطرول',
+  s: level === 'out' || level === 'over' ? 'out' : 'low', t, a,
+});
+
+test('هشدار دستورِ کار دارد؛ ۷۰ ⇒ ۹۰ ⇒ اضافه‌داده هر کدام خبرِ تازه است نه «برطرف»', async () => {
+  const owner = await pumpOwner('دقیق');
+  const dev = await bindDevice(owner, 'pc-exact');
+  await linkPrivate(9001, owner);
+  clear();
+  await state(dev, { alerts: [lv(1, 'امین', 'w70', 'امین — ۷۰٪ِ پطرولِ حسابش مصرف شد؛ ۳۰ لیتر مانده', 'متوجهِ امین باشید.')] });
+  await telegram.flushOutbox();
+  let m = sent().filter(c => c.params.chat_id === '9001').map(c => c.params.text);
+  assert.equal(m.length, 1);
+  assert.match(m[0], /۳۰ لیتر مانده/);
+  assert.match(m[0], /📋 دستورِ کار:\n▫️ متوجهِ امین باشید\./);
+
+  for (const [level, t, a] of [
+    ['w90', 'امین — ۹۰٪ رفت؛ فقط ۱۰ لیتر مانده', 'به امین بگویید حسابش را پر کند.'],
+    ['over', 'امین — ۲۵ لیتر بیشتر از حسابش پطرول داده شده', 'بازپرسی کنید: چه کسی و چرا به امین اضافه داد؟'],
+  ]) {
+    clear();
+    const r = await state(dev, { alerts: [lv(1, 'امین', level, t, a)] });
+    assert.equal(r.opened, 1);
+    assert.equal(r.resolved, 0, `${level} برطرف شدن خوانده شد`);
+    await telegram.flushOutbox();
+    const texts = sent().filter(c => c.params.chat_id === '9001').map(c => c.params.text);
+    assert.equal(texts.length, 1);
+    assert.ok(texts[0].includes(a), 'دستورِ کار نیامد');
+    assert.ok(!texts[0].startsWith('✅'), '⛔ «برطرف شد» آمد');
+  }
+
+  //  حساب پر شد ⇒ برطرف
+  clear();
+  const r = await state(dev, { alerts: [] });
+  assert.equal(r.resolved, 1);
+});
+
+test('وضعیت: مخزن با «لیتر مانده» و حدِ هشدار، بدهیِ شرکت‌ها و دستورِ کار', async () => {
+  const owner = await pumpOwner('وضعِ دقیق');
+  const dev = await bindDevice(owner, 'pc-exact2');
+  await linkPrivate(9002, owner);
+  await state(dev, {
+    alerts: [{ ...tankOut, t: 'مخزنِ دیزل کم شد — ۸۵۰ لیتر مانده', a: 'امروز دیزل سفارش بدهید.' }],
+    tank: { petrol: { show: 5200, threshold: 1000 }, diesel: { show: 850, threshold: 1000, low: true } },
+    owe: [{ n: 'شرکتِ الف', afn: 125000, usd: 3200 }, { n: 'صاف‌شده', afn: 0, usd: 0 }],
+  });
+  clear();
+  await msg(9002, '/status');
+  const t = lastTo(9002).params.text;
+  assert.match(t, /دیزل: ۸۵۰ لیتر مانده — کم است \(حدِ هشدار ۱٬۰۰۰ لیتر\)/);
+  assert.match(t, /پطرول: ۵٬۲۰۰ لیتر مانده — پُر است/);
+  assert.match(t, /💼 بدهیِ پمپ به شرکت‌ها:\n▫️ شرکتِ الف: ۱۲۵٬۰۰۰ افغانی · ۳٬۲۰۰ دالر/);
+  assert.ok(!t.includes('صاف‌شده'), 'شرکتِ بی‌بدهی آمد');
+  assert.match(t, /📋 دستورِ کار:\n▫️ امروز دیزل سفارش بدهید\./);
+});
+
+test('اعلامیهٔ صبح: از ساعتِ ۸ کابل، روزی یک بار، فقط در گروه اگر وصل است', async () => {
+  const owner = await pumpOwner('اعلامیه');
+  const dev = await bindDevice(owner, 'pc-ann');
+  await linkPrivate(9003, owner);
+  await state(dev, {
+    alerts: [lv(4, 'نادر', 'over', 'نادر — ۲۵ لیتر اضافه', 'بازپرسی کنید چرا به نادر اضافه دادید.'),
+      lv(5, 'قادر', 'w70', 'قادر — ۷۰٪', 'متوجهِ قادر باشید.')],
+    tank: { petrol: { show: 0, threshold: 1000, low: true } },
+    owe: [{ n: 'شرکتِ ب', afn: 5000, usd: 0 }],
+  });
+  await telegram.flushOutbox();
+
+  //  ساعتِ ۶ صبحِ کابل ⇒ هنوز نه
+  const day = Date.UTC(2031, 2, 3);
+  const early = day + 1.5 * 3600e3;          // ۶:۰۰ کابل
+  const nine = day + 4.5 * 3600e3;           // ۹:۰۰ کابل
+  clear();
+  assert.equal((await telegram.announceTick(early)).skipped, 'early');
+
+  const r1 = await telegram.announceTick(nine);
+  assert.ok(r1.queued >= 1);
+  await telegram.flushOutbox();
+  const a = sent().filter(c => c.params.chat_id === '9003').map(c => c.params.text).join('\n');
+  assert.match(a, /📢 اعلامیهٔ امروزِ پمپِ/);
+  assert.match(a, /پطرول: ۰ لیتر مانده — خالی است/);
+  assert.match(a, /بازپرسی شود:\n {3}نادر \(پطرول\)/);
+  assert.match(a, /متوجه باشید:\n {3}قادر/);
+  assert.match(a, /شرکتِ ب: ۵٬۰۰۰ افغانی/);
+  assert.match(a, /بازپرسی کنید چرا به نادر اضافه دادید\./);
+
+  //  همان روز دوباره ⇒ هیچ
+  clear();
+  await telegram.announceTick(nine + 3600e3);
+  await telegram.flushOutbox();
+  assert.equal(sent().filter(c => c.params.chat_id === '9003').length, 0, 'اعلامیه دو بار آمد');
+
+  //  گروه وصل شد ⇒ فردا فقط گروه
+  await linkGroup(-1009003, 9003);
+  clear();
+  await telegram.announceTick(nine + 86400e3);
+  await telegram.flushOutbox();
+  assert.equal(sent().filter(c => c.params.chat_id === '9003').length, 0, '⛔ هم خصوصی هم گروه');
+  assert.equal(sent().filter(c => c.params.chat_id === '-1009003').length, 1);
+});
