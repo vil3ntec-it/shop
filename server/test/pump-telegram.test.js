@@ -55,7 +55,13 @@ const adminToken = async () =>
   (await h.post('/api/admin/login', { username: 'admin', password: 'Admin!12345' })).body.token;
 
 const sent = () => calls.filter(c => c.method === 'sendMessage');
-const lastTo = (chatId) => sent().filter(c => c.params.chat_id === String(chatId)).at(-1);
+/*
+ *  ⚠️ «آن‌چه کاربر همین حالا می‌بیند»: دکمه‌ها از ۱۴۰۵/۰۷/۱۴ همان پیام را
+ *  ویرایش می‌کنند (`editMessageText`)، پس صفحهٔ تازه یا پیامِ نو است یا
+ *  ویرایشِ همان پیام.
+ */
+const shown = () => calls.filter(c => c.method === 'sendMessage' || c.method === 'editMessageText');
+const lastTo = (chatId) => shown().filter(c => c.params.chat_id === String(chatId)).at(-1);
 const clear = () => { calls = []; };
 
 function msg(chatId, text, { type = 'private', title = '' } = {}) {
@@ -424,7 +430,7 @@ test('⛔ نشانیِ گروهِ کهنه (بیش از پانزده دقیقه)
   clear();
   await msg(7003, '/start');
   await press(7003, 'group');
-  assert.ok(!sent().some(c => /startgroup/.test(JSON.stringify(c.params))));
+  assert.ok(!shown().some(c => /startgroup/.test(JSON.stringify(c.params))));
 });
 
 test('فرمانی که به باتِ دیگری نشانی دارد نادیده گرفته می‌شود', async () => {
@@ -621,7 +627,7 @@ test('⛔ ذخیرهٔ دوبارهٔ رمز در پنل ⇒ هر پیام **ی�
   //  و منو: فرمان‌ها به تلگرام گفته شدند
   const cmds = calls.filter(c => c.method === 'setMyCommands');
   assert.ok(cmds.some(c => c.params.scope?.type === 'all_private_chats'
-    && ['menu', 'status', 'group', 'channel', 'help', 'stop'].every(n => c.params.commands.some(x => x.command === n))),
+    && ['menu', 'status', 'find', 'code', 'group', 'help'].every(n => c.params.commands.some(x => x.command === n))),
   'فرمان‌های «منو»');
   assert.ok(calls.some(c => c.method === 'setChatMenuButton'), 'دکمهٔ منو');
 });

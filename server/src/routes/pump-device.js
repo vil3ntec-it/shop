@@ -649,4 +649,27 @@ router.use('/events', require('./pump-events').makeRouter((req) => ({
   who: req.stationDevice ? (req.stationDevice.name || 'کامپیوترِ پمپ') : '',
 })));
 
+/*
+ *  حالِ زندهٔ همین پمپ — `/api/pump/device/state`، با توکنِ **دستگاه**.
+ *
+ *  برنامه **همهٔ** هشدارهای بازِ همین حالا را می‌فرستد، نه فقط تازه‌ها؛
+ *  سرور خودش می‌سنجد چه باز شد و چه بسته شد (`lib/pump-state.js`). پس
+ *  بستن و باز کردنِ برنامه دیگر همان هشدارها را دوباره «تازه» نمی‌کند،
+ *  و بات همیشه می‌داند همین حالا چه باز است.
+ *
+ *  ⚠️ سقفِ بدنه همان دو مگابایتِ سراسری است؛ خلاصهٔ پنج هزار قرض‌دار
+ *  (نام، حال و الباقی) چند صد کیلوبایت است و در آن جا می‌شود.
+ */
+const stateLimit = rateLimit({ max: 300, keyPrefix: 'pump-state-write', key: (req) => req.stationId || '' });
+router.post('/state', stateLimit, async (req, res, next) => {
+  try {
+    const out = await require('../lib/pump-state').publish({
+      stationId: req.stationId || '',
+      deviceUid: req.stationDevice ? req.stationDevice.device_uid : '',
+      who: req.stationDevice ? (req.stationDevice.name || 'کامپیوترِ پمپ') : '',
+    }, req.body || {});
+    res.json({ ok: true, ...out, serverTime: now() });
+  } catch (err) { next(err); }
+});
+
 module.exports = router;
