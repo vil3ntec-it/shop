@@ -23,6 +23,8 @@ const express = require('express');
 const zlib = require('zlib');
 const { promisify } = require('util');
 const sync = require('../lib/sync-v1');
+const { rateLimit } = require('../middleware/ratelimit');
+const config = require('../config');
 const { requireSyncAccount, requireSyncWrite } = require('../lib/sync-v1-auth');
 const live = require('../lib/sync-v1-live');
 const v = require('../lib/validate');
@@ -30,7 +32,15 @@ const v = require('../lib/validate');
 const gzip = promisify(zlib.gzip);
 const router = express.Router();
 
+//  ⛔ سطلِ خودِ همگام‌سازی — نه سطلِ عمومیِ آی‌پی (شرح: ‎config.rateLimit.syncMax‎).
+//  اول به‌ازای آی‌پی (برای درخواستِ بی توکن)، بعد به‌ازای **حساب**.
+router.use(rateLimit({ max: config.rateLimit.syncIpMax, keyPrefix: 'syncip' }));
 router.use(requireSyncAccount);
+router.use(rateLimit({
+  max: config.rateLimit.syncMax,
+  keyPrefix: 'sync',
+  key: (req) => (req.sync ? req.sync.app + ':' + req.sync.accountId : ''),
+}));
 
 /* ------------------------------------------------------------------ Push */
 

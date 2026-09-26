@@ -126,7 +126,9 @@ async function createApp({ runMigrations = true } = {}) {
     next();
   });
 
-  app.use(rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'general' }));
+  //  ⚠️ همگام‌سازی سطلِ خودش را دارد (‎routes/sync-v1.js‎، شرحش در ‎config.rateLimit.syncMax‎)
+  const general = rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'general' });
+  app.use((req, res, next) => (/^\/api\/sync\/v1\//.test(req.path) ? next() : general(req, res, next)));
 
   // ---- بررسی سلامت ----
   /*
