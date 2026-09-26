@@ -28,7 +28,7 @@
  * می‌شود، نه در برنامه.
  */
 const express = require('express');
-const { one, query, now } = require('../db');
+const { one, query, now, tx } = require('../db');
 const v = require('../lib/validate');
 const config = require('../config');
 const stations = require('../lib/stations');
@@ -41,7 +41,7 @@ const { catalogOf } = require('../lib/features');
 const { entitlementOf } = require('../lib/entitlement').pump;
 const { requirePumpUser } = require('../middleware/auth');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
-const { badRequest, forbidden, notFound, unauthorized } = require('../middleware/errors');
+const { badRequest, conflict, forbidden, notFound, unauthorized } = require('../middleware/errors');
 
 const router = express.Router();
 const PUMP = catalogOf('pump');
@@ -211,6 +211,16 @@ router.post(
       const deviceName = v.text(req.body?.device?.name, { max: 80 });
       const platform = v.text(req.body?.device?.platform, { max: 40 });
 
+      //  ⛔ نصبی که روزی با کدِ شش‌رقمی فعال شده بود (پمپِ بی‌صاحب) و حالا
+      //  صاحبش وارد حسابش شده: شرحِ کامل بالای `adoptFromDevice`.
+      const adopt = req.body?.adopt === true
+        ? await adoptFromDevice(req.user.id, deviceUid, v.text(req.body?.deviceToken, { max: 200 }))
+        : { action: 'none' };
+      if (adopt.action === 'refused') {
+        throw conflict('این کامپیوتر به پمپِ دیگری بند است که صاحبِ دیگری دارد. '
+          + 'صاحبِ آن پمپ باید این کامپیوتر را از «دستگاه‌ها» جدا کند.', 'station_mismatch');
+      }
+
       //  ⛔ پمپ از حسابِ توکن، هرگز از بدنهٔ درخواست
       const member = await stations.membershipOf(req.user.id);
       if (!member) throw notFound('برای این حساب پمپی ثبت نشده است', 'no_station');
@@ -258,7 +268,7 @@ router.post(
       }
       audit.log({
         userId: req.user.id, action: 'pump.device_bound',
-        detail: { stationId, source: ent?.source || '' }, ip: clientIp(req),
+        detail: { stationId, source: ent?.source || '', adopt: adopt.action, from: adopt.fromStation || '' }, ip: clientIp(req),
       }).catch((e) => console.error('[error] bind.audit', e));
 
       res.status(201).json({
@@ -271,12 +281,97 @@ router.post(
         role: member.role,
         entitlement: ent,
         subscription: ent?.subscription || null,
+        //  ⚠️ برنامه فقط با دیدنِ همین جابه‌جا می‌شود — سرورِ کهنه‌ای که
+        //  `adopt` را نمی‌شناسد این را نمی‌فرستد، پس اشتراکِ پولیِ پمپِ کدی
+        //  هیچ‌وقت بی‌صدا جا نمی‌ماند.
+        adopt: adopt.action,
         ...issued,
         serverTime: now(),
       });
     } catch (err) { next(err); }
   }
 );
+
+/**
+ * ══ نصبی که با کدِ شش‌رقمی فعال شده بود، به حسابِ صاحبش می‌رسد ══════════
+ *
+ * گزارشِ صاحبِ سامانه (۱۴۰۵/۰۷/۱۴): «اشتراک برای حسابِ کاربر دادم، براش
+ * نیومد — نه آزمایشی، نه اشتراکی که دادم.» با پشتهٔ واقعی بازسازی شد:
+ * نصبی که روزی با کدِ شش‌رقمی فعال شده بود روی **پمپِ بی‌صاحبِ** همان کد
+ * نشسته بود (`createStationForDevice`). صاحبش بعداً وارد حسابش شد و مدیر
+ * به **پمپِ حساب** اشتراک داد — ولی برنامه برای همیشه روی پمپِ کد ماند،
+ * چون پمپِ حساب با پمپِ دستگاه یکی نبود. هیچ خطایی هم دیده نمی‌شد.
+ *
+ * ⛔ حساب برنده است — ولی فقط روی پمپِ **بی‌صاحب**:
+ *   • حساب پمپ ندارد ⇒ همان پمپِ کد مالِ حساب می‌شود (`claimed`)؛
+ *     اشتراکِ کد و تاریخچه‌اش همان‌جا می‌ماند.
+ *   • حساب پمپ دارد ⇒ دستگاه به پمپِ حساب می‌رود (`moved`) و **روزهای
+ *     ماندهٔ اشتراکِ زندهٔ پمپِ کد با آن می‌آیند** — اشتراکی که خریده شده
+ *     با یک جابه‌جایی نمی‌سوزد.
+ *   • پمپِ کد صاحب یا عضوی دارد ⇒ هیچ کاری نمی‌شود (`refused`).
+ *
+ * ⚠️ مدرک، خودِ توکنِ دستگاه است (همان که فقط همان کامپیوتر دارد) و شناسهٔ
+ * دستگاهش باید با همین درخواست یکی باشد — شناسهٔ پمپ از بدنه خوانده
+ * نمی‌شود.
+ */
+async function adoptFromDevice(userId, deviceUid, rawToken) {
+  const old = rawToken ? await devices.bySecret(rawToken) : null;
+  if (!old || old.device_uid !== deviceUid) return { action: 'none' };
+  const member = await stations.membershipOf(userId);
+  if (member && member.station_id === old.station_id) return { action: 'none' };
+
+  return tx(async (c) => {
+    const s = (await c.query('SELECT * FROM stations WHERE id=$1 FOR UPDATE', [old.station_id])).rows[0];
+    if (!s) return { action: 'none' };
+    const others = Number((await c.query(
+      `SELECT COUNT(*)::int AS n FROM station_members WHERE station_id=$1 AND status='active'`, [s.id]
+    )).rows[0]?.n || 0);
+    if (s.owner_user_id || others > 0) return { action: 'refused', fromStation: s.id };
+
+    const t = now();
+    if (!member) {
+      const ok = (await c.query(
+        `UPDATE stations SET owner_user_id=$2, updated_at=$3 WHERE id=$1 AND owner_user_id IS NULL RETURNING id`,
+        [s.id, userId, t]
+      )).rows.length > 0;
+      if (!ok) return { action: 'refused', fromStation: s.id };
+      await c.query(
+        `INSERT INTO station_members (id, station_id, user_id, role, status, created_at, updated_at)
+         VALUES ($1,$2,$3,'owner','active',$4,$4)
+         ON CONFLICT (station_id, user_id) DO UPDATE SET role='owner', status='active', updated_at=excluded.updated_at`,
+        [require('../db').newId('mem'), s.id, userId, t]
+      );
+      return { action: 'claimed', fromStation: s.id };
+    }
+
+    //  اشتراکِ زندهٔ پمپِ کد ⇒ پمپِ حساب
+    const live = (await c.query(
+      `SELECT * FROM station_subscriptions WHERE station_id=$1 AND status='active' AND ends_at > $2`, [s.id, t]
+    )).rows[0];
+    let carried = 0;
+    if (live) {
+      const theirs = (await c.query(
+        `SELECT * FROM station_subscriptions WHERE station_id=$1 AND status IN ('active','suspended','pending')`,
+        [member.station_id]
+      )).rows[0];
+      if (!theirs) {
+        await c.query(`UPDATE station_subscriptions SET station_id=$2, updated_at=$3 WHERE id=$1`,
+          [live.id, member.station_id, t]);
+      } else if (theirs.status === 'active') {
+        //  هر دو زنده‌اند ⇒ روزهای ماندهٔ کد روی اشتراکِ حساب می‌نشیند
+        const left = Number(live.ends_at) - t;
+        await c.query(`UPDATE station_subscriptions SET ends_at = ends_at + $2, updated_at=$3 WHERE id=$1`,
+          [theirs.id, left, t]);
+        await c.query(`UPDATE station_subscriptions SET status='cancelled', ends_at=$2, updated_at=$2,
+                              note = CASE WHEN note = '' THEN 'روزهایش به پمپِ حساب رفت' ELSE note END
+                        WHERE id=$1`, [live.id, t]);
+      }
+      carried = 1;
+    }
+    await c.query(`UPDATE station_devices SET status='revoked' WHERE station_id=$1 AND device_uid=$2`, [s.id, deviceUid]);
+    return { action: 'moved', fromStation: s.id, toStation: member.station_id, carried };
+  });
+}
 
 /* ══════════════════════════════════════════════════════════════════
    از این‌جا به بعد: توکنِ دستگاه

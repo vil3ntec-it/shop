@@ -389,12 +389,16 @@ async function createApp({ runMigrations = true } = {}) {
     //  هیچ‌وقت خودش تمام نمی‌شود — تا ابد فعال می‌ماند.
     subs.pump.expireDue().catch(err => console.error('[pump:subscriptions]', err.message));
     subs.pump.notifyExpiring().catch(err => console.error('[pump:expiry-notice]', err.message));
+    //  رباتِ دورهٔ آزمایشی: هر پمپی که آغازِ دوره ندارد (شرحش در `lib/trial-sweep.js`)
+    require('./lib/trial-sweep').sweep().catch(err => console.error('[trial-sweep]', err.message));
     //  سلامتِ برنامه‌ها و سایت‌های دیگر، از سرور سنجیده می‌شود نه از
     //  گوشیِ مدیر که ممکن است پشت فیلتر باشد
     require('./lib/managed-apps').checkHealth()
       .catch(err => console.error('[app-health]', err.message));
   }, 6 * 60 * 60 * 1000);
   if (housekeeping.unref) housekeeping.unref();
+  //  ⚠️ سرِ بالا آمدن هم — شش ساعت صبر برای پمپی که همین حالا بی‌مُهر است زیاد است
+  setImmediate(() => require('./lib/trial-sweep').sweep().catch(err => console.error('[trial-sweep]', err.message)));
   app.locals.housekeeping = housekeeping;
 
   return app;

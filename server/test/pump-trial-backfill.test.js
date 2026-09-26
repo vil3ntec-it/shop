@@ -81,3 +81,20 @@ test('⛔ یک بار، برای همه: هر پمپی که آزمایشی نگ�
   await query(backfill);
   assert.equal(Number((await read(old.id)).trial_started_at) < now() - 80 * DAY, true);
 });
+
+test('⛔ رباتِ دوره‌ای همان قاعده را همیشه اجرا می‌کند — فقط خالی‌ها را پر می‌کند', async () => {
+  const { sweep } = require('../src/lib/trial-sweep');
+  const lost = await station('sweep-lost', 60);          // مُهر ندارد، دوره گذشته
+  const young = await station('sweep-young', 5);         // مُهر ندارد، هنوز در دوره
+  const t0 = now();
+  const n = await sweep();
+  assert.ok(n >= 2, `دستِ‌کم دو پمپ مُهر خوردند (${n})`);
+  const read = async (id) => (await query('SELECT created_at, trial_started_at FROM stations WHERE id=$1', [id])).rows[0];
+  assert.ok(Number((await read(lost.id)).trial_started_at) >= t0 - 60000, 'پمپِ سوخته سی روزِ تازه گرفت');
+  const y = await read(young.id);
+  assert.equal(Number(y.trial_started_at), Number(y.created_at), 'پمپِ درونِ دوره دست نخورد');
+  const me = await h.get('/api/pump/me', { token: lost.u.accessToken });
+  assert.equal(me.body.entitlement.trial.daysLeft, 30);
+  //  بارِ دوم هیچ
+  assert.equal(await sweep(), 0);
+});
