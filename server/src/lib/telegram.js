@@ -518,12 +518,19 @@ async function notLinked(row, editId = 0) {
     'این گروه به هیچ پمپی وصل نیست. در گفت‌وگوی خصوصی با بات، «👥 گروه و کانال» را بزنید.');
 }
 
+/** هشدارها کجا می‌آیند — همان قاعدهٔ `alertChats`، به زبانِ آدم. */
+async function whereText(row) {
+  const g = await groupOfUser(row);
+  if (g) return `📣 هشدارها در «${g}» می‌آیند، نه این‌جا. (جدا کردنِ گروه ⇐ هشدارها دوباره این‌جا.)`;
+  return row.only_out ? '🔕 فقط هشدارهای «تمام شد» می‌آید.' : '🔔 همهٔ هشدارها می‌آید: «تمام شد» و «کم مانده».';
+}
+
 async function menuText(row, link) {
   const state = await require('./pump-state').get(link.station_id);
   const open = state ? state.alerts.length : 0;
   return `⛽ پمپِ «${link.station_name}»\n`
     + (open ? `🚨 ${faNum(open)} هشدارِ باز — «📊 وضعیت» را بزنید.\n` : '✅ همین حالا هشدارِ بازی نیست.\n')
-    + (row.only_out ? '🔕 فقط هشدارهای «تمام شد» می‌آید.' : '🔔 همهٔ هشدارها می‌آید: «تمام شد» و «کم مانده».')
+    + await whereText(row)
     + (row.kind === 'private'
       ? '\n\n🔎 برای جست‌وجو، نامِ قرض‌دار را همین‌جا بنویسید.'
       : (row.kind === 'group' ? '\n\n🔎 جست‌وجو: /find نامِ قرض‌دار' : ''));
@@ -998,7 +1005,7 @@ async function onChannelAdmin(u) {
   await send(row.chat_id, `✅ این کانال به پمپِ «${owner.station_name}» وصل شد. هشدارهای پمپ از این به بعد همین‌جا منتشر می‌شود.`);
   //  ⚠️ بی دکمه: خبرِ «وصل شد» یک خبر است، نه منو (قاعدهٔ ۳)
   return send(who.chat_id,
-    `✅ کانالِ «${titleOf(chat)}» به پمپِ «${owner.station_name}» وصل شد.\nبرای جدا کردن، بات را از مدیرانِ کانال بردارید.`);
+    `✅ کانالِ «${titleOf(chat)}» به پمپِ «${owner.station_name}» وصل شد. از این پس هشدارها در همان کانال می‌آید، نه این‌جا.\nبرای جدا کردن، بات را از مدیرانِ کانال بردارید — هشدارها دوباره همین‌جا می‌آید.`);
 }
 
 async function onGroup(chat, cmd, from) {
@@ -1029,6 +1036,17 @@ async function onGroup(chat, cmd, from) {
       actorType: 'user', userId: tok.user_id, action: 'pump.telegram_link',
       targetType: 'station', targetId: tok.station_id, detail: { kind: 'group' },
     });
+    const priv = await one(
+      `SELECT chat_id FROM telegram_chats
+        WHERE kind='private' AND user_id=$1 AND station_id=$2 AND linked_at IS NOT NULL`,
+      [tok.user_id, tok.station_id]
+    );
+    //  ⚠️ بی دکمه: خبر است، نه منو. و می‌گوید چرا خصوصی ساکت می‌شود (alertChats).
+    if (priv) {
+      await send(priv.chat_id,
+        `✅ گروهِ «${titleOf(chat)}» وصل شد. از این پس هشدارها در همان گروه می‌آید، نه این‌جا.\n`
+        + 'اگر گروه را جدا کنید، هشدارها دوباره همین‌جا می‌آید.');
+    }
     return sendMenu(await chatRow(row.chat_id),
       '✅ این گروه وصل شد. هشدارهای پمپ از این به بعد همین‌جا برای همه می‌آید.\n'
       + 'تنظیمات فقط در دستِ مدیرانِ گروه است.');
@@ -1205,20 +1223,54 @@ function subjectOf(key) {
  * ⚠️ «تمام شد ⇒ کم مانده» برطرف شدن نیست، فقط عوض شدنِ حال است؛ آن را
  * خودِ `publish` کنار می‌گذارد (هشدارِ تازه‌اش جداگانه می‌رود).
  */
+/**
+ * گفت‌وگوهایی که هشدارِ یک پمپ به آن‌ها می‌رود — تنها جای این تصمیم.
+ *
+ * خواستهٔ صاحب سامانه: «وقتی گروه وصل کردم، پیام‌ها توی گروه بیاید؛ اگر
+ * گروهی انتخاب نکردم، توی خودِ بات برای یارو.» پس گفت‌وگوی **خصوصیِ** کسی
+ * که خودش گروه یا کانالی برای همین پمپ وصل کرده، هشدار نمی‌گیرد — همان خبر
+ * در گروهش می‌آید و دو بار شنیدنش همان «تکرار» است.
+ *
+ * ⚠️ به‌ازای **هر نفر**، نه کلِ پمپ: عضوی که خودش گروهی وصل نکرده (شاید
+ * در گروهِ صاحبِ پمپ هم نیست) هشدارش را همچنان در خصوصی می‌گیرد.
+ * ⚠️ گروهی که صاحبش دیگر عضوِ پمپ نیست حساب نمی‌شود — وگرنه خصوصی ساکت
+ * می‌ماند و گروه هم هیچ نمی‌گرفت.
+ * ⛔ قیدِ ۳ سرِ جایش است: عضو، پمپ و حساب — همین لحظه.
+ */
+function alertChats(stationId) {
+  return many(
+    `SELECT c.chat_id, c.only_out, s.name AS station_name
+       FROM telegram_chats c
+       JOIN stations s ON s.id=c.station_id AND s.status='active'
+       JOIN station_members m ON m.station_id=c.station_id AND m.user_id=c.user_id AND m.status='active'
+       JOIN users u ON u.id=c.user_id AND u.status='active'
+      WHERE c.station_id=$1 AND c.linked_at IS NOT NULL
+        AND NOT (c.kind='private' AND EXISTS (
+          SELECT 1 FROM telegram_chats g
+           WHERE g.station_id=c.station_id AND g.user_id=c.user_id
+             AND g.kind IN ('group','channel') AND g.linked_at IS NOT NULL))`,
+    [stationId]
+  );
+}
+
+/** نامِ نخستین گروه/کانالی که این نفر برای این پمپ وصل کرده — یا تهی. */
+async function groupOfUser(row) {
+  if (!row || row.kind !== 'private' || !row.user_id || !row.station_id) return null;
+  const g = await one(
+    `SELECT title FROM telegram_chats
+      WHERE station_id=$1 AND user_id=$2 AND kind IN ('group','channel') AND linked_at IS NOT NULL
+      ORDER BY linked_at LIMIT 1`,
+    [row.station_id, row.user_id]
+  );
+  return g ? (g.title || 'گروهِ شما') : null;
+}
+
 async function notifyResolved(stationId, closed) {
   try {
     const items = (closed || []).filter(a => a && a.k);
     if (!items.length || !stationId) return { queued: 0 };
     if (!(await active())) return { queued: 0, skipped: 'off' };
-    const chats = await many(
-      `SELECT c.chat_id, c.only_out, s.name AS station_name
-         FROM telegram_chats c
-         JOIN stations s ON s.id=c.station_id AND s.status='active'
-         JOIN station_members m ON m.station_id=c.station_id AND m.user_id=c.user_id AND m.status='active'
-         JOIN users u ON u.id=c.user_id AND u.status='active'
-        WHERE c.station_id=$1 AND c.linked_at IS NOT NULL`,
-      [stationId]
-    );
+    const chats = await alertChats(stationId);
     const t = now();
     let queued = 0;
     for (const c of chats) {
@@ -1253,15 +1305,7 @@ async function notifyStation(stationId, saved) {
     if (!(await active())) return { queued: 0, skipped: 'off' };
 
     //  ⛔ قیدِ ۳: عضو، پمپ و حساب — همین لحظه
-    const chats = await many(
-      `SELECT c.chat_id, c.only_out, s.name AS station_name
-         FROM telegram_chats c
-         JOIN stations s ON s.id=c.station_id AND s.status='active'
-         JOIN station_members m ON m.station_id=c.station_id AND m.user_id=c.user_id AND m.status='active'
-         JOIN users u ON u.id=c.user_id AND u.status='active'
-        WHERE c.station_id=$1 AND c.linked_at IS NOT NULL`,
-      [stationId]
-    );
+    const chats = await alertChats(stationId);
     const t = now();
     let queued = 0;
     for (const c of chats) {
