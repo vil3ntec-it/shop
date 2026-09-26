@@ -68,7 +68,58 @@ const CODE_MAX_PER_WINDOW = 5;
 const MAX_ATTEMPTS = 8;
 const GIVE_UP_MS = 24 * 3600 * 1000;
 const KEEP_MS = 7 * 24 * 3600 * 1000;
-const MAX_LINES = 15;
+/**
+ * ⛔ «محدودیت هم نداشته باشه» (۱۴۰۵/۰۷/۱۴): هیچ فهرستی بریده نمی‌شود —
+ * نه هشدارها، نه نتیجهٔ جست‌وجو. تلگرام یک پیام را تا ۴۰۹۶ نویسه می‌پذیرد،
+ * پس متنِ بلند به چند پیامِ پشتِ سرِ هم شکسته می‌شود (`chunks`)، همیشه سرِ
+ * مرزِ یک بند یا یک خط — هیچ نامی وسطش بریده نمی‌شود.
+ */
+const CHUNK = 3800;
+
+/** متنِ بلند ⇒ تکه‌های ≤ CHUNK، سرِ مرزِ بند (خطِ خالی) و بعد خط. */
+function chunks(text, max = CHUNK) {
+  const out = [];
+  let cur = '';
+  const push = (piece, sep) => {
+    if (!cur) { cur = piece; return; }
+    if (cur.length + sep.length + piece.length <= max) { cur += sep + piece; return; }
+    out.push(cur); cur = piece;
+  };
+  for (const block of String(text).split('\n\n')) {
+    if (block.length <= max) { push(block, '\n\n'); continue; }
+    //  بندی که خودش بلند است: خط‌به‌خط
+    let first = true;
+    for (const line of block.split('\n')) {
+      const safe = line.length > max ? line.slice(0, max) : line;
+      push(safe, first ? '\n\n' : '\n');
+      first = false;
+    }
+  }
+  if (cur || !out.length) out.push(cur);
+  return out;
+}
+
+/** چند پیامِ پشتِ سرِ هم برای یک متنِ بلند. */
+async function sendLong(chatId, text) {
+  let res = null;
+  for (const part of chunks(text)) {
+    res = await send(chatId, part);
+    if (!res.ok) break;
+  }
+  return res;
+}
+
+/** یک متن ⇒ چند ردیفِ صف، به ترتیب (created_at پشتِ سرِ هم). */
+async function queueLong(chatId, stationId, text, t) {
+  const parts = chunks(text);
+  for (let i = 0; i < parts.length; i++) {
+    await query(
+      `INSERT INTO telegram_outbox (id, chat_id, station_id, body, next_at, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6)`,
+      [newId('tgo'), chatId, stationId, parts[i], t, t + i]
+    );
+  }
+}
 
 /* ══════════════════════════════════════════════════════════════════
    درگاهِ تلگرام
@@ -395,7 +446,24 @@ async function rememberMenu(chatId, messageId) {
  * ⚠️ «message is not modified» خطا نیست: کاربر دوبار روی همان دکمه زده.
  */
 async function show(chatId, text, keyboard, editId = 0) {
-  const body = String(text).slice(0, 4000);
+  const parts = chunks(text);
+  if (parts.length > 1) {
+    //  متنِ بلند: تکهٔ اول جای همان پیام، میانی‌ها پیامِ تازه، و دکمه‌ها زیرِ آخری
+    if (editId) {
+      await call('editMessageText', {
+        chat_id: String(chatId), message_id: Number(editId), text: parts[0],
+        disable_web_page_preview: true, reply_markup: { inline_keyboard: [] },
+      });
+    } else {
+      await send(chatId, parts[0]);
+    }
+    for (const mid of parts.slice(1, -1)) await send(chatId, mid);
+    const last = parts[parts.length - 1];
+    const res = await send(chatId, last, keyboard && keyboard.length ? keyboard : null);
+    if (res.ok && keyboard && keyboard.length) await rememberMenu(chatId, res.result?.message_id);
+    return res;
+  }
+  const body = parts[0];
   const markup = { inline_keyboard: keyboard || [] };
   if (editId) {
     const res = await call('editMessageText', {
@@ -450,12 +518,19 @@ async function notLinked(row, editId = 0) {
     'این گروه به هیچ پمپی وصل نیست. در گفت‌وگوی خصوصی با بات، «👥 گروه و کانال» را بزنید.');
 }
 
+/** هشدارها کجا می‌آیند — همان قاعدهٔ `alertChats`، به زبانِ آدم. */
+async function whereText(row) {
+  const g = await groupOfUser(row);
+  if (g) return `📣 هشدارها در «${g}» می‌آیند، نه این‌جا. (جدا کردنِ گروه ⇐ هشدارها دوباره این‌جا.)`;
+  return row.only_out ? '🔕 فقط هشدارهای «تمام شد» می‌آید.' : '🔔 همهٔ هشدارها می‌آید: «تمام شد» و «کم مانده».';
+}
+
 async function menuText(row, link) {
   const state = await require('./pump-state').get(link.station_id);
   const open = state ? state.alerts.length : 0;
   return `⛽ پمپِ «${link.station_name}»\n`
     + (open ? `🚨 ${faNum(open)} هشدارِ باز — «📊 وضعیت» را بزنید.\n` : '✅ همین حالا هشدارِ بازی نیست.\n')
-    + (row.only_out ? '🔕 فقط هشدارهای «تمام شد» می‌آید.' : '🔔 همهٔ هشدارها می‌آید: «تمام شد» و «کم مانده».')
+    + await whereText(row)
     + (row.kind === 'private'
       ? '\n\n🔎 برای جست‌وجو، نامِ قرض‌دار را همین‌جا بنویسید.'
       : (row.kind === 'group' ? '\n\n🔎 جست‌وجو: /find نامِ قرض‌دار' : ''));
@@ -526,12 +601,8 @@ async function statusText(link) {
 
   parts.push('');
   if (state.alerts.length) {
-    const shown = state.alerts.slice(0, MAX_LINES);
     parts.push(`🚨 هشدارهای باز (${faNum(state.alerts.length)}):`);
-    for (const a of shown) parts.push(alertLine(a));
-    if (state.alerts.length > shown.length) {
-      parts.push(`… و ${faNum(state.alerts.length - shown.length)} هشدارِ دیگر`);
-    }
+    for (const a of state.alerts) parts.push(alertLine(a));
   } else {
     parts.push('✅ همین حالا هیچ هشدارِ بازی نیست.');
   }
@@ -543,7 +614,7 @@ async function sendStatus(row, editId = 0) {
   if (!link) return notLinked(row, editId);
   const kb = row.kind === 'channel' ? null
     : [[{ text: '🔄 تازه کن', callback_data: 'status' }, BACK]];
-  if (!kb) return send(row.chat_id, await statusText(link));
+  if (!kb) return sendLong(row.chat_id, await statusText(link));
   return show(row.chat_id, await statusText(link), kb, editId);
 }
 
@@ -599,9 +670,8 @@ async function searchText(link, q) {
     const rb = normName(b.n) === query_ ? 0 : (normName(b.n).startsWith(query_) ? 1 : 2);
     return ra - rb || a.n.localeCompare(b.n, 'fa');
   });
-  const shown = hits.slice(0, 6);
-  return `🔎 پمپِ «${link.station_name}»\n\n${shown.map(debtorLines).join('\n\n')}`
-    + (hits.length > shown.length ? `\n\n… و ${faNum(hits.length - shown.length)} نفرِ دیگر — نام را کامل‌تر بنویسید.` : '')
+  const count = hits.length > 1 ? ` — ${faNum(hits.length)} نفر` : '';
+  return `🔎 پمپِ «${link.station_name}»${count}\n\n${hits.map(debtorLines).join('\n\n')}`
     + `\n\n🕒 ${ago(state.debtorsAt || state.updatedAt)}`;
 }
 
@@ -867,7 +937,7 @@ async function onSearch(row, q) {
       ? '🔎 نامِ قرض‌دار را بنویسید.'
       : '🔎 بعد از /find نامِ قرض‌دار را بنویسید؛ مثلاً: /find کریم');
   }
-  return send(row.chat_id, await searchText(link, q));
+  return sendLong(row.chat_id, await searchText(link, q));
 }
 
 /* ── دسترسی در گروه ───────────────────────────────────────────── */
@@ -935,7 +1005,7 @@ async function onChannelAdmin(u) {
   await send(row.chat_id, `✅ این کانال به پمپِ «${owner.station_name}» وصل شد. هشدارهای پمپ از این به بعد همین‌جا منتشر می‌شود.`);
   //  ⚠️ بی دکمه: خبرِ «وصل شد» یک خبر است، نه منو (قاعدهٔ ۳)
   return send(who.chat_id,
-    `✅ کانالِ «${titleOf(chat)}» به پمپِ «${owner.station_name}» وصل شد.\nبرای جدا کردن، بات را از مدیرانِ کانال بردارید.`);
+    `✅ کانالِ «${titleOf(chat)}» به پمپِ «${owner.station_name}» وصل شد. از این پس هشدارها در همان کانال می‌آید، نه این‌جا.\nبرای جدا کردن، بات را از مدیرانِ کانال بردارید — هشدارها دوباره همین‌جا می‌آید.`);
 }
 
 async function onGroup(chat, cmd, from) {
@@ -966,6 +1036,17 @@ async function onGroup(chat, cmd, from) {
       actorType: 'user', userId: tok.user_id, action: 'pump.telegram_link',
       targetType: 'station', targetId: tok.station_id, detail: { kind: 'group' },
     });
+    const priv = await one(
+      `SELECT chat_id FROM telegram_chats
+        WHERE kind='private' AND user_id=$1 AND station_id=$2 AND linked_at IS NOT NULL`,
+      [tok.user_id, tok.station_id]
+    );
+    //  ⚠️ بی دکمه: خبر است، نه منو. و می‌گوید چرا خصوصی ساکت می‌شود (alertChats).
+    if (priv) {
+      await send(priv.chat_id,
+        `✅ گروهِ «${titleOf(chat)}» وصل شد. از این پس هشدارها در همان گروه می‌آید، نه این‌جا.\n`
+        + 'اگر گروه را جدا کنید، هشدارها دوباره همین‌جا می‌آید.');
+    }
     return sendMenu(await chatRow(row.chat_id),
       '✅ این گروه وصل شد. هشدارهای پمپ از این به بعد همین‌جا برای همه می‌آید.\n'
       + 'تنظیمات فقط در دستِ مدیرانِ گروه است.');
@@ -1121,9 +1202,7 @@ function iconOf(e) {
 
 /** متنِ یک پیام برای یک دسته هشدار — یک پیام، نه یکی برای هر هشدار. */
 function formatAlert(stationName, items) {
-  const shown = items.slice(0, MAX_LINES);
-  const lines = shown.map(e => `${iconOf(e)} ${e.title || e.body || ''}`);
-  if (items.length > shown.length) lines.push(`… و ${faNum(items.length - shown.length)} هشدارِ دیگر`);
+  const lines = items.map(e => `${iconOf(e)} ${e.title || e.body || ''}`);
   //  ⚠️ بی دکمه (قاعدهٔ ۳): هشدار خبر است، نه منو. راهِ جزئیات یک فرمان است.
   return `🚨 هشدارِ پمپِ «${stationName}»\n\n${lines.join('\n')}\n\n📊 همهٔ هشدارهای باز: /status`;
 }
@@ -1144,34 +1223,63 @@ function subjectOf(key) {
  * ⚠️ «تمام شد ⇒ کم مانده» برطرف شدن نیست، فقط عوض شدنِ حال است؛ آن را
  * خودِ `publish` کنار می‌گذارد (هشدارِ تازه‌اش جداگانه می‌رود).
  */
+/**
+ * گفت‌وگوهایی که هشدارِ یک پمپ به آن‌ها می‌رود — تنها جای این تصمیم.
+ *
+ * خواستهٔ صاحب سامانه: «وقتی گروه وصل کردم، پیام‌ها توی گروه بیاید؛ اگر
+ * گروهی انتخاب نکردم، توی خودِ بات برای یارو.» پس گفت‌وگوی **خصوصیِ** کسی
+ * که خودش گروه یا کانالی برای همین پمپ وصل کرده، هشدار نمی‌گیرد — همان خبر
+ * در گروهش می‌آید و دو بار شنیدنش همان «تکرار» است.
+ *
+ * ⚠️ به‌ازای **هر نفر**، نه کلِ پمپ: عضوی که خودش گروهی وصل نکرده (شاید
+ * در گروهِ صاحبِ پمپ هم نیست) هشدارش را همچنان در خصوصی می‌گیرد.
+ * ⚠️ گروهی که صاحبش دیگر عضوِ پمپ نیست حساب نمی‌شود — وگرنه خصوصی ساکت
+ * می‌ماند و گروه هم هیچ نمی‌گرفت.
+ * ⛔ قیدِ ۳ سرِ جایش است: عضو، پمپ و حساب — همین لحظه.
+ */
+function alertChats(stationId) {
+  return many(
+    `SELECT c.chat_id, c.only_out, s.name AS station_name
+       FROM telegram_chats c
+       JOIN stations s ON s.id=c.station_id AND s.status='active'
+       JOIN station_members m ON m.station_id=c.station_id AND m.user_id=c.user_id AND m.status='active'
+       JOIN users u ON u.id=c.user_id AND u.status='active'
+      WHERE c.station_id=$1 AND c.linked_at IS NOT NULL
+        AND NOT (c.kind='private' AND EXISTS (
+          SELECT 1 FROM telegram_chats g
+           WHERE g.station_id=c.station_id AND g.user_id=c.user_id
+             AND g.kind IN ('group','channel') AND g.linked_at IS NOT NULL))`,
+    [stationId]
+  );
+}
+
+/** نامِ نخستین گروه/کانالی که این نفر برای این پمپ وصل کرده — یا تهی. */
+async function groupOfUser(row) {
+  if (!row || row.kind !== 'private' || !row.user_id || !row.station_id) return null;
+  const g = await one(
+    `SELECT title FROM telegram_chats
+      WHERE station_id=$1 AND user_id=$2 AND kind IN ('group','channel') AND linked_at IS NOT NULL
+      ORDER BY linked_at LIMIT 1`,
+    [row.station_id, row.user_id]
+  );
+  return g ? (g.title || 'گروهِ شما') : null;
+}
+
 async function notifyResolved(stationId, closed) {
   try {
     const items = (closed || []).filter(a => a && a.k);
     if (!items.length || !stationId) return { queued: 0 };
     if (!(await active())) return { queued: 0, skipped: 'off' };
-    const chats = await many(
-      `SELECT c.chat_id, c.only_out, s.name AS station_name
-         FROM telegram_chats c
-         JOIN stations s ON s.id=c.station_id AND s.status='active'
-         JOIN station_members m ON m.station_id=c.station_id AND m.user_id=c.user_id AND m.status='active'
-         JOIN users u ON u.id=c.user_id AND u.status='active'
-        WHERE c.station_id=$1 AND c.linked_at IS NOT NULL`,
-      [stationId]
-    );
+    const chats = await alertChats(stationId);
     const t = now();
     let queued = 0;
     for (const c of chats) {
       const mine = c.only_out ? items.filter(a => a.s === 'out') : items;
       if (!mine.length) continue;
-      const lines = mine.slice(0, MAX_LINES).map((a) => (String(a.k).startsWith('tank-')
+      const lines = mine.map((a) => (String(a.k).startsWith('tank-')
         ? `🛢️🟢 ${a.n || 'مخزن'} — دیگر کم نیست`
         : `👤🟢 ${a.n}${a.f ? ` — ${a.f}` : ''}: دیگر هشدار ندارد`));
-      if (mine.length > MAX_LINES) lines.push(`… و ${faNum(mine.length - MAX_LINES)} مورد دیگر`);
-      await query(
-        `INSERT INTO telegram_outbox (id, chat_id, station_id, body, next_at, created_at)
-         VALUES ($1,$2,$3,$4,$5,$5)`,
-        [newId('tgo'), c.chat_id, stationId, `✅ برطرف شد — پمپِ «${c.station_name}»\n\n${lines.join('\n')}`, t]
-      );
+      await queueLong(c.chat_id, stationId, `✅ برطرف شد — پمپِ «${c.station_name}»\n\n${lines.join('\n')}`, t);
       queued += 1;
     }
     if (queued) kick();
@@ -1197,25 +1305,13 @@ async function notifyStation(stationId, saved) {
     if (!(await active())) return { queued: 0, skipped: 'off' };
 
     //  ⛔ قیدِ ۳: عضو، پمپ و حساب — همین لحظه
-    const chats = await many(
-      `SELECT c.chat_id, c.only_out, s.name AS station_name
-         FROM telegram_chats c
-         JOIN stations s ON s.id=c.station_id AND s.status='active'
-         JOIN station_members m ON m.station_id=c.station_id AND m.user_id=c.user_id AND m.status='active'
-         JOIN users u ON u.id=c.user_id AND u.status='active'
-        WHERE c.station_id=$1 AND c.linked_at IS NOT NULL`,
-      [stationId]
-    );
+    const chats = await alertChats(stationId);
     const t = now();
     let queued = 0;
     for (const c of chats) {
       const items = c.only_out ? worthy.filter(isOut) : worthy;
       if (!items.length) continue;
-      await query(
-        `INSERT INTO telegram_outbox (id, chat_id, station_id, body, next_at, created_at)
-         VALUES ($1,$2,$3,$4,$5,$5)`,
-        [newId('tgo'), c.chat_id, stationId, formatAlert(c.station_name, items), t]
-      );
+      await queueLong(c.chat_id, stationId, formatAlert(c.station_name, items), t);
       queued += 1;
     }
     if (queued) kick();
@@ -1548,6 +1644,6 @@ module.exports = {
   PURPOSE, ALERT_KINDS,
   setTransport, handleUpdate, pollOnce, flushOutbox, notifyStation,
   start, stop, reload, status, configure, publicInfo, appLinks,
-  formatAlert, parseCommand, asciiDigits, normEmail, normName, notifyResolved, searchText,
+  formatAlert, parseCommand, asciiDigits, normEmail, normName, notifyResolved, searchText, chunks,
   _reset,
 };

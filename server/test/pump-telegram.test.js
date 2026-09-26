@@ -413,7 +413,8 @@ test('گروه با دکمهٔ یک‌بارمصرف وصل می‌شود و ه�
   await alert(dev, [{ kind: 'stock_out', title: 'مخزنِ پطرول ته کشید', clientId: 'g1', data: { state: 'out' } }]);
   await telegram.flushOutbox();
   assert.ok(lastTo(-100777), 'هشدار به گروه نرسید');
-  assert.ok(lastTo(7001), 'هشدار به خصوصی نرسید');
+  //  ⛔ گروه وصل است ⇒ همان خبر در خصوصی تکرار نمی‌شود (۲.۱۱.۲)
+  assert.ok(!sent().some(c => c.params.chat_id === '7001' && /🚨/.test(c.params.text)), 'هم گروه هم خصوصی');
 });
 
 test('⛔ نشانیِ گروهِ کهنه (بیش از پانزده دقیقه) و گفت‌وگوی وصل‌نشده نشانی نمی‌گیرند', async () => {
