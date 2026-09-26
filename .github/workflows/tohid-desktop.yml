@@ -1,0 +1,216 @@
+name: توحید کامپیوتر
+
+#  برنامهٔ کامپیوترِ فروشگاه — همان کدِ `android-native`، روی Compose Desktop.
+#  هر تغییری در برنامهٔ اندروید این را هم می‌سازد، چون همان فایل‌هاست.
+on:
+  push:
+    branches: ['claude/**', main]
+    paths:
+      - 'desktop/**'
+      - 'android-native/app/src/**'
+      - 'android-native/gradle.properties'
+      - '.github/workflows/tohid-desktop.yml'
+  pull_request:
+    paths:
+      - 'desktop/**'
+      - 'android-native/app/src/**'
+      - '.github/workflows/tohid-desktop.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: tohid-desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  check:
+    name: کامپایل و آزمون
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      #  نامِ آزمون‌ها فارسی است؛ بی UTF-8 کامپایلر نامِ فایلِ کلاس را نمی‌سازد
+      LC_ALL: C.UTF-8
+      LANG: C.UTF-8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: وابستگی‌ها
+        working-directory: desktop
+        run: ./gradlew --no-daemon -q resolveDeps
+
+      #  مخزنِ گوگل (`androidx.*`) از بعضی شبکه‌ها بسته است. این بسته همان
+      #  فایل‌ها را به‌شکلِ یک مخزنِ Maven می‌دهد تا بشود بی آن مخزن هم ساخت.
+      - name: بستهٔ ساختِ آفلاین
+        if: ${{ github.ref != 'refs/heads/main' }}
+        run: |
+          out="$RUNNER_TEMP/offline-m2"
+          cd ~/.gradle/caches/modules-2/files-2.1
+          for g in androidx.*; do
+            find "$g" -type f | while read -r f; do
+              rest=${f#*/}; a=${rest%%/*}; rest=${rest#*/}; v=${rest%%/*}
+              dest="$out/${g//.//}/$a/$v"; mkdir -p "$dest"; cp "$f" "$dest/"
+            done
+          done
+          du -sh "$out"
+      - uses: actions/upload-artifact@v4
+        if: ${{ github.ref != 'refs/heads/main' }}
+        with:
+          name: desktop-offline-m2
+          path: ${{ runner.temp }}/offline-m2
+          retention-days: 5
+
+      - name: کامپایل
+        working-directory: desktop
+        run: ./gradlew --no-daemon compileKotlin
+
+      #  همان آزمون‌های `android-native/app/src/test` — این‌جا روی JVMِ
+      #  کامپیوتر، به‌علاوهٔ آزمون‌های خودِ لایهٔ کامپیوتری.
+      - name: آزمون
+        working-directory: desktop
+        run: ./gradlew --no-daemon test
+
+  package:
+    name: نصاب ${{ matrix.label }}
+    needs: check
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2022
+            label: ویندوز
+            task: packageMsi
+            glob: 'build/compose/binaries/main/msi/*.msi'
+            fixed: Tohid-Windows.msi
+          - os: macos-14
+            label: مک (Apple Silicon)
+            task: packageDmg
+            glob: 'build/compose/binaries/main/dmg/*.dmg'
+            fixed: Tohid-Mac-AppleSilicon.dmg
+          - os: macos-15-intel
+            label: مک (Intel)
+            task: packageDmg
+            glob: 'build/compose/binaries/main/dmg/*.dmg'
+            fixed: Tohid-Mac-Intel.dmg
+          - os: ubuntu-22.04
+            label: لینوکس
+            task: packageDeb
+            glob: 'build/compose/binaries/main/deb/*.deb'
+            fixed: Tohid-Linux.deb
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: ساخت نصاب
+        working-directory: desktop
+        shell: bash
+        env:
+          TOHID_API_BASE: ${{ vars.TOHID_API_BASE }}
+        run: ./gradlew --no-daemon ${{ matrix.task }} -PbuildNumber=${{ github.run_number }}
+
+      - name: گزارشِ jpackage
+        if: ${{ failure() }}
+        working-directory: desktop
+        shell: bash
+        run: find build/compose/logs -type f -name '*.txt' -exec sh -c 'echo "== $1"; tail -n 60 "$1"' _ {} \;
+
+      - name: نام‌گذاری
+        working-directory: desktop
+        shell: bash
+        run: |
+          mkdir -p out
+          f=$(ls ${{ matrix.glob }} | head -n1)
+          cp "$f" "out/${{ matrix.fixed }}"
+          ./gradlew --no-daemon -q printVersionName -PbuildNumber=${{ github.run_number }} | tail -n1 > out/version.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.fixed }}
+          path: desktop/out/${{ matrix.fixed }}
+          if-no-files-found: error
+          retention-days: 30
+      - uses: actions/upload-artifact@v4
+        if: ${{ matrix.os == 'ubuntu-22.04' }}
+        with:
+          name: desktop-version
+          path: desktop/out/version.txt
+
+  #  انتشار فقط از `main` — همان قاعدهٔ «مرج ⇒ انتشار».
+  #  فایل‌ها یکی‌یکی و `version.txt` آخر (همان درسِ «Error saving asset»ِ
+  #  برنامهٔ اندروید): هیچ لحظه‌ای شماره‌ای اعلام نمی‌شود که فایلش نیامده.
+  publish:
+    name: انتشار
+    needs: package
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+
+      - name: برچسب
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if ! gh api -X PATCH "repos/${{ github.repository }}/git/refs/tags/tohid-desktop" \
+                 -f sha='${{ github.sha }}' -F force=true >/dev/null 2>&1; then
+            gh api -X POST "repos/${{ github.repository }}/git/refs" \
+              -f ref='refs/tags/tohid-desktop' -f sha='${{ github.sha }}' >/dev/null
+          fi
+
+      - name: انتشار
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: tohid-desktop
+          name: توحید — برنامهٔ کامپیوتر
+          prerelease: true
+          target_commitish: ${{ github.sha }}
+          body: |
+            ## توحید — برنامهٔ کامپیوتر (ویندوز · مک · لینوکس)
+
+            همان برنامهٔ گوشی، بومی روی کامپیوتر — Kotlin و Compose، بی مرورگر و بی WebView.
+            همان حساب، همان دکان، همان اشتراک.
+
+            | سیستم | دانلود |
+            |---|---|
+            | ویندوز ۱۰ و ۱۱ | [Tohid-Windows.msi](https://github.com/${{ github.repository }}/releases/download/tohid-desktop/Tohid-Windows.msi) |
+            | مک (M1 و تازه‌تر) | [Tohid-Mac-AppleSilicon.dmg](https://github.com/${{ github.repository }}/releases/download/tohid-desktop/Tohid-Mac-AppleSilicon.dmg) |
+            | مک (Intel) | [Tohid-Mac-Intel.dmg](https://github.com/${{ github.repository }}/releases/download/tohid-desktop/Tohid-Mac-Intel.dmg) |
+            | لینوکس (دبیان/اوبونتو) | [Tohid-Linux.deb](https://github.com/${{ github.repository }}/releases/download/tohid-desktop/Tohid-Linux.deb) |
+
+            > مک: بارِ اول روی برنامه راست‌کلیک ⇒ Open (نسخه هنوز امضای اپل ندارد).
+
+            ---
+            <sub>ساخته‌شده از `${{ github.sha }}`</sub>
+
+      - name: فرستادنِ فایل‌ها — یکی‌یکی، version.txt آخر
+        working-directory: out
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          up() {
+            for i in 1 2 3; do
+              if gh release upload tohid-desktop "$1" --clobber -R "${{ github.repository }}"; then return 0; fi
+              sleep $((i * 5))
+            done
+            echo "::error::فرستادنِ $1 نشد"; return 1
+          }
+          files="Tohid-Windows.msi Tohid-Mac-AppleSilicon.dmg Tohid-Mac-Intel.dmg Tohid-Linux.deb"
+          for f in $files; do up "$f"; done
+          sha256sum $files > SHA256SUMS.txt
+          up SHA256SUMS.txt
+          up version.txt
