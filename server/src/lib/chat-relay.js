@@ -11,6 +11,7 @@
  *
  *   station_chat_messages / station_chat_media   مشتریِ کیو‌آر ↔ صاحبِ پمپ
  *   support_messages (فقط رشته‌های app='pump')    صاحبِ پمپ ↔ مدیرِ سامانه
+ *   support_media                                  رسانهٔ همان — پس از رسیدن پاک
  *
  * قاعده‌ها:
  *   • ⛔ یک عدد، یک جا: `CHAT_RELAY_DAYS`. متغیرِ محیطیِ همنام فقط برای
@@ -61,7 +62,23 @@ async function sweep({ at = now() } = {}) {
     [cutoff]
   );
 
-  return { chatMessages: msgs.rowCount, chatMedia: media.rowCount, supportMessages: support.rowCount };
+  /*
+   *  رسانهٔ پشتیبانی معمولاً همان لحظهٔ رسیدن به گیرنده پاک شده است
+   *  (`support.sendMedia`). این‌جا فقط آن‌چه هرگز گرفته نشد: کهنه‌تر از
+   *  پنجرهٔ نگه‌داری، و بارگذاریِ بی‌پیامِ کهنه‌تر از یک ساعت.
+   */
+  const supportMedia = await query(
+    `DELETE FROM support_media m
+      WHERE m.created_at < $1
+         OR (m.created_at < $2
+             AND NOT EXISTS (SELECT 1 FROM support_messages x WHERE x.media_id = m.id))`,
+    [cutoff, at - ORPHAN_MEDIA_MS]
+  );
+
+  return {
+    chatMessages: msgs.rowCount, chatMedia: media.rowCount,
+    supportMessages: support.rowCount, supportMedia: supportMedia.rowCount,
+  };
 }
 
 /** متنِ ۴۰۴ِ `media_gone` — یک جا، تا دو در دو جمله نگویند. */

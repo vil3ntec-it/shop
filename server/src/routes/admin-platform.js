@@ -228,15 +228,47 @@ router.get('/support/threads/:id', async (req, res, next) => {
 router.post('/support/threads/:id/messages', async (req, res, next) => {
   try {
     const id = v.id(req.params.id);
-    const body = support.cleanBody(req.body?.body ?? req.body?.text);
+    const kind = v.oneOf(req.body?.kind, ['text', ...support.MEDIA_KINDS], { field: 'نوعِ پیام', def: 'text' });
+    const raw = req.body?.body ?? req.body?.text;
+    const body = kind === 'text' || String(raw ?? '').trim() ? support.cleanBody(raw) : '';
     const message = await support.post(id, {
       sender: 'admin',
       senderId: req.admin.id,
       senderName: req.admin.name || req.admin.username,
       body,
+      kind,
+      mediaId: kind === 'text' ? null : req.body?.mediaId,
     });
     await support.markRead(id, 'admin');
     res.status(201).json({ message });
+  } catch (err) { next(err); }
+});
+
+/*
+ *  رسانهٔ پشتیبانی — فقط رشته‌های پمپ (برنامهٔ دکان رسانه را نشان
+ *  نمی‌دهد). ⛔ فقط در عبور: رسانه‌ای که پمپ فرستاده همان لحظه که مدیر
+ *  کاملش را گرفت از سرور پاک می‌شود؛ پنلِ سرورِ خانگی نسخهٔ خودش را روی
+ *  دیسکِ خودش نگه می‌دارد.
+ */
+router.post('/support/threads/:id/media', support.rawMedia, async (req, res, next) => {
+  try {
+    const id = v.id(req.params.id);
+    const row = await one('SELECT id, app FROM support_threads WHERE id=$1', [id]);
+    if (!row) return next(notFound('این گفت‌وگو پیدا نشد', 'thread_not_found'));
+    if (row.app !== 'pump') return next(badRequest('رسانه فقط در پشتیبانیِ پمپ', 'media_not_supported'));
+    const out = await support.putMedia({
+      threadId: id, uploader: 'admin',
+      mime: req.headers['content-type'] || '', buf: Buffer.isBuffer(req.body) ? req.body : null,
+    });
+    res.status(201).json({ ok: true, ...out });
+  } catch (err) { next(err); }
+});
+
+router.get('/support/media/:mid', async (req, res, next) => {
+  try {
+    const m = await support.getMedia({ id: req.params.mid });
+    if (!m) return next(notFound(require('../lib/chat-relay').GONE_MESSAGE, 'media_gone'));
+    support.sendMedia(req, res, m, 'admin');
   } catch (err) { next(err); }
 });
 
