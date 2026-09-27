@@ -37,8 +37,10 @@ function verify(token, publicKeySpki) {
     format: 'der',
     type: 'spki',
   });
+  //  ES256 = ECDSA با SHA-256 — صریح، چون زیرِ Electron (BoringSSL) `null`
+  //  درهمسازِ پیش‌فرضی ندارد و آزمون خودش می‌افتاد (license-runtime.test.js).
   const ok = crypto.verify(
-    null,
+    'sha256',
     Buffer.from(`${parts[0]}.${parts[1]}`, 'utf8'),
     { key, dsaEncoding: 'ieee-p1363' },
     signature

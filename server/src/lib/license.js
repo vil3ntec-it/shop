@@ -199,7 +199,17 @@ async function issue({
     `${b64url(JSON.stringify(header))}.${b64url(JSON.stringify(payload))}`;
 
   // امضای خام (r||s) نه DER: برنامه همین را می‌خواند
-  const signature = crypto.sign(null, Buffer.from(signing, 'utf8'), {
+  //
+  //  ⛔ **`'sha256'` صریح، نه `null`** (۱۴۰۵/۰۷/۱۵). مرکز فرمان همین سرور را
+  //  با Nodeِ خودِ Electron می‌دواند (`ELECTRON_RUN_AS_NODE`) و آن‌جا
+  //  کتابخانهٔ رمز BoringSSL است، نه OpenSSL. BoringSSL برای کلیدِ EC هیچ
+  //  «درهمسازِ پیش‌فرضی» ندارد: `sign(null, …)` ⇒ `ERR_OSSL_EVP_NO_DEFAULT_DIGEST`
+  //  ⇒ هر مجوزی (آزمایشی، VIP، دائمی، دکان) ۵۰۰ِ «خطای داخلی سرور» می‌داد و
+  //  هیچ اشتراکی به هیچ برنامه‌ای نمی‌رسید — در حالی که پنل «فعال» می‌گفت.
+  //  روی Nodeِ معمولی (OpenSSL) پیش‌فرض همان SHA-256 است، پس امضا مو‌به‌مو
+  //  همان است و ES256 هم همین را می‌خواهد. آزمونِ `license-runtime.test.js`
+  //  و کارِ `electron`ِ CI همین را زیرِ خودِ Electron می‌سنجند.
+  const signature = crypto.sign('sha256', Buffer.from(signing, 'utf8'), {
     key: privateKey,
     dsaEncoding: 'ieee-p1363',
   });
