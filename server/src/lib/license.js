@@ -221,4 +221,26 @@ async function issue({
   };
 }
 
-module.exports = { issue, publicKey, keyId, ISSUER, AUDIENCE, AUDIENCE_PUMP, TOKEN_TTL_MS };
+/**
+ *  امضای خامِ چند بایت با همان کلیدِ مجوز — برای کدِ اشتراکِ آفلاین
+ *  (`lib/offline-codes.js`). ⚠️ `'sha256'` صریح، به همان دلیلِ بالا (Electron).
+ */
+async function signBytes(buf) {
+  const { privateKey } = await keys();
+  return crypto.sign('sha256', Buffer.from(buf), { key: privateKey, dsaEncoding: 'ieee-p1363' });
+}
+
+/** سنجشِ همان امضا با کلیدِ عمومیِ همین سرور. هیچ‌وقت خطا نمی‌دهد. */
+async function verifyBytes(buf, sig) {
+  try {
+    const { privateKey } = await keys();
+    return crypto.verify('sha256', Buffer.from(buf), {
+      key: crypto.createPublicKey(privateKey), dsaEncoding: 'ieee-p1363',
+    }, Buffer.from(sig));
+  } catch { return false; }
+}
+
+module.exports = {
+  issue, publicKey, keyId, signBytes, verifyBytes,
+  ISSUER, AUDIENCE, AUDIENCE_PUMP, TOKEN_TTL_MS,
+};

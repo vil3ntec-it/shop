@@ -17,6 +17,7 @@ const v = require('../lib/validate');
 const stations = require('../lib/stations');
 const subs = require('../lib/subscriptions').pump;
 const vip = require('../lib/vip-codes').pump;
+const offline = require('../lib/offline-codes');
 const plans = require('../lib/plans');
 const audit = require('../lib/audit');
 const { catalogOf, PUMP_FEATURES } = require('../lib/features');
@@ -332,6 +333,51 @@ router.post('/vip-codes/:id/revoke', async (req, res, next) => {
       action: 'admin.pump_vip_code_revoked', targetId: row.id,
     });
     res.json({ vipCode: row });
+  } catch (err) { next(err); }
+});
+
+/* ==========================================================
+   کدِ اشتراکِ آفلاین — بسته به یک کامپیوتر (lib/offline-codes.js)
+
+   خواستهٔ صاحب سامانه (۱۴۰۵/۰۷/۱۵): «برای کسانی که نت ندارن هم اشتراک
+   بدم… سه نوع کد.» کد همین‌جا با کلیدِ مجوز امضا می‌شود و برنامه بی
+   اینترنت می‌سنجدش؛ خودِ کد فقط همین یک بار در پاسخ می‌آید.
+   ========================================================== */
+
+router.get('/offline-codes', async (req, res, next) => {
+  try {
+    res.json({ codes: await offline.list({ limit: v.integer(req.query?.limit, { min: 1, max: 500, def: 100 }) }) });
+  } catch (err) { next(err); }
+});
+
+router.post('/offline-codes', async (req, res, next) => {
+  try {
+    const plan = v.text(req.body?.plan, { max: 10 });
+    const out = await offline.issue({
+      plan,
+      computer: v.text(req.body?.computer, { max: 40 }),
+      days: req.body?.days === undefined || req.body?.days === null || req.body?.days === ''
+        ? null : v.integer(req.body.days, { field: 'روزها', min: 1, max: 3650 }),
+      note: v.text(req.body?.note, { max: 300 }),
+      createdBy: req.admin.id,
+    });
+    await audit.log({
+      actorType: 'admin', userId: req.admin.id, action: 'admin.pump_offline_code_issued',
+      targetType: 'offline_code', targetId: out.offline.id,
+      detail: { plan: out.offline.plan, computer: out.offline.computer, endsAt: out.offline.endsAt },
+    });
+    res.status(201).json(out);
+  } catch (err) { next(err); }
+});
+
+router.post('/offline-codes/:id/revoke', async (req, res, next) => {
+  try {
+    const row = await offline.revoke(v.id(req.params.id));
+    await audit.log({
+      actorType: 'admin', userId: req.admin.id, action: 'admin.pump_offline_code_revoked',
+      targetType: 'offline_code', targetId: row.id,
+    });
+    res.json({ offline: row });
   } catch (err) { next(err); }
 });
 

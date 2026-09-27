@@ -36,6 +36,7 @@ const devices = require('../lib/station-devices');
 const vip = require('../lib/vip-codes').pump;
 const subs = require('../lib/subscriptions').pump;
 const license = require('../lib/license');
+const offline = require('../lib/offline-codes');
 const audit = require('../lib/audit');
 const { catalogOf } = require('../lib/features');
 const { entitlementOf } = require('../lib/entitlement').pump;
@@ -453,6 +454,34 @@ router.post('/license', async (req, res, next) => {
     const ent = await entitlementOf(req.stationId);
     const issued = await signFor(st, ent, req.stationDevice.device_uid, req.stationDevice.name);
     res.json({ source: ent.source, ...issued, serverTime: now() });
+  } catch (err) { next(err); }
+});
+
+/**
+ * کدِ اشتراکِ آفلاین ⇒ اشتراکِ همین پمپ (lib/offline-codes.js).
+ *
+ * «اگه یارو اینترنت پیدا کرد… سرور همون کد رو ببینه و بگه آره این حساب
+ * اشتراک داره.» برنامه کد و کدِ کامپیوترِ خودش را می‌فرستد؛ امضا، کامپیوتر،
+ * باطل‌شدن و «پمپِ دیگر» همین‌جا سنجیده می‌شوند و پاسخ همان مجوزِ تازه
+ * را هم دارد تا برنامه در همان دور قفل‌ها را از سرور هم ببیند.
+ */
+router.post('/offline-code', async (req, res, next) => {
+  try {
+    const out = await offline.redeem({
+      stationId: req.stationId,
+      deviceUid: req.stationDevice.device_uid,
+      code: v.text(req.body?.code, { max: 400, required: true, field: 'کد' }),
+      computer: v.text(req.body?.computer, { max: 40, required: true, field: 'کدِ کامپیوتر' }),
+    });
+    await audit.log({
+      actorType: 'device', action: 'pump.offline_code_redeemed',
+      targetType: 'station', targetId: req.stationId,
+      detail: { serial: out.offline.serial, status: out.status },
+    });
+    const st = await stations.getStation(req.stationId);
+    const ent = await entitlementOf(req.stationId);
+    const issued = await signFor(st, ent, req.stationDevice.device_uid, req.stationDevice.name);
+    res.json({ ...out, source: ent.source, entitlement: ent, ...issued, serverTime: now() });
   } catch (err) { next(err); }
 });
 
