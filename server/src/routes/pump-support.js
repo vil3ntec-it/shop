@@ -26,7 +26,7 @@ const support = require('../lib/support');
 const relay = require('../lib/chat-relay');
 const push = require('../lib/push');
 const { rateLimit } = require('../middleware/ratelimit');
-const { forbidden } = require('../middleware/errors');
+const { forbidden, notFound } = require('../middleware/errors');
 
 const writeLimit = rateLimit({ max: 30, keyPrefix: 'pump-support-write' });
 
@@ -62,18 +62,47 @@ function makeRouter(idOf) {
   router.post('/messages', writeLimit, async (req, res, next) => {
     try {
       const id = need(req);
-      const body = support.cleanBody(req.body?.body ?? req.body?.text);
+      const kind = v.oneOf(req.body?.kind, ['text', ...support.MEDIA_KINDS], { field: 'نوعِ پیام', def: 'text' });
+      const raw = req.body?.body ?? req.body?.text;
+      //  پیامِ رسانه‌ای نوشته نمی‌خواهد؛ اگر نوشته دارد همان قاعدهٔ متن
+      const body = kind === 'text' || String(raw ?? '').trim() ? support.cleanBody(raw) : '';
       const thread = await support.threadFor({
         ...id, subject: v.text(req.body?.subject, { max: 120 }),
       });
       const message = await support.post(thread.id, {
         sender: 'user', senderId: id.userId || '', senderName: id.who || '', body,
+        kind, mediaId: kind === 'text' ? null : req.body?.mediaId,
       });
       res.status(201).json({
         message,
         thread: support.shapeThread(await one('SELECT * FROM support_threads WHERE id=$1', [thread.id])),
         serverTime: now(),
       });
+    } catch (err) { next(err); }
+  });
+
+  /*
+   *  رسانه — عکس، ویدیو، پیامِ صوتی. ⛔ فقط در عبور: رسانه‌ای که مدیر
+   *  فرستاده همان لحظه که این طرف کاملش را گرفت از سرور پاک می‌شود
+   *  (`support.sendMedia`)؛ برنامه نسخهٔ خودش را نگه می‌دارد.
+   */
+  router.post('/media', writeLimit, support.rawMedia, async (req, res, next) => {
+    try {
+      const thread = await support.threadFor(need(req));
+      const out = await support.putMedia({
+        threadId: thread.id, uploader: 'user',
+        mime: req.headers['content-type'] || '', buf: Buffer.isBuffer(req.body) ? req.body : null,
+      });
+      res.status(201).json({ ok: true, ...out });
+    } catch (err) { next(err); }
+  });
+
+  router.get('/media/:mid', async (req, res, next) => {
+    try {
+      const thread = await support.threadFor(need(req));
+      const m = await support.getMedia({ id: req.params.mid, threadId: thread.id });
+      if (!m) throw notFound(relay.GONE_MESSAGE, 'media_gone');
+      support.sendMedia(req, res, m, 'user');
     } catch (err) { next(err); }
   });
 

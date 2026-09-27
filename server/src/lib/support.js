@@ -19,9 +19,30 @@
 const { query, one, many, newId, now } = require('../db');
 const { notifyPanel } = require('./panel-live');
 const push = require('./push');
-const { badRequest, notFound } = require('../middleware/errors');
+const { ApiError, badRequest, notFound } = require('../middleware/errors');
 
 const MAX_BODY = 4000;
+
+/*
+ *  ── رسانه: عکس، ویدیو، پیامِ صوتی — فقط در عبور ─────────────────
+ *
+ *  ⛔ سرور جای بایگانی نیست. هر رسانه همان لحظه که **گیرنده** (طرفِ
+ *  مقابلِ فرستنده) کاملش را گرفت پاک می‌شود (`sendMedia`)، و اگر
+ *  هرگز گرفته نشد `chat-relay.sweep()` می‌بردش. هر طرف نسخهٔ خودش را
+ *  روی دستگاهِ خودش نگه می‌دارد.
+ */
+const MEDIA_KINDS = ['image', 'video', 'audio'];
+const MAX_MEDIA = 25 * 1024 * 1024;
+const MEDIA_PREVIEW = { image: '📷 عکس', video: '🎥 ویدیو', audio: '🎤 پیامِ صوتی' };
+
+/** نوعِ رسانه از روی mime — فقط عکس، ویدیو و صدا. */
+function mediaKindOf(mime) {
+  const m = String(mime || '').toLowerCase().split(';')[0].trim();
+  if (/^image\/[a-z0-9.+-]+$/.test(m)) return 'image';
+  if (/^video\/[a-z0-9.+-]+$/.test(m)) return 'video';
+  if (/^audio\/[a-z0-9.+-]+$/.test(m)) return 'audio';
+  return null;
+}
 
 /**
  * متنِ یک پیام، پیش از آن‌که جایی بنشیند.
@@ -79,6 +100,7 @@ function shapeMessage(r) {
     senderName: r.sender_name || '',
     body: r.body,
     kind: r.kind,
+    mediaId: r.media_id || null,
     readAt: r.read_at ? Number(r.read_at) : null,
     createdAt: Number(r.created_at),
   };
@@ -184,19 +206,40 @@ async function threadFor({ app = 'shop', userId = '', shopId = '', stationId = '
  * مقابل یکی بالا می‌رود — همان چیزی که نقطه‌ی قرمز روی آیکون را
  * می‌سازد.
  */
-async function post(threadId, { sender = 'user', senderId = '', senderName = '', body = '', kind = 'text' }) {
+async function post(threadId, { sender = 'user', senderId = '', senderName = '', body = '', kind = 'text', mediaId = null }) {
   const text = String(body || '').trim();
-  if (!text) throw badRequest('پیام خالی است', 'empty_message');
+  const isMedia = MEDIA_KINDS.includes(kind);
+  if (!text && !isMedia) throw badRequest('پیام خالی است', 'empty_message');
   if (text.length > MAX_BODY) throw badRequest('پیام خیلی بلند است', 'message_too_long');
 
   const thread = await one('SELECT * FROM support_threads WHERE id=$1', [threadId]);
   if (!thread) throw notFound('این گفت‌وگو پیدا نشد', 'thread_not_found');
 
+  /*
+   *  پیامِ رسانه‌ای فقط به رسانه‌ای اشاره می‌کند که در **همین** رشته
+   *  بارگذاری شده و نوعش با پیام می‌خواند. بی این، شناسهٔ رسانهٔ
+   *  پمپِ دیگری در پیامِ این پمپ می‌نشست.
+   */
+  let media = null;
+  if (isMedia) {
+    const mid = String(mediaId || '').trim();
+    //  ⚠️ و فقط رسانه‌ای که **همین طرف** فرستاده؛ وگرنه رسانهٔ طرفِ دیگر
+    //  در پیامِ این طرف می‌نشست و قاعدهٔ «گیرنده که گرفت پاک شود» وارونه
+    media = mid && await one(
+      'SELECT id, mime FROM support_media WHERE id=$1 AND thread_id=$2 AND uploader=$3',
+      [mid, threadId, sender === 'admin' ? 'admin' : 'user']
+    );
+    if (!media || mediaKindOf(media.mime) !== kind) {
+      throw badRequest('رسانهٔ این پیام پیدا نشد یا نوعش نمی‌خواند', 'bad_media');
+    }
+  }
+  const preview = isMedia ? (text ? `${MEDIA_PREVIEW[kind]} · ${text}` : MEDIA_PREVIEW[kind]) : text;
+
   const t = now();
   const message = await one(
-    `INSERT INTO support_messages (id, thread_id, sender, sender_id, sender_name, body, kind, created_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-    [newId('msg'), threadId, sender, senderId, senderName.slice(0, 80), text, kind, t]
+    `INSERT INTO support_messages (id, thread_id, sender, sender_id, sender_name, body, kind, media_id, created_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+    [newId('msg'), threadId, sender, senderId, senderName.slice(0, 80), text, kind, media ? media.id : null, t]
   );
 
   //  صندوقِ پشتیبانیِ پنل زنده است: پیامِ تازه وسطِ باز بودنِ همان گفت‌وگو می‌نشیند
@@ -212,7 +255,7 @@ async function post(threadId, { sender = 'user', senderId = '', senderName = '',
         status = CASE WHEN status='closed' THEN 'open' ELSE status END,
         updated_at = $6
       WHERE id=$1`,
-    [threadId, toAdmin, toUser, text.slice(0, 200), sender, t]
+    [threadId, toAdmin, toUser, preview.slice(0, 200), sender, t]
   );
 
   //  پوش. اگر تنظیم نشده باشد بی‌صدا رد می‌شود و پیام سر جایش می‌ماند.
@@ -220,7 +263,7 @@ async function post(threadId, { sender = 'user', senderId = '', senderName = '',
     if (sender === 'user') {
       await push.sendTo({ allAdmins: true }, {
         title: 'پیام تازه‌ی پشتیبانی',
-        body: `${senderName || thread.who || 'یک کاربر'}: ${text.slice(0, 90)}`,
+        body: `${senderName || thread.who || 'یک کاربر'}: ${preview.slice(0, 90)}`,
         data: { type: 'support', threadId },
       });
     } else if (thread.user_id || thread.station_id) {
@@ -236,7 +279,7 @@ async function post(threadId, { sender = 'user', senderId = '', senderName = '',
         app: thread.app,
       }, {
         title: 'پاسخ پشتیبانی',
-        body: text.slice(0, 120),
+        body: preview.slice(0, 120),
         data: { type: 'support', threadId },
       });
     }
@@ -245,6 +288,61 @@ async function post(threadId, { sender = 'user', senderId = '', senderName = '',
   }
 
   return shapeMessage(message);
+}
+
+/**
+ * بارگذاریِ یک رسانه در یک رشته. `uploader` همان طرفی است که فرستاد —
+ * و تنها طرفی که گرفتنِ رسانه پاکش **نمی‌کند**.
+ */
+async function putMedia({ threadId, uploader, mime, buf }) {
+  const kind = mediaKindOf(mime);
+  if (!kind) throw badRequest('فقط عکس، ویدیو و صدا', 'bad_media');
+  if (!Buffer.isBuffer(buf) || !buf.length) throw badRequest('فایل خالی است', 'bad_media');
+  if (buf.length > MAX_MEDIA) throw new ApiError(413, 'too_large', 'فایل بزرگ‌تر از ۲۵ مگابایت است');
+  if (uploader !== 'user' && uploader !== 'admin') throw badRequest('فرستنده نامعتبر است');
+  const row = await one(
+    `INSERT INTO support_media (id, thread_id, uploader, mime, size, data, created_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id, mime, size`,
+    [newId('smd'), threadId, uploader, String(mime).toLowerCase().split(';')[0].trim().slice(0, 80), buf.length, buf, now()]
+  );
+  return { mediaId: row.id, kind, mime: row.mime, size: Number(row.size) };
+}
+
+/**
+ * یک رسانه، از دیدِ یک طرف. `threadId` خالی یعنی مدیر (هر رشته‌ای).
+ * نبود ⇒ `null` (و مسیر ۴۰۴ِ `media_gone` می‌دهد).
+ */
+async function getMedia({ id, threadId = null }) {
+  const mid = String(id || '').trim();
+  if (!mid || mid.length > 80) return null;
+  return one(
+    'SELECT id, thread_id, uploader, mime, size, data FROM support_media WHERE id=$1'
+      + (threadId ? ' AND thread_id=$2' : ''),
+    threadId ? [mid, threadId] : [mid]
+  );
+}
+
+/**
+ * فرستادنِ بایت‌های یک رسانه به `side` (user | admin).
+ *
+ * ⛔ **قاعدهٔ رله**: اگر `side` گیرنده است (رسانه را طرفِ دیگر
+ * فرستاده)، ردیف همان لحظه که پاسخ کامل رفت پاک می‌شود — `finish`، نه
+ * `close`: اتصالی که وسطِ کار برید چیزی نگرفته و رسانه باید بماند تا
+ * دوباره بپرسد. فرستنده که رسانهٔ خودش را بگیرد چیزی پاک نمی‌شود.
+ * ⚠️ `HEAD` هم به همین مسیر می‌رسد و هیچ بایتی نمی‌برد — پاک نمی‌کند.
+ */
+function sendMedia(req, res, m, side) {
+  res.set('Content-Type', m.mime);
+  res.set('Content-Length', String(m.size));
+  res.set('Cache-Control', 'no-store');
+  const recipient = m.uploader !== side;
+  if (recipient && req.method === 'GET') {
+    res.on('finish', () => {
+      query('DELETE FROM support_media WHERE id=$1', [m.id])
+        .catch((err) => console.error('[support:media-relay]', err.message));
+    });
+  }
+  res.end(m.data);
 }
 
 /** پیام‌های یک رشته. `after` برای گرفتن فقط تازه‌ها. */
@@ -321,7 +419,27 @@ async function systemMessage({ app = 'shop', userId = '', shopId = '', stationId
   return post(thread.id, { sender: 'system', senderName: 'توحید', body, kind });
 }
 
+/**
+ * خوانندهٔ بدنهٔ خامِ بارگذاری. بدنهٔ بزرگ‌تر از سقف پیش از خوانده
+ * شدن رد می‌شود — با همان ۴۱۳ِ `too_large`، نه جملهٔ انگلیسیِ Express.
+ */
+const rawParser = require('express').raw({ type: () => true, limit: MAX_MEDIA });
+function rawMedia(req, res, next) {
+  const len = Number(req.headers['content-length']);
+  if (Number.isFinite(len) && len > MAX_MEDIA) {
+    return next(new ApiError(413, 'too_large', 'فایل بزرگ‌تر از ۲۵ مگابایت است'));
+  }
+  rawParser(req, res, (err) => {
+    if (err && err.type === 'entity.too.large') {
+      return next(new ApiError(413, 'too_large', 'فایل بزرگ‌تر از ۲۵ مگابایت است'));
+    }
+    if (err) return next(new ApiError(400, 'bad_media', 'فایل درست نرسید'));
+    next();
+  });
+}
+
 module.exports = {
   threadFor, post, messages, markRead, list, setStatus, unreadForAdmin, systemMessage,
   shapeThread, shapeMessage, MAX_BODY, cleanBody,
+  MEDIA_KINDS, MAX_MEDIA, MEDIA_PREVIEW, mediaKindOf, putMedia, getMedia, sendMedia, rawMedia,
 };

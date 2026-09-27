@@ -185,5 +185,5 @@ test('relayDays: 15 در رشته‌ها، صندوق، صفحهٔ کیو‌آر
 
 test('پاک‌سازیِ دوباره کاری نمی‌کند و چیزِ تازه را نمی‌برد', async () => {
   const again = await relay.sweep();
-  assert.deepEqual(again, { chatMessages: 0, chatMedia: 0, supportMessages: 0 });
+  assert.deepEqual(again, { chatMessages: 0, chatMedia: 0, supportMessages: 0, supportMedia: 0 });
 });
