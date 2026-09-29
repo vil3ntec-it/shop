@@ -25,6 +25,55 @@ const MIN_RATE = 10;
 const MAX_RATE = 500;
 /** فرمانی که یک روز کسی نگرفت کهنه است — برنامه روشن که شد، نرخِ دیروز را نمی‌نشاند. */
 const STALE_MS = 24 * 3600 * 1000;
+/**
+ * «درجا»: برنامهٔ کامپیوتر پرسشِ `/rate` را باز نگه می‌دارد (`?wait=`) و سرور
+ * همین که بات فرمانی ساخت جواب می‌دهد — نه دقیقهٔ بعد. سقفِ انتظار کمتر از
+ * مهلتِ ۲۰ ثانیه‌ایِ HttpClientِ برنامه است.
+ */
+const WAIT_MAX_S = 15;
+/**
+ * ⛔ سقفِ پرسش‌های بازِ هم‌زمانِ **یک پمپ**. یک پمپ یک کامپیوتر است و یک پرسشِ باز
+ * بس است؛ چهار برای وقتی که اتصالِ قبلی هنوز بسته نشده. بیشتر از آن ⇒ پاسخِ فوری،
+ * تا کسی با یک توکنِ دستگاه نتواند صدها اتصال را روی سرور باز نگه دارد.
+ */
+const MAX_WAITERS = 4;
+
+/** stationId ⇒ شنونده‌های منتظر. فقط در حافظه؛ سرورِ حساب یک پروسه است. */
+const waiters = new Map();
+
+function wake(stationId) {
+  const set = waiters.get(stationId);
+  if (!set) return;
+  waiters.delete(stationId);
+  for (const fn of set) { try { fn(); } catch { /* شنوندهٔ رفته */ } }
+}
+
+/**
+ * تا فرمانی برای همین پمپ ساخته شود یا `ms` بگذرد. ‎{promise, cancel}‎ —
+ * `cancel` برای وقتی که برنامه اتصال را بست، تا شنونده‌ای جا نماند.
+ */
+function waitFor(stationId, ms) {
+  let done;
+  let timer;
+  const promise = new Promise((resolve) => {
+    done = () => {
+      clearTimeout(timer);
+      const set = waiters.get(stationId);
+      if (set) { set.delete(done); if (!set.size) waiters.delete(stationId); }
+      resolve();
+    };
+    timer = setTimeout(done, Math.max(0, ms));
+    if (!waiters.has(stationId)) waiters.set(stationId, new Set());
+    waiters.get(stationId).add(done);
+  });
+  return { promise, cancel: () => done() };
+}
+
+/** شمارِ شنونده‌های منتظر — فقط برای سنجه‌ها. */
+function waiting(stationId) {
+  const set = waiters.get(stationId);
+  return set ? set.size : 0;
+}
 
 const FA = '۰۱۲۳۴۵۶۷۸۹';
 const AR = '٠١٢٣٤٥٦٧٨٩';
@@ -95,11 +144,14 @@ async function create(stationId, { petrol = null, diesel = null, chatId = '', by
   await query(
     `UPDATE station_rate_cmds SET status='superseded', done_at=$2
       WHERE station_id=$1 AND status='pending'`, [stationId, t]);
-  return shape(await one(
+  const row = shape(await one(
     `INSERT INTO station_rate_cmds (id, station_id, petrol, diesel, status, chat_id, by_name, created_at)
      VALUES ($1,$2,$3,$4,'pending',$5,$6,$7) RETURNING *`,
     [newId('rate'), stationId, petrol, diesel, String(chatId || ''), String(by || '').slice(0, 80), t]
   ));
+  //  برنامهٔ منتظرِ همین پمپ همین حالا جواب می‌گیرد
+  wake(stationId);
+  return row;
 }
 
 /** فرمانِ در صفِ همین پمپ — یا ‎null‎. کهنه‌ها همین‌جا کنار می‌روند. */
@@ -132,4 +184,4 @@ async function recent(stationId, limit = 10) {
     [stationId, limit])).map(shape);
 }
 
-module.exports = { parse, create, pending, ack, recent, MIN_RATE, MAX_RATE, STALE_MS };
+module.exports = { parse, create, pending, ack, recent, waitFor, waiting, MIN_RATE, MAX_RATE, STALE_MS, WAIT_MAX_S, MAX_WAITERS };
