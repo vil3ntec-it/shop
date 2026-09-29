@@ -30,6 +30,43 @@ const PUMP = catalogOf('pump');
 /** کاتالوگِ قابلیت‌های پمپ — پنل از این چک‌باکس‌هایش را می‌سازد. */
 router.get('/features', (req, res) => res.json({ features: PUMP_FEATURES }));
 
+/*
+ *  «تنظیماتِ زنده» ی برنامهٔ پمپ (lib/live-config.js) — scope = `all` یا شناسهٔ یک پمپ.
+ *  ⛔ فقط مقدار: برنامه فقط کلیدهایی را می‌خواند که خودش می‌شناسد، پس نوشتنِ
+ *  کلیدِ تازه هیچ رفتاری را عوض نمی‌کند تا روزی بخشی از برنامه به آن وصل شود.
+ */
+router.get('/live-config', async (req, res, next) => {
+  try {
+    res.json(await require('../lib/live-config').list(req.query.scope || 'all'));
+  } catch (err) { next(err); }
+});
+
+router.put('/live-config', async (req, res, next) => {
+  try {
+    const b = req.body || {};
+    const out = await require('../lib/live-config').set(b.scope || 'all', b.key, b.value, req.admin?.username || req.admin?.id || '');
+    await audit.log({
+      actorType: 'admin', userId: req.admin.id, action: 'admin.pump_live_config_set',
+      targetType: 'live_config', targetId: `${out.scope}:${out.key}`, detail: { scope: out.scope, key: out.key },
+    });
+    res.json({ ok: true, ...out });
+  } catch (err) { next(err); }
+});
+
+router.delete('/live-config', async (req, res, next) => {
+  try {
+    const b = { ...(req.query || {}), ...(req.body || {}) };
+    const out = await require('../lib/live-config').remove(b.scope || 'all', b.key);
+    if (out.removed) {
+      await audit.log({
+        actorType: 'admin', userId: req.admin.id, action: 'admin.pump_live_config_removed',
+        targetType: 'live_config', targetId: `${out.scope}:${out.key}`, detail: { scope: out.scope, key: out.key },
+      });
+    }
+    res.json({ ok: true, ...out });
+  } catch (err) { next(err); }
+});
+
 /* ==========================================================
    پمپ‌ها
    ========================================================== */

@@ -457,7 +457,24 @@ router.get('/me', async (req, res, next) => {
  */
 router.get('/rate', async (req, res, next) => {
   try {
-    res.json({ ok: true, cmd: await require('../lib/station-rates').pending(req.stationId), serverTime: now() });
+    res.json({
+      ok: true,
+      cmd: await require('../lib/station-rates').pending(req.stationId),
+      //  ⛔ نسخهٔ «تنظیماتِ زنده» (lib/live-config.js) — از حافظه، بی پرسشِ
+      //  دیتابیس. برنامه فقط وقتی عوض شد برگه را می‌خواند، پس درخواستِ تازه‌ای نیست.
+      liveConfig: await require('../lib/live-config').versionOf(req.stationId),
+      serverTime: now(),
+    });
+  } catch (err) { next(err); }
+});
+
+/**
+ * برگهٔ «تنظیماتِ زنده» ی همین پمپ (`all` + خودش). برنامه فقط وقتی می‌زندش که
+ * `liveConfig`ِ پاسخِ `/rate` با نسخهٔ خودش فرق کند.
+ */
+router.get('/live-config', async (req, res, next) => {
+  try {
+    res.json({ ok: true, ...(await require('../lib/live-config').snapshot(req.stationId)), serverTime: now() });
   } catch (err) { next(err); }
 });
 
