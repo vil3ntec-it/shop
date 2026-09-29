@@ -400,7 +400,21 @@ async function request(destination, { purpose = 'login', ip = '', app = '' } = {
    *  درست کند.
    */
   try {
-    await (await sender(destination))(destination, code, message, { app: sectionOf(app) || '', purpose });
+    const send = await sender(destination);
+    const args = [destination, code, message, { app: sectionOf(app) || '', purpose }];
+    try {
+      await send(...args);
+    } catch (first) {
+      /*
+       *  ⛔ **یک بارِ دیگر، فقط برای خطای گذرا** (۱۴۰۵/۰۷/۱۷). کدِ ثبت‌نام و
+       *  رمز همان لحظه فرستاده می‌شود و صف ندارد؛ یک «421 Try again later»ِ
+       *  جیمیل یا یک قطعیِ کوتاهِ اینترنت یعنی «کد فرستاده نشد» — همان «بعضی
+       *  وقت نه». ۵xx («این گیرنده هرگز») دوباره امتحان نمی‌شود.
+       */
+      if (!isEmail(destination) || (first && first.smtpCode >= 500)) throw first;
+      await new Promise((r) => setTimeout(r, Number(process.env.OTP_RETRY_DELAY_MS) || 1500));
+      await send(...args);
+    }
   } catch (err) {
     await query('DELETE FROM otp_codes WHERE id=$1', [codeRow]);
     console.error('[otp] فرستادن کد نشد:', err.message);
