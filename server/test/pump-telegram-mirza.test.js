@@ -1,0 +1,349 @@
+'use strict';
+/**
+ * باتِ تلگرام — «💬 چت‌های میرزا» و «🏷️ نرخِ اتحادیه از تلگرام».
+ *
+ * خواستهٔ صاحب سامانه (۱۴۰۵/۰۷/۱۶): «توی منو قابلیتِ جدید بذار به اسمِ چت‌های
+ * میرزا… بات کدِ هشت‌رقمیِ برنامه رو بخواد… وقتی برنامه خاموشه، پیام‌های
+ * مشتری‌های کیو‌آر بیاد تلگرام… و نرخِ اتحادیه رو از تلگرام بنویسم و اتومات
+ * توی برنامهٔ کامپیوتر لایف بشینه… روی حساب‌های دیگهٔ کاربران تأثیری نذاره.»
+ */
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const h = require('./helpers');
+const { query, one, newId, now } = require('../src/db');
+const telegram = require('../src/lib/telegram');
+const rates = require('../src/lib/station-rates');
+const otp = require('../src/lib/otp');
+
+const TOKEN = `123456789:${'Mr_z-'.repeat(8)}`;
+const BOT = 'PumpMirzaBot';
+const KEY = 'abcdef0123456789abcd';
+
+let calls = [];
+let responder = null;
+let updateId = 9000;
+let msgSeq = 700;
+
+test.before(async () => {
+  await h.start();
+  const pw = require('../src/lib/password');
+  await query(
+    `INSERT INTO admins (id, username, name, password_hash, role, status, created_at)
+     VALUES ($1,'admin','مدیر',$2,'superadmin','active',$3)`,
+    [newId('adm'), await pw.hashPassword('Admin!12345'), now()]
+  );
+  telegram.setTransport(async (method, params) => {
+    calls.push({ method, params });
+    if (responder) {
+      const r = await responder(method, params);
+      if (r) return r;
+    }
+    if (method === 'getMe') return { ok: true, result: { id: 42, is_bot: true, username: BOT } };
+    if (method === 'sendMessage') { msgSeq += 1; return { ok: true, result: { message_id: msgSeq } }; }
+    if (method === 'getUpdates') return { ok: true, result: [] };
+    return { ok: true, result: true };
+  });
+  const login = await h.post('/api/admin/login', { username: 'admin', password: 'Admin!12345' });
+  const saved = await h.put('/api/admin/telegram', { token: TOKEN, enabled: true }, { token: login.body.token });
+  assert.equal(saved.status, 200, JSON.stringify(saved.body));
+});
+test.after(async () => {
+  telegram.setTransport(null);
+  await h.stop();
+});
+
+const clear = () => { calls = []; };
+const to = (chatId) => calls.filter(c => ['sendMessage', 'editMessageText'].includes(c.method)
+  && c.params.chat_id === String(chatId));
+const lastTo = (chatId) => to(chatId).at(-1);
+const textsTo = (chatId) => to(chatId).map(c => c.params.text).join('\n---\n');
+const rows = (m) => m?.params?.reply_markup?.inline_keyboard || [];
+
+function msg(chatId, text, { type = 'private', from = null, replyTo = 0 } = {}) {
+  updateId += 1;
+  const chat = type === 'private' ? { id: chatId, type, first_name: 'میرزا' } : { id: chatId, type, title: 'گروهِ پمپ' };
+  const m = { message_id: updateId, chat, text, from: from || { id: chatId, first_name: 'میرزا' } };
+  if (replyTo) m.reply_to_message = { message_id: replyTo, chat };
+  return telegram.handleUpdate({ update_id: updateId, message: m });
+}
+
+function press(chatId, data, { type = 'private', from = null, messageId = 77 } = {}) {
+  updateId += 1;
+  return telegram.handleUpdate({
+    update_id: updateId,
+    callback_query: {
+      id: `cb${updateId}`, data, from: from || { id: chatId },
+      message: { message_id: messageId, chat: { id: chatId, type } },
+    },
+  });
+}
+
+/** پمپ + کامپیوترِ بند‌شده + یک حسابِ قرض‌دار با کیو‌آرِ زنده (‎acct-d7‎). */
+async function pump(name) {
+  const u = await h.newUser(name, 'pump');
+  const made = await h.post('/api/pump', { name: `پمپِ ${name}` }, { token: u.accessToken });
+  assert.equal(made.status, 201, JSON.stringify(made.body));
+  const bound = await h.post('/api/pump/device/bind',
+    { device: { uid: `pc-${name}`, name: 'کامپیوترِ پمپ', platform: 'windows' } }, { token: u.accessToken });
+  assert.equal(bound.status, 201, JSON.stringify(bound.body));
+  const dev = bound.body.deviceToken;
+  const put = await h.put('/api/pump/device/files/acct-d7', { data: { v: 1, k: KEY, at: 1, d: { n: 'هارون' } } }, { token: dev });
+  assert.ok(put.status < 300, JSON.stringify(put.body));
+  const ac = await h.get('/api/pump/device/access-code', { token: dev });
+  assert.equal(ac.status, 200, JSON.stringify(ac.body));
+  return {
+    ...u, dev, stationId: made.body.station.id, stationName: made.body.station.name,
+    code: made.body.station.code, access: String(ac.body.code).replace(/\D/g, ''),
+  };
+}
+
+/** برنامهٔ کامپیوتر بسته شد: دستگاه ده دقیقه است چیزی نپرسیده. */
+const desktopOff = (p) => query('UPDATE station_devices SET last_seen_at=$2 WHERE station_id=$1', [p.stationId, now() - 10 * 60_000]);
+
+async function customerSays(p, text) {
+  const r = await h.post(`/api/pump/public/${p.code}/acct/d7/chat?k=${KEY}`, { name: 'هارون', text });
+  assert.equal(r.status, 201, JSON.stringify(r.body));
+  //  رساندن به تلگرام منتظرِ پاسخ نمی‌ماند
+  await new Promise(r2 => setTimeout(r2, 150));
+  return r.body.message;
+}
+
+const fa = (s) => String(s).replace(/\d/g, d => '۰۱۲۳۴۵۶۷۸۹'[Number(d)]);
+
+async function linkRelay(chatId, p, opts = {}) {
+  await press(chatId, 'mirza', opts);
+  await press(chatId, 'mzadd', opts);
+  //  ⚠️ با رقمِ فارسی و خط‌تیره — همان‌طور که میرزا تایپ می‌کند
+  await msg(chatId, fa(`${p.access.slice(0, 4)}-${p.access.slice(4)}`), opts);
+}
+
+async function linkPrivateEmail(chatId, user) {
+  await msg(chatId, '/start');
+  await msg(chatId, user.email);
+  const row = await one(
+    'SELECT id FROM otp_codes WHERE destination=$1 AND purpose=$2 ORDER BY created_at DESC LIMIT 1',
+    [user.email, telegram.PURPOSE]);
+  await msg(chatId, (await otp.reveal(row.id)).code);
+}
+
+/* ══════════════════ نرخ: خواندنِ پیام ══════════════════ */
+
+test('خواندنِ نرخ: سه شکلی که صاحبِ سامانه نوشت، رقمِ فارسی، و عددِ ناممکن', () => {
+  assert.deepEqual(rates.parse('پطرول ۴۵ دیزل ۹۹'), { petrol: 45, diesel: 99 });
+  assert.deepEqual(rates.parse('نرخ اتحادیه پطرول ۷۹ . دیزل ۸۰'), { petrol: 79, diesel: 80 });
+  assert.deepEqual(rates.parse('نرخ جدید پطرول ۷۹ . دیزل'), { petrol: 79, diesel: null });
+  assert.deepEqual(rates.parse('دیزل: ۸۲٫۵'), { petrol: null, diesel: 82.5 });
+  assert.equal(rates.parse('سلام، امروز پطرول نداریم'), null, 'نامِ تیل بی عدد نرخ نیست');
+  assert.equal(rates.parse('کریم'), null);
+  assert.deepEqual(rates.parse('پطرول ۴ دیزل ۸۰'), { petrol: null, diesel: 80, bad: ['petrol'] });
+});
+
+/* ══════════════════ چت‌های میرزا ══════════════════ */
+
+test('منو دکمهٔ «💬 چت‌های میرزا» دارد — حتی برای کسی که هنوز وصل نیست', async () => {
+  clear();
+  await msg(9100, '/start');
+  const kb = rows(lastTo(9100)).flat().map(b => b.callback_data);
+  assert.ok(kb.includes('mirza'), JSON.stringify(kb));
+  assert.match(lastTo(9100).params.text, /گامِ ۱/, 'راهنمای قدم‌به‌قدم برای تازه‌وارد');
+});
+
+test('وصل شدن با کدِ هشت‌رقمی (رقمِ فارسی) ⇒ پیامِ مشتری فقط وقتی برنامه خاموش است می‌آید', async () => {
+  const p = await pump('میرزا');
+  clear();
+  await linkRelay(9101, p);
+  assert.match(textsTo(9101), /✅ وصل شد/, textsTo(9101));
+  const r = await one('SELECT chat_id FROM telegram_relays WHERE station_id=$1', [p.stationId]);
+  assert.equal(r.chat_id, '9101');
+
+  //  برنامه روشن است (همین حالا فایل فرستاد) ⇒ هیچ پیامی به تلگرام
+  clear();
+  await customerSays(p, 'سلام، الباقیِ من چند است؟');
+  assert.equal(to(9101).length, 0, '⛔ برنامهٔ روشن خودش صندوق دارد');
+
+  //  برنامه خاموش شد ⇒ همان لحظه به تلگرام، با نام و راهنمای Reply
+  await desktopOff(p);
+  clear();
+  await customerSays(p, 'فردا دیزل دارید؟');
+  const got = lastTo(9101);
+  assert.ok(got, 'پیامِ مشتری به تلگرام نرسید');
+  assert.match(got.params.text, /فردا دیزل دارید؟/);
+  assert.match(got.params.text, /هارون/);
+  assert.match(got.params.text, /Reply/);
+  assert.equal(got.params.parse_mode, undefined, 'بی parse_mode');
+});
+
+test('↩️ جواب با Reply ⇒ به همان مشتری می‌رسد؛ Reply روی پیامِ دیگر ⇒ هیچ', async () => {
+  const p = await pump('جواب');
+  await linkRelay(9102, p);
+  await desktopOff(p);
+  clear();
+  await customerSays(p, 'کی باز هستید؟');
+  const relayed = lastTo(9102);
+  const mid = msgSeq;
+  assert.ok(relayed);
+
+  clear();
+  await msg(9102, 'تا ساعتِ ده شب باز هستیم', { replyTo: mid });
+  assert.match(textsTo(9102), /✅ جواب به مشتری رسید/);
+  const list = await h.get(`/api/pump/public/${p.code}/acct/d7/chat?k=${KEY}`);
+  const last = list.body.messages.at(-1);
+  assert.equal(last.from, 'o');
+  assert.equal(last.text, 'تا ساعتِ ده شب باز هستیم');
+
+  //  Reply روی پیامی که از مشتری نیامده (مثلاً منو) ⇒ مالِ ما نیست
+  const before = (await h.get(`/api/pump/public/${p.code}/acct/d7/chat?k=${KEY}`)).body.messages.length;
+  await msg(9102, 'این جواب نیست', { replyTo: 1 });
+  const after = (await h.get(`/api/pump/public/${p.code}/acct/d7/chat?k=${KEY}`)).body.messages.length;
+  assert.equal(after, before, '⛔ هیچ پیامی به مشتری نرفت');
+
+  //  ⛔ همان شمارهٔ پیام در گفت‌وگوی دیگری نگاشت ندارد
+  await msg(9199, 'از گفت‌وگوی بیگانه', { replyTo: mid });
+  const after2 = (await h.get(`/api/pump/public/${p.code}/acct/d7/chat?k=${KEY}`)).body.messages.length;
+  assert.equal(after2, before);
+});
+
+test('⛔ پمپِ دیگر: پیامِ مشتریِ پمپِ «ب» به تلگرامِ پمپِ «الف» نمی‌رود', async () => {
+  const a = await pump('الفِ');
+  const b = await pump('بِ');
+  await linkRelay(9103, a);
+  await desktopOff(a);
+  await desktopOff(b);
+  clear();
+  await customerSays(b, 'پیامِ مشتریِ پمپِ ب');
+  assert.equal(to(9103).length, 0, JSON.stringify(to(9103)));
+});
+
+test('⛔ کدِ غلط: شش بار ⇒ یک ساعت بسته؛ و هیچ پیوندی ساخته نمی‌شود', async () => {
+  clear();
+  await press(9104, 'mzadd');
+  for (let i = 0; i < 6; i++) await msg(9104, '12345678');
+  assert.match(textsTo(9104), /پیدا نشد/);
+  await press(9104, 'mzadd');
+  await msg(9104, '87654321');
+  assert.match(lastTo(9104).params.text, /زیاد شد/);
+  const any = await one('SELECT count(*)::int AS n FROM telegram_relays WHERE chat_id=$1', ['9104']);
+  assert.equal(any.n, 0);
+});
+
+test('⛔ کدِ پمپ که عوض شد، «چت‌های میرزا»ی قبلی همان لحظه خاموش است', async () => {
+  const p = await pump('چرخش');
+  await linkRelay(9105, p);
+  await desktopOff(p);
+  const rot = await h.post('/api/pump/device/access-code/rotate', {}, { token: p.dev });
+  assert.ok(rot.status < 300, JSON.stringify(rot.body));
+  await desktopOff(p);
+  clear();
+  await customerSays(p, 'بعد از عوض شدنِ کد');
+  assert.equal(to(9105).length, 0, '⛔ کدِ کهنه نباید پیامی برساند');
+});
+
+test('یک پمپ، یک مقصد: وصل کردن در جای دوم ⇒ جای اول خبر می‌گیرد و دیگر پیامی نمی‌گیرد', async () => {
+  const p = await pump('جابه‌جا');
+  await linkRelay(9106, p);
+  clear();
+  await linkRelay(9107, p);
+  assert.match(textsTo(9106), /جای دیگری می‌آید/);
+  await desktopOff(p);
+  clear();
+  await customerSays(p, 'سلام');
+  assert.equal(to(9106).length, 0);
+  assert.equal(to(9107).length, 1);
+});
+
+test('⛔ در گروه فقط مدیرِ گروه «وصل کردنِ پمپ» را می‌زند؛ کدِ عضوِ دیگر پذیرفته نمی‌شود', async () => {
+  const p = await pump('گروهی');
+  const g = -100900;
+  clear();
+  await press(g, 'mzadd', { type: 'supergroup', from: { id: 555 } });
+  const denied = calls.filter(c => c.method === 'answerCallbackQuery').at(-1);
+  assert.match(denied.params.text || '', /فقط مدیرانِ/);
+
+  responder = async (method, params) => (method === 'getChatMember' && String(params.user_id) === '556'
+    ? { ok: true, result: { status: 'administrator' } } : null);
+  try {
+    await press(g, 'mzadd', { type: 'supergroup', from: { id: 556 } });
+    //  کسِ دیگری در گروه کدی بنویسد ⇒ نادیده
+    await msg(g, p.access, { type: 'supergroup', from: { id: 999 } });
+    assert.equal((await one('SELECT count(*)::int AS n FROM telegram_relays WHERE chat_id=$1', [String(g)])).n, 0);
+    //  خودِ مدیر ⇒ وصل
+    await msg(g, p.access, { type: 'supergroup', from: { id: 556 } });
+    assert.equal((await one('SELECT chat_id FROM telegram_relays WHERE station_id=$1', [p.stationId])).chat_id, String(g));
+  } finally { responder = null; }
+});
+
+/* ══════════════════ نرخِ اتحادیه ══════════════════ */
+
+test('نرخ از تلگرام ⇒ فقط برنامهٔ همان پمپ می‌گیرد، «نشست» می‌گوید و بات خبر می‌دهد', async () => {
+  const a = await pump('نرخ‌الف');
+  const b = await pump('نرخ‌ب');
+  await linkPrivateEmail(9201, a);
+  clear();
+  await msg(9201, 'نرخ اتحادیه پطرول ۷۹ . دیزل ۸۰');
+  assert.match(textsTo(9201), /⏳ نرخِ اتحادیه/);
+  assert.match(textsTo(9201), /دست نمی‌خورند/);
+
+  const mine = await h.get('/api/pump/device/rate', { token: a.dev });
+  assert.equal(mine.status, 200);
+  assert.equal(mine.body.cmd.petrol, 79);
+  assert.equal(mine.body.cmd.diesel, 80);
+  //  ⛔ پمپِ دیگر هیچ فرمانی نمی‌بیند
+  const other = await h.get('/api/pump/device/rate', { token: b.dev });
+  assert.equal(other.body.cmd, null);
+  //  ⛔ و نمی‌تواند فرمانِ پمپِ دیگر را «نشست» کند
+  const steal = await h.post(`/api/pump/device/rate/${mine.body.cmd.id}/ack`, { applied: true }, { token: b.dev });
+  assert.equal(steal.status, 404);
+
+  clear();
+  const ack = await h.post(`/api/pump/device/rate/${mine.body.cmd.id}/ack`, { applied: true }, { token: a.dev });
+  assert.equal(ack.status, 200, JSON.stringify(ack.body));
+  await new Promise(r => setTimeout(r, 100));
+  assert.match(textsTo(9201), /✅ نرخِ اتحادیهٔ .* نشست/);
+  assert.equal((await h.get('/api/pump/device/rate', { token: a.dev })).body.cmd, null, 'دیگر در صف نیست');
+  assert.equal((await h.post(`/api/pump/device/rate/${mine.body.cmd.id}/ack`, {}, { token: a.dev })).status, 404, 'دو بار نه');
+});
+
+test('آخرین حرف مرجع است: «۴۵» بعد «۴۶» ⇒ برنامه فقط ۴۶ را می‌گیرد', async () => {
+  const p = await pump('نرخ‌دوبار');
+  await linkPrivateEmail(9202, p);
+  await msg(9202, 'پطرول ۴۵');
+  await msg(9202, 'پطرول ۴۶');
+  const got = await h.get('/api/pump/device/rate', { token: p.dev });
+  assert.equal(got.body.cmd.petrol, 46);
+  assert.equal(got.body.cmd.diesel, null, 'دیزلِ نگفته دست نمی‌خورد');
+});
+
+test('⛔ نرخ: بی ایمیل، کارمند، عددِ ناممکن و گروهِ بی «نرخ» — هیچ فرمانی ساخته نمی‌شود', async () => {
+  const p = await pump('نرخ‌قفل');
+  const count = async () => (await one('SELECT count(*)::int AS n FROM station_rate_cmds WHERE station_id=$1', [p.stationId])).n;
+
+  //  فقط کدِ هشت‌رقمی (چت‌های میرزا) ⇒ نه
+  await linkRelay(9203, p);
+  clear();
+  await msg(9203, 'پطرول ۷۰ دیزل ۷۰');
+  assert.match(textsTo(9203), /ایمیلِ حسابِ پمپ/);
+
+  //  کارمند (عضوِ فعال، نه صاحب و نه مدیر) ⇒ نه
+  const staff = await h.newUser('کارمندِ نرخ', 'pump');
+  await query(
+    `INSERT INTO station_members (id, station_id, user_id, role, status, created_at, updated_at)
+     VALUES ($1,$2,$3,'staff','active',$4,$4)`, [newId('mem'), p.stationId, staff.userId || staff.user?.id || staff.id, now()]);
+  await linkPrivateEmail(9204, staff);
+  clear();
+  await msg(9204, 'پطرول ۷۰');
+  assert.match(textsTo(9204), /صاحب یا مدیرِ پمپ/);
+
+  //  عددِ ناممکن ⇒ نه، و می‌گوید چرا
+  await linkPrivateEmail(9205, p);
+  clear();
+  await msg(9205, 'پطرول ۷ دیزل ۸۰۰');
+  assert.match(textsTo(9205), /باورکردنی نیست/);
+
+  //  گروه: «پطرول ۵۰ لیتر دادم» حرفِ کارمندان است ⇒ بات ساکت
+  const g = -100901;
+  clear();
+  await msg(g, 'پطرول ۵۰ لیتر دادم', { type: 'supergroup', from: { id: 1234 } });
+  assert.equal(to(g).length, 0);
+
+  assert.equal(await count(), 0, JSON.stringify(await one('SELECT * FROM station_rate_cmds WHERE station_id=$1', [p.stationId])));
+});

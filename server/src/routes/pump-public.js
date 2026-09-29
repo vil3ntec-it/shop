@@ -222,6 +222,8 @@ router.post('/:code/acct/:id/chat', chatLimit, openChat, async (req, res, next) 
       kind: ['text', 'image', 'video', 'audio'].includes(kind) ? kind : 'text',
       text: b.text, mediaId: b.mediaId || null,
     });
+    //  💬 برنامهٔ کامپیوتر خاموش است؟ ⇒ «چت‌های میرزا»ی تلگرام. هیچ‌وقت منتظر نمی‌ماند
+    require('../lib/telegram').relayCustomer({ station, acct, message: msg }).catch(() => {});
     res.status(201).json({ ok: true, message: msg });
   } catch (err) { next(err); }
 });
