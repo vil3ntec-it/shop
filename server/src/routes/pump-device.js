@@ -677,9 +677,7 @@ router.get('/chat/media/:mid', async (req, res, next) => {
   try {
     const m = await chat.getMedia({ stationId: req.stationId, acct: null, id: String(req.params.mid || '') });
     if (!m) throw notFound(relay.GONE_MESSAGE, 'media_gone');
-    res.set('Content-Type', m.mime);
-    res.set('Content-Length', String(m.size));
-    res.end(m.data);
+    chat.sendMedia(req, res, m, 'o');
   } catch (err) { next(err); }
 });
 
@@ -691,6 +689,7 @@ router.get('/chat/:acct', async (req, res, next) => {
       ok: true,
       messages: await chat.list({ stationId: req.stationId, acct, afterSeq: req.query.after, limit: 300 }),
       blocked: !!(th && th.blocked_at), name: th ? th.name : '',
+      custSeenSeq: th ? Number(th.cust_seen_seq) || 0 : 0,
       relayDays: relay.relayDays(),
       serverTime: now(),
     });
@@ -701,7 +700,7 @@ router.post('/chat/:acct/media', express.raw({ type: () => true, limit: '26mb' }
   try {
     const acct = acctParam(req);
     const out = await chat.putMedia({
-      stationId: req.stationId, acct,
+      stationId: req.stationId, acct, uploader: 'o',
       mime: req.headers['content-type'] || '', buf: Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0),
     });
     res.status(201).json({ ok: true, ...out });

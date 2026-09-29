@@ -92,6 +92,16 @@ test('مشتری می‌نویسد، صاحبِ پمپ با نامِ او می�
   const after = await h.get(pub(p.code, '') + '&after=' + list.body.messages[0].seq);
   assert.equal(after.body.messages.length, 1);
 
+  //  ✓✓ مشتری که خواند، صاحبِ پمپ می‌بیند
+  const before = await h.get('/api/pump/device/chat/threads', { token: p.token });
+  assert.equal(before.body.threads[0].custSeenSeq, 0);
+  await h.post(pub(p.code, '/seen'), { seq: list.body.messages[1].seq });
+  const afterSeen = await h.get('/api/pump/device/chat/threads', { token: p.token });
+  assert.equal(afterSeen.body.threads[0].custSeenSeq, list.body.messages[1].seq);
+  const one = await h.get('/api/pump/device/chat/d7', { token: p.token });
+  assert.equal(one.body.custSeenSeq, list.body.messages[1].seq);
+  assert.equal(list.body.ownerSeenSeq, 0);
+
   await h.post('/api/pump/device/chat/d7/seen', { seq: list.body.messages[0].seq }, { token: p.token });
   const t2 = await h.get('/api/pump/device/chat/threads', { token: p.token });
   assert.equal(t2.body.threads[0].unread, 0);

@@ -319,3 +319,16 @@ test('۷) رشته که پاک شود، رسانه‌اش هم می‌رود (CA
   await query('DELETE FROM support_threads WHERE id=$1', [tid]);
   assert.equal(await mediaRow(r.body.mediaId), null);
 });
+
+test('۴) ⛔ SVG (اسکریپت‌دار) رسانه نیست، و هر رسانه با nosniff و CSPِ sandbox می‌رود', async () => {
+  const d = await pumpDevice('pc-svg-1');
+  const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>');
+  const bad = await h.raw('POST', '/api/pump/device/support/media', svg, { token: d.token, headers: { 'Content-Type': 'image/svg+xml' } });
+  assert.equal(bad.status, 400, JSON.stringify(bad.body));
+  const up = await h.raw('POST', '/api/pump/device/support/media', PNG, { token: d.token, headers: { 'Content-Type': 'image/png' } });
+  assert.equal(up.status, 201, JSON.stringify(up.body));
+  const r = await fetch(`${h.base()}/api/pump/device/support/media/${up.body.mediaId}`, { headers: { Authorization: `Bearer ${d.token}` } });
+  assert.equal(r.status, 200);
+  assert.equal(r.headers.get('x-content-type-options'), 'nosniff');
+  assert.match(r.headers.get('content-security-policy') || '', /sandbox/);
+});
