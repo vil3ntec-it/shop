@@ -689,6 +689,7 @@ router.get('/chat/:acct', async (req, res, next) => {
       ok: true,
       messages: await chat.list({ stationId: req.stationId, acct, afterSeq: req.query.after, limit: 300 }),
       blocked: !!(th && th.blocked_at), name: th ? th.name : '',
+      custSeenSeq: th ? Number(th.cust_seen_seq) || 0 : 0,
       relayDays: relay.relayDays(),
       serverTime: now(),
     });

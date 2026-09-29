@@ -228,7 +228,7 @@ async function seen(stationId, acct, side, seq) {
 /** فهرستِ گفت‌وگوها برای صاحبِ پمپ: آخرین پیام، نخوانده‌ها، بلاک. */
 async function threads(stationId) {
   const rows = await many(
-    `SELECT t.acct, t.name, t.blocked_at, t.owner_seen_seq, t.updated_at,
+    `SELECT t.acct, t.name, t.blocked_at, t.owner_seen_seq, t.cust_seen_seq, t.updated_at,
             (SELECT count(*) FROM station_chat_messages m
               WHERE m.station_id=t.station_id AND m.acct=t.acct AND m.from_side='c'
                 AND m.seq > t.owner_seen_seq AND m.deleted_at IS NULL) AS unread,
@@ -242,6 +242,8 @@ async function threads(stationId) {
     name: r.name || '',
     blocked: !!r.blocked_at,
     unread: Number(r.unread) || 0,
+    //  ✓✓ «مشتری دید» — تا کدام پیام را صفحهٔ کیو‌آر خوانده است
+    custSeenSeq: Number(r.cust_seen_seq) || 0,
     updatedAt: Number(r.updated_at),
     last: r.last ? shape(r.last) : null,
   }));
