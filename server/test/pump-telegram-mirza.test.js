@@ -313,6 +313,62 @@ test('آخرین حرف مرجع است: «۴۵» بعد «۴۶» ⇒ برنام
   assert.equal(got.body.cmd.diesel, null, 'دیزلِ نگفته دست نمی‌خورد');
 });
 
+test('«درجا»: پرسشِ باز (?wait=) همان لحظهٔ پیامِ تلگرام جواب می‌گیرد، نه دقیقهٔ بعد', async () => {
+  const a = await pump('درجاالف');
+  const b = await pump('درجاب');
+  await linkPrivateEmail(9291, a);
+  const until = async (fn) => { for (let i = 0; i < 100 && !fn(); i++) await new Promise(r => setTimeout(r, 10)); };
+
+  //  برنامهٔ هر دو پمپ منتظر است
+  const t0 = Date.now();
+  const pa = h.get('/api/pump/device/rate?wait=10', { token: a.dev });
+  const pb = h.get('/api/pump/device/rate?wait=1', { token: b.dev });
+  await until(() => rates.waiting(a.stationId) === 1);
+  assert.equal(rates.waiting(a.stationId), 1, 'برنامه باید منتظر بماند');
+  await msg(9291, 'پطرول ۸۱ دیزل ۸۲');
+  const got = await pa;
+  const ms = Date.now() - t0;
+  assert.equal(got.status, 200, JSON.stringify(got.body));
+  assert.equal(got.body.cmd.petrol, 81);
+  assert.equal(got.body.cmd.diesel, 82);
+  assert.equal(got.body.waitMax, rates.WAIT_MAX_S, 'برنامه از این می‌فهمد که سرور «درجا» را می‌شناسد');
+  assert.ok(ms < 5000, `باید درجا برسد، نه با پایانِ مهلت: ${ms}ms`);
+  assert.ok('liveConfig' in got.body, 'نسخهٔ تنظیماتِ زنده همچنان روی همین پاسخ');
+
+  //  ⛔ پمپِ دیگر بیدار نشد: با پایانِ مهلتِ خودش، بی فرمان
+  const other = await pb;
+  assert.equal(other.body.cmd, null);
+
+  //  فرمانِ در صف ⇒ بی انتظار همان لحظه
+  const t1 = Date.now();
+  const again = await h.get('/api/pump/device/rate?wait=10', { token: a.dev });
+  assert.equal(again.body.cmd.petrol, 81);
+  assert.ok(Date.now() - t1 < 2000);
+
+  //  سقفِ انتظار: عددِ بزرگ به WAIT_MAX_S بریده می‌شود و بی `wait` همان رفتارِ قدیم
+  await h.post(`/api/pump/device/rate/${again.body.cmd.id}/ack`, { applied: true }, { token: a.dev });
+  const t2 = Date.now();
+  assert.equal((await h.get('/api/pump/device/rate', { token: a.dev })).body.cmd, null);
+  assert.ok(Date.now() - t2 < 2000, 'بی wait پاسخ منتظر نمی‌ماند');
+});
+
+test('«درجا»: برنامه‌ای که اتصال را بست شنونده‌ای روی سرور جا نمی‌گذارد', async () => {
+  const p = await pump('درجابسته');
+  const ctrl = new AbortController();
+  const req = fetch(`${h.base()}/api/pump/device/rate?wait=10`, {
+    headers: { Authorization: `Bearer ${p.dev}` }, signal: ctrl.signal,
+  }).catch(() => null);
+  for (let i = 0; i < 100 && rates.waiting(p.stationId) === 0; i++) await new Promise(r => setTimeout(r, 10));
+  assert.equal(rates.waiting(p.stationId), 1);
+  ctrl.abort();
+  await req;
+  for (let i = 0; i < 100 && rates.waiting(p.stationId) > 0; i++) await new Promise(r => setTimeout(r, 10));
+  assert.equal(rates.waiting(p.stationId), 0, 'شنوندهٔ اتصالِ بسته باید پاک شود');
+  //  و فرمانِ بعدی همچنان در صف می‌نشیند تا پرسشِ بعدی
+  await rates.create(p.stationId, { petrol: 70 });
+  assert.equal((await h.get('/api/pump/device/rate', { token: p.dev })).body.cmd.petrol, 70);
+});
+
 test('⛔ نرخ: بی ایمیل، کارمند، عددِ ناممکن و گروهِ بی «نرخ» — هیچ فرمانی ساخته نمی‌شود', async () => {
   const p = await pump('نرخ‌قفل');
   const count = async () => (await one('SELECT count(*)::int AS n FROM station_rate_cmds WHERE station_id=$1', [p.stationId])).n;

@@ -457,9 +457,25 @@ router.get('/me', async (req, res, next) => {
  */
 router.get('/rate', async (req, res, next) => {
   try {
+    const rates = require('../lib/station-rates');
+    let cmd = await rates.pending(req.stationId);
+    //  «درجا» (`?wait=<ثانیه>`): فرمانی در صف نیست ⇒ پاسخ باز می‌ماند تا بات
+    //  فرمانی بسازد یا مهلت تمام شود. بی `wait` همان رفتارِ همیشگی.
+    const wait = Math.min(rates.WAIT_MAX_S, Math.max(0, Number.parseInt(req.query.wait, 10) || 0));
+    if (!cmd && wait > 0) {
+      const w = rates.waitFor(req.stationId, wait * 1000);
+      res.on('close', w.cancel);
+      await w.promise;
+      res.off('close', w.cancel);
+      if (res.writableEnded || res.destroyed) return;
+      cmd = await rates.pending(req.stationId);
+    }
     res.json({
       ok: true,
-      cmd: await require('../lib/station-rates').pending(req.stationId),
+      cmd,
+      //  برنامه از همین می‌فهمد که این سرور «درجا» را می‌شناسد؛ سرورِ کهنه این
+      //  کلید را ندارد و برنامه همان پرسشِ دقیقه‌ای را می‌زند.
+      waitMax: rates.WAIT_MAX_S,
       //  ⛔ نسخهٔ «تنظیماتِ زنده» (lib/live-config.js) — از حافظه، بی پرسشِ
       //  دیتابیس. برنامه فقط وقتی عوض شد برگه را می‌خواند، پس درخواستِ تازه‌ای نیست.
       liveConfig: await require('../lib/live-config').versionOf(req.stationId),
