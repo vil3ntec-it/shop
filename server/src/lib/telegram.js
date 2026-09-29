@@ -1585,13 +1585,33 @@ async function rateStations(from) {
   const uid = String(from?.id || '');
   if (!uid) return [];
   const uname = String(from?.username || '').toLowerCase();
+  //  ⛔ نامِ کاربری عوض‌شدنی است و پس از رها شدن به دیگری می‌رسد: نخستین بار
+  //  که با نام شناخته شد، همان‌جا به شناسهٔ عددیِ همین شخص سنجاق می‌شود و از آن
+  //  پس فقط شناسه ملاک است — کسی که بعداً همان نام را بگیرد هیچ حقی ندارد.
+  if (uname) {
+    await query(
+      `UPDATE station_rate_admins a SET tg_id=$1
+        WHERE a.tg_id='' AND a.tg_username=$2
+          AND NOT EXISTS (SELECT 1 FROM station_rate_admins b
+                           WHERE b.station_id=a.station_id AND b.tg_id=$1)`,
+      [uid, uname]).catch(() => {});
+    //  همان شخص از قبل با شناسه در فهرست بود ⇒ ردیفِ نامیِ اضافه می‌رود، تا نامِ
+    //  رهاشده هیچ دری را باز نگه ندارد
+    await query(
+      `DELETE FROM station_rate_admins a
+        WHERE a.tg_id='' AND a.tg_username=$2
+          AND EXISTS (SELECT 1 FROM station_rate_admins b
+                       WHERE b.station_id=a.station_id AND b.tg_id=$1)`,
+      [uid, uname]).catch(() => {});
+  }
   return many(
     `SELECT s.id AS station_id, s.name AS station_name
        FROM stations s
       WHERE s.status='active' AND (
         EXISTS (SELECT 1 FROM station_rate_admins a
                  WHERE a.station_id=s.id
-                   AND ((a.tg_id<>'' AND a.tg_id=$1) OR (a.tg_username<>'' AND $2<>'' AND a.tg_username=$2)))
+                   AND ((a.tg_id<>'' AND a.tg_id=$1)
+                        OR (a.tg_id='' AND a.tg_username<>'' AND $2<>'' AND a.tg_username=$2)))
         OR EXISTS (SELECT 1 FROM telegram_chat_links l
                      JOIN telegram_chats c ON c.chat_id=l.chat_id AND c.kind='private'
                      JOIN station_members m ON m.station_id=l.station_id AND m.user_id=l.user_id
