@@ -443,3 +443,25 @@ test('⛔ فهرستِ یک پمپ پمپِ دیگر را باز نمی‌کند
   await msg(555123, '/myid', { from: { id: 555123 } });
   assert.match(textsTo(555123), /555123/);
 });
+
+test('⛔ نامِ کاربری به شناسهٔ نخستین کسی که با آن آمد سنجاق می‌شود — کسی که بعداً همان نام را بگیرد هیچ حقی ندارد', async () => {
+  const p = await pump('فهرست‌نام');
+  await linkPrivateEmail(9321, p);
+  await addRateAdmins(9321, '@mirza_rate');
+  const cmds = async () => (await one('SELECT count(*)::int AS n FROM station_rate_cmds WHERE station_id=$1', [p.stationId])).n;
+
+  //  صاحبِ واقعیِ نام ⇒ پذیرفته و سنجاق شد
+  await msg(777321, 'پطرول ۸۱', { from: { id: 777321, username: 'Mirza_Rate' } });
+  assert.equal(await cmds(), 1);
+  assert.equal((await one('SELECT tg_id FROM station_rate_admins WHERE station_id=$1', [p.stationId])).tg_id, '777321');
+
+  //  نام رها شد و کسِ دیگری گرفتش ⇒ هیچ
+  clear();
+  await msg(888321, 'پطرول ۱۰۰', { from: { id: 888321, username: 'mirza_rate' } });
+  assert.match(textsTo(888321), /مدیرِ نرخ/);
+  assert.equal(await cmds(), 1);
+
+  //  همان شخص با نامِ تازه ⇒ هنوز پذیرفته (شناسه ملاک است)
+  await msg(777321, 'پطرول ۸۲', { from: { id: 777321, username: 'someone_else' } });
+  assert.equal(await cmds(), 2);
+});
