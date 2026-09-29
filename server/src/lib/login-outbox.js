@@ -189,6 +189,18 @@ async function requeue(id, attempt, reason, lastError = '') {
   );
 }
 
+/** پشتِ مدارشکن: تلاشِ گرفته‌شده پس داده می‌شود و نوبت همان لحظهٔ نیمه‌باز شدن است. */
+async function waitForBreaker(id) {
+  notifyPanel('logins');
+  const t = now();
+  const at = Math.max(t + 50, breaker.openedAt + BREAKER_RESET);
+  await query(
+    `UPDATE otp_outbox SET status='queued', attempts=GREATEST(attempts-1, 0), next_attempt_at=$2, locked_at=NULL,
+       reason='email_service_error', last_error='breaker_open', updated_at=$3 WHERE id=$1`,
+    [id, at, t]
+  );
+}
+
 // ---------- خودِ ارسال ----------
 
 /** قالبِ ایمیل: RTL، متنِ ساده هم همراهش. ⛔ کد در عنوان نیست. */
@@ -248,12 +260,20 @@ async function deliver(row) {
   if (!code) { await markFailed(row.id, 'expired', 'code_unavailable'); return 'expired'; }
 
   if (breaker.isOpen()) {
-    if (attempt >= Number(row.max_attempts)) {
-      await markFailed(row.id, 'email_service_error', 'breaker_open');
-      alert('otp_email_failed', { request_id: row.id, app: row.app, email: codes.mask(row.email), reason: 'email_service_error' });
-      return 'failed';
-    }
-    await requeue(row.id, attempt, 'email_service_error', 'breaker_open');
+    /*
+     *  ⛔ **انتظار پشتِ درِ بسته «تلاش» نیست** (۱۴۰۵/۰۷/۱۷).
+     *
+     *  گزارشِ صاحب سامانه: «سرور بعضی وقت کد را به ایمیل می‌فرستد و بعضی
+     *  وقت نه.» مدارشکن ۳۰ ثانیه باز می‌ماند ولی چهار تلاشِ هر کد (۲ · ۴ ·
+     *  ۸ ثانیه) روی هم ≈ ۱۴ ثانیه‌اند — پس هر کدی که در آن ۳۰ ثانیه خواسته
+     *  می‌شد، هر چهار تلاشش به درِ بسته می‌خورد و `failed` می‌شد **بی آن‌که
+     *  یک بار هم به سرورِ ایمیل زده شود**.
+     *
+     *  حالا ردیف تا لحظهٔ نیمه‌باز شدنِ مدارشکن کنار می‌ماند و تلاشی که
+     *  `claim` برداشته بود پس داده می‌شود. کدِ منقضی همچنان فرستاده نمی‌شود:
+     *  نوبتِ بعد، همان سنجشِ انقضای بالا ردش می‌کند.
+     */
+    await waitForBreaker(row.id);
     return 'retry';
   }
 

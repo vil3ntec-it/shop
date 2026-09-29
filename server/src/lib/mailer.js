@@ -183,9 +183,9 @@ function smtpSend(cfg, mail) {
       resolve(value);
     }
 
-    /** منتظر یک پاسخ کامل با کدِ مورد انتظار. */
-    function expect(codes) {
-      return new Promise((res, rej) => { waiting = { codes, res, rej }; });
+    /** منتظر یک پاسخ کامل با کدِ مورد انتظار. `stage` فقط برای دسته‌بندیِ خطاست. */
+    function expect(codes, stage = '') {
+      return new Promise((res, rej) => { waiting = { codes, res, rej, stage }; });
     }
 
     function onLineBlock(text) {
@@ -194,8 +194,19 @@ function smtpSend(cfg, mail) {
       if (!waiting) return;
       const w = waiting;
       waiting = null;
-      if (w.codes.includes(code)) w.res(text);
-      else w.rej(new Error(`سرور ایمیل گفت: ${text.trim().slice(0, 200)}`));
+      if (w.codes.includes(code)) { w.res(text); return; }
+      /*
+       *  ⛔ خطا دسته‌بندی می‌شود، نه فقط متن (۱۴۰۵/۰۷/۱۷). صفِ کدِ ورود
+       *  (`login-outbox.deliver`) برای نشانیِ غلط `invalidRecipient` را
+       *  می‌خواند و این‌جا هیچ‌وقت گذاشته نمی‌شد — پس یک نشانیِ غلط چهار بار
+       *  تکرار می‌شد و هر چهار بار روی مدارشکن می‌نشست. ۴xx = «الان نه»،
+       *  ۵xx روی RCPT = «این گیرنده هرگز».
+       */
+      const err = new Error(`سرور ایمیل گفت: ${text.trim().slice(0, 200)}`);
+      err.smtpCode = code;
+      err.temporary = code >= 400 && code < 500;
+      err.invalidRecipient = w.stage === 'rcpt' && code >= 500 && code < 600;
+      w.rej(err);
     }
 
     function attach(s) {
@@ -274,7 +285,7 @@ function smtpSend(cfg, mail) {
         send(`MAIL FROM:<${cfg.from}>`);
         await expect([250]);
         send(`RCPT TO:<${mail.to}>`);
-        await expect([250, 251]);
+        await expect([250, 251], 'rcpt');
         send('DATA');
         await expect([354]);
         socket.write(buildMessage(cfg, mail));
