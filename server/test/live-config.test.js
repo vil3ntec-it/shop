@@ -124,6 +124,19 @@ test('۵) سنجش‌ها: کلید، اندازه، scope؛ و دستگاه ن�
   assert.equal((await h.get('/api/pump/device/live-config')).status, 401, 'بی توکنِ دستگاه نه');
 });
 
+test('۵ب) ⛔ مدیرِ غیرِ ارشد می‌بیند ولی نمی‌نویسد و پاک نمی‌کند', async () => {
+  const pw = require('../src/lib/password');
+  await query(
+    `INSERT INTO admins (id, username, name, password_hash, role, status, created_at)
+     VALUES ($1,'lcplain','مدیر',$2,'admin','active',$3)`,
+    [newId('adm'), await pw.hashPassword('Admin!12345'), now()]
+  );
+  const t = (await h.post('/api/admin/login', { username: 'lcplain', password: 'Admin!12345' })).body.token;
+  assert.equal((await h.get('/api/admin/pump/live-config?scope=all', { token: t })).status, 200);
+  assert.equal((await h.put('/api/admin/pump/live-config', { scope: 'all', key: 'x.y', value: 1 }, { token: t })).status, 403);
+  assert.equal((await h.del('/api/admin/pump/live-config?scope=all&key=x.y', { token: t })).status, 403);
+});
+
 test('۶) فهرستِ پنل: مقدار، زمان و نویسنده', async () => {
   await put('all', 'list.demo', [1, 2, 3]);
   const r = await h.get('/api/admin/pump/live-config?scope=all', { token: admin });

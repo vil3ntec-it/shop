@@ -51,8 +51,9 @@ async function scopeVersion(scope) {
   if (versions.has(scope)) return versions.get(scope);
   const r = await db.one('SELECT version FROM live_config_versions WHERE scope=$1', [scope]);
   const v = r ? Number(r.version) : 0;
-  versions.set(scope, v);
-  return v;
+  //  ⚠️ نوشتنی که وسطِ همین خواندن تمام شد نسخهٔ تازه‌تر را گذاشته — عقبش نبر
+  if (!versions.has(scope) || versions.get(scope) < v) versions.set(scope, v);
+  return versions.get(scope);
 }
 
 /** نسخهٔ برگهٔ یک پمپ: «همه.خودش». در سکوت، بی هیچ پرسشی از دیتابیس. */

@@ -462,7 +462,7 @@ router.get('/rate', async (req, res, next) => {
     //  «درجا» (`?wait=<ثانیه>`): فرمانی در صف نیست ⇒ پاسخ باز می‌ماند تا بات
     //  فرمانی بسازد یا مهلت تمام شود. بی `wait` همان رفتارِ همیشگی.
     const wait = Math.min(rates.WAIT_MAX_S, Math.max(0, Number.parseInt(req.query.wait, 10) || 0));
-    if (!cmd && wait > 0) {
+    if (!cmd && wait > 0 && rates.waiting(req.stationId) < rates.MAX_WAITERS) {
       const w = rates.waitFor(req.stationId, wait * 1000);
       res.on('close', w.cancel);
       await w.promise;

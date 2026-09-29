@@ -31,6 +31,12 @@ const STALE_MS = 24 * 3600 * 1000;
  * مهلتِ ۲۰ ثانیه‌ایِ HttpClientِ برنامه است.
  */
 const WAIT_MAX_S = 15;
+/**
+ * ⛔ سقفِ پرسش‌های بازِ هم‌زمانِ **یک پمپ**. یک پمپ یک کامپیوتر است و یک پرسشِ باز
+ * بس است؛ چهار برای وقتی که اتصالِ قبلی هنوز بسته نشده. بیشتر از آن ⇒ پاسخِ فوری،
+ * تا کسی با یک توکنِ دستگاه نتواند صدها اتصال را روی سرور باز نگه دارد.
+ */
+const MAX_WAITERS = 4;
 
 /** stationId ⇒ شنونده‌های منتظر. فقط در حافظه؛ سرورِ حساب یک پروسه است. */
 const waiters = new Map();
@@ -178,4 +184,4 @@ async function recent(stationId, limit = 10) {
     [stationId, limit])).map(shape);
 }
 
-module.exports = { parse, create, pending, ack, recent, waitFor, waiting, MIN_RATE, MAX_RATE, STALE_MS, WAIT_MAX_S };
+module.exports = { parse, create, pending, ack, recent, waitFor, waiting, MIN_RATE, MAX_RATE, STALE_MS, WAIT_MAX_S, MAX_WAITERS };

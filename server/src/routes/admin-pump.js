@@ -23,6 +23,7 @@ const audit = require('../lib/audit');
 const { catalogOf, PUMP_FEATURES } = require('../lib/features');
 const { entitlementOf } = require('../lib/entitlement').pump;
 const { badRequest, notFound } = require('../middleware/errors');
+const { requireSuperAdmin } = require('../middleware/auth');
 
 const router = express.Router();
 const PUMP = catalogOf('pump');
@@ -34,6 +35,8 @@ router.get('/features', (req, res) => res.json({ features: PUMP_FEATURES }));
  *  «تنظیماتِ زنده» ی برنامهٔ پمپ (lib/live-config.js) — scope = `all` یا شناسهٔ یک پمپ.
  *  ⛔ فقط مقدار: برنامه فقط کلیدهایی را می‌خواند که خودش می‌شناسد، پس نوشتنِ
  *  کلیدِ تازه هیچ رفتاری را عوض نمی‌کند تا روزی بخشی از برنامه به آن وصل شود.
+ *  ⛔ نوشتن و پاک کردن فقط مدیرِ ارشد: یک کلید روی `all` روزی رفتارِ برنامهٔ
+ *  همهٔ پمپ‌ها را عوض می‌کند. (مدیرِ خودساختهٔ پنل ارشد است.)
  */
 router.get('/live-config', async (req, res, next) => {
   try {
@@ -41,7 +44,7 @@ router.get('/live-config', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.put('/live-config', async (req, res, next) => {
+router.put('/live-config', requireSuperAdmin, async (req, res, next) => {
   try {
     const b = req.body || {};
     const out = await require('../lib/live-config').set(b.scope || 'all', b.key, b.value, req.admin?.username || req.admin?.id || '');
@@ -53,7 +56,7 @@ router.put('/live-config', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.delete('/live-config', async (req, res, next) => {
+router.delete('/live-config', requireSuperAdmin, async (req, res, next) => {
   try {
     const b = { ...(req.query || {}), ...(req.body || {}) };
     const out = await require('../lib/live-config').remove(b.scope || 'all', b.key);

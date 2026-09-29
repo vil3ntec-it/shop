@@ -369,6 +369,31 @@ test('«درجا»: برنامه‌ای که اتصال را بست شنونده
   assert.equal((await h.get('/api/pump/device/rate', { token: p.dev })).body.cmd.petrol, 70);
 });
 
+test('«درجا»: ⛔ یک توکنِ دستگاه بیش از سقف پرسشِ باز نگه نمی‌دارد', async () => {
+  const p = await pump('درجاسقف');
+  const ctrls = [];
+  const open = [];
+  for (let i = 0; i < rates.MAX_WAITERS; i++) {
+    const c = new AbortController();
+    ctrls.push(c);
+    open.push(fetch(`${h.base()}/api/pump/device/rate?wait=10`, {
+      headers: { Authorization: `Bearer ${p.dev}` }, signal: c.signal,
+    }).catch(() => null));
+  }
+  for (let i = 0; i < 200 && rates.waiting(p.stationId) < rates.MAX_WAITERS; i++) await new Promise(r => setTimeout(r, 10));
+  assert.equal(rates.waiting(p.stationId), rates.MAX_WAITERS);
+  //  پرسشِ اضافه منتظر نمی‌ماند
+  const t = Date.now();
+  const extra = await h.get('/api/pump/device/rate?wait=10', { token: p.dev });
+  assert.equal(extra.status, 200);
+  assert.ok(Date.now() - t < 2000, `پرسشِ بیش از سقف باید فوری جواب بگیرد: ${Date.now() - t}ms`);
+  assert.equal(rates.waiting(p.stationId), rates.MAX_WAITERS);
+  ctrls.forEach(c => c.abort());
+  await Promise.all(open);
+  for (let i = 0; i < 200 && rates.waiting(p.stationId) > 0; i++) await new Promise(r => setTimeout(r, 10));
+  assert.equal(rates.waiting(p.stationId), 0);
+});
+
 test('⛔ نرخ: بی ایمیل، کارمند، عددِ ناممکن و گروهِ بی «نرخ» — هیچ فرمانی ساخته نمی‌شود', async () => {
   const p = await pump('نرخ‌قفل');
   const count = async () => (await one('SELECT count(*)::int AS n FROM station_rate_cmds WHERE station_id=$1', [p.stationId])).n;
