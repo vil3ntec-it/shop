@@ -1693,7 +1693,6 @@ SCALE=2000 SCALE_PAR=40 node --test test/pump-scale.test.js
 - ⛔ **SVG/XML/HTML رسانه نیست** (`kindOf` چتِ مشتری و `mediaKindOf` پشتیبانی): اسکریپت
   دارد و روی دامنهٔ خودِ سرورِ حساب اجرا می‌شد. و هر رسانه با `nosniff` و CSPِ
   `sandbox` می‌رود — حتی اگر مستقیم در مرورگر باز شود صفحه نیست.
-<<<<<<< HEAD
 
 ## 💬 «چت‌های میرزا» و 🏷️ نرخِ اتحادیه از تلگرام (از ۱۴۰۵/۰۷/۱۶، نسخه 2.11.15)
 
@@ -1732,5 +1731,3 @@ SCALE=2000 SCALE_PAR=40 node --test test/pump-scale.test.js
   عدد بیرون از ۱۰ تا ۵۰۰ ⇒ رد با دلیل.
 - آزمون: `test/pump-telegram-mirza.test.js` (۱۲ بند). سمتِ برنامه: `CLAUDE.md`ِ
   ریپوی پمپ.
-=======
->>>>>>> origin/main
