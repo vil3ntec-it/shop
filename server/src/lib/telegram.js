@@ -542,7 +542,7 @@ const WELCOME =
   + 'این بات سه کار می‌کند:\n'
   + '🚨 هشدار: حسابِ قرض‌داری تمام شد یا کم ماند، یا مخزن ته کشید — همین‌جا خبر می‌گیرید، حتی وقتی برنامه بسته است.\n'
   + '💬 چت‌های میرزا: وقتی برنامهٔ کامپیوتر خاموش است، پیامِ مشتری‌های کیو‌آر همین‌جا می‌آید و جوابشان را می‌دهید.\n'
-  + '🏷️ نرخِ اتحادیه: بنویسید «پطرول ۷۹ دیزل ۸۰» و در برنامهٔ کامپیوترِ پمپ می‌نشیند.\n\n'
+  + '🏷️ نرخِ اتحادیه: «مدیرانِ نرخ»ی که صاحبِ پمپ تعیین کرده بنویسند «پطرول ۷۹ دیزل ۸۰» و در برنامهٔ کامپیوترِ پمپ می‌نشیند.\n\n'
   + 'گامِ ۱ — ✉️ ایمیلِ حسابِ پمپتان را همین‌جا بفرستید (همان که در برنامهٔ پمپ با آن وارد شده‌اید).\n'
   + 'گامِ ۲ — 🔢 یک کدِ شش‌رقمی به همان ایمیل می‌رود (پوشهٔ اسپم را هم ببینید)؛ کد را همین‌جا بفرستید. تمام.\n\n'
   + 'فقط می‌خواهید پیامِ مشتری‌ها را بگیرید؟ «💬 چت‌های میرزا» را بزنید — آن‌جا فقط کدِ هشت‌رقمیِ پمپ لازم است.';
@@ -557,7 +557,8 @@ const HELP =
   + '  ۳) وقتی برنامهٔ کامپیوتر خاموش است، پیامِ مشتری این‌جا می‌آید. روی آن «Reply» بزنید و بنویسید — جواب به گوشیِ همان مشتری می‌رسد.\n'
   + '  در گروه می‌خواهید؟ بات را به گروه اضافه کنید، در گروه /mirza بزنید و همان کد را بفرستید (فقط مدیرِ گروه).\n\n'
   + '🏷️ نرخِ اتحادیه: بنویسید «پطرول ۷۹ دیزل ۸۰» (یکی هم کافی است: «نرخ جدید پطرول ۷۹»).\n'
-  + '  فقط صاحب یا مدیرِ پمپ، و فقط برای پمپِ خودش؛ در گروه با واژهٔ «نرخ» یا /rate. نشست، خبر می‌دهم.\n\n'
+  + '  فقط «مدیرانِ نرخ»ی که صاحبِ پمپ تعیین کرده (⚙️ تنظیمات ← 👮 مدیرانِ نرخ) — هر کسِ دیگری بنویسد هیچ اتفاقی نمی‌افتد.\n'
+  + '  شناسهٔ تلگرامِ هر کس: /myid. در گروه با واژهٔ «نرخ» یا /rate. نشست، خبر می‌دهم.\n\n'
   + '🔎 جست‌وجو: نامِ قرض‌دار را بنویسید (در گروه: /find نام).\n'
   + '📊 وضعیت: هشدارهای بازِ همین حالا و موجودیِ مخزن.\n'
   + '📱 اپ و کدِ پمپ: لینکِ اپِ اندروید و آیفون، و کدی که کارمندان در اپ می‌زنند.\n'
@@ -958,6 +959,9 @@ async function sendSettings(row, editId = 0, lead = '') {
   }
   const kb = [[{ text: row.only_out ? '🔔 «کم مانده» را هم بفرست' : '🔕 فقط «تمام شد» را بفرست', callback_data: 'toggle' }]];
   if (row.kind === 'private') kb.push([{ text: '➕ افزودنِ شعبه (حسابِ دیگر)', callback_data: 'addacct' }]);
+  if (row.kind === 'private' && links.some(l => l.role === 'owner')) {
+    kb.push([{ text: '👮 مدیرانِ نرخِ اتحادیه', callback_data: 'rad' }]);
+  }
   if (links.length > 1) {
     for (const l of links) {
       kb.push([{ text: `🔌 جدا کردنِ «${l.station_name}»`.slice(0, 60), callback_data: `rm:${l.station_id}` }]);
@@ -1112,6 +1116,13 @@ async function onPrivate(chat, cmd, text, from = null) {
 
   if (cmd) {
     if (cmd.name === 'mirza' || cmd.name === 'chats') return sendMirza(row);
+    if (cmd.name === 'myid' || cmd.name === 'id') {
+      return send(row.chat_id, `🆔 شناسهٔ تلگرامِ شما: ${(from || chat).id}\nاین عدد را به صاحبِ پمپ بدهید تا شما را «مدیرِ نرخ» کند.`);
+    }
+    if (cmd.name === 'cancel' && row.state === 'rateadmin') {
+      await query(`UPDATE telegram_chats SET state='', pending_station='' WHERE chat_id=$1`, [row.chat_id]);
+      return sendMenu(row);
+    }
     if (cmd.name === 'rate') {
       const parsed = require('./station-rates').parse(cmd.arg);
       return parsed ? onRate(row, parsed, from || chat)
@@ -1139,6 +1150,8 @@ async function onPrivate(chat, cmd, text, from = null) {
 
   //  💬 در حالِ وصل کردنِ «چت‌های میرزا»: هر نوشته کدِ هشت‌رقمی است
   if (row.state === 'relay') return onRelayCode(row, text);
+  //  👮 صاحبِ پمپ در حالِ افزودنِ شناسه‌های مدیرانِ نرخ
+  if (row.state === 'rateadmin') return onRateAdminInput(row, text);
   //  🏷️ «پطرول ۷۹ دیزل ۸۰» — نرخِ اتحادیه، نه جست‌وجو و نه ایمیل
   const rate = require('./station-rates').parse(text);
   if (rate && row.state !== 'code') return onRate(row, rate, from || chat);
@@ -1255,6 +1268,9 @@ async function onGroup(chat, cmd, from, text = '') {
   }
 
   if (cmd.name === 'mirza' || cmd.name === 'chats') return sendMirza(row);
+  if (cmd.name === 'myid' || cmd.name === 'id') {
+    return send(row.chat_id, `🆔 شناسهٔ تلگرامِ ${from?.first_name || 'شما'}: ${from?.id || '—'}`);
+  }
   if (cmd.name === 'cancel' && row.state === 'relay') {
     await setState(row.chat_id, '');
     return send(row.chat_id, 'باشد.');
@@ -1546,20 +1562,44 @@ async function onRelayReply(m) {
    🏷️ نرخِ اتحادیه از تلگرام — فقط برای پمپِ همان حساب
    ══════════════════════════════════════════════════════════════════
 
-   ⛔ فقط گفت‌وگویی که **با ایمیل** به پمپ وصل است (`linksOf` — عضوِ فعال)،
-   و فقط صاحب یا مدیرِ همان پمپ؛ در گروه هم مدیرِ گروه یا وصل‌کننده.
+   ⛔ **فقط از شناسه‌های تلگرامی که صاحبِ پمپ داده** (`station_rate_admins`،
+   «👮 مدیرانِ نرخ») — خواستهٔ صاحب سامانه: «به بات چند ایدیِ تلگرام می‌دهم…
+   فقط از اون‌ها اطاعت بشه که هر کس و ناکس نتونه بگه این نرخ رو بذار».
+   ملاک **شناسهٔ فرستنده** (`from.id`) است، نه گفت‌وگو: در گروه هم فقط
+   همان شناسه‌ها، هر کس دیگری (حتی مدیرِ گروه) نه. خودِ صاحبِ پمپ (با ایمیل
+   وصل) همیشه مجاز است — فهرست را او می‌سازد.
    کدِ هشت‌رقمی (که دستِ کارمندان است) نرخ را عوض **نمی‌کند**.
    ⛔ در گروه فقط وقتی «نرخ» در پیام هست (یا /rate): «پطرول ۵۰ لیتر دادم»
    حرفِ کارمندان است، نه نرخ.
 */
-
-const RATE_ROLES = new Set(['owner', 'manager']);
 
 function rateLine(p) {
   const parts = [];
   if (p.petrol !== null && p.petrol !== undefined) parts.push(`پطرول ${faNum(p.petrol)}`);
   if (p.diesel !== null && p.diesel !== undefined) parts.push(`دیزل ${faNum(p.diesel)}`);
   return parts.join(' · ');
+}
+
+/** شناسهٔ تلگرامِ فرستنده ⇒ پمپ‌هایی که او مدیرِ نرخشان است (یا صاحبشان). */
+async function rateStations(from) {
+  const uid = String(from?.id || '');
+  if (!uid) return [];
+  const uname = String(from?.username || '').toLowerCase();
+  return many(
+    `SELECT s.id AS station_id, s.name AS station_name
+       FROM stations s
+      WHERE s.status='active' AND (
+        EXISTS (SELECT 1 FROM station_rate_admins a
+                 WHERE a.station_id=s.id
+                   AND ((a.tg_id<>'' AND a.tg_id=$1) OR (a.tg_username<>'' AND $2<>'' AND a.tg_username=$2)))
+        OR EXISTS (SELECT 1 FROM telegram_chat_links l
+                     JOIN telegram_chats c ON c.chat_id=l.chat_id AND c.kind='private'
+                     JOIN station_members m ON m.station_id=l.station_id AND m.user_id=l.user_id
+                          AND m.status='active' AND m.role='owner'
+                     JOIN users u ON u.id=l.user_id AND u.status='active'
+                    WHERE l.station_id=s.id AND l.chat_id=$1))
+      ORDER BY s.name, s.id`,
+    [uid, uname]);
 }
 
 async function onRate(row, parsed, from) {
@@ -1571,18 +1611,15 @@ async function onRate(row, parsed, from) {
       + 'هیچ چیزی عوض نشد؛ دوباره بنویسید، مثلاً: پطرول ۷۹ دیزل ۸۰');
   }
   if (parsed.petrol === null && parsed.diesel === null) return null;
-  const links = isLinked(row) ? await linksOf(row) : [];
-  if (!links.length) {
-    return send(row.chat_id,
-      'برای عوض کردنِ نرخِ اتحادیه از تلگرام، اول باید با ایمیلِ حسابِ پمپ وصل شوید (همین‌جا ایمیل را بفرستید). '
-      + 'کدِ هشت‌رقمیِ پمپ برای این کار کافی نیست.');
-  }
-  if (row.kind !== 'private' && !(await canManage(row, from))) {
-    return send(row.chat_id, '⛔ نرخِ اتحادیه را فقط مدیرانِ همین گروه عوض می‌کنند.');
-  }
-  const allowed = row.kind === 'private' ? links.filter(l => RATE_ROLES.has(l.role)) : links;
+  const allowed = await rateStations(from);
   if (!allowed.length) {
-    return send(row.chat_id, '⛔ نرخِ اتحادیه را فقط صاحب یا مدیرِ پمپ عوض می‌کند، نه کارمند.');
+    if (row.kind !== 'private') {
+      return send(row.chat_id, '⛔ نرخِ اتحادیه را فقط «مدیرانِ نرخ»ی که صاحبِ پمپ تعیین کرده عوض می‌کنند. هیچ چیزی عوض نشد.');
+    }
+    return send(row.chat_id,
+      '⛔ شما «مدیرِ نرخ»ِ هیچ پمپی نیستید، پس هیچ نرخی عوض نشد.\n'
+      + `🆔 شناسهٔ تلگرامِ شما: ${from?.id || '—'}\n`
+      + 'این شناسه را به صاحبِ پمپ بدهید تا در بات ← ⚙️ تنظیمات ← «👮 مدیرانِ نرخ» اضافه کند.');
   }
   if (allowed.length === 1) return createRate(row, allowed[0], parsed, from);
   //  چند شعبه: ⛔ هیچ نرخی «برای همه» نمی‌نشیند — هر شعبه با کلیکِ خودش
@@ -1593,10 +1630,87 @@ async function onRate(row, parsed, from) {
     allowed.map(l => [{ text: `⛽ ${l.station_name}`.slice(0, 50), callback_data: `rg:${l.station_id}:${p}:${d}` }]));
 }
 
+/* ── 👮 مدیرانِ نرخ — فقط صاحبِ پمپ فهرست را می‌سازد ────────────── */
+
+const RATE_ADMIN_MAX = 20;
+
+/** پمپ‌هایی که صاحبشان همین گفت‌وگوی خصوصی است (با ایمیل وصل). */
+async function ownedStations(row) {
+  if (!row || row.kind !== 'private' || !isLinked(row)) return [];
+  return (await linksOf(row)).filter(l => l.role === 'owner');
+}
+
+async function sendRateAdmins(row, stationId, editId = 0, lead = '') {
+  const own = (await ownedStations(row)).find(l => l.station_id === stationId);
+  if (!own) return sendSettings(row, editId);
+  const list = await many(
+    'SELECT * FROM station_rate_admins WHERE station_id=$1 ORDER BY added_at', [stationId]);
+  let text = (lead ? `${lead}\n\n` : '') + `👮 مدیرانِ نرخِ «${own.station_name}»\n\n`
+    + 'فقط این افراد (و خودِ شما) می‌توانند از تلگرام نرخِ اتحادیهٔ همین پمپ را عوض کنند — '
+    + 'هر کسِ دیگری بنویسد، بات هیچ کاری نمی‌کند.\n\n';
+  text += list.length
+    ? list.map(a => `▫️ ${a.label ? `${a.label} — ` : ''}${a.tg_id ? `🆔 ${a.tg_id}` : `@${a.tg_username}`}`).join('\n')
+    : '▫️ هنوز کسی اضافه نشده (فقط خودِ شما).';
+  text += '\n\nهر کس شناسه‌اش را نمی‌داند: به همین بات /myid بفرستد.';
+  const kb = [[{ text: '➕ افزودنِ شناسه', callback_data: `radadd:${stationId}` }]];
+  for (const a of list) {
+    kb.push([{ text: `🗑 برداشتنِ ${a.label || a.tg_id || '@' + a.tg_username}`.slice(0, 60), callback_data: `radrm:${a.id}` }]);
+  }
+  kb.push([{ text: '‹ تنظیمات', callback_data: 'settings' }]);
+  return show(row.chat_id, text, kb, editId);
+}
+
+/** «123456789 @mirza_user 987654321» ⇒ شناسه‌ها و نام‌های کاربری. */
+function parseRateAdmins(text) {
+  const out = [];
+  for (const raw of asciiDigits(text).split(/[\s,،;]+/)) {
+    const t = raw.trim();
+    if (!t) continue;
+    if (/^-?\d{5,15}$/.test(t)) out.push({ tg_id: t.replace(/^-/, ''), tg_username: '' });
+    else if (/^@?[A-Za-z][A-Za-z0-9_]{4,31}$/.test(t)) out.push({ tg_id: '', tg_username: t.replace(/^@/, '').toLowerCase() });
+    else return null;
+  }
+  return out.length ? out : null;
+}
+
+async function onRateAdminInput(row, text) {
+  const sid = row.pending_station;
+  const own = (await ownedStations(row)).find(l => l.station_id === sid);
+  if (!own) { await setState(row.chat_id, ''); return sendSettings(row); }
+  const items = parseRateAdmins(text);
+  if (!items) {
+    return send(row.chat_id,
+      'این شناسه درست نیست. شناسهٔ عددیِ تلگرام را بفرستید (مثلاً 123456789) — چند تا با فاصله هم می‌شود. انصراف: /cancel');
+  }
+  const have = Number((await one('SELECT count(*)::int AS n FROM station_rate_admins WHERE station_id=$1', [sid])).n) || 0;
+  let added = 0;
+  const t = now();
+  for (const it of items) {
+    if (have + added >= RATE_ADMIN_MAX) break;
+    const r = await one(
+      `INSERT INTO station_rate_admins (id, station_id, tg_id, tg_username, added_by, added_at)
+       VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING RETURNING id`,
+      [newId('rad'), sid, it.tg_id, it.tg_username, String(row.chat_id), t]);
+    if (r) added += 1;
+  }
+  await query(`UPDATE telegram_chats SET state='', pending_station='', updated_at=$2 WHERE chat_id=$1`, [row.chat_id, t]);
+  await require('./audit').log({
+    actorType: 'user', userId: own.user_id, action: 'pump.rate_admins_added',
+    targetType: 'station', targetId: sid, detail: { added },
+  });
+  return sendRateAdmins(await chatRow(row.chat_id), sid, 0,
+    added ? `✅ ${faNum(added)} شناسه اضافه شد.` : 'همهٔ این شناسه‌ها از قبل در فهرست بودند (یا فهرست پر است).');
+}
+
 async function createRate(row, link, parsed, from) {
   const rates = require('./station-rates');
   const by = [from?.first_name, from?.last_name].filter(Boolean).join(' ') || (from?.username ? `@${from.username}` : '');
   await rates.create(link.station_id, { petrol: parsed.petrol, diesel: parsed.diesel, chatId: row.chat_id, by });
+  //  نامِ مدیرِ نرخ را یاد بگیر تا فهرست به‌جای عدد نام نشان بدهد
+  if (by && from?.id) {
+    await query(`UPDATE station_rate_admins SET label=$3 WHERE station_id=$1 AND tg_id=$2 AND label=''`,
+      [link.station_id, String(from.id), by.slice(0, 60)]).catch(() => {});
+  }
   const online = await desktopOnline(link.station_id);
   return send(row.chat_id,
     `⏳ نرخِ اتحادیهٔ «${link.station_name}»: ${rateLine(parsed)}\n`
@@ -1635,7 +1749,7 @@ async function onMessage(m) {
 }
 
 /** کارهایی که در گروه فقط مدیر (یا وصل‌کننده) می‌کند. */
-const MANAGE = new Set(['settings', 'toggle', 'unlink', 'unlink_yes', 'code', 'rm', 'rmy', 'addacct', 'chansync', 'mzadd', 'mzrm', 'rg']);
+const MANAGE = new Set(['settings', 'toggle', 'unlink', 'unlink_yes', 'code', 'rm', 'rmy', 'addacct', 'chansync', 'mzadd', 'mzrm']);
 
 async function onCallback(q) {
   const answer = (text = '', alert = false) => call('answerCallbackQuery', {
@@ -1766,14 +1880,40 @@ async function onCallback(q) {
       return sendMirza(await chatRow(row.chat_id), editId,
         `🔌 پیامِ مشتری‌های «${had.station_name}» دیگر این‌جا نمی‌آید.`);
     }
+    case 'rad': {
+      await answer();
+      const own = await ownedStations(row);
+      if (!own.length) {
+        return show(row.chat_id, '👮 «مدیرانِ نرخ» را فقط صاحبِ پمپ (با ایمیل وصل) در گفت‌وگوی خصوصی تعیین می‌کند.', [[BACK]], editId);
+      }
+      if (own.length === 1) return sendRateAdmins(row, own[0].station_id, editId);
+      return show(row.chat_id, '👮 مدیرانِ نرخِ کدام شعبه؟',
+        [...own.map(l => [{ text: `⛽ ${l.station_name}`.slice(0, 50), callback_data: `radst:${l.station_id}` }]), [BACK]], editId);
+    }
+    case 'radst': await answer(); return sendRateAdmins(row, arg, editId);
+    case 'radadd': {
+      await answer();
+      if (!(await ownedStations(row)).some(l => l.station_id === arg)) return sendSettings(row, editId);
+      await query(`UPDATE telegram_chats SET state='rateadmin', pending_station=$2, updated_at=$3 WHERE chat_id=$1`,
+        [row.chat_id, arg, now()]);
+      return show(row.chat_id,
+        '🆔 شناسهٔ عددیِ تلگرامِ مدیر، کارفرما یا میرزا را بفرستید — چند تا با فاصله هم می‌شود.\n'
+        + 'شناسه را نمی‌داند؟ همان شخص به همین بات /myid بفرستد، عدد را می‌گیرد.\n\n(انصراف: /cancel)', null, editId);
+    }
+    case 'radrm': {
+      await answer();
+      const a = await one('SELECT * FROM station_rate_admins WHERE id=$1', [arg]);
+      //  ⛔ فقط صاحبِ همان پمپ از فهرستِ همان پمپ برمی‌دارد
+      if (!a || !(await ownedStations(row)).some(l => l.station_id === a.station_id)) return sendSettings(row, editId);
+      await query('DELETE FROM station_rate_admins WHERE id=$1', [a.id]);
+      return sendRateAdmins(await chatRow(row.chat_id), a.station_id, editId, '🗑 برداشته شد.');
+    }
     case 'rg': {
       //  ‎rg:<پمپ>:<پطرول>:<دیزل>‎ — ⛔ فقط شعبه‌ای که به همین گفت‌وگو وصل است
+      //  ⛔ کسی که دکمه را می‌زند باید خودش مدیرِ نرخِ همان پمپ باشد
       const parts = String(q.data || '').split(':');
-      const l = await branch();
-      if (!l) return answer('این شعبه به این گفت‌وگو وصل نیست.', true);
-      if (row.kind === 'private' && !RATE_ROLES.has(l.role)) {
-        return answer('⛔ نرخ را فقط صاحب یا مدیرِ پمپ عوض می‌کند.', true);
-      }
+      const l = (await rateStations(q.from)).find(x => x.station_id === arg);
+      if (!l) return answer('⛔ شما مدیرِ نرخِ این پمپ نیستید.', true);
       const num = (v) => (v === '-' || v === undefined ? null : Number(v));
       const parsed = require('./station-rates').parse(
         `پطرول ${parts[2] === '-' ? '' : parts[2]} دیزل ${parts[3] === '-' ? '' : parts[3]}`);
@@ -2243,6 +2383,7 @@ async function setCommands() {
       { command: 'group', description: 'وصل کردنِ گروه یا کانال' },
       { command: 'mirza', description: 'چت‌های میرزا — پیامِ مشتری‌های کیو‌آر' },
       { command: 'rate', description: 'نرخِ اتحادیه: /rate پطرول ۷۹ دیزل ۸۰' },
+      { command: 'myid', description: 'شناسهٔ تلگرامِ من (برای مدیرِ نرخ شدن)' },
       { command: 'settings', description: 'تنظیمات' },
       { command: 'help', description: 'راهنما' },
     ],
@@ -2253,7 +2394,8 @@ async function setCommands() {
       { command: 'status', description: 'هشدارهای باز و موجودیِ مخزن' },
       { command: 'find', description: 'جست‌وجوی قرض‌دار: /find نام' },
       { command: 'mirza', description: 'چت‌های میرزا در همین گروه' },
-      { command: 'rate', description: 'نرخِ اتحادیه (مدیرِ گروه)' },
+      { command: 'rate', description: 'نرخِ اتحادیه (فقط مدیرانِ نرخ)' },
+      { command: 'myid', description: 'شناسهٔ تلگرامِ من' },
       { command: 'menu', description: 'منو' },
     ],
   });

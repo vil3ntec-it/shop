@@ -60,3 +60,23 @@ ALTER TABLE telegram_chats ADD COLUMN IF NOT EXISTS relay_by     text    NOT NUL
 --  ⛔ هشِ همان کدِ هشت‌رقمی که با آن وصل شد: صاحبِ پمپ که کد را در پروفایل
 --  عوض کند، همهٔ «چت‌های میرزا»ی قبلی همان لحظه خاموش می‌شوند.
 ALTER TABLE telegram_relays ADD COLUMN IF NOT EXISTS code_hash text NOT NULL DEFAULT '';
+
+--  👮 مدیرانِ نرخ — فقط این شناسه‌های تلگرام نرخِ اتحادیهٔ همین پمپ را عوض
+--  می‌کنند (خواستهٔ صاحب سامانه: «هر کس و ناکس نتونه بگه این نرخ رو بذار»).
+--  صاحبِ پمپ (با ایمیل وصل) فهرست را می‌سازد و خودش هم همیشه مجاز است.
+--  ⚠️ شناسهٔ عددی مرجع است؛ نامِ کاربری (@…) عوض‌شدنی است و فقط کمکی است.
+CREATE TABLE IF NOT EXISTS station_rate_admins (
+  id          text   PRIMARY KEY,
+  station_id  text   NOT NULL REFERENCES stations(id) ON DELETE CASCADE,
+  tg_id       text   NOT NULL DEFAULT '',
+  tg_username text   NOT NULL DEFAULT '',
+  label       text   NOT NULL DEFAULT '',
+  added_by    text   NOT NULL DEFAULT '',
+  added_at    bigint NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_station_rate_admins
+  ON station_rate_admins(station_id, tg_id, tg_username);
+CREATE INDEX IF NOT EXISTS idx_station_rate_admins_tg ON station_rate_admins(tg_id) WHERE tg_id <> '';
+
+--  گفت‌وگویی که منتظرِ «شناسه‌های مدیرِ نرخِ کدام پمپ» است
+ALTER TABLE telegram_chats ADD COLUMN IF NOT EXISTS pending_station text NOT NULL DEFAULT '';

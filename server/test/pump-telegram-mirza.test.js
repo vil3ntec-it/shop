@@ -317,11 +317,12 @@ test('⛔ نرخ: بی ایمیل، کارمند، عددِ ناممکن و گر
   const p = await pump('نرخ‌قفل');
   const count = async () => (await one('SELECT count(*)::int AS n FROM station_rate_cmds WHERE station_id=$1', [p.stationId])).n;
 
-  //  فقط کدِ هشت‌رقمی (چت‌های میرزا) ⇒ نه
+  //  فقط کدِ هشت‌رقمی (چت‌های میرزا) ⇒ نه — و شناسه‌اش را می‌گوید تا صاحبِ پمپ اضافه کند
   await linkRelay(9203, p);
   clear();
   await msg(9203, 'پطرول ۷۰ دیزل ۷۰');
-  assert.match(textsTo(9203), /ایمیلِ حسابِ پمپ/);
+  assert.match(textsTo(9203), /مدیرِ نرخ/);
+  assert.match(textsTo(9203), /9203/);
 
   //  کارمند (عضوِ فعال، نه صاحب و نه مدیر) ⇒ نه
   const staff = await h.newUser('کارمندِ نرخ', 'pump');
@@ -331,7 +332,7 @@ test('⛔ نرخ: بی ایمیل، کارمند، عددِ ناممکن و گر
   await linkPrivateEmail(9204, staff);
   clear();
   await msg(9204, 'پطرول ۷۰');
-  assert.match(textsTo(9204), /صاحب یا مدیرِ پمپ/);
+  assert.match(textsTo(9204), /مدیرِ نرخ/);
 
   //  عددِ ناممکن ⇒ نه، و می‌گوید چرا
   await linkPrivateEmail(9205, p);
@@ -346,4 +347,99 @@ test('⛔ نرخ: بی ایمیل، کارمند، عددِ ناممکن و گر
   assert.equal(to(g).length, 0);
 
   assert.equal(await count(), 0, JSON.stringify(await one('SELECT * FROM station_rate_cmds WHERE station_id=$1', [p.stationId])));
+});
+
+/* ══════════════════ 👮 مدیرانِ نرخ — فقط شناسه‌هایی که صاحبِ پمپ داده ══════════════════ */
+
+async function addRateAdmins(ownerChat, text) {
+  await press(ownerChat, 'rad');
+  const add = rows(lastTo(ownerChat)).flat().find(b => String(b.callback_data).startsWith('radadd:'));
+  assert.ok(add, 'دکمهٔ افزودن نیامد: ' + JSON.stringify(rows(lastTo(ownerChat))));
+  await press(ownerChat, add.callback_data);
+  await msg(ownerChat, text);
+}
+
+test('👮 صاحبِ پمپ شناسه می‌دهد ⇒ فقط همان شناسه‌ها نرخ را عوض می‌کنند، در خصوصی و در گروه', async () => {
+  const p = await pump('فهرست');
+  await linkPrivateEmail(9301, p);
+  clear();
+  await addRateAdmins(9301, fa('777001') + ' 777002');
+  assert.match(textsTo(9301), /۲ شناسه اضافه شد/);
+  const n = async () => (await one('SELECT count(*)::int AS n FROM station_rate_admins WHERE station_id=$1', [p.stationId])).n;
+  assert.equal(await n(), 2);
+
+  const cmds = async () => (await one('SELECT count(*)::int AS n FROM station_rate_cmds WHERE station_id=$1', [p.stationId])).n;
+  //  مدیرِ نرخ در خصوصیِ خودش — بی هیچ ایمیلی
+  clear();
+  await msg(777001, 'پطرول ۸۱ دیزل ۸۲', { from: { id: 777001, first_name: 'کارفرما' } });
+  assert.match(textsTo(777001), /⏳ نرخِ اتحادیه/);
+  assert.equal(await cmds(), 1);
+  //  نامش یاد گرفته شد
+  assert.equal((await one('SELECT label FROM station_rate_admins WHERE station_id=$1 AND tg_id=$2', [p.stationId, '777001'])).label, 'کارفرما');
+
+  //  ⛔ غریبه در خصوصی
+  clear();
+  await msg(888001, 'پطرول ۱۰۰ دیزل ۱۰۰', { from: { id: 888001 } });
+  assert.match(textsTo(888001), /مدیرِ نرخ/);
+  assert.equal(await cmds(), 1);
+
+  //  گروه: مدیرِ گروه که در فهرست نیست ⇒ نه؛ مدیرِ نرخ ⇒ آری
+  const g = -100930;
+  responder = async (method) => (method === 'getChatMember' ? { ok: true, result: { status: 'administrator' } } : null);
+  try {
+    clear();
+    await msg(g, 'نرخ پطرول ۹۰', { type: 'supergroup', from: { id: 888002 } });
+    assert.match(textsTo(g), /مدیرانِ نرخ/);
+    assert.equal(await cmds(), 1, '⛔ مدیرِ گروه به‌تنهایی کافی نیست');
+    await msg(g, 'نرخ پطرول ۹۰', { type: 'supergroup', from: { id: 777002 } });
+    assert.equal(await cmds(), 2);
+  } finally { responder = null; }
+  const got = await h.get('/api/pump/device/rate', { token: p.dev });
+  assert.equal(got.body.cmd.petrol, 90);
+
+  //  برداشتن ⇒ همان لحظه دیگر نه
+  await press(9301, 'rad');
+  const rm = rows(lastTo(9301)).flat().find(b => /777002/.test(b.text) || /radrm:/.test(b.callback_data || ''));
+  const rmAll = rows(lastTo(9301)).flat().filter(b => String(b.callback_data).startsWith('radrm:'));
+  assert.equal(rmAll.length, 2);
+  const target = (await one('SELECT id FROM station_rate_admins WHERE station_id=$1 AND tg_id=$2', [p.stationId, '777002'])).id;
+  await press(9301, `radrm:${target}`);
+  assert.equal(await n(), 1);
+  clear();
+  await msg(g, 'نرخ پطرول ۹۵', { type: 'supergroup', from: { id: 777002 } });
+  assert.equal(await cmds(), 2);
+  assert.ok(rm);
+});
+
+test('⛔ فهرستِ یک پمپ پمپِ دیگر را باز نمی‌کند، و فقط صاحبِ همان پمپ فهرست را عوض می‌کند', async () => {
+  const a = await pump('فهرست‌الف');
+  const b = await pump('فهرست‌ب');
+  await linkPrivateEmail(9311, a);
+  await addRateAdmins(9311, '777311');
+  //  777311 مدیرِ نرخِ «الف» است ⇒ فرمان فقط برای «الف»
+  await msg(777311, 'پطرول ۷۷', { from: { id: 777311 } });
+  assert.equal((await h.get('/api/pump/device/rate', { token: a.dev })).body.cmd.petrol, 77);
+  assert.equal((await h.get('/api/pump/device/rate', { token: b.dev })).body.cmd, null, '⛔ پمپِ ب دست نخورد');
+
+  //  کارمندِ «ب» نمی‌تواند فهرستِ کسی را بسازد
+  const staff = await h.newUser('کارمندِ فهرست', 'pump');
+  await query(
+    `INSERT INTO station_members (id, station_id, user_id, role, status, created_at, updated_at)
+     VALUES ($1,$2,$3,'staff','active',$4,$4)`, [newId('mem'), b.stationId, staff.userId || staff.user?.id || staff.id, now()]);
+  await linkPrivateEmail(9312, staff);
+  clear();
+  await press(9312, 'rad');
+  assert.match(textsTo(9312), /فقط صاحبِ پمپ/);
+  await press(9312, `radadd:${b.stationId}`);
+  await msg(9312, '999999');
+  assert.equal((await one('SELECT count(*)::int AS n FROM station_rate_admins WHERE station_id=$1', [b.stationId])).n, 0);
+  //  و دکمهٔ برداشتنِ فهرستِ «الف» از دستِ کسِ دیگر هیچ کاری نمی‌کند
+  const id = (await one('SELECT id FROM station_rate_admins WHERE station_id=$1', [a.stationId])).id;
+  await press(9312, `radrm:${id}`);
+  assert.equal((await one('SELECT count(*)::int AS n FROM station_rate_admins WHERE station_id=$1', [a.stationId])).n, 1);
+
+  //  /myid شناسه را می‌گوید
+  clear();
+  await msg(555123, '/myid', { from: { id: 555123 } });
+  assert.match(textsTo(555123), /555123/);
 });
