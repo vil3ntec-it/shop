@@ -232,7 +232,7 @@ router.post('/:code/acct/:id/chat/media', chatLimit, openChat,
     try {
       const { station, acct } = req.chat;
       const out = await chat.putMedia({
-        stationId: station.id, acct,
+        stationId: station.id, acct, uploader: 'c',
         mime: req.headers['content-type'] || '', buf: Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0),
       });
       res.status(201).json({ ok: true, ...out });
@@ -244,10 +244,7 @@ router.get('/:code/acct/:id/chat/media/:mid', chatLimit, openChat, async (req, r
     const { station, acct } = req.chat;
     const m = await chat.getMedia({ stationId: station.id, acct, id: String(req.params.mid || '') });
     if (!m) throw notFound(relay.GONE_MESSAGE, 'media_gone');
-    res.set('Content-Type', m.mime);
-    res.set('Content-Length', String(m.size));
-    res.set('Cache-Control', 'private, max-age=3600');
-    res.end(m.data);
+    chat.sendMedia(req, res, m, 'c');
   } catch (err) { next(err); }
 });
 

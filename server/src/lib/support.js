@@ -38,6 +38,8 @@ const MEDIA_PREVIEW = { image: '📷 عکس', video: '🎥 ویدیو', audio: '
 /** نوعِ رسانه از روی mime — فقط عکس، ویدیو و صدا. */
 function mediaKindOf(mime) {
   const m = String(mime || '').toLowerCase().split(';')[0].trim();
+  //  ⛔ SVG/XML «عکس» نیست — اسکریپت دارد
+  if (/svg|xml|html/.test(m)) return null;
   if (/^image\/[a-z0-9.+-]+$/.test(m)) return 'image';
   if (/^video\/[a-z0-9.+-]+$/.test(m)) return 'video';
   if (/^audio\/[a-z0-9.+-]+$/.test(m)) return 'audio';
@@ -335,6 +337,9 @@ function sendMedia(req, res, m, side) {
   res.set('Content-Type', m.mime);
   res.set('Content-Length', String(m.size));
   res.set('Cache-Control', 'no-store');
+  //  ⛔ رسانه هرگز صفحه نیست — حتی اگر مستقیم باز شود
+  res.set('X-Content-Type-Options', 'nosniff');
+  res.set('Content-Security-Policy', "default-src 'none'; media-src 'self'; img-src 'self'; sandbox");
   const recipient = m.uploader !== side;
   if (recipient && req.method === 'GET') {
     res.on('finish', () => {

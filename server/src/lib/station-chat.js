@@ -16,7 +16,7 @@
  *     (یا از محیط: VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / VAPID_SUBJECT).
  */
 const crypto = require('crypto');
-const { one, many, newId, now } = require('../db');
+const { one, many, query, newId, now } = require('../db');
 const plans = require('./plans');
 const stations = require('./stations');
 const { badRequest, forbidden, notFound } = require('../middleware/errors');
@@ -37,7 +37,9 @@ function cleanAcct(raw) {
 }
 
 function kindOf(mime) {
-  const m = String(mime || '').toLowerCase();
+  const m = String(mime || '').toLowerCase().split(';')[0].trim();
+  //  ⛔ SVG و هر نوعِ XMLی «عکس» نیست — اسکریپت دارد و روی دامنهٔ خودِ سرور اجرا می‌شد
+  if (/svg|xml|html/.test(m)) return null;
   if (m.startsWith('image/')) return 'image';
   if (m.startsWith('video/')) return 'video';
   if (m.startsWith('audio/')) return 'audio';
@@ -160,24 +162,49 @@ async function remove({ stationId, acct, id, by }) {
   return shape(saved);
 }
 
-async function putMedia({ stationId, acct, mime, buf }) {
+async function putMedia({ stationId, acct, mime, buf, uploader = null }) {
   const kind = kindOf(mime);
   if (!kind) throw badRequest('فقط عکس، ویدیو و صدا', 'bad_mime');
   if (!buf || !buf.length) throw badRequest('فایل خالی است', 'empty');
   if (buf.length > LIMITS[kind]) throw badRequest('فایل بزرگ‌تر از حد است', 'too_large');
   const row = await one(
-    `INSERT INTO station_chat_media (id, station_id, acct, mime, size, data, created_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id, mime, size`,
-    [newId('med'), stationId, acct, String(mime).toLowerCase().slice(0, 80), buf.length, buf, now()]
+    `INSERT INTO station_chat_media (id, station_id, acct, mime, size, data, created_at, uploader)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id, mime, size`,
+    [newId('med'), stationId, acct, String(mime).toLowerCase().slice(0, 80), buf.length, buf, now(),
+     uploader === 'c' || uploader === 'o' ? uploader : null]
   );
   return { mediaId: row.id, kind, mime: row.mime, size: row.size };
 }
 
 async function getMedia({ stationId, acct, id }) {
   return one(
-    'SELECT mime, size, data FROM station_chat_media WHERE id=$1 AND station_id=$2' + (acct ? ' AND acct=$3' : ''),
+    'SELECT id, mime, size, data, uploader FROM station_chat_media WHERE id=$1 AND station_id=$2' + (acct ? ' AND acct=$3' : ''),
     acct ? [id, stationId, acct] : [id, stationId]
   );
+}
+
+/**
+ * ══ فرستادنِ رسانه — و پاک شدنش پس از رسیدن به گیرنده (۱۴۰۵/۰۷/۱۶) ══════
+ *
+ * `side` طرفی است که می‌خواهد: 'c' صفحهٔ کیو‌آر، 'o' برنامهٔ کامپیوتر. اگر
+ * گیرنده است (نه خودِ فرستنده) و پاسخ **کامل** رفت، ردیف همان لحظه پاک
+ * می‌شود — هر طرف نسخهٔ خودش را روی دستگاهِ خودش نگه می‌دارد. همان قاعدهٔ
+ * `support.sendMedia`. ⛔ رسانهٔ بی `uploader` (پیش از ۰۳۸) دست نمی‌خورد.
+ */
+function sendMedia(req, res, m, side) {
+  res.set('Content-Type', m.mime);
+  res.set('Content-Length', String(m.size));
+  res.set('Cache-Control', 'no-store');
+  //  ⛔ رسانه هرگز صفحه نیست: نه حدسِ نوع، نه اسکریپت، نه فرم — حتی اگر مستقیم باز شود
+  res.set('X-Content-Type-Options', 'nosniff');
+  res.set('Content-Security-Policy', "default-src 'none'; media-src 'self'; img-src 'self'; sandbox");
+  if (m.uploader && m.uploader !== side && req.method === 'GET') {
+    res.on('finish', () => {
+      query('DELETE FROM station_chat_media WHERE id=$1', [m.id])
+        .catch((err) => console.error('[chat:media-relay]', err.message));
+    });
+  }
+  res.end(m.data);
 }
 
 async function setBlocked(stationId, acct, blocked) {
@@ -201,7 +228,7 @@ async function seen(stationId, acct, side, seq) {
 /** فهرستِ گفت‌وگوها برای صاحبِ پمپ: آخرین پیام، نخوانده‌ها، بلاک. */
 async function threads(stationId) {
   const rows = await many(
-    `SELECT t.acct, t.name, t.blocked_at, t.owner_seen_seq, t.updated_at,
+    `SELECT t.acct, t.name, t.blocked_at, t.owner_seen_seq, t.cust_seen_seq, t.updated_at,
             (SELECT count(*) FROM station_chat_messages m
               WHERE m.station_id=t.station_id AND m.acct=t.acct AND m.from_side='c'
                 AND m.seq > t.owner_seen_seq AND m.deleted_at IS NULL) AS unread,
@@ -215,6 +242,8 @@ async function threads(stationId) {
     name: r.name || '',
     blocked: !!r.blocked_at,
     unread: Number(r.unread) || 0,
+    //  ✓✓ «مشتری دید» — تا کدام پیام را صفحهٔ کیو‌آر خوانده است
+    custSeenSeq: Number(r.cust_seen_seq) || 0,
     updatedAt: Number(r.updated_at),
     last: r.last ? shape(r.last) : null,
   }));
@@ -302,6 +331,6 @@ async function pushTo(stationId, acct, payload, { sender = null } = {}) {
 }
 
 module.exports = {
-  LIMITS, cleanAcct, kindOf, openWithKey, post, list, remove, putMedia, getMedia,
+  LIMITS, cleanAcct, kindOf, openWithKey, post, list, remove, putMedia, getMedia, sendMedia,
   setBlocked, seen, threads, thread, savePush, pushTo, publicKey, shape,
 };
