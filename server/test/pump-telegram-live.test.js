@@ -220,8 +220,11 @@ test('منو چهار دکمه در دو ردیف است، و هر دکمه هم
   clear();
   await msg(8201, '/menu');
   const menu = lastTo(8201);
-  assert.equal(rows(menu).length, 2, 'دو ردیف');
-  assert.equal(rows(menu).flat().length, 4, 'چهار دکمه');
+  //  دو ردیفِ همیشگی (چهار دکمه) + ردیفِ «💬 چت‌های میرزا» که صاحبِ سامانه
+  //  در ۱۴۰۵/۰۷/۱۶ خواست — و هیچ دکمهٔ دیگری.
+  assert.equal(rows(menu).length, 3, 'سه ردیف');
+  assert.equal(rows(menu).slice(0, 2).flat().length, 4, 'چهار دکمه در دو ردیفِ اول');
+  assert.deepEqual(rows(menu)[2].map(b => b.callback_data), ['mirza'], 'ردیفِ سوم فقط چت‌های میرزا');
 
   clear();
   for (const d of ['status', 'app', 'settings', 'share', 'menu']) {

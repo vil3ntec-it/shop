@@ -326,13 +326,14 @@ function menuKeyboard(row) {
     { text: '📊 وضعیت', callback_data: 'status' },
     { text: '📱 اپ و کدِ پمپ', callback_data: 'app' },
   ];
+  const mirza = [{ text: '💬 چت‌های میرزا', callback_data: 'mirza' }];
   if (row.kind === 'private') {
     return [top, [
       { text: '👥 گروه و کانال', callback_data: 'share' },
       { text: '⚙️ تنظیمات', callback_data: 'settings' },
-    ]];
+    ], mirza];
   }
-  return [top, [{ text: '⚙️ تنظیمات (مدیرِ گروه)', callback_data: 'settings' }]];
+  return [top, [{ text: '⚙️ تنظیمات (مدیرِ گروه)', callback_data: 'settings' }], mirza];
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -537,25 +538,39 @@ async function show(chatId, text, keyboard, editId = 0) {
 /* ── خصوصی ─────────────────────────────────────────────────────── */
 
 const WELCOME =
-  'سلام 👋 این باتِ هشدارهای پمپ است.\n\n'
-  + 'هر وقت حسابِ قرض‌داری تمام شود یا کم بماند، یا مخزن ته بکشد، همین‌جا خبر می‌گیرید — '
-  + 'حتی وقتی برنامه بسته است.\n\n'
-  + '✉️ برای وصل شدن، ایمیلِ حسابِ پمپتان را بفرستید (همان که در برنامهٔ پمپ با آن وارد شده‌اید).\n'
-  + 'یک کدِ شش‌رقمی به همان ایمیل می‌رود؛ کد را همین‌جا بفرستید و تمام.';
+  'سلام 👋 این باتِ پمپ است — تازه آمده‌اید؟ از همین‌جا شروع کنید.\n\n'
+  + 'این بات سه کار می‌کند:\n'
+  + '🚨 هشدار: حسابِ قرض‌داری تمام شد یا کم ماند، یا مخزن ته کشید — همین‌جا خبر می‌گیرید، حتی وقتی برنامه بسته است.\n'
+  + '💬 چت‌های میرزا: وقتی برنامهٔ کامپیوتر خاموش است، پیامِ مشتری‌های کیو‌آر همین‌جا می‌آید و جوابشان را می‌دهید.\n'
+  + '🏷️ نرخِ اتحادیه: «مدیرانِ نرخ»ی که صاحبِ پمپ تعیین کرده بنویسند «پطرول ۷۹ دیزل ۸۰» و در برنامهٔ کامپیوترِ پمپ می‌نشیند.\n\n'
+  + 'گامِ ۱ — ✉️ ایمیلِ حسابِ پمپتان را همین‌جا بفرستید (همان که در برنامهٔ پمپ با آن وارد شده‌اید).\n'
+  + 'گامِ ۲ — 🔢 یک کدِ شش‌رقمی به همان ایمیل می‌رود (پوشهٔ اسپم را هم ببینید)؛ کد را همین‌جا بفرستید. تمام.\n\n'
+  + 'فقط می‌خواهید پیامِ مشتری‌ها را بگیرید؟ «💬 چت‌های میرزا» را بزنید — آن‌جا فقط کدِ هشت‌رقمیِ پمپ لازم است.';
 
 /** راهنما — برای کسی که هنوز وصل نیست هم هست. */
 const HELP =
-  '📖 راهنمای بات\n\n'
-  + '• ✉️ وصل شدن: ایمیلِ حسابِ پمپ را بفرستید و کدِ شش‌رقمیِ ایمیل را همین‌جا بزنید.\n'
-  + '• 🔎 جست‌وجو: نامِ قرض‌دار را بنویسید تا حالِ حسابش بیاید (در گروه: /find نام).\n'
-  + '• 📊 وضعیت: هشدارهای بازِ همین حالا و موجودیِ مخزن.\n'
-  + '• 📱 اپ و کدِ پمپ: لینکِ اپِ اندروید و آیفون، و کدی که کارمندان در اپ می‌زنند.\n'
-  + '• 👥 گروه و کانال: هشدارها در گروه یا کانالِ تلگرامِ شما هم بیاید.\n'
-  + '• ⚙️ تنظیمات: فقط «تمام شد» بیاید، یا جدا شدن.\n\n'
-  + 'منو همیشه با /menu یا دکمهٔ «منو»ی پایینِ صفحه می‌آید.';
+  '📖 راهنمای بات — قدم‌به‌قدم\n\n'
+  + '✉️ وصل شدن: ایمیلِ حسابِ پمپ را بفرستید ⇐ کدِ شش‌رقمیِ ایمیل را همین‌جا بزنید.\n\n'
+  + '💬 چت‌های میرزا (پیامِ مشتری‌های کیو‌آر):\n'
+  + '  ۱) «💬 چت‌های میرزا» ⇐ «➕ وصل کردنِ پمپ» را بزنید.\n'
+  + '  ۲) کدِ هشت‌رقمیِ پمپ را بفرستید (برنامهٔ کامپیوتر ← پروفایل ← کدِ اپِ کارمندان).\n'
+  + '  ۳) وقتی برنامهٔ کامپیوتر خاموش است، پیامِ مشتری این‌جا می‌آید. روی آن «Reply» بزنید و بنویسید — جواب به گوشیِ همان مشتری می‌رسد.\n'
+  + '  در گروه می‌خواهید؟ بات را به گروه اضافه کنید، در گروه /mirza بزنید و همان کد را بفرستید (فقط مدیرِ گروه).\n\n'
+  + '🏷️ نرخِ اتحادیه: بنویسید «پطرول ۷۹ دیزل ۸۰» (یکی هم کافی است: «نرخ جدید پطرول ۷۹»).\n'
+  + '  فقط «مدیرانِ نرخ»ی که صاحبِ پمپ تعیین کرده (⚙️ تنظیمات ← 👮 مدیرانِ نرخ) — هر کسِ دیگری بنویسد هیچ اتفاقی نمی‌افتد.\n'
+  + '  شناسهٔ تلگرامِ هر کس: /myid. در گروه با واژهٔ «نرخ» یا /rate. نشست، خبر می‌دهم.\n\n'
+  + '🔎 جست‌وجو: نامِ قرض‌دار را بنویسید (در گروه: /find نام).\n'
+  + '📊 وضعیت: هشدارهای بازِ همین حالا و موجودیِ مخزن.\n'
+  + '📱 اپ و کدِ پمپ: لینکِ اپِ اندروید و آیفون، و کدی که کارمندان در اپ می‌زنند.\n'
+  + '👥 گروه و کانال: هشدارها در گروه یا کانالِ تلگرامِ شما هم بیاید.\n'
+  + '⚙️ تنظیمات: فقط «تمام شد» بیاید، شعبهٔ دیگر، یا جدا شدن.\n\n'
+  + 'منو همیشه با /menu یا دکمهٔ «منو»ی پایینِ صفحه می‌آید. انصراف از هر کاری: /cancel';
 
 function welcomeKeyboard() {
-  return [downloadRow(), [{ text: '❓ راهنما', callback_data: 'help' }]];
+  return [downloadRow(), [
+    { text: '💬 چت‌های میرزا', callback_data: 'mirza' },
+    { text: '❓ راهنما', callback_data: 'help' },
+  ]];
 }
 
 /** وقتی گفت‌وگو دیگر به هیچ پمپی وصل نیست — همان خوش‌آمد، با دلیلش. */
@@ -944,6 +959,9 @@ async function sendSettings(row, editId = 0, lead = '') {
   }
   const kb = [[{ text: row.only_out ? '🔔 «کم مانده» را هم بفرست' : '🔕 فقط «تمام شد» را بفرست', callback_data: 'toggle' }]];
   if (row.kind === 'private') kb.push([{ text: '➕ افزودنِ شعبه (حسابِ دیگر)', callback_data: 'addacct' }]);
+  if (row.kind === 'private' && links.some(l => l.role === 'owner')) {
+    kb.push([{ text: '👮 مدیرانِ نرخِ اتحادیه', callback_data: 'rad' }]);
+  }
   if (links.length > 1) {
     for (const l of links) {
       kb.push([{ text: `🔌 جدا کردنِ «${l.station_name}»`.slice(0, 60), callback_data: `rm:${l.station_id}` }]);
@@ -1092,11 +1110,24 @@ async function onCode(row, text) {
   return sendMenu(await chatRow(row.chat_id), lead);
 }
 
-async function onPrivate(chat, cmd, text) {
+async function onPrivate(chat, cmd, text, from = null) {
   let row = await ensureChat(chat, 'private');
   const linked = isLinked(row);
 
   if (cmd) {
+    if (cmd.name === 'mirza' || cmd.name === 'chats') return sendMirza(row);
+    if (cmd.name === 'myid' || cmd.name === 'id') {
+      return send(row.chat_id, `🆔 شناسهٔ تلگرامِ شما: ${(from || chat).id}\nاین عدد را به صاحبِ پمپ بدهید تا شما را «مدیرِ نرخ» کند.`);
+    }
+    if (cmd.name === 'cancel' && row.state === 'rateadmin') {
+      await query(`UPDATE telegram_chats SET state='', pending_station='' WHERE chat_id=$1`, [row.chat_id]);
+      return sendMenu(row);
+    }
+    if (cmd.name === 'rate') {
+      const parsed = require('./station-rates').parse(cmd.arg);
+      return parsed ? onRate(row, parsed, from || chat)
+        : send(row.chat_id, '🏷️ بعد از /rate نرخ را بنویسید؛ مثلاً: /rate پطرول ۷۹ دیزل ۸۰');
+    }
     if (cmd.name === 'cancel') {
       await setState(row.chat_id, linked ? '' : 'email');
       return linked ? sendMenu(row) : send(row.chat_id, 'باشد. هر وقت خواستید ایمیلِ حسابِ پمپ را بفرستید.');
@@ -1116,6 +1147,14 @@ async function onPrivate(chat, cmd, text) {
     await setState(row.chat_id, 'email');
     return show(row.chat_id, WELCOME, welcomeKeyboard());
   }
+
+  //  💬 در حالِ وصل کردنِ «چت‌های میرزا»: هر نوشته کدِ هشت‌رقمی است
+  if (row.state === 'relay') return onRelayCode(row, text);
+  //  👮 صاحبِ پمپ در حالِ افزودنِ شناسه‌های مدیرانِ نرخ
+  if (row.state === 'rateadmin') return onRateAdminInput(row, text);
+  //  🏷️ «پطرول ۷۹ دیزل ۸۰» — نرخِ اتحادیه، نه جست‌وجو و نه ایمیل
+  const rate = require('./station-rates').parse(text);
+  if (rate && row.state !== 'code') return onRate(row, rate, from || chat);
 
   //  ⛔ وصل‌شده: هر نوشته‌ای جست‌وجو است، نه یک منوی دیگر (قاعدهٔ ۳) —
   //  مگر همین حالا در حالِ افزودنِ شعبهٔ دیگر باشد (ایمیل ⇐ کد).
@@ -1212,9 +1251,35 @@ async function onChannelAdmin(u) {
     `✅ کانالِ «${titleOf(chat)}» به ${what} وصل شد. از این پس هشدارها در همان کانال می‌آید، نه این‌جا.\nبرای جدا کردن، بات را از مدیرانِ کانال بردارید — هشدارها دوباره همین‌جا می‌آید.`);
 }
 
-async function onGroup(chat, cmd, from) {
+async function onGroup(chat, cmd, from, text = '') {
   const row = await ensureChat(chat, 'group');
-  if (!cmd) return null;                         // گفت‌وگوی گروه مالِ ما نیست
+  if (!cmd) {
+    //  ⛔ گفت‌وگوی گروه مالِ ما نیست — مگر همان کسی که «وصل کردنِ پمپ» را زد
+    //  کدِ هشت‌رقمی را بفرستد، یا کسی صریح «نرخ …» بنویسد.
+    if (row.state === 'relay' && from && String(from.id) === String(row.relay_by)) {
+      return onRelayCode(row, text);
+    }
+    const t = String(text || '');
+    if (/نرخ/.test(t)) {
+      const parsed = require('./station-rates').parse(t);
+      if (parsed) return onRate(row, parsed, from);
+    }
+    return null;
+  }
+
+  if (cmd.name === 'mirza' || cmd.name === 'chats') return sendMirza(row);
+  if (cmd.name === 'myid' || cmd.name === 'id') {
+    return send(row.chat_id, `🆔 شناسهٔ تلگرامِ ${from?.first_name || 'شما'}: ${from?.id || '—'}`);
+  }
+  if (cmd.name === 'cancel' && row.state === 'relay') {
+    await setState(row.chat_id, '');
+    return send(row.chat_id, 'باشد.');
+  }
+  if (cmd.name === 'rate') {
+    const parsed = require('./station-rates').parse(cmd.arg);
+    return parsed ? onRate(row, parsed, from)
+      : send(row.chat_id, '🏷️ بعد از /rate نرخ را بنویسید؛ مثلاً: /rate پطرول ۷۹ دیزل ۸۰');
+  }
 
   if (cmd.name === 'start' && cmd.arg) {
     const t = now();
@@ -1295,6 +1360,375 @@ async function onGroup(chat, cmd, from) {
   return null;
 }
 
+/* ══════════════════════════════════════════════════════════════════
+   💬 چت‌های میرزا — پیامِ مشتریِ کیو‌آر، وقتی برنامهٔ کامپیوتر خاموش است
+   ══════════════════════════════════════════════════════════════════
+
+   خواستهٔ صاحب سامانه (۱۴۰۵/۰۷/۱۶): «توی منو قابلیتِ جدید بذار به اسمِ
+   چت‌های میرزا… بات کدِ هشت‌رقمیِ برنامه رو بخواد… وقتی برنامه خاموش بود
+   پیام‌های مشتری‌ها بیاد تلگرام… و میرزا انتخاب کنه کجا بیاد.»
+
+     مشتری (view/) ──chat.post──▶ relayCustomer ──(برنامه خاموش؟)──▶ تلگرام
+     تلگرام: «Reply» روی همان پیام ──▶ chat.post(from:'o') ──▶ پوش به مشتری
+
+   ⛔ **فقط وقتی برنامهٔ کامپیوتر خاموش است** (`desktopOnline`): برنامهٔ
+   روشن خودش صندوقِ مشتری‌ها را دارد و دو جا یعنی دو جوابِ ناهم‌خوان.
+   ⛔ **یک پمپ، یک مقصد** (`telegram_relays`، کلید = پمپ).
+   ⛔ **کد که عوض شد، پیوند مُرد** (`code_hash`): صاحبِ پمپ با عوض کردنِ کد
+   در پروفایل، هر تلگرامی را که با کدِ قبلی وصل شده بود بیرون می‌گذارد.
+   ⛔ جواب فقط روی **همان** پیامِ فرستاده‌شده به **همان** گفت‌وگو پذیرفته
+   می‌شود (`telegram_relay_msgs`)؛ هیچ پیامی از گفت‌وگوی دیگر به مشتریِ این
+   پمپ نمی‌رسد.
+*/
+
+/** برنامهٔ کامپیوترِ پمپ «روشن» است اگر یکی از دستگاه‌هایش در این فاصله پرسیده باشد. */
+const DESKTOP_ONLINE_MS = 3 * 60 * 1000;
+const RELAY_TRY_MAX = 6;
+const RELAY_TRY_WINDOW_MS = 60 * 60 * 1000;
+const RELAY_MSG_KEEP_MS = 14 * 24 * 3600 * 1000;
+
+async function desktopOnline(stationId, t = now()) {
+  const r = await one(
+    `SELECT MAX(last_seen_at) AS at FROM station_devices WHERE station_id=$1 AND status='active'`,
+    [stationId]);
+  const at = Number(r && r.at) || 0;
+  return at > 0 && t - at < DESKTOP_ONLINE_MS;
+}
+
+/** مقصدهای این گفت‌وگو — فقط آن‌هایی که کدشان هنوز همان است. */
+async function relaysOf(chatId) {
+  const list = await many(
+    `SELECT r.station_id, r.code_hash, r.linked_at, s.name AS station_name, s.access_code, s.access_code_old
+       FROM telegram_relays r JOIN stations s ON s.id=r.station_id AND s.status='active'
+      WHERE r.chat_id=$1 ORDER BY r.linked_at`, [String(chatId)]);
+  return list.filter(codeStillValid);
+}
+
+function codeStillValid(r) {
+  if (!r.code_hash) return false;
+  return [r.access_code, r.access_code_old].filter(Boolean).some(c => hashToken(c) === r.code_hash);
+}
+
+const MIRZA_INTRO =
+  '💬 چت‌های میرزا\n\n'
+  + 'مشتری‌هایی که کیو‌آرِ حسابشان را اسکن کرده‌اند می‌توانند به پمپ پیام بدهند. '
+  + 'وقتی برنامهٔ کامپیوترِ پمپ خاموش است، همان پیام‌ها این‌جا می‌آید.\n\n'
+  + '↩️ جواب دادن: روی پیامِ مشتری «Reply» بزنید و بنویسید — جواب به گوشیِ همان مشتری می‌رسد.\n'
+  + '🖥️ برنامه که روشن باشد، پیام‌ها فقط در خودِ برنامه می‌آیند (دو جا نمی‌آیند).';
+
+async function sendMirza(row, editId = 0, lead = '') {
+  const relays = await relaysOf(row.chat_id);
+  let text = (lead ? `${lead}\n\n` : '') + MIRZA_INTRO + '\n\n';
+  if (relays.length) {
+    text += `📍 پمپ‌هایی که پیامشان این‌جا می‌آید:\n${relays.map(r => `▫️ ${r.station_name}`).join('\n')}`;
+  } else {
+    text += '📍 هنوز هیچ پمپی به این‌جا وصل نیست.';
+  }
+  if (row.kind === 'private') {
+    text += '\n\n👥 می‌خواهید پیام‌ها در یک گروه بیاید؟ بات را به گروه اضافه کنید، در گروه /mirza را بزنید و همین کد را همان‌جا بفرستید (فقط مدیرِ گروه). '
+      + 'هر پمپ فقط یک مقصد دارد: هر جا آخر وصل شد، پیام‌ها همان‌جا می‌آید.';
+  }
+  const kb = [[{ text: '➕ وصل کردنِ پمپ با کدِ هشت‌رقمی', callback_data: 'mzadd' }]];
+  for (const r of relays) {
+    kb.push([{ text: `🔌 خاموش کردنِ «${r.station_name}»`.slice(0, 60), callback_data: `mzrm:${r.station_id}` }]);
+  }
+  kb.push([isLinked(row) ? BACK : { text: '❓ راهنما', callback_data: 'help' }]);
+  return show(row.chat_id, text, kb, editId);
+}
+
+async function askRelayCode(row, from, editId = 0) {
+  await query(`UPDATE telegram_chats SET state='relay', relay_by=$2, updated_at=$3 WHERE chat_id=$1`,
+    [row.chat_id, String(from?.id || row.chat_id), now()]);
+  return show(row.chat_id,
+    '🔢 کدِ هشت‌رقمیِ پمپ را بفرستید — همان کدی که کارمندان در اپِ گوشی می‌زنند.\n'
+    + 'کجا پیدایش کنم؟ برنامهٔ کامپیوترِ پمپ ← پروفایل ← «کدِ اپِ کارمندان»؛ یا همین بات ← «📱 اپ و کدِ پمپ».\n\n'
+    + '(رقمِ فارسی هم درست است. انصراف: /cancel)', null, editId);
+}
+
+async function onRelayCode(row, text) {
+  const access = require('./station-access');
+  const t = now();
+  let tries = Number(row.relay_tries) || 0;
+  let win = Number(row.relay_window) || 0;
+  if (t - win > RELAY_TRY_WINDOW_MS) { tries = 0; win = t; }
+  if (tries >= RELAY_TRY_MAX) {
+    await setState(row.chat_id, '');
+    return send(row.chat_id, 'تلاشِ نادرست زیاد شد. یک ساعت بعد دوباره «💬 چت‌های میرزا» را بزنید.');
+  }
+  const code = access.normalize(text);
+  const st = access.isValid(code) ? await access.byCode(code) : null;
+  if (!st) {
+    await query('UPDATE telegram_chats SET relay_tries=$2, relay_window=$3 WHERE chat_id=$1',
+      [row.chat_id, tries + 1, win]);
+    return send(row.chat_id, '❌ این کد پیدا نشد. کدِ هشت‌رقمیِ پمپ را دوباره بفرستید — یا /cancel.');
+  }
+  const before = await one('SELECT chat_id FROM telegram_relays WHERE station_id=$1', [st.id]);
+  await query(
+    `INSERT INTO telegram_relays (station_id, chat_id, by_tg, linked_at, code_hash) VALUES ($1,$2,$3,$4,$5)
+     ON CONFLICT (station_id) DO UPDATE SET chat_id=excluded.chat_id, by_tg=excluded.by_tg,
+       linked_at=excluded.linked_at, code_hash=excluded.code_hash`,
+    [st.id, String(row.chat_id), String(row.relay_by || ''), t, hashToken(code)]);
+  await query(`UPDATE telegram_chats SET state='', relay_tries=0, relay_by='', updated_at=$2 WHERE chat_id=$1`,
+    [row.chat_id, t]);
+  await require('./audit').log({
+    actorType: 'system', action: 'pump.telegram_relay',
+    targetType: 'station', targetId: st.id, detail: { chatKind: row.kind },
+  });
+  //  مقصدِ قبلی باید بداند که دیگر پیامی نمی‌گیرد
+  if (before && before.chat_id !== String(row.chat_id)) {
+    await send(before.chat_id,
+      `💬 از این پس پیامِ مشتری‌های «${st.name}» جای دیگری می‌آید (کسی با کدِ پمپ آن را به گفت‌وگوی دیگری برد). `
+      + 'اگر شما نبودید، کدِ پمپ را در برنامهٔ کامپیوتر ← پروفایل عوض کنید.').catch(() => {});
+  }
+  return sendMirza(await chatRow(row.chat_id), 0,
+    `✅ وصل شد: از این پس وقتی برنامهٔ کامپیوترِ «${st.name}» خاموش است، پیامِ مشتری‌هایش این‌جا می‌آید.`);
+}
+
+function mediaWord(kind) {
+  return kind === 'image' ? '📷 عکس' : kind === 'video' ? '🎥 ویدیو' : kind === 'audio' ? '🎤 پیامِ صوتی' : '';
+}
+
+/**
+ * پیامِ تازهٔ مشتری ⇒ تلگرام، اگر برنامهٔ کامپیوتر خاموش است.
+ * ⚠️ هیچ‌وقت استثنا بیرون نمی‌دهد: پیام در صندوقِ پمپ نشسته و این رفاه است.
+ */
+async function relayCustomer({ station, acct, message }) {
+  try {
+    if (!station || !message || message.from !== 'c') return { sent: false, why: 'not_customer' };
+    const r = await one(
+      `SELECT r.chat_id, r.code_hash, s.name AS station_name, s.access_code, s.access_code_old
+         FROM telegram_relays r JOIN stations s ON s.id=r.station_id AND s.status='active'
+        WHERE r.station_id=$1`, [station.id]);
+    if (!r || !codeStillValid(r)) return { sent: false, why: 'no_relay' };
+    if (!(await active())) return { sent: false, why: 'bot_off' };
+    if (await desktopOnline(station.id)) return { sent: false, why: 'desktop_online' };
+    const body = message.kind === 'text'
+      ? message.text
+      : `${mediaWord(message.kind)} — در برنامهٔ کامپیوتر یا اپِ پمپ دیده می‌شود.`;
+    const who = message.name ? `👤 ${message.name}` : '👤 مشتری';
+    const text = `💬 پیامِ مشتری — «${r.station_name}»\n${who}\n\n${body}\n\n↩️ برای جواب، روی همین پیام «Reply» بزنید.`;
+    const res = await send(r.chat_id, text.slice(0, 4000));
+    if (!res.ok) return { sent: false, why: 'telegram' };
+    const t = now();
+    await query(
+      `INSERT INTO telegram_relay_msgs (chat_id, message_id, station_id, acct, created_at)
+       VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING`,
+      [r.chat_id, Number(res.result?.message_id) || 0, station.id, acct, t]);
+    await query('DELETE FROM telegram_relay_msgs WHERE created_at < $1', [t - RELAY_MSG_KEEP_MS]);
+    return { sent: true };
+  } catch (err) {
+    console.error('[telegram:relay]', hide(err.message));
+    return { sent: false, why: 'error' };
+  }
+}
+
+/** جوابِ میرزا با «Reply» ⇒ همان مشتری. ‎true‎ یعنی این پیام مالِ همین‌جا بود. */
+async function onRelayReply(m) {
+  const to = m.reply_to_message;
+  if (!to || !to.message_id) return false;
+  const chatId = String(m.chat.id);
+  const map = await one(
+    'SELECT station_id, acct FROM telegram_relay_msgs WHERE chat_id=$1 AND message_id=$2',
+    [chatId, Number(to.message_id)]);
+  if (!map) return false;
+  //  ⛔ همین حالا هم باید مقصدِ همان پمپ و با همان کد باشد
+  const live = (await relaysOf(chatId)).find(r => r.station_id === map.station_id);
+  if (!live) {
+    await send(chatId, 'این گفت‌وگو دیگر پیامِ مشتری‌های آن پمپ را نمی‌گیرد؛ جواب نرفت.');
+    return true;
+  }
+  const text = typeof m.text === 'string' ? m.text.trim() : '';
+  if (!text) {
+    await send(chatId, 'از تلگرام فقط جوابِ نوشتاری می‌رود. عکس و صدا را از برنامهٔ کامپیوتر بفرستید.');
+    return true;
+  }
+  const chat = require('./station-chat');
+  try {
+    await chat.post({ stationId: map.station_id, acct: map.acct, from: 'o', name: 'پمپ', kind: 'text', text });
+    await chat.pushTo(map.station_id, map.acct, {
+      title: live.station_name || 'پمپ', body: text.slice(0, 120), tag: 'chat-' + map.acct,
+    }).catch(() => {});
+    await call('sendMessage', {
+      chat_id: chatId, text: '✅ جواب به مشتری رسید.', reply_to_message_id: Number(m.message_id),
+      allow_sending_without_reply: true,
+    });
+  } catch (err) {
+    await send(chatId, `❌ جواب نرفت: ${hide(err.message)}`);
+  }
+  return true;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   🏷️ نرخِ اتحادیه از تلگرام — فقط برای پمپِ همان حساب
+   ══════════════════════════════════════════════════════════════════
+
+   ⛔ **فقط از شناسه‌های تلگرامی که صاحبِ پمپ داده** (`station_rate_admins`،
+   «👮 مدیرانِ نرخ») — خواستهٔ صاحب سامانه: «به بات چند ایدیِ تلگرام می‌دهم…
+   فقط از اون‌ها اطاعت بشه که هر کس و ناکس نتونه بگه این نرخ رو بذار».
+   ملاک **شناسهٔ فرستنده** (`from.id`) است، نه گفت‌وگو: در گروه هم فقط
+   همان شناسه‌ها، هر کس دیگری (حتی مدیرِ گروه) نه. خودِ صاحبِ پمپ (با ایمیل
+   وصل) همیشه مجاز است — فهرست را او می‌سازد.
+   کدِ هشت‌رقمی (که دستِ کارمندان است) نرخ را عوض **نمی‌کند**.
+   ⛔ در گروه فقط وقتی «نرخ» در پیام هست (یا /rate): «پطرول ۵۰ لیتر دادم»
+   حرفِ کارمندان است، نه نرخ.
+*/
+
+function rateLine(p) {
+  const parts = [];
+  if (p.petrol !== null && p.petrol !== undefined) parts.push(`پطرول ${faNum(p.petrol)}`);
+  if (p.diesel !== null && p.diesel !== undefined) parts.push(`دیزل ${faNum(p.diesel)}`);
+  return parts.join(' · ');
+}
+
+/** شناسهٔ تلگرامِ فرستنده ⇒ پمپ‌هایی که او مدیرِ نرخشان است (یا صاحبشان). */
+async function rateStations(from) {
+  const uid = String(from?.id || '');
+  if (!uid) return [];
+  const uname = String(from?.username || '').toLowerCase();
+  return many(
+    `SELECT s.id AS station_id, s.name AS station_name
+       FROM stations s
+      WHERE s.status='active' AND (
+        EXISTS (SELECT 1 FROM station_rate_admins a
+                 WHERE a.station_id=s.id
+                   AND ((a.tg_id<>'' AND a.tg_id=$1) OR (a.tg_username<>'' AND $2<>'' AND a.tg_username=$2)))
+        OR EXISTS (SELECT 1 FROM telegram_chat_links l
+                     JOIN telegram_chats c ON c.chat_id=l.chat_id AND c.kind='private'
+                     JOIN station_members m ON m.station_id=l.station_id AND m.user_id=l.user_id
+                          AND m.status='active' AND m.role='owner'
+                     JOIN users u ON u.id=l.user_id AND u.status='active'
+                    WHERE l.station_id=s.id AND l.chat_id=$1))
+      ORDER BY s.name, s.id`,
+    [uid, uname]);
+}
+
+async function onRate(row, parsed, from) {
+  const rates = require('./station-rates');
+  if (parsed.bad && parsed.bad.length) {
+    const names = parsed.bad.map(b => (b === 'petrol' ? 'پطرول' : 'دیزل')).join(' و ');
+    return send(row.chat_id,
+      `⚠️ عددِ ${names} باورکردنی نیست — نرخ باید بینِ ${faNum(rates.MIN_RATE)} و ${faNum(rates.MAX_RATE)} افغانی باشد. `
+      + 'هیچ چیزی عوض نشد؛ دوباره بنویسید، مثلاً: پطرول ۷۹ دیزل ۸۰');
+  }
+  if (parsed.petrol === null && parsed.diesel === null) return null;
+  const allowed = await rateStations(from);
+  if (!allowed.length) {
+    if (row.kind !== 'private') {
+      return send(row.chat_id, '⛔ نرخِ اتحادیه را فقط «مدیرانِ نرخ»ی که صاحبِ پمپ تعیین کرده عوض می‌کنند. هیچ چیزی عوض نشد.');
+    }
+    return send(row.chat_id,
+      '⛔ شما «مدیرِ نرخ»ِ هیچ پمپی نیستید، پس هیچ نرخی عوض نشد.\n'
+      + `🆔 شناسهٔ تلگرامِ شما: ${from?.id || '—'}\n`
+      + 'این شناسه را به صاحبِ پمپ بدهید تا در بات ← ⚙️ تنظیمات ← «👮 مدیرانِ نرخ» اضافه کند.');
+  }
+  if (allowed.length === 1) return createRate(row, allowed[0], parsed, from);
+  //  چند شعبه: ⛔ هیچ نرخی «برای همه» نمی‌نشیند — هر شعبه با کلیکِ خودش
+  const p = parsed.petrol === null ? '-' : String(parsed.petrol);
+  const d = parsed.diesel === null ? '-' : String(parsed.diesel);
+  return show(row.chat_id,
+    `🏷️ نرخِ تازه: ${rateLine(parsed)}\nبرای کدام شعبه؟ (هر شعبه جدا — روی بقیه اثری ندارد)`,
+    allowed.map(l => [{ text: `⛽ ${l.station_name}`.slice(0, 50), callback_data: `rg:${l.station_id}:${p}:${d}` }]));
+}
+
+/* ── 👮 مدیرانِ نرخ — فقط صاحبِ پمپ فهرست را می‌سازد ────────────── */
+
+const RATE_ADMIN_MAX = 20;
+
+/** پمپ‌هایی که صاحبشان همین گفت‌وگوی خصوصی است (با ایمیل وصل). */
+async function ownedStations(row) {
+  if (!row || row.kind !== 'private' || !isLinked(row)) return [];
+  return (await linksOf(row)).filter(l => l.role === 'owner');
+}
+
+async function sendRateAdmins(row, stationId, editId = 0, lead = '') {
+  const own = (await ownedStations(row)).find(l => l.station_id === stationId);
+  if (!own) return sendSettings(row, editId);
+  const list = await many(
+    'SELECT * FROM station_rate_admins WHERE station_id=$1 ORDER BY added_at', [stationId]);
+  let text = (lead ? `${lead}\n\n` : '') + `👮 مدیرانِ نرخِ «${own.station_name}»\n\n`
+    + 'فقط این افراد (و خودِ شما) می‌توانند از تلگرام نرخِ اتحادیهٔ همین پمپ را عوض کنند — '
+    + 'هر کسِ دیگری بنویسد، بات هیچ کاری نمی‌کند.\n\n';
+  text += list.length
+    ? list.map(a => `▫️ ${a.label ? `${a.label} — ` : ''}${a.tg_id ? `🆔 ${a.tg_id}` : `@${a.tg_username}`}`).join('\n')
+    : '▫️ هنوز کسی اضافه نشده (فقط خودِ شما).';
+  text += '\n\nهر کس شناسه‌اش را نمی‌داند: به همین بات /myid بفرستد.';
+  const kb = [[{ text: '➕ افزودنِ شناسه', callback_data: `radadd:${stationId}` }]];
+  for (const a of list) {
+    kb.push([{ text: `🗑 برداشتنِ ${a.label || a.tg_id || '@' + a.tg_username}`.slice(0, 60), callback_data: `radrm:${a.id}` }]);
+  }
+  kb.push([{ text: '‹ تنظیمات', callback_data: 'settings' }]);
+  return show(row.chat_id, text, kb, editId);
+}
+
+/** «123456789 @mirza_user 987654321» ⇒ شناسه‌ها و نام‌های کاربری. */
+function parseRateAdmins(text) {
+  const out = [];
+  for (const raw of asciiDigits(text).split(/[\s,،;]+/)) {
+    const t = raw.trim();
+    if (!t) continue;
+    if (/^-?\d{5,15}$/.test(t)) out.push({ tg_id: t.replace(/^-/, ''), tg_username: '' });
+    else if (/^@?[A-Za-z][A-Za-z0-9_]{4,31}$/.test(t)) out.push({ tg_id: '', tg_username: t.replace(/^@/, '').toLowerCase() });
+    else return null;
+  }
+  return out.length ? out : null;
+}
+
+async function onRateAdminInput(row, text) {
+  const sid = row.pending_station;
+  const own = (await ownedStations(row)).find(l => l.station_id === sid);
+  if (!own) { await setState(row.chat_id, ''); return sendSettings(row); }
+  const items = parseRateAdmins(text);
+  if (!items) {
+    return send(row.chat_id,
+      'این شناسه درست نیست. شناسهٔ عددیِ تلگرام را بفرستید (مثلاً 123456789) — چند تا با فاصله هم می‌شود. انصراف: /cancel');
+  }
+  const have = Number((await one('SELECT count(*)::int AS n FROM station_rate_admins WHERE station_id=$1', [sid])).n) || 0;
+  let added = 0;
+  const t = now();
+  for (const it of items) {
+    if (have + added >= RATE_ADMIN_MAX) break;
+    const r = await one(
+      `INSERT INTO station_rate_admins (id, station_id, tg_id, tg_username, added_by, added_at)
+       VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING RETURNING id`,
+      [newId('rad'), sid, it.tg_id, it.tg_username, String(row.chat_id), t]);
+    if (r) added += 1;
+  }
+  await query(`UPDATE telegram_chats SET state='', pending_station='', updated_at=$2 WHERE chat_id=$1`, [row.chat_id, t]);
+  await require('./audit').log({
+    actorType: 'user', userId: own.user_id, action: 'pump.rate_admins_added',
+    targetType: 'station', targetId: sid, detail: { added },
+  });
+  return sendRateAdmins(await chatRow(row.chat_id), sid, 0,
+    added ? `✅ ${faNum(added)} شناسه اضافه شد.` : 'همهٔ این شناسه‌ها از قبل در فهرست بودند (یا فهرست پر است).');
+}
+
+async function createRate(row, link, parsed, from) {
+  const rates = require('./station-rates');
+  const by = [from?.first_name, from?.last_name].filter(Boolean).join(' ') || (from?.username ? `@${from.username}` : '');
+  await rates.create(link.station_id, { petrol: parsed.petrol, diesel: parsed.diesel, chatId: row.chat_id, by });
+  //  نامِ مدیرِ نرخ را یاد بگیر تا فهرست به‌جای عدد نام نشان بدهد
+  if (by && from?.id) {
+    await query(`UPDATE station_rate_admins SET label=$3 WHERE station_id=$1 AND tg_id=$2 AND label=''`,
+      [link.station_id, String(from.id), by.slice(0, 60)]).catch(() => {});
+  }
+  const online = await desktopOnline(link.station_id);
+  return send(row.chat_id,
+    `⏳ نرخِ اتحادیهٔ «${link.station_name}»: ${rateLine(parsed)}\n`
+    + 'به برنامهٔ کامپیوترِ همین پمپ فرستاده شد و تا یک دقیقه می‌نشیند؛ نشست، همین‌جا خبر می‌دهم.\n'
+    + (online ? '' : '🖥️ برنامهٔ کامپیوتر الان خاموش است — هر وقت (تا ۲۴ ساعت) روشن شد، خودش می‌گیرد.\n')
+    + 'فقط همین پمپ عوض می‌شود؛ پمپ‌ها و حساب‌های دیگر دست نمی‌خورند.');
+}
+
+/** برنامه گفت نشست (یا نشد) — از `routes/pump-device.js`. */
+async function rateDone(row) {
+  if (!row || !row.chat_id) return;
+  const st = await one('SELECT name FROM stations WHERE id=$1', [row.station_id]);
+  const p = { petrol: row.petrol === null ? null : Number(row.petrol), diesel: row.diesel === null ? null : Number(row.diesel) };
+  await send(row.chat_id, row.status === 'applied'
+    ? `✅ نرخِ اتحادیهٔ «${st ? st.name : 'پمپ'}» در برنامهٔ کامپیوتر نشست: ${rateLine(p)}`
+    : `⚠️ نرخِ «${st ? st.name : 'پمپ'}» در برنامهٔ کامپیوتر ننشست${row.note ? `: ${row.note}` : ''}. از خودِ برنامه (مفاد/ضرر ← نرخ اتحادیه) بنویسید.`);
+}
+
 /* ── ورودی ─────────────────────────────────────────────────────── */
 
 async function onMessage(m) {
@@ -1302,15 +1736,20 @@ async function onMessage(m) {
   if (!chat || chat.type === 'channel') return null;
   if (m.migrate_to_chat_id) return migrateChat(chat.id, m.migrate_to_chat_id);
 
+  //  ↩️ جوابِ میرزا به پیامِ یک مشتری — پیش از هر چیزِ دیگر
+  if (m.reply_to_message && (chat.type === 'private' || chat.type === 'group' || chat.type === 'supergroup')) {
+    if (await onRelayReply(m)) return null;
+  }
+
   const cmd = parseCommand(m.text, await username());
-  if (chat.type === 'group' || chat.type === 'supergroup') return onGroup(chat, cmd, m.from);
+  if (chat.type === 'group' || chat.type === 'supergroup') return onGroup(chat, cmd, m.from, m.text || '');
   if (chat.type !== 'private') return null;
   if (typeof m.text !== 'string' || !m.text.trim()) return null;
-  return onPrivate(chat, cmd, m.text);
+  return onPrivate(chat, cmd, m.text, m.from);
 }
 
 /** کارهایی که در گروه فقط مدیر (یا وصل‌کننده) می‌کند. */
-const MANAGE = new Set(['settings', 'toggle', 'unlink', 'unlink_yes', 'code', 'rm', 'rmy', 'addacct', 'chansync']);
+const MANAGE = new Set(['settings', 'toggle', 'unlink', 'unlink_yes', 'code', 'rm', 'rmy', 'addacct', 'chansync', 'mzadd', 'mzrm']);
 
 async function onCallback(q) {
   const answer = (text = '', alert = false) => call('answerCallbackQuery', {
@@ -1318,7 +1757,13 @@ async function onCallback(q) {
   });
   const chat = q.message?.chat;
   if (!chat) return answer();
-  const row = await chatRow(chat.id);
+  let row = await chatRow(chat.id);
+  //  «💬 چت‌های میرزا» به وصل شدن با ایمیل بند نیست — گروهی که بات تازه در آن
+  //  آمده و هنوز هیچ فرمانی نگرفته هم باید بتواند آن را باز کند.
+  if (!row && ['mirza', 'mzadd', 'help'].includes(String(q.data || '').split(':')[0])) {
+    const kind = chat.type === 'private' ? 'private' : (chat.type === 'channel' ? 'channel' : 'group');
+    if (kind !== 'channel') row = await ensureChat(chat, kind);
+  }
   if (!row) return answer();
   const editId = Number(q.message?.message_id) || 0;
 
@@ -1424,6 +1869,59 @@ async function onCallback(q) {
           ? `✅ ${faNum(r.added)} پیوندِ تازه — هر شعبهٔ این گفت‌وگو حالا در ${where} هم می‌آید.`
           : `همهٔ شعبه‌ها از قبل در ${where || 'کانال'} بودند.`,
         [[BACK]], editId);
+    }
+    case 'mirza': await answer(); return sendMirza(row, editId);
+    case 'mzadd': await answer(); return askRelayCode(row, q.from, editId);
+    case 'mzrm': {
+      const had = (await relaysOf(row.chat_id)).find(r => r.station_id === arg);
+      if (!had) { await answer(); return sendMirza(row, editId); }
+      await query('DELETE FROM telegram_relays WHERE station_id=$1 AND chat_id=$2', [arg, row.chat_id]);
+      await answer('✔️ خاموش شد');
+      return sendMirza(await chatRow(row.chat_id), editId,
+        `🔌 پیامِ مشتری‌های «${had.station_name}» دیگر این‌جا نمی‌آید.`);
+    }
+    case 'rad': {
+      await answer();
+      const own = await ownedStations(row);
+      if (!own.length) {
+        return show(row.chat_id, '👮 «مدیرانِ نرخ» را فقط صاحبِ پمپ (با ایمیل وصل) در گفت‌وگوی خصوصی تعیین می‌کند.', [[BACK]], editId);
+      }
+      if (own.length === 1) return sendRateAdmins(row, own[0].station_id, editId);
+      return show(row.chat_id, '👮 مدیرانِ نرخِ کدام شعبه؟',
+        [...own.map(l => [{ text: `⛽ ${l.station_name}`.slice(0, 50), callback_data: `radst:${l.station_id}` }]), [BACK]], editId);
+    }
+    case 'radst': await answer(); return sendRateAdmins(row, arg, editId);
+    case 'radadd': {
+      await answer();
+      if (!(await ownedStations(row)).some(l => l.station_id === arg)) return sendSettings(row, editId);
+      await query(`UPDATE telegram_chats SET state='rateadmin', pending_station=$2, updated_at=$3 WHERE chat_id=$1`,
+        [row.chat_id, arg, now()]);
+      return show(row.chat_id,
+        '🆔 شناسهٔ عددیِ تلگرامِ مدیر، کارفرما یا میرزا را بفرستید — چند تا با فاصله هم می‌شود.\n'
+        + 'شناسه را نمی‌داند؟ همان شخص به همین بات /myid بفرستد، عدد را می‌گیرد.\n\n(انصراف: /cancel)', null, editId);
+    }
+    case 'radrm': {
+      await answer();
+      const a = await one('SELECT * FROM station_rate_admins WHERE id=$1', [arg]);
+      //  ⛔ فقط صاحبِ همان پمپ از فهرستِ همان پمپ برمی‌دارد
+      if (!a || !(await ownedStations(row)).some(l => l.station_id === a.station_id)) return sendSettings(row, editId);
+      await query('DELETE FROM station_rate_admins WHERE id=$1', [a.id]);
+      return sendRateAdmins(await chatRow(row.chat_id), a.station_id, editId, '🗑 برداشته شد.');
+    }
+    case 'rg': {
+      //  ‎rg:<پمپ>:<پطرول>:<دیزل>‎ — ⛔ فقط شعبه‌ای که به همین گفت‌وگو وصل است
+      //  ⛔ کسی که دکمه را می‌زند باید خودش مدیرِ نرخِ همان پمپ باشد
+      const parts = String(q.data || '').split(':');
+      const l = (await rateStations(q.from)).find(x => x.station_id === arg);
+      if (!l) return answer('⛔ شما مدیرِ نرخِ این پمپ نیستید.', true);
+      const num = (v) => (v === '-' || v === undefined ? null : Number(v));
+      const parsed = require('./station-rates').parse(
+        `پطرول ${parts[2] === '-' ? '' : parts[2]} دیزل ${parts[3] === '-' ? '' : parts[3]}`);
+      if (!parsed || parsed.bad || (num(parts[2]) === null && num(parts[3]) === null)) {
+        return answer('این دکمه کهنه است؛ نرخ را دوباره بنویسید.', true);
+      }
+      await answer('⏳ فرستاده شد');
+      return createRate(row, l, parsed, q.from);
     }
     default: return answer();
   }
@@ -1883,6 +2381,9 @@ async function setCommands() {
       { command: 'find', description: 'جست‌وجوی قرض‌دار (یا فقط نام را بنویسید)' },
       { command: 'code', description: 'اپِ اندروید و آیفون و کدِ پمپ' },
       { command: 'group', description: 'وصل کردنِ گروه یا کانال' },
+      { command: 'mirza', description: 'چت‌های میرزا — پیامِ مشتری‌های کیو‌آر' },
+      { command: 'rate', description: 'نرخِ اتحادیه: /rate پطرول ۷۹ دیزل ۸۰' },
+      { command: 'myid', description: 'شناسهٔ تلگرامِ من (برای مدیرِ نرخ شدن)' },
       { command: 'settings', description: 'تنظیمات' },
       { command: 'help', description: 'راهنما' },
     ],
@@ -1892,6 +2393,9 @@ async function setCommands() {
     commands: [
       { command: 'status', description: 'هشدارهای باز و موجودیِ مخزن' },
       { command: 'find', description: 'جست‌وجوی قرض‌دار: /find نام' },
+      { command: 'mirza', description: 'چت‌های میرزا در همین گروه' },
+      { command: 'rate', description: 'نرخِ اتحادیه (فقط مدیرانِ نرخ)' },
+      { command: 'myid', description: 'شناسهٔ تلگرامِ من' },
       { command: 'menu', description: 'منو' },
     ],
   });
@@ -2054,6 +2558,7 @@ function _reset() {
 
 module.exports = {
   PURPOSE, ALERT_KINDS,
+  relayCustomer, rateDone, desktopOnline, DESKTOP_ONLINE_MS,
   setTransport, handleUpdate, pollOnce, flushOutbox, notifyStation,
   start, stop, reload, status, configure, publicInfo, appLinks,
   formatAlert, announcementText, announceTick, parseCommand, asciiDigits, normEmail, normName, notifyResolved, searchText, chunks,

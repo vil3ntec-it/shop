@@ -447,6 +447,32 @@ router.get('/me', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+/**
+ * نرخِ اتحادیه‌ای که صاحبِ پمپ در تلگرام نوشت (lib/station-rates.js).
+ *
+ * ⛔ فقط فرمانِ **همین** پمپ — `req.stationId` از خودِ توکنِ دستگاه است، نه
+ * از درخواست؛ پس هیچ پمپی نرخِ پمپِ دیگر را نمی‌گیرد.
+ * این پرسش هر دقیقه از برنامهٔ روشن می‌آید و همان «برنامه روشن است»ِ
+ * `station_devices.last_seen_at` را هم تازه نگه می‌دارد.
+ */
+router.get('/rate', async (req, res, next) => {
+  try {
+    res.json({ ok: true, cmd: await require('../lib/station-rates').pending(req.stationId), serverTime: now() });
+  } catch (err) { next(err); }
+});
+
+router.post('/rate/:id/ack', async (req, res, next) => {
+  try {
+    const b = req.body || {};
+    const row = await require('../lib/station-rates').ack(req.stationId, req.params.id, {
+      applied: b.applied !== false, note: typeof b.note === 'string' ? b.note : '',
+    });
+    if (!row) throw notFound('این فرمان در صف نیست', 'not_found');
+    require('../lib/telegram').rateDone(row).catch((e) => console.error('[telegram] خبرِ نرخ نرفت:', e.message));
+    res.json({ ok: true, status: row.status });
+  } catch (err) { next(err); }
+});
+
 /** مجوزِ تازه. برنامه هر چند روز یک بار می‌گیردش. */
 router.post('/license', async (req, res, next) => {
   try {
