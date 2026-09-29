@@ -1690,3 +1690,6 @@ SCALE=2000 SCALE_PAR=40 node --test test/pump-scale.test.js
   ماندگار روی دستگاهِ هر طرف است (برنامهٔ کامپیوتر: `chat-media/`؛ صفحهٔ کیو‌آر:
   IndexedDB) و بارِ دوم از سرور ۴۰۴ِ `media_gone` است.
 - آزمون: `test/pump-chat-media-relay.test.js` (دندانش سنجیده شد: بی پاک کردن ۲ سرخ).
+- ⛔ **SVG/XML/HTML رسانه نیست** (`kindOf` چتِ مشتری و `mediaKindOf` پشتیبانی): اسکریپت
+  دارد و روی دامنهٔ خودِ سرورِ حساب اجرا می‌شد. و هر رسانه با `nosniff` و CSPِ
+  `sandbox` می‌رود — حتی اگر مستقیم در مرورگر باز شود صفحه نیست.

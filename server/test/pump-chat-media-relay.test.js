@@ -58,6 +58,8 @@ test('عکسِ مشتری پس از رسیدن به صاحبِ پمپ از سر�
   const mine = await fetch(`${h.base()}${pub(p.code, '/media/' + up.body.mediaId)}`);
   assert.equal(mine.status, 200);
   assert.equal(mine.headers.get('cache-control'), 'no-store');
+  assert.equal(mine.headers.get('x-content-type-options'), 'nosniff');
+  assert.match(mine.headers.get('content-security-policy') || '', /sandbox/);
   await mine.arrayBuffer();
   await new Promise(r => setTimeout(r, 150));
   assert.ok(await row(up.body.mediaId), 'گرفتنِ خودِ فرستنده نباید پاک کند');
@@ -91,4 +93,13 @@ test('ردیفِ کهنهٔ بی‌فرستنده با گرفتن پاک نمی�
   await r.arrayBuffer();
   await new Promise(r2 => setTimeout(r2, 150));
   assert.ok(await row(v.body.mediaId));
+});
+
+test('⛔ SVG (اسکریپت‌دار) عکس شمرده نمی‌شود — نه از مشتری، نه از صاحبِ پمپ', async () => {
+  const p = await pump('pc-relay-4', 'relay-four');
+  const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>');
+  const c = await raw(pub(p.code, '/media'), 'image/svg+xml', svg);
+  assert.equal(c.status, 400, JSON.stringify(c.body));
+  const o = await raw('/api/pump/device/chat/d7/media', 'image/svg+xml; charset=utf-8', svg, p.token);
+  assert.equal(o.status, 400, JSON.stringify(o.body));
 });

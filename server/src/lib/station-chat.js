@@ -37,7 +37,9 @@ function cleanAcct(raw) {
 }
 
 function kindOf(mime) {
-  const m = String(mime || '').toLowerCase();
+  const m = String(mime || '').toLowerCase().split(';')[0].trim();
+  //  ⛔ SVG و هر نوعِ XMLی «عکس» نیست — اسکریپت دارد و روی دامنهٔ خودِ سرور اجرا می‌شد
+  if (/svg|xml|html/.test(m)) return null;
   if (m.startsWith('image/')) return 'image';
   if (m.startsWith('video/')) return 'video';
   if (m.startsWith('audio/')) return 'audio';
@@ -193,6 +195,9 @@ function sendMedia(req, res, m, side) {
   res.set('Content-Type', m.mime);
   res.set('Content-Length', String(m.size));
   res.set('Cache-Control', 'no-store');
+  //  ⛔ رسانه هرگز صفحه نیست: نه حدسِ نوع، نه اسکریپت، نه فرم — حتی اگر مستقیم باز شود
+  res.set('X-Content-Type-Options', 'nosniff');
+  res.set('Content-Security-Policy', "default-src 'none'; media-src 'self'; img-src 'self'; sandbox");
   if (m.uploader && m.uploader !== side && req.method === 'GET') {
     res.on('finish', () => {
       query('DELETE FROM station_chat_media WHERE id=$1', [m.id])
