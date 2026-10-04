@@ -373,6 +373,7 @@ router.post('/offline-codes', async (req, res, next) => {
     const out = await offline.issue({
       plan,
       computer: v.text(req.body?.computer, { max: 40 }),
+      account: v.text(req.body?.account, { max: 200 }),
       days: req.body?.days === undefined || req.body?.days === null || req.body?.days === ''
         ? null : v.integer(req.body.days, { field: 'روزها', min: 1, max: 3650 }),
       note: v.text(req.body?.note, { max: 300 }),
@@ -381,7 +382,7 @@ router.post('/offline-codes', async (req, res, next) => {
     await audit.log({
       actorType: 'admin', userId: req.admin.id, action: 'admin.pump_offline_code_issued',
       targetType: 'offline_code', targetId: out.offline.id,
-      detail: { plan: out.offline.plan, computer: out.offline.computer, endsAt: out.offline.endsAt },
+      detail: { plan: out.offline.plan, computer: out.offline.computer, account: out.offline.accountEmail, endsAt: out.offline.endsAt },
     });
     res.status(201).json(out);
   } catch (err) { next(err); }

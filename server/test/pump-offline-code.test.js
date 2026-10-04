@@ -48,7 +48,7 @@ async function boundDevice(uid) {
   const b = await h.post('/api/pump/device/bind',
     { device: { uid, name: 'کامپیوتر', platform: 'windows' } }, { token: u.accessToken });
   assert.equal(b.status, 201, JSON.stringify(b.body));
-  return { token: b.body.deviceToken, stationId: st.body.station.id };
+  return { token: b.body.deviceToken, stationId: st.body.station.id, email: u.email, userId: u.user?.id };
 }
 
 test('کدِ کامپیوتر: ۱۶ نویسه، نویسهٔ سنجش خطای تایپ را می‌گیرد', () => {
@@ -70,7 +70,7 @@ test('صدورِ سه پلن: امضا با کلیدِ مجوز، فایلِ ‎
     assert.equal(r.status, 201, JSON.stringify(r.body));
     const { code, offline: o, file } = r.body;
     assert.match(code, /^([0-9A-Z]{5}-)+[0-9A-Z]{1,5}$/);
-    assert.equal(code.replace(/-/g, '').length, 157);
+    assert.equal(code.replace(/-/g, '').length, 138, 'نسخهٔ ۲: کوتاه‌تر (بود ۱۵۷)');
     assert.equal(o.plan, plan);
     assert.equal(o.permanent, perm);
     assert.equal(o.computer, PC_A);
@@ -81,18 +81,21 @@ test('صدورِ سه پلن: امضا با کلیدِ مجوز، فایلِ ‎
     assert.ok(p, 'امضای خودِ سرور پذیرفته است');
     assert.equal(p.plan, plan);
     assert.equal(p.serial, o.serial);
-    if (!perm) assert.ok(Math.abs(p.endsAt - (p.issuedAt + days * DAY)) < 1000);
-    //  امضا واقعاً ES256 روی «PYOC1\0» + بدنه است، با کلیدِ عمومیِ منتشرشده
+    assert.equal(p.version, 2);
+    //  دستِ‌کم `days` روزِ کامل از همین لحظه
+    if (!perm) assert.ok(p.endsAt - now() >= days * DAY && p.endsAt - now() <= (days + 1) * DAY);
+    assert.ok(p.issuedAt <= now() && now() - p.issuedAt < DAY, 'روزِ صدور، نه آینده');
+    //  امضا واقعاً ES256 روی «PYOC2\0» + بدنه است، با کلیدِ عمومیِ منتشرشده
     const spki = Buffer.from(await license.publicKey(), 'base64');
     const key = crypto.createPublicKey({ key: spki, format: 'der', type: 'spki' });
-    assert.ok(crypto.verify('sha256', Buffer.concat([Buffer.from('PYOC1\0', 'latin1'), p.body]),
+    assert.ok(crypto.verify('sha256', Buffer.concat([Buffer.from('PYOC2\0', 'latin1'), p.body]),
       { key, dsaEncoding: 'ieee-p1363' }, p.sig));
   }
 });
 
 test('⛔ یک بیتِ عوض‌شده ⇒ کد باطل؛ پلن و کامپیوترِ غلط ⇒ ۴۰۰', async () => {
   const r = await issue({ plan: 'vip', computer: PC_A, days: 10 });
-  const raw = offline.b32decode(r.body.code, offline.TOTAL_LEN);
+  const raw = offline.b32decode(r.body.code, offline.TOTAL2);
   raw[1] = 3;                                   // وی‌آی‌پی ⇒ دائمی
   assert.equal(await offline.verify(offline.b32encode(raw)), null);
 
@@ -114,7 +117,7 @@ test('آنلاین شد ⇒ همان کد اشتراکِ پمپ می‌شود، 
 
   const sub = await one(`SELECT * FROM station_subscriptions WHERE station_id=$1 AND status='active'`, [d.stationId]);
   assert.equal(sub.plan, 'vip');
-  assert.ok(Math.abs(Number(sub.ends_at) - (r.body.offline.issuedAt + 400 * DAY)) < 1000);
+  assert.equal(Number(sub.ends_at), r.body.offline.endsAt);
 
   const row = await one(`SELECT * FROM pump_offline_codes WHERE serial=$1`, [r.body.offline.serial]);
   assert.equal(row.redeemed_station_id, d.stationId, 'دفترِ پنل می‌داند کجا نشست');
@@ -183,4 +186,52 @@ test('دائمی ⇒ پنجاه سال · فهرستِ پنل · بی توکنِ
 
   const anon = await h.post('/api/pump/device/offline-code', { code: r.body.code, computer: PC_A });
   assert.equal(anon.status, 401);
+});
+
+test('نسخهٔ ۲: بسته به حساب — حسابِ دیگر ⇒ ۴۰۹، ایمیلِ ناشناس ⇒ ۴۰۴', async () => {
+  const d1 = await boundDevice('pc-offline-acct-1');
+  const d2 = await boundDevice('pc-offline-acct-2');
+  const r = await issue({ plan: 'vip', computer: PC_A, days: 60, account: d1.email.toUpperCase() });
+  assert.equal(r.status, 201, JSON.stringify(r.body));
+  assert.equal(r.body.offline.accountEmail, d1.email);
+  assert.equal(r.body.file.account, d1.email);
+  const p = await offline.verify(r.body.code);
+  assert.ok(p.account.equals(offline.accountTag(d1.userId)), 'چهار بایتِ حساب در کد');
+
+  const wrong = await h.post('/api/pump/device/offline-code',
+    { code: r.body.code, computer: PC_A }, { token: d2.token });
+  assert.equal(wrong.status, 409);
+  assert.equal(wrong.body.error?.code || wrong.body.code, 'account_mismatch');
+  const ok = await h.post('/api/pump/device/offline-code',
+    { code: r.body.code, computer: PC_A }, { token: d1.token });
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  assert.equal(ok.body.status, 'granted');
+
+  assert.equal((await issue({ plan: 'std', computer: PC_A, account: 'nobody@nowhere.test' })).status, 404);
+  //  بی حساب ⇒ هر حسابی (کامپیوتری که هرگز آنلاین نشده)
+  const any = await issue({ plan: 'std', computer: PC_A, days: 5 });
+  assert.ok((await offline.verify(any.body.code)).account.equals(Buffer.alloc(4)));
+});
+
+test('⛔ کدهای نسخهٔ ۱ که پیش از این صادر شده‌اند همچنان پذیرفته‌اند', async () => {
+  //  همان شکلِ دودوییِ نسخهٔ ۱، با کلیدِ همین سرور
+  const pc = offline.parseComputer(PC_A);
+  const body = Buffer.alloc(offline.BODY_LEN);
+  body[0] = 1; body[1] = 2;
+  pc.machine.copy(body, 2);
+  crypto.randomBytes(6).copy(body, 12);
+  const at = Math.floor(now() / 1000);
+  body.writeUInt32BE(at, 18);
+  body.writeUInt32BE(at + 30 * 86400, 22);
+  Buffer.from(await license.keyId(), 'hex').subarray(0, 8).copy(body, 26);
+  const sig = await license.signBytes(Buffer.concat([Buffer.from('PYOC1\0', 'latin1'), body]));
+  const code = offline.b32encode(Buffer.concat([body, sig]));
+  assert.equal(code.length, 157);
+  const p = await offline.verify(code);
+  assert.ok(p);
+  assert.equal(p.version, 1);
+  const d = await boundDevice('pc-offline-v1');
+  const red = await h.post('/api/pump/device/offline-code', { code, computer: PC_A }, { token: d.token });
+  assert.equal(red.status, 200, JSON.stringify(red.body));
+  assert.equal(red.body.status, 'granted');
 });
