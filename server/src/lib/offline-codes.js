@@ -30,6 +30,24 @@
  *
  * ⚠️ پیشوندِ «PYOC1» جدا کردنِ دامنه است: همین کلید مجوزِ JWS هم امضا
  * می‌کند و هیچ امضایی از این‌جا نباید آن‌جا معنایی داشته باشد.
+ *
+ * ── نسخهٔ ۲ (۱۴۰۵/۰۷/۲۰) — «کوتاه‌تر، برای هر کامپیوتر و هر حساب متفاوت،
+ *    یک بار استفاده» — از امروز فقط همین صادر می‌شود؛ نسخهٔ ۱ همچنان
+ *    پذیرفته است (کدهای صادرشده باطل نمی‌شوند):
+ *
+ *      0      نسخه = 2
+ *      1      پلن
+ *      2..9   کامپیوتر: ۶۴ بیتِ نخستِ همان بایت‌های کامپیوترِ نسخهٔ ۱
+ *      10..13 حساب: ۴ بایتِ نخستِ SHA-256("pump-yaqobi|offline-acct|v2|" ‖ شناسهٔ کاربر)؛
+ *             صفر = هر حسابی (کامپیوتری که هرگز آنلاین نشده)
+ *      14..17 سریال (تصادفی)
+ *      18..19 روزِ صدور — روز از ۲۰۲۴/۰۱/۰۱ِ UTC
+ *      20..21 روزِ پایان (انحصاری)؛ 0xFFFF = دائمی
+ *      22..85 امضای ES256 روی SHA-256("PYOC2\0" ‖ بایت‌های ۰..۲۱)
+ *
+ *    ⇒ ۸۶ بایت ⇒ ۱۳۸ نویسه. ‎kid‎ در کد نیست: برنامه هر کلیدِ داخلِ خودش را
+ *    می‌آزماید (یکی یا دو کلید). امضا کوتاه‌تر از ۶۴ بایت نمی‌شود بی
+ *    رمزنگاریِ دست‌ساز — و آن را نمی‌سازیم.
  */
 const crypto = require('crypto');
 const { one, many, query, tx, newId, now } = require('../db');
@@ -44,6 +62,42 @@ const TOTAL_LEN = BODY_LEN + 64;
 const DOMAIN = Buffer.from('PYOC1\0', 'latin1');
 const PERMANENT = 0xFFFFFFFF;
 const DAY = 86_400_000;
+
+const V2 = 2;
+const BODY2 = 22;
+const TOTAL2 = BODY2 + 64;
+const DOMAIN2 = Buffer.from('PYOC2\0', 'latin1');
+const EPOCH_DAY = Date.UTC(2024, 0, 1) / DAY;
+const PERMANENT2 = 0xFFFF;
+
+/** شناسهٔ کاربر ⇒ ۴ بایتِ «حساب» در کد (هم‌آهنگ با ‎OfflineKey.AccountTag‎ی برنامه). */
+function accountTag(userId) {
+  if (!userId) return Buffer.alloc(4);
+  return crypto.createHash('sha256').update('pump-yaqobi|offline-acct|v2|' + userId, 'utf8').digest().subarray(0, 4);
+}
+
+/**
+ * بدنهٔ نسخهٔ ۲ — خالص (آزمون‌ها و ابزارِ بردارِ آزمونِ برنامه هم از همین می‌سازند).
+ * ⇒ Buffer(22)
+ */
+function body2({ plan, machine, account, serial, issuedDay, endDay }) {
+  const b = Buffer.alloc(BODY2);
+  b[0] = V2;
+  b[1] = PLANS[plan].byte;
+  Buffer.from(machine).copy(b, 2, 0, 8);
+  Buffer.from(account).copy(b, 10, 0, 4);
+  Buffer.from(serial).copy(b, 14, 0, 4);
+  b.writeUInt16BE(issuedDay, 18);
+  b.writeUInt16BE(endDay, 20);
+  return b;
+}
+
+/** بدنه + امضا ⇒ کدِ پنج‌تا‌پنج‌تا. `sign(buf) ⇒ Buffer(64)` */
+async function encode2(body, sign) {
+  const sig = await sign(Buffer.concat([DOMAIN2, body]));
+  if (sig.length !== 64) throw new Error('امضا ۶۴ بایت نیست');
+  return group(b32encode(Buffer.concat([body, sig])), 5);
+}
 
 const PLANS = Object.freeze({
   std: { byte: 1, title: 'استاندارد', defDays: 365 },
@@ -154,6 +208,7 @@ async function kidBytes() {
 
 /** کد ⇒ بخش‌هایش. امضا این‌جا سنجیده نمی‌شود. */
 function parse(code) {
+  if (clean(code).length === Math.ceil(TOTAL2 * 8 / 5)) return parse2(code);
   const buf = b32decode(code, TOTAL_LEN);
   if (!buf || buf[0] !== VERSION) return null;
   const plan = PLAN_OF_BYTE[buf[1]];
@@ -170,6 +225,30 @@ function parse(code) {
     kid: buf.subarray(26, 34).toString('hex'),
     body: buf.subarray(0, BODY_LEN),
     sig: buf.subarray(BODY_LEN, TOTAL_LEN),
+    version: 1,
+    account: Buffer.alloc(4),
+  };
+}
+
+function parse2(code) {
+  const buf = b32decode(code, TOTAL2);
+  if (!buf || buf[0] !== V2) return null;
+  const plan = PLAN_OF_BYTE[buf[1]];
+  if (!plan) return null;
+  const issuedDay = buf.readUInt16BE(18);
+  const endDay = buf.readUInt16BE(20);
+  return {
+    plan,
+    machine: buf.subarray(2, 10),
+    account: buf.subarray(10, 14),
+    serial: buf.subarray(14, 18).toString('hex'),
+    issuedAt: (EPOCH_DAY + issuedDay) * DAY,
+    endsAt: endDay === PERMANENT2 ? 0 : (EPOCH_DAY + endDay) * DAY,
+    permanent: endDay === PERMANENT2,
+    kid: '',
+    body: buf.subarray(0, BODY2),
+    sig: buf.subarray(BODY2, TOTAL2),
+    version: 2,
   };
 }
 
@@ -177,6 +256,10 @@ function parse(code) {
 async function verify(code) {
   const p = parse(code);
   if (!p) return null;
+  if (p.version === 2) {
+    const ok2 = await license.verifyBytes(Buffer.concat([DOMAIN2, p.body]), p.sig);
+    return ok2 ? p : null;
+  }
   if (p.kid !== (await kidBytes()).toString('hex')) return null;
   const ok = await license.verifyBytes(Buffer.concat([DOMAIN, p.body]), p.sig);
   return ok ? p : null;
@@ -198,6 +281,8 @@ function shape(row) {
     redeemedStationId: row.redeemed_station_id || '',
     redeemedAt: row.redeemed_at ? Number(row.redeemed_at) : null,
     createdAt: Number(row.created_at),
+    accountEmail: row.account_email || '',
+    version: Number(row.version) || 1,
   };
 }
 
@@ -205,52 +290,65 @@ function shape(row) {
  * صدور. ⇒ { code, offline, file }
  * `days` برای استاندارد و وی‌آی‌پی (پیش‌فرض ۳۶۵، سقف ۳۶۵۰)؛ دائمی هیچ.
  */
-async function issue({ plan, computer, days = null, note = '', createdBy = '', at = now() } = {}) {
+async function issue({ plan, computer, account = '', days = null, note = '', createdBy = '', at = now() } = {}) {
   const P = PLANS[plan];
   if (!P) throw badRequest('پلن باید استاندارد، وی‌آی‌پی یا دائمی باشد', 'bad_plan');
   const pc = parseComputer(computer);
   if (!pc) throw badRequest('کدِ کامپیوتر درست نیست — ۱۶ نویسه، همان که برنامه نشان می‌دهد', 'bad_computer');
 
-  const issuedSec = Math.floor(at / 1000);
-  let endsSec = PERMANENT;
+  //  «برای هر حساب متفاوت» — ایمیلِ حساب ⇒ شناسهٔ کاربر ⇒ ۴ بایتِ کد.
+  //  خالی ⇒ هر حسابی (کامپیوتری که هرگز آنلاین نشده و حسابی ندارد).
+  let user = null;
+  const email = String(account || '').trim().toLowerCase();
+  if (email) {
+    user = await one('SELECT id, email FROM users WHERE lower(email)=$1', [email]);
+    if (!user) throw notFound('حسابی با این ایمیل نیست', 'account_not_found');
+  }
+
+  const today = Math.floor(at / DAY) - EPOCH_DAY;
+  let endDay = PERMANENT2;
   if (plan !== 'perm') {
     const d = days === null || days === undefined || days === '' ? P.defDays : Number(days);
     if (!Number.isInteger(d) || d < 1 || d > 3650) throw badRequest('روزها باید بینِ ۱ و ۳۶۵۰ باشد', 'bad_days');
-    endsSec = issuedSec + d * 86400;
+    //  دستِ‌کم d روزِ کامل: پایان نیمه‌شبِ پس از روزِ d‌ام
+    endDay = today + d + 1;
   }
 
-  const body = Buffer.alloc(BODY_LEN);
-  body[0] = VERSION;
-  body[1] = P.byte;
-  pc.machine.copy(body, 2);
-  const serial = crypto.randomBytes(6);
-  serial.copy(body, 12);
-  body.writeUInt32BE(issuedSec, 18);
-  body.writeUInt32BE(endsSec, 22);
-  (await kidBytes()).copy(body, 26);
-  const sig = await license.signBytes(Buffer.concat([DOMAIN, body]));
-  if (sig.length !== 64) throw new Error('امضا ۶۴ بایت نیست');
-
-  const code = group(b32encode(Buffer.concat([body, sig])), 5);
-  const row = await one(
-    `INSERT INTO pump_offline_codes (id, serial, plan, computer, issued_at, ends_at, note, created_by, created_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
-    [newId('ofc'), serial.toString('hex'), plan, pc.text, issuedSec * 1000,
-      endsSec === PERMANENT ? 0 : endsSec * 1000, String(note || '').slice(0, 300), createdBy, at]
-  );
-  const offline = shape(row);
-  return { code, offline, file: fileOf(code, offline) };
+  for (let attempt = 0; ; attempt++) {
+    const serial = crypto.randomBytes(4);
+    const body = body2({
+      plan, machine: pc.machine, account: accountTag(user?.id), serial, issuedDay: today, endDay,
+    });
+    const code = await encode2(body, license.signBytes);
+    try {
+      const row = await one(
+        `INSERT INTO pump_offline_codes (id, serial, plan, computer, issued_at, ends_at, note, created_by, created_at,
+                                         account_user_id, account_email, version)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,2) RETURNING *`,
+        [newId('ofc'), serial.toString('hex'), plan, pc.text, (EPOCH_DAY + today) * DAY,
+          endDay === PERMANENT2 ? 0 : (EPOCH_DAY + endDay) * DAY, String(note || '').slice(0, 300), createdBy, at,
+          user?.id || '', user?.email || '']
+      );
+      const offline = shape(row);
+      return { code, offline, file: fileOf(code, offline) };
+    } catch (err) {
+      //  سریالِ تکراری (یک در چهار میلیارد) ⇒ سریالِ تازه
+      if (attempt < 3 && /unique|duplicate/i.test(String(err.message))) continue;
+      throw err;
+    }
+  }
 }
 
 /** محتوای فایلِ ‎.pumpkey‎ — برنامه فقط `code` را باور می‌کند؛ بقیه برای چشم است. */
 function fileOf(code, o) {
   return {
     format: 'pumpyaqobi-offline-key',
-    v: 1,
+    v: 2,
     code,
     plan: o.plan,
     planTitle: o.planTitle,
     computer: o.computer,
+    account: o.accountEmail,
     issuedAt: o.issuedAt,
     endsAt: o.endsAt,
     permanent: o.permanent,
@@ -286,8 +384,17 @@ async function redeem({ stationId, deviceUid = '', code, computer, at = now() })
   const p = await verify(code);
   if (!p) throw badRequest('این کدِ اشتراک معتبر نیست', 'bad_offline_code');
   const pc = parseComputer(computer);
-  if (!pc || !pc.machine.equals(p.machine)) {
+  if (!pc || !pc.machine.subarray(0, p.machine.length).equals(p.machine)) {
     throw badRequest('این کد برای کامپیوترِ دیگری ساخته شده است', 'computer_mismatch');
+  }
+  //  ⛔ کدِ بسته به حساب فقط روی پمپی که آن حساب عضوش است
+  if (p.account.some(b => b !== 0)) {
+    const members = await many(
+      `SELECT user_id FROM station_members WHERE station_id=$1 AND status='active'
+       UNION SELECT owner_user_id FROM stations WHERE id=$1`, [stationId]);
+    if (!members.some(m => accountTag(m.user_id || m.owner_user_id).equals(p.account))) {
+      throw conflict('این کد برای حسابِ دیگری ساخته شده است', 'account_mismatch');
+    }
   }
 
   const claim = await tx(async (c) => {
@@ -295,9 +402,9 @@ async function redeem({ stationId, deviceUid = '', code, computer, at = now() })
     if (!row) {
       //  کدِ امضاشدهٔ خودمان که ردیفش نیست (دیتابیسِ بازگردانده‌شده) ⇒ ثبت
       row = (await c.query(
-        `INSERT INTO pump_offline_codes (id, serial, plan, computer, issued_at, ends_at, note, created_by, created_at)
-         VALUES ($1,$2,$3,$4,$5,$6,'',$7,$8) RETURNING *`,
-        [newId('ofc'), p.serial, p.plan, pc.text, p.issuedAt, p.endsAt, 'redeem', at]
+        `INSERT INTO pump_offline_codes (id, serial, plan, computer, issued_at, ends_at, note, created_by, created_at, version)
+         VALUES ($1,$2,$3,$4,$5,$6,'',$7,$8,$9) RETURNING *`,
+        [newId('ofc'), p.serial, p.plan, pc.text, p.issuedAt, p.endsAt, 'redeem', at, p.version]
       )).rows[0];
     }
     if (row.status === 'revoked') return { row, revoked: true };
@@ -346,7 +453,7 @@ async function redeem({ stationId, deviceUid = '', code, computer, at = now() })
 }
 
 module.exports = {
-  issue, redeem, verify, parse, list, revoke, shape, fileOf,
+  issue, redeem, verify, parse, list, revoke, shape, fileOf, body2, encode2, accountTag,
   parseComputer, computerOfFingerprint, computerOfBytes, b32encode, b32decode,
-  PLANS, ALPHABET, TOTAL_LEN, BODY_LEN, PERMANENT,
+  PLANS, ALPHABET, TOTAL_LEN, BODY_LEN, PERMANENT, TOTAL2, BODY2, EPOCH_DAY, PERMANENT2,
 };
