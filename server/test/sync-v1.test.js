@@ -340,3 +340,43 @@ test('گزارشِ خطا ثبت می‌شود و راز در آن نمی‌ما
   assert.ok(!row.log_tail.includes('0700123456'), 'شماره باید پوشانده شود');
   assert.equal(row.app, 'shop');
 });
+
+/* ------------------------------------- شورا، د۶: حالِ یک نسخه، شمرده */
+
+test('version-health: دستگاه‌ها و خطاهای یک نسخه شمرده می‌شوند، نه فهرست', async () => {
+  const { newId } = require('../src/db');
+  const pw = require('../src/lib/password');
+  await query('DELETE FROM admins WHERE username=$1', ['vh-admin']);
+  await query(
+    `INSERT INTO admins (id, username, name, password_hash, role, status, created_at)
+     VALUES ($1,'vh-admin','مدیر',$2,'superadmin','active',$3)`,
+    [newId('adm'), await pw.hashPassword('Admin!12345'), Date.now()]);
+  const t = (await h.post('/api/admin/login', { username: 'vh-admin', password: 'Admin!12345' })).body.token;
+  assert.ok(t, 'ورودِ مدیر');
+
+  const ask = (v) => h.api('GET', `/api/admin/sync/version-health?app=shop&version=${v}`, { token: t });
+  const zero = await ask('9.8.7');
+  assert.equal(zero.status, 200, JSON.stringify(zero.body));
+  assert.deepEqual([zero.body.installs, zero.body.crashes], [0, 0]);
+
+  //  دو دستگاه با همین نسخه همگام می‌شوند — هر کدام یک بار شمرده می‌شود
+  for (const dev of ['vh-dev-1', 'vh-dev-2', 'vh-dev-1']) {
+    const r = await h.api('POST', '/api/sync/v1/push', {
+      token: owner.accessToken,
+      headers: { 'X-App': 'shop', 'X-Device': dev, 'X-App-Version': '9.8.7' },
+      body: { device_id: dev, schema_version: 1, ops: [op({ row_id: `vh-${dev}`, fields: { name: 'x' } })] },
+    });
+    assert.ok(r.status < 300, JSON.stringify(r.body));
+  }
+  //  ۶۰۱ خطا — بیش از سقفِ ۵۰۰ِ فهرست
+  await query(`INSERT INTO client_errors (id, app, app_version, message, at)
+               SELECT 'vh-' || g, 'shop', '9.8.7', 'آزمون', $1 FROM generate_series(1, 601) g`, [Date.now()]);
+  const r = await ask('v9.8.7');
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.equal(r.body.version, '9.8.7');
+  assert.equal(r.body.installs, 2);
+  assert.equal(r.body.crashes, 601);
+  assert.equal((await ask('9.8.8')).body.installs, 0, 'نسخهٔ دیگر شمرده نمی‌شود');
+  assert.equal((await ask('abc')).status, 400);
+  assert.equal((await h.api('GET', '/api/admin/sync/version-health?app=shop&version=9.8.7')).status, 401);
+});

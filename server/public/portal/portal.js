@@ -126,7 +126,53 @@ async function refresh() {
   me = await call('GET', '/portal/me');
   $('who').textContent = me.user.name ? `سلام، ${me.user.name}` : (me.user.email || 'پورتال مشتری');
   renderSubs();
-  await Promise.all([loadNotices(), loadDownloads()]);
+  await Promise.all([loadNotices(), loadDownloads(), probeRep()]);
+}
+
+/* ---------- شورا چ۳: نمایندگی — فقط اگر خودِ سرور بگوید نماینده است ---------- */
+let rep = null;
+async function probeRep() {
+  try { rep = await call('GET', '/rep/me'); } catch { rep = null; }
+  $('tab-btn-rep').classList.toggle('hidden', !rep);
+}
+
+async function loadRep() {
+  rep = await call('GET', '/rep/me');
+  const tot = $('rep-totals');
+  tot.innerHTML = '';
+  const pct = rep.reps.map(r => `${APP_FA[r.app] || r.app}: ${fa(r.commissionPct)}٪`).join(' · ');
+  tot.appendChild(el('div', 'muted', `درصدِ کمیسیون (از پنل): ${pct}`));
+  tot.appendChild(el('div', null, `${fa(rep.totals.count)} فروش · ${fa(rep.totals.customers)} مشتری`));
+  for (const c of rep.totals.byCurrency) {
+    tot.appendChild(el('div', null,
+      `جمعِ فروش ${fa(c.sales)} ${CUR_FA[c.currency] || c.currency} — کمیسیون ${fa(c.commission)} ${CUR_FA[c.currency] || c.currency}`));
+  }
+  const codes = $('rep-codes');
+  codes.innerHTML = '';
+  for (const c of rep.codes) {
+    const off = c.kind === 'percent' ? `${fa(c.value)}٪` : `${fa(c.value)} ${CUR_FA[c.currency] || c.currency}`;
+    const row = el('div', 'dl');
+    const b = el('b', null, c.code); b.dir = 'ltr';
+    row.appendChild(b);
+    row.appendChild(el('span', 'muted', `${APP_FA[c.app] || c.app} · ${off} · ${fa(c.uses)} بار${c.status === 'active' ? '' : ' · باطل'}`));
+    codes.appendChild(row);
+  }
+  if (!rep.codes.length) codes.appendChild(el('div', 'muted', 'هنوز کدی برایتان ساخته نشده است'));
+  const body = $('rep-body');
+  body.innerHTML = '';
+  for (const s of rep.sales) {
+    const tr = el('tr');
+    tr.appendChild(el('td', null, date(s.at)));
+    tr.appendChild(el('td', null, s.customer || '—'));
+    tr.appendChild(el('td', null, s.plan || '—'));
+    const cd = el('td', null, s.code); cd.dir = 'ltr'; tr.appendChild(cd);
+    tr.appendChild(el('td', null, `${fa(s.finalPrice)} ${CUR_FA[s.currency] || s.currency}`));
+    tr.appendChild(el('td', null, `${fa(s.commission)} (${fa(s.commissionPct)}٪)`));
+    body.appendChild(tr);
+  }
+  if (!rep.sales.length) {
+    const tr = el('tr'); const td = el('td', 'muted', 'هنوز فروشی با کدهای شما ثبت نشده است'); td.colSpan = 6; tr.appendChild(td); body.appendChild(tr);
+  }
 }
 
 function renderSubs() {
@@ -314,7 +360,7 @@ async function loadDownloads() {
 
 const LOADERS = {
   subs: async () => renderSubs(), payments: loadPayments, devices: loadDevices,
-  support: loadSupport, notices: loadNotices, downloads: loadDownloads,
+  support: loadSupport, notices: loadNotices, downloads: loadDownloads, rep: loadRep,
 };
 function openTab(name) {
   for (const tab of document.querySelectorAll('.tab')) tab.classList.toggle('active', tab.dataset.tab === name);

@@ -480,6 +480,7 @@ router.get('/discount-codes', async (req, res, next) => {
     res.json({ codes: await discounts.listCodes({
       app: req.query?.app ? appOf(req.query.app) : '', status: v.text(req.query?.status, { max: 20 }),
       limit: v.integer(req.query?.limit, { min: 1, max: 1000, def: 200 }),
+      repId: v.text(req.query?.repId, { max: 80 }),
     }) });
   } catch (err) { next(err); }
 });
@@ -497,6 +498,45 @@ router.post('/discount-codes/:id/revoke', async (req, res, next) => {
     const code = await discounts.revokeCode(v.id(req.params.id));
     await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.discount_code_revoked', targetId: code.id });
     res.json({ code });
+  } catch (err) { next(err); }
+});
+
+/* ==========================================================
+   نماینده‌های فروش — شورا، چ۳
+   ⛔ درصدِ کمیسیون فقط از همین‌جا (پنل) و پیش‌فرض ندارد. فروشِ هر نماینده
+   همان `discount_uses`ِ کدهای اوست — دفترِ دومی نیست.
+   ========================================================== */
+
+const reps = require('../lib/sales-reps');
+
+router.get('/reps', async (req, res, next) => {
+  try { res.json({ reps: await reps.list({ app: req.query?.app ? appOf(req.query.app) : '' }) }); }
+  catch (err) { next(err); }
+});
+
+router.post('/reps', async (req, res, next) => {
+  try {
+    const rep = await reps.create(req.body || {}, { createdBy: req.admin.id });
+    await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.rep_created', targetType: 'sales_rep',
+      targetId: rep.id, detail: { app: rep.app, commissionPct: rep.commissionPct } });
+    res.status(201).json({ rep });
+  } catch (err) { next(err); }
+});
+
+router.patch('/reps/:id', async (req, res, next) => {
+  try {
+    const rep = await reps.update(v.id(req.params.id), req.body || {});
+    await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.rep_updated', targetType: 'sales_rep',
+      targetId: rep.id, detail: { commissionPct: rep.commissionPct, status: rep.status } });
+    res.json({ rep });
+  } catch (err) { next(err); }
+});
+
+router.get('/reps/:id/report', async (req, res, next) => {
+  try {
+    res.json(await reps.report(v.id(req.params.id), {
+      from: v.timestamp(req.query?.from, { def: 0 }), to: v.timestamp(req.query?.to, { def: 0 }),
+    }));
   } catch (err) { next(err); }
 });
 

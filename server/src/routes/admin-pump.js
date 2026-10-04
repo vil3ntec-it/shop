@@ -213,8 +213,18 @@ router.get('/subscriptions', async (req, res) => {
 router.post('/subscriptions', async (req, res, next) => {
   try {
     const stationId = v.id(req.body?.stationId, { field: 'شناسه‌ی پمپ' });
+    const planCode = v.text(req.body?.plan, { max: 20 }) || 'custom';
+    //  شورا چ۳: کدِ تخفیف (و نماینده‌اش) — همان راهِ بخشِ دکان. قیمتِ نهایی از
+    //  `discounts.quote` و قیمتِ روزِ پلن؛ هیچ عددی این‌جا نوشته نمی‌شود.
+    const discounts = require('../lib/discounts');
+    let quoted = null;
+    if (req.body?.discountCode) {
+      const st = await one('SELECT owner_user_id FROM stations WHERE id=$1', [stationId]);
+      quoted = await discounts.quote(req.body.discountCode, { app: 'pump', plan: planCode, userId: st ? st.owner_user_id || '' : '' });
+    }
     const row = await subs.grant(stationId, {
-      plan: v.text(req.body?.plan, { max: 20 }) || 'custom',
+      price: quoted && quoted.finalPrice !== null ? quoted.finalPrice : null,
+      plan: planCode,
       days: req.body?.days === undefined || req.body?.days === null || req.body?.days === ''
         ? null : v.integer(req.body.days, { field: 'روزها', min: 1, max: 3650 }),
       //  ⚠️ همان `v.timestamp`ِ بخشِ دکان: عددِ بی‌حد یا متن یک ۵۰۰ِ bigint یا اشتراکِ عملاً ابدی می‌ساخت
@@ -227,6 +237,13 @@ router.post('/subscriptions', async (req, res, next) => {
       //  مدیر صریح اشتراک می‌دهد؛ تعلیقِ قبلی با همین تصمیمِ او برداشته می‌شود
       allowUnsuspend: true,
     });
+    if (quoted) {
+      const st = await one('SELECT owner_user_id FROM stations WHERE id=$1', [stationId]);
+      await discounts.useCode(quoted.code.id, {
+        app: 'pump', userId: st ? st.owner_user_id || '' : '', tenantId: stationId, subscriptionId: row.id,
+        price: quoted.price || 0, finalPrice: quoted.finalPrice || 0,
+      });
+    }
     await audit.log({
       actorType: 'admin', userId: req.admin.id, action: 'admin.pump_subscription_granted',
       targetType: 'station', targetId: stationId,
