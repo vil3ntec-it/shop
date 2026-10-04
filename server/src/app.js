@@ -342,6 +342,7 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/admin', require('./routes/admin-notices'));
     api.use('/admin', require('./routes/admin-sales'));
     api.use('/portal', require('./routes/portal'));
+    api.use('/rep', require('./routes/rep'));       // شورا چ۳: نمایندهٔ فروش — فقط فروش‌های خودش
     api.get('/downloads', require('./routes/portal').downloadsHandler);
 
     api.use('/', require('./routes/data'));

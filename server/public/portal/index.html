@@ -53,6 +53,8 @@
     <button class="tab" data-tab="support">پشتیبانی</button>
     <button class="tab" data-tab="notices">اعلان‌ها <span class="pill hidden" id="notice-count"></span></button>
     <button class="tab" data-tab="downloads">دانلود</button>
+    <!-- شورا چ۳: فقط برای نمایندهٔ فروش دیده می‌شود (‎/api/rep/me‎ ۲۰۰) -->
+    <button class="tab hidden" data-tab="rep" id="tab-btn-rep">نمایندگی</button>
   </nav>
 
   <section id="tab-subs">
@@ -101,6 +103,22 @@
     <div class="panel">
       <h2>اعلان‌ها</h2>
       <div id="notices-list"></div>
+    </div>
+  </section>
+
+  <!-- شورا چ۳ — نمایندهٔ فروش: فقط فروش‌های خودش، از همان ردیف‌های سرور -->
+  <section id="tab-rep" class="hidden">
+    <div class="panel">
+      <h2>فروش‌ها و کمیسیونِ من</h2>
+      <div id="rep-totals"></div>
+      <h2 style="margin-top:14px;">کدهای تخفیفِ من</h2>
+      <div id="rep-codes"></div>
+      <div class="table-scroll" style="margin-top:14px;">
+        <table>
+          <thead><tr><th>تاریخ</th><th>مشتری</th><th>پلن</th><th>کد</th><th>مبلغ</th><th>کمیسیون</th></tr></thead>
+          <tbody id="rep-body"></tbody>
+        </table>
+      </div>
     </div>
   </section>
 

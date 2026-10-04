@@ -41,6 +41,7 @@ function shapeCode(r) {
     maxUses: r.max_uses === null || r.max_uses === undefined ? null : Number(r.max_uses),
     oncePerCustomer: !!r.once_per_customer, uses: Number(r.uses || 0), note: r.note || '',
     status: r.status, createdBy: r.created_by || '', createdAt: Number(r.created_at),
+    repId: r.rep_id || '',
   };
 }
 
@@ -63,6 +64,9 @@ async function createCode(input = {}, { createdBy = '' } = {}) {
   if (expiresAt !== null && (!Number.isFinite(expiresAt) || expiresAt <= now())) {
     throw badRequest('مهلتِ کد باید در آینده باشد', 'bad_until');
   }
+  //  شورا چ۳: کدِ نماینده — فقط نمایندهٔ فعالِ **همین بخش**
+  const repId = String(input.repId || '').trim();
+  if (repId) await require('./sales-reps').activeRepFor(repId, app);
   const maxUses = input.maxUses === undefined || input.maxUses === null || input.maxUses === ''
     ? null : Math.max(1, Math.round(Number(input.maxUses) || 1));
   let code = normalizeCode(input.code);
@@ -77,20 +81,21 @@ async function createCode(input = {}, { createdBy = '' } = {}) {
   }
   const row = await one(
     `INSERT INTO discount_codes (id, code, app, plan, kind, value, currency, user_id, expires_at, max_uses,
-                                 once_per_customer, uses, note, status, created_by, created_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,0,$12,'active',$13,$14) RETURNING *`,
+                                 once_per_customer, uses, note, status, created_by, created_at, rep_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,0,$12,'active',$13,$14,$15) RETURNING *`,
     [newId('dsc'), code, app, plan, kind, value, currencyOf(app), String(input.userId || input.user_id || ''),
       expiresAt, maxUses, input.oncePerCustomer === undefined ? true : !!input.oncePerCustomer,
-      String(input.note || '').slice(0, 300), createdBy, t]
+      String(input.note || '').slice(0, 300), createdBy, t, repId]
   );
   return shapeCode(row);
 }
 
-async function listCodes({ app = '', status = '', limit = 200 } = {}) {
+async function listCodes({ app = '', status = '', limit = 200, repId = '' } = {}) {
   const rows = await many(
     `SELECT * FROM discount_codes WHERE ($1 = '' OR app = $1) AND ($2 = '' OR status = $2)
+        AND ($4 = '' OR rep_id = $4)
       ORDER BY created_at DESC LIMIT $3`,
-    [app ? appOf(app) : '', String(status || ''), Math.min(Number(limit) || 200, 1000)]
+    [app ? appOf(app) : '', String(status || ''), Math.min(Number(limit) || 200, 1000), String(repId || '')]
   );
   return rows.map(shapeCode);
 }
@@ -153,10 +158,17 @@ async function useCode(codeId, { app, userId = '', tenantId = '', subscriptionId
   const a = appOf(app);
   const row = await one('SELECT * FROM discount_codes WHERE id=$1 AND app=$2', [String(codeId || ''), a]);
   if (!row) throw notFound('کد پیدا نشد', 'code_not_found');
+  //  شورا چ۳: نماینده و درصدِ **همین لحظه** روی خودِ ردیف — عوض شدنِ درصد
+  //  یا نماینده بعداً، فروشِ امروز را دست نمی‌زند. نمایندهٔ غیرفعال ⇒ بی کمیسیون.
+  const rep = row.rep_id
+    ? await one(`SELECT id, commission_bp FROM sales_reps WHERE id=$1 AND app=$2 AND status='active'`, [row.rep_id, a])
+    : null;
   await query(
-    `INSERT INTO discount_uses (id, code_id, app, user_id, tenant_id, subscription_id, price, final_price, created_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-    [newId('dsu'), row.id, a, userId, tenantId, subscriptionId, Math.round(price || 0), Math.round(finalPrice || 0), now()]
+    `INSERT INTO discount_uses (id, code_id, app, user_id, tenant_id, subscription_id, price, final_price, created_at,
+                                rep_id, commission_bp, currency)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+    [newId('dsu'), row.id, a, userId, tenantId, subscriptionId, Math.round(price || 0), Math.round(finalPrice || 0), now(),
+      rep ? rep.id : '', rep ? Number(rep.commission_bp) : 0, row.currency || currencyOf(a)]
   );
   await query('UPDATE discount_codes SET uses = uses + 1 WHERE id=$1', [row.id]);
   return shapeCode(await one('SELECT * FROM discount_codes WHERE id=$1', [row.id]));

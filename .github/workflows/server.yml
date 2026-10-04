@@ -112,3 +112,8 @@ jobs:
       - name: آزمونِ نسخهٔ وب
         working-directory: server
         run: npm run test:web
+
+      # شورا چ۳: نمایندهٔ فروش در پورتال فقط فروش‌های خودش را می‌بیند
+      - name: آزمونِ نمایندگی در پورتال
+        working-directory: server
+        run: npm run test:portal-rep
