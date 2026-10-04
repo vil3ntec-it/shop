@@ -6,6 +6,7 @@
  *   GET  /api/admin/sync/conflicts        تعارض‌ها با امکانِ بازگرداندن
  *   POST /api/admin/sync/conflicts/:id/restore
  *   GET  /api/admin/sync/errors           خطاهای گزارش‌شدهٔ برنامه‌ها
+ *   GET  /api/admin/sync/version-health   یک نسخه: چند دستگاه، چند خطا (شمرده، نه فهرست)
  *
  * ⚠️ نسخهٔ بازنده هیچ‌وقت پاک نشده — این‌جا برمی‌گردد و به شکلِ یک opِ
  * تازه به دستگاه‌ها می‌رسد. «هیچ داده‌ای بی‌صدا حذف نمی‌شود.»
@@ -67,6 +68,28 @@ router.get('/errors', async (req, res, next) => {
       ? await many('SELECT * FROM client_errors WHERE app=$1 ORDER BY at DESC LIMIT $2', [app, limit])
       : await many('SELECT * FROM client_errors ORDER BY at DESC LIMIT $1', [limit]);
     res.json({ errors: rows });
+  } catch (err) { next(err); }
+});
+
+/**
+ * ⛔ شورا، د۶ — «کانالِ پایدار»ِ آپدیتِ پمپ (مرکز فرمان) از همین می‌پرسد.
+ * هر دو عدد با ‎COUNT‎ شمرده می‌شوند، نه از فهرستِ آخرین خطاها (که سقفِ ۵۰۰
+ * داشت و نسخهٔ کهنه را از قلم می‌انداخت). ‎installs‎ = دستگاه‌هایی که با همین
+ * نسخه همگام شده‌اند — «صفر خطا» بی دستگاه یعنی «کسی نصبش نکرده»، نه «سالم».
+ */
+router.get('/version-health', async (req, res, next) => {
+  try {
+    const app = sectionOf(req.query?.app);
+    const version = String(req.query?.version || '').trim().replace(/^v/i, '').slice(0, 32);
+    if (!app) return next(badRequest('برنامه لازم است', 'app_required'));
+    if (!/^\d+(\.\d+){1,3}$/.test(version)) return next(badRequest('نسخه درست نیست', 'bad_version'));
+    const forms = [version, `v${version}`];
+    const [inst, errs] = await Promise.all([
+      many(`SELECT COUNT(*)::int AS n FROM (SELECT DISTINCT account_id, device_id FROM sync_devices
+              WHERE app=$1 AND app_version = ANY($2::text[])) d`, [app, forms]),
+      many('SELECT COUNT(*)::int AS n FROM client_errors WHERE app=$1 AND app_version = ANY($2::text[])', [app, forms]),
+    ]);
+    res.json({ app, version, installs: Number(inst[0]?.n) || 0, crashes: Number(errs[0]?.n) || 0 });
   } catch (err) { next(err); }
 });
 
