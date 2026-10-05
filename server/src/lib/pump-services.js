@@ -18,9 +18,20 @@ const ONLINE_KEYS = ['kar_app', 'bot', 'messenger', 'cloud', 'cloudbackup'];
 const DAY = 86_400_000;
 const PERMANENT_AFTER = 10 * 365 * DAY;
 
+/*
+ *  ⛔ پلنِ زمان‌دارِ صریح هرگز «دائمی» خوانده نمی‌شود، هر قدر هم پایانش دور
+ *  باشد (۱۴۰۵/۰۷/۲۰، سنجهٔ ‎8د‎ی ‎pump-e2e‎ِ ریپوی server). پیش از این
+ *  وی‌آی‌پی‌ای که از دائمی پایینش آورده بودند پایانِ ۲۰۷۹ را نگه می‌داشت و
+ *  این‌جا «دائمی» می‌شد — یعنی یک سال بعد خدماتش بی‌صدا قطع می‌شد. «دائمی کن»
+ *  حالا پلن را هم ‎perm‎ می‌کند (‎admin-sales.makePermanent‎)، پس فرضِ «پایانِ
+ *  دور» فقط برای پلن‌های بی‌نام و قدیمی (‎custom‎، ‎m1‎…) می‌ماند.
+ */
+const TIMED_PLANS = new Set(['std', 'vip', 'trial']);
+
 function isPermanent(sub, at = Date.now()) {
   if (!sub) return false;
   if (sub.plan === 'perm' || sub.plan === 'permanent') return true;
+  if (TIMED_PLANS.has(sub.plan)) return false;
   return Number(sub.ends_at) - at > PERMANENT_AFTER;
 }
 
@@ -52,4 +63,4 @@ function hasOnline(features) {
   return Array.isArray(features) && features.some(k => ONLINE_KEYS.includes(k));
 }
 
-module.exports = { ONLINE_KEYS, isPermanent, servicesUntil, servicesActive, stripOnline, hasOnline };
+module.exports = { ONLINE_KEYS, TIMED_PLANS, isPermanent, servicesUntil, servicesActive, stripOnline, hasOnline };

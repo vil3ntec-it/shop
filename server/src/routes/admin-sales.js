@@ -415,15 +415,17 @@ async function makePermanent(app, id, by) {
   const t = now();
   const end = plans.endOfPeriod(t, PERMANENT_YEARS, 'year');
   const row = await one(
-    `UPDATE ${T.subsTable} SET status='active', ends_at=$2, plan=CASE WHEN plan='' OR plan='custom' THEN 'perm' ELSE plan END,
+    //  ⛔ پمپ: «دائمی کن» پلن را هم «دائمی» می‌کند — وی‌آی‌پیِ پنجاه‌ساله با نامِ
+    //  «وی‌آی‌پی» نه در پنل درست دیده می‌شد، نه سرور می‌دانست خدماتش ساله است.
+    `UPDATE ${T.subsTable} SET status='active', ends_at=$2,
+            plan=CASE WHEN $5 = 'pump' OR plan='' OR plan='custom' THEN 'perm' ELSE plan END,
             updated_at=$3, created_by=COALESCE(NULLIF($4,''), created_by) WHERE id=$1 RETURNING *`,
-    [cur.id, end, t, by]
+    [cur.id, end, t, by, app]
   );
   //  ⛔ پمپ: سالِ اولِ خدماتِ سرور رایگان، از همین لحظهٔ «دائمی شد» —
   //  ولی دائمیِ موجود (یا تمدیدشده) دست نمی‌خورد.
   let out = row;
-  if (app === 'pump' && !pumpServices.isPermanent(cur, t)
-      && (row.services_until === null || row.services_until === undefined)) {
+  if (app === 'pump' && !pumpServices.isPermanent(cur, t)) {
     out = await one(`UPDATE ${T.subsTable} SET services_until=$2 WHERE id=$1 RETURNING *`,
       [row.id, plans.endOfPeriod(t, 1, 'year')]);
   }
