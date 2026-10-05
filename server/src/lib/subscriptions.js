@@ -211,7 +211,15 @@ function build(T) {
     if (existing && existing.status === 'suspended' && !allowUnsuspend) {
       throw forbidden('اشتراکِ این حساب معلق است؛ با پشتیبانی تماس بگیرید', 'subscription_suspended');
     }
-    const base = existing && Number(existing.ends_at) > t ? Number(existing.ends_at) : t;
+    let base = existing && Number(existing.ends_at) > t ? Number(existing.ends_at) : t;
+    /*
+     *  ⛔ پمپ، از دائمی به پلنِ زمان‌دار: دورهٔ تازه از **امروز** است، نه از
+     *  پایانِ پنجاه‌سالهٔ دائمی — وگرنه «وی‌آی‌پیِ یک‌ساله» تا ۲۰۷۹ می‌ماند.
+     */
+    if (T.app === 'pump' && existing && plan !== 'perm' && plan !== 'permanent'
+        && require('./pump-services').isPermanent(existing, t)) {
+      base = t;
+    }
 
     let start = startsAt ? Number(startsAt) : t;
     let end;
@@ -309,10 +317,12 @@ function build(T) {
      */
     if (T.app === 'pump') {
       const svc = require('./pump-services');
-      if (svc.isPermanent(row, t) && (row.services_until === null || row.services_until === undefined)
-          && !(existing && svc.isPermanent(existing, t))) {
+      if (svc.isPermanent(row, t) && !(existing && svc.isPermanent(existing, t))) {
         row = await one(`UPDATE ${TBL} SET services_until=$2 WHERE id=$1 RETURNING *`,
           [row.id, plans.endOfPeriod(t, 1, 'year')]);
+      } else if (!svc.isPermanent(row, t) && row.services_until !== null && row.services_until !== undefined) {
+        //  دائمی ⇒ زمان‌دار: مهرِ خدماتِ کهنه نمی‌ماند تا «دائمی کنِ» بعدی آن را تازه بگیرد
+        row = await one(`UPDATE ${TBL} SET services_until=NULL WHERE id=$1 RETURNING *`, [row.id]);
       }
     }
     /*

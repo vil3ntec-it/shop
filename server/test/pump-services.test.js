@@ -189,3 +189,48 @@ test('تبدیل به دائمی از پنل: سالِ اولِ خدمات از 
   const yr = require('../src/lib/plans').endOfPeriod(t0, 1, 'year');
   assert.ok(Math.abs(Number(row.services_until) - yr) < 60_000);
 });
+
+/* ── ۲.۱۱.۲۴: پلنِ زمان‌دار هرگز «دائمی» خوانده نمی‌شود ───────────────── */
+
+test('⛔ «دائمی کن» روی وی‌آی‌پی ⇒ کدِ پلن هم «دائمی»، و مجوز همان را می‌گوید', async () => {
+  const p = await pumpWith('وی‌آی‌پیِ دائمی‌شده', 'vip');
+  const r = await h.post(`/api/admin/pump/subscriptions/${p.sub.id}/permanent`, {}, { token: p.admin });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.equal(r.body.subscription.plan, 'perm');
+  const lic = await h.post('/api/pump/device/license', {}, { token: p.deviceToken });
+  assert.equal(claims(lic.body.license).plan, 'perm');
+  assert.ok(Number(claims(lic.body.license).svc_ends) > now() + 360 * DAY);
+});
+
+test('⛔ از دائمی به وی‌آی‌پی: دورهٔ یک‌ساله از امروز، بی مهرِ خدمات — نه وی‌آی‌پیِ ۲۰۷۹', async () => {
+  const p = await pumpWith('دائمیِ پایین‌آمده', 'perm');
+  const g = await h.post('/api/admin/pump/subscriptions', { stationId: p.stationId, plan: 'vip' }, { token: p.admin });
+  assert.ok(g.status < 300, JSON.stringify(g.body));
+  const row = await one('SELECT * FROM station_subscriptions WHERE id=$1', [p.sub.id]);
+  assert.equal(row.plan, 'vip');
+  assert.ok(Number(row.ends_at) < now() + 370 * DAY, `پایان ${new Date(Number(row.ends_at)).toISOString()}`);
+  assert.equal(row.services_until, null, 'مهرِ خدماتِ دائمی نماند');
+  const f = await features(p);
+  for (const k of ONLINE) assert.ok(f.includes(k), `${k} در وی‌آی‌پی`);
+  const x = await h.post(`/api/admin/pump/subscriptions/${p.sub.id}/services`, { amount: 1, unit: 'month' }, { token: p.admin });
+  assert.equal(x.status, 400, 'خدماتِ جدا فقط مالِ دائمی');
+});
+
+test('⛔ وی‌آی‌پی با پایانِ دور (داده‌ی کهنه) هم «دائمی» نیست؛ مهاجرتِ ۰۴۳ کدِ درست را می‌دهد', async () => {
+  const svc = require('../src/lib/pump-services');
+  const far = now() + 40 * 365 * DAY;
+  assert.equal(svc.isPermanent({ plan: 'vip', ends_at: far }), false);
+  assert.equal(svc.isPermanent({ plan: 'std', ends_at: far }), false);
+  assert.equal(svc.isPermanent({ plan: 'custom', ends_at: far }), true, 'پلنِ بی‌نامِ قدیمی همچنان با پایان');
+  assert.equal(svc.isPermanent({ plan: 'perm', ends_at: now() + DAY }), true);
+
+  const p = await pumpWith('وی‌آی‌پیِ کهنهٔ دائمی', 'vip');
+  await query('UPDATE station_subscriptions SET ends_at=$2 WHERE id=$1', [p.sub.id, far]);
+  const sql = require('fs').readFileSync(require('path').join(__dirname, '..', 'migrations', '043_pump_perm_plan_code.sql'), 'utf8');
+  await query(sql);
+  const row = await one('SELECT plan FROM station_subscriptions WHERE id=$1', [p.sub.id]);
+  assert.equal(row.plan, 'perm');
+  const short = await pumpWith('وی‌آی‌پیِ یک‌ساله', 'vip');
+  await query(sql);
+  assert.equal((await one('SELECT plan FROM station_subscriptions WHERE id=$1', [short.sub.id])).plan, 'vip');
+});
