@@ -373,6 +373,21 @@ async function revoke(id) {
 }
 
 /**
+ * قابلیت‌هایی که این کد **همین حالا** می‌دهد — از فهرستِ خودِ پلن روی همین
+ * سرور (همان که ‎subs.grant‎ برمی‌دارد)؛ پلنِ بی‌فهرست ⇒ پلنِ کامل. دائمی
+ * خدماتِ سرور را فقط سالِ اولِ پس از صدورِ کد دارد.
+ */
+async function planKeysOf(p, at) {
+  const plan = await require('./plans').getPlan(p.plan, 'pump');
+  let keys = plan && Array.isArray(plan.features) && plan.features.length
+    ? plan.features : require('./features').catalogOf('pump').PAID_KEYS;
+  if (p.plan === 'perm' && require('./plans').endOfPeriod(p.issuedAt, 1, 'year') <= at) {
+    keys = require('./pump-services').stripOnline(keys);
+  }
+  return keys;
+}
+
+/**
  * برنامه آنلاین شد و کد را آورد ⇒ اشتراک روی همان پمپ.
  *
  * ⛔ کدِ باطل‌شده ⇒ ۴۱۰ (برنامه آن را کنار می‌گذارد). کدِ پمپِ دیگر ⇒ ۴۰۹.
@@ -430,14 +445,44 @@ async function redeem({ stationId, deviceUid = '', code, computer, at = now() })
   const live = await one(
     `SELECT * FROM station_subscriptions WHERE station_id=$1 AND status IN ('active','suspended','pending')
       ORDER BY created_at DESC LIMIT 1`, [stationId]);
-  if (live && Number(live.ends_at) >= endMs && live.status === 'active') {
-    return { status: 'covered', offline: shape(claim.row), granted: false };
+  /*
+   *  ⛔ «covered» یعنی «همین حالا هر چیزی را که این کد می‌دهد دارد» — نه فقط
+   *  «پایانش دیرتر است» (۱۴۰۵/۰۷/۲۱). گزارشِ صاحب سامانه: برنامه از کدِ
+   *  بی‌اینترنت «VIP · ۳۵۷ روز» می‌گفت و همگام‌سازی از همین سرور
+   *  ‎403 plan_no_services‎ می‌گرفت: اشتراکِ زندهٔ **استاندارد** (یا دائمیِ
+   *  خدمات‌تمام‌شده) پایانِ دیرتری داشت، پس کدِ وی‌آی‌پی «covered» خوانده
+   *  می‌شد و خدماتِ سرور هیچ‌وقت نمی‌نشست — و برنامه هم دیگر نمی‌پرسید.
+   */
+  let missing = [];
+  if (live && live.status === 'active') {
+    const want = await planKeysOf(p, at);
+    const ent = await require('./entitlement').pump.entitlementOf(stationId, at);
+    missing = want.filter(k => !ent.features.includes(k));
+    const svc = require('./pump-services');
+    //  دائمی: جز خدماتِ سرور چیزی کم نیست ⇒ خدمات تا پایانِ کد (اگر دیرتر از
+    //  پایانِ فعلیِ خدمات است)، و دائمی دائمی می‌ماند — هرگز به یک‌ساله پایین نمی‌آید
+    if (svc.isPermanent(live, at) && missing.every(k => svc.ONLINE_KEYS.includes(k))) {
+      const until = p.plan === 'perm' ? require('./plans').endOfPeriod(p.issuedAt, 1, 'year') : endMs;
+      if (svc.hasOnline(want) && until > at && until > svc.servicesUntil(live, at)) {
+        await svc.extendServices(live.id, { until }, 'offline-code', `کدِ آفلاین ${p.serial}`);
+        return { status: 'services', offline: shape(claim.row), granted: true };
+      }
+      return { status: 'covered', offline: shape(claim.row), granted: false };
+    }
+    if (!missing.length && (Number(live.ends_at) >= endMs || svc.isPermanent(live, at))) {
+      return { status: 'covered', offline: shape(claim.row), granted: false };
+    }
   }
+
+  //  ⛔ کد اشتراکِ بلندترِ موجود را کوتاه نمی‌کند: پلنِ پایین‌ترِ بلندتر (استاندارد
+  //  تا دو سال) به پلنِ کد بالا می‌رود و همان پایانِ دیرتر را نگه می‌دارد.
+  const liveEnd = live && live.status === 'active' ? Number(live.ends_at) : 0;
+  const endsAt = missing.length && liveEnd > endMs ? liveEnd : endMs;
 
   try {
     await subs.grant(stationId, {
       plan: p.plan,
-      endsAt: endMs,
+      endsAt,
       note: `کدِ آفلاین ${p.serial}`,
       createdBy: 'offline-code',
     });
