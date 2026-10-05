@@ -564,6 +564,18 @@ router.use('/support', require('./pump-support').makeRouter((req) => ({
  *  همان فهرستی که برنامهٔ کامپیوتر با توکنِ **دستگاه** می‌بیند —
  *  یک پوشه، دو در.
  */
+/*
+ *  کلیدِ بکاپِ پمپِ همین حساب — فقط عضوِ همان پمپ (زیرِ `requireStation`).
+ */
+router.get('/backup-key', (req, res, next) => {
+  try {
+    const out = require('../lib/backup-key').reply(req.stationId || '');
+    if (!out) return next(forbidden('کلیدِ بکاپ ساخته نشد', 'no_backup_key'));
+    res.set('Cache-Control', 'no-store');
+    res.json(out);
+  } catch (err) { next(err); }
+});
+
 router.use('/backups', require('./account-backups').makeRouter(
   'pump',
   (req) => req.stationId || '',

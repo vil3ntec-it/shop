@@ -796,6 +796,18 @@ router.use('/support', require('./pump-support').makeRouter((req) => ({
  *  `req.stationId` از `requireDevice` می‌آید — از ردیفِ خودِ توکن،
  *  نه از چیزی که فرستاده شده.
  */
+/*
+ *  کلیدِ بکاپِ همین پمپ — شرحش بالای `lib/backup-key.js`. فقط برای پمپِ خودِ توکن.
+ */
+router.get('/backup-key', (req, res, next) => {
+  try {
+    const out = require('../lib/backup-key').reply(req.stationId || '');
+    if (!out) return next(forbidden('کلیدِ بکاپ ساخته نشد', 'no_backup_key'));
+    res.set('Cache-Control', 'no-store');
+    res.json(out);
+  } catch (err) { next(err); }
+});
+
 router.use('/backups', require('./account-backups').makeRouter(
   'pump',
   (req) => req.stationId || '',
