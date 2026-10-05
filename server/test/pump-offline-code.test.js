@@ -235,3 +235,52 @@ test('⛔ کدهای نسخهٔ ۱ که پیش از این صادر شده‌ا�
   assert.equal(red.status, 200, JSON.stringify(red.body));
   assert.equal(red.body.status, 'granted');
 });
+
+/*
+ *  ⛔ «covered» یعنی «همین حالا همهٔ چیزی را که کد می‌دهد دارد»، نه «پایانش
+ *  دیرتر است» (۱۴۰۵/۰۷/۲۱). گزارشِ صاحب سامانه: برنامه «VIP · ۳۵۷ روز» از
+ *  کدِ بی‌اینترنت، و همگام‌سازی ‎403 plan_no_services‎ از همین سرور.
+ */
+async function entOf(stationId) {
+  return require('../src/lib/entitlement').pump.entitlementOf(stationId);
+}
+
+test('⛔ استانداردِ بلندتر کدِ وی‌آی‌پی را «covered» نمی‌خواند — خدماتِ سرور باز می‌شود', async () => {
+  const d = await boundDevice('pc-offline-std-later');
+  const t = await admin();
+  const g = await h.post('/api/admin/pump/subscriptions', { stationId: d.stationId, plan: 'std', days: 700 }, { token: t });
+  assert.equal(g.status, 201, JSON.stringify(g.body));
+  const before = await one(`SELECT * FROM station_subscriptions WHERE station_id=$1 AND status='active'`, [d.stationId]);
+  assert.ok(!(await entOf(d.stationId)).features.includes('cloud'), 'استاندارد خدماتِ سرور ندارد (پیش‌شرط)');
+  const r = await issue({ plan: 'vip', computer: PC_A, days: 357 });
+  const red = await h.post('/api/pump/device/offline-code', { code: r.body.code, computer: PC_A }, { token: d.token });
+  assert.equal(red.status, 200, JSON.stringify(red.body));
+  assert.notEqual(red.body.status, 'covered', 'وی‌آی‌پی چیزی دارد که استاندارد ندارد');
+  assert.equal(red.body.granted, true);
+  const ent = await entOf(d.stationId);
+  for (const k of ['cloud', 'messenger', 'kar_app']) assert.ok(ent.features.includes(k), 'باید باز باشد: ' + k);
+  const sub = await one(`SELECT * FROM station_subscriptions WHERE station_id=$1 AND status='active'`, [d.stationId]);
+  assert.ok(Number(sub.ends_at) >= Number(before.ends_at), '⛔ کوتاه نشد');
+  //  دوباره ⇒ این بار واقعاً covered
+  const again = await h.post('/api/pump/device/offline-code', { code: r.body.code, computer: PC_A }, { token: d.token });
+  assert.equal(again.body.status, 'covered');
+});
+
+test('⛔ دائمیِ خدمات‌تمام‌شده + کدِ وی‌آی‌پی ⇒ خدماتِ سرور تا پایانِ کد، و دائمی دائمی می‌ماند', async () => {
+  const d = await boundDevice('pc-offline-perm-svc');
+  const t = await admin();
+  const g = await h.post('/api/admin/pump/subscriptions', { stationId: d.stationId, plan: 'perm' }, { token: t });
+  assert.equal(g.status, 201, JSON.stringify(g.body));
+  await query(`UPDATE station_subscriptions SET services_until=$2 WHERE station_id=$1`, [d.stationId, now() - DAY]);
+  assert.ok(!(await entOf(d.stationId)).features.includes('cloud'), 'خدماتِ دائمی تمام شده (پیش‌شرط)');
+  const r = await issue({ plan: 'vip', computer: PC_A, days: 200 });
+  const red = await h.post('/api/pump/device/offline-code', { code: r.body.code, computer: PC_A }, { token: d.token });
+  assert.equal(red.status, 200, JSON.stringify(red.body));
+  assert.equal(red.body.status, 'services');
+  assert.equal(red.body.granted, true);
+  const sub = await one(`SELECT * FROM station_subscriptions WHERE station_id=$1 AND status='active'`, [d.stationId]);
+  assert.equal(sub.plan, 'perm', '⛔ دائمی به وی‌آی‌پیِ یک‌ساله پایین نیامد');
+  assert.equal(Number(sub.services_until), r.body.offline.endsAt);
+  assert.ok((await entOf(d.stationId)).features.includes('cloud'));
+  assert.ok(red.body.features.includes('cloud'), 'مجوزِ همان پاسخ هم');
+});

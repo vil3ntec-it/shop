@@ -63,4 +63,41 @@ function hasOnline(features) {
   return Array.isArray(features) && features.some(k => ONLINE_KEYS.includes(k));
 }
 
-module.exports = { ONLINE_KEYS, TIMED_PLANS, isPermanent, servicesUntil, servicesActive, stripOnline, hasOnline };
+/**
+ * تمدیدِ خدماتِ سرورِ یک اشتراکِ دائمی — ‎{amount, unit}‎ (از پایانِ فعلی اگر
+ * هنوز زنده است) یا ‎{until}‎ (تاریخِ دلخواه؛ گذشته ⇒ همین حالا قطع).
+ * ⛔ تنها پیاده‌سازی: پنلِ مدیر (‎admin-sales‎) و کدِ بی‌اینترنت
+ * (‎offline-codes.redeem‎) هر دو همین را صدا می‌زنند — ردیفِ تاریخچه با هم.
+ */
+async function extendServices(id, { amount, unit, until }, by, note = 'خدماتِ سرور') {
+  const { one, query, newId, now } = require('../db');
+  const { badRequest, notFound } = require('../middleware/errors');
+  const cur = await one('SELECT * FROM station_subscriptions WHERE id=$1', [id]);
+  if (!cur) throw notFound('اشتراک پیدا نشد', 'subscription_not_found');
+  const t = now();
+  if (!isPermanent(cur, t)) {
+    throw badRequest('خدماتِ جدا فقط برای اشتراکِ دائمی است', 'not_permanent');
+  }
+  const prev = servicesUntil(cur, t);
+  let next;
+  if (until !== null && until !== undefined) {
+    next = Math.max(Number(until), t);
+  } else {
+    if (!['day', 'month', 'year'].includes(unit)) throw badRequest('واحدِ مدت معتبر نیست', 'bad_unit');
+    next = plans.endOfPeriod(Math.max(prev, t), amount, unit);
+  }
+  const row = await one(
+    `UPDATE station_subscriptions SET services_until=$2, updated_at=$3 WHERE id=$1 RETURNING *`,
+    [cur.id, next, t]
+  );
+  await query(
+    `INSERT INTO station_subscription_history
+       (id, subscription_id, station_id, action, plan, prev_status, new_status, prev_ends_at, new_ends_at, actor, note, created_at)
+     VALUES ($1,$2,$3,'services',$4,$5,$6,$7,$8,$9,$10,$11)`,
+    [newId('sbh'), row.id, row.station_id, row.plan, cur.status, row.status, prev, next, by, note, t]
+  );
+  require('./panel-live').notifyPanel('customers');
+  return { subscription: row, servicesUntil: next, previous: prev };
+}
+
+module.exports = { ONLINE_KEYS, TIMED_PLANS, isPermanent, servicesUntil, servicesActive, stripOnline, hasOnline, extendServices };

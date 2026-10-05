@@ -494,34 +494,8 @@ for (const [prefix, app] of [['/subscriptions', 'shop'], ['/pump/subscriptions',
    همین حالا قطع). فقط اشتراکِ دائمی — بقیه را فهرستِ پلنشان می‌گوید.
    ========================================================== */
 
-async function extendServices(id, { amount, unit, until }, by) {
-  const cur = await one('SELECT * FROM station_subscriptions WHERE id=$1', [id]);
-  if (!cur) throw notFound('اشتراک پیدا نشد', 'subscription_not_found');
-  const t = now();
-  if (!pumpServices.isPermanent(cur, t)) {
-    throw badRequest('خدماتِ جدا فقط برای اشتراکِ دائمی است', 'not_permanent');
-  }
-  const prev = pumpServices.servicesUntil(cur, t);
-  let next;
-  if (until !== null && until !== undefined) {
-    next = Math.max(Number(until), t);
-  } else {
-    if (!['day', 'month', 'year'].includes(unit)) throw badRequest('واحدِ مدت معتبر نیست', 'bad_unit');
-    next = plans.endOfPeriod(Math.max(prev, t), amount, unit);
-  }
-  const row = await one(
-    `UPDATE station_subscriptions SET services_until=$2, updated_at=$3 WHERE id=$1 RETURNING *`,
-    [cur.id, next, t]
-  );
-  await query(
-    `INSERT INTO station_subscription_history
-       (id, subscription_id, station_id, action, plan, prev_status, new_status, prev_ends_at, new_ends_at, actor, note, created_at)
-     VALUES ($1,$2,$3,'services',$4,$5,$6,$7,$8,$9,$10,$11)`,
-    [newId('sbh'), row.id, row.station_id, row.plan, cur.status, row.status, prev, next, by, 'خدماتِ سرور', t]
-  );
-  notifyPanel('customers');
-  return { subscription: row, servicesUntil: next, previous: prev };
-}
+//  ⛔ تنها پیاده‌سازی در ‎lib/pump-services.js‎ است (کدِ بی‌اینترنت هم همان را صدا می‌زند).
+const { extendServices } = pumpServices;
 
 router.post('/pump/subscriptions/:id/services', async (req, res, next) => {
   try {
