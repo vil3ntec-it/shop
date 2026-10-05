@@ -41,6 +41,7 @@ const audit = require('../lib/audit');
 const { catalogOf } = require('../lib/features');
 const { entitlementOf } = require('../lib/entitlement').pump;
 const { requirePumpUser } = require('../middleware/auth');
+const { requirePumpServices } = require('../middleware/pump-services');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
 const { badRequest, conflict, forbidden, notFound, unauthorized } = require('../middleware/errors');
 
@@ -413,6 +414,7 @@ async function signFor(station, ent, deviceUid, deviceName = '') {
     features: ent.features,
     core: [...PUMP.CORE_KEYS],
     subscriptionEndsAt: endsAt,
+    servicesEndsAt: Number(ent.services?.until || 0),
     activeUntil: ent.source === 'trial' ? endsAt : Number(ent.subscription.graceEndsAt || endsAt),
     plan: ent.subscription.plan || (ent.source === 'trial' ? 'trial' : ''),
     planTitle: ent.source === 'trial' ? 'دوره‌ی آزمایشی' : (ent.subscription.plan || ''),
@@ -796,6 +798,20 @@ router.use('/support', require('./pump-support').makeRouter((req) => ({
  *  `req.stationId` از `requireDevice` می‌آید — از ردیفِ خودِ توکن،
  *  نه از چیزی که فرستاده شده.
  */
+/*
+ *  کلیدِ بکاپِ همین پمپ — شرحش بالای `lib/backup-key.js`. فقط برای پمپِ خودِ توکن.
+ */
+router.get('/backup-key', (req, res, next) => {
+  try {
+    const out = require('../lib/backup-key').reply(req.stationId || '');
+    if (!out) return next(forbidden('کلیدِ بکاپ ساخته نشد', 'no_backup_key'));
+    res.set('Cache-Control', 'no-store');
+    res.json(out);
+  } catch (err) { next(err); }
+});
+
+//  ⛔ فرستادنِ بکاپ فقط با بکاپِ روی سرور در پلن؛ دیدن و پس گرفتن همیشه باز
+router.post('/backups', requirePumpServices({ keys: ['cloudbackup', 'cloud'] }));
 router.use('/backups', require('./account-backups').makeRouter(
   'pump',
   (req) => req.stationId || '',
@@ -811,6 +827,8 @@ router.use('/backups', require('./account-backups').makeRouter(
  *  پس اگر خبر فقط از درِ حساب می‌رفت، همان برنامه‌ای که خبر را
  *  **می‌سازد** راهی برای فرستادنش نداشت.
  */
+//  ⛔ خبرِ پمپ (مخزن، قرض‌دار) فقط با خدماتِ سرور
+router.post('/events', requirePumpServices());
 router.use('/events', require('./pump-events').makeRouter((req) => ({
   stationId: req.stationId || '',
   deviceUid: req.stationDevice ? req.stationDevice.device_uid : '',
@@ -829,7 +847,7 @@ router.use('/events', require('./pump-events').makeRouter((req) => ({
  *  (نام، حال و الباقی) چند صد کیلوبایت است و در آن جا می‌شود.
  */
 const stateLimit = rateLimit({ max: 300, keyPrefix: 'pump-state-write', key: (req) => req.stationId || '' });
-router.post('/state', stateLimit, async (req, res, next) => {
+router.post('/state', stateLimit, requirePumpServices(), async (req, res, next) => {
   try {
     const out = await require('../lib/pump-state').publish({
       stationId: req.stationId || '',

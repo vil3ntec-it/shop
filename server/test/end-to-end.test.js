@@ -142,10 +142,12 @@ test('پلنِ استاندارد فهرستِ خودش را می‌برد، ن�
     { device: { uid: 'pc-e2e-2' } }, { token: o.accessToken });
   const c = claims(bound.body.license);
   //  ⚠️ `feat` هر چیزی است که **باز** است: دفترِ همیشه‌رایگان به‌علاوهٔ
-  //  آن‌چه پلن خریده. پس مرزِ استاندارد یعنی `cloudbackup` باشد و
-  //  بقیهٔ پولی‌ها نباشند.
-  assert.ok(c.feat.includes('cloudbackup'), JSON.stringify(c.feat));
-  for (const locked of ['kar_app', 'bot', 'cloud', 'profit', 'history', 'dashboard']) {
+  //  آن‌چه پلن خریده. از ۱۴۰۵/۰۷/۲۰ (خواستهٔ صاحب سامانه) استاندارد هیچ
+  //  خدماتِ سروری ندارد، مفادش تار است و داشبورد و تاریخچه‌اش باز.
+  for (const open of ['dashboard', 'history']) {
+    assert.ok(c.feat.includes(open), `استاندارد باید ${open} را داشته باشد — ${JSON.stringify(c.feat)}`);
+  }
+  for (const locked of ['kar_app', 'bot', 'cloud', 'cloudbackup', 'messenger', 'profit']) {
     assert.ok(!c.feat.includes(locked),
       `استاندارد نباید ${locked} را داشته باشد — ${JSON.stringify(c.feat)}`);
   }

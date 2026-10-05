@@ -293,6 +293,31 @@ test('بالای شمارِ مجاز، کهنه‌ترین می‌رود و تا
   await withTrial();
 });
 
+test('⛔ بکاپِ پُر با چند بکاپِ خالیِ تازه‌تر پاک نمی‌شود (۲.۱۱.۲۲)', async () => {
+  //  گزارشِ صاحب ریپو: کامپیوترِ تازه دفترِ خالی‌اش را هر شش ساعت فرستاد و
+  //  بکاپِ واقعی از ته رفت. حالا بزرگ‌ترین هرگز به‌خاطرِ کوچک‌ترهای تازه نمی‌رود.
+  const d = await pumpDevice('pc-bak-full');
+  const full = await h.raw('POST', '/api/pump/device/backups?ext=db', blob(8192, 0x41), { token: d.token });
+  assert.equal(full.status, 201, JSON.stringify(full.body));
+  //  سهمِ همین حساب از خودِ سرور — پلهٔ پولی یا رایگان هر کدام که باشد
+  const keep = full.body.stats.keep;
+  assert.ok(keep >= 1);
+  const smalls = [];
+  for (let i = 0; i < keep + 3; i++) {
+    const up = await h.raw('POST', '/api/pump/device/backups?ext=db', blob(64, 0x42 + i), { token: d.token });
+    assert.equal(up.status, 201, JSON.stringify(up.body));
+    smalls.push(up.body.backup.id);
+  }
+  const list = await h.get('/api/pump/device/backups', { token: d.token });
+  const ids = list.body.backups.map((b) => b.id);
+  assert.ok(ids.includes(full.body.backup.id), 'بکاپِ پُر باید بماند');
+  assert.equal(ids[0], smalls[smalls.length - 1], 'تازه‌ترین همچنان اول است');
+  assert.equal(ids.length, keep + 1, 'تازه‌ترین‌ها + همان یک بکاپِ پُر');
+  const back = await h.download(`/api/pump/device/backups/${full.body.backup.id}`, { token: d.token });
+  assert.equal(back.status, 200);
+  assert.equal(back.buffer.length, 8192);
+});
+
 test('فایلِ بزرگ‌تر از سقف رد می‌شود و پیامش می‌گوید چرا', async () => {
   const o = await shopOwner('بزرگ');
   await noTrial();

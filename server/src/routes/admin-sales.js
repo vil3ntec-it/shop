@@ -27,6 +27,8 @@ const tenancy = require('../lib/tenancy');
 const discounts = require('../lib/discounts');
 const notices = require('../lib/notices');
 const audit = require('../lib/audit');
+const pumpServices = require('../lib/pump-services');
+const { notifyPanel } = require('../lib/panel-live');
 const { requireAdmin } = require('../middleware/auth');
 const { badRequest, notFound } = require('../middleware/errors');
 
@@ -311,6 +313,8 @@ async function subscriptionsOf(app, { status = '', city = '', kind = '', limit =
         ? 0 : Math.max(0, Math.ceil((state.graceEndsAt - at) / DAY)),
       permanent, price: r.price === null || r.price === undefined ? null : Number(r.price), currency: r.currency,
       paid: Number(r.paid), features: r.features, note: r.note || '',
+      //  دائمی: پایانِ خدماتِ سرور (۰ ⇒ محدودیتی نیست) — ‎lib/pump-services.js‎
+      servicesUntil: app === 'pump' ? pumpServices.servicesUntil(r, at) : 0,
     };
   }).filter(r => {
     if (status && r.status !== status) return false;
@@ -415,13 +419,21 @@ async function makePermanent(app, id, by) {
             updated_at=$3, created_by=COALESCE(NULLIF($4,''), created_by) WHERE id=$1 RETURNING *`,
     [cur.id, end, t, by]
   );
+  //  ⛔ پمپ: سالِ اولِ خدماتِ سرور رایگان، از همین لحظهٔ «دائمی شد» —
+  //  ولی دائمیِ موجود (یا تمدیدشده) دست نمی‌خورد.
+  let out = row;
+  if (app === 'pump' && !pumpServices.isPermanent(cur, t)
+      && (row.services_until === null || row.services_until === undefined)) {
+    out = await one(`UPDATE ${T.subsTable} SET services_until=$2 WHERE id=$1 RETURNING *`,
+      [row.id, plans.endOfPeriod(t, 1, 'year')]);
+  }
   await query(
     `INSERT INTO ${T.historyTable}
        (id, subscription_id, ${T.tenantKey}, action, plan, prev_status, new_status, prev_ends_at, new_ends_at, actor, note, created_at)
      VALUES ($1,$2,$3,'permanent',$4,$5,$6,$7,$8,$9,$10,$11)`,
     [newId('sbh'), row.id, row[T.tenantKey], row.plan, cur.status, row.status, Number(cur.ends_at), Number(row.ends_at), by, 'تبدیل به دائمی', t]
   );
-  return row;
+  return out;
 }
 
 for (const [prefix, app] of [['/subscriptions', 'shop'], ['/pump/subscriptions', 'pump']]) {
@@ -470,6 +482,58 @@ for (const [prefix, app] of [['/subscriptions', 'shop'], ['/pump/subscriptions',
     } catch (err) { next(err); }
   });
 }
+
+/* ==========================================================
+   خدماتِ سرورِ اشتراکِ دائمیِ پمپ — تمدید (۱۴۰۵/۰۷/۲۰)
+   ----------------------------------------------------------
+   «برای حساب‌های دائمی بشه خدمات رو فعال کرد برای یک سال یا ماه یا
+   کاستم.» ⇒ ‎{amount, unit}‎ (روز/ماه/سال، از پایانِ فعلی اگر هنوز
+   زنده است، وگرنه از همین حالا) یا ‎{until}‎ (تاریخِ دلخواه؛ گذشته ⇒
+   همین حالا قطع). فقط اشتراکِ دائمی — بقیه را فهرستِ پلنشان می‌گوید.
+   ========================================================== */
+
+async function extendServices(id, { amount, unit, until }, by) {
+  const cur = await one('SELECT * FROM station_subscriptions WHERE id=$1', [id]);
+  if (!cur) throw notFound('اشتراک پیدا نشد', 'subscription_not_found');
+  const t = now();
+  if (!pumpServices.isPermanent(cur, t)) {
+    throw badRequest('خدماتِ جدا فقط برای اشتراکِ دائمی است', 'not_permanent');
+  }
+  const prev = pumpServices.servicesUntil(cur, t);
+  let next;
+  if (until !== null && until !== undefined) {
+    next = Math.max(Number(until), t);
+  } else {
+    if (!['day', 'month', 'year'].includes(unit)) throw badRequest('واحدِ مدت معتبر نیست', 'bad_unit');
+    next = plans.endOfPeriod(Math.max(prev, t), amount, unit);
+  }
+  const row = await one(
+    `UPDATE station_subscriptions SET services_until=$2, updated_at=$3 WHERE id=$1 RETURNING *`,
+    [cur.id, next, t]
+  );
+  await query(
+    `INSERT INTO station_subscription_history
+       (id, subscription_id, station_id, action, plan, prev_status, new_status, prev_ends_at, new_ends_at, actor, note, created_at)
+     VALUES ($1,$2,$3,'services',$4,$5,$6,$7,$8,$9,$10,$11)`,
+    [newId('sbh'), row.id, row.station_id, row.plan, cur.status, row.status, prev, next, by, 'خدماتِ سرور', t]
+  );
+  notifyPanel('customers');
+  return { subscription: row, servicesUntil: next, previous: prev };
+}
+
+router.post('/pump/subscriptions/:id/services', async (req, res, next) => {
+  try {
+    const b = req.body || {};
+    const hasUntil = b.until !== undefined && b.until !== null && b.until !== '';
+    const out = await extendServices(v.id(req.params.id), {
+      amount: hasUntil ? 0 : v.integer(b.amount, { min: 1, max: 120, required: true, field: 'مدت' }),
+      unit: hasUntil ? '' : String(b.unit || ''),
+      until: hasUntil ? v.integer(b.until, { min: 0, max: 8_000_000_000_000 }) : null,
+    }, req.admin.id);
+    await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.pump_services', targetType: 'subscription', targetId: req.params.id, detail: { until: out.servicesUntil, previous: out.previous } });
+    res.json(out);
+  } catch (err) { next(err); }
+});
 
 /* ==========================================================
    کدهای تخفیف و تاریخچهٔ قیمت

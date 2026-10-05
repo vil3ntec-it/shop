@@ -131,6 +131,7 @@ async function issue({
   features = [],
   core = [],
   subscriptionEndsAt = 0,
+  servicesEndsAt = 0,
   activeUntil = 0,
   plan = '',
   planTitle = '',
@@ -179,6 +180,8 @@ async function issue({
     nbf: at - 60_000,            // یک دقیقه ارفاق برای ساعت گوشی
     exp: expiresAt,
     sub_ends: subscriptionEndsAt,
+    //  دائمی: پایانِ خدماتِ سرور (۰ ⇒ محدودیتی نیست) — ‎lib/pump-services.js‎
+    svc_ends: Number(servicesEndsAt) || 0,
     feat: features,
     core,
     plan,

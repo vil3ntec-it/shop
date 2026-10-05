@@ -87,13 +87,29 @@ function build(T) {
     if (state.active) {
       //  ⛔ قاعدهٔ «فهرستِ خالی = پلنِ کامل» دست نمی‌خورد؛ افزونه فقط
       //  **به** فهرست اضافه می‌شود (Feature Flag روی همین اشتراک).
-      const granted = state.features.length ? state.features : cat.PAID_KEYS;
+      let granted = state.features.length ? state.features : cat.PAID_KEYS;
       const addons = await require('./discounts').addonKeysOf(T.app, sub.id);
+      /*
+       *  ⛔ دائمی: خدماتِ سرور فقط تا `servicesUntil` (سالِ اول رایگان، بعد
+       *  تمدیدِ مدیر) — ‎lib/pump-services.js‎. بقیهٔ پلن بی محدودیت می‌ماند.
+       *  افزونهٔ صریحِ مدیر دست نمی‌خورد.
+       */
+      let services = null;
+      if (T.app === 'pump') {
+        const svc = require('./pump-services');
+        const until = svc.servicesUntil(sub, at);
+        if (until) {
+          const live = until > at;
+          services = { until, active: live };
+          if (!live) granted = svc.stripOnline(granted);
+        }
+      }
       return {
         app: T.app,
         source: 'subscription',
         features: uniq([...cat.CORE_KEYS, ...cat.FREE_KEYS, ...granted, ...addons]),
         addons,
+        services,
         subscription: state,
         trial,
       };

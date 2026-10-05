@@ -42,9 +42,19 @@ router.use(rateLimit({
   key: (req) => (req.sync ? req.sync.app + ':' + req.sync.accountId : ''),
 }));
 
+/*
+ *  ⛔ پمپ: همگام‌سازی فقط با خدماتِ سرور در پلن (۱۴۰۵/۰۷/۲۰) — استاندارد
+ *  و دائمیِ بی‌تمدید به سرور وصل نمی‌شوند. ‎middleware/pump-services.js‎
+ */
+const pumpOnline = require('../middleware/pump-services').requirePumpServices();
+function pumpServicesOnly(req, res, next) {
+  if (req.sync && req.sync.accountKind === 'station') return pumpOnline(req, res, next);
+  next();
+}
+
 /* ------------------------------------------------------------------ Push */
 
-router.post('/push', requireSyncWrite, async (req, res, next) => {
+router.post('/push', requireSyncWrite, pumpServicesOnly, async (req, res, next) => {
   try {
     const deviceId = v.id(req.body?.device_id || req.body?.deviceId, {
       field: 'شناسه دستگاه', required: true, max: 64,
@@ -81,7 +91,7 @@ router.post('/push', requireSyncWrite, async (req, res, next) => {
 
 /* ------------------------------------------------------------------ Pull */
 
-router.get('/pull', async (req, res, next) => {
+router.get('/pull', pumpServicesOnly, async (req, res, next) => {
   try {
     const deviceId = v.id(req.query?.device_id || req.query?.deviceId, {
       field: 'شناسه دستگاه', required: true, max: 64,
@@ -94,7 +104,7 @@ router.get('/pull', async (req, res, next) => {
 
 /* -------------------------------------------------------------- Snapshot */
 
-router.get('/snapshot', async (req, res, next) => {
+router.get('/snapshot', pumpServicesOnly, async (req, res, next) => {
   try {
     const snap = await sync.snapshot(req.sync);
     const body = JSON.stringify({ ok: true, ...snap });

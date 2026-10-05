@@ -400,6 +400,7 @@ router.post('/license', async (req, res, next) => {
       features: ent.features,
       core: [...PUMP.CORE_KEYS],
       subscriptionEndsAt: endsAt,
+      servicesEndsAt: Number(ent.services?.until || 0),
       activeUntil: ent.source === 'trial' ? endsAt : Number(ent.subscription.graceEndsAt || endsAt),
       plan: ent.subscription.plan || (ent.source === 'trial' ? 'trial' : ''),
       planTitle: ent.source === 'trial' ? 'دوره‌ی آزمایشی' : (ent.subscription.plan || ''),
@@ -564,6 +565,20 @@ router.use('/support', require('./pump-support').makeRouter((req) => ({
  *  همان فهرستی که برنامهٔ کامپیوتر با توکنِ **دستگاه** می‌بیند —
  *  یک پوشه، دو در.
  */
+/*
+ *  کلیدِ بکاپِ پمپِ همین حساب — فقط عضوِ همان پمپ (زیرِ `requireStation`).
+ */
+router.get('/backup-key', (req, res, next) => {
+  try {
+    const out = require('../lib/backup-key').reply(req.stationId || '');
+    if (!out) return next(forbidden('کلیدِ بکاپ ساخته نشد', 'no_backup_key'));
+    res.set('Cache-Control', 'no-store');
+    res.json(out);
+  } catch (err) { next(err); }
+});
+
+//  ⛔ فرستادنِ بکاپ فقط با بکاپِ روی سرور در پلن؛ دیدن و پس گرفتن همیشه باز
+router.post('/backups', require('../middleware/pump-services').requirePumpServices({ keys: ['cloudbackup', 'cloud'] }));
 router.use('/backups', require('./account-backups').makeRouter(
   'pump',
   (req) => req.stationId || '',
@@ -577,6 +592,7 @@ router.use('/backups', require('./account-backups').makeRouter(
  *  (`/api/pump/device/events`)؛ کلیدش `station_id` است، پس یک پمپ یک
  *  دفترِ خبر دارد و صاحبش همان را روی گوشی می‌بیند.
  */
+router.post('/events', require('../middleware/pump-services').requirePumpServices());
 router.use('/events', require('./pump-events').makeRouter((req) => ({
   stationId: req.stationId || '',
   userId: req.user ? req.user.id : '',

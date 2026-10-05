@@ -382,9 +382,30 @@ async function setState(chatId, stateName, email = '') {
  *
  * ⛔ همان سنجشِ قیدِ ۳: عضوِ فعال، پمپِ فعال، حسابِ فعال — برای هر پیوند.
  */
+/*
+ *  ⛔ باتِ تلگرام فقط برای پمپی که «بات» در پلنش دارد (۱۴۰۵/۰۷/۲۰): استاندارد
+ *  و دائمیِ بی‌تمدیدِ خدمات هیچ پاسخ و هیچ هشداری نمی‌گیرند. یک جا، برای هر
+ *  فهرستِ شعبه — ‎lib/pump-services.js‎. خطای سنجش ⇒ آن شعبه نه (بستن امن‌تر است).
+ */
+async function botStations(rows) {
+  const ent = require('./entitlement').pump;
+  const out = [];
+  const seen = new Map();
+  for (const r of rows) {
+    const sid = r.station_id;
+    if (!seen.has(sid)) {
+      let ok = false;
+      try { ok = (await ent.entitlementOf(sid)).features.includes('bot'); } catch { ok = false; }
+      seen.set(sid, ok);
+    }
+    if (seen.get(sid)) out.push(r);
+  }
+  return out;
+}
+
 async function linksOf(row) {
   if (!row || !row.chat_id) return [];
-  return many(
+  return botStations(await many(
     `SELECT l.station_id, l.user_id, s.name AS station_name, u.email, m.role
        FROM telegram_chat_links l
        JOIN stations s ON s.id=l.station_id AND s.status='active'
@@ -393,7 +414,7 @@ async function linksOf(row) {
       WHERE l.chat_id=$1
       ORDER BY l.linked_at, l.station_id`,
     [String(row.chat_id)]
-  );
+  ));
 }
 
 /** نخستین شعبهٔ معتبر — برای جاهایی که یکی کافی است. */
@@ -1619,7 +1640,7 @@ async function rateStations(from) {
                      JOIN users u ON u.id=l.user_id AND u.status='active'
                     WHERE l.station_id=s.id AND l.chat_id=$1))
       ORDER BY s.name, s.id`,
-    [uid, uname]);
+    [uid, uname]).then(botStations);
 }
 
 async function onRate(row, parsed, from) {
@@ -2060,7 +2081,8 @@ function subjectOf(key) {
  * می‌ماند و گروه هم هیچ نمی‌گرفت.
  * ⛔ قیدِ ۳ سرِ جایش است: عضو، پمپ و حساب — همین لحظه.
  */
-function alertChats(stationId) {
+async function alertChats(stationId) {
+  if (!(await botStations([{ station_id: stationId }])).length) return [];
   return many(
     `SELECT c.chat_id, c.kind, c.only_out, l.announced_day, s.name AS station_name
        FROM telegram_chat_links l
