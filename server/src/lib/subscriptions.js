@@ -303,6 +303,19 @@ function build(T) {
       });
     }
     /*
+     *  ⛔ دائمیِ تازه (یا تبدیل‌شده به دائمی): سالِ اولِ خدماتِ سرور رایگان،
+     *  از همین لحظه — نه از شروعِ اشتراکِ قبلی. دائمیِ موجود دست نمی‌خورد.
+     *  ‎lib/pump-services.js‎
+     */
+    if (T.app === 'pump') {
+      const svc = require('./pump-services');
+      if (svc.isPermanent(row, t) && (row.services_until === null || row.services_until === undefined)
+          && !(existing && svc.isPermanent(existing, t))) {
+        row = await one(`UPDATE ${TBL} SET services_until=$2 WHERE id=$1 RETURNING *`,
+          [row.id, plans.endOfPeriod(t, 1, 'year')]);
+      }
+    }
+    /*
      *  اعلانِ «تمدید شد» در خودِ `grant` می‌رود، بیرونِ قفل.
      *  ⚠️ خبر رفاه است، اشتراک اصل: هیچ خطایی از آن‌جا بیرون نمی‌آید
      *  و `onSubscription` خودش هر چیزی را می‌بلعد.

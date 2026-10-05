@@ -371,12 +371,22 @@ test('«از این زمان به بعد» تاریخ را دوباره دانل
 });
 
 /* ══════════════════════════════════════════════════════════════════
-   ۶) قفلِ اشتراک این‌جا نیست
+   ۶) فرستادنِ خبر فقط با خدماتِ سرور (۱۴۰۵/۰۷/۲۰) — خواندن همیشه
+   ──────────────────────────────────────────────────────────────────
+   تا ۲.۱۱.۲۲ «خبر پیام است، قفل نمی‌شود». صاحب سامانه پس گرفت:
+   «استاندارد… اطلاعاتِ تانکِ تیلش به سرور نیاید و اصلاً به سرور وصل
+   حتی نشه.» پمپِ بی‌اشتراک از استاندارد هم کمتر است ⇒ همان در.
+   ⛔ خبرهای قبلی دادهٔ خودِ مشتری‌اند و دیدنشان بسته نمی‌شود.
    ══════════════════════════════════════════════════════════════════ */
 
-test('پمپِ بی‌اشتراک هم خبر می‌فرستد و می‌خواند', async () => {
+test('⛔ پمپِ بی‌اشتراک خبرِ تازه نمی‌فرستد — ولی خبرهای قبلی را می‌بیند', async () => {
   const owner = await pumpOwner('بیست');
   const deviceToken = await bindDevice(owner, 'pc-20');
+
+  //  تا دورهٔ آزمایشی هست، می‌رود
+  const before = await h.post('/api/pump/device/events', { kind: 'note', title: 'پیش از پایان' },
+    { token: deviceToken });
+  assert.equal(before.status, 201, JSON.stringify(before.body));
 
   //  اشتراکی روی این پمپ نیست و دورهٔ آزمایشی هم تمام‌شده فرض می‌شود
   await h.query('UPDATE stations SET created_at=$2, trial_started_at=$2 WHERE id=$1',
@@ -384,10 +394,12 @@ test('پمپِ بی‌اشتراک هم خبر می‌فرستد و می‌خو�
 
   const sent = await h.post('/api/pump/device/events', { kind: 'stock_out', title: 'تیل تمام' },
     { token: deviceToken });
-  assert.equal(sent.status, 201, 'خبر پیام است، نه دادهٔ فروشی — قفل نمی‌شود');
+  assert.equal(sent.status, 403, JSON.stringify(sent.body));
+  assert.equal(sent.body.error?.code, 'plan_no_services');
 
   const seen = await h.get('/api/pump/events', { token: owner.accessToken });
-  assert.equal(seen.body.events.length, 1);
+  assert.equal(seen.status, 200);
+  assert.equal(seen.body.events.length, 1, 'خبرِ پیشین سرِ جایش است');
 });
 
 /* ══════════════════════════════════════════════════════════════════

@@ -148,7 +148,7 @@ async function grant(t, stationId, plan) {
   return r.body;
 }
 
-test('استاندارد: فقط پشتیبانِ ابری — کیو‌آر و اپِ کارمندان و مفاد و تاریخچه و داشبورد بسته', async () => {
+test('استاندارد: هیچ خدماتِ سروری (کیو‌آر، اپ، بات، بکاپِ سرور) و مفادِ تار — داشبورد و تاریخچه باز', async () => {
   const t = await adminToken();
   const o = await pumpOwner('پمپِ استاندارد', 'plan-std');
   await grant(t, o.stationId, 'std');
@@ -158,9 +158,9 @@ test('استاندارد: فقط پشتیبانِ ابری — کیو‌آر و 
   const f = me.body.entitlement.features;
 
   assert.equal(me.body.entitlement.source, 'subscription');
-  assert.ok(f.includes('cloudbackup'), 'پشتیبانِ ابری باید باز باشد');
-
-  for (const locked of ['cloud', 'kar_app', 'bot', 'profit', 'history', 'dashboard']) {
+  //  ⛔ ۱۴۰۵/۰۷/۲۰: «اصلاً به سرور وصل نشه، فقط اشتراک بگیره» — و داشبورد و تاریخچه باز
+  for (const open of ['dashboard', 'history']) assert.ok(f.includes(open), `${open} باید در استاندارد باز باشد`);
+  for (const locked of ['cloud', 'cloudbackup', 'kar_app', 'bot', 'messenger', 'profit']) {
     assert.ok(!f.includes(locked), `${locked} نباید در استاندارد باز باشد`);
   }
 });
@@ -433,7 +433,8 @@ test('کدِ شش‌رقمیِ پلنِ استاندارد همان مرزِ ا�
   assert.equal(r.body.entitlement.source, 'subscription');
 
   const f = r.body.entitlement.features;
-  assert.ok(f.includes('cloudbackup'));
+  assert.ok(!f.includes('cloudbackup'), 'استاندارد بکاپِ روی سرور ندارد (۱۴۰۵/۰۷/۲۰)');
+  assert.ok(f.includes('dashboard'));
   assert.ok(!f.includes('profit'), 'کدِ استاندارد نباید مفاد را باز کند');
   assert.ok(!f.includes('kar_app'));
   assert.ok(f.includes('debtors'), 'دفتر همیشه باز است');
