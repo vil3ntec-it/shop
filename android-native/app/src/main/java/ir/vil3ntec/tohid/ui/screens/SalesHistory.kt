@@ -37,6 +37,7 @@ import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.plain
 import ir.vil3ntec.tohid.qty
 import ir.vil3ntec.tohid.todayIso
+import ir.vil3ntec.tohid.ui.pressMenu
 import ir.vil3ntec.tohid.ui.theme.Radius
 import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.launch
@@ -525,7 +526,8 @@ private fun SaleRow(
         )
         // ردیفِ یکی‌درمیانِ کم‌رنگ: چشم روی جدولِ بلند خط را گم نمی‌کند
         .background(if (striped) Shop.colors.surface2.copy(alpha = 0.45f) else Shop.colors.surface)
-        .clickable(onClick = onInvoice)
+        //  کلیکِ راست (کامپیوتر) یا لمسِ طولانی (گوشی) ⇒ همان منوی کارها
+        .pressMenu(onClick = onInvoice, onMenu = { menu = true })
         .padding(horizontal = 12.dp, vertical = 12.dp),
       verticalAlignment = Alignment.CenterVertically,
     ) {

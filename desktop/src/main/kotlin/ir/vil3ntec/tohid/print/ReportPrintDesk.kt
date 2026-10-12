@@ -31,6 +31,15 @@ object ReportPrint {
 
   fun print(@Suppress("UNUSED_PARAMETER") context: Context, sheet: ReportCsv.Sheet, title: String) {
     //  پنجرهٔ چاپ نخِ صفحه را نگه نمی‌دارد
+    //  اول پیش‌نمایش (همان صفحه‌هایی که به چاپگر می‌روند)، بعد پنجرهٔ چاپِ سیستم
+    javax.swing.SwingUtilities.invokeLater {
+      runCatching { preview(sheet, title) }
+        .onFailure { DesktopNotify.show("چاپ", "پیش‌نمایش ساخته نشد: ${it.message ?: "دلیلِ نامعلوم"}") }
+    }
+  }
+
+  private fun send(sheet: ReportCsv.Sheet, title: String) {
+    //  پنجرهٔ چاپ نخِ صفحه را نگه نمی‌دارد
     Thread({
       runCatching {
         val job = PrinterJob.getPrinterJob()
@@ -39,6 +48,60 @@ object ReportPrint {
         if (job.printDialog()) job.print()
       }.onFailure { DesktopNotify.show("چاپ", "چاپ انجام نشد: ${it.message ?: "دلیلِ نامعلوم"}") }
     }, "tohid-print").apply { isDaemon = true }.start()
+  }
+
+  /**
+   *  پیش‌نمایشِ چاپ — هر صفحه با همان `TablePrintable` روی تصویر رسم می‌شود،
+   *  پس آنچه دیده می‌شود همان است که چاپ می‌شود. بومی (Swing)، نه مرورگر.
+   */
+  private fun preview(sheet: ReportCsv.Sheet, title: String) {
+    val pf = PrinterJob.getPrinterJob().defaultPage()
+    val printable = TablePrintable(sheet, title)
+    val scale = 1.4
+    val pages = ArrayList<java.awt.image.BufferedImage>()
+    var i = 0
+    while (i < 200) {
+      val img = java.awt.image.BufferedImage(
+        (pf.width * scale).toInt(), (pf.height * scale).toInt(), java.awt.image.BufferedImage.TYPE_INT_RGB,
+      )
+      val g = img.createGraphics()
+      g.color = Color.WHITE
+      g.fillRect(0, 0, img.width, img.height)
+      g.scale(scale, scale)
+      val r = printable.print(g, pf, i)
+      g.dispose()
+      if (r != Printable.PAGE_EXISTS) break
+      pages += img
+      i++
+    }
+    val panel = javax.swing.JPanel().apply {
+      layout = javax.swing.BoxLayout(this, javax.swing.BoxLayout.Y_AXIS)
+      background = Color(0xE8, 0xEC, 0xF2)
+      pages.forEachIndexed { n, img ->
+        add(javax.swing.JLabel(javax.swing.ImageIcon(img)).apply {
+          alignmentX = java.awt.Component.CENTER_ALIGNMENT
+          border = javax.swing.BorderFactory.createEmptyBorder(10, 10, 10, 10)
+          toolTipText = "صفحهٔ ${n + 1} از ${pages.size}"
+        })
+      }
+    }
+    val dialog = javax.swing.JDialog(null as java.awt.Frame?, "پیش‌نمایش چاپ — $title", true)
+    val printBtn = javax.swing.JButton("چاپ…").apply {
+      addActionListener { dialog.dispose(); send(sheet, title) }
+    }
+    val closeBtn = javax.swing.JButton("بستن").apply { addActionListener { dialog.dispose() } }
+    val bar = javax.swing.JPanel(java.awt.FlowLayout(java.awt.FlowLayout.LEFT)).apply {
+      componentOrientation = java.awt.ComponentOrientation.RIGHT_TO_LEFT
+      add(javax.swing.JLabel("${pages.size} صفحه"))
+      add(printBtn); add(closeBtn)
+    }
+    dialog.contentPane.layout = java.awt.BorderLayout()
+    dialog.contentPane.add(javax.swing.JScrollPane(panel).apply { verticalScrollBar.unitIncrement = 24 }, java.awt.BorderLayout.CENTER)
+    dialog.contentPane.add(bar, java.awt.BorderLayout.SOUTH)
+    dialog.setSize((pf.width * scale).toInt() + 60, 820)
+    dialog.setLocationRelativeTo(null)
+    dialog.rootPane.defaultButton = printBtn
+    dialog.isVisible = true
   }
 
   private class TablePrintable(private val sheet: ReportCsv.Sheet, private val title: String) : Printable {

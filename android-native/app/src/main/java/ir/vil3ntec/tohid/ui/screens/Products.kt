@@ -43,6 +43,7 @@ import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.plain
 import ir.vil3ntec.tohid.qty
 import ir.vil3ntec.tohid.todayIso
+import ir.vil3ntec.tohid.ui.pressMenu
 import ir.vil3ntec.tohid.ui.theme.Radius
 import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.launch
@@ -118,6 +119,28 @@ fun ProductsScreen(
       }
     }
   }
+
+  //  صفحهٔ پهن (کامپیوتر): جدولِ مرتب‌شونده با انتخابِ چندتایی، به‌جای کارت
+  val wide = screenSize() == Screen.WIDE
+  val stockIdx = remember(d) { ShopStore.index(d) }
+  val tableColumns = remember(stockIdx) {
+    listOf(
+      TableColumn<Product>("نام", 240.dp, sortKey = { it.name }) { it.name + if (!it.active) " (غیرفعال)" else "" },
+      TableColumn<Product>("دسته", 130.dp, sortKey = { it.category }) { it.category },
+      TableColumn<Product>("موجودی", 110.dp, sortKey = { stockIdx.stock(it.id) }, numeric = true,
+        tint = { p -> if (stockIdx.status(p) == "out") Shop.colors.danger else Shop.colors.text }) {
+        "${ir.vil3ntec.tohid.qty(stockIdx.stock(it.id))} ${it.unit}"
+      },
+      TableColumn<Product>("قیمت خرید", 110.dp, sortKey = { it.purchasePrice }, numeric = true) { money(it.purchasePrice) },
+      TableColumn<Product>("قیمت فروش", 110.dp, sortKey = { it.salePrice }, numeric = true) { money(it.salePrice) },
+      TableColumn<Product>("وضعیت", 110.dp, sortKey = { stockIdx.status(it) }) {
+        when (stockIdx.status(it)) { "out" -> "تمام‌شده"; "low" -> "موجودی کم"; else -> "کافی" }
+      },
+    )
+  }
+  val table = rememberTableState(tableColumns)
+  var bulkCategory by remember { mutableStateOf(false) }
+  var bulkDelete by remember { mutableStateOf(false) }
 
   val term = search.trim()
   //  فیلتر و دو جمعِ انبار، یک بار به ازای هر دفتر و هر عبارتِ جستجو —
@@ -271,6 +294,37 @@ fun ProductsScreen(
             }
           }
         }
+      } else if (wide) {
+        //  نوارِ کارِ گروهی — فقط وقتی چیزی انتخاب شده
+        if (table.selected.isNotEmpty()) item(key = "bulk-bar") {
+          Row(
+            Modifier.fillMaxWidth().padding(bottom = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+          ) {
+            Text("${plain(table.selected.size)} کالا انتخاب شد", style = MaterialTheme.typography.titleSmall,
+              color = Shop.colors.text, modifier = Modifier.weight(1f))
+            OutlinedButton(onClick = {
+              apply(WarehouseEngine.bulkUpdate(d, table.selected, todayIso(), System.currentTimeMillis(), ::newId) { it.copy(active = true) },
+                "فعال شد") { table.selected = emptySet() }
+            }) { Text("فعال") }
+            OutlinedButton(onClick = {
+              apply(WarehouseEngine.bulkUpdate(d, table.selected, todayIso(), System.currentTimeMillis(), ::newId) { it.copy(active = false) },
+                "غیرفعال شد") { table.selected = emptySet() }
+            }) { Text("غیرفعال") }
+            OutlinedButton(onClick = { bulkCategory = true }) { Text("تغییر دسته") }
+            OutlinedButton(onClick = { bulkDelete = true }) { Text("حذف", color = Shop.colors.danger) }
+            TextButton(onClick = { table.selected = emptySet() }) { Text("لغو انتخاب") }
+          }
+        }
+        dataTable(
+          rows = sortRows(shown, tableColumns, table),
+          columns = tableColumns,
+          state = table,
+          key = { it.id },
+          onOpen = { onOpenProduct(it.id) },
+          onMenu = { actionsFor = it },
+        )
       } else {
         itemsIndexed(shown, key = { _, p -> p.id }) { index, p ->
           StaggeredItem(index) {
@@ -329,6 +383,45 @@ fun ProductsScreen(
           productForm = null
         }
       },
+    )
+  }
+
+  if (bulkCategory) {
+    var cat by remember { mutableStateOf("") }
+    AlertDialog(
+      onDismissRequest = { bulkCategory = false },
+      containerColor = Shop.colors.surfaceSolid,
+      title = { Text("دستهٔ ${plain(table.selected.size)} کالا", color = Shop.colors.text) },
+      text = {
+        OutlinedTextField(value = cat, onValueChange = { cat = it }, singleLine = true,
+          label = { Text("دستهٔ تازه") }, modifier = Modifier.fillMaxWidth())
+      },
+      confirmButton = {
+        TextButton(onClick = {
+          apply(WarehouseEngine.bulkUpdate(d, table.selected, todayIso(), System.currentTimeMillis(), ::newId) { it.copy(category = cat.trim()) },
+            "دسته عوض شد") { table.selected = emptySet(); bulkCategory = false }
+        }) { Text("ثبت") }
+      },
+      dismissButton = { TextButton(onClick = { bulkCategory = false }) { Text("انصراف") } },
+    )
+  }
+
+  if (bulkDelete) {
+    AlertDialog(
+      onDismissRequest = { bulkDelete = false },
+      containerColor = Shop.colors.surfaceSolid,
+      title = { Text("حذفِ ${plain(table.selected.size)} کالا؟", color = Shop.colors.text) },
+      text = {
+        Text("کالاها و سوابقِ ورودشان از انبار حذف می‌شوند. فاکتورهای قبلی می‌مانند ولی نامِ کالا در آن‌ها «حذف‌شده» نشان داده می‌شود. برگشت ندارد.",
+          style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
+      },
+      confirmButton = {
+        TextButton(onClick = {
+          apply(WarehouseEngine.bulkDelete(d, table.selected, todayIso(), System.currentTimeMillis(), ::newId),
+            "${plain(table.selected.size)} کالا حذف شد") { table.selected = emptySet(); bulkDelete = false }
+        }) { Text("حذف", color = Shop.colors.danger) }
+      },
+      dismissButton = { TextButton(onClick = { bulkDelete = false }) { Text("بازگشت") } },
     )
   }
 
@@ -426,7 +519,7 @@ private fun ProductCard(
       .clip(RoundedCornerShape(Radius.md))
       .background(Shop.colors.surface)
       .border(1.dp, Shop.colors.border, RoundedCornerShape(Radius.md))
-      .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+      .pressMenu(onClick = onClick, onMenu = onLongClick)
       .padding(14.dp)
   ) {
     Row(verticalAlignment = Alignment.CenterVertically) {

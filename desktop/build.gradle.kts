@@ -83,6 +83,8 @@ val replaced = listOf(
   //  چاپِ گزارش: اندروید روی PDFِ چاپ رسم می‌کند، این‌جا `PrinterJob`ِ جاوا —
   //  نه مرورگر (برنامهٔ کامپیوتر سایت نیست)
   "print/ReportPrint.kt",
+  //  کلیکِ راست = منوی کارها (گوشی: لمسِ طولانی)
+  "ui/PressMenu.kt",
 ).map { "ir/vil3ntec/tohid/$it" }
 
 val generated = layout.buildDirectory.dir("generated/tohid")

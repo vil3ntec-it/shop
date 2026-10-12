@@ -344,6 +344,52 @@ object WarehouseEngine {
   }
 
   /** جمله‌ای که پیش از حذف به کاربر نشان داده می‌شود */
+  /* ------------------------------ کارِ گروهی ------------------------------ */
+
+  /**
+   *  چند کالا با هم: فعال/غیرفعال یا دستهٔ تازه. هر کالا ردیفِ «ویرایش
+   *  کالا»ی خودش را در سابقه می‌گیرد — همان ردپای ویرایشِ تکی.
+   */
+  fun bulkUpdate(
+    d: ShopData,
+    ids: Set<String>,
+    today: String,
+    now: Long,
+    newId: () -> String,
+    change: (Product) -> Product,
+  ): Result {
+    if (ids.isEmpty()) return Result.Failed("کالایی انتخاب نشده")
+    val audit = ArrayList<AuditEntry>()
+    val products = d.products.map { p ->
+      if (p.id !in ids) return@map p
+      val next = change(p)
+      val changes = productChanges(p, next)
+      if (changes.isNotEmpty()) {
+        audit += AuditEntry(
+          id = newId(), type = "product_edit", date = today, refId = p.id,
+          notes = "ویرایشِ گروهیِ «${p.name}»: ${changes.joinToString("، ")}", createdAt = now,
+        )
+      }
+      next
+    }
+    if (audit.isEmpty()) return Result.Failed("چیزی عوض نشد")
+    val categories = products.filter { it.id in ids }.map { it.category }.fold(d.productCategories) { acc, c -> withCategory(acc, c) }
+    return Result.Ok(d.copy(products = products, productCategories = categories, auditLog = d.auditLog + audit), id = ids.first())
+  }
+
+  /** حذفِ چند کالا — همان `deleteProduct` برای هر کدام، یا همه یا هیچ */
+  fun bulkDelete(d: ShopData, ids: Set<String>, today: String, now: Long, newId: () -> String): Result {
+    if (ids.isEmpty()) return Result.Failed("کالایی انتخاب نشده")
+    var data = d
+    for (id in ids) {
+      when (val r = deleteProduct(data, id, today, now, newId)) {
+        is Result.Failed -> return r
+        is Result.Ok -> data = r.data
+      }
+    }
+    return Result.Ok(data, id = ids.first())
+  }
+
   fun deleteWarning(d: ShopData, id: String): String {
     val product = d.products.find { it.id == id } ?: return ""
     val sold = ShopStore.soldQty(d, id)
