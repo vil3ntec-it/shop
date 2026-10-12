@@ -123,6 +123,8 @@ fun WarehouseScreen(
   LaunchedEffect(openProductId) {
     if (openProductId != null) {
       expanded = openProductId
+      //  کامپیوتر: از اسکن یا دکمهٔ «ورودِ انبار» آمده ⇒ فرمِ ورودِ همین کالا همان لحظه باز
+      if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) entryFor = openProductId
       onConsumed()
     }
   }

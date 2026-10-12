@@ -68,6 +68,19 @@ fun DeskProductsScreen(
   var openId by remember { mutableStateOf<String?>(null) }
   val searchFocus = remember { FocusRequester() }
 
+  //  اسکن روی همین صفحه (`ScanRouter`): کالای ثبت‌شده ⇐ پنلِ ویرایش؛ ناشناس ⇐ ردیفِ «کالای تازه» با همان بارکد
+  val incoming = remember { mutableStateOf<String?>(null) }
+  val latest by rememberUpdatedState(d)
+  val owner = remember { Any() }
+  DisposableEffect(Unit) {
+    ir.vil3ntec.tohid.scan.ScanRouter.register(owner) { code ->
+      val id = ShopStore.barcodeIndex(latest)[code]
+      if (id != null) { openId = id; search = "" } else { incoming.value = code; toast("بارکدِ تازه — نام و قیمت را بنویسید و Enter بزنید") }
+      true
+    }
+    onDispose { ir.vil3ntec.tohid.scan.ScanRouter.unregister(owner) }
+  }
+
   val stockIndex = remember(d) { d.products.associate { it.id to ShopStore.stock(d, it.id) } }
   val rows = remember(d.products, search, sortBy, asc, stockIndex) {
     val q = search.trim()
@@ -125,7 +138,7 @@ fun DeskProductsScreen(
 
     Row(Modifier.weight(1f)) {
       Column(Modifier.weight(1f).fillMaxHeight()) {
-        QuickAddRow(store, d, ::toast)
+        QuickAddRow(store, d, ::toast, incoming)
         Spacer(Modifier.height(8.dp))
 
         /* ─────────── جدول ─────────── */
@@ -244,7 +257,7 @@ private fun QuickField(
 }
 
 @Composable
-private fun QuickAddRow(store: ShopStore, d: ShopData, toast: (String) -> Unit) {
+private fun QuickAddRow(store: ShopStore, d: ShopData, toast: (String) -> Unit, incoming: MutableState<String?>) {
   val scope = rememberCoroutineScope()
   var name by remember { mutableStateOf("") }
   var barcode by remember { mutableStateOf("") }
@@ -254,6 +267,9 @@ private fun QuickAddRow(store: ShopStore, d: ShopData, toast: (String) -> Unit) 
   var sell by remember { mutableStateOf("") }
   var count by remember { mutableStateOf("") }
   val nameFocus = remember { FocusRequester() }
+  LaunchedEffect(incoming.value) {
+    incoming.value?.let { barcode = it; incoming.value = null; runCatching { nameFocus.requestFocus() } }
+  }
 
   fun save() {
     val draft = WarehouseEngine.ProductDraft(
