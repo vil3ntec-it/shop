@@ -7,4 +7,4 @@ if /I not "%PROCESSOR_ARCHITECTURE%"=="AMD64" if /I not "%PROCESSOR_ARCHITEW6432
   pause
   exit /b 1
 )
-start "" msiexec /i "%~dp0Windows\Tohid-Windows.msi"
+start "" "%~dp0Windows\Tohid-Windows-Setup.exe"
