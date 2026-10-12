@@ -207,15 +207,29 @@ object ReportEngine {
 
   /* --------------------------- بازه‌های آماده --------------------------- */
 
-  enum class Range { TODAY, WEEK, MONTH, ALL }
+  /** `JMONTH`/`JYEAR` — ماه یا سالِ خورشیدیِ انتخاب‌شده (`jy`/`jm`) */
+  enum class Range { TODAY, WEEK, MONTH, ALL, JMONTH, JYEAR }
 
   /** بازهٔ `from..to` برای هر انتخاب — همان بازه‌هایی که نسخهٔ وب داشت */
-  fun rangeOf(choice: Range, today: String): Pair<String, String> = when (choice) {
+  fun rangeOf(choice: Range, today: String, jy: Int = 0, jm: Int = 1): Pair<String, String> = when (choice) {
+    Range.JMONTH -> jalaliMonth(jy, jm)
+    Range.JYEAR -> jalaliMonth(jy, 1).first to jalaliMonth(jy, 12).second
     Range.TODAY -> today to today
     Range.WEEK -> shiftDays(today, -6) to today
     // «این ماه» یعنی از اولِ همان ماهِ میلادیِ فایل، مثل نسخهٔ وب
     Range.MONTH -> today.take(7) + "-01" to today
     Range.ALL -> "0000-01-01" to "9999-12-31"
+  }
+
+  /**
+   *  یک ماهِ خورشیدی به بازهٔ میلادیِ فایل. اسفند ۲۹ یا ۳۰ روز است —
+   *  همان `Jalali.isValid` تصمیم می‌گیرد، نه عددِ ثابت.
+   */
+  fun jalaliMonth(jy: Int, jm: Int): Pair<String, String> {
+    val last = (31 downTo 29).first { ir.vil3ntec.tohid.Jalali.isValid(jy, jm, it) }
+    val from = ir.vil3ntec.tohid.Jalali.toIso(jy, jm, 1) ?: "0000-01-01"
+    val to = ir.vil3ntec.tohid.Jalali.toIso(jy, jm, last) ?: "9999-12-31"
+    return from to to
   }
 
   private fun shiftDays(iso: String, days: Int): String {

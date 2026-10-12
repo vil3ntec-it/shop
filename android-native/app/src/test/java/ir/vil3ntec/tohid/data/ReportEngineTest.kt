@@ -269,6 +269,10 @@ class ReportEngineTest {
   fun `بازه های آماده درست حساب می شوند`() {
     assertEquals("2026-08-28" to "2026-08-28", ReportEngine.rangeOf(ReportEngine.Range.TODAY, "2026-08-28"))
     assertEquals("2026-08-22" to "2026-08-28", ReportEngine.rangeOf(ReportEngine.Range.WEEK, "2026-08-28"))
+    //  ماه و سالِ خورشیدی — میزان ۳۰ روز، حوتِ ۱۴۰۳ (کبیسه) ۳۰ روز
+    assertEquals("2026-09-23" to "2026-10-22", ReportEngine.rangeOf(ReportEngine.Range.JMONTH, "2026-10-12", 1405, 7))
+    assertEquals("2025-02-19" to "2025-03-20", ReportEngine.jalaliMonth(1403, 12))
+    assertEquals("2026-03-21" to "2027-03-20", ReportEngine.rangeOf(ReportEngine.Range.JYEAR, "2026-10-12", 1405))
     assertEquals("2026-08-01" to "2026-08-28", ReportEngine.rangeOf(ReportEngine.Range.MONTH, "2026-08-28"))
     // هفته‌ای که از مرزِ ماه رد می‌شود
     assertEquals("2026-07-29" to "2026-08-04", ReportEngine.rangeOf(ReportEngine.Range.WEEK, "2026-08-04"))

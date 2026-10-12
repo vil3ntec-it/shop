@@ -4605,8 +4605,15 @@
               <option value="today">امروز</option>
               <option value="week">این هفته</option>
               <option value="month" selected>این ماه</option>
+              <option value="jmonth">ماهِ دلخواه</option>
+              <option value="jyear">سالِ دلخواه</option>
               <option value="custom">بازه دلخواه</option>
             </select>
+          </div>
+          <!-- گزارشِ ماهانه و سالانه: ماه و سالِ خورشیدی — همان «ماه…/سال…»ِ اندروید -->
+          <div class="settings-actions-row" id="rep-sales-jrow" style="display:none; margin-bottom:10px;">
+            <select class="form-input" id="rep-sales-jyear" style="flex:1; min-width:110px;" aria-label="سال"></select>
+            <select class="form-input" id="rep-sales-jmonth" style="flex:1; min-width:110px;" aria-label="ماه"></select>
           </div>
           <div class="settings-actions-row" id="rep-sales-custom-row" style="display:none; margin-bottom:10px;">
             <input class="form-input" id="rep-sales-from" type="date" style="flex:1; min-width:120px;">
@@ -10572,16 +10579,14 @@
   }
 
   function renderSalesReport(){
-    const rangeSel = document.getElementById('rep-sales-range');
-    const range = rangeSel.value;
-    const customRow = document.getElementById('rep-sales-custom-row');
-    customRow.style.display = range==='custom' ? 'flex' : 'none';
-    let from, to;
-    const today = todayISO();
-    if(range==='today'){ from=today; to=today; }
-    else if(range==='week'){ const d=new Date(); d.setDate(d.getDate()-6); from=d.toISOString().slice(0,10); to=today; }
-    else if(range==='month'){ const d=new Date(); from=new Date(d.getFullYear(),d.getMonth(),1).toISOString().slice(0,10); to=today; }
-    else { from = document.getElementById('rep-sales-from').value || today; to = document.getElementById('rep-sales-to').value || today; }
+    const range = document.getElementById('rep-sales-range').value;
+    document.getElementById('rep-sales-custom-row').style.display = range==='custom' ? 'flex' : 'none';
+    const jrow = document.getElementById('rep-sales-jrow');
+    jrow.style.display = (range==='jmonth' || range==='jyear') ? 'flex' : 'none';
+    document.getElementById('rep-sales-jmonth').style.display = range==='jmonth' ? '' : 'none';
+    if(jrow.style.display !== 'none') fillReportJalaliPicker();
+    //  یک تابعِ بازه برای نمایش، CSV و چاپ — پیش‌تر دو نسخهٔ جدا داشتند
+    const { from, to } = reportRangeDates();
     const r = computeSalesReport(from, to);
     document.getElementById('rep-s-count').textContent = r.count.toLocaleString('en-US');
     document.getElementById('rep-s-gross').innerHTML = formatMoney(r.gross)+'<small>افغانی</small>';
@@ -10595,6 +10600,53 @@
   document.getElementById('rep-sales-range').addEventListener('change', ()=>{ renderSalesReport(); renderPurchaseReport(); });
   document.getElementById('rep-sales-from').addEventListener('change', ()=>{ renderSalesReport(); renderPurchaseReport(); });
   document.getElementById('rep-sales-to').addEventListener('change', ()=>{ renderSalesReport(); renderPurchaseReport(); });
+  document.getElementById('rep-sales-jyear').addEventListener('change', ()=>{ renderSalesReport(); renderPurchaseReport(); });
+  document.getElementById('rep-sales-jmonth').addEventListener('change', ()=>{ renderSalesReport(); renderPurchaseReport(); });
+
+  /* سال‌های دارای فروش یا خرید + سالِ جاری؛ پیش‌فرض همین ماه */
+  function fillReportJalaliPicker(){
+    const ySel = document.getElementById('rep-sales-jyear');
+    const mSel = document.getElementById('rep-sales-jmonth');
+    const now = jalaliOf(todayISO()) || { y: 1405, m: 1 };
+    if(!mSel.options.length){
+      mSel.innerHTML = JALALI_MONTHS.map((n,i)=>`<option value="${i+1}">${escapeHtml(n)}</option>`).join('');
+      mSel.value = String(now.m);
+    }
+    const years = new Set([now.y]);
+    const firstSale = sales.reduce((m,x)=> x.date && (!m || x.date < m) ? x.date : m, '');
+    const first = firstSale ? jalaliOf(firstSale) : null;
+    for(let y = first ? first.y : now.y; y <= now.y; y++) years.add(y);
+    const keep = ySel.value;
+    const list = Array.from(years).sort((a,b)=> b-a);
+    if(ySel.options.length !== list.length){
+      ySel.innerHTML = list.map(y=>`<option value="${y}">${formatPlain(y)}</option>`).join('');
+      ySel.value = keep && list.includes(+keep) ? keep : String(now.y);
+    }
+  }
+
+  /*
+   * آغازِ یک ماهِ خورشیدی به تاریخِ میلادیِ فایل. از تخمین (۲۱ مارس + روزهای
+   * ماه‌های پیشین) چند روز این‌سو و آن‌سو را با همان `jalaliOf` می‌سنجد —
+   * پس کبیسه و سالِ ۲۹ یا ۳۰ روزهٔ حوت را خودِ مرورگر حل می‌کند.
+   * همان `ReportEngine.jalaliMonth`ِ اندروید.
+   */
+  function jalaliMonthStart(jy, jm){
+    if(jm > 12){ jy += 1; jm = 1; }
+    const base = Date.UTC(jy + 621, 2, 21) + ((jm <= 7 ? (jm-1)*31 : 186 + (jm-7)*30) - 4) * 86400000;
+    for(let i = 0; i < 10; i++){
+      const iso = new Date(base + i*86400000).toISOString().slice(0,10);
+      const j = jalaliOf(iso);
+      if(j && j.y === jy && j.m === jm) return iso;
+    }
+    return null;
+  }
+  function jalaliRange(jy, jm){
+    const from = jalaliMonthStart(jy, jm || 1);
+    const next = jalaliMonthStart(jy, jm ? jm + 1 : 13);
+    if(!from || !next) return null;
+    const to = new Date(Date.parse(next + 'T00:00:00Z') - 86400000).toISOString().slice(0,10);
+    return { from, to };
+  }
 
   function computeProductProfit(productId){
     // از همان نمایهٔ یک‌گذره — پیش‌تر برای هر کالا کلِ اقلام و فاکتورها گشته می‌شد
@@ -13922,11 +13974,20 @@
         to:   document.getElementById('rep-sales-to').value   || today
       };
     }
+    if(range==='jmonth' || range==='jyear'){
+      const now = jalaliOf(today) || { y: 1405, m: 1 };
+      const jy = parseInt(document.getElementById('rep-sales-jyear').value, 10) || now.y;
+      const jm = parseInt(document.getElementById('rep-sales-jmonth').value, 10) || now.m;
+      const r = jalaliRange(jy, range==='jmonth' ? jm : 0);
+      if(r) return r;
+    }
+    //  تاریخِ محلی، نه toISOString (که UTC است و نیمه‌شب روز را عقب می‌برد)
+    const iso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     const d = new Date();
     if(range==='today') return { from: today, to: today };
-    if(range==='week'){ d.setDate(d.getDate()-6); return { from: d.toISOString().slice(0,10), to: today }; }
+    if(range==='week'){ d.setDate(d.getDate()-6); return { from: iso(d), to: today }; }
     d.setDate(1);
-    return { from: d.toISOString().slice(0,10), to: today };
+    return { from: iso(d), to: today };
   }
 
   function buildReportCsvRows(tab){

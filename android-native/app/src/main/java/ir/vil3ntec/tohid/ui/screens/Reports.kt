@@ -12,6 +12,8 @@ import androidx.compose.material3.*
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Print
 import androidx.compose.runtime.*
@@ -96,7 +98,11 @@ fun ReportsScreen(d: ShopData) {
   var section by rememberSaveable { mutableStateOf(if (canSeeMoney) "sales" else "products") }
   var stockProduct by rememberSaveable { mutableStateOf<String?>(null) }
 
-  val (from, to) = ReportEngine.rangeOf(range, todayIso())
+  //  ماه و سالِ خورشیدیِ انتخاب‌شده — پیش‌فرض همین ماه
+  val now = remember { ir.vil3ntec.tohid.Jalali.ofIso(todayIso()) }
+  var jy by rememberSaveable { mutableStateOf(now?.year ?: 1405) }
+  var jm by rememberSaveable { mutableStateOf(now?.month ?: 1) }
+  val (from, to) = ReportEngine.rangeOf(range, todayIso(), jy, jm)
 
   LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
     item {
@@ -151,7 +157,7 @@ fun ReportsScreen(d: ShopData) {
     when (section) {
       //  `rememberSaveable` ممکن است «sales» را از اجرای قبلی برگرداند،
       //  وقتی هنوز نقش معلوم نبود. سدِ دوم همین‌جاست.
-      "sales" -> if (canSeeMoney) salesSection(this, d, range, from, to) { range = it }
+      "sales" -> if (canSeeMoney) salesSection(this, d, range, from, to, jy, jm, { y, m -> jy = y; jm = m }) { range = it }
       "products" -> productsSection(this, d)
       "debtors" -> debtorsSection(this, d)
       "purchases" -> if (canSeeMoney) purchasesSection(this, d, from, to)
@@ -169,6 +175,9 @@ private fun salesSection(
   range: ReportEngine.Range,
   from: String,
   to: String,
+  jy: Int,
+  jm: Int,
+  onPick: (Int, Int) -> Unit,
   onRange: (ReportEngine.Range) -> Unit,
 ) = with(scope) {
   item {
@@ -180,9 +189,28 @@ private fun salesSection(
         ReportEngine.Range.TODAY to "امروز",
         ReportEngine.Range.WEEK to "۷ روز",
         ReportEngine.Range.MONTH to "این ماه",
+        ReportEngine.Range.JMONTH to "ماه…",
+        ReportEngine.Range.JYEAR to "سال…",
         ReportEngine.Range.ALL to "از آغاز",
       ).forEach { (value, label) ->
         FilterChip(selected = range == value, onClick = { onRange(value) }, label = { Text(label) })
+      }
+    }
+    //  گزارشِ ماهانه و سالانه: یک ماه یا سالِ خورشیدی، با پیکان جلو و عقب
+    if (range == ReportEngine.Range.JMONTH || range == ReportEngine.Range.JYEAR) {
+      val monthly = range == ReportEngine.Range.JMONTH
+      Row(verticalAlignment = Alignment.CenterVertically) {
+        IconButton(onClick = {
+          if (monthly) { if (jm == 1) onPick(jy - 1, 12) else onPick(jy, jm - 1) } else onPick(jy - 1, jm)
+        }) { Icon(Icons.Filled.ChevronRight, contentDescription = "قبلی") }
+        Text(
+          if (monthly) "${ir.vil3ntec.tohid.JALALI_MONTHS[jm - 1]} $jy" else "سال $jy",
+          style = MaterialTheme.typography.titleSmall,
+          color = Shop.colors.text,
+        )
+        IconButton(onClick = {
+          if (monthly) { if (jm == 12) onPick(jy + 1, 1) else onPick(jy, jm + 1) } else onPick(jy + 1, jm)
+        }) { Icon(Icons.Filled.ChevronLeft, contentDescription = "بعدی") }
       }
     }
     Spacer(Modifier.height(6.dp))
