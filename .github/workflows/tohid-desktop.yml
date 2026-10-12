@@ -189,6 +189,21 @@ jobs:
 
           #  ۱) Offline
           if ((Install "out\Tohid-Windows-Offline.exe" "$t\a" @()) -ne 0) { Get-Content "$t\a.log" -Tail 40; throw "offline" }
+          #  خودِ برنامه هم باید واقعاً باز شود و بماند: پنجره با عنوانِ «فروشگاه من»
+          $app = Start-Process -FilePath "$t\a\Tohid.exe" -PassThru
+          $title = ''
+          for ($k = 0; $k -lt 45 -and -not $app.HasExited; $k++) {
+            Start-Sleep 2
+            $title = (Get-Process -Id $app.Id -ErrorAction SilentlyContinue).MainWindowTitle
+            if ($title) { break }
+          }
+          if ($app.HasExited) { throw "برنامه باز نشد یا فوراً بسته شد (کدِ خروج $($app.ExitCode))" }
+          Start-Sleep 10
+          if ($app.HasExited) { throw "برنامه پس از باز شدن بسته شد (کدِ خروج $($app.ExitCode))" }
+          Write-Host "✓ برنامه باز است — پنجره: «$title»، حافظه $([int]((Get-Process -Id $app.Id).WorkingSet64/1MB)) مگابایت"
+          if ($title -notmatch 'فروشگاه من') { Write-Host "::warning::عنوانِ پنجره «$title» است" }
+          Get-Process | Where-Object { $_.Path -like "$t\a\*" } | Stop-Process -Force
+          Start-Sleep 3
           Check "$t\a" "Offline"
 
           #  ۲) فایلِ برنامه کنارِ نصاب، بی‌اینترنت
