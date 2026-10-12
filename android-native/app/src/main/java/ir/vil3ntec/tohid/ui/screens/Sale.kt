@@ -145,9 +145,19 @@ fun SaleScreen(
   }
 
   /** یک بارکد — چه از دوربین، چه دستی، چه از بارکدخوانِ سخت‌افزاری */
-  fun onBarcode(raw: String, skipDedup: Boolean = false) {
+  fun onBarcode(raw: String, skipDedup: Boolean = false, fromPhone: Boolean = false) {
     val code = raw.trim()
     if (code.isEmpty()) return
+    //  این گوشی بارکدخوانِ کامپیوتر است ⇒ بارکد به سبدِ کامپیوتر می‌رود
+    if (!fromPhone && ir.vil3ntec.tohid.sync.PhoneScanner.sendCode.value != null) {
+      if (!skipDedup && !gate.accept(code)) return
+      if (ir.vil3ntec.tohid.sync.PhoneScanner.send(code)) {
+        ScanFeedback.ok(context)
+        toast("به کامپیوتر فرستاده شد: $code")
+        return
+      }
+      toast("کامپیوتر در دسترس نیست — بارکد در سبدِ همین گوشی ماند")
+    }
     //  کار در جریان است؛ دوربین نباید بخوابد
     lastScanAt = System.currentTimeMillis()
     if (!skipDedup && !gate.accept(code)) return
@@ -203,6 +213,11 @@ fun SaleScreen(
       val whole = (hit as? BarcodeMatch.Hit.Product)?.exact ?: true
       toast(if (whole) "${product.name} به سبد اضافه شد" else "${product.name} — از نیمهٔ بارکد شناخته شد")
     }
+  }
+
+  //  بارکدی که گوشیِ جفت‌شده خواند، همین‌جا به سبد می‌رود
+  LaunchedEffect(Unit) {
+    for (code in ir.vil3ntec.tohid.sync.PhoneScanner.inbox) onBarcode(code, skipDedup = true, fromPhone = true)
   }
 
   /*

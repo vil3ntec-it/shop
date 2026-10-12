@@ -458,6 +458,10 @@
       try { msg = JSON.parse(ev.data); } catch (e) { return; }
       //  فقط «چیزی عوض شد» می‌آید؛ خودِ داده هرگز از این در نمی‌رود
       if (msg && msg.event === 'changed') pump();
+      //  عکسِ کالا و بارکدِ گوشی — ‎license/photo-studio.js‎ گوش می‌دهد
+      if (msg && (msg.event === 'photos' || msg.event === 'scan' || msg.event === 'hello')) {
+        try { window.dispatchEvent(new CustomEvent('tohid:live', { detail: msg })); } catch (e) { /* مرورگرِ کهنه */ }
+      }
     };
     socket.onclose = function () {
       socketOpen = false;
@@ -542,6 +546,12 @@
     dropped: function () { return queue().dropped(); },
     clearError: function () { patchState({ lastError: '' }); announce(); },
     connectLive: connectLive,
+    /** پیامِ کوچک به دستگاه‌های دیگرِ همین حساب — `false` یعنی سوکت باز نیست */
+    relay: function (obj) {
+      if (!socket || !socketOpen) return false;
+      try { socket.send(JSON.stringify(obj)); return true; } catch (e) { return false; }
+    },
+    get liveOpen() { return socketOpen; },
     disconnectLive: disconnectLive,
     //  فقط برای سنجه‌های مرورگری — هیچ منطقی به آن تکیه ندارد
     _state: state,

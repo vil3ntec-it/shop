@@ -94,15 +94,21 @@ fun ProductDetailScreen(
 
   //  دوربین یا گالری — همان برگه‌ای که صفحهٔ محصولات هم نشان می‌دهد
   var pickOpen by remember { mutableStateOf(false) }
-  PhotoSourceSheet(open = pickOpen, onDismiss = { pickOpen = false }) { uri ->
-    PhotoStore.save(context, product.id, uri).onSuccess {
-      // نشانهٔ عکس روی خودِ محصول می‌نشیند، همان فیلدی که وب می‌نویسد
-      scope.launch {
-        store.save(
-          d.copy(products = d.products.map { if (it.id == product.id) it.copy(photo = true) else it })
-        )
+  var studioUri by remember { mutableStateOf<android.net.Uri?>(null) }
+  PhotoSourceSheet(open = pickOpen, onDismiss = { pickOpen = false }) { uri -> studioUri = uri }
+  studioUri?.let { uri ->
+    PhotoStudioDialog(source = uri, onDismiss = { studioUri = null }) { bitmap ->
+      studioUri = null
+      PhotoStore.saveBitmap(context, product.id, bitmap).onSuccess {
+        // نشانهٔ عکس روی خودِ محصول می‌نشیند، همان فیلدی که وب می‌نویسد
+        scope.launch {
+          store.save(
+            d.copy(products = d.products.map { if (it.id == product.id) it.copy(photo = true) else it })
+          )
+        }
+        ir.vil3ntec.tohid.sync.PhotoSync.changed(context, product.id)
+        photoVersion++
       }
-      photoVersion++
     }
   }
 
@@ -135,6 +141,7 @@ fun ProductDetailScreen(
             size = 72.dp,
             version = photoVersion,
             modifier = Modifier.clickable { choosePhoto() },
+            force = true,
           )
           Box(
             Modifier

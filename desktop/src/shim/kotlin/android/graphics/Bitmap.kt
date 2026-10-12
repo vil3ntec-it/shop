@@ -21,6 +21,10 @@ class Bitmap(val image: BufferedImage) {
   fun setPixel(x: Int, y: Int, color: Int) = image.setRGB(x, y, color)
   fun recycle() {}
 
+  fun getPixels(pixels: IntArray, offset: Int, stride: Int, x: Int, y: Int, width: Int, height: Int) {
+    image.getRGB(x, y, width, height, pixels, offset, stride)
+  }
+
   fun compress(format: CompressFormat, quality: Int, out: OutputStream): Boolean {
     val (img, name) = when (format) {
       CompressFormat.PNG -> image to "png"
@@ -56,6 +60,12 @@ class Bitmap(val image: BufferedImage) {
   companion object {
     fun createBitmap(width: Int, height: Int, config: Config): Bitmap =
       Bitmap(BufferedImage(width.coerceAtLeast(1), height.coerceAtLeast(1), BufferedImage.TYPE_INT_ARGB))
+
+    fun createBitmap(colors: IntArray, width: Int, height: Int, config: Config): Bitmap {
+      val img = BufferedImage(width.coerceAtLeast(1), height.coerceAtLeast(1), BufferedImage.TYPE_INT_ARGB)
+      img.setRGB(0, 0, width, height, colors, 0, width)
+      return Bitmap(img)
+    }
 
     fun createScaledBitmap(src: Bitmap, w: Int, h: Int, filter: Boolean): Bitmap {
       val out = BufferedImage(w.coerceAtLeast(1), h.coerceAtLeast(1), BufferedImage.TYPE_INT_ARGB)

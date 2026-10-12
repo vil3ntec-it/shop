@@ -52,7 +52,16 @@ class LiveSocket(
 
   val connected: Boolean get() = socket != null
 
+  /** پیامِ کوچک به دستگاه‌های دیگرِ همین حساب (سرور فقط رخدادهای شناخته را می‌پذیرد) */
+  fun send(json: String): Boolean = socket?.send(json) ?: false
+
+  companion object {
+    /** سوکتِ همین برنامه — برای «گوشی به‌عنوانِ بارکدخوان» */
+    @Volatile var current: LiveSocket? = null
+  }
+
   fun connect() {
+    current = this
     if (socket != null) return
     if (!Backend.isReady(app)) return
     val token = Backend.tokens(app).accessToken ?: return
@@ -78,6 +87,12 @@ class LiveSocket(
         override fun onMessage(webSocket: WebSocket, text: String) {
           val event = runCatching { JSONObject(text).optString("event") }.getOrDefault("")
           if (event == "changed") runCatching { onChanged() }
+          //  عکسِ کالایی روی دستگاهِ دیگر عوض شد؛ و هنگامِ وصل شدن، صفِ عکس‌ها خالی شود
+          if (event == "photos" || event == "hello") ir.vil3ntec.tohid.sync.PhotoSync.kick(app)
+          if (event == "scan") runCatching {
+            val o = JSONObject(text)
+            ir.vil3ntec.tohid.sync.PhoneScanner.received(o.optString("code"), o.optString("pair"))
+          }
         }
 
         override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {

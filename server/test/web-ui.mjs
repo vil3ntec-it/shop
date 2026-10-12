@@ -43,7 +43,7 @@ const LEDGER = {
   sales: [{ id: 's1', invoiceNumber: 1, finalTotal: 1250000, total: 1250000, date: '2026-10-01', createdAt: 1, status: 'completed', paymentMethod: 'cash' }],
   saleItems: [],
 };
-const PAGES = ['dashboard', 'admin', 'products', 'warehouse', 'sale', 'sales', 'debtors', 'expenses', 'reports', 'settings', 'more', 'purchasing'];
+const PAGES = ['dashboard', 'admin', 'devices', 'products', 'warehouse', 'sale', 'sales', 'debtors', 'expenses', 'reports', 'settings', 'more', 'purchasing'];
 
 const browser = await pw.chromium.launch();
 let failed = 0;

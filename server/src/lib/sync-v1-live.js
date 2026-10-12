@@ -59,6 +59,13 @@ function join(ctx, ws, deviceId) {
     try { msg = JSON.parse(String(raw)); } catch { return; }
     if (msg && (msg.type === 'ping' || msg.event === 'ping')) {
       headOf(ctx).then(cursor => send(ws, { event: 'pong', cursor, serverTime: Date.now() }));
+      return;
+    }
+    //  پیامِ دستگاه به دستگاه‌های دیگرِ همان حساب — فقط رخدادهای شناخته
+    //  (گوشی به‌عنوانِ بارکدخوانِ کامپیوتر). هیچ داده‌ای ذخیره نمی‌شود.
+    if (msg && msg.type === 'relay' && RELAY_EVENTS.has(msg.event)) {
+      const payload = cleanRelay(msg);
+      if (payload) relay(ctx, payload, deviceId);
     }
   });
   ws.on('close', () => {
@@ -81,6 +88,37 @@ function broadcast(ctx, cursor, exceptDevice = '') {
   for (const ws of room) {
     if (exceptDevice && ws.sync && ws.sync.deviceId === exceptDevice) continue;
     send(ws, { event: 'changed', cursor });
+    n++;
+  }
+  return n;
+}
+
+/**
+ * رخدادهایی که دستگاه می‌تواند برای دستگاه‌های دیگرِ حسابش بفرستد.
+ *   scan   — گوشی بارکد خواند ⇒ کامپیوتری که «گوشی به‌عنوانِ بارکدخوان»
+ *            را با همان کدِ جفت‌شدن باز کرده، آن را در سبد می‌گذارد
+ *   photos — عکسِ کالایی عوض شد (سرور خودش هم می‌فرستد)
+ */
+const RELAY_EVENTS = new Set(['scan', 'photos']);
+
+function cleanRelay(msg) {
+  if (msg.event === 'scan') {
+    const code = String(msg.code || '').trim();
+    if (!code || code.length > 64 || /[\u0000-\u001f]/.test(code)) return null;
+    return { event: 'scan', code, pair: String(msg.pair || '').slice(0, 12), at: Date.now() };
+  }
+  if (msg.event === 'photos') return { event: 'photos', rev: Number(msg.rev) || 0 };
+  return null;
+}
+
+/** فرستادنِ یک رخدادِ دلخواه (از فهرستِ بالا) به دستگاه‌های دیگرِ حساب */
+function relay(ctx, payload, exceptDevice = '') {
+  const room = rooms.get(roomKey(ctx));
+  if (!room) return 0;
+  let n = 0;
+  for (const ws of room) {
+    if (exceptDevice && ws.sync && ws.sync.deviceId === exceptDevice) continue;
+    send(ws, payload);
     n++;
   }
   return n;
@@ -137,4 +175,4 @@ function attach(server) {
   return wss;
 }
 
-module.exports = { attach, broadcast, listeners, roomKey, PATHS, PING_MS };
+module.exports = { attach, broadcast, relay, listeners, roomKey, PATHS, PING_MS, RELAY_EVENTS };

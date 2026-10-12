@@ -20,14 +20,23 @@ import java.io.File
  */
 object PhotoStore {
 
-  private const val MAX_EDGE = 400
-  private const val QUALITY = 82
+  /*
+   *  ۸۰۰ پیکسل (پیش‌تر ۴۰۰): عکسِ ساخته‌شده در استودیو مربعِ ۸۰۰ است و
+   *  روی کامپیوتر بزرگ دیده می‌شود. با زمینهٔ سفید، JPEGِ ۸۰٪ حدود ۴۰ تا
+   *  ۸۰ کیلوبایت است — برای همگام‌سازی میانِ دستگاه‌ها هم سبک است.
+   */
+  private const val MAX_EDGE = 800
+  private const val QUALITY = 80
 
   private fun dir(context: Context): File =
     File(context.filesDir, "product-photos").apply { if (!exists()) mkdirs() }
 
   fun file(context: Context, productId: String): File =
     File(dir(context), "$productId.jpg")
+
+  /** شناسهٔ همهٔ کالاهایی که روی این دستگاه عکس دارند */
+  fun localIds(context: Context): Set<String> =
+    dir(context).listFiles()?.filter { it.name.endsWith(".jpg") }?.map { it.name.removeSuffix(".jpg") }?.toSet().orEmpty()
 
   fun exists(context: Context, productId: String): Boolean =
     file(context, productId).exists()
@@ -44,6 +53,52 @@ object PhotoStore {
     if (scaled !== bitmap) scaled.recycle()
     bitmap.recycle()
   }
+
+  /** عکسِ آماده (مثلاً خروجیِ استودیو) را ذخیره می‌کند */
+  fun saveBitmap(context: Context, productId: String, bitmap: Bitmap): Result<Unit> = runCatching {
+    val scaled = shrink(bitmap)
+    file(context, productId).outputStream().use { out ->
+      scaled.compress(Bitmap.CompressFormat.JPEG, QUALITY, out)
+    }
+    if (scaled !== bitmap) scaled.recycle()
+  }
+
+  /** بایت‌های JPEGِ عکسِ کالا — برای فرستادن به سرور */
+  fun bytes(context: Context, productId: String): ByteArray? =
+    file(context, productId).takeIf { it.exists() }?.readBytes()
+
+  /** عکسی که از سرور رسید، همان‌طور که هست (از قبل کوچک و فشرده شده) */
+  fun saveBytes(context: Context, productId: String, data: ByteArray): Result<Unit> = runCatching {
+    require(data.size in 100..2_000_000) { "عکس درست نیست" }
+    val tmp = File(dir(context), "$productId.part")
+    tmp.writeBytes(data)
+    val target = file(context, productId)
+    if (!tmp.renameTo(target)) { target.delete(); tmp.renameTo(target) }
+  }
+
+  /**
+   *  خواندنِ عکسِ انتخاب‌شده برای استودیو — عکسِ ۱۲ مگاپیکسلیِ دوربین
+   *  اول با `inSampleSize` تا حدودِ ۲۴۰۰ پیکسل کوچک خوانده می‌شود، وگرنه
+   *  ۴۸ مگابایت حافظه می‌گرفت.
+   */
+  fun decode(context: Context, source: Uri): Bitmap? = runCatching {
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    context.contentResolver.openInputStream(source).use { BitmapFactory.decodeStream(it, null, bounds) }
+    var sample = 1
+    while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= 2400) sample *= 2
+    val opts = BitmapFactory.Options().apply { inSampleSize = sample }
+    context.contentResolver.openInputStream(source).use { BitmapFactory.decodeStream(it, null, opts) }
+  }.getOrNull()
+
+  fun toStudio(bitmap: Bitmap): PhotoStudio.Image {
+    val w = bitmap.width; val h = bitmap.height
+    val px = IntArray(w * h)
+    bitmap.getPixels(px, 0, w, 0, 0, w, h)
+    return PhotoStudio.Image(w, h, px)
+  }
+
+  fun fromStudio(image: PhotoStudio.Image): Bitmap =
+    Bitmap.createBitmap(image.px, image.width, image.height, Bitmap.Config.ARGB_8888)
 
   fun load(context: Context, productId: String): Bitmap? {
     val f = file(context, productId)
@@ -89,6 +144,8 @@ object PhotoStore {
       val saved = vault(context, key)
       if (saved.exists()) saved.renameTo(live) else live.mkdirs()
     }
+    //  حسابِ دیگر ⇒ همگام‌سازیِ عکس از اول (عکس‌های همین حساب یک بار فرستاده می‌شوند)
+    ir.vil3ntec.tohid.sync.PhotoSync.forget(context)
   }
 
   /* ------------------------ عکسِ خودِ کاربر ------------------------ */

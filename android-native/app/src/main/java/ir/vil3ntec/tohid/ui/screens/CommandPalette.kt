@@ -53,7 +53,7 @@ class PaletteHit(val kind: String, val id: String, val title: String, val hint: 
 
 /** همهٔ صفحه‌هایی که از جست‌وجو باز می‌شوند — همان نام‌های سربرگ */
 val PALETTE_PAGES = listOf(
-  "dashboard" to "داشبورد", "admin" to "مرکزِ مدیریت", "sale" to "فروش", "quick" to "فروشِ سریع",
+  "dashboard" to "داشبورد", "admin" to "مرکزِ مدیریت", "devices" to "دستگاه‌های جانبی (چاپگر، بارکدخوان، گوشی)", "sale" to "فروش", "quick" to "فروشِ سریع",
   "debtors" to "قرض‌داران", "products" to "محصولات", "warehouse" to "انبار", "sales" to "تاریخچهٔ فروش و صندوق",
   "purchasing" to "خرید و تأمین‌کننده", "reports" to "گزارش‌ها", "expenses" to "مصارف", "receipts" to "رسیدها",
   "team" to "کارمندان", "audit" to "سابقهٔ عملیات", "settings" to "تنظیمات و پشتیبان", "myplan" to "اشتراکِ من",

@@ -6,7 +6,7 @@
    - فونت‌های گوگل: اولین بار از شبکه، سپس همیشه از کش.
    داده‌های فروشگاه در localStorage است و اصلاً از اینجا عبور نمی‌کند.
    ========================================================== */
-const VERSION = 'tohid-shop-v42';
+const VERSION = 'tohid-shop-v43';
 const SHELL_CACHE = VERSION + '-shell';
 const FONT_CACHE = VERSION + '-fonts';
 
@@ -50,6 +50,7 @@ const SHELL_ASSETS = [
    *  روی نصبِ آفلاین اصلاً بار نمی‌شد. همان تله‌ای که همین بالا نوشته شده.
    */
   './license/thermal-print.js',
+  './license/photo-studio.js',
   './sounds/scan-beep.mp3',
 ];
 

@@ -69,6 +69,7 @@ private val PAGE_TITLES = mapOf(
   "more" to "بیشتر",
   "purchasing" to "خرید و تأمین‌کننده",
   "admin" to "مرکزِ مدیریت",
+  "devices" to "دستگاه‌های جانبی",
   "sales" to "تاریخچه فروش",
   "reports" to "گزارشات",
   "receipts" to "رسیدها",
@@ -385,6 +386,16 @@ fun AppRoot(
     if (TABS.any { it.id == target }) { tab = target; sub = null } else sub = target
   }
 
+  //  گوشیِ جفت‌شده بارکد فرستاد ⇒ صفحهٔ فروش باز می‌شود و کالا به سبد می‌رود
+  LaunchedEffect(Unit) {
+    ir.vil3ntec.tohid.sync.PhoneScanner.load(context)
+    PhotoPrefs.load(context)
+  }
+  val phoneScan = ir.vil3ntec.tohid.sync.PhoneScanner.lastReceived.value
+  LaunchedEffect(phoneScan) {
+    if (phoneScan != null && (sub ?: tab) != "sale") open("sale")
+  }
+
   //  میان‌برهای کامپیوتر — شرح سرِ `AppNav`
   val navRequest = AppNav.request.value
   LaunchedEffect(navRequest) {
@@ -638,6 +649,7 @@ fun AppRoot(
           onSubscription = { sub = "vip" },
         )
         "team" -> TeamScreen(snackbar)
+        "devices" -> DevicesScreen(snackbar)
         "more" -> MoreScreen(store, data, ::open)
       }
       }
