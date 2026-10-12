@@ -647,6 +647,7 @@ router.post('/backups', requireSuperAdmin, async (req, res, next) => {
 router.use('/logins', require('./admin-logins'));
 //  میزِ «فروشگاه» — بندهای ۴.۲ و ۴.۳ سندِ ریمیک. فقط می‌خواند.
 router.use('/shop-desk', require('./admin-shop-desk'));
+router.use('/shop-offline-codes', require('./admin-shop-offline'));
 //  میزِ «کدِ شاگرد» — بندِ ۴.۴ سندِ ریمیک. ⛔ زیرِ `/shops/:id` می‌نشیند تا
 //  همان `v.id` و همان مرزِ دکان را داشته باشد، نه یک درِ موازی.
 router.use('/shops/:id/staff-codes', require('./admin-staff-codes'));

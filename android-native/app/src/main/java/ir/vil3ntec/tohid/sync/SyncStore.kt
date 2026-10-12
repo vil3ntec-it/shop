@@ -118,6 +118,26 @@ class SyncStore(context: Context) {
     get() = prefs.getString(ACCOUNT_ID, "") ?: ""
     set(v) = prefs.edit().putString(ACCOUNT_ID, v).apply()
 
+  /**
+   *  کدِ اشتراکِ آفلاینِ زده‌شده (‎OfflineCode‎) — بی اینترنت اشتراک را باز
+   *  می‌کند؛ با اینترنت یک بار به سرور می‌رود (`offlineRedeemed`).
+   */
+  var offlineCode: String?
+    get() = prefs.getString(OFFLINE_CODE, null)
+    set(v) = prefs.edit().putString(OFFLINE_CODE, v).putBoolean(OFFLINE_REDEEMED, false).apply()
+
+  var offlineRedeemed: Boolean
+    get() = prefs.getBoolean(OFFLINE_REDEEMED, false)
+    set(v) = prefs.edit().putBoolean(OFFLINE_REDEEMED, v).apply()
+
+  /** سریالِ کدهایی که یک بار در همین برنامه نشسته‌اند — «یک بار بیشتر استفاده نشه» */
+  val offlineUsed: Set<String>
+    get() = prefs.getStringSet(OFFLINE_USED, emptySet()).orEmpty()
+
+  fun markOfflineUsed(serial: String) {
+    prefs.edit().putStringSet(OFFLINE_USED, offlineUsed + serial).apply()
+  }
+
   var license: String?
     get() = prefs.getString(LICENSE, null)
     set(v) = prefs.edit().putString(LICENSE, v).apply()
@@ -290,6 +310,9 @@ class SyncStore(context: Context) {
     const val ACCOUNT_ID = "account_id"
     const val LOCK_ASKED = "lock_asked"
     const val LICENSE = "license"
+    const val OFFLINE_CODE = "offline_code"
+    const val OFFLINE_REDEEMED = "offline_redeemed"
+    const val OFFLINE_USED = "offline_used"
     const val DENIED = "license_denied"
     const val PUBLIC_KEY = "public_key"
     const val SHADOW = "shadow"

@@ -35,6 +35,33 @@ object Platform {
    *  «ذخیره به‌عنوان» با پنجرهٔ خودِ سیستم، پیش‌فرض در «اسناد»؛ بعد از ذخیره
    *  فایل با برنامهٔ پیش‌فرضش (مثلاً اکسل) باز می‌شود.
    */
+  /**
+   *  اثرِ انگشتِ همین کامپیوتر برای «شناسهٔ کامپیوتر»ِ کدِ آفلاین.
+   *
+   *  ویندوز ‎MachineGuid‎ (با نصبِ دوبارهٔ برنامه عوض نمی‌شود)، مک
+   *  ‎IOPlatformUUID‎، لینوکس ‎/etc/machine-id‎. هیچ‌کدام نبود ⇒ شناسهٔ
+   *  ذخیره‌شدهٔ خودِ برنامه. یک بار خوانده و نگه داشته می‌شود.
+   */
+  @Volatile private var fingerprint: String? = null
+
+  fun machineFingerprint(context: android.content.Context): String = fingerprint ?: run {
+    val os = System.getProperty("os.name").orEmpty().lowercase()
+    fun cmd(vararg c: String): String = runCatching {
+      val p = ProcessBuilder(*c).redirectErrorStream(true).start()
+      val out = p.inputStream.bufferedReader().readText()
+      p.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)
+      out
+    }.getOrDefault("")
+    val id = when {
+      os.contains("win") -> Regex("MachineGuid\\s+REG_SZ\\s+([0-9A-Fa-f-]+)")
+        .find(cmd("reg", "query", "HKLM\\SOFTWARE\\Microsoft\\Cryptography", "/v", "MachineGuid"))?.groupValues?.get(1)?.let { "win-" + it.lowercase() }
+      os.contains("mac") -> Regex("\"IOPlatformUUID\" = \"([^\"]+)\"")
+        .find(cmd("ioreg", "-rd1", "-c", "IOPlatformExpertDevice"))?.groupValues?.get(1)?.let { "mac-" + it.lowercase() }
+      else -> runCatching { java.io.File("/etc/machine-id").readText().trim() }.getOrNull()?.takeIf { it.isNotBlank() }?.let { "linux-$it" }
+    }
+    (id ?: ("app-" + ir.vil3ntec.tohid.sync.SyncStore(context).deviceUid)).also { fingerprint = it }
+  }
+
   fun saveFile(suggestedName: String, bytes: ByteArray): String? {
     var picked: java.io.File? = null
     val run = Runnable {

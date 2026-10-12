@@ -37,12 +37,67 @@ object LicenseGuard {
     if (!Integrity.isGenuine(context)) {
       return License.Status(License.State.INVALID, reason = "tampered")
     }
-    return License.status(
+    val online = License.status(
       state.license,
       state.publicKey,
       state.deviceUid,
       trustedNow(state),
       state.accountId,
     )
+    if (online.state == License.State.ACTIVE) return online
+    //  مجوزِ سرور نیست یا تمام شده ⇒ کدِ آفلاینِ همین کامپیوتر، اگر زده شده
+    return offline(context, state) ?: online
+  }
+
+  /* ── کدِ اشتراکِ آفلاین ─────────────────────────────────────────── */
+
+  /** «شناسهٔ کامپیوتر» که برنامه نشان می‌دهد و پنل با آن کد می‌سازد */
+  fun computerId(context: Context): String =
+    OfflineCode.computerId(ir.vil3ntec.tohid.ui.Platform.machineFingerprint(context))
+
+  private fun check(context: Context, state: SyncStore, code: String): OfflineCode.Verdict =
+    OfflineCode.verify(
+      code, state.publicKey, ir.vil3ntec.tohid.ui.Platform.machineFingerprint(context),
+      state.accountId, trustedNow(state),
+    )
+
+  /** وضعیتِ «فعال» از کدِ آفلاینِ ذخیره‌شده، یا null */
+  fun offline(context: Context, state: SyncStore): License.Status? {
+    val code = state.offlineCode ?: return null
+    val p = (check(context, state, code) as? OfflineCode.Verdict.Ok)?.code ?: return null
+    val ends = if (p.permanent) p.issuedAt + 50L * 365 * 86_400_000L else p.endsAt
+    return License.Status(
+      License.State.ACTIVE,
+      License.Payload(
+        deviceUid = state.deviceUid, accountId = state.accountId,
+        issuedAt = p.issuedAt, notBefore = p.issuedAt, expiresAt = ends, subscriptionEndsAt = ends,
+        features = emptyList(), core = emptyList(), plan = "offline", planTitle = p.planTitle,
+      ),
+    )
+  }
+
+  /**
+   *  زدنِ کد در برنامه ⇒ null یعنی نشست؛ وگرنه پیامِ فارسیِ دلیل.
+   *
+   *  ⛔ «یک بار»: سریالی که یک بار این‌جا نشسته (و بعد برداشته یا با کدِ
+   *  دیگری جایگزین شده) دوباره پذیرفته نمی‌شود.
+   */
+  fun applyOffline(context: Context, state: SyncStore, raw: String): String? {
+    val v = check(context, state, raw)
+    if (v is OfflineCode.Verdict.Bad) return OfflineCode.reasonText(v.reason)
+    val p = (v as OfflineCode.Verdict.Ok).code
+    val current = state.offlineCode?.let { OfflineCode.parse(it)?.serial }
+    if (p.serial == current) return null
+    if (p.serial in state.offlineUsed) return OfflineCode.reasonText("used")
+    current?.let { state.markOfflineUsed(it) }
+    state.markOfflineUsed(p.serial)
+    state.offlineCode = OfflineCode.normalized(raw)
+    return null
+  }
+
+  /** سرور گفت این کد دیگر کار نمی‌کند (باطل، دکانِ دیگر، حسابِ دیگر) ⇒ برداشته می‌شود */
+  fun dropOffline(state: SyncStore) {
+    state.offlineCode?.let { OfflineCode.parse(it)?.serial }?.let { state.markOfflineUsed(it) }
+    state.offlineCode = null
   }
 }

@@ -674,6 +674,10 @@ fun VipScreen(onDismiss: () -> Unit) {
         }
       }
 
+      /* ------------- کدِ اشتراکِ آفلاین (بی اینترنت) ------------- */
+      Spacer(Modifier.height(10.dp))
+      OfflineCodeCard()
+
       /*
        *  پرداخت آنلاین — گفته می‌شود که نیست.
        *
@@ -1343,6 +1347,8 @@ fun VipGate(label: String, content: @Composable () -> Unit) {
   val status = remember(enforcing) { LicenseGuard.status(context, state) }
   val open = when {
     !enforcing -> true
+    //  کدِ آفلاینِ همین کامپیوتر — بی اینترنت و حتی پیش از ساختنِ حساب
+    LicenseGuard.offline(context, state) != null -> true
     !signedIn -> false
     status.state == License.State.ACTIVE -> true
     status.state == License.State.GRACE -> true
@@ -1541,6 +1547,127 @@ private fun VipHero() {
         style = MaterialTheme.typography.bodySmall,
         color = colors.muted,
         textAlign = TextAlign.Center,
+      )
+    }
+  }
+}
+
+
+/**
+ *  کدِ اشتراکِ آفلاین — برای کسی که اینترنت ندارد.
+ *
+ *  خواستهٔ صاحب سامانه: «برای هر کامپیوتر یک ایدی… از سرور به اون ادرس کد
+ *  داده میشه و میزنه و روی همون کد فقط کار کنه و یک بار بیشتر هم استفاده نشه.»
+ *
+ *  ۱) «شناسهٔ کامپیوتر» را با دکمهٔ رونوشت برای فروشنده می‌فرستد
+ *  ۲) کدی که پنل برای همین شناسه ساخته این‌جا چسبانده می‌شود ⇒ بی اینترنت
+ *     سنجیده و اشتراک همان لحظه باز (‎LicenseGuard.applyOffline‎)
+ *  ۳) اینترنت که آمد، برنامه خودش کد را یک بار به سرور می‌برد (‎Syncer‎)
+ */
+@Composable
+private fun OfflineCodeCard() {
+  val context = LocalContext.current
+  val colors = Shop.colors
+  val state = remember { SyncStore(context) }
+  val computer = remember { runCatching { LicenseGuard.computerId(context) }.getOrDefault("—") }
+  val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
+  var open by remember { mutableStateOf(false) }
+  var code by remember { mutableStateOf("") }
+  var note by remember { mutableStateOf<String?>(null) }
+  var ok by remember { mutableStateOf(false) }
+  var active by remember { mutableStateOf(LicenseGuard.offline(context, state)) }
+
+  Column(
+    Modifier
+      .fillMaxWidth()
+      .clip(RoundedCornerShape(Radius.md))
+      .background(colors.surface)
+      .border(1.dp, colors.border, RoundedCornerShape(Radius.md))
+      .padding(14.dp),
+  ) {
+    Row(Modifier.fillMaxWidth().clickable { open = !open }, verticalAlignment = Alignment.CenterVertically) {
+      Icon(Icons.Filled.Redeem, contentDescription = null, tint = colors.primary, modifier = Modifier.size(18.dp))
+      Spacer(Modifier.width(9.dp))
+      Column(Modifier.weight(1f)) {
+        Text("کدِ اشتراکِ آفلاین (بی اینترنت)", style = MaterialTheme.typography.labelLarge, color = colors.text, fontWeight = FontWeight.Bold)
+        Text(
+          active?.let { "فعال — ${it.payload?.planTitle.orEmpty()}" } ?: "کدی که فقط روی همین کامپیوتر کار می‌کند",
+          style = MaterialTheme.typography.labelSmall,
+          color = if (active != null) colors.success else colors.muted,
+        )
+      }
+      Text(if (open) "بستن" else "باز کردن", style = MaterialTheme.typography.labelSmall, color = colors.primary, fontWeight = FontWeight.Bold)
+    }
+
+    if (open) {
+      Spacer(Modifier.height(12.dp))
+      Text("شناسهٔ این کامپیوتر — همین را برای فروشنده بفرستید:", style = MaterialTheme.typography.labelSmall, color = colors.muted)
+      Spacer(Modifier.height(6.dp))
+      Row(
+        Modifier
+          .fillMaxWidth()
+          .clip(RoundedCornerShape(Radius.sm))
+          .background(colors.surface2)
+          .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+      ) {
+        androidx.compose.runtime.CompositionLocalProvider(
+          androidx.compose.ui.platform.LocalLayoutDirection provides androidx.compose.ui.unit.LayoutDirection.Ltr,
+        ) {
+          Text(
+            computer,
+            Modifier.weight(1f),
+            style = MaterialTheme.typography.titleMedium,
+            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+            fontWeight = FontWeight.Bold,
+            color = colors.text,
+          )
+        }
+        TextButton(onClick = {
+          clipboard.setText(androidx.compose.ui.text.AnnotatedString(computer))
+          ok = true; note = "شناسه رونوشت شد"
+        }) { Text("رونوشت") }
+      }
+
+      Spacer(Modifier.height(12.dp))
+      OutlinedTextField(
+        value = code,
+        onValueChange = { note = null; code = it.take(400) },
+        label = { Text("کدِ اشتراکِ آفلاین (۱۳۸ نویسه)") },
+        minLines = 3,
+        shape = RoundedCornerShape(Radius.sm),
+        modifier = Modifier.fillMaxWidth(),
+      )
+      Spacer(Modifier.height(10.dp))
+      Button(
+        onClick = {
+          val err = LicenseGuard.applyOffline(context, state, code)
+          if (err == null) {
+            ok = true
+            active = LicenseGuard.offline(context, state)
+            note = "اشتراک روی همین کامپیوتر باز شد" + (active?.let { s ->
+              val d = s.daysLeft()
+              if (d > 3650) " — دائمی" else " — ${d} روز"
+            } ?: "") + ". اینترنت که وصل شد، خودش به حسابتان ثبت می‌شود."
+            code = ""
+          } else {
+            ok = false
+            note = err
+          }
+        },
+        enabled = code.isNotBlank(),
+        shape = RoundedCornerShape(Radius.sm),
+        modifier = Modifier.fillMaxWidth().height(46.dp),
+      ) { Text("ثبتِ کد", fontWeight = FontWeight.Bold) }
+      note?.let {
+        Spacer(Modifier.height(8.dp))
+        Text(it, style = MaterialTheme.typography.labelSmall, color = if (ok) colors.success else colors.danger)
+      }
+      Spacer(Modifier.height(6.dp))
+      Text(
+        "هر کد فقط برای همین شناسه و فقط یک بار است؛ روی کامپیوترِ دیگر یا دوباره پذیرفته نمی‌شود.",
+        style = MaterialTheme.typography.labelSmall,
+        color = colors.muted2,
       )
     }
   }

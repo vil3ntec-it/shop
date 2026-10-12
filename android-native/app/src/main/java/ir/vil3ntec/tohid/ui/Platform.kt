@@ -21,6 +21,15 @@ object Platform {
   /** باز کردنِ پوشه در مدیرِ فایلِ سیستم — فقط کامپیوتر */
   fun openFolder(path: String): Boolean = false
 
+  /**
+   *  اثرِ انگشتِ همین دستگاه برای «شناسهٔ کامپیوتر»ِ کدِ آفلاین — اندروید:
+   *  ‎ANDROID_ID‎ (با نصبِ دوباره عوض نمی‌شود).
+   */
+  @android.annotation.SuppressLint("HardwareIds")
+  fun machineFingerprint(context: android.content.Context): String =
+    "android-" + (android.provider.Settings.Secure.getString(context.contentResolver, android.provider.Settings.Secure.ANDROID_ID)
+      ?: ir.vil3ntec.tohid.sync.SyncStore(context).deviceUid)
+
   /** ذخیرهٔ فایل با پنجرهٔ «ذخیره به‌عنوان» — فقط کامپیوتر؛ مسیرِ ذخیره‌شده یا null */
   fun saveFile(suggestedName: String, bytes: ByteArray): String? = null
 }
