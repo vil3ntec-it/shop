@@ -615,7 +615,13 @@ fun AppRoot(
         "quick" -> VipGate("فروش (صندوق)") {
           QuickSaleScreen(store, cartStore, data, snackbar) { sub = null; tab = "sale" }
         }
-        "sale" -> VipGate("فروش (صندوق)") {
+        //  کامپیوتر صندوقِ خودش را دارد (صفحه‌کلید و بارکدخوان، بی دوربین)؛ گوشی همان دوربین
+        "sale" -> if (Platform.DESKTOP) VipGate("فروش (صندوق)") {
+          DeskSaleScreen(store = store, cartStore = cartStore, d = data, snackbar = snackbar) { code ->
+            pendingBarcode = code
+            open("warehouse")
+          }
+        } else VipGate("فروش (صندوق)") {
           SaleScreen(
             store = store,
             cartStore = cartStore,
@@ -628,7 +634,13 @@ fun AppRoot(
           }
         }
         "debtors" -> VipGate("قرض‌داران") { DebtorsScreen(store, data, snackbar) }
-        "products" -> ProductsScreen(
+        "products" -> if (Platform.DESKTOP) DeskProductsScreen(
+          store = store,
+          d = data,
+          snackbar = snackbar,
+          onOpenWarehouse = { productId -> pendingProduct = productId; open("warehouse") },
+          onOpenProduct = { productId -> openProduct = productId; sub = "product" },
+        ) else ProductsScreen(
           store = store,
           d = data,
           snackbar = snackbar,
