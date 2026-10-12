@@ -16,6 +16,7 @@
 | `server/` | سرور: حساب، دکان چندکاربره، اشتراک، همگام‌سازی، پشتیبان |
 
 - سایت: https://vil3ntec-it.github.io/shop/
+- دانلودِ همهٔ نسخه‌ها (یک صفحه، تشخیصِ خودکارِ سیستم): https://vil3ntec-it.github.io/shop/download.html
 - راه‌اندازی سرور: [`server/README.md`](server/README.md)
 - ساخت برنامه‌ی اندروید: [`android/README.md`](android/README.md)
 - برنامه‌ی کامپیوتر: [`docs/DESKTOP-fa.md`](docs/DESKTOP-fa.md) — دانلود از انتشارِ [`tohid-desktop`](https://github.com/vil3ntec-it/shop/releases/tag/tohid-desktop)

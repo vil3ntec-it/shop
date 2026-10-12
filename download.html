@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>دانلودِ توحید</title>
+<meta name="description" content="دانلودِ برنامهٔ توحید برای ویندوز، مک، لینوکس و اندروید — یک صفحه، انتخاب با شما">
+<link rel="icon" href="icons/icon-192.png">
+<style>
+  @font-face{font-family:Vazirmatn; src:url(fonts/Vazirmatn-Regular.ttf) format('truetype'); font-weight:400; font-display:swap;}
+  @font-face{font-family:Vazirmatn; src:url(fonts/Vazirmatn-Bold.ttf) format('truetype'); font-weight:700; font-display:swap;}
+  :root{--bg:#f4f3fa; --card:#fff; --text:#161427; --muted:#5b5872; --line:#e3e1ee; --primary:#5b3df5; --primary-ink:#fff; --ok:#0f8a52;}
+  @media (prefers-color-scheme: dark){:root{--bg:#0d0c16; --card:#171526; --text:#eceaf7; --muted:#a9a6c0; --line:#2a2740; --primary:#8b74ff; --primary-ink:#0d0c16; --ok:#4fd393;}}
+  *{box-sizing:border-box}
+  body{margin:0; background:var(--bg); color:var(--text); font-family:Vazirmatn, Tahoma, sans-serif; line-height:1.7;}
+  main{max-width:880px; margin:0 auto; padding:32px 16px 48px;}
+  h1{font-size:26px; margin:0 0 4px;}
+  .lead{color:var(--muted); margin:0 0 24px;}
+  .hero{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:22px; margin-bottom:22px;}
+  .hero h2{font-size:17px; margin:0 0 6px;}
+  .btn{display:inline-flex; align-items:center; gap:8px; background:var(--primary); color:var(--primary-ink); text-decoration:none; font-weight:700; padding:12px 22px; border-radius:10px; margin-top:8px;}
+  .btn.alt{background:transparent; color:var(--primary); border:1.5px solid var(--primary);}
+  .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:12px;}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; display:flex; flex-direction:column; gap:4px;}
+  .card b{font-size:15px;}
+  .card span{color:var(--muted); font-size:13px;}
+  .card a{margin-top:auto; align-self:flex-start; color:var(--primary); font-weight:700; text-decoration:none; padding-top:8px;}
+  .card.mine{border-color:var(--primary); box-shadow:0 0 0 2px color-mix(in srgb, var(--primary) 25%, transparent);}
+  h3{font-size:16px; margin:26px 0 10px;}
+  .note{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 16px; font-size:14px; color:var(--muted);}
+  .note b{color:var(--text);}
+  ol{margin:6px 0; padding-inline-start:20px;}
+  .tag{display:inline-block; font-size:11px; padding:1px 8px; border-radius:99px; background:color-mix(in srgb, var(--ok) 15%, transparent); color:var(--ok); margin-inline-start:6px; vertical-align:middle;}
+</style>
+</head>
+<body>
+<main>
+  <h1>دانلودِ توحید</h1>
+  <p class="lead">یک صفحه برای همهٔ دستگاه‌ها. سیستمِ شما خودکار شناخته می‌شود؛ هر نسخهٔ دیگری را هم می‌توانید از پایین انتخاب کنید. همهٔ نسخه‌ها با یک حساب کار می‌کنند و دفتر میانشان همگام است.</p>
+
+  <section class="hero" id="hero">
+    <h2 id="hero-title">در حالِ شناختنِ سیستمِ شما…</h2>
+    <div id="hero-sub" class="lead" style="margin:0"></div>
+    <div id="hero-actions"></div>
+  </section>
+
+  <h3>همهٔ نسخه‌ها</h3>
+  <div class="grid" id="all"></div>
+
+  <h3>نصب</h3>
+  <div class="note">
+    <b>ویندوز:</b> فایلِ ‎.msi‎ را باز کنید. اگر پنجرهٔ آبیِ «Windows protected your PC» آمد، «More info» و بعد «Run anyway» را بزنید (نصاب هنوز امضای تجاری ندارد).<br>
+    <b>مک:</b> فایلِ ‎.dmg‎ را باز کنید و توحید را به پوشهٔ Applications بکشید. بارِ اول روی برنامه کلیکِ راست ⇐ Open.<br>
+    <b>لینوکس:</b> <code dir="ltr">sudo apt install ./Tohid-Linux.deb</code> (دبیان، اوبونتو، مینت).<br>
+    <b>اندروید:</b> فایلِ ‎.apk‎ را باز کنید و «نصب از منبعِ ناشناس» را برای همین بار اجازه دهید.
+  </div>
+
+  <h3>سیستمِ ۳۲ بیتی</h3>
+  <div class="note">
+    برنامهٔ کامپیوتر فقط <b>۶۴ بیتی</b> است — ویندوزِ ۱۰ و ۱۱ (۶۴ بیت)، مکِ اینتل و اپل، لینوکسِ ۶۴ بیت. موتورِ گرافیکِ برنامه (همان که آن را سریع و کامپیوتری کرده) نسخهٔ ۳۲ بیتی ندارد.
+    <ol>
+      <li>بیشترِ کامپیوترهای ده سالِ اخیر ۶۴ بیتی‌اند، حتی اگر ویندوزِ ۳۲ بیتی رویشان نصب باشد. ویندوز ⇐ تنظیمات ⇐ System ⇐ About ⇐ «System type» را ببینید؛ اگر نوشته «x64-based processor»، با نصبِ ویندوزِ ۶۴ بیتی همین برنامه کار می‌کند.</li>
+      <li>روی کامپیوترِ واقعاً ۳۲ بیتی، نسخهٔ وبِ توحید در مرورگر کار می‌کند — با همان حساب و همان دفتر: <a href="./">vil3ntec-it.github.io/shop</a></li>
+    </ol>
+  </div>
+</main>
+<script>
+(function(){
+  'use strict';
+  var BASE = 'https://github.com/vil3ntec-it/shop/releases/download/';
+  var ITEMS = [
+    {id:'all', os:'همهٔ کامپیوترها در یک نصاب', sub:'ویندوز، مک (اپل و اینتل) و لینوکس در یک بسته — بازش کنید و نصب‌کنندهٔ سیستمِ خودتان را بزنید', url: BASE + 'tohid-desktop/Tohid-Setup-All.zip'},
+    {id:'win',   os:'ویندوز ۱۰ و ۱۱', sub:'۶۴ بیت · فایلِ ‎.msi‎', url: BASE + 'tohid-desktop/Tohid-Windows.msi'},
+    {id:'mac-arm', os:'مک — تراشهٔ اپل (M1 تا M4)', sub:'مک‌های ۲۰۲۰ به بعد · فایلِ ‎.dmg‎', url: BASE + 'tohid-desktop/Tohid-Mac-AppleSilicon.dmg'},
+    {id:'mac-intel', os:'مک — اینتل', sub:'مک‌های پیش از ۲۰۲۱ · فایلِ ‎.dmg‎', url: BASE + 'tohid-desktop/Tohid-Mac-Intel.dmg'},
+    {id:'linux', os:'لینوکس', sub:'دبیان، اوبونتو، مینت (۶۴ بیت) · فایلِ ‎.deb‎', url: BASE + 'tohid-desktop/Tohid-Linux.deb'},
+    {id:'android', os:'اندروید', sub:'گوشی و تبلت · فایلِ ‎.apk‎', url: BASE + 'tohid-native/Tohid-Native.apk'},
+    {id:'iphone', os:'آیفون و آیپد', sub:'در Safari باز کنید ⇐ «Add to Home Screen»', url: './'},
+  ];
+  function guess(){
+    var ua = navigator.userAgent || '', plat = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '';
+    if (/iPhone|iPad|iPod/.test(ua) || (plat === 'MacIntel' && navigator.maxTouchPoints > 1)) return Promise.resolve(['iphone']);
+    if (/Android/.test(ua)) return Promise.resolve(['android']);
+    if (/Win/.test(plat) || /Windows/.test(ua)) return Promise.resolve(['win']);
+    if (/Linux/.test(plat) || /Linux/.test(ua)) return Promise.resolve(['linux']);
+    if (/Mac/.test(plat) || /Mac OS X/.test(ua)) {
+      //  کروم و اج معماری را می‌گویند؛ سافاری نمی‌گوید ⇒ هر دو را پیشنهاد کن
+      var d = navigator.userAgentData;
+      if (d && d.getHighEntropyValues) {
+        return d.getHighEntropyValues(['architecture']).then(function(v){
+          return v.architecture === 'arm' ? ['mac-arm'] : v.architecture === 'x86' ? ['mac-intel'] : ['mac-arm', 'mac-intel'];
+        }).catch(function(){ return ['mac-arm', 'mac-intel']; });
+      }
+      return Promise.resolve(['mac-arm', 'mac-intel']);
+    }
+    return Promise.resolve([]);
+  }
+  function card(it, mine){
+    return '<div class="card' + (mine ? ' mine' : '') + '"><b>' + it.os + (mine ? '<span class="tag">سیستمِ شما</span>' : '') +
+      '</b><span>' + it.sub + '</span><a href="' + it.url + '">' + (it.id === 'iphone' ? 'باز کردن' : 'دانلود') + '</a></div>';
+  }
+  guess().then(function(ids){
+    var byId = {}; ITEMS.forEach(function(i){ byId[i.id] = i; });
+    var mine = ids.map(function(i){ return byId[i]; }).filter(Boolean);
+    document.getElementById('all').innerHTML = ITEMS.map(function(i){ return card(i, ids.indexOf(i.id) >= 0); }).join('');
+    var t = document.getElementById('hero-title'), s = document.getElementById('hero-sub'), a = document.getElementById('hero-actions');
+    if (!mine.length) { t.textContent = 'نسخهٔ مناسب را از فهرستِ پایین انتخاب کنید'; return; }
+    t.textContent = mine.length === 1 ? 'پیشنهاد برای سیستمِ شما: ' + mine[0].os : 'مکِ شما — کدام تراشه؟';
+    s.textContent = mine.length === 1 ? mine[0].sub
+      : 'منوی سیب ⇐ About This Mac: اگر «Chip: Apple M…» نوشته، اولی؛ اگر «Processor: Intel»، دومی.';
+    a.innerHTML = mine.map(function(m, k){
+      return '<a class="btn' + (k ? ' alt' : '') + '" href="' + m.url + '">' + (m.id === 'iphone' ? 'باز کردنِ توحید' : 'دانلود — ' + m.os) + '</a> ';
+    }).join('');
+  });
+})();
+</script>
+</body>
+</html>
