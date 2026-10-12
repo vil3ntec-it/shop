@@ -361,6 +361,8 @@ fun AppRoot(
    *  از نوار پایین بیرون می‌رود، باید چند جای دیگر هم عوض شود و یکی‌شان
    *  فراموش می‌شود.
    */
+  val wide = ir.vil3ntec.tohid.ui.screens.screenSize() == ir.vil3ntec.tohid.ui.screens.Screen.WIDE
+
   fun open(target: String) {
     if (TABS.any { it.id == target }) { tab = target; sub = null } else sub = target
   }
@@ -444,8 +446,10 @@ fun AppRoot(
         )
       }
     },
+    //  کامپیوتر (صفحهٔ پهن): منوی کناری به‌جای نوارِ پایینِ گوشی — بندِ ۹ِ ممیزی:
+    //  «نسخهٔ دسکتاپ نباید نسخهٔ موبایلِ بزرگ‌شده باشد»
     bottomBar = {
-      TohidNavBar(
+      if (!wide) TohidNavBar(
         tabs = TABS,
         current = if (sub == null) tab else null,
         onPick = { tab = it; sub = null },
@@ -490,7 +494,8 @@ fun AppRoot(
         return@Box
       }
 
-      PageWidth {
+      if (wide) DeskRail(current = sub ?: tab, onPick = ::open)
+      PageWidth(Modifier.padding(start = if (wide) DESK_RAIL_WIDTH else 0.dp)) {
       AnimatedContent(
         targetState = sub ?: tab,
         transitionSpec = {

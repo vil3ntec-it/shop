@@ -49,7 +49,8 @@ fun isTablet(): Boolean = screenSize() != Screen.PHONE
 fun contentMaxWidth(): Dp = when (screenSize()) {
   Screen.PHONE -> Dp.Unspecified
   Screen.TABLET -> 680.dp
-  Screen.WIDE -> 840.dp
+  //  کامپیوتر: پهنای مفیدِ مانیتور (با منوی کناری)، نه ستونِ باریکِ گوشی
+  Screen.WIDE -> 1200.dp
 }
 
 /**

@@ -57,7 +57,9 @@ const auditLog = [];
 let inv = 1;
 const sellers = ['علی', 'رضا'];
 for (let k = 0; k < 28; k++) {
-  const t = now - (27 - k) * day + 3600_000 * (9 + (k % 8));
+  //  ساعتِ ۹ تا ۱۶ِ همان روز — نه «اکنون + چند ساعت» که فاکتورِ امروز را به فردا می‌برد
+  const dayStart = new Date(now - (27 - k) * day); dayStart.setHours(0, 0, 0, 0);
+  const t = Math.min(now - 60_000, dayStart.getTime() + 3600_000 * (9 + (k % 8)));
   const lines = [products[k % 11], products[(k * 3 + 1) % 11]];
   const qty = [1 + (k % 3), 2];
   let total = 0;
