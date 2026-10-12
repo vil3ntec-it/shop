@@ -633,7 +633,9 @@ fun AppRoot(
             open("warehouse")
           }
         }
-        "debtors" -> VipGate("قرض‌داران") { DebtorsScreen(store, data, snackbar) }
+        "debtors" -> VipGate("قرض‌داران") {
+          if (Platform.DESKTOP) DeskCustomersScreen(store, data, snackbar) else DebtorsScreen(store, data, snackbar)
+        }
         "products" -> if (Platform.DESKTOP) DeskProductsScreen(
           store = store,
           d = data,

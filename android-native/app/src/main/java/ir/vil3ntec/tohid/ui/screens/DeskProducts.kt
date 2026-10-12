@@ -109,6 +109,17 @@ fun DeskProductsScreen(
       )
       Spacer(Modifier.width(10.dp))
       OutlinedButton(onClick = { onOpenWarehouse(null) }) { Text("ورودِ انبار") }
+      Spacer(Modifier.width(6.dp))
+      val context = LocalContext.current
+      OutlinedButton(onClick = {
+        val sheet = ir.vil3ntec.tohid.data.ReportCsv.of("products", d, "", "", ir.vil3ntec.tohid.todayIso())
+        ir.vil3ntec.tohid.ui.Platform.saveFile("${sheet.name}.xlsx", ir.vil3ntec.tohid.data.Xlsx.of(sheet))?.let { toast("ذخیره شد: $it") }
+      }) { Text("اکسل") }
+      Spacer(Modifier.width(6.dp))
+      OutlinedButton(onClick = {
+        val sheet = ir.vil3ntec.tohid.data.ReportCsv.of("products", d, "", "", ir.vil3ntec.tohid.todayIso())
+        ir.vil3ntec.tohid.print.ReportPrint.print(context, sheet, sheet.name)
+      }) { Text("چاپ") }
     }
     Spacer(Modifier.height(10.dp))
 

@@ -30,4 +30,29 @@ object Platform {
     java.awt.Desktop.getDesktop().open(f)
     true
   }.getOrDefault(false)
+
+  /**
+   *  «ذخیره به‌عنوان» با پنجرهٔ خودِ سیستم، پیش‌فرض در «اسناد»؛ بعد از ذخیره
+   *  فایل با برنامهٔ پیش‌فرضش (مثلاً اکسل) باز می‌شود.
+   */
+  fun saveFile(suggestedName: String, bytes: ByteArray): String? {
+    var picked: java.io.File? = null
+    val run = Runnable {
+      val home = System.getProperty("user.home") ?: "."
+      val docs = java.io.File(home, "Documents").takeIf { it.isDirectory } ?: java.io.File(home)
+      val ch = javax.swing.JFileChooser(docs).apply {
+        dialogTitle = "ذخیره"
+        selectedFile = java.io.File(docs, suggestedName.replace(Regex("[\\\\/:*?\"<>|]"), " "))
+        applyComponentOrientation(java.awt.ComponentOrientation.RIGHT_TO_LEFT)
+      }
+      if (ch.showSaveDialog(null) == javax.swing.JFileChooser.APPROVE_OPTION) picked = ch.selectedFile
+    }
+    if (java.awt.EventQueue.isDispatchThread()) run.run() else java.awt.EventQueue.invokeAndWait(run)
+    val f = picked ?: return null
+    return runCatching {
+      f.writeBytes(bytes)
+      runCatching { java.awt.Desktop.getDesktop().open(f) }
+      f.absolutePath
+    }.getOrNull()
+  }
 }
