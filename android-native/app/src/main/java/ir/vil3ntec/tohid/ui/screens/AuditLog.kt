@@ -124,6 +124,7 @@ private fun auditLabel(type: String): String = when (type) {
   "stock_adjustment" -> "اصلاح موجودی"
   "supplier_return" -> "برگشت به تأمین‌کننده"
   "price_change" -> "تغییر قیمت"
+  "product_edit" -> "ویرایش کالا"
   "delete_product" -> "حذف محصول"
   "debtor_delete" -> "حذف قرض‌دار"
   "debt_tx_delete" -> "حذف تراکنش بدهی"

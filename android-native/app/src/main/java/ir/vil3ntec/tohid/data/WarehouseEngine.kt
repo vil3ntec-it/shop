@@ -139,6 +139,22 @@ object WarehouseEngine {
   private fun nameKey(name: String): String =
     name.trim().replace(Regex("\\s+"), " ").replace('ي', 'ی').replace('ك', 'ک').lowercase()
 
+  /** فهرستِ خوانای تغییرها — قیمتِ خرید جدا در `price_change` ثبت می‌شود */
+  internal fun productChanges(a: Product, b: Product): List<String> = buildList {
+    if (a.name != b.name) add("نام «${a.name}» ⇐ «${b.name}»")
+    if (a.salePrice != b.salePrice) add("قیمت فروش ${money(a.salePrice)} ⇐ ${money(b.salePrice)}")
+    if (a.category != b.category) add("دسته «${a.category}» ⇐ «${b.category}»")
+    if (a.unit != b.unit) add("واحد «${a.unit}» ⇐ «${b.unit}»")
+    if (a.minStock != b.minStock) add("حداقل موجودی ${money(a.minStock)} ⇐ ${money(b.minStock)}")
+    if (a.active != b.active) add(if (b.active) "فعال شد" else "غیرفعال شد")
+    if (a.barcodes != b.barcodes) add("بارکد عوض شد")
+  }
+
+  /** تاریخچهٔ یک کالا: ویرایش‌ها و تغییرِ قیمتِ خرید، تازه‌ترین اول */
+  fun productHistory(d: ShopData, productId: String): List<AuditEntry> =
+    d.auditLog.filter { it.refId == productId && (it.type == "product_edit" || it.type == "price_change") }
+      .sortedByDescending { it.createdAt }
+
   /** کالای دیگری با همین نام هست؟ (`exceptId` خودِ کالای در حالِ ویرایش) */
   fun duplicateName(d: ShopData, name: String, exceptId: String? = null): Product? {
     val key = nameKey(name)
@@ -258,6 +274,18 @@ object WarehouseEngine {
         date = today,
         refId = id,
         notes = "تغییر قیمت خرید از ${money(existing.purchasePrice)} به ${money(draft.purchasePrice)} افغانی",
+        createdAt = now,
+      )
+    }
+    //  بقیهٔ تغییرهای کالا هم ردپا دارند — «چه کسی نام یا قیمتِ فروش را عوض کرد؟»
+    val changes = productChanges(existing, updated)
+    if (changes.isNotEmpty()) {
+      audit = audit + AuditEntry(
+        id = newId(),
+        type = "product_edit",
+        date = today,
+        refId = id,
+        notes = "ویرایش «${existing.name}»: ${changes.joinToString("، ")}",
         createdAt = now,
       )
     }

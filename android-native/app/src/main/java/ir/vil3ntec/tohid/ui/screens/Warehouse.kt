@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -72,6 +73,8 @@ fun WarehouseScreen(
   var confirmDelete by remember { mutableStateOf<Product?>(null) }
   var movementsFor by remember { mutableStateOf<Product?>(null) }
   var stockCount by remember { mutableStateOf(false) }
+  //  ورودِ گروهی از CSV — پیش‌نمایش پیش از ثبت
+  var importPlan by remember { mutableStateOf<ir.vil3ntec.tohid.data.ProductImport.Plan?>(null) }
   //  فیلترِ انقضا: null همه، "expired" منقضی، "near" نزدیک به انقضا
   var expiryFilter by rememberSaveable { mutableStateOf<String?>(null) }
 
@@ -124,6 +127,23 @@ fun WarehouseScreen(
     }
   }
 
+  val openCsv = androidx.activity.compose.rememberLauncherForActivityResult(
+    androidx.activity.result.contract.ActivityResultContracts.GetContent()
+  ) { uri ->
+    if (uri == null) return@rememberLauncherForActivityResult
+    scope.launch {
+      val text = runCatching {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+          context.contentResolver.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) }
+        }
+      }.getOrNull()
+      if (text == null) { toast("فایل خوانده نشد"); return@launch }
+      val plan = ir.vil3ntec.tohid.data.ProductImport.plan(d, text)
+      if (plan.missingName) toast("ستونِ «نام محصول» در سطرِ اولِ فایل پیدا نشد")
+      else importPlan = plan
+    }
+  }
+
   val term = search.trim()
   //  محموله‌های منقضی و نزدیک به انقضا — یک بار برای هر تغییرِ دفتر
   val expiryIds = remember(d) {
@@ -163,6 +183,15 @@ fun WarehouseScreen(
           Icon(Icons.Filled.Inventory2, contentDescription = null, modifier = Modifier.size(18.dp))
           Spacer(Modifier.width(6.dp))
           Text("انبارگردانی")
+        }
+        Spacer(Modifier.height(8.dp))
+        OutlinedButton(
+          onClick = { openCsv.launch("*/*") },
+          modifier = Modifier.fillMaxWidth(),
+        ) {
+          Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+          Spacer(Modifier.width(6.dp))
+          Text("ورود کالا از فایل اکسل (CSV)")
         }
         Spacer(Modifier.height(14.dp))
       }
@@ -312,6 +341,43 @@ fun WarehouseScreen(
           "${plain(drafts.size)} کالا ثبت شد",
         ) { bulkProduct = false }
       },
+    )
+  }
+
+  importPlan?.let { plan ->
+    AlertDialog(
+      onDismissRequest = { importPlan = null },
+      containerColor = Shop.colors.surfaceSolid,
+      title = { Text("ورود کالا از فایل", color = Shop.colors.text) },
+      text = {
+        Column(Modifier.heightIn(max = 380.dp).verticalScroll(rememberScrollState())) {
+          Text(
+            "${plain(plan.drafts.size)} کالا آمادهٔ ثبت" +
+              if (plan.skipped.isEmpty()) "" else " · ${plain(plan.skipped.size)} ردیف ثبت نمی‌شود:",
+            style = MaterialTheme.typography.bodyMedium,
+            color = Shop.colors.text,
+          )
+          plan.skipped.take(50).forEach { sk ->
+            Text(
+              "ردیف ${plain(sk.row)}${if (sk.name.isNotBlank()) " «${sk.name}»" else ""}: ${sk.reason}",
+              style = MaterialTheme.typography.labelSmall,
+              color = Shop.colors.danger,
+            )
+          }
+          if (plan.skipped.size > 50) {
+            Text("و ${plain(plan.skipped.size - 50)} ردیفِ دیگر", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+          }
+        }
+      },
+      confirmButton = {
+        TextButton(enabled = plan.drafts.isNotEmpty(), onClick = {
+          apply(
+            WarehouseEngine.addProducts(d, plan.drafts, System.currentTimeMillis(), ::newId),
+            "${plain(plan.drafts.size)} کالا از فایل ثبت شد",
+          ) { importPlan = null }
+        }) { Text("ثبت ${plain(plan.drafts.size)} کالا") }
+      },
+      dismissButton = { TextButton(onClick = { importPlan = null }) { Text("انصراف") } },
     )
   }
 

@@ -4201,6 +4201,8 @@
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               محصول جدید
             </button>
+            <button class="btn btn-secondary btn-sm" id="btn-import-products-top" title="سرستون‌ها: نام محصول، دسته، واحد، قیمت خرید، قیمت فروش، حداقل موجودی، بارکد">ورود از اکسل (CSV)</button>
+            <input type="file" id="in-import-products" accept=".csv,text/csv,text/plain" hidden>
             <button class="btn btn-primary btn-sm" id="btn-bulk-stock-top">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 7.8L12 3.5l8.5 4.3v8.4L12 20.5 3.5 16.2V7.8z"/><path d="M3.5 7.8L12 12l8.5-4.2"/><path d="M12 12v8.5"/></svg>
               ورود کالا به انبار
@@ -4874,6 +4876,10 @@
           <div class="panel">
             <div class="panel-head"><h2>حرکت‌های اخیر</h2></div>
             <div id="pd-moves"></div>
+            <div id="pd-history-wrap" hidden>
+              <div class="panel-head" style="margin-top:14px;"><h2>تاریخچهٔ تغییرات</h2></div>
+              <div id="pd-history"></div>
+            </div>
           </div>
         </div>
       </section>
@@ -6013,6 +6019,13 @@
   let currentAccountDebtorId = null;
   let currentTxType = null;
   let confirmAction = null;
+  /* دکمهٔ تأییدِ پنجرهٔ «مطمئنید؟» — پیش‌فرض «حذف کن»؛ کارهای دیگر برچسبِ خودشان را می‌دهند */
+  function setConfirmOk(label, danger){
+    const b = document.getElementById('btn-confirm-ok'); if(!b) return;
+    b.textContent = label;
+    b.classList.toggle('btn-danger', !!danger);
+    b.classList.toggle('btn-primary', !danger);
+  }
 
   const giveIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg>';
   const receiveIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14"/><path d="M19 12l-7 7-7-7"/></svg>';
@@ -7062,6 +7075,7 @@
         location.reload();
       };
       openModal('modal-confirm');
+      setConfirmOk('خروج', true);
     });
   }
 
@@ -7167,7 +7181,7 @@
   function openModal(id){ document.getElementById(id).classList.add('open'); }
   function closeModal(id){
     document.getElementById(id).classList.remove('open');
-    if(id==='modal-confirm'){ const fg = document.getElementById('fg-confirm-reason'); if(fg){ fg.hidden = true; fg.classList.remove('error'); } }
+    if(id==='modal-confirm'){ const fg = document.getElementById('fg-confirm-reason'); if(fg){ fg.hidden = true; fg.classList.remove('error'); } setConfirmOk('حذف کن', true); }
     if(id==='modal-prod-actions') clearHeldProduct();
     if(id==='modal-scan') stopQuickScan();
     if(id==='modal-product' && document.getElementById('page-sale').classList.contains('active')) startSaleScanner();
@@ -9745,6 +9759,7 @@
           if(!(factor > 0) || !isFinite(factor)){ setFieldError('fg-bp-factor'); return; }
         }
         clearFieldError('fg-bp-factor');
+        const before = { ...p, barcodes: (p.barcodes||[]).slice() };
         p.subcategory = document.getElementById('in-bp-subcategory').value.trim();
         p.supplierId = document.getElementById('in-bp-supplier').value || '';
         p.saleUnit = saleUnit;
@@ -9759,6 +9774,8 @@
         p.salePrice = parseFloat(r.sale);
         p.minStock = parseFloat(r.minStock) || 0;
         p.barcodes = barcode ? [barcode] : [];
+        const changes = productChanges(before, p);
+        if(changes.length) logAudit('product_edit', p.id, `ویرایش «${before.name}»: ${changes.join('، ')}`);
         if(r.photo){
           p.photo = true;
           photoPut(p.id, r.photo).then(()=>{ photoForget(p.id); renderProducts(); })
@@ -9818,6 +9835,104 @@
       bpSaving = false;
       btn.classList.remove('is-busy'); btn.disabled = false;
     }
+  });
+
+  /*
+   * ورودِ گروهیِ کالا از CSV — عددبه‌عدد همان `ProductImport`ِ اندروید:
+   * سرستونِ خروجیِ «گزارشِ محصولات» + «بارکد»؛ هیچ ردیفی بی‌صدا گم نمی‌شود.
+   */
+  const IMPORT_ALIASES = {
+    'نام محصول':'name','نام کالا':'name','نام':'name','کالا':'name','name':'name','product':'name',
+    'دسته':'category','دسته‌بندی':'category','دسته بندی':'category','category':'category',
+    'واحد':'unit','unit':'unit',
+    'قیمت خرید':'purchase','purchase price':'purchase','purchaseprice':'purchase','cost':'purchase',
+    'قیمت فروش':'sale','sale price':'sale','saleprice':'sale','price':'sale',
+    'حداقل موجودی':'min','min stock':'min','minstock':'min',
+    'بارکد':'barcode','barcode':'barcode',
+  };
+  function parseCsvText(text){
+    const src = String(text).replace(/^\uFEFF/, '');
+    const first = src.split('\n')[0] || '';
+    const sep = (first.match(/;/g)||[]).length > (first.match(/,/g)||[]).length ? ';' : ',';
+    const rows = []; let row = []; let cell = ''; let quoted = false;
+    for(let i = 0; i < src.length; i++){
+      const c = src[i];
+      if(quoted){
+        if(c === '"'){ if(src[i+1] === '"'){ cell += '"'; i++; } else quoted = false; }
+        else cell += c;
+      } else if(c === '"') quoted = true;
+      else if(c === sep){ row.push(cell); cell = ''; }
+      else if(c === '\r'){}
+      else if(c === '\n'){ row.push(cell); cell = ''; rows.push(row); row = []; }
+      else cell += c;
+    }
+    if(cell || row.length){ row.push(cell); rows.push(row); }
+    return rows;
+  }
+  function importNumber(t){
+    const v = String(t||'').trim().replace(/[۰-۹]/g, d=> '۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/[٬, ]/g,'').replace('٫','.');
+    if(!v) return 0;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : NaN;
+  }
+  function planProductImport(text){
+    const rows = parseCsvText(text);
+    if(!rows.some(r=> r.some(c=> c.trim()))) return { missingName:true };
+    const col = {};
+    rows[0].forEach((h,i)=>{ const k = IMPORT_ALIASES[h.trim().toLowerCase()]; if(k && col[k] === undefined) col[k] = i; });
+    if(col.name === undefined) return { missingName:true };
+    const at = (r,k)=> col[k] === undefined ? '' : String(r[col[k]] || '').trim();
+    const drafts = [], skipped = [], seenNames = new Set(), seenCodes = new Set();
+    const key = n=> n.replace(/\s+/g,' ').replace(/ي/g,'ی').replace(/ك/g,'ک').toLowerCase();
+    rows.slice(1).forEach((r,i)=>{
+      const n = i + 2;
+      if(r.every(c=> !c.trim())) return;
+      const name = at(r,'name');
+      const purchase = importNumber(at(r,'purchase')), sale = importNumber(at(r,'sale')), min = importNumber(at(r,'min'));
+      const barcode = at(r,'barcode');
+      let reason = null;
+      if(!name) reason = 'نام ندارد';
+      else if(seenNames.has(key(name))) reason = 'نامِ تکراری در همین فایل';
+      else if(duplicateProductName(name)) reason = 'این کالا از قبل در دکان هست';
+      else if(!(purchase >= 0)) reason = 'قیمتِ خرید درست نیست';
+      else if(!(sale >= 0)) reason = 'قیمتِ فروش درست نیست';
+      else if(!(min >= 0)) reason = 'حداقلِ موجودی درست نیست';
+      else if(barcode && (barcodeIndex.has(barcode) || seenCodes.has(barcode))) reason = 'بارکدِ تکراری';
+      if(name) seenNames.add(key(name));
+      if(barcode) seenCodes.add(barcode);
+      if(reason) skipped.push({ row:n, name, reason });
+      else drafts.push({ name, category: at(r,'category'), unit: at(r,'unit') || 'عدد', purchase, sale, min, barcode });
+    });
+    return { drafts, skipped, missingName:false };
+  }
+  document.getElementById('btn-import-products-top').addEventListener('click', ()=>{
+    const inp = document.getElementById('in-import-products'); inp.value = ''; inp.click();
+  });
+  document.getElementById('in-import-products').addEventListener('change', async (e)=>{
+    const file = e.target.files && e.target.files[0]; if(!file) return;
+    let text = '';
+    try{ text = await file.text(); }catch(err){ showToast('فایل خوانده نشد', 'danger'); return; }
+    const plan = planProductImport(text);
+    if(plan.missingName){ showToast('ستونِ «نام محصول» در سطرِ اولِ فایل پیدا نشد', 'danger'); return; }
+    document.getElementById('confirm-title').textContent = `ثبتِ ${formatMoney(plan.drafts.length)} کالا از فایل؟`;
+    document.getElementById('confirm-sub').textContent = plan.skipped.length
+      ? `${formatMoney(plan.skipped.length)} ردیف ثبت نمی‌شود: ` + plan.skipped.slice(0, 12).map(x=> `ردیف ${x.row}${x.name ? ' «'+x.name+'»' : ''}: ${x.reason}`).join(' · ') + (plan.skipped.length > 12 ? ' …' : '')
+      : 'همهٔ ردیف‌ها درست‌اند.';
+    confirmAction = ()=>{
+      if(!plan.drafts.length) return;
+      plan.drafts.forEach(r=>{
+        products.push({ id: uid(), name: r.name, category: r.category, unit: r.unit,
+          purchasePrice: r.purchase, salePrice: r.sale, wholesalePrice: 0, minStock: r.min, notes: '',
+          barcodes: r.barcode ? [r.barcode] : [], createdAt: Date.now() });
+      });
+      rebuildBarcodeIndex();
+      saveState();
+      renderProducts(); renderWarehouseList(); renderWarehouseDashboard();
+      if(document.getElementById('quick-select-grid')) renderQuickSelect();
+      showToast(`${formatMoney(plan.drafts.length)} کالا از فایل ثبت شد`);
+    };
+    openModal('modal-confirm');
+    setConfirmOk(plan.drafts.length ? 'ثبت کن' : 'باشه', false);
   });
 
   let bulkRows = [];          // {key, productId, qty, unit, price, newName, newCategory, newBarcode}
@@ -10150,7 +10265,7 @@
     sale:'ثبت فروش', cancel_sale:'لغو فروش', return:'مرجوعی',
     purchase:'ثبت خرید', customer_payment:'پرداخت مشتری', supplier_payment:'پرداخت تأمین‌کننده',
     stock_adjustment:'اصلاح موجودی', supplier_return:'برگشت به تأمین‌کننده',
-    price_change:'تغییر قیمت', delete_product:'حذف محصول',
+    price_change:'تغییر قیمت', product_edit:'ویرایش کالا', delete_product:'حذف محصول',
     debtor_delete:'حذف قرض‌دار', debt_tx_delete:'حذف تراکنش بدهی', expense_delete:'حذف مصرف'
   };
   const STOCK_MOVEMENT_LABELS = {
@@ -13618,6 +13733,28 @@
           </div>`;
         }).join('')
       : '<p class="pd-empty">هنوز حرکتی ثبت نشده. ورود کالا، فروش و مرجوعیِ این کالا اینجا فهرست می‌شود.</p>';
+
+    /* ---- تاریخچهٔ تغییرات — همان `productHistory`ِ اندروید ---- */
+    const hist = auditLog
+      .filter(a=> a.refId === p.id && (a.type === 'product_edit' || a.type === 'price_change'))
+      .sort((a,b)=> (b.createdAt||0) - (a.createdAt||0))
+      .slice(0, 30);
+    pdEl('pd-history-wrap').hidden = !hist.length;
+    pdEl('pd-history').innerHTML = hist.map(a=>
+      `<div class="pd-move"><span class="pd-move-txt"><i>${escapeHtml(formatDate(a.date))} — ${escapeHtml(a.notes)}</i></span></div>`).join('');
+  }
+
+  /* فهرستِ خوانای تغییرهای کالا — قیمتِ خرید جدا در price_change. همان `productChanges`ِ اندروید */
+  function productChanges(a, b){
+    const out = [];
+    if(a.name !== b.name) out.push(`نام «${a.name}» ⇐ «${b.name}»`);
+    if((a.salePrice||0) !== (b.salePrice||0)) out.push(`قیمت فروش ${formatMoney(a.salePrice||0)} ⇐ ${formatMoney(b.salePrice||0)}`);
+    if((a.category||'') !== (b.category||'')) out.push(`دسته «${a.category||''}» ⇐ «${b.category||''}»`);
+    if((a.unit||'') !== (b.unit||'')) out.push(`واحد «${a.unit||''}» ⇐ «${b.unit||''}»`);
+    if((a.minStock||0) !== (b.minStock||0)) out.push(`حداقل موجودی ${formatMoney(a.minStock||0)} ⇐ ${formatMoney(b.minStock||0)}`);
+    if((a.active !== false) !== (b.active !== false)) out.push(b.active !== false ? 'فعال شد' : 'غیرفعال شد');
+    if(JSON.stringify(a.barcodes||[]) !== JSON.stringify(b.barcodes||[])) out.push('بارکد عوض شد');
+    return out;
   }
 
   function wireProductDetail(){

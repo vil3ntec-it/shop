@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.data.PhotoStore
 import ir.vil3ntec.tohid.data.ReportEngine
 import ir.vil3ntec.tohid.data.ShopData
+import ir.vil3ntec.tohid.data.WarehouseEngine
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.formatDate
 import ir.vil3ntec.tohid.money
@@ -276,6 +277,23 @@ fun ProductDetailScreen(
           amount = kotlin.math.abs(m.qty),
           tint = if (m.qty > 0) Shop.colors.success else Shop.colors.danger,
           currency = "",
+        )
+      }
+    }
+
+    //  تاریخچهٔ تغییرِ کالا — نام، قیمت‌ها، دسته، واحد، فعال/غیرفعال
+    val history = WarehouseEngine.productHistory(d, product.id)
+    if (history.isNotEmpty()) {
+      item {
+        Spacer(Modifier.height(Space.lg))
+        TohidSectionHeader("تاریخچهٔ تغییرات")
+      }
+      items(history.take(30), key = { it.id }) { a ->
+        Text(
+          "${formatDate(a.date)} — ${a.notes}",
+          style = MaterialTheme.typography.bodySmall,
+          color = Shop.colors.text,
+          modifier = Modifier.padding(vertical = Space.xxs),
         )
       }
     }
