@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.admin
 
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -20,6 +21,8 @@ import ir.vil3ntec.tohid.admin.ui.AdminTheme
 class MainActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
+    //  توکن، شماره‌ها و اشتراکِ همه در این صفحه‌هاست: نه عکسِ صفحه، نه پیش‌نمایشِ «برنامه‌های اخیر»
+    window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
     enableEdgeToEdge()
     setContent { AdminTheme { AdminRoot() } }
   }

@@ -79,6 +79,9 @@ fun CheckoutDialog(
     payment = payment,
     paidAmount = paidText.toDoubleOrNull() ?: 0.0,
     debtorId = debtorId,
+    blockExpired = remember { ir.vil3ntec.tohid.data.ShopPolicy.blockExpired(context) },
+    //  نامِ حسابِ واردشده — گزارشِ «فروشِ هر کاربر» از همین می‌خواند
+    seller = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrDefault("") },
   )
   val totals = SalesEngine.totals(d, cart, checkout)
 
@@ -703,12 +706,19 @@ fun CartLineDialog(
   custom: Boolean,
   onDismiss: () -> Unit,
   onConfirm: (quantity: Double, price: Double?) -> Unit,
+  /** واحدِ فروشِ دومِ کالا و ضریبش — شرح سرِ `Product.saleUnit` */
+  saleUnit: String = "",
+  unitFactor: Double = 1.0,
 ) {
   var qtyText by remember { mutableStateOf(qty(quantity)) }
   var priceText by remember { mutableStateOf(qty(unitPrice)) }
   var manual by remember { mutableStateOf(custom) }
+  //  مقدار به کدام واحد تایپ می‌شود؛ موجودی و قیمت همیشه به `unit` می‌مانند
+  var inSaleUnit by remember { mutableStateOf(false) }
+  val hasSaleUnit = saleUnit.isNotBlank() && unitFactor > 0
 
-  val parsedQty = qtyText.toDoubleOrNull()
+  val typedQty = qtyText.toDoubleOrNull()
+  val parsedQty = typedQty?.let { if (inSaleUnit) Math.round(it * unitFactor * 1000.0) / 1000.0 else it }
   val parsedPrice = priceText.toDoubleOrNull()
   val ok = parsedQty != null && parsedQty > 0 && (!manual || (parsedPrice != null && parsedPrice >= 0))
 
@@ -722,12 +732,37 @@ fun CartLineDialog(
         Text(name, style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
         Spacer(Modifier.height(12.dp))
 
+        if (hasSaleUnit) {
+          SegmentedChoice(
+            options = listOf("stock" to unit.ifBlank { "واحد" }, "sale" to saleUnit),
+            selected = if (inSaleUnit) "sale" else "stock",
+            onSelect = { choice ->
+              val wantSale = choice == "sale"
+              if (wantSale != inSaleUnit) {
+                //  همان مقدار، به واحدِ تازه — نه پاک شدنِ کادر
+                typedQty?.let { v ->
+                  qtyText = qty(if (wantSale) v / unitFactor else v * unitFactor)
+                }
+                inSaleUnit = wantSale
+              }
+            },
+          )
+          Spacer(Modifier.height(8.dp))
+        }
         NumberField(
           value = qtyText,
           onValueChange = { qtyText = it },
-          label = if (unit.isNotBlank()) "تعداد ($unit)" else "تعداد",
+          label = (if (inSaleUnit) saleUnit else unit).let { u -> if (u.isNotBlank()) "تعداد ($u)" else "تعداد" },
           modifier = Modifier.fillMaxWidth(),
         )
+        if (inSaleUnit && parsedQty != null) {
+          Spacer(Modifier.height(4.dp))
+          Text(
+            "= ${qty(parsedQty)} $unit",
+            style = MaterialTheme.typography.labelSmall,
+            color = Shop.colors.muted,
+          )
+        }
         Spacer(Modifier.height(12.dp))
 
         Row(verticalAlignment = Alignment.CenterVertically) {

@@ -70,7 +70,7 @@ object UpdateManager {
     busy = true
     message = "در حال بررسی…"
     job = scope.launch {
-      Updater.check(repo, currentVersion)
+      Updater.check(repo, currentVersion, ir.vil3ntec.tohid.core.config.AppConfig.baseUrl(app))
         .onSuccess { found ->
           release = found
           checked = true

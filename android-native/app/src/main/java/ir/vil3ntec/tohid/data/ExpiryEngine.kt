@@ -68,9 +68,10 @@ object ExpiryEngine {
     val byProduct = d.warehouseEntries
       .filter { !it.isAdjustment && it.units > 0 }
       .groupBy { it.productId }
+    val products = d.products.associateBy { it.id }
     for ((productId, entries) in byProduct) {
       if (entries.none { it.expiryDate.isNotBlank() }) continue
-      val product = d.products.find { it.id == productId } ?: continue
+      val product = products[productId] ?: continue
       var left = ShopStore.stock(d, productId)
       if (left <= 0) continue
       //  از دیرترین به زودترین؛ بی‌انقضا دیرتر از همه
@@ -88,6 +89,10 @@ object ExpiryEngine {
     }
     return out.sortedBy { it.daysLeft }
   }
+
+  /** ماندهٔ منقضی‌شدهٔ یک کالا (به FEFO) — برای سیاستِ «کالای منقضی فروخته نشود» */
+  fun expiredRemaining(d: ShopData, productId: String, today: String): Double =
+    lots(d, today).filter { it.product.id == productId && it.expired }.sumOf { it.remaining }
 
   /** منقضی‌شده یا تا `days` روزِ دیگر — همان چیزی که هشدار و گزارش نشان می‌دهند */
   fun alerts(d: ShopData, today: String, days: Int = NEAR_DAYS): List<Lot> =

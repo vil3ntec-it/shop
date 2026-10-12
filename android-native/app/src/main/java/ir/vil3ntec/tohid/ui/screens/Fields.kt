@@ -146,6 +146,8 @@ fun ChipPicker(
   selected: String,
   onSelect: (String) -> Unit,
   placeholder: String,
+  /** «+ تازه» — برای فهرستی که از جای دیگر پر می‌شود (تأمین‌کننده) خاموش */
+  allowNew: Boolean = true,
 ) {
   var adding by remember { mutableStateOf(false) }
   var fresh by remember { mutableStateOf("") }
@@ -167,7 +169,7 @@ fun ChipPicker(
         label = { Text(option) },
       )
     }
-    AssistChip(onClick = { adding = !adding }, label = { Text("+ تازه") })
+    if (allowNew) AssistChip(onClick = { adding = !adding }, label = { Text("+ تازه") })
   }
 
   if (adding) {

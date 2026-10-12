@@ -53,7 +53,7 @@ router.post('/conflicts/:id/restore', async (req, res, next) => {
   try {
     const out = await sync.restoreConflict(req.params.id);
     await audit.log({
-      actorType: 'admin', action: 'sync.conflict_restored', ip: clientIp(req),
+      actorType: 'admin', userId: req.admin.id, action: 'sync.conflict_restored', ip: clientIp(req),
       targetType: 'sync_conflict', targetId: String(req.params.id), detail: out || {},
     });
     res.json({ ok: true, ...(out || {}) });

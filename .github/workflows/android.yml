@@ -1,25 +1,9 @@
 name: Android build
 
+# ⛔ بازنشسته (۱۴۰۵/۰۷/۲۰): پوستهٔ WebViewِ قدیمی. برنامهٔ اندروید بومی است
+# (`android-native/`، `tohid-native.yml`) و قاعده این است که اندروید و کامپیوتر
+# وب نباشند. این ساخت فقط دستی می‌ماند تا کدِ بایگانی‌شده شکسته نماند.
 on:
-  push:
-    branches: ["**"]
-    paths:
-      # خود برنامه (همان فایل‌های سایت) داخل بسته می‌رود، پس تغییر آن‌ها
-      # هم باید بیلد تازه بسازد
-      - "android/**"
-      - "index.html"
-      - "license/**"
-      - "sounds/**"
-      - "icons/**"
-      - "fonts/**"
-      - "manifest.webmanifest"
-      - "sw.js"
-      - ".github/workflows/android.yml"
-  pull_request:
-    paths:
-      - "android/**"
-      - "index.html"
-      - "license/**"
   workflow_dispatch:
 
 permissions:

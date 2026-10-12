@@ -475,7 +475,7 @@ router.get('/plans', async (req, res) => {
   });
 });
 
-router.patch('/plans/:code', async (req, res, next) => {
+router.patch('/plans/:code', requireSuperAdmin, async (req, res, next) => {
   const code = v.text(req.params.code, { max: 20, required: true, field: 'کد پلن' });
   const app = appOf(req);
   const p = await plans.getPlan(code, app);
@@ -512,10 +512,11 @@ router.patch('/plans/:code', async (req, res, next) => {
       app, plan: code, prevPrice: Number(p.price_afn), price: Number(row.price_afn), changedBy: req.admin.id,
     });
   }
+  await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.plan_updated', targetType: 'plan', targetId: `${app}:${code}`, detail: { prevPrice: Number(p.price_afn), price: Number(row?.price_afn) } });
   res.json({ plan: row });
 });
 
-router.patch('/config', async (req, res) => {
+router.patch('/config', requireSuperAdmin, async (req, res) => {
   /*
    *  ⚠️ بخشِ پمپ کلیدهای خودش را دارد و باید داشته باشد: قیمتِ پلن‌های
    *  پمپ دالری است و دورهٔ آزمایشی‌اش هم جدا (`entitlement.js` از
@@ -592,7 +593,35 @@ router.post('/admins', requireSuperAdmin, async (req, res, next) => {
     [newId('adm'), username, v.text(req.body?.name, { max: 60 }), await pw.hashPassword(password),
       v.oneOf(req.body?.role, ['admin', 'superadmin'], { field: 'نقش', def: 'admin' }), now()]
   );
+  await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.admin_created', targetType: 'admin', targetId: row.id, detail: { username, role: row.role } });
   res.status(201).json({ admin: row });
+});
+
+router.get('/admins', requireSuperAdmin, async (req, res) => {
+  res.json({ admins: await many('SELECT id, username, name, role, status, created_at FROM admins ORDER BY created_at') });
+});
+
+/**
+ *  غیرفعال کردن یا عوض کردنِ نقشِ یک مدیر — فقط مدیرِ ارشد.
+ *  ⚠️ نه خودش (قفل شدنِ ناخواسته) و نه آخرین مدیرِ ارشدِ فعال (پنلِ بی‌صاحب).
+ *  غیرفعال ⇒ همهٔ نشست‌هایش همان دم بسته می‌شود.
+ */
+router.patch('/admins/:id', requireSuperAdmin, async (req, res, next) => {
+  const id = String(req.params.id);
+  if (id === req.admin.id) return next(badRequest('نقش یا وضعیتِ خودتان را نمی‌توانید عوض کنید', 'admin_self'));
+  const target = await one('SELECT id, role, status FROM admins WHERE id=$1', [id]);
+  if (!target) return next(notFound('مدیر پیدا نشد'));
+  const status = req.body?.status === undefined ? target.status : v.oneOf(req.body.status, ['active', 'disabled'], { field: 'وضعیت' });
+  const role = req.body?.role === undefined ? target.role : v.oneOf(req.body.role, ['admin', 'superadmin'], { field: 'نقش' });
+  const losesSuper = target.role === 'superadmin' && target.status === 'active' && (role !== 'superadmin' || status !== 'active');
+  if (losesSuper) {
+    const left = await one(`SELECT COUNT(*)::int AS n FROM admins WHERE role='superadmin' AND status='active' AND id<>$1`, [id]);
+    if (!left || left.n < 1) return next(badRequest('آخرین مدیرِ ارشدِ فعال نمی‌تواند کنار برود', 'last_superadmin'));
+  }
+  const row = await one('UPDATE admins SET status=$2, role=$3 WHERE id=$1 RETURNING id, username, name, role, status', [id, status, role]);
+  if (status === 'disabled') await tokens.revokeAllForSubject(id);
+  await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.admin_updated', targetType: 'admin', targetId: id, detail: { status, role } });
+  res.json({ admin: row });
 });
 
 // ---------- پشتیبان‌گیری ----------

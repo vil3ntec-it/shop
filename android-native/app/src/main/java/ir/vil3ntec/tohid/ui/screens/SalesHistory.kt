@@ -37,6 +37,7 @@ import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.plain
 import ir.vil3ntec.tohid.qty
 import ir.vil3ntec.tohid.todayIso
+import ir.vil3ntec.tohid.ui.pressMenu
 import ir.vil3ntec.tohid.ui.theme.Radius
 import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.launch
@@ -121,6 +122,11 @@ fun SalesHistoryScreen(
   }
 
   val active = remember(d) { d.sales.filter { it.status != "cancelled" } }
+  //  صندوق — باز یا بسته، و پنجرهٔ باز/بستن
+  var shiftDialog by remember { mutableStateOf(false) }
+  var shiftHistory by remember { mutableStateOf(false) }
+  val me = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(roleContext).accountName }.getOrDefault("") }
+  val shift = remember(d) { ir.vil3ntec.tohid.data.CashShift.current(d) }
 
   LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
     item {
@@ -139,6 +145,31 @@ fun SalesHistoryScreen(
         hint = "${plain(active.size)} فاکتور — ${plain(d.sales.size - active.size)} لغوشده",
         modifier = Modifier.fillMaxWidth(),
       )
+      Spacer(Modifier.height(12.dp))
+    }
+
+    item {
+      Panel {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+          Column(Modifier.weight(1f)) {
+            Text(
+              if (shift == null) "صندوق بسته است" else "صندوق باز — از ${ir.vil3ntec.tohid.formatMillis(shift.open.createdAt)}",
+              style = MaterialTheme.typography.titleSmall,
+              color = Shop.colors.text,
+            )
+            if (shift != null) {
+              val t = ir.vil3ntec.tohid.data.CashShift.totalsOf(d, shift, System.currentTimeMillis())
+              Text(
+                "نقدِ مورد انتظار در دخل: ${money(t.expected)} ؋",
+                style = MaterialTheme.typography.labelSmall,
+                color = Shop.colors.muted,
+              )
+            }
+          }
+          TextButton(onClick = { shiftHistory = true }) { Text("سابقه") }
+          Button(onClick = { shiftDialog = true }) { Text(if (shift == null) "باز کردن" else "بستن صندوق") }
+        }
+      }
       Spacer(Modifier.height(12.dp))
     }
 
@@ -233,6 +264,111 @@ fun SalesHistoryScreen(
 
   /* ---------------------------- پنجره‌ها ---------------------------- */
 
+  if (shiftDialog) {
+    var amount by remember { mutableStateOf("") }
+    var note by remember { mutableStateOf("") }
+    val t = shift?.let { ir.vil3ntec.tohid.data.CashShift.totalsOf(d, it, System.currentTimeMillis()) }
+    AlertDialog(
+      onDismissRequest = { shiftDialog = false },
+      containerColor = Shop.colors.surfaceSolid,
+      title = { Text(if (shift == null) "باز کردنِ صندوق" else "بستنِ صندوق", color = Shop.colors.text) },
+      text = {
+        Column {
+          if (t != null) {
+            listOf(
+              "اول صندوق" to t.opening, "فروش نقدی" to t.sales, "رسید قرض‌داران" to t.receipts,
+              "مرجوعی" to -t.returns, "مصارف" to -t.expenses, "پرداخت به تأمین‌کننده و خرید" to -t.suppliers,
+            ).forEach { (label, v) ->
+              Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(label, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
+                Text("${if (v < 0) "−" else ""}${money(kotlin.math.abs(v))}", style = MaterialTheme.typography.bodySmall, color = Shop.colors.text)
+              }
+            }
+            Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+              Text("مورد انتظار", style = MaterialTheme.typography.titleSmall, color = Shop.colors.text)
+              Text("${money(t.expected)} ؋", style = MaterialTheme.typography.titleSmall, color = Shop.colors.text)
+            }
+          }
+          OutlinedTextField(
+            value = amount,
+            onValueChange = { amount = ir.vil3ntec.tohid.latinDigits(it) },
+            label = { Text(if (shift == null) "پولِ اولِ صندوق" else "پولِ شمرده‌شده در دخل") },
+            singleLine = true,
+            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+              keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal,
+            ),
+            modifier = Modifier.fillMaxWidth(),
+          )
+          if (shift != null) {
+            val counted = amount.toDoubleOrNull()
+            if (counted != null && t != null) {
+              val diff = counted - t.expected
+              Text(
+                when {
+                  kotlin.math.abs(diff) < 0.5 -> "بی اختلاف"
+                  diff > 0 -> "اضافه: ${money(diff)} ؋"
+                  else -> "کسری: ${money(-diff)} ؋"
+                },
+                style = MaterialTheme.typography.labelMedium,
+                color = if (kotlin.math.abs(diff) < 0.5) Shop.colors.success else Shop.colors.danger,
+              )
+            }
+            OutlinedTextField(
+              value = note, onValueChange = { note = it },
+              label = { Text("یادداشت (اختیاری)") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
+            )
+          }
+        }
+      },
+      confirmButton = {
+        TextButton(onClick = {
+          val v = amount.toDoubleOrNull() ?: Double.NaN
+          val r = if (shift == null) {
+            ir.vil3ntec.tohid.data.CashShift.open(d, v, me, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId)
+          } else {
+            ir.vil3ntec.tohid.data.CashShift.close(d, v, note, me, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId)
+          }
+          when (r) {
+            is ir.vil3ntec.tohid.data.CashShift.Result.Failed -> toast(r.message)
+            is ir.vil3ntec.tohid.data.CashShift.Result.Ok -> {
+              scope.launch { store.save(r.data) }
+              toast(if (shift == null) "صندوق باز شد" else "صندوق بسته شد")
+              shiftDialog = false
+            }
+          }
+        }) { Text(if (shift == null) "باز کن" else "ببند") }
+      },
+      dismissButton = { TextButton(onClick = { shiftDialog = false }) { Text("انصراف") } },
+    )
+  }
+
+  if (shiftHistory) {
+    val shifts = remember(d) { ir.vil3ntec.tohid.data.CashShift.list(d).take(60) }
+    AlertDialog(
+      onDismissRequest = { shiftHistory = false },
+      containerColor = Shop.colors.surfaceSolid,
+      title = { Text("سابقهٔ صندوق", color = Shop.colors.text) },
+      text = {
+        Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
+          if (shifts.isEmpty()) Text("هنوز صندوقی باز نشده.", color = Shop.colors.muted)
+          shifts.forEach { sh ->
+            Text(
+              ir.vil3ntec.tohid.formatMillis(sh.open.createdAt) + " — " + sh.open.notes,
+              style = MaterialTheme.typography.bodySmall, color = Shop.colors.text,
+            )
+            Text(
+              sh.close?.let { ir.vil3ntec.tohid.formatMillis(it.createdAt) + " — " + it.notes } ?: "هنوز باز است",
+              style = MaterialTheme.typography.labelSmall,
+              color = if (sh.close == null) Shop.colors.warning else Shop.colors.muted,
+            )
+            HorizontalDivider(Modifier.padding(vertical = 6.dp), color = Shop.colors.border)
+          }
+        }
+      },
+      confirmButton = { TextButton(onClick = { shiftHistory = false }) { Text("بستن") } },
+    )
+  }
+
   invoiceFor?.let { sale ->
     InvoiceDialog(d = d, sale = sale, onDismiss = { invoiceFor = null }, onMessage = ::toast)
   }
@@ -295,7 +431,7 @@ fun SalesHistoryScreen(
               )
             }
           apply(
-            SalesEngine.cancel(d, sale.id, todayIso(), System.currentTimeMillis(), ::newId),
+            SalesEngine.cancel(d, sale.id, todayIso(), System.currentTimeMillis(), ::newId, reason = "ویرایش در سبد"),
             "فاکتور لغو شد و اقلامش در سبد است",
           ) {
             cartStore.set(lines)
@@ -310,24 +446,39 @@ fun SalesHistoryScreen(
   }
 
   cancelFor?.let { sale ->
+    //  لغو بی دلیل ثبت نمی‌شود — دلیل در فاکتور و سابقه می‌ماند
+    var reason by remember(sale.id) { mutableStateOf("") }
     AlertDialog(
       onDismissRequest = { cancelFor = null },
       containerColor = Shop.colors.surfaceSolid,
       title = { Text("لغو فروش؟", color = Shop.colors.text) },
       text = {
-        Text(
-          SalesEngine.cancelWarning(sale),
-          style = MaterialTheme.typography.bodySmall,
-          color = Shop.colors.muted,
-        )
+        Column {
+          Text(
+            SalesEngine.cancelWarning(sale),
+            style = MaterialTheme.typography.bodySmall,
+            color = Shop.colors.muted,
+          )
+          Spacer(Modifier.height(10.dp))
+          OutlinedTextField(
+            value = reason,
+            onValueChange = { reason = it.take(120) },
+            label = { Text("دلیلِ لغو") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+          )
+        }
       },
       confirmButton = {
-        TextButton(onClick = {
-          apply(
-            SalesEngine.cancel(d, sale.id, todayIso(), System.currentTimeMillis(), ::newId),
-            "فروش لغو شد",
-          ) { cancelFor = null }
-        }) { Text("لغو فروش", color = Shop.colors.danger) }
+        TextButton(
+          enabled = reason.isNotBlank(),
+          onClick = {
+            apply(
+              SalesEngine.cancel(d, sale.id, todayIso(), System.currentTimeMillis(), ::newId, reason = reason),
+              "فروش لغو شد",
+            ) { cancelFor = null }
+          },
+        ) { Text("لغو فروش", color = if (reason.isNotBlank()) Shop.colors.danger else Shop.colors.muted) }
       },
       dismissButton = { TextButton(onClick = { cancelFor = null }) { Text("بازگشت") } },
     )
@@ -375,7 +526,8 @@ private fun SaleRow(
         )
         // ردیفِ یکی‌درمیانِ کم‌رنگ: چشم روی جدولِ بلند خط را گم نمی‌کند
         .background(if (striped) Shop.colors.surface2.copy(alpha = 0.45f) else Shop.colors.surface)
-        .clickable(onClick = onInvoice)
+        //  کلیکِ راست (کامپیوتر) یا لمسِ طولانی (گوشی) ⇒ همان منوی کارها
+        .pressMenu(onClick = onInvoice, onMenu = { menu = true })
         .padding(horizontal = 12.dp, vertical = 12.dp),
       verticalAlignment = Alignment.CenterVertically,
     ) {

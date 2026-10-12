@@ -22,8 +22,26 @@ object Migration {
   private const val ORIGIN = "https://appassets.androidplatform.net/assets/migrate.html"
   private const val KEY = "tohid-shop-data-v1"
 
+  /**
+   *  آیا اصلاً نسخهٔ WebViewِ قدیمی روی این گوشی بوده؟ اگر پوشهٔ دادهٔ
+   *  WebView (`app_webview`) نباشد، هیچ دفترِ قدیمی‌ای هم نیست.
+   *
+   *  پیش‌تر هر بار که دفتر خالی بود — یعنی هر کاربرِ تازه، در هر بار
+   *  باز کردن — یک WebView ساخته می‌شد: بالا آمدنِ کُند، و برخلافِ قاعدهٔ
+   *  صاحب مخزن که برنامهٔ اندروید «حتی یک درصد» وب نباشد. حالا WebView فقط
+   *  برای همان یک بارِ نجاتِ دفترِ نسخهٔ قدیمی ساخته می‌شود و برای هیچ
+   *  کاربرِ دیگری هرگز.
+   */
+  fun hasLegacyWebData(context: Context): Boolean =
+    runCatching { java.io.File(context.applicationInfo.dataDir, "app_webview").isDirectory }.getOrDefault(false)
+
   /** @return متنِ JSON دفترِ دکان، یا null اگر داده‌ای نبود */
-  suspend fun readLegacyData(context: Context): String? =
+  suspend fun readLegacyData(context: Context): String? {
+    if (!hasLegacyWebData(context)) return null
+    return readViaWebView(context)
+  }
+
+  private suspend fun readViaWebView(context: Context): String? =
     suspendCancellableCoroutine { cont ->
       val web = WebView(context)
       web.settings.javaScriptEnabled = true

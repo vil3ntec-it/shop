@@ -116,6 +116,8 @@ fun QuickSaleScreen(
   val term = search.trim()
   val shown = remember(d, term, category) {
     d.products.filter { p ->
+      //  کالای غیرفعال در فروش نمی‌آید — سابقه‌اش در گزارش‌ها می‌ماند
+      p.active &&
       (category == null || p.category == category) &&
         (term.isBlank() || p.name.contains(term, ignoreCase = true) ||
           p.barcodes.any { it.contains(term) })
@@ -377,7 +379,7 @@ fun QuickSaleScreen(
       onDismiss = { scanning = false },
       onCode = { code ->
         scanning = false
-        val found = d.products.firstOrNull { p -> p.barcodes.any { it == code } }
+        val found = d.products.firstOrNull { p -> p.active && p.barcodes.any { it == code } }
         if (found == null) {
           search = code
           scope.launch { snackbar.showSnackbar("بارکد ناشناس — این کالا هنوز ثبت نشده است") }

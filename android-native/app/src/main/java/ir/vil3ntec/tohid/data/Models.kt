@@ -33,6 +33,20 @@ data class Product(
    */
   val photo: Boolean = false,
   val createdAt: Long = 0,
+  /** زیردسته (اختیاری) — زیرِ `category` */
+  val subcategory: String = "",
+  /** تأمین‌کنندهٔ اصلیِ کالا (اختیاری) — شناسهٔ `Supplier` */
+  val supplierId: String = "",
+  /** کالای غیرفعال در فروش و جست‌وجوی فروش نمی‌آید؛ سابقه‌اش می‌ماند */
+  val active: Boolean = true,
+  /**
+   *  واحدِ فروشِ دوم (اختیاری) و ضریبِ آن: یک «واحدِ فروش» چند «واحدِ
+   *  موجودی» است. مثلاً موجودی کیلوگرم، فروش گرم ⇒ `unitFactor = 0.001`.
+   *  موجودی و قیمت همیشه بر حسبِ `unit` می‌مانند؛ فقط ورودیِ مقدار تبدیل
+   *  می‌شود (`SalesEngine.toStockQty`). خالی ⇒ فقط همان `unit`.
+   */
+  val saleUnit: String = "",
+  val unitFactor: Double = 1.0,
 )
 
 @Serializable
@@ -58,6 +72,8 @@ data class WarehouseEntry(
   val expiryDate: String = "",
   /** شمارهٔ سری ساخت (اختیاری) */
   val batch: String = "",
+  /** تاریخِ تولید (اختیاری، `yyyy-MM-dd`) — خالی یعنی ثبت نشده */
+  val productionDate: String = "",
 )
 
 @Serializable
@@ -79,6 +95,10 @@ data class Sale(
   val createdAt: Long = 0,
   val date: String = "",
   val syncStatus: String = "pending",
+  /** دلیلِ لغو — همان `cancelReason`ِ وب */
+  val cancelReason: String = "",
+  /** فروشنده — نامِ حسابی که فاکتور را زد (برای گزارشِ فروشِ هر کاربر)؛ خالی یعنی نامعلوم */
+  val seller: String = "",
 )
 
 @Serializable
@@ -228,6 +248,8 @@ data class AuditEntry(
   val refId: String? = null,
   val notes: String = "",
   val createdAt: Long = 0,
+  /** مبلغِ ردیف — فعلاً فقط صندوق (`shift_open`/`shift_close`)؛ بقیه صفر */
+  val amount: Double = 0.0,
 )
 
 /**

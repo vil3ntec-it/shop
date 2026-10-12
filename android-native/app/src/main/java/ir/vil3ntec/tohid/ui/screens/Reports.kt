@@ -12,6 +12,8 @@ import androidx.compose.material3.*
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Print
 import androidx.compose.runtime.*
@@ -44,6 +46,8 @@ private val SECTION_TITLES = linkedMapOf(
   "sales" to "سود و فروش",
   "products" to "محصولات",
   "debtors" to "قرض‌داران",
+  "purchases" to "خرید",
+  "expiry" to "انقضا",
   "stock" to "گردش موجودی",
 )
 
@@ -86,14 +90,19 @@ fun ReportsScreen(d: ShopData) {
    */
   val canSeeMoney = remember { ir.vil3ntec.tohid.data.ShopRole.canSeeMoney(context) }
   val sections = remember(canSeeMoney) {
-    if (canSeeMoney) SECTION_TITLES else SECTION_TITLES.filterKeys { it != "sales" }
+    //  خرید هم قیمتِ خریدِ دکان است — همان قاعدهٔ «سود و فروش»
+    if (canSeeMoney) SECTION_TITLES else SECTION_TITLES.filterKeys { it != "sales" && it != "purchases" }
   }
 
   var range by rememberSaveable { mutableStateOf(ReportEngine.Range.MONTH) }
   var section by rememberSaveable { mutableStateOf(if (canSeeMoney) "sales" else "products") }
   var stockProduct by rememberSaveable { mutableStateOf<String?>(null) }
 
-  val (from, to) = ReportEngine.rangeOf(range, todayIso())
+  //  ماه و سالِ خورشیدیِ انتخاب‌شده — پیش‌فرض همین ماه
+  val now = remember { ir.vil3ntec.tohid.Jalali.ofIso(todayIso()) }
+  var jy by rememberSaveable { mutableStateOf(now?.year ?: 1405) }
+  var jm by rememberSaveable { mutableStateOf(now?.month ?: 1) }
+  val (from, to) = ReportEngine.rangeOf(range, todayIso(), jy, jm)
 
   LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
     item {
@@ -148,9 +157,11 @@ fun ReportsScreen(d: ShopData) {
     when (section) {
       //  `rememberSaveable` ممکن است «sales» را از اجرای قبلی برگرداند،
       //  وقتی هنوز نقش معلوم نبود. سدِ دوم همین‌جاست.
-      "sales" -> if (canSeeMoney) salesSection(this, d, range, from, to) { range = it }
+      "sales" -> if (canSeeMoney) salesSection(this, d, range, from, to, jy, jm, { y, m -> jy = y; jm = m }) { range = it }
       "products" -> productsSection(this, d)
       "debtors" -> debtorsSection(this, d)
+      "purchases" -> if (canSeeMoney) purchasesSection(this, d, from, to)
+      "expiry" -> expirySection(this, d)
       else -> stockSection(this, d, stockProduct) { stockProduct = it }
     }
   }
@@ -164,6 +175,9 @@ private fun salesSection(
   range: ReportEngine.Range,
   from: String,
   to: String,
+  jy: Int,
+  jm: Int,
+  onPick: (Int, Int) -> Unit,
   onRange: (ReportEngine.Range) -> Unit,
 ) = with(scope) {
   item {
@@ -175,9 +189,28 @@ private fun salesSection(
         ReportEngine.Range.TODAY to "امروز",
         ReportEngine.Range.WEEK to "۷ روز",
         ReportEngine.Range.MONTH to "این ماه",
+        ReportEngine.Range.JMONTH to "ماه…",
+        ReportEngine.Range.JYEAR to "سال…",
         ReportEngine.Range.ALL to "از آغاز",
       ).forEach { (value, label) ->
         FilterChip(selected = range == value, onClick = { onRange(value) }, label = { Text(label) })
+      }
+    }
+    //  گزارشِ ماهانه و سالانه: یک ماه یا سالِ خورشیدی، با پیکان جلو و عقب
+    if (range == ReportEngine.Range.JMONTH || range == ReportEngine.Range.JYEAR) {
+      val monthly = range == ReportEngine.Range.JMONTH
+      Row(verticalAlignment = Alignment.CenterVertically) {
+        IconButton(onClick = {
+          if (monthly) { if (jm == 1) onPick(jy - 1, 12) else onPick(jy, jm - 1) } else onPick(jy - 1, jm)
+        }) { Icon(Icons.Filled.ChevronRight, contentDescription = "قبلی") }
+        Text(
+          if (monthly) "${ir.vil3ntec.tohid.JALALI_MONTHS[jm - 1]} $jy" else "سال $jy",
+          style = MaterialTheme.typography.titleSmall,
+          color = Shop.colors.text,
+        )
+        IconButton(onClick = {
+          if (monthly) { if (jm == 12) onPick(jy + 1, 1) else onPick(jy, jm + 1) } else onPick(jy + 1, jm)
+        }) { Icon(Icons.Filled.ChevronLeft, contentDescription = "بعدی") }
       }
     }
     Spacer(Modifier.height(6.dp))
@@ -220,6 +253,22 @@ private fun salesSection(
       HorizontalDivider(Modifier.padding(vertical = 8.dp), color = Shop.colors.border)
       ReportRow("مصارف", r.expenses, negative = true)
       ReportRow(if (lost) "ضرر خالص" else "سود خالص", r.netProfit, strong = true)
+    }
+
+    //  فروشِ هر کاربر — وقتی بیش از یک فروشنده در بازه هست
+    val sellers = ReportEngine.bySeller(d, from, to)
+    if (sellers.size > 1) {
+      Spacer(Modifier.height(12.dp))
+      Text("فروش هر کاربر", style = MaterialTheme.typography.titleSmall, color = Shop.colors.text)
+      Spacer(Modifier.height(6.dp))
+      Panel {
+        sellers.forEach { st ->
+          Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("${st.seller} — ${plain(st.count)} فاکتور", style = MaterialTheme.typography.bodySmall, color = Shop.colors.text)
+            Text("${money(st.net)} ؋", style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text, fontWeight = FontWeight.Bold)
+          }
+        }
+      }
     }
 
     Spacer(Modifier.height(10.dp))
@@ -374,6 +423,121 @@ private fun debtorsSection(
           "فروش نسیه: ${money(row.given)} — پرداخت‌شده: ${money(row.received)}",
           style = MaterialTheme.typography.labelSmall,
           color = Shop.colors.muted,
+        )
+      }
+      Spacer(Modifier.height(8.dp))
+    }
+  }
+}
+
+/* ------------------------------ خرید ------------------------------ */
+
+private fun purchasesSection(
+  scope: androidx.compose.foundation.lazy.LazyListScope,
+  d: ShopData,
+  from: String,
+  to: String,
+) = with(scope) {
+  val r = ReportEngine.purchases(d, from, to)
+  item {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+      StatTile("جمع خرید", "${money(r.total)} ؋", Shop.colors.primary, modifier = Modifier.weight(1f))
+      StatTile("بدهی به تأمین‌کننده", "${money(r.debt)} ؋", Shop.colors.warning, modifier = Modifier.weight(1f))
+    }
+    Spacer(Modifier.height(12.dp))
+  }
+  if (r.rows.isEmpty()) {
+    item { Panel { EmptyNote("در این بازه خریدی ثبت نشده") } }
+  } else {
+    item {
+      Panel {
+        Text("سهمِ هر تأمین‌کننده", style = MaterialTheme.typography.titleSmall, color = Shop.colors.text)
+        Spacer(Modifier.height(8.dp))
+        r.bySupplier.forEach { (name, total) ->
+          Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(name, style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text)
+            Text("${money(total)} ؋", style = MaterialTheme.typography.bodyMedium, color = Shop.colors.muted)
+          }
+        }
+      }
+      Spacer(Modifier.height(12.dp))
+    }
+    val names = d.products.associate { it.id to it.name }
+    items(r.rows, key = { it.id }) { p ->
+      Row(
+        Modifier
+          .fillMaxWidth()
+          .clip(RoundedCornerShape(Radius.md))
+          .background(Shop.colors.surface)
+          .border(1.dp, Shop.colors.border, RoundedCornerShape(Radius.md))
+          .padding(12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+      ) {
+        Column(Modifier.weight(1f)) {
+          Text(names[p.productId] ?: "—", style = MaterialTheme.typography.titleSmall, color = Shop.colors.text)
+          Text(
+            "${ir.vil3ntec.tohid.formatDate(p.date)} · ${qty(p.quantity)} ${p.unit}",
+            style = MaterialTheme.typography.labelSmall,
+            color = Shop.colors.muted,
+          )
+        }
+        Text("${money(p.totalAmount)} ؋", style = MaterialTheme.typography.titleSmall, color = Shop.colors.text)
+      }
+      Spacer(Modifier.height(8.dp))
+    }
+  }
+}
+
+/* ------------------------------ انقضا ------------------------------ */
+
+private fun expirySection(
+  scope: androidx.compose.foundation.lazy.LazyListScope,
+  d: ShopData,
+) = with(scope) {
+  val lots = ir.vil3ntec.tohid.data.ExpiryEngine.lots(d, ir.vil3ntec.tohid.todayIso())
+  item {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+      StatTile("منقضی", lots.count { it.expired }.toString(), Shop.colors.danger, modifier = Modifier.weight(1f))
+      StatTile(
+        "تا ${ir.vil3ntec.tohid.data.ExpiryEngine.NEAR_DAYS} روز",
+        lots.count { !it.expired && it.daysLeft <= ir.vil3ntec.tohid.data.ExpiryEngine.NEAR_DAYS }.toString(),
+        Shop.colors.warning,
+        modifier = Modifier.weight(1f),
+      )
+    }
+    Spacer(Modifier.height(12.dp))
+  }
+  if (lots.isEmpty()) {
+    item { Panel { EmptyNote("محموله‌ای با تاریخِ انقضا در انبار نمانده") } }
+  } else {
+    items(lots, key = { it.entry.id }) { l ->
+      Row(
+        Modifier
+          .fillMaxWidth()
+          .clip(RoundedCornerShape(Radius.md))
+          .background(Shop.colors.surface)
+          .border(1.dp, Shop.colors.border, RoundedCornerShape(Radius.md))
+          .padding(12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+      ) {
+        Column(Modifier.weight(1f)) {
+          Text(l.product.name, style = MaterialTheme.typography.titleSmall, color = Shop.colors.text)
+          Text(
+            "${ir.vil3ntec.tohid.formatDate(l.entry.expiryDate)}" +
+              (if (l.entry.batch.isNotBlank()) " · سری ${l.entry.batch}" else "") +
+              " · ${qty(l.remaining)} ${l.product.unit}",
+            style = MaterialTheme.typography.labelSmall,
+            color = Shop.colors.muted,
+          )
+        }
+        Text(
+          if (l.expired) "منقضی" else "${l.daysLeft} روز",
+          style = MaterialTheme.typography.titleSmall,
+          color = when {
+            l.expired -> Shop.colors.danger
+            l.daysLeft <= ir.vil3ntec.tohid.data.ExpiryEngine.NEAR_DAYS -> Shop.colors.warning
+            else -> Shop.colors.success
+          },
         )
       }
       Spacer(Modifier.height(8.dp))

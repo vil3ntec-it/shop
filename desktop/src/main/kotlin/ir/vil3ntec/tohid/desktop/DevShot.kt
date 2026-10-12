@@ -38,6 +38,23 @@ object DevShot {
             val (op, arg) = cmd.substringBefore(':') to cmd.substringAfter(':', "")
             when (op) {
               "wait" -> Thread.sleep(arg.toLong())
+              //  رفتن به یک صفحه با همان مسیرِ میان‌برها (`AppNav`) — بی وابستگی به فوکوسِ صفحه‌کلید
+              "go" -> { java.awt.EventQueue.invokeAndWait { ir.vil3ntec.tohid.ui.AppNav.go(arg) }; Thread.sleep(1500) }
+              //  Ctrl+کلید، مثلِ ctrl:1
+              "ctrl" -> {
+                val code = java.awt.event.KeyEvent::class.java.getField("VK_$arg").getInt(null)
+                robot.keyPress(java.awt.event.KeyEvent.VK_CONTROL); robot.keyPress(code)
+                robot.keyRelease(code); robot.keyRelease(java.awt.event.KeyEvent.VK_CONTROL); Thread.sleep(400)
+              }
+              "scroll" -> { robot.mouseWheel(arg.toInt()); Thread.sleep(600) }
+              "move" -> { val (x, y) = arg.split(',').map { it.trim().toInt() }; robot.mouseMove(x, y); Thread.sleep(150) }
+              "rclick" -> {
+                val (x, y) = arg.split(',').map { it.trim().toInt() }
+                robot.mouseMove(x, y); Thread.sleep(80)
+                robot.mousePress(java.awt.event.InputEvent.BUTTON3_DOWN_MASK)
+                robot.mouseRelease(java.awt.event.InputEvent.BUTTON3_DOWN_MASK)
+                Thread.sleep(500)
+              }
               "shot" -> shot(arg)
               "click" -> {
                 val (x, y) = arg.split(',').map { it.trim().toInt() }

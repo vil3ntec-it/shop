@@ -83,6 +83,35 @@ object ReportEngine {
     )
   }
 
+  /* ----------------------------- خرید ----------------------------- */
+
+  data class PurchaseReport(
+    val count: Int,
+    val total: Double,
+    val paid: Double,
+    val debt: Double,
+    /** نامِ تأمین‌کننده ⇒ جمعِ خرید در بازه، بیشترین اول */
+    val bySupplier: List<Pair<String, Double>>,
+    val rows: List<Purchase>,
+  )
+
+  /** خریدهای یک بازه — جمع، پرداخت‌شده، بدهیِ به‌جامانده و سهمِ هر تأمین‌کننده */
+  fun purchases(d: ShopData, from: String, to: String): PurchaseReport {
+    val rows = d.purchases.filter { it.date in from..to }.sortedByDescending { it.date }
+    val names = d.suppliers.associate { it.id to it.name }
+    val bySupplier = rows.groupBy { names[it.supplierId] ?: "بی تأمین‌کننده" }
+      .mapValues { (_, list) -> list.sumOf { it.totalAmount } }
+      .toList().sortedByDescending { it.second }
+    return PurchaseReport(
+      count = rows.size,
+      total = rows.sumOf { it.totalAmount },
+      paid = rows.sumOf { it.paidAmount },
+      debt = rows.sumOf { it.debt },
+      bySupplier = bySupplier,
+      rows = rows,
+    )
+  }
+
   /* ---------------------------- محصولات ---------------------------- */
 
   data class ProductStat(val product: Product, val quantity: Double, val profit: Double)
@@ -167,6 +196,17 @@ object ReportEngine {
     }
   }
 
+  /* ------------------------- فروشِ هر کاربر ------------------------- */
+
+  data class SellerStat(val seller: String, val count: Int, val net: Double, val discount: Double)
+
+  /** فاکتورهای لغونشدهٔ بازه به تفکیکِ فروشنده — بیشترین فروش اول */
+  fun bySeller(d: ShopData, from: String, to: String): List<SellerStat> =
+    d.sales.filter { it.status != "cancelled" && it.date >= from && it.date <= to }
+      .groupBy { it.seller.trim().ifEmpty { "نامعلوم" } }
+      .map { (who, rows) -> SellerStat(who, rows.size, rows.sumOf { it.finalTotal }, rows.sumOf { it.discount }) }
+      .sortedByDescending { it.net }
+
   /* ------------------------- گردشِ موجودی ------------------------- */
 
   /** حرکاتِ انبار، تازه‌ترین اول. مثل نسخهٔ وب حداکثر ۲۰۰ ردیف. */
@@ -178,15 +218,29 @@ object ReportEngine {
 
   /* --------------------------- بازه‌های آماده --------------------------- */
 
-  enum class Range { TODAY, WEEK, MONTH, ALL }
+  /** `JMONTH`/`JYEAR` — ماه یا سالِ خورشیدیِ انتخاب‌شده (`jy`/`jm`) */
+  enum class Range { TODAY, WEEK, MONTH, ALL, JMONTH, JYEAR }
 
   /** بازهٔ `from..to` برای هر انتخاب — همان بازه‌هایی که نسخهٔ وب داشت */
-  fun rangeOf(choice: Range, today: String): Pair<String, String> = when (choice) {
+  fun rangeOf(choice: Range, today: String, jy: Int = 0, jm: Int = 1): Pair<String, String> = when (choice) {
+    Range.JMONTH -> jalaliMonth(jy, jm)
+    Range.JYEAR -> jalaliMonth(jy, 1).first to jalaliMonth(jy, 12).second
     Range.TODAY -> today to today
     Range.WEEK -> shiftDays(today, -6) to today
     // «این ماه» یعنی از اولِ همان ماهِ میلادیِ فایل، مثل نسخهٔ وب
     Range.MONTH -> today.take(7) + "-01" to today
     Range.ALL -> "0000-01-01" to "9999-12-31"
+  }
+
+  /**
+   *  یک ماهِ خورشیدی به بازهٔ میلادیِ فایل. اسفند ۲۹ یا ۳۰ روز است —
+   *  همان `Jalali.isValid` تصمیم می‌گیرد، نه عددِ ثابت.
+   */
+  fun jalaliMonth(jy: Int, jm: Int): Pair<String, String> {
+    val last = (31 downTo 29).first { ir.vil3ntec.tohid.Jalali.isValid(jy, jm, it) }
+    val from = ir.vil3ntec.tohid.Jalali.toIso(jy, jm, 1) ?: "0000-01-01"
+    val to = ir.vil3ntec.tohid.Jalali.toIso(jy, jm, last) ?: "9999-12-31"
+    return from to to
   }
 
   private fun shiftDays(iso: String, days: Int): String {

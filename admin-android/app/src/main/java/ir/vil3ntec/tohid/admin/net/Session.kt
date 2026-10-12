@@ -12,13 +12,13 @@ import androidx.security.crypto.MasterKeys
  *  رمزنشده روی گوشی نمی‌نشیند: با کلیدی در Keystore خودِ گوشی رمز می‌شود.
  *
  *  اگر رمزگذاری روی گوشیِ خاصی نگیرد — بعضی گوشی‌های قدیمی Keystore
- *  سالمی ندارند — به حالتِ ساده برمی‌گردیم، چون برنامه‌ای که اصلاً بالا
- *  نیاید بدتر از برنامه‌ای است که توکنش رمز نشده باشد. آن حالت هم فقط
- *  برای خودِ همین برنامه خواندنی است.
+ *  سالمی ندارند — برنامه بالا می‌آید ولی توکن **هرگز** رمزنشده روی دیسک
+ *  نمی‌رود: فقط تا بسته شدنِ برنامه در حافظه می‌ماند (هر بار ورودِ دوباره).
+ *  نشانیِ سرور و نام، که راز نیستند، در حالتِ ساده می‌مانند.
  */
 class Session(context: Context) {
 
-  private val prefs: SharedPreferences = runCatching {
+  private val encrypted: SharedPreferences? = runCatching {
     val alias = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC)
     EncryptedSharedPreferences.create(
       "tohid-admin-secure",
@@ -27,8 +27,17 @@ class Session(context: Context) {
       EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
       EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
     ) as SharedPreferences
-  }.getOrElse {
-    context.getSharedPreferences("tohid-admin", Context.MODE_PRIVATE)
+  }.getOrNull()
+
+  private val prefs: SharedPreferences =
+    encrypted ?: context.getSharedPreferences("tohid-admin", Context.MODE_PRIVATE)
+
+  /** فقط وقتی رمزگذاری نگرفت — توکن در حافظه، نه روی دیسک */
+  private var memoryToken: String? = null
+
+  init {
+    //  توکنی که نسخه‌های پیشین رمزنشده نوشته‌اند پاک شود
+    if (encrypted == null) prefs.edit().remove(TOKEN).apply()
   }
 
   var serverUrl: String
@@ -36,8 +45,8 @@ class Session(context: Context) {
     set(v) = prefs.edit().putString(SERVER, v.trim().trimEnd('/')).apply()
 
   var token: String?
-    get() = prefs.getString(TOKEN, null)
-    set(v) = prefs.edit().putString(TOKEN, v).apply()
+    get() = if (encrypted != null) encrypted.getString(TOKEN, null) else memoryToken
+    set(v) { if (encrypted != null) encrypted.edit().putString(TOKEN, v).apply() else memoryToken = v }
 
   var adminName: String
     get() = prefs.getString(NAME, "") ?: ""
@@ -55,6 +64,7 @@ class Session(context: Context) {
   val signedIn: Boolean get() = !token.isNullOrBlank() && serverUrl.isNotBlank()
 
   fun signOut() {
+    memoryToken = null
     prefs.edit().remove(TOKEN).remove(NAME).remove(ROLE).remove(EXPIRES).apply()
   }
 

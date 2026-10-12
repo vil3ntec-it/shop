@@ -142,7 +142,25 @@ fun main() {
       onPreviewKeyEvent = { e ->
         if (e.type != KeyEventType.KeyDown) return@Window false
         val mod = e.isCtrlPressed || e.isMetaPressed
+        //  Ctrl+۱ تا ۹ ⇒ صفحه‌ها (`AppNav.SHORTCUTS`)؛ F11 ⇒ تمام‌صفحه
+        val digit = listOf(Key.One, Key.Two, Key.Three, Key.Four, Key.Five, Key.Six, Key.Seven, Key.Eight, Key.Nine)
+          .indexOf(e.key)
         when {
+          e.key == Key.F11 -> {
+            windowState.placement =
+              if (windowState.placement == WindowPlacement.Fullscreen) {
+                if (prefs.getBoolean("desktop_max", false)) WindowPlacement.Maximized else WindowPlacement.Floating
+              } else WindowPlacement.Fullscreen
+            true
+          }
+          e.key == Key.Escape && windowState.placement == WindowPlacement.Fullscreen && !BackDispatcher.hasHandler() -> {
+            windowState.placement = WindowPlacement.Floating
+            true
+          }
+          mod && digit >= 0 && digit < ir.vil3ntec.tohid.ui.AppNav.SHORTCUTS.size -> {
+            ir.vil3ntec.tohid.ui.AppNav.go(ir.vil3ntec.tohid.ui.AppNav.SHORTCUTS[digit].first)
+            true
+          }
           e.key == Key.Escape -> BackDispatcher.dispatch()
           mod && (e.key == Key.Equals || e.key == Key.Plus || e.key == Key.NumPadAdd) -> { setZoom(zoom + 0.1f); true }
           mod && (e.key == Key.Minus || e.key == Key.NumPadSubtract) -> { setZoom(zoom - 0.1f); true }

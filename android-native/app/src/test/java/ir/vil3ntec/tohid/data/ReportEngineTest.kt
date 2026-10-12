@@ -179,6 +179,25 @@ class ReportEngineTest {
     assertEquals(all, aug + sep, 0.0)
   }
 
+  /* ----------------------------- خرید ----------------------------- */
+
+  @Test
+  fun `گزارش خرید جمع و بدهی و سهم هر تامین کننده را می دهد`() {
+    val d = ledger().copy(
+      suppliers = listOf(Supplier(id = "s1", name = "نور"), Supplier(id = "s2", name = "آریا")),
+      purchases = listOf(
+        Purchase(id = "a", supplierId = "s1", totalAmount = 1000.0, paidAmount = 600.0, debt = 400.0, date = "2026-08-05"),
+        Purchase(id = "b", supplierId = "s2", totalAmount = 3000.0, paidAmount = 3000.0, date = "2026-08-20"),
+        Purchase(id = "c", supplierId = "s1", totalAmount = 500.0, date = "2026-07-30"),   // بیرونِ بازه
+      ),
+    )
+    val r = ReportEngine.purchases(d, "2026-08-01", "2026-08-31")
+    assertEquals(2, r.count)
+    assertEquals(4000.0, r.total, 0.0)
+    assertEquals(400.0, r.debt, 0.0)
+    assertEquals("آریا", r.bySupplier.first().first)
+  }
+
   /* --------------------------- محصولات --------------------------- */
 
   @Test
@@ -250,6 +269,10 @@ class ReportEngineTest {
   fun `بازه های آماده درست حساب می شوند`() {
     assertEquals("2026-08-28" to "2026-08-28", ReportEngine.rangeOf(ReportEngine.Range.TODAY, "2026-08-28"))
     assertEquals("2026-08-22" to "2026-08-28", ReportEngine.rangeOf(ReportEngine.Range.WEEK, "2026-08-28"))
+    //  ماه و سالِ خورشیدی — میزان ۳۰ روز، حوتِ ۱۴۰۳ (کبیسه) ۳۰ روز
+    assertEquals("2026-09-23" to "2026-10-22", ReportEngine.rangeOf(ReportEngine.Range.JMONTH, "2026-10-12", 1405, 7))
+    assertEquals("2025-02-19" to "2025-03-20", ReportEngine.jalaliMonth(1403, 12))
+    assertEquals("2026-03-21" to "2027-03-20", ReportEngine.rangeOf(ReportEngine.Range.JYEAR, "2026-10-12", 1405))
     assertEquals("2026-08-01" to "2026-08-28", ReportEngine.rangeOf(ReportEngine.Range.MONTH, "2026-08-28"))
     // هفته‌ای که از مرزِ ماه رد می‌شود
     assertEquals("2026-07-29" to "2026-08-04", ReportEngine.rangeOf(ReportEngine.Range.WEEK, "2026-08-04"))

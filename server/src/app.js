@@ -312,6 +312,8 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/shop/sync', require('./routes/sync'));   // نام قدیمی
     api.use('/admin', require('./routes/admin'));
     api.use('/license', require('./routes/license'));
+    //  نسخه‌های برنامه — برنامه‌ها از همین سرور می‌گیرند، نه از GitHub
+    api.use('/releases', require('./routes/releases'));
     //  پشتیبانی و تپشِ بازدید عمداً توکن اجباری ندارند: همان کسی که
     //  هنوز حساب نساخته، بیشتر از همه به هر دو نیاز دارد.
     api.use('/support', require('./routes/support'));
@@ -364,6 +366,16 @@ async function createApp({ runMigrations = true } = {}) {
   app.use('/api', apiRouter());
 
   // ---- پنل مدیریت ----
+  //  CSP فقط برای پنل: نه اسکریپتِ درون‌خطی، نه منبعِ بیرونی، نه قاب.
+  //  اگر روزی XSS در پنل پیدا شود، مرورگر اجرای اسکریپتِ تزریقی را
+  //  نمی‌پذیرد. style درون‌خطی می‌ماند چون HTMLِ پنل `style=` دارد.
+  app.use('/admin', (req, res, next) => {
+    res.set('Content-Security-Policy',
+      "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; " +
+      "connect-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
+    res.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
+    next();
+  });
   app.use('/admin', express.static(path.join(__dirname, '..', 'public', 'admin'), {
     index: 'index.html', maxAge: 0, etag: true,
   }));

@@ -389,6 +389,32 @@ fun SettingsScreen(
       }
     }
 
+    /* ============================ انقضا ============================ */
+    item {
+      var blockExpired by remember { mutableStateOf(ir.vil3ntec.tohid.data.ShopPolicy.blockExpired(context)) }
+      SettingsSection(
+        icon = Icons.Filled.Lock,
+        title = "کالای منقضی",
+        subtitle = if (blockExpired) "فروخته نمی‌شود" else "فقط هشدار",
+        tint = if (blockExpired) Shop.colors.danger else Shop.colors.warning,
+      ) {
+        Text(
+          "هشدارِ انقضا همیشه هست. اگر «فروخته نشود» را بزنید، مقدارِ محموله‌های منقضی از موجودیِ فروختنی کم می‌شود و فروشِ بیش از آن ثبت نمی‌شود.",
+          style = MaterialTheme.typography.labelSmall,
+          color = Shop.colors.muted2,
+        )
+        Spacer(Modifier.height(8.dp))
+        SegmentedChoice(
+          options = listOf("warn" to "فقط هشدار", "block" to "فروخته نشود"),
+          selected = if (blockExpired) "block" else "warn",
+          onSelect = {
+            blockExpired = it == "block"
+            ir.vil3ntec.tohid.data.ShopPolicy.setBlockExpired(context, blockExpired)
+          },
+        )
+      }
+    }
+
     /* ============================== دوربین ============================== */
     item {
       SettingsSection(

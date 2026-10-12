@@ -49,6 +49,17 @@ object SalesEngine {
   }
 
   /** قیمتِ واحدِ یک ردیف — دستی اگر گذاشته شده، وگرنه قیمتِ کالا */
+  /**
+   *  مقدار بر حسبِ واحدِ فروش ⇒ مقدار بر حسبِ واحدِ موجودی.
+   *  ۲۵۰ گرم از کالای کیلویی با ضریبِ ۰٫۰۰۱ ⇒ ۰٫۲۵ کیلوگرم. نتیجه تا سه رقمِ
+   *  اعشار گرد می‌شود تا خطای ممیزِ شناور (۰٫۲۵۰۰۰۰۰۰۰۱) در موجودی ننشیند.
+   *  واحدِ فروش نداشت ⇒ همان عدد.
+   */
+  fun toStockQty(product: Product, quantityInSaleUnit: Double): Double {
+    if (product.saleUnit.isBlank() || product.unitFactor <= 0 || product.unitFactor.isNaN()) return quantityInSaleUnit
+    return Math.round(quantityInSaleUnit * product.unitFactor * 1000.0) / 1000.0
+  }
+
   fun linePrice(d: ShopData, line: CartLine): Double {
     line.unitPrice?.let { return it }
     if (line.free) return 0.0
@@ -59,6 +70,8 @@ object SalesEngine {
   enum class Payment { CASH, CREDIT }
 
   data class Checkout(
+    /** نامِ فروشنده روی فاکتور — صفحه از حسابِ واردشده می‌گذارد */
+    val seller: String = "",
     val discountType: DiscountType = DiscountType.AMOUNT,
     val discountValue: Double = 0.0,
     val payment: Payment = Payment.CASH,
@@ -77,6 +90,8 @@ object SalesEngine {
      *  به فاکتورِ نقدی هیچ عددی را جابه‌جا نمی‌کند.
      */
     val debtorId: String? = null,
+    /** سیاستِ دکان: کالای منقضی فروخته نشود (`ShopPolicy.blockExpired`) */
+    val blockExpired: Boolean = false,
   )
 
   data class Totals(
@@ -102,6 +117,17 @@ object SalesEngine {
   private val FRACTIONAL_UNITS = setOf("کیلو", "کیلوگرم", "گرم", "لیتر", "میلی‌لیتر", "متر")
 
   fun isFractionalUnit(unit: String): Boolean = unit in FRACTIONAL_UNITS
+
+  /**
+   *  دقتِ اعشارِ هر واحد: «۱٫۵ عدد» پذیرفته نمی‌شود، «۱٫۵ کیلو» می‌شود.
+   *  کالایی که واحدِ فروشِ دوم با ضریب دارد استثناست — «۱ بسته» از کالای
+   *  کارتنی با ضریبِ ۰٫۱ یعنی ۰٫۱ کارتن، و درست است. `null` یعنی درست.
+   */
+  fun quantityProblem(p: Product, quantity: Double): String? {
+    if (isFractionalUnit(p.unit) || p.saleUnit.isNotBlank()) return null
+    if (kotlin.math.abs(quantity - Math.rint(quantity)) < 1e-9) return null
+    return "«${p.name}» به «${p.unit.ifBlank { "عدد" }}» شمرده می‌شود و اعشار نمی‌گیرد"
+  }
 
   /** پلهٔ دکمه‌های کم/زیاد — گرم و میلی‌لیتر ۱۰تایی، کیلو و لیتر و متر ۰٫۱، بقیه ۱ */
   fun cartStep(unit: String): Double =
@@ -260,7 +286,20 @@ object SalesEngine {
     // موجودی درست پیش از ثبت سنجیده می‌شود، نه بعد از آن
     for (line in cart) {
       val p = d.products.find { it.id == line.productId } ?: continue
-      val available = ShopStore.stock(d, p.id)
+      if (!p.active) return Result.Failed("«${p.name}» غیرفعال است و فروخته نمی‌شود")
+      quantityProblem(p, line.quantity)?.let { return Result.Failed(it) }
+      var available = ShopStore.stock(d, p.id)
+      //  سیاستِ دکان: کالای منقضی فروخته نشود ⇒ ماندهٔ محموله‌های منقضی از
+      //  موجودیِ فروختنی کم می‌شود (FEFO؛ شرح سرِ `ExpiryEngine`)
+      if (checkout.blockExpired) {
+        val expired = ExpiryEngine.expiredRemaining(d, p.id, today)
+        if (expired > 0 && line.quantity > available - expired) {
+          return Result.Failed(
+            "از «${p.name}» ${ir.vil3ntec.tohid.qty(expired)} واحد منقضی است؛ " +
+              "فقط ${ir.vil3ntec.tohid.qty(max(0.0, available - expired))} واحدِ سالم مانده"
+          )
+        }
+      }
       if (line.quantity > available) return Result.Failed(shortageMessage(p, line.quantity, available))
     }
 
@@ -308,6 +347,7 @@ object SalesEngine {
       createdAt = now,
       date = today,
       syncStatus = "pending",
+      seller = checkout.seller.trim(),
     )
 
     val items = mutableListOf<SaleItem>()
@@ -412,11 +452,20 @@ object SalesEngine {
    * نشده — نه کلِ مبلغِ اولیه. وگرنه فروشی که پیش‌تر مرجوعی خورده، با
    * لغو شدن بدهیِ قرض‌دار را منفی می‌کرد.
    */
-  fun cancel(d: ShopData, saleId: String, today: String, now: Long, newId: () -> String): Result {
+  fun cancel(
+    d: ShopData,
+    saleId: String,
+    today: String,
+    now: Long,
+    newId: () -> String,
+    /** رابط بی دلیل اجازه نمی‌دهد؛ این‌جا پیش‌فرضِ خالی فقط برای صدازننده‌های قدیمی است */
+    reason: String = "",
+  ): Result {
     val sale = d.sales.find { it.id == saleId } ?: return Result.Failed("فاکتور پیدا نشد")
     if (sale.status == "cancelled") return Result.Failed("این فاکتور قبلاً لغو شده است")
+    val why = reason.trim()
 
-    var updated = sale.copy(status = "cancelled")
+    var updated = sale.copy(status = "cancelled", cancelReason = why)
     val transactions = d.transactions.toMutableList()
 
     if (sale.debtorId != null) {
@@ -457,7 +506,7 @@ object SalesEngine {
           type = "cancel_sale",
           date = today,
           refId = saleId,
-          notes = "لغو فروش فاکتور #${sale.invoiceNumber ?: 0}",
+          notes = "لغو فروش فاکتور #${sale.invoiceNumber ?: 0}" + if (why.isNotEmpty()) " — دلیل: $why" else "",
           createdAt = now,
         ),
       ),

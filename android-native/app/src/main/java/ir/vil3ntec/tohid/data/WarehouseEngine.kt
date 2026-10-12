@@ -21,6 +21,12 @@ object WarehouseEngine {
     val salePrice: Double = 0.0,
     val minStock: Double = 0.0,
     val barcode: String = "",
+    /** null ⇒ در ویرایش دست نمی‌خورد (فرم‌هایی که این فیلدها را ندارند، مثلِ ثبتِ گروهی) */
+    val subcategory: String? = null,
+    val supplierId: String? = null,
+    val active: Boolean? = null,
+    val saleUnit: String? = null,
+    val unitFactor: Double? = null,
   )
 
   data class EntryDraft(
@@ -35,10 +41,71 @@ object WarehouseEngine {
     /** خالی = بی انقضا؛ وگرنه `yyyy-MM-dd` */
     val expiryDate: String = "",
     val batch: String = "",
+    /** خالی = ثبت نشده؛ وگرنه `yyyy-MM-dd` و نه بعد از انقضا */
+    val productionDate: String = "",
   )
+
+  /** تاریخِ تولید درست است و از انقضا جلوتر نیست — `null` یعنی درست */
+  private fun datesProblem(draft: EntryDraft): String? {
+    if (!ExpiryEngine.validDate(draft.expiryDate)) return "تاریخِ انقضا درست نیست"
+    if (!ExpiryEngine.validDate(draft.productionDate)) return "تاریخِ تولید درست نیست"
+    val made = draft.productionDate.trim()
+    val exp = draft.expiryDate.trim()
+    if (made.isNotEmpty() && exp.isNotEmpty() && made > exp) return "تاریخِ تولید بعد از انقضا است"
+    return null
+  }
 
   /** اصلاح موجودی | برگشت به تأمین‌کننده — همان دو حالتِ نسخهٔ وب */
   enum class AdjustKind { ADJUSTMENT, SUPPLIER_RETURN }
+
+  /* ------------------------------ انبارگردانی ------------------------------ */
+
+  /** یک ردیفِ اختلاف: آنچه برنامه می‌گوید، آنچه شمرده شد، و ارزشِ فرقشان */
+  data class CountLine(val product: Product, val system: Double, val counted: Double) {
+    val diff: Double get() = counted - system
+    val value: Double get() = diff * product.purchasePrice
+  }
+
+  /**
+   *  فقط کالاهایی که شمرده شده‌اند و با موجودیِ برنامه فرق دارند.
+   *  فرقِ کمتر از یک‌هزارم (گرد شدنِ اعشار) اختلاف نیست.
+   */
+  fun countLines(d: ShopData, counted: Map<String, Double>): List<CountLine> =
+    d.products.mapNotNull { p ->
+      val c = counted[p.id] ?: return@mapNotNull null
+      val sys = ShopStore.stock(d, p.id)
+      if (kotlin.math.abs(c - sys) < 0.0005) null else CountLine(p, sys, c)
+    }
+
+  /**
+   *  ثبتِ انبارگردانی: هر اختلاف یک «اصلاحِ موجودی» با دلیلِ «انبارگردانی»
+   *  می‌شود — همان ردیفِ انبار، گردشِ کالا و سابقه‌ای که اصلاحِ دستی می‌سازد،
+   *  پس گزارش‌ها و همگام‌سازی چیزِ تازه‌ای نمی‌خواهند. شمارشِ منفی رد می‌شود.
+   */
+  fun stockCount(
+    d: ShopData,
+    counted: Map<String, Double>,
+    note: String,
+    today: String,
+    now: Long,
+    newId: () -> String,
+  ): Result {
+    if (counted.values.any { it.isNaN() || it < 0 }) return Result.Failed("مقدارِ شمرده‌شده نمی‌تواند منفی باشد")
+    val lines = countLines(d, counted)
+    if (lines.isEmpty()) return Result.Failed("اختلافی نیست — موجودیِ شمرده‌شده با برنامه یکی است")
+    val why = listOf("انبارگردانی", note.trim()).filter { it.isNotEmpty() }.joinToString(" — ")
+    var data = d
+    var lastId = ""
+    for (l in lines) {
+      when (val r = adjustStock(
+        data, l.product.id, kotlin.math.abs(l.diff), l.diff > 0, why, AdjustKind.ADJUSTMENT, today, now, newId,
+      )) {
+        is Result.Failed -> return Result.Failed("«${l.product.name}»: ${r.message}")
+        is Result.Ok -> { data = r.data; lastId = r.id }
+      }
+    }
+    return Result.Ok(data, lastId)
+  }
 
   sealed interface Result {
     data class Ok(val data: ShopData, val id: String) : Result
@@ -68,9 +135,48 @@ object WarehouseEngine {
 
   /* ---------------------------- ثبتِ کالا ---------------------------- */
 
+  /** نامِ کالا برای سنجشِ تکرار: فاصله‌های اضافه و بزرگی/کوچکیِ حروف حساب نمی‌شود */
+  private fun nameKey(name: String): String =
+    name.trim().replace(Regex("\\s+"), " ").replace('ي', 'ی').replace('ك', 'ک').lowercase()
+
+  /** فهرستِ خوانای تغییرها — قیمتِ خرید جدا در `price_change` ثبت می‌شود */
+  internal fun productChanges(a: Product, b: Product): List<String> = buildList {
+    if (a.name != b.name) add("نام «${a.name}» ⇐ «${b.name}»")
+    if (a.salePrice != b.salePrice) add("قیمت فروش ${money(a.salePrice)} ⇐ ${money(b.salePrice)}")
+    if (a.category != b.category) add("دسته «${a.category}» ⇐ «${b.category}»")
+    if (a.unit != b.unit) add("واحد «${a.unit}» ⇐ «${b.unit}»")
+    if (a.minStock != b.minStock) add("حداقل موجودی ${money(a.minStock)} ⇐ ${money(b.minStock)}")
+    if (a.active != b.active) add(if (b.active) "فعال شد" else "غیرفعال شد")
+    if (a.barcodes != b.barcodes) add("بارکد عوض شد")
+  }
+
+  /** تاریخچهٔ یک کالا: ویرایش‌ها و تغییرِ قیمتِ خرید، تازه‌ترین اول */
+  fun productHistory(d: ShopData, productId: String): List<AuditEntry> =
+    d.auditLog.filter { it.refId == productId && (it.type == "product_edit" || it.type == "price_change") }
+      .sortedByDescending { it.createdAt }
+
+  /** کالای دیگری با همین نام هست؟ (`exceptId` خودِ کالای در حالِ ویرایش) */
+  fun duplicateName(d: ShopData, name: String, exceptId: String? = null): Product? {
+    val key = nameKey(name)
+    return d.products.firstOrNull { it.id != exceptId && nameKey(it.name) == key }
+  }
+
+  /** واحدِ فروش و ضریب با هم معنی دارند؛ ضریب باید عددِ مثبتِ معتبر باشد */
+  private fun unitProblem(unit: String, saleUnit: String?, factor: Double?): String? {
+    val su = saleUnit?.trim().orEmpty()
+    if (su.isEmpty()) return null
+    if (su == unit.trim()) return "واحدِ فروش همان واحدِ موجودی است — خالی بگذارید"
+    val f = factor ?: return "ضریبِ تبدیل را بنویسید"
+    if (f.isNaN() || f.isInfinite() || f <= 0) return "ضریبِ تبدیل باید عددی بزرگ‌تر از صفر باشد"
+    return null
+  }
+
   fun addProduct(d: ShopData, draft: ProductDraft, now: Long, newId: () -> String): Result {
     val name = draft.name.trim()
     if (name.isEmpty()) return Result.Failed("نام کالا را بنویسید")
+    //  کالای هم‌نام، موجودی و گزارش را دو تکه می‌کند و فروشنده نمی‌داند کدام را بزند
+    duplicateName(d, name)?.let { return Result.Failed("کالایی به نامِ «${it.name}» از قبل هست") }
+    unitProblem(draft.unit, draft.saleUnit, draft.unitFactor)?.let { return Result.Failed(it) }
     if (draft.salePrice.isNaN() || draft.salePrice < 0) return Result.Failed("قیمت فروش درست نیست")
     if (draft.purchasePrice.isNaN() || draft.purchasePrice < 0) return Result.Failed("قیمت خرید درست نیست")
 
@@ -93,6 +199,11 @@ object WarehouseEngine {
       notes = "",
       barcodes = if (barcode.isEmpty()) emptyList() else listOf(barcode),
       createdAt = now,
+      subcategory = draft.subcategory?.trim().orEmpty(),
+      supplierId = draft.supplierId.orEmpty(),
+      active = draft.active ?: true,
+      saleUnit = draft.saleUnit?.trim().orEmpty(),
+      unitFactor = if (draft.saleUnit.isNullOrBlank()) 1.0 else draft.unitFactor ?: 1.0,
     )
 
     return Result.Ok(
@@ -116,6 +227,9 @@ object WarehouseEngine {
     val existing = d.products.find { it.id == id } ?: return Result.Failed("کالا پیدا نشد")
     val name = draft.name.trim()
     if (name.isEmpty()) return Result.Failed("نام کالا را بنویسید")
+    duplicateName(d, name, exceptId = id)?.let { return Result.Failed("کالایی به نامِ «${it.name}» از قبل هست") }
+    unitProblem(draft.unit, draft.saleUnit ?: existing.saleUnit, draft.unitFactor ?: existing.unitFactor)
+      ?.let { return Result.Failed(it) }
     if (draft.salePrice.isNaN() || draft.salePrice < 0) return Result.Failed("قیمت فروش درست نیست")
     if (draft.purchasePrice.isNaN() || draft.purchasePrice < 0) return Result.Failed("قیمت خرید درست نیست")
 
@@ -132,6 +246,14 @@ object WarehouseEngine {
       salePrice = draft.salePrice,
       minStock = if (draft.minStock.isNaN()) 0.0 else draft.minStock,
       barcodes = if (barcode.isEmpty()) emptyList() else listOf(barcode),
+      subcategory = draft.subcategory?.trim() ?: existing.subcategory,
+      supplierId = draft.supplierId ?: existing.supplierId,
+      active = draft.active ?: existing.active,
+      saleUnit = draft.saleUnit?.trim() ?: existing.saleUnit,
+      unitFactor = when {
+        (draft.saleUnit ?: existing.saleUnit).isBlank() -> 1.0
+        else -> draft.unitFactor ?: existing.unitFactor
+      },
     )
 
     // تغییرِ قیمتِ خرید در تاریخچه می‌ماند — سودِ گذشته نباید عوض شود
@@ -152,6 +274,18 @@ object WarehouseEngine {
         date = today,
         refId = id,
         notes = "تغییر قیمت خرید از ${money(existing.purchasePrice)} به ${money(draft.purchasePrice)} افغانی",
+        createdAt = now,
+      )
+    }
+    //  بقیهٔ تغییرهای کالا هم ردپا دارند — «چه کسی نام یا قیمتِ فروش را عوض کرد؟»
+    val changes = productChanges(existing, updated)
+    if (changes.isNotEmpty()) {
+      audit = audit + AuditEntry(
+        id = newId(),
+        type = "product_edit",
+        date = today,
+        refId = id,
+        notes = "ویرایش «${existing.name}»: ${changes.joinToString("، ")}",
         createdAt = now,
       )
     }
@@ -210,6 +344,52 @@ object WarehouseEngine {
   }
 
   /** جمله‌ای که پیش از حذف به کاربر نشان داده می‌شود */
+  /* ------------------------------ کارِ گروهی ------------------------------ */
+
+  /**
+   *  چند کالا با هم: فعال/غیرفعال یا دستهٔ تازه. هر کالا ردیفِ «ویرایش
+   *  کالا»ی خودش را در سابقه می‌گیرد — همان ردپای ویرایشِ تکی.
+   */
+  fun bulkUpdate(
+    d: ShopData,
+    ids: Set<String>,
+    today: String,
+    now: Long,
+    newId: () -> String,
+    change: (Product) -> Product,
+  ): Result {
+    if (ids.isEmpty()) return Result.Failed("کالایی انتخاب نشده")
+    val audit = ArrayList<AuditEntry>()
+    val products = d.products.map { p ->
+      if (p.id !in ids) return@map p
+      val next = change(p)
+      val changes = productChanges(p, next)
+      if (changes.isNotEmpty()) {
+        audit += AuditEntry(
+          id = newId(), type = "product_edit", date = today, refId = p.id,
+          notes = "ویرایشِ گروهیِ «${p.name}»: ${changes.joinToString("، ")}", createdAt = now,
+        )
+      }
+      next
+    }
+    if (audit.isEmpty()) return Result.Failed("چیزی عوض نشد")
+    val categories = products.filter { it.id in ids }.map { it.category }.fold(d.productCategories) { acc, c -> withCategory(acc, c) }
+    return Result.Ok(d.copy(products = products, productCategories = categories, auditLog = d.auditLog + audit), id = ids.first())
+  }
+
+  /** حذفِ چند کالا — همان `deleteProduct` برای هر کدام، یا همه یا هیچ */
+  fun bulkDelete(d: ShopData, ids: Set<String>, today: String, now: Long, newId: () -> String): Result {
+    if (ids.isEmpty()) return Result.Failed("کالایی انتخاب نشده")
+    var data = d
+    for (id in ids) {
+      when (val r = deleteProduct(data, id, today, now, newId)) {
+        is Result.Failed -> return r
+        is Result.Ok -> data = r.data
+      }
+    }
+    return Result.Ok(data, id = ids.first())
+  }
+
   fun deleteWarning(d: ShopData, id: String): String {
     val product = d.products.find { it.id == id } ?: return ""
     val sold = ShopStore.soldQty(d, id)
@@ -226,7 +406,7 @@ object WarehouseEngine {
     if (d.products.none { it.id == draft.productId }) return Result.Failed("ابتدا یک محصول انتخاب یا اضافه کنید")
     if (draft.units.isNaN() || draft.units <= 0) return Result.Failed("تعداد واحد معتبر وارد کنید")
     if (draft.price.isNaN() || draft.price < 0) return Result.Failed("قیمت خرید معتبر وارد کنید")
-    if (!ExpiryEngine.validDate(draft.expiryDate)) return Result.Failed("تاریخِ انقضا درست نیست")
+    datesProblem(draft)?.let { return Result.Failed(it) }
 
     val id = newId()
     val date = draft.date.ifBlank { today }
@@ -245,6 +425,7 @@ object WarehouseEngine {
           createdAt = now,
           expiryDate = draft.expiryDate.trim(),
           batch = draft.batch.trim(),
+          productionDate = draft.productionDate.trim(),
         ),
         stockMovements = d.stockMovements + StockMovement(
           id = newId(),
@@ -270,7 +451,7 @@ object WarehouseEngine {
     if (d.products.none { it.id == draft.productId }) return Result.Failed("ابتدا یک محصول انتخاب یا اضافه کنید")
     if (draft.units.isNaN() || draft.units <= 0) return Result.Failed("تعداد واحد معتبر وارد کنید")
     if (draft.price.isNaN() || draft.price < 0) return Result.Failed("قیمت خرید معتبر وارد کنید")
-    if (!ExpiryEngine.validDate(draft.expiryDate)) return Result.Failed("تاریخِ انقضا درست نیست")
+    datesProblem(draft)?.let { return Result.Failed(it) }
     //  کم کردنِ ورودی‌ای که جنسش فروخته شده، موجودی را منفی می‌کرد —
     //  همان نگهبانِ `deleteEntry`
     val left = ShopStore.stock(d, existing.productId) - existing.units +
@@ -290,6 +471,7 @@ object WarehouseEngine {
       notes = draft.notes,
       expiryDate = draft.expiryDate.trim(),
       batch = draft.batch.trim(),
+      productionDate = draft.productionDate.trim(),
     )
     return Result.Ok(
       d.copy(

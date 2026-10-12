@@ -395,10 +395,29 @@
       try {
         var r = await acc.authFetch('/api/me/devices');
         var list = (r && r.devices) || [];
+        //  مدیریتِ دستگاه‌ها — همان «ببند»ِ اندروید: دستگاهِ دیگر را بیرون می‌کند
+        //  (سرور نشست‌هایش را باطل می‌کند). دستگاهِ خودِ همین مرورگر دکمه ندارد.
+        var mine = acc.deviceId ? acc.deviceId() : '';
         dev.innerHTML = list.length ? list.map(function (d) {
-          return '<div class="acct-row"><span>' + esc(d.name || d.device_uid || 'دستگاه') + '</span>'
-            + '<span class="acct-k">' + clock(Number(d.last_seen_at || 0)) + '</span></div>';
+          var self = d.device_uid && d.device_uid === mine;
+          var revoked = d.status === 'revoked';
+          return '<div class="acct-row"><span>' + esc(d.name || d.device_uid || 'دستگاه')
+            + (self ? ' <i class="acct-k">(همین دستگاه)</i>' : '') + (revoked ? ' <i class="acct-k">(بسته شده)</i>' : '') + '</span>'
+            + '<span class="acct-k">' + clock(Number(d.last_seen_at || 0)) + '</span>'
+            + (!self && !revoked ? ' <button type="button" class="btn btn-secondary btn-sm" data-revoke-device="' + esc(String(d.id)) + '">ببند</button>' : '')
+            + '</div>';
         }).join('') : '<div class="acct-empty">دستگاهی ثبت نشده.</div>';
+        dev.querySelectorAll('[data-revoke-device]').forEach(function (b) {
+          b.addEventListener('click', async function () {
+            if (!window.confirm('این دستگاه از حساب بیرون شود؟ برای ورودِ دوباره باید دوباره وارد شود.')) return;
+            b.disabled = true;
+            try {
+              await acc.authFetch('/api/me/devices/' + encodeURIComponent(b.getAttribute('data-revoke-device')), { method: 'DELETE' });
+              toast('دستگاه بسته شد');
+              fillLists();
+            } catch (e) { b.disabled = false; toast(e.message || 'نشد', 'danger'); }
+          });
+        });
       } catch (e) { dev.innerHTML = '<div class="acct-empty">نشد خواند.</div>'; }
 
       try {

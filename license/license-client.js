@@ -801,6 +801,12 @@
 
   async function storeLicense(r) {
     if (r.serverTime) Clock.syncWithServer(r.serverTime);
+    /* سرور صریحاً مجوز نداد — «سقفِ دستگاه پر است» یا «اشتراکی نیست».
+       همان `serverDenied`ِ اندروید: قفلِ vip.js از همین می‌خواند. پیش‌تر
+       این پاسخ (۲۰۰ با license: null) بی‌اثر از کنارش رد می‌شد. */
+    if (!r.license && (r.reason === 'device_limit' || r.reason === 'no_subscription')) {
+      writeStore({ serverDenied: { code: r.reason, message: r.message || '', at: Date.now() } });
+    }
     if (r.license) {
       // پیش از ذخیره، امضا بررسی می‌شود تا License خراب ذخیره نشود
       const v = await verifyLicense(r.license);
@@ -1288,6 +1294,9 @@
      *  برمی‌داشت و ۴۰۱ می‌گرفت. این یکی همان توکنِ واقعی است.
      */
     getAccessToken: () => readStore().accessToken || '',
+    /** رمزِ ردِ آخرِ سرور (`device_limit`، `no_subscription`، …) یا '' */
+    deniedCode: () => (readStore().serverDenied || {}).code || '',
+    deniedMessage: () => (readStore().serverDenied || {}).message || '',
     isLoggedIn: () => !!readStore().accessToken,
     userLabel: () => readStore().userLabel || '',
     verifyLicense, evaluate: evaluateLocal,

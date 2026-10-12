@@ -24,14 +24,42 @@ object ReportCsv {
       "sales" -> sales(d, from, to)
       "products" -> products(d, today)
       "debtors" -> debtors(d, today)
+      "purchases" -> purchases(d, from, to)
+      "expiry" -> expiry(d, today)
       else -> stock(d, today)
     }
+
+  private fun purchases(d: ShopData, from: String, to: String): Sheet {
+    val names = d.suppliers.associate { it.id to it.name }
+    val products = d.products.associate { it.id to it.name }
+    val rows = mutableListOf(listOf("تاریخ", "تأمین‌کننده", "کالا", "مقدار", "واحد", "قیمت خرید", "جمع", "پرداختی", "بدهی"))
+    ReportEngine.purchases(d, from, to).rows.forEach { p ->
+      rows += listOf(
+        p.date, names[p.supplierId].orEmpty(), products[p.productId].orEmpty(),
+        ir.vil3ntec.tohid.qty(p.quantity), p.unit, round(p.purchasePrice),
+        round(p.totalAmount), round(p.paidAmount), round(p.debt),
+      )
+    }
+    return Sheet("گزارش-خرید-$from-تا-$to", rows)
+  }
+
+  private fun expiry(d: ShopData, today: String): Sheet {
+    val rows = mutableListOf(listOf("کالا", "سری ساخت", "تاریخ تولید", "تاریخ انقضا", "روز مانده", "مقدارِ مانده", "واحد", "وضعیت"))
+    ExpiryEngine.lots(d, today).forEach { l ->
+      rows += listOf(
+        l.product.name, l.entry.batch, l.entry.productionDate, l.entry.expiryDate, l.daysLeft.toString(),
+        ir.vil3ntec.tohid.qty(l.remaining), l.product.unit,
+        when { l.expired -> "منقضی"; l.daysLeft <= ExpiryEngine.NEAR_DAYS -> "نزدیک به انقضا"; else -> "سالم" },
+      )
+    }
+    return Sheet("گزارش-انقضا-$today", rows)
+  }
 
   private fun sales(d: ShopData, from: String, to: String): Sheet {
     val rows = mutableListOf(
       listOf(
         "شماره فاکتور", "تاریخ", "مبلغ کل", "تخفیف", "مبلغ نهایی",
-        "پرداختی", "باقی‌مانده", "روش پرداخت", "وضعیت",
+        "پرداختی", "باقی‌مانده", "روش پرداخت", "وضعیت", "دلیلِ لغو", "فروشنده",
       )
     )
     d.sales
@@ -45,6 +73,8 @@ object ReportCsv {
           round(s.paidAmount), round(s.remaining),
           if (s.paymentMethod == "credit") "نسیه" else "نقدی",
           if (s.status == "cancelled") "لغو‌شده" else "ثبت‌شده",
+          s.cancelReason,
+          s.seller,
         )
       }
     return Sheet("گزارش-فروش-$from-تا-$to", rows)
@@ -72,6 +102,41 @@ object ReportCsv {
       )
     }
     return Sheet("گزارش-محصولات-$today", rows)
+  }
+
+  /**
+   *  صورت‌حسابِ یک مشتری — هر برد و رسید به ترتیبِ زمان، با ماندهٔ پس از
+   *  هر ردیف. ماندهٔ آخر همان «الباقی»ِ صفحهٔ حساب است (`ShopStore.debt`)،
+   *  پس کاغذی که به مشتری داده می‌شود با برنامه یکی است.
+   */
+  fun statement(d: ShopData, debtorId: String, today: String): Sheet {
+    val debtor = d.debtors.find { it.id == debtorId }
+    val rows = mutableListOf(listOf("تاریخ", "شرح", "برد", "رسید", "مانده"))
+    var balance = 0.0
+    d.transactions.filter { it.debtorId == debtorId }
+      .sortedWith(compareBy<DebtTransaction> { it.date }.thenBy { it.createdAt })
+      .forEach { tx ->
+        val give = tx.type == "give"
+        balance += if (give) tx.amount else -tx.amount
+        rows += listOf(
+          tx.date,
+          tx.notes.ifBlank { if (give) "برد" else "رسید" },
+          if (give) round(tx.amount) else "",
+          if (give) "" else round(tx.amount),
+          round(balance),
+        )
+      }
+    val name = debtor?.name?.replace(Regex("[\\\\/:*?\"<>|]"), " ")?.trim().orEmpty()
+    return Sheet("صورت‌حساب-${name.ifBlank { "مشتری" }}-$today", rows)
+  }
+
+  /** گزارشِ اختلافِ انبارگردانی — پیش از ثبت، برای بایگانی یا بازبینی */
+  fun stockCount(lines: List<WarehouseEngine.CountLine>, today: String): Sheet {
+    val rows = mutableListOf(listOf("نام کالا", "واحد", "موجودی برنامه", "شمرده‌شده", "اختلاف", "ارزش اختلاف"))
+    lines.forEach { l ->
+      rows += listOf(l.product.name, l.product.unit, trim(l.system), trim(l.counted), trim(l.diff), round(l.value))
+    }
+    return Sheet("انبارگردانی-$today", rows)
   }
 
   private fun debtors(d: ShopData, today: String): Sheet {

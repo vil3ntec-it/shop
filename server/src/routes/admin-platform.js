@@ -41,7 +41,7 @@ const router = express.Router();
    خودبه‌خود برمی‌گردد. پس مدیر لازم نیست عددِ قبلی را جایی یادداشت کند.
 */
 
-router.put('/plans/:code/discount', async (req, res, next) => {
+router.put('/plans/:code/discount', requireSuperAdmin, async (req, res, next) => {
   try {
     const code = v.text(req.params.code, { max: 20, required: true, field: 'کد پلن' });
     //  ⚠️ بخش هم لازم است: بی آن، تخفیفی که برای دکان‌ها گذاشته می‌شد
@@ -78,7 +78,7 @@ router.put('/plans/:code/discount', async (req, res, next) => {
 });
 
 /** برداشتن تخفیف — قیمت به همان عددِ اصلی برمی‌گردد. */
-router.delete('/plans/:code/discount', async (req, res, next) => {
+router.delete('/plans/:code/discount', requireSuperAdmin, async (req, res, next) => {
   try {
     const code = v.text(req.params.code, { max: 20, required: true, field: 'کد پلن' });
     const app = String(req.query?.app || req.body?.app || '').trim().toLowerCase() === 'pump'
@@ -116,7 +116,7 @@ router.get('/vip-codes', async (req, res, next) => {
  * نمی‌تواند نشانش بدهد؛ پس مدیر یا همان لحظه برش می‌دارد یا می‌گذارد
  * ایمیل کارش را بکند.
  */
-router.post('/vip-codes', async (req, res, next) => {
+router.post('/vip-codes', requireSuperAdmin, async (req, res, next) => {
   try {
     const email = v.text(req.body?.email, { max: 160 });
     if (email && !email.includes('@')) return next(badRequest('نشانی ایمیل درست نیست', 'bad_email'));
@@ -532,7 +532,7 @@ router.get('/email', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.put('/email', async (req, res, next) => {
+router.put('/email', requireSuperAdmin, async (req, res, next) => {
   try {
     const body = req.body || {};
     const patch = {};

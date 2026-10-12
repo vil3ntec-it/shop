@@ -283,18 +283,28 @@
    * محاسبه‌ی موجودی، دقیقاً به همان روشی که خود برنامه حساب می‌کند:
    * مجموع ورودی‌های انبار منهای فروش‌های لغو‌نشده (با کسر مرجوعی).
    */
+  /*
+   *  یک گذر برای همهٔ کالاها. پیش‌تر `stockOf` برای هر کالا کلِ ورودی‌ها و
+   *  اقلامِ فروش را می‌گشت و برای هر قلم کلِ فاکتورها را — هنگامِ بالا آمدنِ
+   *  صفحه در دکانِ بزرگ بیش از نیم‌ثانیه (پروفایلِ Chromium).
+   */
+  function stockIndexOf(data) {
+    const cancelled = new Set();
+    for (const s of (data.sales || [])) if (s.status === 'cancelled') cancelled.add(s.id);
+    const stock = new Map();
+    for (const w of (data.warehouseEntries || [])) stock.set(w.productId, (stock.get(w.productId) || 0) + (w.units || 0));
+    const items = new Map();
+    for (const si of (data.saleItems || [])) {
+      if (cancelled.has(si.saleId)) continue;
+      stock.set(si.productId, (stock.get(si.productId) || 0) - ((si.quantity || 0) - (si.returnedQty || 0)));
+      if (!items.has(si.productId)) items.set(si.productId, []);
+      items.get(si.productId).push(si);
+    }
+    return { stock, items };
+  }
+
   function stockOf(data, productId) {
-    const inbound = (data.warehouseEntries || [])
-      .filter(w => w.productId === productId)
-      .reduce((s, w) => s + (w.units || 0), 0);
-    const sold = (data.saleItems || [])
-      .filter(si => {
-        if (si.productId !== productId) return false;
-        const sale = (data.sales || []).find(s => s.id === si.saleId);
-        return !sale || sale.status !== 'cancelled';
-      })
-      .reduce((s, si) => s + ((si.quantity || 0) - (si.returnedQty || 0)), 0);
-    return inbound - sold;
+    return stockIndexOf(data).stock.get(productId) || 0;
   }
 
   function memberName(userId) {
@@ -311,18 +321,16 @@
     const meta = read('tohid-sync-meta-v1', {});
     const myId = getAcct().userId || '';
     const out = [];
+    const idx = stockIndexOf(data);
 
     for (const p of data.products) {
-      const s = stockOf(data, p.id);
+      const s = idx.stock.get(p.id) || 0;
       if (s >= 0) continue;
 
       // چه کسی این کالا را فروخته؟ فروش‌های دیگران را جدا می‌کنیم
       const byOthers = {};
       let othersQty = 0, myQty = 0;
-      for (const si of (data.saleItems || [])) {
-        if (si.productId !== p.id) continue;
-        const sale = (data.sales || []).find(x => x.id === si.saleId);
-        if (sale && sale.status === 'cancelled') continue;
+      for (const si of (idx.items.get(p.id) || [])) {
         const qty = (si.quantity || 0) - (si.returnedQty || 0);
         const owner = (meta.saleItems && meta.saleItems[si.id] && meta.saleItems[si.id].userId) || '';
         if (owner && owner !== myId) {

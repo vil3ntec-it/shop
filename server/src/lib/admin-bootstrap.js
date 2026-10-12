@@ -39,6 +39,8 @@ async function ensureAdmin({ username, password, log = () => {} } = {}) {
       `UPDATE admins SET password_hash=$2, status='active' WHERE id=$1 RETURNING id`,
       [found.id, await pw.hashPassword(password)]
     );
+    //  رمز عوض شد ⇒ نشست‌هایی که با رمزِ پیشین باز شده‌اند هم بسته شوند
+    if (!same) await require('./tokens').revokeAllForSubject(found.id);
     log(`رمزِ مدیرِ «${uname}» با محیط یکی شد`);
     return { id: found.id, created: false, updated: true };
   }
