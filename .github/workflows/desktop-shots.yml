@@ -1,0 +1,96 @@
+name: عکس‌های برنامهٔ کامپیوتر
+
+#  برنامهٔ واقعیِ کامپیوتر روی نمایشگرِ مجازی (Xvfb) با یک دفترِ نمایشی باز
+#  می‌شود و از همهٔ بخش‌هایش عکس گرفته می‌شود (`DevShot`). عکس‌ها در شاخهٔ
+#  جدای `desktop-screenshots` می‌نشینند — نه در main و نه در شاخهٔ کار — تا
+#  هر کس بی ساختن ببیند برنامه واقعاً چه شکلی است.
+on:
+  pull_request:
+    paths:
+      - 'desktop/**'
+      - 'android-native/app/src/main/**'
+      - '.github/workflows/desktop-shots.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: desktop-shots-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  shots:
+    name: عکس از همهٔ بخش‌ها
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      LC_ALL: C.UTF-8
+      LANG: C.UTF-8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: قلم و نمایشگرِ مجازی
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq xvfb fonts-noto-core >/dev/null
+
+      - name: کامپایل
+        working-directory: desktop
+        run: ./gradlew --no-daemon -q compileKotlin
+
+      - name: دفترِ نمایشی
+        run: node desktop/tools/demo-ledger.mjs "$RUNNER_TEMP/tohid-data"
+
+      - name: اجرای برنامه و عکس
+        working-directory: desktop
+        env:
+          TOHID_DATA_DIR: ${{ runner.temp }}/tohid-data
+        run: |
+          mkdir -p "$RUNNER_TEMP/shots"
+          S="wait:6000;shot:01-dashboard"
+          S="$S;go:sale;wait:1500;shot:02-sale"
+          S="$S;go:quick;wait:1500;shot:03-quick-sale"
+          S="$S;go:debtors;wait:1500;shot:04-debtors"
+          S="$S;go:warehouse;wait:1500;shot:05-warehouse"
+          S="$S;go:products;wait:1500;shot:06-products-table"
+          S="$S;go:sales;wait:1500;shot:07-sales-history-cash-shift"
+          S="$S;go:purchasing;wait:1500;shot:08-purchasing"
+          S="$S;go:reports;wait:1500;shot:09-reports"
+          S="$S;move:700,500;scroll:8;shot:10-reports-lower"
+          S="$S;go:expenses;wait:1500;shot:11-expenses"
+          S="$S;go:more;wait:1500;shot:12-more"
+          S="$S;go:settings;wait:1500;shot:13-settings"
+          S="$S;go:audit;wait:1500;shot:14-audit-log"
+          S="$S;go:team;wait:1500;shot:15-team"
+          S="$S;go:dashboard;key:F11;wait:2000;shot:16-fullscreen-dashboard"
+          export JAVA_TOOL_OPTIONS="-Dtohid.shot=$RUNNER_TEMP/shots -Dtohid.shot.every=9000 -Dtohid.shot.exit=true -Dtohid.shot.script=$S -Dsun.jnu.encoding=UTF-8 -Dfile.encoding=UTF-8"
+          timeout 600 xvfb-run -s "-screen 0 1440x900x24" ./gradlew --no-daemon -q run || true
+          ls -la "$RUNNER_TEMP/shots"
+          test -n "$(ls "$RUNNER_TEMP/shots")"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-screenshots
+          path: ${{ runner.temp }}/shots
+          retention-days: 14
+
+      #  شاخهٔ جدا، هر بار از نو — فقط عکس‌ها و یک README
+      - name: انتشار در شاخهٔ desktop-screenshots
+        run: |
+          cd "$RUNNER_TEMP/shots"
+          {
+            echo "# عکس‌های برنامهٔ کامپیوتر"
+            echo
+            echo "از \`${GITHUB_SHA::7}\` (${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}) — دفترِ نمایشی، نمایشگرِ مجازیِ ۱۴۴۰×۹۰۰."
+            echo
+            for f in *.png; do echo "## ${f%.png}"; echo; echo "![${f%.png}]($f)"; echo; done
+          } > README.md
+          git init -q -b desktop-screenshots
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A && git commit -q -m "عکس‌های برنامهٔ کامپیوتر از ${GITHUB_SHA::7}"
+          git push -q -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" desktop-screenshots
