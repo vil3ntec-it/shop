@@ -144,9 +144,11 @@ jobs:
           $src = (Resolve-Path build/compose/binaries/main/app/Tohid).Path
           New-Item -ItemType Directory -Force out | Out-Null
           $payload = "out/Tohid-Windows-App-$v.7z"
+          #  ‎-ms=off‎: بی آن، نصاب هر فایل را از سرِ بلوکِ «solid» باز می‌کرد و ۹۰ مگابایت ×
+          #  ۲۳۴ فایل نصب را عملاً قفل می‌کرد (آزمونِ نصب روی همین CI گرفت)
           Write-Host "$(Get-Date -f T) 7z"
           Push-Location $src
-          & 7z a -t7z -mx=9 -m0=lzma2 -mf=off -bd -bso0 (Join-Path $env:GITHUB_WORKSPACE "desktop/$payload") *
+          & 7z a -t7z -mx=9 -m0=lzma2 -mf=off -ms=off -bd -bso0 (Join-Path $env:GITHUB_WORKSPACE "desktop/$payload") *
           if ($LASTEXITCODE -ne 0) { throw "7z" }
           Pop-Location
           $sha = (Get-FileHash $payload -Algorithm SHA256).Hash.ToLower()
