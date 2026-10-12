@@ -222,8 +222,11 @@ jobs:
           (Get-FileHash out\MyShop-Windows-Setup.exe -Algorithm SHA256).Hash.ToLower() + "  MyShop-Windows-Setup.exe" | Set-Content -Encoding ascii out\SHA256SUMS.txt
           $env:TOHID_INSTALL_SRC = 'http://127.0.0.1:8765'
           $env:TOHID_INSTALL_ARGS = "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /NOLAUNCH /DIR=$t\e /LOG=$t\e.log /PAYLOADURL=http://127.0.0.1:8765/Tohid-Windows-App-$v.7z"
+          #  مسیرِ ماژول‌های pwsh 7 به powershell 5.1 نرسد — مثلِ ویندوزِ کاربر
+          $env:PSModulePath = [Environment]::GetEnvironmentVariable('PSModulePath', 'Machine')
           $ps = Start-Process powershell.exe -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-Command',"irm http://127.0.0.1:8765/install.ps1 | iex" -PassThru -NoNewWindow
           if (-not $ps.WaitForExit(360000)) { $ps | Stop-Process -Force; throw "install.ps1 گیر کرد" }
+          if (-not (Test-Path "$t\e\Tohid.exe")) { throw "install.ps1 نصب نکرد" }
           Check "$t\e" "install.ps1"
           Remove-Item out\SHA256SUMS.txt, out\install.ps1, out\MyShop-Windows-Setup.exe
           Stop-Process -Id $srv.Id -Force

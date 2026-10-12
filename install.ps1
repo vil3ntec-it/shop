@@ -38,7 +38,10 @@ foreach ($src in $sources) {
       if (-not $line) { throw 'checksum list has no entry for the installer' }
       $want = ($line.Trim() -split '\s+')[0].ToLower()
       Invoke-WebRequest -UseBasicParsing "$src/$name" -OutFile $exe
-      $got = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLower()
+      # .NET directly: Get-FileHash is missing on some systems (PowerShell 4, broken module paths)
+      $fs = [IO.File]::OpenRead($exe)
+      try { $got = ([BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash($fs)) -replace '-', '').ToLower() }
+      finally { $fs.Dispose() }
       if ($got -ne $want) { throw "file damaged in transit (SHA-256 mismatch)" }
       $ok = $true
     } catch {
