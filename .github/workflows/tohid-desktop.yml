@@ -94,8 +94,7 @@ jobs:
             label: ویندوز (Setup.exe)
             task: createDistributable
             inno: true
-            glob: 'build/installer/*.exe'
-            fixed: Tohid-Windows-Setup.exe
+            fixed: Tohid-Windows-Inno
           - os: macos-14
             label: مک (Apple Silicon)
             task: packageDmg
@@ -129,17 +128,93 @@ jobs:
           TOHID_UPDATE_PUBLIC_KEY: ${{ vars.TOHID_UPDATE_PUBLIC_KEY }}
         run: ./gradlew --no-daemon ${{ matrix.task }} -PbuildNumber=${{ github.run_number }}
 
-      - name: نصابِ Inno Setup
+      #  نصابِ آنلاینِ کوچک + نسخهٔ Offline + بستهٔ برنامه (‎.7z‎) — شرحِ
+      #  سناریوها سرِ ‎desktop/installer/Tohid.iss‎. بعد نصبِ واقعی روی همین
+      #  ویندوز: هر سه راه (Offline، فایلِ کنارِ نصاب، دانلود و سنجشِ hash)
+      #  و ردِ فایلِ خراب — تا نصابی که نصب نمی‌شود هرگز منتشر نشود.
+      - name: نصابِ Inno Setup و آزمونِ نصب
         if: ${{ matrix.inno }}
         working-directory: desktop
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
           $v = (./gradlew --no-daemon -q printVersionName -PbuildNumber=${{ github.run_number }} | Select-Object -Last 1).Trim()
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
           if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress | Out-Null }
-          & $iscc /Q "/DAppVersion=$v" installer/Tohid.iss
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          Get-ChildItem build/installer
+          $src = (Resolve-Path build/compose/binaries/main/app/Tohid).Path
+          New-Item -ItemType Directory -Force out | Out-Null
+          $payload = "out/Tohid-Windows-App-$v.7z"
+          #  ‎-ms=off‎: بی آن، نصاب هر فایل را از سرِ بلوکِ «solid» باز می‌کرد و ۹۰ مگابایت ×
+          #  ۲۳۴ فایل نصب را عملاً قفل می‌کرد (آزمونِ نصب روی همین CI گرفت)
+          Write-Host "$(Get-Date -f T) 7z"
+          Push-Location $src
+          & 7z a -t7z -mx=9 -m0=lzma2 -mf=off -ms=off -bd -bso0 (Join-Path $env:GITHUB_WORKSPACE "desktop/$payload") *
+          if ($LASTEXITCODE -ne 0) { throw "7z" }
+          Pop-Location
+          $sha = (Get-FileHash $payload -Algorithm SHA256).Hash.ToLower()
+          $size = (Get-ChildItem $src -Recurse -File | Measure-Object Length -Sum).Sum
+          Write-Host "$(Get-Date -f T) iscc"
+          & $iscc /Q "/DAppVersion=$v" "/DPayloadSha=$sha" "/DPayloadSize=$size" installer/Tohid.iss
+          if ($LASTEXITCODE -ne 0) { throw "iscc online" }
+          & $iscc /Q "/DAppVersion=$v" /DOffline installer/Tohid.iss
+          if ($LASTEXITCODE -ne 0) { throw "iscc offline" }
+          Copy-Item build/installer/Tohid-Windows-Setup.exe, build/installer/Tohid-Windows-Offline.exe out/
+          Get-ChildItem out | Format-Table Name, Length
+
+          function Install($exe, $dir, $extra) {
+            $a = @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/NOLAUNCH', "/DIR=$dir", "/LOG=$dir.log") + $extra
+            #  سقفِ ۶ دقیقه: نصابی که گیر کند گزارشش چاپ می‌شود، نه این‌که کار تا timeout بماند
+            Write-Host "$(Get-Date -f T) → $exe $($extra -join ' ')"
+            $p = Start-Process -FilePath $exe -ArgumentList $a -PassThru
+            if (-not $p.WaitForExit(360000)) {
+              Get-Process | Where-Object { $_.Name -match 'Tohid|setup|\.tmp|unins' } | Format-Table Name, Id, MainWindowTitle | Out-String | Write-Host
+              Get-Content "$dir.log" -Tail 60 -ErrorAction SilentlyContinue
+              Get-Process | Where-Object { $_.Name -match 'Tohid|\.tmp|unins' } | Stop-Process -Force -ErrorAction SilentlyContinue
+              $p | Stop-Process -Force -ErrorAction SilentlyContinue
+              throw "نصاب گیر کرد: $exe"
+            }
+            return $p.ExitCode
+          }
+          function Check($dir, $name) {
+            $n = (Get-ChildItem $dir -Recurse -File | Measure-Object).Count
+            if (-not (Test-Path "$dir\Tohid.exe") -or $n -lt 50) { Get-Content "$dir.log" -Tail 40; throw "${name}: نصب ناقص ($n فایل)" }
+            Write-Host "✓ $name — $n فایل"
+            $u = Start-Process -FilePath "$dir\unins000.exe" -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES' -PassThru
+            if (-not $u.WaitForExit(180000)) { $u | Stop-Process -Force; throw "${name}: حذف گیر کرد" }
+            for ($k = 0; $k -lt 30 -and (Test-Path "$dir\app"); $k++) { Start-Sleep 2 }
+            if (Test-Path "$dir\app") { throw "${name}: حذف ناقص" }
+          }
+          $t = "$env:RUNNER_TEMP\it"; New-Item -ItemType Directory -Force $t | Out-Null
+
+          #  ۱) Offline
+          if ((Install "out\Tohid-Windows-Offline.exe" "$t\a" @()) -ne 0) { Get-Content "$t\a.log" -Tail 40; throw "offline" }
+          Check "$t\a" "Offline"
+
+          #  ۲) فایلِ برنامه کنارِ نصاب، بی‌اینترنت
+          New-Item -ItemType Directory -Force "$t\side" | Out-Null
+          Copy-Item out\Tohid-Windows-Setup.exe, $payload "$t\side\"
+          if ((Install "$t\side\Tohid-Windows-Setup.exe" "$t\b" @('/PAYLOADURL=http://127.0.0.1:9/none')) -ne 0) { Get-Content "$t\b.log" -Tail 40; throw "local payload" }
+          Check "$t\b" "فایلِ کنارِ نصاب"
+
+          #  ۳) دانلود و سنجشِ hash (سرورِ محلی)
+          $srv = Start-Process python -ArgumentList '-m','http.server','8765','--bind','127.0.0.1','--directory',(Resolve-Path out).Path -PassThru
+          Start-Sleep 3
+          #  نصاب در پوشه‌ای بی بسته — وگرنه بستهٔ کنارش را برمی‌داشت و دانلود آزموده نمی‌شد
+          New-Item -ItemType Directory -Force "$t\net" | Out-Null
+          Copy-Item out\Tohid-Windows-Setup.exe "$t\net\"
+          if ((Install "$t\net\Tohid-Windows-Setup.exe" "$t\c" @("/PAYLOADURL=http://127.0.0.1:8765/Tohid-Windows-App-$v.7z")) -ne 0) { Get-Content "$t\c.log" -Tail 40; throw "download" }
+          if (Select-String -Path "$t\c.log" -Pattern 'Using local payload' -Quiet) { throw "دانلود آزموده نشد" }
+          Check "$t\c" "دانلود"
+
+          #  ۴) فایلِ خراب ⇐ باید رد شود، نه نصبِ نیمه‌کاره
+          $bad = "out\bad.7z"; Copy-Item $payload $bad
+          $fs = [IO.File]::OpenWrite((Resolve-Path $bad)); $fs.Seek(5000000, 'Begin') | Out-Null; $fs.Write([byte[]](1..64), 0, 64); $fs.Close()
+          $code = Install "$t\net\Tohid-Windows-Setup.exe" "$t\d" @('/PAYLOADURL=http://127.0.0.1:8765/bad.7z')
+          if ($code -eq 0 -or (Test-Path "$t\d\Tohid.exe")) { throw "فایلِ خراب پذیرفته شد" }
+          Select-String -Path "$t\d.log" -Pattern 'SHA-256|hash|failed' -ErrorAction SilentlyContinue | Select-Object -First 3
+          Write-Host "✓ فایلِ خراب رد شد (کدِ خروج $code)"
+          Remove-Item $bad
+          Stop-Process -Id $srv.Id -Force
 
       - name: گزارشِ jpackage
         if: ${{ failure() }}
@@ -152,14 +227,16 @@ jobs:
         shell: bash
         run: |
           mkdir -p out
-          f=$(ls ${{ matrix.glob }} | head -n1)
-          cp "$f" "out/${{ matrix.fixed }}"
+          if [ -z "${{ matrix.inno }}" ]; then
+            f=$(ls ${{ matrix.glob }} | head -n1)
+            cp "$f" "out/${{ matrix.fixed }}"
+          fi
           ./gradlew --no-daemon -q printVersionName -PbuildNumber=${{ github.run_number }} | tail -n1 > out/version.txt
 
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.fixed }}
-          path: desktop/out/${{ matrix.fixed }}
+          path: ${{ matrix.inno && 'desktop/out/Tohid-Windows-*' || format('desktop/out/{0}', matrix.fixed) }}
           if-no-files-found: error
           retention-days: 30
       - uses: actions/upload-artifact@v4
@@ -212,7 +289,8 @@ jobs:
 
             | سیستم | دانلود |
             |---|---|
-            | ویندوز ۱۰ و ۱۱ (نصاب) | [Tohid-Windows-Setup.exe](https://github.com/${{ github.repository }}/releases/download/tohid-desktop/Tohid-Windows-Setup.exe) |
+            | ویندوز ۱۰ و ۱۱ (نصاب، پیشنهادی) | [Tohid-Windows-Setup.exe](https://github.com/${{ github.repository }}/releases/download/tohid-desktop/Tohid-Windows-Setup.exe) |
+            | ویندوز ۱۰ و ۱۱ (بی‌اینترنت) | [Tohid-Windows-Offline.exe](https://github.com/${{ github.repository }}/releases/download/tohid-desktop/Tohid-Windows-Offline.exe) |
             | ویندوز ۱۰ و ۱۱ (msi، فقط برای مدیرانِ شبکه) | [Tohid-Windows.msi](https://github.com/${{ github.repository }}/releases/download/tohid-desktop/Tohid-Windows.msi) |
             | مک (M1 و تازه‌تر) | [Tohid-Mac-AppleSilicon.dmg](https://github.com/${{ github.repository }}/releases/download/tohid-desktop/Tohid-Mac-AppleSilicon.dmg) |
             | مک (Intel) | [Tohid-Mac-Intel.dmg](https://github.com/${{ github.repository }}/releases/download/tohid-desktop/Tohid-Mac-Intel.dmg) |
@@ -238,13 +316,21 @@ jobs:
             done
             echo "::error::فرستادنِ $1 نشد"; return 1
           }
-          files="Tohid-Windows-Setup.exe Tohid-Windows.msi Tohid-Mac-AppleSilicon.dmg Tohid-Mac-Intel.dmg Tohid-Linux.deb"
-          for f in $files; do up "$f"; done
+          #  بستهٔ برنامهٔ ویندوز پیش از نصابِ آنلاین که آن را می‌خواهد؛ نامش نسخه دارد
+          #  تا نصابِ کهنه‌ای که کاربر نگه داشته هم بستهٔ خودش را پیدا کند (سه نسخهٔ آخر می‌مانند)
+          app=$(ls Tohid-Windows-App-*.7z)
+          up "$app"
+          files="$app Tohid-Windows-Setup.exe Tohid-Windows-Offline.exe Tohid-Windows.msi Tohid-Mac-AppleSilicon.dmg Tohid-Mac-Intel.dmg Tohid-Linux.deb"
+          for f in $files; do [ "$f" = "$app" ] || up "$f"; done
+          gh release view tohid-desktop -R "${{ github.repository }}" --json assets -q '.assets[].name' \
+            | grep '^Tohid-Windows-App-.*\.7z$' | sort -V | head -n -3 \
+            | while read -r old; do gh release delete-asset tohid-desktop "$old" -y -R "${{ github.repository }}" || true; done
           #  نصابِ همهٔ کامپیوترها در یک بسته — انتخابِ سیستم داخلِ خودِ بسته
           #  (‎desktop/setup-all‎: راهنما و سه نصب‌کنندهٔ کوچک که مک تراشه را خودش تشخیص می‌دهد)
           B="$RUNNER_TEMP/Tohid-Setup"
           mkdir -p "$B/Windows" "$B/Mac-Apple-Silicon" "$B/Mac-Intel" "$B/Linux"
-          cp Tohid-Windows-Setup.exe "$B/Windows/"
+          #  نصابِ آنلاین + بستهٔ کنارش: بی‌اینترنت از بسته نصب می‌کند و اگر بسته خراب باشد خودش دانلود می‌کند
+          cp Tohid-Windows-Setup.exe "$app" "$B/Windows/"
           cp Tohid-Mac-AppleSilicon.dmg "$B/Mac-Apple-Silicon/"
           cp Tohid-Mac-Intel.dmg "$B/Mac-Intel/"
           cp Tohid-Linux.deb "$B/Linux/"

@@ -14,7 +14,7 @@ import java.net.URL
  *
  *  | سیستم | فایل | نصب |
  *  |---|---|---|
- *  | ویندوز | `Tohid-Windows-Setup.exe` | نصابِ Inno بی‌صدا (‎/SILENT‎) و بستنِ برنامه؛ نصاب برنامه را دوباره باز می‌کند |
+ *  | ویندوز | `Tohid-Windows-Offline.exe` | نصابِ کاملِ Inno بی‌صدا (‎/SILENT‎) و بستنِ برنامه؛ نصاب برنامه را دوباره باز می‌کند |
  *  | مک | `Tohid-Mac-*.dmg` | بازکردنِ دیسک؛ کاربر برنامه را روی Applications می‌کشد |
  *  | لینوکس | `Tohid-Linux.deb` | نصب‌کنندهٔ بستهٔ سیستم |
  *
@@ -31,7 +31,7 @@ object Updater {
 
   /** نامِ نصابِ همین کامپیوتر */
   val assetName: String = when {
-    os.contains("win") -> "Tohid-Windows-Setup.exe"
+    os.contains("win") -> "Tohid-Windows-Offline.exe"
     os.contains("mac") -> if (arch.contains("aarch64") || arch.contains("arm")) "Tohid-Mac-AppleSilicon.dmg" else "Tohid-Mac-Intel.dmg"
     else -> "Tohid-Linux.deb"
   }
