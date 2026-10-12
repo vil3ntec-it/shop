@@ -49,6 +49,8 @@ fun DeskRail(
   compact: Boolean = false,
   mode: String = RailMode.FULL,
   onMode: (String) -> Unit = {},
+  /** شمارِ کنارِ هر بخش (کم‌موجودی کنارِ کالاها، قرضِ دیرکرده کنارِ قرض‌داران) */
+  badges: Map<String, Int> = emptyMap(),
 ) {
   val context = LocalContext.current
   val canAdmin = ir.vil3ntec.tohid.data.ShopRole.canOpenSettings(context)
@@ -71,38 +73,43 @@ fun DeskRail(
       .padding(vertical = 10.dp, horizontal = 8.dp),
     verticalArrangement = Arrangement.spacedBy(2.dp),
   ) {
-    main.forEach { (id, label, key) -> RailItem(id, label, key, iconOf(id), current == id, onPick, compact) }
-    Spacer(Modifier.height(8.dp))
-    Box(Modifier.fillMaxWidth().height(1.dp).background(Shop.colors.border))
-    Spacer(Modifier.height(8.dp))
-    extra.forEach { (id, label, key) -> RailItem(id, label, key, iconOf(id), current == id, onPick, compact) }
-    //  انتخابِ حالتِ منو — همین‌جا، تا لازم نباشد در تنظیمات دنبالش بگردد
+    //  نشانِ برنامه
     if (!compact) {
-      Spacer(Modifier.height(14.dp))
-      Text("نمایشِ منو", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2,
-        modifier = Modifier.padding(horizontal = 12.dp))
-      Spacer(Modifier.height(4.dp))
-      Row(Modifier.padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        listOf(RailMode.FULL to "ثابت", RailMode.COMPACT to "آیکن", RailMode.HIDDEN to "پنهان").forEach { (m, label) ->
-          Text(
-            label,
-            style = MaterialTheme.typography.labelMedium,
-            color = if (mode == m) Shop.colors.primary else Shop.colors.muted,
-            fontWeight = if (mode == m) FontWeight.Bold else FontWeight.Normal,
-            modifier = Modifier
-              .clip(RoundedCornerShape(8.dp))
-              .background(if (mode == m) Shop.colors.primary.copy(alpha = 0.12f) else Shop.colors.surface.copy(alpha = 0f))
-              .clickable { onMode(m) }
-              .padding(horizontal = 10.dp, vertical = 6.dp),
-          )
+      Row(Modifier.padding(horizontal = 10.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).background(Shop.colors.primary), contentAlignment = Alignment.Center) {
+          Icon(Icons.Filled.Storefront, null, tint = androidx.compose.ui.graphics.Color.White, modifier = Modifier.size(20.dp))
         }
+        Spacer(Modifier.width(10.dp))
+        Column {
+          Text("فروشگاه من", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Shop.colors.text)
+          Text("مدیریتِ دکان", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+        }
+      }
+      Spacer(Modifier.height(8.dp))
+      Text("اصلی", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2, modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp))
+    }
+    main.forEach { (id, label, key) -> RailItem(id, label, key, iconOf(id), current == id, onPick, compact, badges[id] ?: 0) }
+    Spacer(Modifier.height(10.dp))
+    if (!compact) Text("مدیریت", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2, modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp))
+    extra.forEach { (id, label, key) -> RailItem(id, label, key, iconOf(id), current == id, onPick, compact, badges[id] ?: 0) }
+    //  حالتِ منو — سه آیکنِ کوچک پایینِ منو
+    Spacer(Modifier.height(14.dp))
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+      listOf(RailMode.FULL to Icons.Filled.ViewSidebar, RailMode.COMPACT to Icons.Filled.ViewCompact, RailMode.HIDDEN to Icons.Filled.VisibilityOff).forEach { (m, ic) ->
+        Box(
+          Modifier.size(30.dp).clip(RoundedCornerShape(8.dp))
+            .background(if (mode == m) Shop.colors.primary.copy(alpha = 0.12f) else Shop.colors.surface.copy(alpha = 0f))
+            .clickable { onMode(m) },
+          contentAlignment = Alignment.Center,
+        ) { Icon(ic, null, tint = if (mode == m) Shop.colors.primary else Shop.colors.muted, modifier = Modifier.size(17.dp)) }
+        Spacer(Modifier.width(4.dp))
       }
     }
   }
 }
 
 @Composable
-private fun RailItem(id: String, label: String, key: String, icon: ImageVector, selected: Boolean, onPick: (String) -> Unit, compact: Boolean = false) {
+private fun RailItem(id: String, label: String, key: String, icon: ImageVector, selected: Boolean, onPick: (String) -> Unit, compact: Boolean = false, badge: Int = 0) {
   if (compact) {
     //  فقط آیکن — نام در راهنمای دکمه (برای صفحه‌خوان هم)
     Box(
@@ -122,21 +129,28 @@ private fun RailItem(id: String, label: String, key: String, icon: ImageVector, 
     Modifier
       .fillMaxWidth()
       .clip(RoundedCornerShape(10.dp))
-      .background(if (selected) Shop.colors.primary.copy(alpha = 0.12f) else Shop.colors.surface.copy(alpha = 0f))
+      .background(if (selected) Shop.colors.primary else Shop.colors.surface.copy(alpha = 0f))
       .clickable { onPick(id) }
-      .padding(horizontal = 12.dp, vertical = 9.dp),
+      .padding(horizontal = 12.dp, vertical = 10.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
-    Icon(icon, contentDescription = null, tint = if (selected) Shop.colors.primary else Shop.colors.muted, modifier = Modifier.size(19.dp))
-    Spacer(Modifier.width(10.dp))
+    val white = androidx.compose.ui.graphics.Color.White
+    Icon(icon, contentDescription = null, tint = if (selected) white else Shop.colors.muted, modifier = Modifier.size(19.dp))
+    Spacer(Modifier.width(12.dp))
     Text(
       label,
       style = MaterialTheme.typography.bodyMedium,
-      color = if (selected) Shop.colors.primary else Shop.colors.text,
-      fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+      color = if (selected) white else Shop.colors.text,
+      fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
       modifier = Modifier.weight(1f),
     )
-    if (key.isNotEmpty()) Text(key, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2)
+    //  میان‌بر فقط در راهنمای F1؛ این‌جا فقط شمارِ هشدار
+    if (badge > 0) Text(
+      badge.toString(),
+      style = MaterialTheme.typography.labelSmall,
+      color = white,
+      modifier = Modifier.clip(RoundedCornerShape(10.dp)).background(if (selected) white.copy(alpha = 0.25f) else Shop.colors.danger).padding(horizontal = 7.dp, vertical = 1.dp),
+    )
   }
 }
 
