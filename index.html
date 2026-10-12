@@ -4209,6 +4209,14 @@
             <option value="out">تمام‌شده</option>
             <option value="inactive">غیرفعال</option>
           </select>
+          <!-- مرتب‌سازی — همان چیپ‌های «محصولات»ِ برنامه -->
+          <select class="exp-select" id="product-sort" aria-label="مرتب‌سازی">
+            <option value="name">مرتب: نام</option>
+            <option value="stock_asc">کم‌موجودترین</option>
+            <option value="stock_desc">بیشترین موجودی</option>
+            <option value="price_desc">گران‌ترین</option>
+            <option value="newest">تازه‌ترین</option>
+          </select>
         </div>
         <div class="qs-cat-new-row" id="pf-cat-new-row" style="display:none;">
           <input class="form-input" id="in-pf-new-category" type="text" placeholder="نام دسته‌بندی را بنویسید…">
@@ -8635,6 +8643,14 @@
       if(stockF && getStockStatus(p)!==stockF) return false;
       return true;
     });
+    const sortBy = (document.getElementById('product-sort')||{}).value || 'name';
+    const st = {}; filtered.forEach(p=>{ st[p.id] = getProductStock(p.id); });
+    filtered.sort((a,b)=>
+      sortBy==='stock_asc' ? st[a.id]-st[b.id] :
+      sortBy==='stock_desc' ? st[b.id]-st[a.id] :
+      sortBy==='price_desc' ? (b.salePrice||0)-(a.salePrice||0) :
+      sortBy==='newest' ? (b.createdAt||0)-(a.createdAt||0) :
+      String(a.name||'').localeCompare(String(b.name||''), 'fa'));
 
     if(filtered.length===0){
       list.style.display='none'; list.innerHTML='';
@@ -8899,6 +8915,7 @@
     renderProducts();
   });
   document.getElementById('product-filter-stock').addEventListener('change', renderProducts);
+  document.getElementById('product-sort').addEventListener('change', renderProducts);
   document.getElementById('btn-pf-cat-add').addEventListener('click', ()=>{
     document.getElementById('pf-cat-new-row').style.display = 'flex';
     const input = document.getElementById('in-pf-new-category');
@@ -13481,6 +13498,30 @@
   function expiryAlerts(today, days = EXPIRY_NEAR_DAYS){
     return expiryLots(today).filter(l=> l.daysLeft <= days);
   }
+
+  /* میان‌برهای صفحه‌کلید روی دسکتاپ — همان `AppNav.SHORTCUTS`ِ برنامهٔ کامپیوتر.
+     Alt+۱ تا ۹ صفحه‌ها (Ctrl+عدد در مرورگر جابه‌جاییِ زبانه است)، «/» کادرِ
+     جست‌وجوی همین صفحه، Esc بستنِ پنجرهٔ باز. وقتی در کادری تایپ می‌شود،
+     جز Esc و Alt+عدد کاری نمی‌کنند. */
+  const KEY_PAGES = ['dashboard','sale','debtors','warehouse','products','sales','purchasing','reports','expenses'];
+  document.addEventListener('keydown', (e)=>{
+    const typing = e.target && (e.target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName));
+    if(e.altKey && !e.ctrlKey && !e.metaKey){
+      const n = parseInt(e.code && e.code.startsWith('Digit') ? e.code.slice(5) : e.key, 10);
+      if(n >= 1 && n <= KEY_PAGES.length){ e.preventDefault(); location.hash = '#' + KEY_PAGES[n-1]; return; }
+    }
+    if(e.key === 'Escape'){
+      const open = document.querySelector('.modal-scrim.open');
+      if(open){ e.preventDefault(); closeModal(open.id); }
+      return;
+    }
+    if(typing) return;
+    if(e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey){
+      const page = document.querySelector('.page.active');
+      const box = page && page.querySelector('input[type="search"], input[id*="search"], .search-input input, input.exp-search');
+      if(box){ e.preventDefault(); box.focus(); box.select && box.select(); }
+    }
+  });
 
   (function wireExpiryPolicy(){
     const box = document.getElementById('expiry-policy-toggle');

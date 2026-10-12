@@ -365,6 +365,15 @@ fun AppRoot(
     if (TABS.any { it.id == target }) { tab = target; sub = null } else sub = target
   }
 
+  //  میان‌برهای کامپیوتر — شرح سرِ `AppNav`
+  val navRequest = AppNav.request.value
+  LaunchedEffect(navRequest) {
+    if (navRequest != null) {
+      open(navRequest)
+      AppNav.request.value = null
+    }
+  }
+
   //  رنگِ غالبِ زمینه از خودِ صفحه می‌آید: قرض‌داران صورتی، پول نعنایی،
   //  انبار نارنجی، بقیه بنفشِ برند. رنگ‌ها یکی‌اند، فقط ترتیبشان عوض می‌شود.
   val tone = when (sub ?: tab) {

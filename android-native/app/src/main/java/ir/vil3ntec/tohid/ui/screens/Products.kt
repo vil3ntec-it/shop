@@ -70,6 +70,8 @@ fun ProductsScreen(
 
   var search by rememberSaveable { mutableStateOf("") }
   var category by rememberSaveable { mutableStateOf<String?>(null) }
+  //  مرتب‌سازی — همان `product-sort`ِ وب
+  var sort by rememberSaveable { mutableStateOf("name") }
   var productForm by remember { mutableStateOf<ProductFormState?>(null) }
   var bulkProduct by remember { mutableStateOf(false) }
   var actionsFor by remember { mutableStateOf<Product?>(null) }
@@ -120,12 +122,21 @@ fun ProductsScreen(
   val term = search.trim()
   //  فیلتر و دو جمعِ انبار، یک بار به ازای هر دفتر و هر عبارتِ جستجو —
   //  نه در هر بار کشیده شدنِ صفحه
-  val shown = remember(d, term, category) {
-    d.products.filter { p ->
+  val shown = remember(d, term, category, sort) {
+    val stock = ShopStore.index(d)
+    val list = d.products.filter { p ->
       (category == null || p.category == category) &&
         (term.isBlank() || p.name.contains(term, ignoreCase = true) ||
           p.category.contains(term, ignoreCase = true) ||
+          p.subcategory.contains(term, ignoreCase = true) ||
           p.barcodes.any { it.contains(term) })
+    }
+    when (sort) {
+      "stock_asc" -> list.sortedBy { stock.stock(it.id) }
+      "stock_desc" -> list.sortedByDescending { stock.stock(it.id) }
+      "price_desc" -> list.sortedByDescending { it.salePrice }
+      "newest" -> list.sortedByDescending { it.createdAt }
+      else -> list.sortedBy { it.name }
     }
   }
 
@@ -216,6 +227,18 @@ fun ProductsScreen(
           onValueChange = { search = it },
           label = "جستجوی نام، دسته یا بارکد",
         )
+        Spacer(Modifier.height(10.dp))
+        Row(
+          Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+          horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+          listOf(
+            "name" to "نام", "stock_asc" to "کم‌موجودترین", "stock_desc" to "بیشترین موجودی",
+            "price_desc" to "گران‌ترین", "newest" to "تازه‌ترین",
+          ).forEach { (id, label) ->
+            FilterChip(selected = sort == id, onClick = { sort = id }, label = { Text(label) })
+          }
+        }
         if (d.productCategories.isNotEmpty()) {
           Spacer(Modifier.height(10.dp))
           CategoryFilter(
