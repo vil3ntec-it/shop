@@ -1,6 +1,14 @@
 package ir.vil3ntec.tohid.ui.screens
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Print
+import ir.vil3ntec.tohid.data.ReportCsv
+import ir.vil3ntec.tohid.print.ReportPrint
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -106,6 +114,7 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
 
   if (account != null) {
     AccountView(
+      d = d,
       account = account,
       onBack = { openId = null },
       onNewTx = { txFor = account.debtor.id to DebtorEngine.Kind.GIVE },
@@ -547,6 +556,7 @@ private fun CornerButton(
 /** حسابِ یک نفر — مانده، دکمه‌ها، و همهٔ تراکنش‌هایش */
 @Composable
 private fun AccountView(
+  d: ShopData,
   account: DebtorEngine.Account,
   onBack: () -> Unit,
   onNewTx: () -> Unit,
@@ -554,6 +564,24 @@ private fun AccountView(
   onDelete: () -> Unit,
   onDeleteTx: (String) -> Unit,
 ) {
+  val context = LocalContext.current
+  val scope = rememberCoroutineScope()
+  var pending by remember { mutableStateOf<ReportCsv.Sheet?>(null) }
+  //  صورت‌حساب با انتخابگرِ خودِ سیستم ذخیره می‌شود — بی اجازهٔ حافظه
+  val saveCsv = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
+    val sheet = pending
+    pending = null
+    if (uri == null || sheet == null) return@rememberLauncherForActivityResult
+    scope.launch {
+      runCatching {
+        withContext(Dispatchers.IO) {
+          context.contentResolver.openOutputStream(uri)?.use { out ->
+            out.write(ReportCsv.text(sheet).toByteArray(Charsets.UTF_8))
+          } ?: error("فایل ساخته نشد")
+        }
+      }
+    }
+  }
   Box(Modifier.fillMaxSize()) {
   LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, 96.dp)) {
     item {
@@ -646,6 +674,69 @@ private fun AccountView(
           Shop.colors.surface,
           Modifier.weight(1f),
         )
+      }
+
+      //  صورت‌حساب: همان ردیف‌ها با ماندهٔ پس از هر کدام — برای دادن به مشتری
+      if (account.transactions.isNotEmpty()) {
+        Spacer(Modifier.height(10.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+          OutlinedButton(
+            onClick = {
+              val sheet = ReportCsv.statement(d, account.debtor.id, todayIso())
+              pending = sheet
+              saveCsv.launch("${sheet.name}.csv")
+            },
+            modifier = Modifier.weight(1f),
+          ) {
+            Icon(Icons.Filled.Download, contentDescription = null, modifier = Modifier.size(17.dp))
+            Spacer(Modifier.width(6.dp))
+            Text("صورت‌حساب (CSV)")
+          }
+          OutlinedButton(
+            onClick = {
+              val sheet = ReportCsv.statement(d, account.debtor.id, todayIso())
+              ReportPrint.print(context, sheet, "صورت‌حسابِ ${account.debtor.name}")
+            },
+            modifier = Modifier.weight(1f),
+          ) {
+            Icon(Icons.Filled.Print, contentDescription = null, modifier = Modifier.size(17.dp))
+            Spacer(Modifier.width(6.dp))
+            Text("چاپ صورت‌حساب")
+          }
+        }
+      }
+
+      //  فاکتورهای همین مشتری — تا حالا فقط ردیفِ بدهی دیده می‌شد، نه خودِ خرید
+      if (account.sales.isNotEmpty()) {
+        Spacer(Modifier.height(18.dp))
+        SectionTitle("فاکتورهای این مشتری (${account.sales.size})")
+        Panel {
+          account.sales.take(SALES_SHOWN).forEachIndexed { i, sale ->
+            if (i > 0) HorizontalDivider(color = Shop.colors.border)
+            Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+              Column(Modifier.weight(1f)) {
+                Text(
+                  "فاکتور ${sale.invoiceNumber?.toString() ?: "—"}${if (sale.status == "cancelled") " (لغوشده)" else ""}",
+                  style = MaterialTheme.typography.bodyMedium,
+                  color = if (sale.status == "cancelled") Shop.colors.muted2 else Shop.colors.text,
+                )
+                Text(formatDate(sale.date), style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+              }
+              Column(horizontalAlignment = Alignment.End) {
+                Text(money(sale.finalTotal), style = MaterialTheme.typography.titleSmall, color = Shop.colors.text)
+                if (sale.remaining > 0 && sale.status != "cancelled") {
+                  Text("مانده ${money(sale.remaining)}", style = MaterialTheme.typography.labelSmall, color = Shop.colors.danger)
+                }
+              }
+            }
+          }
+          if (account.sales.size > SALES_SHOWN) {
+            Text(
+              "${account.sales.size - SALES_SHOWN} فاکتورِ قدیمی‌تر در «فروش‌ها»",
+              style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted,
+            )
+          }
+        }
       }
 
       Spacer(Modifier.height(18.dp))
@@ -770,6 +861,9 @@ private fun AccountView(
   }
   }
 }
+
+/** چند فاکتورِ آخرِ مشتری در صفحهٔ حسابش — بقیه در «فروش‌ها» */
+private const val SALES_SHOWN = 20
 
 /* ============================ فرم‌ها ============================ */
 

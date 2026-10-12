@@ -191,6 +191,8 @@ object DebtorEngine {
     val transactions: List<DebtTransaction>,
     /** قدیمی‌ترین قرضِ پس‌داده‌نشده از کِی است — `null` یعنی بدهکار نیست */
     val since: Long? = null,
+    /** فاکتورهایی که به نامِ همین مشتری ثبت شده‌اند — تازه‌ترین اول */
+    val sales: List<Sale> = emptyList(),
   )
 
   fun account(d: ShopData, id: String): Account? {
@@ -203,6 +205,7 @@ object DebtorEngine {
       balance = ShopStore.debt(d, id),
       transactions = mine,
       since = debtSince(d, id),
+      sales = d.sales.filter { it.debtorId == id }.sortedByDescending { it.createdAt },
     )
   }
 

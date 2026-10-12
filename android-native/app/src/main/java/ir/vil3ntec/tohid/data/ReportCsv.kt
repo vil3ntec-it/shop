@@ -103,6 +103,32 @@ object ReportCsv {
     return Sheet("گزارش-محصولات-$today", rows)
   }
 
+  /**
+   *  صورت‌حسابِ یک مشتری — هر برد و رسید به ترتیبِ زمان، با ماندهٔ پس از
+   *  هر ردیف. ماندهٔ آخر همان «الباقی»ِ صفحهٔ حساب است (`ShopStore.debt`)،
+   *  پس کاغذی که به مشتری داده می‌شود با برنامه یکی است.
+   */
+  fun statement(d: ShopData, debtorId: String, today: String): Sheet {
+    val debtor = d.debtors.find { it.id == debtorId }
+    val rows = mutableListOf(listOf("تاریخ", "شرح", "برد", "رسید", "مانده"))
+    var balance = 0.0
+    d.transactions.filter { it.debtorId == debtorId }
+      .sortedWith(compareBy<DebtTransaction> { it.date }.thenBy { it.createdAt })
+      .forEach { tx ->
+        val give = tx.type == "give"
+        balance += if (give) tx.amount else -tx.amount
+        rows += listOf(
+          tx.date,
+          tx.notes.ifBlank { if (give) "برد" else "رسید" },
+          if (give) round(tx.amount) else "",
+          if (give) "" else round(tx.amount),
+          round(balance),
+        )
+      }
+    val name = debtor?.name?.replace(Regex("[\\\\/:*?\"<>|]"), " ")?.trim().orEmpty()
+    return Sheet("صورت‌حساب-${name.ifBlank { "مشتری" }}-$today", rows)
+  }
+
   private fun debtors(d: ShopData, today: String): Sheet {
     val rows = mutableListOf(
       listOf("نام قرض‌دار", "شماره تماس", "بدهی", "تاریخ آخرین تراکنش", "یادداشت")

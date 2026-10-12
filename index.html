@@ -3980,6 +3980,18 @@
           </div>
         </div>
 
+        <!-- صورت‌حساب: همان ردیف‌ها با ماندهٔ پس از هر کدام — برای دادن به مشتری -->
+        <div class="acc-statement" id="acc-statement" style="display:flex;gap:8px;margin:0 0 12px;">
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-acc-statement-csv" style="flex:1;">صورت‌حساب (CSV)</button>
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-acc-statement-print" style="flex:1;">چاپ صورت‌حساب</button>
+        </div>
+
+        <!-- فاکتورهای همین مشتری — پیش‌تر فقط ردیفِ بدهی دیده می‌شد، نه خودِ خرید -->
+        <div class="panel" id="acc-sales-panel" style="display:none;">
+          <div class="panel-head"><h2 id="acc-sales-title">فاکتورهای این مشتری</h2></div>
+          <div class="tx-list" id="acc-sales-list"></div>
+        </div>
+
         <div class="panel">
           <div class="panel-head">
             <h2>تاریخچه تراکنش‌ها</h2>
@@ -7479,6 +7491,9 @@
       stateEl.textContent = 'حساب صاف';
     }
 
+    renderAccountSales(id);
+    document.getElementById('acc-statement').style.display = allTx.length ? 'flex' : 'none';
+
     const txs = transactions.filter(t=>t.debtorId===id)
       .sort((a,b)=> new Date(b.date)-new Date(a.date) || b.createdAt-a.createdAt);
     const txList = document.getElementById('tx-list');
@@ -7523,6 +7538,48 @@
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>`).join('');
+  }
+
+  /* فاکتورهای مشتری — ۲۰ تای آخر؛ بقیه در «فروش‌ها». همان `SALES_SHOWN`ِ اندروید */
+  const ACC_SALES_SHOWN = 20;
+  function renderAccountSales(id){
+    const mine = sales.filter(s=>s.debtorId===id).sort((a,b)=> (b.createdAt||0)-(a.createdAt||0));
+    const panel = document.getElementById('acc-sales-panel');
+    if(!mine.length){ panel.style.display = 'none'; return; }
+    panel.style.display = '';
+    document.getElementById('acc-sales-title').textContent = `فاکتورهای این مشتری (${formatMoney(mine.length)})`;
+    const rows = mine.slice(0, ACC_SALES_SHOWN).map(s=>{
+      const cancelled = s.status === 'cancelled';
+      const left = !cancelled && Number(s.remaining) > 0 ? ` · <b style="color:var(--danger)">مانده ${formatMoney(s.remaining)}</b>` : '';
+      return `<div class="tx-item${cancelled ? ' muted' : ''}">
+        <span class="tx-date-col">${formatDate(s.date)}</span>
+        <span class="tx-note-col">فاکتور ${s.invoiceNumber != null ? escapeHtml(String(s.invoiceNumber)) : '—'}${cancelled ? ' (لغوشده)' : ''}${left}</span>
+        <span class="tx-money">${formatMoney(s.finalTotal)}</span>
+      </div>`;
+    });
+    if(mine.length > ACC_SALES_SHOWN){
+      rows.push(`<div class="empty-sub" style="padding:8px 4px;">${formatMoney(mine.length - ACC_SALES_SHOWN)} فاکتورِ قدیمی‌تر در «فروش‌ها»</div>`);
+    }
+    document.getElementById('acc-sales-list').innerHTML = rows.join('');
+  }
+
+  /*
+   * صورت‌حسابِ یک مشتری — ردیف‌ها به ترتیبِ زمان با ماندهٔ پس از هر ردیف.
+   * ماندهٔ آخر همان getDebt است. عدد به عدد همان `ReportCsv.statement`ِ اندروید.
+   */
+  function statementRows(id){
+    const rows = [['تاریخ','شرح','برد','رسید','مانده']];
+    let balance = 0;
+    transactions.filter(t=>t.debtorId===id)
+      .sort((a,b)=> String(a.date).localeCompare(String(b.date)) || (a.createdAt||0)-(b.createdAt||0))
+      .forEach(t=>{
+        const give = t.type === 'give';
+        balance += give ? t.amount : -t.amount;
+        rows.push([t.date, t.notes || (give ? 'برد' : 'رسید'), give ? Math.round(t.amount) : '', give ? '' : Math.round(t.amount), Math.round(balance)]);
+      });
+    const d = debtors.find(x=>x.id===id);
+    const name = String(d ? d.name : '').replace(/[\\/:*?"<>|]/g, ' ').trim() || 'مشتری';
+    return { rows, name: `صورت‌حساب-${name}-${todayISO()}` };
   }
 
 /* سربرگ چسبان فقط وقتی دیده شود که کارت بالای صفحه از دید رفته باشد */
@@ -13956,6 +14013,22 @@
 
   document.getElementById('btn-print-report').addEventListener('click', ()=>{
     const { rows, name } = buildReportCsvRows(currentReportTab);
+    printRows(rows, name);
+  });
+  document.getElementById('btn-acc-statement-csv').addEventListener('click', ()=>{
+    if(!currentAccountDebtorId) return;
+    const { rows, name } = statementRows(currentAccountDebtorId);
+    if(rows.length <= 1){ showToast('این حساب هنوز تراکنشی ندارد', 'warning'); return; }
+    downloadCsv(name + '.csv', rows);
+  });
+  document.getElementById('btn-acc-statement-print').addEventListener('click', ()=>{
+    if(!currentAccountDebtorId) return;
+    const { rows, name } = statementRows(currentAccountDebtorId);
+    printRows(rows, name);
+  });
+
+  /* یک جدول را در پنجرهٔ چاپ باز می‌کند — گزارش‌ها و صورت‌حساب */
+  function printRows(rows, name){
     if(rows.length <= 1){ showToast('در این گزارش داده‌ای برای چاپ وجود ندارد', 'warning'); return; }
     const head = rows[0].map(h=> `<th>${escapeHtml(String(h))}</th>`).join('');
     const body = rows.slice(1).map(r=> '<tr>' + r.map(c=> `<td>${escapeHtml(String(c))}</td>`).join('') + '</tr>').join('');
@@ -13979,7 +14052,7 @@
     win.document.close();
     win.focus();
     win.print();
-  });
+  }
 
   /* ---------- ۴) یادآوری پشتیبان‌گیری ---------- */
   const LAST_BACKUP_KEY = 'tohid-shop-last-backup';
