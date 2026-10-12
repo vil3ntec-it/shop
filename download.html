@@ -47,6 +47,19 @@
   <h3>همهٔ نسخه‌ها</h3>
   <div class="grid" id="all"></div>
 
+  <h3>ویندوز بی پنجرهٔ آبیِ «Windows protected your PC»</h3>
+  <div class="note">
+    آن پنجره برای هر برنامه‌ای می‌آید که با مرورگر دانلود شده و «امضای تجاری» ندارد. این راه همان نصاب را بی آن پنجره نصب می‌کند و درستیِ فایل را هم می‌سنجد:
+    <ol>
+      <li>دکمهٔ Start را راست‌کلیک کنید و «Windows PowerShell» یا «Terminal» را بزنید.</li>
+      <li>این یک خط را کپی کنید، در همان پنجره راست‌کلیک کنید (جای‌گذاری) و Enter بزنید:</li>
+    </ol>
+    <code id="ps" dir="ltr" style="display:block;padding:10px;border:1px solid var(--line);border-radius:8px;user-select:all;word-break:break-all">irm https://vil3ntec-it.github.io/shop/install.ps1 | iex</code>
+    <button class="btn alt" type="button" onclick="navigator.clipboard&&navigator.clipboard.writeText(document.getElementById('ps').textContent);this.textContent='کپی شد'">کپی</button>
+    <p style="margin:8px 0 0">اگر فایل را قبلاً با مرورگر گرفته‌اید: روی ‎Tohid-Windows-Setup.exe‎ راست‌کلیک ⇐ Properties ⇐ تیکِ «Unblock» پایینِ پنجره ⇐ OK؛ بعد بازش کنید و دیگر آن پنجره نمی‌آید.</p>
+    <p style="margin:4px 0 0">به‌روزرسانی‌های بعدی از داخلِ خودِ برنامه می‌آیند و آن پنجره را ندارند.</p>
+  </div>
+
   <h3>نصب</h3>
   <div class="note">
     <b>ویندوز:</b> فایلِ ‎Tohid-Windows-Setup.exe‎ را باز کنید (چند مگابایت است؛ برنامه را خودش دانلود می‌کند و اگر دانلود خراب شود خودش دوباره می‌گیرد). اگر پنجرهٔ آبیِ «Windows protected your PC» آمد، «More info» و بعد «Run anyway» را بزنید (نصاب هنوز امضای تجاری ندارد).<br>

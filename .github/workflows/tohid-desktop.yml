@@ -7,6 +7,7 @@ on:
     branches: ['claude/**', main]
     paths:
       - 'desktop/**'
+      - 'install.ps1'
       - 'android-native/app/src/**'
       - 'android-native/gradle.properties'
       - '.github/workflows/tohid-desktop.yml'
@@ -197,6 +198,7 @@ jobs:
           Check "$t\b" "فایلِ کنارِ نصاب"
 
           #  ۳) دانلود و سنجشِ hash (سرورِ محلی)
+          Copy-Item ..\install.ps1 out\
           $srv = Start-Process python -ArgumentList '-m','http.server','8765','--bind','127.0.0.1','--directory',(Resolve-Path out).Path -PassThru
           Start-Sleep 3
           #  نصاب در پوشه‌ای بی بسته — وگرنه بستهٔ کنارش را برمی‌داشت و دانلود آزموده نمی‌شد
@@ -214,6 +216,15 @@ jobs:
           Select-String -Path "$t\d.log" -Pattern 'SHA-256|hash|failed' -ErrorAction SilentlyContinue | Select-Object -First 3
           Write-Host "✓ فایلِ خراب رد شد (کدِ خروج $code)"
           Remove-Item $bad
+
+          #  ۵) ‎install.ps1‎ (راهِ بی SmartScreen) با Windows PowerShell 5.1 — همان که روی ویندوزِ کاربر است
+          (Get-FileHash out\Tohid-Windows-Setup.exe -Algorithm SHA256).Hash.ToLower() + "  Tohid-Windows-Setup.exe" | Set-Content -Encoding ascii out\SHA256SUMS.txt
+          $env:TOHID_INSTALL_SRC = 'http://127.0.0.1:8765'
+          $env:TOHID_INSTALL_ARGS = "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /NOLAUNCH /DIR=$t\e /LOG=$t\e.log /PAYLOADURL=http://127.0.0.1:8765/Tohid-Windows-App-$v.7z"
+          $ps = Start-Process powershell.exe -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-Command',"irm http://127.0.0.1:8765/install.ps1 | iex" -PassThru -NoNewWindow
+          if (-not $ps.WaitForExit(360000)) { $ps | Stop-Process -Force; throw "install.ps1 گیر کرد" }
+          Check "$t\e" "install.ps1"
+          Remove-Item out\SHA256SUMS.txt, out\install.ps1
           Stop-Process -Id $srv.Id -Force
 
       - name: گزارشِ jpackage
