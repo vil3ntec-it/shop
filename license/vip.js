@@ -108,9 +108,17 @@
    */
   function enforcing() { return !!serverUrl(); }
 
+  /** سرور گفته «سقفِ دستگاهِ این اشتراک پر است» — برای همین مرورگر */
+  function deviceDenied() {
+    const L = window.TohidLicense;
+    return !!(L && L.deniedCode && L.deniedCode() === 'device_limit');
+  }
+
   function hasFeature(key) {
     if (CORE.includes(key)) return true;
     if (!enforcing()) return true;
+    //  اشتراکِ حساب فعال است ولی این دستگاه جا ندارد — همان `device_limit`ِ سرور
+    if (deviceDenied()) return false;
     return (ENT.features || []).includes(key);
   }
 
@@ -130,6 +138,12 @@
         apply();
       }
     } catch { /* آفلاین: با وضعیت کش‌شده ادامه می‌دهیم */ }
+    //  مجوزِ همین دستگاه — تنها جایی که سرور «سقفِ دستگاه پر است» را می‌گوید.
+    //  پیش‌تر وب فقط بعد از کدِ فعال‌سازی این را می‌پرسید.
+    if (a.accessToken && window.TohidLicense && window.TohidLicense.sync) {
+      try { await window.TohidLicense.sync(); } catch { /* آفلاین یا سرورِ قدیمی */ }
+      apply();
+    }
     return ENT;
   }
 
@@ -349,6 +363,10 @@
   function reasonText() {
     const t = ENT.trial || {};
     if (!loggedIn()) return 'برای استفاده از این بخش، حساب بسازید و 7 روز رایگان امتحان کنید.';
+    if (deviceDenied()) {
+      const m = window.TohidLicense.deniedMessage && window.TohidLicense.deniedMessage();
+      return m || 'دستگاه‌های این اشتراک پر است. یک دستگاهِ قدیمی را از «دستگاه‌های من» باطل کنید.';
+    }
     if (t.used && !t.active) return 'دوره آزمایشی شما به پایان رسیده است. برای ادامه استفاده، یک اشتراک انتخاب کنید.';
     return 'این بخش نیازمند اشتراک است.';
   }
