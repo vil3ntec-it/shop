@@ -63,6 +63,7 @@ import ir.vil3ntec.tohid.formatMillis
 import ir.vil3ntec.tohid.plain
 import ir.vil3ntec.tohid.spanText
 import ir.vil3ntec.tohid.todayIso
+import ir.vil3ntec.tohid.ui.pressMenu
 import ir.vil3ntec.tohid.ui.theme.Radius
 import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.launch
@@ -439,6 +440,8 @@ private fun DebtorCard(
   val owes = balance > 0
   val tint = if (owes) Shop.colors.danger else Shop.colors.success
   val fill = if (owes) Shop.colors.dangerTint else Shop.colors.successTint
+  //  کلیکِ راست (کامپیوتر) یا لمسِ طولانی (گوشی) ⇒ منوی کارها
+  var menu by remember { mutableStateOf(false) }
 
   Box(
     Modifier
@@ -446,8 +449,13 @@ private fun DebtorCard(
       .clip(RoundedCornerShape(Radius.md))
       .background(fill)
       .border(1.2.dp, tint, RoundedCornerShape(Radius.md))
-      .clickable(onClick = onOpen)
+      .pressMenu(onClick = onOpen, onMenu = { menu = true })
   ) {
+    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+      DropdownMenuItem(text = { Text("باز کردنِ حساب") }, onClick = { menu = false; onOpen() })
+      DropdownMenuItem(text = { Text("ویرایش") }, onClick = { menu = false; onEdit() })
+      DropdownMenuItem(text = { Text("حذف", color = Shop.colors.danger) }, onClick = { menu = false; onDelete() })
+    }
     Column(
       // پایین جای بیشتری می‌خواهد: مدادِ ویرایش در همان گوشه می‌نشیند و
       // با فاصلهٔ برابر، آخرین خطِ متن زیرش می‌رفت
