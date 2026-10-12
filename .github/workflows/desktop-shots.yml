@@ -52,7 +52,7 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/shots"
           #  صفحهٔ ورود ⇐ «ادامه بدون حساب» (پنجره در گوشهٔ ۰،۰ است)
-          S="wait:6000;shot:00-login;click:697,730;wait:3000;shot:00b-after-skip;key:ESCAPE;wait:1500;shot:01-dashboard"
+          S="wait:6000;shot:00-login;click:686,692;wait:3000;shot:00b-after-skip;key:ESCAPE;wait:1500;shot:01-dashboard"
           S="$S;go:admin;wait:2000;shot:01b-admin-center;move:700,500;scroll:8;wait:600;shot:01c-admin-center-lower"
           S="$S;go:sale;wait:1500;shot:02-sale"
           S="$S;go:quick;wait:1500;shot:03-quick-sale"
