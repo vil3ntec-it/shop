@@ -25,6 +25,8 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
@@ -279,6 +281,10 @@ fun TohidTopBar(
    *  باز است و جایی برای برگشتن نیست.
    */
   onBack: (() -> Unit)? = null,
+  /** دکمهٔ سه‌خط (☰) — فقط کامپیوتر: منوی کناری را باز/جمع/پنهان می‌کند */
+  onMenu: (() -> Unit)? = null,
+  /** جست‌وجوی سریع — صفحه، کالا، بارکد، قرض‌دار */
+  onSearch: (() -> Unit)? = null,
 ) {
   val context = LocalContext.current
   val alerts = rememberAlerts(d)
@@ -330,19 +336,24 @@ fun TohidTopBar(
     else -> BAR_DAY
   }
 
+  /*
+   *  روی کامپیوتر سربرگ تخت و باریک است: بی گوشهٔ گرد، بی درخشش و نوارِ
+   *  رونده — مثلِ نرم‌افزارهای حسابداریِ رومیزی. منوی کناری کنارش است و
+   *  سربرگِ پُرنقش فقط چشم را از جدول می‌گرفت. گوشی همان ظاهرِ قبلی را دارد.
+   */
+  val flat = screenSize() == Screen.WIDE
   Box(
     Modifier
       .fillMaxWidth()
-      .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
-      .background(Brush.linearGradient(barColors))
+      .then(if (flat) Modifier else Modifier.clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp)))
+      .background(if (flat) Brush.horizontalGradient(listOf(barColors.first(), barColors[1])) else Brush.linearGradient(barColors))
       //  در حالتِ سرخ، نفسِ آرامِ یک لایهٔ روشن روی زمینه — نه تغییرِ
       //  خودِ رنگ، که متنِ سفید رویش خوانده نشود
       .drawBehind {
         if (!barUrgent) return@drawBehind
         drawRect(color = Color.White.copy(alpha = (barBeat - 1f).coerceIn(0f, 1f) * 0.5f))
       }
-      .barGlow()
-      .barSweep()
+      .then(if (flat) Modifier else Modifier.barGlow().barSweep())
   ) {
     Row(
       Modifier
@@ -351,7 +362,7 @@ fun TohidTopBar(
         // می‌افتاد. این padding همان بلندیِ نوارِ وضعیت را کنار می‌گذارد،
         // هر اندازه‌ای که روی آن دستگاه باشد — بریدگیِ دوربین هم همین‌طور.
         .windowInsetsPadding(WindowInsets.statusBars)
-        .padding(horizontal = 14.dp, vertical = 10.dp),
+        .padding(horizontal = 14.dp, vertical = if (flat) 6.dp else 10.dp),
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.SpaceBetween,
     ) {
@@ -370,6 +381,19 @@ fun TohidTopBar(
          *  در راست‌به‌چپ، فلشِ برگشت به راست است — همان `ArrowForward`
          *  که بقیهٔ صفحه‌های برنامه هم برای «بازگشت» می‌گذارند.
          */
+        if (onMenu != null) {
+          Box(
+            Modifier
+              .size(34.dp)
+              .clip(RoundedCornerShape(12.dp))
+              .background(Color.White.copy(alpha = 0.14f))
+              .clickable(onClick = onMenu),
+            contentAlignment = Alignment.Center,
+          ) {
+            Icon(Icons.Filled.Menu, contentDescription = "منو", tint = Color.White, modifier = Modifier.size(20.dp))
+          }
+          Spacer(Modifier.width(8.dp))
+        }
         if (onBack != null) {
           Box(
             Modifier
@@ -414,6 +438,30 @@ fun TohidTopBar(
          */
         //  نقطهٔ همگام‌سازی، اولین چیزِ ردیف: کوچک، ولی همیشه سرِ جایش
         SyncDot()
+
+        if (onSearch != null) {
+          if (flat) {
+            //  کامپیوتر: کادرِ جست‌وجوی پیدا، با میان‌برش
+            Row(
+              Modifier
+                .widthIn(min = 220.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(Color.White.copy(alpha = 0.14f))
+                .clickable(onClick = onSearch)
+                .padding(horizontal = 12.dp, vertical = 7.dp),
+              verticalAlignment = Alignment.CenterVertically,
+            ) {
+              Icon(Icons.Filled.Search, contentDescription = null, tint = BAR_INK, modifier = Modifier.size(17.dp))
+              Spacer(Modifier.width(8.dp))
+              Text("جست‌وجو…", color = BAR_INK.copy(alpha = 0.8f), style = MaterialTheme.typography.labelMedium)
+              Spacer(Modifier.width(60.dp))
+              Spacer(Modifier.width(18.dp))
+              Text("Ctrl+K", color = BAR_INK.copy(alpha = 0.6f), style = MaterialTheme.typography.labelSmall)
+            }
+          } else {
+            BarButton(Icons.Filled.Search, "جست‌وجو", onClick = onSearch)
+          }
+        }
 
         VipChip { onOpen("vip") }
 

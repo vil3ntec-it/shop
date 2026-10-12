@@ -68,6 +68,7 @@ private val PAGE_TITLES = mapOf(
   "products" to "محصولات",
   "more" to "بیشتر",
   "purchasing" to "خرید و تأمین‌کننده",
+  "admin" to "مرکزِ مدیریت",
   "sales" to "تاریخچه فروش",
   "reports" to "گزارشات",
   "receipts" to "رسیدها",
@@ -362,6 +363,23 @@ fun AppRoot(
    *  فراموش می‌شود.
    */
   val wide = ir.vil3ntec.tohid.ui.screens.screenSize() == ir.vil3ntec.tohid.ui.screens.Screen.WIDE
+  //  حالتِ منوی کناریِ کامپیوتر — انتخابِ کاربر، روی همین دستگاه
+  val uiPrefs = remember { context.getSharedPreferences("tohid-ui", 0) }
+  var railMode by remember { mutableStateOf(uiPrefs.getString("desk_rail", RailMode.FULL) ?: RailMode.FULL) }
+  var railOverlay by remember { mutableStateOf(false) }
+  fun setRail(m: String) {
+    railMode = m
+    railOverlay = false
+    uiPrefs.edit().putString("desk_rail", m).apply()
+  }
+  /** ☰: ثابت ⇄ آیکن؛ در حالتِ پنهان، منو را روی صفحه باز/بسته می‌کند */
+  fun onMenuPress() {
+    when (railMode) {
+      RailMode.FULL -> setRail(RailMode.COMPACT)
+      RailMode.COMPACT -> setRail(RailMode.FULL)
+      else -> railOverlay = !railOverlay
+    }
+  }
 
   fun open(target: String) {
     if (TABS.any { it.id == target }) { tab = target; sub = null } else sub = target
@@ -410,6 +428,8 @@ fun AppRoot(
         //  زیرصفحه که باز است، سربرگ راهِ برگشت نشان می‌دهد؛ روی تبِ
         //  اصلی جایی برای برگشتن نیست و دکمه هم ساخته نمی‌شود
         onBack = if (sub != null) ({ sub = null }) else null,
+        onMenu = if (wide) ({ onMenuPress() }) else null,
+        onSearch = { AppNav.palette.value = true },
       )
       /*
        *  بنرِ اشتراک — بندِ ۲۱٫۸.
@@ -494,8 +514,40 @@ fun AppRoot(
         return@Box
       }
 
-      if (wide) DeskRail(current = sub ?: tab, onPick = ::open)
-      PageWidth(Modifier.padding(start = if (wide) DESK_RAIL_WIDTH else 0.dp)) {
+      if (wide && railMode != RailMode.HIDDEN) {
+        DeskRail(current = sub ?: tab, onPick = ::open, compact = railMode == RailMode.COMPACT, mode = railMode, onMode = ::setRail)
+      }
+      //  حالتِ «پنهان»: ☰ منو را روی صفحه باز می‌کند؛ زدنِ بیرونش می‌بندد
+      //  جست‌وجوی سریع (Ctrl+K یا ذره‌بینِ سربرگ) — همهٔ دستگاه‌ها
+      if (AppNav.palette.value) {
+        CommandPalette(data, onDismiss = { AppNav.palette.value = false }) { hit ->
+          AppNav.palette.value = false
+          when (hit.kind) {
+            "product" -> { openProduct = hit.id; sub = "product" }
+            "debtor" -> open("debtors")
+            else -> open(hit.id)
+          }
+        }
+      }
+      if (wide && railOverlay) {
+        androidx.compose.ui.window.Dialog(
+          onDismissRequest = { railOverlay = false },
+          properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+          Box(Modifier.fillMaxSize().clickable { railOverlay = false }) {
+            Box(Modifier.align(Alignment.CenterStart).fillMaxHeight()) {
+              DeskRail(current = sub ?: tab, onPick = { open(it); railOverlay = false }, mode = railMode, onMode = ::setRail)
+            }
+          }
+        }
+      }
+      val railPad = when {
+        !wide -> 0.dp
+        railMode == RailMode.FULL -> DESK_RAIL_WIDTH
+        railMode == RailMode.COMPACT -> DESK_RAIL_COMPACT
+        else -> 0.dp
+      }
+      PageWidth(Modifier.padding(start = railPad)) {
       AnimatedContent(
         targetState = sub ?: tab,
         transitionSpec = {
@@ -506,6 +558,7 @@ fun AppRoot(
       ) { current ->
       when (current) {
         "purchasing" -> PurchasingScreen(store, data, snackbar)
+        "admin" -> ManagementScreen(data, ::open)
         "sales" -> SalesHistoryScreen(store, cartStore, data, snackbar) { sub = null; tab = "sale" }
         "reports" -> ReportsScreen(data)
         "receipts" -> ReceiptsScreen(data)

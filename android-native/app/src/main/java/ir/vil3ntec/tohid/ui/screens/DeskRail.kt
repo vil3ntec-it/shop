@@ -24,6 +24,15 @@ import ir.vil3ntec.tohid.ui.theme.Shop
 
 /** پهنای منوی کناری — محتوا به همین اندازه از کنار فاصله می‌گیرد */
 val DESK_RAIL_WIDTH = 212.dp
+/** حالتِ «فقط آیکن» */
+val DESK_RAIL_COMPACT = 72.dp
+
+/** سه حالتِ منو — انتخابِ خودِ کاربر، روی همین دستگاه می‌ماند */
+object RailMode {
+  const val FULL = "full"        // ثابت، با نام
+  const val COMPACT = "compact"  // فقط آیکن
+  const val HIDDEN = "hidden"    // پنهان؛ با ☰ باز می‌شود
+}
 
 /**
  *  منوی کناریِ کامپیوتر.
@@ -34,11 +43,18 @@ val DESK_RAIL_WIDTH = 212.dp
  *  است، پس «Ctrl+۴» همیشه همان چیزی است که این‌جا چهارم نوشته شده.
  */
 @Composable
-fun DeskRail(current: String, onPick: (String) -> Unit) {
+fun DeskRail(
+  current: String,
+  onPick: (String) -> Unit,
+  compact: Boolean = false,
+  mode: String = RailMode.FULL,
+  onMode: (String) -> Unit = {},
+) {
   val context = LocalContext.current
   val canAdmin = ir.vil3ntec.tohid.data.ShopRole.canOpenSettings(context)
   val main = AppNav.SHORTCUTS.mapIndexed { i, (id, label) -> Triple(id, label, "Ctrl+${i + 1}") }
   val extra = buildList {
+    add(Triple("admin", "مرکزِ مدیریت", "Ctrl+0"))
     add(Triple("receipts", "رسیدها", ""))
     add(Triple("team", "کارمندان", ""))
     if (canAdmin) add(Triple("audit", "سابقهٔ عملیات", ""))
@@ -47,23 +63,60 @@ fun DeskRail(current: String, onPick: (String) -> Unit) {
   }
   Column(
     Modifier
-      .width(DESK_RAIL_WIDTH)
+      .width(if (compact) DESK_RAIL_COMPACT else DESK_RAIL_WIDTH)
       .fillMaxHeight()
       .background(Shop.colors.surface)
       .verticalScroll(rememberScrollState())
       .padding(vertical = 10.dp, horizontal = 8.dp),
     verticalArrangement = Arrangement.spacedBy(2.dp),
   ) {
-    main.forEach { (id, label, key) -> RailItem(id, label, key, iconOf(id), current == id, onPick) }
+    main.forEach { (id, label, key) -> RailItem(id, label, key, iconOf(id), current == id, onPick, compact) }
     Spacer(Modifier.height(8.dp))
     Box(Modifier.fillMaxWidth().height(1.dp).background(Shop.colors.border))
     Spacer(Modifier.height(8.dp))
-    extra.forEach { (id, label, key) -> RailItem(id, label, key, iconOf(id), current == id, onPick) }
+    extra.forEach { (id, label, key) -> RailItem(id, label, key, iconOf(id), current == id, onPick, compact) }
+    //  انتخابِ حالتِ منو — همین‌جا، تا لازم نباشد در تنظیمات دنبالش بگردد
+    if (!compact) {
+      Spacer(Modifier.height(14.dp))
+      Text("نمایشِ منو", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2,
+        modifier = Modifier.padding(horizontal = 12.dp))
+      Spacer(Modifier.height(4.dp))
+      Row(Modifier.padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        listOf(RailMode.FULL to "ثابت", RailMode.COMPACT to "آیکن", RailMode.HIDDEN to "پنهان").forEach { (m, label) ->
+          Text(
+            label,
+            style = MaterialTheme.typography.labelMedium,
+            color = if (mode == m) Shop.colors.primary else Shop.colors.muted,
+            fontWeight = if (mode == m) FontWeight.Bold else FontWeight.Normal,
+            modifier = Modifier
+              .clip(RoundedCornerShape(8.dp))
+              .background(if (mode == m) Shop.colors.primary.copy(alpha = 0.12f) else Shop.colors.surface.copy(alpha = 0f))
+              .clickable { onMode(m) }
+              .padding(horizontal = 10.dp, vertical = 6.dp),
+          )
+        }
+      }
+    }
   }
 }
 
 @Composable
-private fun RailItem(id: String, label: String, key: String, icon: ImageVector, selected: Boolean, onPick: (String) -> Unit) {
+private fun RailItem(id: String, label: String, key: String, icon: ImageVector, selected: Boolean, onPick: (String) -> Unit, compact: Boolean = false) {
+  if (compact) {
+    //  فقط آیکن — نام در راهنمای دکمه (برای صفحه‌خوان هم)
+    Box(
+      Modifier
+        .fillMaxWidth()
+        .clip(RoundedCornerShape(10.dp))
+        .background(if (selected) Shop.colors.primary.copy(alpha = 0.12f) else Shop.colors.surface.copy(alpha = 0f))
+        .clickable { onPick(id) }
+        .padding(vertical = 11.dp),
+      contentAlignment = Alignment.Center,
+    ) {
+      Icon(icon, contentDescription = label, tint = if (selected) Shop.colors.primary else Shop.colors.muted, modifier = Modifier.size(21.dp))
+    }
+    return
+  }
   Row(
     Modifier
       .fillMaxWidth()
@@ -100,5 +153,6 @@ private fun iconOf(id: String): ImageVector = when (id) {
   "team" -> Icons.Filled.Badge
   "audit" -> Icons.Filled.History
   "settings" -> Icons.Filled.Settings
+  "admin" -> Icons.Filled.AdminPanelSettings
   else -> Icons.Filled.MoreHoriz
 }

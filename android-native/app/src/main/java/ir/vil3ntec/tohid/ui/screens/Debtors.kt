@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -219,6 +220,19 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
               }
             }
           }
+        } else if (screenSize() == Screen.WIDE) {
+          //  کامپیوتر: جدول — نام، شماره، مانده، مدت؛ ترتیب از همان تراشه‌های بالا
+          item(key = "debtor-head", span = { GridItemSpan(maxLineSpan) }) { DebtorTableHead() }
+          items(rows, key = { "t-" + it.debtor.id }, span = { GridItemSpan(maxLineSpan) }) { row ->
+            DebtorTableRow(
+              row = row,
+              onOpen = { openId = row.debtor.id },
+              onReceive = { txFor = row.debtor.id to DebtorEngine.Kind.RECEIVE },
+              onGive = { txFor = row.debtor.id to DebtorEngine.Kind.GIVE },
+              onEdit = { form = DebtorFormState.of(row.debtor) },
+              onDelete = { confirmDelete = row.debtor },
+            )
+          }
         } else {
           itemsIndexed(rows, key = { _, row -> row.debtor.id }) { index, row ->
             StaggeredItem(index) {
@@ -329,6 +343,63 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
 }
 
 /* ============================ تکه‌ها ============================ */
+
+@Composable
+private fun DebtorTableHead() {
+  Row(
+    Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Shop.colors.surface2).padding(horizontal = 12.dp, vertical = 10.dp),
+    verticalAlignment = Alignment.CenterVertically,
+  ) {
+    listOf("نام" to 0f, "شماره" to 160f, "مانده" to 150f, "مدت" to 110f, "وضعیت" to 110f).forEach { (t, w) ->
+      Text(t, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = Shop.colors.muted,
+        modifier = if (w == 0f) Modifier.weight(1f) else Modifier.width(w.dp))
+    }
+  }
+}
+
+/** یک ردیفِ جدولِ قرض‌داران — زدن ⇐ حساب؛ کلیکِ راست ⇐ رسید، قرضِ تازه، ویرایش، حذف */
+@Composable
+private fun DebtorTableRow(
+  row: DebtorRow,
+  onOpen: () -> Unit,
+  onReceive: () -> Unit,
+  onGive: () -> Unit,
+  onEdit: () -> Unit,
+  onDelete: () -> Unit,
+) {
+  var menu by remember { mutableStateOf(false) }
+  val owes = row.balance > 0
+  val tint = if (owes) Shop.colors.danger else Shop.colors.success
+  Box {
+    Row(
+      Modifier
+        .fillMaxWidth()
+        .clip(RoundedCornerShape(8.dp))
+        .background(Shop.colors.surface)
+        .pressMenu(onClick = onOpen, onMenu = { menu = true })
+        .padding(horizontal = 12.dp, vertical = 9.dp),
+      verticalAlignment = Alignment.CenterVertically,
+    ) {
+      Text(row.debtor.name.ifBlank { "بی‌نام" }, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold,
+        color = Shop.colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+      Text(row.debtor.phone.ifBlank { "—" }, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted,
+        maxLines = 1, modifier = Modifier.width(160.dp))
+      Text(money(kotlin.math.abs(row.balance)), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold,
+        color = tint, maxLines = 1, modifier = Modifier.width(150.dp))
+      Text(row.days?.let { daysText(it) } ?: "—", style = MaterialTheme.typography.bodySmall,
+        color = if ((row.days ?: 0) >= 30) Shop.colors.danger else Shop.colors.muted, maxLines = 1, modifier = Modifier.width(110.dp))
+      Text(DebtorEngine.stateText(row.balance), style = MaterialTheme.typography.labelSmall, color = tint,
+        maxLines = 1, modifier = Modifier.width(110.dp))
+    }
+    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+      DropdownMenuItem(text = { Text("باز کردنِ حساب") }, onClick = { menu = false; onOpen() })
+      DropdownMenuItem(text = { Text("ثبتِ رسید (پول گرفتم)") }, onClick = { menu = false; onReceive() })
+      DropdownMenuItem(text = { Text("قرضِ تازه") }, onClick = { menu = false; onGive() })
+      DropdownMenuItem(text = { Text("ویرایش") }, onClick = { menu = false; onEdit() })
+      DropdownMenuItem(text = { Text("حذف", color = Shop.colors.danger) }, onClick = { menu = false; onDelete() })
+    }
+  }
+}
 
 /** یک ردیفِ فهرست: خودِ قرض‌دار، مانده‌اش، و چند روز است که بدهکار است */
 private data class DebtorRow(
