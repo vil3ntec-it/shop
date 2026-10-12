@@ -96,6 +96,10 @@ class ShopStore(private val context: Context) {
 
   /** نوشتنی که قفلِ نرم جلویش را نمی‌گیرد: بازیابی و جابه‌جاییِ دفتر. */
   private suspend fun writeInternal(next: ShopData) = withContext(Dispatchers.IO) {
+    //  نوشتن و op ساختن زیرِ همان قفلی که نشاندنِ opهای رسیده دارد
+    //  (`SyncV1Engine.absorbRemote`) — شرحش همان‌جا
+    val engine = SyncV1Engine.of(context)
+    synchronized(engine) {
     writeToDisk(next)
     /*
      *  ⛔ **تنها درِ نوشتن در دفتر همین‌جاست** و هر تغییری از همین‌جا رد
@@ -111,8 +115,9 @@ class ShopStore(private val context: Context) {
      *  جلوی ذخیرهٔ دفترِ خودِ دکان‌دار را بگیرد.
      */
     runCatching {
-      val made = SyncV1Engine.of(context).record(next)
+      val made = engine.record(next)
       if (made > 0) SyncV1Worker.now(context)
+    }
     }
   }
 
@@ -126,6 +131,9 @@ class ShopStore(private val context: Context) {
   suspend fun applyFromServer(next: ShopData) = withContext(Dispatchers.IO) {
     writeToDisk(next)
   }
+
+  /** همان، بی تعلیق — برای `SyncV1Engine.absorbRemote` که زیرِ قفل صدایش می‌زند. */
+  fun applyFromServerNow(next: ShopData) = writeToDisk(next)
 
   private fun writeToDisk(next: ShopData) {
     _data.value = next

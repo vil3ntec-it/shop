@@ -298,7 +298,7 @@ fun QuickSaleScreen(
                   name = product.name,
                   unit = product.unit,
                   quantity = line.quantity,
-                  lineTotal = product.salePrice * line.quantity,
+                  lineTotal = SalesEngine.lineTotal(product.salePrice, line.quantity),
                   unitPrice = product.salePrice,
                   selected = selectedId == line.productId,
                   onClick = { selectedId = if (selectedId == line.productId) null else line.productId },

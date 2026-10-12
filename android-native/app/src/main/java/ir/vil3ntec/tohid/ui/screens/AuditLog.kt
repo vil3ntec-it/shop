@@ -125,13 +125,16 @@ private fun auditLabel(type: String): String = when (type) {
   "supplier_return" -> "برگشت به تأمین‌کننده"
   "price_change" -> "تغییر قیمت"
   "delete_product" -> "حذف محصول"
+  "debtor_delete" -> "حذف قرض‌دار"
+  "debt_tx_delete" -> "حذف تراکنش بدهی"
+  "expense_delete" -> "حذف مصرف"
   else -> type
 }
 
 @Composable
 private fun auditTint(type: String): Color = when (type) {
   "sale", "customer_payment" -> Shop.colors.success
-  "cancel_sale", "delete_product" -> Shop.colors.danger
+  "cancel_sale", "delete_product", "debtor_delete", "debt_tx_delete", "expense_delete" -> Shop.colors.danger
   "return", "supplier_return", "stock_adjustment" -> Shop.colors.warning
   else -> Shop.colors.primary
 }

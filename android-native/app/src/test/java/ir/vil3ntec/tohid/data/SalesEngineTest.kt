@@ -345,6 +345,12 @@ class SalesEngineTest {
   }
 
   @Test
+  fun `مبلغ هر ردیف به افغانی کامل گرد می شود`() {
+    assertEquals(173.0, SalesEngine.lineTotal(115.0, 1.5), 0.0)   // ۱۷۲٫۵ ⇒ ۱۷۳
+    assertEquals(250.0, SalesEngine.lineTotal(1000.0, 0.25), 0.0)
+  }
+
+  @Test
   fun `فاکتور لغوشده مرجوعی نمی پذیرد`() {
     val p = Product(id = "p1", name = "برنج", unit = "عدد", purchasePrice = 60.0, salePrice = 100.0)
     val d0 = ShopData(products = listOf(p), warehouseEntries = listOf(WarehouseEntry(id = "w", productId = "p1", units = 100.0)))

@@ -86,7 +86,7 @@
     return next;
   }
   function shadow() { return readJson(keyOf('shadow'), null); }
-  function setShadow(data) { writeJson(keyOf('shadow'), core.shadowOf(data)); }
+  function setShadow(data) { return writeJson(keyOf('shadow'), core.shadowOf(data)); }
   function queue() { return new core.OpQueue(io, keyOf('oplog')); }
 
   /* ==========================================================
@@ -174,9 +174,26 @@
     }
     var out = core.diff(base, data);
     if (!out.ops.length) return 0;
-    queue().push(out.ops);
+    /*
+     *  صف و سایه با هم جلو می‌روند یا هیچ‌کدام. اگر صف نوشته نشود و سایه
+     *  جلو برود، تغییر برای همیشه گم است؛ اگر صف نوشته شود و سایه نه،
+     *  دفعهٔ بعد همان op دوباره ساخته می‌شود و `$inc` دو بار جمع می‌شود.
+     */
+    var q = queue();
+    var before = q.all();
+    if (q.push(out.ops) < 0) {
+      patchState({ lastError: 'حافظهٔ مرورگر پر است؛ تغییرها روی همین دستگاه مانده‌اند و هنوز به سرور نرفته‌اند' });
+      announce();
+      return 0;
+    }
     forgetCounts();
-    setShadow(data);
+    if (!setShadow(data)) {
+      q.replace(before);
+      forgetCounts();
+      patchState({ lastError: 'حافظهٔ مرورگر پر است؛ تغییرها روی همین دستگاه مانده‌اند و هنوز به سرور نرفته‌اند' });
+      announce();
+      return 0;
+    }
     announce();
     schedulePush(reason);
     return out.ops.length;
@@ -310,7 +327,10 @@
     var ops = Array.isArray(r.ops) ? r.ops : [];
     if (ops.length) {
       var data = ledger.read();
-      if (data) {
+      //  دفتر هنوز به صفحه بسته نیست: cursor جلو نمی‌رود، وگرنه همین opها
+      //  هرگز روی این دستگاه نمی‌نشستند
+      if (!data) return 0;
+      {
         var out = core.applyRemote(data, ops);
         ledger.write(out.data);
         //  سایه همین‌جا جلو می‌رود، وگرنه تفاضلِ بعدی همین‌ها را

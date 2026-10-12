@@ -208,6 +208,11 @@ data class PriceChange(
   val createdAt: Long = 0,
 )
 
+/** شناسهٔ ردیفِ سابقه — همان شکلِ `uid()`ِ وب و `newId()`ِ صفحه‌ها */
+fun auditId(): String =
+  "id" + java.lang.Long.toString(System.currentTimeMillis(), 36) +
+    java.lang.Long.toString((Math.random() * 1_000_000_000).toLong(), 36).take(6)
+
 @Serializable
 data class AuditEntry(
   val id: String,

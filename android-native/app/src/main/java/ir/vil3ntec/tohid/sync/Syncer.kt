@@ -164,7 +164,7 @@ class Syncer(
       val reason = body["reason"]
         ?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content }
         .orEmpty()
-      if (reason == "no_subscription" || reason == "no_shop") {
+      if (reason == "no_subscription" || reason == "no_shop" || reason == "device_limit") {
         state.license = null
         state.serverDenied = reason
       }

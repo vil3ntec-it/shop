@@ -7744,6 +7744,8 @@
       ? `«${d.name}» هنوز ${formatMoney(balance)} افغانی بدهی دارد. با حذف او، این طلب و ${formatMoney(txCount)} تراکنش او برای همیشه از دفتر پاک می‌شود.`
       : `«${d.name}» و ${formatMoney(txCount)} تراکنش او حذف خواهند شد. این عملیات قابل بازگشت نیست.`;
     confirmAction = ()=>{
+      // ردپا: پیش‌تر قرض‌دار و همهٔ تراکنش‌هایش بی هیچ سابقه‌ای می‌رفتند
+      logAudit('debtor_delete', id, `حذفِ قرض‌دار «${d.name}» با ${txCount} تراکنش — ماندهٔ حساب ${formatMoney(balance)} افغانی`);
       debtors = debtors.filter(x=>x.id!==id);
       transactions = transactions.filter(t=>t.debtorId!==id);
       saveState();
@@ -7764,6 +7766,8 @@
     document.getElementById('confirm-title').textContent = 'حذف تراکنش؟';
     document.getElementById('confirm-sub').textContent = 'این تراکنش حذف می‌شود و مانده بدهی دوباره محاسبه می‌گردد.';
     confirmAction = ()=>{
+      const who = (debtors.find(x=>x.id===t.debtorId)||{}).name || '';
+      logAudit('debt_tx_delete', t.debtorId, `حذفِ ${t.type==='receive'?'دریافت':'قرض'} ${formatMoney(t.amount)} افغانی از حسابِ «${who}» (تاریخ ${t.date})`);
       transactions = transactions.filter(x=>x.id!==id);
       saveState();
       renderAccountPage(t.debtorId);
@@ -8052,6 +8056,8 @@
     document.getElementById('confirm-title').textContent = 'حذف مصرف؟';
     document.getElementById('confirm-sub').textContent = `«${ex.title}» حذف خواهد شد. این عملیات قابل بازگشت نیست.`;
     confirmAction = ()=>{
+      // ردپا: هزینهٔ پاک‌شده سودِ خالص را بالا می‌برد و باید معلوم بماند
+      logAudit('expense_delete', id, `حذفِ مصرفِ «${ex.title}» ${formatMoney(ex.amount)} افغانی (تاریخ ${ex.date})`);
       expenses = expenses.filter(x=>x.id!==id);
       saveState();
       renderExpenses();
@@ -9805,7 +9811,8 @@
     sale:'ثبت فروش', cancel_sale:'لغو فروش', return:'مرجوعی',
     purchase:'ثبت خرید', customer_payment:'پرداخت مشتری', supplier_payment:'پرداخت تأمین‌کننده',
     stock_adjustment:'اصلاح موجودی', supplier_return:'برگشت به تأمین‌کننده',
-    price_change:'تغییر قیمت', delete_product:'حذف محصول'
+    price_change:'تغییر قیمت', delete_product:'حذف محصول',
+    debtor_delete:'حذف قرض‌دار', debt_tx_delete:'حذف تراکنش بدهی', expense_delete:'حذف مصرف'
   };
   const STOCK_MOVEMENT_LABELS = {
     purchase_in:'ورود خرید', sale:'فروش', customer_return:'مرجوعی مشتری',
@@ -10610,8 +10617,12 @@
   function formatCartQtyFa(qty, unit){
     return formatCartQty(qty, unit);
   }
+  /* مبلغِ هر ردیف همان لحظه به افغانیِ کامل گرد می‌شود — ۱٫۵ کیلو × ۱۱۵ = ۱۷۳ نه ۱۷۲٫۵.
+     بی این، بدهیِ نیم‌افغانی‌ای در حساب می‌نشست که هیچ پرداختی صافش نمی‌کرد،
+     چون پول با عددِ گردشده نشان داده و پرداخت می‌شود. همان `SalesEngine.lineTotal`. */
+  function lineTotal(price, qty){ return Math.round((price||0)*(qty||0)); }
   function cartTotal(){
-    return cart.reduce((s,item)=>{ const p=products.find(x=>x.id===item.productId); return s+(p?p.salePrice*item.quantity:0); }, 0);
+    return cart.reduce((s,item)=>{ const p=products.find(x=>x.id===item.productId); return s+(p?lineTotal(p.salePrice,item.quantity):0); }, 0);
   }
   function addToCart(productId, qty=1){
     const existing = cart.find(c=>c.productId===productId);
@@ -10653,7 +10664,7 @@
         const qtyEl = row.querySelector('[data-cart-qty]');
         if(qtyEl) qtyEl.textContent = `${formatCartQtyFa(item.quantity, p.unit)} ${p.unit}`;
         const amtEl = row.querySelector('[data-cart-line]');
-        if(amtEl) amtEl.textContent = formatMoney(p.salePrice*item.quantity)+' افغانی';
+        if(amtEl) amtEl.textContent = formatMoney(lineTotal(p.salePrice,item.quantity))+' افغانی';
       });
     }
     const total = formatMoney(cartTotal())+' افغانی';
@@ -10691,7 +10702,7 @@
   function cartItemHtml(item){
     const p = products.find(x=>x.id===item.productId);
     if(!p) return '';
-    const lineTotal = p.salePrice*item.quantity;
+    const lineSum = lineTotal(p.salePrice, item.quantity);
     return `
       <div class="exp-card cart-row${selectedCartId===p.id ? ' picked' : ''}" data-cart-row="${p.id}">
         ${p.photo
@@ -10699,7 +10710,7 @@
           : `<div class="exp-icon">${escapeHtml((p.name||'؟')[0])}</div>`}
         <div class="cart-row-name">${escapeHtml(p.name)}</div>
         <div class="cart-row-qty" data-cart-qty>${formatCartQtyFa(item.quantity, p.unit)} ${escapeHtml(p.unit)}</div>
-        <div class="cart-row-sum" data-cart-line>${formatMoney(lineTotal)} افغانی</div>
+        <div class="cart-row-sum" data-cart-line>${formatMoney(lineSum)} افغانی</div>
       </div>`;
   }
   function renderCartDrawer(prefix, hasEmptyPanel){
@@ -11441,7 +11452,7 @@
       saleItems.push({
         id: uid(), saleId, productId: p.id, quantity: item.quantity,
         unitPrice: p.salePrice, purchasePrice: p.purchasePrice||0,
-        totalPrice: p.salePrice*item.quantity, returnedQty: 0
+        totalPrice: lineTotal(p.salePrice, item.quantity), returnedQty: 0
       });
       logStockMovement(p.id, 'sale', -item.quantity, todayISO(), `فاکتور #${invoiceNumber}`, saleId);
     });
@@ -13550,11 +13561,11 @@
 <!-- Sync v1 — هستهٔ بی‌مرورگر اول، بعد ورود، بعد موتور، بعد ظاهر.
      ترتیب عمدی است: موتور به `TohidSyncCore` و `TohidAccount` تکیه دارد و
      اگر پیش از آن‌ها بیاید، بی‌صدا هیچ کاری نمی‌کند. -->
-<script src="license/sync-core.js?v=1" defer></script>
+<script src="license/sync-core.js?v=2" defer></script>
 <script src="license/account-code.js?v=1" defer></script>
-<script src="license/sync-engine.js?v=1" defer></script>
+<script src="license/sync-engine.js?v=2" defer></script>
 <script src="license/license-client.js?v=15" defer></script>
-<script src="license/shop-sync.js?v=15" defer></script>
+<script src="license/shop-sync.js?v=16" defer></script>
 <script src="license/shop-ui.js?v=15" defer></script>
 <script src="license/vip.js?v=16" defer></script>
 <script src="license/support.js?v=16" defer></script>

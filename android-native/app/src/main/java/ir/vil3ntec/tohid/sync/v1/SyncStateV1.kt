@@ -80,6 +80,11 @@ class SyncStateV1(context: Context, private val accountKey: String) {
     get() = prefs.getLong(k("snapshotAt"), 0)
     set(v) = prefs.edit().putLong(k("snapshotAt"), v).apply()
 
+  /** زمانِ «هم‌ترازیِ یک‌باره» با سرور — شرح سرِ `SyncV1Engine.prepare` */
+  var reconciledAt: Long
+    get() = prefs.getLong(k("reconciledAt"), 0)
+    set(v) = prefs.edit().putLong(k("reconciledAt"), v).apply()
+
   /** گزارشِ خطا به سرور — با اجازهٔ کاربر (بندِ ۲۰.۸). پیش‌فرض روشن. */
   var errorReports: Boolean
     get() = prefs.getBoolean("errorReports", true)

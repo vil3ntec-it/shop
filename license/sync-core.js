@@ -529,8 +529,15 @@
       var cut = list.splice(0, list.length - QUEUE_MAX);
       this.drop(cut, 'queue_overflow');
     }
-    this.io.write(this.key, list);
+    //  نوشتنی که نگرفت (حافظهٔ مرورگر پر) گفته می‌شود، نه بی‌صدا رد —
+    //  صدازننده سایه را جلو نمی‌برد تا تغییر دفعهٔ بعد دوباره op شود
+    if (this.io.write(this.key, list) === false) return -1;
     return list.length;
+  };
+
+  /** برگرداندنِ صف به حالتِ پیش از `push` — وقتی گامِ بعدی (سایه) نگرفت. */
+  OpQueue.prototype.replace = function (list) {
+    return this.io.write(this.key, Array.isArray(list) ? list : []) !== false;
   };
 
   /**

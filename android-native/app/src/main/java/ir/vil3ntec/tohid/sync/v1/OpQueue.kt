@@ -71,7 +71,8 @@ class OpQueue(context: Context, accountKey: String) {
       repeat(cut.size) { list.removeAt(0) }
       dropRaw(cut, "queue_overflow")
     }
-    write(file, list)
+    //  اگر نگرفت، `record()` سایه را جلو نمی‌برد و تغییر دفعهٔ بعد دوباره op می‌شود
+    if (!write(file, list)) throw java.io.IOException("صفِ همگام‌سازی روی حافظه نوشته نشد")
   }
 
   /**
@@ -132,21 +133,32 @@ class OpQueue(context: Context, accountKey: String) {
   fun dropped(): List<JsonObject> = read(dropFile)
 
   @Synchronized
-  fun clear() = write(file, emptyList())
+  fun clear() { write(file, emptyList()) }
 
-  private fun read(f: File): List<JsonObject> = runCatching {
+  /**
+   *  فایلِ خراب «خالی» فرض نمی‌شود: پیش‌تر `push` بعدی رویش می‌نوشت و همهٔ
+   *  opهای مانده می‌رفتند. حالا کنار گذاشته می‌شود (`*.corrupt-<زمان>`)
+   *  تا از دست نرود و بشود از پشتیبان یا گزارشِ خطا درش آورد.
+   */
+  private fun read(f: File): List<JsonObject> {
     if (!f.exists()) return emptyList()
-    (json.parseToJsonElement(f.readText()) as? JsonArray)?.mapNotNull { it as? JsonObject }
-      ?: emptyList()
-  }.getOrDefault(emptyList())
+    return runCatching {
+      (json.parseToJsonElement(f.readText()) as JsonArray).mapNotNull { it as? JsonObject }
+    }.getOrElse {
+      runCatching { f.renameTo(File(f.parentFile, "${f.name}.corrupt-${System.currentTimeMillis()}")) }
+      emptyList()
+    }
+  }
 
-  private fun write(f: File, list: List<JsonObject>) {
-    if (f == file) cachedSize = list.size else cachedDropped = list.size
-    runCatching {
+  /** @return نوشته شد یا نه — نوشتنِ ناموفق دیگر بی‌صدا نیست */
+  private fun write(f: File, list: List<JsonObject>): Boolean {
+    val ok = runCatching {
       val tmp = File(f.parentFile, "${f.name}.tmp")
       tmp.writeText(JsonArray(list).toString())
-      if (!tmp.renameTo(f)) { f.delete(); tmp.renameTo(f) }
-    }
+      if (!tmp.renameTo(f)) { f.delete(); check(tmp.renameTo(f)) }
+    }.isSuccess
+    if (ok) { if (f == file) cachedSize = list.size else cachedDropped = list.size }
+    return ok
   }
 
   companion object {

@@ -134,3 +134,24 @@ test('اشتراک که تمام شود، مجوز تازه صادر نمی‌ش
   assert.equal(r.body.license, null, 'اشتراک تمام شده ولی مجوز صادر شد');
   assert.equal(r.body.reason, 'no_subscription');
 });
+
+test('سقفِ دستگاهِ اشتراک: دستگاهِ تازه بیرون می‌ماند، دستگاهِ شمرده‌شده نه', async () => {
+  const { owner, shop } = await ownerWithSubscription('سقف‌دستگاه');
+  await query(`UPDATE subscriptions SET max_devices=2 WHERE shop_id=$1`, [shop.id]);
+  // دستگاهِ ثبت‌نام یکی است؛ دومی:
+  await query(
+    `INSERT INTO devices (id, user_id, device_uid, name, platform, status, created_at, last_seen_at)
+     VALUES ($1,$2,'dev-second','دوم','test','active',$3,$3)`,
+    [newId('dev'), owner.user.id, now()]
+  );
+
+  const blocked = await h.post('/api/license/sync',
+    { device: { uid: 'dev-third', name: 'سوم' } }, { token: owner.accessToken });
+  assert.equal(blocked.status, 200);
+  assert.equal(blocked.body.license, null);
+  assert.equal(blocked.body.reason, 'device_limit');
+
+  const known = await h.post('/api/license/sync',
+    { device: { uid: 'dev-second', name: 'دوم' } }, { token: owner.accessToken });
+  assert.ok(known.body.license, 'دستگاهی که از قبل شمرده شده نباید بیرون بماند');
+});

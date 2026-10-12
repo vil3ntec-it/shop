@@ -378,6 +378,22 @@
       // ۰) پیش از هر چیز: دفتر روی میز باید مال همین حساب باشد
       const swapped = alignLedgerToAccount();
 
+      /* ⛔ وقتی Sync v1 بالاست، دفتر از این راه نه می‌رود نه می‌آید.
+
+         دو موتور روی یک دفتر با دو سایهٔ جدا: آنچه این‌جا در localStorage
+         می‌نشست سایهٔ v1 را جلو نمی‌برد، v1 همان را «تغییرِ محلی» می‌دید و
+         دوباره می‌فرستاد (فیلدهای `$inc` — پرداخت‌ها و مانده‌ها — دو بار
+         جمع می‌شدند)؛ و چون صفحه از حافظه می‌خواند، ذخیرهٔ بعدیِ کاربر
+         همین ادغام را رونویسی می‌کرد. تنها موتورِ دفتر حالا v1 است. */
+      if (v1Active()) {
+        await window.TohidSync.sync();
+        setState({ lastSyncAt: Date.now() });
+        await refreshShopInfo();
+        const shortages = findShortages();
+        renderShortageBanner(shortages);
+        return { pushed: 0, pulled: 0, rev: getState().rev || 0, shortages, rejected: [], swapped };
+      }
+
       // ۱) تغییرات خودم را بفرست
       const { changes, settings } = collectLocalChanges();
       let rejected = [];
@@ -566,6 +582,11 @@
 
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g,
     c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  /** موتورِ Sync v1 بار شده و به دفترِ صفحه بسته است؟ */
+  function v1Active() {
+    return !!(window.TohidSync && typeof window.TohidSync.sync === 'function');
+  }
 
   // ---------- خودکار ----------
   async function autoSync(reason) {
