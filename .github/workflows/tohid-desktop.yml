@@ -201,9 +201,26 @@ jobs:
           Start-Sleep 10
           if ($app.HasExited) { throw "برنامه پس از باز شدن بسته شد (کدِ خروج $($app.ExitCode))" }
           Write-Host "✓ برنامه باز است — پنجره: «$title»، حافظه $([int]((Get-Process -Id $app.Id).WorkingSet64/1MB)) مگابایت"
-          if ($title -notmatch 'فروشگاه من') { Write-Host "::warning::عنوانِ پنجره «$title» است" }
+          $mem = [int]((Get-Process -Id $app.Id).WorkingSet64/1MB)
           Get-Process | Where-Object { $_.Path -like "$t\a\*" } | Stop-Process -Force
           Start-Sleep 3
+          #  ‎Tohid.exe‎ همان فرآیندِ JVM است؛ زیرِ ۸۰ مگابایت یعنی جاوا اصلاً بالا نیامده.
+          #  همان برنامه را با javaِ خودِ بسته اجرا کن تا خطایش در گزارش بیاید.
+          $cfg = Get-Content "$t\a\app\Tohid.cfg"
+          Write-Host "── Tohid.cfg"; $cfg | Write-Host
+          $cp = ($cfg | Where-Object { $_ -like 'app.classpath=*' } | ForEach-Object { $_.Substring(14).Replace('$APPDIR', "$t\a\app") }) -join ';'
+          $main = ($cfg | Where-Object { $_ -like 'app.mainclass=*' } | Select-Object -First 1).Substring(14)
+          $jo = @($cfg | Where-Object { $_ -like 'java-options=*' } | ForEach-Object { $_.Substring(13).Replace('$APPDIR', "$t\a\app") })
+          $jargs = $jo + @('-cp', $cp, $main)
+          $j = Start-Process -FilePath "$t\a\runtime\bin\java.exe" -ArgumentList $jargs -PassThru -RedirectStandardOutput "$t\java.out" -RedirectStandardError "$t\java.err"
+          for ($k = 0; $k -lt 20 -and -not $j.HasExited; $k++) { Start-Sleep 2 }
+          $jmem = if ($j.HasExited) { 0 } else { [int]((Get-Process -Id $j.Id).WorkingSet64/1MB) }
+          Write-Host "── java: $(if ($j.HasExited) { "بسته شد با کدِ $($j.ExitCode)" } else { "باز است، حافظه $jmem مگابایت" })"
+          Get-Content "$t\java.out" -Tail 40 -ErrorAction SilentlyContinue | Write-Host
+          Get-Content "$t\java.err" -Tail 60 -ErrorAction SilentlyContinue | Write-Host
+          if (-not $j.HasExited) { $j | Stop-Process -Force }
+          Start-Sleep 2
+          if ($mem -lt 80) { throw "Tohid.exe بالا نیامد (حافظه $mem مگابایت) — گزارشِ java بالا" }
           Check "$t\a" "Offline"
 
           #  ۲) فایلِ برنامه کنارِ نصاب، بی‌اینترنت
