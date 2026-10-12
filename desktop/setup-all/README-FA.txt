@@ -1,4 +1,4 @@
-توحید — نصابِ همهٔ کامپیوترها
+«فروشگاه من» — نصابِ همهٔ کامپیوترها
 ================================
 
 این بسته برای ویندوز، مک و لینوکس است. فقط فایلِ سیستمِ خودتان را باز کنید:
@@ -8,10 +8,10 @@
   لینوکس (دبیان، اوبونتو، مینت) ⇐  «Install-Linux.sh» را اجرا کنید (رمزِ کاربر را می‌پرسد)
 
 یا مستقیم از پوشه‌ها:
-  Windows/Tohid-Windows-Setup.exe  (بستهٔ کنارش را خودش برمی‌دارد)
-  Mac-Apple-Silicon/Tohid-Mac-AppleSilicon.dmg
-  Mac-Intel/Tohid-Mac-Intel.dmg
-  Linux/Tohid-Linux.deb
+  Windows/MyShop-Windows-Setup.exe  (بستهٔ کنارش را خودش برمی‌دارد)
+  Mac-Apple-Silicon/MyShop-Mac-AppleSilicon.dmg
+  Mac-Intel/MyShop-Mac-Intel.dmg
+  Linux/MyShop-Linux.deb
 
 نکته‌ها
 -------

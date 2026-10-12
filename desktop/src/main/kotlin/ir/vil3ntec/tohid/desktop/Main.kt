@@ -120,10 +120,10 @@ fun main() {
       Tray(
         icon = icon,
         state = tray,
-        tooltip = "توحید",
+        tooltip = "فروشگاه من",
         onAction = { visible = true; SingleInstance.front() },
         menu = {
-          Item("باز کردنِ توحید", onClick = { visible = true; SingleInstance.front() })
+          Item("باز کردنِ فروشگاه من", onClick = { visible = true; SingleInstance.front() })
           Separator()
           Item("خروج", onClick = { quit() })
         },
@@ -141,13 +141,13 @@ fun main() {
           visible = false
           if (!prefs.getBoolean("desktop_tray_told", false)) {
             prefs.edit().putBoolean("desktop_tray_told", true).apply()
-            DesktopNotify.show("توحید هنوز باز است", "همگام‌سازی و هشدارها پشتِ صحنه می‌مانند. برای خروج: سینیِ سیستم ⇒ خروج")
+            DesktopNotify.show("فروشگاه من هنوز باز است", "همگام‌سازی و هشدارها پشتِ صحنه می‌مانند. برای خروج: سینیِ سیستم ⇒ خروج")
           }
         } else quit()
       },
       visible = visible,
       state = windowState,
-      title = "توحید — دفترِ فروشگاه",
+      title = "فروشگاه من",
       icon = icon,
       onPreviewKeyEvent = { e ->
         if (e.type != KeyEventType.KeyDown) return@Window false
@@ -242,10 +242,10 @@ fun main() {
         }
         Menu("راهنما", mnemonic = 'H') {
           Item("میان‌برهای صفحه‌کلید", onClick = { shortcutsOpen = true })
-          Item("دربارهٔ توحید", onClick = {
+          Item("دربارهٔ فروشگاه من", onClick = {
             javax.swing.JOptionPane.showMessageDialog(window,
-              "توحید — دفترِ فروشگاه\nنسخهٔ ${ir.vil3ntec.tohid.BuildConfig.VERSION_NAME}",
-              "دربارهٔ توحید", javax.swing.JOptionPane.INFORMATION_MESSAGE)
+              "فروشگاه من\nنسخهٔ ${ir.vil3ntec.tohid.BuildConfig.VERSION_NAME}",
+              "دربارهٔ فروشگاه من", javax.swing.JOptionPane.INFORMATION_MESSAGE)
           })
         }
       }

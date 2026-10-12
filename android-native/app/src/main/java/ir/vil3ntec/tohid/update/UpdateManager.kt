@@ -64,11 +64,39 @@ object UpdateManager {
   var needsPermission by mutableStateOf(false)
     private set
 
-  fun check(context: Context, repo: String, currentVersion: String) {
+  /**
+   *  بررسیِ خودکار — بارِ اول چند ثانیه پس از باز شدنِ برنامه و بعد هر ۶
+   *  ساعت، بی پیام (نه «تازه‌ترین است»، نه خطای شبکه). نسخهٔ تازه که پیدا
+   *  شد `UpdateBanner` بالای همهٔ صفحه‌ها می‌آید. روی کامپیوتر فایل همان
+   *  موقع در پس‌زمینه گرفته می‌شود تا «به‌روزرسانی» فقط نصب باشد.
+   *  پیش از این، بررسی فقط با دکمهٔ صفحهٔ «بیشتر» بود و کسی نمی‌فهمید
+   *  نسخهٔ تازه آمده.
+   */
+  private var autoStarted = false
+  fun startAuto(context: Context, repo: String, currentVersion: String) {
+    if (autoStarted) return
+    autoStarted = true
+    val app = context.applicationContext
+    scope.launch {
+      kotlinx.coroutines.delay(8_000)
+      while (true) {
+        if (!busy && ready == null) {
+          check(app, repo, currentVersion, quiet = true)
+          job?.join()
+          if (release != null && ready == null && ir.vil3ntec.tohid.ui.Platform.DESKTOP) {
+            download(app, andInstall = false)
+          }
+        }
+        kotlinx.coroutines.delay(6 * 60 * 60 * 1000L)
+      }
+    }
+  }
+
+  fun check(context: Context, repo: String, currentVersion: String, quiet: Boolean = false) {
     if (busy) return
     val app = context.applicationContext
     busy = true
-    message = "در حال بررسی…"
+    if (!quiet) message = "در حال بررسی…"
     job = scope.launch {
       Updater.check(repo, currentVersion, ir.vil3ntec.tohid.core.config.AppConfig.baseUrl(app))
         .onSuccess { found ->
@@ -77,18 +105,18 @@ object UpdateManager {
           // فایلِ همین نسخه شاید از قبل گرفته شده باشد — مثلاً کاربر
           // دانلود کرده و سرِ پرسشِ نصب «نه» زده
           ready = found?.let { Updater.readyFile(app, it) }
-          message = when {
+          if (!quiet || found != null) message = when {
             found == null -> "نسخهٔ شما تازه‌ترین است."
             ready != null -> "نسخهٔ ${found.version} از قبل گرفته شده — آمادهٔ نصب."
             else -> null
           }
         }
-        .onFailure { message = it.message ?: "بررسی ناموفق بود" }
+        .onFailure { if (!quiet) message = it.message ?: "بررسی ناموفق بود" }
       busy = false
     }
   }
 
-  fun download(context: Context) {
+  fun download(context: Context, andInstall: Boolean = true) {
     val target = release ?: return
     if (busy) return
     val app = context.applicationContext
@@ -96,7 +124,7 @@ object UpdateManager {
     // از قبل کامل گرفته شده؟ یک‌راست سراغِ نصب
     Updater.readyFile(app, target)?.let {
       ready = it
-      install(app)
+      if (andInstall) install(app)
       return
     }
 
@@ -109,7 +137,7 @@ object UpdateManager {
           progress = -1
           ready = file
           message = Updater.lastNote
-          install(app)
+          if (andInstall) install(app)
         }
         .onFailure {
           progress = -1

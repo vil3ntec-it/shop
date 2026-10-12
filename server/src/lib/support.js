@@ -421,7 +421,7 @@ async function unreadForAdmin() {
  */
 async function systemMessage({ app = 'shop', userId = '', shopId = '', stationId = '', who = '', body, kind = 'notice' }) {
   const thread = await threadFor({ app, userId, shopId, stationId, who });
-  return post(thread.id, { sender: 'system', senderName: 'توحید', body, kind });
+  return post(thread.id, { sender: 'system', senderName: 'فروشگاه من', body, kind });
 }
 
 /**

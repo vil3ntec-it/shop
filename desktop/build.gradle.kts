@@ -275,7 +275,7 @@ compose.desktop {
       packageVersion = appVersion
       //  ⚠️ لاتین: WiX (نصابِ MSI) متنِ بیرون از صفحه‌کدِ ۱۲۵۲ را نمی‌پذیرد
       //  و ساختِ نصابِ ویندوز با توضیحِ فارسی می‌شکند
-      description = "Tohid - shop ledger"
+      description = "My Shop"
       vendor = "VIL3NTEC"
       copyright = "© VIL3NTEC"
       //  ماژول‌های JDK که برنامه لازم دارد: شبکه، چاپ (javax.print در java.desktop)،
@@ -296,6 +296,9 @@ compose.desktop {
         iconFile.set(project.file("icons/tohid.ico"))
       }
       macOS {
+        //  نامی که کاربر در Finder و Dock می‌بیند — «فروشگاه من»، نه نامِ درونیِ «Tohid»
+        packageName = "My Shop"
+        dockName = "My Shop"
         bundleID = "ir.vil3ntec.tohid.desktop"
         iconFile.set(project.file("icons/tohid.icns"))
       }

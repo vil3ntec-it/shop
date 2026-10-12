@@ -433,7 +433,7 @@ fun AppRoot(
        */
       Column {
       TohidTopBar(
-        title = PAGE_TITLES[sub ?: tab] ?: "توحید",
+        title = PAGE_TITLES[sub ?: tab] ?: "فروشگاه من",
         d = data,
         theme = theme,
         onTheme = onTheme,
@@ -456,6 +456,8 @@ fun AppRoot(
        *  وگرنه کاربر گمان می‌کند دفترش رفته.
        */
       SubscriptionBanner { sub = "myplan" }
+      //  نسخهٔ تازه — بررسیِ خودکار و نصب با یک دکمه (اندروید و کامپیوتر)
+      UpdateBanner()
       }
     },
     /*

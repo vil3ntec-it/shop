@@ -787,7 +787,7 @@ fun SettingsScreen(
         tint = Shop.colors.muted,
       ) {
         Text(
-          "توحید | مدیریت فروشگاه — برنامهٔ اندروید.\nتمام اطلاعات روی همین گوشی ذخیره می‌شود؛ هر چند وقت یک‌بار پشتیبان بگیرید.",
+          "فروشگاه من — برنامهٔ اندروید.\nتمام اطلاعات روی همین گوشی ذخیره می‌شود؛ هر چند وقت یک‌بار پشتیبان بگیرید.",
           style = MaterialTheme.typography.bodySmall,
           color = Shop.colors.muted,
         )

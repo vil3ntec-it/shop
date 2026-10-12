@@ -150,7 +150,7 @@ function build(T) {
    * نتیجه در همان ردیف ثبت می‌شود — رفت یا نرفت و اگر نرفت چرا. بدون
    * این، مدیر «ساخته شد» می‌دید و نمی‌فهمید ایمیل اصلاً بیرون نرفته.
    */
-  async function mail(id, code, { title = '', appName = 'توحید' } = {}) {
+  async function mail(id, code, { title = '', appName = 'فروشگاه من' } = {}) {
     const row = await one(`SELECT * FROM ${TBL} WHERE id=$1`, [id]);
     if (!row) throw notFound('کد پیدا نشد');
     if (!row.email) return shape(row);
@@ -211,7 +211,7 @@ function build(T) {
    * را می‌فرستد (‎senders.sms‎ با تنظیماتِ ‎SMS_API_*‎). خودِ کد ذخیره
    * نمی‌شود؛ فقط «رفت / نرفت» و چرا.
    */
-  async function sms(id, code, { title = '', appName = 'توحید' } = {}) {
+  async function sms(id, code, { title = '', appName = 'فروشگاه من' } = {}) {
     const row = await one(`SELECT * FROM ${TBL} WHERE id=$1`, [id]);
     if (!row) throw notFound('کد پیدا نشد');
     if (!row.phone) return shape(row);

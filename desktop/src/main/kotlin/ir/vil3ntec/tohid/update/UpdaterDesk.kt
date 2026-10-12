@@ -239,7 +239,7 @@ object Updater {
   fun install(context: Context, apk: File): Result<Unit> = runCatching {
     when {
       os.contains("win") -> {
-        //  فقط نوارِ پیشرفت، بی پرسش؛ پایانِ نصب توحید را دوباره باز می‌کند (‎installer/Tohid.iss‎)
+        //  فقط نوارِ پیشرفت، بی پرسش؛ پایانِ نصب فروشگاه من را دوباره باز می‌کند (‎installer/Tohid.iss‎)
         ProcessBuilder(apk.absolutePath, "/SILENT", "/SUPPRESSMSGBOXES", "/NORESTART").start()
         Thread { Thread.sleep(1500); Runtime.getRuntime().halt(0) }.start()
       }

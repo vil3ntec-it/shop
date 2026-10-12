@@ -227,7 +227,7 @@ private fun Bubble(m: SupportMessageDto) {
     ) {
       if (system) {
         Text(
-          "خبر از توحید",
+          "خبر از فروشگاه من",
           style = MaterialTheme.typography.labelSmall,
           color = colors.warning,
           fontWeight = FontWeight.Bold,

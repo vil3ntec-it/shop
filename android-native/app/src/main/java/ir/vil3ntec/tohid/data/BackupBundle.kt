@@ -87,7 +87,7 @@ object BackupBundle {
    *  کاربر بازیابی را تأیید کرده باشد.
    *
    *  @param parse همان `ShopStore.parseBackup` — تا قاعدهٔ «این فایل
-   *    پشتیبانِ توحید هست یا نه» یک جا بماند
+   *    پشتیبانِ فروشگاه من هست یا نه» یک جا بماند
    */
   fun read(
     context: Context,
@@ -154,7 +154,7 @@ object BackupBundle {
       }
     }
 
-    val text = ledger ?: error("این فایل، پشتیبانِ توحید نیست")
+    val text = ledger ?: error("این فایل، پشتیبانِ فروشگاه من نیست")
     Opened(parse(text).getOrThrow(), photos)
   }
 

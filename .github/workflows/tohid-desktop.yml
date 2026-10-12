@@ -1,4 +1,4 @@
-name: توحید کامپیوتر
+name: فروشگاه من — کامپیوتر
 
 #  برنامهٔ کامپیوترِ فروشگاه — همان کدِ `android-native`، روی Compose Desktop.
 #  هر تغییری در برنامهٔ اندروید این را هم می‌سازد، چون همان فایل‌هاست.
@@ -7,6 +7,7 @@ on:
     branches: ['claude/**', main]
     paths:
       - 'desktop/**'
+      - 'install.ps1'
       - 'android-native/app/src/**'
       - 'android-native/gradle.properties'
       - '.github/workflows/tohid-desktop.yml'
@@ -188,6 +189,28 @@ jobs:
 
           #  ۱) Offline
           if ((Install "out\Tohid-Windows-Offline.exe" "$t\a" @()) -ne 0) { Get-Content "$t\a.log" -Tail 40; throw "offline" }
+          #  خودِ برنامه هم باید واقعاً باز شود و بماند. لانچرِ jpackage روی ویندوز یک
+          #  ‎Tohid.exe‎ِ فرزند می‌سازد که JVM در آن است — پس همهٔ ‎Tohid.exe‎های این پوشه سنجیده می‌شوند.
+          $app = Start-Process -FilePath "$t\a\Tohid.exe" -PassThru
+          function Mine { Get-Process -Name Tohid -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$t\a\*" } }
+          $mem = 0; $title = ''
+          for ($k = 0; $k -lt 45; $k++) {
+            Start-Sleep 2
+            $ps_ = @(Mine)
+            if ($ps_.Count -eq 0) { break }
+            $mem = [int](($ps_ | Measure-Object WorkingSet64 -Maximum).Maximum / 1MB)
+            $title = ($ps_ | Where-Object { $_.MainWindowTitle } | Select-Object -First 1).MainWindowTitle
+            if ($mem -ge 150 -and $title) { break }
+          }
+          Start-Sleep 8
+          $alive = @(Mine).Count
+          Write-Host "── Tohid.exe: $alive فرآیند، بیشترین حافظه $mem مگابایت، پنجره «$title»"
+          Mine | Stop-Process -Force -ErrorAction SilentlyContinue
+          Start-Sleep 3
+          if ($alive -eq 0) { throw "برنامه باز شد و خودش بسته شد" }
+          if ($mem -lt 150) { throw "JVMِ برنامه بالا نیامد (حافظه $mem مگابایت)" }
+          if ($title -notmatch 'فروشگاه من') { Write-Host "::warning::عنوانِ پنجره «$title» است (روی CI ممکن است پنجره ساخته نشود)" }
+          Write-Host "✓ برنامه باز شد و ماند"
           Check "$t\a" "Offline"
 
           #  ۲) فایلِ برنامه کنارِ نصاب، بی‌اینترنت
@@ -197,6 +220,7 @@ jobs:
           Check "$t\b" "فایلِ کنارِ نصاب"
 
           #  ۳) دانلود و سنجشِ hash (سرورِ محلی)
+          Copy-Item ..\install.ps1 out\
           $srv = Start-Process python -ArgumentList '-m','http.server','8765','--bind','127.0.0.1','--directory',(Resolve-Path out).Path -PassThru
           Start-Sleep 3
           #  نصاب در پوشه‌ای بی بسته — وگرنه بستهٔ کنارش را برمی‌داشت و دانلود آزموده نمی‌شد
@@ -214,6 +238,19 @@ jobs:
           Select-String -Path "$t\d.log" -Pattern 'SHA-256|hash|failed' -ErrorAction SilentlyContinue | Select-Object -First 3
           Write-Host "✓ فایلِ خراب رد شد (کدِ خروج $code)"
           Remove-Item $bad
+
+          #  ۵) ‎install.ps1‎ (راهِ بی SmartScreen) با Windows PowerShell 5.1 — همان که روی ویندوزِ کاربر است
+          Copy-Item out\Tohid-Windows-Setup.exe out\MyShop-Windows-Setup.exe
+          (Get-FileHash out\MyShop-Windows-Setup.exe -Algorithm SHA256).Hash.ToLower() + "  MyShop-Windows-Setup.exe" | Set-Content -Encoding ascii out\SHA256SUMS.txt
+          $env:TOHID_INSTALL_SRC = 'http://127.0.0.1:8765'
+          $env:TOHID_INSTALL_ARGS = "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /NOLAUNCH /DIR=$t\e /LOG=$t\e.log /PAYLOADURL=http://127.0.0.1:8765/Tohid-Windows-App-$v.7z"
+          #  مسیرِ ماژول‌های pwsh 7 به powershell 5.1 نرسد — مثلِ ویندوزِ کاربر
+          $env:PSModulePath = [Environment]::GetEnvironmentVariable('PSModulePath', 'Machine')
+          $ps = Start-Process powershell.exe -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-Command',"irm http://127.0.0.1:8765/install.ps1 | iex" -PassThru -NoNewWindow
+          if (-not $ps.WaitForExit(360000)) { $ps | Stop-Process -Force; throw "install.ps1 گیر کرد" }
+          if (-not (Test-Path "$t\e\Tohid.exe")) { throw "install.ps1 نصب نکرد" }
+          Check "$t\e" "install.ps1"
+          Remove-Item out\SHA256SUMS.txt, out\install.ps1, out\MyShop-Windows-Setup.exe
           Stop-Process -Id $srv.Id -Force
 
       - name: گزارشِ jpackage
@@ -276,25 +313,24 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: tohid-desktop
-          name: توحید — برنامهٔ کامپیوتر
+          name: فروشگاه من — برنامهٔ کامپیوتر
           prerelease: true
           target_commitish: ${{ github.sha }}
           body: |
-            ## توحید — برنامهٔ کامپیوتر (ویندوز · مک · لینوکس)
+            ## فروشگاه من — برنامهٔ کامپیوتر (ویندوز · مک · لینوکس)
 
             همان برنامهٔ گوشی، بومی روی کامپیوتر — Kotlin و Compose، بی مرورگر و بی WebView.
             همان حساب، همان دکان، همان اشتراک.
 
-            **یک نصاب برای همهٔ کامپیوترها:** [Tohid-Setup-All.zip](https://github.com/${{ github.repository }}/releases/download/tohid-desktop/Tohid-Setup-All.zip) — باز کنید و نصب‌کنندهٔ سیستمِ خودتان را بزنید (مک نوعِ تراشه را خودش تشخیص می‌دهد).
+            **یک نصاب برای همهٔ کامپیوترها:** [MyShop-Setup-All.zip](https://github.com/${{ github.repository }}/releases/download/tohid-desktop/MyShop-Setup-All.zip) — باز کنید و نصب‌کنندهٔ سیستمِ خودتان را بزنید (مک نوعِ تراشه را خودش تشخیص می‌دهد).
 
             | سیستم | دانلود |
             |---|---|
-            | ویندوز ۱۰ و ۱۱ (نصاب، پیشنهادی) | [Tohid-Windows-Setup.exe](https://github.com/${{ github.repository }}/releases/download/tohid-desktop/Tohid-Windows-Setup.exe) |
-            | ویندوز ۱۰ و ۱۱ (بی‌اینترنت) | [Tohid-Windows-Offline.exe](https://github.com/${{ github.repository }}/releases/download/tohid-desktop/Tohid-Windows-Offline.exe) |
-            | ویندوز ۱۰ و ۱۱ (msi، فقط برای مدیرانِ شبکه) | [Tohid-Windows.msi](https://github.com/${{ github.repository }}/releases/download/tohid-desktop/Tohid-Windows.msi) |
-            | مک (M1 و تازه‌تر) | [Tohid-Mac-AppleSilicon.dmg](https://github.com/${{ github.repository }}/releases/download/tohid-desktop/Tohid-Mac-AppleSilicon.dmg) |
-            | مک (Intel) | [Tohid-Mac-Intel.dmg](https://github.com/${{ github.repository }}/releases/download/tohid-desktop/Tohid-Mac-Intel.dmg) |
-            | لینوکس (دبیان/اوبونتو) | [Tohid-Linux.deb](https://github.com/${{ github.repository }}/releases/download/tohid-desktop/Tohid-Linux.deb) |
+            | ویندوز ۱۰ و ۱۱ (نصاب، پیشنهادی) | [MyShop-Windows-Setup.exe](https://github.com/${{ github.repository }}/releases/download/tohid-desktop/MyShop-Windows-Setup.exe) |
+            | ویندوز ۱۰ و ۱۱ (بی‌اینترنت) | [MyShop-Windows-Offline.exe](https://github.com/${{ github.repository }}/releases/download/tohid-desktop/MyShop-Windows-Offline.exe) |
+            | مک (M1 و تازه‌تر) | [MyShop-Mac-AppleSilicon.dmg](https://github.com/${{ github.repository }}/releases/download/tohid-desktop/MyShop-Mac-AppleSilicon.dmg) |
+            | مک (Intel) | [MyShop-Mac-Intel.dmg](https://github.com/${{ github.repository }}/releases/download/tohid-desktop/MyShop-Mac-Intel.dmg) |
+            | لینوکس (دبیان/اوبونتو) | [MyShop-Linux.deb](https://github.com/${{ github.repository }}/releases/download/tohid-desktop/MyShop-Linux.deb) |
 
             > مک: بارِ اول روی برنامه راست‌کلیک ⇒ Open (نسخه هنوز امضای اپل ندارد).
 
@@ -322,23 +358,29 @@ jobs:
           up "$app"
           files="$app Tohid-Windows-Setup.exe Tohid-Windows-Offline.exe Tohid-Windows.msi Tohid-Mac-AppleSilicon.dmg Tohid-Mac-Intel.dmg Tohid-Linux.deb"
           for f in $files; do [ "$f" = "$app" ] || up "$f"; done
+          #  نام‌های رو به کاربر «MyShop-…» (برنامه «فروشگاه من» است)؛ «Tohid-…» فقط برای
+          #  به‌روزرسانیِ درون‌برنامهٔ نسخه‌های نصب‌شده می‌ماند
+          for f in Windows-Setup.exe Windows-Offline.exe Mac-AppleSilicon.dmg Mac-Intel.dmg Linux.deb; do
+            cp "Tohid-$f" "MyShop-$f"; up "MyShop-$f"
+          done
+          files="$files MyShop-Windows-Setup.exe MyShop-Windows-Offline.exe MyShop-Mac-AppleSilicon.dmg MyShop-Mac-Intel.dmg MyShop-Linux.deb"
           gh release view tohid-desktop -R "${{ github.repository }}" --json assets -q '.assets[].name' \
             | grep '^Tohid-Windows-App-.*\.7z$' | sort -V | head -n -3 \
             | while read -r old; do gh release delete-asset tohid-desktop "$old" -y -R "${{ github.repository }}" || true; done
           #  نصابِ همهٔ کامپیوترها در یک بسته — انتخابِ سیستم داخلِ خودِ بسته
           #  (‎desktop/setup-all‎: راهنما و سه نصب‌کنندهٔ کوچک که مک تراشه را خودش تشخیص می‌دهد)
-          B="$RUNNER_TEMP/Tohid-Setup"
+          B="$RUNNER_TEMP/MyShop-Setup"
           mkdir -p "$B/Windows" "$B/Mac-Apple-Silicon" "$B/Mac-Intel" "$B/Linux"
           #  نصابِ آنلاین + بستهٔ کنارش: بی‌اینترنت از بسته نصب می‌کند و اگر بسته خراب باشد خودش دانلود می‌کند
-          cp Tohid-Windows-Setup.exe "$app" "$B/Windows/"
-          cp Tohid-Mac-AppleSilicon.dmg "$B/Mac-Apple-Silicon/"
-          cp Tohid-Mac-Intel.dmg "$B/Mac-Intel/"
-          cp Tohid-Linux.deb "$B/Linux/"
+          cp MyShop-Windows-Setup.exe "$app" "$B/Windows/"
+          cp MyShop-Mac-AppleSilicon.dmg "$B/Mac-Apple-Silicon/"
+          cp MyShop-Mac-Intel.dmg "$B/Mac-Intel/"
+          cp MyShop-Linux.deb "$B/Linux/"
           cp "$GITHUB_WORKSPACE/desktop/setup-all/"* "$B/"
           chmod +x "$B/Install-Mac.command" "$B/Install-Linux.sh"
-          (cd "$RUNNER_TEMP" && zip -r -0 -q Tohid-Setup-All.zip Tohid-Setup)
-          mv "$RUNNER_TEMP/Tohid-Setup-All.zip" .
-          up Tohid-Setup-All.zip
+          (cd "$RUNNER_TEMP" && zip -r -0 -q MyShop-Setup-All.zip MyShop-Setup)
+          mv "$RUNNER_TEMP/MyShop-Setup-All.zip" .
+          up MyShop-Setup-All.zip
           sha256sum $files > SHA256SUMS.txt
           up SHA256SUMS.txt
           #  امضای جدای فهرست — شرح سرِ `update/ReleaseSignature.kt`
