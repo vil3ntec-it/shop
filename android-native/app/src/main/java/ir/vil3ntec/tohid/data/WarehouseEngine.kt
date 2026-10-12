@@ -21,6 +21,12 @@ object WarehouseEngine {
     val salePrice: Double = 0.0,
     val minStock: Double = 0.0,
     val barcode: String = "",
+    /** null ⇒ در ویرایش دست نمی‌خورد (فرم‌هایی که این فیلدها را ندارند، مثلِ ثبتِ گروهی) */
+    val subcategory: String? = null,
+    val supplierId: String? = null,
+    val active: Boolean? = null,
+    val saleUnit: String? = null,
+    val unitFactor: Double? = null,
   )
 
   data class EntryDraft(
@@ -68,9 +74,32 @@ object WarehouseEngine {
 
   /* ---------------------------- ثبتِ کالا ---------------------------- */
 
+  /** نامِ کالا برای سنجشِ تکرار: فاصله‌های اضافه و بزرگی/کوچکیِ حروف حساب نمی‌شود */
+  private fun nameKey(name: String): String =
+    name.trim().replace(Regex("\\s+"), " ").replace('ي', 'ی').replace('ك', 'ک').lowercase()
+
+  /** کالای دیگری با همین نام هست؟ (`exceptId` خودِ کالای در حالِ ویرایش) */
+  fun duplicateName(d: ShopData, name: String, exceptId: String? = null): Product? {
+    val key = nameKey(name)
+    return d.products.firstOrNull { it.id != exceptId && nameKey(it.name) == key }
+  }
+
+  /** واحدِ فروش و ضریب با هم معنی دارند؛ ضریب باید عددِ مثبتِ معتبر باشد */
+  private fun unitProblem(unit: String, saleUnit: String?, factor: Double?): String? {
+    val su = saleUnit?.trim().orEmpty()
+    if (su.isEmpty()) return null
+    if (su == unit.trim()) return "واحدِ فروش همان واحدِ موجودی است — خالی بگذارید"
+    val f = factor ?: return "ضریبِ تبدیل را بنویسید"
+    if (f.isNaN() || f.isInfinite() || f <= 0) return "ضریبِ تبدیل باید عددی بزرگ‌تر از صفر باشد"
+    return null
+  }
+
   fun addProduct(d: ShopData, draft: ProductDraft, now: Long, newId: () -> String): Result {
     val name = draft.name.trim()
     if (name.isEmpty()) return Result.Failed("نام کالا را بنویسید")
+    //  کالای هم‌نام، موجودی و گزارش را دو تکه می‌کند و فروشنده نمی‌داند کدام را بزند
+    duplicateName(d, name)?.let { return Result.Failed("کالایی به نامِ «${it.name}» از قبل هست") }
+    unitProblem(draft.unit, draft.saleUnit, draft.unitFactor)?.let { return Result.Failed(it) }
     if (draft.salePrice.isNaN() || draft.salePrice < 0) return Result.Failed("قیمت فروش درست نیست")
     if (draft.purchasePrice.isNaN() || draft.purchasePrice < 0) return Result.Failed("قیمت خرید درست نیست")
 
@@ -93,6 +122,11 @@ object WarehouseEngine {
       notes = "",
       barcodes = if (barcode.isEmpty()) emptyList() else listOf(barcode),
       createdAt = now,
+      subcategory = draft.subcategory?.trim().orEmpty(),
+      supplierId = draft.supplierId.orEmpty(),
+      active = draft.active ?: true,
+      saleUnit = draft.saleUnit?.trim().orEmpty(),
+      unitFactor = if (draft.saleUnit.isNullOrBlank()) 1.0 else draft.unitFactor ?: 1.0,
     )
 
     return Result.Ok(
@@ -116,6 +150,9 @@ object WarehouseEngine {
     val existing = d.products.find { it.id == id } ?: return Result.Failed("کالا پیدا نشد")
     val name = draft.name.trim()
     if (name.isEmpty()) return Result.Failed("نام کالا را بنویسید")
+    duplicateName(d, name, exceptId = id)?.let { return Result.Failed("کالایی به نامِ «${it.name}» از قبل هست") }
+    unitProblem(draft.unit, draft.saleUnit ?: existing.saleUnit, draft.unitFactor ?: existing.unitFactor)
+      ?.let { return Result.Failed(it) }
     if (draft.salePrice.isNaN() || draft.salePrice < 0) return Result.Failed("قیمت فروش درست نیست")
     if (draft.purchasePrice.isNaN() || draft.purchasePrice < 0) return Result.Failed("قیمت خرید درست نیست")
 
@@ -132,6 +169,14 @@ object WarehouseEngine {
       salePrice = draft.salePrice,
       minStock = if (draft.minStock.isNaN()) 0.0 else draft.minStock,
       barcodes = if (barcode.isEmpty()) emptyList() else listOf(barcode),
+      subcategory = draft.subcategory?.trim() ?: existing.subcategory,
+      supplierId = draft.supplierId ?: existing.supplierId,
+      active = draft.active ?: existing.active,
+      saleUnit = draft.saleUnit?.trim() ?: existing.saleUnit,
+      unitFactor = when {
+        (draft.saleUnit ?: existing.saleUnit).isBlank() -> 1.0
+        else -> draft.unitFactor ?: existing.unitFactor
+      },
     )
 
     // تغییرِ قیمتِ خرید در تاریخچه می‌ماند — سودِ گذشته نباید عوض شود

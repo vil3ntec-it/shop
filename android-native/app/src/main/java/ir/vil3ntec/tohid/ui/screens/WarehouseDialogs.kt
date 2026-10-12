@@ -44,6 +44,11 @@ data class ProductFormState(
   val sale: String = "",
   val minStock: String = "",
   val barcode: String = "",
+  val subcategory: String = "",
+  val supplierId: String = "",
+  val active: Boolean = true,
+  val saleUnit: String = "",
+  val unitFactor: String = "",
 ) {
   companion object {
     fun of(p: Product) = ProductFormState(
@@ -55,6 +60,11 @@ data class ProductFormState(
       sale = numberText(p.salePrice),
       minStock = if (p.minStock == 0.0) "" else numberText(p.minStock),
       barcode = p.barcodes.firstOrNull().orEmpty(),
+      subcategory = p.subcategory,
+      supplierId = p.supplierId,
+      active = p.active,
+      saleUnit = p.saleUnit,
+      unitFactor = if (p.saleUnit.isBlank()) "" else p.unitFactor.toBigDecimal().stripTrailingZeros().toPlainString(),
     )
 
     /** عدد را برای کادرِ ورودی می‌نویسد: بدونِ اعشارِ بی‌مورد و با رقمِ لاتین */
@@ -143,6 +153,58 @@ fun ProductDialog(
           placeholder = "دسته‌بندی تازه",
         )
 
+        Spacer(Modifier.height(10.dp))
+        OutlinedTextField(
+          value = form.subcategory,
+          onValueChange = { form = form.copy(subcategory = it) },
+          label = { Text("زیردسته (اختیاری)") },
+          singleLine = true,
+          modifier = Modifier.fillMaxWidth(),
+        )
+
+        //  واحدِ فروشِ دوم — مثلاً موجودی «کیلوگرم»، فروش «گرم» با ضریبِ ۰٫۰۰۱
+        Spacer(Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+          OutlinedTextField(
+            value = form.saleUnit,
+            onValueChange = { form = form.copy(saleUnit = it) },
+            label = { Text("واحدِ فروشِ دوم (اختیاری)") },
+            placeholder = { Text("گرم") },
+            singleLine = true,
+            modifier = Modifier.weight(1f),
+          )
+          NumberField(
+            value = form.unitFactor,
+            onValueChange = { form = form.copy(unitFactor = it) },
+            label = if (form.unit.isBlank()) "ضریب" else "هر واحد = چند ${form.unit}",
+            modifier = Modifier.weight(1f),
+          )
+        }
+
+        if (d.suppliers.isNotEmpty()) {
+          Spacer(Modifier.height(14.dp))
+          val names = d.suppliers.map { it.name }
+          ChipPicker(
+            title = "تأمین‌کننده (اختیاری)",
+            options = names,
+            selected = d.suppliers.find { it.id == form.supplierId }?.name.orEmpty(),
+            onSelect = { name -> form = form.copy(supplierId = d.suppliers.find { it.name == name }?.id.orEmpty()) },
+            placeholder = "",
+            allowNew = false,
+          )
+        }
+
+        if (form.editingId != null) {
+          Spacer(Modifier.height(14.dp))
+          Text("وضعیت در فروش", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
+          Spacer(Modifier.height(6.dp))
+          SegmentedChoice(
+            options = listOf("on" to "فعال", "off" to "غیرفعال"),
+            selected = if (form.active) "on" else "off",
+            onSelect = { form = form.copy(active = it == "on") },
+          )
+        }
+
         Spacer(Modifier.height(18.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
           OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("انصراف") }
@@ -157,6 +219,12 @@ fun ProductDialog(
                   salePrice = form.sale.toDoubleOrNull() ?: -1.0,
                   minStock = form.minStock.toDoubleOrNull() ?: 0.0,
                   barcode = form.barcode,
+                  subcategory = form.subcategory,
+                  supplierId = form.supplierId,
+                  active = form.active,
+                  saleUnit = form.saleUnit,
+                  //  خالی یا نادرست ⇒ NaN تا موتور با پیامِ روشن ردش کند
+                  unitFactor = if (form.saleUnit.isBlank()) 1.0 else form.unitFactor.toDoubleOrNull() ?: Double.NaN,
                 )
               )
             },

@@ -89,6 +89,10 @@ object ExpiryEngine {
     return out.sortedBy { it.daysLeft }
   }
 
+  /** ماندهٔ منقضی‌شدهٔ یک کالا (به FEFO) — برای سیاستِ «کالای منقضی فروخته نشود» */
+  fun expiredRemaining(d: ShopData, productId: String, today: String): Double =
+    lots(d, today).filter { it.product.id == productId && it.expired }.sumOf { it.remaining }
+
   /** منقضی‌شده یا تا `days` روزِ دیگر — همان چیزی که هشدار و گزارش نشان می‌دهند */
   fun alerts(d: ShopData, today: String, days: Int = NEAR_DAYS): List<Lot> =
     lots(d, today).filter { it.daysLeft <= days }

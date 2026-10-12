@@ -382,14 +382,17 @@ private fun ProductCard(
 ) {
   val stock = ShopStore.stock(d, product.id)
   val status = ShopStore.stockStatus(d, product)
-  val tint = when (status) {
-    "out" -> Shop.colors.danger
-    "low" -> Shop.colors.warning
+  //  کالای غیرفعال پیش از هر چیز همین را نشان می‌دهد — در فروش نمی‌آید
+  val tint = when {
+    !product.active -> Shop.colors.muted
+    status == "out" -> Shop.colors.danger
+    status == "low" -> Shop.colors.warning
     else -> Shop.colors.success
   }
-  val label = when (status) {
-    "out" -> "تمام‌شده"
-    "low" -> "موجودی کم"
+  val label = when {
+    !product.active -> "غیرفعال"
+    status == "out" -> "تمام‌شده"
+    status == "low" -> "موجودی کم"
     else -> "موجودی کافی"
   }
   val profit = product.salePrice - product.purchasePrice

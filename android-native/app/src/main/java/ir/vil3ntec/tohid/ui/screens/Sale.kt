@@ -180,6 +180,11 @@ fun SaleScreen(
       return
     }
     val product = d.products.first { it.id == productId }
+    if (!product.active) {
+      ScanFeedback.unknown(context)
+      toast("«${product.name}» غیرفعال است — از «محصولات» فعالش کنید")
+      return
+    }
     // از خودِ انبارهٔ سبد خوانده می‌شود، نه از مقدارِ لحظهٔ ترکیب: دو
     // اسکنِ پشتِ سرِ هم نباید همدیگر را پاک کنند.
     // و سبد از موجودی جلو نمی‌زند — خطا نباید سرِ ثبت درآید.
@@ -502,6 +507,8 @@ fun SaleScreen(
         basePrice = base,
         //  ردیفِ آزاد همیشه قیمتِ خودش را دارد و برگشتی به «قیمتِ کالا» ندارد
         custom = line.free || line.unitPrice != null,
+        saleUnit = product?.saleUnit.orEmpty(),
+        unitFactor = product?.unitFactor ?: 1.0,
         onDismiss = { editLine = null },
         onConfirm = { quantity, price ->
           var next = SalesEngine.setCartQty(cart, id, quantity)

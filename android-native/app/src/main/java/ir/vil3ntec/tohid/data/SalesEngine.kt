@@ -49,6 +49,17 @@ object SalesEngine {
   }
 
   /** قیمتِ واحدِ یک ردیف — دستی اگر گذاشته شده، وگرنه قیمتِ کالا */
+  /**
+   *  مقدار بر حسبِ واحدِ فروش ⇒ مقدار بر حسبِ واحدِ موجودی.
+   *  ۲۵۰ گرم از کالای کیلویی با ضریبِ ۰٫۰۰۱ ⇒ ۰٫۲۵ کیلوگرم. نتیجه تا سه رقمِ
+   *  اعشار گرد می‌شود تا خطای ممیزِ شناور (۰٫۲۵۰۰۰۰۰۰۰۱) در موجودی ننشیند.
+   *  واحدِ فروش نداشت ⇒ همان عدد.
+   */
+  fun toStockQty(product: Product, quantityInSaleUnit: Double): Double {
+    if (product.saleUnit.isBlank() || product.unitFactor <= 0 || product.unitFactor.isNaN()) return quantityInSaleUnit
+    return Math.round(quantityInSaleUnit * product.unitFactor * 1000.0) / 1000.0
+  }
+
   fun linePrice(d: ShopData, line: CartLine): Double {
     line.unitPrice?.let { return it }
     if (line.free) return 0.0
@@ -77,6 +88,8 @@ object SalesEngine {
      *  به فاکتورِ نقدی هیچ عددی را جابه‌جا نمی‌کند.
      */
     val debtorId: String? = null,
+    /** سیاستِ دکان: کالای منقضی فروخته نشود (`ShopPolicy.blockExpired`) */
+    val blockExpired: Boolean = false,
   )
 
   data class Totals(
@@ -260,7 +273,19 @@ object SalesEngine {
     // موجودی درست پیش از ثبت سنجیده می‌شود، نه بعد از آن
     for (line in cart) {
       val p = d.products.find { it.id == line.productId } ?: continue
-      val available = ShopStore.stock(d, p.id)
+      if (!p.active) return Result.Failed("«${p.name}» غیرفعال است و فروخته نمی‌شود")
+      var available = ShopStore.stock(d, p.id)
+      //  سیاستِ دکان: کالای منقضی فروخته نشود ⇒ ماندهٔ محموله‌های منقضی از
+      //  موجودیِ فروختنی کم می‌شود (FEFO؛ شرح سرِ `ExpiryEngine`)
+      if (checkout.blockExpired) {
+        val expired = ExpiryEngine.expiredRemaining(d, p.id, today)
+        if (expired > 0 && line.quantity > available - expired) {
+          return Result.Failed(
+            "از «${p.name}» ${ir.vil3ntec.tohid.qty(expired)} واحد منقضی است؛ " +
+              "فقط ${ir.vil3ntec.tohid.qty(max(0.0, available - expired))} واحدِ سالم مانده"
+          )
+        }
+      }
       if (line.quantity > available) return Result.Failed(shortageMessage(p, line.quantity, available))
     }
 

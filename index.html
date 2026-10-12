@@ -4207,6 +4207,7 @@
             <option value="ok">موجودی کافی</option>
             <option value="low">موجودی کم</option>
             <option value="out">تمام‌شده</option>
+            <option value="inactive">غیرفعال</option>
           </select>
         </div>
         <div class="qs-cat-new-row" id="pf-cat-new-row" style="display:none;">
@@ -4311,6 +4312,7 @@
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
               </button>
               <button type="button" class="cart-ctl-btn" data-ctl-plus aria-label="زیاد کردن">+</button>
+              <button type="button" class="cart-ctl-btn" data-ctl-qty aria-label="نوشتنِ مقدار" style="width:auto;padding-inline:10px;font-size:12px;">مقدار</button>
             </div>
             <button class="btn btn-primary btn-sm" id="btn-finalize-sale">ثبت فروش</button>
           </div>
@@ -4380,6 +4382,7 @@
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
               </button>
               <button type="button" class="cart-ctl-btn" data-ctl-plus aria-label="زیاد کردن">+</button>
+              <button type="button" class="cart-ctl-btn" data-ctl-qty aria-label="نوشتنِ مقدار" style="width:auto;padding-inline:10px;font-size:12px;">مقدار</button>
             </div>
             <button type="button" class="btn btn-primary btn-sm" id="btn-qs-finalize-sale">ثبت فروش</button>
           </div>
@@ -5010,6 +5013,16 @@
           </div>
         </div>
 
+        <!-- کالای منقضی — همان «کالای منقضی»ِ تنظیماتِ برنامه -->
+        <div class="panel">
+          <div class="panel-head"><h2>کالای منقضی</h2></div>
+          <p class="settings-hint">هشدارِ انقضا همیشه هست. اگر «فروخته نشود» را بزنید، مقدارِ محموله‌های منقضی از موجودیِ فروختنی کم می‌شود و فروشِ بیش از آن ثبت نمی‌شود.</p>
+          <div class="theme-toggle" id="expiry-policy-toggle" style="margin-top:10px;">
+            <button type="button" class="theme-toggle-btn" data-expiry-policy="warn">فقط هشدار</button>
+            <button type="button" class="theme-toggle-btn" data-expiry-policy="block">فروخته نشود</button>
+          </div>
+        </div>
+
         <!-- Appearance -->
         <div class="panel">
           <div class="panel-head"><h2>ظاهر برنامه</h2></div>
@@ -5403,6 +5416,35 @@
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       افزودن ردیف
     </button>
+
+    <!-- جزئیاتِ بیشترِ کالا — فقط در ویرایش (یک ردیف). همان فیلدهای `Product`ِ برنامه:
+         زیردسته، تأمین‌کننده، واحدِ فروشِ دوم و ضریبش، فعال/غیرفعال -->
+    <div id="bp-extras" class="form-section" style="display:none;margin-top:10px;">
+      <div class="form-row-2">
+        <div class="form-group">
+          <label>زیردسته (اختیاری)</label>
+          <input class="form-input" id="in-bp-subcategory" type="text" maxlength="60">
+        </div>
+        <div class="form-group">
+          <label>تأمین‌کننده (اختیاری)</label>
+          <select class="form-select" id="in-bp-supplier"></select>
+        </div>
+      </div>
+      <div class="form-row-2">
+        <div class="form-group">
+          <label>واحدِ فروشِ دوم (اختیاری)</label>
+          <input class="form-input" id="in-bp-sale-unit" type="text" maxlength="20" placeholder="مثلاً گرم">
+        </div>
+        <div class="form-group" id="fg-bp-factor">
+          <label id="lbl-bp-factor">هر واحدِ فروش = چند واحدِ موجودی</label>
+          <input class="form-input" id="in-bp-factor" type="number" min="0" step="any" placeholder="مثلاً 0.001">
+          <div class="field-error">ضریبِ تبدیل باید عددی بزرگ‌تر از صفر باشد.</div>
+        </div>
+      </div>
+      <label class="check-row" style="display:flex;gap:8px;align-items:center;">
+        <input type="checkbox" id="in-bp-active"> فعال در فروش
+      </label>
+    </div>
 
     <div class="bulk-summary" id="bp-summary"></div>
 
@@ -7018,6 +7060,7 @@
     if(id==='modal-product' && document.getElementById('page-sale').classList.contains('active')) startSaleScanner();
   }
   function clearFieldError(id){ document.getElementById(id)?.classList.remove('error'); }
+  function setFieldError(id){ document.getElementById(id)?.classList.add('error'); }
 
   let toastTimer=null;
   function showToast(msg, type='success'){
@@ -8501,6 +8544,17 @@
     });
     document.querySelector('#modal-bulk-product .modal-head h3').textContent = 'ویرایش محصول';
     document.querySelector('#btn-bp-save .btn-label').textContent = 'ذخیره تغییرات';
+    // جزئیاتِ بیشتر
+    document.getElementById('bp-extras').style.display = '';
+    document.getElementById('in-bp-subcategory').value = p.subcategory || '';
+    const supSel = document.getElementById('in-bp-supplier');
+    supSel.innerHTML = '<option value="">—</option>' + suppliers.map(s=>`<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
+    supSel.value = p.supplierId || '';
+    document.getElementById('in-bp-sale-unit').value = p.saleUnit || '';
+    document.getElementById('in-bp-factor').value = p.saleUnit ? (p.unitFactor || '') : '';
+    document.getElementById('lbl-bp-factor').textContent = `هر واحدِ فروش = چند ${p.unit || 'واحد'}`;
+    document.getElementById('in-bp-active').checked = p.active !== false;
+    clearFieldError('fg-bp-factor');
     document.getElementById('btn-bp-add-row').style.display = 'none';
     document.getElementById('bp-summary').style.display = 'none';
     openModal('modal-bulk-product');
@@ -8552,6 +8606,7 @@
     let filtered = products.filter(p=>{
       if(q && !p.name.includes(q)) return false;
       if(catF && p.category!==catF) return false;
+      if(stockF==='inactive') return p.active === false;
       if(stockF && getStockStatus(p)!==stockF) return false;
       return true;
     });
@@ -8580,10 +8635,11 @@
           </div>
         </div>
         <div class="prod-facts">
-          <span class="exp-cat-pill">${escapeHtml(p.category)}</span>
-          <span>موجودی: ${formatMoney(stock)} ${escapeHtml(p.unit)}</span>
+          <span class="exp-cat-pill">${escapeHtml(p.category)}${p.subcategory ? ' / ' + escapeHtml(p.subcategory) : ''}</span>
+          <span>موجودی: ${formatCartQty(stock, p.unit)} ${escapeHtml(p.unit)}</span>
           <span>خرید: ${formatMoney(p.purchasePrice)} افغانی</span>
           <span class="stock-pill ${status}">${stockStatusLabel(status)}</span>
+          ${p.active === false ? '<span class="stock-pill out">غیرفعال</span>' : ''}
         </div>
       </div>`;
     }).join('');
@@ -9325,10 +9381,20 @@
   /* وقتی چیزی ویرایش نمی‌شود null است */
   let bpEditingId = null;
 
+  /* کالای دیگری با همین نام؟ فاصله‌ها، ی/ک عربی و بزرگی/کوچکیِ حروف حساب نمی‌شود */
+  function productNameKey(n){
+    return String(n||'').trim().replace(/\s+/g,' ').replace(/ي/g,'ی').replace(/ك/g,'ک').toLowerCase();
+  }
+  function duplicateProductName(name, exceptId){
+    const key = productNameKey(name);
+    return products.find(p=> p.id !== exceptId && productNameKey(p.name) === key) || null;
+  }
+
   function openBulkProduct(prefillBarcode){
     bpRows = [];
     bpKeySeq = 0;
     bpEditingId = null;
+    document.getElementById('bp-extras').style.display = 'none';
     document.querySelector('#modal-bulk-product .modal-head h3').textContent = 'محصول جدید';
     document.querySelector('#btn-bp-save .btn-label').textContent = 'ذخیره همه';
     document.getElementById('btn-bp-add-row').style.display = '';
@@ -9453,6 +9519,22 @@
           showToast('این بارکد قبلاً برای محصول دیگری ثبت شده', 'danger');
           return;
         }
+        // نامِ تکراری موجودی و گزارش را دو تکه می‌کند — همان `duplicateName`ِ برنامه
+        const dup = duplicateProductName(r.name, p.id);
+        if(dup){ showToast(`کالایی به نامِ «${dup.name}» از قبل هست`, 'danger'); return; }
+        // واحدِ فروشِ دوم و ضریب با هم معنی دارند
+        const saleUnit = document.getElementById('in-bp-sale-unit').value.trim();
+        const factor = parseFloat(document.getElementById('in-bp-factor').value);
+        if(saleUnit){
+          if(saleUnit === r.unit){ showToast('واحدِ فروش همان واحدِ موجودی است — خالی بگذارید', 'danger'); return; }
+          if(!(factor > 0) || !isFinite(factor)){ setFieldError('fg-bp-factor'); return; }
+        }
+        clearFieldError('fg-bp-factor');
+        p.subcategory = document.getElementById('in-bp-subcategory').value.trim();
+        p.supplierId = document.getElementById('in-bp-supplier').value || '';
+        p.saleUnit = saleUnit;
+        p.unitFactor = saleUnit ? factor : 1;
+        p.active = document.getElementById('in-bp-active').checked;
         const newPurchase = parseFloat(r.purchase);
         if(p.purchasePrice !== newPurchase) logPriceChange(p.id, p.purchasePrice, newPurchase);
         p.name = r.name.trim();
@@ -9476,12 +9558,14 @@
         return;
       }
 
-      let saved = 0, skipped = 0;
+      let saved = 0, skipped = 0, dupNames = 0;
       ready.forEach(r=>{
         const name = r.name.trim();
         const barcode = (r.barcode||'').trim();
         // بارکد تکراری، محصول قبلی را خراب می‌کند؛ همان ردیف رد می‌شود
         if(barcode && barcodeIndex.has(barcode)){ skipped++; return; }
+        // نامِ تکراری هم — همان `addProduct`ِ برنامه
+        if(duplicateProductName(name)){ dupNames++; return; }
         const fresh = {
           id: uid(), name, category: r.category, unit: r.unit,
           purchasePrice: parseFloat(r.purchase),
@@ -9509,9 +9593,12 @@
       closeModal('modal-bulk-product');
       renderProducts(); renderWarehouseList(); renderWarehouseDashboard();
       if(document.getElementById('quick-select-grid')) renderQuickSelect();
-      showToast(skipped
-        ? `${formatMoney(saved)} محصول ثبت شد — ${formatMoney(skipped)} ردیف بارکد تکراری داشت`
-        : `${formatMoney(saved)} محصول ثبت شد`);
+      const notes = [];
+      if(skipped) notes.push(`${formatMoney(skipped)} ردیف بارکد تکراری داشت`);
+      if(dupNames) notes.push(`${formatMoney(dupNames)} ردیف نامِ تکراری داشت`);
+      showToast(notes.length
+        ? `${formatMoney(saved)} محصول ثبت شد — ${notes.join('، ')}`
+        : `${formatMoney(saved)} محصول ثبت شد`, notes.length ? 'warn' : undefined);
     } finally {
       bpSaving = false;
       btn.classList.remove('is-busy'); btn.disabled = false;
@@ -10662,6 +10749,8 @@
     return cart.reduce((s,item)=>{ const p=products.find(x=>x.id===item.productId); return s+(p?lineTotal(p.salePrice,item.quantity):0); }, 0);
   }
   function addToCart(productId, qty=1){
+    const prod = products.find(p=>p.id===productId);
+    if(prod && prod.active === false){ showToast(`«${prod.name}» غیرفعال است — از «محصولات» فعالش کنید`, 'danger'); return; }
     const existing = cart.find(c=>c.productId===productId);
     if(existing){
       // کالا از قبل در سبد است: فقط عددش عوض می‌شود، نه کل فهرست
@@ -10934,7 +11023,7 @@
   function renderQuickSelectGrid(){
     const grid = document.getElementById('quick-select-grid');
     const emptyEl = document.getElementById('quick-select-empty');
-    const list = quickSelectCategory ? products.filter(p=>p.category===quickSelectCategory) : products;
+    const list = products.filter(p=> p.active !== false && (!quickSelectCategory || p.category===quickSelectCategory));
     if(list.length===0){
       grid.style.display = 'none'; grid.innerHTML='';
       emptyEl.style.display = '';
@@ -11127,7 +11216,29 @@
     setCartQty(selectedCartId, next);
   }
 
+  /* مقدارِ دقیق — و اگر کالا واحدِ فروشِ دوم دارد (مثلاً گرم از کالای کیلویی)،
+     به همان واحد پرسیده و با ضریبش به واحدِ موجودی تبدیل می‌شود.
+     همان `SalesEngine.toStockQty`ِ برنامه. */
+  function cartCtlTypeQty(){
+    if(!selectedCartId) return;
+    const item = cart.find(c=>c.productId===selectedCartId);
+    const p = item && products.find(x=>x.id===item.productId);
+    if(!p) return;
+    const second = p.saleUnit && p.unitFactor > 0;
+    const unitName = second ? p.saleUnit : (p.unit || 'واحد');
+    const shown = second ? Math.round(item.quantity / p.unitFactor * 1000)/1000 : item.quantity;
+    const raw = window.prompt(`مقدارِ «${p.name}» به ${unitName}:`, String(shown));
+    if(raw == null) return;
+    const typed = parseFloat(String(raw).replace(/[۰-۹]/g, d=> '۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace('٫','.'));
+    if(!(typed > 0)){ showToast('مقدارِ درست بنویسید', 'danger'); return; }
+    const stockQty = second ? Math.round(typed * p.unitFactor * 1000)/1000 : typed;
+    const available = getProductStock(p.id);
+    if(stockQty > available){ showToast(stockShortMessage(p, stockQty, available), 'danger'); return; }
+    setCartQty(p.id, stockQty);
+  }
+
   document.addEventListener('click', (e)=>{
+    if(e.target.closest('[data-ctl-qty]')){ cartCtlTypeQty(); return; }
     if(e.target.closest('[data-ctl-minus]')){ cartCtlStep(-1); return; }
     if(e.target.closest('[data-ctl-plus]')){ cartCtlStep(+1); return; }
     if(e.target.closest('[data-ctl-remove]')){
@@ -11456,7 +11567,21 @@
     for(const item of cart){
       const p = products.find(x=>x.id===item.productId);
       if(!p) continue;
+      if(p.active === false){
+        showToast(`«${p.name}» غیرفعال است و فروخته نمی‌شود`, 'danger');
+        closeModal('modal-sale-checkout');
+        return;
+      }
       const available = getProductStock(p.id);
+      // سیاستِ دکان: کالای منقضی فروخته نشود — همان `blockExpired`ِ برنامه
+      if(blockExpiredPolicy()){
+        const expired = expiryLots(todayISO()).filter(l=> l.product.id===p.id && l.daysLeft<0).reduce((s,l)=> s+l.remaining, 0);
+        if(expired > 0 && item.quantity > available - expired){
+          showToast(`از «${p.name}» ${formatCartQty(expired, p.unit)} واحد منقضی است؛ فقط ${formatCartQty(Math.max(0, available-expired), p.unit)} واحدِ سالم مانده`, 'danger');
+          closeModal('modal-sale-checkout');
+          return;
+        }
+      }
       if(item.quantity>available){
         showToast(stockShortMessage(p, item.quantity, available), 'danger');
         closeModal('modal-sale-checkout');
@@ -13235,6 +13360,10 @@
      امروز روی دیرتر-منقضی‌ها می‌نشیند. بی‌انقضا آخر از همه؛ تاریخِ ساختگی نه.
      ========================================================== */
   const EXPIRY_NEAR_DAYS = 30;
+  /* سیاستِ «کالای منقضی فروخته نشود» — پیش‌فرض خاموش، همان `ShopPolicy`ِ برنامه */
+  const BLOCK_EXPIRED_KEY = 'tohid-block-expired';
+  function blockExpiredPolicy(){ try{ return localStorage.getItem(BLOCK_EXPIRED_KEY)==='1'; }catch(e){ return false; } }
+  function setBlockExpiredPolicy(on){ try{ localStorage.setItem(BLOCK_EXPIRED_KEY, on ? '1' : '0'); }catch(e){} }
   function validIsoDate(v){
     if(!v) return true;
     if(!/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
@@ -13278,6 +13407,19 @@
   function expiryAlerts(today, days = EXPIRY_NEAR_DAYS){
     return expiryLots(today).filter(l=> l.daysLeft <= days);
   }
+
+  (function wireExpiryPolicy(){
+    const box = document.getElementById('expiry-policy-toggle');
+    if(!box) return;
+    const paint = ()=> box.querySelectorAll('[data-expiry-policy]').forEach(b=>
+      b.classList.toggle('active', (b.dataset.expiryPolicy==='block') === blockExpiredPolicy()));
+    box.addEventListener('click', (e)=>{
+      const b = e.target.closest('[data-expiry-policy]'); if(!b) return;
+      setBlockExpiredPolicy(b.dataset.expiryPolicy==='block'); paint();
+      showToast(blockExpiredPolicy() ? 'کالای منقضی دیگر فروخته نمی‌شود' : 'برای کالای منقضی فقط هشدار داده می‌شود');
+    });
+    paint();
+  })();
 
   function buildAlerts(){
     const list = [];
