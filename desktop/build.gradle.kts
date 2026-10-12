@@ -64,6 +64,8 @@ val apiBase = if (dev) (env("TOHID_API_BASE_DEV") ?: prop("tohid.apiBase.dev"))
   else (env("TOHID_API_BASE") ?: prop("tohid.apiBase"))
 val appId = env("TOHID_APP_ID") ?: prop("tohid.appId").ifBlank { "shop" }
 val licenseKey = env("TOHID_LICENSE_PUBLIC_KEY") ?: prop("tohid.licenseKey")
+/** کلیدِ عمومیِ امضای به‌روزرسانی — همان `updateKey()`ِ اندروید؛ شرح سرِ `ReleaseSignature` */
+val updateKey = env("TOHID_UPDATE_PUBLIC_KEY") ?: prop("tohid.updateKey")
 
 /*
  *  فایل‌هایی از اندروید که این‌جا جایگزین دارند. جایگزین‌ها در
@@ -91,6 +93,7 @@ val generateConfig by tasks.registering {
   inputs.property("appId", appId)
   inputs.property("version", appVersion)
   inputs.property("licenseKey", licenseKey)
+  inputs.property("updateKey", updateKey)
   inputs.property("dev", dev)
   outputs.dir(out)
   doLast {
@@ -109,6 +112,7 @@ val generateConfig by tasks.registering {
       |  const val API_BASE: String = ${q(apiBase)}
       |  const val APP_ID: String = ${q(appId)}
       |  const val LICENSE_PUBLIC_KEY: String = ${q(if (dev) "" else licenseKey)}
+      |  const val UPDATE_PUBLIC_KEY: String = ${q(if (dev) "" else updateKey)}
       |  const val SIGNING_SHA256: String = ""
       |  /** این نسخه روی کامپیوتر است — برای جاهایی که باید بدانند. */
       |  const val DESKTOP: Boolean = true

@@ -73,10 +73,14 @@ jobs:
           #  اگر تنظیم نشده باشد خالی می‌ماند و برنامه کاملاً آفلاین کار
           #  می‌کند — نه خطایی، نه قابلیتی که قفل شود.
           TOHID_API_BASE: ${{ vars.TOHID_API_BASE }}
+          TOHID_UPDATE_PUBLIC_KEY: ${{ vars.TOHID_UPDATE_PUBLIC_KEY }}
         run: gradle --no-daemon assembleRelease -PbuildNumber=${{ github.run_number }}
 
       - name: نام‌گذاری و جمع کنترلی
         working-directory: android-native
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.TOHID_UPDATE_SIGNING_KEY }}
+          TOHID_UPDATE_PUBLIC_KEY: ${{ vars.TOHID_UPDATE_PUBLIC_KEY }}
         run: |
           mkdir -p out
           version=$(gradle --no-daemon -q printVersionName -PbuildNumber=${{ github.run_number }} | tail -n1)
@@ -95,6 +99,18 @@ jobs:
           #  فایل از همان مسیرِ دانلود خوانده می‌شود، بدون سهمیه.
           printf '%s\n' "$version" > out/version.txt
           cd out && sha256sum *.apk > SHA256SUMS.txt && cat SHA256SUMS.txt
+          #  امضای جدای فهرست — شرح سرِ `update/ReleaseSignature.kt`.
+          #  کلیدِ عمومی که در برنامه سنجاق شود ولی امضایش نیاید، یعنی
+          #  هیچ گوشی‌ای به‌روز نمی‌شود؛ پس این حالت ساخت را می‌شکند.
+          if [ -n "$UPDATE_SIGNING_KEY" ]; then
+            printf '%s\n' "$UPDATE_SIGNING_KEY" > "$RUNNER_TEMP/update.pem"
+            openssl dgst -sha256 -sign "$RUNNER_TEMP/update.pem" SHA256SUMS.txt | base64 -w0 > SHA256SUMS.txt.sig
+            rm -f "$RUNNER_TEMP/update.pem"
+            echo "فهرست امضا شد"
+          elif [ -n "$TOHID_UPDATE_PUBLIC_KEY" ]; then
+            echo "::error::کلیدِ عمومیِ به‌روزرسانی سنجاق شده ولی secretِ TOHID_UPDATE_SIGNING_KEY نیست"
+            exit 1
+          fi
           echo "APK_NAME=Tohid-Native-$version.apk" >> "$GITHUB_ENV"
           echo "APK_MB=$(du -m Tohid-Native.apk | cut -f1)" >> "$GITHUB_ENV"
 
@@ -173,6 +189,7 @@ jobs:
           up "${{ env.APK_NAME }}"
           up Tohid-Native.apk
           up SHA256SUMS.txt
+          if [ -f SHA256SUMS.txt.sig ]; then up SHA256SUMS.txt.sig; fi
           up version.txt
           #  و از خودِ گیت‌هاب بپرس که هر سه واقعاً روی انتشار نشسته‌اند
           names=$(gh api "repos/${{ github.repository }}/releases/tags/tohid-native" | jq -r '.assets[].name')
@@ -192,7 +209,7 @@ jobs:
           gh api "repos/${{ github.repository }}/releases/tags/tohid-native" \
             | jq -r '.assets[] | "\(.id) \(.name)"' | while read -r id name; do
               case "$name" in
-                "${{ env.APK_NAME }}"|Tohid-Native.apk|SHA256SUMS.txt|version.txt) ;;
+                "${{ env.APK_NAME }}"|Tohid-Native.apk|SHA256SUMS.txt|SHA256SUMS.txt.sig|version.txt) ;;
                 *) gh api -X DELETE "repos/${{ github.repository }}/releases/assets/$id" ;;
               esac
             done

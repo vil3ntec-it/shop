@@ -118,6 +118,7 @@ jobs:
         shell: bash
         env:
           TOHID_API_BASE: ${{ vars.TOHID_API_BASE }}
+          TOHID_UPDATE_PUBLIC_KEY: ${{ vars.TOHID_UPDATE_PUBLIC_KEY }}
         run: ./gradlew --no-daemon ${{ matrix.task }} -PbuildNumber=${{ github.run_number }}
 
       - name: گزارشِ jpackage
@@ -200,6 +201,8 @@ jobs:
         working-directory: out
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          UPDATE_SIGNING_KEY: ${{ secrets.TOHID_UPDATE_SIGNING_KEY }}
+          TOHID_UPDATE_PUBLIC_KEY: ${{ vars.TOHID_UPDATE_PUBLIC_KEY }}
         run: |
           set -e
           up() {
@@ -213,4 +216,14 @@ jobs:
           for f in $files; do up "$f"; done
           sha256sum $files > SHA256SUMS.txt
           up SHA256SUMS.txt
+          #  امضای جدای فهرست — شرح سرِ `update/ReleaseSignature.kt`
+          if [ -n "$UPDATE_SIGNING_KEY" ]; then
+            printf '%s\n' "$UPDATE_SIGNING_KEY" > "$RUNNER_TEMP/update.pem"
+            openssl dgst -sha256 -sign "$RUNNER_TEMP/update.pem" SHA256SUMS.txt | base64 -w0 > SHA256SUMS.txt.sig
+            rm -f "$RUNNER_TEMP/update.pem"
+            up SHA256SUMS.txt.sig
+          elif [ -n "$TOHID_UPDATE_PUBLIC_KEY" ]; then
+            echo "::error::کلیدِ عمومیِ به‌روزرسانی سنجاق شده ولی secretِ TOHID_UPDATE_SIGNING_KEY نیست"
+            exit 1
+          fi
           up version.txt

@@ -86,6 +86,16 @@ android {
       ?: (project.findProperty("tohid.licenseKey") as String?)?.takeIf { it.isNotBlank() }
       ?: ""
 
+  /*
+   *  کلیدِ عمومیِ امضای به‌روزرسانی (P-256، base64 از SPKI) — شرح سرِ
+   *  `update/ReleaseSignature.kt`. اگر خالی باشد برنامه فقط جمعِ کنترلی را
+   *  می‌سنجد؛ اگر پر باشد، نصبیِ بی امضای همین کلید نصب نمی‌شود.
+   */
+  fun updateKey(): String =
+    env("TOHID_UPDATE_PUBLIC_KEY")
+      ?: (project.findProperty("tohid.updateKey") as String?)?.takeIf { it.isNotBlank() }
+      ?: ""
+
   defaultConfig {
     // همان بستهٔ نسخهٔ قبلی: نصب می‌شود *روی* آن، و داده‌های قدیمی
     // سرِ جایشان می‌مانند تا وارد شوند.
@@ -192,6 +202,7 @@ android {
       //  نسخه‌ی خودی کلیدِ سنجاق‌شده ندارد: سرورِ محلی هر بار کلیدِ تازه
       //  می‌سازد و سنجاق‌کردنش یعنی هیچ مجوزی قبول نشود
       buildConfigField("String", "LICENSE_PUBLIC_KEY", "\"\"")
+      buildConfigField("String", "UPDATE_PUBLIC_KEY", "\"\"")
     }
     release {
       signingConfig = signingConfigs.getByName("release")
@@ -236,6 +247,7 @@ android {
         )
       }
       buildConfigField("String", "LICENSE_PUBLIC_KEY", "\"$pinnedKey\"")
+      buildConfigField("String", "UPDATE_PUBLIC_KEY", "\"${updateKey()}\"")
 
       isMinifyEnabled = true
       isShrinkResources = true

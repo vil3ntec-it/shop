@@ -21,6 +21,11 @@ async function main() {
     for (const p of problems) console.error(' -', p);
     process.exit(1);
   }
+  //  هشدار — نه توقف: پشتیبانِ کلِ دیتابیس بی رمز روی همان دیسکی می‌نشیند
+  //  که خودِ دیتابیس هست؛ هر کس به پوشهٔ پشتیبان برسد، همه‌چیز را دارد.
+  if (config.env === 'production' && config.backup.enabled && !config.backup.passphrase) {
+    console.warn('⚠️ BACKUP_PASSPHRASE خالی است؛ پشتیبان‌های دیتابیس رمز نمی‌شوند.');
+  }
 
   if (!(await healthy())) {
     console.error(isPglite()
