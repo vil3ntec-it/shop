@@ -11,4 +11,13 @@ package ir.vil3ntec.tohid.ui
  */
 object Platform {
   const val DESKTOP: Boolean = false
+
+  /** پوشهٔ پیش‌فرضِ پشتیبانِ کامل — اندروید: ‎Android/data/…/files/Backups‎ (با مدیرِ فایل دیده می‌شود) */
+  fun defaultBackupDir(context: android.content.Context): java.io.File? = context.getExternalFilesDir("Backups")
+
+  /** انتخابِ پوشه — فقط کامپیوتر */
+  fun pickFolder(start: String?): String? = null
+
+  /** باز کردنِ پوشه در مدیرِ فایلِ سیستم — فقط کامپیوتر */
+  fun openFolder(path: String): Boolean = false
 }

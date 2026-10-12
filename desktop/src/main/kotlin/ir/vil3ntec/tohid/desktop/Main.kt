@@ -110,6 +110,9 @@ fun main() {
         .putBoolean("desktop_max", windowState.placement == WindowPlacement.Maximized)
         .commit()
       runCatching { live?.disconnect() }
+      //  پشتیبانِ کامل هنگامِ بستن — پایانِ روزِ کاری بی پشتیبان نمی‌ماند
+      //  (دفتر و عکس‌ها، چند صد میلی‌ثانیه)
+      if (ir.vil3ntec.tohid.data.BackupMirror.enabled(context)) runCatching { ir.vil3ntec.tohid.data.BackupMirror.write(context) }
       exitApplication()
     }
 
@@ -199,6 +202,13 @@ fun main() {
           Separator()
           Item("تنظیمات و پشتیبان‌گیری", onClick = { ir.vil3ntec.tohid.ui.AppNav.go("settings") })
           Item("دستگاه‌های جانبی (چاپگر، بارکدخوان)", onClick = { ir.vil3ntec.tohid.ui.AppNav.go("devices") })
+          Item("پشتیبانِ کامل همین حالا (پوشه)", onClick = {
+            val r = ir.vil3ntec.tohid.data.BackupMirror.write(context)
+            DesktopNotify.show("پشتیبان", r.fold({ "نشست: " + it.path }, { "نشد: " + (it.message ?: "") }))
+          })
+          Item("باز کردنِ پوشهٔ پشتیبان", onClick = {
+            ir.vil3ntec.tohid.data.BackupMirror.folder(context)?.let { ir.vil3ntec.tohid.ui.Platform.openFolder(it.path) }
+          })
           Separator()
           Item("خروج از برنامه", onClick = { quit() })
         }

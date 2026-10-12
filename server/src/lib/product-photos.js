@@ -91,4 +91,56 @@ async function remove(ctx, productId, deviceId = '') {
   return { product_id: id, rev: row ? Number(row.rev) : 0, removed: !!row };
 }
 
-module.exports = { list, get, put, remove, sniff, MAX_BYTES, MAX_PHOTOS };
+/* ------------------------------ صندوقِ عکس ------------------------------ */
+//  شرح: ‎migrations/046_photo_inbox.sql‎. عکسِ دوربینِ گوشی تا ۲ مگابایت
+//  (کامپیوتر خودش در استودیو کوچکش می‌کند)، حداکثر ۵۰ عکسِ منتظر برای هر دکان.
+const INBOX_MAX_BYTES = 2 * 1024 * 1024;
+const INBOX_MAX = 50;
+const INBOX_TTL_MS = 24 * 3600 * 1000;
+
+async function inboxPut(ctx, buf, { pair = '', productId = '', deviceId = '' } = {}) {
+  if (!Buffer.isBuffer(buf) || buf.length < 100) throw badRequest('عکس خالی است');
+  if (buf.length > INBOX_MAX_BYTES) throw badRequest('عکس بزرگ‌تر از ۲ مگابایت است');
+  if (!sniff(buf)) throw badRequest('فقط عکسِ JPG، PNG یا WebP');
+  const p = String(pair || '').replace(/\D/g, '').slice(0, 6);
+  if (p.length !== 6) throw badRequest('کدِ جفت‌شدن درست نیست');
+  const pid = productId ? checkId(productId) : '';
+  const now = Date.now();
+  await many('DELETE FROM photo_inbox WHERE created_at < $1 RETURNING id', [now - INBOX_TTL_MS]);
+  const count = await one('SELECT COUNT(*)::int AS n FROM photo_inbox WHERE app=$1 AND account_id=$2', [ctx.app, ctx.accountId]);
+  if (Number(count?.n || 0) >= INBOX_MAX) throw badRequest('صندوقِ عکس پر است — عکس‌های رسیده را در کامپیوتر بردارید');
+  const id = 'in_' + crypto.randomBytes(12).toString('hex');
+  await one(
+    `INSERT INTO photo_inbox (id, app, account_id, pair, product_id, data, size, created_at, device_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,
+    [id, ctx.app, ctx.accountId, p, pid, buf, buf.length, now, String(deviceId || '').slice(0, 64)],
+  );
+  return { id, pair: p, product_id: pid, size: buf.length, created_at: now };
+}
+
+async function inboxList(ctx, pair) {
+  const p = String(pair || '').replace(/\D/g, '').slice(0, 6);
+  const rows = await many(
+    `SELECT id, pair, product_id, size, created_at FROM photo_inbox
+      WHERE app=$1 AND account_id=$2 AND pair=$3 AND created_at >= $4 ORDER BY created_at ASC LIMIT 50`,
+    [ctx.app, ctx.accountId, p, Date.now() - INBOX_TTL_MS],
+  );
+  return rows.map(r => ({ id: r.id, pair: r.pair, product_id: r.product_id, size: Number(r.size), created_at: Number(r.created_at) }));
+}
+
+async function inboxGet(ctx, id) {
+  const r = await one('SELECT data, product_id FROM photo_inbox WHERE app=$1 AND account_id=$2 AND id=$3',
+    [ctx.app, ctx.accountId, String(id || '').slice(0, 64)]);
+  return r ? { data: Buffer.from(r.data), product_id: r.product_id } : null;
+}
+
+async function inboxDelete(ctx, id) {
+  const r = await one('DELETE FROM photo_inbox WHERE app=$1 AND account_id=$2 AND id=$3 RETURNING id',
+    [ctx.app, ctx.accountId, String(id || '').slice(0, 64)]);
+  return !!r;
+}
+
+module.exports = {
+  list, get, put, remove, sniff, MAX_BYTES, MAX_PHOTOS,
+  inboxPut, inboxList, inboxGet, inboxDelete, INBOX_MAX_BYTES,
+};

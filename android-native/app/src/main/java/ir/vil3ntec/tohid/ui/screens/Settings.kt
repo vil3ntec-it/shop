@@ -690,6 +690,52 @@ fun SettingsScreen(
         }
 
         /*
+         *  پشتیبانِ کامل در پوشه — `BackupMirror`.
+         *  همان ZIPِ کامل (دفتر + عکس‌ها) در پوشه‌ای که دیده می‌شود؛ خودکار
+         *  با هر پشتیبانِ ۱۲ ساعته، و این‌جا «همین حالا» (پوشه + سرور با هم).
+         */
+        Spacer(Modifier.height(10.dp))
+        Text("پشتیبانِ کامل در پوشه", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
+        var mirrorTick by remember { mutableStateOf(0) }
+        val mirrorDir = remember(mirrorTick) { ir.vil3ntec.tohid.data.BackupMirror.folder(context)?.path ?: "—" }
+        val mirrorList = remember(mirrorTick) { ir.vil3ntec.tohid.data.BackupMirror.list(context) }
+        var mirrorOn by remember { mutableStateOf(ir.vil3ntec.tohid.data.BackupMirror.enabled(context)) }
+        var mirrorBusy by remember { mutableStateOf(false) }
+        SettingsRow(
+          icon = Icons.Filled.CloudUpload,
+          title = if (mirrorBusy) "در حالِ ساختن…" else "پشتیبانِ کامل همین حالا (پوشه + سرور)",
+          description = "دفتر و همهٔ عکس‌ها · ${mirrorList.size} نسخه در پوشه" +
+            (mirrorList.firstOrNull()?.let { " · آخرین: " + ir.vil3ntec.tohid.formatMillis(it.lastModified()) } ?: ""),
+          tint = Shop.colors.success,
+          onClick = {
+            if (mirrorBusy) return@SettingsRow
+            mirrorBusy = true
+            scope.launch {
+              val local = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { ir.vil3ntec.tohid.data.BackupMirror.write(context) }
+              val cloud = if (signedIn) AutoBackup.push(context, manual = true) else false
+              mirrorBusy = false
+              mirrorTick++; cloudReload += 1
+              toast(
+                local.fold({ "در پوشه نشست" }, { "پوشه: ${it.message}" }) +
+                  if (signedIn) (if (cloud) " · روی سرور هم رفت" else " · سرور: نرفت (نت؟)") else ""
+              )
+            }
+          },
+        )
+        Text("پوشه: $mirrorDir", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+          if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) {
+            TextButton(onClick = {
+              ir.vil3ntec.tohid.ui.Platform.pickFolder(mirrorDir)?.let { ir.vil3ntec.tohid.data.BackupMirror.setFolder(context, it); mirrorTick++ }
+            }) { Text("انتخابِ پوشه…") }
+            TextButton(onClick = { if (!ir.vil3ntec.tohid.ui.Platform.openFolder(mirrorDir)) toast("پوشه باز نشد") }) { Text("باز کردنِ پوشه") }
+          }
+          Spacer(Modifier.weight(1f))
+          Text("خودکار هر ۱۲ ساعت", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+          Switch(checked = mirrorOn, onCheckedChange = { mirrorOn = it; ir.vil3ntec.tohid.data.BackupMirror.setEnabled(context, it) })
+        }
+
+        /*
          *  فشرده کردنِ دفتر.
          *
          *  دستی است و نه خودکار، چون یک‌طرفه است و چون با همگام‌سازی

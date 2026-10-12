@@ -98,8 +98,9 @@ function broadcast(ctx, cursor, exceptDevice = '') {
  *   scan   — گوشی بارکد خواند ⇒ کامپیوتری که «گوشی به‌عنوانِ بارکدخوان»
  *            را با همان کدِ جفت‌شدن باز کرده، آن را در سبد می‌گذارد
  *   photos — عکسِ کالایی عوض شد (سرور خودش هم می‌فرستد)
+ *   photo-request — کامپیوتر: «گوشی، عکسِ این کالا را بگیر» (عکس از ‎/photo-inbox‎ می‌آید)
  */
-const RELAY_EVENTS = new Set(['scan', 'photos']);
+const RELAY_EVENTS = new Set(['scan', 'photos', 'photo-request']);
 
 function cleanRelay(msg) {
   if (msg.event === 'scan') {
@@ -108,6 +109,16 @@ function cleanRelay(msg) {
     return { event: 'scan', code, pair: String(msg.pair || '').slice(0, 12), at: Date.now() };
   }
   if (msg.event === 'photos') return { event: 'photos', rev: Number(msg.rev) || 0 };
+  //  کامپیوتر از گوشیِ جفت‌شده عکسِ یک کالا را می‌خواهد
+  if (msg.event === 'photo-request') {
+    const pair = String(msg.pair || '').replace(/\D/g, '').slice(0, 6);
+    if (pair.length !== 6) return null;
+    return {
+      event: 'photo-request', pair,
+      product_id: String(msg.product_id || '').slice(0, 64),
+      name: String(msg.name || '').slice(0, 120),
+    };
+  }
   return null;
 }
 

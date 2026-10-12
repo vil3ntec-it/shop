@@ -14091,7 +14091,7 @@
     const card = (title, body)=> `<div class="panel"><div class="panel-head"><h2>${title}</h2></div>${body}</div>`;
     const listen = sc && sc.listenCode, send = sc && sc.sendCode;
     hub.innerHTML = [
-      card('گوشی به‌عنوانِ بارکدخوان',
+      card('گوشی ⇄ کامپیوتر (بارکدخوان و دوربین)',
         (signedIn ? '' : '<p class="admin-note" style="color:var(--warning)">برای این کار هر دو دستگاه باید با یک حساب وارد شده باشند.</p>') +
         '<p class="admin-note">این دستگاه گیرنده باشد (کامپیوترِ صندوق):</p>' +
         (listen
@@ -14100,6 +14100,7 @@
         '<p class="admin-note" style="margin-top:12px">این دستگاه فرستنده باشد (آیفون/گوشی):</p>' +
         (send
           ? `<div class="admin-line"><span style="color:var(--success)">بارکدها به کامپیوترِ ${send} می‌روند — صفحهٔ فروش را باز کنید و اسکن کنید</span><b><button type="button" class="btn btn-sm" data-dev="unpair">قطع</button></b></div>`
+            + '<button type="button" class="btn btn-sm" data-dev="sendphoto">فرستادنِ عکس به کامپیوتر</button>'
           : '<div style="display:flex;gap:8px"><input class="form-input" id="dev-pair-code" inputmode="numeric" maxlength="7" placeholder="کدِ شش‌رقمیِ کامپیوتر" aria-label="کدِ شش‌رقمیِ کامپیوتر"><button type="button" class="btn btn-primary btn-sm" data-dev="pair">وصل</button></div>')),
       card('بارکدخوان‌ها',
         '<p class="admin-note">بارکدخوانِ USB یا بلوتوثی خودش را «صفحه‌کلید» معرفی می‌کند: وصل یا جفت کنید و در صفحهٔ فروش اسکن کنید. روی آیفون دوربینِ خودِ گوشی بارکد می‌خواند.</p>'),
@@ -14126,6 +14127,7 @@
     if(k === 'listen') sc.startListening();
     else if(k === 'stop') sc.stopListening();
     else if(k === 'unpair') sc.unpair();
+    else if(k === 'sendphoto'){ phonePhotoPick('', ''); return; }
     else if(k === 'pair'){
       const v = (document.getElementById('dev-pair-code')||{}).value || '';
       if(sc.pairTo(v)) showToast('وصل شد — حالا در صفحهٔ فروش اسکن کنید'); else { showToast('کد باید شش رقم باشد', 'danger'); return; }
@@ -14194,6 +14196,25 @@
       card('میان‌بُرها', '', '', `<div class="admin-links">${links.map(([id,l])=> `<a href="#${id}">${l}</a>`).join('')}</div>`),
     ].join('');
   }
+
+  /* کامپیوتر عکس خواست ⇒ دوربینِ آیفون ⇒ صندوقِ سرور ⇒ استودیوی کامپیوتر */
+  function phonePhotoPick(productId, label){
+    const inp = document.createElement('input');
+    inp.type = 'file'; inp.accept = 'image/*'; inp.setAttribute('capture', 'environment');
+    inp.onchange = ()=>{
+      const f = inp.files && inp.files[0];
+      if(!f) return;
+      showToast('در حالِ فرستادن به کامپیوتر…');
+      window.TohidPhotoStudio.scanner.sendPhoto(f, productId)
+        .then(()=> showToast('عکس به کامپیوتر رسید' + (label ? ` — «${label}»` : '')))
+        .catch(err=> showToast('نرفت: ' + (err && err.message || 'اینترنت؟'), 'danger'));
+    };
+    inp.click();
+  }
+  window.addEventListener('tohid:photo-request', (e)=>{
+    const d = e.detail || {};
+    if(confirm(`کامپیوتر عکسِ «${d.name || 'کالا'}» را می‌خواهد. دوربین باز شود؟`)) phonePhotoPick(d.product_id, d.name);
+  });
 
   /* بارکدی که گوشیِ جفت‌شده خواند ⇒ صفحهٔ فروش و سبد */
   window.addEventListener('tohid:phone-scan', (e)=>{
@@ -14893,7 +14914,7 @@
      اگر پیش از آن‌ها بیاید، بی‌صدا هیچ کاری نمی‌کند. -->
 <script src="license/sync-core.js?v=2" defer></script>
 <script src="license/account-code.js?v=1" defer></script>
-<script src="license/sync-engine.js?v=3" defer></script>
+<script src="license/sync-engine.js?v=4" defer></script>
 <script src="license/license-client.js?v=16" defer></script>
 <script src="license/shop-sync.js?v=18" defer></script>
 <script src="license/shop-ui.js?v=15" defer></script>
@@ -14902,7 +14923,7 @@
 <script src="license/account-ui.js?v=2" defer></script>
 <script src="license/auto-backup.js?v=1" defer></script>
 <script src="license/thermal-print.js?v=1" defer></script>
-<script src="license/photo-studio.js?v=1" defer></script>
+<script src="license/photo-studio.js?v=2" defer></script>
 
 </body>
 </html>

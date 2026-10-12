@@ -39,7 +39,7 @@ import kotlinx.coroutines.launch
  *  همین صفحه روی گوشی، تبلت و کامپیوتر است؛ روی کامپیوتر دوستونه.
  */
 @Composable
-fun DevicesScreen(snackbar: SnackbarHostState) {
+fun DevicesScreen(data: ir.vil3ntec.tohid.data.ShopData, snackbar: SnackbarHostState) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
   fun toast(t: String) { scope.launch { snackbar.showSnackbar(t) } }
@@ -52,7 +52,7 @@ fun DevicesScreen(snackbar: SnackbarHostState) {
     ScannersPanel()
   }
   val right: @Composable () -> Unit = {
-    PhoneScannerPanel(::toast)
+    PhoneScannerPanel(data, ::toast)
     Spacer(Modifier.height(14.dp))
     LivePanel()
     Spacer(Modifier.height(14.dp))
@@ -197,7 +197,7 @@ private fun ScannersPanel() {
 /* ======================= گوشی به‌عنوانِ بارکدخوان ======================= */
 
 @Composable
-private fun PhoneScannerPanel(toast: (String) -> Unit) {
+private fun PhoneScannerPanel(d: ir.vil3ntec.tohid.data.ShopData, toast: (String) -> Unit) {
   val context = LocalContext.current
   val listen = PhoneScanner.listenCode.value
   val send = PhoneScanner.sendCode.value
@@ -205,7 +205,7 @@ private fun PhoneScannerPanel(toast: (String) -> Unit) {
   var typed by remember { mutableStateOf("") }
   val signedIn = remember { ir.vil3ntec.tohid.data.repo.Backend.isReady(context) }
   Panel {
-    Head(Icons.Filled.PhoneAndroid, "گوشی به‌عنوانِ بارکدخوان", "دوربینِ گوشی بارکد می‌خواند، کالا در سبدِ کامپیوتر می‌نشیند")
+    Head(Icons.Filled.PhoneAndroid, "گوشی ⇄ کامپیوتر", "بارکدخوان و دوربینِ گوشی برای کامپیوتر — با یک کدِ شش‌رقمی")
     if (!signedIn) {
       Text("برای این کار هر دو دستگاه باید با یک حساب وارد شده باشند.", color = Shop.colors.warning,
         style = MaterialTheme.typography.bodySmall)
@@ -229,6 +229,30 @@ private fun PhoneScannerPanel(toast: (String) -> Unit) {
           color = Shop.colors.success)
       }
     }
+    //  عکس‌هایی که گوشی بی کالای مشخص فرستاده — «گذاشتن روی کالا…»
+    val inbox = PhoneScanner.inboxItems
+    if (listen != null && inbox.isNotEmpty()) {
+      Spacer(Modifier.height(10.dp))
+      Text("عکس‌های رسیده از گوشی (${inbox.size})", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold,
+        color = Shop.colors.text)
+      var assign by remember { mutableStateOf<PhoneScanner.InboxItem?>(null) }
+      val scope = rememberCoroutineScope()
+      inbox.toList().forEach { item ->
+        Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+          Text("عکس — ${ir.vil3ntec.tohid.formatMillis(item.at)}", style = MaterialTheme.typography.bodySmall,
+            color = Shop.colors.text, modifier = Modifier.weight(1f))
+          TextButton(onClick = { assign = item }) { Text("گذاشتن روی کالا…") }
+          TextButton(onClick = { scope.launch { PhoneScanner.discard(context, item) } }) { Text("دور انداختن", color = Shop.colors.danger) }
+        }
+      }
+      assign?.let { item ->
+        CommandPalette(d, onDismiss = { assign = null }) { hit ->
+          assign = null
+          if (hit.kind == "product") PhoneScanner.openNow.value = item.copy(productId = hit.id)
+          else toast("یک کالا انتخاب کنید")
+        }
+      }
+    }
     Spacer(Modifier.height(12.dp))
     HorizontalDivider(color = Shop.colors.border)
     Spacer(Modifier.height(12.dp))
@@ -245,6 +269,17 @@ private fun PhoneScannerPanel(toast: (String) -> Unit) {
         }) { Text("وصل") }
       }
     } else {
+      var pick by remember { mutableStateOf(false) }
+      val scope = rememberCoroutineScope()
+      PhotoSourceSheet(open = pick, onDismiss = { pick = false }, note = "عکس برای کامپیوتر فرستاده می‌شود") { uri ->
+        toast("در حالِ فرستادن…")
+        scope.launch { toast(PhoneScanner.sendPhoto(context, uri, "") ?: "عکس به کامپیوتر رسید") }
+      }
+      OutlinedButton(onClick = { pick = true }) {
+        Icon(Icons.Filled.PhotoCamera, contentDescription = null, modifier = Modifier.size(16.dp))
+        Spacer(Modifier.width(6.dp)); Text("فرستادنِ عکس به کامپیوتر")
+      }
+      Spacer(Modifier.height(6.dp))
       Row(verticalAlignment = Alignment.CenterVertically) {
         Text("بارکدها به کامپیوترِ ${send.chunked(3).joinToString(" ")} می‌روند", color = Shop.colors.success,
           fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
@@ -286,5 +321,33 @@ private fun PhotosPanel() {
     }
     Text("خاموش کردن فقط روی همین دستگاه است و عکسی پاک نمی‌شود.", style = MaterialTheme.typography.labelSmall,
       color = Shop.colors.muted2)
+
+    /* --------------------------- ربات عکس --------------------------- */
+    Spacer(Modifier.height(12.dp))
+    HorizontalDivider(color = Shop.colors.border)
+    Spacer(Modifier.height(10.dp))
+    val bot = ir.vil3ntec.tohid.data.PhotoBot
+    var auto by remember { mutableStateOf(bot.autoEnabled(context)) }
+    Text("ربات عکس", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Shop.colors.text)
+    Text("همهٔ عکس‌ها را خودش بهتر می‌کند: زمینهٔ سفید، جدا کردنِ کالا، برش و هم‌اندازه، نور و رنگ و تیزی. اصلِ هر عکس نگه داشته می‌شود.",
+      style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+    Spacer(Modifier.height(8.dp))
+    val prog = bot.progress.value
+    if (prog != null) {
+      LinearProgressIndicator(progress = { if (prog.second == 0) 0f else prog.first.toFloat() / prog.second }, modifier = Modifier.fillMaxWidth())
+      Text("${ir.vil3ntec.tohid.plain(prog.first)} از ${ir.vil3ntec.tohid.plain(prog.second)}", style = MaterialTheme.typography.labelSmall,
+        color = Shop.colors.muted)
+    } else {
+      Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Button(onClick = { bot.start(context, onlyNew = false) }) { Text("بهبودِ همهٔ عکس‌ها") }
+        if (bot.originalsCount(context) > 0) OutlinedButton(onClick = { bot.restoreAll(context) }) { Text("برگرداندنِ اصلی‌ها") }
+      }
+    }
+    bot.lastResult.value?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = Shop.colors.success) }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+      Text("عکس‌های تازه (از هر دستگاه) خودکار بهتر شوند", modifier = Modifier.weight(1f), color = Shop.colors.text,
+        style = MaterialTheme.typography.bodyMedium)
+      Switch(checked = auto, onCheckedChange = { auto = it; bot.setAuto(context, it) })
+    }
   }
 }

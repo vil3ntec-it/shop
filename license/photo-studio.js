@@ -378,6 +378,19 @@
       var v = sc(); v.send = c; scSave(v); return true;
     },
     unpair: function () { var v = sc(); delete v.send; scSave(v); },
+    /** آیفون ⇒ کامپیوتر: عکسِ دوربین به صندوقِ سرور؛ کامپیوتر در استودیو بازش می‌کند */
+    sendPhoto: function (file, productId) {
+      var pair = sc().send;
+      if (!pair) return Promise.reject(new Error('اول کدِ کامپیوتر را بزنید'));
+      if (!acc || !acc.isSignedIn || !acc.isSignedIn()) return Promise.reject(new Error('برای فرستادن باید وارد حساب باشید'));
+      return loadImage(file).then(function (el) {
+        var im = fromCanvasImage(el, 1600);
+        return new Promise(function (res, rej) { toCanvas(im).toBlob(function (b) { b ? res(b) : rej(new Error('عکس ساخته نشد')); }, 'image/jpeg', 0.85); });
+      }).then(b64).then(function (data) {
+        return acc.authFetch('/api/sync/v1/photo-inbox', { method: 'POST',
+          body: { data: data, pair: pair, product_id: productId || '', device_id: acc.deviceId ? acc.deviceId() : '' } });
+      });
+    },
     /** آیفون: بارکد به کامپیوتر برود؟ */
     send: function (code) {
       var pair = sc().send;
@@ -389,6 +402,10 @@
   window.addEventListener('tohid:live', function (e) {
     var msg = e.detail || {};
     if (msg.event === 'photos' || msg.event === 'hello') kick();
+    //  کامپیوتر عکسِ کالایی را از همین گوشی خواست
+    if (msg.event === 'photo-request' && sc().send && msg.pair === sc().send) {
+      window.dispatchEvent(new CustomEvent('tohid:photo-request', { detail: { product_id: msg.product_id || '', name: msg.name || '' } }));
+    }
     if (msg.event === 'scan' && msg.code && sc().listen && msg.pair === sc().listen) {
       window.dispatchEvent(new CustomEvent('tohid:phone-scan', { detail: { code: String(msg.code) } }));
     }

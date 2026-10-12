@@ -185,6 +185,39 @@ fun ProductDetailScreen(
         }
       }
 
+      /*
+       *  عکس با دوربینِ گوشی — روی کامپیوتر (یا هر گیرنده‌ای).
+       *  گوشیِ جفت‌شده پنجرهٔ «عکس بگیر» می‌بیند؛ عکس که رسید، استودیو
+       *  همین‌جا با همان عکس باز می‌شود.
+       */
+      if (ir.vil3ntec.tohid.ui.Platform.DESKTOP || ir.vil3ntec.tohid.sync.PhoneScanner.listenCode.value != null) {
+        var phoneMsg by remember { mutableStateOf<String?>(null) }
+        Spacer(Modifier.height(Space.xs))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+          OutlinedButton(onClick = {
+            val sc = ir.vil3ntec.tohid.sync.PhoneScanner
+            when {
+              sc.listenCode.value == null -> {
+                sc.startListening(context)
+                phoneMsg = "کدِ جفت‌شدن: ${sc.listenCode.value} — در گوشی ⇐ دستگاه‌های جانبی همین را بزنید، بعد دوباره این دکمه"
+              }
+              sc.requestPhoto(product.id, product.name) -> {
+                phoneMsg = "روی گوشی «گرفتنِ عکس» را بزنید…"
+              }
+              else -> { phoneMsg = "گوشی وصل نیست — اینترنت و ورود به حساب را ببینید" }
+            }
+          }) {
+            Icon(Icons.Filled.PhotoCamera, contentDescription = null, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(6.dp))
+            Text("عکس با دوربینِ گوشی")
+          }
+          phoneMsg?.let {
+            Spacer(Modifier.width(8.dp))
+            Text(it, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted, modifier = Modifier.weight(1f))
+          }
+        }
+      }
+
       Spacer(Modifier.height(Space.md))
 
       /* -------------------------- موجودی -------------------------- */

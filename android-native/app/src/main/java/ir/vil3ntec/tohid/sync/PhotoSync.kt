@@ -144,11 +144,11 @@ object PhotoSync {
       since = page["head"]?.jsonPrimitive?.longOrNull ?: since
       p.edit().putLong("rev", since).apply()
       if (page["has_more"]?.jsonPrimitive?.booleanOrNull != true) {
-        if (got > 0) version.value = version.value + 1
+        if (got > 0) { version.value = version.value + 1; if (ir.vil3ntec.tohid.data.PhotoBot.autoEnabled(context)) ir.vil3ntec.tohid.data.PhotoBot.start(context, onlyNew = true) }
         return@withLock
       }
     }
-    if (got > 0) version.value = version.value + 1
+    if (got > 0) { version.value = version.value + 1; if (ir.vil3ntec.tohid.data.PhotoBot.autoEnabled(context)) ir.vil3ntec.tohid.data.PhotoBot.start(context, onlyNew = true) }
   }
 
   private fun enc(s: String) = java.net.URLEncoder.encode(s, "UTF-8")

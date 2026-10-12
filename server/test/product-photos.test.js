@@ -101,3 +101,48 @@ test('سوکتِ زنده: عکسِ تازه و بارکدِ گوشی به دس�
   assert.equal(stranger.msgs.filter(m => m.event !== 'hello').length, 0, 'حسابِ دیگر چیزی نمی‌گیرد');
   [desk, phone, stranger].forEach(ws => ws.close());
 });
+
+test('صندوقِ عکس: گوشی عکس می‌فرستد، کامپیوترِ همان کد می‌گیرد و برمی‌دارد', async () => {
+  const { WebSocket } = require('ws');
+  const base = await h.start();
+  require('../src/lib/sync-v1-live').attach(h.server());
+  const desk = await new Promise((resolve, reject) => {
+    const ws = new WebSocket(base.replace('http', 'ws') + `/api/sync/v1/live?token=${encodeURIComponent(a.accessToken)}&device_id=desk2&app=shop`);
+    ws.msgs = []; ws.on('message', m => ws.msgs.push(JSON.parse(String(m))));
+    ws.on('open', () => resolve(ws)); ws.on('error', reject);
+  });
+  await new Promise(r => setTimeout(r, 100));
+
+  const bad = await call('POST', '/api/sync/v1/photo-inbox', a.accessToken, { data: JPEG.toString('base64'), pair: '12' });
+  assert.equal(bad.status, 400);
+
+  const sent = await call('POST', '/api/sync/v1/photo-inbox', a.accessToken,
+    { data: JPEG.toString('base64'), pair: '654321', product_id: 'p-7', device_id: 'phone2' });
+  assert.equal(sent.status, 200, JSON.stringify(sent.body));
+  await new Promise(r => setTimeout(r, 200));
+  assert.ok(desk.msgs.some(m => m.event === 'inbox' && m.id === sent.body.id && m.pair === '654321' && m.product_id === 'p-7'));
+
+  const list = await call('GET', '/api/sync/v1/photo-inbox?pair=654321', a.accessToken);
+  assert.deepEqual(list.body.items.map(i => i.id), [sent.body.id]);
+  //  کدِ دیگر یا دکانِ دیگر چیزی نمی‌بیند
+  assert.equal((await call('GET', '/api/sync/v1/photo-inbox?pair=111111', a.accessToken)).body.items.length, 0);
+  assert.equal((await call('GET', `/api/sync/v1/photo-inbox/${sent.body.id}`, b.accessToken)).status, 404);
+
+  const got = await call('GET', `/api/sync/v1/photo-inbox/${sent.body.id}`, a.accessToken);
+  assert.ok(Buffer.from(got.body.data, 'base64').equals(JPEG));
+  assert.equal(got.body.product_id, 'p-7');
+  assert.equal((await call('DELETE', `/api/sync/v1/photo-inbox/${sent.body.id}`, a.accessToken)).body.removed, true);
+  assert.equal((await call('GET', `/api/sync/v1/photo-inbox/${sent.body.id}`, a.accessToken)).status, 404);
+
+  //  درخواستِ عکس از کامپیوتر به گوشی
+  const phone = await new Promise((resolve, reject) => {
+    const ws = new WebSocket(base.replace('http', 'ws') + `/api/sync/v1/live?token=${encodeURIComponent(a.accessToken)}&device_id=phone3&app=shop`);
+    ws.msgs = []; ws.on('message', m => ws.msgs.push(JSON.parse(String(m))));
+    ws.on('open', () => resolve(ws)); ws.on('error', reject);
+  });
+  await new Promise(r => setTimeout(r, 100));
+  desk.send(JSON.stringify({ type: 'relay', event: 'photo-request', pair: '654321', product_id: 'p-7', name: 'برنج' }));
+  await new Promise(r => setTimeout(r, 200));
+  assert.ok(phone.msgs.some(m => m.event === 'photo-request' && m.pair === '654321' && m.product_id === 'p-7' && m.name === 'برنج'));
+  desk.close(); phone.close();
+});

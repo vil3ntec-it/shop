@@ -536,6 +536,8 @@ fun AppRoot(
         DeskRail(current = sub ?: tab, onPick = ::open, compact = railMode == RailMode.COMPACT, mode = railMode, onMode = ::setRail)
       }
       //  حالتِ «پنهان»: ☰ منو را روی صفحه باز می‌کند؛ زدنِ بیرونش می‌بندد
+      //  دوربینِ گوشی برای کامپیوتر — درخواست، فرستادن و استودیو
+      PhoneLinkHost(store, data, snackbar)
       //  جست‌وجوی سریع (Ctrl+K یا ذره‌بینِ سربرگ) — همهٔ دستگاه‌ها
       if (AppNav.palette.value) {
         CommandPalette(data, onDismiss = { AppNav.palette.value = false }) { hit ->
@@ -656,7 +658,7 @@ fun AppRoot(
           onSubscription = { sub = "vip" },
         )
         "team" -> TeamScreen(snackbar)
-        "devices" -> DevicesScreen(snackbar)
+        "devices" -> DevicesScreen(data, snackbar)
         "more" -> MoreScreen(store, data, ::open)
       }
       }

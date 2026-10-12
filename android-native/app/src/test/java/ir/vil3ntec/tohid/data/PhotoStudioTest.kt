@@ -62,3 +62,13 @@ class PhotoStudioTest {
     assertEquals(320, r.height)
   }
 }
+
+/** ربات عکس عکسِ آماده را دوباره پردازش نمی‌کند */
+class PhotoBotDetectTest {
+  @Test fun `خروجیِ استودیو آماده شناخته می‌شود و عکسِ خام نه`() {
+    val raw = PhotoStudio.Image(320, 240, IntArray(320 * 240) { (255 shl 24) or (150 shl 16) or (150 shl 8) or 140 })
+    org.junit.Assert.assertFalse(PhotoBot.looksDone(raw))
+    val done = PhotoStudio.process(raw, PhotoStudio.Options(removeBackground = false, enhance = false, sharpen = 0, margin = 10))
+    assertTrue(PhotoBot.looksDone(done))
+  }
+}
