@@ -121,8 +121,12 @@ function MsiEnumRelatedProducts(lpUpgradeCode: String; dwReserved: Cardinal; iPr
   external 'MsiEnumRelatedProductsW@msi.dll stdcall';
 
 function MayLaunch: Boolean;
+var
+  I: Integer;
 begin
-  Result := not CmdLineParamExists('/NOLAUNCH');
+  Result := True;
+  for I := 1 to ParamCount do
+    if CompareText(ParamStr(I), '/NOLAUNCH') = 0 then Result := False;
 end;
 
 #ifndef Offline
@@ -151,7 +155,7 @@ begin
     Log('Local payload has a wrong SHA-256, ignoring: ' + Local);
     Exit;
   end;
-  Result := FileCopy(Local, ExpandConstant('{tmp}\') + PayloadName, False);
+  Result := CopyFile(Local, ExpandConstant('{tmp}\') + PayloadName, False);
   Log('Using local payload: ' + Local);
 end;
 
