@@ -161,6 +161,10 @@ fun main() {
             ir.vil3ntec.tohid.ui.AppNav.go(ir.vil3ntec.tohid.ui.AppNav.SHORTCUTS[digit].first)
             true
           }
+          //  Ctrl+M ⇒ مرکزِ مدیریت (Ctrl+0 برای اندازهٔ متن است)
+          //  Ctrl+K ⇒ جست‌وجوی سریع (صفحه، کالا، بارکد، قرض‌دار)
+          mod && e.key == Key.K -> { ir.vil3ntec.tohid.ui.AppNav.palette.value = !ir.vil3ntec.tohid.ui.AppNav.palette.value; true }
+          mod && e.key == Key.M -> { ir.vil3ntec.tohid.ui.AppNav.go("admin"); true }
           e.key == Key.Escape -> BackDispatcher.dispatch()
           mod && (e.key == Key.Equals || e.key == Key.Plus || e.key == Key.NumPadAdd) -> { setZoom(zoom + 0.1f); true }
           mod && (e.key == Key.Minus || e.key == Key.NumPadSubtract) -> { setZoom(zoom - 0.1f); true }

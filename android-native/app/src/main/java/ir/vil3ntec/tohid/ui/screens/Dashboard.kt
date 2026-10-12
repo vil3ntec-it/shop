@@ -121,26 +121,47 @@ fun DashboardScreen(d: ShopData, onOpen: (String) -> Unit = {}) {
     }
     Spacer(Modifier.height(14.dp))
 
-    /* ------------------------- کارتِ قهرمان ------------------------- */
-    HeroSalesCard(view)
+    /*
+     *  کامپیوتر: کارتِ فروش و اقدام کنارِ وضعیتِ دکان، و معاملاتِ اخیر کنارِ
+     *  کارهای دیگر — نه پنج کارتِ تمام‌عرض زیرِ هم که نصفِ صفحه را خالی
+     *  می‌گذاشت. گوشی و تبلت همان ترتیبِ یک‌ستونه را دارند.
+     */
+    if (screenSize() == Screen.WIDE) {
+      Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.weight(1.15f)) {
+          HeroSalesCard(view)
+          Spacer(Modifier.height(12.dp))
+          DominantAction(view, onOpen)
+        }
+        Column(Modifier.weight(1f)) { ShopStatusPanel(view, canSeeMoney, onOpen) }
+      }
+      Spacer(Modifier.height(12.dp))
+      Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.weight(1.15f)) { RecentDeals(d, onOpen) }
+        Column(Modifier.weight(1f)) { MoreActionsRow(onOpen) }
+      }
+    } else {
+      /* ------------------------- کارتِ قهرمان ------------------------- */
+      HeroSalesCard(view)
 
-    /* ------------------------- یک اقدامِ غالب ------------------------- */
-    //  چهار میان‌برِ هم‌وزن، یعنی هیچ‌کدام. صفحه هر بار **یک** کار را
-    //  پیشنهاد می‌دهد، آن هم بر اساس وضعیتِ واقعیِ دکان.
-    Spacer(Modifier.height(12.dp))
-    DominantAction(view, onOpen)
+      /* ------------------------- یک اقدامِ غالب ------------------------- */
+      //  چهار میان‌برِ هم‌وزن، یعنی هیچ‌کدام. صفحه هر بار **یک** کار را
+      //  پیشنهاد می‌دهد، آن هم بر اساس وضعیتِ واقعیِ دکان.
+      Spacer(Modifier.height(12.dp))
+      DominantAction(view, onOpen)
 
-    /* -------------------------- وضعیت دکان -------------------------- */
-    Spacer(Modifier.height(12.dp))
-    ShopStatusPanel(view, canSeeMoney, onOpen)
+      /* -------------------------- وضعیت دکان -------------------------- */
+      Spacer(Modifier.height(12.dp))
+      ShopStatusPanel(view, canSeeMoney, onOpen)
 
-    /* ------------------------- معاملات اخیر ------------------------- */
-    Spacer(Modifier.height(12.dp))
-    RecentDeals(d, onOpen)
+      /* ------------------------- معاملات اخیر ------------------------- */
+      Spacer(Modifier.height(12.dp))
+      RecentDeals(d, onOpen)
 
-    /* ------------------------- کارهای دیگر ------------------------- */
-    Spacer(Modifier.height(12.dp))
-    MoreActionsRow(onOpen)
+      /* ------------------------- کارهای دیگر ------------------------- */
+      Spacer(Modifier.height(12.dp))
+      MoreActionsRow(onOpen)
+    }
 
     /* ---------------------------- پنل‌ها ---------------------------- */
     /*

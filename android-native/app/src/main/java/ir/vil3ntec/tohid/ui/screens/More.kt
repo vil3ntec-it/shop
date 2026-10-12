@@ -21,6 +21,7 @@ import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.ManageSearch
@@ -66,6 +67,13 @@ fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
     Panel {
       // قرض‌داران و محصولات از اینجا رفتند به نوارِ پایین، و انبار و
       // گزارش جایشان آمدند
+      MoreCard(
+        title = "مرکزِ مدیریت",
+        icon = Icons.Filled.AdminPanelSettings,
+        tint = Shop.colors.primary,
+        subtitle = "همه‌چیز یک‌جا: فروش، صندوق، هشدارها، دستگاه‌ها و کارمندان",
+        onClick = { onOpen("admin") },
+      )
       MoreCard(
         title = "انبار",
         icon = Icons.Filled.Inventory2,

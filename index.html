@@ -646,6 +646,18 @@
   .stat-value{font-size:20px; font-weight:800; letter-spacing:-.01em;}
   .stat-value small{font-size:12px; font-weight:500; color:var(--muted); margin-inline-start:4px;}
 
+  /* ---------- مرکزِ مدیریت — همان `ManagementScreen`ِ برنامه ---------- */
+  .admin-kpis{grid-template-columns:repeat(auto-fill,minmax(170px,1fr));}
+  .admin-kpis .stat-hint{font-size:11.5px; color:var(--muted);}
+  .admin-hub{display:grid; grid-template-columns:repeat(auto-fill,minmax(290px,1fr)); gap:14px; margin-top:16px; align-items:start;}
+  .admin-hub .panel{margin-bottom:0;}
+  .admin-line{display:flex; justify-content:space-between; gap:10px; padding:5px 0; font-size:13px;}
+  .admin-line span{color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .admin-line b{white-space:nowrap;}
+  .admin-note{font-size:13px; color:var(--muted); margin:0;}
+  .admin-links{display:grid; grid-template-columns:repeat(3,1fr); gap:6px;}
+  .admin-links a{padding:8px; border-radius:8px; background:var(--primary-tint); color:var(--primary); font-size:12.5px; text-align:center; text-decoration:none;}
+
   /* ---------- Panels ---------- */
   .panel{
     background:var(--surface);
@@ -4726,6 +4738,17 @@
       </section>
 
       <!-- MORE (mobile hub for secondary pages) -->
+      <section class="page" id="page-admin">
+        <div class="page-toolbar">
+          <div class="page-title-block">
+            <h2>مرکزِ مدیریت</h2>
+            <p>همهٔ دکان در یک نگاه — هر کارت به صفحهٔ کاملش می‌رود</p>
+          </div>
+        </div>
+        <div class="stat-grid admin-kpis" id="admin-kpis"></div>
+        <div class="admin-hub" id="admin-hub"></div>
+      </section>
+
       <section class="page" id="page-more">
         <div class="page-toolbar">
           <div class="page-title-block">
@@ -4734,6 +4757,16 @@
           </div>
         </div>
         <div class="more-grid" id="more-nav-list">
+          <a class="more-card" data-page="admin" href="#admin">
+            <span class="more-card-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg></span>
+            <span class="more-card-txt">
+              <b>مرکزِ مدیریت</b>
+              <i>همه‌چیز یک‌جا: فروش، صندوق، هشدارها و فروشنده‌ها</i>
+            </span>
+            <span class="more-card-go">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
+            </span>
+          </a>
           <a class="more-card" data-page="profile" href="#profile">
             <span class="more-card-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M4.8 20v-1.2A4.6 4.6 0 0 1 9.4 14.2h5.2a4.6 4.6 0 0 1 4.6 4.6V20"/></svg></span>
             <span class="more-card-txt">
@@ -13476,7 +13509,7 @@
     }
   });
 
-  const EXTRA_PAGES = ['debtor-account', 'quick-sale', 'supplier-account', 'receipts', 'profile', 'team', 'product'];
+  const EXTRA_PAGES = ['debtor-account', 'quick-sale', 'supplier-account', 'receipts', 'profile', 'team', 'product', 'admin'];
 
   /**
    *  چراغِ نوارِ پایین را می‌برد روی تبِ فعال.
@@ -13960,6 +13993,63 @@
     });
   }
 
+  /* مرکزِ مدیریت — عددها از همان تابع‌های صفحه‌های خودشان، پس با آن‌ها فرق نمی‌کنند */
+  function renderAdminPage(){
+    const today = todayISO(), monthFrom = today.slice(0,7) + '-01';
+    const staff = shopRole() === 'staff';
+    const tR = computeSalesReport(today, today), mR = computeSalesReport(monthFrom, today);
+    let out = 0, low = 0, value = 0;
+    products.forEach(p=>{
+      if(p.active === false) return;
+      const st = getStockStatus(p); if(st==='out') out++; else if(st==='low') low++;
+      value += Math.max(0, getProductStock(p.id)) * (p.purchasePrice||0);
+    });
+    const indebted = debtors.filter(d=> getDebt(d.id) > 0);
+    const owed = indebted.reduce((s,d)=> s + getDebt(d.id), 0);
+    const weOwe = suppliers.reduce((s,x)=> s + Math.max(0, getSupplierDebt(x.id)), 0);
+    const sh = currentShift(), shT = sh ? shiftTotals(sh, Date.now()) : null;
+    const tile = (label, v, hint)=> `<div class="stat-card"><div class="stat-top"><span class="stat-label">${label}</span></div><div class="stat-value">${v}</div><div class="stat-hint">${hint}</div></div>`;
+    const af = n=> `${formatMoney(n)}<small>افغانی</small>`;
+    document.getElementById('admin-kpis').innerHTML = [
+      tile('فروشِ امروز', af(tR.net), `${formatMoney(tR.count)} فاکتور`),
+      tile('فروشِ این ماه', af(mR.net), `${formatMoney(mR.count)} فاکتور`),
+      staff ? '' : tile(mR.netProfit < 0 ? 'ضررِ خالصِ ماه' : 'سودِ خالصِ ماه', af(Math.abs(mR.netProfit)), 'پس از مصارف'),
+      staff ? '' : tile('ارزشِ انبار', af(value), `${formatMoney(products.length)} قلم کالا`),
+      tile('طلب از قرض‌داران', af(owed), `${formatMoney(indebted.length)} نفر`),
+      staff ? '' : tile('بدهی به تأمین‌کننده', af(weOwe), `${formatMoney(suppliers.length)} تأمین‌کننده`),
+      tile('نقدِ مورد انتظار در دخل', sh ? af(shT.expected) : 'صندوق بسته', sh ? 'صندوق باز است' : 'از «تاریخچهٔ فروش» باز کنید'),
+      tile('هشدارِ انبار', formatMoney(out + low), `${formatMoney(out)} تمام‌شده · ${formatMoney(low)} کم`),
+    ].join('');
+    const line = (l, v, color)=> `<div class="admin-line"><span>${escapeHtml(l)}</span><b${color ? ` style="color:var(--${color})"` : ''}>${v}</b></div>`;
+    const card = (title, page, action, body)=> `<div class="panel"><div class="panel-head"><h2>${title}</h2>${page ? `<a href="#${page}" class="link">${action}</a>` : ''}</div>${body}</div>`;
+    let exp = []; try{ exp = expiryAlerts(today, 30); }catch(e){}
+    const sellers = new Map();
+    sales.forEach(x=>{
+      if(x.status === 'cancelled' || x.date < monthFrom || x.date > today) return;
+      const k = String(x.seller||'').trim() || 'نامعلوم';
+      const v = sellers.get(k) || { n:0, net:0 }; v.n++; v.net += x.finalTotal||0; sellers.set(k, v);
+    });
+    const recent = auditLog.slice().sort((a,b)=> (b.createdAt||0)-(a.createdAt||0)).slice(0, 8);
+    const links = [['sale','فروش'],['warehouse','انبار'],['products','محصولات'],['purchasing','خرید'],['reports','گزارش‌ها'],['receipts','رسیدها'],['expenses','مصارف'],['debtors','قرض‌داران'],['team','کارمندان']];
+    document.getElementById('admin-hub').innerHTML = [
+      card('هشدارها', 'warehouse', 'انبار',
+        line('تمام‌شده', formatMoney(out), 'danger') + line('موجودیِ کم', formatMoney(low), 'warning') +
+        line('منقضی', formatMoney(exp.filter(l=> l.daysLeft < 0).length), 'danger') +
+        line('نزدیک به انقضا', formatMoney(exp.filter(l=> l.daysLeft >= 0).length), 'warning') +
+        line('قرض‌دارِ بدهکار', formatMoney(indebted.length))),
+      card('صندوق', 'sales', 'صندوق و فاکتورها', !sh ? '<p class="admin-note">صندوق بسته است.</p>' :
+        line('اول صندوق', formatMoney(shT.opening)) + line('فروشِ نقدی', formatMoney(shT.sales)) +
+        line('رسیدِ قرض‌داران', formatMoney(shT.receipts)) + line('مرجوعی و مصارف', '−' + formatMoney(shT.returns + shT.expenses + shT.suppliers)) +
+        line('مورد انتظار', formatMoney(shT.expected), 'primary')),
+      staff ? '' : card('فروشنده‌ها (این ماه)', 'reports', 'گزارش‌ها', sellers.size === 0 ? '<p class="admin-note">فروشی ثبت نشده.</p>' :
+        Array.from(sellers.entries()).sort((a,b)=> b[1].net - a[1].net).slice(0, 6).map(([k,v])=> line(`${k} · ${formatMoney(v.n)}`, formatMoney(v.net))).join('')),
+      card('حساب و دستگاه‌ها', 'profile', 'حساب من', '<p class="admin-note">دستگاه‌های وصل، اشتراک و کارمندان همین حساب — روی هر دستگاه همین دفتر دیده می‌شود.</p>'),
+      staff ? '' : card('سابقهٔ اخیر', 'audit-log', 'سابقهٔ عملیات', recent.length === 0 ? '<p class="admin-note">هنوز چیزی ثبت نشده.</p>' :
+        recent.map(a=> `<div class="admin-line"><span>${escapeHtml(formatDate(a.date||today))} — ${escapeHtml(a.notes||'')}</span></div>`).join('')),
+      card('میان‌بُرها', '', '', `<div class="admin-links">${links.map(([id,l])=> `<a href="#${id}">${l}</a>`).join('')}</div>`),
+    ].join('');
+  }
+
   function goTo(pageId){
     if(!PAGES.find(p=>p.id===pageId) && !EXTRA_PAGES.includes(pageId)) pageId = 'dashboard';
 
@@ -13998,6 +14088,9 @@
     } else if(pageId==='profile'){
       pageTitle.textContent = 'حساب من';
       profRefresh();
+    } else if(pageId==='admin'){
+      pageTitle.textContent = 'مرکزِ مدیریت';
+      renderAdminPage();
     } else if(pageId==='team'){
       pageTitle.textContent = 'کارمندان دکان';
       teamRefresh();

@@ -26,4 +26,7 @@ object AppNav {
   val request = mutableStateOf<String?>(null)
 
   fun go(target: String) { request.value = target }
+
+  /** جست‌وجوی سریع (Ctrl+K روی کامپیوتر، دکمهٔ ذره‌بین در سربرگ) */
+  val palette = mutableStateOf(false)
 }
