@@ -61,7 +61,7 @@ object Fingerprint {
     )
 
     val info = BiometricPrompt.PromptInfo.Builder()
-      .setTitle("باز کردن توحید")
+      .setTitle("باز کردن فروشگاه من")
       .setSubtitle("انگشتتان را روی حسگر بگذارید")
       .setNegativeButtonText("با رمز وارد می‌شوم")
       .setAllowedAuthenticators(KINDS)

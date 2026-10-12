@@ -1,5 +1,5 @@
 <!--
-  توحید | مدیریت فروشگاه
+  فروشگاه من
   نسخه ۳ (Phase 3): سیستم «مصارف» کامل — ثبت/ویرایش/حذف، دسته‌بندی، جستجو و فیلتر، آمار بالای صفحه، کارت داشبورد.
   نسخه ۳ب (Phase 3b): سیستم‌های «محصولات» و «انبار» کامل —
     محصولات: افزودن/ویرایش/حذف/جستجو/فیلتر، دسته‌بندی و واحد اندازه‌گیری، قیمت خرید/فروش، حداقل موجودی.
@@ -20,7 +20,7 @@
 -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self' https: http: wss: ws: blob: data:; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>توحید | مدیریت فروشگاه</title>
+<title>فروشگاه من</title>
 
 <!--
   نشانیِ Backend مرکزی — تنها جایی که در نسخهٔ وب تنظیم می‌شود.
@@ -87,7 +87,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="توحید">
+<meta name="apple-mobile-web-app-title" content="فروشگاه من">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-96.png" sizes="96x96" type="image/png">
 <link rel="icon" href="icons/icon-192.png" sizes="192x192" type="image/png">
@@ -1690,7 +1690,7 @@
       ── چه چیزی را جانشین شد ─────────────────────────────────────────
       پیش از این، ساختِ حساب یک **کارتِ نقش** ته صفحه بود («فروشنده»)
       کنارِ کارتِ «ادامه بدون حساب»، زیرِ یک جداکننده‌ی «ثبت‌نام در
-      توحید». یعنی مهم‌ترین انتخابِ صفحه — ورود یا ثبت‌نام — ته‌ترین
+      فروشگاه من». یعنی مهم‌ترین انتخابِ صفحه — ورود یا ثبت‌نام — ته‌ترین
       چیزِ کارت بود و هم‌وزنِ «بی‌حساب ادامه بده». حالا بالای فرم است و
       حالِ امروز را نشان می‌دهد، نه یک پیشنهاد.
       ────────────────────────────────────────────────────────────────── */
@@ -3358,7 +3358,7 @@
       <span class="auth-brand-mark">
         <!-- همان نشانی که روی صفحه‌ی گوشی است؛ آیکنِ برنامه و لوگوی
              داخلش نباید دو چیز باشند -->
-        <img class="tohid-mark" src="icons/mark.png" width="38" height="38" alt="توحید" decoding="async">
+        <img class="tohid-mark" src="icons/mark.png" width="38" height="38" alt="فروشگاه من" decoding="async">
       </span>
       <h1>خوش آمدید</h1>
       <p>با ایمیل و رمزتان وارد شوید</p>
@@ -3502,7 +3502,7 @@
 
     <div class="auth-brand">
       <span class="auth-brand-mark">
-        <img class="tohid-mark" src="icons/mark.png" width="38" height="38" alt="توحید" decoding="async">
+        <img class="tohid-mark" src="icons/mark.png" width="38" height="38" alt="فروشگاه من" decoding="async">
       </span>
       <h1>ساخت حساب</h1>
       <p id="signup-sub">با ایمیل‌تان، در سه گام کوتاه</p>
@@ -3648,9 +3648,9 @@
   <!-- Sidebar (desktop) -->
   <aside class="sidebar">
     <div class="brand">
-      <div class="brand-mark"><img class="tohid-mark" src="icons/mark.png" width="26" height="26" alt="توحید" decoding="async"></div>
+      <div class="brand-mark"><img class="tohid-mark" src="icons/mark.png" width="26" height="26" alt="فروشگاه من" decoding="async"></div>
       <div class="brand-text">
-        <b>توحید</b>
+        <b>فروشگاه من</b>
         <span>مدیریت فروشگاه</span>
       </div>
     </div>
@@ -5200,7 +5200,7 @@
           <div class="panel-head"><h2>اطلاعات فروشگاه</h2></div>
           <div class="form-group" style="margin-bottom:12px;">
             <label>نام فروشگاه</label>
-            <input class="form-input" id="in-settings-store-name" type="text" placeholder="مثلاً فروشگاه توحید">
+            <input class="form-input" id="in-settings-store-name" type="text" placeholder="مثلاً فروشگاه نور">
           </div>
           <button class="btn btn-primary btn-sm" id="btn-save-store-name">ذخیره</button>
         </div>
@@ -5330,7 +5330,7 @@
         <!-- About -->
         <div class="panel" style="margin-bottom:0;">
           <div class="panel-head"><h2>درباره برنامه</h2></div>
-          <p class="settings-hint">توحید | مدیریت فروشگاه — نسخه ۴ (قابل نصب و آفلاین)<br>تمام اطلاعات فقط روی همین دستگاه و در همین مرورگر ذخیره می‌شود؛ پس هر چند وقت یک‌بار نسخه پشتیبان بگیرید.</p>
+          <p class="settings-hint">فروشگاه من — نسخه ۴ (قابل نصب و آفلاین)<br>تمام اطلاعات فقط روی همین دستگاه و در همین مرورگر ذخیره می‌شود؛ پس هر چند وقت یک‌بار نسخه پشتیبان بگیرید.</p>
           <div class="build-stamp">
             <span>نسخه‌ی نصب‌شده</span>
             <b id="build-id">—</b>
@@ -12889,7 +12889,7 @@
     const input = document.getElementById('in-settings-store-name');
     if(input) input.value = appSettings.storeName || '';
     const brandEl = document.querySelector('.brand-text b');
-    if(brandEl) brandEl.textContent = appSettings.storeName || 'توحید';
+    if(brandEl) brandEl.textContent = appSettings.storeName || 'فروشگاه من';
     applyTheme(appSettings.theme || 'light');
     // پیش‌فرض روشن است، چون کاربر انیمیشن‌ها را خواسته
     applyMotion(appSettings.motion || 'full');
@@ -14841,7 +14841,7 @@
     if(rows.length <= 1){ showToast('در این گزارش داده‌ای برای چاپ وجود ندارد', 'warning'); return; }
     const head = rows[0].map(h=> `<th>${escapeHtml(String(h))}</th>`).join('');
     const body = rows.slice(1).map(r=> '<tr>' + r.map(c=> `<td>${escapeHtml(String(c))}</td>`).join('') + '</tr>').join('');
-    const store = (appSettings.storeName || 'توحید');
+    const store = (appSettings.storeName || 'فروشگاه من');
     const win = window.open('', '_blank');
     if(!win){ showToast('مرورگر پنجره چاپ را مسدود کرد', 'danger'); return; }
     win.document.write(`<!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="UTF-8"><title>${escapeHtml(name)}</title>

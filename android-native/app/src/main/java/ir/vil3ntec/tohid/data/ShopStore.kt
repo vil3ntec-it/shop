@@ -167,7 +167,7 @@ class ShopStore(private val context: Context) {
       ?: error("فایل پشتیبان معتبر نیست")
     val parsed = json.decodeFromJsonElement(ShopData.serializer(), tree)
     val stamped = tree.containsKey("exportedAt")
-    if (!stamped && backupSize(parsed) == 0) error("این فایل، پشتیبانِ توحید نیست")
+    if (!stamped && backupSize(parsed) == 0) error("این فایل، پشتیبانِ فروشگاه من نیست")
     parsed
   }
 

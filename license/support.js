@@ -207,7 +207,7 @@
       const mine = m.sender === 'user';
       const system = m.sender === 'system';
       const cls = mine ? 'sup-mine' : (system ? 'sup-sys' : 'sup-them');
-      const who = system ? 'خبر از توحید' : (mine ? '' : (m.senderName || 'پشتیبانی'));
+      const who = system ? 'خبر از فروشگاه من' : (mine ? '' : (m.senderName || 'پشتیبانی'));
       return `<div class="sup-msg ${cls}">
         ${who ? `<b>${esc(who)}</b>` : ''}
         <p>${esc(m.body).replace(/\n/g, '<br>')}</p>

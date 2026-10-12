@@ -433,7 +433,7 @@ fun AppRoot(
        */
       Column {
       TohidTopBar(
-        title = PAGE_TITLES[sub ?: tab] ?: "توحید",
+        title = PAGE_TITLES[sub ?: tab] ?: "فروشگاه من",
         d = data,
         theme = theme,
         onTheme = onTheme,

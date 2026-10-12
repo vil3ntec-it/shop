@@ -1,4 +1,4 @@
-﻿; نصابِ ویندوزِ توحید — Inno Setup 6.5+، دو گونه از یک فایل:
+﻿; نصابِ ویندوزِ «فروشگاه من» — Inno Setup 6.5+، دو گونه از یک فایل:
 ;
 ;   Tohid-Windows-Setup.exe    (پیش‌فرض، ~۳ مگابایت) — «نصابِ آنلاین»
 ;   Tohid-Windows-Offline.exe  (/DOffline، ~۹۰ مگابایت) — همه‌چیز داخلِ خودش
@@ -40,8 +40,8 @@
 [Setup]
 ; ⛔ هرگز عوض نشود — ویندوز با همین شناسه نسخهٔ تازه را روی همان برنامه می‌نشاند
 AppId={{8C2E4F1A-5B7D-4E3C-9A61-2F0D7B3E5C14}
-AppName=Tohid
-AppVerName=Tohid {#AppVersion}
+AppName=فروشگاه من
+AppVerName=فروشگاه من {#AppVersion}
 AppVersion={#AppVersion}
 VersionInfoVersion={#AppVersion}
 AppPublisher=VIL3NTEC
@@ -49,7 +49,7 @@ AppPublisherURL=https://vil3ntec-it.github.io/shop/
 AppSupportURL=https://vil3ntec-it.github.io/shop/download.html
 AppCopyright=(c) VIL3NTEC
 DefaultDirName={localappdata}\Tohid
-DefaultGroupName=Tohid
+DefaultGroupName=فروشگاه من
 DisableProgramGroupPage=yes
 DisableDirPage=auto
 DisableWelcomePage=no
@@ -65,7 +65,7 @@ WizardSmallImageFile=wizard-small-55.bmp,wizard-small-69.bmp,wizard-small-83.bmp
 WizardImageStretch=no
 SetupIconFile=..\icons\tohid.ico
 UninstallDisplayIcon={app}\Tohid.exe
-UninstallDisplayName=Tohid
+UninstallDisplayName=فروشگاه من
 CloseApplications=force
 RestartApplications=no
 SetupLogging=yes
@@ -105,12 +105,12 @@ Type: filesandordirs; Name: "{app}\app"
 Type: filesandordirs; Name: "{app}\runtime"
 
 [Icons]
-Name: "{autoprograms}\Tohid"; Filename: "{app}\Tohid.exe"
-Name: "{autodesktop}\Tohid"; Filename: "{app}\Tohid.exe"; Tasks: desktopicon
+Name: "{autoprograms}\فروشگاه من"; Filename: "{app}\Tohid.exe"
+Name: "{autodesktop}\فروشگاه من"; Filename: "{app}\Tohid.exe"; Tasks: desktopicon
 
 [Run]
 ; نصبِ دستی: تیکِ «Launch»؛ به‌روزرسانیِ بی‌صدا: خودکار باز می‌شود (آزمونِ CI با ‎/NOLAUNCH‎ نه)
-Filename: "{app}\Tohid.exe"; Description: "{cm:LaunchProgram,Tohid}"; Flags: nowait postinstall; Check: MayLaunch
+Filename: "{app}\Tohid.exe"; Description: "{cm:LaunchProgram,فروشگاه من}"; Flags: nowait postinstall; Check: MayLaunch
 
 [Code]
 const
@@ -139,7 +139,7 @@ var
 
 procedure InitializeWizard;
 begin
-  DownloadPage := CreateDownloadPage('Downloading Tohid', 'Setup is downloading and verifying the program files...', nil);
+  DownloadPage := CreateDownloadPage('Downloading فروشگاه من', 'Setup is downloading and verifying the program files...', nil);
   DownloadPage.ShowBaseNameInsteadOfUrl := True;
 end;
 
@@ -211,10 +211,10 @@ begin
   if UseLocalPayload then Exit;
   if not DownloadPayload(Err) then begin
     SuppressibleMsgBox(
-      'Tohid could not be downloaded.' + #13#10#13#10 +
+      'فروشگاه من could not be downloaded.' + #13#10#13#10 +
       'Reason: ' + Err + #13#10#13#10 +
       'Please check your internet connection (or turn your VPN/proxy off or on) and click Install again.' + #13#10#13#10 +
-      'Without internet: download Tohid-Windows-Offline.exe from' + #13#10 +
+      'Without internet: download MyShop-Windows-Offline.exe from' + #13#10 +
       'https://vil3ntec-it.github.io/shop/download.html',
       mbCriticalError, MB_OK, IDOK);
     Result := False;

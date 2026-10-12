@@ -297,7 +297,7 @@ const senders = {
      */
     const custom = String(cfg.otpSubject || '').replace(/[:：\-–—]?\s*\{code\}\s*/g, ' ').replace(/\s+/g, ' ').trim();
     const subject = (purpose === 'reset' ? 'کد بازیابیِ رمز' : '')
-      || custom || templates.titleOf(app) || 'کد ورود توحید';
+      || custom || templates.titleOf(app) || 'کد ورود فروشگاه من';
     const text = cfg.otpTemplate
       ? cfg.otpTemplate.replace(/\{code\}/g, code)
       : `کد ورود شما در ادامه است.\n\n${code}\n\nاین کد تا ده دقیقه‌ی دیگر کار می‌کند. اگر شما درخواستش نکرده‌اید، همین ایمیل را نادیده بگیرید.`;

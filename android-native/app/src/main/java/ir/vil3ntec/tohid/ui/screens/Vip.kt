@@ -83,7 +83,7 @@ import ir.vil3ntec.tohid.money
  */
 
 private const val WHATSAPP = "93792236008"
-private const val BUY_MESSAGE = "سلام، می‌خواهم اشتراک برنامه توحید را بخرم."
+private const val BUY_MESSAGE = "سلام، می‌خواهم اشتراک برنامهٔ فروشگاه من را بخرم."
 
 /** قابلیت‌هایی که همیشه باز است */
 private val FREE_FEATURES = listOf(

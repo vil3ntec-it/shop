@@ -76,7 +76,7 @@
           <div class="sync-section" id="shop-setup" hidden>
             <p class="sync-hint">اگر صاحب دکان هستید یک دکان بسازید. اگر شاگرد هستید، کدی که صاحب دکان می‌دهد را وارد کنید.</p>
             <label class="sync-label">نام دکان</label>
-            <input type="text" id="shop-name" class="sync-input" placeholder="دکان توحید">
+            <input type="text" id="shop-name" class="sync-input" placeholder="دکان نور">
             <button type="button" class="sync-btn sync-btn-block" id="shop-create">ساخت دکان</button>
             <div class="sync-or">یا</div>
             <label class="sync-label">کد دعوت</label>

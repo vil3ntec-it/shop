@@ -160,7 +160,7 @@ jobs:
 
             بازنویسی کامل با Kotlin و Jetpack Compose. بدون HTML، بدون WebView.
 
-            **دانلود:** [Tohid-Native.apk](https://github.com/${{ github.repository }}/releases/download/tohid-native/Tohid-Native.apk) — نسخهٔ `${{ env.APK_NAME }}`، حدود ${{ env.APK_MB }} مگابایت
+            **دانلود:** [MyShop-Android.apk](https://github.com/${{ github.repository }}/releases/download/tohid-native/MyShop-Android.apk) — نسخهٔ `${{ env.APK_NAME }}`، حدود ${{ env.APK_MB }} مگابایت
 
             > این لینک همیشه تازه‌ترین نسخه را می‌دهد و با ساختِ بعدی نمی‌میرد.
 
@@ -188,6 +188,9 @@ jobs:
           }
           up "${{ env.APK_NAME }}"
           up Tohid-Native.apk
+          #  نامِ رو به کاربر «فروشگاه من» است؛ «Tohid-Native.apk» فقط برای به‌روزرسانیِ نسخه‌های نصب‌شده می‌ماند
+          cp Tohid-Native.apk MyShop-Android.apk
+          up MyShop-Android.apk
           up SHA256SUMS.txt
           if [ -f SHA256SUMS.txt.sig ]; then up SHA256SUMS.txt.sig; fi
           up version.txt
@@ -209,7 +212,7 @@ jobs:
           gh api "repos/${{ github.repository }}/releases/tags/tohid-native" \
             | jq -r '.assets[] | "\(.id) \(.name)"' | while read -r id name; do
               case "$name" in
-                "${{ env.APK_NAME }}"|Tohid-Native.apk|SHA256SUMS.txt|SHA256SUMS.txt.sig|version.txt) ;;
+                "${{ env.APK_NAME }}"|Tohid-Native.apk|MyShop-Android.apk|SHA256SUMS.txt|SHA256SUMS.txt.sig|version.txt) ;;
                 *) gh api -X DELETE "repos/${{ github.repository }}/releases/assets/$id" ;;
               esac
             done

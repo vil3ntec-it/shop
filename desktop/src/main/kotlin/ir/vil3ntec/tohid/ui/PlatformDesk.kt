@@ -4,11 +4,11 @@ package ir.vil3ntec.tohid.ui
 object Platform {
   const val DESKTOP: Boolean = true
 
-  /** «اسناد ⇐ توحید ⇐ پشتیبان» — جایی که کاربر خودش پیدا می‌کند و با فلش کپی می‌کند */
+  /** «اسناد ⇐ فروشگاه من ⇐ پشتیبان» — جایی که کاربر خودش پیدا می‌کند و با فلش کپی می‌کند */
   fun defaultBackupDir(context: android.content.Context): java.io.File? {
     val home = System.getProperty("user.home") ?: return null
     val docs = java.io.File(home, "Documents").takeIf { it.isDirectory } ?: java.io.File(home)
-    return java.io.File(docs, "Tohid/پشتیبان")
+    return java.io.File(docs, "فروشگاه من/پشتیبان")
   }
 
   fun pickFolder(start: String?): String? {
