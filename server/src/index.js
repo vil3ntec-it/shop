@@ -59,8 +59,10 @@ async function main() {
   //  «رو به پایان / منقضی»
   const notices = require('./lib/notices');
   notices.startRunner();
-  //  باتِ تلگرامِ پمپ — تا رمزش از پنل داده نشده، فقط هر چند ثانیه نگاه می‌کند
-  const telegram = require('./lib/telegram');
+  //  باتِ تلگرامِ پمپ — کدش در ریپوی پمپ است (bots/pump، lib/bots.js)؛ نبود ⇒ بی بات.
+  //  تا رمزش از پنل داده نشده، فقط هر چند ثانیه نگاه می‌کند.
+  const telegram = require('./lib/bots').pump();
+  if (!telegram.available) console.log('[bots] باتِ پمپ نصب نیست (bots/pump) — سرور بی بات بالا می‌آید');
   if (config.telegram.autoStart) telegram.start();
 
   let closing = false;

@@ -365,7 +365,10 @@ await step('باتِ تلگرامِ پمپ: بی رمز «داده نشده» م
     null, { timeout: 10_000 }
   );
   const text = await page.textContent('#tg-msg');
-  assert.ok(text.includes('BotFather'), `پیامِ رمزِ بدشکل باید بگوید رمز از کجا می‌آید — رسید: ${text}`);
+  //  باتِ پمپ در ریپوی پمپ است (lib/bots.js)؛ این‌جا معمولاً نصب نیست ⇒ همان پیامِ «نصب نیست»
+  const missing = !require('../src/lib/bots').pump().available;
+  assert.ok(missing ? text.includes('نصب نیست') : text.includes('BotFather'),
+    `پیامِ رمزِ بدشکل باید بگوید ${missing ? 'بات نصب نیست' : 'رمز از کجا می‌آید'} — رسید: ${text}`);
   const row = await one("SELECT value FROM app_config WHERE key='telegram_token'");
   assert.ok(!row || !row.value, 'رمزِ بدشکل نباید ذخیره شود');
   //  همان ۴۰۰ِ خواسته — بالا را ببینید
