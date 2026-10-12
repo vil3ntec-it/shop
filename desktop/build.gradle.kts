@@ -80,6 +80,9 @@ val replaced = listOf(
   "scan/BarcodeScanner.kt",
   "sync/Integrity.kt",
   "update/Updater.kt",
+  //  چاپِ گزارش: اندروید روی PDFِ چاپ رسم می‌کند، این‌جا `PrinterJob`ِ جاوا —
+  //  نه مرورگر (برنامهٔ کامپیوتر سایت نیست)
+  "print/ReportPrint.kt",
 ).map { "ir/vil3ntec/tohid/$it" }
 
 val generated = layout.buildDirectory.dir("generated/tohid")

@@ -7036,12 +7036,24 @@
     // هستهٔ همگام‌سازی بالا نیامده: همان شکلِ دیروز، تا برنامه نایستد
     return 'id'+Date.now().toString(36)+Math.random().toString(36).slice(2,8);
   }
-  function formatMoney(n){ return Math.round(n).toLocaleString('en-US'); }
+  /* قالب‌بندهای `Intl` یک بار ساخته می‌شوند. `toLocaleString`/`toLocaleDateString`
+     با گزینه، در هر صدا زدن یک قالب‌بندِ تازه می‌سازد — در فهرستِ هزار ردیفی
+     همین نیم‌ثانیه می‌شد. تاریخ‌ها هم چون تکرارِ زیاد دارند حفظ می‌شوند. */
+  const MONEY_FMT = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
+  const DATE_FMT = (()=>{ try{ return new Intl.DateTimeFormat('fa-IR-u-nu-latn',{year:'numeric',month:'2-digit',day:'2-digit'}); }catch(e){ return null; } })();
+  const DATE_MEMO = new Map();
+  function formatMoney(n){ return MONEY_FMT.format(Math.round(n)); }
   /** عدد بدون جداکننده — برای سال و شماره‌هایی که پول نیستند. */
   function formatPlain(n){ return String(n); }
   function formatDate(iso){
-    try{ return new Date(iso+'T00:00:00').toLocaleDateString('fa-IR-u-nu-latn',{year:'numeric',month:'2-digit',day:'2-digit'}); }
-    catch(e){ return iso; }
+    const hit = DATE_MEMO.get(iso);
+    if(hit !== undefined) return hit;
+    let out;
+    try{ out = DATE_FMT ? DATE_FMT.format(new Date(iso+'T00:00:00')) : iso; }
+    catch(e){ out = iso; }
+    if(DATE_MEMO.size > 5000) DATE_MEMO.clear();
+    DATE_MEMO.set(iso, out);
+    return out;
   }
   function todayISO(){
     // بر اساس تاریخ محلی دستگاه (نه UTC) تا نزدیک نیمه‌شب تاریخ اشتباه نمایش داده نشود
@@ -7058,14 +7070,30 @@
   function escapeHtml(s){
     return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
+  /* نمایهٔ بدهی — یک گذر به ازای هر تغییرِ دفتر؛ پیش‌تر `getDebt` داخلِ
+     مرتب‌سازیِ قرض‌داران صدا زده می‌شد و هر بار کلِ تراکنش‌ها را می‌گشت. */
+  /* شمارندهٔ تغییرِ دفتر — هر نمایهٔ کش‌شده (موجودی، بدهی) با آن باطل می‌شود.
+     `saveState`، `loadState` و `applyServerLedger` جلویش می‌برند. */
+  let ledgerRev = 0;
+  function touchLedger(){ ledgerRev++; }
+  let debtIdx = null, debtIdxKey = '';
+  function debtIndex(){
+    const key = ledgerRev + ':' + transactions.length;
+    if(debtIdx && debtIdxKey === key) return debtIdx;
+    const balance = new Map(), last = new Map();
+    for(const t of transactions){
+      balance.set(t.debtorId, (balance.get(t.debtorId)||0) + (t.type==='give' ? t.amount : -t.amount));
+      const prev = last.get(t.debtorId);
+      if(!prev || (t.date||'') > (prev.date||'') || ((t.date||'') === (prev.date||'') && (t.createdAt||0) > (prev.createdAt||0))) last.set(t.debtorId, t);
+    }
+    debtIdx = { balance, last }; debtIdxKey = key;
+    return debtIdx;
+  }
   function getDebt(debtorId){
-    return transactions.filter(t=>t.debtorId===debtorId)
-      .reduce((sum,t)=> sum + (t.type==='give' ? t.amount : -t.amount), 0);
+    return debtIndex().balance.get(debtorId) || 0;
   }
   function getLastTx(debtorId){
-    const list = transactions.filter(t=>t.debtorId===debtorId);
-    if(!list.length) return null;
-    return list.slice().sort((a,b)=> new Date(b.date)-new Date(a.date) || b.createdAt-a.createdAt)[0];
+    return debtIndex().last.get(debtorId) || null;
   }
   function topDebtorInfo(){
     const list = debtors.map(d=>({d, amt:getDebt(d.id)})).filter(x=>x.amt>0).sort((a,b)=>b.amt-a.amt);
@@ -8194,7 +8222,8 @@
       if(dateF==='month' && !inCurrentMonth(ex.date)) return false;
       return true;
     });
-    filtered.sort((a,b)=> new Date(b.date)-new Date(a.date) || b.createdAt-a.createdAt);
+    // تاریخ‌ها `YYYY-MM-DD`اند؛ مقایسهٔ رشته همان ترتیب است، بی ساختنِ Date در هر مقایسه
+    filtered.sort((a,b)=> (b.date||'').localeCompare(a.date||'') || (b.createdAt||0)-(a.createdAt||0));
 
     if(filtered.length===0){
       list.style.display='none'; list.innerHTML='';
@@ -8404,26 +8433,50 @@
       (p.barcodes||[]).forEach(code=>{ if(code) barcodeIndex.set(code, p.id); });
     });
   }
+  /* ==========================================================
+     نمایهٔ موجودی — یک بار به ازای هر تغییرِ دفتر، نه به ازای هر کالا.
+     ----------------------------------------------------------
+     پیش‌تر `getSoldQty` برای هر کالا کلِ اقلامِ فروش را می‌گشت و برای هر
+     قلم کلِ فاکتورها را (`sales.find`)؛ فهرستِ ۱۰۰۰ کالا در دکانی با ده‌ها
+     هزار قلم یعنی ده‌ها میلیون مقایسه در هر بار کشیدنِ صفحه. حالا یک
+     گذرِ خطی می‌سازد و تا تغییرِ بعدیِ دفتر (`ledgerRev`) یا تغییرِ طولِ
+     فهرست‌ها همان را برمی‌گرداند. همان `ShopStore.index`ِ برنامه.
+     ========================================================== */
+  let stockIdx = null, stockIdxKey = '';
+  function stockIndex(){
+    const key = ledgerRev + ':' + warehouseEntries.length + ':' + saleItems.length + ':' + sales.length;
+    if(stockIdx && stockIdxKey === key) return stockIdx;
+    const cancelled = new Set();
+    for(const s of sales) if(s.status==='cancelled') cancelled.add(s.id);
+    const inbound = new Map(), cartons = new Map(), sold = new Map(), profit = new Map();
+    for(const w of warehouseEntries){
+      inbound.set(w.productId, (inbound.get(w.productId)||0) + (w.units||0));
+      cartons.set(w.productId, (cartons.get(w.productId)||0) + (w.cartons||0));
+    }
+    for(const si of saleItems){
+      if(cancelled.has(si.saleId)) continue;
+      const net = (si.quantity||0)-(si.returnedQty||0);
+      sold.set(si.productId, (sold.get(si.productId)||0) + net);
+      profit.set(si.productId, (profit.get(si.productId)||0) + net * ((si.unitPrice||0) - (si.purchasePrice||0)));
+    }
+    stockIdx = { inbound, cartons, sold, profit };
+    stockIdxKey = key;
+    return stockIdx;
+  }
   function getSoldQty(productId){
     // فروش‌های لغوشده و مقدار مرجوعی‌شده در محاسبه موجودی لحاظ نمی‌شوند
-    return saleItems
-      .filter(si=>{
-        if(si.productId!==productId) return false;
-        const sale = sales.find(s=>s.id===si.saleId);
-        return !sale || sale.status!=='cancelled';
-      })
-      .reduce((s,si)=> s+((si.quantity||0)-(si.returnedQty||0)), 0);
+    return stockIndex().sold.get(productId) || 0;
   }
 
   let productCategories = [];
   let productUnits = ['عدد','کیلوگرم','گرم','لیتر','متر','کارتن','بسته'];
 
   function getProductStock(productId){
-    const inbound = warehouseEntries.filter(w=>w.productId===productId).reduce((s,w)=> s + (w.units||0), 0);
-    return inbound - getSoldQty(productId);
+    const idx = stockIndex();
+    return (idx.inbound.get(productId)||0) - (idx.sold.get(productId)||0);
   }
   function getProductCartons(productId){
-    return warehouseEntries.filter(w=>w.productId===productId).reduce((s,w)=> s + (w.cartons||0), 0);
+    return stockIndex().cartons.get(productId) || 0;
   }
   /**
    * پیام روشن وقتی موجودی کم می‌آید.
@@ -8810,15 +8863,17 @@
     const prodF = document.getElementById('warehouse-filter-product').value;
     const catF = document.getElementById('warehouse-filter-category').value;
 
+    const productById = new Map(products.map(x=>[x.id, x]));   // پیش‌تر برای هر ورودی products.find
     let filtered = warehouseEntries.filter(w=>{
-      const p = products.find(x=>x.id===w.productId);
+      const p = productById.get(w.productId);
       const pname = p ? p.name : '';
       if(q && !pname.includes(q) && !(w.notes && w.notes.includes(q))) return false;
       if(prodF && w.productId!==prodF) return false;
       if(catF && (!p || p.category!==catF)) return false;
       return true;
     });
-    filtered.sort((a,b)=> new Date(b.date)-new Date(a.date) || b.createdAt-a.createdAt);
+    // تاریخ‌ها `YYYY-MM-DD`اند؛ مقایسهٔ رشته همان ترتیب است، بی ساختنِ Date در هر مقایسه
+    filtered.sort((a,b)=> (b.date||'').localeCompare(a.date||'') || (b.createdAt||0)-(a.createdAt||0));
 
     if(filtered.length===0){
       list.style.display='none'; list.innerHTML='';
@@ -8828,7 +8883,7 @@
     noRes.style.display='none';
     list.style.display='';
     list.innerHTML = filtered.map(w=>{
-      const p = products.find(x=>x.id===w.productId);
+      const p = productById.get(w.productId);
       const pname = p ? p.name : 'محصول حذف‌شده';
       const calcTxt = (w.cartons && w.perCarton) ? `${formatMoney(w.cartons)} کارتن × ${formatMoney(w.perCarton)} عدد = ${formatMoney(w.units)} ${escapeHtml(w.unit)}` : `${formatMoney(w.units)} ${escapeHtml(w.unit)}`;
       return `
@@ -10427,11 +10482,10 @@
     // بهای کالای فروخته‌شده: کلِ مقدارِ فروخته‌شده با purchasePriceِ ثبت‌شده روی هر قلم.
     // مرجوعی این‌جا کم نمی‌شود؛ اثرش در بازهٔ خودِ مرجوعی می‌نشیند (پایین‌تر).
     let cogs = 0;
-    activeSales.forEach(s=>{
-      saleItems.filter(si=>si.saleId===s.id).forEach(si=>{
-        cogs += (si.quantity||0) * (si.purchasePrice||0);
-      });
-    });
+    const activeIds = new Set(activeSales.map(s=>s.id));
+    for(const si of saleItems){
+      if(activeIds.has(si.saleId)) cogs += (si.quantity||0) * (si.purchasePrice||0);
+    }
     /* مرجوعی‌ها — هر مرجوعی در بازهٔ تاریخِ **خودش**: مبلغی که پس داده شد
        منهای بهای کالایی که به انبار برگشت.
 
@@ -10442,12 +10496,14 @@
     const returnsInRange = returns.filter(r=> r.date>=fromDate && r.date<=toDate);
     let returnAmount = 0;        // مبلغ مرجوعی مؤثر در این بازه (برای نمایش)
     let returnProfitImpact = 0;  // اثر واقعی مرجوعی روی سود
+    const saleById = returnsInRange.length ? new Map(sales.map(x=>[x.id, x])) : null;
+    const itemById = returnsInRange.length ? new Map(saleItems.map(x=>[x.id, x])) : null;
     returnsInRange.forEach(r=>{
-      const sale = sales.find(x=>x.id===r.saleId);
+      const sale = saleById.get(r.saleId);
       if(sale && sale.status==='cancelled') return;
       const amount = r.amount||0;
       returnAmount += amount;
-      const si = saleItems.find(x=>x.id===r.saleItemId);
+      const si = itemById.get(r.saleItemId);
       const cost = si ? (si.purchasePrice||0)*(r.quantity||0) : 0;
       returnProfitImpact += amount - cost;
     });
@@ -10484,16 +10540,9 @@
   document.getElementById('rep-sales-to').addEventListener('change', ()=>{ renderSalesReport(); renderPurchaseReport(); });
 
   function computeProductProfit(productId){
-    let qty=0, profit=0;
-    saleItems.forEach(si=>{
-      if(si.productId!==productId) return;
-      const sale = sales.find(s=>s.id===si.saleId);
-      if(sale && sale.status==='cancelled') return;
-      const netQty = (si.quantity||0)-(si.returnedQty||0);
-      qty += netQty;
-      profit += netQty * ((si.unitPrice||0) - (si.purchasePrice||0));
-    });
-    return {qty, profit};
+    // از همان نمایهٔ یک‌گذره — پیش‌تر برای هر کالا کلِ اقلام و فاکتورها گشته می‌شد
+    const idx = stockIndex();
+    return { qty: idx.sold.get(productId) || 0, profit: idx.profit.get(productId) || 0 };
   }
   function renderProductsReport(){
     const lowList = products.filter(p=> getStockStatus(p)==='low');
@@ -11950,9 +11999,11 @@
   /* ==========================================================
      تاریخچه فروش — لیست، لغو فروش، مرجوعی
   ========================================================== */
-  function saleCardHtml(sale){
-    const debtor = sale.debtorId ? debtors.find(d=>d.id===sale.debtorId) : null;
-    const canReturn = sale.status==='completed' && saleItems.some(si=> si.saleId===sale.id && (si.quantity-(si.returnedQty||0))>0);
+  function saleCardHtml(sale, ctx){
+    const debtor = sale.debtorId ? (ctx ? ctx.debtors.get(sale.debtorId) : debtors.find(d=>d.id===sale.debtorId)) : null;
+    const canReturn = sale.status==='completed' && (ctx
+      ? ctx.returnable.has(sale.id)
+      : saleItems.some(si=> si.saleId===sale.id && (si.quantity-(si.returnedQty||0))>0));
     return `
       <div class="exp-card" style="flex-direction:column; align-items:stretch;">
         <div style="display:flex; justify-content:space-between; align-items:flex-start;">
@@ -11987,8 +12038,24 @@
       return;
     }
     empty.style.display = 'none';
-    list.innerHTML = sorted.map(saleCardHtml).join('');
+    /* یک گذر برای همه — پیش‌تر هر کارت کلِ اقلامِ فروش و قرض‌داران را
+       می‌گشت — و صفحه‌به‌صفحه: هزاران کارت یک‌جا صفحه را چند ثانیه
+       می‌خشکاند. «بیشتر» ۱۰۰تای بعدی را می‌آورد. */
+    const returnable = new Set();
+    for(const si of saleItems) if((si.quantity-(si.returnedQty||0))>0) returnable.add(si.saleId);
+    const ctx = { returnable, debtors: new Map(debtors.map(d=>[d.id, d])) };
+    const shown = sorted.slice(0, salesShown);
+    list.innerHTML = shown.map(sale=> saleCardHtml(sale, ctx)).join('') + (sorted.length > shown.length
+      ? `<button type="button" class="btn btn-secondary" data-sales-more style="width:100%;margin-top:10px;">نمایشِ بیشتر (${formatMoney(sorted.length - shown.length)} فاکتورِ دیگر)</button>`
+      : '');
   }
+  const SALES_PAGE = 100;
+  let salesShown = SALES_PAGE;
+  document.addEventListener('click', (e)=>{
+    if(!e.target.closest('[data-sales-more]')) return;
+    salesShown += SALES_PAGE;
+    renderSalesPage();
+  });
 
   document.getElementById('sales-list').addEventListener('click', (e)=>{
     const viewBtn = e.target.closest('[data-view-invoice]');
@@ -12578,6 +12645,7 @@
   const STORAGE_KEY = 'tohid-shop-data-v1';
 
   function saveState(){
+    touchLedger();
     try{
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         debtors, transactions,
@@ -12610,6 +12678,7 @@
   let alertsReady = false;
 
   function loadState(){
+    touchLedger();
     try{
       const raw = localStorage.getItem(STORAGE_KEY);
       if(!raw) return;
@@ -12717,6 +12786,7 @@
 
   function applyServerLedger(next){
     if(!next) return;
+    touchLedger();
     const put = (v, dflt)=> Array.isArray(v) ? v : dflt;
     debtors          = put(next.debtors, debtors);
     transactions     = put(next.transactions, transactions);
@@ -13964,7 +14034,7 @@
 <script src="license/account-code.js?v=1" defer></script>
 <script src="license/sync-engine.js?v=2" defer></script>
 <script src="license/license-client.js?v=16" defer></script>
-<script src="license/shop-sync.js?v=17" defer></script>
+<script src="license/shop-sync.js?v=18" defer></script>
 <script src="license/shop-ui.js?v=15" defer></script>
 <script src="license/vip.js?v=17" defer></script>
 <script src="license/support.js?v=16" defer></script>
