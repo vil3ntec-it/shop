@@ -295,14 +295,14 @@ class SyncV1Engine private constructor(context: Context) {
    *  دفترِ خالی ⇒ Snapshot (گوشیِ نو). دفترِ پر ⇒ یک بار فرستادنِ همان
    *  دفتر، چون این گوشی تا امروز آفلاین کار می‌کرده.
    */
-  suspend fun firstSync(read: () -> ShopData, write: suspend (ShopData) -> Unit) {
+  suspend fun firstSync(read: () -> ShopData, write: (ShopData) -> Unit) {
     if (state.snapshotAt > 0 || state.cursor > 0) return
     val data = read()
     val tree = LedgerDiff.toJson(data)
     val rows: Int = LedgerDiff.COLLECTIONS.sumOf { key ->
       (tree[key] as? kotlinx.serialization.json.JsonArray)?.size ?: 0
     }
-    if (rows == 0) { restoreFromServer(read, write); return }
+    if (rows == 0) { restoreFromServer(read) { write(it) }; return }
     /*
      *  ⚠️ **اول فرستادن، بعد گرفتن** — و این ترتیب عمدی است. اگر اول
      *  pull می‌کردیم، سایه روی «دفترِ ادغام‌شده» می‌نشست و ردیف‌های
