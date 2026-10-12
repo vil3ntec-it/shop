@@ -27,10 +27,10 @@ object AppNav {
 
   fun go(target: String) { request.value = target }
 
-  /** جست‌وجوی سریع (Ctrl+K روی کامپیوتر، دکمهٔ ذره‌بین در سربرگ) */
   /** پنجرهٔ «میان‌برهای صفحه‌کلید» (F1 یا دکمهٔ ⌨ در سربرگ) — فقط کامپیوتر */
   val help = mutableStateOf(false)
 
+  /** جست‌وجوی سریع (Ctrl+K روی کامپیوتر، دکمهٔ ذره‌بین در سربرگ) */
   val palette = mutableStateOf(false)
 
   /** درخواستِ حالتِ منوی کناری از نوارِ منوی کامپیوتر — `RailMode` */

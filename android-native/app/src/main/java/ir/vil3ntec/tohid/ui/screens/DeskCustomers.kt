@@ -71,9 +71,21 @@ fun DeskCustomersScreen(
   snackbar: SnackbarHostState,
 ) {
   var openId by remember { mutableStateOf<String?>(null) }
+  //  عکس‌های خودکار (`DevShot`، فرمانِ cust:first) ⇐ پروندهٔ بدهکارترین مشتری
+  val shotOpen = DeskCustomersShot.open.value
+  LaunchedEffect(shotOpen) {
+    if (shotOpen == "first") openId = CustomerEngine.summaries(d).maxByOrNull { it.balance }?.id
+    else if (shotOpen == "close") openId = null
+  }
   val open = openId?.let { id -> d.debtors.find { it.id == id } }
   if (open == null) CustomerCards(store, d, snackbar) { openId = it }
   else CustomerFile(store, d, snackbar, open.id) { openId = null }
+}
+
+/** فقط برای عکس‌های خودکارِ CI (`desktop/.../DevShot.kt`) — در کارِ عادی دست نمی‌خورد */
+object DeskCustomersShot {
+  val open = mutableStateOf<String?>(null)
+  val tab = mutableStateOf(-1)
 }
 
 /* ══════════════════════════ بیرون: کارت‌ها ══════════════════════════ */
@@ -286,6 +298,8 @@ private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
   var entry by remember { mutableStateOf<DebtorEngine.Kind?>(null) }
   var picked by remember { mutableStateOf<String?>(null) }
   var showInvoice by remember { mutableStateOf<Sale?>(null) }
+  val shotTab = DeskCustomersShot.tab.value
+  LaunchedEffect(shotTab) { FileTab.values().getOrNull(shotTab)?.let { tab = it } }
 
   fun sheet(): ReportCsv.Sheet = when (tab) {
     FileTab.LEDGER -> CustomerEngine.ledgerSheet(d, debtor, today)
@@ -400,6 +414,8 @@ private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
       }
 
       FileTab.INVOICES -> Row(Modifier.weight(1f)) {
+        //  زبانه باز شد و فاکتوری انتخاب نشده ⇐ تازه‌ترین، تا اقلامش همان‌جا دیده شود
+        LaunchedEffect(invoices) { if (picked == null || invoices.none { it.id == picked }) picked = invoices.firstOrNull()?.id }
         val counts = remember(d) { d.saleItems.groupingBy { it.saleId }.eachCount() }
         val cols = listOf(Col("فاکتور", 80.dp), Col("تاریخ", 110.dp), Col("اقلام", 60.dp, true), Col("جمع", 0.dp, true), Col("قابلِ پرداخت", 0.dp, true), Col("پرداخت‌شده", 0.dp, true), Col("باقی", 0.dp, true), Col("نوع", 70.dp), Col("وضعیت", 80.dp))
         Column(Modifier.weight(1f).fillMaxHeight()) {
