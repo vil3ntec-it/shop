@@ -44,10 +44,10 @@ object ReportCsv {
   }
 
   private fun expiry(d: ShopData, today: String): Sheet {
-    val rows = mutableListOf(listOf("کالا", "سری ساخت", "تاریخ انقضا", "روز مانده", "مقدارِ مانده", "واحد", "وضعیت"))
+    val rows = mutableListOf(listOf("کالا", "سری ساخت", "تاریخ تولید", "تاریخ انقضا", "روز مانده", "مقدارِ مانده", "واحد", "وضعیت"))
     ExpiryEngine.lots(d, today).forEach { l ->
       rows += listOf(
-        l.product.name, l.entry.batch, l.entry.expiryDate, l.daysLeft.toString(),
+        l.product.name, l.entry.batch, l.entry.productionDate, l.entry.expiryDate, l.daysLeft.toString(),
         ir.vil3ntec.tohid.qty(l.remaining), l.product.unit,
         when { l.expired -> "منقضی"; l.daysLeft <= ExpiryEngine.NEAR_DAYS -> "نزدیک به انقضا"; else -> "سالم" },
       )
@@ -127,6 +127,15 @@ object ReportCsv {
       }
     val name = debtor?.name?.replace(Regex("[\\\\/:*?\"<>|]"), " ")?.trim().orEmpty()
     return Sheet("صورت‌حساب-${name.ifBlank { "مشتری" }}-$today", rows)
+  }
+
+  /** گزارشِ اختلافِ انبارگردانی — پیش از ثبت، برای بایگانی یا بازبینی */
+  fun stockCount(lines: List<WarehouseEngine.CountLine>, today: String): Sheet {
+    val rows = mutableListOf(listOf("نام کالا", "واحد", "موجودی برنامه", "شمرده‌شده", "اختلاف", "ارزش اختلاف"))
+    lines.forEach { l ->
+      rows += listOf(l.product.name, l.product.unit, trim(l.system), trim(l.counted), trim(l.diff), round(l.value))
+    }
+    return Sheet("انبارگردانی-$today", rows)
   }
 
   private fun debtors(d: ShopData, today: String): Sheet {

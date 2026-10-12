@@ -72,6 +72,8 @@ data class WarehouseEntry(
   val expiryDate: String = "",
   /** شمارهٔ سری ساخت (اختیاری) */
   val batch: String = "",
+  /** تاریخِ تولید (اختیاری، `yyyy-MM-dd`) — خالی یعنی ثبت نشده */
+  val productionDate: String = "",
 )
 
 @Serializable

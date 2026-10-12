@@ -41,10 +41,71 @@ object WarehouseEngine {
     /** خالی = بی انقضا؛ وگرنه `yyyy-MM-dd` */
     val expiryDate: String = "",
     val batch: String = "",
+    /** خالی = ثبت نشده؛ وگرنه `yyyy-MM-dd` و نه بعد از انقضا */
+    val productionDate: String = "",
   )
+
+  /** تاریخِ تولید درست است و از انقضا جلوتر نیست — `null` یعنی درست */
+  private fun datesProblem(draft: EntryDraft): String? {
+    if (!ExpiryEngine.validDate(draft.expiryDate)) return "تاریخِ انقضا درست نیست"
+    if (!ExpiryEngine.validDate(draft.productionDate)) return "تاریخِ تولید درست نیست"
+    val made = draft.productionDate.trim()
+    val exp = draft.expiryDate.trim()
+    if (made.isNotEmpty() && exp.isNotEmpty() && made > exp) return "تاریخِ تولید بعد از انقضا است"
+    return null
+  }
 
   /** اصلاح موجودی | برگشت به تأمین‌کننده — همان دو حالتِ نسخهٔ وب */
   enum class AdjustKind { ADJUSTMENT, SUPPLIER_RETURN }
+
+  /* ------------------------------ انبارگردانی ------------------------------ */
+
+  /** یک ردیفِ اختلاف: آنچه برنامه می‌گوید، آنچه شمرده شد، و ارزشِ فرقشان */
+  data class CountLine(val product: Product, val system: Double, val counted: Double) {
+    val diff: Double get() = counted - system
+    val value: Double get() = diff * product.purchasePrice
+  }
+
+  /**
+   *  فقط کالاهایی که شمرده شده‌اند و با موجودیِ برنامه فرق دارند.
+   *  فرقِ کمتر از یک‌هزارم (گرد شدنِ اعشار) اختلاف نیست.
+   */
+  fun countLines(d: ShopData, counted: Map<String, Double>): List<CountLine> =
+    d.products.mapNotNull { p ->
+      val c = counted[p.id] ?: return@mapNotNull null
+      val sys = ShopStore.stock(d, p.id)
+      if (kotlin.math.abs(c - sys) < 0.0005) null else CountLine(p, sys, c)
+    }
+
+  /**
+   *  ثبتِ انبارگردانی: هر اختلاف یک «اصلاحِ موجودی» با دلیلِ «انبارگردانی»
+   *  می‌شود — همان ردیفِ انبار، گردشِ کالا و سابقه‌ای که اصلاحِ دستی می‌سازد،
+   *  پس گزارش‌ها و همگام‌سازی چیزِ تازه‌ای نمی‌خواهند. شمارشِ منفی رد می‌شود.
+   */
+  fun stockCount(
+    d: ShopData,
+    counted: Map<String, Double>,
+    note: String,
+    today: String,
+    now: Long,
+    newId: () -> String,
+  ): Result {
+    if (counted.values.any { it.isNaN() || it < 0 }) return Result.Failed("مقدارِ شمرده‌شده نمی‌تواند منفی باشد")
+    val lines = countLines(d, counted)
+    if (lines.isEmpty()) return Result.Failed("اختلافی نیست — موجودیِ شمرده‌شده با برنامه یکی است")
+    val why = listOf("انبارگردانی", note.trim()).filter { it.isNotEmpty() }.joinToString(" — ")
+    var data = d
+    var lastId = ""
+    for (l in lines) {
+      when (val r = adjustStock(
+        data, l.product.id, kotlin.math.abs(l.diff), l.diff > 0, why, AdjustKind.ADJUSTMENT, today, now, newId,
+      )) {
+        is Result.Failed -> return Result.Failed("«${l.product.name}»: ${r.message}")
+        is Result.Ok -> { data = r.data; lastId = r.id }
+      }
+    }
+    return Result.Ok(data, lastId)
+  }
 
   sealed interface Result {
     data class Ok(val data: ShopData, val id: String) : Result
@@ -271,7 +332,7 @@ object WarehouseEngine {
     if (d.products.none { it.id == draft.productId }) return Result.Failed("ابتدا یک محصول انتخاب یا اضافه کنید")
     if (draft.units.isNaN() || draft.units <= 0) return Result.Failed("تعداد واحد معتبر وارد کنید")
     if (draft.price.isNaN() || draft.price < 0) return Result.Failed("قیمت خرید معتبر وارد کنید")
-    if (!ExpiryEngine.validDate(draft.expiryDate)) return Result.Failed("تاریخِ انقضا درست نیست")
+    datesProblem(draft)?.let { return Result.Failed(it) }
 
     val id = newId()
     val date = draft.date.ifBlank { today }
@@ -290,6 +351,7 @@ object WarehouseEngine {
           createdAt = now,
           expiryDate = draft.expiryDate.trim(),
           batch = draft.batch.trim(),
+          productionDate = draft.productionDate.trim(),
         ),
         stockMovements = d.stockMovements + StockMovement(
           id = newId(),
@@ -315,7 +377,7 @@ object WarehouseEngine {
     if (d.products.none { it.id == draft.productId }) return Result.Failed("ابتدا یک محصول انتخاب یا اضافه کنید")
     if (draft.units.isNaN() || draft.units <= 0) return Result.Failed("تعداد واحد معتبر وارد کنید")
     if (draft.price.isNaN() || draft.price < 0) return Result.Failed("قیمت خرید معتبر وارد کنید")
-    if (!ExpiryEngine.validDate(draft.expiryDate)) return Result.Failed("تاریخِ انقضا درست نیست")
+    datesProblem(draft)?.let { return Result.Failed(it) }
     //  کم کردنِ ورودی‌ای که جنسش فروخته شده، موجودی را منفی می‌کرد —
     //  همان نگهبانِ `deleteEntry`
     val left = ShopStore.stock(d, existing.productId) - existing.units +
@@ -335,6 +397,7 @@ object WarehouseEngine {
       notes = draft.notes,
       expiryDate = draft.expiryDate.trim(),
       batch = draft.batch.trim(),
+      productionDate = draft.productionDate.trim(),
     )
     return Result.Ok(
       d.copy(

@@ -71,6 +71,28 @@ fun WarehouseScreen(
   var adjustFor by remember { mutableStateOf<String?>(null) }
   var confirmDelete by remember { mutableStateOf<Product?>(null) }
   var movementsFor by remember { mutableStateOf<Product?>(null) }
+  var stockCount by remember { mutableStateOf(false) }
+  //  فیلترِ انقضا: null همه، "expired" منقضی، "near" نزدیک به انقضا
+  var expiryFilter by rememberSaveable { mutableStateOf<String?>(null) }
+
+  val context = androidx.compose.ui.platform.LocalContext.current
+  var pendingCsv by remember { mutableStateOf<ir.vil3ntec.tohid.data.ReportCsv.Sheet?>(null) }
+  val saveCsv = androidx.activity.compose.rememberLauncherForActivityResult(
+    androidx.activity.result.contract.ActivityResultContracts.CreateDocument("text/csv")
+  ) { uri ->
+    val sheet = pendingCsv
+    pendingCsv = null
+    if (uri == null || sheet == null) return@rememberLauncherForActivityResult
+    scope.launch {
+      runCatching {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+          context.contentResolver.openOutputStream(uri)?.use { out ->
+            out.write(ir.vil3ntec.tohid.data.ReportCsv.text(sheet).toByteArray(Charsets.UTF_8))
+          } ?: error("فایل ساخته نشد")
+        }
+      }
+    }
+  }
 
   fun toast(text: String) {
     scope.launch { snackbar.showSnackbar(text) }
@@ -103,8 +125,17 @@ fun WarehouseScreen(
   }
 
   val term = search.trim()
-  val shown = remember(d, term, category) {
+  //  محموله‌های منقضی و نزدیک به انقضا — یک بار برای هر تغییرِ دفتر
+  val expiryIds = remember(d) {
+    val alerts = ir.vil3ntec.tohid.data.ExpiryEngine.alerts(d, todayIso())
+    mapOf(
+      "expired" to alerts.filter { it.expired }.map { it.product.id }.toSet(),
+      "near" to alerts.filter { !it.expired }.map { it.product.id }.toSet(),
+    )
+  }
+  val shown = remember(d, term, category, expiryFilter) {
     d.products.filter { p ->
+      (expiryFilter == null || p.id in expiryIds[expiryFilter].orEmpty()) &&
       (category == null || p.category == category) &&
         (term.isBlank() || p.name.contains(term, ignoreCase = true) ||
           p.barcodes.any { it.contains(term) })
@@ -126,6 +157,12 @@ fun WarehouseScreen(
           Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
           Spacer(Modifier.width(6.dp))
           Text("ورود کالا به انبار")
+        }
+        Spacer(Modifier.height(8.dp))
+        OutlinedButton(onClick = { stockCount = true }, modifier = Modifier.fillMaxWidth()) {
+          Icon(Icons.Filled.Inventory2, contentDescription = null, modifier = Modifier.size(18.dp))
+          Spacer(Modifier.width(6.dp))
+          Text("انبارگردانی")
         }
         Spacer(Modifier.height(14.dp))
       }
@@ -160,6 +197,19 @@ fun WarehouseScreen(
           singleLine = true,
           modifier = Modifier.fillMaxWidth(),
         )
+        if (expiryIds.values.any { it.isNotEmpty() } || expiryFilter != null) {
+          Spacer(Modifier.height(8.dp))
+          Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf(null to "همه", "expired" to "منقضی", "near" to "نزدیک به انقضا").forEach { (key, label) ->
+              val n = key?.let { expiryIds[it]?.size ?: 0 }
+              FilterChip(
+                selected = expiryFilter == key,
+                onClick = { expiryFilter = key },
+                label = { Text(if (n == null) label else "$label (${plain(n)})") },
+              )
+            }
+          }
+        }
         if (d.productCategories.isNotEmpty()) {
           Spacer(Modifier.height(8.dp))
           CategoryFilter(
@@ -261,6 +311,21 @@ fun WarehouseScreen(
           WarehouseEngine.addProducts(d, drafts, System.currentTimeMillis(), ::newId),
           "${plain(drafts.size)} کالا ثبت شد",
         ) { bulkProduct = false }
+      },
+    )
+  }
+
+  if (stockCount) {
+    StockCountSheet(
+      d = d,
+      onDismiss = { stockCount = false },
+      onExport = { sheet -> pendingCsv = sheet; saveCsv.launch("${sheet.name}.csv") },
+      onSave = { counted, note ->
+        val n = WarehouseEngine.countLines(d, counted).size
+        apply(
+          WarehouseEngine.stockCount(d, counted, note, todayIso(), System.currentTimeMillis(), ::newId),
+          "انبارگردانی ثبت شد — ${plain(n)} اختلاف اصلاح شد",
+        ) { stockCount = false }
       },
     )
   }

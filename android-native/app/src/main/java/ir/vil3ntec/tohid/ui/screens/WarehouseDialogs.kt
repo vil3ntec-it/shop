@@ -256,6 +256,7 @@ fun EntryDialog(
   //  انقضا و سری ساخت — هر دو اختیاری؛ تاریخ خورشیدی یا میلادی تایپ می‌شود
   var expiry by remember { mutableStateOf("") }
   var batch by remember { mutableStateOf("") }
+  var made by remember { mutableStateOf("") }
 
   /*
    * «۴ کارتن × ۲۵ تا» یعنی ۱۰۰ واحد. حساب کردنش دستِ خودِ برنامه است تا
@@ -334,6 +335,15 @@ fun EntryDialog(
             modifier = Modifier.weight(1f),
           )
         }
+        Spacer(Modifier.height(10.dp))
+        OutlinedTextField(
+          value = made,
+          onValueChange = { made = it },
+          label = { Text("تاریخ تولید (اختیاری)") },
+          placeholder = { Text("۱۴۰۵/۰۱/۱۵") },
+          singleLine = true,
+          modifier = Modifier.fillMaxWidth(),
+        )
 
         Spacer(Modifier.height(10.dp))
         OutlinedTextField(
@@ -360,6 +370,7 @@ fun EntryDialog(
                   //  خالی ⇒ بی انقضا؛ تایپِ نادرست ⇒ موتور با پیامِ روشن ردش می‌کند
                   expiryDate = if (expiry.isBlank()) "" else ir.vil3ntec.tohid.Jalali.parseTyped(expiry) ?: "?",
                   batch = batch.trim(),
+                  productionDate = if (made.isBlank()) "" else ir.vil3ntec.tohid.Jalali.parseTyped(made) ?: "?",
                 )
               )
             },

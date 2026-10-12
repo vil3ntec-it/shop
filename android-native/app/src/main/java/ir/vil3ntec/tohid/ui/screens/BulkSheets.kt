@@ -28,6 +28,9 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.WarehouseEngine
+import androidx.compose.foundation.lazy.items
+import ir.vil3ntec.tohid.data.ReportCsv
+import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.plain
 import ir.vil3ntec.tohid.todayIso
@@ -497,9 +500,12 @@ private fun BulkFrame(
   error: String?,
   summary: List<Pair<String, String>>,
   saveEnabled: Boolean,
-  onAddRow: () -> Unit,
+  /** `null` ⇒ ردیف افزودنی نیست (انبارگردانی: ردیف‌ها همان کالاها هستند) */
+  onAddRow: (() -> Unit)?,
   onDismiss: () -> Unit,
   onSave: () -> Unit,
+  saveText: String = "ذخیره همه",
+  extraAction: (@Composable () -> Unit)? = null,
   header: @Composable ColumnScope.() -> Unit = {},
   rows: androidx.compose.foundation.lazy.LazyListScope.() -> Unit,
 ) {
@@ -553,7 +559,7 @@ private fun BulkFrame(
 
         LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
           rows()
-          item {
+          if (onAddRow != null) item {
             OutlinedButton(onClick = onAddRow, modifier = Modifier.fillMaxWidth()) {
               Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(17.dp))
               Spacer(Modifier.width(6.dp))
@@ -596,8 +602,9 @@ private fun BulkFrame(
             maxLines = 2,
             modifier = Modifier.weight(1f),
           )
+          extraAction?.invoke()
           TohidButton(
-            text = "ذخیره همه",
+            text = saveText,
             onClick = onSave,
             enabled = saveEnabled,
           )
@@ -672,4 +679,126 @@ private fun RowEcho(text: String, warn: Boolean) {
     style = MaterialTheme.typography.labelSmall,
     color = if (warn) Shop.colors.warning else Shop.colors.muted,
   )
+}
+
+/* ============================ انبارگردانی ============================ */
+
+/**
+ *  انبارگردانی — هر کالا را بشمار، برنامه اختلاف را نشان می‌دهد و با یک
+ *  «ثبت» همه را «اصلاحِ موجودی» با دلیلِ «انبارگردانی» می‌کند.
+ *
+ *  کالایی که خانه‌اش خالی بماند شمرده نشده و دست نمی‌خورد — دکان‌دار
+ *  می‌تواند فقط یک قفسه را بشمارد. گزارشِ اختلاف پیش از ثبت به CSV می‌رود.
+ */
+@Composable
+fun StockCountSheet(
+  d: ShopData,
+  onDismiss: () -> Unit,
+  onExport: (ReportCsv.Sheet) -> Unit,
+  onSave: (Map<String, Double>, String) -> Unit,
+) {
+  var counts by remember { mutableStateOf(mapOf<String, String>()) }
+  var search by remember { mutableStateOf("") }
+  var note by remember { mutableStateOf("") }
+  var error by remember { mutableStateOf<String?>(null) }
+
+  val parsed: Map<String, Double> = remember(counts) {
+    counts.mapNotNull { (id, text) ->
+      val t = ir.vil3ntec.tohid.latinDigits(text.trim()).replace('٫', '.').replace(',', '.')
+      if (t.isEmpty()) null else t.toDoubleOrNull()?.let { id to it } ?: (id to Double.NaN)
+    }.toMap()
+  }
+  val lines = remember(d, parsed) { WarehouseEngine.countLines(d, parsed.filterValues { !it.isNaN() && it >= 0 }) }
+  val stock = remember(d) { d.products.associate { it.id to ShopStore.stock(d, it.id) } }
+  val term = search.trim()
+  val shown = remember(d, term) {
+    d.products.filter { it.active }
+      .filter { term.isEmpty() || it.name.contains(term, ignoreCase = true) || it.barcodes.any { b -> b.contains(term) } }
+      .sortedBy { it.name }
+  }
+
+  BulkFrame(
+    title = "انبارگردانی",
+    subtitle = "آنچه در قفسه هست را بنویسید؛ خانهٔ خالی یعنی شمرده نشد",
+    error = error,
+    summary = listOf(
+      "شمرده" to plain(parsed.size),
+      "اختلاف" to plain(lines.size),
+      "ارزش اختلاف" to "${money(lines.sumOf { it.value })} ؋",
+    ),
+    saveEnabled = lines.isNotEmpty(),
+    onAddRow = null,
+    onDismiss = onDismiss,
+    saveText = "ثبت اختلاف‌ها",
+    extraAction = {
+      OutlinedButton(onClick = { onExport(ReportCsv.stockCount(lines, todayIso())) }, enabled = lines.isNotEmpty()) {
+        Text("CSV")
+      }
+    },
+    onSave = {
+      val bad = parsed.entries.firstOrNull { it.value.isNaN() || it.value < 0 }
+      if (bad != null) {
+        error = "عددِ «${d.products.find { it.id == bad.key }?.name.orEmpty()}» درست نیست"
+      } else {
+        error = null
+        onSave(parsed, note)
+      }
+    },
+    header = {
+      OutlinedTextField(
+        value = search, onValueChange = { search = it },
+        placeholder = { Text("جستجوی کالا یا بارکد…") },
+        singleLine = true, modifier = Modifier.fillMaxWidth(),
+      )
+      Spacer(Modifier.height(8.dp))
+      OutlinedTextField(
+        value = note, onValueChange = { note = it },
+        placeholder = { Text("یادداشت (مثلاً: قفسهٔ برنج)") },
+        singleLine = true, modifier = Modifier.fillMaxWidth(),
+      )
+      Spacer(Modifier.height(10.dp))
+    },
+  ) {
+    items(shown, key = { it.id }) { p ->
+      val sys = stock[p.id] ?: 0.0
+      val c = parsed[p.id]
+      val diff = if (c != null && !c.isNaN()) c - sys else null
+      Row(
+        Modifier
+          .fillMaxWidth()
+          .clip(RoundedCornerShape(10.dp))
+          .background(Shop.colors.surface)
+          .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+      ) {
+        Column(Modifier.weight(1f)) {
+          Text(p.name, style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text, maxLines = 1)
+          Text(
+            "برنامه: ${ir.vil3ntec.tohid.qty(sys)} ${p.unit}" + when {
+              diff == null || kotlin.math.abs(diff) < 0.0005 -> ""
+              diff > 0 -> " · +${ir.vil3ntec.tohid.qty(diff)}"
+              else -> " · −${ir.vil3ntec.tohid.qty(-diff)}"
+            },
+            style = MaterialTheme.typography.labelSmall,
+            color = when {
+              diff == null || kotlin.math.abs(diff) < 0.0005 -> Shop.colors.muted
+              diff > 0 -> Shop.colors.success
+              else -> Shop.colors.danger
+            },
+          )
+        }
+        OutlinedTextField(
+          value = counts[p.id].orEmpty(),
+          onValueChange = { v -> counts = counts + (p.id to v) },
+          placeholder = { Text("شمرده") },
+          singleLine = true,
+          isError = c != null && (c.isNaN() || c < 0),
+          keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+            keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal,
+          ),
+          modifier = Modifier.width(110.dp),
+        )
+      }
+    }
+  }
 }
