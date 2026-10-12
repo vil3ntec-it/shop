@@ -121,9 +121,9 @@ class ReportEngineTest {
 
     val r = ReportEngine.sales(d, "2026-08-01", "2026-08-31")
     assertEquals(3000.0, r.net, 0.0)           // مبلغِ اولیهٔ فاکتور
-    assertEquals(1200.0, r.cogs, 0.0)          // ۶ کیلوی مانده × ۲۰۰
+    assertEquals(2000.0, r.cogs, 0.0)          // کلِ ۱۰ کیلوی فروخته‌شده × ۲۰۰
     assertEquals(1200.0, r.returnAmount, 0.0)  // ۴ × ۳۰۰
-    // ۳۰۰۰ − ۱۲۰۰ − ۱۲۰۰ = ۶۰۰ ، یعنی سودِ همان ۶ کیلو
+    // ۳۰۰۰ − ۲۰۰۰ − (۱۲۰۰ − ۸۰۰) = ۶۰۰ ، یعنی سودِ همان ۶ کیلو
     assertEquals(600.0, r.grossProfit, 0.0)
     assertEquals(6 * (300.0 - 200.0), r.grossProfit, 0.0)
   }
@@ -157,9 +157,26 @@ class ReportEngineTest {
 
     val r = ReportEngine.sales(d, "2026-08-01", "2026-08-31")
     assertEquals(0.0, r.returnAmount, 0.0)
-    // ولی cogs مرجوعی را کم کرده — همان رفتارِ نسخهٔ وب
-    assertEquals(1200.0, r.cogs, 0.0)
-    assertEquals(1800.0, r.grossProfit, 0.0)
+    // ماهِ فروش دست نمی‌خورد؛ اثرِ مرجوعی در ماهِ خودش (شهریور) می‌نشیند
+    assertEquals(2000.0, r.cogs, 0.0)
+    assertEquals(1000.0, r.grossProfit, 0.0)
+  }
+
+  @Test
+  fun `مرجوعیِ کامل در ماه بعد — جمع ماه ها با کل بازه یکی است و صفر`() {
+    val sold = sell(ledger(), "p1", 10.0, "2026-08-10")
+    val itemId = sold.data.saleItems.single().id
+    val d = (SalesEngine.recordReturn(
+      sold.data, sold.saleId, mapOf(itemId to 10.0), "", "2026-09-05", 0, ::newId,
+    ) as SalesEngine.Result.Ok).data
+
+    val aug = ReportEngine.sales(d, "2026-08-01", "2026-08-31").grossProfit
+    val sep = ReportEngine.sales(d, "2026-09-01", "2026-09-30").grossProfit
+    val all = ReportEngine.sales(d, "2026-01-01", "2026-12-31").grossProfit
+    assertEquals(1000.0, aug, 0.0)
+    assertEquals(-1000.0, sep, 0.0)
+    assertEquals(0.0, all, 0.0)
+    assertEquals(all, aug + sep, 0.0)
   }
 
   /* --------------------------- محصولات --------------------------- */

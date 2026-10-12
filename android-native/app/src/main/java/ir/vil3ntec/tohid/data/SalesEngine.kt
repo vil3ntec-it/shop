@@ -96,16 +96,16 @@ object SalesEngine {
   /**
    * واحدهایی که اعشار می‌گیرند. «۲٫۵ کیلو» معنی دارد، «۲٫۵ عدد» ندارد.
    *
-   * توجه: فهرستِ پیش‌فرضِ واحدها «کیلوگرم» دارد نه «کیلو»، پس در عمل
-   * کیلوگرم هم اعشار نمی‌گیرد. این عیناً رفتارِ نسخهٔ وب است و عمداً
-   * عوض نشده — عددِ سبد نباید با آمدنِ این نسخه فرق کند.
+   * پیش‌تر فقط «کیلو» بود و فهرستِ پیش‌فرض «کیلوگرم» دارد؛ یعنی کالای
+   * کیلویی ۰٫۲۵ نمی‌پذیرفت و ۲۵۰ گرم فروختنی نبود. نسخهٔ وب هم‌زمان عوض شد.
    */
-  fun isFractionalUnit(unit: String): Boolean =
-    unit == "کیلو" || unit == "گرم" || unit == "لیتر"
+  private val FRACTIONAL_UNITS = setOf("کیلو", "کیلوگرم", "گرم", "لیتر", "میلی‌لیتر", "متر")
 
-  /** پلهٔ دکمه‌های کم/زیاد — گرم ۱۰تایی، کیلو و لیتر ۰٫۱، بقیه ۱ */
+  fun isFractionalUnit(unit: String): Boolean = unit in FRACTIONAL_UNITS
+
+  /** پلهٔ دکمه‌های کم/زیاد — گرم و میلی‌لیتر ۱۰تایی، کیلو و لیتر و متر ۰٫۱، بقیه ۱ */
   fun cartStep(unit: String): Double =
-    if (unit == "گرم") 10.0 else if (isFractionalUnit(unit)) 0.1 else 1.0
+    if (unit == "گرم" || unit == "میلی‌لیتر") 10.0 else if (isFractionalUnit(unit)) 0.1 else 1.0
 
   /**
    * افزودن به سبد. اگر کالا از قبل در سبد باشد فقط عددش بالا می‌رود —
@@ -483,6 +483,11 @@ object SalesEngine {
     newId: () -> String,
   ): Result {
     val sale = d.sales.find { it.id == saleId } ?: return Result.Failed("فاکتور پیدا نشد")
+    //  فاکتورِ لغوشده کلاً برگشته است؛ مرجوعیِ دوباره موجودی را دو بار برمی‌گرداند
+    if (sale.status == "cancelled") return Result.Failed("این فاکتور لغو شده است")
+    //  سهمِ تخفیفِ فاکتور: مشتری مبلغِ بعد از تخفیف را داده، پس همان پس داده می‌شود
+    val paidRatio =
+      if (sale.total > 0 && sale.discount > 0) ((sale.total - sale.discount) / sale.total).coerceIn(0.0, 1.0) else 1.0
 
     val items = d.saleItems.toMutableList()
     val returns = d.saleReturns.toMutableList()
@@ -501,7 +506,7 @@ object SalesEngine {
 
       // قیمتِ همان قلم در همان فاکتور، نه قیمتِ امروز
       val amount = if (item.quantity > 0) {
-        (item.totalPrice / item.quantity * quantity).roundToLong().toDouble()
+        (item.totalPrice / item.quantity * quantity * paidRatio).roundToLong().toDouble()
       } else 0.0
 
       items[index] = item.copy(returnedQty = item.returnedQty + quantity)

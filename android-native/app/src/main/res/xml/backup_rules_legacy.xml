@@ -4,4 +4,6 @@
   <include domain="file" path="." />
   <include domain="sharedpref" path="." />
   <exclude domain="sharedpref" path="tohid-sync.xml" />
+  <exclude domain="sharedpref" path="tohid-session.xml" />
+  <exclude domain="sharedpref" path="tohid-session-secure.xml" />
 </full-backup-content>

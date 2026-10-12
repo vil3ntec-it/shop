@@ -120,3 +120,27 @@ test('دوره‌ی آزمایشی هم اجازه‌ی نوشتن می‌دهد
   assert.equal((await pushOne(staff.accessToken, 'trial-1')).status, 200,
     'در دوره‌ی آزمایشی همه‌چیز باید باز باشد');
 });
+
+test('اشتراک تمام‌شده: راهِ Sync v1 هم برای شاگرد بسته است، صاحب می‌نویسد', async () => {
+  const { owner, staff, shop } = await shopWithStaff('v1');
+  let seq = 0;
+  const v1 = (token, dev) => h.api('POST', '/api/sync/v1/push', {
+    token,
+    headers: { 'X-App': 'shop', 'X-Device': dev },
+    body: {
+      device_id: dev, schema_version: 2,
+      ops: [{
+        op_id: `01JV1${String(Date.now()).slice(-9)}${String(++seq).padStart(5, '0')}`,
+        ts: Date.now(), table: 'products', row_id: `v1-${seq}`, type: 'insert', fields: { name: 'کالا' },
+      }],
+    },
+  });
+
+  assert.equal((await v1(staff.accessToken, 'dev-staff-v1')).status, 200);
+  await expire(shop);
+
+  const blocked = await v1(staff.accessToken, 'dev-staff-v1');
+  assert.equal(blocked.status, 403);
+  assert.equal(blocked.body.error.code, 'subscription_required');
+  assert.equal((await v1(owner.accessToken, 'dev-owner-v1')).status, 200, 'صاحب دکان همیشه می‌نویسد');
+});

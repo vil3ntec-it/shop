@@ -1346,8 +1346,9 @@ fun VipGate(label: String, content: @Composable () -> Unit) {
     !signedIn -> false
     status.state == License.State.ACTIVE -> true
     status.state == License.State.GRACE -> true
-    //  حساب دارد ولی سرور هنوز مجوزی نداده — شرحش سرِ `LOCKING`
-    status.state == License.State.NONE -> true
+    //  حساب دارد ولی سرور هنوز مجوزی نداده — شرحش سرِ `LOCKING`؛ اما اگر
+    //  سرور صریحاً گفته «اشتراکی نیست»، دیگر «هنوز» نیست و قفل است
+    status.state == License.State.NONE -> state.serverDenied == null
     else -> false
   }
 

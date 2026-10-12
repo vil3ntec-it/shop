@@ -10221,6 +10221,13 @@
 
     const delta = stockAdjDir==='increase' ? qty : -qty;
     const product = products.find(x=>x.id===productId);
+    // کاهش بیش از موجودی، موجودی را منفی و گزارشِ انبار را دروغ می‌کند
+    const stockNow = getProductStock(productId);
+    if(delta < 0 && stockNow + delta < 0){
+      fgq.classList.add('error'); qtyEl.focus();
+      showToast(`فقط ${formatCartQty(Math.max(0, stockNow), product?product.unit:'')} ${product?product.unit:''} موجود است`, 'danger');
+      return;
+    }
     const whId = uid();
     warehouseEntries.push({id:whId, productId, cartons:0, perCarton:0, units:delta, unit:(product?product.unit:''), price:0, date, notes:reason, createdAt:Date.now(), isAdjustment:true});
     const movementType = stockAdjType==='supplier_return' ? 'supplier_return' : 'adjustment';
@@ -10244,40 +10251,32 @@
     const gross = activeSales.reduce((sum,s)=> sum+(s.total||0), 0);
     const discount = activeSales.reduce((sum,s)=> sum+(s.discount||0), 0);
     const net = activeSales.reduce((sum,s)=> sum+(s.finalTotal||0), 0);
-    // بهای کالای فروخته‌شده: بر اساس purchasePrice ثبت‌شده روی هر قلم فروش، منهای اقلام مرجوعی‌شده
+    // بهای کالای فروخته‌شده: کلِ مقدارِ فروخته‌شده با purchasePriceِ ثبت‌شده روی هر قلم.
+    // مرجوعی این‌جا کم نمی‌شود؛ اثرش در بازهٔ خودِ مرجوعی می‌نشیند (پایین‌تر).
     let cogs = 0;
     activeSales.forEach(s=>{
       saleItems.filter(si=>si.saleId===s.id).forEach(si=>{
-        const netQty = (si.quantity||0) - (si.returnedQty||0);
-        cogs += netQty * (si.purchasePrice||0);
+        cogs += (si.quantity||0) * (si.purchasePrice||0);
       });
     });
-    /* مرجوعی‌ها.
-       net مبلغ اولیه فاکتورهاست (مرجوعی از آن کم نشده) ولی cogs مرجوعی را کم کرده،
-       پس اثر مرجوعی باید یک بار اینجا اعمال شود. سه حالت جدا دارد:
+    /* مرجوعی‌ها — هر مرجوعی در بازهٔ تاریخِ **خودش**: مبلغی که پس داده شد
+       منهای بهای کالایی که به انبار برگشت.
 
-       ۱) فروش لغو شده  → کل فروش قبلاً برگشته؛ مرجوعی‌اش نباید دوباره کم شود
-                          (وگرنه سود دوبار جریمه می‌شود).
-       ۲) فروشِ فعالِ داخل بازه → درآمدش در net هست و هزینه‌اش از cogs کم شده،
-                          پس کل مبلغ مرجوعی کم می‌شود.
-       ۳) فروشِ فعالِ خارج بازه → نه درآمدش در net است نه هزینه‌اش در cogs،
-                          پس فقط سودِ از‌دست‌رفته (مبلغ منهای بهای تمام‌شده) کم می‌شود. */
-    const activeIds = new Set(activeSales.map(s=>s.id));
+       پیش‌تر cogs مقدارِ مرجوعی را از بازهٔ فروش کم می‌کرد و بعد مرجوعیِ ماهِ
+       بعد فقط «مبلغ منهای بها» را کم می‌کرد؛ کالایی که کامل برگشته بود در
+       ماهِ فروش به‌اندازهٔ کلِ مبلغ سود نشان می‌داد و جمعِ ماه‌ها با «همه»
+       یکی درنمی‌آمد. فروشِ لغوشده هم کلاً بیرون است و مرجوعی‌اش شمرده نمی‌شود. */
     const returnsInRange = returns.filter(r=> r.date>=fromDate && r.date<=toDate);
     let returnAmount = 0;        // مبلغ مرجوعی مؤثر در این بازه (برای نمایش)
     let returnProfitImpact = 0;  // اثر واقعی مرجوعی روی سود
     returnsInRange.forEach(r=>{
       const sale = sales.find(x=>x.id===r.saleId);
-      if(sale && sale.status==='cancelled') return;            // حالت ۱
+      if(sale && sale.status==='cancelled') return;
       const amount = r.amount||0;
       returnAmount += amount;
-      if(activeIds.has(r.saleId)){
-        returnProfitImpact += amount;                          // حالت ۲
-      } else {
-        const si = saleItems.find(x=>x.id===r.saleItemId);
-        const cost = si ? (si.purchasePrice||0)*(r.quantity||0) : 0;
-        returnProfitImpact += Math.max(0, amount - cost);      // حالت ۳
-      }
+      const si = saleItems.find(x=>x.id===r.saleItemId);
+      const cost = si ? (si.purchasePrice||0)*(r.quantity||0) : 0;
+      returnProfitImpact += amount - cost;
     });
     const netAfterReturns = net;
     const grossProfit = netAfterReturns - cogs - returnProfitImpact;
@@ -10592,11 +10591,15 @@
       if(raw){ const arr = JSON.parse(raw); if(Array.isArray(arr)) cart = arr.filter(x=>products.find(p=>p.id===x.productId)); }
     }catch(e){}
   }
+  /* واحدهایی که اعشار می‌گیرند. «کیلوگرم» و «میلی‌لیتر» و «متر» هم —
+     پیش‌تر فقط «کیلو» بود و فهرستِ پیش‌فرض «کیلوگرم» دارد، پس کالای کیلویی
+     ۰٫۲۵ نمی‌پذیرفت. همان `SalesEngine.isFractionalUnit`ِ برنامه. */
+  const FRACTIONAL_UNITS = ['کیلو','کیلوگرم','گرم','لیتر','میلی‌لیتر','متر'];
   function isFractionalUnit(unit){
-    return unit==='کیلو' || unit==='گرم' || unit==='لیتر';
+    return FRACTIONAL_UNITS.includes(unit);
   }
   function cartStepFor(unit){
-    return unit==='گرم' ? 10 : isFractionalUnit(unit) ? 0.1 : 1;
+    return (unit==='گرم' || unit==='میلی‌لیتر') ? 10 : isFractionalUnit(unit) ? 0.1 : 1;
   }
   function formatCartQty(qty, unit){
     if(!isFractionalUnit(unit)) return String(qty);
@@ -11782,8 +11785,11 @@
   }
   document.getElementById('btn-confirm-return').addEventListener('click', ()=>{
     const sale = sales.find(s=>s.id===currentReturnSaleId);
-    if(!sale) return;
+    if(!sale || sale.status==='cancelled') return;   // فاکتورِ لغوشده کلاً برگشته است
     const reason = document.getElementById('in-return-reason').value.trim();
+    // سهمِ تخفیفِ فاکتور: مشتری مبلغِ بعد از تخفیف را داده، پس همان پس داده می‌شود
+    const paidRatio = (sale.total||0) > 0 && (sale.discount||0) > 0
+      ? Math.max(0, Math.min(1, (sale.total - sale.discount)/sale.total)) : 1;
     let totalReturnAmount = 0;
     let anyReturned = false;
     document.querySelectorAll('[data-return-qty-input]').forEach(input=>{
@@ -11795,7 +11801,7 @@
       const returnable = si.quantity - (si.returnedQty||0);
       if(qty>returnable) qty = returnable;
       if(qty<=0) return;
-      const amount = Math.round((si.totalPrice/si.quantity) * qty);
+      const amount = Math.round((si.totalPrice/si.quantity) * qty * paidRatio);
       si.returnedQty = (si.returnedQty||0) + qty;
       const retId = uid();
       returns.push({

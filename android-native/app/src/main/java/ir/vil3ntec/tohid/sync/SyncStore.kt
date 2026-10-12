@@ -123,6 +123,18 @@ class SyncStore(context: Context) {
     set(v) = prefs.edit().putString(LICENSE, v).apply()
 
   /**
+   *  پاسخِ صریحِ سرور که «اشتراکی نیست» (`no_subscription`/`no_shop`).
+   *
+   *  بی این نشان، «مجوزی ندارم» دو معنا داشت و هر دو باز می‌شد: سرور
+   *  هنوز مجوز نداده، و سرور گفته اشتراک تمام شده. یعنی آزمایشیِ تمام‌شده
+   *  که هرگز پول نداده بود، فروش را برای همیشه باز داشت. حالا `NONE`
+   *  فقط وقتی باز است که سرور چنین چیزی نگفته باشد؛ مجوزِ تازه پاکش می‌کند.
+   */
+  var serverDenied: String?
+    get() = prefs.getString(DENIED, null)
+    set(v) = prefs.edit().putString(DENIED, v).apply()
+
+  /**
    *  کلیدِ عمومیِ مجوز.
    *
    *  ── چرا خواندنش از این‌جا شروع نمی‌شود ────────────────────────────
@@ -220,7 +232,7 @@ class SyncStore(context: Context) {
     prefs.edit()
       .remove(NAME).remove(EMAIL).remove(PHONE).remove(CREATED)
       .remove(ACCOUNT_ID)
-      .remove(LICENSE).remove(SHADOW).remove(REV).remove(LAST_SYNC)
+      .remove(LICENSE).remove(DENIED).remove(SHADOW).remove(REV).remove(LAST_SYNC)
       .apply()
   }
 
@@ -278,6 +290,7 @@ class SyncStore(context: Context) {
     const val ACCOUNT_ID = "account_id"
     const val LOCK_ASKED = "lock_asked"
     const val LICENSE = "license"
+    const val DENIED = "license_denied"
     const val PUBLIC_KEY = "public_key"
     const val SHADOW = "shadow"
     const val REV = "rev"

@@ -321,8 +321,40 @@ class SalesEngineTest {
     assertEquals(0.1, SalesEngine.cartStep("کیلو"), 0.0)
     assertEquals(0.1, SalesEngine.cartStep("لیتر"), 0.0)
     assertEquals(10.0, SalesEngine.cartStep("گرم"), 0.0)
-    // فهرستِ پیش‌فرض «کیلوگرم» دارد؛ نسخهٔ وب آن را اعشاری نمی‌داند
-    assertEquals(1.0, SalesEngine.cartStep("کیلوگرم"), 0.0)
+    // فهرستِ پیش‌فرض «کیلوگرم» دارد؛ ۲۵۰ گرم یعنی ۰٫۲۵ کیلوگرم
+    assertEquals(0.1, SalesEngine.cartStep("کیلوگرم"), 0.0)
+    assertEquals(10.0, SalesEngine.cartStep("میلی‌لیتر"), 0.0)
+    assertEquals(0.1, SalesEngine.cartStep("متر"), 0.0)
+  }
+
+  @Test
+  fun `مرجوعی سهم تخفیف فاکتور را پس می دهد نه مبلغ پیش از تخفیف`() {
+    val p = Product(id = "p1", name = "برنج", unit = "عدد", purchasePrice = 60.0, salePrice = 100.0)
+    val d0 = ShopData(products = listOf(p), warehouseEntries = listOf(WarehouseEntry(id = "w", productId = "p1", units = 100.0)))
+    val sold = SalesEngine.record(
+      d0, listOf(SalesEngine.CartLine("p1", 10.0)),
+      SalesEngine.Checkout(discountType = SalesEngine.DiscountType.PERCENT, discountValue = 10.0),
+      "2026-08-10", 0, ::newId,
+    ) as SalesEngine.Result.Ok
+    val itemId = sold.data.saleItems.single().id
+    val back = SalesEngine.recordReturn(
+      sold.data, sold.saleId, mapOf(itemId to 10.0), "", "2026-08-11", 0, ::newId,
+    ) as SalesEngine.Result.Ok
+    // ۱۰۰۰ با ۱۰٪ تخفیف = ۹۰۰ پرداخت شد؛ همان ۹۰۰ پس داده می‌شود نه ۱۰۰۰
+    assertEquals(900.0, back.data.saleReturns.single().amount, 0.0)
+  }
+
+  @Test
+  fun `فاکتور لغوشده مرجوعی نمی پذیرد`() {
+    val p = Product(id = "p1", name = "برنج", unit = "عدد", purchasePrice = 60.0, salePrice = 100.0)
+    val d0 = ShopData(products = listOf(p), warehouseEntries = listOf(WarehouseEntry(id = "w", productId = "p1", units = 100.0)))
+    val sold = SalesEngine.record(
+      d0, listOf(SalesEngine.CartLine("p1", 2.0)), SalesEngine.Checkout(), "2026-08-10", 0, ::newId,
+    ) as SalesEngine.Result.Ok
+    val itemId = sold.data.saleItems.single().id
+    val cancelled = (SalesEngine.cancel(sold.data, sold.saleId, "2026-08-11", 0, ::newId) as SalesEngine.Result.Ok).data
+    val r = SalesEngine.recordReturn(cancelled, sold.saleId, mapOf(itemId to 1.0), "", "2026-08-12", 0, ::newId)
+    assertTrue(r is SalesEngine.Result.Failed)
   }
 
   /* --------------------------- نوشتنِ عدد --------------------------- */

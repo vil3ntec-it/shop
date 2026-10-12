@@ -24,6 +24,7 @@
 const express = require('express');
 const { query, one, now, newId } = require('../db');
 const config = require('../config');
+const { forbidden } = require('../middleware/errors');
 const codes = require('../lib/login-codes');
 const outbox = require('../lib/login-outbox');
 const tokens = require('../lib/tokens');
@@ -138,6 +139,8 @@ router.get('/request-status', async (req, res, next) => {
 async function findOrCreateUser(email, ip) {
   const found = await one('SELECT * FROM users WHERE email=$1', [email]);
   if (found) return { user: found, created: false };
+  //  همان قاعدهٔ `auth.js`: ثبت‌نامِ بسته از این راه هم باز نمی‌شود
+  if (!config.allowRegistration) throw forbidden('ثبت‌نام روی این سرور بسته است', 'registration_closed');
   const t = now();
   const row = await one(
     `INSERT INTO users (id, name, email, status, created_at, updated_at)

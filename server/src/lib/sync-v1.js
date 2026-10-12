@@ -303,6 +303,17 @@ async function push(ctx, { deviceId, schemaVersion, ops, appVersion = '', queued
   const t = now();
 
   return tx(async (c) => {
+    /*
+     *  پوش‌های یک حساب پشتِ سرِ هم، نه هم‌زمان.
+     *
+     *  `server_seq` هنگامِ INSERT داده می‌شود نه هنگامِ COMMIT. دو پوشِ
+     *  هم‌زمان از دو دستگاه می‌توانستند ۱۰۰ و ۱۰۱ بگیرند و ۱۰۱ زودتر
+     *  ثبت شود؛ دستگاهِ سومی که همان لحظه pull می‌کرد cursor را ۱۰۱
+     *  می‌گذاشت و ۱۰۰ — مثلاً یک فروش — هرگز به آن نمی‌رسید. با این قفل
+     *  هر شماره‌ای که دیده شود، همهٔ شماره‌های پیش از آن هم ثبت شده‌اند.
+     */
+    await c.query('SELECT pg_advisory_xact_lock(hashtext($1))',
+      [`sync-v1:${ctx.app}:${ctx.accountKind}:${ctx.accountId}`]);
     const dev = await deviceRow(c, ctx, deviceId);
     const deviceCursor = dev ? Number(dev.cursor) : 0;
     const results = [];
@@ -382,15 +393,18 @@ async function push(ctx, { deviceId, schemaVersion, ops, appVersion = '', queued
 async function pull(ctx, { since = 0, deviceId, limit = DEFAULT_PULL }) {
   const from = Math.max(0, Number(since) || 0);
   const cap = Math.min(Math.max(1, Number(limit) || DEFAULT_PULL), MAX_PULL);
+  //  سرِ دفتر **پیش از** خواندنِ opها: opی که وسطِ خواندن ثبت شود
+  //  شماره‌اش از head بزرگ‌تر است و دفعهٔ بعد می‌آید. پیش‌تر head بعد از
+  //  خواندن گرفته می‌شد و همان op زیرِ cursor می‌ماند و هرگز نمی‌رسید.
+  const head = await headSeq({ query: (s, p) => require('../db').query(s, p) }, ctx);
   const rows = await many(
     `SELECT op_id, device_id, server_seq, client_ts, table_name, row_id, op_type, fields, schema_version, received_at
-       FROM oplog WHERE ${ACC} AND server_seq > $4 AND device_id <> $5
+       FROM oplog WHERE ${ACC} AND server_seq > $4 AND server_seq <= $7 AND device_id <> $5
       ORDER BY server_seq ASC LIMIT $6`,
-    [...accArgs(ctx), from, deviceId, cap + 1]
+    [...accArgs(ctx), from, deviceId, cap + 1, head]
   );
   const hasMore = rows.length > cap;
   const page = hasMore ? rows.slice(0, cap) : rows;
-  const head = await headSeq({ query: (s, p) => require('../db').query(s, p) }, ctx);
   //  اگر همه آمد، cursor سرِ دفتر است — opهای خودِ همین دستگاه هم پشتِ
   //  سرش می‌مانند و دیگر لازم نیست دوباره از رویشان رد شود.
   const cursor = hasMore ? Number(page[page.length - 1].server_seq) : Math.max(head, from);

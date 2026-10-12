@@ -389,7 +389,10 @@ router.get('/sms', async (req, res) => {
  * نمی‌بیند، پس نباید بتواند ندانسته پاکش کند. برای پاک کردن عمدی،
  * `key` را با یک فاصله یا `-` بفرستید… نه: صریح‌تر، `clearKey: true`.
  */
-router.put('/sms', async (req, res, next) => {
+//  تنظیمِ پیامک فقط با مدیرِ ارشد: کسی که نشانیِ ارسال را عوض کند، هر کدِ
+//  ورودِ پیامکی و کلیدِ API را به سرورِ خودش می‌فرستد — یعنی دورزدنِ همان
+//  قاعده‌ای که دیدنِ کدها را به مدیرِ ارشد سپرده است.
+router.put('/sms', requireSuperAdmin, async (req, res, next) => {
   const body = req.body || {};
   const patch = {};
 
@@ -433,7 +436,7 @@ router.put('/sms', async (req, res, next) => {
  * می‌سنجد که سرویس پیامک راه افتاده یا نه. پاسخ خام سرویس هم برمی‌گردد
  * تا اگر نرفت، دلیلش روی همان صفحه دیده شود.
  */
-router.post('/sms/test', rateLimit({ max: 10, keyPrefix: 'admin-sms-test' }), async (req, res, next) => {
+router.post('/sms/test', requireSuperAdmin, rateLimit({ max: 10, keyPrefix: 'admin-sms-test' }), async (req, res, next) => {
   const to = v.phone(req.body?.to, { required: true });
   const cfg = await smsSettings.current();
   const send = otp.senders[cfg.provider] || otp.senders.log;

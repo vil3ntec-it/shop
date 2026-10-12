@@ -270,7 +270,10 @@ router.delete('/push', async (req, res, next) => {
 router.use('/backups', require('./account-backups').makeRouter(
   'shop',
   (req) => req.shopId || '',
-  { actor: (req) => ({ userId: req.user ? req.user.id : '', deviceId: req.device ? req.device.id : '' }) }
+  {
+    actor: (req) => ({ userId: req.user ? req.user.id : '', deviceId: req.device ? req.device.id : '' }),
+    canDelete: (req) => req.role === 'owner' || req.role === 'manager',
+  }
 ));
 
 module.exports = router;
