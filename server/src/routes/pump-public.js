@@ -150,7 +150,7 @@ router.get(
   async (req, res, next) => {
     try {
       res.set('Access-Control-Allow-Origin', '*');
-      res.json(await require('../lib/telegram').publicInfo());
+      res.json(await require('../lib/bots').pump().publicInfo());
     } catch (err) { next(err); }
   }
 );
@@ -223,7 +223,7 @@ router.post('/:code/acct/:id/chat', chatLimit, openChat, async (req, res, next) 
       text: b.text, mediaId: b.mediaId || null,
     });
     //  💬 برنامهٔ کامپیوتر خاموش است؟ ⇒ «چت‌های میرزا»ی تلگرام. هیچ‌وقت منتظر نمی‌ماند
-    require('../lib/telegram').relayCustomer({ station, acct, message: msg }).catch(() => {});
+    require('../lib/bots').pump().relayCustomer({ station, acct, message: msg }).catch(() => {});
     res.status(201).json({ ok: true, message: msg });
   } catch (err) { next(err); }
 });

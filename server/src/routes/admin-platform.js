@@ -19,7 +19,8 @@ const { one, many, now } = require('../db');
 const v = require('../lib/validate');
 const plans = require('../lib/plans');
 const mailer = require('../lib/mailer');
-const telegram = require('../lib/telegram');
+//  باتِ پمپ در ریپوی پمپ است (lib/bots.js)؛ نبود ⇒ «نصب نیست»
+const bots = require('../lib/bots');
 const push = require('../lib/push');
 const vip = require('../lib/vip-codes');
 const visitors = require('../lib/visitors');
@@ -694,7 +695,7 @@ router.put('/push', requireSuperAdmin, async (req, res, next) => {
 
 router.get('/telegram', async (req, res, next) => {
   try {
-    res.json({ telegram: await telegram.status() });
+    res.json({ telegram: await bots.pump().status() });
   } catch (err) { next(err); }
 });
 
@@ -703,13 +704,13 @@ router.put('/telegram', requireSuperAdmin, async (req, res, next) => {
     const body = req.body || {};
     let out;
     try {
-      out = await telegram.configure({
+      out = await bots.pump().configure({
         token: typeof body.token === 'string' ? body.token : undefined,
         clearToken: body.clearToken === true,
         enabled: body.enabled === undefined ? undefined : v.bool(body.enabled, true),
       });
     } catch (err) {
-      if (err.code === 'bad_token' || err.code === 'token_rejected') {
+      if (err.code === 'bad_token' || err.code === 'token_rejected' || err.code === 'bot_missing') {
         return next(badRequest(err.message, err.code));
       }
       throw err;
@@ -718,7 +719,7 @@ router.put('/telegram', requireSuperAdmin, async (req, res, next) => {
       actorType: 'admin', userId: req.admin.id, action: 'admin.telegram_settings',
       detail: { tokenChanged: typeof body.token === 'string' && body.token.trim() !== '', cleared: body.clearToken === true },
     });
-    res.json({ telegram: await telegram.status(), ...out });
+    res.json({ telegram: await bots.pump().status(), ...out });
   } catch (err) { next(err); }
 });
 

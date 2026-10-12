@@ -227,7 +227,7 @@ async function publish(ctx, body) {
     const stillOpen = new Set(alerts.map(a => subject(a.k)));
     const resolved = closed.filter(a => !stillOpen.has(subject(a.k)));
     if (resolved.length) {
-      await require('./telegram').notifyResolved(stationId, resolved);
+      await require('./bots').pump().notifyResolved(stationId, resolved);
     }
     return { opened: opened.length, closed: closed.length, resolved: resolved.length, open: alerts.length };
   });
