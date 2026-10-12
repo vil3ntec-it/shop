@@ -257,7 +257,9 @@ fun main() {
               .getOrDefault(ThemeChoice.SYSTEM)
           )
         }
-        var welcomed by remember { mutableStateOf(prefs.getBoolean("welcomed", false)) }
+        //  عکس‌های خودکار در ساختِ dev ⇐ صفحهٔ خوش‌آمد رد می‌شود (همان «ادامه بدون حساب»)
+        val shotRun = ir.vil3ntec.tohid.BuildConfig.DEBUG && System.getProperty("tohid.shot.script") != null
+        var welcomed by remember { mutableStateOf(shotRun || prefs.getBoolean("welcomed", false)) }
         //  نوارِ منو ⇐ نما ⇐ ظاهر
         val themeRequest = ir.vil3ntec.tohid.ui.AppNav.theme.value
         LaunchedEffect(themeRequest) {
