@@ -8,7 +8,7 @@
   لینوکس (دبیان، اوبونتو، مینت) ⇐  «Install-Linux.sh» را اجرا کنید (رمزِ کاربر را می‌پرسد)
 
 یا مستقیم از پوشه‌ها:
-  Windows/Tohid-Windows.msi
+  Windows/Tohid-Windows-Setup.exe  (یا Tohid-Windows.msi)
   Mac-Apple-Silicon/Tohid-Mac-AppleSilicon.dmg
   Mac-Intel/Tohid-Mac-Intel.dmg
   Linux/Tohid-Linux.deb

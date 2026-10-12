@@ -88,6 +88,11 @@ jobs:
             task: packageMsi
             glob: 'build/compose/binaries/main/msi/*.msi'
             fixed: Tohid-Windows.msi
+          - os: windows-2022
+            label: ویندوز (exe)
+            task: packageExe
+            glob: 'build/compose/binaries/main/exe/*.exe'
+            fixed: Tohid-Windows-Setup.exe
           - os: macos-14
             label: مک (Apple Silicon)
             task: packageDmg
@@ -192,7 +197,8 @@ jobs:
 
             | سیستم | دانلود |
             |---|---|
-            | ویندوز ۱۰ و ۱۱ | [Tohid-Windows.msi](https://github.com/${{ github.repository }}/releases/download/tohid-desktop/Tohid-Windows.msi) |
+            | ویندوز ۱۰ و ۱۱ (نصابِ exe) | [Tohid-Windows-Setup.exe](https://github.com/${{ github.repository }}/releases/download/tohid-desktop/Tohid-Windows-Setup.exe) |
+            | ویندوز ۱۰ و ۱۱ (msi) | [Tohid-Windows.msi](https://github.com/${{ github.repository }}/releases/download/tohid-desktop/Tohid-Windows.msi) |
             | مک (M1 و تازه‌تر) | [Tohid-Mac-AppleSilicon.dmg](https://github.com/${{ github.repository }}/releases/download/tohid-desktop/Tohid-Mac-AppleSilicon.dmg) |
             | مک (Intel) | [Tohid-Mac-Intel.dmg](https://github.com/${{ github.repository }}/releases/download/tohid-desktop/Tohid-Mac-Intel.dmg) |
             | لینوکس (دبیان/اوبونتو) | [Tohid-Linux.deb](https://github.com/${{ github.repository }}/releases/download/tohid-desktop/Tohid-Linux.deb) |
@@ -217,13 +223,13 @@ jobs:
             done
             echo "::error::فرستادنِ $1 نشد"; return 1
           }
-          files="Tohid-Windows.msi Tohid-Mac-AppleSilicon.dmg Tohid-Mac-Intel.dmg Tohid-Linux.deb"
+          files="Tohid-Windows-Setup.exe Tohid-Windows.msi Tohid-Mac-AppleSilicon.dmg Tohid-Mac-Intel.dmg Tohid-Linux.deb"
           for f in $files; do up "$f"; done
           #  نصابِ همهٔ کامپیوترها در یک بسته — انتخابِ سیستم داخلِ خودِ بسته
           #  (‎desktop/setup-all‎: راهنما و سه نصب‌کنندهٔ کوچک که مک تراشه را خودش تشخیص می‌دهد)
           B="$RUNNER_TEMP/Tohid-Setup"
           mkdir -p "$B/Windows" "$B/Mac-Apple-Silicon" "$B/Mac-Intel" "$B/Linux"
-          cp Tohid-Windows.msi "$B/Windows/"
+          cp Tohid-Windows-Setup.exe Tohid-Windows.msi "$B/Windows/"
           cp Tohid-Mac-AppleSilicon.dmg "$B/Mac-Apple-Silicon/"
           cp Tohid-Mac-Intel.dmg "$B/Mac-Intel/"
           cp Tohid-Linux.deb "$B/Linux/"
