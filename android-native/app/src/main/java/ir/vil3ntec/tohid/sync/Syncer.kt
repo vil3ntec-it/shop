@@ -146,6 +146,7 @@ class Syncer(
         License.verify(license, key, state.deviceUid, state.accountId) is License.Verdict.Valid
       ) {
         state.license = license
+        state.serverDenied = null
       }
     } else {
       /*
@@ -163,7 +164,10 @@ class Syncer(
       val reason = body["reason"]
         ?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content }
         .orEmpty()
-      if (reason == "no_subscription" || reason == "no_shop") state.license = null
+      if (reason == "no_subscription" || reason == "no_shop") {
+        state.license = null
+        state.serverDenied = reason
+      }
     }
     return status()
   }

@@ -226,6 +226,15 @@ async function redeem(rawCode, userId, ip = '') {
       'SELECT * FROM shop_members WHERE shop_id=$1 AND user_id=$2', [code.shop_id, userId]
     )).rows[0];
 
+    //  عضوی که صاحب دکان **بعد از ساختِ همین کد** کنار گذاشته یا معلق
+    //  کرده، با همان کد برنمی‌گردد. کدِ ثابت مهلت و سقف ندارد؛ پیش‌تر
+    //  شاگردِ اخراجی همان کد را دوباره می‌زد و فعال می‌شد. برگرداندنش با
+    //  خودِ صاحب دکان است — یا با کدی که بعد از کنار گذاشتن ساخته شده.
+    if (existing && existing.status !== 'active' &&
+        Number(existing.updated_at || 0) >= Number(code.created_at || 0)) {
+      throw forbidden('صاحب دکان دسترسی شما را بسته است؛ از خودش بخواهید دوباره بازش کند', 'member_blocked');
+    }
+
     if (existing) {
       await c.query(
         `UPDATE shop_members SET status='active', role=$3, updated_at=$4 WHERE id=$1 AND shop_id=$2`,

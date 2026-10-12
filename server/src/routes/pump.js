@@ -582,7 +582,11 @@ router.post('/backups', require('../middleware/pump-services').requirePumpServic
 router.use('/backups', require('./account-backups').makeRouter(
   'pump',
   (req) => req.stationId || '',
-  { actor: (req) => ({ userId: req.user ? req.user.id : '' }) }
+  {
+    actor: (req) => ({ userId: req.user ? req.user.id : '' }),
+    //  نقش ندارد ⇒ کامپیوترِ خودِ پمپ است، همان رفتارِ قبلی
+    canDelete: (req) => !req.stationRole || req.stationRole === 'owner' || req.stationRole === 'manager',
+  }
 ));
 
 /*

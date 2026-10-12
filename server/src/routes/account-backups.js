@@ -36,7 +36,7 @@ const { badRequest, forbidden } = require('../middleware/errors');
  * @param {(req)=>string} tenantOf شناسهٔ حساب، فقط از میان‌افزار
  * @param {object} opts
  */
-function makeRouter(app, tenantOf, { actor = () => ({}) } = {}) {
+function makeRouter(app, tenantOf, { actor = () => ({}), canDelete = () => true } = {}) {
   const store = backups.forApp(app);
   const router = express.Router();
 
@@ -114,6 +114,9 @@ function makeRouter(app, tenantOf, { actor = () => ({}) } = {}) {
   router.delete('/:id', async (req, res, next) => {
     try {
       const id = need(req);
+      //  پاک کردنِ پشتیبان کارِ صاحب و مدیر است؛ شاگرد می‌توانست همهٔ
+      //  پشتیبان‌های دکان را یکی‌یکی پاک کند
+      if (!canDelete(req)) throw forbidden('پاک کردنِ پشتیبان فقط از صاحب یا مدیر برمی‌آید', 'permission_denied');
       const gone = await store.remove(id, v.text(req.params.id, { max: 64, required: true, field: 'شناسه' }));
       await audit.log({
         shopId: app === 'shop' ? id : '',

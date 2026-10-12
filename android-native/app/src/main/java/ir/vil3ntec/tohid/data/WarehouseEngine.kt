@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.data
 
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.plain
+import kotlin.math.max
 
 /**
  *  انبار — ثبتِ کالا، ورودِ جنس، اصلاحِ موجودی.
@@ -358,6 +359,12 @@ object WarehouseEngine {
     if (why.isEmpty()) return Result.Failed("دلیل اصلاح را بنویسید")
 
     val delta = if (increase) quantity else -quantity
+    //  کاهش بیش از موجودی، موجودی را منفی و گزارشِ انبار را دروغ می‌کند —
+    //  همان نگهبانِ `deleteEntry`
+    val stockNow = ShopStore.stock(d, productId)
+    if (delta < 0 && stockNow + delta < 0) {
+      return Result.Failed("فقط ${ir.vil3ntec.tohid.qty(max(0.0, stockNow))} ${product.unit} موجود است")
+    }
     val id = newId()
     val date = today
     val label = if (kind == AdjustKind.SUPPLIER_RETURN) "برگشت به تأمین‌کننده" else "اصلاح موجودی"

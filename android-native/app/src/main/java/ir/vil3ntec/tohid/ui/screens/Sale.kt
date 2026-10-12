@@ -533,6 +533,9 @@ fun SaleScreen(
       presetDebtorId = cartDebtorId,
       onDismiss = { checkout = false },
       onConfirm = { options ->
+        //  دو ضربهٔ پشتِ سرِ هم پیش از بسته شدنِ پنجره: دومی همان سبدِ قبلی
+        //  را دوباره ثبت می‌کرد. `checkout` همان لحظه خوانده می‌شود.
+        if (!checkout) return@CheckoutDialog
         when (val result = SalesEngine.record(
           d, cart, options,
           today = ir.vil3ntec.tohid.todayIso(),

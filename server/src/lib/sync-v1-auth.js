@@ -100,14 +100,32 @@ async function requireSyncAccount(req, res, next) {
   } catch (err) { next(err); }
 }
 
-/** نوشتن: عضوِ دکان باید `data.write` داشته باشد؛ عضوِ پمپ و کامپیوترِ پمپ می‌نویسند. */
+/**
+ * نوشتن: عضوِ دکان باید `data.write` داشته باشد؛ عضوِ پمپ و کامپیوترِ پمپ می‌نویسند.
+ *
+ * و همان قاعدهٔ `requireDataWrite`ِ راهِ قدیم: شاگرد فقط وقتی دکان
+ * `multi_device` دارد. پیش‌تر این‌جا فقط نقش سنجیده می‌شد، پس توکنِ شاگرد
+ * در دکانی که اشتراکش تمام شده از راهِ v1 همچنان می‌نوشت. opها روی گوشی
+ * می‌مانند (۴۰۳ صف را پاک نمی‌کند) و با تمدید بالا می‌روند.
+ */
 function requireSyncWrite(req, res, next) {
   const ctx = req.sync;
   if (!ctx) return next(unauthorized());
-  if (ctx.accountKind === 'shop' && !can(ctx.role, 'data.write')) {
+  if (ctx.accountKind !== 'shop') return next();
+  if (!can(ctx.role, 'data.write')) {
     return next(forbidden('اجازه‌ی ثبت اطلاعات ندارید', 'permission_denied'));
   }
-  next();
+  if (ctx.role === 'owner' || ctx.role === 'manager') return next();
+  (async () => {
+    const { entitlementOf } = require('./entitlement');
+    const ent = await entitlementOf(ctx.accountId);
+    if (ent.features.includes('multi_device')) return next();
+    return next(forbidden(
+      'اشتراک این دکان تمام شده است. فروش‌های شما روی همین گوشی می‌مانند و ' +
+      'به‌محض تمدید بالا می‌روند.',
+      'subscription_required'
+    ));
+  })().catch(next);
 }
 
 module.exports = { resolveToken, requireSyncAccount, requireSyncWrite, tokenOf, appAlias };

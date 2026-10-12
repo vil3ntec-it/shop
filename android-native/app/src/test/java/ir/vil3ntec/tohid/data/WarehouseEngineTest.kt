@@ -229,16 +229,33 @@ class WarehouseEngineTest {
 
   @Test
   fun `برگشت به تأمین کننده نوع خودش را می گیرد`() {
+    val stocked = ok(
+      WarehouseEngine.addEntry(
+        base, WarehouseEngine.EntryDraft(productId = "p1", units = 5.0, price = 200.0),
+        "2026-08-28", 0, ::newId,
+      )
+    ).data
     val r = ok(
       WarehouseEngine.adjustStock(
-        base, "p1", 2.0, increase = false, reason = "معیوب بود",
+        stocked, "p1", 2.0, increase = false, reason = "معیوب بود",
         kind = WarehouseEngine.AdjustKind.SUPPLIER_RETURN,
         today = "2026-08-28", now = 0, newId = ::newId,
       )
     )
-    assertEquals("supplier_return", r.data.stockMovements.single().type)
-    assertEquals("supplier_return", r.data.auditLog.single().type)
-    assertTrue(r.data.auditLog.single().notes.startsWith("برگشت به تأمین‌کننده «برنج»"))
+    assertEquals("supplier_return", r.data.stockMovements.last().type)
+    assertEquals("supplier_return", r.data.auditLog.last().type)
+    assertTrue(r.data.auditLog.last().notes.startsWith("برگشت به تأمین‌کننده «برنج»"))
+  }
+
+  @Test
+  fun `کاهش بیش از موجودی پذیرفته نمی شود`() {
+    val msg = failed(
+      WarehouseEngine.adjustStock(
+        base, "p1", 2.0, increase = false, reason = "شمارش",
+        kind = WarehouseEngine.AdjustKind.ADJUSTMENT, today = "2026-08-28", now = 0, newId = ::newId,
+      )
+    )
+    assertTrue(msg, msg.contains("موجود است"))
   }
 
   @Test

@@ -1,6 +1,5 @@
 package ir.vil3ntec.tohid.data
 
-import kotlin.math.max
 
 /**
  *  گزارش‌ها.
@@ -31,16 +30,13 @@ object ReportEngine {
   /**
    * سودِ یک بازه.
    *
-   * تکه‌ی ظریفش مرجوعی است. `net` مبلغِ اولیهٔ فاکتورهاست (مرجوعی از آن
-   * کم نشده) ولی `cogs` مرجوعی را کم کرده، پس اثرِ مرجوعی باید یک بار —
-   * و فقط یک بار — اعمال شود. سه حالت دارد:
+   * هر مرجوعی در بازهٔ تاریخِ **خودش** اثر می‌کند: مبلغی که پس داده شد منهای
+   * بهای کالایی که به انبار برگشت. `cogs` کلِ مقدارِ فروخته‌شده است.
    *
-   *   ۱) فروشِ لغوشده: کلِ فروش قبلاً برگشته، پس مرجوعی‌اش نباید دوباره
-   *      کم شود، وگرنه سود دوبار جریمه می‌شود.
-   *   ۲) فروشِ فعالِ داخلِ بازه: هم درآمدش در net است هم هزینه‌اش از cogs
-   *      کم شده، پس کلِ مبلغِ مرجوعی کم می‌شود.
-   *   ۳) فروشِ فعالِ خارجِ بازه: نه درآمدش در net است نه هزینه‌اش در cogs،
-   *      پس فقط سودِ از‌دست‌رفته (مبلغ منهای بهای تمام‌شده) کم می‌شود.
+   * پیش‌تر `cogs` مقدارِ مرجوعی را از بازهٔ فروش کم می‌کرد؛ کالایی که ماهِ
+   * بعد کامل برمی‌گشت، در ماهِ فروش به‌اندازهٔ کلِ مبلغ سود نشان می‌داد و
+   * جمعِ ماه‌ها با «همه» یکی درنمی‌آمد. فروشِ لغوشده کلاً بیرون است و
+   * مرجوعی‌اش شمرده نمی‌شود.
    */
   fun sales(d: ShopData, from: String, to: String): SalesReport {
     //  جدولِ فروش یک بار ساخته و بارها خوانده می‌شود؛ شرحش سرِ `SalesIndex`.
@@ -48,7 +44,6 @@ object ReportEngine {
     val index = ShopStore.salesIndex(d)
 
     val active = d.sales.filter { it.date in from..to && it.status != "cancelled" }
-    val activeIds = active.mapTo(HashSet()) { it.id }
 
     val gross = active.sumOf { it.total }
     val discount = active.sumOf { it.discount }
@@ -57,7 +52,7 @@ object ReportEngine {
     var cogs = 0.0
     active.forEach { sale ->
       index.itemsBySale[sale.id]?.forEach { item ->
-        cogs += (item.quantity - item.returnedQty) * item.purchasePrice
+        cogs += item.quantity * item.purchasePrice
       }
     }
 
@@ -65,15 +60,11 @@ object ReportEngine {
     var returnProfitImpact = 0.0
     d.saleReturns.filter { it.date in from..to }.forEach { r ->
       val sale = index.saleById[r.saleId]
-      if (sale != null && sale.status == "cancelled") return@forEach   // حالت ۱
+      if (sale != null && sale.status == "cancelled") return@forEach
       returnAmount += r.amount
-      if (r.saleId in activeIds) {
-        returnProfitImpact += r.amount                                 // حالت ۲
-      } else {
-        val item = index.itemById[r.saleItemId]
-        val cost = if (item != null) item.purchasePrice * r.quantity else 0.0
-        returnProfitImpact += max(0.0, r.amount - cost)                // حالت ۳
-      }
+      val item = index.itemById[r.saleItemId]
+      val cost = if (item != null) item.purchasePrice * r.quantity else 0.0
+      returnProfitImpact += r.amount - cost
     }
 
     val grossProfit = net - cogs - returnProfitImpact
