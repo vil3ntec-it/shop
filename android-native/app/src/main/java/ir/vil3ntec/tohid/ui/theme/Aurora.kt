@@ -10,6 +10,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
@@ -75,6 +76,12 @@ fun AuroraBackground(
   content: @Composable () -> Unit,
 ) {
   val colors = Shop.colors
+  //  کامپیوتر: زمینهٔ تخت و آرام، مثلِ نرم‌افزارهای رومیزی — لکه‌های نورِ
+  //  متحرک پشتِ جدول‌ها فقط چشم را خسته می‌کرد و کارتِ گرافیک را می‌گرفت
+  if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) {
+    Box(Modifier.fillMaxSize().background(colors.bg)) { content() }
+    return
+  }
   val blobs = tonePalette(tone)
   val rich = richGlass()
   val moving = animated && rich
@@ -193,6 +200,16 @@ fun Modifier.glassSurface(
    *  خودش را نشان می‌داد. روی شیشه، جدایی را لبه‌ی روشن می‌سازد نه سایه.
    *  ────────────────────────────────────────────────────────────────
    */
+  //  کامپیوتر: کارتِ تخت با خطِ دورِ یک‌پیکسلی و سایهٔ بسیار کم — شیشه، درخشش
+  //  و لبهٔ نورانی مالِ گوشی است
+  if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) {
+    return this
+      .shadow(elevation = if (strong) 3.dp else 1.dp, shape = shape)
+      .clip(shape)
+      .background(color = if (tint.alpha < 0.98f) tint.copy(alpha = 1f) else tint, shape = shape)
+      //  خطِ دورِ کارت روی کامپیوتر دیده می‌شود (روی گوشی لبهٔ سفیدِ شیشه بود)
+      .border(1.dp, if (tint.luminance() > 0.5f) Color(0x1F1E1B2E) else Color(0x24FFFFFF), shape)
+  }
   val solid = tint.alpha > 0.98f
   return this
     .then(

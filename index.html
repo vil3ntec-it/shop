@@ -646,6 +646,20 @@
   .stat-value{font-size:20px; font-weight:800; letter-spacing:-.01em;}
   .stat-value small{font-size:12px; font-weight:500; color:var(--muted); margin-inline-start:4px;}
 
+  /* ---------- استودیوی عکس و نمایشِ عکس‌ها ---------- */
+  body.no-photos .prod-thumb, body.no-photos .qs-thumb, body.no-photos .scan-photo{display:none !important;}
+  .ps-scrim{position:fixed; inset:0; background:rgba(15,23,42,.55); z-index:9999; display:flex; align-items:center; justify-content:center; padding:12px;}
+  .ps-box{background:var(--surface); color:var(--text); border-radius:16px; padding:16px; width:min(900px,100%); max-height:94vh; overflow:auto;}
+  .ps-box h3{margin:0 0 10px; font-size:16px;}
+  .ps-previews{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .ps-previews figure{margin:0;}
+  .ps-previews figcaption{font-size:12px; color:var(--muted); margin-bottom:4px;}
+  .ps-previews canvas{width:100%; aspect-ratio:1; object-fit:contain; background:#eef1f5; border:1px solid var(--border); border-radius:10px; display:block;}
+  .ps-controls{display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:8px 14px; margin-top:12px; font-size:13px;}
+  .ps-controls label{display:flex; align-items:center; gap:8px;}
+  .ps-range{flex-direction:column; align-items:stretch !important;}
+  .ps-actions{display:flex; gap:8px; flex-wrap:wrap; margin-top:14px;}
+
   /* ---------- مرکزِ مدیریت — همان `ManagementScreen`ِ برنامه ---------- */
   .admin-kpis{grid-template-columns:repeat(auto-fill,minmax(170px,1fr));}
   .admin-kpis .stat-hint{font-size:11.5px; color:var(--muted);}
@@ -4738,6 +4752,16 @@
       </section>
 
       <!-- MORE (mobile hub for secondary pages) -->
+      <section class="page" id="page-devices">
+        <div class="page-toolbar">
+          <div class="page-title-block">
+            <h2>دستگاه‌های جانبی</h2>
+            <p>چاپگر، بارکدخوان، گوشی به‌عنوانِ بارکدخوانِ کامپیوتر و عکسِ کالاها</p>
+          </div>
+        </div>
+        <div class="admin-hub" id="devices-hub"></div>
+      </section>
+
       <section class="page" id="page-admin">
         <div class="page-toolbar">
           <div class="page-title-block">
@@ -4757,6 +4781,16 @@
           </div>
         </div>
         <div class="more-grid" id="more-nav-list">
+          <a class="more-card" data-page="devices" href="#devices">
+            <span class="more-card-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="13" height="10" rx="2"/><rect x="17" y="8" width="5" height="12" rx="1.5"/><path d="M6 18h6"/></svg></span>
+            <span class="more-card-txt">
+              <b>دستگاه‌های جانبی</b>
+              <i>بارکدخوان، گوشی به‌عنوانِ بارکدخوانِ کامپیوتر، عکس‌ها</i>
+            </span>
+            <span class="more-card-go">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
+            </span>
+          </a>
           <a class="more-card" data-page="admin" href="#admin">
             <span class="more-card-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg></span>
             <span class="more-card-txt">
@@ -9459,11 +9493,24 @@
   function photoTx(mode){
     return photoDb().then(db=> db.transaction(PHOTO_STORE, mode).objectStore(PHOTO_STORE));
   }
-  function photoPut(id, blob){
+  function photoPutRaw(id, blob){
     return photoTx('readwrite').then(store=> new Promise((res, rej)=>{
       const r = store.put(blob, id);
       r.onsuccess = ()=> res(true); r.onerror = ()=> rej(r.error);
     }));
+  }
+  /* عکسِ گذاشته‌شده روی همین دستگاه ⇒ روی حساب هم می‌رود (‎license/photo-studio.js‎) */
+  function photoPut(id, blob){
+    return photoPutRaw(id, blob).then(v=>{
+      try{ window.TohidPhotoStudio && window.TohidPhotoStudio.sync.changed(id); }catch(e){}
+      return v;
+    });
+  }
+  function photoKeys(){
+    return photoTx('readonly').then(store=> new Promise((res)=>{
+      const r = store.getAllKeys();
+      r.onsuccess = ()=> res((r.result||[]).map(String)); r.onerror = ()=> res([]);
+    })).catch(()=> []);
   }
   function photoGet(id){
     return photoTx('readonly').then(store=> new Promise((res, rej)=>{
@@ -9471,12 +9518,40 @@
       r.onsuccess = ()=> res(r.result || null); r.onerror = ()=> rej(r.error);
     })).catch(()=> null);
   }
-  function photoDelete(id){
+  function photoDeleteRaw(id){
     return photoTx('readwrite').then(store=> new Promise((res)=>{
       const r = store.delete(id);
       r.onsuccess = r.onerror = ()=> res(true);
     })).catch(()=>{});
   }
+  function photoDelete(id){
+    return photoDeleteRaw(id).then(v=>{
+      try{ window.TohidPhotoStudio && window.TohidPhotoStudio.sync.removed(id); }catch(e){}
+      return v;
+    });
+  }
+  /* همگام‌سازیِ عکس: اسکریپت‌های license با defer پس از این اسکریپت می‌آیند */
+  window.addEventListener('DOMContentLoaded', ()=>{
+    const studio = window.TohidPhotoStudio;
+    if(!studio) return;
+    studio.sync.bind({
+      get: id=> photoGet(id),
+      put: (id, blob)=> photoPutRaw(id, blob).then(()=>{ photoForget(id); const p = products.find(x=>x.id===id); if(p) p.photo = true; }),
+      remove: id=> photoDeleteRaw(id).then(()=> photoForget(id)),
+      localIds: ()=> photoKeys(),
+      changed: ()=>{
+        document.querySelectorAll('[data-product-photo]').forEach(el=>{ delete el.dataset.photoDone; });
+        try{ renderProducts(); }catch(e){}
+        hydrateProductPhotos();
+      },
+    });
+  });
+  /* نمایشِ عکس‌ها روشن/خاموش — همان `PhotoPrefs`ِ برنامه، فقط روی همین دستگاه */
+  function applyPhotoPref(){
+    let off = false; try{ off = localStorage.getItem('tohid-show-photos') === '0'; }catch(e){}
+    document.body.classList.toggle('no-photos', off);
+  }
+  if(document.body) applyPhotoPref(); else window.addEventListener('DOMContentLoaded', applyPhotoPref);
 
   /* آدرس‌های ساخته‌شده نگه داشته می‌شوند تا برای هر بار نمایش،
      دوباره از دیتابیس خوانده و ساخته نشوند. */
@@ -9523,7 +9598,9 @@
 
   /** عکس محصول را می‌گیرد، فشرده می‌کند و ذخیره می‌کند. */
   async function saveProductPhoto(productId, file){
-    const blob = await compressImage(file);
+    const studio = window.TohidPhotoStudio;
+    const blob = studio ? await studio.open(file) : await compressImage(file);
+    if(!blob) throw new Error('انصراف');
     await photoPut(productId, blob);
     photoForget(productId);
     const p = products.find(x=>x.id===productId);
@@ -9798,7 +9875,11 @@
     bpPhotoRowKey = null;
     if(!file || !row) return;
     try{
-      row.photo = await compressImage(file);
+      //  استودیو: زمینهٔ سفید، برش و هم‌اندازه، کیفیت — «انصراف» یعنی بی عکس
+      const studio = window.TohidPhotoStudio;
+      const picked = studio ? await studio.open(file) : await compressImage(file);
+      if(!picked) return;
+      row.photo = picked;
       const btn = bpRowEl(row.key)?.querySelector('[data-bp-photo]');
       if(btn) btn.classList.add('has-photo');
       showToast('عکس این ردیف انتخاب شد');
@@ -12031,10 +12112,16 @@
     }catch(e){}
   }
 
-  function handleBarcodeScanned(code, {skipDedup=false}={}){
+  function handleBarcodeScanned(code, {skipDedup=false, fromPhone=false}={}){
     code = (code||'').trim();
     if(!code) return;
     if(!skipDedup && isDuplicateScan(code)) return;
+    //  این آیفون بارکدخوانِ کامپیوتر است ⇒ بارکد به سبدِ کامپیوتر می‌رود
+    const scanner = window.TohidPhotoStudio && window.TohidPhotoStudio.scanner;
+    if(!fromPhone && scanner && scanner.sendCode){
+      if(scanner.send(code)){ playScanBeep(); showToast('به کامپیوتر فرستاده شد: ' + code); return; }
+      showToast('کامپیوتر در دسترس نیست — بارکد در سبدِ همین دستگاه ماند', 'danger');
+    }
 
     playScanBeep();
 
@@ -13509,7 +13596,7 @@
     }
   });
 
-  const EXTRA_PAGES = ['debtor-account', 'quick-sale', 'supplier-account', 'receipts', 'profile', 'team', 'product', 'admin'];
+  const EXTRA_PAGES = ['debtor-account', 'quick-sale', 'supplier-account', 'receipts', 'profile', 'team', 'product', 'admin', 'devices'];
 
   /**
    *  چراغِ نوارِ پایین را می‌برد روی تبِ فعال.
@@ -13993,6 +14080,66 @@
     });
   }
 
+  /* دستگاه‌های جانبی — همان `DevicesScreen`ِ برنامه، با آنچه مرورگر اجازه می‌دهد */
+  function renderDevicesPage(){
+    const hub = document.getElementById('devices-hub');
+    const sc = window.TohidPhotoStudio && window.TohidPhotoStudio.scanner;
+    const caps = (window.TohidThermal && window.TohidThermal.capabilities()) || {};
+    const signedIn = !!(window.TohidAccount && window.TohidAccount.isSignedIn && window.TohidAccount.isSignedIn());
+    const live = !!(window.TohidSync && window.TohidSync.liveOpen);
+    let showPhotos = true; try{ showPhotos = localStorage.getItem('tohid-show-photos') !== '0'; }catch(e){}
+    const card = (title, body)=> `<div class="panel"><div class="panel-head"><h2>${title}</h2></div>${body}</div>`;
+    const listen = sc && sc.listenCode, send = sc && sc.sendCode;
+    hub.innerHTML = [
+      card('گوشی ⇄ کامپیوتر (بارکدخوان و دوربین)',
+        (signedIn ? '' : '<p class="admin-note" style="color:var(--warning)">برای این کار هر دو دستگاه باید با یک حساب وارد شده باشند.</p>') +
+        '<p class="admin-note">این دستگاه گیرنده باشد (کامپیوترِ صندوق):</p>' +
+        (listen
+          ? `<div class="admin-line"><b style="font-size:26px;color:var(--primary)" dir="ltr">${listen.slice(0,3)} ${listen.slice(3)}</b><span><button type="button" class="btn btn-sm" data-dev="listen">کدِ تازه</button> <button type="button" class="btn btn-sm" data-dev="stop">قطع</button></span></div>`
+          : '<button type="button" class="btn btn-sm" data-dev="listen">ساختنِ کدِ جفت‌شدن</button>') +
+        '<p class="admin-note" style="margin-top:12px">این دستگاه فرستنده باشد (آیفون/گوشی):</p>' +
+        (send
+          ? `<div class="admin-line"><span style="color:var(--success)">بارکدها به کامپیوترِ ${send} می‌روند — صفحهٔ فروش را باز کنید و اسکن کنید</span><b><button type="button" class="btn btn-sm" data-dev="unpair">قطع</button></b></div>`
+            + '<button type="button" class="btn btn-sm" data-dev="sendphoto">فرستادنِ عکس به کامپیوتر</button>'
+          : '<div style="display:flex;gap:8px"><input class="form-input" id="dev-pair-code" inputmode="numeric" maxlength="7" placeholder="کدِ شش‌رقمیِ کامپیوتر" aria-label="کدِ شش‌رقمیِ کامپیوتر"><button type="button" class="btn btn-primary btn-sm" data-dev="pair">وصل</button></div>')),
+      card('بارکدخوان‌ها',
+        '<p class="admin-note">بارکدخوانِ USB یا بلوتوثی خودش را «صفحه‌کلید» معرفی می‌کند: وصل یا جفت کنید و در صفحهٔ فروش اسکن کنید. روی آیفون دوربینِ خودِ گوشی بارکد می‌خواند.</p>'),
+      card('چاپگرها',
+        `<p class="admin-note">${caps.bluetooth || caps.usb
+          ? 'این مرورگر چاپِ مستقیم دارد' + (caps.bluetooth ? ' (بلوتوثِ کم‌مصرف)' : '') + (caps.usb ? ' (USB)' : '') + ' — دکمه‌هایش کنارِ هر فاکتور است.'
+          : 'آیفون اجازهٔ وصل شدنِ مستقیم به چاپگرِ حرارتی را نمی‌دهد؛ فاکتور با «چاپ» و AirPrint چاپ می‌شود. برای چاپِ حرارتیِ مستقیم، برنامهٔ اندروید یا کامپیوتر را به کار ببرید.'}</p>`),
+      card('همگام‌سازیِ زنده',
+        `<p class="admin-note" style="color:var(--${signedIn && live ? 'success' : 'warning'})">${!signedIn
+          ? 'بی حساب کار می‌کنید — دفتر فقط روی همین دستگاه است.'
+          : live ? 'وصل — فروش، کالا و عکسی که روی دستگاهِ دیگرِ همین حساب ثبت شود، همان لحظه این‌جا می‌آید.'
+                 : 'الان وصل نیست — کارها نگه داشته می‌شوند و با وصل شدن خودشان می‌روند.'}</p>`),
+      card('عکسِ کالاها',
+        `<label class="admin-line"><span>نمایشِ عکس در فهرست‌ها و فروش</span><input type="checkbox" data-dev="photos"${showPhotos ? ' checked' : ''}></label>` +
+        '<p class="admin-note">عکس‌ها روی حساب ذخیره می‌شوند و روی همهٔ دستگاه‌ها می‌آیند. خاموش کردن فقط روی همین دستگاه است.</p>'),
+    ].join('');
+  }
+  document.addEventListener('click', (e)=>{
+    const el = e.target.closest && e.target.closest('[data-dev]');
+    if(!el || el.type === 'checkbox') return;
+    const sc = window.TohidPhotoStudio && window.TohidPhotoStudio.scanner;
+    if(!sc) return;
+    const k = el.dataset.dev;
+    if(k === 'listen') sc.startListening();
+    else if(k === 'stop') sc.stopListening();
+    else if(k === 'unpair') sc.unpair();
+    else if(k === 'sendphoto'){ phonePhotoPick('', ''); return; }
+    else if(k === 'pair'){
+      const v = (document.getElementById('dev-pair-code')||{}).value || '';
+      if(sc.pairTo(v)) showToast('وصل شد — حالا در صفحهٔ فروش اسکن کنید'); else { showToast('کد باید شش رقم باشد', 'danger'); return; }
+    }
+    renderDevicesPage();
+  });
+  document.addEventListener('change', (e)=>{
+    if(!e.target || e.target.dataset.dev !== 'photos') return;
+    try{ localStorage.setItem('tohid-show-photos', e.target.checked ? '1' : '0'); }catch(err){}
+    applyPhotoPref();
+  });
+
   /* مرکزِ مدیریت — عددها از همان تابع‌های صفحه‌های خودشان، پس با آن‌ها فرق نمی‌کنند */
   function renderAdminPage(){
     const today = todayISO(), monthFrom = today.slice(0,7) + '-01';
@@ -14050,6 +14197,33 @@
     ].join('');
   }
 
+  /* کامپیوتر عکس خواست ⇒ دوربینِ آیفون ⇒ صندوقِ سرور ⇒ استودیوی کامپیوتر */
+  function phonePhotoPick(productId, label){
+    const inp = document.createElement('input');
+    inp.type = 'file'; inp.accept = 'image/*'; inp.setAttribute('capture', 'environment');
+    inp.onchange = ()=>{
+      const f = inp.files && inp.files[0];
+      if(!f) return;
+      showToast('در حالِ فرستادن به کامپیوتر…');
+      window.TohidPhotoStudio.scanner.sendPhoto(f, productId)
+        .then(()=> showToast('عکس به کامپیوتر رسید' + (label ? ` — «${label}»` : '')))
+        .catch(err=> showToast('نرفت: ' + (err && err.message || 'اینترنت؟'), 'danger'));
+    };
+    inp.click();
+  }
+  window.addEventListener('tohid:photo-request', (e)=>{
+    const d = e.detail || {};
+    if(confirm(`کامپیوتر عکسِ «${d.name || 'کالا'}» را می‌خواهد. دوربین باز شود؟`)) phonePhotoPick(d.product_id, d.name);
+  });
+
+  /* بارکدی که گوشیِ جفت‌شده خواند ⇒ صفحهٔ فروش و سبد */
+  window.addEventListener('tohid:phone-scan', (e)=>{
+    const code = e.detail && e.detail.code;
+    if(!code) return;
+    if(location.hash !== '#sale') location.hash = '#sale';
+    setTimeout(()=> handleBarcodeScanned(code, {skipDedup:true, fromPhone:true}), 50);
+  });
+
   function goTo(pageId){
     if(!PAGES.find(p=>p.id===pageId) && !EXTRA_PAGES.includes(pageId)) pageId = 'dashboard';
 
@@ -14088,6 +14262,9 @@
     } else if(pageId==='profile'){
       pageTitle.textContent = 'حساب من';
       profRefresh();
+    } else if(pageId==='devices'){
+      pageTitle.textContent = 'دستگاه‌های جانبی';
+      renderDevicesPage();
     } else if(pageId==='admin'){
       pageTitle.textContent = 'مرکزِ مدیریت';
       renderAdminPage();
@@ -14737,7 +14914,7 @@
      اگر پیش از آن‌ها بیاید، بی‌صدا هیچ کاری نمی‌کند. -->
 <script src="license/sync-core.js?v=2" defer></script>
 <script src="license/account-code.js?v=1" defer></script>
-<script src="license/sync-engine.js?v=2" defer></script>
+<script src="license/sync-engine.js?v=4" defer></script>
 <script src="license/license-client.js?v=16" defer></script>
 <script src="license/shop-sync.js?v=18" defer></script>
 <script src="license/shop-ui.js?v=15" defer></script>
@@ -14746,6 +14923,7 @@
 <script src="license/account-ui.js?v=2" defer></script>
 <script src="license/auto-backup.js?v=1" defer></script>
 <script src="license/thermal-print.js?v=1" defer></script>
+<script src="license/photo-studio.js?v=2" defer></script>
 
 </body>
 </html>

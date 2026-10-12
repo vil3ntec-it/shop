@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.AdminPanelSettings
+import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.ManageSearch
@@ -73,6 +74,13 @@ fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
         tint = Shop.colors.primary,
         subtitle = "همه‌چیز یک‌جا: فروش، صندوق، هشدارها، دستگاه‌ها و کارمندان",
         onClick = { onOpen("admin") },
+      )
+      MoreCard(
+        title = "دستگاه‌های جانبی",
+        icon = Icons.Filled.Devices,
+        tint = Shop.colors.accent,
+        subtitle = "چاپگرها، بارکدخوان‌ها، گوشی به‌عنوانِ بارکدخوانِ کامپیوتر",
+        onClick = { onOpen("devices") },
       )
       MoreCard(
         title = "انبار",

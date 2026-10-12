@@ -222,7 +222,7 @@ fun MySubscriptionScreen() {
   }
 
   if (loginOpen) {
-    ModalBottomSheet(onDismissRequest = { loginOpen = false }, containerColor = Shop.colors.bg) {
+    AdaptiveSheet(onDismissRequest = { loginOpen = false }, containerColor = Shop.colors.bg) {
       CodeLoginSheet(
         onClose = { loginOpen = false },
         onSignedIn = {

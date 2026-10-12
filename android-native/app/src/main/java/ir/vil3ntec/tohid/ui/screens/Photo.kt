@@ -38,17 +38,42 @@ import kotlinx.coroutines.withContext
  *  `version` برای تازه‌سازی است: وقتی عکس عوض شد، همین عدد بالا می‌رود و
  *  عکسِ کش‌شده دور ریخته می‌شود.
  */
+/**
+ *  نمایشِ عکسِ کالاها روشن/خاموش — انتخابِ هر دستگاه جدا (روی گوشیِ
+ *  کُند یا فهرستِ بلند، بی عکس سریع‌تر است). عکس‌ها پاک نمی‌شوند.
+ */
+object PhotoPrefs {
+  val show = androidx.compose.runtime.mutableStateOf(true)
+  private var loaded = false
+  fun load(context: android.content.Context) {
+    if (loaded) return
+    loaded = true
+    show.value = context.getSharedPreferences("tohid-ui", 0).getBoolean("show_photos", true)
+  }
+  fun set(context: android.content.Context, value: Boolean) {
+    show.value = value
+    context.getSharedPreferences("tohid-ui", 0).edit().putBoolean("show_photos", value).apply()
+  }
+}
+
 @Composable
 fun ProductPhoto(
   productId: String,
   size: Dp = 48.dp,
   version: Int = 0,
   modifier: Modifier = Modifier,
+  /** صفحهٔ خودِ کالا عکس را همیشه نشان می‌دهد — جای گذاشتنِ عکس همان‌جاست */
+  force: Boolean = false,
 ) {
   val context = LocalContext.current
-  var bitmap by remember(productId, version) { mutableStateOf<Bitmap?>(null) }
+  //  عکس‌ها خاموش‌اند ⇒ هیچ جایی گرفته نمی‌شود و فایلی خوانده نمی‌شود
+  PhotoPrefs.load(context)
+  if (!force && !PhotoPrefs.show.value) return
+  //  عکسی که از دستگاهِ دیگر رسید هم همین‌جا تازه می‌شود
+  val synced = ir.vil3ntec.tohid.sync.PhotoSync.version.value
+  var bitmap by remember(productId, version, synced) { mutableStateOf<Bitmap?>(null) }
 
-  LaunchedEffect(productId, version) {
+  LaunchedEffect(productId, version, synced) {
     bitmap = withContext(Dispatchers.IO) { PhotoStore.load(context, productId) }
   }
 

@@ -94,15 +94,21 @@ fun ProductDetailScreen(
 
   //  دوربین یا گالری — همان برگه‌ای که صفحهٔ محصولات هم نشان می‌دهد
   var pickOpen by remember { mutableStateOf(false) }
-  PhotoSourceSheet(open = pickOpen, onDismiss = { pickOpen = false }) { uri ->
-    PhotoStore.save(context, product.id, uri).onSuccess {
-      // نشانهٔ عکس روی خودِ محصول می‌نشیند، همان فیلدی که وب می‌نویسد
-      scope.launch {
-        store.save(
-          d.copy(products = d.products.map { if (it.id == product.id) it.copy(photo = true) else it })
-        )
+  var studioUri by remember { mutableStateOf<android.net.Uri?>(null) }
+  PhotoSourceSheet(open = pickOpen, onDismiss = { pickOpen = false }) { uri -> studioUri = uri }
+  studioUri?.let { uri ->
+    PhotoStudioDialog(source = uri, onDismiss = { studioUri = null }) { bitmap ->
+      studioUri = null
+      PhotoStore.saveBitmap(context, product.id, bitmap).onSuccess {
+        // نشانهٔ عکس روی خودِ محصول می‌نشیند، همان فیلدی که وب می‌نویسد
+        scope.launch {
+          store.save(
+            d.copy(products = d.products.map { if (it.id == product.id) it.copy(photo = true) else it })
+          )
+        }
+        ir.vil3ntec.tohid.sync.PhotoSync.changed(context, product.id)
+        photoVersion++
       }
-      photoVersion++
     }
   }
 
@@ -135,6 +141,7 @@ fun ProductDetailScreen(
             size = 72.dp,
             version = photoVersion,
             modifier = Modifier.clickable { choosePhoto() },
+            force = true,
           )
           Box(
             Modifier
@@ -175,6 +182,39 @@ fun ProductDetailScreen(
         }
         IconButton(onClick = onEdit) {
           Icon(Icons.Filled.Edit, contentDescription = "ویرایش", tint = Shop.colors.primary)
+        }
+      }
+
+      /*
+       *  عکس با دوربینِ گوشی — روی کامپیوتر (یا هر گیرنده‌ای).
+       *  گوشیِ جفت‌شده پنجرهٔ «عکس بگیر» می‌بیند؛ عکس که رسید، استودیو
+       *  همین‌جا با همان عکس باز می‌شود.
+       */
+      if (ir.vil3ntec.tohid.ui.Platform.DESKTOP || ir.vil3ntec.tohid.sync.PhoneScanner.listenCode.value != null) {
+        var phoneMsg by remember { mutableStateOf<String?>(null) }
+        Spacer(Modifier.height(Space.xs))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+          OutlinedButton(onClick = {
+            val sc = ir.vil3ntec.tohid.sync.PhoneScanner
+            when {
+              sc.listenCode.value == null -> {
+                sc.startListening(context)
+                phoneMsg = "کدِ جفت‌شدن: ${sc.listenCode.value} — در گوشی ⇐ دستگاه‌های جانبی همین را بزنید، بعد دوباره این دکمه"
+              }
+              sc.requestPhoto(product.id, product.name) -> {
+                phoneMsg = "روی گوشی «گرفتنِ عکس» را بزنید…"
+              }
+              else -> { phoneMsg = "گوشی وصل نیست — اینترنت و ورود به حساب را ببینید" }
+            }
+          }) {
+            Icon(Icons.Filled.PhotoCamera, contentDescription = null, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(6.dp))
+            Text("عکس با دوربینِ گوشی")
+          }
+          phoneMsg?.let {
+            Spacer(Modifier.width(8.dp))
+            Text(it, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted, modifier = Modifier.weight(1f))
+          }
         }
       }
 

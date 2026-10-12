@@ -29,17 +29,19 @@ object Space {
  *  اگر گوشهٔ تیز داشته باشد، به کلِ صفحه چسبیده به نظر می‌رسد.
  */
 object Shape {
-  val button = RoundedCornerShape(18.dp)
-  val field = RoundedCornerShape(16.dp)
-  val card = RoundedCornerShape(20.dp)
-  val cardLarge = RoundedCornerShape(24.dp)
-  val dialog = RoundedCornerShape(28.dp)
-  val sheet = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+  //  کامپیوتر: گوشه‌های کم‌گرد — شرح سرِ `ShopShapes`
+  private val desk = ir.vil3ntec.tohid.ui.Platform.DESKTOP
+  val button = RoundedCornerShape(if (desk) 6.dp else 18.dp)
+  val field = RoundedCornerShape(if (desk) 6.dp else 16.dp)
+  val card = RoundedCornerShape(if (desk) 8.dp else 20.dp)
+  val cardLarge = RoundedCornerShape(if (desk) 10.dp else 24.dp)
+  val dialog = RoundedCornerShape(if (desk) 10.dp else 28.dp)
+  val sheet = RoundedCornerShape(topStart = if (desk) 10.dp else 28.dp, topEnd = if (desk) 10.dp else 28.dp)
   /** تراشه کاملاً قرصی است — نه مستطیلِ گردگوشه */
   val chip = RoundedCornerShape(999.dp)
   val badge = RoundedCornerShape(999.dp)
   /** ظرفِ گردِ آیکن‌ها در ردیف‌ها */
-  val icon = RoundedCornerShape(12.dp)
+  val icon = RoundedCornerShape(if (desk) 6.dp else 12.dp)
 }
 
 /**

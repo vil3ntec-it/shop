@@ -250,14 +250,12 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
         }
       }
 
-      FloatingActionButton(
-        onClick = { form = DebtorFormState() },
+      AddFab(
+        label = "قرض‌دار تازه",
         containerColor = Shop.colors.primary,
-        contentColor = Color.White,
+        onClick = { form = DebtorFormState() },
         modifier = Modifier.align(Alignment.BottomStart).padding(16.dp).popIn(),
-      ) {
-        Icon(Icons.Filled.Add, contentDescription = "قرض‌دار تازه")
-      }
+      )
     }
   }
 

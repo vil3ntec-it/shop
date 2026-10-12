@@ -47,7 +47,7 @@ fun Panel(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> 
   Column(
     modifier
       .glassSurface(Shape.card, tint, colors.sheen, colors.border, glow = colors.glow)
-      .padding(18.dp),
+      .padding(if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) 14.dp else 18.dp),
     content = content,
   )
 }

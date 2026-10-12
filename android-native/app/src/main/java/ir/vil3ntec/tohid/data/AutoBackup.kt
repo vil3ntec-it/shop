@@ -196,6 +196,8 @@ object AutoBackup {
   class Worker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
       runCatching { take(applicationContext, ir.vil3ntec.tohid.todayIso()) }
+      //  نسخهٔ کامل (با عکس‌ها) در پوشه‌ای که صاحبِ دکان می‌بیند
+      if (BackupMirror.enabled(applicationContext)) runCatching { BackupMirror.write(applicationContext) }
       //  ⚠️ بعد از نسخهٔ محلی، نه به‌جای آن. اگر ترتیب برعکس بود، یک
       //  خطای شبکه می‌توانست شبی را بی هیچ پشتیبانی بگذارد.
       runCatching { push(applicationContext) }

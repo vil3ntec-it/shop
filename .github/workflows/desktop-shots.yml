@@ -68,6 +68,7 @@ jobs:
           S="$S;go:settings;wait:1500;shot:13-settings"
           S="$S;go:audit;wait:1500;shot:14-audit-log"
           S="$S;go:team;wait:1500;shot:15-team"
+          S="$S;go:devices;wait:1500;shot:15b-devices"
           S="$S;go:dashboard;key:F11;wait:2000;shot:16-fullscreen-dashboard"
           export JAVA_TOOL_OPTIONS="-Dtohid.shot=$RUNNER_TEMP/shots -Dtohid.shot.every=9000 -Dtohid.shot.exit=true -Dtohid.shot.script=$S -Dsun.jnu.encoding=UTF-8 -Dfile.encoding=UTF-8"
           timeout 600 xvfb-run -s "-screen 0 1440x900x24" ./gradlew --no-daemon -q run || true

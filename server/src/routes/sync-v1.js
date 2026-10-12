@@ -149,4 +149,79 @@ router.get('/deleted', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+/* ------------------------------------------------------- عکسِ کالاها */
+//  شرح: ‎lib/product-photos.js‎. عکس base64 در JSON می‌آید و می‌رود — وب،
+//  اندروید و کامپیوتر همه همین را بی کتابخانهٔ اضافه می‌خوانند.
+const photos = require('../lib/product-photos');
+
+router.get('/photos', async (req, res, next) => {
+  try {
+    res.json({ ok: true, ...(await photos.list(req.sync, Number(req.query?.since || 0), Number(req.query?.limit || 500))) });
+  } catch (err) { next(err); }
+});
+
+router.get('/photos/:productId', async (req, res, next) => {
+  try {
+    const p = await photos.get(req.sync, req.params.productId);
+    if (!p) return res.status(404).json({ ok: false, error: 'NOT_FOUND', message: 'عکسی نیست' });
+    res.set('Cache-Control', 'private, max-age=60');
+    res.json({ ok: true, hash: p.hash, type: photos.sniff(p.data), data: p.data.toString('base64') });
+  } catch (err) { next(err); }
+});
+
+router.put('/photos/:productId', requireSyncWrite, async (req, res, next) => {
+  try {
+    const b64 = String(req.body?.data || '');
+    if (b64.length > Math.ceil(photos.MAX_BYTES * 4 / 3) + 8) {
+      return res.status(413).json({ ok: false, error: 'TOO_LARGE', message: 'عکس بزرگ‌تر از ۶۰۰ کیلوبایت است' });
+    }
+    const deviceId = String(req.body?.device_id || req.headers['x-device'] || '').slice(0, 64);
+    const out = await photos.put(req.sync, req.params.productId, Buffer.from(b64, 'base64'), deviceId);
+    live.relay(req.sync, { event: 'photos', rev: out.rev }, deviceId);
+    res.json({ ok: true, ...out });
+  } catch (err) { next(err); }
+});
+
+router.delete('/photos/:productId', requireSyncWrite, async (req, res, next) => {
+  try {
+    const deviceId = String(req.query?.device_id || req.headers['x-device'] || '').slice(0, 64);
+    const out = await photos.remove(req.sync, req.params.productId, deviceId);
+    if (out.removed) live.relay(req.sync, { event: 'photos', rev: out.rev }, deviceId);
+    res.json({ ok: true, ...out });
+  } catch (err) { next(err); }
+});
+
+/* ---------------------------------------------- صندوقِ عکس (دوربینِ گوشی) */
+
+router.post('/photo-inbox', requireSyncWrite, async (req, res, next) => {
+  try {
+    const b64 = String(req.body?.data || '');
+    if (b64.length > Math.ceil(photos.INBOX_MAX_BYTES * 4 / 3) + 8) {
+      return res.status(413).json({ ok: false, error: 'TOO_LARGE', message: 'عکس بزرگ‌تر از ۲ مگابایت است' });
+    }
+    const deviceId = String(req.body?.device_id || req.headers['x-device'] || '').slice(0, 64);
+    const out = await photos.inboxPut(req.sync, Buffer.from(b64, 'base64'), {
+      pair: req.body?.pair, productId: req.body?.product_id || '', deviceId,
+    });
+    live.relay(req.sync, { event: 'inbox', id: out.id, pair: out.pair, product_id: out.product_id }, deviceId);
+    res.json({ ok: true, ...out });
+  } catch (err) { next(err); }
+});
+
+router.get('/photo-inbox', async (req, res, next) => {
+  try { res.json({ ok: true, items: await photos.inboxList(req.sync, req.query?.pair) }); } catch (err) { next(err); }
+});
+
+router.get('/photo-inbox/:id', async (req, res, next) => {
+  try {
+    const p = await photos.inboxGet(req.sync, req.params.id);
+    if (!p) return res.status(404).json({ ok: false, error: 'NOT_FOUND', message: 'عکس دیگر در صندوق نیست' });
+    res.json({ ok: true, product_id: p.product_id, type: photos.sniff(p.data), data: p.data.toString('base64') });
+  } catch (err) { next(err); }
+});
+
+router.delete('/photo-inbox/:id', requireSyncWrite, async (req, res, next) => {
+  try { res.json({ ok: true, removed: await photos.inboxDelete(req.sync, req.params.id) }); } catch (err) { next(err); }
+});
+
 module.exports = router;

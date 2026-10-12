@@ -221,7 +221,15 @@ val DarkColors = ShopColors(
  *  حالا یک جا داده می‌شود و همهٔ کادرهای متن، کشوها، منوها و کارت‌های
  *  متریال در تمامِ برنامه گِرد می‌شوند.
  */
-val ShopShapes = Shapes(
+val ShopShapes = if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) Shapes(
+  //  کامپیوتر: گوشه‌های کم‌گرد، مثلِ نرم‌افزارهای رومیزی — گردیِ ۲۰ پیکسلی
+  //  روی مانیتور «برنامهٔ گوشیِ بزرگ‌شده» به نظر می‌رسید
+  extraSmall = RoundedCornerShape(4.dp),
+  small = RoundedCornerShape(6.dp),
+  medium = RoundedCornerShape(8.dp),
+  large = RoundedCornerShape(10.dp),
+  extraLarge = RoundedCornerShape(12.dp),
+) else Shapes(
   extraSmall = RoundedCornerShape(12.dp),
   small = RoundedCornerShape(16.dp),
   medium = RoundedCornerShape(18.dp),
@@ -237,9 +245,10 @@ val ShopShapes = Shapes(
  *  ورودیِ خیلی گِرد، بی‌جا شلوغ می‌شود.
  */
 object Radius {
-  val sm = 16.dp
-  val md = 20.dp
-  val lg = 28.dp
+  private val desk = ir.vil3ntec.tohid.ui.Platform.DESKTOP
+  val sm = if (desk) 6.dp else 16.dp
+  val md = if (desk) 8.dp else 20.dp
+  val lg = if (desk) 12.dp else 28.dp
 }
 
 val LocalShopColors = staticCompositionLocalOf { LightColors }
@@ -347,12 +356,29 @@ fun TohidTheme(
     // می‌گیرد؛ وگرنه باید سربرگِ هر صفحه را جدا بزرگ می‌کردیم و یکی‌شان
     // جا می‌ماند — همان که جا مانده بود.
     val width = LocalConfiguration.current.screenWidthDp
+    /*
+     *  کامپیوتر بزرگ‌نمایی ندارد، کوچک‌نمایی دارد.
+     *
+     *  منطقِ تبلت (صفحهٔ بزرگ‌تر ⇒ متنِ بزرگ‌تر) روی مانیتور برعکس کار
+     *  می‌کرد: پهنای ۹۰۰ به بالا متن را ۲۲٪ درشت می‌کرد و هر صفحه شبیهِ
+     *  گوشیِ بزرگ‌شده می‌شد. روی کامپیوتر چشم نزدیک‌تر و ماوس دقیق است؛
+     *  متن اندازهٔ نرم‌افزارهای رومیزی است و بزرگ‌نماییِ Ctrl+/− دستِ کاربر.
+     */
     val scale = when {
+      ir.vil3ntec.tohid.ui.Platform.DESKTOP -> 0.93f
       width >= 900 -> 1.22f
       width >= 600 -> 1.12f
       else -> 1f
     }
     val type = remember(scale) { shopTypography(scale) }
-    MaterialTheme(colorScheme = scheme, typography = type, shapes = ShopShapes, content = content)
+    MaterialTheme(colorScheme = scheme, typography = type, shapes = ShopShapes) {
+      if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) {
+        //  دکمه و کادرِ ماوسی لازم نیست ۴۸ پیکسل باشد (اندازهٔ انگشت)
+        CompositionLocalProvider(
+          androidx.compose.material3.LocalMinimumInteractiveComponentSize provides 34.dp,
+          content = content,
+        )
+      } else content()
+    }
   }
 }

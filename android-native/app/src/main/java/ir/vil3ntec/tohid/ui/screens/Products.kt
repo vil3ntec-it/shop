@@ -88,21 +88,30 @@ fun ProductsScreen(
    *  تا دیروز یک‌راست گالری باز می‌شد؛ فروشنده‌ای که جنسِ تازه روی
    *  پیشخوان داشت، باید از برنامه بیرون می‌رفت تا عکس بگیرد.
    */
+  //  عکسِ انتخاب‌شده اول به استودیو می‌رود (زمینهٔ سفید، برش، کیفیت)
+  var studio by remember { mutableStateOf<Pair<String, android.net.Uri>?>(null) }
   PhotoSourceSheet(
     open = photoFor != null,
     onDismiss = { photoFor = null },
   ) { uri ->
     val id = photoFor ?: return@PhotoSourceSheet
-    PhotoStore.save(context, id, uri)
-      .onSuccess {
-        // نشانهٔ عکس روی خودِ محصول می‌نشیند، همان فیلدی که وب می‌نویسد
-        scope.launch {
-          store.save(d.copy(products = d.products.map { if (it.id == id) it.copy(photo = true) else it }))
+    studio = id to uri
+  }
+  studio?.let { (id, uri) ->
+    PhotoStudioDialog(source = uri, onDismiss = { studio = null }) { bitmap ->
+      studio = null
+      PhotoStore.saveBitmap(context, id, bitmap)
+        .onSuccess {
+          // نشانهٔ عکس روی خودِ محصول می‌نشیند، همان فیلدی که وب می‌نویسد
+          scope.launch {
+            store.save(d.copy(products = d.products.map { if (it.id == id) it.copy(photo = true) else it }))
+          }
+          ir.vil3ntec.tohid.sync.PhotoSync.changed(context, id)
+          photoVersion++
+          scope.launch { snackbar.showSnackbar("عکس محصول ثبت شد") }
         }
-        photoVersion++
-        scope.launch { snackbar.showSnackbar("عکس محصول ثبت شد") }
-      }
-      .onFailure { scope.launch { snackbar.showSnackbar("عکس ذخیره نشد") } }
+        .onFailure { scope.launch { snackbar.showSnackbar("عکس ذخیره نشد") } }
+    }
   }
 
   fun toast(text: String) {
@@ -342,14 +351,12 @@ fun ProductsScreen(
       }
     }
 
-    FloatingActionButton(
-      onClick = { bulkProduct = true },
+    AddFab(
+      label = "محصول جدید",
       containerColor = Shop.colors.primary,
-      contentColor = Color.White,
+      onClick = { bulkProduct = true },
       modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp).popIn(),
-    ) {
-      Icon(Icons.Filled.Add, contentDescription = "محصول جدید")
-    }
+    )
   }
 
   /* ------------------------- کادرها ------------------------- */
@@ -426,7 +433,7 @@ fun ProductsScreen(
   }
 
   actionsFor?.let { p ->
-    ModalBottomSheet(
+    AdaptiveSheet(
       onDismissRequest = { actionsFor = null },
       containerColor = Shop.colors.surfaceSolid,
     ) {
@@ -473,6 +480,7 @@ fun ProductsScreen(
             "محصول حذف شد",
           ) {
             PhotoStore.delete(context, p.id)
+            ir.vil3ntec.tohid.sync.PhotoSync.removed(context, p.id)
             confirmDelete = null
           }
         }) { Text("حذف", color = Shop.colors.danger) }

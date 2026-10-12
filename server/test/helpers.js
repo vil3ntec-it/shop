@@ -177,4 +177,6 @@ async function signIn(user, app = 'shop') {
 module.exports = {
   start, stop, resetDatabase, api, get, post, put, patch, del, raw, download, newUser, signIn, query,
   base: () => base,
+  //  سرورِ HTTPِ آزمون — برای سوار کردنِ سوکتِ زنده (‎index.js‎ در تولید همین کار را می‌کند)
+  server: () => server,
 };

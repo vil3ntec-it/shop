@@ -294,14 +294,12 @@ fun WarehouseScreen(
       }
     }
 
-    FloatingActionButton(
-      onClick = { bulkProduct = true },
+    AddFab(
+      label = "کالای تازه",
       containerColor = Shop.colors.primary,
-      contentColor = Color.White,
+      onClick = { bulkProduct = true },
       modifier = Modifier.align(Alignment.BottomStart).padding(16.dp).popIn(),
-    ) {
-      Icon(Icons.Filled.Add, contentDescription = "کالای تازه")
-    }
+    )
   }
 
   /* ---------------------------- پنجره‌ها ---------------------------- */

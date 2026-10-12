@@ -69,6 +69,7 @@ private val PAGE_TITLES = mapOf(
   "more" to "بیشتر",
   "purchasing" to "خرید و تأمین‌کننده",
   "admin" to "مرکزِ مدیریت",
+  "devices" to "دستگاه‌های جانبی",
   "sales" to "تاریخچه فروش",
   "reports" to "گزارشات",
   "receipts" to "رسیدها",
@@ -362,7 +363,8 @@ fun AppRoot(
    *  از نوار پایین بیرون می‌رود، باید چند جای دیگر هم عوض شود و یکی‌شان
    *  فراموش می‌شود.
    */
-  val wide = ir.vil3ntec.tohid.ui.screens.screenSize() == ir.vil3ntec.tohid.ui.screens.Screen.WIDE
+  //  کامپیوتر همیشه چیدمانِ کامپیوتری دارد (منوی کناری، نوارِ وضعیت) — حتی پنجرهٔ باریک
+  val wide = Platform.DESKTOP || ir.vil3ntec.tohid.ui.screens.screenSize() == ir.vil3ntec.tohid.ui.screens.Screen.WIDE
   //  حالتِ منوی کناریِ کامپیوتر — انتخابِ کاربر، روی همین دستگاه
   val uiPrefs = remember { context.getSharedPreferences("tohid-ui", 0) }
   var railMode by remember { mutableStateOf(uiPrefs.getString("desk_rail", RailMode.FULL) ?: RailMode.FULL) }
@@ -371,6 +373,11 @@ fun AppRoot(
     railMode = m
     railOverlay = false
     uiPrefs.edit().putString("desk_rail", m).apply()
+  }
+  //  نوارِ منوی کامپیوتر (نما ⇐ منوی کناری) همین حالت را عوض می‌کند
+  val railRequest = AppNav.rail.value
+  LaunchedEffect(railRequest) {
+    if (railRequest != null) { setRail(railRequest); AppNav.rail.value = null }
   }
   /** ☰: ثابت ⇄ آیکن؛ در حالتِ پنهان، منو را روی صفحه باز/بسته می‌کند */
   fun onMenuPress() {
@@ -383,6 +390,16 @@ fun AppRoot(
 
   fun open(target: String) {
     if (TABS.any { it.id == target }) { tab = target; sub = null } else sub = target
+  }
+
+  //  گوشیِ جفت‌شده بارکد فرستاد ⇒ صفحهٔ فروش باز می‌شود و کالا به سبد می‌رود
+  LaunchedEffect(Unit) {
+    ir.vil3ntec.tohid.sync.PhoneScanner.load(context)
+    PhotoPrefs.load(context)
+  }
+  val phoneScan = ir.vil3ntec.tohid.sync.PhoneScanner.lastReceived.value
+  LaunchedEffect(phoneScan) {
+    if (phoneScan != null && (sub ?: tab) != "sale") open("sale")
   }
 
   //  میان‌برهای کامپیوتر — شرح سرِ `AppNav`
@@ -469,7 +486,8 @@ fun AppRoot(
     //  کامپیوتر (صفحهٔ پهن): منوی کناری به‌جای نوارِ پایینِ گوشی — بندِ ۹ِ ممیزی:
     //  «نسخهٔ دسکتاپ نباید نسخهٔ موبایلِ بزرگ‌شده باشد»
     bottomBar = {
-      if (!wide) TohidNavBar(
+      if (Platform.DESKTOP) DeskStatusBar(data)
+      else if (!wide) TohidNavBar(
         tabs = TABS,
         current = if (sub == null) tab else null,
         onPick = { tab = it; sub = null },
@@ -518,6 +536,8 @@ fun AppRoot(
         DeskRail(current = sub ?: tab, onPick = ::open, compact = railMode == RailMode.COMPACT, mode = railMode, onMode = ::setRail)
       }
       //  حالتِ «پنهان»: ☰ منو را روی صفحه باز می‌کند؛ زدنِ بیرونش می‌بندد
+      //  دوربینِ گوشی برای کامپیوتر — درخواست، فرستادن و استودیو
+      PhoneLinkHost(store, data, snackbar)
       //  جست‌وجوی سریع (Ctrl+K یا ذره‌بینِ سربرگ) — همهٔ دستگاه‌ها
       if (AppNav.palette.value) {
         CommandPalette(data, onDismiss = { AppNav.palette.value = false }) { hit ->
@@ -638,6 +658,7 @@ fun AppRoot(
           onSubscription = { sub = "vip" },
         )
         "team" -> TeamScreen(snackbar)
+        "devices" -> DevicesScreen(data, snackbar)
         "more" -> MoreScreen(store, data, ::open)
       }
       }

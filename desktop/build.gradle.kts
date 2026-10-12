@@ -85,6 +85,8 @@ val replaced = listOf(
   "print/ReportPrint.kt",
   //  کلیکِ راست = منوی کارها (گوشی: لمسِ طولانی)
   "ui/PressMenu.kt",
+  //  «این کامپیوتر است» — اندازه‌ها، پنجره‌ها و نوارهای کامپیوتری (‎ui/Platform.kt‎)
+  "ui/Platform.kt",
 ).map { "ir/vil3ntec/tohid/$it" }
 
 val generated = layout.buildDirectory.dir("generated/tohid")
@@ -236,6 +238,8 @@ dependencies {
   implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.10.2")
   //  همان کلاینتِ سوکتِ زندهٔ اندروید (`LiveSocket`)
   implementation("com.squareup.okhttp3:okhttp:4.12.0")
+  //  چاپگر و بارکدخوانِ بلوتوثی/سریال روی کامپیوتر — درگاهِ COM (‎android/bluetooth/Bluetooth.kt‎)
+  implementation("com.fazecast:jSerialComm:2.11.0")
   //  `org.json` روی اندروید درونِ سیستم است؛ این‌جا باید آورده شود
   implementation("org.json:json:20250517")
 

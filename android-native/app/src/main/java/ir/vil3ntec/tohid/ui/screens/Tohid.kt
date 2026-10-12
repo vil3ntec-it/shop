@@ -663,7 +663,7 @@ fun TohidBottomSheet(
   onDismiss: () -> Unit,
   content: @Composable ColumnScope.() -> Unit,
 ) {
-  ModalBottomSheet(
+  AdaptiveSheet(
     onDismissRequest = onDismiss,
     containerColor = Shop.colors.bg,
     shape = Shape.sheet,

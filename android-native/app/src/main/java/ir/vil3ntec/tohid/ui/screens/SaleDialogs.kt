@@ -375,7 +375,14 @@ fun InvoiceDialog(
  *  گفته می‌شود — نه اینکه دکمهٔ چاپ بی‌صدا کاری نکند.
  */
 @Composable
-private fun PrinterDialog(onDismiss: () -> Unit, onPrint: (String, Int) -> Unit) {
+internal fun PrinterDialog(
+  onDismiss: () -> Unit,
+  /** «چاپ» در فروش؛ «ثبتِ چاپگر» در صفحهٔ دستگاه‌ها */
+  actionLabel: String = "چاپ",
+  /** در فروش، چاپگرِ انتخاب‌شده پیش‌فرض می‌شود و به فهرستِ چاپگرها می‌رود */
+  makeDefault: Boolean = true,
+  onPrint: (String, Int) -> Unit,
+) {
   val context = LocalContext.current
   val prefs = remember { context.getSharedPreferences("tohid", android.content.Context.MODE_PRIVATE) }
 
@@ -587,11 +594,14 @@ private fun PrinterDialog(onDismiss: () -> Unit, onPrint: (String, Int) -> Unit)
             enabled = link != null,
             onClick = {
               val chosen = link ?: return@Button
-              prefs.edit().putString("printer_address", chosen.save()).apply()
+              if (makeDefault) {
+                prefs.edit().putString("printer_address", chosen.save()).apply()
+                ir.vil3ntec.tohid.print.PrinterRegistry.add(context, "", chosen.save(), width)
+              }
               onPrint(chosen.save(), width)
             },
             modifier = Modifier.weight(1f),
-          ) { Text("چاپ") }
+          ) { Text(actionLabel) }
         }
       }
     }

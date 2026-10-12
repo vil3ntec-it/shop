@@ -50,7 +50,9 @@ fun contentMaxWidth(): Dp = when (screenSize()) {
   Screen.PHONE -> Dp.Unspecified
   Screen.TABLET -> 680.dp
   //  کامپیوتر: پهنای مفیدِ مانیتور (با منوی کناری)، نه ستونِ باریکِ گوشی
-  Screen.WIDE -> 1200.dp
+  //  برنامهٔ کامپیوتر کلِ پنجره را می‌گیرد (مثلِ هر نرم‌افزارِ رومیزی)؛ فقط روی
+  //  مانیتورِ خیلی پهن سقف دارد تا ردیف‌های جدول از هم دور نیفتند
+  Screen.WIDE -> if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) 1680.dp else 1200.dp
 }
 
 /**

@@ -482,7 +482,7 @@ fun TohidTopBar(
   }
 
   if (alertsOpen) {
-    ModalBottomSheet(onDismissRequest = { alertsOpen = false }, containerColor = Shop.colors.bg) {
+    AdaptiveSheet(onDismissRequest = { alertsOpen = false }, containerColor = Shop.colors.bg) {
       Column(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, bottom = 28.dp)) {
         Text("هشدارهای فروشگاه", style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
         Spacer(Modifier.height(10.dp))
@@ -757,7 +757,7 @@ private fun SyncDot() {
   }
 
   if (open) {
-    ModalBottomSheet(onDismissRequest = { open = false }, containerColor = Shop.colors.bg) {
+    AdaptiveSheet(onDismissRequest = { open = false }, containerColor = Shop.colors.bg) {
       Column(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, bottom = 28.dp)) {
 
         /* ------------------------- سرور ------------------------- */

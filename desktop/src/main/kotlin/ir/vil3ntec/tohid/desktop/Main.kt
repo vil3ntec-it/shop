@@ -33,6 +33,12 @@ import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberTrayState
 import androidx.compose.ui.window.rememberWindowState
+import androidx.compose.ui.window.MenuBar
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.window.DialogWindow
 import ir.vil3ntec.tohid.R
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.sync.v1.LiveSocket
@@ -104,6 +110,9 @@ fun main() {
         .putBoolean("desktop_max", windowState.placement == WindowPlacement.Maximized)
         .commit()
       runCatching { live?.disconnect() }
+      //  پشتیبانِ کامل هنگامِ بستن — پایانِ روزِ کاری بی پشتیبان نمی‌ماند
+      //  (دفتر و عکس‌ها، چند صد میلی‌ثانیه)
+      if (ir.vil3ntec.tohid.data.BackupMirror.enabled(context)) runCatching { ir.vil3ntec.tohid.data.BackupMirror.write(context) }
       exitApplication()
     }
 
@@ -124,6 +133,7 @@ fun main() {
       }
     }
 
+    var shortcutsOpen by remember { mutableStateOf(false) }
     Window(
       onCloseRequest = {
         //  بی سینی (بعضی میزکارهای لینوکس) بستن یعنی خروج
@@ -165,6 +175,8 @@ fun main() {
           //  Ctrl+K ⇒ جست‌وجوی سریع (صفحه، کالا، بارکد، قرض‌دار)
           mod && e.key == Key.K -> { ir.vil3ntec.tohid.ui.AppNav.palette.value = !ir.vil3ntec.tohid.ui.AppNav.palette.value; true }
           mod && e.key == Key.M -> { ir.vil3ntec.tohid.ui.AppNav.go("admin"); true }
+          //  Ctrl+N ⇒ «تازه»ِ همین صفحه (قرض‌دار، کالا، مصرف، تأمین‌کننده)
+          mod && e.key == Key.N -> ir.vil3ntec.tohid.ui.AppNav.addAction.value?.let { it(); true } ?: false
           e.key == Key.Escape -> BackDispatcher.dispatch()
           mod && (e.key == Key.Equals || e.key == Key.Plus || e.key == Key.NumPadAdd) -> { setZoom(zoom + 0.1f); true }
           mod && (e.key == Key.Minus || e.key == Key.NumPadSubtract) -> { setZoom(zoom - 0.1f); true }
@@ -173,7 +185,79 @@ fun main() {
         }
       },
     ) {
+      /*
+       *  نوارِ منوی کامپیوتر — منوی سیستمِ خودِ ویندوز/مک/لینوکس.
+       *
+       *  همهٔ کارهای برنامه از این‌جا هم پیدا می‌شوند، با میان‌برشان کنارِ
+       *  نام: کاربرِ کامپیوتر اول بالای پنجره را می‌گردد، نه دکمه‌های صفحه.
+       *  ⚠️ میان‌برها این‌جا «ثبت» نمی‌شوند (فقط نوشته می‌شوند): همان
+       *  `onPreviewKeyEvent` بالا آن‌ها را می‌گیرد، وگرنه هر کلید دو بار
+       *  کار می‌کرد.
+       */
+      MenuBar {
+        Menu("فایل", mnemonic = 'F') {
+          Item("فروشِ تازه    Ctrl+2", onClick = { ir.vil3ntec.tohid.ui.AppNav.go("sale") })
+          Item("موردِ تازه در همین صفحه    Ctrl+N", onClick = { ir.vil3ntec.tohid.ui.AppNav.addAction.value?.invoke() })
+          Item("جست‌وجو…    Ctrl+K", onClick = { ir.vil3ntec.tohid.ui.AppNav.palette.value = true })
+          Separator()
+          Item("تنظیمات و پشتیبان‌گیری", onClick = { ir.vil3ntec.tohid.ui.AppNav.go("settings") })
+          Item("دستگاه‌های جانبی (چاپگر، بارکدخوان)", onClick = { ir.vil3ntec.tohid.ui.AppNav.go("devices") })
+          Item("پشتیبانِ کامل همین حالا (پوشه)", onClick = {
+            val r = ir.vil3ntec.tohid.data.BackupMirror.write(context)
+            DesktopNotify.show("پشتیبان", r.fold({ "نشست: " + it.path }, { "نشد: " + (it.message ?: "") }))
+          })
+          Item("باز کردنِ پوشهٔ پشتیبان", onClick = {
+            ir.vil3ntec.tohid.data.BackupMirror.folder(context)?.let { ir.vil3ntec.tohid.ui.Platform.openFolder(it.path) }
+          })
+          Separator()
+          Item("خروج از برنامه", onClick = { quit() })
+        }
+        Menu("برو", mnemonic = 'G') {
+          ir.vil3ntec.tohid.ui.AppNav.SHORTCUTS.forEachIndexed { i, (id, label) ->
+            Item("$label    Ctrl+${i + 1}", onClick = { ir.vil3ntec.tohid.ui.AppNav.go(id) })
+          }
+          Separator()
+          Item("مرکزِ مدیریت    Ctrl+M", onClick = { ir.vil3ntec.tohid.ui.AppNav.go("admin") })
+          Item("رسیدها", onClick = { ir.vil3ntec.tohid.ui.AppNav.go("receipts") })
+          Item("کارمندان", onClick = { ir.vil3ntec.tohid.ui.AppNav.go("team") })
+          Item("سابقهٔ عملیات", onClick = { ir.vil3ntec.tohid.ui.AppNav.go("audit") })
+        }
+        Menu("نما", mnemonic = 'V') {
+          Item("تمام‌صفحه    F11", onClick = {
+            windowState.placement =
+              if (windowState.placement == WindowPlacement.Fullscreen) WindowPlacement.Floating else WindowPlacement.Fullscreen
+          })
+          Separator()
+          Item("بزرگ‌نمایی    Ctrl+=", onClick = { setZoom(zoom + 0.1f) })
+          Item("کوچک‌نمایی    Ctrl+−", onClick = { setZoom(zoom - 0.1f) })
+          Item("اندازهٔ عادی    Ctrl+0", onClick = { setZoom(1f) })
+          Separator()
+          Item("منوی کناری: ثابت", onClick = { ir.vil3ntec.tohid.ui.AppNav.rail.value = "full" })
+          Item("منوی کناری: فقط آیکن", onClick = { ir.vil3ntec.tohid.ui.AppNav.rail.value = "compact" })
+          Item("منوی کناری: پنهان", onClick = { ir.vil3ntec.tohid.ui.AppNav.rail.value = "hidden" })
+          Separator()
+          Item("ظاهرِ روشن", onClick = { ir.vil3ntec.tohid.ui.AppNav.theme.value = "LIGHT" })
+          Item("ظاهرِ تاریک", onClick = { ir.vil3ntec.tohid.ui.AppNav.theme.value = "DARK" })
+          Item("ظاهرِ سیستم", onClick = { ir.vil3ntec.tohid.ui.AppNav.theme.value = "SYSTEM" })
+        }
+        Menu("راهنما", mnemonic = 'H') {
+          Item("میان‌برهای صفحه‌کلید", onClick = { shortcutsOpen = true })
+          Item("دربارهٔ توحید", onClick = {
+            javax.swing.JOptionPane.showMessageDialog(window,
+              "توحید — دفترِ فروشگاه\nنسخهٔ ${ir.vil3ntec.tohid.BuildConfig.VERSION_NAME}",
+              "دربارهٔ توحید", javax.swing.JOptionPane.INFORMATION_MESSAGE)
+          })
+        }
+      }
+      if (shortcutsOpen) {
+        DialogWindow(onCloseRequest = { shortcutsOpen = false }, title = "میان‌برهای صفحه‌کلید",
+          state = androidx.compose.ui.window.rememberDialogState(size = DpSize(460.dp, 520.dp))) {
+          ShortcutsHelp()
+        }
+      }
       LaunchedEffect(Unit) {
+        //  منوی سیستم راست‌به‌چپ، مثلِ خودِ برنامه
+        window.jMenuBar?.applyComponentOrientation(java.awt.ComponentOrientation.RIGHT_TO_LEFT)
         window.minimumSize = java.awt.Dimension(420, 560)
         DesktopFiles.owner = window
         SingleInstance.onActivate = {
@@ -209,6 +293,14 @@ fun main() {
           )
         }
         var welcomed by remember { mutableStateOf(prefs.getBoolean("welcomed", false)) }
+        //  نوارِ منو ⇐ نما ⇐ ظاهر
+        val themeRequest = ir.vil3ntec.tohid.ui.AppNav.theme.value
+        LaunchedEffect(themeRequest) {
+          val picked = themeRequest?.let { runCatching { ThemeChoice.valueOf(it) }.getOrNull() } ?: return@LaunchedEffect
+          theme = picked
+          prefs.edit().putString("theme", picked.name).apply()
+          ir.vil3ntec.tohid.ui.AppNav.theme.value = null
+        }
 
         TohidTheme(theme) {
           CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
@@ -228,6 +320,34 @@ fun main() {
               )
             }
           }
+        }
+      }
+    }
+  }
+}
+
+
+/** پنجرهٔ «میان‌برهای صفحه‌کلید» — همان چیزهایی که `onPreviewKeyEvent` می‌گیرد */
+@androidx.compose.runtime.Composable
+private fun ShortcutsHelp() {
+  val rows = ir.vil3ntec.tohid.ui.AppNav.SHORTCUTS.mapIndexed { i, (_, label) -> "Ctrl+${i + 1}" to label } + listOf(
+    "Ctrl+M" to "مرکزِ مدیریت",
+    "Ctrl+N" to "موردِ تازه در همین صفحه (کالا، قرض‌دار، مصرف…)",
+    "Ctrl+K" to "جست‌وجوی سریع: صفحه، کالا، بارکد، قرض‌دار",
+    "F11" to "تمام‌صفحه",
+    "Ctrl+= / Ctrl+− / Ctrl+0" to "بزرگ‌نمایی / کوچک‌نمایی / عادی",
+    "Esc" to "بستنِ پنجره یا برگشت",
+    "دکمهٔ عقبِ ماوس" to "برگشت",
+    "کلیکِ راست روی ردیف" to "منوی کارها",
+  )
+  androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalLayoutDirection provides LayoutDirection.Rtl) {
+    androidx.compose.foundation.layout.Column(
+      androidx.compose.ui.Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.White).padding(16.dp)
+    ) {
+      rows.forEach { (k, v) ->
+        androidx.compose.foundation.layout.Row(androidx.compose.ui.Modifier.fillMaxWidth().padding(vertical = 5.dp)) {
+          androidx.compose.material3.Text(v, modifier = androidx.compose.ui.Modifier.weight(1f))
+          androidx.compose.material3.Text(k, color = androidx.compose.ui.graphics.Color(0xFF475569))
         }
       }
     }
