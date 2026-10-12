@@ -142,6 +142,7 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
         .sortedWith(sort.order)
     }
 
+    val wideTable = screenSize() == Screen.WIDE
     Box(Modifier.fillMaxSize()) {
       // شبکهٔ کارت‌ها — همان `.debtor-list` نسخهٔ وب. قرض‌دار در یک نگاه
       // از رنگِ کارتش شناخته می‌شود، نه از خواندنِ عدد.
@@ -220,7 +221,7 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
               }
             }
           }
-        } else if (screenSize() == Screen.WIDE) {
+        } else if (wideTable) {
           //  کامپیوتر: جدول — نام، شماره، مانده، مدت؛ ترتیب از همان تراشه‌های بالا
           item(key = "debtor-head", span = { GridItemSpan(maxLineSpan) }) { DebtorTableHead() }
           items(rows, key = { "t-" + it.debtor.id }, span = { GridItemSpan(maxLineSpan) }) { row ->
