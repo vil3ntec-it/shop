@@ -320,13 +320,40 @@ function downloadRow() {
 
 const BACK = { text: '‹ منو', callback_data: 'menu' };
 
-function menuKeyboard(row) {
+/**
+ * 🏷️ دکمهٔ نرخ: ⛔ **هیچ پیامی نمی‌فرستد** — قالبِ «نرخ پطرول … دیزل …» را در
+ * کادرِ نوشتنِ همان گفت‌وگو می‌گذارد (`switch_inline_query_current_chat`)؛ کاربر
+ * عددها را عوض می‌کند و خودش می‌فرستد. خواستهٔ صاحب سامانه (۱۴۰۵/۰۷/۲۰): «از منو
+ * که انتخاب می‌کند نباید پیام فرستاده شود؛ قالبِ آماده توی پیام بیاید».
+ * ⚠️ `/rate` از فهرستِ «/»ِ تلگرام برداشته شد: تلگرام فرمانِ آن فهرست را همان
+ * لحظه می‌فرستد و راهی برای «فقط بنویس» ندارد.
+ */
+//  بی تاریخچه: جای عدد خالی است (نه «۰» که رد می‌شود) — فقط عددِ همان سوخت را بنویسید
+const EMPTY_RATE = 'نرخ پطرول  دیزل ';
+
+function rateButton(template) {
+  return { text: '🏷️ نرخِ اتحادیه', switch_inline_query_current_chat: template || EMPTY_RATE };
+}
+
+/** قالبِ نرخ با آخرین نرخِ نشسته (یک شعبه)، تا فقط عددِ تازه عوض شود. */
+async function rateTemplate(links) {
+  if (!links || links.length !== 1) return EMPTY_RATE;
+  try {
+    const list = await require('./station-rates').recent(links[0].station_id, 10);
+    const last = list.find((r) => r.status === 'applied') || list[0];
+    if (!last) return EMPTY_RATE;
+    const v = (n) => (n === null || n === undefined ? '۰' : faNum(n));
+    return `نرخ پطرول ${v(last.petrol)} دیزل ${v(last.diesel)}`;
+  } catch { return EMPTY_RATE; }
+}
+
+function menuKeyboard(row, template = '') {
   if (row.kind === 'channel') return null;
   const top = [
     { text: '📊 وضعیت', callback_data: 'status' },
     { text: '📱 اپ و کدِ پمپ', callback_data: 'app' },
   ];
-  const mirza = [{ text: '💬 چت‌های میرزا', callback_data: 'mirza' }];
+  const mirza = [{ text: '💬 چت‌های میرزا', callback_data: 'mirza' }, rateButton(template)];
   if (row.kind === 'private') {
     return [top, [
       { text: '👥 گروه و کانال', callback_data: 'share' },
@@ -522,6 +549,18 @@ async function rememberMenu(chatId, messageId) {
  * ⚠️ «message is not modified» خطا نیست: کاربر دوبار روی همان دکمه زده.
  */
 async function show(chatId, text, keyboard, editId = 0) {
+  const res = await showOnce(chatId, text, keyboard, editId);
+  //  ⚠️ اگر تلگرام دکمهٔ «قالب در کادرِ نوشتن» را نپذیرفت (مثلاً حالتِ inlineِ ربات
+  //  خاموش است)، همان دکمه به «🏷️ نرخ» با راهنما (‎rate_help‎) بدل می‌شود — منو نمی‌افتد.
+  if (!res.ok && keyboard && keyboard.some((r) => r.some((b) => b.switch_inline_query_current_chat !== undefined))) {
+    const plain = keyboard.map((r) => r.map((b) => (b.switch_inline_query_current_chat !== undefined
+      ? { text: b.text, callback_data: 'rate_help' } : b)));
+    return showOnce(chatId, text, plain, editId);
+  }
+  return res;
+}
+
+async function showOnce(chatId, text, keyboard, editId = 0) {
   const parts = chunks(text);
   if (parts.length > 1) {
     //  متنِ بلند: تکهٔ اول جای همان پیام، میانی‌ها پیامِ تازه، و دکمه‌ها زیرِ آخری
@@ -577,7 +616,7 @@ const HELP =
   + '  ۲) کدِ هشت‌رقمیِ پمپ را بفرستید (برنامهٔ کامپیوتر ← پروفایل ← کدِ اپِ کارمندان).\n'
   + '  ۳) وقتی برنامهٔ کامپیوتر خاموش است، پیامِ مشتری این‌جا می‌آید. روی آن «Reply» بزنید و بنویسید — جواب به گوشیِ همان مشتری می‌رسد.\n'
   + '  در گروه می‌خواهید؟ بات را به گروه اضافه کنید، در گروه /mirza بزنید و همان کد را بفرستید (فقط مدیرِ گروه).\n\n'
-  + '🏷️ نرخِ اتحادیه: بنویسید «پطرول ۷۹ دیزل ۸۰» (یکی هم کافی است: «نرخ جدید پطرول ۷۹»).\n'
+  + '🏷️ نرخِ اتحادیه: در منو «🏷️ نرخِ اتحادیه» را بزنید — قالب در کادرِ نوشتن می‌نشیند و چیزی فرستاده نمی‌شود؛ عددهای تازه را بنویسید و بفرستید. یا خودتان بنویسید «پطرول ۷۹ دیزل ۸۰» (یکی هم کافی است).\n'
   + '  فقط «مدیرانِ نرخ»ی که صاحبِ پمپ تعیین کرده (⚙️ تنظیمات ← 👮 مدیرانِ نرخ) — هر کسِ دیگری بنویسد هیچ اتفاقی نمی‌افتد.\n'
   + '  شناسهٔ تلگرامِ هر کس: /myid. در گروه با واژهٔ «نرخ» یا /rate. نشست، خبر می‌دهم.\n\n'
   + '🔎 جست‌وجو: نامِ قرض‌دار را بنویسید (در گروه: /find نام).\n'
@@ -646,7 +685,7 @@ async function sendMenu(row, lead = '', editId = 0) {
   const text = (lead ? `${lead}\n\n` : '') + await menuText(row, links);
   //  ⚠️ در کانال دکمه نمی‌گذاریم: هر خواننده‌ای می‌دیدش
   if (row.kind === 'channel') return send(row.chat_id, text);
-  return show(row.chat_id, text, menuKeyboard(row), editId);
+  return show(row.chat_id, text, menuKeyboard(row, await rateTemplate(links)), editId);
 }
 
 /* ── وضعیت: حالِ زنده، نه فقط تاریخچه ─────────────────────────── */
@@ -1146,8 +1185,7 @@ async function onPrivate(chat, cmd, text, from = null) {
     }
     if (cmd.name === 'rate') {
       const parsed = require('./station-rates').parse(cmd.arg);
-      return parsed ? onRate(row, parsed, from || chat)
-        : send(row.chat_id, '🏷️ بعد از /rate نرخ را بنویسید؛ مثلاً: /rate پطرول ۷۹ دیزل ۸۰');
+      return parsed ? onRate(row, parsed, from || chat) : rateHelp(row);
     }
     if (cmd.name === 'cancel') {
       await setState(row.chat_id, linked ? '' : 'email');
@@ -1298,8 +1336,7 @@ async function onGroup(chat, cmd, from, text = '') {
   }
   if (cmd.name === 'rate') {
     const parsed = require('./station-rates').parse(cmd.arg);
-    return parsed ? onRate(row, parsed, from)
-      : send(row.chat_id, '🏷️ بعد از /rate نرخ را بنویسید؛ مثلاً: /rate پطرول ۷۹ دیزل ۸۰');
+    return parsed ? onRate(row, parsed, from) : rateHelp(row);
   }
 
   if (cmd.name === 'start' && cmd.arg) {
@@ -1643,6 +1680,19 @@ async function rateStations(from) {
     [uid, uname]).then(botStations);
 }
 
+/** راهنمای نرخ با همان دکمهٔ «قالب در کادرِ نوشتن». */
+async function rateHelp(row, editId = 0) {
+  const links = isLinked(row) ? await linksOf(row) : [];
+  const text = '🏷️ نرخِ اتحادیه\n\n'
+    + '«✍️ نوشتنِ نرخ» را بزنید: قالبِ «نرخ پطرول … دیزل …» در کادرِ نوشتن می‌نشیند (چیزی فرستاده نمی‌شود). '
+    + 'عددهای تازهٔ اتحادیه را جای عددها بنویسید و بفرستید — یکی هم کافی است (فقط پطرول یا فقط دیزل).\n\n'
+    + 'یا خودتان بنویسید: نرخ پطرول ۷۹ دیزل ۸۰\n'
+    + 'فقط «مدیرانِ نرخ»ی که صاحبِ پمپ تعیین کرده — نشست، همین‌جا خبر می‌دهم.';
+  const kb = [[{ text: '✍️ نوشتنِ نرخ', switch_inline_query_current_chat: await rateTemplate(links) }]];
+  if (editId) kb.push([BACK]);
+  return show(row.chat_id, text, kb, editId);
+}
+
 async function onRate(row, parsed, from) {
   const rates = require('./station-rates');
   if (parsed.bad && parsed.bad.length) {
@@ -1964,6 +2014,7 @@ async function onCallback(q) {
       await answer('⏳ فرستاده شد');
       return createRate(row, l, parsed, q.from);
     }
+    case 'rate_help': await answer(); return rateHelp(row, editId);
     default: return answer();
   }
 }
@@ -2424,7 +2475,6 @@ async function setCommands() {
       { command: 'code', description: 'اپِ اندروید و آیفون و کدِ پمپ' },
       { command: 'group', description: 'وصل کردنِ گروه یا کانال' },
       { command: 'mirza', description: 'چت‌های میرزا — پیامِ مشتری‌های کیو‌آر' },
-      { command: 'rate', description: 'نرخِ اتحادیه: /rate پطرول ۷۹ دیزل ۸۰' },
       { command: 'myid', description: 'شناسهٔ تلگرامِ من (برای مدیرِ نرخ شدن)' },
       { command: 'settings', description: 'تنظیمات' },
       { command: 'help', description: 'راهنما' },
@@ -2436,7 +2486,6 @@ async function setCommands() {
       { command: 'status', description: 'هشدارهای باز و موجودیِ مخزن' },
       { command: 'find', description: 'جست‌وجوی قرض‌دار: /find نام' },
       { command: 'mirza', description: 'چت‌های میرزا در همین گروه' },
-      { command: 'rate', description: 'نرخِ اتحادیه (فقط مدیرانِ نرخ)' },
       { command: 'myid', description: 'شناسهٔ تلگرامِ من' },
       { command: 'menu', description: 'منو' },
     ],

@@ -546,3 +546,89 @@ test('⛔ نامِ کاربری به شناسهٔ نخستین کسی که با 
   await msg(777321, 'پطرول ۸۲', { from: { id: 777321, username: 'someone_else' } });
   assert.equal(await cmds(), 2);
 });
+
+/* ══════════════════ 🏷️ نرخ از منو: قالب در کادرِ نوشتن، نه پیام ══════════════════ */
+
+test('🏷️ نرخ از منو: دکمه هیچ پیامی نمی‌فرستد و قالب (با آخرین نرخ) در کادرِ نوشتن می‌گذارد؛ پیامِ همان قالب نرخ را عوض می‌کند', async () => {
+  const p = await pump('قالب');
+  await linkPrivateEmail(9601, p);
+  //  ⛔ /rate دیگر در فهرستِ «/»ِ تلگرام نیست (انتخابش همان لحظه پیام می‌فرستاد)
+  const cmds = calls.filter(c => c.method === 'setMyCommands');
+  for (const c of cmds) assert.ok(!c.params.commands.some(x => x.command === 'rate'), '⛔ rate در فهرستِ «/»');
+
+  clear();
+  await msg(9601, '/menu');
+  const btn = rows(lastTo(9601)).flat().find(b => /نرخِ اتحادیه/.test(b.text));
+  assert.ok(btn, 'دکمهٔ نرخ در منو');
+  assert.equal(btn.callback_data, undefined, '⛔ دکمه callback ندارد ⇒ زدنش چیزی به سرور نمی‌فرستد');
+  assert.equal(btn.switch_inline_query_current_chat, 'نرخ پطرول  دیزل ', 'بی تاریخچه: جای عدد خالی');
+
+  //  همان چیزی که تلگرام در کادر می‌گذارد و کاربر با عددِ تازه می‌فرستد: «@بات نرخ …»
+  clear();
+  await msg(9601, `@${BOT} نرخ پطرول ۷۹ دیزل ۸۰`);
+  assert.match(textsTo(9601), /⏳ نرخِ اتحادیه/);
+  const got = await h.get('/api/pump/device/rate', { token: p.dev });
+  assert.equal(got.body.cmd.petrol, 79);
+  assert.equal(got.body.cmd.diesel, 80);
+  await h.post(`/api/pump/device/rate/${got.body.cmd.id}/ack`, { applied: true }, { token: p.dev });
+
+  //  قالبِ بعدی همان آخرین نرخِ نشسته را دارد — فقط عددِ تازه عوض می‌شود
+  clear();
+  await msg(9601, '/menu');
+  const again = rows(lastTo(9601)).flat().find(b => /نرخِ اتحادیه/.test(b.text));
+  assert.equal(again.switch_inline_query_current_chat, 'نرخ پطرول ۷۹ دیزل ۸۰');
+
+  //  فقط پطرول (جای دیزل خالی ماند) ⇒ فقط پطرول
+  clear();
+  await msg(9601, `@${BOT} نرخ پطرول ۸۱ دیزل `);
+  const only = await h.get('/api/pump/device/rate', { token: p.dev });
+  assert.equal(only.body.cmd.petrol, 81);
+  assert.equal(only.body.cmd.diesel, null);
+
+  //  /rate تنها (اگر کسی تایپ کرد) ⇒ راهنما با همان دکمهٔ قالب، نه «بعد از /rate بنویسید»
+  clear();
+  await msg(9601, '/rate');
+  const help = lastTo(9601);
+  assert.match(help.params.text, /چیزی فرستاده نمی‌شود/);
+  assert.ok(rows(help).flat().some(b => /^نرخ پطرول/.test(b.switch_inline_query_current_chat || '')));
+});
+
+test('🏷️ در گروه: قالبِ «@بات نرخ …» از مدیرِ نرخ می‌نشیند؛ از دیگری نه', async () => {
+  const p = await pump('قالب‌گروه');
+  await linkPrivateEmail(9602, p);
+  await addRateAdmins(9602, '777601');
+  const g = -100960;
+  const n = async () => (await one('SELECT count(*)::int AS n FROM station_rate_cmds WHERE station_id=$1', [p.stationId])).n;
+  responder = async (method) => (method === 'getChatMember' ? { ok: true, result: { status: 'member' } } : null);
+  try {
+    clear();
+    await msg(g, `@${BOT} نرخ پطرول ۷۷ دیزل ۷۸`, { type: 'supergroup', from: { id: 888601 } });
+    assert.equal(await n(), 0, '⛔ غریبه');
+    await msg(g, `@${BOT} نرخ پطرول ۷۷ دیزل ۷۸`, { type: 'supergroup', from: { id: 777601, first_name: 'کارفرما' } });
+    assert.equal(await n(), 1);
+    assert.match(textsTo(g), /⏳ نرخِ اتحادیه/);
+  } finally { responder = null; }
+});
+
+test('🏷️ اگر تلگرام دکمهٔ قالب را نپذیرفت، منو نمی‌افتد: دکمه به «راهنمای نرخ» بدل می‌شود', async () => {
+  const p = await pump('بی‌قالب');
+  await linkPrivateEmail(9603, p);
+  responder = async (method, params) => {
+    const kb = params?.reply_markup?.inline_keyboard;
+    if ((method === 'sendMessage' || method === 'editMessageText') && kb && kb.flat().some(b => b.switch_inline_query_current_chat !== undefined)) {
+      return { ok: false, error_code: 400, description: 'Bad Request: BUTTON_TYPE_INVALID' };
+    }
+    return null;
+  };
+  try {
+    clear();
+    await msg(9603, '/menu');
+    const m = lastTo(9603);
+    const b = rows(m).flat().find(x => /نرخِ اتحادیه/.test(x.text));
+    assert.ok(b && b.callback_data === 'rate_help', JSON.stringify(rows(m)));
+    clear();
+    await press(9603, 'rate_help');
+    assert.match(textsTo(9603), /نرخ پطرول ۷۹ دیزل ۸۰/);
+  } finally { responder = null; }
+});
+
