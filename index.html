@@ -89,9 +89,9 @@
      لبه‌های نشان نرم می‌شد -->
 <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
 <link rel="stylesheet" href="license/license-ui.css?v=15">
-<link rel="stylesheet" href="license/shop-ui.css?v=15">
+<link rel="stylesheet" href="license/shop-ui.css?v=17">
 <link rel="stylesheet" href="license/vip.css?v=16">
-<link rel="stylesheet" href="license/support.css?v=16">
+<link rel="stylesheet" href="license/support.css?v=17">
 <link rel="stylesheet" href="license/account-ui.css?v=1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -283,6 +283,7 @@
   .nav-list{display:flex; flex-direction:column; gap:2px;}
   .nav-item{
     position:relative;
+    text-decoration:none;   /* پیوندند؛ بی این، زیرخطِ پیش‌فرضِ مرورگر می‌گرفتند */
     display:flex;
     align-items:center;
     gap:10px;
@@ -371,6 +372,10 @@
     overflow-x:auto; scrollbar-width:none;
   }
   .header .header-right::-webkit-scrollbar{ display:none; }
+  /* دکمه‌ها فشرده نمی‌شوند — پیش‌تر دکمهٔ حساب روی گوشی تا یک باریکه له می‌شد؛
+     جا که کم باشد، عنوان کوتاه می‌شود و نوار می‌لغزد */
+  .header .header-right > *{ flex-shrink:0; }
+  .header h1{ min-width:0; overflow:hidden; text-overflow:ellipsis; }
   /* کلیدهای شیشه‌ای روی آبی — همان جوهرِ روشن در هر دو تم */
   .header .icon-btn{
     border-color:rgba(255,255,255,.18);
@@ -4996,10 +5001,12 @@
             همین سایت یکی باشد. تا وقتی وارد نشده‌اید، برنامه کاملاً آفلاین کار
             می‌کند و هیچ قابلیتی قفل نمی‌شود.
           </p>
-          <div class="settings-actions" style="display:grid;gap:10px;margin-top:12px;">
-            <button type="button" class="btn-secondary" id="btn-acct-login">ورود با ایمیل</button>
-            <button type="button" class="btn-secondary" id="btn-acct-plan">اشتراکِ من</button>
-            <button type="button" class="btn-secondary" id="btn-acct-sync">حالِ همگام‌سازی</button>
+          <!-- کلاسِ پایهٔ `btn` نبود و سه دکمه با ظاهرِ خامِ مرورگر می‌آمدند؛ روی
+               دسکتاپ کنارِ هم، روی گوشی زیرِ هم -->
+          <div class="settings-actions" style="display:grid;gap:10px;margin-top:12px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));">
+            <button type="button" class="btn btn-secondary" id="btn-acct-login">ورود با ایمیل</button>
+            <button type="button" class="btn btn-secondary" id="btn-acct-plan">اشتراکِ من</button>
+            <button type="button" class="btn btn-secondary" id="btn-acct-sync">حالِ همگام‌سازی</button>
           </div>
         </div>
 
@@ -7272,7 +7279,7 @@
     const stockValue = products.reduce((sum,p)=> sum + (getProductStock(p.id) * (p.purchasePrice||0)), 0);
     const outDebt = debtors.reduce((sum,d)=> sum + Math.max(0, getDebt(d.id)), 0);
     const rows = [
-      ['مفاد خالص ماه', formatMoney(monthReport.netProfit ?? monthReport.grossProfit), 'var(--success)'],
+      ['مفاد خالص ماه', formatMoney(monthReport.netProfit ?? monthReport.grossProfit), (monthReport.netProfit ?? monthReport.grossProfit) < 0 ? 'var(--danger)' : 'var(--success)'],
       ['فروش ماه', formatMoney(monthReport.net), 'var(--text)'],
       ['ارزش انبار', formatMoney(stockValue), 'var(--warning)'],
       ['قرض بیرون', formatMoney(outDebt), 'var(--danger)'],
@@ -13680,7 +13687,7 @@
 <script src="license/account-code.js?v=1" defer></script>
 <script src="license/sync-engine.js?v=2" defer></script>
 <script src="license/license-client.js?v=15" defer></script>
-<script src="license/shop-sync.js?v=16" defer></script>
+<script src="license/shop-sync.js?v=17" defer></script>
 <script src="license/shop-ui.js?v=15" defer></script>
 <script src="license/vip.js?v=16" defer></script>
 <script src="license/support.js?v=16" defer></script>

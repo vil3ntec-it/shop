@@ -913,7 +913,7 @@ private fun ShopStatusPanel(view: DashboardNumbers, canSeeMoney: Boolean, onOpen
     Text("وضعیت دکان", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = colors.text)
     Spacer(Modifier.height(6.dp))
     if (canSeeMoney) {
-      StatusLine("مفاد خالص ماه", "${money(view.monthNet)} ؋", colors.success) { onOpen("reports") }
+      StatusLine("مفاد خالص ماه", "${money(view.monthNet)} ؋", if (view.monthNet < 0) colors.danger else colors.success) { onOpen("reports") }
     }
     StatusLine("فروش ماه", "${money(view.monthSalesTotal)} ؋", colors.text) { onOpen("reports") }
     StatusLine("ارزش انبار", "${money(view.warehouse.value)} ؋", colors.warning) { onOpen("products") }
