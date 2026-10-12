@@ -109,7 +109,7 @@ fun PhotoSourceSheet(
 
   if (!open) return
 
-  ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Shop.colors.bg) {
+  AdaptiveSheet(onDismissRequest = onDismiss, containerColor = Shop.colors.bg) {
     Column(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, bottom = 28.dp)) {
       Text(
         "انتخاب تصویر",

@@ -351,14 +351,12 @@ fun ProductsScreen(
       }
     }
 
-    FloatingActionButton(
-      onClick = { bulkProduct = true },
+    AddFab(
+      label = "محصول جدید",
       containerColor = Shop.colors.primary,
-      contentColor = Color.White,
+      onClick = { bulkProduct = true },
       modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp).popIn(),
-    ) {
-      Icon(Icons.Filled.Add, contentDescription = "محصول جدید")
-    }
+    )
   }
 
   /* ------------------------- کادرها ------------------------- */
@@ -435,7 +433,7 @@ fun ProductsScreen(
   }
 
   actionsFor?.let { p ->
-    ModalBottomSheet(
+    AdaptiveSheet(
       onDismissRequest = { actionsFor = null },
       containerColor = Shop.colors.surfaceSolid,
     ) {

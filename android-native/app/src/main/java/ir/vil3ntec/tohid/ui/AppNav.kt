@@ -29,4 +29,13 @@ object AppNav {
 
   /** جست‌وجوی سریع (Ctrl+K روی کامپیوتر، دکمهٔ ذره‌بین در سربرگ) */
   val palette = mutableStateOf(false)
+
+  /** درخواستِ حالتِ منوی کناری از نوارِ منوی کامپیوتر — `RailMode` */
+  val rail = mutableStateOf<String?>(null)
+
+  /** کارِ «تازه»ِ صفحهٔ باز (دکمهٔ +) — Ctrl+N روی کامپیوتر همین را صدا می‌زند */
+  val addAction = mutableStateOf<(() -> Unit)?>(null)
+
+  /** درخواستِ تم از نوارِ منوی کامپیوتر: "LIGHT" / "DARK" / "SYSTEM" */
+  val theme = mutableStateOf<String?>(null)
 }

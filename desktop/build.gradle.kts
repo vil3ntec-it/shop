@@ -85,6 +85,8 @@ val replaced = listOf(
   "print/ReportPrint.kt",
   //  کلیکِ راست = منوی کارها (گوشی: لمسِ طولانی)
   "ui/PressMenu.kt",
+  //  «این کامپیوتر است» — اندازه‌ها، پنجره‌ها و نوارهای کامپیوتری (‎ui/Platform.kt‎)
+  "ui/Platform.kt",
 ).map { "ir/vil3ntec/tohid/$it" }
 
 val generated = layout.buildDirectory.dir("generated/tohid")

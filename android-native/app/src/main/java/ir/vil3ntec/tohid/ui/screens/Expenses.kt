@@ -161,14 +161,12 @@ fun ExpensesScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
 
     // دکمهٔ کوچکِ گِرد، نه دکمهٔ پهنِ متن‌دار: آن یکی روی ردیف‌های
     // پایینِ فهرست می‌نشست و زیرش قابلِ زدن نبود
-    FloatingActionButton(
-      onClick = { form = ExpenseFormState(date = todayIso()) },
+    AddFab(
+      label = "مصرف تازه",
       containerColor = Shop.colors.success,
-      contentColor = Color.White,
+      onClick = { form = ExpenseFormState(date = todayIso()) },
       modifier = Modifier.align(Alignment.BottomStart).padding(16.dp).popIn(),
-    ) {
-      Icon(Icons.Filled.Add, contentDescription = "مصرف تازه")
-    }
+    )
   }
 
   if (breakdown) {
@@ -448,7 +446,7 @@ private fun BreakdownSheet(
   onPick: (String?) -> Unit,
   onDismiss: () -> Unit,
 ) {
-  ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Shop.colors.bg) {
+  AdaptiveSheet(onDismissRequest = onDismiss, containerColor = Shop.colors.bg) {
     Column(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, bottom = 28.dp)) {
       Text(title, style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
       Spacer(Modifier.height(4.dp))

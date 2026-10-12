@@ -126,7 +126,36 @@ fun DashboardScreen(d: ShopData, onOpen: (String) -> Unit = {}) {
      *  کارهای دیگر — نه پنج کارتِ تمام‌عرض زیرِ هم که نصفِ صفحه را خالی
      *  می‌گذاشت. گوشی و تبلت همان ترتیبِ یک‌ستونه را دارند.
      */
-    if (screenSize() == Screen.WIDE) {
+    if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) {
+      /*
+       *  کامپیوتر: ردیفِ کاشیِ عدد بالای صفحه (مثلِ داشبوردِ نرم‌افزارهای
+       *  حسابداری)، زیرش معاملاتِ اخیر کنارِ وضعیتِ دکان و اقدامِ پیشنهادی —
+       *  نه کارتِ گرادیانیِ درشتِ گوشی.
+       */
+      val tiles = buildList {
+        add(Triple("فروشِ امروز", "${ir.vil3ntec.tohid.money(view.todayTotal)} ؋", "${ir.vil3ntec.tohid.plain(view.todaySales.size)} فاکتور"))
+        if (canSeeMoney) add(Triple(if (view.todayProfit < 0) "ضررِ امروز" else "سودِ امروز", "${ir.vil3ntec.tohid.money(kotlin.math.abs(view.todayProfit))} ؋", "پس از مصارفِ امروز"))
+        add(Triple("فروشِ این ماه", "${ir.vil3ntec.tohid.money(view.monthSalesTotal)} ؋", "این هفته ${ir.vil3ntec.tohid.money(view.weekTotal)} ؋"))
+        add(Triple("طلب از قرض‌داران", "${ir.vil3ntec.tohid.money(view.totalDebt)} ؋", "${ir.vil3ntec.tohid.plain(view.owing.size)} نفر"))
+        add(Triple("هشدارِ انبار", ir.vil3ntec.tohid.plain(view.lowStock.size + view.outOfStock.size), "${ir.vil3ntec.tohid.plain(view.outOfStock.size)} تمام‌شده"))
+      }
+      Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        tiles.forEach { (label, value, hint) ->
+          StatTile(label = label, value = value, hint = hint, modifier = Modifier.weight(1f))
+        }
+      }
+      Spacer(Modifier.height(12.dp))
+      Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.weight(1.4f)) { RecentDeals(d, onOpen) }
+        Column(Modifier.weight(1f)) {
+          DominantAction(view, onOpen)
+          Spacer(Modifier.height(12.dp))
+          ShopStatusPanel(view, canSeeMoney, onOpen)
+          Spacer(Modifier.height(12.dp))
+          MoreActionsRow(onOpen)
+        }
+      }
+    } else if (screenSize() == Screen.WIDE) {
       Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Column(Modifier.weight(1.15f)) {
           HeroSalesCard(view)
@@ -1080,7 +1109,7 @@ private fun MoreActionsRow(onOpen: (String) -> Unit) {
     Text("فروش سریع · ورود کالا · گزارش‌ها", fontSize = 10.5.sp, color = colors.muted2)
   }
   if (open) {
-    androidx.compose.material3.ModalBottomSheet(
+    AdaptiveSheet(
       onDismissRequest = { open = false },
       containerColor = colors.surfaceSolid,
     ) {
