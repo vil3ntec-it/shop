@@ -43,9 +43,10 @@ object ReportPrint {
 
   private class TablePrintable(private val sheet: ReportCsv.Sheet, private val title: String) : Printable {
 
-    private val base: Font = runCatching {
-      ReportPrint::class.java.classLoader.getResourceAsStream(ir.vil3ntec.tohid.R.path(ir.vil3ntec.tohid.R.font.vazirmatn_regular))
-        !!.use { Font.createFont(Font.TRUETYPE_FONT, it) }
+    private val base: Font = runCatching<Font> {
+      val path = ir.vil3ntec.tohid.R.path(ir.vil3ntec.tohid.R.font.vazirmatn_regular)
+      val stream = ReportPrint::class.java.classLoader.getResourceAsStream(path) ?: error("قلم پیدا نشد")
+      stream.use { Font.createFont(Font.TRUETYPE_FONT, it) }
     }.getOrDefault(Font(Font.SANS_SERIF, Font.PLAIN, 10))
 
     private val header = sheet.rows.firstOrNull().orEmpty()
