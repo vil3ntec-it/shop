@@ -5489,6 +5489,18 @@
           <input class="form-input" id="in-warehouse-date" type="date">
         </div>
       </div>
+      <!-- انقضا و سری ساخت — هر دو اختیاری؛ خالی یعنی «بی انقضا»، نه تاریخِ ساختگی -->
+      <div class="form-row-2">
+        <div class="form-group" id="fg-warehouse-expiry">
+          <label>تاریخ انقضا (اختیاری)</label>
+          <input class="form-input" id="in-warehouse-expiry" type="date">
+          <div class="field-error">تاریخ انقضا درست نیست.</div>
+        </div>
+        <div class="form-group">
+          <label>سری ساخت (اختیاری)</label>
+          <input class="form-input" id="in-warehouse-batch" type="text" maxlength="40" placeholder="مثلاً B-1405-12">
+        </div>
+      </div>
       <div class="form-group">
         <label>توضیحات (اختیاری)</label>
         <textarea class="form-textarea" id="in-warehouse-notes" placeholder="یادداشت اضافه…"></textarea>
@@ -5739,14 +5751,14 @@
     <form id="form-sale-checkout">
       <div class="checkout-summary-row"><span>جمع اقلام (Subtotal)</span><b id="co-subtotal">0 افغانی</b></div>
 
-      <div class="form-group">
+      <div class="form-group" data-discount-only>
         <label>تخفیف</label>
         <div class="seg-toggle" id="co-discount-type">
           <button type="button" class="seg-btn active" data-val="percent">درصدی</button>
           <button type="button" class="seg-btn" data-val="amount">مبلغی</button>
         </div>
       </div>
-      <div class="form-group">
+      <div class="form-group" data-discount-only>
         <input class="form-input" id="co-discount-value" type="number" min="0" step="0.01" placeholder="مقدار تخفیف را وارد کنید (اختیاری)" value="0">
         <div class="field-error" id="co-discount-error">مقدار تخفیف نامعتبر است.</div>
       </div>
@@ -8600,6 +8612,8 @@
     document.getElementById('in-warehouse-price').value = '';
     document.getElementById('in-warehouse-date').value = todayISO();
     document.getElementById('in-warehouse-notes').value = '';
+    document.getElementById('in-warehouse-expiry').value = '';
+    document.getElementById('in-warehouse-batch').value = '';
     document.getElementById('in-new-wh-product-name').value = '';
     document.getElementById('in-new-wh-product-price').value = '';
     document.getElementById('wh-new-product-error').style.display = 'none';
@@ -8628,6 +8642,8 @@
     document.getElementById('in-warehouse-price').value = w.price;
     document.getElementById('in-warehouse-date').value = w.date;
     document.getElementById('in-warehouse-notes').value = w.notes || '';
+    document.getElementById('in-warehouse-expiry').value = w.expiryDate || '';
+    document.getElementById('in-warehouse-batch').value = w.batch || '';
     ['fg-warehouse-product','fg-warehouse-units','fg-warehouse-price'].forEach(clearFieldError);
     openModal('modal-warehouse');
   }
@@ -8986,14 +9002,28 @@
 
     const date = document.getElementById('in-warehouse-date').value || todayISO();
     const notes = document.getElementById('in-warehouse-notes').value.trim();
+    const expiryEl = document.getElementById('in-warehouse-expiry');
+    const expiryDate = (expiryEl.value || '').trim();
+    const fgx = document.getElementById('fg-warehouse-expiry');
+    if(!validIsoDate(expiryDate)){ fgx.classList.add('error'); expiryEl.focus(); return; }
+    fgx.classList.remove('error');
+    const batch = document.getElementById('in-warehouse-batch').value.trim();
 
     if(editingWarehouseId){
       const w = warehouseEntries.find(x=>x.id===editingWarehouseId);
+      // کم کردنِ ورودی‌ای که جنسش فروخته شده، موجودی را منفی می‌کرد — همان `editEntry`ِ برنامه
+      const left = getProductStock(w.productId) - (w.units||0) + (productId===w.productId ? units : 0);
+      if(left < 0){
+        fgu.classList.add('error'); unitsEl.focus();
+        showToast(`این تغییر موجودی را منفی می‌کند: ${formatCartQty(-left, w.unit)} واحد از این ورودی فروخته شده است`, 'danger');
+        return;
+      }
       w.productId=productId; w.cartons=cartons; w.perCarton=perCarton; w.units=units; w.unit=unit; w.price=price; w.date=date; w.notes=notes;
+      w.expiryDate=expiryDate; w.batch=batch;
       showToast('با موفقیت ویرایش شد');
     } else {
       const whId = uid();
-      warehouseEntries.push({id:whId, productId, cartons, perCarton, units, unit, price, date, notes, createdAt:Date.now()});
+      warehouseEntries.push({id:whId, productId, cartons, perCarton, units, unit, price, date, notes, createdAt:Date.now(), expiryDate, batch});
       logStockMovement(productId, 'purchase_in', units, date, notes || 'ثبت ورود کالا', whId);
       showToast('با موفقیت ثبت شد');
     }
@@ -9815,7 +9845,7 @@
     debtor_delete:'حذف قرض‌دار', debt_tx_delete:'حذف تراکنش بدهی', expense_delete:'حذف مصرف'
   };
   const STOCK_MOVEMENT_LABELS = {
-    purchase_in:'ورود خرید', sale:'فروش', customer_return:'مرجوعی مشتری',
+    purchase_in:'ورود خرید', sale:'فروش', customer_return:'مرجوعی مشتری', sale_cancel:'لغو فروش',
     supplier_return:'برگشت به تأمین‌کننده', adjustment:'اصلاح موجودی'
   };
 
@@ -11316,7 +11346,7 @@
   function computeCheckoutTotals(){
     const subtotal = cartTotal();
     let discountValue = parseFloat(document.getElementById('co-discount-value').value);
-    if(isNaN(discountValue) || discountValue<0) discountValue = 0;
+    if(isNaN(discountValue) || discountValue<0 || !canDiscount()) discountValue = 0;
     let discount = 0;
     if(coDiscountType==='percent'){
       discountValue = Math.min(discountValue, 100);
@@ -11357,6 +11387,15 @@
       : '<option value="">— ابتدا یک قرض‌دار اضافه کنید —</option>';
   }
 
+  /* نقشِ همین حساب در دکان — همان `ShopRole`ِ برنامه. تا وقتی معلوم نیست
+     (آفلاین، بی‌حساب)، صاحب فرض می‌شود: قفلِ واقعی سرور است. */
+  function shopRole(){
+    const sh = window.TohidShop && window.TohidShop.state && window.TohidShop.state.shop;
+    return (sh && sh.role) || '';
+  }
+  function canDiscount(){ return shopRole() !== 'staff'; }
+  function canCancelSale(){ return shopRole() !== 'staff'; }
+
   function openSaleCheckoutModal(){
     if(cart.length===0) return;
     // اگر از سبد خرید قرض‌داری انتخاب شده باشد، پنجره از قبل روی «نسیه»
@@ -11367,6 +11406,8 @@
     document.querySelectorAll('#co-discount-type .seg-btn').forEach(b=> b.classList.toggle('active', b.dataset.val==='percent'));
     document.querySelectorAll('#co-payment-type .seg-btn').forEach(b=> b.classList.toggle('active', b.dataset.val===coPaymentType));
     document.getElementById('co-discount-value').value = 0;
+    // تخفیف فقط با صاحب و مدیر — سرور هم opِ تخفیفِ شاگرد را رد می‌کند (`sales.discount`)
+    document.querySelectorAll('[data-discount-only]').forEach(el=> el.style.display = canDiscount() ? '' : 'none');
     document.getElementById('co-debtor-group').style.display = preset ? '' : 'none';
     populateCheckoutDebtorSelect();
     if(preset) document.getElementById('co-debtor-select').value = preset;
@@ -11746,11 +11787,15 @@
   function askCancelSale(saleId){
     const sale = sales.find(s=>s.id===saleId);
     if(!sale) return;
+    if(!canCancelSale()){ showToast('لغوِ فاکتور با صاحب یا مدیرِ دکان است', 'danger'); return; }
     document.getElementById('confirm-title').textContent = 'لغو فروش؟';
     document.getElementById('confirm-sub').textContent = `فروش #${sale.invoiceNumber} لغو می‌شود و موجودی کالاهای آن به انبار برمی‌گردد. سابقه فروش حذف نمی‌شود.`;
     confirmAction = ()=>{
       logAudit('cancel_sale', saleId, `لغو فروش فاکتور #${sale.invoiceNumber}`);
       sale.status = 'cancelled';
+      // جنسِ برگشته در گردشِ انبار هم دیده شود — همان `sale_cancel`ِ برنامه
+      saleItems.filter(si=> si.saleId===saleId && si.productId && (si.quantity - (si.returnedQty||0)) > 0)
+        .forEach(si=> logStockMovement(si.productId, 'sale_cancel', si.quantity - (si.returnedQty||0), todayISO(), `لغو فروش — فاکتور #${sale.invoiceNumber}`, saleId));
       // اگر بخشی از این فروش نسیه بوده، فقط مقدار بدهی «هنوز تسویه‌نشده» از همین فروش خنثی می‌شود
       // (نه کل مبلغ اولیه) تا اگر پیش از این مرجوعی هم ثبت شده باشد، بدهی منفی نشود
       if(sale.debtorId){
@@ -11782,7 +11827,7 @@
     return `
       <div class="form-group" data-return-row="${si.id}">
         <label>${escapeHtml(name)} — قابل مرجوعی: ${formatMoney(returnable)}</label>
-        <input class="form-input" type="number" min="0" max="${returnable}" step="1" value="0" data-return-qty-input="${si.id}">
+        <input class="form-input" type="number" min="0" max="${returnable}" step="${p && isFractionalUnit(p.unit) ? 'any' : 1}" value="0" data-return-qty-input="${si.id}">
       </div>`;
   }
   function openReturnModal(saleId){
@@ -12664,7 +12709,7 @@
     const tri  = me && me.entitlement && me.entitlement.trial;
     const rows = [
       ['دکان', shop ? (shop.name || '—') : 'دکانی ساخته نشده', shop ? 'var(--text)' : 'var(--muted)'],
-      ['نقشِ شما', shop && shop.isOwner ? 'صاحب دکان' : (shop && shop.role ? shop.role : '—'), 'var(--text)'],
+      ['نقشِ شما', shop && shop.isOwner ? 'صاحب دکان' : (shop && shop.role ? (TEAM_ROLES[shop.role] || shop.role) : '—'), 'var(--text)'],
       ['عضو از', profWhen(user.createdAt), 'var(--text)'],
     ];
     if(sub && sub.active){
@@ -13177,8 +13222,78 @@
     return Math.floor((Date.now() - d.getTime()) / 86400000);
   }
 
+  /* ==========================================================
+     انقضا و سری ساخت — همان `ExpiryEngine`ِ برنامه، عددبه‌عدد.
+     فروش محموله را نمی‌شناسد؛ ماندهٔ هر محموله به FEFO حساب می‌شود: موجودیِ
+     امروز روی دیرتر-منقضی‌ها می‌نشیند. بی‌انقضا آخر از همه؛ تاریخِ ساختگی نه.
+     ========================================================== */
+  const EXPIRY_NEAR_DAYS = 30;
+  function validIsoDate(v){
+    if(!v) return true;
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
+    const [y,m,d] = v.split('-').map(Number);
+    const dt = new Date(Date.UTC(y, m-1, d));
+    return dt.getUTCFullYear()===y && dt.getUTCMonth()===m-1 && dt.getUTCDate()===d;
+  }
+  function daysUntil(iso, today){
+    const a = Date.UTC(...today.split('-').map((n,i)=> i===1 ? Number(n)-1 : Number(n)));
+    const b = Date.UTC(...iso.split('-').map((n,i)=> i===1 ? Number(n)-1 : Number(n)));
+    return Math.round((b - a) / 86400000);
+  }
+  function expiryLots(today){
+    const out = [];
+    const byProduct = {};
+    warehouseEntries.forEach(w=>{
+      if(w.isAdjustment || !(w.units > 0)) return;
+      (byProduct[w.productId] = byProduct[w.productId] || []).push(w);
+    });
+    Object.keys(byProduct).forEach(pid=>{
+      const entries = byProduct[pid];
+      if(!entries.some(w=> w.expiryDate)) return;
+      const product = products.find(p=>p.id===pid);
+      if(!product) return;
+      let left = getProductStock(pid);
+      if(left <= 0) return;
+      // از دیرترین به زودترین؛ بی‌انقضا دیرتر از همه
+      const ordered = entries.slice().sort((a,b)=>{
+        if(!a.expiryDate !== !b.expiryDate) return a.expiryDate ? 1 : -1;
+        return (b.expiryDate||'').localeCompare(a.expiryDate||'');
+      });
+      for(const w of ordered){
+        if(left <= 0) break;
+        const take = Math.min(w.units, left);
+        left -= take;
+        if(w.expiryDate && take > 0) out.push({ entry:w, product, remaining:take, daysLeft: daysUntil(w.expiryDate, today) });
+      }
+    });
+    return out.sort((a,b)=> a.daysLeft - b.daysLeft);
+  }
+  function expiryAlerts(today, days = EXPIRY_NEAR_DAYS){
+    return expiryLots(today).filter(l=> l.daysLeft <= days);
+  }
+
   function buildAlerts(){
     const list = [];
+
+    // انقضا — منقضی‌ها جدا، نزدیک‌ها جدا
+    const lots = expiryAlerts(todayISO());
+    const expired = lots.filter(l=> l.daysLeft < 0);
+    const near = lots.filter(l=> l.daysLeft >= 0);
+    const lotText = l=> `${l.product.name} (${formatCartQty(l.remaining, l.product.unit)} ${l.product.unit||''}${l.daysLeft>=0 ? '، ' + l.daysLeft.toLocaleString('en-US') + ' روز' : ''})`;
+    if(expired.length){
+      list.push({
+        tone:'danger', page:'warehouse',
+        title:`${expired.length.toLocaleString('en-US')} محموله منقضی شده است`,
+        sub: expired.slice(0,3).map(lotText).join('، ') + (expired.length>3 ? ' و…' : '')
+      });
+    }
+    if(near.length){
+      list.push({
+        tone:'warning', page:'warehouse',
+        title:`${near.length.toLocaleString('en-US')} محموله تا ${EXPIRY_NEAR_DAYS} روزِ دیگر منقضی می‌شود`,
+        sub: near.slice(0,3).map(lotText).join('، ') + (near.length>3 ? ' و…' : '')
+      });
+    }
 
     // موجودی تمام‌شده
     const outProducts = products.filter(p=> getStockStatus(p)==='out');

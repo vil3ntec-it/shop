@@ -474,7 +474,11 @@
   async function refreshShopInfo() {
     try {
       const r = await apiAuth('/api/v1/shop/me');
-      setState({ shop: r.shop, members: r.members || [] });
+      //  نقش بیرونِ `shop` می‌آید (`role`، `isOwner`)؛ کنارِ دکان نگه داشته
+      //  می‌شود تا صفحه بداند تخفیف و لغو با این حساب هست یا نه، و «نقشِ شما»
+      //  در نمایه دیگر «—» نماند.
+      const shop = r.shop ? Object.assign({}, r.shop, { role: r.role || '', isOwner: !!r.isOwner }) : null;
+      setState({ shop, members: r.members || [] });
       assignInvoiceBlock(r);
       return r;
     } catch { return null; }

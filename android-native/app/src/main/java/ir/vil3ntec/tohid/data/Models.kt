@@ -51,6 +51,13 @@ data class WarehouseEntry(
   /** اگر این ورودی از ثبتِ یک خرید آمده باشد، شناسهٔ همان خرید */
   val purchaseId: String? = null,
   val createdAt: Long = 0,
+  /**
+   *  تاریخِ انقضای همین محموله (`yyyy-MM-dd`)؛ خالی یعنی «انقضا ندارد یا
+   *  ثبت نشده» — هرگز تاریخِ ساختگی جایش نمی‌نشیند. شرح سرِ `ExpiryEngine`.
+   */
+  val expiryDate: String = "",
+  /** شمارهٔ سری ساخت (اختیاری) */
+  val batch: String = "",
 )
 
 @Serializable

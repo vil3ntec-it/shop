@@ -448,6 +448,7 @@ fun movementLabelOf(type: String): String = when (type) {
   "purchase_in" -> "ورود خرید"
   "sale" -> "فروش"
   "customer_return" -> "مرجوعی مشتری"
+  "sale_cancel" -> "لغو فروش"
   "supplier_return" -> "برگشت به تأمین‌کننده"
   "adjustment" -> "اصلاح موجودی"
   else -> type

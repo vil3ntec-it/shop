@@ -32,6 +32,11 @@ const MATRIX = {
   'data.delete.any':      ['owner', 'manager'],
   'data.delete.own':      ['owner', 'manager', 'staff'],
 
+  //  کارهای پولیِ حساس — شاگرد نه. سرور در Sync v1 همین را می‌سنجد
+  //  (`authorizeOp`)، نه فقط پنهان‌شدنِ دکمه در برنامه.
+  'sales.discount':       ['owner', 'manager'],
+  'sales.cancel':         ['owner', 'manager'],
+
   'settings.write':       ['owner', 'manager'],
   'reports.view':         ['owner', 'manager', 'staff'],
   'audit.view':           ['owner', 'manager'],

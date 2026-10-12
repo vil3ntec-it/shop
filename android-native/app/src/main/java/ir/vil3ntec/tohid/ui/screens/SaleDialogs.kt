@@ -60,6 +60,8 @@ fun CheckoutDialog(
   onDismiss: () -> Unit,
   onConfirm: (SalesEngine.Checkout) -> Unit,
 ) {
+  val context = LocalContext.current
+  val canDiscount = remember { ir.vil3ntec.tohid.data.ShopRole.canDiscount(context) }
   // مثل نسخهٔ وب: اگر از سبد قرض‌داری انتخاب شده باشد، پنجره روی «نسیه»
   // باز می‌شود؛ وگرنه «نقدی». تخفیف هم پیش‌فرض درصدی است.
   val preset = presetDebtorId?.takeIf { id -> d.debtors.any { it.id == id } }
@@ -73,7 +75,7 @@ fun CheckoutDialog(
 
   val checkout = SalesEngine.Checkout(
     discountType = discountType,
-    discountValue = discountText.toDoubleOrNull() ?: 0.0,
+    discountValue = if (canDiscount) discountText.toDoubleOrNull() ?: 0.0 else 0.0,
     payment = payment,
     paidAmount = paidText.toDoubleOrNull() ?: 0.0,
     debtorId = debtorId,
@@ -96,6 +98,8 @@ fun CheckoutDialog(
         Text("تسویه فروش", style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
         Spacer(Modifier.height(14.dp))
 
+        //  تخفیف فقط با صاحب و مدیر — `ShopRole.canDiscount`
+        if (canDiscount) {
         Text("نوع تخفیف", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
         Spacer(Modifier.height(6.dp))
         Segmented(
@@ -115,6 +119,7 @@ fun CheckoutDialog(
         )
 
         Spacer(Modifier.height(14.dp))
+        }
         Text("نوع پرداخت", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
         Spacer(Modifier.height(6.dp))
         Segmented(

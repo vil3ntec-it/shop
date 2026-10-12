@@ -31,6 +31,8 @@
 - ⛔ مبلغِ هر ردیفِ فروش همان لحظه گرد می‌شود (`SalesEngine.lineTotal` = `lineTotal`ِ وب).
 - ⛔ حذفِ قرض‌دار، ردیفِ بدهی و مصرف ردیفِ سابقه می‌سازد. سقفِ دستگاهِ دکان در `/license/sync` (`device_limit`).
 - ⛔ (مرحلهٔ ۳) به‌روزرسان جمعِ کنترلیِ نادرست را نصب نمی‌کند. با `UPDATE_PUBLIC_KEY` پُر، `SHA256SUMS.txt.sig` اجباری است (`update/ReleaseSignature.kt`)؛ CI اگر کلیدِ عمومی باشد و secretِ امضا نه، می‌شکند.
+- ⛔ (مرحلهٔ ۴) `authorizeOp`ِ `sync-v1.js`: شاگرد فقط ردیفِ ساختهٔ دستگاهِ خودش را پاک می‌کند و تخفیف (`sales.discount`) و لغو (`sales.cancel`) ندارد؛ برنامه‌ها دکمه را از همان `ShopRole`/`shopRole()` پنهان می‌کنند.
+- ⛔ انقضا روی محموله است (`WarehouseEntry.expiryDate`، خالی = بی انقضا). ماندهٔ هر محموله به FEFO: `ExpiryEngine` = `expiryLots`ِ وب. `java.time` در اندروید نه (minSdk ۲۴).
 
 ## 🖥️ برنامهٔ کامپیوترِ فروشگاه — همان کدِ اندروید (از ۱۴۰۵/۰۷/۱۴)
 

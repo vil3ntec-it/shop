@@ -435,10 +435,23 @@ object SalesEngine {
       }
     }
 
+    //  جنسِ برگشته در دفترِ گردشِ انبار هم دیده شود — پیش‌تر موجودی برمی‌گشت
+    //  (فروشِ لغوشده شمرده نمی‌شود) ولی گردش هیچ ردیفی نداشت و با موجودی نمی‌خواند
+    val back = d.saleItems
+      .filter { it.saleId == saleId && it.productId.isNotBlank() && it.quantity - it.returnedQty > 0 }
+      .map {
+        StockMovement(
+          id = newId(), productId = it.productId, type = "sale_cancel",
+          qty = it.quantity - it.returnedQty, date = today,
+          notes = "لغو فروش — فاکتور #${sale.invoiceNumber ?: 0}", refId = saleId, createdAt = now,
+        )
+      }
+
     return Result.Ok(
       d.copy(
         sales = d.sales.map { if (it.id == saleId) updated else it },
         transactions = transactions,
+        stockMovements = d.stockMovements + back,
         auditLog = d.auditLog + AuditEntry(
           id = newId(),
           type = "cancel_sale",

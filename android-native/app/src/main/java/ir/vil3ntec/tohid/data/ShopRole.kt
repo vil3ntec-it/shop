@@ -64,4 +64,12 @@ object ShopRole {
 
   /** حق باز کردنِ تنظیمات */
   fun canOpenSettings(context: Context): Boolean = !isStaff(context)
+
+  /**
+   *  تخفیف و لغوِ فاکتور — همان `sales.discount` و `sales.cancel`ِ سرور
+   *  (`server/src/lib/permissions.js`). سرور opِ شاگرد را رد می‌کند؛ این‌جا
+   *  فقط دکمه پنهان می‌شود تا opِ ردشده‌ای ساخته نشود.
+   */
+  fun canDiscount(context: Context): Boolean = !isStaff(context)
+  fun canCancelSale(context: Context): Boolean = !isStaff(context)
 }

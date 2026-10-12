@@ -156,6 +156,9 @@ fun DashboardScreen(d: ShopData, onOpen: (String) -> Unit = {}) {
     val attention = buildList {
       view.outOfStock.take(3).forEach { add(Triple(it.name, "تمام‌شده", "products")) }
       view.lowStock.take(3).forEach { add(Triple(it.name, "موجودی کم", "products")) }
+      view.expiring.take(3).forEach {
+        add(Triple(it.product.name, if (it.expired) "منقضی شده" else "${it.daysLeft.fa()} روز تا انقضا", "warehouse"))
+      }
       view.owing.take(2).forEach { add(Triple(it.first.name, "${money(it.second)} ؋ طلب", "debtors")) }
     }
 
@@ -232,6 +235,19 @@ fun DashboardScreen(d: ShopData, onOpen: (String) -> Unit = {}) {
                 if (out) "تمام‌شده" else "موجودی کم",
                 if (out) Shop.colors.danger else Shop.colors.warning,
                 detail = "${qty(ShopStore.stock(d, p.id))}${if (p.unit.isNotBlank()) " ${p.unit}" else ""}",
+              )
+            }
+          }
+          //  انقضا — زودتر-منقضی‌ها اول؛ مقدار همان ماندهٔ محموله به FEFO
+          if (view.expiring.isNotEmpty()) {
+            Spacer(Modifier.height(10.dp))
+            view.expiring.take(5).forEach { lot ->
+              LineRow(
+                lot.product.name,
+                if (lot.expired) "منقضی شده" else "${lot.daysLeft.fa()} روز تا انقضا",
+                if (lot.expired) Shop.colors.danger else Shop.colors.warning,
+                detail = "${qty(lot.remaining)}${if (lot.product.unit.isNotBlank()) " ${lot.product.unit}" else ""} · ${ir.vil3ntec.tohid.formatDate(lot.entry.expiryDate)}" +
+                  if (lot.entry.batch.isNotBlank()) " · سری ${lot.entry.batch}" else "",
               )
             }
           }
@@ -579,6 +595,8 @@ data class DashboardNumbers(
   val supplierDebt: Double,
   val lowStock: List<ir.vil3ntec.tohid.data.Product>,
   val outOfStock: List<ir.vil3ntec.tohid.data.Product>,
+  /** محموله‌های منقضی و نزدیک به انقضا — شرح سرِ `ExpiryEngine` */
+  val expiring: List<ir.vil3ntec.tohid.data.ExpiryEngine.Lot> = emptyList(),
   val warehouse: WarehouseEngine.Summary,
   val monthSalesTotal: Double,
   val bestDay: Double,
@@ -664,6 +682,7 @@ data class DashboardNumbers(
         supplierDebt = d.suppliers.sumOf { ShopStore.supplierDebt(d, it.id) }.coerceAtLeast(0.0),
         lowStock = d.products.filter { stock.status(it) == "low" },
         outOfStock = d.products.filter { stock.status(it) == "out" },
+        expiring = ir.vil3ntec.tohid.data.ExpiryEngine.alerts(d, today),
         warehouse = WarehouseEngine.summary(d),
         monthSalesTotal = monthByDay.values.sum(),
         bestDay = monthByDay.values.maxOrNull() ?: 0.0,

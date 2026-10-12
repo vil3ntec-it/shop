@@ -68,6 +68,8 @@ fun SalesHistoryScreen(
   var returnFor by remember { mutableStateOf<Sale?>(null) }
   var cancelFor by remember { mutableStateOf<Sale?>(null) }
 
+  val roleContext = androidx.compose.ui.platform.LocalContext.current
+  val canCancel = remember { ir.vil3ntec.tohid.data.ShopRole.canCancelSale(roleContext) }
   fun toast(text: String) {
     scope.launch { snackbar.showSnackbar(text) }
   }
@@ -220,8 +222,10 @@ fun SalesHistoryScreen(
           last = index == shown.lastIndex,
           onInvoice = { invoiceFor = sale },
           onReturn = { returnFor = sale },
-          onCancel = { cancelFor = sale },
-          onReopen = { reopenFor = sale },
+          //  لغو و «ویرایش در سبد» (که خودش لغو است) فقط با صاحب و مدیر —
+          //  سرور هم opِ لغوِ شاگرد را رد می‌کند (`sales.cancel`)
+          onCancel = { if (canCancel) cancelFor = sale else toast(CANCEL_DENIED) },
+          onReopen = { if (canCancel) reopenFor = sale else toast(CANCEL_DENIED) },
         )
       }
     }
@@ -538,3 +542,5 @@ private fun RowScope.InvoiceCell(
 
 /** «همهٔ ماه‌ها» — کلیدی که هیچ ماهی نمی‌تواند باشد */
 private const val ALL_MONTHS = "*"
+
+private const val CANCEL_DENIED = "لغوِ فاکتور با صاحب یا مدیرِ دکان است"
