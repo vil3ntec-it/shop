@@ -152,6 +152,19 @@ const config = {
     certsUrl:  process.env.GOOGLE_CERTS_URL || 'https://www.googleapis.com/oauth2/v3/certs',
   },
 
+  /*
+   *  توزیعِ نسخه‌ها — برنامه‌ها نسخهٔ تازه را از **همین سرور** می‌گیرند، نه از
+   *  GitHub. سرور از انتشارِ مخزن می‌خواند (با `GITHUB_TOKEN` اگر مخزن خصوصی
+   *  باشد) و فایل‌ها را روی دیسکِ خودش نگه می‌دارد. توکن هرگز به برنامه نمی‌رسد.
+   */
+  releases: {
+    repo:    (process.env.RELEASE_REPO || 'vil3ntec-it/shop').trim(),
+    token:   (process.env.GITHUB_TOKEN || process.env.RELEASE_GITHUB_TOKEN || '').trim(),
+    dir:     process.env.RELEASE_CACHE_PATH || path.join(ROOT, 'data', 'releases'),
+    ttlMs:   num(process.env.RELEASE_CACHE_MINUTES, 10) * 60 * 1000,
+    apiBase: process.env.RELEASE_API_BASE || 'https://api.github.com',
+  },
+
   backup: {
     dir:        process.env.BACKUP_PATH || path.join(ROOT, 'data', 'backups'),
     keepDaily:  num(process.env.BACKUP_KEEP_DAILY, 14),

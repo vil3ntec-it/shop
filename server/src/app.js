@@ -312,6 +312,8 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/shop/sync', require('./routes/sync'));   // نام قدیمی
     api.use('/admin', require('./routes/admin'));
     api.use('/license', require('./routes/license'));
+    //  نسخه‌های برنامه — برنامه‌ها از همین سرور می‌گیرند، نه از GitHub
+    api.use('/releases', require('./routes/releases'));
     //  پشتیبانی و تپشِ بازدید عمداً توکن اجباری ندارند: همان کسی که
     //  هنوز حساب نساخته، بیشتر از همه به هر دو نیاز دارد.
     api.use('/support', require('./routes/support'));

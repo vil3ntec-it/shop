@@ -51,9 +51,35 @@ object Updater {
     val sumsUrl: String = "",
   )
 
-  suspend fun check(repo: String, currentVersion: String): Result<Release?> =
+  suspend fun check(repo: String, currentVersion: String, server: String = ""): Result<Release?> =
     withContext(Dispatchers.IO) {
       runCatching {
+        //  راهِ اصلی: سرورِ خودمان (`/api/releases/tohid-desktop`) — نه github.com.
+        //  GitHub فقط وقتی که سرور هنوز این مسیر را ندارد.
+        if (server.isNotBlank()) {
+          val base = server.trimEnd('/') + "/api/releases/$TAG"
+          val viaServer = runCatching {
+            val r = org.json.JSONObject(get("$base/latest"))
+            val version = r.optString("version")
+            val assets = r.optJSONArray("assets")
+            var size = -1L
+            var sums = false
+            if (assets != null) for (j in 0 until assets.length()) {
+              val a = assets.getJSONObject(j)
+              if (a.optString("name") == assetName) size = a.optLong("size")
+              if (a.optString("name").equals("SHA256SUMS.txt", true)) sums = true
+            }
+            if (!Regex("^\\d+(\\.\\d+)+$").matches(version) || size < 0) null
+            else Release(
+              version = version,
+              notes = r.optString("notes", ""),
+              apkUrl = "$base/file/$assetName",
+              size = size,
+              sumsUrl = if (sums) "$base/file/SHA256SUMS.txt" else "",
+            )
+          }.getOrNull()
+          if (viaServer != null) return@runCatching viaServer.takeIf { isNewer(it.version, currentVersion) }
+        }
         val slug = repo.trim().trim('/')
         require(Regex("^[\\w.-]+/[\\w.-]+$").matches(slug)) { "آدرس مخزن درست نیست" }
         val text = get(versionUrl(slug)).trim().lineSequence().firstOrNull()?.trim().orEmpty()
