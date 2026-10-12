@@ -503,7 +503,7 @@ router.post('/rate/:id/ack', async (req, res, next) => {
       applied: b.applied !== false, note: typeof b.note === 'string' ? b.note : '',
     });
     if (!row) throw notFound('این فرمان در صف نیست', 'not_found');
-    require('../lib/telegram').rateDone(row).catch((e) => console.error('[telegram] خبرِ نرخ نرفت:', e.message));
+    require('../lib/bots').pump().rateDone(row).catch((e) => console.error('[telegram] خبرِ نرخ نرفت:', e.message));
     res.json({ ok: true, status: row.status });
   } catch (err) { next(err); }
 });

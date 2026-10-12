@@ -2095,3 +2095,12 @@ STARTTLS روی سرورِ ساختگی، چهل رسید)؛ ریشه در **و�
 - ⚠️ `show()` اگر تلگرام دکمهٔ قالب را رد کند، دکمه را به `rate_help` بدل و دوباره می‌فرستد.
 - شرح و آزمون: `docs/TELEGRAM-BOT-fa.md` بندِ ۲۲.
 
+
+## 🤖 باتِ پمپ به ریپوی پمپ رفت — این‌جا فقط «جای بات» (از ۱۴۰۵/۰۷/۲۰، نسخه 2.12.0)
+خواستهٔ صاحب سامانه: «باتِ پمپ بنزین را بیاور توی ریپوی پمپ… به شاپ ربطی نده؛ بعداً برای شاپ بات جدا می‌سازم.»
+- ⛔ کدِ بات و آزمون‌ها و سندش (`TELEGRAM-BOT-fa.md` ⇐ `telegram-bot/README-fa.md`) در **ریپوی pump-staion-yaqobi، پوشهٔ `telegram-bot/`** است. `src/lib/telegram.js` دیگر نیست؛ برای کارِ باتِ پمپ به آن ریپو بروید.
+- ⛔ سرورِ حساب بات را فقط با `src/lib/bots.js` ⇐ `bots.pump()` صدا می‌زند (events، pump-state، pump-public، pump-device، admin-platform، index). بات از `server/bots/pump/` (هنگامِ ساخت: ریپوی server پس از کلونِ shop پوشهٔ پمپ را آن‌جا می‌گذارد) یا `PUMP_BOT_DIR` بار می‌شود؛ `bots/pump/` در `.gitignore` است.
+- ⛔ بی بات ⇒ جانشینِ خاموش: سرور بالا می‌آید، `/api/admin/telegram` ⇐ `missing: true`، PUTِ تنظیم ⇐ ۴۰۰ `bot_missing`، درِ عمومی خالی. آزمون: `test/bots.test.js`.
+- ⚠️ جدول‌ها و مهاجرت‌های بات (`telegram_*`، `station_rate_admins`) هنوز همین‌جا هستند (دیتابیسِ سرورِ حساب).
+- CI: گامِ «باتِ پمپ» در `server.yml` ریپوی پمپ را کلون و `telegram-bot/run-tests.sh` را روی همین سرور می‌دواند.
+- باتِ فروشگاه، هر وقت ساخته شد، از همین راه: `bots.shop()` و پوشهٔ خودش.
