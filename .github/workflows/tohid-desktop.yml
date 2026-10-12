@@ -157,6 +157,9 @@ jobs:
     if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: desktop/setup-all
       - uses: actions/download-artifact@v4
         with:
           path: out
@@ -184,6 +187,8 @@ jobs:
 
             همان برنامهٔ گوشی، بومی روی کامپیوتر — Kotlin و Compose، بی مرورگر و بی WebView.
             همان حساب، همان دکان، همان اشتراک.
+
+            **یک نصاب برای همهٔ کامپیوترها:** [Tohid-Setup-All.zip](https://github.com/${{ github.repository }}/releases/download/tohid-desktop/Tohid-Setup-All.zip) — باز کنید و نصب‌کنندهٔ سیستمِ خودتان را بزنید (مک نوعِ تراشه را خودش تشخیص می‌دهد).
 
             | سیستم | دانلود |
             |---|---|
@@ -214,6 +219,19 @@ jobs:
           }
           files="Tohid-Windows.msi Tohid-Mac-AppleSilicon.dmg Tohid-Mac-Intel.dmg Tohid-Linux.deb"
           for f in $files; do up "$f"; done
+          #  نصابِ همهٔ کامپیوترها در یک بسته — انتخابِ سیستم داخلِ خودِ بسته
+          #  (‎desktop/setup-all‎: راهنما و سه نصب‌کنندهٔ کوچک که مک تراشه را خودش تشخیص می‌دهد)
+          B="$RUNNER_TEMP/Tohid-Setup"
+          mkdir -p "$B/Windows" "$B/Mac-Apple-Silicon" "$B/Mac-Intel" "$B/Linux"
+          cp Tohid-Windows.msi "$B/Windows/"
+          cp Tohid-Mac-AppleSilicon.dmg "$B/Mac-Apple-Silicon/"
+          cp Tohid-Mac-Intel.dmg "$B/Mac-Intel/"
+          cp Tohid-Linux.deb "$B/Linux/"
+          cp "$GITHUB_WORKSPACE/desktop/setup-all/"* "$B/"
+          chmod +x "$B/Install-Mac.command" "$B/Install-Linux.sh"
+          (cd "$RUNNER_TEMP" && zip -r -0 -q Tohid-Setup-All.zip Tohid-Setup)
+          mv "$RUNNER_TEMP/Tohid-Setup-All.zip" .
+          up Tohid-Setup-All.zip
           sha256sum $files > SHA256SUMS.txt
           up SHA256SUMS.txt
           #  امضای جدای فهرست — شرح سرِ `update/ReleaseSignature.kt`

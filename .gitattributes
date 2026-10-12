@@ -1,2 +1,7 @@
 # ⛔ Migrationها همیشه LF — اثرِ انگشتشان در دیتابیس ثبت می‌شود (server/src/migrate.js)
 *.sql text eol=lf
+
+# نصب‌کننده‌های بستهٔ «همهٔ کامپیوترها» (desktop/setup-all)
+*.bat text eol=crlf
+*.command text eol=lf
+*.sh text eol=lf
