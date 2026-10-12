@@ -223,6 +223,7 @@ private fun Kpi(label: String, value: String, tint: Color, modifier: Modifier = 
   }
 }
 
+@Composable
 private fun stateColor(balance: Double) = when {
   balance > 0.5 -> Shop.colors.danger
   balance < -0.5 -> Shop.colors.success
@@ -549,7 +550,7 @@ private fun Sheet(
   count: Int,
   modifier: Modifier,
   empty: String,
-  cell: (Int, Int) -> Cell,
+  cell: @Composable (Int, Int) -> Cell,
   onClick: (Int) -> Unit = {},
   footer: List<String>? = null,
   selected: Int? = null,
