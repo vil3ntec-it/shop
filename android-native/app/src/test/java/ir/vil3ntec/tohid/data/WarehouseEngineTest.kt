@@ -105,8 +105,8 @@ class WarehouseEngineTest {
     assertEquals(250.0, change.newPrice, 0.0)
     assertEquals("p1", change.productId)
 
-    val entry = r.data.auditLog.single()
-    assertEquals("price_change", entry.type)
+    //  تغییرِ قیمتِ خرید ردیفِ خودش را دارد؛ بقیهٔ تغییرها (اینجا بارکد) در «ویرایش کالا»
+    val entry = r.data.auditLog.single { it.type == "price_change" }
     assertEquals("تغییر قیمت خرید از 200 به 250 افغانی", entry.notes)
   }
 
@@ -120,7 +120,9 @@ class WarehouseEngineTest {
       )
     )
     assertTrue(r.data.priceHistory.isEmpty())
-    assertTrue(r.data.auditLog.isEmpty())
+    assertTrue(r.data.auditLog.none { it.type == "price_change" })
+    //  نام عوض شد ⇒ ردیفِ «ویرایش کالا» با نامِ پیشین و تازه
+    assertTrue(r.data.auditLog.single { it.type == "product_edit" }.notes.contains("«برنج تازه»"))
     assertEquals(emptyList<String>(), r.data.products.single().barcodes)  // بارکد برداشته شد
   }
 

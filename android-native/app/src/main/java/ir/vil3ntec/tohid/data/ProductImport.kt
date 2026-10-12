@@ -66,8 +66,9 @@ object ProductImport {
 
   /** «۱٬۲۵۰٫۵» ⇐ 1250.5؛ خالی ⇐ 0؛ نادرست ⇐ NaN */
   internal fun number(text: String): Double {
-    val t = ir.vil3ntec.tohid.latinDigits(text.trim())
-      .replace("٬", "").replace(",", "").replace("٫", ".").replace(" ", "")
+    //  ⚠️ «٬» (هزارگان) پیش از `latinDigits` برداشته شود — آن تابع «٬» را «.» می‌کند
+    //  و «۱٬۲۰۰» می‌شد ۱٫۲
+    val t = ir.vil3ntec.tohid.latinDigits(text.trim().replace("٬", "").replace(",", "").replace(" ", ""))
     if (t.isEmpty()) return 0.0
     return t.toDoubleOrNull() ?: Double.NaN
   }
