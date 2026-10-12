@@ -78,4 +78,18 @@ class ProductRulesTest {
     // بی سیاست، فقط هشدار است و فروش انجام می‌شود
     assertTrue(SalesEngine.record(d, listOf(SalesEngine.CartLine("p1", 7.0)), SalesEngine.Checkout(), "2026-10-12", 0, ::newId) is SalesEngine.Result.Ok)
   }
+
+  @Test
+  fun `واحد شمارشی اعشار نمی گیرد مگر واحد فروش دوم داشته باشد`() {
+    val soap = Product(id = "s", name = "صابون", unit = "عدد", salePrice = 10.0)
+    val rice = Product(id = "r", name = "برنج", unit = "کیلوگرم", salePrice = 10.0)
+    val box = Product(id = "b", name = "چای", unit = "کارتن", salePrice = 10.0, saleUnit = "بسته", unitFactor = 0.1)
+    org.junit.Assert.assertNotNull(SalesEngine.quantityProblem(soap, 1.5))
+    org.junit.Assert.assertNull(SalesEngine.quantityProblem(soap, 2.0))
+    org.junit.Assert.assertNull(SalesEngine.quantityProblem(rice, 0.25))
+    org.junit.Assert.assertNull(SalesEngine.quantityProblem(box, 0.1))
+    val d = ShopData(products = listOf(soap), warehouseEntries = listOf(WarehouseEntry(id = "w", productId = "s", units = 10.0)))
+    val r = SalesEngine.record(d, listOf(SalesEngine.CartLine("s", 1.5)), SalesEngine.Checkout(), "2026-10-12", 0, ::newId)
+    org.junit.Assert.assertTrue(r is SalesEngine.Result.Failed)
+  }
 }

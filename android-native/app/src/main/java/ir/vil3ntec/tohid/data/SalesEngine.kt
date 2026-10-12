@@ -118,6 +118,17 @@ object SalesEngine {
 
   fun isFractionalUnit(unit: String): Boolean = unit in FRACTIONAL_UNITS
 
+  /**
+   *  دقتِ اعشارِ هر واحد: «۱٫۵ عدد» پذیرفته نمی‌شود، «۱٫۵ کیلو» می‌شود.
+   *  کالایی که واحدِ فروشِ دوم با ضریب دارد استثناست — «۱ بسته» از کالای
+   *  کارتنی با ضریبِ ۰٫۱ یعنی ۰٫۱ کارتن، و درست است. `null` یعنی درست.
+   */
+  fun quantityProblem(p: Product, quantity: Double): String? {
+    if (isFractionalUnit(p.unit) || p.saleUnit.isNotBlank()) return null
+    if (kotlin.math.abs(quantity - Math.rint(quantity)) < 1e-9) return null
+    return "«${p.name}» به «${p.unit.ifBlank { "عدد" }}» شمرده می‌شود و اعشار نمی‌گیرد"
+  }
+
   /** پلهٔ دکمه‌های کم/زیاد — گرم و میلی‌لیتر ۱۰تایی، کیلو و لیتر و متر ۰٫۱، بقیه ۱ */
   fun cartStep(unit: String): Double =
     if (unit == "گرم" || unit == "میلی‌لیتر") 10.0 else if (isFractionalUnit(unit)) 0.1 else 1.0
@@ -276,6 +287,7 @@ object SalesEngine {
     for (line in cart) {
       val p = d.products.find { it.id == line.productId } ?: continue
       if (!p.active) return Result.Failed("«${p.name}» غیرفعال است و فروخته نمی‌شود")
+      quantityProblem(p, line.quantity)?.let { return Result.Failed(it) }
       var available = ShopStore.stock(d, p.id)
       //  سیاستِ دکان: کالای منقضی فروخته نشود ⇒ ماندهٔ محموله‌های منقضی از
       //  موجودیِ فروختنی کم می‌شود (FEFO؛ شرح سرِ `ExpiryEngine`)

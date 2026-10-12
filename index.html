@@ -11396,6 +11396,12 @@
   function isFractionalUnit(unit){
     return FRACTIONAL_UNITS.includes(unit);
   }
+  /* «۱٫۵ عدد» نه، «۱٫۵ کیلو» بله؛ کالای دارای واحدِ فروشِ دوم استثناست. null یعنی درست */
+  function quantityProblem(p, qty){
+    if(isFractionalUnit(p.unit) || String(p.saleUnit||'').trim()) return null;
+    if(Math.abs(qty - Math.round(qty)) < 1e-9) return null;
+    return `«${p.name}» به «${p.unit || 'عدد'}» شمرده می‌شود و اعشار نمی‌گیرد`;
+  }
   function cartStepFor(unit){
     return (unit==='گرم' || unit==='میلی‌لیتر') ? 10 : isFractionalUnit(unit) ? 0.1 : 1;
   }
@@ -12239,6 +12245,9 @@
         closeModal('modal-sale-checkout');
         return;
       }
+      //  دقتِ اعشارِ واحد — همان `SalesEngine.quantityProblem`ِ برنامه
+      const qp = quantityProblem(p, item.quantity);
+      if(qp){ showToast(qp, 'danger'); closeModal('modal-sale-checkout'); return; }
       const available = getProductStock(p.id);
       // سیاستِ دکان: کالای منقضی فروخته نشود — همان `blockExpired`ِ برنامه
       if(blockExpiredPolicy()){
@@ -13194,7 +13203,7 @@
         suppliers, purchases, supplierPayments,
         stockMovements, priceHistory, auditLog
       }));
-    }catch(e){ console.error('ذخیره اطلاعات ناموفق بود:', e); }
+    }catch(e){ console.error('ذخیره اطلاعات ناموفق بود:', e); warnStorageFull(e); }
     /*
      *  ⛔ **تنها درِ نوشتن در دفتر همین‌جاست** و هر تغییری از همین‌جا
      *  رد می‌شود. پس `recordChange` تفاضلِ دفتر را با سایهٔ آخرین
@@ -13214,6 +13223,23 @@
   }
 
   let alertsReady = false;
+
+  /*
+   * حافظهٔ مرورگر پر شد (localStorage حدودِ ۵ مگابایت).
+   * پیش‌تر فقط در کنسول نوشته می‌شد و دکان‌دار نمی‌فهمید تغییرِ تازه روی همین
+   * دستگاه نمانده. داده گم نمی‌شود — در حافظهٔ صفحه هست و صفِ همگام‌سازی آن را به
+   * سرور می‌برد — ولی باید بداند تا پشتیبان بگیرد و همگام نگه دارد.
+   * یک بار در هر بار باز شدن، نه با هر ثبت.
+   */
+  let storageWarned = false;
+  function warnStorageFull(e){
+    const full = e && (e.name === 'QuotaExceededError' || e.code === 22 || e.code === 1014 || /quota/i.test(String(e.message||'')));
+    if(!full || storageWarned) return;
+    storageWarned = true;
+    try{
+      showToast('حافظهٔ این مرورگر پر شده: تغییرهای تازه فقط با همگام‌سازی به سرور می‌رسند. همین حالا پشتیبان بگیرید و اینترنت را وصل نگه دارید.', 'danger');
+    }catch(err){}
+  }
 
   function loadState(){
     touchLedger();
@@ -13344,7 +13370,7 @@
     /* فقط روی دیسک می‌نشیند — بی تفاضلِ دوباره */
     try{
       localStorage.setItem(STORAGE_KEY, JSON.stringify(readLedger()));
-    }catch(e){ console.error('نوشتنِ دفترِ رسیده ناموفق بود:', e); }
+    }catch(e){ console.error('نوشتنِ دفترِ رسیده ناموفق بود:', e); warnStorageFull(e); }
 
     rebuildBarcodeIndex();
     repaintLedger();
