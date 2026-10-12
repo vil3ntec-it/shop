@@ -155,15 +155,30 @@ object Updater {
     }
   }
 
+  /**
+   *  همان سه قاعدهٔ `Updater.verify`ِ اندروید: جمعِ کنترلیِ نادرست ⇒ رد؛
+   *  با کلیدِ سنجاق‌شده، فهرستِ بی امضا یا گرفته‌نشده ⇒ رد؛ بی کلید و بی
+   *  فهرست ⇒ مثلِ قبل. پیش‌تر اگر فهرست گرفته نمی‌شد، نصبیِ بی‌امضای MSI
+   *  بی هیچ سنجشی اجرا می‌شد.
+   *
+   *  @return دلیلِ رد، یا null
+   */
   private fun verify(file: File, release: Release): String? {
-    if (release.sumsUrl.isBlank()) return null
-    val lines = runCatching { get(release.sumsUrl) }.getOrNull()
-      ?.lines()
-      ?.mapNotNull { line ->
-        val parts = line.trim().split(Regex("\\s+"))
-        if (parts.size >= 2) parts[0].lowercase() to parts[1].removePrefix("*") else null
-      } ?: return null
-    val expected = lines.firstOrNull { (_, n) -> n.equals(assetName, true) }?.first ?: return null
+    val pinnedKey = ir.vil3ntec.tohid.BuildConfig.UPDATE_PUBLIC_KEY
+    val strict = ReleaseSignature.pinned(pinnedKey)
+    if (release.sumsUrl.isBlank()) return if (strict) "این نسخه فهرستِ امضاشده ندارد؛ برای امنیت نصب نشد" else null
+    val text = runCatching { get(release.sumsUrl) }.getOrNull()
+      ?: return if (strict) "فهرستِ جمعِ کنترلی گرفته نشد؛ برای امنیت نصب نشد — دوباره بزنید" else null
+    if (strict) {
+      val signature = runCatching { get(release.sumsUrl + ".sig") }.getOrNull().orEmpty()
+      if (!ReleaseSignature.verify(text, signature, pinnedKey)) return "امضای این نسخه با کلیدِ برنامه نمی‌خواند؛ نصب نشد"
+    }
+    val lines = text.lines().mapNotNull { line ->
+      val parts = line.trim().split(Regex("\\s+"))
+      if (parts.size >= 2) parts[0].lowercase() to parts[1].removePrefix("*") else null
+    }
+    val expected = lines.firstOrNull { (_, n) -> n.equals(assetName, true) }?.first
+      ?: return if (strict) "این نسخه در فهرستِ امضاشده نیست؛ نصب نشد" else null
     val digest = java.security.MessageDigest.getInstance("SHA-256")
     file.inputStream().use { input ->
       val buffer = ByteArray(64 * 1024)

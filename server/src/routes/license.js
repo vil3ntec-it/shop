@@ -13,7 +13,7 @@
  */
 
 const express = require('express');
-const { now } = require('../db');
+const { one, now } = require('../db');
 const v = require('../lib/validate');
 const { requireUser, optionalShop } = require('../middleware/auth');
 const { entitlementOf } = require('../lib/entitlement');
@@ -21,6 +21,10 @@ const { CORE_KEYS } = require('../lib/features');
 const license = require('../lib/license');
 
 const router = express.Router();
+
+/** اشتراکی که سقف ندارد (آزمایشی) همان پیش‌فرضِ جدولِ اشتراک را می‌گیرد */
+const DEFAULT_MAX_DEVICES = 10;
+const DEVICE_WINDOW_MS = 90 * 24 * 60 * 60 * 1000;
 
 /** کلید عمومی — بدون ورود، چون برنامه پیش از ورود هم باید بتواند بسنجد */
 router.get('/public-key', async (req, res, next) => {
@@ -65,6 +69,36 @@ router.post('/sync', async (req, res, next) => {
       return res.json({
         license: null,
         reason: 'no_subscription',
+        source: ent.source,
+        features: ent.features,
+        serverTime: at,
+      });
+    }
+
+    /*
+     *  سقفِ دستگاه — `max_devices`ِ اشتراک تا امروز ذخیره می‌شد ولی برای
+     *  دکان هیچ‌جا سنجیده نمی‌شد؛ یک حسابِ پولی روی بی‌شمار گوشی مجوز
+     *  می‌گرفت. شمرده می‌شوند: دستگاه‌های فعالِ اعضای فعالِ همین دکان که
+     *  در ۹۰ روزِ گذشته دیده شده‌اند، جز همین دستگاه. دستگاهی که از قبل
+     *  شمرده شده هرگز بیرون نمی‌ماند؛ برای جا باز کردن، صاحب دکان دستگاهِ
+     *  کهنه را از «دستگاه‌های من» باطل می‌کند.
+     */
+    const maxDevices = Number(ent.subscription && ent.subscription.maxDevices) || DEFAULT_MAX_DEVICES;
+    const seen = await one(
+      `SELECT COUNT(DISTINCT d.device_uid)::int AS n,
+              BOOL_OR(d.device_uid = $3) AS known
+         FROM devices d
+         JOIN shop_members m ON m.user_id = d.user_id AND m.shop_id = $1 AND m.status = 'active'
+        WHERE d.status = 'active' AND COALESCE(d.last_seen_at, d.created_at) > $2`,
+      [req.shopId, at - DEVICE_WINDOW_MS, deviceUid]
+    );
+    if (seen && !seen.known && Number(seen.n) >= maxDevices) {
+      return res.json({
+        license: null,
+        reason: 'device_limit',
+        message: `اشتراکِ این دکان برای ${maxDevices} دستگاه است و همه پر شده‌اند. ` +
+          'یک دستگاهِ قدیمی را از «دستگاه‌های من» باطل کنید یا اشتراک را بزرگ‌تر کنید.',
+        maxDevices,
         source: ent.source,
         features: ent.features,
         serverTime: at,

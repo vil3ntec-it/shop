@@ -35,6 +35,7 @@ const zlib = require('zlib');
 const { one, many, tx, newId, now } = require('../db');
 const { ApiError, badRequest, notFound } = require('../middleware/errors');
 const migrations = require('./sync-v1-migrations');
+const { can } = require('./permissions');
 const { TABLES: SHOP_TABLES } = require('./sync');
 
 // ---------- جدول‌های مجاز ----------
@@ -338,6 +339,9 @@ async function push(ctx, { deviceId, schemaVersion, ops, appVersion = '', queued
         continue;
       }
 
+      const denied = await authorizeOp(c, ctx, op, deviceId);
+      if (denied) { results.push({ op_id: op.op_id, status: 'rejected', reason: denied }); continue; }
+
       //  ردیف را قفل می‌کنیم تا دو دستگاه هم‌زمان روی هم ننویسند
       const row = (await c.query(
         `SELECT * FROM sync_rows WHERE ${ACC} AND table_name=$4 AND row_id=$5 FOR UPDATE`,
@@ -386,6 +390,44 @@ async function push(ctx, { deviceId, schemaVersion, ops, appVersion = '', queued
       schema_version: current, upgrade_available: upgradeAvailable,
     };
   });
+}
+
+// ---------- دسترسیِ هر op ----------
+
+/**
+ * آنچه شاگردِ دکان نمی‌تواند — سنجیده روی **خودِ op**، نه دکمهٔ برنامه.
+ *
+ * پیش‌تر v1 هیچ سنجشِ نقشی نداشت: شاگرد از این راه هر ردیفی را پاک
+ * می‌کرد (راهِ قدیم فقط «حذفِ مالِ خودش» را می‌گذاشت)، تخفیف می‌داد و
+ * فاکتور لغو می‌کرد. حالا:
+ *   • حذف: فقط ردیفی که خودِ همین دستگاه ساخته (`data.delete.own`)
+ *   • تخفیف روی فاکتور: `sales.discount`
+ *   • لغوِ فاکتور: `sales.cancel`
+ * op ردشده بی‌صدا نمی‌رود؛ برنامه دلیلش را در دفترِ کنار نشان می‌دهد.
+ *
+ * @returns {Promise<string|null>} دلیلِ رد، یا null
+ */
+async function authorizeOp(c, ctx, op, deviceId) {
+  if (ctx.accountKind !== 'shop') return null;
+  const role = ctx.role;
+  if (can(role, 'data.delete.any') && can(role, 'sales.discount') && can(role, 'sales.cancel')) return null;
+
+  if (op.type === 'delete' && !can(role, 'data.delete.any')) {
+    if (!can(role, 'data.delete.own')) return 'delete_not_allowed';
+    const first = (await c.query(
+      `SELECT device_id FROM oplog WHERE ${ACC} AND table_name=$4 AND row_id=$5 AND op_type='insert'
+        ORDER BY server_seq ASC LIMIT 1`,
+      [...accArgs(ctx), op.table, op.row_id]
+    )).rows[0];
+    if (first && first.device_id !== deviceId) return 'delete_not_allowed';
+    return null;
+  }
+  if (op.table === 'sales' && op.fields) {
+    const f = op.fields;
+    if (Number(f.discount) > 0 && !can(role, 'sales.discount')) return 'discount_not_allowed';
+    if (f.status === 'cancelled' && !can(role, 'sales.cancel')) return 'cancel_not_allowed';
+  }
+  return null;
 }
 
 // ---------- Pull ----------

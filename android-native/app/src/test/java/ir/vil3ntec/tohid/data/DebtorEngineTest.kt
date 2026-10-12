@@ -66,6 +66,10 @@ class DebtorEngineTest {
     val r = ok(DebtorEngine.delete(d, "d1"))
     assertTrue(r.data.debtors.isEmpty())
     assertTrue(r.data.transactions.isEmpty())
+    //  و بی‌ردپا نمی‌رود
+    val trace = r.data.auditLog.last()
+    assertEquals("debtor_delete", trace.type)
+    assertTrue(trace.notes, trace.notes.contains("2 تراکنش"))
   }
 
   @Test
@@ -144,6 +148,7 @@ class DebtorEngineTest {
     val r = ok(DebtorEngine.deleteTransaction(d, txId))
     assertEquals(0.0, ShopStore.debt(r.data, "d1"), 0.0)
     assertTrue(r.data.transactions.isEmpty())
+    assertEquals("debt_tx_delete", r.data.auditLog.last().type)
   }
 
   /* ------------------------------ حساب ------------------------------ */

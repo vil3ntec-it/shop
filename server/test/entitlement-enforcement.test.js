@@ -144,3 +144,39 @@ test('اشتراک تمام‌شده: راهِ Sync v1 هم برای شاگرد 
   assert.equal(blocked.body.error.code, 'subscription_required');
   assert.equal((await v1(owner.accessToken, 'dev-owner-v1')).status, 200, 'صاحب دکان همیشه می‌نویسد');
 });
+
+test('Sync v1: شاگرد تخفیف نمی‌دهد، لغو نمی‌کند و فقط ردیفِ خودش را پاک می‌کند', async () => {
+  const { owner, staff } = await shopWithStaff('نقش‌v1');
+  let seq = 0;
+  const op = (o) => ({
+    op_id: `01JR1${String(Date.now()).slice(-9)}${String(++seq).padStart(5, '0')}`,
+    ts: Date.now(), type: 'update', fields: {}, ...o,
+  });
+  const push = (token, dev, ops) => h.api('POST', '/api/sync/v1/push', {
+    token, headers: { 'X-App': 'shop', 'X-Device': dev },
+    body: { device_id: dev, schema_version: 2, ops },
+  });
+  const status = (r) => r.body.results[0].status + ':' + (r.body.results[0].reason || '');
+
+  // صاحب یک فاکتور و یک کالا می‌سازد
+  await push(owner.accessToken, 'dev-o', [op({ table: 'sales', row_id: 's-1', type: 'insert', fields: { total: 100, finalTotal: 100 } })]);
+  await push(owner.accessToken, 'dev-o', [op({ table: 'products', row_id: 'p-o', type: 'insert', fields: { name: 'کالا' } })]);
+
+  assert.equal(status(await push(staff.accessToken, 'dev-s',
+    [op({ table: 'sales', row_id: 's-2', type: 'insert', fields: { total: 100, discount: 10, finalTotal: 90 } })])),
+    'rejected:discount_not_allowed');
+  assert.equal(status(await push(staff.accessToken, 'dev-s',
+    [op({ table: 'sales', row_id: 's-1', fields: { status: 'cancelled' } })])), 'rejected:cancel_not_allowed');
+  assert.equal(status(await push(staff.accessToken, 'dev-s',
+    [op({ table: 'products', row_id: 'p-o', type: 'delete' })])), 'rejected:delete_not_allowed');
+
+  // فروشِ بی‌تخفیف و حذفِ ردیفِ خودش آزاد است
+  assert.equal(status(await push(staff.accessToken, 'dev-s',
+    [op({ table: 'products', row_id: 'p-s', type: 'insert', fields: { name: 'مالِ شاگرد' } })])), 'applied:');
+  assert.equal(status(await push(staff.accessToken, 'dev-s',
+    [op({ table: 'products', row_id: 'p-s', type: 'delete' })])), 'applied:');
+
+  // صاحب هر سه را می‌تواند
+  assert.equal(status(await push(owner.accessToken, 'dev-o',
+    [op({ table: 'sales', row_id: 's-1', fields: { status: 'cancelled' } })])), 'applied:');
+});

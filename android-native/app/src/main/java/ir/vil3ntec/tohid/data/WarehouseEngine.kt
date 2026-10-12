@@ -32,6 +32,9 @@ object WarehouseEngine {
     val price: Double = 0.0,
     val date: String = "",
     val notes: String = "",
+    /** خالی = بی انقضا؛ وگرنه `yyyy-MM-dd` */
+    val expiryDate: String = "",
+    val batch: String = "",
   )
 
   /** اصلاح موجودی | برگشت به تأمین‌کننده — همان دو حالتِ نسخهٔ وب */
@@ -223,6 +226,7 @@ object WarehouseEngine {
     if (d.products.none { it.id == draft.productId }) return Result.Failed("ابتدا یک محصول انتخاب یا اضافه کنید")
     if (draft.units.isNaN() || draft.units <= 0) return Result.Failed("تعداد واحد معتبر وارد کنید")
     if (draft.price.isNaN() || draft.price < 0) return Result.Failed("قیمت خرید معتبر وارد کنید")
+    if (!ExpiryEngine.validDate(draft.expiryDate)) return Result.Failed("تاریخِ انقضا درست نیست")
 
     val id = newId()
     val date = draft.date.ifBlank { today }
@@ -239,6 +243,8 @@ object WarehouseEngine {
           date = date,
           notes = draft.notes,
           createdAt = now,
+          expiryDate = draft.expiryDate.trim(),
+          batch = draft.batch.trim(),
         ),
         stockMovements = d.stockMovements + StockMovement(
           id = newId(),
@@ -264,6 +270,14 @@ object WarehouseEngine {
     if (d.products.none { it.id == draft.productId }) return Result.Failed("ابتدا یک محصول انتخاب یا اضافه کنید")
     if (draft.units.isNaN() || draft.units <= 0) return Result.Failed("تعداد واحد معتبر وارد کنید")
     if (draft.price.isNaN() || draft.price < 0) return Result.Failed("قیمت خرید معتبر وارد کنید")
+    if (!ExpiryEngine.validDate(draft.expiryDate)) return Result.Failed("تاریخِ انقضا درست نیست")
+    //  کم کردنِ ورودی‌ای که جنسش فروخته شده، موجودی را منفی می‌کرد —
+    //  همان نگهبانِ `deleteEntry`
+    val left = ShopStore.stock(d, existing.productId) - existing.units +
+      (if (draft.productId == existing.productId) draft.units else 0.0)
+    if (left < 0) {
+      return Result.Failed("این تغییر موجودی را منفی می‌کند: ${money(-left)} واحد از این ورودی فروخته شده است")
+    }
 
     val updated = existing.copy(
       productId = draft.productId,
@@ -274,6 +288,8 @@ object WarehouseEngine {
       price = draft.price,
       date = draft.date.ifBlank { today },
       notes = draft.notes,
+      expiryDate = draft.expiryDate.trim(),
+      batch = draft.batch.trim(),
     )
     return Result.Ok(
       d.copy(

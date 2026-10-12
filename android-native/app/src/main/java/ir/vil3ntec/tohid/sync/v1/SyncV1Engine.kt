@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlin.math.min
 import kotlin.math.pow
@@ -126,7 +127,7 @@ class SyncV1Engine private constructor(context: Context) {
    *  @param read  دفترِ همین حالا
    *  @param write دفترِ تازه پس از اعمالِ opهای رسیده
    */
-  suspend fun runOnce(read: () -> ShopData, write: suspend (ShopData) -> Unit): Result<Unit> =
+  suspend fun runOnce(read: () -> ShopData, write: (ShopData) -> Unit): Result<Unit> =
     gate.withLock {
       if (!Backend.isReady(app)) { publish(); return@withLock Result.success(Unit) }
       if (!Backend.isOnline(app)) { publish(); return@withLock Result.success(Unit) }
@@ -173,13 +174,7 @@ class SyncV1Engine private constructor(context: Context) {
         while (rounds < 50) {
           rounds++
           val got = client.pull(device, state.cursor)
-          if (got.ops.isNotEmpty()) {
-            val next = LedgerDiff.applyRemote(LedgerDiff.toJson(read()), got.ops)
-            write(LedgerDiff.fromJson(next))
-            //  سایه همین‌جا جلو می‌رود، وگرنه همین‌ها دوباره به سرور
-            //  پس فرستاده می‌شوند
-            writeShadow(next)
-          }
+          if (got.ops.isNotEmpty()) absorbRemote(got.ops, read, write)
           state.cursor = got.cursor
           state.lastPullAt = System.currentTimeMillis()
           if (got.serverSchema > 0) state.serverSchema = got.serverSchema
@@ -201,6 +196,79 @@ class SyncV1Engine private constructor(context: Context) {
         publish()
       }
     }
+
+  /**
+   *  هم‌ترازیِ یک‌باره با سرور — پیش از نخستین دورِ این حساب روی این دستگاه.
+   *
+   *  ── چرا ───────────────────────────────────────────────────────────
+   *  `firstSync` در اندروید هرگز صدا زده نمی‌شد. یعنی ردیف‌هایی که پیش از
+   *  آمدنِ v1 روی گوشی بودند هرگز op نشدند و فقط موتورِ قدیم آن‌ها را
+   *  می‌برد. حالا که موتورِ قدیم دیگر به دفتر دست نمی‌زند (دو موتور روی
+   *  یک دفتر، `$inc`ها را دو بار می‌شمرد)، این‌جا یک بار جبران می‌شود:
+   *
+   *   • دفترِ خالی ⇒ همان Snapshot (گوشیِ نو).
+   *   • دفترِ پر ⇒ فقط ردیف‌هایی که **سرور ندارد** به‌صورتِ INSERT می‌روند.
+   *     ردیفی که سرور دارد دست نمی‌خورد؛ فرستادنِ دوباره‌اش مقدارِ تازهٔ
+   *     دستگاهِ دیگر را با مقدارِ کهنهٔ این‌جا می‌پوشاند.
+   *   • اگر این دستگاه هنوز هیچ opی نگرفته (`cursor == 0`)، cursor سرِ
+   *     Snapshot می‌نشیند و ردیف‌هایی که فقط سرور دارد به دفتر اضافه
+   *     می‌شوند — وگرنه pull از صفر همهٔ تاریخچه را روی دفتری می‌ریخت که
+   *     همان‌ها را از راهِ قدیم دارد و `$inc`ها دو بار جمع می‌شدند.
+   *  ──────────────────────────────────────────────────────────────────
+   */
+  suspend fun prepare(read: () -> ShopData, write: (ShopData) -> Unit) {
+    if (state.reconciledAt > 0) return
+    gate.withLock {
+      if (state.reconciledAt > 0) return@withLock
+      val body = SyncV1Client(Backend.api(app)).snapshot()
+      val server = LedgerDiff.fromSnapshot(body, JsonObject(emptyMap()))
+      val serverCursor = (body["cursor"] as? kotlinx.serialization.json.JsonPrimitive)
+        ?.content?.toLongOrNull() ?: 0L
+      synchronized(this) {
+        val local = LedgerDiff.toJson(read())
+        val localRows = LedgerDiff.COLLECTIONS.sumOf { (local[it] as? JsonArray)?.size ?: 0 }
+        if (localRows == 0) {
+          val next = LedgerDiff.fromSnapshot(body, local)
+          write(LedgerDiff.fromJson(next))
+          writeShadow(next)
+          state.cursor = serverCursor
+          state.snapshotAt = System.currentTimeMillis()
+        } else {
+          val missing = LedgerDiff.diff(server, local).filter { it.type == SyncOp.INSERT }
+          if (missing.isNotEmpty()) queue.push(missing)
+          if (state.cursor == 0L) {
+            val next = LedgerDiff.unionRows(local, server)
+            write(LedgerDiff.fromJson(next))
+            val shadow = readShadow()
+            writeShadow(if (shadow != null) LedgerDiff.unionRows(shadow, server) else next)
+            state.cursor = serverCursor
+          }
+        }
+        state.reconciledAt = System.currentTimeMillis()
+      }
+    }
+    publish()
+  }
+
+  /**
+   *  نشاندنِ opهای رسیده — زیرِ **همان قفلِ** `record()`.
+   *
+   *  پیش‌تر «بخوان ← اعمال کن ← بنویس ← سایه» فقط زیرِ `gate` بود و
+   *  `record()` قفلِ دیگری داشت. فروشی که وسطِ این چهار گام ثبت می‌شد،
+   *  با نوشتنِ دفترِ کهنه از روی گوشی پاک می‌شد و سایه هم «فرستاده شد»
+   *  ثبتش می‌کرد. حالا `ShopStore` هم نوشتنِ خودش را زیرِ همین قفل
+   *  (`synchronized(engine)`) انجام می‌دهد.
+   *
+   *  سایه هم به‌جای «کلِ دفترِ امروز»، خودِ سایه به‌اضافهٔ همین opهاست؛
+   *  تغییرِ محلی‌ای که هنوز op نشده، با این کار گم نمی‌شود.
+   */
+  @Synchronized
+  internal fun absorbRemote(ops: List<SyncOp>, read: () -> ShopData, write: (ShopData) -> Unit) {
+    val next = LedgerDiff.applyRemote(LedgerDiff.toJson(read()), ops)
+    write(LedgerDiff.fromJson(next))
+    val shadow = readShadow()
+    writeShadow(if (shadow != null) LedgerDiff.applyRemote(shadow, ops) else next)
+  }
 
   /* ==========================================================
      ۳) Snapshot — گوشیِ نو، یک بار
@@ -227,14 +295,14 @@ class SyncV1Engine private constructor(context: Context) {
    *  دفترِ خالی ⇒ Snapshot (گوشیِ نو). دفترِ پر ⇒ یک بار فرستادنِ همان
    *  دفتر، چون این گوشی تا امروز آفلاین کار می‌کرده.
    */
-  suspend fun firstSync(read: () -> ShopData, write: suspend (ShopData) -> Unit) {
+  suspend fun firstSync(read: () -> ShopData, write: (ShopData) -> Unit) {
     if (state.snapshotAt > 0 || state.cursor > 0) return
     val data = read()
     val tree = LedgerDiff.toJson(data)
     val rows: Int = LedgerDiff.COLLECTIONS.sumOf { key ->
       (tree[key] as? kotlinx.serialization.json.JsonArray)?.size ?: 0
     }
-    if (rows == 0) { restoreFromServer(read, write); return }
+    if (rows == 0) { restoreFromServer(read) { write(it) }; return }
     /*
      *  ⚠️ **اول فرستادن، بعد گرفتن** — و این ترتیب عمدی است. اگر اول
      *  pull می‌کردیم، سایه روی «دفترِ ادغام‌شده» می‌نشست و ردیف‌های

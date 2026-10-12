@@ -256,35 +256,59 @@ object Updater {
   }
 
   /**
-   *  سنجشِ جمعِ کنترلی — هشدار می‌دهد، جلو نمی‌گیرد.
+   *  سنجشِ فایلِ گرفته‌شده پیش از نصب.
    *
-   *  تا حالا اگر جمعِ کنترلی نمی‌خواند، فایل پاک می‌شد و به‌روزرسانی
-   *  همان‌جا می‌مرد. حالا فقط یادداشت می‌شود و کار جلو می‌رود.
+   *  ── سه قاعده ──────────────────────────────────────────────────────
+   *  ۱) جمعِ کنترلی **نمی‌خواند** ⇒ فایل پاک و نصب رد می‌شود. پیش‌تر فقط
+   *     هشدار می‌داد، به این امید که اندروید با امضای برنامه جلویش را
+   *     بگیرد؛ ولی کلیدِ امضای اندروید در مخزنِ عمومی بود، پس آن نگهبان
+   *     نبود.
+   *  ۲) نسخه کلیدِ به‌روزرسانیِ سنجاق‌شده دارد (`UPDATE_PUBLIC_KEY`) ⇒
+   *     `SHA256SUMS.txt` باید امضای همان کلید را داشته باشد؛ بی امضا یا با
+   *     امضای نادرست، نصب رد می‌شود. شرح سرِ `ReleaseSignature`.
+   *  ۳) کلید سنجاق نشده و انتشار فهرستی ندارد ⇒ مثلِ قبل جلو می‌رود؛
+   *     نبودنِ فهرست در انتشارهای قدیمی دلیلِ خراب بودن نیست.
+   *  ──────────────────────────────────────────────────────────────────
    *
-   *  چرا این‌طوری بی‌احتیاطی نیست: نگهبانِ واقعی، خودِ اندروید است. فایلی
-   *  که با کلیدِ همین برنامه امضا نشده باشد اصلاً روی نصبِ فعلی نمی‌نشیند
-   *  و گوشی ردش می‌کند. جمعِ کنترلی فقط خرابیِ وسطِ دانلود را می‌گیرد، و
-   *  فایلِ خراب هم به‌هرحال نصب نمی‌شود.
-   *
-   *  اگر انتشار چنین فایلی نداشته باشد، چیزی گفته نمی‌شود — نبودنِ جمعِ
-   *  کنترلی دلیلِ خراب بودن نیست.
+   *  @return یادداشتی برای کاربر، یا null
+   *  @throws IllegalStateException وقتی فایل نباید نصب شود (و پاک شده است)
    */
   private fun verify(file: File, release: Release): String? {
-    if (release.sumsUrl.isBlank()) return null
+    val pinnedKey = ir.vil3ntec.tohid.BuildConfig.UPDATE_PUBLIC_KEY
+    val strict = ReleaseSignature.pinned(pinnedKey)
+    fun reject(why: String): Nothing {
+      file.delete()
+      throw IllegalStateException(why)
+    }
 
-    val name = release.apkUrl.substringAfterLast('/')
-    val lines = runCatching { get(release.sumsUrl) }.getOrNull()
-      ?.lines()
-      ?.mapNotNull { line ->
-        val parts = line.trim().split(Regex("\\s+"))
-        if (parts.size >= 2) parts[0].lowercase() to parts[1].removePrefix("*") else null
+    if (release.sumsUrl.isBlank()) {
+      if (strict) reject("این نسخه فهرستِ امضاشده ندارد؛ برای امنیت نصب نشد")
+      return null
+    }
+    val text = runCatching { get(release.sumsUrl) }.getOrNull()
+    if (text == null) {
+      if (strict) reject("فهرستِ جمعِ کنترلی گرفته نشد؛ برای امنیت نصب نشد — دوباره بزنید")
+      return null
+    }
+    if (strict) {
+      val signature = runCatching { get(release.sumsUrl + ".sig") }.getOrNull().orEmpty()
+      if (!ReleaseSignature.verify(text, signature, pinnedKey)) {
+        reject("امضای این نسخه با کلیدِ برنامه نمی‌خواند؛ نصب نشد")
       }
-      ?: return null
+    }
 
+    val lines = text.lines().mapNotNull { line ->
+      val parts = line.trim().split(Regex("\\s+"))
+      if (parts.size >= 2) parts[0].lowercase() to parts[1].removePrefix("*") else null
+    }
+    val name = release.apkUrl.substringAfterLast('/')
     // خطِ همین فایل، وگرنه هر خطی که مالِ یک نصبی باشد
     val expected = lines.firstOrNull { (_, n) -> n.equals(name, true) }?.first
       ?: lines.firstOrNull { (_, n) -> n.endsWith(".apk", true) }?.first
-      ?: return null
+    if (expected == null) {
+      if (strict) reject("این نسخه در فهرستِ امضاشده نیست؛ نصب نشد")
+      return null
+    }
 
     val digest = java.security.MessageDigest.getInstance("SHA-256")
     file.inputStream().use { input ->
@@ -296,9 +320,10 @@ object Updater {
       }
     }
     val actual = digest.digest().joinToString("") { "%02x".format(it) }
-
-    return if (actual.equals(expected, ignoreCase = true)) null
-    else "هشدار: جمعِ کنترلیِ فایل با نسخهٔ منتشرشده یکی نیست. نصب ادامه دارد؛ اگر گوشی نصب را رد کرد، یک بار دیگر دانلود کنید."
+    if (!actual.equals(expected, ignoreCase = true)) {
+      reject("فایلِ گرفته‌شده با نسخهٔ منتشرشده یکی نیست؛ پاک شد — دوباره بزنید")
+    }
+    return null
   }
 
   /** فایلِ آمادهٔ همین نسخه، اگر از قبل کامل گرفته شده باشد */

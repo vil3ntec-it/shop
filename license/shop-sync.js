@@ -378,6 +378,22 @@
       // ۰) پیش از هر چیز: دفتر روی میز باید مال همین حساب باشد
       const swapped = alignLedgerToAccount();
 
+      /* ⛔ وقتی Sync v1 بالاست، دفتر از این راه نه می‌رود نه می‌آید.
+
+         دو موتور روی یک دفتر با دو سایهٔ جدا: آنچه این‌جا در localStorage
+         می‌نشست سایهٔ v1 را جلو نمی‌برد، v1 همان را «تغییرِ محلی» می‌دید و
+         دوباره می‌فرستاد (فیلدهای `$inc` — پرداخت‌ها و مانده‌ها — دو بار
+         جمع می‌شدند)؛ و چون صفحه از حافظه می‌خواند، ذخیرهٔ بعدیِ کاربر
+         همین ادغام را رونویسی می‌کرد. تنها موتورِ دفتر حالا v1 است. */
+      if (v1Active()) {
+        await window.TohidSync.sync();
+        setState({ lastSyncAt: Date.now() });
+        await refreshShopInfo();
+        const shortages = findShortages();
+        renderShortageBanner(shortages);
+        return { pushed: 0, pulled: 0, rev: getState().rev || 0, shortages, rejected: [], swapped };
+      }
+
       // ۱) تغییرات خودم را بفرست
       const { changes, settings } = collectLocalChanges();
       let rejected = [];
@@ -458,7 +474,11 @@
   async function refreshShopInfo() {
     try {
       const r = await apiAuth('/api/v1/shop/me');
-      setState({ shop: r.shop, members: r.members || [] });
+      //  نقش بیرونِ `shop` می‌آید (`role`، `isOwner`)؛ کنارِ دکان نگه داشته
+      //  می‌شود تا صفحه بداند تخفیف و لغو با این حساب هست یا نه، و «نقشِ شما»
+      //  در نمایه دیگر «—» نماند.
+      const shop = r.shop ? Object.assign({}, r.shop, { role: r.role || '', isOwner: !!r.isOwner }) : null;
+      setState({ shop, members: r.members || [] });
       assignInvoiceBlock(r);
       return r;
     } catch { return null; }
@@ -519,19 +539,41 @@
     bar.classList.add('show');
   }
 
+  /*
+   *  نوارِ کسری بستنی است. پیش‌تر ثابت روی صفحه می‌ماند و روی گوشی همیشه
+   *  کارت‌ها و منو را می‌پوشاند. بستن فقط برای **همین** کسری‌هاست (امضای
+   *  شناسه‌ها در sessionStorage)؛ کسریِ تازه دوباره نشانش می‌دهد. وقتی
+   *  پیداست، `body.has-stock-bar` به محتوا جای پایین می‌دهد.
+   */
+  const SHORTAGE_DISMISS_KEY = 'tohid-stock-bar-dismissed';
+  function shortageSig(shortages) {
+    return shortages.map(s => s.productId || s.name).sort().join("|");
+  }
   function renderShortageBanner(shortages) {
     let bar = $('#stock-alert-bar');
-    if (!shortages.length) { if (bar) bar.remove(); return; }
+    const hide = () => { if (bar) bar.remove(); document.body.classList.remove('has-stock-bar'); };
+    if (!shortages.length) { hide(); return; }
+    let dismissed = '';
+    try { dismissed = sessionStorage.getItem(SHORTAGE_DISMISS_KEY) || ''; } catch { /* حالتِ خصوصی */ }
+    if (dismissed === shortageSig(shortages)) { hide(); return; }
     if (!bar) {
       bar = document.createElement('div');
       bar.id = 'stock-alert-bar';
-      bar.innerHTML = '<div class="sa-head"><b></b><button type="button" class="sync-btn sync-btn-sm">جزئیات</button></div>';
-      bar.querySelector('button').addEventListener('click', () => openShortageModal());
+      bar.innerHTML = '<div class="sa-head"><b></b><span class="sa-acts">' +
+        '<button type="button" class="sync-btn sync-btn-sm" data-sa="open">جزئیات</button>' +
+        '<button type="button" class="sync-btn sync-btn-sm sa-close" data-sa="close" aria-label="بستن">×</button></span></div>';
+      bar.querySelector('[data-sa="open"]').addEventListener('click', () => openShortageModal());
+      bar.querySelector('[data-sa="close"]').addEventListener('click', () => {
+        try { sessionStorage.setItem(SHORTAGE_DISMISS_KEY, shortageSig(findShortages())); } catch { /* حالتِ خصوصی */ }
+        bar.remove(); bar = null;
+        document.body.classList.remove('has-stock-bar');
+      });
       document.body.appendChild(bar);
     }
     bar.querySelector('b').textContent =
       `${fa(shortages.length)} کالا بیشتر از موجودی فروخته شده`;
     bar.classList.add('show');
+    document.body.classList.add('has-stock-bar');
   }
 
   function openShortageModal() {
@@ -566,6 +608,11 @@
 
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g,
     c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  /** موتورِ Sync v1 بار شده و به دفترِ صفحه بسته است؟ */
+  function v1Active() {
+    return !!(window.TohidSync && typeof window.TohidSync.sync === 'function');
+  }
 
   // ---------- خودکار ----------
   async function autoSync(reason) {

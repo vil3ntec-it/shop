@@ -57,9 +57,14 @@ class SyncV1Worker(context: Context, params: WorkerParameters) : CoroutineWorker
       }
     }
 
+    //  یک بار در عمرِ هر حساب روی این دستگاه؛ شکستش (نت) دورِ عادی را نمی‌گیرد
+    runCatching {
+      engine.prepare(read = { store.data.value }, write = { next -> store.applyFromServerNow(next) })
+    }
+
     val outcome = engine.runOnce(
       read = { store.data.value },
-      write = { next -> store.applyFromServer(next) },
+      write = { next -> store.applyFromServerNow(next) },
     )
     return if (outcome.isSuccess) Result.success() else Result.retry()
   }

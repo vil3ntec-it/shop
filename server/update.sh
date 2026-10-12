@@ -62,7 +62,9 @@ step "۱ از ۴ — پشتیبان از دیتابیس"
 #  سرورِ خاموش چیزی برای از دست دادن ندارد.
 mkdir -p data/backups
 DUMP="data/backups/pre-update-$(date +%Y%m%d-%H%M%S).sql"
-if $DC exec -T db pg_dump -U "$PGUSER" "$PGDB" > "$DUMP" 2>/dev/null; then
+#  فقط صاحبِ پوشه بخواندش: کلِ دیتابیس است، بی رمز
+if (umask 077; $DC exec -T db pg_dump -U "$PGUSER" "$PGDB" > "$DUMP" 2>/dev/null); then
+  chmod 600 "$DUMP" 2>/dev/null || true
   ok "گرفته شد: $DUMP ($(du -h "$DUMP" | cut -f1))"
 else
   rm -f "$DUMP"

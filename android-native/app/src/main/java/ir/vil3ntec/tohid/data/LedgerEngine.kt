@@ -76,9 +76,20 @@ object LedgerEngine {
     )
   }
 
-  fun deleteExpense(d: ShopData, id: String): Result {
-    if (d.expenses.none { it.id == id }) return Result.Failed("مصرف پیدا نشد")
-    return Result.Ok(d.copy(expenses = d.expenses.filter { it.id != id }), id = id)
+  fun deleteExpense(
+    d: ShopData,
+    id: String,
+    today: String = ir.vil3ntec.tohid.todayIso(),
+    now: Long = System.currentTimeMillis(),
+    newId: () -> String = ::auditId,
+  ): Result {
+    val e = d.expenses.find { it.id == id } ?: return Result.Failed("مصرف پیدا نشد")
+    //  ردپا: هزینهٔ پاک‌شده سودِ خالص را بالا می‌برد و باید معلوم بماند
+    val trace = AuditEntry(
+      id = newId(), type = "expense_delete", date = today, refId = id, createdAt = now,
+      notes = "حذفِ مصرفِ «${e.title}» ${money(e.amount)} افغانی (تاریخ ${e.date})",
+    )
+    return Result.Ok(d.copy(expenses = d.expenses.filter { it.id != id }, auditLog = d.auditLog + trace), id = id)
   }
 
   /* ========================== تأمین‌کننده‌ها ========================== */

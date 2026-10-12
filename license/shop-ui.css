@@ -32,12 +32,17 @@
 #sync-reload-bar{ background:var(--primary-tint,rgba(124,92,255,.12)); color:var(--primary-dark,#5b3fe0); }
 #stock-alert-bar{ background:var(--danger-tint,#fdecec); color:var(--danger,#e54b4b); }
 #stock-alert-bar .sa-head{ display:flex; align-items:center; justify-content:space-between; gap:12px; width:100%; }
+#stock-alert-bar .sa-acts{ display:flex; gap:6px; flex-shrink:0; }
+#stock-alert-bar .sa-close{ min-width:30px; padding-inline:8px; font-size:16px; line-height:1; }
+/* تا نوار پیداست، آخرِ صفحه زیرش پنهان نماند */
+body.has-stock-bar .main{ padding-bottom:72px; }
 @media (min-width:900px){
   #sync-reload-bar, #stock-alert-bar{ inset-inline-start:auto; max-width:520px; }
 }
 @media (max-width:899px){
   #sync-reload-bar, #stock-alert-bar{ bottom:calc(var(--bottomnav-space, 76px) + 10px); }
-  #stock-alert-bar{ bottom:calc(var(--bottomnav-space, 76px) + 62px); }
+  /* سمتِ دکمه‌های شناورِ «+» (ابتدای خط در راست‌به‌چپ) جا می‌ماند؛ پیش‌تر نوار رویشان می‌افتاد */
+  #stock-alert-bar{ bottom:calc(var(--bottomnav-space, 76px) + 62px); inset-inline-start:84px; }
 }
 
 /* ---------- دکمه ---------- */

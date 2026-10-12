@@ -72,12 +72,25 @@ object DebtorEngine {
    * عیناً رفتارِ نسخهٔ وب. ولی اگر هنوز بدهکار باشد، مبلغش در هشدار
    * می‌آید: طلبی که سهواً از دفتر پاک شود دیگر برنمی‌گردد.
    */
-  fun delete(d: ShopData, id: String): Result {
-    if (d.debtors.none { it.id == id }) return Result.Failed("قرض‌دار پیدا نشد")
+  fun delete(
+    d: ShopData,
+    id: String,
+    today: String = ir.vil3ntec.tohid.todayIso(),
+    now: Long = System.currentTimeMillis(),
+    newId: () -> String = ::auditId,
+  ): Result {
+    val debtor = d.debtors.find { it.id == id } ?: return Result.Failed("قرض‌دار پیدا نشد")
+    val rows = d.transactions.count { it.debtorId == id }
+    //  ردپا: پیش‌تر قرض‌دار و همهٔ تراکنش‌هایش بی هیچ سابقه‌ای می‌رفتند
+    val trace = AuditEntry(
+      id = newId(), type = "debtor_delete", date = today, refId = id, createdAt = now,
+      notes = "حذفِ قرض‌دار «${debtor.name}» با $rows تراکنش — ماندهٔ حساب ${money(ShopStore.debt(d, id))} افغانی",
+    )
     return Result.Ok(
       d.copy(
         debtors = d.debtors.filter { it.id != id },
         transactions = d.transactions.filter { it.debtorId != id },
+        auditLog = d.auditLog + trace,
       ),
       id = id,
     )
@@ -148,9 +161,24 @@ object DebtorEngine {
     )
   }
 
-  fun deleteTransaction(d: ShopData, id: String): Result {
-    if (d.transactions.none { it.id == id }) return Result.Failed("تراکنش پیدا نشد")
-    return Result.Ok(d.copy(transactions = d.transactions.filter { it.id != id }), id = id)
+  fun deleteTransaction(
+    d: ShopData,
+    id: String,
+    today: String = ir.vil3ntec.tohid.todayIso(),
+    now: Long = System.currentTimeMillis(),
+    newId: () -> String = ::auditId,
+  ): Result {
+    val tx = d.transactions.find { it.id == id } ?: return Result.Failed("تراکنش پیدا نشد")
+    val who = d.debtors.find { it.id == tx.debtorId }?.name.orEmpty()
+    val kind = if (tx.type == "receive") "دریافت" else "قرض"
+    val trace = AuditEntry(
+      id = newId(), type = "debt_tx_delete", date = today, refId = tx.debtorId, createdAt = now,
+      notes = "حذفِ $kind ${money(tx.amount)} افغانی از حسابِ «$who» (تاریخ ${tx.date})",
+    )
+    return Result.Ok(
+      d.copy(transactions = d.transactions.filter { it.id != id }, auditLog = d.auditLog + trace),
+      id = id,
+    )
   }
 
   /* ------------------------------ حساب ------------------------------ */

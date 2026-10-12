@@ -213,8 +213,22 @@ object AutoSync {
 
     val state = SyncStore(app)
     running = true
+    /*
+     *  ⛔ دادهٔ دفتر دیگر از راهِ قدیم (`/api/v1/shop/sync`) نمی‌رود و نمی‌آید.
+     *
+     *  دو موتور روی یک دفتر با دو سایهٔ جدا کار می‌کردند: آنچه راهِ قدیم
+     *  می‌نشاند، سایهٔ v1 را جلو نمی‌برد و v1 همان را «تغییرِ محلی» می‌دید
+     *  و دوباره می‌فرستاد — فیلدهای `$inc` (پرداخت‌ها، مانده‌ها) دو بار جمع
+     *  می‌شدند. حالا تنها موتورِ دفتر Sync v1 است (`SyncV1Worker`)؛ این‌جا
+     *  فقط مجوزِ اشتراک تازه می‌شود. ردیف‌هایی که پیش از v1 فقط از راهِ قدیم
+     *  رفته بودند، یک بار با `SyncV1Engine.prepare` جبران می‌شوند.
+     */
     val outcome = runCatching {
-      Syncer(store, state, app).apply { onCollected = { pendingCount = it } }.run()
+      if (!Backend.tokens(app).signedIn) throw ApiFailure.SessionExpired()
+      pendingCount = 0
+      //  «همگام کن»ی که کاربر یا برنامه می‌زند، حالا یعنی دورِ v1
+      ir.vil3ntec.tohid.sync.v1.SyncV1Worker.now(app)
+      Syncer.Outcome(pushed = 0, pulled = 0, revision = state.revision, rejected = emptyList())
     }
     running = false
 

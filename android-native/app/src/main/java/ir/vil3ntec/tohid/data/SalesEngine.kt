@@ -199,14 +199,21 @@ object SalesEngine {
     return "«${product.name}»: ${money(available)}$u موجود است، شما ${money(wanted)}$u خواستید."
   }
 
+  /**
+   *  مبلغِ یک ردیف — همان لحظه به افغانیِ کامل گرد می‌شود (۱٫۵ × ۱۱۵ = ۱۷۳).
+   *  بی این، بدهیِ نیم‌افغانی‌ای می‌نشست که هیچ پرداختی صافش نمی‌کرد، چون پول
+   *  با عددِ گردشده نشان داده و پرداخت می‌شود. همان `lineTotal`ِ نسخهٔ وب.
+   */
+  fun lineTotal(price: Double, quantity: Double): Double = (price * quantity).roundToLong().toDouble()
+
   fun cartTotal(d: ShopData, cart: List<CartLine>): Double =
     cart.sumOf { line ->
       //  ردیفِ آزاد کالا ندارد ولی مبلغ دارد؛ ردیفِ کالایی که کالایش حذف
       //  شده، مثلِ قبل صفر حساب می‌شود
-      if (line.free) line.quantity * (line.unitPrice ?: 0.0)
+      if (line.free) lineTotal(line.unitPrice ?: 0.0, line.quantity)
       else {
         val p = d.products.find { it.id == line.productId }
-        if (p == null) 0.0 else line.quantity * (line.unitPrice ?: p.salePrice)
+        if (p == null) 0.0 else lineTotal(line.unitPrice ?: p.salePrice, line.quantity)
       }
     }
 
@@ -321,7 +328,7 @@ object SalesEngine {
           quantity = line.quantity,
           unitPrice = price,
           purchasePrice = 0.0,
-          totalPrice = price * line.quantity,
+          totalPrice = lineTotal(price, line.quantity),
           returnedQty = 0.0,
         )
         return@forEach
@@ -337,7 +344,7 @@ object SalesEngine {
         quantity = line.quantity,
         unitPrice = unit,
         purchasePrice = p.purchasePrice,
-        totalPrice = unit * line.quantity,
+        totalPrice = lineTotal(unit, line.quantity),
         returnedQty = 0.0,
       )
       movements += StockMovement(
@@ -428,10 +435,23 @@ object SalesEngine {
       }
     }
 
+    //  جنسِ برگشته در دفترِ گردشِ انبار هم دیده شود — پیش‌تر موجودی برمی‌گشت
+    //  (فروشِ لغوشده شمرده نمی‌شود) ولی گردش هیچ ردیفی نداشت و با موجودی نمی‌خواند
+    val back = d.saleItems
+      .filter { it.saleId == saleId && it.productId.isNotBlank() && it.quantity - it.returnedQty > 0 }
+      .map {
+        StockMovement(
+          id = newId(), productId = it.productId, type = "sale_cancel",
+          qty = it.quantity - it.returnedQty, date = today,
+          notes = "لغو فروش — فاکتور #${sale.invoiceNumber ?: 0}", refId = saleId, createdAt = now,
+        )
+      }
+
     return Result.Ok(
       d.copy(
         sales = d.sales.map { if (it.id == saleId) updated else it },
         transactions = transactions,
+        stockMovements = d.stockMovements + back,
         auditLog = d.auditLog + AuditEntry(
           id = newId(),
           type = "cancel_sale",

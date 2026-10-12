@@ -185,6 +185,9 @@ fun EntryDialog(
   var price by remember { mutableStateOf(product?.purchasePrice?.takeIf { it > 0 }?.toLong()?.toString() ?: "") }
   var notes by remember { mutableStateOf("") }
   var unit by remember { mutableStateOf(product?.unit.orEmpty()) }
+  //  انقضا و سری ساخت — هر دو اختیاری؛ تاریخ خورشیدی یا میلادی تایپ می‌شود
+  var expiry by remember { mutableStateOf("") }
+  var batch by remember { mutableStateOf("") }
 
   /*
    * «۴ کارتن × ۲۵ تا» یعنی ۱۰۰ واحد. حساب کردنش دستِ خودِ برنامه است تا
@@ -246,6 +249,25 @@ fun EntryDialog(
         )
 
         Spacer(Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+          OutlinedTextField(
+            value = expiry,
+            onValueChange = { expiry = it },
+            label = { Text("تاریخ انقضا (اختیاری)") },
+            placeholder = { Text("۱۴۰۶/۰۱/۳۰") },
+            singleLine = true,
+            modifier = Modifier.weight(1f),
+          )
+          OutlinedTextField(
+            value = batch,
+            onValueChange = { batch = it },
+            label = { Text("سری ساخت (اختیاری)") },
+            singleLine = true,
+            modifier = Modifier.weight(1f),
+          )
+        }
+
+        Spacer(Modifier.height(10.dp))
         OutlinedTextField(
           value = notes,
           onValueChange = { notes = it },
@@ -267,6 +289,9 @@ fun EntryDialog(
                   unit = unit,
                   price = price.toDoubleOrNull() ?: -1.0,
                   notes = notes.trim(),
+                  //  خالی ⇒ بی انقضا؛ تایپِ نادرست ⇒ موتور با پیامِ روشن ردش می‌کند
+                  expiryDate = if (expiry.isBlank()) "" else ir.vil3ntec.tohid.Jalali.parseTyped(expiry) ?: "?",
+                  batch = batch.trim(),
                 )
               )
             },

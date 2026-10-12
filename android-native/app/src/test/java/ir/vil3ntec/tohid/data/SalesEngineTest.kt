@@ -345,6 +345,25 @@ class SalesEngineTest {
   }
 
   @Test
+  fun `مبلغ هر ردیف به افغانی کامل گرد می شود`() {
+    assertEquals(173.0, SalesEngine.lineTotal(115.0, 1.5), 0.0)   // ۱۷۲٫۵ ⇒ ۱۷۳
+    assertEquals(250.0, SalesEngine.lineTotal(1000.0, 0.25), 0.0)
+  }
+
+  @Test
+  fun `لغو فاکتور حرکت برگشتی انبار می نویسد`() {
+    val p = Product(id = "p1", name = "برنج", unit = "عدد", purchasePrice = 60.0, salePrice = 100.0)
+    val d0 = ShopData(products = listOf(p), warehouseEntries = listOf(WarehouseEntry(id = "w", productId = "p1", units = 100.0)))
+    val sold = SalesEngine.record(
+      d0, listOf(SalesEngine.CartLine("p1", 3.0)), SalesEngine.Checkout(), "2026-08-10", 0, ::newId,
+    ) as SalesEngine.Result.Ok
+    val cancelled = (SalesEngine.cancel(sold.data, sold.saleId, "2026-08-11", 0, ::newId) as SalesEngine.Result.Ok).data
+    val back = cancelled.stockMovements.single { it.type == "sale_cancel" }
+    assertEquals(3.0, back.qty, 0.0)
+    assertEquals(sold.saleId, back.refId)
+  }
+
+  @Test
   fun `فاکتور لغوشده مرجوعی نمی پذیرد`() {
     val p = Product(id = "p1", name = "برنج", unit = "عدد", purchasePrice = 60.0, salePrice = 100.0)
     val d0 = ShopData(products = listOf(p), warehouseEntries = listOf(WarehouseEntry(id = "w", productId = "p1", units = 100.0)))

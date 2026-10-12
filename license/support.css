@@ -235,7 +235,10 @@
  *  روی صفحهٔ ورود، نوارِ پایینی در کار نیست — پس دکمه پایین‌تر می‌آید و
  *  فاصلهٔ الکی نمی‌گذارد.
  */
-body:has(.auth-screen) #sup { bottom: calc(18px + env(safe-area-inset-bottom, 0px)); }
+/*  ⚠️ فقط صفحهٔ ورودِ **پیدا**: صفحهٔ ثبت‌نام همیشه با `.auth-hidden` در DOM
+ *  هست، پس `:has(.auth-screen)` همیشه می‌خواند و دکمه همیشه پایین می‌نشست —
+ *  روی گوشی درست روی دکمهٔ «بیشتر»ِ نوارِ پایین. */
+body:has(.auth-screen:not(.auth-hidden)) #sup { bottom: calc(18px + env(safe-area-inset-bottom, 0px)); }
 
 /*  چاپ: دکمه و پنجره روی کاغذ معنی ندارند */
 @media print { #sup { display: none !important; } }

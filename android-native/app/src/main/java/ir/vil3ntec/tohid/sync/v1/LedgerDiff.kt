@@ -261,6 +261,19 @@ object LedgerDiff {
    *
    *  پاسخِ سرور `{tables: {products: [{id, data}], …}}` است.
    */
+  /** ردیف‌های `base` به‌اضافهٔ ردیف‌هایی از `extra` که شناسه‌شان در `base` نیست. */
+  fun unionRows(base: JsonObject, extra: JsonObject): JsonObject {
+    val out = LinkedHashMap<String, JsonElement>(base)
+    for (key in COLLECTIONS) {
+      val mine = rowsOf(base, key)
+      val ids = mine.mapTo(HashSet()) { idOf(it) }
+      val added = rowsOf(extra, key).filter { idOf(it) !in ids }
+      if (added.isEmpty() && base[key] != null) continue
+      out[key] = JsonArray(mine + added)
+    }
+    return JsonObject(out)
+  }
+
   fun fromSnapshot(snapshot: JsonObject, base: JsonObject): JsonObject {
     val tables = snapshot["tables"] as? JsonObject ?: JsonObject(emptyMap())
     val out = LinkedHashMap<String, JsonElement>(base)
