@@ -340,7 +340,7 @@ router.get('/vip-codes', async (req, res, next) => {
  * نمی‌تواند نشانش بدهد؛ پس مدیر یا همان لحظه برش می‌دارد یا می‌گذارد
  * ایمیل کارش را بکند.
  */
-router.post('/vip-codes', async (req, res, next) => {
+router.post('/vip-codes', requireSuperAdmin, async (req, res, next) => {
   try {
     const email = v.text(req.body?.email, { max: 160 });
     if (email && !email.includes('@')) return next(badRequest('نشانی ایمیل درست نیست', 'bad_email'));
@@ -407,7 +407,7 @@ router.get('/offline-codes', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/offline-codes', async (req, res, next) => {
+router.post('/offline-codes', requireSuperAdmin, async (req, res, next) => {
   try {
     const plan = v.text(req.body?.plan, { max: 10 });
     const out = await offline.issue({

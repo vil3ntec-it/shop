@@ -68,9 +68,10 @@ object ExpiryEngine {
     val byProduct = d.warehouseEntries
       .filter { !it.isAdjustment && it.units > 0 }
       .groupBy { it.productId }
+    val products = d.products.associateBy { it.id }
     for ((productId, entries) in byProduct) {
       if (entries.none { it.expiryDate.isNotBlank() }) continue
-      val product = d.products.find { it.id == productId } ?: continue
+      val product = products[productId] ?: continue
       var left = ShopStore.stock(d, productId)
       if (left <= 0) continue
       //  از دیرترین به زودترین؛ بی‌انقضا دیرتر از همه

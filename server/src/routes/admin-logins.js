@@ -58,7 +58,7 @@ router.post('/:id/resend', async (req, res, next) => {
     if (!rec) return next(notFound('این درخواست پیدا نشد', 'request_not_found'));
     const result = await outbox.processById(rec.request_id);
     await audit.log({
-      actorType: 'admin', action: 'login.resend', ip: clientIp(req),
+      actorType: 'admin', userId: req.admin.id, action: 'login.resend', ip: clientIp(req),
       targetType: 'login_request', targetId: rec.request_id,
       detail: { app: rec.app, email: codes.mask(rec.email), result },
     });
@@ -93,7 +93,7 @@ router.post('/unlock', async (req, res, next) => {
     if (!app || !email) return next(badRequest('برنامه و ایمیل لازم است', 'app_and_email_required'));
     await codes.unlock(app, email);
     await audit.log({
-      actorType: 'admin', action: 'login.unlock', ip: clientIp(req),
+      actorType: 'admin', userId: req.admin.id, action: 'login.unlock', ip: clientIp(req),
       detail: { app, email: codes.mask(email) },
     });
     res.json({ ok: true });

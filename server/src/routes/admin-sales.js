@@ -29,7 +29,7 @@ const notices = require('../lib/notices');
 const audit = require('../lib/audit');
 const pumpServices = require('../lib/pump-services');
 const { notifyPanel } = require('../lib/panel-live');
-const { requireAdmin } = require('../middleware/auth');
+const { requireAdmin, requireSuperAdmin } = require('../middleware/auth');
 const { badRequest, notFound } = require('../middleware/errors');
 
 const router = express.Router();
@@ -134,7 +134,7 @@ router.post('/payments', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.put('/payments/:id', async (req, res, next) => {
+router.put('/payments/:id', requireSuperAdmin, async (req, res, next) => {
   try {
     const cur = await one('SELECT * FROM sub_payments WHERE id=$1 AND deleted=false', [v.id(req.params.id)]);
     if (!cur) return next(notFound('پرداخت پیدا نشد', 'payment_not_found'));
@@ -149,7 +149,7 @@ router.put('/payments/:id', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.delete('/payments/:id', async (req, res, next) => {
+router.delete('/payments/:id', requireSuperAdmin, async (req, res, next) => {
   try {
     const row = await one(`UPDATE sub_payments SET deleted=true WHERE id=$1 AND deleted=false RETURNING id`, [v.id(req.params.id)]);
     if (!row) return next(notFound('پرداخت پیدا نشد', 'payment_not_found'));
@@ -439,7 +439,7 @@ async function makePermanent(app, id, by) {
 }
 
 for (const [prefix, app] of [['/subscriptions', 'shop'], ['/pump/subscriptions', 'pump']]) {
-  router.post(`${prefix}/:id/permanent`, async (req, res, next) => {
+  router.post(`${prefix}/:id/permanent`, requireSuperAdmin, async (req, res, next) => {
     try {
       const row = await makePermanent(app, v.id(req.params.id), req.admin.id);
       await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.subscription_permanent', targetType: 'subscription', targetId: row.id, detail: { app } });
@@ -447,7 +447,7 @@ for (const [prefix, app] of [['/subscriptions', 'shop'], ['/pump/subscriptions',
     } catch (err) { next(err); }
   });
 
-  router.post(`${prefix}/:id/discount`, async (req, res, next) => {
+  router.post(`${prefix}/:id/discount`, requireSuperAdmin, async (req, res, next) => {
     try {
       const out = await discounts.directDiscount({
         app, subscriptionId: v.id(req.params.id),
@@ -465,7 +465,7 @@ for (const [prefix, app] of [['/subscriptions', 'shop'], ['/pump/subscriptions',
     catch (err) { next(err); }
   });
 
-  router.post(`${prefix}/:id/addons`, async (req, res, next) => {
+  router.post(`${prefix}/:id/addons`, requireSuperAdmin, async (req, res, next) => {
     try {
       const addon = await discounts.addAddon({
         app, subscriptionId: v.id(req.params.id), feature: v.text(req.body?.feature, { max: 40, required: true, field: 'قابلیت' }),
@@ -625,7 +625,7 @@ router.get('/campaigns/:id/stats', async (req, res, next) => {
  * نشانیِ دانلود و آخرین نسخهٔ هر برنامه — همان چیزی که پورتال و SDK
  * (`GET /api/downloads`) می‌خوانند. در `app_config` می‌نشیند.
  */
-router.put('/downloads', async (req, res, next) => {
+router.put('/downloads', requireSuperAdmin, async (req, res, next) => {
   try {
     const app = appOf(req.body?.app);
     for (const [key, max] of [['url', 300], ['version', 32], ['notes', 1000]]) {

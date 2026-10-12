@@ -80,7 +80,7 @@ router.post('/:id/resend', async (req, res, next) => {
     if (!out) return next(notFound('این درخواست پیدا نشد', 'request_not_found'));
 
     await audit.log({
-      actorType: 'admin', action: 'otp.resend', ip: clientIp(req),
+      actorType: 'admin', userId: req.admin.id, action: 'otp.resend', ip: clientIp(req),
       targetType: 'otp_code', targetId: String(req.params.id),
       detail: { ok: out.ok, reason: out.ok ? out.via : out.error },
     });
@@ -137,7 +137,7 @@ router.post('/password-reset', async (req, res, next) => {
     }
 
     await audit.log({
-      actorType: 'admin', action: 'otp.password_reset_sent', ip: clientIp(req),
+      actorType: 'admin', userId: req.admin.id, action: 'otp.password_reset_sent', ip: clientIp(req),
       targetType: 'user', targetId: user.id,
       detail: { destination: otp.mask(user.email) },
     });

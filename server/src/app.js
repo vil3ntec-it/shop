@@ -364,6 +364,16 @@ async function createApp({ runMigrations = true } = {}) {
   app.use('/api', apiRouter());
 
   // ---- پنل مدیریت ----
+  //  CSP فقط برای پنل: نه اسکریپتِ درون‌خطی، نه منبعِ بیرونی، نه قاب.
+  //  اگر روزی XSS در پنل پیدا شود، مرورگر اجرای اسکریپتِ تزریقی را
+  //  نمی‌پذیرد. style درون‌خطی می‌ماند چون HTMLِ پنل `style=` دارد.
+  app.use('/admin', (req, res, next) => {
+    res.set('Content-Security-Policy',
+      "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; " +
+      "connect-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
+    res.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
+    next();
+  });
   app.use('/admin', express.static(path.join(__dirname, '..', 'public', 'admin'), {
     index: 'index.html', maxAge: 0, etag: true,
   }));
