@@ -4562,6 +4562,8 @@
           <button type="button" class="seg-btn active" data-rtab="sales">فروش</button>
           <button type="button" class="seg-btn" data-rtab="products">محصولات</button>
           <button type="button" class="seg-btn" data-rtab="debtors">قرض‌داران</button>
+          <button type="button" class="seg-btn" data-rtab="purchases">خرید</button>
+          <button type="button" class="seg-btn" data-rtab="expiry">انقضا</button>
           <button type="button" class="seg-btn" data-rtab="stock">گردش موجودی</button>
         </div>
 
@@ -4619,6 +4621,22 @@
         <!-- Debtors report -->
         <div id="rtab-debtors" style="display:none;">
           <div class="exp-list" id="rep-debtors-list"></div>
+        </div>
+
+        <!-- گزارشِ خرید — همان بازهٔ گزارشِ فروش -->
+        <div id="rtab-purchases" style="display:none;">
+          <p class="settings-hint" id="rep-pu-range" style="margin-bottom:8px;"></p>
+          <div class="exp-stat-grid" style="margin-bottom:12px;">
+            <div class="exp-stat-card"><div class="l">جمع خرید</div><div class="v" id="rep-pu-total">0<small>افغانی</small></div></div>
+            <div class="exp-stat-card"><div class="l">بدهی به تأمین‌کننده</div><div class="v" id="rep-pu-debt">0<small>افغانی</small></div></div>
+          </div>
+          <div class="panel"><div class="panel-head"><h2>سهمِ هر تأمین‌کننده</h2></div><div class="exp-list" id="rep-pu-suppliers"></div></div>
+          <div class="exp-list" id="rep-pu-list" style="margin-top:12px;"></div>
+        </div>
+
+        <!-- گزارشِ انقضا — ماندهٔ هر محموله به FEFO -->
+        <div id="rtab-expiry" style="display:none;">
+          <div class="exp-list" id="rep-expiry-list"></div>
         </div>
 
         <!-- Stock ledger -->
@@ -5739,6 +5757,11 @@
     </div>
     <div class="confirm-title" id="confirm-title">حذف شود؟</div>
     <div class="confirm-sub" id="confirm-sub">این عملیات قابل بازگشت نیست.</div>
+    <!-- دلیل — فقط وقتی پرسشی آن را لازم دارد (لغوِ فاکتور) پیدا می‌شود -->
+    <div class="form-group" id="fg-confirm-reason" hidden style="margin-top:10px;">
+      <input class="form-input" id="confirm-reason" type="text" maxlength="120" placeholder="دلیل را بنویسید (لازم)">
+      <div class="field-error">بی دلیل ثبت نمی‌شود.</div>
+    </div>
     <div class="confirm-actions">
       <button class="btn btn-secondary" data-close-modal="modal-confirm">انصراف</button>
       <button class="btn btn-danger" id="btn-confirm-ok">حذف کن</button>
@@ -7055,6 +7078,7 @@
   function openModal(id){ document.getElementById(id).classList.add('open'); }
   function closeModal(id){
     document.getElementById(id).classList.remove('open');
+    if(id==='modal-confirm'){ const fg = document.getElementById('fg-confirm-reason'); if(fg){ fg.hidden = true; fg.classList.remove('error'); } }
     if(id==='modal-prod-actions') clearHeldProduct();
     if(id==='modal-scan') stopQuickScan();
     if(id==='modal-product' && document.getElementById('page-sale').classList.contains('active')) startSaleScanner();
@@ -7882,7 +7906,8 @@
   // پیش‌فرض «برد» است؛ داخل خودِ پنجره می‌شود به رسید عوضش کرد
   document.getElementById('btn-acc-add-tx').addEventListener('click', ()=>openTxModal('give'));
   document.getElementById('btn-confirm-ok').addEventListener('click', ()=>{
-    if(confirmAction) confirmAction();
+    // کاری که `false` برگرداند (مثلاً دلیلِ خالی) پنجره را باز نگه می‌دارد
+    if(confirmAction && confirmAction() === false) return;
     confirmAction = null;
     closeModal('modal-confirm');
   });
@@ -10437,9 +10462,9 @@
     document.getElementById('rep-s-exp').innerHTML = formatMoney(r.expenses)+'<small>افغانی</small>';
     document.getElementById('rep-s-np').innerHTML = formatMoney(r.netProfit)+'<small>افغانی</small>';
   }
-  document.getElementById('rep-sales-range').addEventListener('change', renderSalesReport);
-  document.getElementById('rep-sales-from').addEventListener('change', renderSalesReport);
-  document.getElementById('rep-sales-to').addEventListener('change', renderSalesReport);
+  document.getElementById('rep-sales-range').addEventListener('change', ()=>{ renderSalesReport(); renderPurchaseReport(); });
+  document.getElementById('rep-sales-from').addEventListener('change', ()=>{ renderSalesReport(); renderPurchaseReport(); });
+  document.getElementById('rep-sales-to').addEventListener('change', ()=>{ renderSalesReport(); renderPurchaseReport(); });
 
   function computeProductProfit(productId){
     let qty=0, profit=0;
@@ -10525,10 +10550,51 @@
   }
   document.getElementById('rep-stock-product-filter').addEventListener('change', renderStockLedger);
 
+  /* خرید — همان `ReportEngine.purchases`ِ برنامه، در بازهٔ گزارشِ فروش */
+  function computePurchaseReport(from, to){
+    const rows = purchases.filter(p=> p.date>=from && p.date<=to).sort((a,b)=> (b.date||'').localeCompare(a.date||''));
+    const name = id => (suppliers.find(s=>s.id===id)||{}).name || 'بی تأمین‌کننده';
+    const by = {};
+    rows.forEach(p=>{ const n = name(p.supplierId); by[n] = (by[n]||0) + (p.totalAmount||0); });
+    return {
+      rows,
+      total: rows.reduce((s,p)=> s+(p.totalAmount||0), 0),
+      debt: rows.reduce((s,p)=> s+(p.debt||0), 0),
+      bySupplier: Object.entries(by).sort((a,b)=> b[1]-a[1]),
+    };
+  }
+  function renderPurchaseReport(){
+    const { from, to } = reportRangeDates();
+    const r = computePurchaseReport(from, to);
+    document.getElementById('rep-pu-range').textContent = `از ${formatDate(from)} تا ${formatDate(to)} — بازه را در زبانهٔ «فروش» عوض کنید.`;
+    document.getElementById('rep-pu-total').innerHTML = `${formatMoney(r.total)}<small>افغانی</small>`;
+    document.getElementById('rep-pu-debt').innerHTML = `${formatMoney(r.debt)}<small>افغانی</small>`;
+    const empty = '<div class="empty-wrap" style="padding:20px;"><div class="empty-sub">در این بازه خریدی ثبت نشده</div></div>';
+    document.getElementById('rep-pu-suppliers').innerHTML = r.bySupplier.map(([n,t])=>
+      `<div class="exp-card"><div class="exp-title">${escapeHtml(n)}</div><div class="exp-amount">${formatMoney(t)} افغانی</div></div>`).join('') || empty;
+    document.getElementById('rep-pu-list').innerHTML = r.rows.map(p=>{
+      const prod = products.find(x=>x.id===p.productId);
+      return `<div class="exp-card"><div><div class="exp-title">${escapeHtml(prod?prod.name:'—')}</div>
+        <div class="exp-meta"><span>${formatDate(p.date)}</span><span>${formatCartQty(p.quantity||0, p.unit)} ${escapeHtml(p.unit||'')}</span></div></div>
+        <div class="exp-amount">${formatMoney(p.totalAmount||0)} افغانی</div></div>`;
+    }).join('');
+  }
+  function renderExpiryReport(){
+    const lots = expiryLots(todayISO());
+    document.getElementById('rep-expiry-list').innerHTML = lots.map(l=>{
+      const tone = l.daysLeft<0 ? 'var(--danger)' : l.daysLeft<=EXPIRY_NEAR_DAYS ? 'var(--warning, #f08a24)' : 'var(--success)';
+      return `<div class="exp-card"><div><div class="exp-title">${escapeHtml(l.product.name)}</div>
+        <div class="exp-meta"><span>${formatDate(l.entry.expiryDate)}</span>${l.entry.batch?`<span>سری ${escapeHtml(l.entry.batch)}</span>`:''}<span>${formatCartQty(l.remaining, l.product.unit)} ${escapeHtml(l.product.unit||'')}</span></div></div>
+        <div class="exp-amount" style="color:${tone};">${l.daysLeft<0 ? 'منقضی' : l.daysLeft + ' روز'}</div></div>`;
+    }).join('') || '<div class="empty-wrap" style="padding:20px;"><div class="empty-sub">محموله‌ای با تاریخِ انقضا در انبار نمانده</div></div>';
+  }
+
   function renderAllReports(){
     renderSalesReport();
     renderProductsReport();
     renderDebtorsReport();
+    renderPurchaseReport();
+    renderExpiryReport();
     renderStockLedger();
   }
   let currentReportTab = 'sales';
@@ -10538,7 +10604,7 @@
     const tab = btn.dataset.rtab;
     currentReportTab = tab;
     document.querySelectorAll('#reports-tabs .seg-btn').forEach(b=> b.classList.toggle('active', b===btn));
-    ['sales','products','debtors','stock'].forEach(t=>{
+    ['sales','products','debtors','purchases','expiry','stock'].forEach(t=>{
       document.getElementById('rtab-'+t).style.display = t===tab ? '' : 'none';
     });
   });
@@ -11922,9 +11988,17 @@
     if(!canCancelSale()){ showToast('لغوِ فاکتور با صاحب یا مدیرِ دکان است', 'danger'); return; }
     document.getElementById('confirm-title').textContent = 'لغو فروش؟';
     document.getElementById('confirm-sub').textContent = `فروش #${sale.invoiceNumber} لغو می‌شود و موجودی کالاهای آن به انبار برمی‌گردد. سابقه فروش حذف نمی‌شود.`;
+    // لغو بی دلیل ثبت نمی‌شود — همان `SalesEngine.cancel(reason)`ِ برنامه
+    const fgReason = document.getElementById('fg-confirm-reason');
+    const reasonEl = document.getElementById('confirm-reason');
+    fgReason.hidden = false; fgReason.classList.remove('error'); reasonEl.value = '';
+    setTimeout(()=> reasonEl.focus(), 50);
     confirmAction = ()=>{
-      logAudit('cancel_sale', saleId, `لغو فروش فاکتور #${sale.invoiceNumber}`);
+      const reason = reasonEl.value.trim();
+      if(!reason){ fgReason.classList.add('error'); reasonEl.focus(); return false; }
+      logAudit('cancel_sale', saleId, `لغو فروش فاکتور #${sale.invoiceNumber} — دلیل: ${reason}`);
       sale.status = 'cancelled';
+      sale.cancelReason = reason;
       // جنسِ برگشته در گردشِ انبار هم دیده شود — همان `sale_cancel`ِ برنامه
       saleItems.filter(si=> si.saleId===saleId && si.productId && (si.quantity - (si.returnedQty||0)) > 0)
         .forEach(si=> logStockMovement(si.productId, 'sale_cancel', si.quantity - (si.returnedQty||0), todayISO(), `لغو فروش — فاکتور #${sale.invoiceNumber}`, saleId));
@@ -13690,7 +13764,7 @@
   function buildReportCsvRows(tab){
     if(tab==='sales'){
       const { from, to } = reportRangeDates();
-      const rows = [['شماره فاکتور','تاریخ','مبلغ کل','تخفیف','مبلغ نهایی','پرداختی','باقی‌مانده','روش پرداخت','وضعیت']];
+      const rows = [['شماره فاکتور','تاریخ','مبلغ کل','تخفیف','مبلغ نهایی','پرداختی','باقی‌مانده','روش پرداخت','وضعیت','دلیلِ لغو']];
       sales
         .filter(s=> s.date>=from && s.date<=to)
         .sort((a,b)=> a.createdAt-b.createdAt)
@@ -13700,7 +13774,8 @@
             Math.round(s.total||0), Math.round(s.discount||0), Math.round(s.finalTotal||0),
             Math.round(s.paidAmount||0), Math.round(s.remaining||0),
             s.paymentMethod==='credit' ? 'نسیه' : 'نقدی',
-            s.status==='cancelled' ? 'لغو‌شده' : 'ثبت‌شده'
+            s.status==='cancelled' ? 'لغو‌شده' : 'ثبت‌شده',
+            s.cancelReason || ''
           ]);
         });
       return { rows, name:`گزارش-فروش-${from}-تا-${to}` };
@@ -13718,6 +13793,25 @@
         ]);
       });
       return { rows, name:`گزارش-محصولات-${todayISO()}` };
+    }
+
+    if(tab==='purchases'){
+      const { from, to } = reportRangeDates();
+      const rows = [['تاریخ','تأمین‌کننده','کالا','مقدار','واحد','قیمت خرید','جمع','پرداختی','بدهی']];
+      computePurchaseReport(from, to).rows.forEach(p=>{
+        rows.push([p.date, (suppliers.find(s=>s.id===p.supplierId)||{}).name||'', (products.find(x=>x.id===p.productId)||{}).name||'',
+          p.quantity||0, p.unit||'', Math.round(p.purchasePrice||0), Math.round(p.totalAmount||0), Math.round(p.paidAmount||0), Math.round(p.debt||0)]);
+      });
+      return { rows, name:`گزارش-خرید-${from}-تا-${to}` };
+    }
+
+    if(tab==='expiry'){
+      const rows = [['کالا','سری ساخت','تاریخ انقضا','روز مانده','مقدارِ مانده','واحد','وضعیت']];
+      expiryLots(todayISO()).forEach(l=>{
+        rows.push([l.product.name, l.entry.batch||'', l.entry.expiryDate, l.daysLeft, l.remaining, l.product.unit||'',
+          l.daysLeft<0 ? 'منقضی' : l.daysLeft<=EXPIRY_NEAR_DAYS ? 'نزدیک به انقضا' : 'سالم']);
+      });
+      return { rows, name:`گزارش-انقضا-${todayISO()}` };
     }
 
     if(tab==='debtors'){

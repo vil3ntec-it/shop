@@ -93,6 +93,8 @@ data class Sale(
   val createdAt: Long = 0,
   val date: String = "",
   val syncStatus: String = "pending",
+  /** دلیلِ لغو — همان `cancelReason`ِ وب */
+  val cancelReason: String = "",
 )
 
 @Serializable

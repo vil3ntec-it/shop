@@ -83,6 +83,35 @@ object ReportEngine {
     )
   }
 
+  /* ----------------------------- خرید ----------------------------- */
+
+  data class PurchaseReport(
+    val count: Int,
+    val total: Double,
+    val paid: Double,
+    val debt: Double,
+    /** نامِ تأمین‌کننده ⇒ جمعِ خرید در بازه، بیشترین اول */
+    val bySupplier: List<Pair<String, Double>>,
+    val rows: List<Purchase>,
+  )
+
+  /** خریدهای یک بازه — جمع، پرداخت‌شده، بدهیِ به‌جامانده و سهمِ هر تأمین‌کننده */
+  fun purchases(d: ShopData, from: String, to: String): PurchaseReport {
+    val rows = d.purchases.filter { it.date in from..to }.sortedByDescending { it.date }
+    val names = d.suppliers.associate { it.id to it.name }
+    val bySupplier = rows.groupBy { names[it.supplierId] ?: "بی تأمین‌کننده" }
+      .mapValues { (_, list) -> list.sumOf { it.totalAmount } }
+      .toList().sortedByDescending { it.second }
+    return PurchaseReport(
+      count = rows.size,
+      total = rows.sumOf { it.totalAmount },
+      paid = rows.sumOf { it.paidAmount },
+      debt = rows.sumOf { it.debt },
+      bySupplier = bySupplier,
+      rows = rows,
+    )
+  }
+
   /* ---------------------------- محصولات ---------------------------- */
 
   data class ProductStat(val product: Product, val quantity: Double, val profit: Double)

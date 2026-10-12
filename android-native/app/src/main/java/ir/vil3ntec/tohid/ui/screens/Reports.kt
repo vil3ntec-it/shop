@@ -44,6 +44,8 @@ private val SECTION_TITLES = linkedMapOf(
   "sales" to "سود و فروش",
   "products" to "محصولات",
   "debtors" to "قرض‌داران",
+  "purchases" to "خرید",
+  "expiry" to "انقضا",
   "stock" to "گردش موجودی",
 )
 
@@ -86,7 +88,8 @@ fun ReportsScreen(d: ShopData) {
    */
   val canSeeMoney = remember { ir.vil3ntec.tohid.data.ShopRole.canSeeMoney(context) }
   val sections = remember(canSeeMoney) {
-    if (canSeeMoney) SECTION_TITLES else SECTION_TITLES.filterKeys { it != "sales" }
+    //  خرید هم قیمتِ خریدِ دکان است — همان قاعدهٔ «سود و فروش»
+    if (canSeeMoney) SECTION_TITLES else SECTION_TITLES.filterKeys { it != "sales" && it != "purchases" }
   }
 
   var range by rememberSaveable { mutableStateOf(ReportEngine.Range.MONTH) }
@@ -151,6 +154,8 @@ fun ReportsScreen(d: ShopData) {
       "sales" -> if (canSeeMoney) salesSection(this, d, range, from, to) { range = it }
       "products" -> productsSection(this, d)
       "debtors" -> debtorsSection(this, d)
+      "purchases" -> if (canSeeMoney) purchasesSection(this, d, from, to)
+      "expiry" -> expirySection(this, d)
       else -> stockSection(this, d, stockProduct) { stockProduct = it }
     }
   }
@@ -374,6 +379,121 @@ private fun debtorsSection(
           "فروش نسیه: ${money(row.given)} — پرداخت‌شده: ${money(row.received)}",
           style = MaterialTheme.typography.labelSmall,
           color = Shop.colors.muted,
+        )
+      }
+      Spacer(Modifier.height(8.dp))
+    }
+  }
+}
+
+/* ------------------------------ خرید ------------------------------ */
+
+private fun purchasesSection(
+  scope: androidx.compose.foundation.lazy.LazyListScope,
+  d: ShopData,
+  from: String,
+  to: String,
+) = with(scope) {
+  val r = ReportEngine.purchases(d, from, to)
+  item {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+      StatTile("جمع خرید", "${money(r.total)} ؋", Shop.colors.primary, modifier = Modifier.weight(1f))
+      StatTile("بدهی به تأمین‌کننده", "${money(r.debt)} ؋", Shop.colors.warning, modifier = Modifier.weight(1f))
+    }
+    Spacer(Modifier.height(12.dp))
+  }
+  if (r.rows.isEmpty()) {
+    item { Panel { EmptyNote("در این بازه خریدی ثبت نشده") } }
+  } else {
+    item {
+      Panel {
+        Text("سهمِ هر تأمین‌کننده", style = MaterialTheme.typography.titleSmall, color = Shop.colors.text)
+        Spacer(Modifier.height(8.dp))
+        r.bySupplier.forEach { (name, total) ->
+          Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(name, style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text)
+            Text("${money(total)} ؋", style = MaterialTheme.typography.bodyMedium, color = Shop.colors.muted)
+          }
+        }
+      }
+      Spacer(Modifier.height(12.dp))
+    }
+    val names = d.products.associate { it.id to it.name }
+    items(r.rows, key = { it.id }) { p ->
+      Row(
+        Modifier
+          .fillMaxWidth()
+          .clip(RoundedCornerShape(Radius.md))
+          .background(Shop.colors.surface)
+          .border(1.dp, Shop.colors.border, RoundedCornerShape(Radius.md))
+          .padding(12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+      ) {
+        Column(Modifier.weight(1f)) {
+          Text(names[p.productId] ?: "—", style = MaterialTheme.typography.titleSmall, color = Shop.colors.text)
+          Text(
+            "${ir.vil3ntec.tohid.formatDate(p.date)} · ${qty(p.quantity)} ${p.unit}",
+            style = MaterialTheme.typography.labelSmall,
+            color = Shop.colors.muted,
+          )
+        }
+        Text("${money(p.totalAmount)} ؋", style = MaterialTheme.typography.titleSmall, color = Shop.colors.text)
+      }
+      Spacer(Modifier.height(8.dp))
+    }
+  }
+}
+
+/* ------------------------------ انقضا ------------------------------ */
+
+private fun expirySection(
+  scope: androidx.compose.foundation.lazy.LazyListScope,
+  d: ShopData,
+) = with(scope) {
+  val lots = ir.vil3ntec.tohid.data.ExpiryEngine.lots(d, ir.vil3ntec.tohid.todayIso())
+  item {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+      StatTile("منقضی", lots.count { it.expired }.toString(), Shop.colors.danger, modifier = Modifier.weight(1f))
+      StatTile(
+        "تا ${ir.vil3ntec.tohid.data.ExpiryEngine.NEAR_DAYS} روز",
+        lots.count { !it.expired && it.daysLeft <= ir.vil3ntec.tohid.data.ExpiryEngine.NEAR_DAYS }.toString(),
+        Shop.colors.warning,
+        modifier = Modifier.weight(1f),
+      )
+    }
+    Spacer(Modifier.height(12.dp))
+  }
+  if (lots.isEmpty()) {
+    item { Panel { EmptyNote("محموله‌ای با تاریخِ انقضا در انبار نمانده") } }
+  } else {
+    items(lots, key = { it.entry.id }) { l ->
+      Row(
+        Modifier
+          .fillMaxWidth()
+          .clip(RoundedCornerShape(Radius.md))
+          .background(Shop.colors.surface)
+          .border(1.dp, Shop.colors.border, RoundedCornerShape(Radius.md))
+          .padding(12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+      ) {
+        Column(Modifier.weight(1f)) {
+          Text(l.product.name, style = MaterialTheme.typography.titleSmall, color = Shop.colors.text)
+          Text(
+            "${ir.vil3ntec.tohid.formatDate(l.entry.expiryDate)}" +
+              (if (l.entry.batch.isNotBlank()) " · سری ${l.entry.batch}" else "") +
+              " · ${qty(l.remaining)} ${l.product.unit}",
+            style = MaterialTheme.typography.labelSmall,
+            color = Shop.colors.muted,
+          )
+        }
+        Text(
+          if (l.expired) "منقضی" else "${l.daysLeft} روز",
+          style = MaterialTheme.typography.titleSmall,
+          color = when {
+            l.expired -> Shop.colors.danger
+            l.daysLeft <= ir.vil3ntec.tohid.data.ExpiryEngine.NEAR_DAYS -> Shop.colors.warning
+            else -> Shop.colors.success
+          },
         )
       }
       Spacer(Modifier.height(8.dp))

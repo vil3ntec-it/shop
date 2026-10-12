@@ -437,11 +437,20 @@ object SalesEngine {
    * نشده — نه کلِ مبلغِ اولیه. وگرنه فروشی که پیش‌تر مرجوعی خورده، با
    * لغو شدن بدهیِ قرض‌دار را منفی می‌کرد.
    */
-  fun cancel(d: ShopData, saleId: String, today: String, now: Long, newId: () -> String): Result {
+  fun cancel(
+    d: ShopData,
+    saleId: String,
+    today: String,
+    now: Long,
+    newId: () -> String,
+    /** رابط بی دلیل اجازه نمی‌دهد؛ این‌جا پیش‌فرضِ خالی فقط برای صدازننده‌های قدیمی است */
+    reason: String = "",
+  ): Result {
     val sale = d.sales.find { it.id == saleId } ?: return Result.Failed("فاکتور پیدا نشد")
     if (sale.status == "cancelled") return Result.Failed("این فاکتور قبلاً لغو شده است")
+    val why = reason.trim()
 
-    var updated = sale.copy(status = "cancelled")
+    var updated = sale.copy(status = "cancelled", cancelReason = why)
     val transactions = d.transactions.toMutableList()
 
     if (sale.debtorId != null) {
@@ -482,7 +491,7 @@ object SalesEngine {
           type = "cancel_sale",
           date = today,
           refId = saleId,
-          notes = "لغو فروش فاکتور #${sale.invoiceNumber ?: 0}",
+          notes = "لغو فروش فاکتور #${sale.invoiceNumber ?: 0}" + if (why.isNotEmpty()) " — دلیل: $why" else "",
           createdAt = now,
         ),
       ),

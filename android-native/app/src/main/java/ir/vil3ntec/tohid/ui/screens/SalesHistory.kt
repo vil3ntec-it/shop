@@ -295,7 +295,7 @@ fun SalesHistoryScreen(
               )
             }
           apply(
-            SalesEngine.cancel(d, sale.id, todayIso(), System.currentTimeMillis(), ::newId),
+            SalesEngine.cancel(d, sale.id, todayIso(), System.currentTimeMillis(), ::newId, reason = "ویرایش در سبد"),
             "فاکتور لغو شد و اقلامش در سبد است",
           ) {
             cartStore.set(lines)
@@ -310,24 +310,39 @@ fun SalesHistoryScreen(
   }
 
   cancelFor?.let { sale ->
+    //  لغو بی دلیل ثبت نمی‌شود — دلیل در فاکتور و سابقه می‌ماند
+    var reason by remember(sale.id) { mutableStateOf("") }
     AlertDialog(
       onDismissRequest = { cancelFor = null },
       containerColor = Shop.colors.surfaceSolid,
       title = { Text("لغو فروش؟", color = Shop.colors.text) },
       text = {
-        Text(
-          SalesEngine.cancelWarning(sale),
-          style = MaterialTheme.typography.bodySmall,
-          color = Shop.colors.muted,
-        )
+        Column {
+          Text(
+            SalesEngine.cancelWarning(sale),
+            style = MaterialTheme.typography.bodySmall,
+            color = Shop.colors.muted,
+          )
+          Spacer(Modifier.height(10.dp))
+          OutlinedTextField(
+            value = reason,
+            onValueChange = { reason = it.take(120) },
+            label = { Text("دلیلِ لغو") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+          )
+        }
       },
       confirmButton = {
-        TextButton(onClick = {
-          apply(
-            SalesEngine.cancel(d, sale.id, todayIso(), System.currentTimeMillis(), ::newId),
-            "فروش لغو شد",
-          ) { cancelFor = null }
-        }) { Text("لغو فروش", color = Shop.colors.danger) }
+        TextButton(
+          enabled = reason.isNotBlank(),
+          onClick = {
+            apply(
+              SalesEngine.cancel(d, sale.id, todayIso(), System.currentTimeMillis(), ::newId, reason = reason),
+              "فروش لغو شد",
+            ) { cancelFor = null }
+          },
+        ) { Text("لغو فروش", color = if (reason.isNotBlank()) Shop.colors.danger else Shop.colors.muted) }
       },
       dismissButton = { TextButton(onClick = { cancelFor = null }) { Text("بازگشت") } },
     )

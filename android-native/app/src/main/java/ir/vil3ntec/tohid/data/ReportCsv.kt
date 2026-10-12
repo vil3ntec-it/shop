@@ -24,14 +24,42 @@ object ReportCsv {
       "sales" -> sales(d, from, to)
       "products" -> products(d, today)
       "debtors" -> debtors(d, today)
+      "purchases" -> purchases(d, from, to)
+      "expiry" -> expiry(d, today)
       else -> stock(d, today)
     }
+
+  private fun purchases(d: ShopData, from: String, to: String): Sheet {
+    val names = d.suppliers.associate { it.id to it.name }
+    val products = d.products.associate { it.id to it.name }
+    val rows = mutableListOf(listOf("تاریخ", "تأمین‌کننده", "کالا", "مقدار", "واحد", "قیمت خرید", "جمع", "پرداختی", "بدهی"))
+    ReportEngine.purchases(d, from, to).rows.forEach { p ->
+      rows += listOf(
+        p.date, names[p.supplierId].orEmpty(), products[p.productId].orEmpty(),
+        ir.vil3ntec.tohid.qty(p.quantity), p.unit, round(p.purchasePrice),
+        round(p.totalAmount), round(p.paidAmount), round(p.debt),
+      )
+    }
+    return Sheet("گزارش-خرید-$from-تا-$to", rows)
+  }
+
+  private fun expiry(d: ShopData, today: String): Sheet {
+    val rows = mutableListOf(listOf("کالا", "سری ساخت", "تاریخ انقضا", "روز مانده", "مقدارِ مانده", "واحد", "وضعیت"))
+    ExpiryEngine.lots(d, today).forEach { l ->
+      rows += listOf(
+        l.product.name, l.entry.batch, l.entry.expiryDate, l.daysLeft.toString(),
+        ir.vil3ntec.tohid.qty(l.remaining), l.product.unit,
+        when { l.expired -> "منقضی"; l.daysLeft <= ExpiryEngine.NEAR_DAYS -> "نزدیک به انقضا"; else -> "سالم" },
+      )
+    }
+    return Sheet("گزارش-انقضا-$today", rows)
+  }
 
   private fun sales(d: ShopData, from: String, to: String): Sheet {
     val rows = mutableListOf(
       listOf(
         "شماره فاکتور", "تاریخ", "مبلغ کل", "تخفیف", "مبلغ نهایی",
-        "پرداختی", "باقی‌مانده", "روش پرداخت", "وضعیت",
+        "پرداختی", "باقی‌مانده", "روش پرداخت", "وضعیت", "دلیلِ لغو",
       )
     )
     d.sales
@@ -45,6 +73,7 @@ object ReportCsv {
           round(s.paidAmount), round(s.remaining),
           if (s.paymentMethod == "credit") "نسیه" else "نقدی",
           if (s.status == "cancelled") "لغو‌شده" else "ثبت‌شده",
+          s.cancelReason,
         )
       }
     return Sheet("گزارش-فروش-$from-تا-$to", rows)

@@ -179,6 +179,25 @@ class ReportEngineTest {
     assertEquals(all, aug + sep, 0.0)
   }
 
+  /* ----------------------------- خرید ----------------------------- */
+
+  @Test
+  fun `گزارش خرید جمع و بدهی و سهم هر تامین کننده را می دهد`() {
+    val d = ledger().copy(
+      suppliers = listOf(Supplier(id = "s1", name = "نور"), Supplier(id = "s2", name = "آریا")),
+      purchases = listOf(
+        Purchase(id = "a", supplierId = "s1", totalAmount = 1000.0, paidAmount = 600.0, debt = 400.0, date = "2026-08-05"),
+        Purchase(id = "b", supplierId = "s2", totalAmount = 3000.0, paidAmount = 3000.0, date = "2026-08-20"),
+        Purchase(id = "c", supplierId = "s1", totalAmount = 500.0, date = "2026-07-30"),   // بیرونِ بازه
+      ),
+    )
+    val r = ReportEngine.purchases(d, "2026-08-01", "2026-08-31")
+    assertEquals(2, r.count)
+    assertEquals(4000.0, r.total, 0.0)
+    assertEquals(400.0, r.debt, 0.0)
+    assertEquals("آریا", r.bySupplier.first().first)
+  }
+
   /* --------------------------- محصولات --------------------------- */
 
   @Test
