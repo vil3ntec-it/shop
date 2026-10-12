@@ -189,42 +189,28 @@ jobs:
 
           #  ۱) Offline
           if ((Install "out\Tohid-Windows-Offline.exe" "$t\a" @()) -ne 0) { Get-Content "$t\a.log" -Tail 40; throw "offline" }
-          #  خودِ برنامه هم باید واقعاً باز شود و بماند: پنجره با عنوانِ «فروشگاه من»
+          #  خودِ برنامه هم باید واقعاً باز شود و بماند. لانچرِ jpackage روی ویندوز یک
+          #  ‎Tohid.exe‎ِ فرزند می‌سازد که JVM در آن است — پس همهٔ ‎Tohid.exe‎های این پوشه سنجیده می‌شوند.
           $app = Start-Process -FilePath "$t\a\Tohid.exe" -PassThru
-          $title = ''
-          for ($k = 0; $k -lt 45 -and -not $app.HasExited; $k++) {
+          function Mine { Get-Process -Name Tohid -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$t\a\*" } }
+          $mem = 0; $title = ''
+          for ($k = 0; $k -lt 45; $k++) {
             Start-Sleep 2
-            $title = (Get-Process -Id $app.Id -ErrorAction SilentlyContinue).MainWindowTitle
-            if ($title) { break }
+            $ps_ = @(Mine)
+            if ($ps_.Count -eq 0) { break }
+            $mem = [int](($ps_ | Measure-Object WorkingSet64 -Maximum).Maximum / 1MB)
+            $title = ($ps_ | Where-Object { $_.MainWindowTitle } | Select-Object -First 1).MainWindowTitle
+            if ($mem -ge 150 -and $title) { break }
           }
-          if ($app.HasExited) { throw "برنامه باز نشد یا فوراً بسته شد (کدِ خروج $($app.ExitCode))" }
-          Start-Sleep 10
-          if ($app.HasExited) { throw "برنامه پس از باز شدن بسته شد (کدِ خروج $($app.ExitCode))" }
-          Write-Host "✓ برنامه باز است — پنجره: «$title»، حافظه $([int]((Get-Process -Id $app.Id).WorkingSet64/1MB)) مگابایت"
-          $mem = [int]((Get-Process -Id $app.Id).WorkingSet64/1MB)
-          $mods = (Get-Process -Id $app.Id).Modules | ForEach-Object { $_.ModuleName }
-          Write-Host "── ماژول‌های Tohid.exe ($($mods.Count)): $(($mods | Where-Object { $_ -match 'jvm|jli|java|skiko|awt' }) -join ', ')"
-          Get-CimInstance Win32_Process -Filter "ParentProcessId=$($app.Id)" | ForEach-Object { Write-Host "   فرزند: $($_.Name) $($_.ProcessId)" }
-          Get-Process | Where-Object { $_.Path -like "$t\a\*" } | Stop-Process -Force
+          Start-Sleep 8
+          $alive = @(Mine).Count
+          Write-Host "── Tohid.exe: $alive فرآیند، بیشترین حافظه $mem مگابایت، پنجره «$title»"
+          Mine | Stop-Process -Force -ErrorAction SilentlyContinue
           Start-Sleep 3
-          #  ‎Tohid.exe‎ همان فرآیندِ JVM است؛ زیرِ ۸۰ مگابایت یعنی جاوا اصلاً بالا نیامده.
-          #  همان برنامه را با javaِ خودِ بسته اجرا کن تا خطایش در گزارش بیاید.
-          $cfg = Get-Content "$t\a\app\Tohid.cfg"
-          Write-Host "── Tohid.cfg"; $cfg | Write-Host
-          $cp = ($cfg | Where-Object { $_ -like 'app.classpath=*' } | ForEach-Object { $_.Substring(14).Replace('$APPDIR', "$t\a\app") }) -join ';'
-          $main = ($cfg | Where-Object { $_ -like 'app.mainclass=*' } | Select-Object -First 1).Substring(14)
-          $jo = @($cfg | Where-Object { $_ -like 'java-options=*' } | ForEach-Object { $_.Substring(13).Replace('$APPDIR', "$t\a\app") })
-          $jargs = $jo + @('-cp', $cp, $main)
-          #  رانتایمِ jpackage خودِ java.exe را ندارد؛ JDKِ همان نسخه (17) روی CI هست
-          $j = Start-Process -FilePath "$env:JAVA_HOME\bin\java.exe" -ArgumentList $jargs -PassThru -RedirectStandardOutput "$t\java.out" -RedirectStandardError "$t\java.err"
-          for ($k = 0; $k -lt 20 -and -not $j.HasExited; $k++) { Start-Sleep 2 }
-          $jmem = if ($j.HasExited) { 0 } else { [int]((Get-Process -Id $j.Id).WorkingSet64/1MB) }
-          Write-Host "── java: $(if ($j.HasExited) { "بسته شد با کدِ $($j.ExitCode)" } else { "باز است، حافظه $jmem مگابایت" })"
-          Get-Content "$t\java.out" -Tail 40 -ErrorAction SilentlyContinue | Write-Host
-          Get-Content "$t\java.err" -Tail 60 -ErrorAction SilentlyContinue | Write-Host
-          if (-not $j.HasExited) { $j | Stop-Process -Force }
-          Start-Sleep 2
-          if ($mem -lt 80) { throw "Tohid.exe بالا نیامد (حافظه $mem مگابایت) — گزارشِ java بالا" }
+          if ($alive -eq 0) { throw "برنامه باز شد و خودش بسته شد" }
+          if ($mem -lt 150) { throw "JVMِ برنامه بالا نیامد (حافظه $mem مگابایت)" }
+          if ($title -notmatch 'فروشگاه من') { Write-Host "::warning::عنوانِ پنجره «$title» است (روی CI ممکن است پنجره ساخته نشود)" }
+          Write-Host "✓ برنامه باز شد و ماند"
           Check "$t\a" "Offline"
 
           #  ۲) فایلِ برنامه کنارِ نصاب، بی‌اینترنت
