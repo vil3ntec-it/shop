@@ -182,7 +182,7 @@ const openTab = async (name) => {
 // ── ۲) هر تب باز می‌شود و خطای جاوااسکریپت نمی‌دهد ────────────────
 await step('هر تب بی خطا باز می‌شود', async () => {
   for (const t of ['shops', 'pump', 'users', 'subs', 'sales', 'payments', 'discounts', 'notices',
-    'requests', 'plans', 'support', 'delivery', 'backups', 'audit']) {
+    'requests', 'plans', 'support', 'delivery', 'backups', 'health', 'audit']) {
     await openTab(t);
   }
   assert.deepEqual(consoleErrors, [], `خطای صفحه: ${consoleErrors.join(' | ')}`);
@@ -603,6 +603,17 @@ await step('قالبِ آمادهٔ اعلان از پنل ویرایش می‌�
   const row = await one(`SELECT * FROM notice_templates WHERE key='welcome' ORDER BY app LIMIT 1`);
   assert.ok(row.title.includes('خوش آمدی از پنل') || row.title === 'خوش آمدی از پنل',
     `عنوانِ قالب باید عوض شده باشد — ${row.title}`);
+});
+
+await step('همگام‌سازی و امنیت: دستگاه‌ها، خطاها و درخواست‌های ورود بی خطا پر می‌شوند', async () => {
+  await openTab('health');
+  await page.waitForTimeout(400);
+  for (const id of ['health-devices', 'health-conflicts', 'health-errors', 'health-logins']) {
+    const rows = await page.locator(`#${id} tr`).count();
+    assert.ok(rows >= 1, `${id} خالی ماند`);
+  }
+  const csp = await page.evaluate(async () => (await fetch('/admin/')).headers.get('content-security-policy'));
+  assert.match(csp || '', /script-src 'self'/);
 });
 
 await step('در کلِ این نشست هیچ خطای صفحه‌ای نبود', async () => {

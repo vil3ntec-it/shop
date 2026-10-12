@@ -225,6 +225,8 @@ async function grantSubscription() {
       plan: $('in-plan').value,
       days: days ? Number(days) : null,
       graceDays: Number($('in-grace').value || 0),
+      //  سقفِ دستگاه — خالی یعنی همان پیش‌فرضِ پلن
+      ...($('in-max-devices').value.trim() ? { maxDevices: Number($('in-max-devices').value) } : {}),
       note: $('in-note').value.trim(),
     });
     msg(node, 'اشتراک ثبت شد.', 'ok');
@@ -570,6 +572,7 @@ async function grantPumpSubscription() {
       plan: $('pump-plan').value,
       days: days ? Number(days) : null,
       graceDays: Number($('pump-grace').value || 0),
+      ...($('pump-max-devices').value.trim() ? { maxDevices: Number($('pump-max-devices').value) } : {}),
       features: chosenPumpFeatures(),
       note: $('pump-note').value.trim(),
     });
@@ -785,6 +788,88 @@ async function loadBackups() {
     tr.appendChild(td);
     body.appendChild(tr);
   }
+}
+
+// ---------- همگام‌سازی و امنیت ----------
+async function loadHealth() {
+  const app = $('health-app').value;
+  const account = $('health-account').value.trim();
+  const q = new URLSearchParams({ app, limit: '200', ...(account ? { account } : {}) });
+
+  const devBody = $('health-devices');
+  devBody.innerHTML = '';
+  try {
+    const out = await call('GET', `/admin/sync/status?${q}`);
+    if (!out.devices.length) emptyRow(devBody, 7, 'دستگاهی نیست');
+    for (const d of out.devices) {
+      const tr = el('tr');
+      const lag = Math.max(0, Number(d.head || 0) - Number(d.cursor || 0));
+      [d.account_id, d.device_id, d.app_version || '—', dateTime(Number(d.last_seen_at || 0)),
+        String(d.queued_count || 0), String(lag), String(d.conflicts || 0)].forEach(t => tr.appendChild(el('td', null, t)));
+      //  حسابی که تعارض دارد ⇒ با یک کلیک فهرستِ تعارض‌هایش
+      if (Number(d.conflicts || 0) > 0) {
+        tr.style.cursor = 'pointer';
+        tr.title = 'نمایشِ تعارض‌ها';
+        tr.onclick = () => { $('health-account').value = d.account_id; loadHealth(); };
+      }
+      devBody.appendChild(tr);
+    }
+  } catch (err) { emptyRow(devBody, 7, err.message); }
+
+  const cBody = $('health-conflicts');
+  cBody.innerHTML = '';
+  if (!account) emptyRow(cBody, 6, 'شناسهٔ حساب را بنویسید یا روی ردیفِ دستگاهِ دارای تعارض بزنید');
+  else {
+    try {
+      const out = await call('GET', `/admin/sync/conflicts?${q}`);
+      if (!out.conflicts.length) emptyRow(cBody, 6, 'تعارضی نیست');
+      for (const c of out.conflicts) {
+        const tr = el('tr');
+        //  مقدارِ بازنده (کنارگذاشته) در برابرِ برنده — مدیر می‌بیند چه چیزی جا ماند
+        const val = v => (v === null || v === undefined) ? '—' : JSON.stringify(v).slice(0, 60);
+        [dateTime(Number(c.at || 0)), c.table_name, `${c.row_id} · ${c.field}`, c.loser_device || '—',
+          `کنار رفت: ${val(c.loser_value)} — ماند: ${val(c.winner_value)}`].forEach(t => tr.appendChild(el('td', null, String(t))));
+        const td = el('td');
+        const btn = el('button', 'btn btn-ghost btn-sm', 'برگرداندن');
+        btn.onclick = async () => {
+          if (!confirm('نسخهٔ کنارگذاشته‌شدهٔ این ردیف برگردانده شود؟')) return;
+          try { await call('POST', `/admin/sync/conflicts/${encodeURIComponent(c.id)}/restore`, {}); msg($('health-msg'), 'برگردانده شد.', 'ok'); loadHealth(); }
+          catch (err) { msg($('health-msg'), err.message, 'bad'); }
+        };
+        td.appendChild(btn); tr.appendChild(td);
+        cBody.appendChild(tr);
+      }
+    } catch (err) { emptyRow(cBody, 6, err.message); }
+  }
+
+  const eBody = $('health-errors');
+  eBody.innerHTML = '';
+  try {
+    const out = await call('GET', `/admin/sync/errors?app=${encodeURIComponent(app)}&limit=100`);
+    if (!out.errors.length) emptyRow(eBody, 5, 'خطایی گزارش نشده');
+    for (const e of out.errors) {
+      const tr = el('tr');
+      [dateTime(Number(e.at || 0)), e.app, e.app_version || e.version || '—', e.device_id || '—', (e.message || '').slice(0, 200)]
+        .forEach(t => tr.appendChild(el('td', null, String(t))));
+      eBody.appendChild(tr);
+    }
+  } catch (err) { emptyRow(eBody, 5, err.message); }
+
+  const lBody = $('health-logins');
+  lBody.innerHTML = '';
+  try {
+    const out = await call('GET', `/admin/logins?app=${encodeURIComponent(app)}&limit=100`);
+    const reqs = (out.requests && out.requests.requests) || out.requests || [];
+    if (!reqs.length) emptyRow(lBody, 7, 'درخواستی نیست');
+    for (const r of reqs) {
+      const tr = el('tr');
+      const state = r.locked ? 'قفل (تلاشِ زیاد)' : r.consumed_at ? 'وارد شد' : r.active ? 'در انتظار' : 'منقضی';
+      [dateTime(r.created_at), r.app, r.masked_email || '', r.device_name || r.device_id || '—', r.ip || '—',
+        `${r.code_attempts}/${r.max_attempts}`, state].forEach(t => tr.appendChild(el('td', null, String(t))));
+      if (r.locked || r.code_attempts >= r.max_attempts) tr.style.color = 'var(--bad, #c0392b)';
+      lBody.appendChild(tr);
+    }
+  } catch (err) { emptyRow(lBody, 7, err.message); }
 }
 
 // ---------- سابقه ----------
@@ -1827,7 +1912,7 @@ const LOADERS = {
   shops: loadShops, pump: loadPump, users: loadUsers, subs: loadSubs,
   sales: loadSales, payments: loadPayments, discounts: loadDiscounts, notices: loadNotices,
   requests: loadRequests, plans: loadPlans, support: loadSupport,
-  delivery: loadDelivery, backups: loadBackups, audit: loadAudit,
+  delivery: loadDelivery, backups: loadBackups, health: loadHealth, audit: loadAudit,
 };
 
 function openTab(name) {
@@ -1850,6 +1935,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   $('btn-refresh').onclick = () => refresh().catch(err => alert(err.message));
   $('btn-shop-search').onclick = () => loadShops();
+  $('btn-health-load').onclick = () => loadHealth().catch(err => alert(err.message));
   $('shop-q').addEventListener('keydown', (e) => { if (e.key === 'Enter') loadShops(); });
   //  پمپ‌بنزین‌ها
   $('btn-pump-search').onclick = () => loadPump();

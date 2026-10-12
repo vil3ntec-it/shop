@@ -12,6 +12,13 @@
 <html lang="fa" dir="rtl" data-motion="full">
 <head>
 <meta charset="UTF-8">
+<!--
+  CSP: اسکریپت فقط از خودِ همین سایت (و درون‌خطیِ خودِ صفحه)؛ نه شیءِ جاسازی، نه
+  base تزریقی، نه فرمی به جای دیگر. اگر روزی متنی از سرور بی‌پاک‌سازی به صفحه برسد،
+  مرورگر اسکریپتِ بیرونی را بار نمی‌کند. اتصال به هر سرور آزاد است چون نشانیِ سرور را
+  خودِ دکان‌دار می‌تواند عوض کند (سرورِ خانگی روی شبکهٔ محلی).
+-->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self' https: http: wss: ws: blob: data:; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>توحید | مدیریت فروشگاه</title>
 
@@ -11257,7 +11264,10 @@
     if(zxingLoadPromise) return zxingLoadPromise;
     zxingLoadPromise = new Promise((resolve, reject)=>{
       const s = document.createElement('script');
-      s.src = 'https://unpkg.com/@zxing/library@latest/umd/index.min.js';
+      //  کپیِ همین مخزن (نسخهٔ ثابتِ 0.21.3، MIT) — پیش‌تر `@latest` از unpkg:
+      //  هر نسخهٔ تازه‌ای که آنجا منتشر می‌شد بی‌بازبینی در صندوقِ دکان اجرا می‌شد،
+      //  و بی اینترنت اسکنرِ دوربین اصلاً بالا نمی‌آمد
+      s.src = 'license/vendor/zxing-0.21.3.min.js';
       s.onload = ()=> resolve(window.ZXing);
       s.onerror = reject;
       document.head.appendChild(s);
