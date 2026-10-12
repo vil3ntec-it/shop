@@ -54,7 +54,7 @@ fun DeskRail(
   val canAdmin = ir.vil3ntec.tohid.data.ShopRole.canOpenSettings(context)
   val main = AppNav.SHORTCUTS.mapIndexed { i, (id, label) -> Triple(id, label, "Ctrl+${i + 1}") }
   val extra = buildList {
-    add(Triple("admin", "مرکزِ مدیریت", "Ctrl+0"))
+    add(Triple("admin", "مرکزِ مدیریت", "Ctrl+M"))
     add(Triple("receipts", "رسیدها", ""))
     add(Triple("team", "کارمندان", ""))
     if (canAdmin) add(Triple("audit", "سابقهٔ عملیات", ""))
