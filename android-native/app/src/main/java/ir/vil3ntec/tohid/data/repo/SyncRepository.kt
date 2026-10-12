@@ -106,6 +106,16 @@ class SyncRepository(private val api: ApiClient) {
     ApiJson.text(api.getPublic(ApiEndpoints.License.PUBLIC_KEY), "publicKey")
       .ifBlank { throw ApiFailure.InvalidResponse("کلید عمومی نیامد") }
 
+  /** کدِ اشتراکِ آفلاین ⇒ اشتراکِ دکانِ همین حساب روی سرور (یک کد، یک دکان) */
+  suspend fun redeemOffline(code: String, computer: String): JsonObject =
+    api.post(
+      ApiEndpoints.Vip.OFFLINE_CODE,
+      buildJsonObject {
+        put("code", JsonPrimitive(code))
+        put("computer", JsonPrimitive(computer))
+      },
+    )
+
   /** گرفتن یا تازه کردنِ مجوز برای همین دستگاه */
   suspend fun license(deviceUid: String, deviceName: String): JsonObject =
     api.post(

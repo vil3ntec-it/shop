@@ -19,7 +19,7 @@
   خودِ دکان‌دار می‌تواند عوض کند (سرورِ خانگی روی شبکهٔ محلی).
 -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self' https: http: wss: ws: blob: data:; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>فروشگاه من</title>
 
 <!--
@@ -3338,6 +3338,69 @@
       animation-duration:.001ms !important; animation-iteration-count:1 !important;
       transition-duration:.001ms !important; scroll-behavior:auto !important;
     }
+  }
+
+  /* ==========================================================
+     آیفون / گوشی — وصله‌های چیدمان
+     ========================================================== */
+  /* لبه‌های نچ در حالت افقی (viewport-fit=cover) */
+  .header{
+    padding-inline:max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-left));
+    padding-top:env(safe-area-inset-top);
+    height:calc(var(--header-h) + env(safe-area-inset-top));
+  }
+  .content{
+    padding-inline:max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-left));
+  }
+  @media(min-width:769px){
+    .content{ padding-inline:max(32px, env(safe-area-inset-right)) max(32px, env(safe-area-inset-left)); }
+  }
+  /* vh در سافاری نوار آدرس را حساب نمی‌کند؛ dvh هر جا پشتیبانی شود */
+  @supports (height:100dvh){
+    .app{ min-height:100dvh; }
+    .modal-box{ max-height:88dvh; }
+    .ps-box{ max-height:94dvh; }
+  }
+  .modal-box, .ps-box{ overscroll-behavior:contain; -webkit-overflow-scrolling:touch; }
+  /* سافاری روی خانهٔ کمتر از ۱۶px زوم می‌کند و صفحه کج می‌ماند */
+  @media (pointer:coarse){
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+    select, textarea{ font-size:16px !important; }
+  }
+  @media(max-width:768px){
+    /* سربرگ: تنظیمات و حساب در «بیشتر» هستند؛ جا برای عنوان باز می‌شود */
+    .header{ gap:8px; }
+    .header .header-right{ gap:6px; }
+    .header .icon-btn[data-page="settings"],
+    .header #user-avatar{ display:none; }
+    .header h1{ flex:1 1 auto; }
+
+    /* نوار بالای صفحه‌ها: عنوان یک ردیف، دکمه‌ها ردیفِ زیر، بی‌شکستنِ متن */
+    .page-toolbar{ flex-wrap:wrap; align-items:flex-start; }
+    .page-toolbar > .page-title-block{ flex:1 1 auto; min-width:0; }
+    .page-toolbar > .toolbar-actions{ flex-wrap:wrap; justify-content:flex-start; max-width:100%; }
+    .page-toolbar > .toolbar-actions:has(> :nth-child(2)){ flex:1 1 100%; }
+    .toolbar-actions > .btn{ white-space:nowrap; min-height:40px; }
+    /* جستجو روی گوشی هم دیده شود — پیش‌تر پنهان بود */
+    .toolbar-actions > .search-box{ display:flex; flex:1 1 100%; max-width:none; min-height:42px; }
+
+    /* فیلترها: ردیف‌های هم‌اندازه به‌جای پله‌پله */
+    .exp-filters > .exp-select{ flex:1 1 140px; min-width:0; }
+    .exp-filters > .qs-cat-row{ flex:1 1 100%; min-width:0; }
+    .exp-filters .qs-cat-row > .exp-select{ flex:1 1 auto; min-width:0; }
+    .exp-select{ min-height:42px; }
+
+    /* قرض‌داران: پنج ستونِ ریز مبلغ را می‌برید؛ سه ستون و دکمه‌های لمس‌پذیر */
+    .debtor-list{ grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px; }
+    .debtor-card{ padding:18px 6px 30px; border-radius:12px; }
+    .debtor-card-close, .debtor-card-edit{ width:26px; height:26px; border-radius:8px; }
+    .debtor-card-close{ top:4px; inset-inline-start:4px; }
+    .debtor-card-edit{ bottom:4px; inset-inline-end:4px; }
+    .debtor-card-close svg, .debtor-card-edit svg{ width:12px; height:12px; }
+    .debtor-info{ margin-top:22px; }
+  }
+  @media(min-width:520px) and (max-width:768px){
+    .debtor-list{ grid-template-columns:repeat(4, minmax(0,1fr)); }
   }
 
 </style>

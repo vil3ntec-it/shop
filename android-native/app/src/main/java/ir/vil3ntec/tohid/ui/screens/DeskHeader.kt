@@ -99,12 +99,20 @@ fun DeskHeader(
         item("قرضِ بیش از ۶۰ روز", board.debtOverdue.size, Shop.colors.danger, "debtors")
       }
     }
+    //  میان‌برها — همیشه پیدا، نه فقط با F1
+    TextButton(onClick = { ir.vil3ntec.tohid.ui.AppNav.help.value = true }) {
+      Icon(Icons.Filled.Keyboard, null, tint = Shop.colors.text, modifier = Modifier.size(20.dp))
+      Spacer(Modifier.width(4.dp))
+      Text("میان‌برها", color = Shop.colors.text)
+      Spacer(Modifier.width(6.dp))
+      Text("F1", Modifier.clip(RoundedCornerShape(6.dp)).border(1.dp, Shop.colors.border, RoundedCornerShape(6.dp)).padding(horizontal = 5.dp), style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+    }
     IconButton(onClick = { onOpen("settings") }) { Icon(Icons.Filled.Settings, "تنظیمات", tint = Shop.colors.text) }
     Spacer(Modifier.width(6.dp))
     Button(onClick = { onOpen("sale") }, shape = RoundedCornerShape(20.dp)) {
       Icon(Icons.Filled.Add, null, modifier = Modifier.size(18.dp))
       Spacer(Modifier.width(6.dp))
-      Text("فروشِ تازه")
+      Text("فروشِ تازه  Ctrl+2")
     }
   }
   HorizontalDivider(color = Shop.colors.border)

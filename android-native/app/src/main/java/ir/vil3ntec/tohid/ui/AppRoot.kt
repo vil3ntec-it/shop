@@ -399,7 +399,30 @@ fun AppRoot(
   }
   val phoneScan = ir.vil3ntec.tohid.sync.PhoneScanner.lastReceived.value
   LaunchedEffect(phoneScan) {
-    if (phoneScan != null && (sub ?: tab) != "sale") open("sale")
+    //  کامپیوتر: بارکدِ گوشی به صفحهٔ باز می‌رود (`ScanRouter`)، نه همیشه به فروش
+    if (!Platform.DESKTOP && phoneScan != null && (sub ?: tab) != "sale") open("sale")
+  }
+  if (Platform.DESKTOP) {
+    LaunchedEffect(Unit) {
+      for (code in ir.vil3ntec.tohid.sync.PhoneScanner.inbox) {
+        ir.vil3ntec.tohid.scan.ScanRouter.dispatch(code) { open("sale") }
+      }
+    }
+    //  انبار و خرید: کالای ثبت‌شده ⇐ ورودِ انبارِ همان؛ ناشناس ⇐ فرمِ کالای تازه با همین بارکد
+    val here = sub ?: tab
+    val stockOwner = remember { Any() }
+    val latestData by rememberUpdatedState(data)
+    DisposableEffect(here) {
+      if (here == "warehouse" || here == "purchasing") {
+        ir.vil3ntec.tohid.scan.ScanRouter.register(stockOwner) { code ->
+          val id = ShopStore.barcodeIndex(latestData)[code]
+          if (id != null) pendingProduct = id else pendingBarcode = code
+          if (here != "warehouse") open("warehouse")
+          true
+        }
+      }
+      onDispose { ir.vil3ntec.tohid.scan.ScanRouter.unregister(stockOwner) }
+    }
   }
 
   //  میان‌برهای کامپیوتر — شرح سرِ `AppNav`

@@ -136,6 +136,20 @@ class Syncer(
       state.publicKey = runCatching { api.publicKey() }.getOrNull()
     }
 
+    //  کدِ آفلاینی که هنوز به سرور نرسیده ⇒ یک بار، پیش از گرفتنِ مجوز —
+    //  تا مجوزِ تازه همان اشتراک را داشته باشد
+    val offline = state.offlineCode
+    if (offline != null && !state.offlineRedeemed) {
+      try {
+        api.redeemOffline(offline, LicenseGuard.computerId(context))
+        state.offlineRedeemed = true
+      } catch (e: ir.vil3ntec.tohid.core.net.ApiFailure) {
+        if (e.code in setOf("code_revoked", "code_used_elsewhere", "account_mismatch", "computer_mismatch", "bad_offline_code")) {
+          LicenseGuard.dropOffline(state)
+        }
+      }
+    }
+
     val body = api.license(state.deviceUid, deviceName)
     val license = body["license"]?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content }
 

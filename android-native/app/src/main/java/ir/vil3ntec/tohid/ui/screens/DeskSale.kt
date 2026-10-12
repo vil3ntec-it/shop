@@ -142,14 +142,33 @@ fun DeskSaleScreen(
     }
   }
 
-  //  بارکدی که گوشیِ جفت‌شده فرستاد
-  LaunchedEffect(Unit) {
-    for (code in ir.vil3ntec.tohid.sync.PhoneScanner.inbox) {
-      when (val hit = BarcodeMatch.find(code, index)) {
-        is BarcodeMatch.Hit.Product -> d.products.firstOrNull { it.id == hit.id }?.let { add(it, 1.0) }
-        else -> toast("بارکدِ گوشی پیدا نشد: $code")
+  /*
+   *  بارکد از بیرونِ کادر — بارکدخوانی که وقتی کادر فوکوس نداشت خواند، یا
+   *  گوشیِ جفت‌شده (`ScanRouter`). تا این صفحه باز است همه به سبد می‌روند؛
+   *  بارکدی که از صفحهٔ دیگری به صندوق فرستاده شد هم این‌جا برداشته می‌شود.
+   */
+  val latestD by rememberUpdatedState(d)
+  fun fromScanner(code: String): Boolean {
+    val dd = latestD
+    when (val hit = BarcodeMatch.find(code, ShopStore.barcodeIndex(dd))) {
+      is BarcodeMatch.Hit.Product -> dd.products.firstOrNull { it.id == hit.id }?.let {
+        if (!it.active) toast("«${it.name}» غیرفعال است") else add(it, 1.0)
+      }
+      else -> scope.launch {
+        ScanFeedback.unknown(context)
+        val r = snackbar.showSnackbar("بارکدِ «$code» ثبت نشده", actionLabel = "ثبتِ کالا", duration = SnackbarDuration.Long)
+        if (r == SnackbarResult.ActionPerformed) onRegisterBarcode(code)
       }
     }
+    return true
+  }
+  val owner = remember { Any() }
+  DisposableEffect(Unit) {
+    ir.vil3ntec.tohid.scan.ScanRouter.register(owner) { fromScanner(it) }
+    onDispose { ir.vil3ntec.tohid.scan.ScanRouter.unregister(owner) }
+  }
+  LaunchedEffect(Unit) {
+    for (code in ir.vil3ntec.tohid.scan.ScanRouter.toSale) fromScanner(code)
   }
 
   val checkout = SalesEngine.Checkout(

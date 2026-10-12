@@ -34,7 +34,10 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberTrayState
 import androidx.compose.ui.window.rememberWindowState
 import androidx.compose.ui.window.MenuBar
+import androidx.compose.ui.input.key.utf16CodePoint
+import androidx.compose.ui.input.key.isAltPressed
 import androidx.compose.foundation.background
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -133,7 +136,8 @@ fun main() {
       }
     }
 
-    var shortcutsOpen by remember { mutableStateOf(false) }
+    var shortcutsOpen by ir.vil3ntec.tohid.ui.AppNav.help
+    val windowHid = remember { ir.vil3ntec.tohid.scan.HidScan() }
     Window(
       onCloseRequest = {
         //  بی سینی (بعضی میزکارهای لینوکس) بستن یعنی خروج
@@ -149,6 +153,24 @@ fun main() {
       state = windowState,
       title = "فروشگاه من",
       icon = icon,
+      /*
+       *  بارکدخوانِ USB/بلوتوث وقتی هیچ کادرِ نوشتنی فوکوس ندارد: نویسه‌های
+       *  تندِ پشتِ هم + Enter ⇐ `ScanRouter` ⇐ همان صفحه‌ای که باز است (صندوق
+       *  سبد، کالاها ویرایش/کالای تازه، انبار ورود). کادرِ فوکوس‌دار نویسه را
+       *  خودش برمی‌دارد و این‌جا نمی‌رسد — پس تایپِ آدم دست نمی‌خورد.
+       */
+      onKeyEvent = { e ->
+        if (e.type != KeyEventType.KeyDown) return@Window false
+        val now = System.currentTimeMillis()
+        if (e.key == Key.Enter || e.key == Key.NumPadEnter) {
+          val code = windowHid.submit(now) ?: return@Window false
+          ir.vil3ntec.tohid.scan.ScanRouter.dispatch(code) { ir.vil3ntec.tohid.ui.AppNav.go("sale") }
+          true
+        } else {
+          val ch = e.utf16CodePoint
+          if (ch in 33..126 && !e.isCtrlPressed && !e.isAltPressed) { windowHid.feed(ch.toChar(), now); true } else false
+        }
+      },
       onPreviewKeyEvent = { e ->
         if (e.type != KeyEventType.KeyDown) return@Window false
         val mod = e.isCtrlPressed || e.isMetaPressed
@@ -194,7 +216,7 @@ fun main() {
        */
       if (shortcutsOpen) {
         DialogWindow(onCloseRequest = { shortcutsOpen = false }, title = "میان‌برهای صفحه‌کلید",
-          state = androidx.compose.ui.window.rememberDialogState(size = DpSize(460.dp, 520.dp))) {
+          state = androidx.compose.ui.window.rememberDialogState(size = DpSize(560.dp, 680.dp))) {
           ShortcutsHelp()
         }
       }
@@ -235,7 +257,9 @@ fun main() {
               .getOrDefault(ThemeChoice.SYSTEM)
           )
         }
-        var welcomed by remember { mutableStateOf(prefs.getBoolean("welcomed", false)) }
+        //  عکس‌های خودکار در ساختِ dev ⇐ صفحهٔ خوش‌آمد رد می‌شود (همان «ادامه بدون حساب»)
+        val shotRun = ir.vil3ntec.tohid.BuildConfig.DEBUG && System.getProperty("tohid.shot.script") != null
+        var welcomed by remember { mutableStateOf(shotRun || prefs.getBoolean("welcomed", false)) }
         //  نوارِ منو ⇐ نما ⇐ ظاهر
         val themeRequest = ir.vil3ntec.tohid.ui.AppNav.theme.value
         LaunchedEffect(themeRequest) {
@@ -273,24 +297,68 @@ fun main() {
 /** پنجرهٔ «میان‌برهای صفحه‌کلید» — همان چیزهایی که `onPreviewKeyEvent` می‌گیرد */
 @androidx.compose.runtime.Composable
 private fun ShortcutsHelp() {
-  val rows = ir.vil3ntec.tohid.ui.AppNav.SHORTCUTS.mapIndexed { i, (_, label) -> "Ctrl+${i + 1}" to label } + listOf(
-    "Ctrl+M" to "مرکزِ مدیریت",
-    "Ctrl+N" to "موردِ تازه در همین صفحه (کالا، قرض‌دار، مصرف…)",
-    "Ctrl+K" to "جست‌وجوی سریع: صفحه، کالا، بارکد، قرض‌دار",
-    "F11" to "تمام‌صفحه",
-    "Ctrl+= / Ctrl+− / Ctrl+0" to "بزرگ‌نمایی / کوچک‌نمایی / عادی",
-    "Esc" to "بستنِ پنجره یا برگشت",
-    "دکمهٔ عقبِ ماوس" to "برگشت",
-    "کلیکِ راست روی ردیف" to "منوی کارها",
+  //  همهٔ میان‌برها، بخش‌به‌بخش — هر کلیدی که در برنامه کار می‌کند همین‌جا نوشته شده
+  val pages = ir.vil3ntec.tohid.ui.AppNav.SHORTCUTS.mapIndexed { i, (_, label) -> "Ctrl+${i + 1}" to label }
+  val groups: List<Pair<String, List<Pair<String, String>>>> = listOf(
+    "همه‌جا" to pages + listOf(
+      "F1" to "همین فهرستِ میان‌برها",
+      "Ctrl+K" to "جست‌وجوی سریع: صفحه، کالا، بارکد، مشتری",
+      "Ctrl+M" to "مرکزِ مدیریت",
+      "Ctrl+N" to "موردِ تازه در همین صفحه",
+      "F11" to "تمام‌صفحه",
+      "Ctrl+= / Ctrl+− / Ctrl+0" to "بزرگ‌نمایی / کوچک‌نمایی / عادی",
+      "Esc" to "بستنِ پنجره یا برگشت",
+      "دکمهٔ عقبِ ماوس" to "برگشت",
+      "کلیکِ راست روی ردیف" to "منوی کارها",
+    ),
+    "بارکدخوان" to listOf(
+      "صندوق" to "کالا به سبد",
+      "کالاها" to "ثبت‌شده: ویرایش — تازه: ردیفِ «کالای تازه»",
+      "انبار و خرید" to "ثبت‌شده: ورودِ انبار — تازه: فرمِ کالای تازه",
+      "صفحه‌های دیگر" to "صندوق باز می‌شود و کالا به سبد می‌رود",
+    ),
+    "صندوقِ فروش" to listOf(
+      "Enter" to "افزودنِ کالا (بارکد یا نام)",
+      "↑ / ↓" to "رفتن میانِ ردیف‌های سبد",
+      "3*" to "تعدادِ کالای بعدی (مثلاً 3*بارکد)",
+      "+ / −" to "یکی بیشتر / کمتر",
+      "Delete" to "حذفِ ردیفِ انتخاب‌شده",
+      "F2" to "انتخابِ مشتری",
+      "F3" to "ویرایشِ ردیف (قیمت، تخفیف)",
+      "F4" to "ردیفِ آزاد بی‌کالا",
+      "F8" to "چاپِ آخرین فاکتور",
+      "F9 / F12 / Ctrl+Enter" to "ثبتِ فروش",
+      "Esc" to "خالی کردنِ کادر",
+    ),
+    "کالاها" to listOf(
+      "Ctrl+F" to "جست‌وجو در جدول",
+      "Tab / Enter" to "رفتن به کادرِ بعدیِ «کالای تازه» و ثبت",
+      "Ctrl+S" to "ذخیرهٔ ویرایش",
+      "Esc" to "بستنِ پنلِ ویرایش",
+    ),
+    "مشتری‌ها و قرض" to listOf(
+      "F7" to "دریافت از مشتری",
+      "F6" to "دادن / قرضِ تازه",
+      "Enter" to "ثبتِ ردیف",
+      "Ctrl+P" to "چاپِ صورت‌حساب",
+      "Ctrl+E" to "خروجیِ اکسل",
+      "Esc" to "بستن",
+    ),
   )
   androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalLayoutDirection provides LayoutDirection.Rtl) {
     androidx.compose.foundation.layout.Column(
-      androidx.compose.ui.Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.White).padding(16.dp)
+      androidx.compose.ui.Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.White)
+        .verticalScroll(androidx.compose.foundation.rememberScrollState()).padding(16.dp)
     ) {
-      rows.forEach { (k, v) ->
-        androidx.compose.foundation.layout.Row(androidx.compose.ui.Modifier.fillMaxWidth().padding(vertical = 5.dp)) {
-          androidx.compose.material3.Text(v, modifier = androidx.compose.ui.Modifier.weight(1f))
-          androidx.compose.material3.Text(k, color = androidx.compose.ui.graphics.Color(0xFF475569))
+      groups.forEach { (title, rows) ->
+        androidx.compose.material3.Text(title, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+          color = androidx.compose.ui.graphics.Color(0xFF1E3A8A), modifier = androidx.compose.ui.Modifier.padding(top = 10.dp, bottom = 4.dp))
+        rows.forEach { (k, v) ->
+          androidx.compose.foundation.layout.Row(androidx.compose.ui.Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+            androidx.compose.material3.Text(v, modifier = androidx.compose.ui.Modifier.weight(1f))
+            androidx.compose.material3.Text(k, color = androidx.compose.ui.graphics.Color(0xFF334155),
+              modifier = androidx.compose.ui.Modifier.background(androidx.compose.ui.graphics.Color(0xFFF1F5F9)).padding(horizontal = 6.dp, vertical = 1.dp))
+          }
         }
       }
     }

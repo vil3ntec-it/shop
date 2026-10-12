@@ -177,6 +177,8 @@ object ApiEndpoints {
    */
   object Vip {
     const val REDEEM = "/vip/redeem"
+    /** کدِ اشتراکِ آفلاینِ بسته به کامپیوتر — ‎server/src/lib/shop-offline-codes.js‎ */
+    const val OFFLINE_CODE = "/vip/offline-code"
   }
 
   /* ------------------------------ پشتیبانِ ابری ------------------------------ */
