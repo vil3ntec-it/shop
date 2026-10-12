@@ -268,8 +268,9 @@ compose.desktop {
     mainClass = "ir.vil3ntec.tohid.desktop.MainKt"
     jvmArgs += listOf("-Dfile.encoding=UTF-8", "-Dsun.jnu.encoding=UTF-8")
     nativeDistributions {
-      //  Exe = نصابِ آشنای «Setup.exe» برای ویندوز؛ Msi همچنان برای به‌روزرسانیِ درون‌برنامه
-      targetFormats(TargetFormat.Exe, TargetFormat.Msi, TargetFormat.Dmg, TargetFormat.Deb)
+      //  نصابِ ویندوز Inno Setup است (‎installer/Tohid.iss‎ روی `createDistributable`)؛
+      //  Msi فقط برای نسخه‌های قدیمی که خودشان را از MSI به‌روز می‌کنند
+      targetFormats(TargetFormat.Msi, TargetFormat.Dmg, TargetFormat.Deb)
       packageName = "Tohid"
       packageVersion = appVersion
       //  ⚠️ لاتین: WiX (نصابِ MSI) متنِ بیرون از صفحه‌کدِ ۱۲۵۲ را نمی‌پذیرد

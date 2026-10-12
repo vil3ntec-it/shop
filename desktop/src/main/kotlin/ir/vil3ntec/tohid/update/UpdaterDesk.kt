@@ -14,7 +14,7 @@ import java.net.URL
  *
  *  | سیستم | فایل | نصب |
  *  |---|---|---|
- *  | ویندوز | `Tohid-Windows.msi` | `msiexec` و بستنِ برنامه، تا فایل‌ها آزاد باشند |
+ *  | ویندوز | `Tohid-Windows-Setup.exe` | نصابِ Inno بی‌صدا (‎/SILENT‎) و بستنِ برنامه؛ نصاب برنامه را دوباره باز می‌کند |
  *  | مک | `Tohid-Mac-*.dmg` | بازکردنِ دیسک؛ کاربر برنامه را روی Applications می‌کشد |
  *  | لینوکس | `Tohid-Linux.deb` | نصب‌کنندهٔ بستهٔ سیستم |
  *
@@ -31,7 +31,7 @@ object Updater {
 
   /** نامِ نصابِ همین کامپیوتر */
   val assetName: String = when {
-    os.contains("win") -> "Tohid-Windows.msi"
+    os.contains("win") -> "Tohid-Windows-Setup.exe"
     os.contains("mac") -> if (arch.contains("aarch64") || arch.contains("arm")) "Tohid-Mac-AppleSilicon.dmg" else "Tohid-Mac-Intel.dmg"
     else -> "Tohid-Linux.deb"
   }
@@ -239,7 +239,8 @@ object Updater {
   fun install(context: Context, apk: File): Result<Unit> = runCatching {
     when {
       os.contains("win") -> {
-        ProcessBuilder("msiexec", "/i", apk.absolutePath).start()
+        //  فقط نوارِ پیشرفت، بی پرسش؛ پایانِ نصب توحید را دوباره باز می‌کند (‎installer/Tohid.iss‎)
+        ProcessBuilder(apk.absolutePath, "/SILENT", "/SUPPRESSMSGBOXES", "/NORESTART").start()
         Thread { Thread.sleep(1500); Runtime.getRuntime().halt(0) }.start()
       }
       os.contains("mac") -> ProcessBuilder("open", apk.absolutePath).start()

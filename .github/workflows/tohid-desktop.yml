@@ -88,10 +88,13 @@ jobs:
             task: packageMsi
             glob: 'build/compose/binaries/main/msi/*.msi'
             fixed: Tohid-Windows.msi
+          #  نصابِ اصلیِ ویندوز: Inno Setup روی همان پوشهٔ برنامهٔ jpackage
+          #  (‎desktop/installer/Tohid.iss‎ — چرا، همان‌جا نوشته شده)
           - os: windows-2022
-            label: ویندوز (exe)
-            task: packageExe
-            glob: 'build/compose/binaries/main/exe/*.exe'
+            label: ویندوز (Setup.exe)
+            task: createDistributable
+            inno: true
+            glob: 'build/installer/*.exe'
             fixed: Tohid-Windows-Setup.exe
           - os: macos-14
             label: مک (Apple Silicon)
@@ -125,6 +128,18 @@ jobs:
           TOHID_API_BASE: ${{ vars.TOHID_API_BASE }}
           TOHID_UPDATE_PUBLIC_KEY: ${{ vars.TOHID_UPDATE_PUBLIC_KEY }}
         run: ./gradlew --no-daemon ${{ matrix.task }} -PbuildNumber=${{ github.run_number }}
+
+      - name: نصابِ Inno Setup
+        if: ${{ matrix.inno }}
+        working-directory: desktop
+        shell: pwsh
+        run: |
+          $v = (./gradlew --no-daemon -q printVersionName -PbuildNumber=${{ github.run_number }} | Select-Object -Last 1).Trim()
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress | Out-Null }
+          & $iscc /Q "/DAppVersion=$v" installer/Tohid.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Get-ChildItem build/installer
 
       - name: گزارشِ jpackage
         if: ${{ failure() }}
@@ -197,8 +212,8 @@ jobs:
 
             | سیستم | دانلود |
             |---|---|
-            | ویندوز ۱۰ و ۱۱ (نصابِ exe) | [Tohid-Windows-Setup.exe](https://github.com/${{ github.repository }}/releases/download/tohid-desktop/Tohid-Windows-Setup.exe) |
-            | ویندوز ۱۰ و ۱۱ (msi) | [Tohid-Windows.msi](https://github.com/${{ github.repository }}/releases/download/tohid-desktop/Tohid-Windows.msi) |
+            | ویندوز ۱۰ و ۱۱ (نصاب) | [Tohid-Windows-Setup.exe](https://github.com/${{ github.repository }}/releases/download/tohid-desktop/Tohid-Windows-Setup.exe) |
+            | ویندوز ۱۰ و ۱۱ (msi، فقط برای مدیرانِ شبکه) | [Tohid-Windows.msi](https://github.com/${{ github.repository }}/releases/download/tohid-desktop/Tohid-Windows.msi) |
             | مک (M1 و تازه‌تر) | [Tohid-Mac-AppleSilicon.dmg](https://github.com/${{ github.repository }}/releases/download/tohid-desktop/Tohid-Mac-AppleSilicon.dmg) |
             | مک (Intel) | [Tohid-Mac-Intel.dmg](https://github.com/${{ github.repository }}/releases/download/tohid-desktop/Tohid-Mac-Intel.dmg) |
             | لینوکس (دبیان/اوبونتو) | [Tohid-Linux.deb](https://github.com/${{ github.repository }}/releases/download/tohid-desktop/Tohid-Linux.deb) |
@@ -229,7 +244,7 @@ jobs:
           #  (‎desktop/setup-all‎: راهنما و سه نصب‌کنندهٔ کوچک که مک تراشه را خودش تشخیص می‌دهد)
           B="$RUNNER_TEMP/Tohid-Setup"
           mkdir -p "$B/Windows" "$B/Mac-Apple-Silicon" "$B/Mac-Intel" "$B/Linux"
-          cp Tohid-Windows-Setup.exe Tohid-Windows.msi "$B/Windows/"
+          cp Tohid-Windows-Setup.exe "$B/Windows/"
           cp Tohid-Mac-AppleSilicon.dmg "$B/Mac-Apple-Silicon/"
           cp Tohid-Mac-Intel.dmg "$B/Mac-Intel/"
           cp Tohid-Linux.deb "$B/Linux/"
