@@ -45,6 +45,7 @@ products.forEach((p, i) => {
   stockMovements.push({ id: id('m'), productId: p.id, type: 'purchase_in', qty: units, date: e.date, notes: 'موجودیِ اول', refId: e.id, createdAt: e.createdAt });
 });
 
+const stockLeft = Object.fromEntries(warehouseEntries.map(w => [w.productId, w.units]));
 const debtors = [
   { id: 'c1', name: 'احمد کریمی', phone: '0700123456', notes: 'همسایهٔ دکان', createdAt: now - 25 * day },
   { id: 'c2', name: 'محمود رحیمی', phone: '0799876543', notes: '', createdAt: now - 20 * day },
@@ -64,8 +65,13 @@ for (let k = 0; k < 28; k++) {
   const qty = [1 + (k % 3), 2];
   let total = 0;
   const sid = id('s');
+  //  بیش از موجودی فروخته نشود — همان قاعدهٔ `SalesEngine.record`ِ برنامه
   lines.forEach((p, j) => {
-    const q = p.unit === 'کیلوگرم' ? qty[j] + 0.5 : qty[j];
+    let q = p.unit === 'کیلوگرم' ? qty[j] + 0.5 : qty[j];
+    const left = (stockLeft[p.id] ?? 0);
+    if (q > left) q = Math.max(0, Math.floor(left));
+    if (q <= 0) return;
+    stockLeft[p.id] = left - q;
     const tp = Math.round(q * p.salePrice);
     total += tp;
     saleItems.push({ id: id('i'), saleId: sid, productId: p.id, name: '', quantity: q, unitPrice: p.salePrice, purchasePrice: p.purchasePrice, totalPrice: tp, returnedQty: 0 });

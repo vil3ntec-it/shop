@@ -345,12 +345,13 @@ private fun PanelGrid(panels: List<@Composable () -> Unit>) {
     }
     return
   }
+  //  تبلت دو ستون، کامپیوتر سه ستون — پهنای مانیتور خالی نمی‌ماند
+  val cols = if (screenSize() == Screen.WIDE) 3 else 2
   Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(gap)) {
-    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(gap)) {
-      panels.filterIndexed { i, _ -> i % 2 == 0 }.forEach { it() }
-    }
-    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(gap)) {
-      panels.filterIndexed { i, _ -> i % 2 == 1 }.forEach { it() }
+    for (c in 0 until cols) {
+      Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(gap)) {
+        panels.filterIndexed { i, _ -> i % cols == c }.forEach { it() }
+      }
     }
   }
 }
