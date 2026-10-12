@@ -20,4 +20,7 @@ object Platform {
 
   /** باز کردنِ پوشه در مدیرِ فایلِ سیستم — فقط کامپیوتر */
   fun openFolder(path: String): Boolean = false
+
+  /** ذخیرهٔ فایل با پنجرهٔ «ذخیره به‌عنوان» — فقط کامپیوتر؛ مسیرِ ذخیره‌شده یا null */
+  fun saveFile(suggestedName: String, bytes: ByteArray): String? = null
 }

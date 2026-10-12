@@ -55,6 +55,13 @@ fun SettingsSection(
   initiallyOpen: Boolean = false,
   content: @Composable ColumnScope.() -> Unit,
 ) {
+  //  کامپیوتر: فقط بخشِ انتخاب‌شده در ستونِ راستِ «تنظیمات» و همیشه باز (`DeskSettings`)
+  val pick = LocalSettingsPick.current
+  if (pick != null) {
+    if (pick != title) return
+    DeskSettingsSection(icon, title, subtitle, tint, content)
+    return
+  }
   var open by rememberSaveable(title) { mutableStateOf(initiallyOpen) }
   val colors = Shop.colors
   val turn by animateFloatAsState(
@@ -217,6 +224,79 @@ fun SegmentedChoice(
           fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
         )
       }
+    }
+  }
+}
+
+
+/** کامپیوتر: عنوانِ بخشی که ستونِ راستِ تنظیمات نشان می‌دهد؛ null یعنی گوشی (همهٔ بخش‌ها، تاشونده) */
+val LocalSettingsPick = staticCompositionLocalOf<String?> { null }
+
+@Composable
+private fun DeskSettingsSection(icon: ImageVector, title: String, subtitle: String, tint: Color, content: @Composable ColumnScope.() -> Unit) {
+  Column(
+    Modifier
+      .fillMaxWidth()
+      .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+      .background(Shop.colors.surfaceSolid)
+      .border(1.dp, Shop.colors.border, androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+      .padding(24.dp),
+  ) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+      IconBubble(icon, tint, 44.dp)
+      Spacer(Modifier.width(14.dp))
+      Column {
+        Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Shop.colors.text)
+        Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = Shop.colors.muted)
+      }
+    }
+    Spacer(Modifier.height(18.dp))
+    Box(Modifier.fillMaxWidth().height(1.dp).background(Shop.colors.border))
+    Spacer(Modifier.height(18.dp))
+    Column(Modifier.widthIn(max = 720.dp), content = content)
+  }
+}
+
+/**
+ *  تنظیماتِ کامپیوتر — دو ستون، مثلِ تنظیماتِ ویندوز و برنامه‌های کامپیوتری:
+ *  فهرستِ بخش‌ها کنار، محتوای بخشِ انتخاب‌شده (همیشه باز) در وسط. همان
+ *  `SettingsScreen`ِ گوشی رسم می‌شود؛ `SettingsSection` با `LocalSettingsPick`
+ *  فقط بخشِ انتخاب‌شده را می‌کشد.
+ */
+@Composable
+fun DeskSettings(sections: List<Pair<String, ImageVector>>, content: @Composable () -> Unit) {
+  var pick by rememberSaveable { mutableStateOf(sections.first().first) }
+  Row(Modifier.fillMaxSize().padding(16.dp)) {
+    Column(
+      Modifier
+        .width(240.dp)
+        .fillMaxHeight()
+        .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+        .background(Shop.colors.surfaceSolid)
+        .border(1.dp, Shop.colors.border, androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+        .padding(10.dp),
+    ) {
+      Text("تنظیمات", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Shop.colors.text, modifier = Modifier.padding(10.dp))
+      sections.forEach { (title, icon) ->
+        val on = title == pick
+        Row(
+          Modifier
+            .fillMaxWidth()
+            .clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
+            .background(if (on) Shop.colors.primary.copy(alpha = 0.12f) else Color.Transparent)
+            .clickable { pick = title }
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+          verticalAlignment = Alignment.CenterVertically,
+        ) {
+          Icon(icon, null, tint = if (on) Shop.colors.primary else Shop.colors.muted, modifier = Modifier.size(19.dp))
+          Spacer(Modifier.width(10.dp))
+          Text(title, style = MaterialTheme.typography.bodyMedium, color = if (on) Shop.colors.primary else Shop.colors.text, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal)
+        }
+      }
+    }
+    Spacer(Modifier.width(16.dp))
+    Box(Modifier.weight(1f).fillMaxHeight()) {
+      CompositionLocalProvider(LocalSettingsPick provides pick) { content() }
     }
   }
 }

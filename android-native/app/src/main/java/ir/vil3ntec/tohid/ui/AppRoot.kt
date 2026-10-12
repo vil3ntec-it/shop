@@ -432,6 +432,15 @@ fun AppRoot(
        *  سربرگ گذاشتم و روی دکمه‌های سربرگ نشست.
        */
       Column {
+      //  کامپیوتر: سربرگِ باریکِ خودش (عنوان، جست‌وجو، هشدارها، فروشِ تازه) — نه نوارِ آبیِ گوشی
+      if (Platform.DESKTOP) DeskHeader(
+        title = PAGE_TITLES[sub ?: tab] ?: "فروشگاه من",
+        d = data,
+        onBack = if (sub != null) ({ sub = null }) else null,
+        onMenu = { onMenuPress() },
+        onSearch = { AppNav.palette.value = true },
+        onOpen = ::open,
+      ) else
       TohidTopBar(
         title = PAGE_TITLES[sub ?: tab] ?: "فروشگاه من",
         d = data,
@@ -535,7 +544,15 @@ fun AppRoot(
       }
 
       if (wide && railMode != RailMode.HIDDEN) {
-        DeskRail(current = sub ?: tab, onPick = ::open, compact = railMode == RailMode.COMPACT, mode = railMode, onMode = ::setRail)
+        val railBoard = remember(data) { ir.vil3ntec.tohid.data.DashboardEngine.board(data, ir.vil3ntec.tohid.todayIso(), 7) }
+        DeskRail(
+          current = sub ?: tab, onPick = ::open, compact = railMode == RailMode.COMPACT, mode = railMode, onMode = ::setRail,
+          badges = mapOf(
+            "products" to railBoard.outOfStock.size + railBoard.lowStock.size,
+            "warehouse" to railBoard.expiring.size,
+            "debtors" to railBoard.debtOverdue.size,
+          ),
+        )
       }
       //  حالتِ «پنهان»: ☰ منو را روی صفحه باز می‌کند؛ زدنِ بیرونش می‌بندد
       //  دوربینِ گوشی برای کامپیوتر — درخواست، فرستادن و استودیو
@@ -594,12 +611,26 @@ fun AppRoot(
         //  دیگری به این مسیر برسد، باز هم باز نمی‌شود.
         "settings" ->
           if (ir.vil3ntec.tohid.data.ShopRole.canOpenSettings(context)) {
-            SettingsScreen(store, data, snackbar, theme, onTheme) { open("more") }
+            if (Platform.DESKTOP) DeskSettings(
+              listOf(
+                "هشدارها" to androidx.compose.material.icons.Icons.Filled.NotificationsActive,
+                "ظاهر" to androidx.compose.material.icons.Icons.Filled.Palette,
+                "کالای منقضی" to androidx.compose.material.icons.Icons.Filled.EventBusy,
+                "قفل برنامه" to androidx.compose.material.icons.Icons.Filled.Lock,
+                "تغییر رمز حساب" to androidx.compose.material.icons.Icons.Filled.Password,
+                "دستگاه‌های وارد شده" to androidx.compose.material.icons.Icons.Filled.Devices,
+                "کد شاگرد" to androidx.compose.material.icons.Icons.Filled.Key,
+                "داده‌ها" to androidx.compose.material.icons.Icons.Filled.Storage,
+                "درباره برنامه" to androidx.compose.material.icons.Icons.Filled.Info,
+              ),
+            ) { SettingsScreen(store, data, snackbar, theme, onTheme) { open("more") } }
+            else SettingsScreen(store, data, snackbar, theme, onTheme) { open("more") }
           } else {
             LaunchedEffect(Unit) { open("more") }
           }
         "expenses" -> ExpensesScreen(store, data, snackbar)
-        "dashboard" -> DashboardScreen(data, ::open)
+        "dashboard" -> if (Platform.DESKTOP) DeskDashboardScreen(data, ::open) { id -> openProduct = id; sub = "product" }
+          else DashboardScreen(data, ::open)
         "product" -> {
           val id = openProduct
           if (id == null) sub = null
@@ -615,7 +646,13 @@ fun AppRoot(
         "quick" -> VipGate("فروش (صندوق)") {
           QuickSaleScreen(store, cartStore, data, snackbar) { sub = null; tab = "sale" }
         }
-        "sale" -> VipGate("فروش (صندوق)") {
+        //  کامپیوتر صندوقِ خودش را دارد (صفحه‌کلید و بارکدخوان، بی دوربین)؛ گوشی همان دوربین
+        "sale" -> if (Platform.DESKTOP) VipGate("فروش (صندوق)") {
+          DeskSaleScreen(store = store, cartStore = cartStore, d = data, snackbar = snackbar) { code ->
+            pendingBarcode = code
+            open("warehouse")
+          }
+        } else VipGate("فروش (صندوق)") {
           SaleScreen(
             store = store,
             cartStore = cartStore,
@@ -627,8 +664,16 @@ fun AppRoot(
             open("warehouse")
           }
         }
-        "debtors" -> VipGate("قرض‌داران") { DebtorsScreen(store, data, snackbar) }
-        "products" -> ProductsScreen(
+        "debtors" -> VipGate("قرض‌داران") {
+          if (Platform.DESKTOP) DeskCustomersScreen(store, data, snackbar) else DebtorsScreen(store, data, snackbar)
+        }
+        "products" -> if (Platform.DESKTOP) DeskProductsScreen(
+          store = store,
+          d = data,
+          snackbar = snackbar,
+          onOpenWarehouse = { productId -> pendingProduct = productId; open("warehouse") },
+          onOpenProduct = { productId -> openProduct = productId; sub = "product" },
+        ) else ProductsScreen(
           store = store,
           d = data,
           snackbar = snackbar,
