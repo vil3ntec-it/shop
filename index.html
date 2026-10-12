@@ -4430,6 +4430,16 @@
           </div>
         </div>
 
+        <!-- صندوق — همان CashShiftِ اندروید: باز/بسته با دو ردیفِ سابقه -->
+        <div class="panel" id="shift-panel" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+          <div style="flex:1; min-width:180px;">
+            <b id="shift-title">صندوق بسته است</b>
+            <div class="empty-sub" id="shift-sub"></div>
+          </div>
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-shift-history">سابقه</button>
+          <button type="button" class="btn btn-primary btn-sm" id="btn-shift-toggle">باز کردن</button>
+        </div>
+
         <div class="panel" id="sales-empty-panel">
           <div class="empty-wrap" style="padding:34px 20px;">
             <div class="empty-icon">
@@ -4636,6 +4646,10 @@
             <div class="exp-stat-card"><div class="l">سود ناخالص</div><div class="v" id="rep-s-gp">0<small>افغانی</small></div></div>
             <div class="exp-stat-card"><div class="l">مصارف</div><div class="v" id="rep-s-exp">0<small>افغانی</small></div></div>
             <div class="exp-stat-card"><div class="l">سود خالص</div><div class="v cat" id="rep-s-np">0<small>افغانی</small></div></div>
+          </div>
+          <div id="rep-s-sellers-wrap" hidden style="margin-top:12px;">
+            <div class="panel-head"><h2>فروش هر کاربر</h2></div>
+            <div id="rep-s-sellers"></div>
           </div>
         </div>
 
@@ -5750,6 +5764,32 @@
 </div>
 
 <!-- Manual stock adjustment / return-to-supplier modal -->
+<div class="modal-scrim" id="modal-shift">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="shift-modal-title">باز کردنِ صندوق</h3>
+      <button class="modal-close" data-close-modal="modal-shift">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div id="shift-breakdown"></div>
+    <div class="form-group">
+      <label id="shift-amount-label">پولِ اولِ صندوق</label>
+      <input class="form-input" id="in-shift-amount" inputmode="decimal">
+      <div class="empty-sub" id="shift-diff"></div>
+    </div>
+    <div class="form-group" id="fg-shift-note">
+      <label>یادداشت (اختیاری)</label>
+      <input class="form-input" id="in-shift-note" maxlength="120">
+    </div>
+    <div id="shift-history-list" style="max-height:50vh; overflow:auto;"></div>
+    <div style="display:flex; gap:8px; justify-content:flex-end;">
+      <button type="button" class="btn btn-secondary" data-close-modal="modal-shift">انصراف</button>
+      <button type="button" class="btn btn-primary" id="btn-shift-save">باز کن</button>
+    </div>
+  </div>
+</div>
+
 <!-- انبارگردانی — همان StockCountSheetِ اندروید: خانهٔ خالی یعنی شمرده نشد -->
 <div class="modal-scrim" id="modal-stock-count">
   <div class="modal-box" style="max-width:720px;">
@@ -10265,7 +10305,7 @@
     sale:'ثبت فروش', cancel_sale:'لغو فروش', return:'مرجوعی',
     purchase:'ثبت خرید', customer_payment:'پرداخت مشتری', supplier_payment:'پرداخت تأمین‌کننده',
     stock_adjustment:'اصلاح موجودی', supplier_return:'برگشت به تأمین‌کننده',
-    price_change:'تغییر قیمت', product_edit:'ویرایش کالا', delete_product:'حذف محصول',
+    price_change:'تغییر قیمت', product_edit:'ویرایش کالا', shift_open:'باز کردن صندوق', shift_close:'بستن صندوق', delete_product:'حذف محصول',
     debtor_delete:'حذف قرض‌دار', debt_tx_delete:'حذف تراکنش بدهی', expense_delete:'حذف مصرف'
   };
   const STOCK_MOVEMENT_LABELS = {
@@ -10664,6 +10704,102 @@
     stockAdjDir = btn.dataset.val;
     document.querySelectorAll('#stock-adj-dir .seg-btn').forEach(b=> b.classList.toggle('active', b===btn));
   });
+  /* ---------- صندوق — عددبه‌عدد همان `CashShift`ِ اندروید ---------- */
+  function shiftList(){
+    const closes = new Map(auditLog.filter(a=> a.type==='shift_close' && a.refId).map(a=> [a.refId, a]));
+    return auditLog.filter(a=> a.type==='shift_open')
+      .sort((a,b)=> (b.createdAt||0)-(a.createdAt||0))
+      .map(o=> ({ open:o, close: closes.get(o.id) || null }));
+  }
+  function currentShift(){ return shiftList().find(s=> !s.close) || null; }
+  function shiftTotals(sh, now){
+    const from = sh.open.createdAt||0, to = sh.close ? sh.close.createdAt : now;
+    const inW = t=> (t||0) >= from && (t||0) <= to;
+    const sum = (arr, f)=> arr.reduce((s,x)=> s + f(x), 0);
+    const t = {
+      opening: sh.open.amount||0,
+      sales: sum(sales.filter(x=> x.status!=='cancelled' && inW(x.createdAt)), x=> Math.max(0, (x.finalTotal||0) - (x.debtGiven||0))),
+      receipts: sum(transactions.filter(x=> x.type==='receive' && inW(x.createdAt)), x=> x.amount||0),
+      returns: sum(returns.filter(x=> inW(x.createdAt)), x=> x.amount||0),
+      expenses: sum(expenses.filter(x=> inW(x.createdAt)), x=> x.amount||0),
+      suppliers: sum(supplierPayments.filter(x=> inW(x.createdAt)), x=> x.amount||0) + sum(purchases.filter(x=> inW(x.createdAt)), x=> x.paidAmount||0),
+    };
+    t.expected = t.opening + t.sales + t.receipts - t.returns - t.expenses - t.suppliers;
+    return t;
+  }
+  function renderShiftPanel(){
+    const sh = currentShift();
+    document.getElementById('shift-title').textContent = sh ? `صندوق باز — از ${new Date(sh.open.createdAt).toLocaleString('fa-IR-u-nu-latn')}` : 'صندوق بسته است';
+    document.getElementById('shift-sub').textContent = sh ? `نقدِ مورد انتظار در دخل: ${formatMoney(shiftTotals(sh, Date.now()).expected)} افغانی` : '';
+    document.getElementById('btn-shift-toggle').textContent = sh ? 'بستن صندوق' : 'باز کردن';
+  }
+  let shiftMode = 'open';
+  function shiftDiffText(){
+    const sh = currentShift(); const el = document.getElementById('shift-diff');
+    if(shiftMode !== 'close' || !sh){ el.textContent=''; return; }
+    const v = importNumber(document.getElementById('in-shift-amount').value);
+    if(!document.getElementById('in-shift-amount').value.trim() || !Number.isFinite(v)){ el.textContent=''; return; }
+    const diff = v - shiftTotals(sh, Date.now()).expected;
+    el.textContent = Math.abs(diff) < 0.5 ? 'بی اختلاف' : diff > 0 ? `اضافه: ${formatMoney(diff)} افغانی` : `کسری: ${formatMoney(-diff)} افغانی`;
+    el.style.color = Math.abs(diff) < 0.5 ? 'var(--success)' : 'var(--danger)';
+  }
+  function openShiftModal(mode){
+    shiftMode = mode;
+    const sh = currentShift();
+    const hist = mode === 'history';
+    document.getElementById('shift-modal-title').textContent = hist ? 'سابقهٔ صندوق' : (sh ? 'بستنِ صندوق' : 'باز کردنِ صندوق');
+    document.getElementById('in-shift-amount').closest('.form-group').hidden = hist;
+    document.getElementById('fg-shift-note').hidden = hist || !sh;
+    document.getElementById('btn-shift-save').hidden = hist;
+    document.getElementById('btn-shift-save').textContent = sh ? 'ببند' : 'باز کن';
+    document.getElementById('shift-amount-label').textContent = sh ? 'پولِ شمرده‌شده در دخل' : 'پولِ اولِ صندوق';
+    document.getElementById('in-shift-amount').value = '';
+    document.getElementById('in-shift-note').value = '';
+    document.getElementById('shift-diff').textContent = '';
+    const bd = document.getElementById('shift-breakdown');
+    if(!hist && sh){
+      const t = shiftTotals(sh, Date.now());
+      const row = (l,v,strong)=> `<div style="display:flex;justify-content:space-between;${strong?'font-weight:700;':''}"><span>${l}</span><span>${v<0?'−':''}${formatMoney(Math.abs(v))}</span></div>`;
+      bd.innerHTML = row('اول صندوق', t.opening) + row('فروش نقدی', t.sales) + row('رسید قرض‌داران', t.receipts)
+        + row('مرجوعی', -t.returns) + row('مصارف', -t.expenses) + row('پرداخت به تأمین‌کننده و خرید', -t.suppliers)
+        + row('مورد انتظار', t.expected, true);
+    } else bd.innerHTML = '';
+    document.getElementById('shift-history-list').innerHTML = hist ? (shiftList().slice(0,60).map(s=>
+      `<div class="exp-card" style="display:block;"><div>${escapeHtml(new Date(s.open.createdAt).toLocaleString('fa-IR-u-nu-latn'))} — ${escapeHtml(s.open.notes)}</div>
+       <div class="empty-sub">${s.close ? escapeHtml(new Date(s.close.createdAt).toLocaleString('fa-IR-u-nu-latn') + ' — ' + s.close.notes) : 'هنوز باز است'}</div></div>`).join('')
+      || '<div class="empty-sub">هنوز صندوقی باز نشده.</div>') : '';
+    openModal('modal-shift');
+  }
+  document.getElementById('btn-shift-toggle').addEventListener('click', ()=> openShiftModal(currentShift() ? 'close' : 'open'));
+  document.getElementById('btn-shift-history').addEventListener('click', ()=> openShiftModal('history'));
+  document.getElementById('in-shift-amount').addEventListener('input', shiftDiffText);
+  document.getElementById('btn-shift-save').addEventListener('click', ()=>{
+    const raw = document.getElementById('in-shift-amount').value;
+    const v = importNumber(raw);
+    if(!raw.trim() || !(v >= 0)){ showToast('مبلغ درست نیست', 'danger'); return; }
+    const who = String(((getAuth()||{}).name) || '').trim();
+    const sh = currentShift();
+    const now = Date.now();
+    if(!sh){
+      auditLog.push({ id: uid(), type:'shift_open', date: todayISO(), refId: null, amount: v, createdAt: now,
+        notes: `باز کردنِ صندوق با ${formatMoney(v)} افغانی` + (who ? ` — ${who}` : '') });
+      showToast('صندوق باز شد');
+    } else {
+      const t = shiftTotals(sh, now);
+      const diff = v - t.expected;
+      const note = document.getElementById('in-shift-note').value.trim();
+      const extra = [note, who].filter(Boolean).join(' — ');
+      auditLog.push({ id: uid(), type:'shift_close', date: todayISO(), refId: sh.open.id, amount: v, createdAt: now,
+        notes: `بستنِ صندوق: مورد انتظار ${formatMoney(t.expected)}، شمرده ${formatMoney(v)}، `
+          + (Math.abs(diff) < 0.5 ? 'بی اختلاف' : diff > 0 ? `اضافه ${formatMoney(diff)}` : `کسری ${formatMoney(-diff)}`)
+          + (extra ? ` — ${extra}` : '') });
+      showToast('صندوق بسته شد');
+    }
+    saveState();
+    closeModal('modal-shift');
+    renderShiftPanel();
+  });
+
   /* ---------- انبارگردانی — عددبه‌عدد همان `WarehouseEngine.stockCount`ِ اندروید ---------- */
   let scCounts = {};   // productId → متنِ نوشته‌شده
   function scParsed(){
@@ -10865,6 +11001,17 @@
     document.getElementById('rep-s-gp').innerHTML = formatMoney(r.grossProfit)+'<small>افغانی</small>';
     document.getElementById('rep-s-exp').innerHTML = formatMoney(r.expenses)+'<small>افغانی</small>';
     document.getElementById('rep-s-np').innerHTML = formatMoney(r.netProfit)+'<small>افغانی</small>';
+    //  فروش هر کاربر — همان `ReportEngine.bySeller`ِ اندروید؛ فقط وقتی بیش از یک فروشنده هست
+    const by = new Map();
+    sales.forEach(x=>{
+      if(x.status === 'cancelled' || x.date < from || x.date > to) return;
+      const k = String(x.seller||'').trim() || 'نامعلوم';
+      const v = by.get(k) || { n:0, net:0 }; v.n++; v.net += x.finalTotal||0; by.set(k, v);
+    });
+    const list = Array.from(by.entries()).sort((a,b)=> b[1].net - a[1].net);
+    document.getElementById('rep-s-sellers-wrap').hidden = list.length < 2;
+    document.getElementById('rep-s-sellers').innerHTML = list.map(([k,v])=>
+      `<div class="exp-card"><div class="exp-title">${escapeHtml(k)} — ${formatMoney(v.n)} فاکتور</div><div class="exp-amount">${formatMoney(v.net)} افغانی</div></div>`).join('');
   }
   document.getElementById('rep-sales-range').addEventListener('change', ()=>{ renderSalesReport(); renderPurchaseReport(); });
   document.getElementById('rep-sales-from').addEventListener('change', ()=>{ renderSalesReport(); renderPurchaseReport(); });
@@ -12127,7 +12274,9 @@
       finalTotal, paymentMethod: coPaymentType, debtorId,
       paidAmount: paid, remaining, status:'completed',
       debtGiven: (debtorId && remaining>0) ? remaining : 0, debtSettled: 0,
-      createdAt: Date.now(), date: todayISO(), syncStatus:'pending'
+      createdAt: Date.now(), date: todayISO(), syncStatus:'pending',
+      //  فروشنده — نامِ حسابِ واردشده؛ گزارشِ «فروش هر کاربر» از همین می‌خواند
+      seller: String(((getAuth()||{}).name) || '').trim()
     });
     cart.forEach(item=>{
       const p = products.find(x=>x.id===item.productId);
@@ -12406,6 +12555,7 @@
   }
 
   function renderSalesPage(){
+    renderShiftPanel();
     const list = document.getElementById('sales-list');
     const empty = document.getElementById('sales-empty-panel');
     if(!list) return;
@@ -14284,7 +14434,7 @@
   function buildReportCsvRows(tab){
     if(tab==='sales'){
       const { from, to } = reportRangeDates();
-      const rows = [['شماره فاکتور','تاریخ','مبلغ کل','تخفیف','مبلغ نهایی','پرداختی','باقی‌مانده','روش پرداخت','وضعیت','دلیلِ لغو']];
+      const rows = [['شماره فاکتور','تاریخ','مبلغ کل','تخفیف','مبلغ نهایی','پرداختی','باقی‌مانده','روش پرداخت','وضعیت','دلیلِ لغو','فروشنده']];
       sales
         .filter(s=> s.date>=from && s.date<=to)
         .sort((a,b)=> a.createdAt-b.createdAt)
@@ -14295,7 +14445,8 @@
             Math.round(s.paidAmount||0), Math.round(s.remaining||0),
             s.paymentMethod==='credit' ? 'نسیه' : 'نقدی',
             s.status==='cancelled' ? 'لغو‌شده' : 'ثبت‌شده',
-            s.cancelReason || ''
+            s.cancelReason || '',
+            s.seller || ''
           ]);
         });
       return { rows, name:`گزارش-فروش-${from}-تا-${to}` };

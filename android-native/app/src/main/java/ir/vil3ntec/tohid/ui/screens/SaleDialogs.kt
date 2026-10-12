@@ -80,6 +80,8 @@ fun CheckoutDialog(
     paidAmount = paidText.toDoubleOrNull() ?: 0.0,
     debtorId = debtorId,
     blockExpired = remember { ir.vil3ntec.tohid.data.ShopPolicy.blockExpired(context) },
+    //  نامِ حسابِ واردشده — گزارشِ «فروشِ هر کاربر» از همین می‌خواند
+    seller = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrDefault("") },
   )
   val totals = SalesEngine.totals(d, cart, checkout)
 

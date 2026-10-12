@@ -255,6 +255,22 @@ private fun salesSection(
       ReportRow(if (lost) "ضرر خالص" else "سود خالص", r.netProfit, strong = true)
     }
 
+    //  فروشِ هر کاربر — وقتی بیش از یک فروشنده در بازه هست
+    val sellers = ReportEngine.bySeller(d, from, to)
+    if (sellers.size > 1) {
+      Spacer(Modifier.height(12.dp))
+      Text("فروش هر کاربر", style = MaterialTheme.typography.titleSmall, color = Shop.colors.text)
+      Spacer(Modifier.height(6.dp))
+      Panel {
+        sellers.forEach { st ->
+          Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("${st.seller} — ${plain(st.count)} فاکتور", style = MaterialTheme.typography.bodySmall, color = Shop.colors.text)
+            Text("${money(st.net)} ؋", style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text, fontWeight = FontWeight.Bold)
+          }
+        }
+      }
+    }
+
     Spacer(Modifier.height(10.dp))
     Text(
       "سود هر قلم از قیمت خرید ثبت‌شده روی همان فاکتور حساب می‌شود، نه قیمت امروز.",

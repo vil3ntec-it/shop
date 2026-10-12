@@ -59,7 +59,7 @@ object ReportCsv {
     val rows = mutableListOf(
       listOf(
         "شماره فاکتور", "تاریخ", "مبلغ کل", "تخفیف", "مبلغ نهایی",
-        "پرداختی", "باقی‌مانده", "روش پرداخت", "وضعیت", "دلیلِ لغو",
+        "پرداختی", "باقی‌مانده", "روش پرداخت", "وضعیت", "دلیلِ لغو", "فروشنده",
       )
     )
     d.sales
@@ -74,6 +74,7 @@ object ReportCsv {
           if (s.paymentMethod == "credit") "نسیه" else "نقدی",
           if (s.status == "cancelled") "لغو‌شده" else "ثبت‌شده",
           s.cancelReason,
+          s.seller,
         )
       }
     return Sheet("گزارش-فروش-$from-تا-$to", rows)

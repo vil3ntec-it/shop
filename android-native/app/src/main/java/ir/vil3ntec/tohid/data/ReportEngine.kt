@@ -196,6 +196,17 @@ object ReportEngine {
     }
   }
 
+  /* ------------------------- فروشِ هر کاربر ------------------------- */
+
+  data class SellerStat(val seller: String, val count: Int, val net: Double, val discount: Double)
+
+  /** فاکتورهای لغونشدهٔ بازه به تفکیکِ فروشنده — بیشترین فروش اول */
+  fun bySeller(d: ShopData, from: String, to: String): List<SellerStat> =
+    d.sales.filter { it.status != "cancelled" && it.date >= from && it.date <= to }
+      .groupBy { it.seller.trim().ifEmpty { "نامعلوم" } }
+      .map { (who, rows) -> SellerStat(who, rows.size, rows.sumOf { it.finalTotal }, rows.sumOf { it.discount }) }
+      .sortedByDescending { it.net }
+
   /* ------------------------- گردشِ موجودی ------------------------- */
 
   /** حرکاتِ انبار، تازه‌ترین اول. مثل نسخهٔ وب حداکثر ۲۰۰ ردیف. */

@@ -70,6 +70,8 @@ object SalesEngine {
   enum class Payment { CASH, CREDIT }
 
   data class Checkout(
+    /** نامِ فروشنده روی فاکتور — صفحه از حسابِ واردشده می‌گذارد */
+    val seller: String = "",
     val discountType: DiscountType = DiscountType.AMOUNT,
     val discountValue: Double = 0.0,
     val payment: Payment = Payment.CASH,
@@ -333,6 +335,7 @@ object SalesEngine {
       createdAt = now,
       date = today,
       syncStatus = "pending",
+      seller = checkout.seller.trim(),
     )
 
     val items = mutableListOf<SaleItem>()

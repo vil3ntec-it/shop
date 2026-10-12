@@ -97,6 +97,8 @@ data class Sale(
   val syncStatus: String = "pending",
   /** دلیلِ لغو — همان `cancelReason`ِ وب */
   val cancelReason: String = "",
+  /** فروشنده — نامِ حسابی که فاکتور را زد (برای گزارشِ فروشِ هر کاربر)؛ خالی یعنی نامعلوم */
+  val seller: String = "",
 )
 
 @Serializable
@@ -246,6 +248,8 @@ data class AuditEntry(
   val refId: String? = null,
   val notes: String = "",
   val createdAt: Long = 0,
+  /** مبلغِ ردیف — فعلاً فقط صندوق (`shift_open`/`shift_close`)؛ بقیه صفر */
+  val amount: Double = 0.0,
 )
 
 /**
