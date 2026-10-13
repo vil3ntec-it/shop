@@ -352,6 +352,9 @@ dependencies {
   implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
 
   testImplementation("junit:junit:4.13.2")
+  //  `org.json`ِ اندروید در آزمونِ واحد فقط پوسته است («not mocked»)؛
+  //  `ReleaseFeedTest` پاسخِ انتشارها را واقعاً می‌خواند. همان نسخهٔ کامپیوتر.
+  testImplementation("org.json:json:20250517")
 }
 
 /**
