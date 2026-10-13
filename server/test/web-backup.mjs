@@ -18,6 +18,7 @@
  * اجرا:  node test/web-backup.mjs
  */
 import { createRequire } from 'node:module';
+import { missingTool, PLAYWRIGHT_INSTALL } from './browser-guard.mjs';
 import assert from 'node:assert/strict';
 import { execSync } from 'node:child_process';
 import http from 'node:http';
@@ -37,10 +38,7 @@ let chromium = null;
 for (const p of candidates()) {
   try { ({ chromium } = require(p)); break; } catch { /* بعدی */ }
 }
-if (!chromium) {
-  console.log('⏭  پلی‌رایت پیدا نشد — این سنجه رد شد');
-  process.exit(0);
-}
+if (!chromium) missingTool('پلی‌رایت', PLAYWRIGHT_INSTALL);
 
 process.env.NODE_ENV = 'test';
 process.env.DATABASE_URL = process.env.TEST_DATABASE_URL
