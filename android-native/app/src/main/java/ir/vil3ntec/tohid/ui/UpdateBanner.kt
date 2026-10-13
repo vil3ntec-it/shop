@@ -27,6 +27,9 @@ import ir.vil3ntec.tohid.update.UpdateManager
  */
 @Composable
 fun UpdateBanner() {
+  //  ⛔ نسخهٔ کافه‌بازار: «برنامه‌ای که از بازار گرفته شده فقط از بازار به‌روز
+  //  می‌شود» — نه بررسی، نه دانلود، نه نصب (و اجازهٔ نصب هم در مانیفستش نیست)
+  if (BuildConfig.STORE == "bazaar") return
   val context = LocalContext.current
   LaunchedEffect(Unit) {
     val prefs = context.getSharedPreferences("tohid", android.content.Context.MODE_PRIVATE)

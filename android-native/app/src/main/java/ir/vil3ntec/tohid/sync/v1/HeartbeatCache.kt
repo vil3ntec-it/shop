@@ -23,6 +23,11 @@ class HeartbeatCache(context: android.content.Context) {
     prefs.edit().putString("body", body.toString()).putLong("at", System.currentTimeMillis()).apply()
   }
 
+  /** تمدید با کد ⇐ تپشِ کهنهٔ «تمام‌شده» دور ریخته می‌شود تا تپشِ بعدی؛ قفل همان لحظه باز */
+  fun forget() {
+    prefs.edit().remove("body").apply()
+  }
+
   /** آیا برنامه باید فقط‌خواندنی شود — بندِ ۲۱٫۸. */
   fun softLocked(): Boolean {
     val sub = read()?.get("subscription") as? JsonObject ?: return false

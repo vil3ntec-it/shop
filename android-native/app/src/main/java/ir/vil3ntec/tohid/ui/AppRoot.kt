@@ -303,6 +303,18 @@ fun AppRoot(
   LaunchedEffect(migration) {
     migration?.let { scope.launch { snackbar.showSnackbar(it) } }
   }
+  //  نوشتنی که قفلِ نرمِ پایانِ اشتراک ردش کرد ⇐ پیامِ «ثبت شد»ِ صفحه برداشته
+  //  می‌شود و راستش گفته می‌شود، با راهِ تمدید
+  LaunchedEffect(store) {
+    store.blocked.collect {
+      snackbar.currentSnackbarData?.dismiss()
+      val r = snackbar.showSnackbar(
+        "اشتراک تمام شده — این فروش/قرض ثبت نشد. انبار، کالا، خرید و مصارف باز است.",
+        actionLabel = "تمدید", duration = SnackbarDuration.Long,
+      )
+      if (r == SnackbarResult.ActionPerformed) AppNav.go("vip")
+    }
+  }
 
   if (lockStore.enabled && !unlocked) {
     AppLockScreen { unlocked = true }
@@ -413,7 +425,8 @@ fun AppRoot(
     val stockOwner = remember { Any() }
     val latestData by rememberUpdatedState(data)
     DisposableEffect(here) {
-      if (here == "warehouse" || here == "purchasing") {
+      //  خریدِ کامپیوتر گیرندهٔ خودش را دارد (`DeskPurchasingScreen`: بارکد ⇐ ردیفِ فاکتور)
+      if (here == "warehouse" || (here == "purchasing" && !Platform.DESKTOP)) {
         ir.vil3ntec.tohid.scan.ScanRouter.register(stockOwner) { code ->
           val id = ShopStore.barcodeIndex(latestData)[code]
           if (id != null) pendingProduct = id else pendingBarcode = code
@@ -619,10 +632,11 @@ fun AppRoot(
         label = "page",
       ) { current ->
       when (current) {
-        "purchasing" -> PurchasingScreen(store, data, snackbar)
+        "purchasing" -> if (Platform.DESKTOP) DeskPurchasingScreen(store, data, snackbar) else PurchasingScreen(store, data, snackbar)
         "admin" -> ManagementScreen(data, ::open)
-        "sales" -> SalesHistoryScreen(store, cartStore, data, snackbar) { sub = null; tab = "sale" }
-        "reports" -> ReportsScreen(data)
+        "sales" -> if (Platform.DESKTOP) DeskInvoicesScreen(store, cartStore, data, snackbar) { sub = null; tab = "sale" }
+          else SalesHistoryScreen(store, cartStore, data, snackbar) { sub = null; tab = "sale" }
+        "reports" -> if (Platform.DESKTOP) DeskReportsScreen(data, snackbar) else ReportsScreen(data)
         "receipts" -> ReceiptsScreen(data)
         //  مثلِ تنظیمات، سدِ دوم: اگر از هر راهِ دیگری به این مسیر
         //  برسد هم برای شاگرد باز نمی‌شود

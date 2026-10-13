@@ -23,6 +23,8 @@ open class Intent(var action: String? = null, var data: Uri? = null) {
   fun putExtra(key: String, value: Boolean): Intent = apply { extras[key] = value }
   fun putExtra(key: String, value: Long): Intent = apply { extras[key] = value }
   fun putExtra(key: String, value: java.io.Serializable?): Intent = apply { extras[key] = value }
+  /** پیوستِ فایل (`EXTRA_STREAM`) — روی کامپیوتر فقط نگه داشته می‌شود */
+  fun putExtra(key: String, value: android.net.Uri?): Intent = apply { extras[key] = value }
   fun getStringExtra(key: String): String? = extras[key] as? String
   @Suppress("UNCHECKED_CAST")
   fun getStringArrayListExtra(key: String): ArrayList<String>? = extras[key] as? ArrayList<String>

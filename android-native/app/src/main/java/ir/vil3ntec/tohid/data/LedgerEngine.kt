@@ -167,6 +167,9 @@ object LedgerEngine {
     val paidAmount: Double = 0.0,
     val date: String = "",
     val notes: String = "",
+    /** تاریخِ انقضا و تولیدِ همین محموله (اختیاری) — روی ورودِ انبار می‌نشیند */
+    val expiryDate: String = "",
+    val productionDate: String = "",
   )
 
   /**
@@ -252,6 +255,8 @@ object LedgerEngine {
           notes = draft.notes.ifBlank { "خرید از تأمین‌کننده" },
           purchaseId = purchaseId,
           createdAt = now,
+          expiryDate = draft.expiryDate,
+          productionDate = draft.productionDate,
         ),
         purchases = d.purchases + Purchase(
           id = purchaseId,

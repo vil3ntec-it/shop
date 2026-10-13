@@ -200,6 +200,12 @@ data class Purchase(
   val debt: Double = 0.0,
   val warehouseEntryId: String? = null,
   val createdAt: Long = 0,
+  /**
+   *  شمارهٔ فاکتورِ خریدِ چندردیفه (`PurchaseBook`) — همهٔ ردیف‌های یک فاکتور
+   *  همین عدد را دارند. ۰ یعنی خریدِ تک‌ردیفهٔ قدیمی (هر ردیف فاکتورِ خودش).
+   *  افزودنی و بی‌خطر؛ نسخهٔ وب نمی‌شناسدش و فقط گروه‌بندی را از دست می‌دهد.
+   */
+  val invoiceNo: Int = 0,
 )
 
 @Serializable
