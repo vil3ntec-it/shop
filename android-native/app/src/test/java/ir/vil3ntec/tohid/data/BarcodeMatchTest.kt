@@ -54,6 +54,21 @@ class BarcodeMatchTest {
   }
 
   @Test
+  fun `بارکد با رقمِ فارسی و عربی همان کالا است — F0-06`() {
+    //  اسکنر یا صفحه‌کلید با چیدمانِ فارسی/پشتو رقمِ ۰-۹ می‌فرستد
+    assertEquals(BarcodeMatch.Hit.Product("cola", true), BarcodeMatch.find("۵۴۴۹۰۰۰۰۰۰۹۹۶", index))
+    assertEquals(BarcodeMatch.Hit.Product("cola", true), BarcodeMatch.find("٥٤٤٩٠٠٠٠٠٠٩٩٦", index))
+    assertEquals(BarcodeMatch.Hit.Product("milk", false), BarcodeMatch.find("۴۰۰۱۶۸۶", index))
+  }
+
+  @Test
+  fun `بارکدی که قبلاً با رقمِ فارسی ثبت شده هنوز پیدا می‌شود`() {
+    val old = index + ("۱۲۳۴۵۶۷۸" to "tea")
+    assertEquals(BarcodeMatch.Hit.Product("tea", true), BarcodeMatch.find("۱۲۳۴۵۶۷۸", old))
+    assertEquals(BarcodeMatch.Hit.Product("tea", true), BarcodeMatch.find("12345678", old))
+  }
+
+  @Test
   fun `کدِ خالی، هیچ`() {
     assertEquals(BarcodeMatch.Hit.None, BarcodeMatch.find("   ", index))
   }

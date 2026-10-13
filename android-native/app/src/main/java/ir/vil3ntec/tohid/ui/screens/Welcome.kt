@@ -1271,7 +1271,7 @@ private fun CodeScreen(
         BasicTextField(
           value = code,
           onValueChange = { raw ->
-            val digits = raw.filter { it.isDigit() }.take(6)
+            val digits = ir.vil3ntec.tohid.normalizeDigits(raw).filter { it in '0'..'9' }.take(6)
             code = digits
             //  در حالتِ عادی با کاملِ شش رقم خودش می‌فرستد. در بازیابی نه،
             //  چون رمزِ تازه هم باید نوشته شود.

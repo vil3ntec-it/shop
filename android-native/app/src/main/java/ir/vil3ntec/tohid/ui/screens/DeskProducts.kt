@@ -246,7 +246,7 @@ private fun QuickField(
 ) {
   OutlinedTextField(
     value = value,
-    onValueChange = { onChange(if (numeric) it.filter { c -> c.isDigit() || c == '.' } else it) },
+    onValueChange = { onChange(if (numeric) ir.vil3ntec.tohid.numericInput(it) else it) },
     label = { Text(label, maxLines = 1) },
     singleLine = true,
     textStyle = MaterialTheme.typography.bodyMedium,
@@ -384,7 +384,7 @@ private fun EditPanel(
       Spacer(Modifier.height(10.dp))
       @Composable fun F(v: String, set: (String) -> Unit, label: String, numeric: Boolean = false) {
         OutlinedTextField(
-          value = v, onValueChange = { set(if (numeric) it.filter { c -> c.isDigit() || c == '.' } else it) },
+          value = v, onValueChange = { set(if (numeric) ir.vil3ntec.tohid.numericInput(it) else it) },
           label = { Text(label) }, singleLine = true, modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(6.dp))
