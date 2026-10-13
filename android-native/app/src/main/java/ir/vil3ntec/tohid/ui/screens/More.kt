@@ -185,6 +185,8 @@ fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
        */
     }
 
+    //  نسخهٔ بازار خودش را به‌روز نمی‌کند — به‌روزرسانی فقط از خودِ بازار (قانونِ بازار)
+    if (BuildConfig.STORE != "bazaar") {
     Spacer(Modifier.height(20.dp))
     SectionTitle("به‌روزرسانی برنامه")
     Panel {
@@ -292,6 +294,7 @@ fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
         Spacer(Modifier.height(8.dp))
         Text(it, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
       }
+    }
     }
 
     /*

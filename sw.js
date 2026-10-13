@@ -6,7 +6,7 @@
    - فونت‌های گوگل: اولین بار از شبکه، سپس همیشه از کش.
    داده‌های فروشگاه در localStorage است و اصلاً از اینجا عبور نمی‌کند.
    ========================================================== */
-const VERSION = 'tohid-shop-v49';
+const VERSION = 'tohid-shop-v50';
 const SHELL_CACHE = VERSION + '-shell';
 const FONT_CACHE = VERSION + '-fonts';
 
@@ -51,6 +51,9 @@ const SHELL_ASSETS = [
    */
   './license/thermal-print.js',
   './license/photo-studio.js',
+  //  خوانندهٔ بارکد برای آیفون — Safari «BarcodeDetector» ندارد و دوربین همیشه
+  //  همین را بار می‌کند؛ بی آن، نصبِ تازه بی اینترنت اصلاً اسکن نمی‌کرد
+  './license/vendor/zxing-0.21.3.min.js',
   './sounds/scan-beep.mp3',
 ];
 
@@ -125,8 +128,14 @@ self.addEventListener('fetch', (event) => {
    * بود و یک فایل کش‌شده تا عوض شدن نسخه‌ی سرویس‌ورکر هرگز تازه نمی‌شد.
    */
   if (url.origin === self.location.origin) {
+    /*
+     *  ⚠️ `index.html` فایل‌ها را با `?v=N` می‌خواند ولی پوسته بی آن کش شده؛
+     *  پس اولین باز کردنِ بی اینترنت (فقط یک بار آنلاین باز شده) اسکریپت‌های
+     *  مجوز و همگام‌سازی را نداشت. حالا اگر نسخهٔ دقیق نبود، همان فایلِ بی
+     *  پرسش‌نامه از پوسته برداشته می‌شود.
+     */
     event.respondWith(
-      caches.match(req).then((hit) => {
+      caches.match(req).then((exact) => exact || (url.search ? caches.match(req, { ignoreSearch: true }) : undefined)).then((hit) => {
         const fresh = fetch(req).then((res) => {
           if (res && res.ok) {
             const copy = res.clone();

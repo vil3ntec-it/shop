@@ -113,6 +113,7 @@ val generateConfig by tasks.registering {
       |
       |object BuildConfig {
       |  const val DEBUG: Boolean = $dev
+      |  const val STORE: String = "direct"
       |  const val APPLICATION_ID: String = "ir.vil3ntec.tohid"
       |  const val VERSION_NAME: String = ${q(appVersion)}
       |  const val VERSION_CODE: Int = ${100 + buildNumber}

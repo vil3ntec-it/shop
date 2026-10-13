@@ -26,8 +26,41 @@ object ReportCsv {
       "debtors" -> debtors(d, today)
       "purchases" -> purchases(d, from, to)
       "expiry" -> expiry(d, today)
+      "profit" -> profit(d, from, to)
+      "expenses" -> expenses(d, from, to)
+      "sellers" -> sellers(d, from, to)
       else -> stock(d, today)
     }
+
+  /** سود و زیانِ بازه — همان عددهای `ReportEngine.sales`، سطر به سطر */
+  private fun profit(d: ShopData, from: String, to: String): Sheet {
+    val r = ReportEngine.sales(d, from, to)
+    val rows = mutableListOf(listOf("شرح", "مبلغ"))
+    rows += listOf("تعدادِ فاکتور", r.count.toString())
+    rows += listOf("فروشِ ناخالص", round(r.gross))
+    rows += listOf("تخفیف", round(r.discount))
+    rows += listOf("فروشِ خالص", round(r.net))
+    rows += listOf("مرجوعی", round(r.returnAmount))
+    rows += listOf("بهای تمام‌شدهٔ کالا", round(r.cogs))
+    rows += listOf("سودِ ناخالص", round(r.grossProfit))
+    rows += listOf("مصارف", round(r.expenses))
+    rows += listOf("سودِ خالص", round(r.netProfit))
+    return Sheet("سود-و-زیان-$from-تا-$to", rows)
+  }
+
+  private fun expenses(d: ShopData, from: String, to: String): Sheet {
+    val rows = mutableListOf(listOf("تاریخ", "عنوان", "دسته", "مبلغ", "یادداشت"))
+    d.expenses.filter { it.date in from..to }.sortedBy { it.date }.forEach { e ->
+      rows += listOf(e.date, e.title, e.category, round(e.amount), e.notes)
+    }
+    return Sheet("مصارف-$from-تا-$to", rows)
+  }
+
+  private fun sellers(d: ShopData, from: String, to: String): Sheet {
+    val rows = mutableListOf(listOf("فروشنده", "تعدادِ فاکتور", "فروشِ خالص", "تخفیف"))
+    ReportEngine.bySeller(d, from, to).forEach { s -> rows += listOf(s.seller, s.count.toString(), round(s.net), round(s.discount)) }
+    return Sheet("فروشِ-هر-کاربر-$from-تا-$to", rows)
+  }
 
   private fun purchases(d: ShopData, from: String, to: String): Sheet {
     val names = d.suppliers.associate { it.id to it.name }

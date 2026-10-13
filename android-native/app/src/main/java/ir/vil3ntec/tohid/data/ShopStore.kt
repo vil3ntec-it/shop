@@ -78,13 +78,27 @@ class ShopStore(private val context: Context) {
    *  @return آیا نوشته شد. `false` یعنی قفلِ نرم — صفحه باید بگوید چرا.
    */
   suspend fun save(next: ShopData): Boolean = withContext(Dispatchers.IO) {
-    if (SoftLock.isLocked(context)) {
+    //  ⛔ قفلِ نرم فقط بخش‌های پولی را می‌بندد — فروش و قرض‌داران. انبار،
+    //  کالا، خرید و مصارف «همیشه باز» است، همان‌که صفحهٔ قفل می‌گوید.
+    if (touchesPaid(_data.value, next) && SoftLock.isLocked(context)) {
       SoftLock.noteBlocked()
+      _blocked.tryEmit(Unit)
       return@withContext false
     }
     writeInternal(next)
     true
   }
+
+  /**
+   *  نوشتنی که قفلِ نرم ردش کرد — `AppRoot` پیامِ روشن نشان می‌دهد، تا کسی
+   *  فکر نکند فروشش ثبت شده (گزارشِ ممیزی: صفحه‌ها «ثبت شد» می‌گفتند).
+   */
+  private val _blocked = kotlinx.coroutines.flow.MutableSharedFlow<Unit>(extraBufferCapacity = 4)
+  val blocked: kotlinx.coroutines.flow.SharedFlow<Unit> = _blocked
+
+  private fun touchesPaid(cur: ShopData, next: ShopData): Boolean =
+    cur.sales != next.sales || cur.saleItems != next.saleItems ||
+      cur.saleReturns != next.saleReturns || cur.transactions != next.transactions || cur.debtors != next.debtors
 
   /**
    *  بازیابیِ پشتیبان — بیرونِ قفلِ نرم.

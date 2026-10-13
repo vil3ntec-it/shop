@@ -527,6 +527,18 @@ fun VipScreen(onDismiss: () -> Unit) {
       }
 
       /* ---------------------- گرفتنِ اشتراک ---------------------- */
+      //  ⛔ نسخهٔ کافه‌بازار: پرداختِ بیرون از بازار ممنوع است ⇒ نه دکمهٔ خرید با
+      //  واتساپ، نه «پرداخت از راهِ واتساپ». اشتراکِ حساب همین‌جا دیده می‌شود.
+      if (ir.vil3ntec.tohid.BuildConfig.STORE == "bazaar") {
+        Spacer(Modifier.height(16.dp))
+        Text(
+          "اشتراکِ حسابِ شما خودکار همین‌جا دیده می‌شود؛ کار با انبار، کالا، خرید و مصارف همیشه رایگان است.",
+          style = MaterialTheme.typography.bodySmall,
+          color = colors.muted,
+          textAlign = TextAlign.Center,
+          modifier = Modifier.fillMaxWidth(),
+        )
+      } else {
       Spacer(Modifier.height(16.dp))
       BuyButton(
         text = "گرفتن اشتراک ${picked.title} — ${plain(picked.price)} $currency",
@@ -567,6 +579,7 @@ fun VipScreen(onDismiss: () -> Unit) {
         textAlign = TextAlign.Center,
         modifier = Modifier.fillMaxWidth(),
       )
+      }
 
       /* ---------------------- کد اشتراک ---------------------- */
       /*
@@ -637,6 +650,8 @@ fun VipScreen(onDismiss: () -> Unit) {
                     //  وضعیتِ اشتراک همان لحظه تازه می‌شود، وگرنه صفحه
                     //  هنوز «اشتراک ندارید» نشان می‌داد
                     SubscriptionPulse.refresh(context)
+                    runCatching { ir.vil3ntec.tohid.sync.v1.HeartbeatCache(context).forget() }
+                    LicenseGuard.changed()
                   }
                   .onFailure {
                     codeOk = false
@@ -1344,7 +1359,7 @@ fun VipGate(label: String, content: @Composable () -> Unit) {
   val enforcing = LOCKING && AppConfig.isConfigured(context)
   //  «حساب دارد یا نه» یک بار پرسیده می‌شود، نه با هر بار کشیده شدنِ صفحه
   val signedIn = remember { ir.vil3ntec.tohid.data.repo.Backend.tokens(context).signedIn }
-  val status = remember(enforcing) { LicenseGuard.status(context, state) }
+  val status = remember(enforcing, LicenseGuard.changes.intValue, SubscriptionPulse.at) { LicenseGuard.status(context, state) }
   val open = when {
     !enforcing -> true
     //  کدِ آفلاینِ همین کامپیوتر — بی اینترنت و حتی پیش از ساختنِ حساب

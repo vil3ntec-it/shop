@@ -218,11 +218,14 @@ fun SettingsScreen(
   ) { uri ->
     if (uri == null) return@rememberLauncherForActivityResult
     scope.launch {
+      //  زیپِ عکس‌ها سنگین است ⇐ بیرون از رشتهٔ اصلی، وگرنه «برنامه پاسخ نمی‌دهد»
       runCatching {
-        val ledger = store.exportBackup(storeName)
-        val out = context.contentResolver.openOutputStream(uri)
-          ?: error("این مسیر برای نوشتن باز نشد")
-        out.use { BackupBundle.write(context, it, ledger).getOrThrow() }
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+          val ledger = store.exportBackup(storeName)
+          val out = context.contentResolver.openOutputStream(uri)
+            ?: error("این مسیر برای نوشتن باز نشد")
+          out.use { BackupBundle.write(context, it, ledger).getOrThrow() }
+        }
       }.onSuccess { photos ->
         BackupClock.mark(context)
         toast(

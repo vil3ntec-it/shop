@@ -74,6 +74,9 @@ jobs:
           #  می‌کند — نه خطایی، نه قابلیتی که قفل شود.
           TOHID_API_BASE: ${{ vars.TOHID_API_BASE }}
           TOHID_UPDATE_PUBLIC_KEY: ${{ vars.TOHID_UPDATE_PUBLIC_KEY }}
+          #  کلیدِ عمومیِ مجوز (همان `GET /api/license/public-key`) — سنجاق در خودِ
+          #  برنامه تا هیچ مجوز یا کدِ آفلاینِ جعلی پذیرفته نشود. راز نیست ⇒ `vars`.
+          TOHID_LICENSE_PUBLIC_KEY: ${{ vars.TOHID_LICENSE_PUBLIC_KEY }}
         run: gradle --no-daemon assembleRelease -PbuildNumber=${{ github.run_number }}
 
       - name: نام‌گذاری و جمع کنترلی
@@ -113,6 +116,30 @@ jobs:
           fi
           echo "APK_NAME=Tohid-Native-$version.apk" >> "$GITHUB_ENV"
           echo "APK_MB=$(du -m Tohid-Native.apk | cut -f1)" >> "$GITHUB_ENV"
+
+      #  نسخهٔ کافه‌بازار — همان کد با `-Pstore=bazaar`: بی به‌روزرسانیِ داخلی،
+      #  بی اجازهٔ نصبِ بسته و بی دکمهٔ خرید با واتساپ (قانونِ بازار). همان
+      #  کلید و همان بسته؛ فقط روی انتشار می‌نشیند تا صاحب در پنلِ بازار
+      #  بارش کند — به‌روزرسانیِ داخلیِ برنامه هرگز سراغش نمی‌رود.
+      - name: نسخهٔ کافه‌بازار
+        working-directory: android-native
+        env:
+          TOHID_KEYSTORE_PASSWORD: ${{ secrets.TOHID_KEYSTORE_PASSWORD }}
+          TOHID_KEY_ALIAS: ${{ secrets.TOHID_KEY_ALIAS }}
+          TOHID_KEY_PASSWORD: ${{ secrets.TOHID_KEY_PASSWORD }}
+          TOHID_API_BASE: ${{ vars.TOHID_API_BASE }}
+          TOHID_UPDATE_PUBLIC_KEY: ${{ vars.TOHID_UPDATE_PUBLIC_KEY }}
+          TOHID_LICENSE_PUBLIC_KEY: ${{ vars.TOHID_LICENSE_PUBLIC_KEY }}
+        run: |
+          gradle --no-daemon assembleRelease -Pstore=bazaar -PbuildNumber=${{ github.run_number }}
+          cp app/build/outputs/apk/release/app-release.apk out/MyShop-Bazaar.apk
+          aapt=$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort | tail -n1)
+          if [ -n "$aapt" ]; then
+            "$aapt" dump permissions out/MyShop-Bazaar.apk | tee "$RUNNER_TEMP/perms.txt"
+            if grep -q REQUEST_INSTALL_PACKAGES "$RUNNER_TEMP/perms.txt"; then
+              echo "::error::نسخهٔ بازار هنوز اجازهٔ نصبِ بسته دارد"; exit 1
+            fi
+          fi
 
       - uses: actions/upload-artifact@v4
         with:
@@ -191,6 +218,8 @@ jobs:
           #  نامِ رو به کاربر «فروشگاه من» است؛ «Tohid-Native.apk» فقط برای به‌روزرسانیِ نسخه‌های نصب‌شده می‌ماند
           cp Tohid-Native.apk MyShop-Android.apk
           up MyShop-Android.apk
+          #  نسخهٔ کافه‌بازار — برای بارگذاری در پنلِ بازار، نه برای به‌روزرسانیِ گوشی‌ها
+          up MyShop-Bazaar.apk
           up SHA256SUMS.txt
           if [ -f SHA256SUMS.txt.sig ]; then up SHA256SUMS.txt.sig; fi
           up version.txt
@@ -212,7 +241,7 @@ jobs:
           gh api "repos/${{ github.repository }}/releases/tags/tohid-native" \
             | jq -r '.assets[] | "\(.id) \(.name)"' | while read -r id name; do
               case "$name" in
-                "${{ env.APK_NAME }}"|Tohid-Native.apk|MyShop-Android.apk|SHA256SUMS.txt|SHA256SUMS.txt.sig|version.txt) ;;
+                "${{ env.APK_NAME }}"|Tohid-Native.apk|MyShop-Android.apk|MyShop-Bazaar.apk|SHA256SUMS.txt|SHA256SUMS.txt.sig|version.txt) ;;
                 *) gh api -X DELETE "repos/${{ github.repository }}/releases/assets/$id" ;;
               esac
             done

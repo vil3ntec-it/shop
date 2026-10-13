@@ -24,6 +24,30 @@ android {
   val versionBase = "3.2"
   val buildNumber = (project.findProperty("buildNumber") as String?)?.toIntOrNull() ?: 0
 
+  /*
+   *  کدام فروشگاه — `-Pstore=bazaar` نسخهٔ کافه‌بازار را می‌سازد.
+   *
+   *  ⛔ قانونِ بازار: «برنامه‌ای که از بازار گرفته شده فقط از بازار به‌روز
+   *  می‌شود» و لینکِ پرداختِ بیرونی ممنوع است. پس نسخهٔ بازار:
+   *    • اجازهٔ `REQUEST_INSTALL_PACKAGES` ندارد (مانیفستِ ساخته‌شده بی آن)،
+   *    • به‌روزرسانیِ داخلی و دکمه‌هایش را ندارد (`BuildConfig.STORE`)،
+   *    • دکمهٔ خرید با واتساپ را ندارد.
+   *  بقیه همان برنامه است — همان بسته، همان حساب، همان دفتر.
+   *  بی این پرچم ⇒ «direct»: همان APKِ سایت و گیت‌هاب، مثلِ همیشه.
+   */
+  val store = (project.findProperty("store") as String?)?.trim()?.ifBlank { null } ?: "direct"
+  if (store == "bazaar") {
+    val source = file("src/main/AndroidManifest.xml")
+    val stripped = layout.buildDirectory.file("store-manifest/AndroidManifest.xml").get().asFile
+    stripped.parentFile.mkdirs()
+    stripped.writeText(
+      source.readText().lines()
+        .filterNot { it.contains("android.permission.REQUEST_INSTALL_PACKAGES") }
+        .joinToString("\n")
+    )
+    sourceSets["main"].manifest.srcFile(stripped)
+  }
+
   //  متغیرِ تنظیم‌نشده در GitHub Actions **رشتهٔ خالی** می‌شود، نه
   //  ناموجود. پس `?:` تنها کافی نیست و خالی هم باید «نبود» حساب شود —
   //  وگرنه رمزِ خالی به کلید داده می‌شود و امضا می‌شکند.
@@ -104,6 +128,7 @@ android {
     targetSdk = 35
     versionCode = 100 + buildNumber
     versionName = "$versionBase.$buildNumber"
+    buildConfigField("String", "STORE", "\"$store\"")
 
     /*
      *  نشانیِ سرور، در زمانِ ساخت — نه در رابط کاربری.

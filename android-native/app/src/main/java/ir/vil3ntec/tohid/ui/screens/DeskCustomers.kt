@@ -153,10 +153,10 @@ private fun CustomerCards(store: ShopStore, d: ShopData, snackbar: SnackbarHostS
   ) {
     //  چهار عددِ کل
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-      Kpi("طلبِ کل", "${money(totalDebt)} ؋", Shop.colors.danger, Modifier.weight(1f))
-      Kpi("بدهکاران", "$debtors نفر", Color(0xFFFF9800), Modifier.weight(1f))
-      Kpi("دیرکرد بیش از ۶۰ روز", "$late نفر", if (late > 0) Shop.colors.danger else Shop.colors.success, Modifier.weight(1f))
-      Kpi("خریدِ مشتری‌ها در این ماه", "${money(monthBought)} ؋", Shop.colors.primary, Modifier.weight(1f))
+      DeskKpi("طلبِ کل", "${money(totalDebt)} ؋", Shop.colors.danger, Modifier.weight(1f))
+      DeskKpi("بدهکاران", "$debtors نفر", Color(0xFFFF9800), Modifier.weight(1f))
+      DeskKpi("دیرکرد بیش از ۶۰ روز", "$late نفر", if (late > 0) Shop.colors.danger else Shop.colors.success, Modifier.weight(1f))
+      DeskKpi("خریدِ مشتری‌ها در این ماه", "${money(monthBought)} ؋", Shop.colors.primary, Modifier.weight(1f))
     }
     Spacer(Modifier.height(12.dp))
 
@@ -209,7 +209,7 @@ private fun CustomerCards(store: ShopStore, d: ShopData, snackbar: SnackbarHostS
 }
 
 @Composable
-private fun Kpi(label: String, value: String, tint: Color, modifier: Modifier = Modifier) {
+internal fun DeskKpi(label: String, value: String, tint: Color, modifier: Modifier = Modifier) {
   Column(
     modifier
       .clip(RoundedCornerShape(12.dp))
@@ -224,7 +224,7 @@ private fun Kpi(label: String, value: String, tint: Color, modifier: Modifier = 
 }
 
 @Composable
-private fun stateColor(balance: Double) = when {
+internal fun stateColor(balance: Double) = when {
   balance > 0.5 -> Shop.colors.danger
   balance < -0.5 -> Shop.colors.success
   else -> Shop.colors.muted
@@ -343,11 +343,11 @@ private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
     }
     Spacer(Modifier.height(10.dp))
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-      Kpi("مانده", "${money(s.balance)} ؋", stateColor(s.balance), Modifier.weight(1f))
-      Kpi("جمعِ خرید", "${money(s.bought)} ؋", Shop.colors.primary, Modifier.weight(1f))
-      Kpi("فاکتورها", "${s.invoices}", Shop.colors.text, Modifier.weight(1f))
-      Kpi("آخرین خرید", s.lastPurchase?.let { formatDate(it) } ?: "—", Shop.colors.text, Modifier.weight(1f))
-      Kpi("آخرین پرداخت", s.lastPaid?.let { formatDate(it) } ?: "—", Shop.colors.success, Modifier.weight(1f))
+      DeskKpi("مانده", "${money(s.balance)} ؋", stateColor(s.balance), Modifier.weight(1f))
+      DeskKpi("جمعِ خرید", "${money(s.bought)} ؋", Shop.colors.primary, Modifier.weight(1f))
+      DeskKpi("فاکتورها", "${s.invoices}", Shop.colors.text, Modifier.weight(1f))
+      DeskKpi("آخرین خرید", s.lastPurchase?.let { formatDate(it) } ?: "—", Shop.colors.text, Modifier.weight(1f))
+      DeskKpi("آخرین پرداخت", s.lastPaid?.let { formatDate(it) } ?: "—", Shop.colors.success, Modifier.weight(1f))
     }
     Spacer(Modifier.height(10.dp))
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -391,20 +391,20 @@ private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
 
     when (tab) {
       FileTab.LEDGER -> {
-        val cols = listOf(Col("ردیف", 56.dp), Col("تاریخ", 110.dp), Col("شرح"), Col("فاکتور", 90.dp), Col("برد (بدهکار)", 130.dp, true), Col("رسید (بستانکار)", 130.dp, true), Col("مانده", 140.dp, true))
-        Sheet(
+        val cols = listOf(TCol("ردیف", 56.dp), TCol("تاریخ", 110.dp), TCol("شرح"), TCol("فاکتور", 90.dp), TCol("برد (بدهکار)", 130.dp, true), TCol("رسید (بستانکار)", 130.dp, true), TCol("مانده", 140.dp, true))
+        DeskTable(
           cols, ledger.size, Modifier.weight(1f),
           empty = "هنوز ردیفی نیست — قرضِ نسیه و دریافت‌ها این‌جا می‌آیند.",
           cell = { i, c ->
             val l = ledger[i]
             when (c) {
-              0 -> Cell(l.row.toString(), Shop.colors.muted)
-              1 -> Cell(formatDate(l.tx.date))
-              2 -> Cell(l.tx.notes.ifBlank { if (l.give > 0) "برد" else "رسید" })
-              3 -> Cell(l.invoiceNumber?.let { "#$it" }.orEmpty(), Shop.colors.primary, link = l.saleId != null)
-              4 -> Cell(if (l.give > 0) money(l.give) else "", Shop.colors.danger)
-              5 -> Cell(if (l.receive > 0) money(l.receive) else "", Shop.colors.success)
-              else -> Cell(money(l.balance), bold = true)
+              0 -> TCell(l.row.toString(), Shop.colors.muted)
+              1 -> TCell(formatDate(l.tx.date))
+              2 -> TCell(l.tx.notes.ifBlank { if (l.give > 0) "برد" else "رسید" })
+              3 -> TCell(l.invoiceNumber?.let { "#$it" }.orEmpty(), Shop.colors.primary, link = l.saleId != null)
+              4 -> TCell(if (l.give > 0) money(l.give) else "", Shop.colors.danger)
+              5 -> TCell(if (l.receive > 0) money(l.receive) else "", Shop.colors.success)
+              else -> TCell(money(l.balance), bold = true)
             }
           },
           onClick = { i -> ledger[i].saleId?.let { picked = it; tab = FileTab.INVOICES } },
@@ -418,9 +418,9 @@ private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
         //  زبانه باز شد و فاکتوری انتخاب نشده ⇐ تازه‌ترین، تا اقلامش همان‌جا دیده شود
         LaunchedEffect(invoices) { if (picked == null || invoices.none { it.id == picked }) picked = invoices.firstOrNull()?.id }
         val counts = remember(d) { d.saleItems.groupingBy { it.saleId }.eachCount() }
-        val cols = listOf(Col("فاکتور", 80.dp), Col("تاریخ", 110.dp), Col("اقلام", 60.dp, true), Col("جمع", 0.dp, true), Col("قابلِ پرداخت", 0.dp, true), Col("پرداخت‌شده", 0.dp, true), Col("باقی", 0.dp, true), Col("نوع", 70.dp), Col("وضعیت", 80.dp))
+        val cols = listOf(TCol("فاکتور", 80.dp), TCol("تاریخ", 110.dp), TCol("اقلام", 60.dp, true), TCol("جمع", 0.dp, true), TCol("قابلِ پرداخت", 0.dp, true), TCol("پرداخت‌شده", 0.dp, true), TCol("باقی", 0.dp, true), TCol("نوع", 70.dp), TCol("وضعیت", 80.dp))
         Column(Modifier.weight(1f).fillMaxHeight()) {
-          Sheet(
+          DeskTable(
             cols, invoices.size, Modifier.weight(1f),
             empty = "این مشتری هنوز فاکتوری ندارد. در صندوق با F2 مشتری را روی فاکتور بگذارید — نقدی هم ثبت می‌شود.",
             selected = invoices.indexOfFirst { it.id == picked }.takeIf { it >= 0 },
@@ -428,15 +428,15 @@ private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
               val v = invoices[i]
               val off = v.status == "cancelled"
               when (c) {
-                0 -> Cell("#${v.invoiceNumber ?: "—"}", Shop.colors.primary, bold = true)
-                1 -> Cell(formatDate(v.date))
-                2 -> Cell((counts[v.id] ?: 0).toString())
-                3 -> Cell(money(v.total), if (off) Shop.colors.muted else Shop.colors.text)
-                4 -> Cell(money(v.finalTotal), if (off) Shop.colors.muted else Shop.colors.text, bold = true)
-                5 -> Cell(money(v.paidAmount), Shop.colors.success)
-                6 -> Cell(if (v.remaining > 0.5) money(v.remaining) else "", Shop.colors.danger)
-                7 -> Cell(if (v.paymentMethod == "credit") "نسیه" else "نقد")
-                else -> Cell(if (off) "لغوشده" else "ثبت‌شده", if (off) Shop.colors.danger else Shop.colors.success)
+                0 -> TCell("#${v.invoiceNumber ?: "—"}", Shop.colors.primary, bold = true)
+                1 -> TCell(formatDate(v.date))
+                2 -> TCell((counts[v.id] ?: 0).toString())
+                3 -> TCell(money(v.total), if (off) Shop.colors.muted else Shop.colors.text)
+                4 -> TCell(money(v.finalTotal), if (off) Shop.colors.muted else Shop.colors.text, bold = true)
+                5 -> TCell(money(v.paidAmount), Shop.colors.success)
+                6 -> TCell(if (v.remaining > 0.5) money(v.remaining) else "", Shop.colors.danger)
+                7 -> TCell(if (v.paymentMethod == "credit") "نسیه" else "نقد")
+                else -> TCell(if (off) "لغوشده" else "ثبت‌شده", if (off) Shop.colors.danger else Shop.colors.success)
               }
             },
             onClick = { i -> picked = invoices[i].id },
@@ -453,20 +453,20 @@ private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
       }
 
       FileTab.ITEMS -> {
-        val cols = listOf(Col("تاریخ", 110.dp), Col("فاکتور", 80.dp), Col("کالا"), Col("تعداد", 80.dp, true), Col("فی", 120.dp, true), Col("جمع", 130.dp, true), Col("برگشتی", 80.dp, true))
-        Sheet(
+        val cols = listOf(TCol("تاریخ", 110.dp), TCol("فاکتور", 80.dp), TCol("کالا"), TCol("تعداد", 80.dp, true), TCol("فی", 120.dp, true), TCol("جمع", 130.dp, true), TCol("برگشتی", 80.dp, true))
+        DeskTable(
           cols, items.size, Modifier.weight(1f),
           empty = "هنوز کالایی نبرده.",
           cell = { i, c ->
             val l = items[i]
             when (c) {
-              0 -> Cell(formatDate(l.date))
-              1 -> Cell("#${l.invoiceNumber ?: "—"}", Shop.colors.primary, link = true)
-              2 -> Cell(l.name)
-              3 -> Cell(qty(l.quantity))
-              4 -> Cell(money(l.unitPrice))
-              5 -> Cell(money(l.total), bold = true)
-              else -> Cell(if (l.returned > 0) qty(l.returned) else "", Shop.colors.danger)
+              0 -> TCell(formatDate(l.date))
+              1 -> TCell("#${l.invoiceNumber ?: "—"}", Shop.colors.primary, link = true)
+              2 -> TCell(l.name)
+              3 -> TCell(qty(l.quantity))
+              4 -> TCell(money(l.unitPrice))
+              5 -> TCell(money(l.total), bold = true)
+              else -> TCell(if (l.returned > 0) qty(l.returned) else "", Shop.colors.danger)
             }
           },
           onClick = { i -> picked = items[i].saleId; tab = FileTab.INVOICES },
@@ -485,7 +485,7 @@ private fun qty(v: Double) = if (v == Math.floor(v)) v.toLong().toString() else 
 
 /** اقلامِ یک فاکتور کنارِ جدول، با دکمهٔ «نمایش و چاپ» که فاکتور را جدا باز می‌کند */
 @Composable
-private fun InvoicePeek(d: ShopData, sale: Sale, modifier: Modifier, onShow: () -> Unit) {
+internal fun InvoicePeek(d: ShopData, sale: Sale, modifier: Modifier, onShow: () -> Unit) {
   val lines = remember(d, sale.id) { d.saleItems.filter { it.saleId == sale.id } }
   Column(
     modifier
@@ -537,26 +537,26 @@ private fun InvoicePeek(d: ShopData, sale: Sale, modifier: Modifier, onShow: () 
 /* ══════════════════════════ جدولِ اکسلی ══════════════════════════ */
 
 /** ستون — پهنای ۰ یعنی «باقی‌مانده»؛ `end` ⇒ عدد، راست‌چینِ انتها */
-private data class Col(val title: String, val width: Dp = 0.dp, val end: Boolean = false)
-private data class Cell(val text: String, val color: Color? = null, val bold: Boolean = false, val link: Boolean = false)
+internal data class TCol(val title: String, val width: Dp = 0.dp, val end: Boolean = false)
+internal data class TCell(val text: String, val color: Color? = null, val bold: Boolean = false, val link: Boolean = false)
 
 /**
  *  جدولِ خط‌دار مثلِ اکسل: سرستونِ پررنگ، خطِ عمودی میانِ ستون‌ها، ردیف‌های
  *  یکی‌درمیان، ردیفِ جمع در پایین. کلیک روی ردیف ⇐ `onClick`.
  */
 @Composable
-private fun Sheet(
-  cols: List<Col>,
+internal fun DeskTable(
+  cols: List<TCol>,
   count: Int,
   modifier: Modifier,
   empty: String,
-  cell: @Composable (Int, Int) -> Cell,
+  cell: @Composable (Int, Int) -> TCell,
   onClick: (Int) -> Unit = {},
   footer: List<String>? = null,
   selected: Int? = null,
 ) {
   val line = Shop.colors.border
-  @Composable fun RowScope.box(c: Col, content: @Composable () -> Unit) {
+  @Composable fun RowScope.box(c: TCol, content: @Composable () -> Unit) {
     Box(
       (if (c.width == 0.dp) Modifier.weight(1f) else Modifier.width(c.width))
         .fillMaxHeight()

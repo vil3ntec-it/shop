@@ -15,6 +15,40 @@ import kotlinx.coroutines.withContext
  */
 object PrintJob {
 
+  /**
+   *  فرستادنِ فاکتور به مشتری — همان تصویرِ چاپِ حرارتی، پهنِ ۵۷۶ نقطه، به
+   *  واتساپ یا تلگرام یا هر برنامه‌ای که کاربر بخواهد. برای دکان‌داری که
+   *  چاپگر ندارد (گزارشِ ممیزی: «راهی برای فرستادنِ فاکتور نیست»).
+   *
+   *  @return پیامِ خطا یا null
+   */
+  suspend fun shareSale(context: Context, d: ShopData, sale: Sale): String? {
+    val storeName = context.getSharedPreferences("tohid", Context.MODE_PRIVATE).getString("store_name", "") ?: ""
+    val file = withContext(Dispatchers.IO) {
+      runCatching {
+        val bitmap = Receipt.render(context, d, sale, storeName, 576)
+        val dir = java.io.File(context.cacheDir, "share").apply { mkdirs(); listFiles()?.forEach { it.delete() } }
+        val f = java.io.File(dir, "invoice-${sale.invoiceNumber ?: "x"}.png")
+        f.outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+        bitmap.recycle()
+        f
+      }
+    }.getOrElse { return "فاکتور ساخته نشد: ${it.message ?: "دلیل نامعلوم"}" }
+    return runCatching {
+      val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.files", file)
+      val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+        type = "image/png"
+        putExtra(android.content.Intent.EXTRA_STREAM, uri)
+        putExtra(android.content.Intent.EXTRA_TEXT, "فاکتور #${sale.invoiceNumber ?: ""}${if (storeName.isNotBlank()) " — $storeName" else ""}")
+        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+      }
+      context.startActivity(
+        android.content.Intent.createChooser(send, "فرستادنِ فاکتور").addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+      )
+      null
+    }.getOrElse { "برنامه‌ای برای فرستادن پیدا نشد" }
+  }
+
   /** برمی‌گرداند: پیامِ خطا، یا null اگر چاپ انجام شد */
   suspend fun printSale(
     context: Context,
