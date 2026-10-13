@@ -184,4 +184,4 @@ async function recent(stationId, limit = 10) {
     [stationId, limit])).map(shape);
 }
 
-module.exports = { parse, create, pending, ack, recent, waitFor, waiting, MIN_RATE, MAX_RATE, STALE_MS, WAIT_MAX_S, MAX_WAITERS };
+module.exports = { parse, create, pending, ack, recent, waitFor, waiting, wake, MIN_RATE, MAX_RATE, STALE_MS, WAIT_MAX_S, MAX_WAITERS };
