@@ -574,6 +574,18 @@ await step('صفحهٔ ورود: کلیدِ دوتکه، بی کادرِ نام�
   await fresh.close();
 });
 
+await step('F0-03: فاکتورِ سری‌دارِ دستگاهِ دیگر «B1-5» دیده می‌شود؛ فاکتورِ وب همان عدد', async () => {
+  const out = await page.evaluate(() => (typeof invoiceLabel === 'function'
+    ? [
+      invoiceLabel({ invoiceNumber: 5, series: 'B1' }),
+      invoiceLabel({ invoiceNumber: 100001 }),
+      invoiceLabel({ invoiceNumber: 7, series: ' ' }),
+      invoiceLabel({}),
+    ]
+    : null));
+  assert.deepEqual(out, ['B1-5', '100001', '7', '']);
+});
+
 await step('در کلِ این نشست هیچ خطای صفحه‌ای نبود', async () => {
   //  ⚠️ خطاهای سرویس‌ورکر و آیکونِ نبوده شمرده نمی‌شوند: آن‌ها مالِ
   //  محیطِ آزمون‌اند نه کد
