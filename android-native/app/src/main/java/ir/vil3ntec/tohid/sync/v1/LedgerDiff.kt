@@ -27,14 +27,18 @@ import kotlinx.serialization.json.doubleOrNull
  *  همان نام‌هایی که سرور در `lib/sync.js → TABLES` می‌شناسد. نامِ بیرونِ
  *  این فهرست `rejected` می‌گیرد.
  *
- *  ⚠️ `expenseCategories` · `productCategories` · `productUnits` و
- *  `nextInvoiceNo` این‌جا **نیستند** و این عمدی است: ردیفِ شناسه‌دار
- *  نیستند و سرور برایشان جدولی ندارد.
+ *  ⚠️ `expenseCategories` · `productCategories` · `productUnits` در
+ *  `COLLECTIONS` نیستند چون ردیفِ شناسه‌دار نیستند، فهرستِ نام‌اند —
+ *  جدا در `LIST_COLLECTIONS` می‌آیند (F0-04، پلهٔ ۳). `nextInvoiceNo` اصلاً
+ *  همگام نمی‌شود: عددِ هر دستگاه مالِ خودش است.
  */
 object LedgerDiff {
 
-  /** نسخهٔ Schema — همان عددی که سرور برای `shop` می‌شناسد. */
-  const val SCHEMA_VERSION = 2
+  /**
+   *  نسخهٔ Schema — همان عددی که سرور برای `shop` می‌شناسد.
+   *  پلهٔ ۳ (F0-04): سه فهرستِ تنظیماتی (`LIST_COLLECTIONS`) هم می‌روند.
+   */
+  const val SCHEMA_VERSION = 3
 
   val COLLECTIONS = listOf(
     "products", "warehouseEntries", "sales", "saleItems", "returns",
@@ -42,6 +46,44 @@ object LedgerDiff {
     "suppliers", "purchases", "supplierPayments",
     "stockMovements", "priceHistory", "auditLog",
   )
+
+  /**
+   *  فهرست‌های تنظیماتی — F0-04 (پلهٔ ۳)، قرینهٔ بخشِ ۱-بِ `sync-core.js`.
+   *
+   *  در دفتر **فهرستِ نام**اند (`["لبنیات", "نوشیدنی"]`). تا پلهٔ ۲ اصلاً
+   *  همگام نمی‌شدند: دسته‌ای که روی گوشی ساخته می‌شد روی کامپیوتر و وب
+   *  نبود. روی خط هر نام یک ردیف است: `row_id` = ‎sha256(نام)‎ (۳۲ نویسهٔ
+   *  اول)، `fields = {name}`. شناسه از خودِ نام است، پس دو دستگاه که یک
+   *  نام را جدا بسازند **یک** ردیف می‌سازند.
+   *
+   *  ⚠️ سایهٔ پیش از پلهٔ ۳ این کلیدها را ندارد ⇒ نخستین تفاضل همهٔ
+   *  نام‌های این دستگاه را یک بار «درج» می‌فرستد (نه حذف). و `applyRemote`
+   *  نبودنِ کلید را نگه می‌دارد: اگر پیش‌فرض‌های مدل در سایه می‌نشستند،
+   *  نامِ محلی «رفته» شمرده می‌شد و نامِ پیش‌فرضی که این‌جا پاک شده بود،
+   *  روی همهٔ دستگاه‌ها حذف می‌شد.
+   */
+  val LIST_COLLECTIONS = listOf("productCategories", "productUnits", "expenseCategories")
+
+  fun listRowId(name: String): String = OpHash.sha256Hex(name).substring(0, 32)
+
+  private fun listName(e: JsonElement?): String = when (e) {
+    is JsonPrimitive -> if (e.isString) e.content.trim() else ""
+    is JsonObject -> (e["name"] as? JsonPrimitive)?.takeIf { it.isString }?.content?.trim().orEmpty()
+    else -> ""
+  }
+
+  /** فهرستِ نام ⇒ نام‌های بی خالی و بی تکرار؛ `null` یعنی کلید اصلاً نیست. */
+  private fun listNames(tree: JsonObject?, key: String): List<String>? {
+    val arr = tree?.get(key) as? JsonArray ?: return null
+    val out = ArrayList<String>(arr.size)
+    for (e in arr) {
+      val n = listName(e)
+      if (n.isNotEmpty() && n !in out) out += n
+    }
+    return out
+  }
+
+  private fun nameArray(list: List<String>): JsonArray = JsonArray(list.map { JsonPrimitive(it) })
 
   /**
    *  فیلدهای شمارنده — دلتا می‌روند، نه «مقدارِ تازه» (بندِ ۲۰.۴).
@@ -111,6 +153,8 @@ object LedgerDiff {
 
   fun shadowOf(tree: JsonObject): JsonObject = buildJsonObject {
     for (key in COLLECTIONS) put(key, tree[key] as? JsonArray ?: JsonArray(emptyList()))
+    //  فهرست‌ها: نبودنِ کلید یعنی «هنوز هیچ‌وقت نرفته» — همان‌طور می‌ماند
+    for (key in LIST_COLLECTIONS) (tree[key] as? JsonArray)?.let { put(key, it) }
   }
 
   private fun rowsOf(tree: JsonObject?, key: String): List<JsonObject> =
@@ -190,6 +234,22 @@ object LedgerDiff {
         if (id !in afterIds) ops += SyncOp(Ulid.next(now), now, table, id, SyncOp.DELETE, null)
       }
     }
+
+    //  فهرست‌های تنظیماتی: فقط درج و حذف؛ نام همان شناسه است
+    for (table in LIST_COLLECTIONS) {
+      val after = listNames(next, table) ?: continue      // دفتری که کلید ندارد چیزی پاک نمی‌کند
+      val before = (listNames(shadow, table) ?: emptyList()).associateBy { listRowId(it) }
+      val afterIds = HashSet<String>(after.size)
+      for (name in after) {
+        val id = listRowId(name)
+        afterIds += id
+        if (id in before) continue
+        ops += SyncOp(Ulid.next(now), now, table, id, SyncOp.INSERT, buildJsonObject { put("name", JsonPrimitive(name)) })
+      }
+      for (id in before.keys) {
+        if (id !in afterIds) ops += SyncOp(Ulid.next(now), now, table, id, SyncOp.DELETE, null)
+      }
+    }
     return ops
   }
 
@@ -203,8 +263,23 @@ object LedgerDiff {
   fun applyRemote(tree: JsonObject, ops: List<SyncOp>): JsonObject {
     val tables = LinkedHashMap<String, MutableList<JsonObject>>()
     for (key in COLLECTIONS) tables[key] = rowsOf(tree, key).toMutableList()
+    //  فهرست‌ها: فقط کلیدی که در درخت هست یا opی به آن رسیده
+    val lists = LinkedHashMap<String, MutableList<String>>()
+    for (key in LIST_COLLECTIONS) listNames(tree, key)?.let { lists[key] = it.toMutableList() }
+    val touchedLists = HashSet<String>()
 
     for (op in ops) {
+      if (op.table in LIST_COLLECTIONS) {
+        touchedLists += op.table
+        val names = lists.getOrPut(op.table) { mutableListOf() }
+        if (op.type == SyncOp.DELETE) {
+          names.removeAll { listRowId(it) == op.rowId }
+        } else {
+          val name = listName(op.fields)
+          if (name.isNotEmpty() && name !in names) names += name
+        }
+        continue
+      }
       val list = tables[op.table] ?: continue          // جدولِ ناشناخته: رد
       val at = list.indexOfFirst { idOf(it) == op.rowId }
       if (op.type == SyncOp.DELETE) {
@@ -229,6 +304,7 @@ object LedgerDiff {
 
     val out = LinkedHashMap<String, JsonElement>(tree)
     for ((key, list) in tables) out[key] = JsonArray(list)
+    for ((key, list) in lists) if (key in touchedLists) out[key] = nameArray(list)
     val raw = JsonObject(out)
 
     /*
@@ -249,11 +325,22 @@ object LedgerDiff {
      *  ⚠️ و اگر روزی ردیفی برسد که مدل نتواند بخواندش، درختِ خام برمی‌گردد:
      *  یک پژواکِ اضافه بهتر از پرتاب شدنِ استثنا وسطِ همگام‌سازی است.
      */
-    return try {
+    val shaped = try {
       toJson(fromJson(raw))
     } catch (_: Exception) {
       raw
     }
+    //  ⚠️ پیش‌فرضِ مدل جای فهرستی که در درخت نبود نمی‌نشیند (شرح بالای `LIST_COLLECTIONS`)
+    return keepListsOf(raw, shaped)
+  }
+
+  private fun keepListsOf(src: JsonObject, dst: JsonObject): JsonObject {
+    val out = LinkedHashMap<String, JsonElement>(dst)
+    for (key in LIST_COLLECTIONS) {
+      val v = src[key]
+      if (v is JsonArray) out[key] = v else out.remove(key)
+    }
+    return JsonObject(out)
   }
 
   /**
@@ -270,6 +357,11 @@ object LedgerDiff {
       val added = rowsOf(extra, key).filter { idOf(it) !in ids }
       if (added.isEmpty() && base[key] != null) continue
       out[key] = JsonArray(mine + added)
+    }
+    for (key in LIST_COLLECTIONS) {
+      val extraNames = listNames(extra, key) ?: continue
+      val mine = listNames(base, key) ?: emptyList()
+      out[key] = nameArray(mine + extraNames.filter { it !in mine })
     }
     return JsonObject(out)
   }
@@ -289,6 +381,17 @@ object LedgerDiff {
         list += JsonObject(row)
       }
       out[key] = JsonArray(list)
+    }
+    //  فهرست‌ها: آنچه سرور دارد، با ترتیبِ محلی برای نام‌های مشترک
+    for (key in LIST_COLLECTIONS) {
+      val rows = tables[key] as? JsonArray ?: continue
+      val server = ArrayList<String>()
+      for (r in rows) {
+        val n = listName((r as? JsonObject)?.get("data"))
+        if (n.isNotEmpty() && n !in server) server += n
+      }
+      val keep = (listNames(base, key) ?: emptyList()).filter { it in server }
+      out[key] = nameArray(keep + server.filter { it !in keep })
     }
     return JsonObject(out)
   }

@@ -13540,6 +13540,7 @@
     if(!next) return;
     touchLedger();
     const put = (v, dflt)=> Array.isArray(v) ? v : dflt;
+    const listsBefore = JSON.stringify([productCategories, productUnits, expenseCategories]);
     debtors          = put(next.debtors, debtors);
     transactions     = put(next.transactions, transactions);
     expenses         = put(next.expenses, expenses);
@@ -13554,6 +13555,10 @@
     stockMovements   = put(next.stockMovements, stockMovements);
     priceHistory     = put(next.priceHistory, priceHistory);
     auditLog         = put(next.auditLog, auditLog);
+    /* F0-04: دسته‌ها و واحدها هم از دستگاه‌های دیگر می‌رسند */
+    productCategories = put(next.productCategories, productCategories);
+    productUnits      = put(next.productUnits, productUnits);
+    expenseCategories = put(next.expenseCategories, expenseCategories);
 
     /* فقط روی دیسک می‌نشیند — بی تفاضلِ دوباره */
     try{
@@ -13562,6 +13567,18 @@
 
     rebuildBarcodeIndex();
     repaintLedger();
+    if(JSON.stringify([productCategories, productUnits, expenseCategories]) !== listsBefore){
+      /* F0-04: کشویی‌های دسته همان لحظه تازه می‌شوند؛ انتخابِ فرمِ بازِ مصرف نمی‌پرد */
+      try{
+        const el = document.getElementById('in-expense-category');
+        const cur = el && el.value;
+        populateCategorySelect();
+        if(cur && (cur === '__new__' || expenseCategories.includes(cur))) el.value = cur;
+        populateCategoryFilter();
+        populateProductCategoryFilter();
+        populateWarehouseCategoryFilter();
+      }catch(e){ console.error('کشوییِ دسته‌ها تازه نشد:', e); }
+    }
   }
 
   /* همان چیزهایی که سرِ بالا آمدنِ برنامه کشیده می‌شوند — یک جا، تا

@@ -199,6 +199,25 @@
     return out.ops.length;
   }
 
+  /**
+   *  F0-04 (پلهٔ ۳): سایهٔ پیش از این نسخه فهرست‌های تنظیماتی را ندارد.
+   *
+   *  اگر همین‌طور بماند و opی از دستگاهِ دیگر برسد، `setShadow(دفتر)`
+   *  همهٔ نام‌های **این** دستگاه را «رفته» ثبت می‌کند و هرگز نمی‌روند.
+   *  پس پیش از هر دور، یک بار تفاضل گرفته می‌شود: سایه بی کلید ⇒ همهٔ
+   *  نام‌های محلی یک بار «درج» می‌روند (شناسه از نام است؛ تکراری نمی‌سازد).
+   */
+  function ensureListShadow() {
+    var base = shadow();
+    var data = base && ledger.read();
+    if (!data) return 0;
+    var lists = core.LIST_COLLECTIONS || [];
+    for (var i = 0; i < lists.length; i++) {
+      if (Array.isArray(data[lists[i]]) && !Array.isArray(base[lists[i]])) return recordChange('lists');
+    }
+    return 0;
+  }
+
   function schedulePush() {
     if (pushTimer) return;
     pushTimer = setTimeout(function () { pushTimer = null; pump(); }, PUSH_DEBOUNCE_MS);
@@ -357,6 +376,7 @@
     busy = true;
     announce();
     try {
+      ensureListShadow();
       var head = 0;
       var q = queue();
       var guard = 0;
