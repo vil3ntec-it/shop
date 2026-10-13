@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.print
 
+import ir.vil3ntec.tohid.data.invoiceLabel
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -127,7 +128,7 @@ object Receipt {
     /* ------------------------------ سربرگ ------------------------------ */
     line(storeName.ifBlank { "فروشگاه" }, title, Layout.Alignment.ALIGN_CENTER)
     gap(0.3f)
-    line("فاکتور فروش #${sale.invoiceNumber?.let { plain(it) } ?: "—"}", head, Layout.Alignment.ALIGN_CENTER)
+    line("فاکتور فروش #${sale.invoiceLabel() ?: "—"}", head, Layout.Alignment.ALIGN_CENTER)
     gap(0.3f)
 
     val time = runCatching {

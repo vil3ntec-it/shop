@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.data.invoiceLabel
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -160,7 +161,7 @@ fun DeskDashboardScreen(d: ShopData, onOpen: (String) -> Unit, onProduct: (Strin
         b.recent.forEach { s ->
           val who = s.debtorId?.let { id -> d.debtors.find { it.id == id }?.name } ?: "مشتریِ گذری"
           ListRow(
-            "#${s.invoiceNumber ?: "-"} · $who",
+            "#${s.invoiceLabel() ?: "-"} · $who",
             "${formatDate(s.date)} · ${if (s.paymentMethod == "credit") "نسیه" else "نقد"}",
             "${money(s.finalTotal)} ؋",
           ) { onOpen("sales") }
