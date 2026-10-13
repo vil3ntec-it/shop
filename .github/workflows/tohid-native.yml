@@ -11,10 +11,20 @@ on:
     paths:
       - 'android-native/**'
       - '.github/workflows/tohid-native.yml'
+  #  ⛔ F0-27: push به main فقط کانالِ آزمایشی (`tohid-native-beta`) را می‌سازد.
+  #  برچسبِ پایدار (`tohid-native`، همان که همهٔ گوشی‌ها می‌پرسند) فقط از این‌جا:
+  #  Actions ⇒ «توحید بومی» ⇒ Run workflow ⇒ شاخهٔ main ⇒ channel = stable.
   workflow_dispatch:
+    inputs:
+      channel:
+        description: 'کانال: beta (فقط دکان‌ها و دستگاه‌های آزمایشی) یا stable (همهٔ دکان‌ها)'
+        type: choice
+        options: [beta, stable]
+        default: beta
 
 concurrency:
-  group: tohid-native-${{ github.ref }}
+  #  انتشارِ پایدار با pushِ بعدی لغو نشود
+  group: tohid-native-${{ github.ref }}-${{ inputs.channel || 'push' }}
   cancel-in-progress: true
 
 permissions:
@@ -28,6 +38,20 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      #  کدام برچسب؟ فقط main منتشر می‌کند؛ پایدار فقط با workflow_dispatch.
+      #  نصبیِ آزمایشی به `.apk` ختم نمی‌شود (`….apk.beta`): برنامه‌های نصب‌شده
+      #  وقتی سرور در دسترس نیست از api.github.com فهرستِ انتشارها را می‌خوانند و
+      #  اولین `.apk`ی را که ببینند برمی‌دارند — نسخهٔ آزمایشی نباید به آن‌ها برسد.
+      - name: کانال
+        run: |
+          if [ "${{ github.ref }}" != "refs/heads/main" ]; then
+            echo "PUBLISH=false" >> "$GITHUB_ENV"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.channel }}" = "stable" ]; then
+            printf 'PUBLISH=true\nCHANNEL=stable\nTAG=tohid-native\n' >> "$GITHUB_ENV"
+          else
+            printf 'PUBLISH=true\nCHANNEL=beta\nTAG=tohid-native-beta\n' >> "$GITHUB_ENV"
+          fi
 
       - uses: actions/setup-java@v4
         with:
@@ -88,6 +112,12 @@ jobs:
           mkdir -p out
           version=$(gradle --no-daemon -q printVersionName -PbuildNumber=${{ github.run_number }} | tail -n1)
           apk=app/build/outputs/apk/release/app-release.apk
+          if [ "$CHANNEL" = beta ]; then
+            cp "$apk" "out/Tohid-Native-$version.apk.beta"
+            printf '%s\n' "$version" > out/version.txt
+            (cd out && sha256sum *.apk.beta > SHA256SUMS.txt && cat SHA256SUMS.txt)
+            echo "APK_NAME=Tohid-Native-$version.apk.beta" >> "$GITHUB_ENV"
+          else
           cp "$apk" "out/Tohid-Native-$version.apk"
           #  همان فایل، یک بار هم با نامِ ثابت.
           #
@@ -101,7 +131,10 @@ jobs:
           #  می‌پرسید و آن سهمیهٔ ساعتی دارد و جاهایی هم بسته است. این
           #  فایل از همان مسیرِ دانلود خوانده می‌شود، بدون سهمیه.
           printf '%s\n' "$version" > out/version.txt
-          cd out && sha256sum *.apk > SHA256SUMS.txt && cat SHA256SUMS.txt
+          (cd out && sha256sum *.apk > SHA256SUMS.txt && cat SHA256SUMS.txt)
+          echo "APK_NAME=Tohid-Native-$version.apk" >> "$GITHUB_ENV"
+          fi
+          cd out
           #  امضای جدای فهرست — شرح سرِ `update/ReleaseSignature.kt`.
           #  کلیدِ عمومی که در برنامه سنجاق شود ولی امضایش نیاید، یعنی
           #  هیچ گوشی‌ای به‌روز نمی‌شود؛ پس این حالت ساخت را می‌شکند.
@@ -114,8 +147,7 @@ jobs:
             echo "::error::کلیدِ عمومیِ به‌روزرسانی سنجاق شده ولی secretِ TOHID_UPDATE_SIGNING_KEY نیست"
             exit 1
           fi
-          echo "APK_NAME=Tohid-Native-$version.apk" >> "$GITHUB_ENV"
-          echo "APK_MB=$(du -m Tohid-Native.apk | cut -f1)" >> "$GITHUB_ENV"
+          echo "APK_MB=$(du -m "$(ls *.apk *.apk.beta 2>/dev/null | head -n1)" | cut -f1)" >> "$GITHUB_ENV"
 
       #  نسخهٔ کافه‌بازار — همان کد با `-Pstore=bazaar`: بی به‌روزرسانیِ داخلی،
       #  بی اجازهٔ نصبِ بسته و بی دکمهٔ خرید با واتساپ (قانونِ بازار). همان
@@ -153,14 +185,14 @@ jobs:
       # نیمه‌تمام و بازبینی‌نشده خودکار روی گوشیِ همه‌ی دکان‌ها می‌نشست.
       # شاخه‌ها فقط ساخته و سنجیده می‌شوند (و APK به‌عنوانِ artifact می‌ماند).
       - name: جابه‌جا کردن برچسب
-        if: ${{ github.ref == 'refs/heads/main' }}
+        if: ${{ env.PUBLISH == 'true' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if ! gh api -X PATCH "repos/${{ github.repository }}/git/refs/tags/tohid-native" \
+          if ! gh api -X PATCH "repos/${{ github.repository }}/git/refs/tags/$TAG" \
                  -f sha='${{ github.sha }}' -F force=true >/dev/null 2>&1; then
             gh api -X POST "repos/${{ github.repository }}/git/refs" \
-              -f ref='refs/tags/tohid-native' -f sha='${{ github.sha }}' >/dev/null
+              -f ref="refs/tags/$TAG" -f sha='${{ github.sha }}' >/dev/null
           fi
 
       # ⚠️ چرا فایل‌ها با خودِ action-gh-release نمی‌روند: آن action همهٔ
@@ -175,7 +207,7 @@ jobs:
       # آخر از همه `version.txt` — تا هیچ لحظه‌ای شماره‌ای اعلام نشود که
       # فایلش هنوز نیامده. هر فایل تا سه بار تلاش می‌شود.
       - name: انتشار
-        if: ${{ github.ref == 'refs/heads/main' }}
+        if: ${{ env.PUBLISH == 'true' && env.CHANNEL == 'stable' }}
         uses: softprops/action-gh-release@v2
         with:
           tag_name: tohid-native
@@ -197,8 +229,30 @@ jobs:
             ---
             <sub>ساخته‌شده از `${{ github.sha }}`</sub>
 
+      - name: انتشارِ آزمایشی
+        if: ${{ env.PUBLISH == 'true' && env.CHANNEL == 'beta' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: tohid-native-beta
+          name: توحید — نسخهٔ آزمایشی اندروید (beta)
+          prerelease: true
+          target_commitish: ${{ github.sha }}
+          body: |
+            ## نسخهٔ آزمایشی — فقط دکان‌ها و دستگاه‌های آزمایشی
+
+            هر مرج به main این‌جا می‌آید، نه روی گوشیِ همه. دکانی که شناسه‌اش در
+            `live_config` (scope `release`، کلیدِ `beta.shops` یا `beta.devices`) باشد
+            این نسخه را از به‌روزرسانیِ داخلِ برنامه می‌گیرد. انتشارِ پایدار برای همه فقط
+            با Run workflow ⇒ channel = stable.
+
+            > نامِ فایل عمداً به `.apk.beta` ختم می‌شود تا برنامه‌های قدیمی که از
+            > api.github.com می‌پرسند آن را برندارند.
+
+            ---
+            <sub>نسخهٔ `${{ env.APK_NAME }}` — ساخته‌شده از `${{ github.sha }}`</sub>
+
       - name: فرستادنِ فایل‌ها — یکی‌یکی، version.txt آخر
-        if: ${{ github.ref == 'refs/heads/main' }}
+        if: ${{ env.PUBLISH == 'true' }}
         working-directory: android-native/out
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -206,7 +260,7 @@ jobs:
           set -e
           up() {
             for i in 1 2 3; do
-              if gh release upload tohid-native "$1" --clobber -R "${{ github.repository }}"; then return 0; fi
+              if gh release upload "$TAG" "$1" --clobber -R "${{ github.repository }}"; then return 0; fi
               echo "::warning::فرستادنِ $1 نشد (تلاش $i) — دوباره"
               sleep $((i * 5))
             done
@@ -214,6 +268,19 @@ jobs:
             return 1
           }
           up "${{ env.APK_NAME }}"
+          if [ "$CHANNEL" = beta ]; then
+            #  آزمایشی: فقط نصبیِ نسخه‌دار، فهرست، امضا و شماره — هیچ `.apk`ی
+            up SHA256SUMS.txt
+            if [ -f SHA256SUMS.txt.sig ]; then up SHA256SUMS.txt.sig; fi
+            up version.txt
+            names=$(gh api "repos/${{ github.repository }}/releases/tags/$TAG" | jq -r '.assets[].name')
+            for f in "${{ env.APK_NAME }}" SHA256SUMS.txt version.txt; do
+              echo "$names" | grep -qx "$f" || { echo "::error::$f روی انتشار نیست"; exit 1; }
+            done
+            echo "$names" | grep -qi '\.apk$' && { echo "::error::انتشارِ آزمایشی نباید فایلِ .apk داشته باشد"; exit 1; }
+            echo "هر سه فایل روی انتشارِ آزمایشی است"
+            exit 0
+          fi
           up Tohid-Native.apk
           #  نامِ رو به کاربر «فروشگاه من» است؛ «Tohid-Native.apk» فقط برای به‌روزرسانیِ نسخه‌های نصب‌شده می‌ماند
           cp Tohid-Native.apk MyShop-Android.apk
@@ -224,21 +291,21 @@ jobs:
           if [ -f SHA256SUMS.txt.sig ]; then up SHA256SUMS.txt.sig; fi
           up version.txt
           #  و از خودِ گیت‌هاب بپرس که هر سه واقعاً روی انتشار نشسته‌اند
-          names=$(gh api "repos/${{ github.repository }}/releases/tags/tohid-native" | jq -r '.assets[].name')
+          names=$(gh api "repos/${{ github.repository }}/releases/tags/$TAG" | jq -r '.assets[].name')
           for f in "${{ env.APK_NAME }}" Tohid-Native.apk SHA256SUMS.txt version.txt; do
             echo "$names" | grep -qx "$f" || { echo "::error::$f روی انتشار نیست"; exit 1; }
           done
           echo "هر چهار فایل روی انتشار است"
 
       - name: پاک کردن نسخه‌های قبلی
-        if: ${{ github.ref == 'refs/heads/main' }}
+        if: ${{ env.PUBLISH == 'true' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           #  هر چیزی جز فایل‌های همین ساخت برداشته می‌شود. «Tohid-Native.apk»
           #  و «version.txt» همیشه می‌مانند — لینکِ ثابت و شمارهٔ نسخه به
           #  آنها بسته است.
-          gh api "repos/${{ github.repository }}/releases/tags/tohid-native" \
+          gh api "repos/${{ github.repository }}/releases/tags/$TAG" \
             | jq -r '.assets[] | "\(.id) \(.name)"' | while read -r id name; do
               case "$name" in
                 "${{ env.APK_NAME }}"|Tohid-Native.apk|MyShop-Android.apk|MyShop-Bazaar.apk|SHA256SUMS.txt|SHA256SUMS.txt.sig|version.txt) ;;
