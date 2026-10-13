@@ -238,7 +238,8 @@ private fun NewPurchaseInvoice(
   var supplierId by remember { mutableStateOf(d.suppliers.maxByOrNull { s -> d.purchases.filter { it.supplierId == s.id }.maxOfOrNull { it.createdAt } ?: 0L }?.id) }
   var supplierMenu by remember { mutableStateOf(false) }
   var newSupplier by remember { mutableStateOf("") }
-  var date by remember { mutableStateOf(today) }
+  //  تاریخِ خورشیدی نوشته و خوانده می‌شود (۱۴۰۵/۰۷/۲۱)؛ در دفتر میلادی می‌نشیند
+  var date by remember { mutableStateOf(formatDate(today)) }
   var paid by remember { mutableStateOf("") }
   var notes by remember { mutableStateOf("") }
   val lines = remember { mutableStateListOf(Draft()) }
@@ -266,9 +267,12 @@ private fun NewPurchaseInvoice(
   fun save() {
     val sid = supplierId ?: return toast("تأمین‌کننده را انتخاب کنید")
     val ls = lines.filter { it.productId.isNotBlank() }.map {
-      PurchaseBook.Line(it.productId, it.qty.toDoubleOrNull() ?: 0.0, it.price.toDoubleOrNull() ?: 0.0, expiryDate = it.expiry.trim())
+      val exp = it.expiry.trim()
+      PurchaseBook.Line(it.productId, it.qty.toDoubleOrNull() ?: 0.0, it.price.toDoubleOrNull() ?: 0.0,
+        expiryDate = if (exp.isEmpty()) "" else ir.vil3ntec.tohid.Jalali.parseTyped(exp) ?: return toast("تاریخِ انقضای «$exp» درست نیست — مثلاً ۱۴۰۶/۰۳/۳۱"))
     }
-    when (val r = PurchaseBook.record(d, sid, ls, paidValue, date.trim().ifBlank { today }, notes, today, System.currentTimeMillis(), ::newId)) {
+    val iso = if (date.isBlank()) today else ir.vil3ntec.tohid.Jalali.parseTyped(date) ?: return toast("تاریخِ فاکتور درست نیست — مثلاً ${formatDate(today)}")
+    when (val r = PurchaseBook.record(d, sid, ls, paidValue, iso, notes, today, System.currentTimeMillis(), ::newId)) {
       is PurchaseBook.Result.Failed -> toast(r.message)
       is PurchaseBook.Result.Ok -> {
         scope.launch { store.save(r.data) }
@@ -321,7 +325,7 @@ private fun NewPurchaseInvoice(
         },
       )
       Spacer(Modifier.width(8.dp))
-      OutlinedTextField(date, { date = it }, singleLine = true, label = { Text("تاریخ (${formatDate(date)})") }, modifier = Modifier.width(200.dp))
+      OutlinedTextField(date, { date = it }, singleLine = true, label = { Text("تاریخ (خورشیدی)") }, modifier = Modifier.width(200.dp))
     }
     Spacer(Modifier.height(10.dp))
 
@@ -411,7 +415,7 @@ private fun LineRow(i: Int, l: Draft, d: ShopData, onNext: () -> Unit, onRemove:
     OutlinedTextField(l.price, { l.price = it.filter { c -> c.isDigit() || c == '.' } }, singleLine = true,
       modifier = Modifier.width(124.dp).focusRequester(l.priceFocus).then(enterOn(onNext)))
     Spacer(Modifier.width(6.dp))
-    OutlinedTextField(l.expiry, { l.expiry = it.take(10) }, singleLine = true, placeholder = { Text("2027-01-31") },
+    OutlinedTextField(l.expiry, { l.expiry = it.take(10) }, singleLine = true, placeholder = { Text("۱۴۰۶/۰۳/۳۱") },
       modifier = Modifier.width(144.dp).then(enterOn(onNext)))
     Text(if (l.productId.isNotBlank()) money(l.total()) else "", Modifier.width(130.dp), textAlign = TextAlign.End, fontWeight = FontWeight.SemiBold, color = Shop.colors.text)
     IconButton(onClick = onRemove, modifier = Modifier.width(40.dp)) { Icon(Icons.Filled.Close, "حذفِ ردیف", tint = Shop.colors.muted) }

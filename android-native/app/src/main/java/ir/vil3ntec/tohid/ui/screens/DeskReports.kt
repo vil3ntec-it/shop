@@ -173,9 +173,18 @@ internal fun SheetTable(sheet: ReportCsv.Sheet, modifier: Modifier) {
   //  جمع فقط برای ستونِ مبلغ — نه شماره، تعداد یا روز
   val noSum = listOf("شماره", "تعداد", "روز", "موجودی", "حداقل", "ردیف", "مقدار", "فی", "قیمت")
   val summable = head.mapIndexed { c, t -> numeric[c] && noSum.none { t.contains(it) } }
+  //  ستونِ متنیِ کوتاه (نوع، وضعیت، فروشنده…) پهنای خودش را می‌گیرد تا له نشود؛
+  //  فقط متن‌های بلند (نام، شرح) باقیِ جا را میانِ خود قسمت می‌کنند
+  val longest = head.indices.map { c -> maxOf(head[c].length, body.maxOfOrNull { it.getOrNull(c).orEmpty().length } ?: 0) }
   val cols = head.mapIndexed { c, t ->
-    TCol(t, when { dates[c] -> 110.dp; numeric[c] -> 120.dp; else -> 0.dp }, end = numeric[c])
-  }
+    val w = when {
+      dates[c] -> 110.dp
+      numeric[c] -> 120.dp
+      longest[c] <= 14 -> (longest[c] * 9 + 30).dp
+      else -> 0.dp
+    }
+    TCol(t, w, end = numeric[c])
+  }.let { cs -> if (cs.none { it.width == 0.dp } && cs.isNotEmpty()) cs.mapIndexed { i, c -> if (i == cs.indexOfFirst { !it.end }) c.copy(width = 0.dp) else c } else cs }
   val footer = if (summable.any { it } && body.size > 1)
     head.indices.map { c -> if (summable[c]) money(body.sumOf { it.getOrNull(c)?.toDoubleOrNull() ?: 0.0 }) else if (c == 0) "جمع" else "" }
   else null
