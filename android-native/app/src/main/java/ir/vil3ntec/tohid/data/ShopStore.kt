@@ -49,10 +49,21 @@ class ShopStore(private val context: Context) {
     withContext(Dispatchers.IO) {
       if (file.exists()) {
         runCatching { json.decodeFromString<ShopData>(file.readText()) }
-          .onSuccess { _data.value = it }
+          .onSuccess { _data.value = it; recoverSync(it) }
+      } else {
+        recoverSync(ShopData())
       }
     }
     _loaded.value = true
+  }
+
+  /**
+   *  commitِ همگام‌سازی‌ای که برنامه وسطش بسته شد، پیش از هر نوشتنی تمام یا
+   *  برگردانده می‌شود — با همین دفترِ روی دیسک (F0-05، شرح سرِ `SyncCommit`).
+   *  ⚠️ خواندنِ دفتر هرگز به‌خاطرِ این نمی‌ایستد.
+   */
+  private fun recoverSync(onDisk: ShopData) {
+    runCatching { SyncV1Engine.of(context).recover(onDisk) }
   }
 
   /**
