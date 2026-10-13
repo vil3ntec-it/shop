@@ -849,7 +849,11 @@ fun SettingsScreen(
             val fixed = withContext(Dispatchers.IO) { BackupBundle.reconcilePhotoFlags(context, next) }
             //  ⚠️ بازیابیِ پشتیبان دادهٔ خودِ کاربر است؛ قفلِ نرمِ
             //  پایانِ اشتراک نباید گروگانش بگیرد.
-            store.applyRestore(fixed)
+            if (!store.applyRestore(fixed)) {
+              //  به دیسک نرسید (F0-01): دفترِ قبلی دست‌نخورده سرِ جایش است
+              toast("بازیابی روی حافظهٔ دستگاه نوشته نشد — اطلاعاتِ قبلی سرِ جایش است")
+              return@launch
+            }
             canUndo = true
             restorePhotos = 0
             toast(

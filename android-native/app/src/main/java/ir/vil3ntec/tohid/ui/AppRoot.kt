@@ -315,6 +315,17 @@ fun AppRoot(
       if (r == SnackbarResult.ActionPerformed) AppNav.go("vip")
     }
   }
+  //  دفتر روی دیسک ننشست (F0-01) ⇐ پیامِ «ثبت شد»ِ صفحه برداشته و راستش
+  //  گفته می‌شود. صفحه همچنان همان دفترِ روی دیسک را نشان می‌دهد.
+  LaunchedEffect(store) {
+    store.diskError.collect { reason ->
+      snackbar.currentSnackbarData?.dismiss()
+      snackbar.showSnackbar(
+        "ذخیره نشد — دفتر روی حافظهٔ دستگاه نوشته نشد ($reason). دوباره امتحان کنید؛ اگر تکرار شد جای خالیِ حافظه را ببینید.",
+        duration = SnackbarDuration.Long,
+      )
+    }
+  }
 
   if (lockStore.enabled && !unlocked) {
     AppLockScreen { unlocked = true }

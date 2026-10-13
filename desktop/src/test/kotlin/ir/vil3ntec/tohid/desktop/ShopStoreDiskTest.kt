@@ -3,7 +3,11 @@ package ir.vil3ntec.tohid.desktop
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -59,12 +63,20 @@ class ShopStoreDiskTest {
     File(ledger, "blocker").writeText("x")
 
     val store = open()
-    val ok = runBlocking { store.save(first) }
+    val (ok, told) = runBlocking {
+      //  همان پیامی که `AppRoot` نشان می‌دهد — پیش از ذخیره گوش داده می‌شود
+      val told = async(start = CoroutineStart.UNDISPATCHED) { store.diskError.first() }
+      val ok = store.save(first)
+      ok to withTimeout(5_000) { told.await() }
+    }
 
     assertEquals(
       "آنچه صفحه نشان می‌دهد باید همان باشد که پس از بستن و باز کردن می‌ماند",
       open().data.value, store.data.value,
     )
     assertFalse("ذخیره‌ای که به دیسک نرسید نباید «ثبت شد» بگیرد", ok)
+    assertTrue("خطا باید به کاربر گفته شود", told.isNotBlank())
+    //  دفترِ حافظه هم عوض نشده: صفحه چیزی را که روی دیسک نیست نشان نمی‌دهد
+    assertEquals(ShopData(), store.data.value)
   }
 }

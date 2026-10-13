@@ -94,7 +94,7 @@ jobs:
       - name: آزمونِ ذخیره
         working-directory: desktop
         shell: bash
-        run: ./gradlew --no-daemon test --tests 'ir.vil3ntec.tohid.desktop.ShopStoreDiskTest'
+        run: ./gradlew --no-daemon test --tests 'ir.vil3ntec.tohid.desktop.ShopStoreDiskTest' --tests 'ir.vil3ntec.tohid.data.DiskWriteTest'
 
   package:
     name: نصاب ${{ matrix.label }}
