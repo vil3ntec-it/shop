@@ -9954,7 +9954,12 @@
   document.getElementById('btn-bp-save').addEventListener('click', ()=>{
     if(bpSaving) return;
     const ready = bpReadyRows();
-    if(!ready.length){ showToast('حداقل یک ردیف کامل لازم است', 'danger'); return; }
+    if(!ready.length){
+      //  اولین کالای دکانِ تازه: همه‌چیز پر است جز دسته (فهرستِ دسته هنوز خالی است) ⇐ همین را بگو
+      const noCat = bpRows.some(r=>(r.name||'').trim() && r.unit && !r.category);
+      showToast(noCat ? 'دسته‌بندی را انتخاب کنید — اگر هنوز دسته‌ای نیست «+ دسته‌بندی جدید»' : 'حداقل یک ردیف کامل لازم است', 'danger');
+      return;
+    }
 
     bpSaving = true;
     const btn = document.getElementById('btn-bp-save');
@@ -14697,6 +14702,9 @@
 
     if(canServiceWorker){
       window.addEventListener('load', ()=>{
+        //  داده‌های دکان در حافظهٔ مرورگر است؛ Safari بی این، سایتِ بی‌استفاده را بعد از
+        //  چند روز پاک می‌کند — «ماندگار» بخواه (روی آیفونِ نصب‌شده و اندروید پذیرفته می‌شود)
+        try{ navigator.storage && navigator.storage.persist && navigator.storage.persist(); }catch(e){}
         navigator.serviceWorker.register('sw.js').then((reg)=>{
           watchForUpdate(reg);
           // هر بار که برنامه باز می‌شود و هر نیم‌ساعت، سایت را برای

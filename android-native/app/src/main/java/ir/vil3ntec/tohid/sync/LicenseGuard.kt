@@ -15,6 +15,14 @@ import android.content.Context
  */
 object LicenseGuard {
 
+  /**
+   *  هر بار که اشتراکِ این گوشی عوض می‌شود (مجوزِ تازه، کدِ آفلاین، کدِ شش‌رقمی)
+   *  یکی بالا می‌رود — `VipGate` و قفلِ نرم با آن همان لحظه دوباره می‌سنجند،
+   *  نه وقتی کاربر صفحه را عوض کرد.
+   */
+  val changes = androidx.compose.runtime.mutableIntStateOf(0)
+  fun changed() { changes.intValue++ }
+
   /** یک روز ارفاق: تنظیمِ منطقهٔ زمانی یا ساعتِ تابستانی، دست‌کاری نیست */
   private const val CLOCK_SLACK = 24L * 60 * 60 * 1000
 
@@ -92,6 +100,7 @@ object LicenseGuard {
     current?.let { state.markOfflineUsed(it) }
     state.markOfflineUsed(p.serial)
     state.offlineCode = OfflineCode.normalized(raw)
+    changed()
     return null
   }
 
@@ -99,5 +108,6 @@ object LicenseGuard {
   fun dropOffline(state: SyncStore) {
     state.offlineCode?.let { OfflineCode.parse(it)?.serial }?.let { state.markOfflineUsed(it) }
     state.offlineCode = null
+    changed()
   }
 }

@@ -303,6 +303,18 @@ fun AppRoot(
   LaunchedEffect(migration) {
     migration?.let { scope.launch { snackbar.showSnackbar(it) } }
   }
+  //  نوشتنی که قفلِ نرمِ پایانِ اشتراک ردش کرد ⇐ پیامِ «ثبت شد»ِ صفحه برداشته
+  //  می‌شود و راستش گفته می‌شود، با راهِ تمدید
+  LaunchedEffect(store) {
+    store.blocked.collect {
+      snackbar.currentSnackbarData?.dismiss()
+      val r = snackbar.showSnackbar(
+        "اشتراک تمام شده — این فروش/قرض ثبت نشد. انبار، کالا، خرید و مصارف باز است.",
+        actionLabel = "تمدید", duration = SnackbarDuration.Long,
+      )
+      if (r == SnackbarResult.ActionPerformed) AppNav.go("vip")
+    }
+  }
 
   if (lockStore.enabled && !unlocked) {
     AppLockScreen { unlocked = true }

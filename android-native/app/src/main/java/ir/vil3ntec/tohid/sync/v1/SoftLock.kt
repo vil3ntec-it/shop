@@ -31,8 +31,19 @@ object SoftLock {
   @Volatile var lastBlockedAt: Long = 0
     private set
 
+  /**
+   *  ⛔ یک منبع با `VipGate`: مجوزی که همین حالا فعال است (یا در مهلت، یا
+   *  کدِ آفلاینِ همین کامپیوتر) قفل را باز می‌کند، هرچه تپشِ کهنه بگوید.
+   *  پیش از این دو منبع با هم نمی‌خواندند: صفحهٔ فروش باز بود ولی نوشتنش
+   *  بی‌صدا دور ریخته می‌شد، و تمدید با کد تا تپشِ بعدی قفل را باز نمی‌کرد.
+   */
   fun refresh(context: Context): Boolean {
-    val on = runCatching { HeartbeatCache(context).softLocked() }.getOrDefault(false)
+    val heartbeat = runCatching { HeartbeatCache(context).softLocked() }.getOrDefault(false)
+    val licensed = heartbeat && runCatching {
+      val st = ir.vil3ntec.tohid.sync.LicenseGuard.status(context, ir.vil3ntec.tohid.sync.SyncStore(context)).state
+      st == ir.vil3ntec.tohid.sync.License.State.ACTIVE || st == ir.vil3ntec.tohid.sync.License.State.GRACE
+    }.getOrDefault(false)
+    val on = heartbeat && !licensed
     _locked.value = on
     return on
   }

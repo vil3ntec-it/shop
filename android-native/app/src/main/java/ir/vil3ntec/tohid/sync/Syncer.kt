@@ -161,6 +161,7 @@ class Syncer(
       ) {
         state.license = license
         state.serverDenied = null
+        LicenseGuard.changed()
       }
     } else {
       /*

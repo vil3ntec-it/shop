@@ -336,6 +336,13 @@ fun InvoiceDialog(
         Spacer(Modifier.height(16.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
           OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("بستن") }
+          //  گوشی: فاکتور به واتساپ/تلگرامِ مشتری — بی چاپگر هم
+          if (!ir.vil3ntec.tohid.ui.Platform.DESKTOP) {
+            OutlinedButton(
+              onClick = { scope.launch { ir.vil3ntec.tohid.print.PrintJob.shareSale(context, d, sale)?.let(onMessage) } },
+              modifier = Modifier.weight(1f),
+            ) { Text("فرستادن") }
+          }
           Button(onClick = { printer = true }, modifier = Modifier.weight(1f)) { Text("چاپ") }
         }
       }
