@@ -68,6 +68,7 @@ const PUMP = Object.freeze({
     stock_out: 'تیلِ مخزن تمام شد',
     low_stock: 'تیلِ مخزن رو به اتمام',
     debt: 'قرض از حد گذشت',
+    shift: 'کسریِ صندوق یا شیفتِ بسته‌نشده',
   }),
   notFoundMessage: 'پمپ پیدا نشد',
   notFoundCode: 'station_not_found',
