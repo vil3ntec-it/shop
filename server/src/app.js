@@ -33,6 +33,8 @@ async function createApp({ runMigrations = true } = {}) {
   //  هیچ سقفی بر شمارِ حساب‌ها) — پس سقفِ خودش را می‌گیرد، پیش از پارسرِ همگانی
   //  (پارسرِ اول بدنه را می‌خواند و دومی کاری نمی‌کند).
   app.use(['/api/pump/device/state', '/api/v1/pump/device/state'], express.json({ limit: '4mb' }));
+  //  عکس/PDFِ برنامه برای بات (‎/report/:id‎): تا ۴ فایلِ ۶ مگابایتی به base64
+  app.use(/^\/api(?:\/v1)?\/pump\/device\/report\//, express.json({ limit: '34mb' }));
   app.use(express.json({ limit: '2mb' }));
 
   /*

@@ -460,11 +460,12 @@ router.get('/me', async (req, res, next) => {
 router.get('/rate', async (req, res, next) => {
   try {
     const rates = require('../lib/station-rates');
+    const reports = require('../lib/station-reports');
     let cmd = await rates.pending(req.stationId);
     //  «درجا» (`?wait=<ثانیه>`): فرمانی در صف نیست ⇒ پاسخ باز می‌ماند تا بات
     //  فرمانی بسازد یا مهلت تمام شود. بی `wait` همان رفتارِ همیشگی.
     const wait = Math.min(rates.WAIT_MAX_S, Math.max(0, Number.parseInt(req.query.wait, 10) || 0));
-    if (!cmd && wait > 0 && rates.waiting(req.stationId) < rates.MAX_WAITERS) {
+    if (!cmd && !reports.hasPending(req.stationId) && wait > 0 && rates.waiting(req.stationId) < rates.MAX_WAITERS) {
       const w = rates.waitFor(req.stationId, wait * 1000);
       res.on('close', w.cancel);
       await w.promise;
@@ -472,9 +473,13 @@ router.get('/rate', async (req, res, next) => {
       if (res.writableEnded || res.destroyed) return;
       cmd = await rates.pending(req.stationId);
     }
+    //  ⚠️ درخواستِ عکس/PDFِ بات (lib/station-reports.js) پس از بسته شدنِ اتصال
+    //  برداشته می‌شود، نه پیش از آن — وگرنه درخواستی که به اتصالِ رفته داده شد گم می‌شد.
+    const reqs = reports.pending(req.stationId);
     res.json({
       ok: true,
       cmd,
+      reqs,
       //  برنامه از همین می‌فهمد که این سرور «درجا» را می‌شناسد؛ سرورِ کهنه این
       //  کلید را ندارد و برنامه همان پرسشِ دقیقه‌ای را می‌زند.
       waitMax: rates.WAIT_MAX_S,
@@ -505,6 +510,24 @@ router.post('/rate/:id/ack', async (req, res, next) => {
     if (!row) throw notFound('این فرمان در صف نیست', 'not_found');
     require('../lib/bots').pump().rateDone(row).catch((e) => console.error('[telegram] خبرِ نرخ نرفت:', e.message));
     res.json({ ok: true, status: row.status });
+  } catch (err) { next(err); }
+});
+
+/**
+ * جوابِ درخواستِ عکس/PDFِ بات (lib/station-reports.js) — از خودِ برنامه.
+ * ⛔ هیچ چیز ذخیره نمی‌شود: فایل‌ها از همین بدنه مستقیم به بات و تلگرام می‌روند.
+ */
+router.post('/report/:id', async (req, res, next) => {
+  try {
+    let done;
+    try {
+      done = require('../lib/station-reports').complete(req.stationId, req.params.id, req.body || {});
+    } catch (e) {
+      if (e.code === 'bad') throw badRequest(e.message, 'bad_report');
+      throw e;
+    }
+    if (!done) throw notFound('این درخواست دیگر در صف نیست', 'not_found');
+    res.json({ ok: true });
   } catch (err) { next(err); }
 });
 
