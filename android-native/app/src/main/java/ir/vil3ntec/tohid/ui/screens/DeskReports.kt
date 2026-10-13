@@ -77,7 +77,7 @@ fun DeskReportsScreen(d: ShopData, snackbar: SnackbarHostState) {
     Modifier
       .fillMaxSize()
       .onPreviewKeyEvent { e ->
-        if (e.type != KeyEventType.KeyDown || !e.isCtrlPressed) return@onPreviewKeyEvent false
+        if (e.type != KeyEventType.KeyDown || !e.isPrimaryModifier) return@onPreviewKeyEvent false
         when (e.key) { Key.P -> { print(); true }; Key.E -> { excel(); true }; else -> false }
       }
       .padding(16.dp),
