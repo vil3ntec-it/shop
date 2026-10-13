@@ -413,7 +413,8 @@ fun AppRoot(
     val stockOwner = remember { Any() }
     val latestData by rememberUpdatedState(data)
     DisposableEffect(here) {
-      if (here == "warehouse" || here == "purchasing") {
+      //  خریدِ کامپیوتر گیرندهٔ خودش را دارد (`DeskPurchasingScreen`: بارکد ⇐ ردیفِ فاکتور)
+      if (here == "warehouse" || (here == "purchasing" && !Platform.DESKTOP)) {
         ir.vil3ntec.tohid.scan.ScanRouter.register(stockOwner) { code ->
           val id = ShopStore.barcodeIndex(latestData)[code]
           if (id != null) pendingProduct = id else pendingBarcode = code
@@ -619,10 +620,11 @@ fun AppRoot(
         label = "page",
       ) { current ->
       when (current) {
-        "purchasing" -> PurchasingScreen(store, data, snackbar)
+        "purchasing" -> if (Platform.DESKTOP) DeskPurchasingScreen(store, data, snackbar) else PurchasingScreen(store, data, snackbar)
         "admin" -> ManagementScreen(data, ::open)
-        "sales" -> SalesHistoryScreen(store, cartStore, data, snackbar) { sub = null; tab = "sale" }
-        "reports" -> ReportsScreen(data)
+        "sales" -> if (Platform.DESKTOP) DeskInvoicesScreen(store, cartStore, data, snackbar) { sub = null; tab = "sale" }
+          else SalesHistoryScreen(store, cartStore, data, snackbar) { sub = null; tab = "sale" }
+        "reports" -> if (Platform.DESKTOP) DeskReportsScreen(data, snackbar) else ReportsScreen(data)
         "receipts" -> ReceiptsScreen(data)
         //  مثلِ تنظیمات، سدِ دوم: اگر از هر راهِ دیگری به این مسیر
         //  برسد هم برای شاگرد باز نمی‌شود
