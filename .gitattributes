@@ -5,3 +5,6 @@
 *.bat text eol=crlf
 *.command text eol=lf
 *.sh text eol=lf
+
+# ⛔ تکه‌های docs/spec بایت‌به‌بایت با MASTER-SPEC.md سنجیده می‌شوند (docs/spec/tools/spec.mjs)
+docs/spec/** text eol=lf
