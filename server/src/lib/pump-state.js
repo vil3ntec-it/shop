@@ -49,6 +49,8 @@ function num(v) {
 /** نوعِ خبر از روی کلید — همان `CloudEvents.KindOf`ِ برنامهٔ پمپ. */
 function kindOf(key, state) {
   if (key.startsWith('tank-')) return state === 'out' ? 'stock_out' : 'low_stock';
+  //  کسریِ صندوق و شیفتِ بسته‌نشده — از ورقِ برنامهٔ پمپ (`AlertWatch.ShiftAlerts`)
+  if (key.startsWith('cash-') || key.startsWith('shift-')) return 'shift';
   return 'debt';
 }
 

@@ -36,7 +36,7 @@ const tenancy = require('./tenancy');
 const { badRequest } = require('../middleware/errors');
 
 /** نوع‌هایی که می‌شناسیم. هر چیز دیگری رد می‌شود. */
-const KINDS = ['sale', 'stock_out', 'low_stock', 'expense', 'debt', 'note'];
+const KINDS = ['sale', 'stock_out', 'low_stock', 'expense', 'debt', 'shift', 'note'];
 
 /**
  * ⛔ **کدام خبر ارزشِ بیدار کردنِ گوشی را دارد.**
@@ -52,12 +52,13 @@ const KINDS = ['sale', 'stock_out', 'low_stock', 'expense', 'debt', 'note'];
  *   • `stock_out` کالا (یا تیلِ مخزن) تمام شد
  *   • `low_stock` دارد تمام می‌شود — هنوز وقت هست سفارش داد
  *   • `debt`      قرض از حد گذشت — هرچه دیرتر، سخت‌تر وصول می‌شود
+ *   • `shift`     کسریِ صندوق یا شیفتِ بسته‌نشده (فقط پمپ، از ورق) — پولِ گم‌شده
  *
  * همان سه‌تایی که `Watchman`ِ برنامهٔ دکان و `StationSnapshot.Alerts`ِ
  * برنامهٔ پمپ هر دو می‌پایند. فروش و مصرف و یادداشت در فهرست می‌نشینند
  * و با باز شدنِ برنامه دیده می‌شوند.
  */
-const PUSH_KINDS = ['stock_out', 'low_stock', 'debt'];
+const PUSH_KINDS = ['stock_out', 'low_stock', 'debt', 'shift'];
 
 const MAX_BATCH = 50;
 const MAX_TEXT = 300;

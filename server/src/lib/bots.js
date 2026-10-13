@@ -35,7 +35,7 @@ function missingPump() {
   return {
     available: false,
     PURPOSE: 'telegram',
-    ALERT_KINDS: ['stock_out', 'low_stock', 'debt'],
+    ALERT_KINDS: ['stock_out', 'low_stock', 'debt', 'shift'],
     relayCustomer: off,
     rateDone: async () => {},
     notifyStation: async () => {},
