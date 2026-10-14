@@ -49,10 +49,21 @@ class ShopStore(private val context: Context) {
     withContext(Dispatchers.IO) {
       if (file.exists()) {
         runCatching { json.decodeFromString<ShopData>(file.readText()) }
-          .onSuccess { _data.value = it }
+          .onSuccess { _data.value = it; recoverSync(it) }
+      } else {
+        recoverSync(ShopData())
       }
     }
     _loaded.value = true
+  }
+
+  /**
+   *  commitِ همگام‌سازی‌ای که برنامه وسطش بسته شد، پیش از هر نوشتنی تمام یا
+   *  برگردانده می‌شود — با همین دفترِ روی دیسک (F0-05، شرح سرِ `SyncCommit`).
+   *  ⚠️ خواندنِ دفتر هرگز به‌خاطرِ این نمی‌ایستد.
+   */
+  private fun recoverSync(onDisk: ShopData) {
+    runCatching { SyncV1Engine.of(context).recover(onDisk) }
   }
 
   /**
@@ -75,7 +86,8 @@ class ShopStore(private val context: Context) {
    *  دست‌نخورده می‌ماند و صفحه همان چیزی را نشان می‌دهد که روی دیسک
    *  است. هیچ چیزی پاک نمی‌شود و خروجی و چاپ و پشتیبان باز می‌مانند.
    *
-   *  @return آیا نوشته شد. `false` یعنی قفلِ نرم — صفحه باید بگوید چرا.
+   *  @return آیا نوشته شد. `false` یعنی قفلِ نرم یا خطای دیسک — صفحه
+   *  نباید «ثبت شد» بگوید؛ دلیلش از `blocked` یا `diskError` گفته می‌شود.
    */
   suspend fun save(next: ShopData): Boolean = withContext(Dispatchers.IO) {
     //  ⛔ قفلِ نرم فقط بخش‌های پولی را می‌بندد — فروش و قرض‌داران. انبار،
@@ -86,7 +98,6 @@ class ShopStore(private val context: Context) {
       return@withContext false
     }
     writeInternal(next)
-    true
   }
 
   /**
@@ -108,13 +119,22 @@ class ShopStore(private val context: Context) {
    */
   suspend fun applyRestore(next: ShopData) = writeInternal(next)
 
-  /** نوشتنی که قفلِ نرم جلویش را نمی‌گیرد: بازیابی و جابه‌جاییِ دفتر. */
-  private suspend fun writeInternal(next: ShopData) = withContext(Dispatchers.IO) {
+  /**
+   *  نوشتنی که قفلِ نرم جلویش را نمی‌گیرد: بازیابی و جابه‌جاییِ دفتر.
+   *
+   *  @return آیا به دیسک رسید
+   */
+  private suspend fun writeInternal(next: ShopData): Boolean = withContext(Dispatchers.IO) {
     //  نوشتن و op ساختن زیرِ همان قفلی که نشاندنِ opهای رسیده دارد
     //  (`SyncV1Engine.absorbRemote`) — شرحش همان‌جا
     val engine = SyncV1Engine.of(context)
     synchronized(engine) {
-    writeToDisk(next)
+    /*
+     *  ⛔ دفتری که به دیسک نرسید op نمی‌سازد (F0-01). وگرنه opها به سرور
+     *  می‌رفتند و سایه جلو می‌رفت، ولی پس از بستن و باز کردن دفترِ کهنه
+     *  می‌ماند و تفاضلِ بعدی همان ردیف‌ها را «حذف‌شده» به سرور می‌فرستاد.
+     */
+    if (!writeToDisk(next)) return@synchronized false
     /*
      *  ⛔ **تنها درِ نوشتن در دفتر همین‌جاست** و هر تغییری از همین‌جا رد
      *  می‌شود. پس دفترِ تغییرات (Sync v1) هم همین‌جا نوشته می‌شود:
@@ -132,6 +152,7 @@ class ShopStore(private val context: Context) {
       val made = engine.record(next)
       if (made > 0) SyncV1Worker.now(context)
     }
+    true
     }
   }
 
@@ -143,25 +164,46 @@ class ShopStore(private val context: Context) {
    *  سایه را خودِ موتور در همان لحظه جلو می‌برد.
    */
   suspend fun applyFromServer(next: ShopData) = withContext(Dispatchers.IO) {
-    writeToDisk(next)
+    applyFromServerNow(next)
   }
 
-  /** همان، بی تعلیق — برای `SyncV1Engine.absorbRemote` که زیرِ قفل صدایش می‌زند. */
-  fun applyFromServerNow(next: ShopData) = writeToDisk(next)
+  /**
+   *  همان، بی تعلیق — برای `SyncV1Engine.absorbRemote` که زیرِ قفل صدایش می‌زند.
+   *
+   *  ⛔ اگر به دیسک نرسد **پرتاب می‌کند**: موتور نباید سایه و cursor را جلو
+   *  ببرد؛ همان opها دورِ بعد دوباره گرفته می‌شوند.
+   */
+  fun applyFromServerNow(next: ShopData) {
+    if (!writeToDisk(next)) throw java.io.IOException("دفتر روی دیسک نوشته نشد")
+  }
 
-  private fun writeToDisk(next: ShopData) {
-    _data.value = next
-    runCatching {
-      // اول در فایلِ کنارى، بعد جابه‌جایی: اگر وسطِ نوشتن برق برود،
-      // دفترِ دکان نصفه‌نیمه نمی‌ماند
-      val tmp = File(file.parentFile, "${file.name}.tmp")
-      tmp.writeText(json.encodeToString(next))
-      tmp.renameTo(file)
+  /**
+   *  خطای نوشتنِ دفتر روی دیسک — `AppRoot` پیامِ روشن نشان می‌دهد (F0-01).
+   *  پیش‌تر این خطا بی‌صدا خورده می‌شد و صفحه «ثبت شد» می‌گفت.
+   */
+  private val _diskError = kotlinx.coroutines.flow.MutableSharedFlow<String>(extraBufferCapacity = 4)
+  val diskError: kotlinx.coroutines.flow.SharedFlow<String> = _diskError
+
+  /**
+   *  @return آیا دفتر واقعاً روی دیسک نشست.
+   *
+   *  ⚠️ دفترِ حافظه (`data`) فقط **پس از** نشستن روی دیسک عوض می‌شود: آنچه
+   *  صفحه نشان می‌دهد همان است که پس از بستن و باز کردن می‌ماند.
+   */
+  private fun writeToDisk(next: ShopData): Boolean {
+    //  فایلِ کناری + fsync + جابه‌جاییِ اتمی که روی ویندوز هم جایگزین
+    //  می‌کند — شرحش سرِ `DiskWrite`
+    val saved = runCatching { DiskWrite.text(file, json.encodeToString(next)) }
+    saved.exceptionOrNull()?.let {
+      _diskError.tryEmit(it.message ?: "خطای نامشخص")
+      return false
     }
+    _data.value = next
     //  خلاصهٔ کوچک، کنارِ دفتر. نگهبانِ پس‌زمینه همین را می‌خواند و دیگر
     //  لازم نیست هر ربع ساعت کلِ دفتر را تجزیه کند — شرحش سرِ
     //  `LedgerSummary`.
     LedgerSummary.write(context, next)
+    return true
   }
 
   /**
@@ -193,7 +235,10 @@ class ShopStore(private val context: Context) {
    *  کاربر است و بستنش یعنی گروگان گرفتنِ دفترِ خودش.
    */
   suspend fun importJson(raw: String): Result<ShopData> = withContext(Dispatchers.IO) {
-    parseBackup(raw).onSuccess { writeInternal(it) }
+    parseBackup(raw).mapCatching {
+      if (!writeInternal(it)) throw java.io.IOException("دفتر روی دیسک نوشته نشد")
+      it
+    }
   }
 
   /* -------------------------- پشتیبانِ ایمنی -------------------------- */
@@ -217,7 +262,8 @@ class ShopStore(private val context: Context) {
   suspend fun undoRestore(): Result<ShopData> = withContext(Dispatchers.IO) {
     runCatching {
       val parsed = json.decodeFromString<ShopData>(safety.readText())
-      writeInternal(parsed)
+      //  ⛔ نسخهٔ ایمنی فقط وقتی پاک می‌شود که دفتر واقعاً روی دیسک نشسته باشد
+      if (!writeInternal(parsed)) throw java.io.IOException("دفتر روی دیسک نوشته نشد")
       safety.delete()
       parsed
     }

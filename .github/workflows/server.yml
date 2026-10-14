@@ -97,9 +97,11 @@ jobs:
       # ⚠️ سراسری نصب می‌شود، نه در `server/`: سرور عمداً فقط دو
       # وابستگی دارد و یک `devDependency`ی چندصد مگابایتی همان قاعده
       # را می‌شکست. خودِ سنجه از `npm root -g` پیدایش می‌کند.
+      # F0-17: نبودِ پلی‌رایت یا axe-core حالا آزمون را **قرمز** می‌کند
+      # (`server/test/browser-guard.mjs`)، نه «رد» با کدِ ۰.
       - name: کرومیوم برای آزمونِ پنل
         run: |
-          npm install -g playwright@1.56.1
+          npm install -g playwright@1.56.1 axe-core@4.10.3
           npx playwright install --with-deps chromium
 
       - name: آزمونِ پنلِ مدیریت
@@ -112,6 +114,12 @@ jobs:
       - name: آزمونِ نسخهٔ وب
         working-directory: server
         run: npm run test:web
+
+      # F0-17: چیدمان (بی بیرون‌زدگی در ۳۲۰ تا ۱۳۶۶) و دسترس‌پذیری (axe-core)
+      # نسخهٔ وب — تا امروز فقط دستی می‌دوید.
+      - name: آزمونِ چیدمان و دسترس‌پذیریِ نسخهٔ وب
+        working-directory: server
+        run: npm run test:web-ui
 
       # شورا چ۳: نمایندهٔ فروش در پورتال فقط فروش‌های خودش را می‌بیند
       - name: آزمونِ نمایندگی در پورتال

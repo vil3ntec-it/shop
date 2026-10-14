@@ -94,8 +94,8 @@ fun DeskHeader(
           )
         }
         item("ناموجود", board.outOfStock.size, Shop.colors.danger, "dashboard")
-        item("کم‌موجود", board.lowStock.size, Color(0xFFFF9800), "dashboard")
-        item("نزدیکِ انقضا", board.expiring.size, Color(0xFFE91E63), "dashboard")
+        item("کم‌موجود", board.lowStock.size, Shop.colors.warning, "dashboard")
+        item("نزدیکِ انقضا", board.expiring.size, Shop.colors.warning, "dashboard")
         item("قرضِ بیش از ۶۰ روز", board.debtOverdue.size, Shop.colors.danger, "debtors")
       }
     }

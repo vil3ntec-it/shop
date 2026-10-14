@@ -26,9 +26,13 @@ async function main() {
   const uname = String(username).toLowerCase();
   const exists = await one('SELECT id FROM admins WHERE username=$1', [uname]);
   if (exists) {
-    await one('UPDATE admins SET password_hash=$2, role=$3 WHERE id=$1 RETURNING id',
+    //  F0-15: راهِ نجات از ترمینال ⇒ تأییدِ دومرحله‌ای هم خاموش (گوشی گم شده)
+    await one(
+      `UPDATE admins SET password_hash=$2, role=$3,
+         totp_secret='', totp_pending='', totp_enabled_at=NULL, totp_last_step=0, totp_recovery='[]'
+       WHERE id=$1 RETURNING id`,
       [exists.id, await pw.hashPassword(password), role]);
-    console.log(`رمز مدیر «${uname}» عوض شد.`);
+    console.log(`رمز مدیر «${uname}» عوض شد (تأییدِ دومرحله‌ای‌اش، اگر روشن بود، خاموش شد).`);
   } else {
     await one(
       `INSERT INTO admins (id, username, name, password_hash, role, status, created_at)

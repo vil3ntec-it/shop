@@ -71,6 +71,40 @@ const verifyLimit = rateLimit({
   },
 });
 
+/*
+ *  ⛔ F0-16 — سقفِ دوم برای دو درِ «آیا این ایمیل حساب دارد؟»
+ *  (`register/start` و `password/forgot`)، به‌ازای هر **IP**. `otpLimit`
+ *  به‌ازای ایمیل است و جلوی امتحانِ هزار ایمیلِ گوناگون از یک جا را نمی‌گرفت.
+ */
+const probeLimit = rateLimit({ max: config.rateLimit.probeIpMax, keyPrefix: 'account-probe' });
+
+/** کارِ `password/forgot` با تأخیرِ یکسان (`config.otp.uniformMs`) — F0-16. */
+async function evenly(work) {
+  const floor = Number(config.otp.uniformMs) || 0;
+  if (floor <= 0) return work();
+  const started = Date.now();
+  let settled = false;
+  let failure = null;
+  const job = work().then(
+    (out) => { settled = true; return out; },
+    (err) => { settled = true; failure = err; return null; },
+  );
+  await Promise.race([job, new Promise((r) => setTimeout(r, floor))]);
+  const left = floor - (Date.now() - started);
+  if (left > 0) await new Promise((r) => setTimeout(r, left));
+  if (!settled) {
+    //  ایمیلِ کند پشتِ پاسخ ادامه می‌دهد؛ پاسخ دیگر منتظرش نمی‌ماند
+    job.then(() => { if (failure) console.error('[auth] بازیابیِ رمز:', failure.message); });
+    return null;
+  }
+  if (failure) throw failure;
+  return job;
+}
+
+//  خطاهایی که فقط حسابِ **موجود** می‌گرفت (چون فقط برای او کد ساخته
+//  می‌شود) و پس وجودِ حساب را لو می‌دادند — F0-16
+const QUIET_RESET_ERRORS = new Set(['otp_resend_wait', 'otp_daily_limit', 'delivery_failed']);
+
 // ---------- کمکی‌ها ----------
 
 /** ثبت تلاش ورود — پایه‌ی قفل موقت حساب. */
@@ -395,11 +429,19 @@ async function assertEmailFree(email) {
 }
 
 // ---------- پله‌ی یک: نام، ایمیل، رمز ----------
-router.post('/register/start', otpLimit, async (req, res, next) => {
+router.post('/register/start', probeLimit, otpLimit, async (req, res, next) => {
   if (!config.allowRegistration) return next(forbidden('ثبت‌نام روی این سرور بسته است', 'registration_closed'));
 
   const { email, name } = registrationInput(req.body);
-  await assertEmailFree(email);
+  /*
+   *  ⛔ F0-16 — ایمیلِ دارای حساب **همان** پاسخ و **همان** ایمیلِ کد را
+   *  می‌گیرد. «از قبل ثبت شده» فقط پس از کدِ درست (`/register/verify`) گفته
+   *  می‌شود، یعنی فقط به خودِ صاحبِ صندوق. پیش‌تر همین‌جا ۴۰۹ می‌آمد و هر
+   *  کسی می‌فهمید کدام ایمیل حساب دارد. کلاینتِ قدیمی چیزی کم ندارد: همان
+   *  `already_registered` را یک پله دیرتر می‌گیرد.
+   *  راهِ برگشت: `SIGNUP_LEGACY_CONFLICT=1`.
+   */
+  if (config.signupLegacyConflict) await assertEmailFree(email);
 
   const out = await otp.request(email, { purpose: 'register', ip: clientIp(req), app: appOf(req) });
   res.status(201).json({
@@ -423,7 +465,6 @@ router.post('/register/verify', verifyLimit, async (req, res, next) => {
   if (!config.allowRegistration) return next(forbidden('ثبت‌نام روی این سرور بسته است', 'registration_closed'));
 
   const email = v.email(req.body?.email, { required: true });
-  await assertEmailFree(email);
   await assertNotLocked('otp', email, clientIp(req));
 
   try {
@@ -433,6 +474,9 @@ router.post('/register/verify', verifyLimit, async (req, res, next) => {
     return next(err);
   }
   await noteAttempt('otp', email, clientIp(req), true);
+  //  ⛔ F0-16: فقط **پس از** کدِ درست — کدِ غلط برای ایمیلِ دارای حساب و
+  //  بی‌حساب یک خطا دارد
+  await assertEmailFree(email);
 
   const ticket = await tokens.issue({
     kind: 'register', subjectId: `email:${email}`, ttlMs: REGISTER_TICKET_TTL_MS,
@@ -782,17 +826,33 @@ router.post('/password', requireAnyUser, async (req, res, next) => {
  * `purpose = 'reset'` جداست از کد ورود، پس کدی که برای ورود صادر شده
  * به درد عوض کردن رمز نمی‌خورد و برعکس.
  */
-router.post('/password/forgot', otpLimit, async (req, res, next) => {
+router.post('/password/forgot', probeLimit, otpLimit, async (req, res, next) => {
   const raw = String(req.body?.email || req.body?.identifier || '').trim();
   if (!raw) return next(badRequest('ایمیل لازم است', 'email_required'));
   const email = v.email(raw, { required: true });
 
-  const user = await one('SELECT id FROM users WHERE email=$1', [email]);
-  let out = {};
-  if (user) {
-    out = await otp.request(email, { purpose: 'reset', ip: clientIp(req), app: appOf(req) });
-    await audit.log({ actorType: 'user', userId: user.id, action: 'auth.password_reset_requested', ip: clientIp(req) });
-  }
+  /*
+   *  ⛔ F0-16 — پاسخِ یکسان **و** تأخیرِ یکسان.
+   *  • «مهلتِ ارسالِ دوباره»، «سقفِ روزانه» و «ایمیل نرفت» فقط به حسابِ
+   *    موجود می‌رسید (برای ناموجود کدی ساخته نمی‌شود)، پس ۴۲۹/۵۰۲ یعنی «حساب
+   *    هست». حالا هر سه فقط در لاگِ سرور می‌نشینند و پاسخ همان ۲۰۰ است.
+   *    کدِ قبلی هنوز معتبر است (مهلتِ کد از مهلتِ ارسالِ دوباره بلندتر است).
+   *  • فرستادنِ ایمیل زمان می‌برد؛ `evenly` هر دو پاسخ را تا یک کفِ ثابت نگه
+   *    می‌دارد.
+   */
+  const out = (await evenly(async () => {
+    const user = await one('SELECT id FROM users WHERE email=$1', [email]);
+    if (!user) return {};
+    try {
+      const sent = await otp.request(email, { purpose: 'reset', ip: clientIp(req), app: appOf(req) });
+      await audit.log({ actorType: 'user', userId: user.id, action: 'auth.password_reset_requested', ip: clientIp(req) });
+      return sent;
+    } catch (err) {
+      if (!QUIET_RESET_ERRORS.has(err && err.code)) throw err;
+      console.warn(`[auth] بازیابیِ رمز بی ارسالِ تازه: ${err.code}`);
+      return {};
+    }
+  })) || {};
 
   //  پاسخ برای حسابِ موجود و ناموجود یکی است. `resendSeconds` هم می‌رود
   //  تا برنامه بتواند شمارش را نشان دهد، چه حساب باشد چه نباشد.
@@ -800,7 +860,7 @@ router.post('/password/forgot', otpLimit, async (req, res, next) => {
     ok: true,
     sent: true,
     email,
-    resendSeconds: out.resendSeconds || Math.ceil(config.otp.resendMs / 1000),
+    resendSeconds: Math.ceil(config.otp.resendMs / 1000),
     ...(out.devCode ? { devCode: out.devCode } : {}),
   });
 });

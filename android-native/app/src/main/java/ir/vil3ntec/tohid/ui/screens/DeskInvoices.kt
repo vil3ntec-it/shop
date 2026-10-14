@@ -86,7 +86,7 @@ fun DeskInvoicesScreen(store: ShopStore, cartStore: CartStore, d: ShopData, snac
     Modifier
       .fillMaxSize()
       .onPreviewKeyEvent { e ->
-        if (e.type != KeyEventType.KeyDown || !e.isCtrlPressed) return@onPreviewKeyEvent false
+        if (e.type != KeyEventType.KeyDown || !e.isPrimaryModifier) return@onPreviewKeyEvent false
         when (e.key) {
           Key.F -> { runCatching { searchFocus.requestFocus() }; true }
           Key.P -> { sheet().let { ir.vil3ntec.tohid.print.ReportPrint.print(context, it, it.name) }; true }

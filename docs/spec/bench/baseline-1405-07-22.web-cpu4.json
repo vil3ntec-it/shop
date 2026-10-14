@@ -1,0 +1,114 @@
+{
+  "at": "2026-10-14T02:46:07.165Z",
+  "env": {
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.80GHz",
+    "cores": 4,
+    "memGB": 16,
+    "os": "linux 6.18.44-fc-v114",
+    "node": "v22.22.0",
+    "browser": "chromium 141.0.7390.37",
+    "cpuThrottle": 4
+  },
+  "fixed": {
+    "debtors": 300,
+    "txPerDebtor": 3,
+    "sales": 1500,
+    "itemsPerSale": 3,
+    "expenses": 300,
+    "suppliers": 50
+  },
+  "sizes": [
+    {
+      "products": 1000,
+      "ledgerChars": 1694244,
+      "inLocalStorage": true,
+      "storageError": null,
+      "boot": {
+        "n": 5,
+        "p50": 2124.8,
+        "p95": 2334.1,
+        "max": 2334.1
+      },
+      "pages": {
+        "dashboard": {
+          "n": 5,
+          "p50": 371.5,
+          "p95": 432.9,
+          "max": 432.9
+        },
+        "products": {
+          "n": 5,
+          "p50": 1897.7,
+          "p95": 2372.5,
+          "max": 2372.5
+        },
+        "warehouse": {
+          "n": 5,
+          "p50": 2223.8,
+          "p95": 2488.7,
+          "max": 2488.7
+        },
+        "sale": {
+          "n": 5,
+          "p50": 267.9,
+          "p95": 331.6,
+          "max": 331.6
+        },
+        "sales": {
+          "n": 5,
+          "p50": 306.3,
+          "p95": 309.1,
+          "max": 309.1
+        },
+        "debtors": {
+          "n": 5,
+          "p50": 509,
+          "p95": 586.7,
+          "max": 586.7
+        },
+        "expenses": {
+          "n": 5,
+          "p50": 551.7,
+          "p95": 668.6,
+          "max": 668.6
+        },
+        "reports": {
+          "n": 5,
+          "p50": 335.9,
+          "p95": 342.2,
+          "max": 342.2
+        },
+        "purchasing": {
+          "n": 5,
+          "p50": 203.5,
+          "p95": 225.8,
+          "max": 225.8
+        },
+        "settings": {
+          "n": 5,
+          "p50": 186.9,
+          "p95": 234.1,
+          "max": 234.1
+        },
+        "more": {
+          "n": 5,
+          "p50": 168.5,
+          "p95": 204.7,
+          "max": 204.7
+        }
+      },
+      "scan": {
+        "n": 30,
+        "p50": 218.7,
+        "p95": 297.3,
+        "max": 305.5,
+        "rowsAtEnd": 30,
+        "focusedBefore": "BODY"
+      },
+      "heapMB": 17,
+      "errors": [],
+      "loaded": 1000,
+      "applyError": null
+    }
+  ]
+}
