@@ -20,7 +20,7 @@
 const crypto = require('crypto');
 
 /** کارهایی که برنامه می‌شناسد. */
-const KINDS = new Set(['tanks', 'debtor']);
+const KINDS = new Set(['tanks', 'debtor', 'company']);
 /** برنامه تا این مدت جواب نداد ⇒ «کامپیوتر جواب نداد». */
 const TIMEOUT_MS = 45_000;
 /** سقفِ درخواست‌های بازِ یک پمپ — تا کسی با دکمه‌زدنِ پیاپی صف نسازد. */

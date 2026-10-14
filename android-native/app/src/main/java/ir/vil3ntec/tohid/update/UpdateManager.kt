@@ -98,7 +98,11 @@ object UpdateManager {
     busy = true
     if (!quiet) message = "در حال بررسی…"
     job = scope.launch {
-      Updater.check(repo, currentVersion, ir.vil3ntec.tohid.core.config.AppConfig.baseUrl(app))
+      //  F0-27: دکان و دستگاه — سرور با آن‌ها می‌داند این‌جا آزمایشی است یا نه.
+      //  هر دو همان شناسه‌هایی‌اند که برنامه از قبل نگه می‌دارد؛ نبودشان ⇒ پایدار.
+      val shop = runCatching { ir.vil3ntec.tohid.data.LedgerOwner.currentShop(app) }.getOrDefault("")
+      val device = runCatching { ir.vil3ntec.tohid.sync.SyncStore(app).deviceUid }.getOrDefault("")
+      Updater.check(repo, currentVersion, ir.vil3ntec.tohid.core.config.AppConfig.baseUrl(app), shop, device)
         .onSuccess { found ->
           release = found
           checked = true

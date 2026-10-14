@@ -16,6 +16,7 @@ const { one, many, query, now } = require('../db');
 const v = require('../lib/validate');
 const stations = require('../lib/stations');
 const subs = require('../lib/subscriptions').pump;
+const idempotency = require('../lib/idempotency');
 const vip = require('../lib/vip-codes').pump;
 const offline = require('../lib/offline-codes');
 const plans = require('../lib/plans');
@@ -254,15 +255,32 @@ router.post('/subscriptions', async (req, res, next) => {
   try {
     const stationId = v.id(req.body?.stationId, { field: 'شناسه‌ی پمپ' });
     const planCode = v.text(req.body?.plan, { max: 20 }) || 'custom';
+    //  ⛔ F0-14 — همان کلیدِ یکتاییِ بخشِ دکان: تکرارِ همان ثبت ⇒ پاسخِ اول، نه دورهٔ دوم
+    const idem = idempotency.fromRequest(req, `sub-grant:pump:${req.admin.id}`);
+    const replay = (response) => {
+      const sub = response.subscription;
+      res.set('Idempotent-Replayed', 'true');
+      return res.status(201).json({ subscription: sub, state: subs.stateOf(sub) });
+    };
+    if (idem) {
+      const prior = await idempotency.find(idem);
+      if (prior) return replay(prior.response);
+    }
     //  شورا چ۳: کدِ تخفیف (و نماینده‌اش) — همان راهِ بخشِ دکان. قیمتِ نهایی از
     //  `discounts.quote` و قیمتِ روزِ پلن؛ هیچ عددی این‌جا نوشته نمی‌شود.
     const discounts = require('../lib/discounts');
     let quoted = null;
     if (req.body?.discountCode) {
       const st = await one('SELECT owner_user_id FROM stations WHERE id=$1', [stationId]);
-      quoted = await discounts.quote(req.body.discountCode, { app: 'pump', plan: planCode, userId: st ? st.owner_user_id || '' : '' });
+      try {
+        quoted = await discounts.quote(req.body.discountCode, { app: 'pump', plan: planCode, userId: st ? st.owner_user_id || '' : '' });
+      } catch (err) {
+        const prior = idem ? await idempotency.find(idem) : null;
+        if (prior) return replay(prior.response);
+        throw err;
+      }
     }
-    const row = await subs.grant(stationId, {
+    const granted = await subs.grantOnce(stationId, {
       price: quoted && quoted.finalPrice !== null ? quoted.finalPrice : null,
       plan: planCode,
       days: req.body?.days === undefined || req.body?.days === null || req.body?.days === ''
@@ -276,7 +294,9 @@ router.post('/subscriptions', async (req, res, next) => {
       createdBy: req.admin.id,
       //  مدیر صریح اشتراک می‌دهد؛ تعلیقِ قبلی با همین تصمیمِ او برداشته می‌شود
       allowUnsuspend: true,
-    });
+    }, idem);
+    if (granted.replayed) return replay(granted.response);
+    const row = granted.row;
     if (quoted) {
       const st = await one('SELECT owner_user_id FROM stations WHERE id=$1', [stationId]);
       await discounts.useCode(quoted.code.id, {

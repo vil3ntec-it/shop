@@ -13,12 +13,14 @@ const pw = require('../lib/password');
 const tokens = require('../lib/tokens');
 const audit = require('../lib/audit');
 const subs = require('../lib/subscriptions');
+const idempotency = require('../lib/idempotency');
 const plans = require('../lib/plans');
 const smsSettings = require('../lib/sms-settings');
 const otp = require('../lib/otp');
 const { entitlementOf } = require('../lib/entitlement');
 const { FEATURES, sanitizeFeatures } = require('../lib/features');
 const { requireAdmin, requireSuperAdmin } = require('../middleware/auth');
+const { checkSecondFactor } = require('../lib/admin-2fa');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
 const { badRequest, unauthorized, notFound, forbidden, tooMany } = require('../middleware/errors');
 
@@ -40,16 +42,32 @@ router.post('/login', adminLimit, async (req, res, next) => {
   }
 
   const admin = await one('SELECT * FROM admins WHERE username=$1', [username]);
-  const ok = admin && admin.status === 'active' && await pw.verifyPassword(password, admin.password_hash);
+  const passOk = admin && admin.status === 'active' && await pw.verifyPassword(password, admin.password_hash);
+
+  //  F0-15: مرحلهٔ دوم فقط برای مدیری که خودش روشنش کرده (اجباری نیست).
+  //  رمزِ درست بی کد = گامِ اولِ ورود، نه شکست؛ کدِ نادرست = شکست (در قفل
+  //  حساب می‌شود). ⛔ بی مرحلهٔ دوم هیچ توکنی ساخته نمی‌شود.
+  const totpCode = typeof req.body?.totp === 'string' ? req.body.totp.trim() : '';
+  const recoveryCode = typeof req.body?.recovery_code === 'string' ? req.body.recovery_code.trim() : '';
+  const twoStep = !!(passOk && admin.totp_enabled_at);
+  if (twoStep && !totpCode && !recoveryCode) {
+    return next(unauthorized('کدِ برنامهٔ تأیید (یا یک کدِ بازیابی) را بنویسید', 'totp_required'));
+  }
+  const second = twoStep ? await checkSecondFactor(admin, { code: totpCode, recovery: recoveryCode }) : null;
+  const ok = passOk && (!twoStep || !!second);
   await query(
     `INSERT INTO login_attempts (scope, identifier, ip, ok, created_at) VALUES ('admin',$1,$2,$3,$4)`,
     [username, clientIp(req), !!ok, now()]
   );
-  if (!ok) return next(unauthorized('نام کاربری یا رمز درست نیست', 'bad_credentials'));
+  if (!passOk) return next(unauthorized('نام کاربری یا رمز درست نیست', 'bad_credentials'));
+  if (!ok) return next(unauthorized('کدِ تأیید درست نیست', 'totp_invalid'));
 
   const t = await tokens.issue({ kind: 'admin', subjectId: admin.id, ttlMs: config.tokens.adminTtlMs });
   await query('UPDATE admins SET last_login_at=$2 WHERE id=$1', [admin.id, now()]);
-  await audit.log({ actorType: 'admin', userId: admin.id, action: 'admin.login', ip: clientIp(req) });
+  await audit.log({
+    actorType: 'admin', userId: admin.id, action: 'admin.login', ip: clientIp(req),
+    ...(second ? { detail: { second_factor: second } } : {}),
+  });
   res.json({
     token: t.token, expiresAt: t.expiresAt,
     admin: { id: admin.id, username: admin.username, name: admin.name, role: admin.role },
@@ -72,6 +90,9 @@ router.get('/me', (req, res) => {
 });
 
 router.get('/features', (req, res) => res.json({ features: FEATURES }));
+
+//  F0-15: تأییدِ دومرحله‌ایِ اختیاری — هر مدیر برای خودش
+router.use('/2fa', require('./admin-2fa'));
 
 // ---------- آمار ----------
 router.get('/stats', async (req, res) => {
@@ -309,6 +330,23 @@ router.post('/subscriptions', async (req, res, next) => {
   const note = v.text(req.body?.note, { max: 300 });
 
   /*
+   *  ⛔ F0-14 — کلیدِ یکتایی. پنل برای هر ثبت یک `Idempotency-Key`
+   *  می‌فرستد؛ تکرارِ همان ثبت (دو بار کلیک، قطعِ شبکه) پاسخِ اول را
+   *  پس می‌گیرد و دورهٔ دوم نمی‌سازد. بی‌کلید ⇒ رفتارِ قبلی (سازگاری).
+   *  ‎lib/idempotency.js‎
+   */
+  const idem = idempotency.fromRequest(req, `sub-grant:shop:${req.admin.id}`);
+  const replay = (response) => {
+    const sub = response.subscription;
+    res.set('Idempotent-Replayed', 'true');
+    return res.status(201).json({ subscription: sub, state: subs.stateOf(sub), discount: response.discount ?? null });
+  };
+  if (idem) {
+    const prior = await idempotency.find(idem);
+    if (prior) return replay(prior.response);
+  }
+
+  /*
    *  قیمت و کدِ تخفیف — اختیاری. کدِ تخفیف اول سنجیده می‌شود (مهلت،
    *  سقف، یک‌بار برای هر مشتری) و قیمتِ نهایی‌اش روی خودِ اشتراک
    *  می‌نشیند؛ بعد از صدور، خرجِ کد ثبت می‌شود.
@@ -319,15 +357,24 @@ router.post('/subscriptions', async (req, res, next) => {
   let quoted = null;
   if (req.body?.discountCode) {
     const shop = await one('SELECT owner_user_id FROM shops WHERE id=$1', [shopId]);
-    quoted = await discounts.quote(req.body.discountCode, { app: 'shop', plan, userId: shop ? shop.owner_user_id : '' });
+    try {
+      quoted = await discounts.quote(req.body.discountCode, { app: 'shop', plan, userId: shop ? shop.owner_user_id : '' });
+    } catch (err) {
+      //  تکرارِ هم‌زمان: درخواستِ اول کد را خرج کرده و کلید را ثبت کرده است
+      const prior = idem ? await idempotency.find(idem) : null;
+      if (prior) return replay(prior.response);
+      throw err;
+    }
     if (quoted.finalPrice !== null) price = quoted.finalPrice;
   }
 
-  const sub = await subs.grant(shopId, {
+  const granted = await subs.grantOnce(shopId, {
     plan, days, features, maxDevices, graceDays, note, createdBy: req.admin.id, price,
     startsAt: v.timestamp(req.body?.startsAt), endsAt: v.timestamp(req.body?.endsAt),
     allowUnsuspend: true,
-  });
+  }, idem, { discount: quoted });
+  if (granted.replayed) return replay(granted.response);
+  const sub = granted.row;
   if (quoted) {
     await discounts.useCode(quoted.code.id, {
       app: 'shop', userId: (await one('SELECT owner_user_id FROM shops WHERE id=$1', [shopId]))?.owner_user_id || '',
@@ -627,7 +674,12 @@ router.patch('/admins/:id', requireSuperAdmin, async (req, res, next) => {
 // ---------- پشتیبان‌گیری ----------
 router.get('/backups', async (req, res) => {
   const backup = require('../lib/backup');
-  res.json({ backups: await backup.list(), dir: config.backup.dir, enabled: config.backup.enabled });
+  //  F0-08: بی رمز ⇒ پنل هشدارِ قرمز می‌دهد (خودِ رمز هرگز این‌جا نمی‌آید)
+  const configured = !!config.backup.passphrase;
+  res.json({
+    backups: await backup.list(), dir: config.backup.dir, enabled: config.backup.enabled,
+    encryption: { configured, warning: configured ? '' : backup.UNENCRYPTED_WARNING },
+  });
 });
 
 router.post('/backups', requireSuperAdmin, async (req, res, next) => {
