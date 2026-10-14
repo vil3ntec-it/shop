@@ -5,9 +5,11 @@
  *   • رنگِ متن‌ها ≥ ۴٫۵:۱ (WCAG AA)، هر دکمه نام دارد، هر فیلد برچسب دارد (axe-core)
  *   • هیچ خطای صفحه‌ای
  *
- * اجرا:  node test/web-ui.mjs   (axe-core اگر نبود، فقط بخشِ دسترس‌پذیری رد می‌شود)
+ * اجرا:  node test/web-ui.mjs
+ * نبودِ پلی‌رایت یا axe-core قرمز است، نه «رد» (F0-17)؛ ردِ آگاهانه فقط با SKIP_BROWSER_TESTS=1.
  */
 import { createRequire } from 'node:module';
+import { missingTool, PLAYWRIGHT_INSTALL, SKIP } from './browser-guard.mjs';
 import assert from 'node:assert/strict';
 import { execSync } from 'node:child_process';
 import http from 'node:http';
@@ -18,7 +20,7 @@ const require = createRequire(import.meta.url);
 const globalRoot = (() => { try { return execSync('npm root -g', { encoding: 'utf8' }).trim(); } catch { return ''; } })();
 const pick = (name) => { for (const p of [`${globalRoot}/${name}`, name]) { try { return require(p); } catch { /* بعدی */ } } return null; };
 const pw = pick('playwright');
-if (!pw) { console.log('⏭  پلی‌رایت پیدا نشد — این سنجه رد شد'); process.exit(0); }
+if (!pw) missingTool('پلی‌رایت', PLAYWRIGHT_INSTALL);
 let axeSrc = null;
 for (const p of [`${globalRoot}/axe-core/axe.min.js`, path.join(import.meta.dirname, '..', 'node_modules', 'axe-core', 'axe.min.js'), process.env.AXE_PATH || '']) {
   if (p && fs.existsSync(p)) { axeSrc = fs.readFileSync(p, 'utf8'); break; }
@@ -80,8 +82,11 @@ for (const width of [320, 390, 768, 1366]) {
   });
 }
 
-if (!axeSrc) {
-  console.log('⏭  axe-core پیدا نشد — سنجهٔ دسترس‌پذیری رد شد (npm i -g axe-core)');
+if (!axeSrc && SKIP) {
+  console.log('⏭  axe-core پیدا نشد و SKIP_BROWSER_TESTS=1 است — سنجهٔ دسترس‌پذیری آگاهانه رد شد');
+} else if (!axeSrc) {
+  failed++;
+  console.log('❌  axe-core پیدا نشد — سنجهٔ دسترس‌پذیری اجرا نشد و «قبول» هم نیست (npm i -g axe-core@4.10.3، یا AXE_PATH)');
 } else {
   await step('دسترس‌پذیری: کنتراست، نامِ دکمه، برچسبِ فیلد، متنِ جایگزینِ تصویر', async () => {
     const { pg } = await open(390);

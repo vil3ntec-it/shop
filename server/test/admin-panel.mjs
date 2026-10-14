@@ -14,6 +14,7 @@
  * اجرا:  node test/admin-panel.mjs
  */
 import { createRequire } from 'node:module';
+import { missingTool, PLAYWRIGHT_INSTALL } from './browser-guard.mjs';
 import assert from 'node:assert/strict';
 import { execSync } from 'node:child_process';
 
@@ -25,8 +26,9 @@ const require = createRequire(import.meta.url);
  *  بالا بیاید. پس از هر جایی که باشد برداشته می‌شود — نصبِ سراسری،
  *  `node_modules`ِ خودِ ریپو، یا مسیرِ `NODE_PATH`.
  *
- *  و اگر هیچ‌جا نبود، سنجه **رد** می‌شود نه شکست: کسی که فقط سرور را
- *  عوض کرده نباید به‌خاطر نبودِ مرورگر قرمز ببیند.
+ *  و اگر هیچ‌جا نبود، سنجه **قرمز** می‌شود (F0-17): «رد» با کدِ ۰ در CI
+ *  سبز دیده می‌شد بی آن‌که مرورگری باز شده باشد. ردِ آگاهانه فقط با
+ *  SKIP_BROWSER_TESTS=1 (`browser-guard.mjs`).
  */
 function candidates() {
   const out = [];
@@ -38,10 +40,7 @@ let chromium = null;
 for (const path of candidates()) {
   try { ({ chromium } = require(path)); break; } catch { /* بعدی */ }
 }
-if (!chromium) {
-  console.log('⏭  پلی‌رایت پیدا نشد — این سنجه رد شد');
-  process.exit(0);
-}
+if (!chromium) missingTool('پلی‌رایت', PLAYWRIGHT_INSTALL);
 
 process.env.NODE_ENV = 'test';
 process.env.DATABASE_URL = process.env.TEST_DATABASE_URL
