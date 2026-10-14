@@ -43,6 +43,9 @@ fun LoginScreen(session: Session, onIn: () -> Unit) {
   var username by rememberSaveable { mutableStateOf("") }
   var password by rememberSaveable { mutableStateOf("") }
   var show by rememberSaveable { mutableStateOf(false) }
+  //  F0-15: کادرِ کد فقط وقتی سرور «totp_required» گفت
+  var needCode by rememberSaveable { mutableStateOf(false) }
+  var code by rememberSaveable { mutableStateOf("") }
   var busy by remember { mutableStateOf(false) }
   var error by remember { mutableStateOf<String?>(null) }
 
@@ -111,6 +114,16 @@ fun LoginScreen(session: Session, onIn: () -> Unit) {
             Text(if (show) "پنهان کردن رمز" else "نمایش رمز", style = MaterialTheme.typography.labelMedium, color = c.muted)
           }
 
+          if (needCode) {
+            Spacer(Modifier.height(12.dp))
+            Field(
+              value = code,
+              onValueChange = { code = it; error = null },
+              label = "کدِ تأییدِ دومرحله‌ای (یا یک کدِ بازیابی)",
+              keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
+            )
+          }
+
           ErrorNote(error)
 
           Spacer(Modifier.height(6.dp))
@@ -123,7 +136,7 @@ fun LoginScreen(session: Session, onIn: () -> Unit) {
             busy = true; error = null
             val base = server.trim().trimEnd('/')
             scope.launch {
-              runCatching { AdminApi(base).login(username.trim(), password) }
+              runCatching { AdminApi(base).login(username.trim(), password, if (needCode) code else "") }
                 .onSuccess {
                   session.serverUrl = base
                   session.token = it.token
@@ -132,7 +145,11 @@ fun LoginScreen(session: Session, onIn: () -> Unit) {
                   session.expiresAt = it.expiresAt
                   onIn()
                 }
-                .onFailure { error = (it as? AdminApi.ApiError)?.message ?: "ورود انجام نشد" }
+                .onFailure {
+                  val e = it as? AdminApi.ApiError
+                  if (e?.code == "totp_required") needCode = true
+                  error = e?.message ?: "ورود انجام نشد"
+                }
               busy = false
             }
           }

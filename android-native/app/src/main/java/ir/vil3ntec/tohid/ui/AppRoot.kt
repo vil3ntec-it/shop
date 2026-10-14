@@ -245,12 +245,11 @@ fun AppRoot(
   ) { }
 
   /*
-   *  لوکیشنِ دکان — همان اولِ کار، حتی بی‌حساب.
+   *  لوکیشنِ دکان — فقط با رضایتِ صریح (F0-07، تا تصمیمِ D-04).
    *
-   *  قرارِ صاحب مخزن: «بدون اینکه برنامه برود ثبت‌نام کند هم لوکیشن باید
-   *  روشن باشد و لوکیشنِ طرف ثبت بشود و بیاید به سرور.» پس اینجاست، نه
-   *  داخلِ ثبت‌نام: یک بار پرسیده می‌شود و جوابش — چه بله چه نه — کارِ
-   *  هیچ بخشی از برنامه را بند نمی‌آورد.
+   *  `LocationPing` خودش دروازه است: بی رضایت نه چیزی می‌فرستد و نه
+   *  `shouldAsk` بله می‌گوید. با رضایت، یک بار پرسیده می‌شود و جوابش —
+   *  چه بله چه نه — کارِ هیچ بخشی از برنامه را بند نمی‌آورد.
    */
   val askLocation = rememberLauncherForActivityResult(
     ActivityResultContracts.RequestMultiplePermissions()
@@ -273,9 +272,9 @@ fun AppRoot(
       if (!granted) runCatching { askNotify.launch(android.Manifest.permission.POST_NOTIFICATIONS) }
     }
 
-    //  لوکیشن: اگر اجازه هست همان‌جا فرستاده می‌شود، وگرنه یک بار پرسیده
-    //  می‌شود. پرسشِ دوباره در هر بار باز شدنِ برنامه، آزار است — همان
-    //  یک بارِ سیستمیِ اندروید بس است.
+    //  لوکیشن: هر دو شاخه پشتِ رضایتِ صریح است (F0-07). با رضایت، اگر
+    //  اجازه هست فرستاده می‌شود، وگرنه یک بار پرسیده می‌شود. پرسشِ دوباره
+    //  در هر بار باز شدنِ برنامه، آزار است.
     if (ir.vil3ntec.tohid.data.DeviceLocation.granted(context)) {
       ir.vil3ntec.tohid.sync.LocationPing.send(context)
     } else if (ir.vil3ntec.tohid.sync.LocationPing.shouldAsk(context)) {

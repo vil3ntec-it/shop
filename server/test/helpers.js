@@ -28,6 +28,9 @@ process.env.LOGIN_LOCKOUT_TRIES = '10000';
 //  غلط می‌زنند همدیگر را می‌بندند — همه از یک IP می‌آیند (127.0.0.1)
 process.env.LOGIN_LOCKOUT_GLOBAL_TRIES = '10000';
 process.env.OTP_RESEND_SECONDS = '0';
+//  F0-16: کفِ تأخیرِ یکسان و سقفِ هر IP — خودشان در `account-enumeration.test.js` سنجیده می‌شوند
+process.env.OTP_UNIFORM_MS ||= '0';
+process.env.RATE_PROBE_IP_MAX ||= '10000';
 //  پیامِ همگانی سقفِ ۵تایی دارد و چند آزمون پشتِ سرِ هم می‌زنندش؛
 //  خودِ سقف در `pump-support.test.js` جدا و با عددِ کوچک سنجیده می‌شود.
 process.env.RATE_BROADCAST_MAX = '10000';
