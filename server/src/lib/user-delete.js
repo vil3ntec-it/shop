@@ -106,6 +106,8 @@ async function remove(userId, { confirmEmail = '' } = {}) {
     await q('codes', 'DELETE FROM login_requests WHERE lower(email)=$1', [email]);
     await q('codes', 'DELETE FROM login_locks WHERE lower(email)=$1', [email]);
     await q('other', 'DELETE FROM subscription_addons WHERE tenant_id = ANY($1::text[])', [tenants]);
+    //  F0-14: پاسخِ ذخیره‌شدهٔ کلیدِ یکتایی رونوشتِ اشتراک است — با حساب می‌رود
+    await q('other', 'DELETE FROM idempotency_keys WHERE tenant_id = ANY($1::text[])', [tenants]);
     await q('other', 'DELETE FROM notice_deliveries WHERE user_id=$1 OR tenant_id = ANY($2::text[])', [userId, tenants]);
     await q('other', 'DELETE FROM discount_uses WHERE user_id=$1', [userId]);
     await q('other', 'DELETE FROM client_errors WHERE user_id=$1 OR account_id = ANY($2::text[]) OR tenant_id = ANY($2::text[])', [userId, accounts]);
