@@ -6016,6 +6016,18 @@
   </div>
 </div>
 
+<!-- POS-13: فاکتورِ نیمه‌کارهٔ بارِ پیش — ادامه یا دور انداختن. بستنِ پنجره = ادامه -->
+<div class="modal-scrim" id="modal-sale-draft" role="alertdialog" aria-modal="true" aria-labelledby="sale-draft-title" aria-describedby="sale-draft-sub">
+  <div class="modal-box confirm-box">
+    <div class="confirm-title" id="sale-draft-title">فاکتورِ نیمه‌کاره پیدا شد</div>
+    <div class="confirm-sub" id="sale-draft-sub"></div>
+    <div class="confirm-actions">
+      <button class="btn btn-secondary" id="btn-sale-draft-discard">دور انداختن</button>
+      <button class="btn btn-primary" id="btn-sale-draft-resume">ادامهٔ همین فاکتور</button>
+    </div>
+  </div>
+</div>
+
 <!-- F0-23: حافظهٔ مرورگر رو به پر شدن — پیشنهادِ خروجی که خودش باز می‌شود -->
 <div class="modal-scrim" id="modal-storage" role="alertdialog" aria-modal="true" aria-labelledby="storage-title" aria-describedby="storage-sub">
   <div class="modal-box confirm-box">
@@ -11445,13 +11457,60 @@
      renderCart() ممکن است هنگام بوت، پیش از این بخش اجرا شود. */
   let selectedCartId = null;
   const DRAFT_CART_KEY = 'tohid-shop-draft-cart-v1';
-  function saveDraftCart(){ try{ localStorage.setItem(DRAFT_CART_KEY, JSON.stringify(cart)); }catch(e){} }
-  function loadDraftCart(){
-    try{
-      const raw = localStorage.getItem(DRAFT_CART_KEY);
-      if(raw){ const arr = JSON.parse(raw); if(Array.isArray(arr)) cart = arr.filter(x=>products.find(p=>p.id===x.productId)); }
-    }catch(e){}
+  /* POS-13/14 — پیش‌نویسِ فاکتور با «کلیدِ یکتای فاکتور»، همان `SaleDraft`ِ برنامه.
+     فروشی که از این پیش‌نویس ثبت می‌شود **همین کلید** را شناسه می‌گیرد؛ پس
+     پیش‌نویسی که کلیدش در `sales` هست پیش‌تر ثبت شده و دوباره پیشنهاد نمی‌شود.
+     همه در یک کلیدِ localStorage (یک setItem ⇒ یا کهنه یا تازه، نه نصفه).
+     کلیدِ v1 (فقط ردیف‌ها) هم نوشته می‌شود: `license/shop-sync.js` از آن
+     می‌فهمد سبد پر است و صفحه را خودکار تازه نکند؛ v2 که باشد، v1 خوانده نمی‌شود. */
+  const DRAFT_SALE_KEY = 'tohid-shop-draft-sale-v2';
+  let draftSaleKey = null;
+  let draftRecovered = null;
+  function saveDraftCart(){
+    draftSaleKey = cart.length ? (draftSaleKey || uid()) : null;
+    try{ localStorage.setItem(DRAFT_SALE_KEY, JSON.stringify({ v:2, key:draftSaleKey, lines:cart, savedAt:Date.now() })); }catch(e){}
+    try{ localStorage.setItem(DRAFT_CART_KEY, JSON.stringify(cart)); }catch(e){}
   }
+  function readDraftSale(){
+    try{
+      const v2 = localStorage.getItem(DRAFT_SALE_KEY);
+      if(v2 !== null){ const d = JSON.parse(v2); return (d && typeof d==='object' && !Array.isArray(d)) ? d : null; }
+      const arr = JSON.parse(localStorage.getItem(DRAFT_CART_KEY) || 'null');
+      return Array.isArray(arr) ? { v:1, key:null, lines:arr } : null;
+    }catch(e){ return null; }
+  }
+  /* همان `SaleDraftRules.decide`: none | posted (دور انداخته شود) | offer (پرسیده شود).
+     ردیفِ کالای حذف‌شده یا غیرفعال (PRD-18) کنار می‌رود و شمرده می‌شود. */
+  function decideDraftRestore(draft, salesList, productList){
+    if(!draft || !Array.isArray(draft.lines) || !draft.lines.length) return { kind:'none' };
+    if(draft.key && salesList.some(s=> s.id===draft.key)) return { kind:'posted', key:draft.key };
+    const lines = draft.lines.filter(x=> x && productList.some(p=> p.id===x.productId && p.active !== false));
+    if(!lines.length) return { kind:'none' };
+    return { kind:'offer', key:draft.key || null, lines, dropped:draft.lines.length - lines.length };
+  }
+  function loadDraftCart(){
+    const r = decideDraftRestore(readDraftSale(), sales, products);
+    cart = r.kind==='offer' ? r.lines : [];
+    draftSaleKey = r.kind==='offer' ? (r.key || uid()) : null;
+    draftRecovered = r.kind==='none' ? null : r;
+    saveDraftCart();
+  }
+  /* پرسشِ بازیابی، یک بار پس از بالا آمدن. سبد از پیش پر است؛ پس بستنِ پنجره = ادامه */
+  function promptDraftRecovery(){
+    const r = draftRecovered; draftRecovered = null;
+    if(!r) return;
+    if(r.kind==='posted'){ showToast('فاکتورِ نیمه‌کارهٔ پیش پیش‌تر ثبت شده بود — دوباره ثبت نشد'); return; }
+    document.getElementById('sale-draft-sub').textContent =
+      `از بارِ پیش، پیش از بسته شدنِ برنامه: ${cart.length} قلم، ${formatMoney(cartTotal())} افغانی.` +
+      (r.dropped ? ` ${r.dropped} قلم که کالایش حذف یا غیرفعال شده کنار گذاشته شد.` : '') +
+      ' این فاکتور هنوز ثبت نشده است.';
+    openModal('modal-sale-draft');
+  }
+  document.getElementById('btn-sale-draft-resume').addEventListener('click', ()=> closeModal('modal-sale-draft'));
+  document.getElementById('btn-sale-draft-discard').addEventListener('click', ()=>{
+    cart = []; saleDebtorId = null; saveDraftCart(); renderCart();
+    closeModal('modal-sale-draft');
+  });
   /* واحدهایی که اعشار می‌گیرند. «کیلوگرم» و «میلی‌لیتر» و «متر» هم —
      پیش‌تر فقط «کیلو» بود و فهرستِ پیش‌فرض «کیلوگرم» دارد، پس کالای کیلویی
      ۰٫۲۵ نمی‌پذیرفت. همان `SalesEngine.isFractionalUnit`ِ برنامه. */
@@ -12083,6 +12142,8 @@
        * دوباره نشان می‌داد و وسط صفحه جا می‌گرفت.
        */
       const p = products.find(x=>x.id===productId);
+      //  PRD-18: کالای غیرفعال با اسکن هم به سبد نمی‌رود — پیامِ «اضافه شد» هم نمی‌آید
+      if(p.active === false){ showToast(`«${p.name}» غیرفعال است — از «محصولات» فعالش کنید`, 'danger'); return; }
       lastScannedProductId = p.id;
       addToCart(p.id, scanMultiplier);
       selectedCartId = p.id;         // کنترل‌های سبد روی همین کالا باز شود
@@ -12301,9 +12362,25 @@
   document.getElementById('co-paid-amount').addEventListener('input', refreshCheckoutModal);
 
   // ---- ثبت نهایی فروش (پس از تایید در Modal تسویه) ----
+  /* POS-14 — دکمهٔ «تایید و ثبت فروش» تا پایانِ ثبت قفل است، و فروش با کلیدِ
+     پیش‌نویس (`draftSaleKey`) ثبت می‌شود: همان کلید دو بار ثبت نمی‌شود. */
+  let saleSaving = false;
   document.getElementById('form-sale-checkout').addEventListener('submit', (e)=>{
     e.preventDefault();
+    if(saleSaving) return;
+    const btn = e.target.querySelector('[type="submit"]');
+    saleSaving = true; if(btn) btn.disabled = true;
+    const unlock = ()=>{ saleSaving = false; if(btn) btn.disabled = false; };
+    try{ Promise.resolve(submitSaleCheckout()).then(unlock, unlock); }
+    catch(err){ unlock(); throw err; }
+  });
+  function submitSaleCheckout(){
     if(cart.length===0) return;
+    if(draftSaleKey && sales.some(s=> s.id===draftSaleKey)){
+      showToast('این فاکتور یک بار ثبت شده است و دوباره ثبت نمی‌شود', 'danger');
+      cart = []; saveDraftCart(); renderCart(); closeModal('modal-sale-checkout');
+      return;
+    }
 
     // بررسی مجدد موجودی درست قبل از ثبت، تا فروش بدون موجودی معتبر ثبت نشود
     for(const item of cart){
@@ -12354,7 +12431,7 @@
       debtorGroup.classList.remove('error');
     }
 
-    const saleId = uid();
+    const saleId = draftSaleKey || uid();
     const invoiceNumber = nextInvoiceNo++;
     sales.push({
       id: saleId, invoiceNumber,
@@ -12397,7 +12474,7 @@
     showToast(`فروش به مبلغ ${formatMoney(finalTotal)} افغانی ثبت شد`);
     if(navigator.vibrate) navigator.vibrate([40,40,40]);
     openInvoiceModal(saleId);
-  });
+  }
 
   /* ==========================================================
      فاکتور — نمایش، چاپ
@@ -13236,6 +13313,7 @@
     confirmAction = ()=>{
       localStorage.removeItem(STORAGE_KEY);
       localStorage.removeItem(DRAFT_CART_KEY);
+      localStorage.removeItem(DRAFT_SALE_KEY);
       // آرایه‌های حافظه هم خالی می‌شوند: تا لحظه‌ی reload اگر چیزی saveState صدا بزند،
       // داده‌ی قدیمی دوباره روی حافظه نوشته نشود. (در WebView اندروید reload ممکن است
       // دیرتر یا اصلاً انجام نشود.)
@@ -14945,6 +15023,7 @@
   renderBackupMeta();
   renderAlerts();
   scheduleStorageCheck(1500);   // F0-23 — پس از بالا آمدن، نه در مسیرِ آن
+  promptDraftRecovery();        // POS-13 — فاکتورِ نیمه‌کارهٔ بارِ پیش
 
 
   goTo(location.hash.replace('#','') || 'dashboard');

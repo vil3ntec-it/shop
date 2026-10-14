@@ -60,6 +60,8 @@ fun CheckoutDialog(
   presetDebtorId: String?,
   onDismiss: () -> Unit,
   onConfirm: (SalesEngine.Checkout) -> Unit,
+  /** POS-14 — ثبت در جریان است ⇒ دکمه تا پایانش قفل */
+  busy: Boolean = false,
 ) {
   val context = LocalContext.current
   val canDiscount = remember { ir.vil3ntec.tohid.data.ShopRole.canDiscount(context) }
@@ -202,8 +204,9 @@ fun CheckoutDialog(
           OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("انصراف") }
           Button(
             onClick = { onConfirm(checkout.copy(paidAmount = paid, debtorId = debtorId)) },
+            enabled = !busy,
             modifier = Modifier.weight(1f),
-          ) { Text("ثبت فروش") }
+          ) { Text(if (busy) "در حالِ ثبت…" else "ثبت فروش") }
         }
       }
     }
