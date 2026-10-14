@@ -8,7 +8,6 @@ import android.provider.Settings
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
@@ -75,14 +74,21 @@ object Updater {
    *  اگر اولی نشد، دومی جوابِ کار را می‌دهد؛ فقط یادداشتِ انتشار همراهش
    *  نیست، که چیزِ مهمی نیست.
    */
-  suspend fun check(repo: String, currentVersion: String, server: String = ""): Result<Release?> =
+  suspend fun check(
+    repo: String,
+    currentVersion: String,
+    server: String = "",
+    //  F0-27: شناسهٔ دکان و دستگاه — سرور با آن‌ها کانالِ آزمایشی را می‌شناسد
+    shop: String = "",
+    device: String = "",
+  ): Result<Release?> =
     withContext(Dispatchers.IO) {
       runCatching {
         //  راهِ اصلی: سرورِ خودمان (`/api/releases`) — برنامه به github.com وصل
         //  نمی‌شود و نامِ مخزن لازم نیست. GitHub فقط وقتی پرسیده می‌شود که
         //  سرور هنوز این مسیر را ندارد (سرورِ به‌روزنشده).
         if (server.isNotBlank()) {
-          val viaServer = runCatching { fromServer(server.trimEnd('/')) }
+          val viaServer = runCatching { fromServer(server.trimEnd('/'), shop, device) }
           viaServer.getOrNull()?.let { return@runCatching it.takeIf { r -> isNewer(r.version, currentVersion) } }
         }
 
@@ -99,75 +105,46 @@ object Updater {
       }
     }
 
-  /** سرورِ خودمان — همان انتشار، از دیسکِ سرور */
-  private fun fromServer(server: String): Release? {
-    val base = "$server/api/releases/$TAG"
-    val r = JSONObject(get("$base/latest"))
-    val version = r.optString("version")
-    if (!Regex("^\\d+(\\.\\d+)+$").matches(version)) return null
-    val assets = r.optJSONArray("assets") ?: return null
-    var apk: JSONObject? = null
-    var plain: JSONObject? = null
-    var hasSums = false
-    for (j in 0 until assets.length()) {
-      val a = assets.getJSONObject(j)
-      val name = a.getString("name")
-      when {
-        name.equals("SHA256SUMS.txt", true) -> hasSums = true
-        name.endsWith(".apk", true) && Regex("\\d+(\\.\\d+)+").containsMatchIn(name) -> if (apk == null) apk = a
-        name.endsWith(".apk", true) -> if (plain == null) plain = a
-      }
-    }
-    val chosen = apk ?: plain ?: return null
-    val name = chosen.getString("name")
+  /**
+   *  سرورِ خودمان — همان انتشار، از دیسکِ سرور.
+   *
+   *  F0-27: `tag`ِ پاسخ می‌گوید فایل‌ها زیرِ کدام برچسب‌اند (`tohid-native` یا
+   *  `tohid-native-beta`)؛ نصبیِ آزمایشی `….apk.beta` است. سرورِ قدیمی `tag`
+   *  نمی‌دهد ⇒ همان `tohid-native`، مثلِ پیش. خواندنِ پاسخ: `ReleaseFeed`.
+   */
+  private fun fromServer(server: String, shop: String, device: String): Release? {
+    val latest = ReleaseFeed.parseLatest(get(ReleaseFeed.latestUrl(server, TAG, shop, device)), TAG) ?: return null
+    val chosen = ReleaseFeed.androidInstaller(latest.assets) ?: return null
     return Release(
-      version = version,
-      notes = r.optString("notes", ""),
-      apkUrl = "$base/file/" + java.net.URLEncoder.encode(name, "UTF-8"),
-      size = chosen.optLong("size"),
-      sumsUrl = if (hasSums) "$base/file/SHA256SUMS.txt" else "",
+      version = latest.version,
+      notes = latest.notes,
+      apkUrl = ReleaseFeed.fileUrl(server, latest.tag, chosen.name),
+      size = chosen.size,
+      sumsUrl = if (latest.hasSums) ReleaseFeed.fileUrl(server, latest.tag, ReleaseFeed.SUMS) else "",
     )
   }
 
-  /** راهِ اول: فهرستِ انتشارها از API */
+  /**
+   *  راهِ اول: انتشارِ همین برچسب از API.
+   *
+   *  ⛔ F0-27: پیش از این فهرستِ ده انتشارِ تازه خوانده و **اولین** انتشاری که
+   *  هر `.apk`ی داشت برداشته می‌شد — برنامهٔ مدیریت (`tohid-admin`) یا یک
+   *  `v*`ِ قدیمی هم. حالا فقط `releases/tags/tohid-native`، و `ReleaseFeed`
+   *  باز هم `tag_name` را می‌سنجد. این راه کانال نمی‌شناسد ⇒ همیشه پایدار.
+   */
   private fun fromApi(slug: String): Release? {
-    val body = get("https://api.github.com/repos/$slug/releases?per_page=10")
-    val list = org.json.JSONArray(body)
-
-    for (i in 0 until list.length()) {
-      val r = list.getJSONObject(i)
-      if (r.optBoolean("draft")) continue
-      val assets = r.getJSONArray("assets")
-
-      // فایلِ نسخه‌دار ترجیح دارد: شمارهٔ نسخه از نامش خوانده می‌شود و
-      // «Tohid-Native.apk» شماره‌ای در نامش ندارد
-      var apk: JSONObject? = null
-      var plain: JSONObject? = null
-      var sums = ""
-      for (j in 0 until assets.length()) {
-        val a = assets.getJSONObject(j)
-        val name = a.getString("name")
-        when {
-          name.equals("SHA256SUMS.txt", true) -> sums = a.getString("browser_download_url")
-          name.endsWith(".apk", true) && Regex("\\d+(\\.\\d+)+").containsMatchIn(name) ->
-            if (apk == null) apk = a
-          name.endsWith(".apk", true) -> if (plain == null) plain = a
-        }
-      }
-      val chosen = apk ?: plain ?: continue
-
-      return Release(
-        // شماره از **نام فایل** خوانده می‌شود، نه از برچسبِ انتشار.
-        // برچسبِ این مخزن «tohid-native» است — یک اسم، نه یک شماره —
-        // و مقایسه با آن همیشه شکست می‌خورد.
-        version = versionOf(chosen.getString("name"), r.getString("tag_name")),
-        notes = r.optString("body", ""),
-        apkUrl = chosen.getString("browser_download_url"),
-        size = chosen.optLong("size"),
-        sumsUrl = sums,
-      )
-    }
-    return null
+    val pick = ReleaseFeed.githubPick(get("https://api.github.com/repos/$slug/releases/tags/$TAG"), TAG)
+      ?: return null
+    return Release(
+      // شماره از **نام فایل** خوانده می‌شود، نه از برچسبِ انتشار.
+      // برچسبِ این مخزن «tohid-native» است — یک اسم، نه یک شماره —
+      // و مقایسه با آن همیشه شکست می‌خورد.
+      version = versionOf(pick.apk.name, TAG),
+      notes = pick.notes,
+      apkUrl = pick.apk.url,
+      size = pick.apk.size,
+      sumsUrl = pick.sumsUrl,
+    )
   }
 
   /** راهِ دوم: فایلِ کوچکِ `version.txt` کنارِ خودِ نصبی */

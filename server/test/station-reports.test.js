@@ -117,3 +117,11 @@ test('۵) کامپیوترِ خاموش ⇒ «جواب نداد»؛ صف سقف 
   await assert.rejects(reports.request(a.id, 'nope', {}), (e) => e.code === 'bad_kind');
   reports._reset();
 });
+
+test('۶) حسابِ شرکت (۱۴۰۵/۰۷/۲۲) کارِ شناخته‌شده است', async () => {
+  assert.ok(reports.KINDS.has('company'));
+  const a = await pump('شرکت');
+  const q = reports.request(a.id, 'company', { id: 3 }, { timeoutMs: 1000 });
+  await assert.rejects(q, (e) => e.code === 'timeout');
+  reports._reset();
+});
