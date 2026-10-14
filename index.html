@@ -15,10 +15,13 @@
 <!--
   CSP: اسکریپت فقط از خودِ همین سایت (و درون‌خطیِ خودِ صفحه)؛ نه شیءِ جاسازی، نه
   base تزریقی، نه فرمی به جای دیگر. اگر روزی متنی از سرور بی‌پاک‌سازی به صفحه برسد،
-  مرورگر اسکریپتِ بیرونی را بار نمی‌کند. اتصال به هر سرور آزاد است چون نشانیِ سرور را
-  خودِ دکان‌دار می‌تواند عوض کند (سرورِ خانگی روی شبکهٔ محلی).
+  مرورگر اسکریپتِ بیرونی را بار نمی‌کند، و (F0-22) داده را هم جز به خودِ سایت و سرورِ
+  همین نسخه — همان `tohid-api-base` پایین‌تر، با https و wss — نمی‌فرستد. نشانیِ سرور در
+  نسخهٔ منتشرشده قفل است (`license/api-config.js`)، پس دیوار هم همان‌قدر تنگ است.
+  ⛔ tohid-api-base عوض شد ⇒ connect-src هم (آزمونِ `server/test/web-csp.test.js`).
+  `unsafe-inline` ِ اسکریپت تا فاز ۲ می‌ماند.
 -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self' https: http: wss: ws: blob: data:; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self' https://api.vill3n.top wss://api.vill3n.top blob: data:; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>فروشگاه من</title>
 
