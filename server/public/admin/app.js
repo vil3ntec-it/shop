@@ -35,8 +35,14 @@ async function call(method, path, body) {
   const text = await res.text();
   let json = null;
   try { json = text ? JSON.parse(text) : null; } catch { json = null; }
-  if (res.status === 401) { logout(); throw new Error('نشست تمام شد، دوباره وارد شوید'); }
-  if (!res.ok) throw new Error(json?.error?.message || `خطای ${res.status}`);
+  //  ⚠️ ۴۰۱ِ خودِ ورود (رمز یا کدِ نادرست، «کدِ تأیید لازم است») نشست را نمی‌بندد
+  if (res.status === 401 && path !== '/admin/login') { logout(); throw new Error('نشست تمام شد، دوباره وارد شوید'); }
+  if (!res.ok) {
+    const err = new Error(json?.error?.message || `خطای ${res.status}`);
+    err.code = json?.error?.code || '';
+    err.status = res.status;
+    throw err;
+  }
   return json;
 }
 
@@ -73,27 +79,94 @@ function badge(status) {
   return el('span', `badge ${cls}`, STATUS_FA[status] || status || '—');
 }
 
+/** رقم‌های فارسی و عربی ⇒ لاتین (کیبوردِ فارسی ۱۲۳۴۵۶ می‌نویسد) */
+const asciiDigits = (s) => String(s || '').replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d))
+  .replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/\s/g, '');
+
 // ---------- ورود ----------
 async function login() {
   const node = $('login-msg');
   try {
-    const out = await call('POST', '/admin/login', {
-      username: $('in-username').value.trim(),
-      password: $('in-password').value,
-    });
+    const body = { username: $('in-username').value.trim(), password: $('in-password').value };
+    //  F0-15: شش رقم = کدِ برنامهٔ تأیید؛ بقیه = کدِ بازیابی
+    const second = asciiDigits($('in-totp').value);
+    if (second) { if (/^\d{6}$/.test(second)) body.totp = second; else body.recovery_code = second; }
+    const out = await call('POST', '/admin/login', body);
+    $('in-totp').value = '';
+    $('totp-row').classList.add('hidden');
     token = out.token;
     sessionStorage.setItem(TOKEN_KEY, token);
     $('who').textContent = `${out.admin.name || out.admin.username} — ${out.admin.role === 'superadmin' ? 'مدیر ارشد' : 'مدیر'}`;
     show();
     await refresh();
   } catch (err) {
+    if (err.code === 'totp_required') {
+      $('totp-row').classList.remove('hidden');
+      $('in-totp').focus();
+      msg(node, err.message, 'warn');
+      return;
+    }
+    if (err.code === 'totp_invalid') $('in-totp').select();
     msg(node, err.message, 'bad');
   }
+}
+
+// ---------- ورودِ دومرحله‌ای (F0-15، اختیاری) ----------
+async function load2fa() {
+  const st = await call('GET', '/admin/2fa');
+  $('twofa-state').textContent = st.enabled
+    ? `روشن است — ${fa(st.recovery_left)} کدِ بازیابی مانده.`
+    : 'خاموش است. اجباری نیست؛ برای مدیرِ سرور پیشنهاد می‌شود.';
+  $('btn-2fa-start').classList.toggle('hidden', st.enabled);
+  $('btn-2fa-enable').classList.toggle('hidden', st.enabled || $('twofa-setup').classList.contains('hidden'));
+  $('btn-2fa-renew').classList.toggle('hidden', !st.enabled);
+  $('btn-2fa-disable').classList.toggle('hidden', !st.enabled);
+  if (st.enabled) $('twofa-setup').classList.add('hidden');
+  return st;
+}
+function showRecoveryCodes(codes) {
+  $('twofa-codes').textContent = (codes || []).join('\n');
+  $('twofa-codes-box').classList.toggle('hidden', !(codes || []).length);
+}
+async function twofa(action) {
+  const node = $('twofa-msg');
+  const password = $('twofa-pass').value;
+  const raw = asciiDigits($('twofa-code').value);
+  const code = /^\d{6}$/.test(raw) ? raw : '';
+  try {
+    if (action === 'start') {
+      const out = await call('POST', '/admin/2fa/setup', { password });
+      $('twofa-secret').textContent = out.secret.replace(/(.{4})/g, '$1 ').trim();
+      $('twofa-link').href = out.otpauth_url;
+      $('twofa-setup').classList.remove('hidden');
+      showRecoveryCodes([]);
+      msg(node, 'کلید ساخته شد؛ هنوز روشن نیست تا کدِ اول را بنویسید.', 'warn');
+    } else if (action === 'enable') {
+      const out = await call('POST', '/admin/2fa/enable', { code });
+      showRecoveryCodes(out.recovery_codes);
+      msg(node, 'ورودِ دومرحله‌ای روشن شد.', 'ok');
+    } else if (action === 'renew') {
+      const out = await call('POST', '/admin/2fa/recovery-codes', { password, code });
+      showRecoveryCodes(out.recovery_codes);
+      msg(node, 'کدهای بازیابیِ تازه ساخته شد؛ کهنه‌ها دیگر کار نمی‌کنند.', 'ok');
+    } else if (action === 'disable') {
+      if (!confirm('ورودِ دومرحله‌ای خاموش شود؟')) return;
+      await call('POST', '/admin/2fa/disable', code ? { password, code } : { password, recovery_code: raw });
+      showRecoveryCodes([]);
+      msg(node, 'ورودِ دومرحله‌ای خاموش شد.', 'ok');
+    }
+    $('twofa-code').value = '';
+    await load2fa();
+  } catch (err) { msg(node, err.message, 'bad'); }
 }
 
 function logout() {
   token = '';
   sessionStorage.removeItem(TOKEN_KEY);
+  $('in-totp').value = '';
+  $('twofa-pass').value = '';
+  $('twofa-panel').classList.add('hidden');
+  showRecoveryCodes([]);
   $('app-view').classList.add('hidden');
   $('login-view').classList.remove('hidden');
 }
@@ -1941,6 +2014,17 @@ function openTab(name) {
 document.addEventListener('DOMContentLoaded', () => {
   $('btn-login').onclick = login;
   $('in-password').addEventListener('keydown', (e) => { if (e.key === 'Enter') login(); });
+  $('in-totp').addEventListener('keydown', (e) => { if (e.key === 'Enter') login(); });
+  //  F0-15
+  $('btn-2fa').onclick = () => {
+    $('twofa-panel').classList.remove('hidden');
+    load2fa().catch(err => msg($('twofa-msg'), err.message, 'bad'));
+  };
+  $('btn-2fa-close').onclick = () => { $('twofa-panel').classList.add('hidden'); showRecoveryCodes([]); $('twofa-pass').value = ''; };
+  $('btn-2fa-start').onclick = () => twofa('start');
+  $('btn-2fa-enable').onclick = () => twofa('enable');
+  $('btn-2fa-renew').onclick = () => twofa('renew');
+  $('btn-2fa-disable').onclick = () => twofa('disable');
   $('btn-logout').onclick = async () => {
     try { await call('POST', '/admin/logout', {}); } catch { /* بی‌اهمیت */ }
     logout();
