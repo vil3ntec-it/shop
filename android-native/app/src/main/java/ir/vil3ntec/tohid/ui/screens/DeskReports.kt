@@ -144,7 +144,7 @@ fun DeskReportsScreen(d: ShopData, snackbar: SnackbarHostState) {
           DeskKpi("ارزشِ انبار (قیمتِ خرید)", "${money(value)} ؋", Shop.colors.primary, Modifier.weight(1f))
           DeskKpi("کالاها", "${d.products.size}", Shop.colors.text, Modifier.weight(1f))
           DeskKpi("تمام‌شده", "$out", Shop.colors.danger, Modifier.weight(1f))
-          DeskKpi("کم‌موجود", "$low", androidx.compose.ui.graphics.Color(0xFFFF9800), Modifier.weight(1f))
+          DeskKpi("کم‌موجود", "$low", Shop.colors.warning, Modifier.weight(1f))
         }
         Rep.DEBTORS -> {
           val total = remember(d) { d.debtors.sumOf { ShopStore.debt(d, it.id).coerceAtLeast(0.0) } }
