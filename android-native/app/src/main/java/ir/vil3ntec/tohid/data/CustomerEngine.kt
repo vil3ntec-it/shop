@@ -40,6 +40,8 @@ object CustomerEngine {
     /** فاکتورِ پشتِ این ردیف (فروشِ نسیه، لغو، مرجوعی) — اگر هست */
     val saleId: String?,
     val invoiceNumber: Int?,
+    /** شمارهٔ نمایشی، با سریِ دستگاه اگر دارد (`B1-12`) — F0-03 */
+    val invoiceLabel: String? = invoiceNumber?.toString(),
   )
 
   data class ItemLine(
@@ -51,6 +53,8 @@ object CustomerEngine {
     val unitPrice: Double,
     val total: Double,
     val returned: Double,
+    /** شمارهٔ نمایشی، با سریِ دستگاه اگر دارد (`B1-12`) — F0-03 */
+    val invoiceLabel: String? = invoiceNumber?.toString(),
   )
 
   fun summary(d: ShopData, debtor: Debtor, now: Long = System.currentTimeMillis()): Summary {
@@ -72,15 +76,26 @@ object CustomerEngine {
   fun summaries(d: ShopData, now: Long = System.currentTimeMillis()): List<Summary> =
     d.debtors.map { summary(d, it, now) }
 
-  /** «فاکتور #۱۲» در شرحِ ردیف ⇒ ۱۲ */
-  private val INVOICE = Regex("""فاکتور\s*#\s*(\d+)""")
+  /**
+   *  «فاکتور #۱۲» یا «فاکتور #B1-12» در شرحِ ردیف.
+   *  سری (F0-03) اختیاری است: شرح‌های پیش از سری همان عدد را دارند.
+   */
+  private val INVOICE = Regex("""فاکتور\s*#\s*(?:([A-Z][1-9][0-9]{0,3})-)?(\d+)""")
 
-  fun invoiceNumberOf(notes: String): Int? = INVOICE.find(notes)?.groupValues?.get(1)?.toIntOrNull()
+  fun invoiceNumberOf(notes: String): Int? = INVOICE.find(notes)?.groupValues?.get(2)?.toIntOrNull()
+
+  /** شمارهٔ نمایشیِ شرح: `B1-12` یا `12`؛ `null` اگر شرح فاکتوری نام نبرده. */
+  fun invoiceLabelOf(notes: String): String? = INVOICE.find(notes)?.let { m ->
+    val n = m.groupValues[2].toIntOrNull() ?: return@let null
+    val series = m.groupValues[1]
+    if (series.isEmpty()) n.toString() else "$series-$n"
+  }
 
   /** صورت‌حساب: ردیف به ردیف به ترتیبِ تاریخ، با ماندهٔ پس از هر ردیف و فاکتورِ پشتش */
   fun ledger(d: ShopData, debtorId: String): List<LedgerLine> {
-    val byNumber = d.sales.filter { it.debtorId == debtorId && it.invoiceNumber != null }
-      .associateBy { it.invoiceNumber!! }
+    //  کلید همان شمارهٔ نمایشی است: `A1-5` و `B1-5` دو فاکتورِ جدااند (F0-03)
+    val byLabel = d.sales.filter { it.debtorId == debtorId && it.invoiceNumber != null }
+      .associateBy { it.invoiceLabel()!! }
     var run = 0.0
     return d.transactions.filter { it.debtorId == debtorId }
       .sortedWith(compareBy<DebtTransaction> { it.date }.thenBy { it.createdAt })
@@ -88,13 +103,15 @@ object CustomerEngine {
         val give = tx.type == "give"
         run += if (give) tx.amount else -tx.amount
         val n = invoiceNumberOf(tx.notes)
+        val label = invoiceLabelOf(tx.notes)
         LedgerLine(
           tx = tx, row = i + 1,
           give = if (give) tx.amount else 0.0,
           receive = if (give) 0.0 else tx.amount,
           balance = run,
-          saleId = n?.let { byNumber[it]?.id },
+          saleId = label?.let { byLabel[it]?.id },
           invoiceNumber = n,
+          invoiceLabel = label,
         )
       }
   }
@@ -111,7 +128,7 @@ object CustomerEngine {
     return sales.flatMap { s ->
       bySale[s.id].orEmpty().map { it ->
         ItemLine(
-          saleId = s.id, invoiceNumber = s.invoiceNumber, date = s.date,
+          saleId = s.id, invoiceNumber = s.invoiceNumber, invoiceLabel = s.invoiceLabel(), date = s.date,
           name = SalesEngine.itemName(d, it), quantity = it.quantity,
           unitPrice = it.unitPrice, total = it.totalPrice, returned = it.returnedQty,
         )
@@ -130,7 +147,7 @@ object CustomerEngine {
     ledger(d, debtor.id).forEach { l ->
       rows += listOf(
         l.row.toString(), l.tx.date, l.tx.notes.ifBlank { if (l.give > 0) "برد" else "رسید" },
-        l.invoiceNumber?.toString().orEmpty(),
+        l.invoiceLabel.orEmpty(),
         if (l.give > 0) r(l.give) else "", if (l.receive > 0) r(l.receive) else "", r(l.balance),
       )
     }
@@ -142,7 +159,7 @@ object CustomerEngine {
     val rows = mutableListOf(listOf("فاکتور", "تاریخ", "اقلام", "جمع", "تخفیف", "قابلِ پرداخت", "پرداخت‌شده", "باقی", "نوع", "وضعیت"))
     invoices(d, debtor.id).forEach { s ->
       rows += listOf(
-        s.invoiceNumber?.toString().orEmpty(), s.date, items[s.id].orEmpty().size.toString(),
+        s.invoiceLabel().orEmpty(), s.date, items[s.id].orEmpty().size.toString(),
         r(s.total), r(s.discount), r(s.finalTotal), r(s.paidAmount), r(s.remaining),
         if (s.paymentMethod == "credit") "نسیه" else "نقد",
         if (s.status == "cancelled") "لغوشده" else "ثبت‌شده",
@@ -154,7 +171,7 @@ object CustomerEngine {
   fun itemsSheet(d: ShopData, debtor: Debtor, today: String): ReportCsv.Sheet {
     val rows = mutableListOf(listOf("تاریخ", "فاکتور", "کالا", "تعداد", "فی", "جمع", "برگشتی"))
     items(d, debtor.id).forEach { l ->
-      rows += listOf(l.date, l.invoiceNumber?.toString().orEmpty(), l.name, q(l.quantity), r(l.unitPrice), r(l.total), if (l.returned > 0) q(l.returned) else "")
+      rows += listOf(l.date, l.invoiceLabel.orEmpty(), l.name, q(l.quantity), r(l.unitPrice), r(l.total), if (l.returned > 0) q(l.returned) else "")
     }
     return ReportCsv.Sheet("اقلامِ-${safe(debtor.name)}-$today", rows)
   }

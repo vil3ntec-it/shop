@@ -82,7 +82,7 @@ import ir.vil3ntec.tohid.money
  *  پرداخت بیرون از برنامه است: هماهنگی از راه واتساپ، همان‌طور که بود.
  */
 
-private const val WHATSAPP = "93792236008"
+//  F0-24: شمارهٔ واتس‌اپِ فروش از سرور می‌آید (`SalesContact`)، نه از این‌جا
 private const val BUY_MESSAGE = "سلام، می‌خواهم اشتراک برنامهٔ فروشگاه من را بخرم."
 
 /** قابلیت‌هایی که همیشه باز است */
@@ -321,6 +321,8 @@ fun VipScreen(onDismiss: () -> Unit) {
    */
   var plans by remember { mutableStateOf(FALLBACK_PLANS) }
   var currency by remember { mutableStateOf("؋") }
+  //  F0-24: `whatsapp_number`ِ پنلِ مدیر؛ تا نرسیده (یا آفلاین) همان شمارهٔ همیشگی
+  var salesNumber by remember { mutableStateOf<String?>(null) }
   LaunchedEffect(Unit) {
     Backend.account(context).plans().onSuccess { dto ->
       val fresh = dto.plans
@@ -338,6 +340,7 @@ fun VipScreen(onDismiss: () -> Unit) {
         }
       if (fresh.isNotEmpty()) plans = fresh
       if (dto.currency.isNotBlank()) currency = dto.currency
+      if (dto.whatsapp.number.isNotBlank()) salesNumber = dto.whatsapp.number
     }
   }
 
@@ -358,12 +361,12 @@ fun VipScreen(onDismiss: () -> Unit) {
 
   fun buy(planTitle: String) {
     val text = Uri.encode("$BUY_MESSAGE ($planTitle)")
-    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$WHATSAPP?text=$text"))
+    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/${SalesContact.waDigits(salesNumber)}?text=$text"))
     runCatching { context.startActivity(intent) }
   }
 
   fun openWhatsApp() {
-    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$WHATSAPP"))
+    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/${SalesContact.waDigits(salesNumber)}"))
     runCatching { context.startActivity(intent) }
   }
 
@@ -753,7 +756,7 @@ fun VipScreen(onDismiss: () -> Unit) {
         Column {
           Text("واتساپ", style = MaterialTheme.typography.labelLarge, color = colors.text)
           CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-            Text("0792236008", style = MaterialTheme.typography.labelSmall, color = colors.muted)
+            Text(SalesContact.display(salesNumber), style = MaterialTheme.typography.labelSmall, color = colors.muted)
           }
         }
       }

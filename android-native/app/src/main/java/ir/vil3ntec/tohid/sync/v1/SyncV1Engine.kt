@@ -42,6 +42,23 @@ class SyncV1Engine private constructor(context: Context) {
   private var state = SyncStateV1(app, accountKey)
   private var queue = OpQueue(app, accountKey)
 
+  /**
+   *  سه تکهٔ حال (صف، سایه، cursor) برای commitِ ژورنالی — F0-05، شرح سرِ
+   *  `SyncCommit`. همیشه حال و صفِ **همین حالا**ی حساب را می‌دهد.
+   */
+  private val parts = object : SyncCommit.Parts {
+    override fun shadow(): String = state.shadow
+    override fun commit(shadow: String, cursor: Long?) {
+      if (!state.commitShadow(shadow, cursor)) throw java.io.IOException("سایهٔ همگام‌سازی روی دیسک ننشست")
+    }
+    override fun queued(): Set<String> = queue.all().mapTo(HashSet()) { it.opId }
+    override fun push(ops: List<SyncOp>) = queue.push(ops)
+  }
+  private var commit = commitFor(accountKey)
+
+  private fun commitFor(key: String) =
+    SyncCommit(SyncCommit.Journal(java.io.File(app.filesDir, "sync-journal-${OpQueue.fileKey(key)}.json")), parts)
+
   private val gate = Mutex()
   private val _status = MutableStateFlow(snapshotStatus())
   val status: StateFlow<SyncStatus> = _status.asStateFlow()
@@ -67,6 +84,21 @@ class SyncV1Engine private constructor(context: Context) {
     accountKey = fresh
     state = SyncStateV1(app, accountKey)
     queue = OpQueue(app, accountKey)
+    commit = commitFor(accountKey)
+    publish()
+  }
+
+  /**
+   *  بازیابیِ commitِ نیمه‌مانده — هنگامِ شروع، با دفتری که همین حالا از
+   *  دیسک خوانده شد (`ShopStore.load`). شرح سرِ `SyncCommit`.
+   */
+  @Synchronized
+  fun recover(ledger: ShopData) {
+    if (!commit.pending()) return
+    if (commit.recover(ledger) == SyncCommit.Outcome.MISMATCH) {
+      //  نباید پیش بیاید؛ اگر آمد، دیده شود
+      state.lastError = "ژورنالِ همگام‌سازی با سایه نخواند"
+    }
     publish()
   }
 
@@ -82,26 +114,28 @@ class SyncV1Engine private constructor(context: Context) {
    */
   @Synchronized
   fun record(data: ShopData): Int {
-    val tree = LedgerDiff.toJson(data)
-    val shadow = readShadow()
-    if (shadow == null) {
-      /*
-       *  نخستین بار روی این دستگاه: دفترِ امروز «تغییر» نیست، حالتِ
-       *  پایه است. اگر همین‌جا تفاضل می‌گرفتیم، کلِ دفتر یک‌جا به سرور
-       *  می‌رفت — دقیقاً همان کاری که قانونِ طلایی منع کرده. فرستادنِ
-       *  دفترِ موجود کارِ `baseline()` است و فقط یک بار.
-       */
-      writeShadow(tree)
-      publish()
-      return 0
-    }
-    val ops = LedgerDiff.diff(shadow, tree)
-    if (ops.isEmpty()) return 0
-    queue.push(ops)
-    writeShadow(tree)
+    /*
+     *  نخستین بار روی این دستگاه (سایه‌ای نیست): دفترِ امروز «تغییر» نیست،
+     *  حالتِ پایه است. اگر همین‌جا تفاضل می‌گرفتیم، کلِ دفتر یک‌جا به سرور
+     *  می‌رفت — دقیقاً همان کاری که قانونِ طلایی منع کرده. فرستادنِ دفترِ
+     *  موجود کارِ `baseline()` است و فقط یک بار.
+     *
+     *  ⛔ صف و سایه با هم (F0-05): اگر میانِ این دو بسته شود، ذخیرهٔ بعدی
+     *  همان تغییرها را با op_idِ تازه می‌فرستاد و `$inc` دو بار جمع می‌شد.
+     *  شرح سرِ `SyncCommit`.
+     */
+    val made = commit.record(data)
     publish()
-    return ops.size
+    return made
   }
+
+  /**
+   *  بایگانیِ دفتر: ردیف‌هایی که به بایگانی می‌روند از سایهٔ همین حساب هم
+   *  بیرون می‌آیند، زیرِ همان قفلِ `record()` — شرح سرِ `SyncCommit.forget`.
+   *  شکست پرتاب می‌شود تا `LedgerArchive.compact` دفتر را کوتاه نکند.
+   */
+  @Synchronized
+  fun forgetArchived(gone: Map<String, Collection<String>>): Int = commit.forget(gone)
 
   /**
    *  دفترِ امروز را یک‌جا به سرور می‌دهد — فقط برای دستگاهِ نخست.
@@ -111,12 +145,9 @@ class SyncV1Engine private constructor(context: Context) {
    *  `snapshot` می‌گیرد، نه از این راه.
    */
   fun baseline(data: ShopData): Int {
-    val tree = LedgerDiff.toJson(data)
-    val ops = LedgerDiff.diff(null, tree)
-    queue.push(ops)
-    writeShadow(tree)
+    val made = commit.baseline(data)
     publish()
-    return ops.size
+    return made
   }
 
   /* ==========================================================
@@ -134,6 +165,8 @@ class SyncV1Engine private constructor(context: Context) {
       busy = true
       publish()
       try {
+        //  ژورنالِ نیمه‌مانده پیش از هر Push/Pull (F0-05)
+        if (commit.pending()) synchronized(this) { commit.recover(read()) }
         val client = SyncV1Client(Backend.api(app))
         val device = store.deviceUid
 
@@ -174,7 +207,7 @@ class SyncV1Engine private constructor(context: Context) {
         while (rounds < 50) {
           rounds++
           val got = client.pull(device, state.cursor)
-          if (got.ops.isNotEmpty()) absorbRemote(got.ops, read, write)
+          if (got.ops.isNotEmpty()) absorbRemote(got.ops, read, write, got.cursor)
           state.cursor = got.cursor
           state.lastPullAt = System.currentTimeMillis()
           if (got.serverSchema > 0) state.serverSchema = got.serverSchema
@@ -263,11 +296,25 @@ class SyncV1Engine private constructor(context: Context) {
    *  تغییرِ محلی‌ای که هنوز op نشده، با این کار گم نمی‌شود.
    */
   @Synchronized
-  internal fun absorbRemote(ops: List<SyncOp>, read: () -> ShopData, write: (ShopData) -> Unit) {
-    val next = LedgerDiff.applyRemote(LedgerDiff.toJson(read()), ops)
-    write(LedgerDiff.fromJson(next))
-    val shadow = readShadow()
-    writeShadow(if (shadow != null) LedgerDiff.applyRemote(shadow, ops) else next)
+  internal fun absorbRemote(
+    ops: List<SyncOp>,
+    read: () -> ShopData,
+    write: (ShopData) -> Unit,
+    cursor: Long? = null,
+  ) {
+    /*
+     *  ⛔ دفتر، سایه و cursor با هم (F0-05): اگر دفتر نوشته شود و سایه و
+     *  cursor نه، همان opها دوباره گرفته و روی دفتر جمع می‌شدند و تفاضلِ
+     *  بعدی آن‌ها را «تغییرِ من» به سرور پس می‌فرستاد.
+     */
+    try {
+      commit.absorb(ops, read(), cursor, write)
+    } catch (e: Throwable) {
+      //  نیمه‌کاره در همین اجرا (نه بسته شدن): همان‌جا با دفترِ همین حالا
+      //  تمام یا برگردانده می‌شود، پیش از آنکه ذخیرهٔ محلی‌ای برسد
+      runCatching { commit.recover(read()) }
+      throw e
+    }
   }
 
   /* ==========================================================

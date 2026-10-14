@@ -102,7 +102,7 @@ fun DeskProductsScreen(
     Modifier
       .fillMaxSize()
       .onPreviewKeyEvent { e ->
-        if (e.type == KeyEventType.KeyDown && e.isCtrlPressed && e.key == Key.F) { runCatching { searchFocus.requestFocus() }; true } else false
+        if (e.type == KeyEventType.KeyDown && e.isPrimaryModifier && e.key == Key.F) { runCatching { searchFocus.requestFocus() }; true } else false
       }
       .padding(12.dp),
   ) {
@@ -369,7 +369,7 @@ private fun EditPanel(
         if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
         when {
           e.key == Key.Escape -> { onClose(); true }
-          e.isCtrlPressed && e.key == Key.S -> { save(); true }
+          e.isPrimaryModifier && e.key == Key.S -> { save(); true }
           e.key == Key.Enter || e.key == Key.NumPadEnter -> { save(); true }
           else -> false
         }

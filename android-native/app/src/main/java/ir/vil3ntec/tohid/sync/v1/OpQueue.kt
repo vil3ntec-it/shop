@@ -28,8 +28,7 @@ class OpQueue(context: Context, accountKey: String) {
 
   private val json = Json { ignoreUnknownKeys = true; isLenient = true }
   private val dir = context.applicationContext.filesDir
-  private val safe = accountKey.map { if (it.isLetterOrDigit()) it else '_' }
-    .joinToString("").take(48).ifBlank { "anon" }
+  private val safe = fileKey(accountKey)
 
   private val file = File(dir, "oplog-$safe.json")
   private val dropFile = File(dir, "oplog-$safe-dropped.json")
@@ -162,6 +161,11 @@ class OpQueue(context: Context, accountKey: String) {
   }
 
   companion object {
+    /** بخشِ نامِ فایل از کلیدِ حساب — صف و ژورنالِ همان حساب (`SyncCommit`) */
+    fun fileKey(accountKey: String): String =
+      accountKey.map { if (it.isLetterOrDigit()) it else '_' }
+        .joinToString("").take(48).ifBlank { "anon" }
+
     const val MAX = 50_000
     const val MAX_OPS = 200
     const val MAX_BYTES = 256 * 1024

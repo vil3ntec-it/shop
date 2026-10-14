@@ -49,6 +49,7 @@ import ir.vil3ntec.tohid.sync.v1.SyncV1Worker
 import ir.vil3ntec.tohid.ui.AppRoot
 import ir.vil3ntec.tohid.ui.screens.Motion
 import ir.vil3ntec.tohid.ui.screens.WelcomeScreen
+import ir.vil3ntec.tohid.ui.theme.Shop
 import ir.vil3ntec.tohid.ui.theme.ThemeChoice
 import ir.vil3ntec.tohid.ui.theme.TohidTheme
 import kotlinx.coroutines.CoroutineScope
@@ -218,7 +219,11 @@ fun main() {
       if (shortcutsOpen) {
         DialogWindow(onCloseRequest = { shortcutsOpen = false }, title = "میان‌برهای صفحه‌کلید",
           state = androidx.compose.ui.window.rememberDialogState(size = DpSize(560.dp, 680.dp))) {
-          ShortcutsHelp()
+          //  پنجرهٔ جدا بیرونِ TohidThemeِ برنامه است ⇐ همان ظاهرِ ذخیره‌شده (روز/شب) را خودش می‌گیرد
+          val dialogTheme = remember {
+            runCatching { ThemeChoice.valueOf(prefs.getString("theme", "SYSTEM")!!) }.getOrDefault(ThemeChoice.SYSTEM)
+          }
+          TohidTheme(dialogTheme) { ShortcutsHelp() }
         }
       }
       LaunchedEffect(Unit) {
@@ -348,17 +353,18 @@ private fun ShortcutsHelp() {
   )
   androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalLayoutDirection provides LayoutDirection.Rtl) {
     androidx.compose.foundation.layout.Column(
-      androidx.compose.ui.Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.White)
+      //  رنگ‌ها از تم (F0-18): در حالتِ تاریک پنجره دیگر سفید نمی‌ماند
+      androidx.compose.ui.Modifier.fillMaxSize().background(Shop.colors.surfaceSolid)
         .verticalScroll(androidx.compose.foundation.rememberScrollState()).padding(16.dp)
     ) {
       groups.forEach { (title, rows) ->
         androidx.compose.material3.Text(title, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-          color = androidx.compose.ui.graphics.Color(0xFF1E3A8A), modifier = androidx.compose.ui.Modifier.padding(top = 10.dp, bottom = 4.dp))
+          color = Shop.colors.primary, modifier = androidx.compose.ui.Modifier.padding(top = 10.dp, bottom = 4.dp))
         rows.forEach { (k, v) ->
           androidx.compose.foundation.layout.Row(androidx.compose.ui.Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-            androidx.compose.material3.Text(v, modifier = androidx.compose.ui.Modifier.weight(1f))
-            androidx.compose.material3.Text(k, color = androidx.compose.ui.graphics.Color(0xFF334155),
-              modifier = androidx.compose.ui.Modifier.background(androidx.compose.ui.graphics.Color(0xFFF1F5F9)).padding(horizontal = 6.dp, vertical = 1.dp))
+            androidx.compose.material3.Text(v, color = Shop.colors.text, modifier = androidx.compose.ui.Modifier.weight(1f))
+            androidx.compose.material3.Text(k, color = Shop.colors.text,
+              modifier = androidx.compose.ui.Modifier.background(Shop.colors.primaryTint).padding(horizontal = 6.dp, vertical = 1.dp))
           }
         }
       }

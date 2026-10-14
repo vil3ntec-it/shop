@@ -47,6 +47,21 @@ class SyncStateV1(context: Context, private val accountKey: String) {
     get() = prefs.getString(k("shadow"), "").orEmpty()
     set(v) = prefs.edit().putString(k("shadow"), v).apply()
 
+  /**
+   *  سایه و cursor با هم و **همزمان** (`commit`، نه `apply`) — F0-05.
+   *
+   *  `apply()` روی دیسک دیرتر می‌نشیند؛ اگر برنامه پیش از آن بسته شود،
+   *  سایه عقب می‌ماند در حالی که opها در صف‌اند. این‌جا یک نوشتنِ هم‌زمان
+   *  است و ژورنالِ `SyncCommit` فقط پس از آن پاک می‌شود.
+   *
+   *  @return نوشته شد یا نه
+   */
+  fun commitShadow(shadow: String, cursor: Long?): Boolean {
+    val e = prefs.edit().putString(k("shadow"), shadow)
+    if (cursor != null) e.putLong(k("cursor"), cursor)
+    return e.commit()
+  }
+
   var lastOkAt: Long
     get() = prefs.getLong(k("lastOkAt"), 0)
     set(v) = prefs.edit().putLong(k("lastOkAt"), v).apply()

@@ -190,7 +190,8 @@ fun DeskSaleScreen(
     if (cart.isEmpty()) { toast("سبد خالی است"); return }
     if (discountBad || paidBad) { toast("عددِ «${if (discountBad) "تخفیف" else "دریافتی"}» درست نیست"); return }
     if (payment == SalesEngine.Payment.CREDIT && cartDebtorId == null) { toast("فروشِ نسیه مشتری می‌خواهد — F2"); pickDebtor = true; return }
-    when (val r = SalesEngine.record(d, cart, checkout, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId)) {
+    when (val r = SalesEngine.record(d, cart, checkout, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId,
+      series = ir.vil3ntec.tohid.sync.DocSeries.current(context))) {
       is SalesEngine.Result.Failed -> toast(r.message)
       is SalesEngine.Result.Ok -> {
         scope.launch { store.save(r.data) }
@@ -220,7 +221,7 @@ fun DeskSaleScreen(
       .onPreviewKeyEvent { e ->
         if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
         when {
-          e.key == Key.F9 || e.key == Key.F12 || (e.isCtrlPressed && (e.key == Key.Enter || e.key == Key.NumPadEnter)) -> { finish(); true }
+          e.key == Key.F9 || e.key == Key.F12 || (e.isPrimaryModifier && (e.key == Key.Enter || e.key == Key.NumPadEnter)) -> { finish(); true }
           e.key == Key.F2 -> { pickDebtor = true; true }
           e.key == Key.F3 -> { selected?.let { editLine = it }; true }
           e.key == Key.F4 -> { freeLine = true; true }
@@ -245,7 +246,7 @@ fun DeskSaleScreen(
               if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
               val empty = query.isEmpty()
               when (e.key) {
-                Key.Enter, Key.NumPadEnter -> { if (!e.isCtrlPressed) { submit(); true } else false }
+                Key.Enter, Key.NumPadEnter -> { if (!e.isPrimaryModifier) { submit(); true } else false }
                 Key.DirectionDown -> { if (matches.isNotEmpty()) hint = (hint + 1).coerceAtMost(matches.size - 1) else moveSel(1); true }
                 Key.DirectionUp -> { if (matches.isNotEmpty()) hint = (hint - 1).coerceAtLeast(0) else moveSel(-1); true }
                 Key.Escape -> { if (!empty) { query = ""; true } else false }

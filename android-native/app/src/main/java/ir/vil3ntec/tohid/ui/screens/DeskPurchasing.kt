@@ -93,7 +93,7 @@ fun DeskPurchasingScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
     Modifier
       .fillMaxSize()
       .onPreviewKeyEvent { e ->
-        if (e.type == KeyEventType.KeyDown && e.isCtrlPressed && e.key == Key.N) { editing = true; true } else false
+        if (e.type == KeyEventType.KeyDown && e.isPrimaryModifier && e.key == Key.N) { editing = true; true } else false
       }
       .padding(16.dp),
   ) {
@@ -288,7 +288,7 @@ private fun NewPurchaseInvoice(
       .onPreviewKeyEvent { e ->
         if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
         when {
-          e.key == Key.F9 || (e.isCtrlPressed && (e.key == Key.Enter || e.key == Key.S)) -> { save(); true }
+          e.key == Key.F9 || (e.isPrimaryModifier && (e.key == Key.Enter || e.key == Key.S)) -> { save(); true }
           e.key == Key.Escape -> { onClose(); true }
           else -> false
         }

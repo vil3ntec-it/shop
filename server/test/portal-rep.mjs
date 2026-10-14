@@ -8,6 +8,7 @@
  * مدیر) ساخته می‌شود و عددِ روی صفحه با پاسخِ خودِ سرور سنجیده می‌شود.
  */
 import { createRequire } from 'node:module';
+import { missingTool, PLAYWRIGHT_INSTALL } from './browser-guard.mjs';
 import { execSync } from 'node:child_process';
 
 const require = createRequire(import.meta.url);
@@ -16,7 +17,7 @@ for (const p of [(() => { try { return `${execSync('npm root -g', { encoding: 'u
   if (!p) continue;
   try { ({ chromium } = require(p)); break; } catch { /* بعدی */ }
 }
-if (!chromium) { console.log('⏭  پلی‌رایت پیدا نشد — این سنجه رد شد'); process.exit(0); }
+if (!chromium) missingTool('پلی‌رایت', PLAYWRIGHT_INSTALL);
 
 process.env.NODE_ENV = 'test';
 process.env.DATABASE_URL = process.env.TEST_DATABASE_URL || 'postgres://shop:shoppass@127.0.0.1:5432/shop_test';

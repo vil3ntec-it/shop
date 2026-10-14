@@ -51,33 +51,20 @@ object Updater {
     val sumsUrl: String = "",
   )
 
-  suspend fun check(repo: String, currentVersion: String, server: String = ""): Result<Release?> =
+  suspend fun check(
+    repo: String,
+    currentVersion: String,
+    server: String = "",
+    //  F0-27: شناسهٔ دکان و دستگاه — سرور با آن‌ها کانالِ آزمایشی را می‌شناسد
+    shop: String = "",
+    device: String = "",
+  ): Result<Release?> =
     withContext(Dispatchers.IO) {
       runCatching {
         //  راهِ اصلی: سرورِ خودمان (`/api/releases/tohid-desktop`) — نه github.com.
         //  GitHub فقط وقتی که سرور هنوز این مسیر را ندارد.
         if (server.isNotBlank()) {
-          val base = server.trimEnd('/') + "/api/releases/$TAG"
-          val viaServer = runCatching {
-            val r = org.json.JSONObject(get("$base/latest"))
-            val version = r.optString("version")
-            val assets = r.optJSONArray("assets")
-            var size = -1L
-            var sums = false
-            if (assets != null) for (j in 0 until assets.length()) {
-              val a = assets.getJSONObject(j)
-              if (a.optString("name") == assetName) size = a.optLong("size")
-              if (a.optString("name").equals("SHA256SUMS.txt", true)) sums = true
-            }
-            if (!Regex("^\\d+(\\.\\d+)+$").matches(version) || size < 0) null
-            else Release(
-              version = version,
-              notes = r.optString("notes", ""),
-              apkUrl = "$base/file/$assetName",
-              size = size,
-              sumsUrl = if (sums) "$base/file/SHA256SUMS.txt" else "",
-            )
-          }.getOrNull()
+          val viaServer = runCatching { fromServer(server.trimEnd('/'), shop, device) }.getOrNull()
           if (viaServer != null) return@runCatching viaServer.takeIf { isNewer(it.version, currentVersion) }
         }
         val slug = repo.trim().trim('/')
@@ -94,6 +81,23 @@ object Updater {
         ).takeIf { isNewer(it.version, currentVersion) }
       }
     }
+
+  /**
+   *  سرورِ خودمان. F0-27: `tag`ِ پاسخ می‌گوید فایل‌ها زیرِ کدام برچسب‌اند
+   *  (`tohid-desktop` یا `tohid-desktop-beta`)؛ سرورِ قدیمی `tag` نمی‌دهد ⇒
+   *  همان `tohid-desktop`، مثلِ پیش. خواندنِ پاسخ: `ReleaseFeed`ِ مشترک.
+   */
+  private fun fromServer(server: String, shop: String, device: String): Release? {
+    val latest = ReleaseFeed.parseLatest(get(ReleaseFeed.latestUrl(server, TAG, shop, device)), TAG) ?: return null
+    val mine = latest.assets.firstOrNull { it.name == assetName } ?: return null
+    return Release(
+      version = latest.version,
+      notes = latest.notes,
+      apkUrl = ReleaseFeed.fileUrl(server, latest.tag, assetName),
+      size = mine.size,
+      sumsUrl = if (latest.hasSums) ReleaseFeed.fileUrl(server, latest.tag, ReleaseFeed.SUMS) else "",
+    )
+  }
 
   fun versionOf(assetName: String, tag: String): String {
     val fromName = Regex("(\\d+(?:\\.\\d+)+)").find(assetName)?.value

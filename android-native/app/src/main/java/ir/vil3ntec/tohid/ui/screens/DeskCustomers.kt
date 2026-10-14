@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.data.invoiceLabel
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -147,14 +148,14 @@ private fun CustomerCards(store: ShopStore, d: ShopData, snackbar: SnackbarHostS
     Modifier
       .fillMaxSize()
       .onPreviewKeyEvent { e ->
-        if (e.type == KeyEventType.KeyDown && e.isCtrlPressed && e.key == Key.E) { excel(); true } else false
+        if (e.type == KeyEventType.KeyDown && e.isPrimaryModifier && e.key == Key.E) { excel(); true } else false
       }
       .padding(16.dp),
   ) {
     //  چهار عددِ کل
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
       DeskKpi("طلبِ کل", "${money(totalDebt)} ؋", Shop.colors.danger, Modifier.weight(1f))
-      DeskKpi("بدهکاران", "$debtors نفر", Color(0xFFFF9800), Modifier.weight(1f))
+      DeskKpi("بدهکاران", "$debtors نفر", Shop.colors.warning, Modifier.weight(1f))
       DeskKpi("دیرکرد بیش از ۶۰ روز", "$late نفر", if (late > 0) Shop.colors.danger else Shop.colors.success, Modifier.weight(1f))
       DeskKpi("خریدِ مشتری‌ها در این ماه", "${money(monthBought)} ؋", Shop.colors.primary, Modifier.weight(1f))
     }
@@ -271,7 +272,7 @@ private fun CustomerCard(s: CustomerEngine.Summary, onClick: () -> Unit) {
         Text(s.lastPurchase?.let { "آخرین خرید ${formatDate(it)}" } ?: "هنوز خریدی نیست", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted, maxLines = 1)
       }
       s.debtDays?.let { days ->
-        val c = when { days > 60 -> Shop.colors.danger; days > 30 -> Color(0xFFFF9800); else -> Shop.colors.muted }
+        val c = when { days > 60 -> Shop.colors.danger; days > 30 -> Shop.colors.warning; else -> Shop.colors.muted }
         Text(
           "$days روز",
           Modifier.clip(RoundedCornerShape(6.dp)).background(c.copy(alpha = 0.14f)).padding(horizontal = 6.dp, vertical = 2.dp),
@@ -318,8 +319,8 @@ private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
         when {
           e.key == Key.F7 -> { entry = DebtorEngine.Kind.RECEIVE; true }
           e.key == Key.F6 -> { entry = DebtorEngine.Kind.GIVE; true }
-          e.isCtrlPressed && e.key == Key.P -> { print(); true }
-          e.isCtrlPressed && e.key == Key.E -> { excel(); true }
+          e.isPrimaryModifier && e.key == Key.P -> { print(); true }
+          e.isPrimaryModifier && e.key == Key.E -> { excel(); true }
           e.key == Key.Escape && entry == null && showInvoice == null -> { onBack(); true }
           else -> false
         }
@@ -401,7 +402,7 @@ private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
               0 -> TCell(l.row.toString(), Shop.colors.muted)
               1 -> TCell(formatDate(l.tx.date))
               2 -> TCell(l.tx.notes.ifBlank { if (l.give > 0) "برد" else "رسید" })
-              3 -> TCell(l.invoiceNumber?.let { "#$it" }.orEmpty(), Shop.colors.primary, link = l.saleId != null)
+              3 -> TCell(l.invoiceLabel?.let { "#$it" }.orEmpty(), Shop.colors.primary, link = l.saleId != null)
               4 -> TCell(if (l.give > 0) money(l.give) else "", Shop.colors.danger)
               5 -> TCell(if (l.receive > 0) money(l.receive) else "", Shop.colors.success)
               else -> TCell(money(l.balance), bold = true)
@@ -428,7 +429,7 @@ private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
               val v = invoices[i]
               val off = v.status == "cancelled"
               when (c) {
-                0 -> TCell("#${v.invoiceNumber ?: "—"}", Shop.colors.primary, bold = true)
+                0 -> TCell("#${v.invoiceLabel() ?: "—"}", Shop.colors.primary, bold = true)
                 1 -> TCell(formatDate(v.date))
                 2 -> TCell((counts[v.id] ?: 0).toString())
                 3 -> TCell(money(v.total), if (off) Shop.colors.muted else Shop.colors.text)
@@ -461,7 +462,7 @@ private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
             val l = items[i]
             when (c) {
               0 -> TCell(formatDate(l.date))
-              1 -> TCell("#${l.invoiceNumber ?: "—"}", Shop.colors.primary, link = true)
+              1 -> TCell("#${l.invoiceLabel ?: "—"}", Shop.colors.primary, link = true)
               2 -> TCell(l.name)
               3 -> TCell(qty(l.quantity))
               4 -> TCell(money(l.unitPrice))
@@ -498,7 +499,7 @@ internal fun InvoicePeek(d: ShopData, sale: Sale, modifier: Modifier, onShow: ()
       Icon(Icons.Filled.ReceiptLong, null, tint = Shop.colors.primary)
       Spacer(Modifier.width(8.dp))
       Column(Modifier.weight(1f)) {
-        Text("فاکتور #${sale.invoiceNumber ?: "—"}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Shop.colors.text)
+        Text("فاکتور #${sale.invoiceLabel() ?: "—"}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Shop.colors.text)
         Text(listOf(formatDate(sale.date), sale.seller.takeIf { it.isNotBlank() }?.let { "فروشنده: $it" }).filterNotNull().joinToString(" · "),
           style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
       }

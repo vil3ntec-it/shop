@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.data.invoiceLabel
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -66,7 +67,7 @@ fun DeskInvoicesScreen(store: ShopStore, cartStore: CartStore, d: ShopData, snac
       .filter { it.date in from..to }
       .filter { pay == "all" || (pay == "credit") == (it.paymentMethod == "credit") }
       .filter { state == "all" || (state == "cancelled") == (it.status == "cancelled") }
-      .filter { q.isEmpty() || it.invoiceNumber?.toString() == q || (it.debtorId?.let(names::get)?.contains(q, true) == true) || it.seller.contains(q, true) }
+      .filter { q.isEmpty() || (it.invoiceNumber?.toString() == q || it.invoiceLabel().equals(q, ignoreCase = true)) || (it.debtorId?.let(names::get)?.contains(q, true) == true) || it.seller.contains(q, true) }
       .sortedWith(compareByDescending<Sale> { it.date }.thenByDescending { it.createdAt })
   }
   val live = list.filter { it.status != "cancelled" }
@@ -74,7 +75,7 @@ fun DeskInvoicesScreen(store: ShopStore, cartStore: CartStore, d: ShopData, snac
   fun sheet(): ReportCsv.Sheet {
     val rows = mutableListOf(listOf("شماره", "تاریخ", "مشتری", "اقلام", "جمع", "تخفیف", "قابل پرداخت", "پرداخت‌شده", "باقی", "نوع", "فروشنده", "وضعیت"))
     list.forEach { s ->
-      rows += listOf(s.invoiceNumber?.toString().orEmpty(), s.date, s.debtorId?.let(names::get).orEmpty(), (counts[s.id] ?: 0).toString(),
+      rows += listOf(s.invoiceLabel().orEmpty(), s.date, s.debtorId?.let(names::get).orEmpty(), (counts[s.id] ?: 0).toString(),
         Math.round(s.total).toString(), Math.round(s.discount).toString(), Math.round(s.finalTotal).toString(),
         Math.round(s.paidAmount).toString(), Math.round(s.remaining).toString(),
         if (s.paymentMethod == "credit") "نسیه" else "نقد", s.seller, if (s.status == "cancelled") "لغوشده" else "ثبت‌شده")
@@ -86,7 +87,7 @@ fun DeskInvoicesScreen(store: ShopStore, cartStore: CartStore, d: ShopData, snac
     Modifier
       .fillMaxSize()
       .onPreviewKeyEvent { e ->
-        if (e.type != KeyEventType.KeyDown || !e.isCtrlPressed) return@onPreviewKeyEvent false
+        if (e.type != KeyEventType.KeyDown || !e.isPrimaryModifier) return@onPreviewKeyEvent false
         when (e.key) {
           Key.F -> { runCatching { searchFocus.requestFocus() }; true }
           Key.P -> { sheet().let { ir.vil3ntec.tohid.print.ReportPrint.print(context, it, it.name) }; true }
@@ -139,7 +140,7 @@ fun DeskInvoicesScreen(store: ShopStore, cartStore: CartStore, d: ShopData, snac
           val s = list[i]
           val off = s.status == "cancelled"
           when (c) {
-            0 -> TCell("#${s.invoiceNumber ?: "—"}", Shop.colors.primary, bold = true)
+            0 -> TCell("#${s.invoiceLabel() ?: "—"}", Shop.colors.primary, bold = true)
             1 -> TCell(formatDate(s.date))
             2 -> TCell(s.debtorId?.let(names::get) ?: "مشتریِ گذری", if (s.debtorId == null) Shop.colors.muted else Shop.colors.text)
             3 -> TCell((counts[s.id] ?: 0).toString())
@@ -183,5 +184,5 @@ internal fun saleSheet(d: ShopData, s: Sale): ReportCsv.Sheet {
   rows += listOf("", "پرداخت‌شده", "", "", Math.round(s.paidAmount).toString())
   if (s.remaining > 0.5) rows += listOf("", "باقی (به حساب)", "", "", Math.round(s.remaining).toString())
   val who = if (customer.isNotBlank()) "-$customer" else ""
-  return ReportCsv.Sheet("فاکتور-${s.invoiceNumber ?: ""}$who-${s.date}", rows)
+  return ReportCsv.Sheet("فاکتور-${s.invoiceLabel() ?: ""}$who-${s.date}", rows)
 }

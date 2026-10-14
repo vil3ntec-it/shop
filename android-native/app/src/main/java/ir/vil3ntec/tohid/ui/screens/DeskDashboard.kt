@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.data.invoiceLabel
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -99,7 +100,7 @@ fun DeskDashboardScreen(d: ShopData, onOpen: (String) -> Unit, onProduct: (Strin
       KpiCard(Modifier.weight(1f), Icons.Filled.PointOfSale, "فروش", money(b.sales.value), b.sales.changePct, Shop.colors.primary)
       KpiCard(Modifier.weight(1f), Icons.Filled.TrendingUp, "سودِ ناخالص", money(b.profit.value), b.profit.changePct, Shop.colors.success)
       KpiCard(Modifier.weight(1f), Icons.Filled.Receipt, "تعدادِ فاکتور", b.invoices.value.toInt().toString(), b.invoices.changePct, Color(0xFF7C4DFF))
-      KpiCard(Modifier.weight(1f), Icons.Filled.ShoppingBasket, "میانگینِ فاکتور", money(b.avgTicket.value), b.avgTicket.changePct, Color(0xFFFF9800))
+      KpiCard(Modifier.weight(1f), Icons.Filled.ShoppingBasket, "میانگینِ فاکتور", money(b.avgTicket.value), b.avgTicket.changePct, Shop.colors.warning)
       KpiCard(Modifier.weight(1f), Icons.Filled.AccountBalanceWallet, "طلب از مشتریان", money(b.receivables), null, Shop.colors.danger) { onOpen("debtors") }
     }
 
@@ -121,9 +122,9 @@ fun DeskDashboardScreen(d: ShopData, onOpen: (String) -> Unit, onProduct: (Strin
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.height(270.dp)) {
       AlertPanel(Modifier.weight(1f), "ناموجود", b.outOfStock.size, Shop.colors.danger,
         b.outOfStock.map { it.product.id to (it.product.name to "۰ ${it.product.unit}") }, onProduct)
-      AlertPanel(Modifier.weight(1f), "کم‌موجود", b.lowStock.size, Color(0xFFFF9800),
+      AlertPanel(Modifier.weight(1f), "کم‌موجود", b.lowStock.size, Shop.colors.warning,
         b.lowStock.map { it.product.id to (it.product.name to "${qty(it.stock)} از حدِ ${qty(it.product.minStock)}") }, onProduct)
-      AlertPanel(Modifier.weight(1f), "انقضا (۳۰ روزِ آینده)", b.expiring.size, Color(0xFFE91E63),
+      AlertPanel(Modifier.weight(1f), "انقضا (۳۰ روزِ آینده)", b.expiring.size, Shop.colors.warning,
         b.expiring.map { it.product.id to (it.product.name to if (it.expired) "گذشته · ${qty(it.remaining)}" else "${it.daysLeft} روز · ${qty(it.remaining)}") }, onProduct)
       AlertPanel(Modifier.weight(1f), "قرضِ بیش از ۶۰ روز", b.debtOverdue.size, Shop.colors.danger,
         b.debtOverdue.map { it.debtor.id to (it.debtor.name to "${money(it.balance)} · ${it.days} روز") }) { onOpen("debtors") }
@@ -160,7 +161,7 @@ fun DeskDashboardScreen(d: ShopData, onOpen: (String) -> Unit, onProduct: (Strin
         b.recent.forEach { s ->
           val who = s.debtorId?.let { id -> d.debtors.find { it.id == id }?.name } ?: "مشتریِ گذری"
           ListRow(
-            "#${s.invoiceNumber ?: "-"} · $who",
+            "#${s.invoiceLabel() ?: "-"} · $who",
             "${formatDate(s.date)} · ${if (s.paymentMethod == "credit") "نسیه" else "نقد"}",
             "${money(s.finalTotal)} ؋",
           ) { onOpen("sales") }

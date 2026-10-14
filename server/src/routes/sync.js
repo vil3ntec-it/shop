@@ -68,16 +68,48 @@ router.get('/status', async (req, res) => {
 });
 
 /*
+ * ⚠️ راهِ قدیم (F0-02) — هنوز کار می‌کند، فقط هشدار ثبت می‌شود.
+ *
+ * تنها موتورِ دفتر Sync v1 است (`/api/sync/v1/*`). push/pullِ این فایل
+ * مستقیم در دفتر ادغام می‌کرد و سایهٔ v1 را جلو نمی‌برد؛ دستگاهی که هر دو
+ * را می‌رفت، فیلدهای `$inc` (پرداخت‌ها، مانده‌ها) را دو بار جمع می‌کرد.
+ * برنامه‌های تازه دیگر این‌جا نمی‌آیند، ولی طبقِ «قاعدهٔ سازگاری»
+ * (docs/spec/02-current.md) تا وقتی کلاینتِ قدیمی هست، رد نمی‌شود — فقط
+ * در لاگ می‌آید که چه کسی، با کدام نسخه، هنوز این راه را می‌رود.
+ *
+ * هر حساب و دستگاه هر ده دقیقه یک خط، نه هر درخواست یک خط.
+ */
+const LEGACY_WARN_MS = 10 * 60 * 1000;
+const legacySeen = new Map();
+function warnLegacy(req, _res, next) {
+  try {
+    const deviceId = String(req.body?.deviceId || req.query?.deviceId || '').slice(0, 64);
+    const key = `${req.user?.id || ''}|${deviceId}`;
+    const t = Date.now();
+    if (!(t - (legacySeen.get(key) || 0) < LEGACY_WARN_MS)) {
+      if (legacySeen.size > 5000) legacySeen.clear();
+      legacySeen.set(key, t);
+      console.warn(
+        '[sync:legacy] %s %s — راهِ قدیمِ همگام‌سازی؛ Sync v1 جایش است (shop=%s user=%s device=%s app=%s v=%s)',
+        req.method, req.originalUrl.split('?')[0], req.shopId || '', req.user?.id || '', deviceId || '-',
+        String(req.get('X-App') || '-').slice(0, 32), String(req.get('X-App-Version') || '-').slice(0, 32),
+      );
+    }
+  } catch { /* هشدار نباید خودِ درخواست را بشکند */ }
+  next();
+}
+
+/*
  * خواندن باز است، نوشتن پشتِ اشتراک.
  *
  * دلیلش در `requireDataWrite` نوشته شده: داده‌ی فروشنده گروگان گرفته
  * نمی‌شود، ولی «چند کاربر روی یک دکان» — که قابلیت پولی است — دیگر
  * مجانی نیست.
  */
-router.post('/', requireDataWrite, pushHandler);
-router.get('/', pullHandler);
-router.post('/push', requireDataWrite, pushHandler);
-router.get('/pull', pullHandler);
+router.post('/', warnLegacy, requireDataWrite, pushHandler);
+router.get('/', warnLegacy, pullHandler);
+router.post('/push', warnLegacy, requireDataWrite, pushHandler);
+router.get('/pull', warnLegacy, pullHandler);
 
 module.exports = router;
 module.exports.pushHandler = pushHandler;

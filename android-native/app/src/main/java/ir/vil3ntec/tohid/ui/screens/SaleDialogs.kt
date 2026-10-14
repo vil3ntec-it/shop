@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.data.invoiceLabel
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -296,7 +297,7 @@ fun InvoiceDialog(
     ) {
       Column(Modifier.padding(18.dp).verticalScroll(rememberScrollState())) {
         Text(
-          "فاکتور فروش #${sale.invoiceNumber?.let { plain(it) } ?: "—"}",
+          "فاکتور فروش #${sale.invoiceLabel() ?: "—"}",
           style = MaterialTheme.typography.titleMedium,
           color = Shop.colors.text,
         )

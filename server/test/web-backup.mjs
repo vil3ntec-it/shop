@@ -18,6 +18,7 @@
  * اجرا:  node test/web-backup.mjs
  */
 import { createRequire } from 'node:module';
+import { missingTool, PLAYWRIGHT_INSTALL } from './browser-guard.mjs';
 import assert from 'node:assert/strict';
 import { execSync } from 'node:child_process';
 import http from 'node:http';
@@ -37,10 +38,7 @@ let chromium = null;
 for (const p of candidates()) {
   try { ({ chromium } = require(p)); break; } catch { /* بعدی */ }
 }
-if (!chromium) {
-  console.log('⏭  پلی‌رایت پیدا نشد — این سنجه رد شد');
-  process.exit(0);
-}
+if (!chromium) missingTool('پلی‌رایت', PLAYWRIGHT_INSTALL);
 
 process.env.NODE_ENV = 'test';
 process.env.DATABASE_URL = process.env.TEST_DATABASE_URL
@@ -100,10 +98,20 @@ const site = http.createServer((req, res) => {
    *  واقعی، و نمونه اول می‌آید. با `replace`ِ تک‌باره فقط کامنت عوض
    *  می‌شد و صفحه به سرورِ واقعی می‌زد.
    */
+  /*
+   *  F0-22: `connect-src` ِ CSP فقط سرورِ همین نسخه را راه می‌دهد، پس هر جا
+   *  نشانی عوض شود، همان نشانی (http و ws) در CSP هم عوض می‌شود — همان کاری
+   *  که هر انتشار با دامنهٔ دیگر باید بکند.
+   */
   if (rel === 'index.html') {
-    const html = fs.readFileSync(file, 'utf8')
+    const src = fs.readFileSync(file, 'utf8');
+    const real = (src.replace(/<!--[\s\S]*?-->/g, '').match(/<meta name="tohid-api-base" content="([^"]+)">/) || [])[1];
+    const html = src
       .replace(/<meta name="tohid-api-base" content="[^"]*">/g,
-        `<meta name="tohid-api-base" content="${API_BASE}">`);
+        `<meta name="tohid-api-base" content="${API_BASE}">`)
+      .replace(/(<meta http-equiv="Content-Security-Policy" content="[^"]*?)(connect-src [^;"]*)/, (_, head, d) => head + d
+        .split(real.replace(/^https:/, 'wss:')).join(API_BASE.replace(/^http/, 'ws'))
+        .split(real).join(API_BASE));
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     res.end(html);
     return;
@@ -275,7 +283,7 @@ await step('لایه‌های Sync v1 در صفحه بالا آمده‌اند',
   assert.equal(out.account, true, 'account-code.js');
   assert.equal(out.sync, true, 'sync-engine.js');
   assert.equal(out.ui, true, 'account-ui.js');
-  assert.equal(out.schema, 2, 'نسخهٔ schema باید با سرور یکی باشد');
+  assert.equal(out.schema, 3, 'نسخهٔ schema باید با سرور یکی باشد (پلهٔ ۳: فهرست‌های تنظیماتی، F0-04)');
   assert.equal(out.ulid, 26, 'شناسهٔ ردیف باید ULID باشد');
 });
 
@@ -572,6 +580,18 @@ await step('صفحهٔ ورود: کلیدِ دوتکه، بی کادرِ نام�
   assert.deepEqual(steps, ['ایمیل و رمز', 'کد تأیید', 'لوکیشن و شرایط'],
     'سه گامِ ثبت‌نام همان‌هایی‌اند که برنامهٔ اندروید هم نشان می‌دهد');
   await fresh.close();
+});
+
+await step('F0-03: فاکتورِ سری‌دارِ دستگاهِ دیگر «B1-5» دیده می‌شود؛ فاکتورِ وب همان عدد', async () => {
+  const out = await page.evaluate(() => (typeof invoiceLabel === 'function'
+    ? [
+      invoiceLabel({ invoiceNumber: 5, series: 'B1' }),
+      invoiceLabel({ invoiceNumber: 100001 }),
+      invoiceLabel({ invoiceNumber: 7, series: ' ' }),
+      invoiceLabel({}),
+    ]
+    : null));
+  assert.deepEqual(out, ['B1-5', '100001', '7', '']);
 });
 
 await step('در کلِ این نشست هیچ خطای صفحه‌ای نبود', async () => {
