@@ -41,11 +41,13 @@
      همان عددی که `server/src/lib/sync-v1-migrations.js` برای `shop`
      می‌شناسد. پلهٔ ۲ یعنی ردیفِ فروش فیلدِ `channel` دارد.
 
+     پلهٔ ۳ (F0-04) یعنی سه فهرستِ تنظیماتی (بخشِ ۱-ب) هم می‌روند.
+
      ⚠️ هر فیلد یا مجموعهٔ تازه = یک پله بالاتر، این‌جا **و** روی سرور.
      برنامه‌ای که جلوتر از سرور باشد ۴۲۶ می‌گیرد و opهایش را نگه
      می‌دارد — هیچ چیزی گم نمی‌شود.
      ========================================================== */
-  var SCHEMA_VERSION = 2;
+  var SCHEMA_VERSION = 3;
 
   /* ==========================================================
      ۱) مجموعه‌ها — فهرستِ سفید، همان نام‌هایی که سرور می‌شناسد
@@ -55,12 +57,10 @@
      حساسیت به حروفِ بزرگ و کوچک). نامِ بیرونِ این فهرست `rejected`
      می‌گیرد.
 
-     ⚠️ `expenseCategories` · `productCategories` · `productUnits` و
-     `nextInvoiceNo` این‌جا **نیستند** و این عمدی است: آن‌ها ردیفِ
-     شناسه‌دار نیستند، یک فهرستِ تنظیماتی‌اند. سرور برایشان جدولی
-     ندارد و ساختنِ جدولِ ساختگی برای آن‌ها یعنی دروغ. همگام‌سازیِ
-     تنظیمات همان `license/shop-sync.js`ِ امروز است و دست نخورده
-     ماند.
+     ⚠️ `expenseCategories` · `productCategories` · `productUnits` این‌جا
+     نیستند چون ردیفِ شناسه‌دار نیستند، فهرستِ نام‌اند — جدا در بخشِ
+     ۱-ب می‌آیند. `nextInvoiceNo` اصلاً همگام نمی‌شود: عددِ هر دستگاه
+     مالِ خودش است.
      ========================================================== */
   var COLLECTIONS = [
     'products', 'warehouseEntries', 'sales', 'saleItems', 'returns',
@@ -68,6 +68,63 @@
     'suppliers', 'purchases', 'supplierPayments',
     'stockMovements', 'priceHistory', 'auditLog',
   ];
+
+  /* ==========================================================
+     ۱-ب) فهرست‌های تنظیماتی — F0-04 (پلهٔ ۳)
+     ----------------------------------------------------------
+     دسته‌های کالا، واحدها و دسته‌های مصارف در دفتر **فهرستِ نام**اند
+     (`['لبنیات', 'نوشیدنی']`)، نه ردیفِ شناسه‌دار. تا پلهٔ ۲ اصلاً
+     همگام نمی‌شدند: دسته‌ای که روی گوشی ساخته می‌شد روی کامپیوتر و
+     وب نبود.
+
+     روی خط هر نام یک ردیف است: `row_id` = ‎sha256(نام)‎ (۳۲ نویسهٔ اول)
+     و `fields = {name}`. شناسه از خودِ نام ساخته می‌شود، پس دو دستگاه
+     که یک نام را جدا بسازند **یک** ردیف می‌سازند، نه دو تا. دفتر همان
+     فهرستِ نام می‌ماند؛ تبدیل فقط در تفاضل و اعمال است.
+
+     ⚠️ سایهٔ پیش از پلهٔ ۳ این کلیدها را ندارد ⇒ نخستین تفاضل همهٔ
+     نام‌های این دستگاه را یک بار «درج» می‌فرستد (نه حذف). دفتری که
+     کلید را اصلاً ندارد هیچ چیزی را پاک نمی‌کند.
+     همان را `LedgerDiff.kt` در اندروید و کامپیوتر دارد.
+     ========================================================== */
+  var LIST_COLLECTIONS = ['productCategories', 'productUnits', 'expenseCategories'];
+
+  function listRowId(name) { return sha256Hex(String(name)).slice(0, 32); }
+
+  function listName(v) {
+    if (typeof v === 'string') return v.trim();
+    if (v && typeof v === 'object' && typeof v.name === 'string') return v.name.trim();
+    return '';
+  }
+
+  /** فهرستِ نام ⇒ ردیف‌ها `{id, name}`؛ نامِ خالی و تکراری کنار می‌رود. */
+  function listRows(list) {
+    var out = [];
+    if (!Array.isArray(list)) return out;
+    var seen = Object.create(null);
+    for (var i = 0; i < list.length; i++) {
+      var name = listName(list[i]);
+      if (!name) continue;
+      var id = listRowId(name);
+      if (seen[id]) continue;
+      seen[id] = true;
+      out.push({ id: id, name: name });
+    }
+    return out;
+  }
+
+  /** یک opِ رسیده روی فهرستِ نام — ترتیبِ محلی می‌ماند، نامِ تازه ته می‌نشیند. */
+  function applyListOp(list, op) {
+    var names = [];
+    var src = Array.isArray(list) ? list : [];
+    for (var i = 0; i < src.length; i++) if (listName(src[i])) names.push(listName(src[i]));
+    if (op.type === 'delete') {
+      return names.filter(function (n) { return listRowId(n) !== op.row_id; });
+    }
+    var name = listName(op.fields || {});
+    if (!name || names.indexOf(name) !== -1) return names;
+    return names.concat([name]);
+  }
 
   /* ==========================================================
      ۲) فیلدهای شمارنده — دلتا می‌روند، نه «مقدارِ تازه»
@@ -371,6 +428,27 @@
         counts['delete']++;
       }
     }
+
+    //  فهرست‌های تنظیماتی (بخشِ ۱-ب): فقط درج و حذف؛ نام همان شناسه است
+    for (var l = 0; l < LIST_COLLECTIONS.length; l++) {
+      var lkey = LIST_COLLECTIONS[l];
+      if (!next || !Array.isArray(next[lkey])) continue;
+      var had = indexById(listRows(shadow && shadow[lkey]));
+      var now = listRows(next[lkey]);
+      var nowIds = Object.create(null);
+      for (var n = 0; n < now.length; n++) {
+        nowIds[now[n].id] = true;
+        if (had[now[n].id]) continue;
+        ops.push(makeOp(mint(ts), ts, lkey, now[n].id, 'insert', { name: now[n].name }));
+        counts.insert++;
+      }
+      var hadIds = Object.keys(had);
+      for (var x = 0; x < hadIds.length; x++) {
+        if (nowIds[hadIds[x]]) continue;
+        ops.push(makeOp(mint(ts), ts, lkey, hadIds[x], 'delete', undefined));
+        counts['delete']++;
+      }
+    }
     return { ops: ops, counts: counts };
   }
 
@@ -401,6 +479,12 @@
 
     for (var i = 0; i < (ops || []).length; i++) {
       var op = normalizeIncoming(ops[i]);
+      if (op && LIST_COLLECTIONS.indexOf(op.table) !== -1) {
+        next[op.table] = applyListOp(next[op.table], op);
+        applied++;
+        tables[op.table] = (tables[op.table] || 0) + 1;
+        continue;
+      }
       if (!op || COLLECTIONS.indexOf(op.table) === -1) { skipped++; continue; }
       if (!Array.isArray(next[op.table])) next[op.table] = [];
       var list = next[op.table];
@@ -472,6 +556,20 @@
       }
       out[key] = list;
     }
+    //  فهرست‌ها: آنچه سرور دارد، با ترتیبِ محلی برای نام‌های مشترک
+    for (var l = 0; l < LIST_COLLECTIONS.length; l++) {
+      var lkey = LIST_COLLECTIONS[l];
+      var lrows = tables[lkey];
+      if (!Array.isArray(lrows)) continue;
+      var server = [];
+      for (var j = 0; j < lrows.length; j++) {
+        var nm = listName(isPlainObject(lrows[j]) ? lrows[j].data : null);
+        if (nm && server.indexOf(nm) === -1) server.push(nm);
+      }
+      var mine = listRows(out[lkey]).map(function (r) { return r.name; });
+      var keep = mine.filter(function (n) { return server.indexOf(n) !== -1; });
+      out[lkey] = keep.concat(server.filter(function (n) { return keep.indexOf(n) === -1; }));
+    }
     return out;
   }
 
@@ -482,6 +580,11 @@
       var key = COLLECTIONS[c];
       out[key] = Array.isArray(data && data[key]) ? JSON.parse(JSON.stringify(data[key])) : [];
     }
+    //  فهرست‌ها همان فهرستِ نام‌اند؛ نبودنِ کلید یعنی «هنوز هیچ‌وقت نرفته»
+    for (var l = 0; l < LIST_COLLECTIONS.length; l++) {
+      var lkey = LIST_COLLECTIONS[l];
+      if (Array.isArray(data && data[lkey])) out[lkey] = data[lkey].slice();
+    }
     return out;
   }
 
@@ -490,6 +593,9 @@
     for (var c = 0; c < COLLECTIONS.length; c++) {
       var key = COLLECTIONS[c];
       out[key] = Array.isArray(out[key]) ? out[key].slice() : [];
+    }
+    for (var l = 0; l < LIST_COLLECTIONS.length; l++) {
+      if (Array.isArray(out[LIST_COLLECTIONS[l]])) out[LIST_COLLECTIONS[l]] = out[LIST_COLLECTIONS[l]].slice();
     }
     return out;
   }
@@ -638,6 +744,8 @@
   return {
     SCHEMA_VERSION: SCHEMA_VERSION,
     COLLECTIONS: COLLECTIONS,
+    LIST_COLLECTIONS: LIST_COLLECTIONS,
+    listRowId: listRowId,
     INC_FIELDS: INC_FIELDS,
     QUEUE_MAX: QUEUE_MAX,
     BACKOFF_MIN_MS: BACKOFF_MIN_MS,
