@@ -11,14 +11,17 @@
 | پوشه | چیست |
 |---|---|
 | `index.html` و `license/` | نسخه‌ی وب (PWA)، روی GitHub Pages |
-| `android/` | برنامه‌ی بومی اندروید (Kotlin + Compose) |
+| `android-native/` | برنامه‌ی بومی اندروید (Kotlin + Compose) |
 | `desktop/` | برنامه‌ی بومی کامپیوتر (ویندوز، مک، لینوکس) — همان کدِ `android-native` روی Compose Desktop |
+| `admin-android/` | برنامه‌ی اندرویدِ «توحید مدیریت» برای مدیرِ سامانه (Kotlin + Compose) |
+| `android/` | پوسته‌ی WebViewِ قدیمِ اندروید که همان نسخه‌ی وب را از داخلِ بسته اجرا می‌کند؛ ساختش فقط دستی است (`android.yml`) |
 | `server/` | سرور: حساب، دکان چندکاربره، اشتراک، همگام‌سازی، پشتیبان |
+| `docs/` | سندها، قاعده‌ها (`RULES-fa.md`) و مشخصاتِ محصول (`docs/spec/`) |
 
 - سایت: https://vil3ntec-it.github.io/shop/
 - دانلودِ همهٔ نسخه‌ها (یک صفحه، تشخیصِ خودکارِ سیستم): https://vil3ntec-it.github.io/shop/download.html
 - راه‌اندازی سرور: [`server/README.md`](server/README.md)
-- ساخت برنامه‌ی اندروید: [`android/README.md`](android/README.md)
+- برنامه‌ی بومی اندروید: [`android-native/README-fa.md`](android-native/README-fa.md) — پوسته‌ی قدیمِ WebView: [`android/README.md`](android/README.md)
 - برنامه‌ی کامپیوتر: [`docs/DESKTOP-fa.md`](docs/DESKTOP-fa.md) — دانلود از انتشارِ [`tohid-desktop`](https://github.com/vil3ntec-it/shop/releases/tag/tohid-desktop)
 
 ## در یک نگاه

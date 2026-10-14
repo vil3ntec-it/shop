@@ -90,7 +90,8 @@ async function plansHandler(req, res) {
     plans: await plans.listPlans(),
     whatsapp: { number: cfg.whatsapp_number || '', message: cfg.whatsapp_message || '' },
     currency: cfg.currency || 'افغانی',
-    trialDays: Number(cfg.trial_days || 0),
+    //  F0-13: همان عددِ `entitlement` (`plans.trialDaysOf`)، نه خواندنِ جدا با `|| 0`
+    trialDays: await plans.trialDaysOf('shop'),
   });
 }
 

@@ -297,7 +297,9 @@ const config = {
   trustProxy:        bool(process.env.TRUST_PROXY, false),
   defaults: {
     timezone:  process.env.DEFAULT_TIMEZONE || 'Asia/Kabul',
-    trialDays: num(process.env.TRIAL_DAYS, 7),
+    //  ⛔ F0-13: `TRIAL_DAYS` برداشته شد — هیچ جا خوانده نمی‌شد و فقط عددِ دومی
+    //  (۷ این‌جا، ۱۴ در docker-compose) نشان می‌داد. مدتِ آزمایشی در
+    //  `app_config.trial_days` است (پنلِ مدیر)؛ پیش‌فرضش `plans.TRIAL_DEFAULT`.
   },
 };
 
