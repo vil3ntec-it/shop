@@ -15,6 +15,7 @@ on:
       - 'index.html'
       - 'sw.js'
       - 'license/**'
+      - 'core/test-vectors/**'
       - '.github/workflows/server.yml'
   pull_request:
     paths:
@@ -22,6 +23,7 @@ on:
       - 'index.html'
       - 'sw.js'
       - 'license/**'
+      - 'core/test-vectors/**'
       - '.github/workflows/server.yml'
   workflow_dispatch:
 
