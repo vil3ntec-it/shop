@@ -1,0 +1,57 @@
+name: ابزارِ مهاجرتِ داده (shop-migrate)
+
+# فقط ساخت و آزمونِ `tools/shop-migrate` — به هیچ برنامه‌ای وصل نیست و چیزی منتشر نمی‌کند.
+# روی تغییرِ همان فایل‌های برنامه هم اجرا می‌شود که ابزار از آن‌ها کپی می‌گیرد یا
+# فرمولشان را تکرار می‌کند (نگهبانِ دیگرش `MigrationGoldenTest` در آزمون‌های android-native است).
+
+on:
+  pull_request:
+    paths:
+      - 'tools/shop-migrate/**'
+      - 'android-native/app/src/main/java/ir/vil3ntec/tohid/data/Models.kt'
+      - 'android-native/app/src/main/java/ir/vil3ntec/tohid/data/ShopStore.kt'
+      - 'android-native/app/src/main/java/ir/vil3ntec/tohid/data/ReportEngine.kt'
+      - 'android-native/app/src/main/java/ir/vil3ntec/tohid/Jalali.kt'
+      - 'android-native/app/src/main/java/ir/vil3ntec/tohid/Format.kt'
+      - 'android-native/app/src/main/java/ir/vil3ntec/tohid/sync/v1/Ulid.kt'
+      - '.github/workflows/shop-migrate.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'tools/shop-migrate/**'
+      - 'android-native/app/src/main/java/ir/vil3ntec/tohid/data/Models.kt'
+      - 'android-native/app/src/main/java/ir/vil3ntec/tohid/data/ShopStore.kt'
+      - 'android-native/app/src/main/java/ir/vil3ntec/tohid/data/ReportEngine.kt'
+      - 'android-native/app/src/main/java/ir/vil3ntec/tohid/Jalali.kt'
+      - 'android-native/app/src/main/java/ir/vil3ntec/tohid/Format.kt'
+      - 'android-native/app/src/main/java/ir/vil3ntec/tohid/sync/v1/Ulid.kt'
+      - '.github/workflows/shop-migrate.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # همان Gradleِ پروژهٔ کامپیوتر (wrapperِ desktop) — همان راهی که صاحبِ محصول اجرا می‌کند
+      - name: طرحِ SQLite و آزمون‌ها
+        run: ./desktop/gradlew --no-daemon -p tools/shop-migrate test
+
+      - name: اجرای آزمایشی روی دفترِ ساختگی
+        run: |
+          ./desktop/gradlew --no-daemon -q -p tools/shop-migrate installDist
+          bin=tools/shop-migrate/build/install/shop-migrate/bin/shop-migrate
+          "$bin" fixture --seed 42 --size medium --anomalies --out "$RUNNER_TEMP/fixture.json"
+          "$bin" dry-run "$RUNNER_TEMP/fixture.json" | tee "$RUNNER_TEMP/report.txt"
