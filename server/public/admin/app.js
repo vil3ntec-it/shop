@@ -23,12 +23,13 @@ let pumpPlans = [];
 let currentShop = null;
 
 // ---------- ابزار ----------
-async function call(method, path, body) {
+async function call(method, path, body, extraHeaders = {}) {
   const res = await fetch(API + path, {
     method,
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...extraHeaders,
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
@@ -44,6 +45,41 @@ async function call(method, path, body) {
     throw err;
   }
   return json;
+}
+
+/*
+ *  ⛔ F0-14 — کلیدِ یکتایی برای ثبتِ اشتراک.
+ *  دو بار کلیک دو دوره می‌ساخت. حالا هر «ثبت» یک کلید دارد: تا بدنه
+ *  همان است و ثبت هنوز موفق نشده، همان کلید می‌رود و سرور فقط یک بار
+ *  اعطا می‌کند (تکرار ⇒ پاسخِ اول). بعد از موفقیت کلید دور ریخته می‌شود.
+ */
+const idemKeys = new Map();
+function newIdemKey() {
+  if (window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID();
+  const rnd = new Uint32Array(4);
+  (window.crypto || window.msCrypto).getRandomValues(rnd);
+  return `k-${Date.now().toString(36)}-${[...rnd].map(n => n.toString(36)).join('')}`;
+}
+function idemKeyFor(name, body) {
+  const sig = JSON.stringify(body);
+  const cur = idemKeys.get(name);
+  if (cur && cur.sig === sig) return cur.key;
+  const key = newIdemKey();
+  idemKeys.set(name, { sig, key });
+  return key;
+}
+/** ثبتِ پولی با کلیدِ یکتایی و قفلِ دکمه تا پاسخ برسد. */
+const idemBusy = new Set();
+async function callOnce(name, method, path, body) {
+  if (idemBusy.has(name)) return null;
+  idemBusy.add(name);
+  try {
+    const out = await call(method, path, body, { 'Idempotency-Key': idemKeyFor(name, body) });
+    idemKeys.delete(name);
+    return out;
+  } finally {
+    idemBusy.delete(name);
+  }
 }
 
 const fa = (n) => Number(n || 0).toLocaleString('fa-AF');
@@ -304,7 +340,8 @@ async function grantSubscription() {
   const node = $('shop-msg');
   try {
     const days = $('in-days').value.trim();
-    await call('POST', '/admin/subscriptions', {
+    //  ⛔ F0-14: با کلیدِ یکتایی — دو بار کلیک یک دوره می‌سازد، نه دو
+    const out = await callOnce('grant-shop', 'POST', '/admin/subscriptions', {
       shopId: currentShop.shop.id,
       plan: $('in-plan').value,
       days: days ? Number(days) : null,
@@ -313,6 +350,7 @@ async function grantSubscription() {
       ...($('in-max-devices').value.trim() ? { maxDevices: Number($('in-max-devices').value) } : {}),
       note: $('in-note').value.trim(),
     });
+    if (!out) return;               // کلیکِ دوم وقتی اولی هنوز در راه است
     msg(node, 'اشتراک ثبت شد.', 'ok');
     await Promise.all([loadStats(), loadShops(), openShop(currentShop.shop.id)]);
   } catch (err) {
@@ -651,7 +689,8 @@ async function grantPumpSubscription() {
   const node = $('pump-msg');
   try {
     const days = $('pump-days').value.trim();
-    await call('POST', '/admin/pump/subscriptions', {
+    //  ⛔ F0-14: همان کلیدِ یکتاییِ بخشِ دکان
+    const out = await callOnce('grant-pump', 'POST', '/admin/pump/subscriptions', {
       stationId: currentStation.station.id,
       plan: $('pump-plan').value,
       days: days ? Number(days) : null,
@@ -660,6 +699,7 @@ async function grantPumpSubscription() {
       features: chosenPumpFeatures(),
       note: $('pump-note').value.trim(),
     });
+    if (!out) return;
     msg(node, 'اشتراک ثبت شد.', 'ok');
     await Promise.all([loadPump(), openStation(currentStation.station.id)]);
   } catch (err) {
