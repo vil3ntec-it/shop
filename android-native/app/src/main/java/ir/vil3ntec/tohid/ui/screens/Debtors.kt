@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.data.invoiceLabel
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -794,7 +795,7 @@ private fun AccountView(
             Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
               Column(Modifier.weight(1f)) {
                 Text(
-                  "فاکتور ${sale.invoiceNumber?.toString() ?: "—"}${if (sale.status == "cancelled") " (لغوشده)" else ""}",
+                  "فاکتور ${sale.invoiceLabel() ?: "—"}${if (sale.status == "cancelled") " (لغوشده)" else ""}",
                   style = MaterialTheme.typography.bodyMedium,
                   color = if (sale.status == "cancelled") Shop.colors.muted2 else Shop.colors.text,
                 )
