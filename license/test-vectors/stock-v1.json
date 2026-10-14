@@ -1,0 +1,339 @@
+{
+  "format": "stock-v1",
+  "about": "Shared golden vectors for the stock/cost core (spec 3.6, PRD-15, PRD-16, INV-02, INV-19). Run by license/stock-core.js (server/test/stock-core.test.js) and by core/stock/StockCore.kt (StockCoreVectorsTest). Money = integer minor units (AFN 1/100). Quantity = integer milli. Expected numbers were computed by hand from the rules below, not copied from either engine.",
+  "rules": [
+    "mulDivRound(a,b,c) = floorDiv(2*a*b + c, 2*c), c > 0: half toward +infinity (Math.round semantics), exact for any 53-bit inputs.",
+    "Moving weighted average per (productId, warehouseId): an outbound of q from qty>0 costs mulDivRound(value, q, qty), or the whole value when q == qty.",
+    "Shortage (stock goes below zero) is costed at the last known unit cost; with no known cost it is 0 and the review task says unknown_cost.",
+    "An inbound with an explicit cost that covers a shortage emits costAdjustMinor = trueCost(covered) - provisionalCost(covered) (append-only cost adjustment).",
+    "Inbound without an explicit cost enters at the current average (or last known cost) and never emits a cost adjustment.",
+    "Lots only decide FEFO and expiry: order = expiryDate asc (none last), productionDate asc (none last), receipt sequence, lotId. Lot \"\" is stock without a lot; only it can go negative.",
+    "Sales skip lots whose expiryDate < today. Local mode refuses an outbound beyond what is available; recorded mode never refuses for stock, takes healthy then expired lots, goes negative and returns a review task.",
+    "Identity per position: value = purchases + landed - cogs - waste - supplierReturns + adjustments + transfers + production + revaluation - costAdjust."
+  ],
+  "mulDivRound": [
+    [10, 1, 4, 3],
+    [-10, 1, 4, -2],
+    [7, 1, 3, 2],
+    [-7, 1, 3, -2],
+    [5, 1, 3, 2],
+    [-5, 1, 3, -2],
+    [1, 1, 2, 1],
+    [-1, 1, 2, 0],
+    [170000, 3000, 15000, 34000],
+    [136000, 1000, 12000, 11333],
+    [123456789, 987654, 1000, 121932591483],
+    [9007199254740991, 1000, 3000, 3002399751580330],
+    [9007199254740991, 9007199254740991, 9007199254740991, 9007199254740991],
+    [-9007199254740991, 4503599627370496, 9007199254740991, -4503599627370496],
+    [4503599627370497, 3, 6, 2251799813685249]
+  ],
+  "fefo": [
+    {
+      "name": "same expiry falls back to receipt sequence; no expiry last; expired skipped",
+      "today": "2026-10-14",
+      "lots": [
+        {"lotId": "b", "productionDate": null, "expiryDate": "2026-11-01", "qtyMilli": 1000, "seq": 2},
+        {"lotId": "a", "productionDate": null, "expiryDate": "2026-11-01", "qtyMilli": 1000, "seq": 3},
+        {"lotId": "z", "productionDate": null, "expiryDate": null, "qtyMilli": 5000, "seq": 0},
+        {"lotId": "e", "productionDate": null, "expiryDate": "2026-01-01", "qtyMilli": 700, "seq": 1}
+      ],
+      "picks": [
+        {"qtyMilli": 2500, "includeExpired": false, "expect": {"picks": [{"lotId": "b", "qtyMilli": 1000}, {"lotId": "a", "qtyMilli": 1000}, {"lotId": "z", "qtyMilli": 500}], "shortMilli": 0}},
+        {"qtyMilli": 3000, "includeExpired": true, "expect": {"picks": [{"lotId": "e", "qtyMilli": 700}, {"lotId": "b", "qtyMilli": 1000}, {"lotId": "a", "qtyMilli": 1000}, {"lotId": "z", "qtyMilli": 300}], "shortMilli": 0}},
+        {"qtyMilli": 8000, "includeExpired": false, "expect": {"picks": [{"lotId": "b", "qtyMilli": 1000}, {"lotId": "a", "qtyMilli": 1000}, {"lotId": "z", "qtyMilli": 5000}], "shortMilli": 1000}},
+        {"qtyMilli": 1500, "includeExpired": false, "preferLotId": "z", "expect": {"picks": [{"lotId": "z", "qtyMilli": 1500}], "shortMilli": 0}},
+        {"qtyMilli": 500, "includeExpired": false, "preferLotId": "e", "expect": {"picks": [{"lotId": "b", "qtyMilli": 500}], "shortMilli": 0}}
+      ]
+    },
+    {
+      "name": "production date breaks an expiry tie before sequence",
+      "today": "2026-10-14",
+      "lots": [
+        {"lotId": "late", "productionDate": "2026-03-01", "expiryDate": "2026-11-01", "qtyMilli": 1000, "seq": 0},
+        {"lotId": "early", "productionDate": "2026-02-01", "expiryDate": "2026-11-01", "qtyMilli": 1000, "seq": 1},
+        {"lotId": "unknown", "productionDate": null, "expiryDate": "2026-11-01", "qtyMilli": 1000, "seq": 2}
+      ],
+      "picks": [
+        {"qtyMilli": 2500, "includeExpired": false, "expect": {"picks": [{"lotId": "early", "qtyMilli": 1000}, {"lotId": "late", "qtyMilli": 1000}, {"lotId": "unknown", "qtyMilli": 500}], "shortMilli": 0}}
+      ]
+    }
+  ],
+  "ledger": [
+    {
+      "name": "receipts with landed cost, then sales at the moving average",
+      "defaults": {"productId": "P1", "warehouseId": "W1", "userId": "u1"},
+      "steps": [
+        {"doc": {"type": "purchase_receipt", "qtyMilli": 10000, "costMinor": 100000}, "expect": {"ok": true, "costMinor": 100000, "costAdjustMinor": 0, "reviewTask": null}},
+        {"doc": {"type": "purchase_receipt", "qtyMilli": 5000, "costMinor": 65000, "landedMinor": 5000}, "expect": {"ok": true, "costMinor": 70000, "costAdjustMinor": 0}},
+        {"doc": {"type": "sale", "qtyMilli": 3000}, "expect": {"ok": true, "costMinor": 34000, "picks": [{"lotId": "", "qtyMilli": 3000}], "shortMilli": 0, "reviewTask": null}},
+        {"doc": {"type": "sale", "qtyMilli": 1000}, "expect": {"ok": true, "costMinor": 11333}},
+        {"doc": {"type": "sale", "qtyMilli": 11000}, "expect": {"ok": true, "costMinor": 124667}}
+      ],
+      "final": {
+        "positions": [{"productId": "P1", "warehouseId": "W1", "qtyMilli": 0, "valueMinor": 0, "reservedMilli": 0, "lots": []}],
+        "totals": {"purchasesMinor": 165000, "landedMinor": 5000, "cogsMinor": 170000, "costAdjustMinor": 0}
+      }
+    },
+    {
+      "name": "local sale beyond stock is refused and changes nothing",
+      "defaults": {"productId": "P1", "warehouseId": "W1", "userId": "u1"},
+      "steps": [
+        {"doc": {"type": "purchase_receipt", "qtyMilli": 2000, "costMinor": 20000}, "expect": {"ok": true}},
+        {"doc": {"type": "sale", "qtyMilli": 3000}, "expect": {"ok": false, "error": "insufficient_stock", "availableMilli": 2000}}
+      ],
+      "final": {
+        "positions": [{"productId": "P1", "warehouseId": "W1", "qtyMilli": 2000, "valueMinor": 20000}],
+        "totals": {"purchasesMinor": 20000, "cogsMinor": 0}
+      }
+    },
+    {
+      "name": "two offline devices sell the last unit; receipt adjusts the provisional cost (S27)",
+      "defaults": {"productId": "P1", "warehouseId": "W1", "userId": "u1"},
+      "steps": [
+        {"doc": {"type": "purchase_receipt", "qtyMilli": 1000, "costMinor": 10000}, "expect": {"ok": true}},
+        {"mode": "recorded", "doc": {"type": "sale", "qtyMilli": 1000, "userId": "deviceA"}, "expect": {"ok": true, "costMinor": 10000, "shortMilli": 0, "reviewTask": null}},
+        {"mode": "recorded", "doc": {"id": "saleB", "type": "sale", "qtyMilli": 1000, "userId": "deviceB"}, "expect": {"ok": true, "costMinor": 10000, "picks": [], "shortMilli": 1000, "reviewTask": {"kind": "stock_review", "productId": "P1", "warehouseId": "W1", "docId": "saleB", "reasons": ["negative_stock"], "shortMilli": 1000, "qtyAfterMilli": -1000}}},
+        {"doc": {"type": "purchase_receipt", "qtyMilli": 4000, "costMinor": 48000}, "expect": {"ok": true, "costMinor": 48000, "costAdjustMinor": 2000}}
+      ],
+      "final": {
+        "positions": [{"productId": "P1", "warehouseId": "W1", "qtyMilli": 3000, "valueMinor": 36000, "lots": [{"lotId": "", "qtyMilli": 3000}]}],
+        "totals": {"purchasesMinor": 58000, "cogsMinor": 20000, "costAdjustMinor": 2000}
+      }
+    },
+    {
+      "name": "shortage covered in steps; last known cost follows the newest receipt",
+      "defaults": {"productId": "P1", "warehouseId": "W1", "userId": "u1"},
+      "steps": [
+        {"doc": {"type": "purchase_receipt", "qtyMilli": 1000, "costMinor": 9000}, "expect": {"ok": true}},
+        {"mode": "recorded", "doc": {"type": "sale", "qtyMilli": 3000}, "expect": {"ok": true, "costMinor": 27000, "picks": [{"lotId": "", "qtyMilli": 1000}], "shortMilli": 2000}},
+        {"doc": {"type": "purchase_receipt", "qtyMilli": 1000, "costMinor": 10000}, "expect": {"ok": true, "costAdjustMinor": 1000}},
+        {"mode": "recorded", "doc": {"type": "sale", "qtyMilli": 1000}, "expect": {"ok": true, "costMinor": 10000, "shortMilli": 1000, "reviewTask": {"kind": "stock_review", "productId": "P1", "warehouseId": "W1", "docId": "d4", "reasons": ["negative_stock"], "shortMilli": 1000, "qtyAfterMilli": -2000}}},
+        {"doc": {"type": "purchase_receipt", "qtyMilli": 3000, "costMinor": 33000}, "expect": {"ok": true, "costAdjustMinor": 3000}}
+      ],
+      "final": {
+        "positions": [{"productId": "P1", "warehouseId": "W1", "qtyMilli": 1000, "valueMinor": 11000, "lots": [{"lotId": "", "qtyMilli": 1000}]}],
+        "totals": {"purchasesMinor": 52000, "cogsMinor": 37000, "costAdjustMinor": 4000}
+      }
+    },
+    {
+      "name": "shortage with no known cost is costed 0 and fully adjusted by the first receipt",
+      "defaults": {"productId": "P1", "warehouseId": "W1", "userId": "u1"},
+      "steps": [
+        {"mode": "recorded", "doc": {"type": "sale", "qtyMilli": 1000}, "expect": {"ok": true, "costMinor": 0, "shortMilli": 1000, "reviewTask": {"kind": "stock_review", "productId": "P1", "warehouseId": "W1", "docId": "d1", "reasons": ["negative_stock", "unknown_cost"], "shortMilli": 1000, "qtyAfterMilli": -1000}}},
+        {"doc": {"type": "purchase_receipt", "qtyMilli": 1000, "costMinor": 5000}, "expect": {"ok": true, "costAdjustMinor": 5000}}
+      ],
+      "final": {
+        "positions": [{"productId": "P1", "warehouseId": "W1", "qtyMilli": 0, "valueMinor": 0, "lots": []}],
+        "totals": {"purchasesMinor": 5000, "cogsMinor": 0, "costAdjustMinor": 5000}
+      }
+    },
+    {
+      "name": "customer returns (explicit and average cost) and supplier return",
+      "defaults": {"productId": "P1", "warehouseId": "W1", "userId": "u1"},
+      "steps": [
+        {"doc": {"type": "purchase_receipt", "qtyMilli": 10000, "costMinor": 50000}, "expect": {"ok": true}},
+        {"doc": {"type": "sale", "qtyMilli": 4000}, "expect": {"ok": true, "costMinor": 20000}},
+        {"doc": {"type": "customer_return", "qtyMilli": 1000, "costMinor": 5000, "refId": "line-1"}, "expect": {"ok": true, "costMinor": 5000, "costAdjustMinor": 0}},
+        {"doc": {"type": "purchase_receipt", "qtyMilli": 3000, "costMinor": 21000}, "expect": {"ok": true}},
+        {"doc": {"type": "supplier_return", "qtyMilli": 2000}, "expect": {"ok": true, "costMinor": 11200}},
+        {"doc": {"type": "customer_return", "qtyMilli": 1000}, "expect": {"ok": true, "costMinor": 5600}}
+      ],
+      "final": {
+        "positions": [{"productId": "P1", "warehouseId": "W1", "qtyMilli": 9000, "valueMinor": 50400}],
+        "totals": {"purchasesMinor": 71000, "cogsMinor": 9400, "supplierReturnsMinor": 11200}
+      }
+    },
+    {
+      "name": "adjustments need a reason; malformed documents are refused",
+      "defaults": {"productId": "P1", "warehouseId": "W1", "userId": "u1"},
+      "steps": [
+        {"doc": {"type": "purchase_receipt", "qtyMilli": 5000, "costMinor": 25000}, "expect": {"ok": true}},
+        {"doc": {"type": "adjustment", "qtyMilli": -1000}, "expect": {"ok": false, "error": "reason_required"}},
+        {"doc": {"type": "adjustment", "qtyMilli": -1000, "reason": "ثبت اشتباه"}, "expect": {"ok": true, "costMinor": 5000}},
+        {"doc": {"type": "count_adjust", "qtyMilli": 500, "reason": "شمارش قفسه"}, "expect": {"ok": true, "costMinor": 2500, "costAdjustMinor": 0}},
+        {"doc": {"type": "damage", "qtyMilli": 500, "reason": "شکسته"}, "expect": {"ok": true, "costMinor": 2500}},
+        {"doc": {"type": "adjustment", "qtyMilli": -5000, "reason": "ثبت اشتباه"}, "expect": {"ok": false, "error": "insufficient_stock", "availableMilli": 4000}},
+        {"doc": {"type": "sale", "qtyMilli": 1000, "userId": ""}, "expect": {"ok": false, "error": "user_required"}},
+        {"doc": {"type": "gift", "qtyMilli": 1000}, "expect": {"ok": false, "error": "unknown_type"}},
+        {"doc": {"type": "cost_adjust", "valueMinor": 1000, "reason": "کرایهٔ دیررسیده"}, "expect": {"ok": true, "costMinor": 1000}}
+      ],
+      "final": {
+        "positions": [{"productId": "P1", "warehouseId": "W1", "qtyMilli": 4000, "valueMinor": 21000}],
+        "totals": {"purchasesMinor": 25000, "adjustmentsMinor": -2500, "wasteMinor": 2500, "revaluationMinor": 1000}
+      }
+    },
+    {
+      "name": "FEFO picking across lots, and a scanned lot first",
+      "today": "2026-10-14",
+      "defaults": {"productId": "P1", "warehouseId": "W1", "userId": "u1"},
+      "steps": [
+        {"doc": {"type": "purchase_receipt", "qtyMilli": 3000, "costMinor": 30000, "lot": {"lotId": "A", "productionDate": "2026-01-01", "expiryDate": "2026-12-01"}}, "expect": {"ok": true}},
+        {"doc": {"type": "purchase_receipt", "qtyMilli": 2000, "costMinor": 22000, "lot": {"lotId": "B", "productionDate": "2026-03-01", "expiryDate": "2026-11-01"}}, "expect": {"ok": true}},
+        {"doc": {"type": "purchase_receipt", "qtyMilli": 2000, "costMinor": 20000, "lot": {"lotId": "C", "productionDate": null, "expiryDate": null}}, "expect": {"ok": true}},
+        {"doc": {"type": "purchase_receipt", "qtyMilli": 1000, "costMinor": 10000, "lot": {"lotId": "D", "productionDate": "2026-02-01", "expiryDate": "2026-11-01"}}, "expect": {"ok": true}},
+        {"doc": {"type": "sale", "qtyMilli": 2500}, "expect": {"ok": true, "costMinor": 25625, "picks": [{"lotId": "D", "qtyMilli": 1000}, {"lotId": "B", "qtyMilli": 1500}], "shortMilli": 0}},
+        {"doc": {"type": "sale", "qtyMilli": 500, "lotId": "C"}, "expect": {"ok": true, "costMinor": 5125, "picks": [{"lotId": "C", "qtyMilli": 500}]}}
+      ],
+      "final": {
+        "positions": [{"productId": "P1", "warehouseId": "W1", "qtyMilli": 5000, "valueMinor": 51250, "lots": [{"lotId": "B", "qtyMilli": 500}, {"lotId": "A", "qtyMilli": 3000}, {"lotId": "C", "qtyMilli": 1500}]}],
+        "totals": {"purchasesMinor": 82000, "cogsMinor": 30750}
+      }
+    },
+    {
+      "name": "expired lots are not sold locally and are written off with a reason",
+      "today": "2026-10-14",
+      "defaults": {"productId": "P1", "warehouseId": "W1", "userId": "u1"},
+      "steps": [
+        {"doc": {"type": "purchase_receipt", "qtyMilli": 2000, "costMinor": 20000, "lot": {"lotId": "X", "expiryDate": "2026-10-01"}}, "expect": {"ok": true}},
+        {"doc": {"type": "purchase_receipt", "qtyMilli": 1000, "costMinor": 10000, "lot": {"lotId": "Y", "expiryDate": "2026-10-14"}}, "expect": {"ok": true}},
+        {"doc": {"type": "purchase_receipt", "qtyMilli": 1000, "costMinor": 10000, "lot": {"lotId": "Z", "expiryDate": "2027-01-01"}}, "expect": {"ok": true}},
+        {"doc": {"type": "sale", "qtyMilli": 3000}, "expect": {"ok": false, "error": "expired_stock", "availableMilli": 2000, "expiredMilli": 2000}},
+        {"doc": {"type": "sale", "qtyMilli": 1500}, "expect": {"ok": true, "costMinor": 15000, "picks": [{"lotId": "Y", "qtyMilli": 1000}, {"lotId": "Z", "qtyMilli": 500}]}},
+        {"doc": {"type": "expired", "qtyMilli": 2000, "lotId": "X"}, "expect": {"ok": false, "error": "reason_required"}},
+        {"doc": {"type": "expired", "qtyMilli": 2000, "lotId": "X", "reason": "تاریخ گذشته"}, "expect": {"ok": true, "costMinor": 20000, "picks": [{"lotId": "X", "qtyMilli": 2000}]}}
+      ],
+      "final": {
+        "positions": [{"productId": "P1", "warehouseId": "W1", "qtyMilli": 500, "valueMinor": 5000, "lots": [{"lotId": "Z", "qtyMilli": 500}]}],
+        "totals": {"purchasesMinor": 40000, "cogsMinor": 15000, "wasteMinor": 20000}
+      }
+    },
+    {
+      "name": "recorded sale is never refused: healthy lots, then expired, then negative",
+      "today": "2026-10-14",
+      "defaults": {"productId": "P1", "warehouseId": "W1", "userId": "u1"},
+      "steps": [
+        {"doc": {"type": "purchase_receipt", "qtyMilli": 1000, "costMinor": 8000, "lot": {"lotId": "X", "expiryDate": "2026-09-01"}}, "expect": {"ok": true}},
+        {"doc": {"type": "purchase_receipt", "qtyMilli": 1000, "costMinor": 12000, "lot": {"lotId": "Z", "expiryDate": "2027-01-01"}}, "expect": {"ok": true}},
+        {"mode": "recorded", "doc": {"type": "sale", "qtyMilli": 2500}, "expect": {"ok": true, "costMinor": 25000, "picks": [{"lotId": "Z", "qtyMilli": 1000}, {"lotId": "X", "qtyMilli": 1000}], "shortMilli": 500, "reviewTask": {"kind": "stock_review", "productId": "P1", "warehouseId": "W1", "docId": "d3", "reasons": ["negative_stock", "expired_sold"], "shortMilli": 500, "qtyAfterMilli": -500}}},
+        {"doc": {"type": "purchase_receipt", "qtyMilli": 2000, "costMinor": 30000}, "expect": {"ok": true, "costAdjustMinor": 2500}}
+      ],
+      "final": {
+        "positions": [{"productId": "P1", "warehouseId": "W1", "qtyMilli": 1500, "valueMinor": 22500, "lots": [{"lotId": "", "qtyMilli": 1500}]}],
+        "totals": {"purchasesMinor": 50000, "cogsMinor": 25000, "costAdjustMinor": 2500}
+      }
+    },
+    {
+      "name": "a lotted receipt first fills the unlotted shortage",
+      "today": "2026-10-14",
+      "defaults": {"productId": "P1", "warehouseId": "W1", "userId": "u1"},
+      "steps": [
+        {"doc": {"type": "purchase_receipt", "qtyMilli": 1000, "costMinor": 10000}, "expect": {"ok": true}},
+        {"mode": "recorded", "doc": {"type": "sale", "qtyMilli": 1500}, "expect": {"ok": true, "costMinor": 15000, "picks": [{"lotId": "", "qtyMilli": 1000}], "shortMilli": 500}},
+        {"doc": {"type": "purchase_receipt", "qtyMilli": 1000, "costMinor": 12000, "lot": {"lotId": "L", "expiryDate": "2027-05-01"}}, "expect": {"ok": true, "costAdjustMinor": 1000}}
+      ],
+      "final": {
+        "positions": [{"productId": "P1", "warehouseId": "W1", "qtyMilli": 500, "valueMinor": 6000, "lots": [{"lotId": "L", "qtyMilli": 500}]}],
+        "totals": {"purchasesMinor": 22000, "cogsMinor": 15000, "costAdjustMinor": 1000}
+      }
+    },
+    {
+      "name": "reservations: sellable = on hand - reserved",
+      "defaults": {"productId": "P1", "warehouseId": "W1", "userId": "u1"},
+      "steps": [
+        {"doc": {"type": "purchase_receipt", "qtyMilli": 5000, "costMinor": 5000}, "expect": {"ok": true}},
+        {"doc": {"type": "reserve", "qtyMilli": 2000, "refId": "W-1"}, "expect": {"ok": true, "costMinor": 0, "picks": []}},
+        {"doc": {"type": "sale", "qtyMilli": 4000}, "expect": {"ok": false, "error": "insufficient_stock", "availableMilli": 3000}},
+        {"doc": {"type": "release", "qtyMilli": 1000, "refId": "W-1"}, "expect": {"ok": true}},
+        {"doc": {"type": "sale", "qtyMilli": 4000}, "expect": {"ok": true, "costMinor": 4000}},
+        {"doc": {"type": "release", "qtyMilli": 2000}, "expect": {"ok": false, "error": "release_exceeds_reserved"}},
+        {"doc": {"type": "reserve", "qtyMilli": 5000}, "expect": {"ok": false, "error": "insufficient_stock", "availableMilli": 0}}
+      ],
+      "final": {
+        "positions": [{"productId": "P1", "warehouseId": "W1", "qtyMilli": 1000, "valueMinor": 1000, "reservedMilli": 1000, "sellableMilli": 0}],
+        "totals": {"purchasesMinor": 5000, "cogsMinor": 4000}
+      }
+    },
+    {
+      "name": "transfer between warehouses carries the average cost",
+      "defaults": {"productId": "P1", "warehouseId": "W1", "userId": "u1"},
+      "steps": [
+        {"doc": {"type": "purchase_receipt", "qtyMilli": 4000, "costMinor": 40000}, "expect": {"ok": true}},
+        {"doc": {"type": "transfer_out", "qtyMilli": 1000, "refId": "T1"}, "expect": {"ok": true, "costMinor": 10000}},
+        {"doc": {"type": "transfer_in", "warehouseId": "W2", "qtyMilli": 1000, "costMinor": 10000, "refId": "T1"}, "expect": {"ok": true, "costMinor": 10000}},
+        {"doc": {"type": "transfer_in", "warehouseId": "W2", "qtyMilli": 1000}, "expect": {"ok": false, "error": "cost_required"}}
+      ],
+      "final": {
+        "positions": [
+          {"productId": "P1", "warehouseId": "W1", "qtyMilli": 3000, "valueMinor": 30000},
+          {"productId": "P1", "warehouseId": "W2", "qtyMilli": 1000, "valueMinor": 10000}
+        ],
+        "totals": {"purchasesMinor": 40000, "transfersMinor": 0}
+      }
+    },
+    {
+      "name": "production consumes a component at average and books the product at its cost",
+      "defaults": {"productId": "P2", "warehouseId": "W1", "userId": "u1"},
+      "steps": [
+        {"doc": {"type": "purchase_receipt", "qtyMilli": 4000, "costMinor": 8000}, "expect": {"ok": true}},
+        {"doc": {"type": "production", "qtyMilli": -2000, "refId": "B1"}, "expect": {"ok": true, "costMinor": 4000}},
+        {"doc": {"type": "production", "productId": "P3", "qtyMilli": 1000, "costMinor": 4000, "refId": "B1"}, "expect": {"ok": true, "costMinor": 4000}}
+      ],
+      "final": {
+        "positions": [
+          {"productId": "P2", "warehouseId": "W1", "qtyMilli": 2000, "valueMinor": 4000},
+          {"productId": "P3", "warehouseId": "W1", "qtyMilli": 1000, "valueMinor": 4000}
+        ],
+        "totals": {"purchasesMinor": 8000, "productionMinor": 0}
+      }
+    },
+    {
+      "name": "validation (recorded mode still refuses malformed documents)",
+      "defaults": {"productId": "P1", "warehouseId": "W1", "userId": "u1"},
+      "steps": [
+        {"doc": {"id": "", "type": "sale", "qtyMilli": 1000}, "expect": {"ok": false, "error": "id_required"}},
+        {"doc": {"type": "sale", "productId": "", "qtyMilli": 1000}, "expect": {"ok": false, "error": "product_required"}},
+        {"doc": {"type": "sale", "warehouseId": "", "qtyMilli": 1000}, "expect": {"ok": false, "error": "warehouse_required"}},
+        {"doc": {"type": "sale", "at": 0, "qtyMilli": 1000}, "expect": {"ok": false, "error": "time_required"}},
+        {"doc": {"type": "sale", "qtyMilli": 0}, "expect": {"ok": false, "error": "bad_qty"}},
+        {"mode": "recorded", "doc": {"type": "sale", "qtyMilli": -1000}, "expect": {"ok": false, "error": "bad_qty"}},
+        {"doc": {"type": "adjustment", "qtyMilli": 0, "reason": "x"}, "expect": {"ok": false, "error": "bad_qty"}},
+        {"doc": {"type": "damage", "qtyMilli": 1000, "reason": "   "}, "expect": {"ok": false, "error": "reason_required"}},
+        {"doc": {"type": "purchase_receipt", "qtyMilli": 1000}, "expect": {"ok": false, "error": "cost_required"}},
+        {"doc": {"type": "purchase_receipt", "qtyMilli": 1000, "costMinor": -1}, "expect": {"ok": false, "error": "bad_cost"}},
+        {"doc": {"type": "purchase_receipt", "qtyMilli": 1000, "costMinor": 1000, "landedMinor": -5}, "expect": {"ok": false, "error": "bad_cost"}},
+        {"doc": {"type": "purchase_receipt", "qtyMilli": 1000, "costMinor": 1000, "lot": {"lotId": ""}}, "expect": {"ok": false, "error": "bad_lot"}},
+        {"doc": {"type": "purchase_receipt", "qtyMilli": 1000, "costMinor": 1000, "lot": {"lotId": "L", "expiryDate": "2026-13-01"}}, "expect": {"ok": false, "error": "bad_date"}},
+        {"doc": {"type": "purchase_receipt", "qtyMilli": 1000, "costMinor": 1000, "lot": {"lotId": "L", "expiryDate": "2026-02-30"}}, "expect": {"ok": false, "error": "bad_date"}},
+        {"doc": {"type": "purchase_receipt", "qtyMilli": 1000, "costMinor": 1000, "lot": {"lotId": "L", "productionDate": "2026-05-01", "expiryDate": "2026-04-01"}}, "expect": {"ok": false, "error": "bad_date"}},
+        {"doc": {"type": "cost_adjust", "valueMinor": 0, "reason": "x"}, "expect": {"ok": false, "error": "bad_cost"}},
+        {"doc": {"type": "cost_adjust", "valueMinor": 100, "qtyMilli": 5, "reason": "x"}, "expect": {"ok": false, "error": "bad_qty"}},
+        {"mode": "recorded", "doc": {"type": "sale", "qtyMilli": 1000, "userId": ""}, "expect": {"ok": false, "error": "user_required"}}
+      ],
+      "final": {"positions": [], "totals": {"purchasesMinor": 0, "cogsMinor": 0}}
+    }
+  ],
+  "ledgerView": {
+    "docs": [
+      {"id": "d1", "type": "purchase_receipt", "productId": "P1", "warehouseId": "W1", "userId": "u1", "at": 1000, "qtyMilli": 5000, "costMinor": 5000, "lot": {"lotId": "L1", "expiryDate": "2027-01-01"}},
+      {"id": "d2", "type": "sale", "productId": "P1", "warehouseId": "W1", "userId": "u2", "at": 2000, "qtyMilli": 1000, "refId": "K2-000154"},
+      {"id": "d3", "type": "adjustment", "productId": "P1", "warehouseId": "W1", "userId": "u1", "at": 3000, "qtyMilli": -500, "reason": "شکست"},
+      {"id": "d4", "type": "sale", "productId": "P2", "warehouseId": "W1", "userId": "u2", "at": 4000, "qtyMilli": 2000},
+      {"id": "d5", "type": "transfer_out", "productId": "P1", "warehouseId": "W1", "userId": "u1", "at": 5000, "qtyMilli": 1000, "refId": "T1"},
+      {"id": "d6", "type": "reserve", "productId": "P1", "warehouseId": "W1", "userId": "u3", "at": 6000, "qtyMilli": 300},
+      {"id": "d7", "type": "cost_adjust", "productId": "P1", "warehouseId": "W1", "userId": "u1", "at": 7000, "valueMinor": 50, "reason": "حمل"}
+    ],
+    "signedQtyMilli": [5000, -1000, -500, -2000, -1000, 0, 0],
+    "onHand": [
+      {"productId": "P1", "warehouseId": "W1", "qtyMilli": 2500},
+      {"productId": "P2", "warehouseId": "W1", "qtyMilli": -2000},
+      {"productId": "P9", "warehouseId": "W1", "qtyMilli": 0}
+    ],
+    "filters": [
+      {"filter": {"productId": "P1"}, "ids": ["d1", "d2", "d3", "d5", "d6", "d7"]},
+      {"filter": {"types": ["sale"]}, "ids": ["d2", "d4"]},
+      {"filter": {"userId": "u1", "from": 2000, "to": 5000}, "ids": ["d3", "d5"]},
+      {"filter": {"types": ["sale", "adjustment"], "productId": "P1", "warehouseId": "W1"}, "ids": ["d2", "d3"]}
+    ],
+    "exportHeader": ["id", "at", "type", "productId", "warehouseId", "qtyMilli", "amountMinor", "userId", "reason", "lotId", "refId"],
+    "exportRows": [
+      ["d1", 1000, "purchase_receipt", "P1", "W1", 5000, 5000, "u1", "", "L1", ""],
+      ["d2", 2000, "sale", "P1", "W1", -1000, "", "u2", "", "", "K2-000154"],
+      ["d3", 3000, "adjustment", "P1", "W1", -500, "", "u1", "شکست", "", ""],
+      ["d4", 4000, "sale", "P2", "W1", -2000, "", "u2", "", "", ""],
+      ["d5", 5000, "transfer_out", "P1", "W1", -1000, "", "u1", "", "", "T1"],
+      ["d6", 6000, "reserve", "P1", "W1", 0, "", "u3", "", "", ""],
+      ["d7", 7000, "cost_adjust", "P1", "W1", 0, 50, "u1", "حمل", "", ""]
+    ]
+  }
+}
