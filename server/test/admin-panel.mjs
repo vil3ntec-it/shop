@@ -618,6 +618,52 @@ await step('همگام‌سازی و امنیت: دستگاه‌ها، خطاه�
   assert.match(csp || '', /script-src 'self'/);
 });
 
+// ── F0-15: ورودِ دومرحله‌ایِ اختیاری — روشن کردن و ورود با کد، از خودِ پنل ──
+await step('ورودِ دومرحله‌ای: از پنل روشن می‌شود، ورود کد می‌خواهد و با کد وارد می‌شود', async () => {
+  const totp = require('../src/lib/totp');
+  const errorsBefore = consoleErrors.length;
+  await page.click('#btn-2fa');
+  await page.waitForSelector('#twofa-panel:not(.hidden)', { timeout: 10_000 });
+  await page.waitForFunction(() => /خاموش است/.test(document.getElementById('twofa-state').textContent), null, { timeout: 10_000 });
+  await page.fill('#twofa-pass', 'Admin!12345');
+  await page.click('#btn-2fa-start');
+  await page.waitForSelector('#twofa-setup:not(.hidden)', { timeout: 10_000 });
+  const secret = (await page.textContent('#twofa-secret')).replace(/\s/g, '');
+  assert.match(secret, /^[A-Z2-7]{32}$/);
+  assert.match(await page.getAttribute('#twofa-link', 'href'), /^otpauth:\/\/totp\//);
+  await page.fill('#twofa-code', totp.generate(secret));
+  await page.click('#btn-2fa-enable');
+  await page.waitForSelector('#twofa-codes-box:not(.hidden)', { timeout: 10_000 });
+  const codes = (await page.textContent('#twofa-codes')).trim().split('\n');
+  assert.equal(codes.length, 10);
+  if (process.env.PANEL_SHOTS) await page.screenshot({ path: `${process.env.PANEL_SHOTS}/f0-15-enabled.png` });
+
+  //  بیرون و دوباره تو: اول «کد لازم است»، بعد با کدِ گامِ بعدی (همان کد دو بار پذیرفته نمی‌شود)
+  await page.click('#btn-logout');
+  await page.waitForSelector('#login-view:not(.hidden)', { timeout: 10_000 });
+  await page.fill('#in-username', 'admin');
+  await page.fill('#in-password', 'Admin!12345');
+  await page.click('#btn-login');
+  await page.waitForSelector('#totp-row:not(.hidden)', { timeout: 10_000 });
+  if (process.env.PANEL_SHOTS) await page.screenshot({ path: `${process.env.PANEL_SHOTS}/f0-15-login-code.png` });
+  const next = totp.hotp(totp.base32Decode(secret), totp.stepAt() + 1);
+  await page.fill('#in-totp', next);
+  await page.click('#btn-login');
+  await page.waitForSelector('#app-view:not(.hidden)', { timeout: 10_000 });
+
+  //  پاک‌کاری: خاموش با کدِ بازیابی، تا اجرای بعدی همان باشد
+  await page.click('#btn-2fa');
+  await page.waitForSelector('#twofa-panel:not(.hidden)', { timeout: 10_000 });
+  await page.fill('#twofa-pass', 'Admin!12345');
+  await page.fill('#twofa-code', codes[0]);
+  page.once('dialog', (d) => d.accept());
+  await page.click('#btn-2fa-disable');
+  await page.waitForFunction(() => /خاموش است/.test(document.getElementById('twofa-state').textContent), null, { timeout: 10_000 });
+  //  ۴۰۱ِ گامِ اولِ ورود («کد لازم است») خطای صفحه نیست — همان پیامِ مرورگر برای پاسخِ ۴۰۱ است
+  const extra = consoleErrors.splice(errorsBefore);
+  assert.deepEqual(extra.filter((m) => !/status of 401/.test(m)), []);
+});
+
 await step('در کلِ این نشست هیچ خطای صفحه‌ای نبود', async () => {
   assert.deepEqual(consoleErrors, [], consoleErrors.join(' | '));
 });
