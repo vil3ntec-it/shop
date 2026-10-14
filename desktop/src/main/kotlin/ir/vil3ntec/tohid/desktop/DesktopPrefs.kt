@@ -68,22 +68,37 @@ class DesktopPrefs(private val file: File) : SharedPreferences {
     override fun remove(key: String) = apply { puts[key] = null }
     override fun clear() = apply { wipe = true }
 
-    private fun merge(): Pair<String, Set<String>> = synchronized(this@DesktopPrefs) {
-      if (wipe) map.clear()
-      for ((k, v) in puts) if (v == null) map.remove(k) else map[k] = v
-      encode() to puts.keys.toSet()
-    }
+    /**
+     *  یکی کردن با نقشه و **در صف گذاشتنِ نوشتن، زیرِ همان قفل**.
+     *
+     *  ⚠️ F0-05: پیش‌تر `commit()` خودش همان‌جا می‌نوشت و `apply()`ِ قبلی‌ای
+     *  که هنوز در صف بود **بعد از آن** متنِ کهنه‌تر را روی فایل می‌نشاند —
+     *  سایهٔ همگام‌سازی پس از `commit` دوباره عقب می‌رفت. حالا هر دو از
+     *  همان یک رشته و به همان ترتیبِ یکی‌شدن می‌نویسند.
+     */
+    private fun mergeAndQueue(): Pair<java.util.concurrent.Future<Boolean>, Set<String>> =
+      synchronized(this@DesktopPrefs) {
+        if (wipe) map.clear()
+        for ((k, v) in puts) if (v == null) map.remove(k) else map[k] = v
+        val text = encode()
+        val done = try {
+          writer.submit<Boolean> { write(text) }
+        } catch (_: java.util.concurrent.RejectedExecutionException) {
+          //  برنامه در حالِ بسته شدن است و رشتهٔ نوشتن دیگر کار نمی‌گیرد
+          java.util.concurrent.CompletableFuture.completedFuture(write(text))
+        }
+        done to puts.keys.toSet()
+      }
 
     override fun commit(): Boolean {
-      val (text, keys) = merge()
-      val ok = write(text)
+      val (done, keys) = mergeAndQueue()
+      val ok = runCatching { done.get() }.getOrDefault(false)
       notify(keys)
       return ok
     }
 
     override fun apply() {
-      val (text, keys) = merge()
-      writer.execute { write(text) }
+      val (_, keys) = mergeAndQueue()
       notify(keys)
     }
   }
