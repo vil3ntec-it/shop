@@ -30,6 +30,19 @@
 .sync-dot-btn[data-dot="grey"]   .sync-dot{ background:var(--muted-2); }
 .sync-dot-btn .sync-dot-text{ display:none; }
 @media (min-width:820px){ .sync-dot-btn .sync-dot-text{ display:inline; } }
+/* SYN-08: شمارِ منتظر همه‌جا؛ زمانِ آخرین همگام‌سازی و خطا روی صفحهٔ پهن */
+.sync-dot-btn .sync-dot-n{ color:var(--text); font-weight:700; }
+.sync-dot-btn .sync-dot-when,
+.sync-dot-btn .sync-dot-err{ display:none; }
+@media (min-width:820px){
+  .sync-dot-btn .sync-dot-when{ display:inline; }
+  .sync-dot-btn .sync-dot-when:not(:empty)::before{ content:"· "; }
+  .sync-dot-btn .sync-dot-err{
+    display:inline-block; max-width:220px; color:var(--danger);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+}
+.sync-dot-btn [hidden]{ display:none !important; }
 
 /* ---------- پوششِ مشترکِ پنجره‌ها ---------- */
 .acct-scrim{
