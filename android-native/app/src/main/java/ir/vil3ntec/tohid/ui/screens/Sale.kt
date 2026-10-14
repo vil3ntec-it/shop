@@ -586,10 +586,14 @@ fun SaleScreen(
   }
 }
 
-/** شناسهٔ یکتا — همان شکلِ `uid()` نسخهٔ وب تا داده بینِ دو نسخه یکدست بماند */
-fun newId(): String =
-  "id" + java.lang.Long.toString(System.currentTimeMillis(), 36) +
-    java.lang.Long.toString((Math.random() * 1_000_000_000).toLong(), 36).take(6)
+/**
+ *  شناسهٔ یکتای ردیفِ تازه — ULID، همان `uid()`ِ نسخهٔ وب (`TohidSyncCore.ulid`).
+ *
+ *  پیش‌تر `"id" + زمان + Math.random` بود: حدودِ سی بیتِ تصادفیِ ناامن، و
+ *  دو ردیفِ یک میلی‌ثانیه از دو دستگاه می‌توانستند یک شناسه بگیرند (F0-10).
+ *  ⛔ شناسهٔ ردیف‌های موجود دست نمی‌خورد — فقط ردیفِ تازه.
+ */
+fun newId(): String = ir.vil3ntec.tohid.sync.v1.Ulid.next()
 
 /** حالِ حسابِ یک قرض‌دار، با همان جمله‌های نسخهٔ وب */
 fun debtStateText(d: ShopData, debtorId: String): String {
