@@ -178,7 +178,18 @@ function show() {
 
 // ---------- تازه‌سازی ----------
 async function refresh() {
-  await Promise.all([loadStats(), loadShops(), loadPlans()]);
+  await Promise.all([loadStats(), loadShops(), loadPlans(), loadBackupWarning()]);
+}
+
+/** F0-08: هشدارِ قرمزِ «پشتیبان رمز ندارد» — بالای همهٔ زبانه‌ها */
+function showBackupWarning(encryption) {
+  const box = $('backup-crypto-warn');
+  const text = encryption && !encryption.configured ? (encryption.warning || 'پشتیبان‌های سرور رمز ندارند.') : '';
+  box.textContent = text ? `⚠️ ${text}` : '';
+  box.classList.toggle('hidden', !text);
+}
+async function loadBackupWarning() {
+  try { showBackupWarning((await call('GET', '/admin/backups')).encryption); } catch { /* هشدار نباید پنل را بخواباند */ }
 }
 
 async function loadStats() {
@@ -840,6 +851,7 @@ function renderPlanTable(body, list, app, msgNode) {
 // ---------- پشتیبان‌ها ----------
 async function loadBackups() {
   const out = await call('GET', '/admin/backups');
+  showBackupWarning(out.encryption);
   $('backup-dir').textContent = `مسیر: ${out.dir}${out.enabled ? '' : ' — پشتیبان‌گیری خودکار خاموش است'}`;
   const body = $('backups-body');
   body.innerHTML = '';

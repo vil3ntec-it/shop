@@ -647,7 +647,12 @@ router.patch('/admins/:id', requireSuperAdmin, async (req, res, next) => {
 // ---------- پشتیبان‌گیری ----------
 router.get('/backups', async (req, res) => {
   const backup = require('../lib/backup');
-  res.json({ backups: await backup.list(), dir: config.backup.dir, enabled: config.backup.enabled });
+  //  F0-08: بی رمز ⇒ پنل هشدارِ قرمز می‌دهد (خودِ رمز هرگز این‌جا نمی‌آید)
+  const configured = !!config.backup.passphrase;
+  res.json({
+    backups: await backup.list(), dir: config.backup.dir, enabled: config.backup.enabled,
+    encryption: { configured, warning: configured ? '' : backup.UNENCRYPTED_WARNING },
+  });
 });
 
 router.post('/backups', requireSuperAdmin, async (req, res, next) => {
