@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.core.money
 
+import kotlin.math.roundToLong
+
 /*
  *  نوع‌های پایهٔ پول و مقدار — بخشِ ۳.۴ِ مشخصات (docs/spec/03-architecture.md).
  *
@@ -7,18 +9,36 @@ package ir.vil3ntec.tohid.core.money
  *  به «هزارم». هیچ Double‌ای در حساب نیست؛ Double فقط در مرزِ دادهٔ امروز
  *  (`fromLegacy`) خوانده می‌شود.
  *
- *  ⛔ هم‌زادِ این پرونده `license/money.js` است و هر دو با یک فایلِ آزمونِ مرجع
- *  (`core/test-vectors/money-v1.json`) سنجیده می‌شوند. یکی را عوض کنی، دیگری هم.
+ *  کاتلینِ خالص است (بی `java.lang.Math`) تا بی تغییر به ماژولِ مشترکِ KMP برود.
+ *
+ *  ⛔ هم‌زادِ این پرونده `license/money.js` است و هر دو با یک فایلِ بردارِ مرجع
+ *  (`license/test-vectors/money-v1.json`) سنجیده می‌شوند. یکی را عوض کنی، دیگری هم.
  *
  *  هنوز هیچ موتوری به این‌ها وصل نیست؛ `SalesEngine` همان حسابِ امروز را می‌کند.
  */
 
-/** بزرگ‌ترین عددِ صحیحی که JS بی‌خطا نگه می‌دارد (۲^۵۳−۱). همهٔ مبلغ‌ها و مقدارها و میانه‌ها زیرِ آن‌اند. */
+/**
+ *  بزرگ‌ترین عددِ صحیحی که JS بی‌خطا نگه می‌دارد (۲^۵۳−۱). همهٔ مبلغ‌ها، مقدارها
+ *  و حاصل‌های میانی زیرِ آن‌اند؛ بیرون از آن هر دو سکو یک‌جور خطا می‌دهند.
+ */
 const val MAX_EXACT: Long = 9_007_199_254_740_991L
 
 internal fun checkExact(v: Long, what: String): Long {
   if (v > MAX_EXACT || v < -MAX_EXACT) throw ArithmeticException("$what بیرون از بازهٔ دقیق: $v")
   return v
+}
+
+/** جمعِ دقیق؛ دو ورودیِ زیرِ ۲^۵۳ هرگز Long را سرریز نمی‌کنند، پس فقط بازه سنجیده می‌شود. */
+internal fun addExact(a: Long, b: Long): Long = checkExact(checkExact(a, "عدد") + checkExact(b, "عدد"), "جمع")
+
+/** ضربِ دقیق؛ پیش از ضرب سنجیده می‌شود که حاصل از ۲^۵۳−۱ بیرون نزند. */
+internal fun mulExact(a: Long, b: Long): Long {
+  checkExact(a, "عدد"); checkExact(b, "عدد")
+  if (a == 0L || b == 0L) return 0L
+  val absA = if (a < 0) -a else a
+  val absB = if (b < 0) -b else b
+  if (absA > MAX_EXACT / absB) throw ArithmeticException("ضرب بیرون از بازهٔ دقیق: $a × $b")
+  return a * b
 }
 
 /**
@@ -47,9 +67,12 @@ class Currency(val code: String, val decimals: Int, val stepMinor: Long) {
     /** دالر: فقط برای عملیاتِ تبادل (PAY-10)؛ پله یک سنت */
     val USD = Currency("USD", 2, 1)
 
-    private val table = listOf(AFN, USD).associateBy { it.code }
+    /** جدولِ ارزها — باید با `CURRENCIES`ِ `license/money.js` و بخشِ `currencies`ِ بردارها یکی باشد. */
+    val TABLE: List<Currency> = listOf(AFN, USD)
 
-    fun of(code: String): Currency = table[code] ?: throw IllegalArgumentException("ارزِ ناشناخته: $code")
+    private val byCode = TABLE.associateBy { it.code }
+
+    fun of(code: String): Currency = byCode[code] ?: throw IllegalArgumentException("ارزِ ناشناخته: $code")
   }
 }
 
@@ -61,14 +84,14 @@ class CurrencyMismatchException(a: Currency, b: Currency) :
 data class Money(val minor: Long, val currency: Currency) : Comparable<Money> {
   init { checkExact(minor, "مبلغ") }
 
-  operator fun plus(other: Money): Money = Money(Math.addExact(minor, same(other).minor), currency)
-  operator fun minus(other: Money): Money = Money(Math.subtractExact(minor, same(other).minor), currency)
+  operator fun plus(other: Money): Money = Money(addExact(minor, same(other).minor), currency)
+  operator fun minus(other: Money): Money = Money(addExact(minor, -same(other).minor), currency)
   operator fun unaryMinus(): Money = Money(-minor, currency)
   override fun compareTo(other: Money): Int = minor.compareTo(same(other).minor)
 
   val isZero: Boolean get() = minor == 0L
 
-  private fun same(other: Money): Money {
+  internal fun same(other: Money): Money {
     if (other.currency != currency) throw CurrencyMismatchException(currency, other.currency)
     return other
   }
@@ -78,12 +101,12 @@ data class Money(val minor: Long, val currency: Currency) : Comparable<Money> {
 
     /**
      *  از عددِ اعشاریِ امروز (مثلاً `salePrice` به افغانی) به واحدِ کوچک، با
-     *  `Math.round` (نیمه به سمتِ +∞). برای هر قیمتی که با حداکثر دو رقمِ اعشار
-     *  وارد شده، دقیقاً همان عدد را برمی‌گرداند.
+     *  گردکردنِ `Math.round` (نیمه به سمتِ +∞). برای هر قیمتی که با حداکثر دو
+     *  رقمِ اعشار وارد شده، دقیقاً همان عدد را برمی‌گرداند.
      */
     fun fromLegacy(major: Double, currency: Currency): Money {
       require(!major.isNaN() && !major.isInfinite()) { "مبلغِ نامعتبر: $major" }
-      return Money(Math.round(major * currency.minorPerMajor), currency)
+      return Money((major * currency.minorPerMajor).roundToLong(), currency)
     }
   }
 }
@@ -98,12 +121,12 @@ value class Qty(val milli: Long) : Comparable<Qty> {
   companion object {
     const val SCALE: Long = 1000
 
-    fun units(n: Long): Qty = Qty(Math.multiplyExact(n, SCALE))
+    fun units(n: Long): Qty = Qty(mulExact(n, SCALE))
 
     /** همان پاک‌سازیِ `SalesEngine.setCartQty`: `Math.round(x × 1000)` */
     fun fromLegacy(quantity: Double): Qty {
       require(!quantity.isNaN() && !quantity.isInfinite()) { "مقدارِ نامعتبر: $quantity" }
-      return Qty(Math.round(quantity * SCALE))
+      return Qty((quantity * SCALE).roundToLong())
     }
   }
 }
