@@ -1,0 +1,171 @@
+name: وب — GitHub Pages
+
+#  ⛔ F0-27، کانالِ آزمایشیِ وب. مرج دیگر یعنی «آزمایشی»، نه «همهٔ دکان‌ها»:
+#   • push به main فقط `/shop/beta/` را تازه می‌کند (دکان‌های آزمایشی آن نشانی را باز می‌کنند).
+#   • ریشهٔ سایت (`/shop/`، همهٔ دکان‌ها، `install.ps1`، `download.html`) فقط از برچسبِ `tohid-web`
+#     ساخته می‌شود و آن برچسب فقط با Actions ⇒ «وب — GitHub Pages» ⇒ Run workflow ⇒ main ⇒
+#     channel = stable جابه‌جا می‌شود؛ پایدار را صاحب محصول می‌زند، نه مرج.
+#
+#  ⚠️ تا وقتی Settings ⇒ Pages ⇒ Source روی «Deploy from a branch» است، این ورک‌فلو فقط سایت را
+#  می‌سازد و می‌سنجد و **چیزی منتشر نمی‌کند**؛ Pages مثلِ امروز با هر push از main منتشر می‌شود.
+#  گامِ صاحب محصول (یک بار): Source = GitHub Actions. نخستین اجرا پس از آن ریشه را روی همان
+#  commitی می‌گذارد که Pages تا آن لحظه نشان می‌داد (برچسبِ `tohid-web` همان‌جا ساخته می‌شود)،
+#  پس برای دکان‌ها هیچ چیز عوض نمی‌شود. برگشت: Source = Deploy from a branch.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - 'sw.js'
+      - 'manifest.webmanifest'
+      - 'download.html'
+      - 'privacy.html'
+      - 'install.ps1'
+      - 'fonts/**'
+      - 'icons/**'
+      - 'license/**'
+      - 'sounds/**'
+      - '.github/workflows/web-pages.yml'
+  pull_request:
+    paths:
+      - 'index.html'
+      - 'sw.js'
+      - 'manifest.webmanifest'
+      - 'download.html'
+      - 'privacy.html'
+      - 'install.ps1'
+      - 'fonts/**'
+      - 'icons/**'
+      - 'license/**'
+      - 'sounds/**'
+      - '.github/workflows/web-pages.yml'
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: 'beta = فقط /beta/ از همین main؛ stable = ریشهٔ سایت (همهٔ دکان‌ها) هم همین main می‌شود'
+        type: choice
+        options: [beta, stable]
+        default: beta
+
+concurrency:
+  #  دو انتشار هم‌زمان نه؛ و انتشارِ پایدار با pushِ بعدی لغو نشود
+  group: web-pages-${{ github.event_name == 'pull_request' && github.ref || 'publish' }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  site:
+    name: ساختِ سایت (پایدار + /beta/)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pages: read
+    outputs:
+      deploy: ${{ steps.plan.outputs.deploy }}
+      tag_to: ${{ steps.plan.outputs.tag_to }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: کدام نسخه کجا
+        id: plan
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          CHANNEL: ${{ inputs.channel }}
+        run: |
+          set -euo pipefail
+          deploy=false; tag_to=''; stable="$GITHUB_SHA"
+          mode=$(gh api "repos/$REPO/pages" --jq .build_type 2>/dev/null || echo none)
+          echo "Pages source: $mode"
+          if [ "$EVENT" = pull_request ] || [ "$GITHUB_REF" != refs/heads/main ]; then
+            echo "فقط ساخت و سنجش؛ انتشار فقط از main"
+          elif [ "$EVENT" = workflow_dispatch ] && [ "$CHANNEL" = stable ]; then
+            deploy=true; tag_to="$GITHUB_SHA"
+          else
+            stable=$(gh api "repos/$REPO/git/ref/tags/tohid-web" --jq .object.sha 2>/dev/null || true)
+            if [ -z "$stable" ] && [ "$mode" = workflow ]; then
+              #  نخستین اجرا پس از رفتن به GitHub Actions: ریشه همان که Pages تا امروز نشان می‌داد
+              stable=$(gh api "repos/$REPO/pages/builds/latest" --jq '.commit // empty' 2>/dev/null || true)
+              tag_to="$stable"
+            fi
+            if [ -n "$stable" ]; then
+              deploy=true
+            else
+              stable="$GITHUB_SHA"
+              echo "::notice title=وب::نسخهٔ پایدارِ وب (برچسبِ tohid-web) معلوم نیست؛ یک بار Run workflow ⇒ main ⇒ channel = stable."
+            fi
+          fi
+          if [ "$mode" != workflow ]; then
+            if [ "$deploy" = true ]; then
+              echo "::notice title=وب::Pages هنوز از شاخه منتشر می‌شود (Source = Deploy from a branch)؛ این اجرا چیزی منتشر نمی‌کند. گامِ صاحب محصول: Settings ⇒ Pages ⇒ Source = GitHub Actions."
+            fi
+            deploy=false; tag_to=''
+          fi
+          echo "deploy=$deploy tag_to=$tag_to stable=$stable beta=$GITHUB_SHA"
+          { echo "deploy=$deploy"; echo "tag_to=$tag_to"; echo "stable=$stable"; } >> "$GITHUB_OUTPUT"
+
+      - name: سرهم کردن — ریشه از پایدار، /beta/ از همین commit
+        env:
+          STABLE: ${{ steps.plan.outputs.stable }}
+        run: |
+          set -euo pipefail
+          rm -rf _site && mkdir -p _site/beta
+          git cat-file -e "$STABLE^{commit}" 2>/dev/null || git fetch --no-tags --depth=1 origin "$STABLE"
+          git archive "$STABLE" | tar -x -C _site
+          git archive HEAD | tar -x -C _site/beta
+          rm -rf _site/.github _site/.gitattributes _site/.gitignore \
+                 _site/beta/.github _site/beta/.gitattributes _site/beta/.gitignore
+          #  PWAِ آزمایشی جدا از پایدار نصب می‌شود: شناسه و نامِ خودش
+          jq '.id = "/tohid-shop/beta/" | .name += " (آزمایشی)" | .short_name += " (آزمایشی)"' \
+            _site/beta/manifest.webmanifest > "$RUNNER_TEMP/manifest.json"
+          mv "$RUNNER_TEMP/manifest.json" _site/beta/manifest.webmanifest
+          for f in index.html sw.js manifest.webmanifest install.ps1; do
+            test -s "_site/$f" && test -s "_site/beta/$f" || { echo "::error::$f نیست"; exit 1; }
+          done
+          #  ⛔ هر دو سرویس‌ورکر باید کانال را بشناسند (کش‌های جدا، پایدار به /beta/ دست نمی‌زند)؛
+          #  وگرنه بازکردنِ /beta/ پوستهٔ آفلاینِ پایدار را پاک می‌کند (server/test/web-beta-channel.mjs)
+          for f in _site/sw.js _site/beta/sw.js; do
+            grep -q 'BETA_PATH' "$f" || { echo "::error::$f کانالِ آزمایشی را نمی‌شناسد؛ یک بار Run workflow ⇒ channel = stable"; exit 1; }
+          done
+          du -sh _site _site/beta
+
+      - uses: actions/upload-pages-artifact@v3
+        if: ${{ steps.plan.outputs.deploy == 'true' }}
+        with:
+          path: _site
+
+  deploy:
+    name: انتشار روی GitHub Pages
+    needs: site
+    if: ${{ needs.site.outputs.deploy == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.pages.outputs.page_url }}
+    steps:
+      #  پایدار ⇐ برچسبِ `tohid-web` (همان الگوی «توحید بومی»)؛ pushها فقط همین را می‌خوانند
+      - name: جابه‌جا کردنِ برچسبِ پایدارِ وب
+        if: ${{ needs.site.outputs.tag_to != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ needs.site.outputs.tag_to }}
+        run: |
+          if ! gh api -X PATCH "repos/${{ github.repository }}/git/refs/tags/tohid-web" \
+                 -f sha="$SHA" -F force=true >/dev/null 2>&1; then
+            gh api -X POST "repos/${{ github.repository }}/git/refs" \
+              -f ref="refs/tags/tohid-web" -f sha="$SHA" >/dev/null
+          fi
+          echo "tohid-web ⇐ $SHA"
+
+      - id: pages
+        uses: actions/deploy-pages@v4
