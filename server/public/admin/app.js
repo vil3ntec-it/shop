@@ -23,12 +23,13 @@ let pumpPlans = [];
 let currentShop = null;
 
 // ---------- ابزار ----------
-async function call(method, path, body) {
+async function call(method, path, body, extraHeaders = {}) {
   const res = await fetch(API + path, {
     method,
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...extraHeaders,
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
@@ -38,6 +39,41 @@ async function call(method, path, body) {
   if (res.status === 401) { logout(); throw new Error('نشست تمام شد، دوباره وارد شوید'); }
   if (!res.ok) throw new Error(json?.error?.message || `خطای ${res.status}`);
   return json;
+}
+
+/*
+ *  ⛔ F0-14 — کلیدِ یکتایی برای ثبتِ اشتراک.
+ *  دو بار کلیک دو دوره می‌ساخت. حالا هر «ثبت» یک کلید دارد: تا بدنه
+ *  همان است و ثبت هنوز موفق نشده، همان کلید می‌رود و سرور فقط یک بار
+ *  اعطا می‌کند (تکرار ⇒ پاسخِ اول). بعد از موفقیت کلید دور ریخته می‌شود.
+ */
+const idemKeys = new Map();
+function newIdemKey() {
+  if (window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID();
+  const rnd = new Uint32Array(4);
+  (window.crypto || window.msCrypto).getRandomValues(rnd);
+  return `k-${Date.now().toString(36)}-${[...rnd].map(n => n.toString(36)).join('')}`;
+}
+function idemKeyFor(name, body) {
+  const sig = JSON.stringify(body);
+  const cur = idemKeys.get(name);
+  if (cur && cur.sig === sig) return cur.key;
+  const key = newIdemKey();
+  idemKeys.set(name, { sig, key });
+  return key;
+}
+/** ثبتِ پولی با کلیدِ یکتایی و قفلِ دکمه تا پاسخ برسد. */
+const idemBusy = new Set();
+async function callOnce(name, method, path, body) {
+  if (idemBusy.has(name)) return null;
+  idemBusy.add(name);
+  try {
+    const out = await call(method, path, body, { 'Idempotency-Key': idemKeyFor(name, body) });
+    idemKeys.delete(name);
+    return out;
+  } finally {
+    idemBusy.delete(name);
+  }
 }
 
 const fa = (n) => Number(n || 0).toLocaleString('fa-AF');

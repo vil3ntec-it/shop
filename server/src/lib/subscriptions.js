@@ -22,6 +22,7 @@ const { badRequest, notFound, forbidden } = require('../middleware/errors');
 const { sanitizeFeatures } = require('./features');
 const plans = require('./plans');
 const tenancy = require('./tenancy');
+const idempotency = require('./idempotency');
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -180,15 +181,48 @@ function build(T) {
    *  نباید تمدیدِ بعدیِ همان مشتری را پشتِ خودش نگه دارد.
    */
   async function grant(tenantId, opts = {}) {
+    return (await grantTx(tenantId, opts, null)).row;
+  }
+
+  /*
+   *  ⛔ F0-14 — اعطا با کلیدِ یکتایی (Idempotency-Key).
+   *
+   *  دو بار کلیک روی «ثبت اشتراک» دو دوره می‌ساخت (۳۰ روز ⇒ ۶۰ روز).
+   *  حالا کلید زیرِ قفلِ خودش خوانده و در **همان تراکنشِ** اعطا ثبت
+   *  می‌شود. قفلِ کلید همیشه **پیش از** قفلِ مشتری گرفته می‌شود، پس ترتیبِ
+   *  قفل‌ها یکی است و بن‌بست پیش نمی‌آید.
+   *
+   *  خروجی: `{ row, replayed, response }` — در تکرار، `response` همان
+   *  چیزی است که بارِ اول ثبت شد و هیچ اعلان و نوشتنی تکرار نمی‌شود.
+   */
+  async function grantOnce(tenantId, opts = {}, idem = null, extra = {}) {
+    const out = await grantTx(tenantId, opts, idem, extra);
+    if (out.replayed) return { row: out.prior.response?.subscription || null, replayed: true, response: out.prior.response || {} };
+    return { row: out.row, replayed: false, response: { subscription: out.row, ...extra } };
+  }
+
+  async function grantTx(tenantId, opts, idem, extra = {}) {
     const out = await tx(async (c) => {
+      if (idem) {
+        await idempotency.lock(c, idem);
+        const prior = await idempotency.find(idem, idempotency.viaClient(c));
+        if (prior) return { replayed: true, prior };
+      }
       await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`sub-grant:${T.app}:${tenantId}`]);
-      return grantLocked(tenantId, opts);
+      const r = await grantLocked(tenantId, opts);
+      if (idem) {
+        await idempotency.save(c, idem, {
+          tenantId, resultId: r.row.id, response: { subscription: r.row, ...extra },
+        });
+      }
+      return r;
     });
+    if (out.replayed) return out;
     await require('./notices').onSubscription({ app: T.app, action: out.existing ? 'renew' : 'grant', row: out.row });
     //  صفحهٔ «مشتری‌ها» و «فروش»ِ پنل همان لحظه عدد تازه می‌گیرند
     notifyPanel('customers');
     notifyPanel('sales');
-    return out.row;
+    return out;
   }
 
   async function grantLocked(tenantId, { plan = 'custom', days = null, startsAt = null, endsAt = null,
@@ -487,7 +521,7 @@ function build(T) {
 
   return {
     tenancy: T,
-    liveOf, latestOf, historyOf, changeLog, stateOf, expireDue, grant, setStatus, TRANSITIONS,
+    liveOf, latestOf, historyOf, changeLog, stateOf, expireDue, grant, grantOnce, setStatus, TRANSITIONS,
     expiringSoon, notifyExpiring, DAY,
   };
 }

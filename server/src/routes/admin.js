@@ -13,6 +13,7 @@ const pw = require('../lib/password');
 const tokens = require('../lib/tokens');
 const audit = require('../lib/audit');
 const subs = require('../lib/subscriptions');
+const idempotency = require('../lib/idempotency');
 const plans = require('../lib/plans');
 const smsSettings = require('../lib/sms-settings');
 const otp = require('../lib/otp');
@@ -309,6 +310,23 @@ router.post('/subscriptions', async (req, res, next) => {
   const note = v.text(req.body?.note, { max: 300 });
 
   /*
+   *  ⛔ F0-14 — کلیدِ یکتایی. پنل برای هر ثبت یک `Idempotency-Key`
+   *  می‌فرستد؛ تکرارِ همان ثبت (دو بار کلیک، قطعِ شبکه) پاسخِ اول را
+   *  پس می‌گیرد و دورهٔ دوم نمی‌سازد. بی‌کلید ⇒ رفتارِ قبلی (سازگاری).
+   *  ‎lib/idempotency.js‎
+   */
+  const idem = idempotency.fromRequest(req, `sub-grant:shop:${req.admin.id}`);
+  const replay = (response) => {
+    const sub = response.subscription;
+    res.set('Idempotent-Replayed', 'true');
+    return res.status(201).json({ subscription: sub, state: subs.stateOf(sub), discount: response.discount ?? null });
+  };
+  if (idem) {
+    const prior = await idempotency.find(idem);
+    if (prior) return replay(prior.response);
+  }
+
+  /*
    *  قیمت و کدِ تخفیف — اختیاری. کدِ تخفیف اول سنجیده می‌شود (مهلت،
    *  سقف، یک‌بار برای هر مشتری) و قیمتِ نهایی‌اش روی خودِ اشتراک
    *  می‌نشیند؛ بعد از صدور، خرجِ کد ثبت می‌شود.
@@ -319,15 +337,24 @@ router.post('/subscriptions', async (req, res, next) => {
   let quoted = null;
   if (req.body?.discountCode) {
     const shop = await one('SELECT owner_user_id FROM shops WHERE id=$1', [shopId]);
-    quoted = await discounts.quote(req.body.discountCode, { app: 'shop', plan, userId: shop ? shop.owner_user_id : '' });
+    try {
+      quoted = await discounts.quote(req.body.discountCode, { app: 'shop', plan, userId: shop ? shop.owner_user_id : '' });
+    } catch (err) {
+      //  تکرارِ هم‌زمان: درخواستِ اول کد را خرج کرده و کلید را ثبت کرده است
+      const prior = idem ? await idempotency.find(idem) : null;
+      if (prior) return replay(prior.response);
+      throw err;
+    }
     if (quoted.finalPrice !== null) price = quoted.finalPrice;
   }
 
-  const sub = await subs.grant(shopId, {
+  const granted = await subs.grantOnce(shopId, {
     plan, days, features, maxDevices, graceDays, note, createdBy: req.admin.id, price,
     startsAt: v.timestamp(req.body?.startsAt), endsAt: v.timestamp(req.body?.endsAt),
     allowUnsuspend: true,
-  });
+  }, idem, { discount: quoted });
+  if (granted.replayed) return replay(granted.response);
+  const sub = granted.row;
   if (quoted) {
     await discounts.useCode(quoted.code.id, {
       app: 'shop', userId: (await one('SELECT owner_user_id FROM shops WHERE id=$1', [shopId]))?.owner_user_id || '',
