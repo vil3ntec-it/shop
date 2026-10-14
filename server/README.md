@@ -108,7 +108,8 @@ pm2 start src/index.js --name shop-server && pm2 save && pm2 startup
 | `GOOGLE_CLIENT_ID` | برای ورود با گوگل — راه‌اندازی در [`GOOGLE-LOGIN.md`](GOOGLE-LOGIN.md) |
 | `BACKUP_PATH` | مسیر ذخیره‌ی پشتیبان‌ها |
 | `BACKUP_PASSPHRASE` | اگر پر باشد، پشتیبان‌ها رمز می‌شوند |
-| `TRIAL_DAYS` | مدت دوره‌ی آزمایشی هر دکان |
+
+⚠️ مدتِ دوره‌ی آزمایشی متغیرِ محیط نیست (`TRIAL_DAYS` هیچ‌وقت خوانده نمی‌شد و برداشته شد): پنلِ مدیر ⇒ تنظیمات، کلیدِ `trial_days` (دکان) و `pump_trial_days` (پمپ) در `app_config`. پیش‌فرضش `TRIAL_DEFAULT` در `src/lib/plans.js` است (دکان ۷، پمپ ۳۰ روز).
 
 ---
 

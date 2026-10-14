@@ -200,7 +200,8 @@ async function createApp({ runMigrations = true } = {}) {
           //  برنامه‌ی کامپیوتر شناسه‌ی خودش را برمی‌دارد، نه شناسه‌ی سایت.
           googleDesktopClientId: config.google.desktopClientId || '',
           otpEnabled: config.otp.provider !== 'off',
-          trialDays: Number(cfg.trial_days || 0),
+          //  F0-13: تنها خوانندهٔ مدتِ آزمایشی — همان عددِ `entitlement`
+          trialDays: await plans.trialDaysOf('shop'),
           whatsapp: { number: cfg.whatsapp_number || '', message: cfg.whatsapp_message || '' },
           minAppVersion: cfg.min_app_version || '',
           //  ثبت‌نام سه‌مرحله‌ای با ایمیل — برنامه با این می‌فهمد این
@@ -260,7 +261,7 @@ async function createApp({ runMigrations = true } = {}) {
               : '',
           })),
           currency: (app === 'pump' ? cfg.pump_currency : cfg.currency) || cfg.currency || 'افغانی',
-          trialDays: Number((app === 'pump' ? cfg.pump_trial_days : cfg.trial_days) || 0),
+          trialDays: await plans.trialDaysOf(app),
           whatsapp: {
             number,
             message,

@@ -172,6 +172,15 @@ await step('مدیر وارد می‌شود', async () => {
   await page.waitForSelector('#app-view:not(.hidden)', { timeout: 10_000 });
 });
 
+// ── F0-08: بی BACKUP_PASSPHRASE، هشدارِ قرمز بالای پنل ────────────
+await step('پشتیبانِ بی‌رمز: هشدارِ قرمز بالای همهٔ زبانه‌ها', async () => {
+  await page.waitForSelector('#backup-crypto-warn:not(.hidden)', { timeout: 10_000 });
+  const box = page.locator('#backup-crypto-warn');
+  assert.match(await box.textContent(), /BACKUP_PASSPHRASE/);
+  assert.ok((await box.getAttribute('class')).includes('msg-bad'), 'هشدار باید قرمز باشد');
+  if (process.env.PANEL_SHOTS) await page.screenshot({ path: `${process.env.PANEL_SHOTS}/f0-08-backup-warning.png` });
+});
+
 const openTab = async (name) => {
   await page.click(`.tab[data-tab="${name}"]`);
   await page.waitForSelector(`#tab-${name}:not(.hidden)`, { timeout: 10_000 });
