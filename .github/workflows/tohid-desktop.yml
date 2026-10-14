@@ -13,6 +13,8 @@ on:
       - '.github/workflows/tohid-desktop.yml'
   pull_request:
     paths:
+      #  آزمون‌های مرجعِ گزارش (ReportCoreVectorsTest) — فقط در PR، تا pushِ main انتشار نسازد
+      - 'license/test-vectors/**'
       - 'desktop/**'
       - 'android-native/app/src/**'
       - '.github/workflows/tohid-desktop.yml'
