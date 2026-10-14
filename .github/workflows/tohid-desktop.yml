@@ -10,12 +10,15 @@ on:
       - 'install.ps1'
       - 'android-native/app/src/**'
       - 'core/**'
+      #  تغییرِ فقط فایل‌های مرجع روی main نسخهٔ آزمایشی نمی‌سازد (در PR سنجیده می‌شود)
+      - '!core/test-vectors/**'
       - 'android-native/gradle.properties'
       - '.github/workflows/tohid-desktop.yml'
   pull_request:
     paths:
       - 'desktop/**'
       - 'android-native/app/src/**'
+      #  کدِ مشترکِ core و آزمون‌های مرجعِ آن (CoreVectorsTest)
       - 'core/**'
       - '.github/workflows/tohid-desktop.yml'
   #  ⛔ F0-27: push به main فقط کانالِ آزمایشی (`tohid-desktop-beta`). برچسبِ پایدار

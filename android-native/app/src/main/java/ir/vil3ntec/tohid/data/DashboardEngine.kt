@@ -158,6 +158,6 @@ object DashboardEngine {
     val dd = doy - (153 * mp + 2) / 5 + 1
     val m = if (mp < 10) mp + 3 else mp - 9
     val yy = if (m <= 2) y + 1 else y
-    return "%04d-%02d-%02d".format(yy, m, dd)
+    return String.format(java.util.Locale.ROOT, "%04d-%02d-%02d", yy, m, dd)
   }
 }

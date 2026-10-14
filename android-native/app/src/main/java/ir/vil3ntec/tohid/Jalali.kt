@@ -132,8 +132,19 @@ object Jalali {
   fun toIso(jy: Int, jm: Int, jd: Int): String? = runCatching {
     if (!isValid(jy, jm, jd)) return null
     val (gy, gm, gd) = d2g(j2d(jy, jm, jd))
-    "%04d-%02d-%02d".format(gy, gm, gd)
+    isoText(gy, gm, gd)
   }.getOrNull()
+
+  /**
+   *  `YYYY-MM-DD` همیشه با رقمِ لاتین (LOC-05: ذخیرهٔ ASCII).
+   *
+   *  ⛔ `"%04d".format(…)` بی Locale رقم را به زبانِ دستگاه می‌نویسد: روی
+   *  گوشی یا ویندوزی که زبانش دری/پشتو/فارسی است، `۲۰۲۶-۰۳-۲۱` در فایلِ
+   *  داده می‌نشست — وب و سرور آن را تاریخ نمی‌شناسند و مقایسهٔ رشته‌ایِ
+   *  بازهٔ گزارش هم به‌هم می‌ریخت.
+   */
+  private fun isoText(y: Int, m: Int, d: Int): String =
+    String.format(java.util.Locale.ROOT, "%04d-%02d-%02d", y, m, d)
 
   /**
    *  آنچه کاربر نوشته، به تاریخِ فایل.
@@ -153,7 +164,7 @@ object Jalali {
     //  کسی که میلادی نوشته، میلادی می‌خواهد
     if (a >= 1700) {
       if (b !in 1..12 || c !in 1..31) return null
-      return "%04d-%02d-%02d".format(a, b, c)
+      return isoText(a, b, c)
     }
     return toIso(a, b, c)
   }

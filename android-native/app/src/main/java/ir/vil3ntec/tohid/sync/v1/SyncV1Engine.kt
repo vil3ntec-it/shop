@@ -130,6 +130,14 @@ class SyncV1Engine private constructor(context: Context) {
   }
 
   /**
+   *  بایگانیِ دفتر: ردیف‌هایی که به بایگانی می‌روند از سایهٔ همین حساب هم
+   *  بیرون می‌آیند، زیرِ همان قفلِ `record()` — شرح سرِ `SyncCommit.forget`.
+   *  شکست پرتاب می‌شود تا `LedgerArchive.compact` دفتر را کوتاه نکند.
+   */
+  @Synchronized
+  fun forgetArchived(gone: Map<String, Collection<String>>): Int = commit.forget(gone)
+
+  /**
    *  دفترِ امروز را یک‌جا به سرور می‌دهد — فقط برای دستگاهِ نخست.
    *
    *  ⚠️ تنها جایی است که «کلِ دفتر» می‌رود و عمدی است: حسابی که تازه
