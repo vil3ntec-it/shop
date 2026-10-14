@@ -29,7 +29,9 @@ apksigner="$bt/apksigner"
 #  sed، نه head: head زودتر می‌بندد و aapt با SIGPIPE زیرِ pipefail می‌افتد
 badge() { "$aapt" dump badging "$1" | sed -n '1p'; }
 field() { sed -n "s/.* $1='\([^']*\)'.*/\1/p" <<<"$2"; }
-cert() { "$apksigner" verify --print-certs "$1" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | sed -n '1p'; }
+#  apksigner بسته به طرحِ امضا «Signer #1 certificate …» یا
+#  «Signer (minSdkVersion=…) certificate …» می‌نویسد — هر دو پذیرفته است
+cert() { { "$apksigner" verify --print-certs "$1" 2>&1 || true; } | sed -n 's/^Signer.* certificate SHA-256 digest: *//p' | sed -n '1p'; }
 
 fail=0
 err() { echo "::error::$1"; fail=1; }
@@ -42,7 +44,10 @@ size=$(stat -c %s "$apk")
 
 [ "$id" = "$want_id" ] || err "applicationId عوض شد: «$id» (باید $want_id بماند)"
 [ "$code" = "$want_code" ] || err "versionCode «$code» است، باید «$want_code» (۱۰۰ + شمارهٔ ساخت) باشد"
-[ -n "$fp" ] || err "APK امضا ندارد"
+if [ -z "$fp" ]; then
+  err "اثر انگشتِ امضا از APK خوانده نشد"
+  "$apksigner" verify --print-certs -v "$apk" 2>&1 | sed -n '1,40p' || true
+fi
 
 #  PRی که فایلِ ساخت را عوض کرده، دروازهٔ حجمِ سخت دارد
 strict=0
