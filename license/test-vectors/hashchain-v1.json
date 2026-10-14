@@ -1,0 +1,2129 @@
+{
+  "format": "tohid-hashchain-v1",
+  "about": "Shared test vectors for the hash chain (SEC-02, STF-09) and posted-document reversal (SEC-03). Every implementation (server/src/lib/hash-chain.js, license/hash-chain.js, android-native core/audit) must pass all of them. Never edit v1; make hashchain-v2.json for a new format.",
+  "rules": {
+    "canonicalJson": "RFC 8785 (JCS) subset: object keys sorted by UTF-16 code units; no whitespace; strings escaped exactly like ECMAScript JSON.stringify (\\\" \\\\ \\b \\f \\n \\r \\t, other chars below U+0020 as \\u00xx lowercase, everything else literal); lone surrogates are rejected (lone_surrogate); numbers must be integers with |n| <= 2^53-1 (money always in minor units) else not_integer; -0 is written 0; JS-only undefined object properties are omitted.",
+    "hash": "lowercase hex of SHA-256( ASCII(prevHash) || UTF-8(canonicalJson(doc)) ); prevHash is 64 lowercase hex chars",
+    "genesis": "0000000000000000000000000000000000000000000000000000000000000000",
+    "link": "entries[0].prevHash == genesis; entries[i].prevHash == entries[i-1].hash; entries[i].seq (when present) == i+1; the first failure wins, checked per entry in the order seq_gap, prev_mismatch, bad_doc, hash_mismatch",
+    "reversal": "only status=posted documents; never a document that has reverses; never twice; opts id/reason/by non-empty strings, no >= 1 integer, postedAt integer (bad_opts); the whole document must be canonical-valid; then integer values of [\"qty\",\"amount\",\"total\",\"subtotal\",\"discount\",\"tax\",\"paid\",\"change\"] are negated at top level and inside every object of [\"lines\",\"payments\"] (null kept, non-integer -> not_integer); unitPrice is kept; then id, no, postedAt, status=posted, reverses=<original id>, reason, by are set.",
+    "errorOrder": "not_posted, is_reversal, already_reversed, bad_opts, canonical errors, not_integer from negation"
+  },
+  "canonical": [
+    {
+      "name": "empty object",
+      "input": {},
+      "output": "{}"
+    },
+    {
+      "name": "empty array",
+      "input": [],
+      "output": "[]"
+    },
+    {
+      "name": "primitives",
+      "input": [
+        null,
+        true,
+        false,
+        0,
+        1,
+        -1,
+        9007199254740991,
+        -9007199254740991
+      ],
+      "output": "[null,true,false,0,1,-1,9007199254740991,-9007199254740991]"
+    },
+    {
+      "name": "key order is UTF-16 code units",
+      "input": {
+        "9": 9,
+        "10": 8,
+        "b": 1,
+        "a": 2,
+        "aa": 3,
+        "A": 4,
+        "é": 5,
+        "￿": 6,
+        "😀": 7,
+        "": 10
+      },
+      "output": "{\"\":10,\"10\":8,\"9\":9,\"A\":4,\"a\":2,\"aa\":3,\"b\":1,\"é\":5,\"😀\":7,\"￿\":6}"
+    },
+    {
+      "name": "string escapes",
+      "input": "\"\\/\b\f\n\r\t\u0000\u001f  ok",
+      "output": "\"\\\"\\\\/\\b\\f\\n\\r\\t\\u0000\\u001f  ok\""
+    },
+    {
+      "name": "persian and emoji",
+      "input": {
+        "name": "دکان توحید",
+        "note": "😀 ۱۲۳",
+        "unit": "افغانی"
+      },
+      "output": "{\"name\":\"دکان توحید\",\"note\":\"😀 ۱۲۳\",\"unit\":\"افغانی\"}"
+    },
+    {
+      "name": "nested document",
+      "input": {
+        "total": 10000,
+        "id": "s1",
+        "lines": [
+          {
+            "qty": 2,
+            "unitPrice": 5000,
+            "amount": 10000
+          }
+        ],
+        "meta": {
+          "z": null,
+          "a": []
+        }
+      },
+      "output": "{\"id\":\"s1\",\"lines\":[{\"amount\":10000,\"qty\":2,\"unitPrice\":5000}],\"meta\":{\"a\":[],\"z\":null},\"total\":10000}"
+    },
+    {
+      "name": "money in minor units",
+      "input": {
+        "amount": 123456789012345,
+        "change": -50
+      },
+      "output": "{\"amount\":123456789012345,\"change\":-50}"
+    }
+  ],
+  "invalid": [
+    {
+      "name": "fraction",
+      "input": {
+        "amount": 1.5
+      },
+      "error": "not_integer"
+    },
+    {
+      "name": "beyond 2^53-1",
+      "input": {
+        "amount": 9007199254740992
+      },
+      "error": "not_integer"
+    },
+    {
+      "name": "huge exponent",
+      "input": [
+        1e+300
+      ],
+      "error": "not_integer"
+    },
+    {
+      "name": "nested fraction",
+      "input": {
+        "lines": [
+          {
+            "amount": 0.5
+          }
+        ]
+      },
+      "error": "not_integer"
+    },
+    {
+      "name": "lone high surrogate",
+      "input": "\ud800",
+      "error": "lone_surrogate"
+    },
+    {
+      "name": "lone low surrogate",
+      "input": "a\udc00b",
+      "error": "lone_surrogate"
+    },
+    {
+      "name": "lone surrogate in key",
+      "input": {
+        "\ud800": 1
+      },
+      "error": "lone_surrogate"
+    }
+  ],
+  "hash": [
+    {
+      "name": "genesis + empty object",
+      "prev": "0000000000000000000000000000000000000000000000000000000000000000",
+      "doc": {},
+      "canonical": "{}",
+      "hash": "5508d2b710e64bc470079e1b211d9c58e21011e59d0559e422345dc19d659a75"
+    },
+    {
+      "name": "genesis + sale",
+      "prev": "0000000000000000000000000000000000000000000000000000000000000000",
+      "doc": {
+        "id": "K2-000001",
+        "series": "K2",
+        "no": 1,
+        "type": "sale",
+        "status": "posted",
+        "postedAt": 1760400000001,
+        "customerId": "c_01",
+        "currency": "AFN",
+        "lines": [
+          {
+            "productId": "p_rice",
+            "qty": 2,
+            "unitPrice": 5000,
+            "amount": 10000
+          },
+          {
+            "productId": "p_oil",
+            "qty": 1,
+            "unitPrice": 12550,
+            "amount": 12550
+          }
+        ],
+        "discount": 550,
+        "total": 22000,
+        "payments": [
+          {
+            "method": "cash",
+            "amount": 20000
+          },
+          {
+            "method": "credit",
+            "amount": 2000
+          }
+        ]
+      },
+      "canonical": "{\"currency\":\"AFN\",\"customerId\":\"c_01\",\"discount\":550,\"id\":\"K2-000001\",\"lines\":[{\"amount\":10000,\"productId\":\"p_rice\",\"qty\":2,\"unitPrice\":5000},{\"amount\":12550,\"productId\":\"p_oil\",\"qty\":1,\"unitPrice\":12550}],\"no\":1,\"payments\":[{\"amount\":20000,\"method\":\"cash\"},{\"amount\":2000,\"method\":\"credit\"}],\"postedAt\":1760400000001,\"series\":\"K2\",\"status\":\"posted\",\"total\":22000,\"type\":\"sale\"}",
+      "hash": "3561b9158e8c0c411e6389cb21ea69b4de485eeb58b960649970645daf176524"
+    },
+    {
+      "name": "linked + persian",
+      "prev": "3561b9158e8c0c411e6389cb21ea69b4de485eeb58b960649970645daf176524",
+      "doc": {
+        "kind": "audit",
+        "action": "sale.void",
+        "reason": "اشتباهِ صندوقدار",
+        "at": 1760400000123
+      },
+      "canonical": "{\"action\":\"sale.void\",\"at\":1760400000123,\"kind\":\"audit\",\"reason\":\"اشتباهِ صندوقدار\"}",
+      "hash": "64e97b61e71a53a333d8540488781ccf1ac7733994e7202ece1af9e2b596c6e5"
+    }
+  ],
+  "chain": {
+    "name": "three sales in series K2",
+    "docs": [
+      {
+        "id": "K2-000001",
+        "series": "K2",
+        "no": 1,
+        "type": "sale",
+        "status": "posted",
+        "postedAt": 1760400000001,
+        "customerId": "c_01",
+        "currency": "AFN",
+        "lines": [
+          {
+            "productId": "p_rice",
+            "qty": 2,
+            "unitPrice": 5000,
+            "amount": 10000
+          },
+          {
+            "productId": "p_oil",
+            "qty": 1,
+            "unitPrice": 12550,
+            "amount": 12550
+          }
+        ],
+        "discount": 550,
+        "total": 22000,
+        "payments": [
+          {
+            "method": "cash",
+            "amount": 20000
+          },
+          {
+            "method": "credit",
+            "amount": 2000
+          }
+        ]
+      },
+      {
+        "id": "K2-000002",
+        "series": "K2",
+        "no": 2,
+        "type": "sale",
+        "status": "posted",
+        "postedAt": 1760400000002,
+        "customerId": "c_01",
+        "currency": "AFN",
+        "lines": [
+          {
+            "productId": "p_rice",
+            "qty": 2,
+            "unitPrice": 5000,
+            "amount": 10000
+          },
+          {
+            "productId": "p_oil",
+            "qty": 1,
+            "unitPrice": 12550,
+            "amount": 12550
+          }
+        ],
+        "discount": 550,
+        "total": 22000,
+        "payments": [
+          {
+            "method": "cash",
+            "amount": 20000
+          },
+          {
+            "method": "credit",
+            "amount": 2000
+          }
+        ],
+        "note": "یادداشت ۲"
+      },
+      {
+        "id": "K2-000003",
+        "series": "K2",
+        "no": 3,
+        "type": "sale",
+        "status": "posted",
+        "postedAt": 1760400000003,
+        "customerId": null,
+        "currency": "AFN",
+        "lines": [
+          {
+            "productId": "p_rice",
+            "qty": 2,
+            "unitPrice": 5000,
+            "amount": 10000
+          },
+          {
+            "productId": "p_oil",
+            "qty": 1,
+            "unitPrice": 12550,
+            "amount": 12550
+          }
+        ],
+        "discount": 550,
+        "total": 22000,
+        "payments": [
+          {
+            "method": "cash",
+            "amount": 20000
+          },
+          {
+            "method": "credit",
+            "amount": 2000
+          }
+        ]
+      }
+    ],
+    "entries": [
+      {
+        "seq": 1,
+        "prevHash": "0000000000000000000000000000000000000000000000000000000000000000",
+        "hash": "3561b9158e8c0c411e6389cb21ea69b4de485eeb58b960649970645daf176524",
+        "doc": {
+          "id": "K2-000001",
+          "series": "K2",
+          "no": 1,
+          "type": "sale",
+          "status": "posted",
+          "postedAt": 1760400000001,
+          "customerId": "c_01",
+          "currency": "AFN",
+          "lines": [
+            {
+              "productId": "p_rice",
+              "qty": 2,
+              "unitPrice": 5000,
+              "amount": 10000
+            },
+            {
+              "productId": "p_oil",
+              "qty": 1,
+              "unitPrice": 12550,
+              "amount": 12550
+            }
+          ],
+          "discount": 550,
+          "total": 22000,
+          "payments": [
+            {
+              "method": "cash",
+              "amount": 20000
+            },
+            {
+              "method": "credit",
+              "amount": 2000
+            }
+          ]
+        }
+      },
+      {
+        "seq": 2,
+        "prevHash": "3561b9158e8c0c411e6389cb21ea69b4de485eeb58b960649970645daf176524",
+        "hash": "ecb837b8f3c3a85c2008c5e3a115fb81f502e9a1ad7ad4f83c486b7d5ad9e477",
+        "doc": {
+          "id": "K2-000002",
+          "series": "K2",
+          "no": 2,
+          "type": "sale",
+          "status": "posted",
+          "postedAt": 1760400000002,
+          "customerId": "c_01",
+          "currency": "AFN",
+          "lines": [
+            {
+              "productId": "p_rice",
+              "qty": 2,
+              "unitPrice": 5000,
+              "amount": 10000
+            },
+            {
+              "productId": "p_oil",
+              "qty": 1,
+              "unitPrice": 12550,
+              "amount": 12550
+            }
+          ],
+          "discount": 550,
+          "total": 22000,
+          "payments": [
+            {
+              "method": "cash",
+              "amount": 20000
+            },
+            {
+              "method": "credit",
+              "amount": 2000
+            }
+          ],
+          "note": "یادداشت ۲"
+        }
+      },
+      {
+        "seq": 3,
+        "prevHash": "ecb837b8f3c3a85c2008c5e3a115fb81f502e9a1ad7ad4f83c486b7d5ad9e477",
+        "hash": "6749284adb33a7463ac56f6506c00de4cd45589a7c0c8b6ba6c8d13152fad20f",
+        "doc": {
+          "id": "K2-000003",
+          "series": "K2",
+          "no": 3,
+          "type": "sale",
+          "status": "posted",
+          "postedAt": 1760400000003,
+          "customerId": null,
+          "currency": "AFN",
+          "lines": [
+            {
+              "productId": "p_rice",
+              "qty": 2,
+              "unitPrice": 5000,
+              "amount": 10000
+            },
+            {
+              "productId": "p_oil",
+              "qty": 1,
+              "unitPrice": 12550,
+              "amount": 12550
+            }
+          ],
+          "discount": 550,
+          "total": 22000,
+          "payments": [
+            {
+              "method": "cash",
+              "amount": 20000
+            },
+            {
+              "method": "credit",
+              "amount": 2000
+            }
+          ]
+        }
+      }
+    ],
+    "head": "6749284adb33a7463ac56f6506c00de4cd45589a7c0c8b6ba6c8d13152fad20f"
+  },
+  "verify": [
+    {
+      "name": "intact chain",
+      "entries": [
+        {
+          "seq": 1,
+          "prevHash": "0000000000000000000000000000000000000000000000000000000000000000",
+          "hash": "3561b9158e8c0c411e6389cb21ea69b4de485eeb58b960649970645daf176524",
+          "doc": {
+            "id": "K2-000001",
+            "series": "K2",
+            "no": 1,
+            "type": "sale",
+            "status": "posted",
+            "postedAt": 1760400000001,
+            "customerId": "c_01",
+            "currency": "AFN",
+            "lines": [
+              {
+                "productId": "p_rice",
+                "qty": 2,
+                "unitPrice": 5000,
+                "amount": 10000
+              },
+              {
+                "productId": "p_oil",
+                "qty": 1,
+                "unitPrice": 12550,
+                "amount": 12550
+              }
+            ],
+            "discount": 550,
+            "total": 22000,
+            "payments": [
+              {
+                "method": "cash",
+                "amount": 20000
+              },
+              {
+                "method": "credit",
+                "amount": 2000
+              }
+            ]
+          }
+        },
+        {
+          "seq": 2,
+          "prevHash": "3561b9158e8c0c411e6389cb21ea69b4de485eeb58b960649970645daf176524",
+          "hash": "ecb837b8f3c3a85c2008c5e3a115fb81f502e9a1ad7ad4f83c486b7d5ad9e477",
+          "doc": {
+            "id": "K2-000002",
+            "series": "K2",
+            "no": 2,
+            "type": "sale",
+            "status": "posted",
+            "postedAt": 1760400000002,
+            "customerId": "c_01",
+            "currency": "AFN",
+            "lines": [
+              {
+                "productId": "p_rice",
+                "qty": 2,
+                "unitPrice": 5000,
+                "amount": 10000
+              },
+              {
+                "productId": "p_oil",
+                "qty": 1,
+                "unitPrice": 12550,
+                "amount": 12550
+              }
+            ],
+            "discount": 550,
+            "total": 22000,
+            "payments": [
+              {
+                "method": "cash",
+                "amount": 20000
+              },
+              {
+                "method": "credit",
+                "amount": 2000
+              }
+            ],
+            "note": "یادداشت ۲"
+          }
+        },
+        {
+          "seq": 3,
+          "prevHash": "ecb837b8f3c3a85c2008c5e3a115fb81f502e9a1ad7ad4f83c486b7d5ad9e477",
+          "hash": "6749284adb33a7463ac56f6506c00de4cd45589a7c0c8b6ba6c8d13152fad20f",
+          "doc": {
+            "id": "K2-000003",
+            "series": "K2",
+            "no": 3,
+            "type": "sale",
+            "status": "posted",
+            "postedAt": 1760400000003,
+            "customerId": null,
+            "currency": "AFN",
+            "lines": [
+              {
+                "productId": "p_rice",
+                "qty": 2,
+                "unitPrice": 5000,
+                "amount": 10000
+              },
+              {
+                "productId": "p_oil",
+                "qty": 1,
+                "unitPrice": 12550,
+                "amount": 12550
+              }
+            ],
+            "discount": 550,
+            "total": 22000,
+            "payments": [
+              {
+                "method": "cash",
+                "amount": 20000
+              },
+              {
+                "method": "credit",
+                "amount": 2000
+              }
+            ]
+          }
+        }
+      ],
+      "ok": true,
+      "head": "6749284adb33a7463ac56f6506c00de4cd45589a7c0c8b6ba6c8d13152fad20f",
+      "length": 3
+    },
+    {
+      "name": "document edited after posting",
+      "entries": [
+        {
+          "seq": 1,
+          "prevHash": "0000000000000000000000000000000000000000000000000000000000000000",
+          "hash": "3561b9158e8c0c411e6389cb21ea69b4de485eeb58b960649970645daf176524",
+          "doc": {
+            "id": "K2-000001",
+            "series": "K2",
+            "no": 1,
+            "type": "sale",
+            "status": "posted",
+            "postedAt": 1760400000001,
+            "customerId": "c_01",
+            "currency": "AFN",
+            "lines": [
+              {
+                "productId": "p_rice",
+                "qty": 2,
+                "unitPrice": 5000,
+                "amount": 10000
+              },
+              {
+                "productId": "p_oil",
+                "qty": 1,
+                "unitPrice": 12550,
+                "amount": 12550
+              }
+            ],
+            "discount": 550,
+            "total": 22000,
+            "payments": [
+              {
+                "method": "cash",
+                "amount": 20000
+              },
+              {
+                "method": "credit",
+                "amount": 2000
+              }
+            ]
+          }
+        },
+        {
+          "seq": 2,
+          "prevHash": "3561b9158e8c0c411e6389cb21ea69b4de485eeb58b960649970645daf176524",
+          "hash": "ecb837b8f3c3a85c2008c5e3a115fb81f502e9a1ad7ad4f83c486b7d5ad9e477",
+          "doc": {
+            "id": "K2-000002",
+            "series": "K2",
+            "no": 2,
+            "type": "sale",
+            "status": "posted",
+            "postedAt": 1760400000002,
+            "customerId": "c_01",
+            "currency": "AFN",
+            "lines": [
+              {
+                "productId": "p_rice",
+                "qty": 2,
+                "unitPrice": 5000,
+                "amount": 10000
+              },
+              {
+                "productId": "p_oil",
+                "qty": 1,
+                "unitPrice": 12550,
+                "amount": 12550
+              }
+            ],
+            "discount": 550,
+            "total": 21000,
+            "payments": [
+              {
+                "method": "cash",
+                "amount": 20000
+              },
+              {
+                "method": "credit",
+                "amount": 2000
+              }
+            ],
+            "note": "یادداشت ۲"
+          }
+        },
+        {
+          "seq": 3,
+          "prevHash": "ecb837b8f3c3a85c2008c5e3a115fb81f502e9a1ad7ad4f83c486b7d5ad9e477",
+          "hash": "6749284adb33a7463ac56f6506c00de4cd45589a7c0c8b6ba6c8d13152fad20f",
+          "doc": {
+            "id": "K2-000003",
+            "series": "K2",
+            "no": 3,
+            "type": "sale",
+            "status": "posted",
+            "postedAt": 1760400000003,
+            "customerId": null,
+            "currency": "AFN",
+            "lines": [
+              {
+                "productId": "p_rice",
+                "qty": 2,
+                "unitPrice": 5000,
+                "amount": 10000
+              },
+              {
+                "productId": "p_oil",
+                "qty": 1,
+                "unitPrice": 12550,
+                "amount": 12550
+              }
+            ],
+            "discount": 550,
+            "total": 22000,
+            "payments": [
+              {
+                "method": "cash",
+                "amount": 20000
+              },
+              {
+                "method": "credit",
+                "amount": 2000
+              }
+            ]
+          }
+        }
+      ],
+      "ok": false,
+      "index": 1,
+      "reason": "hash_mismatch"
+    },
+    {
+      "name": "entry removed (seq present)",
+      "entries": [
+        {
+          "seq": 1,
+          "prevHash": "0000000000000000000000000000000000000000000000000000000000000000",
+          "hash": "3561b9158e8c0c411e6389cb21ea69b4de485eeb58b960649970645daf176524",
+          "doc": {
+            "id": "K2-000001",
+            "series": "K2",
+            "no": 1,
+            "type": "sale",
+            "status": "posted",
+            "postedAt": 1760400000001,
+            "customerId": "c_01",
+            "currency": "AFN",
+            "lines": [
+              {
+                "productId": "p_rice",
+                "qty": 2,
+                "unitPrice": 5000,
+                "amount": 10000
+              },
+              {
+                "productId": "p_oil",
+                "qty": 1,
+                "unitPrice": 12550,
+                "amount": 12550
+              }
+            ],
+            "discount": 550,
+            "total": 22000,
+            "payments": [
+              {
+                "method": "cash",
+                "amount": 20000
+              },
+              {
+                "method": "credit",
+                "amount": 2000
+              }
+            ]
+          }
+        },
+        {
+          "seq": 3,
+          "prevHash": "ecb837b8f3c3a85c2008c5e3a115fb81f502e9a1ad7ad4f83c486b7d5ad9e477",
+          "hash": "6749284adb33a7463ac56f6506c00de4cd45589a7c0c8b6ba6c8d13152fad20f",
+          "doc": {
+            "id": "K2-000003",
+            "series": "K2",
+            "no": 3,
+            "type": "sale",
+            "status": "posted",
+            "postedAt": 1760400000003,
+            "customerId": null,
+            "currency": "AFN",
+            "lines": [
+              {
+                "productId": "p_rice",
+                "qty": 2,
+                "unitPrice": 5000,
+                "amount": 10000
+              },
+              {
+                "productId": "p_oil",
+                "qty": 1,
+                "unitPrice": 12550,
+                "amount": 12550
+              }
+            ],
+            "discount": 550,
+            "total": 22000,
+            "payments": [
+              {
+                "method": "cash",
+                "amount": 20000
+              },
+              {
+                "method": "credit",
+                "amount": 2000
+              }
+            ]
+          }
+        }
+      ],
+      "ok": false,
+      "index": 1,
+      "reason": "seq_gap"
+    },
+    {
+      "name": "entry removed (no seq)",
+      "entries": [
+        {
+          "prevHash": "0000000000000000000000000000000000000000000000000000000000000000",
+          "hash": "3561b9158e8c0c411e6389cb21ea69b4de485eeb58b960649970645daf176524",
+          "doc": {
+            "id": "K2-000001",
+            "series": "K2",
+            "no": 1,
+            "type": "sale",
+            "status": "posted",
+            "postedAt": 1760400000001,
+            "customerId": "c_01",
+            "currency": "AFN",
+            "lines": [
+              {
+                "productId": "p_rice",
+                "qty": 2,
+                "unitPrice": 5000,
+                "amount": 10000
+              },
+              {
+                "productId": "p_oil",
+                "qty": 1,
+                "unitPrice": 12550,
+                "amount": 12550
+              }
+            ],
+            "discount": 550,
+            "total": 22000,
+            "payments": [
+              {
+                "method": "cash",
+                "amount": 20000
+              },
+              {
+                "method": "credit",
+                "amount": 2000
+              }
+            ]
+          }
+        },
+        {
+          "prevHash": "ecb837b8f3c3a85c2008c5e3a115fb81f502e9a1ad7ad4f83c486b7d5ad9e477",
+          "hash": "6749284adb33a7463ac56f6506c00de4cd45589a7c0c8b6ba6c8d13152fad20f",
+          "doc": {
+            "id": "K2-000003",
+            "series": "K2",
+            "no": 3,
+            "type": "sale",
+            "status": "posted",
+            "postedAt": 1760400000003,
+            "customerId": null,
+            "currency": "AFN",
+            "lines": [
+              {
+                "productId": "p_rice",
+                "qty": 2,
+                "unitPrice": 5000,
+                "amount": 10000
+              },
+              {
+                "productId": "p_oil",
+                "qty": 1,
+                "unitPrice": 12550,
+                "amount": 12550
+              }
+            ],
+            "discount": 550,
+            "total": 22000,
+            "payments": [
+              {
+                "method": "cash",
+                "amount": 20000
+              },
+              {
+                "method": "credit",
+                "amount": 2000
+              }
+            ]
+          }
+        }
+      ],
+      "ok": false,
+      "index": 1,
+      "reason": "prev_mismatch"
+    },
+    {
+      "name": "stored hash forged",
+      "entries": [
+        {
+          "seq": 1,
+          "prevHash": "0000000000000000000000000000000000000000000000000000000000000000",
+          "hash": "3561b9158e8c0c411e6389cb21ea69b4de485eeb58b960649970645daf176524",
+          "doc": {
+            "id": "K2-000001",
+            "series": "K2",
+            "no": 1,
+            "type": "sale",
+            "status": "posted",
+            "postedAt": 1760400000001,
+            "customerId": "c_01",
+            "currency": "AFN",
+            "lines": [
+              {
+                "productId": "p_rice",
+                "qty": 2,
+                "unitPrice": 5000,
+                "amount": 10000
+              },
+              {
+                "productId": "p_oil",
+                "qty": 1,
+                "unitPrice": 12550,
+                "amount": 12550
+              }
+            ],
+            "discount": 550,
+            "total": 22000,
+            "payments": [
+              {
+                "method": "cash",
+                "amount": 20000
+              },
+              {
+                "method": "credit",
+                "amount": 2000
+              }
+            ]
+          }
+        },
+        {
+          "seq": 2,
+          "prevHash": "3561b9158e8c0c411e6389cb21ea69b4de485eeb58b960649970645daf176524",
+          "hash": "ecb837b8f3c3a85c2008c5e3a115fb81f502e9a1ad7ad4f83c486b7d5ad9e477",
+          "doc": {
+            "id": "K2-000002",
+            "series": "K2",
+            "no": 2,
+            "type": "sale",
+            "status": "posted",
+            "postedAt": 1760400000002,
+            "customerId": "c_01",
+            "currency": "AFN",
+            "lines": [
+              {
+                "productId": "p_rice",
+                "qty": 2,
+                "unitPrice": 5000,
+                "amount": 10000
+              },
+              {
+                "productId": "p_oil",
+                "qty": 1,
+                "unitPrice": 12550,
+                "amount": 12550
+              }
+            ],
+            "discount": 550,
+            "total": 22000,
+            "payments": [
+              {
+                "method": "cash",
+                "amount": 20000
+              },
+              {
+                "method": "credit",
+                "amount": 2000
+              }
+            ],
+            "note": "یادداشت ۲"
+          }
+        },
+        {
+          "seq": 3,
+          "prevHash": "ecb837b8f3c3a85c2008c5e3a115fb81f502e9a1ad7ad4f83c486b7d5ad9e477",
+          "hash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "doc": {
+            "id": "K2-000003",
+            "series": "K2",
+            "no": 3,
+            "type": "sale",
+            "status": "posted",
+            "postedAt": 1760400000003,
+            "customerId": null,
+            "currency": "AFN",
+            "lines": [
+              {
+                "productId": "p_rice",
+                "qty": 2,
+                "unitPrice": 5000,
+                "amount": 10000
+              },
+              {
+                "productId": "p_oil",
+                "qty": 1,
+                "unitPrice": 12550,
+                "amount": 12550
+              }
+            ],
+            "discount": 550,
+            "total": 22000,
+            "payments": [
+              {
+                "method": "cash",
+                "amount": 20000
+              },
+              {
+                "method": "credit",
+                "amount": 2000
+              }
+            ]
+          }
+        }
+      ],
+      "ok": false,
+      "index": 2,
+      "reason": "hash_mismatch"
+    },
+    {
+      "name": "first link not genesis",
+      "entries": [
+        {
+          "seq": 1,
+          "prevHash": "1111111111111111111111111111111111111111111111111111111111111111",
+          "hash": "3561b9158e8c0c411e6389cb21ea69b4de485eeb58b960649970645daf176524",
+          "doc": {
+            "id": "K2-000001",
+            "series": "K2",
+            "no": 1,
+            "type": "sale",
+            "status": "posted",
+            "postedAt": 1760400000001,
+            "customerId": "c_01",
+            "currency": "AFN",
+            "lines": [
+              {
+                "productId": "p_rice",
+                "qty": 2,
+                "unitPrice": 5000,
+                "amount": 10000
+              },
+              {
+                "productId": "p_oil",
+                "qty": 1,
+                "unitPrice": 12550,
+                "amount": 12550
+              }
+            ],
+            "discount": 550,
+            "total": 22000,
+            "payments": [
+              {
+                "method": "cash",
+                "amount": 20000
+              },
+              {
+                "method": "credit",
+                "amount": 2000
+              }
+            ]
+          }
+        },
+        {
+          "seq": 2,
+          "prevHash": "3561b9158e8c0c411e6389cb21ea69b4de485eeb58b960649970645daf176524",
+          "hash": "ecb837b8f3c3a85c2008c5e3a115fb81f502e9a1ad7ad4f83c486b7d5ad9e477",
+          "doc": {
+            "id": "K2-000002",
+            "series": "K2",
+            "no": 2,
+            "type": "sale",
+            "status": "posted",
+            "postedAt": 1760400000002,
+            "customerId": "c_01",
+            "currency": "AFN",
+            "lines": [
+              {
+                "productId": "p_rice",
+                "qty": 2,
+                "unitPrice": 5000,
+                "amount": 10000
+              },
+              {
+                "productId": "p_oil",
+                "qty": 1,
+                "unitPrice": 12550,
+                "amount": 12550
+              }
+            ],
+            "discount": 550,
+            "total": 22000,
+            "payments": [
+              {
+                "method": "cash",
+                "amount": 20000
+              },
+              {
+                "method": "credit",
+                "amount": 2000
+              }
+            ],
+            "note": "یادداشت ۲"
+          }
+        },
+        {
+          "seq": 3,
+          "prevHash": "ecb837b8f3c3a85c2008c5e3a115fb81f502e9a1ad7ad4f83c486b7d5ad9e477",
+          "hash": "6749284adb33a7463ac56f6506c00de4cd45589a7c0c8b6ba6c8d13152fad20f",
+          "doc": {
+            "id": "K2-000003",
+            "series": "K2",
+            "no": 3,
+            "type": "sale",
+            "status": "posted",
+            "postedAt": 1760400000003,
+            "customerId": null,
+            "currency": "AFN",
+            "lines": [
+              {
+                "productId": "p_rice",
+                "qty": 2,
+                "unitPrice": 5000,
+                "amount": 10000
+              },
+              {
+                "productId": "p_oil",
+                "qty": 1,
+                "unitPrice": 12550,
+                "amount": 12550
+              }
+            ],
+            "discount": 550,
+            "total": 22000,
+            "payments": [
+              {
+                "method": "cash",
+                "amount": 20000
+              },
+              {
+                "method": "credit",
+                "amount": 2000
+              }
+            ]
+          }
+        }
+      ],
+      "ok": false,
+      "index": 0,
+      "reason": "prev_mismatch"
+    },
+    {
+      "name": "non-canonical document",
+      "entries": [
+        {
+          "seq": 1,
+          "prevHash": "0000000000000000000000000000000000000000000000000000000000000000",
+          "hash": "3561b9158e8c0c411e6389cb21ea69b4de485eeb58b960649970645daf176524",
+          "doc": {
+            "id": "K2-000001",
+            "series": "K2",
+            "no": 1,
+            "type": "sale",
+            "status": "posted",
+            "postedAt": 1760400000001,
+            "customerId": "c_01",
+            "currency": "AFN",
+            "lines": [
+              {
+                "productId": "p_rice",
+                "qty": 2,
+                "unitPrice": 5000,
+                "amount": 10000
+              },
+              {
+                "productId": "p_oil",
+                "qty": 1,
+                "unitPrice": 12550,
+                "amount": 12550
+              }
+            ],
+            "discount": 550,
+            "total": 22000,
+            "payments": [
+              {
+                "method": "cash",
+                "amount": 20000
+              },
+              {
+                "method": "credit",
+                "amount": 2000
+              }
+            ]
+          }
+        },
+        {
+          "seq": 2,
+          "prevHash": "3561b9158e8c0c411e6389cb21ea69b4de485eeb58b960649970645daf176524",
+          "hash": "ecb837b8f3c3a85c2008c5e3a115fb81f502e9a1ad7ad4f83c486b7d5ad9e477",
+          "doc": {
+            "id": "K2-000002",
+            "series": "K2",
+            "no": 2,
+            "type": "sale",
+            "status": "posted",
+            "postedAt": 1760400000002,
+            "customerId": "c_01",
+            "currency": "AFN",
+            "lines": [
+              {
+                "productId": "p_rice",
+                "qty": 2,
+                "unitPrice": 5000,
+                "amount": 10000
+              },
+              {
+                "productId": "p_oil",
+                "qty": 1,
+                "unitPrice": 12550,
+                "amount": 12550
+              }
+            ],
+            "discount": 550,
+            "total": 22000,
+            "payments": [
+              {
+                "method": "cash",
+                "amount": 20000
+              },
+              {
+                "method": "credit",
+                "amount": 2000
+              }
+            ],
+            "note": "یادداشت ۲"
+          }
+        },
+        {
+          "seq": 3,
+          "prevHash": "ecb837b8f3c3a85c2008c5e3a115fb81f502e9a1ad7ad4f83c486b7d5ad9e477",
+          "hash": "6749284adb33a7463ac56f6506c00de4cd45589a7c0c8b6ba6c8d13152fad20f",
+          "doc": {
+            "id": "K2-000003",
+            "series": "K2",
+            "no": 3,
+            "type": "sale",
+            "status": "posted",
+            "postedAt": 1760400000003,
+            "customerId": null,
+            "currency": "AFN",
+            "lines": [
+              {
+                "productId": "p_rice",
+                "qty": 2,
+                "unitPrice": 5000,
+                "amount": 10000
+              },
+              {
+                "productId": "p_oil",
+                "qty": 1,
+                "unitPrice": 12550,
+                "amount": 12550
+              }
+            ],
+            "discount": 550,
+            "total": 0.5,
+            "payments": [
+              {
+                "method": "cash",
+                "amount": 20000
+              },
+              {
+                "method": "credit",
+                "amount": 2000
+              }
+            ]
+          }
+        }
+      ],
+      "ok": false,
+      "index": 2,
+      "reason": "bad_doc"
+    },
+    {
+      "name": "empty chain",
+      "entries": [],
+      "ok": true,
+      "head": "0000000000000000000000000000000000000000000000000000000000000000",
+      "length": 0
+    }
+  ],
+  "guard": [
+    {
+      "name": "new document",
+      "before": null,
+      "after": {
+        "id": "K2-000001",
+        "series": "K2",
+        "no": 1,
+        "type": "sale",
+        "status": "posted",
+        "postedAt": 1760400000001,
+        "customerId": "c_01",
+        "currency": "AFN",
+        "lines": [
+          {
+            "productId": "p_rice",
+            "qty": 2,
+            "unitPrice": 5000,
+            "amount": 10000
+          },
+          {
+            "productId": "p_oil",
+            "qty": 1,
+            "unitPrice": 12550,
+            "amount": 12550
+          }
+        ],
+        "discount": 550,
+        "total": 22000,
+        "payments": [
+          {
+            "method": "cash",
+            "amount": 20000
+          },
+          {
+            "method": "credit",
+            "amount": 2000
+          }
+        ]
+      },
+      "ok": true
+    },
+    {
+      "name": "draft may change",
+      "before": {
+        "id": "K2-000001",
+        "series": "K2",
+        "no": 1,
+        "type": "sale",
+        "status": "draft",
+        "postedAt": 1760400000001,
+        "customerId": "c_01",
+        "currency": "AFN",
+        "lines": [
+          {
+            "productId": "p_rice",
+            "qty": 2,
+            "unitPrice": 5000,
+            "amount": 10000
+          },
+          {
+            "productId": "p_oil",
+            "qty": 1,
+            "unitPrice": 12550,
+            "amount": 12550
+          }
+        ],
+        "discount": 550,
+        "total": 22000,
+        "payments": [
+          {
+            "method": "cash",
+            "amount": 20000
+          },
+          {
+            "method": "credit",
+            "amount": 2000
+          }
+        ]
+      },
+      "after": {
+        "id": "K2-000001",
+        "series": "K2",
+        "no": 1,
+        "type": "sale",
+        "status": "draft",
+        "postedAt": 1760400000001,
+        "customerId": "c_01",
+        "currency": "AFN",
+        "lines": [
+          {
+            "productId": "p_rice",
+            "qty": 2,
+            "unitPrice": 5000,
+            "amount": 10000
+          },
+          {
+            "productId": "p_oil",
+            "qty": 1,
+            "unitPrice": 12550,
+            "amount": 12550
+          }
+        ],
+        "discount": 550,
+        "total": 1,
+        "payments": [
+          {
+            "method": "cash",
+            "amount": 20000
+          },
+          {
+            "method": "credit",
+            "amount": 2000
+          }
+        ]
+      },
+      "ok": true
+    },
+    {
+      "name": "posted, identical in another key order",
+      "before": {
+        "id": "K2-000001",
+        "series": "K2",
+        "no": 1,
+        "type": "sale",
+        "status": "posted",
+        "postedAt": 1760400000001,
+        "customerId": "c_01",
+        "currency": "AFN",
+        "lines": [
+          {
+            "productId": "p_rice",
+            "qty": 2,
+            "unitPrice": 5000,
+            "amount": 10000
+          },
+          {
+            "productId": "p_oil",
+            "qty": 1,
+            "unitPrice": 12550,
+            "amount": 12550
+          }
+        ],
+        "discount": 550,
+        "total": 22000,
+        "payments": [
+          {
+            "method": "cash",
+            "amount": 20000
+          },
+          {
+            "method": "credit",
+            "amount": 2000
+          }
+        ]
+      },
+      "after": {
+        "payments": [
+          {
+            "amount": 20000,
+            "method": "cash"
+          },
+          {
+            "amount": 2000,
+            "method": "credit"
+          }
+        ],
+        "total": 22000,
+        "discount": 550,
+        "lines": [
+          {
+            "productId": "p_rice",
+            "qty": 2,
+            "unitPrice": 5000,
+            "amount": 10000
+          },
+          {
+            "productId": "p_oil",
+            "qty": 1,
+            "unitPrice": 12550,
+            "amount": 12550
+          }
+        ],
+        "currency": "AFN",
+        "customerId": "c_01",
+        "postedAt": 1760400000001,
+        "status": "posted",
+        "type": "sale",
+        "no": 1,
+        "series": "K2",
+        "id": "K2-000001"
+      },
+      "ok": true
+    },
+    {
+      "name": "posted, total changed",
+      "before": {
+        "id": "K2-000001",
+        "series": "K2",
+        "no": 1,
+        "type": "sale",
+        "status": "posted",
+        "postedAt": 1760400000001,
+        "customerId": "c_01",
+        "currency": "AFN",
+        "lines": [
+          {
+            "productId": "p_rice",
+            "qty": 2,
+            "unitPrice": 5000,
+            "amount": 10000
+          },
+          {
+            "productId": "p_oil",
+            "qty": 1,
+            "unitPrice": 12550,
+            "amount": 12550
+          }
+        ],
+        "discount": 550,
+        "total": 22000,
+        "payments": [
+          {
+            "method": "cash",
+            "amount": 20000
+          },
+          {
+            "method": "credit",
+            "amount": 2000
+          }
+        ]
+      },
+      "after": {
+        "id": "K2-000001",
+        "series": "K2",
+        "no": 1,
+        "type": "sale",
+        "status": "posted",
+        "postedAt": 1760400000001,
+        "customerId": "c_01",
+        "currency": "AFN",
+        "lines": [
+          {
+            "productId": "p_rice",
+            "qty": 2,
+            "unitPrice": 5000,
+            "amount": 10000
+          },
+          {
+            "productId": "p_oil",
+            "qty": 1,
+            "unitPrice": 12550,
+            "amount": 12550
+          }
+        ],
+        "discount": 550,
+        "total": 21000,
+        "payments": [
+          {
+            "method": "cash",
+            "amount": 20000
+          },
+          {
+            "method": "credit",
+            "amount": 2000
+          }
+        ]
+      },
+      "ok": false,
+      "code": "posted_immutable"
+    },
+    {
+      "name": "posted, cancelled in place",
+      "before": {
+        "id": "K2-000001",
+        "series": "K2",
+        "no": 1,
+        "type": "sale",
+        "status": "posted",
+        "postedAt": 1760400000001,
+        "customerId": "c_01",
+        "currency": "AFN",
+        "lines": [
+          {
+            "productId": "p_rice",
+            "qty": 2,
+            "unitPrice": 5000,
+            "amount": 10000
+          },
+          {
+            "productId": "p_oil",
+            "qty": 1,
+            "unitPrice": 12550,
+            "amount": 12550
+          }
+        ],
+        "discount": 550,
+        "total": 22000,
+        "payments": [
+          {
+            "method": "cash",
+            "amount": 20000
+          },
+          {
+            "method": "credit",
+            "amount": 2000
+          }
+        ]
+      },
+      "after": {
+        "id": "K2-000001",
+        "series": "K2",
+        "no": 1,
+        "type": "sale",
+        "status": "cancelled",
+        "postedAt": 1760400000001,
+        "customerId": "c_01",
+        "currency": "AFN",
+        "lines": [
+          {
+            "productId": "p_rice",
+            "qty": 2,
+            "unitPrice": 5000,
+            "amount": 10000
+          },
+          {
+            "productId": "p_oil",
+            "qty": 1,
+            "unitPrice": 12550,
+            "amount": 12550
+          }
+        ],
+        "discount": 550,
+        "total": 22000,
+        "payments": [
+          {
+            "method": "cash",
+            "amount": 20000
+          },
+          {
+            "method": "credit",
+            "amount": 2000
+          }
+        ]
+      },
+      "ok": false,
+      "code": "posted_immutable"
+    },
+    {
+      "name": "posted, line removed",
+      "before": {
+        "id": "K2-000001",
+        "series": "K2",
+        "no": 1,
+        "type": "sale",
+        "status": "posted",
+        "postedAt": 1760400000001,
+        "customerId": "c_01",
+        "currency": "AFN",
+        "lines": [
+          {
+            "productId": "p_rice",
+            "qty": 2,
+            "unitPrice": 5000,
+            "amount": 10000
+          },
+          {
+            "productId": "p_oil",
+            "qty": 1,
+            "unitPrice": 12550,
+            "amount": 12550
+          }
+        ],
+        "discount": 550,
+        "total": 22000,
+        "payments": [
+          {
+            "method": "cash",
+            "amount": 20000
+          },
+          {
+            "method": "credit",
+            "amount": 2000
+          }
+        ]
+      },
+      "after": {
+        "id": "K2-000001",
+        "series": "K2",
+        "no": 1,
+        "type": "sale",
+        "status": "posted",
+        "postedAt": 1760400000001,
+        "customerId": "c_01",
+        "currency": "AFN",
+        "lines": [
+          {
+            "productId": "p_oil",
+            "qty": 1,
+            "unitPrice": 12550,
+            "amount": 12550
+          }
+        ],
+        "discount": 550,
+        "total": 22000,
+        "payments": [
+          {
+            "method": "cash",
+            "amount": 20000
+          },
+          {
+            "method": "credit",
+            "amount": 2000
+          }
+        ]
+      },
+      "ok": false,
+      "code": "posted_immutable"
+    }
+  ],
+  "reversal": [
+    {
+      "name": "sale reversed",
+      "doc": {
+        "id": "K2-000001",
+        "series": "K2",
+        "no": 1,
+        "type": "sale",
+        "status": "posted",
+        "postedAt": 1760400000001,
+        "customerId": "c_01",
+        "currency": "AFN",
+        "lines": [
+          {
+            "productId": "p_rice",
+            "qty": 2,
+            "unitPrice": 5000,
+            "amount": 10000
+          },
+          {
+            "productId": "p_oil",
+            "qty": 1,
+            "unitPrice": 12550,
+            "amount": 12550
+          }
+        ],
+        "discount": 550,
+        "total": 22000,
+        "payments": [
+          {
+            "method": "cash",
+            "amount": 20000
+          },
+          {
+            "method": "credit",
+            "amount": 2000
+          }
+        ]
+      },
+      "opts": {
+        "id": "K2-R-000001",
+        "no": 1,
+        "postedAt": 1760400099000,
+        "reason": "اشتباه در مقدار",
+        "by": "u_owner"
+      },
+      "expected": {
+        "id": "K2-R-000001",
+        "series": "K2",
+        "no": 1,
+        "type": "sale",
+        "status": "posted",
+        "postedAt": 1760400099000,
+        "customerId": "c_01",
+        "currency": "AFN",
+        "lines": [
+          {
+            "productId": "p_rice",
+            "qty": -2,
+            "unitPrice": 5000,
+            "amount": -10000
+          },
+          {
+            "productId": "p_oil",
+            "qty": -1,
+            "unitPrice": 12550,
+            "amount": -12550
+          }
+        ],
+        "discount": -550,
+        "total": -22000,
+        "payments": [
+          {
+            "method": "cash",
+            "amount": -20000
+          },
+          {
+            "method": "credit",
+            "amount": -2000
+          }
+        ],
+        "reverses": "K2-000001",
+        "reason": "اشتباه در مقدار",
+        "by": "u_owner"
+      }
+    },
+    {
+      "name": "draft cannot be reversed",
+      "doc": {
+        "id": "K2-000001",
+        "series": "K2",
+        "no": 1,
+        "type": "sale",
+        "status": "draft",
+        "postedAt": 1760400000001,
+        "customerId": "c_01",
+        "currency": "AFN",
+        "lines": [
+          {
+            "productId": "p_rice",
+            "qty": 2,
+            "unitPrice": 5000,
+            "amount": 10000
+          },
+          {
+            "productId": "p_oil",
+            "qty": 1,
+            "unitPrice": 12550,
+            "amount": 12550
+          }
+        ],
+        "discount": 550,
+        "total": 22000,
+        "payments": [
+          {
+            "method": "cash",
+            "amount": 20000
+          },
+          {
+            "method": "credit",
+            "amount": 2000
+          }
+        ]
+      },
+      "opts": {
+        "id": "K2-R-000001",
+        "no": 1,
+        "postedAt": 1760400099000,
+        "reason": "اشتباه در مقدار",
+        "by": "u_owner"
+      },
+      "error": "not_posted"
+    },
+    {
+      "name": "reversal cannot be reversed",
+      "doc": {
+        "id": "K2-000002",
+        "series": "K2",
+        "no": 2,
+        "type": "sale",
+        "status": "posted",
+        "postedAt": 1760400000002,
+        "customerId": "c_01",
+        "currency": "AFN",
+        "lines": [
+          {
+            "productId": "p_rice",
+            "qty": 2,
+            "unitPrice": 5000,
+            "amount": 10000
+          },
+          {
+            "productId": "p_oil",
+            "qty": 1,
+            "unitPrice": 12550,
+            "amount": 12550
+          }
+        ],
+        "discount": 550,
+        "total": 22000,
+        "payments": [
+          {
+            "method": "cash",
+            "amount": 20000
+          },
+          {
+            "method": "credit",
+            "amount": 2000
+          }
+        ],
+        "note": "یادداشت ۲",
+        "reverses": "K2-000001"
+      },
+      "opts": {
+        "id": "K2-R-000001",
+        "no": 1,
+        "postedAt": 1760400099000,
+        "reason": "اشتباه در مقدار",
+        "by": "u_owner"
+      },
+      "error": "is_reversal"
+    },
+    {
+      "name": "only once",
+      "doc": {
+        "id": "K2-000001",
+        "series": "K2",
+        "no": 1,
+        "type": "sale",
+        "status": "posted",
+        "postedAt": 1760400000001,
+        "customerId": "c_01",
+        "currency": "AFN",
+        "lines": [
+          {
+            "productId": "p_rice",
+            "qty": 2,
+            "unitPrice": 5000,
+            "amount": 10000
+          },
+          {
+            "productId": "p_oil",
+            "qty": 1,
+            "unitPrice": 12550,
+            "amount": 12550
+          }
+        ],
+        "discount": 550,
+        "total": 22000,
+        "payments": [
+          {
+            "method": "cash",
+            "amount": 20000
+          },
+          {
+            "method": "credit",
+            "amount": 2000
+          }
+        ]
+      },
+      "opts": {
+        "id": "K2-R-000001",
+        "no": 1,
+        "postedAt": 1760400099000,
+        "reason": "اشتباه در مقدار",
+        "by": "u_owner"
+      },
+      "existing": [
+        {
+          "id": "K2-R-000009",
+          "reverses": "K2-000001",
+          "status": "posted"
+        }
+      ],
+      "error": "already_reversed"
+    },
+    {
+      "name": "reason required",
+      "doc": {
+        "id": "K2-000001",
+        "series": "K2",
+        "no": 1,
+        "type": "sale",
+        "status": "posted",
+        "postedAt": 1760400000001,
+        "customerId": "c_01",
+        "currency": "AFN",
+        "lines": [
+          {
+            "productId": "p_rice",
+            "qty": 2,
+            "unitPrice": 5000,
+            "amount": 10000
+          },
+          {
+            "productId": "p_oil",
+            "qty": 1,
+            "unitPrice": 12550,
+            "amount": 12550
+          }
+        ],
+        "discount": 550,
+        "total": 22000,
+        "payments": [
+          {
+            "method": "cash",
+            "amount": 20000
+          },
+          {
+            "method": "credit",
+            "amount": 2000
+          }
+        ]
+      },
+      "opts": {
+        "id": "K2-R-000001",
+        "no": 1,
+        "postedAt": 1760400099000,
+        "reason": "  ",
+        "by": "u_owner"
+      },
+      "error": "bad_opts"
+    },
+    {
+      "name": "who reversed required",
+      "doc": {
+        "id": "K2-000001",
+        "series": "K2",
+        "no": 1,
+        "type": "sale",
+        "status": "posted",
+        "postedAt": 1760400000001,
+        "customerId": "c_01",
+        "currency": "AFN",
+        "lines": [
+          {
+            "productId": "p_rice",
+            "qty": 2,
+            "unitPrice": 5000,
+            "amount": 10000
+          },
+          {
+            "productId": "p_oil",
+            "qty": 1,
+            "unitPrice": 12550,
+            "amount": 12550
+          }
+        ],
+        "discount": 550,
+        "total": 22000,
+        "payments": [
+          {
+            "method": "cash",
+            "amount": 20000
+          },
+          {
+            "method": "credit",
+            "amount": 2000
+          }
+        ]
+      },
+      "opts": {
+        "id": "K2-R-000001",
+        "no": 1,
+        "postedAt": 1760400099000,
+        "reason": "x"
+      },
+      "error": "bad_opts"
+    },
+    {
+      "name": "fraction in document",
+      "doc": {
+        "id": "K2-000001",
+        "series": "K2",
+        "no": 1,
+        "type": "sale",
+        "status": "posted",
+        "postedAt": 1760400000001,
+        "customerId": "c_01",
+        "currency": "AFN",
+        "lines": [
+          {
+            "productId": "p",
+            "qty": 1,
+            "unitPrice": 5,
+            "amount": 2.5
+          }
+        ],
+        "discount": 550,
+        "total": 22000,
+        "payments": [
+          {
+            "method": "cash",
+            "amount": 20000
+          },
+          {
+            "method": "credit",
+            "amount": 2000
+          }
+        ]
+      },
+      "opts": {
+        "id": "K2-R-000001",
+        "no": 1,
+        "postedAt": 1760400099000,
+        "reason": "اشتباه در مقدار",
+        "by": "u_owner"
+      },
+      "error": "not_integer"
+    },
+    {
+      "name": "quantity as text",
+      "doc": {
+        "id": "K2-000001",
+        "series": "K2",
+        "no": 1,
+        "type": "sale",
+        "status": "posted",
+        "postedAt": 1760400000001,
+        "customerId": "c_01",
+        "currency": "AFN",
+        "lines": [
+          {
+            "productId": "p",
+            "qty": "2",
+            "unitPrice": 5,
+            "amount": 10
+          }
+        ],
+        "discount": 550,
+        "total": 22000,
+        "payments": [
+          {
+            "method": "cash",
+            "amount": 20000
+          },
+          {
+            "method": "credit",
+            "amount": 2000
+          }
+        ]
+      },
+      "opts": {
+        "id": "K2-R-000001",
+        "no": 1,
+        "postedAt": 1760400099000,
+        "reason": "اشتباه در مقدار",
+        "by": "u_owner"
+      },
+      "error": "not_integer"
+    }
+  ]
+}

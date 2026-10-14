@@ -26,15 +26,28 @@ async function log(entry) {
   } = entry || {};
   if (!action) return null;
   const id = newId('aud');
+  const clean = scrub(detail);
+  const at = now();
   try {
     await query(
       `INSERT INTO audit_logs (id, shop_id, actor_type, user_id, action, target_type, target_id, detail, ip, created_at)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-      [id, shopId, actorType, userId, action, targetType, targetId, JSON.stringify(scrub(detail)), ip, now()]
+      [id, shopId, actorType, userId, action, targetType, targetId, JSON.stringify(clean), ip, at]
     );
   } catch (err) {
     // شکست ثبت سابقه نباید خود عملیات را از کار بیندازد
     console.error('[audit] ثبت نشد:', err.message);
+    return id;
+  }
+  //  STF-09: سابقهٔ غیرقابل‌ویرایشِ هر کاربر — فقط وقتی پرچمِ
+  //  `security / hashchain.audit` روشن است (پیش‌فرض خاموش). بی IP.
+  try {
+    const chain = require('./hash-chain-store');
+    if (await chain.auditEnabled()) {
+      await chain.appendAudit({ id, shopId, actorType, userId, action, targetType, targetId, detail: clean, at });
+    }
+  } catch (err) {
+    console.error('[audit] زنجیره نوشته نشد:', err.message);
   }
   return id;
 }
