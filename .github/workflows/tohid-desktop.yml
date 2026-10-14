@@ -9,12 +9,14 @@ on:
       - 'desktop/**'
       - 'install.ps1'
       - 'android-native/app/src/**'
+      - 'core/**'
       - 'android-native/gradle.properties'
       - '.github/workflows/tohid-desktop.yml'
   pull_request:
     paths:
       - 'desktop/**'
       - 'android-native/app/src/**'
+      - 'core/**'
       - '.github/workflows/tohid-desktop.yml'
   #  ⛔ F0-27: push به main فقط کانالِ آزمایشی (`tohid-desktop-beta`). برچسبِ پایدار
   #  (`tohid-desktop`، همان که همهٔ کامپیوترها و صفحهٔ دانلود می‌خوانند) فقط از

@@ -229,6 +229,10 @@ val copyRes by tasks.registering(Sync::class) {
 tasks.named("processResources") { dependsOn(copyRes) }
 
 dependencies {
+  //  منطقِ خالصِ مشترک با اندروید — buildِ `../core` (includeBuild در settings.gradle.kts).
+  //  فایل‌هایی که به core رفته‌اند دیگر در `android-native` نیستند، پس از
+  //  `androidSources` هم نمی‌آیند و دوبار کامپایل نمی‌شوند.
+  implementation("ir.vil3ntec.tohid:core:1.0")
   implementation(compose.desktop.currentOs)
   //  نسخهٔ پایدار — نام‌مستعارِ `compose.material3` هنوز بتا می‌آورد
   implementation("org.jetbrains.compose.material3:material3:1.9.0")

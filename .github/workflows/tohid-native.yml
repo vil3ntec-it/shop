@@ -5,11 +5,13 @@ on:
     branches: ['claude/**', main]
     paths:
       - 'android-native/**'
+      - 'core/**'
       - '.github/workflows/tohid-native.yml'
   # PR هم ساخته می‌شود تا APKِ شکسته پیش از مرج دیده شود؛ انتشار فقط از main است
   pull_request:
     paths:
       - 'android-native/**'
+      - 'core/**'
       - '.github/workflows/tohid-native.yml'
   #  ⛔ F0-27: push به main فقط کانالِ آزمایشی (`tohid-native-beta`) را می‌سازد.
   #  برچسبِ پایدار (`tohid-native`، همان که همهٔ گوشی‌ها می‌پرسند) فقط از این‌جا:
