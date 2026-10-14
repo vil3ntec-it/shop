@@ -34,6 +34,12 @@ const TABLES = {
   stockMovements:   'stock_movements',
   priceHistory:     'price_history',
   auditLog:         'shop_audit_log',
+  //  F0-04 (migrations/048): سه فهرستِ تنظیماتی، هر نام یک ردیف
+  //  (`id` = ‎sha256(نام)‎، `data = {name}`). کلیدها همین‌جا فهرستِ سفیدِ
+  //  Sync v1 برای `shop` هم هستند (`sync-v1.js` همین‌ها را می‌خواند).
+  productCategories: 'product_categories',
+  productUnits:      'product_units',
+  expenseCategories: 'expense_categories',
 };
 const COLLECTIONS = Object.keys(TABLES);
 
