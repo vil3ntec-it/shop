@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.data.invoiceLabel
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -114,8 +115,8 @@ fun SalesHistoryScreen(
       .filter { sale ->
         if (term.isBlank()) return@filter true
         //  شمارهٔ فاکتور، یا نامِ مشتری
-        val number = sale.invoiceNumber?.toString().orEmpty()
-        number.contains(term) ||
+        val number = sale.invoiceLabel().orEmpty()
+        number.contains(term, ignoreCase = true) ||
           debtorNames[sale.debtorId].orEmpty().contains(term, ignoreCase = true)
       }
       .sortedByDescending { it.createdAt }
@@ -405,7 +406,7 @@ fun SalesHistoryScreen(
       title = { Text("اصلاح فاکتور؟", color = Shop.colors.text) },
       text = {
         Text(
-          "فاکتور #${plain(sale.invoiceNumber ?: 0)} لغو می‌شود و اقلامش با همان قیمت به سبد خرید برمی‌گردند. " +
+          "فاکتور #${sale.invoiceLabel() ?: "0"} لغو می‌شود و اقلامش با همان قیمت به سبد خرید برمی‌گردند. " +
             "بعد از اصلاح، فروش را دوباره ثبت کنید — شمارهٔ فاکتور تازه‌ای می‌گیرد.",
           style = MaterialTheme.typography.bodySmall,
           color = Shop.colors.muted,
@@ -531,7 +532,7 @@ private fun SaleRow(
         .padding(horizontal = 12.dp, vertical = 12.dp),
       verticalAlignment = Alignment.CenterVertically,
     ) {
-      InvoiceCell(plain(sale.invoiceNumber ?: 0), 0.7f, bold = true)
+      InvoiceCell(sale.invoiceLabel() ?: "0", 0.7f, bold = true)
       InvoiceCell(formatDate(sale.date), 1.1f)
       InvoiceCell(debtor?.name ?: "نقدی", 1.3f)
       InvoiceCell(
@@ -598,7 +599,7 @@ private fun ReturnDialog(
     DialogEntry {
     Surface(color = Shop.colors.surfaceSolid, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
       Column(Modifier.padding(18.dp).verticalScroll(rememberScrollState())) {
-        Text("مرجوعی — فاکتور #${plain(sale.invoiceNumber ?: 0)}",
+        Text("مرجوعی — فاکتور #${sale.invoiceLabel() ?: "0"}",
           style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
         Spacer(Modifier.height(12.dp))
 

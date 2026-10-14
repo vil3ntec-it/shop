@@ -3,6 +3,7 @@ package ir.vil3ntec.tohid.data
 import android.content.Context
 import ir.vil3ntec.tohid.sync.SyncEngine
 import ir.vil3ntec.tohid.sync.SyncStore
+import ir.vil3ntec.tohid.sync.v1.SyncV1Engine
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -31,7 +32,9 @@ import java.io.File
  *  دیگر می‌فرستد. یعنی بایگانی کردن روی یک گوشی، پاک کردنِ سابقه روی
  *  همه‌ی گوشی‌ها می‌شد.
  *
- *  پس این کار سایه را هم در همان لحظه هرس می‌کند: ردیفی که به بایگانی
+ *  پس این کار سایه را هم در همان لحظه هرس می‌کند — **هر دو** سایه: قدیمی
+ *  (`SyncStore`) و Sync v1 (`SyncV1Engine.forgetArchived`؛ پیش از بازبینیِ
+ *  F0-01 این یکی جا مانده بود و حذف‌ها واقعاً می‌رفتند): ردیفی که به بایگانی
  *  می‌رود از سایه هم بیرون می‌آید، و آن‌وقت هیچ دستورِ حذفی ساخته
  *  نمی‌شود. همین دو کار باید با هم انجام شوند، وگرنه یکی بدونِ دیگری
  *  خطرناک است.
@@ -114,27 +117,58 @@ object LedgerArchive {
     now: Long = System.currentTimeMillis(),
     keepDays: Int = KEEP_DAYS,
   ): Result<Done> = runCatching {
+    compactWith(
+      d, now, keepDays,
+      keep = { fresh ->
+        //  بایگانیِ قبلی خوانده و با تازه‌ها یکی می‌شود؛ هیچ ردیفی از بایگانی
+        //  بیرون نمی‌رود. ردیفی که از تلاشِ نیمه‌کارهٔ پیشین آن‌جا نشسته،
+        //  دوباره اضافه نمی‌شود.
+        val existing = readArchive(context)
+        val merged = Archive(
+          stockMovements = union(existing.stockMovements, fresh.stockMovements) { it.id },
+          priceHistory = union(existing.priceHistory, fresh.priceHistory) { it.id },
+          auditLog = union(existing.auditLog, fresh.auditLog) { it.id },
+        )
+        //  ⛔ اگر بایگانی به دیسک نرسد همین‌جا شکست می‌خورد و دفتر کوتاه نمی‌شود
+        //  — پیش‌تر نتیجهٔ `renameTo` دیده نمی‌شد و روی ویندوز ردیف‌ها از دفتر
+        //  می‌رفتند بی آنکه در بایگانی نشسته باشند (F0-01)
+        DiskWrite.text(file(context), json.encodeToString(merged))
+      },
+      forget = { gone ->
+        //  ⛔ سایهٔ Sync v1 — شکستش پرتاب می‌شود و دفتر کوتاه نمی‌شود. پیش‌تر
+        //  فقط سایهٔ قدیمی هرس می‌شد و ذخیرهٔ دفترِ کوتاه برای هر ردیفِ
+        //  بایگانی‌شده DELETE به سرور می‌فرستاد (بازبینیِ F0-01)
+        SyncV1Engine.of(context).forgetArchived(gone)
+        forgetInShadow(context, gone)
+      },
+    )
+  }
+
+  /**
+   *  همان `compact`، بی `Context` — تا آزمون همان مسیر را برود.
+   *
+   *  ترتیب: بایگانی روی دیسک ⇐ سایه‌ها هرس ⇐ دفترِ سبک. هر گامی بشکند
+   *  پرتاب می‌شود و دفترِ کوتاه هیچ‌وقت به صداکننده نمی‌رسد.
+   *
+   *  @param keep  ردیف‌های کهنه را روی دیسک می‌نشاند
+   *  @param forget همان ردیف‌ها را از سایه‌های همگام‌سازی بیرون می‌آورد
+   */
+  internal fun compactWith(
+    d: ShopData,
+    now: Long,
+    keepDays: Int,
+    keep: (Archive) -> Unit,
+    forget: (Map<String, List<String>>) -> Unit,
+  ): Done {
     val (kept, fresh) = split(d, now, keepDays)
     val moved = Plan(fresh.stockMovements.size, fresh.priceHistory.size, fresh.auditLog.size)
-    if (moved.total == 0) return@runCatching Done(d, moved)
+    if (moved.total == 0) return Done(d, moved)
 
-    //  بایگانیِ قبلی خوانده و با تازه‌ها یکی می‌شود؛ هیچ ردیفی از بایگانی
-    //  بیرون نمی‌رود
-    val existing = readArchive(context)
-    val merged = Archive(
-      stockMovements = existing.stockMovements + fresh.stockMovements,
-      priceHistory = existing.priceHistory + fresh.priceHistory,
-      auditLog = existing.auditLog + fresh.auditLog,
-    )
-    //  ⛔ اگر بایگانی به دیسک نرسد همین‌جا شکست می‌خورد و دفتر کوتاه نمی‌شود
-    //  — پیش‌تر نتیجهٔ `renameTo` دیده نمی‌شد و روی ویندوز ردیف‌ها از دفتر
-    //  می‌رفتند بی آنکه در بایگانی نشسته باشند (F0-01)
-    DiskWrite.text(file(context), json.encodeToString(merged))
+    keep(fresh)
 
     //  و سایه، در همان نفس. بدونِ این، همگام‌سازی این ردیف‌ها را
     //  «حذف‌شده» می‌فهمد و روی گوشی‌های دیگر هم پاکشان می‌کند.
-    forgetInShadow(
-      context,
+    forget(
       mapOf(
         "stockMovements" to fresh.stockMovements.map { it.id },
         "priceHistory" to fresh.priceHistory.map { it.id },
@@ -142,7 +176,12 @@ object LedgerArchive {
       ),
     )
 
-    Done(kept, moved)
+    return Done(kept, moved)
+  }
+
+  private fun <T> union(old: List<T>, fresh: List<T>, id: (T) -> String): List<T> {
+    val have = old.mapTo(HashSet(), id)
+    return old + fresh.filter { id(it) !in have }
   }
 
   fun readArchive(context: Context): Archive {

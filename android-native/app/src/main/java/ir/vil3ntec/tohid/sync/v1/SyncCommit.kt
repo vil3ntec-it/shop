@@ -97,6 +97,39 @@ internal class SyncCommit(private val journal: Journal, private val parts: Parts
     return ops.size
   }
 
+  /**
+   *  بایگانیِ دفتر (`LedgerArchive.compact`): ردیف‌هایی که از دفتر به بایگانی
+   *  می‌روند از سایه هم بیرون می‌آیند — بی هیچ op.
+   *
+   *  ⛔ بی این، ذخیرهٔ دفترِ کوتاه‌شده هر ردیفِ بایگانی‌شده را «حذف‌شده»
+   *  می‌دید و DELETE به سرور و همهٔ دستگاه‌های دیگر می‌رفت (بازبینیِ F0-01:
+   *  پیش‌تر فقط سایهٔ همگام‌سازیِ قدیمی هرس می‌شد).
+   *
+   *  پیش از ذخیرهٔ دفترِ کوتاه صدا زده می‌شود. اگر برنامه میانِ این دو بسته
+   *  شود، تفاضلِ بعدی همان ردیف‌ها را **درج** می‌فرستد (سرور دارد، همان
+   *  مقدار) — هرگز حذف. شکستِ نوشتنِ سایه پرتاب می‌شود تا دفتر کوتاه نشود.
+   *
+   *  @param gone نامِ مجموعه ⇐ شناسهٔ ردیف‌ها
+   *  @return چند ردیف از سایه بیرون آمد؛ `0` اگر هنوز سایه‌ای نیست
+   */
+  fun forget(gone: Map<String, Collection<String>>): Int {
+    if (journal.exists()) recover(null)
+    val shadow = parse(parts.shadow()) ?: return 0
+    var removed = 0
+    val next = JsonObject(
+      shadow.mapValues { (table, rows) ->
+        val ids = gone[table]?.toSet()
+        if (ids.isNullOrEmpty() || table !in LedgerDiff.COLLECTIONS || rows !is JsonArray) return@mapValues rows
+        val left = rows.filterNot { ((it as? JsonObject)?.get("id") as? JsonPrimitive)?.content in ids }
+        removed += rows.size - left.size
+        JsonArray(left)
+      },
+    )
+    if (removed == 0) return 0
+    parts.commit(next.toString(), null)
+    return removed
+  }
+
   /** ژورنال ⇐ صف ⇐ سایه (همزمان) ⇐ پاک کردنِ ژورنال */
   private fun commitOps(ops: List<SyncOp>, before: String, shadow: String) {
     journal.write(Journal.Entry(Journal.RECORD, before = sha(before), shadow = sha(shadow), ops = ops))
