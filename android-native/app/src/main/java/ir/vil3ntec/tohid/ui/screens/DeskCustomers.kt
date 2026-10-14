@@ -147,7 +147,7 @@ private fun CustomerCards(store: ShopStore, d: ShopData, snackbar: SnackbarHostS
     Modifier
       .fillMaxSize()
       .onPreviewKeyEvent { e ->
-        if (e.type == KeyEventType.KeyDown && e.isCtrlPressed && e.key == Key.E) { excel(); true } else false
+        if (e.type == KeyEventType.KeyDown && e.isPrimaryModifier && e.key == Key.E) { excel(); true } else false
       }
       .padding(16.dp),
   ) {
@@ -318,8 +318,8 @@ private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
         when {
           e.key == Key.F7 -> { entry = DebtorEngine.Kind.RECEIVE; true }
           e.key == Key.F6 -> { entry = DebtorEngine.Kind.GIVE; true }
-          e.isCtrlPressed && e.key == Key.P -> { print(); true }
-          e.isCtrlPressed && e.key == Key.E -> { excel(); true }
+          e.isPrimaryModifier && e.key == Key.P -> { print(); true }
+          e.isPrimaryModifier && e.key == Key.E -> { excel(); true }
           e.key == Key.Escape && entry == null && showInvoice == null -> { onBack(); true }
           else -> false
         }
