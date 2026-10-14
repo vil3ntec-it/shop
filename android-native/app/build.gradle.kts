@@ -284,12 +284,23 @@ android {
     sourceCompatibility = JavaVersion.VERSION_17
     targetCompatibility = JavaVersion.VERSION_17
   }
-  kotlinOptions { jvmTarget = "17" }
   buildFeatures { compose = true; buildConfig = true }
 }
 
+/*
+ *  همان `kotlinOptions { jvmTarget = "17" }`ِ پیشین — Kotlin 2.2 آن بلوک را
+ *  کنار گذاشته و جایش `compilerOptions` است (همان شکلِ `desktop/build.gradle.kts`).
+ */
+kotlin {
+  compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) }
+}
+
 dependencies {
-  val compose = platform("androidx.compose:compose-bom:2024.12.01")
+  //  قدم صفرِ ۳.۳: همان Compose که کامپیوتر دارد. Compose Multiplatform 1.9.3
+  //  (`desktop/build.gradle.kts`) روی اندروید به androidx.compose 1.9.4 می‌رسد و
+  //  material3ِ 1.9.0اش به androidx material3 1.4.0؛ BOMِ 2025.10.01 دقیقاً همین‌هاست.
+  //  نسخه را فقط هم‌پای `org.jetbrains.compose`ِ کامپیوتر عوض کنید.
+  val compose = platform("androidx.compose:compose-bom:2025.10.01")
   implementation(compose)
   androidTestImplementation(compose)
 
