@@ -147,14 +147,14 @@ private fun CustomerCards(store: ShopStore, d: ShopData, snackbar: SnackbarHostS
     Modifier
       .fillMaxSize()
       .onPreviewKeyEvent { e ->
-        if (e.type == KeyEventType.KeyDown && e.isCtrlPressed && e.key == Key.E) { excel(); true } else false
+        if (e.type == KeyEventType.KeyDown && e.isPrimaryModifier && e.key == Key.E) { excel(); true } else false
       }
       .padding(16.dp),
   ) {
     //  چهار عددِ کل
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
       DeskKpi("طلبِ کل", "${money(totalDebt)} ؋", Shop.colors.danger, Modifier.weight(1f))
-      DeskKpi("بدهکاران", "$debtors نفر", Color(0xFFFF9800), Modifier.weight(1f))
+      DeskKpi("بدهکاران", "$debtors نفر", Shop.colors.warning, Modifier.weight(1f))
       DeskKpi("دیرکرد بیش از ۶۰ روز", "$late نفر", if (late > 0) Shop.colors.danger else Shop.colors.success, Modifier.weight(1f))
       DeskKpi("خریدِ مشتری‌ها در این ماه", "${money(monthBought)} ؋", Shop.colors.primary, Modifier.weight(1f))
     }
@@ -271,7 +271,7 @@ private fun CustomerCard(s: CustomerEngine.Summary, onClick: () -> Unit) {
         Text(s.lastPurchase?.let { "آخرین خرید ${formatDate(it)}" } ?: "هنوز خریدی نیست", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted, maxLines = 1)
       }
       s.debtDays?.let { days ->
-        val c = when { days > 60 -> Shop.colors.danger; days > 30 -> Color(0xFFFF9800); else -> Shop.colors.muted }
+        val c = when { days > 60 -> Shop.colors.danger; days > 30 -> Shop.colors.warning; else -> Shop.colors.muted }
         Text(
           "$days روز",
           Modifier.clip(RoundedCornerShape(6.dp)).background(c.copy(alpha = 0.14f)).padding(horizontal = 6.dp, vertical = 2.dp),
@@ -318,8 +318,8 @@ private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
         when {
           e.key == Key.F7 -> { entry = DebtorEngine.Kind.RECEIVE; true }
           e.key == Key.F6 -> { entry = DebtorEngine.Kind.GIVE; true }
-          e.isCtrlPressed && e.key == Key.P -> { print(); true }
-          e.isCtrlPressed && e.key == Key.E -> { excel(); true }
+          e.isPrimaryModifier && e.key == Key.P -> { print(); true }
+          e.isPrimaryModifier && e.key == Key.E -> { excel(); true }
           e.key == Key.Escape && entry == null && showInvoice == null -> { onBack(); true }
           else -> false
         }

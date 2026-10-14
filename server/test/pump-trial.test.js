@@ -45,11 +45,13 @@ async function adminToken() {
 test('پیش‌فرضِ دورهٔ آزمایشیِ پمپ یک ماه است، و دکان دست نخورده', async () => {
   assert.equal(plans.TRIAL_DEFAULT.pump, '30');
   //  ⛔ عوض کردنِ پیش‌فرضِ **مشترک** دکان را هم عوض می‌کرد و دربارهٔ آن
-  //  چیزی گفته نشده بود.
-  assert.equal(plans.TRIAL_DEFAULT.shop, '14');
+  //  چیزی گفته نشده بود. F0-13: پشتوانهٔ دکان ۱۴ بود ولی آن‌چه کاشته می‌شد
+  //  (و هر نصبی در عمل داشت) ۷ — حالا یکی‌اند و همان ۷ ماند (تا D-03).
+  assert.equal(plans.TRIAL_DEFAULT.shop, '7');
+  assert.equal(plans.TRIAL_DEFAULT.shop, plans.DEFAULT_CONFIG.trial_days);
 
   assert.deepEqual(plans.trialConfig('pump'), { key: 'pump_trial_days', def: '30' });
-  assert.deepEqual(plans.trialConfig('shop'), { key: 'trial_days', def: '14' });
+  assert.deepEqual(plans.trialConfig('shop'), { key: 'trial_days', def: '7' });
 });
 
 test('پمپِ تازه بی هیچ اشتراکی یک ماه همه‌چیز دارد', async () => {
