@@ -66,6 +66,36 @@ async function open(width) {
   return { pg, errors };
 }
 
+// F0-23: دفترِ وب در localStorage است (سقفِ Chromium ۵٬۲۴۲٬۸۸۰ نویسه برای کلِ سایت).
+// زیرِ ۷۰٪ هیچ پنجره‌ای نباید بیاید؛ از ۷۰٪ پیشنهادِ خروجی با درصدِ واقعی باید
+// خودش باز شود و دکمه‌اش همان فایلِ پشتیبان را بدهد.
+await step('حافظهٔ مرورگر: ≥۷۰٪ ⇒ هشدار با درصد و پیشنهادِ اجباریِ خروجی؛ کمتر ⇒ هیچ', async () => {
+  const small = await open(1366);
+  await small.pg.waitForTimeout(3000);
+  assert.equal(await small.pg.locator('#modal-storage.open').count(), 0, 'با دفترِ کوچک نباید هشداری بیاید');
+  await small.pg.close();
+
+  const pg = await browser.newPage({ viewport: { width: 1366, height: 800 }, acceptDownloads: true });
+  const errors = [];
+  pg.on('pageerror', (e) => errors.push(String(e)));
+  await pg.goto(url);
+  const big = JSON.parse(JSON.stringify(LEDGER));
+  big.products[0].notes = 'ی'.repeat(Math.floor(5242880 * 0.75));
+  await pg.evaluate((d) => {
+    localStorage.setItem('tohid-shop-auth-v1', JSON.stringify({ method: 'local', value: '', name: 'آزمون', loginAt: 1 }));
+    localStorage.setItem('tohid-shop-data-v1', d);
+  }, JSON.stringify(big));
+  await pg.reload();
+  await pg.waitForSelector('#modal-storage.open', { timeout: 10000 });
+  const text = await pg.locator('#modal-storage').innerText();
+  assert.match(text, /7[5-6]٪/, `درصدِ واقعی در پنجره نیست: ${text}`);
+  const [dl] = await Promise.all([pg.waitForEvent('download'), pg.click('#btn-storage-export')]);
+  assert.match(dl.suggestedFilename(), /^tohid-shop-backup-.*\.json$/);
+  await pg.waitForFunction(() => !document.querySelector('#modal-storage.open'));
+  assert.deepEqual(errors, []);
+  await pg.close();
+});
+
 for (const width of [320, 390, 768, 1366]) {
   await step(`پهنای ${width}: هیچ صفحه‌ای افقی بیرون نمی‌زند و خطایی نیست`, async () => {
     const { pg, errors } = await open(width);

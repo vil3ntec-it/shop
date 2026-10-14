@@ -6013,6 +6013,21 @@
   </div>
 </div>
 
+<!-- F0-23: حافظهٔ مرورگر رو به پر شدن — پیشنهادِ خروجی که خودش باز می‌شود -->
+<div class="modal-scrim" id="modal-storage" role="alertdialog" aria-modal="true" aria-labelledby="storage-title" aria-describedby="storage-sub">
+  <div class="modal-box confirm-box">
+    <div class="confirm-icon">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg>
+    </div>
+    <div class="confirm-title" id="storage-title">حافظهٔ این مرورگر رو به پر شدن است</div>
+    <div class="confirm-sub" id="storage-sub"></div>
+    <div class="confirm-actions">
+      <button class="btn btn-secondary" data-close-modal="modal-storage">بعداً</button>
+      <button class="btn btn-primary" id="btn-storage-export">دانلود نسخه پشتیبان</button>
+    </div>
+  </div>
+</div>
+
 <!-- Add / Edit expense modal -->
 <div class="modal-scrim" id="modal-expense">
   <div class="modal-box">
@@ -13392,6 +13407,7 @@
         stockMovements, priceHistory, auditLog
       }));
     }catch(e){ console.error('ذخیره اطلاعات ناموفق بود:', e); warnStorageFull(e); }
+    if(alertsReady) scheduleStorageCheck();   // F0-23 — اندازهٔ حافظه، بیرون از مسیرِ ثبت
     /*
      *  ⛔ **تنها درِ نوشتن در دفتر همین‌جاست** و هر تغییری از همین‌جا
      *  رد می‌شود. پس `recordChange` تفاضلِ دفتر را با سایهٔ آخرین
@@ -13427,7 +13443,72 @@
     try{
       showToast('حافظهٔ این مرورگر پر شده: تغییرهای تازه فقط با همگام‌سازی به سرور می‌رسند. همین حالا پشتیبان بگیرید و اینترنت را وصل نگه دارید.', 'danger');
     }catch(err){}
+    try{ checkStorageBudget(3); }catch(err){}
   }
+
+  /*
+   * F0-23 — اندازهٔ حافظهٔ مرورگر را پیش از پر شدن بسنج، نه پس از آن.
+   *
+   * سقف برای کلِ سایت است، نه فقط دفتر: صفِ همگام‌سازی و سایه‌اش هم در همین
+   * localStorage‌اند، پس همهٔ کلیدها شمرده می‌شوند (کلید + مقدار، به نویسه).
+   *   • Chromium (اندروید، ویندوز، WebView): ۵٬۲۴۲٬۸۸۰ نویسه — سنجیده‌شده.
+   *   • WebKit (هر مرورگرِ آیفون، و Safari): ۵MB بایتِ UTF-16، یعنی نصفِ آن.
+   * از ۷۰٪ پنجرهٔ خروجی خودش باز می‌شود، از ۹۰٪ دوباره و تندتر، و با
+   * QuotaExceededError (بالا) بارِ سوم. «بعداً» فقط تا پلهٔ بعد یا بارِ بعدیِ
+   * باز کردنِ برنامه است. ⛔ هیچ داده‌ای پاک نمی‌شود؛ انتقال به IndexedDB
+   * کارِ فاز ۱ است. سنجش پس از هر ثبت با ۲ ثانیه تأخیر است تا ثبت کند نشود.
+   * `var` عمدی است: warnStorageFull ممکن است پیش از رسیدنِ اجرا به این خط صدا زده شود.
+   */
+  var STORAGE_WARN_RATIO = 0.7, STORAGE_CRITICAL_RATIO = 0.9;
+  var storagePromptLevel = 0, storageCheckTimer = null, lastStorageUsage = null;
+  function storageCapChars(){
+    const ua = navigator.userAgent || '';
+    const ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+    const safari = /AppleWebKit\//.test(ua) && /Safari\//.test(ua) && !/Chrome\/|Chromium\/|CriOS\/|Edg\/|OPR\/|Android/.test(ua);
+    return (ios || safari) ? 2621440 : 5242880;
+  }
+  function storageUsage(){
+    let used = 0;
+    try{
+      for(let i = 0; i < localStorage.length; i++){
+        const k = localStorage.key(i);
+        used += k.length + (localStorage.getItem(k) || '').length;
+      }
+    }catch(e){ return null; }
+    const cap = storageCapChars();
+    return { used, cap, ratio: used / cap };
+  }
+  function scheduleStorageCheck(ms){
+    clearTimeout(storageCheckTimer);
+    storageCheckTimer = setTimeout(()=> checkStorageBudget(), ms || 2000);
+  }
+  function checkStorageBudget(forceLevel){
+    const u = storageUsage();
+    if(u) lastStorageUsage = u;
+    try{ renderBackupMeta(); }catch(e){}
+    const ratio = u ? u.ratio : 1;
+    const level = forceLevel || (ratio >= STORAGE_CRITICAL_RATIO ? 2 : ratio >= STORAGE_WARN_RATIO ? 1 : 0);
+    if(level <= storagePromptLevel) return;
+    const appRoot = document.getElementById('app-root');
+    if(appRoot && appRoot.classList.contains('app-hidden')){ scheduleStorageCheck(5000); return; }
+    if(level === 1 && daysSinceLastBackup() === 0) return;   // امروز پشتیبان گرفته
+    storagePromptLevel = level;
+    const pct = Math.min(100, Math.round(ratio * 100));
+    document.getElementById('storage-title').textContent =
+      level >= 3 ? 'حافظهٔ این مرورگر پر شد' :
+      level === 2 ? `حافظهٔ این مرورگر تقریباً پر است — ${pct}٪` :
+                    `حافظهٔ این مرورگر ${pct}٪ پر است`;
+    document.getElementById('storage-sub').textContent = (
+      level >= 3 ? 'تغییرهای تازه روی همین دستگاه نماند و فقط با همگام‌سازی به سرور می‌رسد. ' :
+      level === 2 ? 'به‌زودی تغییرهای تازه روی همین دستگاه ذخیره نمی‌شوند. ' :
+                    'نسخهٔ وب داده را در حافظهٔ خودِ مرورگر نگه می‌دارد و این حافظه سقف دارد. '
+    ) + 'همین حالا یک نسخهٔ پشتیبان دانلود کنید تا چیزی از دست نرود، و اگر حساب دارید اینترنت را وصل نگه دارید تا همگام‌سازی همه‌چیز را به سرور ببرد.';
+    openModal('modal-storage');
+  }
+  document.getElementById('btn-storage-export').addEventListener('click', ()=>{
+    closeModal('modal-storage');
+    document.getElementById('btn-export-backup').click();
+  });
 
   function loadState(){
     touchLedger();
@@ -13559,6 +13640,7 @@
     try{
       localStorage.setItem(STORAGE_KEY, JSON.stringify(readLedger()));
     }catch(e){ console.error('نوشتنِ دفترِ رسیده ناموفق بود:', e); warnStorageFull(e); }
+    if(alertsReady) scheduleStorageCheck();
 
     rebuildBarcodeIndex();
     repaintLedger();
@@ -14968,11 +15050,18 @@
       text.textContent = `آخرین پشتیبان‌گیری: ${days.toLocaleString('en-US')} روز پیش — بهتر است نسخه تازه بگیرید.`;
       wrap.classList.add('warn');
     }
+    /* F0-23: اندازهٔ حافظهٔ مرورگر — از آخرین سنجش، نه سنجشِ تازه (بالا آمدن کند نشود) */
+    const u = lastStorageUsage;
+    if(u){
+      text.textContent += ` · حافظهٔ این مرورگر: ${Math.min(100, Math.round(u.ratio * 100))}٪ پر`;
+      if(u.ratio >= STORAGE_WARN_RATIO){ wrap.classList.remove('ok'); wrap.classList.add('warn'); }
+    }
   }
 
   alertsReady = true;
   renderBackupMeta();
   renderAlerts();
+  scheduleStorageCheck(1500);   // F0-23 — پس از بالا آمدن، نه در مسیرِ آن
 
 
   goTo(location.hash.replace('#','') || 'dashboard');
