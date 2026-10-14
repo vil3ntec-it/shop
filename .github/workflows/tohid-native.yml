@@ -103,6 +103,18 @@ jobs:
           TOHID_LICENSE_PUBLIC_KEY: ${{ vars.TOHID_LICENSE_PUBLIC_KEY }}
         run: gradle --no-daemon assembleRelease -PbuildNumber=${{ github.run_number }}
 
+      #  معیارِ «قدم صفر»ِ ۳.۳: applicationId، versionCode و اثر انگشتِ امضا همان
+      #  نسخهٔ منتشرشده؛ حجم در ±۵٪ (سخت برای PRی که فایلِ ساخت را عوض کرده) و شمارِ
+      #  آزمون‌ها در خلاصهٔ اجرا. پیش از انتشار، تا APKِ ناسازگار هرگز به گوشی‌ها نرسد.
+      - name: دروازه‌های APK
+        working-directory: android-native
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: >-
+          bash tools/apk-gates.sh app/build/outputs/apk/release/app-release.apk
+          $((100 + ${{ github.run_number }})) app/build/test-results/testReleaseUnitTest
+
       - name: نام‌گذاری و جمع کنترلی
         working-directory: android-native
         env:
