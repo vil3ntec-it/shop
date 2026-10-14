@@ -111,11 +111,15 @@ test('ایمیلِ تکراری حسابِ دوم نمی‌سازد', async () =
     terms: { accepted: true, version: ver.body.terms.version }, app: 'pump',
   });
 
+  //  ⛔ F0-16: «از قبل ثبت شده» پس از کدِ درست می‌آید، نه در پلهٔ اول
   const again = await h.post('/api/auth/register/start', {
     name: 'دو', email, password: PASS, passwordConfirm: PASS, app: 'pump',
   });
-  assert.equal(again.status, 409);
-  assert.equal(again.body.error.code, 'already_registered');
+  assert.equal(again.status, 201, JSON.stringify(again.body));
+  const ver2 = await h.post('/api/auth/register/verify', { email, code: again.body.devCode });
+  assert.equal(ver2.status, 409);
+  assert.equal(ver2.body.error.code, 'already_registered');
+  assert.equal(ver2.body.ticket, undefined);
 });
 
 test('رمزِ ضعیف و تکرارِ ناهمسان همان‌جا رد می‌شوند', async () => {

@@ -126,9 +126,10 @@ object LedgerArchive {
       priceHistory = existing.priceHistory + fresh.priceHistory,
       auditLog = existing.auditLog + fresh.auditLog,
     )
-    val tmp = File(context.filesDir, "$NAME.tmp")
-    tmp.writeText(json.encodeToString(merged))
-    tmp.renameTo(file(context))
+    //  ⛔ اگر بایگانی به دیسک نرسد همین‌جا شکست می‌خورد و دفتر کوتاه نمی‌شود
+    //  — پیش‌تر نتیجهٔ `renameTo` دیده نمی‌شد و روی ویندوز ردیف‌ها از دفتر
+    //  می‌رفتند بی آنکه در بایگانی نشسته باشند (F0-01)
+    DiskWrite.text(file(context), json.encodeToString(merged))
 
     //  و سایه، در همان نفس. بدونِ این، همگام‌سازی این ردیف‌ها را
     //  «حذف‌شده» می‌فهمد و روی گوشی‌های دیگر هم پاکشان می‌کند.

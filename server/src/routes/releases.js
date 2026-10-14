@@ -13,6 +13,16 @@
  * خصوصی است — توکن هرگز به برنامه نمی‌رسد)، فایل را یک بار روی دیسکِ خودش
  * نگه می‌دارد، و از آن پس خودش می‌دهد.
  *
+ * ── کانالِ آزمایشی (F0-27، ۱۴۰۵/۰۷/۲۱) ───────────────────────────────
+ * push به main فقط زیرِ `<برچسب>-beta` منتشر می‌شود؛ برچسبِ پایدار فقط با
+ * workflow_dispatch. کدام دکان یا دستگاه آزمایشی است را `live_config`
+ * می‌گوید — scope `release`، کلیدهای `beta.shops` و `beta.devices` (فهرست
+ * یا رشتهٔ جداشده با ویرگول). برنامه `?shop=&device=` می‌فرستد؛ اگر عضو بود،
+ * از دو انتشار هر کدام نسخهٔ بالاتر دارد داده می‌شود و `tag` در پاسخ می‌گوید
+ * فایل‌ها را از کدام برچسب بگیرد. برنامهٔ قدیمی این‌ها را نمی‌فرستد ⇒ پایدار.
+ *   ⛔ شناسه‌ها راز نیستند و نباید باشند: بدترین حالتِ جعل، گرفتنِ یک نسخهٔ
+ *      آزمایشیِ امضاشده است که روی GitHub هم عمومی است.
+ *
  * ⛔ فقط برچسب‌ها و فایل‌هایی که در انتشار هست؛ نامِ فایل هرگز مسیر نمی‌شود.
  * ⛔ اصالت را سرور تضمین نمی‌کند — برنامه `SHA256SUMS.txt` و امضای ECDSAِ آن را
  *    با کلیدِ سنجاق‌شدهٔ خودش می‌سنجد؛ سرورِ دست‌کاری‌شده هم نمی‌تواند نصبیِ جعلی بدهد.
@@ -27,7 +37,10 @@ const { notFound } = require('../middleware/errors');
 
 const router = express.Router();
 
-const TAGS = new Set(['tohid-native', 'tohid-desktop']);
+const STABLE = ['tohid-native', 'tohid-desktop'];
+const BETA = (tag) => `${tag}-beta`;
+const TAGS = new Set([...STABLE, ...STABLE.map(BETA)]);
+const ID = /^[A-Za-z0-9_-]{1,80}$/;
 const NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/;
 
 /** انتشارِ هر برچسب، تا `ttlMs` در حافظه */
@@ -102,15 +115,67 @@ async function cached(tag, asset) {
   return file;
 }
 
+/** `1.2.10` > `1.2.9`؛ رشتهٔ خالی از همه کوچک‌تر */
+function newer(a, b) {
+  const x = String(a || '').split('.').map(Number);
+  const y = String(b || '').split('.').map(Number);
+  for (let i = 0; i < Math.max(x.length, y.length); i++) {
+    const d = (x[i] || 0) - (y[i] || 0);
+    if (d) return d > 0;
+  }
+  return false;
+}
+
+/** فهرستِ آزمایشی‌ها از live_config (scope `release`)، تا ۶۰ ثانیه در حافظه */
+let betaCache = { at: 0, shops: new Set(), devices: new Set() };
+async function betaMembers() {
+  if (Date.now() - betaCache.at < 60 * 1000) return betaCache;
+  const ids = (v) => new Set((Array.isArray(v) ? v : String(v ?? '').split(','))
+    .map((x) => String(x).trim()).filter((x) => ID.test(x)));
+  try {
+    const { items } = await require('../lib/live-config').list('release');
+    const val = (k) => items.find((i) => i.key === k)?.value;
+    betaCache = { at: Date.now(), shops: ids(val('beta.shops')), devices: ids(val('beta.devices')) };
+  } catch (err) {
+    //  دیتابیس در دسترس نیست ⇒ همان فهرستِ قبلی؛ هرگز خطا به‌خاطرِ کانال
+    console.warn(`[releases] beta list: ${err.message}`);
+  }
+  return betaCache;
+}
+
+async function isBeta(q) {
+  const shop = String(q.shop || '');
+  const device = String(q.device || '');
+  if (!shop && !device) return false;
+  const m = await betaMembers();
+  return (ID.test(shop) && m.shops.has(shop)) || (ID.test(device) && m.devices.has(device));
+}
+
 router.get('/:tag/latest', async (req, res, next) => {
   try {
     const tag = String(req.params.tag);
     if (!TAGS.has(tag)) return next(notFound('انتشاری با این نام نیست', 'release_not_found'));
-    const data = await release(tag);
-    res.set('Cache-Control', 'public, max-age=60');
+    let use = tag;
+    let data = await release(tag);
+    let version = await versionOf(data);
+    let channel = tag.endsWith('-beta') ? 'beta' : 'stable';
+    //  عضوِ آزمایشی: از پایدار و آزمایشی، هر کدام بالاتر. انتشارِ آزمایشی
+    //  نبود یا خراب بود ⇒ همان پایدار، بی خطا.
+    if (STABLE.includes(tag) && await isBeta(req.query)) {
+      try {
+        const b = await release(BETA(tag));
+        const bv = await versionOf(b);
+        if (bv && newer(bv, version)) { use = BETA(tag); data = b; version = bv; channel = 'beta'; }
+      } catch (err) {
+        console.warn(`[releases] ${BETA(tag)}: ${err.message}`);
+      }
+    }
+    //  پاسخ به شناسه بسته است ⇒ کشِ مشترک نباید پاسخِ یک دکان را به دیگری بدهد
+    res.set('Cache-Control', req.query.shop || req.query.device ? 'private, max-age=60' : 'public, max-age=60');
     res.json({
-      tag,
-      version: await versionOf(data),
+      tag: use,
+      channel,
+      version,
       notes: data.notes,
       publishedAt: data.publishedAt,
       assets: data.assets.map(a => ({ name: a.name, size: a.size })),
@@ -140,3 +205,4 @@ router.get('/:tag/file/:name', async (req, res, next) => {
 
 module.exports = router;
 module.exports._cache = cache;
+module.exports._forgetBeta = () => { betaCache = { at: 0, shops: new Set(), devices: new Set() }; };
