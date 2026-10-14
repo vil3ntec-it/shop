@@ -132,9 +132,9 @@ object AutoBackup {
      */
     val slot = if (Calendar.getInstance().get(Calendar.HOUR_OF_DAY) < 12) "b" else "sh"
     val target = File(dir(context), "$PREFIX$today-$slot$SUFFIX")
-    val tmp = File(dir(context), "$PREFIX$today-$slot$SUFFIX.tmp")
-    ledger.copyTo(tmp, overwrite = true)
-    tmp.renameTo(target)
+    //  فایلِ کناری + fsync + جابه‌جاییِ اتمی؛ شکست بی‌صدا نیست (F0-01) —
+    //  روی ویندوز `renameTo` نسخهٔ دومِ همان نوبت را هرگز نمی‌نشاند
+    DiskWrite.copy(ledger, target)
     prune(context)
     target
   }
