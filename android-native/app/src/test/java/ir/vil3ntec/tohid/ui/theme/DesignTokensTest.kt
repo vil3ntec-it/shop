@@ -85,9 +85,16 @@ class DesignTokensTest {
     assertTrue("پوشهٔ قلمِ برنامه پیدا نشد (cwd=${File(".").absoluteFile})", dirs[0] != null)
     val fonts = dirs.filterNotNull().flatMap { d -> d.listFiles().orEmpty().filter { it.name.lowercase().startsWith("vazirmatn") && it.extension == "ttf" } }
     assertTrue("قلمِ وزیرمتن پیدا نشد", fonts.size >= 4)
+    //  java.awt در classpathِ کامپایلِ آزمونِ اندروید (android.jar) نیست ولی JVMِ آزمون دارد —
+    //  پس با بازتاب صدا زده می‌شود تا همین آزمون در CIِ اندروید و کامپیوتر هر دو کامپایل شود
+    val fontClass = Class.forName("java.awt.Font")
+    val trueType = fontClass.getField("TRUETYPE_FONT").getInt(null)
+    val createFont = fontClass.getMethod("createFont", Int::class.javaPrimitiveType, File::class.java)
+    val canDisplayUpTo = fontClass.getMethod("canDisplayUpTo", String::class.java)
     for (f in fonts) {
-      val font = java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, f)
-      assertEquals("${f.name} نویسهٔ «${text.getOrNull(font.canDisplayUpTo(text))}» را ندارد", -1, font.canDisplayUpTo(text))
+      val font = createFont.invoke(null, trueType, f)
+      val missing = canDisplayUpTo.invoke(font, text) as Int
+      assertEquals("${f.name} نویسهٔ «${text.getOrNull(missing)}» را ندارد", -1, missing)
     }
   }
 }
