@@ -25,7 +25,7 @@ const { promisify } = require('util');
 const sync = require('../lib/sync-v1');
 const { rateLimit } = require('../middleware/ratelimit');
 const config = require('../config');
-const { requireSyncAccount, requireSyncWrite } = require('../lib/sync-v1-auth');
+const { requireSyncAccount, requireSyncWrite, tokenOf } = require('../lib/sync-v1-auth');
 const live = require('../lib/sync-v1-live');
 const v = require('../lib/validate');
 
@@ -51,6 +51,16 @@ function pumpServicesOnly(req, res, next) {
   if (req.sync && req.sync.accountKind === 'station') return pumpOnline(req, res, next);
   next();
 }
+
+/* ------------------------------------------------------- بلیتِ سوکت (F0-11) */
+/**
+ * `POST /live/ticket` — بلیتِ یک‌بارمصرفِ ۶۰ ثانیه‌ای برای `wss …/live?ticket=`.
+ * توکن در سرآیند می‌ماند و هرگز در آدرس (و لاگ) نمی‌نشیند.
+ */
+router.post('/live/ticket', (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json(live.issueTicket(tokenOf(req)));
+});
 
 /* ------------------------------------------------------------------ Push */
 

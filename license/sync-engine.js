@@ -456,15 +456,47 @@
   var socketAttempt = 0;
   var socketTimer = null;
 
-  async function connectLive() {
-    if (socket || !acc.configured() || !acc.isSignedIn()) return;
+  var socketDialing = false;
+
+  /**
+   * F0-11: توکن در آدرسِ سوکت (و لاگِ پراکسی) نمی‌نشیند. اول با POST یک
+   * بلیتِ یک‌بارمصرفِ ۶۰ ثانیه‌ای می‌گیریم و با `?ticket=` وصل می‌شویم.
+   * فقط اگر سرور هنوز این راه را ندارد (۴۰۴)، همان `?token=` قدیم.
+   */
+  async function liveCredential() {
+    try {
+      var t = await acc.authFetch('/api/sync/v1/live/ticket', { method: 'POST', body: {} });
+      if (t && t.ticket) return ['ticket', String(t.ticket)];
+    } catch (e) {
+      if (!e || e.status !== 404) throw e;
+    }
     var token = await acc.accessToken();
-    if (!token) return;
+    return token ? ['token', token] : null;
+  }
+
+  function retryLive() {
+    if (socketTimer) clearTimeout(socketTimer);
+    socketAttempt += 1;
+    socketTimer = setTimeout(connectLive, core.backoffMs(socketAttempt));
+  }
+
+  async function connectLive() {
+    if (socket || socketDialing || !acc.configured() || !acc.isSignedIn()) return;
+    var cred = null;
+    socketDialing = true;
+    try { cred = await liveCredential(); } catch (e) {
+      //  بی اینترنت یا خطای سرور: مثلِ افتادنِ سوکت، با فاصلهٔ فزاینده دوباره
+      socketDialing = false;
+      if (acc.isSignedIn()) retryLive();
+      return;
+    }
+    socketDialing = false;
+    if (!cred || socket || !acc.isSignedIn()) return;
     var url = '';
     try {
       var u = new URL('/api/sync/v1/live', window.TohidApiConfig.baseUrl());
       u.protocol = u.protocol === 'http:' ? 'ws:' : 'wss:';
-      u.searchParams.set('token', token);
+      u.searchParams.set(cred[0], cred[1]);
       u.searchParams.set('device_id', acc.deviceId());
       u.searchParams.set('app', acc.appId());
       url = u.toString();
@@ -489,9 +521,7 @@
       announce();
       //  ⚠️ بی‌پایان تلاش می‌کنیم ولی با فاصلهٔ فزاینده؛ سوکتی که هر
       //  ثانیه دوباره وصل شود، هم باتری می‌خورد هم سرور را می‌کوبد
-      if (socketTimer) clearTimeout(socketTimer);
-      socketAttempt += 1;
-      socketTimer = setTimeout(connectLive, core.backoffMs(socketAttempt));
+      retryLive();
     };
     socket.onerror = function () { try { socket.close(); } catch (e) { /* بسته شد */ } };
   }

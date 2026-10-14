@@ -4,12 +4,18 @@ import android.content.Context
 import ir.vil3ntec.tohid.core.config.AppConfig
 import ir.vil3ntec.tohid.core.net.ApiEndpoints
 import ir.vil3ntec.tohid.data.repo.Backend
+import okhttp3.Call
+import okhttp3.Callback
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import org.json.JSONObject
+import java.io.IOException
+import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 import kotlin.math.min
 import kotlin.math.pow
@@ -34,6 +40,11 @@ import kotlin.math.pow
  *
  *  ⛔ نشانی از `AppConfig` می‌آید و از هیچ کادری خوانده نمی‌شود — همان
  *  قفلِ همیشگی.
+ *
+ *  ── F0-11: توکن در آدرس نمی‌رود ────────────────────────────────────
+ *  آدرسِ سوکت در لاگِ پراکسی می‌ماند. پس اول با `POST …/live/ticket`
+ *  (توکن در سرآیند) یک بلیتِ یک‌بارمصرفِ ۶۰ ثانیه‌ای می‌گیریم و با
+ *  `?ticket=` وصل می‌شویم. فقط سرورِ کهنه (۴۰۴) ⇒ همان `?token=` قدیم.
  */
 class LiveSocket(
   context: Context,
@@ -46,7 +57,14 @@ class LiveSocket(
     .readTimeout(0, TimeUnit.MILLISECONDS)   // سوکت عمداً باز می‌ماند
     .build()
 
+  /** درخواستِ بلیت نباید مثلِ سوکت بی‌پایان منتظر بماند */
+  private val ticketClient = client.newBuilder()
+    .readTimeout(15, TimeUnit.SECONDS)
+    .callTimeout(20, TimeUnit.SECONDS)
+    .build()
+
   @Volatile private var socket: WebSocket? = null
+  @Volatile private var dialing = false
   @Volatile private var closedByUs = false
   @Volatile private var attempt = 0
 
@@ -62,19 +80,39 @@ class LiveSocket(
 
   fun connect() {
     current = this
-    if (socket != null) return
+    if (socket != null || dialing) return
     if (!Backend.isReady(app)) return
     val token = Backend.tokens(app).accessToken ?: return
     val base = AppConfig.baseUrl(app).ifBlank { return }
     val device = runCatching { ir.vil3ntec.tohid.sync.SyncStore(app).deviceUid }.getOrDefault("")
 
-    val url = base.replaceFirst("https://", "wss://").replaceFirst("http://", "ws://") +
-      ApiEndpoints.SyncV1.LIVE_PATH +
-      "?token=" + java.net.URLEncoder.encode(token, "UTF-8") +
-      "&device_id=" + java.net.URLEncoder.encode(device, "UTF-8") +
-      "&app=" + java.net.URLEncoder.encode(AppConfig.appId, "UTF-8")
-
     closedByUs = false
+    dialing = true
+    val ask = Request.Builder()
+      .url(base.trimEnd('/') + ApiEndpoints.SyncV1.LIVE_TICKET_PATH)
+      .header("Authorization", "Bearer $token")
+      .header("X-App", AppConfig.appId)
+      .post("{}".toRequestBody("application/json".toMediaType()))
+      .build()
+    ticketClient.newCall(ask).enqueue(object : Callback {
+      override fun onFailure(call: Call, e: IOException) {
+        dialing = false
+        fell()
+      }
+
+      override fun onResponse(call: Call, response: Response) {
+        val cred = response.use {
+          LiveCredential.from(it.code, runCatching { it.body?.string() }.getOrNull(), token)
+        }
+        dialing = false
+        if (cred == null || closedByUs) { if (cred == null) fell(); return }
+        open(LiveCredential.url(base, cred, device, AppConfig.appId))
+      }
+    })
+  }
+
+  private fun open(url: String) {
+    if (socket != null) return
     socket = client.newWebSocket(
       Request.Builder().url(url).build(),
       object : WebSocketListener() {
@@ -136,4 +174,24 @@ class LiveSocket(
     socket = null
     SyncV1Engine.of(app).liveConnected = false
   }
+}
+
+/**
+ *  منطقِ خالصِ F0-11 — جدا تا آزمونِ JVM بی اندروید بسنجدش.
+ */
+internal object LiveCredential {
+  /** پاسخِ `POST …/live/ticket` ⇒ («ticket», بلیت)؛ سرورِ کهنه (۴۰۴) ⇒ («token», توکن)؛ بقیه ⇒ null */
+  fun from(code: Int, body: String?, token: String): Pair<String, String>? = when {
+    code in 200..299 -> runCatching { JSONObject(body ?: "").optString("ticket") }.getOrDefault("")
+      .takeIf { it.isNotBlank() }?.let { "ticket" to it }
+    code == 404 -> "token" to token
+    else -> null
+  }
+
+  fun url(base: String, cred: Pair<String, String>, device: String, appId: String): String =
+    base.trimEnd('/').replaceFirst("https://", "wss://").replaceFirst("http://", "ws://") +
+      ApiEndpoints.SyncV1.LIVE_PATH +
+      "?" + cred.first + "=" + URLEncoder.encode(cred.second, "UTF-8") +
+      "&device_id=" + URLEncoder.encode(device, "UTF-8") +
+      "&app=" + URLEncoder.encode(appId, "UTF-8")
 }
