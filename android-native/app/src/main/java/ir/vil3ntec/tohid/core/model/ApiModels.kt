@@ -298,6 +298,14 @@ data class PlansDto(
   val plans: List<PlanDto> = emptyList(),
   val currency: String = "افغانی",
   val trialDays: Int = 0,
+  /** F0-24: شمارهٔ فروش از `app_config.whatsapp_number` (سرورِ قدیمی ⇒ خالی) */
+  val whatsapp: SalesWhatsAppDto = SalesWhatsAppDto(),
+)
+
+@Serializable
+data class SalesWhatsAppDto(
+  val number: String = "",
+  val message: String = "",
 )
 
 /* ============================== کد اشتراک ============================== */

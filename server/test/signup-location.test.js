@@ -101,7 +101,9 @@ test('ثبت‌نام بدون لوکیشن هم تمام می‌شود', async 
   assert.equal(done.body.location, null);
 });
 
-test('ایمیلی که از قبل حساب دارد، در پله‌ی اول رد می‌شود', async () => {
+//  ⛔ F0-16: پلهٔ اول دیگر «از قبل ثبت شده» نمی‌گوید (وگرنه هر کسی می‌فهمید
+//  کدام ایمیل حساب دارد)؛ پس از کدِ درست، در پلهٔ دوم رد می‌شود
+test('ایمیلی که از قبل حساب دارد، پس از کدِ درست رد می‌شود و حسابِ دوم ساخته نمی‌شود', async () => {
   const email = 'signup5@example.com';
   const ticket = await ticketFor(email, { uid: 'dev-signup-5' });
   await h.post('/api/auth/register/complete', {
@@ -109,8 +111,11 @@ test('ایمیلی که از قبل حساب دارد، در پله‌ی اول 
   });
 
   const again = await h.post('/api/auth/register/start', { name: 'کاربر', email, password: PASS });
-  assert.equal(again.status, 409);
-  assert.equal(again.body.error.code, 'already_registered');
+  assert.equal(again.status, 201, JSON.stringify(again.body));
+  const ver = await h.post('/api/auth/register/verify', { email, code: again.body.devCode });
+  assert.equal(ver.status, 409);
+  assert.equal(ver.body.error.code, 'already_registered');
+  assert.equal(ver.body.ticket, undefined);
 });
 
 test('رمز و تکرارش که یکی نباشد، همان پله‌ی اول رد می‌شود', async () => {

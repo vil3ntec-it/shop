@@ -25,10 +25,31 @@ class AdminApi(private val baseUrl: String) {
 
   data class Login(val token: String, val name: String, val role: String, val expiresAt: Long)
 
+  companion object {
+    /** رقم‌های فارسی/عربی ⇒ لاتین؛ شش رقم ⇒ `totp`، بقیه ⇒ `recovery_code` */
+    fun secondFactor(raw: String): Pair<String, String>? {
+      val s = raw.map { ch ->
+        when (ch) {
+          in '۰'..'۹' -> '0' + (ch - '۰')
+          in '٠'..'٩' -> '0' + (ch - '٠')
+          else -> ch
+        }
+      }.joinToString("").filterNot { it.isWhitespace() }
+      if (s.isEmpty()) return null
+      return if (s.length == 6 && s.all { it in '0'..'9' }) "totp" to s else "recovery_code" to s
+    }
+  }
+
   /* ------------------------------ ورود ------------------------------ */
 
-  suspend fun login(username: String, password: String): Login {
-    val body = post("/api/v1/admin/login", JSONObject().put("username", username).put("password", password), null)
+  /**
+   *  F0-15: `second` = کدِ شش‌رقمیِ برنامهٔ تأیید یا یک کدِ بازیابی — فقط
+   *  وقتی سرور `totp_required` گفته باشد پر است.
+   */
+  suspend fun login(username: String, password: String, second: String = ""): Login {
+    val req = JSONObject().put("username", username).put("password", password)
+    secondFactor(second)?.let { (field, value) -> req.put(field, value) }
+    val body = post("/api/v1/admin/login", req, null)
     val admin = body.optJSONObject("admin")
     return Login(
       token = body.optString("token").ifBlank { throw ApiError("سرور توکن نداد", "bad_response", 0) },

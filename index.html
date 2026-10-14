@@ -15,10 +15,13 @@
 <!--
   CSP: اسکریپت فقط از خودِ همین سایت (و درون‌خطیِ خودِ صفحه)؛ نه شیءِ جاسازی، نه
   base تزریقی، نه فرمی به جای دیگر. اگر روزی متنی از سرور بی‌پاک‌سازی به صفحه برسد،
-  مرورگر اسکریپتِ بیرونی را بار نمی‌کند. اتصال به هر سرور آزاد است چون نشانیِ سرور را
-  خودِ دکان‌دار می‌تواند عوض کند (سرورِ خانگی روی شبکهٔ محلی).
+  مرورگر اسکریپتِ بیرونی را بار نمی‌کند، و (F0-22) داده را هم جز به خودِ سایت و سرورِ
+  همین نسخه — همان `tohid-api-base` پایین‌تر، با https و wss — نمی‌فرستد. نشانیِ سرور در
+  نسخهٔ منتشرشده قفل است (`license/api-config.js`)، پس دیوار هم همان‌قدر تنگ است.
+  ⛔ tohid-api-base عوض شد ⇒ connect-src هم (آزمونِ `server/test/web-csp.test.js`).
+  `unsafe-inline` ِ اسکریپت تا فاز ۲ می‌ماند.
 -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self' https: http: wss: ws: blob: data:; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self' https://api.vill3n.top wss://api.vill3n.top blob: data:; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>فروشگاه من</title>
 
@@ -6013,6 +6016,21 @@
   </div>
 </div>
 
+<!-- F0-23: حافظهٔ مرورگر رو به پر شدن — پیشنهادِ خروجی که خودش باز می‌شود -->
+<div class="modal-scrim" id="modal-storage" role="alertdialog" aria-modal="true" aria-labelledby="storage-title" aria-describedby="storage-sub">
+  <div class="modal-box confirm-box">
+    <div class="confirm-icon">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg>
+    </div>
+    <div class="confirm-title" id="storage-title">حافظهٔ این مرورگر رو به پر شدن است</div>
+    <div class="confirm-sub" id="storage-sub"></div>
+    <div class="confirm-actions">
+      <button class="btn btn-secondary" data-close-modal="modal-storage">بعداً</button>
+      <button class="btn btn-primary" id="btn-storage-export">دانلود نسخه پشتیبان</button>
+    </div>
+  </div>
+</div>
+
 <!-- Add / Edit expense modal -->
 <div class="modal-scrim" id="modal-expense">
   <div class="modal-box">
@@ -6208,58 +6226,13 @@
   const receiveIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14"/><path d="M19 12l-7 7-7-7"/></svg>';
 
   /* ==========================================================
-     AUTH — OTP login via the user's own home server (WebSocket)
-     ----------------------------------------------------------
-     Server address must be a WebSocket URL, e.g.:
-        ws://192.168.0.102:4700
-
-     The client opens a connection to:
-        {serverUrl}?token={serverToken}
-     and immediately sends ONE JSON message:
-
-        { "action": "send-code",   "method":"phone"|"email", "value":"...", "name":"..." }
-        { "action": "verify-code", "method":"phone"|"email", "value":"...", "code":"123456", "name":"..." }
-
-     The server must reply with ONE JSON message on the same
-     connection:
-        { "ok": true }                                        (send-code)
-        { "ok": true, "token":"...", "user": { "name":"..." } } (verify-code)
-        { "ok": false, "message":"..." }                       (either — shown to the user)
-
-     After receiving the reply the client closes the socket.
-     If nothing is received within 10s, or the token is wrong /
-     the socket errors, the client shows a connection-failed message.
-
-     The server owns the actual random-code generation, sending
-     the SMS/e-mail, the one-per-minute resend rule, and code
-     expiry — this client only sends the two actions above and
-     shows a 60s cooldown before allowing another "resend" click.
+     ورودِ محلی — فقط «چه کسی روی این دستگاه است» (نام و روش).
+     ورودِ حساب با کدِ ایمیلی است (`license/account-ui.js` و
+     `license/account-code.js`). ورودِ قدیمیِ WebSocket به «سرورِ خانگی»
+     با نشانی و رمزِ دستی (wsRequest، wireConnectButton) هیچ‌جا صدا زده
+     نمی‌شد و در F0-20 برداشته شد.
   ========================================================== */
   const AUTH_KEY = 'tohid-shop-auth-v1';
-  const SERVER_KEY = 'tohid-shop-server-url';
-  const SERVER_TOKEN_KEY = 'tohid-shop-server-token';
-  const RESEND_SECONDS = 60;
-  const WS_REQUEST_TIMEOUT_MS = 10000;
-
-  let authMethod = 'phone';
-  let authPendingValue = '';
-  let authPendingName = '';
-  let authResendTimer = null;
-
-  /* نشانی سرور از `license/api-config.js` می‌آید. یک جا، برای وب و
-     اندروید و هر Client دیگری که بعداً بیاید. */
-  function getServerUrl(){
-    const cfg = window.TohidApiConfig;
-    if(cfg) return cfg.baseUrl();
-    return (localStorage.getItem(SERVER_KEY) || '').trim().replace(/\/+$/,'');
-  }
-  function saveServerUrl(v){
-    const cfg = window.TohidApiConfig;
-    if(cfg){ cfg.setBaseUrl(v); return; }
-    try{ localStorage.setItem(SERVER_KEY, v.trim().replace(/\/+$/,'')); }catch(e){}
-  }
-  function getServerToken(){ return (localStorage.getItem(SERVER_TOKEN_KEY) || '').trim(); }
-  function saveServerToken(v){ try{ localStorage.setItem(SERVER_TOKEN_KEY, (v||'').trim()); }catch(e){} }
   function getAuth(){
     try{ return JSON.parse(localStorage.getItem(AUTH_KEY) || 'null'); }
     catch(e){ return null; }
@@ -6269,13 +6242,6 @@
   }
   function clearAuth(){
     try{ localStorage.removeItem(AUTH_KEY); }catch(e){}
-  }
-  function validatePhone(v){
-    const digits = v.replace(/[\s-]/g,'');
-    return /^(\+?\d{9,13})$/.test(digits);
-  }
-  function validateEmail(v){
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
   }
   function authInitials(name, fallback){
     const n = (name||'').trim();
@@ -6294,99 +6260,6 @@
     if(settingsName) settingsName.textContent = auth.name && auth.name.trim() ? auth.name.trim() : 'کاربر';
     if(settingsValue) settingsValue.textContent = auth.value;
   }
-  function wsRequest(action, payload){
-    return new Promise((resolve)=>{
-      const base = getServerUrl();
-      if(!base){ resolve({ ok:false, message:'ابتدا آدرس و رمز سرور را از دکمه تنظیمات وارد کنید.' }); return; }
-      if(!/^wss?:\/\//i.test(base)){
-        resolve({ ok:false, message:'آدرس سرور باید با ws:// یا wss:// شروع شود.' });
-        return;
-      }
-      const token = getServerToken();
-      let ws;
-      let settled = false;
-      const timer = setTimeout(()=> finish({ ok:false, message:'ارتباط با سرور برقرار نشد (پایان زمان انتظار).' }), WS_REQUEST_TIMEOUT_MS);
-      function finish(result){
-        if(settled) return;
-        settled = true;
-        clearTimeout(timer);
-        try{ ws && ws.close(); }catch(e){}
-        resolve(result);
-      }
-      try{
-        const sep = base.includes('?') ? '&' : '?';
-        ws = new WebSocket(base + sep + 'token=' + encodeURIComponent(token));
-      }catch(e){
-        finish({ ok:false, message:'آدرس سرور نامعتبر است.' });
-        return;
-      }
-      ws.addEventListener('open', ()=>{
-        try{ ws.send(JSON.stringify(Object.assign({ action:action }, payload))); }
-        catch(e){ finish({ ok:false, message:'ارسال درخواست به سرور ناموفق بود.' }); }
-      });
-      ws.addEventListener('message', (ev)=>{
-        let data;
-        try{ data = JSON.parse(ev.data); }
-        catch(e){ finish({ ok:false, message:'پاسخ نامعتبر از سرور دریافت شد.' }); return; }
-        finish(data);
-      });
-      ws.addEventListener('error', ()=>{
-        finish({ ok:false, message:'ارتباط با سرور برقرار نشد. آدرس سرور، رمز سرور و اتصال شبکه را بررسی کنید.' });
-      });
-      ws.addEventListener('close', ()=>{
-        finish({ ok:false, message:'اتصال به سرور بسته شد.' });
-      });
-    });
-  }
-
-  const CONNECT_TIMEOUT_MS = 8000;
-  function testServerConnection(url, token){
-    return new Promise((resolve)=>{
-      const clean = (url||'').trim().replace(/\/+$/,'');
-      if(!clean){ resolve({ ok:false, message:'ابتدا آدرس سرور را وارد کنید.' }); return; }
-      if(!/^wss?:\/\//i.test(clean)){
-        resolve({ ok:false, message:'آدرس سرور باید با ws:// یا wss:// شروع شود.' });
-        return;
-      }
-      let ws;
-      let settled = false;
-      const timer = setTimeout(()=> finish({ ok:false, message:'اتصال برقرار نشد (پایان زمان انتظار). آدرس، رمز و روشن بودن سرور را بررسی کنید.' }), CONNECT_TIMEOUT_MS);
-      function finish(result){
-        if(settled) return;
-        settled = true;
-        clearTimeout(timer);
-        try{ ws && ws.close(); }catch(e){}
-        resolve(result);
-      }
-      try{
-        const sep = clean.includes('?') ? '&' : '?';
-        ws = new WebSocket(clean + sep + 'token=' + encodeURIComponent(token||''));
-      }catch(e){
-        finish({ ok:false, message:'آدرس سرور نامعتبر است.' });
-        return;
-      }
-      ws.addEventListener('open', ()=> finish({ ok:true, message:'به سرور متصل شد.' }));
-      ws.addEventListener('error', ()=> finish({ ok:false, message:'اتصال به سرور ناموفق بود. آدرس، رمز سرور و شبکه را بررسی کنید.' }));
-      ws.addEventListener('close', (ev)=>{
-        if(!settled) finish({ ok:false, message:(ev && ev.code===1008) ? 'رمز سرور نادرست است.' : 'اتصال به سرور بسته شد.' });
-      });
-    });
-  }
-  function wireConnectButton(btn, urlInput, tokenInput, statusEl){
-    if(!btn) return;
-    btn.addEventListener('click', async ()=>{
-      if(statusEl){ statusEl.textContent = 'در حال اتصال...'; statusEl.style.color = ''; }
-      btn.disabled = true;
-      const result = await testServerConnection(urlInput ? urlInput.value : '', tokenInput ? tokenInput.value : '');
-      btn.disabled = false;
-      if(statusEl){
-        statusEl.textContent = result.message;
-        statusEl.style.color = result.ok ? 'var(--success)' : 'var(--danger)';
-      }
-      showToast && showToast(result.message);
-    });
-  }
-
   // ---- صفحه‌ی ورود ----
   // ورود اجباری نیست؛ «ادامه بدون حساب» همیشه هست و یک‌بار که زده شود
   // دیگر این صفحه نمی‌آید. برای خاموش کردن کامل، این خط را true کن.
@@ -13400,6 +13273,7 @@
         stockMovements, priceHistory, auditLog
       }));
     }catch(e){ console.error('ذخیره اطلاعات ناموفق بود:', e); warnStorageFull(e); }
+    if(alertsReady) scheduleStorageCheck();   // F0-23 — اندازهٔ حافظه، بیرون از مسیرِ ثبت
     /*
      *  ⛔ **تنها درِ نوشتن در دفتر همین‌جاست** و هر تغییری از همین‌جا
      *  رد می‌شود. پس `recordChange` تفاضلِ دفتر را با سایهٔ آخرین
@@ -13435,7 +13309,72 @@
     try{
       showToast('حافظهٔ این مرورگر پر شده: تغییرهای تازه فقط با همگام‌سازی به سرور می‌رسند. همین حالا پشتیبان بگیرید و اینترنت را وصل نگه دارید.', 'danger');
     }catch(err){}
+    try{ checkStorageBudget(3); }catch(err){}
   }
+
+  /*
+   * F0-23 — اندازهٔ حافظهٔ مرورگر را پیش از پر شدن بسنج، نه پس از آن.
+   *
+   * سقف برای کلِ سایت است، نه فقط دفتر: صفِ همگام‌سازی و سایه‌اش هم در همین
+   * localStorage‌اند، پس همهٔ کلیدها شمرده می‌شوند (کلید + مقدار، به نویسه).
+   *   • Chromium (اندروید، ویندوز، WebView): ۵٬۲۴۲٬۸۸۰ نویسه — سنجیده‌شده.
+   *   • WebKit (هر مرورگرِ آیفون، و Safari): ۵MB بایتِ UTF-16، یعنی نصفِ آن.
+   * از ۷۰٪ پنجرهٔ خروجی خودش باز می‌شود، از ۹۰٪ دوباره و تندتر، و با
+   * QuotaExceededError (بالا) بارِ سوم. «بعداً» فقط تا پلهٔ بعد یا بارِ بعدیِ
+   * باز کردنِ برنامه است. ⛔ هیچ داده‌ای پاک نمی‌شود؛ انتقال به IndexedDB
+   * کارِ فاز ۱ است. سنجش پس از هر ثبت با ۲ ثانیه تأخیر است تا ثبت کند نشود.
+   * `var` عمدی است: warnStorageFull ممکن است پیش از رسیدنِ اجرا به این خط صدا زده شود.
+   */
+  var STORAGE_WARN_RATIO = 0.7, STORAGE_CRITICAL_RATIO = 0.9;
+  var storagePromptLevel = 0, storageCheckTimer = null, lastStorageUsage = null;
+  function storageCapChars(){
+    const ua = navigator.userAgent || '';
+    const ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+    const safari = /AppleWebKit\//.test(ua) && /Safari\//.test(ua) && !/Chrome\/|Chromium\/|CriOS\/|Edg\/|OPR\/|Android/.test(ua);
+    return (ios || safari) ? 2621440 : 5242880;
+  }
+  function storageUsage(){
+    let used = 0;
+    try{
+      for(let i = 0; i < localStorage.length; i++){
+        const k = localStorage.key(i);
+        used += k.length + (localStorage.getItem(k) || '').length;
+      }
+    }catch(e){ return null; }
+    const cap = storageCapChars();
+    return { used, cap, ratio: used / cap };
+  }
+  function scheduleStorageCheck(ms){
+    clearTimeout(storageCheckTimer);
+    storageCheckTimer = setTimeout(()=> checkStorageBudget(), ms || 2000);
+  }
+  function checkStorageBudget(forceLevel){
+    const u = storageUsage();
+    if(u) lastStorageUsage = u;
+    try{ renderBackupMeta(); }catch(e){}
+    const ratio = u ? u.ratio : 1;
+    const level = forceLevel || (ratio >= STORAGE_CRITICAL_RATIO ? 2 : ratio >= STORAGE_WARN_RATIO ? 1 : 0);
+    if(level <= storagePromptLevel) return;
+    const appRoot = document.getElementById('app-root');
+    if(appRoot && appRoot.classList.contains('app-hidden')){ scheduleStorageCheck(5000); return; }
+    if(level === 1 && daysSinceLastBackup() === 0) return;   // امروز پشتیبان گرفته
+    storagePromptLevel = level;
+    const pct = Math.min(100, Math.round(ratio * 100));
+    document.getElementById('storage-title').textContent =
+      level >= 3 ? 'حافظهٔ این مرورگر پر شد' :
+      level === 2 ? `حافظهٔ این مرورگر تقریباً پر است — ${pct}٪` :
+                    `حافظهٔ این مرورگر ${pct}٪ پر است`;
+    document.getElementById('storage-sub').textContent = (
+      level >= 3 ? 'تغییرهای تازه روی همین دستگاه نماند و فقط با همگام‌سازی به سرور می‌رسد. ' :
+      level === 2 ? 'به‌زودی تغییرهای تازه روی همین دستگاه ذخیره نمی‌شوند. ' :
+                    'نسخهٔ وب داده را در حافظهٔ خودِ مرورگر نگه می‌دارد و این حافظه سقف دارد. '
+    ) + 'همین حالا یک نسخهٔ پشتیبان دانلود کنید تا چیزی از دست نرود، و اگر حساب دارید اینترنت را وصل نگه دارید تا همگام‌سازی همه‌چیز را به سرور ببرد.';
+    openModal('modal-storage');
+  }
+  document.getElementById('btn-storage-export').addEventListener('click', ()=>{
+    closeModal('modal-storage');
+    document.getElementById('btn-export-backup').click();
+  });
 
   function loadState(){
     touchLedger();
@@ -13567,6 +13506,7 @@
     try{
       localStorage.setItem(STORAGE_KEY, JSON.stringify(readLedger()));
     }catch(e){ console.error('نوشتنِ دفترِ رسیده ناموفق بود:', e); warnStorageFull(e); }
+    if(alertsReady) scheduleStorageCheck();
 
     rebuildBarcodeIndex();
     repaintLedger();
@@ -14976,11 +14916,18 @@
       text.textContent = `آخرین پشتیبان‌گیری: ${days.toLocaleString('en-US')} روز پیش — بهتر است نسخه تازه بگیرید.`;
       wrap.classList.add('warn');
     }
+    /* F0-23: اندازهٔ حافظهٔ مرورگر — از آخرین سنجش، نه سنجشِ تازه (بالا آمدن کند نشود) */
+    const u = lastStorageUsage;
+    if(u){
+      text.textContent += ` · حافظهٔ این مرورگر: ${Math.min(100, Math.round(u.ratio * 100))}٪ پر`;
+      if(u.ratio >= STORAGE_WARN_RATIO){ wrap.classList.remove('ok'); wrap.classList.add('warn'); }
+    }
   }
 
   alertsReady = true;
   renderBackupMeta();
   renderAlerts();
+  scheduleStorageCheck(1500);   // F0-23 — پس از بالا آمدن، نه در مسیرِ آن
 
 
   goTo(location.hash.replace('#','') || 'dashboard');

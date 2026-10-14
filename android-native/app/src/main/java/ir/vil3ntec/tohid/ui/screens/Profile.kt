@@ -46,7 +46,8 @@ import ir.vil3ntec.tohid.sync.License
 import ir.vil3ntec.tohid.sync.LicenseGuard
 import ir.vil3ntec.tohid.core.net.userText
 import ir.vil3ntec.tohid.sync.SyncStore
-import ir.vil3ntec.tohid.sync.Syncer
+import ir.vil3ntec.tohid.sync.v1.SyncV1Engine
+import ir.vil3ntec.tohid.sync.v1.SyncV1Worker
 import ir.vil3ntec.tohid.ui.theme.Radius
 import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.Dispatchers
@@ -100,6 +101,8 @@ fun ProfileScreen(
   var busy by remember { mutableStateOf(false) }
   var syncing by remember { mutableStateOf(false) }
   var lastSyncAt by remember { mutableStateOf(state.lastSyncAt) }
+  //  «آخرین همگام‌سازی» از موتورِ v1 می‌آید؛ `state.lastSyncAt` مالِ راهِ قدیم است
+  val v1 by SyncV1Engine.of(context).status.collectAsState()
   var confirmSignOut by remember { mutableStateOf(false) }
 
   /*
@@ -392,22 +395,27 @@ fun ProfileScreen(
       icon = Icons.Filled.Sync,
       tint = colors.accent,
       title = "آخرین همگام‌سازی",
-      value = if (lastSyncAt > 0) formatMillis(lastSyncAt) else "هنوز انجام نشده",
+      value = maxOf(lastSyncAt, v1.lastOkAt).let { if (it > 0) formatMillis(it) else "هنوز انجام نشده" },
       detail = "دفترِ دکان روی سرور پشتیبان می‌گیرد و روی گوشیِ دیگر هم می‌آید",
     )
     Spacer(Modifier.height(10.dp))
     Button(
       onClick = {
-        syncing = true
-        scope.launch {
-          runCatching { Syncer(store, state, context).run() }
-            .onSuccess {
-              lastSyncAt = state.lastSyncAt
-              toast("همگام‌سازی شد — ${it.pushed.fa()} فرستاده، ${it.pulled.fa()} گرفته")
-            }
-            .onFailure { toast(it.userText("همگام‌سازی ناموفق بود")) }
-          syncing = false
-        }
+        /*
+         *  ⛔ F0-02: این دکمه دورِ Sync v1 را می‌اندازد، نه راهِ قدیم.
+         *
+         *  تا این‌جا `Syncer.run` صدا زده می‌شد: push/pullِ قدیمی
+         *  (`/api/v1/shop/sync`) که مستقیم در دفتر ادغام می‌کرد و سایهٔ v1
+         *  را جلو نمی‌برد؛ v1 همان را «تغییرِ محلی» می‌دید و دوباره
+         *  می‌فرستاد — فیلدهای `$inc` (پرداخت‌ها، مانده‌ها) دو بار جمع
+         *  می‌شدند. `AutoSync` از قبل همین کار را می‌کرد؛ فقط این دکمه
+         *  جا مانده بود. کلاسِ `Syncer` حذف نمی‌شود: `AutoSync` از
+         *  `refreshLicense`ِ آن استفاده می‌کند.
+         *  سنجه: `sync/LegacySyncCallTest.kt`.
+         */
+        runCatching { SyncV1Worker.now(context) }
+          .onSuccess { toast("همگام‌سازی شروع شد؛ چند ثانیه بعد «آخرین همگام‌سازی» تازه می‌شود") }
+          .onFailure { toast(it.userText("همگام‌سازی ناموفق بود")) }
       },
       enabled = !syncing,
       colors = ButtonDefaults.buttonColors(containerColor = colors.primary),

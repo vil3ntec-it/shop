@@ -6,15 +6,19 @@ import ir.vil3ntec.tohid.data.DeviceLocation
 import ir.vil3ntec.tohid.data.repo.Backend
 
 /**
- *  رساندنِ لوکیشن به سرور.
+ *  رساندنِ لوکیشن به سرور — فقط با رضایتِ صریح.
  *
- *  ── قرارِ صاحب مخزن ────────────────────────────────────────────────
- *  «بدون اینکه برنامه برود ثبت‌نام کند هم لوکیشن باید روشن باشد و
- *  لوکیشنِ طرف ثبت بشود و بیاید به سرور اون لوکیشن اش.»
+ *  ── قرارِ تازه (F0-07، تا تصمیمِ D-04) ──────────────────────────────
+ *  پیش از این، اگر اجازهٔ اندروید بود، هر شش ساعت موقعیت می‌رفت، حتی
+ *  بی حساب؛ در حالی که `privacy.html` می‌گفت «فقط یک بار و اختیاری
+ *  هنگام ثبت‌نام». اجازهٔ اندروید (که صفحهٔ ثبت‌نام هم می‌خواهد) رضایت
+ *  به فرستادنِ دوره‌ای نیست.
  *
- *  پس این کار به حساب بند نیست. سرور هم مسیرِ `/location` را بی‌توکن
- *  قبول می‌کند و ردیف را به شناسهٔ دستگاه می‌بندد؛ روزی که همان دستگاه
- *  حساب ساخت، ردیف‌های قبلی‌اش هم به آن حساب می‌چسبند.
+ *  پس حالا پیش‌فرض «بی رضایت» است: نه چیزی فرستاده می‌شود و نه اجازهٔ
+ *  اندروید سرِ باز شدنِ برنامه پرسیده می‌شود. مسیرِ فرستادن برای کسی که
+ *  صریحاً `setConsent(true)` داده دست‌نخورده می‌ماند — همان قاعدهٔ شش
+ *  ساعت و همان مسیرِ بی‌توکنِ `/location` سرور. لوکیشنِ یک‌بارهٔ صفحهٔ
+ *  ثبت‌نام (`Welcome`) جدا است و این‌جا عوض نشده.
  *
  *  ── چه چیزی جلوی زیاده‌روی را می‌گیرد ──────────────────────────────
  *  هر بار باز کردنِ برنامه یک ردیفِ تازه لازم ندارد. دکان جابه‌جا
@@ -26,11 +30,42 @@ object LocationPing {
   private const val PREFS = "tohid-location-ping"
   private const val KEY_SENT = "sentAt"
   private const val KEY_ASKED = "askedAt"
+  /** زمانِ رضایتِ صریح؛ صفر یعنی رضایتی نیست */
+  private const val KEY_CONSENT = "consentAt"
 
-  private const val EVERY_MS = 6 * 60 * 60 * 1000L
+  const val EVERY_MS = 6 * 60 * 60 * 1000L
+
+  /** تا تصمیمِ D-04: کسی که چیزی نگفته، رضایت نداده است */
+  const val DEFAULT_CONSENT = false
 
   private fun prefs(context: Context) =
     context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
+  /** آیا کاربر صریحاً به فرستادنِ موقعیت رضایت داده است */
+  fun consented(context: Context): Boolean =
+    prefs(context).getLong(KEY_CONSENT, 0) > 0 || DEFAULT_CONSENT
+
+  /** ثبت یا پس گرفتنِ رضایتِ صریح — جای صدا زدنش با تصمیمِ D-04 روشن می‌شود */
+  fun setConsent(context: Context, yes: Boolean) {
+    val edit = prefs(context).edit()
+    if (yes) edit.putLong(KEY_CONSENT, System.currentTimeMillis()) else edit.remove(KEY_CONSENT)
+    edit.apply()
+  }
+
+  /** دروازهٔ پرسیدنِ اجازهٔ اندروید؛ جدا تا بی‌دستگاه آزموده شود */
+  fun mayAsk(consented: Boolean, askedBefore: Boolean): Boolean =
+    consented && !askedBefore
+
+  /** دروازهٔ فرستادن؛ جدا تا بی‌دستگاه آزموده شود */
+  fun maySend(
+    consented: Boolean,
+    configured: Boolean,
+    granted: Boolean,
+    lastSentAt: Long,
+    now: Long,
+    force: Boolean,
+  ): Boolean =
+    consented && configured && granted && (force || now - lastSentAt >= EVERY_MS)
 
   /**
    *  آیا وقتش هست که اجازهٔ لوکیشن پرسیده شود.
@@ -40,7 +75,8 @@ object LocationPing {
    *  ردّ، خودش دیگر پنجره را نشان نمی‌دهد.
    */
   fun shouldAsk(context: Context): Boolean {
-    if (prefs(context).getLong(KEY_ASKED, 0) > 0) return false
+    //  بی رضایت پرسیده نمی‌شود — و «یک بار» هم مصرف نمی‌شود
+    if (!mayAsk(consented(context), prefs(context).getLong(KEY_ASKED, 0) > 0)) return false
     prefs(context).edit().putLong(KEY_ASKED, System.currentTimeMillis()).apply()
     return true
   }
@@ -53,10 +89,15 @@ object LocationPing {
    */
   suspend fun send(context: Context, force: Boolean = false) {
     runCatching {
-      if (!AppConfig.isConfigured(context)) return
-      if (!DeviceLocation.granted(context)) return
-      val last = prefs(context).getLong(KEY_SENT, 0)
-      if (!force && System.currentTimeMillis() - last < EVERY_MS) return
+      val allowed = maySend(
+        consented = consented(context),
+        configured = AppConfig.isConfigured(context),
+        granted = DeviceLocation.granted(context),
+        lastSentAt = prefs(context).getLong(KEY_SENT, 0),
+        now = System.currentTimeMillis(),
+        force = force,
+      )
+      if (!allowed) return
 
       val fix = DeviceLocation.current(context, force = force) ?: return
       val state = SyncStore(context)
