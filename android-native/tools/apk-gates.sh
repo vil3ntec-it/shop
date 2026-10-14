@@ -29,9 +29,10 @@ apksigner="$bt/apksigner"
 #  sed، نه head: head زودتر می‌بندد و aapt با SIGPIPE زیرِ pipefail می‌افتد
 badge() { "$aapt" dump badging "$1" | sed -n '1p'; }
 field() { sed -n "s/.* $1='\([^']*\)'.*/\1/p" <<<"$2"; }
-#  apksigner بسته به طرحِ امضا «Signer #1 certificate …» یا
-#  «Signer (minSdkVersion=…) certificate …» می‌نویسد — هر دو پذیرفته است
-cert() { { "$apksigner" verify --print-certs "$1" 2>&1 || true; } | sed -n 's/^Signer.* certificate SHA-256 digest: *//p' | sed -n '1p'; }
+#  apksigner بسته به نسخه و طرحِ امضا «Signer #1 certificate …»،
+#  «Signer (minSdkVersion=…) certificate …» یا «V3.0 Signer: certificate …»
+#  می‌نویسد — هر سه پذیرفته است؛ فقط اثر انگشتِ **گواهی** (نه کلیدِ عمومی)
+cert() { { "$apksigner" verify --print-certs -v "$1" 2>&1 || true; } | sed -nE 's/^.*Signer.*certificate SHA-256 digest: *([0-9a-fA-F]{64}).*$/\1/p' | sed -n '1p'; }
 
 fail=0
 err() { echo "::error::$1"; fail=1; }
