@@ -8,20 +8,51 @@
  * می‌کند. اگر سوکت قطع بود، هر ۳۰ ثانیه pull (کارِ برنامه).
  *
  * ── اتاق‌ها ─────────────────────────────────────────────────────────
- * هر حساب یک اتاق دارد (`app:kind:id`). ورود با همان توکنی که push
- * می‌زند — `?token=` (مرورگر نمی‌تواند سرآیند بگذارد) یا
- * `Authorization: Bearer`. حساب از توکن؛ `?device_id=` فقط می‌گوید
- * خبرِ کارِ خودش را برای خودش نفرستیم.
+ * هر حساب یک اتاق دارد (`app:kind:id`). ورود (F0-11، ۱۴۰۵/۰۷/۲۲):
+ *   • راهِ درست: `POST /api/sync/v1/live/ticket` با همان توکنِ push در
+ *     سرآیند ⇒ «بلیتِ» یک‌بارمصرفِ ۶۰ ثانیه‌ای ⇒ `?ticket=`. توکن دیگر
+ *     در آدرس (و لاگِ پراکسی) نمی‌ماند.
+ *   • سازگاری: `?token=` و `Authorization: Bearer` هنوز پذیرفته‌اند تا
+ *     برنامه‌های کهنه از کار نیفتند. ⛔ تا داشبوردِ نسخه‌ها کلاینتِ
+ *     کهنه نشان می‌دهد، `?token=` برداشته نشود.
+ * حساب از توکن؛ `?device_id=` فقط می‌گوید خبرِ کارِ خودش را برای خودش
+ * نفرستیم.
  *
  * ⚠️ روی همان سرورِ HTTP سوار می‌شود (`attach(server)`) و `app.js`
  * خودش `app.listen` را می‌پیچد، پس `index.js` و سنجه‌ها هر دو بی هیچ
  * کارِ اضافه‌ای آن را دارند.
  */
+const crypto = require('node:crypto');
 const { WebSocketServer, WebSocket } = require('ws');
 const { resolveToken, appAlias } = require('./sync-v1-auth');
 
 const PATHS = ['/sync/live', '/api/sync/live', '/api/sync/v1/live', '/api/v1/sync/v1/live'];
 const PING_MS = 30_000;
+
+/* ---------------------------------------------- بلیتِ یک‌بارمصرف (F0-11) */
+const TICKET_MS = 60_000;
+const TICKET_MAX = 20_000;          // سقفِ حافظه — پرتر شد، کهنه‌ترین می‌رود
+/** بلیت ⇒ { token, exp } — خودِ توکن نگه داشته می‌شود تا هنگامِ وصل
+ *  دوباره سنجیده شود (نشستِ باطل‌شده در این ۶۰ ثانیه هم رد شود). */
+const tickets = new Map();
+
+function issueTicket(token) {
+  const now = Date.now();
+  for (const [k, v] of tickets) { if (v.exp > now) break; tickets.delete(k); }
+  while (tickets.size >= TICKET_MAX) tickets.delete(tickets.keys().next().value);
+  const ticket = crypto.randomBytes(32).toString('base64url');
+  tickets.set(ticket, { token, exp: now + TICKET_MS });
+  return { ticket, expires_in: TICKET_MS / 1000 };
+}
+
+/** بلیت را مصرف می‌کند (یک بار)؛ توکنِ پشتش یا '' */
+function takeTicket(ticket) {
+  if (!ticket) return '';
+  const e = tickets.get(ticket);
+  if (!e) return '';
+  tickets.delete(ticket);
+  return e.exp > Date.now() ? e.token : '';
+}
 
 /** اتاقِ هر حساب: کلید ⇒ مجموعهٔ سوکت‌ها */
 const rooms = new Map();
@@ -155,7 +186,9 @@ function attach(server) {
 
     const h = req.headers.authorization || '';
     const m = /^Bearer\s+(.+)$/i.exec(h.trim());
-    const token = m ? m[1].trim() : (url.searchParams.get('token') || '');
+    const ticket = url.searchParams.get('ticket');
+    const token = ticket != null ? takeTicket(ticket)
+      : m ? m[1].trim() : (url.searchParams.get('token') || '');
     const deviceId = String(url.searchParams.get('device_id') || req.headers['x-device'] || '').slice(0, 64);
 
     resolveToken(token).then((ctx) => {
@@ -186,4 +219,4 @@ function attach(server) {
   return wss;
 }
 
-module.exports = { attach, broadcast, relay, listeners, roomKey, PATHS, PING_MS, RELAY_EVENTS };
+module.exports = { attach, broadcast, relay, listeners, roomKey, issueTicket, PATHS, PING_MS, RELAY_EVENTS, TICKET_MS };
