@@ -34,12 +34,18 @@ const DELETE_CANCEL_REASON = 'حذف از نسخهٔ قدیمیِ برنامه';
 function isPlainObject(v) { return v !== null && typeof v === 'object' && !Array.isArray(v); }
 function isInc(v) { return isPlainObject(v) && Object.keys(v).length === 1 && Number.isFinite(v.$inc); }
 
-/** عدد × مقیاس، گردِ دهدهی (نیمه به سمتِ +∞، مثلِ Math.round)؛ نامفهوم ⇒ undefined. */
+/**
+ * عدد × مقیاس با `Math.round` — **همان قاعدهٔ یگانهٔ** `Money.fromLegacy` /
+ * `Qty.fromLegacy` (کاتلین) و `moneyFromLegacy` (`license/money.js`)، با همان
+ * بردارهای مرجع (`license/test-vectors/money-v1.json`؛ آزمونِ همین مبدل).
+ * ⚠️ «درست‌تر» کردنش (مثلاً 1.005 ⇒ 101) یعنی سرور و برنامه یک دفتر را دو جور
+ * تبدیل کنند؛ هر تغییری این‌جا با همان بردارها و هر سه زبان است.
+ * نامفهوم ⇒ undefined.
+ */
 function scaled(x, scale) {
   if (typeof x === 'string' && x.trim() !== '') x = Number(x);
   if (typeof x !== 'number' || !Number.isFinite(x)) return undefined;
-  //  toPrecision(15) خطای دودوییِ ضرب را می‌گیرد: 1.005×100 = 100.49999… ⇒ 100.5
-  const v = Math.round(Number((x * scale).toPrecision(15)));
+  const v = Math.round(x * scale);
   if (!Number.isSafeInteger(v)) return undefined;
   return v === 0 ? 0 : v;   //  −۰ نه
 }

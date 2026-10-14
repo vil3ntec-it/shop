@@ -9,6 +9,7 @@ const convert = require('../src/lib/sync-v3-convert');
 const schema = require('../src/lib/sync-v3-schema');
 const hlc = require('../src/lib/hlc');
 const { TABLES: SHOP_TABLES } = require('../src/lib/sync');
+const path = require('node:path');
 
 const TS = 1_760_000_000_000;
 const v2 = (o) => ({ op_id: '01JTEST0000000000000000001', ts: TS, row_id: 'r-1', ...o });
@@ -25,11 +26,17 @@ test('هر جدولِ Sync v1ِ دکان در v3 جا دارد (SYN-13: دسته
   }
 });
 
-test('toMinor / toMilli: گردکردنِ دهدهی درست، نیمه به سمتِ +∞، بی −۰', () => {
+test('toMinor / toMilli = همان بردارهای مرجعِ fromLegacy (یک قاعده برای سرور، کاتلین و JS)', () => {
+  const vectors = require(path.join(__dirname, '..', '..', 'license', 'test-vectors', 'money-v1.json')).fromLegacy;
+  assert.ok(vectors.money.length > 5 && vectors.qty.length > 5);
+  for (const [x, minor] of vectors.money) assert.equal(convert.toMinor(x), minor, `مبلغِ ${x}`);
+  for (const [x, milli] of vectors.qty) assert.equal(convert.toMilli(x), milli, `مقدارِ ${x}`);
+});
+
+test('toMinor / toMilli: نیمه به سمتِ +∞ (Math.round)، بی −۰، رشتهٔ عددی، نامفهوم ⇒ undefined', () => {
   assert.equal(convert.toMinor(150.5), 15050);
   assert.equal(convert.toMinor(0.1 + 0.2), 30);
   assert.equal(convert.toMinor(19.99), 1999);
-  assert.equal(convert.toMinor(1.005), 101);
   assert.equal(convert.toMinor(-0.005), 0);
   assert.ok(Object.is(convert.toMinor(-0.004), 0));
   assert.equal(convert.toMinor(-2.5), -250);
@@ -37,7 +44,6 @@ test('toMinor / toMilli: گردکردنِ دهدهی درست، نیمه به س
   assert.equal(convert.toMinor('abc'), undefined);
   assert.equal(convert.toMinor(Infinity), undefined);
   assert.equal(convert.toMilli(0.333), 333);
-  assert.equal(convert.toMilli(2.0005), 2001);
 });
 
 test('درجِ کالا: مبلغ و مقدار نامِ تازه و عددِ صحیح می‌گیرند؛ مانده و id نمی‌روند', () => {
