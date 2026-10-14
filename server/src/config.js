@@ -85,6 +85,13 @@ const config = {
     //  آن‌قدر کوتاه بود که کاربرِ بی‌حوصله سه بار می‌زد.
     resendMs:   num(process.env.OTP_RESEND_SECONDS, 120) * 1000,
     dailyMax:   num(process.env.OTP_DAILY_MAX, 20),
+    /*
+     *  ⛔ F0-16 — تأخیرِ یکسانِ `password/forgot`. حسابِ موجود ایمیل می‌فرستد
+     *  و ناموجود نه؛ بی این کف، زمانِ پاسخ (۴۰۰ میلی‌ثانیه در برابرِ ۳) لو
+     *  می‌داد کدام ایمیل حساب دارد. پاسخِ هر دو تا این‌قدر صبر می‌کند؛ ایمیلی
+     *  که کندتر برود پشتِ پاسخ ادامه می‌دهد. ۰ = بی کف (فقط برای آزمون).
+     */
+    uniformMs:  num(process.env.OTP_UNIFORM_MS, 1500),
   },
 
   /*
@@ -204,6 +211,10 @@ const config = {
     windowMs:     num(process.env.RATE_WINDOW_MS, 15 * 60 * 1000),
     authMax:      num(process.env.RATE_AUTH_MAX, 10),
     otpMax:       num(process.env.RATE_OTP_MAX, 5),
+    //  ⛔ F0-16 — `register/start` و `password/forgot` به‌ازای هر **IP**. سقفِ
+    //  `otpMax` به‌ازای هر ایمیل است، پس امتحانِ هزار ایمیلِ گوناگون از یک
+    //  جا هیچ سقفی نداشت. سی در ربع ساعت برای یک کافی‌نت هم بس است.
+    probeIpMax:   num(process.env.RATE_PROBE_IP_MAX, 30),
     /*
      *  زدنِ کد (تأییدِ ثبت‌نام، رمزِ تازه، ورود با کد) — **جدا از فرستادن**.
      *
@@ -280,10 +291,15 @@ const config = {
   corsOrigins: list(process.env.CORS_ORIGIN || process.env.CORS_ORIGINS),
 
   allowRegistration: bool(process.env.ALLOW_REGISTRATION, true),
+  //  ⛔ F0-16 — راهِ برگشتِ سازگاری: `1` همان ۴۰۹ِ `already_registered` را در
+  //  پلهٔ اولِ ثبت‌نام برمی‌گرداند (رفتارِ پیش از 2.14.2). پیش‌فرض خاموش.
+  signupLegacyConflict: bool(process.env.SIGNUP_LEGACY_CONFLICT, false),
   trustProxy:        bool(process.env.TRUST_PROXY, false),
   defaults: {
     timezone:  process.env.DEFAULT_TIMEZONE || 'Asia/Kabul',
-    trialDays: num(process.env.TRIAL_DAYS, 7),
+    //  ⛔ F0-13: `TRIAL_DAYS` برداشته شد — هیچ جا خوانده نمی‌شد و فقط عددِ دومی
+    //  (۷ این‌جا، ۱۴ در docker-compose) نشان می‌داد. مدتِ آزمایشی در
+    //  `app_config.trial_days` است (پنلِ مدیر)؛ پیش‌فرضش `plans.TRIAL_DEFAULT`.
   },
 };
 

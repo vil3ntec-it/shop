@@ -43,11 +43,28 @@ function keyFrom(passphrase, salt) {
  * گرفتن یک پشتیبان.
  * @returns {{file:string, bytes:number, kind:string, createdAt:number, encrypted:boolean}}
  */
+/** متنِ هشدار برای پنل و لاگ — یک جا، تا همه یک چیز بگویند (F0-08) */
+const UNENCRYPTED_WARNING = 'BACKUP_PASSPHRASE تنظیم نشده است: پشتیبان‌های سرور رمز ندارند و هر کس فایل را داشته باشد دادهٔ همهٔ حساب‌ها را دارد. رمز را صاحبِ سامانه در محیطِ سرور بگذارد.';
+
+/**
+ * F0-08 — بی رمز، پشتیبان **هرگز** نمی‌ایستد؛ ولی هر اجرا یک خبرِ سامانه‌ای
+ * (`backup.unencrypted` در «سابقه»ی پنل) و یک خطِ هشدار در لاگِ سرور
+ * می‌گذارد — همان راهِ «هشدار به مدیر» در ‎lib/login-outbox.js‎.
+ * ⛔ نه `await` لازم دارد نه شکستش چیزی را می‌خواباند.
+ */
+function warnUnencrypted(kind) {
+  console.warn(`[backup] ⚠️ ${kind}: ${UNENCRYPTED_WARNING}`);
+  require('./audit').log({
+    actorType: 'system', action: 'backup.unencrypted', detail: { kind },
+  }).catch(() => {});
+}
+
 async function run({ kind = 'manual', dir = null } = {}) {
   if (!KINDS.includes(kind)) throw new Error('نوع پشتیبان معتبر نیست');
   await ensureDirs();
 
   const encrypted = !!config.backup.passphrase;
+  if (!encrypted) warnUnencrypted(kind);
   if (db.isPglite()) return runPglite({ kind, dir, encrypted });
   const base = `shop-${stamp()}.sql.gz${encrypted ? '.enc' : ''}`;
   const target = path.join(dir || dirFor(kind), base);
@@ -269,4 +286,4 @@ function schedule() {
   return timer;
 }
 
-module.exports = { run, list, prune, restore, decode, schedule, KINDS, dirFor };
+module.exports = { run, list, prune, restore, decode, schedule, KINDS, dirFor, UNENCRYPTED_WARNING };

@@ -143,37 +143,6 @@ fun EmptyNote(text: String) {
   }
 }
 
-/**
- *  صفحه‌هایی که هنوز ساخته نشده‌اند.
- *
- *  عمداً صریح می‌گوید کدام بخش هنوز نیامده. یک صفحهٔ خالی یا نصفه‌کاره،
- *  کاربر را گمراه می‌کند که چیزی خراب است.
- */
-@Composable
-fun ComingSoon(title: String, detail: String) {
-  Column(
-    Modifier.fillMaxSize().padding(24.dp),
-    verticalArrangement = Arrangement.Center,
-    horizontalAlignment = Alignment.CenterHorizontally,
-  ) {
-    Text(title, style = MaterialTheme.typography.headlineSmall, color = Shop.colors.text)
-    Spacer(Modifier.height(8.dp))
-    Text(
-      "این بخش در نسخهٔ بعدی می‌آید.",
-      style = MaterialTheme.typography.bodyMedium,
-      color = Shop.colors.muted,
-      textAlign = TextAlign.Center,
-    )
-    Spacer(Modifier.height(4.dp))
-    Text(
-      detail,
-      style = MaterialTheme.typography.bodySmall,
-      color = Shop.colors.muted2,
-      textAlign = TextAlign.Center,
-    )
-  }
-}
-
 /* ============================ حرکت و انیمیشن ============================ */
 
 /**

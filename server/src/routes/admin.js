@@ -20,6 +20,7 @@ const otp = require('../lib/otp');
 const { entitlementOf } = require('../lib/entitlement');
 const { FEATURES, sanitizeFeatures } = require('../lib/features');
 const { requireAdmin, requireSuperAdmin } = require('../middleware/auth');
+const { checkSecondFactor } = require('../lib/admin-2fa');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
 const { badRequest, unauthorized, notFound, forbidden, tooMany } = require('../middleware/errors');
 
@@ -41,16 +42,32 @@ router.post('/login', adminLimit, async (req, res, next) => {
   }
 
   const admin = await one('SELECT * FROM admins WHERE username=$1', [username]);
-  const ok = admin && admin.status === 'active' && await pw.verifyPassword(password, admin.password_hash);
+  const passOk = admin && admin.status === 'active' && await pw.verifyPassword(password, admin.password_hash);
+
+  //  F0-15: مرحلهٔ دوم فقط برای مدیری که خودش روشنش کرده (اجباری نیست).
+  //  رمزِ درست بی کد = گامِ اولِ ورود، نه شکست؛ کدِ نادرست = شکست (در قفل
+  //  حساب می‌شود). ⛔ بی مرحلهٔ دوم هیچ توکنی ساخته نمی‌شود.
+  const totpCode = typeof req.body?.totp === 'string' ? req.body.totp.trim() : '';
+  const recoveryCode = typeof req.body?.recovery_code === 'string' ? req.body.recovery_code.trim() : '';
+  const twoStep = !!(passOk && admin.totp_enabled_at);
+  if (twoStep && !totpCode && !recoveryCode) {
+    return next(unauthorized('کدِ برنامهٔ تأیید (یا یک کدِ بازیابی) را بنویسید', 'totp_required'));
+  }
+  const second = twoStep ? await checkSecondFactor(admin, { code: totpCode, recovery: recoveryCode }) : null;
+  const ok = passOk && (!twoStep || !!second);
   await query(
     `INSERT INTO login_attempts (scope, identifier, ip, ok, created_at) VALUES ('admin',$1,$2,$3,$4)`,
     [username, clientIp(req), !!ok, now()]
   );
-  if (!ok) return next(unauthorized('نام کاربری یا رمز درست نیست', 'bad_credentials'));
+  if (!passOk) return next(unauthorized('نام کاربری یا رمز درست نیست', 'bad_credentials'));
+  if (!ok) return next(unauthorized('کدِ تأیید درست نیست', 'totp_invalid'));
 
   const t = await tokens.issue({ kind: 'admin', subjectId: admin.id, ttlMs: config.tokens.adminTtlMs });
   await query('UPDATE admins SET last_login_at=$2 WHERE id=$1', [admin.id, now()]);
-  await audit.log({ actorType: 'admin', userId: admin.id, action: 'admin.login', ip: clientIp(req) });
+  await audit.log({
+    actorType: 'admin', userId: admin.id, action: 'admin.login', ip: clientIp(req),
+    ...(second ? { detail: { second_factor: second } } : {}),
+  });
   res.json({
     token: t.token, expiresAt: t.expiresAt,
     admin: { id: admin.id, username: admin.username, name: admin.name, role: admin.role },
@@ -73,6 +90,9 @@ router.get('/me', (req, res) => {
 });
 
 router.get('/features', (req, res) => res.json({ features: FEATURES }));
+
+//  F0-15: تأییدِ دومرحله‌ایِ اختیاری — هر مدیر برای خودش
+router.use('/2fa', require('./admin-2fa'));
 
 // ---------- آمار ----------
 router.get('/stats', async (req, res) => {
@@ -654,7 +674,12 @@ router.patch('/admins/:id', requireSuperAdmin, async (req, res, next) => {
 // ---------- پشتیبان‌گیری ----------
 router.get('/backups', async (req, res) => {
   const backup = require('../lib/backup');
-  res.json({ backups: await backup.list(), dir: config.backup.dir, enabled: config.backup.enabled });
+  //  F0-08: بی رمز ⇒ پنل هشدارِ قرمز می‌دهد (خودِ رمز هرگز این‌جا نمی‌آید)
+  const configured = !!config.backup.passphrase;
+  res.json({
+    backups: await backup.list(), dir: config.backup.dir, enabled: config.backup.enabled,
+    encryption: { configured, warning: configured ? '' : backup.UNENCRYPTED_WARNING },
+  });
 });
 
 router.post('/backups', requireSuperAdmin, async (req, res, next) => {
