@@ -107,6 +107,38 @@ if (!axeSrc && SKIP) {
   });
 }
 
+// F0-22: CSP ِ واقعیِ مرورگر — سرورِ همین نسخه باز، هر میزبانِ دیگری بسته.
+// fetch ها با route جواب می‌گیرند، پس بی CSP همه «ok» می‌شدند و «blocked» فقط
+// کارِ CSP است. WebSocket را route نمی‌کنیم (پلی‌رایت خودش جانشینش می‌کند و CSP
+// دیگر سنجیده نمی‌شود)؛ برای آن گزارشِ securitypolicyviolation ِ خودِ مرورگر
+// ملاک است، و فقط به میزبانِ بیگانه وصل می‌شود — نه به سرورِ واقعی.
+await step('CSP: اتصال فقط به سرورِ همین نسخه — میزبانِ دیگر بسته است', async () => {
+  const { pg } = await open(390);
+  const api = await pg.evaluate(() => window.TohidApiConfig.baseUrl());
+  await pg.route(`${api}/**`, (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
+  await pg.route('https://evil.example/**', (r) => r.fulfill({ status: 200, body: 'leak' }));
+  await pg.route(/^http:\/\/192\.168\.0\.102:4700\//, (r) => r.fulfill({ status: 200, body: 'leak' }));
+  const out = await pg.evaluate(async (api) => {
+    const blocked = [];
+    document.addEventListener('securitypolicyviolation', (e) => blocked.push(e.blockedURI));
+    const tryFetch = (u) => fetch(u).then(() => 'ok', () => 'blocked');
+    const r = {
+      api: await tryFetch(api + '/api/v1/plans'),
+      evil: await tryFetch('https://evil.example/x'),
+      lan: await tryFetch('http://192.168.0.102:4700/x'),
+    };
+    try { new WebSocket('ws://192.168.0.102:4700').onerror = () => {}; } catch { /* بسته */ }
+    await new Promise((x) => setTimeout(x, 300));
+    return { r, blocked };
+  }, api);
+  await pg.close();
+  assert.deepEqual(out.r, { api: 'ok', evil: 'blocked', lan: 'blocked' });
+  const saw = (p) => out.blocked.some((u) => u.startsWith(p));
+  assert.ok(saw('https://evil.example') && saw('http://192.168.0.102:4700'), `CSP گزارشِ fetch ِ بیگانه را نداد: ${out.blocked.join(' ')}`);
+  assert.ok(saw('ws://192.168.0.102:4700'), `CSP جلوِ WebSocket ِ بیگانه را نگرفت: ${out.blocked.join(' ')}`);
+  assert.ok(!saw(api), 'CSP سرورِ خودِ برنامه را بست');
+});
+
 await browser.close();
 server.close();
 console.log(failed ? `\n${failed} سنجه قرمز` : '\nهمه سبز');
