@@ -91,11 +91,15 @@ test('v3 ۱۵.۴ بند ۴: سود «تقریبی» تا بها معتبر نی�
   // کپیِ قیمتِ خرید (line) همیشه تقریبی؛ قلمِ آزادِ بی‌بها + فاکتورِ قدیمیِ بی‌قلم = ۲ قلمِ بی‌بها
   assert.equal(line.today.profitApproximate, true);
   assert.equal(line.today.costEstimatedLines, 2);
-  const mavg = core.today(L, { date: '2026-10-14', clock: kabulClock, costing: 'mavg' });
+  // D-23 در BLOCKERS.md باز است ⇒ بی costApproved حتی میانگینِ موزون هم «تقریبی» است
+  const open = core.today(L, { date: '2026-10-14', clock: kabulClock, costing: 'mavg' });
+  assert.equal(open.yesterday.costEstimatedLines, 0);
+  assert.equal(open.yesterday.profitApproximate, true);
+  const mavg = core.today(L, { date: '2026-10-14', clock: kabulClock, costing: 'mavg', costApproved: true });
   assert.equal(mavg.today.profitApproximate, true); // همان دو قلمِ بی‌بها
-  assert.equal(mavg.yesterday.costEstimatedLines, 0);
   assert.equal(mavg.yesterday.profitApproximate, false); // همهٔ قلم‌ها از میانگینِ موزون
-  assert.equal(line.yesterday.profitApproximate, true);
+  // کپیِ قیمتِ خرید هرگز سودِ قطعی نیست، حتی با costApproved
+  assert.equal(core.today(L, { date: '2026-10-14', clock: kabulClock, costApproved: true }).yesterday.profitApproximate, true);
   const t = core.plain(core.tables('today', mavg)[0]);
   assert.deepEqual(t.rows.map((r) => r[r.length - 1]), ['بله', 'نه', 'نه']);
 });

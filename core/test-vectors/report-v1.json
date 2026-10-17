@@ -642,6 +642,132 @@
      "marginBp": 2265,
      "avgTicket": 37000,
      "costEstimatedLines": 0,
+     "profitApproximate": true,
+     "date": "2026-10-13"
+    },
+    "lastWeek": {
+     "invoices": 1,
+     "returnCount": 1,
+     "gross": 30000,
+     "discount": 0,
+     "sales": 30000,
+     "returns": 15000,
+     "netSales": 15000,
+     "cogs": 10000,
+     "grossProfit": 5000,
+     "marginBp": 3333,
+     "avgTicket": 30000,
+     "costEstimatedLines": 0,
+     "profitApproximate": true,
+     "date": "2026-10-07"
+    },
+    "vsYesterday": {
+     "invoices": {
+      "diff": 1,
+      "bp": 5000
+     },
+     "sales": {
+      "diff": -15050,
+      "bp": -2034
+     },
+     "returns": {
+      "diff": 14000,
+      "bp": null
+     },
+     "netSales": {
+      "diff": -29050,
+      "bp": -3926
+     },
+     "grossProfit": {
+      "diff": 2819,
+      "bp": 1682
+     },
+     "avgTicket": {
+      "diff": -17350,
+      "bp": -4689
+     },
+     "discount": {
+      "diff": -3450,
+      "bp": -6900
+     }
+    },
+    "vsLastWeek": {
+     "invoices": {
+      "diff": 2,
+      "bp": 20000
+     },
+     "sales": {
+      "diff": 28950,
+      "bp": 9650
+     },
+     "returns": {
+      "diff": -1000,
+      "bp": -667
+     },
+     "netSales": {
+      "diff": 29950,
+      "bp": 19967
+     },
+     "grossProfit": {
+      "diff": 14582,
+      "bp": 29164
+     },
+     "avgTicket": {
+      "diff": -10350,
+      "bp": -3450
+     },
+     "discount": {
+      "diff": 1550,
+      "bp": null
+     }
+    }
+   }
+  },
+  {
+   "name": "امروز با میانگینِ موزون و D-23 ثبت‌شده (costApproved) — دیروز سودِ قطعی دارد",
+   "id": "RPT-01/03",
+   "fn": "today",
+   "opts": {
+    "date": "2026-10-14",
+    "clock": {
+     "offsetMinutes": 270,
+     "dayStartMinute": 240
+    },
+    "costing": "mavg",
+    "costApproved": true
+   },
+   "ledger": "kabul",
+   "expect": {
+    "date": "2026-10-14",
+    "today": {
+     "invoices": 3,
+     "returnCount": 1,
+     "gross": 60500,
+     "discount": 1550,
+     "sales": 58950,
+     "returns": 14000,
+     "netSales": 44950,
+     "cogs": 25368,
+     "grossProfit": 19582,
+     "marginBp": 4356,
+     "avgTicket": 19650,
+     "costEstimatedLines": 2,
+     "profitApproximate": true,
+     "date": "2026-10-14"
+    },
+    "yesterday": {
+     "invoices": 2,
+     "returnCount": 0,
+     "gross": 79000,
+     "discount": 5000,
+     "sales": 74000,
+     "returns": 0,
+     "netSales": 74000,
+     "cogs": 57237,
+     "grossProfit": 16763,
+     "marginBp": 2265,
+     "avgTicket": 37000,
+     "costEstimatedLines": 0,
      "profitApproximate": false,
      "date": "2026-10-13"
     },

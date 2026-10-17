@@ -34,10 +34,13 @@ class ReportCoreVectorsTest {
 
   private fun costing(o: JsonObject) = if (s(o, "costing") == "mavg") ReportCore.Costing.MAVG else ReportCore.Costing.LINE
 
-  private fun today(l: ReportLedger, o: JsonObject) =
-    ReportCore.today(l, s(o, "date"), clock(o), costing(o), (o["now"] as? kotlinx.serialization.json.JsonPrimitive)?.longOrNull ?: 0L)
+  private fun approved(o: JsonObject) = s(o, "costApproved") == "true"
 
-  private fun sales(l: ReportLedger, o: JsonObject) = ReportCore.sales(l, s(o, "from"), s(o, "to"), clock(o), costing(o))
+  private fun today(l: ReportLedger, o: JsonObject) = ReportCore.today(
+    l, s(o, "date"), clock(o), costing(o), (o["now"] as? kotlinx.serialization.json.JsonPrimitive)?.longOrNull ?: 0L, approved(o),
+  )
+
+  private fun sales(l: ReportLedger, o: JsonObject) = ReportCore.sales(l, s(o, "from"), s(o, "to"), clock(o), costing(o), approved(o))
 
   private fun debts(l: ReportLedger, o: JsonObject) =
     ReportCore.debts(l, s(o, "asOf")!!, (o["buckets"] as? JsonArray)?.map { it.jsonPrimitive.long } ?: emptyList(), clock(o))

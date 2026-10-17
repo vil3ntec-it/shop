@@ -29,7 +29,7 @@ object ReportCore {
     val avgTicket: Long,
     /** قلم‌های فروخته‌شدهٔ بازه که بهایشان معلوم نیست یا تخمینی است */
     val costEstimatedLines: Int,
-    /** v3 ۱۵.۴ بند ۴: سود «تقریبی» است — بهای 'line' (کپیِ قیمتِ خرید) یا قلمِ بی‌بها */
+    /** v3 ۱۵.۴ بند ۴: سود «تقریبی» است — D-23 هنوز ثبت نشده، بهای LINE، یا قلمِ بی‌بها */
     val profitApproximate: Boolean,
   )
 
@@ -40,7 +40,7 @@ object ReportCore {
     val avgTicket: Long,
     /** قلم‌های فروخته‌شدهٔ بازه که بهایشان معلوم نیست یا تخمینی است */
     val costEstimatedLines: Int,
-    /** v3 ۱۵.۴ بند ۴: سود «تقریبی» است — بهای 'line' (کپیِ قیمتِ خرید) یا قلمِ بی‌بها */
+    /** v3 ۱۵.۴ بند ۴: سود «تقریبی» است — D-23 هنوز ثبت نشده، بهای LINE، یا قلمِ بی‌بها */
     val profitApproximate: Boolean,
   )
 
@@ -95,7 +95,7 @@ object ReportCore {
   @Serializable
   data class FraudReport(val from: String, val to: String, val rows: List<FraudRow>, val totals: FraudRow)
 
-  class Costs(val mode: Costing, val line: Map<String, Long>, val ret: Map<String, Long>, val est: Set<String>)
+  class Costs(val mode: Costing, val approved: Boolean, val line: Map<String, Long>, val ret: Map<String, Long>, val est: Set<String>)
 
   /* ---------------- عدد ---------------- */
 
@@ -127,7 +127,11 @@ object ReportCore {
    *  MAVG = میانگینِ موزونِ متحرک با بازپخشِ ورودِ انبار، فروش و برگشتی به ترتیبِ
    *  زمان؛ پیش از نخستین ورود، بهای ثبت‌شده روی قلم. شرحِ کامل سرِ `costsOf`ِ JS.
    */
-  fun costs(l: ReportLedger, mode: Costing): Costs {
+  /**
+   *  `approved` = تصمیمِ D-23 ثبت شده و همین روش مصوب است؛ تا آن روز سود همیشه «تقریبی» است
+   *  (v3 ۱۵.۴ بند ۴، BLOCKERS.md). LINE هرگز سودِ قطعی نمی‌دهد.
+   */
+  fun costs(l: ReportLedger, mode: Costing, approved: Boolean = false): Costs {
     val line = HashMap<String, Long>()
     val ret = HashMap<String, Long>()
     val est = HashSet<String>()
@@ -141,7 +145,7 @@ object ReportCore {
         val it = l.itemById[r.saleItemId]
         ret[r.id] = if (it != null) rnd(it.unitCost.toDouble() * r.qty.toDouble() / 1000.0) else 0L
       }
-      return Costs(Costing.LINE, line, ret, est)
+      return Costs(Costing.LINE, false, line, ret, est)
     }
     class Ev(val t: Long, val k: Int, val id: String, val e: ReportLedger.Entry? = null, val it: ReportLedger.Item? = null, val r: ReportLedger.Return? = null)
     val ev = ArrayList<Ev>()
@@ -211,7 +215,7 @@ object ReportCore {
       }
     }
     l.items.forEach { if (it.id !in line) line[it.id] = lineMode(it) }
-    return Costs(Costing.MAVG, line, ret, est)
+    return Costs(Costing.MAVG, approved, line, ret, est)
   }
 
   /* ---------------- تخصیصِ تخفیف ---------------- */
@@ -319,7 +323,7 @@ object ReportCore {
     val totals = Totals(
       invoices, returnCount, gross, discount, sales, returns, net, cogs, net - cogs, bp(net - cogs, net),
       if (invoices > 0) divRound(sales, invoices.toLong()) else 0L,
-      estimated, costs.mode == Costing.LINE || estimated > 0,
+      estimated, !costs.approved || estimated > 0,
     )
     if (!withDims) return Agg(totals, emptyMap())
     val dims = DIMS.associateWith { dim ->
@@ -331,10 +335,13 @@ object ReportCore {
   }
 
   /** RPT-02/03 — فروشِ بازهٔ `from..to` (روزِ کاری، هر دو سر) به شش تفکیک، با سود و حاشیه */
-  fun sales(l: ReportLedger, from: String? = null, to: String? = null, clock: ReportClock? = null, costing: Costing = Costing.LINE): SalesReport {
+  fun sales(
+    l: ReportLedger, from: String? = null, to: String? = null, clock: ReportClock? = null,
+    costing: Costing = Costing.LINE, costApproved: Boolean = false,
+  ): SalesReport {
     val f = from?.ifEmpty { null } ?: "0000-01-01"
     val t = to?.ifEmpty { null } ?: "9999-12-31"
-    val a = aggregate(l, f, t, clock, costs(l, costing), true)
+    val a = aggregate(l, f, t, clock, costs(l, costing, costApproved), true)
     fun d(k: String) = a.dims.getValue(k)
     return SalesReport(f, t, costing.id, a.totals, d("product"), d("category"), d("user"), d("hour"), d("payment"), d("channel"))
   }
@@ -355,10 +362,13 @@ object ReportCore {
   }
 
   /** RPT-01 — امروز در برابرِ دیروز و همان روزِ هفتهٔ پیش. `date` یا `now` + `clock` لازم است. */
-  fun today(l: ReportLedger, date: String? = null, clock: ReportClock? = null, costing: Costing = Costing.LINE, now: Long = 0): TodayReport {
+  fun today(
+    l: ReportLedger, date: String? = null, clock: ReportClock? = null, costing: Costing = Costing.LINE,
+    now: Long = 0, costApproved: Boolean = false,
+  ): TodayReport {
     val d0 = date?.ifEmpty { null } ?: (if (clock != null && now > 0) clock.date(now) else "")
     require(ReportDates.epochDay(d0) != null) { "report-core: today() needs opts.date or opts.now + opts.clock" }
-    val costs = costs(l, costing)
+    val costs = costs(l, costing, costApproved)
     fun day(d: String): Day {
       val t = aggregate(l, d, d, clock, costs, false).totals
       return Day(d, t.invoices, t.returnCount, t.gross, t.discount, t.sales, t.returns, t.netSales, t.cogs, t.grossProfit, t.marginBp, t.avgTicket,

@@ -191,8 +191,10 @@
    *    برمی‌گردد. پیش از نخستین ورود، بهای ثبت‌شده روی قلم جایگزین است.
    *  `est[itemId]` = بهای این قلم معلوم نیست یا تخمینی است: بهای ثبت‌شدهٔ صفر، یا
    *  در 'mavg' فروشِ بیش از موجودیِ بازپخش‌شده (بخشِ ۱۵.۴ بند ۴ v3).
+   *  `approved` = تصمیمِ D-23 ثبت شده و همین روش، روشِ مصوب است. تا آن روز (BLOCKERS.md)
+   *  سود همیشه «تقریبی» است؛ 'line' (کپیِ قیمتِ خرید) هرگز سودِ قطعی نمی‌دهد.
    */
-  function costsOf(L, mode) {
+  function costsOf(L, mode, approved) {
     var line = {}, ret = {}, est = {};
     function lineMode(it) { if (it.unitCost === 0) est[it.id] = true; return rnd(it.unitCost * it.qty / 1000); }
     if (mode !== 'mavg') {
@@ -201,7 +203,7 @@
         var it = L.itemById[r.saleItemId];
         ret[r.id] = it ? rnd(it.unitCost * r.qty / 1000) : 0;
       });
-      return { mode: 'line', line: line, ret: ret, est: est };
+      return { mode: 'line', approved: false, line: line, ret: ret, est: est };
     }
     var ev = [];
     L.entries.forEach(function (e) { ev.push({ t: timeOf(e), k: 0, id: e.id, e: e }); });
@@ -259,7 +261,7 @@
       }
     });
     L.items.forEach(function (it) { if (line[it.id] === undefined) line[it.id] = lineMode(it); });
-    return { mode: 'mavg', line: line, ret: ret, est: est };
+    return { mode: 'mavg', approved: approved === true, line: line, ret: ret, est: est };
   }
 
   /* ---------------- تخصیصِ تخفیفِ فاکتور ---------------- */
@@ -364,7 +366,7 @@
       invoices: T.invoices, returnCount: T.returnCount, gross: T.gross, discount: T.discount, sales: T.sales,
       returns: T.returns, netSales: T.sales - T.returns, cogs: T.cogs, grossProfit: 0, marginBp: null,
       avgTicket: T.invoices > 0 ? divRound(T.sales, T.invoices) : 0,
-      costEstimatedLines: T.est, profitApproximate: costs.mode === 'line' || T.est > 0,
+      costEstimatedLines: T.est, profitApproximate: !costs.approved || T.est > 0,
     };
     totals.grossProfit = totals.netSales - totals.cogs;
     totals.marginBp = bp(totals.grossProfit, totals.netSales);
@@ -390,7 +392,7 @@
     opts = opts || {};
     var L = ledger(raw);
     var r = aggregate(L, str(opts.from) || '0000-01-01', str(opts.to) || '9999-12-31', clockOf(opts.clock),
-      costsOf(L, opts.costing), true);
+      costsOf(L, opts.costing, opts.costApproved), true);
     r.from = str(opts.from) || '0000-01-01'; r.to = str(opts.to) || '9999-12-31';
     r.costing = opts.costing === 'mavg' ? 'mavg' : 'line';
     return r;
@@ -409,7 +411,7 @@
   /** RPT-01 — امروز در برابرِ دیروز و همان روزِ هفتهٔ پیش */
   function today(raw, opts) {
     opts = opts || {};
-    var L = ledger(raw), clock = clockOf(opts.clock), costs = costsOf(L, opts.costing);
+    var L = ledger(raw), clock = clockOf(opts.clock), costs = costsOf(L, opts.costing, opts.costApproved);
     var d0 = str(opts.date) || (clock && opts.now > 0 ? clock.date(opts.now) : '');
     if (epochDay(d0) === null) throw new Error('report-core: today() needs opts.date or opts.now + opts.clock');
     function day(d) { var t = aggregate(L, d, d, clock, costs, false).totals; t.date = d; return t; }
