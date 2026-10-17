@@ -186,6 +186,20 @@ router.post(['/staff/join', '/join'], joinLimit, async (req, res) => {
 });
 
 // ---------- تنظیمات مشترک دکان ----------
+/*
+ * «سری سند»ِ این دستگاه — F0-03.
+ *
+ * برنامهٔ اندروید و کامپیوتر هنگامِ پیوستن (نخستین همگام‌سازی) یک بار
+ * می‌پرسند و نگهش می‌دارند؛ شمارهٔ نمایشیِ فاکتور `{سری}-{شماره}` می‌شود.
+ * هر عضوِ دکان (صاحب یا شاگرد) برای دستگاهِ خودش می‌گیرد. شرح در
+ * `lib/doc-series.js`.
+ */
+router.post('/series', requireShop, async (req, res) => {
+  const deviceId = v.id(req.body?.deviceId, { field: 'شناسه دستگاه', max: 80 });
+  const out = await require('../lib/doc-series').seriesFor(req.shopId, deviceId, req.user.id);
+  res.json({ series: out.series, created: out.created });
+});
+
 router.get('/settings', requireShop, async (req, res) => {
   const row = await one('SELECT data, rev, updated_at FROM shop_settings WHERE shop_id=$1', [req.shopId]);
   res.json({ settings: row?.data || {}, rev: Number(row?.rev || 0), updatedAt: Number(row?.updated_at || 0) });

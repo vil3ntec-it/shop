@@ -9,8 +9,8 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
  *    پایگاهِ **درون‌حافظه** می‌برد و گزارشِ تطبیقِ «محاسبهٔ قدیم ⇄ مدلِ تازه»
  *    را چاپ می‌کند. هیچ فایلی نمی‌نویسد.
  *
- *  مدلِ دادهٔ قدیم (`Models.kt`)، تقویم (`Jalali.kt` + `Format.kt`) و `Ulid.kt` از خودِ
- *  `android-native` کپی می‌شوند، نه بازنویسی — تا خواندنِ پشتیبان دقیقاً
+ *  مدلِ دادهٔ قدیم (`Models.kt`)، تقویم (`Jalali.kt` + `Format.kt`) از خودِ
+ *  `android-native` و `Ulid.kt` از `core/` کپی می‌شوند، نه بازنویسی — تا خواندنِ پشتیبان دقیقاً
  *  همانِ برنامه باشد.
  */
 plugins {
@@ -24,20 +24,26 @@ val repoRoot = rootDir.resolve("../..")
 val legacyRoot = repoRoot.resolve("android-native/app/src/main/java")
 val legacyFiles = listOf(
   "ir/vil3ntec/tohid/data/Models.kt",
-  "ir/vil3ntec/tohid/sync/v1/Ulid.kt",
   "ir/vil3ntec/tohid/Jalali.kt",
   "ir/vil3ntec/tohid/Format.kt",
 )
+//  Ulid.kt از قدم صفرِ ۳.۳ (#223) در ماژولِ مشترکِ core است، با همان بسته
+val coreRoot = repoRoot.resolve("core/src/jvmMain/kotlin")
+val coreFiles = listOf(
+  "ir/vil3ntec/tohid/sync/v1/Ulid.kt",
+)
 
 val legacySources by tasks.registering(Sync::class) {
-  inputs.files(legacyFiles.map { legacyRoot.resolve(it) })
+  inputs.files(legacyFiles.map { legacyRoot.resolve(it) } + coreFiles.map { coreRoot.resolve(it) })
   doFirst {
-    val missing = legacyFiles.filterNot { legacyRoot.resolve(it).isFile }
+    val missing = legacyFiles.filterNot { legacyRoot.resolve(it).isFile } +
+      coreFiles.filterNot { coreRoot.resolve(it).isFile }
     check(missing.isEmpty()) {
-      "فایلِ مدلِ قدیم جابه‌جا شده؛ فهرستِ legacyFiles را درست کنید: $missing"
+      "فایلِ مدلِ قدیم جابه‌جا شده؛ فهرستِ legacyFiles/coreFiles را درست کنید: $missing"
     }
   }
   from(legacyRoot) { legacyFiles.forEach { include(it) } }
+  from(coreRoot) { coreFiles.forEach { include(it) } }
   into(layout.buildDirectory.dir("generated/legacy-src"))
 }
 

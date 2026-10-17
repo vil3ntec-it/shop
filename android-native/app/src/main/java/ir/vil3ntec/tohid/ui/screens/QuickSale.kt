@@ -424,6 +424,8 @@ fun QuickSaleScreen(
           today = todayIso(),
           now = System.currentTimeMillis(),
           newId = ::newId,
+          //  F0-03: «سری سند»ِ این دستگاه — `{سری}-{شماره}`
+          series = ir.vil3ntec.tohid.sync.DocSeries.current(context),
         )) {
           is SalesEngine.Result.Failed -> toast(result.message)
           is SalesEngine.Result.Ok -> {

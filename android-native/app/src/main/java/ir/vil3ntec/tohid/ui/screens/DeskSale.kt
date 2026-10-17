@@ -185,7 +185,8 @@ fun DeskSaleScreen(
   fun finish() {
     if (cart.isEmpty()) { toast("سبد خالی است"); return }
     if (payment == SalesEngine.Payment.CREDIT && cartDebtorId == null) { toast("فروشِ نسیه مشتری می‌خواهد — F2"); pickDebtor = true; return }
-    when (val r = SalesEngine.record(d, cart, checkout, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId)) {
+    when (val r = SalesEngine.record(d, cart, checkout, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId,
+      series = ir.vil3ntec.tohid.sync.DocSeries.current(context))) {
       is SalesEngine.Result.Failed -> toast(r.message)
       is SalesEngine.Result.Ok -> {
         scope.launch { store.save(r.data) }

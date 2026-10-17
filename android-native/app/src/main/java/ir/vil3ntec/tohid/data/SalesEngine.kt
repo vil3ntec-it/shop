@@ -272,6 +272,9 @@ object SalesEngine {
   /**
    * ثبتِ فروش. اگر چیزی درست نباشد، دفتر دست‌نخورده می‌ماند و دلیلش
    * برگردانده می‌شود — نصفه ثبت نمی‌شود.
+   *
+   * @param series «سری سند»ِ این دستگاه (F0-03، `DocSeries.current`)؛ خالی
+   *               یعنی هنوز نرسیده و فاکتور مثلِ پیش بی سری ثبت می‌شود.
    */
   fun record(
     d: ShopData,
@@ -280,6 +283,7 @@ object SalesEngine {
     today: String,
     now: Long,
     newId: () -> String,
+    series: String = "",
   ): Result {
     if (cart.isEmpty()) return Result.Failed("سبد خرید خالی است")
 
@@ -332,6 +336,7 @@ object SalesEngine {
     val sale = Sale(
       id = saleId,
       invoiceNumber = invoiceNumber,
+      series = series.trim().ifEmpty { null },
       total = t.subtotal,
       discountType = if (checkout.discountType == DiscountType.PERCENT) "percent" else "amount",
       discountValue = t.discountValue,
@@ -393,7 +398,7 @@ object SalesEngine {
         type = "sale",
         qty = -line.quantity,
         date = today,
-        notes = "فاکتور #$invoiceNumber",
+        notes = "فاکتور #${sale.invoiceLabel()}",
         refId = saleId,
         createdAt = now,
       )
@@ -411,7 +416,7 @@ object SalesEngine {
         type = "give",
         amount = remaining,
         date = today,
-        notes = "فروش نسیه — فاکتور #$invoiceNumber",
+        notes = "فروش نسیه — فاکتور #${sale.invoiceLabel()}",
         createdAt = now,
       )
     }
@@ -421,7 +426,7 @@ object SalesEngine {
       type = "sale",
       date = today,
       refId = saleId,
-      notes = "ثبت فروش فاکتور #$invoiceNumber به مبلغ ${money(t.finalTotal)} افغانی",
+      notes = "ثبت فروش فاکتور #${sale.invoiceLabel()} به مبلغ ${money(t.finalTotal)} افغانی",
       createdAt = now,
     )
 
@@ -477,7 +482,7 @@ object SalesEngine {
           type = "receive",
           amount = outstanding,
           date = today,
-          notes = "لغو فروش — فاکتور #${sale.invoiceNumber ?: 0}",
+          notes = "لغو فروش — فاکتور #${sale.invoiceLabel() ?: "0"}",
           createdAt = now,
         )
         updated = updated.copy(debtSettled = sale.debtSettled + outstanding)
@@ -492,7 +497,7 @@ object SalesEngine {
         StockMovement(
           id = newId(), productId = it.productId, type = "sale_cancel",
           qty = it.quantity - it.returnedQty, date = today,
-          notes = "لغو فروش — فاکتور #${sale.invoiceNumber ?: 0}", refId = saleId, createdAt = now,
+          notes = "لغو فروش — فاکتور #${sale.invoiceLabel() ?: "0"}", refId = saleId, createdAt = now,
         )
       }
 
@@ -506,7 +511,7 @@ object SalesEngine {
           type = "cancel_sale",
           date = today,
           refId = saleId,
-          notes = "لغو فروش فاکتور #${sale.invoiceNumber ?: 0}" + if (why.isNotEmpty()) " — دلیل: $why" else "",
+          notes = "لغو فروش فاکتور #${sale.invoiceLabel() ?: "0"}" + if (why.isNotEmpty()) " — دلیل: $why" else "",
           createdAt = now,
         ),
       ),
@@ -517,7 +522,7 @@ object SalesEngine {
 
   /** جملهٔ هشدارِ پیش از لغو */
   fun cancelWarning(sale: Sale): String =
-    "فروش #${ir.vil3ntec.tohid.plain(sale.invoiceNumber ?: 0)} لغو می‌شود و موجودی کالاهای آن به انبار برمی‌گردد. سابقه فروش حذف نمی‌شود."
+    "فروش #${sale.invoiceLabel() ?: "0"} لغو می‌شود و موجودی کالاهای آن به انبار برمی‌گردد. سابقه فروش حذف نمی‌شود."
 
   /**
    *  نامی که روی یک قلمِ فاکتور نوشته می‌شود.
@@ -600,7 +605,7 @@ object SalesEngine {
         type = "customer_return",
         qty = quantity,
         date = today,
-        notes = reason.ifBlank { "مرجوعی فاکتور #${sale.invoiceNumber ?: 0}" },
+        notes = reason.ifBlank { "مرجوعی فاکتور #${sale.invoiceLabel() ?: "0"}" },
         refId = returnId,
         createdAt = now,
       )
@@ -625,7 +630,7 @@ object SalesEngine {
           type = "receive",
           amount = settle,
           date = today,
-          notes = "مرجوعی کالا — فاکتور #${sale.invoiceNumber ?: 0}",
+          notes = "مرجوعی کالا — فاکتور #${sale.invoiceLabel() ?: "0"}",
           createdAt = now,
         )
         updatedSale = updatedSale.copy(debtSettled = sale.debtSettled + settle)
@@ -644,7 +649,7 @@ object SalesEngine {
           type = "return",
           date = today,
           refId = saleId,
-          notes = "مرجوعی به مبلغ ${money(totalAmount)} افغانی — فاکتور #${sale.invoiceNumber ?: 0}",
+          notes = "مرجوعی به مبلغ ${money(totalAmount)} افغانی — فاکتور #${sale.invoiceLabel() ?: "0"}",
           createdAt = now,
         ),
       ),

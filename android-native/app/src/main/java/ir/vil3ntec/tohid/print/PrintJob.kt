@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.print
 
+import ir.vil3ntec.tohid.data.invoiceLabel
 import android.content.Context
 import ir.vil3ntec.tohid.data.Sale
 import ir.vil3ntec.tohid.data.ShopData
@@ -28,7 +29,7 @@ object PrintJob {
       runCatching {
         val bitmap = Receipt.render(context, d, sale, storeName, 576)
         val dir = java.io.File(context.cacheDir, "share").apply { mkdirs(); listFiles()?.forEach { it.delete() } }
-        val f = java.io.File(dir, "invoice-${sale.invoiceNumber ?: "x"}.png")
+        val f = java.io.File(dir, "invoice-${sale.invoiceLabel() ?: "x"}.png")
         f.outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
         bitmap.recycle()
         f
@@ -39,7 +40,7 @@ object PrintJob {
       val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
         type = "image/png"
         putExtra(android.content.Intent.EXTRA_STREAM, uri)
-        putExtra(android.content.Intent.EXTRA_TEXT, "فاکتور #${sale.invoiceNumber ?: ""}${if (storeName.isNotBlank()) " — $storeName" else ""}")
+        putExtra(android.content.Intent.EXTRA_TEXT, "فاکتور #${sale.invoiceLabel() ?: ""}${if (storeName.isNotBlank()) " — $storeName" else ""}")
         addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
       }
       context.startActivity(

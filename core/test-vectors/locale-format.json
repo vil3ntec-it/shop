@@ -1,0 +1,66 @@
+{
+  "_doc": "آزمون‌های مرجعِ ارقام (LOC-05)، افغانی (LOC-07) و تلفن (LOC-09). یک فایل، دو پیاده‌سازی: core/text/LocaleFormat.kt و license/text-core.js. legacyLatinDigits رفتارِ امروزِ latinDigits ِ اندروید است (Format.kt) — تنها فرقش با asciiDigits این است که «٬» را نقطه می‌کند؛ legacyMoney رفتارِ امروزِ money() است که formatAfghani(…, 'none', 'latn') باید عیناً همان باشد.",
+  "asciiDigits": [
+    { "in": "۱۲۳", "out": "123", "legacyLatinDigits": "123" },
+    { "in": "٤٥٦", "out": "456", "legacyLatinDigits": "456" },
+    { "in": "۲٫۵", "out": "2.5", "legacyLatinDigits": "2.5" },
+    { "in": "۱٬۲۳۴٫۵", "out": "1,234.5", "legacyLatinDigits": "1.234.5" },
+    { "in": "07۰ ۱۲۳", "out": "070 123", "legacyLatinDigits": "070 123" },
+    { "in": "abc-XYZ", "out": "abc-XYZ", "legacyLatinDigits": "abc-XYZ" },
+    { "in": "", "out": "", "legacyLatinDigits": "" }
+  ],
+  "displayDigits": [
+    { "in": "1405/07/22", "style": "fa", "out": "۱۴۰۵/۰۷/۲۲" },
+    { "in": "۱۲ kg", "style": "latn", "out": "12 kg" },
+    { "in": "٣ و 4", "style": "fa", "out": "۳ و ۴" }
+  ],
+  "formatAfghani": [
+    { "amount": 1250, "symbol": "sign", "digits": "latn", "out": "1,250 ؋" },
+    { "amount": 1250, "symbol": "word", "digits": "latn", "out": "1,250 افغانی" },
+    { "amount": 1250, "symbol": "none", "digits": "latn", "out": "1,250" },
+    { "amount": 1250, "symbol": "sign", "digits": "fa", "out": "۱٬۲۵۰ ؋" },
+    { "amount": 1234567.5, "symbol": "word", "digits": "fa", "out": "۱٬۲۳۴٬۵۶۸ افغانی" },
+    { "amount": -1500, "symbol": "sign", "digits": "latn", "out": "-1,500 ؋" },
+    { "amount": 100, "symbol": "none", "digits": "latn", "out": "100" },
+    { "amount": 1000, "symbol": "none", "digits": "latn", "out": "1,000" },
+    { "amount": 999999, "symbol": "none", "digits": "latn", "out": "999,999" },
+    { "amount": 2.5, "symbol": "none", "digits": "latn", "out": "3" },
+    { "amount": -2.5, "symbol": "none", "digits": "latn", "out": "-2" },
+    { "amount": 999.49, "symbol": "none", "digits": "latn", "out": "999" },
+    { "amount": -0.4, "symbol": "none", "digits": "latn", "out": "0" },
+    { "amount": 0, "symbol": "word", "digits": "fa", "out": "۰ افغانی" },
+    { "amount": 123456789012, "symbol": "none", "digits": "latn", "out": "123,456,789,012" }
+  ],
+  "normalizePhone": [
+    { "in": "0701234567", "out": "+93701234567" },
+    { "in": "۰۷۰۱۲۳۴۵۶۷", "out": "+93701234567" },
+    { "in": "٠٧٠١٢٣٤٥٦٧", "out": "+93701234567" },
+    { "in": "070 123 4567", "out": "+93701234567" },
+    { "in": "070-123-4567", "out": "+93701234567" },
+    { "in": "701234567", "out": "+93701234567" },
+    { "in": "93701234567", "out": "+93701234567" },
+    { "in": "+93701234567", "out": "+93701234567" },
+    { "in": "+93 70 123 4567", "out": "+93701234567" },
+    { "in": "0093701234567", "out": "+93701234567" },
+    { "in": "+930701234567", "out": "+93701234567" },
+    { "in": "‎+93 (70) 123-4567", "out": "+93701234567" },
+    { "in": "0201234567", "out": "+93201234567" },
+    { "in": "0791234567", "out": "+93791234567" },
+    { "in": "+989121234567", "out": "+989121234567" },
+    { "in": "00989121234567", "out": "+989121234567" },
+    { "in": "07012345", "out": null },
+    { "in": "07012345678", "out": null },
+    { "in": "9370123456", "out": null },
+    { "in": "+93 1234", "out": null },
+    { "in": "0001234567", "out": null },
+    { "in": "070x1234567", "out": null },
+    { "in": "abc", "out": null },
+    { "in": "", "out": null }
+  ],
+  "formatPhone": [
+    { "in": "+93701234567", "out": "+93 70 123 4567" },
+    { "in": "+93201234567", "out": "+93 20 123 4567" },
+    { "in": "+989121234567", "out": "+989121234567" },
+    { "in": "0701234567", "out": "0701234567" }
+  ]
+}
