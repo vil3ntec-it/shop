@@ -454,7 +454,12 @@ test('ناموفق ← تلاشِ دوباره ← ناموفق ← برگشت �
   const self = await send(courier.token, [ev(id, 'returned')]);
   assert.equal(self.body.results[0].code, 'staff_only');
   const staff = await member(a.shopId, 'staff', 'شاگردِ انبار');
-  const back = await staffStatus(staff.token, id, { to: 'returned' });
+  //  CAS: «از وضعیتِ کهنه» ⇒ ۴۰۹ با وضعیتِ فعلی
+  const stale = await staffStatus(staff.token, id, { to: 'returned', from: 'moving' });
+  assert.equal(stale.status, 409);
+  assert.equal(stale.body.error.code, 'status_changed');
+  assert.equal(stale.body.error.current, 'failed');
+  const back = await staffStatus(staff.token, id, { to: 'returned', from: 'failed' });
   assert.equal(back.status, 200, JSON.stringify(back.body));
   assert.equal(back.body.assignment.status, 'returned');
   assert.equal((await orderRow(order.id)).status, 'returned_to_store');

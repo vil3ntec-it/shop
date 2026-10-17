@@ -431,7 +431,7 @@ const REJECT_STATUS = {
   permission_denied: 403, reason_required: 400, bad_reason: 400, note_required: 400,
   assignment_not_found: 404, event_key_reused: 409, bad_code: 422, code_required: 422, code_locked: 423,
   cash_required: 400, cash_reason_required: 400, bad_cash: 400,
-  order_not_ready: 409, order_state_conflict: 409,
+  order_not_ready: 409, order_state_conflict: 409, status_changed: 409,
 };
 const REJECT_MESSAGE = {
   invalid_transition: 'این تغییرِ وضعیت مجاز نیست',
@@ -453,6 +453,7 @@ const REJECT_MESSAGE = {
   bad_cash: 'مبلغِ گرفته‌شده معتبر نیست',
   order_not_ready: 'سفارش هنوز آمادهٔ این کار نیست',
   order_state_conflict: 'وضعیتِ سفارش با این رویداد جور نیست',
+  status_changed: 'وضعیتِ مأموریت همین حالا عوض شده است',
 };
 
 function rejection(code, extra = {}) {
@@ -467,12 +468,16 @@ function parseEvent(raw, { requireKey = true } = {}) {
   if (!D.STATUSES.includes(to)) throw badRequest('نوعِ رویداد معتبر نیست', 'bad_event_type');
   const reason = str(e.reason);
   if (reason && !/^[a-z_]{1,40}$/.test(reason)) throw badRequest('دلیل معتبر نیست', 'bad_reason');
+  //  CAS اختیاری (§۲۸.۵): «از این وضعیت» — اگر عوض شده باشد رد می‌شود
+  const from = str(e.from);
+  if (from && !D.STATUSES.includes(from)) throw badRequest('وضعیتِ مبدأ معتبر نیست', 'bad_status');
   const cashReason = str(e.cashReason);
   if (cashReason && !D.REASONS.cash.includes(cashReason)) throw badRequest('دلیلِ اختلافِ نقد معتبر نیست', 'bad_reason');
   return {
     key,
     assignmentId: str(e.assignmentId),
     to,
+    from,
     reason,
     note: text(e.note, 300),
     cashCollectedMinor: optInt(e.cashCollectedMinor, 'مبلغِ گرفته‌شده'),
@@ -513,6 +518,7 @@ async function applyEvent(c, shopId, ev, actor) {
     }
   }
   if (a.status === ev.to) return { ok: true, status: 'unchanged', assignment: a };
+  if (ev.from && ev.from !== a.status) return rejection('status_changed', { current: a.status });
 
   const verdict = D.check(a, ev.to, { actor, reason: ev.reason, note: ev.note });
   if (!verdict.ok) return rejection(verdict.code, { current: a.status });
