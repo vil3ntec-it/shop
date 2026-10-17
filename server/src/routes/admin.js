@@ -703,6 +703,8 @@ router.use('/shop-offline-codes', require('./admin-shop-offline'));
 //  میزِ «کدِ شاگرد» — بندِ ۴.۴ سندِ ریمیک. ⛔ زیرِ `/shops/:id` می‌نشیند تا
 //  همان `v.id` و همان مرزِ دکان را داشته باشد، نه یک درِ موازی.
 router.use('/shops/:id/staff-codes', require('./admin-staff-codes'));
+//  مجوزهای کارمندان و دستگاه‌های یک دکان (STF-01..03، STF-10)
+router.use('/shops/:id/staff-perms', require('./admin-staff-perms'));
 /*
  *  ⚠️ **دو دفترِ کد هست و هر دو میز می‌خواهند.** `/logins` مالِ
  *  `login_requests` است (ورود با کدِ ایمیلی) و `/otp` مالِ `otp_codes`
