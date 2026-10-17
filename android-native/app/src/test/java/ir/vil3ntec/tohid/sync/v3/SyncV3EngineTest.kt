@@ -282,9 +282,10 @@ class SyncV3EngineTest {
   @Test fun upgradeRequiredKeepsQueueAndStops() {
     val server = FakeServer()
     val n = Device("dev-new", server, ShopData(), protocol = 4)
-    assertTrue(n.sync().ok)                    //  Snapshot و Pull پروتکل ندارند
+    //  دستگاهی که پیش‌تر همگام بوده (چیزی برای نخستین بارگذاری ندارد): Snapshot و Pull پروتکل ندارند
+    assertTrue(n.sync(first = false).ok)
     n.edit { d -> d.copy(products = listOf(Product(id = "p426", name = "نو"))) }
-    val r = n.sync()
+    val r = n.sync(first = false)
     assertFalse(r.ok)
     assertTrue(r.upgrade)
     assertEquals(1, n.engine.queued())
