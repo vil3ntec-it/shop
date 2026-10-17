@@ -632,7 +632,7 @@ fun VipScreen(onDismiss: () -> Unit) {
           Spacer(Modifier.height(12.dp))
           OutlinedTextField(
             value = code,
-            onValueChange = { codeNote = null; code = it.filter { ch -> ch.isDigit() }.take(6) },
+            onValueChange = { codeNote = null; code = ir.vil3ntec.tohid.normalizeDigits(it).filter { ch -> ch in '0'..'9' }.take(6) },
             label = { Text("کد شش‌رقمی") },
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),

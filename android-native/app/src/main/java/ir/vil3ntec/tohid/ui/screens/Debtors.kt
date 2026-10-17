@@ -1092,7 +1092,7 @@ private fun TransactionDialog(
 @Composable
 private fun ReminderRow(name: String, phone: String, balance: Double) {
   val context = LocalContext.current
-  val clean = remember(phone) { phone.filter { it.isDigit() || it == '+' } }
+  val clean = remember(phone) { ir.vil3ntec.tohid.normalizeDigits(phone).filter { it in '0'..'9' || it == '+' } }
   if (clean.isBlank()) return
 
   val message = remember(name, balance) {
