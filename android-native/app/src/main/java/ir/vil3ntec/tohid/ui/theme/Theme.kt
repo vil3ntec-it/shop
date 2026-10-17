@@ -363,7 +363,9 @@ fun TohidTheme(
       width >= 600 -> 1.12f
       else -> 1f
     }
-    val type = remember(scale) { shopTypography(scale) }
+    //  رقمِ صفحه، انتخابِ دکان (LOC-05) — با زدنِ کلید کلِ برنامه عوض می‌شود
+    val digits = ir.vil3ntec.tohid.LocaleChoice.digits
+    val type = remember(scale, digits) { shopTypography(scale, digits) }
     MaterialTheme(colorScheme = scheme, typography = type, shapes = ShopShapes) {
       if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) {
         //  دکمه و کادرِ ماوسی لازم نیست ۴۸ پیکسل باشد (اندازهٔ انگشت)

@@ -42,7 +42,7 @@ object DebtorEngine {
         debtors = d.debtors + Debtor(
           id = id,
           name = name,
-          phone = draft.phone.trim(),
+          phone = ir.vil3ntec.tohid.LocaleText.phoneForSave(draft.phone),
           notes = draft.notes.trim(),
           createdAt = now,
         )
@@ -59,7 +59,7 @@ object DebtorEngine {
     return Result.Ok(
       d.copy(
         debtors = d.debtors.map {
-          if (it.id == id) it.copy(name = name, phone = draft.phone.trim(), notes = draft.notes.trim()) else it
+          if (it.id == id) it.copy(name = name, phone = ir.vil3ntec.tohid.LocaleText.phoneForSave(draft.phone), notes = draft.notes.trim()) else it
         }
       ),
       id = id,

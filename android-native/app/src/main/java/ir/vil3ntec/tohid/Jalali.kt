@@ -1,5 +1,8 @@
 package ir.vil3ntec.tohid
 
+import ir.vil3ntec.tohid.core.calendar.CivilDays
+import ir.vil3ntec.tohid.core.calendar.SolarHijri
+
 /**
  *  تبدیلِ تاریخ میلادی به خورشیدی.
  *
@@ -8,132 +11,31 @@ package ir.vil3ntec.tohid
  *  ولی چیزی که فروشنده می‌بیند باید خورشیدی باشد — وگرنه فاکتورِ امروز
  *  تاریخِ ناآشنا دارد.
  *
- *  الگوریتم همان الگوریتمِ شناخته‌شدهٔ jalaali است (بر پایهٔ تقویمِ رسمی با
- *  جدولِ «شکست»‌ها، نه تقریبِ ۳۳ ساله). درستی‌اش با ۱۷۰ سال روزِ پیاپی
- *  سنجیده شده: هیچ روزی جا نمی‌افتد و هیچ روزی دوبار نمی‌آید.
- *
- *  در کاتلین `/` روی عددِ صحیح به سمتِ صفر بریده می‌شود و `%` هم علامتِ
- *  مقسوم را می‌گیرد — دقیقاً همان `div` و `mod` الگوریتمِ اصلی.
+ *  حالا فقط پوسته است: حساب در `core/calendar` (`SolarHijri`، `CivilDays`)
+ *  است — همان الگوریتمِ jalaali با جدولِ «شکست»‌ها که پیش‌تر همین‌جا دوباره
+ *  نوشته شده بود. `CoreVectorsTest` برابریِ هر روزِ ۱۳۰۰ تا ۱۵۰۰ را پیش از
+ *  این جابه‌جایی نشان داده بود و `JalaliTest` هنوز ۱۷۰ سال روزِ پیاپی را
+ *  می‌سنجد. نام‌ها و امضاها ماندند تا ده‌ها صدازننده دست نخورند.
  */
 object Jalali {
 
-  private val BREAKS = intArrayOf(
-    -61, 9, 38, 199, 426, 686, 756, 818, 1111, 1181, 1210,
-    1635, 2060, 2097, 2192, 2262, 2324, 2394, 2456, 3178,
-  )
-
   data class Date(val year: Int, val month: Int, val day: Int)
 
-  private data class Cal(val leap: Int, val gy: Int, val march: Int)
-
-  private fun cal(jy: Int): Cal {
-    val gy = jy + 621
-    var leapJ = -14
-    var jp = BREAKS[0]
-    var jump = 0
-
-    require(jy >= jp && jy < BREAKS[BREAKS.size - 1]) { "سالِ خورشیدیِ خارج از دامنه: $jy" }
-
-    for (i in 1 until BREAKS.size) {
-      val jm = BREAKS[i]
-      jump = jm - jp
-      if (jy < jm) break
-      leapJ += (jump / 33) * 8 + (jump % 33) / 4
-      jp = jm
-    }
-    var n = jy - jp
-
-    leapJ += (n / 33) * 8 + ((n % 33) + 3) / 4
-    if (jump % 33 == 4 && jump - n == 4) leapJ += 1
-
-    val leapG = gy / 4 - ((gy / 100 + 1) * 3) / 4 - 150
-    val march = 20 + leapJ - leapG
-
-    if (jump - n < 6) n = n - jump + ((jump + 4) / 33) * 33
-    var leap = (((n + 1) % 33) - 1) % 4
-    if (leap == -1) leap = 4
-
-    return Cal(leap, gy, march)
-  }
-
-  /** شمارهٔ روزِ مطلق برای یک تاریخِ میلادی */
-  private fun g2d(gy: Int, gm: Int, gd: Int): Int {
-    var d = ((gy + (gm - 8) / 6 + 100100) * 1461) / 4 +
-      (153 * ((gm + 9) % 12) + 2) / 5 + gd - 34840408
-    d -= ((gy + 100100 + (gm - 8) / 6) / 100 * 3) / 4 - 752
-    return d
-  }
-
-  private fun d2gYear(jdn: Int): Int {
-    var j = 4 * jdn + 139361631
-    j += (((4 * jdn + 183187720) / 146097) * 3) / 4 * 4 - 3908
-    val i = ((j % 1461) / 4) * 5 + 308
-    val gm = ((i / 153) % 12) + 1
-    return j / 1461 - 100100 + (8 - gm) / 6
-  }
-
+  /** میلادی ⇒ خورشیدی. مثلِ قبل، تاریخِ میلادیِ نادرست (۳۰ فوریه) جلو می‌غلتد؛ بیرون از دامنه ⇒ استثنا */
   fun of(gy: Int, gm: Int, gd: Int): Date {
-    val jdn = g2d(gy, gm, gd)
-    val gYear = d2gYear(jdn)
-    var jy = gYear - 621
-    val c = cal(jy)
-    var k = jdn - g2d(gYear, 3, c.march)
-
-    if (k >= 0) {
-      if (k <= 185) return Date(jy, 1 + k / 31, k % 31 + 1)
-      k -= 186
-    } else {
-      jy -= 1
-      k += 179
-      if (c.leap == 1) k += 1
-    }
-    return Date(jy, 7 + k / 30, k % 30 + 1)
-  }
-
-  /* ─────────── راهِ برگشت: خورشیدی → میلادی ─────────── */
-
-  /**
-   *  شمارهٔ روزِ مطلق برای یک تاریخِ خورشیدی — عکسِ `of`.
-   *
-   *  تا امروز فقط راهِ رفت بود (میلادی → خورشیدی)، چون تاریخ همیشه از
-   *  فایل می‌آمد و فقط نشان داده می‌شد. حالا کاربر هم تاریخ **می‌نویسد**،
-   *  و آنچه می‌نویسد خورشیدی است.
-   */
-  private fun j2d(jy: Int, jm: Int, jd: Int): Int {
-    val c = cal(jy)
-    return g2d(c.gy, 3, c.march) + (jm - 1) * 31 - (jm / 7) * (jm - 7) + jd - 1
-  }
-
-  private fun d2g(jdn: Int): Triple<Int, Int, Int> {
-    var j = 4 * jdn + 139361631
-    j += (((4 * jdn + 183187720) / 146097) * 3) / 4 * 4 - 3908
-    val i = ((j % 1461) / 4) * 5 + 308
-    val gd = ((i % 153) / 5) + 1
-    val gm = ((i / 153) % 12) + 1
-    val gy = j / 1461 - 100100 + (8 - gm) / 6
-    return Triple(gy, gm, gd)
+    val j = SolarHijri.ofJdn(CivilDays.jdnOf(gy, gm, gd))
+    require(j != null) { "سالِ خورشیدیِ خارج از دامنه: $gy-$gm-$gd" }
+    return Date(j.year, j.month, j.day)
   }
 
   /** آیا این سه عدد اصلاً یک روزِ خورشیدیِ درست‌اند */
-  fun isValid(jy: Int, jm: Int, jd: Int): Boolean {
-    if (jm !in 1..12 || jd < 1) return false
-    val max = when {
-      jm <= 6 -> 31
-      jm <= 11 -> 30
-      else -> if (runCatching { cal(jy).leap == 0 }.getOrDefault(false)) 30 else 29
-    }
-    return jd <= max
-  }
+  fun isValid(jy: Int, jm: Int, jd: Int): Boolean = jd >= 1 && jd <= SolarHijri.monthLength(jy, jm)
 
   /**
    *  تاریخِ خورشیدی به همان `YYYY-MM-DD`ِ میلادی که در فایل ذخیره می‌شود.
-   *  اگر تاریخ درست نباشد، `null`.
+   *  اگر تاریخ درست نباشد، `null`. رقم همیشه ASCII است (LOC-05).
    */
-  fun toIso(jy: Int, jm: Int, jd: Int): String? = runCatching {
-    if (!isValid(jy, jm, jd)) return null
-    val (gy, gm, gd) = d2g(j2d(jy, jm, jd))
-    isoText(gy, gm, gd)
-  }.getOrNull()
+  fun toIso(jy: Int, jm: Int, jd: Int): String? = SolarHijri.fromSolar(jy, jm, jd)
 
   /**
    *  `YYYY-MM-DD` همیشه با رقمِ لاتین (LOC-05: ذخیرهٔ ASCII).
@@ -239,11 +141,15 @@ fun todayIso(): String {
   return "$y-$m-$d"
 }
 
-/** نامِ ماه‌های خورشیدی — برای برچسبِ ماه، نه برای تاریخِ کامل */
-val JALALI_MONTHS = listOf(
-  "حمل", "ثور", "جوزا", "سرطان", "اسد", "سنبله",
-  "میزان", "عقرب", "قوس", "جدی", "دلو", "حوت",
-)
+/**
+ *  نامِ ماه‌های خورشیدی — برای برچسبِ ماه، نه برای تاریخِ کامل.
+ *
+ *  دری یا پشتو، به انتخابِ دکان (`LocaleChoice.months`، LOC-01)؛ پیش‌فرض دری،
+ *  همان فهرستِ امروز. خواندنش در صفحه، حالتِ Compose را می‌خواند، پس با
+ *  عوض‌شدنِ کلید برچسب‌ها هم بی بازکردنِ دوباره عوض می‌شوند.
+ */
+val JALALI_MONTHS: List<String>
+  get() = LocaleText.monthNames(LocaleChoice.months)
 
 /**
  *  برچسبِ یک ماه: از `2026-09` به «سنبله ۱۴۰۵».
