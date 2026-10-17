@@ -47,7 +47,7 @@ class OwnerExportTest {
       WarehouseEntry("w2", "p1", 0.0, 0.0, -3.0, "کیلوگرم", 0.0, "2026-08-10", "خراب شد", true, null, 1_700_000_000_000),
     ),
     sales = listOf(
-      Sale("s1", 1, 600.0, "percent", 10.0, 60.0, 540.0, "credit", "d1", 40.0, 500.0, "completed", 500.0, 0.0, 1_700_000_000_000, "2026-08-28", "pending", "", "علی"),
+      Sale("s1", 1, 600.0, "percent", 10.0, 60.0, 540.0, "credit", "d1", 40.0, 500.0, "completed", 500.0, 0.0, 1_700_000_000_000, "2026-08-28", "pending", "", "علی", series = "B1"),
       Sale("s2", null, 0.0, status = "cancelled", cancelReason = "اشتباه"),
     ),
     saleItems = listOf(SaleItem("si1", "s1", "p1", "برنج", 2.0, 300.0, 200.0, 600.0, 0.5)),

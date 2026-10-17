@@ -203,3 +203,11 @@ test('صفحه دکمه‌ها را دارد و فایل را بار می‌کن
   const handler = html.slice(html.indexOf("'btn-owner-export-'"), html.indexOf("'btn-owner-export-'") + 600);
   assert.ok(!/markBackupTaken|localStorage\.setItem|saveData\(/.test(handler), 'خروجی نباید چیزی بنویسد');
 });
+
+test('F0-25: خروجیِ مالک پشتِ قفلِ اشتراک نمی‌رود', () => {
+  //  «دسترسی خواندن و export دادهٔ مالک… نباید به‌خاطر انقضا از بین برود»
+  const lic = fs.readFileSync(path.join(ROOT, 'license/license-client.js'), 'utf8');
+  const gated = lic.slice(lic.indexOf('const FEATURE_ELEMENTS'), lic.indexOf('};', lic.indexOf('const FEATURE_ELEMENTS')));
+  assert.ok(gated.length > 20, 'FEATURE_ELEMENTS پیدا نشد');
+  assert.ok(!gated.includes('btn-owner-export'), 'دکمهٔ خروجیِ کامل به قابلیتِ اشتراکی بسته شده');
+});

@@ -96,6 +96,7 @@
     batch: 'شمارهٔ بچ',
     productionDate: 'تاریخ تولید',
     invoiceNumber: 'شمارهٔ فاکتور',
+    series: 'سری سند',
     total: 'جمع',
     discountType: 'نوع تخفیف',
     discountValue: 'مقدار تخفیف',

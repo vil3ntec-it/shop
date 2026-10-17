@@ -135,6 +135,7 @@ object OwnerExport {
     "batch" to "شمارهٔ بچ",
     "productionDate" to "تاریخ تولید",
     "invoiceNumber" to "شمارهٔ فاکتور",
+    "series" to "سری سند",
     "total" to "جمع",
     "discountType" to "نوع تخفیف",
     "discountValue" to "مقدار تخفیف",
