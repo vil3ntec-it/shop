@@ -1,7 +1,8 @@
 name: مشخصاتِ جامع
 
-# docs/spec تکه‌های MASTER-SPEC.md است. اگر کسی تکه‌ای را دستی ویرایش کند، یا STATUS.md
-# شناسه‌ای را جا بیندازد یا ✅ بی‌شواهد بزند، این‌جا قرمز می‌شود.
+# docs/spec تکه‌های MASTER-SPEC.md (مشخصاتِ نسخهٔ ۳) است. اگر چسباندنِ تکه‌ها همان SHA-256ِ اصل نباشد،
+# تکه‌ای دستی ویرایش شود، شناسه‌ای تکراری یا ارجاعی شکسته باشد، STATUS.md یا BLOCKERS.md با سند نخواند،
+# یا IMPLEMENTED-VERIFIED بی دستور/نتیجهٔ آزمون و commit/PR باشد، این‌جا قرمز می‌شود.
 
 on:
   push:
@@ -29,3 +30,4 @@ jobs:
         with:
           node-version: 22
       - run: node docs/spec/tools/spec.mjs check
+      - run: node --test docs/spec/tools/spec.test.mjs
