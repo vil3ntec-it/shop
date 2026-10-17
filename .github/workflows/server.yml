@@ -129,6 +129,12 @@ jobs:
         working-directory: server
         run: npm run test:web-ui
 
+      # F0-23 (دنباله): دفترِ وب در IndexedDB — آزمایشی و پیش‌فرض خاموش. انتقال،
+      # بارِ دوباره، خروجی/بازیابی، برگشت، نبودِ IndexedDB، سهمیه و دفترِ دیررس.
+      - name: آزمونِ دفترِ وب در IndexedDB
+        working-directory: server
+        run: npm run test:web-idb
+
       # OPS-08: خروجیِ کاملِ مالک (اکسل و JSON) با دکمهٔ واقعی در کرومیوم —
       # فایلِ دانلودشده باز و سنجیده می‌شود، و دفتر نباید عوض شود.
       - name: آزمونِ خروجیِ کاملِ مالک در نسخهٔ وب

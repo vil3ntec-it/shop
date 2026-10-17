@@ -375,7 +375,16 @@
    * @param {boolean} opts.reload  اگر false باشد، پس از دریافت داده‌ی تازه
    *   صفحه خودکار تازه نمی‌شود (برای WebView اندروید یا تست‌ها مفید است).
    */
+  /* دفتر در IndexedDB (`ledger-store.js`) و هنوز نرسیده: تا آن موقع دست به
+     دفتر و صاحبش نمی‌زنیم. خاموش (پیش‌فرض) ⇒ null و همه‌چیز مثل قبل. */
+  function ledgerPending() {
+    const s = window.TohidLedgerStore;
+    return s && !s.isReady() ? s.ready : null;
+  }
+
   async function sync({ silent = false, reload = true } = {}) {
+    const pending = ledgerPending();
+    if (pending) await pending;
     if (syncing) return { skipped: true };
     const acct = getAcct();
     if (!acct.accessToken) throw new ApiError('ابتدا وارد حساب شوید', 'no_account');
@@ -649,6 +658,8 @@
   }
 
   function init() {
+    const pending = ledgerPending();
+    if (pending) { pending.then(init); return; }
     renderShortageBanner(findShortages());
     if (autoEnabled) autoSync('startup');
     startAutoTimer();

@@ -365,7 +365,7 @@ fun SettingsScreen(
           value = debtLimitText,
           onValueChange = { entered ->
             //  فقط رقم؛ خالی یعنی «هشدارِ قرض را نمی‌خواهم»
-            val digits = entered.filter { it.isDigit() }
+            val digits = ir.vil3ntec.tohid.normalizeDigits(entered).filter { it in '0'..'9' }
             debtLimitText = digits
             val value = digits.toDoubleOrNull() ?: 0.0
             debtLimit = value

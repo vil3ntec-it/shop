@@ -15,7 +15,7 @@
  */
 const BETA = /\/beta\/sw\.js$/.test(self.location.pathname);
 const BETA_PATH = new URL('./beta/', self.location).pathname;
-const VERSION = (BETA ? 'beta-' : '') + 'tohid-shop-v51';
+const VERSION = (BETA ? 'beta-' : '') + 'tohid-shop-v52';
 const SHELL_CACHE = VERSION + '-shell';
 const FONT_CACHE = VERSION + '-fonts';
 
@@ -60,6 +60,8 @@ const SHELL_ASSETS = [
    */
   './license/thermal-print.js',
   './license/photo-studio.js',
+  //  جای دفتر (localStorage یا IndexedDB) — بی آن، دفترِ IndexedDB روی نصبِ آفلاین باز نمی‌شد
+  './license/ledger-store.js',
   //  خروجیِ کاملِ مالک (OPS-08) — بی اینترنت هم باید کار کند
   './license/owner-export.js',
   //  خوانندهٔ بارکد برای آیفون — Safari «BarcodeDetector» ندارد و دوربین همیشه

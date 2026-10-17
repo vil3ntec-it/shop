@@ -666,7 +666,7 @@ private fun EntryRow(kind: DebtorEngine.Kind, onCancel: () -> Unit, onSave: (Dou
     Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
       Text(if (receive) "دریافتِ وجه" else "قرضِ دستی", style = MaterialTheme.typography.labelLarge, color = Shop.colors.text)
       Spacer(Modifier.width(8.dp))
-      OutlinedTextField(amount, { amount = it.filter { c -> c.isDigit() || c == '.' } }, label = { Text("مبلغ (؋)") }, singleLine = true, modifier = Modifier.width(160.dp).focusRequester(focus).then(keys))
+      OutlinedTextField(amount, { amount = ir.vil3ntec.tohid.numericInput(it) }, label = { Text("مبلغ (؋)") }, singleLine = true, modifier = Modifier.width(160.dp).focusRequester(focus).then(keys))
       Spacer(Modifier.width(6.dp))
       OutlinedTextField(notes, { notes = it }, label = { Text("شرح") }, singleLine = true, modifier = Modifier.weight(1f).then(keys))
       Spacer(Modifier.width(6.dp))
