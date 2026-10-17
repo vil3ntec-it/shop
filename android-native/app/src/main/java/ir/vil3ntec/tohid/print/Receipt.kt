@@ -124,11 +124,12 @@ object Receipt {
 
     fun gap(factor: Float = 0.5f) { y += pad * factor }
 
-    //  رقمِ فاکتور همان انتخابِ دکان است (LOC-05)؛ مبلغ بی اعشار با «افغانی» (LOC-07).
-    //  حالتِ لاتین دقیقاً همان متنِ پیشین است (`LocaleTextTest`).
+    //  رقمِ فاکتور همان انتخابِ دکان است (LOC-05)؛ مبلغ بی اعشار با «افغانی» یا «؋» (LOC-07).
+    //  پیش‌فرض (لاتین، «افغانی») دقیقاً همان متنِ پیشین است (`LocaleTextTest`).
     val digits = LocaleChoice.digits
+    val symbol = LocaleChoice.symbol
     fun num(value: Double) = LocaleText.amount(value, digits)
-    fun afn(value: Double) = LocaleText.afghani(value, digits)
+    fun afn(value: Double) = LocaleText.afghani(value, digits, symbol)
 
     /* ------------------------------ سربرگ ------------------------------ */
     line(storeName.ifBlank { "فروشگاه" }, title, Layout.Alignment.ALIGN_CENTER)

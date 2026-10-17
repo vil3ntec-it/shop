@@ -44,9 +44,13 @@ object LocaleText {
   fun amount(value: Double, digits: String): String =
     LocaleFormat.formatAfghani(value, LocaleFormat.SYMBOL_NONE, digits)
 
-  /** مبلغ با «افغانی» — در حالتِ لاتین دقیقاً همان `"${money(x)} افغانی"` ِ امروز */
-  fun afghani(value: Double, digits: String): String =
-    LocaleFormat.formatAfghani(value, LocaleFormat.SYMBOL_WORD, digits)
+  /** نمادِ پول (LOC-07): «؋» یا «افغانی»؛ هر مقدارِ ناشناخته ⇒ «افغانی»، یعنی رفتارِ امروز */
+  fun symbolOf(value: String?): String =
+    if (value == LocaleFormat.SYMBOL_SIGN) LocaleFormat.SYMBOL_SIGN else LocaleFormat.SYMBOL_WORD
+
+  /** مبلغ با نماد — با رقمِ لاتین و «افغانی» دقیقاً همان `"${money(x)} افغانی"` ِ امروز */
+  fun afghani(value: Double, digits: String, symbol: String = LocaleFormat.SYMBOL_WORD): String =
+    LocaleFormat.formatAfghani(value, symbolOf(symbol), digits)
 
   /** متنی که رقم دارد (شمارهٔ فاکتور، ساعت) */
   fun digitsIn(text: String, digits: String): String = LocaleFormat.displayDigits(text, digits)

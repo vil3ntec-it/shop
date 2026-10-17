@@ -5269,7 +5269,7 @@
           </div>
         </div>
 
-        <!-- LOC-01/LOC-05: رقم و نامِ ماه — پیش‌فرض همان امروز (لاتین، دری) -->
+        <!-- LOC-01/05/07: رقم، نامِ ماه و نمادِ پولِ فاکتور — پیش‌فرض همان امروز (لاتین، دری، «افغانی») -->
         <div class="panel">
           <div class="panel-head"><h2>تاریخ و رقم</h2></div>
           <p class="settings-hint">رقم روی صفحه و فاکتور. چیزی که ذخیره و همگام می‌شود همیشه رقمِ لاتین است؛ با عوض کردنِ این کلید هیچ داده‌ای عوض نمی‌شود.</p>
@@ -5281,6 +5281,11 @@
           <div class="theme-toggle" id="months-toggle" style="margin-top:8px;">
             <button type="button" class="theme-toggle-btn" data-months-choice="fa">دری (حمل، ثور…)</button>
             <button type="button" class="theme-toggle-btn" data-months-choice="ps">پشتو (وری، غویی…)</button>
+          </div>
+          <p class="settings-hint" style="margin-top:14px;">نمادِ پول در فاکتور. مبلغ همیشه بی اعشار است.</p>
+          <div class="theme-toggle" id="currency-toggle" style="margin-top:8px;">
+            <button type="button" class="theme-toggle-btn" data-currency-choice="word">افغانی</button>
+            <button type="button" class="theme-toggle-btn" data-currency-choice="sign">؋</button>
           </div>
         </div>
 
@@ -7193,10 +7198,7 @@
     const hit = DATE_MEMO.get(iso);
     if(hit !== undefined) return hit;
     let out;
-    //  هستهٔ تقویم (LOC-01) — همان jalaali ِ برنامهٔ گوشی؛ تاریخِ نادرست ⇒ راهِ قدیمِ Intl
-    const core = window.TohidCalendar && TohidCalendar.toSolar(iso) ? TohidCalendar.formatSolarNumeric(iso, 'latn') : null;
-    if(core) out = core;
-    else try{ out = DATE_FMT ? DATE_FMT.format(new Date(iso+'T00:00:00')) : iso; }
+    try{ out = DATE_FMT ? DATE_FMT.format(new Date(iso+'T00:00:00')) : iso; }
     catch(e){ out = iso; }
     if(DATE_MEMO.size > 5000) DATE_MEMO.clear();
     DATE_MEMO.set(iso, out);
@@ -7209,8 +7211,11 @@
     const T = window.TohidText;
     return T ? T.formatAfghani(n, 'none', shopDigits()) : formatMoney(n);
   }
-  /** مبلغِ فاکتور با «افغانی»، بی اعشار (LOC-07) */
-  function rcAfn(n){ return rcNum(n) + ' افغانی'; }
+  /** مبلغِ فاکتور با «افغانی» یا «؋»، بی اعشار (LOC-07)؛ پیش‌فرض «افغانی» = دیروز */
+  function rcAfn(n){
+    const T = window.TohidText;
+    return T ? T.formatAfghani(n, shopSymbol(), shopDigits()) : formatMoney(n) + ' افغانی';
+  }
   /** رقمِ متنِ فاکتور (شماره، تاریخ، ساعت) */
   function rcText(t){
     const T = window.TohidText;
@@ -12914,9 +12919,10 @@
       btn.classList.toggle('active', btn.dataset.motionChoice === (full ? 'full' : 'auto'));
     });
   }
-  /* LOC-01/LOC-05 — رقمِ صفحه و فاکتور، و زبانِ نامِ ماه. پیش‌فرض همان امروز. */
+  /* LOC-01/05/07 — رقمِ صفحه و فاکتور، زبانِ نامِ ماه، نمادِ پولِ فاکتور. پیش‌فرض همان امروز. */
   function shopDigits(){ return appSettings.digits === 'fa' ? 'fa' : 'latn'; }
   function shopMonths(){ return appSettings.months === 'ps' ? 'ps' : 'fa'; }
+  function shopSymbol(){ return appSettings.currency === 'sign' ? 'sign' : 'word'; }
   function applyLocaleChoice(){
     const digits = shopDigits(), months = shopMonths();
     if(digits === 'fa') document.documentElement.setAttribute('data-digits', 'fa');
@@ -12924,6 +12930,7 @@
     applyMonthNames(months);
     document.querySelectorAll('#digits-toggle .theme-toggle-btn').forEach(b=> b.classList.toggle('active', b.dataset.digitsChoice === digits));
     document.querySelectorAll('#months-toggle .theme-toggle-btn').forEach(b=> b.classList.toggle('active', b.dataset.monthsChoice === months));
+    document.querySelectorAll('#currency-toggle .theme-toggle-btn').forEach(b=> b.classList.toggle('active', b.dataset.currencyChoice === shopSymbol()));
     const sample = document.getElementById('months-sample');
     if(sample && window.TohidCalendar) sample.textContent = TohidCalendar.formatSolarLong(todayISO(), months, 'latn');
   }
@@ -12931,6 +12938,13 @@
     const btn = e.target.closest('[data-digits-choice]');
     if(!btn) return;
     appSettings.digits = btn.dataset.digitsChoice === 'fa' ? 'fa' : 'latn';
+    saveSettings();
+    applyLocaleChoice();
+  });
+  document.getElementById('currency-toggle').addEventListener('click', (e)=>{
+    const btn = e.target.closest('[data-currency-choice]');
+    if(!btn) return;
+    appSettings.currency = btn.dataset.currencyChoice === 'sign' ? 'sign' : 'word';
     saveSettings();
     applyLocaleChoice();
   });

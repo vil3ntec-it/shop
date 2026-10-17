@@ -18,8 +18,8 @@ import ir.vil3ntec.tohid.todayIso
 import ir.vil3ntec.tohid.ui.theme.Shop
 
 /**
- *  «تاریخ و رقم» در تنظیمات — رقمِ صفحه و فاکتور (LOC-05) و زبانِ نامِ ماه‌ها
- *  (LOC-01). پیش‌فرض‌ها رفتارِ امروز است: لاتین و دری.
+ *  «تاریخ و رقم» در تنظیمات — رقمِ صفحه و فاکتور (LOC-05)، زبانِ نامِ ماه‌ها
+ *  (LOC-01) و نمادِ پولِ فاکتور (LOC-07). پیش‌فرض‌ها رفتارِ امروز است: لاتین، دری، «افغانی».
  *
  *  برچسبِ گزینه‌ها عمداً بی رقم است: وقتی رقمِ فارسی روشن است، فونت هر
  *  «123»ی را «۱۲۳» می‌کشد و نمونهٔ «لاتین» هم فارسی دیده می‌شد.
@@ -29,6 +29,7 @@ fun LocaleSection() {
   val context = LocalContext.current
   val digits = LocaleChoice.digits
   val months = LocaleChoice.months
+  val symbol = LocaleChoice.symbol
   SettingsSection(
     icon = Icons.Filled.Event,
     title = "تاریخ و رقم",
@@ -58,6 +59,18 @@ fun LocaleSection() {
       options = listOf(LocaleText.MONTHS_DARI to "دری (حمل، ثور…)", LocaleText.MONTHS_PASHTO to "پشتو (وری، غویی…)"),
       selected = months,
       onSelect = { LocaleChoice.setMonths(context, it) },
+    )
+    Spacer(Modifier.height(14.dp))
+    Text(
+      "نمادِ پول در فاکتور. مبلغ همیشه بی اعشار است.",
+      style = MaterialTheme.typography.labelSmall,
+      color = Shop.colors.muted2,
+    )
+    Spacer(Modifier.height(8.dp))
+    SegmentedChoice(
+      options = listOf(LocaleFormat.SYMBOL_WORD to "افغانی", LocaleFormat.SYMBOL_SIGN to "؋"),
+      selected = symbol,
+      onSelect = { LocaleChoice.setSymbol(context, it) },
     )
   }
 }

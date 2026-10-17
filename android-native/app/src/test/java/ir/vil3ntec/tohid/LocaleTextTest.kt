@@ -81,6 +81,17 @@ class LocaleTextTest {
   }
 
   @Test
+  fun `نماد پول در فاکتور قابل تنظیم است و پیش فرض افغانی است`() {
+    for (v in listOf(null, "", "word", "none", "AFN", "x")) assertEquals("$v", LocaleFormat.SYMBOL_WORD, LocaleText.symbolOf(v))
+    assertEquals(LocaleFormat.SYMBOL_SIGN, LocaleText.symbolOf("sign"))
+    assertEquals("1,250,000 ؋", LocaleText.afghani(1250000.0, latn, LocaleFormat.SYMBOL_SIGN))
+    assertEquals("۱٬۲۵۰٬۰۰۰ ؋", LocaleText.afghani(1250000.0, fa, LocaleFormat.SYMBOL_SIGN))
+    //  مقدارِ ناشناخته هرگز مبلغِ بی نماد نمی‌سازد
+    assertEquals("1,250,000 افغانی", LocaleText.afghani(1250000.0, latn, "none"))
+    assertEquals(LocaleFormat.SYMBOL_WORD, LocaleChoice.symbol)
+  }
+
+  @Test
   fun `نام ماه پشتو`() {
     val ps = LocaleText.monthNames(LocaleText.MONTHS_PASHTO)
     assertEquals(12, ps.size)

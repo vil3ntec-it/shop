@@ -7,9 +7,9 @@ import androidx.compose.runtime.setValue
 import ir.vil3ntec.tohid.core.text.LocaleFormat
 
 /**
- *  رقم و نامِ ماه — انتخابِ دکان‌دار، روی همین دستگاه (LOC-01، LOC-05).
+ *  رقم، نامِ ماه و نمادِ پول — انتخابِ دکان‌دار، روی همین دستگاه (LOC-01، LOC-05، LOC-07).
  *
- *  پیش‌فرض‌ها **رفتارِ امروز** است: رقمِ لاتین و نامِ ماهِ دری. تا دکان‌دار
+ *  پیش‌فرض‌ها **رفتارِ امروز** است: رقمِ لاتین، نامِ ماهِ دری و «افغانی». تا دکان‌دار
  *  خودش در تنظیمات عوض نکند، هیچ چیزی عوض نمی‌شود.
  *
  *  مثلِ `Motion`، حالت `mutableStateOf` است تا با زدنِ کلید، کلِ برنامه
@@ -21,6 +21,7 @@ object LocaleChoice {
   private const val PREFS = "tohid-locale"
   private const val DIGITS = "digits"
   private const val MONTHS = "months"
+  private const val SYMBOL = "symbol"
 
   /** `latn` یا `fa` (`LocaleFormat.DIGITS_*`) */
   var digits by mutableStateOf(LocaleFormat.DIGITS_LATN)
@@ -30,6 +31,10 @@ object LocaleChoice {
   var months by mutableStateOf(LocaleText.MONTHS_DARI)
     private set
 
+  /** نمادِ پول در فاکتور: `word` (افغانی) یا `sign` (؋) — `LocaleFormat.SYMBOL_*` */
+  var symbol by mutableStateOf(LocaleFormat.SYMBOL_WORD)
+    private set
+
   private fun prefs(context: Context) =
     context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
@@ -37,6 +42,7 @@ object LocaleChoice {
     val p = runCatching { prefs(context) }.getOrNull() ?: return
     digits = LocaleText.digitsOf(p.getString(DIGITS, null))
     months = LocaleText.monthsOf(p.getString(MONTHS, null))
+    symbol = LocaleText.symbolOf(p.getString(SYMBOL, null))
   }
 
   fun setDigits(context: Context, value: String) {
@@ -47,5 +53,10 @@ object LocaleChoice {
   fun setMonths(context: Context, value: String) {
     months = LocaleText.monthsOf(value)
     prefs(context).edit().putString(MONTHS, months).apply()
+  }
+
+  fun setSymbol(context: Context, value: String) {
+    symbol = LocaleText.symbolOf(value)
+    prefs(context).edit().putString(SYMBOL, symbol).apply()
   }
 }
