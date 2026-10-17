@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.core.pay
 
 import ir.vil3ntec.tohid.core.money.Currency
+import ir.vil3ntec.tohid.core.money.MAX_EXACT
 import ir.vil3ntec.tohid.core.money.Rounding
 import ir.vil3ntec.tohid.core.money.addExact
 import ir.vil3ntec.tohid.core.money.mulExact
@@ -8,7 +9,7 @@ import ir.vil3ntec.tohid.core.money.mulExact
 /*
  *  هستهٔ پرداخت — PAY-01..07، 09، 10، 23 (docs/spec/06-PAY.md، بخشِ ۳.۴ و ۴.۲).
  *
- *  ⛔ هم‌زادِ `license/pay-core.js`؛ هر دو با `license/test-vectors/pay-v1.json`
+ *  ⛔ هم‌زادِ `license/pay-core.js`؛ هر دو با `core/test-vectors/pay-v1.json`
  *  سنجیده می‌شوند (`PayCoreTest`). یکی را عوض کنی، دیگری هم.
  *
  *  کاتلینِ خالص است: نه اندروید، نه ساعت، نه ذخیره. هر مبلغ Long به واحدِ کوچک
@@ -18,7 +19,8 @@ import ir.vil3ntec.tohid.core.money.mulExact
 
 /** نتیجه: مقدار یا کدِ خطا (همان کدهای JS) با جزئیاتِ اختیاری */
 sealed interface PayResult<out T> {
-  data class Ok<T>(val value: T) : PayResult<T>
+  /** `duplicate`: همان عملیات (همان op_id و همان محتوا) پیش‌تر ثبت شده بود؛ اثرِ دومی نیست */
+  data class Ok<T>(val value: T, val duplicate: Boolean = false) : PayResult<T>
 
   data class Err(
     val code: String,
@@ -67,9 +69,19 @@ data class SettleInput(
   val methods: List<PayMethod>? = null,
 )
 
-data class PaymentRow(val method: String, val kind: String, val amount: Long, val ref: String?, val status: String)
+data class PaymentRow(
+  val method: String,
+  val kind: String,
+  val amount: Long,
+  val ref: String?,
+  val status: String,
+  /** سطحِ تأیید (PAY-08): `manual` = ثبتِ دستی با شمارهٔ مرجع؛ نقد و حساب ندارند */
+  val verification: String?,
+)
 
 data class Settlement(
+  /** ارزِ همهٔ مبلغ‌ها (بخشِ ۱۹: ارزِ هر مبلغ صریح) */
+  val currency: String,
   /** paid | on_account | short */
   val status: String,
   val total: Long,
@@ -118,11 +130,16 @@ data class RefundInput(
   /** بدهیِ هنوز بازِ همین فاکتور؛ null = همهٔ سهمِ حساب */
   val accountOutstanding: Long? = null,
   val methods: List<PayMethod>? = null,
+  val currency: String = "AFN",
 )
 
 data class Payout(val method: String, val kind: String, val amount: Long)
 
-data class Refund(val amount: Long, val approvedBy: String, val payouts: List<Payout>, val payments: List<PaidRow>)
+data class Refund(val currency: String, val amount: Long, val approvedBy: String, val payouts: List<Payout>, val payments: List<PaidRow>)
+
+/** عددِ صحیحِ امن (۰ تا ۲^۵۳−۱) — همان `Number.isSafeInteger`ِ JS، تا هر دو زبان یک ورودی را رد کنند (بخشِ ۲۸.۴) */
+internal fun nonNegExact(v: Long): Boolean = v in 0..MAX_EXACT
+internal fun posExact(v: Long): Boolean = v in 1..MAX_EXACT
 
 object Pay {
   const val ACCOUNT = "account"
@@ -176,7 +193,7 @@ object Pay {
       val name = x.name.trim()
       val limit = x.limit
       if (id.isEmpty() || id == ACCOUNT || id in seen || x.kind !in KINDS || name.isEmpty() ||
-        (limit != null && limit <= 0)
+        (limit != null && !posExact(limit))
       ) return PayResult.Err("BAD_METHOD", index = i)
       seen += id
       out += PayMethod(id, x.kind, name, if (x.kind == CASH) false else x.needsRef, limit, x.enabled)
@@ -204,15 +221,15 @@ object Pay {
 
   // ── تسویه (PAY-01، 02، 04، 05، 09، 10) ──────────────────
   private class Analysis(
-    val t: MethodTable, val total: Long, val cash: Long, val nonCash: Long, val rounded: Long,
+    val currency: String, val t: MethodTable, val total: Long, val cash: Long, val nonCash: Long, val rounded: Long,
     val rounding: Long, val change: Long, val kept: Long, val remaining: Long, val rows: List<PaymentRow?>,
   )
 
   private fun analyse(input: SettleInput): PayResult<Analysis> {
     val cur = try { Currency.of(input.currency) } catch (e: IllegalArgumentException) { return PayResult.Err("UNKNOWN_CURRENCY") }
-    if (input.total < 0) return PayResult.Err("INVALID_AMOUNT")
+    if (!nonNegExact(input.total)) return PayResult.Err("INVALID_AMOUNT")
     val step = input.cashRounding
-    if (step < 0 || (step > 0 && step % cur.stepMinor != 0L)) return PayResult.Err("INVALID_STEP")
+    if (!nonNegExact(step) || (step > 0 && step % cur.stepMinor != 0L)) return PayResult.Err("INVALID_STEP")
     val t = when (val r = table(input.methods)) { is PayResult.Ok -> r.value; is PayResult.Err -> return r }
 
     var cash = 0L
@@ -222,7 +239,7 @@ object Pay {
     input.tenders.forEachIndexed { i, x ->
       val m = t[x.method] ?: return PayResult.Err("UNKNOWN_METHOD", index = i)
       if (!m.enabled) return PayResult.Err("METHOD_DISABLED", index = i)
-      if (x.amount <= 0) return PayResult.Err("INVALID_AMOUNT", index = i)
+      if (!posExact(x.amount)) return PayResult.Err("INVALID_AMOUNT", index = i)
       if ((x.currency ?: cur.code) != cur.code) return PayResult.Err("CURRENCY_MISMATCH", index = i)
       val ref = x.ref?.trim().orEmpty()
       if (m.needsRef && ref.isEmpty()) return PayResult.Err("REF_REQUIRED", index = i)
@@ -232,7 +249,7 @@ object Pay {
         if (!cashSeen) { cashSeen = true; rows += null }
       } else {
         nonCash = addExact(nonCash, x.amount)
-        rows += PaymentRow(m.id, m.kind, x.amount, ref.ifEmpty { null }, "pending")
+        rows += PaymentRow(m.id, m.kind, x.amount, ref.ifEmpty { null }, "pending", "manual")
       }
     }
     // پولِ پس فقط از نقد: بیش‌پرداختِ کیف پول یا کارت پس داده نمی‌شود
@@ -242,10 +259,10 @@ object Pay {
     val rounded = if (step > 0) mulExact(Rounding.roundHalfUp(cashDue, step), step) else cashDue
     // گردکردنِ نقدی فقط وقتی نقد فاکتور را می‌بندد؛ هرگز بیش از مبلغِ دقیق نمی‌خواهد
     val rounding = if (cash > 0 && step > 0 && cash >= rounded) rounded - cashDue else 0L
-    val due = cashDue + rounding
+    val due = addExact(cashDue, rounding)
     val change = if (cash >= due) cash - due else 0L
     val kept = cash - change
-    return PayResult.Ok(Analysis(t, input.total, cash, nonCash, rounded, rounding, change, kept, due - kept, rows))
+    return PayResult.Ok(Analysis(cur.code, t, input.total, cash, nonCash, rounded, rounding, change, kept, due - kept, rows))
   }
 
   fun settle(input: SettleInput): PayResult<Settlement> {
@@ -255,11 +272,12 @@ object Pay {
     val payments = ArrayList<PaymentRow>()
     a.rows.forEach { r ->
       if (r != null) payments += r
-      else if (a.kept > 0) payments += PaymentRow(a.t.cashId, CASH, a.kept, null, "confirmed")
+      else if (a.kept > 0) payments += PaymentRow(a.t.cashId, CASH, a.kept, null, "confirmed", null)
     }
-    if (toAccount > 0) payments += PaymentRow(ACCOUNT, ACCOUNT, toAccount, null, "confirmed")
+    if (toAccount > 0) payments += PaymentRow(ACCOUNT, ACCOUNT, toAccount, null, "confirmed", null)
     return PayResult.Ok(
       Settlement(
+        currency = a.currency,
         status = when {
           a.remaining == 0L -> "paid"
           customer.isNotEmpty() -> "on_account"
@@ -267,8 +285,8 @@ object Pay {
         },
         total = a.total,
         rounding = a.rounding,
-        due = a.total + a.rounding,
-        tendered = a.cash + a.nonCash,
+        due = addExact(a.total, a.rounding),
+        tendered = addExact(a.cash, a.nonCash),
         change = a.change,
         remaining = a.remaining,
         toAccount = toAccount,
@@ -292,12 +310,12 @@ object Pay {
       return PayResult.Err("UNKNOWN_CURRENCY")
     }
     if (src == dst) return PayResult.Err("EXCHANGE_SAME_CURRENCY")
-    if (op.fromAmount <= 0) return PayResult.Err("INVALID_AMOUNT")
-    if (op.rate <= 0) return PayResult.Err("INVALID_RATE")
+    if (!posExact(op.fromAmount)) return PayResult.Err("INVALID_AMOUNT")
+    if (!posExact(op.rate)) return PayResult.Err("INVALID_RATE")
     val source = op.source?.trim().orEmpty()
     val approver = op.approvedBy?.trim().orEmpty()
     if (source.isEmpty()) return PayResult.Err("EXCHANGE_FIELDS", field = "source")
-    if (op.at == null || op.at <= 0) return PayResult.Err("EXCHANGE_FIELDS", field = "at")
+    if (op.at == null || !posExact(op.at)) return PayResult.Err("EXCHANGE_FIELDS", field = "at")
     if (approver.isEmpty()) return PayResult.Err("EXCHANGE_FIELDS", field = "approvedBy")
     val amount = mulExact(
       Rounding.roundHalfUp(mulExact(op.fromAmount, op.rate), mulExact(src.minorPerMajor, dst.stepMinor)),
@@ -310,9 +328,10 @@ object Pay {
   fun refund(input: RefundInput): PayResult<Refund> {
     val approver = input.approvedBy?.trim().orEmpty()
     if (approver.isEmpty()) return PayResult.Err("APPROVAL_REQUIRED")
-    if (input.amount <= 0) return PayResult.Err("INVALID_AMOUNT")
+    if (!posExact(input.amount)) return PayResult.Err("INVALID_AMOUNT")
     val mode = input.mode
     if (mode != "original" && mode != "cash" && mode != "store_credit") return PayResult.Err("BAD_MODE")
+    val cur = try { Currency.of(input.currency) } catch (e: IllegalArgumentException) { return PayResult.Err("UNKNOWN_CURRENCY") }
     val t = when (val r = table(input.methods)) { is PayResult.Ok -> r.value; is PayResult.Err -> return r }
     if (mode == "store_credit") {
       if (input.customerId?.trim().isNullOrEmpty()) return PayResult.Err("CUSTOMER_REQUIRED")
@@ -323,13 +342,13 @@ object Pay {
     var total = 0L
     pays.forEachIndexed { i, p ->
       if (t.kindOf(p.method) == null) return PayResult.Err("UNKNOWN_METHOD", index = i)
-      if (p.amount < 0 || p.refunded < 0 || p.refunded > p.amount) return PayResult.Err("INVALID_AMOUNT", index = i)
+      if (!nonNegExact(p.amount) || !nonNegExact(p.refunded) || p.refunded > p.amount) return PayResult.Err("INVALID_AMOUNT", index = i)
       if (p.status !in STATUSES) return PayResult.Err("BAD_STATUS", index = i)
       left[i] = if (p.status in REFUNDABLE) p.amount - p.refunded else 0L
       total = addExact(total, left[i])
     }
     if (input.amount > total) return PayResult.Err("REFUND_EXCEEDS", refundable = total)
-    if (input.accountOutstanding != null && input.accountOutstanding < 0) return PayResult.Err("INVALID_AMOUNT")
+    if (input.accountOutstanding != null && !nonNegExact(input.accountOutstanding)) return PayResult.Err("INVALID_AMOUNT")
     var outstanding = input.accountOutstanding ?: Long.MAX_VALUE
 
     // ترتیب: اول بدهیِ همین فاکتور (مثلِ امروز)، بعد بقیه از آخر به اول
@@ -357,6 +376,7 @@ object Pay {
     }
     return PayResult.Ok(
       Refund(
+        currency = cur.code,
         amount = input.amount,
         approvedBy = approver,
         payouts = payouts.map { (m, a) -> Payout(m, t.kindOf(m)!!, a) },

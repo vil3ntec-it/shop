@@ -29,7 +29,7 @@ import java.security.MessageDigest
 
 /**
  *  پرداخت و صندوق — همان بردارهای مرجعی که `server/test/pay-core.test.js`
- *  برای `license/pay-core.js` می‌خواند (`license/test-vectors/pay-v1.json`).
+ *  برای `license/pay-core.js` می‌خواند (`core/test-vectors/pay-v1.json`).
  *  خروجیِ کاتلین به همان شکلِ JSONِ JS برگردانده و با بردار برابر سنجیده می‌شود.
  *
  *  `legacyShift`: خودِ `CashShift.totals`ِ امروز روی همان داده‌ها همان عددِ
@@ -42,14 +42,15 @@ import java.security.MessageDigest
  */
 class PayCoreTest {
 
+  /** همان جست‌وجوی رو به بالای `CoreVectorsTest`: از `app/`، `desktop/` یا ریشهٔ مخزن */
   private val v: JsonObject = run {
-    val f = listOf(
-      "../../license/test-vectors/pay-v1.json",   // android-native/app
-      "../license/test-vectors/pay-v1.json",      // desktop
-      "license/test-vectors/pay-v1.json",         // ریشهٔ مخزن
-    ).map { File(it) }.firstOrNull { it.isFile }
-      ?: error("بردارهای پرداخت پیدا نشد (cwd=${File(".").absoluteFile})")
-    Json.parseToJsonElement(f.readText()).jsonObject
+    var dir: File? = File(System.getProperty("user.dir")).absoluteFile
+    while (dir != null) {
+      val f = File(dir, "core/test-vectors/pay-v1.json")
+      if (f.isFile) return@run Json.parseToJsonElement(f.readText()).jsonObject
+      dir = dir.parentFile
+    }
+    error("core/test-vectors/pay-v1.json پیدا نشد")
   }
 
   // ── خواندنِ JSON ─────────────────────────────────────────
@@ -97,7 +98,7 @@ class PayCoreTest {
   }
 
   private fun <T> res(r: PayResult<T>, ok: (T) -> Map<String, Any?>): JsonElement = when (r) {
-    is PayResult.Ok -> j(mapOf("ok" to true) + ok(r.value))
+    is PayResult.Ok -> j(mapOf("ok" to true) + (if (r.duplicate) mapOf("duplicate" to true) else emptyMap()) + ok(r.value))
     is PayResult.Err -> j(
       linkedMapOf<String, Any?>("ok" to false, "error" to r.code).apply {
         r.index?.let { put("index", it) }
@@ -115,14 +116,14 @@ class PayCoreTest {
   )
 
   private fun settlementJson(s: Settlement) = mapOf(
-    "status" to s.status, "total" to s.total, "rounding" to s.rounding, "due" to s.due, "tendered" to s.tendered,
+    "currency" to s.currency, "status" to s.status, "total" to s.total, "rounding" to s.rounding, "due" to s.due, "tendered" to s.tendered,
     "change" to s.change, "remaining" to s.remaining, "toAccount" to s.toAccount,
-    "payments" to s.payments.map { mapOf("method" to it.method, "kind" to it.kind, "amount" to it.amount, "ref" to it.ref, "status" to it.status) },
+    "payments" to s.payments.map { mapOf("method" to it.method, "kind" to it.kind, "amount" to it.amount, "ref" to it.ref, "status" to it.status, "verification" to it.verification) },
   )
 
   private fun reportJson(r: ShiftReport): Map<String, Any?> {
     val m = linkedMapOf<String, Any?>(
-      "kind" to r.kind, "at" to r.at, "by" to r.by, "openedAt" to r.openedAt, "openedBy" to r.openedBy, "float" to r.float,
+      "kind" to r.kind, "shiftId" to r.shiftId, "currency" to r.currency, "at" to r.at, "by" to r.by, "openedAt" to r.openedAt, "openedBy" to r.openedBy, "float" to r.float,
       "methods" to r.methods.mapValues { (_, t) -> mapOf("sales" to t.sales, "refunds" to t.refunds, "receipts" to t.receipts, "net" to t.net) },
       "moves" to mapOf("in" to r.moves.cashIn, "out" to r.moves.cashOut),
       "events" to mapOf(
@@ -151,6 +152,16 @@ class PayCoreTest {
       assertEquals(name, JsonPrimitive(false), o["ok"])
       assertTrue(name, o.str("error") in setOf("INVALID_AMOUNT", "INVALID_RATE", "INVALID_COUNT"))
     }
+  }
+
+  /** خطای بازه: کاتلین ArithmeticException، همان RangeErrorِ JS */
+  private fun assertThrows(name: String, block: () -> Unit) {
+    try {
+      block()
+    } catch (e: ArithmeticException) {
+      return
+    }
+    throw AssertionError("$name — باید خطای بازه می‌داد")
   }
 
   // ── آزمون‌ها ──────────────────────────────────────────────
@@ -190,6 +201,12 @@ class PayCoreTest {
   @Test fun settle() {
     var n = 0
     for (c in v["settle"]!!.jsonArray.map { it.jsonObject }) orNonInteger(c.str("name")!!, c["expect"]!!) {
+      // بیرون از ۲^۵۳−۱ (بخشِ ۲۸.۴): هر دو زبان خطای بازه می‌دهند، نه عددِ گردشده
+      if (c.obj("expect")!!.has("throws")) {
+        assertThrows(c.str("name")!!) { Pay.settle(settleInput(c.obj("input")!!)) }
+        n++
+        return@orNonInteger
+      }
       val r = Pay.settle(settleInput(c.obj("input")!!))
       assertEquals(c.str("name"), c["expect"], res(r) { settlementJson(it) })
       if (r is PayResult.Ok) {
@@ -281,11 +298,12 @@ class PayCoreTest {
         payments = o.arr("payments").map { PaidRow(it.str("method")!!, it.lng("amount")!!, it.lng("refunded") ?: 0, it.str("status")!!) },
         amount = o.lng("amount")!!, mode = o.str("mode")!!, approvedBy = o.str("approvedBy"),
         customerId = o.str("customerId"), accountOutstanding = o.lng("accountOutstanding"), methods = methodsOrNull(o),
+        currency = o.str("currency") ?: "AFN",
       )
       val r = Pay.refund(input)
       val got = res(r) { x ->
         mapOf(
-          "amount" to x.amount, "approvedBy" to x.approvedBy,
+          "currency" to x.currency, "amount" to x.amount, "approvedBy" to x.approvedBy,
           "payouts" to x.payouts.map { mapOf("method" to it.method, "kind" to it.kind, "amount" to it.amount) },
           "payments" to x.payments.map { mapOf("method" to it.method, "amount" to it.amount, "refunded" to it.refunded, "status" to it.status) },
         )
@@ -306,24 +324,30 @@ class PayCoreTest {
       val expect = st["expect"] ?: JsonObject(mapOf("ok" to JsonPrimitive(true)))
       val o = st.obj("input") ?: JsonObject(emptyMap())
       orNonInteger(label, expect) {
+        if (expect.jsonObject.has("throws")) {
+          assertThrows(label) {
+            if (st.str("op") == "x") ShiftCore.xReport(shift, o.lng("at")!!, o.str("by")) else error("گامِ پرتابیِ ناشناخته")
+          }
+          return@orNonInteger
+        }
         val got: JsonElement = when (st.str("op")) {
           "open", "record" -> {
             val r = if (st.str("op") == "open") {
               ShiftCore.open(
                 OpenShiftInput(
-                  at = o.lng("at")!!, float = o.lng("float")!!, by = o.str("by"),
+                  id = o.str("id"), at = o.lng("at")!!, float = o.lng("float")!!, by = o.str("by"),
                   threshold = o.lng("threshold") ?: Pay.DEFAULT_VARIANCE_THRESHOLD, coins = o.bool("coins") ?: false,
-                  methods = methodsOrNull(o),
+                  methods = methodsOrNull(o), currency = o.str("currency") ?: "AFN",
                 )
               )
             } else {
               ShiftCore.record(
                 shift,
                 ShiftEventInput(
-                  type = o.str("type")!!, at = o.lng("at")!!,
+                  id = o.str("id"), type = o.str("type")!!, at = o.lng("at")!!,
                   rows = if (o.has("rows")) o.arr("rows").map { ShiftRow(it.str("method").orEmpty(), it.lng("amount")!!) } else null,
                   method = o.str("method"), amount = o.lng("amount"), reason = o.str("reason"), note = o.str("note"),
-                  by = o.str("by"), approvedBy = o.str("approvedBy"),
+                  by = o.str("by"), approvedBy = o.str("approvedBy"), currency = o.str("currency"),
                 )
               )
             }
@@ -335,7 +359,7 @@ class PayCoreTest {
             val r = ShiftCore.close(
               shift,
               CloseShiftInput(
-                at = o.lng("at")!!, counts = longMap(o.obj("counts")), methodCounts = longMap(o.obj("methodCounts")),
+                id = o.str("id"), at = o.lng("at")!!, counts = longMap(o.obj("counts")), methodCounts = longMap(o.obj("methodCounts")),
                 by = o.str("by"), blind = o.bool("blind") ?: false, reason = o.str("reason"),
               )
             )
@@ -361,12 +385,12 @@ class PayCoreTest {
   }
 
   @Test fun shiftIsImmutableAndVarianceNeverCorrected() {
-    val s0 = (ShiftCore.open(OpenShiftInput(at = 0, float = 1000)) as PayResult.Ok).value
-    val bad = ShiftCore.record(s0, ShiftEventInput("cash_out", 1, amount = 2000, reason = "owner_withdrawal"))
+    val s0 = (ShiftCore.open(OpenShiftInput(id = "sh", at = 0, float = 1000)) as PayResult.Ok).value
+    val bad = ShiftCore.record(s0, ShiftEventInput("a", "cash_out", 1, amount = 2000, reason = "owner_withdrawal"))
     assertEquals("INSUFFICIENT_CASH", (bad as PayResult.Err).code)
-    val s1 = (ShiftCore.record(s0, ShiftEventInput("sale", 1, rows = listOf(ShiftRow("cash", 500)))) as PayResult.Ok).value
+    val s1 = (ShiftCore.record(s0, ShiftEventInput("b", "sale", 1, rows = listOf(ShiftRow("cash", 500)))) as PayResult.Ok).value
     assertEquals(0, s0.events.size)
-    val closed = (ShiftCore.close(s1, CloseShiftInput(at = 2, counts = mapOf("1000" to 1L))) as PayResult.Ok).value
+    val closed = (ShiftCore.close(s1, CloseShiftInput(id = "z", at = 2, counts = mapOf("1000" to 1L))) as PayResult.Ok).value
     assertEquals(-500L, closed.z!!.variance!!["cash"])
     assertEquals(1500L, closed.z!!.expected!!["cash"])
     assertEquals(closed.z, (ShiftCore.zReport(closed) as PayResult.Ok).value)

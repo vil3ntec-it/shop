@@ -2,7 +2,7 @@
    فروشگاه من | هستهٔ پرداخت و صندوق — PAY-01..07، 09..16، 19، 23
    ----------------------------------------------------------
    هم‌زادِ `android-native/.../core/pay/{Payment,Shift}.kt`. هر دو با یک
-   فایلِ بردارِ مرجع (`license/test-vectors/pay-v1.json`) سنجیده می‌شوند؛
+   فایلِ بردارِ مرجع (`core/test-vectors/pay-v1.json`) سنجیده می‌شوند؛
    یکی را عوض کنی، دیگری هم.
 
    خالص است: نه DOM، نه ساعت، نه ذخیره. هر مبلغ عددِ صحیح به واحدِ کوچک
@@ -173,7 +173,7 @@
         if (cashAt < 0) { cashAt = rows.length; rows.push(null); }
       } else {
         nonCash = add(nonCash, x.amount);
-        rows.push({ method: meth.id, kind: meth.kind, amount: x.amount, ref: ref || null, status: 'pending' });
+        rows.push({ method: meth.id, kind: meth.kind, amount: x.amount, ref: ref || null, status: 'pending', verification: 'manual' });
       }
     }
     // پول پس فقط از نقد: بیش‌پرداختِ کیف پول یا کارت پس داده نمی‌شود
@@ -183,13 +183,13 @@
     var rounded = step > 0 ? exactMul(M.roundHalfUp(cashDue, step), step) : cashDue;
     // گردکردنِ نقدی فقط وقتی نقد فاکتور را می‌بندد؛ هرگز بیش از مبلغِ دقیق از مشتری نمی‌خواهد
     var rounding = (cash > 0 && step > 0 && cash >= rounded) ? rounded - cashDue : 0;
-    var due = cashDue + rounding;
+    var due = add(cashDue, rounding);
     var change = cash >= due ? cash - due : 0;
     var kept = cash - change;
     var remaining = due - kept;
 
     return {
-      ok: true, t: t, total: input.total, cash: cash, nonCash: nonCash, cashDue: cashDue, rounded: rounded,
+      ok: true, cur: cur, t: t, total: input.total, cash: cash, nonCash: nonCash, cashDue: cashDue, rounded: rounded,
       rounding: rounding, change: change, kept: kept, remaining: remaining, rows: rows, cashAt: cashAt,
     };
   }
@@ -202,16 +202,17 @@
     var payments = [];
     a.rows.forEach(function (r) {
       if (r !== null) payments.push(r);
-      else if (a.kept > 0) payments.push({ method: a.t.cashId, kind: 'cash', amount: a.kept, ref: null, status: 'confirmed' });
+      else if (a.kept > 0) payments.push({ method: a.t.cashId, kind: 'cash', amount: a.kept, ref: null, status: 'confirmed', verification: null });
     });
-    if (toAccount > 0) payments.push({ method: ACCOUNT, kind: ACCOUNT, amount: toAccount, ref: null, status: 'confirmed' });
+    if (toAccount > 0) payments.push({ method: ACCOUNT, kind: ACCOUNT, amount: toAccount, ref: null, status: 'confirmed', verification: null });
     return {
       ok: true,
+      currency: a.cur.code,
       status: a.remaining === 0 ? 'paid' : (customer ? 'on_account' : 'short'),
       total: a.total,
       rounding: a.rounding,
-      due: a.total + a.rounding,
-      tendered: a.cash + a.nonCash,
+      due: add(a.total, a.rounding),
+      tendered: add(a.cash, a.nonCash),
       change: a.change,
       remaining: a.remaining,
       toAccount: toAccount,
@@ -258,6 +259,8 @@
     if (!posInt(input.amount)) return fail('INVALID_AMOUNT');
     var mode = input.mode;
     if (mode !== 'original' && mode !== 'cash' && mode !== 'store_credit') return fail('BAD_MODE');
+    var cur;
+    try { cur = M.currency(input.currency || 'AFN'); } catch (e) { return fail('UNKNOWN_CURRENCY'); }
     var t = table(input.methods);
     if (!t.ok) return t;
     if (mode === 'store_credit') {
@@ -309,6 +312,7 @@
 
     return {
       ok: true,
+      currency: cur.code,
       amount: input.amount,
       approvedBy: approver,
       payouts: payouts,
@@ -323,8 +327,21 @@
   }
 
   // ── شیفت (PAY-11..16، 19) ──────────────────────────────
+  /* هر عملیاتِ شیفت شناسهٔ پایدار (op_id) دارد (بخشِ ۱۵.۲ بندِ ۱ و ۲۹.۵ بندِ ۲):
+     تکرارِ همان عملیات با همان محتوا همان نتیجه را می‌دهد و اثرِ دوم ندارد
+     (`duplicate: true`)؛ همان شناسه با محتوای دیگر `ID_CONFLICT` است. */
+  function canon(v) {
+    if (v === null || typeof v !== 'object') return JSON.stringify(v);
+    if (Array.isArray(v)) return '[' + v.map(canon).join(',') + ']';
+    return '{' + Object.keys(v).sort().map(function (k) { return JSON.stringify(k) + ':' + canon(v[k]); }).join(',') + '}';
+  }
+
   function openShift(p) {
     p = p || {};
+    var id = text(p.id);
+    if (!id) return fail('ID_REQUIRED');
+    var cur;
+    try { cur = M.currency(p.currency || 'AFN'); } catch (e) { return fail('UNKNOWN_CURRENCY'); }
     if (!nonNeg(p.at)) return fail('INVALID_TIME');
     if (!nonNeg(p.float)) return fail('INVALID_AMOUNT');
     var threshold = p.threshold === undefined ? DEFAULT_VARIANCE_THRESHOLD : p.threshold;
@@ -334,9 +351,9 @@
     return {
       ok: true,
       shift: Object.freeze({
-        status: 'open', openedAt: p.at, openedBy: text(p.by) || null, float: p.float,
+        id: id, currency: cur.code, status: 'open', openedAt: p.at, openedBy: text(p.by) || null, float: p.float,
         threshold: threshold, coins: !!p.coins, methods: t.methods, events: Object.freeze([]),
-        closedAt: null, z: null,
+        closedAt: null, closeOp: null, z: null,
       }),
     };
   }
@@ -361,21 +378,19 @@
     return { ok: true, rows: out };
   }
 
-  function record(s, e) {
-    if (!s || s.status !== 'open') return fail('SHIFT_CLOSED');
-    e = e || {};
-    if (!nonNeg(e.at) || e.at < s.openedAt) return fail('INVALID_TIME');
-    var t = table(s.methods), r;
+  /* سنجش و یک‌دست‌کردنِ رویداد، بی نگاه به حالتِ شیفت */
+  function buildEvent(s, t, e) {
+    // PAY-10: شیفت یک ارز دارد؛ رویدادِ ارزِ دیگر پذیرفته نمی‌شود
+    if ((e.currency || s.currency) !== s.currency) return fail('CURRENCY_MISMATCH');
+    var r, ev = { id: text(e.id), type: e.type, at: e.at };
     switch (e.type) {
       case 'sale':
       case 'refund':
-        r = rowsOf(t, e.rows, true);
-        if (!r.ok) return r;
-        return { ok: true, shift: withEvent(s, { type: e.type, at: e.at, rows: r.rows }) };
       case 'receipt':
-        r = rowsOf(t, [{ method: e.method, amount: e.amount }], false);
+        r = e.type === 'receipt' ? rowsOf(t, [{ method: e.method, amount: e.amount }], false) : rowsOf(t, e.rows, true);
         if (!r.ok) return r;
-        return { ok: true, shift: withEvent(s, { type: 'receipt', at: e.at, rows: r.rows }) };
+        ev.rows = r.rows;
+        return { ok: true, event: ev };
       case 'cash_in':
       case 'cash_out': {
         if (!posInt(e.amount)) return fail('INVALID_AMOUNT');
@@ -383,18 +398,38 @@
         if (MOVE_REASONS[e.type].indexOf(e.reason) < 0) return fail('BAD_REASON');
         var note = text(e.note);
         if (e.reason === 'other' && !note) return fail('NOTE_REQUIRED');
-        if (e.type === 'cash_out' && e.amount > totals(s).expected[t.cashId]) return fail('INSUFFICIENT_CASH');
-        return { ok: true, shift: withEvent(s, { type: e.type, at: e.at, amount: e.amount, reason: e.reason, note: note || null, by: text(e.by) || null }) };
+        ev.amount = e.amount; ev.reason = e.reason; ev.note = note || null; ev.by = text(e.by) || null;
+        return { ok: true, event: ev };
       }
       case 'no_sale': {
         var reason = text(e.reason), approver = text(e.approvedBy);
         if (!reason) return fail('REASON_REQUIRED');
         if (!approver) return fail('APPROVAL_REQUIRED');
-        return { ok: true, shift: withEvent(s, { type: 'no_sale', at: e.at, reason: reason, by: text(e.by) || null, approvedBy: approver }) };
+        ev.reason = reason; ev.by = text(e.by) || null; ev.approvedBy = approver;
+        return { ok: true, event: ev };
       }
       default:
         return fail('BAD_EVENT');
     }
+  }
+
+  function record(s, e) {
+    if (!s) return fail('SHIFT_CLOSED');
+    e = e || {};
+    if (!text(e.id)) return fail('ID_REQUIRED');
+    var t = table(s.methods), b, i;
+    for (i = 0; i < s.events.length; i++) {
+      if (s.events[i].id !== text(e.id)) continue;
+      b = buildEvent(s, t, e);
+      if (!b.ok) return b;
+      return canon(b.event) === canon(s.events[i]) ? { ok: true, shift: s, duplicate: true } : fail('ID_CONFLICT');
+    }
+    if (s.status !== 'open') return fail('SHIFT_CLOSED');
+    if (!nonNeg(e.at) || e.at < s.openedAt) return fail('INVALID_TIME');
+    b = buildEvent(s, t, e);
+    if (!b.ok) return b;
+    if (b.event.type === 'cash_out' && b.event.amount > totals(s).expected[t.cashId]) return fail('INSUFFICIENT_CASH');
+    return { ok: true, shift: withEvent(s, b.event) };
   }
 
   function totals(s) {
@@ -430,7 +465,7 @@
   function reportOf(s, kind, at, by) {
     var x = totals(s);
     return {
-      kind: kind, at: at, by: text(by) || null, openedAt: s.openedAt, openedBy: s.openedBy, float: s.float,
+      kind: kind, shiftId: s.id, currency: s.currency, at: at, by: text(by) || null, openedAt: s.openedAt, openedBy: s.openedBy, float: s.float,
       methods: x.methods, moves: x.moves, expected: x.expected, events: x.events,
     };
   }
@@ -443,55 +478,75 @@
     return { ok: true, report: reportOf(s, 'X', p.at, p.by) };
   }
 
-  /* PAY-13، 14، 16 — بستن با شمارشِ اسکناس و شمارشِ هر روش؛ اختلاف ثبت می‌شود، اصلاح نه */
-  function closeShift(s, c) {
-    c = c || {};
-    if (!s || s.status !== 'open') return fail('SHIFT_CLOSED');
-    if (!nonNeg(c.at) || c.at < s.openedAt) return fail('INVALID_TIME');
+  /* سنجش و یک‌دست‌کردنِ ورودیِ بستن، بی نگاه به حالتِ شیفت */
+  function buildClose(s, c, id) {
     var t = table(s.methods);
-    var counts = c.counts || {}, denoms = {}, cashCounted = 0;
+    var counts = c.counts || {}, denoms = {}, cash = 0;
     var keys = Object.keys(counts), k, i;
     for (i = 0; i < keys.length; i++) {
       k = keys[i];
       var d = /^[1-9][0-9]*$/.test(k) ? Number(k) : NaN;
       if (!isDenomination(d, s.coins)) return fail('BAD_DENOMINATION', { denomination: k });
       if (!nonNeg(counts[k])) return fail('INVALID_COUNT');
-      if (counts[k] > 0) { denoms[k] = counts[k]; cashCounted = add(cashCounted, exactMul(d, counts[k])); }
+      if (counts[k] > 0) { denoms[k] = counts[k]; cash = add(cash, exactMul(d, counts[k])); }
     }
-    var mc = c.methodCounts || {}, counted = {};
-    counted[t.cashId] = cashCounted;
+    var mc = c.methodCounts || {}, methodCounts = {};
     keys = Object.keys(mc);
     for (i = 0; i < keys.length; i++) {
       k = keys[i];
       var kind = kindOf(t, k);
       if (!kind || k === t.cashId || !has(COUNTABLE, kind)) return fail('UNKNOWN_METHOD', { method: k });
       if (!nonNeg(mc[k])) return fail('INVALID_COUNT');
-      counted[k] = mc[k];
+      methodCounts[k] = mc[k];
     }
-    var rep = reportOf(s, 'Z', c.at, c.by);
+    return {
+      ok: true, t: t, cash: cash,
+      op: { id: id, at: c.at, by: text(c.by) || null, counts: denoms, methodCounts: methodCounts, blind: !!c.blind, reason: text(c.reason) || null },
+    };
+  }
+
+  /* PAY-13، 14، 16 — بستن با شمارشِ اسکناس و شمارشِ هر روش؛ اختلاف ثبت می‌شود، اصلاح نه */
+  function closeShift(s, c) {
+    c = c || {};
+    if (!s) return fail('SHIFT_CLOSED');
+    var id = text(c.id);
+    if (!id) return fail('ID_REQUIRED');
+    var b;
+    if (s.status !== 'open') {
+      if (!s.closeOp || s.closeOp.id !== id) return fail('SHIFT_CLOSED');
+      b = buildClose(s, c, id);
+      if (!b.ok) return b;
+      return canon(b.op) === canon(s.closeOp) ? { ok: true, shift: s, report: s.z, duplicate: true } : fail('ID_CONFLICT');
+    }
+    if (!nonNeg(c.at) || c.at < s.openedAt) return fail('INVALID_TIME');
+    b = buildClose(s, c, id);
+    if (!b.ok) return b;
+    var op = b.op, counted = {};
+    counted[b.t.cashId] = b.cash;
+    Object.keys(op.methodCounts).forEach(function (m) { counted[m] = op.methodCounts[m]; });
+    var rep = reportOf(s, 'Z', op.at, op.by);
     var variance = {}, over = false, review = false;
-    Object.keys(rep.expected).concat(Object.keys(counted)).forEach(function (id) {
-      if (has(variance, id)) return;
-      if (!has(counted, id)) { variance[id] = null; return; }
-      var v = counted[id] - (has(rep.expected, id) ? rep.expected[id] : 0);
-      variance[id] = v;
+    Object.keys(rep.expected).concat(Object.keys(counted)).forEach(function (m) {
+      if (has(variance, m)) return;
+      if (!has(counted, m)) { variance[m] = null; return; }
+      var v = add(counted[m], -(has(rep.expected, m) ? rep.expected[m] : 0));
+      variance[m] = v;
       if (v !== 0) review = true;
       if (Math.abs(v) > s.threshold) over = true;
     });
-    var reason = text(c.reason);
-    var blind = !!c.blind;
-    if (over && !reason) return blind ? fail('REASON_REQUIRED') : fail('REASON_REQUIRED', { variance: variance });
+    if (over && !op.reason) return op.blind ? fail('REASON_REQUIRED') : fail('REASON_REQUIRED', { variance: variance });
 
     rep.counted = counted;
-    rep.denominations = denoms;
+    rep.denominations = op.counts;
     rep.variance = variance;
-    rep.reason = reason || null;
+    rep.reason = op.reason;
     rep.needsReview = review;
-    rep.blind = blind;
+    rep.blind = op.blind;
     var copy = {};
     for (var key in s) if (has(s, key)) copy[key] = s[key];
     copy.status = 'closed';
-    copy.closedAt = c.at;
+    copy.closedAt = op.at;
+    copy.closeOp = Object.freeze(op);
     copy.z = Object.freeze(rep);
     return { ok: true, shift: Object.freeze(copy), report: rep };
   }

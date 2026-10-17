@@ -3,7 +3,7 @@
  * پرداخت و صندوق (PAY-01..07، 09..16، 19، 23) — سمتِ وب: `license/pay-core.js`.
  *
  * همان فایلِ بردارِ مرجعی را می‌خواند که `PayCoreTest.kt`ِ اندروید و کامپیوتر
- * می‌خواند (`license/test-vectors/pay-v1.json`). عددهای بردار دستی و از روی
+ * می‌خواند (`core/test-vectors/pay-v1.json`). عددهای بردار دستی و از روی
  * قاعده نوشته شده‌اند، نه از خروجیِ کد؛ پس این آزمون دوری نیست.
  *
  * بخشِ `legacyShift` رفتارِ امروزِ صندوق را می‌سنجد: خودِ `shiftTotals`ِ
@@ -18,7 +18,7 @@ const path = require('node:path');
 
 const ROOT = path.join(__dirname, '..', '..');
 const P = require(path.join(ROOT, 'license', 'pay-core.js'));
-const V = JSON.parse(fs.readFileSync(path.join(ROOT, 'license', 'test-vectors', 'pay-v1.json'), 'utf8'));
+const V = JSON.parse(fs.readFileSync(path.join(ROOT, 'core', 'test-vectors', 'pay-v1.json'), 'utf8'));
 
 const sum = (a, f) => a.reduce((s, x) => s + f(x), 0);
 
@@ -69,6 +69,8 @@ function checkSettleInvariants(r, name) {
 
 test('تسویه: ترکیبی، پولِ پس، جزئی، گردکردن، ارز', () => {
   for (const c of V.settle) {
+    // بیرون از ۲^۵۳−۱ (بخشِ ۲۸.۴): هر دو زبان خطای بازه می‌دهند، نه عددِ گردشده
+    if (c.expect.throws) { assert.throws(() => P.settle(c.input), RangeError, c.name); continue; }
     const r = P.settle(c.input);
     assert.deepEqual(r, c.expect, c.name);
     checkSettleInvariants(r, c.name);
@@ -154,15 +156,20 @@ function runSteps(steps, name) {
   steps.forEach((st, i) => {
     const label = `${name} — گامِ ${i + 1} (${st.op})`;
     let got;
+    const dup = (r, extra) => Object.assign({ ok: true }, r.duplicate ? { duplicate: true } : {}, extra || {});
+    if (st.expect && st.expect.throws) {
+      assert.throws(() => (st.op === 'x' ? P.xReport(shift, st.input) : P.record(shift, st.input)), RangeError, label);
+      return;
+    }
     if (st.op === 'open' || st.op === 'record') {
       const r = st.op === 'open' ? P.openShift(st.input) : P.record(shift, st.input);
       if (r.ok) shift = r.shift;
-      got = r.ok ? { ok: true } : r;
+      got = r.ok ? dup(r) : r;
     } else if (st.op === 'x' || st.op === 'close' || st.op === 'z') {
       const r = st.op === 'x' ? P.xReport(shift, st.input) : st.op === 'close' ? P.closeShift(shift, st.input) : P.zReport(shift);
       if (r.ok && st.op === 'close') shift = r.shift;
       if (r.ok && st.op !== 'x') last = r.report;
-      got = r.ok ? { ok: true, report: r.report } : r;
+      got = r.ok ? dup(r, { report: r.report }) : r;
     } else if (st.op === 'cashierView') {
       got = { report: P.cashierView(last) };
     } else {
@@ -178,13 +185,13 @@ test('شیفت: باز کردن، ورود/خروج، کشو بی فروش، X،
 });
 
 test('شیفت: رویدادِ ردشده هیچ اثری نمی‌گذارد و Z بعد از بستن ثابت است', () => {
-  const s0 = P.openShift({ at: 0, float: 1000 }).shift;
-  const bad = P.record(s0, { type: 'cash_out', at: 1, amount: 2000, reason: 'owner_withdrawal' });
+  const s0 = P.openShift({ id: 'sh', at: 0, float: 1000 }).shift;
+  const bad = P.record(s0, { id: 'a', type: 'cash_out', at: 1, amount: 2000, reason: 'owner_withdrawal' });
   assert.equal(bad.error, 'INSUFFICIENT_CASH');
   assert.equal(s0.events.length, 0);
-  const s1 = P.record(s0, { type: 'sale', at: 1, rows: [{ method: 'cash', amount: 500 }] }).shift;
+  const s1 = P.record(s0, { id: 'b', type: 'sale', at: 1, rows: [{ method: 'cash', amount: 500 }] }).shift;
   assert.equal(s0.events.length, 0, 'شیفتِ پیشین دست نخورده');
-  const closed = P.closeShift(s1, { at: 2, counts: { 1000: 1 } });
+  const closed = P.closeShift(s1, { id: 'z', at: 2, counts: { 1000: 1 } });
   assert.equal(closed.report.variance.cash, -500, 'اختلاف ثبت می‌شود');
   assert.equal(closed.report.expected.cash, 1500, 'مبلغِ مورد انتظار خودکار «اصلاح» نمی‌شود');
   assert.ok(Object.isFrozen(closed.shift) && Object.isFrozen(closed.shift.z));
