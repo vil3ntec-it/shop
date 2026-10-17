@@ -49,6 +49,12 @@ const MATRIX = {
   'orders.manage':        ['owner', 'manager', 'staff'],
   'orders.contact':       ['owner', 'manager'],
   'orders.refund':        ['owner', 'manager'],
+
+  //  چتِ مشتری ↔ دکان (v3 §۳۳) — پشتِ پرچمِ `shop.chat`، پیش‌فرض خاموش.
+  //  شمارهٔ کاملِ مشتری در چت هم همان `orders.contact` را می‌خواهد.
+  'chat.view':            ['owner', 'manager', 'staff'],
+  'chat.reply':           ['owner', 'manager', 'staff'],
+  'chat.moderate':        ['owner', 'manager'],
 };
 
 function can(role, permission) {
