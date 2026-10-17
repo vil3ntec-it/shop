@@ -302,6 +302,8 @@ fun AppRoot(
   LaunchedEffect(migration) {
     migration?.let { scope.launch { snackbar.showSnackbar(it) } }
   }
+  //  POS-13: فاکتورِ نیمه‌کارهٔ بارِ پیش — ادامه یا دور انداختن
+  DraftRecoveryPrompt(cartStore, data, loaded, snackbar)
   //  نوشتنی که قفلِ نرمِ پایانِ اشتراک ردش کرد ⇐ پیامِ «ثبت شد»ِ صفحه برداشته
   //  می‌شود و راستش گفته می‌شود، با راهِ تمدید
   LaunchedEffect(store) {
