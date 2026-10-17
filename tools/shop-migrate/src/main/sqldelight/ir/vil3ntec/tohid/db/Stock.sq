@@ -1,0 +1,59 @@
+-- حرکتِ کالا — فقط افزودنی. موجودی = جمعِ حرکت‌ها و هرگز عددِ قابلِ ویرایش نیست.
+-- اصلاح = حرکتِ تازه (با دلیل)، نه ویرایشِ حرکتِ قبلی.
+
+CREATE TABLE stockMove (
+  id TEXT NOT NULL PRIMARY KEY,
+  shopId TEXT NOT NULL REFERENCES shop(id),
+  deviceId TEXT NOT NULL REFERENCES device(id),
+  warehouseId TEXT NOT NULL REFERENCES warehouse(id),
+  productId TEXT NOT NULL REFERENCES product(id),
+  kind TEXT NOT NULL CHECK (kind IN (
+    'purchase_in', 'receipt', 'sale', 'sale_cancel', 'customer_return', 'supplier_return',
+    'adjustment', 'count', 'damaged', 'expired', 'transfer_out', 'transfer_in',
+    'reserve', 'release', 'production', 'cost_adjust'
+  )),
+  -- علامت‌دار: ورود مثبت، خروج منفی
+  qtyMilli INTEGER NOT NULL,
+  -- بهای واحد در ورودها؛ NULL یعنی نامعلوم
+  unitCostMinor INTEGER,
+  -- سندِ سازنده: ('sale', id) ، ('saleReturn', id) ، ('warehouseEntry', شناسهٔ قدیم) …
+  refType TEXT,
+  refId TEXT,
+  reason TEXT NOT NULL DEFAULT '',
+  businessDate TEXT NOT NULL,
+  createdAt INTEGER NOT NULL,
+  CHECK (kind NOT IN ('adjustment', 'count', 'damaged', 'expired') OR length(trim(reason)) > 0)
+);
+
+CREATE INDEX stockMoveByProduct ON stockMove(productId, warehouseId);
+CREATE INDEX stockMoveByRef ON stockMove(refType, refId);
+
+CREATE TRIGGER stockMoveNoUpdate
+BEFORE UPDATE ON stockMove
+BEGIN
+  SELECT RAISE(ABORT, 'stockMove is append-only');
+END;
+
+CREATE TRIGGER stockMoveNoDelete
+BEFORE DELETE ON stockMove
+BEGIN
+  SELECT RAISE(ABORT, 'stockMove is append-only');
+END;
+
+CREATE TRIGGER stockMoveActiveDevice
+BEFORE INSERT ON stockMove
+WHEN (SELECT d.active FROM device d WHERE d.id = new.deviceId) = 0
+BEGIN
+  SELECT RAISE(ABORT, 'device is deactivated');
+END;
+
+insertStockMove:
+INSERT INTO stockMove VALUES ?;
+
+stockByProduct:
+SELECT productId, sum(qtyMilli) AS qtyMilli
+FROM stockMove
+GROUP BY productId;
+
+stockOf:
+SELECT coalesce(sum(qtyMilli), 0) FROM stockMove WHERE productId = ?;
