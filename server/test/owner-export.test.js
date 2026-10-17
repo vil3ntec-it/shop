@@ -200,8 +200,11 @@ test('صفحه دکمه‌ها را دارد و فایل را بار می‌کن
   assert.match(html, /<script src="license\/owner-export\.js\?v=\d+" defer><\/script>/);
   assert.ok(html.includes('id="btn-owner-export-xlsx"') && html.includes('id="btn-owner-export-json"'));
   assert.ok(sw.includes("'./license/owner-export.js'"));
-  const handler = html.slice(html.indexOf("'btn-owner-export-'"), html.indexOf("'btn-owner-export-'") + 600);
-  assert.ok(!/markBackupTaken|localStorage\.setItem|saveData\(/.test(handler), 'خروجی نباید چیزی بنویسد');
+  const handler = html.slice(html.indexOf("'btn-owner-export-'"), html.indexOf("'btn-owner-export-'") + 900);
+  assert.ok(!/markBackupTaken|localStorage\.setItem/.test(handler), 'خروجی مُهرِ پشتیبان نمی‌زند');
+  assert.ok(handler.includes("shopRole() === 'staff'"), '۲۱.۲: فقط مالک/نقشِ مجاز');
+  assert.ok(handler.includes("logAudit('data_export'"), '۲۱.۲: خروجی در سابقهٔ عملیات ثبت می‌شود');
+  assert.ok(/data_export:'[^']+'/.test(html), 'نوعِ سابقهٔ data_export برچسبِ فارسی دارد');
 });
 
 test('F0-25: خروجیِ مالک پشتِ قفلِ اشتراک نمی‌رود', () => {
@@ -210,4 +213,23 @@ test('F0-25: خروجیِ مالک پشتِ قفلِ اشتراک نمی‌رو�
   const gated = lic.slice(lic.indexOf('const FEATURE_ELEMENTS'), lic.indexOf('};', lic.indexOf('const FEATURE_ELEMENTS')));
   assert.ok(gated.length > 20, 'FEATURE_ELEMENTS پیدا نشد');
   assert.ok(!gated.includes('btn-owner-export'), 'دکمهٔ خروجیِ کامل به قابلیتِ اشتراکی بسته شده');
+});
+
+test('قالبِ امن: متنِ شبیهِ فرمول فرمول نمی‌شود', async () => {
+  //  ‎.xlsx‎ فقط عنصرِ <f> را فرمول می‌داند؛ هر رشته inlineStr است
+  const src = ledger();
+  src.products[1].name = '=HYPERLINK("http://x","y")';
+  src.debtors[0].notes = '+1-2@SUM(A1)';
+  const { files, names } = await book(src);
+  for (const [name, text] of files) assert.ok(!/<f[ >]/.test(text), `فرمول در ${name}`);
+  const rows = sheetRows(files.get(`xl/worksheets/sheet${names.indexOf('کالاها') + 1}.xml`));
+  const cell = rows[2].find((c) => c.v === src.products[1].name);
+  assert.equal(cell.t, 'inlineStr');
+});
+
+test('بی شبکه: owner-export.js هیچ درخواستِ بیرونی نمی‌سازد', () => {
+  const src = fs.readFileSync(path.join(ROOT, 'license/owner-export.js'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+  assert.ok(!/\bfetch\s*\(|XMLHttpRequest|WebSocket|sendBeacon|\bimport\s*\(|importScripts|https?:\/\/(?!schemas\.openxmlformats\.org)/.test(src),
+    'owner-export.js به شبکه می‌رود یا چیزی از بیرون بار می‌کند');
 });

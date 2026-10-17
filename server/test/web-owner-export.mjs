@@ -6,8 +6,10 @@
  *   • فایلِ ‎.xlsx‎ِ دانلودشده: ZIPِ درست، و هر XML با DOMParserِ خودِ
  *     مرورگر بی خطا خوانده می‌شود؛ هر مجموعه برگهٔ خودش را دارد
  *   • فایلِ JSON دوباره خوانده می‌شود و مو به مو همان دفتر است
- *   • فقط می‌خواند: دفتر و مُهرِ «آخرین پشتیبان» دست نمی‌خورند
- *   • هیچ درخواستِ شبکه‌ای در کار نیست (بی اینترنت هم کار می‌کند)
+ *   • جز یک ردیفِ «خروجی کامل داده» در سابقهٔ عملیات (مشخصات ۲۱.۲)، دفتر و مُهرِ
+ *     «آخرین پشتیبان» دست نمی‌خورند
+ *   • شاگرد خروجی نمی‌گیرد (فقط مالک/نقشِ مجاز — ۲۱.۲)
+ *   • همهٔ درخواست‌های بیرونی بسته‌اند و خروجی باز هم ساخته می‌شود (بی اینترنت)
  *
  * اجرا:  node test/web-owner-export.mjs
  * نبودِ پلی‌رایت قرمز است، نه «رد» (F0-17).
@@ -83,10 +85,10 @@ await pg.evaluate(() => goTo('settings'));
 await pg.waitForSelector('#btn-owner-export-xlsx', { state: 'visible' });
 const stored = () => pg.evaluate(() => ({ data: localStorage.getItem('tohid-shop-data-v1'), last: localStorage.getItem('tohid-shop-last-backup') }));
 const before = await stored();
+//  دفترِ درونِ صفحه پیش از هر خروجی — صفحه هنگامِ بار شدن فیلدهای پیش‌فرض را می‌افزاید،
+//  پس منبعِ مقایسه همین است (`backupPayload()`)، نه رشتهٔ خامِ کاشته‌شده
+const mem = JSON.parse(await pg.evaluate(() => JSON.stringify(backupPayload())));
 
-const requests = [];
-//  فقط درخواست به بیرون از خودِ برنامه شمرده می‌شود (صدای اسکنِ خودِ برنامه با کلیکِ اول بار می‌شود)
-pg.on('request', (r) => { if (!/^(blob|data):/.test(r.url()) && !r.url().startsWith(origin)) requests.push(r.url()); });
 
 async function download(id) {
   const [dl] = await Promise.all([pg.waitForEvent('download'), pg.click(id)]);
@@ -127,8 +129,9 @@ await step('دکمهٔ «خروجی کامل — JSON»: سرآیندِ نسخه
   assert.equal(t.formatVersion, 1);
   assert.equal(t.source.app, 'web');
   assert.match(t.exportedAt, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
-  //  منبع همان دفترِ درونِ صفحه است (`backupPayload()`؛ صفحه هنگامِ بار شدن فیلدهای پیش‌فرض را می‌افزاید)
-  const source = JSON.parse(await pg.evaluate(() => JSON.stringify(backupPayload())));
+  //  منبع همان دفترِ درونِ صفحه است؛ ردیفِ سابقهٔ خروجیِ اکسلِ بالا هم حالا در آن است
+  const source = JSON.parse(JSON.stringify(mem));
+  source.auditLog = JSON.parse(await pg.evaluate(() => JSON.stringify(backupPayload().auditLog))).slice(0, mem.auditLog.length + 1);
   for (const k of Object.keys(LEDGER)) assert.deepEqual(t[k], source[k], k);
   assert.equal(source.products[0].name, 'برنج آزمون');
   assert.equal(t.counts.products, 1);
@@ -137,10 +140,34 @@ await step('دکمهٔ «خروجی کامل — JSON»: سرآیندِ نسخه
   assert.deepEqual(parsed.data.settings, source.settings);
 });
 
-await step('فقط می‌خواند و به شبکه نمی‌رود', async () => {
-  assert.deepEqual(await stored(), before, 'دفتر یا مُهرِ پشتیبان عوض شد');
-  assert.deepEqual(requests, [], `درخواستِ شبکه در حینِ خروجی: ${requests.join(' ')}`);
+//  «بی شبکه»: همهٔ درخواست‌های بیرونی از اول بسته‌اند (route بالا) و خروجی باز هم ساخته شد؛
+//  خودِ owner-export.js هم هیچ fetch/XHR ندارد (owner-export.test.js). تپشِ زمان‌دارِ
+//  پشتیبانی (support.js) ربطی به خروجی ندارد، پس درخواست‌ها این‌جا شمرده نمی‌شوند.
+await step('جز ردیفِ سابقهٔ «خروجی کامل» چیزی نوشته نمی‌شود', async () => {
+  const after = await stored();
+  assert.equal(after.last, before.last, 'مُهرِ «آخرین پشتیبان» خورد');
+  const a = JSON.parse(after.data);
+  const added = a.auditLog.slice(mem.auditLog.length);
+  assert.deepEqual(added.map((x) => [x.type, x.notes, x.refId]),
+    [['data_export', 'خروجی کامل داده — اکسل', null], ['data_export', 'خروجی کامل داده — JSON', null]]);
+  const diff = Object.keys(LEDGER).filter((k) => k !== 'auditLog' && JSON.stringify(a[k]) !== JSON.stringify(mem[k]));
+  assert.deepEqual(diff, [], 'جز سابقه چیزی در دفتر عوض شد');
   assert.deepEqual(errors, [], `خطای صفحه: ${errors.join(' | ')}`);
+});
+
+await step('شاگرد خروجیِ کامل نمی‌گیرد (فقط مالک/نقشِ مجاز)', async () => {
+  await pg.evaluate(() => localStorage.setItem('tohid-sync-state-v1',
+    JSON.stringify({ rev: 0, lastSyncAt: 0, members: [], shop: { id: 'x', name: 'آزمون', role: 'staff', isOwner: false } })));
+  let downloaded = false;
+  const onDl = () => { downloaded = true; };
+  pg.on('download', onDl);
+  const auditBefore = await pg.evaluate(() => JSON.parse(localStorage.getItem('tohid-shop-data-v1')).auditLog.length);
+  await pg.click('#btn-owner-export-json');
+  await pg.waitForTimeout(800);
+  pg.off('download', onDl);
+  assert.equal(downloaded, false, 'شاگرد فایل گرفت');
+  assert.match(await pg.locator('#toast-wrap').innerText(), /فقط برای صاحب دکان یا مدیر/);
+  assert.equal(await pg.evaluate(() => JSON.parse(localStorage.getItem('tohid-shop-data-v1')).auditLog.length), auditBefore);
 });
 
 await browser.close();

@@ -258,10 +258,13 @@ fun SettingsScreen(
 
   /*
    *  خروجیِ کاملِ داده برای مالک (OPS-08) — شرح سرِ `OwnerExport`.
-   *  ⛔ فقط می‌خواند: نه دفتر، نه مُهرِ پشتیبان (`BackupClock`) دست نمی‌خورد.
+   *  مشخصات ۲۱.۲: فقط مالک/نقشِ مجاز (شاگرد تنظیمات را اصلاً باز نمی‌کند؛
+   *  این‌جا هم دوباره سنجیده می‌شود) و با ثبت در سابقهٔ عملیات. جز همان یک
+   *  ردیفِ سابقه چیزی در دفتر نوشته نمی‌شود و مُهرِ پشتیبان (`BackupClock`) نمی‌خورد.
    */
   fun ownerExport(excel: Boolean) = { uri: android.net.Uri? ->
-    if (uri != null) scope.launch {
+    if (uri != null && ir.vil3ntec.tohid.data.ShopRole.isStaff(context)) toast("خروجی کامل فقط برای صاحب دکان یا مدیر است")
+    else if (uri != null) scope.launch {
       runCatching {
         withContext(Dispatchers.IO) {
           val meta = ir.vil3ntec.tohid.data.OwnerExport.Meta(
@@ -275,7 +278,19 @@ fun SettingsScreen(
             else ir.vil3ntec.tohid.data.OwnerExport.writeJson(store.data.value, meta, archive, it)
           }
         }
-      }.onSuccess { toast(if (excel) "فایل اکسلِ همهٔ داده‌ها ساخته شد" else "فایل JSONِ همهٔ داده‌ها ساخته شد") }
+      }.onSuccess {
+        val now = System.currentTimeMillis()
+        val cur = store.data.value
+        store.save(
+          cur.copy(
+            auditLog = cur.auditLog + ir.vil3ntec.tohid.data.AuditEntry(
+              id = ir.vil3ntec.tohid.data.auditId(), type = "data_export", date = todayIso(),
+              notes = if (excel) "خروجی کامل داده — اکسل" else "خروجی کامل داده — JSON", createdAt = now,
+            ),
+          ),
+        )
+        toast(if (excel) "فایل اکسلِ همهٔ داده‌ها ساخته شد" else "فایل JSONِ همهٔ داده‌ها ساخته شد")
+      }
         .onFailure { toast("خروجی ساخته نشد: ${it.message ?: "دلیل نامعلوم"}") }
     }
     Unit
