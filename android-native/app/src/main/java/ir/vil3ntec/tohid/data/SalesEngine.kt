@@ -114,6 +114,8 @@ object SalesEngine {
    * پیش‌تر فقط «کیلو» بود و فهرستِ پیش‌فرض «کیلوگرم» دارد؛ یعنی کالای
    * کیلویی ۰٫۲۵ نمی‌پذیرفت و ۲۵۰ گرم فروختنی نبود. نسخهٔ وب هم‌زمان عوض شد.
    */
+  const val ALREADY_POSTED = "این فاکتور یک بار ثبت شده است و دوباره ثبت نمی‌شود"
+
   private val FRACTIONAL_UNITS = setOf("کیلو", "کیلوگرم", "گرم", "لیتر", "میلی‌لیتر", "متر")
 
   fun isFractionalUnit(unit: String): Boolean = unit in FRACTIONAL_UNITS
@@ -284,8 +286,15 @@ object SalesEngine {
     now: Long,
     newId: () -> String,
     series: String = "",
+    /**
+     *  کلیدِ یکتای فاکتور (POS-14) — همان `SaleDraft.key`. فروشِ تازه همین
+     *  شناسه را می‌گیرد و اگر پیش‌تر ثبت شده باشد **دوباره ثبت نمی‌شود**.
+     *  `null` ⇒ مثلِ همیشه شناسهٔ تازه.
+     */
+    saleId: String? = null,
   ): Result {
     if (cart.isEmpty()) return Result.Failed("سبد خرید خالی است")
+    if (saleId != null && d.sales.any { it.id == saleId }) return Result.Failed(ALREADY_POSTED)
 
     // موجودی درست پیش از ثبت سنجیده می‌شود، نه بعد از آن
     for (line in cart) {
@@ -330,7 +339,7 @@ object SalesEngine {
     //  بدهی فقط از فروشِ نسیه‌ای می‌آید که هنوز تسویه نشده
     val onCredit = checkout.payment == Payment.CREDIT && remaining > 0
 
-    val saleId = newId()
+    val saleId = saleId?.takeIf { it.isNotBlank() } ?: newId()
     val invoiceNumber = d.nextInvoiceNo
 
     val sale = Sale(

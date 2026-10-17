@@ -1,0 +1,790 @@
+{
+  "note": "ساختهٔ spec.mjs split؛ دستی ویرایش نکن. 00-index.md و همین فایل بیرون از چسباندن‌اند.",
+  "source": "MASTER-SPEC.md",
+  "bytes": 681829,
+  "sha256": "9e4a59f3e95d073e25c4d3bb5465b330893d8dfb9b9333d3a22551890c850797",
+  "parts": [
+    {
+      "file": "00-intro.md",
+      "section": 0,
+      "title": "مقدمه: این سند چیست و چطور استفاده شود",
+      "lines": [
+        0,
+        32
+      ],
+      "bytes": 3857,
+      "sha256": "31e123b87081da8e17c6bcdcef7cd1a72a24b2db7cd495bd11c6c642f48cd6e2"
+    },
+    {
+      "file": "00-start.md",
+      "section": 0,
+      "title": "پیام شروع رسمی (تنها متن اجرایی معتبر)",
+      "lines": [
+        34,
+        43
+      ],
+      "bytes": 3083,
+      "sha256": "2d2ad1334c8f7071f1fe4e6dbc884c7dba978820918a52304d0f57f2c0a43a89"
+    },
+    {
+      "file": "01-goals.md",
+      "section": 1,
+      "title": "۱. هدف، معیار برتری و قوانین غیرقابل‌مذاکره",
+      "lines": [
+        44,
+        124
+      ],
+      "bytes": 10925,
+      "sha256": "69c8e705addfc229901ba6ca6cfd529fa49628e094f246ef3b7c5e0396addfd5"
+    },
+    {
+      "file": "02-current.md",
+      "section": 2,
+      "title": "۲. وضعیت فعلی: آنچه حفظ می‌شود و آنچه باید اصلاح شود",
+      "lines": [
+        125,
+        239
+      ],
+      "bytes": 22181,
+      "sha256": "a40009ee127d230bb0ac7117caf5b67f976d238a9a8fef24eb136797676c7fc6"
+    },
+    {
+      "file": "03-architecture.md",
+      "section": 3,
+      "title": "۳. معماری هدف",
+      "lines": [
+        240,
+        646
+      ],
+      "bytes": 45184,
+      "sha256": "dcdcf5c5b3f620962ead7de317d7ef65841613c2acb44164b6be83c026f73162"
+    },
+    {
+      "file": "04-afghanistan.md",
+      "section": 4,
+      "title": "۴. شرایط افغانستان و الزامات ناشی از آن",
+      "lines": [
+        647,
+        836
+      ],
+      "bytes": 15778,
+      "sha256": "c5a737bc814e165e30705b68df2e29e8d82d038b39d3ac68ad66366dc2b59cfa"
+    },
+    {
+      "file": "05-ux.md",
+      "section": 5,
+      "title": "۵. تجربه کاربری: کیبورد، لمس و سیستم طراحی",
+      "lines": [
+        837,
+        1029
+      ],
+      "bytes": 19630,
+      "sha256": "756abbd9b815457f9f4f0b5d812294e45028946ffa18ef557213f30e284daecd"
+    },
+    {
+      "file": "06-intro.md",
+      "section": 6,
+      "title": "۶. فهرست کامل قابلیت‌ها — راهنما",
+      "lines": [
+        1030,
+        1046
+      ],
+      "bytes": 807,
+      "sha256": "3ae25134ff7b621b3300944777c6c76ab38cee3c28b356f9644564b5bf6999ec"
+    },
+    {
+      "file": "06-POS.md",
+      "section": 6,
+      "title": "۶.۱ صندوق فروش (POS)",
+      "lines": [
+        1047,
+        1091
+      ],
+      "bytes": 7644,
+      "sha256": "4639fea44e7e0c0ebd6d49758323a8ce1d812e758a869772a0174d081eb3c29c"
+    },
+    {
+      "file": "06-PAY.md",
+      "section": 6,
+      "title": "۶.۲ پرداخت و صندوق پول (PAY)",
+      "lines": [
+        1092,
+        1118
+      ],
+      "bytes": 4097,
+      "sha256": "d5e61f8e8ae300db767a5a6eb09b20b8feb4b774ad7ae0ed69d8d3f612d6884e"
+    },
+    {
+      "file": "06-PRD.md",
+      "section": 6,
+      "title": "۶.۳ کالا، واحد و قیمت (PRD)",
+      "lines": [
+        1119,
+        1148
+      ],
+      "bytes": 4142,
+      "sha256": "c13b48b19b9aa2cd8c5cc3016226ffef1eac06b3b532c1b847a9a1614c2d1a81"
+    },
+    {
+      "file": "06-PRM.md",
+      "section": 6,
+      "title": "۶.۴ تخفیف، وفاداری و کارت هدیه (PRM)",
+      "lines": [
+        1149,
+        1169
+      ],
+      "bytes": 2339,
+      "sha256": "d690d65c550ab269c9538c09c5814fce12d37dd7b93402b76b85b2ab2b840793"
+    },
+    {
+      "file": "06-INV.md",
+      "section": 6,
+      "title": "۶.۵ انبار (INV)",
+      "lines": [
+        1170,
+        1193
+      ],
+      "bytes": 3500,
+      "sha256": "d8f7a39c19a09b8da125b220bc5716ef78d8b3e0b52f7e4eaf55d67d77019dd4"
+    },
+    {
+      "file": "06-PUR.md",
+      "section": 6,
+      "title": "۶.۶ خرید و تأمین‌کننده (PUR)",
+      "lines": [
+        1194,
+        1210
+      ],
+      "bytes": 2342,
+      "sha256": "c824dcebd9618bf41a4dacd138d313f77719ef73f24b0d8581b6b465e8d6d8d3"
+    },
+    {
+      "file": "06-CRM.md",
+      "section": 6,
+      "title": "۶.۷ مشتری و حساب قرض (CRM)",
+      "lines": [
+        1211,
+        1229
+      ],
+      "bytes": 2114,
+      "sha256": "4c14aff9ff2ab773380ddee7e6c82520d75176bc8b13bf2493c7cac41c8324bd"
+    },
+    {
+      "file": "06-RET.md",
+      "section": 6,
+      "title": "۶.۸ برگشت و تعویض (RET)",
+      "lines": [
+        1230,
+        1245
+      ],
+      "bytes": 1691,
+      "sha256": "5864a4fed9f6f66d644c041d2cb954faf7a856e46d1a7283b9a702e6b0e35b8b"
+    },
+    {
+      "file": "06-STF.md",
+      "section": 6,
+      "title": "۶.۹ کارمندان و مجوزها (STF)",
+      "lines": [
+        1246,
+        1259
+      ],
+      "bytes": 1769,
+      "sha256": "9968b10dd550e8d9c6078faf1cd578108a85f6108eba9284005eb58abbaa8a5e"
+    },
+    {
+      "file": "06-RPT.md",
+      "section": 6,
+      "title": "۶.۱۰ گزارش و تحلیل (RPT)",
+      "lines": [
+        1260,
+        1281
+      ],
+      "bytes": 2343,
+      "sha256": "b4d119c247c74e9629a457287122333066b28adc5413e145e627715fc9c6f899"
+    },
+    {
+      "file": "06-HW.md",
+      "section": 6,
+      "title": "۶.۱۱ دستگاه‌ها (HW)",
+      "lines": [
+        1282,
+        1306
+      ],
+      "bytes": 2703,
+      "sha256": "979b182dd8c98e90a4783d7b2ebbdc2aae9e60f4afe32b5dae9e6fb480053de4"
+    },
+    {
+      "file": "06-SYN.md",
+      "section": 6,
+      "title": "۶.۱۲ آفلاین و همگام‌سازی (SYN)",
+      "lines": [
+        1307,
+        1323
+      ],
+      "bytes": 2298,
+      "sha256": "29df506f7476b109a9897642b88fbe57dc27466f9d3f4ca0863243538f21c358"
+    },
+    {
+      "file": "06-SEC.md",
+      "section": 6,
+      "title": "۶.۱۳ امنیت (SEC). جزئیات در بخش ۱۰.",
+      "lines": [
+        1324,
+        1336
+      ],
+      "bytes": 1417,
+      "sha256": "3cc6dea7f35c26e1544f3629def8758eee34c867d1cb02d8b5d304bf38419310"
+    },
+    {
+      "file": "06-WEB.md",
+      "section": 6,
+      "title": "۶.۱۴ ویترین اینترنتی (WEB)",
+      "lines": [
+        1337,
+        1369
+      ],
+      "bytes": 4053,
+      "sha256": "f2d1b8d4b0d71090360edfa1d5c432a0ee429ecf5ca58dba09aae4e5b8e71a32"
+    },
+    {
+      "file": "06-CHK.md",
+      "section": 6,
+      "title": "۶.۱۵ سبد و ثبت سفارش (CHK)",
+      "lines": [
+        1370,
+        1396
+      ],
+      "bytes": 3625,
+      "sha256": "468af838679f3d72a093f8d0581f45d1d5ac29fefa949c8d9db0d4ecf0b1f57f"
+    },
+    {
+      "file": "06-ORD.md",
+      "section": 6,
+      "title": "۶.۱۶ دریافت سفارش در فروشگاه (ORD)",
+      "lines": [
+        1397,
+        1420
+      ],
+      "bytes": 3660,
+      "sha256": "91ce51e46a57b0fbcc0ba97d8e758b576e52c7ded711786150a89ef72dcc9053"
+    },
+    {
+      "file": "06-PCK.md",
+      "section": 6,
+      "title": "۶.۱۷ جمع‌آوری و بسته‌بندی (PCK)",
+      "lines": [
+        1421,
+        1437
+      ],
+      "bytes": 2118,
+      "sha256": "834e8b8586427b39e25ba150741793dc9a059a67133c63307ef6e26c61b6b6e8"
+    },
+    {
+      "file": "06-DLV.md",
+      "section": 6,
+      "title": "۶.۱۸ تحویل و پیک (DLV)",
+      "lines": [
+        1438,
+        1463
+      ],
+      "bytes": 3201,
+      "sha256": "5419574b09cabc9bee0a4bee75c7f57cf8a50da9e98a094c69315b8d5d750dd3"
+    },
+    {
+      "file": "06-NTF.md",
+      "section": 6,
+      "title": "۶.۱۹ اطلاع‌رسانی و پشتیبانی (NTF)",
+      "lines": [
+        1464,
+        1476
+      ],
+      "bytes": 1423,
+      "sha256": "dd6f961dae2ddde344b78825b0ac48f0a78a58d64c035d3265bbbaa182df97a3"
+    },
+    {
+      "file": "06-MKT.md",
+      "section": 6,
+      "title": "۶.۲۰ بازاریابی (MKT)",
+      "lines": [
+        1477,
+        1491
+      ],
+      "bytes": 1425,
+      "sha256": "952c965c24720d943bc13c65059ff4b284b526dc836e9610f5f50b8bd2ef3d7d"
+    },
+    {
+      "file": "06-RSK.md",
+      "section": 6,
+      "title": "۶.۲۱ تقلب و ریسک (RSK)",
+      "lines": [
+        1492,
+        1504
+      ],
+      "bytes": 1518,
+      "sha256": "c733593ff7523f52ec2e7c3f48af53fd296b116a1692e68162ec57e94e067cab"
+    },
+    {
+      "file": "06-AI.md",
+      "section": 6,
+      "title": "۶.۲۲ هوش مصنوعی (AI)",
+      "lines": [
+        1505,
+        1521
+      ],
+      "bytes": 2383,
+      "sha256": "cc9d3cb4e5f793b0159b9afddec98e3aa9aa010d2be3dadd33a95fad4ea005c4"
+    },
+    {
+      "file": "06-LOC.md",
+      "section": 6,
+      "title": "۶.۲۳ بومی‌سازی (LOC)",
+      "lines": [
+        1522,
+        1534
+      ],
+      "bytes": 1533,
+      "sha256": "a3f2b6aa5421ee3a8df586e63fcd84eccd3745f38fda2f7f051fea290c53a65f"
+    },
+    {
+      "file": "06-OPS.md",
+      "section": 6,
+      "title": "۶.۲۴ عملیات و پشتیبانی محصول (OPS)",
+      "lines": [
+        1535,
+        1560
+      ],
+      "bytes": 2101,
+      "sha256": "89e7eafef0857ad2864541f0e46af8582965846fe6f284716bbcb86927b56f62"
+    },
+    {
+      "file": "07-0.md",
+      "section": 7,
+      "title": "۷. سناریوهای کامل و معیار قبولی — قواعد",
+      "lines": [
+        1561,
+        1570
+      ],
+      "bytes": 1211,
+      "sha256": "f10592d4229ec4e306eab96065998988f8bf0874834755453af71d685c2f679e"
+    },
+    {
+      "file": "07-1.md",
+      "section": 7,
+      "title": "۷.۱ صندوق",
+      "lines": [
+        1571,
+        1750
+      ],
+      "bytes": 12888,
+      "sha256": "4711c317eb8f88060e6f08154f0582baac9d2f8142d68506aad2fcfb989233a7"
+    },
+    {
+      "file": "07-2.md",
+      "section": 7,
+      "title": "۷.۲ انبار و خرید",
+      "lines": [
+        1751,
+        1805
+      ],
+      "bytes": 4358,
+      "sha256": "42b8fbe1b4ff98d519da7a14e8ee682e0f5aaf1cb83e7371acf08f2668c98226"
+    },
+    {
+      "file": "07-3.md",
+      "section": 7,
+      "title": "۷.۳ آفلاین و همگام‌سازی",
+      "lines": [
+        1806,
+        1860
+      ],
+      "bytes": 4093,
+      "sha256": "9f4bd2d6555642439168a5c1ce712e9316c83c2b54f02a26b8f644b858a6c207"
+    },
+    {
+      "file": "07-4.md",
+      "section": 7,
+      "title": "۷.۴ فروش اینترنتی و تحویل",
+      "lines": [
+        1861,
+        1950
+      ],
+      "bytes": 7401,
+      "sha256": "15306aa3e8454dc3b29606207d206f61912caaac81f648f51d603c25b0ae0d25"
+    },
+    {
+      "file": "07-5.md",
+      "section": 7,
+      "title": "۷.۵ کارمندان، اشتراک و گزارش",
+      "lines": [
+        1951,
+        1987
+      ],
+      "bytes": 2835,
+      "sha256": "af3172cfde573e7727c601a9aa038f75573036bd0493d1db64bab265dff92115"
+    },
+    {
+      "file": "07-6.md",
+      "section": 7,
+      "title": "۷.۶ سی کار روزانه برای سنجش «۹۰٪ بدون موس»",
+      "lines": [
+        1988,
+        2028
+      ],
+      "bytes": 2522,
+      "sha256": "486903b3fd417ba8394858d5961c8ab0c6b2f4f0f73ba52627f279af4ce0b7bb"
+    },
+    {
+      "file": "08-phases.md",
+      "section": 8,
+      "title": "۸. فازبندی و ترتیب اجرا",
+      "lines": [
+        2029,
+        2142
+      ],
+      "bytes": 9052,
+      "sha256": "11c9c642f95c9c3ce313154828ee9534d652b4233df6369cd39a1135ffc4aac3"
+    },
+    {
+      "file": "09-testing.md",
+      "section": 9,
+      "title": "۹. آزمایش، کارایی و پایداری",
+      "lines": [
+        2143,
+        2233
+      ],
+      "bytes": 7324,
+      "sha256": "590db357ad21937fdd24688aeae59b846a9182a0ce154fb616dde26b6951236a"
+    },
+    {
+      "file": "10-security.md",
+      "section": 10,
+      "title": "۱۰. امنیت و حریم خصوصی",
+      "lines": [
+        2234,
+        2360
+      ],
+      "bytes": 11749,
+      "sha256": "c54976aaf92f0f706e104e3edf4e359471550d08e40d503fca0886affc9543cd"
+    },
+    {
+      "file": "11-operations.md",
+      "section": 11,
+      "title": "۱۱. عملیات، انتشار و پایش",
+      "lines": [
+        2361,
+        2404
+      ],
+      "bytes": 3692,
+      "sha256": "4dba73e7c2fbb4121e764e5e90e925ebbba3f02fbac69ebf1f26129dbd033aa6"
+    },
+    {
+      "file": "12-report.md",
+      "section": 12,
+      "title": "۱۲. پروتکل گزارش و تعریف «تمام‌شده»",
+      "lines": [
+        2405,
+        2450
+      ],
+      "bytes": 3030,
+      "sha256": "dd1bb0e6c6ba0bec696f4e2d39e77777e2c7387078285f90bd9a26dc16008e6a"
+    },
+    {
+      "file": "13-decisions.md",
+      "section": 13,
+      "title": "۱۳. دروازه‌های تصمیم صاحب محصول",
+      "lines": [
+        2451,
+        2483
+      ],
+      "bytes": 5065,
+      "sha256": "1ecb027a7115c51c7a8ef57ea7124df4defed9a9cfff29d6fc685fc008af33ca"
+    },
+    {
+      "file": "14-sources.md",
+      "section": 14,
+      "title": "۱۴. منابع اصلی",
+      "lines": [
+        2484,
+        2532
+      ],
+      "bytes": 4723,
+      "sha256": "6fd140bb2ef312e9ae1059e828983885780401ba869ef0e492de7d9bb2971bbe"
+    },
+    {
+      "file": "15-corrections.md",
+      "section": 15,
+      "title": "۱۵. اصلاحات الزام‌آور و رفع ابهام‌ها (نسخهٔ ۱۵ اکتبر ۲۰۲۶)",
+      "lines": [
+        2533,
+        2692
+      ],
+      "bytes": 38644,
+      "sha256": "0bb5b99ca7c53ed691dd69d3549e8d6d6f5ec6cd0327442f04e5308f36feac62"
+    },
+    {
+      "file": "16-acceptance.md",
+      "section": 16,
+      "title": "۱۶. آزمون‌های پذیرش جدید (مانع انتشار)",
+      "lines": [
+        2693,
+        2713
+      ],
+      "bytes": 4704,
+      "sha256": "d66c42b94707b140313a878c34071d7a440550e0ac80e911182bc933107bde57"
+    },
+    {
+      "file": "17-release-checklist.md",
+      "section": 17,
+      "title": "۱۷. چک‌لیست انتشار عمومی",
+      "lines": [
+        2714,
+        2731
+      ],
+      "bytes": 1951,
+      "sha256": "3a576ce18fbd58c8010b0d97d2b52622598fd47a7a4290f9c4588e9028df9b71"
+    },
+    {
+      "file": "18-changelog.md",
+      "section": 18,
+      "title": "۱۸. تاریخچهٔ اصلاحات این سند",
+      "lines": [
+        2732,
+        2737
+      ],
+      "bytes": 670,
+      "sha256": "3af0af5571af9ae6247818f54fdd6017e6c9913423c621f6cad02e13f2c79866"
+    },
+    {
+      "file": "19-final-requirements.md",
+      "section": 19,
+      "title": "۱۹. الزامات تکمیلی نهایی: محصول ساده در ظاهر، دقیق در داخل",
+      "lines": [
+        2738,
+        2966
+      ],
+      "bytes": 57489,
+      "sha256": "cf1dd3b4b6a73398fc536229be31ae17350fa2bd6691f283d5886d77a82a6818"
+    },
+    {
+      "file": "20-product-decisions.md",
+      "section": 20,
+      "title": "۲۰. تصمیم‌های تکمیلی محصول، فناوری و تجربهٔ استفاده (بازبینی ۱۵ اکتبر ۲۰۲۶)",
+      "lines": [
+        2967,
+        3127
+      ],
+      "bytes": 36964,
+      "sha256": "c184215b17a50744a20d8f289a42e7aae3551b7524fd53ea451e1f94ca5064e9"
+    },
+    {
+      "file": "21-accounts-support.md",
+      "section": 21,
+      "title": "21. حساب‌ها، پشتیبانی، اعتماد، پرداخت، پیام‌رسانی، شارژ سیم‌کارت، امنیت اشتراک و مقیاس‌پذیری",
+      "lines": [
+        3128,
+        3348
+      ],
+      "bytes": 56409,
+      "sha256": "af96e461de74f63bdc921188f4dd692ae9ccb5cc1f2ede4b450ab8fe71e181b4"
+    },
+    {
+      "file": "22-execution-order.md",
+      "section": 22,
+      "title": "22. ترتیب اجرای پروژه: اول صحت عملکرد، بعد بررسی عمیق امنیت",
+      "lines": [
+        3349,
+        3413
+      ],
+      "bytes": 10186,
+      "sha256": "4a81e79c10dec8c73cf1f6827d87434904c593bcba4a239329cb85bab4ae554c"
+    },
+    {
+      "file": "23-marketplace-login.md",
+      "section": 23,
+      "title": "23. تجربهٔ ورود مشتری در بازارچه: مشاهده آزاد، ثبت سفارش با تأیید",
+      "lines": [
+        3414,
+        3470
+      ],
+      "bytes": 8608,
+      "sha256": "5932f08e8e206d96ed49e28fad80f135796a359efb294acd79470c565b6b70a5"
+    },
+    {
+      "file": "24-evidence-audit.md",
+      "section": 24,
+      "title": "24. ممیزی شواهدی نسخهٔ فعلی و نمره‌گذاری قابل‌تکرار (افزوده‌شده: ۱۵ اکتبر ۲۰۲۶)",
+      "lines": [
+        3471,
+        3628
+      ],
+      "bytes": 26872,
+      "sha256": "07a206c51fcd52317a29208f467b120818289206c7091f22412868409e02146f"
+    },
+    {
+      "file": "25-dev-instructions.md",
+      "section": 25,
+      "title": "25. دستور نهایی برای دستیار توسعه: اجرا، بازسنجی و اعلام نمره",
+      "lines": [
+        3629,
+        3645
+      ],
+      "bytes": 3546,
+      "sha256": "a70647d4b4794754945b0595337bbd19cbce79dfc3a836ebe6255ed45ffc3c0b"
+    },
+    {
+      "file": "26-completion.md",
+      "section": 26,
+      "title": "26. فرمان تکمیل واقعی تا ۱۰ از ۱۰ — بدون نمره‌سازی و بدون حدس",
+      "lines": [
+        3646,
+        3759
+      ],
+      "bytes": 18123,
+      "sha256": "c9dd12d9805bb57d4787b5ef557e72b0f4b1e00f5408ee84b218e21451a12e4a"
+    },
+    {
+      "file": "27-old-start.md",
+      "section": 27,
+      "title": "۲۷. پیام شروع قدیمی (منسوخ)",
+      "lines": [
+        3760,
+        3764
+      ],
+      "bytes": 365,
+      "sha256": "c06f4bc5a48e8237cbe7a76d56fb649e08541083a8e9dd9278babea15df46334",
+      "obsolete": true
+    },
+    {
+      "file": "28-safe-execution.md",
+      "section": 28,
+      "title": "۲۸. قرارداد نهایی اجرای ایمن و محدودیت‌های باز",
+      "lines": [
+        3765,
+        3809
+      ],
+      "bytes": 8493,
+      "sha256": "bd4fce6456c6e6f8d0137907fd48022c3b014ea8f8d3cde64d0a90b9f5e27732"
+    },
+    {
+      "file": "29-auth-security-annex.md",
+      "section": 29,
+      "title": "۲۹. ضمیمهٔ الزام‌آور نهایی: ورود، اشتراک، امنیت، حریم خصوصی، صحت داده و مقیاس",
+      "lines": [
+        3810,
+        3955
+      ],
+      "bytes": 24570,
+      "sha256": "11b9e087b1fd1aa1d0084f46e56225f24f65e82da98013585a7ae5a5edcf833a"
+    },
+    {
+      "file": "30-order-notify.md",
+      "section": 30,
+      "title": "۳۰. الزام قطعی اعلان سفارش حتی وقتی برنامهٔ گوشی بسته است",
+      "lines": [
+        3956,
+        4012
+      ],
+      "bytes": 9271,
+      "sha256": "2735f0ba750f0270733bad924883cb6416dcf7b22eb51f8be04bc2ba963f295a"
+    },
+    {
+      "file": "31-store-presence.md",
+      "section": 31,
+      "title": "۳۱. وضعیت آنلاین/آفلاین و ساعت کاری فروشگاه",
+      "lines": [
+        4013,
+        4050
+      ],
+      "bytes": 7558,
+      "sha256": "49e99b1937d3bd01dc49988ac19ade145e2e047afe05cdb54da7014964acd5d0"
+    },
+    {
+      "file": "32-catalog-stock.md",
+      "section": 32,
+      "title": "۳۲. کاتالوگ واحد و موجودی هوشمند فروشگاه، قفسه و انبار",
+      "lines": [
+        4051,
+        4099
+      ],
+      "bytes": 10417,
+      "sha256": "d4ebbf2460ed2a9f2aa4b0996bd3aae584afaa4d918bb6805d1cd9db0322c490"
+    },
+    {
+      "file": "33-chat.md",
+      "section": 33,
+      "title": "۳۳. چت و پیام‌رسانی قابل اعتماد، باکیفیت و کم‌مصرف",
+      "lines": [
+        4100,
+        4147
+      ],
+      "bytes": 9457,
+      "sha256": "f4a5e7519335ca437f878acc38687267333ca11a53ba407fc21b8f5ce812f60a"
+    },
+    {
+      "file": "34-product-images.md",
+      "section": 34,
+      "title": "۳۴. مدیریت حرفه‌ای تصاویر محصولات: بهبود، ورود گروهی و کنترل کیفیت",
+      "lines": [
+        4148,
+        4196
+      ],
+      "bytes": 10151,
+      "sha256": "e9228e094167d2a3f2f41dc3f087e10bd47129ee07178d8e816b10fd6ff69398"
+    },
+    {
+      "file": "35-new-gate.md",
+      "section": 35,
+      "title": "۳۵. دروازهٔ پذیرش برای قابلیت‌های جدید",
+      "lines": [
+        4197,
+        4216
+      ],
+      "bytes": 2350,
+      "sha256": "21bb9d4f0fcb5ef87a89e435b9f1a4840acd1f36d057f11f0cb6301430a9d250"
+    },
+    {
+      "file": "36-image-studio.md",
+      "section": 36,
+      "title": "۳۶. سامانهٔ حرفه‌ای آماده‌سازی، ترمیم و کنترل کیفیت تصاویر محصول (Product Image Studio)",
+      "lines": [
+        4217,
+        4381
+      ],
+      "bytes": 24670,
+      "sha256": "4bfc9bf41f4c920b003c8fc512b15c2431c3d756f7fb7e4b1acaddf4990d9417"
+    },
+    {
+      "file": "37-image-bank.md",
+      "section": 37,
+      "title": "۳۷. بانک مرکزی تصاویر محصولات + جست‌وجو و انتخاب هوشمند در استودیوی تصویر",
+      "lines": [
+        4382,
+        4522
+      ],
+      "bytes": 19649,
+      "sha256": "121a922867d5f6088fc120bbc36f7edaadba1eff80326ca1454777cd7debf40d"
+    },
+    {
+      "file": "38-gap-closure.md",
+      "section": 38,
+      "title": "۳۸. تکمیل شکاف‌های محصول و عملیات بر اساس ممیزی قابلیت‌های حرفه‌ای",
+      "lines": [
+        4523,
+        4616
+      ],
+      "bytes": 13995,
+      "sha256": "ec83cef732f04b218e63a446ab6c5b4d76cfa74ca97aca285c0cd3e500b6ca4e"
+    },
+    {
+      "file": "39-disambiguation.md",
+      "section": 39,
+      "title": "۳۹. قرارداد نهایی رفع ابهام برای ایجنت توسعه (افزوده‌شده: ۱۷ اکتبر ۲۰۲۶)",
+      "lines": [
+        4617,
+        4667
+      ],
+      "bytes": 9890,
+      "sha256": "3c0dfa4dc9f6700769381670c7bd8ee2f0863be055d11c05503c434b1538b8fb"
+    }
+  ]
+}

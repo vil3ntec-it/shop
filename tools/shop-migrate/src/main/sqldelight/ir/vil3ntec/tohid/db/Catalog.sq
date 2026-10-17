@@ -1,0 +1,133 @@
+-- کالا، واحد، تبدیلِ واحد، بارکد، فهرستِ قیمت
+
+CREATE TABLE measureUnit (
+  id TEXT NOT NULL PRIMARY KEY,
+  shopId TEXT NOT NULL REFERENCES shop(id),
+  name TEXT NOT NULL,
+  UNIQUE (shopId, name)
+);
+
+CREATE TABLE product (
+  id TEXT NOT NULL PRIMARY KEY,
+  shopId TEXT NOT NULL REFERENCES shop(id),
+  name TEXT NOT NULL,
+  category TEXT NOT NULL DEFAULT '',
+  subcategory TEXT NOT NULL DEFAULT '',
+  -- واحدِ موجودی؛ موجودی و قیمت همیشه بر حسبِ همین واحد
+  unitId TEXT REFERENCES measureUnit(id),
+  minStockMilli INTEGER NOT NULL DEFAULT 0,
+  -- بهای خریدِ ثبت‌شده روی کالا (`purchasePrice`ِ قدیم) — فقط پیش‌فرضِ فرم؛
+  -- بهای تمام‌شدهٔ واقعی از حرکت‌های کالا می‌آید (۳.۶)
+  refCostMinor INTEGER NOT NULL DEFAULT 0,
+  supplierId TEXT REFERENCES supplier(id),
+  notes TEXT NOT NULL DEFAULT '',
+  hasPhoto INTEGER NOT NULL DEFAULT 0 CHECK (hasPhoto IN (0, 1)),
+  active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
+  createdAt INTEGER NOT NULL
+);
+
+-- تبدیلِ واحد فقط از تعریفِ ثبت‌شده: ۱ fromUnit = factorNum/factorDen toUnit
+-- (عددِ گویا، نه Double — «۱ گرم = ۱/۱۰۰۰ کیلوگرم»)
+CREATE TABLE unitConversion (
+  productId TEXT NOT NULL REFERENCES product(id),
+  fromUnitId TEXT NOT NULL REFERENCES measureUnit(id),
+  toUnitId TEXT NOT NULL REFERENCES measureUnit(id),
+  factorNum INTEGER NOT NULL CHECK (factorNum > 0),
+  factorDen INTEGER NOT NULL CHECK (factorDen > 0),
+  PRIMARY KEY (productId, fromUnitId),
+  CHECK (fromUnitId <> toUnitId)
+);
+
+-- بارکد در فروشگاه یکتاست؛ تنها استثنا تعارضِ آفلاین: تا ادغام، هر دو ردیف
+-- با `duplicate = 1` می‌مانند و اسکنِ آن بارکد پنجرهٔ انتخاب باز می‌کند.
+CREATE TABLE barcode (
+  id TEXT NOT NULL PRIMARY KEY,
+  shopId TEXT NOT NULL REFERENCES shop(id),
+  code TEXT NOT NULL CHECK (length(code) > 0),
+  productId TEXT NOT NULL REFERENCES product(id),
+  duplicate INTEGER NOT NULL DEFAULT 0 CHECK (duplicate IN (0, 1)),
+  UNIQUE (productId, code)
+);
+
+CREATE UNIQUE INDEX barcodeUniqueInShop ON barcode(shopId, code) WHERE duplicate = 0;
+CREATE INDEX barcodeByCode ON barcode(shopId, code);
+
+CREATE TABLE priceList (
+  id TEXT NOT NULL PRIMARY KEY,
+  shopId TEXT NOT NULL REFERENCES shop(id),
+  kind TEXT NOT NULL CHECK (kind IN ('retail', 'wholesale', 'custom')),
+  name TEXT NOT NULL,
+  currency TEXT NOT NULL REFERENCES currency(code)
+);
+
+-- قیمت با بازهٔ زمانی [validFrom, validTo). تغییرِ قیمت ردیفِ تازه است و هرگز
+-- اسنادِ گذشته را عوض نمی‌کند (سند قیمتِ خودش را دارد). تنها ویرایشِ مجاز:
+-- بستنِ بازهٔ باز.
+CREATE TABLE price (
+  id TEXT NOT NULL PRIMARY KEY,
+  priceListId TEXT NOT NULL REFERENCES priceList(id),
+  productId TEXT NOT NULL REFERENCES product(id),
+  amountMinor INTEGER NOT NULL CHECK (amountMinor >= 0),
+  validFrom INTEGER NOT NULL,
+  validTo INTEGER,
+  CHECK (validTo IS NULL OR validTo >= validFrom)
+);
+
+CREATE INDEX priceByProduct ON price(productId, priceListId, validFrom);
+
+CREATE TRIGGER priceNoOverlap
+BEFORE INSERT ON price
+WHEN EXISTS (
+  SELECT 1 FROM price p
+  WHERE p.priceListId = new.priceListId AND p.productId = new.productId
+    AND p.validFrom < coalesce(new.validTo, 9223372036854775807)
+    AND new.validFrom < coalesce(p.validTo, 9223372036854775807)
+    AND (new.validTo IS NULL OR new.validTo > new.validFrom)
+    AND (p.validTo IS NULL OR p.validTo > p.validFrom)
+)
+BEGIN
+  SELECT RAISE(ABORT, 'price ranges overlap');
+END;
+
+CREATE TRIGGER priceOnlyClose
+BEFORE UPDATE ON price
+WHEN old.validTo IS NOT NULL
+  OR new.validTo IS NULL
+  OR new.id <> old.id OR new.priceListId <> old.priceListId OR new.productId <> old.productId
+  OR new.amountMinor <> old.amountMinor OR new.validFrom <> old.validFrom
+BEGIN
+  SELECT RAISE(ABORT, 'price rows are history: only closing an open range is allowed');
+END;
+
+CREATE TRIGGER priceNoDelete
+BEFORE DELETE ON price
+BEGIN
+  SELECT RAISE(ABORT, 'price rows are history');
+END;
+
+insertMeasureUnit:
+INSERT INTO measureUnit VALUES ?;
+
+insertProduct:
+INSERT INTO product VALUES ?;
+
+insertUnitConversion:
+INSERT INTO unitConversion VALUES ?;
+
+insertBarcode:
+INSERT INTO barcode VALUES ?;
+
+insertPriceList:
+INSERT INTO priceList VALUES ?;
+
+insertPrice:
+INSERT INTO price VALUES ?;
+
+closePrice:
+UPDATE price SET validTo = :validTo WHERE id = :id;
+
+productIds:
+SELECT id FROM product ORDER BY id;
+
+productByBarcode:
+SELECT productId, duplicate FROM barcode WHERE shopId = ? AND code = ?;
