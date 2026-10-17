@@ -1,0 +1,75 @@
+-- فاز ۱ — مدل داده (بخش ۳.۴). هنوز به برنامه وصل نیست.
+--
+-- قاعده‌های سراسریِ این طرح:
+--   • پول: `...Minor` = عددِ صحیح به واحدِ کوچکِ ارز (AFN یک‌صدم). Double هیچ‌جا نیست.
+--   • مقدار: `...Milli` = عددِ صحیح به هزارم.
+--   • زمان: `...At` = میلی‌ثانیهٔ UTC؛ `businessDate` = روزِ کاری `yyyy-MM-dd`.
+--   • شناسه: ULID. شناسهٔ قدیمی با جدولِ `legacyId` نگه داشته می‌شود.
+--   • فقط ویژگی‌های SQLite 3.9 (minSdk 24): بی window function، بی UPSERT،
+--     بی RETURNING، بی STRICT، بی ستونِ تولیدشده.
+--   • تنظیمِ اتصال (WAL، synchronous=FULL، foreign_keys) در `DbSettings.kt`.
+
+CREATE TABLE currency (
+  code TEXT NOT NULL PRIMARY KEY,
+  decimals INTEGER NOT NULL CHECK (decimals BETWEEN 0 AND 4),
+  -- پلهٔ گردکردنِ مبلغِ ردیف، به واحدِ کوچک (AFN = ۱۰۰ یعنی یک افغانی)
+  roundingStepMinor INTEGER NOT NULL CHECK (roundingStepMinor > 0)
+);
+
+CREATE TABLE shop (
+  id TEXT NOT NULL PRIMARY KEY,
+  name TEXT NOT NULL,
+  currency TEXT NOT NULL REFERENCES currency(code),
+  timeZone TEXT NOT NULL,
+  -- شروعِ روزِ کاری بر حسبِ دقیقه از نیمه‌شب؛ شیفتِ عبورکننده از نیمه‌شب مالِ روزِ شروعش است
+  businessDayStartMinute INTEGER NOT NULL DEFAULT 0 CHECK (businessDayStartMinute BETWEEN 0 AND 1439),
+  createdAt INTEGER NOT NULL
+);
+
+-- هر دستگاه یک «سری سند» یکتا در فروشگاه دارد. دستگاهِ غیرفعال سندِ تازه نمی‌پذیرد
+-- (ماشه‌های `...ActiveDevice` در Sales.sq، Stock.sq و Audit.sq).
+CREATE TABLE device (
+  id TEXT NOT NULL PRIMARY KEY,
+  shopId TEXT NOT NULL REFERENCES shop(id),
+  series TEXT NOT NULL CHECK (length(series) BETWEEN 1 AND 8),
+  name TEXT NOT NULL,
+  active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
+  createdAt INTEGER NOT NULL,
+  UNIQUE (shopId, series)
+);
+
+-- هر حرکتِ کالا یک انبارِ مشخص دارد
+CREATE TABLE warehouse (
+  id TEXT NOT NULL PRIMARY KEY,
+  shopId TEXT NOT NULL REFERENCES shop(id),
+  name TEXT NOT NULL,
+  createdAt INTEGER NOT NULL
+);
+
+-- شناسه‌های قدیمی (Math.random وب، یا ULIDِ تازه) با نگاشت حفظ می‌شوند.
+-- `occurrence` برای ردیف‌های تکراریِ همان شناسه در دادهٔ قدیم است.
+CREATE TABLE legacyId (
+  entity TEXT NOT NULL,
+  legacyId TEXT NOT NULL,
+  occurrence INTEGER NOT NULL DEFAULT 1,
+  newId TEXT NOT NULL,
+  PRIMARY KEY (entity, legacyId, occurrence)
+);
+
+insertCurrency:
+INSERT INTO currency VALUES ?;
+
+insertShop:
+INSERT INTO shop VALUES ?;
+
+insertDevice:
+INSERT INTO device VALUES ?;
+
+insertWarehouse:
+INSERT INTO warehouse VALUES ?;
+
+insertLegacyId:
+INSERT INTO legacyId VALUES ?;
+
+deactivateDevice:
+UPDATE device SET active = 0 WHERE id = ?;

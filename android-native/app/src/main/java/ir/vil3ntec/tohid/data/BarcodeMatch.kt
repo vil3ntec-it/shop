@@ -41,11 +41,22 @@ object BarcodeMatch {
    *  @param index همان `ShopStore.barcodeIndex` — بارکد به شناسهٔ کالا
    */
   fun find(code: String, index: Map<String, String>): Hit {
-    val clean = code.trim()
-    if (clean.isEmpty()) return Hit.None
+    val raw = code.trim()
+    if (raw.isEmpty()) return Hit.None
 
     //  اولْ کاملْ — تندترین و مطمئن‌ترین راه، و همان راهِ همیشگی
+    index[raw]?.let { return Hit.Product(it, true) }
+
+    /*
+     *  F0-06 — رقمِ فارسی/عربی: اسکنر یا صفحه‌کلید با چیدمانِ فارسی/پشتو
+     *  «۶۲۶…» می‌فرستد. هر دو طرف یک‌شکل سنجیده می‌شوند، تا بارکدی که
+     *  قبلاً با رقمِ فارسی ثبت شده هم با رقمِ لاتین پیدا شود.
+     */
+    val clean = norm(raw)
     index[clean]?.let { return Hit.Product(it, true) }
+    val same = index.entries.filter { norm(it.key) == clean }.map { it.value }.distinct()
+    if (same.size == 1) return Hit.Product(same.first(), true)
+    if (same.size > 1) return Hit.Several(same.size)
 
     if (clean.length < MIN_PART) return Hit.None
 
@@ -56,7 +67,8 @@ object BarcodeMatch {
      *     اضافه چسبانده (ITFِ نصفه‌خوانده این‌طور می‌شود)
      */
     val ids = index.entries
-      .filter { (known, _) ->
+      .filter { (stored, _) ->
+        val known = norm(stored)
         known.length >= MIN_PART && (known.contains(clean) || clean.contains(known))
       }
       .map { it.value }
@@ -68,4 +80,8 @@ object BarcodeMatch {
       else -> Hit.Several(ids.size)
     }
   }
+
+  /** رقمِ لاتین؛ بارکدِ تمام‌لاتین (بیشترِ آن‌ها) بی ساختنِ رشتهٔ تازه */
+  private fun norm(s: String): String =
+    if (s.any { it >= '٠' }) ir.vil3ntec.tohid.normalizeDigits(s) else s
 }

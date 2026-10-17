@@ -80,17 +80,21 @@ jobs:
         run: |
           set -euo pipefail
           deploy=false; tag_to=''; stable="$GITHUB_SHA"
-          mode=$(gh api "repos/$REPO/pages" --jq .build_type 2>/dev/null || echo none)
+          #  ⛔ `gh api` روی 404 بدنهٔ خطا (JSON) را در stdout می‌نویسد؛ `|| true` آن را نگه می‌داشت و
+          #  همان JSON جای commit به `git archive` می‌رسید. فقط شناسهٔ ۴۰ نویسه‌ای پذیرفته است.
+          sha_of() { local v; v=$(gh api "$1" --jq "$2" 2>/dev/null) || v=''; [[ "$v" =~ ^[0-9a-f]{40}$ ]] && echo "$v" || true; }
+          mode=$(gh api "repos/$REPO/pages" --jq .build_type 2>/dev/null) || mode=none
+          [[ "$mode" =~ ^[a-z_]+$ ]] || mode=none
           echo "Pages source: $mode"
           if [ "$EVENT" = pull_request ] || [ "$GITHUB_REF" != refs/heads/main ]; then
             echo "فقط ساخت و سنجش؛ انتشار فقط از main"
           elif [ "$EVENT" = workflow_dispatch ] && [ "$CHANNEL" = stable ]; then
             deploy=true; tag_to="$GITHUB_SHA"
           else
-            stable=$(gh api "repos/$REPO/git/ref/tags/tohid-web" --jq .object.sha 2>/dev/null || true)
+            stable=$(sha_of "repos/$REPO/git/ref/tags/tohid-web" .object.sha)
             if [ -z "$stable" ] && [ "$mode" = workflow ]; then
               #  نخستین اجرا پس از رفتن به GitHub Actions: ریشه همان که Pages تا امروز نشان می‌داد
-              stable=$(gh api "repos/$REPO/pages/builds/latest" --jq '.commit // empty' 2>/dev/null || true)
+              stable=$(sha_of "repos/$REPO/pages/builds/latest" '.commit // empty')
               tag_to="$stable"
             fi
             if [ -n "$stable" ]; then

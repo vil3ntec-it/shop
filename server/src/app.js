@@ -130,7 +130,7 @@ async function createApp({ runMigrations = true } = {}) {
 
   //  ⚠️ همگام‌سازی سطلِ خودش را دارد (‎routes/sync-v1.js‎، شرحش در ‎config.rateLimit.syncMax‎)
   const general = rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'general' });
-  app.use((req, res, next) => (/^\/api\/sync\/v1\//.test(req.path) ? next() : general(req, res, next)));
+  app.use((req, res, next) => (/^\/api\/sync\/v[13]\//.test(req.path) ? next() : general(req, res, next)));
 
   // ---- بررسی سلامت ----
   /*
@@ -289,9 +289,14 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/auth', require('./routes/auth'));
     api.use('/auth/:app', require('./routes/app-auth'));
     api.use('/sync/v1', require('./routes/sync-v1'));
+    //  Sync v3 (بخشِ ۳.۸) — فقط دکان، پیش‌فرض خاموش (‎config.syncV3‎)
+    api.use('/sync/v3', require('./routes/sync-v3'));
     api.use('/errors', require('./routes/errors'));
     api.use('/location', require('./routes/location'));
     api.use('/me', require('./routes/me'));
+    //  سفارشِ آنلاین (فاز ۴) — پیش از `/shop` تا `requireUser`ِ آن دو بار نرود؛
+    //  زیرِ همان پیشوند، پس ACCOUNT_PREFIXESِ پنلِ خانگی دست نمی‌خورد
+    api.use('/shop/orders', require('./routes/orders'));
     api.use('/shop', require('./routes/shop'));
     /*
      *  بخشِ پمپ‌بنزین — دفترِ جدا، همان دستگاهِ اشتراک.
