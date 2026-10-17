@@ -244,6 +244,14 @@
     overflow-x:hidden;
   }
   button{font-family:inherit; cursor:pointer;}
+  /* LOC-05: رقمِ فارسیِ صفحه. `ss01`ِ وزیرمتن فقط ۰-۹ (و ٠-٩) را با شکلِ ۰-۹ می‌کشد؛
+     متن، کادرها و داده همان رقمِ لاتین می‌مانند. فونتِ محلی اول می‌آید چون فایلِ
+     Google Fonts به چند زیرمجموعه بریده شده و ss01 ِ رقمِ لاتین در آن به شکلِ فارسی
+     نمی‌رسد. */
+  html[data-digits="fa"] body{
+    font-family:'Vazirmatn Local','Vazirmatn','Vazir','IRANSans','Noto Naskh Arabic','Segoe UI',Tahoma,sans-serif;
+    font-feature-settings:"ss01";
+  }
   ul{list-style:none;}
 
   /* ---------- Layout shell ---------- */
@@ -5261,6 +5269,21 @@
           </div>
         </div>
 
+        <!-- LOC-01/LOC-05: رقم و نامِ ماه — پیش‌فرض همان امروز (لاتین، دری) -->
+        <div class="panel">
+          <div class="panel-head"><h2>تاریخ و رقم</h2></div>
+          <p class="settings-hint">رقم روی صفحه و فاکتور. چیزی که ذخیره و همگام می‌شود همیشه رقمِ لاتین است؛ با عوض کردنِ این کلید هیچ داده‌ای عوض نمی‌شود.</p>
+          <div class="theme-toggle" id="digits-toggle" style="margin-top:10px;">
+            <button type="button" class="theme-toggle-btn" data-digits-choice="latn">رقمِ لاتین</button>
+            <button type="button" class="theme-toggle-btn" data-digits-choice="fa">رقمِ فارسی</button>
+          </div>
+          <p class="settings-hint" style="margin-top:14px;">نامِ ماه‌های خورشیدی: امروز <span id="months-sample">—</span></p>
+          <div class="theme-toggle" id="months-toggle" style="margin-top:8px;">
+            <button type="button" class="theme-toggle-btn" data-months-choice="fa">دری (حمل، ثور…)</button>
+            <button type="button" class="theme-toggle-btn" data-months-choice="ps">پشتو (وری، غویی…)</button>
+          </div>
+        </div>
+
         <!-- Store info -->
         <div class="panel">
           <div class="panel-head"><h2>اطلاعات فروشگاه</h2></div>
@@ -6197,6 +6220,10 @@
   </div>
 </div>
 
+<!-- LOC-01/05/07/09: هستهٔ خالصِ متن و تقویم (همتای core/text و core/calendar ِ کاتلین).
+     بی defer، چون اسکریپتِ پایین همان لحظهٔ بالا آمدن تاریخ و ماه می‌سازد. -->
+<script src="license/text-core.js?v=1"></script>
+<script src="license/calendar-core.js?v=1"></script>
 <script>
   /* ==========================================================
      DEBTORS SYSTEM — state, rendering, and interactions
@@ -7166,11 +7193,54 @@
     const hit = DATE_MEMO.get(iso);
     if(hit !== undefined) return hit;
     let out;
-    try{ out = DATE_FMT ? DATE_FMT.format(new Date(iso+'T00:00:00')) : iso; }
+    //  هستهٔ تقویم (LOC-01) — همان jalaali ِ برنامهٔ گوشی؛ تاریخِ نادرست ⇒ راهِ قدیمِ Intl
+    const core = window.TohidCalendar && TohidCalendar.toSolar(iso) ? TohidCalendar.formatSolarNumeric(iso, 'latn') : null;
+    if(core) out = core;
+    else try{ out = DATE_FMT ? DATE_FMT.format(new Date(iso+'T00:00:00')) : iso; }
     catch(e){ out = iso; }
     if(DATE_MEMO.size > 5000) DATE_MEMO.clear();
     DATE_MEMO.set(iso, out);
     return out;
+  }
+  /* LOC-05/07/09 — از هستهٔ متن (`license/text-core.js`). اگر هسته نیامده بود
+     (کشِ قدیمی، خطای شبکه)، همان رفتارِ دیروز. */
+  /** عدد/مبلغِ فاکتور بی نماد؛ رقمِ لاتین ⇒ همان formatMoney */
+  function rcNum(n){
+    const T = window.TohidText;
+    return T ? T.formatAfghani(n, 'none', shopDigits()) : formatMoney(n);
+  }
+  /** مبلغِ فاکتور با «افغانی»، بی اعشار (LOC-07) */
+  function rcAfn(n){ return rcNum(n) + ' افغانی'; }
+  /** رقمِ متنِ فاکتور (شماره، تاریخ، ساعت) */
+  function rcText(t){
+    const T = window.TohidText;
+    return T ? T.displayDigits(String(t), shopDigits()) : String(t);
+  }
+  /** تلفن به شکلِ ذخیره (LOC-09): ‎+93…؛ چیزِ نادرست همان‌طور که نوشته شده، با رقمِ ASCII */
+  function phoneForSave(raw){
+    const t = String(raw||'').trim();
+    const T = window.TohidText;
+    if(!t || !T) return t;
+    return T.normalizePhone(t) || T.asciiDigits(t);
+  }
+  /** نمایش: ‎+93 7X XXX XXXX؛ LRM اول، وگرنه «+» در راست‌به‌چپ به تهِ شماره می‌پرد */
+  function phoneShow(p){
+    const T = window.TohidText;
+    p = p || '';
+    return (T && p.charAt(0) === '+') ? '\u200E' + T.formatPhone(p) : p;
+  }
+  /** جست‌وجو: شرطِ اول همان includes ِ دیروز؛ بعد ‎+93 با «07…» و رقمِ فارسی */
+  function phoneMatches(p, q){
+    p = p || '';
+    if(p.includes(q)) return true;
+    const T = window.TohidText;
+    if(!T) return false;
+    const digits = (x)=> T.asciiDigits(String(x)).replace(/[^0-9]/g, '');
+    const qd = digits(q);
+    if(!qd) return false;
+    const pd = digits(p);
+    if(pd.includes(qd)) return true;
+    return p.startsWith('+93') && ('0' + pd.slice(2)).includes(qd);
   }
   function todayISO(){
     // بر اساس تاریخ محلی دستگاه (نه UTC) تا نزدیک نیمه‌شب تاریخ اشتباه نمایش داده نشود
@@ -7273,7 +7343,7 @@
     emptyPanel.style.display='none';
 
     const q = filter.trim();
-    const filtered = debtors.filter(d=> !q || d.name.includes(q) || (d.phone && d.phone.includes(q)));
+    const filtered = debtors.filter(d=> !q || d.name.includes(q) || (d.phone && phoneMatches(d.phone, q)));
     filtered.sort((a,b)=> getDebt(b.id) - getDebt(a.id));
 
     if(filtered.length===0){
@@ -7303,7 +7373,7 @@
           ${settled
             ? `<span class="debtor-amount settled">0</span>`
             : `<span class="debtor-amount ${credit ? 'credit' : ''}">${formatMoney(Math.abs(debt))}</span>`}
-          <div class="debtor-meta">${d.phone ? `<span>${escapeHtml(d.phone)}</span>` : ''}</div>
+          <div class="debtor-meta">${d.phone ? `<span>${escapeHtml(phoneShow(d.phone))}</span>` : ''}</div>
         </div>
         <button class="debtor-card-edit" data-edit-debtor="${d.id}" aria-label="ویرایش">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
@@ -7697,6 +7767,16 @@
      ========================================================== */
   const JALALI_MONTHS = ['حمل','ثور','جوزا','سرطان','اسد','سنبله',
                          'میزان','عقرب','قوس','جدی','دلو','حوت'];
+  /** LOC-01: دری یا پشتو از هستهٔ تقویم. آرایه درجا عوض می‌شود تا هر جا که
+      `JALALI_MONTHS` را می‌خواند، بی تغییر همان زبان را بگیرد. */
+  function applyMonthNames(lang){
+    const C = window.TohidCalendar;
+    if(!C || !C.solarMonthName) return;
+    for(let i=0;i<12;i++) JALALI_MONTHS[i] = C.solarMonthName(i+1, lang==='ps' ? 'ps' : 'fa');
+    //  فهرستِ ماهِ گزارش فقط بارِ اول پر می‌شود؛ برچسب‌هایش همین‌جا تازه می‌شوند
+    const rep = document.getElementById('rep-sales-jmonth');
+    if(rep) Array.from(rep.options).forEach((o,i)=>{ if(JALALI_MONTHS[i]) o.textContent = JALALI_MONTHS[i]; });
+  }
 
   const _jalaliFmt = (()=>{
     try{
@@ -8118,7 +8198,7 @@
     const fg = document.getElementById('fg-debtor-name');
     if(!name){ fg.classList.add('error'); nameEl.focus(); return; }
     fg.classList.remove('error');
-    const phone = document.getElementById('in-debtor-phone').value.trim();
+    const phone = phoneForSave(document.getElementById('in-debtor-phone').value);
     const notes = document.getElementById('in-debtor-notes').value.trim();
 
     if(editingDebtorId){
@@ -10414,7 +10494,7 @@
     }
     emptyPanel.style.display='none';
     const q = (filter!==undefined?filter:document.getElementById('supplier-search')?.value||'').trim();
-    const filtered = suppliers.filter(s=> !q || s.name.includes(q) || (s.phone && s.phone.includes(q)));
+    const filtered = suppliers.filter(s=> !q || s.name.includes(q) || (s.phone && phoneMatches(s.phone, q)));
     filtered.sort((a,b)=> getSupplierDebt(b.id) - getSupplierDebt(a.id));
     if(filtered.length===0){
       list.style.display='none'; list.innerHTML=''; noRes.style.display='';
@@ -10432,7 +10512,7 @@
         <div class="debtor-info"><div class="debtor-name">${escapeHtml(s.name)}</div></div>
         <div class="debtor-side">
           ${settled ? `<span class="debtor-amount settled">بدون بدهی</span>` : `<span class="debtor-amount">${formatMoney(debt)} افغانی</span>`}
-          <div class="debtor-meta">${s.phone ? `<span>${escapeHtml(s.phone)}</span>` : ''}</div>
+          <div class="debtor-meta">${s.phone ? `<span>${escapeHtml(phoneShow(s.phone))}</span>` : ''}</div>
         </div>
         <button class="debtor-card-edit" data-edit-supplier="${s.id}" aria-label="ویرایش">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
@@ -10486,7 +10566,7 @@
     currentAccountSupplierId = id;
     document.getElementById('sacc-avatar').textContent = initials(s.name);
     document.getElementById('sacc-name').textContent = s.name;
-    document.getElementById('sacc-phone').textContent = s.phone || s.address || '—';
+    document.getElementById('sacc-phone').textContent = phoneShow(s.phone) || s.address || '—';
     const debt = getSupplierDebt(id);
     const amtEl = document.getElementById('sacc-amount');
     if(debt<=0){ amtEl.textContent='بدون بدهی'; amtEl.classList.add('settled'); }
@@ -10568,7 +10648,7 @@
     const fg = document.getElementById('fg-supplier-name');
     if(!name){ fg.classList.add('error'); nameEl.focus(); return; }
     fg.classList.remove('error');
-    const phone = document.getElementById('in-supplier-phone').value.trim();
+    const phone = phoneForSave(document.getElementById('in-supplier-phone').value);
     const address = document.getElementById('in-supplier-address').value.trim();
     const notes = document.getElementById('in-supplier-notes').value.trim();
     if(editingSupplierId){
@@ -11696,7 +11776,7 @@
   function renderPickDebtorList(query){
     const listEl = document.getElementById('pick-debtor-list');
     const q = (query||'').trim().toLowerCase();
-    const list = debtors.filter(d=> !q || (d.name||'').toLowerCase().includes(q) || (d.phone||'').includes(q));
+    const list = debtors.filter(d=> !q || (d.name||'').toLowerCase().includes(q) || phoneMatches(d.phone||'', q));
     if(!list.length){
       listEl.innerHTML = `<div class="pick-debtor-empty">${debtors.length ? 'قرض‌داری با این نام پیدا نشد.' : 'هنوز قرض‌داری ثبت نشده است. «قرض‌دار جدید» را بزنید.'}</div>`;
       return;
@@ -12412,10 +12492,10 @@
       const netQty = si.quantity - (si.returnedQty||0);
       return `<tr>
         <td>${escapeHtml(name)}</td>
-        <td>${formatMoney(si.quantity)}${si.returnedQty?` <small>(مرجوعی: ${formatMoney(si.returnedQty)})</small>`:''}</td>
+        <td>${rcNum(si.quantity)}${si.returnedQty?` <small>(مرجوعی: ${rcNum(si.returnedQty)})</small>`:''}</td>
         <td>${escapeHtml(unit)}</td>
-        <td>${formatMoney(si.unitPrice)}</td>
-        <td>${formatMoney(si.totalPrice)}</td>
+        <td>${rcNum(si.unitPrice)}</td>
+        <td>${rcNum(si.totalPrice)}</td>
       </tr>`;
     }).join('');
     const dt = new Date(sale.createdAt || Date.now());
@@ -12423,10 +12503,10 @@
     return `
       <div class="invoice-head">
         <h4>${escapeHtml(appSettings.storeName || 'فروشگاه')}</h4>
-        <div>فاکتور فروش #${sale.invoiceNumber != null ? escapeHtml(invoiceLabel(sale)) : '—'}</div>
+        <div>فاکتور فروش #${sale.invoiceNumber != null ? escapeHtml(rcText(invoiceLabel(sale))) : '—'}</div>
       </div>
       <div class="invoice-meta">
-        <span>تاریخ: ${formatDate(sale.date)} — ${timeStr}</span>
+        <span>تاریخ: ${rcText(formatDate(sale.date))} — ${rcText(timeStr)}</span>
         <span>${sale.status==='cancelled' ? '<b style="color:var(--danger)">لغوشده</b>' : (sale.paymentMethod==='credit' ? 'نسیه' : 'نقدی')}</span>
       </div>
       <table class="invoice-table">
@@ -12434,11 +12514,11 @@
         <tbody>${rows}</tbody>
       </table>
       <div class="invoice-totals">
-        <div><span>جمع اقلام</span><b>${formatMoney(sale.total)} افغانی</b></div>
-        <div><span>تخفیف</span><b>${formatMoney(sale.discount||0)} افغانی</b></div>
-        <div class="grand"><span>مبلغ نهایی</span><b>${formatMoney(sale.finalTotal)} افغانی</b></div>
-        <div><span>مبلغ پرداختی</span><b>${formatMoney(sale.paidAmount||0)} افغانی</b></div>
-        <div><span>باقی‌مانده</span><b>${formatMoney(sale.remaining||0)} افغانی</b></div>
+        <div><span>جمع اقلام</span><b>${rcAfn(sale.total)}</b></div>
+        <div><span>تخفیف</span><b>${rcAfn(sale.discount||0)}</b></div>
+        <div class="grand"><span>مبلغ نهایی</span><b>${rcAfn(sale.finalTotal)}</b></div>
+        <div><span>مبلغ پرداختی</span><b>${rcAfn(sale.paidAmount||0)}</b></div>
+        <div><span>باقی‌مانده</span><b>${rcAfn(sale.remaining||0)}</b></div>
         ${debtor ? `<div><span>قرض‌دار</span><b>${escapeHtml(debtor.name)}</b></div>` : ''}
       </div>`;
   }
@@ -12524,12 +12604,12 @@
       const unit = p && p.unit ? ' ' + p.unit : '';
       rows.push({
         right: name,
-        left: formatMoney(si.totalPrice),
+        left: rcNum(si.totalPrice),
       });
       //  تعداد و قیمتِ واحد زیرِ نامِ کالا — روی نوارِ باریک، یک سطر
       //  برای هر دو جا نمی‌شود
       rows.push({
-        right: '   ' + formatMoney(si.quantity) + unit + ' × ' + formatMoney(si.unitPrice),
+        right: '   ' + rcNum(si.quantity) + unit + ' × ' + rcNum(si.unitPrice),
         left: '',
       });
     });
@@ -12539,11 +12619,11 @@
      *  کاغذ و صفحه نباید دو چیزِ متفاوت بگویند. (`invoiceHtml` بالاتر
      *  همین‌هاست.)
      */
-    const totals = [{ right:'جمع اقلام', left: formatMoney(sale.total) }];
-    if(sale.discount) totals.push({ right:'تخفیف', left: formatMoney(sale.discount) });
-    totals.push({ right:'مبلغ نهایی', left: formatMoney(sale.finalTotal), strong:true });
-    if(sale.paidAmount) totals.push({ right:'پرداختی', left: formatMoney(sale.paidAmount) });
-    if(sale.remaining) totals.push({ right:'باقی‌مانده', left: formatMoney(sale.remaining) });
+    const totals = [{ right:'جمع اقلام', left: rcNum(sale.total) }];
+    if(sale.discount) totals.push({ right:'تخفیف', left: rcNum(sale.discount) });
+    totals.push({ right:'مبلغ نهایی', left: rcNum(sale.finalTotal), strong:true });
+    if(sale.paidAmount) totals.push({ right:'پرداختی', left: rcNum(sale.paidAmount) });
+    if(sale.remaining) totals.push({ right:'باقی‌مانده', left: rcNum(sale.remaining) });
     totals.push({
       right: 'نوع فروش',
       left: sale.paymentMethod==='credit' ? 'نسیه' : 'نقدی',
@@ -12553,8 +12633,8 @@
     return {
       title: appSettings.storeName || 'فروشگاه',
       meta: [
-        'فاکتور فروش #' + (sale.invoiceNumber != null ? invoiceLabel(sale) : '—'),
-        formatDate(sale.date) + ' — ' + timeStr,
+        'فاکتور فروش #' + (sale.invoiceNumber != null ? rcText(invoiceLabel(sale)) : '—'),
+        rcText(formatDate(sale.date) + ' — ' + timeStr),
         sale.status==='cancelled' ? 'لغو شده' : '',
       ].filter(Boolean),
       rows,
@@ -12834,6 +12914,33 @@
       btn.classList.toggle('active', btn.dataset.motionChoice === (full ? 'full' : 'auto'));
     });
   }
+  /* LOC-01/LOC-05 — رقمِ صفحه و فاکتور، و زبانِ نامِ ماه. پیش‌فرض همان امروز. */
+  function shopDigits(){ return appSettings.digits === 'fa' ? 'fa' : 'latn'; }
+  function shopMonths(){ return appSettings.months === 'ps' ? 'ps' : 'fa'; }
+  function applyLocaleChoice(){
+    const digits = shopDigits(), months = shopMonths();
+    if(digits === 'fa') document.documentElement.setAttribute('data-digits', 'fa');
+    else document.documentElement.removeAttribute('data-digits');
+    applyMonthNames(months);
+    document.querySelectorAll('#digits-toggle .theme-toggle-btn').forEach(b=> b.classList.toggle('active', b.dataset.digitsChoice === digits));
+    document.querySelectorAll('#months-toggle .theme-toggle-btn').forEach(b=> b.classList.toggle('active', b.dataset.monthsChoice === months));
+    const sample = document.getElementById('months-sample');
+    if(sample && window.TohidCalendar) sample.textContent = TohidCalendar.formatSolarLong(todayISO(), months, 'latn');
+  }
+  document.getElementById('digits-toggle').addEventListener('click', (e)=>{
+    const btn = e.target.closest('[data-digits-choice]');
+    if(!btn) return;
+    appSettings.digits = btn.dataset.digitsChoice === 'fa' ? 'fa' : 'latn';
+    saveSettings();
+    applyLocaleChoice();
+  });
+  document.getElementById('months-toggle').addEventListener('click', (e)=>{
+    const btn = e.target.closest('[data-months-choice]');
+    if(!btn) return;
+    appSettings.months = btn.dataset.monthsChoice === 'ps' ? 'ps' : 'fa';
+    saveSettings();
+    applyLocaleChoice();
+  });
   function applySettingsToUI(){
     const input = document.getElementById('in-settings-store-name');
     if(input) input.value = appSettings.storeName || '';
@@ -12842,6 +12949,7 @@
     applyTheme(appSettings.theme || 'light');
     // پیش‌فرض روشن است، چون کاربر انیمیشن‌ها را خواسته
     applyMotion(appSettings.motion || 'full');
+    applyLocaleChoice();
   }
 
   document.getElementById('theme-toggle').addEventListener('click', (e)=>{

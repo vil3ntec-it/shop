@@ -392,6 +392,9 @@ fun SettingsScreen(
       }
     }
 
+    /* ======================== رقم و نامِ ماه (LOC-01، LOC-05) ======================== */
+    item { LocaleSection() }
+
     /* ============================ انقضا ============================ */
     item {
       var blockExpired by remember { mutableStateOf(ir.vil3ntec.tohid.data.ShopPolicy.blockExpired(context)) }
