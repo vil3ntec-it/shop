@@ -56,6 +56,8 @@ fun DeskRail(
   val canAdmin = ir.vil3ntec.tohid.data.ShopRole.canOpenSettings(context)
   val main = AppNav.SHORTCUTS.mapIndexed { i, (id, label) -> Triple(id, label, "Ctrl+${i + 1}") }
   val extra = buildList {
+    //  فقط وقتی سرور گفته بخشِ سفارش برای این دکان روشن است
+    if (ir.vil3ntec.tohid.ui.OrdersLive.enabled) add(Triple("orders", "سفارش‌ها", ""))
     add(Triple("admin", "مرکزِ مدیریت", "Ctrl+M"))
     add(Triple("receipts", "رسیدها", ""))
     add(Triple("team", "کارمندان", ""))
@@ -169,6 +171,7 @@ private fun iconOf(id: String): ImageVector = when (id) {
   "audit" -> Icons.Filled.History
   "settings" -> Icons.Filled.Settings
   "admin" -> Icons.Filled.AdminPanelSettings
+  "orders" -> Icons.Filled.ShoppingBasket
     "devices" -> Icons.Filled.Devices
   else -> Icons.Filled.MoreHoriz
 }
