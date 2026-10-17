@@ -100,7 +100,7 @@ object ReportCsv {
       .sortedBy { it.createdAt }
       .forEach { s ->
         rows += listOf(
-          s.invoiceNumber?.toString() ?: "",
+          s.invoiceLabel() ?: "",
           s.date,
           round(s.total), round(s.discount), round(s.finalTotal),
           round(s.paidAmount), round(s.remaining),
