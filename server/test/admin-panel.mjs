@@ -524,6 +524,46 @@ await step('داشبوردِ فروش همان پرداخت را نشان می�
   assert.equal(series, 12, 'نمودارِ رشد دوازده ماه است');
 });
 
+//  ⛔ G2ِ ADMIN-CONTROL-PLANE.md: دلیلِ اختیاری فقط در سابقه می‌نشیند. «لغو»ِ
+//  پرسش هیچ کاری نمی‌کند؛ پرداختِ همین گام در پایان حذف می‌شود تا گام‌های بعد
+//  همان عددهای قبلی را ببینند.
+await step('دلیلِ اختیاری: ثبت و حذفِ پرداخت آن را در سابقه می‌گذارند', async () => {
+  const detailOf = (r) => (typeof r.detail === 'string' ? JSON.parse(r.detail) : r.detail) || {};
+  await openTab('payments');
+  await page.selectOption('#pay-app', 'shop');
+  await page.fill('#pay-tenant', owner.shopId);
+  await page.fill('#pay-amount', '700');
+  await page.fill('#pay-note', 'با دلیلِ پنل');
+  await page.fill('#pay-reason', 'رسیدِ حواله رسید');
+  await page.evaluate(() => { document.getElementById('pay-msg').textContent = ''; });
+  await page.click('#btn-pay-add');
+  await page.waitForFunction(
+    () => /ثبت شد/.test(document.getElementById('pay-msg').textContent), null, { timeout: 10_000 }
+  );
+  const pay = await one(`SELECT * FROM sub_payments WHERE note='با دلیلِ پنل'`);
+  assert.ok(pay, 'پرداخت باید ثبت شده باشد');
+  const made = await one(`SELECT * FROM audit_logs WHERE action='admin.payment_created' AND target_id=$1`, [pay.id]);
+  assert.equal(detailOf(made).reason, 'رسیدِ حواله رسید');
+  assert.equal(await page.inputValue('#pay-reason'), '', 'خانهٔ دلیل پس از ثبت خالی می‌شود');
+
+  const row = page.locator('#payments-body tr', { hasText: pay.receipt_no });
+  await row.waitFor({ timeout: 10_000 });
+  page.once('dialog', (d) => d.dismiss());
+  await row.locator('button', { hasText: 'حذف' }).click();
+  await page.waitForTimeout(300);
+  assert.equal((await one('SELECT deleted FROM sub_payments WHERE id=$1', [pay.id])).deleted, false, 'لغو ⇒ حذف نمی‌شود');
+
+  page.once('dialog', (d) => d.accept('رسیدِ تکراری'));
+  await row.locator('button', { hasText: 'حذف' }).click();
+  for (let i = 0; i < 50; i += 1) {
+    if ((await one('SELECT deleted FROM sub_payments WHERE id=$1', [pay.id])).deleted) break;
+    await page.waitForTimeout(100);
+  }
+  const gone = await one(`SELECT * FROM audit_logs WHERE action='admin.payment_deleted' AND target_id=$1`, [pay.id]);
+  assert.ok(gone, 'حذف باید سابقه داشته باشد');
+  assert.equal(detailOf(gone).reason, 'رسیدِ تکراری');
+});
+
 await step('کدِ تخفیف از پنل ساخته می‌شود و در دیتابیس می‌نشیند', async () => {
   await openTab('discounts');
   await page.selectOption('#dc-app', 'shop');
