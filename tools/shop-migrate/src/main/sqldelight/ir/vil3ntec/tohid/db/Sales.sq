@@ -1,0 +1,260 @@
+-- فروش، ردیف، پرداخت، مرجوعی.
+--
+-- چرخهٔ عمر: draft ⇒ final ⇒ (فقط با دلیل) cancelled.
+--   • در draft ردیف و پرداخت افزوده/ویرایش می‌شود.
+--   • «پایان» (draft ⇒ final) سند را در زنجیرهٔ هشِ سریِ دستگاه می‌نشاند:
+--       hash = SHA-256(prevHash ‖ canonicalJson(doc))   (۱۰.۳، JCS)
+--     نخستین سندِ هر سری prevHash = شصت‌وچهار صفر.
+--   • پس از «پایان» هیچ ستونی عوض نمی‌شود؛ تنها گذارِ مجاز لغو با دلیل است.
+--   • ردیف و پرداختِ سندِ غیرپیش‌نویس افزوده، ویرایش یا حذف نمی‌شود.
+
+CREATE TABLE sale (
+  id TEXT NOT NULL PRIMARY KEY,
+  shopId TEXT NOT NULL REFERENCES shop(id),
+  deviceId TEXT NOT NULL REFERENCES device(id),
+  -- شمارندهٔ سریِ دستگاه (۳.۵)؛ NULL برای فاکتورِ قدیمی که شمارهٔ خودش را نگه می‌دارد
+  number INTEGER,
+  -- «K2-000154»؛ فاکتورِ قدیمی همان شمارهٔ قبلی
+  displayNo TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('draft', 'final', 'cancelled')),
+  currency TEXT NOT NULL REFERENCES currency(code),
+  subtotalMinor INTEGER NOT NULL,
+  discountMinor INTEGER NOT NULL DEFAULT 0,
+  totalMinor INTEGER NOT NULL,
+  customerId TEXT REFERENCES customer(id),
+  seller TEXT NOT NULL DEFAULT '',
+  cancelReason TEXT,
+  businessDate TEXT NOT NULL,
+  createdAt INTEGER NOT NULL,
+  finalizedAt INTEGER,
+  cancelledAt INTEGER,
+  chainSeq INTEGER,
+  prevHash TEXT,
+  hash TEXT,
+  CHECK (status = 'draft' OR (
+    chainSeq IS NOT NULL AND finalizedAt IS NOT NULL
+    AND length(prevHash) = 64 AND length(hash) = 64
+  )),
+  CHECK (status <> 'cancelled' OR (length(trim(cancelReason)) > 0 AND cancelledAt IS NOT NULL))
+);
+
+CREATE UNIQUE INDEX saleNumber ON sale(deviceId, number) WHERE number IS NOT NULL;
+CREATE UNIQUE INDEX saleChain ON sale(deviceId, chainSeq) WHERE chainSeq IS NOT NULL;
+CREATE INDEX saleByDate ON sale(businessDate);
+
+CREATE TRIGGER saleInsertAsDraft
+BEFORE INSERT ON sale
+WHEN new.status <> 'draft'
+BEGIN
+  SELECT RAISE(ABORT, 'a sale is born as draft');
+END;
+
+CREATE TRIGGER saleActiveDevice
+BEFORE INSERT ON sale
+WHEN (SELECT d.active FROM device d WHERE d.id = new.deviceId) = 0
+BEGIN
+  SELECT RAISE(ABORT, 'device is deactivated');
+END;
+
+CREATE TRIGGER saleChainLink
+BEFORE UPDATE ON sale
+WHEN old.status = 'draft' AND new.status <> 'draft' AND (
+  new.chainSeq IS NULL
+  OR new.chainSeq <> coalesce((SELECT max(s.chainSeq) FROM sale s WHERE s.deviceId = new.deviceId AND s.chainSeq IS NOT NULL), 0) + 1
+  OR (new.chainSeq = 1 AND new.prevHash IS NOT '0000000000000000000000000000000000000000000000000000000000000000')
+  OR (new.chainSeq > 1 AND new.prevHash IS NOT (
+    SELECT s.hash FROM sale s WHERE s.deviceId = new.deviceId AND s.chainSeq = new.chainSeq - 1
+  ))
+)
+BEGIN
+  SELECT RAISE(ABORT, 'sale hash chain broken');
+END;
+
+CREATE TRIGGER saleFinalIsFrozen
+BEFORE UPDATE ON sale
+WHEN old.status <> 'draft' AND (
+  old.status <> 'final' OR new.status <> 'cancelled'
+  OR new.id <> old.id OR new.shopId <> old.shopId OR new.deviceId <> old.deviceId
+  OR new.number IS NOT old.number OR new.displayNo <> old.displayNo OR new.currency <> old.currency
+  OR new.subtotalMinor <> old.subtotalMinor OR new.discountMinor <> old.discountMinor
+  OR new.totalMinor <> old.totalMinor OR new.customerId IS NOT old.customerId
+  OR new.seller <> old.seller OR new.businessDate <> old.businessDate
+  OR new.createdAt <> old.createdAt OR new.finalizedAt IS NOT old.finalizedAt
+  OR new.chainSeq IS NOT old.chainSeq OR new.prevHash IS NOT old.prevHash OR new.hash IS NOT old.hash
+)
+BEGIN
+  SELECT RAISE(ABORT, 'sale is final: the only change allowed is cancel with a reason');
+END;
+
+CREATE TRIGGER saleNoDelete
+BEFORE DELETE ON sale
+WHEN old.status <> 'draft'
+BEGIN
+  SELECT RAISE(ABORT, 'a final sale is never deleted');
+END;
+
+CREATE TABLE saleLine (
+  id TEXT NOT NULL PRIMARY KEY,
+  saleId TEXT NOT NULL REFERENCES sale(id),
+  lineNo INTEGER NOT NULL,
+  -- NULL = قلمِ آزاد (بی کالا، بی حرکتِ انبار)
+  productId TEXT REFERENCES product(id),
+  -- فقط قلمِ آزاد؛ قلمِ کالایی نامش را از کالا می‌گیرد
+  name TEXT NOT NULL DEFAULT '',
+  qtyMilli INTEGER NOT NULL,
+  unitPriceMinor INTEGER NOT NULL,
+  -- همان لحظه گرد شده (۳.۴) و همان‌طور ذخیره می‌شود
+  lineTotalMinor INTEGER NOT NULL,
+  -- بهای موقتِ واحد (۳.۶)؛ اختلاف با بهای قطعی سندِ «تعدیل بها» است، نه ویرایشِ این ردیف
+  unitCostMinor INTEGER NOT NULL DEFAULT 0,
+  UNIQUE (saleId, lineNo)
+);
+
+CREATE INDEX saleLineBySale ON saleLine(saleId);
+
+CREATE TRIGGER saleLineInsertDraftOnly
+BEFORE INSERT ON saleLine
+WHEN (SELECT s.status FROM sale s WHERE s.id = new.saleId) <> 'draft'
+BEGIN
+  SELECT RAISE(ABORT, 'lines of a final sale are frozen');
+END;
+
+CREATE TRIGGER saleLineUpdateDraftOnly
+BEFORE UPDATE ON saleLine
+WHEN (SELECT s.status FROM sale s WHERE s.id = old.saleId) <> 'draft'
+BEGIN
+  SELECT RAISE(ABORT, 'lines of a final sale are frozen');
+END;
+
+CREATE TRIGGER saleLineDeleteDraftOnly
+BEFORE DELETE ON saleLine
+WHEN (SELECT s.status FROM sale s WHERE s.id = old.saleId) <> 'draft'
+BEGIN
+  SELECT RAISE(ABORT, 'lines of a final sale are frozen');
+END;
+
+-- account = روی حسابِ مشتری (نسیه)
+CREATE TABLE salePayment (
+  id TEXT NOT NULL PRIMARY KEY,
+  saleId TEXT NOT NULL REFERENCES sale(id),
+  method TEXT NOT NULL CHECK (method IN ('cash', 'card', 'transfer', 'mobile', 'account', 'storeCredit', 'giftCard')),
+  amountMinor INTEGER NOT NULL CHECK (amountMinor >= 0),
+  currency TEXT NOT NULL REFERENCES currency(code),
+  paidAt INTEGER NOT NULL
+);
+
+CREATE INDEX salePaymentBySale ON salePayment(saleId);
+
+CREATE TRIGGER salePaymentInsertDraftOnly
+BEFORE INSERT ON salePayment
+WHEN (SELECT s.status FROM sale s WHERE s.id = new.saleId) <> 'draft'
+BEGIN
+  SELECT RAISE(ABORT, 'payments of a final sale are frozen');
+END;
+
+CREATE TRIGGER salePaymentUpdateDraftOnly
+BEFORE UPDATE ON salePayment
+WHEN (SELECT s.status FROM sale s WHERE s.id = old.saleId) <> 'draft'
+BEGIN
+  SELECT RAISE(ABORT, 'payments of a final sale are frozen');
+END;
+
+CREATE TRIGGER salePaymentDeleteDraftOnly
+BEFORE DELETE ON salePayment
+WHEN (SELECT s.status FROM sale s WHERE s.id = old.saleId) <> 'draft'
+BEGIN
+  SELECT RAISE(ABORT, 'payments of a final sale are frozen');
+END;
+
+-- مرجوعی به ردیفِ فروشِ اصلی ارجاع دارد. فاکتورِ لغوشده (یا پیش‌نویس) مرجوعی نمی‌پذیرد.
+CREATE TABLE saleReturn (
+  id TEXT NOT NULL PRIMARY KEY,
+  saleId TEXT NOT NULL REFERENCES sale(id),
+  saleLineId TEXT NOT NULL REFERENCES saleLine(id),
+  qtyMilli INTEGER NOT NULL CHECK (qtyMilli >= 0),
+  amountMinor INTEGER NOT NULL CHECK (amountMinor >= 0),
+  reason TEXT NOT NULL DEFAULT '',
+  businessDate TEXT NOT NULL,
+  createdAt INTEGER NOT NULL
+);
+
+CREATE INDEX saleReturnBySale ON saleReturn(saleId);
+
+CREATE TRIGGER saleReturnFinalOnly
+BEFORE INSERT ON saleReturn
+WHEN (SELECT s.status FROM sale s WHERE s.id = new.saleId) <> 'final'
+  OR (SELECT l.saleId FROM saleLine l WHERE l.id = new.saleLineId) <> new.saleId
+BEGIN
+  SELECT RAISE(ABORT, 'returns need a final, not cancelled, sale and one of its own lines');
+END;
+
+CREATE TRIGGER saleReturnNoUpdate
+BEFORE UPDATE ON saleReturn
+BEGIN
+  SELECT RAISE(ABORT, 'saleReturn is append-only');
+END;
+
+CREATE TRIGGER saleReturnNoDelete
+BEFORE DELETE ON saleReturn
+BEGIN
+  SELECT RAISE(ABORT, 'saleReturn is append-only');
+END;
+
+insertSale:
+INSERT INTO sale VALUES ?;
+
+finalizeSale:
+UPDATE sale
+SET status = 'final', finalizedAt = :finalizedAt, chainSeq = :chainSeq, prevHash = :prevHash, hash = :hash
+WHERE id = :id;
+
+cancelSale:
+UPDATE sale SET status = 'cancelled', cancelReason = :reason, cancelledAt = :cancelledAt WHERE id = :id;
+
+insertSaleLine:
+INSERT INTO saleLine VALUES ?;
+
+insertSalePayment:
+INSERT INTO salePayment VALUES ?;
+
+insertSaleReturn:
+INSERT INTO saleReturn VALUES ?;
+
+-- جمعِ فاکتورهای پایان‌یافته (لغوشده بیرون) در بازهٔ روزِ کاری
+salesTotals:
+SELECT count(*) AS cnt,
+       coalesce(sum(subtotalMinor), 0) AS subtotalMinor,
+       coalesce(sum(discountMinor), 0) AS discountMinor,
+       coalesce(sum(totalMinor), 0) AS totalMinor
+FROM sale
+WHERE status = 'final' AND businessDate BETWEEN :from AND :to;
+
+-- بهای کالای فروخته‌شده به «هزارمِ واحدِ کوچک» (qtyMilli × unitCostMinor) — بی گردکردن
+cogsMilliMinor:
+SELECT coalesce(sum(l.qtyMilli * l.unitCostMinor), 0)
+FROM saleLine l JOIN sale s ON s.id = l.saleId
+WHERE s.status = 'final' AND s.businessDate BETWEEN :from AND :to;
+
+-- مرجوعی‌های بازه (به تاریخِ خودشان) — فقط فاکتورِ لغونشده
+returnTotals:
+SELECT coalesce(sum(r.amountMinor), 0) AS amountMinor,
+       coalesce(sum(r.qtyMilli * l.unitCostMinor), 0) AS costMilliMinor
+FROM saleReturn r
+JOIN sale s ON s.id = r.saleId
+JOIN saleLine l ON l.id = r.saleLineId
+WHERE s.status = 'final' AND r.businessDate BETWEEN :from AND :to;
+
+paymentTotals:
+SELECT p.method, coalesce(sum(p.amountMinor), 0) AS totalMinor
+FROM salePayment p JOIN sale s ON s.id = p.saleId
+WHERE s.status = 'final'
+GROUP BY p.method;
+
+saleChainOf:
+SELECT * FROM sale WHERE deviceId = ? AND status <> 'draft' ORDER BY chainSeq;
+
+linesOfSale:
+SELECT * FROM saleLine WHERE saleId = ? ORDER BY lineNo;
+
+paymentsOfSale:
+SELECT * FROM salePayment WHERE saleId = ? ORDER BY id;

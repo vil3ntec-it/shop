@@ -1,0 +1,40 @@
+-- شیفتِ صندوق (D-14): جای دو ردیفِ `shift_open`/`shift_close`ِ سابقهٔ عملیات.
+-- اختلافِ شمارش ثبت می‌شود و هرگز خودکار اصلاح نمی‌شود: صندوقِ بسته منجمد است.
+-- (شمارشِ اسکناس‌به‌اسکناس و ورود/خروجِ نقد در گام‌های بعدیِ فاز ۱.)
+
+CREATE TABLE cashShift (
+  id TEXT NOT NULL PRIMARY KEY,
+  shopId TEXT NOT NULL REFERENCES shop(id),
+  deviceId TEXT NOT NULL REFERENCES device(id),
+  openedAt INTEGER NOT NULL,
+  openingMinor INTEGER NOT NULL CHECK (openingMinor >= 0),
+  openedBy TEXT NOT NULL DEFAULT '',
+  -- روزِ کاریِ شروعِ شیفت؛ شیفتِ عبورکننده از نیمه‌شب مالِ همین روز است
+  businessDate TEXT NOT NULL,
+  closedAt INTEGER,
+  countedMinor INTEGER,
+  -- NULL برای صندوقِ قدیمی: «مورد انتظار» فقط در متنِ یادداشت ثبت می‌شد
+  expectedMinor INTEGER,
+  closeNote TEXT NOT NULL DEFAULT '',
+  CHECK ((closedAt IS NULL) = (countedMinor IS NULL))
+);
+
+CREATE TRIGGER cashShiftClosedIsFrozen
+BEFORE UPDATE ON cashShift
+WHEN old.closedAt IS NOT NULL
+BEGIN
+  SELECT RAISE(ABORT, 'a closed shift is frozen: differences are recorded, never auto-corrected');
+END;
+
+CREATE TRIGGER cashShiftNoDelete
+BEFORE DELETE ON cashShift
+BEGIN
+  SELECT RAISE(ABORT, 'cashShift is never deleted');
+END;
+
+insertCashShift:
+INSERT INTO cashShift VALUES ?;
+
+closeShift:
+UPDATE cashShift SET closedAt = :closedAt, countedMinor = :countedMinor, expectedMinor = :expectedMinor, closeNote = :note
+WHERE id = :id;
