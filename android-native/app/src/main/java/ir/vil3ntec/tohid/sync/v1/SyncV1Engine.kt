@@ -5,6 +5,8 @@ import ir.vil3ntec.tohid.core.config.AppConfig
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.sync.SyncStore
+import ir.vil3ntec.tohid.sync.v3.SyncChoice
+import ir.vil3ntec.tohid.sync.v3.SyncV3Runner
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -94,6 +96,8 @@ class SyncV1Engine private constructor(context: Context) {
    */
   @Synchronized
   fun recover(ledger: ShopData) {
+    //  Sync v3 پشتِ تنظیمِ هر دستگاه (پیش‌فرض v1) — شرح سرِ `sync/v3/SyncV3Runner.kt`
+    if (SyncChoice.isV3(app)) { SyncV3Runner.of(app).recover(ledger); return }
     if (!commit.pending()) return
     if (commit.recover(ledger) == SyncCommit.Outcome.MISMATCH) {
       //  نباید پیش بیاید؛ اگر آمد، دیده شود
@@ -114,6 +118,7 @@ class SyncV1Engine private constructor(context: Context) {
    */
   @Synchronized
   fun record(data: ShopData): Int {
+    if (SyncChoice.isV3(app)) return SyncV3Runner.of(app).record(data)
     /*
      *  نخستین بار روی این دستگاه (سایه‌ای نیست): دفترِ امروز «تغییر» نیست،
      *  حالتِ پایه است. اگر همین‌جا تفاضل می‌گرفتیم، کلِ دفتر یک‌جا به سرور
@@ -135,7 +140,8 @@ class SyncV1Engine private constructor(context: Context) {
    *  شکست پرتاب می‌شود تا `LedgerArchive.compact` دفتر را کوتاه نکند.
    */
   @Synchronized
-  fun forgetArchived(gone: Map<String, Collection<String>>): Int = commit.forget(gone)
+  fun forgetArchived(gone: Map<String, Collection<String>>): Int =
+    if (SyncChoice.isV3(app)) SyncV3Runner.of(app).forgetArchived(gone) else commit.forget(gone)
 
   /**
    *  دفترِ امروز را یک‌جا به سرور می‌دهد — فقط برای دستگاهِ نخست.
