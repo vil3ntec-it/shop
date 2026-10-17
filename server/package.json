@@ -19,6 +19,7 @@
     "test:portal-rep": "node test/portal-rep.mjs",
     "test:login": "node --test --test-concurrency=1 test/login-contract.test.js test/sync-v1.test.js",
     "test:auto-backup": "node --test test/auto-backup.test.js",
+    "test:web-idb": "node test/web-idb.mjs",
     "test:mail": "node test/mail-delivery.js"
   },
   "engines": {
