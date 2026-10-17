@@ -15,6 +15,8 @@ on:
       - 'android-native/**'
       #  کدِ مشترکِ core و آزمون‌های مرجعِ آن (CoreVectorsTest)
       - 'core/**'
+      #  بردارهای مرجعِ مشترک با JS (StockCoreVectorsTest همین‌ها را می‌خواند)
+      - 'license/test-vectors/**'
       - '.github/workflows/tohid-native.yml'
   #  ⛔ F0-27: push به main فقط کانالِ آزمایشی (`tohid-native-beta`) را می‌سازد.
   #  برچسبِ پایدار (`tohid-native`، همان که همهٔ گوشی‌ها می‌پرسند) فقط از این‌جا:
