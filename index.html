@@ -7162,6 +7162,48 @@
   function formatMoney(n){ return MONEY_FMT.format(Math.round(n)); }
   /** عدد بدون جداکننده — برای سال و شماره‌هایی که پول نیستند. */
   function formatPlain(n){ return String(n); }
+  /**
+   * F0-06 — رقمِ فارسی/پشتو (۰-۹) و عربی (٠-٩) به لاتین، «٫» به نقطه.
+   * هر parseِ عددی (مبلغ، تعداد، درصد، بارکد، تلفن) اول از این می‌گذرد.
+   * یک نویسه به یک نویسه — جای حرف‌ها عوض نمی‌شود. همان `normalizeDigits`ِ
+   * برنامهٔ اندروید/کامپیوتر (`Format.kt`).
+   */
+  function normalizeDigits(s){
+    return String(s==null ? '' : s).replace(/[\u06F0-\u06F9\u0660-\u0669\u066B]/g, c=>{
+      const n = c.charCodeAt(0);
+      if(n===0x066B) return '.';
+      return String(n >= 0x06F0 ? n-0x06F0 : n-0x0660);
+    });
+  }
+  /*
+   * F0-06 — صفحه‌کلیدِ فارسی/پشتو در کادرِ عدد. کروم در `type=number` رقمِ
+   * فارسی را اصلاً نمی‌پذیرد (کادر خالی می‌ماند و تخفیف بی‌صدا صفر می‌شد)،
+   * و در کادرِ متنیِ عددی «۵۰۰» به `parseFloat` می‌رسید. پیش از نشستن،
+   * همان نویسه لاتین می‌شود؛ اگر مرورگر نگذاشت (نوشتنِ ترکیبی)، پس از آن.
+   */
+  const NON_LATIN_DIGIT = /[\u06F0-\u06F9\u0660-\u0669\u066B]/;
+  function isNumericBox(t){
+    return t instanceof HTMLInputElement
+      && (t.type==='number' || t.type==='tel' || /^(numeric|decimal|tel)$/.test(t.inputMode||''));
+  }
+  document.addEventListener('beforeinput', e=>{
+    const t = e.target;
+    if(!isNumericBox(t) || !e.cancelable) return;
+    const data = e.data!=null ? e.data : (e.dataTransfer ? e.dataTransfer.getData('text/plain') : '');
+    if(!data || !NON_LATIN_DIGIT.test(data)) return;
+    e.preventDefault();
+    const fixed = normalizeDigits(data);
+    let ok = false;
+    try{ ok = document.execCommand('insertText', false, fixed); }catch(err){ ok = false; }
+    if(!ok){ t.value = t.value + fixed; t.dispatchEvent(new Event('input', { bubbles:true })); }
+  }, true);
+  document.addEventListener('input', e=>{
+    const t = e.target;
+    if(!isNumericBox(t) || t.type==='number' || !NON_LATIN_DIGIT.test(t.value)) return;
+    const at = t.selectionStart;
+    t.value = normalizeDigits(t.value);
+    try{ if(at!=null) t.setSelectionRange(at, at); }catch(err){ /* بعضی نوع‌ها انتخاب ندارند */ }
+  }, true);
   function formatDate(iso){
     const hit = DATE_MEMO.get(iso);
     if(hit !== undefined) return hit;
@@ -8600,7 +8642,13 @@
   function rebuildBarcodeIndex(){
     barcodeIndex.clear();
     products.forEach(p=>{
-      (p.barcodes||[]).forEach(code=>{ if(code) barcodeIndex.set(code, p.id); });
+      (p.barcodes||[]).forEach(code=>{
+        if(!code) return;
+        barcodeIndex.set(code, p.id);
+        //  F0-06: بارکدی که قبلاً با رقمِ فارسی ثبت شده، با رقمِ لاتین هم
+        const latin = normalizeDigits(code);
+        if(latin!==code && !barcodeIndex.has(latin)) barcodeIndex.set(latin, p.id);
+      });
     });
   }
   /* ==========================================================
@@ -12062,7 +12110,8 @@
   }
 
   function handleBarcodeScanned(code, {skipDedup=false, fromPhone=false}={}){
-    code = (code||'').trim();
+    const rawCode = String(code||'').trim();
+    code = normalizeDigits(rawCode);   // F0-06: «۶۲۶…» همان «626…» است
     if(!code) return;
     if(!skipDedup && isDuplicateScan(code)) return;
     //  این آیفون بارکدخوانِ کامپیوتر است ⇒ بارکد به سبدِ کامپیوتر می‌رود
@@ -12074,7 +12123,7 @@
 
     playScanBeep();
 
-    const productId = barcodeIndex.get(code);
+    const productId = barcodeIndex.get(code) || barcodeIndex.get(rawCode);
 
     if(productId){
       /*
@@ -12142,7 +12191,24 @@
       hwBuffer = '';
       return;
     }
-    if(e.key.length===1) hwBuffer += e.key;
+    hwBuffer += scanKeyChar(e);
+  }
+  /**
+   * F0-06 — نویسهٔ بارکد از کلیدِ فیزیکی. بارکدخوان «کلید» می‌فرستد؛ با
+   * چیدمانِ فارسی/پشتو `e.key` «۶» یا «ش» است و پیش از این همان در بافر
+   * می‌نشست. اگر `e.key` ASCII است همان (رفتارِ قبلی)، وگرنه `e.code`
+   * (Digit6، Numpad6، KeyA) — همان `ScanKeys`ِ برنامهٔ کامپیوتر.
+   */
+  function scanKeyChar(e){
+    const k = e.key || '';
+    if(k.length===1 && k.charCodeAt(0)>=32 && k.charCodeAt(0)<=126) return k;
+    const code = e.code || '';
+    let m = /^(?:Digit|Numpad)([0-9])$/.exec(code);
+    if(m && !e.shiftKey) return m[1];
+    m = /^Key([A-Z])$/.exec(code);
+    if(m) return e.shiftKey ? m[1] : m[1].toLowerCase();
+    if(k.length===1 && /[\u06F0-\u06F9\u0660-\u0669]/.test(k)) return normalizeDigits(k);
+    return '';
   }
 
   // ---- کنترل دوربین صفحه فروش ----
@@ -12205,7 +12271,7 @@
 
   function computeCheckoutTotals(){
     const subtotal = cartTotal();
-    let discountValue = parseFloat(document.getElementById('co-discount-value').value);
+    let discountValue = parseFloat(normalizeDigits(document.getElementById('co-discount-value').value));
     if(isNaN(discountValue) || discountValue<0 || !canDiscount()) discountValue = 0;
     let discount = 0;
     if(coDiscountType==='percent'){
@@ -12227,7 +12293,7 @@
     document.getElementById('co-debtor-group').style.display = coPaymentType==='credit' ? '' : 'none';
 
     const paidInput = document.getElementById('co-paid-amount');
-    let paid = parseFloat(paidInput.value);
+    let paid = parseFloat(normalizeDigits(paidInput.value));
     if(isNaN(paid) || paid<0) paid = 0;
     if(coPaymentType==='cash'){
       // در فروش نقدی، پیش‌فرض کل مبلغ پرداخت شده در نظر گرفته می‌شود
@@ -12336,7 +12402,7 @@
 
     const { subtotal, discountValue, discount, finalTotal } = computeCheckoutTotals();
 
-    let paid = parseFloat(document.getElementById('co-paid-amount').value);
+    let paid = parseFloat(normalizeDigits(document.getElementById('co-paid-amount').value));
     const paidGroup = document.getElementById('co-paid-amount').closest('.form-group');
     if(isNaN(paid) || paid<0){
       paidGroup.classList.add('error'); return;
