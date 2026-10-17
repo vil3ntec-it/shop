@@ -5,3 +5,6 @@ dependencyResolutionManagement {
 }
 rootProject.name = "TohidNative"
 include(":app")
+
+//  core — منطقِ خالصِ مشترک با کامپیوتر (قدم صفرِ ۳.۳)؛ `ir.vil3ntec.tohid:core`
+includeBuild("../core")

@@ -13,13 +13,17 @@ on:
     paths:
       - 'server/**'
       - 'index.html'
+      - 'sw.js'
       - 'license/**'
+      - 'core/test-vectors/**'
       - '.github/workflows/server.yml'
   pull_request:
     paths:
       - 'server/**'
       - 'index.html'
+      - 'sw.js'
       - 'license/**'
+      - 'core/test-vectors/**'
       - '.github/workflows/server.yml'
   workflow_dispatch:
 
@@ -120,6 +124,12 @@ jobs:
       - name: آزمونِ چیدمان و دسترس‌پذیریِ نسخهٔ وب
         working-directory: server
         run: npm run test:web-ui
+
+      # F0-23 (دنباله): دفترِ وب در IndexedDB — آزمایشی و پیش‌فرض خاموش. انتقال،
+      # بارِ دوباره، خروجی/بازیابی، برگشت، نبودِ IndexedDB، سهمیه و دفترِ دیررس.
+      - name: آزمونِ دفترِ وب در IndexedDB
+        working-directory: server
+        run: npm run test:web-idb
 
       # شورا چ۳: نمایندهٔ فروش در پورتال فقط فروش‌های خودش را می‌بیند
       - name: آزمونِ نمایندگی در پورتال

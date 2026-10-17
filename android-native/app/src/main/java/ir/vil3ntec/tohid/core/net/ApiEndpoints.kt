@@ -130,6 +130,8 @@ object ApiEndpoints {
     const val STAFF_CODE = "/shop/staff-code"
     const val STAFF_CODE_ROTATE = "/shop/staff-code/rotate"
     const val STAFF_CODES = "/shop/staff-codes"
+    /** «سری سند»ِ این دستگاه (F0-03) — `POST {deviceId}` ⇒ `{series}` */
+    const val SERIES = "/shop/series"
 
     fun member(id: String) = "$MEMBERS/${enc(id)}"
     fun staffCode(id: String) = "$STAFF_CODES/${enc(id)}"

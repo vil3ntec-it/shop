@@ -22,12 +22,16 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.data.BarcodeMatch
+import ir.vil3ntec.tohid.data.CartQuery
 import ir.vil3ntec.tohid.data.CartStore
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.SalesEngine
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.money
+import ir.vil3ntec.tohid.numberInvalid
+import ir.vil3ntec.tohid.numericInput
+import ir.vil3ntec.tohid.parseNumber
 import ir.vil3ntec.tohid.qty
 import ir.vil3ntec.tohid.scan.ScanFeedback
 import ir.vil3ntec.tohid.ui.theme.Shop
@@ -93,17 +97,14 @@ fun DeskSaleScreen(
 
   val index = remember(d.products) { ShopStore.barcodeIndex(d) }
 
-  //  «۳*کد» ⇐ (۳، «کد»)
-  val parsed = remember(query) {
-    val m = Regex("^\\s*([0-9]+(?:\\.[0-9]+)?)\\s*[*×xX]\\s*(.*)$").find(query)
-    if (m != null) (m.groupValues[1].toDoubleOrNull() ?: 1.0) to m.groupValues[2] else 1.0 to query
-  }
+  //  «۳*کد» ⇐ (۳، «کد») — رقمِ فارسی هم (F0-06، `CartQuery`)
+  val parsed = remember(query) { CartQuery.parse(query).let { it.count to it.term } }
   val term = parsed.second.trim()
   val matches: List<Product> = remember(term, d.products) {
     if (term.isEmpty()) emptyList()
     else d.products.asSequence()
       .filter { it.active }
-      .filter { p -> p.name.contains(term, ignoreCase = true) || p.barcodes.any { it.startsWith(term) } }
+      .filter { p -> p.name.contains(term, ignoreCase = true) || CartQuery.barcodeStarts(p.barcodes, term) }
       .sortedWith(compareBy({ !it.name.startsWith(term, ignoreCase = true) }, { it.name }))
       .take(9)
       .toList()
@@ -174,18 +175,23 @@ fun DeskSaleScreen(
   val checkout = SalesEngine.Checkout(
     seller = seller,
     discountType = SalesEngine.DiscountType.PERCENT,
-    discountValue = if (canDiscount) discountText.toDoubleOrNull() ?: 0.0 else 0.0,
+    //  F0-06: خالی ⇐ صفر؛ نامعتبر ⇐ خطای کنارِ کادر و `finish` ثبت نمی‌کند
+    discountValue = if (canDiscount) parseNumber(discountText) ?: 0.0 else 0.0,
     payment = payment,
-    paidAmount = paidText.toDoubleOrNull() ?: 0.0,
+    paidAmount = parseNumber(paidText) ?: 0.0,
     debtorId = cartDebtorId,
     blockExpired = blockExpired,
   )
   val totals = SalesEngine.totals(d, cart, checkout)
+  val discountBad = canDiscount && numberInvalid(discountText)
+  val paidBad = payment == SalesEngine.Payment.CREDIT && numberInvalid(paidText)
 
   fun finish() {
     if (cart.isEmpty()) { toast("سبد خالی است"); return }
+    if (discountBad || paidBad) { toast("عددِ «${if (discountBad) "تخفیف" else "دریافتی"}» درست نیست"); return }
     if (payment == SalesEngine.Payment.CREDIT && cartDebtorId == null) { toast("فروشِ نسیه مشتری می‌خواهد — F2"); pickDebtor = true; return }
-    when (val r = SalesEngine.record(d, cart, checkout, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId)) {
+    when (val r = SalesEngine.record(d, cart, checkout, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId,
+      series = ir.vil3ntec.tohid.sync.DocSeries.current(context))) {
       is SalesEngine.Result.Failed -> toast(r.message)
       is SalesEngine.Result.Ok -> {
         scope.launch { store.save(r.data) }
@@ -382,9 +388,11 @@ fun DeskSaleScreen(
           Spacer(Modifier.height(10.dp))
           OutlinedTextField(
             value = discountText,
-            onValueChange = { discountText = it.filter { c -> c.isDigit() || c == '.' } },
+            onValueChange = { discountText = numericInput(it) },
             label = { Text("تخفیف (٪)") },
             singleLine = true,
+            isError = discountBad,
+            supportingText = if (discountBad) { { Text("عدد درست نیست") } } else null,
             modifier = Modifier.fillMaxWidth(),
           )
         }
@@ -392,9 +400,11 @@ fun DeskSaleScreen(
           Spacer(Modifier.height(8.dp))
           OutlinedTextField(
             value = paidText,
-            onValueChange = { paidText = it.filter { c -> c.isDigit() || c == '.' } },
+            onValueChange = { paidText = numericInput(it) },
             label = { Text("دریافتیِ همین حالا (؋)") },
             singleLine = true,
+            isError = paidBad,
+            supportingText = if (paidBad) { { Text("عدد درست نیست") } } else null,
             modifier = Modifier.fillMaxWidth(),
           )
         }

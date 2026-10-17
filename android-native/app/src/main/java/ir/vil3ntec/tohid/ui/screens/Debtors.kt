@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.data.invoiceLabel
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -794,7 +795,7 @@ private fun AccountView(
             Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
               Column(Modifier.weight(1f)) {
                 Text(
-                  "فاکتور ${sale.invoiceNumber?.toString() ?: "—"}${if (sale.status == "cancelled") " (لغوشده)" else ""}",
+                  "فاکتور ${sale.invoiceLabel() ?: "—"}${if (sale.status == "cancelled") " (لغوشده)" else ""}",
                   style = MaterialTheme.typography.bodyMedium,
                   color = if (sale.status == "cancelled") Shop.colors.muted2 else Shop.colors.text,
                 )
@@ -1091,7 +1092,7 @@ private fun TransactionDialog(
 @Composable
 private fun ReminderRow(name: String, phone: String, balance: Double) {
   val context = LocalContext.current
-  val clean = remember(phone) { phone.filter { it.isDigit() || it == '+' } }
+  val clean = remember(phone) { ir.vil3ntec.tohid.normalizeDigits(phone).filter { it in '0'..'9' || it == '+' } }
   if (clean.isBlank()) return
 
   val message = remember(name, balance) {

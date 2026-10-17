@@ -32,7 +32,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.utf16CodePoint
+import ir.vil3ntec.tohid.scan.scanChar
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -267,10 +267,11 @@ fun SaleScreen(
           return@onKeyEvent false
         }
 
-        val ch = event.utf16CodePoint
-        //  فقط نویسه‌های دیدنی؛ کلیدهای کنترلی به کارِ بارکد نمی‌آیند
-        if (ch in 32..126) {
-          hid.feed(ch.toChar(), now)
+        //  فقط نویسه‌های دیدنی؛ کلیدهای کنترلی به کارِ بارکد نمی‌آیند.
+        //  F0-06: با کلیدِ فیزیکی — چیدمانِ فارسی/پشتو «۶» و «ش» می‌سازد
+        val ch = event.scanChar(allowSpace = true)
+        if (ch != null) {
+          hid.feed(ch, now)
           return@onKeyEvent true
         }
         false
@@ -563,6 +564,8 @@ fun SaleScreen(
           today = ir.vil3ntec.tohid.todayIso(),
           now = System.currentTimeMillis(),
           newId = ::newId,
+          //  F0-03: «سری سند»ِ این دستگاه — `{سری}-{شماره}`
+          series = ir.vil3ntec.tohid.sync.DocSeries.current(context),
         )) {
           is SalesEngine.Result.Failed -> toast(result.message)
           is SalesEngine.Result.Ok -> {
