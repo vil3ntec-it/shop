@@ -77,6 +77,14 @@ class LockStore(context: Context) {
     return bytes.toHex()
   }
 
+  /**
+   *  قفلِ خودکار پس از چند دقیقه بی‌کاری (STF-05). ۰ = خاموش — همان رفتارِ
+   *  پیشین که فقط هنگامِ باز شدنِ برنامه می‌پرسید. با برداشتنِ رمز بی‌اثر است.
+   */
+  var idleMinutes: Int
+    get() = ir.vil3ntec.tohid.core.perm.IdleLock.clamp(prefs.getInt(IDLE, 0))
+    set(v) = prefs.edit().putInt(IDLE, ir.vil3ntec.tohid.core.perm.IdleLock.clamp(v)).apply()
+
   private fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it) }
 
   private fun String.fromHex(): ByteArray =
@@ -86,6 +94,7 @@ class LockStore(context: Context) {
     private const val HASH = "pin_hash"
     private const val SALT = "pin_salt"
     private const val LEN = "pin_len"
+    private const val IDLE = "idle_minutes"
 
     /** رمزِ تازه شش رقم است */
     const val NEW_PIN_LEN = 6
