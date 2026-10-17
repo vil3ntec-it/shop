@@ -644,6 +644,12 @@ await step('همگام‌سازی و امنیت: دستگاه‌ها، خطاه�
     const rows = await page.locator(`#${id} tr`).count();
     assert.ok(rows >= 1, `${id} خالی ماند`);
   }
+  //  §۳۸.۸، OPS-01@38: کارت‌های سلامتِ سرور با وضعیتِ متنی (نه فقط رنگ)
+  await page.waitForFunction(() => document.querySelectorAll('#sys-health .stat').length === 7, null, { timeout: 10_000 });
+  assert.match((await page.locator('#sys-overall').textContent()).trim(), /^● (سالم|هشدار|خراب|نامعلوم)$/);
+  const cardsText = await page.locator('#sys-health').textContent();
+  assert.match(cardsText, /دیتابیس/);
+  assert.ok(!/postgres(ql)?:\/\//i.test(cardsText), 'نشانیِ دیتابیس در کارت‌ها');
   const csp = await page.evaluate(async () => (await fetch('/admin/')).headers.get('content-security-policy'));
   assert.match(csp || '', /script-src 'self'/);
 });
