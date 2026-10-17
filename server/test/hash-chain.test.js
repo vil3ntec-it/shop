@@ -27,7 +27,6 @@ const count = async (chain) => Number((await query('SELECT COUNT(*)::int AS n FR
 
 async function flag(on) {
   await live.set(store.FLAG_SCOPE, store.FLAG_AUDIT, on, 'test');
-  store._forget();
 }
 
 async function tamper(sql, params) {
@@ -43,11 +42,14 @@ async function runCli(args) {
   return { code, out: lines.join('\n') };
 }
 
-test.before(async () => { await h.start(); store._forget(); });
+test.before(async () => { await h.start(); });
 test.after(async () => { await h.stop(); });
 
 test('۱) پیش‌فرض خاموش: سابقه نوشته می‌شود، زنجیره نه', async () => {
   assert.equal(await store.auditEnabled(), false);
+  for (const [text, on] of [[null, false], ['true', true], ['1', true], ['"on"', true], ['false', false], ['"yes"', false], ['{bad', false]]) {
+    assert.equal(store.flagOn(text), on, String(text));
+  }
   const id = await audit.log({ shopId: SHOP, userId: 'u_off', action: 'sale.create', detail: { total: 5 } });
   const row = (await query('SELECT action FROM audit_logs WHERE id=$1', [id])).rows[0];
   assert.equal(row.action, 'sale.create');
@@ -69,7 +71,6 @@ test('۲) پرچم از درِ پنل روشن می‌شود و هر کاربر 
   const put = await h.put('/api/admin/pump/live-config',
     { scope: store.FLAG_SCOPE, key: store.FLAG_AUDIT, value: true }, { token: login.body.token });
   assert.equal(put.status, 200, JSON.stringify(put.body));
-  store._forget();
   assert.equal(await store.auditEnabled(), true);
 
   const ids = [];

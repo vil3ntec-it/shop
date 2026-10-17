@@ -1,6 +1,7 @@
 {
   "format": "tohid-hashchain-v1",
-  "about": "Shared test vectors for the hash chain (SEC-02, STF-09) and posted-document reversal (SEC-03). Every implementation (server/src/lib/hash-chain.js, license/hash-chain.js, android-native core/audit) must pass all of them. Never edit v1; make hashchain-v2.json for a new format.",
+  "version": 1,
+  "about": "بردارهای مرجعِ زنجیرهٔ هش (SEC-02، STF-09) و سندِ معکوس (SEC-03). ساخته‌شده با server/scripts/hashchain-vectors.js — دستی ویرایش نشود. سرور (server/src/lib/hash-chain.js)، وب (license/hash-chain.js) و Kotlin (core/audit) همه را می‌گذرانند. v1 هرگز عوض نمی‌شود؛ قالبِ تازه = hashchain-v2.json.",
   "rules": {
     "canonicalJson": "RFC 8785 (JCS) subset: object keys sorted by UTF-16 code units; no whitespace; strings escaped exactly like ECMAScript JSON.stringify (\\\" \\\\ \\b \\f \\n \\r \\t, other chars below U+0020 as \\u00xx lowercase, everything else literal); lone surrogates are rejected (lone_surrogate); numbers must be integers with |n| <= 2^53-1 (money always in minor units) else not_integer; -0 is written 0; JS-only undefined object properties are omitted.",
     "hash": "lowercase hex of SHA-256( ASCII(prevHash) || UTF-8(canonicalJson(doc)) ); prevHash is 64 lowercase hex chars",

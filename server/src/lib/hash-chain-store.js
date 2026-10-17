@@ -22,30 +22,29 @@ const hc = require('./hash-chain');
 const FLAG_SCOPE = 'security';
 const FLAG_AUDIT = 'hashchain.audit';
 const CHAIN_RE = /^[A-Za-z0-9_.:/-]{1,200}$/;
-const FLAG_TTL_MS = 60 * 1000;
 const PAGE = 1000;
 
-let flag = { at: 0, audit: false };
+/**
+ * پرچم به‌صورتِ زیرپرسش — audit.js آن را در `RETURNING` ِ همان INSERT ِ سابقه
+ * می‌خواند. ⛔ پس وقتی خاموش است هیچ پرسشِ اضافه‌ای نیست و سابقه دقیقاً همان
+ * یک دستورِ امروز است (پرسشِ جدا پس از INSERT، اگر پس از بسته شدنِ دیتابیس
+ * برسد، استخر را از نو می‌سازد و فرآیند را زنده نگه می‌دارد — backup.test).
+ */
+const FLAG_SQL = `(SELECT value FROM live_config WHERE scope = '${FLAG_SCOPE}' AND key = '${FLAG_AUDIT}')`;
 
-function truthy(v) {
+/** مقدارِ متنیِ live_config (JSON) ⇒ روشن؟ نبود یا خراب ⇒ خاموش. */
+function flagOn(text) {
+  if (text === null || text === undefined) return false;
+  let v;
+  try { v = JSON.parse(text); } catch { return false; }
   return v === true || v === 1 || v === '1' || v === 'true' || v === 'on';
 }
 
-/** آیا سابقهٔ عملیات به زنجیره برود؟ تا ۶۰ ثانیه در حافظه؛ خطا ⇒ همان قبلی. */
+/** آیا سابقهٔ عملیات به زنجیره می‌رود؟ (برای آزمون و ابزار؛ مسیرِ داغ از FLAG_SQL می‌خواند) */
 async function auditEnabled() {
-  if (Date.now() - flag.at < FLAG_TTL_MS) return flag.audit;
-  let on = flag.audit;
-  try {
-    const r = await db.one('SELECT value FROM live_config WHERE scope=$1 AND key=$2', [FLAG_SCOPE, FLAG_AUDIT]);
-    on = r ? truthy(JSON.parse(r.value)) : false;
-  } catch (err) {
-    console.warn(`[hash-chain] پرچم خوانده نشد: ${err.message}`);
-  }
-  flag = { at: Date.now(), audit: on };
-  return on;
+  const r = await db.one(`SELECT ${FLAG_SQL} AS v`);
+  return flagOn(r && r.v);
 }
-
-function _forget() { flag = { at: 0, audit: false }; }
 
 function checkChain(chain) {
   const c = String(chain || '');
@@ -235,7 +234,7 @@ async function verifyAll({ chains = null, rows = true } = {}) {
 }
 
 module.exports = {
-  FLAG_SCOPE, FLAG_AUDIT,
+  FLAG_SCOPE, FLAG_AUDIT, FLAG_SQL, flagOn,
   auditEnabled, auditChainId, detailHash, append, appendAudit,
-  verifyChain, verifyAll, listChains, _forget,
+  verifyChain, verifyAll, listChains,
 };

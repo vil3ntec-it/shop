@@ -18,8 +18,12 @@ const web = require(path.join(ROOT, 'license/hash-chain.js'));
 
 const IMPLS = { server, web };
 
-test('بردارها: قالب و genesis همان است', () => {
+test('بردارها: کهنه نیستند، و قالب و genesis همان است', () => {
+  const gen = require('../scripts/hashchain-vectors');
+  assert.equal(fs.readFileSync(gen.FIXTURE, 'utf8'), gen.serialize(gen.build()),
+    'بردارها کهنه‌اند: cd server && node scripts/hashchain-vectors.js --write');
   assert.equal(V.format, 'tohid-hashchain-v1');
+  assert.equal(V.version, 1);
   for (const impl of Object.values(IMPLS)) {
     assert.equal(impl.FORMAT, V.format);
     assert.equal(impl.GENESIS, V.rules.genesis);
