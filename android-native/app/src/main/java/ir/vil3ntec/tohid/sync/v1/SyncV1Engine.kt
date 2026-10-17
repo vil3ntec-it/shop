@@ -377,6 +377,8 @@ class SyncV1Engine private constructor(context: Context) {
   }
 
   fun snapshotStatus(): SyncStatus {
+    //  Sync v3 پشتِ تنظیمِ هر دستگاه (پیش‌فرض v1): همان نوار و قفلِ خروج، از صفِ v3
+    if (SyncChoice.isV3(app)) SyncV3Runner.of(app).asV1Status()?.let { return it }
     val queued = runCatching { queue.size() }.getOrDefault(0)
     return SyncStatus(
       dot = SyncDot.of(

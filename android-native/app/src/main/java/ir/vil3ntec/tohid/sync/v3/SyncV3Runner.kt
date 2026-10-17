@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.sync.v3
 
 import android.content.Context
+import ir.vil3ntec.tohid.core.config.AppConfig
 import ir.vil3ntec.tohid.core.net.ApiClient
 import ir.vil3ntec.tohid.core.net.ApiFailure
 import ir.vil3ntec.tohid.data.DiskWrite
@@ -8,9 +9,12 @@ import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.sync.SyncStore
+import ir.vil3ntec.tohid.sync.v1.LedgerDiff
 import ir.vil3ntec.tohid.sync.v1.OpQueue
 import ir.vil3ntec.tohid.sync.v1.SyncCommit
+import ir.vil3ntec.tohid.sync.v1.SyncDot
 import ir.vil3ntec.tohid.sync.v1.SyncStateV1
+import ir.vil3ntec.tohid.sync.v1.SyncStatus
 import ir.vil3ntec.tohid.sync.v1.SyncV1Engine
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -146,7 +150,36 @@ class SyncV3Runner private constructor(context: Context) {
     ).load().also { engine = it }
   }
 
-  private fun publish() { _status.value = engine?.status() }
+  private fun publish() {
+    _status.value = engine?.status()
+    //  نوار، نشان و قفلِ خروج (#230) از `SyncV1Engine.status` می‌خوانند — همان را تازه کن
+    runCatching { SyncV1Engine.of(app).publish() }
+  }
+
+  /**
+   *  حالِ v3 به شکلِ همان `SyncStatus`ی که نوارِ پایین، نشانِ همگام‌سازی و `LogoutGuard`
+   *  می‌خوانند (SYN-08، SYN-10): صفِ منتظر، آخرین موفق، خطای آخر؛ ۴۲۶ ⇒ `holding`.
+   */
+  internal fun asV1Status(): SyncStatus? = runCatching {
+    val e = engine()
+    val s = e.status()
+    SyncStatus(
+      dot = SyncDot.of(
+        error = s.lastError.isNotBlank(), online = Backend.isOnline(app), signedIn = Backend.tokens(app).signedIn,
+        configured = AppConfig.isConfigured(app), queued = s.queued, busy = s.busy,
+      ),
+      queued = s.queued,
+      dropped = s.rejected,
+      cursor = e.meta.cursor,
+      lastOkAt = s.lastOkAt,
+      lastError = s.lastError,
+      holding = s.upgradeRequired,
+      upgradeAvailable = false,
+      schemaVersion = LedgerDiff.SCHEMA_VERSION,
+      serverSchema = 0,
+      live = false,
+    )
+  }.getOrNull()
 
   /** زیرِ قفلِ `ShopStore.writeInternal` */
   fun record(data: ShopData): Int = runCatching { engine().record(data) }.getOrDefault(0).also { publish() }
