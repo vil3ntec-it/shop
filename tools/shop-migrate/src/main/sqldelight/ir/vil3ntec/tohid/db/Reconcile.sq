@@ -1,0 +1,23 @@
+-- پرسش‌های گزارشِ تطبیق (اجرای آزمایشی). فقط خواندن.
+
+rowCounts:
+SELECT
+  (SELECT count(*) FROM product) AS product,
+  (SELECT count(*) FROM customer) AS customer,
+  (SELECT count(*) FROM supplier) AS supplier,
+  (SELECT count(*) FROM sale) AS sale,
+  (SELECT count(*) FROM saleLine) AS saleLine,
+  (SELECT count(*) FROM saleReturn) AS saleReturn,
+  (SELECT count(*) FROM salePayment) AS salePayment,
+  (SELECT count(*) FROM customerLedgerEntry) AS customerLedgerEntry,
+  (SELECT count(*) FROM expense) AS expense,
+  (SELECT count(*) FROM supplierInvoice) AS supplierInvoice,
+  (SELECT count(*) FROM supplierPayment WHERE supplierInvoiceId IS NULL) AS supplierPaymentStandalone,
+  (SELECT count(*) FROM stockMove WHERE refType = 'warehouseEntry') AS stockMoveFromEntries,
+  (SELECT count(*) FROM stockMove) AS stockMove,
+  (SELECT count(*) FROM auditLog) AS auditLog,
+  (SELECT count(*) FROM cashShift) AS cashShift,
+  (SELECT count(*) FROM barcode) AS barcode,
+  (SELECT count(*) FROM price WHERE validTo IS NOT NULL) AS priceClosed,
+  (SELECT count(*) FROM measureUnit) AS measureUnit,
+  (SELECT count(*) FROM legacyId) AS legacyId;
