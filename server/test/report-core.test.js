@@ -83,6 +83,21 @@ test('RPT-03 با دست: میانگینِ موزونِ متحرک', () => {
     saleItems: [{ id: 'xi', saleId: 'x', productId: 'q', quantity: 2, purchasePrice: 7.25, totalPrice: 50 }],
   }), 'mavg');
   assert.equal(solo.line.xi, 1450);
+  assert.equal(solo.est.xi, true); // بی ورودِ انبار ⇒ بها تخمینی است
+});
+
+test('v3 ۱۵.۴ بند ۴: سود «تقریبی» تا بها معتبر نیست', () => {
+  const line = core.today(L, { date: '2026-10-14', clock: kabulClock });
+  // کپیِ قیمتِ خرید (line) همیشه تقریبی؛ قلمِ آزادِ بی‌بها + فاکتورِ قدیمیِ بی‌قلم = ۲ قلمِ بی‌بها
+  assert.equal(line.today.profitApproximate, true);
+  assert.equal(line.today.costEstimatedLines, 2);
+  const mavg = core.today(L, { date: '2026-10-14', clock: kabulClock, costing: 'mavg' });
+  assert.equal(mavg.today.profitApproximate, true); // همان دو قلمِ بی‌بها
+  assert.equal(mavg.yesterday.costEstimatedLines, 0);
+  assert.equal(mavg.yesterday.profitApproximate, false); // همهٔ قلم‌ها از میانگینِ موزون
+  assert.equal(line.yesterday.profitApproximate, true);
+  const t = core.plain(core.tables('today', mavg)[0]);
+  assert.deepEqual(t.rows.map((r) => r[r.length - 1]), ['بله', 'نه', 'نه']);
 });
 
 test('RPT-02: تخصیصِ تخفیف با بزرگ‌ترین باقی‌مانده، جمعِ هر تفکیک = جمعِ کل', () => {

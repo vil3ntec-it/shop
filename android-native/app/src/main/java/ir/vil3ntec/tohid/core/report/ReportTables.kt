@@ -10,7 +10,7 @@ import kotlinx.serialization.json.long
  *  با `kind`)؛ قالب‌بندیِ محلی (رقمِ فارسی، جداکنندهٔ هزارگان) کارِ لایهٔ نمایش است.
  *  `plain` متنِ ساده با رقمِ لاتین می‌دهد (CSV و آزمون). دوقلوی `tables`/`plain`ِ JS.
  *
- *  kind: text | date | count | qty (هزارم) | money (واحدِ کوچک) | bp (بیسیس‌پوینت)
+ *  kind: text | date | count | qty (هزارم) | money (واحدِ کوچک) | bp (بیسیس‌پوینت) | flag (بله/نه)
  */
 object ReportTables {
   @Serializable
@@ -65,10 +65,10 @@ object ReportTables {
     val t = r.totals
     val noQty = SALES_COLS.filter { it.key != "qty" }
     val head = listOf(C("from", "از", "date"), C("to", "تا", "date"), C("returnCount", "برگشتی (بار)", "count")) +
-      noQty + C("avgTicket", "میانگین فاکتور", "money")
+      noQty + C("avgTicket", "میانگین فاکتور", "money") + C("profitApproximate", "سود تقریبی", "flag")
     val summary = listOf(p(r.from), p(r.to), p(t.returnCount.toLong())) +
       salesCells(t.invoices, 0, t.gross, t.discount, t.sales, t.returns, t.netSales, t.cogs, t.grossProfit, t.marginBp)
-        .filterIndexed { i, _ -> i != 1 } + p(t.avgTicket)
+        .filterIndexed { i, _ -> i != 1 } + p(t.avgTicket) + JsonPrimitive(t.profitApproximate)
     val out = mutableListOf(Table("sales.totals", "خلاصهٔ فروش", cols(head), listOf(summary), null))
     val byDim = mapOf("product" to r.product, "category" to r.category, "user" to r.user,
       "hour" to r.hour, "payment" to r.payment, "channel" to r.channel)
@@ -93,12 +93,12 @@ object ReportTables {
   private val TODAY_COLS = listOf(
     C("invoices", "فاکتور", "count"), C("sales", "فروش", "money"), C("returns", "برگشتی", "money"),
     C("netSales", "فروش خالص", "money"), C("grossProfit", "سود ناخالص", "money"), C("marginBp", "حاشیه", "bp"),
-    C("avgTicket", "میانگین فاکتور", "money"),
+    C("avgTicket", "میانگین فاکتور", "money"), C("profitApproximate", "سود تقریبی", "flag"),
   )
 
   fun today(r: ReportCore.TodayReport): List<Table> {
     fun row(label: String, d: ReportCore.Day) = listOf(p(label), p(d.date), p(d.invoices.toLong()), p(d.sales), p(d.returns),
-      p(d.netSales), p(d.grossProfit), p(d.marginBp), p(d.avgTicket))
+      p(d.netSales), p(d.grossProfit), p(d.marginBp), p(d.avgTicket), JsonPrimitive(d.profitApproximate))
     return listOf(Table(
       "today", "داشبورد امروز", cols(listOf(C("day", "روز", "text"), C("date", "تاریخ", "date")) + TODAY_COLS),
       listOf(row("امروز", r.today), row("دیروز", r.yesterday), row("همین روز هفتهٔ پیش", r.lastWeek)), null,
@@ -158,6 +158,7 @@ object ReportTables {
   fun cellText(v: JsonPrimitive, kind: String): String {
     if (v is JsonNull) return ""
     return when (kind) {
+      "flag" -> if (v.content == "true") "بله" else "نه"
       "money", "bp" -> {
         val n = v.long
         val a = if (n < 0) -n else n

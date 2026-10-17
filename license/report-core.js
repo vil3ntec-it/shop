@@ -22,11 +22,15 @@
    ========================================================== */
 (function (factory) {
   'use strict';
-  var api = factory();
+  //  تقویم و روزِ کاری از `calendar-core.js` (همان `core/calendar`ِ Kotlin)؛ در مرورگر پیش از این فایل بار شود
+  var cal = typeof module !== 'undefined' && module.exports ? require('./calendar-core.js')
+    : (typeof window !== 'undefined' ? window.TohidCalendar : globalThis.TohidCalendar);
+  if (!cal || typeof cal.businessDateAt !== 'function') throw new Error('report-core: calendar-core.js (TohidCalendar) must load first');
+  var api = factory(cal);
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (typeof window !== 'undefined') window.TohidReportCore = api;
   else if (typeof globalThis !== 'undefined') globalThis.TohidReportCore = api;
-})(function () {
+})(function (cal) {
   'use strict';
 
   var VERSION = 1;
@@ -66,46 +70,21 @@
 
   /* ---------------- تاریخ ---------------- */
 
-  /** `yyyy-MM-dd` ⇐ روزِ شمارهٔ n از ۱۹۷۰ (Hinnant)؛ null برای رشتهٔ نامعتبر */
-  function epochDay(iso) {
-    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(str(iso));
-    if (!m) return null;
-    var y = +m[1], mo = +m[2], d = +m[3];
-    if (mo < 1 || mo > 12 || d < 1 || d > 31) return null;
-    y -= mo <= 2 ? 1 : 0;
-    var era = floorDiv(y, 400);
-    var yoe = y - era * 400;
-    var doy = Math.floor((153 * (mo + (mo > 2 ? -3 : 9)) + 2) / 5) + d - 1;
-    var doe = yoe * 365 + Math.floor(yoe / 4) - Math.floor(yoe / 100) + doy;
-    return era * 146097 + doe - 719468;
-  }
-
   function pad(n, w) { var s = String(n); while (s.length < w) s = '0' + s; return s; }
 
-  function isoOf(n) {
-    var z = n + 719468;
-    var era = floorDiv(z, 146097);
-    var doe = z - era * 146097;
-    var yoe = Math.floor((doe - Math.floor(doe / 1460) + Math.floor(doe / 36524) - Math.floor(doe / 146096)) / 365);
-    var doy = doe - (365 * yoe + Math.floor(yoe / 4) - Math.floor(yoe / 100));
-    var mp = Math.floor((5 * doy + 2) / 153);
-    var d = doy - Math.floor((153 * mp + 2) / 5) + 1;
-    var m = mp < 10 ? mp + 3 : mp - 9;
-    var y = yoe + era * 400 + (m <= 2 ? 1 : 0);
-    return pad(y, 4) + '-' + pad(m, 2) + '-' + pad(d, 2);
-  }
+  /** شمارهٔ روز از ۱۹۷۰ ⇐ `yyyy-MM-dd` (روی calendar-core)؛ null برای تاریخِ نامعتبر، مثلاً ۰۲-۳۰ */
+  function epochDay(iso) { var j = cal.jdnOfIso(iso); return j === null ? null : j - 2440588; }
 
-  function addDays(iso, k) { var n = epochDay(iso); return n === null ? '' : isoOf(n + k); }
+  function addDays(iso, k) { var d = cal.addDays(iso, k); return d === null ? '' : d; }
 
   /**
-   * ساعتِ فروشگاه با اختلافِ ثابت از UTC (افغانستان +۲۷۰ دقیقه، بی ساعتِ تابستانی)
-   * و شروعِ روزِ کاری (دقیقه از نیمه‌شب). وقتی `core/calendar/BusinessDay`
-   * (PR #224) روی main بنشیند، همان جای این را می‌گیرد؛ شکلِ `{date, hour}` یکی است.
+   * ساعتِ فروشگاه با اختلافِ ثابت از UTC (کابل +۲۷۰ دقیقه، بی ساعتِ تابستانی) و شروعِ
+   * روزِ کاری (دقیقه از نیمه‌شب). روزِ کاری همان `businessDateAt`ِ calendar-core است.
    */
   function fixedClock(offsetMinutes, dayStartMinute) {
-    var off = num(offsetMinutes) * 60000, start = num(dayStartMinute) * 60000;
+    var offMin = num(offsetMinutes), startMin = num(dayStartMinute), off = offMin * 60000;
     return {
-      date: function (ms) { return isoOf(floorDiv(ms + off - start, DAY_MS)); },
+      date: function (ms) { return cal.businessDateAt(ms, offMin, startMin); },
       hour: function (ms) { return Math.floor((ms + off - floorDiv(ms + off, DAY_MS) * DAY_MS) / 3600000); },
     };
   }
@@ -208,17 +187,19 @@
    *    فروش‌ها و برگشتی‌ها به ترتیبِ زمان بازپخش می‌شوند؛ هر فروش به میانگینِ
    *    همان لحظه از «انبارهٔ ارزش» برمی‌دارد و برگشتی به بهای همان قلم
    *    برمی‌گردد. پیش از نخستین ورود، بهای ثبت‌شده روی قلم جایگزین است.
+   *  `est[itemId]` = بهای این قلم معلوم نیست یا تخمینی است: بهای ثبت‌شدهٔ صفر، یا
+   *  در 'mavg' فروشِ بیش از موجودیِ بازپخش‌شده (بخشِ ۱۵.۴ بند ۴ v3).
    */
   function costsOf(L, mode) {
-    var line = {}, ret = {};
-    function lineMode(it) { return rnd(it.unitCost * it.qty / 1000); }
+    var line = {}, ret = {}, est = {};
+    function lineMode(it) { if (it.unitCost === 0) est[it.id] = true; return rnd(it.unitCost * it.qty / 1000); }
     if (mode !== 'mavg') {
       L.items.forEach(function (it) { line[it.id] = lineMode(it); });
       L.returns.forEach(function (r) {
         var it = L.itemById[r.saleItemId];
         ret[r.id] = it ? rnd(it.unitCost * r.qty / 1000) : 0;
       });
-      return { line: line, ret: ret };
+      return { mode: 'line', line: line, ret: ret, est: est };
     }
     var ev = [];
     L.entries.forEach(function (e) { ev.push({ t: timeOf(e), k: 0, id: e.id, e: e }); });
@@ -234,10 +215,13 @@
     ev.sort(function (a, b) { return (a.t - b.t) || (a.k - b.k) || cmp(a.id, b.id); });
     var pools = {};
     function pool(pid) { return pools[pid] || (pools[pid] = { q: 0, v: 0, unit: null }); }
+    var short = false;
     function take(p, q, fallbackUnit) {
       var cost;
+      short = false;
       if (p.q > 0 && q <= p.q) cost = rnd(p.v * q / p.q);
       else {
+        short = true;
         var avail = p.q > 0 ? p.q : 0;
         var unit = p.unit !== null ? p.unit : fallbackUnit;
         cost = (avail > 0 ? p.v : 0) + rnd((q - avail) * unit / 1000);
@@ -262,7 +246,8 @@
         }
       } else if (x.k === 1) {
         var it = x.it;
-        line[it.id] = it.productId === '' || it.qty <= 0 ? lineMode(it) : take(pool(it.productId), it.qty, it.unitCost);
+        if (it.productId === '' || it.qty <= 0) line[it.id] = lineMode(it);
+        else { line[it.id] = take(pool(it.productId), it.qty, it.unitCost); if (short) est[it.id] = true; }
       } else {
         var r = x.r, item = L.itemById[r.saleItemId];
         if (!item || item.qty <= 0 || r.qty <= 0) { ret[r.id] = 0; return; }
@@ -272,7 +257,7 @@
       }
     });
     L.items.forEach(function (it) { if (line[it.id] === undefined) line[it.id] = lineMode(it); });
-    return { line: line, ret: ret };
+    return { mode: 'mavg', line: line, ret: ret, est: est };
   }
 
   /* ---------------- تخصیصِ تخفیفِ فاکتور ---------------- */
@@ -317,7 +302,7 @@
   }
 
   function aggregate(L, from, to, clock, costs, withDims) {
-    var T = { invoices: 0, returnCount: 0, gross: 0, discount: 0, sales: 0, returns: 0, cogs: 0 };
+    var T = { invoices: 0, returnCount: 0, gross: 0, discount: 0, sales: 0, returns: 0, cogs: 0, est: 0 };
     var acc = {};
     DIMS.forEach(function (d) { acc[d] = {}; });
     function productName(pid, fallback) { var p = L.products[pid]; return p && p.name !== '' ? p.name : fallback; }
@@ -340,15 +325,16 @@
       T.invoices++; T.gross += s.total; T.discount += s.discount; T.sales += s.finalTotal;
       var items = L.itemsBySale[s.id] || [];
       var lines = items.map(function (it) {
-        return { pid: it.productId, name: it.name, qty: it.qty, gross: it.total, cost: costs.line[it.id] };
+        return { pid: it.productId, name: it.name, qty: it.qty, gross: it.total, cost: costs.line[it.id], est: costs.est[it.id] === true };
       });
-      if (!lines.length) lines.push({ pid: '', name: '', qty: 0, gross: s.total, cost: 0 });
+      if (!lines.length) lines.push({ pid: '', name: '', qty: 0, gross: s.total, cost: 0, est: true });
       var sum = 0;
       lines.forEach(function (ln) { sum += ln.gross; });
       var shares = allocate(sum - s.finalTotal, lines.map(function (ln) { return ln.gross; }));
       var hour = posHour(s, clock);
       lines.forEach(function (ln, i) {
         T.cogs += ln.cost;
+        if (ln.est) T.est++;
         if (!withDims) return;
         var keys = keysFor(ln.pid, ln.name, s, hour);
         DIMS.forEach(function (dim) {
@@ -376,6 +362,7 @@
       invoices: T.invoices, returnCount: T.returnCount, gross: T.gross, discount: T.discount, sales: T.sales,
       returns: T.returns, netSales: T.sales - T.returns, cogs: T.cogs, grossProfit: 0, marginBp: null,
       avgTicket: T.invoices > 0 ? divRound(T.sales, T.invoices) : 0,
+      costEstimatedLines: T.est, profitApproximate: costs.mode === 'line' || T.est > 0,
     };
     totals.grossProfit = totals.netSales - totals.cogs;
     totals.marginBp = bp(totals.grossProfit, totals.netSales);
@@ -602,10 +589,10 @@
     var out = [];
     out.push({ id: 'sales.totals', title: 'خلاصهٔ فروش', columns: cols([['from', 'از', 'date'], ['to', 'تا', 'date']]
       .concat([['returnCount', 'برگشتی (بار)', 'count']]).concat(SALES_COLS.filter(function (c) { return c[0] !== 'qty'; }))
-      .concat([['avgTicket', 'میانگین فاکتور', 'money']])), rows: [], total: null });
+      .concat([['avgTicket', 'میانگین فاکتور', 'money'], ['profitApproximate', 'سود تقریبی', 'flag']])), rows: [], total: null });
     var t = r.totals;
     out[0].rows.push([r.from, r.to].concat(pick(t, [['returnCount']])).concat(pick(t, SALES_COLS.filter(function (c) { return c[0] !== 'qty'; })))
-      .concat([t.avgTicket]));
+      .concat([t.avgTicket, t.profitApproximate]));
     DIMS.forEach(function (dim) {
       var list = r[dim];
       var tot = { qty: 0, gross: 0, discount: 0, sales: 0, returns: 0, netSales: 0, cogs: 0, grossProfit: 0 };
@@ -623,7 +610,7 @@
 
   var TODAY_COLS = [['invoices', 'فاکتور', 'count'], ['sales', 'فروش', 'money'], ['returns', 'برگشتی', 'money'],
     ['netSales', 'فروش خالص', 'money'], ['grossProfit', 'سود ناخالص', 'money'], ['marginBp', 'حاشیه', 'bp'],
-    ['avgTicket', 'میانگین فاکتور', 'money']];
+    ['avgTicket', 'میانگین فاکتور', 'money'], ['profitApproximate', 'سود تقریبی', 'flag']];
 
   function todayTables(r) {
     return [{
@@ -688,10 +675,11 @@
 
   /**
    * یک خانه ⇐ متنِ ساده با رقمِ لاتین (CSV و آزمون). رقمِ فارسی/پشتو و جداکنندهٔ
-   * هزارگان کارِ لایهٔ نمایش است. money ⇒ «1234.50»، qty ⇒ «1.5»، bp ⇒ «12.34%».
+   * هزارگان کارِ لایهٔ نمایش است. money ⇒ «1234.50»، qty ⇒ «1.5»، bp ⇒ «12.34%»، flag ⇒ «بله»/«نه».
    */
   function cellText(v, kind) {
     if (v === null || v === undefined) return '';
+    if (kind === 'flag') return v === true ? 'بله' : 'نه';
     if (kind === 'money' || kind === 'bp') {
       var neg = v < 0, a = neg ? -v : v;
       var s = String(floorDiv(a, 100)) + '.' + pad(a % 100, 2);
@@ -717,8 +705,6 @@
     VERSION: VERSION,
     ledger: ledger,
     fixedClock: fixedClock,
-    epochDay: epochDay,
-    isoOf: isoOf,
     allocate: allocate,
     costs: costsOf,
     today: today,

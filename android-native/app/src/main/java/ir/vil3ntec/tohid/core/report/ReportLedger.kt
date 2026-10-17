@@ -4,6 +4,8 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import ir.vil3ntec.tohid.core.calendar.BusinessDay
+import ir.vil3ntec.tohid.core.calendar.CivilDays
 import kotlin.math.floor
 
 /**
@@ -134,8 +136,8 @@ class ReportLedger private constructor() {
 
 /**
  *  ساعتِ فروشگاه: روزِ کاری و ساعتِ دیواری از یک لحظه (UTC ms).
- *  روزِ کاری که از نیمه‌شب رد می‌شود مالِ روزِ شروعش است (بخشِ ۳.۲ ـ زمان).
- *  وقتی `core/calendar/BusinessDay` (PR #224) روی main بنشیند، همان پشتِ این رابط می‌نشیند.
+ *  روزِ کاری که از نیمه‌شب رد می‌شود مالِ روزِ شروعش است (بخشِ ۳.۲ ـ زمان) —
+ *  خودِ حساب از `core/calendar/BusinessDay` است، نه نسخهٔ دوم.
  */
 interface ReportClock {
   /** `yyyy-MM-dd`ِ روزِ کاری */
@@ -145,47 +147,20 @@ interface ReportClock {
   fun hour(ms: Long): Int
 
   companion object {
-    /** اختلافِ ثابت از UTC (افغانستان +۲۷۰، بی ساعتِ تابستانی) و شروعِ روزِ کاری (دقیقه از نیمه‌شب) */
+    /** اختلافِ ثابت از UTC (کابل +۲۷۰، بی ساعتِ تابستانی) و شروعِ روزِ کاری (دقیقه از نیمه‌شب) */
     fun fixed(offsetMinutes: Int, dayStartMinute: Int): ReportClock = object : ReportClock {
-      private val off = offsetMinutes * 60_000L
-      private val start = dayStartMinute * 60_000L
-      override fun date(ms: Long) = ReportDates.isoOf(Math.floorDiv(ms + off - start, ReportDates.DAY_MS))
-      override fun hour(ms: Long) = (Math.floorMod(ms + off, ReportDates.DAY_MS) / 3_600_000L).toInt()
+      override fun date(ms: Long) = BusinessDay.businessDateAt(ms, offsetMinutes, dayStartMinute)
+      override fun hour(ms: Long) = (Math.floorMod(ms + offsetMinutes * 60_000L, ReportDates.DAY_MS) / 3_600_000L).toInt()
     }
   }
 }
 
-/** تاریخِ میلادیِ `yyyy-MM-dd` ⇄ شمارهٔ روز از ۱۹۷۰ (Hinnant) — همان `epochDay`/`isoOf`ِ JS */
+/** شمارهٔ روز از ۱۹۷۰ ⇄ `yyyy-MM-dd` — روی `CivilDays`؛ تاریخِ نامعتبر (مثلاً ۰۲-۳۰) null */
 object ReportDates {
   const val DAY_MS = 86_400_000L
-  private val ISO = Regex("""^(\d{4})-(\d{2})-(\d{2})$""")
+  private const val JDN_1970 = 2440588
 
-  fun epochDay(iso: String): Long? {
-    val m = ISO.find(iso) ?: return null
-    var y = m.groupValues[1].toLong()
-    val mo = m.groupValues[2].toInt()
-    val d = m.groupValues[3].toInt()
-    if (mo < 1 || mo > 12 || d < 1 || d > 31) return null
-    if (mo <= 2) y -= 1
-    val era = Math.floorDiv(y, 400L)
-    val yoe = y - era * 400
-    val doy = (153 * (mo + if (mo > 2) -3 else 9) + 2) / 5 + d - 1
-    val doe = yoe * 365 + yoe / 4 - yoe / 100 + doy
-    return era * 146097 + doe - 719468
-  }
+  fun epochDay(iso: String): Long? = CivilDays.jdnOfIso(iso)?.let { (it - JDN_1970).toLong() }
 
-  fun isoOf(n: Long): String {
-    val z = n + 719468
-    val era = Math.floorDiv(z, 146097L)
-    val doe = z - era * 146097
-    val yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365
-    val doy = doe - (365 * yoe + yoe / 4 - yoe / 100)
-    val mp = (5 * doy + 2) / 153
-    val d = doy - (153 * mp + 2) / 5 + 1
-    val m = if (mp < 10) mp + 3 else mp - 9
-    val y = yoe + era * 400 + if (m <= 2) 1 else 0
-    return y.toString().padStart(4, '0') + "-" + m.toString().padStart(2, '0') + "-" + d.toString().padStart(2, '0')
-  }
-
-  fun addDays(iso: String, k: Int): String = epochDay(iso)?.let { isoOf(it + k) } ?: ""
+  fun addDays(iso: String, k: Int): String = CivilDays.addDays(iso, k) ?: ""
 }

@@ -27,6 +27,10 @@ object ReportCore {
     val invoices: Int, val returnCount: Int, val gross: Long, val discount: Long, val sales: Long,
     val returns: Long, val netSales: Long, val cogs: Long, val grossProfit: Long, val marginBp: Long?,
     val avgTicket: Long,
+    /** قلم‌های فروخته‌شدهٔ بازه که بهایشان معلوم نیست یا تخمینی است */
+    val costEstimatedLines: Int,
+    /** v3 ۱۵.۴ بند ۴: سود «تقریبی» است — بهای 'line' (کپیِ قیمتِ خرید) یا قلمِ بی‌بها */
+    val profitApproximate: Boolean,
   )
 
   @Serializable
@@ -34,6 +38,10 @@ object ReportCore {
     val date: String, val invoices: Int, val returnCount: Int, val gross: Long, val discount: Long, val sales: Long,
     val returns: Long, val netSales: Long, val cogs: Long, val grossProfit: Long, val marginBp: Long?,
     val avgTicket: Long,
+    /** قلم‌های فروخته‌شدهٔ بازه که بهایشان معلوم نیست یا تخمینی است */
+    val costEstimatedLines: Int,
+    /** v3 ۱۵.۴ بند ۴: سود «تقریبی» است — بهای 'line' (کپیِ قیمتِ خرید) یا قلمِ بی‌بها */
+    val profitApproximate: Boolean,
   )
 
   @Serializable
@@ -83,7 +91,7 @@ object ReportCore {
   @Serializable
   data class FraudReport(val from: String, val to: String, val rows: List<FraudRow>, val totals: FraudRow)
 
-  class Costs(val line: Map<String, Long>, val ret: Map<String, Long>)
+  class Costs(val mode: Costing, val line: Map<String, Long>, val ret: Map<String, Long>, val est: Set<String>)
 
   /* ---------------- عدد ---------------- */
 
@@ -118,14 +126,18 @@ object ReportCore {
   fun costs(l: ReportLedger, mode: Costing): Costs {
     val line = HashMap<String, Long>()
     val ret = HashMap<String, Long>()
-    fun lineMode(it: ReportLedger.Item) = rnd(it.unitCost.toDouble() * it.qty.toDouble() / 1000.0)
+    val est = HashSet<String>()
+    fun lineMode(it: ReportLedger.Item): Long {
+      if (it.unitCost == 0L) est += it.id
+      return rnd(it.unitCost.toDouble() * it.qty.toDouble() / 1000.0)
+    }
     if (mode != Costing.MAVG) {
       l.items.forEach { line[it.id] = lineMode(it) }
       l.returns.forEach { r ->
         val it = l.itemById[r.saleItemId]
         ret[r.id] = if (it != null) rnd(it.unitCost.toDouble() * r.qty.toDouble() / 1000.0) else 0L
       }
-      return Costs(line, ret)
+      return Costs(Costing.LINE, line, ret, est)
     }
     class Ev(val t: Long, val k: Int, val id: String, val e: ReportLedger.Entry? = null, val it: ReportLedger.Item? = null, val r: ReportLedger.Return? = null)
     val ev = ArrayList<Ev>()
@@ -143,9 +155,12 @@ object ReportCore {
     class Pool(var q: Long = 0, var v: Long = 0, var unit: Double? = null)
     val pools = HashMap<String, Pool>()
     fun pool(pid: String) = pools.getOrPut(pid) { Pool() }
+    var short = false
     fun take(p: Pool, q: Long, fallbackUnit: Double): Long {
+      short = false
       val cost = if (p.q > 0 && q <= p.q) rnd(p.v.toDouble() * q.toDouble() / p.q.toDouble())
       else {
+        short = true
         val avail = if (p.q > 0) p.q else 0L
         val unit = p.unit ?: fallbackUnit
         (if (avail > 0) p.v else 0L) + rnd((q - avail).toDouble() * unit / 1000.0)
@@ -178,7 +193,8 @@ object ReportCore {
         }
         1 -> {
           val it = x.it!!
-          line[it.id] = if (it.productId == "" || it.qty <= 0) lineMode(it) else take(pool(it.productId), it.qty, it.unitCost.toDouble())
+          if (it.productId == "" || it.qty <= 0) line[it.id] = lineMode(it)
+          else { line[it.id] = take(pool(it.productId), it.qty, it.unitCost.toDouble()); if (short) est += it.id }
         }
         else -> {
           val r = x.r!!
@@ -191,7 +207,7 @@ object ReportCore {
       }
     }
     l.items.forEach { if (it.id !in line) line[it.id] = lineMode(it) }
-    return Costs(line, ret)
+    return Costs(Costing.MAVG, line, ret, est)
   }
 
   /* ---------------- تخصیصِ تخفیف ---------------- */
@@ -241,7 +257,7 @@ object ReportCore {
 
   private fun aggregate(l: ReportLedger, from: String, to: String, clock: ReportClock?, costs: Costs, withDims: Boolean): Agg {
     var invoices = 0; var returnCount = 0
-    var gross = 0L; var discount = 0L; var sales = 0L; var returns = 0L; var cogs = 0L
+    var gross = 0L; var discount = 0L; var sales = 0L; var returns = 0L; var cogs = 0L; var estimated = 0
     val acc = DIMS.associateWith { HashMap<String, Acc>() }
     fun productName(pid: String, fallback: String) = l.products[pid]?.name?.takeIf { it != "" } ?: fallback
     fun categoryOf(pid: String) = l.products[pid]?.category ?: ""
@@ -257,18 +273,19 @@ object ReportCore {
         "channel" to (channel to channel),
       )
     }
-    class Line(val pid: String, val name: String, val qty: Long, val gross: Long, val cost: Long)
+    class Line(val pid: String, val name: String, val qty: Long, val gross: Long, val cost: Long, val est: Boolean)
     for (s in l.sales) {
       if (s.cancelled) continue
       val d = posDate(s, clock)
       if (!(d >= from && d <= to)) continue
       invoices++; gross += s.total; discount += s.discount; sales += s.finalTotal
-      val lines = l.itemsBySale[s.id].orEmpty().map { Line(it.productId, it.name, it.qty, it.total, costs.line.getValue(it.id)) }
-        .ifEmpty { listOf(Line("", "", 0L, s.total, 0L)) }
+      val lines = l.itemsBySale[s.id].orEmpty().map { Line(it.productId, it.name, it.qty, it.total, costs.line.getValue(it.id), it.id in costs.est) }
+        .ifEmpty { listOf(Line("", "", 0L, s.total, 0L, true)) }
       val shares = allocate(lines.sumOf { it.gross } - s.finalTotal, lines.map { it.gross })
       val hour = posHour(s, clock)
       lines.forEachIndexed { i, ln ->
         cogs += ln.cost
+        if (ln.est) estimated++
         if (!withDims) return@forEachIndexed
         val keys = keysFor(ln.pid, ln.name, s, hour)
         for (dim in DIMS) {
@@ -298,6 +315,7 @@ object ReportCore {
     val totals = Totals(
       invoices, returnCount, gross, discount, sales, returns, net, cogs, net - cogs, bp(net - cogs, net),
       if (invoices > 0) divRound(sales, invoices.toLong()) else 0L,
+      estimated, costs.mode == Costing.LINE || estimated > 0,
     )
     if (!withDims) return Agg(totals, emptyMap())
     val dims = DIMS.associateWith { dim ->
@@ -339,7 +357,8 @@ object ReportCore {
     val costs = costs(l, costing)
     fun day(d: String): Day {
       val t = aggregate(l, d, d, clock, costs, false).totals
-      return Day(d, t.invoices, t.returnCount, t.gross, t.discount, t.sales, t.returns, t.netSales, t.cogs, t.grossProfit, t.marginBp, t.avgTicket)
+      return Day(d, t.invoices, t.returnCount, t.gross, t.discount, t.sales, t.returns, t.netSales, t.cogs, t.grossProfit, t.marginBp, t.avgTicket,
+        t.costEstimatedLines, t.profitApproximate)
     }
     val t = day(d0)
     val y = day(ReportDates.addDays(d0, -1))

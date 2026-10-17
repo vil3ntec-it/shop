@@ -498,6 +498,8 @@
      "grossProfit": 17450,
      "marginBp": 3882,
      "avgTicket": 19650,
+     "costEstimatedLines": 2,
+     "profitApproximate": true,
      "date": "2026-10-14"
     },
     "yesterday": {
@@ -512,6 +514,8 @@
      "grossProfit": 12500,
      "marginBp": 1689,
      "avgTicket": 37000,
+     "costEstimatedLines": 0,
+     "profitApproximate": true,
      "date": "2026-10-13"
     },
     "lastWeek": {
@@ -526,6 +530,8 @@
      "grossProfit": 5000,
      "marginBp": 3333,
      "avgTicket": 30000,
+     "costEstimatedLines": 0,
+     "profitApproximate": true,
      "date": "2026-10-07"
     },
     "vsYesterday": {
@@ -617,6 +623,8 @@
      "grossProfit": 19582,
      "marginBp": 4356,
      "avgTicket": 19650,
+     "costEstimatedLines": 2,
+     "profitApproximate": true,
      "date": "2026-10-14"
     },
     "yesterday": {
@@ -631,6 +639,8 @@
      "grossProfit": 16763,
      "marginBp": 2265,
      "avgTicket": 37000,
+     "costEstimatedLines": 0,
+     "profitApproximate": false,
      "date": "2026-10-13"
     },
     "lastWeek": {
@@ -645,6 +655,8 @@
      "grossProfit": 5000,
      "marginBp": 3333,
      "avgTicket": 30000,
+     "costEstimatedLines": 0,
+     "profitApproximate": false,
      "date": "2026-10-07"
     },
     "vsYesterday": {
@@ -733,6 +745,8 @@
      "grossProfit": 18950,
      "marginBp": 3871,
      "avgTicket": 15738,
+     "costEstimatedLines": 2,
+     "profitApproximate": true,
      "date": "2026-10-14"
     },
     "yesterday": {
@@ -747,6 +761,8 @@
      "grossProfit": 11000,
      "marginBp": 1571,
      "avgTicket": 70000,
+     "costEstimatedLines": 0,
+     "profitApproximate": true,
      "date": "2026-10-13"
     },
     "lastWeek": {
@@ -761,6 +777,8 @@
      "grossProfit": 5000,
      "marginBp": 3333,
      "avgTicket": 30000,
+     "costEstimatedLines": 0,
+     "profitApproximate": true,
      "date": "2026-10-07"
     },
     "vsYesterday": {
@@ -852,6 +870,8 @@
      "grossProfit": 17450,
      "marginBp": 3882,
      "avgTicket": 19650,
+     "costEstimatedLines": 2,
+     "profitApproximate": true,
      "date": "2026-10-14"
     },
     "yesterday": {
@@ -866,6 +886,8 @@
      "grossProfit": 12500,
      "marginBp": 1689,
      "avgTicket": 37000,
+     "costEstimatedLines": 0,
+     "profitApproximate": true,
      "date": "2026-10-13"
     },
     "lastWeek": {
@@ -880,6 +902,8 @@
      "grossProfit": 5000,
      "marginBp": 3333,
      "avgTicket": 30000,
+     "costEstimatedLines": 0,
+     "profitApproximate": true,
      "date": "2026-10-07"
     },
     "vsYesterday": {
@@ -970,7 +994,9 @@
      "cogs": 99000,
      "grossProfit": 34950,
      "marginBp": 2609,
-     "avgTicket": 27158
+     "avgTicket": 27158,
+     "costEstimatedLines": 2,
+     "profitApproximate": true
     },
     "product": [
      {
@@ -1309,7 +1335,9 @@
      "cogs": 92605,
      "grossProfit": 41345,
      "marginBp": 3087,
-     "avgTicket": 27158
+     "avgTicket": 27158,
+     "costEstimatedLines": 2,
+     "profitApproximate": true
     },
     "product": [
      {
@@ -1643,7 +1671,9 @@
      "cogs": 99000,
      "grossProfit": 34950,
      "marginBp": 2609,
-     "avgTicket": 27158
+     "avgTicket": 27158,
+     "costEstimatedLines": 2,
+     "profitApproximate": true
     },
     "product": [
      {
@@ -2214,7 +2244,8 @@
       "بهای تمام‌شده",
       "سود ناخالص",
       "حاشیه",
-      "میانگین فاکتور"
+      "میانگین فاکتور",
+      "سود تقریبی"
      ],
      "rows": [
       [
@@ -2230,7 +2261,8 @@
        "990.00",
        "349.50",
        "26.09%",
-       "271.58"
+       "271.58",
+       "بله"
       ]
      ],
      "total": null
@@ -2729,7 +2761,8 @@
       "فروش خالص",
       "سود ناخالص",
       "حاشیه",
-      "میانگین فاکتور"
+      "میانگین فاکتور",
+      "سود تقریبی"
      ],
      "rows": [
       [
@@ -2741,7 +2774,8 @@
        "449.50",
        "174.50",
        "38.82%",
-       "196.50"
+       "196.50",
+       "بله"
       ],
       [
        "دیروز",
@@ -2752,7 +2786,8 @@
        "740.00",
        "125.00",
        "16.89%",
-       "370.00"
+       "370.00",
+       "بله"
       ],
       [
        "همین روز هفتهٔ پیش",
@@ -2763,7 +2798,8 @@
        "150.00",
        "50.00",
        "33.33%",
-       "300.00"
+       "300.00",
+       "بله"
       ]
      ],
      "total": null
@@ -3000,7 +3036,9 @@
      "cogs": 0,
      "grossProfit": 0,
      "marginBp": null,
-     "avgTicket": 0
+     "avgTicket": 0,
+     "costEstimatedLines": 0,
+     "profitApproximate": true
     },
     "product": [],
     "category": [],
