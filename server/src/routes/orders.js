@@ -13,12 +13,13 @@
  */
 const express = require('express');
 const orders = require('../lib/orders');
+const refunds = require('../lib/order-refunds');
 const S = require('../lib/order-states');
 const audit = require('../lib/audit');
 const { can } = require('../lib/permissions');
 const { requireUser, requireShop, requirePermission } = require('../middleware/auth');
 const { clientIp } = require('../middleware/ratelimit');
-const { forbidden } = require('../middleware/errors');
+const { forbidden, conflict } = require('../middleware/errors');
 
 const router = express.Router();
 router.use(requireUser, requireShop, requirePermission('orders.view'));
@@ -50,6 +51,8 @@ router.get('/config', wrap(async (req, res) => {
   const st = await orders.stateOf(req.shopId);
   res.json({
     ...st,
+    //  دفترِ بازپرداخت (§۳۸.۷، FIN-01) — پیش‌فرض خاموش
+    refundLedger: await refunds.flagOf(req.shopId),
     tabs: S.TABS,
     reasons: S.REASONS,
     sources: orders.STAFF_SOURCES,
@@ -69,8 +72,20 @@ router.get('/', needFlag, wrap(async (req, res) => {
   }, actorOf(req)));
 }));
 
+/**
+ * تطبیقِ دریافت و بازپرداخت (§۳۸.۷): جمع‌های بازه + صفِ اختلاف‌ها.
+ * فقط‌خواندنی؛ هر کس بازپرداخت می‌کند (صاحب و مدیر) آن را می‌بیند.
+ * پیش از `/:id` تا با شناسهٔ سفارش اشتباه نشود.
+ */
+router.get('/reconciliation', needFlag, requirePermission('orders.refund'), wrap(async (req, res) => {
+  res.json(await refunds.report(req.shopId, { from: req.query.from, to: req.query.to }));
+}));
+
 router.get('/:id', needFlag, wrap(async (req, res) => {
-  res.json({ order: await orders.get(req.shopId, req.params.id, actorOf(req)) });
+  const order = await orders.get(req.shopId, req.params.id, actorOf(req));
+  //  دفترِ بازپرداختِ همین سفارش — مبلغِ برگشته، مانده و اختلاف (FIN-01)
+  order.refund = await refunds.summary(req.shopId, order.id);
+  res.json({ order });
 }));
 
 /**
@@ -95,6 +110,10 @@ router.post('/', needFlag, requirePermission('orders.create'), needWrite, wrap(a
 }));
 
 router.post('/:id/transition', needFlag, requirePermission('orders.manage'), needWrite, wrap(async (req, res) => {
+  //  دفترِ بازپرداخت روشن ⇒ «بازپرداخت‌شده» بی مبلغ پذیرفته نیست؛ فقط از راهِ `/refunds`
+  if (S.MONEY_TARGETS.includes(String(req.body?.to || '').trim()) && (await refunds.flagOf(req.shopId))) {
+    throw conflict('بازپرداخت را با مبلغش از «ثبتِ بازپرداخت» بزنید', 'refund_via_ledger');
+  }
   let out;
   try {
     out = await orders.transition(req.shopId, req.params.id, req.body || {}, actorOf(req));
@@ -113,6 +132,44 @@ router.post('/:id/transition', needFlag, requirePermission('orders.manage'), nee
     });
   }
   res.json({ order: out.order, unchanged: out.unchanged });
+}));
+
+/**
+ * ثبتِ بازپرداخت با مبلغ (§۳۸.۲/۳۸.۷، FIN-01) — پشتِ پرچمِ خاموشِ
+ * `shop.orders.refunds`. کلیدِ یکتایی لازم است؛ تکرارِ همان درخواست
+ * ردیفِ دوم نمی‌سازد. سفارش باید «درخواستِ برگشت» باشد.
+ */
+const needLedger = wrap(async (req, res, next) => {
+  if (!(await refunds.flagOf(req.shopId))) {
+    return next(forbidden('دفترِ بازپرداخت برای این دکان روشن نیست', 'refund_ledger_disabled'));
+  }
+  next();
+});
+
+router.post('/:id/refunds', needFlag, requirePermission('orders.refund'), needWrite, needLedger, wrap(async (req, res) => {
+  const key = orders.clientKeyOf(req);
+  let out;
+  try {
+    out = await refunds.record(req.shopId, req.params.id, { key, body: req.body, actor: actorOf(req) });
+  } catch (err) {
+    if (err.code === 'refund_exceeds_remaining') {
+      return res.status(409).json({ error: { code: err.code, message: err.message, remainingMinor: err.remainingMinor } });
+    }
+    throw err;
+  }
+  const order = await orders.get(req.shopId, req.params.id, actorOf(req));
+  order.refund = await refunds.summary(req.shopId, order.id);
+  if (out.replayed) {
+    res.set('Idempotent-Replayed', 'true');
+    return res.status(200).json({ order, entry: out.entry, replayed: true });
+  }
+  await audit.log({
+    shopId: req.shopId, userId: req.user.id, action: 'order.refund',
+    targetType: 'online_order', targetId: order.id,
+    detail: { orderNo: order.orderNo, amountMinor: out.entry.amountMinor, seq: out.entry.seq, from: out.from, to: out.to },
+    ip: clientIp(req),
+  });
+  res.status(201).json({ order, entry: out.entry });
 }));
 
 module.exports = router;
