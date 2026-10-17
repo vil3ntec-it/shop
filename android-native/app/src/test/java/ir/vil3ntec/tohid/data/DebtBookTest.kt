@@ -229,7 +229,9 @@ class DebtBookTest {
     var d = tx(d0, "c1", DebtorEngine.Kind.GIVE, 4000.0, "2026-10-01", 1)
     assertNull(DebtBook.creditCheck(d, "c1", m(1_000_000.0)))
 
-    d = ok(DebtorEngine.edit(d, "c1", DebtorEngine.DebtorDraft("احمد", "0790000000", "", creditLimit = 5000.0)))
+    d = ok(DebtorEngine.editWithLimit(d, "c1", DebtorEngine.DebtorDraft("احمد", "0790000000", "", creditLimit = 5000.0)))
+    assertEquals("credit_limit_set", d.auditLog.last().type)
+    assertEquals("0790000000", d.debtors.first().phone)
     val c = DebtBook.creditCheck(d, "c1", m(2000.0))!!
     assertTrue(c.over)
     assertEquals(m(1000.0), c.excess)
@@ -246,9 +248,16 @@ class DebtBookTest {
     assertEquals("credit_over_limit", approved.auditLog.last().type)
     assertEquals(m(6000.0), DebtBook.book(approved, "c1", "2026-10-17")!!.balance)
 
-    assertTrue(DebtorEngine.edit(d, "c1", DebtorEngine.DebtorDraft("احمد", creditLimit = -1.0)) is DebtorEngine.Result.Failed)
-    //  برداشتنِ سقف
-    assertNull(ok(DebtorEngine.edit(d, "c1", DebtorEngine.DebtorDraft("احمد"))).debtors.first().creditLimit)
+    assertTrue(DebtorEngine.setCreditLimit(d, "c1", -1.0) is DebtorEngine.Result.Failed)
+    assertTrue(DebtorEngine.editWithLimit(d, "c1", DebtorEngine.DebtorDraft("احمد", creditLimit = Double.NaN)) is DebtorEngine.Result.Failed)
+    assertTrue(DebtorEngine.add(d, DebtorEngine.DebtorDraft("تازه", creditLimit = -5.0), 1, ::newId) is DebtorEngine.Result.Failed)
+    //  همان سقف ⇒ بی ردِ تازه؛ برداشتنِ سقف ⇒ رد
+    assertEquals(d.auditLog.size, ok(DebtorEngine.setCreditLimit(d, "c1", 5000.0)).auditLog.size)
+    val cleared = ok(DebtorEngine.setCreditLimit(d, "c1", null))
+    assertNull(cleared.debtors.first().creditLimit)
+    assertEquals("credit_limit_set", cleared.auditLog.last().type)
+    //  `edit`ِ تنها به سقف دست نمی‌زند
+    assertEquals(5000.0, ok(DebtorEngine.edit(d, "c1", DebtorEngine.DebtorDraft("احمد"))).debtors.first().creditLimit!!, 0.0)
   }
 
   /* ───────────────────────────── رسید ───────────────────────────── */

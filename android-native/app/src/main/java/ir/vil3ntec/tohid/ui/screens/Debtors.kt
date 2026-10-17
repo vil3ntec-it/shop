@@ -67,6 +67,10 @@ import ir.vil3ntec.tohid.plain
 import ir.vil3ntec.tohid.spanText
 import ir.vil3ntec.tohid.todayIso
 import ir.vil3ntec.tohid.ui.pressMenu
+import ir.vil3ntec.tohid.ui.components.common.ScreenKind
+import ir.vil3ntec.tohid.ui.components.common.ViewMode
+import ir.vil3ntec.tohid.ui.components.common.ViewModeToggle
+import ir.vil3ntec.tohid.ui.components.common.rememberViewMode
 import ir.vil3ntec.tohid.ui.theme.Radius
 import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.launch
@@ -149,7 +153,10 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
         .sortedWith(sort.order)
     }
 
-    val wideTable = screenSize() == Screen.WIDE
+    //  نمای کارتی/جدولی (VISUAL-DIRECTION §۱٫۵): انتخابِ همین کاربر روی همین دستگاه؛
+    //  گوشی همیشه کارتی. جست‌وجو، ترتیب و قرض‌دارِ بازشده با عوض‌شدنِ نما می‌مانند.
+    val view = rememberViewMode("debtors", ScreenKind.MANAGEMENT)
+    val wideTable = view.mode == ViewMode.TABLE
     Box(Modifier.fillMaxSize()) {
       // شبکهٔ کارت‌ها — همان `.debtor-list` نسخهٔ وب. قرض‌دار در یک نگاه
       // از رنگِ کارتش شناخته می‌شود، نه از خواندنِ عدد.
@@ -203,6 +210,10 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
              *  که در دکان همان مهم‌تر است: قرضِ کوچکی که شش ماه مانده،
              *  از قرضِ بزرگِ دیروز بدتر است.
              */
+            if (view.toggleVisible) {
+              Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { ViewModeToggle(view) }
+              Spacer(Modifier.height(6.dp))
+            }
             DebtorSortRow(current = sort, count = rows.size) { sortName = it.name }
             Spacer(Modifier.height(4.dp))
           }
@@ -276,7 +287,7 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
         val result = if (state.editingId == null) {
           DebtorEngine.add(d, draft, System.currentTimeMillis(), ::newId)
         } else {
-          DebtorEngine.edit(d, state.editingId, draft)
+          DebtorEngine.editWithLimit(d, state.editingId, draft)
         }
         apply(result, if (state.editingId == null) "با موفقیت ثبت شد" else "با موفقیت ویرایش شد") {
           form = null
@@ -950,9 +961,11 @@ private fun AccountView(
               style = MaterialTheme.typography.labelSmall,
               color = Shop.colors.muted,
             )
-            book?.entry(tx.id)?.let { e ->
-              Spacer(Modifier.height(4.dp))
-              DebtEntryDetail(book, e)
+            book?.let { bk ->
+              bk.entry(tx.id)?.let { e ->
+                Spacer(Modifier.height(4.dp))
+                DebtEntryDetail(bk, e)
+              }
             }
           }
           Text(

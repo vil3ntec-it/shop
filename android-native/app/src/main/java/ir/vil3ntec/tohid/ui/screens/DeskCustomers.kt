@@ -45,6 +45,10 @@ import ir.vil3ntec.tohid.data.Xlsx
 import ir.vil3ntec.tohid.formatDate
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.ui.Platform
+import ir.vil3ntec.tohid.ui.components.common.ScreenKind
+import ir.vil3ntec.tohid.ui.components.common.ViewMode
+import ir.vil3ntec.tohid.ui.components.common.ViewModeToggle
+import ir.vil3ntec.tohid.ui.components.common.rememberViewMode
 import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.launch
 
@@ -105,6 +109,9 @@ private fun CustomerCards(store: ShopStore, d: ShopData, snackbar: SnackbarHostS
   var filter by remember { mutableStateOf(Filter.ALL) }
   var sort by remember { mutableStateOf(Sort.DEBT) }
   var sortMenu by remember { mutableStateOf(false) }
+  //  نمای کارتی/جدولی (VISUAL-DIRECTION §۱٫۵) — پیش‌فرضِ مدیریت جدول؛ جست‌وجو،
+  //  صافی و ترتیب با عوض‌شدنِ نما دست نمی‌خورند
+  val view = rememberViewMode("customers", ScreenKind.MANAGEMENT)
 
   val all = remember(d) { CustomerEngine.summaries(d) }
   val list = remember(all, search, filter, sort) {
@@ -183,13 +190,15 @@ private fun CustomerCards(store: ShopStore, d: ShopData, snackbar: SnackbarHostS
         }
       }
       Spacer(Modifier.width(6.dp))
+      ViewModeToggle(view)
+      Spacer(Modifier.width(6.dp))
       OutlinedButton(onClick = ::excel) { Text("اکسل  Ctrl+E") }
     }
     Spacer(Modifier.height(8.dp))
     NewCustomerRow(store, d, ::toast) { onOpen(it) }
     Spacer(Modifier.height(4.dp))
     Text(
-      "${list.size} از ${all.size} مشتری — روی کارت بزنید تا صورت‌حساب، فاکتورها و اقلامش باز شود.",
+      "${list.size} از ${all.size} مشتری — روی ${if (view.mode == ViewMode.TABLE) "ردیف" else "کارت"} بزنید تا صورت‌حساب، فاکتورها و اقلامش باز شود.",
       style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted,
     )
     Spacer(Modifier.height(8.dp))
@@ -198,6 +207,31 @@ private fun CustomerCards(store: ShopStore, d: ShopData, snackbar: SnackbarHostS
       Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Text(if (all.isEmpty()) "هنوز مشتری‌ای نیست — نام را در «مشتریِ تازه» بنویسید و Enter بزنید." else "با این صافی کسی نیست.", color = Shop.colors.muted)
       }
+    } else if (view.mode == ViewMode.TABLE) {
+      //  همان فهرست، همان صافی و ترتیب — جدولِ خط‌دار مثلِ داخلِ پرونده
+      val cols = listOf(
+        TCol("نام"), TCol("تلفن", 140.dp), TCol("مانده", 140.dp, true), TCol("روزِ بدهی", 90.dp, true),
+        TCol("فاکتورها", 80.dp, true), TCol("جمعِ خرید", 130.dp, true), TCol("آخرین خرید", 110.dp), TCol("آخرین پرداخت", 110.dp),
+      )
+      DeskTable(
+        cols, list.size, Modifier.weight(1f),
+        empty = "",
+        cell = { i, c ->
+          val r = list[i]
+          when (c) {
+            0 -> TCell(r.name, bold = true)
+            1 -> TCell(r.phone, Shop.colors.muted)
+            2 -> TCell(if (kotlin.math.abs(r.balance) < 0.5) "صاف" else money(r.balance), stateColor(r.balance), bold = true)
+            3 -> TCell(r.debtDays?.toString().orEmpty(), if ((r.debtDays ?: 0) > 60) Shop.colors.danger else Shop.colors.muted)
+            4 -> TCell(r.invoices.toString())
+            5 -> TCell(money(r.bought))
+            6 -> TCell(r.lastPurchase?.let { formatDate(it) } ?: "—", Shop.colors.muted)
+            else -> TCell(r.lastPaid?.let { formatDate(it) } ?: "—", Shop.colors.success)
+          }
+        },
+        onClick = { i -> onOpen(list[i].id) },
+        footer = listOf("جمع (${list.size})", "", money(list.sumOf { it.balance }), "", list.sumOf { it.invoices }.toString(), money(list.sumOf { it.bought }), "", ""),
+      )
     } else {
       LazyVerticalGrid(
         columns = GridCells.Adaptive(210.dp),
@@ -575,7 +609,7 @@ private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
       text = { Column { CreditLimitField(text) { text = it } } },
       confirmButton = {
         TextButton(onClick = {
-          when (val r = DebtorEngine.edit(d, id, DebtorEngine.DebtorDraft(debtor.name, debtor.phone, debtor.notes, parseLimit(text)))) {
+          when (val r = DebtorEngine.setCreditLimit(d, id, parseLimit(text))) {
             is DebtorEngine.Result.Failed -> toast(r.message)
             is DebtorEngine.Result.Ok -> { scope.launch { store.save(r.data) }; limitOpen = false; toast("سقفِ اعتبار ذخیره شد") }
           }

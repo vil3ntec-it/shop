@@ -54,17 +54,7 @@ internal fun DebtBookBanner(book: DebtBook.Book) {
   }
   if (lines.isEmpty()) return
   Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-    lines.forEach { (text, tint) ->
-      Text(
-        text,
-        style = MaterialTheme.typography.labelMedium,
-        color = tint,
-        modifier = Modifier
-          .clip(RoundedCornerShape(999.dp))
-          .background(tint.copy(alpha = 0.10f))
-          .padding(horizontal = 10.dp, vertical = 4.dp),
-      )
-    }
+    lines.forEach { (text, tint) -> DebtPill(text, tint) }
   }
 }
 
@@ -96,16 +86,11 @@ internal fun DebtEntryDetail(book: DebtBook.Book, e: DebtBook.Entry, maxLines: I
     if (e.give && e.amount.minor > 0) {
       Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
         e.dueDate?.let { due ->
-          Text(
-            "سررسید ${formatDate(due)}${if (e.overdue) " — گذشته" else ""}",
-            style = small, fontWeight = FontWeight.Bold,
-            color = if (e.overdue) Shop.colors.danger else Shop.colors.primary,
-          )
+          DebtPill("سررسید ${formatDate(due)}${if (e.overdue) " — گذشته" else ""}", if (e.overdue) Shop.colors.danger else Shop.colors.primary)
         }
-        Text(
+        DebtPill(
           if (e.paid) "تسویه شد" else "باز ${DebtBook.show(e.open)}",
-          style = small, fontWeight = FontWeight.Bold,
-          color = if (e.paid) Shop.colors.success else Shop.colors.warning,
+          if (e.paid) Shop.colors.success else Shop.colors.warning,
         )
       }
     }
@@ -121,6 +106,22 @@ internal fun DebtEntryDetail(book: DebtBook.Book, e: DebtBook.Entry, maxLines: I
     }
     if (!e.give && e.open.minor > 0) Text("پیش‌پرداخت ${DebtBook.show(e.open)}", style = small, color = Shop.colors.success)
     Text("مانده پس از این ردیف: ${DebtBook.state(e.balanceAfter)}", style = small, color = Shop.colors.muted2)
+  }
+}
+
+/** وضعیت = متن + رنگ + نقطه (VISUAL-DIRECTION §۱ بند ۳) — متن به رنگِ متن تا کنتراست بماند */
+@Composable
+private fun DebtPill(text: String, dot: androidx.compose.ui.graphics.Color) {
+  Row(
+    Modifier
+      .clip(RoundedCornerShape(999.dp))
+      .background(dot.copy(alpha = 0.12f))
+      .padding(horizontal = 8.dp, vertical = 2.dp),
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(5.dp),
+  ) {
+    Box(Modifier.size(6.dp).clip(RoundedCornerShape(3.dp)).background(dot))
+    Text(text, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Shop.colors.text)
   }
 }
 

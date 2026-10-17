@@ -133,6 +133,7 @@ private fun auditLabel(type: String): String = when (type) {
   "expense_delete" -> "حذف مصرف"
   "debt_due_set" -> "سررسیدِ قرض"
   "credit_over_limit" -> "برد بیش از سقفِ اعتبار"
+  "credit_limit_set" -> "سقفِ اعتبار"
   else -> type
 }
 

@@ -62,19 +62,54 @@ object DebtorEngine {
     if (d.debtors.none { it.id == id }) return Result.Failed("قرض‌دار پیدا نشد")
     val name = draft.name.trim()
     if (name.isEmpty()) return Result.Failed("نام قرض‌دار را بنویسید")
-    if (badLimit(draft.creditLimit)) return Result.Failed("سقفِ اعتبار معتبر وارد کنید")
 
     return Result.Ok(
       d.copy(
         debtors = d.debtors.map {
-          if (it.id == id) {
-            it.copy(name = name, phone = draft.phone.trim(), notes = draft.notes.trim(), creditLimit = draft.creditLimit)
-          } else it
+          if (it.id == id) it.copy(name = name, phone = draft.phone.trim(), notes = draft.notes.trim()) else it
         }
       ),
       id = id,
     )
   }
+
+  /**
+   *  سقفِ اعتبار (CRM-03) — گذاشتن، عوض کردن یا برداشتن (`null` = بی سقف).
+   *
+   *  سیاستِ مالیِ همین مشتری است، پس هر تغییر ردی در دفترچهٔ ثبت دارد. `edit`
+   *  به سقف دست نمی‌زند؛ صفحهٔ ویرایش `editWithLimit` را صدا می‌زند.
+   */
+  fun setCreditLimit(
+    d: ShopData,
+    id: String,
+    limit: Double?,
+    today: String = ir.vil3ntec.tohid.todayIso(),
+    now: Long = System.currentTimeMillis(),
+    newId: () -> String = ::auditId,
+  ): Result {
+    val debtor = d.debtors.find { it.id == id } ?: return Result.Failed("قرض‌دار پیدا نشد")
+    if (badLimit(limit)) return Result.Failed("سقفِ اعتبار معتبر وارد کنید")
+    if (limit == debtor.creditLimit) return Result.Ok(d, id)
+    fun text(v: Double?) = v?.let { "${money(it)} افغانی" } ?: "بی سقف"
+    val trace = AuditEntry(
+      id = newId(), type = "credit_limit_set", date = today, refId = id, createdAt = now,
+      notes = "سقفِ اعتبارِ «${debtor.name}»: ${text(debtor.creditLimit)} ⇐ ${text(limit)}",
+    )
+    return Result.Ok(
+      d.copy(
+        debtors = d.debtors.map { if (it.id == id) it.copy(creditLimit = limit) else it },
+        auditLog = d.auditLog + trace,
+      ),
+      id = id,
+    )
+  }
+
+  /** ویرایشِ نام/تلفن/یادداشت و سقف با هم — همه یا هیچ */
+  fun editWithLimit(d: ShopData, id: String, draft: DebtorDraft): Result =
+    when (val r = edit(d, id, draft)) {
+      is Result.Failed -> r
+      is Result.Ok -> setCreditLimit(r.data, id, draft.creditLimit)
+    }
 
   /**
    * حذفِ قرض‌دار — با تراکنش‌هایش.
