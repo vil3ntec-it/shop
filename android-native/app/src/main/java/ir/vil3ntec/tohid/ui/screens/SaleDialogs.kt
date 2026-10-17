@@ -36,6 +36,9 @@ import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.formatDate
 import ir.vil3ntec.tohid.money
+import ir.vil3ntec.tohid.numberInvalid
+import ir.vil3ntec.tohid.numericInput
+import ir.vil3ntec.tohid.parseNumber
 import ir.vil3ntec.tohid.plain
 import ir.vil3ntec.tohid.qty
 import ir.vil3ntec.tohid.print.PrintJob
@@ -60,6 +63,8 @@ fun CheckoutDialog(
   presetDebtorId: String?,
   onDismiss: () -> Unit,
   onConfirm: (SalesEngine.Checkout) -> Unit,
+  /** POS-14 — ثبت در جریان است ⇒ دکمه تا پایانش قفل */
+  busy: Boolean = false,
 ) {
   val context = LocalContext.current
   val canDiscount = remember { ir.vil3ntec.tohid.data.ShopRole.canDiscount(context) }
@@ -76,9 +81,10 @@ fun CheckoutDialog(
 
   val checkout = SalesEngine.Checkout(
     discountType = discountType,
-    discountValue = if (canDiscount) discountText.toDoubleOrNull() ?: 0.0 else 0.0,
+    //  F0-06: خالی ⇐ صفر؛ نامعتبر ⇐ خطای کنارِ کادر و دکمهٔ ثبت خاموش
+    discountValue = if (canDiscount) parseNumber(discountText) ?: 0.0 else 0.0,
     payment = payment,
-    paidAmount = paidText.toDoubleOrNull() ?: 0.0,
+    paidAmount = parseNumber(paidText) ?: 0.0,
     debtorId = debtorId,
     blockExpired = remember { ir.vil3ntec.tohid.data.ShopPolicy.blockExpired(context) },
     //  نامِ حسابِ واردشده — گزارشِ «فروشِ هر کاربر» از همین می‌خواند
@@ -88,8 +94,10 @@ fun CheckoutDialog(
 
   // در فروشِ نقدی مبلغِ پرداختی همیشه کلِ مبلغِ نهایی است
   val paid = if (payment == SalesEngine.Payment.CASH) totals.finalTotal
-  else minOf(paidText.toDoubleOrNull()?.coerceAtLeast(0.0) ?: 0.0, totals.finalTotal)
+  else minOf(parseNumber(paidText)?.coerceAtLeast(0.0) ?: 0.0, totals.finalTotal)
   val remaining = (totals.finalTotal - paid).coerceAtLeast(0.0)
+  val discountBad = canDiscount && numberInvalid(discountText)
+  val paidBad = payment == SalesEngine.Payment.CREDIT && numberInvalid(paidText)
 
   Dialog(onDismissRequest = onDismiss) {
     DialogEntry {
@@ -115,9 +123,11 @@ fun CheckoutDialog(
         Spacer(Modifier.height(12.dp))
         OutlinedTextField(
           value = discountText,
-          onValueChange = { discountText = it.filter { c -> c.isDigit() || c == '.' } },
+          onValueChange = { discountText = numericInput(it) },
           label = { Text(if (discountType == SalesEngine.DiscountType.PERCENT) "تخفیف (٪)" else "تخفیف (افغانی)") },
           singleLine = true,
+          isError = discountBad,
+          supportingText = if (discountBad) { { Text("عدد درست نیست") } } else null,
           keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
           modifier = Modifier.fillMaxWidth(),
         )
@@ -179,9 +189,11 @@ fun CheckoutDialog(
           Spacer(Modifier.height(12.dp))
           OutlinedTextField(
             value = paidText,
-            onValueChange = { paidText = it.filter { c -> c.isDigit() || c == '.' } },
+            onValueChange = { paidText = numericInput(it) },
             label = { Text("مبلغ پرداختی") },
             singleLine = true,
+            isError = paidBad,
+            supportingText = if (paidBad) { { Text("عدد درست نیست") } } else null,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             modifier = Modifier.fillMaxWidth(),
           )
@@ -202,8 +214,9 @@ fun CheckoutDialog(
           OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("انصراف") }
           Button(
             onClick = { onConfirm(checkout.copy(paidAmount = paid, debtorId = debtorId)) },
+            enabled = !busy && !discountBad && !paidBad,
             modifier = Modifier.weight(1f),
-          ) { Text("ثبت فروش") }
+          ) { Text(if (busy) "در حالِ ثبت…" else "ثبت فروش") }
         }
       }
     }
@@ -554,7 +567,7 @@ internal fun PrinterDialog(
             Spacer(Modifier.height(8.dp))
             OutlinedTextField(
               value = port,
-              onValueChange = { port = it.filter { c -> c.isDigit() }.take(5) },
+              onValueChange = { port = ir.vil3ntec.tohid.normalizeDigits(it).filter { c -> c in '0'..'9' }.take(5) },
               label = { Text("درگاه") },
               singleLine = true,
               keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),

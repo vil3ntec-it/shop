@@ -32,7 +32,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.utf16CodePoint
+import ir.vil3ntec.tohid.scan.scanChar
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -41,6 +41,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import ir.vil3ntec.tohid.data.CartStore
+import ir.vil3ntec.tohid.data.SalePost
 import ir.vil3ntec.tohid.data.SalesEngine
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
@@ -267,10 +268,11 @@ fun SaleScreen(
           return@onKeyEvent false
         }
 
-        val ch = event.utf16CodePoint
-        //  فقط نویسه‌های دیدنی؛ کلیدهای کنترلی به کارِ بارکد نمی‌آیند
-        if (ch in 32..126) {
-          hid.feed(ch.toChar(), now)
+        //  فقط نویسه‌های دیدنی؛ کلیدهای کنترلی به کارِ بارکد نمی‌آیند.
+        //  F0-06: با کلیدِ فیزیکی — چیدمانِ فارسی/پشتو «۶» و «ش» می‌سازد
+        val ch = event.scanChar(allowSpace = true)
+        if (ch != null) {
+          hid.feed(ch, now)
           return@onKeyEvent true
         }
         false
@@ -554,29 +556,34 @@ fun SaleScreen(
       cart = cart,
       presetDebtorId = cartDebtorId,
       onDismiss = { checkout = false },
+      busy = cartStore.posting.collectAsState().value,
       onConfirm = { options ->
         //  دو ضربهٔ پشتِ سرِ هم پیش از بسته شدنِ پنجره: دومی همان سبدِ قبلی
         //  را دوباره ثبت می‌کرد. `checkout` همان لحظه خوانده می‌شود.
         if (!checkout) return@CheckoutDialog
-        when (val result = SalesEngine.record(
+        //  POS-14: یک ثبت در هر لحظه با کلیدِ فاکتور؛ سبد فقط پس از نوشتنِ دفتر پاک می‌شود
+        scope.launch { when (val posted = cartStore.post(store) { key ->
+          SalesEngine.record(
           d, cart, options,
           today = ir.vil3ntec.tohid.todayIso(),
           now = System.currentTimeMillis(),
           newId = ::newId,
           //  F0-03: «سری سند»ِ این دستگاه — `{سری}-{شماره}`
           series = ir.vil3ntec.tohid.sync.DocSeries.current(context),
-        )) {
-          is SalesEngine.Result.Failed -> toast(result.message)
-          is SalesEngine.Result.Ok -> {
-            scope.launch { store.save(result.data) }
-            cartStore.clear()
+          saleId = key,
+        ) }) {
+          SalePost.Outcome.Busy -> Unit
+          SalePost.Outcome.NotSaved -> toast(SalePost.NOT_SAVED)
+          is SalePost.Outcome.Refused -> toast(posted.message)
+          is SalePost.Outcome.Done -> {
+            val result = posted.ok
             selectedId = null
             checkout = false
             Haptics.success(context)
             toast("فروش به مبلغ ${money(result.data.sales.last().finalTotal)} ؋ ثبت شد")
             invoice = result.data to result.saleId
           }
-        }
+        } }
       },
     )
   }
