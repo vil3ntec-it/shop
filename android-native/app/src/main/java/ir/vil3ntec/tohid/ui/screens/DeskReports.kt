@@ -7,10 +7,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.key.*
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.Jalali
+import ir.vil3ntec.tohid.core.keymap.KeyMap
 import ir.vil3ntec.tohid.data.ReportCsv
 import ir.vil3ntec.tohid.data.ReportEngine
 import ir.vil3ntec.tohid.data.ShopData
@@ -30,7 +31,7 @@ import kotlinx.coroutines.launch
  *  عددهای کلِ همان بازه. بازه: امروز، ۷ روز، این ماه، ماهِ خورشیدی، سالِ
  *  خورشیدی، همه، یا «از … تا …» با تاریخِ خورشیدی (۱۴۰۵/۰۷/۰۱).
  *
- *  Ctrl+P چاپ، Ctrl+E اکسل.
+ *  Ctrl+P چاپ، Ctrl+E اکسل — از ثبتِ مرکزیِ کلیدها (`KeyMap.GLOBAL_PRINT` / `GLOBAL_EXPORT`).
  */
 private enum class Rep(val key: String, val label: String, val ranged: Boolean) {
   SALES("sales", "فروش", true),
@@ -77,8 +78,12 @@ fun DeskReportsScreen(d: ShopData, snackbar: SnackbarHostState) {
     Modifier
       .fillMaxSize()
       .onPreviewKeyEvent { e ->
-        if (e.type != KeyEventType.KeyDown || !e.isPrimaryModifier) return@onPreviewKeyEvent false
-        when (e.key) { Key.P -> { print(); true }; Key.E -> { excel(); true }; else -> false }
+        //  کلیدها از ثبتِ مرکزی (`core/keymap/keymap.json`)، نه کدِ کلیدِ دستی
+        when {
+          e.matches(KeyMap.GLOBAL_PRINT) -> { print(); true }
+          e.matches(KeyMap.GLOBAL_EXPORT) -> { excel(); true }
+          else -> false
+        }
       }
       .padding(16.dp),
   ) {
@@ -107,9 +112,9 @@ fun DeskReportsScreen(d: ShopData, snackbar: SnackbarHostState) {
         Text("وضعیتِ همین حالا — بی بازهٔ تاریخ", Modifier.weight(1f), color = Shop.colors.muted, style = MaterialTheme.typography.bodySmall)
       }
       Spacer(Modifier.width(12.dp))
-      OutlinedButton(onClick = ::print) { Text("چاپ  Ctrl+P") }
+      OutlinedButton(onClick = ::print) { Text("چاپ  ${KeyMap.GLOBAL_PRINT.hint}") }
       Spacer(Modifier.width(6.dp))
-      Button(onClick = ::excel) { Text("اکسل  Ctrl+E") }
+      Button(onClick = ::excel) { Text("اکسل  ${KeyMap.GLOBAL_EXPORT.hint}") }
     }
     Spacer(Modifier.height(10.dp))
 

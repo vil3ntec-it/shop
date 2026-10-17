@@ -41,6 +41,14 @@ const MATRIX = {
   'reports.view':         ['owner', 'manager', 'staff'],
   'audit.view':           ['owner', 'manager'],
   'backup.run':           ['owner'],
+
+  //  سفارشِ آنلاین (فاز ۴) — پشتِ پرچمِ `shop.orders`، پیش‌فرض خاموش.
+  //  شمارهٔ کاملِ مشتری فقط برای «کاربرِ مجاز» (ORD-17)؛ بازپرداخت پولی است.
+  'orders.view':          ['owner', 'manager', 'staff'],
+  'orders.create':        ['owner', 'manager', 'staff'],
+  'orders.manage':        ['owner', 'manager', 'staff'],
+  'orders.contact':       ['owner', 'manager'],
+  'orders.refund':        ['owner', 'manager'],
 };
 
 function can(role, permission) {

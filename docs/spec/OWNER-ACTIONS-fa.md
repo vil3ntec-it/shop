@@ -189,6 +189,11 @@
   - این کار با `PUT /api/admin/pump/live-config` و ورودِ **مدیرِ کل** انجام می‌شود، با بدنهٔ `{"scope":"release","key":"beta.shops","value":"<شناسهٔ دکان>"}`.
   - هنوز دکمه‌ای در پنل برایش نیست. اگر بخواهید، Claude یک دکمه اضافه می‌کند.
 - ⚠️ **اول سرور به‌روز شود**، وگرنه سرور کانالِ آزمایشی را نمی‌شناسد.
+- **وب (GitHub Pages) — یک کلیک، یک بار:** گیت‌هاب ⇐ Settings ⇐ Pages ⇐ Build and deployment ⇐ Source = **GitHub Actions**.
+  - تا این کلیک زده نشود، وب مثلِ امروز با هر مرج برای همه عوض می‌شود و ورک‌فلوِ «وب — GitHub Pages» هیچ چیزی منتشر نمی‌کند.
+  - پس از آن: مرج فقط `https://vil3ntec-it.github.io/shop/beta/` را عوض می‌کند (نشانیِ دکان‌های آزمایشی). ریشهٔ سایت (همهٔ دکان‌ها، `install.ps1`، صفحهٔ دانلود) همان می‌ماند که لحظهٔ کلیک بود.
+  - **انتشار برای همه:** Actions ⇐ «وب — GitHub Pages» ⇐ Run workflow ⇐ `main` ⇐ `channel = stable`.
+  - برگشت: Source = Deploy from a branch (`main`، `/`).
 
 ---
 

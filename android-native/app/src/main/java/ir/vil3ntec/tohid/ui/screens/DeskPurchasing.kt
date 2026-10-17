@@ -350,7 +350,7 @@ private fun NewPurchaseInvoice(
     Row(verticalAlignment = Alignment.CenterVertically) {
       OutlinedTextField(notes, { notes = it }, singleLine = true, label = { Text("یادداشت / شمارهٔ فاکتورِ فروشنده") }, modifier = Modifier.weight(1f))
       Spacer(Modifier.width(10.dp))
-      OutlinedTextField(paid, { paid = it.filter { c -> c.isDigit() || c == '.' } }, singleLine = true, label = { Text("پرداخت‌شده (؋)") }, modifier = Modifier.width(170.dp))
+      OutlinedTextField(paid, { paid = ir.vil3ntec.tohid.numericInput(it) }, singleLine = true, label = { Text("پرداخت‌شده (؋)") }, modifier = Modifier.width(170.dp))
       TextButton(onClick = { paid = Math.round(total).toString() }) { Text("همه") }
       Spacer(Modifier.width(10.dp))
       Column(horizontalAlignment = Alignment.End, modifier = Modifier.width(220.dp)) {
@@ -409,10 +409,10 @@ private fun LineRow(i: Int, l: Draft, d: ShopData, onNext: () -> Unit, onRemove:
       }
     }
     Spacer(Modifier.width(6.dp))
-    OutlinedTextField(l.qty, { l.qty = it.filter { c -> c.isDigit() || c == '.' } }, singleLine = true,
+    OutlinedTextField(l.qty, { l.qty = ir.vil3ntec.tohid.numericInput(it) }, singleLine = true,
       modifier = Modifier.width(94.dp).focusRequester(l.qtyFocus).then(enterOn { runCatching { l.priceFocus.requestFocus() } }))
     Spacer(Modifier.width(6.dp))
-    OutlinedTextField(l.price, { l.price = it.filter { c -> c.isDigit() || c == '.' } }, singleLine = true,
+    OutlinedTextField(l.price, { l.price = ir.vil3ntec.tohid.numericInput(it) }, singleLine = true,
       modifier = Modifier.width(124.dp).focusRequester(l.priceFocus).then(enterOn(onNext)))
     Spacer(Modifier.width(6.dp))
     OutlinedTextField(l.expiry, { l.expiry = it.take(10) }, singleLine = true, placeholder = { Text("۱۴۰۶/۰۳/۳۱") },
@@ -532,7 +532,7 @@ private fun ColumnScope.Suppliers(store: ShopStore, d: ShopData, toast: (String)
         Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
           Text("پرداخت به «${open.supplier.name}»", color = Shop.colors.text)
           Spacer(Modifier.width(8.dp))
-          OutlinedTextField(amount, { amount = it.filter { c -> c.isDigit() || c == '.' } }, singleLine = true, label = { Text("مبلغ (؋)") },
+          OutlinedTextField(amount, { amount = ir.vil3ntec.tohid.numericInput(it) }, singleLine = true, label = { Text("مبلغ (؋)") },
             modifier = Modifier.width(180.dp).focusRequester(focus).onPreviewKeyEvent { e ->
               if (e.type != KeyEventType.KeyDown) false
               else when (e.key) { Key.Enter, Key.NumPadEnter -> { pay(); true }; Key.Escape -> { paying = false; true }; else -> false }

@@ -23,3 +23,6 @@ dependencyResolutionManagement {
   }
 }
 rootProject.name = "TohidDesktop"
+
+//  core — منطقِ خالصِ مشترک با اندروید (قدم صفرِ ۳.۳)؛ `ir.vil3ntec.tohid:core`
+includeBuild("../core")

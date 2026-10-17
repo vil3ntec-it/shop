@@ -34,7 +34,7 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberTrayState
 import androidx.compose.ui.window.rememberWindowState
 import androidx.compose.ui.window.MenuBar
-import androidx.compose.ui.input.key.utf16CodePoint
+import ir.vil3ntec.tohid.scan.scanChar
 import androidx.compose.ui.input.key.isAltPressed
 import androidx.compose.foundation.background
 import androidx.compose.foundation.verticalScroll
@@ -168,8 +168,9 @@ fun main() {
           ir.vil3ntec.tohid.scan.ScanRouter.dispatch(code) { ir.vil3ntec.tohid.ui.AppNav.go("sale") }
           true
         } else {
-          val ch = e.utf16CodePoint
-          if (ch in 33..126 && !e.isCtrlPressed && !e.isAltPressed) { windowHid.feed(ch.toChar(), now); true } else false
+          //  F0-06: با کلیدِ فیزیکی — چیدمانِ فارسی/پشتو «۶» و «ش» می‌سازد
+          val ch = e.scanChar()
+          if (ch != null && !e.isCtrlPressed && !e.isAltPressed) { windowHid.feed(ch, now); true } else false
         }
       },
       onPreviewKeyEvent = { e ->
