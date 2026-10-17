@@ -177,7 +177,7 @@ fun OrderLines(
         Modifier
           .fillMaxWidth()
           .background(if (on) Shop.colors.primaryTint else Color.Transparent)
-          .semantics { selected = on }
+          .semantics { this.selected = on }
           .clickable(onClickLabel = "انتخابِ ردیف") { onSelect(line.id) }
           .padding(horizontal = 6.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
