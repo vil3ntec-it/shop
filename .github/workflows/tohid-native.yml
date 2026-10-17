@@ -5,13 +5,16 @@ on:
     branches: ['claude/**', main]
     paths:
       - 'android-native/**'
+      - 'core/**'
+      #  تغییرِ فقط فایل‌های مرجع روی main نسخهٔ آزمایشی نمی‌سازد (در PR سنجیده می‌شود)
+      - '!core/test-vectors/**'
       - '.github/workflows/tohid-native.yml'
   # PR هم ساخته می‌شود تا APKِ شکسته پیش از مرج دیده شود؛ انتشار فقط از main است
   pull_request:
     paths:
       - 'android-native/**'
-      #  آزمون‌های مرجعِ مشترک (CoreVectorsTest) — فقط در PR، تا pushِ main انتشار نسازد
-      - 'core/test-vectors/**'
+      #  کدِ مشترکِ core و آزمون‌های مرجعِ آن (CoreVectorsTest)
+      - 'core/**'
       - '.github/workflows/tohid-native.yml'
   #  ⛔ F0-27: push به main فقط کانالِ آزمایشی (`tohid-native-beta`) را می‌سازد.
   #  برچسبِ پایدار (`tohid-native`، همان که همهٔ گوشی‌ها می‌پرسند) فقط از این‌جا:

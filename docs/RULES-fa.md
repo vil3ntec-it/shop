@@ -84,6 +84,45 @@
   `ui/theme/HardcodedColorsTest` (فهرستِ مجاز فقط با دلیل و سقفی که فقط پایین می‌آید) و `ThemeContrastTest`
   (هشدار در هر دو تم دست‌کم ۴٫۵:۱).
 
+### برنامه: دیسک، شناسه و همگام‌سازی (Sync v1)
+- ⛔ **F0-01 (#193):** هر نوشتنِ دفتر، بایگانیِ دفتر و پشتیبانِ خودکار روی دیسک فقط از `data/DiskWrite.kt` (فایلِ
+  کناری + fsync ⇐ `Files.move(ATOMIC_MOVE, REPLACE_EXISTING)` ⇐ جایگزینِ `REPLACE_EXISTING` با سه تلاش ⇐ fsyncِ
+  پوشه؛ شکست = `IOException`). `tmp.renameTo(file)`ِ بی‌بررسی برنمی‌گردد — روی ویندوز فایلِ موجود را جایگزین
+  نمی‌کند. دفترِ حافظه **فقط پس از** نشستن روی دیسک عوض می‌شود، دفترِ دیسک‌نشده op نمی‌سازد، `save` شکست را
+  `false` می‌دهد و `ShopStore.diskError` پیامِ «ذخیره نشد» را نشان می‌دهد. سنجه: `ShopStoreDiskTest` (کارِ
+  `disk-windows` روی `windows-latest` در `tohid-desktop.yml`) و `DiskWriteTest`.
+- ⛔ **F0-05 (#195):** سایه، صفِ opها و cursorِ Sync v1 فقط از راهِ `sync/v1/SyncCommit.kt` عوض می‌شوند: ژورنال
+  (fsync) ⇐ صف ⇐ سایه + cursor **با هم** (`SyncStateV1.commitShadow`، `commit()` نه `apply()`) ⇐ پاک کردنِ
+  ژورنال. بازیابی در `ShopStore.load` و پیش از هر ثبت و Push/Pull. opی که دوباره به صف برمی‌گردد **همان** `op_id`
+  را دارد؛ هرگز opِ تازه برای همان تغییر. در کامپیوتر `DesktopPrefs.commit()` پشتِ `apply()`های در صف می‌رود. سنجه:
+  `SyncCommitTest` (۱۳) و `SyncCommitDesktopTest`.
+- ⛔ **F0-10 (#190):** شناسهٔ هر ردیفِ تازه (`newId()`، `auditId()`) فقط `Ulid.next()` (۴۸ بیت زمان + ۸۰ بیتِ
+  SecureRandom)؛ `"id" + زمان + Math.random` برنمی‌گردد. شناسهٔ ردیف‌های موجود دست نمی‌خورد و هیچ کدی شکلِ شناسه
+  را تجزیه یا بر اساسش مرتب نمی‌کند. سنجه: `NewIdTest`.
+- ⛔ **F0-02 (#196):** «همگام‌سازی حالا» و هر همگام‌سازیِ دستی فقط `SyncV1Worker.now(context)`؛ push/pullِ قدیمی
+  (`Syncer(...).run()`) از برنامه صدا زده نمی‌شود — مستقیم در دفتر ادغام می‌کرد و `$inc` دو بار جمع می‌شد. کلاسِ
+  `Syncer` برای `refreshLicense` می‌ماند. مسیرهای قدیمیِ سرور (`/api/sync`، `/api/v1/shop/sync/*`) برای برنامهٔ کهنه
+  باز می‌مانند و `[sync:legacy]` در لاگ می‌نویسند. سنجه: `LegacySyncCallTest.kt` و `server/test/sync-legacy-warn.test.js`.
+- ⛔ **F0-04 (#197):** فهرست‌های تنظیماتی (`productCategories`، `productUnits`، `expenseCategories`) از **پلهٔ ۳ِ
+  schema** با Sync v1 می‌روند: هر نام یک ردیف با `row_id = sha256(نام)[0..32]` و `fields = {name}`، فقط درج و حذف.
+  شناسه را به ULID برنگردانید — دو دستگاه یک نام را دو ردیف می‌ساختند. سایهٔ بی کلید یعنی «هنوز نرفته»، نه «خالی»
+  (نامِ محلی یک بار درج می‌رود، هرگز حذف). سرور پیش از برنامه‌ها مستقر می‌شود؛ برنامهٔ پلهٔ ۳ روی سرورِ پلهٔ ۲ ۴۲۶
+  می‌گیرد و opهایش را نگه می‌دارد. هر مجموعهٔ تازه = یک پلهٔ تازه. سنجه: `server/test/sync-setting-lists.test.js`
+  و `SettingListsSyncTest.kt`.
+
+### سرور: اشتراک و سوکتِ زنده
+- ⛔ **F0-14 (#201):** «ثبت اشتراک»ِ پنلِ مدیر (دکان و پمپ) سرآیندِ `Idempotency-Key` می‌فرستد و تا بدنه همان است و
+  ثبت موفق نشده همان کلید را. کلید زیرِ `pg_advisory_xact_lock` در **همان تراکنشِ** اعطا (`lib/idempotency.js`،
+  `subscriptions.grantOnce`، جدولِ `idempotency_keys` در مهاجرتِ ۰۵۰، پاک‌سازی پس از ۷ روز)؛ قفلِ کلید همیشه پیش از
+  قفلِ مشتری. همان کلید + همان بدنه ⇐ پاسخِ اول (`Idempotent-Replayed: true`، بی اعلان و ممیزی و مصرفِ دوبارهٔ کدِ
+  تخفیف)؛ بدنهٔ دیگر ⇐ ۴۰۹ `idempotency_key_reused`. درخواستِ بی‌کلید همان رفتارِ قبلی (سازگاری). حذفِ کاملِ حساب
+  این ردیف‌ها را هم پاک می‌کند. سنجه: `server/test/admin-idempotency.test.js`.
+- ⛔ **F0-11 / SEC-05 (#202):** سوکتِ زنده اول `POST /api/sync/v1/live/ticket` (توکن در سرآیند) و بعد
+  `wss …/live?ticket=` — بلیتِ ۳۲ بایتی، یک‌بارمصرف، ۶۰ ثانیه، سقفِ ۲۰٬۰۰۰ در حافظه؛ هنگامِ وصل توکنِ پشتِ بلیت
+  دوباره سنجیده می‌شود. توکن در آدرس فقط وقتی سرور ۴۰۴ می‌دهد (سرورِ کهنه)؛ بی اینترنت هرگز. `?token=` و
+  `Authorization: Bearer` روی سرور برای برنامه‌های کهنه پذیرفته می‌مانند و تا داشبوردِ نسخه‌ها برنامهٔ کهنه نشان
+  می‌دهد برداشته نمی‌شوند. سنجه: `server/test/sync-live-ticket.test.js` و `LiveCredentialTest.kt`.
+
 ### سنجشِ کارایی
 - **F0-26:** خطِ پایه در `docs/spec/bench/baseline-1405-07-22.md`. هر PR که کارایی را عوض می‌کند
   `node bench/web.mjs --compare docs/spec/bench/baseline-1405-07-22.web.json` را اجرا و عدد را در PR می‌گذارد؛
@@ -452,7 +491,9 @@ Windows PowerShell 5.1 واقعاً اجرا می‌کند.
   می‌سنجد؛ هرگز «اولین انتشاری که `.apk` دارد» (که `tohid-admin` یا `v*`ِ قدیمی را برمی‌داشت).
 - ⛔ برنامهٔ مدیریت (`tohid-admin.yml`) هم فقط از `main` منتشر می‌شود (F0-12، #192)؛ `claude/**` و PR فقط
   ساخته و آزموده می‌شوند (`testReleaseUnitTest` پیش از ساخت).
-- وب (GitHub Pages) هنوز با هر مرج منتشر می‌شود؛ کانالِ آزمایشیِ وب کارِ باقی‌ماندهٔ F0-27 است.
+- وب (GitHub Pages) هنوز با هر مرج منتشر می‌شود. کانالِ آزمایشیِ وب در PR #221 است (ریشه فقط با Run workflow ⇒
+  «وب — GitHub Pages» ⇒ channel = stable، مرج فقط `/beta/`) و پس از مرجش با یک کلیکِ صاحب محصول (Pages ⇒ Source =
+  GitHub Actions، `OWNER-ACTIONS-fa.md` بخشِ ۵) روشن می‌شود.
 
 ## کدام برنامه — قاعده‌ی صاحب مخزن
 

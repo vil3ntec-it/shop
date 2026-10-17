@@ -304,6 +304,9 @@ dependencies {
   implementation(compose)
   androidTestImplementation(compose)
 
+  //  منطقِ خالصِ مشترک با کامپیوتر — buildِ `../core` (includeBuild در settings.gradle.kts)
+  implementation("ir.vil3ntec.tohid:core:1.0")
+
   implementation("androidx.core:core-ktx:1.15.0")
   implementation("androidx.activity:activity-compose:1.9.3")
   implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
