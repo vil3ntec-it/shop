@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.data.BarcodeMatch
 import ir.vil3ntec.tohid.data.CartQuery
 import ir.vil3ntec.tohid.data.CartStore
+import ir.vil3ntec.tohid.data.SalePost
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.SalesEngine
 import ir.vil3ntec.tohid.data.ShopData
@@ -190,18 +191,21 @@ fun DeskSaleScreen(
     if (cart.isEmpty()) { toast("سبد خالی است"); return }
     if (discountBad || paidBad) { toast("عددِ «${if (discountBad) "تخفیف" else "دریافتی"}» درست نیست"); return }
     if (payment == SalesEngine.Payment.CREDIT && cartDebtorId == null) { toast("فروشِ نسیه مشتری می‌خواهد — F2"); pickDebtor = true; return }
-    when (val r = SalesEngine.record(d, cart, checkout, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId,
-      series = ir.vil3ntec.tohid.sync.DocSeries.current(context))) {
-      is SalesEngine.Result.Failed -> toast(r.message)
-      is SalesEngine.Result.Ok -> {
-        scope.launch { store.save(r.data) }
-        cartStore.clear()
+    //  POS-14: F9ِ پشتِ‌سرِهم یک فروش می‌سازد؛ سبد فقط پس از نوشتنِ دفتر پاک می‌شود
+    scope.launch { when (val posted = cartStore.post(store) { key ->
+      SalesEngine.record(d, cart, checkout, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId,
+      series = ir.vil3ntec.tohid.sync.DocSeries.current(context), saleId = key) }) {
+      SalePost.Outcome.Busy -> Unit
+      SalePost.Outcome.NotSaved -> toast(SalePost.NOT_SAVED)
+      is SalePost.Outcome.Refused -> toast(posted.message)
+      is SalePost.Outcome.Done -> {
+        val r = posted.ok
         selected = null; discountText = ""; paidText = ""; payment = SalesEngine.Payment.CASH
         lastInvoice = r.data to r.saleId
         toast("فروش ${money(r.data.sales.last().finalTotal)} ؋ ثبت شد — F8 چاپ")
         refocus()
       }
-    }
+    } }
   }
 
   fun step(id: String, sign: Int) {
@@ -412,7 +416,7 @@ fun DeskSaleScreen(
         Spacer(Modifier.weight(1f))
         Button(
           onClick = { finish() },
-          enabled = cart.isNotEmpty(),
+          enabled = cart.isNotEmpty() && !cartStore.posting.collectAsState().value,
           modifier = Modifier.fillMaxWidth().height(52.dp),
         ) { Text("ثبتِ فروش  (F9)", style = MaterialTheme.typography.titleMedium) }
         Spacer(Modifier.height(6.dp))
