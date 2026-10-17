@@ -35,6 +35,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.data.CartStore
+import ir.vil3ntec.tohid.data.SalePost
 import ir.vil3ntec.tohid.data.SalesEngine
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
@@ -418,19 +419,25 @@ fun QuickSaleScreen(
       cart = cart,
       presetDebtorId = cartDebtorId,
       onDismiss = { checkout = false },
+      busy = cartStore.posting.collectAsState().value,
       onConfirm = { options ->
-        when (val result = SalesEngine.record(
+        if (!checkout) return@CheckoutDialog
+        //  POS-14: یک ثبت در هر لحظه با کلیدِ فاکتور؛ سبد فقط پس از نوشتنِ دفتر پاک می‌شود
+        scope.launch { when (val posted = cartStore.post(store) { key ->
+          SalesEngine.record(
           d, cart, options,
           today = todayIso(),
           now = System.currentTimeMillis(),
           newId = ::newId,
           //  F0-03: «سری سند»ِ این دستگاه — `{سری}-{شماره}`
           series = ir.vil3ntec.tohid.sync.DocSeries.current(context),
-        )) {
-          is SalesEngine.Result.Failed -> toast(result.message)
-          is SalesEngine.Result.Ok -> {
-            scope.launch { store.save(result.data) }
-            cartStore.clear()
+          saleId = key,
+        ) }) {
+          SalePost.Outcome.Busy -> Unit
+          SalePost.Outcome.NotSaved -> toast(SalePost.NOT_SAVED)
+          is SalePost.Outcome.Refused -> toast(posted.message)
+          is SalePost.Outcome.Done -> {
+            val result = posted.ok
             selectedId = null
             checkout = false
             cartOpen = false
@@ -444,7 +451,7 @@ fun QuickSaleScreen(
             )
             invoice = result.data to result.saleId
           }
-        }
+        } }
       },
     )
   }

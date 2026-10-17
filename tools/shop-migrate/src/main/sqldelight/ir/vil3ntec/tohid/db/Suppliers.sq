@@ -1,0 +1,85 @@
+-- تأمین‌کننده، فاکتورِ خرید، پرداخت به تأمین‌کننده، مصرف.
+-- مانده تأمین‌کننده = جمعِ فاکتورها − جمعِ پرداخت‌ها؛ ذخیره نمی‌شود.
+-- (سفارشِ خرید و رسیدِ کالا با دریافتِ جزئی در گام‌های بعدیِ فاز ۱ می‌آیند.)
+
+CREATE TABLE supplier (
+  id TEXT NOT NULL PRIMARY KEY,
+  shopId TEXT NOT NULL REFERENCES shop(id),
+  name TEXT NOT NULL,
+  phone TEXT NOT NULL DEFAULT '',
+  address TEXT NOT NULL DEFAULT '',
+  notes TEXT NOT NULL DEFAULT '',
+  createdAt INTEGER NOT NULL
+);
+
+-- خریدِ قدیم هر ردیف یک فاکتور است؛ `legacyInvoiceNo` گروهِ فاکتورِ چندردیفه را نگه می‌دارد
+CREATE TABLE supplierInvoice (
+  id TEXT NOT NULL PRIMARY KEY,
+  shopId TEXT NOT NULL REFERENCES shop(id),
+  -- NULL = خرید بی تأمین‌کننده
+  supplierId TEXT REFERENCES supplier(id),
+  productId TEXT REFERENCES product(id),
+  qtyMilli INTEGER NOT NULL DEFAULT 0,
+  unitCostMinor INTEGER NOT NULL DEFAULT 0,
+  totalMinor INTEGER NOT NULL,
+  currency TEXT NOT NULL REFERENCES currency(code),
+  legacyInvoiceNo INTEGER NOT NULL DEFAULT 0,
+  notes TEXT NOT NULL DEFAULT '',
+  businessDate TEXT NOT NULL,
+  createdAt INTEGER NOT NULL
+);
+
+CREATE INDEX supplierInvoiceBySupplier ON supplierInvoice(supplierId);
+
+CREATE TABLE supplierPayment (
+  id TEXT NOT NULL PRIMARY KEY,
+  shopId TEXT NOT NULL REFERENCES shop(id),
+  supplierId TEXT REFERENCES supplier(id),
+  -- پرداختِ همان لحظهٔ خرید به فاکتورش وصل است؛ پرداختِ جدا NULL
+  supplierInvoiceId TEXT REFERENCES supplierInvoice(id),
+  amountMinor INTEGER NOT NULL,
+  currency TEXT NOT NULL REFERENCES currency(code),
+  notes TEXT NOT NULL DEFAULT '',
+  businessDate TEXT NOT NULL,
+  createdAt INTEGER NOT NULL
+);
+
+CREATE INDEX supplierPaymentBySupplier ON supplierPayment(supplierId);
+
+CREATE TABLE expense (
+  id TEXT NOT NULL PRIMARY KEY,
+  shopId TEXT NOT NULL REFERENCES shop(id),
+  title TEXT NOT NULL DEFAULT '',
+  category TEXT NOT NULL DEFAULT '',
+  amountMinor INTEGER NOT NULL,
+  currency TEXT NOT NULL REFERENCES currency(code),
+  notes TEXT NOT NULL DEFAULT '',
+  businessDate TEXT NOT NULL,
+  createdAt INTEGER NOT NULL
+);
+
+CREATE INDEX expenseByDate ON expense(businessDate);
+
+insertSupplier:
+INSERT INTO supplier VALUES ?;
+
+insertSupplierInvoice:
+INSERT INTO supplierInvoice VALUES ?;
+
+insertSupplierPayment:
+INSERT INTO supplierPayment VALUES ?;
+
+insertExpense:
+INSERT INTO expense VALUES ?;
+
+balanceBySupplier:
+SELECT s.id,
+       coalesce((SELECT sum(i.totalMinor) FROM supplierInvoice i WHERE i.supplierId = s.id), 0)
+     - coalesce((SELECT sum(p.amountMinor) FROM supplierPayment p WHERE p.supplierId = s.id), 0) AS balanceMinor
+FROM supplier s;
+
+supplierPaidTotal:
+SELECT coalesce(sum(amountMinor), 0) FROM supplierPayment;
+
+expenseTotal:
+SELECT coalesce(sum(amountMinor), 0) FROM expense WHERE businessDate BETWEEN :from AND :to;

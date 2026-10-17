@@ -47,5 +47,3 @@
 - انواع سرویس پیش‌زمینه اندروید: https://developer.android.com/develop/background-work/services/fgs/service-types
 - UnifiedPush: https://unifiedpush.org/developers/implementations/
 - مجوز مدل RMBG-2.0 (غیرتجاری): https://huggingface.co/briaai/RMBG-2.0
-
-
