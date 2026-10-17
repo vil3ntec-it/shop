@@ -1,0 +1,54 @@
+-- مشتری (یکی با قرض‌دار) و دفترِ حسابش.
+-- مانده از روی دفتر حساب می‌شود و هرگز به‌صورت عددِ مطلق ذخیره نمی‌شود:
+-- این جدول ستونِ «مانده» ندارد و دفتر فقط افزودنی است.
+
+CREATE TABLE customer (
+  id TEXT NOT NULL PRIMARY KEY,
+  shopId TEXT NOT NULL REFERENCES shop(id),
+  name TEXT NOT NULL,
+  phone TEXT NOT NULL DEFAULT '',
+  notes TEXT NOT NULL DEFAULT '',
+  createdAt INTEGER NOT NULL
+);
+
+-- give = قرض داده شد (بدهیِ مشتری بیشتر، deltaMinor ≥ 0)
+-- receive = پول گرفته شد (بدهیِ مشتری کمتر، deltaMinor ≤ 0)
+CREATE TABLE customerLedgerEntry (
+  id TEXT NOT NULL PRIMARY KEY,
+  customerId TEXT NOT NULL REFERENCES customer(id),
+  kind TEXT NOT NULL CHECK (kind IN ('give', 'receive')),
+  deltaMinor INTEGER NOT NULL,
+  currency TEXT NOT NULL REFERENCES currency(code),
+  saleId TEXT REFERENCES sale(id),
+  note TEXT NOT NULL DEFAULT '',
+  businessDate TEXT NOT NULL,
+  createdAt INTEGER NOT NULL,
+  CHECK ((kind = 'give' AND deltaMinor >= 0) OR (kind = 'receive' AND deltaMinor <= 0))
+);
+
+CREATE INDEX ledgerByCustomer ON customerLedgerEntry(customerId, createdAt);
+
+CREATE TRIGGER ledgerNoUpdate
+BEFORE UPDATE ON customerLedgerEntry
+BEGIN
+  SELECT RAISE(ABORT, 'customerLedgerEntry is append-only');
+END;
+
+CREATE TRIGGER ledgerNoDelete
+BEFORE DELETE ON customerLedgerEntry
+BEGIN
+  SELECT RAISE(ABORT, 'customerLedgerEntry is append-only');
+END;
+
+insertCustomer:
+INSERT INTO customer VALUES ?;
+
+insertLedgerEntry:
+INSERT INTO customerLedgerEntry VALUES ?;
+
+balanceByCustomer:
+SELECT c.id, coalesce((SELECT sum(e.deltaMinor) FROM customerLedgerEntry e WHERE e.customerId = c.id), 0) AS balanceMinor
+FROM customer c;
+
+ledgerTotals:
+SELECT kind, sum(deltaMinor) AS totalMinor FROM customerLedgerEntry GROUP BY kind;

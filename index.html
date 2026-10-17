@@ -84,6 +84,9 @@
   }catch(e){}
 })();
 </script>
+<!-- جای دفتر (localStorage یا IndexedDB؛ پیش‌فرض localStorage). عمداً بی defer و
+     همین بالا: اگر دفتر در IndexedDB باشد، خواندنش از همین لحظه شروع می‌شود -->
+<script src="license/ledger-store.js?v=1"></script>
 <!-- نوارِ وضعیتِ گوشی هم‌رنگِ سربرگ می‌شود — همان آبیِ نیتیو، در هر تم -->
 <meta name="theme-color" id="meta-theme-color" content="#0F62B4">
 <meta name="description" content="مدیریت فروش، انبار، قرض‌داران، مصارف و گزارشات فروشگاه — بدون نیاز به اینترنت">
@@ -5371,6 +5374,13 @@
           <div class="settings-actions-row">
             <button class="btn btn-secondary btn-sm" id="btn-cloud-backup">همین حالا روی سرور بگذار</button>
           </div>
+
+          <!-- F0-23 (دنباله): جای دفتر روی همین دستگاه. آزمایشی و پیش‌فرض خاموش —
+               قاعدهٔ آیفون (مشخصات ۱.۳ بند ۷). منطقش در license/ledger-store.js -->
+          <label class="check-row" style="display:flex;gap:8px;align-items:center;margin-top:14px;">
+            <input type="checkbox" id="in-ledger-idb"> نگه‌داشتنِ دفتر در IndexedDB (آزمایشی)
+          </label>
+          <p class="settings-hint" id="ledger-store-hint"></p>
         </div>
 
         <!-- Account -->
@@ -6012,6 +6022,18 @@
     <div class="confirm-actions">
       <button class="btn btn-secondary" data-close-modal="modal-confirm">انصراف</button>
       <button class="btn btn-danger" id="btn-confirm-ok">حذف کن</button>
+    </div>
+  </div>
+</div>
+
+<!-- POS-13: فاکتورِ نیمه‌کارهٔ بارِ پیش — ادامه یا دور انداختن. بستنِ پنجره = ادامه -->
+<div class="modal-scrim" id="modal-sale-draft" role="alertdialog" aria-modal="true" aria-labelledby="sale-draft-title" aria-describedby="sale-draft-sub">
+  <div class="modal-box confirm-box">
+    <div class="confirm-title" id="sale-draft-title">فاکتورِ نیمه‌کاره پیدا شد</div>
+    <div class="confirm-sub" id="sale-draft-sub"></div>
+    <div class="confirm-actions">
+      <button class="btn btn-secondary" id="btn-sale-draft-discard">دور انداختن</button>
+      <button class="btn btn-primary" id="btn-sale-draft-resume">ادامهٔ همین فاکتور</button>
     </div>
   </div>
 </div>
@@ -7162,6 +7184,48 @@
   function formatMoney(n){ return MONEY_FMT.format(Math.round(n)); }
   /** عدد بدون جداکننده — برای سال و شماره‌هایی که پول نیستند. */
   function formatPlain(n){ return String(n); }
+  /**
+   * F0-06 — رقمِ فارسی/پشتو (۰-۹) و عربی (٠-٩) به لاتین، «٫» به نقطه.
+   * هر parseِ عددی (مبلغ، تعداد، درصد، بارکد، تلفن) اول از این می‌گذرد.
+   * یک نویسه به یک نویسه — جای حرف‌ها عوض نمی‌شود. همان `normalizeDigits`ِ
+   * برنامهٔ اندروید/کامپیوتر (`Format.kt`).
+   */
+  function normalizeDigits(s){
+    return String(s==null ? '' : s).replace(/[\u06F0-\u06F9\u0660-\u0669\u066B]/g, c=>{
+      const n = c.charCodeAt(0);
+      if(n===0x066B) return '.';
+      return String(n >= 0x06F0 ? n-0x06F0 : n-0x0660);
+    });
+  }
+  /*
+   * F0-06 — صفحه‌کلیدِ فارسی/پشتو در کادرِ عدد. کروم در `type=number` رقمِ
+   * فارسی را اصلاً نمی‌پذیرد (کادر خالی می‌ماند و تخفیف بی‌صدا صفر می‌شد)،
+   * و در کادرِ متنیِ عددی «۵۰۰» به `parseFloat` می‌رسید. پیش از نشستن،
+   * همان نویسه لاتین می‌شود؛ اگر مرورگر نگذاشت (نوشتنِ ترکیبی)، پس از آن.
+   */
+  const NON_LATIN_DIGIT = /[\u06F0-\u06F9\u0660-\u0669\u066B]/;
+  function isNumericBox(t){
+    return t instanceof HTMLInputElement
+      && (t.type==='number' || t.type==='tel' || /^(numeric|decimal|tel)$/.test(t.inputMode||''));
+  }
+  document.addEventListener('beforeinput', e=>{
+    const t = e.target;
+    if(!isNumericBox(t) || !e.cancelable) return;
+    const data = e.data!=null ? e.data : (e.dataTransfer ? e.dataTransfer.getData('text/plain') : '');
+    if(!data || !NON_LATIN_DIGIT.test(data)) return;
+    e.preventDefault();
+    const fixed = normalizeDigits(data);
+    let ok = false;
+    try{ ok = document.execCommand('insertText', false, fixed); }catch(err){ ok = false; }
+    if(!ok){ t.value = t.value + fixed; t.dispatchEvent(new Event('input', { bubbles:true })); }
+  }, true);
+  document.addEventListener('input', e=>{
+    const t = e.target;
+    if(!isNumericBox(t) || t.type==='number' || !NON_LATIN_DIGIT.test(t.value)) return;
+    const at = t.selectionStart;
+    t.value = normalizeDigits(t.value);
+    try{ if(at!=null) t.setSelectionRange(at, at); }catch(err){ /* بعضی نوع‌ها انتخاب ندارند */ }
+  }, true);
   function formatDate(iso){
     const hit = DATE_MEMO.get(iso);
     if(hit !== undefined) return hit;
@@ -8600,7 +8664,13 @@
   function rebuildBarcodeIndex(){
     barcodeIndex.clear();
     products.forEach(p=>{
-      (p.barcodes||[]).forEach(code=>{ if(code) barcodeIndex.set(code, p.id); });
+      (p.barcodes||[]).forEach(code=>{
+        if(!code) return;
+        barcodeIndex.set(code, p.id);
+        //  F0-06: بارکدی که قبلاً با رقمِ فارسی ثبت شده، با رقمِ لاتین هم
+        const latin = normalizeDigits(code);
+        if(latin!==code && !barcodeIndex.has(latin)) barcodeIndex.set(latin, p.id);
+      });
     });
   }
   /* ==========================================================
@@ -11445,13 +11515,60 @@
      renderCart() ممکن است هنگام بوت، پیش از این بخش اجرا شود. */
   let selectedCartId = null;
   const DRAFT_CART_KEY = 'tohid-shop-draft-cart-v1';
-  function saveDraftCart(){ try{ localStorage.setItem(DRAFT_CART_KEY, JSON.stringify(cart)); }catch(e){} }
-  function loadDraftCart(){
-    try{
-      const raw = localStorage.getItem(DRAFT_CART_KEY);
-      if(raw){ const arr = JSON.parse(raw); if(Array.isArray(arr)) cart = arr.filter(x=>products.find(p=>p.id===x.productId)); }
-    }catch(e){}
+  /* POS-13/14 — پیش‌نویسِ فاکتور با «کلیدِ یکتای فاکتور»، همان `SaleDraft`ِ برنامه.
+     فروشی که از این پیش‌نویس ثبت می‌شود **همین کلید** را شناسه می‌گیرد؛ پس
+     پیش‌نویسی که کلیدش در `sales` هست پیش‌تر ثبت شده و دوباره پیشنهاد نمی‌شود.
+     همه در یک کلیدِ localStorage (یک setItem ⇒ یا کهنه یا تازه، نه نصفه).
+     کلیدِ v1 (فقط ردیف‌ها) هم نوشته می‌شود: `license/shop-sync.js` از آن
+     می‌فهمد سبد پر است و صفحه را خودکار تازه نکند؛ v2 که باشد، v1 خوانده نمی‌شود. */
+  const DRAFT_SALE_KEY = 'tohid-shop-draft-sale-v2';
+  let draftSaleKey = null;
+  let draftRecovered = null;
+  function saveDraftCart(){
+    draftSaleKey = cart.length ? (draftSaleKey || uid()) : null;
+    try{ localStorage.setItem(DRAFT_SALE_KEY, JSON.stringify({ v:2, key:draftSaleKey, lines:cart, savedAt:Date.now() })); }catch(e){}
+    try{ localStorage.setItem(DRAFT_CART_KEY, JSON.stringify(cart)); }catch(e){}
   }
+  function readDraftSale(){
+    try{
+      const v2 = localStorage.getItem(DRAFT_SALE_KEY);
+      if(v2 !== null){ const d = JSON.parse(v2); return (d && typeof d==='object' && !Array.isArray(d)) ? d : null; }
+      const arr = JSON.parse(localStorage.getItem(DRAFT_CART_KEY) || 'null');
+      return Array.isArray(arr) ? { v:1, key:null, lines:arr } : null;
+    }catch(e){ return null; }
+  }
+  /* همان `SaleDraftRules.decide`: none | posted (دور انداخته شود) | offer (پرسیده شود).
+     ردیفِ کالای حذف‌شده یا غیرفعال (PRD-18) کنار می‌رود و شمرده می‌شود. */
+  function decideDraftRestore(draft, salesList, productList){
+    if(!draft || !Array.isArray(draft.lines) || !draft.lines.length) return { kind:'none' };
+    if(draft.key && salesList.some(s=> s.id===draft.key)) return { kind:'posted', key:draft.key };
+    const lines = draft.lines.filter(x=> x && productList.some(p=> p.id===x.productId && p.active !== false));
+    if(!lines.length) return { kind:'none' };
+    return { kind:'offer', key:draft.key || null, lines, dropped:draft.lines.length - lines.length };
+  }
+  function loadDraftCart(){
+    const r = decideDraftRestore(readDraftSale(), sales, products);
+    cart = r.kind==='offer' ? r.lines : [];
+    draftSaleKey = r.kind==='offer' ? (r.key || uid()) : null;
+    draftRecovered = r.kind==='none' ? null : r;
+    saveDraftCart();
+  }
+  /* پرسشِ بازیابی، یک بار پس از بالا آمدن. سبد از پیش پر است؛ پس بستنِ پنجره = ادامه */
+  function promptDraftRecovery(){
+    const r = draftRecovered; draftRecovered = null;
+    if(!r) return;
+    if(r.kind==='posted'){ showToast('فاکتورِ نیمه‌کارهٔ پیش پیش‌تر ثبت شده بود — دوباره ثبت نشد'); return; }
+    document.getElementById('sale-draft-sub').textContent =
+      `از بارِ پیش، پیش از بسته شدنِ برنامه: ${cart.length} قلم، ${formatMoney(cartTotal())} افغانی.` +
+      (r.dropped ? ` ${r.dropped} قلم که کالایش حذف یا غیرفعال شده کنار گذاشته شد.` : '') +
+      ' این فاکتور هنوز ثبت نشده است.';
+    openModal('modal-sale-draft');
+  }
+  document.getElementById('btn-sale-draft-resume').addEventListener('click', ()=> closeModal('modal-sale-draft'));
+  document.getElementById('btn-sale-draft-discard').addEventListener('click', ()=>{
+    cart = []; saleDebtorId = null; saveDraftCart(); renderCart();
+    closeModal('modal-sale-draft');
+  });
   /* واحدهایی که اعشار می‌گیرند. «کیلوگرم» و «میلی‌لیتر» و «متر» هم —
      پیش‌تر فقط «کیلو» بود و فهرستِ پیش‌فرض «کیلوگرم» دارد، پس کالای کیلویی
      ۰٫۲۵ نمی‌پذیرفت. همان `SalesEngine.isFractionalUnit`ِ برنامه. */
@@ -12062,7 +12179,8 @@
   }
 
   function handleBarcodeScanned(code, {skipDedup=false, fromPhone=false}={}){
-    code = (code||'').trim();
+    const rawCode = String(code||'').trim();
+    code = normalizeDigits(rawCode);   // F0-06: «۶۲۶…» همان «626…» است
     if(!code) return;
     if(!skipDedup && isDuplicateScan(code)) return;
     //  این آیفون بارکدخوانِ کامپیوتر است ⇒ بارکد به سبدِ کامپیوتر می‌رود
@@ -12074,7 +12192,7 @@
 
     playScanBeep();
 
-    const productId = barcodeIndex.get(code);
+    const productId = barcodeIndex.get(code) || barcodeIndex.get(rawCode);
 
     if(productId){
       /*
@@ -12083,6 +12201,8 @@
        * دوباره نشان می‌داد و وسط صفحه جا می‌گرفت.
        */
       const p = products.find(x=>x.id===productId);
+      //  PRD-18: کالای غیرفعال با اسکن هم به سبد نمی‌رود — پیامِ «اضافه شد» هم نمی‌آید
+      if(p.active === false){ showToast(`«${p.name}» غیرفعال است — از «محصولات» فعالش کنید`, 'danger'); return; }
       lastScannedProductId = p.id;
       addToCart(p.id, scanMultiplier);
       selectedCartId = p.id;         // کنترل‌های سبد روی همین کالا باز شود
@@ -12142,7 +12262,24 @@
       hwBuffer = '';
       return;
     }
-    if(e.key.length===1) hwBuffer += e.key;
+    hwBuffer += scanKeyChar(e);
+  }
+  /**
+   * F0-06 — نویسهٔ بارکد از کلیدِ فیزیکی. بارکدخوان «کلید» می‌فرستد؛ با
+   * چیدمانِ فارسی/پشتو `e.key` «۶» یا «ش» است و پیش از این همان در بافر
+   * می‌نشست. اگر `e.key` ASCII است همان (رفتارِ قبلی)، وگرنه `e.code`
+   * (Digit6، Numpad6، KeyA) — همان `ScanKeys`ِ برنامهٔ کامپیوتر.
+   */
+  function scanKeyChar(e){
+    const k = e.key || '';
+    if(k.length===1 && k.charCodeAt(0)>=32 && k.charCodeAt(0)<=126) return k;
+    const code = e.code || '';
+    let m = /^(?:Digit|Numpad)([0-9])$/.exec(code);
+    if(m && !e.shiftKey) return m[1];
+    m = /^Key([A-Z])$/.exec(code);
+    if(m) return e.shiftKey ? m[1] : m[1].toLowerCase();
+    if(k.length===1 && /[\u06F0-\u06F9\u0660-\u0669]/.test(k)) return normalizeDigits(k);
+    return '';
   }
 
   // ---- کنترل دوربین صفحه فروش ----
@@ -12205,7 +12342,7 @@
 
   function computeCheckoutTotals(){
     const subtotal = cartTotal();
-    let discountValue = parseFloat(document.getElementById('co-discount-value').value);
+    let discountValue = parseFloat(normalizeDigits(document.getElementById('co-discount-value').value));
     if(isNaN(discountValue) || discountValue<0 || !canDiscount()) discountValue = 0;
     let discount = 0;
     if(coDiscountType==='percent'){
@@ -12227,7 +12364,7 @@
     document.getElementById('co-debtor-group').style.display = coPaymentType==='credit' ? '' : 'none';
 
     const paidInput = document.getElementById('co-paid-amount');
-    let paid = parseFloat(paidInput.value);
+    let paid = parseFloat(normalizeDigits(paidInput.value));
     if(isNaN(paid) || paid<0) paid = 0;
     if(coPaymentType==='cash'){
       // در فروش نقدی، پیش‌فرض کل مبلغ پرداخت شده در نظر گرفته می‌شود
@@ -12301,9 +12438,25 @@
   document.getElementById('co-paid-amount').addEventListener('input', refreshCheckoutModal);
 
   // ---- ثبت نهایی فروش (پس از تایید در Modal تسویه) ----
+  /* POS-14 — دکمهٔ «تایید و ثبت فروش» تا پایانِ ثبت قفل است، و فروش با کلیدِ
+     پیش‌نویس (`draftSaleKey`) ثبت می‌شود: همان کلید دو بار ثبت نمی‌شود. */
+  let saleSaving = false;
   document.getElementById('form-sale-checkout').addEventListener('submit', (e)=>{
     e.preventDefault();
+    if(saleSaving) return;
+    const btn = e.target.querySelector('[type="submit"]');
+    saleSaving = true; if(btn) btn.disabled = true;
+    const unlock = ()=>{ saleSaving = false; if(btn) btn.disabled = false; };
+    try{ Promise.resolve(submitSaleCheckout()).then(unlock, unlock); }
+    catch(err){ unlock(); throw err; }
+  });
+  function submitSaleCheckout(){
     if(cart.length===0) return;
+    if(draftSaleKey && sales.some(s=> s.id===draftSaleKey)){
+      showToast('این فاکتور یک بار ثبت شده است و دوباره ثبت نمی‌شود', 'danger');
+      cart = []; saveDraftCart(); renderCart(); closeModal('modal-sale-checkout');
+      return;
+    }
 
     // بررسی مجدد موجودی درست قبل از ثبت، تا فروش بدون موجودی معتبر ثبت نشود
     for(const item of cart){
@@ -12336,7 +12489,7 @@
 
     const { subtotal, discountValue, discount, finalTotal } = computeCheckoutTotals();
 
-    let paid = parseFloat(document.getElementById('co-paid-amount').value);
+    let paid = parseFloat(normalizeDigits(document.getElementById('co-paid-amount').value));
     const paidGroup = document.getElementById('co-paid-amount').closest('.form-group');
     if(isNaN(paid) || paid<0){
       paidGroup.classList.add('error'); return;
@@ -12354,7 +12507,7 @@
       debtorGroup.classList.remove('error');
     }
 
-    const saleId = uid();
+    const saleId = draftSaleKey || uid();
     const invoiceNumber = nextInvoiceNo++;
     sales.push({
       id: saleId, invoiceNumber,
@@ -12397,7 +12550,7 @@
     showToast(`فروش به مبلغ ${formatMoney(finalTotal)} افغانی ثبت شد`);
     if(navigator.vibrate) navigator.vibrate([40,40,40]);
     openInvoiceModal(saleId);
-  });
+  }
 
   /* ==========================================================
      فاکتور — نمایش، چاپ
@@ -13093,7 +13246,8 @@
    */
   (function startAutoBackup(){
     const go = () => {
-      if (window.TohidAutoBackup) window.TohidAutoBackup.start(() => JSON.stringify(backupPayload()));
+      /* دفترِ نرسیده (IndexedDB) پشتیبانِ خالی نشود — null یعنی «این بار نه» */
+      if (window.TohidAutoBackup) window.TohidAutoBackup.start(() => ledgerInMemory === false ? null : JSON.stringify(backupPayload()));
     };
     if (document.readyState === 'loading') window.addEventListener('DOMContentLoaded', go, { once: true });
     else go();
@@ -13236,6 +13390,7 @@
     confirmAction = ()=>{
       localStorage.removeItem(STORAGE_KEY);
       localStorage.removeItem(DRAFT_CART_KEY);
+      localStorage.removeItem(DRAFT_SALE_KEY);
       // آرایه‌های حافظه هم خالی می‌شوند: تا لحظه‌ی reload اگر چیزی saveState صدا بزند،
       // داده‌ی قدیمی دوباره روی حافظه نوشته نشود. (در WebView اندروید reload ممکن است
       // دیرتر یا اصلاً انجام نشود.)
@@ -13247,7 +13402,9 @@
       stockMovements = []; priceHistory = []; auditLog = [];
       cart = [];
       showToast('تمام اطلاعات پاک شد', 'danger');
-      setTimeout(()=> location.reload(), 500);
+      /* دفتر در IndexedDB: پاک کردن ناهمگام است — reload پس از نشستنش */
+      const reload = ()=> location.reload();
+      setTimeout(()=> ledgerFlush().then(reload, reload), 500);
     };
     openModal('modal-confirm');
   });
@@ -13260,7 +13417,41 @@
   ========================================================== */
   const STORAGE_KEY = 'tohid-shop-data-v1';
 
+  /*
+   * F0-23 (دنباله) — دفتر در IndexedDB، **پیش‌فرض خاموش** (قاعدهٔ آیفون،
+   * مشخصات ۱.۳ بند ۷). `license/ledger-store.js` اگر روشن باشد همین
+   * `localStorage.getItem/setItem(STORAGE_KEY)`ها را به IndexedDB می‌برد، پس
+   * این‌جا فقط یک چیز عوض می‌شود: خواندنِ IndexedDB ناهمگام است و تا دفتر
+   * در حافظهٔ صفحه ننشسته (`ledgerInMemory`)، نه چیزی نوشته می‌شود، نه
+   * همگام‌سازی و پشتیبانِ خودکار راه می‌افتند — وگرنه دفترِ خالی «همه حذف شد»
+   * به سرور می‌رفت. خاموش ⇒ `ledgerInMemory` از اول true است و همه‌چیز مثل قبل.
+   */
+  /* `var` عمدی است (مثل STORAGE_WARN_RATIO پایین): saveState ممکن است پیش از رسیدنِ اجرا به این خط صدا زده شود */
+  var ledgerStore = window.TohidLedgerStore || null;
+  /* فایلِ ledger-store نرسید (نصبِ آفلاینِ کهنه) ولی دفتر در IndexedDB است: دست نزن */
+  var ledgerStoreMissing = !ledgerStore && (()=>{ try{ return localStorage.getItem('tohid-ledger-store-v1') === 'idb'; }catch(e){ return false; } })();
+  var ledgerInMemory = ledgerStore ? ledgerStore.isReady() : !ledgerStoreMissing;
+  var ledgerLoaded = ledgerInMemory ? Promise.resolve()
+    : ledgerStore ? ledgerStore.ready.then(onLedgerHydrated) : new Promise(()=>{});
+  function ledgerFlush(){ return ledgerStore ? ledgerStore.flush() : Promise.resolve(); }
+  if(ledgerStore) ledgerStore.onError((e)=> warnStorageFull(e));
+  if(ledgerStoreMissing) setTimeout(()=>{ try{ showToast('بخشِ بارِ دفتر نرسید و دفتر باز نشد. اینترنت را وصل کنید و برنامه را دوباره باز کنید.', 'danger'); }catch(e){} }, 0);
+
+  /* دفتر از IndexedDB رسید — همان کارهایی که سرِ بالا آمدن با دفترِ localStorage می‌شود */
+  function onLedgerHydrated(){
+    ledgerInMemory = true;
+    loadState();
+    try{
+      rebuildBarcodeIndex();
+      loadDraftCart();
+      renderCart();
+    }catch(e){ console.error('رسمِ دفترِ رسیده ناموفق بود:', e); }
+    repaintLedger();
+    if(alertsReady) scheduleStorageCheck(1500);
+  }
+
   function saveState(){
+    if(ledgerInMemory === false) return;   // دفتر هنوز از IndexedDB نرسیده: دفترِ خالی روی دفترِ واقعی نوشته نشود
     touchLedger();
     try{
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
@@ -13342,7 +13533,11 @@
       }
     }catch(e){ return null; }
     const cap = storageCapChars();
-    return { used, cap, ratio: used / cap };
+    let ratio = used / cap;
+    /* دفتر در IndexedDB: آن هم سقف دارد (storage.estimate) — پُرترِ این دو */
+    const idb = ledgerStore && ledgerStore.usage();
+    if(idb && idb.ratio > ratio) ratio = idb.ratio;
+    return { used, cap, ratio, idb };
   }
   function scheduleStorageCheck(ms){
     clearTimeout(storageCheckTimer);
@@ -13375,6 +13570,42 @@
     closeModal('modal-storage');
     document.getElementById('btn-export-backup').click();
   });
+
+  /* F0-23 (دنباله) — کلیدِ «دفتر در IndexedDB» (آزمایشی، پیش‌فرض خاموش).
+     روشن: رونوشت، سنجش، بعد جابه‌جایی؛ نبودِ IndexedDB ⇒ همان localStorage می‌ماند. */
+  (function wireLedgerStoreToggle(){
+    const box = document.getElementById('in-ledger-idb');
+    const hint = document.getElementById('ledger-store-hint');
+    if(!box || !hint) return;
+    function paint(){
+      const idb = !!ledgerStore && ledgerStore.mode() === 'idb';
+      box.checked = idb || ledgerStoreMissing;
+      box.disabled = !ledgerStore || ledgerInMemory === false;
+      hint.textContent = !ledgerStore
+        ? 'بخشِ جای دفتر بار نشد؛ دفتر همان‌جای قبلی است.'
+        : idb
+          ? 'دفتر در IndexedDB است و سقفِ ۵ مگابایتیِ حافظهٔ ساده را ندارد. نسخهٔ پیش از انتقال هم همان‌جا نگه داشته شده است. خاموش کردن، دفتر را به حافظهٔ ساده برمی‌گرداند.'
+          : 'دفتر در حافظهٔ سادهٔ مرورگر (localStorage) است که حدودِ ۵ مگابایت جا دارد. روشن کردن، آن را به IndexedDB می‌برد و نسخهٔ پیش از انتقال را نگه می‌دارد. آزمایشی است: پیش از روشن کردن یک پشتیبان بگیرید.';
+    }
+    box.addEventListener('change', ()=>{
+      if(!ledgerStore) return;
+      const want = box.checked;
+      box.disabled = true;
+      (want ? ledgerStore.enable() : ledgerStore.disable()).then(()=>{
+        showToast(want ? 'دفتر به IndexedDB رفت و نسخهٔ پیش از انتقال هم نگه داشته شد' : 'دفتر به حافظهٔ سادهٔ مرورگر برگشت');
+      }, (e)=>{
+        console.error('جابه‌جاییِ دفتر ناموفق بود:', e);
+        const full = !!e && (e.name === 'QuotaExceededError' || /quota/i.test(String(e.message || '')));
+        showToast(want
+          ? (full ? 'در IndexedDB جا نبود؛ دفتر همان‌جای قبلی ماند و چیزی عوض نشد.'
+                  : 'این مرورگر IndexedDB نمی‌دهد (مثلاً حالتِ ناشناس)؛ دفتر همان‌جای قبلی ماند و چیزی عوض نشد.')
+          : (full ? 'دفتر در حافظهٔ ساده جا نمی‌شود؛ همان IndexedDB ماند.'
+                  : 'برگرداندنِ دفتر نشد؛ همان IndexedDB ماند.'), 'danger');
+      }).then(()=>{ paint(); scheduleStorageCheck(500); });
+    });
+    paint();
+    ledgerLoaded.then(paint);
+  })();
 
   function loadState(){
     touchLedger();
@@ -13485,6 +13716,8 @@
 
   function applyServerLedger(next){
     if(!next) return;
+    /* دفتر هنوز از IndexedDB نرسیده: موتور نباید سایه را جلو ببرد (پایین، holdSyncUntilLedger) */
+    if(ledgerInMemory === false) throw new Error('دفتر هنوز بار نشده است');
     touchLedger();
     const put = (v, dflt)=> Array.isArray(v) ? v : dflt;
     const listsBefore = JSON.stringify([productCategories, productUnits, expenseCategories]);
@@ -13557,8 +13790,25 @@
    */
   function bindSyncBridge(){
     if(window.TohidSync && window.TohidSync.bind){
-      window.TohidSync.bind({ read: readLedger, write: applyServerLedger });
+      window.TohidSync.bind({ read: ()=> ledgerInMemory === false ? null : readLedger(), write: applyServerLedger });
+      if(ledgerInMemory === false) holdSyncUntilLedger(window.TohidSync);
     }
+  }
+  /*
+   *  دفتر در IndexedDB و هنوز نرسیده: موتور راه نیفتد. `firstSync` با دفترِ
+   *  خالی Snapshot می‌گرفت و سایه را جلو می‌برد، و نخستین تفاضل پس از رسیدنِ
+   *  دفتر همه‌چیز را «حذف‌شده» می‌دید. پس هر درِ ورودِ موتور تا رسیدنِ دفتر
+   *  صبر می‌کند و بعد به حالِ خودش برمی‌گردد.
+   */
+  function holdSyncUntilLedger(api){
+    const names = ['start', 'onSignedIn', 'sync', 'pullOnce', 'restoreFromServer', 'firstSync'];
+    const orig = {};
+    names.forEach((n)=>{
+      if(typeof api[n] !== 'function') return;
+      orig[n] = api[n];
+      api[n] = function(){ const args = arguments; return ledgerLoaded.then(()=> orig[n].apply(api, args)); };
+    });
+    ledgerLoaded.then(()=>{ Object.keys(orig).forEach((n)=>{ api[n] = orig[n]; }); });
   }
   if(window.TohidSync) bindSyncBridge();
   else document.addEventListener('DOMContentLoaded', bindSyncBridge);
@@ -14945,6 +15195,7 @@
   renderBackupMeta();
   renderAlerts();
   scheduleStorageCheck(1500);   // F0-23 — پس از بالا آمدن، نه در مسیرِ آن
+  promptDraftRecovery();        // POS-13 — فاکتورِ نیمه‌کارهٔ بارِ پیش
 
 
   goTo(location.hash.replace('#','') || 'dashboard');
@@ -14959,7 +15210,7 @@
 <script src="license/account-code.js?v=1" defer></script>
 <script src="license/sync-engine.js?v=5" defer></script>
 <script src="license/license-client.js?v=16" defer></script>
-<script src="license/shop-sync.js?v=18" defer></script>
+<script src="license/shop-sync.js?v=19" defer></script>
 <script src="license/shop-ui.js?v=15" defer></script>
 <script src="license/vip.js?v=17" defer></script>
 <script src="license/support.js?v=16" defer></script>
