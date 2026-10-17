@@ -13,6 +13,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.sync.SyncBadge
 import ir.vil3ntec.tohid.data.CashShift
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.money
@@ -48,17 +49,19 @@ fun DeskStatusBar(d: ShopData) {
       .padding(horizontal = 10.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
-    val (dot, text) = when {
+    val (dot, head) = when {
       !signedIn -> colors.muted2 to "بی حساب — فقط همین کامپیوتر"
       sync.dot == SyncDot.GREEN -> colors.success to (if (sync.live) "همگام، زنده" else "همگام با سرور")
-      sync.dot == SyncDot.YELLOW -> colors.warning to "در صفِ ارسال: ${plain(sync.queued)}"
+      sync.dot == SyncDot.YELLOW -> colors.warning to "در صفِ ارسال"
       sync.dot == SyncDot.RED -> colors.danger to "همگام‌سازی خطا دارد"
       else -> colors.muted2 to "بی اینترنت — کارها نگه داشته می‌شوند"
     }
+    //  SYN-08: شمارِ منتظر، آخرین همگام‌سازیِ موفق و خطای آخر همیشه پیداست
+    val text = if (!signedIn) head else SyncBadge.line(head, sync.queued, sync.lastOkAt, sync.lastError, now)
     Cell(onClick = { AppNav.go("devices") }) {
       Box(Modifier.size(8.dp).clip(CircleShape).background(dot))
       Spacer(Modifier.width(6.dp))
-      Label(text)
+      Label(text, if (signedIn && sync.dot == SyncDot.RED) colors.danger else colors.muted)
     }
     Sep()
     Cell(onClick = { AppNav.go("sales") }) {
