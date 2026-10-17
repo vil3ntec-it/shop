@@ -1,0 +1,60 @@
+-- سابقهٔ عملیات با زنجیرهٔ هش (۱۰.۳) — یک زنجیره برای هر دستگاه (سری).
+--   hash = SHA-256(prevHash ‖ canonicalJson(doc))، canonicalJson طبقِ RFC 8785 (JCS)
+--   نخستین ردیف: seq = 1 و prevHash = شصت‌وچهار صفر. seq بی‌شکاف است.
+-- `notes` عمداً بیرون از سندِ هش‌شده است: ممکن است نامِ اشخاص داشته باشد و
+-- ناشناس‌سازی (SEC-10) نباید زنجیره را بشکند. سندِ هش‌شده در `HashChain.auditDoc`.
+
+CREATE TABLE auditLog (
+  id TEXT NOT NULL PRIMARY KEY,
+  shopId TEXT NOT NULL REFERENCES shop(id),
+  deviceId TEXT NOT NULL REFERENCES device(id),
+  seq INTEGER NOT NULL CHECK (seq >= 1),
+  type TEXT NOT NULL,
+  refId TEXT,
+  amountMinor INTEGER NOT NULL DEFAULT 0,
+  notes TEXT NOT NULL DEFAULT '',
+  businessDate TEXT NOT NULL,
+  createdAt INTEGER NOT NULL,
+  prevHash TEXT NOT NULL CHECK (length(prevHash) = 64),
+  hash TEXT NOT NULL CHECK (length(hash) = 64),
+  UNIQUE (deviceId, seq)
+);
+
+CREATE TRIGGER auditLogChainLink
+BEFORE INSERT ON auditLog
+WHEN new.seq <> coalesce((SELECT max(a.seq) FROM auditLog a WHERE a.deviceId = new.deviceId), 0) + 1
+  OR (new.seq = 1 AND new.prevHash <> '0000000000000000000000000000000000000000000000000000000000000000')
+  OR (new.seq > 1 AND new.prevHash IS NOT (
+    SELECT a.hash FROM auditLog a WHERE a.deviceId = new.deviceId AND a.seq = new.seq - 1
+  ))
+BEGIN
+  SELECT RAISE(ABORT, 'auditLog hash chain broken');
+END;
+
+CREATE TRIGGER auditLogActiveDevice
+BEFORE INSERT ON auditLog
+WHEN (SELECT d.active FROM device d WHERE d.id = new.deviceId) = 0
+BEGIN
+  SELECT RAISE(ABORT, 'device is deactivated');
+END;
+
+CREATE TRIGGER auditLogNoUpdate
+BEFORE UPDATE ON auditLog
+BEGIN
+  SELECT RAISE(ABORT, 'auditLog is append-only');
+END;
+
+CREATE TRIGGER auditLogNoDelete
+BEFORE DELETE ON auditLog
+BEGIN
+  SELECT RAISE(ABORT, 'auditLog is append-only');
+END;
+
+insertAudit:
+INSERT INTO auditLog VALUES ?;
+
+auditChainOf:
+SELECT * FROM auditLog WHERE deviceId = ? ORDER BY seq;
+
+auditHead:
+SELECT seq, hash FROM auditLog WHERE deviceId = ? ORDER BY seq DESC LIMIT 1;
