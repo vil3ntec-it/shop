@@ -6,6 +6,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   splitParts, collect, sha, readBlockers, readStatus, verifyStatus, buildStatus, expandRefs, counts, familyOf,
+  buildBlockers, verifyBlockers, RESOLVED_CLASH,
 } from './spec.mjs';
 
 const DIR = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -117,6 +118,21 @@ test('تکراری: بی رده خطاست؛ دو بار در یک جدولِ ت
   assert.ok(collect(twice).errors.some((e) => e.includes('D-01') && e.includes('یک جدول')));
   const stale = collect(splitParts(DOC).parts, new Map([['INV-01', 'برخورد'], ['S141', 'هم‌معنا'], ['POS-01', 'برخورد']]));
   assert.ok(stale.errors.some((e) => e.includes('POS-01') && e.includes('دیگر چندجا')));
+});
+
+test('BLOCKERS: رده و وضعیتِ شناسه‌های چندجاتعریف‌شده (قاعدهٔ ID@بخش)', () => {
+  const reg = new Map([['INV-01', 'برخورد'], ['S141', 'هم‌معنا']]);
+  const d = collect(splitParts(DOC).parts, reg);
+  const built = buildBlockers(d, '');
+  assert.deepEqual(readBlockers(built).reg, reg, 'رده رفت‌وبرگشت دارد');
+  assert.deepEqual(verifyBlockers(d, built), [], '«باز» پذیرفته است');
+  const row = (state) => built.replace(/^(\| INV-01 \|(?:[^|]*\|){3}) [^|]* \|/m, `$1 ${state} |`);
+  const ok = row(`${RESOLVED_CLASH} (۱۴۰۵/۰۷/۲۵) — هر دو نیازمندی جدا پیگیری می‌شوند`);
+  assert.notEqual(ok, built);
+  assert.deepEqual(verifyBlockers(d, ok), []);
+  assert.equal(buildBlockers(d, ok), ok, 'status وضعیتِ دستی را نگه می‌دارد');
+  assert.ok(verifyBlockers(d, row('حل‌شده با حدس')).some((e) => e.includes('INV-01')));
+  assert.ok(verifyBlockers(d, row('تمام')).some((e) => e.includes('INV-01')));
 });
 
 test('ارجاعِ شکسته: فقط برای خانواده‌ای که تعریف دارد', () => {

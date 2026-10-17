@@ -20,8 +20,8 @@
 //   برچسبِ پررنگی که پس از شناسه واژه دارد (`- **F0-01 ذخیرهٔ ویندوز:**`) «اصلاحیه» است، نه تعریف: شناسه باید
 //   جای دیگری تعریف شده باشد.
 // ⛔ شناسهٔ دوبار تعریف‌شده خطاست، مگر در BLOCKERS.md بخشِ «شناسه‌های چندجاتعریف‌شده» رده گرفته باشد:
-//   «هم‌معنا» (یک الزام، یک ردیف) یا «برخورد» (دو الزامِ متفاوت؛ تعریفِ دوم با کلیدِ `ID@بخش` جدا پیگیری می‌شود
-//   تا صاحب محصول تصمیم بگیرد). ارجاع به شناسهٔ تعریف‌نشده از خانواده‌ای که تعریف دارد هم خطاست.
+//   «هم‌معنا» (یک الزام، یک ردیف) یا «برخورد» (دو الزامِ متفاوت؛ قاعدهٔ ID@بخش: هر دو می‌مانند، متن شماره‌گذاریِ
+//   دوباره نمی‌شود و تعریفِ دوم کلیدِ `ID@<بخش>` می‌گیرد). ارجاع به شناسهٔ تعریف‌نشده از خانواده‌ای که تعریف دارد هم خطاست.
 // ⛔ در STATUS.md ستون‌های وضعیت، تأیید، اتصال بیرونی، مانع و commit/PR، و در BLOCKERS.md ستون‌های وضعیت/رده/
 //    توضیح دستی پر می‌شوند و status آن‌ها را دور نمی‌ریزد. بخشِ «یادداشت‌ها»ِ STATUS و «موانعِ دیگر»ِ BLOCKERS
 //    دست‌نخورده می‌مانند.
@@ -504,8 +504,8 @@ export function buildStatus(data, oldText, srcSha, decisionStatus = new Map()) {
 > حفظ می‌مانند (§۲۸.۳، §۳۹.۵). وضعیت فقط یکی از: ${STATES.map((s) => `\`${s}\``).join(' · ')}.
 > \`NOT-VERIFIED\` یعنی هنوز ممیزی نشده (نه «ندارد»)؛ \`BLOCKED-EXTERNAL\` قبول نیست. \`IMPLEMENTED-VERIFIED\` بی دستور/نتیجهٔ
 > آزمون و بی commit/PR، و \`BLOCKED-EXTERNAL\` بی «مانع» ممنوع است. اتصال بیرونی: نامرتبط/آماده اتصال/sandbox آزموده/زنده تأییدشده.
-> کلیدِ \`X@N\` یعنی شناسهٔ X که در بخش N با معنای دیگری دوباره تعریف شده؛ تا تصمیمِ صاحب محصول جدا پیگیری می‌شود
-> (BLOCKERS.md). تصمیم‌های D-* و موانع در \`BLOCKERS.md\`. «مانع»ِ پیش‌فرض همان D-هایی است که متنِ سند برای آن شناسه نام برده.
+> کلیدِ \`X@N\` یعنی شناسهٔ X که در بخش N با معنای دیگری دوباره تعریف شده (قاعدهٔ ID@بخش در BLOCKERS.md): هر دو
+> نیازمندی جدا پیگیری می‌شوند و متنِ سند شماره‌گذاریِ دوباره نمی‌شود. تصمیم‌های D-* و موانع در \`BLOCKERS.md\`. «مانع»ِ پیش‌فرض همان D-هایی است که متنِ سند برای آن شناسه نام برده.
 
 ## خلاصه به تفکیکِ خانواده
 
@@ -551,22 +551,30 @@ export function verifyStatus(data, text) {
 // ---------------------------------------------------------------- BLOCKERS.md
 const OTHER = 'موانعِ دیگر (دستی)';
 
+// وضعیتِ هر شناسهٔ چندجاتعریف‌شده: «حل‌شده…» یا «باز…». «برخورد» با قاعدهٔ ID@بخش حل می‌شود: هر دو نیازمندی می‌مانند،
+// متنِ سند شماره‌گذاریِ دوباره نمی‌شود و تعریفِ دوم در همه‌جا `ID@<بخش>` است.
+export const RESOLVED_CLASH = 'حل‌شده بنا بر قاعدهٔ ID@بخش';
+const DUP_STATE = /^(حل‌شده|باز)/;
+
 export function readBlockers(text) {
   const decisions = new Map();
   const reg = new Map();
   const regNote = new Map();
+  const regStatus = new Map();
   let sec = '';
   for (const l of String(text ?? '').split('\n')) {
     if (l.startsWith('## ')) sec = l;
     if (!l.startsWith('|')) continue;
     const c = cellsOf(l);
     if (sec.includes('دروازه‌های تصمیم') && c.length === 6 && /^D-[0-9]+$/.test(c[0])) decisions.set(c[0], c[5]);
-    if (sec.includes('چندجا') && c.length === 5 && KEY.test(c[0])) {
+    // | شناسه | محل‌ها | کلید در STATUS | رده | وضعیت | توضیح |  (شکلِ پنج‌ستونیِ پیشین بی «وضعیت» هم خوانده می‌شود)
+    if (sec.includes('چندجا') && (c.length === 6 || c.length === 5) && KEY.test(c[0])) {
       if (c[3] === SAME || c[3] === CLASH) reg.set(c[0], c[3]);
-      regNote.set(c[0], c[4]);
+      if (c.length === 6) regStatus.set(c[0], c[4]);
+      regNote.set(c[0], c.at(-1));
     }
   }
-  return { decisions, reg, regNote };
+  return { decisions, reg, regNote, regStatus };
 }
 
 export function buildBlockers(data, oldText, legacyDecisions = new Map()) {
@@ -596,16 +604,19 @@ export function buildBlockers(data, oldText, legacyDecisions = new Map()) {
   out += `
 ## ۲. شناسه‌های چندجاتعریف‌شده (§۳۹.۹ ب)
 
-رده: «${SAME}» = یک الزام که دو جا آمده (یک ردیف در STATUS)؛ «${CLASH}» = دو الزامِ متفاوت با یک شناسه (تعریفِ دوم با
-کلیدِ \`ID@بخش\` جدا پیگیری می‌شود تا صاحب محصول شناسهٔ تازه یا ادغام را تعیین کند؛ ابزار متنِ سند را عوض نمی‌کند).
-«${UNREG}» خطاست.
+رده: «${SAME}» = یک الزام که دو جا آمده (یک ردیف در STATUS)؛ «${CLASH}» = دو الزامِ متفاوت با یک شناسه. «${UNREG}» خطاست.
 
-| شناسه | محل‌ها | کلید در STATUS | رده | توضیح |
-|---|---|---|---|---|
+**قاعدهٔ ID@بخش (۱۴۰۵/۰۷/۲۵؛ صاحب محصول: «نپرس، بهترین را بردار»):** هر دو نیازمندی می‌مانند و متنِ سند شماره‌گذاریِ
+دوباره نمی‌شود. تعریفِ نخست همان شناسه است و هر تعریفِ بعدی \`ID@<بخش>\` (مثلاً \`INV-01@32\`، \`OPS-01@29\`، \`INV-01@38\`)؛
+در STATUS، PR و کامیت با همین کلید نام برده می‌شود. وضعیت فقط «حل‌شده…» یا «باز…» است.
+
+| شناسه | محل‌ها | کلید در STATUS | رده | وضعیت | توضیح |
+|---|---|---|---|---|---|
 `;
   for (const d of data.dups) {
     const keys = data.entries.filter((e) => e.key === d.id || e.clashOf === d.id).map((e) => e.key);
-    out += `| ${d.id} | ${d.locs.map((l) => `§${toFa(l.sub)} (خط ${toFa(l.line)})`).join('، ')} | ${keys.join('، ')} | ${d.cls} | ${old.regNote.get(d.id) ?? DASH} |\n`;
+    const state = old.regStatus.get(d.id) ?? 'باز — در انتظار';
+    out += `| ${d.id} | ${d.locs.map((l) => `§${toFa(l.sub)} (خط ${toFa(l.line)})`).join('، ')} | ${keys.join('، ')} | ${d.cls} | ${state} | ${old.regNote.get(d.id) ?? DASH} |\n`;
   }
   out += `\n## ${OTHER}\n\n${notesOf(oldText, OTHER)}\n`;
   return out;
@@ -616,6 +627,12 @@ export function verifyBlockers(data, text) {
   const { decisions } = readBlockers(text);
   for (const id of data.decisions.keys()) if (!decisions.has(id)) errs.push(`BLOCKERS.md: تصمیمِ ${id} نیست — status بزن`);
   for (const [id, s] of decisions) if (!s || s === DASH) errs.push(`BLOCKERS.md: ${id} وضعیت ندارد`);
+  const { reg, regStatus } = readBlockers(text);
+  for (const d of data.dups) {
+    const s = regStatus.get(d.id) ?? '';
+    if (!DUP_STATE.test(s)) errs.push(`BLOCKERS.md: وضعیتِ ${d.id} باید «حل‌شده…» یا «باز…» باشد`);
+    else if (reg.get(d.id) === CLASH && s.startsWith('حل‌شده') && !s.startsWith(RESOLVED_CLASH)) errs.push(`BLOCKERS.md: «${CLASH}»ِ ${d.id} فقط با «${RESOLVED_CLASH}» حل می‌شود`);
+  }
   return errs;
 }
 
