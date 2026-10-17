@@ -54,6 +54,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import ir.vil3ntec.tohid.data.DebtBook
 import ir.vil3ntec.tohid.data.Debtor
 import ir.vil3ntec.tohid.data.DebtorEngine
 import ir.vil3ntec.tohid.data.ShopData
@@ -91,6 +92,10 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
   var txFor by remember { mutableStateOf<Pair<String, DebtorEngine.Kind>?>(null) }
   var confirmDelete by remember { mutableStateOf<Debtor?>(null) }
   var confirmTx by remember { mutableStateOf<String?>(null) }
+  //  دفترِ قرض (v3 §22.2-A5): رسیدِ یک ردیف، سررسیدِ یک برد، و بردی که از سقف می‌گذرد
+  var receiptFor by remember { mutableStateOf<String?>(null) }
+  var dueFor by remember { mutableStateOf<String?>(null) }
+  var overLimit by remember { mutableStateOf<PendingTx?>(null) }
 
   fun toast(text: String) {
     scope.launch { snackbar.showSnackbar(text) }
@@ -124,6 +129,7 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
       onEdit = { form = DebtorFormState.of(account.debtor) },
       onDelete = { confirmDelete = account.debtor },
       onDeleteTx = { confirmTx = it },
+      onOpenTx = { receiptFor = it },
     )
   } else {
     /*
@@ -285,15 +291,62 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
       balance = ShopStore.debt(d, debtorId),
       kind = kind,
       onDismiss = { txFor = null },
-      onSave = { chosenKind, amount, date, notes ->
-        apply(
-          DebtorEngine.addTransaction(
-            d, debtorId, chosenKind, amount, date, notes, todayIso(), System.currentTimeMillis(), ::newId,
-          ),
-          "با موفقیت ثبت شد",
-        ) { txFor = null }
+      onSave = { chosenKind, amount, date, notes, due ->
+        val pending = PendingTx(debtorId, chosenKind, amount, date, notes, due)
+        //  CRM-03: بردِ بیش از سقف فقط با تأییدِ صریح — مشتریِ بی سقف همان رفتارِ همیشه
+        val credit = if (chosenKind == DebtorEngine.Kind.GIVE && !amount.isNaN() && amount > 0) {
+          DebtBook.creditCheck(d, debtorId, DebtBook.minor(amount))
+        } else null
+        if (credit != null && credit.over) overLimit = pending
+        else apply(pending.submit(d, overLimit = false), "با موفقیت ثبت شد") { txFor = null }
       },
     )
+  }
+
+  overLimit?.let { pending ->
+    val credit = DebtBook.creditCheck(d, pending.debtorId, DebtBook.minor(pending.amount))
+    if (credit == null) {
+      //  سقف در همین فاصله برداشته شد ⇒ پرسشی نمانده
+      LaunchedEffect(pending) { overLimit = null }
+    } else {
+      OverLimitDialog(
+        credit = credit,
+        onConfirm = {
+          apply(pending.submit(d, overLimit = true), "با موفقیت ثبت شد") { txFor = null }
+          overLimit = null
+        },
+        onDismiss = { overLimit = null },
+      )
+    }
+  }
+
+  receiptFor?.let { txId ->
+    val tx = d.transactions.find { it.id == txId }
+    if (tx == null) {
+      LaunchedEffect(txId) { receiptFor = null }
+    } else {
+      DebtReceiptDialog(
+        d = d,
+        debtorId = tx.debtorId,
+        txId = txId,
+        onDismiss = { receiptFor = null },
+        onDue = if (tx.type == "give") ({ dueFor = txId; receiptFor = null }) else null,
+      )
+    }
+  }
+
+  dueFor?.let { txId ->
+    val tx = d.transactions.find { it.id == txId }
+    val entry = tx?.let { DebtBook.book(d, it.debtorId, todayIso())?.entry(txId) }
+    if (entry == null) {
+      LaunchedEffect(txId) { dueFor = null }
+    } else {
+      DueDateDialog(
+        entry = entry,
+        onDismiss = { dueFor = null },
+        onSave = { due -> apply(DebtorEngine.setDueDate(d, txId, due), "سررسید ثبت شد") { dueFor = null } },
+      )
+    }
   }
 
   confirmDelete?.let { debtor ->
@@ -642,10 +695,13 @@ private fun AccountView(
   onEdit: () -> Unit,
   onDelete: () -> Unit,
   onDeleteTx: (String) -> Unit,
+  onOpenTx: (String) -> Unit,
 ) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
   var pending by remember { mutableStateOf<ReportCsv.Sheet?>(null) }
+  //  دفترِ همین مشتری: اقلام، تخصیصِ پرداخت، سررسید و ماندهٔ پس از هر ردیف
+  val book = remember(d, account.debtor.id) { DebtBook.book(d, account.debtor.id, todayIso()) }
   //  صورت‌حساب با انتخابگرِ خودِ سیستم ذخیره می‌شود — بی اجازهٔ حافظه
   val saveCsv = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
     val sheet = pending
@@ -728,6 +784,10 @@ private fun AccountView(
             color = Shop.colors.danger,
           )
         }
+      }
+      book?.let {
+        Spacer(Modifier.height(8.dp))
+        DebtBookBanner(it)
       }
       Spacer(Modifier.height(14.dp))
 
@@ -846,6 +906,8 @@ private fun AccountView(
             .clip(RoundedCornerShape(Radius.sm))
             .background(wash)
             .border(1.dp, tint.copy(alpha = 0.45f), RoundedCornerShape(Radius.sm))
+            //  لمسِ ردیف ⇒ رسیدش (چاپ/فرستادن) و برای برد، سررسید
+            .clickable { onOpenTx(tx.id) }
             .padding(12.dp),
           verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -888,6 +950,10 @@ private fun AccountView(
               style = MaterialTheme.typography.labelSmall,
               color = Shop.colors.muted,
             )
+            book?.entry(tx.id)?.let { e ->
+              Spacer(Modifier.height(4.dp))
+              DebtEntryDetail(book, e)
+            }
           }
           Text(
             "${if (isGive) "+" else "−"}${money(tx.amount)}",
@@ -951,10 +1017,27 @@ data class DebtorFormState(
   val name: String = "",
   val phone: String = "",
   val notes: String = "",
+  /** سقفِ اعتبار (CRM-03) — خالی یعنی بی سقف */
+  val creditLimit: String = "",
 ) {
   companion object {
-    fun of(d: Debtor) = DebtorFormState(d.id, d.name, d.phone, d.notes)
+    fun of(d: Debtor) = DebtorFormState(d.id, d.name, d.phone, d.notes, limitText(d.creditLimit))
   }
+}
+
+/** بردی که منتظرِ تأییدِ «بیش از سقف» است */
+private data class PendingTx(
+  val debtorId: String,
+  val kind: DebtorEngine.Kind,
+  val amount: Double,
+  val date: String,
+  val notes: String,
+  val due: String?,
+) {
+  fun submit(d: ShopData, overLimit: Boolean) = DebtorEngine.addTransaction(
+    d, debtorId, kind, amount, date, notes, todayIso(), System.currentTimeMillis(), ::newId,
+    dueDate = due, overLimit = overLimit,
+  )
 }
 
 @Composable
@@ -984,12 +1067,14 @@ private fun DebtorDialog(
         Spacer(Modifier.height(10.dp))
         OutlinedTextField(form.notes, { form = form.copy(notes = it) }, label = { Text("یادداشت (اختیاری)") },
           modifier = Modifier.fillMaxWidth())
+        Spacer(Modifier.height(10.dp))
+        CreditLimitField(form.creditLimit) { form = form.copy(creditLimit = it) }
 
         Spacer(Modifier.height(18.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
           OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("انصراف") }
           Button(
-            onClick = { onSave(DebtorEngine.DebtorDraft(form.name, form.phone, form.notes)) },
+            onClick = { onSave(DebtorEngine.DebtorDraft(form.name, form.phone, form.notes, parseLimit(form.creditLimit))) },
             modifier = Modifier.weight(1f),
           ) { Text("ذخیره") }
         }
@@ -1005,11 +1090,12 @@ private fun TransactionDialog(
   balance: Double,
   kind: DebtorEngine.Kind,
   onDismiss: () -> Unit,
-  onSave: (DebtorEngine.Kind, Double, String, String) -> Unit,
+  onSave: (DebtorEngine.Kind, Double, String, String, String?) -> Unit,
 ) {
   var amount by remember { mutableStateOf("") }
   var date by remember { mutableStateOf(todayIso()) }
   var notes by remember { mutableStateOf("") }
+  var due by remember { mutableStateOf("") }
   // نوعِ تراکنش داخلِ همین کادر عوض می‌شود — مثل نسخهٔ وب، که یک کادر
   // دارد با دو کلید، نه دو دکمهٔ جدا در صفحهٔ حساب
   var chosen by remember { mutableStateOf(kind) }
@@ -1068,11 +1154,17 @@ private fun TransactionDialog(
         OutlinedTextField(notes, { notes = it }, label = { Text("یادداشت (اختیاری)") },
           modifier = Modifier.fillMaxWidth())
 
+        //  سررسید فقط برای برد (اختیاری) — رسید سررسید ندارد
+        if (!receiving) {
+          Spacer(Modifier.height(10.dp))
+          DueDateField(due) { due = it }
+        }
+
         Spacer(Modifier.height(18.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
           OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("انصراف") }
           Button(
-            onClick = { onSave(chosen, amount.toDoubleOrNull() ?: 0.0, date, notes) },
+            onClick = { onSave(chosen, amount.toDoubleOrNull() ?: 0.0, date, notes, due.ifBlank { null }.takeIf { !receiving }) },
             modifier = Modifier.weight(1f),
           ) { Text(if (receiving) "ثبت رسید" else "ثبت برد") }
         }

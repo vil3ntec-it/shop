@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -33,6 +34,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.data.CustomerEngine
+import ir.vil3ntec.tohid.data.DebtBook
 import ir.vil3ntec.tohid.data.DebtorEngine
 import ir.vil3ntec.tohid.data.ReportCsv
 import ir.vil3ntec.tohid.data.Sale
@@ -300,6 +302,24 @@ private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
   var entry by remember { mutableStateOf<DebtorEngine.Kind?>(null) }
   var picked by remember { mutableStateOf<String?>(null) }
   var showInvoice by remember { mutableStateOf<Sale?>(null) }
+  //  دفترِ قرض (v3 §22.2-A5): ردیفِ انتخاب‌شدهٔ صورت‌حساب، رسید، سررسید، سقفِ اعتبار
+  val book = remember(d, id) { DebtBook.book(d, id, today) }
+  var pickedTx by remember { mutableStateOf<String?>(null) }
+  var receiptFor by remember { mutableStateOf<String?>(null) }
+  var dueFor by remember { mutableStateOf<String?>(null) }
+  var limitOpen by remember { mutableStateOf(false) }
+  var overLimit by remember { mutableStateOf<Triple<Double, String, String?>?>(null) }
+  fun record(kind: DebtorEngine.Kind, amount: Double, notes: String, due: String?, over: Boolean) {
+    when (val r = DebtorEngine.addTransaction(d, id, kind, amount, today, notes, today, System.currentTimeMillis(), ::newId, dueDate = due, overLimit = over)) {
+      is DebtorEngine.Result.Failed -> toast(r.message)
+      is DebtorEngine.Result.Ok -> {
+        scope.launch { store.save(r.data) }
+        entry = null
+        tab = FileTab.LEDGER
+        toast(if (kind == DebtorEngine.Kind.RECEIVE) "دریافتِ ${money(amount)} ؋ ثبت شد" else "قرضِ ${money(amount)} ؋ ثبت شد")
+      }
+    }
+  }
   val shotTab = DeskCustomersShot.tab.value
   LaunchedEffect(shotTab) { FileTab.values().getOrNull(shotTab)?.let { tab = it } }
 
@@ -321,7 +341,7 @@ private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
           e.key == Key.F6 -> { entry = DebtorEngine.Kind.GIVE; true }
           e.isPrimaryModifier && e.key == Key.P -> { print(); true }
           e.isPrimaryModifier && e.key == Key.E -> { excel(); true }
-          e.key == Key.Escape && entry == null && showInvoice == null -> { onBack(); true }
+          e.key == Key.Escape && entry == null && showInvoice == null && receiptFor == null && dueFor == null && !limitOpen && overLimit == null -> { onBack(); true }
           else -> false
         }
       }
@@ -350,11 +370,17 @@ private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
       DeskKpi("آخرین خرید", s.lastPurchase?.let { formatDate(it) } ?: "—", Shop.colors.text, Modifier.weight(1f))
       DeskKpi("آخرین پرداخت", s.lastPaid?.let { formatDate(it) } ?: "—", Shop.colors.success, Modifier.weight(1f))
     }
+    book?.let {
+      Spacer(Modifier.height(8.dp))
+      DebtBookBanner(it)
+    }
     Spacer(Modifier.height(10.dp))
     Row(verticalAlignment = Alignment.CenterVertically) {
       Button(onClick = { entry = DebtorEngine.Kind.RECEIVE }) { Text("دریافتِ وجه  F7") }
       Spacer(Modifier.width(6.dp))
       OutlinedButton(onClick = { entry = DebtorEngine.Kind.GIVE }) { Text("قرضِ دستی  F6") }
+      Spacer(Modifier.width(6.dp))
+      OutlinedButton(onClick = { limitOpen = true }) { Text("سقفِ اعتبار") }
       Spacer(Modifier.weight(1f))
       OutlinedButton(onClick = ::print) { Text("چاپِ «${tab.label}»  Ctrl+P") }
       Spacer(Modifier.width(6.dp))
@@ -363,16 +389,11 @@ private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
     entry?.let { kind ->
       Spacer(Modifier.height(8.dp))
       key(id, kind) {
-        EntryRow(kind, onCancel = { entry = null }) { amount, notes ->
-          when (val r = DebtorEngine.addTransaction(d, id, kind, amount, today, notes, today, System.currentTimeMillis(), ::newId)) {
-            is DebtorEngine.Result.Failed -> toast(r.message)
-            is DebtorEngine.Result.Ok -> {
-              scope.launch { store.save(r.data) }
-              entry = null
-              tab = FileTab.LEDGER
-              toast(if (kind == DebtorEngine.Kind.RECEIVE) "دریافتِ ${money(amount)} ؋ ثبت شد" else "قرضِ ${money(amount)} ؋ ثبت شد")
-            }
-          }
+        EntryRow(kind, onCancel = { entry = null }) { amount, notes, due ->
+          //  CRM-03: بردِ بیش از سقف فقط با تأییدِ صریح؛ مشتریِ بی سقف همان رفتارِ همیشه
+          val credit = if (kind == DebtorEngine.Kind.GIVE) DebtBook.creditCheck(d, id, DebtBook.minor(amount)) else null
+          if (credit != null && credit.over) overLimit = Triple(amount, notes, due)
+          else record(kind, amount, notes, due, over = false)
         }
       }
     }
@@ -391,28 +412,60 @@ private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
     Spacer(Modifier.height(8.dp))
 
     when (tab) {
-      FileTab.LEDGER -> {
-        val cols = listOf(TCol("ردیف", 56.dp), TCol("تاریخ", 110.dp), TCol("شرح"), TCol("فاکتور", 90.dp), TCol("برد (بدهکار)", 130.dp, true), TCol("رسید (بستانکار)", 130.dp, true), TCol("مانده", 140.dp, true))
-        DeskTable(
-          cols, ledger.size, Modifier.weight(1f),
-          empty = "هنوز ردیفی نیست — قرضِ نسیه و دریافت‌ها این‌جا می‌آیند.",
-          cell = { i, c ->
-            val l = ledger[i]
-            when (c) {
-              0 -> TCell(l.row.toString(), Shop.colors.muted)
-              1 -> TCell(formatDate(l.tx.date))
-              2 -> TCell(l.tx.notes.ifBlank { if (l.give > 0) "برد" else "رسید" })
-              3 -> TCell(l.invoiceLabel?.let { "#$it" }.orEmpty(), Shop.colors.primary, link = l.saleId != null)
-              4 -> TCell(if (l.give > 0) money(l.give) else "", Shop.colors.danger)
-              5 -> TCell(if (l.receive > 0) money(l.receive) else "", Shop.colors.success)
-              else -> TCell(money(l.balance), bold = true)
+      FileTab.LEDGER -> Row(Modifier.weight(1f)) {
+        val cols = listOf(TCol("ردیف", 56.dp), TCol("تاریخ", 110.dp), TCol("شرح"), TCol("فاکتور", 90.dp), TCol("برد (بدهکار)", 130.dp, true), TCol("رسید (بستانکار)", 130.dp, true), TCol("مانده", 140.dp, true), TCol("سررسید / باز", 170.dp))
+        Column(Modifier.weight(1f).fillMaxHeight()) {
+          DeskTable(
+            cols, ledger.size, Modifier.weight(1f),
+            empty = "هنوز ردیفی نیست — قرضِ نسیه و دریافت‌ها این‌جا می‌آیند.",
+            selected = ledger.indexOfFirst { it.tx.id == pickedTx }.takeIf { it >= 0 },
+            cell = { i, c ->
+              val l = ledger[i]
+              when (c) {
+                0 -> TCell(l.row.toString(), Shop.colors.muted)
+                1 -> TCell(formatDate(l.tx.date))
+                2 -> TCell(l.tx.notes.ifBlank { if (l.give > 0) "برد" else "رسید" })
+                3 -> TCell(l.invoiceLabel?.let { "#$it" }.orEmpty(), Shop.colors.primary, link = l.saleId != null)
+                4 -> TCell(if (l.give > 0) money(l.give) else "", Shop.colors.danger)
+                5 -> TCell(if (l.receive > 0) money(l.receive) else "", Shop.colors.success)
+                6 -> TCell(money(l.balance), bold = true)
+                else -> book?.entry(l.tx.id)?.takeIf { it.give && it.amount.minor > 0 }?.let { e ->
+                  val due = e.dueDate?.let { formatDate(it) + " · " }.orEmpty()
+                  TCell(
+                    due + if (e.paid) "تسویه" else "باز ${DebtBook.show(e.open)}",
+                    when { e.overdue -> Shop.colors.danger; e.paid -> Shop.colors.success; else -> Shop.colors.warning },
+                  )
+                } ?: TCell("")
+              }
+            },
+            onClick = { i -> pickedTx = ledger[i].tx.id },
+            footer = listOf("", "", "جمع", "", money(ledger.sumOf { it.give }), money(ledger.sumOf { it.receive }), money(s.balance), book?.overdueAmount?.takeIf { it.minor > 0 }?.let { "گذشته ${DebtBook.show(it)}" }.orEmpty()),
+          )
+          Text("اشتباه پاک نمی‌شود: با ردیفِ مخالف («دریافت» یا «قرضِ دستی») و شرحِ «اصلاحِ ردیفِ …» درست کنید تا ردش بماند. روی ردیف بزنید تا اقلام، پرداخت‌ها، رسید و سررسیدش کنارِ جدول بیاید.",
+            style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+        }
+        //  جزئیاتِ ردیفِ انتخاب‌شده — کنارِ جدول، مثلِ اقلامِ فاکتور در زبانهٔ «فاکتورها»
+        val e = pickedTx?.let { book?.entry(it) }
+        if (book != null && e != null) {
+          Spacer(Modifier.width(12.dp))
+          Surface(color = Shop.colors.surface, shape = RoundedCornerShape(8.dp), modifier = Modifier.width(380.dp).fillMaxHeight()) {
+            Column(Modifier.padding(12.dp).verticalScroll(rememberScrollState())) {
+              Text(
+                "ردیفِ ${e.row} — ${if (e.give) "برد" else "رسید"} ${DebtBook.show(e.amount)} ؋",
+                style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Shop.colors.text,
+              )
+              Text(formatDate(e.tx.date) + (e.invoiceLabel?.let { " — فاکتور #$it" } ?: ""), style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+              Spacer(Modifier.height(8.dp))
+              DebtEntryDetail(book, e, maxLines = 40)
+              Spacer(Modifier.height(10.dp))
+              Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Button(onClick = { receiptFor = e.tx.id }) { Text("رسید") }
+                if (e.give) OutlinedButton(onClick = { dueFor = e.tx.id }) { Text("سررسید") }
+                e.sale?.let { sale -> OutlinedButton(onClick = { picked = sale.id; tab = FileTab.INVOICES }) { Text("فاکتور") } }
+              }
             }
-          },
-          onClick = { i -> ledger[i].saleId?.let { picked = it; tab = FileTab.INVOICES } },
-          footer = listOf("", "", "جمع", "", money(ledger.sumOf { it.give }), money(ledger.sumOf { it.receive }), money(s.balance)),
-        )
-        Text("اشتباه پاک نمی‌شود: با ردیفِ مخالف («دریافت» یا «قرضِ دستی») و شرحِ «اصلاحِ ردیفِ …» درست کنید تا ردش بماند. روی شمارهٔ فاکتور بزنید تا خودِ فاکتور باز شود.",
-          style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+          }
+        }
       }
 
       FileTab.INVOICES -> Row(Modifier.weight(1f)) {
@@ -479,6 +532,57 @@ private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
 
   showInvoice?.let { sale ->
     InvoiceDialog(d = d, sale = sale, onDismiss = { showInvoice = null }, onMessage = ::toast)
+  }
+
+  receiptFor?.let { txId ->
+    DebtReceiptDialog(
+      d = d, debtorId = id, txId = txId,
+      onDismiss = { receiptFor = null },
+      onDue = if (book?.entry(txId)?.give == true) ({ dueFor = txId; receiptFor = null }) else null,
+    )
+  }
+  dueFor?.let { txId ->
+    val e = book?.entry(txId)
+    if (e == null) {
+      LaunchedEffect(txId) { dueFor = null }
+    } else {
+      DueDateDialog(e, onDismiss = { dueFor = null }) { due ->
+        when (val r = DebtorEngine.setDueDate(d, txId, due)) {
+          is DebtorEngine.Result.Failed -> toast(r.message)
+          is DebtorEngine.Result.Ok -> { scope.launch { store.save(r.data) }; dueFor = null; toast("سررسید ثبت شد") }
+        }
+      }
+    }
+  }
+  overLimit?.let { (amount, notes, due) ->
+    val credit = DebtBook.creditCheck(d, id, DebtBook.minor(amount))
+    if (credit == null) {
+      LaunchedEffect(amount) { overLimit = null }
+    } else {
+      OverLimitDialog(
+        credit,
+        onConfirm = { record(DebtorEngine.Kind.GIVE, amount, notes, due, over = true); overLimit = null },
+        onDismiss = { overLimit = null },
+      )
+    }
+  }
+  if (limitOpen) {
+    var text by remember { mutableStateOf(limitText(debtor.creditLimit)) }
+    AlertDialog(
+      onDismissRequest = { limitOpen = false },
+      containerColor = Shop.colors.surfaceSolid,
+      title = { Text("سقفِ اعتبارِ ${debtor.name}", color = Shop.colors.text) },
+      text = { Column { CreditLimitField(text) { text = it } } },
+      confirmButton = {
+        TextButton(onClick = {
+          when (val r = DebtorEngine.edit(d, id, DebtorEngine.DebtorDraft(debtor.name, debtor.phone, debtor.notes, parseLimit(text)))) {
+            is DebtorEngine.Result.Failed -> toast(r.message)
+            is DebtorEngine.Result.Ok -> { scope.launch { store.save(r.data) }; limitOpen = false; toast("سقفِ اعتبار ذخیره شد") }
+          }
+        }) { Text("ذخیره") }
+      },
+      dismissButton = { TextButton(onClick = { limitOpen = false }) { Text("انصراف") } },
+    )
   }
 }
 
@@ -644,12 +748,16 @@ private fun NewCustomerRow(store: ShopStore, d: ShopData, toast: (String) -> Uni
 
 /** ردیفِ ثبتِ دریافت/قرض — مبلغ، شرح، Enter */
 @Composable
-private fun EntryRow(kind: DebtorEngine.Kind, onCancel: () -> Unit, onSave: (Double, String) -> Unit) {
+private fun EntryRow(kind: DebtorEngine.Kind, onCancel: () -> Unit, onSave: (Double, String, String?) -> Unit) {
   var amount by remember { mutableStateOf("") }
   var notes by remember { mutableStateOf("") }
+  //  سررسیدِ برد (اختیاری) — خورشیدی نوشته می‌شود، مثلِ کادرِ تاریخ
+  var dueText by remember { mutableStateOf("") }
+  val due = if (dueText.isBlank()) null else ir.vil3ntec.tohid.Jalali.parseTyped(dueText)
+  val dueBroken = dueText.isNotBlank() && due == null
   val focus = remember { FocusRequester() }
   LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
-  fun go() { amount.toDoubleOrNull()?.let { onSave(it, notes.trim()) } }
+  fun go() { if (!dueBroken) amount.toDoubleOrNull()?.let { onSave(it, notes.trim(), due) } }
   val keys = Modifier.onPreviewKeyEvent { e ->
     if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
     when (e.key) {
@@ -669,8 +777,16 @@ private fun EntryRow(kind: DebtorEngine.Kind, onCancel: () -> Unit, onSave: (Dou
       OutlinedTextField(amount, { amount = ir.vil3ntec.tohid.numericInput(it) }, label = { Text("مبلغ (؋)") }, singleLine = true, modifier = Modifier.width(160.dp).focusRequester(focus).then(keys))
       Spacer(Modifier.width(6.dp))
       OutlinedTextField(notes, { notes = it }, label = { Text("شرح") }, singleLine = true, modifier = Modifier.weight(1f).then(keys))
+      if (!receive) {
+        Spacer(Modifier.width(6.dp))
+        OutlinedTextField(
+          dueText, { dueText = ir.vil3ntec.tohid.latinDigits(it).filter { c -> c.isDigit() || c == '/' || c == '-' } },
+          label = { Text("سررسید (اختیاری)") }, placeholder = { Text("۱۴۰۵/۰۸/۰۱") },
+          singleLine = true, isError = dueBroken, modifier = Modifier.width(170.dp).then(keys),
+        )
+      }
       Spacer(Modifier.width(6.dp))
-      Button(onClick = ::go, enabled = (amount.toDoubleOrNull() ?: 0.0) > 0) { Text("ثبت ↵") }
+      Button(onClick = ::go, enabled = (amount.toDoubleOrNull() ?: 0.0) > 0 && !dueBroken) { Text("ثبت ↵") }
       TextButton(onClick = onCancel) { Text("Esc") }
     }
   }

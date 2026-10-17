@@ -131,6 +131,8 @@ private fun auditLabel(type: String): String = when (type) {
   "debtor_delete" -> "حذف قرض‌دار"
   "debt_tx_delete" -> "حذف تراکنش بدهی"
   "expense_delete" -> "حذف مصرف"
+  "debt_due_set" -> "سررسیدِ قرض"
+  "credit_over_limit" -> "برد بیش از سقفِ اعتبار"
   else -> type
 }
 
@@ -138,7 +140,7 @@ private fun auditLabel(type: String): String = when (type) {
 private fun auditTint(type: String): Color = when (type) {
   "sale", "customer_payment" -> Shop.colors.success
   "cancel_sale", "delete_product", "debtor_delete", "debt_tx_delete", "expense_delete" -> Shop.colors.danger
-  "return", "supplier_return", "stock_adjustment" -> Shop.colors.warning
+  "return", "supplier_return", "stock_adjustment", "credit_over_limit" -> Shop.colors.warning
   else -> Shop.colors.primary
 }
 
