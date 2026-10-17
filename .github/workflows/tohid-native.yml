@@ -5,13 +5,16 @@ on:
     branches: ['claude/**', main]
     paths:
       - 'android-native/**'
+      - 'core/**'
+      #  تغییرِ فقط فایل‌های مرجع روی main نسخهٔ آزمایشی نمی‌سازد (در PR سنجیده می‌شود)
+      - '!core/test-vectors/**'
       - '.github/workflows/tohid-native.yml'
   # PR هم ساخته می‌شود تا APKِ شکسته پیش از مرج دیده شود؛ انتشار فقط از main است
   pull_request:
     paths:
       - 'android-native/**'
-      #  آزمون‌های مرجعِ مشترک (CoreVectorsTest) — فقط در PR، تا pushِ main انتشار نسازد
-      - 'core/test-vectors/**'
+      #  کدِ مشترکِ core و آزمون‌های مرجعِ آن (CoreVectorsTest)
+      - 'core/**'
       - '.github/workflows/tohid-native.yml'
   #  ⛔ F0-27: push به main فقط کانالِ آزمایشی (`tohid-native-beta`) را می‌سازد.
   #  برچسبِ پایدار (`tohid-native`، همان که همهٔ گوشی‌ها می‌پرسند) فقط از این‌جا:
@@ -104,6 +107,18 @@ jobs:
           #  برنامه تا هیچ مجوز یا کدِ آفلاینِ جعلی پذیرفته نشود. راز نیست ⇒ `vars`.
           TOHID_LICENSE_PUBLIC_KEY: ${{ vars.TOHID_LICENSE_PUBLIC_KEY }}
         run: gradle --no-daemon assembleRelease -PbuildNumber=${{ github.run_number }}
+
+      #  معیارِ «قدم صفر»ِ ۳.۳: applicationId، versionCode و اثر انگشتِ امضا همان
+      #  نسخهٔ منتشرشده؛ حجم در ±۵٪ (سخت برای PRی که فایلِ ساخت را عوض کرده) و شمارِ
+      #  آزمون‌ها در خلاصهٔ اجرا. پیش از انتشار، تا APKِ ناسازگار هرگز به گوشی‌ها نرسد.
+      - name: دروازه‌های APK
+        working-directory: android-native
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: >-
+          bash tools/apk-gates.sh app/build/outputs/apk/release/app-release.apk
+          $((100 + ${{ github.run_number }})) app/build/test-results/testReleaseUnitTest
 
       - name: نام‌گذاری و جمع کنترلی
         working-directory: android-native

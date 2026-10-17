@@ -221,20 +221,14 @@ val DarkColors = ShopColors(
  *  حالا یک جا داده می‌شود و همهٔ کادرهای متن، کشوها، منوها و کارت‌های
  *  متریال در تمامِ برنامه گِرد می‌شوند.
  */
-val ShopShapes = if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) Shapes(
+val ShopShapes = Shapes(
   //  کامپیوتر: گوشه‌های کم‌گرد، مثلِ نرم‌افزارهای رومیزی — گردیِ ۲۰ پیکسلی
-  //  روی مانیتور «برنامهٔ گوشیِ بزرگ‌شده» به نظر می‌رسید
-  extraSmall = RoundedCornerShape(4.dp),
-  small = RoundedCornerShape(6.dp),
-  medium = RoundedCornerShape(8.dp),
-  large = RoundedCornerShape(10.dp),
-  extraLarge = RoundedCornerShape(12.dp),
-) else Shapes(
-  extraSmall = RoundedCornerShape(12.dp),
-  small = RoundedCornerShape(16.dp),
-  medium = RoundedCornerShape(18.dp),
-  large = RoundedCornerShape(20.dp),
-  extraLarge = RoundedCornerShape(28.dp),
+  //  روی مانیتور «برنامهٔ گوشیِ بزرگ‌شده» به نظر می‌رسید. عددها در `Corner` (Tokens.kt).
+  extraSmall = RoundedCornerShape(Corner.extraSmall.current),
+  small = RoundedCornerShape(Corner.small.current),
+  medium = RoundedCornerShape(Corner.medium.current),
+  large = RoundedCornerShape(Corner.large.current),
+  extraLarge = RoundedCornerShape(Corner.extraLarge.current),
 )
 
 /**
@@ -245,10 +239,9 @@ val ShopShapes = if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) Shapes(
  *  ورودیِ خیلی گِرد، بی‌جا شلوغ می‌شود.
  */
 object Radius {
-  private val desk = ir.vil3ntec.tohid.ui.Platform.DESKTOP
-  val sm = if (desk) 6.dp else 16.dp
-  val md = if (desk) 8.dp else 20.dp
-  val lg = if (desk) 12.dp else 28.dp
+  val sm = Corner.panelSm.current
+  val md = Corner.panelMd.current
+  val lg = Corner.panelLg.current
 }
 
 val LocalShopColors = staticCompositionLocalOf { LightColors }
