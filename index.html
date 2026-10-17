@@ -84,6 +84,9 @@
   }catch(e){}
 })();
 </script>
+<!-- جای دفتر (localStorage یا IndexedDB؛ پیش‌فرض localStorage). عمداً بی defer و
+     همین بالا: اگر دفتر در IndexedDB باشد، خواندنش از همین لحظه شروع می‌شود -->
+<script src="license/ledger-store.js?v=1"></script>
 <!-- نوارِ وضعیتِ گوشی هم‌رنگِ سربرگ می‌شود — همان آبیِ نیتیو، در هر تم -->
 <meta name="theme-color" id="meta-theme-color" content="#0F62B4">
 <meta name="description" content="مدیریت فروش، انبار، قرض‌داران، مصارف و گزارشات فروشگاه — بدون نیاز به اینترنت">
@@ -5371,6 +5374,13 @@
           <div class="settings-actions-row">
             <button class="btn btn-secondary btn-sm" id="btn-cloud-backup">همین حالا روی سرور بگذار</button>
           </div>
+
+          <!-- F0-23 (دنباله): جای دفتر روی همین دستگاه. آزمایشی و پیش‌فرض خاموش —
+               قاعدهٔ آیفون (مشخصات ۱.۳ بند ۷). منطقش در license/ledger-store.js -->
+          <label class="check-row" style="display:flex;gap:8px;align-items:center;margin-top:14px;">
+            <input type="checkbox" id="in-ledger-idb"> نگه‌داشتنِ دفتر در IndexedDB (آزمایشی)
+          </label>
+          <p class="settings-hint" id="ledger-store-hint"></p>
         </div>
 
         <!-- Account -->
@@ -13159,7 +13169,8 @@
    */
   (function startAutoBackup(){
     const go = () => {
-      if (window.TohidAutoBackup) window.TohidAutoBackup.start(() => JSON.stringify(backupPayload()));
+      /* دفترِ نرسیده (IndexedDB) پشتیبانِ خالی نشود — null یعنی «این بار نه» */
+      if (window.TohidAutoBackup) window.TohidAutoBackup.start(() => ledgerInMemory === false ? null : JSON.stringify(backupPayload()));
     };
     if (document.readyState === 'loading') window.addEventListener('DOMContentLoaded', go, { once: true });
     else go();
@@ -13313,7 +13324,9 @@
       stockMovements = []; priceHistory = []; auditLog = [];
       cart = [];
       showToast('تمام اطلاعات پاک شد', 'danger');
-      setTimeout(()=> location.reload(), 500);
+      /* دفتر در IndexedDB: پاک کردن ناهمگام است — reload پس از نشستنش */
+      const reload = ()=> location.reload();
+      setTimeout(()=> ledgerFlush().then(reload, reload), 500);
     };
     openModal('modal-confirm');
   });
@@ -13326,7 +13339,41 @@
   ========================================================== */
   const STORAGE_KEY = 'tohid-shop-data-v1';
 
+  /*
+   * F0-23 (دنباله) — دفتر در IndexedDB، **پیش‌فرض خاموش** (قاعدهٔ آیفون،
+   * مشخصات ۱.۳ بند ۷). `license/ledger-store.js` اگر روشن باشد همین
+   * `localStorage.getItem/setItem(STORAGE_KEY)`ها را به IndexedDB می‌برد، پس
+   * این‌جا فقط یک چیز عوض می‌شود: خواندنِ IndexedDB ناهمگام است و تا دفتر
+   * در حافظهٔ صفحه ننشسته (`ledgerInMemory`)، نه چیزی نوشته می‌شود، نه
+   * همگام‌سازی و پشتیبانِ خودکار راه می‌افتند — وگرنه دفترِ خالی «همه حذف شد»
+   * به سرور می‌رفت. خاموش ⇒ `ledgerInMemory` از اول true است و همه‌چیز مثل قبل.
+   */
+  /* `var` عمدی است (مثل STORAGE_WARN_RATIO پایین): saveState ممکن است پیش از رسیدنِ اجرا به این خط صدا زده شود */
+  var ledgerStore = window.TohidLedgerStore || null;
+  /* فایلِ ledger-store نرسید (نصبِ آفلاینِ کهنه) ولی دفتر در IndexedDB است: دست نزن */
+  var ledgerStoreMissing = !ledgerStore && (()=>{ try{ return localStorage.getItem('tohid-ledger-store-v1') === 'idb'; }catch(e){ return false; } })();
+  var ledgerInMemory = ledgerStore ? ledgerStore.isReady() : !ledgerStoreMissing;
+  var ledgerLoaded = ledgerInMemory ? Promise.resolve()
+    : ledgerStore ? ledgerStore.ready.then(onLedgerHydrated) : new Promise(()=>{});
+  function ledgerFlush(){ return ledgerStore ? ledgerStore.flush() : Promise.resolve(); }
+  if(ledgerStore) ledgerStore.onError((e)=> warnStorageFull(e));
+  if(ledgerStoreMissing) setTimeout(()=>{ try{ showToast('بخشِ بارِ دفتر نرسید و دفتر باز نشد. اینترنت را وصل کنید و برنامه را دوباره باز کنید.', 'danger'); }catch(e){} }, 0);
+
+  /* دفتر از IndexedDB رسید — همان کارهایی که سرِ بالا آمدن با دفترِ localStorage می‌شود */
+  function onLedgerHydrated(){
+    ledgerInMemory = true;
+    loadState();
+    try{
+      rebuildBarcodeIndex();
+      loadDraftCart();
+      renderCart();
+    }catch(e){ console.error('رسمِ دفترِ رسیده ناموفق بود:', e); }
+    repaintLedger();
+    if(alertsReady) scheduleStorageCheck(1500);
+  }
+
   function saveState(){
+    if(ledgerInMemory === false) return;   // دفتر هنوز از IndexedDB نرسیده: دفترِ خالی روی دفترِ واقعی نوشته نشود
     touchLedger();
     try{
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
@@ -13408,7 +13455,11 @@
       }
     }catch(e){ return null; }
     const cap = storageCapChars();
-    return { used, cap, ratio: used / cap };
+    let ratio = used / cap;
+    /* دفتر در IndexedDB: آن هم سقف دارد (storage.estimate) — پُرترِ این دو */
+    const idb = ledgerStore && ledgerStore.usage();
+    if(idb && idb.ratio > ratio) ratio = idb.ratio;
+    return { used, cap, ratio, idb };
   }
   function scheduleStorageCheck(ms){
     clearTimeout(storageCheckTimer);
@@ -13441,6 +13492,42 @@
     closeModal('modal-storage');
     document.getElementById('btn-export-backup').click();
   });
+
+  /* F0-23 (دنباله) — کلیدِ «دفتر در IndexedDB» (آزمایشی، پیش‌فرض خاموش).
+     روشن: رونوشت، سنجش، بعد جابه‌جایی؛ نبودِ IndexedDB ⇒ همان localStorage می‌ماند. */
+  (function wireLedgerStoreToggle(){
+    const box = document.getElementById('in-ledger-idb');
+    const hint = document.getElementById('ledger-store-hint');
+    if(!box || !hint) return;
+    function paint(){
+      const idb = !!ledgerStore && ledgerStore.mode() === 'idb';
+      box.checked = idb || ledgerStoreMissing;
+      box.disabled = !ledgerStore || ledgerInMemory === false;
+      hint.textContent = !ledgerStore
+        ? 'بخشِ جای دفتر بار نشد؛ دفتر همان‌جای قبلی است.'
+        : idb
+          ? 'دفتر در IndexedDB است و سقفِ ۵ مگابایتیِ حافظهٔ ساده را ندارد. نسخهٔ پیش از انتقال هم همان‌جا نگه داشته شده است. خاموش کردن، دفتر را به حافظهٔ ساده برمی‌گرداند.'
+          : 'دفتر در حافظهٔ سادهٔ مرورگر (localStorage) است که حدودِ ۵ مگابایت جا دارد. روشن کردن، آن را به IndexedDB می‌برد و نسخهٔ پیش از انتقال را نگه می‌دارد. آزمایشی است: پیش از روشن کردن یک پشتیبان بگیرید.';
+    }
+    box.addEventListener('change', ()=>{
+      if(!ledgerStore) return;
+      const want = box.checked;
+      box.disabled = true;
+      (want ? ledgerStore.enable() : ledgerStore.disable()).then(()=>{
+        showToast(want ? 'دفتر به IndexedDB رفت و نسخهٔ پیش از انتقال هم نگه داشته شد' : 'دفتر به حافظهٔ سادهٔ مرورگر برگشت');
+      }, (e)=>{
+        console.error('جابه‌جاییِ دفتر ناموفق بود:', e);
+        const full = !!e && (e.name === 'QuotaExceededError' || /quota/i.test(String(e.message || '')));
+        showToast(want
+          ? (full ? 'در IndexedDB جا نبود؛ دفتر همان‌جای قبلی ماند و چیزی عوض نشد.'
+                  : 'این مرورگر IndexedDB نمی‌دهد (مثلاً حالتِ ناشناس)؛ دفتر همان‌جای قبلی ماند و چیزی عوض نشد.')
+          : (full ? 'دفتر در حافظهٔ ساده جا نمی‌شود؛ همان IndexedDB ماند.'
+                  : 'برگرداندنِ دفتر نشد؛ همان IndexedDB ماند.'), 'danger');
+      }).then(()=>{ paint(); scheduleStorageCheck(500); });
+    });
+    paint();
+    ledgerLoaded.then(paint);
+  })();
 
   function loadState(){
     touchLedger();
@@ -13551,6 +13638,8 @@
 
   function applyServerLedger(next){
     if(!next) return;
+    /* دفتر هنوز از IndexedDB نرسیده: موتور نباید سایه را جلو ببرد (پایین، holdSyncUntilLedger) */
+    if(ledgerInMemory === false) throw new Error('دفتر هنوز بار نشده است');
     touchLedger();
     const put = (v, dflt)=> Array.isArray(v) ? v : dflt;
     const listsBefore = JSON.stringify([productCategories, productUnits, expenseCategories]);
@@ -13623,8 +13712,25 @@
    */
   function bindSyncBridge(){
     if(window.TohidSync && window.TohidSync.bind){
-      window.TohidSync.bind({ read: readLedger, write: applyServerLedger });
+      window.TohidSync.bind({ read: ()=> ledgerInMemory === false ? null : readLedger(), write: applyServerLedger });
+      if(ledgerInMemory === false) holdSyncUntilLedger(window.TohidSync);
     }
+  }
+  /*
+   *  دفتر در IndexedDB و هنوز نرسیده: موتور راه نیفتد. `firstSync` با دفترِ
+   *  خالی Snapshot می‌گرفت و سایه را جلو می‌برد، و نخستین تفاضل پس از رسیدنِ
+   *  دفتر همه‌چیز را «حذف‌شده» می‌دید. پس هر درِ ورودِ موتور تا رسیدنِ دفتر
+   *  صبر می‌کند و بعد به حالِ خودش برمی‌گردد.
+   */
+  function holdSyncUntilLedger(api){
+    const names = ['start', 'onSignedIn', 'sync', 'pullOnce', 'restoreFromServer', 'firstSync'];
+    const orig = {};
+    names.forEach((n)=>{
+      if(typeof api[n] !== 'function') return;
+      orig[n] = api[n];
+      api[n] = function(){ const args = arguments; return ledgerLoaded.then(()=> orig[n].apply(api, args)); };
+    });
+    ledgerLoaded.then(()=>{ Object.keys(orig).forEach((n)=>{ api[n] = orig[n]; }); });
   }
   if(window.TohidSync) bindSyncBridge();
   else document.addEventListener('DOMContentLoaded', bindSyncBridge);
@@ -15025,7 +15131,7 @@
 <script src="license/account-code.js?v=1" defer></script>
 <script src="license/sync-engine.js?v=5" defer></script>
 <script src="license/license-client.js?v=16" defer></script>
-<script src="license/shop-sync.js?v=18" defer></script>
+<script src="license/shop-sync.js?v=19" defer></script>
 <script src="license/shop-ui.js?v=15" defer></script>
 <script src="license/vip.js?v=17" defer></script>
 <script src="license/support.js?v=16" defer></script>
