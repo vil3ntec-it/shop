@@ -12,8 +12,6 @@ on:
   # PR هم ساخته می‌شود تا APKِ شکسته پیش از مرج دیده شود؛ انتشار فقط از main است
   pull_request:
     paths:
-      #  آزمون‌های مرجعِ گزارش (ReportCoreVectorsTest) — فقط در PR، تا pushِ main انتشار نسازد
-      - 'license/test-vectors/**'
       - 'android-native/**'
       #  کدِ مشترکِ core و آزمون‌های مرجعِ آن (CoreVectorsTest)
       - 'core/**'

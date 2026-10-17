@@ -10,7 +10,7 @@ import kotlin.math.min
  *  حاشیه)، RPT-06 (سنِ بدهی و طلبِ تأمین‌کننده)، RPT-09 (ضدتقلب).
  *
  *  خالص: نه Android، نه دیسک، نه ساعتِ دستگاه. دوقلوی `license/report-core.js`؛
- *  هر دو آزمون‌های مرجعِ `license/test-vectors/report-v1.json` را عیناً می‌گذرانند.
+ *  هر دو آزمون‌های مرجعِ `core/test-vectors/report-v1.json` را عیناً می‌گذرانند.
  *  پول واحدِ کوچک، مقدار هزارم، درصد بیسیس‌پوینت (۱۰۰ = ۱٪؛ null یعنی مخرج ≤ ۰).
  *
  *  ⛔ هر حسابِ اعشاری این‌جا عمداً با همان ترتیبِ عملیاتِ JS نوشته شده (Double
@@ -85,7 +85,11 @@ object ReportCore {
   data class FraudRow(
     val key: String, val invoices: Int, val gross: Long, val discountCount: Int, val discount: Long,
     val discountBp: Long?, val returnCount: Int, val returns: Long, val voidCount: Int, val voids: Long,
-    val lineDeleteCount: Int, val lineDeletes: Long, val drawerOpenCount: Int,
+    val lineDeleteCount: Int, val lineDeletes: Long, val noSaleCount: Int,
+    /** رویدادهای این کاربر که تأییدکننده داشتند (v3 S08) */
+    val overrideCount: Int,
+    /** تأییدهایی که این کاربر داد */
+    val approvalCount: Int,
   )
 
   @Serializable
@@ -452,15 +456,16 @@ object ReportCore {
   private class FAcc(val key: String) {
     var invoices = 0; var gross = 0L; var discountCount = 0; var discount = 0L
     var returnCount = 0; var returns = 0L; var voidCount = 0; var voids = 0L
-    var lineDeleteCount = 0; var lineDeletes = 0L; var drawerOpenCount = 0
+    var lineDeleteCount = 0; var lineDeletes = 0L; var noSaleCount = 0; var overrideCount = 0; var approvalCount = 0
     fun row() = FraudRow(key, invoices, gross, discountCount, discount, bp(discount, gross), returnCount, returns,
-      voidCount, voids, lineDeleteCount, lineDeletes, drawerOpenCount)
+      voidCount, voids, lineDeleteCount, lineDeletes, noSaleCount, overrideCount, approvalCount)
   }
 
   /**
    *  RPT-09 — تخفیف (فروشنده)، برگشتی، لغو، حذفِ ردیف (`auditLog` نوعِ `line_delete`) و
-   *  باز کردنِ کشو بی فروش (`drawer_open`) به تفکیکِ کاربر. کاربر فقط از فیلدِ صریحِ همان
-   *  رویداد می‌آید؛ نبودش "" (نامعلوم) است و به فروشندهٔ فاکتور نسبت داده نمی‌شود.
+   *  باز کردنِ کشو بی فروش (`no_sale`، همان نامِ pay-core) به تفکیکِ کاربر. کاربر فقط از فیلدِ
+   *  صریحِ همان رویداد می‌آید؛ نبودش "" (نامعلوم) است و به فروشندهٔ فاکتور نسبت داده نمی‌شود.
+   *  v3 S08: رویدادِ دارای `approvedBy` برای کننده `overrideCount` و برای تأییدکننده `approvalCount`.
    */
   fun fraud(l: ReportLedger, from: String? = null, to: String? = null, clock: ReportClock? = null): FraudReport {
     val f = from?.ifEmpty { null } ?: "0000-01-01"
@@ -468,6 +473,7 @@ object ReportCore {
     fun inRange(d: String) = d >= f && d <= t
     val users = HashMap<String, FAcc>()
     fun u(k: String) = users.getOrPut(k) { FAcc(k) }
+    fun approved(x: FAcc, approver: String) { if (approver != "") { x.overrideCount++; u(approver).approvalCount++ } }
     val cancelEntry = HashMap<String, ReportLedger.Audit>()
     l.audit.forEach { a -> if (a.type == "cancel_sale" && a.refId != "" && a.refId !in cancelEntry) cancelEntry[a.refId] = a }
     for (s in l.sales) {
@@ -476,29 +482,34 @@ object ReportCore {
         if (!inRange(if (a != null) posDate(a, clock) else posDate(s, clock))) continue
         val v = u(if (s.cancelledBy != "") s.cancelledBy else a?.user ?: "")
         v.voidCount++; v.voids += s.finalTotal
+        approved(v, a?.approvedBy ?: "")
         continue
       }
       if (!inRange(posDate(s, clock))) continue
       val x = u(s.seller)
       x.invoices++; x.gross += s.total
       if (s.discount > 0) { x.discountCount++; x.discount += s.discount }
+      approved(x, s.approvedBy)
     }
     for (r in l.returns) {
       if (l.saleById[r.saleId]?.cancelled == true || !inRange(posDate(r, clock))) continue
       val x = u(r.user)
       x.returnCount++; x.returns += r.amount
+      approved(x, r.approvedBy)
     }
     for (a in l.audit) {
-      if ((a.type != "line_delete" && a.type != "drawer_open") || !inRange(posDate(a, clock))) continue
+      if ((a.type != "line_delete" && a.type != "no_sale") || !inRange(posDate(a, clock))) continue
       val x = u(a.user)
-      if (a.type == "line_delete") { x.lineDeleteCount++; x.lineDeletes += a.amount } else x.drawerOpenCount++
+      if (a.type == "line_delete") { x.lineDeleteCount++; x.lineDeletes += a.amount } else x.noSaleCount++
+      approved(x, a.approvedBy)
     }
     val rows = users.keys.sorted().map { users.getValue(it).row() }
     val tot = FAcc("")
     users.values.forEach { x ->
       tot.invoices += x.invoices; tot.gross += x.gross; tot.discountCount += x.discountCount; tot.discount += x.discount
       tot.returnCount += x.returnCount; tot.returns += x.returns; tot.voidCount += x.voidCount; tot.voids += x.voids
-      tot.lineDeleteCount += x.lineDeleteCount; tot.lineDeletes += x.lineDeletes; tot.drawerOpenCount += x.drawerOpenCount
+      tot.lineDeleteCount += x.lineDeleteCount; tot.lineDeletes += x.lineDeletes; tot.noSaleCount += x.noSaleCount
+      tot.overrideCount += x.overrideCount; tot.approvalCount += x.approvalCount
     }
     return FraudReport(f, t, rows, tot.row())
   }

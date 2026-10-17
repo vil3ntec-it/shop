@@ -138,14 +138,15 @@ object ReportTables {
     C("discountCount", "تخفیف (بار)", "count"), C("discount", "تخفیف", "money"), C("discountBp", "نسبت تخفیف", "bp"),
     C("returnCount", "برگشتی (بار)", "count"), C("returns", "برگشتی", "money"), C("voidCount", "لغو (بار)", "count"),
     C("voids", "لغو", "money"), C("lineDeleteCount", "حذف ردیف (بار)", "count"), C("lineDeletes", "حذف ردیف", "money"),
-    C("drawerOpenCount", "باز کردن کشو بی فروش", "count"),
+    C("noSaleCount", "باز کردن کشو بی فروش", "count"), C("overrideCount", "نیازمند تأیید (بار)", "count"),
+    C("approvalCount", "تأیید داده (بار)", "count"),
   )
 
   fun fraud(r: ReportCore.FraudReport): List<Table> {
     fun cells(x: ReportCore.FraudRow) = listOf(
       p(x.invoices.toLong()), p(x.gross), p(x.discountCount.toLong()), p(x.discount), p(x.discountBp),
       p(x.returnCount.toLong()), p(x.returns), p(x.voidCount.toLong()), p(x.voids), p(x.lineDeleteCount.toLong()),
-      p(x.lineDeletes), p(x.drawerOpenCount.toLong()),
+      p(x.lineDeletes), p(x.noSaleCount.toLong()), p(x.overrideCount.toLong()), p(x.approvalCount.toLong()),
     )
     return listOf(Table(
       "fraud", "ضدتقلب به تفکیک کاربر", cols(listOf(C("name", "کاربر", "text")) + FRAUD_COLS),

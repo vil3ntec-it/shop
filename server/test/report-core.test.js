@@ -2,7 +2,7 @@
 /**
  * هستهٔ گزارش (RPT-01/02/03/06/09/11) — `license/report-core.js`.
  *
- *  ۱) آزمون‌های مرجعِ مشترک (`license/test-vectors/report-v1.json`)؛ همین
+ *  ۱) آزمون‌های مرجعِ مشترک (`core/test-vectors/report-v1.json`)؛ همین
  *     فایل را `ReportCoreVectorsTest.kt` هم روی هستهٔ Kotlin می‌دواند.
  *  ۲) عددهایی که با دست حساب شده‌اند (نه از خروجیِ خودِ هسته).
  *  ۳) مرجعِ رفتارِ امروز: فرمولِ گزارشِ فروشِ `index.html` (همان
@@ -15,7 +15,7 @@ const path = require('path');
 
 const file = path.join(__dirname, '..', '..', 'license', 'report-core.js');
 const core = require(file);
-const vectors = require(path.join(__dirname, '..', '..', 'license', 'test-vectors', 'report-v1.json'));
+const vectors = require(path.join(__dirname, '..', '..', 'core', 'test-vectors', 'report-v1.json'));
 const L = vectors.ledgers.kabul;
 const kabulClock = { offsetMinutes: 270, dayStartMinute: 240 };
 
@@ -140,8 +140,14 @@ test('RPT-09: کاربرِ هر رویداد فقط از فیلدِ صریحش',
   assert.equal(by['احمد'].voidCount, 0);
   assert.equal(by['احمد'].returnCount, 1); // برگشتیِ فاکتورِ کریم را احمد گرفت
   assert.equal(by['احمد'].lineDeletes, 6000);
-  assert.equal(by[''].drawerOpenCount, 1);
-  assert.equal(r.totals.drawerOpenCount, 2);
+  assert.equal(by[''].noSaleCount, 1);
+  assert.equal(r.totals.noSaleCount, 2);
+  // v3 S08: تخفیفِ تأییدشدهٔ s2 و کشوی بی فروشِ a3 (شکلِ رویدادِ pay-core: by/at/approvedBy)
+  assert.equal(by['کریم'].noSaleCount, 1);
+  assert.equal(by['کریم'].overrideCount, 2);
+  assert.equal(by['مدیر'].approvalCount, 2);
+  assert.equal(by['مدیر'].invoices, 0);
+  assert.equal(r.totals.overrideCount, r.totals.approvalCount);
 });
 
 test('RPT-11: جدول و متنِ ساده', () => {

@@ -95,6 +95,7 @@
      "paidAmount": 700,
      "status": "completed",
      "seller": "کریم",
+     "approvedBy": "مدیر",
      "date": "2026-10-13",
      "createdAt": 1791898200000
     },
@@ -448,14 +449,15 @@
     },
     {
      "id": "a3",
-     "type": "drawer_open",
-     "user": "کریم",
-     "date": "2026-10-14",
-     "createdAt": 1791966600000
+     "type": "no_sale",
+     "by": "کریم",
+     "approvedBy": "مدیر",
+     "reason": "change",
+     "at": 1791966600000
     },
     {
      "id": "a4",
-     "type": "drawer_open",
+     "type": "no_sale",
      "date": "2026-10-13",
      "createdAt": 1791905400000
     },
@@ -2162,7 +2164,9 @@
       "voids": 0,
       "lineDeleteCount": 0,
       "lineDeletes": 0,
-      "drawerOpenCount": 1
+      "noSaleCount": 1,
+      "overrideCount": 0,
+      "approvalCount": 0
      },
      {
       "key": "احمد",
@@ -2177,7 +2181,26 @@
       "voids": 0,
       "lineDeleteCount": 1,
       "lineDeletes": 6000,
-      "drawerOpenCount": 0
+      "noSaleCount": 0,
+      "overrideCount": 0,
+      "approvalCount": 0
+     },
+     {
+      "key": "مدیر",
+      "invoices": 0,
+      "gross": 0,
+      "discountCount": 0,
+      "discount": 0,
+      "discountBp": null,
+      "returnCount": 0,
+      "returns": 0,
+      "voidCount": 0,
+      "voids": 0,
+      "lineDeleteCount": 0,
+      "lineDeletes": 0,
+      "noSaleCount": 0,
+      "overrideCount": 0,
+      "approvalCount": 2
      },
      {
       "key": "کریم",
@@ -2192,7 +2215,9 @@
       "voids": 60000,
       "lineDeleteCount": 0,
       "lineDeletes": 0,
-      "drawerOpenCount": 1
+      "noSaleCount": 1,
+      "overrideCount": 2,
+      "approvalCount": 0
      }
     ],
     "totals": {
@@ -2208,7 +2233,9 @@
      "voids": 60000,
      "lineDeleteCount": 1,
      "lineDeletes": 6000,
-     "drawerOpenCount": 2
+     "noSaleCount": 2,
+     "overrideCount": 2,
+     "approvalCount": 2
     }
    }
   },
@@ -2951,7 +2978,9 @@
       "لغو",
       "حذف ردیف (بار)",
       "حذف ردیف",
-      "باز کردن کشو بی فروش"
+      "باز کردن کشو بی فروش",
+      "نیازمند تأیید (بار)",
+      "تأیید داده (بار)"
      ],
      "rows": [
       [
@@ -2967,7 +2996,9 @@
        "0.00",
        "0",
        "0.00",
-       "1"
+       "1",
+       "0",
+       "0"
       ],
       [
        "احمد",
@@ -2982,7 +3013,26 @@
        "0.00",
        "1",
        "60.00",
+       "0",
+       "0",
        "0"
+      ],
+      [
+       "مدیر",
+       "0",
+       "0.00",
+       "0",
+       "0.00",
+       "",
+       "0",
+       "0.00",
+       "0",
+       "0.00",
+       "0",
+       "0.00",
+       "0",
+       "0",
+       "2"
       ],
       [
        "کریم",
@@ -2997,7 +3047,9 @@
        "600.00",
        "0",
        "0.00",
-       "1"
+       "1",
+       "2",
+       "0"
       ]
      ],
      "total": [
@@ -3013,6 +3065,8 @@
       "600.00",
       "1",
       "60.00",
+      "2",
+      "2",
       "2"
      ]
     }

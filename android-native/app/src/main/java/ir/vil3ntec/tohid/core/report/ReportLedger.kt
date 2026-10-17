@@ -23,7 +23,7 @@ class ReportLedger private constructor() {
   class Product(val id: String, val name: String, val category: String)
   class Sale(
     val id: String, val total: Long, val discount: Long, val finalTotal: Long, val method: String,
-    val cancelled: Boolean, val seller: String, val cancelledBy: String, val channel: String,
+    val cancelled: Boolean, val seller: String, val cancelledBy: String, val approvedBy: String, val channel: String,
     override val date: String, override val createdAt: Long,
   ) : Dated
   class Item(
@@ -32,7 +32,7 @@ class ReportLedger private constructor() {
   )
   class Return(
     val id: String, val saleId: String, val saleItemId: String, val productId: String, val qty: Long,
-    val amount: Long, val user: String, override val date: String, override val createdAt: Long,
+    val amount: Long, val user: String, val approvedBy: String, override val date: String, override val createdAt: Long,
   ) : Dated
   class Tx(val id: String, val debtorId: String, val give: Boolean, val amount: Long, override val date: String, override val createdAt: Long) : Dated
   class Purchase(val id: String, val supplierId: String, val total: Long, val paid: Long, override val date: String, override val createdAt: Long) : Dated
@@ -42,7 +42,7 @@ class ReportLedger private constructor() {
     override val date: String, override val createdAt: Long,
   ) : Dated
   class Audit(
-    val id: String, val type: String, val refId: String, val user: String, val amount: Long,
+    val id: String, val type: String, val refId: String, val user: String, val approvedBy: String, val amount: Long,
     override val date: String, override val createdAt: Long,
   ) : Dated
 
@@ -71,7 +71,7 @@ class ReportLedger private constructor() {
         val x = Sale(
           id = s.s("id"), total = money(s, "total"), discount = money(s, "discount"), finalTotal = money(s, "finalTotal"),
           method = s.s("paymentMethod"), cancelled = s.s("status") == "cancelled", seller = s.s("seller").trim(),
-          cancelledBy = s.s("cancelledBy").trim(), channel = s.s("channel").ifEmpty { "pos" },
+          cancelledBy = s.s("cancelledBy").trim(), approvedBy = s.s("approvedBy").trim(), channel = s.s("channel").ifEmpty { "pos" },
           date = s.s("date"), createdAt = ms(s, "createdAt"),
         )
         l.sales += x; l.saleById[x.id] = x
@@ -87,7 +87,7 @@ class ReportLedger private constructor() {
       raw.list("returns").forEach { r ->
         l.returns += Return(
           id = r.s("id"), saleId = r.s("saleId"), saleItemId = r.s("saleItemId"), productId = r.s("productId"),
-          qty = milli(r, "quantity"), amount = money(r, "amount"), user = r.s("user").trim(),
+          qty = milli(r, "quantity"), amount = money(r, "amount"), user = r.s("user").trim(), approvedBy = r.s("approvedBy").trim(),
           date = r.s("date"), createdAt = ms(r, "createdAt"),
         )
       }
@@ -110,7 +110,11 @@ class ReportLedger private constructor() {
         )
       }
       raw.list("auditLog").forEach { a ->
-        l.audit += Audit(a.s("id"), a.s("type"), a.s("refId"), a.s("user").trim(), money(a, "amount"), a.s("date"), ms(a, "createdAt"))
+        //  `by`/`at`/`approvedBy` همان شکلِ رویدادِ صندوقِ pay-core (#237) است؛ `user`/`createdAt` شکلِ سابقهٔ امروز
+        l.audit += Audit(
+          a.s("id"), a.s("type"), a.s("refId"), a.s("by").ifEmpty { a.s("user") }.trim(), a.s("approvedBy").trim(),
+          money(a, "amount"), a.s("date"), ms(a, "createdAt").takeIf { it != 0L } ?: ms(a, "at"),
+        )
       }
       return l
     }

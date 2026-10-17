@@ -17,7 +17,7 @@
      `date`ِ خودش را دارد، چون کاربر انتخابش کرده.
    • برگشتی در روزِ **خودش** اثر می‌کند، نه روزِ فاکتور — روزِ بسته‌شده
      دیگر عوض نمی‌شود (همان قاعدهٔ ReportEngine.sales).
-   • همان آزمون‌های مرجع (`license/test-vectors/report-v1.json`) روی
+   • همان آزمون‌های مرجع (`core/test-vectors/report-v1.json`) روی
      `core/report/ReportCore.kt` هم می‌دوند؛ هر دو باید عیناً برابر باشند.
    ========================================================== */
 (function (factory) {
@@ -123,7 +123,7 @@
       var x = {
         id: str(s.id), total: money(s.total), discount: money(s.discount), finalTotal: money(s.finalTotal),
         method: str(s.paymentMethod), status: str(s.status), cancelled: str(s.status) === 'cancelled',
-        seller: str(s.seller).trim(), cancelledBy: str(s.cancelledBy).trim(),
+        seller: str(s.seller).trim(), cancelledBy: str(s.cancelledBy).trim(), approvedBy: str(s.approvedBy).trim(),
         channel: str(s.channel) || 'pos', date: str(s.date), createdAt: ms(s.createdAt),
       };
       L.sales.push(x); L.saleById[x.id] = x;
@@ -139,7 +139,7 @@
     arr(raw.returns).forEach(function (r) {
       L.returns.push({
         id: str(r.id), saleId: str(r.saleId), saleItemId: str(r.saleItemId), productId: str(r.productId),
-        qty: milli(r.quantity), amount: money(r.amount), user: str(r.user).trim(),
+        qty: milli(r.quantity), amount: money(r.amount), user: str(r.user).trim(), approvedBy: str(r.approvedBy).trim(),
         date: str(r.date), createdAt: ms(r.createdAt),
       });
     });
@@ -171,8 +171,10 @@
     });
     arr(raw.auditLog).forEach(function (a) {
       L.audit.push({
-        id: str(a.id), type: str(a.type), refId: str(a.refId), user: str(a.user).trim(),
-        amount: money(a.amount), date: str(a.date), createdAt: ms(a.createdAt),
+        //  `by`/`at`/`approvedBy` همان شکلِ رویدادِ صندوقِ pay-core (#237) است؛ `user`/`createdAt` شکلِ سابقهٔ امروز
+        id: str(a.id), type: str(a.type), refId: str(a.refId), user: (str(a.by) || str(a.user)).trim(),
+        approvedBy: str(a.approvedBy).trim(), amount: money(a.amount), date: str(a.date),
+        createdAt: ms(a.createdAt) || ms(a.at),
       });
     });
     return L;
@@ -500,11 +502,12 @@
   /* ---------------- ضدتقلب (RPT-09) ---------------- */
 
   /**
-   * RPT-09 — به تفکیکِ کاربر: تخفیف (فروشنده)، برگشتی، لغو، حذفِ ردیف و
-   * باز کردنِ کشو بی فروش. کاربرِ هر رویداد فقط از فیلدِ صریحش می‌آید
-   * (`seller`، `returns[].user`، `cancelledBy` یا `auditLog[].user`)؛ نبودش
-   * یعنی "" (نامعلوم) — گناه به گردنِ فروشندهٔ فاکتور انداخته نمی‌شود.
-   * سابقه‌های `line_delete` و `drawer_open` هنوز ثبت نمی‌شوند؛ این‌جا خوانده می‌شوند.
+   * RPT-09 — به تفکیکِ کاربر: تخفیف (فروشنده)، برگشتی، لغو، حذفِ ردیف و باز کردنِ
+   * کشو بی فروش (`no_sale`، همان نامِ pay-core). کاربرِ هر رویداد فقط از فیلدِ صریحش
+   * می‌آید (`seller`، `returns[].user`، `cancelledBy`، `auditLog[].by|user`)؛ نبودش یعنی ""
+   * (نامعلوم) — به گردنِ فروشندهٔ فاکتور انداخته نمی‌شود.
+   * v3 S08: هر رویدادی که `approvedBy` دارد، برای کننده `overrideCount` و برای
+   * تأییدکننده `approvalCount` می‌شمارد.
    */
   function fraud(raw, opts) {
     opts = opts || {};
@@ -512,11 +515,13 @@
     var from = str(opts.from) || '0000-01-01', to = str(opts.to) || '9999-12-31';
     var users = {};
     function inRange(d) { return d >= from && d <= to; }
-    function u(key) {
-      return users[key] || (users[key] = { key: key, invoices: 0, gross: 0, discountCount: 0, discount: 0,
-        discountBp: null, returnCount: 0, returns: 0, voidCount: 0, voids: 0, lineDeleteCount: 0,
-        lineDeletes: 0, drawerOpenCount: 0 });
+    function blank(key) {
+      return { key: key, invoices: 0, gross: 0, discountCount: 0, discount: 0, discountBp: null, returnCount: 0,
+        returns: 0, voidCount: 0, voids: 0, lineDeleteCount: 0, lineDeletes: 0, noSaleCount: 0,
+        overrideCount: 0, approvalCount: 0 };
     }
+    function u(key) { return users[key] || (users[key] = blank(key)); }
+    function approved(x, approver) { if (approver !== '') { x.overrideCount++; u(approver).approvalCount++; } }
     var cancelEntry = {};
     L.audit.forEach(function (a) {
       if (a.type === 'cancel_sale' && a.refId !== '' && !cancelEntry[a.refId]) cancelEntry[a.refId] = a;
@@ -527,35 +532,37 @@
         if (!inRange(a ? posDate(a, clock) : posDate(s, clock))) return;
         var v = u(s.cancelledBy !== '' ? s.cancelledBy : (a ? a.user : ''));
         v.voidCount++; v.voids += s.finalTotal;
+        approved(v, a ? a.approvedBy : '');
         return;
       }
       if (!inRange(posDate(s, clock))) return;
       var x = u(s.seller);
       x.invoices++; x.gross += s.total;
       if (s.discount > 0) { x.discountCount++; x.discount += s.discount; }
+      approved(x, s.approvedBy);
     });
     L.returns.forEach(function (r) {
       var s = L.saleById[r.saleId];
       if ((s && s.cancelled) || !inRange(posDate(r, clock))) return;
       var x = u(r.user);
       x.returnCount++; x.returns += r.amount;
+      approved(x, r.approvedBy);
     });
     L.audit.forEach(function (a) {
-      if ((a.type !== 'line_delete' && a.type !== 'drawer_open') || !inRange(posDate(a, clock))) return;
+      if ((a.type !== 'line_delete' && a.type !== 'no_sale') || !inRange(posDate(a, clock))) return;
       var x = u(a.user);
-      if (a.type === 'line_delete') { x.lineDeleteCount++; x.lineDeletes += a.amount; } else x.drawerOpenCount++;
+      if (a.type === 'line_delete') { x.lineDeleteCount++; x.lineDeletes += a.amount; } else x.noSaleCount++;
+      approved(x, a.approvedBy);
     });
     var rows = Object.keys(users).sort().map(function (k) {
       var x = users[k];
       x.discountBp = bp(x.discount, x.gross);
       return x;
     });
-    var totals = u('\u0000');
-    delete users['\u0000'];
+    var totals = blank('');
     rows.forEach(function (x) {
       for (var k in x) if (k !== 'key' && k !== 'discountBp') totals[k] += x[k];
     });
-    totals.key = '';
     totals.discountBp = bp(totals.discount, totals.gross);
     return { from: from, to: to, rows: rows, totals: totals };
   }
@@ -653,7 +660,8 @@
     ['discountCount', 'تخفیف (بار)', 'count'], ['discount', 'تخفیف', 'money'], ['discountBp', 'نسبت تخفیف', 'bp'],
     ['returnCount', 'برگشتی (بار)', 'count'], ['returns', 'برگشتی', 'money'], ['voidCount', 'لغو (بار)', 'count'],
     ['voids', 'لغو', 'money'], ['lineDeleteCount', 'حذف ردیف (بار)', 'count'], ['lineDeletes', 'حذف ردیف', 'money'],
-    ['drawerOpenCount', 'باز کردن کشو بی فروش', 'count']];
+    ['noSaleCount', 'باز کردن کشو بی فروش', 'count'], ['overrideCount', 'نیازمند تأیید (بار)', 'count'],
+    ['approvalCount', 'تأیید داده (بار)', 'count']];
 
   function fraudTables(r) {
     return [{

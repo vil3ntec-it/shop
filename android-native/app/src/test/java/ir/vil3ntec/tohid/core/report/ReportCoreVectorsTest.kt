@@ -97,11 +97,11 @@ class ReportCoreVectorsTest {
     fun vectorFile(): File {
       var d: File? = File(".").absoluteFile
       while (d != null) {
-        val f = File(d, "license/test-vectors/report-v1.json")
+        val f = File(d, "core/test-vectors/report-v1.json")
         if (f.isFile) return f
         d = d.parentFile
       }
-      error("license/test-vectors/report-v1.json پیدا نشد (cwd=${File(".").absoluteFile})")
+      error("core/test-vectors/report-v1.json پیدا نشد (cwd=${File(".").absoluteFile})")
     }
   }
 }
