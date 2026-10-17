@@ -9,6 +9,9 @@ on:
       - 'desktop/**'
       - 'install.ps1'
       - 'android-native/app/src/**'
+      - 'core/**'
+      #  تغییرِ فقط فایل‌های مرجع روی main نسخهٔ آزمایشی نمی‌سازد (در PR سنجیده می‌شود)
+      - '!core/test-vectors/**'
       - 'android-native/gradle.properties'
       - '.github/workflows/tohid-desktop.yml'
   pull_request:
@@ -17,6 +20,8 @@ on:
       - 'license/test-vectors/**'
       - 'desktop/**'
       - 'android-native/app/src/**'
+      #  کدِ مشترکِ core و آزمون‌های مرجعِ آن (CoreVectorsTest)
+      - 'core/**'
       - '.github/workflows/tohid-desktop.yml'
   #  ⛔ F0-27: push به main فقط کانالِ آزمایشی (`tohid-desktop-beta`). برچسبِ پایدار
   #  (`tohid-desktop`، همان که همهٔ کامپیوترها و صفحهٔ دانلود می‌خوانند) فقط از
@@ -87,6 +92,23 @@ jobs:
       - name: آزمون
         working-directory: desktop
         run: ./gradlew --no-daemon test
+
+      #  معیارِ «قدم صفر»ِ ۳.۳: شناسه‌های نصاب ثابت می‌مانند — با شناسهٔ تازه نصاب
+      #  کنارِ نسخهٔ قبلی می‌نشیند به‌جای به‌روزرسانی‌اش. شمارِ آزمون‌ها در خلاصهٔ اجرا.
+      - name: دروازه‌های نصاب
+        working-directory: desktop
+        run: |
+          fail=0
+          grep -qF 'upgradeUuid = "6f1e0c52-7a3b-4d8e-9c1f-3b2a5d7e9f10"' build.gradle.kts || { echo "::error::upgradeUuidِ MSI عوض شد"; fail=1; }
+          grep -qF 'AppId={{8C2E4F1A-5B7D-4E3C-9A61-2F0D7B3E5C14}' installer/Tohid.iss || { echo "::error::AppIdِ Inno Setup عوض شد"; fail=1; }
+          grep -qF 'bundleID = "ir.vil3ntec.tohid.desktop"' build.gradle.kts || { echo "::error::bundleIDِ مک عوض شد"; fail=1; }
+          tests=$(grep -ho '<testsuite [^>]*' build/test-results/test/*.xml | awk '
+            { for (i = 1; i <= NF; i++) if (match($i, /^(tests|failures|errors|skipped)="[0-9]+"/)) {
+                split($i, kv, "\""); k = substr($i, 1, index($i, "=") - 1); s[k] += kv[2] } }
+            END { printf "%d آزمون، %d شکست، %d خطا، %d ردشده", s["tests"], s["failures"], s["errors"], s["skipped"] }')
+          printf '### دروازه‌های نصاب (قدم صفرِ ۳.۳)\n\nupgradeUuid، AppIdِ Inno و bundleIDِ مک: %s\n\nآزمون‌ها: %s\n' \
+            "$([ $fail = 0 ] && echo بی‌تغییر || echo '**عوض شد**')" "$tests" >> "$GITHUB_STEP_SUMMARY"
+          exit $fail
 
   #  F0-01: روی ویندوز `renameTo` فایلِ موجود را جایگزین نمی‌کند و دفتر از
   #  ذخیرهٔ دوم به بعد به دیسک نمی‌رسید. آزمون‌های ذخیره روی خودِ ویندوز.
