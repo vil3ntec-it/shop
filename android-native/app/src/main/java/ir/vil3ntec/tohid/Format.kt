@@ -92,3 +92,31 @@ fun latinDigits(text: String): String = text.map { c ->
     else -> c
   }
 }.joinToString("")
+
+/**
+ *  F0-06 — نامی که مشخصات به کار می‌برد؛ همان `latinDigits`. هر parseِ
+ *  عددی (مبلغ، تعداد، درصد، بارکد، تلفن) اول از این می‌گذرد. یک نویسه به
+ *  یک نویسه است، پس جای حرف‌ها در متن عوض نمی‌شود.
+ */
+fun normalizeDigits(text: String): String = latinDigits(text)
+
+/**
+ *  F0-06 — پالایشِ کادرِ عدد هنگامِ تایپ: اول رقمِ فارسی/عربی لاتین می‌شود،
+ *  بعد فقط `0-9` و نقطه می‌ماند.
+ *
+ *  ⚠️ `isDigit()` تنها کافی نیست: «۵» را رقم می‌داند و نگه می‌دارد، ولی
+ *  `toDoubleOrNull()` آن را نمی‌خواند و `?: 0.0` صفرش می‌کرد.
+ */
+fun numericInput(raw: String): String = normalizeDigits(raw).filter { it in '0'..'9' || it == '.' }
+
+/**
+ *  F0-06 — عددِ نوشته‌شده در کادر.
+ *
+ *  @return `null` یعنی «عدد نیست» (خالی هم `null` است). صدازننده کنارِ
+ *    کادر خطا نشان می‌دهد — **هرگز** بی‌صدا صفرش نمی‌کند.
+ */
+fun parseNumber(text: String): Double? =
+  normalizeDigits(text).trim().takeIf { it.isNotEmpty() }?.toDoubleOrNull()?.takeIf { it.isFinite() }
+
+/** F0-06 — نوشته‌ای که خالی نیست ولی عدد هم نیست: کادر باید خطا نشان دهد */
+fun numberInvalid(text: String): Boolean = text.isNotBlank() && parseNumber(text) == null
