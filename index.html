@@ -5353,6 +5353,12 @@
             <button class="btn btn-secondary btn-sm" id="btn-import-backup">بازیابی از فایل</button>
             <input type="file" id="in-import-backup-file" accept="application/json,.json" style="display:none;">
           </div>
+          <!-- خروجیِ کاملِ داده برای مالک (OPS-08) — شرح در ‎license/owner-export.js‎ -->
+          <p class="settings-hint" style="margin-top:14px;">خروجی کامل داده برای خودتان: همهٔ داده‌ها در یک فایل اکسل (هر بخش یک برگه، با سرستونِ فارسی) یا JSON.</p>
+          <div class="settings-actions-row">
+            <button class="btn btn-secondary btn-sm" id="btn-owner-export-xlsx">خروجی کامل — اکسل</button>
+            <button class="btn btn-secondary btn-sm" id="btn-owner-export-json">خروجی کامل — JSON</button>
+          </div>
 
           <!--
             پشتیبان روی سرور.
@@ -13055,6 +13061,16 @@
     showToast('فایل پشتیبان دانلود شد');
   });
 
+  // ---- خروجیِ کاملِ داده برای مالک (OPS-08) — فقط می‌خواند؛ مُهرِ پشتیبان نمی‌خورد ----
+  ['xlsx', 'json'].forEach((kind)=>{
+    document.getElementById('btn-owner-export-' + kind).addEventListener('click', ()=>{
+      if(!window.TohidOwnerExport){ showToast('ابزارِ خروجی هنوز بار نشده؛ چند لحظهٔ دیگر دوباره بزنید', 'error'); return; }
+      window.TohidOwnerExport.save(kind, backupPayload(), todayISO()).then(
+        ()=> showToast(kind === 'xlsx' ? 'فایل اکسلِ همهٔ داده‌ها دانلود شد' : 'فایل JSONِ همهٔ داده‌ها دانلود شد'),
+        (e)=> showToast('خروجی ساخته نشد: ' + ((e && e.message) || 'دلیل نامعلوم'), 'error'));
+    });
+  });
+
   /* ---- پشتیبان روی سرور ----------------------------------------
    *
    *  همان دادهٔ «دانلود نسخه پشتیبان»، این بار روی سرور — تا گم شدنِ
@@ -14959,6 +14975,7 @@
 <script src="license/auto-backup.js?v=1" defer></script>
 <script src="license/thermal-print.js?v=1" defer></script>
 <script src="license/photo-studio.js?v=2" defer></script>
+<script src="license/owner-export.js?v=1" defer></script>
 
 </body>
 </html>

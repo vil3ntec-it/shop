@@ -6,7 +6,7 @@
    - فونت‌های گوگل: اولین بار از شبکه، سپس همیشه از کش.
    داده‌های فروشگاه در localStorage است و اصلاً از اینجا عبور نمی‌کند.
    ========================================================== */
-const VERSION = 'tohid-shop-v50';
+const VERSION = 'tohid-shop-v51';
 const SHELL_CACHE = VERSION + '-shell';
 const FONT_CACHE = VERSION + '-fonts';
 
@@ -51,6 +51,8 @@ const SHELL_ASSETS = [
    */
   './license/thermal-print.js',
   './license/photo-studio.js',
+  //  خروجیِ کاملِ مالک (OPS-08) — بی اینترنت هم باید کار کند
+  './license/owner-export.js',
   //  خوانندهٔ بارکد برای آیفون — Safari «BarcodeDetector» ندارد و دوربین همیشه
   //  همین را بار می‌کند؛ بی آن، نصبِ تازه بی اینترنت اصلاً اسکن نمی‌کرد
   './license/vendor/zxing-0.21.3.min.js',
