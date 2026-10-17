@@ -294,6 +294,8 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/errors', require('./routes/errors'));
     api.use('/location', require('./routes/location'));
     api.use('/me', require('./routes/me'));
+    //  اعلانِ سفارش (v3 §۳۰) — پیش از `/shop` به همان دلیلِ `/shop/orders`؛ پیش‌فرض خاموش
+    api.use('/shop/order-notify', require('./routes/order-notify'));
     //  سفارشِ آنلاین (فاز ۴) — پیش از `/shop` تا `requireUser`ِ آن دو بار نرود؛
     //  زیرِ همان پیشوند، پس ACCOUNT_PREFIXESِ پنلِ خانگی دست نمی‌خورد
     api.use('/shop/orders', require('./routes/orders'));

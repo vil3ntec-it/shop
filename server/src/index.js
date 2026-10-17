@@ -49,6 +49,10 @@ async function main() {
    *  سرویسِ ایمیل منتظر می‌ماند و هر کندیِ ایمیل، کندیِ ورود می‌شد.
    */
   outbox.start();
+  //  کارگرِ اعلانِ سفارش (v3 §۳۰) — روی خودِ سرور، بی‌نیاز به کامپیوترِ دکان؛
+  //  بی پرچمِ `shop.order_notify` صفش خالی است و کاری نمی‌کند
+  const orderNotify = require('./lib/order-notify');
+  orderNotify.start();
   //  نسخهٔ schemaی هر بخش از کد به دفتر می‌رود — پنل و مدیر از همان‌جا می‌خوانند
   require('./lib/sync-v1').syncSchemaTable().catch((e) => console.error('[sync] app_schema', e.message));
   //  «چیزی عوض شد» ⇒ دستگاه‌های دیگرِ همان حساب Pull می‌کنند
@@ -72,6 +76,7 @@ async function main() {
     console.log(`[${signal}] در حال خاموش شدن…`);
     if (backupTimer) clearInterval(backupTimer);
     outbox.stop();
+    orderNotify.stop();
     notices.stopRunner();
     telegram.stop();
     server.close(async () => {

@@ -279,7 +279,7 @@ async function get(shopId, id, viewer) {
 /**
  * @returns {{order:object, replayed:boolean}}
  */
-async function create(shopId, { key, body, actor }) {
+async function create(shopId, { key, body, actor, notify }) {
   const at = now();
   const input = parseCreate(body, at);
   const hash = hashOf(body);
@@ -333,6 +333,16 @@ async function create(shopId, { key, body, actor }) {
       [ulid(at), id, shopId, actor.type, actor.id || '', '',
         JSON.stringify({ source: input.source, isTest: input.isTest, totalMinor: input.totalMinor }), at]
     );
+    /*
+     *  اعلانِ سفارش (v3 §۳۰): `notify` = `async (run, {shopId, orderId, orderNo, at})`
+     *  درونِ همین تراکنش و فقط برای سفارشِ تازه (تکرارِ همان کلید به این‌جا
+     *  نمی‌رسد). نیامدنش ⇒ سفارشِ مشتری `order-notify.enqueueIn` (بی پرچمِ
+     *  `shop.order_notify` هیچ نمی‌نویسد)؛ سفارشِ کارمند هیچ — رفتارِ پیشین.
+     *  `null` ⇒ هیچ. خطایش کلِ سفارش را برمی‌گرداند: «ثبت شد» بی صفِ اعلان نیست.
+     */
+    const hook = notify !== undefined ? notify
+      : (actor.type === 'customer' ? require('./order-notify').enqueueIn : null);
+    if (hook) await hook(run, { shopId, orderId: id, orderNo: no, at });
     return { order: await loadDetail(run, shopId, id, actor), replayed: false };
   });
 }
