@@ -31,6 +31,9 @@ const FEATURES = [
    *  پس این کلید هم در آن هست؛ ولی بی پرچم هیچ دری باز نمی‌شود.
    */
   { key: 'online_orders', label: 'سفارشِ آنلاین', core: false },
+  //  ویترینِ اینترنتی (فاز ۴، WEB) — همان قاعده با پرچمِ `shop.storefront`؛
+  //  ثبتِ سفارش از ویترین `online_orders` را هم می‌خواهد.
+  { key: 'storefront', label: 'ویترینِ اینترنتی', core: false },
   //  تحویل و پیک (۳.۱۷، D-10: افزونه در همین فهرست) + پرچمِ `shop.delivery`، پیش‌فرض خاموش
   { key: 'delivery', label: 'تحویل و پیک', core: false },
 ];
