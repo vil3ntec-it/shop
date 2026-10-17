@@ -6,7 +6,16 @@
    - فونت‌های گوگل: اولین بار از شبکه، سپس همیشه از کش.
    داده‌های فروشگاه در localStorage است و اصلاً از اینجا عبور نمی‌کند.
    ========================================================== */
-const VERSION = 'tohid-shop-v51';
+/*
+ *  ⛔ کانالِ آزمایشیِ وب (F0-27): همین فایل در `/beta/` هم منتشر می‌شود و کش‌ها
+ *  مالِ **کلِ دامنه**اند. پس کشِ آزمایشی پیشوندِ `beta-` دارد و هر کانال فقط
+ *  کشِ کهنهٔ **خودش** را پاک می‌کند — وگرنه فعال شدنِ یکی پوستهٔ آفلاینِ دیگری
+ *  را می‌برد. پایدار هم به ناوبری و فایل‌های `/beta/` دست نمی‌زند
+ *  (`server/test/web-beta-channel.mjs`).
+ */
+const BETA = /\/beta\/sw\.js$/.test(self.location.pathname);
+const BETA_PATH = new URL('./beta/', self.location).pathname;
+const VERSION = (BETA ? 'beta-' : '') + 'tohid-shop-v51';
 const SHELL_CACHE = VERSION + '-shell';
 const FONT_CACHE = VERSION + '-fonts';
 
@@ -76,7 +85,7 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
       .then((keys) => Promise.all(
-        keys.filter((k) => !k.startsWith(VERSION)).map((k) => caches.delete(k))
+        keys.filter((k) => !k.startsWith(VERSION) && k.startsWith('beta-') === BETA).map((k) => caches.delete(k))
       ))
       .then(() => self.clients.claim())
   );
@@ -97,6 +106,9 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET') return;
 
   const url = new URL(req.url);
+
+  //  نسخهٔ آزمایشی سرویس‌ورکرِ خودش را دارد؛ پایدار پاسخِ آن را جای پوستهٔ خودش کش نمی‌کند
+  if (!BETA && url.origin === self.location.origin && url.pathname.startsWith(BETA_PATH)) return;
 
   // ---- فونت‌ها: اول کش، بعد شبکه (و ذخیره برای دفعات بعد) ----
   if (isFontRequest(url)) {

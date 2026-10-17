@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.data.invoiceLabel
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -1055,7 +1056,7 @@ private fun RecentDeals(d: ShopData, onOpen: (String) -> Unit) {
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
           Text(
-            "فاکتور ${(sale.invoiceNumber ?: 0).fa()}",
+            "فاکتور ${sale.invoiceLabel() ?: 0.fa()}",
             fontSize = 13.sp,
             fontWeight = FontWeight.Medium,
             color = colors.text,

@@ -7664,7 +7664,7 @@
       const left = !cancelled && Number(s.remaining) > 0 ? ` · <b style="color:var(--danger)">مانده ${formatMoney(s.remaining)}</b>` : '';
       return `<div class="tx-item${cancelled ? ' muted' : ''}">
         <span class="tx-date-col">${formatDate(s.date)}</span>
-        <span class="tx-note-col">فاکتور ${s.invoiceNumber != null ? escapeHtml(String(s.invoiceNumber)) : '—'}${cancelled ? ' (لغوشده)' : ''}${left}</span>
+        <span class="tx-note-col">فاکتور ${s.invoiceNumber != null ? escapeHtml(invoiceLabel(s)) : '—'}${cancelled ? ' (لغوشده)' : ''}${left}</span>
         <span class="tx-money">${formatMoney(s.finalTotal)}</span>
       </div>`;
     });
@@ -8587,6 +8587,14 @@
   ========================================================== */
   let products = [];         // {id,name,category,unit,purchasePrice,salePrice,minStock,notes,barcodes:[],createdAt}
   let warehouseEntries = []; // {id,productId,cartons,perCarton,units,unit,price,date,notes,createdAt}
+  /* شمارهٔ نمایشیِ فاکتور — F0-03: فاکتورِ برنامهٔ اندروید/کامپیوتر «سری سند»ِ
+     دستگاهش را دارد (`series`، مثلاً B1) و `B1-154` دیده می‌شود؛ فاکتورِ وب
+     (که بازهٔ خودش را دارد) و فاکتورهای قدیمی همان عدد را نشان می‌دهند. */
+  function invoiceLabel(s){
+    if(!s || s.invoiceNumber == null) return '';
+    const series = typeof s.series === 'string' ? s.series.trim() : '';
+    return series ? `${series}-${s.invoiceNumber}` : String(s.invoiceNumber);
+  }
   let sales = [];            // {id,invoiceNumber,total,discountType,discountValue,discount,finalTotal,paymentMethod,debtorId,paidAmount,remaining,status,createdAt,date,syncStatus}
   let saleItems = [];        // {id,saleId,productId,quantity,unitPrice,purchasePrice,totalPrice,returnedQty}
   let returns = [];          // {id,saleId,saleItemId,productId,quantity,amount,reason,date,createdAt}
@@ -12421,7 +12429,7 @@
     return `
       <div class="invoice-head">
         <h4>${escapeHtml(appSettings.storeName || 'فروشگاه')}</h4>
-        <div>فاکتور فروش #${sale.invoiceNumber ?? '—'}</div>
+        <div>فاکتور فروش #${sale.invoiceNumber != null ? escapeHtml(invoiceLabel(sale)) : '—'}</div>
       </div>
       <div class="invoice-meta">
         <span>تاریخ: ${formatDate(sale.date)} — ${timeStr}</span>
@@ -12551,7 +12559,7 @@
     return {
       title: appSettings.storeName || 'فروشگاه',
       meta: [
-        'فاکتور فروش #' + (sale.invoiceNumber ?? '—'),
+        'فاکتور فروش #' + (sale.invoiceNumber != null ? invoiceLabel(sale) : '—'),
         formatDate(sale.date) + ' — ' + timeStr,
         sale.status==='cancelled' ? 'لغو شده' : '',
       ].filter(Boolean),
@@ -12621,7 +12629,7 @@
       <div class="exp-card" style="flex-direction:column; align-items:stretch;">
         <div style="display:flex; justify-content:space-between; align-items:flex-start;">
           <div>
-            <div class="exp-title">فاکتور #${sale.invoiceNumber ?? '—'}</div>
+            <div class="exp-title">فاکتور #${sale.invoiceNumber != null ? escapeHtml(invoiceLabel(sale)) : '—'}</div>
             <div class="exp-meta">
               <span>${formatDate(sale.date)}</span>
               <span class="sale-status-badge ${sale.status==='cancelled' ? 'cancelled' : (sale.paymentMethod==='credit'?'credit':'cash')}">
@@ -12685,7 +12693,7 @@
     if(!sale) return;
     if(!canCancelSale()){ showToast('لغوِ فاکتور با صاحب یا مدیرِ دکان است', 'danger'); return; }
     document.getElementById('confirm-title').textContent = 'لغو فروش؟';
-    document.getElementById('confirm-sub').textContent = `فروش #${sale.invoiceNumber} لغو می‌شود و موجودی کالاهای آن به انبار برمی‌گردد. سابقه فروش حذف نمی‌شود.`;
+    document.getElementById('confirm-sub').textContent = `فروش #${invoiceLabel(sale)} لغو می‌شود و موجودی کالاهای آن به انبار برمی‌گردد. سابقه فروش حذف نمی‌شود.`;
     // لغو بی دلیل ثبت نمی‌شود — همان `SalesEngine.cancel(reason)`ِ برنامه
     const fgReason = document.getElementById('fg-confirm-reason');
     const reasonEl = document.getElementById('confirm-reason');
@@ -12694,12 +12702,12 @@
     confirmAction = ()=>{
       const reason = reasonEl.value.trim();
       if(!reason){ fgReason.classList.add('error'); reasonEl.focus(); return false; }
-      logAudit('cancel_sale', saleId, `لغو فروش فاکتور #${sale.invoiceNumber} — دلیل: ${reason}`);
+      logAudit('cancel_sale', saleId, `لغو فروش فاکتور #${invoiceLabel(sale)} — دلیل: ${reason}`);
       sale.status = 'cancelled';
       sale.cancelReason = reason;
       // جنسِ برگشته در گردشِ انبار هم دیده شود — همان `sale_cancel`ِ برنامه
       saleItems.filter(si=> si.saleId===saleId && si.productId && (si.quantity - (si.returnedQty||0)) > 0)
-        .forEach(si=> logStockMovement(si.productId, 'sale_cancel', si.quantity - (si.returnedQty||0), todayISO(), `لغو فروش — فاکتور #${sale.invoiceNumber}`, saleId));
+        .forEach(si=> logStockMovement(si.productId, 'sale_cancel', si.quantity - (si.returnedQty||0), todayISO(), `لغو فروش — فاکتور #${invoiceLabel(sale)}`, saleId));
       // اگر بخشی از این فروش نسیه بوده، فقط مقدار بدهی «هنوز تسویه‌نشده» از همین فروش خنثی می‌شود
       // (نه کل مبلغ اولیه) تا اگر پیش از این مرجوعی هم ثبت شده باشد، بدهی منفی نشود
       if(sale.debtorId){
@@ -12707,7 +12715,7 @@
         if(outstanding>0){
           transactions.push({
             id: uid(), debtorId: sale.debtorId, type:'receive', amount: outstanding,
-            date: todayISO(), notes: `لغو فروش — فاکتور #${sale.invoiceNumber}`, createdAt: Date.now()
+            date: todayISO(), notes: `لغو فروش — فاکتور #${invoiceLabel(sale)}`, createdAt: Date.now()
           });
           sale.debtSettled = (sale.debtSettled||0) + outstanding;
         }
@@ -12768,12 +12776,12 @@
         id: retId, saleId: sale.id, saleItemId: si.id, productId: si.productId,
         quantity: qty, amount, reason, date: todayISO(), createdAt: Date.now()
       });
-      logStockMovement(si.productId, 'customer_return', qty, todayISO(), reason || `مرجوعی فاکتور #${sale.invoiceNumber}`, retId);
+      logStockMovement(si.productId, 'customer_return', qty, todayISO(), reason || `مرجوعی فاکتور #${invoiceLabel(sale)}`, retId);
       totalReturnAmount += amount;
       anyReturned = true;
     });
     if(!anyReturned){ showToast('مقدار معتبری برای مرجوعی وارد نشده', 'danger'); return; }
-    logAudit('return', sale.id, `مرجوعی به مبلغ ${formatMoney(totalReturnAmount)} افغانی — فاکتور #${sale.invoiceNumber}`);
+    logAudit('return', sale.id, `مرجوعی به مبلغ ${formatMoney(totalReturnAmount)} افغانی — فاکتور #${invoiceLabel(sale)}`);
 
     // اگر فروش نسیه بوده، بدهی معادل مرجوعی از حساب قرض‌دار کسر می‌شود
     // (حداکثر تا سقف بدهی باقی‌مانده از همین فروش، تا با لغو بعدی فروش، بدهی منفی نشود)
@@ -12783,7 +12791,7 @@
       if(settleAmount>0){
         transactions.push({
           id: uid(), debtorId: sale.debtorId, type:'receive', amount: settleAmount,
-          date: todayISO(), notes: `مرجوعی کالا — فاکتور #${sale.invoiceNumber}`, createdAt: Date.now()
+          date: todayISO(), notes: `مرجوعی کالا — فاکتور #${invoiceLabel(sale)}`, createdAt: Date.now()
         });
         sale.debtSettled = (sale.debtSettled||0) + settleAmount;
       }
@@ -14790,7 +14798,7 @@
         .sort((a,b)=> a.createdAt-b.createdAt)
         .forEach(s=>{
           rows.push([
-            s.invoiceNumber || '', s.date,
+            invoiceLabel(s), s.date,
             Math.round(s.total||0), Math.round(s.discount||0), Math.round(s.finalTotal||0),
             Math.round(s.paidAmount||0), Math.round(s.remaining||0),
             s.paymentMethod==='credit' ? 'نسیه' : 'نقدی',

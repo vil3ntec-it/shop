@@ -57,6 +57,9 @@ class SyncV1Worker(context: Context, params: WorkerParameters) : CoroutineWorker
       }
     }
 
+    //  F0-03: «سری سند»ِ این دستگاه — یک بار، هنگامِ پیوستن؛ شکستش بی‌صداست
+    runCatching { ir.vil3ntec.tohid.sync.DocSeries.ensure(app) }
+
     //  یک بار در عمرِ هر حساب روی این دستگاه؛ شکستش (نت) دورِ عادی را نمی‌گیرد
     runCatching {
       engine.prepare(read = { store.data.value }, write = { next -> store.applyFromServerNow(next) })
