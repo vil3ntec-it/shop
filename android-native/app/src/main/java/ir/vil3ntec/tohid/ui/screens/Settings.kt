@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.SystemUpdate
+import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.material.icons.filled.Undo
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -254,6 +255,50 @@ fun SettingsScreen(
         .onFailure { toast("فایل ساخته نشد: ${it.message ?: "دلیل نامعلوم"}") }
     }
   }
+
+  /*
+   *  خروجیِ کاملِ داده برای مالک (OPS-08) — شرح سرِ `OwnerExport`.
+   *  مشخصات ۲۱.۲: فقط مالک/نقشِ مجاز (شاگرد تنظیمات را اصلاً باز نمی‌کند؛
+   *  این‌جا هم دوباره سنجیده می‌شود) و با ثبت در سابقهٔ عملیات. جز همان یک
+   *  ردیفِ سابقه چیزی در دفتر نوشته نمی‌شود و مُهرِ پشتیبان (`BackupClock`) نمی‌خورد.
+   */
+  fun ownerExport(excel: Boolean) = { uri: android.net.Uri? ->
+    if (uri != null && ir.vil3ntec.tohid.data.ShopRole.isStaff(context)) toast("خروجی کامل فقط برای صاحب دکان یا مدیر است")
+    else if (uri != null) scope.launch {
+      runCatching {
+        withContext(Dispatchers.IO) {
+          val meta = ir.vil3ntec.tohid.data.OwnerExport.Meta(
+            System.currentTimeMillis(), if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) "desktop" else "android",
+            BuildConfig.VERSION_NAME, storeName,
+          )
+          val archive = LedgerArchive.readArchive(context)
+          val out = context.contentResolver.openOutputStream(uri) ?: error("این مسیر برای نوشتن باز نشد")
+          out.use {
+            if (excel) ir.vil3ntec.tohid.data.OwnerExport.writeXlsx(store.data.value, meta, archive, it)
+            else ir.vil3ntec.tohid.data.OwnerExport.writeJson(store.data.value, meta, archive, it)
+          }
+        }
+      }.onSuccess {
+        val now = System.currentTimeMillis()
+        val cur = store.data.value
+        store.save(
+          cur.copy(
+            auditLog = cur.auditLog + ir.vil3ntec.tohid.data.AuditEntry(
+              id = ir.vil3ntec.tohid.data.auditId(), type = "data_export", date = todayIso(),
+              notes = if (excel) "خروجی کامل داده — اکسل" else "خروجی کامل داده — JSON", createdAt = now,
+            ),
+          ),
+        )
+        toast(if (excel) "فایل اکسلِ همهٔ داده‌ها ساخته شد" else "فایل JSONِ همهٔ داده‌ها ساخته شد")
+      }
+        .onFailure { toast("خروجی ساخته نشد: ${it.message ?: "دلیل نامعلوم"}") }
+    }
+    Unit
+  }
+  val exportAllJson = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json"), ownerExport(false))
+  val exportAllXlsx = rememberLauncherForActivityResult(
+    ActivityResultContracts.CreateDocument("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"), ownerExport(true),
+  )
 
   //  بازیابی هر دو شکل را می‌شناسد: ZIPِ کامل و JSONِ ساده
   val pickFile = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
@@ -587,6 +632,20 @@ fun SettingsScreen(
           description = "بدون عکس — همان فایلی که نسخهٔ وب می‌خواند",
           tint = Shop.colors.muted,
           onClick = { exportJson.launch("tohid-shop-backup-${todayIso()}.json") },
+        )
+        SettingsRow(
+          icon = Icons.Filled.TableChart,
+          title = "خروجی کامل داده — اکسل",
+          description = "همهٔ داده‌ها، هر بخش در یک برگه با سرستونِ فارسی",
+          tint = Shop.colors.success,
+          onClick = { exportAllXlsx.launch("tohid-export-${todayIso()}.xlsx") },
+        )
+        SettingsRow(
+          icon = Icons.Filled.Description,
+          title = "خروجی کامل داده — JSON",
+          description = "همهٔ داده‌ها با سرآیندِ نسخه‌دار، برای بردن به هر جای دیگر",
+          tint = Shop.colors.muted,
+          onClick = { exportAllJson.launch("tohid-export-${todayIso()}.json") },
         )
         SettingsRow(
           icon = Icons.Filled.CloudDownload,
