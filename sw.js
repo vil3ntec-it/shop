@@ -15,7 +15,7 @@
  */
 const BETA = /\/beta\/sw\.js$/.test(self.location.pathname);
 const BETA_PATH = new URL('./beta/', self.location).pathname;
-const VERSION = (BETA ? 'beta-' : '') + 'tohid-shop-v51';
+const VERSION = (BETA ? 'beta-' : '') + 'tohid-shop-v52';
 const SHELL_CACHE = VERSION + '-shell';
 const FONT_CACHE = VERSION + '-fonts';
 
@@ -49,6 +49,9 @@ const SHELL_ASSETS = [
    */
   './license/sync-core.js',
   './license/account-code.js',
+  //  Sync v3 پشتِ تنظیمِ هر دستگاه (پیش‌فرض v1) و قاعدهٔ یگانهٔ مبلغی که مبدلش می‌خواند
+  './license/money.js',
+  './license/sync-v3-engine.js',
   './license/sync-engine.js',
   './license/account-ui.js',
   './license/account-ui.css',
