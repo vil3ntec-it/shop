@@ -297,6 +297,8 @@ async function createApp({ runMigrations = true } = {}) {
     //  سفارشِ آنلاین (فاز ۴) — پیش از `/shop` تا `requireUser`ِ آن دو بار نرود؛
     //  زیرِ همان پیشوند، پس ACCOUNT_PREFIXESِ پنلِ خانگی دست نمی‌خورد
     api.use('/shop/orders', require('./routes/orders'));
+    //  بانکِ تصاویر (v3 ۳۷) — پشتِ پرچمِ `shop.image_bank`، پیش‌فرض خاموش
+    api.use('/shop/images', require('./routes/shop-images'));
     api.use('/shop', require('./routes/shop'));
     /*
      *  بخشِ پمپ‌بنزین — دفترِ جدا، همان دستگاهِ اشتراک.
@@ -351,6 +353,8 @@ async function createApp({ runMigrations = true } = {}) {
      */
     api.use('/admin', require('./routes/admin-notices'));
     api.use('/admin', require('./routes/admin-sales'));
+    //  بانکِ مرکزیِ تصاویر (v3 ۳۷.۳) — پشتِ پرچمِ `image_bank.central`، پیش‌فرض خاموش
+    api.use('/admin/image-bank', require('./routes/admin-image-bank'));
     api.use('/portal', require('./routes/portal'));
     api.use('/rep', require('./routes/rep'));       // شورا چ۳: نمایندهٔ فروش — فقط فروش‌های خودش
     api.get('/downloads', require('./routes/portal').downloadsHandler);
