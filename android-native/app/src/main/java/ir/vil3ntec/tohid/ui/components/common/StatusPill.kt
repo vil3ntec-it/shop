@@ -14,31 +14,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.ui.theme.Shape
 import ir.vil3ntec.tohid.ui.theme.Shop
-import ir.vil3ntec.tohid.ui.theme.ShopColors
-
-/** معنای رنگِ نشان — رنگ هیچ‌جا تزیین نیست */
-enum class PillTone { SUCCESS, WARNING, DANGER, NEUTRAL }
-
-/**
- *  رنگِ متن/نقطه و زمینهٔ هر نشان. متن روی زمینهٔ کم‌رنگِ همان رنگ می‌نشیند؛
- *  همهٔ جفت‌ها در `BackOfficeContrastTest` ≥ ۴٫۵:۱ سنجیده می‌شوند.
- */
-fun pillColors(c: ShopColors, tone: PillTone): Pair<Color, Color> = when (tone) {
-  PillTone.SUCCESS -> c.success to c.successTint
-  PillTone.WARNING -> c.warning to c.warningTint
-  PillTone.DANGER -> c.danger to c.dangerTint
-  PillTone.NEUTRAL -> c.muted to c.muted.copy(alpha = NEUTRAL_TINT)
-}
-
-/** زمینهٔ نشانِ خنثی: همان رنگِ `muted` با ۱۲٪ — هم‌وزنِ تینت‌های دیگر */
-const val NEUTRAL_TINT = 0.12f
 
 /**
  *  نشانِ وضعیت — «متن + رنگ + نقطه»، هرگز رنگِ تنها (v3 §۱۹.۱۱،
