@@ -18,6 +18,8 @@ const audit = require('../lib/audit');
 const { sectionOf } = require('../lib/tenancy');
 const { badRequest } = require('../middleware/errors');
 const { clientIp } = require('../middleware/ratelimit');
+const { requireSuperAdmin } = require('../middleware/auth');
+const { requireReason } = require('../lib/admin-access');
 
 const router = express.Router();
 
@@ -40,21 +42,33 @@ router.get('/conflicts', async (req, res, next) => {
     const accountId = String(req.query?.account || '').slice(0, 80);
     if (!accountId) return next(badRequest('شناسهٔ حساب لازم است', 'account_required'));
     const ctx = { app, accountKind: app === 'pump' ? 'station' : 'shop', accountId };
-    res.json({
-      conflicts: await sync.listConflicts(ctx, {
-        limit: Math.min(500, Number(req.query?.limit || 100) || 100),
-        includeRestored: req.query?.all === '1',
-      }),
+    const conflicts = await sync.listConflicts(ctx, {
+      limit: Math.min(500, Number(req.query?.limit || 100) || 100),
+      includeRestored: req.query?.all === '1',
     });
+    //  تعارض‌ها مقدارِ خودِ ردیف‌های حساب را دارند (نام، قیمت، مانده) —
+    //  دیدنشان دیدنِ دادهٔ خصوصی است و سابقه دارد (ADMIN-CONTROL-PLANE.md)
+    await audit.log({
+      shopId: app === 'shop' ? accountId : '', actorType: 'admin', userId: req.admin.id,
+      action: 'admin.sync_conflicts_viewed', targetType: 'account', targetId: accountId,
+      ip: clientIp(req), detail: { app, count: conflicts.length },
+    });
+    res.json({ conflicts });
   } catch (err) { next(err); }
 });
 
-router.post('/conflicts/:id/restore', async (req, res, next) => {
+/*
+ *  ⛔ بازگرداندن دادهٔ یک حساب را عوض می‌کند (opِ تازه به همهٔ دستگاه‌هایش)
+ *  ⇒ فقط مدیرِ ارشد، فقط با دلیلِ نوشته (ADMIN-CONTROL-PLANE.md، v3 ۳۹.۸).
+ */
+router.post('/conflicts/:id/restore', requireSuperAdmin, async (req, res, next) => {
   try {
+    const reason = requireReason(req);
     const out = await sync.restoreConflict(req.params.id);
     await audit.log({
+      shopId: out?.ctx?.accountKind === 'shop' ? String(out.ctx.accountId || '') : '',
       actorType: 'admin', userId: req.admin.id, action: 'sync.conflict_restored', ip: clientIp(req),
-      targetType: 'sync_conflict', targetId: String(req.params.id), detail: out || {},
+      targetType: 'sync_conflict', targetId: String(req.params.id), detail: { ...(out || {}), reason },
     });
     res.json({ ok: true, ...(out || {}) });
   } catch (err) { next(err); }
