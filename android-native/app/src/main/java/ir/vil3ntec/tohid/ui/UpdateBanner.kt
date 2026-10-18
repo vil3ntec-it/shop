@@ -12,6 +12,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.BuildConfig
 import ir.vil3ntec.tohid.ui.theme.Shop
+import ir.vil3ntec.tohid.update.ReleaseFeed
 import ir.vil3ntec.tohid.update.UpdateManager
 
 /**
@@ -37,18 +38,21 @@ fun UpdateBanner() {
     UpdateManager.startAuto(context, repo, BuildConfig.VERSION_NAME)
   }
   val found = UpdateManager.release ?: return
+  //  §۳۸.۹: زیرِ حداقلِ پشتیبانی‌شده ⇒ پیامِ صادقانه و بی «بعداً». برنامه قفل
+  //  نمی‌شود و دفتر سرِ جایش است (D-05)؛ فقط پنهان کردنِ نوار ممکن نیست.
+  val required = ReleaseFeed.belowMinimum(BuildConfig.VERSION_NAME, found.minVersion)
   var hidden by remember(found.version) { mutableStateOf(false) }
-  if (hidden) return
+  if (hidden && !required) return
   val progress = UpdateManager.progress
   val ready = UpdateManager.ready
   val busy = UpdateManager.busy
-  val tint = Shop.colors.primary
+  val tint = if (required) Shop.colors.danger else Shop.colors.primary
   Row(
     Modifier
       .fillMaxWidth()
       .padding(horizontal = 14.dp, vertical = 8.dp)
       .clip(RoundedCornerShape(14.dp))
-      .background(Shop.colors.primaryTint)
+      .background(if (required) Shop.colors.dangerTint else Shop.colors.primaryTint)
       .padding(horizontal = 12.dp, vertical = 8.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
@@ -59,6 +63,7 @@ fun UpdateBanner() {
             (UpdateManager.note?.let { " · $it" } ?: "")
           ready != null && Platform.DESKTOP -> "نسخهٔ ${found.version} آماده است. «به‌روزرسانی» برنامه را چند ثانیه می‌بندد و دوباره باز می‌کند؛ دفتر سرِ جایش می‌ماند."
           ready != null -> "نسخهٔ ${found.version} گرفته شد — آمادهٔ نصب."
+          required -> "این نسخه (${BuildConfig.VERSION_NAME}) دیگر پشتیبانی نمی‌شود. لطفاً به ${found.version} به‌روز کنید؛ دفترتان سرِ جایش می‌ماند."
           else -> "نسخهٔ تازهٔ فروشگاه من آمد: ${found.version}"
         },
         style = MaterialTheme.typography.labelMedium,
@@ -75,7 +80,7 @@ fun UpdateBanner() {
       }
     }
     if (progress < 0) {
-      TextButton(onClick = { hidden = true }) { Text("بعداً") }
+      if (!required) TextButton(onClick = { hidden = true }) { Text("بعداً") }
       Button(
         enabled = !busy,
         onClick = { if (ready != null) UpdateManager.install(context) else UpdateManager.download(context) },

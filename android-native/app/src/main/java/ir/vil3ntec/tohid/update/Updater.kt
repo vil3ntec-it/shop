@@ -56,6 +56,8 @@ object Updater {
     val size: Long,
     /** نشانیِ فایلِ جمع‌های کنترلی، اگر انتشار داشته باشدش */
     val sumsUrl: String = "",
+    /** §۳۸.۹: حداقل نسخهٔ پشتیبانی‌شده (فقط از سرورِ خودمان)؛ خالی ⇒ حداقلی نیست */
+    val minVersion: String = "",
   )
 
   /**
@@ -121,6 +123,7 @@ object Updater {
       apkUrl = ReleaseFeed.fileUrl(server, latest.tag, chosen.name),
       size = chosen.size,
       sumsUrl = if (latest.hasSums) ReleaseFeed.fileUrl(server, latest.tag, ReleaseFeed.SUMS) else "",
+      minVersion = latest.minVersion,
     )
   }
 
