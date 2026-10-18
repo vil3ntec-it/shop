@@ -266,6 +266,30 @@ const config = {
      */
     lockoutGlobalTries: num(process.env.LOGIN_LOCKOUT_GLOBAL_TRIES, 40),
     lockoutMs:    num(process.env.LOGIN_LOCKOUT_MIN, 15) * 60 * 1000,
+    /*
+     *  ثبتِ سفارش از ویترین (‎POST /api/store/:slug/checkout‎) — به‌ازای IP.
+     *  خواندنِ ویترین همان `generalMax` را با سطلِ خودش دارد (مثلِ کیو‌آرِ
+     *  پمپ). ⚠️ پشتِ تونل و بی `TRUST_PROXY` همهٔ مشتری‌ها یک IP‌اند.
+     */
+    storeCheckoutMax: num(process.env.RATE_STORE_CHECKOUT_MAX, 20),
+  },
+
+  /**
+   * ویترینِ اینترنتی (فاز ۴، D-06: `{slug}.vill3n.top`).
+   * درخواستی که میزبانش `<slug>.<domain>` است و `slug`ش رزرو نیست، در
+   * ریشه صفحهٔ ویترین را می‌گیرد. خالی ⇒ فقط نشانیِ `/store/<slug>`.
+   */
+  storefront: {
+    domain: String(process.env.STOREFRONT_DOMAIN ?? 'vill3n.top').trim().toLowerCase().replace(/^\.+|\.+$/g, ''),
+    /*
+     *  ۳۱.۲ بندِ ۴ — «اتصالِ تأییدشده» از آخرین تماسِ دستگاه‌های دکان:
+     *  کهنه‌تر از `staleMs` ⇒ «اتصال تأیید نشده»؛ کهنه‌تر از `offlineMs` ⇒
+     *  «موقتاً آفلاین». (N ِ D-18 تا تصمیمِ صاحب محصول: همین ۶۰ دقیقه.)
+     */
+    staleMs:   num(process.env.STORE_PRESENCE_STALE_MIN, 10) * 60 * 1000,
+    offlineMs: num(process.env.STORE_PRESENCE_OFFLINE_MIN, 60) * 60 * 1000,
+    //  ۲۳.۴ — شمارهٔ تأییدشدهٔ مشتری چند روز بی کدِ تازه می‌ماند
+    ticketTtlMs: num(process.env.STORE_CUSTOMER_TICKET_DAYS, 14) * 24 * 60 * 60 * 1000,
   },
 
   // CORS_ORIGIN چند دامنه را با کاما می‌پذیرد. برنامه‌ی اندروید به CORS
@@ -286,6 +310,29 @@ const config = {
     pumpSite: (process.env.PUMP_SITE_URL || 'https://yaqobipump.top').replace(/\/$/, ''),
     //  در آزمون خاموش است: حلقهٔ گرفتنِ پیام نباید به اینترنت برود.
     autoStart: bool(process.env.TELEGRAM_AUTOSTART, (process.env.NODE_ENV || '') !== 'test'),
+  },
+
+  /**
+   * چتِ مشتری ↔ دکان (v3 §۳۳) — پشتِ پرچمِ `shop.chat`، پیش‌فرض خاموش.
+   *
+   * سقفِ رسانه: برنامه پیش از فرستادن عکس را کوچک و فشرده می‌کند (سرور
+   * کتابخانهٔ تصویر ندارد ⇒ فقط بایت‌ها را می‌شناسد، EXIF ِ مکان را می‌برد
+   * و سقف را می‌سنجد). پیش‌نمایش (`thumb`) را هم خودِ برنامه می‌سازد.
+   * ⚠️ پنجرهٔ ویرایش/حذف برای همه و مدتِ نگهداری تصمیمِ بازِ صاحب محصول‌اند
+   * (سند عدد نداده): این‌ها مقدارِ موقت‌اند و `retentionDays = 0` یعنی
+   * «سرور خودش چیزی پاک نمی‌کند» تا تصمیم گرفته شود.
+   */
+  shopChat: {
+    imageMax:       num(process.env.CHAT_IMAGE_MAX_KB, 1536) * 1024,
+    thumbMax:       num(process.env.CHAT_THUMB_MAX_KB, 64) * 1024,
+    audioMax:       num(process.env.CHAT_AUDIO_MAX_KB, 3072) * 1024,
+    fileMax:        num(process.env.CHAT_FILE_MAX_KB, 5120) * 1024,
+    editWindowMs:   num(process.env.CHAT_EDIT_WINDOW_MIN, 15) * 60 * 1000,
+    deleteWindowMs: num(process.env.CHAT_DELETE_WINDOW_MIN, 1440) * 60 * 1000,
+    retentionDays:  num(process.env.CHAT_SHOP_RETENTION_DAYS, 0),
+    //  به‌ازای هر فرستنده (مشتری: دکان+شماره، کارمند: کاربر) در پنجرهٔ `rateLimit.windowMs`
+    sendMax:        num(process.env.RATE_CHAT_SEND_MAX, 300),
+    uploadMax:      num(process.env.RATE_CHAT_UPLOAD_MAX, 60),
   },
 
   corsOrigins: list(process.env.CORS_ORIGIN || process.env.CORS_ORIGINS),
