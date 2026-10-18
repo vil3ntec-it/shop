@@ -19,12 +19,15 @@ val Vazirmatn = FontFamily(
   Font(R.font.vazirmatn_bold, FontWeight.Bold),
 )
 
-private fun style(size: Int, weight: FontWeight, line: Int, scale: Float) =
+private fun style(size: Int, weight: FontWeight, line: Int, scale: Float, features: String?) =
   TextStyle(
     fontFamily = Vazirmatn,
     fontSize = (size * scale).sp,
     fontWeight = weight,
     lineHeight = (line * scale).sp,
+    //  رقمِ فارسیِ صفحه (LOC-05): `ss01`ِ وزیرمتن همان رقمِ لاتین را با شکلِ ۱۲۳
+    //  می‌کشد. متن و داده ASCII می‌مانند؛ لاتین ⇒ null، یعنی همان سبکِ امروز
+    fontFeatureSettings = features,
   )
 
 /**
@@ -38,12 +41,14 @@ private fun style(size: Int, weight: FontWeight, line: Int, scale: Float) =
  *  ضریب عمداً کوچک است: بیشتر از این، چیدمانِ ردیف‌ها به هم می‌ریزد و
  *  عنوان‌های بلند دو خطی می‌شوند.
  */
-fun shopTypography(scale: Float = 1f) = Typography(
-  displaySmall = style(28, FontWeight.Bold, 36, scale),
-  headlineMedium = style(22, FontWeight.Bold, 30, scale),
-  headlineSmall = style(18, FontWeight.SemiBold, 26, scale),
-  titleMedium = style(16, FontWeight.SemiBold, 24, scale),
-  titleSmall = style(14, FontWeight.Medium, 20, scale),
+fun shopTypography(scale: Float = 1f, digits: String = ir.vil3ntec.tohid.core.text.LocaleFormat.DIGITS_LATN): Typography {
+  val f = ir.vil3ntec.tohid.LocaleText.fontFeatures(digits)
+  return Typography(
+  displaySmall = style(28, FontWeight.Bold, 36, scale, f),
+  headlineMedium = style(22, FontWeight.Bold, 30, scale, f),
+  headlineSmall = style(18, FontWeight.SemiBold, 26, scale, f),
+  titleMedium = style(16, FontWeight.SemiBold, 24, scale, f),
+  titleSmall = style(14, FontWeight.Medium, 20, scale, f),
   // متن‌های بدنه و برچسب یک درجه پُرتر شدند.
   //
   // `Normal` روی سطحِ کم‌رنگِ کارت‌ها نازک می‌افتاد و متنِ کوچک — به‌ویژه
@@ -51,10 +56,11 @@ fun shopTypography(scale: Float = 1f) = Typography(
   // بالاتر رفتند، نه بیشتر: `Bold` کردنِ متنِ ریز، خطوط را به هم می‌چسباند
   // و عرضِ متن را زیاد می‌کند، و آن‌وقت همان چیزی از کادر بیرون می‌زند که
   // می‌خواستیم خوانا شود.
-  bodyLarge = style(15, FontWeight.Medium, 24, scale),
-  bodyMedium = style(14, FontWeight.Medium, 22, scale),
-  bodySmall = style(12, FontWeight.Medium, 18, scale),
-  labelLarge = style(14, FontWeight.SemiBold, 20, scale),
-  labelMedium = style(12, FontWeight.SemiBold, 16, scale),
-  labelSmall = style(11, FontWeight.SemiBold, 14, scale),
-)
+  bodyLarge = style(15, FontWeight.Medium, 24, scale, f),
+  bodyMedium = style(14, FontWeight.Medium, 22, scale, f),
+  bodySmall = style(12, FontWeight.Medium, 18, scale, f),
+  labelLarge = style(14, FontWeight.SemiBold, 20, scale, f),
+  labelMedium = style(12, FontWeight.SemiBold, 16, scale, f),
+  labelSmall = style(11, FontWeight.SemiBold, 14, scale, f),
+  )
+}

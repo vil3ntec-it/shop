@@ -470,7 +470,7 @@ private fun ColumnScope.Suppliers(store: ShopStore, d: ShopData, toast: (String)
             Spacer(Modifier.width(10.dp))
             Column {
               Text(s.supplier.name, fontWeight = FontWeight.Bold, color = Shop.colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-              Text(s.supplier.phone.ifBlank { "بی تلفن" }, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+              Text(ir.vil3ntec.tohid.LocaleText.phoneDisplay(s.supplier.phone).ifBlank { "بی تلفن" }, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
             }
           }
           Spacer(Modifier.weight(1f))
@@ -502,7 +502,7 @@ private fun ColumnScope.Suppliers(store: ShopStore, d: ShopData, toast: (String)
       IconButton(onClick = { openId = null }) { Icon(Icons.Filled.ArrowForward, "برگشت", tint = Shop.colors.text) }
       Text(open.supplier.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Shop.colors.text)
       Spacer(Modifier.width(12.dp))
-      Text(open.supplier.phone, color = Shop.colors.muted)
+      Text(ir.vil3ntec.tohid.LocaleText.phoneDisplay(open.supplier.phone), color = Shop.colors.muted)
       Spacer(Modifier.weight(1f))
       Button(onClick = { paying = true }) { Text("پرداخت به تأمین‌کننده  F7") }
       Spacer(Modifier.width(6.dp))

@@ -245,6 +245,27 @@ await step('پشتیبان‌های همان دکان در صفحه‌اش می�
   assert.ok(stats.includes('نسخه'), 'خلاصهٔ سهم باید نوشته شود');
 });
 
+//  ⛔ دانلود = خروجیِ دادهٔ خصوصی ⇒ پنل دلیل می‌پرسد و سرور ردیفِ سابقه می‌نویسد
+//  (ADMIN-CONTROL-PLANE.md). لغوِ پرسش ⇒ هیچ درخواستی نمی‌رود.
+await step('دانلودِ پشتیبانِ دکان دلیل می‌پرسد و در سابقه می‌ماند', async () => {
+  const count = async () => (await one(
+    `SELECT COUNT(*)::int n FROM audit_logs WHERE action='admin.account_backup_downloaded'`)).n;
+  const btn = '#shop-bak-body button:has-text("دانلود")';
+  page.once('dialog', (d) => d.dismiss());
+  await page.click(btn);
+  await page.waitForTimeout(300);
+  assert.equal(await count(), 0, 'لغوِ دلیل ⇒ دانلودی نیست');
+
+  page.once('dialog', (d) => d.accept('بازیابی به درخواستِ صاحبِ دکان'));
+  const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 10_000 }), page.click(btn)]);
+  assert.ok(dl.suggestedFilename(), 'فایل باید برسد');
+  const row = await one(
+    `SELECT * FROM audit_logs WHERE action='admin.account_backup_downloaded' ORDER BY created_at DESC LIMIT 1`);
+  assert.ok(row, 'ردیفِ سابقه باید باشد');
+  const detail = typeof row.detail === 'string' ? JSON.parse(row.detail) : row.detail;
+  assert.equal(detail.reason, 'بازیابی به درخواستِ صاحبِ دکان');
+});
+
 // ── ۵) پشتیبانی ───────────────────────────────────────────────────
 await step('گفت‌وگوی پشتیبانی در پنل دیده و جواب داده می‌شود', async () => {
   await openTab('support');

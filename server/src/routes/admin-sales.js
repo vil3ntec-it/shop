@@ -476,9 +476,12 @@ for (const [prefix, app] of [['/subscriptions', 'shop'], ['/pump/subscriptions',
     } catch (err) { next(err); }
   });
 
-  router.delete(`${prefix}/:id/addons/:addonId`, async (req, res, next) => {
+  //  ⛔ برداشتنِ قابلیتِ پولی هم‌وزنِ افزودنش است ⇒ فقط مدیرِ ارشد؛ و فقط
+  //  از همان اشتراکی که در نشانی آمده، وگرنه ردیفِ سابقه اشتراکِ دیگری را
+  //  نشان می‌داد (ADMIN-CONTROL-PLANE.md)
+  router.delete(`${prefix}/:id/addons/:addonId`, requireSuperAdmin, async (req, res, next) => {
     try {
-      const addon = await discounts.removeAddon(v.id(req.params.addonId), { app });
+      const addon = await discounts.removeAddon(v.id(req.params.addonId), { app, subscriptionId: v.id(req.params.id) });
       await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.addon_removed', targetType: 'subscription', targetId: req.params.id, detail: { app, feature: addon.feature } });
       res.json({ addon });
     } catch (err) { next(err); }
@@ -645,6 +648,7 @@ router.put('/users/:id/city', async (req, res, next) => {
     const row = await one('UPDATE users SET city=$2, updated_at=$3 WHERE id=$1 RETURNING id, city',
       [v.id(req.params.id), v.text(req.body?.city, { max: 60 }), now()]);
     if (!row) return next(notFound('کاربر پیدا نشد'));
+    await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.user_city', targetType: 'user', targetId: row.id, detail: { city: row.city } });
     res.json({ user: row });
   } catch (err) { next(err); }
 });
