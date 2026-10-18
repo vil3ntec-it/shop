@@ -105,6 +105,7 @@ fun UsersScreen(session: Session) {
  */
 @Composable
 private fun UserSheet(session: Session, userId: String, onBack: () -> Unit) {
+  var reason by rememberSaveable { mutableStateOf("") }
   val c = Admin.colors
   val scope = rememberCoroutineScope()
   val context = androidx.compose.ui.platform.LocalContext.current
@@ -248,6 +249,8 @@ private fun UserSheet(session: Session, userId: String, onBack: () -> Unit) {
     }
 
     Spacer(Modifier.height(18.dp))
+    ReasonField(value = reason, onValueChange = { reason = it }, modifier = Modifier.fillMaxWidth())
+    Spacer(Modifier.height(8.dp))
     GhostButton(
       text = if (status == "active") "بستن این حساب" else "باز کردن این حساب",
       modifier = Modifier.fillMaxWidth(),
@@ -258,8 +261,8 @@ private fun UserSheet(session: Session, userId: String, onBack: () -> Unit) {
       busy = true
       scope.launch {
         val next = if (status == "active") "disabled" else "active"
-        runCatching { AdminApi(session.serverUrl).setUserStatus(token, userId, next) }
-          .onSuccess { load() }
+        runCatching { AdminApi(session.serverUrl).setUserStatus(token, userId, next, reason) }
+          .onSuccess { reason = ""; load() }
           .onFailure { error = (it as? AdminApi.ApiError)?.message ?: "انجام نشد"; busy = false }
       }
     }
