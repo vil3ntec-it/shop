@@ -664,6 +664,7 @@ fun AppRoot(
               listOf(
                 "هشدارها" to androidx.compose.material.icons.Icons.Filled.NotificationsActive,
                 "ظاهر" to androidx.compose.material.icons.Icons.Filled.Palette,
+                "تاریخ و رقم" to androidx.compose.material.icons.Icons.Filled.Event,
                 "کالای منقضی" to androidx.compose.material.icons.Icons.Filled.EventBusy,
                 "قفل برنامه" to androidx.compose.material.icons.Icons.Filled.Lock,
                 "تغییر رمز حساب" to androidx.compose.material.icons.Icons.Filled.Password,

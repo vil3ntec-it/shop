@@ -107,7 +107,7 @@ private fun CustomerCards(store: ShopStore, d: ShopData, snackbar: SnackbarHostS
   val all = remember(d) { CustomerEngine.summaries(d) }
   val list = remember(all, search, filter, sort) {
     val q = search.trim()
-    all.filter { q.isEmpty() || it.name.contains(q, true) || it.phone.contains(q) }
+    all.filter { q.isEmpty() || it.name.contains(q, true) || ir.vil3ntec.tohid.LocaleText.phoneMatches(it.phone, q) }
       .filter {
         when (filter) {
           Filter.ALL -> true
@@ -254,7 +254,7 @@ private fun CustomerCard(s: CustomerEngine.Summary, onClick: () -> Unit) {
       Spacer(Modifier.width(10.dp))
       Column(Modifier.weight(1f)) {
         Text(s.name, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Shop.colors.text)
-        Text(s.phone.ifBlank { "بی تلفن" }, maxLines = 1, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+        Text(ir.vil3ntec.tohid.LocaleText.phoneDisplay(s.phone).ifBlank { "بی تلفن" }, maxLines = 1, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
       }
     }
     Spacer(Modifier.weight(1f))
@@ -337,7 +337,7 @@ private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
       Spacer(Modifier.width(12.dp))
       Column(Modifier.weight(1f)) {
         Text(debtor.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Shop.colors.text)
-        Text(listOf(debtor.phone, DebtorEngine.stateText(s.balance), debtor.notes).filter { it.isNotBlank() }.joinToString(" · "),
+        Text(listOf(ir.vil3ntec.tohid.LocaleText.phoneDisplay(debtor.phone), DebtorEngine.stateText(s.balance), debtor.notes).filter { it.isNotBlank() }.joinToString(" · "),
           style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
       }
       Text("Esc برگشت", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)

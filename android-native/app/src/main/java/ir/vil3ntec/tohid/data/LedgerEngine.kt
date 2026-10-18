@@ -110,7 +110,7 @@ object LedgerEngine {
         suppliers = d.suppliers + Supplier(
           id = id,
           name = name,
-          phone = draft.phone.trim(),
+          phone = ir.vil3ntec.tohid.LocaleText.phoneForSave(draft.phone),
           address = draft.address.trim(),
           notes = draft.notes.trim(),
           createdAt = now,
@@ -129,7 +129,7 @@ object LedgerEngine {
         suppliers = d.suppliers.map {
           if (it.id == id) it.copy(
             name = name,
-            phone = draft.phone.trim(),
+            phone = ir.vil3ntec.tohid.LocaleText.phoneForSave(draft.phone),
             address = draft.address.trim(),
             notes = draft.notes.trim(),
           ) else it
