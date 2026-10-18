@@ -16,6 +16,8 @@ on:
       - 'sw.js'
       - 'license/**'
       - 'core/test-vectors/**'
+      # نام‌های فارسیِ خروجیِ کاملِ مالک با نسخهٔ وب سنجیده می‌شوند (owner-export.test.js)
+      - 'android-native/app/src/main/java/ir/vil3ntec/tohid/data/OwnerExport.kt'
       - '.github/workflows/server.yml'
   pull_request:
     paths:
@@ -24,6 +26,8 @@ on:
       - 'sw.js'
       - 'license/**'
       - 'core/test-vectors/**'
+      # نام‌های فارسیِ خروجیِ کاملِ مالک با نسخهٔ وب سنجیده می‌شوند (owner-export.test.js)
+      - 'android-native/app/src/main/java/ir/vil3ntec/tohid/data/OwnerExport.kt'
       - '.github/workflows/server.yml'
   workflow_dispatch:
 
@@ -131,10 +135,22 @@ jobs:
         working-directory: server
         run: npm run test:web-idb
 
+      # OPS-08: خروجیِ کاملِ مالک (اکسل و JSON) با دکمهٔ واقعی در کرومیوم —
+      # فایلِ دانلودشده باز و سنجیده می‌شود، و دفتر نباید عوض شود.
+      - name: آزمونِ خروجیِ کاملِ مالک در نسخهٔ وب
+        working-directory: server
+        run: npm run test:web-export
+
       # شورا چ۳: نمایندهٔ فروش در پورتال فقط فروش‌های خودش را می‌بیند
       - name: آزمونِ نمایندگی در پورتال
         working-directory: server
         run: npm run test:portal-rep
+
+      # فاز ۴: ویترین با کرومیومِ واقعی — از کاتالوگ تا رسید، CSP ِ سخت،
+      # بی بیرون‌زدگی در ۳۲۰ تا ۱۲۸۰، و دسترس‌پذیری (axe-core)
+      - name: آزمونِ ویترین
+        working-directory: server
+        run: npm run test:web-store
 
       # باتِ پمپ در ریپوی پمپ است (telegram-bot/) ولی داخلِ همین سرور اجرا می‌شود؛
       # پس هر تغییرِ سرورِ حساب با آزمون‌های خودِ بات هم سنجیده می‌شود تا بات نشکند.

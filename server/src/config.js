@@ -266,6 +266,30 @@ const config = {
      */
     lockoutGlobalTries: num(process.env.LOGIN_LOCKOUT_GLOBAL_TRIES, 40),
     lockoutMs:    num(process.env.LOGIN_LOCKOUT_MIN, 15) * 60 * 1000,
+    /*
+     *  ثبتِ سفارش از ویترین (‎POST /api/store/:slug/checkout‎) — به‌ازای IP.
+     *  خواندنِ ویترین همان `generalMax` را با سطلِ خودش دارد (مثلِ کیو‌آرِ
+     *  پمپ). ⚠️ پشتِ تونل و بی `TRUST_PROXY` همهٔ مشتری‌ها یک IP‌اند.
+     */
+    storeCheckoutMax: num(process.env.RATE_STORE_CHECKOUT_MAX, 20),
+  },
+
+  /**
+   * ویترینِ اینترنتی (فاز ۴، D-06: `{slug}.vill3n.top`).
+   * درخواستی که میزبانش `<slug>.<domain>` است و `slug`ش رزرو نیست، در
+   * ریشه صفحهٔ ویترین را می‌گیرد. خالی ⇒ فقط نشانیِ `/store/<slug>`.
+   */
+  storefront: {
+    domain: String(process.env.STOREFRONT_DOMAIN ?? 'vill3n.top').trim().toLowerCase().replace(/^\.+|\.+$/g, ''),
+    /*
+     *  ۳۱.۲ بندِ ۴ — «اتصالِ تأییدشده» از آخرین تماسِ دستگاه‌های دکان:
+     *  کهنه‌تر از `staleMs` ⇒ «اتصال تأیید نشده»؛ کهنه‌تر از `offlineMs` ⇒
+     *  «موقتاً آفلاین». (N ِ D-18 تا تصمیمِ صاحب محصول: همین ۶۰ دقیقه.)
+     */
+    staleMs:   num(process.env.STORE_PRESENCE_STALE_MIN, 10) * 60 * 1000,
+    offlineMs: num(process.env.STORE_PRESENCE_OFFLINE_MIN, 60) * 60 * 1000,
+    //  ۲۳.۴ — شمارهٔ تأییدشدهٔ مشتری چند روز بی کدِ تازه می‌ماند
+    ticketTtlMs: num(process.env.STORE_CUSTOMER_TICKET_DAYS, 14) * 24 * 60 * 60 * 1000,
   },
 
   // CORS_ORIGIN چند دامنه را با کاما می‌پذیرد. برنامه‌ی اندروید به CORS

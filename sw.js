@@ -15,7 +15,7 @@
  */
 const BETA = /\/beta\/sw\.js$/.test(self.location.pathname);
 const BETA_PATH = new URL('./beta/', self.location).pathname;
-const VERSION = (BETA ? 'beta-' : '') + 'tohid-shop-v53';
+const VERSION = (BETA ? 'beta-' : '') + 'tohid-shop-v54';
 const SHELL_CACHE = VERSION + '-shell';
 const FONT_CACHE = VERSION + '-fonts';
 
@@ -65,6 +65,8 @@ const SHELL_ASSETS = [
   './license/photo-studio.js',
   //  جای دفتر (localStorage یا IndexedDB) — بی آن، دفترِ IndexedDB روی نصبِ آفلاین باز نمی‌شد
   './license/ledger-store.js',
+  //  خروجیِ کاملِ مالک (OPS-08) — بی اینترنت هم باید کار کند
+  './license/owner-export.js',
   //  بخشِ «سفارش‌ها» (فاز ۴) — پشتِ پرچمِ سرور؛ خاموش ⇒ هیچ کاری نمی‌کند
   './license/orders-ui.js',
   './license/orders-ui.css',

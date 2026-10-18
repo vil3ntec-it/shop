@@ -72,9 +72,18 @@ class AdminApi(private val baseUrl: String) {
 
   suspend fun user(token: String, id: String): JSONObject = get("/api/v1/admin/users/$id", token)
 
+  /**
+   *  دلیلِ اختیاری (ADMIN-CONTROL-PLANE.md، G2) — فقط در سابقهٔ سرور می‌نشیند.
+   *  خالی ⇒ هیچ کلیدی نمی‌رود و درخواست دقیقاً همان قبلی است.
+   */
+  private fun JSONObject.withReason(reason: String): JSONObject = apply {
+    val r = reason.trim().take(200)
+    if (r.isNotEmpty()) put("reason", r)
+  }
+
   /** فعال یا بسته کردنِ حساب. بستن، همهٔ نشست‌هایش را هم می‌بندد. */
-  suspend fun setUserStatus(token: String, id: String, status: String): JSONObject =
-    post("/api/v1/admin/users/$id/status", JSONObject().put("status", status), token)
+  suspend fun setUserStatus(token: String, id: String, status: String, reason: String = ""): JSONObject =
+    post("/api/v1/admin/users/$id/status", JSONObject().put("status", status).withReason(reason), token)
 
   /* ------------------------------ دکان‌ها ------------------------------ */
 
@@ -105,6 +114,7 @@ class AdminApi(private val baseUrl: String) {
     plan: String,
     days: Int?,
     note: String = "",
+    reason: String = "",
   ): JSONObject = post(
     "/api/v1/admin/subscriptions",
     JSONObject().apply {
@@ -112,7 +122,7 @@ class AdminApi(private val baseUrl: String) {
       put("plan", plan)
       if (days != null) put("days", days)
       if (note.isNotBlank()) put("note", note)
-    },
+    }.withReason(reason),
     token,
   )
 
@@ -123,11 +133,11 @@ class AdminApi(private val baseUrl: String) {
    *  می‌کند؛ این یکی تاریخ را **می‌نشاند** — برای وقتی که اشتباهی شده و
    *  باید درست شود.
    */
-  suspend fun setEndsAt(token: String, subscriptionId: String, endsAt: Long): JSONObject =
-    put("/api/v1/admin/subscriptions/$subscriptionId", JSONObject().put("endsAt", endsAt), token)
+  suspend fun setEndsAt(token: String, subscriptionId: String, endsAt: Long, reason: String = ""): JSONObject =
+    put("/api/v1/admin/subscriptions/$subscriptionId", JSONObject().put("endsAt", endsAt).withReason(reason), token)
 
-  suspend fun setSubscriptionStatus(token: String, id: String, status: String): JSONObject =
-    post("/api/v1/admin/subscriptions/$id/status", JSONObject().put("status", status), token)
+  suspend fun setSubscriptionStatus(token: String, id: String, status: String, reason: String = ""): JSONObject =
+    post("/api/v1/admin/subscriptions/$id/status", JSONObject().put("status", status).withReason(reason), token)
 
   suspend fun subscriptions(token: String, status: String = "", limit: Int = 50): JSONArray =
     get("/api/v1/admin/subscriptions?limit=$limit&status=${enc(status)}", token)
@@ -183,10 +193,10 @@ class AdminApi(private val baseUrl: String) {
   suspend fun purchaseRequests(token: String): JSONArray =
     get("/api/v1/admin/purchase-requests", token).optJSONArray("requests") ?: JSONArray()
 
-  suspend fun approveRequest(token: String, id: String, days: Int?): JSONObject =
+  suspend fun approveRequest(token: String, id: String, days: Int?, reason: String = ""): JSONObject =
     post(
       "/api/v1/admin/purchase-requests/$id/approve",
-      JSONObject().apply { if (days != null) put("days", days) },
+      JSONObject().apply { if (days != null) put("days", days) }.withReason(reason),
       token,
     )
 
@@ -459,8 +469,8 @@ class AdminApi(private val baseUrl: String) {
       .optJSONArray("events") ?: JSONArray()
 
   /** روشن و خاموش کردنِ یک پمپ — همان کاری که پنل می‌کند. */
-  suspend fun setStationStatus(token: String, id: String, status: String): JSONObject =
-    post("/api/v1/admin/pump/stations/$id/status", JSONObject().put("status", status), token)
+  suspend fun setStationStatus(token: String, id: String, status: String, reason: String = ""): JSONObject =
+    post("/api/v1/admin/pump/stations/$id/status", JSONObject().put("status", status).withReason(reason), token)
 
   /** یک نگاهِ کلی به بخشِ پمپ — شمارها برای بالای صفحه. */
   suspend fun pumpStats(token: String): JSONObject =
@@ -485,6 +495,7 @@ class AdminApi(private val baseUrl: String) {
     plan: String,
     days: Int?,
     note: String,
+    reason: String = "",
   ): JSONObject = post(
     "/api/v1/admin/pump/subscriptions",
     JSONObject().apply {
@@ -492,14 +503,14 @@ class AdminApi(private val baseUrl: String) {
       put("plan", plan)
       if (days != null) put("days", days)
       if (note.isNotBlank()) put("note", note)
-    },
+    }.withReason(reason),
     token,
   )
 
-  suspend fun setStationSubStatus(token: String, subscriptionId: String, status: String): JSONObject =
+  suspend fun setStationSubStatus(token: String, subscriptionId: String, status: String, reason: String = ""): JSONObject =
     post(
       "/api/v1/admin/pump/subscriptions/$subscriptionId/status",
-      JSONObject().put("status", status),
+      JSONObject().put("status", status).withReason(reason),
       token,
     )
 

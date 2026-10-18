@@ -5385,6 +5385,12 @@
             <button class="btn btn-secondary btn-sm" id="btn-import-backup">بازیابی از فایل</button>
             <input type="file" id="in-import-backup-file" accept="application/json,.json" style="display:none;">
           </div>
+          <!-- خروجیِ کاملِ داده برای مالک (OPS-08) — شرح در ‎license/owner-export.js‎ -->
+          <p class="settings-hint" style="margin-top:14px;">خروجی کامل داده برای خودتان: همهٔ داده‌ها در یک فایل اکسل (هر بخش یک برگه، با سرستونِ فارسی) یا JSON.</p>
+          <div class="settings-actions-row">
+            <button class="btn btn-secondary btn-sm" id="btn-owner-export-xlsx">خروجی کامل — اکسل</button>
+            <button class="btn btn-secondary btn-sm" id="btn-owner-export-json">خروجی کامل — JSON</button>
+          </div>
 
           <!--
             پشتیبان روی سرور.
@@ -10538,7 +10544,8 @@
     purchase:'ثبت خرید', customer_payment:'پرداخت مشتری', supplier_payment:'پرداخت تأمین‌کننده',
     stock_adjustment:'اصلاح موجودی', supplier_return:'برگشت به تأمین‌کننده',
     price_change:'تغییر قیمت', product_edit:'ویرایش کالا', shift_open:'باز کردن صندوق', shift_close:'بستن صندوق', delete_product:'حذف محصول',
-    debtor_delete:'حذف قرض‌دار', debt_tx_delete:'حذف تراکنش بدهی', expense_delete:'حذف مصرف'
+    debtor_delete:'حذف قرض‌دار', debt_tx_delete:'حذف تراکنش بدهی', expense_delete:'حذف مصرف',
+    data_export:'خروجی کامل داده'
   };
   const STOCK_MOVEMENT_LABELS = {
     purchase_in:'ورود خرید', sale:'فروش', customer_return:'مرجوعی مشتری', sale_cancel:'لغو فروش',
@@ -13345,6 +13352,24 @@
     showToast('فایل پشتیبان دانلود شد');
   });
 
+  /* ---- خروجیِ کاملِ داده برای مالک (OPS-08) ----
+   *  مشخصات ۲۱.۲: فقط مالک/نقشِ مجاز (شاگرد نه — همان مرزِ «تنظیمات»ِ برنامهٔ
+   *  نصبی) و با ثبت در سابقهٔ عملیات. جز همان یک ردیفِ سابقه، چیزی در دفتر
+   *  نوشته نمی‌شود و مُهرِ «آخرین پشتیبان» هم نمی‌خورد. */
+  ['xlsx', 'json'].forEach((kind)=>{
+    document.getElementById('btn-owner-export-' + kind).addEventListener('click', ()=>{
+      if(shopRole() === 'staff'){ showToast('خروجی کامل فقط برای صاحب دکان یا مدیر است', 'error'); return; }
+      if(!window.TohidOwnerExport){ showToast('ابزارِ خروجی هنوز بار نشده؛ چند لحظهٔ دیگر دوباره بزنید', 'error'); return; }
+      window.TohidOwnerExport.save(kind, backupPayload(), todayISO()).then(
+        ()=>{
+          logAudit('data_export', null, kind === 'xlsx' ? 'خروجی کامل داده — اکسل' : 'خروجی کامل داده — JSON');
+          saveState();
+          showToast(kind === 'xlsx' ? 'فایل اکسلِ همهٔ داده‌ها دانلود شد' : 'فایل JSONِ همهٔ داده‌ها دانلود شد');
+        },
+        (e)=> showToast('خروجی ساخته نشد: ' + ((e && e.message) || 'دلیل نامعلوم'), 'error'));
+    });
+  });
+
   /* ---- پشتیبان روی سرور ----------------------------------------
    *
    *  همان دادهٔ «دانلود نسخه پشتیبان»، این بار روی سرور — تا گم شدنِ
@@ -15348,6 +15373,7 @@
 <script src="license/auto-backup.js?v=1" defer></script>
 <script src="license/thermal-print.js?v=1" defer></script>
 <script src="license/photo-studio.js?v=2" defer></script>
+<script src="license/owner-export.js?v=1" defer></script>
 <!-- بخشِ «سفارش‌ها» — فقط وقتی سرور بگوید برای این دکان روشن است، ساخته می‌شود -->
 <script src="license/orders-ui.js?v=1" defer></script>
 
