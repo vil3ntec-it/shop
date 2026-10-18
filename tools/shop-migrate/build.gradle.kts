@@ -26,6 +26,13 @@ val legacyFiles = listOf(
   "ir/vil3ntec/tohid/data/Models.kt",
   "ir/vil3ntec/tohid/Jalali.kt",
   "ir/vil3ntec/tohid/Format.kt",
+  //  Jalali.kt از LOC-01 به هستهٔ تقویم و متن تکیه دارد؛ LocaleChoice (حالتِ Compose)
+  //  این‌جا جانشینِ JVMِ خودش را در src/main دارد
+  "ir/vil3ntec/tohid/LocaleText.kt",
+  "ir/vil3ntec/tohid/core/calendar/SolarHijri.kt",
+  "ir/vil3ntec/tohid/core/calendar/CivilDays.kt",
+  "ir/vil3ntec/tohid/core/text/LocaleFormat.kt",
+  "ir/vil3ntec/tohid/core/text/TextNormalizer.kt",
 )
 //  Ulid.kt از قدم صفرِ ۳.۳ (#223) در ماژولِ مشترکِ core است، با همان بسته
 val coreRoot = repoRoot.resolve("core/src/jvmMain/kotlin")
