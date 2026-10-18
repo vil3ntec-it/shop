@@ -101,6 +101,7 @@ class OrderStatesTest {
     for (list in OrderStates.TRANSITIONS.values) for (to in list) assertNotNull(to, OrderText.ACTION[to])
     for (list in OrderStates.REASONS.values) for (r in list) assertNotNull(r, OrderText.REASON[r])
     for (s in listOf("phone", "telegram", "whatsapp", "manual")) assertNotNull(s, OrderText.SOURCE[s])
+    for (s in vec.getValue("codTransitions").jsonObject.keys) assertNotNull(s, OrderText.COD[s])
   }
 
   @Test

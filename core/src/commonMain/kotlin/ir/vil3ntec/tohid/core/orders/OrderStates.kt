@@ -44,7 +44,8 @@ object OrderStates {
     "rejected" to listOf("out_of_stock", "closed", "busy", "out_of_area", "other"),
     "auto_rejected" to listOf("timeout", "other"),
     "cancelled" to listOf("customer_request", "out_of_stock", "no_show", "other"),
-    "delivery_failed" to listOf("no_answer", "wrong_address", "refused", "other"),
+    //  recalled: دکان پس از حرکتِ پیک لغو کرد و بسته برمی‌گردد (تحویل و پیک)
+    "delivery_failed" to listOf("no_answer", "wrong_address", "refused", "recalled", "other"),
   )
 
   val REASON_REQUIRED: List<String> = listOf("rejected", "auto_rejected", "cancelled", "delivery_failed")
@@ -144,6 +145,12 @@ object OrderText {
     "out_of_stock" to "ناموجود", "closed" to "دکان بسته است", "busy" to "شلوغ", "out_of_area" to "خارج از محدوده",
     "other" to "دلیلِ دیگر", "timeout" to "پایانِ مهلت", "customer_request" to "درخواستِ مشتری", "no_show" to "مشتری نیامد",
     "no_answer" to "جواب نداد", "wrong_address" to "نشانیِ غلط", "refused" to "مشتری نپذیرفت",
+    "recalled" to "دکان پس از حرکتِ پیک برگرداند",
+  )
+  /** ماشینِ جدای «نقد هنگامِ تحویل» (رویدادِ `cod` در خطِ زمانی) */
+  val COD = mapOf(
+    "to_collect" to "در انتظارِ دریافت", "collected_by_courier" to "پیک گرفت",
+    "collected_in_store" to "در دکان گرفته شد", "settled_to_shop" to "به دکان تسویه شد",
   )
   val SOURCE = mapOf(
     "phone" to "تلفنی", "telegram" to "تلگرام", "whatsapp" to "واتس‌اپ", "manual" to "دستی",

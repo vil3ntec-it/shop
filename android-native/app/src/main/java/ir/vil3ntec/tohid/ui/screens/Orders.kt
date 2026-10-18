@@ -458,7 +458,11 @@ private fun OrderDetailSheet(
           Column(Modifier.weight(1f)) {
             Text(orderStamp(e.at), style = MaterialTheme.typography.labelSmall, color = c.muted)
             Text(
-              if (e.kind == "created") "ثبت شد" else "${OrderText.status(e.fromStatus)} ← ${OrderText.status(e.toStatus)}",
+              when (e.kind) {
+                "created" -> "ثبت شد"
+                "cod" -> "نقد: ${OrderText.COD[e.toStatus] ?: e.toStatus}"
+                else -> "${OrderText.status(e.fromStatus)} ← ${OrderText.status(e.toStatus)}"
+              },
               color = c.text, fontWeight = FontWeight.SemiBold,
             )
             val who = when (e.actorType) { "system" -> "سیستم"; "customer" -> "مشتری"; else -> "کارمند" }

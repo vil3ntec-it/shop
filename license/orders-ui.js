@@ -45,6 +45,12 @@
     out_of_stock: 'ناموجود', closed: 'دکان بسته است', busy: 'شلوغ', out_of_area: 'خارج از محدوده',
     other: 'دلیلِ دیگر', timeout: 'پایانِ مهلت', customer_request: 'درخواستِ مشتری', no_show: 'مشتری نیامد',
     no_answer: 'جواب نداد', wrong_address: 'نشانیِ غلط', refused: 'مشتری نپذیرفت',
+    recalled: 'دکان پس از حرکتِ پیک برگرداند',
+  };
+  /** ماشینِ جدای «نقد هنگامِ تحویل» (رویدادِ `cod` در خطِ زمانی) */
+  const COD_LABELS = {
+    to_collect: 'در انتظارِ دریافت', collected_by_courier: 'پیک گرفت',
+    collected_in_store: 'در دکان گرفته شد', settled_to_shop: 'به دکان تسویه شد',
   };
   const SOURCE_LABELS = { phone: 'تلفنی', telegram: 'تلگرام', whatsapp: 'واتس‌اپ', manual: 'دستی', web: 'ویترین', storefront: 'ویترین' };
   /** گذارهایی که دکمه‌شان «خطر» است */
@@ -173,7 +179,7 @@
   }
 
   const core = {
-    TABS, TAB_LABELS, STATUS_LABELS, ACTION_LABELS, REASON_LABELS, SOURCE_LABELS, READY_MINUTES,
+    TABS, TAB_LABELS, STATUS_LABELS, ACTION_LABELS, REASON_LABELS, SOURCE_LABELS, COD_LABELS, READY_MINUTES,
     reasonChoices, needsReason, actionsFor, latin, scaled, money, ago, buildCreateBody, newKey,
   };
   if (typeof module !== 'undefined' && module.exports) { module.exports = core; return; }
@@ -615,7 +621,8 @@
         <td dir="ltr">${money(l.lineTotalMinor)}</td></tr>`).join('');
     const events = (o.events || []).map((e) => {
       const what = e.kind === 'created' ? 'ثبت شد'
-        : `${esc(STATUS_LABELS[e.fromStatus] || e.fromStatus)} ← ${esc(STATUS_LABELS[e.toStatus] || e.toStatus)}`;
+        : e.kind === 'cod' ? `نقد: ${esc(COD_LABELS[e.toStatus] || e.toStatus)}`
+          : `${esc(STATUS_LABELS[e.fromStatus] || e.fromStatus)} ← ${esc(STATUS_LABELS[e.toStatus] || e.toStatus)}`;
       const ready = e.detail && e.detail.readyAt ? ` · آماده تا ${esc(when(e.detail.readyAt))}` : '';
       return `<li><time>${esc(when(e.at))}</time><b>${what}</b>
         <span>${esc(actorName(e))}${e.reason ? ` · دلیل: ${esc(REASON_LABELS[e.reason] || e.reason)}` : ''}${ready}</span>

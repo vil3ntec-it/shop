@@ -54,6 +54,8 @@ test('۲) وب: هر برگه، وضعیت، دلیل و منبع نامِ فا�
   for (const list of Object.values(vec.transitions)) for (const to of list) assert.ok(web.ACTION_LABELS[to], to);
   for (const list of Object.values(vec.reasons)) for (const r of list) assert.ok(web.REASON_LABELS[r], r);
   for (const s of require('../src/lib/orders').STAFF_SOURCES) assert.ok(web.SOURCE_LABELS[s], s);
+  //  رویدادِ «نقد هنگامِ تحویل» در خطِ زمانی
+  for (const s of Object.keys(vec.codTransitions)) assert.ok(web.COD_LABELS[s], s);
 });
 
 test('۳) فرمِ دستی: عددِ فارسی، اعشار بی ممیزِ شناور، و بدنه‌ای که سرور می‌پذیرد', () => {

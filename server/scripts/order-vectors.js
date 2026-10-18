@@ -94,6 +94,7 @@ function build() {
     moneyTargets: S.MONEY_TARGETS,
     tabs: S.TABS,
     openTabs: S.OPEN_TABS,
+    codTransitions: S.COD_TRANSITIONS,
     permissions,
     nextFor,
     check,
