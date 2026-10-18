@@ -50,7 +50,8 @@ const REASONS = Object.freeze({
   //  ORD-05 — کارِ سیستم
   auto_rejected: ['timeout', 'other'],
   cancelled: ['customer_request', 'out_of_stock', 'no_show', 'other'],
-  delivery_failed: ['no_answer', 'wrong_address', 'refused', 'other'],
+  //  recalled: دکان پس از حرکتِ پیک لغو کرد و بسته برمی‌گردد (تحویل و پیک)
+  delivery_failed: ['no_answer', 'wrong_address', 'refused', 'recalled', 'other'],
 });
 
 /** گذارهایی که بی دلیل پذیرفته نیستند. */

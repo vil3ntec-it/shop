@@ -142,6 +142,7 @@ private fun StationSheet(session: Session, stationId: String, onBack: () -> Unit
   var error by remember { mutableStateOf<String?>(null) }
   var done by remember { mutableStateOf<String?>(null) }
   var granting by remember { mutableStateOf(false) }
+  var reason by rememberSaveable { mutableStateOf("") }
   //  خبرهایی که خودِ برنامه فرستاده — «خبر نگرفتم» را همین‌جا می‌شود سنجید
   var events by remember { mutableStateOf<JSONArray?>(null) }
 
@@ -173,11 +174,11 @@ private fun StationSheet(session: Session, stationId: String, onBack: () -> Unit
       busy = busy,
       noun = "پمپ",
       onBack = { granting = false },
-      onGrant = { plan, days, note ->
+      onGrant = { plan, days, note, why ->
         val token = session.token ?: return@GrantSheet
         busy = true
         scope.launch {
-          runCatching { AdminApi(session.serverUrl).grantStation(token, stationId, plan, days, note) }
+          runCatching { AdminApi(session.serverUrl).grantStation(token, stationId, plan, days, note, why) }
             .onSuccess { granting = false; done = "اشتراک ثبت شد"; load() }
             .onFailure { error = (it as? AdminApi.ApiError)?.message ?: "ثبت نشد"; busy = false }
         }
@@ -258,6 +259,10 @@ private fun StationSheet(session: Session, stationId: String, onBack: () -> Unit
       enabled = !busy,
     ) { done = null; granting = true }
 
+    //  یک خانهٔ دلیل برای همهٔ دکمه‌های پایین (تعلیق، لغو، خاموش/روشن)
+    Spacer(Modifier.height(8.dp))
+    ReasonField(value = reason, onValueChange = { reason = it }, modifier = Modifier.fillMaxWidth())
+
     val subId = sub?.optString("id").orEmpty()
     //  ⚠️ `sub != null` هم شرط است و نه فقط `subId`: بی آن، کاتلین
     //  داخلِ بلوک `sub` را هنوز nullable می‌بیند و کد کامپایل نمی‌شود.
@@ -275,9 +280,9 @@ private fun StationSheet(session: Session, stationId: String, onBack: () -> Unit
           scope.launch {
             runCatching {
               AdminApi(session.serverUrl)
-                .setStationSubStatus(token, subId, if (suspended) "active" else "suspended")
+                .setStationSubStatus(token, subId, if (suspended) "active" else "suspended", reason)
             }
-              .onSuccess { done = "وضعیت عوض شد"; load() }
+              .onSuccess { done = "وضعیت عوض شد"; reason = ""; load() }
               .onFailure { error = (it as? AdminApi.ApiError)?.message ?: "نشد"; busy = false }
           }
         }
@@ -290,8 +295,8 @@ private fun StationSheet(session: Session, stationId: String, onBack: () -> Unit
           val token = session.token ?: return@GhostButton
           busy = true
           scope.launch {
-            runCatching { AdminApi(session.serverUrl).setStationSubStatus(token, subId, "cancelled") }
-              .onSuccess { done = "اشتراک لغو شد"; load() }
+            runCatching { AdminApi(session.serverUrl).setStationSubStatus(token, subId, "cancelled", reason) }
+              .onSuccess { done = "اشتراک لغو شد"; reason = ""; load() }
               .onFailure { error = (it as? AdminApi.ApiError)?.message ?: "نشد"; busy = false }
           }
         }
@@ -313,9 +318,9 @@ private fun StationSheet(session: Session, stationId: String, onBack: () -> Unit
       scope.launch {
         runCatching {
           AdminApi(session.serverUrl)
-            .setStationStatus(token, stationId, if (stationOff) "active" else "disabled")
+            .setStationStatus(token, stationId, if (stationOff) "active" else "disabled", reason)
         }
-          .onSuccess { done = if (stationOff) "پمپ روشن شد" else "پمپ خاموش شد"; load() }
+          .onSuccess { done = if (stationOff) "پمپ روشن شد" else "پمپ خاموش شد"; reason = ""; load() }
           .onFailure { error = (it as? AdminApi.ApiError)?.message ?: "نشد"; busy = false }
       }
     }
