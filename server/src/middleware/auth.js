@@ -38,11 +38,24 @@ function requireUserOf(app) {
       const token = bearer(req);
       if (!token) return next(unauthorized());
       const row = await tokens.verify(token, 'access', app);
-      if (!row) return next(unauthorized('نشست شما منقضی شده است، دوباره وارد شوید', 'invalid_token'));
+      if (!row) return invalidToken(token, next);
       req.appSection = app;
       return userFromToken(req, res, next, row);
     } catch (err) { next(err); }
   };
+}
+
+/**
+ * توکن پذیرفته نشد. اگر مالِ دستگاهی است که صاحب دکان از کار انداخته
+ * (STF-10)، خطای روشنِ `device_disabled` — نه «نشست منقضی شد» که برنامه را
+ * در حلقهٔ «دوباره وارد شوید» می‌اندازد. فقط در مسیرِ شکست یک پرسش.
+ */
+async function invalidToken(token, next) {
+  try {
+    const block = require('../lib/device-block');
+    if (await block.explain(token)) return next(forbidden(block.MESSAGE, block.CODE));
+  } catch { /* پاسخِ پیش‌فرض */ }
+  return next(unauthorized('نشست شما منقضی شده است، دوباره وارد شوید', 'invalid_token'));
 }
 
 /** کاربر عادی — بخشِ دکان، همان‌جا که همیشه بود. */
@@ -51,7 +64,7 @@ async function requireUser(req, res, next) {
     const token = bearer(req);
     if (!token) return next(unauthorized());
     const row = await tokens.verify(token, 'access', 'shop');
-    if (!row) return next(unauthorized('نشست شما منقضی شده است، دوباره وارد شوید', 'invalid_token'));
+    if (!row) return invalidToken(token, next);
     req.appSection = 'shop';
     return userFromToken(req, res, next, row);
   } catch (err) { next(err); }
@@ -68,6 +81,8 @@ async function userFromToken(req, res, next, row) {
     if (row.device_id) {
       const dev = await one('SELECT * FROM devices WHERE id=$1', [row.device_id]);
       if (!dev || dev.status !== 'active') {
+        const block = require('../lib/device-block');
+        if (await block.isDisabledRow(dev)) return next(forbidden(block.MESSAGE, block.CODE));
         return next(forbidden('دسترسی این دستگاه لغو شده است', 'device_revoked'));
       }
       req.device = dev;
@@ -105,7 +120,7 @@ async function requireAnyUser(req, res, next) {
     const token = bearer(req);
     if (!token) return next(unauthorized());
     const row = await tokens.verify(token, 'access', null);
-    if (!row) return next(unauthorized('نشست شما منقضی شده است، دوباره وارد شوید', 'invalid_token'));
+    if (!row) return invalidToken(token, next);
     req.appSection = row.app || 'shop';
     return userFromToken(req, res, next, row);
   } catch (err) { next(err); }
@@ -260,7 +275,13 @@ function requirePermission(permission) {
     if (!can(req.member.role, permission)) {
       return next(forbidden('این کار در حد دسترسی شما نیست', 'permission_denied'));
     }
-    next();
+    //  STF-01..03: لایه‌های دکان/کاربر فقط می‌بندند — سقفِ نقش همین بالا سنجیده شد
+    const perms = require('../lib/staff-perms');
+    if (!perms.isLayered(permission)) return next();
+    perms.memberAllows(req, permission).then((ok) => (ok
+      ? next()
+      : next(forbidden('صاحب دکان این کار را برای شما بسته است', 'permission_denied'))
+    )).catch(next);
   };
 }
 

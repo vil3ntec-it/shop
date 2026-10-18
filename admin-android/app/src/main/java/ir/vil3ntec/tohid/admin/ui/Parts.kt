@@ -75,6 +75,17 @@ fun Field(
   )
 }
 
+/** دلیلِ اختیاری (ADMIN-CONTROL-PLANE.md، G2) — فقط در سابقهٔ سرور می‌نشیند. */
+@Composable
+fun ReasonField(value: String, onValueChange: (String) -> Unit, modifier: Modifier = Modifier) {
+  Field(
+    value = value,
+    onValueChange = { onValueChange(it.take(200)) },
+    label = "دلیل (اختیاری) — فقط در سابقه می‌ماند",
+    modifier = modifier,
+  )
+}
+
 @Composable
 fun PrimaryButton(text: String, modifier: Modifier = Modifier, enabled: Boolean = true, busy: Boolean = false, onClick: () -> Unit) {
   Button(

@@ -530,6 +530,7 @@ fun SettingsScreen(
             onClick = { lockStore.set(""); lockOn = false; toast("قفل برداشته شد") },
             modifier = Modifier.fillMaxWidth(),
           )
+          IdleLockChoice(lockStore)   // STF-05
         } else {
           TohidButton(
             text = "گذاشتن رمز",
@@ -656,7 +657,7 @@ fun SettingsScreen(
         )
 
         /*
-         *  نسخه‌های شبانه.
+         *  نسخه‌های خودکار (نیم‌ساعته و پایانِ روز — OPS-02، `AutoBackup`).
          *
          *  روی خودِ گوشی می‌مانند، پس گوشی که گم شود این‌ها هم می‌روند —
          *  برای آن، همان پشتیبانِ کامل بالا لازم است. این‌ها جلوی
@@ -666,7 +667,7 @@ fun SettingsScreen(
         if (autoBackups.isNotEmpty()) {
           Spacer(Modifier.height(12.dp))
           Text(
-            "نسخه‌های خودکار شبانه",
+            "نسخه‌های خودکار — هر نیم ساعت اگر دفتر عوض شده؛ ۷ روز و ۴ هفتهٔ اخیر",
             style = MaterialTheme.typography.labelMedium,
             color = Shop.colors.muted,
           )

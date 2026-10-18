@@ -115,6 +115,9 @@ fun main() {
         .putBoolean("desktop_max", windowState.placement == WindowPlacement.Maximized)
         .commit()
       runCatching { live?.disconnect() }
+      //  نسخهٔ محلیِ پایانِ روز (OPS-02) — فقط اگر دفتر از نسخهٔ نیم‌ساعتهٔ آخر
+      //  عوض شده؛ یک مقایسه و یک رونوشت، چند ده میلی‌ثانیه
+      runCatching { ir.vil3ntec.tohid.data.AutoBackup.take(context, ir.vil3ntec.tohid.todayIso()) }
       //  پشتیبانِ کامل هنگامِ بستن — پایانِ روزِ کاری بی پشتیبان نمی‌ماند
       //  (دفتر و عکس‌ها، چند صد میلی‌ثانیه)
       if (ir.vil3ntec.tohid.data.BackupMirror.enabled(context)) runCatching { ir.vil3ntec.tohid.data.BackupMirror.write(context) }

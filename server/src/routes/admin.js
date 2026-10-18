@@ -181,7 +181,8 @@ router.post('/users/:id/status', async (req, res, next) => {
   const user = await one('UPDATE users SET status=$2, updated_at=$3 WHERE id=$1 RETURNING id, status', [id, status, now()]);
   if (!user) return next(notFound('کاربر پیدا نشد'));
   if (status === 'disabled') await tokens.revokeAllForSubject(id);
-  await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.user_status', targetType: 'user', targetId: id, detail: { status } });
+  const reason = reasonOf(req);   // اختیاری — فقط در سابقه (ADMIN-CONTROL-PLANE.md G2)
+  await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.user_status', targetType: 'user', targetId: id, detail: { status, ...(reason ? { reason } : {}) } });
   res.json({ user });
 });
 
@@ -387,7 +388,8 @@ router.post('/subscriptions', async (req, res, next) => {
       tenantId: shopId, subscriptionId: sub.id, price: quoted.price || 0, finalPrice: quoted.finalPrice || 0,
     });
   }
-  await audit.log({ shopId, actorType: 'admin', userId: req.admin.id, action: 'admin.subscription_granted', targetType: 'subscription', targetId: sub.id, detail: { plan, days, price } });
+  const reason = reasonOf(req);   // اختیاری — فقط در سابقه (ADMIN-CONTROL-PLANE.md G2)
+  await audit.log({ shopId, actorType: 'admin', userId: req.admin.id, action: 'admin.subscription_granted', targetType: 'subscription', targetId: sub.id, detail: { plan, days, price, ...(reason ? { reason } : {}) } });
   res.status(201).json({ subscription: sub, state: subs.stateOf(sub), discount: quoted });
 });
 
@@ -411,7 +413,8 @@ router.put('/subscriptions/:id', async (req, res, next) => {
             grace_days=$6, max_devices=$7, note=$8, updated_at=$9 WHERE id=$1 RETURNING *`,
     [id, plan, startsAt, endsAt, JSON.stringify(features), graceDays, maxDevices, note, now()]
   );
-  await audit.log({ shopId: row.shop_id, actorType: 'admin', userId: req.admin.id, action: 'admin.subscription_updated', targetType: 'subscription', targetId: id });
+  const reason = reasonOf(req);   // اختیاری — فقط در سابقه (ADMIN-CONTROL-PLANE.md G2)
+  await audit.log({ shopId: row.shop_id, actorType: 'admin', userId: req.admin.id, action: 'admin.subscription_updated', targetType: 'subscription', targetId: id, detail: reason ? { reason } : {} });
   res.json({ subscription: row, state: subs.stateOf(row) });
 });
 
@@ -419,7 +422,8 @@ router.post('/subscriptions/:id/status', async (req, res) => {
   const id = v.id(req.params.id);
   const status = v.oneOf(req.body?.status, ['active', 'suspended', 'cancelled', 'expired'], { field: 'وضعیت' });
   const row = await subs.setStatus(id, status, req.admin.id);
-  await audit.log({ shopId: row.shop_id, actorType: 'admin', userId: req.admin.id, action: 'admin.subscription_status', targetType: 'subscription', targetId: id, detail: { status } });
+  const reason = reasonOf(req);   // اختیاری — فقط در سابقه (ADMIN-CONTROL-PLANE.md G2)
+  await audit.log({ shopId: row.shop_id, actorType: 'admin', userId: req.admin.id, action: 'admin.subscription_status', targetType: 'subscription', targetId: id, detail: { status, ...(reason ? { reason } : {}) } });
   res.json({ subscription: row, state: subs.stateOf(row) });
 });
 
@@ -611,7 +615,8 @@ router.post('/purchase-requests/:id/approve', async (req, res, next) => {
   });
   await query(`UPDATE purchase_requests SET status='approved', handled_at=$2, handled_by=$3 WHERE id=$1`,
     [id, now(), req.admin.id]);
-  await audit.log({ shopId: reqRow.shop_id, actorType: 'admin', userId: req.admin.id, action: 'admin.request_approved', targetId: id });
+  const reason = reasonOf(req);   // اختیاری — فقط در سابقه (ADMIN-CONTROL-PLANE.md G2)
+  await audit.log({ shopId: reqRow.shop_id, actorType: 'admin', userId: req.admin.id, action: 'admin.request_approved', targetId: id, detail: reason ? { reason } : {} });
   res.json({ subscription: sub, state: subs.stateOf(sub) });
 });
 
@@ -718,6 +723,8 @@ router.use('/shop-offline-codes', require('./admin-shop-offline'));
 //  میزِ «کدِ شاگرد» — بندِ ۴.۴ سندِ ریمیک. ⛔ زیرِ `/shops/:id` می‌نشیند تا
 //  همان `v.id` و همان مرزِ دکان را داشته باشد، نه یک درِ موازی.
 router.use('/shops/:id/staff-codes', require('./admin-staff-codes'));
+//  مجوزهای کارمندان و دستگاه‌های یک دکان (STF-01..03، STF-10)
+router.use('/shops/:id/staff-perms', require('./admin-staff-perms'));
 /*
  *  ⚠️ **دو دفترِ کد هست و هر دو میز می‌خواهند.** `/logins` مالِ
  *  `login_requests` است (ورود با کدِ ایمیلی) و `/otp` مالِ `otp_codes`
