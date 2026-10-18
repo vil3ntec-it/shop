@@ -957,8 +957,10 @@ async function loadHealth() {
         const td = el('td');
         const btn = el('button', 'btn btn-ghost btn-sm', 'برگرداندن');
         btn.onclick = async () => {
-          if (!confirm('نسخهٔ کنارگذاشته‌شدهٔ این ردیف برگردانده شود؟')) return;
-          try { await call('POST', `/admin/sync/conflicts/${encodeURIComponent(c.id)}/restore`, {}); msg($('health-msg'), 'برگردانده شد.', 'ok'); loadHealth(); }
+          //  ⛔ بازگرداندن دلیلِ نوشته می‌خواهد و فقط کارِ مدیرِ ارشد است (سرور می‌سنجد)
+          const reason = askReason('نسخهٔ کنارگذاشته‌شدهٔ این ردیف برگردانده شود؟ دلیلش را بنویسید (در سابقه می‌ماند):');
+          if (!reason) return;
+          try { await call('POST', `/admin/sync/conflicts/${encodeURIComponent(c.id)}/restore`, { reason }); msg($('health-msg'), 'برگردانده شد.', 'ok'); loadHealth(); }
           catch (err) { msg($('health-msg'), err.message, 'bad'); }
         };
         td.appendChild(btn); tr.appendChild(td);
@@ -1157,6 +1159,17 @@ async function loadAccountBackups(app, tenantId, prefix) {
 }
 
 /**
+ * دلیلِ یک دسترسیِ حساس — لغو یا کوتاه‌تر از ۳ نویسه ⇒ null (کاری انجام نمی‌شود).
+ */
+function askReason(question) {
+  const r = prompt(question);
+  if (r === null) return null;
+  const s = String(r).trim();
+  if (s.length < 3) { alert('دلیل لازم است (دست‌کم ۳ نویسه).'); return null; }
+  return s.slice(0, 200);
+}
+
+/**
  * دانلودِ یک پشتیبان.
  *
  * ⚠️ با یک لینکِ ساده نمی‌شود: مسیر توکنِ مدیر می‌خواهد و مرورگر
@@ -1164,10 +1177,19 @@ async function loadAccountBackups(app, tenantId, prefix) {
  * می‌گیریم و به‌صورتِ `blob` به کاربر می‌دهیم.
  */
 async function downloadBackup(app, tenantId, b) {
-  const res = await fetch(`${API}/admin/accounts/${app}/${tenantId}/backups/${b.id}`, {
+  //  ⛔ دانلود = خروجیِ کلِ دادهٔ خصوصیِ این حساب ⇒ دلیلِ نوشته؛ فقط مدیرِ ارشد
+  //  (سرور می‌سنجد و ردیفِ سابقه می‌نویسد — ADMIN-CONTROL-PLANE.md)
+  const reason = askReason('دلیلِ گرفتنِ پشتیبانِ این حساب را بنویسید (در سابقه می‌ماند):');
+  if (!reason) return;
+  const res = await fetch(`${API}/admin/accounts/${app}/${tenantId}/backups/${b.id}?reason=${encodeURIComponent(reason)}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok) { alert('گرفتنِ فایل نشد'); return; }
+  if (!res.ok) {
+    let text = 'گرفتنِ فایل نشد';
+    try { const j = await res.json(); if (j?.error?.message) text = j.error.message; } catch { /* بدنهٔ غیرِ JSON */ }
+    alert(text);
+    return;
+  }
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
   const a = el('a');

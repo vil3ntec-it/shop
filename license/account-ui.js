@@ -590,7 +590,8 @@
   function mountDot() {
     var host = document.querySelector('.header .header-right');
     if (!host || dotBtn) return;
-    dotBtn = el('button', 'sync-dot-btn', '<span class="sync-dot"></span><span class="sync-dot-text">همگام</span>');
+    dotBtn = el('button', 'sync-dot-btn', '<span class="sync-dot"></span><span class="sync-dot-n" hidden></span>'
+      + '<span class="sync-dot-text">همگام</span><span class="sync-dot-when"></span><span class="sync-dot-err" hidden></span>');
     dotBtn.type = 'button';
     dotBtn.id = 'sync-dot-btn';
     dotBtn.setAttribute('aria-label', 'حالِ همگام‌سازی');
@@ -599,13 +600,143 @@
     paintDot();
   }
 
+  /*
+   *  SYN-08 — حالِ همگام‌سازی همیشه پیداست: نقطه، شمارِ منتظر، آخرین
+   *  همگام‌سازیِ موفق و خطای آخر. همان قاعدهٔ `core/sync/SyncGuard.kt`ِ
+   *  نیتیو. عددها از `TohidSync.status()` (صفِ واقعی) می‌آیند.
+   *  گوشی: نقطه و شمار (بخش ۵: «در گوشی خلاصه‌اش در بالا»)؛ پهن: همه.
+   */
+  function since(ms, now) {
+    if (!ms) return 'هنوز همگام نشده';
+    var m = Math.max(0, Math.floor((now - ms) / 60000));
+    if (m < 1) return 'همین حالا';
+    if (m < 60) return fa(m) + ' دقیقه پیش';
+    if (m < 1440) return fa(Math.floor(m / 60)) + ' ساعت پیش';
+    return fa(Math.floor(m / 1440)) + ' روز پیش';
+  }
+
+  function badgeLine(st, now) {
+    var head = core.DOT_LABEL[st.dot] || '';
+    var parts = [st.lastError ? head + ': ' + st.lastError : head];
+    if (st.queued) parts.push('در صف: ' + fa(st.queued));
+    if (st.signedIn) parts.push('آخرین همگام‌سازی: ' + since(st.lastOkAt, now));
+    return parts.join(' · ');
+  }
+
   function paintDot() {
     if (!dotBtn || !sync || !core) return;
     var st = sync.status();
+    var now = Date.now();
+    var line = badgeLine(st, now);
     dotBtn.setAttribute('data-dot', st.dot);
-    dotBtn.title = core.DOT_LABEL[st.dot] + (st.queued ? ' — ' + fa(st.queued) + ' در صف' : '');
+    dotBtn.title = line;
+    dotBtn.setAttribute('aria-label', 'حالِ همگام‌سازی — ' + line);
+    var n = dotBtn.querySelector('.sync-dot-n');
+    if (n) { n.textContent = st.queued ? fa(st.queued) : ''; n.hidden = !st.queued; }
     var text = dotBtn.querySelector('.sync-dot-text');
-    if (text) text.textContent = st.queued ? fa(st.queued) + ' در صف' : core.DOT_LABEL[st.dot];
+    if (text) text.textContent = core.DOT_LABEL[st.dot];
+    var when = dotBtn.querySelector('.sync-dot-when');
+    if (when) when.textContent = st.signedIn ? since(st.lastOkAt, now) : '';
+    var err = dotBtn.querySelector('.sync-dot-err');
+    if (err) { err.textContent = st.lastError || ''; err.hidden = !st.lastError; }
+  }
+
+  /* ==========================================================
+     SYN-10 — قفلِ خروج وقتی چیزی هنوز به سرور نرفته
+     ----------------------------------------------------------
+     تا صفِ opها خالی نشده، خروج از حساب بسته است. تنها راهِ دیگر «خروجِ
+     اجباری» است: اول فایلِ پشتیبانِ کامل (همان دکمهٔ «دانلودِ پشتیبان»ِ
+     تنظیمات)، بعد پرسشِ دوم. همان قاعدهٔ `LogoutGuard`ِ نیتیو.
+     ========================================================== */
+  function leaveVerdict(st) {
+    var n = Math.max(0, Number(st && st.queued) || 0);
+    return { allowed: n === 0, pending: n };
+  }
+
+  var leaveSheet = null;
+  var leaveProceed = null;
+  var leaveStage = 'block';
+
+  function buildLeave() {
+    if (leaveSheet) return leaveSheet;
+    var s = sheet('acct-leave', 'هنوز همه‌چیز به سرور نرفته');
+    s.body.innerHTML = '<div id="lv-body"></div>';
+
+    function render() {
+      var host = s.body.querySelector('#lv-body');
+      var st = sync.status();
+      var v = leaveVerdict(st);
+      var html;
+      if (v.allowed) {
+        html = '<div class="acct-sub">صف خالی است؛ حالا می‌توانید از حساب خارج شوید.</div>'
+          + '<div class="acct-btns"><button type="button" class="acct-btn danger" id="lv-out">خروج از حساب</button>'
+          + '<button type="button" class="acct-btn ghost" id="lv-stay">ماندن</button></div>';
+      } else if (leaveStage === 'force') {
+        html = '<div class="acct-sub">فایلِ پشتیبانِ کامل دانلود شد. '
+          + fa(v.pending) + ' تغییر هنوز به سرور نرفته و تا دوباره با همین حساب وارد نشوید فرستاده نمی‌شود. '
+          + 'باز هم خارج می‌شوید؟</div>'
+          + '<div class="acct-btns"><button type="button" class="acct-btn danger" id="lv-force-yes">باز هم خارج شو</button>'
+          + '<button type="button" class="acct-btn ghost" id="lv-stay">ماندن</button></div>';
+      } else {
+        html = '<div class="acct-sub" id="lv-why">' + fa(v.pending) + ' تغییرِ این دستگاه هنوز به سرور نرسیده است. '
+          + 'تا این‌ها نروند، خروج از حساب بسته است؛ وگرنه این کارها روی سرور و دستگاه‌های دیگر دیده نمی‌شوند. '
+          + (st.online ? '«همین حالا همگام کن» را بزنید و بمانید تا صف خالی شود.'
+            : 'اینترنتِ این دستگاه وصل نیست؛ اول وصل شوید و بعد «همین حالا همگام کن» را بزنید.')
+          + '</div>'
+          + (st.lastError ? '<div class="acct-msg err">' + esc(st.lastError) + '</div>' : '')
+          + '<div class="acct-btns"><button type="button" class="acct-btn" id="lv-sync">همین حالا همگام کن</button>'
+          + '<button type="button" class="acct-btn ghost" id="lv-stay">ماندن</button>'
+          + '<button type="button" class="acct-btn danger" id="lv-force">خروجِ اجباری…</button></div>'
+          + '<div class="acct-msg info" id="lv-msg"></div>';
+      }
+      host.innerHTML = html;
+      var on = function (id, fn) { var b = host.querySelector('#' + id); if (b) b.addEventListener('click', fn); };
+      on('lv-stay', function () { s.close(); });
+      on('lv-out', function () { s.close(); var go = leaveProceed; leaveProceed = null; if (go) go({ forced: false }); });
+      on('lv-sync', async function () {
+        var m = host.querySelector('#lv-msg');
+        if (m) m.textContent = 'در حالِ همگام‌سازی…';
+        try { await sync.sync(); } catch (e) { /* خطا در خودِ وضعیت می‌نشیند */ }
+        render();
+      });
+      on('lv-force', function () {
+        //  تأییدِ اول. پشتیبان ساخته نشود، خروجی هم نیست.
+        var btn = document.getElementById('btn-export-backup');
+        var m = host.querySelector('#lv-msg');
+        if (!btn) { if (m) { m.textContent = 'پشتیبان ساخته نشد؛ خروجِ اجباری انجام نشد.'; m.className = 'acct-msg err'; } return; }
+        try { btn.click(); } catch (e) {
+          if (m) { m.textContent = 'پشتیبان ساخته نشد؛ خروجِ اجباری انجام نشد.'; m.className = 'acct-msg err'; }
+          return;
+        }
+        leaveStage = 'force';
+        render();
+      });
+      on('lv-force-yes', function () {
+        //  تأییدِ دوم — پس از پشتیبان
+        s.close();
+        var go = leaveProceed; leaveProceed = null;
+        if (go) go({ forced: true });
+      });
+    }
+
+    //  صف که در همین حال خالی شد، پنجره خودش «حالا می‌شود» می‌گوید
+    if (sync && sync.onChange) sync.onChange(function () { if (s.scrim.classList.contains('open')) render(); });
+    leaveSheet = { open: function () { s.open(); render(); }, close: s.close };
+    return leaveSheet;
+  }
+
+  /**
+   *  `proceed` همان خروجِ همیشگی است. صف خالی ⇒ همین حالا صدا زده می‌شود؛
+   *  وگرنه پنجرهٔ قفل باز می‌شود و `proceed({ forced })` فقط از آن‌جا.
+   *  @return true اگر خروج همین حالا آزاد بود
+   */
+  function guardLeave(proceed) {
+    var st = sync && sync.status ? sync.status() : null;
+    if (!st || leaveVerdict(st).allowed) { proceed({ forced: false }); return true; }
+    leaveProceed = proceed;
+    leaveStage = 'block';
+    buildLeave().open();
+    return false;
   }
 
   /* ==========================================================
@@ -729,6 +860,8 @@
     if (sync) {
       sync.onChange(function () { paintDot(); });
       sync.start();
+      //  «۵ دقیقه پیش» خودش کهنه می‌شود
+      setInterval(paintDot, 30000);
     }
     acc.on('heartbeat', function () { applySubscription(); if (planSheet) planSheet.render(); });
     acc.on('signed-out', function () { refreshHeader(); });
@@ -754,6 +887,7 @@
     setErrorReports: setErrorReports,
     refreshHeader: refreshHeader,
     localBackup: localBackup,
+    guardLeave: guardLeave,
     isSoftLocked: function () { return softLocked; },
     _applySubscription: applySubscription,
   };

@@ -48,6 +48,9 @@ import ir.vil3ntec.tohid.core.net.userText
 import ir.vil3ntec.tohid.sync.SyncStore
 import ir.vil3ntec.tohid.sync.v1.SyncV1Engine
 import ir.vil3ntec.tohid.sync.v1.SyncV1Worker
+import ir.vil3ntec.tohid.core.sync.LogoutGuard
+import ir.vil3ntec.tohid.data.BackupMirror
+import ir.vil3ntec.tohid.sync.AutoSync
 import ir.vil3ntec.tohid.ui.theme.Radius
 import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.Dispatchers
@@ -104,6 +107,9 @@ fun ProfileScreen(
   //  «آخرین همگام‌سازی» از موتورِ v1 می‌آید؛ `state.lastSyncAt` مالِ راهِ قدیم است
   val v1 by SyncV1Engine.of(context).status.collectAsState()
   var confirmSignOut by remember { mutableStateOf(false) }
+  //  SYN-10: صفِ پُر ⇒ خروج بسته؛ «خروجِ اجباری» = پشتیبانِ دیدنی + دو تأیید
+  var blockSignOut by remember { mutableStateOf(false) }
+  var forcedBackup by remember { mutableStateOf<String?>(null) }
 
   /*
    *  نامِ دکان — همان‌جایی که تنظیمات هم از آن می‌خواند
@@ -434,7 +440,12 @@ fun ProfileScreen(
      */
     Spacer(Modifier.height(22.dp))
     OutlinedButton(
-      onClick = { confirmSignOut = true },
+      onClick = {
+        when (LogoutGuard.decide(v1.queued, AutoSync.pendingCount)) {
+          LogoutGuard.Allow -> confirmSignOut = true
+          is LogoutGuard.Block -> blockSignOut = true
+        }
+      },
       colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.danger),
       border = androidx.compose.foundation.BorderStroke(1.dp, colors.danger.copy(alpha = 0.6f)),
       modifier = Modifier.fillMaxWidth(),
@@ -446,6 +457,99 @@ fun ProfileScreen(
       color = colors.muted2,
       textAlign = TextAlign.Center,
       modifier = Modifier.fillMaxWidth(),
+    )
+  }
+
+  fun signOutNow() {
+    busy = true
+    scope.launch {
+      runCatching { Backend.auth(context).signOut() }
+      state.signOut()
+      busy = false
+      toast("از حساب خارج شدید")
+      onBack()
+    }
+  }
+
+  /*
+   *  SYN-10 — داده‌ای که هنوز به سرور نرفته، خروج را می‌بندد.
+   *
+   *  عدد از همان صفِ واقعیِ Sync v1 است و زنده تازه می‌شود: صف که خالی شد،
+   *  همین پنجره «حالا می‌توانید خارج شوید» می‌گوید. راهِ دیگر فقط «خروجِ
+   *  اجباری» است: اول پشتیبانِ کامل در پوشهٔ دیدنی (`BackupMirror`)، و اگر
+   *  نوشته نشد خروجی هم در کار نیست؛ بعد پرسشِ دوم.
+   */
+  if (blockSignOut) {
+    val verdict = LogoutGuard.decide(v1.queued, AutoSync.pendingCount)
+    val online = remember(v1) { Backend.isOnline(context) }
+    AlertDialog(
+      onDismissRequest = { if (!busy) blockSignOut = false },
+      containerColor = colors.bg,
+      title = { Text(if (verdict is LogoutGuard.Block) LogoutGuard.TITLE else "همه‌چیز به سرور رسید", color = colors.text) },
+      text = {
+        Column {
+          Text(
+            when (verdict) {
+              is LogoutGuard.Block -> LogoutGuard.message(verdict.pending, online)
+              LogoutGuard.Allow -> "صف خالی است؛ حالا می‌توانید از حساب خارج شوید."
+            },
+            color = colors.muted,
+          )
+          if (v1.lastError.isNotBlank()) {
+            Spacer(Modifier.height(8.dp))
+            Text(v1.lastError, style = MaterialTheme.typography.labelMedium, color = colors.danger)
+          }
+          if (verdict is LogoutGuard.Block) {
+            Spacer(Modifier.height(8.dp))
+            TextButton(enabled = !busy, onClick = {
+              busy = true
+              scope.launch {
+                val written = withContext(Dispatchers.IO) { BackupMirror.write(context) }
+                busy = false
+                written
+                  .onSuccess { forcedBackup = it.absolutePath; blockSignOut = false }
+                  .onFailure { toast(it.userText("پشتیبان نوشته نشد؛ خروجِ اجباری انجام نشد")) }
+              }
+            }) { Text(if (busy) "در حالِ نوشتنِ پشتیبان…" else LogoutGuard.FORCE, color = colors.danger) }
+          }
+        }
+      },
+      confirmButton = {
+        if (verdict is LogoutGuard.Block) {
+          TextButton(enabled = !busy, onClick = {
+            runCatching { SyncV1Worker.now(context) }
+              .onSuccess { toast("همگام‌سازی شروع شد") }
+              .onFailure { toast(it.userText("همگام‌سازی ناموفق بود")) }
+          }) { Text(LogoutGuard.SYNC_NOW, color = colors.primary) }
+        } else {
+          TextButton(enabled = !busy, onClick = { blockSignOut = false; confirmSignOut = true }) {
+            Text("خروج", color = colors.danger)
+          }
+        }
+      },
+      dismissButton = {
+        TextButton(enabled = !busy, onClick = { blockSignOut = false }) { Text(LogoutGuard.STAY, color = colors.muted) }
+      },
+    )
+  }
+
+  forcedBackup?.let { path ->
+    val pending = (LogoutGuard.decide(v1.queued, AutoSync.pendingCount) as? LogoutGuard.Block)?.pending ?: 0
+    AlertDialog(
+      onDismissRequest = { forcedBackup = null },
+      containerColor = colors.bg,
+      title = { Text(LogoutGuard.FORCE_TITLE, color = colors.text) },
+      text = { Text(LogoutGuard.forceMessage(pending, path), color = colors.muted) },
+      confirmButton = {
+        TextButton(enabled = !busy, onClick = {
+          forcedBackup = null
+          //  کلیکِ «خروجِ اجباری» تأییدِ اول بود، این دومی است
+          if (LogoutGuard.canForce(backupWritten = true, confirmations = 2)) signOutNow()
+        }) { Text("باز هم خارج شو", color = colors.danger) }
+      },
+      dismissButton = {
+        TextButton(onClick = { forcedBackup = null }) { Text(LogoutGuard.STAY, color = colors.muted) }
+      },
     )
   }
 
@@ -481,14 +585,9 @@ fun ProfileScreen(
            *  نشستِ سرور با گذشتِ مهلتش می‌میرد — که بدتر از آن است که
            *  کاربر را در حسابی نگه داریم که خواسته از آن بیرون بیاید.
            */
-          busy = true
-          scope.launch {
-            runCatching { Backend.auth(context).signOut() }
-            state.signOut()
-            busy = false
-            toast("از حساب خارج شدید")
-            onBack()
-          }
+          //  میانِ دو کلیک چیزی ثبت شده باشد، قفل دوباره سر می‌رسد (SYN-10)
+          if (LogoutGuard.decide(v1.queued, AutoSync.pendingCount) is LogoutGuard.Block) blockSignOut = true
+          else signOutNow()
         }) { Text("خروج", color = colors.danger) }
       },
       dismissButton = {
