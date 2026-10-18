@@ -77,7 +77,7 @@ fun paletteSearch(d: ShopData, query: String, limit: Int = 40): List<PaletteHit>
   }
   for (b in d.debtors) {
     if (out.size >= limit) break
-    if (norm(b.name).contains(q) || norm(b.phone).contains(q)) {
+    if (norm(b.name).contains(q) || norm(b.phone).contains(q) || ir.vil3ntec.tohid.LocaleText.phoneMatches(b.phone, q)) {
       out += PaletteHit("debtor", b.id, b.name, "قرض‌دار · بدهی ${money(ShopStore.debt(d, b.id))} ؋", Icons.Filled.Person)
     }
   }

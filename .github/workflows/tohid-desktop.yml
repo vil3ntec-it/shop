@@ -20,6 +20,8 @@ on:
       - 'android-native/app/src/**'
       #  کدِ مشترکِ core و آزمون‌های مرجعِ آن (CoreVectorsTest)
       - 'core/**'
+      #  بردارهای مرجعِ مشترک با JS (StockCoreVectorsTest همین‌ها را می‌خواند)
+      - 'license/test-vectors/**'
       - '.github/workflows/tohid-desktop.yml'
   #  ⛔ F0-27: push به main فقط کانالِ آزمایشی (`tohid-desktop-beta`). برچسبِ پایدار
   #  (`tohid-desktop`، همان که همهٔ کامپیوترها و صفحهٔ دانلود می‌خوانند) فقط از

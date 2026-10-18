@@ -21,6 +21,7 @@ const { entitlementOf } = require('../lib/entitlement');
 const { FEATURES, sanitizeFeatures } = require('../lib/features');
 const { requireAdmin, requireSuperAdmin } = require('../middleware/auth');
 const { checkSecondFactor } = require('../lib/admin-2fa');
+const { reasonOf } = require('../lib/admin-access');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
 const { badRequest, unauthorized, notFound, forbidden, tooMany } = require('../middleware/errors');
 
@@ -152,6 +153,9 @@ router.get('/users/:id', async (req, res, next) => {
        FROM device_locations WHERE user_id=$1 ORDER BY created_at DESC LIMIT 10`,
     [id]
   );
+  //  پروندهٔ کاربر لوکیشنِ دقیق و دستگاه‌هایش را دارد ⇒ هر بار دیدنش سابقه دارد
+  //  (ADMIN-CONTROL-PLANE.md، v3 ۲۹.۴ بندِ ۴ و ۵)
+  await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.user_viewed', targetType: 'user', targetId: id, ip: clientIp(req) });
   res.json({
     user: {
       id: user.id, name: user.name, email: user.email, phone: user.phone,
@@ -273,6 +277,8 @@ router.get('/shops/:id', async (req, res, next) => {
     [shop.owner_user_id]
   );
 
+  //  تماسِ اعضا و جای دکان ⇒ دیدنش سابقه دارد (ADMIN-CONTROL-PLANE.md)
+  await audit.log({ shopId: id, actorType: 'admin', userId: req.admin.id, action: 'admin.shop_viewed', targetType: 'shop', targetId: id, ip: clientIp(req) });
   res.json({
     shop: { id: shop.id, name: shop.name, status: shop.status, createdAt: Number(shop.created_at), ownerUserId: shop.owner_user_id },
     location: place
@@ -611,8 +617,17 @@ router.post('/purchase-requests/:id/approve', async (req, res, next) => {
 
 router.post('/purchase-requests/:id/reject', async (req, res) => {
   const id = v.id(req.params.id);
-  await query(`UPDATE purchase_requests SET status='rejected', handled_at=$2, handled_by=$3 WHERE id=$1 AND status='pending'`,
+  const done = await one(
+    `UPDATE purchase_requests SET status='rejected', handled_at=$2, handled_by=$3 WHERE id=$1 AND status='pending' RETURNING shop_id`,
     [id, now(), req.admin.id]);
+  //  ردیفِ سابقه فقط وقتی واقعاً رد شد — دوباره‌زدن ردیفِ دوم نمی‌سازد.
+  //  دلیل (اگر آمد — برنامهٔ مدیرِ اندروید می‌فرستد) همان‌جا می‌ماند.
+  if (done) {
+    await audit.log({
+      shopId: done.shop_id, actorType: 'admin', userId: req.admin.id, action: 'admin.request_rejected',
+      targetType: 'purchase_request', targetId: id, detail: { reason: reasonOf(req) },
+    });
+  }
   res.json({ ok: true });
 });
 

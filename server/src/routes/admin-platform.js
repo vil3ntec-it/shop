@@ -30,8 +30,9 @@ const subs = require('../lib/subscriptions');
 const audit = require('../lib/audit');
 const { sanitizeFeatures } = require('../lib/features');
 const { requireSuperAdmin } = require('../middleware/auth');
-const { rateLimit } = require('../middleware/ratelimit');
+const { rateLimit, clientIp } = require('../middleware/ratelimit');
 const { badRequest, notFound } = require('../middleware/errors');
+const { requireReason } = require('../lib/admin-access');
 
 const router = express.Router();
 
@@ -277,7 +278,9 @@ router.post('/support/threads/:id/status', async (req, res, next) => {
   try {
     const id = v.id(req.params.id);
     const status = v.oneOf(req.body?.status, ['open', 'pending', 'closed'], { field: 'وضعیت' });
-    res.json({ thread: await support.setStatus(id, status) });
+    const thread = await support.setStatus(id, status);
+    await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.support_status', targetType: 'support_thread', targetId: id, detail: { status } });
+    res.json({ thread });
   } catch (err) { next(err); }
 });
 
@@ -631,13 +634,26 @@ router.get('/accounts/:app/:tenantId/backups', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.get('/accounts/:app/:tenantId/backups/:id', async (req, res, next) => {
+/*
+ *  ⛔ دانلودِ پشتیبانِ یک حساب یعنی «خروجیِ» کلِ دادهٔ خصوصیِ او (فروش،
+ *  قرض، مشتری). پس: فقط مدیرِ ارشد، فقط با دلیلِ نوشته، و هر بار یک ردیفِ
+ *  سابقه با همان دلیل — ADMIN-CONTROL-PLANE.md، v3 ۳۹.۸.
+ */
+router.get('/accounts/:app/:tenantId/backups/:id', requireSuperAdmin, async (req, res, next) => {
   try {
     const store = backupStore(req);
+    const tenantId = v.text(req.params.tenantId, { max: 64, required: true, field: 'شناسهٔ حساب' });
+    const reason = requireReason(req);
     const { row, data } = await store.read(
-      v.text(req.params.tenantId, { max: 64, required: true, field: 'شناسهٔ حساب' }),
+      tenantId,
       v.text(req.params.id, { max: 64, required: true, field: 'شناسه' })
     );
+    await audit.log({
+      shopId: store.app === 'shop' ? tenantId : '',
+      actorType: 'admin', userId: req.admin.id, action: 'admin.account_backup_downloaded',
+      targetType: 'account_backup', targetId: row.id, ip: clientIp(req),
+      detail: { app: store.app, tenantId, reason, bytes: data.length },
+    });
     res.set('Content-Type', 'application/octet-stream');
     res.set('Content-Length', String(data.length));
     res.set('Content-Disposition', `attachment; filename="${row.name}"`);

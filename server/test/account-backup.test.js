@@ -410,7 +410,9 @@ test('مدیر پشتیبانِ هر حساب را جدا می‌بیند و ب�
   assert.equal(list.body.backups.length, 1);
   assert.equal(list.body.stats.usedBytes, data.length);
 
-  const back = await h.download(`/api/admin/accounts/shop/${o.shopId}/backups/${up.body.backup.id}`, { token: t });
+  //  دانلود = خروجیِ دادهٔ خصوصی ⇒ دلیلِ نوشته لازم است (ADMIN-CONTROL-PLANE.md)
+  const back = await h.download(
+    `/api/admin/accounts/shop/${o.shopId}/backups/${up.body.backup.id}?reason=${encodeURIComponent('آزمونِ بازیابی')}`, { token: t });
   assert.equal(back.status, 200);
   assert.ok(back.buffer.equals(data));
 });
