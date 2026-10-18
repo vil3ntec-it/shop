@@ -135,6 +135,7 @@ private fun ShopSheet(session: Session, shopId: String, onBack: () -> Unit) {
   var error by remember { mutableStateOf<String?>(null) }
   var done by remember { mutableStateOf<String?>(null) }
   var granting by remember { mutableStateOf(false) }
+  var reason by rememberSaveable { mutableStateOf("") }
   val context = LocalContext.current
 
   fun load() {
@@ -161,11 +162,11 @@ private fun ShopSheet(session: Session, shopId: String, onBack: () -> Unit) {
       current = live,
       busy = busy,
       onBack = { granting = false },
-      onGrant = { plan, days, note ->
+      onGrant = { plan, days, note, why ->
         val token = session.token ?: return@GrantSheet
         busy = true
         scope.launch {
-          runCatching { AdminApi(session.serverUrl).grant(token, shopId, plan, days, note) }
+          runCatching { AdminApi(session.serverUrl).grant(token, shopId, plan, days, note, why) }
             .onSuccess { granting = false; done = "اشتراک ثبت شد"; load() }
             .onFailure { error = (it as? AdminApi.ApiError)?.message ?: "ثبت نشد"; busy = false }
         }
@@ -291,6 +292,8 @@ private fun ShopSheet(session: Session, shopId: String, onBack: () -> Unit) {
 
     if (live != null) {
       Spacer(Modifier.height(8.dp))
+      ReasonField(value = reason, onValueChange = { reason = it }, modifier = Modifier.fillMaxWidth())
+      Spacer(Modifier.height(8.dp))
       Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         val subId = live.optString("id")
         val suspended = live.optString("status") == "suspended"
@@ -304,8 +307,8 @@ private fun ShopSheet(session: Session, shopId: String, onBack: () -> Unit) {
           busy = true
           scope.launch {
             runCatching {
-              AdminApi(session.serverUrl).setSubscriptionStatus(token, subId, if (suspended) "active" else "suspended")
-            }.onSuccess { done = "وضعیت عوض شد"; load() }
+              AdminApi(session.serverUrl).setSubscriptionStatus(token, subId, if (suspended) "active" else "suspended", reason)
+            }.onSuccess { done = "وضعیت عوض شد"; reason = ""; load() }
               .onFailure { error = (it as? AdminApi.ApiError)?.message ?: "انجام نشد"; busy = false }
           }
         }
@@ -313,8 +316,8 @@ private fun ShopSheet(session: Session, shopId: String, onBack: () -> Unit) {
           val token = session.token ?: return@GhostButton
           busy = true
           scope.launch {
-            runCatching { AdminApi(session.serverUrl).setSubscriptionStatus(token, subId, "cancelled") }
-              .onSuccess { done = "اشتراک لغو شد"; load() }
+            runCatching { AdminApi(session.serverUrl).setSubscriptionStatus(token, subId, "cancelled", reason) }
+              .onSuccess { done = "اشتراک لغو شد"; reason = ""; load() }
               .onFailure { error = (it as? AdminApi.ApiError)?.message ?: "انجام نشد"; busy = false }
           }
         }
@@ -390,12 +393,13 @@ fun GrantSheet(
   busy: Boolean,
   noun: String = "دکان",
   onBack: () -> Unit,
-  onGrant: (plan: String, days: Int?, note: String) -> Unit,
+  onGrant: (plan: String, days: Int?, note: String, reason: String) -> Unit,
 ) {
   val c = Admin.colors
   var picked by rememberSaveable { mutableStateOf("") }
   var customDays by rememberSaveable { mutableStateOf("") }
   var note by rememberSaveable { mutableStateOf("") }
+  var reason by rememberSaveable { mutableStateOf("") }
 
   val custom = picked == "custom"
   val days = customDays.filter { it.isDigit() }.toIntOrNull()
@@ -452,6 +456,8 @@ fun GrantSheet(
 
     Spacer(Modifier.height(12.dp))
     Field(value = note, onValueChange = { note = it }, label = "یادداشت (اختیاری) — مثلاً شمارهٔ رسید")
+    Spacer(Modifier.height(8.dp))
+    ReasonField(value = reason, onValueChange = { reason = it })
 
     Spacer(Modifier.height(18.dp))
     PrimaryButton(
@@ -459,7 +465,7 @@ fun GrantSheet(
       modifier = Modifier.fillMaxWidth(),
       enabled = picked.isNotBlank() && (!custom || (days != null && days > 0)),
       busy = busy,
-    ) { onGrant(picked, if (custom) days else null, note.trim()) }
+    ) { onGrant(picked, if (custom) days else null, note.trim(), reason.trim()) }
 
     Text(
       "تاریخ‌ها را سرور حساب می‌کند، نه ساعت این گوشی.",
