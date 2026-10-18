@@ -31,6 +31,7 @@ const pumpServices = require('../lib/pump-services');
 const { notifyPanel } = require('../lib/panel-live');
 const { requireAdmin, requireSuperAdmin } = require('../middleware/auth');
 const { badRequest, notFound } = require('../middleware/errors');
+const { reasonOf } = require('../lib/admin-access');
 
 const router = express.Router();
 router.use(requireAdmin);
@@ -127,8 +128,9 @@ router.post('/payments', async (req, res, next) => {
       [id, p.app, p.tenantKind, p.tenantId, p.subscriptionId, p.amount, p.currency, p.method,
         receiptNo, p.note, p.paidAt, req.admin.id, t]
     );
+    const reason = reasonOf(req);   // اختیاری — فقط در سابقه (ADMIN-CONTROL-PLANE.md G2)
     await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.payment_created', targetType: 'payment', targetId: id,
-      detail: { app: p.app, amount: p.amount, currency: p.currency } });
+      detail: { app: p.app, amount: p.amount, currency: p.currency, ...(reason ? { reason } : {}) } });
     const row = await one(`SELECT ${PAYMENT_COLS} FROM sub_payments p ${PAYMENT_JOIN} WHERE p.id=$1`, [id]);
     res.status(201).json({ payment: shapePayment(row) });
   } catch (err) { next(err); }
@@ -143,7 +145,8 @@ router.put('/payments/:id', requireSuperAdmin, async (req, res, next) => {
       `UPDATE sub_payments SET subscription_id=$2, amount=$3, currency=$4, method=$5, receipt_no=$6, note=$7, paid_at=$8 WHERE id=$1`,
       [cur.id, p.subscriptionId, p.amount, p.currency, p.method, p.receiptNo, p.note, p.paidAt]
     );
-    await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.payment_updated', targetType: 'payment', targetId: cur.id });
+    const reason = reasonOf(req);   // اختیاری — فقط در سابقه (ADMIN-CONTROL-PLANE.md G2)
+    await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.payment_updated', targetType: 'payment', targetId: cur.id, detail: reason ? { reason } : {} });
     const row = await one(`SELECT ${PAYMENT_COLS} FROM sub_payments p ${PAYMENT_JOIN} WHERE p.id=$1`, [cur.id]);
     res.json({ payment: shapePayment(row) });
   } catch (err) { next(err); }
@@ -153,7 +156,8 @@ router.delete('/payments/:id', requireSuperAdmin, async (req, res, next) => {
   try {
     const row = await one(`UPDATE sub_payments SET deleted=true WHERE id=$1 AND deleted=false RETURNING id`, [v.id(req.params.id)]);
     if (!row) return next(notFound('پرداخت پیدا نشد', 'payment_not_found'));
-    await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.payment_deleted', targetType: 'payment', targetId: row.id });
+    const reason = reasonOf(req);   // اختیاری — فقط در سابقه (ADMIN-CONTROL-PLANE.md G2)
+    await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.payment_deleted', targetType: 'payment', targetId: row.id, detail: reason ? { reason } : {} });
     res.json({ ok: true });
   } catch (err) { next(err); }
 });
