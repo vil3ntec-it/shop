@@ -629,3 +629,32 @@ test('Sync v3: با منبعِ v3 کالا و موجودی از sync_v3_rows (م
   assert.equal(p.stock.levels.shop_floor, 4000);
   await reconciled(s, 'v3p');
 });
+
+test('ارسال (همان گذارهایی که پیکِ #249 از transitionIn می‌زند): تحویل ⇒ کسر؛ برگشت به دکان و بازگشت به قفسه ⇒ آزادی', async () => {
+  const s = await shop('ارسال');
+  await enable(s);
+  await push(s, [product('dv1'), entry('dv1-e', 'dv1', 3)]);
+  const send = (qty) => h.post('/api/shop/orders', {
+    source: 'phone', fulfillment: 'delivery', paymentMethod: 'cod',
+    customer: { name: 'مشتری', phone: '0791234567' }, address: { landmark: 'کنارِ مسجد' }, lines: [line('dv1', qty)],
+  }, { token: s.token, headers: { 'Idempotency-Key': fresh() } });
+  const a = await send(1000);
+  const b = await send(1000);
+  assert.equal(a.status, 201, JSON.stringify(a.body));
+  assert.equal(b.status, 201);
+  for (const to of ['accepted', 'picking', 'packed', 'out_for_delivery']) {
+    assert.equal((await go(s, a.body.order.id, { to })).status, 200, to);
+    assert.equal((await go(s, b.body.order.id, { to })).status, 200, to);
+  }
+  assert.equal((await go(s, a.body.order.id, { to: 'delivered' })).status, 200);
+  for (const [to, extra] of [['delivery_failed', { reason: 'no_answer' }], ['retry_scheduled', {}],
+    ['returned_to_store', {}], ['restocked', {}]]) {
+    const r = await go(s, b.body.order.id, { to, ...extra });
+    assert.equal(r.status, 200, `${to}: ${JSON.stringify(r.body)}`);
+  }
+  assert.deepEqual((await heldOf(s, a.body.order.id)).map((x) => x.status), ['committed']);
+  assert.deepEqual((await heldOf(s, b.body.order.id)).map((x) => [x.status, x.closeReason]), [['released', 'restocked']]);
+  const st = await stockOf(s, 'dv1');
+  assert.deepEqual([st.levels.shop_floor, st.reservedMilli, st.sellableMilli], [2000, 0, 2000]);
+  await reconciled(s, 'dv1');
+});
