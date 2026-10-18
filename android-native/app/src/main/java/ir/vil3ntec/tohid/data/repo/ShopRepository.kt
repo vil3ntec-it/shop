@@ -3,6 +3,9 @@ package ir.vil3ntec.tohid.data.repo
 import ir.vil3ntec.tohid.core.model.IssuedCodeDto
 import ir.vil3ntec.tohid.core.model.MemberDto
 import ir.vil3ntec.tohid.core.model.MembersPageDto
+import ir.vil3ntec.tohid.core.model.PermsPageDto
+import ir.vil3ntec.tohid.core.model.ShopDeviceDto
+import ir.vil3ntec.tohid.core.model.ShopDevicesDto
 import ir.vil3ntec.tohid.core.model.ShopStateDto
 import ir.vil3ntec.tohid.core.model.StaffCodeDto
 import ir.vil3ntec.tohid.core.model.StaffCodesDto
@@ -10,6 +13,7 @@ import ir.vil3ntec.tohid.core.net.ApiClient
 import ir.vil3ntec.tohid.core.net.ApiEndpoints
 import ir.vil3ntec.tohid.core.net.ApiJson
 import ir.vil3ntec.tohid.core.net.ApiResult
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 
@@ -69,6 +73,35 @@ class ShopRepository(private val api: ApiClient) {
    */
   suspend fun standingCode(): String =
     result { ApiJson.text(api.get(ApiEndpoints.Shop.STAFF_CODE), "code") }.valueOrNull().orEmpty()
+
+  /** کدِ ثابت و اینکه صاحب دکان خاموشش کرده یا نه (STF-11) — خطا ⇒ ("", false) */
+  suspend fun standingState(): Pair<String, Boolean> =
+    result {
+      val body = api.get(ApiEndpoints.Shop.STAFF_CODE)
+      ApiJson.text(body, "code") to ApiJson.bool(body, "disabled")
+    }.valueOrNull() ?: ("" to false)
+
+  /** خاموش کردنِ کدِ ثابت؛ «کد تازه» دوباره روشنش می‌کند */
+  suspend fun disableStandingCode(): ApiResult<Unit> =
+    result { api.post(ApiEndpoints.Shop.STAFF_CODE_DISABLE); Unit }
+
+  /* ------------------------ مجوزها و دستگاه‌ها ------------------------ */
+
+  suspend fun permissions(): ApiResult<PermsPageDto> =
+    result { ApiJson.decode<PermsPageDto>(api.get(ApiEndpoints.Shop.PERMISSIONS)) }
+
+  /** لایهٔ یک کارمند — `perms` همان قالبِ `PermCore` ({کلید: {mode}}) */
+  suspend fun setMemberPerms(memberId: String, perms: JsonObject): ApiResult<Unit> =
+    result { api.put(ApiEndpoints.Shop.memberPerms(memberId), buildJsonObject { put("perms", perms) }); Unit }
+
+  suspend fun devices(): ApiResult<List<ShopDeviceDto>> =
+    result { ApiJson.decode<ShopDevicesDto>(api.get(ApiEndpoints.Shop.DEVICES)).devices }
+
+  suspend fun disableDevice(deviceId: String): ApiResult<Unit> =
+    result { api.post(ApiEndpoints.Shop.deviceDisable(deviceId)); Unit }
+
+  suspend fun enableDevice(deviceId: String): ApiResult<Unit> =
+    result { api.post(ApiEndpoints.Shop.deviceEnable(deviceId)); Unit }
 
   suspend fun rotateStandingCode(): ApiResult<IssuedCodeDto> =
     result { ApiJson.decode<IssuedCodeDto>(api.post(ApiEndpoints.Shop.STAFF_CODE_ROTATE)) }
