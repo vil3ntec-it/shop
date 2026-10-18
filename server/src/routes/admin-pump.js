@@ -25,6 +25,7 @@ const { catalogOf, PUMP_FEATURES } = require('../lib/features');
 const { entitlementOf } = require('../lib/entitlement').pump;
 const { badRequest, notFound } = require('../middleware/errors');
 const { requireSuperAdmin } = require('../middleware/auth');
+const { reasonOf } = require('../lib/admin-access');
 
 const router = express.Router();
 const PUMP = catalogOf('pump');
@@ -223,9 +224,10 @@ router.post('/stations/:id/status', async (req, res, next) => {
       'UPDATE stations SET status=$2, updated_at=$3 WHERE id=$1 RETURNING *', [id, status, now()]
     );
     if (!row) return next(notFound('پمپ پیدا نشد', 'station_not_found'));
+    const reason = reasonOf(req);   // اختیاری — فقط در سابقه (ADMIN-CONTROL-PLANE.md G2)
     await audit.log({
       actorType: 'admin', userId: req.admin.id, action: 'admin.station_status',
-      targetType: 'station', targetId: id, detail: { status },
+      targetType: 'station', targetId: id, detail: { status, ...(reason ? { reason } : {}) },
     });
     res.json({ station: stations.shape(row) });
   } catch (err) { next(err); }
@@ -304,10 +306,11 @@ router.post('/subscriptions', async (req, res, next) => {
         price: quoted.price || 0, finalPrice: quoted.finalPrice || 0,
       });
     }
+    const reason = reasonOf(req);   // اختیاری — فقط در سابقه (ADMIN-CONTROL-PLANE.md G2)
     await audit.log({
       actorType: 'admin', userId: req.admin.id, action: 'admin.pump_subscription_granted',
       targetType: 'station', targetId: stationId,
-      detail: { plan: row.plan, endsAt: Number(row.ends_at) },
+      detail: { plan: row.plan, endsAt: Number(row.ends_at), ...(reason ? { reason } : {}) },
     });
     res.status(201).json({ subscription: row, state: subs.stateOf(row) });
   } catch (err) { next(err); }
@@ -318,9 +321,10 @@ router.post('/subscriptions/:id/status', async (req, res, next) => {
   try {
     const row = await subs.setStatus(v.id(req.params.id),
       String(req.body?.status || ''), req.admin.id);
+    const reason = reasonOf(req);   // اختیاری — فقط در سابقه (ADMIN-CONTROL-PLANE.md G2)
     await audit.log({
       actorType: 'admin', userId: req.admin.id, action: 'admin.pump_subscription_status',
-      targetType: 'subscription', targetId: row.id, detail: { status: row.status },
+      targetType: 'subscription', targetId: row.id, detail: { status: row.status, ...(reason ? { reason } : {}) },
     });
     res.json({ subscription: row, state: subs.stateOf(row) });
   } catch (err) { next(err); }

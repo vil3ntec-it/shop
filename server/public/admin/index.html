@@ -150,6 +150,8 @@
       </div>
       <label>یادداشت</label>
       <input type="text" id="in-note" placeholder="مثلاً: نقدی گرفته شد">
+      <label for="in-reason">دلیل (اختیاری — فقط در سابقه می‌ماند؛ برای فعال‌سازی، تعلیق و لغو)</label>
+      <input type="text" id="in-reason" maxlength="200" placeholder="مثلاً: درخواستِ تلفنیِ صاحبِ دکان">
       <div class="row" style="margin-top:12px;">
         <button class="btn btn-sm" id="btn-grant">فعال‌سازی / تمدید</button>
         <button class="btn btn-warn btn-sm" id="btn-suspend">تعلیق</button>
@@ -330,6 +332,8 @@
       <div id="pump-feats" class="feat-grid"></div>
       <label>یادداشت</label>
       <input type="text" id="pump-note" placeholder="مثلاً: نقدی گرفته شد">
+      <label for="pump-reason">دلیل (اختیاری — فقط در سابقه می‌ماند؛ برای فعال‌سازی، تعلیق و لغو)</label>
+      <input type="text" id="pump-reason" maxlength="200" placeholder="مثلاً: درخواستِ تلفنیِ صاحبِ پمپ">
       <div class="row" style="margin-top:12px;">
         <button class="btn btn-sm" id="btn-pump-grant">فعال‌سازی / تمدید</button>
         <button class="btn btn-warn btn-sm" id="btn-pump-suspend">تعلیق</button>
@@ -646,6 +650,7 @@
           </select></div>
         <div><label>شمارهٔ رسید (خالی = خودکار)</label><input type="text" id="pay-receipt" dir="ltr"></div>
         <div><label>یادداشت</label><input type="text" id="pay-note"></div>
+        <div><label for="pay-reason">دلیل (اختیاری — فقط در سابقه)</label><input type="text" id="pay-reason" maxlength="200"></div>
       </div>
       <div class="row" style="margin-top:10px;"><button class="btn btn-sm" id="btn-pay-add">ثبت</button></div>
       <div id="pay-msg"></div>
