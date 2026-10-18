@@ -65,6 +65,11 @@ fun TeamScreen(snackbar: SnackbarHostState) {
   /** کدِ ثابتِ دکان — همیشه همان است، پس هر بار نشان داده می‌شود */
   var standing by remember { mutableStateOf("") }
   var rotating by remember { mutableStateOf(false) }
+  /** STF-11: صاحب دکان کدِ ثابت را خاموش کرده — فقط «کد تازه» روشنش می‌کند */
+  var standingOff by remember { mutableStateOf(false) }
+  var askStandingOff by remember { mutableStateOf(false) }
+  //  STF-01..03 / STF-10: فقط صاحب دکان مجوز و دستگاه را عوض می‌کند (سرور هم همین را می‌سنجد)
+  val isOwner = remember { ir.vil3ntec.tohid.data.ShopRole.current(context) == ir.vil3ntec.tohid.data.ShopRole.OWNER }
 
   //  صفحه نه نشانیِ سرور را می‌داند و نه توکن را؛ فقط مخزن را صدا می‌زند
   val shops = remember(context) { Backend.shop(context) }
@@ -83,7 +88,7 @@ fun TeamScreen(snackbar: SnackbarHostState) {
 
     //  کدِ ثابت جدا خوانده می‌شود؛ سرورِ قدیمی این مسیر را ندارد و
     //  نبودنش نباید بقیهٔ صفحه را خراب کند
-    standing = shops.standingCode()
+    shops.standingState().let { (code, off) -> standing = code; standingOff = off }
   }
 
   LaunchedEffect(signedIn) { if (signedIn) reload() }
@@ -174,6 +179,32 @@ fun TeamScreen(snackbar: SnackbarHostState) {
      *  باید هر بار می‌آمد اینجا. این کد از شناسهٔ دکان ساخته می‌شود، پس
      *  هر وقت نگاه کنید همان است — نه جایی نوشته شده، نه گم می‌شود.
      */
+    if (standingOff) {
+      SectionTitle("کد دکان شما")
+      Panel {
+        Text(
+          "کدِ ثابتِ دکان خاموش است؛ کسی با آن وارد نمی‌شود. شاگردهای فعلی سرِ کارشان هستند.",
+          style = MaterialTheme.typography.bodySmall,
+          color = colors.muted,
+        )
+        Spacer(Modifier.height(10.dp))
+        TohidSecondaryButton(
+          text = if (rotating) "…" else "روشن کردن با کدِ تازه",
+          enabled = !rotating,
+          onClick = {
+            rotating = true
+            scope.launch {
+              shops.rotateStandingCode()
+                .onSuccess { standing = it.code; standingOff = false }
+                .onFailure { error = it.userMessage }
+              rotating = false
+            }
+          },
+          modifier = Modifier.fillMaxWidth(),
+        )
+      }
+      Spacer(Modifier.height(18.dp))
+    }
     if (standing.isNotBlank()) {
       SectionTitle("کد دکان شما")
       Panel {
@@ -232,6 +263,13 @@ fun TeamScreen(snackbar: SnackbarHostState) {
           color = colors.muted2,
           modifier = Modifier.padding(top = 8.dp),
         )
+        if (isOwner) {
+          TohidSecondaryButton(
+            text = "خاموش کردنِ کد",
+            onClick = { askStandingOff = true },
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+          )
+        }
       }
       Spacer(Modifier.height(18.dp))
     }
@@ -252,6 +290,10 @@ fun TeamScreen(snackbar: SnackbarHostState) {
     }
 
     Spacer(Modifier.height(18.dp))
+
+    /* ---------------- مجوزِ کارمندان و دستگاه‌ها (STF) ---------------- */
+    MemberPermsSection(shops, canEdit = isOwner, snackbar = snackbar)
+    DevicesSection(shops, canEdit = isOwner, snackbar = snackbar)
 
     /* ------------------------ کدهای شاگرد ------------------------ */
     SectionTitle("کدهای پیوستن")
@@ -295,6 +337,24 @@ fun TeamScreen(snackbar: SnackbarHostState) {
             .onSuccess { issued -> fresh = issued.code; reload() }
             .onFailure { snackbar.showSnackbar(it.userMessage) }
           busy = false
+        }
+      },
+    )
+  }
+
+  if (askStandingOff) {
+    TohidConfirmDialog(
+      title = "خاموش کردنِ کدِ دکان",
+      message = "از این پس کسی با کدِ ثابت وارد دکان نمی‌شود، تا وقتی «روشن کردن با کدِ تازه» را بزنید. شاگردهای فعلی سرِ کارشان می‌مانند.",
+      confirmText = "خاموش کن",
+      danger = true,
+      onDismiss = { askStandingOff = false },
+      onConfirm = {
+        askStandingOff = false
+        scope.launch {
+          shops.disableStandingCode()
+            .onSuccess { standing = ""; standingOff = true; snackbar.showSnackbar("کدِ دکان خاموش شد") }
+            .onFailure { snackbar.showSnackbar(it.userMessage) }
         }
       },
     )

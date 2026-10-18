@@ -58,11 +58,15 @@ jobs:
           S="wait:6000;shot:00-start;key:ESCAPE;wait:1500;shot:01-dashboard"
           S="$S;go:admin;wait:2000;shot:01b-admin-center;move:700,500;scroll:8;wait:600;shot:01c-admin-center-lower"
           S="$S;go:sale;wait:1500;shot:02-sale"
+          #  صندوقِ سه‌ستونه با سه قلم (اسکن، «3*» و نام + Enter) و نمای جدولیِ کالا
+          S="$S;type:626001007;key:ENTER;type:3*626001003;key:ENTER;type:صابون;key:ENTER;wait:1500;shot:02b-sale-cart"
+          S="$S;posview:table;wait:1200;shot:02c-sale-table;posview:card;wait:800"
           S="$S;go:quick;wait:1500;shot:03-quick-sale"
           S="$S;go:debtors;wait:1500;shot:04-debtors"
           S="$S;cust:first;wait:1200;shot:04b-customer-ledger;custtab:1;wait:1000;shot:04c-customer-invoices;custtab:2;wait:1000;shot:04d-customer-items;custtab:0;cust:close"
           S="$S;go:warehouse;wait:1500;shot:05-warehouse"
           S="$S;go:products;wait:1500;shot:06-products-table"
+          S="$S;prodsel:3;wait:800;shot:06b-products-bulk-bar;prodview:card;wait:1200;shot:06c-products-cards;prodsel:0;prodview:table;wait:800"
           S="$S;go:sales;wait:1500;shot:07-sales-history-cash-shift"
           S="$S;go:purchasing;wait:1500;shot:08-purchasing;new:;wait:1200;shot:08b-purchase-invoice-new;key:ESCAPE;wait:800"
           S="$S;go:reports;wait:1500;shot:09-reports"
@@ -76,6 +80,7 @@ jobs:
           S="$S;go:vip;wait:1500;shot:15c-subscription-offline-code"
           S="$S;go:dashboard;key:F11;wait:2000;shot:16-fullscreen-dashboard"
           S="$S;help:on;wait:1500;shot:17-shortcuts-F1;help:off"
+          S="$S;key:F11;wait:1500;theme:DARK;go:products;wait:1500;shot:18-products-dark;prodsel:2;wait:800;shot:18b-products-dark-bulk;prodsel:0;go:dashboard;wait:1500;shot:19-dashboard-dark;theme:LIGHT"
           export JAVA_TOOL_OPTIONS="-Dtohid.shot=$RUNNER_TEMP/shots -Dtohid.shot.every=9000 -Dtohid.shot.exit=true -Dtohid.shot.script=$S -Dsun.jnu.encoding=UTF-8 -Dfile.encoding=UTF-8"
           timeout 600 xvfb-run -s "-screen 0 1440x900x24" ./gradlew --no-daemon -q -Pdev=true run || true
           ls -la "$RUNNER_TEMP/shots"

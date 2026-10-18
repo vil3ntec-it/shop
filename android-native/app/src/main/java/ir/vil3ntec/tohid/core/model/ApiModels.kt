@@ -161,6 +161,8 @@ data class ShopStateDto(
   val role: String? = null,
   val isOwner: Boolean = false,
   val permissions: List<String> = emptyList(),
+  /** STF-01..03: لایه‌های مجوز برای `PermCore` (`ShopRole.rememberPolicy`) */
+  val policy: kotlinx.serialization.json.JsonObject? = null,
   val memberCount: Int = 0,
   val serverTime: Long = 0,
 ) {
