@@ -231,7 +231,8 @@ class DebtBookTest {
 
     d = ok(DebtorEngine.editWithLimit(d, "c1", DebtorEngine.DebtorDraft("احمد", "0790000000", "", creditLimit = 5000.0)))
     assertEquals("credit_limit_set", d.auditLog.last().type)
-    assertEquals("0790000000", d.debtors.first().phone)
+    //  نام/تلفن همان کارِ `edit` (هر قاعدهٔ ذخیرهٔ تلفن که دارد)؛ سقف فقط افزوده می‌شود
+    assertEquals(ok(DebtorEngine.edit(d0, "c1", DebtorEngine.DebtorDraft("احمد", "0790000000", ""))).debtors.first().phone, d.debtors.first().phone)
     val c = DebtBook.creditCheck(d, "c1", m(2000.0))!!
     assertTrue(c.over)
     assertEquals(m(1000.0), c.excess)

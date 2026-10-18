@@ -147,7 +147,7 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
     val rows = remember(d, term, sort) {
       d.debtors
         .filter {
-          term.isBlank() || it.name.contains(term, ignoreCase = true) || it.phone.contains(term)
+          term.isBlank() || it.name.contains(term, ignoreCase = true) || ir.vil3ntec.tohid.LocaleText.phoneMatches(it.phone, term)
         }
         .map { DebtorRow(it, ShopStore.debt(d, it.id), DebtorEngine.debtDays(d, it.id)) }
         .sortedWith(sort.order)
@@ -446,7 +446,7 @@ private fun DebtorTableRow(
     ) {
       Text(row.debtor.name.ifBlank { "بی‌نام" }, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold,
         color = Shop.colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-      Text(row.debtor.phone.ifBlank { "—" }, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted,
+      Text(ir.vil3ntec.tohid.LocaleText.phoneDisplay(row.debtor.phone).ifBlank { "—" }, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted,
         maxLines = 1, modifier = Modifier.width(160.dp))
       Text(money(kotlin.math.abs(row.balance)), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold,
         color = tint, maxLines = 1, modifier = Modifier.width(150.dp))
@@ -616,7 +616,7 @@ private fun DebtorCard(
         overflow = TextOverflow.Ellipsis,
       )
       Text(
-        if (debtor.phone.isNotBlank()) debtor.phone else DebtorEngine.stateText(balance),
+        if (debtor.phone.isNotBlank()) ir.vil3ntec.tohid.LocaleText.phoneDisplay(debtor.phone) else DebtorEngine.stateText(balance),
         style = MaterialTheme.typography.labelSmall,
         color = Shop.colors.muted,
         textAlign = TextAlign.Center,
@@ -755,7 +755,7 @@ private fun AccountView(
       Text(account.debtor.name, style = MaterialTheme.typography.headlineMedium, color = Shop.colors.text)
       if (account.debtor.phone.isNotBlank()) {
         CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-          Text(account.debtor.phone, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
+          Text(ir.vil3ntec.tohid.LocaleText.phoneDisplay(account.debtor.phone), style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
         }
         Spacer(Modifier.height(10.dp))
         /*

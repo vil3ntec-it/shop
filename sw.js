@@ -59,6 +59,9 @@ const SHELL_ASSETS = [
    *  روی نصبِ آفلاین اصلاً بار نمی‌شد. همان تله‌ای که همین بالا نوشته شده.
    */
   './license/thermal-print.js',
+  //  LOC-01/05/07/09: هستهٔ خالصِ متن و تقویم — بی آن‌ها فاکتور و تاریخ به راهِ قدیم برمی‌گردند
+  './license/text-core.js',
+  './license/calendar-core.js',
   './license/photo-studio.js',
   //  جای دفتر (localStorage یا IndexedDB) — بی آن، دفترِ IndexedDB روی نصبِ آفلاین باز نمی‌شد
   './license/ledger-store.js',
