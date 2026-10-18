@@ -307,6 +307,8 @@ async function createApp({ runMigrations = true } = {}) {
     //  `/store` — پیشوندِ تازه ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی (دستورالعمل در PR)
     api.use('/shop/storefront', require('./routes/storefront-admin'));
     api.use('/store', require('./routes/storefront'));
+    //  بانکِ تصاویر (v3 ۳۷) — پشتِ پرچمِ `shop.image_bank`، پیش‌فرض خاموش
+    api.use('/shop/images', require('./routes/shop-images'));
     //  تحویل و پیک (۲۲.۲ C) — همان قاعده؛ درهای پیک زیرِ `/courier` (۳.۱۱)
     api.use('/shop/delivery', require('./routes/delivery'));
     api.use('/courier', require('./routes/courier'));
@@ -364,6 +366,8 @@ async function createApp({ runMigrations = true } = {}) {
      */
     api.use('/admin', require('./routes/admin-notices'));
     api.use('/admin', require('./routes/admin-sales'));
+    //  بانکِ مرکزیِ تصاویر (v3 ۳۷.۳) — پشتِ پرچمِ `image_bank.central`، پیش‌فرض خاموش
+    api.use('/admin/image-bank', require('./routes/admin-image-bank'));
     api.use('/portal', require('./routes/portal'));
     api.use('/rep', require('./routes/rep'));       // شورا چ۳: نمایندهٔ فروش — فقط فروش‌های خودش
     api.get('/downloads', require('./routes/portal').downloadsHandler);
