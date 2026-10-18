@@ -281,10 +281,12 @@ async function addAddon({ app, subscriptionId, feature, price = 0, note = '', by
   return shapeAddon(row);
 }
 
-async function removeAddon(id, { app } = {}) {
+/** `subscriptionId` (اختیاری): افزونه فقط از همان اشتراک برداشته می‌شود. */
+async function removeAddon(id, { app, subscriptionId = '' } = {}) {
   const row = await one(
-    `UPDATE subscription_addons SET removed_at=$2 WHERE id=$1 AND app=$3 AND removed_at IS NULL RETURNING *`,
-    [String(id || ''), now(), appOf(app)]
+    `UPDATE subscription_addons SET removed_at=$2
+      WHERE id=$1 AND app=$3 AND removed_at IS NULL AND ($4 = '' OR subscription_id=$4) RETURNING *`,
+    [String(id || ''), now(), appOf(app), String(subscriptionId || '')]
   );
   if (!row) throw notFound('افزونه پیدا نشد', 'addon_not_found');
   return shapeAddon(row);
