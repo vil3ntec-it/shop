@@ -45,11 +45,14 @@ function decode(text) {
   try { return JSON.parse(text); } catch { return null; }
 }
 
-/** پرچمِ دکان: مقدارِ خودِ دکان بر `all` جلو می‌افتد؛ فقط `true` روشن است. */
-async function flagOf(shopId) {
+/**
+ * پرچمِ دکان: مقدارِ خودِ دکان بر `all` جلو می‌افتد؛ فقط `true` روشن است.
+ * `key` پیش‌فرض همین بخش است؛ تحویل و پیک (`shop.delivery`) همین قاعده را می‌خواند.
+ */
+async function flagOf(shopId, key = FLAG_KEY) {
   const rows = await many(
     'SELECT scope, value FROM live_config WHERE key=$1 AND scope IN ($2,$3)',
-    [FLAG_KEY, 'all', String(shopId)]
+    [key, 'all', String(shopId)]
   );
   let v;
   for (const r of rows) if (r.scope === 'all') v = decode(r.value);
@@ -147,6 +150,8 @@ function parseCreate(body, at) {
   if (d.callBeforeArrival === true) delivery.callBeforeArrival = true;
   const leaveWith = text(d.leaveWith, 80);
   if (leaveWith) delivery.leaveWith = leaveWith;
+  //  عکسِ تحویل فقط با رضایتِ صریحِ مشتری (v3 §۲۲.۲ C بندِ ۴، DLV-08)
+  if (d.photoConsent === true) delivery.photoConsent = true;
 
   if (!Array.isArray(b.lines) || b.lines.length === 0) throw badRequest('سفارش بی قلم است', 'bad_lines');
   if (b.lines.length > MAX_LINES) throw badRequest(`حداکثر ${MAX_LINES} قلم`, 'bad_lines');
@@ -372,7 +377,7 @@ const CHECK_MESSAGE = {
  * @param {{type:'user'|'system'|'customer', id?:string, role?:string}} actor
  * @returns {{order:object, unchanged:boolean, from:string, to:string}}
  */
-async function transition(shopId, id, input, actor) {
+function parseTransition(input) {
   const to = str(input?.to);
   if (!S.ORDER_STATUSES.includes(to)) throw badRequest('وضعیتِ مقصد معتبر نیست', 'bad_status');
   const expected = str(input?.from);
@@ -385,8 +390,26 @@ async function transition(shopId, id, input, actor) {
     if (to !== 'accepted') throw badRequest('زمانِ آماده فقط هنگامِ قبول', 'bad_ready_time');
     readyAt = now() + int(input.readyInMinutes, 'زمانِ آماده', { min: 1, max: 7 * 24 * 60 }) * 60_000;
   }
+  return { to, expected, reason, note, readyAt };
+}
 
-  return tx(async (c) => {
+/** گذارِ وضعیت (شرح و پارامترها در بالا) — ورودی پیش از باز شدنِ تراکنش سنجیده می‌شود. */
+async function transition(shopId, id, input, actor) {
+  const p = parseTransition(input);
+  return tx((c) => applyTransition(c, shopId, id, p, actor));
+}
+
+/**
+ * همان گذار، درونِ تراکنشی که فراخواننده باز کرده (تحویل و پیک: اثرِ
+ * مأموریت بر سفارش با همان قفل و همان تراکنش). راهِ دیگری برای عوض کردنِ
+ * وضعیتِ سفارش نیست.
+ */
+async function transitionIn(c, shopId, id, input, actor) {
+  return applyTransition(c, shopId, id, parseTransition(input), actor);
+}
+
+async function applyTransition(c, shopId, id, { to, expected, reason, note, readyAt }, actor) {
+  {
     const run = (t, p) => c.query(t, p);
     const row = (await c.query(
       'SELECT * FROM online_orders WHERE shop_id=$1 AND id=$2 FOR UPDATE', [shopId, String(id || '')]
@@ -426,7 +449,36 @@ async function transition(shopId, id, input, actor) {
         JSON.stringify(readyAt ? { readyAt } : {}), at]
     );
     return { order: await loadDetail(run, shopId, row.id, actor), unchanged: false, from: row.status, to };
-  });
+  }
+}
+
+/**
+ * گذارِ «نقد هنگامِ تحویل» (ماشینِ جدای ۳.۹) درونِ تراکنشِ فراخواننده —
+ * فقط آن‌چه `order-states.canCod` اجازه می‌دهد، با رویدادِ `cod`.
+ * @returns {boolean} آیا عوض شد
+ */
+async function codIn(c, shopId, id, to, actor, detail = {}) {
+  const row = (await c.query(
+    'SELECT id, cod_status FROM online_orders WHERE shop_id=$1 AND id=$2 FOR UPDATE', [shopId, String(id || '')]
+  )).rows[0];
+  if (!row) throw notFound('سفارش پیدا نشد', 'order_not_found');
+  if (row.cod_status === to) return false;
+  if (!S.canCod(row.cod_status, to)) throw conflict('این تغییرِ وضعیتِ نقد مجاز نیست', 'invalid_cod_transition');
+  const at = now();
+  const seq = Number((await c.query(
+    'SELECT COALESCE(MAX(seq), 0) + 1 AS n FROM online_order_events WHERE order_id=$1', [row.id]
+  )).rows[0].n);
+  await c.query(
+    'UPDATE online_orders SET cod_status=$3, version=version+1, updated_at=$4 WHERE shop_id=$1 AND id=$2',
+    [shopId, row.id, to, at]
+  );
+  await c.query(
+    `INSERT INTO online_order_events (id, order_id, shop_id, seq, kind, from_status, to_status,
+       actor_type, actor_id, reason, note, detail, created_at)
+     VALUES ($1,$2,$3,$4,'cod',$5,$6,$7,$8,'','',$9::jsonb,$10)`,
+    [ulid(at), row.id, shopId, seq, row.cod_status, to, actor.type, actor.id || '', JSON.stringify(detail), at]
+  );
+  return true;
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -511,5 +563,5 @@ async function summary(shopId) {
 module.exports = {
   FLAG_KEY, FEATURE_KEY, KEY_RE, MAX_LINES, STAFF_SOURCES,
   flagOf, entitledOf, stateOf, clientKeyOf, hashOf, parseCreate, maskPhone,
-  create, transition, get, list, summary,
+  create, transition, transitionIn, codIn, get, list, summary,
 };
