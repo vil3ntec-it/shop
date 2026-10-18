@@ -326,6 +326,9 @@ async function create(shopId, { key, body, actor }) {
           l.lineTotalMinor, l.note, l.substitution]
       );
     }
+    //  کاتالوگ و موجودی (v3 §۳۲.۲، CHK-18): پرچمِ `shop.catalog` روشن ⇒ رزروِ اتمی در همین
+    //  تراکنش؛ کمبود ⇒ ۴۰۹ و کلِ سفارش برمی‌گردد. خاموش ⇒ هیچ (همان رفتارِ پیشین).
+    await require('./catalog').onOrderCreated(c, shopId, { orderId: id, lines: input.lines, at, actor });
     await c.query(
       `INSERT INTO online_order_events (id, order_id, shop_id, seq, kind, from_status, to_status,
          actor_type, actor_id, reason, note, detail, created_at)
@@ -408,6 +411,9 @@ async function transition(shopId, id, input, actor) {
         WHERE shop_id=$1 AND id=$2`,
       [shopId, row.id, to, reason, readyAt ?? null, at]
     );
+    //  کاتالوگ و موجودی (v3 §۳۲.۲): قبول ⇒ رزرو می‌ماند · رد/لغو ⇒ آزاد · تحویل ⇒ کسرِ قطعی؛
+    //  کمبود هنگامِ قبول ⇒ ۴۰۹ و گذار برمی‌گردد. بی رزرو و پرچمِ خاموش ⇒ هیچ.
+    await require('./catalog').onOrderStatus(c, shopId, { id: row.id, from: row.status, to }, actor, at);
     await c.query(
       `INSERT INTO online_order_events (id, order_id, shop_id, seq, kind, from_status, to_status,
          actor_type, actor_id, reason, note, detail, created_at)
