@@ -299,6 +299,9 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/shop/orders', require('./routes/orders'));
     //  بانکِ تصاویر (v3 ۳۷) — پشتِ پرچمِ `shop.image_bank`، پیش‌فرض خاموش
     api.use('/shop/images', require('./routes/shop-images'));
+    //  تحویل و پیک (۲۲.۲ C) — همان قاعده؛ درهای پیک زیرِ `/courier` (۳.۱۱)
+    api.use('/shop/delivery', require('./routes/delivery'));
+    api.use('/courier', require('./routes/courier'));
     api.use('/shop', require('./routes/shop'));
     /*
      *  بخشِ پمپ‌بنزین — دفترِ جدا، همان دستگاهِ اشتراک.

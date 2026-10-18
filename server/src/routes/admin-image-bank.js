@@ -13,7 +13,7 @@
 const express = require('express');
 const bank = require('../lib/image-bank');
 const audit = require('../lib/audit');
-const v = require('../lib/validate');
+const { requireReason } = require('../lib/admin-access');
 const { requireAdmin, requireSuperAdmin } = require('../middleware/auth');
 const { clientIp } = require('../middleware/ratelimit');
 const { forbidden, notFound, badRequest } = require('../middleware/errors');
@@ -35,12 +35,8 @@ router.use(wrap(async (req, res, next) => {
   next();
 }));
 
-/** دلیلِ نوشته (۳ تا ۲۰۰ نویسه) — مثلِ خروجی/بازگردانیِ مدیرِ ارشد. */
-function reasonOf(req) {
-  const r = v.text(req.body?.reason, { max: 200 }).trim();
-  if (r.length < 3) throw badRequest('دلیلِ این تصمیم را بنویسید (دست‌کم ۳ نویسه)', 'reason_required');
-  return r;
-}
+//  دلیلِ نوشته (۳ تا ۲۰۰ نویسه) — همان `requireReason`ِ ADMIN-CONTROL-PLANE
+const reasonOf = requireReason;
 const log = (req, action, targetId, detail = {}) => audit.log({
   actorType: 'admin', userId: req.admin.id, action, targetType: 'image', targetId, ip: clientIp(req), detail,
 });

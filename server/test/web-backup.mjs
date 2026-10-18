@@ -316,7 +316,8 @@ await step('ثبتِ یک قرض‌دار از خودِ فرم ⇒ op ⇒ ردی
     await page.waitForTimeout(400);
   }
   assert.ok(row, 'ردیفِ قرض‌دار باید روی سرور نشسته باشد');
-  assert.equal(row.data.phone, '0700111222');
+  //  LOC-09: فرم شماره را با قالبِ ‎+93 ذخیره می‌کند (ورودیِ 07… پذیرفته است)
+  assert.equal(row.data.phone, '+93700111222');
   assert.match(row.row_id, /^[0-9A-HJKMNP-TV-Z]{26}$/, 'شناسهٔ ردیفِ تازه باید ULID باشد');
 
   const op = await one(
@@ -357,7 +358,7 @@ await step('ویرایشِ یک فیلد فقط همان یک فیلد را می
   }
   assert.ok(op, 'opِ ویرایش باید رسیده باشد');
   assert.deepEqual(Object.keys(op.fields), ['phone'], `فقط فیلدِ عوض‌شده: ${JSON.stringify(op.fields)}`);
-  assert.equal(op.fields.phone, '0799888777');
+  assert.equal(op.fields.phone, '+93799888777');   // LOC-09
 });
 
 await step('«اشتراکِ من» از تپشِ سرور پر می‌شود و رنگش از سرور می‌آید', async () => {
