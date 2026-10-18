@@ -735,6 +735,8 @@ router.use('/shops/:id/staff-codes', require('./admin-staff-codes'));
  */
 router.use('/otp', require('./admin-otp'));
 router.use('/sync', require('./admin-sync'));
+//  F0-27: کانالِ آزمایشیِ نسخه‌ها (فقط مدیرِ ارشد) — درِ خودش، نه `/pump/live-config`
+router.use('/release', require('./admin-release'));
 router.use('/', require('./admin-platform'));
 //  بخشِ پمپ‌بنزین — زیر همان `requireAdmin`، ولی روی دفترِ خودش
 router.use('/pump', require('./admin-pump'));

@@ -219,7 +219,7 @@ const MOUNTS = {
   'admin-shop-desk.js': '/admin/shop-desk', 'admin-shop-offline.js': '/admin/shop-offline-codes',
   'admin-staff-codes.js': '/admin/shops/:id/staff-codes', 'admin-otp.js': '/admin/otp',
   'admin-sync.js': '/admin/sync', 'admin-platform.js': '/admin', 'admin-pump.js': '/admin/pump',
-  'admin-notices.js': '/admin', 'admin-sales.js': '/admin',
+  'admin-notices.js': '/admin', 'admin-sales.js': '/admin', 'admin-release.js': '/admin/release',
 };
 const PUBLIC = new Set(['POST /admin/login']);   // تنها درِ بی‌توکن: خودِ ورود
 
