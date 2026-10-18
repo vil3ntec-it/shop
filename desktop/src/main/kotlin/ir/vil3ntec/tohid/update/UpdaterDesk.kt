@@ -49,6 +49,8 @@ object Updater {
     val apkUrl: String,
     val size: Long,
     val sumsUrl: String = "",
+    /** §۳۸.۹: حداقل نسخهٔ پشتیبانی‌شده (فقط از سرورِ خودمان)؛ خالی ⇒ حداقلی نیست */
+    val minVersion: String = "",
   )
 
   suspend fun check(
@@ -96,6 +98,7 @@ object Updater {
       apkUrl = ReleaseFeed.fileUrl(server, latest.tag, assetName),
       size = mine.size,
       sumsUrl = if (latest.hasSums) ReleaseFeed.fileUrl(server, latest.tag, ReleaseFeed.SUMS) else "",
+      minVersion = latest.minVersion,
     )
   }
 
