@@ -308,3 +308,18 @@ test('🎁 گیفت‌کارت: بی کدِ کامپیوتر صادر می‌ش�
   //  کدِ معمولی هنوز بی کدِ کامپیوتر صادر نمی‌شود
   assert.equal((await issue({ plan: 'vip', days: 30 })).status, 400);
 });
+
+test('🔢 کدِ ۸ رقمی: فقط روز، رفت‌وبرگشت، و ۸ رقم', async () => {
+  const sc = require('../src/lib/pump-short-codes');
+  const r = await h.post('/api/admin/pump/short-codes', { days: 45, note: 'مشتریِ بی‌نت' }, { token: await admin() });
+  assert.equal(r.status, 201, JSON.stringify(r.body));
+  assert.match(r.body.short.code, /^\d{4}-\d{4}$/);
+  assert.equal(sc.open(r.body.short.code).days, 45);
+  assert.equal((await h.post('/api/admin/pump/short-codes', { days: 366 }, { token: await admin() })).status, 400);
+  const l = await h.get('/api/admin/pump/short-codes', { token: await admin() });
+  assert.equal(l.body.codes[0].code, r.body.short.code);
+  for (const d of [1, 30, 365]) for (const k of [0, 31]) assert.deepEqual(sc.open(sc.make(d, k)), { days: d, serial: k });
+  //  ⛔ همان بردارهایی که ShortCodeTestsِ برنامهٔ پمپ می‌سنجد
+  assert.equal(sc.make(30, 5), '04718293');
+  assert.equal(sc.make(365, 31), '90490609');
+});

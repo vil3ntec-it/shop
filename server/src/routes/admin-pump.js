@@ -19,6 +19,7 @@ const subs = require('../lib/subscriptions').pump;
 const idempotency = require('../lib/idempotency');
 const vip = require('../lib/vip-codes').pump;
 const offline = require('../lib/offline-codes');
+const shortCodes = require('../lib/pump-short-codes');
 const plans = require('../lib/plans');
 const audit = require('../lib/audit');
 const { catalogOf, PUMP_FEATURES } = require('../lib/features');
@@ -448,6 +449,28 @@ router.post('/offline-codes', requireSuperAdmin, async (req, res, next) => {
       actorType: 'admin', userId: req.admin.id, action: 'admin.pump_offline_code_issued',
       targetType: 'offline_code', targetId: out.offline.id,
       detail: { plan: out.offline.plan, computer: out.offline.computer, gift: out.offline.gift, account: out.offline.accountEmail, endsAt: out.offline.endsAt },
+    });
+    res.status(201).json(out);
+  } catch (err) { next(err); }
+});
+
+/*  🔢 کدِ ۸ رقمیِ روزدار (lib/pump-short-codes.js) — بی کدِ کامپیوتر، فقط روز */
+router.get('/short-codes', async (req, res, next) => {
+  try {
+    res.json({ codes: await shortCodes.list({ limit: v.integer(req.query?.limit, { min: 1, max: 500, def: 100 }) }) });
+  } catch (err) { next(err); }
+});
+
+router.post('/short-codes', requireSuperAdmin, async (req, res, next) => {
+  try {
+    const out = await shortCodes.issue({
+      days: v.integer(req.body?.days, { field: 'روزها', min: 1, max: shortCodes.MAX_DAYS }),
+      note: v.text(req.body?.note, { max: 300 }),
+      createdBy: req.admin.id,
+    });
+    await audit.log({
+      actorType: 'admin', userId: req.admin.id, action: 'admin.pump_short_code_issued',
+      targetType: 'short_code', targetId: out.short.id, detail: { days: out.short.days },
     });
     res.status(201).json(out);
   } catch (err) { next(err); }
