@@ -2167,6 +2167,8 @@
   .debtor-table th, .debtor-table td{padding:8px 10px; border-bottom:1px solid var(--border); text-align:start; white-space:nowrap;}
   .debtor-table th{font-size:12px; color:var(--muted); background:var(--surface-2);}
   .debtor-table td.num{text-align:end; font-weight:800;}
+  /* خانهٔ تلفن همان `.debtor-meta`ِ کارت است (نمایشِ phoneShow) — ولی خانهٔ جدول می‌ماند، نه flex */
+  .debtor-table td.debtor-meta{display:table-cell; font-size:13px; font-weight:400; margin:0; min-height:0; color:var(--text);}
   .debtor-table td.is-debt{color:var(--danger);}
   .debtor-table td.is-credit{color:var(--success);}
   .debtor-table tr.debtor-row{cursor:pointer;}
@@ -7958,7 +7960,7 @@
   function debtState(m){
     return m > 0 ? `${moneyMinor(m)} افغانی بدهکار` : m < 0 ? `${moneyMinor(-m)} افغانی موجودی دارد` : 'حساب صاف است';
   }
-  const DEBT_FMT = { money: moneyMinor, date: (s)=> formatDate(s), qty: (n)=> String(Math.round(n*1000)/1000), state: debtState };
+  const DEBT_FMT = { money: moneyMinor, date: (s)=> formatDate(s), qty: (n)=> String(Math.round(n*1000)/1000), state: debtState, phone: (p)=> phoneShow(p) };
   function isIsoDay(s){ const B = window.TohidDebtBook; return !!(B && B.isIsoDate(s)); }
   function overLimitText(c){
     return `${moneyMinor(c.excessMinor)} افغانی بیش از سقفِ اعتبار (${moneyMinor(c.limitMinor)}) — ماندهٔ فعلی ${moneyMinor(c.balanceMinor)}`;
@@ -8152,7 +8154,7 @@
       const cls = debt > 0 ? 'is-debt' : debt < 0 ? 'is-credit' : '';
       return `<tr class="debtor-row" data-debtor-id="${d.id}">
         <td><button type="button" class="debtor-open" data-open-debtor="${d.id}">${escapeHtml(d.name)}</button></td>
-        <td>${d.phone ? escapeHtml(d.phone) : '—'}</td>
+        <td class="debtor-meta">${d.phone ? `<span>${escapeHtml(phoneShow(d.phone))}</span>` : '—'}</td>
         <td class="num ${cls}">${debt === 0 ? 'صاف' : formatMoney(Math.abs(debt)) + (debt < 0 ? ' (موجودی)' : '')}</td>
         <td>${last ? escapeHtml(formatDate(last.date)) : '—'}</td>
         <td class="num">${lim}</td>

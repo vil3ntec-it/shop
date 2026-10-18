@@ -273,7 +273,7 @@ object DebtBook {
     val af = " افغانی"
     val rows = mutableListOf<Pair<String, String>>()
     rows += "مشتری" to book.debtor.name
-    if (book.debtor.phone.isNotBlank()) rows += "تلفن" to book.debtor.phone
+    if (book.debtor.phone.isNotBlank()) rows += "تلفن" to ir.vil3ntec.tohid.LocaleText.phoneDisplay(book.debtor.phone)
     rows += "تاریخ" to formatDate(e.tx.date)
     e.invoiceLabel?.let { rows += "فاکتور" to "#$it" }
 

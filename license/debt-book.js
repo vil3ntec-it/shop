@@ -219,7 +219,7 @@
 
   /*
    * رسیدِ یک ردیف — همان ردیف‌های `DebtBook.receipt`ِ کاتلین.
-   * fmt = { money(minor), date(iso), qty(n), state(minor) } — صفحه قالبِ خودش را می‌دهد.
+   * fmt = { money(minor), date(iso), qty(n), state(minor), phone?(p) } — صفحه قالبِ خودش را می‌دهد.
    */
   function receipt(data, debtorId, txId, storeName, today, fmt) {
     var b = book(data, debtorId, today);
@@ -229,7 +229,7 @@
     var af = ' افغانی';
     var rows = [];
     rows.push(['مشتری', b.debtor.name || '']);
-    if (b.debtor.phone) rows.push(['تلفن', b.debtor.phone]);
+    if (b.debtor.phone) rows.push(['تلفن', fmt.phone ? fmt.phone(b.debtor.phone) : b.debtor.phone]);
     rows.push(['تاریخ', fmt.date(e.tx.date)]);
     if (e.invoiceLabel) rows.push(['فاکتور', '#' + e.invoiceLabel]);
     if (e.give) {

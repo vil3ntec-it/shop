@@ -220,7 +220,7 @@ private fun CustomerCards(store: ShopStore, d: ShopData, snackbar: SnackbarHostS
           val r = list[i]
           when (c) {
             0 -> TCell(r.name, bold = true)
-            1 -> TCell(r.phone, Shop.colors.muted)
+            1 -> TCell(ir.vil3ntec.tohid.LocaleText.phoneDisplay(r.phone), Shop.colors.muted)
             2 -> TCell(if (kotlin.math.abs(r.balance) < 0.5) "صاف" else money(r.balance), stateColor(r.balance), bold = true)
             3 -> TCell(r.debtDays?.toString().orEmpty(), if ((r.debtDays ?: 0) > 60) Shop.colors.danger else Shop.colors.muted)
             4 -> TCell(r.invoices.toString())
