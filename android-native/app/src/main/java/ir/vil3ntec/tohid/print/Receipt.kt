@@ -17,9 +17,8 @@ import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.Sale
 import ir.vil3ntec.tohid.data.SaleItem
 import ir.vil3ntec.tohid.data.ShopData
-import ir.vil3ntec.tohid.formatDate
-import ir.vil3ntec.tohid.money
-import ir.vil3ntec.tohid.plain
+import ir.vil3ntec.tohid.LocaleChoice
+import ir.vil3ntec.tohid.LocaleText
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -125,10 +124,17 @@ object Receipt {
 
     fun gap(factor: Float = 0.5f) { y += pad * factor }
 
+    //  رقمِ فاکتور همان انتخابِ دکان است (LOC-05)؛ مبلغ بی اعشار با «افغانی» یا «؋» (LOC-07).
+    //  پیش‌فرض (لاتین، «افغانی») دقیقاً همان متنِ پیشین است (`LocaleTextTest`).
+    val digits = LocaleChoice.digits
+    val symbol = LocaleChoice.symbol
+    fun num(value: Double) = LocaleText.amount(value, digits)
+    fun afn(value: Double) = LocaleText.afghani(value, digits, symbol)
+
     /* ------------------------------ سربرگ ------------------------------ */
     line(storeName.ifBlank { "فروشگاه" }, title, Layout.Alignment.ALIGN_CENTER)
     gap(0.3f)
-    line("فاکتور فروش #${sale.invoiceLabel() ?: "—"}", head, Layout.Alignment.ALIGN_CENTER)
+    line(LocaleText.digitsIn("فاکتور فروش #${sale.invoiceLabel() ?: "—"}", digits), head, Layout.Alignment.ALIGN_CENTER)
     gap(0.3f)
 
     val time = runCatching {
@@ -139,7 +145,7 @@ object Receipt {
       sale.paymentMethod == "credit" -> "نسیه"
       else -> "نقدی"
     }
-    line("${formatDate(sale.date)} — ${time}   ($kind)", small, Layout.Alignment.ALIGN_CENTER)
+    line("${LocaleText.date(sale.date, digits)} — ${LocaleText.digitsIn(time, digits)}   ($kind)", small, Layout.Alignment.ALIGN_CENTER)
 
     rule(thick = true)
 
@@ -149,21 +155,21 @@ object Receipt {
       val name = ir.vil3ntec.tohid.data.SalesEngine.itemName(d, item)
       val unit = product?.unit.orEmpty()
       line(name, body)
-      val detail = "${money(item.quantity)}${if (unit.isNotBlank()) " $unit" else ""} × ${money(item.unitPrice)}"
-      row(detail, money(item.totalPrice), small)
-      if (item.returnedQty > 0) line("مرجوعی: ${money(item.returnedQty)}", small)
+      val detail = "${num(item.quantity)}${if (unit.isNotBlank()) " $unit" else ""} × ${num(item.unitPrice)}"
+      row(detail, num(item.totalPrice), small)
+      if (item.returnedQty > 0) line("مرجوعی: ${num(item.returnedQty)}", small)
       gap(0.25f)
     }
 
     rule()
 
     /* ------------------------------ جمع‌ها ------------------------------ */
-    row("جمع اقلام", "${money(sale.total)} افغانی", body)
-    row("تخفیف", "${money(sale.discount)} افغانی", body)
+    row("جمع اقلام", afn(sale.total), body)
+    row("تخفیف", afn(sale.discount), body)
     rule()
-    row("مبلغ نهایی", "${money(sale.finalTotal)} افغانی", head)
-    row("پرداختی", "${money(sale.paidAmount)} افغانی", body)
-    row("باقی‌مانده", "${money(sale.remaining)} افغانی", body)
+    row("مبلغ نهایی", afn(sale.finalTotal), head)
+    row("پرداختی", afn(sale.paidAmount), body)
+    row("باقی‌مانده", afn(sale.remaining), body)
     if (debtor != null) row("قرض‌دار", debtor.name, body)
 
     rule(thick = true)
