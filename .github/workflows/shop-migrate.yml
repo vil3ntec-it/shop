@@ -13,6 +13,9 @@ on:
       - 'android-native/app/src/main/java/ir/vil3ntec/tohid/data/ReportEngine.kt'
       - 'android-native/app/src/main/java/ir/vil3ntec/tohid/Jalali.kt'
       - 'android-native/app/src/main/java/ir/vil3ntec/tohid/Format.kt'
+      - 'android-native/app/src/main/java/ir/vil3ntec/tohid/LocaleText.kt'
+      - 'android-native/app/src/main/java/ir/vil3ntec/tohid/core/calendar/**'
+      - 'android-native/app/src/main/java/ir/vil3ntec/tohid/core/text/**'
       - 'core/src/jvmMain/kotlin/ir/vil3ntec/tohid/sync/v1/Ulid.kt'
       - '.github/workflows/shop-migrate.yml'
   push:
@@ -24,6 +27,9 @@ on:
       - 'android-native/app/src/main/java/ir/vil3ntec/tohid/data/ReportEngine.kt'
       - 'android-native/app/src/main/java/ir/vil3ntec/tohid/Jalali.kt'
       - 'android-native/app/src/main/java/ir/vil3ntec/tohid/Format.kt'
+      - 'android-native/app/src/main/java/ir/vil3ntec/tohid/LocaleText.kt'
+      - 'android-native/app/src/main/java/ir/vil3ntec/tohid/core/calendar/**'
+      - 'android-native/app/src/main/java/ir/vil3ntec/tohid/core/text/**'
       - 'core/src/jvmMain/kotlin/ir/vil3ntec/tohid/sync/v1/Ulid.kt'
       - '.github/workflows/shop-migrate.yml'
   workflow_dispatch:

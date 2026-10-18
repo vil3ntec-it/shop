@@ -50,6 +50,16 @@ const MATRIX = {
   'orders.contact':       ['owner', 'manager'],
   'orders.refund':        ['owner', 'manager'],
 
+  //  تحویل و پیک (۲۲.۲ C) — پشتِ پرچمِ `shop.delivery`، پیش‌فرض خاموش.
+  //  «پیک» نقشِ عضویت نیست: عضوی است که ردیفِ فعالِ `shop_couriers` دارد و
+  //  فقط مأموریت‌های خودش را از `/api/courier` می‌بیند.
+  'delivery.view':        ['owner', 'manager', 'staff'],
+  'delivery.assign':      ['owner', 'manager'],
+  'delivery.handover':    ['owner', 'manager', 'staff'],
+  'delivery.couriers':    ['owner', 'manager'],
+  'delivery.settle':      ['owner', 'manager'],
+  'delivery.photo':       ['owner', 'manager'],
+
   //  چتِ مشتری ↔ دکان (v3 §۳۳) — پشتِ پرچمِ `shop.chat`، پیش‌فرض خاموش.
   //  شمارهٔ کاملِ مشتری در چت هم همان `orders.contact` را می‌خواهد.
   'chat.view':            ['owner', 'manager', 'staff'],
