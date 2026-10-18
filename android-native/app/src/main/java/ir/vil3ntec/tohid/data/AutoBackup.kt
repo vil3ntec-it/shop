@@ -12,7 +12,7 @@ import java.util.Calendar
 import java.util.concurrent.TimeUnit
 
 /**
- *  پشتیبانِ خودکارِ شبانه.
+ *  پشتیبانِ خودکار — نسخهٔ محلیِ نیم‌ساعته و پایانِ روز، و ابریِ دوازده‌ساعته.
  *
  *  ── چه اشکالی را می‌بندد ────────────────────────────────────────────
  *  پشتیبان فقط یک دکمهٔ دستی در تنظیمات بود. متنِ خودِ برنامه هم همین را
@@ -32,24 +32,25 @@ import java.util.concurrent.TimeUnit
  *  کسی یادش نمانده.
  *  ──────────────────────────────────────────────────────────────────
  *
- *  سه نسخه نگه داشته می‌شود، نه یکی. اگر خرابی دو روز بعد دیده شود،
- *  نسخهٔ دیروز هم همان خرابی را دارد.
+ *  ── چند بار و چند تا (OPS-02) ──────────────────────────────────────
+ *  • نسخهٔ محلی **هر نیم ساعت، فقط اگر دفتر عوض شده** (`LOCAL_EVERY_MINUTES`،
+ *    کارِ جدای `tohid-auto-backup-local`)، به‌علاوهٔ نوبت‌های ۱۱ و ۲۳ (پایانِ
+ *    روز) و بستنِ برنامهٔ کامپیوتر. فایلِ تکراری ساخته نمی‌شود.
+ *  • نگه‌داری با `BackupRetention`: ۶ تای آخر + تازه‌ترینِ ۷ روزِ اخیر +
+ *    تازه‌ترینِ ۴ هفتهٔ اخیر. به‌جای «۶ تای آخر»ِ پیشین آمده و هیچ نسخه‌ای
+ *    را که آن قاعده نگه می‌داشت زودتر پاک نمی‌کند — فقط بیشتر می‌ماند.
+ *    اگر خرابی دو روز یا دو هفته بعد دیده شود، نسخهٔ سالم هنوز هست.
+ *  • پشتیبانِ ابری همان هر دوازده ساعت است و تغییری نکرده.
+ *  ──────────────────────────────────────────────────────────────────
  */
 object AutoBackup {
 
   private const val WORK = "tohid-auto-backup"
+  private const val LOCAL_WORK = "tohid-auto-backup-local"
   private const val DIR = "auto-backups"
-  private const val PREFIX = "auto-"
-  private const val SUFFIX = ".json"
 
-  /**
-   *  چند نسخه روی خودِ گوشی نگه داشته شود.
-   *
-   *  ⚠️ با دو نسخه در روز، شش تا یعنی همان **سه روز** پوششی که نسخهٔ
-   *  شبانه داشت. کم گذاشتنش یعنی «خرابی دو روز بعد دیده شود و نسخهٔ
-   *  سالمی نمانده باشد» — همان چیزی که این کار برایش هست.
-   */
-  const val KEEP = 6
+  /** نسخهٔ محلی هر چند دقیقه (فقط اگر دفتر عوض شده) — OPS-02: «هر ۱۵ تا ۳۰ دقیقه» */
+  const val LOCAL_EVERY_MINUTES = 30L
 
   data class Snapshot(val file: File, val at: Long, val bytes: Long)
 
@@ -75,6 +76,15 @@ object AutoBackup {
     runCatching {
       WorkManager.getInstance(context)
         .enqueueUniquePeriodicWork(WORK, ExistingPeriodicWorkPolicy.UPDATE, request)
+    }
+    //  نسخهٔ محلیِ نیم‌ساعته: بی شرطِ باتری — فقط مقایسه و رونوشتِ یک فایل
+    //  است، بی شبکه، و اگر دفتر عوض نشده هیچ نمی‌نویسد
+    val local = PeriodicWorkRequestBuilder<LocalWorker>(LOCAL_EVERY_MINUTES, TimeUnit.MINUTES)
+      .setInitialDelay(LOCAL_EVERY_MINUTES, TimeUnit.MINUTES)
+      .build()
+    runCatching {
+      WorkManager.getInstance(context)
+        .enqueueUniquePeriodicWork(LOCAL_WORK, ExistingPeriodicWorkPolicy.UPDATE, local)
     }
   }
 
@@ -107,41 +117,31 @@ object AutoBackup {
 
   /** نسخه‌های موجود، تازه‌ترین اول */
   fun list(context: Context): List<Snapshot> =
-    dir(context).listFiles().orEmpty()
-      .filter { it.isFile && it.name.startsWith(PREFIX) && it.name.endsWith(SUFFIX) }
-      .map { Snapshot(it, it.lastModified(), it.length()) }
-      .sortedByDescending { it.at }
+    LocalSnapshots.list(dir(context)).map { Snapshot(it.file, it.at, it.bytes) }
 
   /**
-   *  گرفتنِ یک نسخه.
+   *  گرفتنِ یک نسخه — **فقط اگر دفتر با تازه‌ترین نسخه فرق دارد**؛ بعد هرس.
    *
    *  عمداً از خودِ فایلِ دفتر کپی می‌شود، نه از سریالایزِ دوباره: هم
    *  ارزان‌تر است، هم دقیقاً همان بایت‌هایی می‌ماند که برنامه می‌خواند.
-   *  اگر دفتری نیست، کاری هم نیست.
+   *  اگر دفتری نیست یا عوض نشده، null. خواندنِ دفتر جایگزین شدنش را نمی‌بندد
+   *  (`LocalSnapshots.openShared`)، پس ثبتِ فروش هیچ‌وقت منتظرِ این نمی‌ماند.
+   *
+   *  ⚠️ نامِ فایل ساعت و ثانیه دارد (`auto-2026-10-17-143000.json`): با
+   *  نسخهٔ نیم‌ساعته، نامِ «تاریخ + نوبتِ صبح/عصر»ِ پیشین نسخهٔ قبلیِ همان
+   *  نوبت را رونویسی می‌کرد. نام‌های قدیمی (`…-b`/`…-sh`) هم همچنان نسخه‌اند.
    */
   fun take(context: Context, today: String): Result<File?> = runCatching {
     val ledger = File(context.filesDir, "shop-data.json")
-    if (!ledger.exists() || ledger.length() == 0L) return@runCatching null
-
-    /*
-     *  ⚠️ نامِ فایل **نوبت** را هم دارد.
-     *
-     *  با دو نسخه در روز و نامی که فقط تاریخ داشت، نسخهٔ دوم روی اولی
-     *  می‌نشست و عملاً همان یکی‌در‌روزِ قبلی می‌ماند — فقط با دو برابر
-     *  کار. «ب» برای پیش از ظهر، «ش» برای بعدش.
-     */
-    val slot = if (Calendar.getInstance().get(Calendar.HOUR_OF_DAY) < 12) "b" else "sh"
-    val target = File(dir(context), "$PREFIX$today-$slot$SUFFIX")
-    //  فایلِ کناری + fsync + جابه‌جاییِ اتمی؛ شکست بی‌صدا نیست (F0-01) —
-    //  روی ویندوز `renameTo` نسخهٔ دومِ همان نوبت را هرگز نمی‌نشاند
-    DiskWrite.copy(ledger, target)
+    val time = java.text.SimpleDateFormat("HHmmss", java.util.Locale.US).format(java.util.Date())
+    val made = LocalSnapshots.takeIfChanged(ledger, dir(context), "${LocalSnapshots.PREFIX}$today-$time${LocalSnapshots.SUFFIX}")
     prune(context)
-    target
+    made
   }
 
-  /** فقط تازه‌ترین‌ها می‌مانند */
+  /** «۶ آخر + ۷ روزانه + ۴ هفتگی» به وقتِ همین دستگاه (`BackupRetention`) */
   private fun prune(context: Context) {
-    list(context).drop(KEEP).forEach { runCatching { it.file.delete() } }
+    LocalSnapshots.prune(dir(context), { at -> java.util.TimeZone.getDefault().getOffset(at) / 60_000 })
   }
 
   /**
@@ -191,6 +191,14 @@ object AutoBackup {
         )
         .isSuccess
     }.getOrDefault(false)
+  }
+
+  /** نسخهٔ محلیِ نیم‌ساعته — بی ابر، بی پوشهٔ قرینه؛ اگر دفتر عوض نشده، هیچ */
+  class LocalWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
+    override suspend fun doWork(): Result {
+      runCatching { take(applicationContext, ir.vil3ntec.tohid.todayIso()) }
+      return Result.success()
+    }
   }
 
   class Worker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
