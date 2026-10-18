@@ -284,3 +284,27 @@ test('⛔ دائمیِ خدمات‌تمام‌شده + کدِ وی‌آی‌پ�
   assert.ok((await entOf(d.stationId)).features.includes('cloud'));
   assert.ok(red.body.features.includes('cloud'), 'مجوزِ همان پاسخ هم');
 });
+
+test('🎁 گیفت‌کارت: بی کدِ کامپیوتر صادر می‌شود، روی هر کامپیوتر و هر پمپی می‌نشیند', async () => {
+  const r = await issue({ plan: 'vip', gift: true, days: 30 });
+  assert.equal(r.status, 201, JSON.stringify(r.body));
+  assert.equal(r.body.offline.gift, true);
+  assert.equal(r.body.offline.computer, 'GIFT');
+  const p = offline.parse(r.body.code);
+  assert.ok(p.machine.every(b => b === 0), 'هشت بایتِ کامپیوتر همه صفر');
+  assert.ok(offline.isGift(p));
+
+  const d1 = await boundDevice('pc-gift-1');
+  const d2 = await boundDevice('pc-gift-2');
+  const a = await h.post('/api/pump/device/offline-code',
+    { code: r.body.code, computer: PC_A }, { token: d1.token });
+  assert.equal(a.status, 200, JSON.stringify(a.body));
+  assert.equal(a.body.status, 'granted');
+  const b = await h.post('/api/pump/device/offline-code',
+    { code: r.body.code, computer: PC_B }, { token: d2.token });
+  assert.equal(b.status, 200, 'کاملاً آزاد: پمپِ دیگر هم ⇒ ' + JSON.stringify(b.body));
+  assert.equal(b.body.status, 'granted');
+
+  //  کدِ معمولی هنوز بی کدِ کامپیوتر صادر نمی‌شود
+  assert.equal((await issue({ plan: 'vip', days: 30 })).status, 400);
+});
