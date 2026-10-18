@@ -206,8 +206,9 @@ fun ProductGrid(
   state: LazyGridState,
   modifier: Modifier = Modifier,
 ) {
+  //  برجسته (پیشنهادِ Enter) دیده می‌ماند؛ فهرستِ تازه بی برجسته از سر
   LaunchedEffect(highlight, items) {
-    if (highlight in items.indices) runCatching { state.animateScrollToItem(highlight) }
+    runCatching { if (highlight in items.indices) state.animateScrollToItem(highlight) else state.scrollToItem(0) }
   }
   LazyVerticalGrid(
     columns = GridCells.Adaptive(minSize = if (target >= 48.dp) 196.dp else 176.dp),
@@ -244,7 +245,7 @@ fun ProductTable(
   modifier: Modifier = Modifier,
 ) {
   LaunchedEffect(highlight, items) {
-    if (highlight in items.indices) runCatching { state.animateScrollToItem(highlight) }
+    runCatching { if (highlight in items.indices) state.animateScrollToItem(highlight) else state.scrollToItem(0) }
   }
   val head = MaterialTheme.typography.labelMedium
   Column(modifier.border(1.dp, Shop.colors.border, ShopShape.card).clip(ShopShape.card)) {

@@ -156,11 +156,11 @@ fun OrderLines(
 ) {
   if (lines.isEmpty()) {
     Column(
-      modifier.fillMaxWidth().padding(vertical = 28.dp, horizontal = 12.dp),
+      modifier.fillMaxWidth().padding(vertical = 12.dp, horizontal = 12.dp),
       horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-      Icon(Icons.Filled.ShoppingBasket, contentDescription = null, tint = Shop.colors.muted2, modifier = Modifier.size(40.dp))
-      Spacer(Modifier.height(8.dp))
+      Icon(Icons.Filled.ShoppingBasket, contentDescription = null, tint = Shop.colors.muted2, modifier = Modifier.size(28.dp))
+      Spacer(Modifier.height(6.dp))
       Text("سبد خالی است", style = MaterialTheme.typography.titleSmall, color = Shop.colors.text)
       Spacer(Modifier.height(4.dp))
       Text(
