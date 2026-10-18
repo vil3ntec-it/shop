@@ -135,6 +135,14 @@ object ApiEndpoints {
 
     fun member(id: String) = "$MEMBERS/${enc(id)}"
     fun staffCode(id: String) = "$STAFF_CODES/${enc(id)}"
+
+    /*  کارمندان، مجوزها و دستگاه‌ها — STF-01..03، STF-10، STF-11 */
+    const val STAFF_CODE_DISABLE = "/shop/staff-code/disable"
+    const val PERMISSIONS = "/shop/permissions"
+    const val DEVICES = "/shop/devices"
+    fun memberPerms(id: String) = "$PERMISSIONS/members/${enc(id)}"
+    fun deviceDisable(id: String) = "$DEVICES/${enc(id)}/disable"
+    fun deviceEnable(id: String) = "$DEVICES/${enc(id)}/enable"
   }
 
   /* ------------------------------ همگام‌سازی ------------------------------ */

@@ -81,7 +81,12 @@ function tokenOf(req) {
 async function requireSyncAccount(req, res, next) {
   try {
     const ctx = await resolveToken(tokenOf(req));
-    if (!ctx) return next(unauthorized('نشست شما منقضی شده است، دوباره وارد شوید', 'invalid_token'));
+    if (!ctx) {
+      //  STF-10: دستگاهِ ازکارافتاده خطای روشن می‌گیرد و تلاشش شمرده می‌شود
+      const block = require('./device-block');
+      if (await block.explain(tokenOf(req))) return next(forbidden(block.MESSAGE, block.CODE));
+      return next(unauthorized('نشست شما منقضی شده است، دوباره وارد شوید', 'invalid_token'));
+    }
     if (!ctx.accountId) {
       return next(forbidden(
         ctx.missing === 'no_station' ? 'برای این حساب پمپی ثبت نشده است' : 'برای این حساب دکانی ثبت نشده است',

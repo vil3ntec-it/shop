@@ -1,0 +1,906 @@
+'use strict';
+/**
+ * ویترینِ اینترنتی و ثبتِ سفارشِ مشتری — فاز ۴ (WEB، CHK؛ بخش‌های ۳.۹ و ۳.۱۰).
+ *
+ *   روشن ── سه قفل پشتِ هم، هر سه پیش‌فرض خاموش: پرچم‌های `shop.orders` و
+ *           `shop.storefront` در «تنظیماتِ زنده» (+ کلیدهای اشتراکِ
+ *           `online_orders` و `storefront`) و `enabled` ِ خودِ دکان. هر کدام
+ *           نباشد ⇒ نشانیِ عمومی ۴۰۴، درست مثلِ نشانیِ ناموجود.
+ *   نشانی ─ D-06: `{slug}.vill3n.top` (پیشنهادِ خودِ مشخصات)؛ `/store/<slug>`
+ *           همان صفحه روی هر میزبانی است، برای پیش از DNS ِ ستاره‌دار.
+ *   کالا ── فقط کالایی که دکان «در ویترین» گذاشته (`storefront_products`)،
+ *           حذف‌نشده و فعال در دفترِ همگام‌سازی (`sync_rows`، فقط خواندن).
+ *   قیمت ── را سرور می‌گوید (قیمتِ آنلاین، وگرنه قیمتِ فروشِ دفتر) و درونِ
+ *           همان تراکنشِ ساختِ سفارش دوباره می‌خواند (CHK-17). عددی که مشتری
+ *           می‌فرستد خوانده نمی‌شود؛ `expectedTotalMinor` فقط برای این است
+ *           که اگر جمع عوض شده، سفارش ثبت نشود و تغییر روشن نشان داده شود.
+ *   ساخت ── فقط از راهِ `orders.create` با کلیدِ یکتایی (CHK-19).
+ *   پیگیری ─ با توکنِ حدس‌نزدنی: `<شناسهٔ سفارش>.<HMAC>` — چیزی ذخیره
+ *           نمی‌شود و تکرارِ همان درخواست همان توکن را برمی‌گرداند.
+ *
+ *   مشتری ─ ۲۳: دیدن و سبد آزاد؛ **ثبتِ سفارش فقط با شمارهٔ تأییدشده**
+ *           (کدِ یک‌بارمصرفِ همان `lib/otp.js`). بی سرویسِ پیامک در تولید
+ *           ⇒ ۵۰۳ ِ صریح، نه «فرستاده شد» ِ دروغ (BLOCKED-EXTERNAL).
+ *   وضعیت ─ ۳۱.۱: «باز/بسته» از ساعتِ کاری و اعلامِ مالک، «اتصال» از آخرین
+ *           تماسِ واقعیِ دستگاه‌های دکان (`sync_devices.last_seen_at`)، و
+ *           «پذیرشِ سفارش» جدا — هیچ زمانِ ساختگی نشان داده نمی‌شود.
+ *
+ * ⛔ هنوز نیست (و عمداً): موجودی و رزرو (CHK-18، ۳۲.۲ — لایهٔ موجودیِ سرور
+ * نیامده؛ پس موجودی «در حال بررسی» است، نه «موجود»)، ناحیه و هزینهٔ ارسالِ
+ * چندضلعی (CHK-07/10)، زمان‌بندی (CHK-12)، حسابِ کاملِ مشتری (۲۳.۴)،
+ * پرداختِ آنلاین (D-08، 🔌).
+ */
+const crypto = require('crypto');
+const db = require('../db');
+const { one, many, now, tx } = db;
+const config = require('../config');
+const orders = require('./orders');
+const S = require('./order-states');
+const { stripControl } = require('./validate');
+const { badRequest, notFound, conflict, ApiError } = require('../middleware/errors');
+
+const FLAG_KEY = 'shop.storefront';
+const FEATURE_KEY = 'storefront';
+const SLUG_RE = /^[a-z0-9][a-z0-9-]{1,30}[a-z0-9]$/;
+const PRODUCT_ID_RE = /^[A-Za-z0-9_.:-]{1,80}$/;
+/** زیردامنه‌هایی که مالِ خودِ سامانه‌اند یا گمراه می‌کنند. */
+const RESERVED = new Set([
+  'api', 'www', 'admin', 'panel', 'portal', 'sdk', 'shop', 'store', 'stores', 'beta', 'app', 'apps',
+  'pump', 'mail', 'smtp', 'imap', 'pop', 'ftp', 'ns1', 'ns2', 'cdn', 'static', 'assets', 'help',
+  'support', 'status', 'docs', 'blog', 'dev', 'test', 'staging', 'login', 'auth', 'account',
+  'billing', 'pay', 'payment', 'download', 'downloads', 'home', 'vill3n', 'tohid', 'official',
+]);
+const MAX_CHECKOUT_LINES = 100;
+const MAX_QTY_MILLI = 10_000_000;
+const MAX_PRICE_MINOR = 100_000_000_000;
+const MAX_FEE_MINOR = 100_000_000;
+const MAX_DECLARE_MS = 7 * 24 * 60 * 60 * 1000;
+const PAGE = 40;
+const MAX_PAGE = 100;
+const SHOP_ROWS = "r.app = 'shop' AND r.account_kind = 'shop' AND r.table_name = 'products'";
+const LIVE_PRODUCT = "r.deleted_at IS NULL AND COALESCE(r.data->>'active', 'true') <> 'false'";
+
+// ════════════════════════════════════════════════════════════════════
+//  ورودی
+// ════════════════════════════════════════════════════════════════════
+
+const str = (v) => (typeof v === 'string' ? v.trim() : '');
+const text = (v, max) => stripControl(str(v)).slice(0, max);
+const obj = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
+
+function int(v, field, { min = 0, max = Number.MAX_SAFE_INTEGER } = {}) {
+  if (typeof v !== 'number' || !Number.isSafeInteger(v)) throw badRequest(`${field} باید عددِ صحیح باشد`, 'bad_number');
+  if (v < min || v > max) throw badRequest(`${field} در بازهٔ مجاز نیست`, 'bad_number');
+  return v;
+}
+
+function bool(v, field) {
+  if (typeof v !== 'boolean') throw badRequest(`${field} باید بله/نه باشد`, 'bad_boolean');
+  return v;
+}
+
+/** «ي/ك» ِ عربی، اعراب، کشیده و نیم‌فاصله — همان چیزی که کاربر در جست‌وجو نمی‌بیند. */
+function normalize(s) {
+  return String(s || '')
+    .toLowerCase()
+    .replace(/[يى]/g, 'ی').replace(/ك/g, 'ک').replace(/[ۀة]/g, 'ه').replace(/[أإآ]/g, 'ا')
+    .replace(/[ً-ٰٟـ]/g, '')
+    .replace(/[‌‍]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+/** همان نرمال‌سازی، در SQL، روی نامِ کالا. */
+const SQL_NAME = "translate(lower(r.data->>'name'), 'يىكۀةأإآ' || chr(1600) || chr(8204), 'ییکههااا  ')";
+
+function slugOf(v) {
+  const s = str(v).toLowerCase();
+  if (!SLUG_RE.test(s) || s.includes('--')) {
+    throw badRequest('نشانیِ ویترین: ۳ تا ۳۲ حرفِ کوچکِ انگلیسی، رقم یا خطِ تیره', 'bad_slug');
+  }
+  if (RESERVED.has(s)) throw badRequest('این نشانی رزرو است', 'slug_reserved');
+  return s;
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  روشن یا خاموش
+// ════════════════════════════════════════════════════════════════════
+
+async function stateOf(shopId) {
+  const [ordersFlag, storefrontFlag, { ent }] = await Promise.all([
+    orders.flagOf(shopId), orders.flagOf(shopId, FLAG_KEY), orders.entitledOf(shopId),
+  ]);
+  const flag = ordersFlag && storefrontFlag;
+  const entitled = ent.features.includes(FEATURE_KEY) && ent.features.includes(orders.FEATURE_KEY);
+  return { flag, ordersFlag, storefrontFlag, entitled, enabled: flag && entitled, ent };
+}
+
+/** ویترینِ عمومی — یا ۴۰۴؛ «نیست»، «خاموش» و «پرچم نیست» یک جواب‌اند. */
+async function open(slug) {
+  const s = str(slug).toLowerCase();
+  const gone = () => notFound('این ویترین پیدا نشد', 'store_not_found');
+  if (!SLUG_RE.test(s)) throw gone();
+  const row = await one(
+    `SELECT sf.*, s.status AS shop_status FROM storefronts sf JOIN shops s ON s.id = sf.shop_id WHERE sf.slug = $1`,
+    [s]
+  );
+  if (!row || row.enabled !== true || row.shop_status !== 'active') throw gone();
+  if (!(await stateOf(row.shop_id)).enabled) throw gone();
+  return row;
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  نمای عمومی
+// ════════════════════════════════════════════════════════════════════
+
+// ── ۳۱.۱ — وضعیتِ دکان برای مشتری ─────────────────────────────────
+
+const asJson = (x, def) => {
+  if (x && typeof x === 'object') return x;
+  try { return JSON.parse(x); } catch { return def; }
+};
+
+/** روز، دقیقه و تاریخِ محلیِ دکان — ساعتِ گوشیِ مشتری مرجع نیست. */
+function localParts(at, timezone) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone, hourCycle: 'h23', weekday: 'short', year: 'numeric', month: '2-digit',
+    day: '2-digit', hour: '2-digit', minute: '2-digit',
+  }).formatToParts(new Date(at)).map((p) => [p.type, p.value]));
+  const dow = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(parts.weekday);
+  const hour = Number(parts.hour) % 24;
+  return {
+    dow, minutes: hour * 60 + Number(parts.minute),
+    date: `${parts.year}-${parts.month}-${parts.day}`,
+    time: `${String(hour).padStart(2, '0')}:${parts.minute}`,
+  };
+}
+
+function scheduleOf(sf, at) {
+  const hours = asJson(sf.weekly_hours, {});
+  const closed = asJson(sf.closed_dates, []);
+  const local = localParts(at, sf.timezone || 'Asia/Kabul');
+  const today = Array.isArray(hours[String(local.dow)]) ? hours[String(local.dow)] : [];
+  const set = Object.keys(hours).length > 0;
+  const holiday = closed.includes(local.date);
+  let open = null;   // null = ساعتِ کاری تنظیم نشده
+  if (holiday) open = false;
+  else if (set) open = today.some(([o, c]) => local.minutes >= o && local.minutes < c);
+  return { set, open, holiday, today, local };
+}
+
+/**
+ * سه چیزِ جدا (۳۱.۱؛ ۳۱.۲ بندِ ۷):
+ *   badge            — open_online | open_unconfirmed | declared_until | closed | offline
+ *   lastConfirmedAt  — آخرین تماسِ واقعیِ یکی از دستگاه‌های دکان با سرور، یا null
+ *   orderAcceptance  — accepting | delayed | later. سرور سفارش را در هر سه
+ *                      پایدار ثبت می‌کند (۳۱.۲ بندِ ۶)؛ این فقط به مشتری راست
+ *                      می‌گوید کی بررسی می‌شود (WEB-03/25).
+ */
+function presenceOf(sf, at, lastSeenAt) {
+  let mode = sf.presence_mode || 'auto';
+  const until = sf.declared_until === null || sf.declared_until === undefined ? null : Number(sf.declared_until);
+  if (mode === 'online_until' && !(until > at)) mode = 'auto';   // پایانِ اعلام ⇒ خودکار منقضی (۳۱.۲ بندِ ۵)
+  const sched = scheduleOf(sf, at);
+  const seen = Number(lastSeenAt) > 0 ? Number(lastSeenAt) : null;
+  const age = seen === null ? Infinity : at - seen;
+  const { staleMs, offlineMs } = config.storefront;
+  const declaredOpen = mode === 'online' || mode === 'online_until';
+
+  let badge;
+  if (mode === 'closed' || (!declaredOpen && sched.open === false)) badge = 'closed';
+  else if (mode === 'offline' || age > offlineMs) badge = 'offline';
+  else if (mode === 'online_until') badge = 'declared_until';
+  else badge = age <= staleMs ? 'open_online' : 'open_unconfirmed';
+
+  const connection = age <= staleMs ? 'confirmed' : (age > offlineMs ? 'lost' : 'unconfirmed');
+  let orderAcceptance = 'delayed';
+  if (badge === 'closed' || mode === 'offline') orderAcceptance = 'later';
+  else if (connection === 'confirmed') orderAcceptance = 'accepting';
+  return {
+    badge,
+    mode,
+    declaredUntil: mode === 'online_until' ? until : null,
+    connection,
+    lastConfirmedAt: seen,
+    orderAcceptance,
+    timezone: sf.timezone || 'Asia/Kabul',
+    localTime: sched.local.time,
+    hoursSet: sched.set,
+    holiday: sched.holiday,
+    today: sched.today,
+    notice: sf.notice || '',
+  };
+}
+
+/** آخرین تماسِ واقعیِ دستگاه‌های دکان با سرور (همگام‌سازی) — یا ۰. */
+async function lastSeenOf(shopId) {
+  const r = await one(
+    `SELECT MAX(last_seen_at) AS t FROM sync_devices WHERE app = 'shop' AND account_kind = 'shop' AND account_id = $1`,
+    [shopId]
+  );
+  return r && r.t !== null && r.t !== undefined ? Number(r.t) : 0;
+}
+
+async function statusOf(sf, at = now()) {
+  return presenceOf(sf, at, await lastSeenOf(sf.shop_id));
+}
+
+function profile(sf, categories = [], status = null) {
+  return {
+    slug: sf.slug,
+    title: sf.title,
+    tagline: sf.tagline,
+    contactPhone: sf.contact_phone,
+    accent: sf.accent,
+    status,
+    fulfillment: { delivery: sf.accept_delivery === true, pickup: sf.accept_pickup === true },
+    deliveryFeeMinor: Number(sf.delivery_fee_minor),
+    minOrderMinor: Number(sf.min_order_minor),
+    currency: 'AFN',
+    //  پرداختِ آنلاین منتظرِ D-08 است (🔌) — تا آن روز هیچ دکمه‌ای نیست
+    payment: { methods: ['cod'], online: { available: false, decision: 'D-08' } },
+    categories,
+  };
+}
+
+/** قیمتِ واحد به یک‌صدمِ افغانی — قیمتِ آنلاین، وگرنه قیمتِ فروشِ دفتر؛ نبود ⇒ null. */
+function priceOf(row) {
+  if (row.online_price_minor !== null && row.online_price_minor !== undefined) return Number(row.online_price_minor);
+  const d = typeof row.data === 'string' ? JSON.parse(row.data) : row.data || {};
+  const sale = Number(d.salePrice);
+  if (!Number.isFinite(sale) || sale <= 0) return null;
+  const minor = Math.round(sale * 100);
+  return Number.isSafeInteger(minor) && minor <= MAX_PRICE_MINOR ? minor : null;
+}
+
+function productView(row) {
+  const d = typeof row.data === 'string' ? JSON.parse(row.data) : row.data || {};
+  return {
+    id: row.id,
+    name: text(d.name, 200),
+    unit: text(d.unit, 30),
+    category: text(d.category, 80),
+    priceMinor: priceOf(row),
+    maxQtyMilli: row.max_qty_milli === null || row.max_qty_milli === undefined ? null : Number(row.max_qty_milli),
+    photo: row.has_photo === true,
+    //  ۳۲.۱/۳۲.۳: سرور هنوز دفترِ موجودی ندارد ⇒ «در حال بررسی»، هرگز «موجود»
+    stock: { status: 'unverified', checkedAt: null },
+  };
+}
+
+const PRODUCT_COLS = `r.row_id AS id, r.data, sp.online_price_minor, sp.max_qty_milli,
+  EXISTS (SELECT 1 FROM product_photos ph WHERE ph.app = 'shop' AND ph.account_id = sp.shop_id
+            AND ph.product_id = r.row_id AND ph.data IS NOT NULL) AS has_photo`;
+const PRODUCT_FROM = `storefront_products sp
+  JOIN sync_rows r ON ${SHOP_ROWS} AND r.account_id = sp.shop_id AND r.row_id = sp.product_id`;
+
+async function categories(shopId) {
+  const rows = await many(
+    `SELECT DISTINCT r.data->>'category' AS c FROM ${PRODUCT_FROM}
+      WHERE sp.shop_id = $1 AND sp.published AND ${LIVE_PRODUCT} AND COALESCE(r.data->>'category', '') <> ''
+      ORDER BY 1 LIMIT 60`,
+    [shopId]
+  );
+  return rows.map((r) => text(r.c, 80)).filter(Boolean);
+}
+
+function encodeCursor(name, id) {
+  return Buffer.from(JSON.stringify([name, id])).toString('base64url');
+}
+function decodeCursor(raw) {
+  try {
+    const [name, id] = JSON.parse(Buffer.from(String(raw), 'base64url').toString('utf8'));
+    if (typeof name !== 'string' || typeof id !== 'string' || !PRODUCT_ID_RE.test(id)) throw new Error('x');
+    return { name, id };
+  } catch {
+    throw badRequest('نشانگرِ صفحه معتبر نیست', 'bad_cursor');
+  }
+}
+
+/** کاتالوگِ عمومی: فقط منتشرشده، زنده و قیمت‌دار؛ به ترتیبِ نام، صفحه‌بندیِ کلیدی. */
+async function catalog(shopId, { q, category, cursor, limit } = {}) {
+  const lim = Math.min(MAX_PAGE, Math.max(1, Number.parseInt(limit, 10) || PAGE));
+  const params = [shopId];
+  let where = `sp.shop_id = $1 AND sp.published AND ${LIVE_PRODUCT}`;
+  const needle = normalize(text(q, 60));
+  if (needle) {
+    params.push(`%${needle.replace(/[\\%_]/g, (c) => `\\${c}`)}%`);
+    where += ` AND ${SQL_NAME} LIKE $${params.length}`;
+  }
+  const cat = text(category, 80);
+  if (cat) {
+    params.push(cat);
+    where += ` AND r.data->>'category' = $${params.length}`;
+  }
+  if (cursor) {
+    const c = decodeCursor(cursor);
+    params.push(c.name, c.id);
+    where += ` AND (COALESCE(r.data->>'name', ''), r.row_id) > ($${params.length - 1}, $${params.length})`;
+  }
+  params.push(lim + 1);
+  const rows = await many(
+    `SELECT ${PRODUCT_COLS} FROM ${PRODUCT_FROM} WHERE ${where}
+      ORDER BY COALESCE(r.data->>'name', ''), r.row_id LIMIT $${params.length}`,
+    params
+  );
+  const more = rows.length > lim;
+  const page = more ? rows.slice(0, lim) : rows;
+  const last = page[page.length - 1];
+  return {
+    //  کالای بی‌قیمت فروختنی نیست — نشان داده نمی‌شود
+    items: page.map(productView).filter((p) => p.priceMinor !== null && p.name),
+    nextCursor: more ? encodeCursor(String((last.data && last.data.name) || ''), last.id) : null,
+  };
+}
+
+/** عکسِ کالای منتشرشده — یا null. */
+async function photo(shopId, productId) {
+  if (!PRODUCT_ID_RE.test(String(productId || ''))) return null;
+  const live = await one(
+    `SELECT 1 FROM ${PRODUCT_FROM} WHERE sp.shop_id = $1 AND sp.product_id = $2 AND sp.published AND ${LIVE_PRODUCT}`,
+    [shopId, productId]
+  );
+  if (!live) return null;
+  return require('./product-photos').get({ app: 'shop', accountId: shopId }, productId);
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  ثبتِ سفارش
+// ════════════════════════════════════════════════════════════════════
+
+function parseCheckout(body, sf) {
+  const b = obj(body);
+  const fulfillment = str(b.fulfillment);
+  if (!['delivery', 'pickup'].includes(fulfillment)) throw badRequest('ارسال یا دریافت از دکان؟', 'bad_fulfillment');
+  if ((fulfillment === 'delivery' && !sf.accept_delivery) || (fulfillment === 'pickup' && !sf.accept_pickup)) {
+    throw badRequest('این روشِ تحویل در این ویترین نیست', 'fulfillment_unavailable');
+  }
+  const paymentMethod = str(b.paymentMethod) || 'cod';
+  if (paymentMethod !== 'cod') throw badRequest('فعلاً فقط نقد هنگامِ تحویل', 'bad_payment_method');
+  //  CHK-01: مهمان فقط با نام و شماره (و پین برای ارسال)
+  const contact = orders.parseContact(b, fulfillment, { phoneRequired: true });
+
+  if (!Array.isArray(b.lines) || b.lines.length === 0) throw badRequest('سبد خالی است', 'bad_lines');
+  if (b.lines.length > MAX_CHECKOUT_LINES) throw badRequest(`حداکثر ${MAX_CHECKOUT_LINES} قلم`, 'bad_lines');
+  const seen = new Set();
+  const lines = b.lines.map((l, i) => {
+    const x = obj(l);
+    const productId = str(x.productId);
+    if (!PRODUCT_ID_RE.test(productId)) throw badRequest(`کالای قلمِ ${i + 1} معتبر نیست`, 'bad_lines');
+    if (seen.has(productId)) throw badRequest('یک کالا دو بار در سبد آمده است', 'bad_lines');
+    seen.add(productId);
+    return {
+      productId,
+      qtyMilli: int(x.qtyMilli, `مقدارِ قلمِ ${i + 1}`, { min: 1, max: MAX_QTY_MILLI }),
+      note: text(x.note, 200),
+    };
+  });
+
+  let expectedTotalMinor = null;
+  if (b.expectedTotalMinor !== undefined && b.expectedTotalMinor !== null) {
+    expectedTotalMinor = int(b.expectedTotalMinor, 'جمعِ دیده‌شده', { min: 0, max: MAX_PRICE_MINOR * 10 });
+  }
+  return { fulfillment, paymentMethod, ...contact, note: text(b.note, 500), lines, expectedTotalMinor };
+}
+
+/** برگهٔ قیمتِ امروزِ سبد (همان که در `price_changed` برمی‌گردد). */
+function quoteOf(lines, fees) {
+  return {
+    lines: lines.map((l) => ({
+      productId: l.productId, name: l.name, unit: l.unit, qtyMilli: l.qtyMilli,
+      unitPriceMinor: l.unitPriceMinor, lineTotalMinor: l.lineTotalMinor,
+    })),
+    subtotalMinor: fees.subtotalMinor,
+    deliveryFeeMinor: fees.deliveryFeeMinor,
+    totalMinor: fees.totalMinor,
+  };
+}
+
+function withData(err, data) {
+  Object.assign(err, { data });
+  return err;
+}
+
+/**
+ * قیمت‌گذاریِ سرور درونِ تراکنشِ `orders.create` — قیمت و «هنوز در ویترین»
+ * همان لحظه از دفتر خوانده می‌شود.
+ */
+function pricer(shopId, sf, input) {
+  return async (run, at) => {
+    const ids = input.lines.map((l) => l.productId);
+    const rows = (await run(
+      `SELECT ${PRODUCT_COLS} FROM ${PRODUCT_FROM}
+        WHERE sp.shop_id = $1 AND sp.product_id = ANY($2::text[]) AND sp.published AND ${LIVE_PRODUCT}`,
+      [shopId, ids]
+    )).rows;
+    const byId = new Map(rows.map((r) => [r.id, productView(r)]));
+    const unavailable = ids.filter((id) => !byId.has(id) || byId.get(id).priceMinor === null || !byId.get(id).name);
+    if (unavailable.length) {
+      throw withData(conflict('برخی کالاها دیگر در ویترین نیستند', 'product_unavailable'), { unavailable });
+    }
+    const lines = input.lines.map((l, i) => {
+      const p = byId.get(l.productId);
+      if (p.maxQtyMilli !== null && l.qtyMilli > p.maxQtyMilli) {
+        throw withData(badRequest(`حداکثرِ «${p.name}» در هر سفارش بیشتر نمی‌شود`, 'qty_over_limit'),
+          { productId: p.id, maxQtyMilli: p.maxQtyMilli });
+      }
+      return {
+        lineNo: i + 1, productId: p.id, name: p.name, unit: p.unit, qtyMilli: l.qtyMilli,
+        unitPriceMinor: p.priceMinor, lineTotalMinor: S.lineTotalMinor(l.qtyMilli, p.priceMinor),
+        note: l.note, substitution: '',
+      };
+    });
+    const subtotalMinor = lines.reduce((s, l) => s + l.lineTotalMinor, 0);
+    const deliveryFeeMinor = input.fulfillment === 'delivery' ? Number(sf.delivery_fee_minor) : 0;
+    const totalMinor = subtotalMinor + deliveryFeeMinor;
+    if (!Number.isSafeInteger(totalMinor)) throw badRequest('جمعِ سفارش بیش از حد بزرگ است', 'bad_lines');
+    const fees = { subtotalMinor, deliveryFeeMinor, totalMinor };
+    if (subtotalMinor < Number(sf.min_order_minor)) {
+      throw withData(badRequest('سبد از حداقلِ سفارش کمتر است', 'below_min_order'),
+        { minOrderMinor: Number(sf.min_order_minor), quote: quoteOf(lines, fees) });
+    }
+    //  CHK-17: جمعِ امروز با آن‌چه مشتری دید فرق دارد ⇒ ثبت نمی‌شود، تغییر نشان داده می‌شود
+    if (input.expectedTotalMinor !== null && input.expectedTotalMinor !== totalMinor) {
+      throw withData(conflict('قیمت‌ها عوض شده است؛ سبد را دوباره ببینید', 'price_changed'), { quote: quoteOf(lines, fees) });
+    }
+    return {
+      source: 'storefront', fulfillment: input.fulfillment, paymentMethod: input.paymentMethod,
+      customerName: input.customerName, customerPhone: input.customerPhone,
+      address: input.address, delivery: input.delivery, note: input.note, isTest: false,
+      lines, subtotalMinor, discountMinor: 0, deliveryFeeMinor, totalMinor,
+      scheduledFor: null, itemsCount: lines.length,
+    };
+  };
+}
+
+// ── توکنِ پیگیری ─────────────────────────────────────────────────
+
+function tokenKey() {
+  const secret = config.secrets.api || config.secrets.jwt;
+  if (!secret) throw new ApiError(503, 'storefront_unavailable', 'ویترین هنوز روی این سرور آماده نیست');
+  return crypto.createHash('sha256').update(`storefront-order-token\n${secret}`).digest();
+}
+
+function macOf(shopId, orderId) {
+  return crypto.createHmac('sha256', tokenKey()).update(`${shopId}\n${orderId}`).digest('base64url').slice(0, 32);
+}
+
+function tokenOf(shopId, orderId) {
+  return `${orderId}.${macOf(shopId, orderId)}`;
+}
+
+/** شناسهٔ سفارش از توکن — یا null (زمان‌ثابت). */
+function orderIdOf(shopId, token) {
+  const m = /^([0-9A-Z]{26})\.([A-Za-z0-9_-]{32})$/.exec(String(token || ''));
+  if (!m) return null;
+  const a = Buffer.from(m[2]);
+  const b = Buffer.from(macOf(shopId, m[1]));
+  return a.length === b.length && crypto.timingSafeEqual(a, b) ? m[1] : null;
+}
+
+/** نمای مشتری — نه شناسهٔ کارمند، نه یادداشتِ داخلی، نه شماره و نشانی. */
+function publicOrder(o, token) {
+  return {
+    token,
+    orderNo: o.orderNo,
+    status: o.status,
+    statusReason: o.statusReason,
+    fulfillment: o.fulfillment,
+    paymentMethod: o.paymentMethod,
+    paymentStatus: o.paymentStatus,
+    currency: o.currency,
+    itemsCount: o.itemsCount,
+    lines: o.lines.map((l) => ({
+      productId: l.productId, name: l.name, unit: l.unit, qtyMilli: l.qtyMilli,
+      unitPriceMinor: l.unitPriceMinor, lineTotalMinor: l.lineTotalMinor, note: l.note,
+    })),
+    subtotalMinor: o.subtotalMinor,
+    discountMinor: o.discountMinor,
+    deliveryFeeMinor: o.deliveryFeeMinor,
+    totalMinor: o.totalMinor,
+    readyAt: o.readyAt,
+    createdAt: o.createdAt,
+    updatedAt: o.updatedAt,
+    //  CHK-22: لغوِ رایگان تا پیش از قبول
+    canCancel: o.status === 'new',
+    timeline: o.events
+      .filter((e) => e.kind === 'created' || e.kind === 'status')
+      .map((e) => ({ status: e.toStatus, at: e.at })),
+  };
+}
+
+const CUSTOMER = Object.freeze({ type: 'customer', id: '' });
+
+async function checkout(sf, { key, body, ticket }) {
+  //  ۲۳.۲: نهایی‌کردنِ سفارش ⇒ شمارهٔ تأییدشده (S133)
+  const verified = phoneOfTicket(ticket);
+  if (!verified) throw new ApiError(401, 'verification_required', 'برای ثبتِ سفارش، شمارهٔ خود را تأیید کنید');
+  const input = parseCheckout(body, sf);
+  if (input.customerPhone !== verified) {
+    throw new ApiError(403, 'phone_not_verified', 'این شماره تأیید نشده است؛ همان شمارهٔ تأییدشده را بنویسید');
+  }
+  tokenKey();   // سرورِ بی رمز سفارش نمی‌گیرد که بعد پیگیری‌اش ممکن نباشد
+  const out = await orders.create(sf.shop_id, { key, body, actor: CUSTOMER, price: pricer(sf.shop_id, sf, input) });
+  return {
+    order: publicOrder(out.order, tokenOf(sf.shop_id, out.order.id)), replayed: out.replayed,
+    orderId: out.order.id,
+  };
+}
+
+async function track(sf, token) {
+  const id = orderIdOf(sf.shop_id, token);
+  if (!id) throw notFound('سفارش پیدا نشد', 'order_not_found');
+  const o = await orders.get(sf.shop_id, id, CUSTOMER);
+  if (o.source !== 'storefront') throw notFound('سفارش پیدا نشد', 'order_not_found');
+  return publicOrder(o, token);
+}
+
+async function cancel(sf, token) {
+  const id = orderIdOf(sf.shop_id, token);
+  if (!id) throw notFound('سفارش پیدا نشد', 'order_not_found');
+  const o = await orders.get(sf.shop_id, id, CUSTOMER);
+  if (o.source !== 'storefront') throw notFound('سفارش پیدا نشد', 'order_not_found');
+  try {
+    const out = await orders.transition(sf.shop_id, id, { to: 'cancelled_by_customer', from: 'new' }, CUSTOMER);
+    return { order: publicOrder(out.order, token), unchanged: out.unchanged };
+  } catch (err) {
+    if (err.code === 'status_changed' || err.code === 'invalid_transition') {
+      throw conflict('سفارش قبول شده است؛ برای لغو با دکان تماس بگیرید', 'cannot_cancel');
+    }
+    throw err;
+  }
+}
+
+// ── ۲۳: تأییدِ شمارهٔ مشتری ─────────────────────────────────────────
+//  بلیتِ امضاشده و بی‌حالت: `v1.<شماره>.<انقضا>.<HMAC>` — فقط می‌گوید «این
+//  شماره به‌تازگی با کدِ یک‌بارمصرف تأیید شد». در سرور ذخیره نمی‌شود.
+
+const OTP_PURPOSE = 'store_order';
+
+function ticketMac(phone, exp) {
+  return crypto.createHmac('sha256', tokenKey()).update(`customer-phone\n${phone}\n${exp}`)
+    .digest('base64url').slice(0, 32);
+}
+
+function ticketOf(phone, at = now()) {
+  const exp = at + config.storefront.ticketTtlMs;
+  const b64 = Buffer.from(phone).toString('base64url');
+  return { ticket: `v1.${b64}.${exp.toString(36)}.${ticketMac(phone, exp)}`, expiresAt: exp };
+}
+
+/** شمارهٔ تأییدشده از بلیت — یا null (منقضی، دست‌خورده یا بی‌شکل). */
+function phoneOfTicket(ticket, at = now()) {
+  const m = /^v1\.([A-Za-z0-9_-]{4,40})\.([0-9a-z]{1,12})\.([A-Za-z0-9_-]{32})$/.exec(String(ticket || ''));
+  if (!m) return null;
+  const phone = Buffer.from(m[1], 'base64url').toString('utf8');
+  const exp = Number.parseInt(m[2], 36);
+  if (!/^\+[1-9]\d{7,14}$/.test(phone) || !(exp > at)) return null;
+  const a = Buffer.from(m[3]);
+  const b = Buffer.from(ticketMac(phone, exp));
+  return a.length === b.length && crypto.timingSafeEqual(a, b) ? phone : null;
+}
+
+/**
+ * آیا کد واقعاً به مشتری می‌رسد؟ در تولید، راهِ `log` یعنی کد فقط در لاگِ
+ * سرور می‌نشیند ⇒ تأیید در دسترس نیست و همین را صریح می‌گوییم (۲۳.۳ بندِ ۳).
+ */
+async function verificationAvailable() {
+  if (config.env !== 'production') return true;
+  const { provider } = await require('./sms-settings').current();
+  return Boolean(provider) && provider !== 'log';
+}
+
+async function startVerification(body, { ip = '' } = {}) {
+  const phone = require('./validate').phone(obj(body).phone, { required: true });
+  if (!(await verificationAvailable())) {
+    throw new ApiError(503, 'verification_unavailable',
+      'تأییدِ شماره هنوز روی این سرور راه‌اندازی نشده است؛ فعلاً برای سفارش با شمارهٔ دکان تماس بگیرید');
+  }
+  tokenKey();
+  const out = await require('./otp').request(phone, { purpose: OTP_PURPOSE, ip, app: 'shop' });
+  return {
+    sent: out.sent === true, expiresAt: out.expiresAt, resendSeconds: out.resendSeconds,
+    ...(out.devCode ? { devCode: out.devCode } : {}),
+  };
+}
+
+async function checkVerification(body) {
+  const b = obj(body);
+  const phone = require('./validate').phone(b.phone, { required: true });
+  tokenKey();
+  await require('./otp').verify(phone, b.code, { purpose: OTP_PURPOSE });
+  return { phone, ...ticketOf(phone) };
+}
+
+/** S138: سفارش‌های همین شمارهٔ تأییدشده در همین ویترین — از هر دستگاهی. */
+async function myOrders(sf, ticket) {
+  const phone = phoneOfTicket(ticket);
+  if (!phone) throw new ApiError(401, 'verification_required', 'برای دیدنِ سفارش‌ها، شمارهٔ خود را تأیید کنید');
+  const rows = await many(
+    `SELECT id, order_no, status, total_minor, items_count, created_at FROM online_orders
+      WHERE shop_id = $1 AND source = 'storefront' AND customer_phone = $2
+      ORDER BY created_at DESC, id DESC LIMIT 20`,
+    [sf.shop_id, phone]
+  );
+  return rows.map((r) => ({
+    orderNo: Number(r.order_no), status: r.status, totalMinor: Number(r.total_minor),
+    itemsCount: Number(r.items_count), createdAt: Number(r.created_at), token: tokenOf(sf.shop_id, r.id),
+  }));
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  سمتِ دکان
+// ════════════════════════════════════════════════════════════════════
+
+function settingsView(sf, status = null) {
+  if (!sf) return null;
+  const { categories: _c, ...pub } = profile(sf, [], status);
+  return {
+    ...pub,
+    enabled: sf.enabled === true,
+    notice: sf.notice || '',
+    timezone: sf.timezone || 'Asia/Kabul',
+    weeklyHours: asJson(sf.weekly_hours, {}),
+    closedDates: asJson(sf.closed_dates, []),
+    presenceMode: sf.presence_mode || 'auto',
+    declaredUntil: sf.declared_until === null || sf.declared_until === undefined ? null : Number(sf.declared_until),
+    updatedAt: Number(sf.updated_at),
+  };
+}
+
+async function settingsOf(shopId) {
+  const sf = await one('SELECT * FROM storefronts WHERE shop_id = $1', [shopId]);
+  return sf ? settingsView(sf, await statusOf(sf)) : null;
+}
+
+function timezoneOf(v) {
+  const tz = str(v);
+  try {
+    if (!tz || tz.length > 64) throw new Error('x');
+    new Intl.DateTimeFormat('en-US', { timeZone: tz });
+    return tz;
+  } catch {
+    throw badRequest('منطقهٔ زمانی معتبر نیست', 'bad_timezone');
+  }
+}
+
+/** {"0":[[480,1200]], …} — بازه‌ها به دقیقه از نیمه‌شب، بی هم‌پوشانی؛ شبِ پس از ۲۴ در روزِ بعد. */
+function weeklyHoursOf(v) {
+  const h = obj(v);
+  const out = {};
+  for (const [day, list] of Object.entries(h)) {
+    if (!/^[0-6]$/.test(day) || !Array.isArray(list) || list.length > 4) throw badRequest('ساعتِ کاری معتبر نیست', 'bad_hours');
+    const ranges = list.map((r) => {
+      if (!Array.isArray(r) || r.length !== 2) throw badRequest('ساعتِ کاری معتبر نیست', 'bad_hours');
+      const o = int(r[0], 'آغاز', { min: 0, max: 1439 });
+      const c = int(r[1], 'پایان', { min: 1, max: 1440 });
+      if (c <= o) throw badRequest('پایانِ بازه باید پس از آغاز باشد', 'bad_hours');
+      return [o, c];
+    }).sort((a, b) => a[0] - b[0]);
+    for (let i = 1; i < ranges.length; i++) {
+      if (ranges[i][0] < ranges[i - 1][1]) throw badRequest('بازه‌های یک روز روی هم افتاده‌اند', 'bad_hours');
+    }
+    out[day] = ranges;
+  }
+  return out;
+}
+
+function closedDatesOf(v) {
+  if (!Array.isArray(v) || v.length > 60) throw badRequest('فهرستِ تعطیلی معتبر نیست', 'bad_closed_dates');
+  const out = [...new Set(v.map((d) => {
+    const s = str(d);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(s) || Number.isNaN(Date.parse(`${s}T00:00:00Z`))) {
+      throw badRequest('تاریخِ تعطیلی باید به شکلِ YYYY-MM-DD باشد', 'bad_closed_dates');
+    }
+    return s;
+  }))].sort();
+  return out;
+}
+
+async function recordEvent(c, shopId, e) {
+  const r = await c.query(
+    `INSERT INTO storefront_presence_events (id, shop_id, event_id, actor_id, kind, status, declared_until,
+       store_timezone, detail, source_device_id, client_event_at, server_received_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12)
+     ON CONFLICT (shop_id, event_id) DO NOTHING RETURNING id`,
+    [require('./ulid').ulid(e.at), shopId, e.eventId, e.actorId || '', e.kind, e.status || '', e.declaredUntil ?? null,
+      e.timezone || '', JSON.stringify(e.detail || {}), e.deviceId || '', e.clientEventAt ?? null, e.at]
+  );
+  return r.rows.length > 0;
+}
+
+/** تنظیمِ ویترین — فقط فیلدهای آمده عوض می‌شوند. */
+async function saveSettings(shopId, body, userId) {
+  const b = obj(body);
+  const has = (k) => Object.prototype.hasOwnProperty.call(b, k);
+  const saved = await tx(async (c) => {
+    await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', ['storefront-slugs']);
+    const cur = (await c.query('SELECT * FROM storefronts WHERE shop_id = $1 FOR UPDATE', [shopId])).rows[0];
+    const v = {
+      slug: cur?.slug || '', enabled: cur?.enabled === true, title: cur?.title || '', tagline: cur?.tagline || '',
+      contact_phone: cur?.contact_phone || '', accent: cur?.accent || '', notice: cur?.notice || '',
+      timezone: cur?.timezone || 'Asia/Kabul',
+      weekly_hours: cur ? asJson(cur.weekly_hours, {}) : {},
+      closed_dates: cur ? asJson(cur.closed_dates, []) : [],
+      accept_delivery: cur ? cur.accept_delivery === true : true,
+      accept_pickup: cur ? cur.accept_pickup === true : true,
+      delivery_fee_minor: cur ? Number(cur.delivery_fee_minor) : 0,
+      min_order_minor: cur ? Number(cur.min_order_minor) : 0,
+    };
+    if (has('slug') || !cur) v.slug = slugOf(b.slug);
+    if (has('enabled')) v.enabled = bool(b.enabled, 'روشن بودن');
+    if (has('title')) v.title = text(b.title, 60);
+    if (has('tagline')) v.tagline = text(b.tagline, 120);
+    if (has('contactPhone')) v.contact_phone = require('./validate').phone(b.contactPhone) || '';
+    if (has('notice')) v.notice = text(b.notice, 120);
+    if (has('accent')) {
+      const a = str(b.accent).toLowerCase();
+      if (a && !/^#[0-9a-f]{6}$/.test(a)) throw badRequest('رنگ باید به شکلِ ‎#rrggbb‎ باشد', 'bad_accent');
+      v.accent = a;
+    }
+    if (has('timezone')) v.timezone = timezoneOf(b.timezone);
+    if (has('weeklyHours')) v.weekly_hours = weeklyHoursOf(b.weeklyHours);
+    if (has('closedDates')) v.closed_dates = closedDatesOf(b.closedDates);
+    if (has('acceptDelivery')) v.accept_delivery = bool(b.acceptDelivery, 'ارسال');
+    if (has('acceptPickup')) v.accept_pickup = bool(b.acceptPickup, 'دریافت از دکان');
+    if (has('deliveryFeeMinor')) v.delivery_fee_minor = int(b.deliveryFeeMinor, 'هزینهٔ ارسال', { max: MAX_FEE_MINOR });
+    if (has('minOrderMinor')) v.min_order_minor = int(b.minOrderMinor, 'حداقلِ سفارش', { max: MAX_PRICE_MINOR });
+    if (!v.accept_delivery && !v.accept_pickup) throw badRequest('دست‌کم یکی از ارسال یا دریافت از دکان', 'bad_fulfillment');
+    if (v.enabled && !v.title) throw badRequest('برای روشن کردن، نامِ ویترین لازم است', 'title_required');
+
+    const taken = (await c.query('SELECT 1 FROM storefronts WHERE slug = $1 AND shop_id <> $2', [v.slug, shopId])).rows[0];
+    if (taken) throw conflict('این نشانی را دکانِ دیگری گرفته است', 'slug_taken');
+
+    const at = now();
+    await c.query(
+      `INSERT INTO storefronts (shop_id, slug, enabled, title, tagline, contact_phone, accent, notice, timezone,
+         weekly_hours, closed_dates, accept_delivery, accept_pickup, delivery_fee_minor, min_order_minor,
+         updated_by, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12,$13,$14,$15,$16,$17,$17)
+       ON CONFLICT (shop_id) DO UPDATE SET slug = EXCLUDED.slug, enabled = EXCLUDED.enabled, title = EXCLUDED.title,
+         tagline = EXCLUDED.tagline, contact_phone = EXCLUDED.contact_phone, accent = EXCLUDED.accent,
+         notice = EXCLUDED.notice, timezone = EXCLUDED.timezone, weekly_hours = EXCLUDED.weekly_hours,
+         closed_dates = EXCLUDED.closed_dates, accept_delivery = EXCLUDED.accept_delivery,
+         accept_pickup = EXCLUDED.accept_pickup, delivery_fee_minor = EXCLUDED.delivery_fee_minor,
+         min_order_minor = EXCLUDED.min_order_minor, updated_by = EXCLUDED.updated_by, updated_at = EXCLUDED.updated_at`,
+      [shopId, v.slug, v.enabled, v.title, v.tagline, v.contact_phone, v.accent, v.notice, v.timezone,
+        JSON.stringify(v.weekly_hours), JSON.stringify(v.closed_dates), v.accept_delivery, v.accept_pickup,
+        v.delivery_fee_minor, v.min_order_minor, userId || '', at]
+    );
+    //  ۳۱.۲ بندِ ۱: تغییرِ ساعتِ کاری هم رویداد دارد
+    if (has('timezone') || has('weeklyHours') || has('closedDates')) {
+      await recordEvent(c, shopId, {
+        eventId: `hours-${require('./ulid').ulid(at)}`, actorId: userId, kind: 'hours', timezone: v.timezone,
+        detail: { weeklyHours: v.weekly_hours, closedDates: v.closed_dates }, at,
+      });
+    }
+    return (await c.query('SELECT * FROM storefronts WHERE shop_id = $1', [shopId])).rows[0];
+  });
+  return settingsView(saved, await statusOf(saved));
+}
+
+/**
+ * ۳۱.۱/۳۱.۲ — اعلامِ مالک: «آنلاین تا ساعتِ…»، «آنلاین»، «آفلاین»، «بسته»
+ * یا «طبقِ ساعتِ کاری». `eventId` از برنامه می‌آید تا صفِ آفلاین دوباره‌فرستادن
+ * را بی‌اثر کند؛ رویدادِ کهنه‌تر (زمانِ دستگاه) در تاریخچه می‌نشیند ولی
+ * وضعیتِ تازه‌تر را برنمی‌گرداند. «ثبت شد» فقط پس از همین پاسخ.
+ */
+async function declarePresence(shopId, body, { userId = '', deviceId = '' } = {}) {
+  const b = obj(body);
+  const eventId = str(b.eventId);
+  if (!/^[A-Za-z0-9_.:-]{8,80}$/.test(eventId)) throw badRequest('شناسهٔ رویداد لازم است', 'bad_event_id');
+  const mode = str(b.mode);
+  if (!['auto', 'online', 'online_until', 'offline', 'closed'].includes(mode)) throw badRequest('وضعیت معتبر نیست', 'bad_mode');
+  const at = now();
+  let declaredUntil = null;
+  if (mode === 'online_until') {
+    declaredUntil = int(b.declaredUntil, 'زمانِ پایان', { min: at + 60_000, max: at + MAX_DECLARE_MS });
+  }
+  const clientEventAt = b.clientEventAt === undefined || b.clientEventAt === null
+    ? null : int(b.clientEventAt, 'زمانِ دستگاه', { min: 0, max: 4102444800000 });
+
+  const row = await tx(async (c) => {
+    const sf = (await c.query('SELECT * FROM storefronts WHERE shop_id = $1 FOR UPDATE', [shopId])).rows[0];
+    if (!sf) throw notFound('هنوز ویترینی ساخته نشده است', 'storefront_missing');
+    const newer = clientEventAt === null ? null : (await c.query(
+      `SELECT 1 FROM storefront_presence_events WHERE shop_id = $1 AND kind = 'presence'
+          AND (detail->>'applied') = 'true' AND COALESCE(client_event_at, server_received_at) > $2 LIMIT 1`,
+      [shopId, clientEventAt]
+    )).rows[0];
+    const applied = !newer;
+    const inserted = await recordEvent(c, shopId, {
+      eventId, actorId: userId, kind: 'presence', status: mode, declaredUntil, timezone: sf.timezone,
+      detail: { applied }, deviceId: text(b.deviceId, 80) || deviceId, clientEventAt, at,
+    });
+    if (inserted && applied) {
+      await c.query(
+        'UPDATE storefronts SET presence_mode = $2, declared_until = $3, updated_by = $4, updated_at = $5 WHERE shop_id = $1',
+        [shopId, mode, declaredUntil, userId || '', at]
+      );
+    }
+    const sfNow = (await c.query('SELECT * FROM storefronts WHERE shop_id = $1', [shopId])).rows[0];
+    return { sf: sfNow, replayed: !inserted, applied: inserted ? applied : null };
+  });
+  return { status: await statusOf(row.sf), replayed: row.replayed, applied: row.applied, serverReceivedAt: at };
+}
+
+/** همهٔ کالاهای دفتر با نشانِ ویترین — برای صفحهٔ «در ویترین» ِ برنامه. */
+async function staffProducts(shopId, { cursor, limit } = {}) {
+  const lim = Math.min(MAX_PAGE, Math.max(1, Number.parseInt(limit, 10) || PAGE));
+  const params = [shopId];
+  let where = `${SHOP_ROWS} AND r.account_id = $1 AND r.deleted_at IS NULL`;
+  if (cursor) {
+    if (!PRODUCT_ID_RE.test(String(cursor))) throw badRequest('نشانگرِ صفحه معتبر نیست', 'bad_cursor');
+    params.push(String(cursor));
+    where += ` AND r.row_id > $${params.length}`;
+  }
+  params.push(lim + 1);
+  const rows = await many(
+    `SELECT r.row_id AS id, r.data, sp.published, sp.online_price_minor, sp.max_qty_milli
+       FROM sync_rows r
+       LEFT JOIN storefront_products sp ON sp.shop_id = r.account_id AND sp.product_id = r.row_id
+      WHERE ${where} ORDER BY r.row_id LIMIT $${params.length}`,
+    params
+  );
+  const more = rows.length > lim;
+  const page = more ? rows.slice(0, lim) : rows;
+  return {
+    items: page.map((r) => ({
+      ...productView({ ...r, online_price_minor: null }),
+      published: r.published === true,
+      onlinePriceMinor: r.online_price_minor === null || r.online_price_minor === undefined ? null : Number(r.online_price_minor),
+      active: isActive(r.data),
+    })),
+    nextCursor: more ? page[page.length - 1].id : null,
+  };
+}
+
+function isActive(data) {
+  const d = typeof data === 'string' ? JSON.parse(data) : data || {};
+  return String(d.active ?? 'true') !== 'false';
+}
+
+/** گذاشتن یا برداشتنِ یک کالا از ویترین. */
+async function setProduct(shopId, productId, body, userId) {
+  const id = String(productId || '');
+  if (!PRODUCT_ID_RE.test(id)) throw badRequest('شناسهٔ کالا معتبر نیست', 'bad_product');
+  const b = obj(body);
+  const published = bool(b.published, 'در ویترین');
+  const nullable = (k, field, opts) => (b[k] === null || b[k] === undefined ? null : int(b[k], field, opts));
+  const onlinePriceMinor = nullable('onlinePriceMinor', 'قیمتِ آنلاین', { min: 0, max: MAX_PRICE_MINOR });
+  const maxQtyMilli = nullable('maxQtyMilli', 'حداکثرِ هر سفارش', { min: 1, max: MAX_QTY_MILLI });
+  const exists = await one(
+    `SELECT 1 FROM sync_rows r WHERE ${SHOP_ROWS} AND r.account_id = $1 AND r.row_id = $2 AND r.deleted_at IS NULL`,
+    [shopId, id]
+  );
+  if (!exists) throw notFound('این کالا در دفترِ دکان نیست', 'product_not_found');
+  await one(
+    `INSERT INTO storefront_products (shop_id, product_id, published, online_price_minor, max_qty_milli, updated_by, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7)
+     ON CONFLICT (shop_id, product_id) DO UPDATE SET published = EXCLUDED.published,
+       online_price_minor = EXCLUDED.online_price_minor, max_qty_milli = EXCLUDED.max_qty_milli,
+       updated_by = EXCLUDED.updated_by, updated_at = EXCLUDED.updated_at
+     RETURNING product_id`,
+    [shopId, id, published, onlinePriceMinor, maxQtyMilli, userId || '', now()]
+  );
+  return { productId: id, published, onlinePriceMinor, maxQtyMilli };
+}
+
+/** میزبانِ `<slug>.<دامنه>` ⇒ slug؛ وگرنه ''. */
+function slugFromHost(host) {
+  const domain = config.storefront.domain;
+  if (!domain) return '';
+  const h = String(host || '').toLowerCase().replace(/:\d+$/, '');
+  if (!h.endsWith(`.${domain}`)) return '';
+  const label = h.slice(0, -(domain.length + 1));
+  if (!SLUG_RE.test(label) || RESERVED.has(label)) return '';
+  return label;
+}
+
+module.exports = {
+  FLAG_KEY, FEATURE_KEY, SLUG_RE, RESERVED,
+  normalize, slugOf, slugFromHost, stateOf, open, profile, categories, catalog, photo,
+  localParts, presenceOf, statusOf,
+  parseCheckout, checkout, track, cancel, tokenOf, orderIdOf,
+  ticketOf, phoneOfTicket, verificationAvailable, startVerification, checkVerification, myOrders,
+  settingsOf, saveSettings, declarePresence, staffProducts, setProduct,
+};
