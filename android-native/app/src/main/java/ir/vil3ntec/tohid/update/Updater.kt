@@ -187,69 +187,60 @@ object Updater {
   /**
    * دانلود با گزارشِ پیشرفت. فایل در پوشهٔ خودِ برنامه می‌نشیند تا اجازهٔ
    * حافظهٔ گوشی لازم نشود.
+   *
+   * قطع شدن دیگر یعنی «دوباره بزنید» نیست: `ResumableDownload` در همین یک بار
+   * زدن خودش از بایت‌هایی که روی دیسک است ادامه می‌دهد (Range + If-Range)،
+   * بی‌اینترنت صبر می‌کند و نیمه با بسته شدنِ برنامه هم می‌ماند. سنجشِ
+   * جمعِ کنترلی و امضا (`verify`) همان است که بود.
+   *
+   * @param onStatus یک خطِ کوتاه زیرِ نوار — «ادامه از ۴۲٪»، «منتظرِ اینترنت…»
    */
   suspend fun download(
     context: Context,
     release: Release,
+    onStatus: (String?) -> Unit = {},
     onProgress: (Int) -> Unit,
   ): Result<File> = withContext(Dispatchers.IO) {
     runCatching {
       val dir = File(context.cacheDir, "updates").apply { mkdirs() }
       val out = File(dir, "tohid-${release.version}.apk")
 
-      // فقط فایلِ نسخه‌های **دیگر** پاک می‌شوند. قبلاً همه پاک می‌شدند و
-      // نتیجه‌اش این بود که اگر کاربر سرِ پرسشِ نصب «نه» می‌زد، دفعهٔ بعد
-      // همان فایل از صفر گرفته می‌شد.
-      dir.listFiles()?.forEach { if (it.name != out.name) it.delete() }
+      // فقط فایلِ نسخه‌های **دیگر** پاک می‌شوند (نیمه و یادداشتِ همین نسخه می‌مانند).
+      // قبلاً همه پاک می‌شدند و نتیجه‌اش این بود که اگر کاربر سرِ پرسشِ نصب
+      // «نه» می‌زد، دفعهٔ بعد همان فایل از صفر گرفته می‌شد.
+      dir.listFiles()?.forEach { if (!ResumableDownload.belongsTo(it, out)) it.delete() }
 
       // فایلِ کاملِ همین نسخه از قبل هست؟ دوباره گرفته نمی‌شود.
       if (release.size > 0 && out.length() == release.size) {
         onProgress(100)
         return@runCatching out
       }
+      // نیمه‌ای که نسخهٔ پیشینِ برنامه با همین نام گذاشته بود ⇒ از همان‌جا
+      ResumableDownload.adoptLegacyPartial(out, release.size)
 
-      // نیمه‌کاره مانده؟ از همان‌جا ادامه داده می‌شود، نه از اول.
-      val have = if (release.size > 0 && out.length() in 1 until release.size) out.length() else 0L
-      if (have == 0L) out.delete()
-
-      val conn = (URL(release.apkUrl).openConnection() as HttpURLConnection).apply {
-        instanceFollowRedirects = true
-        connectTimeout = 20000
-        readTimeout = 60000
-        if (have > 0) setRequestProperty("Range", "bytes=$have-")
-      }
-
-      // ۲۰۶ یعنی سرور ادامه را فرستاد؛ ۲۰۰ یعنی از اول فرستاده و آنچه
-      // داریم به درد نمی‌خورد
-      val resuming = have > 0 && conn.responseCode == 206
-      var done = if (resuming) have else 0L
-      val total = if (release.size > 0) release.size else conn.contentLengthLong + done
-
-      conn.inputStream.use { input ->
-        java.io.FileOutputStream(out, resuming).use { output ->
-          val buffer = ByteArray(64 * 1024)
-          var last = -1
-          while (true) {
-            val n = input.read(buffer)
-            if (n <= 0) break
-            output.write(buffer, 0, n)
-            done += n
-            if (total > 0) {
-              val pct = ((done * 100) / total).toInt().coerceIn(0, 100)
-              if (pct != last) { last = pct; onProgress(pct) }
-            }
-          }
+      var last = -1
+      ResumableDownload.fetch(
+        url = release.apkUrl,
+        out = out,
+        expected = release.size,
+        online = { ir.vil3ntec.tohid.data.repo.Backend.isOnline(context) },
+        reason = ::reason,
+        userAgent = "tohid-app",
+      ) { event ->
+        if (event is ResumableDownload.Event.Progress) {
+          val pct = ResumableDownload.percent(event.done, event.total)
+          if (pct >= 0 && pct != last) { last = pct; onProgress(pct) }
         }
+        onStatus(ResumableDownload.statusText(event))
       }
-      conn.disconnect()
 
       if (!looksLikeApk(out)) {
         out.delete()
         throw IllegalStateException("چیزی که گرفته شد فایلِ نصبی نیست — دوباره بزنید")
       }
       if (release.size > 0 && out.length() != release.size) {
-        // نیمه‌کاره ماند؛ دفعهٔ بعد از همین‌جا ادامه داده می‌شود
-        throw IllegalStateException("دانلود نیمه‌کاره ماند — دوباره بزنید تا ادامه پیدا کند")
+        out.delete()
+        throw IllegalStateException("اندازهٔ فایلِ گرفته‌شده با انتشار نمی‌خواند — دوباره بزنید")
       }
       lastNote = verify(out, release)
       out

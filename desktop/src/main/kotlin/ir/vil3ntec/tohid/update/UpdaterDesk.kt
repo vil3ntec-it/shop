@@ -120,58 +120,51 @@ object Updater {
   private fun target(context: Context, release: Release): File =
     File(File(context.cacheDir, "updates"), "${release.version}-$assetName")
 
+  /**
+   *  دانلودِ ادامه‌دار — همان `ResumableDownload`ِ مشترک با اندروید: قطع ⇒
+   *  خودش از همان بایت ادامه می‌دهد، بی‌اینترنت صبر می‌کند، نیمه با بستنِ
+   *  برنامه می‌ماند. سنجشِ جمعِ کنترلی و امضا (`verify`) همان است که بود.
+   */
   suspend fun download(
     context: Context,
     release: Release,
+    onStatus: (String?) -> Unit = {},
     onProgress: (Int) -> Unit,
   ): Result<File> = withContext(Dispatchers.IO) {
     runCatching {
       val out = target(context, release)
       out.parentFile.mkdirs()
-      out.parentFile.listFiles()?.forEach { if (it.name != out.name) it.delete() }
+      out.parentFile.listFiles()?.forEach { if (!ResumableDownload.belongsTo(it, out)) it.delete() }
 
       if (release.size > 0 && out.length() == release.size) {
         onProgress(100)
         return@runCatching out
       }
-      val have = if (release.size > 0 && out.length() in 1 until release.size) out.length() else 0L
-      if (have == 0L) out.delete()
+      ResumableDownload.adoptLegacyPartial(out, release.size)
 
-      val conn = (URL(release.apkUrl).openConnection() as HttpURLConnection).apply {
-        instanceFollowRedirects = true
-        connectTimeout = 20000
-        readTimeout = 60000
-        if (have > 0) setRequestProperty("Range", "bytes=$have-")
-      }
-      val resuming = have > 0 && conn.responseCode == 206
-      if (conn.responseCode !in 200..299) throw IllegalStateException(reason(conn.responseCode))
-      var done = if (resuming) have else 0L
-      val total = if (release.size > 0) release.size else conn.contentLengthLong + done
-
-      conn.inputStream.use { input ->
-        java.io.FileOutputStream(out, resuming).use { output ->
-          val buffer = ByteArray(64 * 1024)
-          var last = -1
-          while (true) {
-            val n = input.read(buffer)
-            if (n <= 0) break
-            output.write(buffer, 0, n)
-            done += n
-            if (total > 0) {
-              val pct = ((done * 100) / total).toInt().coerceIn(0, 100)
-              if (pct != last) { last = pct; onProgress(pct) }
-            }
-          }
+      var last = -1
+      ResumableDownload.fetch(
+        url = release.apkUrl,
+        out = out,
+        expected = release.size,
+        online = { ir.vil3ntec.tohid.data.repo.Backend.isOnline(context) },
+        reason = ::reason,
+        userAgent = "tohid-desktop",
+      ) { event ->
+        if (event is ResumableDownload.Event.Progress) {
+          val pct = ResumableDownload.percent(event.done, event.total)
+          if (pct >= 0 && pct != last) { last = pct; onProgress(pct) }
         }
+        onStatus(ResumableDownload.statusText(event))
       }
-      conn.disconnect()
 
       if (out.length() < 1_000_000) {
         out.delete()
         throw IllegalStateException("چیزی که گرفته شد فایلِ نصبی نیست — دوباره بزنید")
       }
       if (release.size > 0 && out.length() != release.size) {
-        throw IllegalStateException("دانلود نیمه‌کاره ماند — دوباره بزنید تا ادامه پیدا کند")
+        out.delete()
+        throw IllegalStateException("اندازهٔ فایلِ گرفته‌شده با انتشار نمی‌خواند — دوباره بزنید")
       }
       val bad = verify(out, release)
       if (bad != null) {

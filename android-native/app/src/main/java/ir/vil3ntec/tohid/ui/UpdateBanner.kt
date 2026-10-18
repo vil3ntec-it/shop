@@ -55,7 +55,8 @@ fun UpdateBanner() {
     Column(Modifier.weight(1f)) {
       Text(
         when {
-          progress >= 0 -> "در حالِ گرفتنِ نسخهٔ ${found.version}… ${progress}٪"
+          progress >= 0 -> "در حالِ گرفتنِ نسخهٔ ${found.version}… ${progress}٪" +
+            (UpdateManager.note?.let { " · $it" } ?: "")
           ready != null && Platform.DESKTOP -> "نسخهٔ ${found.version} آماده است. «به‌روزرسانی» برنامه را چند ثانیه می‌بندد و دوباره باز می‌کند؛ دفتر سرِ جایش می‌ماند."
           ready != null -> "نسخهٔ ${found.version} گرفته شد — آمادهٔ نصب."
           else -> "نسخهٔ تازهٔ فروشگاه من آمد: ${found.version}"
