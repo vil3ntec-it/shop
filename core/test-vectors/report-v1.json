@@ -1,0 +1,3280 @@
+{
+ "version": 1,
+ "about": "آزمون‌های مرجعِ هستهٔ گزارش (RPT-01/02/03/06/09/11). همین فایل را license/report-core.js (server/test/report-core.test.js) و core/report/ReportCore.kt (ReportCoreVectorsTest) می‌دوانند. پول = واحدِ کوچک (۱ افغانی = ۱۰۰)، مقدار = هزارم، درصد = بیسیس‌پوینت. clock = {offsetMinutes, dayStartMinute}؛ null یعنی date ذخیره‌شده. ورودی همان شکلِ دفترِ وب است. expect را با دست عوض نکن: هر تفاوت «تغییرِ رفتار» است.",
+ "ledgers": {
+  "kabul": {
+   "products": [
+    {
+     "id": "p1",
+     "name": "چای سبز",
+     "category": "نوشیدنی",
+     "purchasePrice": 130,
+     "salePrice": 150
+    },
+    {
+     "id": "p2",
+     "name": "قند",
+     "category": "خوراکی",
+     "purchasePrice": 40,
+     "salePrice": 60
+    },
+    {
+     "id": "p3",
+     "name": "صابون",
+     "category": "",
+     "purchasePrice": 25,
+     "salePrice": 40
+    }
+   ],
+   "warehouseEntries": [
+    {
+     "id": "w1",
+     "productId": "p1",
+     "units": 10,
+     "price": 100,
+     "date": "2026-10-01",
+     "createdAt": 1790829000000
+    },
+    {
+     "id": "w2",
+     "productId": "p1",
+     "units": 10,
+     "price": 130,
+     "date": "2026-10-10",
+     "createdAt": 1791606600000
+    },
+    {
+     "id": "w3",
+     "productId": "p2",
+     "units": 50,
+     "price": 40,
+     "date": "2026-10-01",
+     "createdAt": 1790829000000
+    },
+    {
+     "id": "w4",
+     "productId": "p3",
+     "units": 20,
+     "price": 25,
+     "date": "2026-10-01",
+     "createdAt": 1790829000000
+    },
+    {
+     "id": "w5",
+     "productId": "p2",
+     "units": -2,
+     "price": 0,
+     "isAdjustment": true,
+     "date": "2026-10-12",
+     "createdAt": 1791779400000
+    }
+   ],
+   "sales": [
+    {
+     "id": "s1",
+     "invoiceNumber": 1,
+     "total": 300,
+     "discount": 0,
+     "finalTotal": 300,
+     "paymentMethod": "cash",
+     "paidAmount": 300,
+     "status": "completed",
+     "seller": "احمد",
+     "date": "2026-10-07",
+     "createdAt": 1791351000000
+    },
+    {
+     "id": "s2",
+     "invoiceNumber": 2,
+     "total": 750,
+     "discountType": "amount",
+     "discountValue": 50,
+     "discount": 50,
+     "finalTotal": 700,
+     "paymentMethod": "cash",
+     "paidAmount": 700,
+     "status": "completed",
+     "seller": "کریم",
+     "approvedBy": "مدیر",
+     "date": "2026-10-13",
+     "createdAt": 1791898200000
+    },
+    {
+     "id": "s3",
+     "invoiceNumber": 3,
+     "total": 40,
+     "discount": 0,
+     "finalTotal": 40,
+     "paymentMethod": "credit",
+     "debtorId": "d1",
+     "paidAmount": 0,
+     "remaining": 40,
+     "status": "completed",
+     "seller": "کریم",
+     "date": "2026-10-14",
+     "createdAt": 1791928800000
+    },
+    {
+     "id": "s4",
+     "invoiceNumber": 4,
+     "total": 355,
+     "discount": 15.5,
+     "finalTotal": 339.5,
+     "paymentMethod": "cash",
+     "paidAmount": 339.5,
+     "status": "completed",
+     "seller": " احمد ",
+     "channel": "online",
+     "date": "2026-10-14",
+     "createdAt": 1791953100000
+    },
+    {
+     "id": "s5",
+     "invoiceNumber": 5,
+     "total": 600,
+     "discount": 0,
+     "finalTotal": 600,
+     "paymentMethod": "cash",
+     "paidAmount": 600,
+     "status": "cancelled",
+     "cancelReason": "اشتباه",
+     "seller": "احمد",
+     "date": "2026-10-14",
+     "createdAt": 1791959400000
+    },
+    {
+     "id": "s6",
+     "invoiceNumber": 6,
+     "total": 150,
+     "discount": 0,
+     "finalTotal": 150,
+     "paymentMethod": "cash",
+     "paidAmount": 150,
+     "status": "completed",
+     "date": "2026-10-14",
+     "createdAt": 1791963000000
+    },
+    {
+     "id": "s7",
+     "invoiceNumber": 7,
+     "total": 100,
+     "discount": 0,
+     "finalTotal": 100,
+     "paymentMethod": "cash",
+     "paidAmount": 100,
+     "status": "completed",
+     "date": "2026-10-14",
+     "createdAt": 0
+    }
+   ],
+   "saleItems": [
+    {
+     "id": "i1",
+     "saleId": "s1",
+     "productId": "p1",
+     "quantity": 2,
+     "unitPrice": 150,
+     "purchasePrice": 100,
+     "totalPrice": 300,
+     "returnedQty": 1
+    },
+    {
+     "id": "i2",
+     "saleId": "s2",
+     "productId": "p1",
+     "quantity": 3,
+     "unitPrice": 150,
+     "purchasePrice": 130,
+     "totalPrice": 450,
+     "returnedQty": 1
+    },
+    {
+     "id": "i3",
+     "saleId": "s2",
+     "productId": "p2",
+     "quantity": 5,
+     "unitPrice": 60,
+     "purchasePrice": 40,
+     "totalPrice": 300,
+     "returnedQty": 0
+    },
+    {
+     "id": "i4",
+     "saleId": "s3",
+     "productId": "p3",
+     "quantity": 1,
+     "unitPrice": 40,
+     "purchasePrice": 25,
+     "totalPrice": 40,
+     "returnedQty": 0
+    },
+    {
+     "id": "i5",
+     "saleId": "s4",
+     "productId": "p1",
+     "quantity": 1.5,
+     "unitPrice": 150,
+     "purchasePrice": 130,
+     "totalPrice": 225,
+     "returnedQty": 0
+    },
+    {
+     "id": "i6",
+     "saleId": "s4",
+     "productId": "p2",
+     "quantity": 2,
+     "unitPrice": 60,
+     "purchasePrice": 40,
+     "totalPrice": 120,
+     "returnedQty": 0
+    },
+    {
+     "id": "i7",
+     "saleId": "s4",
+     "productId": "",
+     "name": "کیسه",
+     "quantity": 1,
+     "unitPrice": 10,
+     "purchasePrice": 0,
+     "totalPrice": 10,
+     "returnedQty": 0
+    },
+    {
+     "id": "i8",
+     "saleId": "s5",
+     "productId": "p2",
+     "quantity": 10,
+     "unitPrice": 60,
+     "purchasePrice": 40,
+     "totalPrice": 600,
+     "returnedQty": 0
+    },
+    {
+     "id": "i9",
+     "saleId": "s6",
+     "productId": "p1",
+     "quantity": 1,
+     "unitPrice": 150,
+     "purchasePrice": 130,
+     "totalPrice": 150,
+     "returnedQty": 0
+    }
+   ],
+   "returns": [
+    {
+     "id": "r1",
+     "saleId": "s2",
+     "saleItemId": "i2",
+     "productId": "p1",
+     "quantity": 1,
+     "amount": 140,
+     "reason": "خراب",
+     "user": "احمد",
+     "date": "2026-10-14",
+     "createdAt": 1791955800000
+    },
+    {
+     "id": "r2",
+     "saleId": "s1",
+     "saleItemId": "i1",
+     "productId": "p1",
+     "quantity": 1,
+     "amount": 150,
+     "date": "2026-10-07",
+     "createdAt": 1791369000000
+    }
+   ],
+   "debtors": [
+    {
+     "id": "d1",
+     "name": "رحیم"
+    },
+    {
+     "id": "d2",
+     "name": "نذیر"
+    },
+    {
+     "id": "d3",
+     "name": "ولی"
+    }
+   ],
+   "transactions": [
+    {
+     "id": "t1",
+     "debtorId": "d1",
+     "type": "give",
+     "amount": 1000,
+     "date": "2026-07-01",
+     "createdAt": 1782880200000
+    },
+    {
+     "id": "t2",
+     "debtorId": "d1",
+     "type": "give",
+     "amount": 500,
+     "date": "2026-09-20",
+     "createdAt": 1789878600000
+    },
+    {
+     "id": "t3",
+     "debtorId": "d1",
+     "type": "receive",
+     "amount": 700,
+     "date": "2026-10-01",
+     "createdAt": 1790829000000
+    },
+    {
+     "id": "t4",
+     "debtorId": "d1",
+     "type": "give",
+     "amount": 40,
+     "date": "2026-10-14",
+     "createdAt": 1791928800000
+    },
+    {
+     "id": "t5",
+     "debtorId": "d2",
+     "type": "give",
+     "amount": 200,
+     "date": "2026-08-20",
+     "createdAt": 1787200200000
+    },
+    {
+     "id": "t6",
+     "debtorId": "d2",
+     "type": "receive",
+     "amount": 50,
+     "date": "2026-10-10",
+     "createdAt": 1791606600000
+    },
+    {
+     "id": "t7",
+     "debtorId": "d3",
+     "type": "give",
+     "amount": 100,
+     "date": "2026-09-01",
+     "createdAt": 1788237000000
+    },
+    {
+     "id": "t8",
+     "debtorId": "d3",
+     "type": "receive",
+     "amount": 160,
+     "date": "2026-09-15",
+     "createdAt": 1789446600000
+    },
+    {
+     "id": "t9",
+     "debtorId": "d2",
+     "type": "give",
+     "amount": 999,
+     "date": "2026-10-20",
+     "createdAt": 1792470600000
+    }
+   ],
+   "suppliers": [
+    {
+     "id": "sup1",
+     "name": "تجارتی کابل"
+    },
+    {
+     "id": "sup2",
+     "name": "شرکت هرات"
+    }
+   ],
+   "purchases": [
+    {
+     "id": "pu1",
+     "productId": "p1",
+     "supplierId": "sup1",
+     "quantity": 20,
+     "purchasePrice": 100,
+     "totalAmount": 2000,
+     "paidAmount": 500,
+     "debt": 1500,
+     "date": "2026-08-01",
+     "createdAt": 1785558600000
+    },
+    {
+     "id": "pu2",
+     "productId": "p1",
+     "supplierId": "sup1",
+     "quantity": 10,
+     "purchasePrice": 130,
+     "totalAmount": 1300,
+     "paidAmount": 1300,
+     "debt": 0,
+     "date": "2026-10-05",
+     "createdAt": 1791174600000
+    },
+    {
+     "id": "pu3",
+     "productId": "p2",
+     "supplierId": "sup2",
+     "quantity": 25,
+     "purchasePrice": 40,
+     "totalAmount": 1000,
+     "paidAmount": 0,
+     "debt": 1000,
+     "date": "2026-10-01",
+     "createdAt": 1790829000000
+    }
+   ],
+   "supplierPayments": [
+    {
+     "id": "sp1",
+     "supplierId": "sup1",
+     "amount": 1000,
+     "date": "2026-09-01",
+     "createdAt": 1788237000000
+    }
+   ],
+   "auditLog": [
+    {
+     "id": "a1",
+     "type": "cancel_sale",
+     "refId": "s5",
+     "user": "کریم",
+     "date": "2026-10-14",
+     "createdAt": 1791959700000
+    },
+    {
+     "id": "a2",
+     "type": "line_delete",
+     "refId": "s4",
+     "user": "احمد",
+     "amount": 60,
+     "date": "2026-10-14",
+     "createdAt": 1791952800000
+    },
+    {
+     "id": "a3",
+     "type": "no_sale",
+     "by": "کریم",
+     "approvedBy": "مدیر",
+     "reason": "change",
+     "at": 1791966600000
+    },
+    {
+     "id": "a4",
+     "type": "no_sale",
+     "date": "2026-10-13",
+     "createdAt": 1791905400000
+    },
+    {
+     "id": "a5",
+     "type": "sale",
+     "refId": "s6",
+     "date": "2026-10-14",
+     "createdAt": 1791963000000
+    }
+   ]
+  },
+  "empty": {}
+ },
+ "cases": [
+  {
+   "name": "امروز با روزِ کاریِ ۰۴:۰۰ — فاکتورِ ۰۲:۳۰ مالِ دیروز است",
+   "id": "RPT-01",
+   "fn": "today",
+   "opts": {
+    "date": "2026-10-14",
+    "clock": {
+     "offsetMinutes": 270,
+     "dayStartMinute": 240
+    },
+    "costing": "line"
+   },
+   "ledger": "kabul",
+   "expect": {
+    "date": "2026-10-14",
+    "today": {
+     "invoices": 3,
+     "returnCount": 1,
+     "gross": 60500,
+     "discount": 1550,
+     "sales": 58950,
+     "returns": 14000,
+     "netSales": 44950,
+     "cogs": 27500,
+     "grossProfit": 17450,
+     "marginBp": 3882,
+     "avgTicket": 19650,
+     "costEstimatedLines": 2,
+     "profitApproximate": true,
+     "date": "2026-10-14"
+    },
+    "yesterday": {
+     "invoices": 2,
+     "returnCount": 0,
+     "gross": 79000,
+     "discount": 5000,
+     "sales": 74000,
+     "returns": 0,
+     "netSales": 74000,
+     "cogs": 61500,
+     "grossProfit": 12500,
+     "marginBp": 1689,
+     "avgTicket": 37000,
+     "costEstimatedLines": 0,
+     "profitApproximate": true,
+     "date": "2026-10-13"
+    },
+    "lastWeek": {
+     "invoices": 1,
+     "returnCount": 1,
+     "gross": 30000,
+     "discount": 0,
+     "sales": 30000,
+     "returns": 15000,
+     "netSales": 15000,
+     "cogs": 10000,
+     "grossProfit": 5000,
+     "marginBp": 3333,
+     "avgTicket": 30000,
+     "costEstimatedLines": 0,
+     "profitApproximate": true,
+     "date": "2026-10-07"
+    },
+    "vsYesterday": {
+     "invoices": {
+      "diff": 1,
+      "bp": 5000
+     },
+     "sales": {
+      "diff": -15050,
+      "bp": -2034
+     },
+     "returns": {
+      "diff": 14000,
+      "bp": null
+     },
+     "netSales": {
+      "diff": -29050,
+      "bp": -3926
+     },
+     "grossProfit": {
+      "diff": 4950,
+      "bp": 3960
+     },
+     "avgTicket": {
+      "diff": -17350,
+      "bp": -4689
+     },
+     "discount": {
+      "diff": -3450,
+      "bp": -6900
+     }
+    },
+    "vsLastWeek": {
+     "invoices": {
+      "diff": 2,
+      "bp": 20000
+     },
+     "sales": {
+      "diff": 28950,
+      "bp": 9650
+     },
+     "returns": {
+      "diff": -1000,
+      "bp": -667
+     },
+     "netSales": {
+      "diff": 29950,
+      "bp": 19967
+     },
+     "grossProfit": {
+      "diff": 12450,
+      "bp": 24900
+     },
+     "avgTicket": {
+      "diff": -10350,
+      "bp": -3450
+     },
+     "discount": {
+      "diff": 1550,
+      "bp": null
+     }
+    }
+   }
+  },
+  {
+   "name": "امروز با میانگینِ موزون",
+   "id": "RPT-01",
+   "fn": "today",
+   "opts": {
+    "date": "2026-10-14",
+    "clock": {
+     "offsetMinutes": 270,
+     "dayStartMinute": 240
+    },
+    "costing": "mavg"
+   },
+   "ledger": "kabul",
+   "expect": {
+    "date": "2026-10-14",
+    "today": {
+     "invoices": 3,
+     "returnCount": 1,
+     "gross": 60500,
+     "discount": 1550,
+     "sales": 58950,
+     "returns": 14000,
+     "netSales": 44950,
+     "cogs": 25368,
+     "grossProfit": 19582,
+     "marginBp": 4356,
+     "avgTicket": 19650,
+     "costEstimatedLines": 2,
+     "profitApproximate": true,
+     "date": "2026-10-14"
+    },
+    "yesterday": {
+     "invoices": 2,
+     "returnCount": 0,
+     "gross": 79000,
+     "discount": 5000,
+     "sales": 74000,
+     "returns": 0,
+     "netSales": 74000,
+     "cogs": 57237,
+     "grossProfit": 16763,
+     "marginBp": 2265,
+     "avgTicket": 37000,
+     "costEstimatedLines": 0,
+     "profitApproximate": true,
+     "date": "2026-10-13"
+    },
+    "lastWeek": {
+     "invoices": 1,
+     "returnCount": 1,
+     "gross": 30000,
+     "discount": 0,
+     "sales": 30000,
+     "returns": 15000,
+     "netSales": 15000,
+     "cogs": 10000,
+     "grossProfit": 5000,
+     "marginBp": 3333,
+     "avgTicket": 30000,
+     "costEstimatedLines": 0,
+     "profitApproximate": true,
+     "date": "2026-10-07"
+    },
+    "vsYesterday": {
+     "invoices": {
+      "diff": 1,
+      "bp": 5000
+     },
+     "sales": {
+      "diff": -15050,
+      "bp": -2034
+     },
+     "returns": {
+      "diff": 14000,
+      "bp": null
+     },
+     "netSales": {
+      "diff": -29050,
+      "bp": -3926
+     },
+     "grossProfit": {
+      "diff": 2819,
+      "bp": 1682
+     },
+     "avgTicket": {
+      "diff": -17350,
+      "bp": -4689
+     },
+     "discount": {
+      "diff": -3450,
+      "bp": -6900
+     }
+    },
+    "vsLastWeek": {
+     "invoices": {
+      "diff": 2,
+      "bp": 20000
+     },
+     "sales": {
+      "diff": 28950,
+      "bp": 9650
+     },
+     "returns": {
+      "diff": -1000,
+      "bp": -667
+     },
+     "netSales": {
+      "diff": 29950,
+      "bp": 19967
+     },
+     "grossProfit": {
+      "diff": 14582,
+      "bp": 29164
+     },
+     "avgTicket": {
+      "diff": -10350,
+      "bp": -3450
+     },
+     "discount": {
+      "diff": 1550,
+      "bp": null
+     }
+    }
+   }
+  },
+  {
+   "name": "امروز با میانگینِ موزون و D-23 ثبت‌شده (costApproved) — دیروز سودِ قطعی دارد",
+   "id": "RPT-01/03",
+   "fn": "today",
+   "opts": {
+    "date": "2026-10-14",
+    "clock": {
+     "offsetMinutes": 270,
+     "dayStartMinute": 240
+    },
+    "costing": "mavg",
+    "costApproved": true
+   },
+   "ledger": "kabul",
+   "expect": {
+    "date": "2026-10-14",
+    "today": {
+     "invoices": 3,
+     "returnCount": 1,
+     "gross": 60500,
+     "discount": 1550,
+     "sales": 58950,
+     "returns": 14000,
+     "netSales": 44950,
+     "cogs": 25368,
+     "grossProfit": 19582,
+     "marginBp": 4356,
+     "avgTicket": 19650,
+     "costEstimatedLines": 2,
+     "profitApproximate": true,
+     "date": "2026-10-14"
+    },
+    "yesterday": {
+     "invoices": 2,
+     "returnCount": 0,
+     "gross": 79000,
+     "discount": 5000,
+     "sales": 74000,
+     "returns": 0,
+     "netSales": 74000,
+     "cogs": 57237,
+     "grossProfit": 16763,
+     "marginBp": 2265,
+     "avgTicket": 37000,
+     "costEstimatedLines": 0,
+     "profitApproximate": false,
+     "date": "2026-10-13"
+    },
+    "lastWeek": {
+     "invoices": 1,
+     "returnCount": 1,
+     "gross": 30000,
+     "discount": 0,
+     "sales": 30000,
+     "returns": 15000,
+     "netSales": 15000,
+     "cogs": 10000,
+     "grossProfit": 5000,
+     "marginBp": 3333,
+     "avgTicket": 30000,
+     "costEstimatedLines": 0,
+     "profitApproximate": false,
+     "date": "2026-10-07"
+    },
+    "vsYesterday": {
+     "invoices": {
+      "diff": 1,
+      "bp": 5000
+     },
+     "sales": {
+      "diff": -15050,
+      "bp": -2034
+     },
+     "returns": {
+      "diff": 14000,
+      "bp": null
+     },
+     "netSales": {
+      "diff": -29050,
+      "bp": -3926
+     },
+     "grossProfit": {
+      "diff": 2819,
+      "bp": 1682
+     },
+     "avgTicket": {
+      "diff": -17350,
+      "bp": -4689
+     },
+     "discount": {
+      "diff": -3450,
+      "bp": -6900
+     }
+    },
+    "vsLastWeek": {
+     "invoices": {
+      "diff": 2,
+      "bp": 20000
+     },
+     "sales": {
+      "diff": 28950,
+      "bp": 9650
+     },
+     "returns": {
+      "diff": -1000,
+      "bp": -667
+     },
+     "netSales": {
+      "diff": 29950,
+      "bp": 19967
+     },
+     "grossProfit": {
+      "diff": 14582,
+      "bp": 29164
+     },
+     "avgTicket": {
+      "diff": -10350,
+      "bp": -3450
+     },
+     "discount": {
+      "diff": 1550,
+      "bp": null
+     }
+    }
+   }
+  },
+  {
+   "name": "امروز بی ساعت — همان date ذخیره‌شده (رفتارِ امروز)",
+   "id": "RPT-01",
+   "fn": "today",
+   "opts": {
+    "date": "2026-10-14",
+    "clock": null,
+    "costing": "line"
+   },
+   "ledger": "kabul",
+   "expect": {
+    "date": "2026-10-14",
+    "today": {
+     "invoices": 4,
+     "returnCount": 1,
+     "gross": 64500,
+     "discount": 1550,
+     "sales": 62950,
+     "returns": 14000,
+     "netSales": 48950,
+     "cogs": 30000,
+     "grossProfit": 18950,
+     "marginBp": 3871,
+     "avgTicket": 15738,
+     "costEstimatedLines": 2,
+     "profitApproximate": true,
+     "date": "2026-10-14"
+    },
+    "yesterday": {
+     "invoices": 1,
+     "returnCount": 0,
+     "gross": 75000,
+     "discount": 5000,
+     "sales": 70000,
+     "returns": 0,
+     "netSales": 70000,
+     "cogs": 59000,
+     "grossProfit": 11000,
+     "marginBp": 1571,
+     "avgTicket": 70000,
+     "costEstimatedLines": 0,
+     "profitApproximate": true,
+     "date": "2026-10-13"
+    },
+    "lastWeek": {
+     "invoices": 1,
+     "returnCount": 1,
+     "gross": 30000,
+     "discount": 0,
+     "sales": 30000,
+     "returns": 15000,
+     "netSales": 15000,
+     "cogs": 10000,
+     "grossProfit": 5000,
+     "marginBp": 3333,
+     "avgTicket": 30000,
+     "costEstimatedLines": 0,
+     "profitApproximate": true,
+     "date": "2026-10-07"
+    },
+    "vsYesterday": {
+     "invoices": {
+      "diff": 3,
+      "bp": 30000
+     },
+     "sales": {
+      "diff": -7050,
+      "bp": -1007
+     },
+     "returns": {
+      "diff": 14000,
+      "bp": null
+     },
+     "netSales": {
+      "diff": -21050,
+      "bp": -3007
+     },
+     "grossProfit": {
+      "diff": 7950,
+      "bp": 7227
+     },
+     "avgTicket": {
+      "diff": -54262,
+      "bp": -7752
+     },
+     "discount": {
+      "diff": -3450,
+      "bp": -6900
+     }
+    },
+    "vsLastWeek": {
+     "invoices": {
+      "diff": 3,
+      "bp": 30000
+     },
+     "sales": {
+      "diff": 32950,
+      "bp": 10983
+     },
+     "returns": {
+      "diff": -1000,
+      "bp": -667
+     },
+     "netSales": {
+      "diff": 33950,
+      "bp": 22633
+     },
+     "grossProfit": {
+      "diff": 13950,
+      "bp": 27900
+     },
+     "avgTicket": {
+      "diff": -14262,
+      "bp": -4754
+     },
+     "discount": {
+      "diff": 1550,
+      "bp": null
+     }
+    }
+   }
+  },
+  {
+   "name": "امروز از now + clock (۰۳:۵۹ صبحِ ۱۵ هنوز روزِ ۱۴ است)",
+   "id": "RPT-01",
+   "fn": "today",
+   "opts": {
+    "now": 1792020540000,
+    "clock": {
+     "offsetMinutes": 270,
+     "dayStartMinute": 240
+    },
+    "costing": "line"
+   },
+   "ledger": "kabul",
+   "expect": {
+    "date": "2026-10-14",
+    "today": {
+     "invoices": 3,
+     "returnCount": 1,
+     "gross": 60500,
+     "discount": 1550,
+     "sales": 58950,
+     "returns": 14000,
+     "netSales": 44950,
+     "cogs": 27500,
+     "grossProfit": 17450,
+     "marginBp": 3882,
+     "avgTicket": 19650,
+     "costEstimatedLines": 2,
+     "profitApproximate": true,
+     "date": "2026-10-14"
+    },
+    "yesterday": {
+     "invoices": 2,
+     "returnCount": 0,
+     "gross": 79000,
+     "discount": 5000,
+     "sales": 74000,
+     "returns": 0,
+     "netSales": 74000,
+     "cogs": 61500,
+     "grossProfit": 12500,
+     "marginBp": 1689,
+     "avgTicket": 37000,
+     "costEstimatedLines": 0,
+     "profitApproximate": true,
+     "date": "2026-10-13"
+    },
+    "lastWeek": {
+     "invoices": 1,
+     "returnCount": 1,
+     "gross": 30000,
+     "discount": 0,
+     "sales": 30000,
+     "returns": 15000,
+     "netSales": 15000,
+     "cogs": 10000,
+     "grossProfit": 5000,
+     "marginBp": 3333,
+     "avgTicket": 30000,
+     "costEstimatedLines": 0,
+     "profitApproximate": true,
+     "date": "2026-10-07"
+    },
+    "vsYesterday": {
+     "invoices": {
+      "diff": 1,
+      "bp": 5000
+     },
+     "sales": {
+      "diff": -15050,
+      "bp": -2034
+     },
+     "returns": {
+      "diff": 14000,
+      "bp": null
+     },
+     "netSales": {
+      "diff": -29050,
+      "bp": -3926
+     },
+     "grossProfit": {
+      "diff": 4950,
+      "bp": 3960
+     },
+     "avgTicket": {
+      "diff": -17350,
+      "bp": -4689
+     },
+     "discount": {
+      "diff": -3450,
+      "bp": -6900
+     }
+    },
+    "vsLastWeek": {
+     "invoices": {
+      "diff": 2,
+      "bp": 20000
+     },
+     "sales": {
+      "diff": 28950,
+      "bp": 9650
+     },
+     "returns": {
+      "diff": -1000,
+      "bp": -667
+     },
+     "netSales": {
+      "diff": 29950,
+      "bp": 19967
+     },
+     "grossProfit": {
+      "diff": 12450,
+      "bp": 24900
+     },
+     "avgTicket": {
+      "diff": -10350,
+      "bp": -3450
+     },
+     "discount": {
+      "diff": 1550,
+      "bp": null
+     }
+    }
+   }
+  },
+  {
+   "name": "فروشِ بازه با تفکیک‌ها — بهای ثبت‌شده",
+   "id": "RPT-02/03",
+   "fn": "sales",
+   "opts": {
+    "from": "2026-10-01",
+    "to": "2026-10-14",
+    "clock": {
+     "offsetMinutes": 270,
+     "dayStartMinute": 240
+    },
+    "costing": "line"
+   },
+   "ledger": "kabul",
+   "expect": {
+    "totals": {
+     "invoices": 6,
+     "returnCount": 2,
+     "gross": 169500,
+     "discount": 6550,
+     "sales": 162950,
+     "returns": 29000,
+     "netSales": 133950,
+     "cogs": 99000,
+     "grossProfit": 34950,
+     "marginBp": 2609,
+     "avgTicket": 27158,
+     "costEstimatedLines": 2,
+     "profitApproximate": true
+    },
+    "product": [
+     {
+      "key": "p1",
+      "name": "چای سبز",
+      "invoices": 4,
+      "qty": 5500,
+      "gross": 112500,
+      "discount": 3982,
+      "sales": 108518,
+      "returns": 29000,
+      "netSales": 79518,
+      "cogs": 68500,
+      "grossProfit": 11018,
+      "marginBp": 1386
+     },
+     {
+      "key": "p2",
+      "name": "قند",
+      "invoices": 2,
+      "qty": 7000,
+      "gross": 42000,
+      "discount": 2524,
+      "sales": 39476,
+      "returns": 0,
+      "netSales": 39476,
+      "cogs": 28000,
+      "grossProfit": 11476,
+      "marginBp": 2907
+     },
+     {
+      "key": "",
+      "name": "",
+      "invoices": 2,
+      "qty": 1000,
+      "gross": 11000,
+      "discount": 44,
+      "sales": 10956,
+      "returns": 0,
+      "netSales": 10956,
+      "cogs": 0,
+      "grossProfit": 10956,
+      "marginBp": 10000
+     },
+     {
+      "key": "p3",
+      "name": "صابون",
+      "invoices": 1,
+      "qty": 1000,
+      "gross": 4000,
+      "discount": 0,
+      "sales": 4000,
+      "returns": 0,
+      "netSales": 4000,
+      "cogs": 2500,
+      "grossProfit": 1500,
+      "marginBp": 3750
+     }
+    ],
+    "category": [
+     {
+      "key": "نوشیدنی",
+      "name": "نوشیدنی",
+      "invoices": 4,
+      "qty": 5500,
+      "gross": 112500,
+      "discount": 3982,
+      "sales": 108518,
+      "returns": 29000,
+      "netSales": 79518,
+      "cogs": 68500,
+      "grossProfit": 11018,
+      "marginBp": 1386
+     },
+     {
+      "key": "خوراکی",
+      "name": "خوراکی",
+      "invoices": 2,
+      "qty": 7000,
+      "gross": 42000,
+      "discount": 2524,
+      "sales": 39476,
+      "returns": 0,
+      "netSales": 39476,
+      "cogs": 28000,
+      "grossProfit": 11476,
+      "marginBp": 2907
+     },
+     {
+      "key": "",
+      "name": "",
+      "invoices": 3,
+      "qty": 2000,
+      "gross": 15000,
+      "discount": 44,
+      "sales": 14956,
+      "returns": 0,
+      "netSales": 14956,
+      "cogs": 2500,
+      "grossProfit": 12456,
+      "marginBp": 8328
+     }
+    ],
+    "user": [
+     {
+      "key": "کریم",
+      "name": "کریم",
+      "invoices": 2,
+      "qty": 8000,
+      "gross": 79000,
+      "discount": 5000,
+      "sales": 74000,
+      "returns": 14000,
+      "netSales": 60000,
+      "cogs": 48500,
+      "grossProfit": 11500,
+      "marginBp": 1917
+     },
+     {
+      "key": "احمد",
+      "name": "احمد",
+      "invoices": 2,
+      "qty": 5500,
+      "gross": 65500,
+      "discount": 1550,
+      "sales": 63950,
+      "returns": 15000,
+      "netSales": 48950,
+      "cogs": 37500,
+      "grossProfit": 11450,
+      "marginBp": 2339
+     },
+     {
+      "key": "",
+      "name": "",
+      "invoices": 2,
+      "qty": 1000,
+      "gross": 25000,
+      "discount": 0,
+      "sales": 25000,
+      "returns": 0,
+      "netSales": 25000,
+      "cogs": 13000,
+      "grossProfit": 12000,
+      "marginBp": 4800
+     }
+    ],
+    "hour": [
+     {
+      "key": "",
+      "name": "",
+      "invoices": 1,
+      "qty": 0,
+      "gross": 10000,
+      "discount": 0,
+      "sales": 10000,
+      "returns": 0,
+      "netSales": 10000,
+      "cogs": 0,
+      "grossProfit": 10000,
+      "marginBp": 10000
+     },
+     {
+      "key": "02",
+      "name": "02",
+      "invoices": 1,
+      "qty": 1000,
+      "gross": 4000,
+      "discount": 0,
+      "sales": 4000,
+      "returns": 0,
+      "netSales": 4000,
+      "cogs": 2500,
+      "grossProfit": 1500,
+      "marginBp": 3750
+     },
+     {
+      "key": "09",
+      "name": "09",
+      "invoices": 1,
+      "qty": 4500,
+      "gross": 35500,
+      "discount": 1550,
+      "sales": 33950,
+      "returns": 0,
+      "netSales": 33950,
+      "cogs": 27500,
+      "grossProfit": 6450,
+      "marginBp": 1900
+     },
+     {
+      "key": "10",
+      "name": "10",
+      "invoices": 1,
+      "qty": 1000,
+      "gross": 30000,
+      "discount": 0,
+      "sales": 30000,
+      "returns": 14000,
+      "netSales": 16000,
+      "cogs": 7000,
+      "grossProfit": 9000,
+      "marginBp": 5625
+     },
+     {
+      "key": "12",
+      "name": "12",
+      "invoices": 1,
+      "qty": 1000,
+      "gross": 15000,
+      "discount": 0,
+      "sales": 15000,
+      "returns": 0,
+      "netSales": 15000,
+      "cogs": 13000,
+      "grossProfit": 2000,
+      "marginBp": 1333
+     },
+     {
+      "key": "15",
+      "name": "15",
+      "invoices": 0,
+      "qty": -1000,
+      "gross": 0,
+      "discount": 0,
+      "sales": 0,
+      "returns": 15000,
+      "netSales": -15000,
+      "cogs": -10000,
+      "grossProfit": -5000,
+      "marginBp": null
+     },
+     {
+      "key": "18",
+      "name": "18",
+      "invoices": 1,
+      "qty": 8000,
+      "gross": 75000,
+      "discount": 5000,
+      "sales": 70000,
+      "returns": 0,
+      "netSales": 70000,
+      "cogs": 59000,
+      "grossProfit": 11000,
+      "marginBp": 1571
+     }
+    ],
+    "payment": [
+     {
+      "key": "cash",
+      "name": "cash",
+      "invoices": 5,
+      "qty": 13500,
+      "gross": 165500,
+      "discount": 6550,
+      "sales": 158950,
+      "returns": 29000,
+      "netSales": 129950,
+      "cogs": 96500,
+      "grossProfit": 33450,
+      "marginBp": 2574
+     },
+     {
+      "key": "credit",
+      "name": "credit",
+      "invoices": 1,
+      "qty": 1000,
+      "gross": 4000,
+      "discount": 0,
+      "sales": 4000,
+      "returns": 0,
+      "netSales": 4000,
+      "cogs": 2500,
+      "grossProfit": 1500,
+      "marginBp": 3750
+     }
+    ],
+    "channel": [
+     {
+      "key": "pos",
+      "name": "pos",
+      "invoices": 5,
+      "qty": 10000,
+      "gross": 134000,
+      "discount": 5000,
+      "sales": 129000,
+      "returns": 29000,
+      "netSales": 100000,
+      "cogs": 71500,
+      "grossProfit": 28500,
+      "marginBp": 2850
+     },
+     {
+      "key": "online",
+      "name": "online",
+      "invoices": 1,
+      "qty": 4500,
+      "gross": 35500,
+      "discount": 1550,
+      "sales": 33950,
+      "returns": 0,
+      "netSales": 33950,
+      "cogs": 27500,
+      "grossProfit": 6450,
+      "marginBp": 1900
+     }
+    ],
+    "from": "2026-10-01",
+    "to": "2026-10-14",
+    "costing": "line"
+   }
+  },
+  {
+   "name": "فروشِ بازه — میانگینِ موزونِ متحرک",
+   "id": "RPT-03",
+   "fn": "sales",
+   "opts": {
+    "from": "2026-10-01",
+    "to": "2026-10-14",
+    "clock": {
+     "offsetMinutes": 270,
+     "dayStartMinute": 240
+    },
+    "costing": "mavg"
+   },
+   "ledger": "kabul",
+   "expect": {
+    "totals": {
+     "invoices": 6,
+     "returnCount": 2,
+     "gross": 169500,
+     "discount": 6550,
+     "sales": 162950,
+     "returns": 29000,
+     "netSales": 133950,
+     "cogs": 92605,
+     "grossProfit": 41345,
+     "marginBp": 3087,
+     "avgTicket": 27158,
+     "costEstimatedLines": 2,
+     "profitApproximate": true
+    },
+    "product": [
+     {
+      "key": "p1",
+      "name": "چای سبز",
+      "invoices": 4,
+      "qty": 5500,
+      "gross": 112500,
+      "discount": 3982,
+      "sales": 108518,
+      "returns": 29000,
+      "netSales": 79518,
+      "cogs": 62105,
+      "grossProfit": 17413,
+      "marginBp": 2190
+     },
+     {
+      "key": "p2",
+      "name": "قند",
+      "invoices": 2,
+      "qty": 7000,
+      "gross": 42000,
+      "discount": 2524,
+      "sales": 39476,
+      "returns": 0,
+      "netSales": 39476,
+      "cogs": 28000,
+      "grossProfit": 11476,
+      "marginBp": 2907
+     },
+     {
+      "key": "",
+      "name": "",
+      "invoices": 2,
+      "qty": 1000,
+      "gross": 11000,
+      "discount": 44,
+      "sales": 10956,
+      "returns": 0,
+      "netSales": 10956,
+      "cogs": 0,
+      "grossProfit": 10956,
+      "marginBp": 10000
+     },
+     {
+      "key": "p3",
+      "name": "صابون",
+      "invoices": 1,
+      "qty": 1000,
+      "gross": 4000,
+      "discount": 0,
+      "sales": 4000,
+      "returns": 0,
+      "netSales": 4000,
+      "cogs": 2500,
+      "grossProfit": 1500,
+      "marginBp": 3750
+     }
+    ],
+    "category": [
+     {
+      "key": "نوشیدنی",
+      "name": "نوشیدنی",
+      "invoices": 4,
+      "qty": 5500,
+      "gross": 112500,
+      "discount": 3982,
+      "sales": 108518,
+      "returns": 29000,
+      "netSales": 79518,
+      "cogs": 62105,
+      "grossProfit": 17413,
+      "marginBp": 2190
+     },
+     {
+      "key": "خوراکی",
+      "name": "خوراکی",
+      "invoices": 2,
+      "qty": 7000,
+      "gross": 42000,
+      "discount": 2524,
+      "sales": 39476,
+      "returns": 0,
+      "netSales": 39476,
+      "cogs": 28000,
+      "grossProfit": 11476,
+      "marginBp": 2907
+     },
+     {
+      "key": "",
+      "name": "",
+      "invoices": 3,
+      "qty": 2000,
+      "gross": 15000,
+      "discount": 44,
+      "sales": 14956,
+      "returns": 0,
+      "netSales": 14956,
+      "cogs": 2500,
+      "grossProfit": 12456,
+      "marginBp": 8328
+     }
+    ],
+    "user": [
+     {
+      "key": "کریم",
+      "name": "کریم",
+      "invoices": 2,
+      "qty": 8000,
+      "gross": 79000,
+      "discount": 5000,
+      "sales": 74000,
+      "returns": 14000,
+      "netSales": 60000,
+      "cogs": 45658,
+      "grossProfit": 14342,
+      "marginBp": 2390
+     },
+     {
+      "key": "احمد",
+      "name": "احمد",
+      "invoices": 2,
+      "qty": 5500,
+      "gross": 65500,
+      "discount": 1550,
+      "sales": 63950,
+      "returns": 15000,
+      "netSales": 48950,
+      "cogs": 35368,
+      "grossProfit": 13582,
+      "marginBp": 2775
+     },
+     {
+      "key": "",
+      "name": "",
+      "invoices": 2,
+      "qty": 1000,
+      "gross": 25000,
+      "discount": 0,
+      "sales": 25000,
+      "returns": 0,
+      "netSales": 25000,
+      "cogs": 11579,
+      "grossProfit": 13421,
+      "marginBp": 5368
+     }
+    ],
+    "hour": [
+     {
+      "key": "",
+      "name": "",
+      "invoices": 1,
+      "qty": 0,
+      "gross": 10000,
+      "discount": 0,
+      "sales": 10000,
+      "returns": 0,
+      "netSales": 10000,
+      "cogs": 0,
+      "grossProfit": 10000,
+      "marginBp": 10000
+     },
+     {
+      "key": "02",
+      "name": "02",
+      "invoices": 1,
+      "qty": 1000,
+      "gross": 4000,
+      "discount": 0,
+      "sales": 4000,
+      "returns": 0,
+      "netSales": 4000,
+      "cogs": 2500,
+      "grossProfit": 1500,
+      "marginBp": 3750
+     },
+     {
+      "key": "09",
+      "name": "09",
+      "invoices": 1,
+      "qty": 4500,
+      "gross": 35500,
+      "discount": 1550,
+      "sales": 33950,
+      "returns": 0,
+      "netSales": 33950,
+      "cogs": 25368,
+      "grossProfit": 8582,
+      "marginBp": 2528
+     },
+     {
+      "key": "10",
+      "name": "10",
+      "invoices": 1,
+      "qty": 1000,
+      "gross": 30000,
+      "discount": 0,
+      "sales": 30000,
+      "returns": 14000,
+      "netSales": 16000,
+      "cogs": 8421,
+      "grossProfit": 7579,
+      "marginBp": 4737
+     },
+     {
+      "key": "12",
+      "name": "12",
+      "invoices": 1,
+      "qty": 1000,
+      "gross": 15000,
+      "discount": 0,
+      "sales": 15000,
+      "returns": 0,
+      "netSales": 15000,
+      "cogs": 11579,
+      "grossProfit": 3421,
+      "marginBp": 2281
+     },
+     {
+      "key": "15",
+      "name": "15",
+      "invoices": 0,
+      "qty": -1000,
+      "gross": 0,
+      "discount": 0,
+      "sales": 0,
+      "returns": 15000,
+      "netSales": -15000,
+      "cogs": -10000,
+      "grossProfit": -5000,
+      "marginBp": null
+     },
+     {
+      "key": "18",
+      "name": "18",
+      "invoices": 1,
+      "qty": 8000,
+      "gross": 75000,
+      "discount": 5000,
+      "sales": 70000,
+      "returns": 0,
+      "netSales": 70000,
+      "cogs": 54737,
+      "grossProfit": 15263,
+      "marginBp": 2180
+     }
+    ],
+    "payment": [
+     {
+      "key": "cash",
+      "name": "cash",
+      "invoices": 5,
+      "qty": 13500,
+      "gross": 165500,
+      "discount": 6550,
+      "sales": 158950,
+      "returns": 29000,
+      "netSales": 129950,
+      "cogs": 90105,
+      "grossProfit": 39845,
+      "marginBp": 3066
+     },
+     {
+      "key": "credit",
+      "name": "credit",
+      "invoices": 1,
+      "qty": 1000,
+      "gross": 4000,
+      "discount": 0,
+      "sales": 4000,
+      "returns": 0,
+      "netSales": 4000,
+      "cogs": 2500,
+      "grossProfit": 1500,
+      "marginBp": 3750
+     }
+    ],
+    "channel": [
+     {
+      "key": "pos",
+      "name": "pos",
+      "invoices": 5,
+      "qty": 10000,
+      "gross": 134000,
+      "discount": 5000,
+      "sales": 129000,
+      "returns": 29000,
+      "netSales": 100000,
+      "cogs": 67237,
+      "grossProfit": 32763,
+      "marginBp": 3276
+     },
+     {
+      "key": "online",
+      "name": "online",
+      "invoices": 1,
+      "qty": 4500,
+      "gross": 35500,
+      "discount": 1550,
+      "sales": 33950,
+      "returns": 0,
+      "netSales": 33950,
+      "cogs": 25368,
+      "grossProfit": 8582,
+      "marginBp": 2528
+     }
+    ],
+    "from": "2026-10-01",
+    "to": "2026-10-14",
+    "costing": "mavg"
+   }
+  },
+  {
+   "name": "همهٔ زمان‌ها بی ساعت (مرجعِ ReportEngine.sales)",
+   "id": "RPT-02/03",
+   "fn": "sales",
+   "opts": {
+    "clock": null,
+    "costing": "line"
+   },
+   "ledger": "kabul",
+   "expect": {
+    "totals": {
+     "invoices": 6,
+     "returnCount": 2,
+     "gross": 169500,
+     "discount": 6550,
+     "sales": 162950,
+     "returns": 29000,
+     "netSales": 133950,
+     "cogs": 99000,
+     "grossProfit": 34950,
+     "marginBp": 2609,
+     "avgTicket": 27158,
+     "costEstimatedLines": 2,
+     "profitApproximate": true
+    },
+    "product": [
+     {
+      "key": "p1",
+      "name": "چای سبز",
+      "invoices": 4,
+      "qty": 5500,
+      "gross": 112500,
+      "discount": 3982,
+      "sales": 108518,
+      "returns": 29000,
+      "netSales": 79518,
+      "cogs": 68500,
+      "grossProfit": 11018,
+      "marginBp": 1386
+     },
+     {
+      "key": "p2",
+      "name": "قند",
+      "invoices": 2,
+      "qty": 7000,
+      "gross": 42000,
+      "discount": 2524,
+      "sales": 39476,
+      "returns": 0,
+      "netSales": 39476,
+      "cogs": 28000,
+      "grossProfit": 11476,
+      "marginBp": 2907
+     },
+     {
+      "key": "",
+      "name": "",
+      "invoices": 2,
+      "qty": 1000,
+      "gross": 11000,
+      "discount": 44,
+      "sales": 10956,
+      "returns": 0,
+      "netSales": 10956,
+      "cogs": 0,
+      "grossProfit": 10956,
+      "marginBp": 10000
+     },
+     {
+      "key": "p3",
+      "name": "صابون",
+      "invoices": 1,
+      "qty": 1000,
+      "gross": 4000,
+      "discount": 0,
+      "sales": 4000,
+      "returns": 0,
+      "netSales": 4000,
+      "cogs": 2500,
+      "grossProfit": 1500,
+      "marginBp": 3750
+     }
+    ],
+    "category": [
+     {
+      "key": "نوشیدنی",
+      "name": "نوشیدنی",
+      "invoices": 4,
+      "qty": 5500,
+      "gross": 112500,
+      "discount": 3982,
+      "sales": 108518,
+      "returns": 29000,
+      "netSales": 79518,
+      "cogs": 68500,
+      "grossProfit": 11018,
+      "marginBp": 1386
+     },
+     {
+      "key": "خوراکی",
+      "name": "خوراکی",
+      "invoices": 2,
+      "qty": 7000,
+      "gross": 42000,
+      "discount": 2524,
+      "sales": 39476,
+      "returns": 0,
+      "netSales": 39476,
+      "cogs": 28000,
+      "grossProfit": 11476,
+      "marginBp": 2907
+     },
+     {
+      "key": "",
+      "name": "",
+      "invoices": 3,
+      "qty": 2000,
+      "gross": 15000,
+      "discount": 44,
+      "sales": 14956,
+      "returns": 0,
+      "netSales": 14956,
+      "cogs": 2500,
+      "grossProfit": 12456,
+      "marginBp": 8328
+     }
+    ],
+    "user": [
+     {
+      "key": "کریم",
+      "name": "کریم",
+      "invoices": 2,
+      "qty": 8000,
+      "gross": 79000,
+      "discount": 5000,
+      "sales": 74000,
+      "returns": 14000,
+      "netSales": 60000,
+      "cogs": 48500,
+      "grossProfit": 11500,
+      "marginBp": 1917
+     },
+     {
+      "key": "احمد",
+      "name": "احمد",
+      "invoices": 2,
+      "qty": 5500,
+      "gross": 65500,
+      "discount": 1550,
+      "sales": 63950,
+      "returns": 15000,
+      "netSales": 48950,
+      "cogs": 37500,
+      "grossProfit": 11450,
+      "marginBp": 2339
+     },
+     {
+      "key": "",
+      "name": "",
+      "invoices": 2,
+      "qty": 1000,
+      "gross": 25000,
+      "discount": 0,
+      "sales": 25000,
+      "returns": 0,
+      "netSales": 25000,
+      "cogs": 13000,
+      "grossProfit": 12000,
+      "marginBp": 4800
+     }
+    ],
+    "hour": [
+     {
+      "key": "",
+      "name": "",
+      "invoices": 6,
+      "qty": 14500,
+      "gross": 169500,
+      "discount": 6550,
+      "sales": 162950,
+      "returns": 29000,
+      "netSales": 133950,
+      "cogs": 99000,
+      "grossProfit": 34950,
+      "marginBp": 2609
+     }
+    ],
+    "payment": [
+     {
+      "key": "cash",
+      "name": "cash",
+      "invoices": 5,
+      "qty": 13500,
+      "gross": 165500,
+      "discount": 6550,
+      "sales": 158950,
+      "returns": 29000,
+      "netSales": 129950,
+      "cogs": 96500,
+      "grossProfit": 33450,
+      "marginBp": 2574
+     },
+     {
+      "key": "credit",
+      "name": "credit",
+      "invoices": 1,
+      "qty": 1000,
+      "gross": 4000,
+      "discount": 0,
+      "sales": 4000,
+      "returns": 0,
+      "netSales": 4000,
+      "cogs": 2500,
+      "grossProfit": 1500,
+      "marginBp": 3750
+     }
+    ],
+    "channel": [
+     {
+      "key": "pos",
+      "name": "pos",
+      "invoices": 5,
+      "qty": 10000,
+      "gross": 134000,
+      "discount": 5000,
+      "sales": 129000,
+      "returns": 29000,
+      "netSales": 100000,
+      "cogs": 71500,
+      "grossProfit": 28500,
+      "marginBp": 2850
+     },
+     {
+      "key": "online",
+      "name": "online",
+      "invoices": 1,
+      "qty": 4500,
+      "gross": 35500,
+      "discount": 1550,
+      "sales": 33950,
+      "returns": 0,
+      "netSales": 33950,
+      "cogs": 27500,
+      "grossProfit": 6450,
+      "marginBp": 1900
+     }
+    ],
+    "from": "0000-01-01",
+    "to": "9999-12-31",
+    "costing": "line"
+   }
+  },
+  {
+   "name": "سنِ بدهی و طلبِ تأمین‌کننده",
+   "id": "RPT-06",
+   "fn": "debts",
+   "opts": {
+    "asOf": "2026-10-14"
+   },
+   "ledger": "kabul",
+   "expect": {
+    "asOf": "2026-10-14",
+    "buckets": [
+     30,
+     60,
+     90
+    ],
+    "customers": {
+     "rows": [
+      {
+       "id": "d1",
+       "name": "رحیم",
+       "balance": 84000,
+       "open": 84000,
+       "credit": 0,
+       "buckets": [
+        54000,
+        0,
+        0,
+        30000
+       ],
+       "oldestDays": 105
+      },
+      {
+       "id": "d2",
+       "name": "نذیر",
+       "balance": 15000,
+       "open": 15000,
+       "credit": 0,
+       "buckets": [
+        0,
+        15000,
+        0,
+        0
+       ],
+       "oldestDays": 55
+      },
+      {
+       "id": "d3",
+       "name": "ولی",
+       "balance": -6000,
+       "open": 0,
+       "credit": 6000,
+       "buckets": [
+        0,
+        0,
+        0,
+        0
+       ],
+       "oldestDays": null
+      }
+     ],
+     "totals": {
+      "balance": 93000,
+      "open": 99000,
+      "credit": 6000,
+      "buckets": [
+       54000,
+       15000,
+       0,
+       30000
+      ]
+     }
+    },
+    "suppliers": {
+     "rows": [
+      {
+       "id": "sup2",
+       "name": "شرکت هرات",
+       "balance": 100000,
+       "open": 100000,
+       "credit": 0,
+       "buckets": [
+        100000,
+        0,
+        0,
+        0
+       ],
+       "oldestDays": 13
+      },
+      {
+       "id": "sup1",
+       "name": "تجارتی کابل",
+       "balance": 50000,
+       "open": 50000,
+       "credit": 0,
+       "buckets": [
+        0,
+        0,
+        50000,
+        0
+       ],
+       "oldestDays": 74
+      }
+     ],
+     "totals": {
+      "balance": 150000,
+      "open": 150000,
+      "credit": 0,
+      "buckets": [
+       100000,
+       0,
+       50000,
+       0
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "سنِ بدهی با مرزهای ۷/۳۰",
+   "id": "RPT-06",
+   "fn": "debts",
+   "opts": {
+    "asOf": "2026-10-14",
+    "buckets": [
+     7,
+     30
+    ]
+   },
+   "ledger": "kabul",
+   "expect": {
+    "asOf": "2026-10-14",
+    "buckets": [
+     7,
+     30
+    ],
+    "customers": {
+     "rows": [
+      {
+       "id": "d1",
+       "name": "رحیم",
+       "balance": 84000,
+       "open": 84000,
+       "credit": 0,
+       "buckets": [
+        4000,
+        50000,
+        30000
+       ],
+       "oldestDays": 105
+      },
+      {
+       "id": "d2",
+       "name": "نذیر",
+       "balance": 15000,
+       "open": 15000,
+       "credit": 0,
+       "buckets": [
+        0,
+        0,
+        15000
+       ],
+       "oldestDays": 55
+      },
+      {
+       "id": "d3",
+       "name": "ولی",
+       "balance": -6000,
+       "open": 0,
+       "credit": 6000,
+       "buckets": [
+        0,
+        0,
+        0
+       ],
+       "oldestDays": null
+      }
+     ],
+     "totals": {
+      "balance": 93000,
+      "open": 99000,
+      "credit": 6000,
+      "buckets": [
+       4000,
+       50000,
+       45000
+      ]
+     }
+    },
+    "suppliers": {
+     "rows": [
+      {
+       "id": "sup2",
+       "name": "شرکت هرات",
+       "balance": 100000,
+       "open": 100000,
+       "credit": 0,
+       "buckets": [
+        0,
+        100000,
+        0
+       ],
+       "oldestDays": 13
+      },
+      {
+       "id": "sup1",
+       "name": "تجارتی کابل",
+       "balance": 50000,
+       "open": 50000,
+       "credit": 0,
+       "buckets": [
+        0,
+        0,
+        50000
+       ],
+       "oldestDays": 74
+      }
+     ],
+     "totals": {
+      "balance": 150000,
+      "open": 150000,
+      "credit": 0,
+      "buckets": [
+       0,
+       100000,
+       50000
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "ضدتقلب به تفکیکِ کاربر",
+   "id": "RPT-09",
+   "fn": "fraud",
+   "opts": {
+    "from": "2026-10-13",
+    "to": "2026-10-14",
+    "clock": {
+     "offsetMinutes": 270,
+     "dayStartMinute": 240
+    }
+   },
+   "ledger": "kabul",
+   "expect": {
+    "from": "2026-10-13",
+    "to": "2026-10-14",
+    "rows": [
+     {
+      "key": "",
+      "invoices": 2,
+      "gross": 25000,
+      "discountCount": 0,
+      "discount": 0,
+      "discountBp": 0,
+      "returnCount": 0,
+      "returns": 0,
+      "voidCount": 0,
+      "voids": 0,
+      "lineDeleteCount": 0,
+      "lineDeletes": 0,
+      "noSaleCount": 1,
+      "overrideCount": 0,
+      "approvalCount": 0
+     },
+     {
+      "key": "احمد",
+      "invoices": 1,
+      "gross": 35500,
+      "discountCount": 1,
+      "discount": 1550,
+      "discountBp": 437,
+      "returnCount": 1,
+      "returns": 14000,
+      "voidCount": 0,
+      "voids": 0,
+      "lineDeleteCount": 1,
+      "lineDeletes": 6000,
+      "noSaleCount": 0,
+      "overrideCount": 0,
+      "approvalCount": 0
+     },
+     {
+      "key": "مدیر",
+      "invoices": 0,
+      "gross": 0,
+      "discountCount": 0,
+      "discount": 0,
+      "discountBp": null,
+      "returnCount": 0,
+      "returns": 0,
+      "voidCount": 0,
+      "voids": 0,
+      "lineDeleteCount": 0,
+      "lineDeletes": 0,
+      "noSaleCount": 0,
+      "overrideCount": 0,
+      "approvalCount": 2
+     },
+     {
+      "key": "کریم",
+      "invoices": 2,
+      "gross": 79000,
+      "discountCount": 1,
+      "discount": 5000,
+      "discountBp": 633,
+      "returnCount": 0,
+      "returns": 0,
+      "voidCount": 1,
+      "voids": 60000,
+      "lineDeleteCount": 0,
+      "lineDeletes": 0,
+      "noSaleCount": 1,
+      "overrideCount": 2,
+      "approvalCount": 0
+     }
+    ],
+    "totals": {
+     "key": "",
+     "invoices": 5,
+     "gross": 139500,
+     "discountCount": 2,
+     "discount": 6550,
+     "discountBp": 470,
+     "returnCount": 1,
+     "returns": 14000,
+     "voidCount": 1,
+     "voids": 60000,
+     "lineDeleteCount": 1,
+     "lineDeletes": 6000,
+     "noSaleCount": 2,
+     "overrideCount": 2,
+     "approvalCount": 2
+    }
+   }
+  },
+  {
+   "name": "جدولِ فروش",
+   "id": "RPT-11",
+   "fn": "tables",
+   "of": "sales",
+   "opts": {
+    "from": "2026-10-01",
+    "to": "2026-10-14",
+    "clock": {
+     "offsetMinutes": 270,
+     "dayStartMinute": 240
+    },
+    "costing": "line"
+   },
+   "ledger": "kabul",
+   "expect": [
+    {
+     "id": "sales.totals",
+     "title": "خلاصهٔ فروش",
+     "head": [
+      "از",
+      "تا",
+      "برگشتی (بار)",
+      "فاکتور",
+      "جمع پیش از تخفیف",
+      "تخفیف",
+      "فروش",
+      "برگشتی",
+      "فروش خالص",
+      "بهای تمام‌شده",
+      "سود ناخالص",
+      "حاشیه",
+      "میانگین فاکتور",
+      "سود تقریبی"
+     ],
+     "rows": [
+      [
+       "2026-10-01",
+       "2026-10-14",
+       "2",
+       "6",
+       "1695.00",
+       "65.50",
+       "1629.50",
+       "290.00",
+       "1339.50",
+       "990.00",
+       "349.50",
+       "26.09%",
+       "271.58",
+       "بله"
+      ]
+     ],
+     "total": null
+    },
+    {
+     "id": "sales.product",
+     "title": "فروش به تفکیک کالا",
+     "head": [
+      "کالا",
+      "فاکتور",
+      "مقدار",
+      "جمع پیش از تخفیف",
+      "تخفیف",
+      "فروش",
+      "برگشتی",
+      "فروش خالص",
+      "بهای تمام‌شده",
+      "سود ناخالص",
+      "حاشیه"
+     ],
+     "rows": [
+      [
+       "چای سبز",
+       "4",
+       "5.5",
+       "1125.00",
+       "39.82",
+       "1085.18",
+       "290.00",
+       "795.18",
+       "685.00",
+       "110.18",
+       "13.86%"
+      ],
+      [
+       "قند",
+       "2",
+       "7",
+       "420.00",
+       "25.24",
+       "394.76",
+       "0.00",
+       "394.76",
+       "280.00",
+       "114.76",
+       "29.07%"
+      ],
+      [
+       "قلم آزاد",
+       "2",
+       "1",
+       "110.00",
+       "0.44",
+       "109.56",
+       "0.00",
+       "109.56",
+       "0.00",
+       "109.56",
+       "100.00%"
+      ],
+      [
+       "صابون",
+       "1",
+       "1",
+       "40.00",
+       "0.00",
+       "40.00",
+       "0.00",
+       "40.00",
+       "25.00",
+       "15.00",
+       "37.50%"
+      ]
+     ],
+     "total": [
+      "جمع",
+      "6",
+      "14.5",
+      "1695.00",
+      "65.50",
+      "1629.50",
+      "290.00",
+      "1339.50",
+      "990.00",
+      "349.50",
+      "26.09%"
+     ]
+    },
+    {
+     "id": "sales.category",
+     "title": "فروش به تفکیک دسته",
+     "head": [
+      "دسته",
+      "فاکتور",
+      "مقدار",
+      "جمع پیش از تخفیف",
+      "تخفیف",
+      "فروش",
+      "برگشتی",
+      "فروش خالص",
+      "بهای تمام‌شده",
+      "سود ناخالص",
+      "حاشیه"
+     ],
+     "rows": [
+      [
+       "نوشیدنی",
+       "4",
+       "5.5",
+       "1125.00",
+       "39.82",
+       "1085.18",
+       "290.00",
+       "795.18",
+       "685.00",
+       "110.18",
+       "13.86%"
+      ],
+      [
+       "خوراکی",
+       "2",
+       "7",
+       "420.00",
+       "25.24",
+       "394.76",
+       "0.00",
+       "394.76",
+       "280.00",
+       "114.76",
+       "29.07%"
+      ],
+      [
+       "بی‌دسته",
+       "3",
+       "2",
+       "150.00",
+       "0.44",
+       "149.56",
+       "0.00",
+       "149.56",
+       "25.00",
+       "124.56",
+       "83.28%"
+      ]
+     ],
+     "total": [
+      "جمع",
+      "6",
+      "14.5",
+      "1695.00",
+      "65.50",
+      "1629.50",
+      "290.00",
+      "1339.50",
+      "990.00",
+      "349.50",
+      "26.09%"
+     ]
+    },
+    {
+     "id": "sales.user",
+     "title": "فروش به تفکیک کاربر",
+     "head": [
+      "کاربر",
+      "فاکتور",
+      "مقدار",
+      "جمع پیش از تخفیف",
+      "تخفیف",
+      "فروش",
+      "برگشتی",
+      "فروش خالص",
+      "بهای تمام‌شده",
+      "سود ناخالص",
+      "حاشیه"
+     ],
+     "rows": [
+      [
+       "کریم",
+       "2",
+       "8",
+       "790.00",
+       "50.00",
+       "740.00",
+       "140.00",
+       "600.00",
+       "485.00",
+       "115.00",
+       "19.17%"
+      ],
+      [
+       "احمد",
+       "2",
+       "5.5",
+       "655.00",
+       "15.50",
+       "639.50",
+       "150.00",
+       "489.50",
+       "375.00",
+       "114.50",
+       "23.39%"
+      ],
+      [
+       "نامعلوم",
+       "2",
+       "1",
+       "250.00",
+       "0.00",
+       "250.00",
+       "0.00",
+       "250.00",
+       "130.00",
+       "120.00",
+       "48.00%"
+      ]
+     ],
+     "total": [
+      "جمع",
+      "6",
+      "14.5",
+      "1695.00",
+      "65.50",
+      "1629.50",
+      "290.00",
+      "1339.50",
+      "990.00",
+      "349.50",
+      "26.09%"
+     ]
+    },
+    {
+     "id": "sales.hour",
+     "title": "فروش به تفکیک ساعت",
+     "head": [
+      "ساعت",
+      "فاکتور",
+      "مقدار",
+      "جمع پیش از تخفیف",
+      "تخفیف",
+      "فروش",
+      "برگشتی",
+      "فروش خالص",
+      "بهای تمام‌شده",
+      "سود ناخالص",
+      "حاشیه"
+     ],
+     "rows": [
+      [
+       "نامعلوم",
+       "1",
+       "0",
+       "100.00",
+       "0.00",
+       "100.00",
+       "0.00",
+       "100.00",
+       "0.00",
+       "100.00",
+       "100.00%"
+      ],
+      [
+       "02:00",
+       "1",
+       "1",
+       "40.00",
+       "0.00",
+       "40.00",
+       "0.00",
+       "40.00",
+       "25.00",
+       "15.00",
+       "37.50%"
+      ],
+      [
+       "09:00",
+       "1",
+       "4.5",
+       "355.00",
+       "15.50",
+       "339.50",
+       "0.00",
+       "339.50",
+       "275.00",
+       "64.50",
+       "19.00%"
+      ],
+      [
+       "10:00",
+       "1",
+       "1",
+       "300.00",
+       "0.00",
+       "300.00",
+       "140.00",
+       "160.00",
+       "70.00",
+       "90.00",
+       "56.25%"
+      ],
+      [
+       "12:00",
+       "1",
+       "1",
+       "150.00",
+       "0.00",
+       "150.00",
+       "0.00",
+       "150.00",
+       "130.00",
+       "20.00",
+       "13.33%"
+      ],
+      [
+       "15:00",
+       "0",
+       "-1",
+       "0.00",
+       "0.00",
+       "0.00",
+       "150.00",
+       "-150.00",
+       "-100.00",
+       "-50.00",
+       ""
+      ],
+      [
+       "18:00",
+       "1",
+       "8",
+       "750.00",
+       "50.00",
+       "700.00",
+       "0.00",
+       "700.00",
+       "590.00",
+       "110.00",
+       "15.71%"
+      ]
+     ],
+     "total": [
+      "جمع",
+      "6",
+      "14.5",
+      "1695.00",
+      "65.50",
+      "1629.50",
+      "290.00",
+      "1339.50",
+      "990.00",
+      "349.50",
+      "26.09%"
+     ]
+    },
+    {
+     "id": "sales.payment",
+     "title": "فروش به تفکیک روش پرداخت",
+     "head": [
+      "روش پرداخت",
+      "فاکتور",
+      "مقدار",
+      "جمع پیش از تخفیف",
+      "تخفیف",
+      "فروش",
+      "برگشتی",
+      "فروش خالص",
+      "بهای تمام‌شده",
+      "سود ناخالص",
+      "حاشیه"
+     ],
+     "rows": [
+      [
+       "نقد",
+       "5",
+       "13.5",
+       "1655.00",
+       "65.50",
+       "1589.50",
+       "290.00",
+       "1299.50",
+       "965.00",
+       "334.50",
+       "25.74%"
+      ],
+      [
+       "نسیه",
+       "1",
+       "1",
+       "40.00",
+       "0.00",
+       "40.00",
+       "0.00",
+       "40.00",
+       "25.00",
+       "15.00",
+       "37.50%"
+      ]
+     ],
+     "total": [
+      "جمع",
+      "6",
+      "14.5",
+      "1695.00",
+      "65.50",
+      "1629.50",
+      "290.00",
+      "1339.50",
+      "990.00",
+      "349.50",
+      "26.09%"
+     ]
+    },
+    {
+     "id": "sales.channel",
+     "title": "فروش به تفکیک کانال",
+     "head": [
+      "کانال",
+      "فاکتور",
+      "مقدار",
+      "جمع پیش از تخفیف",
+      "تخفیف",
+      "فروش",
+      "برگشتی",
+      "فروش خالص",
+      "بهای تمام‌شده",
+      "سود ناخالص",
+      "حاشیه"
+     ],
+     "rows": [
+      [
+       "حضوری",
+       "5",
+       "10",
+       "1340.00",
+       "50.00",
+       "1290.00",
+       "290.00",
+       "1000.00",
+       "715.00",
+       "285.00",
+       "28.50%"
+      ],
+      [
+       "اینترنتی",
+       "1",
+       "4.5",
+       "355.00",
+       "15.50",
+       "339.50",
+       "0.00",
+       "339.50",
+       "275.00",
+       "64.50",
+       "19.00%"
+      ]
+     ],
+     "total": [
+      "جمع",
+      "6",
+      "14.5",
+      "1695.00",
+      "65.50",
+      "1629.50",
+      "290.00",
+      "1339.50",
+      "990.00",
+      "349.50",
+      "26.09%"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "جدولِ امروز",
+   "id": "RPT-11",
+   "fn": "tables",
+   "of": "today",
+   "opts": {
+    "date": "2026-10-14",
+    "clock": {
+     "offsetMinutes": 270,
+     "dayStartMinute": 240
+    },
+    "costing": "line"
+   },
+   "ledger": "kabul",
+   "expect": [
+    {
+     "id": "today",
+     "title": "داشبورد امروز",
+     "head": [
+      "روز",
+      "تاریخ",
+      "فاکتور",
+      "فروش",
+      "برگشتی",
+      "فروش خالص",
+      "سود ناخالص",
+      "حاشیه",
+      "میانگین فاکتور",
+      "سود تقریبی"
+     ],
+     "rows": [
+      [
+       "امروز",
+       "2026-10-14",
+       "3",
+       "589.50",
+       "140.00",
+       "449.50",
+       "174.50",
+       "38.82%",
+       "196.50",
+       "بله"
+      ],
+      [
+       "دیروز",
+       "2026-10-13",
+       "2",
+       "740.00",
+       "0.00",
+       "740.00",
+       "125.00",
+       "16.89%",
+       "370.00",
+       "بله"
+      ],
+      [
+       "همین روز هفتهٔ پیش",
+       "2026-10-07",
+       "1",
+       "300.00",
+       "150.00",
+       "150.00",
+       "50.00",
+       "33.33%",
+       "300.00",
+       "بله"
+      ]
+     ],
+     "total": null
+    }
+   ]
+  },
+  {
+   "name": "جدولِ بدهی",
+   "id": "RPT-11",
+   "fn": "tables",
+   "of": "debts",
+   "opts": {
+    "asOf": "2026-10-14"
+   },
+   "ledger": "kabul",
+   "expect": [
+    {
+     "id": "debts.customers",
+     "title": "سن بدهی مشتری‌ها",
+     "head": [
+      "مشتری",
+      "مانده",
+      "پیش‌پرداخت",
+      "0–30 روز",
+      "31–60 روز",
+      "61–90 روز",
+      "91+ روز",
+      "قدیمی‌ترین (روز)"
+     ],
+     "rows": [
+      [
+       "رحیم",
+       "840.00",
+       "0.00",
+       "540.00",
+       "0.00",
+       "0.00",
+       "300.00",
+       "105"
+      ],
+      [
+       "نذیر",
+       "150.00",
+       "0.00",
+       "0.00",
+       "150.00",
+       "0.00",
+       "0.00",
+       "55"
+      ],
+      [
+       "ولی",
+       "-60.00",
+       "60.00",
+       "0.00",
+       "0.00",
+       "0.00",
+       "0.00",
+       ""
+      ]
+     ],
+     "total": [
+      "جمع",
+      "930.00",
+      "60.00",
+      "540.00",
+      "150.00",
+      "0.00",
+      "300.00",
+      ""
+     ]
+    },
+    {
+     "id": "debts.suppliers",
+     "title": "طلب تأمین‌کنندگان",
+     "head": [
+      "تأمین‌کننده",
+      "مانده",
+      "پیش‌پرداخت",
+      "0–30 روز",
+      "31–60 روز",
+      "61–90 روز",
+      "91+ روز",
+      "قدیمی‌ترین (روز)"
+     ],
+     "rows": [
+      [
+       "شرکت هرات",
+       "1000.00",
+       "0.00",
+       "1000.00",
+       "0.00",
+       "0.00",
+       "0.00",
+       "13"
+      ],
+      [
+       "تجارتی کابل",
+       "500.00",
+       "0.00",
+       "0.00",
+       "0.00",
+       "500.00",
+       "0.00",
+       "74"
+      ]
+     ],
+     "total": [
+      "جمع",
+      "1500.00",
+      "0.00",
+      "1000.00",
+      "0.00",
+      "500.00",
+      "0.00",
+      ""
+     ]
+    }
+   ]
+  },
+  {
+   "name": "جدولِ ضدتقلب",
+   "id": "RPT-11",
+   "fn": "tables",
+   "of": "fraud",
+   "opts": {
+    "from": "2026-10-13",
+    "to": "2026-10-14",
+    "clock": {
+     "offsetMinutes": 270,
+     "dayStartMinute": 240
+    }
+   },
+   "ledger": "kabul",
+   "expect": [
+    {
+     "id": "fraud",
+     "title": "ضدتقلب به تفکیک کاربر",
+     "head": [
+      "کاربر",
+      "فاکتور",
+      "جمع پیش از تخفیف",
+      "تخفیف (بار)",
+      "تخفیف",
+      "نسبت تخفیف",
+      "برگشتی (بار)",
+      "برگشتی",
+      "لغو (بار)",
+      "لغو",
+      "حذف ردیف (بار)",
+      "حذف ردیف",
+      "باز کردن کشو بی فروش",
+      "نیازمند تأیید (بار)",
+      "تأیید داده (بار)"
+     ],
+     "rows": [
+      [
+       "نامعلوم",
+       "2",
+       "250.00",
+       "0",
+       "0.00",
+       "0.00%",
+       "0",
+       "0.00",
+       "0",
+       "0.00",
+       "0",
+       "0.00",
+       "1",
+       "0",
+       "0"
+      ],
+      [
+       "احمد",
+       "1",
+       "355.00",
+       "1",
+       "15.50",
+       "4.37%",
+       "1",
+       "140.00",
+       "0",
+       "0.00",
+       "1",
+       "60.00",
+       "0",
+       "0",
+       "0"
+      ],
+      [
+       "مدیر",
+       "0",
+       "0.00",
+       "0",
+       "0.00",
+       "",
+       "0",
+       "0.00",
+       "0",
+       "0.00",
+       "0",
+       "0.00",
+       "0",
+       "0",
+       "2"
+      ],
+      [
+       "کریم",
+       "2",
+       "790.00",
+       "1",
+       "50.00",
+       "6.33%",
+       "0",
+       "0.00",
+       "1",
+       "600.00",
+       "0",
+       "0.00",
+       "1",
+       "2",
+       "0"
+      ]
+     ],
+     "total": [
+      "جمع",
+      "5",
+      "1395.00",
+      "2",
+      "65.50",
+      "4.70%",
+      "1",
+      "140.00",
+      "1",
+      "600.00",
+      "1",
+      "60.00",
+      "2",
+      "2",
+      "2"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "دفترِ خالی",
+   "id": "RPT-02",
+   "fn": "sales",
+   "ledger": "empty",
+   "opts": {},
+   "expect": {
+    "totals": {
+     "invoices": 0,
+     "returnCount": 0,
+     "gross": 0,
+     "discount": 0,
+     "sales": 0,
+     "returns": 0,
+     "netSales": 0,
+     "cogs": 0,
+     "grossProfit": 0,
+     "marginBp": null,
+     "avgTicket": 0,
+     "costEstimatedLines": 0,
+     "profitApproximate": true
+    },
+    "product": [],
+    "category": [],
+    "user": [],
+    "hour": [],
+    "payment": [],
+    "channel": [],
+    "from": "0000-01-01",
+    "to": "9999-12-31",
+    "costing": "line"
+   }
+  },
+  {
+   "name": "بدهیِ دفترِ خالی",
+   "id": "RPT-06",
+   "fn": "debts",
+   "ledger": "empty",
+   "opts": {
+    "asOf": "2026-01-01"
+   },
+   "expect": {
+    "asOf": "2026-01-01",
+    "buckets": [
+     30,
+     60,
+     90
+    ],
+    "customers": {
+     "rows": [],
+     "totals": {
+      "balance": 0,
+      "open": 0,
+      "credit": 0,
+      "buckets": [
+       0,
+       0,
+       0,
+       0
+      ]
+     }
+    },
+    "suppliers": {
+     "rows": [],
+     "totals": {
+      "balance": 0,
+      "open": 0,
+      "credit": 0,
+      "buckets": [
+       0,
+       0,
+       0,
+       0
+      ]
+     }
+    }
+   }
+  }
+ ]
+}
