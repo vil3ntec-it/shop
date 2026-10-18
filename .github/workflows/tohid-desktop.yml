@@ -124,10 +124,12 @@ jobs:
           java-version: 17
       - uses: gradle/actions/setup-gradle@v4
 
+      #  OPS-02: نسخهٔ نیم‌ساعته دفتر را می‌خواند؛ این‌جا روی ویندوزِ واقعی سنجیده
+      #  می‌شود که آن خواندن جلوی نوشتنِ دفتر (ثبتِ فروش) را نمی‌گیرد
       - name: آزمونِ ذخیره
         working-directory: desktop
         shell: bash
-        run: ./gradlew --no-daemon test --tests 'ir.vil3ntec.tohid.desktop.ShopStoreDiskTest' --tests 'ir.vil3ntec.tohid.data.DiskWriteTest'
+        run: ./gradlew --no-daemon test --tests 'ir.vil3ntec.tohid.desktop.ShopStoreDiskTest' --tests 'ir.vil3ntec.tohid.data.DiskWriteTest' --tests 'ir.vil3ntec.tohid.data.LocalSnapshotsTest'
 
   package:
     name: نصاب ${{ matrix.label }}

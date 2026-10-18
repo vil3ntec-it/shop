@@ -82,6 +82,22 @@ async function callOnce(name, method, path, body) {
   }
 }
 
+/*
+ *  دلیلِ اختیاری (ADMIN-CONTROL-PLANE.md، G2) — فقط در سابقهٔ سرور می‌نشیند.
+ *  خالی ⇒ هیچ کلیدی در بدنه نمی‌رود و درخواست همان قبلی است.
+ */
+function reasonBody(id) {
+  const s = String($(id)?.value || '').trim().slice(0, 200);
+  return s ? { reason: s } : {};
+}
+/** پرسشِ تأیید با دلیلِ اختیاری — «لغو» ⇒ null (هیچ کاری نمی‌شود). */
+function askOptionalReason(question) {
+  const r = prompt(`${question}\nدلیل (اختیاری — فقط در سابقه می‌ماند):`, '');
+  if (r === null) return null;
+  const s = String(r).trim().slice(0, 200);
+  return s ? { reason: s } : {};
+}
+
 const fa = (n) => Number(n || 0).toLocaleString('fa-AF');
 function date(ms) {
   if (!ms) return '—';
@@ -349,8 +365,10 @@ async function grantSubscription() {
       //  سقفِ دستگاه — خالی یعنی همان پیش‌فرضِ پلن
       ...($('in-max-devices').value.trim() ? { maxDevices: Number($('in-max-devices').value) } : {}),
       note: $('in-note').value.trim(),
+      ...reasonBody('in-reason'),
     });
     if (!out) return;               // کلیکِ دوم وقتی اولی هنوز در راه است
+    $('in-reason').value = '';
     msg(node, 'اشتراک ثبت شد.', 'ok');
     await Promise.all([loadStats(), loadShops(), openShop(currentShop.shop.id)]);
   } catch (err) {
@@ -364,7 +382,8 @@ async function setSubStatus(status) {
   const sub = currentShop.subscriptions?.[0];
   if (!sub) return msg(node, 'این دکان اشتراکی ندارد.', 'warn');
   try {
-    await call('POST', `/admin/subscriptions/${sub.id}/status`, { status });
+    await call('POST', `/admin/subscriptions/${sub.id}/status`, { status, ...reasonBody('in-reason') });
+    $('in-reason').value = '';
     msg(node, 'وضعیت اشتراک عوض شد.', 'ok');
     await Promise.all([loadStats(), loadShops(), openShop(currentShop.shop.id)]);
   } catch (err) {
@@ -698,8 +717,10 @@ async function grantPumpSubscription() {
       ...($('pump-max-devices').value.trim() ? { maxDevices: Number($('pump-max-devices').value) } : {}),
       features: chosenPumpFeatures(),
       note: $('pump-note').value.trim(),
+      ...reasonBody('pump-reason'),
     });
     if (!out) return;
+    $('pump-reason').value = '';
     msg(node, 'اشتراک ثبت شد.', 'ok');
     await Promise.all([loadPump(), openStation(currentStation.station.id)]);
   } catch (err) {
@@ -713,7 +734,8 @@ async function setPumpSubStatus(status) {
   const id = currentStation.subscription?.id;
   if (!id) return msg(node, 'این پمپ اشتراکی ندارد.', 'warn');
   try {
-    await call('POST', `/admin/pump/subscriptions/${id}/status`, { status });
+    await call('POST', `/admin/pump/subscriptions/${id}/status`, { status, ...reasonBody('pump-reason') });
+    $('pump-reason').value = '';
     msg(node, 'وضعیت اشتراک عوض شد.', 'ok');
     await Promise.all([loadPump(), openStation(currentStation.station.id)]);
   } catch (err) {
@@ -753,8 +775,10 @@ async function loadUsers() {
     const btn = el('button', `btn btn-sm ${u.status === 'active' ? 'btn-danger' : 'btn-ghost'}`,
       u.status === 'active' ? 'غیرفعال' : 'فعال');
     btn.onclick = async () => {
+      const extra = askOptionalReason(u.status === 'active' ? 'این حساب بسته شود؟' : 'این حساب باز شود؟');
+      if (!extra) return;
       await call('POST', `/admin/users/${u.id}/status`,
-        { status: u.status === 'active' ? 'disabled' : 'active' });
+        { status: u.status === 'active' ? 'disabled' : 'active', ...extra });
       await loadUsers();
     };
     act.appendChild(btn);
@@ -797,7 +821,11 @@ async function loadRequests() {
     tr.appendChild(el('td', null, dateTime(r.created_at)));
     const act = el('td', 'row');
     const ok = el('button', 'btn btn-sm', 'تأیید');
-    ok.onclick = async () => { await call('POST', `/admin/purchase-requests/${r.id}/approve`, {}); await loadRequests(); await loadStats(); };
+    ok.onclick = async () => {
+      const extra = askOptionalReason('این درخواستِ خرید تأیید شود؟');
+      if (!extra) return;
+      await call('POST', `/admin/purchase-requests/${r.id}/approve`, extra); await loadRequests(); await loadStats();
+    };
     const no = el('button', 'btn btn-ghost btn-sm', 'رد');
     no.onclick = async () => { await call('POST', `/admin/purchase-requests/${r.id}/reject`, {}); await loadRequests(); };
     act.appendChild(ok); act.appendChild(no);
@@ -957,8 +985,10 @@ async function loadHealth() {
         const td = el('td');
         const btn = el('button', 'btn btn-ghost btn-sm', 'برگرداندن');
         btn.onclick = async () => {
-          if (!confirm('نسخهٔ کنارگذاشته‌شدهٔ این ردیف برگردانده شود؟')) return;
-          try { await call('POST', `/admin/sync/conflicts/${encodeURIComponent(c.id)}/restore`, {}); msg($('health-msg'), 'برگردانده شد.', 'ok'); loadHealth(); }
+          //  ⛔ بازگرداندن دلیلِ نوشته می‌خواهد و فقط کارِ مدیرِ ارشد است (سرور می‌سنجد)
+          const reason = askReason('نسخهٔ کنارگذاشته‌شدهٔ این ردیف برگردانده شود؟ دلیلش را بنویسید (در سابقه می‌ماند):');
+          if (!reason) return;
+          try { await call('POST', `/admin/sync/conflicts/${encodeURIComponent(c.id)}/restore`, { reason }); msg($('health-msg'), 'برگردانده شد.', 'ok'); loadHealth(); }
           catch (err) { msg($('health-msg'), err.message, 'bad'); }
         };
         td.appendChild(btn); tr.appendChild(td);
@@ -1157,6 +1187,17 @@ async function loadAccountBackups(app, tenantId, prefix) {
 }
 
 /**
+ * دلیلِ یک دسترسیِ حساس — لغو یا کوتاه‌تر از ۳ نویسه ⇒ null (کاری انجام نمی‌شود).
+ */
+function askReason(question) {
+  const r = prompt(question);
+  if (r === null) return null;
+  const s = String(r).trim();
+  if (s.length < 3) { alert('دلیل لازم است (دست‌کم ۳ نویسه).'); return null; }
+  return s.slice(0, 200);
+}
+
+/**
  * دانلودِ یک پشتیبان.
  *
  * ⚠️ با یک لینکِ ساده نمی‌شود: مسیر توکنِ مدیر می‌خواهد و مرورگر
@@ -1164,10 +1205,19 @@ async function loadAccountBackups(app, tenantId, prefix) {
  * می‌گیریم و به‌صورتِ `blob` به کاربر می‌دهیم.
  */
 async function downloadBackup(app, tenantId, b) {
-  const res = await fetch(`${API}/admin/accounts/${app}/${tenantId}/backups/${b.id}`, {
+  //  ⛔ دانلود = خروجیِ کلِ دادهٔ خصوصیِ این حساب ⇒ دلیلِ نوشته؛ فقط مدیرِ ارشد
+  //  (سرور می‌سنجد و ردیفِ سابقه می‌نویسد — ADMIN-CONTROL-PLANE.md)
+  const reason = askReason('دلیلِ گرفتنِ پشتیبانِ این حساب را بنویسید (در سابقه می‌ماند):');
+  if (!reason) return;
+  const res = await fetch(`${API}/admin/accounts/${app}/${tenantId}/backups/${b.id}?reason=${encodeURIComponent(reason)}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok) { alert('گرفتنِ فایل نشد'); return; }
+  if (!res.ok) {
+    let text = 'گرفتنِ فایل نشد';
+    try { const j = await res.json(); if (j?.error?.message) text = j.error.message; } catch { /* بدنهٔ غیرِ JSON */ }
+    alert(text);
+    return;
+  }
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
   const a = el('a');
@@ -1632,8 +1682,9 @@ async function loadPayments() {
     acts.appendChild(receipt);
     const del = el('button', 'btn btn-danger btn-sm', 'حذف');
     del.onclick = async () => {
-      if (!confirm('این پرداخت حذف شود؟')) return;
-      try { await call('DELETE', `/admin/payments/${p.id}`); await loadPayments(); }
+      const extra = askOptionalReason('این پرداخت حذف شود؟');
+      if (!extra) return;
+      try { await call('DELETE', `/admin/payments/${p.id}`, extra); await loadPayments(); }
       catch (err) { msg($('pay-msg'), err.message, 'bad'); }
     };
     acts.appendChild(del);
@@ -1669,10 +1720,12 @@ async function addPayment() {
       method: $('pay-method').value,
       receiptNo: $('pay-receipt').value.trim(),
       note: $('pay-note').value.trim(),
+      ...reasonBody('pay-reason'),
     });
     msg(node, 'ثبت شد.', 'ok');
     $('pay-amount').value = '';
     $('pay-note').value = '';
+    $('pay-reason').value = '';
     await loadPayments();
   } catch (err) { msg(node, err.message, 'bad'); }
 }
