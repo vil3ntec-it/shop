@@ -223,7 +223,7 @@ private fun SupplierRow(
         Text(supplier.name, style = MaterialTheme.typography.titleSmall, color = Shop.colors.text)
         if (supplier.phone.isNotBlank()) {
           Spacer(Modifier.height(3.dp))
-          Text(supplier.phone, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+          Text(ir.vil3ntec.tohid.LocaleText.phoneDisplay(supplier.phone), style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
         }
       }
       Column(horizontalAlignment = Alignment.End) {
