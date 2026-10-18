@@ -58,6 +58,9 @@ jobs:
           S="wait:6000;shot:00-start;key:ESCAPE;wait:1500;shot:01-dashboard"
           S="$S;go:admin;wait:2000;shot:01b-admin-center;move:700,500;scroll:8;wait:600;shot:01c-admin-center-lower"
           S="$S;go:sale;wait:1500;shot:02-sale"
+          #  صندوقِ سه‌ستونه با سه قلم (اسکن، «3*» و نام + Enter) و نمای جدولیِ کالا
+          S="$S;type:626001007;key:ENTER;type:3*626001003;key:ENTER;type:صابون;key:ENTER;wait:1500;shot:02b-sale-cart"
+          S="$S;posview:table;wait:1200;shot:02c-sale-table;posview:card;wait:800"
           S="$S;go:quick;wait:1500;shot:03-quick-sale"
           S="$S;go:debtors;wait:1500;shot:04-debtors"
           S="$S;cust:first;wait:1200;shot:04b-customer-ledger;custtab:1;wait:1000;shot:04c-customer-invoices;custtab:2;wait:1000;shot:04d-customer-items;custtab:0;cust:close"
