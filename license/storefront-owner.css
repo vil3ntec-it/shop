@@ -1,0 +1,57 @@
+/* ویترینِ اینترنتی — صفحهٔ صاحب دکان (license/storefront-owner.js). فقط توکن‌های خودِ برنامه. */
+.more-card[hidden]{display:none !important;}
+#sf-root .sf-h{font-size:14.5px; font-weight:700; margin-bottom:10px;}
+#sf-root .sf-tabs{display:flex; gap:8px; margin-bottom:14px; overflow-x:auto;}
+#sf-root .sf-tab, #sf-root .sf-chip{
+  min-height:44px; padding:8px 16px; border-radius:999px; border:1px solid var(--border);
+  background:var(--surface); color:var(--text); font:inherit; font-weight:600; cursor:pointer; white-space:nowrap;
+}
+#sf-root .sf-chip{min-height:36px; padding:6px 14px; font-size:12.5px;}
+#sf-root .sf-tab[aria-selected="true"], #sf-root .sf-chip[aria-pressed="true"]{background:var(--primary); border-color:var(--primary); color:#fff;}
+#sf-root .sf-chips{display:flex; gap:8px; flex-wrap:wrap; margin:4px 0 12px;}
+#sf-root .sf-row{display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;}
+#sf-root .sf-row .form-group{margin-bottom:0;}
+#sf-root .sf-grow{flex:1 1 180px; min-width:0;}
+#sf-root .sf-actions{display:flex; gap:8px; flex-wrap:wrap; margin:12px 0 8px;}
+#sf-root .sf-line{font-size:13px; color:var(--muted); margin-top:6px; line-height:1.8;}
+#sf-root .sf-line.strong{color:var(--text); font-weight:600;}
+#sf-root .sf-line.warn, #sf-root .sf-note.warn{color:var(--warning);}
+#sf-root .sf-note{font-size:13px; padding:10px 12px; border-radius:var(--radius-sm); background:var(--surface-2); margin-bottom:12px; line-height:1.8;}
+#sf-root .sf-note.warn{background:var(--warning-tint);}
+#sf-root .sf-note.ok{background:var(--success-tint); color:var(--success);}
+#sf-root .sf-err{color:var(--danger); font-size:12.5px; margin-top:6px;}
+#sf-root .sf-check{display:flex; align-items:center; gap:8px; min-height:44px; font-size:13.5px; cursor:pointer;}
+#sf-root .sf-check input{width:20px; height:20px;}
+/* «متن + رنگ + نقطه»، هرگز رنگِ تنها (VISUAL-DIRECTION §۱) */
+#sf-root .sf-badge, #sf-root .sf-pill{
+  display:inline-flex; align-items:center; gap:6px; padding:3px 12px; border-radius:999px;
+  font-size:12.5px; font-weight:700; background:var(--surface-2); color:var(--muted);
+}
+#sf-root .sf-pill{padding:2px 9px; font-size:11.5px; border:1px solid var(--border);}
+#sf-root .sf-badge::before, #sf-root .sf-pill::before{content:''; width:8px; height:8px; border-radius:50%; background:currentColor;}
+#sf-root .sf-badge.ok, #sf-root .sf-pill.ok{background:var(--success-tint); color:var(--success);}
+#sf-root .sf-badge.warn{background:var(--warning-tint); color:var(--warning);}
+#sf-root .sf-badge.off{background:var(--danger-tint); color:var(--danger);}
+#sf-root .sf-view{display:flex; gap:4px;}
+#sf-root .sf-view [aria-pressed="true"]{background:var(--primary-tint); color:var(--primary); border-color:var(--primary);}
+#sf-root .sf-bulk{
+  position:sticky; bottom:calc(var(--bottomnav-space, 0px) + 8px); z-index:3;
+  display:flex; gap:8px; align-items:center; flex-wrap:wrap;
+  background:var(--primary-tint); border:1px solid var(--border); border-radius:var(--radius-sm); padding:8px 12px; margin-bottom:12px;
+}
+#sf-root .sf-bulk b{flex:1 1 auto;}
+#sf-root .sf-table-wrap{overflow-x:auto;}
+#sf-root .sf-table{width:100%; border-collapse:collapse; font-size:13px;}
+#sf-root .sf-table th{text-align:start; font-weight:700; color:var(--muted); padding:8px; border-bottom:1px solid var(--border); white-space:nowrap;}
+#sf-root .sf-table td{padding:8px; border-bottom:1px solid var(--border); vertical-align:middle;}
+#sf-root .sf-table small, #sf-root .sf-card small{color:var(--muted);}
+#sf-root .sf-switch{width:20px; height:20px;}
+#sf-root .sf-cards{display:grid; gap:10px; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr));}
+#sf-root .sf-card{border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 12px; background:var(--surface-solid); min-width:0;}
+#sf-root .sf-card-top, #sf-root .sf-card-bot{display:flex; align-items:center; gap:8px;}
+#sf-root .sf-card-bot{margin-top:8px; flex-wrap:wrap; font-size:12.5px;}
+#sf-root .sf-card b, #sf-root .sf-table b{overflow-wrap:anywhere;}
+#sf-root .sf-empty .btn{margin-top:8px;}
+@media (max-width:599px){
+  #sf-root .sf-cards{grid-template-columns:1fr;}
+}

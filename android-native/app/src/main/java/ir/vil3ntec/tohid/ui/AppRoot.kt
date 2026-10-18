@@ -84,6 +84,7 @@ private val PAGE_TITLES = mapOf(
   "support" to "پشتیبانی",
   "profile" to "حساب من",
   "team" to "کارمندان دکان",
+  "storefront" to "ویترینِ اینترنتی",
 )
 
 /**
@@ -415,6 +416,9 @@ fun AppRoot(
   fun open(target: String) {
     if (TABS.any { it.id == target }) { tab = target; sub = null } else sub = target
   }
+
+  //  ویترین (فاز ۴): فقط وقتی سرور می‌گوید روشن است، بخشش دیده می‌شود
+  LaunchedEffect(Unit) { runCatching { StorefrontGate.refresh(context) } }
 
   //  گوشیِ جفت‌شده بارکد فرستاد ⇒ صفحهٔ فروش باز می‌شود و کالا به سبد می‌رود
   LaunchedEffect(Unit) {
@@ -755,6 +759,7 @@ fun AppRoot(
           onSubscription = { sub = "vip" },
         )
         "team" -> TeamScreen(snackbar)
+        "storefront" -> if (StorefrontGate.visible) StorefrontScreen(snackbar) else LaunchedEffect(Unit) { open("more") }
         "devices" -> DevicesScreen(data, snackbar)
         "more" -> MoreScreen(store, data, ::open)
       }

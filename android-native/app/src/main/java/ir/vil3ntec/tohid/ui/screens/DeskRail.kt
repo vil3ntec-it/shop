@@ -60,6 +60,7 @@ fun DeskRail(
     add(Triple("receipts", "رسیدها", ""))
     add(Triple("team", "کارمندان", ""))
     add(Triple("devices", "دستگاه‌های جانبی", ""))
+    if (StorefrontGate.visible) add(Triple("storefront", "ویترینِ اینترنتی", ""))
     if (canAdmin) add(Triple("audit", "سابقهٔ عملیات", ""))
     if (canAdmin) add(Triple("settings", "تنظیمات", ""))
     add(Triple("more", "بیشتر", ""))
@@ -170,5 +171,6 @@ private fun iconOf(id: String): ImageVector = when (id) {
   "settings" -> Icons.Filled.Settings
   "admin" -> Icons.Filled.AdminPanelSettings
     "devices" -> Icons.Filled.Devices
+  "storefront" -> Icons.Filled.Storefront
   else -> Icons.Filled.MoreHoriz
 }

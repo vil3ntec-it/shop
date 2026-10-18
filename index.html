@@ -106,6 +106,7 @@
 <link rel="stylesheet" href="license/vip.css?v=16">
 <link rel="stylesheet" href="license/support.css?v=17">
 <link rel="stylesheet" href="license/account-ui.css?v=2">
+<link rel="stylesheet" href="license/storefront-owner.css?v=1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <!-- فونت به‌صورت غیرمسدودکننده بارگذاری می‌شود تا نبودِ اینترنت باز شدن برنامه را کند نکند -->
@@ -4888,6 +4889,17 @@
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
             </span>
           </a>
+          <!-- ویترین (فاز ۴): فقط وقتی سرور روشنش کرده و کاربر صاحب/مدیر است (license/storefront-owner.js) -->
+          <a class="more-card" data-page="storefront" href="#storefront" id="more-storefront" hidden>
+            <span class="more-card-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l1.5-5h15L21 9"/><path d="M3 9a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0"/><path d="M5 12v8h14v-8"/><path d="M10 20v-5h4v5"/></svg></span>
+            <span class="more-card-txt">
+              <b>ویترینِ اینترنتی</b>
+              <i>نشانی، ساعتِ کاری، کالاهای آنلاین و وضعیتی که مشتری می‌بیند</i>
+            </span>
+            <span class="more-card-go">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
+            </span>
+          </a>
           <a class="more-card" data-page="team" href="#team">
             <span class="more-card-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
             <span class="more-card-txt">
@@ -5140,6 +5152,20 @@
            و هر وقت خواست دسترسی‌اش را ببندد. بقیه‌اش — نقش‌ها و
            اجازه‌ها — کارِ سرور است.
            ========================================================== -->
+      <section class="page" id="page-storefront">
+        <a class="account-back" href="#more" data-page="more">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>
+          بازگشت به بیشتر
+        </a>
+        <div class="page-toolbar">
+          <div class="page-title-block">
+            <h2>ویترینِ اینترنتی</h2>
+            <p>نشانی، ساعتِ کاری، کالاهای آنلاین و وضعیتی که مشتری می‌بیند</p>
+          </div>
+        </div>
+        <div id="sf-root"></div>
+      </section>
+
       <section class="page" id="page-team">
         <a class="account-back" href="#more" data-page="more">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>
@@ -14032,7 +14058,7 @@
     }
   });
 
-  const EXTRA_PAGES = ['debtor-account', 'quick-sale', 'supplier-account', 'receipts', 'profile', 'team', 'product', 'admin', 'devices'];
+  const EXTRA_PAGES = ['debtor-account', 'quick-sale', 'supplier-account', 'receipts', 'profile', 'team', 'product', 'admin', 'devices', 'storefront'];
 
   /**
    *  چراغِ نوارِ پایین را می‌برد روی تبِ فعال.
@@ -14708,6 +14734,9 @@
     } else if(pageId==='team'){
       pageTitle.textContent = 'کارمندان دکان';
       teamRefresh();
+    } else if(pageId==='storefront'){
+      pageTitle.textContent = 'ویترینِ اینترنتی';
+      if(window.TohidStorefrontOwner) window.TohidStorefrontOwner.open();
     } else if(pageId==='product'){
       const p = products.find(x=> x.id === currentProductId);
       pageTitle.textContent = p ? p.name : 'کالا';
@@ -14720,7 +14749,7 @@
     }
 
     document.body.classList.toggle('no-fab',
-      pageId==='profile' || pageId==='team' || pageId==='settings' || pageId==='product');
+      pageId==='profile' || pageId==='team' || pageId==='settings' || pageId==='product' || pageId==='storefront');
 
     // دوربین فقط داخل صفحه «فروش» فعال بماند تا باتری/CPU هدر نرود
     if(pageId==='sale'){ startSaleScanner(); } else { stopSaleScanner(); }
@@ -15373,6 +15402,7 @@
 <script src="license/thermal-print.js?v=1" defer></script>
 <script src="license/photo-studio.js?v=2" defer></script>
 <script src="license/owner-export.js?v=1" defer></script>
+<script src="license/storefront-owner.js?v=1" defer></script>
 
 </body>
 </html>
