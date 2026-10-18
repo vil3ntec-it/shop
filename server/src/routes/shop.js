@@ -44,7 +44,10 @@ router.get(['/', '/me'], optionalShop, async (req, res) => {
   if (!req.member) return res.json({ shop: null, role: null, permissions: [] });
   const shop = await shops.getShop(req.shopId);
   const ent = await entitlementOf(req.shopId);
+  //  STF-01..03: `permissions` با لایه‌های دکان (هرگز بیش از نقش) و `policy` برای هستهٔ برنامه
+  const { permissions, policy } = await require('../lib/staff-perms').policyOf(req.shopId, req.member);
   res.json(shopPayload(shop, req.member, {
+    permissions, policy,
     memberCount: await shops.memberCount(req.shopId),
     entitlement: { source: ent.source, subscription: ent.subscription, trial: ent.trial },
     serverTime: now(),
@@ -142,7 +145,14 @@ router.get('/staff-codes', requireShop, requirePermission('staffcode.view'), asy
  */
 router.get('/staff-code', requireShop, requirePermission('staffcode.view'), async (req, res) => {
   const out = await staffCodes.standing(req.shopId, req.user.id);
-  res.json({ code: out.code, id: out.id, role: out.role, generation: out.generation, standing: true });
+  res.json({ code: out.code, id: out.id, role: out.role, generation: out.generation, standing: true, disabled: Boolean(out.disabled) });
+});
+
+/** خاموش کردنِ کدِ ثابت (STF-11) — بی اشتراک هم، چون بستنِ در همیشه باید ممکن باشد. */
+router.post('/staff-code/disable', requireShop, requirePermission('staffcode.revoke'), async (req, res) => {
+  const out = await staffCodes.disableStanding(req.shopId, req.user.id);
+  await audit.log({ shopId: req.shopId, userId: req.user.id, action: 'staff_code.disabled', targetType: 'staff_code', detail: { generation: out.generation }, ip: clientIp(req) });
+  res.json({ code: null, id: null, role: out.role, generation: out.generation, standing: true, disabled: true });
 });
 
 /** عوض کردن کد ثابت — برای وقتی که لو رفته باشد. شاگردهای فعلی می‌مانند. */
@@ -226,5 +236,8 @@ router.get('/audit', requireShop, requirePermission('audit.view'), async (req, r
   );
   res.json({ entries: rows });
 });
+
+//  کارمندان، مجوزها و دستگاه‌ها (STF-01..03، STF-10) — زیرِ همان `requireUser`
+router.use(require('./shop-staff'));
 
 module.exports = router;
