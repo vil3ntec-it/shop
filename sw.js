@@ -15,7 +15,7 @@
  */
 const BETA = /\/beta\/sw\.js$/.test(self.location.pathname);
 const BETA_PATH = new URL('./beta/', self.location).pathname;
-const VERSION = (BETA ? 'beta-' : '') + 'tohid-shop-v52';
+const VERSION = (BETA ? 'beta-' : '') + 'tohid-shop-v53';
 const SHELL_CACHE = VERSION + '-shell';
 const FONT_CACHE = VERSION + '-fonts';
 
@@ -65,6 +65,8 @@ const SHELL_ASSETS = [
   './license/photo-studio.js',
   //  جای دفتر (localStorage یا IndexedDB) — بی آن، دفترِ IndexedDB روی نصبِ آفلاین باز نمی‌شد
   './license/ledger-store.js',
+  //  خروجیِ کاملِ مالک (OPS-08) — بی اینترنت هم باید کار کند
+  './license/owner-export.js',
   //  خوانندهٔ بارکد برای آیفون — Safari «BarcodeDetector» ندارد و دوربین همیشه
   //  همین را بار می‌کند؛ بی آن، نصبِ تازه بی اینترنت اصلاً اسکن نمی‌کرد
   './license/vendor/zxing-0.21.3.min.js',

@@ -11,10 +11,11 @@
  *   خواندن ─ کارتِ سبکِ هر برگه (ORD-11/12) با صفحه‌بندیِ کلیدی، شمارش‌ها،
  *           و جزئیات با خطِ زمانی (ORD-16).
  *
- * ⛔ هنوز نیست (و عمداً): بررسیِ دوبارهٔ قیمت و موجودی با موتورِ قیمت
- * (CHK-17)، رزروِ موجودی (CHK-18) و سندِ فروشِ سریِ W (ORD-20) — این‌ها
- * لایهٔ دادهٔ کالا و موجودیِ سرور را لازم دارند. سفارشِ دستیِ کارمند قیمت
- * را خودش می‌گوید، درست مثلِ صندوق.
+ * ⛔ هنوز نیست (و عمداً): بررسیِ دوبارهٔ موجودی (بخشی از CHK-17)، رزروِ
+ * موجودی (CHK-18) و سندِ فروشِ سریِ W (ORD-20) — این‌ها لایهٔ موجودیِ سرور
+ * را لازم دارند. سفارشِ دستیِ کارمند قیمت را خودش می‌گوید، درست مثلِ صندوق؛
+ * سفارشِ ویترین قیمت را از دفترِ سرور می‌گیرد (`price` در `create`،
+ * ‎lib/storefront.js‎).
  */
 const crypto = require('crypto');
 const db = require('../db');
@@ -47,7 +48,7 @@ function decode(text) {
 
 /**
  * پرچمِ دکان: مقدارِ خودِ دکان بر `all` جلو می‌افتد؛ فقط `true` روشن است.
- * `key` پیش‌فرض همین بخش است؛ تحویل و پیک (`shop.delivery`) همین قاعده را می‌خواند.
+ * `key` نیامده ⇒ `shop.orders`؛ ویترین (`shop.storefront`) و تحویل و پیک (`shop.delivery`) همین قاعده را می‌خوانند.
  */
 async function flagOf(shopId, key = FLAG_KEY) {
   const rows = await many(
@@ -126,32 +127,7 @@ function parseCreate(body, at) {
   //  پرداختِ آنلاین منتظرِ D-08 است (🔌)؛ امروز فقط نقد هنگامِ تحویل
   if (paymentMethod !== 'cod') throw badRequest('فعلاً فقط نقد هنگامِ تحویل', 'bad_payment_method');
 
-  const c = b.customer && typeof b.customer === 'object' ? b.customer : {};
-  const customerName = text(c.name, 80);
-  if (!customerName) throw badRequest('نامِ مشتری لازم است', 'bad_customer');
-  const v = require('./validate');
-  const customerPhone = v.phone(c.phone, { required: fulfillment === 'delivery' }) || '';
-
-  let address = {};
-  if (fulfillment === 'delivery') {
-    const a = b.address && typeof b.address === 'object' ? b.address : {};
-    const lat = coord(a.lat, -90, 90);
-    const lng = coord(a.lng, -180, 180);
-    if ((lat === null) !== (lng === null)) throw badRequest('پین ناقص است', 'bad_address');
-    const landmark = text(a.landmark, 200);
-    const addrText = text(a.text, 300);
-    //  پین منبعِ اصلی است (CHK-08)؛ سفارشِ تلفنی بی پین با نشانه پذیرفته است
-    if (lat === null && !landmark && !addrText) throw badRequest('نشانی یا پینِ تحویل لازم است', 'bad_address');
-    address = { ...(lat !== null ? { lat, lng } : {}), ...(landmark ? { landmark } : {}), ...(addrText ? { text: addrText } : {}) };
-  }
-
-  const d = b.delivery && typeof b.delivery === 'object' ? b.delivery : {};
-  const delivery = {};
-  if (d.callBeforeArrival === true) delivery.callBeforeArrival = true;
-  const leaveWith = text(d.leaveWith, 80);
-  if (leaveWith) delivery.leaveWith = leaveWith;
-  //  عکسِ تحویل فقط با رضایتِ صریحِ مشتری (v3 §۲۲.۲ C بندِ ۴، DLV-08)
-  if (d.photoConsent === true) delivery.photoConsent = true;
+  const { customerName, customerPhone, address, delivery } = parseContact(b, fulfillment);
 
   if (!Array.isArray(b.lines) || b.lines.length === 0) throw badRequest('سفارش بی قلم است', 'bad_lines');
   if (b.lines.length > MAX_LINES) throw badRequest(`حداکثر ${MAX_LINES} قلم`, 'bad_lines');
@@ -191,6 +167,42 @@ function parseCreate(body, at) {
     deliveryFeeMinor, totalMinor, scheduledFor,
     itemsCount: lines.length,
   };
+}
+
+/**
+ * مشتری، نشانی و دستورِ تحویل — مشترکِ سفارشِ دستیِ کارمند و ویترین.
+ * `phoneRequired` نیامده ⇒ فقط برای ارسال لازم است (رفتارِ سفارشِ دستی).
+ */
+function parseContact(body, fulfillment, { phoneRequired } = {}) {
+  const b = body && typeof body === 'object' ? body : {};
+  const c = b.customer && typeof b.customer === 'object' ? b.customer : {};
+  const customerName = text(c.name, 80);
+  if (!customerName) throw badRequest('نامِ مشتری لازم است', 'bad_customer');
+  const v = require('./validate');
+  const customerPhone = v.phone(c.phone, { required: phoneRequired ?? fulfillment === 'delivery' }) || '';
+
+  let address = {};
+  if (fulfillment === 'delivery') {
+    const a = b.address && typeof b.address === 'object' ? b.address : {};
+    const lat = coord(a.lat, -90, 90);
+    const lng = coord(a.lng, -180, 180);
+    if ((lat === null) !== (lng === null)) throw badRequest('پین ناقص است', 'bad_address');
+    const landmark = text(a.landmark, 200);
+    const addrText = text(a.text, 300);
+    //  پین منبعِ اصلی است (CHK-08)؛ سفارشِ تلفنی بی پین با نشانه پذیرفته است
+    if (lat === null && !landmark && !addrText) throw badRequest('نشانی یا پینِ تحویل لازم است', 'bad_address');
+    address = { ...(lat !== null ? { lat, lng } : {}), ...(landmark ? { landmark } : {}), ...(addrText ? { text: addrText } : {}) };
+  }
+
+  const d = b.delivery && typeof b.delivery === 'object' ? b.delivery : {};
+  const delivery = {};
+  if (d.callBeforeArrival === true) delivery.callBeforeArrival = true;
+  const leaveWith = text(d.leaveWith, 80);
+  if (leaveWith) delivery.leaveWith = leaveWith;
+  //  عکسِ تحویل فقط با رضایتِ صریحِ مشتری (v3 §۲۲.۲ C بندِ ۴، DLV-08)
+  if (d.photoConsent === true) delivery.photoConsent = true;
+
+  return { customerName, customerPhone, address, delivery };
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -282,11 +294,15 @@ async function get(shopId, id, viewer) {
 // ════════════════════════════════════════════════════════════════════
 
 /**
+ * `price` (فقط ویترین): `async (run, at) => input` با همان شکلِ `parseCreate`.
+ * درونِ همین تراکنش و **پس از** بررسیِ کلیدِ یکتایی صدا زده می‌شود، تا
+ * قیمت را سرور از دفتر بخواند و تکرارِ همان درخواست همان سفارشِ قبلی را
+ * برگرداند حتی اگر قیمت از آن پس عوض شده باشد. نیامدنش ⇒ رفتارِ پیشین.
  * @returns {{order:object, replayed:boolean}}
  */
-async function create(shopId, { key, body, actor, notify }) {
+async function create(shopId, { key, body, actor, price, notify }) {
   const at = now();
-  const input = parseCreate(body, at);
+  let input = price ? null : parseCreate(body, at);
   const hash = hashOf(body);
 
   return tx(async (c) => {
@@ -303,6 +319,7 @@ async function create(shopId, { key, body, actor, notify }) {
       }
       return { order: await loadDetail(run, shopId, prev.id, actor), replayed: true };
     }
+    if (price) input = await price(run, at);
 
     const no = Number((await c.query(
       'SELECT COALESCE(MAX(order_no), 0) + 1 AS n FROM online_orders WHERE shop_id=$1', [shopId]
@@ -562,6 +579,6 @@ async function summary(shopId) {
 
 module.exports = {
   FLAG_KEY, FEATURE_KEY, KEY_RE, MAX_LINES, STAFF_SOURCES,
-  flagOf, entitledOf, stateOf, clientKeyOf, hashOf, parseCreate, maskPhone,
+  flagOf, entitledOf, stateOf, clientKeyOf, hashOf, parseCreate, parseContact, maskPhone,
   create, transition, transitionIn, codIn, get, list, summary,
 };
