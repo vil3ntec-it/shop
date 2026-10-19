@@ -111,7 +111,9 @@ ok((await page.textContent('#store-title')) === 'ویترینِ آزمایشی',
 const status = await page.textContent('#store-status');
 ok(/باز است|بسته است|آفلاین|اعلام شده/.test(status) && /اتصال/.test(status), 'وضعیتِ دکان و اتصال دیده می‌شود (۳۱.۱)', status.slice(0, 80));
 ok((await page.locator('#products li[data-id]').count()) === 2, 'فقط دو کالای منتشرشده — «صابون» نه');
-ok((await page.textContent('#products')).includes('موجودی در حال بررسی است'), 'موجودیِ نامعلوم «موجود» گفته نمی‌شود (۳۲.۳)');
+//  ۳۲.۳: موجودیِ نامعلوم هرگز «موجود» نیست؛ «در حال بررسی» یک بار بالای کاتالوگ، نه روی هر کارت
+ok(await page.isVisible('#stock-note') && (await page.textContent('#stock-note')).includes('موجودی در حال بررسی است')
+  && !/(^|[\s،.])موجود([\s،.]|$)/.test(await page.textContent('#products')), 'موجودیِ نامعلوم «موجود» گفته نمی‌شود (۳۲.۳)');
 
 for (const w of [320, 360, 768, 1280]) {
   await page.setViewportSize({ width: w, height: 760 });
