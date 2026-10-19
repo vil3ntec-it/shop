@@ -100,6 +100,12 @@ function fromV2(raw, { schemaVersion, deviceId, index = 0, hlc: given = '' } = {
   const stamp = (given && hlc.canonical(given)) || hlc.fromTs(op.ts, index, String(deviceId || 'v2'));
   const base = { tx: op.op_id, hlc: stamp, table: op.table, row_id: op.row_id, legacy: true };
   const { set, inc, dropped } = op.type === 'delete' ? { set: {}, inc: {}, dropped: [] } : convertFields(spec, op.fields);
+  //  «برگهٔ امضاشده»ی تأیید (بخشِ ۱۰.۱): در درج همان‌جا در سند می‌ماند (سابقه)،
+  //  در ویرایش/لغو فیلد نیست — همراهِ opها می‌رود تا `authorize` بسنجد
+  const f = op.fields;
+  const approval = op.type !== 'delete' && f && typeof f.approval === 'object' && f.approval !== null
+    && !Array.isArray(f.approval) ? f.approval : null;
+  if (approval && op.type !== 'insert') delete set.approval;
   const parts = [];            //  [پسوند، op]
 
   const counterInc = {};
@@ -133,6 +139,7 @@ function fromV2(raw, { schemaVersion, deviceId, index = 0, hlc: given = '' } = {
   //  یک op ⇒ همان شناسه؛ چند op ⇒ پسوندِ نقطه‌دار (ULID هرگز نقطه ندارد)
   const ops = parts.map(([suffix, p]) => ({
     ...base, ...p, op_id: parts.length === 1 ? op.op_id : `${op.op_id}.${suffix}`,
+    ...(approval ? { approval } : {}),
   }));
   return { ok: true, ops, dropped };
 }
