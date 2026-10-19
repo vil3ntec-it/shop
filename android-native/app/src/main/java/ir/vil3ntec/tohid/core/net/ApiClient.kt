@@ -80,6 +80,20 @@ class ApiClient(
   )
 
   /**
+   *  گرفتنِ **بایت‌های خام** با توکن (رسانهٔ چتِ دکان) — همان تازه‌سازیِ
+   *  یک‌باره‌ی نشستِ پیر که `authorized` دارد.
+   */
+  suspend fun getBytes(path: String): ByteArray {
+    val token = tokens.accessToken ?: throw ApiFailure.SessionExpired()
+    return try {
+      engine.fetchBytes(path, token)
+    } catch (failure: ApiFailure) {
+      if (failure !is ApiFailure.SessionExpired) throw failure
+      engine.fetchBytes(path, renew(usedToken = token))
+    }
+  }
+
+  /**
    *  درخواست با توکن — و اگر توکن پیر بود، یک بار تازه‌سازی و تکرار.
    *
    *  «یک بار» عمدی است: اگر بعد از توکنِ تازه هم ۴۰۱ آمد، مشکل از پیریِ
