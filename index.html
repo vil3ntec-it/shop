@@ -3418,6 +3418,8 @@
   }
 
 </style>
+<!-- «Professional Retail OS» (docs/VISUAL-DIRECTION-fa.md) — پس از سبکِ بالا، تا ظاهرِ صفحه‌های کار را بگیرد -->
+<link rel="stylesheet" href="license/retail-os.css?v=1">
 </head>
 <body>
 
@@ -3732,10 +3734,9 @@
       </div>
     </div>
 
-    <div>
-      <div class="nav-group-label">منو اصلی</div>
+    <nav aria-label="منوی اصلی">
       <ul class="nav-list" id="sidebar-nav"></ul>
-    </div>
+    </nav>
 
     <div class="sidebar-foot">نسخه ۳ب · محصولات و انبار</div>
   </aside>
@@ -6257,6 +6258,8 @@
      بی defer، چون اسکریپتِ پایین همان لحظهٔ بالا آمدن تاریخ و ماه می‌سازد. -->
 <script src="license/text-core.js?v=1"></script>
 <script src="license/calendar-core.js?v=1"></script>
+<!-- نمای کارتی/جدولیِ فهرست‌ها (همتای ViewModePref.kt)؛ بی defer چون فهرست‌ها همان لحظه رسم می‌شوند -->
+<script src="license/view-mode.js?v=1"></script>
 <script>
   /* ==========================================================
      DEBTORS SYSTEM — state, rendering, and interactions
@@ -14016,12 +14019,32 @@
   const bottomNav = document.getElementById('bottom-nav');
   const pageTitle = document.getElementById('page-title');
 
-  PAGES.forEach(p=>{
-    if(p.inSidebar){
+  /* منوی کناریِ گروه‌بندی‌شده — همان گروه‌های `DeskMenu`ِ برنامهٔ کامپیوتر
+     (v3 §۲۰.۳، VISUAL-DIRECTION §۳). همان صفحه‌ها و همان پیوندها، فقط
+     گروه‌بندی آمده (برچسبِ Alt+عدد را پایین‌تر، کنارِ KEY_PAGES می‌گذاریم). صفحه‌ای که در
+     هیچ گروهی نیست به گروهِ نخست می‌رود تا از منو جا نماند. */
+  const NAV_GROUPS = [
+    { title:'اصلی', ids:['dashboard','products','warehouse','debtors','expenses','sales','purchasing','reports'] },
+    { title:'کانال‌های فروش', ids:['sale'] },
+    { title:'مدیریت و سامانه', ids:['audit-log','settings'] },
+  ];
+  const navPages = PAGES.filter(p=> p.inSidebar);
+  NAV_GROUPS[0].ids.push(...navPages.map(p=> p.id).filter(id=> !NAV_GROUPS.some(g=> g.ids.includes(id))));
+  NAV_GROUPS.forEach(g=>{
+    const items = g.ids.map(id=> navPages.find(p=> p.id===id)).filter(Boolean);
+    if(!items.length) return;
+    const head = document.createElement('li');
+    head.className = 'nav-group';
+    head.textContent = g.title;
+    sidebarNav.appendChild(head);
+    items.forEach(p=>{
       const li = document.createElement('li');
       li.innerHTML = `<a class="nav-item" data-page="${p.id}" href="#${p.id}"><span class="ic">${p.icon}</span>${p.title || p.label}</a>`;
       sidebarNav.appendChild(li);
-    }
+    });
+  });
+
+  PAGES.forEach(p=>{
     if(p.inBottomNav){
       const a = document.createElement('a');
       a.className = 'bn-item';
@@ -14867,6 +14890,13 @@
      جست‌وجوی همین صفحه، Esc بستنِ پنجرهٔ باز. وقتی در کادری تایپ می‌شود،
      جز Esc و Alt+عدد کاری نمی‌کنند. */
   const KEY_PAGES = ['dashboard','sale','debtors','warehouse','products','sales','purchasing','reports','expenses'];
+  /* برچسبِ همان کلید کنارِ هر صفحه در منوی کناری (VISUAL-DIRECTION §۳، مثلِ DeskMenu) */
+  document.querySelectorAll('#sidebar-nav .nav-item[data-page]').forEach(a=>{
+    const n = KEY_PAGES.indexOf(a.dataset.page);
+    if(n < 0) return;
+    a.setAttribute('aria-keyshortcuts', `Alt+${n+1}`);
+    a.insertAdjacentHTML('beforeend', `<span class="nav-key" aria-hidden="true">Alt+${n+1}</span>`);
+  });
   document.addEventListener('keydown', (e)=>{
     const typing = e.target && (e.target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName));
     if(e.altKey && !e.ctrlKey && !e.metaKey){
