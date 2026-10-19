@@ -38,6 +38,12 @@ const MATRIX = {
   'sales.cancel':         ['owner', 'manager'],
 
   'settings.write':       ['owner', 'manager'],
+
+  //  موجودیِ سرور (v3 §۳۲، INV-08/INV-12) — پشتِ پرچمِ `shop.catalog`. جابه‌جاییِ
+  //  قفسه/انبار کارِ روزمره است؛ خراب، مرجوعی، اصلاح و شمارش دلیل و مدیر می‌خواهد.
+  'stock.view':           ['owner', 'manager', 'staff'],
+  'stock.move':           ['owner', 'manager', 'staff'],
+  'stock.adjust':         ['owner', 'manager'],
   'reports.view':         ['owner', 'manager', 'staff'],
   'audit.view':           ['owner', 'manager'],
   'backup.run':           ['owner'],
