@@ -1,0 +1,132 @@
+{
+  "version": 1,
+  "about": "دفترِ قرض‌داران — بردارهای مرجعِ مشترکِ DebtBook.kt و license/debt-book.js. پول به واحدِ کوچک (پول = یک‌صدمِ افغانی). عددها با دست حساب شده‌اند؛ هر دو سکو باید دقیقاً همین را بدهند.",
+  "cases": [
+    {
+      "name": "پیش‌پرداخت، تخصیصِ اول‌آمده اول‌رفته، سررسیدِ گذشته و نزدیک‌ترین سررسید",
+      "debtorId": "c1",
+      "today": "2026-10-17",
+      "ledger": {
+        "debtors": [{ "id": "c1", "name": "احمد", "phone": "", "notes": "", "createdAt": 0 }],
+        "transactions": [
+          { "id": "g2", "debtorId": "c1", "type": "give", "amount": 300, "date": "2026-10-03", "notes": "", "createdAt": 3, "dueDate": "2026-10-10" },
+          { "id": "r0", "debtorId": "c1", "type": "receive", "amount": 100, "date": "2026-10-01", "notes": "", "createdAt": 1 },
+          { "id": "g1", "debtorId": "c1", "type": "give", "amount": 500, "date": "2026-10-02", "notes": "", "createdAt": 2, "dueDate": "2026-10-20" },
+          { "id": "r4", "debtorId": "c1", "type": "receive", "amount": 450, "date": "2026-10-04", "notes": "", "createdAt": 4 },
+          { "id": "g3", "debtorId": "c1", "type": "give", "amount": 50, "date": "2026-10-05", "notes": "", "createdAt": 5, "dueDate": "2026-11-01" },
+          { "id": "x9", "debtorId": "c2", "type": "give", "amount": 999, "date": "2026-10-01", "notes": "", "createdAt": 1 }
+        ]
+      },
+      "expect": {
+        "balanceMinor": 30000,
+        "overdueMinor": 25000,
+        "overdue": ["g2"],
+        "nextDue": "g3",
+        "credit": null,
+        "creditCheck": { "extraMinor": 100000000, "result": null },
+        "entries": [
+          { "id": "r0", "row": 1, "give": false, "balanceAfterMinor": -10000, "openMinor": 0, "overdue": false, "due": null, "sale": null, "allocations": [["g1", 10000]], "lines": [] },
+          { "id": "g1", "row": 2, "give": true, "balanceAfterMinor": 40000, "openMinor": 0, "overdue": false, "due": "2026-10-20", "sale": null, "allocations": [["r0", 10000], ["r4", 40000]], "lines": [] },
+          { "id": "g2", "row": 3, "give": true, "balanceAfterMinor": 70000, "openMinor": 25000, "overdue": true, "due": "2026-10-10", "sale": null, "allocations": [["r4", 5000]], "lines": [] },
+          { "id": "r4", "row": 4, "give": false, "balanceAfterMinor": 25000, "openMinor": 0, "overdue": false, "due": null, "sale": null, "allocations": [["g1", 40000], ["g2", 5000]], "lines": [] },
+          { "id": "g3", "row": 5, "give": true, "balanceAfterMinor": 30000, "openMinor": 5000, "overdue": false, "due": "2026-11-01", "sale": null, "allocations": [], "lines": [] }
+        ]
+      }
+    },
+    {
+      "name": "فروشِ نسیه با اقلام؛ مرجوعی اول همان فاکتور را می‌بندد، رسیدِ بی‌نام قدیمی‌ترین را",
+      "debtorId": "c1",
+      "today": "2026-10-17",
+      "ledger": {
+        "products": [{ "id": "p2", "name": "روغن", "unit": "بوتل", "salePrice": 130 }],
+        "debtors": [{ "id": "c1", "name": "احمد" }],
+        "sales": [
+          { "id": "s7", "invoiceNumber": 7, "debtorId": "c1", "total": 240, "discount": 0, "finalTotal": 240, "paidAmount": 0, "remaining": 240, "paymentMethod": "credit", "status": "completed", "date": "2026-10-01", "createdAt": 2, "debtGiven": 240, "debtSettled": 120 }
+        ],
+        "saleItems": [
+          { "id": "i1", "saleId": "s7", "productId": "p2", "quantity": 2, "unitPrice": 120, "totalPrice": 240, "returnedQty": 1 }
+        ],
+        "transactions": [
+          { "id": "g0", "debtorId": "c1", "type": "give", "amount": 1000, "date": "2026-09-01", "notes": "", "createdAt": 1 },
+          { "id": "g7", "debtorId": "c1", "type": "give", "amount": 240, "date": "2026-10-01", "notes": "فروش نسیه — فاکتور #7", "createdAt": 2 },
+          { "id": "r7", "debtorId": "c1", "type": "receive", "amount": 120, "date": "2026-10-02", "notes": "مرجوعی کالا — فاکتور #7", "createdAt": 3 },
+          { "id": "r8", "debtorId": "c1", "type": "receive", "amount": 200, "date": "2026-10-03", "notes": "", "createdAt": 4 }
+        ]
+      },
+      "expect": {
+        "balanceMinor": 92000,
+        "overdueMinor": 0,
+        "overdue": [],
+        "nextDue": null,
+        "credit": null,
+        "entries": [
+          { "id": "g0", "row": 1, "give": true, "balanceAfterMinor": 100000, "openMinor": 80000, "overdue": false, "due": null, "sale": null, "allocations": [["r8", 20000]], "lines": [] },
+          { "id": "g7", "row": 2, "give": true, "balanceAfterMinor": 124000, "openMinor": 12000, "overdue": false, "due": null, "sale": "s7", "allocations": [["r7", 12000]],
+            "lines": [{ "name": "روغن", "quantity": 2, "unit": "بوتل", "unitPriceMinor": 12000, "totalMinor": 24000, "returned": 1 }] },
+          { "id": "r7", "row": 3, "give": false, "balanceAfterMinor": 112000, "openMinor": 0, "overdue": false, "due": null, "sale": "s7", "allocations": [["g7", 12000]], "lines": [] },
+          { "id": "r8", "row": 4, "give": false, "balanceAfterMinor": 92000, "openMinor": 0, "overdue": false, "due": null, "sale": null, "allocations": [["g0", 20000]], "lines": [] }
+        ]
+      }
+    },
+    {
+      "name": "شمارهٔ فاکتور با سری (B1-5 نه A1-5)، قلمِ آزادِ وزنی، و ۰٫۱ + ۰٫۲ بی خطای ممیز",
+      "debtorId": "c1",
+      "today": "2026-10-17",
+      "ledger": {
+        "debtors": [{ "id": "c1", "name": "احمد" }],
+        "sales": [
+          { "id": "sb", "invoiceNumber": 5, "series": "B1", "debtorId": "c1", "total": 250.5, "finalTotal": 250.5, "remaining": 250.5, "paymentMethod": "credit", "status": "completed", "date": "2026-10-01", "createdAt": 1 },
+          { "id": "sa", "invoiceNumber": 5, "series": "A1", "debtorId": "c1", "total": 10, "finalTotal": 10, "paidAmount": 10, "paymentMethod": "cash", "status": "completed", "date": "2026-10-01", "createdAt": 1 }
+        ],
+        "saleItems": [
+          { "id": "ib", "saleId": "sb", "productId": "", "name": "قلم آزاد", "quantity": 1.5, "unitPrice": 167, "totalPrice": 250.5 },
+          { "id": "ia", "saleId": "sa", "productId": "", "name": "نان", "quantity": 1, "unitPrice": 10, "totalPrice": 10 }
+        ],
+        "transactions": [
+          { "id": "gb", "debtorId": "c1", "type": "give", "amount": 250.5, "date": "2026-10-01", "notes": "فروش نسیه — فاکتور #B1-5", "createdAt": 1 },
+          { "id": "ra", "debtorId": "c1", "type": "receive", "amount": 0.1, "date": "2026-10-02", "notes": "", "createdAt": 2 },
+          { "id": "rb", "debtorId": "c1", "type": "receive", "amount": 0.2, "date": "2026-10-02", "notes": "", "createdAt": 3 }
+        ]
+      },
+      "expect": {
+        "balanceMinor": 25020,
+        "overdueMinor": 0,
+        "overdue": [],
+        "nextDue": null,
+        "credit": null,
+        "entries": [
+          { "id": "gb", "row": 1, "give": true, "balanceAfterMinor": 25050, "openMinor": 25020, "overdue": false, "due": null, "sale": "sb", "allocations": [["ra", 10], ["rb", 20]],
+            "lines": [{ "name": "قلم آزاد", "quantity": 1.5, "unit": "", "unitPriceMinor": 16700, "totalMinor": 25050, "returned": 0 }] },
+          { "id": "ra", "row": 2, "give": false, "balanceAfterMinor": 25040, "openMinor": 0, "overdue": false, "due": null, "sale": null, "allocations": [["gb", 10]], "lines": [] },
+          { "id": "rb", "row": 3, "give": false, "balanceAfterMinor": 25020, "openMinor": 0, "overdue": false, "due": null, "sale": null, "allocations": [["gb", 20]], "lines": [] }
+        ]
+      }
+    },
+    {
+      "name": "پرداختِ بیشتر از بدهی ⇒ پیش‌پرداخت روی بردِ بعدی؛ سقفِ اعتبار",
+      "debtorId": "c1",
+      "today": "2026-10-17",
+      "ledger": {
+        "debtors": [{ "id": "c1", "name": "احمد", "creditLimit": 5000 }],
+        "transactions": [
+          { "id": "g1", "debtorId": "c1", "type": "give", "amount": 100, "date": "2026-10-01", "notes": "", "createdAt": 1 },
+          { "id": "r1", "debtorId": "c1", "type": "receive", "amount": 150, "date": "2026-10-02", "notes": "", "createdAt": 2 },
+          { "id": "g2", "debtorId": "c1", "type": "give", "amount": 30, "date": "2026-10-03", "notes": "", "createdAt": 3 }
+        ]
+      },
+      "expect": {
+        "balanceMinor": -2000,
+        "overdueMinor": 0,
+        "overdue": [],
+        "nextDue": null,
+        "credit": { "limitMinor": 500000, "balanceMinor": -2000, "headroomMinor": 502000, "over": false },
+        "creditCheck": { "extraMinor": 503000, "result": { "limitMinor": 500000, "balanceMinor": -2000, "afterMinor": 501000, "over": true, "excessMinor": 1000 } },
+        "entries": [
+          { "id": "g1", "row": 1, "give": true, "balanceAfterMinor": 10000, "openMinor": 0, "overdue": false, "due": null, "sale": null, "allocations": [["r1", 10000]], "lines": [] },
+          { "id": "r1", "row": 2, "give": false, "balanceAfterMinor": -5000, "openMinor": 2000, "overdue": false, "due": null, "sale": null, "allocations": [["g1", 10000], ["g2", 3000]], "lines": [] },
+          { "id": "g2", "row": 3, "give": true, "balanceAfterMinor": -2000, "openMinor": 0, "overdue": false, "due": null, "sale": null, "allocations": [["r1", 3000]], "lines": [] }
+        ]
+      }
+    }
+  ]
+}
