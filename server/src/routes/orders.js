@@ -81,6 +81,17 @@ router.get('/reconciliation', needFlag, requirePermission('orders.refund'), wrap
   res.json(await refunds.report(req.shopId, { from: req.query.from, to: req.query.to }));
 }));
 
+/**
+ * سفارش‌های تحویل‌شده‌ای که فروششان هنوز در دفترِ دکان نیست (`lib/order-ledger.js`) —
+ * برنامهٔ دکان برای هر کدام فروشِ عادی با شناسهٔ ثابتِ `o-<سفارش>` می‌سازد. فقط‌خواندنی؛
+ * همان کسی که سفارش را تحویل می‌دهد (`orders.manage`). پیش از `/:id`.
+ */
+router.get('/handover', needFlag, requirePermission('orders.manage'), wrap(async (req, res) => {
+  res.json(await require('../lib/order-ledger').handoverPending(req.shopId, {
+    since: req.query.since, limit: req.query.limit,
+  }, actorOf(req)));
+}));
+
 router.get('/:id', needFlag, wrap(async (req, res) => {
   const order = await orders.get(req.shopId, req.params.id, actorOf(req));
   //  دفترِ بازپرداختِ همین سفارش — مبلغِ برگشته، مانده و اختلاف (FIN-01)

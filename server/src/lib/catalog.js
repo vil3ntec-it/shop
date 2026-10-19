@@ -11,8 +11,10 @@
  *              «سهمی» دارد؛ همگام‌سازیِ دوباره فقط تفاوت را با حالتِ recorded
  *              در دفتر می‌نویسد ⇒ هیچ فروشی دو بار کم نمی‌شود (INV-07) و هیچ
  *              فروشِ ثبت‌شده‌ای رد نمی‌شود (INV-19).
- *   سفارش ──── رزرو درونِ همان تراکنشِ ساختِ سفارش (`onOrderCreated`)؛ گذارِ
- *              وضعیت رزرو را تمدید/آزاد/قطعی می‌کند (`onOrderStatus`).
+ *   سفارش ──── ⛔ تصمیمِ صاحبِ مخزن (۱۴۰۵/۰۷/۲۷): سفارشِ آنلاین موجودی را **نه رزرو
+ *              می‌کند نه کم**. دکان کالا را از برنامهٔ خودش تحویل می‌دهد و همان‌جا یک
+ *              فروشِ عادی (با `orderId`) ثبت می‌شود؛ این کاتالوگ فقط دفترِ همگام‌شدهٔ
+ *              دستگاه‌ها را می‌خواند. ساختِ سفارش فقط می‌سنجد (`checkOrder`، بی نوشتن).
  *   نمایش ──── «در قفسه» / «در انبار، آماده‌سازی لازم» / «تمام شده» /
  *              «در حال بررسی» / «قابلِ سفارش نیست» — موجودیِ نامعلوم یا کهنه
  *              هرگز «موجود» نیست (INV-02، INV-14).
@@ -247,26 +249,39 @@ async function ingestTx(c, shopId, at, settings, { full = false } = {}) {
 }
 
 /**
- * نخستین خواندنِ دفترِ دستگاه (یا پس از عوض شدنِ منبعِ v1/v3) **در تراکنشِ خودش**، پیش از
- * تراکنشِ سفارش (QA #263): خواندنِ کاملِ دفتر دیگر درونِ تراکنشِ ساختِ سفارشِ مشتری و زیرِ
- * قفلِ `orders:<دکان>` نمی‌ماند. کاتالوگِ از پیش خوانده‌شده ⇒ هیچ (همان خواندنِ تفاوتِ کوچک
- * درونِ تراکنشِ سفارش می‌ماند تا رزرو با موجودیِ تازه سنجیده شود). پرچم خاموش ⇒ هیچ.
+ * خواندنِ دفترِ دستگاه **در تراکنشِ خودش**، پیش از تراکنشِ سفارش (QA #263): خواندنِ دفتر
+ * درونِ تراکنشِ ساختِ سفارشِ مشتری و زیرِ قفلِ `orders:<دکان>` نمی‌ماند؛ سنجشِ فقط‌خواندنیِ
+ * `checkOrder` با همین عددِ تازه است. بی ردیفِ تازه ⇒ هیچ. پرچم خاموش ⇒ هیچ.
  */
 async function prepare(shopId, { at = now() } = {}) {
   if (!(await stock.flagOf(shopId))) return null;
-  const settings = await stock.settingsOf(shopId);
-  const fmt = settings.syncSource === 'v3' ? 'v3' : 'v1';
-  const st = await one('SELECT source FROM catalog_sync_state WHERE shop_id=$1', [shopId]);
-  if (st && st.source === fmt) return null;
-  return tx(async (c) => ingestTx(c, shopId, at, await stock.settingsOf(shopId, c)));
+  return refresh(shopId, { maxAgeMs: 1, at });
 }
 
-/** همگام‌سازیِ کاتالوگ در تراکنشِ خودش؛ `maxAgeMs` ⇒ اگر تازه خوانده شده، نه. */
+/**
+ * آیا دفترِ دستگاه‌ها از آخرین خواندن ردیفِ تازه‌ای دارد؟ (یک پرسشِ نمایه‌دار؛ منبعِ
+ * عوض‌شده یا هرگز‌نخوانده ⇒ «بله».)
+ */
+async function hasNewer(shopId) {
+  const st = await one('SELECT source, watermark FROM catalog_sync_state WHERE shop_id=$1', [shopId]);
+  if (!st) return true;
+  const fmt = (await stock.settingsOf(shopId)).syncSource === 'v3' ? 'v3' : 'v1';
+  if (st.source !== fmt) return true;
+  const r = await one(
+    `SELECT 1 AS x FROM ${TABLES[fmt]} WHERE app='shop' AND account_kind='shop' AND account_id=$1
+        AND table_name = ANY($2::text[]) AND updated_seq > $3 LIMIT 1`,
+    [shopId, DEVICE_TABLES, num(st.watermark)]
+  );
+  return !!r;
+}
+
+/**
+ * همگام‌سازیِ کاتالوگ در تراکنشِ خودش. `maxAgeMs` (خواندنِ ویترین/بازار) ⇒ فقط وقتی
+ * دفترِ دستگاه‌ها ردیفِ تازه دارد خوانده می‌شود؛ پس **همان خواندنِ بعدی** پس از
+ * رسیدنِ فروشِ دستگاه عددِ تازه را می‌بیند و بارِ خواندنِ پیاپیِ بی‌تغییر هیچ است.
+ */
 async function refresh(shopId, { full = false, maxAgeMs = 0, at = now() } = {}) {
-  if (maxAgeMs > 0 && !full) {
-    const st = await one('SELECT last_run_at FROM catalog_sync_state WHERE shop_id=$1', [shopId]);
-    if (st && at - num(st.last_run_at) < maxAgeMs) return { skipped: true };
-  }
+  if (maxAgeMs > 0 && !full && !(await hasNewer(shopId))) return { skipped: true };
   return tx(async (c) => ingestTx(c, shopId, at, await stock.settingsOf(shopId, c), { full }));
 }
 
@@ -281,9 +296,14 @@ async function refresh(shopId, { full = false, maxAgeMs = 0, at = now() } = {}) 
  */
 async function freshness(shopId, settings, at) {
   const since = at - settings.staleAfterSec * 1000;
+  //  `queued` ِ Sync v1 اندازهٔ صف **پیش از** همان push است (دسته را هم می‌شمارد). برنامه پس از
+  //  خالی کردنِ صف pull می‌کند ⇒ pull ِ پس از آخرین push یعنی صف خالی شد؛ وگرنه پس از هر فروش
+  //  ویترین تا pushِ بعدی «در حال بررسی» می‌ماند و عددِ تازه را نشان نمی‌داد.
   const v1 = await one(
     `SELECT COALESCE(MAX(last_seen_at),0)::bigint AS seen,
-            COALESCE(MAX(CASE WHEN last_seen_at >= $2 THEN queued_count ELSE 0 END),0)::int AS queued
+            COALESCE(MAX(CASE WHEN last_seen_at >= $2
+                               AND NOT (last_push_at IS NOT NULL AND last_pull_at IS NOT NULL AND last_pull_at >= last_push_at)
+                              THEN queued_count ELSE 0 END),0)::int AS queued
        FROM sync_devices WHERE app='shop' AND account_kind='shop' AND account_id=$1`, [shopId, since]
   );
   const v3 = await one(
@@ -339,10 +359,11 @@ async function publicStock(shopId, productIds, { at = now() } = {}) {
   await refresh(shopId, { maxAgeMs: 5000, at });
   const settings = await stock.settingsOf(shopId);
   const fr = await freshness(shopId, settings, at);
-  const [ps, lvs, held] = await Promise.all([productsOf(shopId, ids), stock.levelsOf(null, shopId, ids), stock.heldOf(null, shopId, ids)]);
+  const [ps, lvs] = await Promise.all([productsOf(shopId, ids), stock.levelsOf(null, shopId, ids)]);
   const out = new Map();
+  //  فقط دفترِ همگام‌شدهٔ دستگاه‌ها — سفارشِ آنلاین هیچ رزرو و کسری ندارد
   for (const id of ids) {
-    out.set(id, badgeOf(ps.get(id), lvs.get(id), held.get(id) || 0, settings, fr, settings.showQty === 'exact'));
+    out.set(id, badgeOf(ps.get(id), lvs.get(id), 0, settings, fr, settings.showQty === 'exact'));
   }
   return out;
 }
@@ -401,8 +422,8 @@ async function list(shopId, { q, cursor, limit } = {}) {
   const page = rows.slice(0, lim).map((r) => r.product_id);
   const settings = await stock.settingsOf(shopId);
   const fr = await freshness(shopId, settings, now());
-  const [ps, lvs, held] = await Promise.all([productsOf(shopId, page), stock.levelsOf(null, shopId, page), stock.heldOf(null, shopId, page)]);
-  const items = page.map((id) => productView(ps.get(id), lvs.get(id), held.get(id) || 0, settings, fr));
+  const [ps, lvs] = await Promise.all([productsOf(shopId, page), stock.levelsOf(null, shopId, page)]);
+  const items = page.map((id) => productView(ps.get(id), lvs.get(id), 0, settings, fr));
   const last = items[items.length - 1];
   return {
     items, freshness: fr,
@@ -419,17 +440,9 @@ async function detail(shopId, productId) {
   const settings = await stock.settingsOf(shopId);
   const fr = await freshness(shopId, settings, now());
   const lv = (await stock.levelsOf(null, shopId, [id])).get(id);
-  const held = (await stock.heldOf(null, shopId, [id])).get(id) || 0;
-  const reservations = (await query(
-    `SELECT id, order_id, line_no, qty_milli, expires_at, created_at FROM stock_reservations
-      WHERE shop_id=$1 AND product_id=$2 AND status='held' ORDER BY created_at, id`, [shopId, id]
-  )).rows.map((r) => ({
-    id: r.id, orderId: r.order_id, lineNo: r.line_no, qtyMilli: num(r.qty_milli),
-    expiresAt: r.expires_at === null ? null : num(r.expires_at), createdAt: num(r.created_at),
-  }));
   const lows = {};
   for (const loc of stock.LOCATIONS) if (lv && lv[loc] && lv[loc].low !== null) lows[loc] = lv[loc].low;
-  return { product: productView(p, lv, held, settings, fr), reservations, lowByLocation: lows, freshness: fr };
+  return { product: productView(p, lv, 0, settings, fr), lowByLocation: lows, freshness: fr };
 }
 
 function moveView(r) {
@@ -460,18 +473,6 @@ async function moves(shopId, { productId, cursor, limit } = {}) {
   const items = rows.slice(0, lim).map(moveView);
   const last = items[items.length - 1];
   return { items, nextCursor: rows.length > lim && last ? encodeCursor(String(last.createdAt), last.id) : null };
-}
-
-async function reservationsOf(shopId, orderId) {
-  return (await query(
-    `SELECT id, line_no, product_id, qty_milli, status, expires_at, created_at, closed_at, close_reason
-       FROM stock_reservations WHERE shop_id=$1 AND order_id=$2 ORDER BY created_at, line_no, id`,
-    [shopId, String(orderId || '')]
-  )).rows.map((r) => ({
-    id: r.id, lineNo: r.line_no, productId: r.product_id, qtyMilli: num(r.qty_milli), status: r.status,
-    expiresAt: r.expires_at === null ? null : num(r.expires_at), createdAt: num(r.created_at),
-    closedAt: r.closed_at === null ? null : num(r.closed_at), closeReason: r.close_reason,
-  }));
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -720,81 +721,20 @@ async function toStockLines(c, shopId, lines) {
 }
 
 /**
- * درونِ تراکنشِ `orders.create`، پس از نوشتنِ قلم‌ها: پرچم روشن ⇒ دفترِ
- * دستگاه خوانده و قلم‌های کالادار رزرو می‌شوند؛ کمبود ⇒ خطا و **کلِ سفارش**
- * برمی‌گردد. پرچم خاموش ⇒ null، بی هیچ نوشتنی.
+ * درونِ تراکنشِ `orders.create`، پس از بررسیِ کلیدِ یکتایی: پرچم روشن ⇒ قلم‌های کالادار
+ * **فقط سنجیده** می‌شوند — کالای ناموجود/غیرفعال/حذف‌شده (`product_unavailable`)، واحدِ
+ * ناشناس (`bad_unit`) و مقدارِ بیش از موجودیِ قابل‌فروشِ همین لحظه (`out_of_stock`).
+ * ⛔ هیچ رزرو، هیچ حرکت و هیچ نوشتنی (تصمیمِ صاحبِ مخزن): کالا را دکان از برنامه تحویل
+ * می‌دهد و فروش همان‌جا ثبت می‌شود. سفارشِ آزمایشی و پرچمِ خاموش ⇒ null.
  */
-async function onOrderCreated(c, shopId, { orderId, lines, at, actor, isTest = false }) {
-  //  سفارشِ آزمایشیِ کارمند موجودیِ واقعی را نه رزرو می‌کند نه کم (QA #263)
+async function checkOrder(c, shopId, { lines, isTest = false }) {
   if (isTest) return null;
   const withProduct = (lines || []).filter((l) => str(l.productId));
   if (!withProduct.length) return null;
   if (!(await stock.flagOf(shopId, c))) return null;
-  await stock.lock(c, shopId);
   const settings = await stock.settingsOf(shopId, c);
-  await ingestTx(c, shopId, at, settings);
-  await stock.expireDue(c, shopId, at);
   const { lines: sl, names } = await toStockLines(c, shopId, withProduct);
-  return stock.reserve(c, shopId, {
-    orderId, lines: sl, at, expiresAt: at + settings.reserveTtlSec * 1000, actor, settings, names,
-  });
-}
-
-const RELEASE_ON = new Set(['rejected', 'auto_rejected', 'cancelled_by_customer', 'cancelled', 'restocked']);
-const COMMIT_ON = new Set(['picked_up', 'delivered']);
-
-/**
- * درونِ تراکنشِ گذارِ سفارش، پس از عوض شدنِ وضعیت:
- *   accepted ⇒ رزرو تا پایان می‌ماند؛ رزروِ منقضی/نبوده ⇒ دوباره رزرو (کمبود ⇒ ۴۰۹)
- *   رد/لغو/بازگشت به قفسه ⇒ آزادسازی · تحویل ⇒ کسرِ قطعی
- */
-async function onOrderStatus(c, shopId, { id, to }, actor, at) {
-  if (to !== 'accepted' && !RELEASE_ON.has(to) && !COMMIT_ON.has(to)) return null;
-  const has = (await c.query(
-    `SELECT 1 FROM stock_reservations WHERE shop_id=$1 AND order_id=$2 AND status='held' LIMIT 1`, [shopId, id]
-  )).rows.length > 0;
-  if (!has && to !== 'accepted') return null;
-  const test = (await c.query('SELECT is_test FROM online_orders WHERE shop_id=$1 AND id=$2', [shopId, id])).rows[0];
-  if (test && test.is_test === true) {
-    //  سفارشِ آزمایشی: هرگز رزرو یا کسرِ قطعی (فروشِ واقعی در دفترِ موجودی) نه.
-    //  رزروِ مانده از پیش از این اصلاح در پایانِ کار آزاد می‌شود، کسر نمی‌شود.
-    if (!has || to === 'accepted') return null;
-    await stock.lock(c, shopId);
-    return { released: await stock.release(c, shopId, id, { reason: 'test_order', actor, at }) };
-  }
-  const flag = await stock.flagOf(shopId, c);
-  if (!has && !flag) return null;
-  await stock.lock(c, shopId);
-  const settings = await stock.settingsOf(shopId, c);
-  if (RELEASE_ON.has(to)) return { released: await stock.release(c, shopId, id, { reason: to, actor, at }) };
-  if (COMMIT_ON.has(to)) return { committed: await stock.commit(c, shopId, id, { actor, at, settings }) };
-
-  await stock.expireDue(c, shopId, at);
-  //  CHK-18: رزروی که فروشِ حضوریِ هم‌زمان پشتوانه‌اش را برده (INV-06) با «قبول» بی‌مهلت
-  //  نمی‌شود؛ ۴۰۹ و گذار برمی‌گردد — دکان رد می‌کند یا موجودی را درست می‌کند. اول فروش‌های
-  //  تازه‌رسیدهٔ دستگاه‌ها خوانده می‌شوند، وگرنه داوری با موجودیِ کهنه است.
-  const held = await c.query(
-    `SELECT 1 FROM stock_reservations WHERE shop_id=$1 AND order_id=$2 AND status='held' LIMIT 1`, [shopId, id]
-  );
-  if (held.rows.length && flag) await ingestTx(c, shopId, at, settings);
-  const short = held.rows.length ? await stock.shortOf(c, shopId, id, settings) : [];
-  if (short.length) {
-    const names = new Map((await c.query(
-      'SELECT product_id, name, unit FROM catalog_products WHERE shop_id=$1 AND product_id = ANY($2::text[])',
-      [shopId, short.map((x) => x.productId)]
-    )).rows.map((r) => [r.product_id, r]));
-    throw stock.outOfStock(short.map((x) => ({ ...x, name: names.get(x.productId)?.name || '', unit: names.get(x.productId)?.unit || '' })));
-  }
-  if (await stock.extend(c, shopId, id)) return { extended: true };
-  if (!flag) return null;
-  const lines = (await c.query(
-    `SELECT line_no AS "lineNo", product_id AS "productId", unit, qty_milli AS "qtyMilli"
-       FROM online_order_lines WHERE order_id=$1 AND shop_id=$2 AND product_id <> '' ORDER BY line_no`, [id, shopId]
-  )).rows;
-  if (!lines.length) return null;
-  await ingestTx(c, shopId, at, settings);
-  const { lines: sl, names } = await toStockLines(c, shopId, lines);
-  return { reserved: await stock.reserve(c, shopId, { orderId: id, lines: sl, at, expiresAt: null, actor, settings, names }) };
+  return stock.check(c, shopId, { lines: sl, settings, names });
 }
 
 /** برای مسیرهای HTTP: پرچم لازم است. */
@@ -804,8 +744,8 @@ async function requireEnabled(shopId) {
 
 module.exports = {
   MANUAL, TRANSFER_LOCS,
-  ingestTx, refresh, prepare, freshness, badgeOf, publicStock,
-  list, detail, moves, reservationsOf, tasks, resolveTask,
+  ingestTx, refresh, hasNewer, prepare, freshness, badgeOf, publicStock,
+  list, detail, moves, tasks, resolveTask,
   parseManual, manualMove, setLow,
-  toStockLines, onOrderCreated, onOrderStatus, requireEnabled,
+  toStockLines, checkOrder, requireEnabled,
 };
