@@ -295,6 +295,8 @@
         phoneOpen = true;
         $('cart-sheet').hidden = false; $('surface-cap').hidden = false;
         $('surface').inert = true;
+        $('cart-sheet').classList.add('entering');
+        setTimeout(function () { $('cart-sheet').classList.remove('entering'); }, 600);
         requestAnimationFrame(function () { document.body.classList.add('cart-open'); });
         setTimeout(function () { $('cart-title').focus(); }, 60);
       }
