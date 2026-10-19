@@ -64,6 +64,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -364,10 +365,11 @@ private fun BestsellerRow(items: List<PhoneCatalogItem>, onTap: (PhoneCatalogIte
         Modifier
           .height(32.dp)
           .graphicsLayer { scaleX = pop.value; scaleY = pop.value }
+          .alpha(if (b.stock <= 0) SOLD_OUT_ALPHA else 1f)
           .clip(RoundedCornerShape(percent = 50))
           .background(if (b.inCart > 0) v.cart else v.catalogCard)
           .clickable(role = Role.Button, onClickLabel = if (b.weighed) "وزن کردن" else "یکی به سبد") {
-            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            if (b.stock > 0) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
             onTap(b)
           }
           .padding(horizontal = 12.dp),
@@ -381,6 +383,9 @@ private fun BestsellerRow(items: List<PhoneCatalogItem>, onTap: (PhoneCatalogIte
     } }
   }
 }
+
+/** کالای «تمام شد»: محتوا کم‌رنگ (۴۵٪)، بی لرزش و بی پرش؛ زدنش پیامِ موجودی می‌دهد */
+private const val SOLD_OUT_ALPHA = 0.45f
 
 /** پرشِ کوچکِ کاشی وقتی مقدارش در سبد بیشتر شد (بندِ G) */
 @Composable
@@ -480,7 +485,7 @@ fun PhoneTile(
         onLongClickLabel = "نوشتنِ مقدار",
         onLongClick = { onHold(item) },
         onClick = {
-          haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+          if (!out) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
           onTap(item)
         },
       )
@@ -490,42 +495,44 @@ fun PhoneTile(
       }
       .padding(8.dp),
   ) {
-    Row(verticalAlignment = Alignment.Top) {
-      ItemThumb(item)
-      Spacer(Modifier.width(6.dp))
+    Column(Modifier.alpha(if (out) SOLD_OUT_ALPHA else 1f)) {
+      Row(verticalAlignment = Alignment.Top) {
+        ItemThumb(item)
+        Spacer(Modifier.width(6.dp))
+        Text(
+          item.name,
+          color = v.ink,
+          fontSize = 13.sp,
+          lineHeight = 18.sp,
+          fontWeight = FontWeight.SemiBold,
+          minLines = 2,
+          maxLines = 2,
+          overflow = TextOverflow.Ellipsis,
+          modifier = Modifier.weight(1f),
+        )
+      }
+      Spacer(Modifier.height(6.dp))
+      Row(Modifier.fillMaxWidth().heightIn(min = 24.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+          priceText,
+          color = v.ink,
+          fontSize = PhoneSaleText.priceSp(priceText).sp,
+          fontWeight = FontWeight.Bold,
+          maxLines = 1,
+          softWrap = false,
+          modifier = Modifier.weight(1f),
+        )
+        if (item.inCart > 0) MinusButton(item, 24.dp, onMinus)
+      }
       Text(
-        item.name,
-        color = v.ink,
-        fontSize = 13.sp,
-        lineHeight = 18.sp,
-        fontWeight = FontWeight.SemiBold,
-        minLines = 2,
-        maxLines = 2,
-        overflow = TextOverflow.Ellipsis,
-        modifier = Modifier.weight(1f),
-      )
-    }
-    Spacer(Modifier.height(6.dp))
-    Row(Modifier.fillMaxWidth().heightIn(min = 24.dp), verticalAlignment = Alignment.CenterVertically) {
-      Text(
-        priceText,
-        color = v.ink,
-        fontSize = PhoneSaleText.priceSp(priceText).sp,
-        fontWeight = FontWeight.Bold,
+        stockText,
+        color = if (out) v.negative else v.inkMuted,
+        fontSize = 11.sp,
+        lineHeight = 14.sp,
         maxLines = 1,
-        softWrap = false,
-        modifier = Modifier.weight(1f),
+        overflow = TextOverflow.Ellipsis,
       )
-      if (item.inCart > 0) MinusButton(item, 24.dp, onMinus)
     }
-    Text(
-      stockText,
-      color = if (out) v.negative else v.inkMuted,
-      fontSize = 11.sp,
-      lineHeight = 14.sp,
-      maxLines = 1,
-      overflow = TextOverflow.Ellipsis,
-    )
   }
 }
 
@@ -554,6 +561,8 @@ fun PhoneListRow(
   val priceText = "${money(item.price)} ؋"
   val stockText = PhoneSaleText.stock(item.stock, item.unit)
   val hairline = v.hairline
+  val out = item.stock <= 0
+  val dim = if (out) SOLD_OUT_ALPHA else 1f
   Row(
     Modifier
       .fillMaxWidth()
@@ -572,16 +581,16 @@ fun PhoneListRow(
         onLongClickLabel = "نوشتنِ مقدار",
         onLongClick = { onHold(item) },
         onClick = {
-          haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+          if (!out) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
           onTap(item)
         },
       )
       .padding(start = 10.dp, end = 6.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
-    Box(Modifier.graphicsLayer { scaleX = pop.value; scaleY = pop.value }) { ItemThumb(item) }
+    Box(Modifier.alpha(dim).graphicsLayer { scaleX = pop.value; scaleY = pop.value }) { ItemThumb(item) }
     Spacer(Modifier.width(10.dp))
-    Column(Modifier.weight(1f)) {
+    Column(Modifier.weight(1f).alpha(dim)) {
       Text(item.name, color = v.ink, fontSize = 14.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
       Row(verticalAlignment = Alignment.CenterVertically) {
         Text(priceText, color = v.ink, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1)
@@ -594,20 +603,22 @@ fun PhoneListRow(
         )
       }
     }
-    if (item.inCart > 0) {
-      MinusButton(item, 34.dp, onMinus)
-      Text(
-        qty(item.inCart),
-        color = v.ink,
-        fontSize = 14.sp,
-        fontWeight = FontWeight.Bold,
-        maxLines = 1,
-        textAlign = TextAlign.Center,
-        modifier = Modifier.widthIn(min = 28.dp),
-      )
-    }
-    RoundButton("یکی بیشتر ${item.name}", { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onTap(item) }, 34.dp, v.cart) {
-      Icon(Icons.Outlined.Add, contentDescription = null, tint = v.onCart, modifier = Modifier.size(20.dp))
+    Row(Modifier.alpha(dim), verticalAlignment = Alignment.CenterVertically) {
+      if (item.inCart > 0) {
+        MinusButton(item, 34.dp, onMinus)
+        Text(
+          qty(item.inCart),
+          color = v.ink,
+          fontSize = 14.sp,
+          fontWeight = FontWeight.Bold,
+          maxLines = 1,
+          textAlign = TextAlign.Center,
+          modifier = Modifier.widthIn(min = 28.dp),
+        )
+      }
+      RoundButton("یکی بیشتر ${item.name}", { if (!out) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onTap(item) }, 34.dp, v.cart) {
+        Icon(Icons.Outlined.Add, contentDescription = null, tint = v.onCart, modifier = Modifier.size(20.dp))
+      }
     }
   }
 }

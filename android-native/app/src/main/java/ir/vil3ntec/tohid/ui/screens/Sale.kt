@@ -17,6 +17,14 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.activity.compose.BackHandler
 import androidx.compose.material.icons.outlined.LocalOffer
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.PhotoCamera
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.unit.sp
 import ir.vil3ntec.tohid.data.WarehouseEngine
 import ir.vil3ntec.tohid.ui.components.pos.CartSummary
 import ir.vil3ntec.tohid.ui.components.pos.PhoneCartAmount
@@ -331,7 +339,13 @@ fun SaleScreen(
       cartStore.lines.value, p.id, SalesEngine.cartStep(p.unit), ShopStore.stock(d, p.id),
     )
     if (added.capped) {
-      toast("${p.name} فقط ${qty(added.available)}${if (p.unit.isNotBlank()) " ${p.unit}" else ""} موجود است")
+      Haptics.confirm(context)
+      //  «تمام شد»: همان پیامِ موتورِ فروش (جنس هست؟ اول ورودیِ انبار)؛ بخشی ماند ⇐ چقدر هست
+      toast(
+        if (added.available <= 0) SalesEngine.shortageMessage(p, SalesEngine.cartStep(p.unit), added.available)
+        else "${p.name} فقط ${qty(added.available)}${if (p.unit.isNotBlank()) " ${p.unit}" else ""} موجود است"
+      )
+      if (added.cart === cartStore.lines.value) return
     }
     cartStore.set(added.cart)
     selectedId = p.id
@@ -504,6 +518,128 @@ fun SaleScreen(
       listOf(1, 2, 5, 10).forEach { m ->
         MultiplierChip(m, m == multiplier) { multiplier = m }
         Spacer(Modifier.width(6.dp))
+      }
+    }
+  }
+
+  /** «جستجو»ِ بارکدِ دستی — همان کارِ دکمهٔ تبلت */
+  fun searchManual() {
+    val code = manual.trim()
+    if (code.isNotEmpty()) {
+      onBarcode(code, skipDedup = true)
+      if (index.containsKey(code)) manual = ""
+    }
+  }
+
+  /*
+   *  گوشی (نسخهٔ ۳): همان دوربینِ پیوسته، بارکدِ دستی، «هر اسکن» و «قلم آزاد» — با رنگ‌های
+   *  خودِ سبد (سطحِ سیاه، دکمهٔ زرد، چیپ‌های خاکستری و انتخابِ زرد)، نه بنفشِ برنامه.
+   */
+  val phoneScanPanel: @Composable () -> Unit = {
+    val v = PhoneV3.colors
+    Column(
+      Modifier
+        .fillMaxWidth()
+        .clip(RoundedCornerShape(PhoneV3.catalogCardRadius))
+        .background(v.black)
+        .padding(12.dp),
+    ) {
+      Box(
+        Modifier
+          .fillMaxWidth()
+          .height(200.dp)
+          .clip(RoundedCornerShape(16.dp))
+          .background(v.blackRaised),
+        contentAlignment = Alignment.Center,
+      ) {
+        if (cameraOn && granted) {
+          CameraScanner(
+            onCode = { onBarcode(it) },
+            onStatus = { text, isError -> status = text; statusError = isError },
+            modifier = Modifier.fillMaxSize(),
+            isKnown = { index.containsKey(it) },
+          )
+          ScanLine(Modifier.fillMaxWidth(0.86f).height(120.dp))
+          Text(
+            status,
+            color = if (statusError) v.negative else v.onBlack,
+            fontSize = 12.sp,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            modifier = Modifier
+              .align(Alignment.BottomCenter)
+              .fillMaxWidth()
+              .background(v.black.copy(alpha = 0.55f))
+              .padding(horizontal = 12.dp, vertical = 6.dp),
+          )
+        } else {
+          Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(Icons.Outlined.PhotoCamera, contentDescription = null, tint = v.onBlackMuted, modifier = Modifier.size(30.dp))
+            Spacer(Modifier.height(8.dp))
+            Text(
+              if (granted) "دوربین خاموش است" else "برای اسکن، اجازهٔ دوربین لازم است",
+              color = v.onBlackMuted,
+              fontSize = 13.sp,
+            )
+            Spacer(Modifier.height(10.dp))
+            V3Pill(if (granted) "روشن کردن دوربین" else "اجازه دادن", v.cart, v.onCart) {
+              if (granted) {
+                cameraOn = true
+                gate.reset()
+                lastScanAt = System.currentTimeMillis()
+              } else askCamera.launch(Manifest.permission.CAMERA)
+            }
+          }
+        }
+      }
+      Spacer(Modifier.height(10.dp))
+      Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+          Modifier
+            .weight(1f)
+            .height(44.dp)
+            .clip(RoundedCornerShape(percent = 50))
+            .background(v.blackRaised)
+            .padding(start = 14.dp, end = 4.dp),
+          verticalAlignment = Alignment.CenterVertically,
+        ) {
+          Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+            if (manual.isEmpty()) Text("یا بارکد را دستی وارد کنید", color = v.onBlackMuted, fontSize = 14.sp, maxLines = 1)
+            BasicTextField(
+              value = manual,
+              onValueChange = { manual = it },
+              singleLine = true,
+              textStyle = TextStyle(color = v.onBlack, fontSize = 15.sp),
+              cursorBrush = SolidColor(v.cart),
+              keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Search),
+              keyboardActions = KeyboardActions(onSearch = { searchManual() }),
+              modifier = Modifier.fillMaxWidth(),
+            )
+          }
+          if (manual.isNotEmpty()) {
+            IconButton(onClick = { manual = "" }, modifier = Modifier.size(36.dp)) {
+              Icon(Icons.Filled.Close, contentDescription = "پاک کردن بارکد", tint = v.onBlackMuted, modifier = Modifier.size(18.dp))
+            }
+          }
+        }
+        Spacer(Modifier.width(8.dp))
+        V3Pill("جستجو", v.cart, v.onCart) { searchManual() }
+      }
+      Spacer(Modifier.height(10.dp))
+      Row(
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+      ) {
+        Text("هر اسکن:", color = v.onBlackMuted, fontSize = 12.sp, maxLines = 1)
+        listOf(1, 2, 5, 10).forEach { m ->
+          val on = m == multiplier
+          V3Pill("×${ir.vil3ntec.tohid.plain(m)}", if (on) v.cart else v.blackRaised, if (on) v.onCart else v.onBlack, height = 36.dp) {
+            multiplier = m
+          }
+        }
+        Spacer(Modifier.width(6.dp))
+        V3Pill("+ قلم آزاد", v.onBlack, v.black, height = 36.dp) { freeLine = true }
       }
     }
   }
@@ -720,23 +856,7 @@ fun SaleScreen(
             onBack = goBack,
             onScan = { if (scanOpen) closeScanner() else openScanner() },
             scanning = scanOpen,
-            scanPanel = {
-              Column(
-                Modifier
-                  .fillMaxWidth()
-                  .clip(RoundedCornerShape(PhoneV3.catalogCardRadius))
-                  .background(PhoneV3.colors.catalogCard)
-                  .padding(12.dp),
-              ) {
-                scanControls()
-                Spacer(Modifier.height(4.dp))
-                TextButton(onClick = { freeLine = true }) {
-                  Icon(Icons.Filled.AddCircleOutline, contentDescription = null, tint = PhoneV3.colors.icon)
-                  Spacer(Modifier.width(6.dp))
-                  Text("قلم آزاد", color = PhoneV3.colors.ink)
-                }
-              }
-            },
+            scanPanel = { phoneScanPanel() },
             emptyText = when {
               d.products.isEmpty() -> "هنوز محصولی ثبت نشده."
               phoneSearch.isNotBlank() -> "کالایی با «${phoneSearch.trim()}» پیدا نشد"
@@ -751,26 +871,29 @@ fun SaleScreen(
         cart = { revealed, dragHandle ->
           val rows = CartSummary.rows(cart, d.products)
           Box(dragHandle.fillMaxWidth().padding(top = 62.dp, bottom = 38.dp)) { PhoneCartTitle() }
-          LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
-            itemsIndexed(rows, key = { _, r -> r.id }) { i, r ->
-              PhoneCartRow(
-                row = r,
-                index = i,
-                revealed = revealed,
-                expanded = expandedLine == r.id,
-                onToggle = { expandedLine = if (expandedLine == r.id) null else r.id },
-                onMinus = { phoneStep(r, -1) },
-                onPlus = { phoneStep(r, +1) },
-                onRemove = {
-                  Haptics.confirm(context)
-                  cartStore.set(SalesEngine.setCartQty(cartStore.lines.value, r.id, 0.0))
-                  if (selectedId == r.id) selectedId = null
-                  if (expandedLine == r.id) expandedLine = null
-                },
-                onEdit = { editLine = r.id },
-              )
-            }
-            item(key = "customer") {
+          //  ردیف‌ها می‌لغزند؛ «مشتری» و «تخفیف» زیرشان می‌مانند و هرگز پشتِ «جمع:» نمی‌روند
+          Box(Modifier.weight(1f).fillMaxWidth()) {
+            Column(Modifier.fillMaxWidth()) {
+              LazyColumn(Modifier.weight(1f, fill = false).fillMaxWidth()) {
+                itemsIndexed(rows, key = { _, r -> r.id }) { i, r ->
+                  PhoneCartRow(
+                    row = r,
+                    index = i,
+                    revealed = revealed,
+                    expanded = expandedLine == r.id,
+                    onToggle = { expandedLine = if (expandedLine == r.id) null else r.id },
+                    onMinus = { phoneStep(r, -1) },
+                    onPlus = { phoneStep(r, +1) },
+                    onRemove = {
+                      Haptics.confirm(context)
+                      cartStore.set(SalesEngine.setCartQty(cartStore.lines.value, r.id, 0.0))
+                      if (selectedId == r.id) selectedId = null
+                      if (expandedLine == r.id) expandedLine = null
+                    },
+                    onEdit = { editLine = r.id },
+                  )
+                }
+              }
               val debtorName = cartDebtorId?.let { id -> d.debtors.find { it.id == id }?.name }
               PhoneCartInfoRow(
                 icon = Icons.Outlined.Person,
@@ -784,10 +907,8 @@ fun SaleScreen(
                   if (debtorName != null) PhoneCartClear("برداشتنِ قرض‌دار") { cartStore.setDebtor(null) }
                 },
               )
-            }
-            val off = CartSummary.manualDiscount(cart, d.products)
-            if (off > 0) {
-              item(key = "discount") {
+              val off = CartSummary.manualDiscount(cart, d.products)
+              if (off > 0) {
                 PhoneCartInfoRow(
                   icon = Icons.Outlined.LocalOffer,
                   title = "تخفیف",
@@ -816,7 +937,8 @@ fun SaleScreen(
           when {
             p == null -> null
             SalesEngine.quantityProblem(p, q) != null -> SalesEngine.quantityProblem(p, q)
-            q > stock -> "فقط ${qty(stock.coerceAtLeast(0.0))}${if (p.unit.isNotBlank()) " ${p.unit}" else ""} موجود است"
+            stock <= 0 -> SalesEngine.shortageMessage(p, q, stock)
+            q > stock -> "فقط ${qty(stock)}${if (p.unit.isNotBlank()) " ${p.unit}" else ""} موجود است"
             else -> null
           }
         },
@@ -1255,3 +1377,19 @@ fun CartBar(
  *  می‌شود و آدم را عصبانی می‌کند؛ بلندتر از این، دیگر صرفه‌جویی نیست.
  */
 private const val CAMERA_IDLE_MS = 3L * 60L * 1000L
+
+/** قرصِ کوچکِ صندوقِ گوشیِ نسخهٔ ۳ (زرد یا خاکستری روی سیاه) — کادرِ اسکن */
+@Composable
+private fun V3Pill(text: String, bg: Color, fg: Color, height: androidx.compose.ui.unit.Dp = 44.dp, onClick: () -> Unit) {
+  Box(
+    Modifier
+      .height(height)
+      .clip(RoundedCornerShape(percent = 50))
+      .background(bg)
+      .clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onClick)
+      .padding(horizontal = 16.dp),
+    contentAlignment = Alignment.Center,
+  ) {
+    Text(text, color = fg, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+  }
+}
