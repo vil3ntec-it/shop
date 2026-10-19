@@ -323,7 +323,7 @@ private fun FreshTable(t: ReportTables.Table, modifier: Modifier) {
   val rows = remember(t, sort) { sort?.let { (c, desc) -> ReportBoard.sortRows(t.rows, c, desc) } ?: t.rows }
   val line = Shop.colors.border
   val width = t.columns.fold(0.dp) { a, c -> a + colWidth(c.kind) }
-  @Composable fun RowScope.cell(i: Int, onClick: (() -> Unit)? = null, content: @Composable () -> Unit) {
+  @Composable fun RowScope.cell(i: Int, onClick: (() -> Unit)?, content: @Composable () -> Unit) {
     val c = t.columns[i]
     Box(
       Modifier.width(colWidth(c.kind)).fillMaxHeight().border(0.5.dp, line)
@@ -349,7 +349,7 @@ private fun FreshTable(t: ReportTables.Table, modifier: Modifier) {
         items(rows.size) { r ->
           Row(Modifier.height(IntrinsicSize.Min).background(if (r % 2 == 1) Shop.colors.surface2.copy(alpha = 0.4f) else Shop.colors.surface)) {
             rows[r].forEachIndexed { i, v ->
-              cell(i) {
+              cell(i, null) {
                 Text(
                   ReportFreshModel.display(v, t.columns[i].kind, ::formatDate), maxLines = 1, overflow = TextOverflow.Ellipsis,
                   style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text,
@@ -362,7 +362,7 @@ private fun FreshTable(t: ReportTables.Table, modifier: Modifier) {
       t.total?.let { tot ->
         Row(Modifier.height(IntrinsicSize.Min).background(Shop.colors.surface2)) {
           tot.forEachIndexed { i, v ->
-            cell(i) { Text(if (v is JsonNull) "" else ReportFreshModel.display(v, t.columns[i].kind, ::formatDate), fontWeight = FontWeight.Bold, color = Shop.colors.text, maxLines = 1) }
+            cell(i, null) { Text(if (v is JsonNull) "" else ReportFreshModel.display(v, t.columns[i].kind, ::formatDate), fontWeight = FontWeight.Bold, color = Shop.colors.text, maxLines = 1) }
           }
         }
       }
