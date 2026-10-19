@@ -84,7 +84,8 @@ jobs:
           #  گوشی (phone-ui): پنجرهٔ ۳۹۰×۸۴۴ِ `PhonePreview` — عکس فقط از همان پنجره
           S="$S;phone:nav;wait:1500;pshot:20-phone-nav;phone:nav-dark;wait:1500;pshot:20b-phone-nav-dark;phone:settings;wait:1500;pshot:21-phone-settings;phone:settings-dark;wait:1500;pshot:21b-phone-settings-dark;phone:profile;wait:1500;pshot:22-phone-profile;phone:profile-dark;wait:1500;pshot:22b-phone-profile-dark;phone:cart;wait:2000;pshot:23-phone-cart-bar;phone:cart-open;wait:2000;pshot:23b-phone-cart-sheet;phone:cart-open-dark;wait:2000;pshot:23c-phone-cart-sheet-dark;phone:off"
           #  قرض‌دارانِ گوشی (phone v3، r9): سه نفرِ r9، هشت نفرِ بلند، خالی — روز و شب
-          S="$S;phone:debtors-r9;wait:2500;pshot:phone-v3-debtors-r9;phone:debtors-r9-dark;wait:2500;pshot:phone-v3-debtors-r9-dark;phone:debtors-many;wait:2500;pshot:phone-v3-debtors-many;phone:debtors-many-dark;wait:2500;pshot:phone-v3-debtors-many-dark;phone:debtors-empty;wait:2000;pshot:phone-v3-debtors-empty;phone:debtors-empty-dark;wait:2000;pshot:phone-v3-debtors-empty-dark;phone:off"
+          #  «many-end»: همان فهرست تا ته پایین‌کشیده — آخرین ردیف از زیرِ دکمهٔ «+» بیرون است
+          S="$S;phone:debtors-r9;wait:2500;pshot:phone-v3-debtors-r9;phone:debtors-r9-dark;wait:2500;pshot:phone-v3-debtors-r9-dark;phone:debtors-many-dark;wait:2500;pshot:phone-v3-debtors-many-dark;phone:debtors-many;wait:2500;pshot:phone-v3-debtors-many;move:200,600;scroll:15;wait:1200;pshot:phone-v3-debtors-many-end;phone:debtors-empty;wait:2000;pshot:phone-v3-debtors-empty;phone:debtors-empty-dark;wait:2000;pshot:phone-v3-debtors-empty-dark;phone:off"
           export JAVA_TOOL_OPTIONS="-Dtohid.shot=$RUNNER_TEMP/shots -Dtohid.shot.every=9000 -Dtohid.shot.exit=true -Dtohid.shot.script=$S -Dsun.jnu.encoding=UTF-8 -Dfile.encoding=UTF-8"
           timeout 600 xvfb-run -s "-screen 0 1440x900x24" ./gradlew --no-daemon -q -Pdev=true run || true
           ls -la "$RUNNER_TEMP/shots"

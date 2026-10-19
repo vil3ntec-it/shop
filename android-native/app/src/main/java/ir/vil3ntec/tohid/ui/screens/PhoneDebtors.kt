@@ -34,7 +34,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.ChevronLeft
+import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
@@ -70,6 +71,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
@@ -77,8 +80,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.plain
+import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Debt
 import ir.vil3ntec.tohid.ui.theme.PhoneV3DebtColors
 import ir.vil3ntec.tohid.ui.theme.shopTypography
@@ -150,34 +155,47 @@ private fun DrawScope.glow(color: Color, center: Offset, sigma: Float) {
 /* ------------------------------ سربرگ ------------------------------ */
 
 /**
- *  سربرگِ سبک: عنوانِ «قرض‌داران» و — وقتی صفحه از «بیشتر» باز شده — دکمهٔ گردِ
- *  برگشت. بی زمینه و بی خط، روی همان زمینهٔ آرورا؛ چیدمانِ r9 زیرش دست نمی‌خورد.
+ *  سربرگ — همان سربرگِ تنظیماتِ گوشی (r5، `V3Header` در PhoneV3Kit ِ شاخهٔ profile):
+ *  دکمهٔ گردِ سفیدِ ۴۴dp با سایهٔ نرم و «›» در آغاز، عنوانِ ۱۹sp وسط، بلندیِ ۶۰dp.
+ *  تا آن جزء روی شاخهٔ پایه بیاید همین‌جا با همان اندازه‌ها و رنگ‌های `PhoneV3` کشیده
+ *  می‌شود؛ بعد از ادغام، این تابع به `V3Header("قرض‌داران", onBack)` بدل می‌شود.
  */
 @Composable
 fun DebtorsHeader(onBack: (() -> Unit)?, modifier: Modifier = Modifier) {
-  val c = PhoneV3Debt.colors
-  Row(
-    modifier.fillMaxWidth().height(52.dp).padding(horizontal = PhoneV3Debt.gutter),
-    verticalAlignment = Alignment.CenterVertically,
-  ) {
+  val v3 = PhoneV3.colors
+  val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+  Box(modifier.fillMaxWidth().height(60.dp).padding(horizontal = 18.dp), contentAlignment = Alignment.Center) {
     if (onBack != null) {
       val source = remember { MutableInteractionSource() }
       val pressed by source.collectIsPressedAsState()
       Box(
         Modifier
-          .size(36.dp)
+          .align(Alignment.CenterStart)
+          .size(44.dp)
+          .shadow(6.dp, CircleShape, clip = false, ambientColor = v3.ink.copy(alpha = 0.10f), spotColor = v3.ink.copy(alpha = 0.10f))
           .pressScale(pressed)
           .clip(CircleShape)
-          .background(c.surface)
-          .border(1.dp, c.edge, CircleShape)
+          .background(v3.card)
           .clickable(interactionSource = source, indication = LocalIndication.current, role = Role.Button, onClick = onBack),
         contentAlignment = Alignment.Center,
       ) {
-        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "برگشت", tint = c.ink, modifier = Modifier.size(20.dp))
+        Icon(
+          if (rtl) Icons.Outlined.ChevronRight else Icons.Outlined.ChevronLeft,
+          contentDescription = "بازگشت",
+          tint = v3.icon,
+          modifier = Modifier.size(24.dp),
+        )
       }
-      Spacer(Modifier.width(10.dp))
     }
-    Text("قرض‌داران", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = c.ink, maxLines = 1)
+    Text(
+      "قرض‌داران",
+      style = MaterialTheme.typography.titleMedium.copy(fontSize = 19.sp, lineHeight = 26.sp, fontWeight = FontWeight.SemiBold),
+      color = v3.ink,
+      maxLines = 1,
+      overflow = TextOverflow.Ellipsis,
+      textAlign = TextAlign.Center,
+      modifier = Modifier.padding(horizontal = 52.dp).semantics { heading() },
+    )
   }
 }
 
@@ -338,13 +356,16 @@ fun DebtorsSortRow(current: DebtorListModel.Sort, count: Int, onPick: (DebtorLis
     }
     //  محوِ لبهٔ انتها (چپ در راست‌به‌چپ) — فقط تا وقتی تراشه‌ای پشتِ لبه مانده
     if (scroll.canScrollForward) {
-      val edge = if (rtl) listOf(c.page, c.page.copy(alpha = 0f)) else listOf(c.page.copy(alpha = 0f), c.page)
+      //  ۱۲dpِ لبه پُر، بعد ۲۸dp محو: تراشهٔ نیمه‌پیدا آشکارا «ادامه دارد» می‌گوید
+      val solid = c.page
+      val clear = c.page.copy(alpha = 0f)
+      val stops = if (rtl) arrayOf(0f to solid, 0.3f to solid, 1f to clear) else arrayOf(0f to clear, 0.7f to solid, 1f to solid)
       Box(
         Modifier
           .align(Alignment.CenterEnd)
-          .width(36.dp)
-          .height(40.dp)
-          .background(Brush.horizontalGradient(edge))
+          .width(40.dp)
+          .height(44.dp)
+          .background(Brush.horizontalGradient(*stops))
       )
     }
   }
