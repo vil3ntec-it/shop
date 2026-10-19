@@ -1,0 +1,1561 @@
+{
+ "version": 1,
+ "about": "تابلوی گزارش (خانه): کارت‌ها، نشان‌ها، درصد، بازه و مرتب‌سازی — license/report-board.js و core/report/ReportBoard.kt هر دو باید عیناً همین را بدهند. دفترها از report-v1.json.",
+ "cases": [
+  {
+   "name": "خانهٔ ۱۴ مهر، بهای ثبت‌شده، بی ساعت (رفتارِ امروز)",
+   "fn": "build",
+   "ledger": "kabul",
+   "opts": {
+    "date": "2026-10-14"
+   },
+   "expect": {
+    "date": "2026-10-14",
+    "kpis": [
+     {
+      "id": "netSales",
+      "title": "فروش خالص امروز",
+      "value": 48950,
+      "kind": "money",
+      "delta": {
+       "diff": -21050,
+       "bp": -3007
+      },
+      "trend": "down",
+      "good": false,
+      "deltaText": "-30.1٪ نسبت به دیروز",
+      "period": "امروز",
+      "approximate": false,
+      "target": {
+       "tab": "sales",
+       "span": "today",
+       "dim": "product"
+      }
+     },
+     {
+      "id": "invoices",
+      "title": "فاکتورهای امروز",
+      "value": 4,
+      "kind": "count",
+      "delta": {
+       "diff": 3,
+       "bp": 30000
+      },
+      "trend": "up",
+      "good": true,
+      "deltaText": "+300٪ نسبت به دیروز",
+      "period": "امروز",
+      "approximate": false,
+      "target": {
+       "tab": "sales",
+       "span": "today",
+       "dim": "user"
+      }
+     },
+     {
+      "id": "grossProfit",
+      "title": "سود ناخالص امروز (تقریبی)",
+      "value": 18950,
+      "kind": "money",
+      "delta": {
+       "diff": 7950,
+       "bp": 7227
+      },
+      "trend": "up",
+      "good": true,
+      "deltaText": "+72.3٪ نسبت به دیروز",
+      "period": "امروز",
+      "approximate": true,
+      "target": {
+       "tab": "profit",
+       "span": "today",
+       "dim": "product"
+      }
+     },
+     {
+      "id": "avgTicket",
+      "title": "میانگین فاکتور",
+      "value": 15738,
+      "kind": "money",
+      "delta": {
+       "diff": -54262,
+       "bp": -7752
+      },
+      "trend": "down",
+      "good": false,
+      "deltaText": "-77.5٪ نسبت به دیروز",
+      "period": "امروز",
+      "approximate": false,
+      "target": {
+       "tab": "today",
+       "span": "today",
+       "dim": ""
+      }
+     },
+     {
+      "id": "receivable",
+      "title": "طلب از مشتریان",
+      "value": 93000,
+      "kind": "money",
+      "delta": null,
+      "trend": null,
+      "good": null,
+      "deltaText": null,
+      "period": "تا امروز",
+      "approximate": false,
+      "target": {
+       "tab": "debts",
+       "span": "all",
+       "dim": ""
+      }
+     }
+    ],
+    "pills": [
+     {
+      "id": "profit",
+      "text": "سود تقریبی",
+      "tone": "warning",
+      "target": {
+       "tab": "profit",
+       "span": "today",
+       "dim": "product"
+      }
+     },
+     {
+      "id": "cost",
+      "text": "2 قلم بی بهای خرید",
+      "tone": "warning",
+      "target": {
+       "tab": "profit",
+       "span": "today",
+       "dim": "product"
+      }
+     },
+     {
+      "id": "overdue",
+      "text": "1 مشتری با قرض بیش از 90 روز",
+      "tone": "danger",
+      "target": {
+       "tab": "debts",
+       "span": "all",
+       "dim": ""
+      }
+     },
+     {
+      "id": "fraud",
+      "text": "3 رویداد حساس امروز",
+      "tone": "warning",
+      "target": {
+       "tab": "fraud",
+       "span": "today",
+       "dim": ""
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "خانه با روزِ کاریِ ۰۴:۰۰ و میانگینِ موزون",
+   "fn": "build",
+   "ledger": "kabul",
+   "opts": {
+    "date": "2026-10-14",
+    "clock": {
+     "offsetMinutes": 270,
+     "dayStartMinute": 240
+    },
+    "costing": "mavg"
+   },
+   "expect": {
+    "date": "2026-10-14",
+    "kpis": [
+     {
+      "id": "netSales",
+      "title": "فروش خالص امروز",
+      "value": 44950,
+      "kind": "money",
+      "delta": {
+       "diff": -29050,
+       "bp": -3926
+      },
+      "trend": "down",
+      "good": false,
+      "deltaText": "-39.3٪ نسبت به دیروز",
+      "period": "امروز",
+      "approximate": false,
+      "target": {
+       "tab": "sales",
+       "span": "today",
+       "dim": "product"
+      }
+     },
+     {
+      "id": "invoices",
+      "title": "فاکتورهای امروز",
+      "value": 3,
+      "kind": "count",
+      "delta": {
+       "diff": 1,
+       "bp": 5000
+      },
+      "trend": "up",
+      "good": true,
+      "deltaText": "+50٪ نسبت به دیروز",
+      "period": "امروز",
+      "approximate": false,
+      "target": {
+       "tab": "sales",
+       "span": "today",
+       "dim": "user"
+      }
+     },
+     {
+      "id": "grossProfit",
+      "title": "سود ناخالص امروز (تقریبی)",
+      "value": 19582,
+      "kind": "money",
+      "delta": {
+       "diff": 2819,
+       "bp": 1682
+      },
+      "trend": "up",
+      "good": true,
+      "deltaText": "+16.8٪ نسبت به دیروز",
+      "period": "امروز",
+      "approximate": true,
+      "target": {
+       "tab": "profit",
+       "span": "today",
+       "dim": "product"
+      }
+     },
+     {
+      "id": "avgTicket",
+      "title": "میانگین فاکتور",
+      "value": 19650,
+      "kind": "money",
+      "delta": {
+       "diff": -17350,
+       "bp": -4689
+      },
+      "trend": "down",
+      "good": false,
+      "deltaText": "-46.9٪ نسبت به دیروز",
+      "period": "امروز",
+      "approximate": false,
+      "target": {
+       "tab": "today",
+       "span": "today",
+       "dim": ""
+      }
+     },
+     {
+      "id": "receivable",
+      "title": "طلب از مشتریان",
+      "value": 93000,
+      "kind": "money",
+      "delta": null,
+      "trend": null,
+      "good": null,
+      "deltaText": null,
+      "period": "تا امروز",
+      "approximate": false,
+      "target": {
+       "tab": "debts",
+       "span": "all",
+       "dim": ""
+      }
+     }
+    ],
+    "pills": [
+     {
+      "id": "profit",
+      "text": "سود تقریبی",
+      "tone": "warning",
+      "target": {
+       "tab": "profit",
+       "span": "today",
+       "dim": "product"
+      }
+     },
+     {
+      "id": "cost",
+      "text": "2 قلم بی بهای خرید",
+      "tone": "warning",
+      "target": {
+       "tab": "profit",
+       "span": "today",
+       "dim": "product"
+      }
+     },
+     {
+      "id": "overdue",
+      "text": "1 مشتری با قرض بیش از 90 روز",
+      "tone": "danger",
+      "target": {
+       "tab": "debts",
+       "span": "all",
+       "dim": ""
+      }
+     },
+     {
+      "id": "fraud",
+      "text": "4 رویداد حساس امروز",
+      "tone": "warning",
+      "target": {
+       "tab": "fraud",
+       "span": "today",
+       "dim": ""
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "خانهٔ شاگرد — سود و بها پنهان، نه صفر",
+   "fn": "build",
+   "ledger": "kabul",
+   "opts": {
+    "date": "2026-10-14",
+    "money": false
+   },
+   "expect": {
+    "date": "2026-10-14",
+    "kpis": [
+     {
+      "id": "netSales",
+      "title": "فروش خالص امروز",
+      "value": 48950,
+      "kind": "money",
+      "delta": {
+       "diff": -21050,
+       "bp": -3007
+      },
+      "trend": "down",
+      "good": false,
+      "deltaText": "-30.1٪ نسبت به دیروز",
+      "period": "امروز",
+      "approximate": false,
+      "target": {
+       "tab": "sales",
+       "span": "today",
+       "dim": "product"
+      }
+     },
+     {
+      "id": "invoices",
+      "title": "فاکتورهای امروز",
+      "value": 4,
+      "kind": "count",
+      "delta": {
+       "diff": 3,
+       "bp": 30000
+      },
+      "trend": "up",
+      "good": true,
+      "deltaText": "+300٪ نسبت به دیروز",
+      "period": "امروز",
+      "approximate": false,
+      "target": {
+       "tab": "sales",
+       "span": "today",
+       "dim": "user"
+      }
+     },
+     {
+      "id": "avgTicket",
+      "title": "میانگین فاکتور",
+      "value": 15738,
+      "kind": "money",
+      "delta": {
+       "diff": -54262,
+       "bp": -7752
+      },
+      "trend": "down",
+      "good": false,
+      "deltaText": "-77.5٪ نسبت به دیروز",
+      "period": "امروز",
+      "approximate": false,
+      "target": {
+       "tab": "today",
+       "span": "today",
+       "dim": ""
+      }
+     },
+     {
+      "id": "receivable",
+      "title": "طلب از مشتریان",
+      "value": 93000,
+      "kind": "money",
+      "delta": null,
+      "trend": null,
+      "good": null,
+      "deltaText": null,
+      "period": "تا امروز",
+      "approximate": false,
+      "target": {
+       "tab": "debts",
+       "span": "all",
+       "dim": ""
+      }
+     }
+    ],
+    "pills": [
+     {
+      "id": "overdue",
+      "text": "1 مشتری با قرض بیش از 90 روز",
+      "tone": "danger",
+      "target": {
+       "tab": "debts",
+       "span": "all",
+       "dim": ""
+      }
+     },
+     {
+      "id": "fraud",
+      "text": "3 رویداد حساس امروز",
+      "tone": "warning",
+      "target": {
+       "tab": "fraud",
+       "span": "today",
+       "dim": ""
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "خانه با D-23 ثبت‌شده (costApproved) — دیروز",
+   "fn": "build",
+   "ledger": "kabul",
+   "opts": {
+    "date": "2026-10-13",
+    "costing": "mavg",
+    "costApproved": true
+   },
+   "expect": {
+    "date": "2026-10-13",
+    "kpis": [
+     {
+      "id": "netSales",
+      "title": "فروش خالص امروز",
+      "value": 70000,
+      "kind": "money",
+      "delta": {
+       "diff": 70000,
+       "bp": null
+      },
+      "trend": "up",
+      "good": true,
+      "deltaText": "دیروز صفر یا منفی بود",
+      "period": "امروز",
+      "approximate": false,
+      "target": {
+       "tab": "sales",
+       "span": "today",
+       "dim": "product"
+      }
+     },
+     {
+      "id": "invoices",
+      "title": "فاکتورهای امروز",
+      "value": 1,
+      "kind": "count",
+      "delta": {
+       "diff": 1,
+       "bp": null
+      },
+      "trend": "up",
+      "good": true,
+      "deltaText": "دیروز صفر یا منفی بود",
+      "period": "امروز",
+      "approximate": false,
+      "target": {
+       "tab": "sales",
+       "span": "today",
+       "dim": "user"
+      }
+     },
+     {
+      "id": "grossProfit",
+      "title": "سود ناخالص امروز",
+      "value": 15263,
+      "kind": "money",
+      "delta": {
+       "diff": 15263,
+       "bp": null
+      },
+      "trend": "up",
+      "good": true,
+      "deltaText": "دیروز صفر یا منفی بود",
+      "period": "امروز",
+      "approximate": false,
+      "target": {
+       "tab": "profit",
+       "span": "today",
+       "dim": "product"
+      }
+     },
+     {
+      "id": "avgTicket",
+      "title": "میانگین فاکتور",
+      "value": 70000,
+      "kind": "money",
+      "delta": {
+       "diff": 70000,
+       "bp": null
+      },
+      "trend": "up",
+      "good": true,
+      "deltaText": "دیروز صفر یا منفی بود",
+      "period": "امروز",
+      "approximate": false,
+      "target": {
+       "tab": "today",
+       "span": "today",
+       "dim": ""
+      }
+     },
+     {
+      "id": "receivable",
+      "title": "طلب از مشتریان",
+      "value": 89000,
+      "kind": "money",
+      "delta": null,
+      "trend": null,
+      "good": null,
+      "deltaText": null,
+      "period": "تا امروز",
+      "approximate": false,
+      "target": {
+       "tab": "debts",
+       "span": "all",
+       "dim": ""
+      }
+     }
+    ],
+    "pills": [
+     {
+      "id": "profit",
+      "text": "سود قطعی",
+      "tone": "success",
+      "target": {
+       "tab": "profit",
+       "span": "today",
+       "dim": "product"
+      }
+     },
+     {
+      "id": "overdue",
+      "text": "1 مشتری با قرض بیش از 90 روز",
+      "tone": "danger",
+      "target": {
+       "tab": "debts",
+       "span": "all",
+       "dim": ""
+      }
+     },
+     {
+      "id": "fraud",
+      "text": "1 رویداد حساس امروز",
+      "tone": "warning",
+      "target": {
+       "tab": "fraud",
+       "span": "today",
+       "dim": ""
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "دفترِ خالی — هیچ عددِ ساختگی",
+   "fn": "build",
+   "ledger": "empty",
+   "opts": {
+    "date": "2026-10-14"
+   },
+   "expect": {
+    "date": "2026-10-14",
+    "kpis": [
+     {
+      "id": "netSales",
+      "title": "فروش خالص امروز",
+      "value": 0,
+      "kind": "money",
+      "delta": {
+       "diff": 0,
+       "bp": null
+      },
+      "trend": "flat",
+      "good": false,
+      "deltaText": "بی تغییر نسبت به دیروز",
+      "period": "امروز",
+      "approximate": false,
+      "target": {
+       "tab": "sales",
+       "span": "today",
+       "dim": "product"
+      }
+     },
+     {
+      "id": "invoices",
+      "title": "فاکتورهای امروز",
+      "value": 0,
+      "kind": "count",
+      "delta": {
+       "diff": 0,
+       "bp": null
+      },
+      "trend": "flat",
+      "good": false,
+      "deltaText": "بی تغییر نسبت به دیروز",
+      "period": "امروز",
+      "approximate": false,
+      "target": {
+       "tab": "sales",
+       "span": "today",
+       "dim": "user"
+      }
+     },
+     {
+      "id": "grossProfit",
+      "title": "سود ناخالص امروز (تقریبی)",
+      "value": 0,
+      "kind": "money",
+      "delta": {
+       "diff": 0,
+       "bp": null
+      },
+      "trend": "flat",
+      "good": false,
+      "deltaText": "بی تغییر نسبت به دیروز",
+      "period": "امروز",
+      "approximate": true,
+      "target": {
+       "tab": "profit",
+       "span": "today",
+       "dim": "product"
+      }
+     },
+     {
+      "id": "avgTicket",
+      "title": "میانگین فاکتور",
+      "value": 0,
+      "kind": "money",
+      "delta": {
+       "diff": 0,
+       "bp": null
+      },
+      "trend": "flat",
+      "good": false,
+      "deltaText": "بی تغییر نسبت به دیروز",
+      "period": "امروز",
+      "approximate": false,
+      "target": {
+       "tab": "today",
+       "span": "today",
+       "dim": ""
+      }
+     },
+     {
+      "id": "receivable",
+      "title": "طلب از مشتریان",
+      "value": 0,
+      "kind": "money",
+      "delta": null,
+      "trend": null,
+      "good": null,
+      "deltaText": null,
+      "period": "تا امروز",
+      "approximate": false,
+      "target": {
+       "tab": "debts",
+       "span": "all",
+       "dim": ""
+      }
+     }
+    ],
+    "pills": [
+     {
+      "id": "profit",
+      "text": "سود تقریبی",
+      "tone": "warning",
+      "target": {
+       "tab": "profit",
+       "span": "today",
+       "dim": "product"
+      }
+     },
+     {
+      "id": "overdue",
+      "text": "قرض بیش از 90 روز نیست",
+      "tone": "success",
+      "target": {
+       "tab": "debts",
+       "span": "all",
+       "dim": ""
+      }
+     },
+     {
+      "id": "fraud",
+      "text": "رویداد حساسی امروز نیست",
+      "tone": "success",
+      "target": {
+       "tab": "fraud",
+       "span": "today",
+       "dim": ""
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "درصد از بیسیس‌پوینت",
+   "fn": "pct",
+   "input": [
+    null,
+    0,
+    4,
+    5,
+    1250,
+    -1250,
+    1234,
+    -1235,
+    10000,
+    30000,
+    -3007,
+    99,
+    95,
+    94
+   ],
+   "expect": [
+    null,
+    "0٪",
+    "0٪",
+    "+0.1٪",
+    "+12.5٪",
+    "-12.5٪",
+    "+12.3٪",
+    "-12.4٪",
+    "+100٪",
+    "+300٪",
+    "-30.1٪",
+    "+1٪",
+    "+1٪",
+    "+0.9٪"
+   ]
+  },
+  {
+   "name": "بازه‌ها از ۱۴ مهر (۲۰۲۶-۱۰-۱۴) و ۱ مارس",
+   "fn": "range",
+   "input": [
+    "today",
+    "week",
+    "month",
+    "all",
+    "x"
+   ],
+   "today": [
+    "2026-10-14",
+    "2026-03-01"
+   ],
+   "expect": [
+    [
+     {
+      "from": "2026-10-14",
+      "to": "2026-10-14"
+     },
+     {
+      "from": "2026-10-08",
+      "to": "2026-10-14"
+     },
+     {
+      "from": "2026-10-01",
+      "to": "2026-10-14"
+     },
+     {
+      "from": "0000-01-01",
+      "to": "9999-12-31"
+     },
+     {
+      "from": "2026-10-14",
+      "to": "2026-10-14"
+     }
+    ],
+    [
+     {
+      "from": "2026-03-01",
+      "to": "2026-03-01"
+     },
+     {
+      "from": "2026-02-23",
+      "to": "2026-03-01"
+     },
+     {
+      "from": "2026-03-01",
+      "to": "2026-03-01"
+     },
+     {
+      "from": "0000-01-01",
+      "to": "9999-12-31"
+     },
+     {
+      "from": "2026-03-01",
+      "to": "2026-03-01"
+     }
+    ]
+   ]
+  },
+  {
+   "name": "مرتب‌سازیِ جدولِ فروشِ کالا، ستونِ 0 صعودی",
+   "fn": "sortRows",
+   "rows": [
+    [
+     "چای سبز",
+     4,
+     5500,
+     112500,
+     3982,
+     108518,
+     29000,
+     79518,
+     68500,
+     11018,
+     1386
+    ],
+    [
+     "قند",
+     2,
+     7000,
+     42000,
+     2524,
+     39476,
+     0,
+     39476,
+     28000,
+     11476,
+     2907
+    ],
+    [
+     "قلم آزاد",
+     2,
+     1000,
+     11000,
+     44,
+     10956,
+     0,
+     10956,
+     0,
+     10956,
+     10000
+    ],
+    [
+     "صابون",
+     1,
+     1000,
+     4000,
+     0,
+     4000,
+     0,
+     4000,
+     2500,
+     1500,
+     3750
+    ]
+   ],
+   "col": 0,
+   "desc": false,
+   "expect": [
+    [
+     "صابون",
+     1,
+     1000,
+     4000,
+     0,
+     4000,
+     0,
+     4000,
+     2500,
+     1500,
+     3750
+    ],
+    [
+     "قلم آزاد",
+     2,
+     1000,
+     11000,
+     44,
+     10956,
+     0,
+     10956,
+     0,
+     10956,
+     10000
+    ],
+    [
+     "قند",
+     2,
+     7000,
+     42000,
+     2524,
+     39476,
+     0,
+     39476,
+     28000,
+     11476,
+     2907
+    ],
+    [
+     "چای سبز",
+     4,
+     5500,
+     112500,
+     3982,
+     108518,
+     29000,
+     79518,
+     68500,
+     11018,
+     1386
+    ]
+   ]
+  },
+  {
+   "name": "مرتب‌سازیِ جدولِ فروشِ کالا، ستونِ 7 نزولی",
+   "fn": "sortRows",
+   "rows": [
+    [
+     "چای سبز",
+     4,
+     5500,
+     112500,
+     3982,
+     108518,
+     29000,
+     79518,
+     68500,
+     11018,
+     1386
+    ],
+    [
+     "قند",
+     2,
+     7000,
+     42000,
+     2524,
+     39476,
+     0,
+     39476,
+     28000,
+     11476,
+     2907
+    ],
+    [
+     "قلم آزاد",
+     2,
+     1000,
+     11000,
+     44,
+     10956,
+     0,
+     10956,
+     0,
+     10956,
+     10000
+    ],
+    [
+     "صابون",
+     1,
+     1000,
+     4000,
+     0,
+     4000,
+     0,
+     4000,
+     2500,
+     1500,
+     3750
+    ]
+   ],
+   "col": 7,
+   "desc": true,
+   "expect": [
+    [
+     "چای سبز",
+     4,
+     5500,
+     112500,
+     3982,
+     108518,
+     29000,
+     79518,
+     68500,
+     11018,
+     1386
+    ],
+    [
+     "قند",
+     2,
+     7000,
+     42000,
+     2524,
+     39476,
+     0,
+     39476,
+     28000,
+     11476,
+     2907
+    ],
+    [
+     "قلم آزاد",
+     2,
+     1000,
+     11000,
+     44,
+     10956,
+     0,
+     10956,
+     0,
+     10956,
+     10000
+    ],
+    [
+     "صابون",
+     1,
+     1000,
+     4000,
+     0,
+     4000,
+     0,
+     4000,
+     2500,
+     1500,
+     3750
+    ]
+   ]
+  },
+  {
+   "name": "مرتب‌سازیِ جدولِ فروشِ کالا، ستونِ 7 صعودی",
+   "fn": "sortRows",
+   "rows": [
+    [
+     "چای سبز",
+     4,
+     5500,
+     112500,
+     3982,
+     108518,
+     29000,
+     79518,
+     68500,
+     11018,
+     1386
+    ],
+    [
+     "قند",
+     2,
+     7000,
+     42000,
+     2524,
+     39476,
+     0,
+     39476,
+     28000,
+     11476,
+     2907
+    ],
+    [
+     "قلم آزاد",
+     2,
+     1000,
+     11000,
+     44,
+     10956,
+     0,
+     10956,
+     0,
+     10956,
+     10000
+    ],
+    [
+     "صابون",
+     1,
+     1000,
+     4000,
+     0,
+     4000,
+     0,
+     4000,
+     2500,
+     1500,
+     3750
+    ]
+   ],
+   "col": 7,
+   "desc": false,
+   "expect": [
+    [
+     "صابون",
+     1,
+     1000,
+     4000,
+     0,
+     4000,
+     0,
+     4000,
+     2500,
+     1500,
+     3750
+    ],
+    [
+     "قلم آزاد",
+     2,
+     1000,
+     11000,
+     44,
+     10956,
+     0,
+     10956,
+     0,
+     10956,
+     10000
+    ],
+    [
+     "قند",
+     2,
+     7000,
+     42000,
+     2524,
+     39476,
+     0,
+     39476,
+     28000,
+     11476,
+     2907
+    ],
+    [
+     "چای سبز",
+     4,
+     5500,
+     112500,
+     3982,
+     108518,
+     29000,
+     79518,
+     68500,
+     11018,
+     1386
+    ]
+   ]
+  },
+  {
+   "name": "مرتب‌سازیِ جدولِ فروشِ کالا، ستونِ 10 نزولی",
+   "fn": "sortRows",
+   "rows": [
+    [
+     "چای سبز",
+     4,
+     5500,
+     112500,
+     3982,
+     108518,
+     29000,
+     79518,
+     68500,
+     11018,
+     1386
+    ],
+    [
+     "قند",
+     2,
+     7000,
+     42000,
+     2524,
+     39476,
+     0,
+     39476,
+     28000,
+     11476,
+     2907
+    ],
+    [
+     "قلم آزاد",
+     2,
+     1000,
+     11000,
+     44,
+     10956,
+     0,
+     10956,
+     0,
+     10956,
+     10000
+    ],
+    [
+     "صابون",
+     1,
+     1000,
+     4000,
+     0,
+     4000,
+     0,
+     4000,
+     2500,
+     1500,
+     3750
+    ]
+   ],
+   "col": 10,
+   "desc": true,
+   "expect": [
+    [
+     "قلم آزاد",
+     2,
+     1000,
+     11000,
+     44,
+     10956,
+     0,
+     10956,
+     0,
+     10956,
+     10000
+    ],
+    [
+     "صابون",
+     1,
+     1000,
+     4000,
+     0,
+     4000,
+     0,
+     4000,
+     2500,
+     1500,
+     3750
+    ],
+    [
+     "قند",
+     2,
+     7000,
+     42000,
+     2524,
+     39476,
+     0,
+     39476,
+     28000,
+     11476,
+     2907
+    ],
+    [
+     "چای سبز",
+     4,
+     5500,
+     112500,
+     3982,
+     108518,
+     29000,
+     79518,
+     68500,
+     11018,
+     1386
+    ]
+   ]
+  },
+  {
+   "name": "مرتب‌سازیِ جدولِ فروشِ کالا، ستونِ 10 صعودی",
+   "fn": "sortRows",
+   "rows": [
+    [
+     "چای سبز",
+     4,
+     5500,
+     112500,
+     3982,
+     108518,
+     29000,
+     79518,
+     68500,
+     11018,
+     1386
+    ],
+    [
+     "قند",
+     2,
+     7000,
+     42000,
+     2524,
+     39476,
+     0,
+     39476,
+     28000,
+     11476,
+     2907
+    ],
+    [
+     "قلم آزاد",
+     2,
+     1000,
+     11000,
+     44,
+     10956,
+     0,
+     10956,
+     0,
+     10956,
+     10000
+    ],
+    [
+     "صابون",
+     1,
+     1000,
+     4000,
+     0,
+     4000,
+     0,
+     4000,
+     2500,
+     1500,
+     3750
+    ]
+   ],
+   "col": 10,
+   "desc": false,
+   "expect": [
+    [
+     "چای سبز",
+     4,
+     5500,
+     112500,
+     3982,
+     108518,
+     29000,
+     79518,
+     68500,
+     11018,
+     1386
+    ],
+    [
+     "قند",
+     2,
+     7000,
+     42000,
+     2524,
+     39476,
+     0,
+     39476,
+     28000,
+     11476,
+     2907
+    ],
+    [
+     "صابون",
+     1,
+     1000,
+     4000,
+     0,
+     4000,
+     0,
+     4000,
+     2500,
+     1500,
+     3750
+    ],
+    [
+     "قلم آزاد",
+     2,
+     1000,
+     11000,
+     44,
+     10956,
+     0,
+     10956,
+     0,
+     10956,
+     10000
+    ]
+   ]
+  },
+  {
+   "name": "مرتب‌سازی با خانهٔ خالی (همیشه آخر) و پرچم، ستونِ 1 صعودی",
+   "fn": "sortRows",
+   "rows": [
+    [
+     "الف",
+     null,
+     true
+    ],
+    [
+     "ب",
+     3,
+     false
+    ],
+    [
+     "پ",
+     null,
+     true
+    ],
+    [
+     "ت",
+     1,
+     false
+    ],
+    [
+     "ث",
+     3,
+     true
+    ]
+   ],
+   "col": 1,
+   "desc": false,
+   "expect": [
+    [
+     "ت",
+     1,
+     false
+    ],
+    [
+     "ب",
+     3,
+     false
+    ],
+    [
+     "ث",
+     3,
+     true
+    ],
+    [
+     "الف",
+     null,
+     true
+    ],
+    [
+     "پ",
+     null,
+     true
+    ]
+   ]
+  },
+  {
+   "name": "مرتب‌سازی با خانهٔ خالی (همیشه آخر) و پرچم، ستونِ 1 نزولی",
+   "fn": "sortRows",
+   "rows": [
+    [
+     "الف",
+     null,
+     true
+    ],
+    [
+     "ب",
+     3,
+     false
+    ],
+    [
+     "پ",
+     null,
+     true
+    ],
+    [
+     "ت",
+     1,
+     false
+    ],
+    [
+     "ث",
+     3,
+     true
+    ]
+   ],
+   "col": 1,
+   "desc": true,
+   "expect": [
+    [
+     "ب",
+     3,
+     false
+    ],
+    [
+     "ث",
+     3,
+     true
+    ],
+    [
+     "ت",
+     1,
+     false
+    ],
+    [
+     "الف",
+     null,
+     true
+    ],
+    [
+     "پ",
+     null,
+     true
+    ]
+   ]
+  },
+  {
+   "name": "مرتب‌سازی با خانهٔ خالی (همیشه آخر) و پرچم، ستونِ 2 صعودی",
+   "fn": "sortRows",
+   "rows": [
+    [
+     "الف",
+     null,
+     true
+    ],
+    [
+     "ب",
+     3,
+     false
+    ],
+    [
+     "پ",
+     null,
+     true
+    ],
+    [
+     "ت",
+     1,
+     false
+    ],
+    [
+     "ث",
+     3,
+     true
+    ]
+   ],
+   "col": 2,
+   "desc": false,
+   "expect": [
+    [
+     "ب",
+     3,
+     false
+    ],
+    [
+     "ت",
+     1,
+     false
+    ],
+    [
+     "الف",
+     null,
+     true
+    ],
+    [
+     "پ",
+     null,
+     true
+    ],
+    [
+     "ث",
+     3,
+     true
+    ]
+   ]
+  }
+ ]
+}
