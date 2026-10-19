@@ -295,7 +295,7 @@ fun ProductTable(
       verticalAlignment = Alignment.CenterVertically,
     ) {
       Text("کالا", Modifier.weight(1f), style = head, color = c.muted)
-      Text("کد", Modifier.width(130.dp), style = head, color = c.muted)
+      Text("کد", Modifier.width(112.dp), style = head, color = c.muted)
       Text("قیمت", Modifier.width(110.dp), style = head, color = c.muted, textAlign = TextAlign.End)
       Spacer(Modifier.width(16.dp))
       Text("موجودی", Modifier.width(130.dp), style = head, color = c.muted)
@@ -320,10 +320,10 @@ fun ProductTable(
           ProductThumb(p.id, p.name, 32.dp, showPhotos, tintKey = p.category)
           Spacer(Modifier.width(10.dp))
           Column(Modifier.weight(1f)) {
-            Text(p.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(p.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = c.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
             if (p.category.isNotBlank()) Text(p.category, style = MaterialTheme.typography.labelSmall, color = c.muted, maxLines = 1)
           }
-          Text(p.barcodes.firstOrNull().orEmpty(), Modifier.width(130.dp), style = MaterialTheme.typography.bodySmall.tabular(), color = c.muted, maxLines = 1)
+          Text(p.barcodes.firstOrNull().orEmpty(), Modifier.width(112.dp), style = MaterialTheme.typography.bodySmall.tabular(), color = c.muted, maxLines = 1)
           Text("${money(p.salePrice)} ؋", Modifier.width(110.dp), style = MaterialTheme.typography.bodyMedium.tabular(), fontWeight = FontWeight.SemiBold, color = c.text, textAlign = TextAlign.End, maxLines = 1)
           Spacer(Modifier.width(16.dp))
           StockLine(cb.stockOf(p.id), p.minStock, p.unit, Modifier.width(130.dp))
