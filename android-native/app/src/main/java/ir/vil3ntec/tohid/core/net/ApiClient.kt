@@ -80,6 +80,27 @@ class ApiClient(
   )
 
   /**
+   *  فرستادنِ فایل با PUT — نسخهٔ کوچکِ عکس در بانکِ تصاویر. سرور برای همان
+   *  بایت‌ها همان پاسخ را می‌دهد (یک‌بارنویس)، پس تکرار بی‌خطر است.
+   */
+  suspend fun putBytes(
+    path: String,
+    bytes: ByteArray,
+    contentType: String = "application/octet-stream",
+  ): JsonObject = authorized("PUT", path, null, idempotent = true, raw = RawBody(bytes, contentType))
+
+  /** خواندنِ یک فایل (نه JSON) با همان نشست و همان تازه‌سازیِ توکن */
+  suspend fun getBytes(path: String): ByteArray {
+    val token = tokens.accessToken ?: throw ApiFailure.SessionExpired()
+    return try {
+      engine.sendForBytes("GET", path, token)
+    } catch (failure: ApiFailure) {
+      if (failure !is ApiFailure.SessionExpired) throw failure
+      engine.sendForBytes("GET", path, renew(usedToken = token))
+    }
+  }
+
+  /**
    *  درخواست با توکن — و اگر توکن پیر بود، یک بار تازه‌سازی و تکرار.
    *
    *  «یک بار» عمدی است: اگر بعد از توکنِ تازه هم ۴۰۱ آمد، مشکل از پیریِ
