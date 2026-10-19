@@ -85,26 +85,27 @@ internal val PhoneV3Colors.pressed: Color get() = lerp(card, bg, 0.9f)
  */
 internal fun Modifier.frosted(c: PhoneV3Colors): Modifier = drawBehind {
   val dark = c.bg.red < 0.3f
-  val base = if (dark) c.bg else lerp(c.bg, c.inkMuted, 0.10f)
+  //  r4: خاکستریِ میانه با سایه‌روشنِ نرم — لبه‌ها و پایین تیره‌تر، پشتِ عکس و کارت روشن
+  val base = if (dark) c.bg else lerp(c.bg, c.inkMuted, 0.20f)
   drawRect(base)
   val w = size.width
   val h = size.height
   drawRect(
     Brush.radialGradient(
-      listOf(c.card.copy(alpha = if (dark) 0.55f else 0.95f), c.card.copy(alpha = 0f)),
-      center = Offset(w * 0.18f, h * 0.30f), radius = w * 0.85f,
+      listOf(c.card.copy(alpha = if (dark) 0.50f else 0.92f), c.card.copy(alpha = 0f)),
+      center = Offset(w * 0.40f, h * 0.22f), radius = w * 0.95f,
     ),
   )
   drawRect(
     Brush.radialGradient(
-      listOf(c.tile.copy(alpha = if (dark) 0.9f else 0.85f), c.tile.copy(alpha = 0f)),
-      center = Offset(w * 0.95f, h * 0.62f), radius = w * 0.75f,
+      listOf(c.tile.copy(alpha = if (dark) 0.9f else 0.80f), c.tile.copy(alpha = 0f)),
+      center = Offset(w * 0.10f, h * 0.70f), radius = w * 0.70f,
     ),
   )
   drawRect(
     Brush.radialGradient(
-      listOf(lerp(base, c.inkMuted, if (dark) 0.08f else 0.22f), base.copy(alpha = 0f)),
-      center = Offset(w * 1.0f, h * 1.0f), radius = w * 0.8f,
+      listOf(lerp(base, c.inkMuted, if (dark) 0.08f else 0.30f), base.copy(alpha = 0f)),
+      center = Offset(w * 1.0f, h * 0.85f), radius = w * 0.75f,
     ),
   )
 }
@@ -199,7 +200,7 @@ internal fun V3BackButton(onClick: () -> Unit) {
   val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
   V3RoundButton(
     if (rtl) Icons.Outlined.ChevronRight else Icons.Outlined.ChevronLeft,
-    "بازگشت", size = 40.dp, iconSize = 24.dp, onClick = onClick,
+    "بازگشت", size = 44.dp, iconSize = 24.dp, onClick = onClick,
   )
 }
 
@@ -207,7 +208,7 @@ internal fun V3BackButton(onClick: () -> Unit) {
 @Composable
 internal fun V3Header(title: String, onBack: (() -> Unit)?, modifier: Modifier = Modifier) {
   val c = PhoneV3.colors
-  Box(modifier.fillMaxWidth().height(60.dp).padding(horizontal = 16.dp), contentAlignment = Alignment.Center) {
+  Box(modifier.fillMaxWidth().height(60.dp).padding(horizontal = 18.dp), contentAlignment = Alignment.Center) {
     if (onBack != null) Box(Modifier.align(Alignment.CenterStart)) { V3BackButton(onBack) }
     Text(
       title,
@@ -241,14 +242,18 @@ internal fun V3LargeHeader(title: String, trailing: (@Composable () -> Unit)? = 
   }
 }
 
-/** سرخطِ خاکستریِ گروه، بیرونِ کارت (r5) */
+/**
+ *  سرخطِ گروه، بیرونِ کارت (r5): درشت و پُررنگ مثلِ «Security»ِ مرجع، با رنگِ
+ *  خاکستریِ تیره (میانِ متن و متنِ کم‌رنگ) تا از نامِ ردیف‌ها جدا خوانده شود.
+ */
 @Composable
 internal fun V3GroupTitle(text: String, modifier: Modifier = Modifier) {
+  val c = PhoneV3.colors
   Text(
     text,
-    style = v3Text(14, FontWeight.SemiBold, 20),
-    color = PhoneV3.colors.inkMuted,
-    modifier = modifier.padding(start = 6.dp, end = 6.dp, bottom = 8.dp).semantics { heading() },
+    style = v3Text(16, FontWeight.Bold, 22),
+    color = lerp(c.ink, c.inkMuted, 0.3f),
+    modifier = modifier.padding(start = 4.dp, end = 4.dp, bottom = 9.dp).semantics { heading() },
   )
 }
 
@@ -257,7 +262,7 @@ internal fun V3GroupTitle(text: String, modifier: Modifier = Modifier) {
 internal fun V3Card(
   modifier: Modifier = Modifier,
   radius: Dp = PhoneV3.groupRadius,
-  padding: PaddingValues = PaddingValues(vertical = 6.dp),
+  padding: PaddingValues = PaddingValues(vertical = 8.dp),
   content: @Composable ColumnScope.() -> Unit,
 ) {
   Column(
@@ -303,7 +308,7 @@ internal fun V3Row(
     if (icon != null) {
       if (tile) {
         Box(
-          Modifier.size(38.dp).clip(RoundedCornerShape(11.dp)).background(c.iconTile),
+          Modifier.size(40.dp).clip(RoundedCornerShape(11.dp)).background(c.iconTile),
           contentAlignment = Alignment.Center,
         ) { Icon(icon, contentDescription = null, tint = if (danger) c.negative else c.icon, modifier = Modifier.size(21.dp)) }
         Spacer(Modifier.width(12.dp))
@@ -335,9 +340,10 @@ internal fun V3Row(
         Spacer(Modifier.width(4.dp))
         //  فلشِ «جلو»: در راست‌به‌چپ رو به چپ (سمتِ پایان)
         val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+        //  r5: فلشِ خاکستریِ کم‌رنگ؛ فهرستِ r4: فلشِ تیره
         Icon(
           if (rtl) Icons.Outlined.ChevronLeft else Icons.Outlined.ChevronRight,
-          contentDescription = null, tint = c.chevron, modifier = Modifier.size(22.dp),
+          contentDescription = null, tint = if (tile) c.chevron else c.icon, modifier = Modifier.size(22.dp),
         )
       }
     }

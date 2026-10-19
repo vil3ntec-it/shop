@@ -194,7 +194,7 @@ fun SettingsGroup(
     Column(modifier, content = content)
     return
   }
-  Column(modifier.fillMaxWidth().padding(top = 18.dp)) {
+  Column(modifier.fillMaxWidth().padding(top = 14.dp)) {
     V3GroupTitle(title)
     V3Card(content = content)
   }

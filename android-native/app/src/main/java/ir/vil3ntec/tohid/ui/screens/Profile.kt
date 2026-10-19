@@ -242,7 +242,6 @@ fun ProfileScreen(
         ProfileEditPage(
           accountId = accountId,
           avatarVersion = avatarVersion,
-          initial = ProfileModel.initial(account),
           name = name,
           onName = { name = it },
           email = email,
@@ -506,7 +505,6 @@ private fun ProfileRoot(
         ProfileAvatar(
           accountId = accountId,
           version = avatarVersion,
-          initial = ProfileModel.initial(account),
           size = avatarSize,
           modifier = Modifier
             .align(Alignment.TopCenter)
@@ -547,7 +545,7 @@ private fun ProfileCard(
       .shadow(18.dp, shape, clip = false, ambientColor = c.ink.copy(alpha = 0.10f), spotColor = c.ink.copy(alpha = 0.12f))
       .clip(shape)
       .background(c.cardGlass)
-      .padding(start = 22.dp, end = 22.dp, top = 24.dp, bottom = 22.dp),
+      .padding(start = 24.dp, end = 24.dp, top = 24.dp, bottom = 24.dp),
   ) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
       Column(Modifier.weight(1f)) {
@@ -637,8 +635,9 @@ private fun StatBox(label: String, count: Int, modifier: Modifier = Modifier) {
 private fun PlanBanner(b: ProfileModel.Banner, modifier: Modifier = Modifier, onClick: () -> Unit) {
   val c = PhoneV3.colors
   val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
-  val light = lerp(c.black, c.onBlackMuted, 0.62f)
-  val stops = if (rtl) listOf(c.black, c.black, light) else listOf(light, c.black, c.black)
+  //  r4: خاکستریِ میانه در یک سر، سیاه در سرِ دیگر — شیبِ یکنواخت
+  val light = lerp(c.black, c.onBlackMuted, 0.72f)
+  val stops = if (rtl) listOf(c.black, lerp(c.black, light, 0.35f), light) else listOf(light, lerp(c.black, light, 0.35f), c.black)
   Row(
     modifier
       .fillMaxWidth()
@@ -707,11 +706,11 @@ private fun menuIcon(id: String): ImageVector = when (id) {
 }
 
 /**
- *  عکسِ حساب در حلقهٔ سفید؛ بی‌عکس، حرفِ اولِ نام روی دایرهٔ خاکستریِ نرم، و
- *  «مهمان» آدمکِ خطی.
+ *  عکسِ حساب در حلقهٔ سفید؛ بی‌عکس، آدمکِ خطیِ تک‌رنگ روی دایرهٔ خاکستریِ نرم
+ *  (بندِ F: «عکسِ کاربر یا نشانِ تک‌رنگِ آدمک»).
  */
 @Composable
-private fun ProfileAvatar(accountId: String, version: Int, initial: String?, size: Dp, modifier: Modifier = Modifier) {
+private fun ProfileAvatar(accountId: String, version: Int, size: Dp, modifier: Modifier = Modifier) {
   val context = LocalContext.current
   val c = PhoneV3.colors
   var bitmap by remember(accountId, version) { mutableStateOf<android.graphics.Bitmap?>(null) }
@@ -738,7 +737,6 @@ private fun ProfileAvatar(accountId: String, version: Int, initial: String?, siz
         contentScale = ContentScale.Crop,
         modifier = Modifier.fillMaxSize(),
       )
-      initial != null -> Text(initial, style = v3Text(46, FontWeight.Bold, 56), color = c.inkMuted)
       else -> Icon(Icons.Outlined.Person, contentDescription = null, tint = c.inkMuted, modifier = Modifier.size(size * 0.46f))
     }
   }
@@ -750,7 +748,6 @@ private fun ProfileAvatar(accountId: String, version: Int, initial: String?, siz
 private fun ProfileEditPage(
   accountId: String,
   avatarVersion: Int,
-  initial: String?,
   name: String,
   onName: (String) -> Unit,
   email: String,
@@ -786,7 +783,7 @@ private fun ProfileEditPage(
         Spacer(Modifier.height(8.dp))
         V3Card(padding = PaddingValues(14.dp)) {
           Row(verticalAlignment = Alignment.CenterVertically) {
-            ProfileAvatar(accountId, avatarVersion, initial, 64.dp)
+            ProfileAvatar(accountId, avatarVersion, 64.dp)
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
               Text("عکسِ حساب", style = v3Text(15, FontWeight.SemiBold, 22), color = c.ink)

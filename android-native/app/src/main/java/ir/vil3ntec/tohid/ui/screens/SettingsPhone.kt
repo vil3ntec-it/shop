@@ -82,7 +82,8 @@ internal fun PhoneSettingsFrame(onBack: (() -> Unit)?, body: LazyListScope.() ->
           LazyColumn(
             Modifier.weight(1f).fillMaxWidth(),
             state = if (d == null) rootList else rememberLazyListState(),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = if (d == null) 0.dp else 8.dp, bottom = 32.dp),
+            //  r5: کارت‌ها ۲۰dp از لبه
+            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = if (d == null) 0.dp else 8.dp, bottom = 32.dp),
             content = body,
           )
         }

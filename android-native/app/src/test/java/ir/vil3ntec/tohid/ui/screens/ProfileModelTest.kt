@@ -61,22 +61,19 @@ class ProfileModelTest {
   private val guest = ProfileModel.Account(signedIn = false, name = "نامِ کهنهٔ روی گوشی", email = "x@y.af", phone = "0799", role = "staff")
 
   @Test
-  fun `واردشده — نام، شماره پیش از ایمیل، نشانِ نقش، حرفِ اول`() {
+  fun `واردشده — نام، شماره پیش از ایمیل، نشانِ نقش`() {
     assertEquals("احمد ولی‌زاده", ProfileModel.displayName(owner))
     assertEquals("0700123456", ProfileModel.contact(owner, "دکان"))
     assertEquals("a@b.af", ProfileModel.contact(owner.copy(phone = " "), "دکان"))
     assertEquals("صاحب دکان", ProfileModel.badge(owner))
     assertEquals("فروشنده", ProfileModel.badge(owner.copy(role = "staff")))
-    assertEquals("ا", ProfileModel.initial(owner))
     assertEquals("بی‌نام", ProfileModel.displayName(owner.copy(name = "  ")))
-    assertNull(ProfileModel.initial(owner.copy(name = "")))
   }
 
   @Test
-  fun `مهمان — «مهمان»، بی نشان، بی حرف، خطِ دوم نامِ دکان`() {
+  fun `مهمان — «مهمان»، بی نشان، خطِ دوم نامِ دکان`() {
     assertEquals(ProfileModel.GUEST, ProfileModel.displayName(guest))
     assertNull(ProfileModel.badge(guest))
-    assertNull(ProfileModel.initial(guest))
     assertEquals("دکانِ نمونه", ProfileModel.contact(guest, " دکانِ نمونه "))
     assertEquals("", ProfileModel.contact(guest, ""))
   }

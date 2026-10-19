@@ -95,10 +95,6 @@ object ProfileModel {
   /** نشانِ سیاهِ نقش — فقط برای حسابِ واردشده */
   fun badge(a: Account): String? = if (a.signedIn) roleLabel(a.role) else null
 
-  /** حرفِ اولِ نام برای دایرهٔ بی‌عکس؛ مهمان حرف ندارد (آیکنِ آدمک) */
-  fun initial(a: Account): String? =
-    if (!a.signedIn) null else a.name.trim().firstOrNull { it.isLetterOrDigit() }?.uppercase()
-
   /** کارِ دکمهٔ سفیدِ نوارِ تیره */
   enum class Action { SIGN_IN, RENEW, PLANS }
 

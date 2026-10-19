@@ -25,8 +25,10 @@ class SettingsLayoutTest {
 
   @Test
   fun `هر بخشِ تنظیمات دقیقاً در یک گروه است`() {
+    //  متنِ خام خوانده می‌شود ولی کامپیوتر در ساخت «دوربین بارکدخوان» را «بارکدخوان»
+    //  می‌کند (`phrases`ِ desktop/build.gradle.kts) ⇐ همان را این‌جا هم یکی می‌گیریم
     val found = (sectionTitle.findAll(src("Settings.kt")) + sectionTitle.findAll(src("LocaleSection.kt")))
-      .map { it.groupValues[1] }.toList()
+      .map { it.groupValues[1] }.map { if (it == "دوربین بارکدخوان") SettingsLayout.CAMERA else it }.toList()
     assertTrue("بخشی پیدا نشد — الگوی متن عوض شده؟", found.size >= 10)
     assertEquals("بخشِ تکراری در کد", found.size, found.toSet().size)
     assertEquals(found.toSet(), SettingsLayout.sections.toSet())
@@ -71,7 +73,7 @@ class SettingsLayoutTest {
   @Test
   fun `نامِ کوتاهِ ردیف — کلید عوض نمی‌شود`() {
     assertEquals("پشتیبان و بازگردانی", SettingsLayout.labelOf("داده‌ها"))
-    assertEquals("بارکدخوان", SettingsLayout.labelOf("دوربین بارکدخوان"))
+    assertEquals("بارکدخوان", SettingsLayout.labelOf(SettingsLayout.CAMERA))
     assertEquals("دستگاه‌های وصل", SettingsLayout.labelOf("دستگاه‌های وارد شده"))
     assertEquals("هشدارها", SettingsLayout.labelOf("هشدارها"))
   }

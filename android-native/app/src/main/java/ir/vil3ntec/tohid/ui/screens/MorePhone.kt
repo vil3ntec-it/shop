@@ -82,9 +82,9 @@ fun PhoneMoreScreen(d: ShopData, onOpen: (String) -> Unit) {
           Column(Modifier.widthIn(max = 560.dp).fillMaxWidth()) {
             Spacer(Modifier.height(6.dp))
             V3LargeHeader("بیشتر")
-            Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 32.dp)) {
+            Column(Modifier.padding(start = 20.dp, end = 20.dp, bottom = 32.dp)) {
               groups.forEach { g ->
-                V3GroupTitle(g.title, Modifier.padding(top = 18.dp))
+                V3GroupTitle(g.title, Modifier.padding(top = 14.dp))
                 V3Card {
                   g.items.forEach { item ->
                     V3Row(

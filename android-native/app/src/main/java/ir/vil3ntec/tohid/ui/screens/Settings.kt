@@ -411,7 +411,7 @@ fun SettingsScreen(
         SettingsSection(
           icon = Icons.Filled.Palette,
           title = "ظاهر",
-          subtitle = "روشن، تیره، یا خودکار مثلِ گوشی",
+          subtitle = "روشن، تیره، یا خودکار (مثل گوشی)",
           tint = Shop.colors.primary,
           value = themeLabel(theme),
         ) {

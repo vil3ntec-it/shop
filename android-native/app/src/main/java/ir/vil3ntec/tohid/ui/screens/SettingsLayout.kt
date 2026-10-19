@@ -27,6 +27,12 @@ object SettingsLayout {
   const val DATA = "داده‌ها"
   const val ABOUT = "درباره"
 
+  /**
+   *  بخشِ دوربین. ⚠️ کامپیوتر این عبارت را در ساخت به «بارکدخوان» برمی‌گرداند
+   *  (جدولِ `phrases`ِ `desktop/build.gradle.kts`)؛ آزمون‌ها از همین ثابت می‌خوانند.
+   */
+  const val CAMERA = "دوربین بارکدخوان"
+
   /** پیوند به ویرایشگرِ نوارِ پایین (مسیرش را بخشِ نوار می‌سازد) */
   const val NAV_BAR = "نوار پایین"
   /** پیوند به چاپگرها در صفحهٔ «دستگاه‌های جانبی» */
@@ -42,7 +48,7 @@ object SettingsLayout {
     Group(GENERAL, listOf("هشدارها", "ظاهر", NAV_BAR, "زبان", "تاریخ و رقم")),
     Group(SECURITY, listOf("قفل برنامه", "کد شاگرد", "دستگاه‌های وارد شده", "تغییر رمز حساب")),
     Group(SALES, listOf("کالای منقضی", PRINTER)),
-    Group(DEVICES, listOf("دوربین بارکدخوان")),
+    Group(DEVICES, listOf(CAMERA)),
     Group(DATA, listOf("همگام‌سازی", "داده‌ها")),
     Group(ABOUT, listOf("درباره برنامه")),
   )
@@ -54,7 +60,7 @@ object SettingsLayout {
     "کد شاگرد" to "کدِ شاگرد",
     "دستگاه‌های وارد شده" to "دستگاه‌های وصل",
     "تغییر رمز حساب" to "رمزِ حساب",
-    "دوربین بارکدخوان" to "بارکدخوان",
+    CAMERA to "بارکدخوان",
     "داده‌ها" to "پشتیبان و بازگردانی",
   )
 
@@ -72,7 +78,7 @@ object SettingsLayout {
   fun groupIndex(title: String): Int = GROUPS.indexOfFirst { it.title == title }
 
   /** بخش‌هایی که کامپیوتر عمداً ندارد (دوربینِ گوشی؛ کامپیوتر بارکدخوانِ خودش را دارد) */
-  val DESK_HIDDEN: Set<String> = setOf("دوربین بارکدخوان")
+  val DESK_HIDDEN: Set<String> = setOf(CAMERA)
 
   /**
    *  فهرستِ ستونِ کناریِ تنظیماتِ کامپیوتر: همان‌هایی که `AppRoot` داده، به
