@@ -766,7 +766,7 @@ fun AppRoot(
           }
         "expenses" -> ExpensesScreen(store, data, snackbar)
         "dashboard" -> if (Platform.DESKTOP) DeskDashboardScreen(data, ::open) { id -> openProduct = id; sub = "product" }
-          else DashboardScreen(data, ::open, bottomReserve = navReserve)
+          else DashboardScreen(data, bottomReserve = navReserve, onOpen = ::open)
         //  phone v3 §F: جست‌وجوی کامل (کالا، مشتری، فاکتور، بخش) با بارکد
         ir.vil3ntec.tohid.ui.components.common.PhoneNav.SEARCH -> PhoneSearchScreen(
           d = data,

@@ -73,8 +73,8 @@ private fun todayIso(): String =
 @Composable
 fun DashboardScreen(
   d: ShopData,
-  onOpen: (String) -> Unit = {},
   bottomReserve: androidx.compose.ui.unit.Dp = ir.vil3ntec.tohid.ui.components.common.PhoneNav.RESERVE,
+  onOpen: (String) -> Unit = {},
 ) {
   /*
    *  phone v3 §D: عرضِ گوشی (و تبلت، که همان نوارِ پایینِ گوشی را دارد) خانهٔ تازه را
