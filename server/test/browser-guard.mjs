@@ -21,3 +21,30 @@ export function missingTool(name, install) {
 }
 
 export const PLAYWRIGHT_INSTALL = 'npm i -g playwright@1.56.1 && npx playwright install chromium';
+
+/*
+ *  درخواستِ پس‌زمینه‌ای که از صفحه بیشتر عمر کند (شمارشِ دوره‌ای، pullِ زنده،
+ *  تازه‌سازیِ نشست…) وقتی صفحه/زمینه بسته شد، در گرداننده‌ی `page.route`
+ *  با «Target page, context or browser has been closed» یا «Fetch response
+ *  has been disposed» می‌افتد. این استثنای بی‌صاحب کلِ فرآیندِ آزمون را
+ *  می‌کُشت، حتی وقتی همه‌ی گام‌ها سبز بودند.
+ *
+ *  `closeSafeRoute` فقط **همین** خطا را نادیده می‌گیرد؛ هر خطای دیگرِ
+ *  گرداننده (مثلاً «Route is already handled») مثلِ پیش بالا می‌رود.
+ */
+const CLOSED_TARGET = /Target page, context or browser has been closed|Target closed|Fetch response has been disposed/;
+
+export function isClosedTargetError(err) {
+  return CLOSED_TARGET.test(String((err && err.message) || err || ''));
+}
+
+export function closeSafeRoute(handler) {
+  return async (route, request) => {
+    try {
+      return await handler(route, request);
+    } catch (err) {
+      if (isClosedTargetError(err)) return undefined;
+      throw err;
+    }
+  };
+}
