@@ -86,6 +86,25 @@ class PermCoreTest {
     }
   }
 
+  /** درصدِ تخفیف برای سقف (صدمِ درصد، با بخششِ نیم افغانی) — همان `discountBp`ِ JS */
+  @Test fun discountBp() {
+    for (c in list("discount_bp")) {
+      val d = c.getValue("discount").jsonPrimitive.content.toLong()
+      val t = c.getValue("total").jsonPrimitive.content.toLong()
+      assertEquals(c.toString(), c.getValue("out").jsonPrimitive.content.toLong(), PermCore.discountBp(d, t))
+    }
+  }
+
+  /** «نیازمند تأیید» برای شاگرد پذیرفته است ولی «مجاز» نه (بخشِ ۱۰.۱) */
+  @Test fun staffApproveButNeverAllow() {
+    val approve = listOf(mapOf("sales.discount" to mapOf("mode" to "approve")))
+    assertEquals("approve", PermCore.resolve("staff", approve, "sales.discount").mode)
+    assertEquals(false, PermCore.allows("staff", approve, "sales.discount"))
+    val allow = listOf(mapOf("sales.discount" to mapOf("mode" to "allow")))
+    assertEquals("deny", PermCore.resolve("staff", allow, "sales.discount").mode)
+    assertEquals("not_approvable", PermCore.validate("staff", "settings.write", mapOf("mode" to "approve")))
+  }
+
   /** آزمونِ مرجع: canDiscount / canCancelSale / canSeeMoney / canOpenSettings ِ امروز = !isStaff */
   @Test fun shopRoleCharacterisation() {
     val keys = listOf("sales.discount", "sales.cancel", "reports.money", "settings.write")

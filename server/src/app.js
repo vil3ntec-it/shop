@@ -303,6 +303,8 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/admin/shop-chat', require('./routes/admin-shop-chat'));
     //  کاتالوگ و موجودیِ سرور (v3 §۳۲) — پیش از `/shop`، پشتِ پرچمِ خاموشِ `shop.catalog`
     api.use('/shop/catalog', require('./routes/catalog'));
+    //  اعلانِ سفارش (v3 §۳۰) — پیش از `/shop` به همان دلیلِ `/shop/orders`؛ پیش‌فرض خاموش
+    api.use('/shop/order-notify', require('./routes/order-notify'));
     //  سفارشِ آنلاین (فاز ۴) — پیش از `/shop` تا `requireUser`ِ آن دو بار نرود؛
     //  زیرِ همان پیشوند، پس ACCOUNT_PREFIXESِ پنلِ خانگی دست نمی‌خورد
     api.use('/shop/orders', require('./routes/orders'));
@@ -310,6 +312,10 @@ async function createApp({ runMigrations = true } = {}) {
     //  `/store` — پیشوندِ تازه ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی (دستورالعمل در PR)
     api.use('/shop/storefront', require('./routes/storefront-admin'));
     api.use('/store', require('./routes/storefront'));
+    //  بازارچه (WEB، §۲۳) — پشتِ پرچمِ `market.directory`، پیش‌فرض خاموش. درِ دکان
+    //  پیش از `/shop`؛ درِ عمومی `/market` — پیشوندِ تازه ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی
+    api.use('/shop/market', require('./routes/market-admin'));
+    api.use('/market', require('./routes/market'));
     //  بانکِ تصاویر (v3 ۳۷) — پشتِ پرچمِ `shop.image_bank`، پیش‌فرض خاموش
     api.use('/shop/images', require('./routes/shop-images'));
     //  تحویل و پیک (۲۲.۲ C) — همان قاعده؛ درهای پیک زیرِ `/courier` (۳.۱۱)
