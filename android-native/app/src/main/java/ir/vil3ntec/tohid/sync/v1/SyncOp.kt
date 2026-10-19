@@ -52,7 +52,14 @@ data class SyncOp(
   }
 }
 
-/** نتیجهٔ هر op در پاسخِ `push` — `applied | duplicate | rejected`. */
+/** نتیجهٔ هر op در پاسخِ `push` — `applied | duplicate | rejected | deferred`. */
 data class OpResult(val opId: String, val status: String, val reason: String = "") {
   val accepted: Boolean get() = status == "applied" || status == "duplicate"
+
+  /**
+   *  «بعداً دوباره»: سرور ردیفی بی نشانی (تراکنشِ بی refId) را که پس از سندِ ردشده‌ای آمده
+   *  و معلوم نیست مالِ آن است، نگه داشت — نه اعمال، نه رد. در صف می‌ماند و دورِ بعد (بی
+   *  آن سند) دوباره می‌رود. برنامهٔ کهنه آن را «ردشده» می‌شمارد و در حالِ همگام‌سازی نشان می‌دهد.
+   */
+  val deferred: Boolean get() = status == "deferred"
 }

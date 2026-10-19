@@ -407,4 +407,32 @@ class SyncV3EngineTest {
     assertEquals(1, a.engine.status().conflictsOpen)
     assertEquals("conflict", a.engine.status().state)
   }
+
+  @Test fun oneSaleOfAnySizeIsOneTxButMultiSaleLedgerIsNot() {
+    val server = FakeServer()
+    val a = Device("dev-a", server, ShopData(products = listOf(p1))).also { assertTrue(it.sync().ok) }
+    //  یک فاکتورِ ۶۰قلمی (بیش از سقفِ قدیمِ ۵۰) ⇒ هنوز یک tx: ردِ فاکتور قلم‌ها را هم برمی‌گرداند
+    a.edit { d ->
+      d.copy(
+        sales = d.sales + Sale(id = "big", total = 60.0, finalTotal = 60.0, paidAmount = 60.0),
+        saleItems = d.saleItems + (0 until 60).map {
+          SaleItem(id = "big-$it", saleId = "big", productId = "p1", quantity = 1.0, unitPrice = 1.0, totalPrice = 1.0)
+        },
+      )
+    }
+    assertTrue(a.sync().ok)
+    val docs = server.log.filter { it.rowId == "big" || it.rowId.startsWith("big-") }
+    assertEquals(61, docs.size)
+    assertEquals(1, docs.map { it.tx }.toSet().size)
+    assertTrue(docs.first().tx.startsWith("tx."))
+
+    //  دفترِ چندفاکتوری (نخستین بارگذاری، بازگردانیِ پشتیبان) بیش از ۵۰ op ⇒ سند به سند نیست، بی tx ِ مشترک
+    a.edit { d -> d.copy(sales = d.sales + (0 until 60).map { Sale(id = "bulk-$it", total = 1.0, finalTotal = 1.0, paidAmount = 1.0) }) }
+    assertTrue(a.sync().ok)
+    val bulk = server.log.filter { it.rowId.startsWith("bulk-") }
+    assertEquals(60, bulk.size)
+    //  (هر فاکتورِ قدیمی tx ِ خودش را از `V3Convert` دارد — درج + شمارنده — ولی نه یک tx برای همه)
+    assertTrue(bulk.none { it.tx.startsWith("tx.") })
+    assertEquals(60, bulk.map { it.tx }.toSet().size)
+  }
 }

@@ -196,7 +196,8 @@ class SyncV1Engine private constructor(context: Context) {
           state.upgradeAvailable = out.upgradeAvailable
 
           val accepted = out.results.filter { it.accepted }.map { it.opId }
-          val rejected = out.results.filter { !it.accepted }
+          //  «deferred» نه پذیرفته است نه رد: در صف می‌ماند و دورِ بعد دوباره می‌رود
+          val rejected = out.results.filter { !it.accepted && !it.deferred }
           if (accepted.isNotEmpty()) queue.ack(accepted)
           if (rejected.isNotEmpty()) {
             //  ردشده‌ها از صف بیرون می‌روند — وگرنه صف تا ابد قفل
@@ -206,6 +207,8 @@ class SyncV1Engine private constructor(context: Context) {
             queue.ack(ids)
           }
           state.lastPushAt = System.currentTimeMillis()
+          //  دسته‌ای که هیچ پیش نرفت (همه «deferred») ⇒ همین‌جا بس؛ دورِ بعدِ همگام‌سازی
+          if (accepted.isEmpty() && rejected.isEmpty()) break
         }
 
         //  Pull — تا وقتی سرور بگوید چیزِ دیگری هست
