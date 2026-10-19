@@ -335,6 +335,30 @@ test('مرجوعیِ پیشینِ دستگاه دو بار برنمی‌گردد
   assert.equal(deviceStock(view, 'p-rice'), 10);
 });
 
+test('دفترِ بازپرداخت (#255، shop.orders.refunds): بازپرداختِ کامل با مبلغ ⇒ همان سندِ برگشت؛ تکرارِ درخواست ⇒ هیچ', async () => {
+  const a = await shopWithStock('دفترِ بازپرداخت');
+  await setFlag(a.shopId, 'shop.orders.refunds', true);
+  const order = await newOrder(a);
+  await walk(a, order.id, [...TO_PICKED_UP, 'return_requested']);
+  const key = `ledger-refund-${Date.now()}`;
+  const refund = () => h.post(`/api/shop/orders/${order.id}/refunds`,
+    { amountMinor: order.totalMinor, reason: 'کالا خراب بود' },
+    { token: a.token, headers: { 'Idempotency-Key': key } });
+  const r = await refund();
+  assert.equal(r.status, 201, JSON.stringify(r.body));
+  assert.equal((await one('SELECT status FROM online_orders WHERE id=$1', [order.id])).status, 'refunded_full');
+
+  const ret = (await ledger.docsOf({ query }, order.id)).find((d) => d.kind === 'return');
+  assert.ok(ret, 'سندِ برگشت از مسیرِ دفترِ بازپرداخت هم ساخته می‌شود');
+  assert.equal(ret.onStatus, 'refunded_full');
+  assert.equal(ret.totalMinor, order.totalMinor);
+  const n = (await serverOps(a.shopId)).n;
+  const again = await refund();
+  assert.ok([200, 201].includes(again.status), JSON.stringify(again.body));
+  assert.equal((await serverOps(a.shopId)).n, n);
+  assert.equal(deviceStock(await devicePull(a.token, DEV_B), 'p-rice'), 10);
+});
+
 test('سفارشِ آزمایشی سند نمی‌سازد', async () => {
   const a = await shopWithStock('آزمایشی');
   const order = await newOrder(a);
