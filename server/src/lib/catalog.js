@@ -745,6 +745,21 @@ async function onOrderStatus(c, shopId, { id, to }, actor, at) {
   if (COMMIT_ON.has(to)) return { committed: await stock.commit(c, shopId, id, { actor, at, settings }) };
 
   await stock.expireDue(c, shopId, at);
+  //  CHK-18: رزروی که فروشِ حضوریِ هم‌زمان پشتوانه‌اش را برده (INV-06) با «قبول» بی‌مهلت
+  //  نمی‌شود؛ ۴۰۹ و گذار برمی‌گردد — دکان رد می‌کند یا موجودی را درست می‌کند. اول فروش‌های
+  //  تازه‌رسیدهٔ دستگاه‌ها خوانده می‌شوند، وگرنه داوری با موجودیِ کهنه است.
+  const held = await c.query(
+    `SELECT 1 FROM stock_reservations WHERE shop_id=$1 AND order_id=$2 AND status='held' LIMIT 1`, [shopId, id]
+  );
+  if (held.rows.length && flag) await ingestTx(c, shopId, at, settings);
+  const short = held.rows.length ? await stock.shortOf(c, shopId, id, settings) : [];
+  if (short.length) {
+    const names = new Map((await c.query(
+      'SELECT product_id, name, unit FROM catalog_products WHERE shop_id=$1 AND product_id = ANY($2::text[])',
+      [shopId, short.map((x) => x.productId)]
+    )).rows.map((r) => [r.product_id, r]));
+    throw stock.outOfStock(short.map((x) => ({ ...x, name: names.get(x.productId)?.name || '', unit: names.get(x.productId)?.unit || '' })));
+  }
   if (await stock.extend(c, shopId, id)) return { extended: true };
   if (!flag) return null;
   const lines = (await c.query(
