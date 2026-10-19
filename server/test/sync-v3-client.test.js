@@ -290,10 +290,17 @@ test('تعارض: دو دستگاه یک فیلد را بی‌خبر از هم �
     d.products = d.products.map((x) => (x.id === P1.id ? { ...x, name } : x));
     dev.ledger.write(d);
   };
+  const lastHlc = (dev) => dev.engine.outbox[dev.engine.outbox.length - 1].ops[0].hlc;
   edit(A, 'نامِ A');
   assert.equal(await A.engine.record(), 1);
+  const hA = lastHlc(A);
+  //  هر دستگاه با ساعتِ تصحیح‌شدهٔ خودش (rawNow + offsetMs) مُهر می‌زند و offsetها تا ده‌ها ms فرق دارند؛
+  //  «B بعدتر» یعنی بعدتر روی ساعتِ B: صبر تا ساعتِ B از wallِ A بگذرد
+  while (B.engine.now() <= V3.hlc.parse(hA).wall) await new Promise((r) => setTimeout(r, 5));
   edit(B, 'نامِ B');
-  assert.equal(await B.engine.record(), 1);          //  HLCِ B تازه‌تر است
+  assert.equal(await B.engine.record(), 1);
+  const hB = lastHlc(B);
+  assert.ok(V3.hlc.compare(hB, hA) > 0, `HLCِ B تازه‌تر است: ${hB} > ${hA}`);
   assert.equal((await A.engine.pushOnce()).ok, true);
   const pb = await B.engine.pushOnce();
   assert.equal(pb.ok, true);
@@ -429,4 +436,66 @@ test('وضعیت برای نوار و نگهبانِ خروج (SYN-08، SYN-10):
   assert.equal(srv.status, 200);
   assert.equal(srv.body.device.device_id, A.name);
   assert.equal(srv.body.device.queued, 0);
+});
+
+/** ذخیرهٔ UI (همان saveData) وقتی IndexedDB ژورنال را می‌نویسد — `times` بار */
+function saveDuringJournal(dev, times, prefix) {
+  const commit = dev.store.commit.bind(dev.store);
+  let n = 0;
+  dev.store.commit = async (ch) => {
+    if (ch && ch.journal && n < times) {
+      n++;
+      await new Promise((r) => setTimeout(r, 5));
+      const ui = core.cloneLedger(dev.ledger.get());
+      ui.products = ui.products.concat([{ ...P1, id: `${prefix}-${n}`, name: `ثبت‌شده وسطِ Pull ${n}`, barcodes: [] }]);
+      dev.ledger.write(ui);
+    }
+    return commit(ch);
+  };
+  return () => { dev.store.commit = commit; };
+}
+
+let R;
+test('Pull: ذخیرهٔ UI وسطِ نوشتنِ ژورنال گم نمی‌شود؛ op روی دفترِ تازه می‌نشیند و ذخیره ثبت و فرستاده می‌شود', async () => {
+  R = device('v3c-dev-race', owner.accessToken, {});
+  await R.engine.load();
+  assert.equal((await R.engine.sync()).ok, true);
+  const d = A.ledger.get();
+  d.products = d.products.concat([{ ...P1, id: 'p-v3c-remote-1', name: 'از دستگاهِ دیگر', barcodes: [] }]);
+  A.ledger.write(d);
+  assert.equal((await A.engine.sync()).ok, true);
+
+  const restore = saveDuringJournal(R, 1, 'p-v3c-ui');
+  const r = await R.engine.pullOnce();
+  restore();
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.ok(find(R.ledger, 'products', 'p-v3c-remote-1'), 'opِ رسیده نشست');
+  assert.ok(find(R.ledger, 'products', 'p-v3c-ui-1'), 'ذخیرهٔ UI ماند');
+  assert.equal(R.store.data.journal, null);
+  assert.ok(await R.engine.record() >= 1, 'ذخیرهٔ UI «تغییرِ من» شمرده شد');
+  assert.equal((await R.engine.sync()).ok, true);
+  assert.ok(await rowOf('products', 'p-v3c-ui-1'), 'ذخیرهٔ UI به سرور رسید');
+});
+
+test('Pull: دفتری که وسطِ هر ژورنال عوض می‌شود ⇒ هیچ نوشتنی، cursor نمی‌جنبد؛ بعد همان صفحه می‌نشیند', async () => {
+  const d = A.ledger.get();
+  d.products = d.products.concat([{ ...P1, id: 'p-v3c-remote-2', name: 'از دستگاهِ دیگر ۲', barcodes: [] }]);
+  A.ledger.write(d);
+  assert.equal((await A.engine.sync()).ok, true);
+
+  const before = R.engine.meta.cursor;
+  const restore = saveDuringJournal(R, 1000, 'p-v3c-busy');
+  const r = await R.engine.pullOnce();
+  restore();
+  assert.deepEqual([r.ok, r.reason, r.applied], [false, 'ledger_busy', 0]);
+  assert.equal(R.engine.meta.cursor, before);
+  assert.equal(R.store.data.journal, null);
+  assert.equal(find(R.ledger, 'products', 'p-v3c-remote-2'), undefined);
+  const busy = R.ledger.get().products.filter((x) => x.id.startsWith('p-v3c-busy-')).length;
+  assert.ok(busy >= 2, `همهٔ ذخیره‌های UI ماندند: ${busy}`);
+
+  const again = await R.engine.pullOnce();
+  assert.equal(again.ok, true, JSON.stringify(again));
+  assert.ok(find(R.ledger, 'products', 'p-v3c-remote-2'));
+  assert.equal(R.ledger.get().products.filter((x) => x.id.startsWith('p-v3c-busy-')).length, busy);
 });
