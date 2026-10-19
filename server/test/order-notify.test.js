@@ -187,6 +187,48 @@ test('پوش فقط به دستگاه‌های همان دکان، بی نام �
   assert.equal(row.acked_at, null, 'پذیرفتنِ پوش اثباتِ دیده‌شدن نیست');
 });
 
+test('گیرنده فقط دارندهٔ orders.view (صاحب همیشه): پیک، عضوِ بسته‌شده و غیرعضو زنگ نمی‌گیرند؛ config همان را می‌شمارد', async () => {
+  const a = await readyShop('گیرنده', ['owner']);
+  //  عضوها مستقیم در DB (این آزمون دربارهٔ گیرنده است، نه راهِ پیوستن)
+  const member = async (name, role, status = 'active') => {
+    const u = await h.newUser(name, 'shop');
+    await query(
+      `INSERT INTO shop_members (id, shop_id, user_id, role, status, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$6)`,
+      [newId('mem'), a.shopId, u.user.id, role, status, now()]
+    );
+    return u.user.id;
+  };
+  const ids = {
+    manager: await member('مدیرِ گیرنده', 'manager'),
+    staff: await member('شاگردِ گیرنده', 'staff'),
+    courier: await member('پیکِ گیرنده', 'courier'),
+    removed: await member('شاگردِ رفته', 'staff', 'removed'),
+    stranger: (await h.newUser('غریبه', 'shop')).user.id,
+  };
+  //  هر کدام یک دستگاهِ ثبت‌شده روی همین دکان دارد
+  for (const [k, userId] of Object.entries(ids)) {
+    await push.register({ app: 'shop', token: `${k}-${a.shopId}`, userId, shopId: a.shopId, deviceUid: `dev-${k}` });
+  }
+  assert.deepEqual((await N.recipientIds(a.shopId)).sort(), [a.user.id, ids.manager, ids.staff].sort());
+
+  await customerOrder(a.shopId);
+  sent = [];
+  await N.tick(now() + 1000);
+  assert.deepEqual(sentTo(a.shopId).map((x) => x.row.token).sort(),
+    [`manager-${a.shopId}`, `owner-${a.shopId}`, `staff-${a.shopId}`]);
+  const [row] = await rowsOf(a.shopId);
+  assert.equal(Number(row.devices_sent), 3);
+
+  const cfg = await h.get('/api/shop/order-notify/config', { token: a.token });
+  assert.equal(cfg.status, 200, JSON.stringify(cfg.body));
+  assert.equal(cfg.body.push.shopDevices, 3, 'دستگاهِ پیک/غیرعضو شمرده نمی‌شود');
+
+  //  پوشِ دیگرِ دکان (بی فیلتر) همان رفتارِ پیشین را دارد
+  const all = await push.targetsFor({ shopId: a.shopId, app: 'shop' });
+  assert.equal(all.length, 6);
+  assert.equal((await push.targetsFor({ shopId: a.shopId, app: 'shop', onlyUserIds: [] })).length, 0);
+});
+
 /* ══════════════════════════════════════════════════════════════════
    ۶) NOTIF-11 — خطا ⇒ تلاشِ محدود؛ کانالِ پشتیبان حداکثر یک بار
    ══════════════════════════════════════════════════════════════════ */

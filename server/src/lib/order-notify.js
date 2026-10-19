@@ -30,9 +30,14 @@
  *     لمسِ اعلان باید `/api/shop/orders/:id` را بخواند (دسترسی دوباره
  *     سنجیده می‌شود)؛ payload منبعِ داده نیست (بندِ ۵).
  *   • سفارشی که از «تازه» بیرون رفته (کسی قبول/رد کرده) دیگر زنگ نمی‌زند.
+ *   • گیرنده فقط عضوِ فعالی است که `orders.view` دارد (صاحب همیشه) —
+ *     همان سدِّ `/api/shop/orders`؛ پیک و عضوِ بسته‌شده زنگ نمی‌گیرند.
  */
 const { query, one, many, now } = require('../db');
 const push = require('./push');
+const { can } = require('./permissions');
+const staffPerms = require('./staff-perms');
+const permCore = require('./perm-core');
 const { ulid } = require('./ulid');
 const { badRequest, notFound } = require('../middleware/errors');
 
@@ -158,10 +163,36 @@ function messageFor(row, reminder) {
   };
 }
 
+const RECIPIENT_PERMISSION = 'orders.view';
+
+/**
+ * کاربرانی که اعلانِ سفارش می‌گیرند: عضوِ فعالِ دکان که `orders.view` دارد
+ * (همان سنجشِ `requirePermission`: سقفِ نقش، سپس لایه‌ها اگر کلید لایه‌پذیر
+ * باشد) + صاحبِ دکان همیشه. پیک (`courier`) و عضوِ بسته‌شده بیرون‌اند.
+ */
+async function recipientIds(shopId) {
+  const rows = await many(
+    `SELECT user_id, role FROM shop_members WHERE shop_id=$1 AND status='active'
+     UNION SELECT owner_user_id AS user_id, 'owner' AS role FROM shops WHERE id=$1`,
+    [shopId]
+  );
+  const out = new Set();
+  for (const r of rows) {
+    if (!r.user_id || !can(r.role, RECIPIENT_PERMISSION)) continue;
+    if (r.role !== 'owner' && staffPerms.isLayered(RECIPIENT_PERMISSION)) {
+      const layers = await staffPerms.layersFor(shopId, r.role, r.user_id);
+      if (!permCore.allows(r.role, layers, RECIPIENT_PERMISSION)) continue;
+    }
+    out.add(String(r.user_id));
+  }
+  return [...out];
+}
+
 /** همان راهِ موجودِ پوش؛ خروجی همیشه یک نتیجه است، هرگز استثنا. */
 async function send(row, reminder) {
   try {
-    const out = (await push.sendTo({ shopId: row.shop_id, app: 'shop' }, messageFor(row, reminder))) || {};
+    const onlyUserIds = await recipientIds(row.shop_id);
+    const out = (await push.sendTo({ shopId: row.shop_id, app: 'shop', onlyUserIds }, messageFor(row, reminder))) || {};
     const sent = Number(out.sent || 0);
     const total = Number(out.total || 0);
     if (sent > 0) return { sent, total, result: 'ok', error: '' };
@@ -328,8 +359,10 @@ function shape(r) {
 async function config(shopId, { userId = '', deviceUid = '' } = {}) {
   const enabled = await flagOf(shopId);
   const cfg = await push.current();
+  //  فقط دستگاه‌هایی که واقعاً اعلان می‌گیرند (دارندگانِ `orders.view`)
   const devices = await one(
-    `SELECT COUNT(*)::int AS n FROM push_tokens WHERE status='active' AND app='shop' AND shop_id=$1`, [shopId]
+    `SELECT COUNT(*)::int AS n FROM push_tokens WHERE status='active' AND app='shop' AND shop_id=$1
+       AND user_id = ANY($2::text[])`, [shopId, await recipientIds(shopId)]
   );
   const mine = await one(
     `SELECT COUNT(*)::int AS n FROM push_tokens WHERE status='active' AND app='shop' AND shop_id=$1 AND
@@ -399,5 +432,5 @@ async function ack(shopId, notifId, { kind, userId = '', deviceUid = '' } = {}) 
 
 module.exports = {
   FLAG_KEY, EVENT, CHANNEL, MAX_ATTEMPTS, MAX_REMINDERS, BACKOFF_MS, ACK_WINDOW_MS, STALE_MS,
-  flagOf, enqueueIn, messageFor, tick, start, stop, setFallback, config, pending, ack, shape,
+  flagOf, enqueueIn, messageFor, tick, start, stop, setFallback, config, pending, ack, shape, recipientIds,
 };
