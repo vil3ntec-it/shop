@@ -395,6 +395,8 @@
       header.insertBefore(el, header.firstChild);
     }
     el.className = 'vip-badge vip-badge-' + tone;
+    //  روی گوشی متن پنهان است (فقط تاج)؛ نامِ دکمه برای صفحه‌خوان از همین می‌آید
+    el.setAttribute('aria-label', text);
     // چند جرقه‌ی ریز که از نشان می‌ریزند — فقط تزئینی
     el.innerHTML =
       `<span class="vip-badge-icon">${ICON.crown}</span><span>${esc(text)}</span>` +
