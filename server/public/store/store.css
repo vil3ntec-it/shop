@@ -106,8 +106,9 @@
   }
   body.cart-open .cartbar { opacity: 0; pointer-events: none; }
   body.phone-cart .cartbar .ttl { font-size: 22px; }
-  body.phone-cart .cartbar .thumbs { flex: none; gap: var(--s3); margin-inline-start: var(--s2); }
+  body.phone-cart .cartbar .thumbs { flex: 0 1 auto; min-width: 0; overflow: hidden; gap: var(--s3); margin-inline-start: var(--s2); }
   body.phone-cart .cartbar .thumb { width: 48px; height: 48px; }
+  body.phone-cart .cartbar .count { flex: none; }
   body.phone-cart .cartbar .more { margin-inline-start: var(--s2); }
   body.phone-cart .cartbar .sum { display: none; }
   body.phone-cart .cartbar .count { width: 56px; height: 56px; margin-inline-start: auto; font-size: 19px; }
@@ -127,6 +128,12 @@
   body.phone-cart.cart-open .cline:nth-child(3) { animation-delay: .08s; }
   body.phone-cart.cart-open .cline:nth-child(4) { animation-delay: .12s; }
   body.phone-cart.cart-open .cline:nth-child(n+5) { animation-delay: .16s; }
+}
+@media (max-width: 374px) {
+  body.phone-cart .cartbar { padding-inline: var(--s4); gap: var(--s2); }
+  body.phone-cart .cartbar .thumbs { gap: var(--s2); margin-inline-start: 0; }
+  body.phone-cart .cartbar .thumb { width: 40px; height: 40px; }
+  body.phone-cart .cartbar .count { width: 48px; height: 48px; }
 }
 @media (prefers-reduced-motion: reduce) {
   body.phone-cart .surface, body.phone-cart #cart-sheet, .cartbar { transition: none !important; }
