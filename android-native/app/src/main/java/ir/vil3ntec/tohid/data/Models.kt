@@ -85,6 +85,15 @@ data class WarehouseEntry(
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val landedCost: Double? = null,
+  /**
+   *  همان هزینهٔ جانبی، **دقیق** به پولِ خرد (صدمِ افغانی) — منبعِ حساب در `StockLedger`.
+   *  `landedCost` فقط برای خواندنِ آدم و ابزارِ قدیمی است؛ هر دو با هم نوشته می‌شوند.
+   *  نامِ `…Minor` در Sync v3 بی تبدیل و به‌صورتِ عددِ صحیح می‌رود و برمی‌گردد
+   *  (`landedCost` در `V3Schema.money` نیست — ⛔ اضافه نشود، وگرنه این دو نام با هم می‌خورند).
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val landedCostMinor: Long? = null,
   /** محلِ نگه‌داری (INV-20)؛ `null`/خالی = محلِ اصلیِ دکان */
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
@@ -223,10 +232,14 @@ data class SaleReturn(
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val channel: String? = null,
-  /** کاربرِ ثبت‌کننده (افزودنی؛ `null` = ثبتِ قدیمی) */
+  /**
+   *  ثبت‌کنندهٔ برگشت — همان فیلدِ `by` ِ برگشتِ تازه (RET، #318). دفترِ موجودی (`StockLedger`)
+   *  کاربرِ ردیفِ برگشت را از همین می‌خواند؛ برگشتِ قدیمی `null` است (⇐ «legacy»).
+   *  ⛔ هنگامِ ادغام با #318 فقط **یک** `by` بماند.
+   */
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
-  val userId: String? = null,
+  val by: String? = null,
 )
 
 @Serializable
@@ -317,6 +330,10 @@ data class Purchase(
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val landedCost: Double? = null,
+  /** همان سهم، دقیق به صدمِ افغانی (مثلِ `WarehouseEntry.landedCostMinor`) */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val landedCostMinor: Long? = null,
 )
 
 @Serializable

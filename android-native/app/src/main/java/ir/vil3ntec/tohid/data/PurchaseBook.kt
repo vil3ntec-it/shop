@@ -95,13 +95,14 @@ object PurchaseBook {
       cur = cur.copy(
         purchases = cur.purchases.map { p ->
           val share = landed[p.id] ?: 0L
-          if (share > 0) p.copy(landedCost = share / 100.0) else p
+          if (share > 0) p.copy(landedCost = share / 100.0, landedCostMinor = share) else p
         },
         warehouseEntries = cur.warehouseEntries.map { w ->
           val pid = w.purchaseId
           if (pid == null || pid !in set) w
           else w.copy(
             landedCost = (landed[pid] ?: 0L).takeIf { it > 0 }?.let { it / 100.0 },
+            landedCostMinor = (landed[pid] ?: 0L).takeIf { it > 0 },
             locationId = loc,
             userId = user,
           )

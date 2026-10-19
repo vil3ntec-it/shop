@@ -74,7 +74,7 @@ class StockWiringTest {
       as WarehouseEngine.Result.Ok
     val w = e.data.warehouseEntries.last()
     val wj = wire.encodeToJsonElement(WarehouseEntry.serializer(), w).jsonObject
-    for (k in listOf("landedCost", "locationId", "userId", "adjKind", "lotId")) assertFalse(k, k in wj)
+    for (k in listOf("landedCost", "landedCostMinor", "locationId", "userId", "adjKind", "lotId")) assertFalse(k, k in wj)
 
     val a = WarehouseEngine.adjustStock(base, "p1", 1.0, false, "شکست", WarehouseEngine.AdjustKind.ADJUSTMENT, today, now, ::newId)
       as WarehouseEngine.Result.Ok
@@ -86,6 +86,7 @@ class StockWiringTest {
       as PurchaseBook.Result.Ok
     assertNull(p.data.purchases.last().landedCost)
     assertNull(p.data.warehouseEntries.last().landedCost)
+    assertNull(p.data.warehouseEntries.last().landedCostMinor)
   }
 
   @Test
@@ -154,6 +155,7 @@ class StockWiringTest {
     ) as WarehouseEngine.Result.Ok
     val w = e.data.warehouseEntries.last()
     assertEquals(20.0, w.landedCost!!, 0.0)
+    assertEquals(2000L, w.landedCostMinor)
     assertEquals("انبار", w.locationId)
     assertEquals("کریم", w.userId)
     assertTrue(WarehouseEngine.addEntry(d, WarehouseEngine.EntryDraft(productId = "p1", units = 1.0, price = 1.0, landedCost = -1.0), today, now, ::newId)
@@ -162,6 +164,7 @@ class StockWiringTest {
     val edited = WarehouseEngine.editEntry(e.data, w.id, WarehouseEngine.EntryDraft(productId = "p1", units = 4.0, price = 100.0), today)
       as WarehouseEngine.Result.Ok
     assertEquals(20.0, edited.data.warehouseEntries.last().landedCost!!, 0.0)
+    assertEquals(2000L, edited.data.warehouseEntries.last().landedCostMinor)
 
     //  فاکتورِ دوردیفه: ۱۰۰ هزینهٔ جانبی به نسبتِ ۱۰۰۰ و ۳۰۰۰ ⇒ ۲۵ و ۷۵؛ بدهیِ تأمین‌کننده همان جمعِ فاکتور
     val p = PurchaseBook.record(
@@ -170,9 +173,11 @@ class StockWiringTest {
     ) as PurchaseBook.Result.Ok
     val mine = p.data.purchases.filter { it.invoiceNo == p.invoiceNo }
     assertEquals(listOf(25.0, 75.0), mine.map { it.landedCost })
+    assertEquals(listOf(2500L, 7500L), mine.map { it.landedCostMinor })
     assertEquals(4000.0, ShopStore.supplierDebt(p.data, "s1"), 0.0)
     val entries = p.data.warehouseEntries.filter { it.purchaseId in mine.map { m -> m.id } }
     assertEquals(listOf(25.0, 75.0), entries.map { it.landedCost })
+    assertEquals(listOf(2500L, 7500L), entries.map { it.landedCostMinor })
     assertTrue(entries.all { it.locationId == "انبار" && it.userId == "کریم" })
     val pv = StockLedger.productView(StockLedger.replay(p.data), "p1")
     //  (1000 + 650 + 50 + 1000 + 25) / 25 = 109 افغانی
