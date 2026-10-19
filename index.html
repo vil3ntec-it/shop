@@ -109,6 +109,7 @@
 <link rel="stylesheet" href="license/vip.css?v=16">
 <link rel="stylesheet" href="license/support.css?v=17">
 <link rel="stylesheet" href="license/account-ui.css?v=2">
+<link rel="stylesheet" href="license/orders-ui.css?v=1">
 <!-- «گزارشِ تازه» (RPT-01/02/03/06/09/11) — پیش‌فرض خاموش؛ شرح در license/report-ui.js -->
 <link rel="stylesheet" href="license/report-ui.css?v=1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -14440,7 +14441,7 @@
     }
   });
 
-  const EXTRA_PAGES = ['debtor-account', 'quick-sale', 'supplier-account', 'receipts', 'profile', 'team', 'product', 'admin', 'devices'];
+  const EXTRA_PAGES = ['debtor-account', 'quick-sale', 'supplier-account', 'receipts', 'profile', 'team', 'product', 'admin', 'devices', 'orders'];
 
   /**
    *  چراغِ نوارِ پایین را می‌برد روی تبِ فعال.
@@ -15770,7 +15771,9 @@
      اگر پیش از آن‌ها بیاید، بی‌صدا هیچ کاری نمی‌کند. -->
 <script src="license/sync-core.js?v=3" defer></script>
 <script src="license/account-code.js?v=2" defer></script>
-<script src="license/sync-engine.js?v=5" defer></script>
+<script src="license/money.js?v=1" defer></script>
+<script src="license/sync-v3-engine.js?v=1" defer></script>
+<script src="license/sync-engine.js?v=6" defer></script>
 <script src="license/license-client.js?v=17" defer></script>
 <script src="license/shop-sync.js?v=20" defer></script>
 <script src="license/shop-ui.js?v=15" defer></script>
@@ -15781,6 +15784,8 @@
 <script src="license/thermal-print.js?v=1" defer></script>
 <script src="license/photo-studio.js?v=2" defer></script>
 <script src="license/owner-export.js?v=1" defer></script>
+<!-- بخشِ «سفارش‌ها» — فقط وقتی سرور بگوید برای این دکان روشن است، ساخته می‌شود -->
+<script src="license/orders-ui.js?v=1" defer></script>
 
 </body>
 </html>
