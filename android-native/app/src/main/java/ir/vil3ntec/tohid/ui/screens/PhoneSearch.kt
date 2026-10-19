@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -80,7 +82,10 @@ fun PhoneSearchScreen(
   val invoices = remember(d, query) { invoiceSearch(d, query) }
   val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
-  Column(Modifier.fillMaxSize().background(p.bg).verticalScroll(rememberScrollState()).padding(horizontal = 18.dp)) {
+  Column(
+    Modifier.fillMaxSize().background(p.bg).windowInsetsPadding(WindowInsets.statusBars)
+      .verticalScroll(rememberScrollState()).padding(horizontal = 18.dp),
+  ) {
     Spacer(Modifier.height(12.dp))
     Row(verticalAlignment = Alignment.CenterVertically) {
       RoundButton(Icons.Outlined.ChevronRight, "بازگشت", onBack)

@@ -12,6 +12,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -48,7 +49,8 @@ fun PhoneV3HomePreview(screen: String, store: ShopStore) {
     "v3home-big-stats" -> PhoneHomeShot(big = true, page = 1)
     else -> PhoneHomeShot.NONE
   }
-  when (screen) {
+  //  هر نام حالتِ تازهٔ خودش را می‌گیرد (ورقهٔ پیجر، کارتِ کششی)
+  key(screen) { when (screen) {
     //  هر موردِ نوار یک بار فعال، و قرصِ «تمدیدِ اشتراک» — روی هم
     "v3home-navs" -> Column(
       Modifier.fillMaxSize().background(PhoneV3.colors.bg).padding(top = 8.dp),
@@ -76,5 +78,5 @@ fun PhoneV3HomePreview(screen: String, store: ShopStore) {
       PhoneHomeScreen(data, onOpen = {}, bottomReserve = reserve, shot = shot)
       PhoneNavBar(layout, "dashboard", onPick = {}, onEdit = null, modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(), renewDays = renew)
     }
-  }
+  } }
 }

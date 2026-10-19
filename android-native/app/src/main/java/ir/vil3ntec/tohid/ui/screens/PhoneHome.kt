@@ -440,15 +440,7 @@ private fun HomeHeader(
           lineHeight = 52.sp,
         ),
       )
-      Spacer(Modifier.height(4.dp))
-      Text(
-        if (view.todayCount == 0) "هنوز فروشی ثبت نشده" else "${view.todayCount} فاکتور",
-        modifier = Modifier.fillMaxWidth(),
-        textAlign = TextAlign.Center,
-        color = p.onAccent.copy(alpha = 0.6f),
-        style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp),
-      )
-      Spacer(Modifier.height(10.dp))
+      Spacer(Modifier.height(14.dp))
       Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
         PagerDots(pages, currentPage, p.onAccent, p.onAccent.copy(alpha = 0.35f))
       }

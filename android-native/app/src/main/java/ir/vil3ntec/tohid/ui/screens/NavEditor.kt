@@ -19,6 +19,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -90,7 +92,7 @@ fun NavEditorScreen(allowed: Set<String>, onBack: () -> Unit) {
   val rows = NavLayouts.rows(layout, allowed)
   val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
-  Column(Modifier.fillMaxSize().background(p.bg)) {
+  Column(Modifier.fillMaxSize().background(p.bg).windowInsetsPadding(WindowInsets.statusBars)) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
       RoundButton(Icons.Outlined.ChevronRight, "بازگشت", onBack)
       Text(
