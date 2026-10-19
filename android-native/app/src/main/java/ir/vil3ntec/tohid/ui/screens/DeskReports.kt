@@ -50,6 +50,9 @@ private enum class Span(val label: String) { TODAY("امروز"), WEEK("۷ رو�
 @Composable
 fun DeskReportsScreen(d: ShopData, snackbar: SnackbarHostState) {
   val context = LocalContext.current
+  //  «گزارشِ تازه» (پیش‌فرض خاموش) ⇒ صفحهٔ هستهٔ مشترکِ گزارش؛ خاموش ⇒ همین صفحهٔ امروز، دست‌نخورده
+  ReportFresh.load(context)
+  if (ReportFresh.on.value) { DeskFreshReports(d, snackbar); return }
   val scope = rememberCoroutineScope()
   fun toast(t: String) { scope.launch { snackbar.showSnackbar(t) } }
   val today = ir.vil3ntec.tohid.todayIso()
@@ -111,6 +114,8 @@ fun DeskReportsScreen(d: ShopData, snackbar: SnackbarHostState) {
       } else {
         Text("وضعیتِ همین حالا — بی بازهٔ تاریخ", Modifier.weight(1f), color = Shop.colors.muted, style = MaterialTheme.typography.bodySmall)
       }
+      Spacer(Modifier.width(12.dp))
+      ReportFreshSwitch()
       Spacer(Modifier.width(12.dp))
       OutlinedButton(onClick = ::print) { Text("چاپ  ${KeyMap.GLOBAL_PRINT.hint}") }
       Spacer(Modifier.width(6.dp))
