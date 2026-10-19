@@ -69,7 +69,7 @@
 .sc-hint{margin:6px 0 0;color:var(--muted);font-size:12px;}
 .sc-empty{padding:24px 8px;text-align:center;color:var(--muted);}
 .sc-badge{display:inline-flex;min-width:20px;height:20px;padding:0 6px;border-radius:10px;align-items:center;justify-content:center;background:var(--danger);color:#fff;font-size:12px;font-weight:700;margin-inline-start:6px;}
-@media (max-width:640px){
+@media (max-width:639px){
   .sc-actions{width:100%;}
   .sc-bubble{max-width:88%;}
   .sc-thumb img{max-width:200px;}

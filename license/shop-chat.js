@@ -67,7 +67,7 @@
   const kb = (n) => `${Math.max(1, Math.round((n || 0) / 1024))} کیلوبایت`;
   const mmss = (ms) => { const s = Math.round((ms || 0) / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  const isPhone = () => window.matchMedia('(max-width: 640px)').matches;
+  const isPhone = () => window.matchMedia('(max-width: 639px)').matches;
 
   function account() {
     try { return (window.TohidShop && window.TohidShop.account) || {}; } catch { return {}; }
@@ -192,7 +192,8 @@
   //  صفحه
   // ════════════════════════════════════════════════════════════════════
 
-  function viewKey() { return `tohid-view-mode:${S.user || 'local'}:chat-inbox`; }
+  //  همان قالبِ کلیدِ `ViewModePref` ِ برنامه و `orders-ui.js`: هر کاربر، هر صفحه، فقط همین دستگاه
+  function viewKey() { return `view_mode:${String(S.user || 'local').replace(/[^\w.@-]/g, '_')}:chat-inbox`; }
   function loadView() {
     const v = ls.get(viewKey());
     S.view = v === 'card' || v === 'table' ? v : 'table';

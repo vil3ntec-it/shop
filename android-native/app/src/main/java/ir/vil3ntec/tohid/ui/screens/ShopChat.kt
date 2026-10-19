@@ -486,7 +486,7 @@ private fun ChatThreadPane(
             full[m.id] = true
             scope.launch { loadImage(id) { repo.media(convId, id).onFailure { e -> banner = e.userMessage to true }.valueOrNull() } }
           },
-          onAudio = { m.media?.id?.let { id -> scope.launch { repo.media(convId, id).onSuccess { bytes -> playOrSave(context, id, bytes) }.onFailure { banner = it.userMessage to true } } } },
+          onAudio = { m.media?.id?.let { id -> scope.launch { repo.media(convId, id).onSuccess { bytes -> playOrSave(context, id, bytes)?.let { banner = it to true } }.onFailure { banner = it.userMessage to true } } } },
           onReport = { reportFor = m.id },
         )
       }
@@ -552,10 +552,11 @@ private fun ChatThreadPane(
 /** صدا روی گوشی پخش می‌شود؛ کامپیوتر رمزگشای Opus/AAC ندارد ⇒ «ذخیرهٔ فایل». */
 private var player: ChatMedia.Player? = null
 
-private fun playOrSave(context: android.content.Context, id: String, bytes: ByteArray) {
+/** @return پیامِ خطا برای نمایش، یا null */
+private fun playOrSave(context: android.content.Context, id: String, bytes: ByteArray): String? {
   if (ChatMedia.voiceSupported) {
     val p = player ?: ChatMedia.Player(context.applicationContext).also { player = it }
-    runCatching { p.play(id, bytes) {} }
+    return runCatching { p.play(id, bytes) {} }.exceptionOrNull()?.let { "این پیامِ صوتی روی این گوشی پخش نشد" }
   } else {
     val ext = when {
       bytes.size > 4 && String(bytes, 0, 4, Charsets.ISO_8859_1) == "OggS" -> "ogg"
@@ -563,6 +564,7 @@ private fun playOrSave(context: android.content.Context, id: String, bytes: Byte
       else -> "m4a"
     }
     Platform.saveFile("voice-$id.$ext", bytes)
+    return null
   }
 }
 
