@@ -242,6 +242,10 @@ private fun NewPurchaseInvoice(
   var date by remember { mutableStateOf(formatDate(today)) }
   var paid by remember { mutableStateOf("") }
   var notes by remember { mutableStateOf("") }
+  //  موتورِ تازهٔ موجودی (روشن): هزینهٔ جانبیِ کلِ فاکتور (PUR-06) — روی بهای ردیف‌ها پخش می‌شود، نه بدهیِ تأمین‌کننده
+  val stockOn = ir.vil3ntec.tohid.data.StockLedger.isOn(d)
+  var landed by remember { mutableStateOf("") }
+  val context = androidx.compose.ui.platform.LocalContext.current
   val lines = remember { mutableStateListOf(Draft()) }
   val no = remember(d) { PurchaseBook.nextNo(d) }
 
@@ -272,7 +276,9 @@ private fun NewPurchaseInvoice(
         expiryDate = if (exp.isEmpty()) "" else ir.vil3ntec.tohid.Jalali.parseTyped(exp) ?: return toast("تاریخِ انقضای «$exp» درست نیست — مثلاً ۱۴۰۶/۰۳/۳۱"))
     }
     val iso = if (date.isBlank()) today else ir.vil3ntec.tohid.Jalali.parseTyped(date) ?: return toast("تاریخِ فاکتور درست نیست — مثلاً ${formatDate(today)}")
-    when (val r = PurchaseBook.record(d, sid, ls, paidValue, iso, notes, today, System.currentTimeMillis(), ::newId)) {
+    val landedValue = if (!stockOn || landed.isBlank()) 0.0 else landed.toDoubleOrNull() ?: return toast("هزینهٔ جانبی درست نیست")
+    val user = if (stockOn) runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrNull() else null
+    when (val r = PurchaseBook.record(d, sid, ls, paidValue, iso, notes, today, System.currentTimeMillis(), ::newId, landedTotal = landedValue, userId = user)) {
       is PurchaseBook.Result.Failed -> toast(r.message)
       is PurchaseBook.Result.Ok -> {
         scope.launch { store.save(r.data) }
@@ -352,6 +358,15 @@ private fun NewPurchaseInvoice(
       Spacer(Modifier.width(10.dp))
       OutlinedTextField(paid, { paid = ir.vil3ntec.tohid.numericInput(it) }, singleLine = true, label = { Text("پرداخت‌شده (؋)") }, modifier = Modifier.width(170.dp))
       TextButton(onClick = { paid = Math.round(total).toString() }) { Text("همه") }
+      if (stockOn) {
+        Spacer(Modifier.width(10.dp))
+        OutlinedTextField(
+          landed, { landed = ir.vil3ntec.tohid.numericInput(it) }, singleLine = true,
+          label = { Text("هزینهٔ جانبی (؋)") },
+          supportingText = { Text("کرایه، گمرک — روی بهای ردیف‌ها") },
+          modifier = Modifier.width(190.dp),
+        )
+      }
       Spacer(Modifier.width(10.dp))
       Column(horizontalAlignment = Alignment.End, modifier = Modifier.width(220.dp)) {
         Text("جمعِ فاکتور: ${money(total)} ؋", fontWeight = FontWeight.Bold, color = Shop.colors.text)

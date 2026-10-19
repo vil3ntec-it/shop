@@ -76,6 +76,31 @@ data class WarehouseEntry(
   val batch: String = "",
   /** تاریخِ تولید (اختیاری، `yyyy-MM-dd`) — خالی یعنی ثبت نشده */
   val productionDate: String = "",
+  /*
+   *  ── موتورِ تازهٔ موجودی و بها (`StockLedger`، پشتِ تنظیمِ دکان) ──────
+   *  همه افزودنی، `null` = رفتارِ امروز. `null` نوشته نمی‌شود (`NEVER`)، وگرنه
+   *  نخستین تفاضلِ Sync v1 برای هر ردیفِ قدیمی یک op می‌ساخت.
+   */
+  /** هزینهٔ جانبیِ همین ردیف (کرایه، گمرک) به افغانی، کلِ ردیف — PUR-06 */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val landedCost: Double? = null,
+  /** محلِ نگه‌داری (INV-20)؛ `null`/خالی = محلِ اصلیِ دکان */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val locationId: String? = null,
+  /** کاربری که ثبت کرد (INV-02)؛ `null` = ثبتِ قدیمی */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val userId: String? = null,
+  /** نوعِ اصلاح (INV-04): count · damage · expired · lost · other · supplier_return */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val adjKind: String? = null,
+  /** سری‌ای که اصلاحِ کاهشی از آن برداشته شود (اختیاری) */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val lotId: String? = null,
 )
 
 @Serializable
@@ -149,6 +174,14 @@ data class SaleItem(
   val purchasePrice: Double = 0.0,
   val totalPrice: Double = 0.0,
   val returnedQty: Double = 0.0,
+  /** سریِ اسکن‌شده سرِ صندوق — اول از همین برداشته می‌شود (`StockLedger`، افزودنی) */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val lotId: String? = null,
+  /** محلِ فروش (INV-20)؛ `null` = محلِ اصلیِ دکان */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val locationId: String? = null,
 )
 
 @Serializable
@@ -162,6 +195,10 @@ data class SaleReturn(
   val reason: String = "",
   val date: String = "",
   val createdAt: Long = 0,
+  /** کاربرِ ثبت‌کننده (افزودنی؛ `null` = ثبتِ قدیمی) */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val userId: String? = null,
 )
 
 @Serializable
@@ -248,6 +285,10 @@ data class Purchase(
    *  افزودنی و بی‌خطر؛ نسخهٔ وب نمی‌شناسدش و فقط گروه‌بندی را از دست می‌دهد.
    */
   val invoiceNo: Int = 0,
+  /** سهمِ این ردیف از هزینهٔ جانبیِ فاکتور (افغانی) — فقط نمایش؛ بدهیِ تأمین‌کننده نیست (PUR-06، افزودنی) */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val landedCost: Double? = null,
 )
 
 @Serializable
@@ -264,13 +305,30 @@ data class SupplierPayment(
 data class StockMovement(
   val id: String,
   val productId: String = "",
-  /** purchase_in | sale | customer_return | supplier_return | adjustment */
+  /** purchase_in | sale | customer_return | supplier_return | adjustment | transfer */
   val type: String = "",
   val qty: Double = 0.0,
   val date: String = "",
   val notes: String = "",
   val refId: String? = null,
   val createdAt: Long = 0,
+  /*  افزودنی — `StockLedger`: کاربر و دلیل (INV-02)، و برای `transfer` مبدأ،
+   *  مقصد و سری (INV-20). انتقال جمعِ صفر است و موتورِ امروز نمی‌بیندش. */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val userId: String? = null,
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val reason: String? = null,
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val locationId: String? = null,
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val toLocationId: String? = null,
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val lotId: String? = null,
 )
 
 @Serializable

@@ -45,6 +45,12 @@ products.forEach((p, i) => {
   stockMovements.push({ id: id('m'), productId: p.id, type: 'purchase_in', qty: units, date: e.date, notes: 'موجودیِ اول', refId: e.id, createdAt: e.createdAt });
 });
 
+//  «دفترِ موجودی» (موتورِ تازه، فقط وقتی تنظیمش روشن شود دیده می‌شود): هزینهٔ جانبیِ یک ورود و یک
+//  انتقال به انبارِ پشتی — هر دو فیلدِ افزودنی‌اند و موجودیِ موتورِ امروز را عوض نمی‌کنند
+warehouseEntries[0].landedCost = 120;
+stockMovements.push({ id: id('m'), productId: 'p1', type: 'transfer', qty: 10, date: iso(now - 20 * day), notes: 'پر کردنِ انبارِ پشتی',
+  refId: null, createdAt: now - 20 * day, userId: 'علی', reason: 'پر کردنِ انبارِ پشتی', locationId: '', toLocationId: 'انبارِ پشتی' });
+
 const stockLeft = Object.fromEntries(warehouseEntries.map(w => [w.productId, w.units]));
 const debtors = [
   { id: 'c1', name: 'احمد کریمی', phone: '0700123456', notes: 'همسایهٔ دکان', createdAt: now - 25 * day },

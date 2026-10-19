@@ -43,7 +43,21 @@ object WarehouseEngine {
     val batch: String = "",
     /** خالی = ثبت نشده؛ وگرنه `yyyy-MM-dd` و نه بعد از انقضا */
     val productionDate: String = "",
+    /*
+     *  موتورِ تازهٔ موجودی (`StockLedger`) — `null` یعنی فرم این‌ها را ندارد (خاموش)
+     *  و ردیف دقیقاً مثلِ امروز ساخته/ویرایش می‌شود.
+     */
+    /** هزینهٔ جانبیِ کلِ همین ردیف (کرایه، گمرک) به افغانی؛ ۰ = ندارد — PUR-06 */
+    val landedCost: Double? = null,
+    /** محلِ نگه‌داری؛ "" = محلِ اصلیِ دکان — INV-20 */
+    val locationId: String? = null,
+    /** کاربرِ ثبت‌کننده (INV-02) — فقط در ردیفِ تازه */
+    val userId: String? = null,
   )
+
+  /** هزینهٔ جانبیِ نادرست — `null` یعنی درست یا نیامده */
+  private fun landedProblem(draft: EntryDraft): String? =
+    draft.landedCost?.takeIf { it.isNaN() || it < 0 }?.let { "هزینهٔ جانبی درست نیست" }
 
   /** تاریخِ تولید درست است و از انقضا جلوتر نیست — `null` یعنی درست */
   private fun datesProblem(draft: EntryDraft): String? {
@@ -407,6 +421,7 @@ object WarehouseEngine {
     if (draft.units.isNaN() || draft.units <= 0) return Result.Failed("تعداد واحد معتبر وارد کنید")
     if (draft.price.isNaN() || draft.price < 0) return Result.Failed("قیمت خرید معتبر وارد کنید")
     datesProblem(draft)?.let { return Result.Failed(it) }
+    landedProblem(draft)?.let { return Result.Failed(it) }
 
     val id = newId()
     val date = draft.date.ifBlank { today }
@@ -426,6 +441,9 @@ object WarehouseEngine {
           expiryDate = draft.expiryDate.trim(),
           batch = draft.batch.trim(),
           productionDate = draft.productionDate.trim(),
+          landedCost = draft.landedCost?.takeIf { it > 0 },
+          locationId = draft.locationId?.trim()?.ifEmpty { null },
+          userId = draft.userId?.trim()?.ifEmpty { null },
         ),
         stockMovements = d.stockMovements + StockMovement(
           id = newId(),
@@ -452,6 +470,7 @@ object WarehouseEngine {
     if (draft.units.isNaN() || draft.units <= 0) return Result.Failed("تعداد واحد معتبر وارد کنید")
     if (draft.price.isNaN() || draft.price < 0) return Result.Failed("قیمت خرید معتبر وارد کنید")
     datesProblem(draft)?.let { return Result.Failed(it) }
+    landedProblem(draft)?.let { return Result.Failed(it) }
     //  کم کردنِ ورودی‌ای که جنسش فروخته شده، موجودی را منفی می‌کرد —
     //  همان نگهبانِ `deleteEntry`
     val left = ShopStore.stock(d, existing.productId) - existing.units +
@@ -472,6 +491,9 @@ object WarehouseEngine {
       expiryDate = draft.expiryDate.trim(),
       batch = draft.batch.trim(),
       productionDate = draft.productionDate.trim(),
+      //  فرمی که این دو را ندارد (خاموش) ⇒ همان مقدارِ قبلی
+      landedCost = if (draft.landedCost != null) draft.landedCost.takeIf { it > 0 } else existing.landedCost,
+      locationId = if (draft.locationId != null) draft.locationId.trim().ifEmpty { null } else existing.locationId,
     )
     return Result.Ok(
       d.copy(
@@ -550,6 +572,12 @@ object WarehouseEngine {
     today: String,
     now: Long,
     newId: () -> String,
+    /**
+     *  موتورِ تازهٔ موجودی (INV-04): count · damage · expired · lost · other؛ برگشت به
+     *  تأمین‌کننده خودش `supplier_return` می‌شود. `null` (خاموش) ⇒ ردیف مثلِ امروز.
+     */
+    adjKind: String? = null,
+    userId: String? = null,
   ): Result {
     val product = d.products.find { it.id == productId } ?: return Result.Failed("ابتدا یک محصول اضافه کنید")
     if (quantity.isNaN() || quantity <= 0) return Result.Failed("مقدار معتبر وارد کنید")
@@ -566,6 +594,15 @@ object WarehouseEngine {
     val id = newId()
     val date = today
     val label = if (kind == AdjustKind.SUPPLIER_RETURN) "برگشت به تأمین‌کننده" else "اصلاح موجودی"
+    val stockKind: String? = when {
+      adjKind == null -> null
+      kind == AdjustKind.SUPPLIER_RETURN -> "supplier_return"
+      //  خراب/گم‌شده/منقضی فقط کاهش است؛ افزایش ⇒ اصلاحِ شمارش
+      increase && adjKind in setOf("damage", "lost", "expired") -> "count"
+      adjKind in StockLedger.ADJ_KINDS -> adjKind
+      else -> "other"
+    }
+    val user = userId?.trim()?.ifEmpty { null }.takeIf { stockKind != null }
 
     return Result.Ok(
       d.copy(
@@ -581,6 +618,8 @@ object WarehouseEngine {
           notes = why,
           isAdjustment = true,
           createdAt = now,
+          adjKind = stockKind,
+          userId = user,
         ),
         stockMovements = d.stockMovements + StockMovement(
           id = newId(),
@@ -591,6 +630,8 @@ object WarehouseEngine {
           notes = why,
           refId = id,
           createdAt = now,
+          userId = user,
+          reason = if (stockKind != null) why else null,
         ),
         auditLog = d.auditLog + AuditEntry(
           id = newId(),

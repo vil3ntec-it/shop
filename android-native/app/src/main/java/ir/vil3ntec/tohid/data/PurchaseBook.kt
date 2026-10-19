@@ -42,8 +42,17 @@ object PurchaseBook {
     today: String,
     now: Long,
     newId: () -> String,
+    /*
+     *  موتورِ تازهٔ موجودی (`StockLedger`) — پیش‌فرض‌ها همان رفتارِ امروز‌اند.
+     *  هزینهٔ جانبیِ کلِ فاکتور (کرایه، گمرک) به نسبتِ جمعِ هر ردیف روی بهای همان
+     *  ردیف می‌نشیند (PUR-06)؛ به بدهیِ تأمین‌کننده اضافه **نمی‌شود**.
+     */
+    landedTotal: Double = 0.0,
+    locationId: String? = null,
+    userId: String? = null,
   ): Result {
     if (d.suppliers.none { it.id == supplierId }) return Result.Failed("تأمین‌کننده را انتخاب کنید")
+    if (landedTotal.isNaN() || landedTotal < 0) return Result.Failed("هزینهٔ جانبی درست نیست")
     val real = lines.filter { it.productId.isNotBlank() }
     if (real.isEmpty()) return Result.Failed("دست‌کم یک ردیف کالا لازم است")
     real.forEachIndexed { i, l ->
@@ -78,6 +87,27 @@ object PurchaseBook {
     }
     val set = ids.toSet()
     cur = cur.copy(purchases = cur.purchases.map { if (it.id in set) it.copy(invoiceNo = no) else it })
+    val landed = StockLedger.spreadLanded(StockLedger.minor(landedTotal), real.map { StockLedger.minor(lineTotal(it)) })
+      .let { shares -> ids.zip(shares).toMap() }
+    val loc = locationId?.trim()?.ifEmpty { null }
+    val user = userId?.trim()?.ifEmpty { null }
+    if (landed.values.any { it > 0 } || loc != null || user != null) {
+      cur = cur.copy(
+        purchases = cur.purchases.map { p ->
+          val share = landed[p.id] ?: 0L
+          if (share > 0) p.copy(landedCost = share / 100.0) else p
+        },
+        warehouseEntries = cur.warehouseEntries.map { w ->
+          val pid = w.purchaseId
+          if (pid == null || pid !in set) w
+          else w.copy(
+            landedCost = (landed[pid] ?: 0L).takeIf { it > 0 }?.let { it / 100.0 },
+            locationId = loc,
+            userId = user,
+          )
+        },
+      )
+    }
     return Result.Ok(cur, no)
   }
 
