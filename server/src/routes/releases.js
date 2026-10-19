@@ -151,6 +151,15 @@ async function isBeta(q) {
   return (ID.test(shop) && m.shops.has(shop)) || (ID.test(device) && m.devices.has(device));
 }
 
+/** حداقلِ دکان از `app_config` — دیتابیسِ ناسالم خوراکِ انتشار را نمی‌خواباند. */
+async function minVersion() {
+  try {
+    return require('../lib/app-compat').minVersionOf(await require('../lib/plans').allConfig(), 'shop');
+  } catch {
+    return '';
+  }
+}
+
 router.get('/:tag/latest', async (req, res, next) => {
   try {
     const tag = String(req.params.tag);
@@ -179,6 +188,9 @@ router.get('/:tag/latest', async (req, res, next) => {
       notes: data.notes,
       publishedAt: data.publishedAt,
       assets: data.assets.map(a => ({ name: a.name, size: a.size })),
+      //  §۳۸.۹: حداقل نسخهٔ پشتیبانی‌شدهٔ دکان؛ خالی ⇒ حداقلی نیست. برنامهٔ زیرِ آن
+      //  به‌جای «نسخهٔ تازه آمد» صادقانه می‌گوید «این نسخه دیگر پشتیبانی نمی‌شود».
+      minVersion: await minVersion(),
     });
   } catch (err) {
     console.warn(`[releases] ${err.message}`);

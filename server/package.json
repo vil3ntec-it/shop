@@ -17,7 +17,7 @@
     "test:web-ui": "node test/web-ui.mjs",
     "test:web-export": "node test/web-owner-export.mjs",
     "test:all": "npm test && npm run test:panel && npm run test:web && npm run test:web-ui && npm run test:web-export && npm run test:portal-rep && npm run test:web-store",
-    "test:web": "node test/web-backup.mjs && node test/web-beta-channel.mjs && node test/web-digits.mjs && node test/web-locale.mjs && node test/web-pos-draft.mjs && node test/web-sync-ux.mjs && node test/web-retail-os.mjs",
+    "test:web": "node test/web-backup.mjs && node test/web-beta-channel.mjs && node test/web-digits.mjs && node test/web-locale.mjs && node test/web-pos-draft.mjs && node test/web-sync-ux.mjs && node test/web-session.mjs && node test/web-debtors-ledger.mjs && node test/web-orders.mjs && node test/web-retail-os.mjs",
     "test:portal-rep": "node test/portal-rep.mjs",
     "test:web-store": "node test/web-store.mjs",
     "test:login": "node --test --test-concurrency=1 test/login-contract.test.js test/sync-v1.test.js",
