@@ -170,6 +170,10 @@ fun AppRoot(
         if ((failure as? ir.vil3ntec.tohid.core.net.ApiFailure)?.code == "no_shop") {
           needsShop = true
         }
+        //  این حساب حالا «پیک» است (DLV-01): سرور فقط درِ پیک را باز می‌کند ⇒ حالتِ پیک
+        if ((failure as? ir.vil3ntec.tohid.core.net.ApiFailure)?.code == "courier_scope") {
+          ir.vil3ntec.tohid.data.ShopRole.remember(context, ir.vil3ntec.tohid.data.ShopRole.COURIER)
+        }
       }
   }
 
