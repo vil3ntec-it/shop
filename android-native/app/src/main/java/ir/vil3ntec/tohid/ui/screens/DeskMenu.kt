@@ -39,16 +39,24 @@ object DeskMenu {
    *  @param canAdmin صاحب/مدیر — سابقهٔ عملیات و تنظیمات فقط برای آن‌ها (همان سدِ `AppRoot`)
    *  @param shortcuts همان `AppNav.SHORTCUTS`؛ آزمون از متنِ AppNav.kt می‌دهد (AppNav وضعیتِ Compose دارد)
    */
-  fun groups(canAdmin: Boolean, shortcuts: List<Pair<String, String>> = AppNav.SHORTCUTS): List<Group> {
-    return build(canAdmin) { id, label -> shortcutItem(shortcuts, id, label) }
+  fun groups(
+    canAdmin: Boolean,
+    shortcuts: List<Pair<String, String>> = AppNav.SHORTCUTS,
+    ordersLive: Boolean = false,
+  ): List<Group> {
+    return build(canAdmin, ordersLive) { id, label -> shortcutItem(shortcuts, id, label) }
   }
 
-  private fun build(canAdmin: Boolean, page: (String, String?) -> Item): List<Group> = listOf(
+  /**
+   *  @param ordersLive سرور بخشِ سفارش را برای این دکان روشن کرده (`OrdersLive.enabled`)؛
+   *  خاموش ⇒ همان ردیفِ «در دست ساخت»
+   */
+  private fun build(canAdmin: Boolean, ordersLive: Boolean, page: (String, String?) -> Item): List<Group> = listOf(
     Group(
       "اصلی",
       listOf(
         page("dashboard", null),
-        soon("orders", "سفارش‌های آنلاین"),
+        if (ordersLive) Item("orders", "سفارش‌های آنلاین") else soon("orders", "سفارش‌های آنلاین"),
         soon("fulfil", "آماده‌سازی و تحویل"),
         page("products", null),
         page("warehouse", null),
