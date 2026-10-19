@@ -22,11 +22,12 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.ui.theme.Shop
+import ir.vil3ntec.tohid.ui.theme.Shape
 
 /** پهنای منوی کناری — محتوا به همین اندازه از کنار فاصله می‌گیرد */
-val DESK_RAIL_WIDTH = 212.dp
+val DESK_RAIL_WIDTH = 200.dp
 /** حالتِ «فقط آیکن» */
-val DESK_RAIL_COMPACT = 72.dp
+val DESK_RAIL_COMPACT = 68.dp
 
 /** سه حالتِ منو — انتخابِ خودِ کاربر، روی همین دستگاه می‌ماند */
 object RailMode {
@@ -63,7 +64,8 @@ fun DeskRail(
     Modifier
       .width(if (compact) DESK_RAIL_COMPACT else DESK_RAIL_WIDTH)
       .fillMaxHeight()
-      .background(Shop.colors.surface)
+      //  نسخهٔ ۲: ناحیهٔ منو رنگِ خودش را دارد (خاکستری-آبیِ سرد)، نه سفیدِ هم‌رنگِ کارت‌ها
+      .background(Shop.colors.zoneNav)
       .verticalScroll(rememberScrollState())
       .padding(vertical = 10.dp, horizontal = 8.dp),
     verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -71,7 +73,7 @@ fun DeskRail(
     //  نشانِ برنامه
     if (!compact) {
       Row(Modifier.padding(horizontal = 10.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).background(Shop.colors.primary), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(34.dp).clip(Shape.button).background(Shop.colors.primary), contentAlignment = Alignment.Center) {
           Icon(Icons.Filled.Storefront, null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(20.dp))
         }
         Spacer(Modifier.width(10.dp))
@@ -139,13 +141,13 @@ private fun RailItem(id: String, label: String, key: String, icon: ImageVector, 
     Box(
       Modifier
         .fillMaxWidth()
-        .clip(RoundedCornerShape(10.dp))
-        .background(if (selected) Shop.colors.primaryTint else Shop.colors.surface.copy(alpha = 0f))
+        .clip(Shape.button)
+        .background(if (selected) Shop.colors.primaryTint else Shop.colors.zoneNav)
         .clickable { onPick(id) }
-        .padding(vertical = 11.dp),
+        .padding(vertical = 10.dp),
       contentAlignment = Alignment.Center,
     ) {
-      Icon(icon, contentDescription = label, tint = if (selected) Shop.colors.primary else Shop.colors.muted, modifier = Modifier.size(21.dp))
+      Icon(icon, contentDescription = label, tint = if (selected) Shop.colors.primaryDark else Shop.colors.muted, modifier = Modifier.size(21.dp))
     }
     return
   }
@@ -153,21 +155,22 @@ private fun RailItem(id: String, label: String, key: String, icon: ImageVector, 
    *  انتخاب‌شده: زمینهٔ کم‌رنگِ اصلی، متنِ تیرهٔ پررنگ و آیکنِ رنگِ اصلی —
    *  نه متنِ سفید روی رنگِ اصلی (در شب ۲٫۷:۱ بود، زیرِ ۴٫۵:۱).
    */
+  //  نسخهٔ ۲: قرصِ گرد با تهِ رنگِ اصلی و متنِ اصلیِ پررنگ (کنتراست در `BackOfficeContrastTest`)
   Row(
     Modifier
       .fillMaxWidth()
-      .clip(RoundedCornerShape(8.dp))
-      .background(if (selected) Shop.colors.primaryTint else Shop.colors.surface.copy(alpha = 0f))
+      .clip(Shape.chip)
+      .background(if (selected) Shop.colors.primaryTint else Shop.colors.zoneNav)
       .clickable { onPick(id) }
-      .padding(horizontal = 12.dp, vertical = 9.dp),
+      .padding(horizontal = 12.dp, vertical = 8.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
-    Icon(icon, contentDescription = null, tint = if (selected) Shop.colors.primary else Shop.colors.muted, modifier = Modifier.size(19.dp))
+    Icon(icon, contentDescription = null, tint = if (selected) Shop.colors.primaryDark else Shop.colors.muted, modifier = Modifier.size(19.dp))
     Spacer(Modifier.width(12.dp))
     Text(
       label,
       style = MaterialTheme.typography.bodyMedium,
-      color = Shop.colors.text,
+      color = if (selected) Shop.colors.primaryDark else Shop.colors.text,
       fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
       maxLines = 1,
       modifier = Modifier.weight(1f),

@@ -427,8 +427,16 @@ fun AppRoot(
   LaunchedEffect(railRequest) {
     if (railRequest != null) { setRail(railRequest); AppNav.rail.value = null }
   }
+  /*
+   *  نسخهٔ ۲: در صندوق منوی کناری خودبه‌خود «فقط آیکن» می‌شود تا کاتالوگ جا بگیرد
+   *  (نقدِ ۱۴۰۵/۰۷/۲۷). انتخابِ ذخیره‌شدهٔ کاربر (`railMode`) دست نمی‌خورد و در صفحهٔ
+   *  بعدی برمی‌گردد؛ «پنهان» همان پنهان می‌ماند. ☰ در صندوق منو را روی صفحه باز می‌کند.
+   */
+  val onSale = Platform.DESKTOP && (sub ?: tab) == "sale"
+  val shownRail = if (onSale && railMode == RailMode.FULL) RailMode.COMPACT else railMode
   /** ☰: ثابت ⇄ آیکن؛ در حالتِ پنهان، منو را روی صفحه باز/بسته می‌کند */
   fun onMenuPress() {
+    if (onSale && railMode == RailMode.FULL) { railOverlay = !railOverlay; return }
     when (railMode) {
       RailMode.FULL -> setRail(RailMode.COMPACT)
       RailMode.COMPACT -> setRail(RailMode.FULL)
@@ -523,6 +531,7 @@ fun AppRoot(
         onMenu = { onMenuPress() },
         onSearch = { AppNav.palette.value = true },
         onOpen = ::open,
+        page = sub ?: tab,
       ) else
       TohidTopBar(
         title = PAGE_TITLES[sub ?: tab] ?: "فروشگاه من",
@@ -548,8 +557,9 @@ fun AppRoot(
        *  وگرنه کاربر گمان می‌کند دفترش رفته.
        */
       SubscriptionBanner { sub = "myplan" }
-      //  نسخهٔ تازه — بررسیِ خودکار و نصب با یک دکمه (اندروید و کامپیوتر)
-      UpdateBanner()
+      //  نسخهٔ تازه — بررسیِ خودکار و نصب با یک دکمه. کامپیوتر (نسخهٔ ۲): تراشهٔ
+      //  کوچکِ سربرگ (`UpdateChip` در `DeskHeader`)، نه نوارِ تمام‌عرض
+      if (!Platform.DESKTOP) UpdateBanner()
       }
     },
     /*
@@ -626,10 +636,10 @@ fun AppRoot(
         return@Box
       }
 
-      if (wide && railMode != RailMode.HIDDEN) {
+      if (wide && shownRail != RailMode.HIDDEN) {
         val railBoard = remember(data) { ir.vil3ntec.tohid.data.DashboardEngine.board(data, ir.vil3ntec.tohid.todayIso(), 7) }
         DeskRail(
-          current = sub ?: tab, onPick = ::open, compact = railMode == RailMode.COMPACT, mode = railMode, onMode = ::setRail,
+          current = sub ?: tab, onPick = ::open, compact = shownRail == RailMode.COMPACT, mode = railMode, onMode = ::setRail,
           badges = mapOf(
             "products" to railBoard.outOfStock.size + railBoard.lowStock.size,
             "warehouse" to railBoard.expiring.size,
@@ -665,8 +675,8 @@ fun AppRoot(
       }
       val railPad = when {
         !wide -> 0.dp
-        railMode == RailMode.FULL -> DESK_RAIL_WIDTH
-        railMode == RailMode.COMPACT -> DESK_RAIL_COMPACT
+        shownRail == RailMode.FULL -> DESK_RAIL_WIDTH
+        shownRail == RailMode.COMPACT -> DESK_RAIL_COMPACT
         else -> 0.dp
       }
       PageWidth(Modifier.padding(start = railPad)) {
