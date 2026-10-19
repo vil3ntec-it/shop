@@ -37,19 +37,17 @@ class WebPaletteParityTest {
     "warning" to { it.warning }, "warning-tint" to { it.warningTint },
     "danger" to { it.danger }, "danger-tint" to { it.dangerTint },
     "aurora-1" to { it.auroraOne }, "aurora-2" to { it.auroraTwo }, "aurora-3" to { it.auroraThree },
+    //  نسخهٔ ۲ (۱۴۰۵/۰۷/۲۷): رنگِ اطلاع و سه ناحیه — وب و گوشی همین عددها را می‌گیرند
+    "info" to { it.info }, "info-tint" to { it.infoTint },
+    "zone-nav" to { it.zoneNav }, "zone-cart" to { it.zoneCart },
+    "field-border" to { it.fieldBorder },
   )
 
-  /** ناهم‌خوانیِ امروز (۱۴۰۵/۰۷/۲۲) — فقط کم شود */
-  private val drift = setOf(
-    "light:accent",        //  وب #00c39a؛ برنامه #0FA98A
-    "light:warning-tint",  //  وب از warningِ تیره؛ برنامه از نارنجیِ روشن
-    "dark:success-tint",   //  وب ۱۸٪؛ برنامه ۲۰٪
-    "dark:warning-tint",
-    "dark:danger-tint",
-    "dark:aurora-2",       //  وب ۳۸٪؛ برنامه ۴۰٪
-    "dark:aurora-3",       //  وب ۳۴٪؛ برنامه ۳۵٪
-    "radius-lg",           //  وب ۲۴؛ برنامه ۲۸
-  )
+  /**
+   *  ناهم‌خوانیِ امروز — فقط کم شود. نسخهٔ ۲ (۱۴۰۵/۰۷/۲۷) هر هشت موردِ پیشین را یکی
+   *  کرد (accent، تینت‌ها، آرورا و `radius-lg`)؛ فهرست خالی است و خالی می‌ماند.
+   */
+  private val drift = emptySet<String>()
 
   private fun block(src: String, selector: String): Map<String, String> {
     val body = src.substringAfter(selector, "").substringBefore("}")

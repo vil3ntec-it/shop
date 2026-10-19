@@ -4,7 +4,7 @@ import androidx.compose.ui.graphics.Color
 import ir.vil3ntec.tohid.ui.theme.ShopColors
 
 /** معنای رنگِ نشان — رنگ هیچ‌جا تزیین نیست */
-enum class PillTone { SUCCESS, WARNING, DANGER, NEUTRAL }
+enum class PillTone { SUCCESS, WARNING, DANGER, NEUTRAL, INFO }
 
 /**
  *  رنگِ متن/نقطه و زمینهٔ هر نشان. متن روی زمینهٔ کم‌رنگِ همان رنگ می‌نشیند؛
@@ -15,6 +15,8 @@ fun pillColors(c: ShopColors, tone: PillTone): Pair<Color, Color> = when (tone) 
   PillTone.WARNING -> c.warning to c.warningTint
   PillTone.DANGER -> c.danger to c.dangerTint
   PillTone.NEUTRAL -> c.muted to c.muted.copy(alpha = NEUTRAL_TINT)
+  //  نسخهٔ ۲: اطلاع (آبی) — «در راه»، «تازه»، «آمادهٔ نصب»
+  PillTone.INFO -> c.info to c.infoTint
 }
 
 /** زمینهٔ نشانِ خنثی: همان رنگِ `muted` با ۱۲٪ — هم‌وزنِ تینت‌های دیگر */

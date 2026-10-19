@@ -110,6 +110,21 @@ data class ShopColors(
   val fieldBg: Color,
   val fieldBorder: Color,
   val fieldFocus: Color,
+  /** نسخهٔ ۲: رنگِ اطلاع (آبی) برای نشانِ «متن + رنگ + نقطه» — کنارِ موفق/هشدار/خطر */
+  val info: Color,
+  val infoTint: Color,
+  /*
+   *  ناحیه‌ها — نسخهٔ ۲ (VISUAL-DIRECTION «نسخهٔ ۲»).
+   *
+   *  صاحب محصول: «همهٔ جعبه‌ها یک رنگ‌اند، هیچ چیز از هم جدا نیست». پس هر
+   *  ناحیه رنگِ زمینهٔ خودش را دارد تا با یک نگاه شناخته شود: منو (`zoneNav`،
+   *  خاکستری-آبیِ سرد)، کاتالوگ (همان `bg`، خنثی) و سبد (`zoneCart`، تهِ رنگِ
+   *  اصلی). کارت‌ها روی همهٔ این‌ها سفید (`surface`) با سایهٔ نرم‌اند.
+   */
+  val zoneNav: Color,
+  val zoneCart: Color,
+  /** رنگِ سایهٔ نرمِ کارت‌ها (`softCard`) — به‌جای خطِ دورِ تیره */
+  val shadow: Color,
 )
 
 /**
@@ -122,96 +137,91 @@ data class ShopColors(
  *  سفیدِ ۹۰٪ِ شیشه.
  */
 val LightColors = ShopColors(
-  //  زمینهٔ روز: خاکستریِ خنثیِ بسیار روشن — کارتِ سفید رویش با خطِ نازک جدا می‌شود
-  bg = Color(0xFFF5F5F8),
-  //  کارت: سفیدِ توپر
+  /*
+   *  نسخهٔ ۲ (۱۴۰۵/۰۷/۲۷): زمینهٔ خنثیِ آرام، کارتِ سفید با سایهٔ نرم، یک رنگِ
+   *  اصلیِ نیلی-بنفش. خطِ دورِ کارت فقط مویی است (۷٪) — نسخهٔ ۱ با خطِ ۱۰٪ و
+   *  گوشهٔ ۸، «همه‌جا خطِ تیره» دیده می‌شد. همهٔ جفت‌ها ≥ ۴٫۵:۱
+   *  (`ThemeContrastTest`، `BackOfficeContrastTest`). وب همین عددها (`WebPaletteParityTest`).
+   */
+  bg = Color(0xFFF4F5F8),
   surface = Color(0xFFFFFFFF),
-  surface2 = Color(0xFAFFFFFF),
-  //  خطِ دورِ کارت: تیرهٔ ۱۰٪ — برابرِ وب (پیش‌تر لبهٔ سفیدِ شیشه و در drift)
-  border = Color(0x1A191627),
-  text = Color(0xFF191627),
-  //  تمِ روشن: رنگِ متن‌ها ≥ ۴٫۵:۱ (WCAG AA) — همان رنگ‌های وب پس از بررسیِ axe
-  muted = Color(0xFF635C86),
-  muted2 = Color(0xFF6A6390),
-  primary = Color(0xFF6F50F0),
-  primaryDark = Color(0xFF5B3FE0),
-  primaryTint = Color(0x147C5CFF),   //  ۸٪ — با ۱۲٪ رنگِ اصلی روی آن ۴٫۴:۱ بود (کارتِ سفید)
-  success = Color(0xFF08745E),
-  successTint = Color(0x1F0FA98A),
-  warning = Color(0xFF8F5A00),
-  warningTint = Color(0x1FF0A32B),
-  danger = Color(0xFFBF2C2C),
-  dangerTint = Color(0x1FD93B3B),
+  //  پرکنِ ملایمِ درونِ کارت: ردیفِ یک‌درمیان، جای عکس، کادرِ جست‌وجو
+  surface2 = Color(0xFFF6F7F9),
+  border = Color(0x12101828),
+  text = Color(0xFF171A26),
+  muted = Color(0xFF5A6072),
+  muted2 = Color(0xFF575D6F),
+  primary = Color(0xFF5B45E0),
+  primaryDark = Color(0xFF4532C2),
+  primaryTint = Color(0x1A5B45E0),
+  success = Color(0xFF076A4F),
+  successTint = Color(0x1F10B981),
+  warning = Color(0xFF845200),
+  warningTint = Color(0x24F59E0B),
+  danger = Color(0xFFB3203A),
+  dangerTint = Color(0x1AE11D48),
   accent = Color(0xFF0FA98A),
-  glow = Color(0x1F7C5CFF),
+  glow = Color(0x1F5B45E0),
   sheen = Color(0x59FFFFFF),
   auroraOne = Color(0x4D7C5CFF),
   auroraTwo = Color(0x3D00C39A),
   auroraThree = Color(0x33FF5FA2),
   surfaceSolid = Color(0xFFFFFFFF),
-  fieldBg = Color(0xCCFFFFFF),
-  fieldBorder = Color(0x1F191627),
-  fieldFocus = Color(0xFF7C5CFF),
+  fieldBg = Color(0xFFFFFFFF),
+  //  کادرِ ورودی باید پیدا باشد، ولی نرم: ۱۴٪ (نه خطِ تیره)
+  fieldBorder = Color(0x24101828),
+  fieldFocus = Color(0xFF5B45E0),
+  info = Color(0xFF1A55C4),
+  infoTint = Color(0x1A2563EB),
+  zoneNav = Color(0xFFE9ECF3),
+  zoneCart = Color(0xFFEFECFD),
+  shadow = Color(0xB3101828),
 )
 
 /**
- *  شب — بنفشِ تیره، نه سیاه.
+ *  شب — نسخهٔ ۲: خاکستریِ تیرهٔ سرد، نه سیاه و نه بنفش.
  *
- *  سیاهِ خالص با لکه‌های نور، لکه‌دار و کثیف دیده می‌شود؛ یک بنفشِ بسیار
- *  تیره همان عمق را می‌دهد و نور رویش تمیز می‌نشیند.
+ *  کارت فقط یک پله از زمینه روشن‌تر است و یک لبهٔ مویی (۷٪ سفید) دارد؛ سایه
+ *  در شب دیده نمی‌شود، پس جدایی از همین اختلافِ کم می‌آید. منو تیره‌تر از
+ *  زمینه است و سبد تهِ بنفش دارد — همان سه ناحیهٔ روز.
  *
  *  درسی که از پالتِ قبلی نگه داشته شد: متن‌های فرعی نباید تیره باشند.
- *  هر سه پلهٔ متن آن‌قدر روشن‌اند که روی شیشهٔ کم‌رنگ هم خوانده شوند.
  */
 val DarkColors = ShopColors(
-  //  شبِ بنفش‌فام، نه سیاهِ خالص: سیاهِ خالص با نورِ آرورا لکه‌دار
-  //  می‌شود و شیشه رویش کثیف به نظر می‌رسد
-  bg = Color(0xFF0B0A14),
-  /*
-   *  ── کارت در شب: یک پله روشن‌تر، نه یک رنگِ دیگر ────────────────────
-   *  کارتِ بنفشِ پررنگ، کارت را «رنگی» نشان می‌دهد نه «بالاتر». برنامه‌های
-   *  گران در تمِ شب همه یک کار می‌کنند: سطحِ کارت فقط چند درصد از زمینه
-   *  روشن‌تر است و تقریباً بی‌رنگ؛ عمق از همان اختلافِ کم و یک لبه‌ی
-   *  بسیار کم‌رنگ می‌آید، نه از رنگ. رنگ برای چیزهایی می‌ماند که معنی
-   *  دارند: پول، هشدار، دکمه.
-   *
-   *  مات هم هست (۹۴٪) تا نورِ زمینه از داخلِ کارت خوانده نشود.
-   *  ──────────────────────────────────────────────────────────────────
-   */
-  surface = Color(0xF0141221),
-  surface2 = Color(0xF61C1930),
-  //  لبه‌ی کم‌رنگ‌تر: خطِ پررنگ دورِ کارت، جعبه می‌سازد نه سطح
-  border = Color(0x1AFFFFFF),
-  text = Color(0xFFF0EEF8),
-  muted = Color(0xFFA8A3BC),
-  muted2 = Color(0xFF7E7995),
-  primary = Color(0xFFA78BFF),
-  primaryDark = Color(0xFF7C5CFF),
-  primaryTint = Color(0x33A78BFF),
-  success = Color(0xFF5CE0BC),
-  successTint = Color(0x335CE0BC),
-  warning = Color(0xFFF5B54A),
-  warningTint = Color(0x33F5B54A),
-  danger = Color(0xFFFF7A7A),
-  dangerTint = Color(0x33FF7A7A),
-  accent = Color(0xFF5CE0BC),
+  bg = Color(0xFF0F1117),
+  surface = Color(0xFF181B23),
+  surface2 = Color(0xFF1F232D),
+  border = Color(0x12FFFFFF),
+  text = Color(0xFFECEEF4),
+  muted = Color(0xFFA3A9B9),
+  muted2 = Color(0xFF959CAD),
+  primary = Color(0xFFA594FF),
+  //  «پررنگ‌ترِ» رنگِ اصلی در شب روشن‌تر است: متن روی تینت
+  primaryDark = Color(0xFFC3B8FF),
+  primaryTint = Color(0x29A594FF),
+  success = Color(0xFF4FD1A5),
+  successTint = Color(0x244FD1A5),
+  warning = Color(0xFFF2B45A),
+  warningTint = Color(0x24F2B45A),
+  danger = Color(0xFFFF8F8F),
+  dangerTint = Color(0x24FF8F8F),
+  accent = Color(0xFF4FD1A5),
   glow = Color(0x4D7C5CFF),
   sheen = Color(0x1FFFFFFF),
   auroraOne = Color(0x8C7C5CFF),
-  auroraTwo = Color(0x6600C39A),
-  auroraThree = Color(0x59FF5FA2),
-  surfaceSolid = Color(0xFF171526),
-  fieldBg = Color(0x14FFFFFF),
-  fieldBorder = Color(0x26FFFFFF),
-  fieldFocus = Color(0xFFA78BFF),
+  auroraTwo = Color(0x6100C39A),
+  auroraThree = Color(0x57FF5FA2),
+  surfaceSolid = Color(0xFF1C1F28),
+  fieldBg = Color(0xFF1F232D),
+  fieldBorder = Color(0x24FFFFFF),
+  fieldFocus = Color(0xFFA594FF),
+  info = Color(0xFF86B4FF),
+  infoTint = Color(0x2486B4FF),
+  zoneNav = Color(0xFF0A0C11),
+  zoneCart = Color(0xFF1A1830),
+  shadow = Color(0xFF000000),
 )
 
-/**
- *  گِردیِ گوشه‌ها — بزرگ و نرم.
- *
- *  گوشهٔ تیز، عنصر را «جعبه» نشان می‌دهد. گِردیِ زیاد همان عنصر را روی
- *  زمینه شناور می‌کند، که همان حسی است که می‌خواهیم.
- */
 /**
  *  گِردیِ اجزای آماده‌ی متریال.
  *
@@ -225,10 +235,11 @@ val DarkColors = ShopColors(
  *  متریال در تمامِ برنامه گِرد می‌شوند.
  */
 val ShopShapes = Shapes(
-  //  کامپیوتر: گوشه‌های کم‌گرد، مثلِ نرم‌افزارهای رومیزی — گردیِ ۲۰ پیکسلی
-  //  روی مانیتور «برنامهٔ گوشیِ بزرگ‌شده» به نظر می‌رسید. عددها در `Corner` (Tokens.kt).
+  //  نسخهٔ ۲: یک پلهٔ گِردی برای همهٔ سکوها — کادرِ ورودی ۱۲، کارت و منو ۱۶،
+  //  پنجره ۲۰. عددها فقط در `Corner` (Tokens.kt).
   extraSmall = RoundedCornerShape(Corner.extraSmall.current),
-  small = RoundedCornerShape(Corner.small.current),
+  //  تراشه‌های متریال (FilterChip، AssistChip…) از `small` می‌خوانند ⇒ قرصیِ کامل
+  small = Shape.chip,
   medium = RoundedCornerShape(Corner.medium.current),
   large = RoundedCornerShape(Corner.large.current),
   extraLarge = RoundedCornerShape(Corner.extraLarge.current),

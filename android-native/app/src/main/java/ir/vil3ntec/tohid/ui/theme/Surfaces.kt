@@ -1,0 +1,59 @@
+package ir.vil3ntec.tohid.ui.theme
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+
+/*
+ *  سطح‌های نسخهٔ ۲ — VISUAL-DIRECTION «نسخهٔ ۲».
+ *
+ *  صاحب محصول (۱۴۰۵/۰۷/۲۷): «همه‌جا خطِ تیره، همهٔ جعبه‌ها یک رنگ، هیچ چیز
+ *  شناخته نمی‌شود». پس:
+ *   • کارت = سطحِ سفید + گوشهٔ ۱۶ + سایهٔ نرمِ پهن + لبهٔ مویی (۷٪). خطِ تیره نه.
+ *   • ناحیه = زمینهٔ رنگیِ خودش (منو، کاتالوگ، سبد)، نه یک کارتِ دیگر با همان رنگ.
+ *  صفحه‌ها رنگ و گوشه را از این‌جا می‌گیرند، نه عدد در صفحه (`HardcodedColorsTest`).
+ */
+
+/**
+ *  کارتِ نرم: سایهٔ پهن و کم‌رنگ، گوشهٔ گرد و لبهٔ مویی.
+ *
+ *  رنگِ سایه ضریب است، نه رنگِ نهایی: Compose آن را در آلفای سایهٔ سامانه
+ *  (حدودِ ۱۹٪) ضرب می‌کند؛ پس `ShopColors.shadow` با آلفای بالا سایه‌ای کم‌رنگ می‌دهد.
+ */
+fun Modifier.softCard(
+  colors: ShopColors,
+  shape: androidx.compose.ui.graphics.Shape = Shape.card,
+  fill: Color = colors.surface,
+  elevation: Dp = Elevation.card,
+  hairline: Boolean = true,
+): Modifier = this
+  .shadow(elevation, shape, clip = false, ambientColor = colors.shadow, spotColor = colors.shadow)
+  .clip(shape)
+  .background(fill, shape)
+  .then(if (hairline) Modifier.border(1.dp, colors.border, shape) else Modifier)
+
+/** ناحیه (منو، کاتالوگ، سبد): زمینهٔ رنگیِ گرد، بی سایه و بی خط */
+fun Modifier.zone(fill: Color, shape: androidx.compose.ui.graphics.Shape = Shape.cardLarge): Modifier =
+  this.clip(shape).background(fill, shape)
+
+/** گوشهٔ گزینهٔ درونِ شیار — ۳ کمتر از کنترل تا با فاصلهٔ ۳ هم‌مرکز بنشیند */
+val SegmentInnerShape = RoundedCornerShape(Corner.CONTROL - 3.dp)
+
+/**
+ *  شیارِ کنترلِ قطعه‌ای (زبانه‌ها، کلیدِ نما، روشِ پرداخت): زمینهٔ فرورفته و گزینهٔ
+ *  انتخاب‌شدهٔ سفیدِ برآمده — نه خطِ دور دورِ هر گزینه. شیار همان رنگِ سردِ
+ *  `zoneNav` است: در روز کمی تیره‌تر از زمینه و در شب تیره‌تر از کارت.
+ */
+fun Modifier.segmentTrack(colors: ShopColors): Modifier =
+  this.clip(Shape.button).background(colors.zoneNav, Shape.button).padding(3.dp)
+
+/** گزینهٔ انتخاب‌شده درونِ `segmentTrack` */
+fun Modifier.segmentSelected(colors: ShopColors): Modifier =
+  this.softCard(colors, SegmentInnerShape, fill = colors.surface, elevation = Elevation.raised)

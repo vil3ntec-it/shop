@@ -47,6 +47,7 @@ import ir.vil3ntec.tohid.ui.Platform
 import ir.vil3ntec.tohid.ui.theme.Elevation
 import ir.vil3ntec.tohid.ui.theme.Shape
 import ir.vil3ntec.tohid.ui.theme.Shop
+import ir.vil3ntec.tohid.ui.theme.softCard
 
 /** یک کارِ گروهی. `destructive` ⇒ رنگِ خطر؛ تأیید و دلیل کارِ صفحه است (`BulkConfirmDialog`) */
 data class BulkAction(
@@ -71,31 +72,29 @@ fun BulkActionBar(
   modifier: Modifier = Modifier,
 ) {
   val c = Shop.colors
-  val h = if (Platform.DESKTOP) 34.dp else 48.dp
+  val h = if (Platform.DESKTOP) 36.dp else 48.dp
+  //  نسخهٔ ۲: نوارِ شناورِ قرصی با سایهٔ نرمِ بلند، بی خطِ دور؛ کارها دکمهٔ نرمِ پرشده
   Row(
     modifier
-      .shadow(Elevation.floating, Shape.cardLarge)
-      .clip(Shape.cardLarge)
-      .background(c.surfaceSolid)
-      .border(1.dp, c.border, Shape.cardLarge)
-      .padding(horizontal = 10.dp, vertical = 8.dp),
+      .softCard(c, Shape.chip, fill = c.surfaceSolid, elevation = Elevation.lifted)
+      .padding(horizontal = 8.dp, vertical = 6.dp),
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(6.dp),
   ) {
     Text(
       "$count انتخاب‌شده",
-      style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = c.text,
-      modifier = Modifier.padding(horizontal = 6.dp),
+      style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = c.primaryDark,
+      modifier = Modifier.clip(Shape.chip).background(c.primaryTint).padding(horizontal = 12.dp, vertical = 6.dp),
     )
     for (a in actions) {
       val fg = if (a.destructive) c.danger else c.text
       Row(
         Modifier
           .heightIn(min = h)
-          .clip(Shape.button)
-          .border(1.dp, if (a.destructive) c.danger.copy(alpha = 0.35f) else c.border, Shape.button)
+          .clip(Shape.chip)
+          .background(if (a.destructive) c.dangerTint else c.surface2)
           .clickable(role = Role.Button, onClick = a.onClick)
-          .padding(horizontal = 10.dp),
+          .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
       ) {
         Icon(a.icon, null, tint = fg, modifier = Modifier.size(17.dp))
@@ -107,7 +106,7 @@ fun BulkActionBar(
       Icons.Filled.Close, null, tint = c.muted,
       modifier = Modifier
         .size(h)
-        .clip(Shape.button)
+        .clip(Shape.chip)
         .clickable(role = Role.Button, onClick = onClose)
         .semantics { contentDescription = "لغوِ انتخاب" }
         .padding(8.dp),

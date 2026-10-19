@@ -54,8 +54,9 @@ jobs:
           TOHID_DATA_DIR: ${{ runner.temp }}/tohid-data
         run: |
           mkdir -p "$RUNNER_TEMP/shots"
-          #  ساختِ dev صفحهٔ خوش‌آمد را خودش رد می‌کند (پنجره در گوشهٔ ۰،۰ است)
-          S="wait:6000;shot:00-start;key:ESCAPE;wait:1500;shot:01-dashboard"
+          #  ساختِ دو صفحهٔ خوش‌آمد را خودش رد می‌کند (پنجره در گوشهٔ ۰،۰ است).
+          #  نمایشگر ۱۹۲۰×۱۰۸۰ است و پنجره با size: اندازه می‌گیرد؛ عکس فقط خودِ پنجره است.
+          S="size:1280,800;wait:6000;shot:00-start;key:ESCAPE;wait:1500;shot:01-dashboard"
           S="$S;go:admin;wait:2000;shot:01b-admin-center;move:700,500;scroll:8;wait:600;shot:01c-admin-center-lower"
           S="$S;go:sale;wait:1500;shot:02-sale"
           #  صندوقِ سه‌ستونه با سه قلم (اسکن، «3*» و نام + Enter) و نمای جدولیِ کالا
@@ -81,8 +82,15 @@ jobs:
           S="$S;go:dashboard;key:F11;wait:2000;shot:16-fullscreen-dashboard"
           S="$S;help:on;wait:1500;shot:17-shortcuts-F1;help:off"
           S="$S;key:F11;wait:1500;theme:DARK;go:products;wait:1500;shot:18-products-dark;prodsel:2;wait:800;shot:18b-products-dark-bulk;prodsel:0;go:dashboard;wait:1500;shot:19-dashboard-dark;theme:LIGHT"
+          #  مجموعهٔ ثابتِ ظاهر (نسخهٔ ۲): صندوق روز و شب، کالاها، داشبورد و قرض‌داران در دو اندازهٔ واقعی
+          for WH in 1280,800 1920,1080; do
+            N="v2-${WH/,/x}"
+            S="$S;size:$WH;wait:1500;theme:LIGHT;go:sale;wait:2000;shot:$N-pos-light;posview:table;wait:1200;shot:$N-pos-table-light;posview:card;wait:800"
+            S="$S;theme:DARK;wait:2000;shot:$N-pos-dark;theme:LIGHT;wait:1200"
+            S="$S;go:products;wait:1800;shot:$N-products;go:dashboard;wait:1800;shot:$N-dashboard;go:debtors;wait:1800;shot:$N-debtors"
+          done
           export JAVA_TOOL_OPTIONS="-Dtohid.shot=$RUNNER_TEMP/shots -Dtohid.shot.every=9000 -Dtohid.shot.exit=true -Dtohid.shot.script=$S -Dsun.jnu.encoding=UTF-8 -Dfile.encoding=UTF-8"
-          timeout 600 xvfb-run -s "-screen 0 1440x900x24" ./gradlew --no-daemon -q -Pdev=true run || true
+          timeout 780 xvfb-run -s "-screen 0 1920x1080x24" ./gradlew --no-daemon -q -Pdev=true run || true
           ls -la "$RUNNER_TEMP/shots"
           test -n "$(ls "$RUNNER_TEMP/shots")"
 
@@ -92,19 +100,50 @@ jobs:
           path: ${{ runner.temp }}/shots
           retention-days: 14
 
-      #  شاخهٔ جدا، هر بار از نو — فقط عکس‌ها و یک README
+      #  شاخهٔ جدا: ریشه = آخرین اجرا (مثلِ پیش)، و هر شاخهٔ کار پوشهٔ خودش را دارد
+      #  (pr/<شاخه>/) تا عکس‌های PRها روی هم نیفتند. تاریخچه یک کامیت می‌ماند (orphan)؛
+      #  پوشهٔ شاخه‌ای که ۲۱ روز اجرا نداشته پاک می‌شود. دو اجرای هم‌زمان با
+      #  force-with-lease و تلاشِ دوباره پوشهٔ هم را پاک نمی‌کنند.
       - name: انتشار در شاخهٔ desktop-screenshots
+        env:
+          URL: https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
         run: |
-          cd "$RUNNER_TEMP/shots"
-          {
-            echo "# عکس‌های برنامهٔ کامپیوتر"
-            echo
-            echo "از \`${GITHUB_SHA::7}\` (${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}) — دفترِ نمایشی، نمایشگرِ مجازیِ ۱۴۴۰×۹۰۰."
-            echo
-            for f in *.png; do echo "## ${f%.png}"; echo; echo "![${f%.png}]($f)"; echo; done
-          } > README.md
-          git init -q -b desktop-screenshots
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A && git commit -q -m "عکس‌های برنامهٔ کامپیوتر از ${GITHUB_SHA::7}"
-          git push -q -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" desktop-screenshots
+          BR="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+          SAFE=$(printf '%s' "$BR" | tr -c 'A-Za-z0-9._-' '-')
+          SHOTS="$RUNNER_TEMP/shots"
+          readme() {  # $1 = پوشه، $2 = عنوان
+            {
+              echo "# $2"
+              echo
+              echo "از \`${GITHUB_SHA::7}\` (${BR}) — دفترِ نمایشی؛ عکس فقط خودِ پنجره است (۱۲۸۰×۸۰۰ و، برای v2-1920x1080-*، ۱۹۲۰×۱۰۸۰)."
+              echo
+              for f in "$1"/*.png; do b=$(basename "$f" .png); echo "## $b"; echo; echo "![$b]($b.png)"; echo; done
+            } > "$1/README.md"
+          }
+          for i in 1 2 3 4 5; do
+            rm -rf "$RUNNER_TEMP/pub"
+            if git clone -q --depth 1 --branch desktop-screenshots "$URL" "$RUNNER_TEMP/pub" 2>/dev/null; then
+              BASE=$(git -C "$RUNNER_TEMP/pub" rev-parse HEAD); LEASE="--force-with-lease=desktop-screenshots:$BASE"
+            else
+              mkdir -p "$RUNNER_TEMP/pub" && git -C "$RUNNER_TEMP/pub" init -q -b desktop-screenshots; LEASE="--force"
+            fi
+            cd "$RUNNER_TEMP/pub"
+            find . -maxdepth 1 -name '*.png' -delete
+            cp "$SHOTS"/*.png .
+            readme . "عکس‌های برنامهٔ کامپیوتر — آخرین اجرا"
+            rm -rf "pr/$SAFE" && mkdir -p "pr/$SAFE" && cp "$SHOTS"/*.png "pr/$SAFE/"
+            date +%s > "pr/$SAFE/.stamp"
+            readme "pr/$SAFE" "عکس‌های شاخهٔ $BR"
+            NOW=$(date +%s)
+            for d in pr/*/; do
+              s=$(cat "$d.stamp" 2>/dev/null || echo 0)
+              if [ $((NOW - s)) -gt 1814400 ]; then rm -rf "$d"; fi
+            done
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git checkout -q --orphan publish
+            git add -A && git commit -q -m "عکس‌های برنامهٔ کامپیوتر از ${GITHUB_SHA::7} (${BR})"
+            if git push -q $LEASE "$URL" publish:desktop-screenshots; then echo "منتشر شد: pr/$SAFE"; exit 0; fi
+            cd "$RUNNER_TEMP"; sleep $((i * 7))
+          done
+          echo "::error::انتشارِ عکس‌ها پس از پنج بار نشد"; exit 1

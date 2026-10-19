@@ -30,9 +30,10 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import ir.vil3ntec.tohid.ui.Platform
 import ir.vil3ntec.tohid.ui.theme.Shape
 import ir.vil3ntec.tohid.ui.theme.Shop
+import ir.vil3ntec.tohid.ui.theme.softCard
+import ir.vil3ntec.tohid.ui.theme.tabular
 
 enum class Trend { UP, DOWN, FLAT }
 
@@ -61,31 +62,30 @@ fun StatCard(
   onClick: (() -> Unit)? = null,
 ) {
   val c = Shop.colors
-  val pad = if (Platform.DESKTOP) 14.dp else 16.dp
+  //  نسخهٔ ۲: کارتِ نرم (سایه، گوشهٔ ۱۶، لبهٔ مویی) — نه خطِ دورِ تیره
   Column(
     modifier
-      .clip(Shape.card)
-      .background(c.surfaceSolid)
-      .border(if (selected) 2.dp else 1.dp, if (selected) c.primary else c.border, Shape.card)
+      .softCard(c, Shape.card)
+      .then(if (selected) Modifier.border(2.dp, c.primary, Shape.card) else Modifier)
       .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClickLabel = "نمایشِ فهرست", onClick = onClick) else Modifier)
       .semantics {
         contentDescription = listOfNotNull(title, value, delta?.text, period).joinToString("، ")
         if (onClick != null) this.selected = selected
       }
-      .padding(pad),
+      .padding(16.dp),
   ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
       if (icon != null) {
-        Box(Modifier.size(26.dp).clip(Shape.icon).background(c.primaryTint), contentAlignment = Alignment.Center) {
-          Icon(icon, null, tint = c.primary, modifier = Modifier.size(16.dp))
+        Box(Modifier.size(32.dp).clip(Shape.icon).background(c.primaryTint), contentAlignment = Alignment.Center) {
+          Icon(icon, null, tint = c.primaryDark, modifier = Modifier.size(18.dp))
         }
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(10.dp))
       }
       Text(title, style = MaterialTheme.typography.labelLarge, color = c.muted, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
+    Spacer(Modifier.height(12.dp))
+    Text(value, style = MaterialTheme.typography.headlineMedium.tabular(), color = c.text, fontWeight = FontWeight.Bold, maxLines = 1)
     Spacer(Modifier.height(8.dp))
-    Text(value, style = MaterialTheme.typography.headlineSmall, color = c.text, fontWeight = FontWeight.Bold, maxLines = 1)
-    Spacer(Modifier.height(6.dp))
     Row(verticalAlignment = Alignment.CenterVertically) {
       if (delta != null) {
         val tint = when {

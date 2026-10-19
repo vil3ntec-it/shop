@@ -212,12 +212,15 @@ fun Modifier.glassSurface(
   //  ۱۴۰۵/۰۷/۲۵ صفحه‌های کارِ گوشی هم (VISUAL-DIRECTION §۱). شیشه، درخشش و
   //  لبهٔ نورانی فقط با `decorative = true`
   if (ir.vil3ntec.tohid.ui.Platform.DESKTOP || !decorative) {
+    //  نسخهٔ ۲: سایهٔ نرمِ پهن به‌جای خطِ تیرهٔ ۱۲٪ (نقدِ صاحب محصول: «همه‌جا خطِ
+    //  تیره»)؛ لبه فقط مویی، از همان `border`ِ تم (۷٪). همان `softCard`.
+    val light = tint.luminance() > 0.5f
+    val shadowColor = if (light) Color(0xB3101828) else Color(0xFF000000)
     return this
-      .shadow(elevation = if (strong) 3.dp else 1.dp, shape = shape)
+      .shadow(elevation = if (strong) Elevation.lifted else Elevation.card, shape = shape, ambientColor = shadowColor, spotColor = shadowColor)
       .clip(shape)
       .background(color = if (tint.alpha < 0.98f) tint.copy(alpha = 1f) else tint, shape = shape)
-      //  خطِ دورِ کارت روی کامپیوتر دیده می‌شود (روی گوشی لبهٔ سفیدِ شیشه بود)
-      .border(1.dp, if (tint.luminance() > 0.5f) Color(0x1F1E1B2E) else Color(0x24FFFFFF), shape)
+      .border(1.dp, border, shape)
   }
   val solid = tint.alpha > 0.98f
   return this
