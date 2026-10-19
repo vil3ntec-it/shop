@@ -167,6 +167,19 @@
        خودِ نوار — وگرنه دکمه‌ی شناور و نوارِ سبد رویش می‌افتند. */
     --bottomnav-gap:10px;
     --bottomnav-space:calc(var(--bottomnav-h) + var(--bottomnav-gap) + env(safe-area-inset-bottom));
+    /* DESIGN v2 (صاحب محصول، ۱۴۰۵/۰۷/۲۸): گِردیِ نرم، سایهٔ نرم به‌جای خطِ تیره، رنگِ جدا
+       برای هر ناحیه (منو، کاتالوگ، سبد). همهٔ صفحه‌ها فقط از همین چند توکن می‌خوانند؛
+       هم‌ترازی با جدولِ توکنِ design-v2 یعنی عوض‌کردنِ همین بلوک و بلوکِ شب. */
+    --r-card:16px;
+    --r-ctl:12px;
+    --r-chip:999px;
+    --hairline:rgba(25,22,39,.06);
+    --elev-1:0 1px 2px rgba(25,22,39,.04), 0 6px 16px -8px rgba(25,22,39,.12);
+    --elev-2:0 2px 4px rgba(25,22,39,.05), 0 16px 36px -14px rgba(25,22,39,.24);
+    --zone-nav:#efeef6;
+    --zone-catalog:#f5f5f8;
+    --zone-cart:#f4f1ff;
+    --zone-cart-line:rgba(111,80,240,.14);
   }
   /*
      شبِ برنامه: زمینه‌ی بنفشِ بسیار تیره (نه سیاهِ خالص، که با نور
@@ -197,6 +210,13 @@
     --aurora-3:rgba(255,95,162,.34);
     --shadow-sm:0 1px 2px rgba(0,0,0,.4);
     --shadow-md:0 10px 30px -12px rgba(0,0,0,.7);
+    --hairline:rgba(255,255,255,.06);
+    --elev-1:0 1px 2px rgba(0,0,0,.4), 0 8px 20px -10px rgba(0,0,0,.6);
+    --elev-2:0 2px 4px rgba(0,0,0,.4), 0 18px 40px -14px rgba(0,0,0,.75);
+    --zone-nav:#100f1b;
+    --zone-catalog:#0b0a14;
+    --zone-cart:#1a1630;
+    --zone-cart-line:rgba(167,139,255,.22);
   }
   /* ==========================================================
      زمینه‌ی آرورا — سه لکه‌ی نور، ساکن.
@@ -8060,6 +8080,9 @@
     const bar = document.getElementById('update-bar');
     const btn = document.getElementById('btn-apply-update');
     if(!bar || !btn) return;
+    //  DESIGN v2: نوارِ شناورِ بالای صفحه نه — چیپِ کوچکی در سربرگ
+    const slot = document.querySelector('.header .header-right');
+    if(slot && bar.parentElement !== slot) slot.prepend(bar);
     bar.hidden = false;
     btn.onclick = ()=>{
       btn.disabled = true;
@@ -15396,7 +15419,7 @@
 <script src="license/license-client.js?v=16" defer></script>
 <script src="license/shop-sync.js?v=19" defer></script>
 <script src="license/shop-ui.js?v=15" defer></script>
-<script src="license/vip.js?v=17" defer></script>
+<script src="license/vip.js?v=18" defer></script>
 <script src="license/support.js?v=16" defer></script>
 <script src="license/account-ui.js?v=3" defer></script>
 <script src="license/auto-backup.js?v=1" defer></script>
