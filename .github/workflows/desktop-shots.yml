@@ -8,13 +8,22 @@ on:
   pull_request:
     paths:
       - 'desktop/**'
-      - 'android-native/app/src/main/**'
+      #  نصاب و بستهٔ «همهٔ کامپیوترها» در هیچ عکسی دیده نمی‌شوند
+      - '!desktop/installer/**'
+      - '!desktop/setup-all/**'
+      #  کامپیوتر از اندروید فقط کدِ Kotlin و سه پوشهٔ res (قلم، صدا، نشان) را برمی‌دارد
+      #  (`androidSources` و `copyRes` در desktop/build.gradle.kts)؛ مانیفست و بقیهٔ res فقط اندرویدند
+      - 'android-native/app/src/main/java/**'
+      - 'android-native/app/src/main/res/font/**'
+      - 'android-native/app/src/main/res/raw/**'
+      - 'android-native/app/src/main/res/drawable-xxxhdpi/**'
       - '.github/workflows/desktop-shots.yml'
   workflow_dispatch:
 
 concurrency:
-  group: desktop-shots-${{ github.ref }}
-  cancel-in-progress: true
+  #  PR: pushِ تازه اجرای قبلیِ همان PR را لغو می‌کند؛ اجرای دستی لغو نمی‌شود
+  group: desktop-shots-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: write

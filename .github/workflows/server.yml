@@ -32,8 +32,9 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: server-${{ github.ref }}
-  cancel-in-progress: true
+  #  PR: pushِ تازه اجرای قبلیِ همان PR را لغو می‌کند. اجرای main (و برچسب‌ها) هرگز وسطِ کار لغو نمی‌شود.
+  group: server-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
