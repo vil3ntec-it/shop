@@ -272,7 +272,8 @@ test('توکنِ بی‌دامنهٔ پیش از پیک شدن: /api/shop/join �
   const join = await h.post('/api/shop/join', { code }, { token: u.accessToken });
   assert.equal(join.status, 201, JSON.stringify(join.body));
   assert.equal(join.body.courier, true);
-  assert.equal(join.body.shop.role, 'courier');
+  assert.equal(join.body.role, 'courier', 'همان شکلِ پاسخِ پیوستن (ShopStateDto)');
+  assert.deepEqual(join.body.permissions, [], 'نقشِ پیک هیچ مجوزی در جدولِ نقش‌ها ندارد');
   assert.ok(join.body.accessToken);
   //  نشستِ پیشین (بی‌دامنه) دیگر کار نمی‌کند — نه فقط روی /api/shop، که همه‌جا
   assert.equal((await h.get('/api/me', { token: u.accessToken })).status, 401);

@@ -204,13 +204,13 @@ router.post(['/staff/join', '/join'], joinLimit, async (req, res) => {
     const deviceId = req.tokenRow?.device_id || null;
     const access = await tokens.issue({ kind: 'access', subjectId: req.user.id, deviceId, ttlMs: config.tokens.accessTtlMs, app: 'shop' });
     const refresh = await tokens.issue({ kind: 'refresh', subjectId: req.user.id, deviceId, ttlMs: config.tokens.refreshTtlMs, app: 'shop' });
-    return res.status(201).json({
-      shop: { id: shop.id, name: shop.name || '', role },
+    //  همان شکلِ پاسخِ پیوستن (`role` در بالا، بی مجوز) + نشستِ تازه که برنامه جایگزین می‌کند
+    return res.status(201).json(shopPayload(shop, member, {
       courier: true,
       accessToken: access.token, accessExpiresAt: access.expiresAt,
       refreshToken: refresh.token, refreshExpiresAt: refresh.expiresAt,
       deviceId,
-    });
+    }));
   }
   res.status(201).json(shopPayload(shop, member, {
     entitlement: { source: ent.source, subscription: ent.subscription, trial: ent.trial },
