@@ -226,7 +226,9 @@ class PayFlowTest {
     val part = sale(PayFlow.Draft(2000.0, "500", customerId = "d1"))
     val onAccount = sale(PayFlow.Draft(2000.0, "0", customerId = "d1"))
     val all = listOf(cash, card, hawala, wallet, mixed, part, onAccount)
-    assertEquals(listOf("نقد", "کارت", "حواله", "کیف پول", "ترکیبی", "ترکیبی", "به حساب"), all.map { PayFlow.payLabel(it) })
+    assertEquals(listOf("نقد", "کارت", "حواله", "کیف پول", "ترکیبی", "ترکیبی", "نسیه"), all.map { PayFlow.payLabel(it) })
+    //  فروشِ کاملاً به حسابِ payV2 همان «نسیه»ِ فاکتورِ قدیمیِ هم‌شکل است
+    assertEquals(PayFlow.payLabel(Sale(id = "o", finalTotal = 2000.0, paymentMethod = "credit")), PayFlow.payLabel(onAccount))
     assertEquals(listOf("cash", "noncash", "noncash", "noncash", "noncash", "credit", "credit"), all.map { PayFlow.payGroup(it) })
     assertEquals("نقدی", PayFlow.payLabel(cash, cash = "نقدی"))
     //  ردیف‌ها بر `paymentMethod` مقدم‌اند (فاکتورِ پیش از اصلاحِ legacyMethod: کارت با cash)
