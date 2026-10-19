@@ -104,7 +104,7 @@
     var s = (p && p.stock) || { status: 'unverified' };
     switch (s.status) {
       case 'in_stock': return { text: 'موجود', kind: 'ok', orderable: true };
-      case 'in_warehouse': return { text: s.prepMinutes ? 'در انبار · آماده‌سازی ~' + K.fa(s.prepMinutes, 0) + ' دقیقه' : 'در انبار؛ آماده‌سازی لازم', kind: 'info', orderable: true };
+      case 'in_warehouse': return { text: s.prepMinutes ? 'در انبار، آماده‌سازی ~' + K.fa(s.prepMinutes, 0) + ' دقیقه' : 'در انبار؛ آماده‌سازی لازم', kind: 'info', orderable: true };
       case 'out_of_stock': return { text: 'ناموجود', kind: 'err', orderable: false };
       case 'unavailable': return { text: 'قابلِ سفارش نیست', kind: 'err', orderable: false };
       default: return { text: 'موجودی در حال بررسی است', kind: 'off', orderable: true };
@@ -212,7 +212,7 @@
   function renderAddSheet(p) {
     var b = $('ps-add'); var st = stockOf(p); var line = cart[p.id];
     b.disabled = !st.orderable;
-    b.textContent = !st.orderable ? st.text : (line ? 'یکی دیگر · ' + K.qty(line.qtyMilli) + ' در سبد' : 'افزودن به سبد · ' + K.money(p.priceMinor));
+    b.textContent = !st.orderable ? st.text : (line ? 'یکی دیگر — ' + K.qty(line.qtyMilli) + ' در سبد' : 'افزودن به سبد — ' + K.money(p.priceMinor));
     b.onclick = function () { addOne(p); renderAddSheet(p); };
   }
 
@@ -373,7 +373,7 @@
     var ok = verifiedFor($('c-phone').value);
     var btn = $('submit-order');
     btn.disabled = !ids().length || !f || below || hasBad() || !ok;
-    btn.textContent = quoteNote ? 'پذیرفتنِ قیمتِ تازه و ثبت · ' + K.money(sub + fee) : 'ثبتِ سفارش · ' + K.money(sub + fee);
+    btn.textContent = quoteNote ? 'پذیرفتنِ قیمتِ تازه و ثبت — ' + K.money(sub + fee) : 'ثبتِ سفارش — ' + K.money(sub + fee);
   }
 
   function renderVerify() {
@@ -502,7 +502,7 @@
   function openCheckout() {
     if (!ids().length) { location.hash = '#/'; return; }
     show('view-checkout');
-    document.title = 'ثبتِ سفارش · ' + store.title;
+    document.title = 'ثبتِ سفارش — ' + store.title;
     if (!fulfillment()) {
       var f = defaultFulfillment();
       var r = document.querySelector('input[name="fulfillment"][value="' + f + '"]');
@@ -527,7 +527,7 @@
     $('o-title').textContent = 'سفارشِ شمارهٔ ' + K.fa(o.orderNo, 0);
     K.clear($('o-pill')).appendChild(el('span', { class: 'pill ' + K.orderKind(o.status), text: K.ORDER[o.status] || o.status }));
     var why = o.statusReason && K.REASON[o.statusReason] ? ' — ' + K.REASON[o.statusReason] : '';
-    $('o-status').textContent = (o.fulfillment === 'pickup' ? 'دریافت از دکان' : 'ارسال به نشانیِ شما') + ' · ' + K.when(o.createdAt) + why;
+    $('o-status').textContent = (o.fulfillment === 'pickup' ? 'دریافت از دکان' : 'ارسال به نشانیِ شما') + '، ' + K.when(o.createdAt) + why;
     var steps = K.clear($('o-steps'));
     K.orderSteps(o).forEach(function (s) {
       var dot = el('span', { class: 'dot' });
@@ -569,7 +569,7 @@
   var FINAL = ['rejected', 'auto_rejected', 'cancelled_by_customer', 'cancelled', 'delivered', 'picked_up', 'restocked', 'refunded_full', 'refunded_partial'];
   function openOrder(token) {
     show('view-order');
-    document.title = 'سفارش · ' + store.title;
+    document.title = 'سفارش — ' + store.title;
     clearTimeout(pollTimer);
     $('o-msg').hidden = true;
     var placed = K.loadS('placed:' + token);
@@ -611,7 +611,7 @@
   // ── سفارش‌های من در همین دکان ──
   function openOrders() {
     show('view-orders');
-    document.title = 'سفارش‌های من · ' + store.title;
+    document.title = 'سفارش‌های من — ' + store.title;
     var draw = function (list) {
       var ul = K.clear($('my-orders'));
       list.forEach(function (o) {
