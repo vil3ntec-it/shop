@@ -25,7 +25,11 @@ import kotlinx.serialization.json.buildJsonObject
  *  را ندارد و پیامِ خودِ سرور همان را می‌گوید — دکمه را پنهان نمی‌کنیم و
  *  وانمود نمی‌کنیم که قابلیت نیست.
  */
-class ShopRepository(private val api: ApiClient) {
+class ShopRepository(
+  private val api: ApiClient,
+  /** فقط برای پیوستن به‌عنوانِ پیک: سرور نشستِ تازهٔ دامنه‌دار می‌دهد (DLV-01) */
+  private val tokens: ir.vil3ntec.tohid.core.net.TokenStorage? = null,
+) {
 
   /** دکانِ من — یا `null` اگر هنوز دکانی ساخته نشده */
   suspend fun current(): ApiResult<ShopStateDto> =
@@ -39,10 +43,28 @@ class ShopRepository(private val api: ApiClient) {
 
   /** پیوستن با کدِ شاگرد */
   suspend fun join(code: String): ApiResult<ShopStateDto> = result {
-    ApiJson.decode<ShopStateDto>(
-      api.post(ApiEndpoints.Shop.JOIN, buildJsonObject { put("code", JsonPrimitive(code.trim())) })
-    )
+    val body = api.post(ApiEndpoints.Shop.JOIN, buildJsonObject { put("code", JsonPrimitive(code.trim())) })
+    /*
+     *  کدِ دعوتِ پیک: سرور نشست‌های بی‌دامنهٔ این حساب را بست و نشستِ تازهٔ
+     *  `courier` را همین‌جا داد. اگر نگه داشته نشود، برنامه با توکنِ باطل
+     *  می‌ماند و کاربر بی‌دلیل بیرون می‌افتد.
+     */
+    val access = ApiJson.text(body, "accessToken")
+    if (access.isNotBlank()) {
+      tokens?.save(access, ApiJson.text(body, "refreshToken").ifBlank { null }, ApiJson.long(body, "accessExpiresAt"))
+    }
+    ApiJson.decode<ShopStateDto>(body)
   }
+
+  /**
+   *  «دعوتِ پیک» دیده شود؟ — پرچمِ `shop.delivery` روشن و اشتراکِ تحویل هست.
+   *  سرورِ قدیمی یا هر خطا ⇒ نه (دکمهٔ بی‌اثر نشان داده نمی‌شود).
+   */
+  suspend fun courierInviteAllowed(): Boolean =
+    result {
+      val body = api.get(ApiEndpoints.Shop.DELIVERY_CONFIG)
+      ApiJson.bool(body, "readable") && ApiJson.bool(body, "entitled")
+    }.valueOrNull() == true
 
   /* ------------------------------ کارمندان ------------------------------ */
 

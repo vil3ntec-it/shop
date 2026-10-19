@@ -102,6 +102,7 @@
     productionDate: 'تاریخ تولید',
     invoiceNumber: 'شمارهٔ فاکتور',
     series: 'سری سند',
+    channel: 'کانال فروش',
     total: 'جمع',
     discountType: 'نوع تخفیف',
     discountValue: 'مقدار تخفیف',

@@ -30,6 +30,12 @@ object ShopRole {
   const val OWNER = "owner"
   const val MANAGER = "manager"
   const val STAFF = "staff"
+  /**
+   *  پیک (DLV-01، v3 §۳.۱۱) — توکنش فقط درهای `/api/courier/…` را باز می‌کند، پس
+   *  برنامه به‌جای دکان «حالتِ پیک» را باز می‌کند و همگام‌سازیِ دفتر را
+   *  اصلاً راه نمی‌اندازد (سرور هم `403 courier_scope` می‌دهد).
+   */
+  const val COURIER = "courier"
 
   private fun prefs(context: Context) =
     context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -52,6 +58,7 @@ object ShopRole {
     val edit = p.edit().putString(KEY, clean)
     if (p.getString(KEY, null) != clean) edit.remove(POLICY)
     edit.apply()
+    courierMode.value = clean == COURIER
   }
 
   /** شناسهٔ دکان — «برگهٔ امضاشده»ی تأیید (STF-02) به آن بسته است */
@@ -71,6 +78,7 @@ object ShopRole {
 
   fun forget(context: Context) {
     prefs(context).edit().remove(KEY).remove(POLICY).remove(SHOP_ID).apply()
+    courierMode.value = false
   }
 
   /**
@@ -79,6 +87,17 @@ object ShopRole {
    */
   fun allows(context: Context, key: String): Boolean =
     PermPolicy.allows(current(context), prefs(context).getString(POLICY, null), key)
+
+  /** حالتِ پیک: نقشِ ذخیره‌شده «پیک» است */
+  fun isCourier(context: Context): Boolean =
+    prefs(context).getString(KEY, "").orEmpty() == COURIER
+
+  /**
+   *  «الان پیک است؟» — زنده، تا صفحهٔ اصلی از هر راهی که نقش عوض شد (ورود
+   *  با کد، پیوستن از صفحهٔ ساختِ دکان، پرسشِ دوبارهٔ سرور) همان لحظه به
+   *  حالتِ پیک برود یا از آن بیرون بیاید.
+   */
+  val courierMode = kotlinx.coroutines.flow.MutableStateFlow(false)
 
   /** شاگرد است — نه صاحب، نه مدیر */
   fun isStaff(context: Context): Boolean = current(context) == STAFF

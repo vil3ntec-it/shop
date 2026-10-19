@@ -480,6 +480,8 @@ object SalesEngine {
   ): Result {
     val sale = d.sales.find { it.id == saleId } ?: return Result.Failed("فاکتور پیدا نشد")
     if (sale.status == "cancelled") return Result.Failed("این فاکتور قبلاً لغو شده است")
+    //  ORD-20: فاکتورِ سفارشِ اینترنتی را سرور ساخته؛ لغو/«اصلاح در سبد» یعنی دوباره زدن
+    if (sale.isOnlineOrder()) return Result.Failed(ONLINE_ORDER_LOCKED)
     val why = reason.trim()
 
     var updated = sale.copy(status = "cancelled", cancelReason = why)
@@ -533,6 +535,10 @@ object SalesEngine {
   }
 
   /** جملهٔ هشدارِ پیش از لغو */
+  /** پیامِ ردِ لغوِ فاکتورِ سفارشِ اینترنتی */
+  const val ONLINE_ORDER_LOCKED =
+    "این فاکتورِ سفارشِ اینترنتی است و از صندوق لغو نمی‌شود؛ برگشتِ کاملش از بخشِ «سفارش‌ها» (بازپرداخت) ثبت می‌شود"
+
   fun cancelWarning(sale: Sale): String =
     "فروش #${sale.invoiceLabel() ?: "0"} لغو می‌شود و موجودی کالاهای آن به انبار برمی‌گردد. سابقه فروش حذف نمی‌شود."
 

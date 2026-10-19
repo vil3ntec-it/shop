@@ -70,6 +70,11 @@ fun TeamScreen(snackbar: SnackbarHostState) {
   var askStandingOff by remember { mutableStateOf(false) }
   //  STF-01..03 / STF-10: فقط صاحب دکان مجوز و دستگاه را عوض می‌کند (سرور هم همین را می‌سنجد)
   val isOwner = remember { ir.vil3ntec.tohid.data.ShopRole.current(context) == ir.vil3ntec.tohid.data.ShopRole.OWNER }
+  /**
+   *  «دعوتِ پیک» (DLV-01) — فقط وقتی سرور می‌گوید تحویل برای این دکان روشن
+   *  است (پرچمِ `shop.delivery` + اشتراک). خاموش ⇒ گزینه اصلاً دیده نمی‌شود.
+   */
+  var courierAllowed by remember { mutableStateOf(false) }
 
   //  صفحه نه نشانیِ سرور را می‌داند و نه توکن را؛ فقط مخزن را صدا می‌زند
   val shops = remember(context) { Backend.shop(context) }
@@ -89,6 +94,8 @@ fun TeamScreen(snackbar: SnackbarHostState) {
     //  کدِ ثابت جدا خوانده می‌شود؛ سرورِ قدیمی این مسیر را ندارد و
     //  نبودنش نباید بقیهٔ صفحه را خراب کند
     shops.standingState().let { (code, off) -> standing = code; standingOff = off }
+
+    courierAllowed = isOwner && shops.courierInviteAllowed()
   }
 
   LaunchedEffect(signedIn) { if (signedIn) reload() }
@@ -329,6 +336,7 @@ fun TeamScreen(snackbar: SnackbarHostState) {
   if (askNew) {
     NewCodeDialog(
       busy = busy,
+      courierAllowed = courierAllowed,
       onDismiss = { askNew = false },
       onCreate = { role, uses, days ->
         askNew = false
@@ -491,6 +499,7 @@ private fun RoleChip(role: String, status: String) {
     status != "active" -> colors.muted2
     role == "owner" -> colors.primary
     role == "manager" -> colors.accent
+    role == "courier" -> colors.warning
     else -> colors.success
   }
   Box(
@@ -511,6 +520,7 @@ private fun RoleChip(role: String, status: String) {
 private fun roleText(role: String): String = when (role) {
   "owner" -> "صاحب دکان"
   "manager" -> "مدیر"
+  "courier" -> "پیک"
   else -> "شاگرد"
 }
 
@@ -519,6 +529,7 @@ private fun roleText(role: String): String = when (role) {
 @Composable
 private fun NewCodeDialog(
   busy: Boolean,
+  courierAllowed: Boolean,
   onDismiss: () -> Unit,
   onCreate: (role: String, maxUses: Int, days: Int) -> Unit,
 ) {
@@ -534,7 +545,9 @@ private fun NewCodeDialog(
     text = {
       Column {
         Text(
-          "شاگرد این کد را در صفحهٔ ورود می‌زند و به همین دکان می‌پیوندد.",
+          if (role == "courier")
+            "پیک این کد را در «ورود با کدِ شاگرد» می‌زند. حسابش فقط مأموریت‌های خودش را می‌بیند — نه دفتر، نه کالا، نه گزارش."
+          else "شاگرد این کد را در صفحهٔ ورود می‌زند و به همین دکان می‌پیوندد.",
           style = MaterialTheme.typography.bodySmall,
           color = colors.muted,
         )
@@ -544,6 +557,12 @@ private fun NewCodeDialog(
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
           RoleOption("شاگرد", "فروش و ثبت", role == "staff", Modifier.weight(1f)) { role = "staff" }
           RoleOption("مدیر", "همه‌کاره جز حذف دکان", role == "manager", Modifier.weight(1f)) { role = "manager" }
+        }
+        if (courierAllowed) {
+          Spacer(Modifier.height(8.dp))
+          RoleOption("پیک", "فقط مأموریت‌های خودش", role == "courier", Modifier.fillMaxWidth()) {
+            role = "courier"; uses = "1"
+          }
         }
         Spacer(Modifier.height(14.dp))
         NumberField(uses, { uses = it }, "چند بار قابل استفاده (۰ = بی‌شمار)")
