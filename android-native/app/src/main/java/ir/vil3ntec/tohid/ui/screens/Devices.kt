@@ -49,11 +49,18 @@ fun DevicesScreen(data: ir.vil3ntec.tohid.data.ShopData, snackbar: SnackbarHostS
   val left: @Composable () -> Unit = {
     PrintersPanel(::toast)
     Spacer(Modifier.height(14.dp))
+    PrintQueuePanel(::toast)
+    Spacer(Modifier.height(14.dp))
+    LabelsPanel(data, ::toast)
+    Spacer(Modifier.height(14.dp))
     ScannersPanel()
   }
   val right: @Composable () -> Unit = {
     PhoneScannerPanel(data, ::toast)
     Spacer(Modifier.height(14.dp))
+    ScalePanel(data, ::toast)
+    Spacer(Modifier.height(14.dp))
+    if (ir.vil3ntec.tohid.hw.CustomerFacing.supported) { CustomerDisplayPanel(); Spacer(Modifier.height(14.dp)) }
     LivePanel()
     Spacer(Modifier.height(14.dp))
     PhotosPanel()
@@ -100,6 +107,7 @@ private fun PrintersPanel(toast: (String) -> Unit) {
   val def = remember(tick) { PrinterRegistry.defaultLink(context) }
   var adding by remember { mutableStateOf(false) }
   var name by remember { mutableStateOf("") }
+  var editing by remember { mutableStateOf<PrinterRegistry.Saved?>(null) }
 
   Panel {
     Head(Icons.Filled.Print, "چاپگرها", "حرارتیِ ۵۸ و ۸۰ میلی‌متری — بلوتوث، وای‌فای، سیم یا چاپگرِ نصب‌شده")
@@ -116,9 +124,12 @@ private fun PrintersPanel(toast: (String) -> Unit) {
         Column(Modifier.weight(1f)) {
           Text(p.name + if (isDefault) " — پیش‌فرض" else "", fontWeight = FontWeight.Bold, color = Shop.colors.text,
             style = MaterialTheme.typography.bodyMedium)
-          Text("${PrinterRegistry.kind(p.link)} · ${PrinterRegistry.label(p.link)} · ${if (p.width >= ThermalPrinter.WIDTH_80MM) "۸۰" else "۵۸"} میلی‌متر",
+          Text("${PrinterRegistry.kind(p.link)} · ${PrinterRegistry.label(p.link)} · " +
+            (if (p.isLabel) "برچسبِ کالا" else "${if (p.width >= ThermalPrinter.WIDTH_80MM) "۸۰" else "۵۸"} میلی‌متر") +
+            (if (p.drawer && !p.isLabel) " · کشو" else ""),
             style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
         }
+        TextButton(onClick = { editing = p }) { Text("تنظیم") }
         TextButton(onClick = {
           toast("برگهٔ آزمون به «${p.name}» رفت…")
           scope.launch { toast(PrinterRegistry.testPrint(context, p) ?: "چاپِ آزمون انجام شد") }
@@ -142,6 +153,9 @@ private fun PrintersPanel(toast: (String) -> Unit) {
       "روی کامپیوتر: چاپگرِ بلوتوثی را اول در تنظیماتِ بلوتوثِ ویندوز/مک جفت کنید؛ یا به‌شکلِ «چاپگرِ نصب‌شده» دیده می‌شود یا در برگهٔ بلوتوث به‌شکلِ درگاهِ COM.",
       style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2,
     )
+  }
+  editing?.let { p ->
+    PrinterSettingsDialog(p, onDismiss = { editing = null }, onSaved = { editing = null; tick++; toast("تنظیمِ چاپگر ذخیره شد") }, toast = toast)
   }
   if (adding) {
     PrinterDialog(

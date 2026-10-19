@@ -364,19 +364,57 @@ fun InvoiceDialog(
     }
   }
 
+  //  HW-02: فاکتوری که پیش‌تر چاپ شده دوباره فقط با دلیل؛ چاپ از صفِ چاپ می‌رود و هرگز فروش نمی‌سازد
+  var reprint by remember { mutableStateOf<Pair<String, Int>?>(null) }
+  fun send(address: String, width: Int, reason: String?) {
+    onMessage("در حال فرستادن به چاپگر…")
+    scope.launch { onMessage(ir.vil3ntec.tohid.print.PrintSpooler.printSale(context, d, sale, address, width, reason)) }
+  }
   if (printer) {
     PrinterDialog(
       onDismiss = { printer = false },
       onPrint = { address, width ->
         printer = false
-        onMessage("در حال فرستادن به چاپگر…")
-        scope.launch {
-          val error = PrintJob.printSale(context, d, sale, address, width)
-          onMessage(error ?: "فاکتور به چاپگر فرستاده شد")
-        }
+        if (ir.vil3ntec.tohid.print.PrintLog.wasPrinted(context, sale.id)) reprint = address to width
+        else send(address, width, null)
       },
     )
   }
+  reprint?.let { (address, width) ->
+    ReprintReasonDialog(onDismiss = { reprint = null }) { reason -> reprint = null; send(address, width, reason) }
+  }
+}
+
+/** دلیلِ چاپِ دوباره — یکی از دلیل‌های رایج یا نوشتهٔ خودِ فروشنده */
+@Composable
+internal fun ReprintReasonDialog(onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
+  val reasons = listOf("کاغذ گیر کرد یا بریده شد", "چاپ ناخوانا بود", "مشتری نسخهٔ دوم خواست")
+  var picked by remember { mutableStateOf<String?>(null) }
+  var other by remember { mutableStateOf("") }
+  val reason = picked ?: other.trim()
+  AlertDialog(
+    onDismissRequest = onDismiss,
+    title = { Text("این فاکتور پیش‌تر چاپ شده") },
+    text = {
+      Column {
+        Text("برای چاپِ دوباره دلیل را بگویید. روی کاغذ «چاپِ دوباره» می‌آید و فروشِ تازه‌ای ساخته نمی‌شود.",
+          style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
+        Spacer(Modifier.height(8.dp))
+        reasons.forEach { r ->
+          Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            RadioButton(selected = picked == r, onClick = { picked = r })
+            Text(r, style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text)
+          }
+        }
+        OutlinedTextField(
+          value = other, onValueChange = { other = it.take(80); picked = null }, singleLine = true,
+          label = { Text("دلیلِ دیگر") }, modifier = Modifier.fillMaxWidth(),
+        )
+      }
+    },
+    confirmButton = { Button(onClick = { onConfirm(reason) }, enabled = reason.isNotBlank()) { Text("چاپِ دوباره") } },
+    dismissButton = { TextButton(onClick = onDismiss) { Text("انصراف") } },
+  )
 }
 
 /* ============================ چاپگر ============================ */

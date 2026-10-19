@@ -61,6 +61,18 @@ object DevShot {
               "help" -> { java.awt.EventQueue.invokeAndWait { ir.vil3ntec.tohid.ui.AppNav.help.value = arg != "off" }; Thread.sleep(1500) }
               //  محصولات: نما (prodview:card|table) و انتخابِ n ردیفِ اولِ فهرست (prodsel:3 — نوارِ کارِ گروهی)
               "prodview" -> { java.awt.EventQueue.invokeAndWait { ir.vil3ntec.tohid.ui.screens.DeskProductsShot.view.value = arg }; Thread.sleep(1200) }
+              //  دستگاه‌ها: پیش‌نمایشِ بی چاپگر — hwshot:receipt|label|a4|close (HW-11)
+              //  و نمایشگرِ مشتری — hwshot:customer|nocustomer (HW-10)
+              "hwshot" -> {
+                java.awt.EventQueue.invokeAndWait {
+                  when (arg) {
+                    "customer" -> ir.vil3ntec.tohid.hw.CustomerFacing.open.value = true
+                    "nocustomer" -> ir.vil3ntec.tohid.hw.CustomerFacing.open.value = false
+                    else -> ir.vil3ntec.tohid.ui.screens.HwShot.preview.value = arg.takeIf { it != "close" }
+                  }
+                }
+                Thread.sleep(1500)
+              }
               "prodsel" -> { java.awt.EventQueue.invokeAndWait { ir.vil3ntec.tohid.ui.screens.DeskProductsShot.select.value = arg.toInt() }; Thread.sleep(1000) }
               //  تم: theme:DARK|LIGHT|SYSTEM — همان درخواستِ نوارِ منو (`AppNav.theme`)
               "theme" -> { java.awt.EventQueue.invokeAndWait { ir.vil3ntec.tohid.ui.AppNav.theme.value = arg }; Thread.sleep(1500) }

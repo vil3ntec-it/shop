@@ -1,0 +1,587 @@
+{
+ "_doc": "HW-01..04، HW-09، POS-29 — بردارهای مشترکِ ESC/POS، بارکد، برچسب و ترازو. همین فایل را license/hw-core.js (server/test/hw-core.test.js) و core/hw/*.kt (HwCoreTest.kt) می‌دوانند. legacyRaster از کدِ پیش از این تغییر (toEscPosِ thermal-print.js، همان ThermalPrinter.render) گرفته شده: پیش‌فرضِ پروفایل باید همان بایت‌ها را بدهد.",
+ "version": 1,
+ "pattern": "pixel(x,y) = RGBA((37x+11y)&255, (13x+29y)&255, (7x+3y)&255, (x+2y)%7==0 ? 100 : 255); تصویر = fromRgba(pattern, w, h, w)",
+ "legacyRaster": [
+  {
+   "w": 384,
+   "h": 3,
+   "len": 161,
+   "sha256": "f980ca0ddef3570fecb5cb2a6901584e11238c5f0a071c84a73f974aa390470b",
+   "head": "1b401d763000300003007ee00be400df",
+   "tail": "c80a0a0a1d564200"
+  },
+  {
+   "w": 576,
+   "h": 130,
+   "len": 9385,
+   "sha256": "96ab01e39b2791891a96a610371e5adb6dee25c5cdb9b290457df01e07b010a5",
+   "head": "1b401d763000480080007ee00be400df",
+   "tail": "180a0a0a1d564200"
+  },
+  {
+   "w": 384,
+   "h": 1,
+   "len": 65,
+   "sha256": "45d31be2f1ebde7c609a954fa0cbc5562c643a1f68a0ad38bf9446a70e2dc359",
+   "head": "1b401d763000300001007ee00be400df",
+   "tail": "df0a0a0a1d564200"
+  }
+ ],
+ "documents": [
+  {
+   "name": "column-58",
+   "w": 384,
+   "h": 30,
+   "profile": {
+    "paperDots": 384,
+    "mode": "column"
+   },
+   "openDrawer": false,
+   "len": 2330,
+   "sha256": "828c27adc4dc2870b1bd63ae4ec6daa9b2d05ca95b5ed938dddffab70f91dba0",
+   "head": "1b401b33181b2a2180017e7c38ec583f",
+   "tail": "320a0a0a1d564200"
+  },
+  {
+   "name": "raster-80-full-drawer",
+   "w": 576,
+   "h": 5,
+   "profile": {
+    "paperDots": 576,
+    "cut": "full",
+    "drawerPin": 1
+   },
+   "openDrawer": true,
+   "len": 382,
+   "sha256": "8adaef2fb71079c2cf0d3aebd7ec27f66612b48700ff3c742e83f8a5947d816e",
+   "head": "1b401b700119fa1d763000480005007e",
+   "tail": "e20a0a0a1d564100"
+  },
+  {
+   "name": "raster-58-nocut-feed0",
+   "w": 384,
+   "h": 2,
+   "profile": {
+    "paperDots": 384,
+    "cut": "none",
+    "feedLines": 0
+   },
+   "openDrawer": false,
+   "len": 106,
+   "sha256": "2a1712ab02aedfd44b4320fd59c2dec414b0334e8203b8ebcfb4c9c190d3873e",
+   "head": "1b401d763000300002007ee00be400df",
+   "tail": "4405fa206ec10f76"
+  }
+ ],
+ "drawer": [
+  {
+   "pin": 0,
+   "onMs": 50,
+   "offMs": 500,
+   "hex": "1b700019fa"
+  },
+  {
+   "pin": 1,
+   "onMs": 100,
+   "offMs": 200,
+   "hex": "1b70013264"
+  },
+  {
+   "pin": 0,
+   "onMs": 1,
+   "offMs": 9999,
+   "hex": "1b700001ff"
+  }
+ ],
+ "drawerOnly": [
+  {
+   "profile": {
+    "drawerPin": 1
+   },
+   "hex": "1b401b700119fa"
+  }
+ ],
+ "cut": [
+  {
+   "mode": "partial",
+   "hex": "1d564200"
+  },
+  {
+   "mode": "full",
+   "hex": "1d564100"
+  },
+  {
+   "mode": "none",
+   "hex": ""
+  }
+ ],
+ "paperStatus": [
+  {
+   "byte": 18,
+   "out": {
+    "nearEnd": false,
+    "out": false
+   }
+  },
+  {
+   "byte": 30,
+   "out": {
+    "nearEnd": true,
+    "out": false
+   }
+  },
+  {
+   "byte": 114,
+   "out": {
+    "nearEnd": false,
+    "out": true
+   }
+  },
+  {
+   "byte": 126,
+   "out": {
+    "nearEnd": true,
+    "out": true
+   }
+  },
+  {
+   "byte": 0,
+   "out": null
+  },
+  {
+   "byte": 255,
+   "out": null
+  },
+  {
+   "byte": 19,
+   "out": null
+  }
+ ],
+ "ean13": [
+  {
+   "code": "5901234123457",
+   "valid": true,
+   "modules": "10100010110100111011001100100110111101001110101010110011011011001000010101110010011101000100101"
+  },
+  {
+   "code": "6260100120014",
+   "valid": false,
+   "modules": null
+  },
+  {
+   "code": "4006381333931",
+   "valid": true,
+   "modules": "10100011010100111010111101111010001001011001101010100001010000101000010111010010000101100110101"
+  },
+  {
+   "code": "2100150012507",
+   "valid": true,
+   "modules": "10100110010001101010011101100110110001010011101010111001011001101101100100111011100101000100101"
+  },
+  {
+   "code": "0000000000000",
+   "valid": true,
+   "modules": "10100011010001101000110100011010001101000110101010111001011100101110010111001011100101110010101"
+  },
+  {
+   "code": "9780201379624",
+   "valid": true,
+   "modules": "10101110110001001010011100100110100111001100101010100001010001001110100101000011011001011100101"
+  },
+  {
+   "code": "5901234123458",
+   "valid": false,
+   "modules": null
+  },
+  {
+   "code": "590123412345",
+   "valid": false,
+   "modules": null
+  }
+ ],
+ "code128": [
+  {
+   "text": "ABC-123",
+   "symbols": [
+    104,
+    33,
+    34,
+    35,
+    13,
+    17,
+    18,
+    19,
+    70,
+    106
+   ],
+   "modules": "1101001000010100011000100010110001000100011010011011100100111001101100111001011001011100101100001001100011101011"
+  },
+  {
+   "text": "12345678",
+   "symbols": [
+    105,
+    12,
+    34,
+    56,
+    78,
+    47,
+    106
+   ],
+   "modules": "1101001110010110011100100010110001110001011011000010100100011101101100011101011"
+  },
+  {
+   "text": "1234567",
+   "symbols": [
+    105,
+    12,
+    34,
+    56,
+    100,
+    23,
+    44,
+    106
+   ],
+   "modules": "110100111001011001110010001011000111000101101011110111011101101110100011011101100011101011"
+  },
+  {
+   "text": "A1234567",
+   "symbols": [
+    104,
+    33,
+    17,
+    99,
+    23,
+    45,
+    67,
+    54,
+    106
+   ],
+   "modules": "11010010000101000110001001110011010111011110111011011101011101100010000101100111010110001100011101011"
+  },
+  {
+   "text": "PJJ123C",
+   "symbols": [
+    104,
+    48,
+    42,
+    42,
+    17,
+    18,
+    19,
+    35,
+    55,
+    106
+   ],
+   "modules": "1101001000011101110110101101110001011011100010011100110110011100101100101110010001000110111010001101100011101011"
+  },
+  {
+   "text": "x",
+   "symbols": [
+    104,
+    88,
+    89,
+    106
+   ],
+   "modules": "1101001000011110010010110110111101100011101011"
+  },
+  {
+   "text": "00",
+   "symbols": [
+    105,
+    0,
+    2,
+    106
+   ],
+   "modules": "1101001110011011001100110011001101100011101011"
+  },
+  {
+   "text": "AB12345",
+   "symbols": [
+    104,
+    33,
+    34,
+    17,
+    99,
+    23,
+    45,
+    7,
+    106
+   ],
+   "modules": "11010010000101000110001000101100010011100110101110111101110110111010111011000100110001001100011101011"
+  },
+  {
+   "text": "hello world",
+   "symbols": [
+    104,
+    72,
+    69,
+    76,
+    76,
+    79,
+    0,
+    87,
+    79,
+    82,
+    76,
+    68,
+    93,
+    106
+   ],
+   "modules": "110100100001001100001010110010000110010100001100101000010001111010110110011001111001010010001111010100100111101100101000010000100110101000111101100011101011"
+  }
+ ],
+ "code128Errors": [
+  "سلام",
+  "",
+  "a\tb"
+ ],
+ "forProduct": [
+  {
+   "code": "5901234123457",
+   "kind": "EAN13"
+  },
+  {
+   "code": "5901234123458",
+   "kind": "CODE128"
+  },
+  {
+   "code": "AB-77",
+   "kind": "CODE128"
+  },
+  {
+   "code": "کالا",
+   "kind": null
+  },
+  {
+   "code": "",
+   "kind": null
+  }
+ ],
+ "checker": "20x4، نقطهٔ (x,y) سیاه اگر (x+y)%3==0",
+ "tspl": {
+  "size": {
+   "widthMm": 40,
+   "heightMm": 30,
+   "gapMm": 2
+  },
+  "copies": 2,
+  "len": 93,
+  "sha256": "3028536151c33b1debbac18fb9ac43eb7853887ba761f726d16eb1877b1d7a10",
+  "head": "53495a45203430206d6d2c3330206d6d",
+  "tail": "4e5420322c310d0a",
+  "text": "SIZE 40 mm,30 mm\r\nGAP 2 mm,0 mm\r\nDIRECTION 1\r\nCLS\r\nBITMAP 0,0,3,4,0,"
+ },
+ "labelEscPos": {
+  "copies": 2,
+  "len": 44,
+  "sha256": "85fa9674e4c931b5a7c22b88bdd86e8de76b953ea7b5a34021a32efedae26f75",
+  "head": "1b401d76300003000400924920249240",
+  "tail": "404924909249200a"
+ },
+ "moduleDots": [
+  {
+   "modules": 95,
+   "maxDots": 320,
+   "out": 2
+  },
+  {
+   "modules": 95,
+   "maxDots": 230,
+   "out": 2
+  },
+  {
+   "modules": 95,
+   "maxDots": 460,
+   "out": 4
+  },
+  {
+   "modules": 123,
+   "maxDots": 320,
+   "out": 2
+  },
+  {
+   "modules": 200,
+   "maxDots": 320,
+   "out": 0
+  },
+  {
+   "modules": 95,
+   "maxDots": 1000,
+   "out": 4
+  }
+ ],
+ "a4Cell": [
+  {
+   "index": 0,
+   "out": [
+    1400,
+    45
+   ]
+  },
+  {
+   "index": 1,
+   "out": [
+    700,
+    45
+   ]
+  },
+  {
+   "index": 2,
+   "out": [
+    0,
+    45
+   ]
+  },
+  {
+   "index": 3,
+   "out": [
+    1400,
+    405
+   ]
+  },
+  {
+   "index": 23,
+   "out": [
+    0,
+    2565
+   ]
+  },
+  {
+   "index": 24,
+   "out": [
+    1400,
+    45
+   ]
+  }
+ ],
+ "weight": {
+  "rules": [
+   {
+    "prefix": "21",
+    "itemDigits": 5,
+    "valueDigits": 5,
+    "kind": "weight",
+    "decimals": 3
+   },
+   {
+    "prefix": "22",
+    "itemDigits": 5,
+    "valueDigits": 5,
+    "kind": "price",
+    "decimals": 0
+   }
+  ],
+  "cases": [
+   {
+    "code": "2100150012507",
+    "out": {
+     "type": "hit",
+     "prefix": "21",
+     "kind": "weight",
+     "itemCode": "00150",
+     "value": 1.25,
+     "raw": 1250
+    }
+   },
+   {
+    "code": "2100150012508",
+    "out": {
+     "type": "badCheck"
+    }
+   },
+   {
+    "code": "2201234005009",
+    "out": {
+     "type": "hit",
+     "prefix": "22",
+     "kind": "price",
+     "itemCode": "01234",
+     "value": 500,
+     "raw": 500
+    }
+   },
+   {
+    "code": "6260100120014",
+    "out": {
+     "type": "notScale"
+    }
+   },
+   {
+    "code": "210015001250",
+    "out": {
+     "type": "notScale"
+    }
+   },
+   {
+    "code": "2300150012504",
+    "out": {
+     "type": "notScale"
+    }
+   }
+  ]
+ },
+ "nci": [
+  {
+   "name": "stable-kg",
+   "ascii": "\n1.250KG\r\n00\r\u0003",
+   "out": {
+    "kg": 1.25,
+    "unit": "KG",
+    "motion": false,
+    "zero": false,
+    "over": false,
+    "under": false,
+    "error": false,
+    "usable": true
+   }
+  },
+  {
+   "name": "motion-lb-S",
+   "ascii": "\n2.000LB\r\nS10\r\u0003",
+   "out": {
+    "kg": 0.90718474,
+    "unit": "LB",
+    "motion": true,
+    "zero": false,
+    "over": false,
+    "under": false,
+    "error": false,
+    "usable": false
+   }
+  },
+  {
+   "name": "zero",
+   "ascii": "\n0.000KG\r\n20\r\u0003",
+   "out": {
+    "kg": 0,
+    "unit": "KG",
+    "motion": false,
+    "zero": true,
+    "over": false,
+    "under": false,
+    "error": false,
+    "usable": false
+   }
+  },
+  {
+   "name": "over",
+   "ascii": "\n30.000KG\r\n02\r\u0003",
+   "out": {
+    "kg": 30,
+    "unit": "KG",
+    "motion": false,
+    "zero": false,
+    "over": true,
+    "under": false,
+    "error": false,
+    "usable": false
+   }
+  },
+  {
+   "name": "unknown-command",
+   "ascii": "\n?\r\u0003",
+   "out": null
+  }
+ ]
+}

@@ -1,0 +1,125 @@
+package ir.vil3ntec.tohid.core.hw
+
+/**
+ *  صفِ چاپ (HW-02، سناریوی S16) — منطقِ خالص، بی نخ و بی فایل.
+ *
+ *  قاعده‌ها:
+ *    • **به ترتیب**: فقط سرِ صف چاپ می‌شود؛ تا او چاپ نشده، بعدی منتظر است.
+ *    • **تلاشِ دوباره** با فاصلهٔ فزاینده (`backoffMs`). وقتی پله‌ها تمام
+ *      شد: «چاپِ معوق» روشن ⇒ با آخرین فاصله ادامه؛ خاموش ⇒ کار می‌ایستد
+ *      و از کاربر پرسیده می‌شود (`needsUser`).
+ *    • **چاپِ دوباره هرگز فروش نمی‌سازد**: کارِ صف فقط شناسهٔ فروش و
+ *      بایت‌های آماده را دارد؛ صف به دفتر دست نمی‌زند.
+ *    • رسیدِ خودکارِ یک فروش دو بار در صف نمی‌نشیند.
+ */
+class PrintQueue(
+  private val backoffMs: List<Long> = listOf(2_000, 5_000, 15_000, 30_000, 60_000),
+) {
+
+  enum class Kind(val key: String) {
+    RECEIPT("receipt"), REPRINT("reprint"), TEST("test"), DRAWER("drawer"), LABEL("label");
+
+    companion object {
+      fun of(key: String?): Kind = entries.firstOrNull { it.key == key } ?: RECEIPT
+    }
+  }
+
+  data class Job(
+    val id: String,
+    val kind: Kind,
+    /** چاپگر — همان رشتهٔ `Link.save()` */
+    val link: String,
+    val title: String,
+    val createdAt: Long,
+    val saleId: String? = null,
+    /** دلیلِ چاپِ دوباره — برای `REPRINT` اجباری */
+    val reason: String = "",
+    val attempts: Int = 0,
+    val nextAt: Long = 0,
+    val lastError: String? = null,
+    /** پله‌ها تمام شد و «چاپِ معوق» خاموش است — منتظرِ کاربر */
+    val held: Boolean = false,
+  )
+
+  sealed interface Status {
+    /** صف خالی */
+    data object Idle : Status
+    /** سرِ صف آماده یا در حالِ چاپ */
+    data class Busy(val job: Job, val waiting: Int) : Status
+    /** چاپ نشد؛ تلاشِ بعدی در `nextAt` */
+    data class Retrying(val job: Job, val waiting: Int) : Status
+    /** چاپ نشد و صف ایستاد — «تلاشِ دوباره» یا «کنار گذاشتن» */
+    data class NeedsUser(val job: Job, val waiting: Int) : Status
+  }
+
+  private val jobs = ArrayList<Job>()
+
+  /** «چاپِ معوق»: پس از تمام شدنِ پله‌ها هم خودش ادامه بدهد */
+  var deferred: Boolean = false
+
+  val size: Int get() = jobs.size
+  fun all(): List<Job> = jobs.toList()
+
+  /** @return `false` اگر همین رسیدِ خودکار از پیش در صف باشد */
+  fun enqueue(job: Job): Boolean {
+    require(job.kind != Kind.REPRINT || job.reason.isNotBlank()) { "چاپِ دوباره دلیل می‌خواهد" }
+    if (job.kind == Kind.RECEIPT && job.saleId != null &&
+      jobs.any { it.kind == Kind.RECEIPT && it.saleId == job.saleId }
+    ) return false
+    jobs += job
+    return true
+  }
+
+  /** کارِ آمادهٔ چاپ — همیشه سرِ صف، و فقط وقتی زمانش رسیده و نایستاده */
+  fun next(now: Long): Job? {
+    val head = jobs.firstOrNull() ?: return null
+    if (head.held || now < head.nextAt) return null
+    return head
+  }
+
+  fun succeeded(id: String) {
+    jobs.removeAll { it.id == id }
+  }
+
+  fun failed(id: String, error: String, now: Long) {
+    val i = jobs.indexOfFirst { it.id == id }
+    if (i < 0) return
+    val j = jobs[i]
+    val attempts = j.attempts + 1
+    val exhausted = attempts > backoffMs.size
+    val wait = backoffMs[minOf(attempts, backoffMs.size) - 1]
+    jobs[i] = j.copy(
+      attempts = attempts,
+      lastError = error,
+      nextAt = now + wait,
+      held = exhausted && !deferred,
+    )
+  }
+
+  /** «تلاشِ دوباره» — همین حالا، و ایستادن برداشته می‌شود */
+  fun retryNow(now: Long) {
+    val head = jobs.firstOrNull() ?: return
+    jobs[0] = head.copy(nextAt = now, held = false)
+  }
+
+  /** کنار گذاشتنِ یک کار (مثلاً «رسیدِ دیجیتال فرستادم»). فروش دست نمی‌خورد. */
+  fun discard(id: String) {
+    jobs.removeAll { it.id == id }
+  }
+
+  fun status(): Status {
+    val head = jobs.firstOrNull() ?: return Status.Idle
+    val waiting = jobs.size - 1
+    return when {
+      head.held -> Status.NeedsUser(head, waiting)
+      head.attempts > 0 -> Status.Retrying(head, waiting)
+      else -> Status.Busy(head, waiting)
+    }
+  }
+
+  /** بازگرداندنِ صفِ ذخیره‌شده پس از بسته شدنِ برنامه — به همان ترتیب */
+  fun restore(saved: List<Job>) {
+    jobs.clear()
+    jobs.addAll(saved)
+  }
+}

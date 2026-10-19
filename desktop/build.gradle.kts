@@ -83,6 +83,8 @@ val replaced = listOf(
   //  چاپِ گزارش: اندروید روی PDFِ چاپ رسم می‌کند، این‌جا `PrinterJob`ِ جاوا —
   //  نه مرورگر (برنامهٔ کامپیوتر سایت نیست)
   "print/ReportPrint.kt",
+  //  برگهٔ A4ِ برچسب (HW-04): اندروید PDFِ چاپ، این‌جا `PrinterJob`
+  "print/LabelSheetPrint.kt",
   //  کلیکِ راست = منوی کارها (گوشی: لمسِ طولانی)
   "ui/PressMenu.kt",
   //  «این کامپیوتر است» — اندازه‌ها، پنجره‌ها و نوارهای کامپیوتری (‎ui/Platform.kt‎)

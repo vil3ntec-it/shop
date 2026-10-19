@@ -163,6 +163,22 @@ fun SaleScreen(
     lastScanAt = System.currentTimeMillis()
     if (!skipDedup && !gate.accept(code)) return
 
+    //  POS-29: برچسبِ ترازو — فقط اگر دکان قاعده‌اش را روشن کرده باشد (پیش‌فرض خاموش)
+    when (val w = ir.vil3ntec.tohid.data.ScaleLabels.match(
+      ir.vil3ntec.tohid.data.ScaleLabels.rules(context), code, index, d.products,
+    )) {
+      null -> Unit
+      is ir.vil3ntec.tohid.data.ScaleLabels.Match.Rejected -> { ScanFeedback.unknown(context); toast(w.message); return }
+      is ir.vil3ntec.tohid.data.ScaleLabels.Match.Weighed -> {
+        val added = SalesEngine.addToCartCapped(cartStore.lines.value, w.product.id, w.quantity, ShopStore.stock(d, w.product.id))
+        cartStore.set(added.cart)
+        selectedId = w.product.id
+        if (added.capped) { ScanFeedback.unknown(context); toast("${w.product.name} فقط ${qty(added.available)} ${w.product.unit} موجود است") }
+        else { ScanFeedback.ok(context); toast("${w.product.name} — ${qty(w.quantity)} ${w.product.unit} به سبد اضافه شد") }
+        return
+      }
+    }
+
     /*
      *  شناختنِ کالا — کامل، و اگر نشد از نیمهٔ بارکد.
      *  قاعده‌اش سرِ `BarcodeMatch` نوشته شده؛ خطِ سرخش یکتا بودن است.

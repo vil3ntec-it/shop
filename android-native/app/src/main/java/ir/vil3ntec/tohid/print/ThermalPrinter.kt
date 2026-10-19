@@ -196,10 +196,87 @@ object ThermalPrinter {
       return "فاکتور آماده نشد: ${e.message ?: "خطای ناشناخته"}"
     }
 
-    return when (link) {
-      is Link.Bluetooth -> sendBluetooth(context, link.address, bytes)
-      is Link.Network -> sendNetwork(link.host, link.port, bytes)
-      is Link.Usb -> sendUsb(context, link.deviceName, bytes)
+    return send(context, link, bytes)
+  }
+
+  /**
+   *  بایت‌های آماده روی همان سه راه — صفِ چاپ، برچسب، کشو و برگهٔ آزمون.
+   *  @return `null` یعنی رفت؛ وگرنه پیامِ فارسیِ خطا.
+   */
+  fun send(context: Context, link: Link, bytes: ByteArray): String? = when (link) {
+    is Link.Bluetooth -> sendBluetooth(context, link.address, bytes)
+    is Link.Network -> sendNetwork(link.host, link.port, bytes)
+    is Link.Usb -> sendUsb(context, link.deviceName, bytes)
+  }
+
+  /**
+   *  بررسیِ سلامت (HW-11): وصل می‌شود و `DLE EOT 4` (حسگرِ کاغذ) می‌پرسد.
+   *  چیزی چاپ نمی‌شود. چاپگری که پاسخ ندهد هنوز ممکن است چاپ کند —
+   *  بعضی چاپگرها اصلاً پاسخِ وضعیت نمی‌دهند؛ همین گفته می‌شود.
+   *
+   *  ⚠️ روی چاپگرِ واقعی آزموده نشده (NOT-VERIFIED)؛ منطقِ خواندنِ پاسخ
+   *  (`EscPos.parsePaperStatus`) آزمون دارد.
+   */
+  fun probe(context: Context, link: Link): Probe = when (link) {
+    is Link.Network -> probeStream(link.label()) {
+      val socket = Socket()
+      socket.connect(InetSocketAddress(link.host, link.port), CONNECT_TIMEOUT_MS)
+      socket.soTimeout = PROBE_READ_MS
+      socket
+    }
+    is Link.Bluetooth -> {
+      val adapter = adapter(context)
+      when {
+        adapter == null -> Probe(false, "بلوتوث روی این دستگاه نیست")
+        !adapter.isEnabled -> Probe(false, "بلوتوث خاموش است")
+        else -> probeStream(link.address) {
+          val s = adapter.getRemoteDevice(link.address).createRfcommSocketToServiceRecord(SPP)
+          adapter.cancelDiscovery()
+          s.connect()
+          s
+        }
+      }
+    }
+    is Link.Usb -> {
+      val manager = usbManager(context)
+      val device = manager?.deviceList?.get(link.deviceName)
+      when {
+        device == null -> Probe(false, "چاپگرِ سیمی پیدا نشد — کابل وصل است؟")
+        manager?.hasPermission(device) != true -> Probe(false, "اجازهٔ دسترسی به چاپگرِ سیمی داده نشده")
+        else -> Probe(true, "وصل است — وضعیتِ کاغذ از راهِ سیم خوانده نمی‌شود")
+      }
+    }
+  }
+
+  data class Probe(val ok: Boolean, val message: String, val paper: ir.vil3ntec.tohid.core.hw.PaperStatus? = null)
+
+  private const val PROBE_READ_MS = 1_500
+
+  private fun probeStream(label: String, open: () -> java.io.Closeable): Probe {
+    var conn: java.io.Closeable? = null
+    return try {
+      conn = open()
+      val (input, output) = when (val c = conn) {
+        is Socket -> c.getInputStream() to c.getOutputStream()
+        is android.bluetooth.BluetoothSocket -> c.inputStream to c.outputStream
+        else -> return Probe(true, "وصل شد")
+      }
+      output.write(ir.vil3ntec.tohid.core.hw.EscPos.PAPER_STATUS)
+      output.flush()
+      val b = try { input.read() } catch (e: java.io.InterruptedIOException) { -1 }
+      val paper = if (b >= 0) ir.vil3ntec.tohid.core.hw.EscPos.parsePaperStatus(b) else null
+      when {
+        paper == null -> Probe(true, "وصل شد ($label) — چاپگر وضعیتِ کاغذ را نگفت")
+        paper.out -> Probe(false, "کاغذ تمام شده است", paper)
+        paper.nearEnd -> Probe(true, "وصل است — کاغذ رو به پایان است", paper)
+        else -> Probe(true, "وصل است و کاغذ دارد", paper)
+      }
+    } catch (e: SecurityException) {
+      Probe(false, "اجازهٔ بلوتوث داده نشده")
+    } catch (e: Exception) {
+      Probe(false, "وصل نشد ($label): ${e.message ?: "پاسخی نیامد"}")
+    } finally {
+      try { conn?.close() } catch (e: Exception) { /* بسته شده */ }
     }
   }
 
@@ -338,13 +415,37 @@ object ThermalPrinter {
    *  منطق داخلِ فرستندهٔ بلوتوث بود؛ اگر همان‌جا می‌ماند، هر راهِ تازه
    *  یک کپی از ESC/POS می‌خواست و روزی یکی‌شان اصلاح می‌شد و بقیه نه.
    */
-  fun render(bitmap: Bitmap, paperWidth: Int): ByteArray {
-    val out = java.io.ByteArrayOutputStream()
-    out.write(byteArrayOf(0x1B, 0x40))              // ESC @ — از نو
-    writeImage(out, scale(bitmap, paperWidth), paperWidth)
-    out.write("\n\n\n".toByteArray())               // کمی کاغذ جلو برود
-    out.write(byteArrayOf(0x1D, 0x56, 0x42, 0x00))  // GS V B — بریدنِ کاغذ
-    return out.toByteArray()
+  fun render(bitmap: Bitmap, paperWidth: Int): ByteArray =
+    renderWith(bitmap, ir.vil3ntec.tohid.core.hw.PrinterProfile(paperDots = paperWidth))
+
+  /**
+   *  همان، با پروفایلِ چاپگر (حالتِ `ESC *`، برش، کشو). بایت‌ها را
+   *  `core/hw/EscPos` می‌سازد — همان هسته‌ای که وب (`license/hw-core.js`)
+   *  دارد؛ پیش‌فرضِ پروفایل عیناً بایت‌های پیشینِ این تابع است و آزمونِ
+   *  `HwCoreTest` همین را می‌پاید.
+   */
+  fun renderWith(
+    bitmap: Bitmap,
+    profile: ir.vil3ntec.tohid.core.hw.PrinterProfile,
+    openDrawer: Boolean = false,
+  ): ByteArray = ir.vil3ntec.tohid.core.hw.EscPos.document(toMono(bitmap, profile.paperDots), profile, openDrawer)
+
+  /** تصویر ⇐ یک‌بیتی به عرضِ کاغذ (نسبت نگه داشته می‌شود) */
+  fun toMono(bitmap: Bitmap, paperWidth: Int): ir.vil3ntec.tohid.core.hw.MonoImage {
+    val scaled = scale(bitmap, paperWidth)
+    val px = IntArray(scaled.width * scaled.height)
+    scaled.getPixels(px, 0, scaled.width, 0, 0, scaled.width, scaled.height)
+    if (scaled !== bitmap) scaled.recycle()
+    return ir.vil3ntec.tohid.core.hw.MonoImage.fromArgb(px, scaled.width, scaled.height, paperWidth)
+  }
+
+  /** پیش‌نمایش: یک‌بیتی ⇐ تصویرِ سیاه‌وسفید برای صفحه */
+  fun toBitmap(image: ir.vil3ntec.tohid.core.hw.MonoImage): Bitmap {
+    val px = IntArray(image.width * image.height)
+    for (y in 0 until image.height) for (x in 0 until image.width) {
+      px[y * image.width + x] = if (image[x, y]) Color.BLACK else Color.WHITE
+    }
+    return Bitmap.createBitmap(px, image.width, image.height, Bitmap.Config.ARGB_8888)
   }
 
   /** تصویر را به عرضِ کاغذ می‌رساند و نسبتش را نگه می‌دارد */
@@ -352,43 +453,5 @@ object ThermalPrinter {
     if (source.width == width) return source
     val height = (source.height.toFloat() * width / source.width).toInt().coerceAtLeast(1)
     return Bitmap.createScaledBitmap(source, width, height, true)
-  }
-
-  /**
-   * فرستادنِ تصویر با GS v 0 (چاپِ نقطه‌ایِ رستری).
-   *
-   * تصویر تکه‌تکه فرستاده می‌شود، نه یک‌جا: بافرِ این چاپگرها کوچک است و
-   * فاکتورِ بلند را یک‌جا نمی‌پذیرد.
-   */
-  private fun writeImage(out: OutputStream, bitmap: Bitmap, paperWidth: Int) {
-    val bytesPerRow = (paperWidth + 7) / 8
-    val chunk = 128 // تعدادِ سطر در هر تکه
-
-    var y = 0
-    while (y < bitmap.height) {
-      val rows = minOf(chunk, bitmap.height - y)
-      val data = ByteArray(bytesPerRow * rows)
-
-      for (row in 0 until rows) {
-        for (x in 0 until paperWidth) {
-          if (x >= bitmap.width) continue
-          val pixel = bitmap.getPixel(x, y + row)
-          // شفاف را سفید حساب می‌کنیم، وگرنه کلِ کاغذ سیاه در می‌آید
-          val alpha = Color.alpha(pixel)
-          val luminance = if (alpha < 128) 255
-          else (0.299 * Color.red(pixel) + 0.587 * Color.green(pixel) + 0.114 * Color.blue(pixel)).toInt()
-          if (luminance < 128) {
-            data[row * bytesPerRow + x / 8] =
-              (data[row * bytesPerRow + x / 8].toInt() or (0x80 shr (x % 8))).toByte()
-          }
-        }
-      }
-
-      out.write(byteArrayOf(0x1D, 0x76, 0x30, 0x00))            // GS v 0
-      out.write(byteArrayOf((bytesPerRow and 0xFF).toByte(), (bytesPerRow shr 8).toByte()))
-      out.write(byteArrayOf((rows and 0xFF).toByte(), (rows shr 8).toByte()))
-      out.write(data)
-      y += rows
-    }
   }
 }
