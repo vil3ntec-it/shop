@@ -166,8 +166,15 @@ router.post('/staff-code/rotate', requireShop, requirePermission('staffcode.crea
 
 // «چند کاربر روی یک دکان» قابلیت اشتراکی است؛ بررسی‌اش اینجا سمت سرور
 // انجام می‌شود، نه با پنهان کردن دکمه در گوشی.
-router.post(['/staff-code', '/invite'], requireShop, requirePermission('staffcode.create'), requireFeature('multi_device'), async (req, res) => {
-  const role = req.body?.role ? v.oneOf(req.body.role, ['manager', 'staff'], { field: 'نقش' }) : 'staff';
+router.post(['/staff-code', '/invite'], requireShop, requirePermission('staffcode.create'), requireFeature('multi_device'), async (req, res, next) => {
+  const role = req.body?.role ? v.oneOf(req.body.role, ['manager', 'staff', 'courier'], { field: 'نقش' }) : 'staff';
+  //  دعوتِ پیک (DLV-01) — پشتِ پرچمِ `shop.delivery`، پیش‌فرض خاموش؛ همان
+  //  سنجش‌های `routes/delivery.js` (بی پرچم ۴۰۴، بی اشتراکِ تحویل ۴۰۳)
+  if (role === 'courier') {
+    const st = await require('../lib/delivery').stateOf(req.shopId);
+    if (!st.readable) return next(notFound('تحویل و پیک برای این دکان روشن نیست', 'delivery_disabled'));
+    if (!st.entitled) return next(forbidden('این قابلیت نیازمندِ اشتراک است', 'subscription_required'));
+  }
   const maxUses = v.integer(req.body?.maxUses, { field: 'تعداد استفاده', min: 0, max: 500, def: 1 });
   const days = v.integer(req.body?.expiresInDays, { field: 'مهلت', min: 0, max: 3650, def: 0 });
   const expiresAt = days ? now() + days * 24 * 3600 * 1000 : null;
@@ -192,6 +199,21 @@ router.post(['/staff/join', '/join'], joinLimit, async (req, res) => {
   const member = await shops.membershipOf(req.user.id);
   const ent = await entitlementOf(shop.id);
   await audit.log({ shopId: shop.id, userId: req.user.id, action: 'staff.joined', detail: { role }, ip: clientIp(req) });
+  //  پیک (DLV-01): `redeem` نشست‌های بی‌دامنهٔ همین حساب — از جمله همین —
+  //  را بست؛ نشستِ تازه با دامنهٔ `courier` روی همان دستگاه همین‌جا داده می‌شود
+  if (role === 'courier') {
+    const tokens = require('../lib/tokens');
+    const deviceId = req.tokenRow?.device_id || null;
+    const access = await tokens.issue({ kind: 'access', subjectId: req.user.id, deviceId, ttlMs: config.tokens.accessTtlMs, app: 'shop' });
+    const refresh = await tokens.issue({ kind: 'refresh', subjectId: req.user.id, deviceId, ttlMs: config.tokens.refreshTtlMs, app: 'shop' });
+    //  همان شکلِ پاسخِ پیوستن (`role` در بالا، بی مجوز) + نشستِ تازه که برنامه جایگزین می‌کند
+    return res.status(201).json(shopPayload(shop, member, {
+      courier: true,
+      accessToken: access.token, accessExpiresAt: access.expiresAt,
+      refreshToken: refresh.token, refreshExpiresAt: refresh.expiresAt,
+      deviceId,
+    }));
+  }
   res.status(201).json(shopPayload(shop, member, {
     entitlement: { source: ent.source, subscription: ent.subscription, trial: ent.trial },
   }));
