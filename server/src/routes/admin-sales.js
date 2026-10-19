@@ -635,13 +635,36 @@ router.get('/campaigns/:id/stats', async (req, res, next) => {
 router.put('/downloads', requireSuperAdmin, async (req, res, next) => {
   try {
     const app = appOf(req.body?.app);
+    /*
+     *  §۳۸.۹: حداقل نسخهٔ پشتیبانی‌شدهٔ همین برنامه (`min_app_version_<app>`).
+     *  خالی ⇒ حداقلی نیست. بالاتر از «آخرین نسخه» پذیرفته نیست — نسخه‌ای که
+     *  هنوز منتشر نشده را نمی‌شود از کسی خواست. پیش از هر نوشتن سنجیده
+     *  می‌شود تا درخواستِ ردشده نیمه‌کاره ذخیره نشود.
+     */
+    let min;
+    if (req.body?.minVersion !== undefined) {
+      const compat = require('../lib/app-compat');
+      const raw = v.text(req.body.minVersion, { max: 32 });
+      min = compat.valid(raw);
+      if (raw && !min) return next(badRequest('حداقل نسخه باید مثلِ 2.14.2 باشد', 'bad_version'));
+      const latest = compat.valid(req.body?.version !== undefined
+        ? v.text(req.body.version, { max: 32 })
+        : (await plans.allConfig())[`latest_version_${app}`]);
+      if (min && latest && compat.compare(min, latest) > 0) {
+        return next(badRequest('حداقل نسخه از آخرین نسخهٔ منتشرشده بالاتر است', 'min_above_latest'));
+      }
+    }
     for (const [key, max] of [['url', 300], ['version', 32], ['notes', 1000]]) {
       if (req.body?.[key] !== undefined) {
         const cfgKey = key === 'url' ? `download_url_${app}` : key === 'version' ? `latest_version_${app}` : `release_notes_${app}`;
         await plans.setConfig(cfgKey, v.text(req.body[key], { max }));
       }
     }
-    await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.downloads_updated', detail: { app } });
+    if (min !== undefined) await plans.setConfig(`min_app_version_${app}`, min);
+    await audit.log({
+      actorType: 'admin', userId: req.admin.id, action: 'admin.downloads_updated',
+      detail: { app, ...(min !== undefined ? { minVersion: min } : {}) },
+    });
     res.json(await require('./portal').downloadsOf(app));
   } catch (err) { next(err); }
 });

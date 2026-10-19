@@ -283,17 +283,30 @@ function shape(row) {
     createdAt: Number(row.created_at),
     accountEmail: row.account_email || '',
     version: Number(row.version) || 1,
+    gift: row.computer === GIFT,
   };
+}
+
+/*
+ *  🎁 گیفت‌کارت (۱۴۰۵/۰۷/۲۶) — خواستهٔ صاحب سامانه: «کد اشتراک بدم به طرف
+ *  بدون این که نت وصل باشه یا کد برنامه شو بده… یک بار برای هر برنامه».
+ *  همان کدِ v2 با ۸ بایتِ کامپیوترِ **همه صفر**: به هیچ کامپیوتری بسته نیست
+ *  و سرور هم استفادهٔ دوباره روی پمپِ دیگر را رد نمی‌کند (کاملاً آزاد).
+ *  «یک بار برای هر برنامه» را خودِ برنامه نگه می‌دارد (OfflineCodesUsed).
+ */
+const GIFT = 'GIFT';
+function isGift(p) {
+  return p.version === 2 && p.machine.every(b => b === 0);
 }
 
 /**
  * صدور. ⇒ { code, offline, file }
  * `days` برای استاندارد و وی‌آی‌پی (پیش‌فرض ۳۶۵، سقف ۳۶۵۰)؛ دائمی هیچ.
  */
-async function issue({ plan, computer, account = '', days = null, note = '', createdBy = '', at = now() } = {}) {
+async function issue({ plan, computer, gift = false, account = '', days = null, note = '', createdBy = '', at = now() } = {}) {
   const P = PLANS[plan];
   if (!P) throw badRequest('پلن باید استاندارد، وی‌آی‌پی یا دائمی باشد', 'bad_plan');
-  const pc = parseComputer(computer);
+  const pc = gift ? { text: GIFT, machine: Buffer.alloc(8) } : parseComputer(computer);
   if (!pc) throw badRequest('کدِ کامپیوتر درست نیست — ۱۶ نویسه، همان که برنامه نشان می‌دهد', 'bad_computer');
 
   //  «برای هر حساب متفاوت» — ایمیلِ حساب ⇒ شناسهٔ کاربر ⇒ ۴ بایتِ کد.
@@ -398,8 +411,9 @@ async function planKeysOf(p, at) {
 async function redeem({ stationId, deviceUid = '', code, computer, at = now() }) {
   const p = await verify(code);
   if (!p) throw badRequest('این کدِ اشتراک معتبر نیست', 'bad_offline_code');
-  const pc = parseComputer(computer);
-  if (!pc || !pc.machine.subarray(0, p.machine.length).equals(p.machine)) {
+  const gift = isGift(p);
+  const pc = gift ? { text: GIFT } : parseComputer(computer);
+  if (!gift && (!pc || !pc.machine.subarray(0, p.machine.length).equals(p.machine))) {
     throw badRequest('این کد برای کامپیوترِ دیگری ساخته شده است', 'computer_mismatch');
   }
   //  ⛔ کدِ بسته به حساب فقط روی پمپی که آن حساب عضوش است
@@ -423,7 +437,8 @@ async function redeem({ stationId, deviceUid = '', code, computer, at = now() })
       )).rows[0];
     }
     if (row.status === 'revoked') return { row, revoked: true };
-    if (row.redeemed_station_id && row.redeemed_station_id !== stationId) return { row, elsewhere: true };
+    //  🎁 گیفت روی هر پمپی می‌نشیند؛ ردیف نخستین پمپ را نگه می‌دارد
+    if (!gift && row.redeemed_station_id && row.redeemed_station_id !== stationId) return { row, elsewhere: true };
     const first = !row.redeemed_station_id;
     if (first) {
       row = (await c.query(
@@ -499,6 +514,6 @@ async function redeem({ stationId, deviceUid = '', code, computer, at = now() })
 
 module.exports = {
   issue, redeem, verify, parse, list, revoke, shape, fileOf, body2, encode2, accountTag,
-  parseComputer, computerOfFingerprint, computerOfBytes, b32encode, b32decode,
+  parseComputer, computerOfFingerprint, isGift, GIFT, computerOfBytes, b32encode, b32decode,
   PLANS, ALPHABET, TOTAL_LEN, BODY_LEN, PERMANENT, TOTAL2, BODY2, EPOCH_DAY, PERMANENT2,
 };
