@@ -362,6 +362,19 @@ fun AppRoot(
     }
   }
 
+  //  SEC-01: دفترِ رمزدار باز نشد ⇐ نوشتن بسته است (`ShopStore.unreadable`)؛
+  //  پیامِ ماندگار با راهِ «تنظیمات ← امنیت». با دفترِ ساده هرگز پیش نمی‌آید.
+  val unreadable by store.unreadable.collectAsState()
+  LaunchedEffect(unreadable) {
+    if (unreadable == null) return@LaunchedEffect
+    snackbar.currentSnackbarData?.dismiss()
+    val r = snackbar.showSnackbar(
+      "دفترِ رمزدارِ این دستگاه باز نشد؛ برای اینکه دفترِ واقعی رونویسی نشود، ثبت بسته است. هیچ چیزی پاک نشده.",
+      actionLabel = "امنیت", duration = SnackbarDuration.Indefinite,
+    )
+    if (r == SnackbarResult.ActionPerformed) AppNav.go("settings")
+  }
+
   if (lockStore.enabled && !unlocked) {
     AppLockScreen { unlocked = true }
     return
@@ -718,6 +731,7 @@ fun AppRoot(
                 "تاریخ و رقم" to androidx.compose.material.icons.Icons.Filled.Event,
                 "کالای منقضی" to androidx.compose.material.icons.Icons.Filled.EventBusy,
                 "قفل برنامه" to androidx.compose.material.icons.Icons.Filled.Lock,
+                ir.vil3ntec.tohid.ui.screens.SECURITY_SECTION_TITLE to androidx.compose.material.icons.Icons.Filled.Security,
                 "تغییر رمز حساب" to androidx.compose.material.icons.Icons.Filled.Password,
                 "دستگاه‌های وارد شده" to androidx.compose.material.icons.Icons.Filled.Devices,
                 "کد شاگرد" to androidx.compose.material.icons.Icons.Filled.Key,

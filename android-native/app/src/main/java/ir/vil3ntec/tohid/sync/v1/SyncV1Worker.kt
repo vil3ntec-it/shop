@@ -44,6 +44,10 @@ class SyncV1Worker(context: Context, params: WorkerParameters) : CoroutineWorker
 
     val store = ShopStore(app)
     store.load()
+    //  SEC-01: دفترِ رمزدارِ خوانده‌نشده ⇒ این دور همگام نمی‌شود. دفترِ حافظه
+    //  خالی است؛ تفاضل و نشاندنِ opهای سرور روی آن یعنی رونویسیِ دفترِ واقعی.
+    //  با دفترِ ساده (پیش‌فرض) هرگز پیش نمی‌آید.
+    if (store.unreadable.value != null) return Result.success()
     //  Sync v3 پشتِ تنظیمِ هر دستگاه (پیش‌فرض v1): همین کارگر، موتورِ دیگر
     if (ir.vil3ntec.tohid.sync.v3.SyncChoice.isV3(app)) {
       return if (ir.vil3ntec.tohid.sync.v3.SyncV3Runner.of(app).work(store)) Result.success() else Result.retry()

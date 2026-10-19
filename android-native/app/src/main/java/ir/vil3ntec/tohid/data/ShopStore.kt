@@ -11,6 +11,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import ir.vil3ntec.tohid.core.atrest.AtRestException
+import ir.vil3ntec.tohid.core.atrest.AtRestMigration
 import java.io.File
 
 /**
@@ -48,13 +50,49 @@ class ShopStore(private val context: Context) {
   suspend fun load() {
     withContext(Dispatchers.IO) {
       if (file.exists()) {
-        runCatching { json.decodeFromString<ShopData>(file.readText()) }
-          .onSuccess { _data.value = it; recoverSync(it) }
+        //  SEC-01: دفترِ ساده همان‌طور خوانده می‌شود؛ رمزدار با کلیدِ همین دستگاه
+        val text = try {
+          AtRest.readText(context, file).also { _unreadable.value = null }
+        } catch (e: AtRestException) {
+          _unreadable.value = e.kind
+          null
+        } catch (e: Exception) {
+          //  همان رفتارِ همیشهٔ دفترِ ساده: خطای خواندن بی‌صدا، دفترِ خالی
+          null
+        }
+        if (text != null) {
+          runCatching { json.decodeFromString<ShopData>(text) }
+            .onSuccess { _data.value = it; recoverSync(it) }
+        }
       } else {
+        _unreadable.value = null
         recoverSync(ShopData())
       }
     }
     _loaded.value = true
+  }
+
+  /**
+   *  SEC-01 — دفترِ رمزداری که روی این دستگاه باز نشد (کلید نیست، گذرا در
+   *  دسترس نیست، یا فایل خراب است). `null` یعنی دفتر سالم خوانده شد.
+   *
+   *  ⛔ تا وقتی این پر است **هیچ نوشتنی جز بازیابی** به دفتر نمی‌رسد:
+   *  دفترِ حافظه خالی است و ذخیره‌اش یعنی رونویسیِ دفترِ واقعی با هیچ —
+   *  و تفاضلِ همگام‌سازی همهٔ ردیف‌ها را «حذف‌شده» به سرور می‌فرستاد.
+   *  بازیابی (پشتیبانِ ابری/فایل/نسخهٔ خودکار) اول فایلِ خوانده‌نشده را
+   *  کنار می‌گذارد (`shop-data.json.unreadable-<زمان>`)، هرگز پاکش نمی‌کند.
+   *  با دفترِ ساده (پیش‌فرض) هرگز پر نمی‌شود.
+   */
+  private val _unreadable = MutableStateFlow<AtRestException.Kind?>(null)
+  val unreadable: StateFlow<AtRestException.Kind?> = _unreadable.asStateFlow()
+
+  /**
+   *  هم‌سو کردنِ فایل‌های دفتر با تنظیمِ «رمزگذاریِ داده» — زیرِ همان قفلِ
+   *  نوشتنِ دفتر (`AtRest.converge`). با هر بازشدن و با هر تغییرِ تنظیم.
+   */
+  suspend fun convergeAtRest(): AtRestMigration.Report = withContext(Dispatchers.IO) {
+    runCatching { AtRest.converge(context, SyncV1Engine.of(context)) }
+      .getOrElse { AtRestMigration.Report(failed = listOf("*" to AtRestException.Kind.IO)) }
   }
 
   /**
@@ -76,7 +114,10 @@ class ShopStore(private val context: Context) {
    */
   suspend fun loadAndSummarize() {
     load()
-    withContext(Dispatchers.IO) { LedgerSummary.write(context, _data.value) }
+    //  دفترِ خوانده‌نشده خلاصهٔ «خالی» نمی‌گیرد
+    if (_unreadable.value == null) withContext(Dispatchers.IO) { LedgerSummary.write(context, _data.value) }
+    //  SEC-01: با تنظیمِ خاموش و دفترِ ساده فقط سرآیندِ چند فایل خوانده می‌شود
+    convergeAtRest()
   }
 
   /**
@@ -117,14 +158,14 @@ class ShopStore(private val context: Context) {
    *  ⛔ دادهٔ خودِ کاربر است و گروگان گرفتنش سریع‌ترین راهِ از دست دادنِ
    *  اعتماد. همان قاعده‌ای که برای خروجی و چاپ هم هست.
    */
-  suspend fun applyRestore(next: ShopData) = writeInternal(next)
+  suspend fun applyRestore(next: ShopData) = writeInternal(next, replacing = true)
 
   /**
    *  نوشتنی که قفلِ نرم جلویش را نمی‌گیرد: بازیابی و جابه‌جاییِ دفتر.
    *
    *  @return آیا به دیسک رسید
    */
-  private suspend fun writeInternal(next: ShopData): Boolean = withContext(Dispatchers.IO) {
+  private suspend fun writeInternal(next: ShopData, replacing: Boolean = false): Boolean = withContext(Dispatchers.IO) {
     //  نوشتن و op ساختن زیرِ همان قفلی که نشاندنِ opهای رسیده دارد
     //  (`SyncV1Engine.absorbRemote`) — شرحش همان‌جا
     val engine = SyncV1Engine.of(context)
@@ -134,7 +175,7 @@ class ShopStore(private val context: Context) {
      *  می‌رفتند و سایه جلو می‌رفت، ولی پس از بستن و باز کردن دفترِ کهنه
      *  می‌ماند و تفاضلِ بعدی همان ردیف‌ها را «حذف‌شده» به سرور می‌فرستاد.
      */
-    if (!writeToDisk(next)) return@synchronized false
+    if (!writeToDisk(next, replacing)) return@synchronized false
     /*
      *  ⛔ **تنها درِ نوشتن در دفتر همین‌جاست** و هر تغییری از همین‌جا رد
      *  می‌شود. پس دفترِ تغییرات (Sync v1) هم همین‌جا نوشته می‌شود:
@@ -190,14 +231,34 @@ class ShopStore(private val context: Context) {
    *  ⚠️ دفترِ حافظه (`data`) فقط **پس از** نشستن روی دیسک عوض می‌شود: آنچه
    *  صفحه نشان می‌دهد همان است که پس از بستن و باز کردن می‌ماند.
    */
-  private fun writeToDisk(next: ShopData): Boolean {
+  private fun writeToDisk(next: ShopData, replacing: Boolean = false): Boolean {
+    //  SEC-01: دفترِ رمزدارِ خوانده‌نشده فقط با بازیابی جایگزین می‌شود — شرح سرِ `unreadable`
+    var aside: File? = null
+    if (_unreadable.value != null) {
+      if (!replacing) {
+        _diskError.tryEmit(UNREADABLE)
+        return false
+      }
+      val keep = File(file.absoluteFile.parentFile, "${file.name}.unreadable-${System.currentTimeMillis()}")
+      if (file.exists()) {
+        if (runCatching { DiskWrite.move(file, keep) }.isFailure) {
+          _diskError.tryEmit("دفترِ قبلی کنار گذاشته نشد؛ بازیابی انجام نشد")
+          return false
+        }
+        aside = keep
+      }
+    }
     //  فایلِ کناری + fsync + جابه‌جاییِ اتمی که روی ویندوز هم جایگزین
-    //  می‌کند — شرحش سرِ `DiskWrite`
-    val saved = runCatching { DiskWrite.text(file, json.encodeToString(next)) }
+    //  می‌کند — شرحش سرِ `DiskWrite`. رمز فقط اگر «رمزگذاریِ داده» روشن است
+    //  (`AtRest`)؛ خاموش ⇒ همان بایت‌های همیشه.
+    val saved = runCatching { AtRest.writeText(context, file, json.encodeToString(next)) }
     saved.exceptionOrNull()?.let {
+      //  بازیابی ننشست ⇒ دفترِ کنارگذاشته سرِ جایش برمی‌گردد
+      aside?.let { a -> if (!file.exists()) runCatching { DiskWrite.move(a, file) } }
       _diskError.tryEmit(it.message ?: "خطای نامشخص")
       return false
     }
+    _unreadable.value = null
     _data.value = next
     //  خلاصهٔ کوچک، کنارِ دفتر. نگهبانِ پس‌زمینه همین را می‌خواند و دیگر
     //  لازم نیست هر ربع ساعت کلِ دفتر را تجزیه کند — شرحش سرِ
@@ -236,7 +297,7 @@ class ShopStore(private val context: Context) {
    */
   suspend fun importJson(raw: String): Result<ShopData> = withContext(Dispatchers.IO) {
     parseBackup(raw).mapCatching {
-      if (!writeInternal(it)) throw java.io.IOException("دفتر روی دیسک نوشته نشد")
+      if (!writeInternal(it, replacing = true)) throw java.io.IOException("دفتر روی دیسک نوشته نشد")
       it
     }
   }
@@ -252,7 +313,10 @@ class ShopStore(private val context: Context) {
    *  نسخه همان‌جا روی گوشی می‌ماند تا یک دکمه بتواند برش گرداند.
    */
   suspend fun keepSafetyCopy() = withContext(Dispatchers.IO) {
-    runCatching { safety.writeText(json.encodeToString(_data.value)) }
+    //  دفترِ خوانده‌نشده نسخهٔ ایمنیِ «خالی» نمی‌گیرد (نسخهٔ ایمنیِ درستِ قبلی می‌ماند)
+    if (_unreadable.value == null) {
+      runCatching { synchronized(AtRest.lock) { AtRest.writeText(context, safety, json.encodeToString(_data.value)) } }
+    }
     Unit
   }
 
@@ -261,9 +325,9 @@ class ShopStore(private val context: Context) {
   /** برگرداندن به لحظهٔ پیش از بازیابی */
   suspend fun undoRestore(): Result<ShopData> = withContext(Dispatchers.IO) {
     runCatching {
-      val parsed = json.decodeFromString<ShopData>(safety.readText())
+      val parsed = json.decodeFromString<ShopData>(AtRest.readText(context, safety))
       //  ⛔ نسخهٔ ایمنی فقط وقتی پاک می‌شود که دفتر واقعاً روی دیسک نشسته باشد
-      if (!writeInternal(parsed)) throw java.io.IOException("دفتر روی دیسک نوشته نشد")
+      if (!writeInternal(parsed, replacing = true)) throw java.io.IOException("دفتر روی دیسک نوشته نشد")
       safety.delete()
       parsed
     }
@@ -303,6 +367,7 @@ class ShopStore(private val context: Context) {
     }
     LedgerSummary.clear(context)
     _data.value = ShopData()
+    _unreadable.value = null
     Unit
   }
 
@@ -349,6 +414,9 @@ class ShopStore(private val context: Context) {
   }
 
   companion object {
+    /** پیامِ نوشتنی که به‌خاطرِ دفترِ رمزدارِ خوانده‌نشده رد شد */
+    const val UNREADABLE =
+      "دفترِ رمزدارِ این دستگاه باز نشد، پس این تغییر ثبت نشد تا دفترِ واقعی رونویسی نشود. از «تنظیمات ← امنیت» دوباره امتحان یا بازیابی کنید."
 
     /** چند رکورد در این دفتر هست — برای خلاصهٔ پیش از بازیابی */
     fun backupSize(d: ShopData): Int =
