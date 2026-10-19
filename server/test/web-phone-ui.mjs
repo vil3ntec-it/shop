@@ -92,7 +92,17 @@ for (const width of [360, 390, 768]) {
     const { pg, ctx, errors } = await open(width);
     for (const page of ['dashboard', 'sale', 'debtors', 'products', 'more']) {
       await pg.evaluate((p) => goTo(p), page);
-      await pg.waitForTimeout(800);
+      //  پایانِ جابه‌جاییِ قرص (transition) — نه زمانِ ثابت، که روی ماشینِ کند لق می‌شود
+      await pg.waitForFunction(() => {
+        const a = document.querySelector('#bottom-nav .bn-item.active');
+        if (!a) return false;
+        const probe = document.createElement('i');
+        probe.style.background = getComputedStyle(document.documentElement).getPropertyValue('--nav-pill');
+        document.body.appendChild(probe);
+        const want = getComputedStyle(probe).backgroundColor;
+        probe.remove();
+        return getComputedStyle(a).backgroundColor === want;
+      }, null, { timeout: 5000 }).catch(() => {});
       const nav = await pg.evaluate(() => {
         const css = (el, k) => getComputedStyle(el).getPropertyValue(k).trim();
         const root = document.documentElement;
