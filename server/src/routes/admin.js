@@ -260,9 +260,23 @@ router.get('/shops/:id', async (req, res, next) => {
   );
   const ent = await entitlementOf(id);
   const history = await subs.historyOf(id);
+  /*
+   *  شمارِ «اطلاعاتِ ثبت‌شده»: ردیف‌های زندهٔ یکتا از **هر دو** دفتر — راهِ قدیم (`lib/sync.js`)
+   *  و Sync v1 (`sync_rows`، همان‌جا که برنامه‌های اندروید و کامپیوتر می‌نویسند). پیش‌تر فقط
+   *  راهِ قدیم شمرده می‌شد و دکانِ برنامه‌ای در پنل «محصولات: ۰، فروش‌ها: ۰» داشت.
+   *  UNION بر شناسه: ردیفی که در هر دو دفتر هست (کوچ) یک بار شمرده می‌شود.
+   */
   const counts = {};
   for (const [col, table] of Object.entries(require('../lib/sync').TABLES)) {
-    const r = await one(`SELECT COUNT(*)::int n FROM ${table} WHERE shop_id=$1 AND deleted=false`, [id]);
+    const r = await one(
+      `SELECT COUNT(*)::int n FROM (
+         SELECT id FROM ${table} WHERE shop_id=$1 AND deleted=false
+         UNION
+         SELECT row_id FROM sync_rows
+          WHERE app='shop' AND account_kind='shop' AND account_id=$1 AND table_name=$2 AND deleted_at IS NULL
+       ) x`,
+      [id, col]
+    );
     counts[col] = r.n;
   }
   /*

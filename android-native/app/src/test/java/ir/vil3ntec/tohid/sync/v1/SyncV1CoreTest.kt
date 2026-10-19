@@ -302,4 +302,36 @@ class SyncV1CoreTest {
     assertNotNull(body["hash"])
     assertEquals(OpHash.of("debtors", "c-1", "delete", null), (body["hash"] as JsonPrimitive).content)
   }
+
+  /* --------------------- دسته: یک ثبت بریده نمی‌شود --------------------- */
+
+  private fun saveOps(ts: Long, n: Int, tag: String) =
+    (0 until n).map { SyncOp("$tag-$it", ts, "saleItems", "$tag-$it", SyncOp.INSERT, buildJsonObject { put("q", JsonPrimitive(it)) }) }
+
+  @Test
+  fun `سقفِ دسته وسطِ یک ثبت نمی‌افتد — آن ثبت کامل به دستهٔ بعد می‌رود`() {
+    //  ثبتِ اول ۱۵۰ op، ثبتِ دوم (فاکتورِ نسیه با قلم‌ها و بردش) ۸۰ op ⇒ سقفِ ۲۰۰ وسطِ ثبتِ دوم
+    val ops = saveOps(1000, 150, "a") + saveOps(2000, 80, "b")
+    val sizes = ops.map { 10 }
+    val first = OpQueue.cut(ops, sizes, maxOps = 200, maxBytes = 1_000_000)
+    assertEquals(150, first.size)
+    assertTrue(first.all { it.ts == 1000L })
+    //  ثبتی که خودش از سقف بزرگ‌تر است ناچار بریده می‌شود (دستهٔ خالی = صفِ قفل)
+    val big = saveOps(3000, 260, "c")
+    assertEquals(200, OpQueue.cut(big, big.map { 10 }, maxOps = 200, maxBytes = 1_000_000).size)
+    //  سقفِ بایت هم همین‌طور
+    val bytes = OpQueue.cut(ops, sizes, maxOps = 500, maxBytes = 2 + 10 * 170)
+    assertEquals(150, bytes.size)
+    //  ثبت کامل جا شد ⇒ همان دستهٔ همیشه
+    assertEquals(230, OpQueue.cut(ops, sizes, maxOps = 500, maxBytes = 1_000_000).size)
+  }
+
+  @Test
+  fun `deferred ِ سرور نه پذیرفته است نه رد — در صف می‌ماند`() {
+    val d = OpResult("o1", "deferred", "held_after_reject")
+    assertTrue(d.deferred)
+    assertTrue(!d.accepted)
+    assertTrue(!OpResult("o2", "rejected", "tx_rejected").deferred)
+    assertTrue(OpResult("o3", "duplicate").accepted)
+  }
 }

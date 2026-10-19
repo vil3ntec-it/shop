@@ -425,7 +425,7 @@ function openTask(c, ctx, { kind, table, rowId, dedupe, detail, t }) {
  * @returns {Promise<null | string | {reason, box, detail}>} دلیلِ رد؛ با `box`
  *          یعنی ردیفی هم در صندوقِ تعارض لازم است (opِ پولیِ ردشده).
  */
-async function authorize(c, ctx, op, row, deviceId, origin) {
+async function authorize(c, ctx, op, row, deviceId, origin, groups = null) {
   if (origin === 'v1' || origin === 'server') return null;      //  v1 خودش سنجیده بود (و `v1Guard`)
   const role = ctx.role;
   const own = !!row && row.created_by === deviceId;
@@ -437,6 +437,9 @@ async function authorize(c, ctx, op, row, deviceId, origin) {
   //  تخفیف، لغوِ فاکتور و برگشت: نقش + دو لایه + «برگهٔ امضاشده» (STF-02/03)
   const need = approvals.needOf(op, row);
   if (need) {
+    //  برگشت: سقف روی جمعِ سند (docId یا tx)، یک داوری برای همهٔ ردیف‌هایش
+    const g = need.perm === 'returns.create' && groups ? groups.get(op) : null;
+    if (g) return approvals.judgeGroup(c, ctx, g, { at: approvals.wallOf(g.rows[0].op.hlc), deviceId, path: origin });
     //  قاعدهٔ امروزِ v1 برای نقشی که لغو ندارد (شاگرد): «حذفِ فاکتورِ خودت» از راهِ حذفِ v2
     const fallback = need.perm === 'sales.cancel' && op.fromDelete && own && can(role, 'data.delete.own')
       && permCore.defaultMode(role, 'sales.cancel') === 'deny';
@@ -464,14 +467,14 @@ async function nextSeq(c) {
  * @returns {Promise<object>} نتیجهٔ همین op برای پاسخ:
  *          applied | partial | conflict | duplicate | rejected
  */
-async function applyOne(c, ctx, op, { deviceId, origin, cursor = 0, t }) {
+async function applyOne(c, ctx, op, { deviceId, origin, cursor = 0, t, groups = null }) {
   const dup = (await c.query(
     `SELECT server_seq FROM sync_v3_ops WHERE ${ACC} AND op_id=$4`, [...acc(ctx), op.op_id]
   )).rows[0];
   if (dup) return { op_id: op.op_id, status: 'duplicate', server_seq: Number(dup.server_seq) };
 
   const row = await loadRow(c, ctx, op.table, op.row_id);
-  const denied = await authorize(c, ctx, op, row, deviceId, origin);
+  const denied = await authorize(c, ctx, op, row, deviceId, origin, groups);
   if (denied) {
     const out = { op_id: op.op_id, status: 'rejected', reason: typeof denied === 'string' ? denied : denied.reason };
     //  ردیفِ صندوق بعد از برگشتِ savepoint نوشته می‌شود (`push`)؛ در پاسخ نمی‌آید
@@ -750,6 +753,9 @@ async function push(ctx, { deviceId, protocol = PROTOCOL, format = 'v3', schemaV
     }
   });
 
+  //  سندهای برگشتِ این دسته (جمعِ ردیف‌ها زیرِ یک سقف و یک برگه)
+  const groups = approvals.returnGroupsOf(units.flatMap((u) => u.items.flatMap((it) => it.ops)));
+
   //  پلِ v3 ⇒ v1 (پرچمِ دکان): بیشترِ عقب‌ماندگیِ v1 ⇒ v3 بیرونِ تراکنشِ push
   const toV1On = await toV1.enabled(ctx);
   if (toV1On) await catchUp(ctx, 3, true);
@@ -767,6 +773,22 @@ async function push(ctx, { deviceId, protocol = PROTOCOL, format = 'v3', schemaV
     let applied = 0;
     let sp = 0;
 
+    //  دنبالهٔ tx ای که سرش در دستهٔ پیشین با سقف/تأیید رد شد (tx ِ بزرگ‌تر از یک دسته) ⇒ همان رد
+    const txs = units.filter((u) => u.tx && !u.broken).map((u) => u.tx);
+    if (txs.length) {
+      const held = (await c.query(
+        `SELECT detail->>'tx' AS tx, loser_op_id FROM sync_v3_conflicts
+          WHERE ${ACC} AND kind = ANY($4::text[]) AND detail->>'tx' = ANY($5::text[])`,
+        [...acc(ctx), approvals.HOLD_KINDS, txs]
+      )).rows;
+      for (const u of units) {
+        const hits = u.tx ? held.filter((r) => r.tx === u.tx) : [];
+        //  همان tx دوباره (پاسخ گم شد) ⇒ دوباره داوری می‌شود، نه «دنباله»
+        const again = hits.some((r) => u.items.some((it) => it.ops.some((o) => o.op_id === r.loser_op_id)));
+        if (hits.length && !again) u.broken = true;
+      }
+    }
+
     for (const unit of units) {
       if (unit.broken) {
         for (const it of unit.items) results[it.i] = { op_id: it.ops[0].op_id, status: 'rejected', reason: 'tx_rejected' };
@@ -779,7 +801,7 @@ async function push(ctx, { deviceId, protocol = PROTOCOL, format = 'v3', schemaV
       for (const it of unit.items) {
         const parts = [];
         for (const op of it.ops) {
-          const r = await applyOne(c, ctx, op, { deviceId, origin, cursor, t });
+          const r = await applyOne(c, ctx, op, { deviceId, origin, cursor, t, groups });
           parts.push(r);
           if (r.status === 'rejected') { failed = r; break; }
         }
@@ -792,7 +814,7 @@ async function push(ctx, { deviceId, protocol = PROTOCOL, format = 'v3', schemaV
         if (failed.box) {
           const b = failed.box;
           await addConflict(c, ctx, { table: b.table, row_id: b.row_id, loser_op_id: b.op_id, loser_device: deviceId },
-            b.kind, t, { dedupe: `perm:${b.op_id}`, detail: b.detail });
+            b.kind, t, { dedupe: `perm:${b.op_id}`, detail: unit.tx ? { ...b.detail, tx: unit.tx } : b.detail });
         }
         for (const it of unit.items) {
           const mine = local.find(l => l.it === it);

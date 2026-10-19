@@ -205,7 +205,12 @@ internal class SyncV3Engine(
       if (doc) docOps += conv.ops.size
       drafts += Draft(op, V3Entry.V3, conv.ops, "", doc)
     }
-    val tx = if (docOps in 2..TX_GROUP_MAX) "tx.${ops.first().opId}" else null
+    //  یک ثبت = یک سند (فاکتور با قلم‌ها، لغو، برگشت…) ⇒ همیشه یک tx، هر اندازه: ردِ سند
+    //  (سقف/تأیید) همه را با هم برمی‌گرداند، وگرنه فاکتورِ ۶۰قلمیِ ردشده قلم و بردش را جا می‌گذاشت.
+    //  دفترِ چندفاکتوری (نخستین بارگذاری، بازگردانیِ پشتیبان) سند به سند نیست ⇒ همان سقفِ [TX_GROUP_MAX]
+    val heads = drafts.filter { it.doc && (it.op.table == "sales" || it.op.table == "purchases") }
+      .mapTo(HashSet()) { it.op.table + "/" + it.op.rowId }.size
+    val tx = if (docOps >= 2 && (heads <= 1 || docOps <= TX_GROUP_MAX)) "tx.${ops.first().opId}" else null
     var seq = startSeq
     val entries = drafts.map { d ->
       seq += 1
@@ -532,6 +537,7 @@ internal class SyncV3Engine(
     const val MIN_BYTES = 64 * 1024
     const val MAX_BYTES = 256 * 1024
     const val MAX_OPS = 200
+    /** سقفِ tx ِ مشترک فقط برای دفترِ چندفاکتوری؛ یک سند همیشه یک tx است (`toEntries`) */
     const val TX_GROUP_MAX = 50
     const val ROUNDS = 50
     const val MIN_BACKOFF_MS = 2000L
