@@ -9,6 +9,7 @@ const subs = require('./lib/subscriptions');
 const { rateLimit } = require('./middleware/ratelimit');
 const { notFoundHandler, errorHandler } = require('./middleware/errors');
 const { requireUser, optionalShop } = require('./middleware/auth');
+const { redactPath } = require('./lib/log-redact');
 
 async function createApp({ runMigrations = true } = {}) {
   const app = express();
@@ -59,7 +60,7 @@ async function createApp({ runMigrations = true } = {}) {
       return next(err);
     }
     const tooBig = err.type === 'entity.too.large';
-    console.warn(`[body] ${req.method} ${req.path.slice(0, 120)} — ${err.type}`);
+    console.warn(`[body] ${req.method} ${redactPath(req.originalUrl)} — ${err.type}`);
     res.status(tooBig ? 413 : 400).json({
       error: {
         code: tooBig ? 'body_too_large' : 'bad_json',
@@ -115,14 +116,14 @@ async function createApp({ runMigrations = true } = {}) {
 
   // ---- ثبت درخواست‌ها ----
   // فقط روش، مسیر، وضعیت و زمان پاسخ. هیچ بدنه، رمز، کد یا توکنی نوشته
-  // نمی‌شود؛ حتی مسیرهایی که شناسه دارند کوتاه می‌شوند.
+  // نمی‌شود؛ بخشِ توکن‌مانندِ مسیر `:tok` می‌شود و مسیر کوتاه می‌شود.
   app.use((req, res, next) => {
     const started = Date.now();
     res.on('finish', () => {
       const ms = Date.now() - started;
       if (res.statusCode >= 400 || ms > 1000 || config.env !== 'production') {
-        const path = req.originalUrl.split('?')[0].slice(0, 120);
-        console.log(`${req.method} ${path} ${res.statusCode} ${ms}ms`);
+        //  ⛔ توکن در مسیر (پیگیریِ سفارش، پرونده، دعوت…) ⇒ `:tok` (lib/log-redact.js)
+        console.log(`${req.method} ${redactPath(req.originalUrl)} ${res.statusCode} ${ms}ms`);
       }
     });
     next();

@@ -271,6 +271,12 @@ test('ABUSE-01: شکایت از سفارش ⇒ پرونده، مدرک، پاس�
   }
   //  دکان مدرک را نمی‌گیرد (فقط شمارش)
   assert.equal(view.body.case.evidence, undefined);
+  //  ⛔ بازبینیِ حریم: شمارهٔ سفارش شاکی را به دکان می‌شناساند (دکان سفارش‌هایش را با
+  //  نام و شماره دارد) ⇒ نه در پرونده، نه در فهرست؛ فقط «دربارهٔ یک سفارش»
+  assert.equal(view.body.case.subject, 'order');
+  assert.ok(!('orderNo' in view.body.case), JSON.stringify(view.body.case));
+  assert.ok(list.body.cases.every((c) => !('orderNo' in c)), JSON.stringify(list.body.cases));
+  assert.ok(!json.includes('"orderNo"') && !json.includes('order_no') && !json.includes('orderId'), 'هیچ شمارهٔ سفارشی در نمای دکان');
 
   //  پاسخِ دکان؛ تکرار با همان clientId ⇒ پاسخِ دوم نمی‌سازد؛ شاکی پاسخ را می‌بیند
   const reply = { body: 'عذرخواهی؛ جایگزین آماده است', clientId: `cl-${uniq()}-000` };

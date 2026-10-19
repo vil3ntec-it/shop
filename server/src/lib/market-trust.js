@@ -161,6 +161,16 @@ function base(row) {
   };
 }
 
+/**
+ * نمای دکان از همان پایه، بی `orderNo`: دکان سفارش‌هایش را با نام و شمارهٔ
+ * مشتری دارد ⇒ شمارهٔ سفارش شاکی را می‌شناساند (بازبینیِ حریم). دکان فقط
+ * می‌بیند «دربارهٔ یک سفارش» (`subject`).
+ */
+function shopBase(row) {
+  const { orderNo, ...rest } = base(row);   // eslint-disable-line no-unused-vars
+  return rest;
+}
+
 /** نتیجه از دیدِ بیرون: رأیِ اعتراض بر تصمیمِ نخست جلو می‌افتد. */
 function verdict(row) {
   if (row.appeal_outcome === 'reversed') return 'reversed';
@@ -184,12 +194,12 @@ function customerView(row, events, evidence) {
 
 /**
  * نمای دکان — فقط از فهرستِ سفید. ⛔ هیچ چیزی از شاکی (شماره، نشانه، HMAC،
- * توکن، IP، برچسبِ خودکار) و هیچ شناسهٔ مدیری این‌جا نیست.
+ * توکن، IP، برچسبِ خودکار، شمارهٔ سفارش) و هیچ شناسهٔ مدیری این‌جا نیست.
  */
 function shopView(row, events, evidenceCount, sanctions) {
   const deadline = row.decided_at == null ? null : Number(row.decided_at) + config.trust.appealDays * DAY;
   return {
-    id: row.id, ...base(row), severity: row.severity, body: row.body,
+    id: row.id, ...shopBase(row), severity: row.severity, body: row.body,
     outcome: row.outcome || null, decisionReason: row.decision_reason || '', decidedAt: n(row.decided_at),
     appeal: row.appealed_at == null ? null : {
       body: row.appeal_body, at: n(row.appealed_at), outcome: row.appeal_outcome || null,
@@ -469,7 +479,7 @@ async function listForShop(shopId, { status, limit, before } = {}) {
   );
   return {
     cases: rows.map((r) => ({
-      id: r.id, ...base(r), severity: r.severity, outcome: r.outcome || null,
+      id: r.id, ...shopBase(r), severity: r.severity, outcome: r.outcome || null,
       appealOutcome: r.appeal_outcome || null, evidenceCount: Number(r.evidence_count || 0),
     })),
   };
