@@ -230,6 +230,8 @@ fun main() {
           TohidTheme(dialogTheme) { ShortcutsHelp() }
         }
       }
+      //  پیش‌نمایشِ گوشی — فقط برای عکس‌های خودکار (`DevShot` ⇐ `phone:<صفحه>`)
+      PhonePreviewWindow(store, context)
       LaunchedEffect(Unit) {
         //  منوی سیستم راست‌به‌چپ، مثلِ خودِ برنامه
         window.jMenuBar?.applyComponentOrientation(java.awt.ComponentOrientation.RIGHT_TO_LEFT)

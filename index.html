@@ -157,6 +157,17 @@
     --aurora-1:rgba(124,92,255,.30);
     --aurora-2:rgba(0,195,154,.24);
     --aurora-3:rgba(255,95,162,.20);
+    /* برگهٔ تیرهٔ سبد و قرصِ نوارِ پایینِ گوشی — عدد به عدد همان `Theme.kt`
+       (sheet، onSheet، …؛ `WebPaletteParityTest`). متن ≥ ۴٫۵:۱ روی برگه. */
+    --sheet:#17151f;
+    --on-sheet:#ffffff;
+    --on-sheet-muted:#b8b3cc;
+    --sheet-accent:#b9a6ff;
+    --on-sheet-accent:#17151f;
+    --sheet-line:rgba(255,255,255,.14);
+    --sheet-raised:rgba(255,255,255,.08);
+    --nav-pill:#17151f;
+    --on-nav-pill:#ffffff;
     --radius-sm:16px;
     --radius-md:20px;
     --radius-lg:24px;
@@ -198,6 +209,15 @@
     --aurora-1:rgba(124,92,255,.55);
     --aurora-2:rgba(0,195,154,.38);
     --aurora-3:rgba(255,95,162,.34);
+    --sheet:#221f33;
+    --on-sheet:#f0eef8;
+    --on-sheet-muted:#b3aec8;
+    --sheet-accent:#a78bff;
+    --on-sheet-accent:#14102a;
+    --sheet-line:rgba(255,255,255,.14);
+    --sheet-raised:rgba(255,255,255,.08);
+    --nav-pill:#f0eef8;
+    --on-nav-pill:#17151f;
     --shadow-sm:0 1px 2px rgba(0,0,0,.4);
     --shadow-md:0 10px 30px -12px rgba(0,0,0,.7);
   }
@@ -794,80 +814,53 @@
 
   /* ---------- Bottom navigation (mobile) ---------- */
   /* ==========================================================
-     نوارِ پایین — همان نوارِ شناورِ برنامه‌ی نیتیو (TohidNavBar).
+     نوارِ پایین — قرصِ شناور با تبِ فعالِ تیره (phone-ui، تصویرِ مرجعِ ۳)؛
+     همان `PhoneNavBar`ِ برنامهٔ نیتیو.
 
-     نوار یک قرصِ گِردِ جدا از لبه‌ی صفحه است، نه خطی که به ته چسبیده،
-     و روی تبِ فعال یک «چراغ» دارد: یک نوارِ نازکِ نور بالای تب، و
-     مخروطی که از همان‌جا رو به پایین پهن و کم‌رنگ می‌شود.
-
-     چراغ نرم جابه‌جا می‌شود، نه اینکه خاموش و روشن شود — همان حسِ
-     «منبعِ نور از این تب کنده شد و رفت روی آن یکی». جابه‌جایی با
-     transition روی دو متغیرِ CSS انجام می‌شود که فقط موقعِ عوض‌شدنِ
-     صفحه یک بار نوشته می‌شوند؛ هیچ کارِ هر-فریمی در JS نیست.
+     تبِ فعال یک قرصِ پُر است با آیکن و برچسب؛ بقیه فقط آیکن‌اند و برچسبشان
+     برای صفحه‌خوان می‌ماند (`.bn-label` پنهانِ دیدنی). هر تب ≥ ۴۸ پیکسل.
+     design v2: سایهٔ نرم، بی خطِ دورِ تیره. «کاهشِ حرکت» با قاعدهٔ سراسریِ
+     پایینِ همین برگه خاموش می‌شود.
      ========================================================== */
   .bottom-nav{
-    --lamp-x:50%;
-    --lamp-w:0px;
-    --lamp-on:0;
     position:fixed;
     bottom:calc(var(--bottomnav-gap) + env(safe-area-inset-bottom));
     inset-inline:var(--bottomnav-gap);
     height:var(--bottomnav-h);
-    background:var(--surface);
-    -webkit-backdrop-filter:blur(16px);
-    backdrop-filter:blur(16px);
-    border:1px solid var(--border);
+    background:var(--surface-solid);
     border-radius:calc(var(--bottomnav-h) / 2);
-    box-shadow:var(--shadow-md);
-    display:flex;
+    box-shadow:0 10px 30px -10px rgba(25,22,39,.28), 0 2px 6px rgba(25,22,39,.06);
+    display:flex; align-items:center; gap:2px;
+    padding:0 5px;
     z-index:30;
-    overflow:hidden;
-    isolation:isolate;
   }
-  /* نوارِ نور — درست بالای تبِ فعال */
-  .bottom-nav::before{
-    content:''; position:absolute; z-index:1; pointer-events:none;
-    top:5px; height:3px; border-radius:3px;
-    inset-inline-start:calc(var(--lamp-x) - var(--lamp-w) * .20);
-    width:calc(var(--lamp-w) * .40);
-    background:var(--primary);
-    opacity:var(--lamp-on);
-    transition:inset-inline-start .38s cubic-bezier(.22,1,.36,1),
-               width .38s cubic-bezier(.22,1,.36,1), opacity .3s ease;
-  }
-  /* مخروطِ نور — از همان نوار به پایین باز می‌شود و محو می‌شود */
-  .bottom-nav::after{
-    content:''; position:absolute; z-index:0; pointer-events:none;
-    top:8px; bottom:0;
-    inset-inline-start:calc(var(--lamp-x) - var(--lamp-w) * 1.2);
-    width:calc(var(--lamp-w) * 2.4);
-    opacity:var(--lamp-on);
-    /* دو لایه: حبابِ خودِ چراغ درست زیرِ نوار، و مخروطی که پایین‌تر می‌رود.
-       هر دو خیلی قبل از لبه‌ی جعبه محو می‌شوند تا مخروط لبه‌ی تیز نگیرد. */
-    background:
-      radial-gradient(ellipse 26% 34% at 50% 0%,
-        color-mix(in srgb, var(--primary) 42%, transparent) 0%,
-        color-mix(in srgb, var(--primary) 14%, transparent) 45%,
-        transparent 78%),
-      radial-gradient(ellipse 46% 108% at 50% 0%,
-        color-mix(in srgb, var(--primary) 22%, transparent) 0%,
-        color-mix(in srgb, var(--primary) 9%, transparent) 34%,
-        transparent 76%);
-    transition:inset-inline-start .38s cubic-bezier(.22,1,.36,1),
-               width .38s cubic-bezier(.22,1,.36,1), opacity .3s ease;
-  }
-  .bn-item{ position:relative; z-index:2; }
   .bn-item{
-    flex:1;
-    display:flex; flex-direction:column; align-items:center; justify-content:center;
-    gap:4px;
-    color:var(--muted-2);
-    font-size:10.5px;
-    font-weight:600;
+    position:relative;
+    flex:1 1 0; min-width:48px; height:52px;
+    display:flex; flex-direction:row; align-items:center; justify-content:center;
+    gap:8px;
+    border-radius:999px;
+    color:var(--muted);
+    font-size:13px;
+    font-weight:700;
     text-decoration:none;
+    white-space:nowrap;
   }
-  .bn-item .ic{width:21px; height:21px; display:flex; align-items:center; justify-content:center;}
-  .bn-item.active{color:var(--primary);}
+  /* پس از قاعدهٔ عمومیِ «حسِ لمس» هم بماند (ویژگیِ بالاتر) */
+  .bottom-nav .bn-item{
+    transition:flex-grow .26s cubic-bezier(.22,1,.36,1), background-color .26s ease,
+               color .2s ease, transform .13s cubic-bezier(.22,1,.36,1);
+  }
+  .bn-item .ic{width:22px; height:22px; display:flex; align-items:center; justify-content:center; flex:0 0 auto;}
+  .bn-item .ic svg{width:22px; height:22px;}
+  .bn-item.active{flex-grow:2.6; background:var(--nav-pill); color:var(--on-nav-pill); padding-inline:12px;}
+  /* برچسبِ تبِ غیرفعال دیده نمی‌شود ولی نامِ پیوند می‌ماند */
+  .bn-item:not(.active) .bn-label{
+    position:absolute; width:1px; height:1px; overflow:hidden;
+    clip:rect(0 0 0 0); clip-path:inset(50%); white-space:nowrap;
+  }
+  .bn-item .bn-label{overflow:hidden; text-overflow:ellipsis; min-width:0;}
+  .bn-item:focus-visible{outline:3px solid var(--primary); outline-offset:2px;}
 
   @media(min-width:769px){
     .bottom-nav{display:none;}
@@ -14407,35 +14400,13 @@
       a.className = 'bn-item';
       a.dataset.page = p.id;
       a.href = `#${p.id}`;
-      a.innerHTML = `<span class="ic">${p.icon}</span><span>${p.label}</span>`;
+      a.innerHTML = `<span class="ic" aria-hidden="true">${p.icon}</span><span class="bn-label">${p.label}</span>`;
       bottomNav.appendChild(a);
     }
   });
 
   const EXTRA_PAGES = ['debtor-account', 'quick-sale', 'supplier-account', 'receipts', 'profile', 'team', 'product', 'admin', 'devices'];
 
-  /**
-   *  چراغِ نوارِ پایین را می‌برد روی تبِ فعال.
-   *
-   *  فقط دو متغیرِ CSS می‌نویسد و بس؛ خودِ جابه‌جایی را transition انجام
-   *  می‌دهد، پس هیچ کارِ هر-فریمی در JS نیست. اگر صفحه‌ی باز در نوارِ
-   *  پایین نباشد (مثلاً «گزارشات»)، چراغ خاموش می‌شود.
-   */
-  function moveNavLamp(){
-    if(!bottomNav) return;
-    const on = bottomNav.querySelector('.bn-item.active');
-    if(!on){ bottomNav.style.setProperty('--lamp-on','0'); return; }
-    const bar = bottomNav.getBoundingClientRect();
-    const it  = on.getBoundingClientRect();
-    // فاصله از لبه‌ی آغازِ نوار — در راست‌به‌چپ یعنی از راست
-    const rtl = getComputedStyle(bottomNav).direction === 'rtl';
-    const start = rtl ? (bar.right - it.right) : (it.left - bar.left);
-    bottomNav.style.setProperty('--lamp-x', (start + it.width/2) + 'px');
-    bottomNav.style.setProperty('--lamp-w', it.width + 'px');
-    bottomNav.style.setProperty('--lamp-on','1');
-  }
-  // اگر پهنای صفحه عوض شد، چراغ سرِ جایش برگردد
-  window.addEventListener('resize', moveNavLamp);
 
 
   /* ==========================================================
@@ -15048,9 +15019,11 @@
     document.getElementById('page-'+pageId)?.classList.add('active');
 
     document.querySelectorAll('.nav-item, .bn-item').forEach(el=>{
-      el.classList.toggle('active', el.dataset.page===pageId);
+      const on = el.dataset.page===pageId;
+      el.classList.toggle('active', on);
+      //  صفحه‌خوان هم بداند کدام تب باز است
+      if(on) el.setAttribute('aria-current', 'page'); else el.removeAttribute('aria-current');
     });
-    moveNavLamp();
 
     if(pageId==='debtor-account'){
       const d = debtors.find(x=>x.id===currentAccountDebtorId);
