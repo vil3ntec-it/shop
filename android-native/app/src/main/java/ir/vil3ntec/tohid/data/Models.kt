@@ -4,6 +4,7 @@ import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonNames
 
 /**
  *  مدلِ داده — دقیقاً همان چیزی که نسخهٔ وب می‌نویسد.
@@ -76,6 +77,10 @@ data class WarehouseEntry(
   val batch: String = "",
   /** تاریخِ تولید (اختیاری، `yyyy-MM-dd`) — خالی یعنی ثبت نشده */
   val productionDate: String = "",
+  /** نوعِ اصلاح (INV-04): count · damage · expired · lost · other · supplier_return */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val adjKind: String? = null,
 )
 
 @Serializable
@@ -114,6 +119,24 @@ data class Sale(
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val series: String? = null,
   /**
+   *  PAY (v3 A4) — ردیف‌های پرداختِ ترکیبی (نقد، کیف پول، کارت، حواله، به حساب)، به پول.
+   *  فقط فروشی که با پرچمِ `ShopPolicy.payV2` ثبت شده دارد؛ معنای فیلدهای بالا
+   *  (`paidAmount`، `remaining`، `debtGiven`) همان امروز است، پس برنامهٔ کهنه همان عدد
+   *  را می‌خواند؛ `paymentMethod` برای فروشِ غیرنقد `wallet`/`card`/`transfer`/`mixed` است
+   *  (`PayFlow.legacyMethod`). `null` نوشته نمی‌شود — مثلِ `series`.
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val payments: List<SalePayment>? = null,
+  /** دریافتیِ کل (نقد + غیرنقد)، به پول — فقط با `payments` */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val tenderedMinor: Long? = null,
+  /** پولِ پس (فقط از نقد)، به پول — فقط با `payments` */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val changeMinor: Long? = null,
+  /**
    *  کانالِ فروش (ORD-20): `online` برای فاکتورِ سریِ `W` که سرور هنگامِ
    *  تحویلِ سفارشِ اینترنتی در دفترِ دکان می‌گذارد؛ فاکتورِ صندوق `null`
    *  است (گزارش آن را «حضوری» می‌خواند — `ReportLedger`). مثلِ `series`
@@ -122,6 +145,33 @@ data class Sale(
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val channel: String? = null,
+)
+
+/**
+ *  یک ردیفِ پرداختِ فاکتور (`Sale.payments`) — به پول، نام‌ها همان `PaymentRow`ِ هسته.
+ *  غیرنقد «ثبتِ دستی، در انتظار» است (`status = pending`، `verification = manual`)
+ *  تا تأییدِ قابلِ اتکا برسد (PAY-08)؛ نقد و «به حساب» تأییدشده‌اند.
+ *
+ *  روی سیم مبلغ `amount` است (به پول) — همان `PaymentRow`ِ هسته و ردیفی که سرور روی فاکتورِ
+ *  W می‌گذارد (`order-ledger.js`، #321)؛ `amountMinor`ِ نسخهٔ پیشِ این شاخه هم خوانده می‌شود.
+ *  بی این، فاکتورِ W ِ سرور خواندنِ کلِ دفتر را می‌شکست (فیلدِ اجباریِ گم).
+ */
+@OptIn(ExperimentalSerializationApi::class)
+@Serializable
+data class SalePayment(
+  val method: String,
+  val kind: String,
+  @SerialName("amount")
+  @JsonNames("amountMinor")
+  val amountMinor: Long,
+  val status: String,
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val ref: String? = null,
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val verification: String? = null,
+  /** امانتِ کیست، اگر پول هنوز دستِ دکان نیست — `courier` برای «نقد هنگامِ تحویل»ِ فاکتورِ W */
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val custody: String? = null,
 )
 
 /**
@@ -210,6 +260,13 @@ data class SaleReturn(
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val creditTo: String? = null,
+  /**
+   *  سهمِ این ردیف که به روشِ غیرنقدِ اصلی (کیف پول، کارت، حواله…) پس رفت: شناسهٔ روش ⇒
+   *  افغانی. فقط فاکتورِ با `Sale.payments`؛ این سهم از دخل کم نمی‌شود (`CashShift`).
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val toMethods: Map<String, Double>? = null,
   /** فقط برگشتِ بی رسید: قیمتِ واحدی که پس داده شد */
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
@@ -225,6 +282,14 @@ data class SaleReturn(
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val exchangeSaleId: String? = null,
+  /**
+   *  `online` برای مرجوعیِ سرور هنگامِ بازپرداختِ سفارشِ اینترنتی (ORD-20): پولش از راهِ
+   *  سفارش برمی‌گردد، نه از دخل (`CashShift`). مرجوعیِ دستگاه `null` است و مثلِ `Sale.channel`
+   *  هرگز `null` نوشته نمی‌شود تا ردیف‌های قدیمی opِ تازه نسازند.
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val channel: String? = null,
 )
 
 @Serializable
