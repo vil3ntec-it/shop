@@ -64,6 +64,7 @@
         <input id="q" type="search" placeholder="جست‌وجوی کالا…" autocomplete="off" enterkeyhint="search" maxlength="60">
       </form>
       <div id="cats" class="chips section" role="group" aria-label="دسته‌ها"></div>
+      <p id="stock-note" class="stock-note" hidden>موجودی در حال بررسی است؛ دکان هنگامِ قبولِ سفارش آن را تأیید می‌کند.</p>
       <div id="catalog-msg" class="note section" hidden role="status"></div>
       <div id="catalog-empty" class="empty" hidden>
         <div class="art" id="empty-art"></div>
@@ -150,9 +151,10 @@
       <div class="split section">
         <div class="stack">
           <div class="card card-lg">
-            <div class="spread"><h1 id="o-title">سفارش</h1><span id="o-pill"></span></div>
-            <p id="o-status" class="muted"></p>
+            <div class="spread"><h1 id="o-title">سفارش</h1><span id="o-status" class="pill" role="status"></span></div>
+            <p id="o-meta" class="muted"></p>
             <ol id="o-steps" class="steps section" aria-label="مراحلِ سفارش"></ol>
+            <details class="history section"><summary>تاریخچهٔ کامل</summary><ol id="o-timeline" class="timeline"></ol></details>
           </div>
           <div class="card card-lg">
             <h2>اقلام</h2>
