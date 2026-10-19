@@ -6036,7 +6036,7 @@
   <div class="modal-box">
     <div class="modal-head">
       <h3 id="shift-modal-title">باز کردنِ صندوق</h3>
-      <button class="modal-close" data-close-modal="modal-shift">
+      <button class="modal-close" data-close-modal="modal-shift" aria-label="بستن">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
@@ -6047,12 +6047,12 @@
       <div class="checkout-summary-row total"><span>نقدِ شمرده</span><b id="shift-denoms-total">0 افغانی</b></div>
     </div>
     <div class="form-group">
-      <label id="shift-amount-label">پولِ اولِ صندوق</label>
+      <label id="shift-amount-label" for="in-shift-amount">پولِ اولِ صندوق</label>
       <input class="form-input" id="in-shift-amount" inputmode="decimal">
       <div class="empty-sub" id="shift-diff"></div>
     </div>
     <div class="form-group" id="fg-shift-note">
-      <label id="shift-note-label">یادداشت (اختیاری)</label>
+      <label id="shift-note-label" for="in-shift-note">یادداشت (اختیاری)</label>
       <input class="form-input" id="in-shift-note" maxlength="120">
       <div class="field-error" id="shift-v2-error" role="alert" style="display:block;"></div>
     </div>
@@ -6319,7 +6319,7 @@
   <div class="modal-box">
     <div class="modal-head">
       <h3>تسویه فروش</h3>
-      <button class="modal-close" data-close-modal="modal-sale-checkout">
+      <button class="modal-close" data-close-modal="modal-sale-checkout" aria-label="بستن">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
@@ -13223,8 +13223,8 @@
       <div class="pay-row" data-pay-row="${i}">
         <select class="form-input" data-pay-f="method" aria-label="روشِ پرداخت">${opts.map(m=>
           `<option value="${escapeHtml(m.id)}"${m.id===r.method?' selected':''}>${escapeHtml(m.name)}</option>`).join('')}</select>
-        <input class="form-input" data-pay-f="ref" placeholder="شمارهٔ مرجع" autocomplete="off" value="${escapeHtml(r.ref)}">
-        <input class="form-input" data-pay-f="amount" inputmode="decimal" placeholder="مبلغ" autocomplete="off" value="${escapeHtml(r.amount)}">
+        <input class="form-input" data-pay-f="ref" placeholder="شمارهٔ مرجع" aria-label="شمارهٔ مرجعِ ${escapeHtml(TohidPayFlow.methodName(r.method))}" autocomplete="off" value="${escapeHtml(r.ref)}">
+        <input class="form-input" data-pay-f="amount" inputmode="decimal" placeholder="مبلغ" aria-label="مبلغِ ${escapeHtml(TohidPayFlow.methodName(r.method))}" autocomplete="off" value="${escapeHtml(r.amount)}">
         <button type="button" class="btn btn-secondary btn-sm pay-del" data-pay-del="${i}" aria-label="حذفِ این روش">✕</button>
       </div>`).join('');
     refreshPayV2();

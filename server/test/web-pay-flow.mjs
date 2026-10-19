@@ -27,6 +27,11 @@ const globalRoot = (() => { try { return execSync('npm root -g', { encoding: 'ut
 const pick = (name) => { for (const p of [`${globalRoot}/${name}`, name]) { try { return require(p); } catch { /* بعدی */ } } return null; };
 const pw = pick('playwright');
 if (!pw) missingTool('پلی‌رایت', PLAYWRIGHT_INSTALL);
+const SKIP = process.env.SKIP_BROWSER_TESTS === '1';
+let axeSrc = null;
+for (const p of [`${globalRoot}/axe-core/axe.min.js`, path.join(import.meta.dirname, '..', 'node_modules', 'axe-core', 'axe.min.js'), process.env.AXE_PATH || '']) {
+  if (p && fs.existsSync(p)) { axeSrc = fs.readFileSync(p, 'utf8'); break; }
+}
 
 const ROOT = process.env.WEB_ROOT ? path.resolve(process.env.WEB_ROOT) : path.join(import.meta.dirname, '..', '..');
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json' };
@@ -308,6 +313,46 @@ await step('خاموش کردنِ دوبارهٔ پرچم ⇒ همان نقد/ن
   assert.equal('payments' in d.sales[1], false);
   assert.deepEqual(errors, []);
   await ctx.close();
+});
+
+await step('دسترس‌پذیری (axe): پنلِ پرداخت، شمارشِ اسکناس، ورود/خروج و گزارشِ X — روز و شب', async () => {
+  if (!axeSrc) {
+    if (SKIP) { console.log('⏭  axe-core پیدا نشد و SKIP_BROWSER_TESTS=1 است — آگاهانه رد شد'); return; }
+    throw new Error('axe-core پیدا نشد (npm i -g axe-core@4.10.3، یا AXE_PATH) — «قبول» نیست');
+  }
+  const bad = [];
+  for (const scheme of ['light', 'dark']) {
+    const ctx = await profile(true);
+    const { pg } = await openIn(ctx);
+    await pg.emulateMedia({ colorScheme: scheme });
+    await pg.addScriptTag({ content: axeSrc });
+    const run = (sel) => pg.evaluate(async (q) => {
+      const out = await window.axe.run(document.querySelector(q), { runOnly: ['color-contrast', 'button-name', 'label', 'image-alt', 'link-name'] });
+      return out.violations.map((x) => `${x.id}: ${x.nodes.slice(0, 3).map((n) => n.target.join(' ')).join(' ; ')}`);
+    }, sel);
+    const closeAll = () => pg.evaluate(() => document.querySelectorAll('.modal-scrim.open').forEach(m => m.classList.remove('open')));
+    await openShift(pg, 2000);
+    await checkout(pg, 'p2');
+    await pg.keyboard.type('1000');
+    await pg.keyboard.press('PageDown');
+    await pg.waitForTimeout(300);
+    (await run('#modal-sale-checkout')).forEach((v) => bad.push(`${scheme} پنلِ پرداخت — ${v}`));
+    await closeAll();
+    await pg.evaluate(() => { goTo('sales'); renderShiftPanel(); });
+    await press(pg, '#btn-shift-move');
+    await pg.waitForTimeout(300);
+    (await run('#modal-shift-move')).forEach((v) => bad.push(`${scheme} ورود/خروج — ${v}`));
+    await closeAll();
+    await press(pg, '#btn-shift-x');
+    await pg.waitForTimeout(300);
+    (await run('#modal-shift-report')).forEach((v) => bad.push(`${scheme} گزارش X — ${v}`));
+    await closeAll();
+    await pg.evaluate(() => openShiftModal('close'));
+    await pg.waitForTimeout(300);
+    (await run('#modal-shift')).forEach((v) => bad.push(`${scheme} شمارش — ${v}`));
+    await ctx.close();
+  }
+  assert.deepEqual(bad, [], bad.join('\n    '));
 });
 
 await browser.close();
