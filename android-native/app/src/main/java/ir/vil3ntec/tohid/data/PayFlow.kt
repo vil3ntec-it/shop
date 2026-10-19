@@ -225,15 +225,68 @@ object PayFlow {
     is Outcome.Ok -> if (s.value.status == "short") Outcome.Bad(Problem("SHORT", remaining = s.value.remaining)) else s
   }
 
+  // ── برچسبِ روشِ پرداختِ فاکتور (تاریخچه، فاکتورها، جزئیات، رسید) ──
   /**
-   *  ردیف‌های پرداختِ ترکیبی روی فاکتور و رسید (برچسب، افغانی).
+   *  نامِ فارسیِ هر نوعِ پرداخت و هر مقدارِ `paymentMethod` (قدیمی و [legacyMethod]).
+   *  همان برچسب‌های جدولِ «فروش به تفکیک روش پرداخت» (`ReportTables` و `report-core.js`).
+   */
+  val KIND_LABELS: Map<String, String> = linkedMapOf(
+    CASH to "نقد", "credit" to "نسیه", ACCOUNT to "به حساب", "card" to "کارت", "transfer" to "حواله",
+    "wallet" to "کیف پول", "store_credit" to "اعتبار فروشگاه", "gift_card" to "کارت هدیه", "other" to "سایر", MIXED to "ترکیبی",
+  )
+
+  /** گروهِ فیلترِ فهرست: [CASH] (فقط نقد)، `credit` (چیزی به حساب رفت)، [NON_CASH] (کارت، کیف پول، حواله یا ترکیبی) */
+  const val NON_CASH = "noncash"
+
+  /** نوع‌های پرداختِ این فاکتور (ردیف‌های با مبلغ)؛ خالی یعنی فاکتورِ بی `payments` */
+  private fun kinds(s: Sale): Set<String> = s.payments.orEmpty().filter { it.amountMinor > 0 }.mapTo(LinkedHashSet()) { it.kind }
+
+  /**
+   *  گروهِ پرداختِ فاکتور برای فیلتر. با `payments` از ردیف‌ها؛ بی آن از `paymentMethod`
+   *  (`credit` ⇒ نسیه، نوع‌های غیرنقد و `mixed` ⇒ غیرنقد، بقیه مثلِ امروز نقد).
+   */
+  fun payGroup(s: Sale): String {
+    val k = kinds(s)
+    if (k.isEmpty()) return when (s.paymentMethod) {
+      "credit" -> "credit"
+      in KIND_LABELS.keys - setOf(CASH, "credit", ACCOUNT) -> NON_CASH
+      else -> CASH
+    }
+    return when {
+      ACCOUNT in k -> "credit"
+      k == setOf(CASH) -> CASH
+      else -> NON_CASH
+    }
+  }
+
+  /**
+   *  برچسبِ کوتاهِ روشِ پرداختِ فاکتور: نقد / کارت / حواله / کیف پول / به حساب / ترکیبی.
+   *  با `payments` از ردیف‌ها (یک نوع ⇒ همان، بیشتر ⇒ «ترکیبی»)؛ بی آن از `paymentMethod`
+   *  (`credit` ⇒ «نسیه»؛ مقدارِ ناشناخته مثلِ امروز نقد). `cash` واژهٔ نقدِ همان صفحه است
+   *  («نقد» یا «نقدی») تا متنِ فاکتورِ امروز عوض نشود.
+   */
+  fun payLabel(s: Sale, cash: String = KIND_LABELS.getValue(CASH)): String {
+    val k = kinds(s)
+    val key = when {
+      k.isEmpty() -> s.paymentMethod
+      k.size == 1 -> k.single()
+      else -> MIXED
+    }
+    return if (key == CASH) cash else KIND_LABELS[key] ?: if (k.isEmpty()) cash else key
+  }
+
+  /** نامِ یک ردیف: نامِ روش؛ روشِ ناشناخته (جدولِ دکان) ⇒ نامِ نوعش */
+  private fun rowName(p: SalePayment): String = method(p.method)?.name ?: KIND_LABELS[p.kind] ?: p.method
+
+  /**
+   *  ردیف‌های پرداختِ ترکیبی روی فاکتور و رسید (برچسب، افغانی) — جمعشان همان مبلغِ فاکتور.
    *  فاکتورِ بی `payments` (امروز، یا پرچمِ خاموش) هیچ ردیفی نمی‌گیرد.
    */
   fun receiptLines(s: Sale): List<Pair<String, Double>> {
     val list = s.payments?.takeIf { it.isNotEmpty() } ?: return emptyList()
     return buildList {
-      list.filter { it.method != ACCOUNT }.forEach { p ->
-        add(methodName(p.method) + (if (p.status == "pending") " (ثبتِ دستی)" else "") + (p.ref?.let { " — $it" } ?: "") to major(p.amountMinor))
+      list.filter { it.amountMinor > 0 }.forEach { p ->
+        add(rowName(p) + (if (p.status == "pending") " (ثبتِ دستی)" else "") + (p.ref?.let { " — $it" } ?: "") to major(p.amountMinor))
       }
       s.tenderedMinor?.takeIf { it > 0 }?.let { add("دریافتی" to major(it)) }
       s.changeMinor?.takeIf { it > 0 }?.let { add("پولِ پس" to major(it)) }

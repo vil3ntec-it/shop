@@ -142,8 +142,8 @@ object Receipt {
     }.getOrDefault("")
     val kind = when {
       sale.status == "cancelled" -> "لغوشده"
-      sale.paymentMethod == "credit" -> "نسیه"
-      else -> "نقدی"
+      //  PAY (v3 A4): از `payments` اگر هست (کارت، حواله، کیف پول، ترکیبی…)؛ وگرنه همان امروز
+      else -> ir.vil3ntec.tohid.data.PayFlow.payLabel(sale, cash = "نقدی")
     }
     line("${LocaleText.date(sale.date, digits)} — ${LocaleText.digitsIn(time, digits)}   ($kind)", small, Layout.Alignment.ALIGN_CENTER)
 

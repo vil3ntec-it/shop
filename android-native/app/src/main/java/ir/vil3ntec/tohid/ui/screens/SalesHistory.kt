@@ -106,8 +106,8 @@ fun SalesHistoryScreen(
     d.sales
       .filter {
         when (filter) {
-          "cash" -> it.status != "cancelled" && it.paymentMethod == "cash"
-          "credit" -> it.status != "cancelled" && it.paymentMethod == "credit"
+          //  PAY (v3 A4): گروه از `payments` اگر هست — کارت و کیف پول و حواله «نقدی» نیستند
+          "cash", "credit", ir.vil3ntec.tohid.data.PayFlow.NON_CASH -> it.status != "cancelled" && ir.vil3ntec.tohid.data.PayFlow.payGroup(it) == filter
           "cancelled" -> it.status == "cancelled"
           else -> true
         }
@@ -204,7 +204,7 @@ fun SalesHistoryScreen(
         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
       ) {
-        listOf("all" to "همه", "cash" to "نقدی", "credit" to "نسیه", "cancelled" to "لغوشده").forEach { (id, label) ->
+        listOf("all" to "همه", "cash" to "نقدی", "credit" to "نسیه", ir.vil3ntec.tohid.data.PayFlow.NON_CASH to "غیرنقد", "cancelled" to "لغوشده").forEach { (id, label) ->
           FilterChip(selected = filter == id, onClick = { filter = id }, label = { Text(label) })
         }
       }
@@ -522,7 +522,7 @@ private fun SaleRow(
   val kindTint = when {
     cancelled -> Shop.colors.danger
     online -> Shop.colors.primary
-    sale.paymentMethod == "credit" -> Shop.colors.warning
+    ir.vil3ntec.tohid.data.PayFlow.payGroup(sale) == "credit" -> Shop.colors.warning
     else -> Shop.colors.success
   }
 
@@ -548,8 +548,7 @@ private fun SaleRow(
         when {
           cancelled -> "لغوشده"
           online -> "اینترنتی"
-          sale.paymentMethod == "credit" -> "نسیه"
-          else -> "نقدی"
+          else -> ir.vil3ntec.tohid.data.PayFlow.payLabel(sale, cash = "نقدی")
         },
         0.8f,
         tint = kindTint,

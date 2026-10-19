@@ -336,7 +336,7 @@ fun InvoiceDialog(
         )
         Spacer(Modifier.height(4.dp))
         Text(
-          "${formatDate(sale.date)} — ${if (sale.paymentMethod == "credit") "نسیه" else "نقدی"}",
+          "${formatDate(sale.date)} — ${ir.vil3ntec.tohid.data.PayFlow.payLabel(sale, cash = "نقدی")}",
           style = MaterialTheme.typography.labelSmall,
           color = Shop.colors.muted,
         )

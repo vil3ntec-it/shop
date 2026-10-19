@@ -36,15 +36,17 @@ import java.io.File
  */
 class PayFlowTest {
 
-  private val v: JsonObject = run {
+  private fun vector(name: String): JsonObject {
     var dir: File? = File(System.getProperty("user.dir")).absoluteFile
     while (dir != null) {
-      val f = File(dir, "core/test-vectors/pay-v1.json")
-      if (f.isFile) return@run Json.parseToJsonElement(f.readText()).jsonObject
+      val f = File(dir, "core/test-vectors/$name")
+      if (f.isFile) return Json.parseToJsonElement(f.readText()).jsonObject
       dir = dir.parentFile
     }
-    error("core/test-vectors/pay-v1.json پیدا نشد")
+    error("core/test-vectors/$name پیدا نشد")
   }
+
+  private val v: JsonObject = vector("pay-v1.json")
 
   private fun JsonObject.has(k: String) = this[k] != null && this[k] !is JsonNull
   private fun JsonObject.str(k: String): String? = if (has(k)) this[k]!!.jsonPrimitive.content else null
@@ -209,6 +211,51 @@ class PayFlowTest {
     assertEquals("mixed", m(PayFlow.Draft(1200.0, rows = listOf(PayFlow.DraftRow("hesabpay", "P1", "700"), PayFlow.DraftRow("afpay_card", "C1", "500")))))
     //  بدهی همان credit می‌ماند — SalesEngine بدهی را با همین می‌سازد
     assertEquals("credit", m(PayFlow.Draft(2000.0, rows = listOf(PayFlow.DraftRow("afpay_card", "C1", "500")), customerId = "d1")))
+  }
+
+  @Test fun `برچسب و گروهِ روشِ پرداخت - از payments، وگرنه از paymentMethod؛ ردیف‌به‌ردیف روی فاکتور و رسید`() {
+    fun sale(d: PayFlow.Draft): Sale {
+      val f = PayFlow.saleFields(ok(PayFlow.checkout(d)))
+      return Sale(id = "x", finalTotal = d.total, paymentMethod = f.paymentMethod, payments = f.payments, tenderedMinor = f.tenderedMinor, changeMinor = f.changeMinor)
+    }
+    val cash = sale(PayFlow.Draft(850.0, "1000"))
+    val card = sale(PayFlow.Draft(1200.0, rows = listOf(PayFlow.DraftRow("afpay_card", "C1", "1200"))))
+    val hawala = sale(PayFlow.Draft(1200.0, rows = listOf(PayFlow.DraftRow("hawala", "H1", "1200"))))
+    val wallet = sale(PayFlow.Draft(1200.0, rows = listOf(PayFlow.DraftRow("hesabpay", "P1", "1200"))))
+    val mixed = sale(PayFlow.Draft(2450.0, "1000", listOf(PayFlow.DraftRow("hesabpay", "HP-77", "1450"))))
+    val part = sale(PayFlow.Draft(2000.0, "500", customerId = "d1"))
+    val onAccount = sale(PayFlow.Draft(2000.0, "0", customerId = "d1"))
+    val all = listOf(cash, card, hawala, wallet, mixed, part, onAccount)
+    assertEquals(listOf("نقد", "کارت", "حواله", "کیف پول", "ترکیبی", "ترکیبی", "به حساب"), all.map { PayFlow.payLabel(it) })
+    assertEquals(listOf("cash", "noncash", "noncash", "noncash", "noncash", "credit", "credit"), all.map { PayFlow.payGroup(it) })
+    assertEquals("نقدی", PayFlow.payLabel(cash, cash = "نقدی"))
+    //  ردیف‌ها بر `paymentMethod` مقدم‌اند (فاکتورِ پیش از اصلاحِ legacyMethod: کارت با cash)
+    assertEquals("کارت", PayFlow.payLabel(card.copy(paymentMethod = "cash")))
+    assertEquals(PayFlow.NON_CASH, PayFlow.payGroup(card.copy(paymentMethod = "cash")))
+    //  بی `payments` (فاکتورِ امروز، برنامهٔ دیگر): از `paymentMethod`؛ مقدارِ ناشناخته مثلِ امروز نقد
+    fun legacy(m: String) = Sale(id = "l", finalTotal = 100.0, paymentMethod = m)
+    val keys = listOf("cash", "credit", "card", "wallet", "transfer", "mixed", "store_credit", "")
+    assertEquals(
+      listOf("نقدی", "نسیه", "کارت", "کیف پول", "حواله", "ترکیبی", "اعتبار فروشگاه", "نقدی"),
+      keys.map { PayFlow.payLabel(legacy(it), cash = "نقدی") },
+    )
+    assertEquals(listOf("cash", "credit", "noncash", "noncash", "noncash", "noncash", "noncash", "cash"), keys.map { PayFlow.payGroup(legacy(it)) })
+    //  جزئیات و رسید: ردیف به ردیف (به حساب هم)، بعد دریافتی و پولِ پس
+    assertEquals(listOf("نقد" to 500.0, "به حسابِ مشتری" to 1500.0, "دریافتی" to 500.0), PayFlow.receiptLines(part))
+    assertEquals(listOf("نقد" to 1000.0, "HesabPay (ثبتِ دستی) — HP-77" to 1450.0, "دریافتی" to 2450.0), PayFlow.receiptLines(mixed))
+    //  روشِ ناشناختهٔ جدولِ دکان ⇒ نامِ نوعش، نه شناسهٔ خام
+    assertEquals(listOf("کارت (ثبتِ دستی)" to 10.0), PayFlow.receiptLines(Sale(id = "u", payments = listOf(SalePayment("my_bank", "card", 1000, "pending")))))
+  }
+
+  @Test fun `برچسب‌ها همان جدولِ «روش پرداخت»ِ گزارش‌اند (بردارِ مشترکِ report-v1، JS و Kotlin)`() {
+    val r = vector("report-v1.json")
+    val sales = r["ledgers"]!!.jsonObject["payKinds"]!!.jsonObject.arr("sales")
+    val byAmount = sales.associate { String.format(java.util.Locale.US, "%.2f", it.dbl("finalTotal")) to it.str("paymentMethod")!! }
+    val case = r["cases"]!!.jsonArray.map { it.jsonObject }.first { it.str("ledger") == "payKinds" }
+    val table = case["expect"]!!.jsonArray.map { it.jsonObject }.first { it.str("id") == "sales.payment" }
+    val rows = table["rows"]!!.jsonArray.map { row -> row.jsonArray.map { it.jsonPrimitive.content } }
+    assertEquals(sales.size, rows.size)
+    rows.forEach { assertEquals(it[0], PayFlow.KIND_LABELS[byAmount.getValue(it[5])]) }
   }
 
   private fun s12(): Pair<ShopData, AuditEntry> {
