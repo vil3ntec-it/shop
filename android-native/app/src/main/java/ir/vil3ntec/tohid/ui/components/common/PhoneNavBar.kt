@@ -55,6 +55,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
@@ -140,6 +141,9 @@ object PhoneNav {
 
   /** دایرهٔ خاکستریِ موردِ فعال — روز همان زمینهٔ صفحه، شب کمی روشن‌تر از قرص */
   fun highlight(p: PhoneV3Colors) = if (p === PhoneV3Dark) p.hairline else p.bg
+
+  /** لبهٔ خاکستریِ روشنِ هر تکه (r10) — بی آن، سفید روی صفحهٔ سفید گم می‌شد */
+  fun edge(p: PhoneV3Colors) = if (p === PhoneV3Dark) p.hairline else p.chevron.copy(alpha = 0.55f)
 }
 
 /**
@@ -157,12 +161,19 @@ fun PhoneNavBar(
   renewDays: Int? = null,
   onRenew: () -> Unit = {},
   systemInsets: Boolean = true,
+  /** محوِ ملایمِ زمینه زیرِ نوار تا متنِ صفحه از لای تکه‌ها پیدا نباشد; پیش‌نمایش‌ها خاموش */
+  scrim: Boolean = true,
 ) {
   val p = PhoneV3.colors
   val active = NavCatalog.activeFor(layout, current)
   Column(
     modifier
       .fillMaxWidth()
+      .then(
+        if (scrim) Modifier.background(
+          Brush.verticalGradient(0f to p.card.copy(alpha = 0f), 0.32f to p.card.copy(alpha = 0.92f), 1f to p.card),
+        ) else Modifier,
+      )
       .then(if (systemInsets) Modifier.windowInsetsPadding(WindowInsets.navigationBars) else Modifier)
       .padding(top = 8.dp, bottom = 12.dp),
     horizontalAlignment = Alignment.CenterHorizontally,
@@ -202,7 +213,8 @@ fun PhoneNavBar(tabs: List<NavTab>, current: String?, onPick: (String) -> Unit, 
   PhoneNavBar(NavLayouts.DEFAULT, route, onPick = { onPick(it.route) }, onEdit = null, modifier = modifier)
 }
 
-private val floatShadow = 14.dp
+private val floatShadow = 16.dp
+private const val SHADOW_ALPHA = 0.16f
 
 @Composable
 private fun NavPill(
@@ -226,11 +238,10 @@ private fun NavPill(
   Box(
     Modifier
       .height(PhoneNav.CIRCLE)
-      .shadow(floatShadow, shape, clip = false, ambientColor = p.black.copy(alpha = 0.10f), spotColor = p.black.copy(alpha = 0.10f))
+      .shadow(floatShadow, shape, clip = false, ambientColor = p.black.copy(alpha = SHADOW_ALPHA), spotColor = p.black.copy(alpha = SHADOW_ALPHA))
       .clip(shape)
       .background(p.card)
-      //  شب: قرصِ تیره روی زمینهٔ تیره بی لبه گم می‌شد
-      .then(if (p === PhoneV3Dark) Modifier.border(1.dp, p.hairline, shape) else Modifier)
+      .border(1.dp, PhoneNav.edge(p), shape)
       .padding(horizontal = 4.dp),
     contentAlignment = Alignment.CenterStart,
   ) {
@@ -255,10 +266,10 @@ private fun SideCircle(id: String, active: Boolean, p: PhoneV3Colors, onPick: (N
   Box(
     Modifier
       .size(PhoneNav.CIRCLE)
-      .shadow(floatShadow, CircleShape, clip = false, ambientColor = p.black.copy(alpha = 0.10f), spotColor = p.black.copy(alpha = 0.10f))
+      .shadow(floatShadow, CircleShape, clip = false, ambientColor = p.black.copy(alpha = SHADOW_ALPHA), spotColor = p.black.copy(alpha = SHADOW_ALPHA))
       .clip(CircleShape)
       .background(p.card)
-      .then(if (p === PhoneV3Dark) Modifier.border(1.dp, p.hairline, CircleShape) else Modifier),
+      .border(1.dp, PhoneNav.edge(p), CircleShape),
     contentAlignment = Alignment.Center,
   ) {
     val shown by animateFloatAsState(if (active) 1f else 0f, if (Motion.enabled) tween(200) else snap(), label = "sideHi")

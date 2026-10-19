@@ -107,7 +107,7 @@ fun NavEditorScreen(allowed: Set<String>, onBack: () -> Unit) {
         .clip(RoundedCornerShape(PhoneV3.cardRadius)).background(p.tile),
       contentAlignment = Alignment.Center,
     ) {
-      PhoneNavBar(layout, current = "dashboard", onPick = {}, onEdit = null, systemInsets = false)
+      PhoneNavBar(layout, current = "dashboard", onPick = {}, onEdit = null, systemInsets = false, scrim = false)
     }
     Box(Modifier.fillMaxWidth().height(40.dp), contentAlignment = Alignment.Center) {
       androidx.compose.animation.Crossfade(targetState = problem, label = "navProblem") { pr ->

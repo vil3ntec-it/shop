@@ -43,6 +43,17 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
+import androidx.compose.material.icons.rounded.Apps
+import androidx.compose.material.icons.rounded.Assessment
+import androidx.compose.material.icons.rounded.Badge
+import androidx.compose.material.icons.rounded.Groups
+import androidx.compose.material.icons.rounded.LocalOffer
+import androidx.compose.material.icons.rounded.LocalShipping
+import androidx.compose.material.icons.rounded.Payments
+import androidx.compose.material.icons.rounded.Receipt
+import androidx.compose.material.icons.rounded.ReceiptLong
+import androidx.compose.material.icons.rounded.ShoppingBag
+import androidx.compose.material.icons.rounded.Warehouse
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -550,18 +561,19 @@ fun PressBox(
   ) { content() }
 }
 
+/** r7: نشانهٔ پُر و رنگی روی کاشیِ روشن — تنها جای آیکنِ پُرِ رنگی در گوشی (SPEC §D) */
 private fun tileIcon(id: String): ImageVector = when (id) {
-  "products" -> Icons.Outlined.LocalOffer
-  "warehouse" -> Icons.Outlined.Warehouse
-  "debtors" -> Icons.Outlined.Group
-  "expenses" -> Icons.Outlined.Payments
-  "reports" -> Icons.Outlined.Assessment
-  "team" -> Icons.Outlined.Badge
-  "orders" -> Icons.Outlined.ShoppingBag
-  "purchasing" -> Icons.Outlined.LocalShipping
-  "sales" -> Icons.Outlined.History
-  "receipts" -> Icons.Outlined.ReceiptLong
-  else -> Icons.Outlined.GridView
+  "products" -> Icons.Rounded.LocalOffer
+  "warehouse" -> Icons.Rounded.Warehouse
+  "debtors" -> Icons.Rounded.Groups
+  "expenses" -> Icons.Rounded.Payments
+  "reports" -> Icons.Rounded.Assessment
+  "team" -> Icons.Rounded.Badge
+  "orders" -> Icons.Rounded.ShoppingBag
+  "purchasing" -> Icons.Rounded.LocalShipping
+  "sales" -> Icons.Rounded.ReceiptLong
+  "receipts" -> Icons.Rounded.Receipt
+  else -> Icons.Rounded.Apps
 }
 
 /** شبکهٔ ۴×۲ِ «بخش‌ها» — کاشیِ روشنِ گرد با نشانهٔ رنگی و نام زیرش (r7 Payment List) */
@@ -579,7 +591,7 @@ private fun SectionsGrid(tiles: List<HomeSections.Tile>, onOpen: (String) -> Uni
                 Modifier.fillMaxSize().clip(RoundedCornerShape(PhoneV3.tileRadius)).background(p.tile),
                 contentAlignment = Alignment.Center,
               ) {
-                Icon(tileIcon(t.id), contentDescription = null, tint = PhoneV3Glyph.of(p, i), modifier = Modifier.size(26.dp))
+                Icon(tileIcon(t.id), contentDescription = null, tint = PhoneV3Glyph.of(p, i), modifier = Modifier.size(28.dp))
                 if (t.id == "orders" && OrdersLive.newCount > 0) Box(
                   Modifier.align(Alignment.TopEnd).padding(8.dp).size(8.dp).clip(CircleShape).background(p.negative),
                 )

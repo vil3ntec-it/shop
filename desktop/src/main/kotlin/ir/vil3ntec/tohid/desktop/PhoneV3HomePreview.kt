@@ -61,10 +61,10 @@ fun PhoneV3HomePreview(screen: String, store: ShopStore) {
         "products" to "کالاها", "more" to "بیشتر", "profile" to "حساب",
       ).forEach { (route, label) ->
         Text("فعال: $label", color = PhoneV3.colors.inkMuted, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(start = 16.dp))
-        PhoneNavBar(NavLayouts.DEFAULT, route, onPick = {}, onEdit = null, systemInsets = false)
+        PhoneNavBar(NavLayouts.DEFAULT, route, onPick = {}, onEdit = null, systemInsets = false, scrim = false)
       }
       Text("سفارشی (اسکن، قرض‌داران، گزارش‌ها) + تمدیدِ اشتراک", color = PhoneV3.colors.inkMuted, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(start = 16.dp))
-      PhoneNavBar(custom, "reports", onPick = {}, onEdit = null, renewDays = 1, systemInsets = false)
+      PhoneNavBar(custom, "reports", onPick = {}, onEdit = null, renewDays = 1, systemInsets = false, scrim = false)
     }
     "v3home-editor" -> NavEditorScreen(allowed) {}
     "v3home-search" -> Box(Modifier.fillMaxSize()) {
