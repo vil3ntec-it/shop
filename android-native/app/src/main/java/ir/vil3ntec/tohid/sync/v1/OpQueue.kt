@@ -75,6 +75,24 @@ class OpQueue(context: Context, accountKey: String) {
   }
 
   /**
+   *  opهایی که پس از بازیابیِ سرور دوباره باید بروند — **جلوی** صف (پیش از تغییرهای
+   *  تازه‌تر، به همان ترتیبِ نخستین فرستادن) و با **همان op_id** (F0-05). opی که همین
+   *  حالا در صف هست دوباره نمی‌آید. §۹.۵، `core/sync/RestoreReplay.kt`.
+   *
+   *  @return چند op به صف آمد
+   */
+  @Synchronized
+  fun pushFront(ops: List<SyncOp>): Int {
+    if (ops.isEmpty()) return 0
+    val list = read(file)
+    val have = list.mapNotNullTo(HashSet()) { (it["op_id"] as? JsonPrimitive)?.content }
+    val add = ops.filter { it.opId.isNotEmpty() && have.add(it.opId) }.map { it.toJson() }
+    if (add.isEmpty()) return 0
+    if (!write(file, add + list)) throw java.io.IOException("صفِ همگام‌سازی روی حافظه نوشته نشد")
+    return add.size
+  }
+
+  /**
    *  دستهٔ بعدی — با سقفِ خودِ سرور: ۲۰۰ op یا ۲۵۶ کیلوبایت.
    *
    *  ⚠️ سقف بر حسبِ **بایت** است نه نویسه: حرفِ فارسی در UTF-8 دو بایت

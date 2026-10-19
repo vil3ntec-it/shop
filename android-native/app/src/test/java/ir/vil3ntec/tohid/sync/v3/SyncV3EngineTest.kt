@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.sync.v3
 
+import ir.vil3ntec.tohid.core.sync.ReplayBook
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.Sale
 import ir.vil3ntec.tohid.data.SaleItem
@@ -55,6 +56,32 @@ class SyncV3EngineTest {
 
     fun row(table: String, id: String): Map<String, JsonElement>? = rows[table to id]?.takeIf { (table to id) !in deleted }
 
+    /** §۹.۵: «دوران»ی که سرورِ واقعی کنارِ هر pull می‌دهد (`lib/sync-epoch.js`)؛ null ⇒ سرورِ کهنه */
+    var epochId: String? = null
+    var epochBase = 0L
+
+    class Saved(
+      val seq: Long, val log: List<Op>, val seen: Map<String, Long>,
+      val rows: Map<Pair<String, String>, Map<String, JsonElement>>, val deleted: Set<Pair<String, String>>,
+    )
+
+    /** پشتیبانِ سرور: همه‌چیز همین لحظه */
+    fun backup() = Saved(seq, log.toList(), HashMap(seen), rows.mapValues { LinkedHashMap(it.value) }, HashSet(deleted))
+
+    /** بازیابی از پشتیبان و بالا آمدنِ دوباره: دفتر و شمارنده به لحظهٔ پشتیبان، دورانِ تازه */
+    fun restore(s: Saved, epoch: String) {
+      seq = s.seq
+      log.clear(); log += s.log
+      seen.clear(); seen.putAll(s.seen)
+      rows.clear(); for ((k, v) in s.rows) rows[k] = LinkedHashMap(v)
+      deleted.clear(); deleted += s.deleted
+      epochId = epoch
+      epochBase = s.seq
+    }
+
+    /** بالا آمدنِ عادی: دورانِ تازه، پایه = سرِ دفتر */
+    fun reboot(epoch: String) { epochId = epoch; epochBase = seq }
+
     private fun meta(body: Map<String, JsonElement>): JsonObject = JsonObject(
       body + mapOf("server_time" to JsonPrimitive(time), "hlc" to JsonPrimitive("%015d:000000:server".format(time))),
     )
@@ -99,10 +126,10 @@ class SyncV3EngineTest {
         val id = str(o, "op_id")
         val tx = str(o, "tx")
         when {
-          id in seen -> buildJsonObject { put("op_id", JsonPrimitive(id)); put("status", JsonPrimitive("duplicate")) }
+          id in seen -> buildJsonObject { put("op_id", JsonPrimitive(id)); put("status", JsonPrimitive("duplicate")); put("server_seq", JsonPrimitive(seen.getValue(id))) }
           i in bad -> buildJsonObject { put("op_id", JsonPrimitive(id)); put("status", JsonPrimitive("rejected")); put("reason", JsonPrimitive(bad.getValue(i))) }
           tx.isNotEmpty() && tx in badTx -> buildJsonObject { put("op_id", JsonPrimitive(id)); put("status", JsonPrimitive("rejected")); put("reason", JsonPrimitive("tx_rejected")) }
-          else -> { apply(device, o); buildJsonObject { put("op_id", JsonPrimitive(id)); put("status", JsonPrimitive("applied")) } }
+          else -> { apply(device, o); buildJsonObject { put("op_id", JsonPrimitive(id)); put("status", JsonPrimitive("applied")); put("server_seq", JsonPrimitive(seq)) } }
         }
       }
       return V3Response(200, meta(mapOf("results" to JsonArray(results), "head" to JsonPrimitive(seq))))
@@ -142,7 +169,10 @@ class SyncV3EngineTest {
           put("row_id", JsonPrimitive(op.rowId)); put("kind", JsonPrimitive(op.kind)); put("effect", op.effect ?: JsonNull)
         }
       })
-      return V3Response(200, meta(mapOf("ops" to ops, "cursor" to JsonPrimitive(cursor), "has_more" to JsonPrimitive(more))))
+      val epoch = epochId?.let { id ->
+        mapOf("epoch" to buildJsonObject { put("id", JsonPrimitive(id)); put("base", JsonPrimitive(minOf(epochBase, seq))); put("head", JsonPrimitive(seq)) })
+      }.orEmpty()
+      return V3Response(200, meta(mapOf("ops" to ops, "cursor" to JsonPrimitive(cursor), "has_more" to JsonPrimitive(more)) + epoch))
     }
 
     private fun snapshot(): V3Response {
@@ -181,6 +211,8 @@ class SyncV3EngineTest {
     }
     override fun loadQueue() = queue
     override fun saveQueue(queue: V3Queue) { this.queue = queue }
+    //  همان دفترچهٔ `FileV3Store` (§۹.۵) — همهٔ آزمون‌ها با آن می‌دوند، مثلِ برنامه
+    override val replay = ReplayBook.inDir(dir, "replay")
   }
 
   private val tmp: File = Files.createTempDirectory("v3-engine").toFile()
@@ -406,5 +438,81 @@ class SyncV3EngineTest {
     assertEquals("cf1", list.single()["id"]!!.jsonPrimitive.content)
     assertEquals(1, a.engine.status().conflictsOpen)
     assertEquals("conflict", a.engine.status().state)
+  }
+
+  /* --------------------------------------- §۹.۵: سرور از پشتیبان برگشت */
+
+  @Test fun restoredServerGetsLostOpsAgainAndNoDeviceAppliesTwice() {
+    //  همان سناریوی E2E-OPS-14.replay، این بار برای v3
+    val server = FakeServer().apply { epochId = "ep_1" }
+    val a = Device("dev-a", server, baseData).also { assertTrue(it.sync().ok) }
+    val b = Device("dev-b", server, ShopData()).also { assertTrue(it.sync().ok) }
+    assertEquals("ep_1", b.engine.meta.epoch)
+    val saved = server.backup()
+
+    //  پس از پشتیبان: شاگرد ۵۰ از فروشِ s1 می‌گیرد (دلتا) و صاحب آن را می‌نشاند
+    b.edit { d -> d.copy(sales = d.sales.map { it.copy(paidAmount = 150.0, remaining = 81.0) }) }
+    assertTrue(b.sync().ok)
+    assertTrue(a.sync().ok)
+    assertEquals(150.0, a.ledger.data.sales.single().paidAmount, 0.0)
+    assertEquals(15000L, long(server.row("sales", "s1"), "paidAmountMinor"))
+
+    server.restore(saved, "ep_2")
+    assertEquals("سرور به لحظهٔ پشتیبان برگشت", 10000L, long(server.row("sales", "s1"), "paidAmountMinor"))
+
+    //  دستگاهِ سوم پس از بازیابی قیمت را عوض می‌کند — شماره‌اش زیرِ cursor ِ کهنهٔ a و b است
+    val c = Device("dev-c", server, ShopData()).also { assertTrue(it.sync().ok) }
+    c.edit { d -> d.copy(products = d.products.map { it.copy(salePrice = 130.0) }) }
+    assertTrue(c.sync().ok)
+
+    //  شاگرد: دورانِ تازه ⇒ دلتای خودش با همان op_id دوباره؛ cursor تا پایه ⇒ قیمتِ c هم می‌رسد
+    val pushes = server.pushSizes.size
+    assertTrue(b.sync().ok)
+    assertEquals("دلتای گم‌شده همین دور رفت", pushes + 1, server.pushSizes.size)
+    assertEquals(0, b.engine.queued())
+    assertEquals("ep_2", b.engine.meta.epoch)
+    assertEquals(15000L, long(server.row("sales", "s1"), "paidAmountMinor"))
+    assertEquals(150.0, b.ledger.data.sales.single().paidAmount, 0.0)
+    assertEquals(130.0, b.ledger.data.products.single().salePrice, 0.0)
+
+    //  صاحب: دلتای دوباره‌رسیدهٔ شاگرد را پیش‌تر نشانده بود ⇒ ۱۵۰ می‌ماند، نه ۲۰۰
+    assertTrue(a.sync().ok)
+    assertEquals(150.0, a.ledger.data.sales.single().paidAmount, 0.0)
+    assertEquals(81.0, a.ledger.data.sales.single().remaining, 0.0)
+    assertEquals(130.0, a.ledger.data.products.single().salePrice, 0.0)
+    assertEquals(0, a.engine.queued())
+    //  دوباره فرستادن و نادیده گرفتن هیچ opِ تازه‌ای نمی‌سازد
+    assertEquals(0, a.engine.record(a.ledger.data))
+    assertEquals(0, b.engine.record(b.ledger.data))
+    //  همه با سرور یکی
+    val d = Device("dev-d", server, ShopData()).also { assertTrue(it.sync().ok) }
+    assertEquals(150.0, d.ledger.data.sales.single().paidAmount, 0.0)
+    assertEquals(130.0, d.ledger.data.products.single().salePrice, 0.0)
+  }
+
+  @Test fun normalRestartNewEpochChangesNothing() {
+    val server = FakeServer().apply { epochId = "ep_1" }
+    val a = Device("dev-a", server, baseData).also { assertTrue(it.sync().ok) }
+    val cursor = a.engine.meta.cursor
+    val pushes = server.pushSizes.size
+    server.reboot("ep_boot")
+    assertTrue(a.sync().ok)
+    assertEquals("ep_boot", a.engine.meta.epoch)
+    assertEquals(cursor, a.engine.meta.cursor)
+    assertEquals("هیچ چیزی دوباره نرفت", pushes, server.pushSizes.size)
+  }
+
+  @Test fun oldServerWithoutEpochKeepsCursorAndQueue() {
+    val server = FakeServer()
+    val a = Device("dev-a", server, baseData).also { assertTrue(it.sync().ok) }
+    assertEquals("", a.engine.meta.epoch)
+    val saved = server.backup()
+    a.edit { d -> d.copy(products = d.products.map { it.copy(salePrice = 120.0) }) }
+    assertTrue(a.sync().ok)
+    server.restore(saved, "ignored")
+    server.epochId = null
+    val pushes = server.pushSizes.size
+    assertTrue(a.sync().ok)
+    assertEquals("بی دوران همان رفتارِ پیشین: چیزی دوباره نمی‌رود", pushes, server.pushSizes.size)
   }
 }

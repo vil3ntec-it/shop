@@ -20,6 +20,11 @@ async function createApp({ runMigrations = true } = {}) {
   //  قالب‌های آمادهٔ مرکزِ اعلان (خوش‌آمد، رو به پایان، تمدید شد، …)
   await require('./lib/notices').seedTemplates();
   await pruneExpired();
+  //  §۹.۵: هر بالا آمدن یک «دورانِ» همگام‌سازیِ تازه — پس از بازیابی از پشتیبان، برنامه‌ها
+  //  از همین می‌فهمند سرور به عقب رفته و opهای «اعمال‌شده»ی گم‌شده را دوباره می‌فرستند
+  //  (`lib/sync-epoch.js`). شکستش بالا آمدن را نمی‌خواباند؛ فقط آن تشخیص نمی‌شود.
+  await require('./lib/sync-epoch').rotate('boot')
+    .catch(err => console.error('[sync-epoch] دورانِ تازه ساخته نشد:', err.message));
   //  سرور فقط رلهٔ پیام است: پیام و رسانهٔ کهنه‌تر از CHAT_RELAY_DAYS می‌رود
   await require('./lib/chat-relay').sweep().catch(err => console.error('[chat-relay]', err.message));
   //  مدیر از محیط — نصبی که پنلِ خانگی خودش بالا می‌آورد و ترمینالی در کار نیست
@@ -292,6 +297,9 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/sync/v1', require('./routes/sync-v1'));
     //  Sync v3 (بخشِ ۳.۸) — فقط دکان، پیش‌فرض خاموش (‎config.syncV3‎)
     api.use('/sync/v3', require('./routes/sync-v3'));
+    //  «دورانِ» همگام‌سازیِ v1 پس از بازیابی (§۹.۵) — فقط دکان، جدا از `routes/sync-v1.js`
+    //  ِ مشترک با پمپ؛ پیش از `/shop` (همان دلیلِ `/shop/orders`)
+    api.use('/shop/sync-epoch', require('./routes/shop-sync-epoch'));
     api.use('/errors', require('./routes/errors'));
     api.use('/location', require('./routes/location'));
     api.use('/me', require('./routes/me'));

@@ -95,6 +95,18 @@ class SyncStateV1(context: Context, private val accountKey: String) {
     get() = prefs.getLong(k("snapshotAt"), 0)
     set(v) = prefs.edit().putLong(k("snapshotAt"), v).apply()
 
+  /** «دورانِ» سروری که این حساب آخرین بار دید — §۹.۵، `core/sync/RestoreReplay.kt` */
+  var epoch: String
+    get() = prefs.getString(k("epoch"), "").orEmpty()
+    set(v) = prefs.edit().putString(k("epoch"), v).apply()
+
+  /**
+   *  پس از بازیابیِ سرور: دورانِ تازه و cursor ِ پایین‌آمده با هم و همزمان (`commit`).
+   *  اگر پیش از این بسته شود، دورِ بعد همان را دوباره می‌بیند و opهای صف‌شده تکرار نمی‌شوند.
+   */
+  fun commitEpoch(epoch: String, cursor: Long): Boolean =
+    prefs.edit().putString(k("epoch"), epoch).putLong(k("cursor"), cursor).commit()
+
   /** زمانِ «هم‌ترازیِ یک‌باره» با سرور — شرح سرِ `SyncV1Engine.prepare` */
   var reconciledAt: Long
     get() = prefs.getLong(k("reconciledAt"), 0)

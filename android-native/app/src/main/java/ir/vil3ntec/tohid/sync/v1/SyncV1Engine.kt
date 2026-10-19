@@ -2,6 +2,8 @@ package ir.vil3ntec.tohid.sync.v1
 
 import android.content.Context
 import ir.vil3ntec.tohid.core.config.AppConfig
+import ir.vil3ntec.tohid.core.sync.ReplayBook
+import ir.vil3ntec.tohid.core.sync.RestoreReplay
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.sync.SyncStore
@@ -43,6 +45,8 @@ class SyncV1Engine private constructor(context: Context) {
   private var accountKey: String = keyOf()
   private var state = SyncStateV1(app, accountKey)
   private var queue = OpQueue(app, accountKey)
+  /** opهای پذیرفته‌شده و رسیده، برای پس از بازیابیِ سرور — §۹.۵، `checkEpoch` */
+  private var replay = replayFor(accountKey)
 
   /**
    *  سه تکهٔ حال (صف، سایه، cursor) برای commitِ ژورنالی — F0-05، شرح سرِ
@@ -61,6 +65,8 @@ class SyncV1Engine private constructor(context: Context) {
   private fun commitFor(key: String) =
     SyncCommit(SyncCommit.Journal(java.io.File(app.filesDir, "sync-journal-${OpQueue.fileKey(key)}.json")), parts)
 
+  private fun replayFor(key: String) = ReplayBook.inDir(app.filesDir, "sync-replay-${OpQueue.fileKey(key)}")
+
   private val gate = Mutex()
   private val _status = MutableStateFlow(snapshotStatus())
   val status: StateFlow<SyncStatus> = _status.asStateFlow()
@@ -69,6 +75,9 @@ class SyncV1Engine private constructor(context: Context) {
   @Volatile var liveConnected: Boolean = false
     internal set
   @Volatile private var attempt = 0
+  /** آخرین پرسشِ «دوران» (§۹.۵)؛ `epochDue` ⇒ دورِ بعد بی‌درنگ بپرس */
+  @Volatile private var epochCheckedAt = 0L
+  @Volatile private var epochDue = true
 
   /**
    *  کلیدِ حساب — شناسهٔ کاربر اگر معلوم باشد، وگرنه نامِ حساب، وگرنه
@@ -87,6 +96,8 @@ class SyncV1Engine private constructor(context: Context) {
     state = SyncStateV1(app, accountKey)
     queue = OpQueue(app, accountKey)
     commit = commitFor(accountKey)
+    replay = replayFor(accountKey)
+    epochDue = true
     publish()
   }
 
@@ -176,6 +187,9 @@ class SyncV1Engine private constructor(context: Context) {
         val client = SyncV1Client(Backend.api(app))
         val device = store.deviceUid
 
+        //  §۹.۵: سرور از پشتیبان برگشته؟ opهای گم‌شدهٔ همین دستگاه جلوی صف، cursor تا پایه
+        checkEpoch(client)
+
         //  صف را تا ته خالی می‌کنیم، دسته‌دسته
         var guard = 0
         while (queue.size() > 0 && guard < 500) {
@@ -197,7 +211,13 @@ class SyncV1Engine private constructor(context: Context) {
 
           val accepted = out.results.filter { it.accepted }.map { it.opId }
           val rejected = out.results.filter { !it.accepted }
-          if (accepted.isNotEmpty()) queue.ack(accepted)
+          if (accepted.isNotEmpty()) {
+            queue.ack(accepted)
+            //  §۹.۵: پذیرفته‌شده‌ها با server_seq کنارِ صف می‌مانند تا اگر سرور از پشتیبان
+            //  برگشت، با همان op_id دوباره بروند (`checkEpoch`)
+            val seqOf = out.results.filter { it.accepted }.associate { it.opId to it.seq }
+            replay.sent(batch.filter { it.opId in seqOf }.map { ReplayBook.Sent(it.opId, seqOf[it.opId] ?: 0L, it.toJson()) })
+          }
           if (rejected.isNotEmpty()) {
             //  ردشده‌ها از صف بیرون می‌روند — وگرنه صف تا ابد قفل
             //  می‌کند — ولی بی‌صدا نه.
@@ -212,9 +232,18 @@ class SyncV1Engine private constructor(context: Context) {
         var rounds = 0
         while (rounds < 50) {
           rounds++
-          val got = client.pull(device, state.cursor)
-          if (got.ops.isNotEmpty()) absorbRemote(got.ops, read, write, got.cursor)
+          val since = state.cursor
+          val got = client.pull(device, since)
+          //  §۹.۵: opی که این دستگاه پیش‌تر نشانده یا فرستاده (دوباره‌فرستادهٔ دستگاهِ دیگر
+          //  پس از بازیابیِ سرور) دوباره نمی‌نشیند — `$inc` دو بار کم نمی‌شود
+          val fresh = replay.unknown(got.ops) { it.opId }
+          if (fresh.isNotEmpty()) {
+            absorbRemote(fresh, read, write, got.cursor)
+            replay.seen(fresh.map { it.opId })
+          }
           state.cursor = got.cursor
+          //  سرِ دفترِ سرور پشتِ cursor ⇒ سرور برگشته؛ دوران دورِ بعد بی‌درنگ پرسیده شود
+          if (got.head in 0 until since) epochDue = true
           state.lastPullAt = System.currentTimeMillis()
           if (got.serverSchema > 0) state.serverSchema = got.serverSchema
           if (!got.hasMore) break
@@ -235,6 +264,42 @@ class SyncV1Engine private constructor(context: Context) {
         publish()
       }
     }
+
+  /**
+   *  سرور از پشتیبان برگشته؟ — §۹.۵، شرح سرِ `core/sync/RestoreReplay.kt`.
+   *
+   *  هر دقیقه یک بار (یا بی‌درنگ وقتی pull سرِ دفترِ سرور را پشتِ cursor دید) دورانِ
+   *  سرور خوانده می‌شود. عوض شده ⇒ opهای پذیرفته‌شدهٔ همین دستگاه با `server_seq`
+   *  بالاتر از پایه، با همان op_id، جلوی صف و cursor تا پایه — زیرِ قفلِ `record()`.
+   *  بالا آمدنِ عادیِ سرور ⇒ پایه همان سرِ دفتر است و هیچ چیزی عوض نمی‌شود.
+   *  سرورِ کهنه یا خاموش (۴۰۴) یا نرسیدن ⇒ همان رفتارِ پیشین؛ دورِ همگام‌سازی نمی‌خوابد.
+   */
+  private suspend fun checkEpoch(client: SyncV1Client) {
+    val t = System.currentTimeMillis()
+    if (!epochDue && t - epochCheckedAt < EPOCH_EVERY_MS) return
+    epochCheckedAt = t
+    val server = try {
+      client.epoch()
+    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+      throw cancelled
+    } catch (_: Throwable) {
+      return
+    }
+    epochDue = false
+    if (server == null) return
+    synchronized(this) {
+      val plan = RestoreReplay.plan(state.epoch, state.cursor, server)
+      val base = plan.replayAbove
+      if (base == null) {
+        if (plan.epoch != state.epoch) state.epoch = plan.epoch
+        return
+      }
+      //  اول صف (فایل، اتمی)، بعد دوران + cursor با هم: بسته شدن در میانه ⇒ دورِ بعد
+      //  همان را می‌بیند و `pushFront` opِ در صف را دوباره نمی‌آورد
+      queue.pushFront(replay.replayAbove(base).mapNotNull { SyncOp.fromJson(it.body) })
+      if (!state.commitEpoch(plan.epoch, plan.cursor)) throw java.io.IOException("دورانِ همگام‌سازی روی دیسک ننشست")
+    }
+  }
 
   /**
    *  هم‌ترازیِ یک‌باره با سرور — پیش از نخستین دورِ این حساب روی این دستگاه.
@@ -423,6 +488,8 @@ class SyncV1Engine private constructor(context: Context) {
   companion object {
     const val MIN_BACKOFF_MS = 2_000L
     const val MAX_BACKOFF_MS = 5 * 60_000L
+    /** پرسیدنِ «دوران» (§۹.۵) — یک درخواستِ کوچک در دقیقه، نه در هر دور */
+    const val EPOCH_EVERY_MS = 60_000L
 
     @Volatile private var instance: SyncV1Engine? = null
 

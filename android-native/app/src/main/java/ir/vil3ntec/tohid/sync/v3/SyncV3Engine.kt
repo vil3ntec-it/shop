@@ -1,11 +1,14 @@
 package ir.vil3ntec.tohid.sync.v3
 
+import ir.vil3ntec.tohid.core.sync.ReplayBook
+import ir.vil3ntec.tohid.core.sync.RestoreReplay
 import ir.vil3ntec.tohid.core.sync.v3.HlcClock
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.sync.v1.LedgerDiff
 import ir.vil3ntec.tohid.sync.v1.SyncCommit
 import ir.vil3ntec.tohid.sync.v1.SyncOp
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -98,6 +101,8 @@ data class V3Meta(
   val conflictsDirty: Boolean = false,
   val pushBytes: Int = SyncV3Engine.MIN_BYTES,
   val pullBytes: Int = SyncV3Engine.MIN_BYTES,
+  /** «دورانِ» سروری که آخرین بار دیده شد — §۹.۵، `core/sync/RestoreReplay.kt` */
+  val epoch: String = "",
 )
 
 /** انبارِ محلی؛ هر `save` یک نوشتنِ اتمی (فایلِ کناری + fsync + جابه‌جایی). */
@@ -107,6 +112,8 @@ internal interface V3Store {
   fun loadQueue(): V3Queue?
   fun saveQueue(queue: V3Queue)
   val journal: SyncCommit.Journal
+  /** ورودی‌های پذیرفته‌شده و op_idهای رسیده برای پس از بازیابیِ سرور (§۹.۵)؛ null ⇒ نیست */
+  val replay: ReplayBook? get() = null
 }
 
 /** SYN-08 و بخشِ ۲۹.۵ بندِ ۸: «روی دستگاه ثبت شد» جدا از «سرور تأیید کرد». */
@@ -139,6 +146,8 @@ data class V3Step(
   val upgrade: Boolean = false,
   val stopped: Boolean = false,
   val retryInMs: Long = 0,
+  /** ورودی‌هایی که پس از بازیابیِ سرور دوباره جلوی صف آمدند (§۹.۵) */
+  val replayed: Int = 0,
 )
 
 internal class SyncV3Engine(
@@ -165,6 +174,11 @@ internal class SyncV3Engine(
 
   /** زمانِ تصحیح‌شده: ساعتِ دستگاه + اختلافی که از `server_time` نگه داشته شده */
   fun now(): Long = rawNow() + meta.offsetMs
+
+  /** ورودیِ صف ⇄ JSON برای دفترچهٔ `ReplayBook` (§۹.۵) */
+  private val entryJson = Json { ignoreUnknownKeys = true }
+
+  private fun opIdOf(o: JsonObject): String = (o["op_id"] as? JsonPrimitive)?.content.orEmpty()
 
   val clock = HlcClock(this.deviceId, { now() })
 
@@ -416,6 +430,7 @@ internal class SyncV3Engine(
   private fun settle(b: Batch, results: List<JsonObject?>): V3Step {
     val done = HashSet<String>()
     val rejected = ArrayList<V3Entry>()
+    val accepted = ArrayList<ReplayBook.Sent>()
     var conflict = false
     var at = 0
     val t = now()
@@ -438,11 +453,16 @@ internal class SyncV3Engine(
       if (statuses.all { it in DONE }) {
         done += e.key
         if (statuses.any { it == "conflict" || it == "partial" }) conflict = true
+        val s = mine.maxOfOrNull { (it!!["server_seq"] as? JsonPrimitive)?.content?.toLongOrNull() ?: 0L } ?: 0L
+        accepted += ReplayBook.Sent(e.key, s, entryJson.encodeToJsonElement(V3Entry.serializer(), e) as JsonObject)
       }
     }
     val q = queue.copy(outbox = queue.outbox.filter { it.key !in done }, rejected = queue.rejected + rejected, seq = seq)
     store.saveQueue(q)
     queue = q
+    //  §۹.۵: پذیرفته‌شده‌ها با server_seq کنارِ صف می‌مانند تا اگر سرور از پشتیبان برگشت،
+    //  با همان op_idها دوباره بروند (`pullOnce`)
+    store.replay?.sent(accepted)
     save(meta.copy(
       attempt = 0, lastError = "", lastErrorAt = 0, lastOkAt = t, lastPushAt = t,
       pushBytes = min(MAX_BYTES, meta.pushBytes * 2), conflictsDirty = meta.conflictsDirty || conflict,
@@ -458,8 +478,39 @@ internal class SyncV3Engine(
     val body = r.body
     if (r.status != 200 || body == null) return fail(r.status, body)
     val cursor = ((body["cursor"] as? JsonPrimitive)?.content?.toLongOrNull() ?: since).coerceAtLeast(since)
-    val items = (body["ops"] as? JsonArray).orEmpty()
-    val legacy = items.mapNotNull { (it as? JsonObject)?.let(V3Convert::effectToLegacy) }
+    val book = store.replay
+
+    /*
+     *  §۹.۵: سرور از پشتیبان برگشته؟ (شرح سرِ `core/sync/RestoreReplay.kt`) — ورودی‌های
+     *  پذیرفته‌شدهٔ همین دستگاه بالای پایه، با همان op_idها، جلوی صف؛ cursor تا پایه. اگر
+     *  cursor پایین آمد این صفحه (از cursor ِ کهنه) نشانده نمی‌شود و pull از پایه ادامه می‌یابد.
+     */
+    val plan = RestoreReplay.plan(meta.epoch, since, RestoreReplay.Epoch.from(body["epoch"]))
+    var replayed = 0
+    plan.replayAbove?.let { base ->
+      withLock {
+        if (book != null) {
+          val have = queue.outbox.mapTo(HashSet()) { it.key }
+          val again = book.replayAbove(base)
+            .mapNotNull { s -> runCatching { entryJson.decodeFromJsonElement(V3Entry.serializer(), s.body) }.getOrNull() }
+            .filter { have.add(it.key) }
+          if (again.isNotEmpty()) {
+            val q = queue.copy(outbox = again + queue.outbox)
+            store.saveQueue(q)
+            queue = q
+            replayed = again.size
+          }
+        }
+        if (plan.cursor < since) save(meta.copy(epoch = plan.epoch, cursor = plan.cursor))
+      }
+      if (plan.cursor < since) return V3Step(ok = true, hasMore = true, replayed = replayed)
+    }
+
+    //  opی که این دستگاه پیش‌تر نشانده (دوباره‌فرستادهٔ دستگاهِ دیگر پس از بازیابی) دوباره
+    //  نمی‌نشیند — `$inc` دو بار جمع نمی‌شود
+    val all = (body["ops"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }
+    val items = book?.unknown(all) { opIdOf(it) } ?: all
+    val legacy = items.mapNotNull(V3Convert::effectToLegacy)
     withLock {
       if (legacy.isNotEmpty()) {
         //  ژورنال ⇐ دفتر ⇐ سایه + cursor ⇐ پاک کردنِ ژورنال (شرح سرِ `SyncCommit.absorb`)
@@ -468,11 +519,13 @@ internal class SyncV3Engine(
       val t = now()
       save(meta.copy(
         cursor = cursor, lastPullAt = t, lastOkAt = t, attempt = 0, lastError = "", lastErrorAt = 0,
-        pullBytes = min(MAX_BYTES, budget * 2),
+        pullBytes = min(MAX_BYTES, budget * 2), epoch = plan.epoch,
       ))
+      //  «دیده شد» فقط پس از نشستن روی دفتر (شرح سرِ `ReplayBook`)
+      book?.seen(items.map { opIdOf(it) })
     }
     val more = (body["has_more"] as? JsonPrimitive)?.content == "true"
-    return V3Step(ok = true, applied = legacy.size, hasMore = more)
+    return V3Step(ok = true, applied = legacy.size, hasMore = more, replayed = replayed)
   }
 
   suspend fun fetchConflicts(all: Boolean = false): List<JsonObject>? {
@@ -510,10 +563,19 @@ internal class SyncV3Engine(
         if (!p.ok) return p
         if (p.done == 0 && p.rejected == 0) break
       }
+      var replayed = 0
       for (i in 0 until ROUNDS) {
         val q = pullOnce()
         if (!q.ok) return q
+        replayed += q.replayed
         if (!q.hasMore) break
+      }
+      //  §۹.۵: ورودی‌هایی که پس از بازیابیِ سرور دوباره جلوی صف آمدند، همین دور بروند
+      if (replayed > 0) for (i in 0 until ROUNDS) {
+        if (queue.outbox.isEmpty()) break
+        val p = pushOnce()
+        if (!p.ok) return p
+        if (p.done == 0 && p.rejected == 0) break
       }
       if (meta.conflictsDirty || now() - conflictsAt > 5 * 60 * 1000L) {
         conflictsAt = now()

@@ -16,6 +16,8 @@
  *     `WarehouseEngine.kt`، `SalesEngine.kt`، `DebtorEngine.kt` و `CashShift.kt` برگردانده
  *     شده‌اند (نامِ تابعِ کاتلین کنارِ هر کدام).
  *   • «حالتِ هواپیما»: `offline = true` ⇒ هیچ درخواستی بیرون نمی‌رود (همان `Backend.isOnline`).
+ *   • پس از بازیابیِ سرور (§۹.۵): دوران، دوباره‌فرستادن و نادیده گرفتنِ opِ آشنا همان
+ *     `SyncV1Engine.checkEpoch` و `core/sync/RestoreReplay.kt` (`restorePlan`، `replayAbove`).
  */
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
@@ -27,6 +29,40 @@ const ROOT = path.join(import.meta.dirname, '..', '..', '..', '..');
 export const core = require(path.join(ROOT, 'license', 'sync-core.js'));
 export const MODELS_KT = path.join(ROOT, 'android-native', 'app', 'src', 'main', 'java', 'ir', 'vil3ntec', 'tohid', 'data', 'Models.kt');
 export const APP_VERSION = JSON.parse(fs.readFileSync(path.join(ROOT, 'server', 'package.json'), 'utf8')).version;
+
+/* ---- §۹.۵ — قرینهٔ سطر به سطرِ `core/sync/RestoreReplay.kt` (`RestoreReplayTest.kt` همان بردارها) ---- */
+
+/** `SyncV1Engine.EPOCH_EVERY_MS` */
+export const EPOCH_EVERY_MS = 60_000;
+
+/** `RestoreReplay.Epoch.from` */
+export function epochFrom(e) {
+  if (!e || typeof e !== 'object' || typeof e.id !== 'string' || !e.id) return null;
+  const base = Number(e.base);
+  const head = Number(e.head);
+  if (!Number.isInteger(base) || !Number.isInteger(head) || base < 0 || head < 0) return null;
+  return { id: e.id, base, head };
+}
+
+/** `RestoreReplay.plan` ⇒ {epoch, cursor, replayAbove|null} */
+export function restorePlan(known, cursor, server) {
+  if (!server) return { epoch: known, cursor, replayAbove: null };
+  const rotated = known !== '' && known !== server.id;
+  const behind = cursor > server.head;
+  if (!rotated && !behind) return { epoch: server.id, cursor, replayAbove: null };
+  const base = Math.min(server.base, server.head);
+  return { epoch: server.id, cursor: Math.min(cursor, base), replayAbove: base };
+}
+
+/** `ReplayBook.replayAbove`: ترتیبِ نخستین فرستادن، آخرین server_seq ِ هر op_id */
+export function replayAbove(sent, base) {
+  const byId = new Map();
+  for (const s of sent) {
+    const prev = byId.get(s.id);
+    byId.set(s.id, prev ? { ...prev, seq: s.seq } : s);
+  }
+  return [...byId.values()].filter((s) => s.seq <= 0 || s.seq > base);
+}
 
 /* ═══════════════════════════ Models.kt ⇒ شکلِ ردیف ═══════════════════════════ */
 
@@ -137,6 +173,13 @@ export class NativeDevice {
     this.dropped = [];
     this.cursor = 0;
     this.snapshotAt = 0;
+    //  §۹.۵ (`core/sync/RestoreReplay.kt`): دورانِ سرور و دفترچهٔ `ReplayBook`
+    this.epoch = '';
+    this.epochCheckedAt = 0;
+    this.epochDue = true;
+    this.sent = [];          //  …-sent.jsonl: {id, seq, op} ِ پذیرفته‌شده‌های خودِ دستگاه
+    this.seen = new Set();   //  …-seen.jsonl: op_idِ رسیده‌هایی که روی دفتر نشستند
+    this.replayed = 0;
     this.lastError = '';
     this.holding = false;
     this.requests = [];
@@ -228,10 +271,35 @@ export class NativeDevice {
     return ops.length;
   }
 
+  /**
+   *  `SyncV1Engine.checkEpoch` — سرور از پشتیبان برگشته؟ (§۹.۵، `RestoreReplay.plan`)
+   *  هر دقیقه یک بار یا بی‌درنگ وقتی pull سرِ دفتر را پشتِ cursor دید.
+   */
+  async checkEpoch() {
+    const t = Date.now();
+    if (!this.epochDue && t - this.epochCheckedAt < EPOCH_EVERY_MS) return;
+    this.epochCheckedAt = t;
+    const r = await this.api('GET', '/shop/sync-epoch');
+    if (r.status !== 200 && r.status !== 404) return;          //  `ApiFailure` ⇒ دورِ بعد
+    this.epochDue = false;
+    if (r.status !== 200) return;                              //  سرورِ کهنه/خاموش ⇒ رفتارِ پیشین
+    const plan = restorePlan(this.epoch, this.cursor, epochFrom(r.body?.epoch));
+    if (plan.replayAbove == null) { this.epoch = plan.epoch; return; }
+    //  `OpQueue.pushFront`: جلوی صف، همان op_id، بی تکرارِ آنچه در صف هست
+    const have = new Set(this.queue.map((o) => o.op_id));
+    const again = replayAbove(this.sent, plan.replayAbove).filter((s) => !have.has(s.id) && have.add(s.id)).map((s) => s.op);
+    this.queue.unshift(...again);
+    this.replayed += again.length;
+    //  `SyncStateV1.commitEpoch`
+    this.epoch = plan.epoch;
+    this.cursor = plan.cursor;
+  }
+
   /** `SyncV1Engine.runOnce`: همهٔ صف در دسته‌ها، بعد pull تا تهِ cursor */
   async sync() {
     if (this.offline) { this.lastError = 'offline'; return { ok: false, offline: true }; }
     try {
+      await this.checkEpoch();
       let guard = 0;
       while (this.queue.length && guard++ < 500) {
         //  `OpQueue.batch()`: حداکثر ۲۰۰ op و ۲۵۶KB
@@ -250,16 +318,23 @@ export class NativeDevice {
         const res = r.body.results || [];
         const ok = new Set(res.filter((x) => x.status === 'applied' || x.status === 'duplicate').map((x) => x.op_id));
         const bad = res.filter((x) => !(x.status === 'applied' || x.status === 'duplicate'));
+        //  `ReplayBook.sent`: پذیرفته‌شده‌ها با server_seq برای پس از بازیابیِ سرور
+        const seqOf = new Map(res.filter((x) => ok.has(x.op_id)).map((x) => [x.op_id, Number(x.server_seq) || 0]));
+        for (const op of batch) if (seqOf.has(op.op_id)) this.sent.push({ id: op.op_id, seq: seqOf.get(op.op_id), op });
         for (const b of bad) this.dropped.push({ ...batch.find((o) => o.op_id === b.op_id), why: b.reason || b.status });
         const gone = new Set([...ok, ...bad.map((b) => b.op_id)]);
         this.queue = this.queue.filter((o) => !gone.has(o.op_id));
       }
       for (let i = 0; i < 50; i++) {
-        const r = await this.api('GET', `/sync/v1/pull?device_id=${encodeURIComponent(this.deviceId)}&since=${this.cursor}`);
+        const since = this.cursor;
+        const r = await this.api('GET', `/sync/v1/pull?device_id=${encodeURIComponent(this.deviceId)}&since=${since}`);
         if (r.status !== 200) { this.lastError = `${r.status} ${r.body?.error?.code || ''}`.trim(); return { ok: false, status: r.status, body: r.body }; }
-        const ops = r.body.ops || [];
-        if (ops.length) this.absorb(ops);
+        //  `ReplayBook.unknown`: opی که این دستگاه پیش‌تر نشانده یا فرستاده دوباره نمی‌نشیند
+        const known = new Set([...this.seen, ...this.sent.map((s) => s.id)]);
+        const ops = (r.body.ops || []).filter((o) => !known.has(o.op_id));
+        if (ops.length) { this.absorb(ops); for (const o of ops) this.seen.add(o.op_id); }
         this.cursor = Number(r.body.cursor || this.cursor);
+        if (Number.isFinite(r.body.head) && r.body.head >= 0 && r.body.head < since) this.epochDue = true;
         if (!r.body.has_more) break;
       }
       this.lastError = '';

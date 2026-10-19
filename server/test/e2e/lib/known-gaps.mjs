@@ -28,10 +28,6 @@ export const KNOWN_GAPS = [
     ref: 'باگ — BLOCKED: authorizeOp در server/src/lib/sync-v1.js (مشترک با پمپ، دست‌نزدنی) فقط سرِ فاکتور را رد می‌کند؛ تصمیمِ نشستِ اصلی لازم است',
   },
   {
-    scenario: 'ops', step: 'E2E-OPS-14.replay', match: /فروشِ پس از پشتیبان روی سرورِ بازیابی‌شده نیست/,
-    ref: '§۹.۵ — MISSING: پس از بازیابیِ سرور، برنامه cursor ِ جلوتر از سرِ دفترِ سرور را تشخیص نمی‌دهد و opهای «اعمال‌شده» را دوباره نمی‌فرستد',
-  },
-  {
     scenario: 'admin', step: 'E2E-ADM.counts', match: /Sync v1 شمرده نمی‌شود/,
     ref: 'باگ — اصلاح در PR #310 (GET /api/admin/shops/:id فقط راهِ قدیم را می‌شمرد)',
   },

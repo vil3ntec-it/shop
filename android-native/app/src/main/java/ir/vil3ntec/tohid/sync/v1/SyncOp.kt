@@ -52,7 +52,11 @@ data class SyncOp(
   }
 }
 
-/** نتیجهٔ هر op در پاسخِ `push` — `applied | duplicate | rejected`. */
-data class OpResult(val opId: String, val status: String, val reason: String = "") {
+/**
+ *  نتیجهٔ هر op در پاسخِ `push` — `applied | duplicate | rejected`.
+ *  `seq` همان `server_seq` (برای `applied` و `duplicate`؛ نبود ⇒ ۰) — دفترچهٔ
+ *  `ReplayBook` با آن می‌فهمد پس از بازیابیِ سرور کدام op باید دوباره برود (§۹.۵).
+ */
+data class OpResult(val opId: String, val status: String, val reason: String = "", val seq: Long = 0L) {
   val accepted: Boolean get() = status == "applied" || status == "duplicate"
 }

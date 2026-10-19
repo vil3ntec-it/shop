@@ -10,7 +10,10 @@
  *   ۴) سرورِ تازه از همان فایل (فرایندِ جدا، پوشهٔ تازه) بالا می‌آید.
  *   ۵) دستگاه‌ها با همان نشست ادامه می‌دهند؛ دستگاهِ نو از Snapshot همان دفتر را می‌گیرد؛ سفارش،
  *      رویدادها، بازپرداخت، گزارشِ تطبیق و کاتالوگ با پیش از پشتیبان یکی‌اند.
- *   ۶) §۹.۵: فروشِ «پس از پشتیبان» که در سرورِ بازیابی‌شده نیست، از صف/دفترِ دستگاه دوباره می‌رسد.
+ *   ۶) §۹.۵: فروشِ «پس از پشتیبان» که در سرورِ بازیابی‌شده نیست، از دفترچهٔ opهای پذیرفته‌شدهٔ
+ *      دستگاه (`ReplayBook`) با همان op_id دوباره می‌رسد — دستگاه از «دورانِ» تازهٔ سرور
+ *      (`GET /api/shop/sync-epoch`) می‌فهمد سرور برگشته؛ گوشیِ دیگری که همان فروش را
+ *      پیش‌تر گرفته، opِ دوباره‌رسیده را دو بار نمی‌نشاند.
  *
  * اجرا:  node test/e2e/ops.e2e.mjs
  */
@@ -30,7 +33,7 @@ const owner = await E.owner('owner-ops@e2e.local', 'صاحبِ پشتیبان', 
 const staff = await E.staff(owner, 'staff-ops@e2e.local', 'شاگردِ پشتیبان');
 for (const k of ['shop.orders', 'shop.orders.refunds', 'shop.catalog']) await E.flag(owner.shopId, k, true);
 
-let A; let B; let rice; let orderId; let before; let file; let child; let R; let lateSale;
+let A; let B; let rice; let orderId; let before; let file; let child; let R; let lateSale; let s1Id; let s1Item; let late;
 
 await E.step('E2E-OPS-14.0', 'دکانِ واقعی: فروش، نسیه، دریافت، مرجوعی، سفارش و بازپرداخت', async () => {
   A = await E.device('A-owner-phone', owner.email);
@@ -39,6 +42,7 @@ await E.step('E2E-OPS-14.0', 'دکانِ واقعی: فروش، نسیه، در�
   rice = A.stockIn({ name: 'برنج', price: 100, cost: 70, units: 50 });
   const debtor = A.addDebtor('احمد');
   const s1 = A.sell({ lines: [{ id: rice, qty: 3 }] });
+  s1Id = s1.saleId;
   A.sell({ lines: [{ id: rice, qty: 4 }], payment: 'credit', debtorId: debtor, paid: 100 });
   A.receive(debtor, 50);
   A.returnItems(s1.saleId, { [A.ledger.saleItems.find((x) => x.saleId === s1.saleId).id]: 1 }, 'خراب');
@@ -83,10 +87,23 @@ await E.step('E2E-OPS-14.backup', 'پشتیبانِ رمزدارِ سرور: م�
   config.backup.passphrase = PASS;
 }, { needs: ['E2E-OPS-14.0'] });
 
-await E.step('E2E-OPS-14.late', 'پس از پشتیبان: شاگرد یک فروشِ دیگر می‌فرستد (روی سرورِ قدیم «اعمال شد»)', async () => {
+await E.step('E2E-OPS-14.late', 'پس از پشتیبان: شاگرد یک فروشِ تازه و صاحب یک مرجوعیِ دیگر روی فروشِ پیش از پشتیبان (`$inc`) می‌فرستند (روی سرورِ قدیم «اعمال شد») و هر کدام مالِ دیگری را می‌گیرد', async () => {
   lateSale = B.sell({ lines: [{ id: rice, qty: 2 }] }).saleId;
+  const bOps = B.queue.map((o) => o.op_id);
   await B.drain();
   assert.equal(B.queue.length, 0);
+  //  مرجوعیِ دوم روی همان قلمِ فروشِ پیش از پشتیبان ⇒ opِ update با returnedQty: {$inc: 1}
+  s1Item = A.ledger.saleItems.find((x) => x.saleId === s1Id).id;
+  A.returnItems(s1Id, { [s1Item]: 1 }, 'خراب');
+  const aOps = A.queue.map((o) => o.op_id);
+  assert.ok(A.queue.some((o) => o.table === 'saleItems' && o.type === 'update' && o.fields?.returnedQty?.$inc === 1), 'مرجوعی opِ $inc نساخت');
+  await A.drain();
+  await B.drain();
+  const returned = (d) => d.ledger.saleItems.find((x) => x.id === s1Item).returnedQty;
+  late = { bOps, aOps, returned: returned(A), stock: A.stock(rice) };
+  assert.equal(returned(B), late.returned, 'مرجوعیِ صاحب به دستگاهِ شاگرد نرسید');
+  assert.ok(A.ledger.sales.some((x) => x.id === lateSale), 'فروشِ شاگرد به گوشیِ صاحب نرسید');
+  assert.equal(B.stock(rice), late.stock);
 }, { needs: ['E2E-OPS-14.backup'] });
 
 await E.step('E2E-OPS-14.restore', 'سرورِ تازه از همان فایل در پوشهٔ تازه بالا می‌آید (فرایندِ جدا)', async () => {
@@ -111,7 +128,11 @@ await E.step('E2E-OPS-14.restore', 'سرورِ تازه از همان فایل �
 /** همان دستگاه، حالا روبه‌روی سرورِ بازیابی‌شده (نشست و دفترش همان) */
 function moved(dev, label) {
   const d = new NativeDevice(R, label, { deviceId: dev.deviceId });
-  Object.assign(d, { token: dev.token, refreshToken: dev.refreshToken, ledger: dev.ledger, shadow: dev.shadow, queue: dev.queue.slice(), cursor: dev.cursor, snapshotAt: dev.snapshotAt });
+  Object.assign(d, {
+    token: dev.token, refreshToken: dev.refreshToken, ledger: dev.ledger, shadow: dev.shadow, queue: dev.queue.slice(), cursor: dev.cursor, snapshotAt: dev.snapshotAt,
+    //  دورانِ دیده‌شده و دفترچهٔ `ReplayBook` هم روی همان دستگاه می‌مانند (§۹.۵)
+    epoch: dev.epoch, sent: dev.sent.slice(), seen: new Set(dev.seen),
+  });
   return d;
 }
 
@@ -138,16 +159,35 @@ await E.step('E2E-OPS-14.consistent', 'پس از بازیابی: دفتر، مو
   assert.equal(rep.ok, true, JSON.stringify(rep.mismatches));
 }, { needs: ['E2E-OPS-14.restore'] });
 
-await E.step('E2E-OPS-14.replay', '§۹.۵: فروشِ «پس از آخرین پشتیبان» از دستگاهِ شاگرد دوباره به سرورِ بازیابی‌شده می‌رسد', async () => {
+await E.step('E2E-OPS-14.replay', '§۹.۵: کارهای «پس از آخرین پشتیبان» از هر دو دستگاه دوباره به سرورِ بازیابی‌شده می‌رسند و هیچ دستگاهی opِ دوباره‌رسیده را دو بار نمی‌نشاند', async () => {
+  const returned = (d) => d.ledger.saleItems.find((x) => x.id === s1Item).returnedQty;
+  //  ۱) شاگرد: دورانِ تازه ⇒ فقط opهای پس از پشتیبانِ خودش، با همان op_id، جلوی صف
   const B2 = moved(B, 'B-after-restore');
   const r = await B2.sync();
   assert.equal(r.ok, true, JSON.stringify(r));
+  assert.equal(B2.replayed, late.bOps.length, `شاگرد دوباره فرستاد: ${B2.replayed}، opهای پس از پشتیبانش: ${late.bOps.length}`);
+  assert.equal(B2.queue.length, 0);
+  //  ۲) صاحب: مرجوعیِ پس از پشتیبانش دوباره می‌رود؛ فروشِ دوباره‌رسیدهٔ شاگرد را که پیش‌تر داشت دوباره نمی‌نشاند
+  const A3 = moved(A, 'A-after-restore');
+  assert.equal((await A3.sync()).ok, true);
+  assert.equal(A3.replayed, late.aOps.length, `صاحب دوباره فرستاد: ${A3.replayed}، opهای پس از پشتیبانش: ${late.aOps.length}`);
+  //  ۳) شاگرد دوباره: مرجوعیِ دوباره‌رسیدهٔ صاحب (returnedQty: {$inc: 1}) را پیش‌تر نشانده بود
+  assert.equal((await B2.sync()).ok, true);
+
   const N = new NativeDevice(R, 'N2-new-device');
   N.token = A.token;
   N.refreshToken = A.refreshToken;
   assert.equal((await N.firstSync()).ok, true);
   assert.ok(N.ledger.sales.some((s) => s.id === lateSale), 'فروشِ پس از پشتیبان روی سرورِ بازیابی‌شده نیست و دستگاه هم دوباره نمی‌فرستد (cursor ِ دستگاه از سرِ دفترِ سرور جلوتر است)');
-}, { needs: ['E2E-OPS-14.restore'] });
+  assert.equal(returned(N), late.returned, 'سرور: مرجوعیِ پس از پشتیبان نرسید');
+  for (const [d, who] of [[A3, 'گوشیِ صاحب'], [B2, 'دستگاهِ شاگرد']]) {
+    assert.equal(returned(d), late.returned, `${who}: opِ دوباره‌رسیده دو بار نشست (returnedQty ${returned(d)} ≠ ${late.returned})`);
+    assert.equal(d.ledger.sales.filter((s) => s.id === lateSale).length, 1, who);
+    assert.equal(d.stock(rice), late.stock, `${who}: موجودی`);
+    assert.ok(d.cursor <= N.cursor, `${who}: cursor (${d.cursor}) از سرِ دفترِ سرور (${N.cursor}) جلوتر ماند`);
+  }
+  assert.equal(N.stock(rice), late.stock, 'سرور: موجودی همان پیش از بازیابی');
+}, { needs: ['E2E-OPS-14.restore', 'E2E-OPS-14.late'] });
 
 if (child) child.kill('SIGTERM');
 await E.finish();

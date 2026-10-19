@@ -22,6 +22,7 @@ const zlib = require('zlib');
 const { promisify } = require('util');
 const config = require('../config');
 const sync = require('../lib/sync-v3');
+const syncEpoch = require('../lib/sync-epoch');
 const { rateLimit } = require('../middleware/ratelimit');
 const { requireSyncAccount, requireSyncWrite } = require('../lib/sync-v1-auth');
 const { forbidden, notFoundHandler } = require('../middleware/errors');
@@ -98,6 +99,9 @@ router.get('/pull', async (req, res, next) => {
       maxBytes: Number(req.query?.max_bytes || 0) || undefined,
       limit: Number(req.query?.limit || 0) || undefined,
     });
+    //  §۹.۵: «دورانِ» سرور کنارِ هر pull — عوض شده ⇒ برنامه opهای گم‌شده را دوباره می‌فرستد
+    //  (`lib/sync-epoch.js`، `SyncV3Engine.pullOnce`). خاموش ⇒ همان پاسخِ پیشین.
+    if (config.syncEpoch.enabled) out.epoch = await syncEpoch.forAccount(req.sync, 'v3');
     await send(req, res, { ok: true, ...out });
   } catch (err) { next(err); }
 });
