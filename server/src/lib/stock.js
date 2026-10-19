@@ -510,6 +510,39 @@ async function extend(c, shopId, orderId) {
   return r.rowCount || 0;
 }
 
+/**
+ * CHK-18: آیا رزروِ «نگه‌داشته»ی این سفارش هنوز پشتوانه دارد؟ (قفل باید گرفته باشد)
+ *
+ * فروشِ حضوریِ هم‌زمان (INV-06) رد نمی‌شود و ممکن است موجودیِ زیرِ یک رزرو را ببرد؛ آن‌وقت
+ * فقط وظیفهٔ «رزروِ بی‌پشتوانه» ساخته می‌شود. «قبول» نباید چنین رزروی را بی‌صدا بی‌مهلت کند.
+ * رزروها به ترتیبِ ساخت (همان ترتیبِ رسیدنِ سفارش‌ها) از موجودیِ قابلِ فروش برداشته می‌شوند؛
+ * سهمِ این سفارش از هر کالا که بیرون بیفتد کمبود است.
+ * @returns {Promise<Array<{productId:string, requestedMilli:number, availableMilli:number}>>}
+ */
+async function shortOf(c, shopId, orderId, settings) {
+  const mine = (await c.query(
+    `SELECT product_id, COALESCE(SUM(qty_milli), 0)::bigint AS q, MIN(created_at) AS first
+       FROM stock_reservations WHERE shop_id=$1 AND branch_id='' AND order_id=$2 AND status='held'
+      GROUP BY product_id ORDER BY product_id`,
+    [shopId, orderId]
+  )).rows;
+  if (!mine.length) return [];
+  const ids = mine.map((r) => r.product_id);
+  const lvs = await levelsOf(c, shopId, ids);
+  const short = [];
+  for (const m of mine) {
+    const before = num((await c.query(
+      `SELECT COALESCE(SUM(qty_milli), 0)::bigint AS q FROM stock_reservations
+        WHERE shop_id=$1 AND branch_id='' AND product_id=$2 AND status='held' AND order_id <> $3
+          AND (created_at < $4 OR (created_at = $4 AND order_id < $3))`,
+      [shopId, m.product_id, orderId, num(m.first)]
+    )).rows[0].q);
+    const available = sellableOnHand(lvs.get(m.product_id), settings) - before;
+    if (available < num(m.q)) short.push({ productId: m.product_id, requestedMilli: num(m.q), availableMilli: Math.max(0, available) });
+  }
+  return short;
+}
+
 /** رزروهای سررسیده (هنوز قبول‌نشده) آزاد می‌شوند — قفل باید گرفته باشد. */
 async function expireDue(c, shopId, at) {
   const orders = (await c.query(
@@ -648,6 +681,6 @@ module.exports = {
   flagOf, settingsOf, saveSettings, lock, decide,
   levelsOf, heldOf, freeOf, sellableOnHand, onHandAt, fmtMilli,
   insertMove, postMove, openTask, checkProducts,
-  reserve, release, commit, extend, expireDue, sweepExpired, startSweeper, stopSweeper,
+  reserve, release, commit, extend, shortOf, outOfStock, expireDue, sweepExpired, startSweeper, stopSweeper,
   reconcile,
 };

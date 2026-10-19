@@ -9,7 +9,7 @@
  * نبودِ پلی‌رایت یا axe-core قرمز است، نه «رد» (F0-17)؛ ردِ آگاهانه فقط با SKIP_BROWSER_TESTS=1.
  */
 import { createRequire } from 'node:module';
-import { missingTool, PLAYWRIGHT_INSTALL, SKIP } from './browser-guard.mjs';
+import { missingTool, PLAYWRIGHT_INSTALL, SKIP, closeSafeRoute } from './browser-guard.mjs';
 import assert from 'node:assert/strict';
 import { execSync } from 'node:child_process';
 import http from 'node:http';
@@ -145,9 +145,9 @@ if (!axeSrc && SKIP) {
 await step('CSP: اتصال فقط به سرورِ همین نسخه — میزبانِ دیگر بسته است', async () => {
   const { pg } = await open(390);
   const api = await pg.evaluate(() => window.TohidApiConfig.baseUrl());
-  await pg.route(`${api}/**`, (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
-  await pg.route('https://evil.example/**', (r) => r.fulfill({ status: 200, body: 'leak' }));
-  await pg.route(/^http:\/\/192\.168\.0\.102:4700\//, (r) => r.fulfill({ status: 200, body: 'leak' }));
+  await pg.route(`${api}/**`, closeSafeRoute((r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{}' })));
+  await pg.route('https://evil.example/**', closeSafeRoute((r) => r.fulfill({ status: 200, body: 'leak' })));
+  await pg.route(/^http:\/\/192\.168\.0\.102:4700\//, closeSafeRoute((r) => r.fulfill({ status: 200, body: 'leak' })));
   const out = await pg.evaluate(async (api) => {
     const blocked = [];
     document.addEventListener('securitypolicyviolation', (e) => blocked.push(e.blockedURI));
