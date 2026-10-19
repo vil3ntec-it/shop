@@ -59,6 +59,8 @@ CREATE TABLE IF NOT EXISTS store_phone_revocations (
   updated_at     bigint  NOT NULL
 );
 
---  «سفارش‌های من» ِ هر ویترین با همین شماره
-CREATE INDEX IF NOT EXISTS ix_online_orders_storefront_phone
-  ON online_orders(shop_id, customer_phone, created_at DESC) WHERE source = 'storefront';
+--  «سفارش‌های من» ِ هر ویترین با همین شماره: نمایهٔ `ix_online_orders_storefront_phone`
+--  ِ ‎115_market_customer_orders.sql‎ (customer_phone, created_at DESC) همین را هم
+--  می‌پوشاند (سفارش‌های یک شماره اندک‌اند؛ shop_id فیلتر می‌شود). ⛔ پیش‌تر این‌جا
+--  نمایه‌ای با **همان نام** و ستون‌های دیگر بود ⇒ با IF NOT EXISTS یکی از دو بی‌صدا
+--  ساخته نمی‌شد؛ برداشته شد.

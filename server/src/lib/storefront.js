@@ -450,6 +450,21 @@ async function productDetail(shopId, productId) {
 }
 
 /**
+ * همان کالاهای کاتالوگ با شناسه (حداکثر ۱۰۰) — برای تازه کردنِ قیمت و «هنوز در
+ * ویترین» ِ سبدِ مهمان و «خرید دوباره» (WEB-12، ۳۲.۳). نبودن ⇒ در فهرست نیست.
+ */
+async function catalogByIds(shopId, raw) {
+  const ids = [...new Set(String(raw || '').split(',').map((s) => s.trim()).filter((s) => PRODUCT_ID_RE.test(s)))].slice(0, MAX_PAGE);
+  if (!ids.length) return { items: [], nextCursor: null };
+  const rows = await many(
+    `SELECT ${PRODUCT_COLS} FROM ${PRODUCT_FROM}
+      WHERE sp.shop_id = $1 AND sp.product_id = ANY($2::text[]) AND sp.published AND ${LIVE_PRODUCT}`,
+    [shopId, ids]
+  );
+  return { items: rows.map(productView).filter((p) => p.priceMinor !== null && p.name), nextCursor: null };
+}
+
+/**
  * عکسِ کالای منتشرشده — یا null. `size` = `display` (صفحهٔ کالا) یا `thumb`
  * (کارت): اول نسخهٔ همان اندازه از بانکِ تصاویر (پرچمِ دکان)، وگرنه عکسِ
  * همگام‌شدهٔ امروز.
@@ -1178,10 +1193,12 @@ function slugFromHost(host) {
 
 module.exports = {
   FLAG_KEY, FEATURE_KEY, SLUG_RE, RESERVED,
-  normalize, slugOf, slugFromHost, stateOf, open, profile, categories, catalog, photo,
+  normalize, slugOf, slugFromHost, stateOf, open, profile, categories, catalog, catalogByIds, photo,
   highlights, productDetail, reorder, ordersOfPhone, verifiedPhone,
   localParts, presenceOf, statusOf,
   parseCheckout, checkout, track, cancel, tokenOf, orderIdOf,
   K_ANON, ticketOf, parseTicket, verifiedPhoneOfTicket, verificationAvailable, startVerification, checkVerification, myOrders,
   settingsOf, saveSettings, declarePresence, staffProducts, setProduct,
+  //  بازارچه (`lib/market.js`) همان دروازهٔ کالا را می‌خواند، نه نسخهٔ دومی از آن
+  PRODUCT_FROM, PRODUCT_COLS, LIVE_PRODUCT, SQL_NAME, productView,
 };

@@ -63,6 +63,8 @@ router.get('/:slug', readLimit, store, wrap(async (req, res) => {
   res.json({
     store: { ...sf.profile(req.store, cats, status), delivery },
     verification: { available: await sf.verificationAvailable() },
+    //  پیوندِ «بازارچه» فقط وقتی بازارچه باز است (پرچمِ `market.directory`)
+    market: { available: await require('../lib/market').directoryOn() },
   });
 }));
 
@@ -82,9 +84,17 @@ router.get('/:slug/slots', readLimit, store, wrap(async (req, res) => {
 }));
 
 router.get('/:slug/products', readLimit, store, wrap(async (req, res) => {
-  res.json(await sf.catalog(req.store.shop_id, {
-    q: req.query.q, category: req.query.category, cursor: req.query.cursor, limit: req.query.limit,
-  }));
+  const out = req.query.ids !== undefined
+    ? await sf.catalogByIds(req.store.shop_id, req.query.ids)
+    : await sf.catalog(req.store.shop_id, {
+      q: req.query.q, category: req.query.category, cursor: req.query.cursor, limit: req.query.limit,
+    });
+  //  ۳۲.۳: با پرچمِ `shop.catalog` وضعیتِ موجودی از دفترِ سرور (#263)؛ خاموش ⇒ null
+  //  و همان «در حال بررسی». موجودیِ نامعلوم/کهنه هرگز «موجود» نیست (`badgeOf`).
+  const stock = out.items.length
+    ? await require('../lib/catalog').publicStock(req.store.shop_id, out.items.map((p) => p.id)) : null;
+  if (stock) out.items = out.items.map((p) => ({ ...p, stock: stock.get(p.id) || p.stock }));
+  res.json(out);
 }));
 
 //  ── WEB-08: صفحهٔ کالا ───────────────────────────────────────────────

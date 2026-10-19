@@ -278,6 +278,11 @@ const config = {
      *  این سقف جمع کردنِ همهٔ خانه‌های لبه برای برازشِ مرکز را هم کند می‌کند.
      */
     storeLocateDailyMax: num(process.env.RATE_STORE_LOCATE_DAILY_MAX, 60),
+    //  بازارچه (`/api/market/*`): خواندن سطلِ خودش را با `generalMax` دارد؛
+    //  جست‌وجوی کالا در همهٔ دکان‌ها گران‌تر است ⇒ سطلِ تنگ‌ترِ خودش، به‌ازای IP.
+    //  بازبینیِ امنیتی: ۳۰۰ ⇒ ۶۰ در ربع ساعت، و سقفِ ضربه‌ای در دقیقه
+    marketSearchMax: num(process.env.RATE_MARKET_SEARCH_MAX, 60),
+    marketSearchBurstMax: num(process.env.RATE_MARKET_SEARCH_BURST_MAX, 10),
   },
 
   /**
@@ -300,6 +305,18 @@ const config = {
     accountTicketMaxMs: num(process.env.STORE_ACCOUNT_TICKET_MAX_MIN, 10) * 60 * 1000,
     //  CHK-02 — نشستِ حسابِ مشتری (لغوشدنی) چند روز می‌ماند
     customerSessionDays: num(process.env.STORE_CUSTOMER_SESSION_DAYS, 180),
+  },
+
+  /**
+   * بازارچه (`lib/market.js`، پرچمِ `market.directory`). نتیجهٔ دروازهٔ هر دکان
+   * (پرچم‌ها و اشتراک) این‌قدر در حافظه می‌ماند؛ «روشن»، «فعال» و «در فهرست»
+   * همیشه زنده خوانده می‌شوند. ۰ ⇒ بی حافظه.
+   */
+  market: {
+    gateCacheMs: num(process.env.MARKET_GATE_CACHE_MS, 30 * 1000),
+    //  «برشِ» دکان‌های در فهرست (شمارِ کالا، دیدهٔ دستگاه، نمایهٔ جست‌وجو) — یک‌پرواز.
+    //  «روشن»، «فعال» و «در فهرست» باز هم در هر درخواست زنده سنجیده می‌شوند.
+    eligibleCacheMs: num(process.env.MARKET_ELIGIBLE_CACHE_MS, 30 * 1000),
   },
 
   // CORS_ORIGIN چند دامنه را با کاما می‌پذیرد. برنامه‌ی اندروید به CORS
