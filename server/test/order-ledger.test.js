@@ -368,28 +368,45 @@ test('سفارشِ آزمایشی سند نمی‌سازد', async () => {
   assert.equal((await serverOps(a.shopId)).n, 0);
 });
 
-test('لایهٔ موجودیِ سرور (#263): رزروِ کسرِ قطعی‌شده ⇒ سهمِ قلمِ W از پیش ثبت می‌شود', async () => {
+test('لایهٔ موجودیِ سرور (#263، shop.catalog): کسرِ قطعیِ رزرو + فاکتورِ W ⇒ موجودیِ سرور یک بار کم می‌شود؛ برگشت یک بار برمی‌گردد', async () => {
   const a = await shopWithStock('کاتالوگ');
-  //  جدول‌های 083 ِ #263؛ اگر آن PR ادغام شده باشد، همین‌ها پیش‌تر ساخته شده‌اند
-  await query(`CREATE TABLE IF NOT EXISTS stock_reservations (
-    id text PRIMARY KEY, shop_id text NOT NULL, order_id text NOT NULL, line_no integer NOT NULL,
-    product_id text NOT NULL, branch_id text NOT NULL DEFAULT '', qty_milli bigint NOT NULL,
-    status text NOT NULL DEFAULT 'held', expires_at bigint, created_at bigint NOT NULL, closed_at bigint,
-    close_reason text NOT NULL DEFAULT '')`);
-  await query(`CREATE TABLE IF NOT EXISTS stock_sources (
-    shop_id text NOT NULL, source_key text NOT NULL, product_id text NOT NULL, posted_milli bigint NOT NULL DEFAULT 0,
-    rev integer NOT NULL DEFAULT 0, updated_at bigint NOT NULL, PRIMARY KEY (shop_id, source_key, product_id))`);
-  const order = await newOrder(a);
-  await walk(a, order.id, ['accepted', 'picking', 'packed', 'ready_for_pickup']);
-  //  همان چیزی که `stock.commit` ِ #263 در قلّابِ گذار پیش از این قلّاب می‌گذارد
-  await query(
-    `INSERT INTO stock_reservations (id, shop_id, order_id, line_no, product_id, qty_milli, status, created_at, closed_at, close_reason)
-     VALUES ($1,$2,$3,1,'p-rice',1500,'committed',$4,$4,'fulfilled')`,
-    [newId('res'), a.shopId, order.id, now()]
+  await setFlag(a.shopId, 'shop.catalog', true);
+  const catalog = require('../src/lib/catalog');
+  const onHand = async () => Number((await one(
+    `SELECT COALESCE(SUM(on_hand_milli), 0) AS n FROM stock_levels WHERE shop_id=$1 AND product_id='p-rice'`, [a.shopId]
+  )).n);
+  const moves = (type) => many(
+    `SELECT source, qty_milli FROM stock_moves WHERE shop_id=$1 AND product_id='p-rice' AND type=$2 ORDER BY created_at, id`,
+    [a.shopId, type]
   );
-  await walk(a, order.id, ['picked_up']);
-  const pre = await many('SELECT source_key, product_id, posted_milli, rev FROM stock_sources WHERE shop_id=$1', [a.shopId]);
+
+  //  ساختِ سفارش ⇒ #263 دفترِ دستگاه را می‌خواند (۱۰ کیلو) و ۱٫۵ را رزرو می‌کند
+  const order = await newOrder(a);
+  assert.equal(await onHand(), 10000);
+  await walk(a, order.id, TO_PICKED_UP);
+  const committed = await many(
+    `SELECT line_no, qty_milli FROM stock_reservations WHERE shop_id=$1 AND order_id=$2 AND status='committed'`,
+    [a.shopId, order.id]
+  );
+  assert.deepEqual(committed.map((r) => [Number(r.line_no), Number(r.qty_milli)]), [[1, 1500]], 'کسرِ قطعیِ #263');
+
+  //  پیش‌ثبت = همان کلید و همان معنای `ingestTx`: si:<قلم> و posted_milli = want = −مقدار
+  const pre = await many('SELECT source_key, product_id, posted_milli, rev FROM stock_sources WHERE shop_id=$1 AND source_key LIKE $2',
+    [a.shopId, 'si:w-%']);
   assert.deepEqual(pre.map((r) => [r.source_key, r.product_id, Number(r.posted_milli), Number(r.rev)]),
-    [[`si:w-${order.id}-1`, 'p-rice', -1500, 0]],
-    'خواندنِ دفترِ دستگاه (ingest) برای این قلم تفاوتِ صفر می‌بیند؛ قلمِ آزاد سهمی ندارد');
+    [[`si:w-${order.id}-1`, 'p-rice', -1500, 0]], 'قلمِ آزاد سهمی ندارد');
+
+  //  خواندنِ دوباره و کاملِ دفترِ دستگاه (همان که دکمهٔ «تازه کردن» و هر سفارشِ بعدی می‌زند)
+  for (let i = 0; i < 2; i++) await catalog.refresh(a.shopId, { full: true });
+  assert.equal(await onHand(), 8500, 'یک بار کم شد، نه دو بار');
+  assert.deepEqual((await moves('sale')).map((m) => [m.source, Number(m.qty_milli)]), [['order', 1500]],
+    'فروشِ W از دفترِ دستگاه حرکتِ دومی نساخت');
+
+  //  بازپرداختِ کامل ⇒ سندِ برگشتِ W ⇒ ingest یک بار برمی‌گرداند
+  await walk(a, order.id, ['return_requested', 'refunded_full']);
+  for (let i = 0; i < 2; i++) await catalog.refresh(a.shopId, { full: true });
+  assert.equal(await onHand(), 10000);
+  assert.deepEqual((await moves('customer_return')).map((m) => [m.source, Number(m.qty_milli)]), [['device', 1500]]);
+  //  موجودیِ دستگاه هم همان
+  assert.equal(deviceStock(await devicePull(a.token, DEV_B), 'p-rice'), 10);
 });
