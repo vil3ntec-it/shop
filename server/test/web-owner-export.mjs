@@ -16,7 +16,7 @@
  * ⚠️ دادهٔ این‌جا ساختگی است — هیچ دادهٔ دکانِ واقعی در آزمون نیست.
  */
 import { createRequire } from 'node:module';
-import { missingTool, PLAYWRIGHT_INSTALL } from './browser-guard.mjs';
+import { missingTool, PLAYWRIGHT_INSTALL, closeSafeRoute } from './browser-guard.mjs';
 import assert from 'node:assert/strict';
 import { execSync } from 'node:child_process';
 import http from 'node:http';
@@ -73,7 +73,7 @@ const pg = await browser.newPage({ viewport: { width: 1366, height: 800 }, accep
 const errors = [];
 pg.on('pageerror', (e) => errors.push(String(e)));
 //  بیرون از خودِ برنامه هیچ درخواستی نمی‌رود (فونت، سرور…) — مثلِ گوشیِ بی اینترنت
-await pg.route((u) => !u.href.startsWith(origin), (r) => r.abort());
+await pg.route((u) => !u.href.startsWith(origin), closeSafeRoute((r) => r.abort()));
 await pg.goto(`${origin}/index.html`);
 await pg.evaluate((d) => {
   localStorage.setItem('tohid-shop-auth-v1', JSON.stringify({ method: 'local', value: '', name: 'آزمون', loginAt: 1 }));
