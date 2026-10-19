@@ -15,7 +15,7 @@
  */
 const BETA = /\/beta\/sw\.js$/.test(self.location.pathname);
 const BETA_PATH = new URL('./beta/', self.location).pathname;
-const VERSION = (BETA ? 'beta-' : '') + 'tohid-shop-v53';
+const VERSION = (BETA ? 'beta-' : '') + 'tohid-shop-v54';
 const SHELL_CACHE = VERSION + '-shell';
 const FONT_CACHE = VERSION + '-fonts';
 
@@ -63,6 +63,8 @@ const SHELL_ASSETS = [
   './license/text-core.js',
   './license/calendar-core.js',
   './license/photo-studio.js',
+  './license/image-bank.js',
+  './license/image-bank.css',
   //  جای دفتر (localStorage یا IndexedDB) — بی آن، دفترِ IndexedDB روی نصبِ آفلاین باز نمی‌شد
   './license/ledger-store.js',
   //  خروجیِ کاملِ مالک (OPS-08) — بی اینترنت هم باید کار کند
