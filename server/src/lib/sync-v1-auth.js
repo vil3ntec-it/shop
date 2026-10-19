@@ -33,7 +33,7 @@ function appAlias(raw) {
 async function resolveToken(token) {
   if (!token || typeof token !== 'string' || token.length < 20) return null;
 
-  const row = await tokens.verify(token, 'access', null);
+  const row = await tokens.verify(token, 'access', null, { anyScope: true });
   if (row) {
     const user = await one('SELECT id, status FROM users WHERE id=$1', [row.subject_id]);
     if (!user || user.status !== 'active') return null;
@@ -50,9 +50,13 @@ async function resolveToken(token) {
         userId: user.id, role: m.role, via: 'user',
       };
     }
+    //  ⛔ DLV-01 (§۳.۱۱): توکنِ پیک — یا عضوی که نقشش پیک است — به دفترِ دکان
+    //  راه ندارد: pull، snapshot، push، v3 و سوکتِ زنده همه بسته‌اند.
+    if (row.scope) return { app, accountKind: 'shop', accountId: '', userId: user.id, role: '', via: 'user', missing: 'courier_scope' };
     //  دکانِ برگزیدهٔ همین نشست، اگر برگزیده (مهاجرتِ ۰۹۷)
     const m = await require('./shops').membershipOf(user.id, { shopId: row.shop_id || null });
     if (!m) return { app, accountKind: 'shop', accountId: '', userId: user.id, role: '', via: 'user', missing: 'no_shop' };
+    if (m.role === 'courier') return { app, accountKind: 'shop', accountId: '', userId: user.id, role: m.role, via: 'user', missing: 'courier_scope' };
     return {
       app, accountKind: 'shop', accountId: m.shop_id, accountName: m.shop_name || '',
       userId: user.id, role: m.role, via: 'user',
@@ -89,6 +93,9 @@ async function requireSyncAccount(req, res, next) {
       return next(unauthorized('نشست شما منقضی شده است، دوباره وارد شوید', 'invalid_token'));
     }
     if (!ctx.accountId) {
+      if (ctx.missing === 'courier_scope') {
+        return next(forbidden(require('../middleware/auth').COURIER_SCOPE_MESSAGE, 'courier_scope'));
+      }
       return next(forbidden(
         ctx.missing === 'no_station' ? 'برای این حساب پمپی ثبت نشده است' : 'برای این حساب دکانی ثبت نشده است',
         ctx.missing || 'no_account'

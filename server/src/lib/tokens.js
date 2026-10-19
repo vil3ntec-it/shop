@@ -22,14 +22,35 @@ async function issue({ kind, subjectId, deviceId = null, ttlMs, app = 'shop', ap
   const token = generateToken();
   const issuedAt = now();
   const expiresAt = issuedAt + ttlMs;
+  const scope = (kind === 'access' || kind === 'refresh') ? await scopeFor(subjectId, app) : '';
   //  `shopId`: دکانِ برگزیدهٔ نشست (مهاجرتِ ۰۹۷) — تهی یعنی «همان قاعدهٔ همیشگی»
   await query(
-    `INSERT INTO tokens (token_hash, kind, subject_id, device_id, issued_at, expires_at, app, app_version, shop_id)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-    [hashToken(token), kind, subjectId, deviceId, issuedAt, expiresAt, app, String(appVersion || '').slice(0, 32), shopId || null]
+    `INSERT INTO tokens (token_hash, kind, subject_id, device_id, issued_at, expires_at, app, app_version, scope, shop_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+    [hashToken(token), kind, subjectId, deviceId, issuedAt, expiresAt, app, String(appVersion || '').slice(0, 32), scope, shopId || null]
   );
   if (kind === 'access' || kind === 'refresh') await rememberApp(subjectId, app, issuedAt);
-  return { token, expiresAt, app };
+  return { token, expiresAt, app, scope };
+}
+
+/**
+ * دامنهٔ توکن — DLV-01، v3 §۳.۱۱.
+ *
+ * عضوِ فعالِ دکان با نقشِ «پیک» توکنِ `scope='courier'` می‌گیرد که فقط
+ * `/api/courier/*` را باز می‌کند. ⛔ دامنه این‌جا از **عضویتِ همین لحظه**
+ * ساخته می‌شود، نه از درخواست — پس هر راهِ ورود (رمز، کدِ ایمیل، گوگل، کدِ
+ * شاگرد) و هر تازه‌سازی همان دامنه را می‌گیرد و هیچ مسیری نمی‌تواند توکنِ
+ * پیک را «پهن» کند. نقش که عوض شود، تازه‌سازیِ بعدی دامنهٔ تازه را می‌دهد.
+ */
+const COURIER_SCOPE = 'courier';
+
+async function scopeFor(subjectId, app) {
+  if ((app || 'shop') !== 'shop') return '';
+  const r = await one(
+    `SELECT 1 AS x FROM shop_members WHERE user_id=$1 AND status='active' AND role='courier' LIMIT 1`,
+    [String(subjectId || '')]
+  );
+  return r ? COURIER_SCOPE : '';
 }
 
 /**
@@ -65,7 +86,7 @@ async function rememberApp(subjectId, app, at) {
  * `app = null` یعنی «هر بخشی» و فقط برای کارهای درونیِ خودِ سرور
  * (مثلِ باطل کردن) به کار می‌رود، نه برای مسیرها.
  */
-async function verify(token, kind, app = 'shop') {
+async function verify(token, kind, app = 'shop', { anyScope = false } = {}) {
   if (typeof token !== 'string' || token.length < 20) return null;
   const row = await one(
     'SELECT * FROM tokens WHERE token_hash = $1 AND kind = $2',
@@ -76,6 +97,10 @@ async function verify(token, kind, app = 'shop') {
   if (Number(row.expires_at) < now()) return null;
   //  توکنِ مدیر بخش ندارد؛ پنل یکی است و بالای هر دو می‌نشیند
   if (app !== null && kind !== 'admin' && (row.app || 'shop') !== app) return null;
+  //  توکنِ دامنه‌دار (پیک) برای هر خواننده‌ای که دامنه نمی‌شناسد «نیست» —
+  //  پیش‌فرض بسته. فقط نگهبان‌هایی که خودشان دامنه را می‌سنجند
+  //  (`middleware/auth.js`، `sync-v1-auth.js`) `anyScope` می‌دهند.
+  if (row.scope && !anyScope) return null;
   return row;
 }
 
@@ -239,6 +264,7 @@ function safeEqual(a, b) {
 }
 
 module.exports = {
+  COURIER_SCOPE, scopeFor,
   rotateRefresh, markRotated, revokeFamily, findRefresh, GRACE_MS,
   generateToken, hashToken, issue, verify, revoke,
   revokeAllForSubject, revokeOthersForSubject, revokeAllForDevice, safeEqual,
