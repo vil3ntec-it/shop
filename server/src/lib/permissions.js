@@ -38,6 +38,12 @@ const MATRIX = {
   'sales.cancel':         ['owner', 'manager'],
 
   'settings.write':       ['owner', 'manager'],
+
+  //  موجودیِ سرور (v3 §۳۲، INV-08/INV-12) — پشتِ پرچمِ `shop.catalog`. جابه‌جاییِ
+  //  قفسه/انبار کارِ روزمره است؛ خراب، مرجوعی، اصلاح و شمارش دلیل و مدیر می‌خواهد.
+  'stock.view':           ['owner', 'manager', 'staff'],
+  'stock.move':           ['owner', 'manager', 'staff'],
+  'stock.adjust':         ['owner', 'manager'],
   'reports.view':         ['owner', 'manager', 'staff'],
   'audit.view':           ['owner', 'manager'],
   'backup.run':           ['owner'],
@@ -51,8 +57,10 @@ const MATRIX = {
   'orders.refund':        ['owner', 'manager'],
 
   //  تحویل و پیک (۲۲.۲ C) — پشتِ پرچمِ `shop.delivery`، پیش‌فرض خاموش.
-  //  «پیک» نقشِ عضویت نیست: عضوی است که ردیفِ فعالِ `shop_couriers` دارد و
-  //  فقط مأموریت‌های خودش را از `/api/courier` می‌بیند.
+  //  پیک عضوی است که ردیفِ فعالِ `shop_couriers` دارد و فقط مأموریت‌های خودش
+  //  را از `/api/courier` می‌بیند. نقشِ عضویتِ `courier` (DLV-01، مهاجرتِ ۱۰۲)
+  //  عمداً در هیچ سطرِ این جدول نیست: توکنش دامنهٔ `courier` دارد و جز درِ
+  //  پیک همه‌جا `403 courier_scope` می‌گیرد (`middleware/auth.js`).
   'delivery.view':        ['owner', 'manager', 'staff'],
   'delivery.assign':      ['owner', 'manager'],
   'delivery.handover':    ['owner', 'manager', 'staff'],
