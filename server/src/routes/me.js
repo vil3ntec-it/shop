@@ -15,6 +15,7 @@ const subs = require('../lib/subscriptions');
 const plans = require('../lib/plans');
 const { publicUser } = require('./auth');
 const audit = require('../lib/audit');
+const reauth = require('../lib/reauth');
 
 const router = express.Router();
 
@@ -206,6 +207,8 @@ router.put('/', async (req, res) => {
   }
 
   const claiming = phone && !req.user.phone;
+  //  شماره «راهِ ورود» است — افزودنش کارِ حساس است (بندِ ۲۱.۱، AUTH-08)
+  if (claiming) await reauth.assertFresh(req);
   if (claiming) {
     const taken = await one('SELECT id FROM users WHERE phone=$1 AND id<>$2', [phone, req.user.id]);
     if (taken) {

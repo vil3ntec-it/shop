@@ -12,6 +12,7 @@ const v = require('../lib/validate');
 const shops = require('../lib/shops');
 const staffCodes = require('../lib/staff-codes');
 const audit = require('../lib/audit');
+const { requireRecentAuth } = require('../lib/reauth');
 const subsLib = require('../lib/subscriptions');
 const { entitlementOf } = require('../lib/entitlement');
 const { permissionsOf } = require('../lib/permissions');
@@ -85,7 +86,8 @@ router.get('/members', requireShop, requirePermission('members.view'), async (re
   });
 });
 
-router.patch('/members/:id', requireShop, requirePermission('members.role'), async (req, res) => {
+//  ⛔ نقشِ کارمند = مجوزهایش ⇒ فقط از نشستِ تازه احراز‌شده (بندِ ۲۱.۱، `lib/reauth`)
+router.patch('/members/:id', requireShop, requirePermission('members.role'), requireRecentAuth, async (req, res) => {
   const id = v.id(req.params.id, { field: 'شناسه عضو' });
   const patch = {
     role: req.body?.role ? v.oneOf(req.body.role, ['manager', 'staff'], { field: 'نقش' }) : undefined,

@@ -69,6 +69,13 @@ const config = {
     accessTtlMs:  num(process.env.ACCESS_TOKEN_TTL_MIN, 60) * 60 * 1000,
     refreshTtlMs: num(process.env.REFRESH_TOKEN_TTL_DAYS, 90) * 24 * 60 * 60 * 1000,
     adminTtlMs:   num(process.env.ADMIN_TOKEN_TTL_HOURS, 12) * 60 * 60 * 1000,
+    /*
+     *  تأییدِ دوباره برای کارهای حساس (بندِ ۲۱.۱) — `lib/reauth.js`.
+     *  پنجره: چند دقیقه پس از ورود یا تأییدِ دوباره، همان نشست «تازه» است.
+     *  `AUTH_REAUTH=off` کلیدِ بازگشت است (رفتارِ پیش از این تغییر).
+     */
+    reauthWindowMs: num(process.env.REAUTH_WINDOW_MIN, 10) * 60 * 1000,
+    reauthEnforced: bool(process.env.AUTH_REAUTH, true),
   },
 
   otp: {

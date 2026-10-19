@@ -25,6 +25,7 @@ const google = require('../lib/google');
 const geo = require('../lib/geo');
 const terms = require('../lib/terms');
 const audit = require('../lib/audit');
+const reauth = require('../lib/reauth');
 const { membershipOf } = require('../lib/shops');
 const staffCodes = require('../lib/staff-codes');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
@@ -248,6 +249,8 @@ async function issueSession(user, device, ip, app = 'shop', appVersion = '') {
     ttlMs: config.tokens.refreshTtlMs, app, appVersion,
   });
   await query('UPDATE users SET last_login_at=$2 WHERE id=$1', [user.id, now()]);
+  //  ورود خودش احراز است: تا چند دقیقه کارهای حساس بی پرسشِ دوباره (`lib/reauth`)
+  await reauth.markFresh({ accessToken: access.token, ip });
   return {
     accessToken: access.token,
     accessExpiresAt: access.expiresAt,
@@ -769,11 +772,67 @@ router.post('/logout', sessionLimit, async (req, res) => {
  * نه از بدنه. پس «خروج از همه» در برنامهٔ دکان نشستِ پمپِ همان آدم را
  * دست نمی‌زند و برعکس — همان قاعدهٔ «دو بخش، دو دفتر».
  */
-router.post('/logout-all', requireAnyUser, async (req, res) => {
+router.post('/logout-all', requireAnyUser, reauth.requireRecentAuth, async (req, res) => {
   const app = req.appSection || 'shop';
   const n = await tokens.revokeAllForSubject(req.user.id, null, app);
   await audit.log({ actorType: 'user', userId: req.user.id, action: 'auth.logout_all', detail: { sessions: n, app } });
   res.json({ ok: true, sessions: n, app });
+});
+
+/* ---------- تأییدِ دوبارهٔ هویت برای کارهای حساس (بندِ ۲۱.۱) ---------- */
+
+/** مقصدِ کدِ تأییدِ دوباره: ایمیلِ حساب، وگرنه شمارهٔ آن. */
+function reauthDestination(user) {
+  return user.email || user.phone || '';
+}
+
+/**
+ *  کد برای تأییدِ دوباره — فقط به ایمیل/شمارهٔ **خودِ حساب**، با
+ *  `purpose='reauth'`؛ نه برای ورود کار می‌کند و نه برای بازیابی.
+ */
+router.post('/reauth/code', requireAnyUser, sessionLimit, async (req, res, next) => {
+  const to = reauthDestination(req.user);
+  if (!to) return next(badRequest('این حساب ایمیل یا شماره ندارد که کد به آن برود', 'no_destination'));
+  const out = await otp.request(to, { purpose: 'reauth', ip: clientIp(req), app: req.appSection || 'shop' });
+  res.json({ ok: true, sent: true, resendSeconds: Math.ceil(config.otp.resendMs / 1000), ...(out.devCode ? { devCode: out.devCode } : {}) });
+});
+
+/**
+ *  تأییدِ دوباره با رمز یا کد. موفق ⇒ همین نشست تا چند دقیقه «تازه» است.
+ *  همان قفلِ تلاشِ ناموفقِ ورود، پس راهِ تازه‌ای برای حدس زدنِ رمز نیست.
+ */
+router.post('/reauth', requireAnyUser, sessionLimit, async (req, res, next) => {
+  const user = req.user;
+  const ip = clientIp(req);
+  const password = typeof req.body?.password === 'string' ? req.body.password : '';
+  const code = String(req.body?.code || '').trim();
+  let method = '';
+  if (password) {
+    const id = user.email || user.phone || user.id;
+    await assertNotLocked('user', id, ip);
+    let ok = false;
+    if (user.password_hash) ok = await pw.verifyPassword(password, user.password_hash);
+    else await pw.burnTime(password);
+    await noteAttempt('user', id, ip, ok);
+    if (!ok) return next(unauthorized('رمز درست نیست', 'bad_credentials'));
+    method = 'password';
+  } else if (code) {
+    const to = reauthDestination(user);
+    await assertNotLocked('otp', to, ip);
+    try {
+      await otp.verify(to, code, { purpose: 'reauth' });
+    } catch (err) {
+      await noteAttempt('otp', to, ip, false);
+      return next(err);
+    }
+    await noteAttempt('otp', to, ip, true);
+    method = 'code';
+  } else {
+    return next(badRequest('رمز یا کد لازم است', 'reauth_proof_required'));
+  }
+  await reauth.markFresh({ tokenHash: req.tokenRow.token_hash, ip });
+  await audit.log({ actorType: 'user', userId: user.id, action: 'auth.reauth', detail: { method }, ip });
+  res.json({ ok: true, freshUntil: await reauth.freshUntil(req.tokenRow.token_hash) });
 });
 
 /** گذاشتن یا عوض کردن رمز عبور (برای کسی که با کد وارد شده). */
@@ -782,6 +841,9 @@ router.post('/password', requireAnyUser, async (req, res, next) => {
   const weak = pw.checkStrength(next_);
   if (weak) return next(badRequest(weak, 'weak_password'));
 
+  //  ⛔ حسابِ بی‌رمز «رمزِ فعلی» ندارد که ثابتش کند؛ بی این، هر کسی با یک
+  //  نشستِ باز رمز می‌گذاشت و حساب را از آنِ خودش می‌کرد (بندِ ۲۱.۱)
+  if (!req.user.password_hash) await reauth.assertFresh(req);
   if (req.user.password_hash) {
     const current = typeof req.body?.currentPassword === 'string' ? req.body.currentPassword : '';
     const ok = await pw.verifyPassword(current, req.user.password_hash);
