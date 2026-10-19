@@ -130,6 +130,15 @@ data class Sale(
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val changeMinor: Long? = null,
+  /**
+   *  کانالِ فروش (ORD-20): `online` برای فاکتورِ سریِ `W` که سرور هنگامِ
+   *  تحویلِ سفارشِ اینترنتی در دفترِ دکان می‌گذارد؛ فاکتورِ صندوق `null`
+   *  است (گزارش آن را «حضوری» می‌خواند — `ReportLedger`). مثلِ `series`
+   *  هرگز `null` نوشته نمی‌شود تا فاکتورهای قدیمی opِ تازه نسازند.
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val channel: String? = null,
 )
 
 /**
@@ -150,6 +159,17 @@ data class SalePayment(
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val verification: String? = null,
 )
+
+/**
+ *  فاکتورِ سفارشِ اینترنتی (سریِ `W`، ORD-20) — سرور آن را هنگامِ تحویل
+ *  می‌سازد. صندوق آن را لغو یا «اصلاح در سبد» نمی‌کند (یعنی دوباره نمی‌زند)؛
+ *  برگشتِ کاملش از بخشِ «سفارش‌ها» (بازپرداخت) سندِ برگشت می‌سازد.
+ *  مرجوعیِ قلم‌به‌قلم در دکان مثلِ هر فاکتورِ دیگر مجاز است.
+ */
+fun Sale.isOnlineOrder(): Boolean = channel == "online" || series?.trim() == ONLINE_SERIES
+
+/** سریِ سرور برای سفارشِ اینترنتی — هیچ دستگاهی آن را نمی‌گیرد (`server/src/lib/doc-series.js`) */
+const val ONLINE_SERIES = "W"
 
 /**
  *  شمارهٔ نمایشیِ فاکتور — `B1-154` (F0-03)، یا همان `154` برای فاکتورِ بی سری؛
