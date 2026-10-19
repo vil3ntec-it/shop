@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.ManageSearch
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.ShoppingBasket
+import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.filled.WorkspacePremium
 import ir.vil3ntec.tohid.ui.theme.Shop
 
@@ -87,6 +88,16 @@ fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
         subtitle = "همه‌چیز یک‌جا: فروش، صندوق، هشدارها، دستگاه‌ها و کارمندان",
         onClick = { onOpen("admin") },
       )
+      //  ویترین (فاز ۴): فقط وقتی سرور روشنش کرده و کاربر صاحب/مدیر است
+      if (StorefrontGate.visible) {
+        MoreCard(
+          title = "ویترینِ اینترنتی",
+          icon = Icons.Filled.Storefront,
+          tint = Shop.colors.primary,
+          subtitle = "نشانی، ساعتِ کاری، کالاهای آنلاین و وضعیتی که مشتری می‌بیند",
+          onClick = { onOpen("storefront") },
+        )
+      }
       MoreCard(
         title = "دستگاه‌های جانبی",
         icon = Icons.Filled.Devices,
