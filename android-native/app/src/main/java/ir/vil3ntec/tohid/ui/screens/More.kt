@@ -23,11 +23,13 @@ import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Devices
+import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.ManageSearch
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.ReceiptLong
+import androidx.compose.material.icons.filled.ShoppingBasket
 import androidx.compose.material.icons.filled.WorkspacePremium
 import ir.vil3ntec.tohid.ui.theme.Shop
 
@@ -41,6 +43,7 @@ fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
   val prefs = remember { context.getSharedPreferences("tohid", android.content.Context.MODE_PRIVATE) }
   //  شاگرد این ردیف‌ها را اصلاً نمی‌بیند
   val canManage = remember { ir.vil3ntec.tohid.data.ShopRole.canOpenSettings(context) }
+  LaunchedEffect(Unit) { ir.vil3ntec.tohid.data.ShopChatSync.refreshConfig(context) }
 
   // آدرس مخزنِ به‌روزرسانی ثابت است و به کاربر نشان داده نمی‌شود؛ فقط
   // برای عیب‌یابی می‌شود با همین کلید در تنظیماتِ برنامه عوضش کرد.
@@ -68,6 +71,14 @@ fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
     Panel {
       // قرض‌داران و محصولات از اینجا رفتند به نوارِ پایین، و انبار و
       // گزارش جایشان آمدند
+      //  «سفارش‌ها» فقط وقتی سرور برای این دکان روشن گفته (پیش‌فرض خاموش)
+      if (ir.vil3ntec.tohid.ui.OrdersLive.enabled) MoreCard(
+        title = "سفارش‌ها" + ir.vil3ntec.tohid.ui.OrdersLive.newCount.let { if (it > 0) " ($it تازه)" else "" },
+        icon = Icons.Filled.ShoppingBasket,
+        tint = Shop.colors.primary,
+        subtitle = "صفِ سفارش‌های آنلاین، تلفنی، تلگرام و واتس‌اپ",
+        onClick = { onOpen("orders") },
+      )
       MoreCard(
         title = "مرکزِ مدیریت",
         icon = Icons.Filled.AdminPanelSettings,
@@ -164,6 +175,17 @@ fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
         tint = Shop.colors.warning,
         subtitle = "روزهای مانده، دستگاه‌ها، پرداخت‌ها و پیام‌های مدیر",
         onClick = { onOpen("myplan") },
+      )
+      /*
+       *  گفت‌وگو با مشتری (v3 §۳۳) — ⛔ فقط وقتی سرور برای همین دکان پرچمِ
+       *  `shop.chat` را روشن گفته. خاموش ⇒ نه ردیف و نه دکمه‌ای بی‌اثر.
+       */
+      if (ir.vil3ntec.tohid.data.ShopChatSync.config.value?.enabled == true) MoreCard(
+        title = "گفت‌وگو با مشتری",
+        icon = Icons.Filled.Forum,
+        tint = Shop.colors.accent,
+        subtitle = "پیام‌های مشتریانِ ویترین دربارهٔ سفارش‌ها",
+        onClick = { onOpen("chat") },
       )
       MoreCard(
         title = "پشتیبانی",
