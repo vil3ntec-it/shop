@@ -17,7 +17,7 @@
  *     axe-core روشن و تاریک، JS ِ هر صفحه زیرِ ۷۵KB، و هیچ پیوندی به برنامهٔ مدیریت.
  */
 import { createRequire } from 'node:module';
-import { missingTool, PLAYWRIGHT_INSTALL, SKIP } from './browser-guard.mjs';
+import { missingTool, PLAYWRIGHT_INSTALL, SKIP, closeSafeRoute } from './browser-guard.mjs';
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -312,12 +312,12 @@ await dark.close();
 {
   const c2 = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'fa-AF' });
   const p2 = await c2.newPage(); watch(p2);
-  await p2.route(`**/api/store/${ga.slug}`, async (route) => {
+  await p2.route(`**/api/store/${ga.slug}`, closeSafeRoute(async (route) => {
     const res = await route.fetch();
     const j = await res.json();
     j.verification = { available: false };
     await route.fulfill({ response: res, json: j });
-  });
+  }));
   await p2.goto(`${base}/store/${ga.slug}`);
   await p2.waitForSelector('#products li[data-id]');
   await p2.locator('#products li[data-id="rice"]').getByRole('button', { name: /افزودن/ }).click();
