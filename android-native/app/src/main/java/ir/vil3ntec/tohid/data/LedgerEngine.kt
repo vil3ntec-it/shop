@@ -268,6 +268,7 @@ object LedgerEngine {
           expiryDate = draft.expiryDate,
           productionDate = draft.productionDate,
           landedCost = landed,
+          landedCostMinor = landed?.let(StockLedger::minor),
           userId = draft.userId?.trim()?.ifEmpty { null },
         ),
         purchases = d.purchases + Purchase(

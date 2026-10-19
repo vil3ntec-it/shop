@@ -442,6 +442,7 @@ object WarehouseEngine {
           batch = draft.batch.trim(),
           productionDate = draft.productionDate.trim(),
           landedCost = draft.landedCost?.takeIf { it > 0 },
+          landedCostMinor = draft.landedCost?.takeIf { it > 0 }?.let(StockLedger::minor),
           locationId = draft.locationId?.trim()?.ifEmpty { null },
           userId = draft.userId?.trim()?.ifEmpty { null },
         ),
@@ -493,6 +494,7 @@ object WarehouseEngine {
       productionDate = draft.productionDate.trim(),
       //  فرمی که این دو را ندارد (خاموش) ⇒ همان مقدارِ قبلی
       landedCost = if (draft.landedCost != null) draft.landedCost.takeIf { it > 0 } else existing.landedCost,
+      landedCostMinor = if (draft.landedCost != null) draft.landedCost.takeIf { it > 0 }?.let(StockLedger::minor) else existing.landedCostMinor,
       locationId = if (draft.locationId != null) draft.locationId.trim().ifEmpty { null } else existing.locationId,
     )
     return Result.Ok(

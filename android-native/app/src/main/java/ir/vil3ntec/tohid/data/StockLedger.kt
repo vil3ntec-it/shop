@@ -125,23 +125,38 @@ object StockLedger {
     return if (id.isEmpty()) null else LotRef(id, prod, exp)
   }
 
-  private fun adjKindOf(w: WarehouseEntry, moveTypeByRef: Map<String, String>): String {
+  /** هزینهٔ جانبیِ ردیف به صدمِ افغانی: `landedCostMinor` (دقیق) اگر هست، وگرنه از `landedCost` */
+  fun landedMinorOf(w: WarehouseEntry): Long = w.landedCostMinor ?: minor(w.landedCost)
+
+  private fun adjKindOf(w: WarehouseEntry, moveTypeByRef: Map<String, String>, damagedReturn: Boolean): String {
     val k = w.adjKind.orEmpty()
     if (k in ADJ_KINDS) return k
     if (moveTypeByRef[w.id] == "supplier_return") return "supplier_return"
     if (w.notes.startsWith("انبارگردانی")) return "count"
+    if (damagedReturn || w.notes.startsWith(DAMAGED_RETURN_NOTE)) return "damage"
     return "other"
   }
+
+  /**
+   *  برگشتِ ضایعات (RET، #318): ردیفِ اصلاحیِ منفی + حرکتِ `damage` با همان کالا و همان
+   *  `createdAt` که `refId`ش ردیفِ برگشت است. ردیفی که `adjKind` ندارد از همین شناخته
+   *  می‌شود تا در «ضایعات»ِ دفترِ موجودی بیاید و کاربرش `by` ِ همان برگشت باشد.
+   */
+  const val DAMAGED_RETURN_NOTE = "ضایعاتِ برگشتی"
 
   /** [only]: فقط همین کالاها (سنجشِ سبد)؛ `null` یعنی همه */
   fun events(d: ShopData, only: Set<String>? = null): List<Event> {
     val out = ArrayList<Event>()
     fun want(pid: String) = only == null || pid in only
     val moveTypeByRef = HashMap<String, String>()
+    val damageRef = HashMap<String, String>()
     for (mv in d.stockMovements) {
+      if (mv.type == "damage" && mv.createdAt > 0) damageRef.putIfAbsent(mv.productId + "|" + mv.createdAt, mv.refId.orEmpty())
       val r = mv.refId ?: continue
       if (!moveTypeByRef.containsKey(r)) moveTypeByRef[r] = mv.type
     }
+    val returnBy = HashMap<String, String>()
+    for (r in d.saleReturns) r.by?.trim()?.takeIf { it.isNotEmpty() }?.let { returnBy[r.id] = it }
 
     d.warehouseEntries.forEachIndexed { i, w ->
       if (w.productId.isEmpty() || !want(w.productId)) return@forEachIndexed
@@ -149,18 +164,19 @@ object StockLedger {
       if (q == 0L) return@forEachIndexed
       val at = atOf(w.createdAt, w.date)
       val id = w.id.ifEmpty { "w#$i" }
-      val user = w.userId.orEmpty().trim().ifEmpty { LEGACY_USER }
+      val dmg = if (w.isAdjustment && q < 0 && w.adjKind.isNullOrEmpty() && w.createdAt > 0) damageRef[w.productId + "|" + w.createdAt] else null
+      val user = w.userId?.trim()?.ifEmpty { null } ?: dmg?.let { returnBy[it] } ?: LEGACY_USER
       val ref = w.purchaseId.orEmpty().ifEmpty { w.id }
       val loc = w.locationId.orEmpty()
       if (!w.isAdjustment && q > 0) {
         out += Event(
           id, "entry", "purchase_receipt", at, dayOf(w.date, at), w.productId, loc, q, user, ref,
           costMinor = max(0L, Math.round(w.units * w.price * 100.0)),
-          landedMinor = max(0L, minor(w.landedCost)),
+          landedMinor = max(0L, landedMinorOf(w)),
           lot = lotRefOf(w),
         )
       } else {
-        val kind = if (w.isAdjustment) adjKindOf(w, moveTypeByRef) else "other"
+        val kind = if (w.isAdjustment) adjKindOf(w, moveTypeByRef, dmg != null) else "other"
         val (type, qty) = when {
           kind == "supplier_return" && q < 0 -> "supplier_return" to -q
           (kind == "damage" || kind == "expired") && q < 0 -> kind to -q
@@ -226,7 +242,7 @@ object StockLedger {
         val rat = atOf(r.createdAt, r.date)
         out += Event(
           r.id.ifEmpty { "$sid:r$j" }, "return", "customer_return", rat, dayOf(r.date, rat), si.productId, loc, take,
-          r.userId.orEmpty().trim().ifEmpty { LEGACY_USER }, si.saleId,
+          r.by?.trim()?.ifEmpty { null } ?: LEGACY_USER, si.saleId,
           reason = r.reason.trim().ifEmpty { null }, lotId = pref,
         )
         left -= take

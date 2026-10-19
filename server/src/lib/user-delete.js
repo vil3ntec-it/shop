@@ -14,6 +14,12 @@
  *     پوش، پشتیبانی، خطا، بازدید…) — وگرنه دادهٔ شخصی بی‌صاحب می‌ماند.
  * بعد از تراکنش: پوشهٔ پشتیبان‌های ابریِ همان پمپ‌ها/دکان‌ها از دیسک.
  *
+ * Sync v3 (`sync_v3_*`): همان قاعدهٔ دفترِ v1 — دفترِ دکانی که مالِ خودِ حساب
+ * است کامل می‌رود (op، ردیف، تعارض، دستگاه و حالِ پل‌ها)؛ دکانِ کسِ دیگری که
+ * این حساب فقط عضوش بوده دست نمی‌خورد (دادهٔ مشترکِ دکان است، و بریدنِ نیمه‌اش
+ * cursorِ پل‌ها و نشانِ «بی حلقه» را می‌شکست) — جز شناسهٔ خودِ این کاربر در
+ * `sync_v3_conflicts.resolved_by` که خالی می‌شود.
+ *
  * چه **نمی‌رود**، عمداً:
  *   • `sub_payments` — دفترِ پولِ صاحبِ سامانه است (درآمد)، نه دادهٔ کاربر.
  *   • `audit_logs` — خودِ این حذف همان‌جا ثبت می‌شود.
@@ -27,6 +33,19 @@ const path = require('node:path');
 const { one, many, tx } = require('../db');
 const config = require('../config');
 const backups = require('./account-backups');
+
+/**
+ * همهٔ جدول‌های `sync_v3_*` که `account_id` دارند — از کاتالوگ، نه فهرستِ دستی:
+ * جدولِ تازه (مثلاً پلِ v3 ⇒ v1ِ مهاجرتِ ۰۹۳) خودبه‌خود پاک می‌شود و جدولی که
+ * هنوز ساخته نشده لازم نیست. نام فقط از کاتالوگ می‌آید و با الگو سنجیده می‌شود.
+ */
+async function syncV3Tables(c) {
+  const r = await c.query(
+    `SELECT DISTINCT table_name AS t FROM information_schema.columns
+      WHERE table_schema = current_schema() AND column_name = 'account_id' AND table_name LIKE 'sync\\_v3\\_%'
+      ORDER BY 1`);
+  return r.rows.map((x) => x.t).filter((t) => /^sync_v3_[a-z0-9_]+$/.test(t));
+}
 
 async function scope(userId) {
   const user = await one('SELECT id, email, name, status FROM users WHERE id=$1', [userId]);
@@ -99,6 +118,12 @@ async function remove(userId, { confirmEmail = '' } = {}) {
     await q('sync', 'DELETE FROM sync_devices WHERE account_id = ANY($1::text[])', [accounts]);
     await q('sync', 'DELETE FROM sync_conflicts WHERE account_id = ANY($1::text[])', [accounts]);
     await q('sync', 'DELETE FROM sync_operations WHERE user_id=$1 OR shop_id = ANY($2::text[])', [userId, shopIds]);
+    //  Sync v3: دفترِ دکان‌های خودش؛ در دکانِ دیگران فقط نامِ خودش از «بستنِ تعارض»
+    const v3 = await syncV3Tables(c);
+    for (const t of v3) await q('sync_v3', `DELETE FROM "${t}" WHERE account_id = ANY($1::text[])`, [accounts]);
+    if (v3.includes('sync_v3_conflicts')) {
+      await q('sync_v3_anonymized', "UPDATE sync_v3_conflicts SET resolved_by='' WHERE resolved_by=$1", [userId]);
+    }
     await q('codes', 'DELETE FROM station_vip_codes WHERE station_id = ANY($1::text[])', [stationIds]);
     await q('codes', 'DELETE FROM vip_codes WHERE shop_id = ANY($1::text[])', [shopIds]);
     await q('codes', 'DELETE FROM otp_codes WHERE lower(destination)=$1', [email]);
@@ -135,4 +160,4 @@ async function remove(userId, { confirmEmail = '' } = {}) {
   };
 }
 
-module.exports = { preview, remove };
+module.exports = { preview, remove, syncV3Tables };

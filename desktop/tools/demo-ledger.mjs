@@ -48,6 +48,7 @@ products.forEach((p, i) => {
 //  «دفترِ موجودی» (موتورِ تازه، فقط وقتی تنظیمش روشن شود دیده می‌شود): هزینهٔ جانبیِ یک ورود و یک
 //  انتقال به انبارِ پشتی — هر دو فیلدِ افزودنی‌اند و موجودیِ موتورِ امروز را عوض نمی‌کنند
 warehouseEntries[0].landedCost = 120;
+warehouseEntries[0].landedCostMinor = 12000;
 stockMovements.push({ id: id('m'), productId: 'p1', type: 'transfer', qty: 10, date: iso(now - 20 * day), notes: 'پر کردنِ انبارِ پشتی',
   refId: null, createdAt: now - 20 * day, userId: 'علی', reason: 'پر کردنِ انبارِ پشتی', locationId: '', toLocationId: 'انبارِ پشتی' });
 

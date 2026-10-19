@@ -173,11 +173,13 @@ object OwnerExport {
     "nextInvoiceNo" to "شمارهٔ فاکتور بعدی",
     //  موتورِ تازهٔ موجودی و بها (افزودنی، فقط وقتی تنظیمِ دکان روشن است)
     "landedCost" to "هزینهٔ جانبی",
+    "landedCostMinor" to "هزینهٔ جانبی (صدم افغانی)",
     "locationId" to "محل",
     "toLocationId" to "محلِ مقصد",
     "userId" to "کاربر",
     "adjKind" to "نوعِ اصلاح",
     "lotId" to "سری",
+    "by" to "ثبت‌کننده",
   )
 
   /** کلیدهای سرآیند — داده نیستند و برگه نمی‌شوند */
