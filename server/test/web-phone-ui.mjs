@@ -93,7 +93,17 @@ for (const width of [360, 390, 768]) {
     const { pg, ctx, errors } = await open(width);
     for (const page of ['dashboard', 'sale', 'debtors', 'products', 'more']) {
       await pg.evaluate((p) => goTo(p), page);
-      await pg.waitForTimeout(800);
+      //  پایانِ جابه‌جاییِ قرص (transition) — نه زمانِ ثابت، که روی ماشینِ کند لق می‌شود
+      await pg.waitForFunction(() => {
+        const a = document.querySelector('#bottom-nav .bn-item.active');
+        if (!a) return false;
+        const probe = document.createElement('i');
+        probe.style.background = getComputedStyle(document.documentElement).getPropertyValue('--nav-pill');
+        document.body.appendChild(probe);
+        const want = getComputedStyle(probe).backgroundColor;
+        probe.remove();
+        return getComputedStyle(a).backgroundColor === want;
+      }, null, { timeout: 5000 }).catch(() => {});
       const nav = await pg.evaluate(() => {
         const css = (el, k) => getComputedStyle(el).getPropertyValue(k).trim();
         const root = document.documentElement;
@@ -281,6 +291,172 @@ await step('حساب من: نوارِ هشدار فقط وقتی واقعی اس
   await pg.evaluate(() => { window.__vipOpened = 0; window.TohidLicense.open = () => { window.__vipOpened++; }; });
   await pg.click('#prof-notice-btn');
   assert.equal(await pg.evaluate(() => window.__vipOpened), 1);
+  await ctx.close();
+});
+
+/* ============================ سبدِ صندوق: نوار و برگهٔ تیره ============================ */
+async function posCart(pg, page = 'sale', ids = ['p1', 'p2', 'p3', 'p4']) {
+  await pg.evaluate(([pageId, list]) => {
+    //  قفلِ اشتراک (اگر هست) جلوی دیدنِ صندوق را نگیرد — آزمون چیدمان است، نه اشتراک
+    [document.documentElement, document.body].forEach(r => [...r.classList].filter(c => c.startsWith('vip-lock-')).forEach(c => r.classList.remove(c)));
+    goTo(pageId);
+    list.forEach((id, i) => addToCart(id, i === 0 ? 2 : 1));
+  }, [page, ids]);
+  await pg.waitForTimeout(400);
+}
+//  پایانِ انیمیشنِ بالا آمدنِ برگه — نه زمانِ ثابت
+const settle = (pg) => pg.waitForFunction(() => document.getAnimations().every(a => a.playState !== 'running'), null, { timeout: 3000 }).catch(() => {});
+const drawerState = (pg, prefix = '') => pg.evaluate((pre) => {
+  const d = document.getElementById(pre + 'cart-drawer');
+  const vis = (el) => !!el && getComputedStyle(el).display !== 'none' && el.getBoundingClientRect().width > 0;
+  const opener = d.querySelector('[data-cart-open]');
+  return {
+    shown: vis(d), open: d.classList.contains('open'),
+    bg: getComputedStyle(d).backgroundColor,
+    thumbs: [...d.querySelectorAll('[data-cart-thumbs] .cbar-thumb')].map(t => t.textContent.trim()),
+    more: d.querySelector('[data-cart-thumbs] .cbar-more')?.textContent.trim() || null,
+    count: d.querySelector('[data-cart-count]').textContent.trim(),
+    countShown: vis(d.querySelector('[data-cart-count]')),
+    total: d.querySelector('.cart-total strong').textContent.trim(),
+    openerShown: vis(opener), openerName: opener.getAttribute('aria-label'), expanded: opener.getAttribute('aria-expanded'),
+    finalizeShown: vis(d.querySelector('.cart-summary-bar .btn')),
+    stepShown: [...d.querySelectorAll('.cart-row-step')].filter(vis).length,
+    rows: d.querySelectorAll('[data-cart-row]').length,
+    sheetOpenBody: document.body.classList.contains('cart-sheet-open'),
+    focus: document.activeElement && (document.activeElement.hasAttribute('data-cart-close') ? 'close' : document.activeElement.hasAttribute('data-cart-open') ? 'open' : document.activeElement.tagName),
+    pill: (() => { const i = document.createElement('i'); i.style.background = getComputedStyle(document.documentElement).getPropertyValue('--sheet'); document.body.appendChild(i); const c = getComputedStyle(i).backgroundColor; i.remove(); return c; })(),
+  };
+}, prefix);
+
+for (const width of [360, 390, 768]) {
+  await step(`صندوق در ${width}: نوارِ تیرهٔ جمع‌شده — عکس/حرفِ اول، «+N»، شمار، مبلغ؛ بی بیرون‌زدگی، axe`, async () => {
+    const { pg, ctx, errors } = await open(width);
+    await pg.evaluate(() => goTo('sale'));
+    assert.equal((await drawerState(pg)).shown, false, 'سبدِ خالی ⇒ نوار نیست');
+    await posCart(pg);
+    const s = await drawerState(pg);
+    assert.ok(s.shown && !s.open, 'نوار پیدا و بسته');
+    assert.equal(s.bg, s.pill, 'زمینهٔ نوار همان --sheet');
+    assert.deepEqual(s.thumbs, ['چ', 'ص', 'ر'], 'سه قلمِ تازه‌تر، حرفِ اول');
+    assert.equal(s.more, '+1');
+    assert.equal(s.count, '4'); assert.ok(s.countShown);
+    assert.match(s.total, /740/);
+    assert.ok(s.openerShown, 'کلِ نوار یک دکمه است');
+    assert.match(s.openerName, /4 قلم، 740 افغانی/);
+    assert.equal(s.expanded, 'false');
+    assert.equal(s.finalizeShown, false, 'دکمهٔ ثبت در برگه است، نه در نوارِ جمع‌شده');
+    assert.ok(await overflow(pg) <= 0, 'بیرون‌زدگیِ افقی');
+    const v = await axe(pg, '#cart-drawer', ['color-contrast', 'button-name', 'aria-allowed-attr', 'aria-valid-attr-value']);
+    assert.deepEqual(v, []);
+    assert.deepEqual(errors, []);
+    await ctx.close();
+  });
+}
+
+await step('صندوق ۳۹۰: برگهٔ تیره — باز، − / مقدار / +، Esc، زدنِ بالا، همان پنجرهٔ پرداخت', async () => {
+  const { pg, ctx, errors } = await open(390);
+  await posCart(pg);
+  await pg.click('#cart-drawer [data-cart-open]');
+  await settle(pg);
+  let s = await drawerState(pg);
+  assert.ok(s.open && s.sheetOpenBody, 'برگه باز است');
+  assert.equal(s.expanded, 'true');
+  assert.equal(s.focus, 'close', 'تمرکز روی «بستن»');
+  assert.equal(s.stepShown, 4, 'هر ردیف − مقدار + دارد');
+  assert.ok(s.finalizeShown, 'ثبت فروش در برگه');
+  const geo = await pg.evaluate(() => {
+    const d = document.getElementById('cart-drawer').getBoundingClientRect();
+    const b = document.getElementById('btn-finalize-sale').getBoundingClientRect();
+    return { top: d.top, bottom: d.bottom, vh: innerHeight, btnW: b.width, w: d.width, btnH: b.height };
+  });
+  assert.ok(geo.bottom >= geo.vh - 1 && geo.top < geo.vh * 0.2, `برگهٔ تمام‌قد از پایین ${JSON.stringify(geo)}`);
+  assert.ok(geo.btnW >= geo.w - 40 && geo.btnH >= 48, 'دکمهٔ اصلیِ تمام‌عرض');
+  let v = await axe(pg, '#cart-drawer', ['color-contrast', 'button-name', 'aria-allowed-attr']);
+  assert.deepEqual(v, [], 'axe روی برگه');
+  //  + و − روی ردیفِ خودش، بی انتخابِ ردیف
+  const row = (id) => `#cart-drawer [data-cart-row="${id}"]`;
+  await pg.click(`${row('p3')} [data-line-step="1"]`);
+  assert.equal(await pg.evaluate(() => cart.find(c => c.productId === 'p3').quantity), 2);
+  assert.match(await pg.textContent('#cart-total-amount'), /780/);
+  assert.match(await pg.textContent(`${row('p3')} .cart-step-qty`), /2/);
+  assert.equal(await pg.evaluate(() => selectedCartId), null, 'دکمه‌های ردیف، ردیف را انتخاب نمی‌کنند');
+  await pg.click(`${row('p4')} [data-line-step="-1"]`);
+  await pg.waitForTimeout(200);
+  assert.deepEqual(await pg.evaluate(() => cart.map(c => c.productId)), ['p1', 'p2', 'p3'], '− تا صفر ردیف را برمی‌دارد');
+  //  مقدارِ نوشتنی: همان کادرِ «مقدار»ِ پیشین
+  pg.once('dialog', d => d.accept('۵'));
+  await pg.click(`${row('p2')} [data-line-qty]`);
+  await pg.waitForTimeout(200);
+  assert.equal(await pg.evaluate(() => cart.find(c => c.productId === 'p2').quantity), 5);
+  //  Esc ⇐ بسته، تمرکز به نوار
+  await pg.keyboard.press('Escape');
+  await pg.waitForTimeout(300);
+  s = await drawerState(pg);
+  assert.ok(!s.open && !s.sheetOpenBody, 'Esc برگه را بست');
+  assert.equal(s.focus, 'open', 'تمرکز به نوار برگشت');
+  //  زدنِ بالای برگه ⇐ بسته
+  await pg.click('#cart-drawer [data-cart-open]');
+  await pg.waitForTimeout(400);
+  await pg.mouse.click(195, 40);
+  await pg.waitForTimeout(300);
+  assert.equal((await drawerState(pg)).open, false, 'زدنِ صفحهٔ بالای برگه');
+  //  دکمهٔ اصلی همان پنجرهٔ پرداختِ پیشین را باز می‌کند
+  await pg.click('#cart-drawer [data-cart-open]');
+  await pg.waitForTimeout(400);
+  await pg.click('#btn-finalize-sale');
+  await pg.waitForTimeout(400);
+  assert.ok(await pg.isVisible('#form-sale-checkout'), 'پنجرهٔ پرداخت باز شد');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+await step('شب: نوار و برگهٔ سبد axe سبز', async () => {
+  const { pg, ctx } = await open(390);
+  await pg.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'));
+  await posCart(pg);
+  let v = await axe(pg, '#cart-drawer', ['color-contrast', 'button-name']);
+  assert.deepEqual(v, [], 'نوار');
+  await pg.click('#cart-drawer [data-cart-open]');
+  await pg.waitForTimeout(450);
+  v = await axe(pg, '#cart-drawer', ['color-contrast', 'button-name']);
+  assert.deepEqual(v, [], 'برگه');
+  await ctx.close();
+});
+
+await step('«انتخاب محصول» در گوشی همان نوار و برگه را دارد', async () => {
+  const { pg, ctx } = await open(390);
+  await posCart(pg, 'quick-sale', ['p1', 'p2']);
+  const s = await drawerState(pg, 'qs-');
+  assert.ok(s.shown && !s.open && s.count === '2' && s.thumbs.length === 2);
+  await pg.click('#qs-cart-drawer [data-cart-open]');
+  await pg.waitForTimeout(400);
+  assert.equal((await drawerState(pg, 'qs-')).open, true);
+  await ctx.close();
+});
+
+await step('کامپیوتر (۱۲۸۰): کشوی سبدِ پیشین بی تغییر — بی نوارِ تیره و بی − + ِ ردیف', async () => {
+  const { pg, ctx } = await open(1280);
+  await posCart(pg);
+  const s = await drawerState(pg);
+  assert.ok(s.shown);
+  assert.notEqual(s.bg, s.pill, 'زمینهٔ تیرهٔ گوشی در کامپیوتر نیست');
+  assert.equal(s.openerShown, false); assert.equal(s.countShown, false);
+  assert.ok(s.finalizeShown, '«ثبت فروش» همان‌جا در نوار');
+  await pg.click('#cart-summary-bar .cart-total');
+  await pg.waitForTimeout(300);
+  const t = await drawerState(pg);
+  assert.ok(t.open && !t.sheetOpenBody, 'زدنِ نوار همان باز شدنِ فهرست');
+  assert.equal(t.stepShown, 0, 'ردیف‌ها همان قرصِ مقدار');
+  await ctx.close();
+});
+
+await step('«کاهشِ حرکت»: برگهٔ سبد بی انیمیشن', async () => {
+  const { pg, ctx } = await open(390, { reducedMotion: 'reduce' });
+  await pg.evaluate(() => document.documentElement.removeAttribute('data-motion'));
+  await posCart(pg);
+  await pg.click('#cart-drawer [data-cart-open]');
+  const dur = await pg.evaluate(() => parseFloat(getComputedStyle(document.getElementById('cart-drawer')).animationDuration));
+  assert.ok(dur < 0.01, `animation ${dur}s`);
   await ctx.close();
 });
 

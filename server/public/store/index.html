@@ -145,8 +145,36 @@
   </section>
 </main>
 
+<!-- سبدِ گوشی (phone-ui، تصویرهای مرجعِ ۵ و ۶): نوارِ تیره وقتی سبد پُر است؛ زدنش برگهٔ تیره را باز می‌کند -->
 <div id="cart-bar" class="cart-bar" hidden>
-  <a id="open-cart" class="btn" href="#/cart">سبد</a>
+  <button id="open-cart" class="cbar" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="cart-sheet">
+    <span class="cbar-label">سبد</span>
+    <span id="cart-thumbs" class="cbar-thumbs" aria-hidden="true"></span>
+    <span id="cart-bar-total" class="cbar-total"></span>
+    <span id="cart-bar-count" class="cbar-count"></span>
+  </button>
+</div>
+<div id="cart-sheet" class="csheet" role="dialog" aria-modal="true" aria-labelledby="cart-sheet-title" hidden>
+  <div class="csheet-head">
+    <h2 id="cart-sheet-title">سبد</h2>
+    <span id="cart-sheet-count" class="csheet-muted"></span>
+    <button id="close-cart" class="csheet-close" type="button" aria-label="بستنِ سبد">×</button>
+  </div>
+  <ul id="sheet-lines" class="csheet-lines" aria-label="قلم‌های سبد"></ul>
+  <div id="sheet-delivery" class="csheet-delivery" hidden>
+    <span class="csheet-ic" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h11v9H3zM14 10h4l3 3v3h-7z"/><circle cx="7" cy="18" r="1.8"/><circle cx="17" cy="18" r="1.8"/></svg></span>
+    <div class="csheet-delivery-txt">
+      <b>ارسال</b>
+      <span id="sheet-delivery-note" class="csheet-muted"></span>
+      <div id="sheet-progress" class="csheet-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-labelledby="sheet-delivery-note" hidden><i></i></div>
+    </div>
+    <span id="sheet-delivery-fee" class="csheet-fee"></span>
+  </div>
+  <div class="csheet-total">
+    <span id="sheet-total-label" class="csheet-muted">جمعِ کالاها</span>
+    <strong id="sheet-total"></strong>
+  </div>
+  <a id="sheet-continue" class="csheet-primary" href="#/cart">ادامه</a>
 </div>
 </body>
 </html>

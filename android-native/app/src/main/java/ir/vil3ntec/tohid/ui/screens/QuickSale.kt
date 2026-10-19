@@ -92,6 +92,12 @@ fun QuickSaleScreen(
   var newCategory by rememberSaveable { mutableStateOf<String?>(null) }
   var confirmDeleteCategory by remember { mutableStateOf<String?>(null) }
   var cartOpen by rememberSaveable { mutableStateOf(false) }
+  //  phone-ui: گوشی نوار و برگهٔ تیرهٔ سبد دارد؛ تبلت همان کشوی پیشین
+  val phone = screenSize() == Screen.PHONE
+  LaunchedEffect(cart.isEmpty()) { if (cart.isEmpty()) cartOpen = false }
+  //  عکسِ خودکار (`PhoneCartShot`) — در نسخهٔ دستِ کاربر هرگز روشن نمی‌شود
+  val shotOpen = ir.vil3ntec.tohid.ui.components.pos.PhoneCartShot.open.value
+  LaunchedEffect(shotOpen) { if (shotOpen) cartOpen = true }
   var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
   var pickDebtor by rememberSaveable { mutableStateOf(false) }
   var checkout by rememberSaveable { mutableStateOf(false) }
@@ -129,7 +135,7 @@ fun QuickSaleScreen(
     LazyVerticalGrid(
       columns = GridCells.Adaptive(minSize = gridMinSize(phone = 112.dp, tablet = 140.dp)),
       modifier = Modifier.fillMaxSize(),
-      contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, if (cart.isEmpty()) 24.dp else 180.dp),
+      contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, if (cart.isEmpty()) 24.dp else if (phone) 104.dp else 180.dp),
       horizontalArrangement = Arrangement.spacedBy(8.dp),
       verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -278,7 +284,7 @@ fun QuickSaleScreen(
     }
 
     /* --------------------------- سبد پایین --------------------------- */
-    AnimatedVisibility(
+    if (!phone) AnimatedVisibility(
       visible = cart.isNotEmpty(),
       enter = slideInVertically(tween(220)) { it } + fadeIn(tween(220)),
       exit = slideOutVertically(tween(180)) { it } + fadeOut(tween(180)),
@@ -337,6 +343,24 @@ fun QuickSaleScreen(
           )
         }
       }
+    }
+
+    /* ------------- گوشی: نوار و برگهٔ تیرهٔ سبد (phone-ui) ------------- */
+    if (phone) {
+      PhoneSaleCartLayer(
+        d = d,
+        cart = cart,
+        cartDebtorId = cartDebtorId,
+        cartStore = cartStore,
+        open = cartOpen,
+        onOpen = { cartOpen = true },
+        onClose = { cartOpen = false },
+        //  «انتخاب محصول» کادرِ تعداد و قیمت نداشت — همان می‌ماند
+        onEdit = null,
+        onRemoved = { if (selectedId == it) selectedId = null },
+        onPickDebtor = { pickDebtor = true },
+        onCheckout = { checkout = true },
+      )
     }
   }
 

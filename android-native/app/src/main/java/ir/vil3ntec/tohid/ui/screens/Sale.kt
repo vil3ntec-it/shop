@@ -13,6 +13,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import ir.vil3ntec.tohid.ui.components.pos.CartSummary
+import ir.vil3ntec.tohid.ui.components.pos.PhoneCartDebtor
+import ir.vil3ntec.tohid.ui.components.pos.PhoneCartFooter
+import ir.vil3ntec.tohid.ui.components.pos.PhoneCartHeader
+import ir.vil3ntec.tohid.ui.components.pos.PhoneCartLayer
+import ir.vil3ntec.tohid.ui.components.pos.PhoneCartLine
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -80,6 +86,10 @@ fun SaleScreen(
 
   val cart by cartStore.lines.collectAsState()
   val cartDebtorId by cartStore.debtorId.collectAsState()
+  //  phone-ui: گوشی نوار و برگهٔ تیرهٔ سبد دارد (تصویرهای مرجعِ ۵ و ۶)؛ تبلت همان سبدِ پیشین
+  val phone = screenSize() == Screen.PHONE
+  var cartOpen by rememberSaveable { mutableStateOf(false) }
+  LaunchedEffect(cart.isEmpty()) { if (cart.isEmpty()) cartOpen = false }
 
   // کالای حذف‌شده نباید در سبد بماند
   LaunchedEffect(d.products.size, d.debtors.size) { cartStore.prune(d) }
@@ -280,7 +290,7 @@ fun SaleScreen(
   ) {
     LazyColumn(
       Modifier.fillMaxSize(),
-      contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, if (cart.isEmpty()) 24.dp else 200.dp),
+      contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, if (cart.isEmpty()) 24.dp else if (phone) 104.dp else 200.dp),
     ) {
       item {
         Row(
@@ -423,7 +433,8 @@ fun SaleScreen(
             EmptyNote("سبد خرید خالی است.\nبا اسکن اولین کالا، سبد خرید اینجا نمایش داده می‌شود.")
           }
         }
-      } else {
+      } else if (!phone) {
+        //  گوشی: ردیف‌ها در برگهٔ تیرهٔ سبد‌اند (`PhoneCartLayer` پایین)
         items(cart, key = { it.productId }) { line ->
           val product = d.products.find { it.id == line.productId }
           //  ردیفِ آزاد کالا ندارد ولی باید دیده شود
@@ -481,7 +492,7 @@ fun SaleScreen(
     }
 
     /* ------------------------ نوارِ پایینِ سبد ------------------------ */
-    AnimatedVisibility(
+    if (!phone) AnimatedVisibility(
       visible = cart.isNotEmpty(),
       enter = slideInVertically(tween(220)) { it } + fadeIn(tween(220)),
       exit = slideOutVertically(tween(180)) { it } + fadeOut(tween(180)),
@@ -494,6 +505,23 @@ fun SaleScreen(
         onPickDebtor = { pickDebtor = true },
         onClearDebtor = { cartStore.setDebtor(null) },
         onFinalize = { checkout = true },
+      )
+    }
+
+    /* ------------- گوشی: نوار و برگهٔ تیرهٔ سبد (phone-ui) ------------- */
+    if (phone) {
+      PhoneSaleCartLayer(
+        d = d,
+        cart = cart,
+        cartDebtorId = cartDebtorId,
+        cartStore = cartStore,
+        open = cartOpen,
+        onOpen = { cartOpen = true },
+        onClose = { cartOpen = false },
+        onEdit = { editLine = it },
+        onRemoved = { if (selectedId == it) selectedId = null },
+        onPickDebtor = { pickDebtor = true },
+        onCheckout = { checkout = true },
       )
     }
   }
@@ -611,6 +639,84 @@ fun debtStateText(d: ShopData, debtorId: String): String {
     amount > 0 -> "${money(amount)} ؋ بدهکار"
     amount < 0 -> "${money(-amount)} ؋ موجودی دارد"
     else -> "حساب صاف است"
+  }
+}
+
+/**
+ *  سبدِ گوشی برای صندوق و «انتخاب محصول» (phone-ui، تصویرهای مرجعِ ۵ و ۶).
+ *
+ *  همان داده و همان کارهای پیشین — فقط جایشان: ردیف‌ها (− مقدار +، زدنِ مقدار ⇐
+ *  کادرِ «تعداد و قیمت» اگر `onEdit` باشد)، قرض‌دار، جمع، و دکمهٔ اصلی که همان
+ *  `CheckoutDialog` را باز می‌کند. ردیفِ «ارسال» در صندوق نیست.
+ */
+@Composable
+internal fun BoxScope.PhoneSaleCartLayer(
+  d: ShopData,
+  cart: List<SalesEngine.CartLine>,
+  cartDebtorId: String?,
+  cartStore: CartStore,
+  open: Boolean,
+  onOpen: () -> Unit,
+  onClose: () -> Unit,
+  onEdit: ((String) -> Unit)?,
+  onRemoved: (String) -> Unit,
+  onPickDebtor: () -> Unit,
+  onCheckout: () -> Unit,
+) {
+  PhoneCartLayer(
+    model = CartSummary.of(
+      cart.map { line ->
+        val product = d.products.find { it.id == line.productId }
+        CartSummary.Line(line.productId, product?.name ?: line.label, product != null)
+      },
+      SalesEngine.cartTotal(d, cart),
+    ),
+    open = open,
+    onOpen = onOpen,
+    onClose = onClose,
+  ) {
+    PhoneCartHeader(cart.size, onClose)
+    Spacer(Modifier.height(4.dp))
+    LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
+      items(cart, key = { it.productId }) { line ->
+        val product = d.products.find { it.id == line.productId }
+        //  همان دو گونه ردیفِ پیشین: کالای ثبت‌شده و «قلمِ آزاد»
+        if (product == null && !line.free) return@items
+        val name = product?.name ?: line.label
+        val price = line.unitPrice ?: product?.salePrice ?: 0.0
+        val unit = product?.unit.orEmpty()
+        val step = if (product != null) SalesEngine.cartStep(product.unit) else 1.0
+        val custom = line.free || line.unitPrice != null
+        PhoneCartLine(
+          thumb = CartSummary.Thumb(line.productId, CartSummary.initials(name), product != null),
+          name = name,
+          detail = "${qty(line.quantity)}${if (unit.isNotBlank()) " $unit" else ""} × ${money(price)} = " +
+            "${money(SalesEngine.lineTotal(price, line.quantity))} ؋" + if (custom) "  (قیمت دستی)" else "",
+          qtyText = qty(line.quantity),
+          lastStep = line.quantity <= step,
+          onMinus = {
+            cartStore.set(SalesEngine.setCartQty(cart, line.productId, line.quantity - step))
+            if (line.quantity <= step) onRemoved(line.productId)
+          },
+          onPlus = { cartStore.set(SalesEngine.setCartQty(cart, line.productId, line.quantity + step)) },
+          onEdit = onEdit?.let { edit -> { edit(line.productId) } },
+        )
+      }
+    }
+    Spacer(Modifier.height(10.dp))
+    val debtorName = cartDebtorId?.let { id -> d.debtors.find { it.id == id }?.name }
+    PhoneCartDebtor(
+      name = debtorName,
+      note = cartDebtorId?.let { id -> debtStateText(d, id) },
+      onPick = onPickDebtor,
+      onClear = { cartStore.setDebtor(null) },
+    )
+    Spacer(Modifier.height(14.dp))
+    PhoneCartFooter(
+      total = SalesEngine.cartTotal(d, cart),
+      primary = if (debtorName != null) "ثبت نسیه" else "پرداخت و ثبت فروش",
+      onPrimary = onCheckout,
+    )
   }
 }
 

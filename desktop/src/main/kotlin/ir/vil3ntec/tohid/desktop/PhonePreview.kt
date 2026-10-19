@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -30,7 +31,11 @@ import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.PointOfSale
 import androidx.compose.material.icons.filled.ShoppingBag
+import ir.vil3ntec.tohid.data.CartStore
+import ir.vil3ntec.tohid.data.SalesEngine
 import ir.vil3ntec.tohid.data.ShopStore
+import ir.vil3ntec.tohid.ui.components.pos.PhoneCartShot
+import ir.vil3ntec.tohid.ui.screens.QuickSaleScreen
 import ir.vil3ntec.tohid.ui.components.common.NavTab
 import ir.vil3ntec.tohid.ui.components.common.PhoneNavBar
 import ir.vil3ntec.tohid.ui.screens.DashboardScreen
@@ -103,6 +108,17 @@ private fun PhonePreviewContent(screen: String, store: ShopStore, dark: Boolean)
       //  «حساب من»: کارتِ عکس، نقش، آمار و گروه‌ها
       "profile" -> Box(Modifier.weight(1f).fillMaxWidth()) {
         ProfileScreen(store = store, snackbar = snackbar, onBack = {}, onSignIn = {}, onSubscription = {})
+      }
+      //  سبدِ گوشی: نوارِ تیره (cart) و برگهٔ باز (cart-open) روی «انتخاب محصول» با چهار کالای دفترِ نمایشی
+      "cart", "cart-open" -> Box(Modifier.weight(1f).fillMaxWidth()) {
+        val context = LocalContext.current
+        val cartStore = remember { CartStore(context) }
+        LaunchedEffect(data.products.size, screen) {
+          val picks = data.products.filter { it.active }.take(4)
+          if (picks.isNotEmpty()) cartStore.set(picks.mapIndexed { i, p -> SalesEngine.CartLine(p.id, if (i == 0) 2.0 else 1.0) })
+          PhoneCartShot.open.value = screen == "cart-open"
+        }
+        QuickSaleScreen(store, cartStore, data, snackbar) {}
       }
       else -> {
         //  «nav» و هر نامِ ناشناس: خانه با نوارِ پایینِ قرصی
