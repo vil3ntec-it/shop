@@ -103,16 +103,16 @@
   function stockOf(p) {
     var s = (p && p.stock) || { status: 'unverified' };
     switch (s.status) {
-      case 'in_stock': return { text: 'موجود', kind: 'ok', orderable: true };
-      case 'in_warehouse': return { text: s.prepMinutes ? 'در انبار، آماده‌سازی ~' + K.fa(s.prepMinutes, 0) + ' دقیقه' : 'در انبار؛ آماده‌سازی لازم', kind: 'info', orderable: true };
-      case 'out_of_stock': return { text: 'ناموجود', kind: 'err', orderable: false };
-      case 'unavailable': return { text: 'قابلِ سفارش نیست', kind: 'err', orderable: false };
+      case 'in_stock': return { text: 'موجود', kind: 'ok', orderable: true, known: true };
+      case 'in_warehouse': return { text: s.prepMinutes ? 'در انبار، آماده‌سازی ~' + K.fa(s.prepMinutes, 0) + ' دقیقه' : 'در انبار؛ آماده‌سازی لازم', kind: 'info', orderable: true, known: true };
+      case 'out_of_stock': return { text: 'ناموجود', kind: 'err', orderable: false, known: true };
+      case 'unavailable': return { text: 'قابلِ سفارش نیست', kind: 'err', orderable: false, known: true };
       default: return { text: 'موجودی در حال بررسی است', kind: 'off', orderable: true };
     }
   }
 
   function imgBox(cls, p) {
-    var box = el('span', { class: cls + (p.photo ? ' photo' : '') });
+    var box = el('span', { class: cls + (p.photo ? ' photo tile' : '') });
     if (p.photo) box.appendChild(el('img', { attrs: { src: photoUrl(p.id), alt: '', loading: 'lazy', decoding: 'async', width: '300', height: '300' } }));
     else box.appendChild(el('span', { class: 'ph', text: String(p.name || '؟').slice(0, 1), attrs: { 'aria-hidden': 'true' } }));
     return box;
@@ -124,9 +124,11 @@
     var open = el('button', { class: 'p-open', attrs: { type: 'button', 'aria-label': p.name + '، ' + K.money(p.priceMinor) + (p.unit ? ' برای هر ' + p.unit : '') + ' — جزئیات' },
       on: { click: function () { location.hash = '#/p/' + encodeURIComponent(p.id); } } },
       imgBox('p-img', p),
-      el('span', { class: 'p-price num' }, K.money(p.priceMinor), p.unit ? el('small', { text: ' / ' + p.unit }) : null),
+      el('span', { class: 'p-price num' }, K.fa(p.priceMinor / 100), el('small', { text: ' افغانی' })),
       el('span', { class: 'p-name', text: p.name }),
-      el('span', { class: 'p-stock' }, el('span', { class: 'pill ' + st.kind, text: st.text })));
+      p.unit ? el('span', { class: 'p-unit', text: 'هر ' + p.unit }) : null,
+      //  ۳۲.۳: نشانِ موجودی فقط وقتی دانسته است؛ «در حال بررسی» یک بار بالای کاتالوگ
+      st.known ? el('span', { class: 'p-stock' }, el('span', { class: 'pill ' + st.kind, text: st.text })) : null);
     li.append(open, addButton(p, st));
     return li;
   }
@@ -174,6 +176,8 @@
     return api('/products' + qs).then(function (r) {
       if (!more) K.clear(ul);
       r.items.forEach(function (p) { catalog.items[p.id] = p; ul.appendChild(card(p)); });
+      var unknown = Object.keys(catalog.items).some(function (id) { return !stockOf(catalog.items[id]).known; });
+      $('stock-note').hidden = !unknown;
       catalog.cursor = r.nextCursor;
       $('more').hidden = !r.nextCursor;
       var empty = ul.children.length === 0;
@@ -196,6 +200,7 @@
       $('ps-cat').hidden = !x.category;
       K.clear($('ps-img')).appendChild(imgBox('ps-img-in', x).firstChild);
       $('ps-img').classList.toggle('photo', Boolean(x.photo));
+      $('ps-img').classList.toggle('tile', Boolean(x.photo));
       $('ps-name').textContent = x.name;
       K.clear($('ps-price')).append(K.money(x.priceMinor), x.unit ? el('small', { text: ' / ' + x.unit }) : '');
       K.clear($('ps-stock')).appendChild(el('span', { class: 'pill ' + st.kind, text: st.text }));
@@ -258,7 +263,7 @@
   function hasBad() { return ids().some(function (id) { return cart[id].unavailable; }); }
 
   function thumb(id, l) {
-    var t = el('span', { class: 'thumb' + (l.photo ? ' photo' : '') });
+    var t = el('span', { class: 'thumb' + (l.photo ? ' photo tile' : '') });
     if (l.photo) t.appendChild(el('img', { attrs: { src: photoUrl(id), alt: '', loading: 'lazy', width: '44', height: '44' } }));
     else t.textContent = String(l.name || '؟').slice(0, 1);
     return t;
@@ -290,6 +295,8 @@
         phoneOpen = true;
         $('cart-sheet').hidden = false; $('surface-cap').hidden = false;
         $('surface').inert = true;
+        $('cart-sheet').classList.add('entering');
+        setTimeout(function () { $('cart-sheet').classList.remove('entering'); }, 600);
         requestAnimationFrame(function () { document.body.classList.add('cart-open'); });
         setTimeout(function () { $('cart-title').focus(); }, 60);
       }
@@ -591,9 +598,16 @@
 
   function renderOrder(o, token) {
     $('o-title').textContent = 'سفارشِ شمارهٔ ' + K.fa(o.orderNo, 0);
-    K.clear($('o-pill')).appendChild(el('span', { class: 'pill ' + K.orderKind(o.status), text: K.ORDER[o.status] || o.status }));
+    var st = $('o-status');
     var why = o.statusReason && K.REASON[o.statusReason] ? ' — ' + K.REASON[o.statusReason] : '';
-    $('o-status').textContent = (o.fulfillment === 'pickup' ? 'دریافت از دکان' : 'ارسال به نشانیِ شما') + '، ' + K.when(o.createdAt) + why;
+    st.className = 'pill ' + K.orderKind(o.status);
+    st.textContent = (K.ORDER[o.status] || o.status) + why;
+    $('o-meta').textContent = (o.fulfillment === 'pickup' ? 'دریافت از دکان' : 'ارسال به نشانیِ شما') + '، ' + K.when(o.createdAt);
+    //  ORD-16: هر تغییر با زمانش (خلاصه در پله‌ها، همه این‌جا)
+    var tl = K.clear($('o-timeline'));
+    (o.timeline || []).forEach(function (e) {
+      tl.appendChild(el('li', {}, el('span', { text: K.ORDER[e.status] || e.status }), el('span', { class: 'num', text: K.when(e.at) })));
+    });
     var steps = K.clear($('o-steps'));
     K.orderSteps(o).forEach(function (s) {
       var dot = el('span', { class: 'dot' });
@@ -648,8 +662,10 @@
         if (FINAL.indexOf(r.order.status) < 0) pollTimer = setTimeout(function () { if (!document.hidden && location.hash === '#/o/' + token) load(); else pollTimer = setTimeout(load, 20000); }, 20000);
       }).catch(function (e) {
         $('o-title').textContent = 'سفارش';
-        K.clear($('o-pill')); K.clear($('o-steps')); K.clear($('o-lines')); K.clear($('o-totals'));
-        $('o-status').textContent = e.status === 404 ? 'این سفارش پیدا نشد.' : e.message;
+        K.clear($('o-steps')); K.clear($('o-lines')); K.clear($('o-totals')); K.clear($('o-timeline'));
+        $('o-status').className = 'pill err';
+        $('o-status').textContent = e.status === 404 ? 'پیدا نشد' : 'خطا';
+        $('o-meta').textContent = e.status === 404 ? 'این سفارش پیدا نشد.' : e.message;
         $('o-cancel').hidden = true; $('o-reorder').hidden = true;
       });
     };
