@@ -36,6 +36,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -94,8 +95,9 @@ fun BoxScope.PhoneQtyKeypad(
   val v = PhoneV3.colors
   val motion = Motion.enabled
   //  برای انیمیشنِ بسته شدن، آخرین درخواست می‌ماند
-  var shown by remember { mutableStateOf(request) }
-  if (request != null) shown = request
+  val last = remember { mutableStateOf(request) }
+  SideEffect { if (request != null) last.value = request }
+  val shown = request ?: last.value
   BackHandler(enabled = request != null, onBack = onDismiss)
 
   AnimatedVisibility(
