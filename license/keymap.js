@@ -27,7 +27,7 @@
     "global.save": {"scope":"global","title":"ذخیره یا تأیید","status":"partial","page":null,"web":[["S",true,false,false],["Enter",true,false,false]],"overrides":[]},
     "global.print": {"scope":"global","title":"چاپ","status":"partial","page":null,"web":[["P",true,false,false]],"overrides":[]},
     "global.export": {"scope":"global","title":"خروجی","status":"partial","page":null,"web":[["E",true,false,false]],"overrides":[]},
-    "global.lock": {"scope":"global","title":"قفلِ صندوق و تعویضِ کاربر با PIN","status":"planned","page":null,"web":[["L",false,false,true]],"overrides":[]},
+    "global.lock": {"scope":"global","title":"قفلِ صندوق و تعویضِ کاربر با PIN","status":"partial","page":null,"web":[["L",false,false,true]],"overrides":[]},
     "global.zoomIn": {"scope":"global","title":"بزرگ‌نمایی","status":"live","page":null,"web":[],"overrides":[]},
     "global.zoomOut": {"scope":"global","title":"کوچک‌نمایی","status":"live","page":null,"web":[],"overrides":[]},
     "global.zoomReset": {"scope":"global","title":"اندازهٔ عادیِ متن","status":"live","page":null,"web":[],"overrides":[]},

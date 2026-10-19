@@ -203,6 +203,16 @@ fun AppRoot(
    */
   val lockStore = remember { ir.vil3ntec.tohid.data.LockStore(context) }
   var unlocked by rememberSaveable { mutableStateOf(false) }
+  //  Ctrl+L (STF-04): قفلِ صندوق همین حالا. بی رمزِ برنامه قفلی نیست که بیفتد —
+  //  پس فقط راهش گفته می‌شود (پیام پایین‌تر، کنارِ بقیهٔ پیام‌ها).
+  val lockAsk by AppNav.lockNow
+  var lockSeen by rememberSaveable { mutableStateOf(AppNav.lockNow.intValue) }
+  var lockHint by remember { mutableStateOf(0) }
+  LaunchedEffect(lockAsk) {
+    if (lockAsk == lockSeen) return@LaunchedEffect
+    lockSeen = lockAsk
+    if (lockStore.enabled) unlocked = false else lockHint++
+  }
 
   /*
    *  قفلِ خودکار پس از بی‌کاری — STF-05. آخرین لمس/کلید روی ساعتِ یکنوا؛
@@ -348,6 +358,21 @@ fun AppRoot(
         actionLabel = "تمدید", duration = SnackbarDuration.Long,
       )
       if (r == SnackbarResult.ActionPerformed) AppNav.go("vip")
+    }
+  }
+  LaunchedEffect(lockHint) {
+    if (lockHint == 0) return@LaunchedEffect
+    snackbar.currentSnackbarData?.dismiss()
+    snackbar.showSnackbar("برای قفلِ صندوق با Ctrl+L، اول در «تنظیمات» رمزِ برنامه را بگذارید.")
+  }
+  //  سدِ نقش (A16): کاری بیرون از حدِ نقشِ این کارمند ⇐ ثبت نشد، و راستش گفته می‌شود
+  LaunchedEffect(store) {
+    store.roleBlocked.collect { (part, role) ->
+      snackbar.currentSnackbarData?.dismiss()
+      snackbar.showSnackbar(
+        "ثبت نشد — «$part» در حدِ نقشِ شما ($role) نیست. اگر لازم است، صاحب دکان نقشتان را در «کارمندان» عوض کند.",
+        duration = SnackbarDuration.Long,
+      )
     }
   }
   //  دفتر روی دیسک ننشست (F0-01) ⇐ پیامِ «ثبت شد»ِ صفحه برداشته و راستش
