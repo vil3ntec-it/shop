@@ -77,7 +77,8 @@ object Backend {
 
     //  ورود با کدِ شش‌رقمیِ ایمیلی — کنارِ `auth`، نه جایش
     val codeLogin = CodeLoginRepository(api, tokens)
-    val shop = ShopRepository(api)
+    val shop = ShopRepository(api, tokens)
+    val courier = CourierRepository(api)
     val account = AccountRepository(api)
     val sync = SyncRepository(api)
     val events = EventsRepository(api)
@@ -88,6 +89,9 @@ object Backend {
 
     //  پشتیبانِ ابری — فهرست و فرستادنِ فایلِ همین دکان
     val backups = BackupRepository(api)
+
+    /** چتِ مشتری ↔ دکان (v3 §۳۳) — پشتِ پرچمِ `shop.chat` */
+    val shopChat = ShopChatRepository(api)
   }
 
   private fun of(context: Context): Wiring =
@@ -108,11 +112,13 @@ object Backend {
   fun auth(context: Context): AuthRepository = of(context).auth
   fun codeLogin(context: Context): CodeLoginRepository = of(context).codeLogin
   fun shop(context: Context): ShopRepository = of(context).shop
+  fun courier(context: Context): CourierRepository = of(context).courier
   fun account(context: Context): AccountRepository = of(context).account
   fun sync(context: Context): SyncRepository = of(context).sync
   fun events(context: Context): EventsRepository = of(context).events
   fun support(context: Context): SupportRepository = of(context).support
   fun backups(context: Context): BackupRepository = of(context).backups
+  fun shopChat(context: Context): ShopChatRepository = of(context).shopChat
 
   /** آیا برنامه هم نشانی دارد و هم حساب — یعنی اصلاً می‌شود به سرور زد */
   fun isReady(context: Context): Boolean =
