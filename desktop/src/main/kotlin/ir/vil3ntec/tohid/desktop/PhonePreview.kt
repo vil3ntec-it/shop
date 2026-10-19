@@ -135,7 +135,8 @@ private fun PhonePreviewContent(screen: String, store: ShopStore, dark: Boolean)
         val demo = remember(screen) { debtorsDemo(screen, System.currentTimeMillis()) }
         //  میکروفونِ کادرِ جستجو همان‌طور که اندروید نشان می‌دهد (کامپیوتر خودش پنهانش می‌کند)
         LaunchedEffect(Unit) { PhoneDebtorsShot.mic.value = true }
-        DebtorsScreen(store, demo, snackbar)
+        //  پوستهٔ v3: قرض‌داران از «بیشتر» باز می‌شود ⇒ سربرگِ خودِ صفحه با برگشت
+        DebtorsScreen(store, demo, snackbar, showHeader = true, onBack = {})
       }
       else -> {
         //  «nav» و هر نامِ ناشناس: خانه با نوارِ پایینِ قرصی

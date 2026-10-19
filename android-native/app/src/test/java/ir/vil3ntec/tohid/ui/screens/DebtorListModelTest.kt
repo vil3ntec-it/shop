@@ -142,11 +142,11 @@ class DebtorListModelTest {
   }
 
   @Test
-  fun `یک ماه به بالا پررنگ`() {
-    val d = ShopData(debtors = listOf(Debtor(id = "a")), transactions = listOf(tx("a", "give", 5.0, 30)))
-    assertTrue(DebtorListModel.stale(DebtorListModel.rows(d, "", Sort.MOST, now).single()))
-    val fresh = d.copy(transactions = listOf(tx("a", "give", 5.0, 29)))
-    assertFalse(DebtorListModel.stale(DebtorListModel.rows(fresh, "", Sort.MOST, now).single()))
+  fun `ماه و سال — همان daysText`() {
+    val d = ShopData(debtors = listOf(Debtor(id = "a")), transactions = listOf(tx("a", "give", 5.0, 64)))
+    assertEquals("2 ماه", DebtorListModel.daysLabel(DebtorListModel.rows(d, "", Sort.MOST, now).single()))
+    val old = d.copy(transactions = listOf(tx("a", "give", 5.0, 400)))
+    assertEquals("1 سال و 1 ماه", DebtorListModel.daysLabel(DebtorListModel.rows(old, "", Sort.MOST, now).single()))
   }
 
   @Test

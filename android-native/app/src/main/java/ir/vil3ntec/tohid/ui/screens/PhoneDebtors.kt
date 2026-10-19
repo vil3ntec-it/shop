@@ -34,6 +34,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
@@ -144,6 +145,40 @@ private fun DrawScope.glow(color: Color, center: Offset, sigma: Float) {
     t to color.copy(alpha = color.alpha * f)
   }.toTypedArray()
   drawCircle(brush = Brush.radialGradient(*pairs, center = center, radius = radius), radius = radius, center = center)
+}
+
+/* ------------------------------ سربرگ ------------------------------ */
+
+/**
+ *  سربرگِ سبک: عنوانِ «قرض‌داران» و — وقتی صفحه از «بیشتر» باز شده — دکمهٔ گردِ
+ *  برگشت. بی زمینه و بی خط، روی همان زمینهٔ آرورا؛ چیدمانِ r9 زیرش دست نمی‌خورد.
+ */
+@Composable
+fun DebtorsHeader(onBack: (() -> Unit)?, modifier: Modifier = Modifier) {
+  val c = PhoneV3Debt.colors
+  Row(
+    modifier.fillMaxWidth().height(52.dp).padding(horizontal = PhoneV3Debt.gutter),
+    verticalAlignment = Alignment.CenterVertically,
+  ) {
+    if (onBack != null) {
+      val source = remember { MutableInteractionSource() }
+      val pressed by source.collectIsPressedAsState()
+      Box(
+        Modifier
+          .size(36.dp)
+          .pressScale(pressed)
+          .clip(CircleShape)
+          .background(c.surface)
+          .border(1.dp, c.edge, CircleShape)
+          .clickable(interactionSource = source, indication = LocalIndication.current, role = Role.Button, onClick = onBack),
+        contentAlignment = Alignment.Center,
+      ) {
+        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "برگشت", tint = c.ink, modifier = Modifier.size(20.dp))
+      }
+      Spacer(Modifier.width(10.dp))
+    }
+    Text("قرض‌داران", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = c.ink, maxLines = 1)
+  }
 }
 
 /* ------------------------------ کارتِ سه‌عددی ------------------------------ */
@@ -273,28 +308,44 @@ private fun RoundIcon(icon: ImageVector, description: String, fill: Color, tint:
 /**
  *  «N مورد» و چهار تراشهٔ ترتیب — انتخاب‌شده بنفشِ پر با ✓ و متنِ سفیدِ
  *  پررنگ، بقیه قرصِ سفید. رنگِ تراشه نرم عوض می‌شود و ✓ باز می‌شود؛ روی
- *  گوشیِ باریک ردیف افقی اسکرول می‌شود.
+ *  گوشیِ باریک ردیف تا لبهٔ صفحه افقی اسکرول می‌شود و تا چیزی پشتِ لبه
+ *  مانده، لبهٔ انتها محو می‌شود تا پیدا باشد که ادامه دارد.
  */
 @Composable
 fun DebtorsSortRow(current: DebtorListModel.Sort, count: Int, onPick: (DebtorListModel.Sort) -> Unit) {
   val c = PhoneV3Debt.colors
-  Row(
-    Modifier
-      .bleed(PhoneV3Debt.gutter)
-      .horizontalScroll(rememberScrollState())
-      .padding(horizontal = PhoneV3Debt.gutter),
-    horizontalArrangement = Arrangement.spacedBy(6.dp),
-    verticalAlignment = Alignment.CenterVertically,
-  ) {
-    //  شمارنده تراشه نیست، پس زده نمی‌شود: فقط می‌گوید فهرست چند تاست
-    Text(
-      "${plain(count)} مورد",
-      style = MaterialTheme.typography.labelSmall,
-      color = c.muted2,
-      modifier = Modifier.padding(end = 2.dp),
-    )
-    DebtorListModel.Sort.entries.forEach { option ->
-      SortChip(option.label, option == current, c) { onPick(option) }
+  val scroll = rememberScrollState()
+  val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+  Box(Modifier.bleed(PhoneV3Debt.gutter)) {
+    Row(
+      Modifier
+        .fillMaxWidth()
+        .horizontalScroll(scroll)
+        .padding(horizontal = PhoneV3Debt.gutter),
+      horizontalArrangement = Arrangement.spacedBy(5.dp),
+      verticalAlignment = Alignment.CenterVertically,
+    ) {
+      //  شمارنده تراشه نیست، پس زده نمی‌شود: فقط می‌گوید فهرست چند تاست
+      Text(
+        "${plain(count)} مورد",
+        style = MaterialTheme.typography.labelSmall,
+        color = c.muted2,
+        modifier = Modifier.padding(end = 2.dp),
+      )
+      DebtorListModel.Sort.entries.forEach { option ->
+        SortChip(option.label, option == current, c) { onPick(option) }
+      }
+    }
+    //  محوِ لبهٔ انتها (چپ در راست‌به‌چپ) — فقط تا وقتی تراشه‌ای پشتِ لبه مانده
+    if (scroll.canScrollForward) {
+      val edge = if (rtl) listOf(c.page, c.page.copy(alpha = 0f)) else listOf(c.page.copy(alpha = 0f), c.page)
+      Box(
+        Modifier
+          .align(Alignment.CenterEnd)
+          .width(36.dp)
+          .height(40.dp)
+          .background(Brush.horizontalGradient(edge))
+      )
     }
   }
 }
@@ -326,7 +377,7 @@ private fun SortChip(label: String, picked: Boolean, c: PhoneV3DebtColors, onCli
       .background(fill)
       .border(1.dp, edge, shape)
       .clickable(interactionSource = source, indication = LocalIndication.current, role = Role.Tab, onClick = onClick)
-      .padding(horizontal = 11.dp, vertical = 8.dp),
+      .padding(horizontal = 9.dp, vertical = 8.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
     AnimatedVisibility(
@@ -432,7 +483,7 @@ fun DebtorTile(
       )
       DebtorListModel.daysLabel(row)?.let { days ->
         Spacer(Modifier.height(5.dp))
-        DaysPill(days, stale = DebtorListModel.stale(row), tint = tint, c = c)
+        DaysPill(days, c)
       }
     }
 
@@ -454,30 +505,22 @@ fun DebtorTile(
   }
 }
 
-/** قرصِ «N روز» — از یک ماه به بالا هم‌رنگِ کارت و پررنگ */
+/**
+ *  قرصِ «N روز» — همیشه خاکستری، مثلِ r9. «بدهکار است» را خطِ قرمزِ کارت می‌گوید؛
+ *  قرصِ رنگی کنارش همان حرف را دوباره و بلندتر می‌زد.
+ */
 @Composable
-private fun DaysPill(text: String, stale: Boolean, tint: Color, c: PhoneV3DebtColors) {
+private fun DaysPill(text: String, c: PhoneV3DebtColors) {
   Row(
     Modifier
       .clip(RoundedCornerShape(50))
-      .background(if (stale) tint.copy(alpha = 0.16f) else c.page.copy(alpha = 0.7f))
+      .background(c.page.copy(alpha = 0.7f))
       .padding(horizontal = 7.dp, vertical = 3.dp),
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(3.dp),
   ) {
-    Icon(
-      Icons.Filled.Schedule,
-      contentDescription = null,
-      tint = if (stale) tint else c.muted,
-      modifier = Modifier.size(11.dp),
-    )
-    Text(
-      text,
-      style = MaterialTheme.typography.labelSmall,
-      color = if (stale) tint else c.muted,
-      fontWeight = if (stale) FontWeight.Bold else FontWeight.Normal,
-      maxLines = 1,
-    )
+    Icon(Icons.Filled.Schedule, contentDescription = null, tint = c.muted, modifier = Modifier.size(11.dp))
+    Text(text, style = MaterialTheme.typography.labelSmall, color = c.muted, fontWeight = FontWeight.Normal, maxLines = 1)
   }
 }
 
@@ -562,7 +605,12 @@ fun DebtorsEmptyCard(
  *  تراشه. Ctrl+N و فرمانِ `new:` ِ عکس‌برداری هم همین را می‌زنند (`AppNav.addAction`).
  */
 @Composable
-fun DebtorsAddButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun DebtorsAddButton(
+  onClick: () -> Unit,
+  modifier: Modifier = Modifier,
+  /** دفترِ خالی دکمهٔ «قرض‌دار تازه» ِ خودش را دارد؛ آن‌جا دایره کشیده نمی‌شود (Ctrl+N می‌ماند) */
+  visible: Boolean = true,
+) {
   val c = PhoneV3Debt.colors
   val latest = rememberUpdatedState(onClick)
   DisposableEffect(Unit) {
@@ -570,6 +618,7 @@ fun DebtorsAddButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
     ir.vil3ntec.tohid.ui.AppNav.addAction.value = action
     onDispose { if (ir.vil3ntec.tohid.ui.AppNav.addAction.value === action) ir.vil3ntec.tohid.ui.AppNav.addAction.value = null }
   }
+  if (!visible) return
   val source = remember { MutableInteractionSource() }
   val pressed by source.collectIsPressedAsState()
   //  لایهٔ فشردن ۸dp از دایره بزرگ‌تر است: سایه بیرونِ دایره می‌افتد و لایه (روی کامپیوتر) آن را نمی‌بُرد

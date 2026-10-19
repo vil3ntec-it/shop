@@ -153,7 +153,4 @@ object DebtorListModel {
 
   /** قرصِ ساعت: فقط وقتی بدهکار است */
   fun daysLabel(row: Row): String? = row.days?.takeIf { row.owes }?.let { ir.vil3ntec.tohid.daysText(it) }
-
-  /** از یک ماه به بالا قرص پررنگ می‌شود تا در یک نگاه از بقیه جدا باشد */
-  fun stale(row: Row): Boolean = (row.days ?: 0L) >= 30
 }

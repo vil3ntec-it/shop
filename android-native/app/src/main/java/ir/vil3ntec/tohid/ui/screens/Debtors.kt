@@ -84,7 +84,18 @@ import kotlinx.coroutines.launch
  *  چه با دست، یک عدد است.
  */
 @Composable
-fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
+fun DebtorsScreen(
+  store: ShopStore,
+  d: ShopData,
+  snackbar: SnackbarHostState,
+  /**
+   *  سربرگِ سبکِ خودِ صفحه (عنوان + برگشت) — برای پوستهٔ گوشیِ v3 که نوارِ بالا
+   *  ندارد. پیش‌فرض خاموش: پوستهٔ امروز (`TohidTopBar`) عنوان را خودش دارد.
+   */
+  showHeader: Boolean = false,
+  /** باز شده از «بیشتر» ⇒ دکمهٔ برگشتِ سربرگ؛ `null` ⇒ بی دکمه */
+  onBack: (() -> Unit)? = null,
+) {
   val scope = rememberCoroutineScope()
 
   var search by rememberSaveable { mutableStateOf("") }
@@ -161,12 +172,15 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
     //  میکروفون، تراشه‌های ترتیب و شبکهٔ کارت‌های قرمز/سبز
     PhoneDebtorsTheme {
       DebtorsBackdrop {
+       Column(Modifier.fillMaxSize()) {
+        if (showHeader) DebtorsHeader(onBack)
         // شبکهٔ کارت‌ها — همان `.debtor-list` نسخهٔ وب. قرض‌دار در یک نگاه
         // از رنگِ کارتش شناخته می‌شود، نه از خواندنِ عدد.
+        //  پایین ۸۸dp: آخرین ردیف از زیرِ دکمهٔ گردِ «+» (۱۶ + ۵۶ + فاصله) بیرون می‌آید
         LazyVerticalGrid(
           columns = GridCells.Adaptive(minSize = gridMinSize(phone = PhoneV3Debt.tileMin, tablet = PhoneV3Debt.tileMinTablet)),
-          modifier = Modifier.fillMaxSize(),
-          contentPadding = PaddingValues(PhoneV3Debt.gutter, 8.dp, PhoneV3Debt.gutter, 96.dp),
+          modifier = Modifier.fillMaxWidth().weight(1f),
+          contentPadding = PaddingValues(PhoneV3Debt.gutter, 8.dp, PhoneV3Debt.gutter, 88.dp),
           horizontalArrangement = Arrangement.spacedBy(PhoneV3Debt.gap),
           verticalArrangement = Arrangement.spacedBy(PhoneV3Debt.gap),
         ) {
@@ -251,11 +265,14 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
             }
           }
         }
+       }
 
-        //  ۸dp + ۸dpِ داخلِ دکمه (جای سایه) = همان ۱۶dp از لبه
+        //  ۸dp + ۸dpِ داخلِ دکمه (جای سایه) = همان ۱۶dp از لبه. دفترِ خالی دکمهٔ
+        //  «قرض‌دار تازه» ِ خودش را دارد، پس دایره آن‌جا کشیده نمی‌شود
         DebtorsAddButton(
           onClick = { form = DebtorFormState() },
           modifier = Modifier.align(Alignment.BottomStart).padding(8.dp).popIn(),
+          visible = d.debtors.isNotEmpty(),
         )
       }
     }
