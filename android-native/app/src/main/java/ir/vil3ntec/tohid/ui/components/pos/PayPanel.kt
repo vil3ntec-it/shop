@@ -99,7 +99,8 @@ class PayPanelState {
 
 private fun plainAmount(v: Double): String = if (v == Math.rint(v)) v.toLong().toString() else v.toString()
 
-private fun KeyEvent.down(vararg keys: Key) = type == KeyEventType.KeyDown && key in keys
+//  `Key` کلاسِ مقداری است و vararg نمی‌گیرد — دو کلید بس است (Enter و Enterِ عددی)
+private fun KeyEvent.down(k: Key, also: Key? = null) = type == KeyEventType.KeyDown && (key == k || key == also)
 
 @Composable
 fun PaySplitSection(
