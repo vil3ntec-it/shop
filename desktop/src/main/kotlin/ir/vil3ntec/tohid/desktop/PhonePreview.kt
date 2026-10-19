@@ -35,6 +35,7 @@ import ir.vil3ntec.tohid.data.CartStore
 import ir.vil3ntec.tohid.data.SalesEngine
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.ui.components.pos.PhoneCartShot
+import ir.vil3ntec.tohid.ui.components.pos.PhoneCartUi
 import ir.vil3ntec.tohid.ui.screens.QuickSaleScreen
 import ir.vil3ntec.tohid.ui.components.common.NavTab
 import ir.vil3ntec.tohid.ui.components.common.PhoneNavBar
@@ -110,7 +111,8 @@ private fun PhonePreviewContent(screen: String, store: ShopStore, dark: Boolean)
         ProfileScreen(store = store, snackbar = snackbar, onBack = {}, onSignIn = {}, onSubscription = {})
       }
       //  سبدِ گوشی: نوارِ تیره (cart) و برگهٔ باز (cart-open) روی «انتخاب محصول» با چهار کالای دفترِ نمایشی
-      "cart", "cart-open" -> Box(Modifier.weight(1f).fillMaxWidth()) {
+      "cart", "cart-open" -> {
+        Box(Modifier.weight(1f).fillMaxWidth()) {
         val context = LocalContext.current
         val cartStore = remember { CartStore(context) }
         LaunchedEffect(data.products.size, screen) {
@@ -119,6 +121,9 @@ private fun PhonePreviewContent(screen: String, store: ShopStore, dark: Boolean)
           PhoneCartShot.open.value = screen == "cart-open"
         }
         QuickSaleScreen(store, cartStore, data, snackbar) {}
+        }
+        //  مثلِ `AppRoot`: نوارِ پایین زیرِ نوارِ سبد، و تا برگه باز است کنار می‌رود
+        if (!PhoneCartUi.sheetOpen.value) PhoneNavBar(tabs = PREVIEW_TABS, current = "sale", onPick = {})
       }
       else -> {
         //  «nav» و هر نامِ ناشناس: خانه با نوارِ پایینِ قرصی
