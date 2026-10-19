@@ -246,6 +246,21 @@ async function ingestTx(c, shopId, at, settings, { full = false } = {}) {
   return { products, moves, source: fmt };
 }
 
+/**
+ * نخستین خواندنِ دفترِ دستگاه (یا پس از عوض شدنِ منبعِ v1/v3) **در تراکنشِ خودش**، پیش از
+ * تراکنشِ سفارش (QA #263): خواندنِ کاملِ دفتر دیگر درونِ تراکنشِ ساختِ سفارشِ مشتری و زیرِ
+ * قفلِ `orders:<دکان>` نمی‌ماند. کاتالوگِ از پیش خوانده‌شده ⇒ هیچ (همان خواندنِ تفاوتِ کوچک
+ * درونِ تراکنشِ سفارش می‌ماند تا رزرو با موجودیِ تازه سنجیده شود). پرچم خاموش ⇒ هیچ.
+ */
+async function prepare(shopId, { at = now() } = {}) {
+  if (!(await stock.flagOf(shopId))) return null;
+  const settings = await stock.settingsOf(shopId);
+  const fmt = settings.syncSource === 'v3' ? 'v3' : 'v1';
+  const st = await one('SELECT source FROM catalog_sync_state WHERE shop_id=$1', [shopId]);
+  if (st && st.source === fmt) return null;
+  return tx(async (c) => ingestTx(c, shopId, at, await stock.settingsOf(shopId, c)));
+}
+
 /** همگام‌سازیِ کاتالوگ در تراکنشِ خودش؛ `maxAgeMs` ⇒ اگر تازه خوانده شده، نه. */
 async function refresh(shopId, { full = false, maxAgeMs = 0, at = now() } = {}) {
   if (maxAgeMs > 0 && !full) {
@@ -709,7 +724,9 @@ async function toStockLines(c, shopId, lines) {
  * دستگاه خوانده و قلم‌های کالادار رزرو می‌شوند؛ کمبود ⇒ خطا و **کلِ سفارش**
  * برمی‌گردد. پرچم خاموش ⇒ null، بی هیچ نوشتنی.
  */
-async function onOrderCreated(c, shopId, { orderId, lines, at, actor }) {
+async function onOrderCreated(c, shopId, { orderId, lines, at, actor, isTest = false }) {
+  //  سفارشِ آزمایشیِ کارمند موجودیِ واقعی را نه رزرو می‌کند نه کم (QA #263)
+  if (isTest) return null;
   const withProduct = (lines || []).filter((l) => str(l.productId));
   if (!withProduct.length) return null;
   if (!(await stock.flagOf(shopId, c))) return null;
@@ -737,6 +754,14 @@ async function onOrderStatus(c, shopId, { id, to }, actor, at) {
     `SELECT 1 FROM stock_reservations WHERE shop_id=$1 AND order_id=$2 AND status='held' LIMIT 1`, [shopId, id]
   )).rows.length > 0;
   if (!has && to !== 'accepted') return null;
+  const test = (await c.query('SELECT is_test FROM online_orders WHERE shop_id=$1 AND id=$2', [shopId, id])).rows[0];
+  if (test && test.is_test === true) {
+    //  سفارشِ آزمایشی: هرگز رزرو یا کسرِ قطعی (فروشِ واقعی در دفترِ موجودی) نه.
+    //  رزروِ مانده از پیش از این اصلاح در پایانِ کار آزاد می‌شود، کسر نمی‌شود.
+    if (!has || to === 'accepted') return null;
+    await stock.lock(c, shopId);
+    return { released: await stock.release(c, shopId, id, { reason: 'test_order', actor, at }) };
+  }
   const flag = await stock.flagOf(shopId, c);
   if (!has && !flag) return null;
   await stock.lock(c, shopId);
@@ -764,7 +789,7 @@ async function requireEnabled(shopId) {
 
 module.exports = {
   MANUAL, TRANSFER_LOCS,
-  ingestTx, refresh, freshness, badgeOf, publicStock,
+  ingestTx, refresh, prepare, freshness, badgeOf, publicStock,
   list, detail, moves, reservationsOf, tasks, resolveTask,
   parseManual, manualMove, setLow,
   toStockLines, onOrderCreated, onOrderStatus, requireEnabled,
