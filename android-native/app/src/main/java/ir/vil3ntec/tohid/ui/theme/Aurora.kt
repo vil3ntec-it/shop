@@ -73,12 +73,18 @@ private fun tonePalette(tone: AuroraTone): List<Color> {
 fun AuroraBackground(
   tone: AuroraTone = AuroraTone.Brand,
   animated: Boolean = true,
+  /**
+   *  نورِ آرورا فقط برای صفحهٔ آغاز/ورود — VISUAL-DIRECTION §۱ بندِ ۱:
+   *  صفحه‌های کار (صندوق، فهرست‌ها، فرم‌ها، گزارش‌ها) زمینهٔ تخت دارند.
+   */
+  decorative: Boolean = false,
   content: @Composable () -> Unit,
 ) {
   val colors = Shop.colors
   //  کامپیوتر: زمینهٔ تخت و آرام، مثلِ نرم‌افزارهای رومیزی — لکه‌های نورِ
-  //  متحرک پشتِ جدول‌ها فقط چشم را خسته می‌کرد و کارتِ گرافیک را می‌گرفت
-  if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) {
+  //  متحرک پشتِ جدول‌ها فقط چشم را خسته می‌کرد و کارتِ گرافیک را می‌گرفت.
+  //  صفحه‌های کارِ گوشی هم از ۱۴۰۵/۰۷/۲۵ همین زمینهٔ تخت را دارند.
+  if (ir.vil3ntec.tohid.ui.Platform.DESKTOP || !decorative) {
     Box(Modifier.fillMaxSize().background(colors.bg)) { content() }
     return
   }
@@ -191,6 +197,8 @@ fun Modifier.glassSurface(
   border: Color,
   strong: Boolean = false,
   glow: Color = Color(0x1F7C5CFF),
+  /** شیشهٔ واقعی فقط برای صفحهٔ آغاز/ورود؛ صفحه‌های کار کارتِ توپر می‌گیرند */
+  decorative: Boolean = false,
 ): Modifier {
   /*
    *  ── چرا سایه فقط روی سطحِ توپر ──────────────────────────────────
@@ -200,9 +208,10 @@ fun Modifier.glassSurface(
    *  خودش را نشان می‌داد. روی شیشه، جدایی را لبه‌ی روشن می‌سازد نه سایه.
    *  ────────────────────────────────────────────────────────────────
    */
-  //  کامپیوتر: کارتِ تخت با خطِ دورِ یک‌پیکسلی و سایهٔ بسیار کم — شیشه، درخشش
-  //  و لبهٔ نورانی مالِ گوشی است
-  if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) {
+  //  کارتِ تخت با خطِ دورِ یک‌پیکسلی و سایهٔ بسیار کم — کامپیوتر از قبل، و از
+  //  ۱۴۰۵/۰۷/۲۵ صفحه‌های کارِ گوشی هم (VISUAL-DIRECTION §۱). شیشه، درخشش و
+  //  لبهٔ نورانی فقط با `decorative = true`
+  if (ir.vil3ntec.tohid.ui.Platform.DESKTOP || !decorative) {
     return this
       .shadow(elevation = if (strong) 3.dp else 1.dp, shape = shape)
       .clip(shape)

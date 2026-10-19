@@ -203,7 +203,8 @@ async function createApp({ runMigrations = true } = {}) {
           //  F0-13: تنها خوانندهٔ مدتِ آزمایشی — همان عددِ `entitlement`
           trialDays: await plans.trialDaysOf('shop'),
           whatsapp: { number: cfg.whatsapp_number || '', message: cfg.whatsapp_message || '' },
-          minAppVersion: cfg.min_app_version || '',
+          //  §۳۸.۹: حداقلِ همان برنامه‌ای که می‌پرسد (`X-App-Id`/`?app=`؛ نبود ⇒ دکان)
+          minAppVersion: require('./lib/app-compat').minVersionOf(cfg, require('./lib/tenancy').appOfRequest(req)),
           //  ثبت‌نام سه‌مرحله‌ای با ایمیل — برنامه با این می‌فهمد این
           //  سرور مسیرهای /auth/register/* را دارد
           emailSignup: true,
@@ -294,11 +295,21 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/errors', require('./routes/errors'));
     api.use('/location', require('./routes/location'));
     api.use('/me', require('./routes/me'));
+    //  چتِ مشتری ↔ دکان (v3 §۳۳) — پشتِ پرچمِ `shop.chat`، پیش‌فرض خاموش.
+    //  پیش از `/shop` (همان دلیلِ `/shop/orders`)؛ درِ مشتری زیرِ `/store/:slug/chat`
+    //  که بی ماژولِ ویترین ۴۰۴ است و بقیهٔ `/store` را دست نمی‌زند.
+    api.use('/shop/chat', require('./routes/shop-chat'));
+    api.use('/store', require('./routes/shop-chat-store'));
+    api.use('/admin/shop-chat', require('./routes/admin-shop-chat'));
     //  کاتالوگ و موجودیِ سرور (v3 §۳۲) — پیش از `/shop`، پشتِ پرچمِ خاموشِ `shop.catalog`
     api.use('/shop/catalog', require('./routes/catalog'));
     //  سفارشِ آنلاین (فاز ۴) — پیش از `/shop` تا `requireUser`ِ آن دو بار نرود؛
     //  زیرِ همان پیشوند، پس ACCOUNT_PREFIXESِ پنلِ خانگی دست نمی‌خورد
     api.use('/shop/orders', require('./routes/orders'));
+    //  ویترین (فاز ۴): تنظیمِ دکان زیرِ `/shop` (پیش از آن)، و درِ عمومی
+    //  `/store` — پیشوندِ تازه ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی (دستورالعمل در PR)
+    api.use('/shop/storefront', require('./routes/storefront-admin'));
+    api.use('/store', require('./routes/storefront'));
     //  تحویل و پیک (۲۲.۲ C) — همان قاعده؛ درهای پیک زیرِ `/courier` (۳.۱۱)
     api.use('/shop/delivery', require('./routes/delivery'));
     api.use('/courier', require('./routes/courier'));
@@ -392,6 +403,32 @@ async function createApp({ runMigrations = true } = {}) {
   app.use('/admin', express.static(path.join(__dirname, '..', 'public', 'admin'), {
     index: 'index.html', maxAge: 0, etag: true,
   }));
+  // ---- ویترینِ اینترنتی (فاز ۴؛ D-06: `{slug}.vill3n.top`) ----
+  //  CSP ِ سخت مثلِ پنل، حتی بی style ِ درون‌خطی؛ فقط مکانِ دستگاه برای پین.
+  //  پوسته ایستاست و داده از `/api/store/:slug` می‌آید (همان مبدأ ⇒ بی CORS).
+  //  ویترینِ خاموش یا ناموجود ⇒ همان پوسته با وضعیتِ ۴۰۴.
+  const storeDir = path.join(__dirname, '..', 'public', 'store');
+  const storefront = require('./lib/storefront');
+  const storeHeaders = (req, res, next) => {
+    res.set('Content-Security-Policy',
+      "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; " +
+      "connect-src 'self'; manifest-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'");
+    res.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(self), payment=()');
+    next();
+  };
+  const storePage = async (slug, res) => {
+    let status = 200;
+    try { await storefront.open(slug); } catch (err) { if (err.status === 404) status = 404; else throw err; }
+    res.status(status).set('Cache-Control', 'no-cache').sendFile('index.html', { root: storeDir });
+  };
+  app.use('/store', storeHeaders, express.static(storeDir, { index: false, maxAge: 0, etag: true }));
+  app.get('/store/:slug', storeHeaders, (req, res, next) => storePage(req.params.slug, res).catch(next));
+  app.get('/', (req, res, next) => {
+    const slug = storefront.slugFromHost(req.hostname);
+    if (!slug) return next();
+    storeHeaders(req, res, () => storePage(slug, res).catch(next));
+  });
+
   app.get('/', (req, res) => res.redirect('/admin/'));
 
   // ---- پورتالِ مشتری و SDK ----
@@ -409,6 +446,8 @@ async function createApp({ runMigrations = true } = {}) {
     //  پیام‌ها و رسانه‌های چت فقط CHAT_RELAY_DAYS روز روی سرور می‌مانند؛
     //  برنامهٔ پمپ رونوشتِ خودش را دارد
     require('./lib/chat-relay').sweep().catch(err => console.error('[chat-relay]', err.message));
+    //  چتِ دکان: رسانهٔ بارگذاری‌شدهٔ بی‌پیام پس از یک ساعت (و نگهداری، اگر روشن شد)
+    require('./lib/shop-chat').sweep().catch(err => console.error('[shop-chat]', err.message));
     subs.expireDue().catch(err => console.error('[subscriptions]', err.message));
     //  خبر دادن به کسی که اشتراکش دارد تمام می‌شود — پیش از آنکه قفل
     //  شود، نه بعدش. هر آستانه فقط یک بار، پس تکراری نمی‌رود.
