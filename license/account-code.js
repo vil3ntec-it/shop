@@ -237,6 +237,10 @@
     refreshing = (async function () {
       try {
         var r = await call('/api/auth/refresh', { method: 'POST', body: { refreshToken: rt } });
+        //  ⚠️ پاسخِ ۲۰۰ِ بی توکن (صفحهٔ HTMLِ وای‌فایِ هتل یا اپراتور) نشست
+        //  را پاک نمی‌کند: تا دیروز `accessToken: ''` نوشته می‌شد و کاربر
+        //  بی‌دلیل «خارج» می‌افتاد
+        if (!(r.accessToken || r.access_token)) throw ApiError('پاسخ سرور خوانده نشد', 'invalid_response', 0);
         patchAcct({
           accessToken: r.accessToken || r.access_token || '',
           accessExpiresAt: r.accessExpiresAt || (Date.now() + (Number(r.access_expires_in || 3600) * 1000)),
@@ -273,7 +277,17 @@
     } catch (e) {
       if (e.status !== 401) throw e;
       var fresh = '';
-      try { fresh = await refresh(); } catch (e2) { signOutLocal(); throw e; }
+      /*
+       *  فقط «سرور گفت این توکن مرده» (۴۰۱ از خودِ تازه‌سازی) نشست را می‌بندد.
+       *  قطعیِ اینترنت، ۴۲۹، ۵۰۲ یا صفحهٔ HTMLِ وای‌فای دربارهٔ خودِ توکن
+       *  چیزی نمی‌گویند؛ تا دیروز همه‌شان کاربر را بیرون می‌انداختند (بندِ
+       *  ۲۳.۴ سندِ v3). خطای **خودِ تازه‌سازی** بالا می‌رود تا «اینترنت
+       *  نیست» به‌جای «نشست تمام شد» دیده شود.
+       */
+      try { fresh = await refresh(); } catch (e2) {
+        if (e2 && e2.status === 401) { signOutLocal(); throw e; }
+        throw e2;
+      }
       if (!fresh) { signOutLocal(); throw e; }
       try {
         return await call(path, Object.assign({}, opts, { token: fresh }));

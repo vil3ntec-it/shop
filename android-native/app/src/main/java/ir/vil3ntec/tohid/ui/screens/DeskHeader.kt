@@ -25,7 +25,8 @@ import ir.vil3ntec.tohid.ui.theme.Shop
  *
  *  باریک و روشن، مثلِ برنامه‌های کامپیوتریِ امروزی: ☰ و برگشت، عنوانِ صفحه،
  *  **جست‌وجوی همه‌جا** (Ctrl+K)، **زنگِ هشدارها** با شمار (ناموجود، کم‌موجود،
- *  انقضا، قرضِ دیرکرده) و دکمهٔ اصلیِ **«فروشِ تازه»**.
+ *  انقضا، قرضِ دیرکرده) و دکمهٔ اصلیِ **«فروشِ تازه»**. در انتها نام و نقشِ
+ *  کاربرِ همین دستگاه (VISUAL-DIRECTION §۳) که صفحهٔ «حساب من» را باز می‌کند.
  */
 @Composable
 fun DeskHeader(
@@ -60,7 +61,9 @@ fun DeskHeader(
         .widthIn(max = 520.dp)
         .height(40.dp)
         .clip(RoundedCornerShape(20.dp))
-        .background(Shop.colors.surface2)
+        //  زمینهٔ خنثی + خطِ نازک: روی سربرگِ سفید، سطحِ سفید دیده نمی‌شد
+        .background(Shop.colors.bg)
+        .border(1.dp, Shop.colors.border, RoundedCornerShape(20.dp))
         .clickable { onSearch() }
         .padding(horizontal = 14.dp),
       verticalAlignment = Alignment.CenterVertically,
@@ -114,6 +117,37 @@ fun DeskHeader(
       Spacer(Modifier.width(6.dp))
       Text("فروشِ تازه  Ctrl+2")
     }
+    Spacer(Modifier.width(10.dp))
+    UserChip(onOpen)
   }
   HorizontalDivider(color = Shop.colors.border)
+}
+
+/**
+ *  نام و نقشِ کاربر — نام از حسابِ واردشده (`SyncStore.accountName`)، نقش از
+ *  `ShopRole` (همان سدِ مجوزهای برنامه). بی‌حساب: «بی‌حساب» و نقشِ صاحب دکان،
+ *  همان فرضِ `ShopRole.current`.
+ */
+@Composable
+private fun UserChip(onOpen: (String) -> Unit) {
+  val context = androidx.compose.ui.platform.LocalContext.current
+  val name = remember(context) { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrDefault("").trim() }
+  val role = remember(context) { DeskMenu.roleLabel(ir.vil3ntec.tohid.data.ShopRole.current(context)) }
+  val shown = name.ifEmpty { "بی‌حساب" }
+  Row(
+    Modifier
+      .clip(RoundedCornerShape(20.dp))
+      .clickable(onClickLabel = "حساب من") { onOpen("profile") }
+      .padding(horizontal = 6.dp, vertical = 4.dp),
+    verticalAlignment = Alignment.CenterVertically,
+  ) {
+    Box(Modifier.size(32.dp).clip(CircleShape).background(Shop.colors.primaryTint), contentAlignment = Alignment.Center) {
+      Text(shown.take(1), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Shop.colors.text)
+    }
+    Spacer(Modifier.width(8.dp))
+    Column {
+      Text(shown, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = Shop.colors.text, maxLines = 1, modifier = Modifier.widthIn(max = 140.dp))
+      Text(role, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted, maxLines = 1)
+    }
+  }
 }

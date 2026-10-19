@@ -677,6 +677,30 @@ await step('قالبِ آمادهٔ اعلان از پنل ویرایش می‌�
     `عنوانِ قالب باید عوض شده باشد — ${row.title}`);
 });
 
+// ── §۳۸.۹: حداقل نسخهٔ پشتیبانی‌شده از همان فرمِ «نشانیِ دانلود» ──
+await step('حداقل نسخه: از پنل ذخیره می‌شود، نادرست رد می‌شود و دوباره خوانده می‌شود', async () => {
+  await openTab('sales');
+  await page.selectOption('#dl-app', 'shop');
+  await page.fill('#dl-version', '2.14.2');
+  await page.fill('#dl-min', '2.14.0');
+  await page.click('#btn-dl-save');
+  await page.waitForFunction(() => /ذخیره شد/.test(document.getElementById('dl-msg').textContent), null, { timeout: 10_000 });
+  assert.equal((await one(`SELECT value FROM app_config WHERE key='min_app_version_shop'`)).value, '2.14.0');
+
+  //  ۴۰۰ِ عمدی در کنسولِ مرورگر «Failed to load resource» می‌نویسد — همان یکی کنار می‌رود
+  const errorsBefore = consoleErrors.length;
+  await page.fill('#dl-min', '9.0.0');
+  await page.click('#btn-dl-save');
+  await page.waitForFunction(() => /بالاتر/.test(document.getElementById('dl-msg').textContent), null, { timeout: 10_000 });
+  assert.equal((await one(`SELECT value FROM app_config WHERE key='min_app_version_shop'`)).value, '2.14.0');
+  const extra = consoleErrors.splice(errorsBefore);
+  assert.ok(extra.every((e) => /400/.test(e)), extra.join(' | '));
+
+  await page.fill('#dl-min', '');
+  await openTab('sales');
+  assert.equal(await page.inputValue('#dl-min'), '2.14.0', 'پس از بازخوانی همان مقدارِ ذخیره‌شده');
+});
+
 await step('همگام‌سازی و امنیت: دستگاه‌ها، خطاها و درخواست‌های ورود بی خطا پر می‌شوند', async () => {
   await openTab('health');
   await page.waitForTimeout(400);
