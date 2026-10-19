@@ -142,11 +142,9 @@ fun PromosScreen(d: ShopData, snackbar: SnackbarHostState) {
   Box(Modifier.fillMaxSize()) {
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(Space.md)) {
       item(key = "head") {
+        //  نامِ صفحه را سربرگ می‌گوید؛ این‌جا فقط توضیح و «قاعدهٔ تازه» (بی تکرار)
         Row(verticalAlignment = Alignment.CenterVertically) {
-          Column(Modifier.weight(1f)) {
-            Text("تخفیف‌ها", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = c.text)
-            Text("قاعده‌های خودکار و کدهای تخفیفِ صندوق", style = MaterialTheme.typography.bodySmall, color = c.muted)
-          }
+          Text("قاعده‌های خودکار و کدهای تخفیفِ صندوق", Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, color = c.muted)
           if (snap.manage) Button(onClick = addNew) { Text("+ قاعدهٔ تازه") }
         }
         Spacer(Modifier.height(Space.md))

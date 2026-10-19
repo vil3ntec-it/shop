@@ -111,6 +111,7 @@ fun DeskSaleScreen(
   //  PRM: تخفیف‌های خودکار — کلیدِ دکان خاموش ⇒ null و `priced` همان `cart` است
   val promo = ir.vil3ntec.tohid.ui.PromoLive.rememberOutcome(d, cart)
   val priced = ir.vil3ntec.tohid.data.PromoEngine.priced(cart, promo)
+  val promoSnap = ir.vil3ntec.tohid.ui.PromoLive.snap.value
 
   var query by remember { mutableStateOf("") }
   var hint by remember { mutableStateOf(0) }
@@ -417,22 +418,26 @@ fun DeskSaleScreen(
               onEdit = { editLine = it },
               onMinus = { step(it, -1); refocus() },
               onPlus = { step(it, 1); refocus() },
-              modifier = Modifier.weight(1f, fill = false),
+              //  PRM-18: هر تخفیفِ اعمال‌شده یک ردیف با نامش و کادرِ کد — تهِ همان فهرست،
+              //  با اسکرولِ اقلام، تا جای ردیف‌های سبد را نگیرند
+              footer = if (promoSnap.active) {
+                {
+                  promo?.let { PromoLines(it.applied) }
+                  if (promoSnap.hasCodes) {
+                    PromoCodeField(
+                      codes = promo?.codes.orEmpty(),
+                      entered = ir.vil3ntec.tohid.ui.PromoLive.coupons.value,
+                      onAdd = { ir.vil3ntec.tohid.ui.PromoLive.addCoupon(it); refocus() },
+                      onRemove = { ir.vil3ntec.tohid.ui.PromoLive.removeCoupon(it) },
+                      modifier = Modifier.padding(top = 8.dp),
+                    )
+                  }
+                }
+              } else null,
             )
-            //  PRM-18: هر تخفیفِ اعمال‌شده یک ردیف با نامش، تهِ اقلام
-            promo?.let { PromoLines(it.applied) }
           },
           summary = {
             PaymentSummary(PromoSummary.rows(totals, promo), totals.finalTotal) {
-              val promoSnap = ir.vil3ntec.tohid.ui.PromoLive.snap.value
-              if (promoSnap.active && promoSnap.hasCodes) {
-                PromoCodeField(
-                  codes = promo?.codes.orEmpty(),
-                  entered = ir.vil3ntec.tohid.ui.PromoLive.coupons.value,
-                  onAdd = { ir.vil3ntec.tohid.ui.PromoLive.addCoupon(it); refocus() },
-                  onRemove = { ir.vil3ntec.tohid.ui.PromoLive.removeCoupon(it) },
-                )
-              }
               if (canDiscount) {
                 OutlinedTextField(
                   value = discountText,

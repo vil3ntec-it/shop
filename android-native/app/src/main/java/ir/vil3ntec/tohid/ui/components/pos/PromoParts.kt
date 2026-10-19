@@ -50,13 +50,14 @@ import ir.vil3ntec.tohid.ui.theme.Space
 
 object PromoSummary {
   /**
-   *  خلاصهٔ پرداخت با تخفیف‌های خودکار: «جمع» پیش از آن‌ها، هر قاعده یک ردیفِ
-   *  منفی، بعد تخفیفِ دستی. بی تخفیف ⇒ همان `PosSummary.rows`.
+   *  خلاصهٔ پرداخت با تخفیف‌های خودکار: «جمع» پیش از آن‌ها، یک ردیفِ منفیِ
+   *  «تخفیفِ خودکار» (نامِ هر قاعده یک بار، در ردیفِ خودش در سبد — نه دوباره
+   *  این‌جا)، بعد تخفیفِ دستی. بی تخفیف ⇒ همان `PosSummary.rows`.
    */
   fun rows(t: SalesEngine.Totals, o: PromoEngine.Outcome?): List<PosSummaryRow> =
-    if (o == null || o.applied.isEmpty()) PosSummary.rows(t) else buildList {
+    if (o == null || o.discount <= 0) PosSummary.rows(t) else buildList {
       add(PosSummaryRow("جمع", o.gross))
-      o.applied.forEach { add(PosSummaryRow(it.name, it.discount, negative = true)) }
+      add(PosSummaryRow("تخفیفِ خودکار", o.discount, negative = true))
       if (t.discount > 0) add(PosSummaryRow("تخفیف", t.discount, negative = true))
     }
 }
