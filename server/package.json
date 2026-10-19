@@ -20,6 +20,7 @@
     "test:web": "node test/web-backup.mjs && node test/web-beta-channel.mjs && node test/web-digits.mjs && node test/web-locale.mjs && node test/web-pos-draft.mjs && node test/web-sync-ux.mjs && node test/web-session.mjs && node test/web-debtors-ledger.mjs && node test/web-orders.mjs && node test/web-sync-v3.mjs",
     "test:portal-rep": "node test/portal-rep.mjs",
     "test:web-store": "node test/web-store.mjs",
+    "test:e2e": "node test/e2e/run.mjs",
     "test:login": "node --test --test-concurrency=1 test/login-contract.test.js test/sync-v1.test.js",
     "test:auto-backup": "node --test test/auto-backup.test.js",
     "test:web-idb": "node test/web-idb.mjs",
