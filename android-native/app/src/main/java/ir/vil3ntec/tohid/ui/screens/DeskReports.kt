@@ -12,9 +12,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.Jalali
 import ir.vil3ntec.tohid.core.keymap.KeyMap
+import ir.vil3ntec.tohid.data.CustomerInsight
+import ir.vil3ntec.tohid.data.CustomerMerge
+import ir.vil3ntec.tohid.data.DebtReminder
 import ir.vil3ntec.tohid.data.ReportCsv
 import ir.vil3ntec.tohid.data.ReportEngine
 import ir.vil3ntec.tohid.data.ShopData
+import ir.vil3ntec.tohid.data.ShopPolicy
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.data.Xlsx
 import ir.vil3ntec.tohid.formatDate
@@ -33,7 +37,8 @@ import kotlinx.coroutines.launch
  *
  *  Ctrl+P چاپ، Ctrl+E اکسل — از ثبتِ مرکزیِ کلیدها (`KeyMap.GLOBAL_PRINT` / `GLOBAL_EXPORT`).
  */
-private enum class Rep(val key: String, val label: String, val ranged: Boolean) {
+/** `crm`: گزارشِ مشتری — فقط وقتی `ShopPolicy.crmReports` روشن است (پیش‌فرض خاموش) */
+private enum class Rep(val key: String, val label: String, val ranged: Boolean, val crm: Boolean = false) {
   SALES("sales", "فروش", true),
   PROFIT("profit", "سود و زیان", true),
   PURCHASES("purchases", "خرید", true),
@@ -43,6 +48,10 @@ private enum class Rep(val key: String, val label: String, val ranged: Boolean) 
   DEBTORS("debtors", "قرض‌داران", false),
   STOCK("stock", "گردشِ موجودی", false),
   EXPIRY("expiry", "انقضا", false),
+  AGING("aging", "سنِ بدهی", false, crm = true),
+  RFM("rfm", "تحلیلِ خریدِ مشتریان", false, crm = true),
+  DUPLICATES("duplicates", "مشتریانِ تکراری", false, crm = true),
+  REMINDERS("reminders", "یادآوریِ امروز", false, crm = true),
 }
 
 private enum class Span(val label: String) { TODAY("امروز"), WEEK("۷ روز"), MONTH("این ماه"), JMONTH("ماهِ خورشیدی"), JYEAR("سالِ خورشیدی"), ALL("همه"), CUSTOM("از … تا …") }
@@ -55,6 +64,8 @@ fun DeskReportsScreen(d: ShopData, snackbar: SnackbarHostState) {
   val today = ir.vil3ntec.tohid.todayIso()
   val j = remember(today) { Jalali.ofIso(today) }
 
+  val crm = remember { ShopPolicy.crmReports(context) }
+  val reps = remember(crm) { Rep.values().filter { crm || !it.crm } }
   var rep by remember { mutableStateOf(Rep.SALES) }
   var span by remember { mutableStateOf(Span.MONTH) }
   var fromText by remember { mutableStateOf(j?.let { "%d/%02d/01".format(it.year, it.month) }.orEmpty()) }
@@ -88,8 +99,8 @@ fun DeskReportsScreen(d: ShopData, snackbar: SnackbarHostState) {
       .padding(16.dp),
   ) {
     //  نوعِ گزارش
-    ScrollableTabRow(selectedTabIndex = rep.ordinal, containerColor = Shop.colors.surface, edgePadding = 0.dp) {
-      Rep.values().forEach { r -> Tab(selected = rep == r, onClick = { rep = r }, text = { Text(r.label) }) }
+    ScrollableTabRow(selectedTabIndex = reps.indexOf(rep).coerceAtLeast(0), containerColor = Shop.colors.surface, edgePadding = 0.dp) {
+      reps.forEach { r -> Tab(selected = rep == r, onClick = { rep = r }, text = { Text(r.label) }) }
     }
     Spacer(Modifier.height(10.dp))
 
@@ -155,6 +166,31 @@ fun DeskReportsScreen(d: ShopData, snackbar: SnackbarHostState) {
           val total = remember(d) { d.debtors.sumOf { ShopStore.debt(d, it.id).coerceAtLeast(0.0) } }
           DeskKpi("طلبِ کل", "${money(total)} ؋", Shop.colors.danger, Modifier.weight(1f))
           DeskKpi("بدهکاران", "${d.debtors.count { ShopStore.debt(d, it.id) > 0.5 }}", Shop.colors.text, Modifier.weight(1f))
+        }
+        Rep.AGING -> {
+          val a = remember(d, today) { CustomerInsight.aging(d, today) }
+          DeskKpi("ماندهٔ کل", "${money(a.balance)} ؋", Shop.colors.danger, Modifier.weight(1f))
+          DeskKpi("بیش از ۹۰ روز", "${money(a.totals.lastOrNull() ?: 0.0)} ؋", Shop.colors.warning, Modifier.weight(1f))
+          DeskKpi("بدهکاران", "${a.lines.count { it.balance > 0.5 }}", Shop.colors.text, Modifier.weight(1f))
+        }
+        Rep.RFM -> {
+          val rows = remember(d, today) { CustomerInsight.rfm(d, today) }
+          fun n(s: CustomerInsight.Segment) = "${rows.count { it.segment == s }}"
+          DeskKpi("مشتریانِ خریدار (یک سال)", "${rows.size}", Shop.colors.primary, Modifier.weight(1f))
+          DeskKpi(CustomerInsight.Segment.CHAMPION.label, n(CustomerInsight.Segment.CHAMPION), Shop.colors.success, Modifier.weight(1f))
+          DeskKpi(CustomerInsight.Segment.AT_RISK.label, n(CustomerInsight.Segment.AT_RISK), Shop.colors.warning, Modifier.weight(1f))
+          DeskKpi(CustomerInsight.Segment.LOST.label, n(CustomerInsight.Segment.LOST), Shop.colors.danger, Modifier.weight(1f))
+        }
+        Rep.DUPLICATES -> {
+          val groups = remember(d) { CustomerMerge.duplicates(d) }
+          DeskKpi("گروه‌های تکراری", "${groups.size}", Shop.colors.warning, Modifier.weight(1f))
+          DeskKpi("با شمارهٔ یکسان", "${groups.count { it.strong }}", Shop.colors.danger, Modifier.weight(1f))
+        }
+        Rep.REMINDERS -> {
+          val due = remember(d, today) { DebtReminder.due(d, today) }
+          DeskKpi("یادآوریِ امروز", "${due.size}", Shop.colors.warning, Modifier.weight(1f))
+          DeskKpi("سررسید گذشته", "${due.count { it.overdueSince.isNotEmpty() }}", Shop.colors.danger, Modifier.weight(1f))
+          DeskKpi("جمعِ مانده", "${money(due.sumOf { it.balance })} ؋", Shop.colors.text, Modifier.weight(1f))
         }
       }
     }

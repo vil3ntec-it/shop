@@ -466,6 +466,34 @@ fun SettingsScreen(
       }
     }
 
+    /* ================= گزارش‌های مشتری (CRM-04/06/10/14) — فقط کامپیوتر ================= */
+    //  فقط زبانه‌های «گزارش‌ها»ی کامپیوتر را نشان/پنهان می‌کند؛ گوشی هنوز این زبانه‌ها را ندارد،
+    //  پس این‌جا دکمهٔ بی‌اثر نمی‌گذاریم. پیش‌فرض خاموش.
+    if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) item {
+      var crmReports by remember { mutableStateOf(ir.vil3ntec.tohid.data.ShopPolicy.crmReports(context)) }
+      SettingsSection(
+        icon = Icons.Filled.TableChart,
+        title = "گزارش‌های مشتری",
+        subtitle = if (crmReports) "در «گزارش‌ها» دیده می‌شوند" else "خاموش",
+        tint = if (crmReports) Shop.colors.success else Shop.colors.muted,
+      ) {
+        Text(
+          "چهار زبانهٔ تازه در «گزارش‌ها»: سنِ بدهی (۰–۳۰، ۳۱–۶۰، ۶۱–۹۰، ۹۰+ روز)، تحلیلِ خریدِ مشتریان (RFM)، مشتریانِ تکراری و یادآوریِ امروز. فقط خواندنی‌اند و چیزی در دفتر نمی‌نویسند. پس از تغییر، «گزارش‌ها» را دوباره باز کنید.",
+          style = MaterialTheme.typography.labelSmall,
+          color = Shop.colors.muted2,
+        )
+        Spacer(Modifier.height(8.dp))
+        SegmentedChoice(
+          options = listOf("off" to "خاموش", "on" to "روشن"),
+          selected = if (crmReports) "on" else "off",
+          onSelect = {
+            crmReports = it == "on"
+            ir.vil3ntec.tohid.data.ShopPolicy.setCrmReports(context, crmReports)
+          },
+        )
+      }
+    }
+
     /* ============================== دوربین ============================== */
     item {
       SettingsSection(
