@@ -18,14 +18,15 @@ function hashToken(token) { return createHash('sha256').update(String(token)).di
  *  خالی یعنی «نگفت» — نسخه‌های امروزِ دستِ کاربر چیزی نمی‌فرستند و
  *  نباید هم از کار بیفتند. شرحش سرِ `migrations/015`.
  */
-async function issue({ kind, subjectId, deviceId = null, ttlMs, app = 'shop', appVersion = '' }) {
+async function issue({ kind, subjectId, deviceId = null, ttlMs, app = 'shop', appVersion = '', shopId = null }) {
   const token = generateToken();
   const issuedAt = now();
   const expiresAt = issuedAt + ttlMs;
+  //  `shopId`: دکانِ برگزیدهٔ نشست (مهاجرتِ ۰۹۷) — تهی یعنی «همان قاعدهٔ همیشگی»
   await query(
-    `INSERT INTO tokens (token_hash, kind, subject_id, device_id, issued_at, expires_at, app, app_version)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-    [hashToken(token), kind, subjectId, deviceId, issuedAt, expiresAt, app, String(appVersion || '').slice(0, 32)]
+    `INSERT INTO tokens (token_hash, kind, subject_id, device_id, issued_at, expires_at, app, app_version, shop_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+    [hashToken(token), kind, subjectId, deviceId, issuedAt, expiresAt, app, String(appVersion || '').slice(0, 32), shopId || null]
   );
   if (kind === 'access' || kind === 'refresh') await rememberApp(subjectId, app, issuedAt);
   return { token, expiresAt, app };

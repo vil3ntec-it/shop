@@ -50,7 +50,8 @@ async function resolveToken(token) {
         userId: user.id, role: m.role, via: 'user',
       };
     }
-    const m = await require('./shops').membershipOf(user.id);
+    //  دکانِ برگزیدهٔ همین نشست، اگر برگزیده (مهاجرتِ ۰۹۷)
+    const m = await require('./shops').membershipOf(user.id, { shopId: row.shop_id || null });
     if (!m) return { app, accountKind: 'shop', accountId: '', userId: user.id, role: '', via: 'user', missing: 'no_shop' };
     return {
       app, accountKind: 'shop', accountId: m.shop_id, accountName: m.shop_name || '',

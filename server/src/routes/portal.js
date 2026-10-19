@@ -37,12 +37,13 @@ const DAY = 24 * 60 * 60 * 1000;
    ========================================================== */
 
 /** عضویتِ این کاربر در یک بخش — یا null. */
-async function membership(app, userId) {
+async function membership(app, userId, tokenRow = null) {
   if (app === 'pump') {
     const m = await stations.membershipOf(userId);
     return m ? { app, tenantId: m.station_id, name: m.station_name || '', role: m.role, code: m.station_code || '' } : null;
   }
-  const m = await shops.membershipOf(userId);
+  //  دکانِ برگزیدهٔ همین نشست، اگر برگزیده (مهاجرتِ ۰۹۷) — از ردیفِ توکن، نه از درخواست
+  const m = await shops.membershipOf(userId, { shopId: shops.sessionShopOf(tokenRow) });
   return m ? { app: 'shop', tenantId: m.shop_id, name: m.shop_name || '', role: m.role } : null;
 }
 
@@ -50,7 +51,7 @@ async function membership(app, userId) {
 async function tenantOf(app, req) {
   if (app === 'shop' && req.shopId !== undefined) return req.shopId || '';
   if (app === 'pump' && req.stationId !== undefined) return req.stationId || '';
-  const m = await membership(app, req.user.id);
+  const m = await membership(app, req.user.id, req.tokenRow);
   return m ? m.tenantId : '';
 }
 
@@ -242,7 +243,7 @@ router.get('/me', async (req, res, next) => {
     const at = now();
     const memberships = [];
     for (const app of ['shop', 'pump']) {
-      const m = await membership(app, req.user.id);
+      const m = await membership(app, req.user.id, req.tokenRow);
       if (!m) continue;
       await subs.forApp(app).expireDue(at);
       const ent = await entitlement.forApp(app).entitlementOf(m.tenantId, at);
@@ -271,7 +272,7 @@ router.get('/subscriptions', async (req, res, next) => {
   try {
     const out = [];
     for (const app of ['shop', 'pump']) {
-      const m = await membership(app, req.user.id);
+      const m = await membership(app, req.user.id, req.tokenRow);
       if (!m) continue;
       const ent = await entitlement.forApp(app).entitlementOf(m.tenantId);
       out.push({ ...m, subscription: subscriptionView(ent) });
@@ -284,7 +285,7 @@ router.get('/payments', async (req, res, next) => {
   try {
     const out = [];
     for (const app of ['shop', 'pump']) {
-      const m = await membership(app, req.user.id);
+      const m = await membership(app, req.user.id, req.tokenRow);
       if (m) out.push(...await paymentsOf(app, m.tenantId));
     }
     res.json({ payments: out.sort((a, b) => b.paidAt - a.paidAt), serverTime: now() });
@@ -297,7 +298,7 @@ router.get('/payments/:id/receipt', async (req, res, next) => {
     const row = await one(`SELECT ${sales().PAYMENT_COLS} FROM sub_payments p ${sales().PAYMENT_JOIN} WHERE p.id=$1 AND p.deleted=false`,
       [v.id(req.params.id)]);
     if (!row) return next(notFound('رسید پیدا نشد', 'payment_not_found'));
-    const m = await membership(row.app, req.user.id);
+    const m = await membership(row.app, req.user.id, req.tokenRow);
     if (!m || m.tenantId !== row.tenant_id) return next(notFound('رسید پیدا نشد', 'payment_not_found'));
     res.set('Content-Type', 'text/html; charset=utf-8');
     res.send(await sales().receiptHtml(row));
@@ -326,7 +327,7 @@ router.delete('/devices/:id', async (req, res, next) => {
 /** پشتیبانی — همان رشتهٔ همیشگیِ همین کاربر در بخشِ نشست. */
 async function supportIdentity(req) {
   const app = req.appSection === 'pump' ? 'pump' : 'shop';
-  const m = await membership(app, req.user.id);
+  const m = await membership(app, req.user.id, req.tokenRow);
   return {
     app, userId: req.user.id,
     shopId: app === 'shop' && m ? m.tenantId : '',
@@ -361,7 +362,7 @@ router.get('/settings', async (req, res, next) => {
   try {
     const out = {};
     for (const app of ['shop', 'pump']) {
-      const m = await membership(app, req.user.id);
+      const m = await membership(app, req.user.id, req.tokenRow);
       if (m) out[app] = { cloudSync: await cloudSyncOf(app, m.tenantId) };
     }
     res.json({ settings: out });
