@@ -141,3 +141,20 @@ test('پاسخِ وابسته به شناسه در کشِ مشترک نمی‌ن
   assert.match(r1.headers.get('cache-control'), /private/);
   assert.match(r2.headers.get('cache-control'), /public/);
 });
+
+test('§۳۸.۹: حداقل نسخهٔ دکان در خوراکِ انتشار؛ نبود یا نادرست ⇒ خالی', async () => {
+  const plans = require('../src/lib/plans');
+  let r = await h.api('GET', '/api/releases/tohid-native/latest');
+  assert.equal(r.body.minVersion, '', 'پیش‌فرض: حداقلی نیست');
+  await plans.setConfig('min_app_version_shop', '3.2.45');
+  r = await h.api('GET', '/api/releases/tohid-native/latest');
+  assert.equal(r.status, 200);
+  assert.equal(r.body.minVersion, '3.2.45');
+  await plans.setConfig('min_app_version_pump', '9.0.0');
+  r = await h.api('GET', '/api/releases/tohid-native/latest');
+  assert.equal(r.body.minVersion, '3.2.45', 'حداقلِ پمپ به برنامهٔ دکان نمی‌رسد');
+  await plans.setConfig('min_app_version_shop', 'نادرست');
+  r = await h.api('GET', '/api/releases/tohid-native/latest');
+  assert.equal(r.body.minVersion, '');
+  await plans.setConfig('min_app_version_shop', '');
+});
