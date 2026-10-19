@@ -92,8 +92,9 @@ async function shop(slug, title, listing, products) {
   for (const [id] of products) await call('PUT', `/api/shop/storefront/products/${id}`, { published: true }, T);
   return { slug, shopId, token: T };
 }
-const ga = await shop('golestan-test', 'سوپرمارکتِ آزمایشی', { category: 'grocery', area: 'کارتهٔ سه' }, [['rice', 'برنج', 120.5], ['oil', 'روغن', 300]]);
-const gb = await shop('bahar-test', 'نانواییِ آزمایشی', { category: 'bakery', area: 'شهرِ نو' }, [['naan', 'نانِ تندوری', 15]]);
+//  بازارچه فقط با خواستِ صاحب دکان است (بازبینیِ حریم) ⇒ `listed: true` ِ صریح
+const ga = await shop('golestan-test', 'سوپرمارکتِ آزمایشی', { listed: true, category: 'grocery', area: 'کارتهٔ سه' }, [['rice', 'برنج', 120.5], ['oil', 'روغن', 300]]);
+const gb = await shop('bahar-test', 'نانواییِ آزمایشی', { listed: true, category: 'bakery', area: 'شهرِ نو' }, [['naan', 'نانِ تندوری', 15]]);
 const gc = await shop('hidden-test', 'دکانِ بیرون از فهرست', { listed: false }, [['tea', 'چای', 80]]);
 
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium/chrome-linux/chrome' }).catch(() => chromium.launch());

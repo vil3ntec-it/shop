@@ -5,9 +5,10 @@
  * ⛔ بی‌توکن و عمومی، ولی پیش‌فرض خاموش: بی پرچمِ `market.directory` (scope
  * `all`) همه‌چیز ۴۰۴ `market_not_found` است و ویترینِ هر دکان همان رفتارِ امروز.
  * ⛔ سقفِ درخواست به‌ازای IP: خواندن سطلِ خودش را با `generalMax`، جست‌وجوی
- * کالا `marketSearchMax`، و تأییدِ شماره **همان سطل‌های ویترین** (یک IP با دو
- * نشانی دو برابر تلاش نمی‌گیرد).
- * پاسخ‌ها کش نمی‌شوند (وضعیتِ باز/بسته زنده است).
+ * کالا `marketSearchBurstMax` در دقیقه و `marketSearchMax` در ربع ساعت، و
+ * تأییدِ شماره **همان سطل‌های ویترین** (یک IP با دو نشانی دو برابر تلاش نمی‌گیرد).
+ * پاسخ‌ها در مرورگر کش نمی‌شوند؛ سرور «برشِ» دکان‌ها را `eligibleCacheMs` نگه
+ * می‌دارد (lib/market.js).
  */
 const express = require('express');
 const config = require('../config');
@@ -20,6 +21,8 @@ const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).cat
 
 const readLimit = rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'market-read' });
 const searchLimit = rateLimit({ max: config.rateLimit.marketSearchMax, keyPrefix: 'market-search' });
+//  سقفِ ضربه‌ای: چند جست‌وجو در دقیقه از یک IP، جدا از سقفِ ربع‌ساعته
+const searchBurst = rateLimit({ max: config.rateLimit.marketSearchBurstMax, windowMs: 60 * 1000, keyPrefix: 'market-search-burst' });
 //  همان کلیدهای `routes/storefront.js` ⇒ همان سطل
 const sendCodeLimit = rateLimit({ max: config.rateLimit.storeCheckoutMax, keyPrefix: 'store-verify' });
 const codeLimit = rateLimit({ max: config.rateLimit.verifyMax, keyPrefix: 'store-verify-code' });
@@ -39,7 +42,7 @@ router.get('/shops', readLimit, on, wrap(async (req, res) => {
   res.json(await market.shops({ q, category, lat, lng, limit, offset }));
 }));
 
-router.get('/search', searchLimit, on, wrap(async (req, res) => {
+router.get('/search', searchBurst, searchLimit, on, wrap(async (req, res) => {
   const { q, lat, lng, limit } = req.query;
   res.json(await market.search({ q, lat, lng, limit }));
 }));
