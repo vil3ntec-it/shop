@@ -42,21 +42,23 @@ object DeskMenu {
   fun groups(
     canAdmin: Boolean,
     shortcuts: List<Pair<String, String>> = AppNav.SHORTCUTS,
+    ordersLive: Boolean = false,
     storefrontLive: Boolean = false,
   ): List<Group> {
-    return build(canAdmin, storefrontLive) { id, label -> shortcutItem(shortcuts, id, label) }
+    return build(canAdmin, ordersLive, storefrontLive) { id, label -> shortcutItem(shortcuts, id, label) }
   }
 
   /**
+   *  @param ordersLive سرور بخشِ سفارش را برای این دکان روشن کرده (`OrdersLive.enabled`)
    *  @param storefrontLive سرور ویترین را برای این دکان روشن کرده و کاربر اجازهٔ مدیریتش را دارد
-   *  (`StorefrontGate.visible`)؛ خاموش ⇒ همان ردیفِ «در دست ساخت»
+   *  (`StorefrontGate.visible`). خاموش ⇒ همان ردیفِ «در دست ساخت»
    */
-  private fun build(canAdmin: Boolean, storefrontLive: Boolean, page: (String, String?) -> Item): List<Group> = listOf(
+  private fun build(canAdmin: Boolean, ordersLive: Boolean, storefrontLive: Boolean, page: (String, String?) -> Item): List<Group> = listOf(
     Group(
       "اصلی",
       listOf(
         page("dashboard", null),
-        soon("orders", "سفارش‌های آنلاین"),
+        if (ordersLive) Item("orders", "سفارش‌های آنلاین") else soon("orders", "سفارش‌های آنلاین"),
         soon("fulfil", "آماده‌سازی و تحویل"),
         page("products", null),
         page("warehouse", null),

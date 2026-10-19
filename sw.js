@@ -70,6 +70,9 @@ const SHELL_ASSETS = [
   //  دفترِ قرض‌داران (پول به واحدِ کوچک + DebtBook) — بی این دو، حسابِ ردیف‌ها روی نصبِ آفلاین نمی‌آمد
   './license/money.js',
   './license/debt-book.js',
+  //  بخشِ «سفارش‌ها» (فاز ۴) — پشتِ پرچمِ سرور؛ خاموش ⇒ هیچ کاری نمی‌کند
+  './license/orders-ui.js',
+  './license/orders-ui.css',
   './license/storefront-owner.js',
   './license/storefront-owner.css',
   //  خوانندهٔ بارکد برای آیفون — Safari «BarcodeDetector» ندارد و دوربین همیشه

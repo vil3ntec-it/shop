@@ -58,8 +58,12 @@ fun DeskRail(
 ) {
   val context = LocalContext.current
   val canAdmin = ir.vil3ntec.tohid.data.ShopRole.canOpenSettings(context)
-  //  ویترین فقط وقتی سرور روشنش کرده و کاربر اجازهٔ مدیریت دارد (StorefrontGate)
-  val groups = DeskMenu.groups(canAdmin, storefrontLive = StorefrontGate.visible)
+  //  سفارش‌ها و ویترین فقط وقتی سرور روشنشان کرده (و برای ویترین، کاربر اجازهٔ مدیریت دارد)
+  val groups = DeskMenu.groups(
+    canAdmin,
+    ordersLive = ir.vil3ntec.tohid.ui.OrdersLive.enabled,
+    storefrontLive = StorefrontGate.visible,
+  )
   Column(
     Modifier
       .width(if (compact) DESK_RAIL_COMPACT else DESK_RAIL_WIDTH)
@@ -122,14 +126,17 @@ private fun RailSoonItem(label: String, icon: ImageVector) {
   ) {
     Icon(icon, contentDescription = null, tint = Shop.colors.muted, modifier = Modifier.size(19.dp))
     Spacer(Modifier.width(12.dp))
-    Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, color = Shop.colors.muted, maxLines = 1)
-    Text(
-      DeskMenu.SOON_LABEL,
-      style = MaterialTheme.typography.labelSmall,
-      color = Shop.colors.muted,
-      maxLines = 1,
-      modifier = Modifier.clip(RoundedCornerShape(10.dp)).background(Shop.colors.muted.copy(alpha = 0.12f)).padding(horizontal = 6.dp, vertical = 1.dp),
-    )
+    //  نشان زیرِ نام می‌آید، نه کنارش — کنارِ هم نامِ بلند («آماده‌سازی و تحویل») بریده می‌شد
+    Column(Modifier.weight(1f)) {
+      Text(label, style = MaterialTheme.typography.bodyMedium, color = Shop.colors.muted, maxLines = 2)
+      Text(
+        DeskMenu.SOON_LABEL,
+        style = MaterialTheme.typography.labelSmall,
+        color = Shop.colors.muted,
+        maxLines = 1,
+        modifier = Modifier.padding(top = 2.dp).clip(RoundedCornerShape(10.dp)).background(Shop.colors.muted.copy(alpha = 0.12f)).padding(horizontal = 6.dp, vertical = 1.dp),
+      )
+    }
   }
 }
 
@@ -198,7 +205,8 @@ private fun iconOf(id: String): ImageVector = when (id) {
   "audit" -> Icons.Filled.History
   "settings" -> Icons.Filled.Settings
   "admin" -> Icons.Filled.AdminPanelSettings
-    "devices" -> Icons.Filled.Devices
+  "orders" -> Icons.Filled.ShoppingBasket
+  "devices" -> Icons.Filled.Devices
   "storefront" -> Icons.Filled.Storefront
   "soon:orders" -> Icons.Filled.ShoppingCart
   "soon:fulfil" -> Icons.Filled.Inventory
