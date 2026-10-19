@@ -50,6 +50,17 @@ class DeskMenuTest {
   }
 
   @Test
+  fun `سفارش‌ها فقط با روشن بودنِ بخش زنده است و به مسیرِ AppRoot می‌رود`() {
+    val root = File(ui!!, "AppRoot.kt").readText()
+    val off = DeskMenu.groups(true, shortcuts()).flatMap { it.items }.map { it.id }
+    assertTrue("soon:orders" in off && "orders" !in off)
+    val on = DeskMenu.groups(true, shortcuts(), ordersLive = true).flatMap { it.items }
+    val orders = on.single { it.id == "orders" }
+    assertEquals(DeskMenu.State.LIVE, orders.state)
+    assertTrue(Regex("""\n\s*"orders"\s*->""").containsMatchIn(root))
+  }
+
+  @Test
   fun `در دست ساخت ها شناسهٔ مسیر و کلید ندارند`() {
     val soon = DeskMenu.groups(true, shortcuts()).flatMap { it.items }.filter { it.state == DeskMenu.State.SOON }
     assertTrue(soon.isNotEmpty())
