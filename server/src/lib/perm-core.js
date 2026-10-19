@@ -16,7 +16,10 @@
    • مالک همیشه همه‌کاره است؛ هیچ لایه‌ای او را قفل نمی‌کند.
    • نقشِ ناشناخته و مجوزِ ناشناخته ⇐ ممنوع (بسته‌به‌خطا).
    • مجوزِ «restrict» فقط تنگ‌تر از پیش‌فرضِ نقش می‌شود، هرگز گشادتر:
-     لایه‌ای که بیش از نقش بدهد، تا حدِ نقش بریده می‌شود.
+     لایه‌ای که بیش از نقش بدهد، تا حدِ نقش بریده می‌شود. تنها استثنا
+     «نیازمند تأیید» برای مجوزِ تأییدپذیر است: به خودِ کاربر هیچ قدرتی
+     نمی‌دهد، چون سرور op را فقط با «برگهٔ امضاشده»ی کسی می‌پذیرد که خودش
+     همان کار را «مجاز» دارد (بخشِ ۱۰.۱؛ `server/src/lib/staff-approval.js`).
    • مجوزِ «none» از لایه‌ها اثر نمی‌گیرد.
    • سقف (caps) فقط وقتی اثر دارد که حالت allow باشد؛ عددِ بالاتر از
      سقف ⇐ approve (اگر مجوز تأییدپذیر است) وگرنه deny.
@@ -56,6 +59,12 @@
     'sales.cancel': {
       defaults: { owner: 'allow', manager: 'allow', staff: 'deny' },
       edit: 'restrict', approvable: true, caps: [], display: false,
+    },
+    //  برگشتِ کالا و بازپرداخت (STF-03 «مبلغِ برگشت»): امروز هر عضوِ نویسنده
+    //  ثبت می‌کند، پس پیش‌فرض برای همه allow است
+    'returns.create': {
+      defaults: { owner: 'allow', manager: 'allow', staff: 'allow' },
+      edit: 'restrict', approvable: true, caps: ['maxAmount'], display: false,
     },
     'settings.write': {
       defaults: { owner: 'allow', manager: 'allow', staff: 'deny' },
@@ -103,7 +112,7 @@
         if (MODES.indexOf(o.mode) >= 0) {
           var m = o.mode;
           if (m === 'approve' && !spec.approvable) m = 'deny';
-          if (spec.edit === 'restrict' && RANK[m] > RANK[base]) m = base;
+          if (spec.edit === 'restrict' && RANK[m] > RANK[base] && m !== 'approve') m = base;
           mode = m;
         }
         if (o.caps && typeof o.caps === 'object') {
@@ -144,6 +153,25 @@
     return { decision: 'allow', reason: 'ok' };
   }
 
+  /*
+   *  درصدِ تخفیف برای سنجشِ سقف، به «صدمِ درصد» (عددِ صحیح؛ ۵٪ = ۵۰۰).
+   *  برنامه‌ها تخفیف را تا افغانیِ کامل گرد می‌کنند (۵٪ِ ۳۳۳ می‌شود ۱۷)، پس
+   *  تا نیم افغانی (۵۰ Minor) بخشیده می‌شود تا ۵٪ِ درست «بیش از ۵٪» نشود.
+   *  جمعِ صفر یا منفی با تخفیفِ مثبت ⇐ ۱۰۰٪.
+   */
+  var ROUNDING_MINOR = 50;
+  function discountBp(discountMinor, totalMinor) {
+    var d = Number(discountMinor);
+    var t = Number(totalMinor);
+    if (!isFinite(d) || d <= 0) return 0;
+    if (!isFinite(t) || t <= 0) return 10000;
+    var forgiven = Math.max(0, Math.floor(d) - ROUNDING_MINOR);
+    return Math.min(10000, Math.floor(forgiven * 10000 / Math.floor(t)));
+  }
+  function discountPct(discountMinor, totalMinor) {
+    return discountBp(discountMinor, totalMinor) / 100;
+  }
+
   /** بی درخواستِ عددی: آیا دکمه دیده شود و بی‌واسطه کار کند */
   function allows(role, layers, key) {
     return evaluate(role, layers, key, null).decision === 'allow';
@@ -176,7 +204,7 @@
     if (has(o, 'mode')) {
       if (MODES.indexOf(o.mode) < 0) return 'bad_mode';
       if (o.mode === 'approve' && !spec.approvable) return 'not_approvable';
-      if (spec.edit === 'restrict' && RANK[o.mode] > RANK[base]) return 'exceeds_role';
+      if (spec.edit === 'restrict' && RANK[o.mode] > RANK[base] && o.mode !== 'approve') return 'exceeds_role';
     }
     if (has(o, 'caps')) {
       if (!o.caps || typeof o.caps !== 'object' || Array.isArray(o.caps)) return 'bad_cap';
@@ -205,5 +233,8 @@
     allows: allows,
     effective: effective,
     validate: validate,
+    ROUNDING_MINOR: ROUNDING_MINOR,
+    discountBp: discountBp,
+    discountPct: discountPct,
   };
 });

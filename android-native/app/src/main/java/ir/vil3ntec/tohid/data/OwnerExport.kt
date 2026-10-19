@@ -143,6 +143,7 @@ object OwnerExport {
     "productionDate" to "تاریخ تولید",
     "invoiceNumber" to "شمارهٔ فاکتور",
     "series" to "سری سند",
+    "channel" to "کانال فروش",
     "total" to "جمع",
     "discountType" to "نوع تخفیف",
     "discountValue" to "مقدار تخفیف",

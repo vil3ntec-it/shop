@@ -21,6 +21,13 @@
   <uses-permission android:name="android.permission.CAMERA" />
 
   <!--
+       پیامِ صوتیِ چتِ دکان (v3 §۳۳). فقط وقتی کاربر دکمهٔ ضبط را می‌زند و
+       با پرسشِ صریحِ اندروید؛ چت پشتِ پرچمِ shop.chat است و بی آن هیچ‌وقت
+       پرسیده نمی‌شود.
+  -->
+  <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+  <!--
        لوکیشنِ دکان.
 
        قرارِ صاحب مخزن: لوکیشن باید همان اولِ کار — حتی پیش از ثبت‌نام —
