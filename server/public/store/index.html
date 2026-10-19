@@ -8,7 +8,6 @@
 <link rel="icon" href="data:,">
 <link rel="preload" href="/store/fonts/vazirmatn-regular.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/store/store.css">
-<script src="/store/chat-core.js" defer></script>
 <script src="/store/store.js" defer></script>
 </head>
 <body>
@@ -18,10 +17,7 @@
       <h1 id="store-title">ویترین</h1>
       <p id="store-tagline" class="muted" hidden></p>
     </div>
-    <div class="row top-actions">
-      <a id="store-chat" class="btn btn-ghost btn-sm" href="#/chat" hidden>پیام به دکان</a>
-      <a id="store-call" class="btn btn-ghost btn-sm" href="#" hidden>تماس با دکان</a>
-    </div>
+    <a id="store-call" class="btn btn-ghost btn-sm" href="#" hidden>تماس با دکان</a>
   </div>
   <div class="wrap">
     <div id="store-status" class="status" role="status" aria-live="polite"></div>
@@ -134,7 +130,6 @@
       <ol id="o-timeline" class="timeline"></ol>
       <p class="muted">این صفحه با همین نشانی دوباره باز می‌شود؛ نشانی را نگه دارید.</p>
       <p id="o-msg" class="note" hidden role="alert"></p>
-      <a id="o-chat" class="btn btn-ghost btn-block" href="#/chat" hidden>گفت‌وگو با دکان دربارهٔ این سفارش</a>
       <button id="o-cancel" class="btn btn-ghost btn-block" type="button" hidden>لغوِ سفارش</button>
     </div>
   </section>
@@ -146,71 +141,6 @@
       <h2>سفارش‌های من</h2>
       <ul id="my-orders" class="lines"></ul>
       <p id="my-orders-empty" class="muted" hidden>هنوز سفارشی در این دستگاه نیست.</p>
-    </div>
-  </section>
-
-  <!-- گفت‌وگو با دکان (v3 §۳۳) — فقط وقتی دکان چت را روشن کرده -->
-  <section id="view-chat" hidden>
-    <p><a href="#/">→ بازگشت به کالاها</a></p>
-    <div class="panel">
-      <h2 id="ch-title">گفت‌وگو با دکان</h2>
-      <p id="ch-sub" class="muted"></p>
-
-      <div id="ch-verify" hidden>
-        <label for="ch-phone">شمارهٔ موبایل</label>
-        <div class="row">
-          <input id="ch-phone" type="tel" inputmode="tel" autocomplete="tel" dir="ltr" maxlength="20">
-          <button id="ch-send-code" class="btn btn-ghost btn-sm" type="button">فرستادنِ کدِ تأیید</button>
-        </div>
-        <div id="ch-code-row" hidden>
-          <label for="ch-code">کدِ تأیید</label>
-          <div class="row">
-            <input id="ch-code" type="text" inputmode="numeric" autocomplete="one-time-code" dir="ltr" maxlength="8">
-            <button id="ch-check" class="btn btn-sm" type="button">تأیید</button>
-          </div>
-        </div>
-        <p id="ch-verify-msg" class="note" hidden role="status"></p>
-      </div>
-
-      <div id="ch-home" hidden>
-        <ul id="ch-list" class="lines" aria-label="گفت‌وگوهای من"></ul>
-        <p id="ch-empty" class="muted" hidden>هنوز گفت‌وگویی ندارید.</p>
-        <button id="ch-new" class="btn btn-block" type="button">پیامِ تازه به دکان</button>
-        <p class="muted">برای پرسیدن دربارهٔ یک سفارش، از صفحهٔ همان سفارش «گفت‌وگو با دکان» را بزنید.</p>
-      </div>
-
-      <div id="ch-thread" hidden>
-        <p id="ch-banner" class="note" hidden role="status"></p>
-        <ol id="ch-msgs" class="chat-msgs" aria-label="پیام‌ها"></ol>
-        <p id="ch-none" class="muted" hidden>هنوز پیامی نیست؛ اولین پیام را بنویسید.</p>
-        <div id="ch-voice" class="chat-voice" hidden></div>
-        <form id="ch-form" class="chat-compose">
-          <label for="ch-text" class="sr-only">متنِ پیام</label>
-          <textarea id="ch-text" rows="2" maxlength="4000" placeholder="پیامِ شما…"></textarea>
-          <input id="ch-file" type="file" accept="image/jpeg,image/png,image/webp" hidden aria-label="انتخابِ عکس">
-          <div class="row chat-tools">
-            <button id="ch-img" class="btn btn-ghost btn-sm" type="button">عکس</button>
-            <button id="ch-mic" class="btn btn-ghost btn-sm" type="button" hidden>پیامِ صوتی</button>
-            <button id="ch-send" class="btn btn-sm" type="submit">فرستادن</button>
-          </div>
-        </form>
-        <p id="ch-hint" class="muted"></p>
-        <div class="row chat-more">
-          <button id="ch-report" class="btn btn-ghost btn-sm" type="button">گزارشِ سوءاستفاده</button>
-          <button id="ch-block" class="btn btn-ghost btn-sm" type="button">بستنِ پیام‌های این دکان</button>
-        </div>
-        <form id="ch-report-form" class="panel" hidden>
-          <b id="ch-report-title">گزارش به مدیرِ سامانه</b>
-          <label for="ch-reason">دلیل</label>
-          <select id="ch-reason"></select>
-          <label for="ch-rnote">توضیح (اختیاری)</label>
-          <textarea id="ch-rnote" maxlength="500"></textarea>
-          <div class="row">
-            <button class="btn btn-sm" type="submit">فرستادنِ گزارش</button>
-            <button id="ch-report-cancel" class="btn btn-ghost btn-sm" type="button">انصراف</button>
-          </div>
-        </form>
-      </div>
     </div>
   </section>
 </main>

@@ -411,18 +411,13 @@ async function createApp({ runMigrations = true } = {}) {
   //  CSP ِ سخت مثلِ پنل، حتی بی style ِ درون‌خطی؛ فقط مکانِ دستگاه برای پین.
   //  پوسته ایستاست و داده از `/api/store/:slug` می‌آید (همان مبدأ ⇒ بی CORS).
   //  ویترینِ خاموش یا ناموجود ⇒ همان پوسته با وضعیتِ ۴۰۴.
-  //  چتِ مشتری (v3 §۳۳): عکس و صدای چت با بلیتِ سرآیندی خوانده می‌شوند، نه
-  //  نشانیِ عمومی ⇒ `blob:` فقط برای img/media (ساختش فقط از اسکریپتِ همین
-  //  مبدأ). میکروفون فقط برای همین صفحه و فقط همین مبدأ (پیامِ صوتی، با
-  //  اجازهٔ صریحِ مرورگر)؛ پنل و بقیه همان `microphone=()` می‌مانند.
-  //  ⛔ هنوز بی 'unsafe-inline' (آزمون: test/store-chat-headers.test.js).
   const storeDir = path.join(__dirname, '..', 'public', 'store');
   const storefront = require('./lib/storefront');
   const storeHeaders = (req, res, next) => {
     res.set('Content-Security-Policy',
-      "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'; " +
+      "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; " +
       "connect-src 'self'; manifest-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'");
-    res.set('Permissions-Policy', 'camera=(), microphone=(self), geolocation=(self), payment=()');
+    res.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(self), payment=()');
     next();
   };
   const storePage = async (slug, res) => {
