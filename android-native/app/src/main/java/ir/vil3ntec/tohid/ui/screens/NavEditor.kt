@@ -1,6 +1,5 @@
 package ir.vil3ntec.tohid.ui.screens
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
@@ -109,17 +108,15 @@ fun NavEditorScreen(allowed: Set<String>, onBack: () -> Unit) {
       PhoneNavBar(layout, current = "dashboard", onPick = {}, onEdit = null, systemInsets = false)
     }
     Box(Modifier.fillMaxWidth().height(40.dp), contentAlignment = Alignment.Center) {
-      AnimatedVisibility(problem != null, enter = fadeIn(), exit = fadeOut()) {
+      androidx.compose.animation.Crossfade(targetState = problem, label = "navProblem") { pr ->
         Text(
-          problem?.message.orEmpty(), color = p.negative, textAlign = TextAlign.Center,
-          style = MaterialTheme.typography.labelLarge.copy(fontSize = 13.sp, fontWeight = FontWeight.Bold),
+          pr?.message ?: "ردیف را با دستگیره بکشید، یا رویش بزنید و جا را انتخاب کنید",
+          color = if (pr != null) p.negative else p.inkMuted,
+          textAlign = TextAlign.Center,
+          style = if (pr != null) MaterialTheme.typography.labelLarge.copy(fontSize = 13.sp, fontWeight = FontWeight.Bold)
+          else MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp),
         )
       }
-      if (problem == null) Text(
-        "ردیف را با دستگیره بکشید، یا رویش بزنید و جا را انتخاب کنید",
-        color = p.inkMuted, textAlign = TextAlign.Center,
-        style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp),
-      )
     }
     Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 18.dp)) {
       EditorList(layout, rows, allowed, ::applyEdit)

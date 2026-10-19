@@ -17,6 +17,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -228,6 +229,8 @@ private fun NavPill(
       .shadow(floatShadow, shape, clip = false, ambientColor = p.black.copy(alpha = 0.10f), spotColor = p.black.copy(alpha = 0.10f))
       .clip(shape)
       .background(p.card)
+      //  شب: قرصِ تیره روی زمینهٔ تیره بی لبه گم می‌شد
+      .then(if (p === PhoneV3Dark) Modifier.border(1.dp, p.hairline, shape) else Modifier)
       .padding(horizontal = 4.dp),
     contentAlignment = Alignment.CenterStart,
   ) {
@@ -254,7 +257,8 @@ private fun SideCircle(id: String, active: Boolean, p: PhoneV3Colors, onPick: (N
       .size(PhoneNav.CIRCLE)
       .shadow(floatShadow, CircleShape, clip = false, ambientColor = p.black.copy(alpha = 0.10f), spotColor = p.black.copy(alpha = 0.10f))
       .clip(CircleShape)
-      .background(p.card),
+      .background(p.card)
+      .then(if (p === PhoneV3Dark) Modifier.border(1.dp, p.hairline, CircleShape) else Modifier),
     contentAlignment = Alignment.Center,
   ) {
     val shown by animateFloatAsState(if (active) 1f else 0f, if (Motion.enabled) tween(200) else snap(), label = "sideHi")
