@@ -4,6 +4,7 @@ import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonNames
 
 /**
  *  مدلِ داده — دقیقاً همان چیزی که نسخهٔ وب می‌نویسد.
@@ -146,19 +147,27 @@ data class Sale(
  *  یک ردیفِ پرداختِ فاکتور (`Sale.payments`) — به پول، نام‌ها همان `PaymentRow`ِ هسته.
  *  غیرنقد «ثبتِ دستی، در انتظار» است (`status = pending`، `verification = manual`)
  *  تا تأییدِ قابلِ اتکا برسد (PAY-08)؛ نقد و «به حساب» تأییدشده‌اند.
+ *
+ *  روی سیم مبلغ `amount` است (به پول) — همان `PaymentRow`ِ هسته و ردیفی که سرور روی فاکتورِ
+ *  W می‌گذارد (`order-ledger.js`، #321)؛ `amountMinor`ِ نسخهٔ پیشِ این شاخه هم خوانده می‌شود.
+ *  بی این، فاکتورِ W ِ سرور خواندنِ کلِ دفتر را می‌شکست (فیلدِ اجباریِ گم).
  */
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class SalePayment(
   val method: String,
   val kind: String,
+  @SerialName("amount")
+  @JsonNames("amountMinor")
   val amountMinor: Long,
   val status: String,
-  @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val ref: String? = null,
-  @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val verification: String? = null,
+  /** امانتِ کیست، اگر پول هنوز دستِ دکان نیست — `courier` برای «نقد هنگامِ تحویل»ِ فاکتورِ W */
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val custody: String? = null,
 )
 
 /**
@@ -219,6 +228,14 @@ data class SaleReturn(
   val reason: String = "",
   val date: String = "",
   val createdAt: Long = 0,
+  /**
+   *  `online` برای مرجوعیِ سرور هنگامِ بازپرداختِ سفارشِ اینترنتی (ORD-20): پولش از راهِ
+   *  سفارش برمی‌گردد، نه از دخل (`CashShift`). مرجوعیِ دستگاه `null` است و مثلِ `Sale.channel`
+   *  هرگز `null` نوشته نمی‌شود تا ردیف‌های قدیمی opِ تازه نسازند.
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val channel: String? = null,
 )
 
 @Serializable

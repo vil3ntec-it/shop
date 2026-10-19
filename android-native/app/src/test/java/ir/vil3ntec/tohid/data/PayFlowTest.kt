@@ -246,18 +246,62 @@ class PayFlowTest {
     assertEquals(listOf("نقد" to 500.0, "به حسابِ مشتری" to 1500.0, "دریافتی" to 500.0), PayFlow.receiptLines(part))
     assertEquals(listOf("نقد" to 1000.0, "HesabPay (ثبتِ دستی) — HP-77" to 1450.0, "دریافتی" to 2450.0), PayFlow.receiptLines(mixed))
     //  روشِ ناشناختهٔ جدولِ دکان ⇒ نامِ نوعش، نه شناسهٔ خام
-    assertEquals(listOf("کارت (ثبتِ دستی)" to 10.0), PayFlow.receiptLines(Sale(id = "u", payments = listOf(SalePayment("my_bank", "card", 1000, "pending")))))
+    assertEquals(listOf("کارت (ثبتِ دستی)" to 10.0), PayFlow.receiptLines(Sale(id = "u", payments = listOf(SalePayment("my_bank", "card", 1000, "pending", verification = "manual")))))
   }
 
   @Test fun `برچسب‌ها همان جدولِ «روش پرداخت»ِ گزارش‌اند (بردارِ مشترکِ report-v1، JS و Kotlin)`() {
     val r = vector("report-v1.json")
-    val sales = r["ledgers"]!!.jsonObject["payKinds"]!!.jsonObject.arr("sales")
-    val byAmount = sales.associate { String.format(java.util.Locale.US, "%.2f", it.dbl("finalTotal")) to it.str("paymentMethod")!! }
-    val case = r["cases"]!!.jsonArray.map { it.jsonObject }.first { it.str("ledger") == "payKinds" }
-    val table = case["expect"]!!.jsonArray.map { it.jsonObject }.first { it.str("id") == "sales.payment" }
-    val rows = table["rows"]!!.jsonArray.map { row -> row.jsonArray.map { it.jsonPrimitive.content } }
-    assertEquals(sales.size, rows.size)
-    rows.forEach { assertEquals(it[0], PayFlow.KIND_LABELS[byAmount.getValue(it[5])]) }
+    for (ledger in listOf("payKinds", "payOnline")) {
+      val sales = r["ledgers"]!!.jsonObject[ledger]!!.jsonObject.arr("sales")
+      val byAmount = sales.associate { String.format(java.util.Locale.US, "%.2f", it.dbl("finalTotal")) to it.str("paymentMethod")!! }
+      val case = r["cases"]!!.jsonArray.map { it.jsonObject }.first { it.str("ledger") == ledger }
+      val table = case["expect"]!!.jsonArray.map { it.jsonObject }.first { it.str("id") == "sales.payment" }
+      val rows = table["rows"]!!.jsonArray.map { row -> row.jsonArray.map { it.jsonPrimitive.content } }
+      assertEquals(ledger, sales.size, rows.size)
+      rows.forEach { assertEquals(ledger, it[0], PayFlow.KIND_LABELS[byAmount.getValue(it[5])]) }
+      //  فاکتورِ هم‌شکل در فهرست همان برچسبِ گزارش را می‌گیرد
+      sales.forEach { j ->
+        val sale = json.decodeFromString<Sale>(j.toString())
+        assertEquals(ledger, PayFlow.KIND_LABELS[j.str("paymentMethod")], PayFlow.payLabel(sale))
+      }
+    }
+  }
+
+  /** همان ردیفی که `server/src/lib/order-ledger.js` (#321) روی فاکتورِ W می‌نویسد */
+  private val serverW = """{"id":"w-o2","invoiceNumber":2,"series":"W","total":700,"discount":0,"finalTotal":700,
+    "paymentMethod":"cod","debtorId":null,"paidAmount":700,"remaining":0,"status":"completed","seller":"",
+    "date":"2026-10-19","createdAt":130,"channel":"online","orderId":"o2","orderNo":2,
+    "payments":[{"method":"cod","kind":"cash","amount":70000,"ref":null,"status":"pending","verification":null,"custody":"courier"}]}"""
+
+  @Test fun `فاکتورِ W ِ سرور (#321) خوانده می‌شود؛ «نقد هنگامِ تحویل» غیرنقد است و به دخل نمی‌آید`() {
+    val w = json.decodeFromString<Sale>(serverW)
+    assertEquals(listOf(SalePayment("cod", "cash", 70000, "pending", custody = "courier")), w.payments)
+    assertEquals("نقد هنگامِ تحویل", PayFlow.payLabel(w))
+    assertEquals(PayFlow.NON_CASH, PayFlow.payGroup(w))
+    assertEquals(listOf("نقد هنگامِ تحویل (در انتظار)" to 700.0), PayFlow.receiptLines(w))
+    val online = json.decodeFromString<Sale>(serverW.replace("\"cod\"", "\"online\"").replace("\"kind\":\"cash\"", "\"kind\":\"other\"")
+      .replace("\"pending\"", "\"confirmed\"").replace("\"verification\":null", "\"verification\":\"provider\"").replace(",\"custody\":\"courier\"", ""))
+    assertEquals("پرداختِ آنلاین", PayFlow.payLabel(online))
+    assertEquals(PayFlow.NON_CASH, PayFlow.payGroup(online))
+    assertEquals(listOf("پرداختِ آنلاین" to 700.0), PayFlow.receiptLines(online))
+    //  رفت‌وبرگشت: مبلغ همان `amount` و امانت (`custody`) گم نمی‌شود
+    val back = json.parseToJsonElement(json.encodeToString(w)).jsonObject["payments"]!!.jsonArray.single().jsonObject
+    assertEquals(70000L, back["amount"]!!.jsonPrimitive.longOrNull)
+    assertEquals("courier", back["custody"]!!.jsonPrimitive.content)
+    assertFalse(back.containsKey("amountMinor"))
+    //  صندوقِ پرچم‌دار (هسته) هم مثلِ CashShift: فاکتور و مرجوعیِ سرورِ W در دخل نیست، بی هشدارِ skipped
+    val d = ShopData(
+      sales = listOf(Sale(id = "s1", finalTotal = 500.0, createdAt = 110), w, online.copy(id = "w-o1")),
+      saleReturns = listOf(
+        SaleReturn(id = "w-o2-1-r", saleId = "w-o2", amount = 700.0, createdAt = 140, channel = "online"),
+        SaleReturn(id = "r-pos", saleId = "s1", amount = 20.0, createdAt = 141),
+      ),
+    )
+    val open = AuditEntry(id = "sh", type = CashShift.OPEN, createdAt = 100, amount = 1000.0)
+    val r = ok(PayFlow.report(d, open, null, 200))
+    assertTrue(r.skipped.isEmpty())
+    assertEquals(mapOf("cash" to 148000L), r.report.expected)
+    assertEquals(1480.0, CashShift.totals(d, 100, 200, 1000.0).expected, 1e-9)
   }
 
   private fun s12(): Pair<ShopData, AuditEntry> {
@@ -373,8 +417,8 @@ class PayFlowTest {
 
   @Test fun `فاکتورِ ترکیبیِ دستگاهِ دیگر (JSON) خوانده می‌شود و چیزی گم نمی‌شود`() {
     val web = """{"id":"w1","finalTotal":2450,"paymentMethod":"mixed","paidAmount":2450,"remaining":0,"debtGiven":0,
-      "payments":[{"method":"cash","kind":"cash","amountMinor":100000,"status":"confirmed"},
-      {"method":"hesabpay","kind":"wallet","amountMinor":145000,"status":"pending","ref":"HP-77","verification":"manual"}],
+      "payments":[{"method":"cash","kind":"cash","amount":100000,"status":"confirmed"},
+      {"method":"hesabpay","kind":"wallet","amount":145000,"status":"pending","ref":"HP-77","verification":"manual"}],
       "tenderedMinor":245000,"changeMinor":0}"""
     val s = json.decodeFromString<Sale>(web)
     assertEquals(listOf(ShiftRowOf("cash", 100000), ShiftRowOf("hesabpay", 145000)), PayFlow.saleRows(s).map { ShiftRowOf(it.method, it.amount) })
@@ -382,6 +426,10 @@ class PayFlowTest {
     val orig = json.parseToJsonElement(web).jsonObject
     assertEquals(orig["payments"], back["payments"])
     assertEquals(orig["tenderedMinor"], back["tenderedMinor"])
+    //  نامِ پیشینِ مبلغ در همین شاخه (`amountMinor`) هم خوانده می‌شود و `amount` نوشته می‌شود
+    val old = json.decodeFromString<Sale>(web.replace("\"amount\"", "\"amountMinor\""))
+    assertEquals(s.payments, old.payments)
+    assertEquals(orig["payments"], json.parseToJsonElement(json.encodeToString(old)).jsonObject["payments"])
   }
 
   @Test fun `ردیف‌های رسید - غیرنقد «ثبتِ دستی» با مرجع، دریافتی و پولِ پس؛ فاکتورِ امروز هیچ`() {

@@ -234,7 +234,13 @@ object PayFlow {
     //  «به حساب» همان نسیه است (واژهٔ دکان)؛ «به حسابِ مشتری» فقط متنِ ردیفِ رسید/جزئیات ([receiptLines])
     CASH to "نقد", "credit" to "نسیه", ACCOUNT to "نسیه", "card" to "کارت", "transfer" to "حواله",
     "wallet" to "کیف پول", "store_credit" to "اعتبار فروشگاه", "gift_card" to "کارت هدیه", "other" to "سایر", MIXED to "ترکیبی",
+    //  فاکتورِ W ِ سفارشِ اینترنتی (#321): روشِ سفارش، نه نوعِ ردیف
+    ONLINE to "پرداختِ آنلاین", COD to "نقد هنگامِ تحویل",
   )
+
+  /** `paymentMethod`ِ فاکتورِ W: پرداختِ آنلاین و نقد هنگامِ تحویل (دستِ پیک) — هیچ‌کدام نقدِ دخل نیست */
+  const val ONLINE = "online"
+  const val COD = "cod"
 
   /** گروهِ فیلترِ فهرست: [CASH] (فقط نقد)، `credit` (چیزی به حساب رفت)، [NON_CASH] (کارت، کیف پول، حواله یا ترکیبی) */
   const val NON_CASH = "noncash"
@@ -247,6 +253,8 @@ object PayFlow {
    *  (`credit` ⇒ نسیه، نوع‌های غیرنقد و `mixed` ⇒ غیرنقد، بقیه مثلِ امروز نقد).
    */
   fun payGroup(s: Sale): String {
+    //  سفارشِ اینترنتی (آنلاین یا نقد هنگامِ تحویل) پولِ دخل نیست ⇒ غیرنقد
+    if (s.paymentMethod == ONLINE || s.paymentMethod == COD || CashShift.isOnline(s)) return NON_CASH
     val k = kinds(s)
     if (k.isEmpty()) return when (s.paymentMethod) {
       "credit" -> "credit"
@@ -267,6 +275,8 @@ object PayFlow {
    *  («نقد» یا «نقدی») تا متنِ فاکتورِ امروز عوض نشود.
    */
   fun payLabel(s: Sale, cash: String = KIND_LABELS.getValue(CASH)): String {
+    //  فاکتورِ W: روشِ سفارش (ردیفش `other` یا `cash`ِ دستِ پیک است، نه کارت یا نقدِ دخل)
+    if (s.paymentMethod == ONLINE || s.paymentMethod == COD) return KIND_LABELS.getValue(s.paymentMethod)
     val k = kinds(s)
     val key = when {
       k.isEmpty() -> s.paymentMethod
@@ -276,8 +286,16 @@ object PayFlow {
     return if (key == CASH) cash else KIND_LABELS[key] ?: if (k.isEmpty()) cash else key
   }
 
-  /** نامِ یک ردیف: نامِ روش؛ روشِ ناشناخته (جدولِ دکان) ⇒ نامِ نوعش */
-  private fun rowName(p: SalePayment): String = method(p.method)?.name ?: KIND_LABELS[p.kind] ?: p.method
+  /** نامِ یک ردیف: نامِ روش (یا `online`/`cod`ِ فاکتورِ W)؛ روشِ ناشناخته (جدولِ دکان) ⇒ نامِ نوعش */
+  private fun rowName(p: SalePayment): String =
+    method(p.method)?.name ?: (if (p.method == ONLINE || p.method == COD) KIND_LABELS[p.method] else null) ?: KIND_LABELS[p.kind] ?: p.method
+
+  /** «در انتظار»: ثبتِ دستی تا تأیید (PAY-08)، یا پولِ سفارش تا تأییدِ درگاه/تسویهٔ پیک */
+  private fun pendingNote(p: SalePayment): String = when {
+    p.status != "pending" -> ""
+    p.verification == "manual" -> " (ثبتِ دستی)"
+    else -> " (در انتظار)"
+  }
 
   /**
    *  ردیف‌های پرداختِ ترکیبی روی فاکتور و رسید (برچسب، افغانی) — جمعشان همان مبلغِ فاکتور.
@@ -287,7 +305,7 @@ object PayFlow {
     val list = s.payments?.takeIf { it.isNotEmpty() } ?: return emptyList()
     return buildList {
       list.filter { it.amountMinor > 0 }.forEach { p ->
-        add(rowName(p) + (if (p.status == "pending") " (ثبتِ دستی)" else "") + (p.ref?.let { " — $it" } ?: "") to major(p.amountMinor))
+        add(rowName(p) + pendingNote(p) + (p.ref?.let { " — $it" } ?: "") to major(p.amountMinor))
       }
       s.tenderedMinor?.takeIf { it > 0 }?.let { add("دریافتی" to major(it)) }
       s.changeMinor?.takeIf { it > 0 }?.let { add("پولِ پس" to major(it)) }
@@ -300,7 +318,8 @@ object PayFlow {
   /** ردیف‌های فروشِ یک فاکتور: `payments` اگر هست، وگرنه همان حسابِ امروز */
   fun saleRows(s: Sale): List<ShiftRow> {
     s.payments?.takeIf { it.isNotEmpty() }?.let { list ->
-      return list.filter { it.amountMinor > 0 }.map { ShiftRow(it.method, it.amountMinor) }
+      //  ردیفی که امانتِ کسِ دیگری است (`custody`، مثلاً پیک) پولِ این صندوق نیست
+      return list.filter { it.amountMinor > 0 && it.custody == null }.map { ShiftRow(it.method, it.amountMinor) }
     }
     val debt = s.debtGiven.coerceAtLeast(0.0)
     val cash = (s.finalTotal - debt).coerceAtLeast(0.0)
@@ -319,8 +338,10 @@ object PayFlow {
     val from = open.createdAt
     fun inWindow(at: Long) = at in from..to
     val ev = ArrayList<Pair<Int, ShiftEventInput>>()
+    //  فاکتورِ اینترنتیِ سرور (W، #321) و مرجوعیِ سرورِ آن پولِ دخل نیستند — همان قاعدهٔ `CashShift`
+    val online = d.sales.filter(CashShift::isOnline).mapTo(HashSet()) { it.id }
     d.sales.forEach { s ->
-      if (s.status == "cancelled" || !inWindow(s.createdAt)) return@forEach
+      if (s.status == "cancelled" || s.id in online || !inWindow(s.createdAt)) return@forEach
       val rows = saleRows(s)
       if (rows.isNotEmpty()) ev += 0 to ShiftEventInput(id = "sale:${s.id}", type = "sale", at = s.createdAt, rows = rows)
     }
@@ -341,7 +362,7 @@ object PayFlow {
       )
     }
     d.saleReturns.forEach { r ->
-      if (!inWindow(r.createdAt) || minor(r.amount) <= 0) return@forEach
+      if (!inWindow(r.createdAt) || minor(r.amount) <= 0 || CashShift.isOnlineReturn(r, online)) return@forEach
       ev += 2 to ShiftEventInput(id = "ret:${r.id}", type = "refund", at = r.createdAt, rows = listOf(ShiftRow(CASH, minor(r.amount))))
     }
     fun out(id: String, at: Long, amount: Double, reason: String, note: String?) {

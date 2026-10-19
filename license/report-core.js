@@ -582,6 +582,7 @@
     payment: {
       cash: 'نقد', credit: 'نسیه', card: 'کارت', wallet: 'کیف پول', transfer: 'حواله',
       store_credit: 'اعتبار فروشگاه', gift_card: 'کارت هدیه', other: 'سایر', mixed: 'ترکیبی',
+      online: 'پرداختِ آنلاین', cod: 'نقد هنگامِ تحویل',
     },
     channel: { pos: 'حضوری', online: 'اینترنتی' },
   };

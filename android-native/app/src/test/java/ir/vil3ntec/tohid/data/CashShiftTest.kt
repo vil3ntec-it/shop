@@ -69,4 +69,58 @@ class CashShiftTest {
     //  فیلترِ «نقدی»ِ تاریخچه و برنامهٔ کهنه (`paymentMethod == "cash"`) فقط نقدِ خالص را می‌گیرد
     assertEquals(listOf("a", "old"), d.sales.filter { it.paymentMethod == "cash" }.map { it.id })
   }
+
+  @Test
+  fun `فروش و مرجوعیِ اینترنتیِ سرور (سریِ W، کانالِ online) پولِ دخل نیست`() {
+    var d = ShopData()
+    d = (CashShift.open(d, 1000.0, "", "2026-10-19", 100, ::newId) as CashShift.Result.Ok).data
+    d = d.copy(
+      sales = listOf(
+        Sale(id = "s1", finalTotal = 500.0, createdAt = 110),                                       // نقدیِ صندوق
+        //  پرداختِ آنلاین و نقد هنگامِ تحویل (دستِ پیک تا تسویه) — هیچ‌کدام در دخل نیست
+        Sale(id = "w-o1", finalTotal = 900.0, paymentMethod = "online", paidAmount = 900.0,
+          series = "W", channel = "online", createdAt = 120),
+        Sale(id = "w-o2", finalTotal = 700.0, paymentMethod = "cod", paidAmount = 700.0,
+          series = "W", channel = "online", createdAt = 130),
+        //  فاکتورِ پیش از این اصلاح با `paymentMethod = cash` هم بیرون می‌ماند (سری W)
+        Sale(id = "w-o3", finalTotal = 300.0, paymentMethod = "cash", paidAmount = 300.0, series = "W", createdAt = 131),
+        //  فقط کانال (بی سری) هم کافی است
+        Sale(id = "w-o4", finalTotal = 50.0, channel = "online", createdAt = 132),
+      ),
+      saleReturns = listOf(
+        SaleReturn(id = "w-o1-1-r", saleId = "w-o1", saleItemId = "w-o1-1", amount = 900.0, createdAt = 140, channel = "online"),
+        //  ردیفِ سرور پیش از نشانِ `channel`: شناسهٔ ثابتِ `w-…` بر فاکتورِ اینترنتی
+        SaleReturn(id = "w-o2-1-r", saleId = "w-o2", saleItemId = "w-o2-1", amount = 700.0, createdAt = 141),
+        //  مرجوعیِ دستیِ همین صندوق برای فاکتورِ W: نقد از دخل رفت ⇒ کم می‌شود
+        SaleReturn(id = "01JDEVICERETURN0000000000", saleId = "w-o3", amount = 100.0, createdAt = 142),
+        SaleReturn(id = "r-pos", saleId = "s1", amount = 20.0, createdAt = 143),
+      ),
+    )
+    val t = CashShift.totalsOf(d, CashShift.current(d)!!, 200)
+    assertEquals(500.0, t.sales, 1e-9)
+    assertEquals(120.0, t.returns, 1e-9)
+    //  ۱۰۰۰ + ۵۰۰ − ۱۰۰ − ۲۰
+    assertEquals(1380.0, t.expected, 1e-9)
+    assertTrue(CashShift.isOnline(d.sales[1]))
+    assertTrue(!CashShift.isOnline(d.sales[0]))
+  }
+
+  /** هر دو قاعده با هم: فقط نقدِ فاکتورِ صندوق (PAY v3 A4) و هیچ پولی از فاکتورِ W (#321) */
+  @Test
+  fun `ردیفِ cash ِ «نقد هنگامِ تحویل» روی فاکتورِ W نقدِ دخل نیست؛ فاکتورِ ترکیبیِ صندوق فقط نقدش`() {
+    val f = PayFlow.saleFields(PayFlow.checkout(PayFlow.Draft(2450.0, "1000", listOf(PayFlow.DraftRow("hesabpay", "HP-1", "1450")))).valueOrNull()!!)
+    val pos = Sale(id = "s1", finalTotal = 2450.0, paymentMethod = f.paymentMethod, paidAmount = f.paidAmount, payments = f.payments, createdAt = 110)
+    val cod = Sale(
+      id = "w-o2", finalTotal = 700.0, paymentMethod = "cod", paidAmount = 700.0, series = "W", channel = "online", createdAt = 120,
+      payments = listOf(SalePayment("cod", "cash", 70000, "pending", custody = "courier")),
+    )
+    //  حتی اگر نشانِ W/online گم شده باشد، ردیفِ امانتِ پیک (`custody`) نقدِ دخل نیست
+    val stray = cod.copy(id = "x", series = null, channel = null)
+    assertEquals(listOf(1000.0, 0.0, 0.0), listOf(pos, cod, stray).map { CashShift.saleCash(it) })
+    val d = ShopData(sales = listOf(pos, cod, stray))
+    val t = CashShift.totals(d, 100, 200, 1000.0)
+    assertEquals(1000.0, t.sales, 1e-9)
+    assertEquals(2000.0, t.expected, 1e-9)
+    assertEquals(t.expected, PayFlow.expectedCash(d, AuditEntry(id = "sh", createdAt = 100, amount = 1000.0), 200), 1e-9)
+  }
 }

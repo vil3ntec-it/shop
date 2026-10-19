@@ -45,6 +45,7 @@ object ReportTables {
     "payment" to mapOf(
       "cash" to "نقد", "credit" to "نسیه", "card" to "کارت", "wallet" to "کیف پول", "transfer" to "حواله",
       "store_credit" to "اعتبار فروشگاه", "gift_card" to "کارت هدیه", "other" to "سایر", "mixed" to "ترکیبی",
+      "online" to "پرداختِ آنلاین", "cod" to "نقد هنگامِ تحویل",
     ),
     "channel" to mapOf("pos" to "حضوری", "online" to "اینترنتی"),
   )
