@@ -1,15 +1,11 @@
 package ir.vil3ntec.tohid.ui.components.pos
 
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
@@ -30,16 +26,21 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
-import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
-import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
-import androidx.compose.foundation.lazy.staggeredgrid.items
-import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -48,23 +49,24 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.QrCodeScanner
+import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.ViewList
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
@@ -72,6 +74,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -94,15 +97,19 @@ import ir.vil3ntec.tohid.ui.screens.Motion
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 
 /*
- *  سطحِ کالاهای صندوقِ گوشی (نسخهٔ ۳، تصویرِ مرجعِ r3) — آینه‌شده برای راست‌به‌چپ.
+ *  کاتالوگِ صندوقِ گوشی (نسخهٔ ۳) — درونِ سطحِ روشنِ قابِ سبد (`PhoneSaleFrame`).
  *
- *  سربرگِ ثابت (برگشت، عنوانِ وسط، اسکن) روی همان رنگِ سطح، با محوشدنی که کارت‌ها زیرش
- *  می‌روند؛ زیرش ردیفِ چیپ‌های دسته (و ذره‌بینِ جستجو)، بعد شبکهٔ دوستونهٔ پلکانی: ستونِ
- *  دوم کمی پایین‌تر شروع می‌شود (r3). کارت: عکس یا حرفِ اولِ درشت، قیمتِ درشت، نام (دو خط)
- *  و موجودی به خاکستری. زدنِ کارت ⇐ یک پله به سبد؛ −/+ فقط در سبد است.
+ *  هدفِ صاحب محصول: فروشنده هر کالا را تند و دقیق برساند؛ کالای زیاد در دید، هیچ چیزِ
+ *  درشت. پس فشرده و ثابت در بالا:
+ *    ۱) برگشت · جستجو (نام، بارکد، کد) · اسکن · کاشی/فهرست   ← می‌ماند
+ *    ۲) چیپ‌های کوچکِ دسته                                       ← می‌ماند
+ *    ۳) «پرفروش‌ها»: قرص‌های یک‌ضربه‌ای (نام + قیمت) — هنگامِ جستجو پنهان
+ *    ۴) کاشیِ سه‌ستونه (~۱۰۰dp) یا فهرستِ ۵۲dp، پرفروش‌ترین اول
+ *  زدن ⇐ +۱ (لرزش و پرشِ کوچک)؛ کالای وزنی ⇐ صفحه‌کلید؛ نگه داشتن ⇐ صفحه‌کلید.
+ *  در سبد ⇐ دایرهٔ زردِ مقدار و «−». رنگ‌ها فقط از `PhoneV3`.
  */
 
-/** یک کارتِ کالا — فقط داده‌ای که کارت نشان می‌دهد */
+/** یک کالا — فقط داده‌ای که کاشی و ردیف نشان می‌دهند */
 data class PhoneCatalogItem(
   val id: String,
   val name: String,
@@ -112,18 +119,14 @@ data class PhoneCatalogItem(
   val hasPhoto: Boolean,
   /** مقدارِ همین کالا در سبد (۰ ⇐ بی‌نشان) */
   val inCart: Double,
+  /** کالای وزنی/پیمانه‌ای (کیلو، لیتر، …): زدن ⇐ صفحه‌کلید، نه +۱ */
+  val weighed: Boolean,
 )
-
-/** بلندیِ سربرگ زیرِ نوارِ وضعیت */
-private val HEADER = 64.dp
-
-/** پایین‌تر شروع شدنِ ستونِ دوم (r3 ≈ ۵۱dp = این + فاصلهٔ ردیف‌ها) */
-private val STAGGER = 36.dp
 
 @Composable
 fun PhoneCatalog(
-  title: String,
   items: List<PhoneCatalogItem>,
+  bestsellers: List<PhoneCatalogItem>,
   categories: List<String>,
   category: String?,
   onCategory: (String?) -> Unit,
@@ -131,111 +134,110 @@ fun PhoneCatalog(
   onAddCategory: () -> Unit,
   search: String,
   onSearch: (String) -> Unit,
+  listMode: Boolean,
+  onToggleMode: () -> Unit,
   onBack: () -> Unit,
   onScan: () -> Unit,
   scanning: Boolean,
   scanPanel: @Composable () -> Unit,
   emptyText: String,
   bottomGap: Dp,
-  onAdd: (PhoneCatalogItem) -> Unit,
+  onTap: (PhoneCatalogItem) -> Unit,
+  onHold: (PhoneCatalogItem) -> Unit,
+  onMinus: (PhoneCatalogItem) -> Unit,
 ) {
   val v = PhoneV3.colors
-  //  زیرِ نوارِ وضعیت؛ کمینهٔ ۲۴ (بلندیِ نوارِ وضعیتِ گوشی) تا در پنجرهٔ بی‌نوار هم سربرگ جای r3 بنشیند
+  //  زیرِ نوارِ وضعیت؛ کمینهٔ ۲۴ (بلندیِ نوارِ وضعیتِ گوشی) تا در پنجرهٔ بی‌نوار هم همان‌جا بنشیند
   val top = maxOf(WindowInsets.statusBars.asPaddingValues().calculateTopPadding(), 24.dp)
-  val grid = rememberLazyStaggeredGridState()
-  LaunchedEffect(scanning) { if (scanning) grid.animateScrollToItem(0) }
+  val grid = rememberLazyGridState()
+  val list = rememberLazyListState()
+  LaunchedEffect(scanning) {
+    if (scanning) runCatching { if (listMode) list.scrollToItem(0) else grid.scrollToItem(0) }
+  }
 
-  Box(Modifier.fillMaxSize()) {
-    LazyVerticalStaggeredGrid(
-      columns = StaggeredGridCells.Fixed(2),
-      state = grid,
-      modifier = Modifier.fillMaxSize(),
-      contentPadding = PaddingValues(start = 15.dp, end = 15.dp, top = top + HEADER, bottom = bottomGap),
-      horizontalArrangement = Arrangement.spacedBy(14.dp),
-      verticalItemSpacing = 15.dp,
+  Column(Modifier.fillMaxSize()) {
+    /* ---------- ۱) بالای ثابت: برگشت، جستجو، اسکن، کاشی/فهرست ---------- */
+    Row(
+      Modifier.fillMaxWidth().padding(top = top + 6.dp, start = 4.dp, end = 12.dp).height(44.dp),
+      verticalAlignment = Alignment.CenterVertically,
     ) {
-      item(key = "chips", span = StaggeredGridItemSpan.FullLine) {
-        CategoryChips(categories, category, onCategory, onCategoryHold, onAddCategory, search, onSearch)
+      RoundButton("برگشت", onBack, 40.dp, null) { BackChevron(v.icon) }
+      Spacer(Modifier.width(2.dp))
+      SearchField(search, onSearch, Modifier.weight(1f))
+      Spacer(Modifier.width(8.dp))
+      RoundButton(if (scanning) "بستنِ اسکن" else "اسکنِ بارکد", onScan, 44.dp, v.catalogCard) {
+        Icon(if (scanning) Icons.Outlined.Close else Icons.Outlined.QrCodeScanner, null, tint = v.icon, modifier = Modifier.size(22.dp))
       }
-      if (scanning) {
-        item(key = "scan", span = StaggeredGridItemSpan.FullLine) { scanPanel() }
-      }
-      if (items.isEmpty()) {
-        item(key = "empty", span = StaggeredGridItemSpan.FullLine) {
-          Text(
-            emptyText,
-            color = v.inkMuted,
-            fontSize = 14.sp,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth().padding(vertical = 56.dp, horizontal = 24.dp),
-          )
-        }
-      } else {
-        val first = items.first()
-        item(key = first.id) { PhoneProductCard(first) { onAdd(first) } }
-        //  ستونِ دوم از این‌جا شروع می‌شود ⇐ همان پلکانِ r3
-        item(key = "stagger") { Spacer(Modifier.fillMaxWidth().height(STAGGER)) }
-        items(items.drop(1), key = { it.id }) { p -> PhoneProductCard(p) { onAdd(p) } }
+      Spacer(Modifier.width(6.dp))
+      RoundButton(if (listMode) "نمایِ کاشی" else "نمایِ فهرست", onToggleMode, 44.dp, v.catalogCard) {
+        Icon(if (listMode) Icons.Outlined.GridView else Icons.Outlined.ViewList, null, tint = v.icon, modifier = Modifier.size(22.dp))
       }
     }
 
-    /* ---------------- سربرگِ ثابت (r3) ---------------- */
-    Column(Modifier.fillMaxWidth()) {
-      Box(
-        Modifier
-          .fillMaxWidth()
-          .background(v.catalogPage)
-          .padding(top = top + 16.dp, start = 16.dp, end = 16.dp)
-          .height(48.dp),
-      ) {
-        HeaderButton("برگشت", onBack, Modifier.align(Alignment.CenterStart)) { BackChevron(v.icon) }
-        Text(
-          title,
-          color = v.ink,
-          fontSize = 20.sp,
-          fontWeight = FontWeight.Bold,
-          maxLines = 1,
-          overflow = TextOverflow.Ellipsis,
-          textAlign = TextAlign.Center,
-          modifier = Modifier.align(Alignment.Center).padding(horizontal = 56.dp),
-        )
-        HeaderButton(if (scanning) "بستنِ اسکن" else "اسکنِ بارکد", onScan, Modifier.align(Alignment.CenterEnd)) {
-          Icon(
-            if (scanning) Icons.Outlined.Close else Icons.Outlined.QrCodeScanner,
-            contentDescription = null,
-            tint = v.icon,
-            modifier = Modifier.size(24.dp),
-          )
+    /* ---------- ۲) چیپ‌های دسته ---------- */
+    CategoryChips(categories, category, onCategory, onCategoryHold, onAddCategory)
+
+    /* ---------- ۳) پرفروش‌ها (هنگامِ جستجو نه) ---------- */
+    if (search.isBlank() && bestsellers.isNotEmpty()) BestsellerRow(bestsellers, onTap)
+
+    /* ---------- ۴) کاشی یا فهرست ---------- */
+    Box(Modifier.weight(1f).fillMaxWidth()) {
+      val pad = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = bottomGap)
+      if (listMode) {
+        LazyColumn(state = list, modifier = Modifier.fillMaxSize(), contentPadding = pad) {
+          if (scanning) item(key = "scan") { Box(Modifier.padding(bottom = 8.dp)) { scanPanel() } }
+          if (items.isEmpty()) item(key = "empty") { EmptyText(emptyText) }
+          itemsIndexed(items, key = { _, it -> it.id }) { i, it ->
+            PhoneListRow(it, first = i == 0, last = i == items.lastIndex, onTap = onTap, onHold = onHold, onMinus = onMinus)
+          }
+        }
+      } else {
+        LazyVerticalGrid(
+          columns = GridCells.Fixed(3),
+          state = grid,
+          modifier = Modifier.fillMaxSize(),
+          contentPadding = pad,
+          horizontalArrangement = Arrangement.spacedBy(8.dp),
+          verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+          if (scanning) item(key = "scan", span = { GridItemSpan(maxLineSpan) }) { scanPanel() }
+          if (items.isEmpty()) item(key = "empty", span = { GridItemSpan(maxLineSpan) }) { EmptyText(emptyText) }
+          items(items, key = { it.id }) { PhoneTile(it, onTap, onHold, onMinus) }
         }
       }
-      //  کارت‌ها زیرِ سربرگ محو می‌شوند (r3: «Les Framboise»)
-      Box(
-        Modifier
-          .fillMaxWidth()
-          .height(18.dp)
-          .background(Brush.verticalGradient(listOf(v.catalogPage, v.catalogPage.copy(alpha = 0f)))),
-      )
     }
   }
 }
 
 @Composable
-private fun HeaderButton(label: String, onClick: () -> Unit, modifier: Modifier, content: @Composable () -> Unit) {
+private fun EmptyText(text: String) {
+  Text(
+    text,
+    color = PhoneV3.colors.inkMuted,
+    fontSize = 14.sp,
+    textAlign = TextAlign.Center,
+    modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp, horizontal = 24.dp),
+  )
+}
+
+@Composable
+private fun RoundButton(label: String, onClick: () -> Unit, size: Dp, bg: Color?, content: @Composable () -> Unit) {
   Box(
-    modifier
-      .size(48.dp)
+    Modifier
+      .size(size)
       .clip(CircleShape)
+      .then(if (bg != null) Modifier.background(bg) else Modifier)
       .clickable(role = Role.Button, onClick = onClick)
       .semantics { contentDescription = label },
     contentAlignment = Alignment.Center,
   ) { content() }
 }
 
-/** پیکانِ نازکِ برگشت (r3 «‹») — در راست‌به‌چپ رو به راست */
+/** پیکانِ نازکِ برگشت — در راست‌به‌چپ رو به راست */
 @Composable
 private fun BackChevron(color: Color) {
   val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
-  Canvas(Modifier.size(22.dp)) {
+  Canvas(Modifier.size(20.dp)) {
     val w = size.width
     val h = size.height
     fun x(f: Float) = if (rtl) w - w * f else w * f
@@ -249,11 +251,45 @@ private fun BackChevron(color: Color) {
 }
 
 /**
- *  ردیفِ چیپ‌های دسته (کوچک و روشن): ذره‌بین، «همه»، دسته‌ها و «+» برای دستهٔ تازه.
- *  نگه داشتنِ یک دسته ⇐ حذفش (با تأیید، کارِ صدازننده). زدنِ ذره‌بین ⇐ همین ردیف
- *  کادرِ جستجو می‌شود (نام یا بارکد)؛ × پاکش می‌کند و چیپ‌ها برمی‌گردند.
+ *  کادرِ جستجو — نام، بارکد یا کد؛ فارسی/عربی و رقم‌ها یکی (`CatalogSearch`). با باز
+ *  شدنِ صفحه فوکوس نمی‌گیرد تا صفحه‌کلید روی کاتالوگ نپرد.
  */
-@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun SearchField(value: String, onValueChange: (String) -> Unit, modifier: Modifier) {
+  val v = PhoneV3.colors
+  Row(
+    modifier
+      .height(44.dp)
+      .clip(RoundedCornerShape(percent = 50))
+      .background(v.catalogCard)
+      .padding(start = 14.dp, end = 4.dp),
+    verticalAlignment = Alignment.CenterVertically,
+  ) {
+    Icon(Icons.Outlined.Search, contentDescription = null, tint = v.inkMuted, modifier = Modifier.size(20.dp))
+    Spacer(Modifier.width(8.dp))
+    Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+      if (value.isEmpty()) Text("نام، بارکد یا کدِ کالا", color = v.inkMuted, fontSize = 14.sp, maxLines = 1)
+      BasicTextField(
+        value = value,
+        onValueChange = onValueChange,
+        singleLine = true,
+        textStyle = TextStyle(color = v.ink, fontSize = 14.sp),
+        cursorBrush = SolidColor(v.ink),
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        modifier = Modifier.fillMaxWidth().semantics { contentDescription = "جستجوی کالا" },
+      )
+    }
+    if (value.isNotEmpty()) {
+      RoundButton("پاک کردنِ جستجو", { onValueChange("") }, 36.dp, null) {
+        Icon(Icons.Outlined.Close, contentDescription = null, tint = v.icon, modifier = Modifier.size(18.dp))
+      }
+    } else {
+      Spacer(Modifier.width(10.dp))
+    }
+  }
+}
+
+/** چیپ‌های کوچکِ دسته: «همه»، دسته‌ها و «+» (دستهٔ تازه)؛ نگه داشتنِ دسته ⇐ حذف (با تأیید) */
 @Composable
 private fun CategoryChips(
   categories: List<String>,
@@ -261,58 +297,22 @@ private fun CategoryChips(
   onCategory: (String?) -> Unit,
   onHold: (String) -> Unit,
   onAdd: () -> Unit,
-  search: String,
-  onSearch: (String) -> Unit,
 ) {
-  val v = PhoneV3.colors
-  var searching by rememberSaveable { mutableStateOf(search.isNotEmpty()) }
-  if (searching || search.isNotEmpty()) {
-    val focus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
-    Row(
-      Modifier
-        .fillMaxWidth()
-        .padding(vertical = 2.dp)
-        .height(44.dp)
-        .clip(RoundedCornerShape(percent = 50))
-        .background(v.catalogCard)
-        .padding(start = 14.dp, end = 4.dp),
-      verticalAlignment = Alignment.CenterVertically,
-    ) {
-      Icon(Icons.Outlined.Search, contentDescription = null, tint = v.inkMuted, modifier = Modifier.size(20.dp))
-      Spacer(Modifier.width(10.dp))
-      Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-        if (search.isEmpty()) Text("جستجوی نام کالا یا بارکد", color = v.inkMuted, fontSize = 14.sp, maxLines = 1)
-        BasicTextField(
-          value = search,
-          onValueChange = onSearch,
-          singleLine = true,
-          textStyle = TextStyle(color = v.ink, fontSize = 14.sp),
-          cursorBrush = SolidColor(v.ink),
-          keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-          modifier = Modifier.fillMaxWidth().focusRequester(focus),
-        )
-      }
-      HeaderButton("بستنِ جستجو", { onSearch(""); searching = false }, Modifier) {
-        Icon(Icons.Outlined.Close, contentDescription = null, tint = v.icon, modifier = Modifier.size(20.dp))
-      }
-    }
-    return
-  }
   Row(
     Modifier
       .fillMaxWidth()
       .horizontalScroll(rememberScrollState())
-      .padding(vertical = 2.dp),
-    horizontalArrangement = Arrangement.spacedBy(8.dp),
+      .padding(start = 12.dp, end = 12.dp, top = 8.dp),
+    horizontalArrangement = Arrangement.spacedBy(6.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
-    RoundChip("جستجو", Icons.Outlined.Search) { searching = true }
     Chip("همه", selected = category == null, onClick = { onCategory(null) }, onHold = null)
     categories.forEach { c ->
       Chip(c, selected = category == c, onClick = { onCategory(if (category == c) null else c) }, onHold = { onHold(c) })
     }
-    RoundChip("دستهٔ تازه", Icons.Outlined.Add, onAdd)
+    RoundButton("دستهٔ تازه", onAdd, 32.dp, PhoneV3.colors.catalogCard) {
+      Icon(Icons.Outlined.Add, contentDescription = null, tint = PhoneV3.colors.icon, modifier = Modifier.size(16.dp))
+    }
   }
 }
 
@@ -322,7 +322,7 @@ private fun Chip(text: String, selected: Boolean, onClick: () -> Unit, onHold: (
   val v = PhoneV3.colors
   Box(
     Modifier
-      .height(36.dp)
+      .height(32.dp)
       .clip(RoundedCornerShape(percent = 50))
       .background(if (selected) v.ink else v.catalogCard)
       .combinedClickable(
@@ -331,7 +331,7 @@ private fun Chip(text: String, selected: Boolean, onClick: () -> Unit, onHold: (
         onLongClick = onHold,
         onClick = onClick,
       )
-      .padding(horizontal = 16.dp),
+      .padding(horizontal = 14.dp),
     contentAlignment = Alignment.Center,
   ) {
     Text(
@@ -344,125 +344,270 @@ private fun Chip(text: String, selected: Boolean, onClick: () -> Unit, onHold: (
   }
 }
 
+/** «پرفروش‌ها»: قرص‌های یک‌ضربه‌ای (نام + قیمت) — سریع‌ترین راه به کالاهای همیشگی */
 @Composable
-private fun RoundChip(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit) {
+private fun BestsellerRow(items: List<PhoneCatalogItem>, onTap: (PhoneCatalogItem) -> Unit) {
   val v = PhoneV3.colors
-  Box(
+  val haptic = LocalHapticFeedback.current
+  Row(
     Modifier
-      .size(36.dp)
-      .clip(CircleShape)
-      .background(v.catalogCard)
-      .clickable(role = Role.Button, onClick = onClick)
-      .semantics { contentDescription = label },
-    contentAlignment = Alignment.Center,
+      .fillMaxWidth()
+      .horizontalScroll(rememberScrollState())
+      .padding(start = 12.dp, end = 12.dp, top = 8.dp),
+    horizontalArrangement = Arrangement.spacedBy(6.dp),
+    verticalAlignment = Alignment.CenterVertically,
   ) {
-    Icon(icon, contentDescription = null, tint = v.icon, modifier = Modifier.size(18.dp))
+    Text("پرفروش‌ها", color = v.inkMuted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+    items.forEach { b -> key(b.id) {
+      val pop = rememberAddPop(b.inCart)
+      Row(
+        Modifier
+          .height(32.dp)
+          .graphicsLayer { scaleX = pop.value; scaleY = pop.value }
+          .clip(RoundedCornerShape(percent = 50))
+          .background(if (b.inCart > 0) v.cart else v.catalogCard)
+          .clickable(role = Role.Button, onClickLabel = if (b.weighed) "وزن کردن" else "یکی به سبد") {
+            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            onTap(b)
+          }
+          .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+      ) {
+        val on = if (b.inCart > 0) v.onCart else v.ink
+        Text(b.name, color = on, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 116.dp))
+        Spacer(Modifier.width(6.dp))
+        Text("${money(b.price)} ؋", color = on, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+      }
+    } }
+  }
+}
+
+/** پرشِ کوچکِ کاشی وقتی مقدارش در سبد بیشتر شد (بندِ G) */
+@Composable
+private fun rememberAddPop(inCart: Double): Animatable<Float, AnimationVector1D> {
+  val pop = remember { Animatable(1f) }
+  val last = remember { mutableStateOf(inCart) }
+  LaunchedEffect(inCart) {
+    val grew = inCart > last.value
+    last.value = inCart
+    if (grew && Motion.enabled) {
+      pop.snapTo(1.06f)
+      pop.animateTo(1f, spring(dampingRatio = 0.4f, stiffness = 700f))
+    }
+  }
+  return pop
+}
+
+/**
+ *  دایرهٔ ۳۲dpِ آغازِ کاشی/ردیف: عکس، یا حرفِ اول؛ در سبد ⇐ زرد با مقدار (نشانِ مقدار).
+ *  عکس‌دار و در سبد ⇐ نشانِ زردِ کوچک روی گوشهٔ عکس.
+ */
+@Composable
+private fun ItemThumb(item: PhoneCatalogItem) {
+  val v = PhoneV3.colors
+  val image = rememberProductImage(item.id, item.hasPhoto)
+  val inCart = item.inCart > 0
+  val qtyText = qty(item.inCart)
+  Box(Modifier.size(32.dp)) {
+    Box(
+      Modifier.size(32.dp).clip(CircleShape).background(if (inCart && image == null) v.cart else v.bg),
+      contentAlignment = Alignment.Center,
+    ) {
+      when {
+        image != null -> Image(image, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(32.dp))
+        inCart -> Text(qtyText, color = v.onCart, fontSize = if (qtyText.length <= 3) 12.sp else 9.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+        else -> Text(CartSummary.initials(item.name), color = v.inkMuted, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+      }
+    }
+    if (image != null && inCart) {
+      Box(
+        Modifier.align(Alignment.BottomEnd).offset(4.dp, 4.dp).size(18.dp).clip(CircleShape).background(v.cart),
+        contentAlignment = Alignment.Center,
+      ) {
+        Text(qtyText, color = v.onCart, fontSize = 9.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+      }
+    }
+  }
+}
+
+/** «−» کوچکِ کالای درونِ سبد */
+@Composable
+private fun MinusButton(item: PhoneCatalogItem, size: Dp, onMinus: (PhoneCatalogItem) -> Unit) {
+  RoundButton("یکی کمتر ${item.name}", { onMinus(item) }, size, PhoneV3.colors.bg) {
+    Icon(Icons.Outlined.Remove, contentDescription = null, tint = PhoneV3.colors.icon, modifier = Modifier.size(size * 0.6f))
   }
 }
 
 /**
- *  کارتِ کالا (r3): سفید، گوشهٔ ۲۰، بی خط؛ عکس وسط (یا کاشیِ نرمِ حرفِ اول)، قیمتِ
- *  درشت، نامِ دوخطی، موجودی به خاکستری. فشردن ⇐ کمی کوچک (۰٫۹۶)؛ زدن ⇐ یک پله به سبد
- *  با لرزشِ کوتاه. اگر در سبد است، دایرهٔ زردِ کوچکِ مقدار گوشه‌اش می‌نشیند.
+ *  کاشیِ کوچکِ کالا (~۱۰۰dp): دایرهٔ ۳۲ و نامِ دوخطیِ ۱۳sp، قیمتِ پررنگِ ۱۴sp، موجودیِ
+ *  کوچکِ خاکستری (سرخ «تمام شد»). فشردن ⇐ ۰٫۹۶؛ زدن ⇐ +۱ با لرزش و پرش (وزنی ⇐
+ *  صفحه‌کلید)؛ نگه داشتن ⇐ صفحه‌کلید. در سبد ⇐ مقدارِ زرد و «−».
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun PhoneProductCard(item: PhoneCatalogItem, onAdd: () -> Unit) {
+fun PhoneTile(
+  item: PhoneCatalogItem,
+  onTap: (PhoneCatalogItem) -> Unit,
+  onHold: (PhoneCatalogItem) -> Unit,
+  onMinus: (PhoneCatalogItem) -> Unit,
+) {
   val v = PhoneV3.colors
   val haptic = LocalHapticFeedback.current
   val interaction = remember { MutableInteractionSource() }
   val pressed by interaction.collectIsPressedAsState()
   val motion = Motion.enabled
-  val scale by animateFloatAsState(
+  val press by animateFloatAsState(
     targetValue = if (pressed && motion) 0.96f else 1f,
     animationSpec = if (motion) spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMedium) else snap(),
-    label = "cardPress",
+    label = "tilePress",
   )
+  val pop = rememberAddPop(item.inCart)
   val priceText = "${money(item.price)} ؋"
   val stockText = PhoneSaleText.stock(item.stock, item.unit)
-  Box(
+  val out = item.stock <= 0
+  Column(
     Modifier
       .fillMaxWidth()
-      .graphicsLayer { scaleX = scale; scaleY = scale },
-  ) {
-    Column(
-      Modifier
-        .fillMaxWidth()
-        .clip(RoundedCornerShape(PhoneV3.catalogCardRadius))
-        .background(v.catalogCard)
-        .clickable(
-          interactionSource = interaction,
-          indication = null,
-          role = Role.Button,
-          onClickLabel = "افزودن به سبد",
-        ) {
+      .heightIn(min = 100.dp)
+      .graphicsLayer { val s = press * pop.value; scaleX = s; scaleY = s }
+      .clip(RoundedCornerShape(PhoneV3.tileRadius))
+      .background(v.catalogCard)
+      .combinedClickable(
+        interactionSource = interaction,
+        indication = null,
+        role = Role.Button,
+        onClickLabel = if (item.weighed) "وزن کردن" else "یکی به سبد",
+        onLongClickLabel = "نوشتنِ مقدار",
+        onLongClick = { onHold(item) },
+        onClick = {
           haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-          onAdd()
-        }
-        .semantics(mergeDescendants = true) { contentDescription = "${item.name}، $priceText، $stockText" }
-        .padding(start = 22.dp, end = 22.dp, top = 36.dp, bottom = 18.dp),
-    ) {
-      Box(Modifier.fillMaxWidth().height(88.dp), contentAlignment = Alignment.Center) {
-        val image = rememberProductImage(item.id, item.hasPhoto)
-        if (image != null) {
-          Image(
-            image,
-            contentDescription = null,
-            contentScale = ContentScale.Fit,
-            modifier = Modifier.size(88.dp).clip(RoundedCornerShape(16.dp)),
-          )
-        } else {
-          Box(
-            Modifier.size(88.dp).clip(RoundedCornerShape(26.dp)).background(v.bg),
-            contentAlignment = Alignment.Center,
-          ) {
-            Text(CartSummary.initials(item.name), color = v.inkMuted, fontSize = 34.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-          }
-        }
-      }
-      Spacer(Modifier.height(30.dp))
-      Text(
-        priceText,
-        color = v.ink,
-        fontSize = PhoneSaleText.priceSp(priceText).sp,
-        lineHeight = 32.sp,
-        fontWeight = FontWeight.Bold,
-        maxLines = 1,
-        softWrap = false,
+          onTap(item)
+        },
       )
-      Spacer(Modifier.height(12.dp))
+      .semantics(mergeDescendants = true) {
+        contentDescription = "${item.name}، $priceText، $stockText" +
+          if (item.inCart > 0) "، ${qty(item.inCart)} در سبد" else ""
+      }
+      .padding(8.dp),
+  ) {
+    Row(verticalAlignment = Alignment.Top) {
+      ItemThumb(item)
+      Spacer(Modifier.width(6.dp))
       Text(
         item.name,
         color = v.ink,
-        fontSize = 14.sp,
-        lineHeight = 20.sp,
+        fontSize = 13.sp,
+        lineHeight = 18.sp,
         fontWeight = FontWeight.SemiBold,
         minLines = 2,
         maxLines = 2,
         overflow = TextOverflow.Ellipsis,
-      )
-      Spacer(Modifier.height(6.dp))
-      Text(
-        stockText,
-        color = if (item.stock <= 0) v.negative else v.inkMuted,
-        fontSize = 12.sp,
-        lineHeight = 16.sp,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier.weight(1f),
       )
     }
-    //  مقدارِ همین کالا در سبد — زردِ سبد، کوچک، گوشهٔ آغاز
-    AnimatedVisibility(
-      visible = item.inCart > 0,
-      enter = if (motion) scaleIn(spring(dampingRatio = 0.5f, stiffness = 600f), initialScale = 0.6f) + fadeIn(tween(120)) else fadeIn(snap()),
-      exit = if (motion) scaleOut(tween(120)) + fadeOut(tween(120)) else fadeOut(snap()),
-      modifier = Modifier.align(Alignment.TopStart).padding(12.dp),
-    ) {
-      Box(
-        Modifier.size(24.dp).clip(CircleShape).background(v.cart),
-        contentAlignment = Alignment.Center,
-      ) {
-        Text(qty(item.inCart), color = v.onCart, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+    Spacer(Modifier.height(6.dp))
+    Row(Modifier.fillMaxWidth().heightIn(min = 24.dp), verticalAlignment = Alignment.CenterVertically) {
+      Text(
+        priceText,
+        color = v.ink,
+        fontSize = PhoneSaleText.priceSp(priceText).sp,
+        fontWeight = FontWeight.Bold,
+        maxLines = 1,
+        softWrap = false,
+        modifier = Modifier.weight(1f),
+      )
+      if (item.inCart > 0) MinusButton(item, 24.dp, onMinus)
+    }
+    Text(
+      stockText,
+      color = if (out) v.negative else v.inkMuted,
+      fontSize = 11.sp,
+      lineHeight = 14.sp,
+      maxLines = 1,
+      overflow = TextOverflow.Ellipsis,
+    )
+  }
+}
+
+/**
+ *  ردیفِ فهرست (۵۲dp): دایره، نام، قیمت · موجودی، و در انتها «+» (در سبد ⇐ «−» مقدار «+»).
+ *  ردیف‌ها یک کارتِ سفیدِ پیوسته با خطِ مویی‌اند (مثلِ گروه‌های r5).
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun PhoneListRow(
+  item: PhoneCatalogItem,
+  first: Boolean,
+  last: Boolean,
+  onTap: (PhoneCatalogItem) -> Unit,
+  onHold: (PhoneCatalogItem) -> Unit,
+  onMinus: (PhoneCatalogItem) -> Unit,
+) {
+  val v = PhoneV3.colors
+  val haptic = LocalHapticFeedback.current
+  val pop = rememberAddPop(item.inCart)
+  val r = PhoneV3.tileRadius
+  val shape = RoundedCornerShape(
+    topStart = if (first) r else 0.dp, topEnd = if (first) r else 0.dp,
+    bottomStart = if (last) r else 0.dp, bottomEnd = if (last) r else 0.dp,
+  )
+  val priceText = "${money(item.price)} ؋"
+  val stockText = PhoneSaleText.stock(item.stock, item.unit)
+  val hairline = v.hairline
+  Row(
+    Modifier
+      .fillMaxWidth()
+      .height(52.dp)
+      .clip(shape)
+      .background(v.catalogCard)
+      .drawBehind {
+        if (!last) {
+          val y = size.height - 0.5.dp.toPx()
+          drawLine(hairline, Offset(0f, y), Offset(size.width, y), strokeWidth = 1.dp.toPx())
+        }
       }
+      .combinedClickable(
+        role = Role.Button,
+        onClickLabel = if (item.weighed) "وزن کردن" else "یکی به سبد",
+        onLongClickLabel = "نوشتنِ مقدار",
+        onLongClick = { onHold(item) },
+        onClick = {
+          haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+          onTap(item)
+        },
+      )
+      .padding(start = 10.dp, end = 6.dp),
+    verticalAlignment = Alignment.CenterVertically,
+  ) {
+    Box(Modifier.graphicsLayer { scaleX = pop.value; scaleY = pop.value }) { ItemThumb(item) }
+    Spacer(Modifier.width(10.dp))
+    Column(Modifier.weight(1f)) {
+      Text(item.name, color = v.ink, fontSize = 14.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+      Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(priceText, color = v.ink, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+        Text(
+          "  ·  $stockText",
+          color = if (item.stock <= 0) v.negative else v.inkMuted,
+          fontSize = 12.sp,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
+        )
+      }
+    }
+    if (item.inCart > 0) {
+      MinusButton(item, 34.dp, onMinus)
+      Text(
+        qty(item.inCart),
+        color = v.ink,
+        fontSize = 14.sp,
+        fontWeight = FontWeight.Bold,
+        maxLines = 1,
+        textAlign = TextAlign.Center,
+        modifier = Modifier.widthIn(min = 28.dp),
+      )
+    }
+    RoundButton("یکی بیشتر ${item.name}", { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onTap(item) }, 34.dp, v.cart) {
+      Icon(Icons.Outlined.Add, contentDescription = null, tint = v.onCart, modifier = Modifier.size(20.dp))
     }
   }
 }

@@ -84,12 +84,13 @@ jobs:
           #  گوشی (phone-ui): پنجرهٔ ۳۹۰×۸۴۴ِ `PhonePreview` — عکس فقط از همان پنجره
           S="$S;phone:nav;wait:1500;pshot:20-phone-nav;phone:nav-dark;wait:1500;pshot:20b-phone-nav-dark;phone:settings;wait:1500;pshot:21-phone-settings;phone:settings-dark;wait:1500;pshot:21b-phone-settings-dark;phone:profile;wait:1500;pshot:22-phone-profile;phone:profile-dark;wait:1500;pshot:22b-phone-profile-dark;phone:cart;wait:2000;pshot:23-phone-cart-bar;phone:cart-open;wait:2000;pshot:23b-phone-cart-sheet;phone:cart-open-dark;wait:2000;pshot:23c-phone-cart-sheet-dark;phone:off"
           #  گوشی نسخهٔ ۳، صندوق (r3 بسته / r2 باز) — `PhoneV3CartPreview`
-          S="$S;phone:v3cart-closed;wait:2500;pshot:phone-v3-cart-closed;phone:v3cart-closed-dark;wait:2500;pshot:phone-v3-cart-closed-dark"
-          S="$S;phone:v3cart-open;wait:3000;pshot:phone-v3-cart-open;phone:v3cart-open-dark;wait:3000;pshot:phone-v3-cart-open-dark"
-          S="$S;phone:v3cart-empty;wait:2200;pshot:phone-v3-cart-empty;phone:v3cart-empty-dark;wait:2200;pshot:phone-v3-cart-empty-dark"
-          S="$S;phone:v3cart-long;wait:2500;pshot:phone-v3-cart-long;phone:v3cart-long-dark;wait:2500;pshot:phone-v3-cart-long-dark"
-          S="$S;phone:v3cart-long-open;wait:3000;pshot:phone-v3-cart-long-open;phone:v3cart-long-open-dark;wait:3000;pshot:phone-v3-cart-long-open-dark"
-          S="$S;phone:v3cart-scan;wait:2500;pshot:phone-v3-cart-scan;phone:off"
+          S="$S;phone:v3cart-grid;wait:2500;pshot:phone-v3-cart-grid;phone:v3cart-grid-dark;wait:2500;pshot:phone-v3-cart-grid-dark"
+          S="$S;phone:v3cart-list;wait:2500;pshot:phone-v3-cart-list;phone:v3cart-list-dark;wait:2500;pshot:phone-v3-cart-list-dark"
+          S="$S;phone:v3cart-search;wait:2800;pshot:phone-v3-cart-search;phone:v3cart-search-dark;wait:2500;pshot:phone-v3-cart-search-dark"
+          S="$S;phone:v3cart-keypad;wait:3000;pshot:phone-v3-cart-keypad;phone:v3cart-keypad-dark;wait:2500;pshot:phone-v3-cart-keypad-dark"
+          S="$S;phone:v3cart-open;wait:3000;pshot:phone-v3-cart-open;phone:v3cart-open-dark;wait:2500;pshot:phone-v3-cart-open-dark"
+          S="$S;phone:v3cart-long;wait:2500;pshot:phone-v3-cart-long;phone:v3cart-long-open;wait:3000;pshot:phone-v3-cart-long-open;phone:v3cart-long-open-dark;wait:2500;pshot:phone-v3-cart-long-open-dark"
+          S="$S;phone:v3cart-empty;wait:2200;pshot:phone-v3-cart-empty;phone:v3cart-scan;wait:2500;pshot:phone-v3-cart-scan;phone:off"
           export JAVA_TOOL_OPTIONS="-Dtohid.shot=$RUNNER_TEMP/shots -Dtohid.shot.every=9000 -Dtohid.shot.exit=true -Dtohid.shot.script=$S -Dsun.jnu.encoding=UTF-8 -Dfile.encoding=UTF-8"
           timeout 600 xvfb-run -s "-screen 0 1440x900x24" ./gradlew --no-daemon -q -Pdev=true run || true
           ls -la "$RUNNER_TEMP/shots"

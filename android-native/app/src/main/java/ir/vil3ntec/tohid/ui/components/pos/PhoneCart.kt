@@ -115,6 +115,15 @@ object PhoneCartShot {
 
   /** ردیفی که −/+ش در عکس باز باشد (شناسهٔ کالا) */
   val expand = mutableStateOf<String?>(null)
+
+  /** نمای کاتالوگ در عکس: true فهرست، false کاشی (ذخیره نمی‌شود) */
+  val list = mutableStateOf<Boolean?>(null)
+
+  /** متنِ جستجو در عکس */
+  val search = mutableStateOf<String?>(null)
+
+  /** کالایی که صفحه‌کلیدِ مقدارش در عکس باز باشد */
+  val keypad = mutableStateOf<String?>(null)
 }
 
 /** حالِ صندوقِ گوشی برای `AppRoot` و نوارِ پایین (بی آن‌که این‌جا به آن‌ها دست بخورد). */

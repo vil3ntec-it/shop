@@ -108,29 +108,23 @@ class CartSummaryTest {
 /** اندازهٔ قلمِ مبلغ‌های درشت و خطِ موجودیِ کارت (نسخهٔ ۳) */
 class PhoneSaleTextTest {
   @Test
-  fun `عنوان — دسته یا «فروش»`() {
-    assertEquals("فروش", PhoneSaleText.title(null))
-    assertEquals("فروش", PhoneSaleText.title("  "))
-    assertEquals("خوراکی", PhoneSaleText.title("خوراکی"))
-  }
-
-  @Test
   fun `مبلغِ دراز کوچک‌تر می‌شود و هرگز بزرگ‌تر نه`() {
     val texts = listOf("85 ؋", "1,650 ؋", "12,500 ؋", "1,234,567 ؋", "12,345,678 ؋", "1,234,567,890 ؋")
     val price = texts.map { PhoneSaleText.priceSp(it) }
     val total = texts.map { PhoneSaleText.totalSp(it) }
-    assertEquals(26, price.first()); assertEquals(34, total.first())
+    assertEquals(14, price.first()); assertEquals(34, total.first())
     assertTrue(price.zipWithNext().all { (a, b) -> b <= a })
     assertTrue(total.zipWithNext().all { (a, b) -> b <= a })
     assertEquals(30, PhoneSaleText.totalSp("12,345,678 ؋"))
-    assertTrue(PhoneSaleText.priceSp("1,234,567,890 ؋") < 19)
+    assertEquals(13, PhoneSaleText.priceSp("4,250,000 ؋"))
+    assertTrue(PhoneSaleText.priceSp("1,234,567,890 ؋") < 13)
   }
 
   @Test
-  fun `موجودی با واحد، صفر «موجود نیست»`() {
+  fun `موجودی با واحد، صفر «تمام شد»`() {
     assertEquals("40 کیلوگرم مانده", PhoneSaleText.stock(40.0, "کیلوگرم"))
     assertEquals("2.5 مانده", PhoneSaleText.stock(2.5, ""))
-    assertEquals("موجود نیست", PhoneSaleText.stock(0.0, "عدد"))
-    assertEquals("موجود نیست", PhoneSaleText.stock(-3.0, "عدد"))
+    assertEquals("تمام شد", PhoneSaleText.stock(0.0, "عدد"))
+    assertEquals("تمام شد", PhoneSaleText.stock(-3.0, "عدد"))
   }
 }

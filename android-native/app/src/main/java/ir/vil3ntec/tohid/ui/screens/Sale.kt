@@ -31,7 +31,9 @@ import ir.vil3ntec.tohid.ui.components.pos.PhoneCartUi
 import ir.vil3ntec.tohid.ui.components.pos.PhoneCatalog
 import ir.vil3ntec.tohid.ui.components.pos.PhoneCatalogItem
 import ir.vil3ntec.tohid.ui.components.pos.PhoneSaleFrame
-import ir.vil3ntec.tohid.ui.components.pos.PhoneSaleText
+import ir.vil3ntec.tohid.ui.components.pos.CatalogSearch
+import ir.vil3ntec.tohid.ui.components.pos.PhoneKeypadRequest
+import ir.vil3ntec.tohid.ui.components.pos.PhoneQtyKeypad
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -355,21 +357,76 @@ fun SaleScreen(
     }
   }
 
-  val catalogItems = remember(d, phoneSearch, category, cart, phone) {
-    if (!phone) return@remember emptyList<PhoneCatalogItem>()
-    val term = phoneSearch.trim()
-    val inCart = cart.groupBy { it.productId }.mapValues { (_, l) -> l.sumOf { it.quantity } }
-    d.products
-      .filter { p ->
-        //  کالای غیرفعال در فروش نمی‌آید — سابقه‌اش در گزارش‌ها می‌ماند
-        p.active &&
-          (category == null || p.category == category) &&
-          (term.isBlank() || p.name.contains(term, ignoreCase = true) || p.barcodes.any { it.contains(term) })
-      }
-      .map { p ->
-        PhoneCatalogItem(p.id, p.name, p.salePrice, p.unit, ShopStore.stock(d, p.id), p.photo, inCart[p.id] ?: 0.0)
-      }
+  /*
+   *  کاتالوگ: نمایهٔ جستجو (کلیدهای نرمال) و ترتیبِ پرفروش‌ترین فقط با تغییرِ کالاها یا
+   *  فروش‌ها ساخته می‌شود، نه با هر حرف (سنجشِ کارایی: ۲۶۴–۴۴۹ms برای هر کلید). کالای
+   *  غیرفعال در فروش نمی‌آید — سابقه‌اش در گزارش‌ها می‌ماند.
+   */
+  val popularity = remember(d.sales, d.saleItems, phone) {
+    if (phone) CatalogSearch.popularity(d.sales, d.saleItems) else emptyMap()
   }
+  val searchIndex = remember(d.products, popularity, phone) {
+    CatalogSearch.index(if (phone) d.products else emptyList(), popularity)
+  }
+  val productById = remember(d.products) { d.products.associateBy { it.id } }
+  val inCartQty = remember(cart) { cart.groupBy { it.productId }.mapValues { (_, l) -> l.sumOf { it.quantity } } }
+  fun catalogItem(p: ir.vil3ntec.tohid.data.Product) = PhoneCatalogItem(
+    id = p.id,
+    name = p.name,
+    price = p.salePrice,
+    unit = p.unit,
+    stock = ShopStore.stock(d, p.id),
+    hasPhoto = p.photo,
+    inCart = inCartQty[p.id] ?: 0.0,
+    weighed = SalesEngine.isFractionalUnit(p.unit),
+  )
+  val shownIds = remember(searchIndex, phoneSearch, category) { CatalogSearch.search(searchIndex, phoneSearch, category) }
+  val catalogItems = remember(shownIds, productById, inCartQty, d) { shownIds.mapNotNull { productById[it]?.let(::catalogItem) } }
+  val bestsellers = remember(searchIndex, productById, inCartQty, d) {
+    CatalogSearch.top(searchIndex).mapNotNull { productById[it]?.let(::catalogItem) }
+  }
+
+  //  کاشی یا فهرست — همان انبارِ `ViewModePref` (کارت = کاشی، جدول = فهرست)، برای هر کاربر
+  val modeStore = remember(context) {
+    ir.vil3ntec.tohid.ui.components.common.ViewModePref.Store.of(
+      context.getSharedPreferences(ir.vil3ntec.tohid.ui.components.common.ViewModePref.PREFS, android.content.Context.MODE_PRIVATE)
+    )
+  }
+  val modeKey = remember(context) {
+    val user = runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountId }.getOrDefault("")
+    ir.vil3ntec.tohid.ui.components.common.ViewModePref.key(user, "sale-phone")
+  }
+  var listMode by remember {
+    mutableStateOf(
+      ir.vil3ntec.tohid.ui.components.common.ViewMode.parse(runCatching { modeStore.get(modeKey) }.getOrNull()) ==
+        ir.vil3ntec.tohid.ui.components.common.ViewMode.TABLE
+    )
+  }
+  fun toggleMode() {
+    listMode = !listMode
+    val mode = if (listMode) ir.vil3ntec.tohid.ui.components.common.ViewMode.TABLE else ir.vil3ntec.tohid.ui.components.common.ViewMode.CARD
+    runCatching { modeStore.put(modeKey, mode.id) }
+  }
+
+  //  صفحه‌کلیدِ مقدار/وزن (نگه داشتن، یا زدنِ کالای وزنی)
+  var keypadFor by remember { mutableStateOf<String?>(null) }
+  fun phoneTap(item: PhoneCatalogItem) { if (item.weighed) keypadFor = item.id else phoneAdd(item.id) }
+  fun phoneMinus(item: PhoneCatalogItem) {
+    val p = productById[item.id] ?: return
+    val lines = cartStore.lines.value
+    val now = lines.find { it.productId == p.id }?.quantity ?: return
+    val next = now - SalesEngine.cartStep(p.unit)
+    cartStore.set(SalesEngine.setCartQty(lines, p.id, next))
+    if (next <= 0 && selectedId == p.id) selectedId = null
+  }
+
+  //  عکس‌های خودکار: نما، جستجو و صفحه‌کلید
+  val shotList = PhoneCartShot.list.value
+  LaunchedEffect(shotList) { if (phone && shotList != null) listMode = shotList }
+  val shotSearch = PhoneCartShot.search.value
+  LaunchedEffect(shotSearch) { if (phone && shotSearch != null) phoneSearch = shotSearch }
+  val shotKeypad = PhoneCartShot.keypad.value
+  LaunchedEffect(shotKeypad) { if (phone && shotKeypad != null) keypadFor = shotKeypad }
 
   /*
    *  دوربین، بارکدِ دستی و «هر اسکن» — یک‌جا تا تبلت (کادرِ بالای صفحه) و گوشیِ
@@ -649,8 +706,8 @@ fun SaleScreen(
         pulse = pulse,
         catalog = { bottomGap ->
           PhoneCatalog(
-            title = PhoneSaleText.title(category),
             items = catalogItems,
+            bestsellers = bestsellers,
             categories = d.productCategories,
             category = category,
             onCategory = { category = it },
@@ -658,6 +715,8 @@ fun SaleScreen(
             onAddCategory = { newCategory = "" },
             search = phoneSearch,
             onSearch = { phoneSearch = it },
+            listMode = listMode,
+            onToggleMode = { toggleMode() },
             onBack = goBack,
             onScan = { if (scanOpen) closeScanner() else openScanner() },
             scanning = scanOpen,
@@ -684,7 +743,9 @@ fun SaleScreen(
               else -> "محصولی در این دسته‌بندی نیست"
             },
             bottomGap = bottomGap,
-            onAdd = { phoneAdd(it.id) },
+            onTap = { phoneTap(it) },
+            onHold = { keypadFor = it.id },
+            onMinus = { phoneMinus(it) },
           )
         },
         cart = { revealed, dragHandle ->
@@ -743,6 +804,33 @@ fun SaleScreen(
           PhoneCartTotal(SalesEngine.cartTotal(d, cart))
           Spacer(Modifier.height(36.dp))
           PhoneCartPay("پرداخت", onClick = { checkout = true })
+        },
+      )
+      PhoneQtyKeypad(
+        request = keypadFor?.let { id -> productById[id] }?.let { p ->
+          PhoneKeypadRequest(p.id, p.name, p.unit, p.salePrice, SalesEngine.isFractionalUnit(p.unit), inCartQty[p.id] ?: 0.0)
+        },
+        problem = { req, q ->
+          val p = productById[req.id]
+          val stock = ShopStore.stock(d, req.id)
+          when {
+            p == null -> null
+            SalesEngine.quantityProblem(p, q) != null -> SalesEngine.quantityProblem(p, q)
+            q > stock -> "فقط ${qty(stock.coerceAtLeast(0.0))}${if (p.unit.isNotBlank()) " ${p.unit}" else ""} موجود است"
+            else -> null
+          }
+        },
+        onDismiss = { keypadFor = null },
+        onConfirm = { req, q ->
+          val lines = cartStore.lines.value
+          val next = when {
+            lines.any { it.productId == req.id } -> SalesEngine.setCartQty(lines, req.id, q)
+            q > 0 -> SalesEngine.addToCart(lines, req.id, q)
+            else -> lines
+          }
+          cartStore.set(next)
+          if (q > 0) selectedId = req.id else if (selectedId == req.id) selectedId = null
+          keypadFor = null
         },
       )
     }
