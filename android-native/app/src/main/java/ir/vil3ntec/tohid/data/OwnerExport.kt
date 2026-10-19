@@ -171,6 +171,13 @@ object OwnerExport {
     "oldPrice" to "قیمت قبلی",
     "newPrice" to "قیمت تازه",
     "nextInvoiceNo" to "شمارهٔ فاکتور بعدی",
+    //  موتورِ تازهٔ موجودی و بها (افزودنی، فقط وقتی تنظیمِ دکان روشن است)
+    "landedCost" to "هزینهٔ جانبی",
+    "locationId" to "محل",
+    "toLocationId" to "محلِ مقصد",
+    "userId" to "کاربر",
+    "adjKind" to "نوعِ اصلاح",
+    "lotId" to "سری",
   )
 
   /** کلیدهای سرآیند — داده نیستند و برگه نمی‌شوند */
