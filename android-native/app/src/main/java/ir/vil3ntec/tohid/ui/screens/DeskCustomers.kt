@@ -211,8 +211,9 @@ private fun CustomerCards(store: ShopStore, d: ShopData, snackbar: SnackbarHostS
     } else if (view.mode == ViewMode.TABLE) {
       //  همان فهرست، همان صافی و ترتیب — جدولِ خط‌دار مثلِ داخلِ پرونده
       val cols = listOf(
-        TCol("نام"), TCol("تلفن", 140.dp), TCol("مانده", 140.dp, true), TCol("روزِ بدهی", 90.dp, true),
-        TCol("فاکتورها", 80.dp, true), TCol("جمعِ خرید", 130.dp, true), TCol("آخرین خرید", 110.dp), TCol("آخرین پرداخت", 110.dp),
+        //  ستونِ نام اولویت دارد: ستون‌های ثابت به‌اندازهٔ محتوا (بازبینیِ ۱۴۰۵/۰۷/۲۷)
+        TCol("نام"), TCol("تلفن", 118.dp), TCol("مانده", 104.dp, true), TCol("روزِ بدهی", 76.dp, true),
+        TCol("فاکتورها", 70.dp, true), TCol("جمعِ خرید", 104.dp, true), TCol("آخرین خرید", 98.dp), TCol("آخرین پرداخت", 98.dp),
       )
       DeskTable(
         cols, list.size, Modifier.weight(1f),
@@ -723,8 +724,9 @@ internal fun DeskTable(
           cols.forEachIndexed { ci, c ->
             val v = cell(i, ci)
             box(c) {
+              //  ستونِ اصلی (پهنای ۰ = باقیِ جا، معمولاً نام) تا دو خط می‌شکند، بریده نمی‌شود
               Text(
-                v.text, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                v.text, maxLines = if (c.width == 0.dp) 2 else 1, overflow = TextOverflow.Ellipsis,
                 style = if (c.end) MaterialTheme.typography.bodyMedium.tabular() else MaterialTheme.typography.bodyMedium,
                 fontWeight = if (v.bold) FontWeight.SemiBold else null,
                 color = v.color ?: Shop.colors.text,

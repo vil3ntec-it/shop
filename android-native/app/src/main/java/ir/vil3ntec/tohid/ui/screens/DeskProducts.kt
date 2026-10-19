@@ -425,12 +425,13 @@ private fun ProductTable(
         H("نام", ProductListModel.Sort.NAME, Modifier)
         H("/ دسته", ProductListModel.Sort.CATEGORY, Modifier)
       }
-      H("بارکد · تاریخ", ProductListModel.Sort.CODE, Modifier.width(150.dp))
-      H("خرید (؋)", ProductListModel.Sort.BUY, Modifier.width(100.dp), end = true)
-      H("فروش (؋)", ProductListModel.Sort.SELL, Modifier.width(100.dp), end = true)
-      H("موجودی", ProductListModel.Sort.STOCK, Modifier.width(110.dp), end = true)
+      //  ستونِ نام اولویت دارد (بازبینیِ ۱۴۰۵/۰۷/۲۷: نامِ بلند با «…» بریده می‌شد و بارکد جا داشت)
+      H("بارکد · تاریخ", ProductListModel.Sort.CODE, Modifier.width(COL_CODE))
+      H("خرید (؋)", ProductListModel.Sort.BUY, Modifier.width(COL_PRICE), end = true)
+      H("فروش (؋)", ProductListModel.Sort.SELL, Modifier.width(COL_PRICE), end = true)
+      H("موجودی", ProductListModel.Sort.STOCK, Modifier.width(COL_STOCK), end = true)
       Spacer(Modifier.width(12.dp))
-      H("وضعیت", ProductListModel.Sort.STATUS, Modifier.width(110.dp))
+      H("وضعیت", ProductListModel.Sort.STATUS, Modifier.width(COL_STATUS))
     }
     LazyColumn(Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(bottom = bottomSpace)) {
       itemsIndexed(rows, key = { _, p -> p.id }) { i, p ->
@@ -459,27 +460,34 @@ private fun ProductTable(
           Box(Modifier.size(36.dp), contentAlignment = Alignment.Center) { ProductThumb(p.id, p.name, 36.dp, photos) }
           Spacer(Modifier.width(10.dp))
           Column(Modifier.weight(1f)) {
-            Text(p.name, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = c.text)
+            //  نام تا دو خط می‌شکند، بریده نمی‌شود
+            Text(p.name, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = c.text)
             Text(p.category.ifBlank { "بی‌دسته" }, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelSmall, color = c.muted)
           }
-          Column(Modifier.width(150.dp).padding(horizontal = 4.dp)) {
+          Column(Modifier.width(COL_CODE).padding(horizontal = 4.dp)) {
             Text(p.barcodes.firstOrNull().orEmpty().ifEmpty { "—" }, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall, color = c.text)
             if (p.createdAt > 0) Text(ir.vil3ntec.tohid.formatMillis(p.createdAt), maxLines = 1, style = MaterialTheme.typography.labelSmall, color = c.muted)
           }
-          Cell(money(p.purchasePrice), 100.dp, end = true)
-          Cell(money(p.salePrice), 100.dp, end = true, bold = true)
+          Cell(money(p.purchasePrice), COL_PRICE, end = true)
+          Cell(money(p.salePrice), COL_PRICE, end = true, bold = true)
           Text(
             "${qty(stock)} ${p.unit}",
-            Modifier.width(110.dp), textAlign = TextAlign.End, maxLines = 1,
+            Modifier.width(COL_STOCK), textAlign = TextAlign.End, maxLines = 1,
             style = MaterialTheme.typography.bodyMedium, color = c.text,
           )
           Spacer(Modifier.width(12.dp))
-          Box(Modifier.width(110.dp)) { val (t, tone) = pill(status); StatusPill(t, tone) }
+          Box(Modifier.width(COL_STATUS)) { val (t, tone) = pill(status); StatusPill(t, tone) }
         }
       }
     }
   }
 }
+
+/** پهنای ستون‌های ثابتِ جدولِ کالا — به‌اندازهٔ محتوا، تا باقیِ جا مالِ نام باشد */
+private val COL_CODE = 116.dp
+private val COL_PRICE = 84.dp
+private val COL_STOCK = 100.dp
+private val COL_STATUS = 100.dp
 
 /** نمای کارتی — همان داده، همان نشان و همان چک‌باکسِ انتخاب */
 @Composable
