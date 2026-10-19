@@ -35,6 +35,7 @@ for (const [name, file] of [['وب', WEB], ['سرور', SRV]]) {
     for (const c of V.evaluate) assert.deepEqual(P.evaluate(c.role, c.layers, c.key, c.req), c.out, JSON.stringify(c));
     for (const c of V.effective) assert.deepEqual(P.effective(c.role, c.layers), c.out, JSON.stringify(c));
     for (const c of V.validate) assert.equal(P.validate(c.role, c.key, c.override), c.out, JSON.stringify(c));
+    for (const c of V.discount_bp) assert.equal(P.discountBp(c.discount, c.total), c.out, JSON.stringify(c));
   });
 }
 

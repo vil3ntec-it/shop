@@ -69,6 +69,31 @@ const afn = (minor) => Number(minor) / 100;
 const q3 = (x) => Math.round(x * 1000) / 1000;
 const part = (v) => String(v || '').replace(/[^A-Za-z0-9_.:-]/g, '_').slice(0, 60) || '-';
 
+/**
+ * روشِ پرداختِ فاکتورِ W — **هرگز «نقد در دخل» نیست**:
+ *   online ⇒ `paymentMethod: 'online'`؛ ردیفِ PAY از نوعِ `other`. «تأییدشده» با سطحِ
+ *            `provider` فقط وقتی سفارش `paid` است (PAY-08)؛ وگرنه `pending`.
+ *   cod    ⇒ `paymentMethod: 'cod'`؛ نوعِ `cash` ولی دستِ پیک/تحویل‌دهنده
+ *            (`custody: 'courier'`) و تا تسویهٔ پیک (`courier_settlements`، DLV) پولِ دخل
+ *            نیست ⇒ `pending`. سند تغییرناپذیر است؛ وضعیتِ تسویه را `cod_status` ِ سفارش
+ *            و سندِ تسویه نگه می‌دارند، نه این ردیف.
+ * مبلغِ ردیف به واحدِ کوچک (پول) — همان قراردادِ هستهٔ PAY (`PaymentRow`).
+ */
+function paymentOf(order, totalMinor) {
+  if (order.payment_method === 'online') {
+    const paid = order.payment_status === 'paid';
+    return {
+      method: 'online',
+      rows: [{ method: 'online', kind: 'other', amount: totalMinor, ref: null,
+        status: paid ? 'confirmed' : 'pending', verification: paid ? 'provider' : null }],
+    };
+  }
+  return {
+    method: 'cod',
+    rows: [{ method: 'cod', kind: 'cash', amount: totalMinor, ref: null, status: 'pending', verification: null, custody: 'courier' }],
+  };
+}
+
 /** پرچمِ دکان درونِ تراکنشِ فراخواننده: مقدارِ خودِ دکان بر `all` جلو می‌افتد؛ فقط `true` روشن است. */
 async function flagOn(c, shopId) {
   const rows = (await c.query(
@@ -326,6 +351,7 @@ async function postSale(c, shopId, orderId, actor, at, onStatus) {
 
   const totalMinor = Number(order.total_minor);
   const discountMinor = Number(order.discount_minor);
+  const pay = paymentOf(order, totalMinor);
   const sale = {
     invoiceNumber: docNo,
     total: afn(totalMinor + discountMinor),
@@ -333,8 +359,12 @@ async function postSale(c, shopId, orderId, actor, at, onStatus) {
     discountValue: afn(discountMinor),
     discount: afn(discountMinor),
     finalTotal: afn(totalMinor),
-    paymentMethod: 'cash',
+    //  روشِ واقعی (online | cod)، نه `cash`. برنامهٔ قدیمی هر چه «credit» نباشد را «نقد»
+    //  می‌نویسد و صندوقِ قدیمی آن را در دخل می‌شمارد ⇒ پرچم را فقط با نسخهٔ تازه روشن کنید.
+    paymentMethod: pay.method,
     debtorId: null,
+    //  معنای قدیمی می‌ماند: مشتری همه را داده (آنلاین یا به پیک)، بدهی‌ای نیست. «کجاست» را
+    //  `payments` و `channel` می‌گویند؛ صندوق (CashShift) فاکتورِ اینترنتی را در دخل نمی‌شمارد.
     paidAmount: afn(totalMinor),
     remaining: 0,
     status: 'completed',
@@ -350,6 +380,7 @@ async function postSale(c, shopId, orderId, actor, at, onStatus) {
     channel: 'online',
     orderId: order.id,
     orderNo: Number(order.order_no),
+    payments: pay.rows,
   };
 
   const list = [['sales', saleId, 'insert', sale]];
@@ -451,7 +482,8 @@ async function postReturn(c, shopId, orderId, actor, at, onStatus) {
   for (const b of back) {
     list.push(['returns', ids.ret(b.itemId), 'insert', {
       saleId, saleItemId: b.itemId, productId: b.productId, quantity: b.qty, amount: afn(b.amountMinor),
-      reason, date, createdAt: at,
+      //  پول از راهِ سفارش برمی‌گردد، نه از دخل ⇒ صندوق (CashShift) این مرجوعی را کم نمی‌کند
+      reason, date, createdAt: at, channel: 'online',
     }]);
     list.push(['saleItems', b.itemId, 'update', { returnedQty: { $inc: b.qty } }]);
     if (b.productId) {

@@ -61,6 +61,9 @@ private val SECTION_TITLES = linkedMapOf(
 @Composable
 fun ReportsScreen(d: ShopData) {
   val context = LocalContext.current
+  //  «گزارشِ تازه» (پیش‌فرض خاموش) ⇒ خلاصهٔ امروز و سنِ بدهی از هستهٔ مشترکِ گزارش
+  ReportFresh.load(context)
+  if (ReportFresh.on.value) { PhoneFreshReports(d); return }
   val scope = rememberCoroutineScope()
   var pending by remember { mutableStateOf<ReportCsv.Sheet?>(null) }
 
@@ -112,7 +115,9 @@ fun ReportsScreen(d: ShopData) {
         style = MaterialTheme.typography.bodySmall,
         color = Shop.colors.muted,
       )
-      Spacer(Modifier.height(14.dp))
+      Spacer(Modifier.height(8.dp))
+      ReportFreshSwitch()
+      Spacer(Modifier.height(10.dp))
 
       Row(
         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
