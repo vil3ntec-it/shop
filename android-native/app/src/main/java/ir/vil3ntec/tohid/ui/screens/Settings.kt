@@ -4,17 +4,18 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.ChevronLeft
-import androidx.compose.material.icons.filled.CloudDownload
-import androidx.compose.material.icons.filled.Compress
-import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.CloudUpload
-import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.outlined.CloudDownload
+import androidx.compose.material.icons.outlined.Compress
+import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.CloudUpload
+import androidx.compose.material.icons.outlined.CloudDone
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
@@ -27,9 +28,9 @@ import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.filled.Sync
-import androidx.compose.material.icons.filled.SystemUpdate
-import androidx.compose.material.icons.filled.TableChart
-import androidx.compose.material.icons.filled.Undo
+import androidx.compose.material.icons.outlined.SystemUpdate
+import androidx.compose.material.icons.outlined.TableChart
+import androidx.compose.material.icons.outlined.Restore
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -93,6 +94,8 @@ fun SettingsScreen(
   snackbar: SnackbarHostState,
   theme: ThemeChoice,
   onTheme: (ThemeChoice) -> Unit,
+  /** گوشی: برگشت از ریشهٔ تنظیمات؛ null ⇒ همان صفحه‌ای که تنظیمات را باز کرد (`SettingsNav.origin`) */
+  onBack: (() -> Unit)? = null,
   onUpdates: () -> Unit,
 ) {
   val context = LocalContext.current
@@ -332,19 +335,16 @@ fun SettingsScreen(
     toast(if (granted) "دوربین آماده است — بارکدخوان کار می‌کند" else "بدون اجازهٔ دوربین، بارکدخوان باز نمی‌شود")
   }
 
-  LazyColumn(
-    Modifier.fillMaxSize(),
-    contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, 32.dp),
-    verticalArrangement = Arrangement.spacedBy(20.dp),
-  ) {
-    item {
-      Text(
-        "هشدارها، ظاهر، داده‌ها و پشتیبان — حساب و نام دکان در «حساب من» است",
-        style = MaterialTheme.typography.bodySmall,
-        color = Shop.colors.muted,
-      )
-      Spacer(Modifier.height(4.dp))
-    }
+  //  همگام‌سازی (از «حساب من» به این‌جا آمد) — همان موتورِ v1 و همان دکمه
+  val v1 by ir.vil3ntec.tohid.sync.v1.SyncV1Engine.of(context).status.collectAsState()
+  val lastSyncOk = maxOf(state.lastSyncAt, v1.lastOkAt)
+  val syncNow = System.currentTimeMillis()
+
+  /*
+   *  بدنهٔ تنظیمات — یک بار نوشته شده و سه جا کشیده می‌شود: فهرستِ گوشی،
+   *  صفحهٔ یک بخشِ گوشی، و ستونِ وسطِ کامپیوتر (شرح سرِ `SettingsParts.kt`).
+   */
+  val body: LazyListScope.() -> Unit = {
 
     /*
      *  حساب و نامِ فروشگاه اینجا نیستند — عمداً.
@@ -411,18 +411,15 @@ fun SettingsScreen(
         SettingsSection(
           icon = Icons.Filled.Palette,
           title = "ظاهر",
-          subtitle = when (theme) {
-            ThemeChoice.LIGHT -> "روشن"
-            ThemeChoice.DARK -> "تاریک"
-            ThemeChoice.SYSTEM -> "مثل گوشی"
-          },
+          subtitle = "روشن، تیره، یا خودکار مثلِ گوشی",
           tint = Shop.colors.primary,
+          value = themeLabel(theme),
         ) {
           SegmentedChoice(
             options = listOf(
-              ThemeChoice.LIGHT.name to "روشن",
-              ThemeChoice.DARK.name to "تاریک",
-              ThemeChoice.SYSTEM.name to "مثل گوشی",
+              ThemeChoice.LIGHT.name to themeLabel(ThemeChoice.LIGHT),
+              ThemeChoice.DARK.name to themeLabel(ThemeChoice.DARK),
+              ThemeChoice.SYSTEM.name to themeLabel(ThemeChoice.SYSTEM),
             ),
             selected = theme.name,
             onSelect = { onTheme(ThemeChoice.valueOf(it)) },
@@ -441,37 +438,12 @@ fun SettingsScreen(
           )
         }
 
-        /* ======================== رقم و نامِ ماه (LOC-01، LOC-05) ======================== */
-        LocaleSection()
-      }
-    }
+        /* ===================== نوارِ پایین (F2) — ویرایشگرش مالِ بخشِ نوار است ===================== */
+        SettingsLink(SettingsLayout.NAV_BAR) { ir.vil3ntec.tohid.ui.AppNav.go(SettingsLayout.LINKS.getValue(SettingsLayout.NAV_BAR)) }
 
-    /* ============================ فروش و پرداخت ============================ */
-    item {
-      SettingsGroup(SettingsLayout.SALES) {
-        /* ============================ انقضا ============================ */
-        var blockExpired by remember { mutableStateOf(ir.vil3ntec.tohid.data.ShopPolicy.blockExpired(context)) }
-        SettingsSection(
-          icon = Icons.Filled.Lock,
-          title = "کالای منقضی",
-          subtitle = if (blockExpired) "فروخته نمی‌شود" else "فقط هشدار",
-          tint = if (blockExpired) Shop.colors.danger else Shop.colors.warning,
-        ) {
-          Text(
-            "هشدارِ انقضا همیشه هست. اگر «فروخته نشود» را بزنید، مقدارِ محموله‌های منقضی از موجودیِ فروختنی کم می‌شود و فروشِ بیش از آن ثبت نمی‌شود.",
-            style = MaterialTheme.typography.labelSmall,
-            color = Shop.colors.muted2,
-          )
-          Spacer(Modifier.height(8.dp))
-          SegmentedChoice(
-            options = listOf("warn" to "فقط هشدار", "block" to "فروخته نشود"),
-            selected = if (blockExpired) "block" else "warn",
-            onSelect = {
-              blockExpired = it == "block"
-              ir.vil3ntec.tohid.data.ShopPolicy.setBlockExpired(context, blockExpired)
-            },
-          )
-        }
+        /* ======================== زبانِ ماه‌ها، رقم و نماد (LOC-01، LOC-05، LOC-07) ======================== */
+        LanguageSection()
+        LocaleSection()
       }
     }
 
@@ -484,6 +456,12 @@ fun SettingsScreen(
           title = "قفل برنامه",
           subtitle = if (lockOn) "روشن — با رمز باز می‌شود" else "خاموش",
           tint = if (lockOn) Shop.colors.success else Shop.colors.muted,
+          //  کلیدِ سبزِ ردیف (r5): روشن ⇐ همان پنجرهٔ گذاشتنِ رمز؛ خاموش ⇐ همان «برداشتن رمز»
+          toggle = lockOn,
+          onToggle = { on ->
+            if (on) askPin = true
+            else { lockStore.set(""); lockOn = false; toast("قفل برداشته شد") }
+          },
         ) {
           Text(
             "تا امروز هر کسی گوشی را برمی‌داشت، حساب‌های دکان جلویش باز بود: طلب مشتری‌ها، سود، قیمت خرید. با رمز، تا زده نشود هیچ‌چیز دیده نمی‌شود.",
@@ -526,18 +504,6 @@ fun SettingsScreen(
           }
         }
 
-        /* ========================= رمز حساب ========================= */
-        if (signedIn) {
-          SettingsSection(
-            icon = Icons.Filled.Password,
-            title = "تغییر رمز حساب",
-            subtitle = "رمزِ ورود به سرور",
-            tint = Shop.colors.primary,
-          ) {
-            PasswordChange(state = state, snackbarToast = ::toast)
-          }
-        }
-
         /* ============================ کلیدها ============================ */
         SettingsSection(
           icon = Icons.Filled.Key,
@@ -574,6 +540,63 @@ fun SettingsScreen(
             )
           }
         }
+
+        /* ======================== دستگاه‌های وارد شده ======================== */
+        if (signedIn) {
+          SettingsSection(
+            icon = Icons.Filled.Devices,
+            title = "دستگاه‌های وارد شده",
+            subtitle = "گوشی گم شد؟ نشستش را ببندید",
+            tint = Shop.colors.warning,
+          ) {
+            DeviceList(state = state, snackbarToast = ::toast)
+          }
+        }
+
+        /* ========================= رمز حساب ========================= */
+        if (signedIn) {
+          SettingsSection(
+            icon = Icons.Filled.Password,
+            title = "تغییر رمز حساب",
+            subtitle = "رمزِ ورود به سرور",
+            tint = Shop.colors.primary,
+          ) {
+            PasswordChange(state = state, snackbarToast = ::toast)
+          }
+        }
+      }
+    }
+
+    /* ============================ فروش و پرداخت ============================ */
+    item {
+      SettingsGroup(SettingsLayout.SALES) {
+        /* ============================ انقضا ============================ */
+        var blockExpired by remember { mutableStateOf(ir.vil3ntec.tohid.data.ShopPolicy.blockExpired(context)) }
+        SettingsSection(
+          icon = Icons.Filled.Lock,
+          title = "کالای منقضی",
+          subtitle = if (blockExpired) "فروخته نمی‌شود" else "فقط هشدار",
+          tint = if (blockExpired) Shop.colors.danger else Shop.colors.warning,
+          value = if (blockExpired) "فروخته نمی‌شود" else "فقط هشدار",
+        ) {
+          Text(
+            "هشدارِ انقضا همیشه هست. اگر «فروخته نشود» را بزنید، مقدارِ محموله‌های منقضی از موجودیِ فروختنی کم می‌شود و فروشِ بیش از آن ثبت نمی‌شود.",
+            style = MaterialTheme.typography.labelSmall,
+            color = Shop.colors.muted2,
+          )
+          Spacer(Modifier.height(8.dp))
+          SegmentedChoice(
+            options = listOf("warn" to "فقط هشدار", "block" to "فروخته نشود"),
+            selected = if (blockExpired) "block" else "warn",
+            onSelect = {
+              blockExpired = it == "block"
+              ir.vil3ntec.tohid.data.ShopPolicy.setBlockExpired(context, blockExpired)
+            },
+          )
+        }
+
+        /* ===================== چاپگر و رسید ⇐ صفحهٔ «دستگاه‌های جانبی» ===================== */
+        SettingsLink(SettingsLayout.PRINTER) { ir.vil3ntec.tohid.ui.AppNav.go(SettingsLayout.LINKS.getValue(SettingsLayout.PRINTER)) }
       }
     }
 
@@ -586,6 +609,7 @@ fun SettingsScreen(
           title = "دوربین بارکدخوان",
           subtitle = if (cameraGranted) "اجازه داده شده" else "هنوز اجازه داده نشده",
           tint = if (cameraGranted) Shop.colors.success else Shop.colors.warning,
+          value = if (cameraGranted) "آماده" else "بی‌اجازه",
         ) {
           Text(
             "برنامه برای اسکن بارکد محصولات به دوربین نیاز دارد.",
@@ -602,24 +626,49 @@ fun SettingsScreen(
             modifier = Modifier.fillMaxWidth(),
           )
         }
-
-        /* ======================== دستگاه‌های وارد شده ======================== */
-        if (signedIn) {
-          SettingsSection(
-            icon = Icons.Filled.Devices,
-            title = "دستگاه‌های وارد شده",
-            subtitle = "گوشی گم شد؟ نشستش را ببندید",
-            tint = Shop.colors.warning,
-          ) {
-            DeviceList(state = state, snackbarToast = ::toast)
-          }
-        }
       }
     }
 
-    /* ============================ همگام‌سازی و پشتیبان ============================ */
+    /* ============================ داده‌ها: همگام‌سازی، پشتیبان و بازگردانی ============================ */
     item {
       SettingsGroup(SettingsLayout.DATA) {
+        /* ============================ همگام‌سازی ============================ */
+        /*
+         *  از «حساب من» به این‌جا آمد: کارتِ حسابِ نسخهٔ ۳ فقط r4 است (نام، نقش،
+         *  آمار، اشتراک). همان موتورِ v1 و همان دکمه — ⛔ F0-02: دورِ Sync v1،
+         *  نه راهِ قدیمِ `Syncer.run` (سنجه: `sync/LegacySyncCallTest.kt`).
+         */
+        SettingsSection(
+          icon = Icons.Filled.Sync,
+          title = "همگام‌سازی",
+          subtitle = if (!signedIn) "برای همگام‌سازی اول وارد حساب شوید"
+          else ir.vil3ntec.tohid.core.sync.SyncBadge.line("همگام‌سازی", v1.queued, lastSyncOk, v1.lastError, syncNow),
+          tint = Shop.colors.accent,
+          value = if (!signedIn) "وارد نشده" else ir.vil3ntec.tohid.core.sync.SyncBadge.since(lastSyncOk, syncNow),
+        ) {
+          Text(
+            "دفترِ دکان روی سرور پشتیبان می‌گیرد و روی گوشیِ دیگر هم می‌آید. " +
+              "آخرین همگام‌سازی: " + (if (lastSyncOk > 0) ir.vil3ntec.tohid.formatMillis(lastSyncOk) else "هنوز انجام نشده"),
+            style = MaterialTheme.typography.labelSmall,
+            color = Shop.colors.muted2,
+          )
+          if (v1.lastError.isNotBlank()) {
+            Spacer(Modifier.height(6.dp))
+            Text(v1.lastError, style = MaterialTheme.typography.labelSmall, color = Shop.colors.danger)
+          }
+          Spacer(Modifier.height(12.dp))
+          TohidButton(
+            text = "همگام‌سازی حالا",
+            enabled = signedIn,
+            onClick = {
+              runCatching { ir.vil3ntec.tohid.sync.v1.SyncV1Worker.now(context) }
+                .onSuccess { toast("همگام‌سازی شروع شد؛ چند ثانیه بعد «آخرین همگام‌سازی» تازه می‌شود") }
+                .onFailure { toast(it.userText("همگام‌سازی ناموفق بود")) }
+            },
+            modifier = Modifier.fillMaxWidth(),
+          )
+        }
+
         /* ============================== داده‌ها ============================== */
         SettingsSection(
           icon = Icons.Filled.Storage,
@@ -634,35 +683,35 @@ fun SettingsScreen(
           )
           Spacer(Modifier.height(12.dp))
           SettingsRow(
-            icon = Icons.Filled.CloudUpload,
+            icon = Icons.Outlined.CloudUpload,
             title = "گرفتن پشتیبان کامل",
             description = "دفتر و عکس‌های کالاها، در یک فایل",
             tint = Shop.colors.success,
             onClick = { exportFile.launch("tohid-backup-${todayIso()}.zip") },
           )
           SettingsRow(
-            icon = Icons.Filled.Description,
+            icon = Icons.Outlined.Description,
             title = "پشتیبان فقط دفتر",
             description = "بدون عکس — همان فایلی که نسخهٔ وب می‌خواند",
             tint = Shop.colors.muted,
             onClick = { exportJson.launch("tohid-shop-backup-${todayIso()}.json") },
           )
           SettingsRow(
-            icon = Icons.Filled.TableChart,
+            icon = Icons.Outlined.TableChart,
             title = "خروجی کامل داده — اکسل",
             description = "همهٔ داده‌ها، هر بخش در یک برگه با سرستونِ فارسی",
             tint = Shop.colors.success,
             onClick = { exportAllXlsx.launch("tohid-export-${todayIso()}.xlsx") },
           )
           SettingsRow(
-            icon = Icons.Filled.Description,
+            icon = Icons.Outlined.Description,
             title = "خروجی کامل داده — JSON",
             description = "همهٔ داده‌ها با سرآیندِ نسخه‌دار، برای بردن به هر جای دیگر",
             tint = Shop.colors.muted,
             onClick = { exportAllJson.launch("tohid-export-${todayIso()}.json") },
           )
           SettingsRow(
-            icon = Icons.Filled.CloudDownload,
+            icon = Icons.Outlined.CloudDownload,
             title = "بازیابی از فایل",
             description = "جایگزینی اطلاعات فعلی با یک پشتیبان",
             tint = Shop.colors.primary,
@@ -686,7 +735,7 @@ fun SettingsScreen(
             )
             autoBackups.forEach { snap ->
               SettingsRow(
-                icon = Icons.Filled.History,
+                icon = Icons.Outlined.History,
                 title = ir.vil3ntec.tohid.formatMillis(snap.at),
                 description = "${plain((snap.bytes / 1024).toInt())} کیلوبایت — برای بازگرداندن بزنید",
                 tint = Shop.colors.muted,
@@ -722,7 +771,7 @@ fun SettingsScreen(
           )
           val cloud = cloudBackups
           SettingsRow(
-            icon = Icons.Filled.CloudUpload,
+            icon = Icons.Outlined.CloudUpload,
             title = if (cloudBusy) "در حال فرستادن…" else "همین حالا روی سرور بگذار",
             description = when {
               !signedIn -> "برای این کار باید وارد حساب شده باشید"
@@ -754,7 +803,7 @@ fun SettingsScreen(
           }
           cloud?.items?.take(5)?.forEach { b ->
             SettingsRow(
-              icon = Icons.Filled.CloudDone,
+              icon = Icons.Outlined.CloudDone,
               title = ir.vil3ntec.tohid.formatMillis(b.createdAt),
               description = "${plain((b.bytes / 1024).toInt())} کیلوبایت · " +
                 (if (b.kind == "manual") "دستی" else "خودکار"),
@@ -781,7 +830,7 @@ fun SettingsScreen(
           var mirrorOn by remember { mutableStateOf(ir.vil3ntec.tohid.data.BackupMirror.enabled(context)) }
           var mirrorBusy by remember { mutableStateOf(false) }
           SettingsRow(
-            icon = Icons.Filled.CloudUpload,
+            icon = Icons.Outlined.CloudUpload,
             title = if (mirrorBusy) "در حالِ ساختن…" else "پشتیبانِ کامل همین حالا (پوشه + سرور)",
             description = "دفتر و همهٔ عکس‌ها · ${mirrorList.size} نسخه در پوشه" +
               (mirrorList.firstOrNull()?.let { " · آخرین: " + ir.vil3ntec.tohid.formatMillis(it.lastModified()) } ?: ""),
@@ -822,7 +871,7 @@ fun SettingsScreen(
            */
           if (archivePlan.total > 0) {
             SettingsRow(
-              icon = Icons.Filled.Compress,
+              icon = Icons.Outlined.Compress,
               title = "فشرده کردن دفتر",
               description = "${plain(archivePlan.total)} ردیف سابقهٔ کهنه به بایگانی می‌رود — دفتر سبک‌تر و ثبت فروش تندتر می‌شود",
               tint = Shop.colors.warning,
@@ -831,7 +880,7 @@ fun SettingsScreen(
           }
           if (canUndo) {
             SettingsRow(
-              icon = Icons.Filled.Undo,
+              icon = Icons.Outlined.Restore,
               title = "برگرداندن به پیش از بازیابی",
               description = "اگر فایل اشتباهی بازیابی شد",
               tint = Shop.colors.warning,
@@ -867,6 +916,7 @@ fun SettingsScreen(
           title = "درباره برنامه",
           subtitle = "نسخهٔ ${BuildConfig.VERSION_NAME}",
           tint = Shop.colors.muted,
+          value = BuildConfig.VERSION_NAME,
         ) {
           Text(
             "فروشگاه من — برنامهٔ اندروید.\nتمام اطلاعات روی همین گوشی ذخیره می‌شود؛ هر چند وقت یک‌بار پشتیبان بگیرید.",
@@ -875,7 +925,7 @@ fun SettingsScreen(
           )
           Spacer(Modifier.height(12.dp))
           SettingsRow(
-            icon = Icons.Filled.SystemUpdate,
+            icon = Icons.Outlined.SystemUpdate,
             title = "دریافت آخرین نسخه",
             description = "نسخهٔ نصب‌شده: ${BuildConfig.VERSION_NAME}",
             tint = Shop.colors.primary,
@@ -886,6 +936,27 @@ fun SettingsScreen(
     }
   }
 
+  val pick = LocalSettingsPick.current
+  if (pick != null) {
+    //  کامپیوتر: ستونِ وسطِ `DeskSettings` — همان که بود
+    LazyColumn(
+      Modifier.fillMaxSize(),
+      contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, 32.dp),
+      verticalArrangement = Arrangement.spacedBy(20.dp),
+    ) {
+      item {
+        Text(
+          "هشدارها، ظاهر، داده‌ها و پشتیبان — حساب و نام دکان در «حساب من» است",
+          style = MaterialTheme.typography.bodySmall,
+          color = Shop.colors.muted,
+        )
+        Spacer(Modifier.height(4.dp))
+      }
+      body()
+    }
+  } else {
+    PhoneSettingsFrame(onBack = onBack, body = body)
+  }
 
   /* ---------------------------- پنجره‌ها ---------------------------- */
 

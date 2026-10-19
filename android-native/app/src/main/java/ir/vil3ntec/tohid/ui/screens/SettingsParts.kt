@@ -1,53 +1,122 @@
 package ir.vil3ntec.tohid.ui.screens
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronLeft
-import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.outlined.Backup
+import androidx.compose.material.icons.outlined.CalendarToday
+import androidx.compose.material.icons.outlined.CallToAction
+import androidx.compose.material.icons.outlined.EventBusy
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Key
+import androidx.compose.material.icons.outlined.Language
+import androidx.compose.material.icons.outlined.LightMode
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.Password
+import androidx.compose.material.icons.outlined.PhoneAndroid
+import androidx.compose.material.icons.outlined.PointOfSale
+import androidx.compose.material.icons.outlined.Print
+import androidx.compose.material.icons.outlined.QrCodeScanner
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Shield
+import androidx.compose.material.icons.outlined.Sync
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.Shape
 import ir.vil3ntec.tohid.ui.theme.Shop
 import ir.vil3ntec.tohid.ui.theme.Space
-import ir.vil3ntec.tohid.ui.theme.glassSurface
 import androidx.compose.runtime.saveable.rememberSaveable
 
 /**
  *  اجزای صفحهٔ تنظیمات.
  *
- *  تنظیمات پیش از این یک ستونِ بلند از متن روی زمینهٔ خالی بود: کاربر باید
- *  کل صفحه را می‌خواند تا چیزی را پیدا کند. حالا هر موضوع یک کارتِ جدا
- *  است که باز و بسته می‌شود، و هر ردیف آیکنِ خودش را دارد تا چشم بتواند
- *  اسکن کند نه اینکه بخواند.
+ *  یک `SettingsScreen` سه جور کشیده می‌شود و هر بخش (`SettingsSection`) خودش
+ *  می‌داند کجاست:
+ *   • **گوشی، فهرست** (`PhoneSettingsMode.Root`، تصویرِ مرجعِ r5): هر بخش یک
+ *     ردیفِ کوتاه با آیکنِ خطیِ تک‌رنگ و مقدارِ خاکستری / کلیدِ سبز / فلش است
+ *     و زدنش صفحهٔ خودِ همان بخش را باز می‌کند — بی آکاردئون و بی حبابِ رنگی.
+ *   • **گوشی، صفحهٔ بخش** (`PhoneSettingsMode.Detail`): فقط همان بخش، با همان
+ *     محتوای پیشین در یک کارتِ سفید.
+ *   • **کامپیوتر** (`LocalSettingsPick`): ستونِ کناری و بخشِ انتخاب‌شده، مثلِ قبل.
+ *  کارِ هیچ تنظیمی عوض نشده؛ فقط جای نشستنش.
  */
 
+/** گوشی: فهرست یا صفحهٔ یک بخش؛ null یعنی کامپیوتر (`LocalSettingsPick`) */
+sealed interface PhoneSettingsMode {
+  class Root(val open: (String) -> Unit) : PhoneSettingsMode
+  class Detail(val title: String) : PhoneSettingsMode
+}
+
+val LocalPhoneSettings = staticCompositionLocalOf<PhoneSettingsMode?> { null }
+
 /**
- *  یک بخشِ تنظیمات — کارتی که باز و بسته می‌شود.
+ *  درخواستِ بازکردنِ تنظیمات روی یک گروه یا یک بخش — از گروهِ «تنظیمات»ِ
+ *  «بیشتر» و از پیش‌نمایشِ عکس‌ها. `origin` صفحه‌ای است که «برگشت»ِ ریشهٔ
+ *  تنظیمات به آن می‌رود وقتی `AppRoot` راهِ برگشت نداده.
+ */
+object SettingsNav {
+  data class Request(val group: String? = null, val detail: String? = null)
+
+  val pending = mutableStateOf<Request?>(null)
+  var origin by mutableStateOf("more")
+
+  fun open(from: String, group: String? = null, detail: String? = null) {
+    origin = from
+    pending.value = if (group == null && detail == null) null else Request(group, detail)
+    ir.vil3ntec.tohid.ui.AppNav.go("settings")
+  }
+}
+
+/** آیکنِ خطیِ ردیفِ هر بخش و هر گروه (r5) — همه تک‌رنگ */
+internal fun settingsIcon(key: String): ImageVector? = when (key) {
+  "هشدارها" -> Icons.Outlined.Notifications
+  "ظاهر" -> Icons.Outlined.LightMode
+  SettingsLayout.NAV_BAR -> Icons.Outlined.CallToAction
+  "زبان" -> Icons.Outlined.Language
+  "تاریخ و رقم" -> Icons.Outlined.CalendarToday
+  "قفل برنامه" -> Icons.Outlined.Lock
+  "کد شاگرد" -> Icons.Outlined.Key
+  "دستگاه‌های وارد شده" -> Icons.Outlined.PhoneAndroid
+  "تغییر رمز حساب" -> Icons.Outlined.Password
+  "کالای منقضی" -> Icons.Outlined.EventBusy
+  SettingsLayout.PRINTER -> Icons.Outlined.Print
+  "دوربین بارکدخوان" -> Icons.Outlined.QrCodeScanner
+  "همگام‌سازی" -> Icons.Outlined.Sync
+  "داده‌ها" -> Icons.Outlined.Backup
+  "درباره برنامه" -> Icons.Outlined.Info
+  //  گروه‌ها (گروهِ «تنظیمات»ِ صفحهٔ «بیشتر»؛ «داده‌ها» همان کلیدِ بخشِ پشتیبان است)
+  SettingsLayout.GENERAL -> Icons.Outlined.Tune
+  SettingsLayout.SECURITY -> Icons.Outlined.Shield
+  SettingsLayout.SALES -> Icons.Outlined.PointOfSale
+  SettingsLayout.DEVICES -> Icons.Outlined.QrCodeScanner
+  SettingsLayout.ABOUT -> Icons.Outlined.Info
+  else -> null
+}
+
+/**
+ *  یک بخشِ تنظیمات.
  *
- *  بخشِ بسته فقط یک ردیف جا می‌گیرد، پس تمامِ موضوع‌ها در یک صفحه دیده
- *  می‌شوند و کاربر می‌داند برنامه چه چیزهایی دارد.
+ *  `value` مقدارِ کوتاهِ خاکستریِ ته ردیف است (r5)، و `toggle`/`onToggle` کلیدِ
+ *  سبزِ خودِ ردیف (مثلِ Face IDِ r5) برای بخشی که روشن/خاموش دارد؛ زدنِ خودِ
+ *  ردیف همچنان صفحهٔ بخش را باز می‌کند.
  */
 @Composable
 fun SettingsSection(
@@ -55,7 +124,9 @@ fun SettingsSection(
   title: String,
   subtitle: String,
   tint: Color = Shop.colors.primary,
-  initiallyOpen: Boolean = false,
+  value: String? = null,
+  toggle: Boolean? = null,
+  onToggle: ((Boolean) -> Unit)? = null,
   content: @Composable ColumnScope.() -> Unit,
 ) {
   //  کامپیوتر: فقط بخشِ انتخاب‌شده در ستونِ راستِ «تنظیمات» و همیشه باز (`DeskSettings`)
@@ -65,109 +136,67 @@ fun SettingsSection(
     DeskSettingsSection(icon, title, subtitle, tint, content)
     return
   }
-  var open by rememberSaveable(title) { mutableStateOf(initiallyOpen) }
-  val colors = Shop.colors
-  val turn by animateFloatAsState(
-    targetValue = if (open) 180f else 0f,
-    animationSpec = tween(if (Motion.enabled) 260 else 0, easing = FastOutSlowInEasing),
-    label = "chevron",
-  )
-
-  //  گوشی (phone-ui): درونِ `SettingsGroup` ردیفی از کارتِ گروه است، نه کارتِ جدا
-  val grouped = LocalSettingsGrouped.current
-  Column(
-    Modifier
-      .fillMaxWidth()
-      .then(
-        if (grouped) Modifier.background(colors.surfaceSolid)
-        else Modifier.glassSurface(Shape.card, colors.surface, colors.sheen, colors.border, glow = colors.glow)
-      )
-  ) {
-    Row(
-      Modifier
-        .fillMaxWidth()
-        .heightIn(min = 56.dp)
-        .clickable(onClickLabel = if (open) "بستن" else "باز کردن") { open = !open }
-        .padding(Space.md),
-      verticalAlignment = Alignment.CenterVertically,
-    ) {
-      IconBubble(icon, tint)
-      Spacer(Modifier.width(Space.sm))
-      Column(Modifier.weight(1f)) {
-        Text(title, style = MaterialTheme.typography.titleSmall, color = colors.text, fontWeight = FontWeight.Bold)
-        Text(subtitle, style = MaterialTheme.typography.labelSmall, color = colors.muted)
-      }
-      Icon(
-        Icons.Filled.ExpandMore,
-        contentDescription = if (open) "بستن" else "باز کردن",
-        tint = colors.muted,
-        modifier = Modifier.rotate(turn),
-      )
-    }
-
-    AnimatedVisibility(
-      visible = open,
-      enter = fadeIn(tween(180)) + expandVertically(tween(240, easing = FastOutSlowInEasing)),
-      exit = fadeOut(tween(140)) + shrinkVertically(tween(200, easing = FastOutSlowInEasing)),
-    ) {
-      Column(
-        Modifier.padding(start = Space.md, end = Space.md, bottom = Space.md),
-        content = content,
-      )
-    }
+  when (val mode = LocalPhoneSettings.current) {
+    is PhoneSettingsMode.Root -> V3Row(
+      icon = settingsIcon(title) ?: icon,
+      label = SettingsLayout.labelOf(title),
+      value = value,
+      toggle = toggle,
+      onToggle = onToggle,
+      onClick = { mode.open(title) },
+    )
+    is PhoneSettingsMode.Detail -> if (mode.title == title) SettingsDetailBody(subtitle, content)
+    null -> SettingsDetailBody(subtitle, content)
   }
 }
 
-/** درونِ `SettingsGroup` است ⇐ بخش‌ها ردیفِ کارتِ گروه‌اند (گوشی) */
-val LocalSettingsGrouped = staticCompositionLocalOf { false }
+/** صفحهٔ یک بخش روی گوشی: یک خطِ خاکستری و محتوای پیشینِ بخش در کارتِ سفید */
+@Composable
+private fun SettingsDetailBody(subtitle: String, content: @Composable ColumnScope.() -> Unit) {
+  val c = PhoneV3.colors
+  Column(Modifier.fillMaxWidth()) {
+    if (subtitle.isNotBlank()) {
+      Text(
+        subtitle,
+        style = v3Text(13, FontWeight.Medium, 19),
+        color = c.inkMuted,
+        modifier = Modifier.padding(start = 6.dp, end = 6.dp, bottom = 10.dp),
+      )
+    }
+    V3Card(padding = PaddingValues(16.dp), content = content)
+  }
+}
 
 /**
- *  گروهِ تنظیمات — سرخطِ کوچک و یک کارتِ گردِ سفید (تصویرِ مرجعِ ۴، phone-ui).
+ *  ردیفی در فهرستِ تنظیماتِ گوشی که صفحهٔ دیگری از برنامه را باز می‌کند
+ *  (`SettingsLayout.LINKS`). کامپیوتر و صفحهٔ هر بخش آن را نمی‌کشند.
+ */
+@Composable
+fun SettingsLink(title: String, value: String? = null, onClick: () -> Unit) {
+  if (LocalSettingsPick.current != null) return
+  if (LocalPhoneSettings.current !is PhoneSettingsMode.Root) return
+  V3Row(icon = settingsIcon(title), label = SettingsLayout.labelOf(title), value = value, onClick = onClick)
+}
+
+/**
+ *  گروهِ تنظیمات — سرخطِ خاکستری بیرونِ کارت و یک کارتِ سفیدِ گرد (r5).
  *
- *  بخش‌های درونش (`SettingsSection`) ردیف‌های همین کارت‌اند و میانشان یک خطِ
- *  مویی است: زمینهٔ کارت رنگِ خط است و ردیف‌ها با یک پیکسل فاصله رویش
- *  می‌نشینند، پس خط فقط **میانِ** ردیف‌ها دیده می‌شود. سایهٔ نرم به‌جای
- *  خطِ دورِ تیره (design v2). `padded` برای کارتی که فرم دارد نه ردیف.
- *
- *  کامپیوتر (`LocalSettingsPick`): هیچ سرخط و کارتی نمی‌کشد — بخشِ انتخاب‌شده
- *  همان‌طور که بود در ستونِ وسط می‌آید.
+ *  صفحهٔ یک بخش و کامپیوتر هیچ سرخط و کارتی نمی‌کشند — فقط همان بخشِ
+ *  انتخاب‌شده دیده می‌شود.
  */
 @Composable
 fun SettingsGroup(
   title: String,
   modifier: Modifier = Modifier,
-  padded: Boolean = false,
   content: @Composable ColumnScope.() -> Unit,
 ) {
-  if (LocalSettingsPick.current != null) {
+  if (LocalSettingsPick.current != null || LocalPhoneSettings.current !is PhoneSettingsMode.Root) {
     Column(modifier, content = content)
     return
   }
-  val colors = Shop.colors
-  Column(modifier.fillMaxWidth()) {
-    Text(
-      title,
-      style = MaterialTheme.typography.labelLarge,
-      color = colors.muted,
-      fontWeight = FontWeight.Bold,
-      modifier = Modifier
-        .padding(start = Space.xxs, end = Space.xxs, bottom = Space.xs)
-        .semantics { heading() },
-    )
-    Column(
-      Modifier
-        .fillMaxWidth()
-        .shadow(6.dp, Shape.card, clip = false, ambientColor = colors.text.copy(alpha = 0.10f), spotColor = colors.text.copy(alpha = 0.10f))
-        .clip(Shape.card)
-        .background(colors.border),
-      verticalArrangement = Arrangement.spacedBy(1.dp),
-    ) {
-      CompositionLocalProvider(LocalSettingsGrouped provides true) {
-        if (padded) {
-          Column(Modifier.fillMaxWidth().background(colors.surfaceSolid).padding(Space.md), content = content)
-        } else content()
-      }
-    }
+  Column(modifier.fillMaxWidth().padding(top = 18.dp)) {
+    V3GroupTitle(title)
+    V3Card(content = content)
   }
 }
 
@@ -190,6 +219,9 @@ fun IconBubble(icon: ImageVector, tint: Color, size: androidx.compose.ui.unit.Dp
  *
  *  توضیحِ کوتاه اختیاری است ولی جایی که هست، کاربر را از حدس‌زدن نجات
  *  می‌دهد: «پشتیبان‌گیری» به‌تنهایی نمی‌گوید آخرین بار کِی بوده.
+ *
+ *  درونِ صفحهٔ تنظیماتِ گوشی همان ردیفِ r5 است (`V3Row`): آیکنِ تک‌رنگ روی
+ *  کاشیِ خاکستری، بی خطِ دور و بی رنگِ جدا برای هر ردیف.
  */
 @Composable
 fun SettingsRow(
@@ -202,6 +234,10 @@ fun SettingsRow(
   onClick: (() -> Unit)? = null,
   trailing: @Composable (() -> Unit)? = null,
 ) {
+  if (LocalPhoneSettings.current != null && trailing == null) {
+    V3Row(icon = icon, label = title, modifier = modifier, value = value, description = description, onClick = onClick)
+    return
+  }
   val colors = Shop.colors
   Row(
     modifier
@@ -246,6 +282,7 @@ fun SettingsRow(
  *
  *  به‌جای چند دکمهٔ رادیویی زیرِ هم: یک نوار که نشانگرش زیرِ گزینهٔ
  *  انتخاب‌شده می‌لغزد. هم جای کمتری می‌گیرد، هم عوض‌کردنش یک لمس است.
+ *  درونِ تنظیماتِ گوشی تک‌رنگ است (r5): قرصِ سفید روی نوارِ خاکستری.
  */
 @Composable
 fun SegmentedChoice(
@@ -254,6 +291,10 @@ fun SegmentedChoice(
   onSelect: (String) -> Unit,
   modifier: Modifier = Modifier,
 ) {
+  if (LocalPhoneSettings.current != null) {
+    V3Segmented(options, selected, onSelect, modifier)
+    return
+  }
   val colors = Shop.colors
   Row(
     modifier
@@ -265,7 +306,7 @@ fun SegmentedChoice(
   ) {
     options.forEach { (id, label) ->
       val active = selected == id
-      val bg by androidx.compose.animation.animateColorAsState(
+      val bg by animateColorAsState(
         targetValue = if (active) colors.primary.copy(alpha = 0.22f) else Color.Transparent,
         animationSpec = tween(if (Motion.enabled) 220 else 0),
         label = "seg",
@@ -290,8 +331,55 @@ fun SegmentedChoice(
   }
 }
 
+/** گزینه‌های تک‌رنگِ گوشی: قرصِ سفیدِ سایه‌دار روی نوارِ خاکستری */
+@Composable
+private fun V3Segmented(
+  options: List<Pair<String, String>>,
+  selected: String,
+  onSelect: (String) -> Unit,
+  modifier: Modifier,
+) {
+  val c = PhoneV3.colors
+  Row(
+    modifier
+      .fillMaxWidth()
+      .clip(RoundedCornerShape(12.dp))
+      .background(c.bg)
+      .padding(3.dp),
+    horizontalArrangement = Arrangement.spacedBy(3.dp),
+  ) {
+    options.forEach { (id, label) ->
+      val active = selected == id
+      val bg by animateColorAsState(
+        if (active) c.card else c.card.copy(alpha = 0f), tween(if (Motion.enabled) 200 else 0), label = "seg3",
+      )
+      Box(
+        Modifier
+          .weight(1f)
+          .heightIn(min = 38.dp)
+          .then(
+            if (active) Modifier.shadow(2.dp, RoundedCornerShape(10.dp), clip = false, ambientColor = c.ink.copy(alpha = 0.12f), spotColor = c.ink.copy(alpha = 0.12f))
+            else Modifier,
+          )
+          .clip(RoundedCornerShape(10.dp))
+          .background(bg)
+          .clickable(role = Role.RadioButton) { onSelect(id) }
+          .padding(horizontal = 6.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center,
+      ) {
+        Text(
+          label,
+          style = v3Text(14, if (active) FontWeight.SemiBold else FontWeight.Medium, 20),
+          color = if (active) c.ink else c.inkMuted,
+          maxLines = 1,
+        )
+      }
+    }
+  }
+}
 
-/** کامپیوتر: عنوانِ بخشی که ستونِ راستِ تنظیمات نشان می‌دهد؛ null یعنی گوشی (همهٔ بخش‌ها، تاشونده) */
+
+/** کامپیوتر: عنوانِ بخشی که ستونِ راستِ تنظیمات نشان می‌دهد؛ null یعنی گوشی */
 val LocalSettingsPick = staticCompositionLocalOf<String?> { null }
 
 @Composable
@@ -324,10 +412,18 @@ private fun DeskSettingsSection(icon: ImageVector, title: String, subtitle: Stri
  *  فهرستِ بخش‌ها کنار، محتوای بخشِ انتخاب‌شده (همیشه باز) در وسط. همان
  *  `SettingsScreen`ِ گوشی رسم می‌شود؛ `SettingsSection` با `LocalSettingsPick`
  *  فقط بخشِ انتخاب‌شده را می‌کشد.
+ *
+ *  بخشی که `AppRoot` در فهرستش ندارد (تازه‌آمده‌ها مثلِ «زبان» و «همگام‌سازی»)
+ *  خودکار کنارِ هم‌گروهش می‌نشیند (`SettingsLayout.deskOrder`) تا روی کامپیوتر
+ *  هیچ بخشی بی‌راه نماند.
  */
 @Composable
 fun DeskSettings(sections: List<Pair<String, ImageVector>>, content: @Composable () -> Unit) {
-  var pick by rememberSaveable { mutableStateOf(sections.first().first) }
+  val all = remember(sections) {
+    val given = sections.toMap()
+    SettingsLayout.deskOrder(sections.map { it.first }).map { it to (given[it] ?: settingsIcon(it) ?: Icons.Outlined.Settings) }
+  }
+  var pick by rememberSaveable { mutableStateOf(all.first().first) }
   Row(Modifier.fillMaxSize().padding(16.dp)) {
     Column(
       Modifier
@@ -339,7 +435,7 @@ fun DeskSettings(sections: List<Pair<String, ImageVector>>, content: @Composable
         .padding(10.dp),
     ) {
       Text("تنظیمات", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Shop.colors.text, modifier = Modifier.padding(10.dp))
-      sections.forEach { (title, icon) ->
+      all.forEach { (title, icon) ->
         val on = title == pick
         Row(
           Modifier

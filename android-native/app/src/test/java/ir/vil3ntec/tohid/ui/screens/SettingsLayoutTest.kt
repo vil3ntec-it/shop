@@ -35,13 +35,19 @@ class SettingsLayoutTest {
   }
 
   @Test
-  fun `گروه‌ها همان شش سرخطِ سفارش‌اند و هیچ‌کدام خالی نیست`() {
+  fun `گروه‌ها همان سرخط‌های بندِ C (r5) اند و هیچ‌کدام خالی نیست`() {
     assertEquals(
-      listOf("عمومی", "فروش و پرداخت", "امنیت", "دستگاه‌ها", "همگام‌سازی و پشتیبان", "درباره"),
+      listOf("عمومی", "امنیت", "فروش و پرداخت", "دستگاه‌ها", "داده‌ها", "درباره"),
       SettingsLayout.GROUPS.map { it.title },
     )
     SettingsLayout.GROUPS.forEach { assertTrue("${it.title} خالی است", it.sections.isNotEmpty()) }
     assertEquals(SettingsLayout.SECURITY, SettingsLayout.groupOf("قفل برنامه"))
+    //  بندِ C: «دستگاه‌های وصل» زیرِ امنیت، همگام‌سازی کنارِ پشتیبان، زبان و نوارِ پایین در عمومی
+    assertEquals(SettingsLayout.SECURITY, SettingsLayout.groupOf("دستگاه‌های وارد شده"))
+    assertEquals(SettingsLayout.DATA, SettingsLayout.groupOf("همگام‌سازی"))
+    assertEquals(SettingsLayout.GENERAL, SettingsLayout.groupOf("زبان"))
+    assertEquals(SettingsLayout.GENERAL, SettingsLayout.groupOf(SettingsLayout.NAV_BAR))
+    assertEquals(SettingsLayout.SALES, SettingsLayout.groupOf(SettingsLayout.PRINTER))
     assertEquals(null, SettingsLayout.groupOf("ناموجود"))
   }
 
@@ -49,6 +55,40 @@ class SettingsLayoutTest {
   fun `Settings_kt هر گروه را به همان ترتیب می‌کشد`() {
     val s = src("Settings.kt")
     val order = Regex("""SettingsGroup\(\s*SettingsLayout\.([A-Z]+)""").findAll(s).map { it.groupValues[1] }.toList()
-    assertEquals(listOf("GENERAL", "SALES", "SECURITY", "DEVICES", "DATA", "ABOUT"), order)
+    assertEquals(listOf("GENERAL", "SECURITY", "SALES", "DEVICES", "DATA", "ABOUT"), order)
+  }
+
+  @Test
+  fun `پیوندها بخش نیستند، مسیر دارند و Settings_kt همه را می‌کشد`() {
+    assertEquals("nav-editor", SettingsLayout.LINKS[SettingsLayout.NAV_BAR])
+    assertEquals("devices", SettingsLayout.LINKS[SettingsLayout.PRINTER])
+    SettingsLayout.LINKS.keys.forEach { assertTrue(it !in SettingsLayout.sections) }
+    val s = src("Settings.kt")
+    val drawn = Regex("""SettingsLink\(SettingsLayout\.([A-Z_]+)\)""").findAll(s).map { it.groupValues[1] }.toSet()
+    assertEquals(setOf("NAV_BAR", "PRINTER"), drawn)
+  }
+
+  @Test
+  fun `نامِ کوتاهِ ردیف — کلید عوض نمی‌شود`() {
+    assertEquals("پشتیبان و بازگردانی", SettingsLayout.labelOf("داده‌ها"))
+    assertEquals("بارکدخوان", SettingsLayout.labelOf("دوربین بارکدخوان"))
+    assertEquals("دستگاه‌های وصل", SettingsLayout.labelOf("دستگاه‌های وارد شده"))
+    assertEquals("هشدارها", SettingsLayout.labelOf("هشدارها"))
+  }
+
+  @Test
+  fun `کامپیوتر — بخشِ تازه کنارِ هم‌گروهش، ترتیبِ دادهٔ AppRoot دست‌نخورده`() {
+    //  همان فهرستِ امروزِ `AppRoot` برای `DeskSettings`
+    val given = listOf(
+      "هشدارها", "ظاهر", "تاریخ و رقم", "کالای منقضی", "قفل برنامه", "تغییر رمز حساب",
+      "دستگاه‌های وارد شده", "کد شاگرد", "داده‌ها", "درباره برنامه",
+    )
+    val out = SettingsLayout.deskOrder(given)
+    assertEquals(SettingsLayout.sections.toSet() - SettingsLayout.DESK_HIDDEN, out.toSet())
+    assertEquals(out.size, out.toSet().size)
+    assertEquals(given, out.filter { it in given })
+    assertEquals(out.indexOf("ظاهر") + 1, out.indexOf("زبان"))
+    assertTrue(out.indexOf("همگام‌سازی") < out.indexOf("داده‌ها"))
+    SettingsLayout.LINKS.keys.forEach { assertTrue(it !in out) }
   }
 }
