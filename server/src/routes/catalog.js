@@ -51,9 +51,18 @@ router.put('/settings', needFlag, requirePermission('settings.write'), wrap(asyn
   res.json({ settings });
 }));
 
-/** خواندنِ دوبارهٔ دفترِ دستگاه همین حالا (`full: true` ⇒ از اول؛ بی‌خطر چون فقط تفاوت نوشته می‌شود). */
+/**
+ * خواندنِ دوبارهٔ دفترِ دستگاه همین حالا (`full: true` ⇒ از اول؛ بی‌خطر چون فقط تفاوت نوشته می‌شود).
+ * ⛔ `full` همهٔ دفتر را زیرِ قفلِ موجودیِ دکان می‌خواند و تا پایانش ثبتِ سفارش منتظر می‌ماند
+ * ⇒ فقط مالک و مدیر (QA #263). خواندنِ تفاوت همان `stock.move` می‌ماند.
+ */
+const FULL_REFRESH_ROLES = new Set(['owner', 'manager']);
 router.post('/refresh', needFlag, requirePermission('stock.move'), wrap(async (req, res) => {
-  res.json(await catalog.refresh(req.shopId, { full: req.body?.full === true }));
+  const full = req.body?.full === true;
+  if (full && !FULL_REFRESH_ROLES.has(req.role)) {
+    throw forbidden('خواندنِ کاملِ دفتر فقط برای مالک و مدیر است', 'full_refresh_forbidden');
+  }
+  res.json(await catalog.refresh(req.shopId, { full }));
 }));
 
 router.get('/products', needFlag, wrap(async (req, res) => {

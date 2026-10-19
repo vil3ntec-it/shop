@@ -190,7 +190,13 @@ test('سفارش ← تحویل ⇒ دستگاه فاکتورِ W را با pull
   assert.equal(sale.invoiceNumber, 1);
   assert.equal(sale.channel, 'online');
   assert.equal(sale.status, 'completed');
-  assert.equal(sale.paymentMethod, 'cash');
+  //  QA: روشِ واقعی (نقد هنگامِ تحویل)، نه `cash` ِ دخل؛ ردیفِ PAY نقدِ دستِ پیک را تا تسویه «در انتظار» می‌گوید
+  assert.equal(sale.paymentMethod, 'cod');
+  assert.deepEqual(sale.payments, [{ method: 'cod', kind: 'cash', amount: order.totalMinor, ref: null,
+    status: 'pending', verification: null, custody: 'courier' }]);
+  assert.equal(sale.paidAmount, sale.finalTotal, 'مشتری همه را داده؛ بدهی‌ای نیست');
+  assert.equal(sale.remaining, 0);
+  assert.equal(sale.debtGiven, 0);
   assert.equal(sale.finalTotal, order.totalMinor / 100);
   assert.equal(sale.total - sale.discount, sale.finalTotal);
   assert.match(sale.date, /^\d{4}-\d{2}-\d{2}$/);
@@ -292,6 +298,7 @@ test('بازپرداختِ کامل ⇒ سندِ برگشت؛ فاکتور وی�
   assert.deepEqual(after.data, saleRow.data, 'ردیفِ فاکتور دست نخورده');
   const returns = view.rows('returns').filter((r) => r.saleId === sale.id);
   assert.equal(returns.length, 2);
+  assert.ok(returns.every((r) => r.channel === 'online'), 'مرجوعیِ سفارش از دخل پرداخت نمی‌شود');
   assert.equal(Math.round(returns.reduce((s, r) => s + r.amount, 0) * 100), order.totalMinor);
   assert.ok(view.rows('saleItems').filter((i) => i.saleId === sale.id).every((i) => i.returnedQty === i.quantity));
   assert.deepEqual(view.rows('stockMovements').filter((m) => m.type === 'customer_return').map((m) => [m.productId, m.qty]),
@@ -357,6 +364,36 @@ test('دفترِ بازپرداخت (#255، shop.orders.refunds): بازپردا
   assert.ok([200, 201].includes(again.status), JSON.stringify(again.body));
   assert.equal((await serverOps(a.shopId)).n, n);
   assert.equal(deviceStock(await devicePull(a.token, DEV_B), 'p-rice'), 10);
+});
+
+test('پرداختِ آنلاین ⇒ فاکتورِ W با روشِ online و ردیفِ PAY ِ غیرنقدی؛ تأیید فقط وقتی سفارش paid است', async () => {
+  const a = await shopWithStock('آنلاین');
+  const paid = await newOrder(a);
+  const pending = await newOrder(a);
+  //  ثبتِ سفارشِ آنلاین هنوز بسته است (D-08)؛ جدول آن را دارد ⇒ همان ردیفی که درگاه خواهد ساخت
+  await query("UPDATE online_orders SET payment_method='online', payment_status='paid', cod_status='' WHERE id=$1", [paid.id]);
+  await query("UPDATE online_orders SET payment_method='online', payment_status='pending', cod_status='' WHERE id=$1", [pending.id]);
+  await walk(a, paid.id, TO_PICKED_UP);
+  await walk(a, pending.id, TO_PICKED_UP);
+
+  const view = await devicePull(a.token, DEV_B);
+  const byId = new Map(view.rows('sales').map((s) => [s.id, s]));
+  const s1 = byId.get(`w-${paid.id}`);
+  assert.equal(s1.paymentMethod, 'online');
+  assert.notEqual(s1.paymentMethod, 'cash');
+  assert.equal(s1.channel, 'online');
+  assert.deepEqual(s1.payments, [{ method: 'online', kind: 'other', amount: paid.totalMinor, ref: null,
+    status: 'confirmed', verification: 'provider' }]);
+  assert.equal(s1.paidAmount, s1.finalTotal);
+  assert.equal(s1.debtGiven, 0);
+  const s2 = byId.get(`w-${pending.id}`);
+  assert.equal(s2.paymentMethod, 'online');
+  assert.equal(s2.payments[0].status, 'pending', 'بی تأییدِ ارائه‌دهنده «موفق» نوشته نمی‌شود (PAY-08)');
+  assert.equal(s2.payments[0].verification, null);
+  //  جمعِ ردیف‌های PAY = مبلغِ فاکتور (واحدِ کوچک)
+  for (const s of [s1, s2]) {
+    assert.equal(s.payments.reduce((t, r) => t + r.amount, 0), Math.round(s.finalTotal * 100));
+  }
 });
 
 test('سفارشِ آزمایشی سند نمی‌سازد', async () => {
