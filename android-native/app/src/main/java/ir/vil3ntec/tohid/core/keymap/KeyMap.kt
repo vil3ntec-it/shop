@@ -274,14 +274,24 @@ object KeyMap {
     web = listOf(Chord(KeyName.X, shift = true, alt = true)),
   )
   val SALE_HOLD = KeyAction(
-    "sale.hold", "sale", "نگه‌داشتنِ سبد", KeyStatus.PLANNED,
+    "sale.hold", "sale", "نگه‌داشتنِ سبد", KeyStatus.PARTIAL,
     keys = listOf(Chord(KeyName.F6)),
     web = listOf(Chord(KeyName.G, alt = true)),
   )
   val SALE_HELD_LIST = KeyAction(
-    "sale.heldList", "sale", "فهرستِ سبدهای نگه‌داشته", KeyStatus.PLANNED,
+    "sale.heldList", "sale", "فهرستِ سبدهای نگه‌داشته", KeyStatus.PARTIAL,
     keys = listOf(Chord(KeyName.F6, shift = true)),
     web = listOf(Chord(KeyName.G, shift = true, alt = true)),
+  )
+  val SALE_NEXT_OPEN = KeyAction(
+    "sale.nextOpen", "sale", "فاکتورِ بازِ بعدی", KeyStatus.PARTIAL,
+    keys = listOf(Chord(KeyName.PageDown, mod = true)),
+    web = emptyList(),
+  )
+  val SALE_PREV_OPEN = KeyAction(
+    "sale.prevOpen", "sale", "فاکتورِ بازِ قبلی", KeyStatus.PARTIAL,
+    keys = listOf(Chord(KeyName.PageUp, mod = true)),
+    web = emptyList(),
   )
   val SALE_RECEIVE = KeyAction(
     "sale.receive", "sale", "دریافتِ وجه یا قسط از مشتری", KeyStatus.PLANNED,
@@ -550,6 +560,8 @@ object KeyMap {
     SALE_DISCOUNT_INVOICE,
     SALE_HOLD,
     SALE_HELD_LIST,
+    SALE_NEXT_OPEN,
+    SALE_PREV_OPEN,
     SALE_RECEIVE,
     SALE_REPRINT,
     SALE_DRAWER,

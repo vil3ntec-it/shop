@@ -1,10 +1,13 @@
 package ir.vil3ntec.tohid.data
 
 import android.content.Context
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.concurrent.Callable
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicReference
 
@@ -28,7 +31,7 @@ import java.util.concurrent.atomic.AtomicReference
  *  شرحش سرِ `SaleDraft` است: فروش با `key`ِ همین پیش‌نویس ثبت می‌شود و
  *  پیش‌نویس فقط **پس از** رسیدنِ دفتر به دیسک پاک می‌شود (`post`).
  */
-class CartStore(context: Context) {
+class CartStore(context: Context) : HeldCart {
 
   private val prefs = context.getSharedPreferences("tohid", Context.MODE_PRIVATE)
   private val file = File(context.filesDir, FILE)
@@ -112,6 +115,33 @@ class CartStore(context: Context) {
     _lines.value = keep.cart()
     _debtorId.value = keep.debtorId
     persist()
+  }
+
+  /* ── POS-12: فاکتورهای نگه‌داشته (`HeldInvoiceStore`) ─────────────────── */
+
+  override val busy: Boolean get() = posting.value
+
+  override fun snapshot(): SaleDraft =
+    SaleDraft.of(if (_lines.value.isEmpty()) null else saleKey(), _lines.value, _debtorId.value, System.currentTimeMillis())
+
+  /**
+   *  سبد را با فاکتورِ دیگری عوض می‌کند (`null` = سبدِ خالی) و تا رسیدنش به
+   *  دیسک صبر می‌کند — جابه‌جاییِ فاکتورها بی این صبر می‌توانست میانِ دو فایل
+   *  فاکتوری را گم کند.
+   */
+  override suspend fun replace(draft: SaleDraft?): Boolean {
+    val lines = draft?.cart().orEmpty()
+    key = if (lines.isEmpty()) null else draft?.key ?: newKey()
+    _lines.value = lines
+    _debtorId.value = draft?.debtorId
+    //  همان نویسندهٔ تک‌رشته‌ای: نوشتن‌های پیشین پیش از این می‌روند و این یکی آخرین حالت را می‌نویسد
+    return withContext(Dispatchers.IO) {
+      runCatching {
+        writer.submit(Callable {
+          runCatching { DiskWrite.text(file, SaleDraftCodec.encode(SaleDraft.of(key, _lines.value, _debtorId.value, System.currentTimeMillis()))) }.isSuccess
+        }).get()
+      }.getOrDefault(false)
+    }
   }
 
   /**
