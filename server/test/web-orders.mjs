@@ -12,7 +12,7 @@
  * اجرا:  TEST_DATABASE_URL=pglite:memory node test/web-orders.mjs
  */
 import { createRequire } from 'node:module';
-import { missingTool, PLAYWRIGHT_INSTALL } from './browser-guard.mjs';
+import { missingTool, PLAYWRIGHT_INSTALL, closeSafeRoute } from './browser-guard.mjs';
 import assert from 'node:assert/strict';
 import { execSync } from 'node:child_process';
 import http from 'node:http';
@@ -195,14 +195,14 @@ await step('بخش در منو پیدا می‌شود و شش برگهٔ ORD-12 
 
 await step('سفارشِ دستی (ORD-21): قطعِ نت وسطِ ثبت ⇒ «ثبت» دوباره، و فقط یک سفارش', async () => {
   let dropped = 0;
-  await page.route('**/api/v1/shop/orders', async (route) => {
+  await page.route('**/api/v1/shop/orders', closeSafeRoute(async (route) => {
     if (route.request().method() === 'POST' && !dropped) {
       dropped++;
       await route.fetch();            // سرور واقعاً ثبت می‌کند…
       return route.abort('failed');   // …ولی پاسخ به مرورگر نمی‌رسد
     }
     return route.fallback();
-  });
+  }));
   await page.click('#ord-new-btn');
   await page.waitForSelector('#ord-new-modal.open');
   await page.selectOption('#ord-f-source', 'phone');
