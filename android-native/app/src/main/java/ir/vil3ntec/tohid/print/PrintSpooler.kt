@@ -222,8 +222,9 @@ object PrintSpooler {
         }
       }
       if (err == null || bytes == null || link == null) file.delete()
-      if (err == null && job.saleId != null && (job.kind == PrintQueue.Kind.RECEIPT || job.kind == PrintQueue.Kind.REPRINT)) {
-        PrintLog.add(ctx, PrintLog.Entry(job.saleId, job.kind.key, job.reason, System.currentTimeMillis(), true))
+      val printedSale = job.saleId
+      if (err == null && printedSale != null && (job.kind == PrintQueue.Kind.RECEIPT || job.kind == PrintQueue.Kind.REPRINT)) {
+        PrintLog.add(ctx, PrintLog.Entry(printedSale, job.kind.key, job.reason, System.currentTimeMillis(), true))
       }
       lastError.value = err
       firstTry.remove(job.id)?.complete(err)
