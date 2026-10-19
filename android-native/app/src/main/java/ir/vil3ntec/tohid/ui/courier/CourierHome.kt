@@ -77,6 +77,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -406,7 +407,9 @@ internal fun CourierBoard(
             verticalArrangement = Arrangement.spacedBy(12.dp),
           ) {
             item(key = "head") {
-              BoardHeader(name, syncing, onRefresh = onRefresh, onSignOut = { askSignOut = true }) { ViewModeToggle(view) }
+              //  کلیدِ کارت/جدول فقط روی صفحهٔ پهن (گوشی همیشه کارت است)
+              val wide = LocalConfiguration.current.screenWidthDp >= 600
+              BoardHeader(name, syncing, onRefresh = onRefresh, onSignOut = { askSignOut = true }) { if (wide) ViewModeToggle(view) }
             }
             item(key = "sync") { SyncLine(syncing, waitingTotal, lastError) }
             itemsIndexed(queue.rejected, key = { _, r -> "rej-" + r.event.eventId }) { _, r ->
@@ -852,7 +855,8 @@ private fun InfoRow(icon: ImageVector, text: String, ltr: Boolean = false, divid
       text,
       style = v3Style(15.sp).copy(textDirection = if (ltr) TextDirection.Ltr else TextDirection.Content),
       color = p.ink,
-      modifier = Modifier.weight(1f),
+      //  شماره چپ‌به‌راست است ولی باید کنارِ آیکن بنشیند، نه تهِ ردیف
+      modifier = if (ltr) Modifier else Modifier.weight(1f),
     )
   }
   if (divider) Box(Modifier.fillMaxWidth().padding(start = 32.dp).height(1.dp).background(p.hairline))
@@ -894,7 +898,8 @@ private data class KV(val label: String, val value: String, val strong: Boolean 
 private fun MoneyCard(c: MissionCard) {
   val p = PhoneV3.colors
   val rows = buildList {
-    if (c.expectedCollectMinor > 0) add(KV("نقدِ گرفتنی", afn(c.expectedCollectMinor), strong = true))
+    val live = CourierFlow.isLive(c.status)
+    if (c.expectedCollectMinor > 0) add(KV(if (live) "نقدِ گرفتنی" else "نقدِ سفارش", afn(c.expectedCollectMinor), strong = live))
     else add(KV("نقد", "از مشتری گرفته نمی‌شود"))
     c.cashCollectedMinor?.let { add(KV("گرفته شد", afn(it), positive = true)) }
     if (c.fareMinor > 0) add(KV("کرایهٔ شما", afn(c.fareMinor)))
