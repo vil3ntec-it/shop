@@ -12,9 +12,9 @@
  *   • push/pull/snapshot با همان بدنه و سرآیندهای `SyncV1Client.kt` و `HttpEngine.kt`
  *     (`X-App` · `X-Device` · `X-App-Version` · `X-Request-Id`)؛ ترتیبِ کار همان
  *     `SyncV1Engine.runOnce`/`firstSync`/`SyncCommit.absorb`.
- *   • کارهای دکان (کالا، ورودِ انبار، فروش، قرض، صندوق، مرجوعی) سطر به سطر از
- *     `WarehouseEngine.kt`، `SalesEngine.kt`، `DebtorEngine.kt` و `CashShift.kt` برگردانده
- *     شده‌اند (نامِ تابعِ کاتلین کنارِ هر کدام).
+ *   • کارهای دکان (کالا، ورودِ انبار، فروش، قرض، صندوق، مرجوعی، فروشِ تحویلِ سفارش) سطر به
+ *     سطر از `WarehouseEngine.kt`، `SalesEngine.kt`، `DebtorEngine.kt`، `CashShift.kt` و
+ *     `OrderFulfillment.kt` برگردانده شده‌اند (نامِ تابعِ کاتلین کنارِ هر کدام).
  *   • «حالتِ هواپیما»: `offline = true` ⇒ هیچ درخواستی بیرون نمی‌رود (همان `Backend.isOnline`).
  */
 import { createRequire } from 'node:module';
@@ -435,6 +435,96 @@ export class NativeDevice {
     d.nextInvoiceNo = invoiceNumber + 1;
     this.save(d);
     return { ok: true, saleId: id, invoiceNumber, finalTotal };
+  }
+
+  /**
+   * `OrderFulfillment.fulfill` (+ `OrdersLive.post`): تحویلِ سفارشِ آنلاین ⇒ یک فروشِ عادی در
+   * همین دفتر با شناسه‌های ثابتِ سفارش (`o-<سفارش>`، `o-<سفارش>-<قلم>`، `…-m`، `…-a`)،
+   * قیمت‌های دقیقِ سفارش، هزینهٔ ارسال به‌صورتِ قلمِ آزاد، `channel = online` و روشِ پرداختِ
+   * واقعی. سیاستِ موجودیِ صندوق: بیش از موجودی (جمعِ قلم‌های هر کالا) ⇒ خطای روشن.
+   * order: جزئیاتِ سفارش (`GET /shop/orders/:id` یا یک ردیفِ `GET /shop/orders/handover`).
+   * @returns {{ok:true, saleId:string, already?:true} | {ok:false, message:string}}
+   */
+  fulfillOrder(o) {
+    const d = clone(this.ledger);
+    const saleId = `o-${o.id}`;
+    const have = d.sales.find((s) => s.orderId === o.id || s.id === saleId || s.id === `w-${o.id}`);
+    if (have) return { ok: true, already: true, saleId: have.id };
+    if (o.isTest) return { ok: false, message: 'سفارشِ آزمایشی فروش و کسرِ موجودی ندارد' };
+    const tag = `سفارش #${o.orderNo}: `;
+    const lines = [...(o.lines || [])].sort((a, b) => a.lineNo - b.lineNo);
+    if (!lines.length) return { ok: false, message: `قلم‌های سفارش #${o.orderNo} نیامد؛ سفارش را دوباره باز کنید` };
+    const now = this.now();
+    const today = todayOf(now);
+    const byId = new Map(d.products.map((p) => [p.id, p]));
+    const plan = lines.map((l) => {
+      const p = l.productId ? byId.get(l.productId) || null : null;
+      let q = l.qtyMilli / 1000;
+      //  `SalesEngine.toStockQty`: واحدِ فروش (کارتن) ⇒ واحدِ موجودی
+      if (p && l.unit && l.unit === p.saleUnit && l.unit !== p.unit && p.unitFactor > 0) q = Math.round(q * p.unitFactor * 1000) / 1000;
+      return { itemId: `${saleId}-${l.lineNo}`, lineNo: l.lineNo, p, q, name: l.name, totalMinor: l.lineTotalMinor };
+    });
+    const need = new Map();
+    for (const x of plan) {
+      if (!x.p) continue;
+      if (!x.p.active) return { ok: false, message: `${tag}«${x.p.name}» غیرفعال است` };
+      need.set(x.p.id, (need.get(x.p.id) || 0) + x.q);
+    }
+    for (const [pid, q] of need) {
+      const available = this.stock(pid, d);
+      if (q > available + 1e-9) return { ok: false, message: `${tag}از «${byId.get(pid).name}» فقط ${available} مانده` };
+    }
+    const fee = Number(o.deliveryFeeMinor || 0);
+    const rows = plan.map((x) => [x.itemId, x.totalMinor]);
+    if (fee > 0) rows.push([`${saleId}-fee`, fee]);
+    const finalTotal = o.totalMinor / 100;
+    let pay;
+    if (o.paymentMethod === 'online') {
+      const paid = o.paymentStatus === 'paid';
+      pay = { method: 'online', rows: [{ method: 'online', kind: 'other', amount: o.totalMinor, status: paid ? 'confirmed' : 'pending', ...(paid ? { verification: 'provider' } : {}) }] };
+    } else if (o.fulfillment === 'delivery') {
+      pay = { method: 'cod', rows: [{ method: 'cod', kind: 'cash', amount: o.totalMinor, status: 'pending', custody: 'courier' }] };
+    } else {
+      pay = { method: 'cash', rows: [{ method: 'cash', kind: 'cash', amount: o.totalMinor, status: 'confirmed' }] };
+    }
+    const digits = (s) => String(s || '').replace(/\D/g, '').slice(-9);
+    const phone = digits(o.customer && o.customer.phone);
+    const debtor = phone.length >= 7 ? d.debtors.find((x) => digits(x.phone) === phone) : null;
+    const invoiceNumber = d.nextInvoiceNo || 1;
+    const discount = Number(o.discountMinor || 0) / 100;
+    d.sales.push(row('Sale', {
+      id: saleId, invoiceNumber, total: rows.reduce((s, r) => s + r[1], 0) / 100, discountType: 'amount',
+      discountValue: discount, discount, finalTotal, paymentMethod: pay.method, debtorId: debtor ? debtor.id : null,
+      paidAmount: finalTotal, remaining: 0, status: 'completed', debtGiven: 0, debtSettled: 0, createdAt: now, date: today,
+      syncStatus: 'pending', seller: this.seller, orderId: o.id, orderNo: o.orderNo, payments: pay.rows, channel: 'online',
+    }));
+    for (const x of plan) {
+      const total = x.totalMinor / 100;
+      d.saleItems.push(row('SaleItem', {
+        id: x.itemId, saleId, productId: x.p ? x.p.id : '', name: x.p ? '' : (x.name || 'قلمِ سفارش'), quantity: x.q,
+        unitPrice: Math.round((total / x.q) * 100) / 100, purchasePrice: x.p ? x.p.purchasePrice : 0, totalPrice: total, returnedQty: 0,
+      }));
+    }
+    if (fee > 0) {
+      d.saleItems.push(row('SaleItem', {
+        id: `${saleId}-fee`, saleId, productId: '', name: 'هزینهٔ ارسال', quantity: 1, unitPrice: fee / 100, purchasePrice: 0,
+        totalPrice: fee / 100, returnedQty: 0,
+      }));
+    }
+    for (const x of plan) {
+      if (!x.p) continue;
+      d.stockMovements.push(row('StockMovement', {
+        id: `${x.itemId}-m`, productId: x.p.id, type: 'sale', qty: -x.q, date: today,
+        notes: `فاکتور #${invoiceNumber} — سفارشِ اینترنتی #${o.orderNo}`, refId: saleId, createdAt: now,
+      }));
+    }
+    d.auditLog.push(row('AuditEntry', {
+      id: `${saleId}-a`, type: 'sale', date: today, refId: saleId,
+      notes: `ثبت فروش فاکتور #${invoiceNumber} — سفارشِ اینترنتی #${o.orderNo} به مبلغ ${money(finalTotal)} افغانی`, createdAt: now,
+    }));
+    d.nextInvoiceNo = invoiceNumber + 1;
+    this.save(d);
+    return { ok: true, saleId };
   }
 
   /** `DebtorEngine.addTransaction(kind = RECEIVE)` */
