@@ -64,7 +64,13 @@ router.post('/live/ticket', (req, res) => {
 
 /* ------------------------------------------------------------------ Push */
 
-router.post('/push', requireSyncWrite, pumpServicesOnly, async (req, res, next) => {
+/*
+ *  دکان: سقفِ تخفیف/لغو/برگشت و «برگهٔ امضاشده» (STF-02/03، بخشِ ۱۰.۱) —
+ *  ‎lib/staff-approval.js‎. حسابِ پمپ بی هیچ کاری از آن رد می‌شود.
+ */
+const { v1Guard: shopStaffGuard } = require('../lib/staff-approval');
+
+router.post('/push', requireSyncWrite, pumpServicesOnly, shopStaffGuard, async (req, res, next) => {
   try {
     const deviceId = v.id(req.body?.device_id || req.body?.deviceId, {
       field: 'شناسه دستگاه', required: true, max: 64,
