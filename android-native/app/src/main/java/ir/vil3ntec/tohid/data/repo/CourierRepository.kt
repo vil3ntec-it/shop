@@ -1,0 +1,62 @@
+package ir.vil3ntec.tohid.data.repo
+
+import ir.vil3ntec.tohid.core.courier.CourierEvent
+import ir.vil3ntec.tohid.core.courier.EventResult
+import ir.vil3ntec.tohid.core.courier.MissionCard
+import ir.vil3ntec.tohid.core.net.ApiClient
+import ir.vil3ntec.tohid.core.net.ApiEndpoints
+import ir.vil3ntec.tohid.core.net.ApiResult
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+
+/**
+ *  درِ پیک (`/api/courier/…`) — DLV-01/02/08/10، v3 §۳.۱۱.
+ *
+ *  صفحه‌ها نشانیِ سرور و توکن را نمی‌دانند؛ فقط همین مخزن را صدا می‌زنند.
+ *  ⛔ توکنِ پیک جز همین درها جایی را باز نمی‌کند (سرور: `403 courier_scope`).
+ */
+class CourierRepository(private val api: ApiClient) {
+
+  data class Me(val id: String, val name: String, val active: Boolean, val cashCapMinor: Long)
+
+  suspend fun me(): ApiResult<Me> = result {
+    val c = api.get(ApiEndpoints.Courier.ME)["courier"] as? JsonObject ?: JsonObject(emptyMap())
+    Me(CourierWire.str(c, "id"), CourierWire.str(c, "name"), CourierWire.bool(c, "active"), CourierWire.long(c, "cashCapMinor") ?: 0L)
+  }
+
+  /** `scope`: «active» (زنده) یا «done» (پایان‌یافته؛ سرور نشانی را نمی‌دهد) */
+  suspend fun missions(scope: String): ApiResult<List<MissionCard>> = result {
+    val items = api.get(ApiEndpoints.Courier.missions(scope))["items"] as? JsonArray ?: JsonArray(emptyList())
+    items.mapNotNull { (it as? JsonObject)?.let(CourierWire::card) }
+  }
+
+  /** یک بسته از صف؛ پاسخ برای هر رویداد جدا (applied/duplicate/unchanged/rejected) */
+  suspend fun send(deviceId: String, events: List<CourierEvent>): ApiResult<List<EventResult>> = result {
+    val body = buildJsonObject {
+      put("deviceId", JsonPrimitive(deviceId))
+      put("events", buildJsonArray { events.forEach { add(CourierWire.eventJson(it)) } })
+    }
+    val results = api.post(ApiEndpoints.Courier.EVENTS, body)["results"] as? JsonArray ?: JsonArray(emptyList())
+    results.map { el ->
+      val o = el as? JsonObject ?: JsonObject(emptyMap())
+      CourierWire.result(o)
+    }
+  }
+
+  /** عکسِ بسته (DLV-08) — `parcelOnly` همیشه true: پیک پیش از گرفتن تأیید کرده */
+  suspend fun photo(assignmentId: String, eventId: String, imageBase64: String, deviceTime: Long): ApiResult<String> = result {
+    val out = api.post(
+      ApiEndpoints.Courier.photos(assignmentId),
+      buildJsonObject {
+        put("eventId", JsonPrimitive(eventId))
+        put("imageBase64", JsonPrimitive(imageBase64))
+        put("parcelOnly", JsonPrimitive(true))
+        put("deviceTime", JsonPrimitive(deviceTime))
+      },
+    )
+    CourierWire.str(out, "photoId")
+  }
+}
