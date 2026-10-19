@@ -41,7 +41,6 @@ class WebPaletteParityTest {
 
   /** ناهم‌خوانیِ امروز (۱۴۰۵/۰۷/۲۲) — فقط کم شود */
   private val drift = setOf(
-    "light:border",        //  وب: خطِ تیرهٔ ۱۰٪؛ برنامه: لبهٔ سفیدِ ۹۰٪ِ شیشه
     "light:accent",        //  وب #00c39a؛ برنامه #0FA98A
     "light:warning-tint",  //  وب از warningِ تیره؛ برنامه از نارنجیِ روشن
     "dark:success-tint",   //  وب ۱۸٪؛ برنامه ۲۰٪

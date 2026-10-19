@@ -530,6 +530,7 @@ fun SettingsScreen(
             onClick = { lockStore.set(""); lockOn = false; toast("قفل برداشته شد") },
             modifier = Modifier.fillMaxWidth(),
           )
+          IdleLockChoice(lockStore)   // STF-05
         } else {
           TohidButton(
             text = "گذاشتن رمز",
