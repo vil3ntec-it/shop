@@ -46,6 +46,8 @@ router.get('/config', wrap(async (req, res) => {
     ...st,
     settings: st.flag ? await sf.settingsOf(req.shopId) : null,
     permissions: { manage: can(req.role, 'settings.write') },
+    //  برگهٔ «ارسال و زمان» فقط با پرچمِ جدای `shop.storefront.zones`
+    zones: st.flag ? await sfd.flagOn(req.shopId) : false,
   });
 }));
 
@@ -67,11 +69,16 @@ router.post('/presence', requirePermission('settings.write'), needFlag, needWrit
 }));
 
 //  ── ناحیه‌های ارسال و بازه‌های زمان‌بندی (CHK-06/07/10/12) ─────────────
-router.get('/delivery', requirePermission('data.read'), needFlag, wrap(async (req, res) => {
+const needZones = wrap(async (req, res, next) => {
+  if (!(await sfd.flagOn(req.shopId))) return next(forbidden('ناحیه و زمان‌بندی برای این دکان روشن نیست', 'zones_disabled'));
+  next();
+});
+
+router.get('/delivery', requirePermission('data.read'), needFlag, needZones, wrap(async (req, res) => {
   res.json(await sfd.settingsOf(req.shopId));
 }));
 
-router.put('/delivery', requirePermission('settings.write'), needFlag, needWrite, wrap(async (req, res) => {
+router.put('/delivery', requirePermission('settings.write'), needFlag, needZones, needWrite, wrap(async (req, res) => {
   const out = await sfd.saveSettings(req.shopId, req.body, req.user.id);
   await audit.log({
     shopId: req.shopId, userId: req.user.id, action: 'storefront.delivery',

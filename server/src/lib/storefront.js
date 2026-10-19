@@ -525,7 +525,7 @@ function withData(err, data) {
  * قیمت‌گذاریِ سرور درونِ تراکنشِ `orders.create` — قیمت و «هنوز در ویترین»
  * همان لحظه از دفتر خوانده می‌شود.
  */
-function pricer(shopId, sf, input) {
+function pricer(shopId, sf, input, { zonesOn = false } = {}) {
   return async (run, at) => {
     const ids = input.lines.map((l) => l.productId);
     const rows = (await run(
@@ -552,7 +552,7 @@ function pricer(shopId, sf, input) {
     });
     const subtotalMinor = lines.reduce((s, l) => s + l.lineTotalMinor, 0);
     //  ناحیه (هزینه/حداقلِ خودش؛ بی ناحیه همان ثابتِ امروز) و بازهٔ زمانی، زیرِ همین قفل
-    const d = await sfd.forCheckout(run, sf, input, subtotalMinor, at);
+    const d = await sfd.forCheckout(run, sf, input, subtotalMinor, at, { zonesOn });
     const { deliveryFeeMinor } = d;
     const totalMinor = subtotalMinor + deliveryFeeMinor;
     if (!Number.isSafeInteger(totalMinor)) throw badRequest('جمعِ سفارش بیش از حد بزرگ است', 'bad_lines');
@@ -654,7 +654,9 @@ async function checkout(sf, { key, body, ticket, session }) {
     throw new ApiError(403, 'phone_not_verified', 'این شماره تأیید نشده است؛ همان شمارهٔ تأییدشده را بنویسید');
   }
   tokenKey();   // سرورِ بی رمز سفارش نمی‌گیرد که بعد پیگیری‌اش ممکن نباشد
-  const out = await orders.create(sf.shop_id, { key, body, actor: CUSTOMER, price: pricer(sf.shop_id, sf, input) });
+  //  پرچمِ ناحیه/بازه پیش از تراکنش خوانده می‌شود (قفلِ سفارش کوتاه بماند)
+  const zonesOn = await sfd.flagOn(sf.shop_id);
+  const out = await orders.create(sf.shop_id, { key, body, actor: CUSTOMER, price: pricer(sf.shop_id, sf, input, { zonesOn }) });
   return {
     order: publicOrder(out.order, tokenOf(sf.shop_id, out.order.id)), replayed: out.replayed,
     orderId: out.order.id,

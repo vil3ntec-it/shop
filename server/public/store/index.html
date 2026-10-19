@@ -17,10 +17,7 @@
       <h1 id="store-title">ویترین</h1>
       <p id="store-tagline" class="muted" hidden></p>
     </div>
-    <div class="top-actions">
-      <a id="account-link" class="btn btn-ghost btn-sm" href="#/account">حسابِ من</a>
-      <a id="store-call" class="btn btn-ghost btn-sm" href="#" hidden>تماس با دکان</a>
-    </div>
+    <a id="store-call" class="btn btn-ghost btn-sm" href="#" hidden>تماس با دکان</a>
   </div>
   <div class="wrap">
     <div id="store-status" class="status" role="status" aria-live="polite"></div>
@@ -43,15 +40,6 @@
       <input id="q" type="search" placeholder="جست‌وجوی کالا…" autocomplete="off" enterkeyhint="search">
     </form>
     <div id="cats" class="chips" role="group" aria-label="دسته‌ها"></div>
-    <!-- WEB-02: پرفروش‌ها و تازه‌ها — فقط از دادهٔ واقعی؛ خالی ⇒ پنهان -->
-    <section id="shelf-best" class="shelf" aria-labelledby="shelf-best-h" hidden>
-      <h2 id="shelf-best-h">پرفروش‌ها</h2>
-      <ul class="shelf-row"></ul>
-    </section>
-    <section id="shelf-new" class="shelf" aria-labelledby="shelf-new-h" hidden>
-      <h2 id="shelf-new-h">تازه‌ها</h2>
-      <ul class="shelf-row"></ul>
-    </section>
     <div id="catalog-empty" class="empty" hidden>
       <p id="catalog-empty-text">چیزی پیدا نشد.</p>
       <p class="muted">نامِ دیگری را امتحان کنید یا با دکان تماس بگیرید.</p>
@@ -60,32 +48,6 @@
     <ul id="products" class="grid" aria-label="کالاها"></ul>
     <button id="more" class="btn btn-ghost btn-block" type="button" hidden>کالاهای بیشتر</button>
     <p class="muted"><a href="#/orders">سفارش‌های من</a></p>
-  </section>
-
-  <!-- WEB-08: صفحهٔ کالا -->
-  <section id="view-product" hidden>
-    <p><a href="#/">→ بازگشت به کالاها</a></p>
-    <article class="panel product">
-      <div id="p-media" class="product-media"></div>
-      <div class="product-info">
-        <h2 id="p-name"></h2>
-        <p id="p-price" class="price"></p>
-        <p id="p-stock" class="stock"></p>
-        <div id="p-act" class="product-act"></div>
-        <p id="p-max" class="muted" hidden></p>
-        <p id="p-desc" class="product-desc" hidden></p>
-        <dl id="p-specs" class="specs" hidden></dl>
-      </div>
-    </article>
-    <p id="p-msg" class="note" hidden role="alert"></p>
-    <section id="p-similar" class="shelf" aria-labelledby="p-similar-h" hidden>
-      <h2 id="p-similar-h">کالاهای مشابه</h2>
-      <ul class="shelf-row"></ul>
-    </section>
-    <section id="p-complementary" class="shelf" aria-labelledby="p-complementary-h" hidden>
-      <h2 id="p-complementary-h">معمولاً با این هم می‌خرند</h2>
-      <ul class="shelf-row"></ul>
-    </section>
   </section>
 
   <!-- سبد و ثبت -->
@@ -101,8 +63,6 @@
         <span class="grand">مبلغِ نهایی</span><span id="t-total" class="grand"></span>
       </div>
       <p id="min-order" class="note warn" hidden></p>
-      <p id="free-note" class="note info" hidden></p>
-      <p id="reorder-note" class="note info" hidden role="status"></p>
     </div>
 
     <form id="checkout-form" class="panel" novalidate>
@@ -132,10 +92,6 @@
       </div>
 
       <div id="address-box" hidden>
-        <div id="saved-box" hidden>
-          <p class="field-label" id="saved-h">نشانی‌های من</p>
-          <div id="saved-addresses" class="chips wrap-chips" role="group" aria-labelledby="saved-h"></div>
-        </div>
         <label for="a-text">نشانی</label>
         <textarea id="a-text" maxlength="300" autocomplete="street-address"></textarea>
         <label for="a-landmark">نشانهٔ نزدیک (مثلاً «پشتِ مسجد»)</label>
@@ -144,30 +100,9 @@
           <button id="pin-btn" class="btn btn-ghost btn-sm" type="button">پین با موقعیتِ فعلیِ من</button>
           <span id="pin-text" class="muted">پین اختیاری است.</span>
         </div>
-        <!-- CHK-07/10: ناحیهٔ ارسال — با پین سنجیده می‌شود؛ بی پین، مشتری ناحیه‌اش را می‌گزیند -->
-        <div id="zone-box" hidden>
-          <div id="zone-pick" hidden>
-            <label for="zone-select">ناحیهٔ من</label>
-            <select id="zone-select"></select>
-          </div>
-          <p id="zone-msg" class="note" hidden role="status"></p>
-          <button id="zone-pickup" class="btn btn-ghost btn-sm" type="button" hidden>خودم از دکان می‌گیرم</button>
-        </div>
         <label class="check"><input id="d-call" type="checkbox"> پیش از رسیدن زنگ بزنید</label>
         <label for="d-leave">تحویل به (اختیاری، مثلاً «دربان»)</label>
         <input id="d-leave" type="text" maxlength="80">
-        <div id="save-address-box" hidden>
-          <label class="check"><input id="save-address" type="checkbox"> این نشانی را در حسابم نگه دار</label>
-          <label for="save-label" class="sr-only">نامِ نشانی</label>
-          <input id="save-label" type="text" maxlength="40" placeholder="نام، مثلاً «خانه»" hidden>
-        </div>
-      </div>
-
-      <!-- CHK-12: هرچه زودتر یا بازهٔ زمانی با ظرفیت -->
-      <div id="slot-box" hidden>
-        <label for="slot" id="slot-label">زمانِ تحویل</label>
-        <select id="slot"></select>
-        <p id="slot-msg" class="note" hidden role="status"></p>
       </div>
 
       <label for="c-note">یادداشت برای دکان (اختیاری)</label>
@@ -193,64 +128,9 @@
       <ul id="o-lines" class="lines"></ul>
       <div id="o-totals" class="totals"></div>
       <ol id="o-timeline" class="timeline"></ol>
-      <p id="o-when" class="muted" hidden></p>
       <p class="muted">این صفحه با همین نشانی دوباره باز می‌شود؛ نشانی را نگه دارید.</p>
       <p id="o-msg" class="note" hidden role="alert"></p>
-      <button id="o-reorder" class="btn btn-block" type="button" hidden>خریدِ دوباره</button>
       <button id="o-cancel" class="btn btn-ghost btn-block" type="button" hidden>لغوِ سفارش</button>
-    </div>
-    <!-- CHK-01: پس از سفارشِ مهمان، پیشنهادِ حساب با همان شمارهٔ تأییدشده -->
-    <div id="o-account" class="panel" hidden>
-      <h2>سفارش‌ها را در هر دستگاه ببینید</h2>
-      <p class="muted">با همین شمارهٔ تأییدشده حساب بسازید؛ بی گذرواژه. نشانی‌ها هم نگه داشته می‌شوند.</p>
-      <button id="o-account-btn" class="btn btn-block" type="button">ساختنِ حساب</button>
-    </div>
-  </section>
-
-  <!-- حسابِ مشتری (۲۳، CHK-02/09، S138) -->
-  <section id="view-account" hidden>
-    <p><a href="#/">→ بازگشت به کالاها</a></p>
-    <div id="acc-signin" class="panel" hidden>
-      <h2>ورود به حساب</h2>
-      <p class="muted">فقط با شمارهٔ موبایل و یک کدِ یک‌بارمصرف؛ بی گذرواژه. دیدن و سبد بی حساب هم ممکن است.</p>
-      <label for="acc-phone">شمارهٔ موبایل</label>
-      <input id="acc-phone" type="tel" inputmode="tel" autocomplete="tel" dir="ltr" maxlength="20">
-      <button id="acc-send" class="btn btn-ghost btn-sm" type="button">فرستادنِ کد</button>
-      <div id="acc-code-row" hidden>
-        <label for="acc-code">کدِ تأیید</label>
-        <div class="row">
-          <input id="acc-code" type="text" inputmode="numeric" autocomplete="one-time-code" dir="ltr" maxlength="8">
-          <button id="acc-check" class="btn btn-sm" type="button">ورود</button>
-        </div>
-      </div>
-      <p id="acc-msg" class="note" hidden role="alert"></p>
-    </div>
-    <div id="acc-home" hidden>
-      <div class="panel">
-        <h2>حسابِ من</h2>
-        <p id="acc-who" class="muted" dir="ltr"></p>
-        <label for="acc-name">نام</label>
-        <div class="row">
-          <input id="acc-name" type="text" maxlength="80" autocomplete="name">
-          <button id="acc-save-name" class="btn btn-ghost btn-sm" type="button">ذخیرهٔ نام</button>
-        </div>
-        <p id="acc-home-msg" class="note" hidden role="status"></p>
-      </div>
-      <div class="panel">
-        <h2>سفارش‌های من</h2>
-        <ul id="acc-orders" class="lines"></ul>
-        <p id="acc-orders-empty" class="muted" hidden>هنوز سفارشی از این ویترین ندارید.</p>
-        <button id="acc-more" class="btn btn-ghost btn-block" type="button" hidden>سفارش‌های قدیمی‌تر</button>
-      </div>
-      <div class="panel">
-        <h2>نشانی‌های من</h2>
-        <ul id="acc-addresses" class="lines"></ul>
-        <p id="acc-addresses-empty" class="muted" hidden>هنوز نشانی‌ای نگه نداشته‌اید؛ هنگامِ سفارش می‌توانید نگه دارید.</p>
-      </div>
-      <div class="panel row">
-        <button id="acc-logout" class="btn btn-ghost" type="button">خروج از این دستگاه</button>
-        <button id="acc-delete" class="btn btn-danger" type="button">پاک کردنِ حساب</button>
-      </div>
     </div>
   </section>
 

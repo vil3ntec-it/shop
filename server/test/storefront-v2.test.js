@@ -62,6 +62,8 @@ async function liveStore(label, settings = {}) {
   const o = { ...u, token: u.accessToken, shopId: made.body.shop.id };
   await setFlag(o.shopId, 'shop.orders', true);
   await setFlag(o.shopId, 'shop.storefront', true);
+  //  ناحیه و بازه پرچمِ جدا و پیش‌فرض خاموش دارند؛ آزمون‌های این‌جا روشنش می‌کنند
+  await setFlag(o.shopId, 'shop.storefront.zones', true);
   const slug = `v-${uniq()}`;
   const put = await h.put('/api/shop/storefront', {
     slug, enabled: true, title: `ویترینِ ${label}`, deliveryFeeMinor: 5000, minOrderMinor: 0, ...settings,
@@ -238,6 +240,38 @@ test('تنظیمِ ناحیه و بازه: ورودیِ بد رد، هم‌پو�
 /* ══════════════════════════════════════════════════════════════════
    ۳) ناحیه و هزینهٔ ارسال
    ══════════════════════════════════════════════════════════════════ */
+
+test('⛔ پرچمِ `shop.storefront.zones` خاموش ⇒ رفتارِ امروز؛ ناحیه‌های ذخیره‌شده پاک نمی‌شوند', async () => {
+  const s = await liveStore('پرچمِ ناحیه');
+  assert.equal((await putDelivery(s, {
+    zones: ZONES, allowAsap: false,
+    slotRules: [{ fulfillment: 'pickup', weekdays: EVERY_DAY, startMin: 600, endMin: 720, capacity: 1 }],
+  })).status, 200);
+  await setFlag(s.shopId, 'shop.storefront.zones', false);
+  const t = await ticketFor(s.slug, PHONE);
+  const cfg = await h.get('/api/shop/storefront/config', { token: s.token });
+  assert.equal(cfg.body.zones, false);
+  const off = await putDelivery(s, { zones: [] });
+  assert.equal(off.status, 403);
+  assert.equal(off.body.error.code, 'zones_disabled');
+  assert.equal((await h.get('/api/shop/storefront/delivery', { token: s.token })).status, 403);
+  const prof = await h.get(`/api/store/${s.slug}`);
+  assert.deepEqual(prof.body.store.delivery, { zoned: false, zones: [], allowAsap: true, scheduling: { delivery: false, pickup: false } });
+  assert.equal((await h.get(`/api/store/${s.slug}/delivery?lat=${OUTSIDE.lat}&lng=${OUTSIDE.lng}`)).body.inZone, true);
+  assert.equal((await h.get(`/api/store/${s.slug}/slots?fulfillment=pickup`)).body.scheduling, false);
+  //  پینِ بیرون پذیرفته می‌شود و هزینه همان ثابتِ امروز است؛ «هرچه زودتر» هم
+  const far = await checkout(s.slug, body({ address: { text: 'هر جا', ...OUTSIDE }, expectedTotalMinor: SUBTOTAL + 5000 }), { ticket: t });
+  assert.equal(far.status, 201, JSON.stringify(far.body));
+  assert.equal(far.body.order.deliveryFeeMinor, 5000);
+  assert.equal(far.body.order.zoneName, '');
+  const asap = await checkout(s.slug, body({ fulfillment: 'pickup', address: undefined }), { ticket: t });
+  assert.equal(asap.status, 201, JSON.stringify(asap.body));
+  assert.equal((await checkout(s.slug, body({ fulfillment: 'pickup', address: undefined, slotStartsAt: Date.now() + 86400000 }), { ticket: t })).body.error.code, 'slot_unavailable');
+  //  روشن کردنِ دوباره ⇒ همان ناحیه‌ها
+  await setFlag(s.shopId, 'shop.storefront.zones', true);
+  assert.equal((await h.get(`/api/store/${s.slug}`)).body.store.delivery.zones.length, 2);
+  assert.equal((await h.get('/api/shop/storefront/config', { token: s.token })).body.zones, true);
+});
 
 test('بی ناحیه ⇒ همان هزینهٔ ثابتِ امروز، پین اختیاری (رفتارِ پیشین)', async () => {
   const s = await liveStore('بی‌ناحیه');

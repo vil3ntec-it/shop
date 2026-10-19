@@ -17,6 +17,10 @@
  *            به مشتری فقط «هست/پر است/کم مانده» گفته می‌شود، نه عددِ سفارش‌ها.
  *
  * ⛔ قیمت و هزینه را سرور می‌گوید؛ عددِ مشتری فقط برای «تغییر کرده؟» است.
+ * ⛔ پرچمِ جدا و پیش‌فرض خاموشِ `shop.storefront.zones` (live_config، دکان یا all):
+ *    صفحهٔ امروزِ ویترین (server/public/store) ناحیه و بازه را نمی‌شناسد؛ تا
+ *    مشتری‌ای که این‌ها را نشان دهد آماده نشده، خاموش ⇒ هزینه و حداقلِ ثابتِ امروز،
+ *    بی بازه، و تنظیمِ مالک ۴۰۳. ناحیه‌های ذخیره‌شده با خاموش کردن پاک نمی‌شوند.
  */
 const db = require('../db');
 const { tx } = db;
@@ -35,6 +39,10 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 //  این وضعیت‌ها بازه را آزاد کرده‌اند
 const RELEASED = ['rejected', 'auto_rejected', 'cancelled_by_customer', 'cancelled'];
 const ID_RE = /^[0-9A-Z]{26}$/;
+const FLAG_KEY = 'shop.storefront.zones';
+
+/** ناحیه و بازه برای این دکان روشن است؟ (پیش‌فرض خاموش) */
+const flagOn = (shopId) => require('./orders').flagOf(shopId, FLAG_KEY);
 
 const str = (v) => (typeof v === 'string' ? v.trim() : '');
 const text = (v, max) => stripControl(str(v)).slice(0, max);
@@ -375,6 +383,9 @@ function publicSlot(s) {
 
 /** برای پروفایلِ ویترین: نام و هزینهٔ ناحیه‌ها و این‌که کدام روش بازه دارد. */
 async function publicInfo(sf) {
+  if (!(await flagOn(sf.shop_id))) {
+    return { zoned: false, zones: [], allowAsap: true, scheduling: { delivery: false, pickup: false } };
+  }
   const [zones, rules] = await Promise.all([zonesOf(sf.shop_id), rulesOf(sf.shop_id)]);
   const act = zones.filter((z) => z.active);
   return {
@@ -395,7 +406,7 @@ async function locate(sf, latRaw, lngRaw) {
   if (!Number.isFinite(lat) || lat < -90 || lat > 90 || !Number.isFinite(lng) || lng < -180 || lng > 180) {
     throw badRequest('مختصاتِ پین معتبر نیست', 'bad_address');
   }
-  const zones = (await zonesOf(sf.shop_id)).filter((z) => z.active);
+  const zones = (await flagOn(sf.shop_id)) ? (await zonesOf(sf.shop_id)).filter((z) => z.active) : [];
   if (!zones.length) return { zoned: false, inZone: true, zone: null, pickup: sf.accept_pickup === true };
   const z = zoneAt(zones, lat, lng);
   return { zoned: true, inZone: Boolean(z), zone: z ? publicZone(z) : null, pickup: sf.accept_pickup === true };
@@ -403,7 +414,8 @@ async function locate(sf, latRaw, lngRaw) {
 
 async function publicSlots(sf, fulfillment, at = db.now()) {
   if (!['delivery', 'pickup'].includes(fulfillment)) throw badRequest('ارسال یا دریافت از دکان؟', 'bad_fulfillment');
-  const rules = (await rulesOf(sf.shop_id)).filter((r) => r.active && r.fulfillment === fulfillment);
+  const on = await flagOn(sf.shop_id);
+  const rules = on ? (await rulesOf(sf.shop_id)).filter((r) => r.active && r.fulfillment === fulfillment) : [];
   const slots = rules.length ? await slotsWithLoad(sf, fulfillment, at, { rules }) : [];
   return {
     fulfillment,
@@ -428,14 +440,14 @@ function withData(err, data) {
  * است (+ `zoneId` و `slotStartsAt`). خطاها دادهٔ کافی برای نشان دادنِ راهِ
  * درست دارند (ناحیه‌ها، بازه‌های تازه، امکانِ «دریافت از دکان»).
  */
-async function forCheckout(run, sf, input, subtotalMinor, at) {
+async function forCheckout(run, sf, input, subtotalMinor, at, { zonesOn = false } = {}) {
   let deliveryFeeMinor = 0;
   let minOrderMinor = Number(sf.min_order_minor);
   let address = input.address;
   let delivery = input.delivery;
 
   if (input.fulfillment === 'delivery') {
-    const zones = (await zonesOf(sf.shop_id, run)).filter((z) => z.active);
+    const zones = zonesOn ? (await zonesOf(sf.shop_id, run)).filter((z) => z.active) : [];
     if (!zones.length) {
       deliveryFeeMinor = Number(sf.delivery_fee_minor);   // رفتارِ امروز
     } else {
@@ -462,7 +474,7 @@ async function forCheckout(run, sf, input, subtotalMinor, at) {
   }
 
   let scheduledFor = null;
-  const rules = (await rulesOf(sf.shop_id, run)).filter((r) => r.active && r.fulfillment === input.fulfillment);
+  const rules = zonesOn ? (await rulesOf(sf.shop_id, run)).filter((r) => r.active && r.fulfillment === input.fulfillment) : [];
   if (input.slotStartsAt === null) {
     if (rules.length && sf.allow_asap === false) {
       const slots = await slotsWithLoad(sf, input.fulfillment, at, { run, rules });
@@ -486,7 +498,7 @@ async function forCheckout(run, sf, input, subtotalMinor, at) {
 }
 
 module.exports = {
-  MAX_ZONES, MAX_RULES, RELEASED, ID_RE, DAY_MS,
+  MAX_ZONES, MAX_RULES, RELEASED, ID_RE, DAY_MS, FLAG_KEY, flagOn,
   inPolygon, distanceM, contains, zoneAt, publicZone, epochOf, localDate, addDays,
   zonesOf, rulesOf, settingsOf, saveSettings, slotsOf, slotsWithLoad, publicSlot,
   publicInfo, locate, publicSlots, forCheckout,
