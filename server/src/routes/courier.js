@@ -16,13 +16,18 @@
  */
 const express = require('express');
 const delivery = require('../lib/delivery');
-const { requireUser, requireShop } = require('../middleware/auth');
+const { requireUser, requireShop, allowCourierScope } = require('../middleware/auth');
 const { forbidden, notFound } = require('../middleware/errors');
 
 const router = express.Router();
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
-router.use(requireUser, requireShop, wrap(async (req, res, next) => {
+/*
+ *  DLV-01 (§۳.۱۱): **تنها** دری که توکنِ دامنه‌دارِ پیک را می‌پذیرد. پرچمِ
+ *  `req.courierScope` فقط همین‌جا روشن می‌شود و تهِ همین روتر هر نشانیِ
+ *  ناشناخته ۴۰۴ است، تا درخواست با پرچمِ روشن به روترِ دیگری سُر نخورد.
+ */
+router.use(allowCourierScope, requireUser, requireShop, wrap(async (req, res, next) => {
   const st = await delivery.stateOf(req.shopId);
   if (!st.readable) return next(notFound('تحویل و پیک برای این دکان روشن نیست', 'delivery_disabled'));
   const courier = await delivery.courierOfUser(req.shopId, req.user.id);
@@ -62,5 +67,8 @@ router.post('/missions/:id/photos', wrap(async (req, res) => {
   const out = await delivery.putPhoto(req.shopId, req.params.id, req.body, req.courierActor);
   res.status(out.replayed ? 200 : 201).json(out);
 }));
+
+//  ⛔ تهِ درِ پیک: هیچ نشانیِ دیگری از این‌جا به روترهای بعدی نمی‌رود
+router.use((req, res, next) => next(notFound('این نشانی در درِ پیک نیست', 'not_found')));
 
 module.exports = router;

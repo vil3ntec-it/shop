@@ -16,7 +16,7 @@ const os = require('node:os');
 const path = require('node:path');
 
 const DIR = __dirname;
-const FILES = ['admin-panel.mjs', 'web-backup.mjs', 'web-ui.mjs', 'portal-rep.mjs'];
+const FILES = ['admin-panel.mjs', 'web-backup.mjs', 'web-ui.mjs', 'portal-rep.mjs', 'web-sync-v3.mjs'];
 
 // محیطی که پلی‌رایت در آن پیدا نمی‌شود: `npm root -g` به پوشه‌ای خالی
 // می‌رود و NODE_PATH خالی است.

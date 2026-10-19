@@ -59,6 +59,9 @@ async function main() {
   //  «رو به پایان / منقضی»
   const notices = require('./lib/notices');
   notices.startRunner();
+  //  جاروی رزروهای سررسیدهٔ سفارش (v3 §۳۲.۲ بندِ ۶) — بی ردیف (پرچمِ خاموش) کاری نمی‌کند
+  const stock = require('./lib/stock');
+  stock.startSweeper();
   //  باتِ تلگرامِ پمپ — کدش در ریپوی پمپ است (bots/pump، lib/bots.js)؛ نبود ⇒ بی بات.
   //  تا رمزش از پنل داده نشده، فقط هر چند ثانیه نگاه می‌کند.
   const telegram = require('./lib/bots').pump();
@@ -73,6 +76,7 @@ async function main() {
     if (backupTimer) clearInterval(backupTimer);
     outbox.stop();
     notices.stopRunner();
+    stock.stopSweeper();
     telegram.stop();
     server.close(async () => {
       await closeDb();
