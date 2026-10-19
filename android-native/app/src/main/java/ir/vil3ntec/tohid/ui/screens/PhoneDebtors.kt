@@ -66,6 +66,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -202,7 +203,8 @@ private fun RowScope.StatCell(label: String, value: String, tint: Color, c: Phon
 @Composable
 fun DebtorsSearchField(value: String, onValueChange: (String) -> Unit, modifier: Modifier = Modifier) {
   val c = PhoneV3Debt.colors
-  val voice = rememberVoiceSearch(onValueChange)
+  //  پیش‌نمایشِ گوشی روی کامپیوتر (`PhoneDebtorsShot.mic`) دایره را همان‌طور که اندروید نشان می‌دهد می‌کشد
+  val voice = rememberVoiceSearch(onValueChange) ?: if (PhoneDebtorsShot.mic.value) ({}) else null
   OutlinedTextField(
     value = value,
     onValueChange = onValueChange,
@@ -234,6 +236,15 @@ fun DebtorsSearchField(value: String, onValueChange: (String) -> Unit, modifier:
   )
 }
 
+/**
+ *  فقط برای عکسِ خودکارِ پیش‌نمایشِ گوشی (`DevShot`، صفحه‌های debtors-r9/many/empty)، مثلِ
+ *  `PhoneCartShot`: کامپیوتر تشخیصِ گفتار ندارد و میکروفون را پنهان می‌کند، ولی عکس باید همان
+ *  گوشی را نشان دهد. در نسخهٔ دستِ کاربر کسی آن را روشن نمی‌کند.
+ */
+object PhoneDebtorsShot {
+  val mic = mutableStateOf(false)
+}
+
 @Composable
 private fun RoundIcon(icon: ImageVector, description: String, fill: Color, tint: Color, onClick: () -> Unit) {
   val source = remember { MutableInteractionSource() }
@@ -262,7 +273,10 @@ private fun RoundIcon(icon: ImageVector, description: String, fill: Color, tint:
 fun DebtorsSortRow(current: DebtorListModel.Sort, count: Int, onPick: (DebtorListModel.Sort) -> Unit) {
   val c = PhoneV3Debt.colors
   Row(
-    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+    Modifier
+      .bleed(PhoneV3Debt.gutter)
+      .horizontalScroll(rememberScrollState())
+      .padding(horizontal = PhoneV3Debt.gutter),
     horizontalArrangement = Arrangement.spacedBy(6.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
@@ -277,6 +291,18 @@ fun DebtorsSortRow(current: DebtorListModel.Sort, count: Int, onPick: (DebtorLis
       SortChip(option.label, option == current, c) { onPick(option) }
     }
   }
+}
+
+/**
+ *  ردیفِ اسکرولی تا لبهٔ صفحه: تراشه‌ها زیرِ لبهٔ گوشی می‌روند، نه زیرِ حاشیهٔ
+ *  ۱۶dp — پهنا دو حاشیه بیشتر اندازه گرفته و به همان اندازه به عقب گذاشته می‌شود.
+ */
+private fun Modifier.bleed(gutter: Dp): Modifier = layout { measurable, constraints ->
+  if (!constraints.hasBoundedWidth) return@layout measurable.measure(constraints).let { p -> layout(p.width, p.height) { p.place(0, 0) } }
+  val extra = gutter.roundToPx() * 2
+  val width = constraints.maxWidth + extra
+  val p = measurable.measure(constraints.copy(minWidth = width, maxWidth = width))
+  layout(constraints.maxWidth, p.height) { p.place(-extra / 2, 0) }
 }
 
 @Composable
@@ -389,12 +415,13 @@ fun DebtorTile(
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
       )
+      //  تا دو خط، وسط‌چین: «۱٬۰۰۰ افغانی بدهکار» در کارتِ ۱۱۴dpِ گوشی کامل دیده می‌شود
       Text(
         DebtorListModel.subtitle(row),
         style = MaterialTheme.typography.labelSmall,
         color = c.muted,
         textAlign = TextAlign.Center,
-        maxLines = 1,
+        maxLines = 2,
         overflow = TextOverflow.Ellipsis,
       )
       DebtorListModel.daysLabel(row)?.let { days ->
@@ -539,16 +566,18 @@ fun DebtorsAddButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
   }
   val source = remember { MutableInteractionSource() }
   val pressed by source.collectIsPressedAsState()
-  Box(
-    modifier
-      .size(PhoneV3Debt.fabSize)
-      .pressScale(pressed)
-      .shadow(6.dp, CircleShape, ambientColor = c.accent, spotColor = c.accent)
-      .clip(CircleShape)
-      .background(c.accent)
-      .clickable(interactionSource = source, indication = LocalIndication.current, role = Role.Button, onClick = onClick),
-    contentAlignment = Alignment.Center,
-  ) {
-    Icon(Icons.Filled.Add, contentDescription = "قرض‌دار تازه", tint = c.onAccent, modifier = Modifier.size(26.dp))
+  //  لایهٔ فشردن ۸dp از دایره بزرگ‌تر است: سایه بیرونِ دایره می‌افتد و لایه (روی کامپیوتر) آن را نمی‌بُرد
+  Box(modifier.pressScale(pressed).padding(8.dp)) {
+    Box(
+      Modifier
+        .size(PhoneV3Debt.fabSize)
+        .shadow(6.dp, CircleShape, ambientColor = c.accent, spotColor = c.accent)
+        .clip(CircleShape)
+        .background(c.accent)
+        .clickable(interactionSource = source, indication = LocalIndication.current, role = Role.Button, onClick = onClick),
+      contentAlignment = Alignment.Center,
+    ) {
+      Icon(Icons.Filled.Add, contentDescription = "قرض‌دار تازه", tint = c.onAccent, modifier = Modifier.size(26.dp))
+    }
   }
 }

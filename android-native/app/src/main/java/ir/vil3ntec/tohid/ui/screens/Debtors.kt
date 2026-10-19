@@ -195,8 +195,11 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { ViewModeToggle(view) }
                 Spacer(Modifier.height(6.dp))
               }
-              DebtorsSortRow(current = sort, count = rows.size) { sortName = it.name }
-              Spacer(Modifier.height(4.dp))
+              //  دفترِ خالی چیزی برای مرتب کردن ندارد؛ جست‌وجوی بی‌نتیجه «۰ مورد» را نشان می‌دهد
+              if (d.debtors.isNotEmpty()) {
+                DebtorsSortRow(current = sort, count = rows.size) { sortName = it.name }
+                Spacer(Modifier.height(4.dp))
+              }
             }
           }
 
@@ -249,9 +252,10 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
           }
         }
 
+        //  ۸dp + ۸dpِ داخلِ دکمه (جای سایه) = همان ۱۶dp از لبه
         DebtorsAddButton(
           onClick = { form = DebtorFormState() },
-          modifier = Modifier.align(Alignment.BottomStart).padding(16.dp).popIn(),
+          modifier = Modifier.align(Alignment.BottomStart).padding(8.dp).popIn(),
         )
       }
     }

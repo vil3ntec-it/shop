@@ -168,7 +168,8 @@ val PhoneV3DebtLight = PhoneV3DebtColors(
   page = Color(0xFFF2F0FA),
   blobPink = Color(0x33FF5FA2),
   blobViolet = Color(0x407C5CFF),
-  blobWarm = Color(0x26FF9A3D),
+  //  r9 پایینِ چپ تقریباً بی‌رنگ است (#F3EDF1)
+  blobWarm = Color(0x14FF9A3D),
   surface = Color(0xF2FFFFFF),
   edge = Color(0xE6FFFFFF),
   ink = Color(0xFF191627),
@@ -177,12 +178,14 @@ val PhoneV3DebtLight = PhoneV3DebtColors(
   fieldEdge = Color(0x1F191627),
   accent = Color(0xFF6F50F0),
   onAccent = Color(0xFFFFFFFF),
-  accentInk = Color(0xFF6F50F0),
+  //  r9: #6F51F1؛ یک پله تیره‌تر تا برچسبِ جستجوی فعال روی زمینه ≥ ۴٫۵:۱ (۴٫۵۶ ⇐ ۴٫۸۱)
+  accentInk = Color(0xFF6B4CEC),
   accentSoft = Color(0x246F50F0),
   //  r9: #BF2C2C؛ یک پله تیره‌تر تا روی کارتِ صورتی ≥ ۴٫۵:۱ (۴٫۳۸ ⇐ ۴٫۶۱) — به چشم همان
   owe = Color(0xFFB92A2A),
   oweTint = Color(0x1FD93B3B),
-  settled = Color(0xFF08745E),
+  //  r9: #08745E؛ یک پله تیره‌تر تا روی کارتِ سبز با فاصله ≥ ۴٫۵:۱ (۴٫۵۱ ⇐ ۴٫۷۶)
+  settled = Color(0xFF07705B),
   settledTint = Color(0x1F0FA98A),
 )
 
@@ -192,7 +195,7 @@ val PhoneV3DebtDark = PhoneV3DebtColors(
   page = Color(0xFF0B0A14),
   blobPink = Color(0x40FF5FA2),
   blobViolet = Color(0x597C5CFF),
-  blobWarm = Color(0x26FF9A3D),
+  blobWarm = Color(0x1AFF9A3D),
   surface = Color(0xF0141221),
   edge = Color(0x1AFFFFFF),
   ink = Color(0xFFF0EEF8),

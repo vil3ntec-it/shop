@@ -44,6 +44,7 @@ import ir.vil3ntec.tohid.data.Debtor
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.ui.screens.DashboardScreen
 import ir.vil3ntec.tohid.ui.screens.DebtorsScreen
+import ir.vil3ntec.tohid.ui.screens.PhoneDebtorsShot
 import ir.vil3ntec.tohid.ui.screens.ProfileScreen
 import ir.vil3ntec.tohid.ui.screens.SettingsScreen
 import ir.vil3ntec.tohid.ui.theme.Shop
@@ -132,6 +133,8 @@ private fun PhonePreviewContent(screen: String, store: ShopStore, dark: Boolean)
       //  قرض‌دارانِ گوشی (r9): سه نفرِ r9، هشت نفر با نام و مبلغِ بلند، و خالی — با دفترِ ساختگیِ خودش
       "debtors-r9", "debtors-many", "debtors-empty" -> Box(Modifier.weight(1f).fillMaxWidth()) {
         val demo = remember(screen) { debtorsDemo(screen, System.currentTimeMillis()) }
+        //  میکروفونِ کادرِ جستجو همان‌طور که اندروید نشان می‌دهد (کامپیوتر خودش پنهانش می‌کند)
+        LaunchedEffect(Unit) { PhoneDebtorsShot.mic.value = true }
         DebtorsScreen(store, demo, snackbar)
       }
       else -> {
