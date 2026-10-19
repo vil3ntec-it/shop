@@ -256,7 +256,7 @@ fun AppRoot(
     ir.vil3ntec.tohid.sync.AutoSync.stopPolling()
   }
   //  بخشِ «سفارش‌ها»: فقط اگر سرور برای این دکان روشن گفته، و فقط وقتی برنامه جلوی چشم است
-  OrdersLive.Host()
+  OrdersLive.Host(store)
 
   //  اگر دفتر دیرتر از ON_START آماده شد، همان‌جا شروع می‌کنیم
   LaunchedEffect(loaded) {
@@ -807,7 +807,7 @@ fun AppRoot(
           onSubscription = { sub = "vip" },
         )
         "team" -> TeamScreen(snackbar)
-        "orders" -> OrdersScreen(snackbar) { sub = null }
+        "orders" -> OrdersScreen(store, snackbar) { sub = null }
         "storefront" -> if (StorefrontGate.visible) StorefrontScreen(snackbar) else LaunchedEffect(Unit) { open("more") }
         "devices" -> DevicesScreen(data, snackbar)
         "more" -> MoreScreen(store, data, ::open)

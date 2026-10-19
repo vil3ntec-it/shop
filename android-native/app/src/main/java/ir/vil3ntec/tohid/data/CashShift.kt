@@ -37,8 +37,20 @@ object CashShift {
   const val ONLINE = "online"
   const val ONLINE_SERIES = "W"
 
-  /** فاکتورِ اینترنتیِ سرور — پولش به دخل نمی‌آید */
-  fun isOnline(s: Sale): Boolean = s.channel == ONLINE || s.series == ONLINE_SERIES
+  /**
+   *  فاکتورِ اینترنتی که پولش به دخل نمی‌آید: فاکتورِ W ِ سرور همیشه؛ هر فروشِ `channel = online`
+   *  (از جمله فروشِ تحویلِ سفارش در برنامه، `OrderFulfillment`) مگر «نقد سرِ پیشخوان»
+   *  ([paidAtCounter]) — پرداختِ آنلاین نزدِ درگاه است و نقدِ پیک تا تسویهٔ پیک.
+   */
+  fun isOnline(s: Sale): Boolean =
+    s.series == ONLINE_SERIES || (s.channel == ONLINE && !paidAtCounter(s))
+
+  /**
+   *  سفارشِ «تحویل در دکان» که مشتری سرِ پیشخوان نقد داد: ردیفِ پرداختِ نقدِ بی‌امانت
+   *  (`kind = cash`، بی `custody`) — همان نقدِ عادیِ دخل. نقدِ پیک `custody = courier` دارد.
+   */
+  fun paidAtCounter(s: Sale): Boolean =
+    s.payments?.any { it.kind == "cash" && it.custody == null && it.amountMinor > 0 } == true
 
   /**
    *  مرجوعیِ سرور برای سفارشِ اینترنتی. ردیف‌های پیش از نشانِ `channel` با شناسهٔ

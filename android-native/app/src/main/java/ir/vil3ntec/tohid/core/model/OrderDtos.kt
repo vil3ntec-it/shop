@@ -115,6 +115,15 @@ data class OrderDto(
   val deliveryFeeMinor: Long = 0,
   val lines: List<OrderLineDto> = emptyList(),
   val events: List<OrderEventDto> = emptyList(),
+  /** فقط در `GET /shop/orders/handover`: لحظهٔ نخستین تحویل (زمانِ سرور) */
+  val handedOverAt: Long? = null,
+)
+
+/** `GET /shop/orders/handover` — سفارش‌های تحویل‌شده‌ای که فروششان هنوز در دفترِ دکان نیست */
+@Serializable
+data class HandoverPageDto(
+  val items: List<OrderDto> = emptyList(),
+  val serverTime: Long = 0,
 )
 
 @Serializable

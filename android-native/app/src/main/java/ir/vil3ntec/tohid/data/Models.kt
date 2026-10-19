@@ -4,6 +4,7 @@ import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonNames
 
 /**
  *  مدلِ داده — دقیقاً همان چیزی که نسخهٔ وب می‌نویسد.
@@ -102,6 +103,16 @@ data class Sale(
   /** فروشنده — نامِ حسابی که فاکتور را زد (برای گزارشِ فروشِ هر کاربر)؛ خالی یعنی نامعلوم */
   val seller: String = "",
   /**
+   *  سفارشِ آنلاینی که این فروش تحویلِ آن است (`OrderFulfillment`) — شناسه و شمارهٔ سفارش.
+   *  فروشِ صندوق `null` است و `null` نوشته نمی‌شود (`NEVER`)، مثلِ `series`.
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val orderId: String? = null,
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val orderNo: Long? = null,
+  /**
    *  «سری سند»ِ دستگاهی که فاکتور را زد (F0-03)، مثلاً `B1`؛ شمارهٔ نمایشی
    *  `{سری}-{شماره}` می‌شود (`invoiceLabel`). فاکتورِ پیش از سری و فاکتورِ
    *  وب (که بازهٔ خودش را دارد) `null`اند و همان عدد را نشان می‌دهند.
@@ -114,6 +125,24 @@ data class Sale(
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val series: String? = null,
   /**
+   *  PAY (v3 A4) — ردیف‌های پرداختِ ترکیبی (نقد، کیف پول، کارت، حواله، به حساب)، به پول.
+   *  فقط فروشی که با پرچمِ `ShopPolicy.payV2` ثبت شده دارد؛ معنای فیلدهای بالا
+   *  (`paidAmount`، `remaining`، `debtGiven`) همان امروز است، پس برنامهٔ کهنه همان عدد
+   *  را می‌خواند؛ `paymentMethod` برای فروشِ غیرنقد `wallet`/`card`/`transfer`/`mixed` است
+   *  (`PayFlow.legacyMethod`). `null` نوشته نمی‌شود — مثلِ `series`.
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val payments: List<SalePayment>? = null,
+  /** دریافتیِ کل (نقد + غیرنقد)، به پول — فقط با `payments` */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val tenderedMinor: Long? = null,
+  /** پولِ پس (فقط از نقد)، به پول — فقط با `payments` */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val changeMinor: Long? = null,
+  /**
    *  کانالِ فروش (ORD-20): `online` برای فاکتورِ سریِ `W` که سرور هنگامِ
    *  تحویلِ سفارشِ اینترنتی در دفترِ دکان می‌گذارد؛ فاکتورِ صندوق `null`
    *  است (گزارش آن را «حضوری» می‌خواند — `ReportLedger`). مثلِ `series`
@@ -125,9 +154,36 @@ data class Sale(
 )
 
 /**
+ *  یک ردیفِ پرداختِ فاکتور (`Sale.payments`) — به پول، نام‌ها همان `PaymentRow`ِ هسته.
+ *  غیرنقد «ثبتِ دستی، در انتظار» است (`status = pending`، `verification = manual`)
+ *  تا تأییدِ قابلِ اتکا برسد (PAY-08)؛ نقد و «به حساب» تأییدشده‌اند.
+ *
+ *  روی سیم مبلغ `amount` است (به پول) — همان `PaymentRow`ِ هسته و ردیفی که سرور روی فاکتورِ
+ *  W می‌گذارد (`order-ledger.js`، #321)؛ `amountMinor`ِ نسخهٔ پیشِ این شاخه هم خوانده می‌شود.
+ *  بی این، فاکتورِ W ِ سرور خواندنِ کلِ دفتر را می‌شکست (فیلدِ اجباریِ گم).
+ */
+@OptIn(ExperimentalSerializationApi::class)
+@Serializable
+data class SalePayment(
+  val method: String,
+  val kind: String,
+  @SerialName("amount")
+  @JsonNames("amountMinor")
+  val amountMinor: Long,
+  val status: String,
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val ref: String? = null,
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val verification: String? = null,
+  /** امانتِ کیست، اگر پول هنوز دستِ دکان نیست — `courier` برای «نقد هنگامِ تحویل»ِ فاکتورِ W */
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val custody: String? = null,
+)
+
+/**
  *  فاکتورِ سفارشِ اینترنتی (سریِ `W`، ORD-20) — سرور آن را هنگامِ تحویل
  *  می‌سازد. صندوق آن را لغو یا «اصلاح در سبد» نمی‌کند (یعنی دوباره نمی‌زند)؛
- *  برگشتِ کاملش از بخشِ «سفارش‌ها» (بازپرداخت) سندِ برگشت می‌سازد.
+ *  فروشی که برنامه هنگامِ تحویلِ سفارش می‌زند (`OrderFulfillment`) هم همین کانال را دارد.
  *  مرجوعیِ قلم‌به‌قلم در دکان مثلِ هر فاکتورِ دیگر مجاز است.
  */
 fun Sale.isOnlineOrder(): Boolean = channel == "online" || series?.trim() == ONLINE_SERIES

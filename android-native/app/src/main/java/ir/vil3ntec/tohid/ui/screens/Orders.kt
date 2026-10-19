@@ -36,6 +36,9 @@ import ir.vil3ntec.tohid.core.model.OrdersConfigDto
 import ir.vil3ntec.tohid.core.orders.OrderDraft
 import ir.vil3ntec.tohid.core.orders.OrderStates
 import ir.vil3ntec.tohid.core.orders.OrderText
+import ir.vil3ntec.tohid.data.OrderFulfillment
+import ir.vil3ntec.tohid.data.ShopStore
+import ir.vil3ntec.tohid.data.invoiceLabel
 import ir.vil3ntec.tohid.data.repo.OrdersRepository
 import ir.vil3ntec.tohid.ui.OrdersLive
 import ir.vil3ntec.tohid.ui.Platform
@@ -43,6 +46,7 @@ import ir.vil3ntec.tohid.ui.components.common.ScreenKind
 import ir.vil3ntec.tohid.ui.components.common.ViewMode
 import ir.vil3ntec.tohid.ui.components.common.ViewModeToggle
 import ir.vil3ntec.tohid.ui.components.common.rememberViewMode
+import ir.vil3ntec.tohid.ui.theme.Radius
 import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.launch
 
@@ -56,9 +60,12 @@ import kotlinx.coroutines.launch
  *  با `orders.manage`؛ سرور هر گذار را دوباره می‌سنجد.
  *  ⛔ شمارهٔ کامل و دکمهٔ تماس فقط وقتی سرور شماره را داده (`orders.contact`).
  *  نمای کارتی/جدولی: `ViewModePref` (گوشی همیشه کارتی).
+ *  ⛔ موجودی (تصمیمِ صاحبِ مخزن): سایت و سرور به موجودی دست نمی‌زنند. «مشتری گرفت»، «ارسال
+ *  شد» یا «تحویل شد» ⇒ همین برنامه یک فروشِ عادی با قیمت‌های سفارش ثبت می‌کند
+ *  (`OrderFulfillment`) و همان لحظه همگام می‌کند؛ کمبود ⇒ گذار فرستاده نمی‌شود و پیامِ روشن.
  */
 @Composable
-fun OrdersScreen(snackbar: SnackbarHostState, onLeave: () -> Unit) {
+fun OrdersScreen(store: ShopStore, snackbar: SnackbarHostState, onLeave: () -> Unit) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
   val cfg = OrdersLive.config.value
@@ -118,6 +125,17 @@ fun OrdersScreen(snackbar: SnackbarHostState, onLeave: () -> Unit) {
       "اعلانِ فوری (وقتی برنامه بسته است) هنوز وصل نیست؛ تا برنامه باز است، صف هر چند ثانیه خودش تازه می‌شود.",
       style = MaterialTheme.typography.labelSmall, color = colors.muted,
     )
+    //  تحویل‌هایی که فروششان ثبت نشد (کمبود، قفل…) — موجودی تا ثبتِ فروش کم نشده است
+    val unposted = OrdersLive.unposted.value
+    if (unposted.isNotEmpty()) {
+      Spacer(Modifier.height(8.dp))
+      FulfillNotice(
+        title = "${unposted.size} سفارشِ تحویل‌شده هنوز فروش ندارد — موجودی کم نشده",
+        body = unposted.take(3).joinToString("\n") { it.message },
+        action = "دوباره ثبت کن",
+        onAction = { scope.launch { OrdersLive.reconcile(context, store, force = true) } },
+      )
+    }
     Spacer(Modifier.height(10.dp))
     //  برگه‌های ORD-12 با شمارش
     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -165,7 +183,7 @@ fun OrdersScreen(snackbar: SnackbarHostState, onLeave: () -> Unit) {
 
   openId?.let { id ->
     OrderDetailSheet(
-      id = id, repo = repo, cfg = cfg, snackbar = snackbar,
+      id = id, repo = repo, cfg = cfg, store = store, snackbar = snackbar,
       onClose = { openId = null },
       onChanged = { reload++; scope.launch { OrdersLive.pollSummary(context) } },
     )
@@ -313,11 +331,14 @@ private fun OrderDetailSheet(
   id: String,
   repo: OrdersRepository,
   cfg: OrdersConfigDto,
+  store: ShopStore,
   snackbar: SnackbarHostState,
   onClose: () -> Unit,
   onChanged: () -> Unit,
 ) {
   val c = Shop.colors
+  val context = LocalContext.current
+  val ledger by store.data.collectAsState()
   val scope = rememberCoroutineScope()
   val uri = LocalUriHandler.current
   val clipboard = LocalClipboardManager.current
@@ -335,9 +356,31 @@ private fun OrderDetailSheet(
       .onFailure { if (order == null) { error = it.userMessage } }
   }
 
+  /** فروشِ تحویلِ سفارش در همین دفتر (یکتا با شناسهٔ سفارش) — نتیجه همیشه گفته می‌شود */
+  suspend fun postSale(o: OrderDto) {
+    when (val r = OrdersLive.post(context, store, o)) {
+      OrdersLive.Posted.Saved -> snackbar.showSnackbar("فروشِ سفارش #${o.orderNo} ثبت شد؛ موجودی کم شد و همگام می‌شود")
+      OrdersLive.Posted.Already -> Unit
+      is OrdersLive.Posted.Failed -> snackbar.showSnackbar(r.message)
+    }
+  }
+
   fun send(to: String, reason: String = "", note: String = "", ready: Int? = null) {
     val o = order ?: return
     if (busy) return
+    //  تحویل ⇒ فروش در همین دفتر: پیش از فرستادنِ گذار سنجیده می‌شود (سیاستِ موجودیِ صندوق)؛
+    //  کمبود ⇒ گذار نمی‌رود و پیام روشن است، نه سفارشِ «تحویل‌شده» بی فروش
+    if (to in OrderFulfillment.HANDED_OVER && OrderFulfillment.saleOf(ledger, o.id) == null && !o.isTest) {
+      val dry = OrderFulfillment.fulfill(
+        ledger, o, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(),
+        blockExpired = ir.vil3ntec.tohid.data.ShopPolicy.blockExpired(context),
+      )
+      if (dry is OrderFulfillment.Result.Failed) {
+        val msg = "تحویل ثبت نشد — ${dry.message}"
+        if (act != null) actError = msg else scope.launch { snackbar.showSnackbar(msg) }
+        return
+      }
+    }
     busy = true
     actError = null
     scope.launch {
@@ -347,12 +390,17 @@ private fun OrderDetailSheet(
           act = null
           onChanged()
           scope.launch { snackbar.showSnackbar("سفارش #${it.orderNo}: ${OrderText.status(it.status)}") }
+          if (it.status in OrderFulfillment.HANDED_OVER) postSale(it)
         }
         .onFailure { f ->
           if (f.code == "status_changed") {
             act = null
             scope.launch { snackbar.showSnackbar("وضعیتِ این سفارش همین حالا جای دیگری عوض شد؛ وضعیتِ تازه را ببینید.") }
-            repo.get(o.id).onSuccess { order = it }
+            repo.get(o.id).onSuccess {
+              order = it
+              //  دستگاهِ دیگر یا پیک تحویل داد ⇒ فروش (یکتا) همین‌جا هم ثبت می‌شود
+              if (OrderFulfillment.needsSale(ledger, it)) postSale(it)
+            }
             onChanged()
           } else if (act != null) {
             actError = f.userMessage
@@ -386,6 +434,25 @@ private fun OrderDetailSheet(
         Tag(fulfillmentLabel(o)); Tag("${o.itemsCount} قلم"); Tag(OrderText.pay(o.paymentStatus, o.paymentMethod))
         Tag(OrderText.source(o.source)); Tag(timeLabel(o, System.currentTimeMillis()))
         if (o.isTest) Tag("آزمایشی", warn = true)
+      }
+
+      //  فروشِ تحویل در دفترِ دکان (موجودی فقط این‌جا کم می‌شود)
+      val sold = OrderFulfillment.saleOf(ledger, o.id)
+      if (sold != null) {
+        Spacer(Modifier.height(6.dp))
+        Text(
+          "فروشِ تحویل: فاکتور #${sold.invoiceLabel() ?: "—"} — برگشتِ کالا با «مرجوعیِ» همین فاکتور در «فروش‌ها»",
+          style = MaterialTheme.typography.bodySmall, color = c.muted,
+        )
+      } else if (OrderFulfillment.needsSale(ledger, o)) {
+        Spacer(Modifier.height(8.dp))
+        FulfillNotice(
+          title = "فروشِ این سفارش هنوز در دفترِ دکان نیست — موجودی کم نشده",
+          body = OrdersLive.unposted.value.firstOrNull { it.orderId == o.id }?.message
+            ?: "کالا از دکان بیرون رفته؛ فروش را با قیمت‌های همین سفارش ثبت کنید.",
+          action = if (cfg.permissions.manage) "ثبتِ فروش" else null,
+          onAction = { if (!busy) scope.launch { busy = true; postSale(o); busy = false } },
+        )
       }
 
       val actions = OrderStates.actions(o.status, o.fulfillment, cfg.permissions.manage, cfg.permissions.refund)
@@ -487,6 +554,29 @@ private fun OrderDetailSheet(
       onDismiss = { act = null },
       onConfirm = { reason, note, ready -> send(to, reason, note, ready) },
     )
+  }
+}
+
+/** هشدارِ «تحویل بی فروش» — رنگِ هشدار + متن، با کارِ بعدی (VISUAL-DIRECTION: هرگز رنگِ تنها) */
+@Composable
+private fun FulfillNotice(title: String, body: String, action: String?, onAction: () -> Unit) {
+  val c = Shop.colors
+  Column(
+    Modifier.fillMaxWidth().clip(RoundedCornerShape(Radius.md)).background(c.warningTint).padding(12.dp),
+  ) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+      Box(Modifier.size(8.dp).clip(CircleShape).background(c.warning))
+      Spacer(Modifier.width(8.dp))
+      Text(title, Modifier.weight(1f), color = c.text, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+    }
+    if (body.isNotBlank()) {
+      Spacer(Modifier.height(4.dp))
+      Text(body, color = c.text, style = MaterialTheme.typography.bodySmall)
+    }
+    if (action != null) {
+      Spacer(Modifier.height(8.dp))
+      TohidSecondaryButton(action, onClick = onAction)
+    }
   }
 }
 

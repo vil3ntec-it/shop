@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data.repo
 
+import ir.vil3ntec.tohid.core.model.HandoverPageDto
 import ir.vil3ntec.tohid.core.model.OrderDto
 import ir.vil3ntec.tohid.core.model.OrderPageDto
 import ir.vil3ntec.tohid.core.model.OrdersConfigDto
@@ -42,6 +43,14 @@ class OrdersRepository(private val api: ApiClient) {
 
   suspend fun get(id: String): ApiResult<OrderDto> =
     result { order(api.get("$ROOT/${enc(id)}")) }
+
+  /**
+   *  سفارش‌های تحویل‌شده (مشتری گرفت / به پیک داده شد / رسید) که فروششان هنوز در دفترِ
+   *  همگام‌شدهٔ دکان نیست — `OrderFulfillment` برای هر کدام فروشِ عادی می‌سازد. [since]: فقط
+   *  تحویل‌های پس از نخستین به‌کارگیریِ همین قابلیت روی این دستگاه.
+   */
+  suspend fun handover(since: Long): ApiResult<HandoverPageDto> =
+    result { ApiJson.decode<HandoverPageDto>(api.get("$ROOT/handover?since=$since&limit=20")) }
 
   suspend fun create(clientKey: String, body: OrderDraft.Body): ApiResult<OrderDto> =
     result { order(api.post(ROOT, createJson(clientKey, body))) }
