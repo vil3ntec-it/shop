@@ -304,6 +304,9 @@ async function create(shopId, { key, body, actor, price, notify }) {
   const at = now();
   let input = price ? null : parseCreate(body, at);
   const hash = hashOf(body);
+  //  QA #263: نخستین خواندنِ کاملِ دفترِ دستگاه (پرچمِ `shop.catalog`) در تراکنشِ خودش و
+  //  **پیش از** تراکنش و قفلِ سفارش؛ سفارشِ آزمایشی موجودی را لمس نمی‌کند.
+  if (!(input && input.isTest)) await require('./catalog').prepare(shopId, { at });
 
   return tx(async (c) => {
     const run = (t, p) => c.query(t, p);
@@ -350,7 +353,7 @@ async function create(shopId, { key, body, actor, price, notify }) {
     }
     //  کاتالوگ و موجودی (v3 §۳۲.۲، CHK-18): پرچمِ `shop.catalog` روشن ⇒ رزروِ اتمی در همین
     //  تراکنش؛ کمبود ⇒ ۴۰۹ و کلِ سفارش برمی‌گردد. خاموش ⇒ هیچ (همان رفتارِ پیشین).
-    await require('./catalog').onOrderCreated(c, shopId, { orderId: id, lines: input.lines, at, actor });
+    await require('./catalog').onOrderCreated(c, shopId, { orderId: id, lines: input.lines, at, actor, isTest: input.isTest });
     await c.query(
       `INSERT INTO online_order_events (id, order_id, shop_id, seq, kind, from_status, to_status,
          actor_type, actor_id, reason, note, detail, created_at)
@@ -416,6 +419,8 @@ function parseTransition(input) {
 /** گذارِ وضعیت (شرح و پارامترها در بالا) — ورودی پیش از باز شدنِ تراکنش سنجیده می‌شود. */
 async function transition(shopId, id, input, actor) {
   const p = parseTransition(input);
+  //  قبول ممکن است رزرو بخواهد ⇒ نخستین خواندنِ کاملِ دفتر بیرون از تراکنشِ گذار (QA #263)
+  if (p.to === 'accepted') await require('./catalog').prepare(shopId);
   const out = await tx((c) => applyTransition(c, shopId, id, p, actor));
   //  پس از COMMIT: دستگاه‌های وصل سندِ W را همین حالا بگیرند
   if (out.ledger && out.ledger.head) require('./order-ledger').notify(shopId, out.ledger.head);

@@ -15,6 +15,9 @@ package ir.vil3ntec.tohid.core.perm
  *  تا همان ورودیِ نسخهٔ JS را بی تبدیلِ نوع بپذیرند.
  *   • مالک همیشه همه‌کاره است؛ نقش یا مجوزِ ناشناخته ⇐ ممنوع.
  *   • مجوزِ «restrict» فقط تنگ‌تر از نقش می‌شود؛ «none» از لایه اثر نمی‌گیرد.
+ *     استثنا: «نیازمند تأیید» برای مجوزِ تأییدپذیر، چون به خودِ کاربر قدرتی
+ *     نمی‌دهد — سرور op را فقط با «برگهٔ امضاشده»ی کسی می‌پذیرد که خودش
+ *     همان کار را «مجاز» دارد (بخشِ ۱۰.۱؛ `ApprovalSlip`).
  *   • سقف فقط با حالتِ allow اثر دارد؛ بیش از سقف ⇐ approve (تأییدپذیر) یا deny.
  *
  *  Kotlin خالص است — بی android.*، بی کتابخانه.
@@ -51,11 +54,14 @@ object PermCore {
   )
 
   private val OMD = mapOf("owner" to "allow", "manager" to "allow", "staff" to "deny")
+  private val ALL = mapOf("owner" to "allow", "manager" to "allow", "staff" to "allow")
 
   /** پیش‌فرض‌ها = رفتارِ امروز (MATRIXِ سرور و ShopRoleِ برنامه) */
   val CATALOG: Map<String, Spec> = mapOf(
     "sales.discount" to Spec(OMD, "restrict", true, listOf("maxPct", "maxAmount"), false),
     "sales.cancel" to Spec(OMD, "restrict", true, emptyList(), false),
+    // برگشتِ کالا و بازپرداخت (STF-03): امروز هر عضوِ نویسنده ثبت می‌کند
+    "returns.create" to Spec(ALL, "restrict", true, listOf("maxAmount"), false),
     "settings.write" to Spec(OMD, "restrict", false, emptyList(), false),
     "audit.view" to Spec(OMD, "restrict", false, emptyList(), false),
     "reports.money" to Spec(OMD, "full", false, emptyList(), true),
@@ -83,7 +89,7 @@ object PermCore {
         if (raw != null && raw in MODES) {
           var m: String = raw
           if (m == "approve" && !spec.approvable) m = "deny"
-          if (spec.edit == "restrict" && RANK.getValue(m) > RANK.getValue(base)) m = base
+          if (spec.edit == "restrict" && RANK.getValue(m) > RANK.getValue(base) && m != "approve") m = base
           mode = m
         }
         val oc = o["caps"] as? Map<*, *>
@@ -116,6 +122,22 @@ object PermCore {
     return Decision("allow", "ok")
   }
 
+  /** نیم افغانیِ گرد کردن که در سنجشِ درصدِ تخفیف بخشیده می‌شود */
+  const val ROUNDING_MINOR: Long = 50
+
+  /**
+   *  درصدِ تخفیف به «صدمِ درصد» (۵٪ = ۵۰۰) — همان `discountBp`ِ JS.
+   *  تخفیفِ گردشده تا نیم افغانی بخشیده می‌شود؛ جمعِ صفر با تخفیف ⇐ ۱۰۰٪.
+   */
+  fun discountBp(discountMinor: Long, totalMinor: Long): Long {
+    if (discountMinor <= 0) return 0
+    if (totalMinor <= 0) return 10_000
+    val forgiven = maxOf(0L, discountMinor - ROUNDING_MINOR)
+    return minOf(10_000L, forgiven * 10_000L / totalMinor)
+  }
+
+  fun discountPct(discountMinor: Long, totalMinor: Long): Double = discountBp(discountMinor, totalMinor) / 100.0
+
   /** بی درخواستِ عددی: دکمه دیده شود و بی‌واسطه کار کند */
   fun allows(role: String, layers: List<Any?>?, key: String): Boolean =
     evaluate(role, layers, key, null).decision == "allow"
@@ -135,7 +157,7 @@ object PermCore {
       val m = o["mode"] as? String
       if (m == null || m !in MODES) return "bad_mode"
       if (m == "approve" && !spec.approvable) return "not_approvable"
-      if (spec.edit == "restrict" && RANK.getValue(m) > RANK.getValue(base)) return "exceeds_role"
+      if (spec.edit == "restrict" && RANK.getValue(m) > RANK.getValue(base) && m != "approve") return "exceeds_role"
     }
     if (o.containsKey("caps")) {
       val c = o["caps"] as? Map<*, *> ?: return "bad_cap"
