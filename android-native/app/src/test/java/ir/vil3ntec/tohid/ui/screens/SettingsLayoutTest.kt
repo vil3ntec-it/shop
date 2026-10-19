@@ -23,15 +23,27 @@ class SettingsLayoutTest {
 
   private val sectionTitle = Regex("""SettingsSection\(\s*icon\s*=[^\n]*\n\s*title\s*=\s*"([^"]+)"""")
 
+  /**
+   *  عنوان‌های گروه‌ها از متنِ خودِ `SettingsLayout.kt`. کامپیوتر پیش از کامپایل
+   *  چند عبارت را عوض می‌کند (`phrases` در `desktop/build.gradle.kts`، مثلاً
+   *  «دوربین بارکدخوان» ⇐ «بارکدخوان»)، پس متن با متن سنجیده می‌شود نه با شیءِ کامپایل‌شده.
+   */
+  private val layoutTitles: List<String> by lazy {
+    Regex("""Group\(\s*[A-Z]+\s*,\s*listOf\(([^)]*)\)""").findAll(src("SettingsLayout.kt"))
+      .flatMap { g -> Regex("\"([^\"]+)\"").findAll(g.groupValues[1]).map { it.groupValues[1] } }
+      .toList()
+  }
+
   @Test
   fun `هر بخشِ تنظیمات دقیقاً در یک گروه است`() {
     val found = (sectionTitle.findAll(src("Settings.kt")) + sectionTitle.findAll(src("LocaleSection.kt")))
       .map { it.groupValues[1] }.toList()
     assertTrue("بخشی پیدا نشد — الگوی متن عوض شده؟", found.size >= 10)
     assertEquals("بخشِ تکراری در کد", found.size, found.toSet().size)
-    assertEquals(found.toSet(), SettingsLayout.sections.toSet())
+    assertEquals(found.toSet(), layoutTitles.toSet())
+    assertEquals("متنِ گروه‌ها با شیءِ کامپایل‌شده نمی‌خواند", layoutTitles.size, SettingsLayout.sections.size)
     assertEquals("بخشِ تکراری در گروه‌ها", SettingsLayout.sections.size, SettingsLayout.sections.toSet().size)
-    found.forEach { assertTrue("$it گروه ندارد", SettingsLayout.groupOf(it) != null) }
+    SettingsLayout.sections.forEach { assertTrue("$it گروه ندارد", SettingsLayout.groupOf(it) != null) }
   }
 
   @Test
