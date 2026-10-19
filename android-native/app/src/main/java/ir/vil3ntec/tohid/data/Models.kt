@@ -207,6 +207,17 @@ data class Debtor(
   val phone: String = "",
   val notes: String = "",
   val createdAt: Long = 0,
+  /**
+   *  سقفِ اعتبار به افغانی (CRM-03) — `null` یعنی بی سقف، همان رفتارِ همیشه.
+   *  هم‌واحدِ `DebtTransaction.amount`؛ حساب با `DebtBook.creditCheck` به واحدِ کوچک.
+   *
+   *  ⛔ `null` نوشته نمی‌شود (`EncodeDefault.NEVER`، مثلِ `Sale.series`): وگرنه
+   *  هر قرض‌دارِ قدیمی یک کلیدِ تازه می‌گرفت و نخستین تفاضلِ Sync v1 برای همه op
+   *  می‌ساخت. قرض‌دارِ قدیمی بایت‌به‌بایت همان می‌ماند.
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val creditLimit: Double? = null,
 )
 
 @Serializable
@@ -219,6 +230,16 @@ data class DebtTransaction(
   val date: String = "",
   val notes: String = "",
   val createdAt: Long = 0,
+  /**
+   *  سررسیدِ یک برد (`yyyy-MM-dd`) — `null` یعنی سررسید ندارد، همان رفتارِ همیشه.
+   *  فقط برای `give`؛ رسید سررسید ندارد. مبلغ را عوض نمی‌کند، فقط «کِی باید
+   *  پس بیاید» (`DebtBook`: عقب‌افتاده = سررسید گذشته و هنوز باز).
+   *
+   *  ⛔ `null` نوشته نمی‌شود (`EncodeDefault.NEVER`) — تراکنشِ قدیمی همان می‌ماند.
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val dueDate: String? = null,
 )
 
 @Serializable
