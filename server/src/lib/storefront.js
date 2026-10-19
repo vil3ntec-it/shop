@@ -25,9 +25,11 @@
  *           تماسِ واقعیِ دستگاه‌های دکان (`sync_devices.last_seen_at`)، و
  *           «پذیرشِ سفارش» جدا — هیچ زمانِ ساختگی نشان داده نمی‌شود.
  *
- * ⛔ هنوز نیست (و عمداً): موجودی و رزرو (CHK-18، ۳۲.۲ — لایهٔ موجودیِ سرور
- * نیامده؛ پس موجودی «در حال بررسی» است، نه «موجود»)، ناحیه و هزینهٔ ارسالِ
- * چندضلعی (CHK-07/10)، زمان‌بندی (CHK-12)، حسابِ کاملِ مشتری (۲۳.۴)،
+ *   گامِ ۲ ── ناحیه و هزینهٔ ارسال، بازهٔ زمان‌بندی (`storefront-delivery.js`)،
+ *           حسابِ مشتری (`store-customers.js`)، صفحهٔ کالا، پرفروش‌ها/تازه‌ها،
+ *           خریدِ دوباره و عکسِ کوچکِ بانک + موجودیِ کاتالوگ (`storefront-shelf.js`).
+ *
+ * ⛔ هنوز نیست (و عمداً): رزروِ موجودی تا وقتی PR #263 روی سرور نیست (CHK-18)،
  * پرداختِ آنلاین (D-08، 🔌).
  */
 const crypto = require('crypto');
@@ -36,6 +38,8 @@ const { one, many, now, tx } = db;
 const config = require('../config');
 const orders = require('./orders');
 const S = require('./order-states');
+const sfd = require('./storefront-delivery');
+const shelf = require('./storefront-shelf');
 const { stripControl } = require('./validate');
 const { badRequest, notFound, conflict, ApiError } = require('../middleware/errors');
 
@@ -327,19 +331,127 @@ async function catalog(shopId, { q, category, cursor, limit } = {}) {
   const last = page[page.length - 1];
   return {
     //  کالای بی‌قیمت فروختنی نیست — نشان داده نمی‌شود
-    items: page.map(productView).filter((p) => p.priceMinor !== null && p.name),
+    items: await decorate(shopId, page.map(productView).filter((p) => p.priceMinor !== null && p.name)),
     nextCursor: more ? encodeCursor(String((last.data && last.data.name) || ''), last.id) : null,
   };
 }
 
-/** عکسِ کالای منتشرشده — یا null. */
-async function photo(shopId, productId) {
+/** عکسِ بانک (اگر هست) و وضعیتِ موجودیِ کاتالوگ (اگر روشن است) روی نماها. */
+async function decorate(shopId, items) {
+  if (!items.length) return items;
+  const bank = await shelf.bankIds(shopId, items.map((p) => p.id));
+  for (const p of items) if (bank.has(p.id)) p.photo = true;
+  return shelf.applyStock(shopId, items);
+}
+
+/** کالاهای منتشرشده، زنده و قیمت‌دار با همین شناسه‌ها — به همان ترتیب. */
+async function liveByIds(shopId, ids, run) {
+  if (!ids.length) return [];
+  const sql = `SELECT ${PRODUCT_COLS}, sp.description, sp.specs FROM ${PRODUCT_FROM}
+    WHERE sp.shop_id = $1 AND sp.product_id = ANY($2::text[]) AND sp.published AND ${LIVE_PRODUCT}`;
+  const rows = run ? (await run(sql, [shopId, ids])).rows : await many(sql, [shopId, ids]);
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  return ids.map((id) => byId.get(id)).filter(Boolean);
+}
+
+const RECENT_MS = 30 * 24 * 60 * 60 * 1000;
+const SHELF = 8;
+
+/**
+ * WEB-02 — «پرفروش‌ها»: بیشترین سفارشِ واقعیِ ویترینِ همین دکان در ۳۰ روزِ
+ * گذشته (بی آزمایشی و بی ردشده/لغوشده)؛ «تازه‌ها»: تازه‌ترین انتشارها در
+ * ۳۰ روز. هیچ‌کدام عددِ ساختگی ندارد؛ نبودِ داده ⇒ فهرستِ خالی.
+ */
+async function highlights(shopId, at = now()) {
+  const since = at - RECENT_MS;
+  const [best, fresh] = await Promise.all([
+    many(
+      `SELECT l.product_id, COUNT(DISTINCT l.order_id)::int AS orders, SUM(l.qty_milli)::bigint AS qty
+         FROM online_order_lines l JOIN online_orders o ON o.id = l.order_id
+        WHERE l.shop_id = $1 AND o.shop_id = $1 AND o.source = 'storefront' AND NOT o.is_test
+          AND o.created_at >= $2 AND o.status <> ALL($3::text[])
+        GROUP BY l.product_id ORDER BY 2 DESC, 3 DESC, 1 LIMIT 40`,
+      [shopId, since, sfd.RELEASED]
+    ),
+    many(
+      `SELECT product_id FROM storefront_products
+        WHERE shop_id = $1 AND published AND published_at >= $2
+        ORDER BY published_at DESC, product_id LIMIT 40`,
+      [shopId, since]
+    ),
+  ]);
+  const shelfOf = async (ids) => {
+    const items = (await liveByIds(shopId, ids)).map(productView).filter((p) => p.priceMinor !== null && p.name);
+    return (await decorate(shopId, items)).filter(shelf.suggestable).slice(0, SHELF);
+  };
+  const [bestsellers, newArrivals] = await Promise.all([
+    shelfOf(best.map((r) => r.product_id)), shelfOf(fresh.map((r) => r.product_id)),
+  ]);
+  return { bestsellers, newArrivals, windowDays: 30 };
+}
+
+function specsOf(v) {
+  const list = Array.isArray(v) ? v : (() => { try { return JSON.parse(v); } catch { return []; } })();
+  return (Array.isArray(list) ? list : [])
+    .map((x) => ({ name: text(x && x.name, 40), value: text(x && x.value, 120) }))
+    .filter((x) => x.name && x.value).slice(0, 20);
+}
+
+/**
+ * WEB-08 — صفحهٔ کالا: نام، توضیح و مشخصاتِ عمومی (یادداشتِ داخلیِ دفتر
+ * هرگز)، قیمت، واحد، موجودی، سقفِ هر سفارش؛ «مشابه» (همان دسته) و «مکمل»
+ * (بیشترین هم‌سفارشی در همین ویترین). ناموجود پیشنهاد نمی‌شود (WEB-09).
+ */
+async function productDetail(shopId, productId) {
+  if (!PRODUCT_ID_RE.test(String(productId || ''))) throw notFound('این کالا در ویترین نیست', 'product_not_found');
+  const [row] = await liveByIds(shopId, [String(productId)]);
+  const p = row ? productView(row) : null;
+  if (!p || p.priceMinor === null || !p.name) throw notFound('این کالا در ویترین نیست', 'product_not_found');
+  const product = { ...p, description: text(row.description, 2000), specs: specsOf(row.specs) };
+  await decorate(shopId, [product]);
+
+  const [sameCat, together] = await Promise.all([
+    p.category ? many(
+      `SELECT sp.product_id FROM ${PRODUCT_FROM}
+        WHERE sp.shop_id = $1 AND sp.published AND ${LIVE_PRODUCT} AND r.data->>'category' = $2 AND sp.product_id <> $3
+        ORDER BY COALESCE(r.data->>'name', ''), r.row_id LIMIT 24`,
+      [shopId, p.category, p.id]
+    ) : [],
+    many(
+      `SELECT l2.product_id, COUNT(*)::int AS n
+         FROM online_order_lines l1
+         JOIN online_order_lines l2 ON l2.order_id = l1.order_id AND l2.product_id <> l1.product_id
+         JOIN online_orders o ON o.id = l1.order_id
+        WHERE l1.shop_id = $1 AND l1.product_id = $2 AND o.source = 'storefront' AND NOT o.is_test
+          AND o.created_at >= $3 AND o.status <> ALL($4::text[])
+        GROUP BY l2.product_id ORDER BY 2 DESC, 1 LIMIT 24`,
+      [shopId, p.id, now() - 3 * RECENT_MS, sfd.RELEASED]
+    ),
+  ]);
+  const shelfOf = async (ids) => {
+    const items = (await liveByIds(shopId, ids)).map(productView).filter((x) => x.priceMinor !== null && x.name);
+    return (await decorate(shopId, items)).filter(shelf.suggestable).slice(0, SHELF);
+  };
+  const [similar, complementary] = await Promise.all([
+    shelfOf(sameCat.map((r) => r.product_id)), shelfOf(together.map((r) => r.product_id)),
+  ]);
+  return { product, similar, complementary };
+}
+
+/**
+ * عکسِ کالای منتشرشده — یا null. `size` = `display` (صفحهٔ کالا) یا `thumb`
+ * (کارت): اول نسخهٔ همان اندازه از بانکِ تصاویر (پرچمِ دکان)، وگرنه عکسِ
+ * همگام‌شدهٔ امروز.
+ */
+async function photo(shopId, productId, size = 'display') {
   if (!PRODUCT_ID_RE.test(String(productId || ''))) return null;
   const live = await one(
     `SELECT 1 FROM ${PRODUCT_FROM} WHERE sp.shop_id = $1 AND sp.product_id = $2 AND sp.published AND ${LIVE_PRODUCT}`,
     [shopId, productId]
   );
   if (!live) return null;
+  const banked = await shelf.bankImage(shopId, productId, size === 'thumb' ? 'thumb' : 'display');
+  if (banked) return banked;
   return require('./product-photos').get({ app: 'shop', accountId: shopId }, productId);
 }
 
@@ -379,7 +491,15 @@ function parseCheckout(body, sf) {
   if (b.expectedTotalMinor !== undefined && b.expectedTotalMinor !== null) {
     expectedTotalMinor = int(b.expectedTotalMinor, 'جمعِ دیده‌شده', { min: 0, max: MAX_PRICE_MINOR * 10 });
   }
-  return { fulfillment, paymentMethod, ...contact, note: text(b.note, 500), lines, expectedTotalMinor };
+  //  CHK-07/10: ناحیه‌ای که مشتری بی پین برگزیده (پین باشد، پین برنده است)
+  const zoneId = fulfillment === 'delivery' ? str(obj(b.address).zoneId) : '';
+  if (zoneId && !sfd.ID_RE.test(zoneId)) throw badRequest('ناحیه معتبر نیست', 'bad_zone');
+  //  CHK-12: آغازِ بازهٔ برگزیده؛ نبود ⇒ «هرچه زودتر»
+  const slotStartsAt = b.slotStartsAt === undefined || b.slotStartsAt === null || b.slotStartsAt === ''
+    ? null : int(b.slotStartsAt, 'بازهٔ زمانی', { min: 1, max: 4102444800000 });
+  return {
+    fulfillment, paymentMethod, ...contact, note: text(b.note, 500), lines, expectedTotalMinor, zoneId, slotStartsAt,
+  };
 }
 
 /** برگهٔ قیمتِ امروزِ سبد (همان که در `price_changed` برمی‌گردد). */
@@ -392,6 +512,7 @@ function quoteOf(lines, fees) {
     subtotalMinor: fees.subtotalMinor,
     deliveryFeeMinor: fees.deliveryFeeMinor,
     totalMinor: fees.totalMinor,
+    ...(fees.minOrderMinor !== undefined ? { minOrderMinor: fees.minOrderMinor } : {}),
   };
 }
 
@@ -430,13 +551,15 @@ function pricer(shopId, sf, input) {
       };
     });
     const subtotalMinor = lines.reduce((s, l) => s + l.lineTotalMinor, 0);
-    const deliveryFeeMinor = input.fulfillment === 'delivery' ? Number(sf.delivery_fee_minor) : 0;
+    //  ناحیه (هزینه/حداقلِ خودش؛ بی ناحیه همان ثابتِ امروز) و بازهٔ زمانی، زیرِ همین قفل
+    const d = await sfd.forCheckout(run, sf, input, subtotalMinor, at);
+    const { deliveryFeeMinor } = d;
     const totalMinor = subtotalMinor + deliveryFeeMinor;
     if (!Number.isSafeInteger(totalMinor)) throw badRequest('جمعِ سفارش بیش از حد بزرگ است', 'bad_lines');
-    const fees = { subtotalMinor, deliveryFeeMinor, totalMinor };
-    if (subtotalMinor < Number(sf.min_order_minor)) {
+    const fees = { subtotalMinor, deliveryFeeMinor, totalMinor, minOrderMinor: d.minOrderMinor };
+    if (subtotalMinor < d.minOrderMinor) {
       throw withData(badRequest('سبد از حداقلِ سفارش کمتر است', 'below_min_order'),
-        { minOrderMinor: Number(sf.min_order_minor), quote: quoteOf(lines, fees) });
+        { minOrderMinor: d.minOrderMinor, quote: quoteOf(lines, fees) });
     }
     //  CHK-17: جمعِ امروز با آن‌چه مشتری دید فرق دارد ⇒ ثبت نمی‌شود، تغییر نشان داده می‌شود
     if (input.expectedTotalMinor !== null && input.expectedTotalMinor !== totalMinor) {
@@ -445,9 +568,9 @@ function pricer(shopId, sf, input) {
     return {
       source: 'storefront', fulfillment: input.fulfillment, paymentMethod: input.paymentMethod,
       customerName: input.customerName, customerPhone: input.customerPhone,
-      address: input.address, delivery: input.delivery, note: input.note, isTest: false,
+      address: d.address, delivery: d.delivery, note: input.note, isTest: false,
       lines, subtotalMinor, discountMinor: 0, deliveryFeeMinor, totalMinor,
-      scheduledFor: null, itemsCount: lines.length,
+      scheduledFor: d.scheduledFor, itemsCount: lines.length,
     };
   };
 }
@@ -498,6 +621,10 @@ function publicOrder(o, token) {
     deliveryFeeMinor: o.deliveryFeeMinor,
     totalMinor: o.totalMinor,
     readyAt: o.readyAt,
+    //  CHK-12: بازهٔ برگزیده (null = هرچه زودتر) · CHK-07: ناحیهٔ ارسال
+    scheduledFor: o.scheduledFor,
+    slotEndsAt: o.delivery && o.delivery.slot ? Number(o.delivery.slot.endsAt) : null,
+    zoneName: o.address && o.address.zone ? o.address.zone.name : '',
     createdAt: o.createdAt,
     updatedAt: o.updatedAt,
     //  CHK-22: لغوِ رایگان تا پیش از قبول
@@ -510,9 +637,17 @@ function publicOrder(o, token) {
 
 const CUSTOMER = Object.freeze({ type: 'customer', id: '' });
 
-async function checkout(sf, { key, body, ticket }) {
-  //  ۲۳.۲: نهایی‌کردنِ سفارش ⇒ شمارهٔ تأییدشده (S133)
-  const verified = phoneOfTicket(ticket);
+/** شمارهٔ تأییدشده: از بلیتِ تازه، وگرنه از نشستِ حسابِ مشتری — یا null. */
+async function verifiedPhone(ticket, session) {
+  const fromTicket = phoneOfTicket(ticket);
+  if (fromTicket) return fromTicket;
+  const a = session ? await require('./store-customers').auth(session) : null;
+  return a ? a.customer.phone : null;
+}
+
+async function checkout(sf, { key, body, ticket, session }) {
+  //  ۲۳.۲: نهایی‌کردنِ سفارش ⇒ شمارهٔ تأییدشده (S133) — بلیت یا نشستِ حساب (S134)
+  const verified = await verifiedPhone(ticket, session);
   if (!verified) throw new ApiError(401, 'verification_required', 'برای ثبتِ سفارش، شمارهٔ خود را تأیید کنید');
   const input = parseCheckout(body, sf);
   if (input.customerPhone !== verified) {
@@ -612,8 +747,8 @@ async function checkVerification(body) {
 }
 
 /** S138: سفارش‌های همین شمارهٔ تأییدشده در همین ویترین — از هر دستگاهی. */
-async function myOrders(sf, ticket) {
-  const phone = phoneOfTicket(ticket);
+async function myOrders(sf, ticket, session = '') {
+  const phone = await verifiedPhone(ticket, session);
   if (!phone) throw new ApiError(401, 'verification_required', 'برای دیدنِ سفارش‌ها، شمارهٔ خود را تأیید کنید');
   const rows = await many(
     `SELECT id, order_no, status, total_minor, items_count, created_at FROM online_orders
@@ -625,6 +760,75 @@ async function myOrders(sf, ticket) {
     orderNo: Number(r.order_no), status: r.status, totalMinor: Number(r.total_minor),
     itemsCount: Number(r.items_count), createdAt: Number(r.created_at), token: tokenOf(sf.shop_id, r.id),
   }));
+}
+
+/**
+ * تاریخچهٔ حسابِ مشتری در همین ویترین — صفحه‌بندیِ کلیدی (تازه‌ترین اول)،
+ * با نامِ چند قلمِ اول. فقط همین شماره و همین دکان (S138).
+ */
+async function ordersOfPhone(sf, phone, { cursor, limit } = {}) {
+  const lim = Math.min(50, Math.max(1, Number.parseInt(limit, 10) || 20));
+  const params = [sf.shop_id, phone];
+  let where = `shop_id = $1 AND source = 'storefront' AND customer_phone = $2`;
+  if (cursor) {
+    const m = /^(\d{1,15})\.([0-9A-Z]{26})$/.exec(String(cursor));
+    if (!m) throw badRequest('نشانگرِ صفحه معتبر نیست', 'bad_cursor');
+    params.push(Number(m[1]), m[2]);
+    where += ` AND (created_at, id) < ($3, $4)`;
+  }
+  params.push(lim + 1);
+  const rows = await many(
+    `SELECT id, order_no, status, fulfillment, total_minor, items_count, scheduled_for, created_at FROM online_orders
+      WHERE ${where} ORDER BY created_at DESC, id DESC LIMIT $${params.length}`,
+    params
+  );
+  const more = rows.length > lim;
+  const page = more ? rows.slice(0, lim) : rows;
+  const names = page.length ? await many(
+    `SELECT order_id, name FROM online_order_lines WHERE shop_id = $1 AND order_id = ANY($2::text[]) AND line_no <= 3
+      ORDER BY order_id, line_no`,
+    [sf.shop_id, page.map((r) => r.id)]
+  ) : [];
+  const last = page[page.length - 1];
+  return {
+    orders: page.map((r) => ({
+      orderNo: Number(r.order_no), status: r.status, fulfillment: r.fulfillment, totalMinor: Number(r.total_minor),
+      itemsCount: Number(r.items_count), createdAt: Number(r.created_at),
+      scheduledFor: r.scheduled_for === null ? null : Number(r.scheduled_for),
+      preview: names.filter((n) => n.order_id === r.id).map((n) => n.name),
+      token: tokenOf(sf.shop_id, r.id),
+    })),
+    nextCursor: more ? `${Number(last.created_at)}.${last.id}` : null,
+  };
+}
+
+/**
+ * WEB-12 — «خریدِ دوباره» با قیمت و موجودیِ امروز: هر قلمِ سفارشِ قبلی با
+ * قیمتِ امروز (یا «دیگر در ویترین نیست»/«ناموجود»). چیزی ساخته نمی‌شود؛
+ * سبد در مرورگر پر می‌شود و ثبت از همان راهِ همیشگی است.
+ */
+async function reorder(sf, token) {
+  const o = await track(sf, token);
+  const ids = o.lines.map((l) => l.productId);
+  const live = await decorate(sf.shop_id, (await liveByIds(sf.shop_id, ids)).map(productView));
+  const byId = new Map(live.map((p) => [p.id, p]));
+  return {
+    orderNo: o.orderNo,
+    lines: o.lines.map((l) => {
+      const p = byId.get(l.productId);
+      const ok = Boolean(p && p.priceMinor !== null && p.name) && shelf.suggestable(p);
+      const qtyMilli = ok && p.maxQtyMilli !== null ? Math.min(l.qtyMilli, p.maxQtyMilli) : l.qtyMilli;
+      return {
+        productId: l.productId, name: ok ? p.name : l.name, unit: ok ? p.unit : l.unit, qtyMilli,
+        previousPriceMinor: l.unitPriceMinor,
+        priceMinor: ok ? p.priceMinor : null,
+        maxQtyMilli: ok ? p.maxQtyMilli : null,
+        available: ok,
+        reason: ok ? '' : (p && p.priceMinor !== null ? 'out_of_stock' : 'not_in_store'),
+        stock: ok ? p.stock : null,
+      };
+    }),
+  };
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -835,7 +1039,7 @@ async function staffProducts(shopId, { cursor, limit } = {}) {
   }
   params.push(lim + 1);
   const rows = await many(
-    `SELECT r.row_id AS id, r.data, sp.published, sp.online_price_minor, sp.max_qty_milli
+    `SELECT r.row_id AS id, r.data, sp.published, sp.online_price_minor, sp.max_qty_milli, sp.description, sp.specs
        FROM sync_rows r
        LEFT JOIN storefront_products sp ON sp.shop_id = r.account_id AND sp.product_id = r.row_id
       WHERE ${where} ORDER BY r.row_id LIMIT $${params.length}`,
@@ -849,6 +1053,8 @@ async function staffProducts(shopId, { cursor, limit } = {}) {
       published: r.published === true,
       onlinePriceMinor: r.online_price_minor === null || r.online_price_minor === undefined ? null : Number(r.online_price_minor),
       active: isActive(r.data),
+      description: text(r.description, 2000),
+      specs: specsOf(r.specs),
     })),
     nextCursor: more ? page[page.length - 1].id : null,
   };
@@ -868,21 +1074,38 @@ async function setProduct(shopId, productId, body, userId) {
   const nullable = (k, field, opts) => (b[k] === null || b[k] === undefined ? null : int(b[k], field, opts));
   const onlinePriceMinor = nullable('onlinePriceMinor', 'قیمتِ آنلاین', { min: 0, max: MAX_PRICE_MINOR });
   const maxQtyMilli = nullable('maxQtyMilli', 'حداکثرِ هر سفارش', { min: 1, max: MAX_QTY_MILLI });
+  //  WEB-08: توضیح و مشخصاتِ عمومی — فقط اگر آمده باشند (برنامه‌های قدیمی‌تر نمی‌فرستند)
+  const has = (k) => Object.prototype.hasOwnProperty.call(b, k);
+  const description = has('description') ? text(b.description, 2000) : null;
+  let specs = null;
+  if (has('specs')) {
+    if (!Array.isArray(b.specs) || b.specs.length > 20) throw badRequest('حداکثر ۲۰ مشخصه', 'bad_specs');
+    specs = specsOf(b.specs);
+  }
   const exists = await one(
     `SELECT 1 FROM sync_rows r WHERE ${SHOP_ROWS} AND r.account_id = $1 AND r.row_id = $2 AND r.deleted_at IS NULL`,
     [shopId, id]
   );
   if (!exists) throw notFound('این کالا در دفترِ دکان نیست', 'product_not_found');
-  await one(
-    `INSERT INTO storefront_products (shop_id, product_id, published, online_price_minor, max_qty_milli, updated_by, updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7)
+  const at = now();
+  const row = await one(
+    `INSERT INTO storefront_products (shop_id, product_id, published, online_price_minor, max_qty_milli, updated_by, updated_at,
+       description, specs, published_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,COALESCE($8,''),COALESCE($9::jsonb,'[]'::jsonb),CASE WHEN $3 THEN $7::bigint END)
      ON CONFLICT (shop_id, product_id) DO UPDATE SET published = EXCLUDED.published,
        online_price_minor = EXCLUDED.online_price_minor, max_qty_milli = EXCLUDED.max_qty_milli,
-       updated_by = EXCLUDED.updated_by, updated_at = EXCLUDED.updated_at
-     RETURNING product_id`,
-    [shopId, id, published, onlinePriceMinor, maxQtyMilli, userId || '', now()]
+       updated_by = EXCLUDED.updated_by, updated_at = EXCLUDED.updated_at,
+       description = COALESCE($8, storefront_products.description),
+       specs = COALESCE($9::jsonb, storefront_products.specs),
+       published_at = COALESCE(storefront_products.published_at, EXCLUDED.published_at)
+     RETURNING product_id, description, specs`,
+    [shopId, id, published, onlinePriceMinor, maxQtyMilli, userId || '', at, description,
+      specs === null ? null : JSON.stringify(specs)]
   );
-  return { productId: id, published, onlinePriceMinor, maxQtyMilli };
+  return {
+    productId: id, published, onlinePriceMinor, maxQtyMilli,
+    description: text(row.description, 2000), specs: specsOf(row.specs),
+  };
 }
 
 /** میزبانِ `<slug>.<دامنه>` ⇒ slug؛ وگرنه ''. */
@@ -899,6 +1122,7 @@ function slugFromHost(host) {
 module.exports = {
   FLAG_KEY, FEATURE_KEY, SLUG_RE, RESERVED,
   normalize, slugOf, slugFromHost, stateOf, open, profile, categories, catalog, photo,
+  highlights, productDetail, reorder, ordersOfPhone, verifiedPhone,
   localParts, presenceOf, statusOf,
   parseCheckout, checkout, track, cancel, tokenOf, orderIdOf,
   ticketOf, phoneOfTicket, verificationAvailable, startVerification, checkVerification, myOrders,

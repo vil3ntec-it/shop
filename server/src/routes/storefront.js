@@ -16,11 +16,13 @@
 const express = require('express');
 const config = require('../config');
 const sf = require('../lib/storefront');
+const sfd = require('../lib/storefront-delivery');
+const customers = require('../lib/store-customers');
 const orders = require('../lib/orders');
 const audit = require('../lib/audit');
 const { sniff } = require('../lib/product-photos');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
-const { notFound } = require('../middleware/errors');
+const { notFound, ApiError } = require('../middleware/errors');
 
 const router = express.Router();
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
@@ -38,10 +40,40 @@ const store = wrap(async (req, res, next) => {
 });
 
 const ticketOf = (req) => req.get('x-store-ticket') || '';
+const sessionOf = (req) => req.get('x-store-session') || '';
+
+/** حسابِ مشتری (نشستِ `X-Store-Session`) — یا ۴۰۱. */
+const customer = wrap(async (req, res, next) => {
+  const a = await customers.auth(sessionOf(req));
+  if (!a) throw new ApiError(401, 'session_required', 'برای این کار وارد حسابِ خود شوید');
+  req.customer = a.customer;
+  req.session = a;
+  next();
+});
 
 router.get('/:slug', readLimit, store, wrap(async (req, res) => {
-  const [cats, status] = await Promise.all([sf.categories(req.store.shop_id), sf.statusOf(req.store)]);
-  res.json({ store: sf.profile(req.store, cats, status), verification: { available: await sf.verificationAvailable() } });
+  const [cats, status, delivery] = await Promise.all([
+    sf.categories(req.store.shop_id), sf.statusOf(req.store), sfd.publicInfo(req.store),
+  ]);
+  res.json({
+    store: { ...sf.profile(req.store, cats, status), delivery },
+    verification: { available: await sf.verificationAvailable() },
+  });
+}));
+
+//  ── WEB-02: پرفروش‌ها و تازه‌ها (دادهٔ واقعی؛ نبود ⇒ خالی) ───────────
+router.get('/:slug/highlights', readLimit, store, wrap(async (req, res) => {
+  res.json(await sf.highlights(req.store.shop_id));
+}));
+
+//  ── CHK-07/10: کدام ناحیه؟ (بی ذخیره، بی ژئوکدر) ────────────────────
+router.get('/:slug/delivery', readLimit, store, wrap(async (req, res) => {
+  res.json(await sfd.locate(req.store, req.query.lat, req.query.lng));
+}));
+
+//  ── CHK-12: بازه‌های پیشِ رو — فقط «هست/پر/کم مانده» ─────────────────
+router.get('/:slug/slots', readLimit, store, wrap(async (req, res) => {
+  res.json(await sfd.publicSlots(req.store, String(req.query.fulfillment || '')));
 }));
 
 router.get('/:slug/products', readLimit, store, wrap(async (req, res) => {
@@ -50,15 +82,24 @@ router.get('/:slug/products', readLimit, store, wrap(async (req, res) => {
   }));
 }));
 
-router.get('/:slug/products/:id/photo', readLimit, store, wrap(async (req, res) => {
-  const p = await sf.photo(req.store.shop_id, req.params.id);
+//  ── WEB-08: صفحهٔ کالا ───────────────────────────────────────────────
+router.get('/:slug/products/:id', readLimit, store, wrap(async (req, res) => {
+  res.json(await sf.productDetail(req.store.shop_id, req.params.id));
+}));
+
+/** عکس: `display` برای صفحهٔ کالا، `thumb` برای کارت (WEB-16). */
+const picture = (size) => wrap(async (req, res) => {
+  const p = await sf.photo(req.store.shop_id, req.params.id, size);
   if (!p) throw notFound('عکس نیست', 'photo_not_found');
   const etag = `"${p.hash}"`;
+  //  پاسخ‌های JSON ِ ویترین کش نمی‌شوند؛ عکس با ETag ِ محتوا می‌شود
   res.set('Cache-Control', 'public, max-age=300');
   res.set('ETag', etag);
   if (req.get('if-none-match') === etag) return res.status(304).end();
-  res.type(sniff(p.data) || 'application/octet-stream').send(p.data);
-}));
+  res.type(p.mime || sniff(p.data) || 'application/octet-stream').send(p.data);
+});
+router.get('/:slug/products/:id/photo', readLimit, store, picture('display'));
+router.get('/:slug/products/:id/thumb', readLimit, store, picture('thumb'));
 
 //  ── ۲۳: تأییدِ شماره پیش از ثبتِ سفارش ──────────────────────────────
 router.post('/:slug/verify/start', sendCodeLimit, store, wrap(async (req, res) => {
@@ -72,7 +113,7 @@ router.post('/:slug/verify/check', codeLimit, store, wrap(async (req, res) => {
 //  ── ثبت: فقط از راهِ `orders.create` با کلیدِ یکتایی (CHK-19) ───────
 router.post('/:slug/checkout', checkoutLimit, store, wrap(async (req, res) => {
   const key = orders.clientKeyOf(req);
-  const out = await sf.checkout(req.store, { key, body: req.body, ticket: ticketOf(req) });
+  const out = await sf.checkout(req.store, { key, body: req.body, ticket: ticketOf(req), session: sessionOf(req) });
   if (out.replayed) {
     res.set('Idempotent-Replayed', 'true');
     return res.status(200).json({ order: out.order, replayed: true });
@@ -87,11 +128,73 @@ router.post('/:slug/checkout', checkoutLimit, store, wrap(async (req, res) => {
 }));
 
 router.get('/:slug/orders', readLimit, store, wrap(async (req, res) => {
-  res.json({ orders: await sf.myOrders(req.store, ticketOf(req)) });
+  res.json({ orders: await sf.myOrders(req.store, ticketOf(req), sessionOf(req)) });
 }));
 
 router.get('/:slug/orders/:token', readLimit, store, wrap(async (req, res) => {
   res.json({ order: await sf.track(req.store, req.params.token) });
+}));
+
+//  WEB-12: «خریدِ دوباره» — همان توکنِ پیگیری؛ فقط خواندن
+router.get('/:slug/orders/:token/reorder', readLimit, store, wrap(async (req, res) => {
+  res.json(await sf.reorder(req.store, req.params.token));
+}));
+
+//  ── حسابِ مشتری (۲۳، CHK-01/02/09، S134/S138/S140) ───────────────────
+//  ساختن یا ورود فقط با بلیتِ تازهٔ «شماره تأیید شد»
+router.post('/:slug/account', checkoutLimit, store, wrap(async (req, res) => {
+  const phone = sf.phoneOfTicket(ticketOf(req));
+  if (!phone) throw new ApiError(401, 'verification_required', 'اول شمارهٔ خود را با کد تأیید کنید');
+  const out = await customers.signIn(phone, { name: req.body && req.body.name });
+  await audit.log({
+    shopId: req.store.shop_id, actorType: 'customer', action: 'store_customer.sign_in',
+    targetType: 'store_customer', targetId: out.customer.id, detail: {}, ip: clientIp(req),
+  });
+  res.status(201).json({ session: out.token, expiresAt: out.expiresAt, customer: out.customer });
+}));
+
+router.get('/:slug/account', readLimit, store, customer, wrap(async (req, res) => {
+  res.json({
+    customer: customers.view(req.customer), expiresAt: req.session.expiresAt,
+    addresses: await customers.addresses(req.customer),
+  });
+}));
+
+router.put('/:slug/account', checkoutLimit, store, customer, wrap(async (req, res) => {
+  res.json({ customer: await customers.rename(req.customer, req.body) });
+}));
+
+router.delete('/:slug/account', checkoutLimit, store, customer, wrap(async (req, res) => {
+  const out = await customers.remove(req.customer);
+  await audit.log({
+    shopId: req.store.shop_id, actorType: 'customer', action: 'store_customer.delete',
+    targetType: 'store_customer', targetId: req.customer.id, detail: {}, ip: clientIp(req),
+  });
+  res.json(out);
+}));
+
+router.post('/:slug/account/logout', checkoutLimit, store, wrap(async (req, res) => {
+  res.json(await customers.signOut(sessionOf(req)));
+}));
+
+router.get('/:slug/account/orders', readLimit, store, customer, wrap(async (req, res) => {
+  res.json(await sf.ordersOfPhone(req.store, req.customer.phone, { cursor: req.query.cursor, limit: req.query.limit }));
+}));
+
+router.get('/:slug/account/addresses', readLimit, store, customer, wrap(async (req, res) => {
+  res.json({ addresses: await customers.addresses(req.customer) });
+}));
+
+router.post('/:slug/account/addresses', checkoutLimit, store, customer, wrap(async (req, res) => {
+  res.status(201).json({ address: await customers.addAddress(req.customer, req.body) });
+}));
+
+router.put('/:slug/account/addresses/:id', checkoutLimit, store, customer, wrap(async (req, res) => {
+  res.json({ address: await customers.updateAddress(req.customer, req.params.id, req.body) });
+}));
+
+router.delete('/:slug/account/addresses/:id', checkoutLimit, store, customer, wrap(async (req, res) => {
+  res.json(await customers.removeAddress(req.customer, req.params.id));
 }));
 
 router.post('/:slug/orders/:token/cancel', checkoutLimit, store, wrap(async (req, res) => {

@@ -290,6 +290,8 @@ const config = {
     offlineMs: num(process.env.STORE_PRESENCE_OFFLINE_MIN, 60) * 60 * 1000,
     //  ۲۳.۴ — شمارهٔ تأییدشدهٔ مشتری چند روز بی کدِ تازه می‌ماند
     ticketTtlMs: num(process.env.STORE_CUSTOMER_TICKET_DAYS, 14) * 24 * 60 * 60 * 1000,
+    //  CHK-02 — نشستِ حسابِ مشتری (لغوشدنی) چند روز می‌ماند
+    customerSessionDays: num(process.env.STORE_CUSTOMER_SESSION_DAYS, 180),
   },
 
   // CORS_ORIGIN چند دامنه را با کاما می‌پذیرد. برنامه‌ی اندروید به CORS
