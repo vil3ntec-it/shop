@@ -224,7 +224,7 @@
     K.save(KEY_CART, cart);
     if (store) K.save(K.cartMetaKey(slug), { title: store.title, accent: store.accent, at: Date.now() });
     renderBar();
-    if (K.sheetOpen() === $('cart-sheet')) renderSheet();
+    if (cartOpen()) renderSheet();
     if (!$('view-checkout').hidden) renderCheckout();
   }
   function addOne(p) {
@@ -232,6 +232,7 @@
     if (p.maxQtyMilli && cur + 1000 > p.maxQtyMilli) { K.toast('حداکثرِ هر سفارش: ' + K.qty(p.maxQtyMilli)); return; }
     var focused = document.activeElement && document.activeElement.classList && document.activeElement.classList.contains('p-add');
     setQty(p.id, cur + 1000, p);
+    if (isPhone() && navigator.vibrate) { try { navigator.vibrate(8); } catch (e) { /* بی لرزش */ } }
     var li = document.querySelector('#products li[data-id="' + CSS.escape(p.id) + '"] .p-add');
     if (focused && li) li.focus();
   }
@@ -263,18 +264,79 @@
     return t;
   }
 
+  // ── گوشی: مدلِ مرجعِ صاحب محصول (phone-v3 r3 بسته / r2 باز) ──
+  //  با سبدِ پُر، پایهٔ صفحه سیاه است و کاتالوگ روی سطحِ روشن با گوشه‌های گردِ پایین؛
+  //  زدنِ نوار سطح را بالا می‌برد و سبد روی پایهٔ سیاه پیدا می‌شود. کامپیوتر/تبلت همان کشو.
+  var PHONE = window.matchMedia('(max-width: 599px)');
+  var phoneOpen = false; var editing = ''; var lastQty = 0; var shownIds = {};
+  function isPhone() { return PHONE.matches; }
+  function cartOpen() { return phoneOpen || K.sheetOpen() === $('cart-sheet'); }
+  /** پایهٔ سیاه فقط در گوشی، در کاتالوگ و با سبدِ پُر؛ جای پیمایش حفظ می‌شود. */
+  function applyMode() {
+    var onCatalog = !$('view-catalog').hidden;
+    var want = isPhone() && ids().length > 0 && onCatalog;
+    var on = document.body.classList.contains('phone-cart');
+    if (want === on) return;
+    var y = on ? $('surface').scrollTop : window.scrollY;
+    document.body.classList.toggle('phone-cart', want);
+    if (want) $('surface').scrollTop = y;
+    else if (onCatalog) window.scrollTo(0, y);
+  }
+  function openCart() {
+    renderSheet();
+    if (!ids().length) return;
+    if (document.body.classList.contains('phone-cart')) {
+      if (!phoneOpen) {
+        phoneOpen = true;
+        $('cart-sheet').hidden = false; $('surface-cap').hidden = false;
+        $('surface').inert = true;
+        requestAnimationFrame(function () { document.body.classList.add('cart-open'); });
+        setTimeout(function () { $('cart-title').focus(); }, 60);
+      }
+    } else if (K.sheetOpen() !== $('cart-sheet')) K.openSheet($('cart-sheet'), closeToCatalog);
+    renderBar();
+  }
+  function closeCart() {
+    editing = '';
+    if (phoneOpen) {
+      phoneOpen = false;
+      document.body.classList.remove('cart-open');
+      $('surface').inert = false;
+      $('surface-cap').hidden = true;
+      setTimeout(function () { if (!phoneOpen) $('cart-sheet').hidden = true; }, 360);
+      renderBar();
+      if (!$('cart-bar').hidden) $('cart-bar').focus();
+    } else if (K.sheetOpen() === $('cart-sheet')) K.closeSheet(true);
+  }
+  function closeAll() { closeCart(); if (K.sheetOpen()) K.closeSheet(true); }
+
   function renderBar() {
+    applyMode();
     var n = ids().length;
     var bar = $('cart-bar');
     var onCatalog = !$('view-catalog').hidden;
-    bar.hidden = n === 0 || !onCatalog || K.sheetOpen() === $('cart-sheet');
+    bar.hidden = n === 0 || !onCatalog || (K.sheetOpen() === $('cart-sheet'));
+    bar.inert = phoneOpen;
     document.body.classList.toggle('has-bar', !bar.hidden);
-    if (!n) return;
+    if (!n) { lastQty = 0; shownIds = {}; return; }
     var th = K.clear($('bar-thumbs'));
-    ids().slice(0, 3).forEach(function (id) { th.appendChild(thumb(id, cart[id])); });
+    var seen = {};
+    ids().slice(0, 3).forEach(function (id) {
+      var t = thumb(id, cart[id]);
+      if (!shownIds[id] && lastQty) t.classList.add('pop');
+      seen[id] = true;
+      th.appendChild(t);
+    });
+    shownIds = seen;
+    $('bar-more').hidden = n <= 3;
+    $('bar-more').textContent = '+' + K.fa(n - 3, 0);
     $('bar-total').textContent = K.money(subtotal());
-    $('open-cart').textContent = K.fa(n, 0);
-    $('bar-label').textContent = '، ' + K.fa(n, 0) + ' قلم — باز کردنِ سبد';
+    var count = $('open-cart');
+    count.textContent = K.fa(n, 0);
+    var q = ids().reduce(function (s, id) { return s + cart[id].qtyMilli; }, 0);
+    if (lastQty && q > lastQty) { count.classList.remove('bump'); void count.offsetWidth; count.classList.add('bump'); }
+    lastQty = q;
+    $('bar-label').textContent = '، ' + K.fa(n, 0) + ' قلم، جمع ' + K.money(subtotal()) + ' — باز کردنِ سبد';
   }
 
   function renderSheet() {
@@ -285,12 +347,16 @@
       var minus = el('button', { attrs: { type: 'button', 'aria-label': 'یکی کمتر ' + l.name }, on: { click: function () { setQty(id, l.qtyMilli - 1000); } } }, K.icon('minus'));
       var plus = el('button', { attrs: { type: 'button', 'aria-label': 'یکی بیشتر ' + l.name }, on: { click: function () { setQty(id, l.qtyMilli + 1000); } } }, K.icon('plus'));
       if (l.maxQtyMilli && l.qtyMilli + 1000 > l.maxQtyMilli) plus.disabled = true;
-      ul.appendChild(el('li', { class: 'cline' + (l.unavailable ? ' bad' : '') },
-        thumb(id, l),
-        el('span', { class: 'body' },
-          el('span', { class: 'name' }, l.name, el('small', { text: l.unavailable ? 'دیگر در ویترین نیست — بردارید' : K.money(l.priceMinor) + (l.unit ? ' / ' + l.unit : '') })),
-          el('span', { class: 'stepper' }, minus, el('output', { text: K.qty(l.qtyMilli), attrs: { 'aria-live': 'polite' } }), plus)),
-        el('span', { class: 'price num', text: K.money(K.lineTotal(l.qtyMilli, l.priceMinor)) })));
+      var main = el('button', {
+        class: 'cline-main', attrs: { type: 'button', 'aria-expanded': String(editing === id), 'aria-label': l.name + '، ' + K.qty(l.qtyMilli) + ' ' + (l.unit || 'عدد') + '، ' + K.money(K.lineTotal(l.qtyMilli, l.priceMinor)) + ' — تغییرِ تعداد' },
+        on: { click: function () { editing = editing === id ? '' : id; renderSheet(); } },
+      },
+      thumb(id, l),
+      el('span', { class: 'q num', text: K.qty(l.qtyMilli) + ' ×' }),
+      el('span', { class: 'name' }, l.name, el('small', { text: l.unavailable ? 'دیگر در ویترین نیست — بردارید' : K.money(l.priceMinor) + (l.unit ? ' / ' + l.unit : '') })),
+      el('span', { class: 'price num', text: K.money(K.lineTotal(l.qtyMilli, l.priceMinor)) }));
+      ul.appendChild(el('li', { class: 'cline' + (l.unavailable ? ' bad' : '') + (editing === id ? ' editing' : '') },
+        main, el('span', { class: 'stepper' }, minus, el('output', { text: K.qty(l.qtyMilli), attrs: { 'aria-live': 'polite' } }), plus)));
     });
     var sub = subtotal();
     var f = defaultFulfillment();
@@ -313,7 +379,7 @@
     var m = $('sheet-msg');
     if (block) K.note(m, 'warn', block); else m.hidden = true;
     $('cart-next').disabled = Boolean(block) || ids().length === 0;
-    if (!ids().length) { K.closeSheet(); closeToCatalog(); }
+    if (!ids().length) { closeCart(); closeToCatalog(); }
   }
 
   /** WEB-12/۳۲.۳: قیمت و «هنوز در ویترین» ِ سبد با سرور تازه می‌شود؛ بی‌صدا عوض نمی‌شود. */
@@ -337,7 +403,7 @@
 
   function closeToCatalog() {
     if (/^#\/(cart|p\/)/.test(location.hash)) history.replaceState(null, '', location.pathname + location.search + '#/');
-    if (K.sheetOpen()) K.closeSheet(true);
+    closeAll();
     renderBar();
   }
 
@@ -637,21 +703,20 @@
   function route() {
     if (!store) return;
     var h = location.hash || '#/';
-    if (h.indexOf('#/o/') === 0) { if (K.sheetOpen()) K.closeSheet(true); return openOrder(h.slice(4)); }
+    if (h.indexOf('#/o/') === 0) { closeAll(); return openOrder(h.slice(4)); }
     clearTimeout(pollTimer);
-    if (h === '#/orders') { if (K.sheetOpen()) K.closeSheet(true); return openOrders(); }
-    if (h === '#/checkout') { if (K.sheetOpen()) K.closeSheet(true); return openCheckout(); }
+    if (h === '#/orders') { closeAll(); return openOrders(); }
+    if (h === '#/checkout') { closeAll(); return openCheckout(); }
     if ($('view-catalog').hidden) show('view-catalog');
     document.title = store.title;
     if (h === '#/cart') {
       if (!ids().length) { closeToCatalog(); return; }
-      renderSheet();
-      if (K.sheetOpen() !== $('cart-sheet')) K.openSheet($('cart-sheet'), closeToCatalog);
-      renderBar();
+      if (K.sheetOpen() && K.sheetOpen() !== $('cart-sheet')) K.closeSheet(true);
+      openCart();
       return;
     }
-    if (h.indexOf('#/p/') === 0) return openProduct(decodeURIComponent(h.slice(4)));
-    if (K.sheetOpen()) K.closeSheet(true);
+    if (h.indexOf('#/p/') === 0) { closeCart(); return openProduct(decodeURIComponent(h.slice(4))); }
+    closeAll();
     renderBar();
   }
 
@@ -698,9 +763,13 @@
     $('clear-search').addEventListener('click', function () { catalog.q = ''; catalog.category = ''; $('q').value = ''; renderCats(); loadProducts(false); });
     $('more').addEventListener('click', function () { loadProducts(true); });
     $('cart-bar').addEventListener('click', function () { location.hash = '#/cart'; });
-    $('cart-close').addEventListener('click', function () { K.closeSheet(); });
+    $('cart-close').addEventListener('click', function () { closeCart(); closeToCatalog(); });
+    $('surface-cap').addEventListener('click', function () { closeCart(); closeToCatalog(); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && phoneOpen) { e.preventDefault(); closeCart(); closeToCatalog(); } });
+    PHONE.addEventListener('change', function () { if (phoneOpen) { closeCart(); closeToCatalog(); } renderBar(); });
+    $('surface').addEventListener('scroll', function () { document.querySelector('.appbar').classList.toggle('scrolled', $('surface').scrollTop > 120); }, { passive: true });
     $('ps-close').addEventListener('click', function () { K.closeSheet(); });
-    $('cart-next').addEventListener('click', function () { K.closeSheet(true); location.hash = '#/checkout'; });
+    $('cart-next').addEventListener('click', function () { closeCart(); location.hash = '#/checkout'; });
     Array.prototype.forEach.call(document.querySelectorAll('input[name="fulfillment"]'), function (r) { r.addEventListener('change', renderCheckout); });
     $('c-phone').addEventListener('input', renderCheckout);
     $('verify-send').addEventListener('click', sendCode);

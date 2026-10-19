@@ -32,14 +32,17 @@
   --info-tint: rgba(37, 99, 235, .10);
   --zone-nav: #E9ECF3;
   --zone-cart: #EFECFD;
-  /* برگهٔ تیرهٔ سبد (PhoneSheet.kt) */
-  --sheet: #17151F;
+  /* سبد = مدلِ مرجعِ صاحب محصول (phone-v3 r2/r3، PhoneV3.kt): پایهٔ سیاه، دایره و دکمهٔ زرد */
+  --sheet: #0D0D0F;
   --on-sheet: #FFFFFF;
-  --on-sheet-muted: #B8B3CC;
-  --sheet-accent: #B9A6FF;
-  --on-sheet-accent: #17151F;
-  --sheet-line: rgba(255, 255, 255, .14);
-  --sheet-raised: rgba(255, 255, 255, .08);
+  --on-sheet-muted: #9A9AA3;
+  --sheet-accent: #FFC24A;
+  --on-sheet-accent: #111114;
+  --sheet-line: rgba(255, 255, 255, .10);
+  --sheet-raised: #1F1F23;
+  --surface-radius: 36px;
+  --strip-h: 96px;
+  --spring: cubic-bezier(.32, 1.25, .5, 1);
   --scrim: rgba(12, 22, 38, .55);
   --shadow-1: 0 1px 2px rgba(16, 24, 40, .04), 0 4px 14px rgba(16, 24, 40, .06);
   --shadow-2: 0 10px 30px rgba(16, 24, 40, .12);
@@ -77,11 +80,11 @@
     --info-tint: rgba(134, 180, 255, .14);
     --zone-nav: #0A0C11;
     --zone-cart: #1A1830;
-    --sheet: #221F33;
-    --on-sheet: #F0EEF8;
-    --on-sheet-muted: #B3AEC8;
-    --sheet-accent: #A78BFF;
-    --on-sheet-accent: #14102A;
+    --sheet: #000000;
+    --on-sheet: #FFFFFF;
+    --on-sheet-muted: #9A9AA3;
+    --sheet-accent: #FFC24A;
+    --on-sheet-accent: #111114;
     --scrim: rgba(2, 5, 9, .7);
     --shadow-1: 0 1px 2px rgba(0, 0, 0, .3), 0 4px 14px rgba(0, 0, 0, .25);
     --shadow-2: 0 10px 30px rgba(0, 0, 0, .45);
