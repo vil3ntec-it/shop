@@ -12,6 +12,10 @@
  *     ثبت‌نام است؛ نشانه‌اش نبودنِ ردیفِ `user_apps` برای آن بخش. دادهٔ هر
  *     بخش جداست، پس ورودِ نخست به بخشِ خالی به دفترِ بخشِ دیگر راه ندارد؛
  *     ورودِ بعدی از دستگاهِ تازه به هر دو بخش هشدار می‌سازد.
+ *   • حسابی که کمتر از چند دقیقه (`LOGIN_ALERT_GRACE_MIN`، پیش‌فرض ده) از
+ *     ساختش گذشته هشدار نمی‌گیرد: صاحبِ تازه همان دقیقه‌ها گوشی، کامپیوتر و
+ *     وب را راه می‌اندازد و هر کدام «دستگاهِ تازه» است — هشدارِ بی‌جا فقط
+ *     عادت می‌دهد که هشدار نادیده گرفته شود.
  *
  * ── «مکان» به زبانِ راست ──────────────────────────────────────────
  * سرور پایگاهِ داده‌ای برای IP → شهر ندارد. پس «مکان» همان شبکه (پیشوندِ
@@ -54,6 +58,8 @@ function networkLabel(ip) {
  */
 async function before(user, deviceUid, ip, app = 'shop') {
   if (!enabled() || !user) return null;
+  const grace = Math.max(0, Number(config.loginAlertGraceMs) || 0);
+  if (Number(user.created_at || 0) > now() - grace) return null;
   try {
     const been = await one('SELECT 1 AS ok FROM user_apps WHERE user_id=$1 AND app=$2', [user.id, app || 'shop']);
     if (!been) return null;

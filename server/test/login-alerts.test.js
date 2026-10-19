@@ -10,7 +10,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const h = require('./helpers');
 const config = require('../src/config');
-const { many } = require('../src/db');
+const { many, query } = require('../src/db');
 
 test.before(async () => { await h.start(); });
 test.after(async () => {
@@ -19,6 +19,12 @@ test.after(async () => {
   await h.stop();
 });
 
+/** حسابی که از ساختش ساعتی گذشته — پنجرهٔ راه‌اندازیِ حسابِ تازه تمام شده */
+async function settledUser(name) {
+  const u = await h.newUser(name);
+  await query('UPDATE users SET created_at = created_at - 3600000 WHERE id=$1', [u.user.id]);
+  return u;
+}
 const alertsOf = (userId) => many(
   `SELECT d.* FROM notice_deliveries d JOIN notices n ON n.id = d.notice_id
     WHERE n.template_key='login_new' AND d.user_id=$1 ORDER BY d.created_at`, [userId]
@@ -28,7 +34,7 @@ const login = (u, extra = {}, headers = {}) => h.api('POST', '/api/auth/login', 
 });
 
 test('ثبت‌نام هشدار نیست؛ ورود از دستگاهِ تازه یک اعلانِ داخلِ برنامه می‌سازد', async () => {
-  const u = await h.newUser('هشدار');
+  const u = await settledUser('هشدار');
   assert.equal((await alertsOf(u.user.id)).length, 0, 'نخستین ورود هشدار ندارد');
 
   const r = await login(u, { device: { deviceId: 'dev-new-phone', name: 'گوشیِ تازه', platform: 'android' } });
@@ -51,7 +57,7 @@ test('ثبت‌نام هشدار نیست؛ ورود از دستگاهِ تاز�
 });
 
 test('بی شناسهٔ دستگاه: شبکهٔ آشنا ساکت، شبکهٔ تازه هشدار', async () => {
-  const u = await h.newUser('بی‌دستگاه');
+  const u = await settledUser('بی‌دستگاه');
   assert.equal((await login(u)).status, 200);
   assert.equal((await alertsOf(u.user.id)).length, 0, 'همان شبکهٔ دستگاهِ ثبت‌نام');
 
@@ -68,10 +74,10 @@ test('بی شناسهٔ دستگاه: شبکهٔ آشنا ساکت، شبکهٔ 
 });
 
 test('هشدارِ صاحب به شاگردِ همان دکان نمی‌رسد', async () => {
-  const owner = await h.newUser('صاحبِ هشدار');
+  const owner = await settledUser('صاحبِ هشدار');
   await h.post('/api/shop', { name: 'دکانِ هشدار' }, { token: owner.accessToken });
   const code = (await h.get('/api/shop/staff-code', { token: owner.accessToken })).body.code;
-  const staff = await h.newUser('شاگردِ هشدار');
+  const staff = await settledUser('شاگردِ هشدار');
   assert.ok([200, 201].includes((await h.post('/api/shop/join', { code }, { token: staff.accessToken })).status));
 
   assert.equal((await login(owner, { device: { deviceId: 'dev-owner-laptop', name: 'لپ‌تاپ', platform: 'desktop' } })).status, 200);
@@ -87,7 +93,7 @@ test('پیامک/ایمیل نمی‌رود؛ کلیدِ بازگشت (LOGIN_ALE
   assert.ok(all.length >= 3);
   assert.ok(all.every((r) => r.channel === 'inapp'));
 
-  const u = await h.newUser('خاموش');
+  const u = await settledUser('خاموش');
   config.loginAlerts = false;
   try {
     assert.equal((await login(u, { device: { deviceId: 'dev-off', name: 'x', platform: 'test' } })).status, 200);
@@ -98,7 +104,7 @@ test('پیامک/ایمیل نمی‌رود؛ کلیدِ بازگشت (LOGIN_ALE
 });
 
 test('نخستین ورود به بخشِ دیگر (پمپ) مثلِ ثبت‌نام است؛ دستگاهِ تازهٔ بعدی در همان بخش هشدار دارد', async () => {
-  const u = await h.newUser('دوبخشی‌هشدار');
+  const u = await settledUser('دوبخشی‌هشدار');
   const pump = await h.signIn(u, 'pump');
   assert.ok(pump.accessToken);
   assert.equal((await alertsOf(u.user.id)).length, 0);
@@ -107,4 +113,13 @@ test('نخستین ورود به بخشِ دیگر (پمپ) مثلِ ثبت‌ن
   const rows = await alertsOf(u.user.id);
   assert.equal(rows.length, 1);
   assert.equal(rows[0].app, 'pump', 'هشدار در همان بخشی که ورود شد');
+});
+
+test('حسابِ تازه‌ساخته (کمتر از ده دقیقه) دستگاه‌هایش را بی هشدار راه می‌اندازد', async () => {
+  const u = await h.newUser('تازه‌ساخته');
+  assert.equal((await login(u, { device: { deviceId: 'dev-onboard-2', name: 'کامپیوتر', platform: 'desktop' } })).status, 200);
+  assert.equal((await alertsOf(u.user.id)).length, 0);
+  await query('UPDATE users SET created_at = created_at - 3600000 WHERE id=$1', [u.user.id]);
+  assert.equal((await login(u, { device: { deviceId: 'dev-onboard-3', name: 'گوشیِ سوم', platform: 'android' } })).status, 200);
+  assert.equal((await alertsOf(u.user.id)).length, 1, 'پس از پنجره، دستگاهِ تازه هشدار دارد');
 });

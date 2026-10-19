@@ -144,6 +144,8 @@ const config = {
   //  هشدارِ ورود از دستگاه/شبکهٔ تازه (بندِ ۲۱.۱) — `lib/login-alerts.js`؛
   //  `LOGIN_ALERTS=off` کلیدِ بازگشت است
   loginAlerts: bool(process.env.LOGIN_ALERTS, true),
+  //  حسابِ تازه‌ساخته در این چند دقیقه دستگاه‌هایش را راه می‌اندازد — هشدار نه
+  loginAlertGraceMs: num(process.env.LOGIN_ALERT_GRACE_MIN, 10) * 60 * 1000,
 
   google: {
     //  همه‌ی شناسه‌های پذیرفته‌شده — سنجشِ توکن هر کدام را قبول می‌کند.
