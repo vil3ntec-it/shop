@@ -127,18 +127,42 @@ class ApiClient(
         token = null,
       )
     } catch (failure: ApiFailure) {
-      //  «نت نیست» یعنی نشست هنوز سالم است و فقط الان نمی‌شود؛ حساب را
-      //  به‌خاطرِ یک قطعیِ گذرا پاک نمی‌کنیم
-      if (failure.retryable) throw failure
+      /*
+       *  فقط «سرور خودش گفت این توکن مرده» (۴۰۱) نشست را می‌بندد.
+       *
+       *  تا امروز هر خطای غیرِ گذرا نشست را پاک می‌کرد: ۴۲۹ِ سقفِ نرخ،
+       *  صفحهٔ HTMLِ وای‌فایِ هتل یا اپراتور (۲۰۰ ولی نه JSON)، ۴۰۳ِ یک
+       *  پراکسی… هیچ‌کدام دربارهٔ خودِ توکن چیزی نمی‌گویند و کاربر بی‌دلیل
+       *  بیرون می‌افتاد (بندِ ۲۳.۴ و ۲۱.۱ سندِ v3). نشست می‌ماند و خطا بالا
+       *  می‌رود؛ درخواستِ بعدی دوباره امتحان می‌کند.
+       */
+      if (failure.status != 401) throw failure
       forgetSession()
       throw ApiFailure.SessionExpired()
     }
 
-    val access = (body["accessToken"] as? JsonPrimitive)?.content?.takeIf { it.isNotBlank() }
-      ?: run { forgetSession(); throw ApiFailure.SessionExpired() }
+    val access = ApiJson.text(body, "accessToken").ifBlank { ApiJson.text(body, "access_token") }
+      .takeIf { it.isNotBlank() }
+      ?: throw ApiFailure.InvalidResponse("توکنِ تازه نیامد")
 
-    val expiresAt = (body["accessExpiresAt"] as? JsonPrimitive)?.content?.toLongOrNull() ?: 0
-    tokens.save(access = access, refresh = null, expiresAt = expiresAt)
+    /*
+     *  ⛔ توکنِ تازه‌سازیِ **چرخیده** ذخیره می‌شود.
+     *
+     *  سرور در هر تازه‌سازی توکنِ تازه‌سازیِ تازه می‌دهد و قبلی را می‌بندد
+     *  (`lib/tokens.rotateRefresh`)؛ اگر قبلی بیرون از پنجرهٔ ارفاقِ سی‌ثانیه‌ای
+     *  برگردد، «دزدی» حساب می‌شود و کلِ نشستِ این دستگاه بسته می‌شود. این‌جا
+     *  تا امروز `refresh = null` بود — یعنی همیشه همان توکنِ اولِ ورود
+     *  می‌رفت و دومین تازه‌سازی (حدودِ دو ساعت کار، یا فردای همان روز)
+     *  کاربر را بیرون می‌انداخت. نیامدنش هنوز یعنی «عوض نشده».
+     */
+    val rotated = ApiJson.text(body, "refreshToken").ifBlank { ApiJson.text(body, "refresh_token") }
+      .takeIf { it.isNotBlank() }
+
+    val expiresAt = (body["accessExpiresAt"] as? JsonPrimitive)?.content?.toLongOrNull()
+      ?: (body["access_expires_in"] as? JsonPrimitive)?.content?.toLongOrNull()
+        ?.let { System.currentTimeMillis() + it * 1000 }
+      ?: 0
+    tokens.save(access = access, refresh = rotated, expiresAt = expiresAt)
     access
   }
 
