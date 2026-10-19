@@ -219,6 +219,25 @@ jobs:
         working-directory: server
         run: npm run test:web-store
 
+      # سناریوهای سرتاسری (E2E-*، S*): دستگاه‌های برنامهٔ دکان در سطحِ پروتکل (همان opها، JSON و
+      # سرآیندهای اندروید/کامپیوتر)، ویترین و پنلِ مدیر در کرومیوم. هر سناریو PGlite ِ خودش را دارد
+      # و چند تا هم‌زمان می‌دوند (TEST_DATABASE_URL ِ بالا را نمی‌خوانند). جدولِ گام‌ها در لاگ؛
+      # «شکافِ شناخته» (test/e2e/lib/known-gaps.mjs) قرمز نیست ولی دیده می‌شود.
+      - name: سناریوهای سرتاسری (E2E)
+        working-directory: server
+        env:
+          E2E_RESULTS_DIR: ${{ runner.temp }}/e2e
+        run: npm run test:e2e
+
+      - name: نتیجه و عکس‌های سناریوهای سرتاسری
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results
+          path: ${{ runner.temp }}/e2e
+          if-no-files-found: ignore
+          retention-days: 14
+
       # باتِ پمپ در ریپوی پمپ است (telegram-bot/) ولی داخلِ همین سرور اجرا می‌شود؛
       # پس هر تغییرِ سرورِ حساب با آزمون‌های خودِ بات هم سنجیده می‌شود تا بات نشکند.
       # ریپوی پمپ عمومی است. بات هنوز آن‌جا نیامده ⇒ این گام فقط خبر می‌دهد.
