@@ -66,7 +66,10 @@
   };
 
   // ── عدد، پول، زمان ──
-  K.fa = function (n, d) { return Number(n).toLocaleString('fa-AF', { maximumFractionDigits: d === undefined ? 2 : d }); };
+  //  جداکنندهٔ هزارگانِ فارسی «٬» و اعشارِ «٫» (نه ویرگول و نقطهٔ لاتین)
+  K.fa = function (n, d) {
+    return Number(n).toLocaleString('fa-AF', { maximumFractionDigits: d === undefined ? 2 : d }).replace(/,/g, '٬').replace(/\./g, '٫');
+  };
   K.money = function (minor) { return K.fa(Math.round(Number(minor)) / 100) + ' افغانی'; };
   K.qty = function (milli) { return K.fa(Number(milli) / 1000, 3); };
   /** همان گردکردنِ سرور: هر قلم به افغانیِ کامل (order-states.lineTotalMinor). */
@@ -290,7 +293,7 @@
     new: 'ثبت شد — منتظرِ تأییدِ دکان', accepted: 'دکان قبول کرد', rejected: 'دکان نپذیرفت',
     auto_rejected: 'بی پاسخ ماند', cancelled_by_customer: 'شما لغو کردید', picking: 'در حالِ جمع‌آوری',
     packed: 'بسته‌بندی شد', ready_for_pickup: 'آمادهٔ دریافت از دکان', out_for_delivery: 'در راه',
-    picked_up: 'تحویل گرفتید', delivered: 'تحویل شد', cancelled: 'لغو شد', delivery_failed: 'تحویل نشد',
+    picked_up: 'تحویل گرفته شد', delivered: 'تحویل شد', cancelled: 'لغو شد', delivery_failed: 'تحویل نشد',
     retry_scheduled: 'تحویلِ دوباره', returned_to_store: 'به دکان برگشت', restocked: 'به دکان برگشت',
     return_requested: 'درخواستِ مرجوعی', refunded_partial: 'بخشی بازپرداخت شد', refunded_full: 'بازپرداخت شد',
   };
