@@ -33,6 +33,8 @@ const hlc = require('./hlc');
 const schema = require('./sync-v3-schema');
 const convert = require('./sync-v3-convert');
 const toV1 = require('./sync-v3-to-v1');
+const approvals = require('./staff-approval');
+const permCore = require('./perm-core');
 
 const PROTOCOL = 3;
 const MAX_OPS = 500;
@@ -48,7 +50,10 @@ const OP_ID_RE = /^[A-Za-z0-9_.-]{1,80}$/;
 //  برگرداندنِ مقدارِ بازنده همان اختیارِ «حذف و اصلاحِ دادهٔ دیگران» است (مالک و مدیر)
 const RESOLVE_PERMISSION = 'data.delete.any';
 const REVERTIBLE = new Set(['lww', 'clock_skew', 'stale_after_delete', 'stale_delete']);
-const TASKS = new Set(['negative_stock', 'duplicate_barcode', 'duplicate_customer']);
+//  وظیفه‌های بررسی؛ سه‌تای آخر opِ پولیِ ردشده‌اند (STF-02/03، `staff-approval.js`)
+const TASKS = new Set(['negative_stock', 'duplicate_barcode', 'duplicate_customer',
+  'approval_required', 'approval_rejected', 'perm_denied']);
+const MAX_APPROVAL_BYTES = 2048;
 
 const clock = hlc.createClock({ node: SERVER_DEVICE });
 let clockReady = null;
@@ -146,10 +151,18 @@ function validate(raw, origin = 'v3') {
   }
   const txId = r.tx === undefined || r.tx === null ? '' : String(r.tx);
   if (txId.length > 80) return bad('bad_tx');
+  //  «برگهٔ امضاشده»ی تأیید (بخشِ ۱۰.۱) — فقط همراه است؛ سنجشش در `authorize`
+  let approval = null;
+  if (r.approval !== undefined && r.approval !== null) {
+    if (!isPlainObject(r.approval) || Buffer.byteLength(JSON.stringify(r.approval), 'utf8') > MAX_APPROVAL_BYTES) {
+      return bad('bad_approval');
+    }
+    approval = r.approval;
+  }
   return {
     ok: true,
     op: { op_id: opId, table: spec.name, spec, row_id: r.row_id, kind: r.kind, hlc: stamp, fields, reason, tx: txId,
-      fromDelete: relaxed && r.fromDelete === true },
+      fromDelete: relaxed && r.fromDelete === true, approval },
   };
 }
 
@@ -408,8 +421,12 @@ function openTask(c, ctx, { kind, table, rowId, dedupe, detail, t }) {
 
 // ---------- دسترسیِ هر op ----------
 
-function authorize(ctx, op, row, deviceId, origin) {
-  if (origin === 'v1' || origin === 'server') return null;      //  v1 خودش سنجیده بود
+/**
+ * @returns {Promise<null | string | {reason, box, detail}>} دلیلِ رد؛ با `box`
+ *          یعنی ردیفی هم در صندوقِ تعارض لازم است (opِ پولیِ ردشده).
+ */
+async function authorize(c, ctx, op, row, deviceId, origin) {
+  if (origin === 'v1' || origin === 'server') return null;      //  v1 خودش سنجیده بود (و `v1Guard`)
   const role = ctx.role;
   const own = !!row && row.created_by === deviceId;
   if (op.kind === 'delete' && op.spec.policy === 'master') {
@@ -417,14 +434,22 @@ function authorize(ctx, op, row, deviceId, origin) {
     if (!can(role, 'data.delete.own')) return 'delete_not_allowed';
     return !row || !row.created_by || own ? null : 'delete_not_allowed';
   }
+  //  تخفیف، لغوِ فاکتور و برگشت: نقش + دو لایه + «برگهٔ امضاشده» (STF-02/03)
+  const need = approvals.needOf(op, row);
+  if (need) {
+    //  قاعدهٔ امروزِ v1 برای نقشی که لغو ندارد (شاگرد): «حذفِ فاکتورِ خودت» از راهِ حذفِ v2
+    const fallback = need.perm === 'sales.cancel' && op.fromDelete && own && can(role, 'data.delete.own')
+      && permCore.defaultMode(role, 'sales.cancel') === 'deny';
+    return approvals.judge(c, ctx, need, approvals.slipOf(op), {
+      opId: op.op_id, at: approvals.wallOf(op.hlc), deviceId, path: origin, fallback,
+    });
+  }
   if (op.kind === 'cancel') {
     if (can(role, op.spec.cancel)) return null;
-    //  همان قاعدهٔ v1: «حذفِ ردیفِ خودت» — برای سندی که از حذفِ v2 آمده، یا غیرِ فاکتور
-    if ((op.spec.cancel !== 'sales.cancel' || op.fromDelete) && can(role, 'data.delete.own') && own) return null;
+    //  همان قاعدهٔ v1: «حذفِ ردیفِ خودت» — برای سندِ غیرِ فاکتور
+    if (can(role, 'data.delete.own') && own) return null;
     return 'cancel_not_allowed';
   }
-  if (op.table === 'sales' && op.kind === 'insert' && Number(op.fields.discountMinor) > 0
-    && !can(role, 'sales.discount')) return 'discount_not_allowed';
   return null;
 }
 
@@ -446,8 +471,18 @@ async function applyOne(c, ctx, op, { deviceId, origin, cursor = 0, t }) {
   if (dup) return { op_id: op.op_id, status: 'duplicate', server_seq: Number(dup.server_seq) };
 
   const row = await loadRow(c, ctx, op.table, op.row_id);
-  const denied = authorize(ctx, op, row, deviceId, origin);
-  if (denied) return { op_id: op.op_id, status: 'rejected', reason: denied };
+  const denied = await authorize(c, ctx, op, row, deviceId, origin);
+  if (denied) {
+    const out = { op_id: op.op_id, status: 'rejected', reason: typeof denied === 'string' ? denied : denied.reason };
+    //  ردیفِ صندوق بعد از برگشتِ savepoint نوشته می‌شود (`push`)؛ در پاسخ نمی‌آید
+    if (denied.box) {
+      Object.defineProperty(out, 'box', {
+        enumerable: false,
+        value: { kind: denied.box, detail: denied.detail, table: op.table, row_id: op.row_id, op_id: op.op_id },
+      });
+    }
+    return out;
+  }
 
   //  نگهبانِ ساعت: سرور با HLCِ کج جلو نمی‌رود و آن را «مؤثر» نمی‌کند
   let eff = op.hlc;
@@ -753,6 +788,12 @@ async function push(ctx, { deviceId, protocol = PROTOCOL, format = 'v3', schemaV
       }
       if (failed) {
         await c.query(`ROLLBACK TO SAVEPOINT ${name}`);
+        //  opِ پولیِ ردشده هرگز بی‌صدا نمی‌رود: صندوقِ تعارض برای صاحب دکان
+        if (failed.box) {
+          const b = failed.box;
+          await addConflict(c, ctx, { table: b.table, row_id: b.row_id, loser_op_id: b.op_id, loser_device: deviceId },
+            b.kind, t, { dedupe: `perm:${b.op_id}`, detail: b.detail });
+        }
         for (const it of unit.items) {
           const mine = local.find(l => l.it === it);
           const culprit = mine && mine.parts.find(p => p.status === 'rejected');
