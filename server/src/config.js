@@ -214,6 +214,10 @@ const config = {
     windowMs:     num(process.env.RATE_WINDOW_MS, 15 * 60 * 1000),
     authMax:      num(process.env.RATE_AUTH_MAX, 10),
     otpMax:       num(process.env.RATE_OTP_MAX, 5),
+    //  کدِ وصلِ گوگل (`/auth/google/link-code`) به‌ازای «ایمیلِ توکن + IP».
+    //  کلیدِ `otpMax` از بدنه می‌آید و این مسیر ایمیلی در بدنه ندارد، پس
+    //  تا امروز فقط به‌ازای IP شمرده می‌شد.
+    linkCodeMax:  num(process.env.RATE_LINK_CODE_MAX, 3),
     //  ⛔ F0-16 — `register/start` و `password/forgot` به‌ازای هر **IP**. سقفِ
     //  `otpMax` به‌ازای هر ایمیل است، پس امتحانِ هزار ایمیلِ گوناگون از یک
     //  جا هیچ سقفی نداشت. سی در ربع ساعت برای یک کافی‌نت هم بس است.

@@ -184,3 +184,115 @@ test('کلیدِ بازگشت (GOOGLE_EMAIL_AUTOLINK) رفتارِ قبلی را
     config.google.legacyEmailLink = false;
   }
 });
+
+/* ================================================================
+ *  یافته‌های بازبینیِ امنیتی (۱۴۰۵/۰۷/۲۷) — گوگلِ «ایمیلِ تأییدنشده»
+ *
+ *  گوگل اجازه می‌دهد حسابی با نشانیِ ایمیلِ **دیگری** ساخته شود بی آن‌که
+ *  آن ایمیل تأیید شود (`email_verified=false`). چنین توکنی هیچ چیزی دربارهٔ
+ *  مالکیتِ ایمیل ثابت نمی‌کند.
+ * ================================================================ */
+
+test('امنیت ۱: گوگلِ تأییدنشده حسابِ تازه نمی‌سازد (پیش‌دستی روی ایمیلِ قربانی)', async () => {
+  const email = 'victim-precreate@test.local';
+  const r = await h.post('/api/auth/google', { idToken: googleToken({ sub: 'g-att-1', email, verified: false }) });
+  assert.equal(r.status, 403, JSON.stringify(r.body));
+  assert.equal(r.body.error.code, 'google_email_unverified');
+  assert.match(r.body.error.message, /تأیید/);
+  assert.equal(r.body.accessToken, undefined);
+  assert.equal(await one('SELECT id FROM users WHERE email=$1', [email]), null, 'هیچ حسابی ساخته نشد');
+  assert.equal(await one(`SELECT id FROM user_identities WHERE provider='google' AND subject='g-att-1'`), null);
+});
+
+test('امنیت ۱: گوگلِ تأییدنشده حتی با رمزِ درست وصل نمی‌شود و وجودِ حساب/روش‌ها را لو نمی‌دهد', async () => {
+  const u = await h.newUser('قربانیِ وصل');
+  const tokenOf = (email) => googleToken({ sub: `g-att-${email}`, email, verified: false });
+
+  const bare = await h.post('/api/auth/google', { idToken: tokenOf(u.email) });
+  const none = await h.post('/api/auth/google', { idToken: tokenOf('nobody-here@test.local') });
+  assert.equal(bare.status, 403, JSON.stringify(bare.body));
+  assert.deepEqual(bare.body, none.body, 'پاسخِ حسابِ موجود و ناموجود یکی است');
+  assert.equal(bare.body.error.link, undefined, 'روش‌های ورودِ حساب گفته نمی‌شود');
+
+  const withPassword = await h.post('/api/auth/google', { idToken: tokenOf(u.email), password: u.password });
+  assert.equal(withPassword.status, 403, JSON.stringify(withPassword.body));
+  assert.equal(withPassword.body.error.code, 'google_email_unverified');
+  assert.equal((await identities(u.user.id)).length, 0, 'گوگل وصل نشد');
+  assert.equal((await linkAudits(u.user.id)).length, 0);
+});
+
+test('امنیت ۱: «رمزِ فراموش‌شده» گوگلِ تأییدنشدهٔ قدیمی را جدا می‌کند و سابقه می‌گذارد؛ گوگلِ تأییدشده می‌ماند', async () => {
+  const { newId, now } = require('../src/db');
+  const email = 'victim-reset@test.local';
+  //  حسابی که پیش از این رفع، مهاجم با گوگلِ تأییدنشده برای ایمیلِ قربانی ساخته بود
+  const t = now();
+  const acc = await one(
+    `INSERT INTO users (id, name, email, status, created_at, updated_at)
+     VALUES ($1,'مهاجم',$2,'active',$3,$3) RETURNING *`, [newId('usr'), email, t]
+  );
+  await h.query(
+    `INSERT INTO user_identities (id, user_id, provider, subject, email, created_at)
+     VALUES ($1,$2,'google','g-att-old',$3,$4)`, [newId('idn'), acc.id, email, t]
+  );
+  //  و یک گوگلِ قدیمیِ دیگر که بعداً با توکنِ تأییدشده وارد شده (همان صاحبِ ایمیل)
+  await h.query(
+    `INSERT INTO user_identities (id, user_id, provider, subject, email, created_at)
+     VALUES ($1,$2,'google','g-own-old',$3,$4)`, [newId('idn'), acc.id, email, t]
+  );
+  const own = await h.post('/api/auth/google', { idToken: googleToken({ sub: 'g-own-old', email }) });
+  assert.equal(own.status, 200, JSON.stringify(own.body));
+
+  //  مهاجم تا این‌جا هنوز وارد می‌شود (شناسه از قبل وصل است)
+  const before = await h.post('/api/auth/google', { idToken: googleToken({ sub: 'g-att-old', email, verified: false }) });
+  assert.equal(before.status, 200, JSON.stringify(before.body));
+
+  //  صاحبِ واقعیِ ایمیل رمز را بازیابی می‌کند
+  const forgot = await h.post('/api/auth/password/forgot', { email });
+  assert.ok(forgot.body.devCode);
+  const reset = await h.post('/api/auth/password/reset', { email, code: forgot.body.devCode, password: 'N3w!Passw0rd' });
+  assert.equal(reset.status, 200, JSON.stringify(reset.body));
+
+  const left = (await identities(acc.id)).map((r) => r.subject).sort();
+  assert.deepEqual(left, ['g-own-old'], 'فقط گوگلِ تأییدشده ماند');
+  const after = await h.post('/api/auth/google', { idToken: googleToken({ sub: 'g-att-old', email, verified: false }) });
+  assert.equal(after.status, 403, 'مهاجم دیگر راهی ندارد');
+  assert.equal(after.body.error.code, 'google_email_unverified');
+
+  const log = await one(
+    `SELECT * FROM audit_logs WHERE action='auth.identity_unlinked' AND user_id=$1`, [acc.id]
+  );
+  assert.ok(log, 'جدا شدن در سابقه نشست');
+  assert.deepEqual(detailOf(log), { provider: 'google', reason: 'password_reset_unverified', count: 1 });
+});
+
+test('امنیت ۲: کدِ وصل برای گوگلِ تأییدنشده چیزی نمی‌فرستد و پاسخش با «حساب نیست» یکی است', async () => {
+  const u = await h.newUser('قربانیِ کد');
+  const asked = await h.post('/api/auth/google/link-code', {
+    idToken: googleToken({ sub: 'g-att-code', email: u.email, verified: false }),
+  });
+  const nobody = await h.post('/api/auth/google/link-code', {
+    idToken: googleToken({ sub: 'g-att-code-2', email: 'nobody-code@test.local', verified: false }),
+  });
+  assert.equal(asked.status, 200, JSON.stringify(asked.body));
+  assert.equal(asked.body.sent, false, 'کدی نرفت');
+  assert.equal(asked.body.devCode, undefined);
+  const strip = ({ email, ...rest }) => rest;
+  assert.deepEqual(strip(asked.body), strip(nobody.body), 'پاسخ وجودِ حساب را لو نمی‌دهد');
+});
+
+test('امنیت ۲: کدِ وصل به‌ازای «ایمیل + IP» سقف دارد', async () => {
+  const u = await h.newUser('سقفِ کدِ وصل');
+  const idToken = googleToken({ sub: 'g-sub-limit', email: u.email });
+  const max = config.rateLimit.linkCodeMax || 3;
+  for (let i = 0; i < max; i++) {
+    const r = await h.post('/api/auth/google/link-code', { idToken });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.equal(r.body.sent, true);
+  }
+  const over = await h.post('/api/auth/google/link-code', { idToken });
+  assert.equal(over.status, 429, JSON.stringify(over.body));
+  //  ایمیلِ دیگر از همان IP سطلِ خودش را دارد
+  const v = await h.newUser('ایمیلِ دیگر');
+  const other = await h.post('/api/auth/google/link-code', { idToken: googleToken({ sub: 'g-sub-limit-2', email: v.email }) });
+  assert.equal(other.status, 200, JSON.stringify(other.body));
+});

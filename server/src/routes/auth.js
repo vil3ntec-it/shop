@@ -667,10 +667,62 @@ router.post('/otp/verify', verifyLimit, async (req, res, next) => {
  */
 const LINK_METHODS_MESSAGE = 'این ایمیل از قبل حساب دارد. برای وصل کردنِ گوگل به همان حساب، رمزِ حساب را بزنید یا کدی را که به همین ایمیل می‌فرستیم وارد کنید.';
 
-/** حسابِ موجودی که این ایمیل را دارد و هنوز این گوگل به آن وصل نیست. */
+/*
+ *  ⛔ بازبینیِ امنیتی ۱۴۰۵/۰۷/۲۷ — گوگلِ «ایمیلِ تأییدنشده».
+ *
+ *  گوگل اجازه می‌دهد حسابی با نشانیِ ایمیلِ کسِ دیگری ساخته شود بی آن‌که آن
+ *  ایمیل تأیید شود؛ توکنش `email_verified=false` دارد و هیچ چیزی دربارهٔ
+ *  مالکیتِ ایمیل ثابت نمی‌کند. تا امروز چنین توکنی (۱) برای ایمیلِ کسی که
+ *  هنوز حساب نداشت **حساب می‌ساخت** — مهاجم پیش از قربانی جا را می‌گرفت و
+ *  پس از «رمزِ فراموش‌شده»ی قربانی هم با همان گوگل وارد می‌شد — و (۲) برای
+ *  حسابِ موجود «این ایمیل حساب دارد + روش‌هایش» را می‌گفت و کدِ وصل را به
+ *  صندوقِ قربانی می‌فرستاد (بمبارانِ ایمیل).
+ *
+ *  حالا ساختن و وصل کردن فقط با ایمیلِ تأییدشده است. پاسخِ تأییدنشده برای
+ *  ایمیلِ دارای حساب و بی‌حساب **یکی** است. شناسه‌ای که از قبل وصل است
+ *  (یافتن با `sub`) همان‌طور وارد می‌شود؛ «رمزِ فراموش‌شده» شناسه‌های
+ *  تأییدنشده را جدا می‌کند (`unlinkUnverifiedGoogle`).
+ */
+const GOOGLE_UNVERIFIED_MESSAGE = 'ایمیلِ این حسابِ گوگل نزدِ خودِ گوگل تأیید نشده است، پس با آن نمی‌شود حساب ساخت یا به حسابی وصل شد. اول ایمیل را در حسابِ گوگل تأیید کنید، یا با ایمیل و رمز/کدِ ایمیل وارد شوید.';
+
+/** حسابِ موجودی که این ایمیل را دارد و هنوز این گوگل به آن وصل نیست — فقط برای ایمیلِ تأییدشده. */
 async function accountOfGoogleEmail(profile) {
-  if (!profile.email) return null;
+  if (!profile.email || !profile.emailVerified) return null;
   return one('SELECT * FROM users WHERE email=$1', [profile.email]);
+}
+
+/**
+ *  شناسه‌های گوگلی که تأییدِ ایمیلشان ثابت نیست (`email_verified` نه `true`:
+ *  تأییدنشده یا ردیفِ قدیمیِ نامعلوم) از حساب جدا می‌شوند — پس از اینکه
+ *  کسی مالکیتِ ایمیلِ حساب را با کد ثابت کرد. گوگلِ قدیمیِ صاحبِ حساب که
+ *  دوباره با توکنِ تأییدشده وارد شده `true` است و می‌ماند؛ آن‌که جدا شد با
+ *  رمزِ تازه دوباره وصل می‌شود.
+ */
+async function unlinkUnverifiedGoogle(userId, ip, reason) {
+  const gone = await query(
+    `DELETE FROM user_identities
+      WHERE user_id=$1 AND provider='google' AND email_verified IS NOT TRUE`, [userId]
+  );
+  if (gone.rowCount) {
+    await audit.log({
+      actorType: 'user', userId, action: 'auth.identity_unlinked',
+      targetType: 'user', targetId: userId, detail: { provider: 'google', reason, count: gone.rowCount }, ip,
+    });
+  }
+  return gone.rowCount;
+}
+
+/**
+ *  سقفِ کدِ وصل به‌ازای «ایمیلِ توکن + IP». کلیدِ `otpLimit` از بدنه می‌آید
+ *  و این مسیر ایمیلی در بدنه ندارد (فقط توکن)، پس پس از خواندنِ توکن شمرده می‌شود.
+ */
+const linkCodeLimit = rateLimit({
+  max: config.rateLimit.linkCodeMax, keyPrefix: 'google-link-code',
+  key: (req) => (req.googleProfile?.email ? `${req.googleProfile.email.toLowerCase()}|${clientIp(req)}` : null),
+});
+async function readGoogleProfile(req, res, next) {
+  req.googleProfile = await google.verifyIdToken(req.body?.idToken || req.body?.id_token);
+  next();
 }
 
 /**
@@ -734,7 +786,20 @@ router.post('/google', authLimit, async (req, res, next) => {
   );
 
   let linkedVia = '';
-  if (!user) {
+  if (user) {
+    //  ردیفِ قدیمی (پیش از ستون) با هر ورودِ تأییدشده «تأییدشده» می‌شود
+    if (profile.emailVerified) {
+      await query(
+        `UPDATE user_identities SET email_verified=true
+          WHERE provider='google' AND subject=$1 AND email_verified IS NOT TRUE`, [profile.sub]
+      );
+    }
+  } else {
+    //  ساختن یا وصل کردن فقط با ایمیلِ تأییدشده — پیش از هر جست‌وجو، تا
+    //  پاسخ برای ایمیلِ دارای حساب و بی‌حساب یکی باشد
+    if (profile.email && !profile.emailVerified) {
+      return next(forbidden(GOOGLE_UNVERIFIED_MESSAGE, 'google_email_unverified'));
+    }
     const existing = await accountOfGoogleEmail(profile);
     if (existing) {
       if (config.google.legacyEmailLink && profile.emailVerified) {
@@ -762,9 +827,9 @@ router.post('/google', authLimit, async (req, res, next) => {
   if (user.status !== 'active') return next(forbidden('این حساب غیرفعال است', 'account_disabled'));
 
   const linked = await query(
-    `INSERT INTO user_identities (id, user_id, provider, subject, email, created_at)
-     VALUES ($1,$2,'google',$3,$4,$5) ON CONFLICT (provider, subject) DO NOTHING`,
-    [newId('idn'), user.id, profile.sub, profile.email || '', now()]
+    `INSERT INTO user_identities (id, user_id, provider, subject, email, email_verified, created_at)
+     VALUES ($1,$2,'google',$3,$4,$5,$6) ON CONFLICT (provider, subject) DO NOTHING`,
+    [newId('idn'), user.id, profile.sub, profile.email || '', !!profile.emailVerified, now()]
   );
   if (linkedVia && linked.rowCount) {
     await audit.log({
@@ -784,9 +849,11 @@ router.post('/google', authLimit, async (req, res, next) => {
  *  فقط کسی که توکنِ معتبرِ گوگل با همان ایمیل دارد می‌تواند بخواهدش، و کد
  *  `purpose='link'` دارد: نه برای ورود کار می‌کند و نه برای بازیابیِ رمز.
  *  حسابی که نیست یا گوگلش از قبل وصل است کدی نمی‌گیرد (پاسخ همان ۲۰۰ است).
+ *  ⛔ گوگلِ تأییدنشده هم کدی نمی‌گیرد و همان پاسخِ «حساب نیست» را می‌بیند
+ *  (`accountOfGoogleEmail`)؛ و سقفِ «ایمیل + IP» (`linkCodeLimit`) دارد.
  */
-router.post('/google/link-code', authLimit, otpLimit, async (req, res) => {
-  const profile = await google.verifyIdToken(req.body?.idToken || req.body?.id_token);
+router.post('/google/link-code', authLimit, otpLimit, readGoogleProfile, linkCodeLimit, async (req, res) => {
+  const profile = req.googleProfile;
   const already = await one(
     `SELECT 1 FROM user_identities WHERE provider='google' AND subject=$1`, [profile.sub]
   );
@@ -1005,6 +1072,10 @@ router.post('/password/reset', verifyLimit, async (req, res, next) => {
   const hash = await pw.hashPassword(password);
   await query('UPDATE users SET password_hash=$2, updated_at=$3 WHERE id=$1', [user.id, hash, now()]);
   await tokens.revokeAllForSubject(user.id);
+  //  ⛔ صاحبِ ایمیل همین حالا مالکیت را با کد ثابت کرد: گوگلی که تأییدِ
+  //  ایمیلش ثابت نیست (مثلاً کسی که پیش از او با گوگلِ تأییدنشده همین
+  //  ایمیل را گرفته بود) دیگر راهی به این حساب ندارد
+  await unlinkUnverifiedGoogle(user.id, clientIp(req), 'password_reset_unverified');
   await audit.log({ actorType: 'user', userId: user.id, action: 'auth.password_reset', ip: clientIp(req) });
 
   //  و همان‌جا واردش می‌کنیم؛ کسی که تازه رمز گذاشته نباید دوباره بزندش
