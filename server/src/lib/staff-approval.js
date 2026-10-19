@@ -332,12 +332,59 @@ async function boxV1(ctx, op, deviceId, out) {
 }
 
 /**
+ * opِ `op` همراهِ opِ ردشدهٔ `parent` (با نیازِ `need`) در همین دسته است؟
+ *
+ * v1 تراکنش ندارد: اگر فقط سرِ سند رد شود و قلم‌ها و حرکتِ انبارش
+ * بنشینند، موجودیِ همهٔ دستگاه‌ها بی هیچ فاکتوری کم (یا زیاد) می‌شود. پس
+ * ردِ سند همراه‌هایش را هم می‌گیرد — همان «کلِ tx»ِ v3:
+ *   فروش (ثبت با تخفیف): قلم‌ها (saleItems.saleId)، حرکتِ انبار و سطرِ
+ *     دفترِ کار (stockMovements/auditLog.refId)؛
+ *   لغو: حرکتِ «برگشت به انبار»ِ همان لغو (sale_cancel) و سطرِ cancel_sale؛
+ *   برگشت: حرکتِ انبارش (refId = شناسهٔ برگشت) و به‌روزرسانیِ همان قلم (returnedQty).
+ */
+function companionOf(parent, need, op) {
+  const s = parent.row_id;
+  const f = isPlainObject(op.fields) ? op.fields : {};
+  if (need.perm === 'sales.discount') {
+    return (op.table === 'saleItems' && f.saleId === s)
+      || ((op.table === 'stockMovements' || op.table === 'auditLog') && f.refId === s);
+  }
+  if (need.perm === 'sales.cancel') {
+    return (op.table === 'stockMovements' && f.refId === s && f.type === 'sale_cancel')
+      || (op.table === 'auditLog' && f.refId === s && f.type === 'cancel_sale');
+  }
+  if (need.perm === 'returns.create') {
+    const item = isPlainObject(parent.fields) ? parent.fields.saleItemId : '';
+    return (op.table === 'stockMovements' && f.refId === s)
+      || (op.table === 'saleItems' && op.type === 'update' && typeof item === 'string' && item !== '' && op.row_id === item);
+  }
+  return false;
+}
+
+/**
+ * `authorizeOp`ِ v1 این opِ فروش را حتماً با نقش رد می‌کند؟ همان دو شرطِ
+ * خودش (با همان `can`)، فقط برای opی که فیلد دارد — حذف راهِ «حذفِ مالِ
+ * خودت» را دارد که به دفتر بسته است، پس این‌جا پیش‌بینی نمی‌شود.
+ */
+function v1RoleRejects(role, op) {
+  if (op.table !== 'sales' || op.type === 'delete' || !isPlainObject(op.fields)) return false;
+  const { can } = require('./permissions');
+  return (Number(op.fields.discount) > 0 && !can(role, 'sales.discount'))
+    || (op.fields.status === 'cancelled' && !can(role, 'sales.cancel'));
+}
+
+/**
  * میان‌افزارِ `POST /api/sync/v1/push` — فقط دکان. پمپ (و هر حسابِ دیگر)
  * بی هیچ کاری رد می‌شود.
  *
  * opی که تصمیمش allow نیست از دسته بیرون می‌آید و پاسخش در جای خودش
- * «rejected» است. نقشی که پیش‌فرضش deny است (شاگرد برای تخفیف و لغو) به
- * همان `authorizeOp`ِ امروز سپرده می‌شود — رفتار و کدِ خطایش عوض نمی‌شود.
+ * «rejected» است؛ همراه‌هایش در همین دسته (`companionOf`) هم با
+ * `tx_rejected`. نقشی که پیش‌فرضش deny است (شاگرد برای تخفیف و لغو) به
+ * همان `authorizeOp`ِ امروز سپرده می‌شود — رفتار و کدِ خطایش عوض نمی‌شود،
+ * فقط همراه‌های opی که آن حتماً رد می‌کند دیگر یتیم نمی‌نشینند.
+ *
+ * opی که op_idاش از پیش در oplog است داوری نمی‌شود: پاسخش «تکراری»ِ خودِ
+ * v1 است، حتی اگر سقف از آن پس پایین آمده باشد (پاسخِ گم‌شده و تلاشِ دوباره).
  */
 async function v1Guard(req, res, next) {
   const ctx = req.sync;
@@ -346,29 +393,42 @@ async function v1Guard(req, res, next) {
     const ops = Array.isArray(req.body?.ops) ? req.body.ops : null;
     if (!ops || !ops.length) return next();
     const { validateOp } = require('./sync-v1');
+    const valid = [];
     const cands = [];
     ops.forEach((raw, i) => {
       const v = validateOp('shop', raw);
       if (!v.ok) return;                       //  خودِ v1 ردش می‌کند، با دلیلِ خودش
+      valid.push({ i, op: v.op });
       const need = needOfV1(v.op);
       if (need) cands.push({ i, op: v.op, need });
     });
     if (!cands.length) return next();
+    //  op_idِ ثبت‌شده (هر حسابی — op_id در oplog یکتاست) را خودِ v1 جواب می‌دهد:
+    //  «تکراری» برای همین حساب، op_id_taken برای دیگری. نه داوری، نه صندوق.
+    const seen = new Set((await many(
+      'SELECT op_id FROM oplog WHERE op_id = ANY($1::text[])', [valid.map((x) => String(x.op.op_id))]
+    )).map((r) => r.op_id));
     const deviceId = String(req.body?.device_id || req.body?.deviceId || '').slice(0, 64);
     const rejected = new Map();
+    const parents = [];
     for (const { i, op, need } of cands) {
+      if (seen.has(String(op.op_id))) continue;
       const slip = isPlainObject(op.fields) && isPlainObject(op.fields.approval) ? op.fields.approval : null;
       if (core.defaultMode(ctx.role, need.perm) === 'deny') {
         //  نقشی که امروز این کار را ندارد (شاگرد): `authorizeOp`ِ v1 (مشترک با پمپ، دست‌نخورده)
         //  با نقش ردش می‌کند — همان رفتار و کدِ امروز. فقط اگر برگه آورده، دلیلِ روشن‌تر:
         //  تأییدِ شاگرد فقط از راهِ Sync v3 می‌نشیند.
-        if (!slip) continue;
+        if (!slip) {
+          if (v1RoleRejects(ctx.role, op)) parents.push({ i, op, need });
+          continue;
+        }
         const out = {
           reason: 'approval_needs_v3', box: 'approval_rejected',
           detail: { perm: need.perm, requester: ctx.userId || '', role: ctx.role || '', path: 'v1', slip_error: 'approval_needs_v3',
             approver: typeof slip.by === 'string' ? slip.by.slice(0, 80) : '' },
         };
         rejected.set(i, { op_id: String(op.op_id || ''), status: 'rejected', reason: out.reason });
+        parents.push({ i, op, need });
         await boxV1(ctx, op, deviceId, out);
         continue;
       }
@@ -378,7 +438,15 @@ async function v1Guard(req, res, next) {
       });
       if (!out) continue;
       rejected.set(i, { op_id: String(op.op_id || ''), status: 'rejected', reason: out.reason });
+      parents.push({ i, op, need });
       await boxV1(ctx, op, deviceId, out);
+    }
+    //  همراه‌های سندِ ردشده با آن برمی‌گردند (op_idِ ثبت‌شده را باز خودِ v1 جواب می‌دهد)
+    for (const p of parents) {
+      for (const { i, op } of valid) {
+        if (i === p.i || rejected.has(i) || seen.has(String(op.op_id)) || !companionOf(p.op, p.need, op)) continue;
+        rejected.set(i, { op_id: String(op.op_id || ''), status: 'rejected', reason: 'tx_rejected' });
+      }
     }
     if (!rejected.size) return next();
     req.body.ops = ops.filter((_, i) => !rejected.has(i));
