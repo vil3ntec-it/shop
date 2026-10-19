@@ -54,7 +54,7 @@ class HardcodedColorsTest {
     "ui/screens/WelcomeDecor.kt" to 14,
     "ui/screens/Vip.kt" to 12,
     //  پالتِ دسته‌ایِ نمودارِ دونات + آیکونِ «تعدادِ فاکتور» (≥۳:۱ در هر دو تم)
-    "ui/screens/DeskDashboard.kt" to 8,
+    "ui/screens/DeskDashboard.kt" to 7,   //  نسخهٔ ۲: بنفشِ ثابتِ کارتِ «تعدادِ فاکتور» ⇐ Shop.colors.info
     //  ایستگاهِ میانیِ گرادیانِ کارتِ بالای داشبورد
     "ui/screens/Dashboard.kt" to 1,
     //  سبزِ واتساپ — رنگِ برندِ همان برنامه

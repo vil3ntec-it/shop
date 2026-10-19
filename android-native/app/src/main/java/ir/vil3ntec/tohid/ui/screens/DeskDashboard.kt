@@ -35,6 +35,8 @@ import ir.vil3ntec.tohid.formatDate
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.qty
 import ir.vil3ntec.tohid.ui.theme.Shop
+import ir.vil3ntec.tohid.ui.theme.softCard
+import ir.vil3ntec.tohid.ui.theme.tabular
 
 /**
  *  داشبوردِ کامپیوتر — نمای کلیِ دکان در یک نگاه، نه کاشی‌های گوشی.
@@ -99,14 +101,15 @@ fun DeskDashboardScreen(d: ShopData, onOpen: (String) -> Unit, onProduct: (Strin
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
       KpiCard(Modifier.weight(1f), Icons.Filled.PointOfSale, "فروش", money(b.sales.value), b.sales.changePct, Shop.colors.primary)
       KpiCard(Modifier.weight(1f), Icons.Filled.TrendingUp, "سودِ ناخالص", money(b.profit.value), b.profit.changePct, Shop.colors.success)
-      KpiCard(Modifier.weight(1f), Icons.Filled.Receipt, "تعدادِ فاکتور", b.invoices.value.toInt().toString(), b.invoices.changePct, Color(0xFF7C4DFF))
+      KpiCard(Modifier.weight(1f), Icons.Filled.Receipt, "تعدادِ فاکتور", b.invoices.value.toInt().toString(), b.invoices.changePct, Shop.colors.info)
       KpiCard(Modifier.weight(1f), Icons.Filled.ShoppingBasket, "میانگینِ فاکتور", money(b.avgTicket.value), b.avgTicket.changePct, Shop.colors.warning)
       KpiCard(Modifier.weight(1f), Icons.Filled.AccountBalanceWallet, "طلب از مشتریان", money(b.receivables), null, Shop.colors.danger) { onOpen("debtors") }
     }
 
     /* ۳ ─ نمودار و کارهای سریع */
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.height(300.dp)) {
-      Panel2(Modifier.weight(2.2f).fillMaxHeight(), "فروش و سود", "${if (days == 1) "امروز" else "$days روزِ گذشته"} · امروز ${money(b.todaySales)} ؋") {
+      //  scroll = false: نمودار باید همهٔ ارتفاعِ کارت را بگیرد؛ درونِ ستونِ لغزان ارتفاعش صفر می‌شد و خطِ صاف می‌کشید
+      Panel2(Modifier.weight(2.2f).fillMaxHeight(), "فروش و سود", "${if (days == 1) "امروز" else "$days روزِ گذشته"} · امروز ${money(b.todaySales)} ؋", scroll = false) {
         SalesChart(b.series, Modifier.fillMaxSize())
       }
       Panel2(Modifier.weight(1f).fillMaxHeight(), "کارهای سریع") {
@@ -173,25 +176,24 @@ fun DeskDashboardScreen(d: ShopData, onOpen: (String) -> Unit, onProduct: (Strin
 
 /* ───────────────────────────── اجزا ───────────────────────────── */
 
-private val CardShape = RoundedCornerShape(16.dp)
+private val CardShape = ir.vil3ntec.tohid.ui.theme.Shape.card
 
 @Composable
-private fun Panel2(modifier: Modifier, title: String, subtitle: String? = null, content: @Composable ColumnScope.() -> Unit) {
-  Surface(color = Shop.colors.surfaceSolid, shape = CardShape, modifier = modifier.border(1.dp, Shop.colors.border, CardShape)) {
-    Column(Modifier.padding(16.dp)) {
-      Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = Shop.colors.text)
-      if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
-      Spacer(Modifier.height(10.dp))
-      Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), content = content)
-    }
+private fun Panel2(modifier: Modifier, title: String, subtitle: String? = null, scroll: Boolean = true, content: @Composable ColumnScope.() -> Unit) {
+  //  نسخهٔ ۲: کارتِ نرم (سایه، گوشهٔ ۱۶، لبهٔ مویی) — نه خطِ دورِ تیره
+  Column(modifier.softCard(Shop.colors, CardShape).padding(16.dp)) {
+    Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = Shop.colors.text)
+    if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
+    Spacer(Modifier.height(10.dp))
+    Column(Modifier.weight(1f).then(if (scroll) Modifier.verticalScroll(rememberScrollState()) else Modifier), content = content)
   }
 }
 
 @Composable
 private fun KpiCard(modifier: Modifier, icon: ImageVector, title: String, value: String, change: Double?, tint: Color, onClick: (() -> Unit)? = null) {
   Surface(
-    color = Shop.colors.surfaceSolid, shape = CardShape,
-    modifier = modifier.border(1.dp, Shop.colors.border, CardShape).then(if (onClick != null) Modifier.clickable { onClick() } else Modifier),
+    color = Shop.colors.surface, shape = CardShape,
+    modifier = modifier.softCard(Shop.colors, CardShape).then(if (onClick != null) Modifier.clickable { onClick() } else Modifier),
   ) {
     Column(Modifier.padding(16.dp)) {
       Row(verticalAlignment = Alignment.CenterVertically) {
@@ -202,7 +204,7 @@ private fun KpiCard(modifier: Modifier, icon: ImageVector, title: String, value:
         Text(title, style = MaterialTheme.typography.bodyMedium, color = Shop.colors.muted)
       }
       Spacer(Modifier.height(10.dp))
-      Text(value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = Shop.colors.text, maxLines = 1)
+      Text(value, style = MaterialTheme.typography.headlineSmall.tabular(), fontWeight = FontWeight.Bold, color = Shop.colors.text, maxLines = 1)
       if (change != null) {
         val up = change >= 0
         Text(
@@ -258,7 +260,8 @@ private fun AlertPanel(
   rows: List<Pair<String, Pair<String, String>>>,
   onClick: (String) -> Unit,
 ) {
-  Surface(color = Shop.colors.surfaceSolid, shape = CardShape, modifier = modifier.fillMaxHeight().border(1.dp, if (count > 0) tint.copy(alpha = 0.45f) else Shop.colors.border, CardShape)) {
+  //  نسخهٔ ۲: کارتِ نرم؛ معنا را نقطه، نشانِ شمار و رنگِ ردیف‌ها می‌گویند — نه خطِ دورِ رنگی
+  Surface(color = Shop.colors.surface, shape = CardShape, modifier = modifier.fillMaxHeight().softCard(Shop.colors, CardShape)) {
     Column(Modifier.padding(14.dp)) {
       Row(verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(10.dp).clip(CircleShape).background(if (count > 0) tint else Shop.colors.success))

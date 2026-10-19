@@ -50,6 +50,9 @@ import ir.vil3ntec.tohid.ui.components.common.ViewMode
 import ir.vil3ntec.tohid.ui.components.common.ViewModeToggle
 import ir.vil3ntec.tohid.ui.components.common.rememberViewMode
 import ir.vil3ntec.tohid.ui.theme.Shop
+import ir.vil3ntec.tohid.ui.theme.Shape
+import ir.vil3ntec.tohid.ui.theme.softCard
+import ir.vil3ntec.tohid.ui.theme.tabular
 import kotlinx.coroutines.launch
 
 /**
@@ -172,10 +175,8 @@ private fun CustomerCards(store: ShopStore, d: ShopData, snackbar: SnackbarHostS
 
     //  نوارِ ابزار
     Row(verticalAlignment = Alignment.CenterVertically) {
-      OutlinedTextField(
-        value = search, onValueChange = { search = it }, singleLine = true,
-        placeholder = { Text("جست‌وجوی نام یا تلفن") }, modifier = Modifier.width(280.dp),
-      )
+      //  نسخهٔ ۲: همان کادرِ جست‌وجوی مشترکِ فهرست‌ها (`SearchBox`) — گرد، نرم، با ×
+      ir.vil3ntec.tohid.ui.components.common.SearchBox(search, { search = it }, "جست‌وجوی نام یا تلفن", Modifier.width(280.dp))
       Spacer(Modifier.width(8.dp))
       Row(Modifier.weight(1f).horizontalScroll(rememberScrollState())) {
         Filter.values().forEach { f ->
@@ -247,16 +248,19 @@ private fun CustomerCards(store: ShopStore, d: ShopData, snackbar: SnackbarHostS
 
 @Composable
 internal fun DeskKpi(label: String, value: String, tint: Color, modifier: Modifier = Modifier) {
+  //  نسخهٔ ۲: کارتِ نرم (سایه، گوشهٔ ۱۶)، نقطهٔ رنگیِ معنا کنارِ عنوان و عددِ درشتِ هم‌پهنا
   Column(
     modifier
-      .clip(RoundedCornerShape(12.dp))
-      .background(Shop.colors.surface)
-      .border(1.dp, Shop.colors.border, RoundedCornerShape(12.dp))
-      .padding(14.dp),
+      .softCard(Shop.colors, Shape.card)
+      .padding(16.dp),
   ) {
-    Text(label, style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
-    Spacer(Modifier.height(4.dp))
-    Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = tint, maxLines = 1)
+    Row(verticalAlignment = Alignment.CenterVertically) {
+      Box(Modifier.size(8.dp).clip(CircleShape).background(tint))
+      Spacer(Modifier.width(8.dp))
+      Text(label, style = MaterialTheme.typography.labelLarge, color = Shop.colors.muted, maxLines = 1)
+    }
+    Spacer(Modifier.height(8.dp))
+    Text(value, style = MaterialTheme.typography.headlineSmall.tabular(), fontWeight = FontWeight.Bold, color = tint, maxLines = 1)
   }
 }
 
@@ -274,9 +278,8 @@ private fun CustomerCard(s: CustomerEngine.Summary, onClick: () -> Unit) {
   Column(
     Modifier
       .aspectRatio(1f)
-      .clip(RoundedCornerShape(14.dp))
-      .background(Shop.colors.surface)
-      .border(1.dp, if (s.balance > 0.5) tint.copy(alpha = 0.45f) else Shop.colors.border, RoundedCornerShape(14.dp))
+      //  نسخهٔ ۲: کارتِ نرم؛ بدهکار را نقطه و رنگِ مانده نشان می‌دهد نه خطِ دورِ رنگی
+      .softCard(Shop.colors, Shape.card)
       .clickable(onClick = onClick)
       .padding(14.dp),
   ) {
@@ -628,9 +631,7 @@ internal fun InvoicePeek(d: ShopData, sale: Sale, modifier: Modifier, onShow: ()
   val lines = remember(d, sale.id) { d.saleItems.filter { it.saleId == sale.id } }
   Column(
     modifier
-      .clip(RoundedCornerShape(12.dp))
-      .background(Shop.colors.surface)
-      .border(1.dp, Shop.colors.border, RoundedCornerShape(12.dp))
+      .softCard(Shop.colors, Shape.card)
       .padding(14.dp),
   ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -644,10 +645,10 @@ internal fun InvoicePeek(d: ShopData, sale: Sale, modifier: Modifier, onShow: ()
     }
     Spacer(Modifier.height(10.dp))
     HeadRow(listOf("کالا" to 0.dp, "تعداد" to 56.dp, "جمع" to 100.dp))
-    LazyColumn(Modifier.weight(1f).fillMaxWidth().border(1.dp, Shop.colors.border)) {
+    LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
       itemsIndexed(lines, key = { _, l -> l.id }) { i, l ->
         Row(
-          Modifier.fillMaxWidth().background(if (i % 2 == 1) Shop.colors.surface2.copy(alpha = 0.45f) else Shop.colors.surface).padding(horizontal = 8.dp, vertical = 6.dp),
+          Modifier.fillMaxWidth().background(if (i % 2 == 1) Shop.colors.surface2 else Shop.colors.surface).padding(horizontal = 8.dp, vertical = 6.dp),
           verticalAlignment = Alignment.CenterVertically,
         ) {
           Column(Modifier.weight(1f)) {
@@ -680,8 +681,10 @@ internal data class TCol(val title: String, val width: Dp = 0.dp, val end: Boole
 internal data class TCell(val text: String, val color: Color? = null, val bold: Boolean = false, val link: Boolean = false)
 
 /**
- *  جدولِ خط‌دار مثلِ اکسل: سرستونِ پررنگ، خطِ عمودی میانِ ستون‌ها، ردیف‌های
- *  یکی‌درمیان، ردیفِ جمع در پایین. کلیک روی ردیف ⇐ `onClick`.
+ *  جدولِ مدیریت: سرستون، ردیف‌های یکی‌درمیان، ردیفِ جمع در پایین. کلیک روی ردیف ⇐ `onClick`.
+ *
+ *  نسخهٔ ۲ (نقدِ ۱۴۰۵/۰۷/۲۷: «همه‌جا خطِ تیره»): خطِ عمودی و افقیِ خانه‌ها برداشته
+ *  شد؛ ردیف‌ها را زمینهٔ یکی‌درمیان و ارتفاعِ راحت جدا می‌کند و کلِ جدول یک کارتِ نرم است.
  */
 @Composable
 internal fun DeskTable(
@@ -694,19 +697,17 @@ internal fun DeskTable(
   footer: List<String>? = null,
   selected: Int? = null,
 ) {
-  val line = Shop.colors.border
   @Composable fun RowScope.box(c: TCol, content: @Composable () -> Unit) {
     Box(
       (if (c.width == 0.dp) Modifier.weight(1f) else Modifier.width(c.width))
         .fillMaxHeight()
-        .border(0.5.dp, line)
-        .padding(horizontal = 8.dp, vertical = 6.dp),
+        .padding(horizontal = 12.dp, vertical = 9.dp),
       contentAlignment = if (c.end) Alignment.CenterEnd else Alignment.CenterStart,
     ) { content() }
   }
-  Column(modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).border(1.dp, line, RoundedCornerShape(8.dp))) {
+  Column(modifier.fillMaxWidth().softCard(Shop.colors, Shape.card)) {
     Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min).background(Shop.colors.surface2)) {
-      cols.forEach { c -> box(c) { Text(c.title, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = Shop.colors.text, maxLines = 1) } }
+      cols.forEach { c -> box(c) { Text(c.title, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = Shop.colors.muted, maxLines = 1) } }
     }
     LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
       if (count == 0) item {
@@ -714,8 +715,8 @@ internal fun DeskTable(
       }
       items(count) { i ->
         val bg = when {
-          i == selected -> Shop.colors.primary.copy(alpha = 0.14f)
-          i % 2 == 1 -> Shop.colors.surface2.copy(alpha = 0.4f)
+          i == selected -> Shop.colors.primaryTint
+          i % 2 == 1 -> Shop.colors.surface2
           else -> Shop.colors.surface
         }
         Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min).background(bg).clickable { onClick(i) }) {
@@ -724,7 +725,7 @@ internal fun DeskTable(
             box(c) {
               Text(
                 v.text, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.bodyMedium,
+                style = if (c.end) MaterialTheme.typography.bodyMedium.tabular() else MaterialTheme.typography.bodyMedium,
                 fontWeight = if (v.bold) FontWeight.SemiBold else null,
                 color = v.color ?: Shop.colors.text,
                 textDecoration = if (v.link) androidx.compose.ui.text.style.TextDecoration.Underline else null,
@@ -736,7 +737,7 @@ internal fun DeskTable(
     }
     footer?.let { f ->
       Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min).background(Shop.colors.surface2)) {
-        cols.forEachIndexed { ci, c -> box(c) { Text(f.getOrElse(ci) { "" }, fontWeight = FontWeight.Bold, color = Shop.colors.text, maxLines = 1) } }
+        cols.forEachIndexed { ci, c -> box(c) { Text(f.getOrElse(ci) { "" }, style = MaterialTheme.typography.bodyMedium.tabular(), fontWeight = FontWeight.Bold, color = Shop.colors.text, maxLines = 1) } }
       }
     }
   }
