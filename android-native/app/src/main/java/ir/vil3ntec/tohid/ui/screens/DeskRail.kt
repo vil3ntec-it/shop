@@ -202,6 +202,7 @@ private fun iconOf(id: String): ImageVector = when (id) {
   "settings" -> Icons.Filled.Settings
   "admin" -> Icons.Filled.AdminPanelSettings
   "orders" -> Icons.Filled.ShoppingBasket
+  "promos" -> Icons.Filled.LocalOffer
   "devices" -> Icons.Filled.Devices
   "soon:orders" -> Icons.Filled.ShoppingCart
   "soon:fulfil" -> Icons.Filled.Inventory

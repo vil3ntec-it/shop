@@ -70,11 +70,13 @@ object DeskMenu {
     ),
     Group(
       "کانال‌های فروش",
-      listOf(
-        page("sale", "فروش (صندوق)"),
-        soon("storefront", "ویترین و بازارچه"),
-        soon("delivery", "پیک و مناطق تحویل"),
-      ),
+      buildList {
+        add(page("sale", "فروش (صندوق)"))
+        //  تخفیف‌ها (PRM) — صاحب و مدیر؛ کلیدِ دکان درونِ همان صفحه است
+        if (canAdmin) add(Item("promos", "تخفیف‌ها"))
+        add(soon("storefront", "ویترین و بازارچه"))
+        add(soon("delivery", "پیک و مناطق تحویل"))
+      },
     ),
     Group(
       "مدیریت و سامانه",

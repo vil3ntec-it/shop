@@ -89,6 +89,7 @@ private val PAGE_TITLES = mapOf(
   "profile" to "حساب من",
   "team" to "کارمندان دکان",
   "orders" to "سفارش‌ها",
+  "promos" to "تخفیف‌ها",
 )
 
 /**
@@ -256,6 +257,8 @@ fun AppRoot(
   }
   //  بخشِ «سفارش‌ها»: فقط اگر سرور برای این دکان روشن گفته، و فقط وقتی برنامه جلوی چشم است
   OrdersLive.Host()
+  //  تخفیف‌های دکان (PRM): پیش‌فرض خاموش؛ نسخهٔ همین دستگاه برای کارِ آفلاین
+  PromoLive.Host()
 
   //  اگر دفتر دیرتر از ON_START آماده شد، همان‌جا شروع می‌کنیم
   LaunchedEffect(loaded) {
@@ -804,6 +807,10 @@ fun AppRoot(
         )
         "team" -> TeamScreen(snackbar)
         "orders" -> OrdersScreen(snackbar) { sub = null }
+        //  مثلِ تنظیمات: فقط صاحب و مدیر (`settings.write`)؛ سرور هم همین را می‌سنجد
+        "promos" ->
+          if (ir.vil3ntec.tohid.data.ShopRole.canOpenSettings(context)) PromosScreen(data, snackbar)
+          else LaunchedEffect(Unit) { open("more") }
         "devices" -> DevicesScreen(data, snackbar)
         "more" -> MoreScreen(store, data, ::open)
       }

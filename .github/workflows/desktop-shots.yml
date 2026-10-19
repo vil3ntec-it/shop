@@ -78,6 +78,8 @@ jobs:
           S="$S;go:team;wait:1500;shot:15-team"
           S="$S;go:devices;wait:1500;shot:15b-devices"
           S="$S;go:vip;wait:1500;shot:15c-subscription-offline-code"
+          #  تخفیف‌ها (PRM): پنج قاعدهٔ نمونه (`PromoLive.demo`)، سبدِ همان ۰۲b با ردیف‌های تخفیف و کادرِ کد، صفحهٔ مدیر و ویرایشگر
+          S="$S;promo:demo;go:sale;wait:1500;shot:20-sale-promos;go:promos;wait:1500;shot:21-promos-table;new:;wait:1200;shot:22-promo-editor;key:ESCAPE;wait:800"
           S="$S;go:dashboard;key:F11;wait:2000;shot:16-fullscreen-dashboard"
           S="$S;help:on;wait:1500;shot:17-shortcuts-F1;help:off"
           S="$S;key:F11;wait:1500;theme:DARK;go:products;wait:1500;shot:18-products-dark;prodsel:2;wait:800;shot:18b-products-dark-bulk;prodsel:0;go:dashboard;wait:1500;shot:19-dashboard-dark;theme:LIGHT"
