@@ -556,12 +556,8 @@
       } catch (e) {
         //  توکنِ پیر — یک بار تازه و یک بار دوباره، مثلِ `apiWithRefresh`
         if (e.code !== 'invalid_token' && e.status !== 401) throw e;
-        const st = readStore();
-        if (!st.refreshToken) throw e;
-        const r = await api('/api/v1/auth/refresh', {
-          method: 'POST', auth: false, body: { refreshToken: st.refreshToken },
-        });
-        writeStore({ accessToken: r.accessToken, accessExpiresAt: r.accessExpiresAt });
+        if (!readStore().refreshToken) throw e;
+        await refreshSession();
         return apiRaw(`/api/v1/me/backups?${q}`, { body });
       }
     },
@@ -577,14 +573,42 @@
       return await api(path, opts);
     } catch (e) {
       if (e.code !== 'invalid_token' && e.status !== 401) throw e;
-      const st = readStore();
-      if (!st.refreshToken) throw e;
-      const r = await api('/api/v1/auth/refresh', {
-        method: 'POST', auth: false, body: { refreshToken: st.refreshToken },
-      });
-      writeStore({ accessToken: r.accessToken, accessExpiresAt: r.accessExpiresAt });
+      if (!readStore().refreshToken) throw e;
+      await refreshSession();
       return api(path, opts);
     }
+  }
+
+  /**
+   *  تازه‌سازیِ نشست — **یکی** برای همهٔ لایه‌های وب.
+   *
+   *  ⛔ سرور توکنِ تازه‌سازی را در هر بار می‌چرخاند و توکنِ قبلی را — اگر
+   *  بیرون از پنجرهٔ ارفاقِ سی‌ثانیه‌ای برگردد — «دزدی» می‌گیرد و کلِ نشستِ
+   *  این مرورگر را می‌بندد (`refresh_reused`). این‌جا تا دیروز فقط توکنِ
+   *  دسترسی نوشته می‌شد و توکنِ چرخیده دور می‌رفت، پس دومین تازه‌سازی
+   *  (حدودِ دو ساعت کار، یا فردا) کاربر را بیرون می‌انداخت.
+   *
+   *  اگر `account-code.js` بالا آمده، همان `TohidAccount.refresh` به کار
+   *  می‌رود: یک تازه‌سازیِ هم‌زمان برای هر سه لایه، نه سه تا که زنجیره را
+   *  روی هم بچرخانند. جایگزینش همان کار را می‌کند و توکنِ چرخیده را نگه
+   *  می‌دارد. ⚠️ هیچ‌کدام نشست را این‌جا پاک نمی‌کنند: خطا فقط بالا می‌رود.
+   */
+  async function refreshSession() {
+    const acc = window.TohidAccount;
+    if (acc && typeof acc.refresh === 'function') return acc.refresh();
+    const st = readStore();
+    const r = await api('/api/v1/auth/refresh', {
+      method: 'POST', auth: false, body: { refreshToken: st.refreshToken },
+    });
+    const access = (r && (r.accessToken || r.access_token)) || '';
+    //  ۲۰۰ِ بی توکن (صفحهٔ HTMLِ وای‌فای) ⇒ نشستِ سالم دست نمی‌خورد
+    if (!access) throw new ApiError('پاسخ سرور خوانده نشد', 'invalid_response');
+    writeStore({
+      accessToken: access,
+      accessExpiresAt: r.accessExpiresAt || (Date.now() + Number(r.access_expires_in || 3600) * 1000),
+      refreshToken: r.refreshToken || r.refresh_token || st.refreshToken,
+    });
+    return access;
   }
 
   function devicePayload() {

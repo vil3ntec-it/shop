@@ -168,7 +168,8 @@ async function downloadsOf(app = '') {
       url: cfg[`download_url_${a}`] || '',
       version: cfg[`latest_version_${a}`] || '',
       notes: cfg[`release_notes_${a}`] || '',
-      minVersion: cfg.min_app_version || '',
+      //  §۳۸.۹: حداقلِ همین برنامه (کلیدِ سراسریِ قدیمی فقط پشتوانه)
+      minVersion: require('../lib/app-compat').minVersionOf(cfg, a),
     });
   }
   return {

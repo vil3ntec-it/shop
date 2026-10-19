@@ -87,6 +87,9 @@
 <!-- جای دفتر (localStorage یا IndexedDB؛ پیش‌فرض localStorage). عمداً بی defer و
      همین بالا: اگر دفتر در IndexedDB باشد، خواندنش از همین لحظه شروع می‌شود -->
 <script src="license/ledger-store.js?v=1"></script>
+<!-- دفترِ قرض‌داران (v3 §22.2-A5): پول به واحدِ کوچک و همان حسابِ DebtBook.kt — بی defer، پیش از اسکریپتِ برنامه -->
+<script src="license/money.js?v=1"></script>
+<script src="license/debt-book.js?v=1"></script>
 <!-- نوارِ وضعیتِ گوشی هم‌رنگِ سربرگ می‌شود — همان آبیِ نیتیو، در هر تم -->
 <meta name="theme-color" id="meta-theme-color" content="#0F62B4">
 <meta name="description" content="مدیریت فروش، انبار، قرض‌داران، مصارف و گزارشات فروشگاه — بدون نیاز به اینترنت">
@@ -106,6 +109,7 @@
 <link rel="stylesheet" href="license/vip.css?v=16">
 <link rel="stylesheet" href="license/support.css?v=17">
 <link rel="stylesheet" href="license/account-ui.css?v=2">
+<link rel="stylesheet" href="license/orders-ui.css?v=1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <!-- فونت به‌صورت غیرمسدودکننده بارگذاری می‌شود تا نبودِ اینترنت باز شدن برنامه را کند نکند -->
@@ -2137,6 +2141,40 @@
     color:var(--muted-2); display:flex; align-items:center; justify-content:center; flex-shrink:0;
   }
   .tx-del:hover{background:var(--danger-tint); color:var(--danger);}
+  /* دفترِ قرض (v3 §22.2-A5): زیرِ هر ردیف — اقلام، سررسید، باقی، مانده پس از ردیف */
+  .tx-item[data-tx-receipt]{cursor:pointer;}
+  .tx-sub{grid-column:1/-1; display:flex; flex-direction:column; gap:3px; font-size:11px; color:var(--muted); margin-top:-4px; min-width:0;}
+  .tx-sub > div{overflow-wrap:anywhere;}
+  .tx-pills{display:flex; flex-wrap:wrap; gap:6px; align-items:center;}
+  .tx-pill{display:inline-flex; align-items:center; gap:5px; font-weight:800; font-size:10.5px; padding:2px 9px; border-radius:999px; color:var(--text); background:var(--surface-2);}
+  .tx-pill::before{content:''; width:6px; height:6px; border-radius:50%; background:var(--muted);}
+  .tx-pill.due::before{background:var(--primary);}
+  .tx-pill.late{background:var(--danger-tint); color:var(--text);}   /* متن خوانا، رنگ در نقطه و زمینه (۴٫۵:۱) */
+  .tx-pill.late::before{background:var(--danger);}
+  .tx-pill.open::before{background:var(--warning);}
+  .tx-pill.paid::before{background:var(--success);}
+  .tx-receipt-btn{border:1px solid var(--border); background:var(--surface); color:var(--primary); font-family:inherit; font-size:11px; font-weight:800; padding:2px 10px; border-radius:999px; cursor:pointer;}
+  .acc-book-info{display:flex; flex-wrap:wrap; gap:6px; margin:0 0 12px;}
+  .acc-book-info:empty{display:none;}
+  .debt-receipt-rows{display:flex; flex-direction:column; gap:2px; font-size:13px; margin:4px 0 12px;}
+  .debt-receipt-rows .r{display:flex; justify-content:space-between; gap:12px; border-bottom:1px dashed var(--border); padding:4px 0;}
+  .debt-receipt-rows .r span{color:var(--muted); overflow-wrap:anywhere;}
+  .debt-receipt-rows .r b{white-space:nowrap; color:var(--text);}
+  .debtor-view-toggle{display:flex; gap:4px;}
+  .debtor-view-toggle .seg-btn{flex:0 0 auto; padding:6px 10px; font-size:12px;}
+  @media(max-width:640px){ .debtor-view-toggle{display:none;} }
+  .debtor-list.is-table{display:block; overflow-x:auto;}
+  .debtor-table{width:100%; border-collapse:collapse; font-size:13px; background:var(--surface-solid); border:1px solid var(--border);}
+  .debtor-table th, .debtor-table td{padding:8px 10px; border-bottom:1px solid var(--border); text-align:start; white-space:nowrap;}
+  .debtor-table th{font-size:12px; color:var(--muted); background:var(--surface-2);}
+  .debtor-table td.num{text-align:end; font-weight:800;}
+  /* خانهٔ تلفن همان `.debtor-meta`ِ کارت است (نمایشِ phoneShow) — ولی خانهٔ جدول می‌ماند، نه flex */
+  .debtor-table td.debtor-meta{display:table-cell; font-size:13px; font-weight:400; margin:0; min-height:0; color:var(--text);}
+  .debtor-table td.is-debt{color:var(--danger);}
+  .debtor-table td.is-credit{color:var(--success);}
+  .debtor-table tr.debtor-row{cursor:pointer;}
+  .debtor-table tr.debtor-row:hover td{background:var(--primary-tint);}
+  .debtor-open{border:none; background:none; padding:0; font-family:inherit; font-size:13px; font-weight:800; color:var(--text); cursor:pointer; text-align:start;}
 
   /* dashboard debtors mini list */
   .mini-debtor-row{
@@ -3963,6 +4001,11 @@
               <input id="debtor-search" type="text" placeholder="جستجوی قرض‌دار…" style="border:none; background:transparent; outline:none; font-family:inherit; font-size:13px; color:var(--text); width:100%;">
               <button type="button" class="search-clear-btn" data-target="debtor-search" aria-label="پاک کردن جستجو">×</button>
             </div>
+            <!-- نمای کارتی/جدولی (VISUAL-DIRECTION §۱٫۵) — ترجیحِ همین کاربر روی همین دستگاه؛ گوشی همیشه کارتی -->
+            <div class="debtor-view-toggle" id="debtor-view-toggle" role="group" aria-label="نمای فهرست">
+              <button type="button" class="seg-btn" data-debtor-view="card" aria-pressed="false">کارتی</button>
+              <button type="button" class="seg-btn" data-debtor-view="table" aria-pressed="false">جدولی</button>
+            </div>
             <button class="btn btn-primary btn-sm" id="btn-add-debtor-top">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               قرض‌دار جدید
@@ -4089,6 +4132,9 @@
             <u id="acc-state">افغانی</u>
           </div>
         </div>
+
+        <!-- دفترِ قرض: بردهای عقب‌افتاده، نزدیک‌ترین سررسید، سقفِ اعتبار (DebtBook) -->
+        <div class="acc-book-info" id="acc-book-info"></div>
 
         <!-- صورت‌حساب: همان ردیف‌ها با ماندهٔ پس از هر کدام — برای دادن به مشتری -->
         <div class="acc-statement" id="acc-statement" style="display:flex;gap:8px;margin:0 0 12px;">
@@ -5528,6 +5574,11 @@
         <label>توضیحات (اختیاری)</label>
         <textarea class="form-textarea" id="in-debtor-notes" placeholder="یادداشت درباره این قرض‌دار…"></textarea>
       </div>
+      <div class="form-group" id="fg-debtor-limit">
+        <label for="in-debtor-limit">سقفِ اعتبار (اختیاری)</label>
+        <input class="form-input" id="in-debtor-limit" type="number" inputmode="numeric" min="0" step="1" placeholder="خالی یعنی بی سقف">
+        <div class="field-error">سقفِ اعتبار معتبر وارد کنید.</div>
+      </div>
       <div class="modal-actions">
         <button type="button" class="btn btn-secondary" data-close-modal="modal-debtor">انصراف</button>
         <button type="submit" class="btn btn-primary">ذخیره</button>
@@ -5575,6 +5626,12 @@
           <label for="in-tx-notes">توضیحات (اختیاری)</label>
           <input class="form-input" id="in-tx-notes" type="text" placeholder="مثلاً بابت خرید">
         </div>
+      </div>
+      <!-- سررسید فقط برای برد (اختیاری) — رسید سررسید ندارد -->
+      <div class="form-group" id="fg-tx-due">
+        <label for="in-tx-due">سررسید (اختیاری)</label>
+        <input class="form-input" id="in-tx-due" type="date">
+        <div class="field-error">سررسید نمی‌تواند پیش از تاریخِ برد باشد.</div>
       </div>
       <div class="modal-actions">
         <button type="submit" class="btn btn-primary btn-submit" id="btn-tx-submit">
@@ -6041,6 +6098,48 @@
 </div>
 
 <!-- Confirm dialog -->
+<!-- رسیدِ یک ردیفِ دفترِ قرض: چاپ/PDF و فرستادن (v3 §22.2-A5) -->
+<div class="modal-scrim" id="modal-debt-receipt">
+  <div class="modal-box modal-compact">
+    <div class="sheet-grip" aria-hidden="true"></div>
+    <div class="modal-head">
+      <h3 id="debt-receipt-title">رسید</h3>
+      <button class="modal-close" data-close-modal="modal-debt-receipt" aria-label="بستن">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="debt-receipt-rows" id="debt-receipt-rows"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-primary" id="btn-debt-receipt-print">چاپ / PDF</button>
+      <button type="button" class="btn btn-secondary" id="btn-debt-receipt-share">فرستادن</button>
+      <button type="button" class="btn btn-secondary" id="btn-debt-receipt-due">سررسید</button>
+    </div>
+  </div>
+</div>
+
+<!-- سررسیدِ یک بردِ ثبت‌شده (فروشِ نسیه هم) -->
+<div class="modal-scrim" id="modal-debt-due">
+  <div class="modal-box modal-compact">
+    <div class="sheet-grip" aria-hidden="true"></div>
+    <div class="modal-head">
+      <h3>سررسیدِ برد</h3>
+      <button class="modal-close" data-close-modal="modal-debt-due" aria-label="بستن">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="empty-sub" id="debt-due-sub" style="margin-bottom:10px;"></div>
+    <div class="form-group" id="fg-debt-due">
+      <label for="in-debt-due">سررسید</label>
+      <input class="form-input" id="in-debt-due" type="date">
+      <div class="field-error">سررسید نمی‌تواند پیش از تاریخِ برد باشد.</div>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-primary" id="btn-debt-due-save">ذخیره</button>
+      <button type="button" class="btn btn-secondary" id="btn-debt-due-clear">بی سررسید</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-scrim" id="modal-confirm">
   <div class="modal-box confirm-box">
     <div class="confirm-icon">
@@ -7413,6 +7512,7 @@
     const emptyPanel = document.getElementById('debtors-empty-panel');
     const list = document.getElementById('debtor-list');
     const noRes = document.getElementById('debtors-no-results');
+    syncDebtorViewToggle();
 
     if(debtors.length===0){
       emptyPanel.style.display='';
@@ -7435,6 +7535,13 @@
     }
     noRes.style.display='none';
     list.style.display='';
+    //  نمای جدولی (VISUAL-DIRECTION §۱٫۵) — همان فهرست، همان جست‌وجو و ترتیب
+    if(debtorViewMode() === 'table'){
+      list.classList.add('is-table');
+      list.innerHTML = debtorTableHtml(filtered);
+      return;
+    }
+    list.classList.remove('is-table');
 
     list.innerHTML = filtered.map(d=>{
       const debt = getDebt(d.id);
@@ -7748,6 +7855,9 @@
     }
 
     renderAccountSales(id);
+    //  دفترِ قرض: اقلام، تخصیصِ پرداخت، سررسید و ماندهٔ پس از هر ردیف (DebtBook)
+    const book = debtBookOf(id);
+    renderDebtBookInfo(book);
     document.getElementById('acc-statement').style.display = allTx.length ? 'flex' : 'none';
 
     const txs = transactions.filter(t=>t.debtorId===id)
@@ -7785,7 +7895,7 @@
     syncBottomBarHeight();
     // ردیف: تاریخ · توضیحات · برد یا رسید · مبلغ
     txList.innerHTML = visible.map(t=> `
-      <div class="tx-item ${t.type}">
+      <div class="tx-item ${t.type}" data-tx-receipt="${t.id}">
         <span class="tx-date-col">${formatDate(t.date)}</span>
         <span class="tx-note-col${t.notes ? '' : ' empty'}">${t.notes ? escapeHtml(t.notes) : '—'}</span>
         <span class="tx-kind">${t.type==='give' ? 'برد' : 'رسید'}</span>
@@ -7793,6 +7903,7 @@
         <button class="tx-del" data-del-tx="${t.id}" aria-label="حذف تراکنش">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
+        ${debtEntryHtml(book, book && book.entry(t.id))}
       </div>`).join('');
   }
 
@@ -7809,7 +7920,7 @@
       const left = !cancelled && Number(s.remaining) > 0 ? ` · <b style="color:var(--danger)">مانده ${formatMoney(s.remaining)}</b>` : '';
       return `<div class="tx-item${cancelled ? ' muted' : ''}">
         <span class="tx-date-col">${formatDate(s.date)}</span>
-        <span class="tx-note-col">فاکتور ${s.invoiceNumber != null ? escapeHtml(invoiceLabel(s)) : '—'}${cancelled ? ' (لغوشده)' : ''}${left}</span>
+        <span class="tx-note-col"><button type="button" class="tx-receipt-btn" data-view-invoice="${s.id}">فاکتور ${s.invoiceNumber != null ? escapeHtml(invoiceLabel(s)) : '—'}</button>${cancelled ? ' (لغوشده)' : ''}${left}</span>
         <span class="tx-money">${formatMoney(s.finalTotal)}</span>
       </div>`;
     });
@@ -7837,6 +7948,235 @@
     const name = String(d ? d.name : '').replace(/[\\/:*?"<>|]/g, ' ').trim() || 'مشتری';
     return { rows, name: `صورت‌حساب-${name}-${todayISO()}` };
   }
+
+  /* ==========================================================
+     دفترِ قرض‌داران — v3 §22.2 (مرحلهٔ A، بندِ ۵)، §21.11 و CRM-03
+     ----------------------------------------------------------
+     همان `DebtBook.kt` از راهِ `license/debt-book.js` (هر دو با یک فایلِ
+     بردار). هیچ عددی ذخیره نمی‌شود؛ همه از transactions/sales/saleItems.
+     تنها دو فیلدِ اختیاری — `dueDate` روی برد و `creditLimit` روی قرض‌دار —
+     وقتی نوشته می‌شوند که کاربر خودش پرشان کند؛ دفترِ قدیمی همان می‌ماند.
+     ========================================================== */
+  function debtLedger(){ return { debtors, transactions, sales, saleItems, products }; }
+  function debtBookOf(id){
+    const B = window.TohidDebtBook;
+    if(!B) return null;
+    try{ return B.book(debtLedger(), id, todayISO()); }catch(e){ return null; }
+  }
+  function moneyMinor(m){ return formatMoney(m / 100); }
+  function debtState(m){
+    return m > 0 ? `${moneyMinor(m)} افغانی بدهکار` : m < 0 ? `${moneyMinor(-m)} افغانی موجودی دارد` : 'حساب صاف است';
+  }
+  const DEBT_FMT = { money: moneyMinor, date: (s)=> formatDate(s), qty: (n)=> String(Math.round(n*1000)/1000), state: debtState, phone: (p)=> phoneShow(p) };
+  function isIsoDay(s){ const B = window.TohidDebtBook; return !!(B && B.isIsoDate(s)); }
+  function overLimitText(c){
+    return `${moneyMinor(c.excessMinor)} افغانی بیش از سقفِ اعتبار (${moneyMinor(c.limitMinor)}) — ماندهٔ فعلی ${moneyMinor(c.balanceMinor)}`;
+  }
+  /* اگر این برد ثبت شود از سقف می‌گذرد؟ `null` = بی سقف (همان رفتارِ همیشه) */
+  function debtCreditCheck(id, amount){
+    const B = window.TohidDebtBook;
+    if(!B) return null;
+    try{ return B.creditCheck(debtLedger(), id, B.minor(amount)); }catch(e){ return null; }
+  }
+
+  /* سربرگِ حساب: عقب‌افتاده، سررسیدِ بعدی، سقف — متن + رنگ + نقطه */
+  function renderDebtBookInfo(book){
+    const el = document.getElementById('acc-book-info');
+    if(!el) return;
+    const parts = [];
+    if(book && book.overdue.length) parts.push(`<span class="tx-pill late">${formatMoney(book.overdue.length)} برد از سررسید گذشته — ${moneyMinor(book.overdueMinor)} افغانی</span>`);
+    if(book && book.nextDue) parts.push(`<span class="tx-pill due">سررسیدِ بعدی ${escapeHtml(formatDate(book.nextDue.dueDate))} — ${moneyMinor(book.nextDue.openMinor)} افغانی</span>`);
+    if(book && book.credit){
+      const c = book.credit;
+      parts.push(c.over
+        ? `<span class="tx-pill late">${moneyMinor(c.excessMinor)} افغانی بیش از سقفِ اعتبار (${moneyMinor(c.limitMinor)})</span>`
+        : `<span class="tx-pill">سقفِ اعتبار ${moneyMinor(c.limitMinor)} — تا سقف ${moneyMinor(c.headroomMinor)} افغانی</span>`);
+    }
+    el.innerHTML = parts.join('');
+  }
+
+  /* زیرِ هر ردیف: اقلامِ فاکتورِ برد (قیمتِ همان لحظه)، تخفیف، پرداختِ همان لحظه،
+     سررسید و باقیِ همان برد؛ یا این‌که رسید بابتِ کدام برد بود؛ و مانده پس از ردیف */
+  function debtEntryHtml(book, e){
+    if(!book || !e) return '';
+    const out = [];
+    e.lines.slice(0, 8).forEach(l=>{
+      const unit = l.unit ? ' ' + escapeHtml(l.unit) : '';
+      out.push(`<div>• ${escapeHtml(l.name)} — ${DEBT_FMT.qty(l.quantity)}${unit} × ${moneyMinor(l.unitPriceMinor)} = ${moneyMinor(l.totalMinor)}${l.returned > 0 ? ` (مرجوعی ${DEBT_FMT.qty(l.returned)})` : ''}</div>`);
+    });
+    if(e.lines.length > 8) out.push(`<div>+${formatMoney(e.lines.length - 8)} قلمِ دیگر — در رسید</div>`);
+    if(e.give && e.lines.length && e.sale){
+      const bits = [];
+      if(Number(e.sale.discount) > 0) bits.push(`تخفیف ${formatMoney(Number(e.sale.discount))}`);
+      if(Number(e.sale.paidAmount) > 0) bits.push(`پرداختِ همان لحظه ${formatMoney(Number(e.sale.paidAmount))}`);
+      if(bits.length) out.push(`<div>${bits.join(' · ')}</div>`);
+    }
+    if(!e.give && e.allocations.length){
+      out.push(`<div>بابتِ ${e.allocations.map(a=>{
+        const g = book.entry(a[0]);
+        const what = g && g.invoiceLabel ? 'فاکتور #' + escapeHtml(g.invoiceLabel) : 'برد ' + (g ? escapeHtml(formatDate(g.tx.date)) : '');
+        return `${what} (${moneyMinor(a[1])})`;
+      }).join('، ')}</div>`);
+    }
+    const pills = [];
+    if(e.give && e.amountMinor > 0){
+      if(e.dueDate) pills.push(`<span class="tx-pill ${e.overdue ? 'late' : 'due'}">سررسید ${escapeHtml(formatDate(e.dueDate))}${e.overdue ? ' — گذشته' : ''}</span>`);
+      pills.push(e.paid ? `<span class="tx-pill paid">تسویه شد</span>` : `<span class="tx-pill open">باز ${moneyMinor(e.openMinor)}</span>`);
+    }
+    if(!e.give && e.openMinor > 0) pills.push(`<span class="tx-pill paid">پیش‌پرداخت ${moneyMinor(e.openMinor)}</span>`);
+    pills.push(`<button type="button" class="tx-receipt-btn" data-open-receipt="${e.tx.id}">رسید${e.give ? ' / سررسید' : ''}</button>`);
+    out.push(`<div class="tx-pills">${pills.join('')}</div>`);
+    out.push(`<div>مانده پس از این ردیف: ${debtState(e.balanceAfterMinor)}</div>`);
+    return `<div class="tx-sub">${out.join('')}</div>`;
+  }
+
+  /* ---- رسیدِ یک ردیف: چاپ/PDF و فرستادن ---- */
+  let debtReceiptTx = null;
+  function currentDebtReceipt(){
+    const B = window.TohidDebtBook;
+    const t = debtReceiptTx && transactions.find(x=>x.id===debtReceiptTx);
+    if(!B || !t) return null;
+    return B.receipt(debtLedger(), t.debtorId, t.id, appSettings.storeName || '', todayISO(), DEBT_FMT);
+  }
+  function openDebtReceipt(txId){
+    debtReceiptTx = txId;
+    const r = currentDebtReceipt();
+    if(!r) return;
+    const t = transactions.find(x=>x.id===txId);
+    document.getElementById('debt-receipt-title').textContent = r.title;
+    document.getElementById('debt-receipt-rows').innerHTML = r.rows.map(([k, v])=>
+      `<div class="r"><span>${escapeHtml(k)}</span>${v === '' ? '' : `<b>${escapeHtml(v)}</b>`}</div>`).join('');
+    //  دکمهٔ بی‌کار نمی‌گذاریم: «فرستادن» فقط جایی که مرورگر می‌فرستد؛ وگرنه «کپیِ متن»
+    document.getElementById('btn-debt-receipt-share').textContent = navigator.share ? 'فرستادن' : 'کپیِ متن';
+    //  `hidden` حریفِ `display`ِ `.btn` نمی‌شود — رسیدِ دریافت سررسید ندارد
+    document.getElementById('btn-debt-receipt-due').style.display = (t && t.type === 'give') ? '' : 'none';
+    openModal('modal-debt-receipt');
+  }
+  document.getElementById('btn-debt-receipt-print').addEventListener('click', ()=>{
+    const r = currentDebtReceipt();
+    if(r) printRows([[r.title, '']].concat(r.rows), r.name);
+  });
+  document.getElementById('btn-debt-receipt-share').addEventListener('click', async ()=>{
+    const r = currentDebtReceipt();
+    if(!r) return;
+    const text = window.TohidDebtBook.receiptText(r);
+    if(navigator.share){
+      try{ await navigator.share({ title: r.title, text }); }catch(e){ /* کاربر لغو کرد */ }
+      return;
+    }
+    try{ await navigator.clipboard.writeText(text); showToast('متنِ رسید کپی شد'); }
+    catch(e){ showToast('کپی نشد — متن را از پنجره بردارید', 'danger'); }
+  });
+  document.getElementById('btn-debt-receipt-due').addEventListener('click', ()=>{
+    const id = debtReceiptTx;
+    closeModal('modal-debt-receipt');
+    if(id) openDebtDue(id);
+  });
+
+  /* ---- سررسیدِ یک برد — مبلغ و تاریخ دست نمی‌خورد؛ ردش در دفترچهٔ ثبت ---- */
+  let debtDueTx = null;
+  function openDebtDue(txId){
+    const t = transactions.find(x=>x.id===txId);
+    if(!t || t.type !== 'give') return;
+    debtDueTx = txId;
+    const label = (window.TohidDebtBook && window.TohidDebtBook.invoiceLabelOf(t.notes)) || '';
+    document.getElementById('debt-due-sub').textContent =
+      `${formatDate(t.date)} — ${formatMoney(t.amount)} افغانی${label ? ' — فاکتور #' + label : ''}`;
+    document.getElementById('in-debt-due').value = t.dueDate || '';
+    document.getElementById('in-debt-due').min = t.date || '';
+    clearFieldError('fg-debt-due');
+    openModal('modal-debt-due');
+  }
+  function setDebtDue(due){
+    const t = transactions.find(x=>x.id===debtDueTx);
+    if(!t) return;
+    if(due && (!isIsoDay(due) || due < t.date)){ setFieldError('fg-debt-due'); return; }
+    const before = t.dueDate || null;
+    if((due || null) !== before){
+      if(due) t.dueDate = due; else delete t.dueDate;
+      const who = (debtors.find(x=>x.id===t.debtorId)||{}).name || '';
+      logAudit('debt_due_set', t.id, `سررسیدِ بردِ ${formatMoney(t.amount)} افغانی از حسابِ «${who}» (تاریخ ${t.date}): ${before || 'ندارد'} ⇐ ${due || 'ندارد'}`);
+      saveState();
+    }
+    closeModal('modal-debt-due');
+    if(currentAccountDebtorId) renderAccountPage(currentAccountDebtorId);
+    showToast('سررسید ثبت شد');
+  }
+  document.getElementById('btn-debt-due-save').addEventListener('click', ()=> setDebtDue(document.getElementById('in-debt-due').value.trim()));
+  document.getElementById('btn-debt-due-clear').addEventListener('click', ()=> setDebtDue(''));
+
+  //  ردیفِ تراکنش ⇒ رسیدش؛ دکمهٔ حذف کارِ خودش را می‌کند
+  document.getElementById('tx-list').addEventListener('click', (e)=>{
+    if(e.target.closest('[data-del-tx]')) return;
+    const btn = e.target.closest('[data-open-receipt]');
+    const row = btn || e.target.closest('[data-tx-receipt]');
+    if(row) openDebtReceipt(btn ? btn.dataset.openReceipt : row.dataset.txReceipt);
+  });
+  //  فاکتورهای همین مشتری ⇒ خودِ فاکتور
+  document.getElementById('acc-sales-list').addEventListener('click', (e)=>{
+    const b = e.target.closest('[data-view-invoice]');
+    if(b) openInvoiceModal(b.dataset.viewInvoice);
+  });
+
+  /* ---- سقفِ اعتبار (CRM-03) — هر تغییر ردی در دفترچهٔ ثبت ---- */
+  function applyCreditLimit(d, limit){
+    const before = (typeof d.creditLimit === 'number' && isFinite(d.creditLimit)) ? d.creditLimit : null;
+    if(before === limit) return;
+    if(limit === null) delete d.creditLimit; else d.creditLimit = limit;
+    const text = (v)=> v === null ? 'بی سقف' : `${formatMoney(v)} افغانی`;
+    logAudit('credit_limit_set', d.id, `سقفِ اعتبارِ «${d.name}»: ${text(before)} ⇐ ${text(limit)}`);
+  }
+
+  /* ---- نمای کارتی/جدولیِ فهرستِ قرض‌داران — ترجیحِ محلی، همگام نمی‌شود ---- */
+  function debtorViewKey(){
+    const a = getAuth();
+    const user = String((a && a.value) || 'local').replace(/[^A-Za-z0-9@._-]/g, '_') || 'local';
+    return `tohid-ui:view_mode:${user}:debtors`;
+  }
+  function debtorViewMode(){
+    if(window.matchMedia && window.matchMedia('(max-width:640px)').matches) return 'card';   // گوشی همیشه کارتی
+    let v = null;
+    try{ v = localStorage.getItem(debtorViewKey()); }catch(e){}
+    return v === 'card' || v === 'table' ? v : 'table';   // مدیریت ⇒ جدولی
+  }
+  function syncDebtorViewToggle(){
+    const mode = debtorViewMode();
+    document.querySelectorAll('#debtor-view-toggle [data-debtor-view]').forEach(b=>{
+      const on = b.dataset.debtorView === mode;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+  }
+  document.getElementById('debtor-view-toggle').addEventListener('click', (e)=>{
+    const b = e.target.closest('[data-debtor-view]');
+    if(!b) return;
+    try{ localStorage.setItem(debtorViewKey(), b.dataset.debtorView); }catch(e){}
+    renderDebtors(document.getElementById('debtor-search').value);
+  });
+  function debtorTableHtml(rows){
+    const body = rows.map(d=>{
+      const debt = getDebt(d.id);
+      const last = getLastTx(d.id);
+      const lim = (typeof d.creditLimit === 'number' && isFinite(d.creditLimit)) ? formatMoney(d.creditLimit) : '—';
+      const cls = debt > 0 ? 'is-debt' : debt < 0 ? 'is-credit' : '';
+      return `<tr class="debtor-row" data-debtor-id="${d.id}">
+        <td><button type="button" class="debtor-open" data-open-debtor="${d.id}">${escapeHtml(d.name)}</button></td>
+        <td class="debtor-meta">${d.phone ? `<span>${escapeHtml(phoneShow(d.phone))}</span>` : '—'}</td>
+        <td class="num ${cls}">${debt === 0 ? 'صاف' : formatMoney(Math.abs(debt)) + (debt < 0 ? ' (موجودی)' : '')}</td>
+        <td>${last ? escapeHtml(formatDate(last.date)) : '—'}</td>
+        <td class="num">${lim}</td>
+        <td><button type="button" class="icon-btn-sm" data-edit-debtor="${d.id}" aria-label="ویرایشِ ${escapeHtml(d.name)}">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+        </button></td>
+      </tr>`;
+    }).join('');
+    return `<table class="debtor-table"><thead><tr><th scope="col">نام</th><th scope="col">تلفن</th><th scope="col">مانده</th><th scope="col">آخرین تراکنش</th><th scope="col">سقفِ اعتبار</th><th scope="col">ویرایش</th></tr></thead><tbody>${body}</tbody></table>`;
+  }
+  document.getElementById('debtor-list').addEventListener('click', (e)=>{
+    if(e.target.closest('[data-edit-debtor],[data-del-debtor]')) return;
+    const row = e.target.closest('.debtor-row');
+    if(row) openAccount(row.dataset.debtorId);
+  });
 
 /* سربرگ چسبان فقط وقتی دیده شود که کارت بالای صفحه از دید رفته باشد */
 /* ==========================================================
@@ -8164,7 +8504,9 @@
     document.getElementById('in-debtor-name').value = '';
     document.getElementById('in-debtor-phone').value = '';
     document.getElementById('in-debtor-notes').value = '';
+    document.getElementById('in-debtor-limit').value = '';
     clearFieldError('fg-debtor-name');
+    clearFieldError('fg-debtor-limit');
     openModal('modal-debtor');
   }
   function openEditDebtor(id){
@@ -8175,7 +8517,9 @@
     document.getElementById('in-debtor-name').value = d.name;
     document.getElementById('in-debtor-phone').value = d.phone || '';
     document.getElementById('in-debtor-notes').value = d.notes || '';
+    document.getElementById('in-debtor-limit').value = (typeof d.creditLimit === 'number' && isFinite(d.creditLimit)) ? d.creditLimit : '';
     clearFieldError('fg-debtor-name');
+    clearFieldError('fg-debtor-limit');
     openModal('modal-debtor');
   }
   function askDeleteDebtor(id){
@@ -8234,6 +8578,9 @@
       type==='give' ? 'ثبت برد جدید' : 'ثبت رسید جدید';
     const submitLabel = document.querySelector('#btn-tx-submit .btn-label');
     if(submitLabel) submitLabel.textContent = type==='give' ? 'ثبت برد' : 'ثبت رسید';
+    //  سررسید فقط برای برد
+    const fgDue = document.getElementById('fg-tx-due');
+    if(fgDue){ fgDue.hidden = type !== 'give'; fgDue.classList.remove('error'); }
   }
   document.getElementById('tx-type-toggle').addEventListener('click', (e)=>{
     const btn = e.target.closest('[data-tx-type]');
@@ -8246,6 +8593,7 @@
     document.getElementById('in-tx-date').value = todayISO();
     document.getElementById('in-tx-notes').value = '';
     document.getElementById('tx-amount-echo').textContent = '';
+    document.getElementById('in-tx-due').value = '';
     clearFieldError('fg-tx-amount');
     openModal('modal-tx');
   }
@@ -8282,13 +8630,20 @@
     const phone = phoneForSave(document.getElementById('in-debtor-phone').value);
     const notes = document.getElementById('in-debtor-notes').value.trim();
 
+    //  CRM-03: سقفِ اعتبار — خالی یعنی بی سقف (همان رفتارِ همیشه)
+    const limitRaw = document.getElementById('in-debtor-limit').value.trim();
+    const limit = limitRaw === '' ? null : Number(limitRaw);
+    if(limit !== null && (!isFinite(limit) || limit < 0)){ setFieldError('fg-debtor-limit'); return; }
+    clearFieldError('fg-debtor-limit');
     if(editingDebtorId){
       const d = debtors.find(x=>x.id===editingDebtorId);
       d.name = name; d.phone = phone; d.notes = notes;
+      applyCreditLimit(d, limit);
       showToast('با موفقیت ویرایش شد');
       if(currentAccountDebtorId===editingDebtorId) renderAccountPage(editingDebtorId);
     } else {
       const fresh = {id:uid(), name, phone, notes, createdAt:Date.now()};
+      if(limit !== null) fresh.creditLimit = limit;
       debtors.push(fresh);
       showToast('با موفقیت ثبت شد');
       if(onDebtorCreated){ const cb = onDebtorCreated; onDebtorCreated = null; setTimeout(()=>cb(fresh), 0); }
@@ -8309,18 +8664,43 @@
     if(!amount || amount<=0){ fg.classList.add('error'); amtEl.focus(); return; }
     fg.classList.remove('error');
 
+    const date = document.getElementById('in-tx-date').value || todayISO();
+    const notes = document.getElementById('in-tx-notes').value.trim();
+    //  سررسید (اختیاری، فقط برد) — همان قاعدهٔ `DebtorEngine.addTransaction`
+    const dueRaw = currentTxType === 'give' ? document.getElementById('in-tx-due').value.trim() : '';
+    if(dueRaw && (!isIsoDay(dueRaw) || dueRaw < date)){ setFieldError('fg-tx-due'); return; }
+    clearFieldError('fg-tx-due');
+    const type = currentTxType, who = currentAccountDebtorId;
+    //  CRM-03: بردِ بیش از سقف فقط با تأییدِ صریح و ردش می‌ماند؛ مشتریِ بی سقف همان رفتارِ همیشه
+    const credit = type === 'give' ? debtCreditCheck(who, amount) : null;
+    if(credit && credit.over){
+      document.getElementById('confirm-title').textContent = 'بیش از سقفِ اعتبار';
+      document.getElementById('confirm-sub').textContent = overLimitText(credit) + '. اگر ثبت شود، در «دفترچهٔ ثبت» با همین مبلغ می‌ماند.';
+      setConfirmOk('باز هم ثبت شود', true);
+      confirmAction = ()=>{ recordDebtTx(who, type, amount, date, notes, dueRaw, credit); };
+      openModal('modal-confirm');
+      return;
+    }
+    recordDebtTx(who, type, amount, date, notes, dueRaw, null);
+  });
+
+  function recordDebtTx(debtorId, type, amount, date, notes, due, overCredit){
+    if(txSubmitting) return;
     txSubmitting = true;
     const btn = document.getElementById('btn-tx-submit');
     btn.classList.add('is-busy');
     btn.disabled = true;
 
     try{
-      const date = document.getElementById('in-tx-date').value || todayISO();
-      const notes = document.getElementById('in-tx-notes').value.trim();
       const txId = uid();
-      transactions.push({id:txId, debtorId:currentAccountDebtorId, type:currentTxType, amount, date, notes, createdAt:Date.now()});
-      if(currentTxType==='receive'){
-        const d = debtors.find(x=>x.id===currentAccountDebtorId);
+      const row = {id:txId, debtorId, type, amount, date, notes, createdAt:Date.now()};
+      //  کلیدِ تازه فقط وقتی که پر شده — ردیفِ بی سررسید همان شکلِ همیشه
+      if(type === 'give' && due) row.dueDate = due;
+      transactions.push(row);
+      const d = debtors.find(x=>x.id===debtorId);
+      if(overCredit){
+        logAudit('credit_over_limit', txId, `بردِ ${formatMoney(amount)} افغانی برای «${d?d.name:''}» با تأییدِ کاربر — ${overLimitText(overCredit)}`);
+      } else if(type==='receive'){
         logAudit('customer_payment', txId, `پرداخت مشتری «${d?d.name:''}» به مبلغ ${formatMoney(amount)} افغانی`);
       }
       saveState();
@@ -8334,7 +8714,7 @@
       btn.classList.remove('is-busy');
       btn.disabled = false;
     }
-  });
+  }
 
   // Delegated clicks: debtor cards, edit/delete buttons, transaction delete, modal close
   document.addEventListener('click', (e)=>{
@@ -10544,7 +10924,8 @@
     stock_adjustment:'اصلاح موجودی', supplier_return:'برگشت به تأمین‌کننده',
     price_change:'تغییر قیمت', product_edit:'ویرایش کالا', shift_open:'باز کردن صندوق', shift_close:'بستن صندوق', delete_product:'حذف محصول',
     debtor_delete:'حذف قرض‌دار', debt_tx_delete:'حذف تراکنش بدهی', expense_delete:'حذف مصرف',
-    data_export:'خروجی کامل داده'
+    data_export:'خروجی کامل داده',
+    debt_due_set:'سررسیدِ قرض', credit_over_limit:'برد بیش از سقفِ اعتبار', credit_limit_set:'سقفِ اعتبار'
   };
   const STOCK_MOVEMENT_LABELS = {
     purchase_in:'ورود خرید', sale:'فروش', customer_return:'مرجوعی مشتری', sale_cancel:'لغو فروش',
@@ -14032,7 +14413,7 @@
     }
   });
 
-  const EXTRA_PAGES = ['debtor-account', 'quick-sale', 'supplier-account', 'receipts', 'profile', 'team', 'product', 'admin', 'devices'];
+  const EXTRA_PAGES = ['debtor-account', 'quick-sale', 'supplier-account', 'receipts', 'profile', 'team', 'product', 'admin', 'devices', 'orders'];
 
   /**
    *  چراغِ نوارِ پایین را می‌برد روی تبِ فعال.
@@ -15361,10 +15742,10 @@
      ترتیب عمدی است: موتور به `TohidSyncCore` و `TohidAccount` تکیه دارد و
      اگر پیش از آن‌ها بیاید، بی‌صدا هیچ کاری نمی‌کند. -->
 <script src="license/sync-core.js?v=3" defer></script>
-<script src="license/account-code.js?v=1" defer></script>
+<script src="license/account-code.js?v=2" defer></script>
 <script src="license/sync-engine.js?v=5" defer></script>
-<script src="license/license-client.js?v=16" defer></script>
-<script src="license/shop-sync.js?v=19" defer></script>
+<script src="license/license-client.js?v=17" defer></script>
+<script src="license/shop-sync.js?v=20" defer></script>
 <script src="license/shop-ui.js?v=15" defer></script>
 <script src="license/vip.js?v=17" defer></script>
 <script src="license/support.js?v=16" defer></script>
@@ -15373,6 +15754,8 @@
 <script src="license/thermal-print.js?v=1" defer></script>
 <script src="license/photo-studio.js?v=2" defer></script>
 <script src="license/owner-export.js?v=1" defer></script>
+<!-- بخشِ «سفارش‌ها» — فقط وقتی سرور بگوید برای این دکان روشن است، ساخته می‌شود -->
+<script src="license/orders-ui.js?v=1" defer></script>
 
 </body>
 </html>
