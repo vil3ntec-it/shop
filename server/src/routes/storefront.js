@@ -41,13 +41,25 @@ const ticketOf = (req) => req.get('x-store-ticket') || '';
 
 router.get('/:slug', readLimit, store, wrap(async (req, res) => {
   const [cats, status] = await Promise.all([sf.categories(req.store.shop_id), sf.statusOf(req.store)]);
-  res.json({ store: sf.profile(req.store, cats, status), verification: { available: await sf.verificationAvailable() } });
+  res.json({
+    store: sf.profile(req.store, cats, status), verification: { available: await sf.verificationAvailable() },
+    //  پیوندِ «بازارچه» فقط وقتی بازارچه باز است (پرچمِ `market.directory`)
+    market: { available: await require('../lib/market').directoryOn() },
+  });
 }));
 
 router.get('/:slug/products', readLimit, store, wrap(async (req, res) => {
-  res.json(await sf.catalog(req.store.shop_id, {
-    q: req.query.q, category: req.query.category, cursor: req.query.cursor, limit: req.query.limit,
-  }));
+  const out = req.query.ids !== undefined
+    ? await sf.catalogByIds(req.store.shop_id, req.query.ids)
+    : await sf.catalog(req.store.shop_id, {
+      q: req.query.q, category: req.query.category, cursor: req.query.cursor, limit: req.query.limit,
+    });
+  //  ۳۲.۳: با پرچمِ `shop.catalog` وضعیتِ موجودی از دفترِ سرور (#263)؛ خاموش ⇒ null
+  //  و همان «در حال بررسی». موجودیِ نامعلوم/کهنه هرگز «موجود» نیست (`badgeOf`).
+  const stock = out.items.length
+    ? await require('../lib/catalog').publicStock(req.store.shop_id, out.items.map((p) => p.id)) : null;
+  if (stock) out.items = out.items.map((p) => ({ ...p, stock: stock.get(p.id) || p.stock }));
+  res.json(out);
 }));
 
 router.get('/:slug/products/:id/photo', readLimit, store, wrap(async (req, res) => {
