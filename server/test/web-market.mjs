@@ -45,6 +45,8 @@ process.env.RATE_MARKET_SEARCH_MAX = '100000';
 process.env.OTP_RESEND_SECONDS = '0';
 process.env.OTP_UNIFORM_MS = '0';
 process.env.MARKET_GATE_CACHE_MS = '0';
+process.env.MARKET_ELIGIBLE_CACHE_MS = '0';
+process.env.RATE_MARKET_SEARCH_BURST_MAX = '100000';
 
 const { createApp } = require('../src/app');
 const { query, one, newId, now, closeDb } = require('../src/db');
@@ -106,6 +108,8 @@ const watch = (page) => {
 };
 async function axe(page, label) {
   if (!axeSrc) return;
+  //  رنگ را پس از پایانِ حرکت‌ها می‌سنجیم (سطرِ نیمه‌شفافِ وسطِ حرکت کنتراستِ واقعی نیست)
+  await page.waitForFunction(() => document.getAnimations().every((x) => x.playState !== 'running'), null, { timeout: 5000 }).catch(() => {});
   //  از راهِ CDP (نه برچسبِ <script>) تا CSP ِ سختِ صفحه برای آزمون شل نشود
   if (!(await page.evaluate(() => Boolean(window.axe)))) await page.evaluate(axeSrc);
   const out = await page.evaluate(async () => (await window.axe.run(document,
@@ -262,7 +266,7 @@ await axe(page, 'پیگیری');
 //  دکان قبول می‌کند ⇒ پیگیری نشان می‌دهد و لغو دیگر نیست؛ سفارشِ دوم را لغو می‌کنیم
 await call('POST', `/api/shop/orders/${row.id}/transition`, { to: 'accepted' }, ga.token);
 await page.reload();
-await page.waitForFunction(() => /قبول/.test(document.getElementById('o-pill').textContent), null, { timeout: 10000 });
+await page.waitForFunction(() => /قبول/.test(document.getElementById('o-status').textContent), null, { timeout: 10000 });
 ok(await page.isHidden('#o-cancel'), 'پس از قبول، لغوِ رایگان نیست (CHK-22)');
 
 //  خریدِ دوباره ⇒ همان اقلام با قیمتِ امروز به سبد
@@ -281,7 +285,7 @@ await page.waitForSelector('#o-cancel:not([hidden])');
 await page.click('#o-cancel');
 await page.waitForSelector('dialog.confirm[open]');
 await page.click('dialog.confirm .btn-danger');
-await page.waitForFunction(() => /لغو کردید/.test(document.getElementById('o-pill').textContent), null, { timeout: 10000 });
+await page.waitForFunction(() => /لغو کردید/.test(document.getElementById('o-status').textContent), null, { timeout: 10000 });
 const cancelled = await one(`SELECT status FROM online_orders WHERE shop_id=$1 ORDER BY created_at DESC LIMIT 1`, [ga.shopId]);
 ok(cancelled.status === 'cancelled_by_customer', 'لغوِ رایگان با پرسشِ تأیید (CHK-22)', cancelled.status);
 ok((await page.locator('#o-steps li.step.stop').count()) === 1, 'پله‌ها پایانِ «لغو» را نشان می‌دهند');
