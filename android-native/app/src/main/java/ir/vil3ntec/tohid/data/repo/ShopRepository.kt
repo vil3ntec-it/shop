@@ -90,6 +90,14 @@ class ShopRepository(private val api: ApiClient) {
   suspend fun permissions(): ApiResult<PermsPageDto> =
     result { ApiJson.decode<PermsPageDto>(api.get(ApiEndpoints.Shop.PERMISSIONS)) }
 
+  /**
+   *  تأییدِ دوبارهٔ هویت با رمز — سرور کارهای حساس (مجوزِ کارمندان، نقش،
+   *  خروج از همهٔ دستگاه‌ها…) را فقط از نشستی می‌پذیرد که چند دقیقهٔ اخیر
+   *  وارد شده یا همین را زده (`reauth_required`، بندِ ۲۱.۱).
+   */
+  suspend fun confirmIdentity(password: String): ApiResult<Unit> =
+    result { api.post(ApiEndpoints.Auth.REAUTH, buildJsonObject { put("password", JsonPrimitive(password)) }); Unit }
+
   /** لایهٔ یک کارمند — `perms` همان قالبِ `PermCore` ({کلید: {mode}}) */
   suspend fun setMemberPerms(memberId: String, perms: JsonObject): ApiResult<Unit> =
     result { api.put(ApiEndpoints.Shop.memberPerms(memberId), buildJsonObject { put("perms", perms) }); Unit }
