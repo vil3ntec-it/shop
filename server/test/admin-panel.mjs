@@ -679,8 +679,31 @@ await step('قالبِ آمادهٔ اعلان از پنل ویرایش می‌�
 
 // ── §۳۸.۹: حداقل نسخهٔ پشتیبانی‌شده از همان فرمِ «نشانیِ دانلود» ──
 await step('حداقل نسخه: از پنل ذخیره می‌شود، نادرست رد می‌شود و دوباره خوانده می‌شود', async () => {
-  await openTab('sales');
-  await page.selectOption('#dl-app', 'shop');
+  /*
+   *  ⚠️ هم بازکردنِ برگه و هم `selectOption` تابعِ `loadDownloads()` را صدا می‌زنند. پاسخِ
+   *  دیررسِ آن، فرمِ تازه‌پرشده را با مقدارِ ذخیره‌شده (این‌جا نسخهٔ خالی) عوض می‌کرد؛ PUT
+   *  با version='' می‌رفت، سرور «آخرین نسخه»ای برای سنجش نداشت و 9.0.0 هم ۲۰۰ می‌گرفت
+   *  (CIِ #296: دو PUT ِ ۲۰۰ و انتظارِ بی‌پایان برای «بالاتر»). پس پیش از پر کردن، هر
+   *  خواندنِ /downloads ِ همین گام باید تمام شده و روی فرم نشسته باشد.
+   */
+  const loads = new Set();
+  const onReq = (r) => { if (r.method() === 'GET' && /\/downloads\?app=/.test(r.url())) loads.add(r); };
+  const onEnd = (r) => { loads.delete(r); };
+  page.on('request', onReq);
+  page.on('requestfinished', onEnd);
+  page.on('requestfailed', onEnd);
+  try {
+    await openTab('sales');
+    await page.selectOption('#dl-app', 'shop');
+    for (let i = 0; loads.size && i < 100; i++) await new Promise((r) => setTimeout(r, 100));
+    assert.equal(loads.size, 0, 'خواندنِ /downloads تمام نشد');
+  } finally {
+    page.off('request', onReq);
+    page.off('requestfinished', onEnd);
+    page.off('requestfailed', onEnd);
+  }
+  //  پاسخ رسیده؛ یک دورِ رویدادِ صفحه تا `loadDownloads` آن را روی فرم بنشاند
+  await page.evaluate(() => new Promise((r) => setTimeout(r, 50)));
   await page.fill('#dl-version', '2.14.2');
   await page.fill('#dl-min', '2.14.0');
   await page.click('#btn-dl-save');
