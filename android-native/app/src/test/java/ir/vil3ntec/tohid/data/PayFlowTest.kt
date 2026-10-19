@@ -311,5 +311,15 @@ class PayFlowTest {
     assertEquals(orig["tenderedMinor"], back["tenderedMinor"])
   }
 
+  @Test fun `ردیف‌های رسید - غیرنقد «ثبتِ دستی» با مرجع، دریافتی و پولِ پس؛ فاکتورِ امروز هیچ`() {
+    val f = PayFlow.saleFields(ok(PayFlow.checkout(PayFlow.Draft(2450.0, "1100", listOf(PayFlow.DraftRow("hesabpay", "HP-77", "1450"))))))
+    val s = Sale(id = "r", finalTotal = 2450.0, payments = f.payments, tenderedMinor = f.tenderedMinor, changeMinor = f.changeMinor)
+    assertEquals(
+      listOf("نقد" to 1000.0, "HesabPay (ثبتِ دستی) — HP-77" to 1450.0, "دریافتی" to 2550.0, "پولِ پس" to 100.0),
+      PayFlow.receiptLines(s),
+    )
+    assertTrue(PayFlow.receiptLines(Sale(id = "old", finalTotal = 100.0)).isEmpty())
+  }
+
   private data class ShiftRowOf(val method: String, val amount: Long)
 }

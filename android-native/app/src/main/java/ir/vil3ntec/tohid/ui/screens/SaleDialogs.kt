@@ -97,7 +97,20 @@ fun CheckoutDialog(
   else minOf(parseNumber(paidText)?.coerceAtLeast(0.0) ?: 0.0, totals.finalTotal)
   val remaining = (totals.finalTotal - paid).coerceAtLeast(0.0)
   val discountBad = canDiscount && numberInvalid(discountText)
-  val paidBad = payment == SalesEngine.Payment.CREDIT && numberInvalid(paidText)
+  //  PAY (v3 A4): پرداختِ ترکیبی — فقط با پرچم؛ خاموش ⇒ همان نقد/نسیهٔ امروز
+  val payV2 = remember { ir.vil3ntec.tohid.data.ShopPolicy.payV2(context) }
+  val payState = remember { ir.vil3ntec.tohid.ui.components.pos.PayPanelState() }
+  val cashFocus = remember { androidx.compose.ui.focus.FocusRequester() }
+  var payError by remember { mutableStateOf<String?>(null) }
+  val paidBad = !payV2 && payment == SalesEngine.Payment.CREDIT && numberInvalid(paidText)
+  fun confirm() {
+    if (busy || discountBad || paidBad) return
+    if (!payV2) { onConfirm(checkout.copy(paidAmount = paid, debtorId = debtorId)); return }
+    when (val r = ir.vil3ntec.tohid.data.PayFlow.checkout(payState.draft(totals.finalTotal, debtorId))) {
+      is ir.vil3ntec.tohid.data.PayFlow.Outcome.Ok -> onConfirm(checkout.copy(settlement = r.value, debtorId = debtorId))
+      is ir.vil3ntec.tohid.data.PayFlow.Outcome.Bad -> payError = ir.vil3ntec.tohid.data.PayFlow.message(r.problem)
+    }
+  }
 
   Dialog(onDismissRequest = onDismiss) {
     DialogEntry {
@@ -134,6 +147,7 @@ fun CheckoutDialog(
 
         Spacer(Modifier.height(14.dp))
         }
+        if (!payV2) {
         Text("نوع پرداخت", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
         Spacer(Modifier.height(6.dp))
         Segmented(
@@ -141,6 +155,7 @@ fun CheckoutDialog(
           selected = payment,
           onSelect = { payment = it },
         )
+        }
 
         /*
          *  مشتری — در نسیه اجباری، در نقدی اختیاری.
@@ -155,7 +170,7 @@ fun CheckoutDialog(
          */
         Spacer(Modifier.height(12.dp))
         Text(
-          if (payment == SalesEngine.Payment.CREDIT) "قرض‌دار" else "مشتری (اختیاری)",
+          if (payV2) "مشتری — باقی‌مانده به حسابش می‌رود" else if (payment == SalesEngine.Payment.CREDIT) "قرض‌دار" else "مشتری (اختیاری)",
           style = MaterialTheme.typography.labelMedium,
           color = Shop.colors.muted,
         )
@@ -185,7 +200,21 @@ fun CheckoutDialog(
           )
         }
 
-        if (payment == SalesEngine.Payment.CREDIT) {
+        if (payV2) {
+          Spacer(Modifier.height(12.dp))
+          ir.vil3ntec.tohid.ui.components.pos.PaySplitSection(
+            state = payState,
+            total = totals.finalTotal,
+            customerId = debtorId,
+            customerName = debtorId?.let { id -> d.debtors.find { it.id == id }?.name },
+            target = 48.dp,
+            cashFocus = cashFocus,
+            onSubmit = { confirm() },
+          )
+          payError?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = Shop.colors.danger) }
+        }
+
+        if (!payV2 && payment == SalesEngine.Payment.CREDIT) {
           Spacer(Modifier.height(12.dp))
           OutlinedTextField(
             value = paidText,
@@ -205,15 +234,17 @@ fun CheckoutDialog(
           MoneyRow("تخفیف", totals.discount)
           HorizontalDivider(Modifier.padding(vertical = 6.dp), color = Shop.colors.border)
           MoneyRow("مبلغ نهایی", totals.finalTotal, strong = true)
+          if (!payV2) {
           MoneyRow("مبلغ پرداختی", paid)
           MoneyRow("باقی‌مانده", remaining, tint = if (remaining > 0) Shop.colors.warning else null)
+          }
         }
 
         Spacer(Modifier.height(16.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
           OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("انصراف") }
           Button(
-            onClick = { onConfirm(checkout.copy(paidAmount = paid, debtorId = debtorId)) },
+            onClick = { confirm() },
             enabled = !busy && !discountBad && !paidBad,
             modifier = Modifier.weight(1f),
           ) { Text(if (busy) "در حالِ ثبت…" else "ثبت فروش") }
@@ -340,6 +371,8 @@ fun InvoiceDialog(
         MoneyRow("مبلغ نهایی", sale.finalTotal, strong = true)
         MoneyRow("پرداختی", sale.paidAmount)
         MoneyRow("باقی‌مانده", sale.remaining, tint = if (sale.remaining > 0) Shop.colors.warning else null)
+        //  PAY (v3 A4): ردیف‌های پرداختِ ترکیبی — فقط فاکتوری که `payments` دارد
+        ir.vil3ntec.tohid.data.PayFlow.receiptLines(sale).forEach { (label, amount) -> MoneyRow(label, amount) }
         if (debtor != null) {
           Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), horizontalArrangement = Arrangement.SpaceBetween) {
             Text("قرض‌دار", style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)

@@ -128,6 +128,8 @@ fun SalesHistoryScreen(
   var shiftHistory by remember { mutableStateOf(false) }
   val me = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(roleContext).accountName }.getOrDefault("") }
   val shift = remember(d) { ir.vil3ntec.tohid.data.CashShift.current(d) }
+  //  PAY (v3 A4): صندوقِ شیفت با هستهٔ pay-core — فقط با پرچم (`ShiftPanelV2`)؛ خاموش ⇒ کارتِ امروز
+  val payV2 = remember { ir.vil3ntec.tohid.data.ShopPolicy.payV2(roleContext) }
 
   LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
     item {
@@ -149,7 +151,10 @@ fun SalesHistoryScreen(
       Spacer(Modifier.height(12.dp))
     }
 
-    item {
+    if (payV2) item {
+      ShiftPanelV2(d = d, store = store, me = me, toast = ::toast)
+      Spacer(Modifier.height(12.dp))
+    } else item {
       Panel {
         Row(verticalAlignment = Alignment.CenterVertically) {
           Column(Modifier.weight(1f)) {

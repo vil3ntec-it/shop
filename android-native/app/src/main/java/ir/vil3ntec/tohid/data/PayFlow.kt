@@ -123,6 +123,9 @@ object PayFlow {
   sealed interface Outcome<out T> {
     data class Ok<T>(val value: T) : Outcome<T>
     data class Bad(val problem: Problem) : Outcome<Nothing>
+
+    /** مقدار، یا `null` اگر خطا بود */
+    fun valueOrNull(): T? = if (this is Ok) value else null
   }
 
   private class Built(val input: SettleInput, val at: List<Int>)
@@ -196,6 +199,21 @@ object PayFlow {
   fun checkout(d: Draft): Outcome<Settlement> = when (val s = preview(d)) {
     is Outcome.Bad -> s
     is Outcome.Ok -> if (s.value.status == "short") Outcome.Bad(Problem("SHORT", remaining = s.value.remaining)) else s
+  }
+
+  /**
+   *  ردیف‌های پرداختِ ترکیبی روی فاکتور و رسید (برچسب، افغانی) — همان `invoicePayLines`ِ وب.
+   *  فاکتورِ بی `payments` (امروز، یا پرچمِ خاموش) هیچ ردیفی نمی‌گیرد.
+   */
+  fun receiptLines(s: Sale): List<Pair<String, Double>> {
+    val list = s.payments?.takeIf { it.isNotEmpty() } ?: return emptyList()
+    return buildList {
+      list.filter { it.method != ACCOUNT }.forEach { p ->
+        add(methodName(p.method) + (if (p.status == "pending") " (ثبتِ دستی)" else "") + (p.ref?.let { " — $it" } ?: "") to major(p.amountMinor))
+      }
+      s.tenderedMinor?.takeIf { it > 0 }?.let { add("دریافتی" to major(it)) }
+      s.changeMinor?.takeIf { it > 0 }?.let { add("پولِ پس" to major(it)) }
+    }
   }
 
   // ── صندوق (PAY-11..15، 19) ───────────────────────────────

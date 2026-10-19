@@ -170,6 +170,8 @@ object Receipt {
     row("مبلغ نهایی", afn(sale.finalTotal), head)
     row("پرداختی", afn(sale.paidAmount), body)
     row("باقی‌مانده", afn(sale.remaining), body)
+    //  PAY (v3 A4): ردیف‌های پرداختِ ترکیبی — فقط فاکتوری که `payments` دارد
+    ir.vil3ntec.tohid.data.PayFlow.receiptLines(sale).forEach { (label, amount) -> row(label, afn(amount), body) }
     if (debtor != null) row("قرض‌دار", debtor.name, body)
 
     rule(thick = true)
