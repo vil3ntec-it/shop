@@ -70,6 +70,9 @@ const SHELL_ASSETS = [
   './license/ledger-store.js',
   //  خروجیِ کاملِ مالک (OPS-08) — بی اینترنت هم باید کار کند
   './license/owner-export.js',
+  //  دفترِ قرض‌داران (پول به واحدِ کوچک + DebtBook) — بی این دو، حسابِ ردیف‌ها روی نصبِ آفلاین نمی‌آمد
+  './license/money.js',
+  './license/debt-book.js',
   //  خوانندهٔ بارکد برای آیفون — Safari «BarcodeDetector» ندارد و دوربین همیشه
   //  همین را بار می‌کند؛ بی آن، نصبِ تازه بی اینترنت اصلاً اسکن نمی‌کرد
   './license/vendor/zxing-0.21.3.min.js',

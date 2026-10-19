@@ -121,7 +121,11 @@ class AuthRepository(
     val access = (body["accessToken"] as? JsonPrimitive)?.content?.takeIf { it.isNotBlank() }
       ?: throw ApiFailure.SessionExpired()
     val expires = (body["accessExpiresAt"] as? JsonPrimitive)?.content?.toLongOrNull() ?: 0L
-    tokens.save(access, refreshToken, expires)
+    //  ⛔ سرور توکنِ تازه‌سازی را می‌چرخاند؛ قبلی پس از سی ثانیه «دزدی» است
+    //  (شرحش سرِ `ApiClient.renew`)
+    val rotated = (body["refreshToken"] as? JsonPrimitive)?.content?.takeIf { it.isNotBlank() && it != "null" }
+      ?: refreshToken
+    tokens.save(access, rotated, expires)
 
     /*
      *  حساب را از سرور می‌گیریم، نه از حافظه.
@@ -135,7 +139,8 @@ class AuthRepository(
     val session = SessionDto(
       accessToken = access,
       accessExpiresAt = expires,
-      refreshToken = refreshToken,
+      //  همان که الان در حافظه است — `api.get` بالا شاید خودش یک بار دیگر چرخانده باشد
+      refreshToken = tokens.refreshToken ?: rotated,
       user = me.user,
       shop = me.shop,
     )

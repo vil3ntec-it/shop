@@ -105,6 +105,8 @@ object OwnerExport {
     "id" to "شناسه",
     "name" to "نام",
     "phone" to "تلفن",
+    "dueDate" to "سررسید",
+    "creditLimit" to "سقف اعتبار",
     "notes" to "یادداشت",
     "createdAt" to "زمان ثبت (UTC)",
     "date" to "تاریخ",

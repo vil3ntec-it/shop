@@ -23,7 +23,12 @@ object DebtorEngine {
     val name: String = "",
     val phone: String = "",
     val notes: String = "",
+    /** سقفِ اعتبار (CRM-03) به افغانی — `null` یعنی بی سقف */
+    val creditLimit: Double? = null,
   )
+
+  /** سقفِ نامعتبر (منفی یا ناعدد) پذیرفته نمی‌شود؛ `null` یعنی بی سقف */
+  private fun badLimit(v: Double?): Boolean = v != null && (v.isNaN() || v.isInfinite() || v < 0)
 
   sealed interface Result {
     data class Ok(val data: ShopData, val id: String) : Result
@@ -35,6 +40,7 @@ object DebtorEngine {
   fun add(d: ShopData, draft: DebtorDraft, now: Long, newId: () -> String): Result {
     val name = draft.name.trim()
     if (name.isEmpty()) return Result.Failed("نام قرض‌دار را بنویسید")
+    if (badLimit(draft.creditLimit)) return Result.Failed("سقفِ اعتبار معتبر وارد کنید")
 
     val id = newId()
     return Result.Ok(
@@ -45,6 +51,7 @@ object DebtorEngine {
           phone = ir.vil3ntec.tohid.LocaleText.phoneForSave(draft.phone),
           notes = draft.notes.trim(),
           createdAt = now,
+          creditLimit = draft.creditLimit,
         )
       ),
       id = id,
@@ -65,6 +72,44 @@ object DebtorEngine {
       id = id,
     )
   }
+
+  /**
+   *  سقفِ اعتبار (CRM-03) — گذاشتن، عوض کردن یا برداشتن (`null` = بی سقف).
+   *
+   *  سیاستِ مالیِ همین مشتری است، پس هر تغییر ردی در دفترچهٔ ثبت دارد. `edit`
+   *  به سقف دست نمی‌زند؛ صفحهٔ ویرایش `editWithLimit` را صدا می‌زند.
+   */
+  fun setCreditLimit(
+    d: ShopData,
+    id: String,
+    limit: Double?,
+    today: String = ir.vil3ntec.tohid.todayIso(),
+    now: Long = System.currentTimeMillis(),
+    newId: () -> String = ::auditId,
+  ): Result {
+    val debtor = d.debtors.find { it.id == id } ?: return Result.Failed("قرض‌دار پیدا نشد")
+    if (badLimit(limit)) return Result.Failed("سقفِ اعتبار معتبر وارد کنید")
+    if (limit == debtor.creditLimit) return Result.Ok(d, id)
+    fun text(v: Double?) = v?.let { "${money(it)} افغانی" } ?: "بی سقف"
+    val trace = AuditEntry(
+      id = newId(), type = "credit_limit_set", date = today, refId = id, createdAt = now,
+      notes = "سقفِ اعتبارِ «${debtor.name}»: ${text(debtor.creditLimit)} ⇐ ${text(limit)}",
+    )
+    return Result.Ok(
+      d.copy(
+        debtors = d.debtors.map { if (it.id == id) it.copy(creditLimit = limit) else it },
+        auditLog = d.auditLog + trace,
+      ),
+      id = id,
+    )
+  }
+
+  /** ویرایشِ نام/تلفن/یادداشت و سقف با هم — همه یا هیچ */
+  fun editWithLimit(d: ShopData, id: String, draft: DebtorDraft): Result =
+    when (val r = edit(d, id, draft)) {
+      is Result.Failed -> r
+      is Result.Ok -> setCreditLimit(r.data, id, draft.creditLimit)
+    }
 
   /**
    * حذفِ قرض‌دار — با تراکنش‌هایش.
@@ -115,6 +160,11 @@ object DebtorEngine {
    *
    * فقط «پرداخت» در دفترچهٔ ثبت می‌نشیند، نه «قرض دادن» — همان کارِ نسخهٔ
    * وب. دلیلش این است که پول‌گرفتن چیزی است که بعداً سرش بحث می‌شود.
+   *
+   * `dueDate` (اختیاری، فقط برد): سررسید. `overLimit`: برد از سقفِ اعتبارِ
+   * مشتری (اگر سقف دارد) بیرون می‌زند و کاربر صریحاً تأیید کرده — بی آن، ثبت
+   * نمی‌شود و همان جمله برمی‌گردد؛ با آن، ردش در دفترچهٔ ثبت می‌ماند (CRM-03).
+   * مشتریِ بی سقف همان رفتارِ همیشه را دارد.
    */
   fun addTransaction(
     d: ShopData,
@@ -126,12 +176,21 @@ object DebtorEngine {
     today: String,
     now: Long,
     newId: () -> String,
+    dueDate: String? = null,
+    overLimit: Boolean = false,
   ): Result {
     val debtor = d.debtors.find { it.id == debtorId } ?: return Result.Failed("قرض‌دار پیدا نشد")
     if (amount.isNaN() || amount <= 0) return Result.Failed("مبلغ معتبر وارد کنید")
 
-    val id = newId()
     val when_ = date.ifBlank { today }
+    //  رسید سررسید ندارد
+    val due = if (kind == Kind.GIVE) dueDate?.trim()?.takeIf { it.isNotEmpty() } else null
+    dueProblem(due, when_)?.let { return Result.Failed(it) }
+
+    val credit = if (kind == Kind.GIVE) DebtBook.creditCheck(d, debtorId, DebtBook.minor(amount)) else null
+    if (credit != null && credit.over && !overLimit) return Result.Failed(DebtBook.overLimitText(credit))
+
+    val id = newId()
     val transaction = DebtTransaction(
       id = id,
       debtorId = debtorId,
@@ -140,9 +199,19 @@ object DebtorEngine {
       date = when_,
       notes = notes.trim(),
       createdAt = now,
+      dueDate = due,
     )
 
-    val audit = if (kind == Kind.RECEIVE) {
+    val audit = if (credit != null && credit.over) {
+      d.auditLog + AuditEntry(
+        id = newId(),
+        type = "credit_over_limit",
+        date = when_,
+        refId = id,
+        notes = "بردِ ${money(amount)} افغانی برای «${debtor.name}» با تأییدِ کاربر — ${DebtBook.overLimitText(credit)}",
+        createdAt = now,
+      )
+    } else if (kind == Kind.RECEIVE) {
       d.auditLog + AuditEntry(
         id = newId(),
         type = "customer_payment",
@@ -158,6 +227,49 @@ object DebtorEngine {
     return Result.Ok(
       d.copy(transactions = d.transactions + transaction, auditLog = audit),
       id = id,
+    )
+  }
+
+  /** سررسیدِ نامعتبر ⇒ جمله؛ درست یا خالی ⇒ `null` */
+  private fun dueProblem(due: String?, date: String): String? = when {
+    due == null -> null
+    !DebtBook.isIsoDate(due) -> "سررسید خوانده نشد"
+    due < date -> "سررسید نمی‌تواند پیش از تاریخِ برد باشد"
+    else -> null
+  }
+
+  /**
+   *  گذاشتن، عوض کردن یا برداشتنِ (`null`) سررسیدِ یک برد — فروشِ نسیه هم.
+   *
+   *  مبلغ و تاریخِ برد دست نمی‌خورد؛ فقط «کِی باید پس بیاید». هر تغییر ردی در
+   *  دفترچهٔ ثبت دارد، با سررسیدِ قبلی.
+   */
+  fun setDueDate(
+    d: ShopData,
+    txId: String,
+    dueDate: String?,
+    today: String = ir.vil3ntec.tohid.todayIso(),
+    now: Long = System.currentTimeMillis(),
+    newId: () -> String = ::auditId,
+  ): Result {
+    val tx = d.transactions.find { it.id == txId } ?: return Result.Failed("تراکنش پیدا نشد")
+    if (tx.type != "give") return Result.Failed("سررسید فقط برای برد است")
+    val due = dueDate?.trim()?.takeIf { it.isNotEmpty() }
+    dueProblem(due, tx.date)?.let { return Result.Failed(it) }
+    if (due == tx.dueDate) return Result.Ok(d, txId)
+
+    val who = d.debtors.find { it.id == tx.debtorId }?.name.orEmpty()
+    val trace = AuditEntry(
+      id = newId(), type = "debt_due_set", date = today, refId = txId, createdAt = now,
+      notes = "سررسیدِ بردِ ${money(tx.amount)} افغانی از حسابِ «$who» (تاریخ ${tx.date}): " +
+        "${tx.dueDate ?: "ندارد"} ⇐ ${due ?: "ندارد"}",
+    )
+    return Result.Ok(
+      d.copy(
+        transactions = d.transactions.map { if (it.id == txId) it.copy(dueDate = due) else it },
+        auditLog = d.auditLog + trace,
+      ),
+      id = txId,
     )
   }
 
