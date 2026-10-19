@@ -86,6 +86,7 @@ private val PAGE_TITLES = mapOf(
   "support" to "پشتیبانی",
   "profile" to "حساب من",
   "team" to "کارمندان دکان",
+  "orders" to "سفارش‌ها",
 )
 
 /**
@@ -251,6 +252,8 @@ fun AppRoot(
   LifecycleEventEffect(Lifecycle.Event.ON_STOP) {
     ir.vil3ntec.tohid.sync.AutoSync.stopPolling()
   }
+  //  بخشِ «سفارش‌ها»: فقط اگر سرور برای این دکان روشن گفته، و فقط وقتی برنامه جلوی چشم است
+  OrdersLive.Host()
 
   //  اگر دفتر دیرتر از ON_START آماده شد، همان‌جا شروع می‌کنیم
   LaunchedEffect(loaded) {
@@ -638,6 +641,7 @@ fun AppRoot(
             "products" to railBoard.outOfStock.size + railBoard.lowStock.size,
             "warehouse" to railBoard.expiring.size,
             "debtors" to railBoard.debtOverdue.size,
+            "orders" to OrdersLive.newCount,
           ),
         )
       }
@@ -794,6 +798,7 @@ fun AppRoot(
           onSubscription = { sub = "vip" },
         )
         "team" -> TeamScreen(snackbar)
+        "orders" -> OrdersScreen(snackbar) { sub = null }
         "devices" -> DevicesScreen(data, snackbar)
         "more" -> MoreScreen(store, data, ::open)
       }
