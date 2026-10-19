@@ -17,6 +17,8 @@
 </head>
 <body>
 <a class="skip" href="#main">پرش به محتوا</a>
+<!-- سطحِ روشنِ صفحه؛ در گوشی با سبدِ پُر روی پایهٔ سیاه می‌نشیند (مدلِ مرجعِ r3/r2) -->
+<div id="surface" class="surface">
 <header class="appbar">
   <div class="wrap appbar-row">
     <a id="to-market" class="btn btn-icon btn-ghost" href="/market/" aria-label="بازارچه" hidden></a>
@@ -185,11 +187,14 @@
     </div>
   </section>
 </main>
+</div>
+<button id="surface-cap" class="surface-cap" type="button" aria-label="بستنِ سبد و بازگشت به کالاها" hidden></button>
 
-<!-- نوارِ تیرهٔ سبد (ref-5) -->
+<!-- نوارِ سبد روی پایهٔ سیاه (r3): «سبد»، تا سه عکسِ گرد، دایرهٔ زردِ شمار -->
 <button id="cart-bar" class="cartbar" type="button" hidden aria-haspopup="dialog" aria-controls="cart-sheet">
   <span class="ttl">سبد</span>
   <span id="bar-thumbs" class="thumbs" aria-hidden="true"></span>
+  <span id="bar-more" class="more" aria-hidden="true" hidden></span>
   <span class="sum"><small>جمع</small><b id="bar-total" class="num"></b></span>
   <span id="open-cart" class="count" aria-hidden="true"></span>
   <span id="bar-label" class="sr-only"></span>
@@ -197,10 +202,10 @@
 
 <div id="scrim" class="scrim" hidden></div>
 
-<!-- برگهٔ تیرهٔ سبد (ref-6) -->
+<!-- سبدِ باز (r2): روی پایهٔ سیاه در گوشی؛ کشوی کناری در کامپیوتر -->
 <div id="cart-sheet" class="sheet dark drawer" role="dialog" aria-modal="true" aria-labelledby="cart-title" hidden>
   <div class="sheet-head">
-    <div><h2 id="cart-title">سبدِ خرید</h2><p id="cart-shop" class="muted small"></p></div>
+    <div><h2 id="cart-title" tabindex="-1">سبد</h2><p id="cart-shop" class="muted small"></p></div>
     <button id="cart-close" class="btn btn-icon btn-ghost" type="button" aria-label="بستن"></button>
   </div>
   <div class="sheet-body">

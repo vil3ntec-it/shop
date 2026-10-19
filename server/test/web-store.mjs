@@ -143,7 +143,9 @@ ok((await page.textContent('#open-cart')).includes('۲'), 'سبدِ مهمان �
 
 await page.click('#open-cart');
 //  نوارِ تیره ⇐ برگهٔ تیرهٔ سبد (ref-5/6) ⇐ «ادامه»
-await page.waitForSelector('#cart-sheet.on');
+//  گوشی (۳۶۰): مدلِ مرجعِ r3/r2 — سطحِ روشن بالا می‌رود و سبد روی پایهٔ سیاه است
+await page.waitForFunction(() => document.body.classList.contains('cart-open') || document.getElementById('cart-sheet').classList.contains('on'));
+ok(await page.evaluate(() => document.body.classList.contains('phone-cart') && document.body.classList.contains('cart-open')), 'گوشی: پایهٔ سیاه و سبدِ باز (r2)');
 ok((await page.locator('#sheet-lines li').count()) === 2 && (await page.locator('#sheet-lines .stepper').count()) === 2, 'برگهٔ سبد: اقلام با −/+');
 await page.click('#cart-next');
 await page.waitForSelector('#view-checkout:not([hidden])');
