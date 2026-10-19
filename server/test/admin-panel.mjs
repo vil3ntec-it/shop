@@ -718,6 +718,45 @@ await step('همگام‌سازی و امنیت: دستگاه‌ها، خطاه�
   assert.match(csp || '', /script-src 'self'/);
 });
 
+// ── F0-27: کانالِ آزمایشی — مدیرِ ارشد از پنل دکان و دستگاه را می‌افزاید ──
+await step('کانالِ آزمایشی: ذخیره در live_config و سابقه؛ شناسهٔ ناجور پیامِ قرمز و بی‌تغییر', async () => {
+  await openTab('plans');
+  await page.waitForSelector('#beta-panel:not(.hidden)', { timeout: 10_000 });
+  await page.fill('#beta-shops', 'shop_panel_1\nshop_panel_2');
+  await page.fill('#beta-devices', 'dev_panel_1, dev_panel_1');
+  await page.fill('#beta-reason', 'آزمونِ پنل');
+  await page.click('#btn-beta-save');
+  await page.waitForSelector('#beta-msg .msg-ok', { timeout: 10_000 });
+  const val = async (key) => {
+    const r = await one(`SELECT value FROM live_config WHERE scope='release' AND key=$1`, [key]);
+    return typeof r.value === 'string' ? JSON.parse(r.value) : r.value;
+  };
+  assert.deepEqual(await val('beta.shops'), ['shop_panel_1', 'shop_panel_2']);
+  assert.deepEqual(await val('beta.devices'), ['dev_panel_1']);
+  const a = await one(`SELECT detail FROM audit_logs WHERE action='admin.release_beta_set' ORDER BY created_at DESC LIMIT 1`);
+  const d = typeof a.detail === 'string' ? JSON.parse(a.detail) : a.detail;
+  assert.equal(d.reason, 'آزمونِ پنل');
+  assert.equal(d.shops.added, 'shop_panel_1, shop_panel_2');
+  assert.match(await page.textContent('#beta-shops-meta'), /relroot|admin/);
+
+  await page.fill('#beta-shops', 'bad id!');
+  await page.click('#btn-beta-save');
+  await page.waitForSelector('#beta-msg .msg-bad', { timeout: 10_000 });
+  assert.deepEqual(await val('beta.shops'), ['shop_panel_1', 'shop_panel_2'], 'شناسهٔ ناجور چیزی را عوض نکرد');
+});
+
+await step('کانالِ آزمایشی: دکمهٔ صفحهٔ دکان همان دکان را می‌افزاید', async () => {
+  await openTab('shops');
+  await page.click('#shops-body tr:first-child button');
+  await page.waitForSelector('#shop-detail:not(.hidden) #btn-shop-beta', { timeout: 10_000 });
+  const id = (await page.textContent('#shop-id')).trim();
+  await page.click('#btn-shop-beta');
+  await page.waitForFunction(() => document.querySelector('#btn-shop-beta')?.textContent?.includes('در کانالِ آزمایشی است'), null, { timeout: 10_000 });
+  const r = await one(`SELECT value FROM live_config WHERE scope='release' AND key='beta.shops'`);
+  const ids = typeof r.value === 'string' ? JSON.parse(r.value) : r.value;
+  assert.deepEqual(ids, ['shop_panel_1', 'shop_panel_2', id], 'بقیهٔ فهرست دست نخورد');
+});
+
 // ── F0-15: ورودِ دومرحله‌ایِ اختیاری — روشن کردن و ورود با کد، از خودِ پنل ──
 await step('ورودِ دومرحله‌ای: از پنل روشن می‌شود، ورود کد می‌خواهد و با کد وارد می‌شود', async () => {
   const totp = require('../src/lib/totp');
