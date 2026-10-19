@@ -11,9 +11,9 @@
  *   خواندن ─ کارتِ سبکِ هر برگه (ORD-11/12) با صفحه‌بندیِ کلیدی، شمارش‌ها،
  *           و جزئیات با خطِ زمانی (ORD-16).
  *
- * ⛔ هنوز نیست (و عمداً): بررسیِ دوبارهٔ موجودی (بخشی از CHK-17)، رزروِ
- * موجودی (CHK-18) و سندِ فروشِ سریِ W (ORD-20) — این‌ها لایهٔ موجودیِ سرور
- * را لازم دارند. سفارشِ دستیِ کارمند قیمت را خودش می‌گوید، درست مثلِ صندوق؛
+ * ⛔ هنوز نیست (و عمداً): بررسیِ دوبارهٔ موجودی (بخشی از CHK-17) و رزروِ
+ * موجودی (CHK-18) — این‌ها لایهٔ موجودیِ سرور را لازم دارند. سندِ فروشِ سریِ W
+ * (ORD-20) در `lib/order-ledger.js` است و از قلّابِ گذار صدا زده می‌شود. سفارشِ دستیِ کارمند قیمت را خودش می‌گوید، درست مثلِ صندوق؛
  * سفارشِ ویترین قیمت را از دفترِ سرور می‌گیرد (`price` در `create`،
  * ‎lib/storefront.js‎).
  */
@@ -403,7 +403,10 @@ function parseTransition(input) {
 /** گذارِ وضعیت (شرح و پارامترها در بالا) — ورودی پیش از باز شدنِ تراکنش سنجیده می‌شود. */
 async function transition(shopId, id, input, actor) {
   const p = parseTransition(input);
-  return tx((c) => applyTransition(c, shopId, id, p, actor));
+  const out = await tx((c) => applyTransition(c, shopId, id, p, actor));
+  //  پس از COMMIT: دستگاه‌های وصل سندِ W را همین حالا بگیرند
+  if (out.ledger && out.ledger.head) require('./order-ledger').notify(shopId, out.ledger.head);
+  return out;
 }
 
 /**
@@ -455,7 +458,10 @@ async function applyTransition(c, shopId, id, { to, expected, reason, note, read
       [ulid(at), row.id, shopId, seq, row.status, to, actor.type, actor.id || '', reason, note,
         JSON.stringify(readyAt ? { readyAt } : {}), at]
     );
-    return { order: await loadDetail(run, shopId, row.id, actor), unchanged: false, from: row.status, to };
+    //  ORD-20: تحویل ⇒ فاکتورِ سریِ W در دفترِ دستگاه‌های دکان؛ بازپرداختِ کامل ⇒ سندِ برگشت.
+    //  پرچمِ خاموشِ `shop.orders.ledger` ⇒ هیچ. هر خطا کلِ گذار را برمی‌گرداند (سند و گذار با هم).
+    const ledger = await require('./order-ledger').onOrderStatus(c, shopId, { id: row.id, from: row.status, to }, actor, at);
+    return { order: await loadDetail(run, shopId, row.id, actor), unchanged: false, from: row.status, to, ledger };
   }
 }
 
