@@ -1,0 +1,787 @@
+{
+  "_doc": "STF-02 / بخشِ ۱۰.۱ — «برگهٔ امضاشده». همین فایل را license/approval-core.js (و نسخهٔ سرور) و ApprovalSlip.kt می‌دوانند. test_key فقط کلیدِ آزمون است؛ در هیچ برنامه‌ای به کار نمی‌رود.",
+  "version": 1,
+  "ttl_max_ms": 900000,
+  "skew_ms": 300000,
+  "test_key": {
+    "alg": "ES256",
+    "key_id": "ak_7ea833d85856fc32ba38d95e",
+    "spki_b64": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE5nzZow9ldcgfx9qgjgUbR6q7EpUy/S8PaSbNyxEwGxdH8WMR8C8CXOEEGemWd/M0OZLNFqyVazF2InGS2Bcw3A==",
+    "pkcs8_b64": "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgsUnnceod7M5G9JVX07/KSbaKOJC+tnXZ1mRb4V/LGVuhRANCAATmfNmjD2V1yB/H2qCOBRtHqrsSlTL9Lw9pJs3LETAbF0fxYxHwLwJc4QQZ6ZZ38zQ5ks0WrJVrMXYicZLYFzDc"
+  },
+  "payload": [
+    {
+      "slip": {
+        "v": 1,
+        "shop": "shp_test",
+        "doc": "sales/s-0001",
+        "perm": "sales.discount",
+        "pct_bp": 1000,
+        "amount": 50000,
+        "by": "usr_manager",
+        "key": "ak_7ea833d85856fc32ba38d95e",
+        "iat": 1760000000000,
+        "exp": 1760000600000,
+        "nonce": "n0nce-AAAABBBBCCCC",
+        "reason": "مشتریِ همیشگی",
+        "sig": "x"
+      },
+      "out": "tohid-approval/1\nshop=shp_test\ndoc=sales/s-0001\nperm=sales.discount\npct_bp=1000\namount=50000\nby=usr_manager\nkey=ak_7ea833d85856fc32ba38d95e\niat=1760000000000\nexp=1760000600000\nnonce=n0nce-AAAABBBBCCCC\nreason=مشتریِ همیشگی"
+    },
+    {
+      "slip": {
+        "v": 1,
+        "shop": "shp_test",
+        "doc": "sales/s-0002",
+        "perm": "sales.cancel",
+        "pct_bp": null,
+        "amount": null,
+        "by": "usr_manager",
+        "key": "ak_7ea833d85856fc32ba38d95e",
+        "iat": 1760000000000,
+        "exp": 1760000600000,
+        "nonce": "n0nce-DDDDEEEEFFFF",
+        "reason": "اشتباهِ صندوق",
+        "sig": "x"
+      },
+      "out": "tohid-approval/1\nshop=shp_test\ndoc=sales/s-0002\nperm=sales.cancel\npct_bp=\namount=\nby=usr_manager\nkey=ak_7ea833d85856fc32ba38d95e\niat=1760000000000\nexp=1760000600000\nnonce=n0nce-DDDDEEEEFFFF\nreason=اشتباهِ صندوق"
+    },
+    {
+      "slip": {
+        "v": 1,
+        "shop": "shp_test",
+        "doc": "returns/r-0001",
+        "perm": "returns.create",
+        "pct_bp": null,
+        "amount": 120000,
+        "by": "usr_manager",
+        "key": "ak_7ea833d85856fc32ba38d95e",
+        "iat": 1760000000000,
+        "exp": 1760000600000,
+        "nonce": "n0nce-GGGGHHHHIIII",
+        "reason": "کالای خراب",
+        "sig": "x"
+      },
+      "out": "tohid-approval/1\nshop=shp_test\ndoc=returns/r-0001\nperm=returns.create\npct_bp=\namount=120000\nby=usr_manager\nkey=ak_7ea833d85856fc32ba38d95e\niat=1760000000000\nexp=1760000600000\nnonce=n0nce-GGGGHHHHIIII\nreason=کالای خراب"
+    },
+    {
+      "slip": {
+        "v": 1,
+        "shop": "shp_test",
+        "doc": "sales/s-0002",
+        "perm": "sales.cancel",
+        "by": "usr_manager",
+        "key": "ak_7ea833d85856fc32ba38d95e",
+        "iat": 1760000000000,
+        "exp": 1760000600000,
+        "nonce": "n0nce-DDDDEEEEFFFF",
+        "reason": "اشتباهِ صندوق",
+        "sig": "x"
+      },
+      "out": "tohid-approval/1\nshop=shp_test\ndoc=sales/s-0002\nperm=sales.cancel\npct_bp=\namount=\nby=usr_manager\nkey=ak_7ea833d85856fc32ba38d95e\niat=1760000000000\nexp=1760000600000\nnonce=n0nce-DDDDEEEEFFFF\nreason=اشتباهِ صندوق"
+    }
+  ],
+  "signatures": [
+    {
+      "payload": 0,
+      "der_b64": "MEYCIQCI5TGzsnUAzjfy4jt2/UE9W1UG9htWZSyCE7OtBq9pRQIhAPYEAkyTAfRWN2BcD05VTuf86evELZIe192GVPNaz9qm",
+      "p1363_b64": "ljqSvMBKzgmnKhJqXp63CTnw9iCdxwI2fYfBspOZ5b4pA0mazBH86ZhlSSENcK6yvI2tVXnrsljlhChe85AzHQ=="
+    },
+    {
+      "payload": 1,
+      "der_b64": "MEQCIDLqBkJge5r7hEPwOchAuCRIxHzfTLJQDtsx1XE41vbnAiB0qA0aOrVtWIya0ioMlA/WPGdkug74RTu0KWF40qnlgQ==",
+      "p1363_b64": "DvK5GGY1nh5vHUP0IJ/Y7UBXt92/POzB7kO7UU/hwRbYMw0zFdxTKPVLTbHoxD3vz803Sa9Ya47EVIC1amTHHQ=="
+    },
+    {
+      "payload": 2,
+      "der_b64": "MEYCIQCGBvM0u/eXaX4AiNxhVXB5IJs7UsdZpTDpE38L2qEc0AIhAJq2G7hqgQYYXinYZ6DZojEg9hxrXlwTAAiexFkYEwpu",
+      "p1363_b64": "GPlqs06PymZPHq+sK0d8J50GhFTAmu7j9vVyhtatBf2fMRKwTA3e1+5mawmAZ70Iza17jqp07PSl9HbbmYVxUg=="
+    }
+  ],
+  "check": [
+    {
+      "slip": {
+        "v": 1,
+        "shop": "shp_test",
+        "doc": "sales/s-0001",
+        "perm": "sales.discount",
+        "pct_bp": 1000,
+        "amount": 50000,
+        "by": "usr_manager",
+        "key": "ak_7ea833d85856fc32ba38d95e",
+        "iat": 1760000000000,
+        "exp": 1760000600000,
+        "nonce": "n0nce-AAAABBBBCCCC",
+        "reason": "مشتریِ همیشگی",
+        "sig": "x"
+      },
+      "out": null
+    },
+    {
+      "slip": {
+        "v": 1,
+        "shop": "shp_test",
+        "doc": "sales/s-0002",
+        "perm": "sales.cancel",
+        "pct_bp": null,
+        "amount": null,
+        "by": "usr_manager",
+        "key": "ak_7ea833d85856fc32ba38d95e",
+        "iat": 1760000000000,
+        "exp": 1760000600000,
+        "nonce": "n0nce-DDDDEEEEFFFF",
+        "reason": "اشتباهِ صندوق",
+        "sig": "x"
+      },
+      "out": null
+    },
+    {
+      "slip": {
+        "v": 1,
+        "shop": "shp_test",
+        "doc": "returns/r-0001",
+        "perm": "returns.create",
+        "pct_bp": null,
+        "amount": 120000,
+        "by": "usr_manager",
+        "key": "ak_7ea833d85856fc32ba38d95e",
+        "iat": 1760000000000,
+        "exp": 1760000600000,
+        "nonce": "n0nce-GGGGHHHHIIII",
+        "reason": "کالای خراب",
+        "sig": "x"
+      },
+      "out": null
+    },
+    {
+      "slip": {
+        "v": 1,
+        "shop": "shp_test",
+        "doc": "sales/s-0002",
+        "perm": "sales.cancel",
+        "by": "usr_manager",
+        "key": "ak_7ea833d85856fc32ba38d95e",
+        "iat": 1760000000000,
+        "exp": 1760000600000,
+        "nonce": "n0nce-DDDDEEEEFFFF",
+        "reason": "اشتباهِ صندوق",
+        "sig": "x"
+      },
+      "out": null
+    },
+    {
+      "slip": null,
+      "out": "bad_slip"
+    },
+    {
+      "slip": [],
+      "out": "bad_slip"
+    },
+    {
+      "slip": {
+        "v": 2,
+        "shop": "shp_test",
+        "doc": "sales/s-0001",
+        "perm": "sales.discount",
+        "pct_bp": 1000,
+        "amount": 50000,
+        "by": "usr_manager",
+        "key": "ak_7ea833d85856fc32ba38d95e",
+        "iat": 1760000000000,
+        "exp": 1760000600000,
+        "nonce": "n0nce-AAAABBBBCCCC",
+        "reason": "مشتریِ همیشگی",
+        "sig": "x"
+      },
+      "out": "bad_version"
+    },
+    {
+      "slip": {
+        "v": 1,
+        "shop": "",
+        "doc": "sales/s-0001",
+        "perm": "sales.discount",
+        "pct_bp": 1000,
+        "amount": 50000,
+        "by": "usr_manager",
+        "key": "ak_7ea833d85856fc32ba38d95e",
+        "iat": 1760000000000,
+        "exp": 1760000600000,
+        "nonce": "n0nce-AAAABBBBCCCC",
+        "reason": "مشتریِ همیشگی",
+        "sig": "x"
+      },
+      "out": "bad_slip"
+    },
+    {
+      "slip": {
+        "v": 1,
+        "shop": "shp_test",
+        "doc": "sales/a\nperm=x",
+        "perm": "sales.discount",
+        "pct_bp": 1000,
+        "amount": 50000,
+        "by": "usr_manager",
+        "key": "ak_7ea833d85856fc32ba38d95e",
+        "iat": 1760000000000,
+        "exp": 1760000600000,
+        "nonce": "n0nce-AAAABBBBCCCC",
+        "reason": "مشتریِ همیشگی",
+        "sig": "x"
+      },
+      "out": "bad_slip"
+    },
+    {
+      "slip": {
+        "v": 1,
+        "shop": "shp_test",
+        "doc": "sales/s-0001",
+        "perm": "settings.write",
+        "pct_bp": 1000,
+        "amount": 50000,
+        "by": "usr_manager",
+        "key": "ak_7ea833d85856fc32ba38d95e",
+        "iat": 1760000000000,
+        "exp": 1760000600000,
+        "nonce": "n0nce-AAAABBBBCCCC",
+        "reason": "مشتریِ همیشگی",
+        "sig": "x"
+      },
+      "out": "bad_perm"
+    },
+    {
+      "slip": {
+        "v": 1,
+        "shop": "shp_test",
+        "doc": "sales/s-0001",
+        "perm": "sales.discount",
+        "pct_bp": 10001,
+        "amount": 50000,
+        "by": "usr_manager",
+        "key": "ak_7ea833d85856fc32ba38d95e",
+        "iat": 1760000000000,
+        "exp": 1760000600000,
+        "nonce": "n0nce-AAAABBBBCCCC",
+        "reason": "مشتریِ همیشگی",
+        "sig": "x"
+      },
+      "out": "bad_value"
+    },
+    {
+      "slip": {
+        "v": 1,
+        "shop": "shp_test",
+        "doc": "sales/s-0001",
+        "perm": "sales.discount",
+        "pct_bp": 12.5,
+        "amount": 50000,
+        "by": "usr_manager",
+        "key": "ak_7ea833d85856fc32ba38d95e",
+        "iat": 1760000000000,
+        "exp": 1760000600000,
+        "nonce": "n0nce-AAAABBBBCCCC",
+        "reason": "مشتریِ همیشگی",
+        "sig": "x"
+      },
+      "out": "bad_value"
+    },
+    {
+      "slip": {
+        "v": 1,
+        "shop": "shp_test",
+        "doc": "sales/s-0001",
+        "perm": "sales.discount",
+        "pct_bp": 1000,
+        "amount": -1,
+        "by": "usr_manager",
+        "key": "ak_7ea833d85856fc32ba38d95e",
+        "iat": 1760000000000,
+        "exp": 1760000600000,
+        "nonce": "n0nce-AAAABBBBCCCC",
+        "reason": "مشتریِ همیشگی",
+        "sig": "x"
+      },
+      "out": "bad_value"
+    },
+    {
+      "slip": {
+        "v": 1,
+        "shop": "shp_test",
+        "doc": "sales/s-0001",
+        "perm": "sales.discount",
+        "pct_bp": 1000,
+        "amount": 50000,
+        "by": "usr_manager",
+        "key": "ak_7ea833d85856fc32ba38d95e",
+        "iat": 1760000000000,
+        "exp": 1760000000000,
+        "nonce": "n0nce-AAAABBBBCCCC",
+        "reason": "مشتریِ همیشگی",
+        "sig": "x"
+      },
+      "out": "bad_time"
+    },
+    {
+      "slip": {
+        "v": 1,
+        "shop": "shp_test",
+        "doc": "sales/s-0001",
+        "perm": "sales.discount",
+        "pct_bp": 1000,
+        "amount": 50000,
+        "by": "usr_manager",
+        "key": "ak_7ea833d85856fc32ba38d95e",
+        "iat": 1760000000000,
+        "exp": 1760000900001,
+        "nonce": "n0nce-AAAABBBBCCCC",
+        "reason": "مشتریِ همیشگی",
+        "sig": "x"
+      },
+      "out": "bad_time"
+    },
+    {
+      "slip": {
+        "v": 1,
+        "shop": "shp_test",
+        "doc": "sales/s-0001",
+        "perm": "sales.discount",
+        "pct_bp": 1000,
+        "amount": 50000,
+        "by": "usr_manager",
+        "key": "ak_7ea833d85856fc32ba38d95e",
+        "iat": 1760000000000,
+        "exp": 1760000900000,
+        "nonce": "n0nce-AAAABBBBCCCC",
+        "reason": "مشتریِ همیشگی",
+        "sig": "x"
+      },
+      "out": null
+    },
+    {
+      "slip": {
+        "v": 1,
+        "shop": "shp_test",
+        "doc": "sales/s-0001",
+        "perm": "sales.discount",
+        "pct_bp": 1000,
+        "amount": 50000,
+        "by": "usr_manager",
+        "key": "ak_7ea833d85856fc32ba38d95e",
+        "iat": 1760000000000,
+        "exp": 1760000600000,
+        "nonce": "short",
+        "reason": "مشتریِ همیشگی",
+        "sig": "x"
+      },
+      "out": "bad_nonce"
+    },
+    {
+      "slip": {
+        "v": 1,
+        "shop": "shp_test",
+        "doc": "sales/s-0001",
+        "perm": "sales.discount",
+        "pct_bp": 1000,
+        "amount": 50000,
+        "by": "usr_manager",
+        "key": "ak_7ea833d85856fc32ba38d95e",
+        "iat": 1760000000000,
+        "exp": 1760000600000,
+        "nonce": "has space in it 12345",
+        "reason": "مشتریِ همیشگی",
+        "sig": "x"
+      },
+      "out": "bad_nonce"
+    },
+    {
+      "slip": {
+        "v": 1,
+        "shop": "shp_test",
+        "doc": "sales/s-0001",
+        "perm": "sales.discount",
+        "pct_bp": 1000,
+        "amount": 50000,
+        "by": "usr_manager",
+        "key": "ak_7ea833d85856fc32ba38d95e",
+        "iat": 1760000000000,
+        "exp": 1760000600000,
+        "nonce": "n0nce-AAAABBBBCCCC",
+        "reason": "   ",
+        "sig": "x"
+      },
+      "out": "bad_reason"
+    },
+    {
+      "slip": {
+        "v": 1,
+        "shop": "shp_test",
+        "doc": "sales/s-0001",
+        "perm": "sales.discount",
+        "pct_bp": 1000,
+        "amount": 50000,
+        "by": "usr_manager",
+        "key": "ak_7ea833d85856fc32ba38d95e",
+        "iat": 1760000000000,
+        "exp": 1760000600000,
+        "nonce": "n0nce-AAAABBBBCCCC",
+        "reason": "دو\nخط",
+        "sig": "x"
+      },
+      "out": "bad_reason"
+    },
+    {
+      "slip": {
+        "v": 1,
+        "shop": "shp_test",
+        "doc": "sales/s-0001",
+        "perm": "sales.discount",
+        "pct_bp": 1000,
+        "amount": 50000,
+        "by": "usr_manager",
+        "key": "ak_7ea833d85856fc32ba38d95e",
+        "iat": 1760000000000,
+        "exp": 1760000600000,
+        "nonce": "n0nce-AAAABBBBCCCC",
+        "reason": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "sig": "x"
+      },
+      "out": "bad_reason"
+    },
+    {
+      "slip": {
+        "v": 1,
+        "shop": "shp_test",
+        "doc": "sales/s-0001",
+        "perm": "sales.discount",
+        "pct_bp": 1000,
+        "amount": 50000,
+        "by": "usr_manager",
+        "key": "ak_7ea833d85856fc32ba38d95e",
+        "iat": 1760000000000,
+        "exp": 1760000600000,
+        "nonce": "n0nce-AAAABBBBCCCC",
+        "reason": "مشتریِ همیشگی",
+        "sig": ""
+      },
+      "out": "bad_sig"
+    }
+  ],
+  "covers": [
+    {
+      "slip": {
+        "v": 1,
+        "shop": "shp_test",
+        "doc": "sales/s-0001",
+        "perm": "sales.discount",
+        "pct_bp": 1000,
+        "amount": 50000,
+        "by": "usr_manager",
+        "key": "ak_7ea833d85856fc32ba38d95e",
+        "iat": 1760000000000,
+        "exp": 1760000600000,
+        "nonce": "n0nce-AAAABBBBCCCC",
+        "reason": "مشتریِ همیشگی",
+        "sig": "x"
+      },
+      "need": {
+        "perm": "sales.discount",
+        "doc": "sales/s-0001",
+        "pct_bp": 1000,
+        "amount": 50000,
+        "at": 1760000001000
+      },
+      "out": null
+    },
+    {
+      "slip": {
+        "v": 1,
+        "shop": "shp_test",
+        "doc": "sales/s-0001",
+        "perm": "sales.discount",
+        "pct_bp": 1000,
+        "amount": 50000,
+        "by": "usr_manager",
+        "key": "ak_7ea833d85856fc32ba38d95e",
+        "iat": 1760000000000,
+        "exp": 1760000600000,
+        "nonce": "n0nce-AAAABBBBCCCC",
+        "reason": "مشتریِ همیشگی",
+        "sig": "x"
+      },
+      "need": {
+        "perm": "sales.discount",
+        "doc": "sales/s-0001",
+        "pct_bp": 999,
+        "amount": 10,
+        "at": 1760000001000
+      },
+      "out": null
+    },
+    {
+      "slip": {
+        "v": 1,
+        "shop": "shp_test",
+        "doc": "sales/s-0001",
+        "perm": "sales.discount",
+        "pct_bp": 1000,
+        "amount": 50000,
+        "by": "usr_manager",
+        "key": "ak_7ea833d85856fc32ba38d95e",
+        "iat": 1760000000000,
+        "exp": 1760000600000,
+        "nonce": "n0nce-AAAABBBBCCCC",
+        "reason": "مشتریِ همیشگی",
+        "sig": "x"
+      },
+      "need": {
+        "perm": "sales.discount",
+        "doc": "sales/s-0001",
+        "pct_bp": 1001,
+        "amount": 50000,
+        "at": 1760000001000
+      },
+      "out": "approval_too_small"
+    },
+    {
+      "slip": {
+        "v": 1,
+        "shop": "shp_test",
+        "doc": "sales/s-0001",
+        "perm": "sales.discount",
+        "pct_bp": 1000,
+        "amount": 50000,
+        "by": "usr_manager",
+        "key": "ak_7ea833d85856fc32ba38d95e",
+        "iat": 1760000000000,
+        "exp": 1760000600000,
+        "nonce": "n0nce-AAAABBBBCCCC",
+        "reason": "مشتریِ همیشگی",
+        "sig": "x"
+      },
+      "need": {
+        "perm": "sales.discount",
+        "doc": "sales/s-0001",
+        "pct_bp": 1000,
+        "amount": 50001,
+        "at": 1760000001000
+      },
+      "out": "approval_too_small"
+    },
+    {
+      "slip": {
+        "v": 1,
+        "shop": "shp_test",
+        "doc": "sales/s-0001",
+        "perm": "sales.discount",
+        "pct_bp": 1000,
+        "amount": 50000,
+        "by": "usr_manager",
+        "key": "ak_7ea833d85856fc32ba38d95e",
+        "iat": 1760000000000,
+        "exp": 1760000600000,
+        "nonce": "n0nce-AAAABBBBCCCC",
+        "reason": "مشتریِ همیشگی",
+        "sig": "x"
+      },
+      "need": {
+        "perm": "sales.discount",
+        "doc": "sales/s-0009",
+        "pct_bp": 1000,
+        "amount": 50000,
+        "at": 1760000001000
+      },
+      "out": "approval_mismatch"
+    },
+    {
+      "slip": {
+        "v": 1,
+        "shop": "shp_test",
+        "doc": "sales/s-0001",
+        "perm": "sales.discount",
+        "pct_bp": 1000,
+        "amount": 50000,
+        "by": "usr_manager",
+        "key": "ak_7ea833d85856fc32ba38d95e",
+        "iat": 1760000000000,
+        "exp": 1760000600000,
+        "nonce": "n0nce-AAAABBBBCCCC",
+        "reason": "مشتریِ همیشگی",
+        "sig": "x"
+      },
+      "need": {
+        "perm": "sales.cancel",
+        "doc": "sales/s-0001",
+        "at": 1760000001000
+      },
+      "out": "approval_mismatch"
+    },
+    {
+      "slip": {
+        "v": 1,
+        "shop": "shp_test",
+        "doc": "sales/s-0001",
+        "perm": "sales.discount",
+        "pct_bp": 1000,
+        "amount": 50000,
+        "by": "usr_manager",
+        "key": "ak_7ea833d85856fc32ba38d95e",
+        "iat": 1760000000000,
+        "exp": 1760000600000,
+        "nonce": "n0nce-AAAABBBBCCCC",
+        "reason": "مشتریِ همیشگی",
+        "sig": "x"
+      },
+      "need": {
+        "perm": "sales.discount",
+        "doc": "sales/s-0001",
+        "pct_bp": 1000,
+        "amount": 50000,
+        "at": 1760000900001
+      },
+      "out": "approval_expired"
+    },
+    {
+      "slip": {
+        "v": 1,
+        "shop": "shp_test",
+        "doc": "sales/s-0001",
+        "perm": "sales.discount",
+        "pct_bp": 1000,
+        "amount": 50000,
+        "by": "usr_manager",
+        "key": "ak_7ea833d85856fc32ba38d95e",
+        "iat": 1760000000000,
+        "exp": 1760000600000,
+        "nonce": "n0nce-AAAABBBBCCCC",
+        "reason": "مشتریِ همیشگی",
+        "sig": "x"
+      },
+      "need": {
+        "perm": "sales.discount",
+        "doc": "sales/s-0001",
+        "pct_bp": 1000,
+        "amount": 50000,
+        "at": 1759999699999
+      },
+      "out": "approval_expired"
+    },
+    {
+      "slip": {
+        "v": 1,
+        "shop": "shp_test",
+        "doc": "sales/s-0001",
+        "perm": "sales.discount",
+        "pct_bp": 1000,
+        "amount": 50000,
+        "by": "usr_manager",
+        "key": "ak_7ea833d85856fc32ba38d95e",
+        "iat": 1760000000000,
+        "exp": 1760000600000,
+        "nonce": "n0nce-AAAABBBBCCCC",
+        "reason": "مشتریِ همیشگی",
+        "sig": "x"
+      },
+      "need": {
+        "perm": "sales.discount",
+        "doc": "sales/s-0001",
+        "pct_bp": 1000,
+        "amount": 50000,
+        "at": 1760000900000
+      },
+      "out": null
+    },
+    {
+      "slip": {
+        "v": 1,
+        "shop": "shp_test",
+        "doc": "sales/s-0002",
+        "perm": "sales.cancel",
+        "pct_bp": null,
+        "amount": null,
+        "by": "usr_manager",
+        "key": "ak_7ea833d85856fc32ba38d95e",
+        "iat": 1760000000000,
+        "exp": 1760000600000,
+        "nonce": "n0nce-DDDDEEEEFFFF",
+        "reason": "اشتباهِ صندوق",
+        "sig": "x"
+      },
+      "need": {
+        "perm": "sales.cancel",
+        "doc": "sales/s-0002",
+        "at": 1760000001000
+      },
+      "out": null
+    },
+    {
+      "slip": {
+        "v": 1,
+        "shop": "shp_test",
+        "doc": "sales/s-0002",
+        "perm": "sales.cancel",
+        "by": "usr_manager",
+        "key": "ak_7ea833d85856fc32ba38d95e",
+        "iat": 1760000000000,
+        "exp": 1760000600000,
+        "nonce": "n0nce-DDDDEEEEFFFF",
+        "reason": "اشتباهِ صندوق",
+        "sig": "x"
+      },
+      "need": {
+        "perm": "sales.cancel",
+        "doc": "sales/s-0002",
+        "amount": 5000,
+        "at": 1760000001000
+      },
+      "out": "approval_too_small"
+    },
+    {
+      "slip": {
+        "v": 1,
+        "shop": "shp_test",
+        "doc": "returns/r-0001",
+        "perm": "returns.create",
+        "pct_bp": null,
+        "amount": 120000,
+        "by": "usr_manager",
+        "key": "ak_7ea833d85856fc32ba38d95e",
+        "iat": 1760000000000,
+        "exp": 1760000600000,
+        "nonce": "n0nce-GGGGHHHHIIII",
+        "reason": "کالای خراب",
+        "sig": "x"
+      },
+      "need": {
+        "perm": "returns.create",
+        "doc": "returns/r-0001",
+        "amount": 120000,
+        "at": 1760000001000
+      },
+      "out": null
+    },
+    {
+      "slip": {
+        "v": 1,
+        "shop": "shp_test",
+        "doc": "returns/r-0001",
+        "perm": "returns.create",
+        "pct_bp": null,
+        "amount": 120000,
+        "by": "usr_manager",
+        "key": "ak_7ea833d85856fc32ba38d95e",
+        "iat": 1760000000000,
+        "exp": 1760000600000,
+        "nonce": "n0nce-GGGGHHHHIIII",
+        "reason": "کالای خراب",
+        "sig": "x"
+      },
+      "need": {
+        "perm": "returns.create",
+        "doc": "returns/r-0001",
+        "amount": 120001,
+        "at": 1760000001000
+      },
+      "out": "approval_too_small"
+    }
+  ]
+}

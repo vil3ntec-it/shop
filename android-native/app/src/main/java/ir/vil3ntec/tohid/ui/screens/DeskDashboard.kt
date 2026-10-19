@@ -97,8 +97,12 @@ fun DeskDashboardScreen(d: ShopData, onOpen: (String) -> Unit, onProduct: (Strin
       }
     }
 
-    /* ۲ ─ کارت‌های عدد */
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    /* ۲ ─ کارت‌های عدد — «گزارشِ تازه» روشن: کارت‌های امروز و نشان‌های وضعیت از هستهٔ گزارش، با کلیک به فهرستِ همان عدد */
+    ReportFresh.load(context)
+    if (ReportFresh.on.value) {
+      val canSeeMoney = remember { ir.vil3ntec.tohid.data.ShopRole.canSeeMoney(context) }
+      HomeKpis(d, onOpen, canSeeMoney, columns = 5)
+    } else Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
       KpiCard(Modifier.weight(1f), Icons.Filled.PointOfSale, "فروش", money(b.sales.value), b.sales.changePct, Shop.colors.primary)
       KpiCard(Modifier.weight(1f), Icons.Filled.TrendingUp, "سودِ ناخالص", money(b.profit.value), b.profit.changePct, Shop.colors.success)
       KpiCard(Modifier.weight(1f), Icons.Filled.Receipt, "تعدادِ فاکتور", b.invoices.value.toInt().toString(), b.invoices.changePct, Shop.colors.info)
