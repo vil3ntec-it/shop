@@ -1,5 +1,15 @@
-package ir.vil3ntec.tohid.core.hw
+package ir.vil3ntec.tohid.desktop
 
+import ir.vil3ntec.tohid.core.hw.Barcodes
+import ir.vil3ntec.tohid.core.hw.CutMode
+import ir.vil3ntec.tohid.core.hw.EscPos
+import ir.vil3ntec.tohid.core.hw.EscPosPreview
+import ir.vil3ntec.tohid.core.hw.ImageMode
+import ir.vil3ntec.tohid.core.hw.Labels
+import ir.vil3ntec.tohid.core.hw.MonoImage
+import ir.vil3ntec.tohid.core.hw.MonoPng
+import ir.vil3ntec.tohid.core.hw.PrinterProfile
+import ir.vil3ntec.tohid.core.hw.WeightBarcode
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -23,6 +33,8 @@ import javax.imageio.ImageIO
  *  PNG را رمزگشای مستقلِ `ImageIO` می‌خواند و نقطه‌به‌نقطه می‌سنجد.
  *
  *  با `HW_PREVIEW_DIR` پرونده‌ها همان‌جا نوشته می‌شوند (برای دیدن).
+ *
+ *  فقط در آزمون‌های کامپیوتر: آزمونِ واحدِ اندروید java.awt و ImageIO ندارد.
  */
 class HwPreviewPngTest {
 
