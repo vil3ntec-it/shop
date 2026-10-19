@@ -168,14 +168,30 @@ router.post(['/staff-code', '/invite'], requireShop, requirePermission('staffcod
   const role = req.body?.role ? v.oneOf(req.body.role, ['manager', 'staff', 'courier'], { field: 'نقش' }) : 'staff';
   //  دعوتِ پیک (DLV-01) — پشتِ پرچمِ `shop.delivery`، پیش‌فرض خاموش؛ همان
   //  سنجش‌های `routes/delivery.js` (بی پرچم ۴۰۴، بی اشتراکِ تحویل ۴۰۳)
+  let maxUses, expiresAt;
   if (role === 'courier') {
     const st = await require('../lib/delivery').stateOf(req.shopId);
     if (!st.readable) return next(notFound('تحویل و پیک برای این دکان روشن نیست', 'delivery_disabled'));
     if (!st.entitled) return next(forbidden('این قابلیت نیازمندِ اشتراک است', 'subscription_required'));
+    //  دعوتِ پیک: فقط ۱ بار و با مهلت (QA #282). بی مهلت ⇐ ۷۲ ساعت؛ ۰ («همیشه») یا بیش از سقف رد می‌شود
+    const C = staffCodes.COURIER_INVITE;
+    const rawUses = req.body?.maxUses;
+    maxUses = rawUses === undefined || rawUses === null || rawUses === '' ? C.maxUses : Number(rawUses);
+    if (maxUses !== C.maxUses) return next(badRequest('کدِ دعوتِ پیک فقط یک بار مصرف می‌شود', 'courier_invite_single_use'));
+    const raw = req.body?.expiresInDays;
+    if (raw === undefined || raw === null || raw === '') expiresAt = now() + C.defaultTtlMs;
+    else {
+      const d = Math.trunc(Number(raw));
+      if (!Number.isFinite(d) || d < 1 || d > C.maxDays) {
+        return next(badRequest(`مهلتِ کدِ دعوتِ پیک باید ۱ تا ${C.maxDays.toLocaleString('fa-IR')} روز باشد`, 'courier_invite_expiry'));
+      }
+      expiresAt = now() + d * 24 * 3600 * 1000;
+    }
+  } else {
+    maxUses = v.integer(req.body?.maxUses, { field: 'تعداد استفاده', min: 0, max: 500, def: 1 });
+    const days = v.integer(req.body?.expiresInDays, { field: 'مهلت', min: 0, max: 3650, def: 0 });
+    expiresAt = days ? now() + days * 24 * 3600 * 1000 : null;
   }
-  const maxUses = v.integer(req.body?.maxUses, { field: 'تعداد استفاده', min: 0, max: 500, def: 1 });
-  const days = v.integer(req.body?.expiresInDays, { field: 'مهلت', min: 0, max: 3650, def: 0 });
-  const expiresAt = days ? now() + days * 24 * 3600 * 1000 : null;
 
   const out = await staffCodes.create(req.shopId, req.user.id, { role, expiresAt, maxUses });
   await audit.log({ shopId: req.shopId, userId: req.user.id, action: 'staff_code.created', targetType: 'staff_code', targetId: out.id, detail: { role, maxUses, expiresAt } });
