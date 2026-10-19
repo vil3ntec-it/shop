@@ -1,0 +1,125 @@
+package ir.vil3ntec.tohid.core.model
+
+import kotlinx.serialization.Serializable
+
+/*
+ *  شکلِ پاسخ‌های `/api/shop/orders` (server/src/routes/orders.js و lib/orders.js).
+ *  هر میدان پیش‌فرض دارد تا میدانِ تازهٔ سرور یا میدانِ نبوده هیچ نسخهٔ نصب‌شده‌ای
+ *  را نشکند (`ApiJson`: ignoreUnknownKeys، explicitNulls=false).
+ */
+
+@Serializable
+data class OrderPermsDto(
+  val create: Boolean = false,
+  val manage: Boolean = false,
+  val contact: Boolean = false,
+  val refund: Boolean = false,
+)
+
+/** `GET /shop/orders/config` — بخش فقط وقتی `enabled` است دیده می‌شود */
+@Serializable
+data class OrdersConfigDto(
+  val flag: Boolean = false,
+  val entitled: Boolean = false,
+  val enabled: Boolean = false,
+  val tabs: List<String> = emptyList(),
+  val reasons: Map<String, List<String>> = emptyMap(),
+  val sources: List<String> = emptyList(),
+  val permissions: OrderPermsDto = OrderPermsDto(),
+)
+
+/** `GET /shop/orders/summary` — شمارشِ برگه‌های باز و نشانگرِ تغییر */
+@Serializable
+data class OrdersSummaryDto(
+  val counts: Map<String, Int> = emptyMap(),
+  val oldestNewAt: Long? = null,
+  val rev: Long = 0,
+  val serverTime: Long = 0,
+)
+
+@Serializable
+data class OrderCustomerDto(
+  val name: String = "",
+  val phoneMasked: String = "",
+  /** فقط با دسترسیِ `orders.contact` از سرور می‌آید */
+  val phone: String? = null,
+)
+
+@Serializable
+data class OrderAddressDto(
+  val lat: Double? = null,
+  val lng: Double? = null,
+  val landmark: String = "",
+  val text: String = "",
+)
+
+@Serializable
+data class OrderLineDto(
+  val lineNo: Int = 0,
+  val productId: String = "",
+  val name: String = "",
+  val unit: String = "",
+  val qtyMilli: Long = 0,
+  val unitPriceMinor: Long = 0,
+  val lineTotalMinor: Long = 0,
+  val note: String = "",
+  val substitution: String = "",
+)
+
+@Serializable
+data class OrderEventDetailDto(val readyAt: Long? = null)
+
+@Serializable
+data class OrderEventDto(
+  val seq: Int = 0,
+  val kind: String = "",
+  val fromStatus: String = "",
+  val toStatus: String = "",
+  val actorType: String = "",
+  val actorId: String = "",
+  val reason: String = "",
+  val note: String = "",
+  val detail: OrderEventDetailDto = OrderEventDetailDto(),
+  val at: Long = 0,
+)
+
+/** کارتِ فهرست (ORD-11) و جزئیات (ORD-16) — میدان‌های جزئیات در کارت خالی‌اند */
+@Serializable
+data class OrderDto(
+  val id: String = "",
+  val orderNo: Long = 0,
+  val status: String = "",
+  val tab: String = "",
+  val next: List<String> = emptyList(),
+  val source: String = "",
+  val isTest: Boolean = false,
+  val fulfillment: String = "",
+  val paymentMethod: String = "",
+  val paymentStatus: String = "",
+  val codStatus: String = "",
+  val customer: OrderCustomerDto = OrderCustomerDto(),
+  val itemsCount: Int = 0,
+  val currency: String = "",
+  val totalMinor: Long = 0,
+  val scheduledFor: Long? = null,
+  val readyAt: Long? = null,
+  val statusReason: String = "",
+  val version: Long = 0,
+  val createdAt: Long = 0,
+  val updatedAt: Long = 0,
+  val canContact: Boolean = false,
+  val address: OrderAddressDto = OrderAddressDto(),
+  val note: String = "",
+  val subtotalMinor: Long = 0,
+  val discountMinor: Long = 0,
+  val deliveryFeeMinor: Long = 0,
+  val lines: List<OrderLineDto> = emptyList(),
+  val events: List<OrderEventDto> = emptyList(),
+)
+
+@Serializable
+data class OrderPageDto(
+  val tab: String = "",
+  val items: List<OrderDto> = emptyList(),
+  val nextCursor: String? = null,
+)
