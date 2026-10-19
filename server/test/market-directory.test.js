@@ -16,6 +16,8 @@
  */
 process.env.RATE_MARKET_SEARCH_MAX = '40';
 process.env.MARKET_GATE_CACHE_MS = '0';
+//  آزمون‌های «همان دم» بی برش؛ آزمونِ برشِ یک‌پرواز خودش زمانش را می‌گذارد
+process.env.MARKET_ELIGIBLE_CACHE_MS = '0';
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const h = require('./helpers');
@@ -53,8 +55,11 @@ const op = (rowId, fields, type = 'insert') => ({
   op_id: `op-${uniq()}`, ts: Date.now(), table: 'products', row_id: rowId, type, fields,
 });
 
-/** دکانِ روشن با ویترین؛ `products` = [شناسه, نام, قیمت, منتشر؟]. */
-async function liveStore(label, { products, settings = {}, listing = null } = {}) {
+/**
+ * دکانِ روشن با ویترین؛ `products` = [شناسه, نام, قیمت, منتشر؟]. بازارچه فقط با
+ * خواستِ صاحب دکان است ⇒ پیش‌فرضِ این‌جا `listed: true`؛ `listing: null` ⇒ بی ردیف.
+ */
+async function liveStore(label, { products, settings = {}, listing = {} } = {}) {
   const u = await h.newUser(label, 'shop');
   const made = await h.post('/api/shop', { name: `دکانِ ${label}` }, { token: u.accessToken });
   assert.equal(made.status, 201, JSON.stringify(made.body));
@@ -77,7 +82,7 @@ async function liveStore(label, { products, settings = {}, listing = null } = {}
     assert.equal(r.status, 200, JSON.stringify(r.body));
   }
   if (listing) {
-    const r = await h.put('/api/shop/market', listing, { token: o.token });
+    const r = await h.put('/api/shop/market', { listed: true, ...listing }, { token: o.token });
     assert.equal(r.status, 200, JSON.stringify(r.body));
   }
   return { ...o, slug, device };
@@ -253,10 +258,10 @@ test('دسته، جست‌وجو در نام و ناحیه، عبارتِ هم�
 });
 
 test('تنظیمِ دکان: اعتبارسنجی، موقعیتِ درشت، قفلِ پرچمِ ویترین و نقش', async () => {
-  const s = await liveStore('تنظیم');
+  const s = await liveStore('تنظیم', { listing: null });
   const get = await h.get('/api/shop/market', { token: s.token });
   assert.equal(get.status, 200, JSON.stringify(get.body));
-  assert.equal(get.body.listing.listed, true, 'نبودِ ردیف = در فهرست');
+  assert.equal(get.body.listing.listed, false, 'نبودِ ردیف = بیرون از فهرست (فقط با خواستِ صاحب دکان)');
   assert.ok(get.body.listing.categories.length >= 10);
 
   assert.equal((await h.put('/api/shop/market', { category: 'casino' }, { token: s.token })).body.error.code, 'bad_category');
@@ -350,13 +355,74 @@ test('سفارش‌های من: فقط با بلیت، فقط همان شمار�
    ۴) سقفِ درخواست و موجودی
    ══════════════════════════════════════════════════════════════════ */
 
-test('سقفِ جست‌وجو به‌ازای IP ⇒ ۴۲۹', async () => {
+test('سقفِ جست‌وجو به‌ازای IP ⇒ ۴۲۹ (ضربه‌ای: ۱۰ در دقیقه، کنارِ سقفِ ربع‌ساعته)', async () => {
   await setFlag('all', 'market.directory', true);
-  let last = null;
-  for (let i = 0; i < 41; i++) last = await h.get(`/api/market/search?q=${encodeURIComponent('برنج')}`);
-  assert.equal(last.status, 429);
+  const config = require('../src/config');
+  assert.equal(config.rateLimit.marketSearchBurstMax, 10);
+  const statuses = [];
+  for (let i = 0; i < 11; i++) statuses.push((await h.get(`/api/market/search?q=${encodeURIComponent('برنج')}`)).status);
+  assert.deepEqual(statuses, [...Array(10).fill(200), 429]);
   //  فهرست سطلِ خودش را دارد
   assert.equal((await h.get('/api/market/shops')).status, 200);
+});
+
+/* ══════════════════════════════════════════════════════════════════
+   ۵) بازبینیِ امنیتی: فهرست فقط با خواستِ صاحب دکان؛ برشِ یک‌پرواز؛ نمایهٔ جست‌وجو
+   ══════════════════════════════════════════════════════════════════ */
+
+test('⛔ فهرست فقط با خواستِ صاحب دکان: ویترینِ روشنِ بی ردیف در بازارچه نیست تا خودش بخواهد', async () => {
+  await setFlag('all', 'market.directory', true);
+  const silent = await liveStore('بی‌خواست', { listing: null, products: [['lentil', 'عدس‌ویژه', 90, true]] });
+  const shops = await h.get('/api/market/shops');
+  assert.ok(!slugsOf(shops).includes(silent.slug), 'بی خواست در فهرست نیست');
+  assert.equal((await h.get(`/api/market/search?q=${encodeURIComponent('عدس‌ویژه')}`)).body.products.length, 0);
+  assert.equal((await h.get(`/api/store/${silent.slug}`)).status, 200, 'ویترینِ خودش با نشانیِ خودش باز است');
+  const row = await one('SELECT listed FROM market_listings WHERE shop_id=$1', [silent.shopId]);
+  assert.equal(row, null);
+  //  صاحب دکان می‌خواهد ⇒ همان دم
+  assert.equal((await h.put('/api/shop/market', { listed: true }, { token: silent.token })).status, 200);
+  assert.ok(slugsOf(await h.get('/api/market/shops')).includes(silent.slug));
+  assert.equal((await h.get(`/api/market/search?q=${encodeURIComponent('عدس‌ویژه')}`)).body.products.length, 1);
+  await h.put('/api/shop/storefront', { enabled: false }, { token: silent.token });
+});
+
+test('⛔ DoS: برشِ دکان‌ها یک‌پرواز و ماندگار؛ جست‌وجو از نمایهٔ باریک با سنجشِ زنده', async () => {
+  await setFlag('all', 'market.directory', true);
+  const market = require('../src/lib/market');
+  const config = require('../src/config');
+  const a = await liveStore('برش', { products: [['dal', 'ماشِ‌سبز', 70, true], ['tea', 'چای‌سبز', 150, true]] });
+  const saved = config.market.eligibleCacheMs;
+  config.market.eligibleCacheMs = 60_000;
+  try {
+    market.clearCache();
+    const before = market.stats().builds;
+    //  ۲۰ درخواستِ هم‌زمان و ۱۰ پیاپی ⇒ یک بار ساختن
+    const burst = await Promise.all(Array.from({ length: 20 }, () => h.get('/api/market/shops')));
+    assert.ok(burst.every((r) => r.status === 200 && slugsOf(r).includes(a.slug)));
+    for (let i = 0; i < 5; i++) assert.equal((await h.get('/api/market')).status, 200);
+    for (let i = 0; i < 5; i++) assert.equal((await h.get(`/api/market/search?q=${encodeURIComponent('سبز')}`)).status, 200);
+    assert.equal(market.stats().builds - before, 1, 'یک ساختن برای ۳۰ درخواست');
+
+    //  نمایه: هر دو کالا در `market_search`
+    const idx = await query('SELECT product_id FROM market_search WHERE shop_id=$1 ORDER BY product_id', [a.shopId]);
+    assert.deepEqual(idx.rows.map((r) => r.product_id), ['dal', 'tea']);
+    //  نام عوض شد: نامِ کهنه همان دم بیرون (سنجشِ زنده)، نامِ تازه پس از برشِ بعد (نمایه)
+    await push(a.token, [op('tea', { name: 'قهوه‌تلخ' }, 'update')], a.device);
+    const old = await h.get(`/api/market/search?q=${encodeURIComponent('چای')}`);
+    assert.equal(old.body.products.length, 0, 'نتیجهٔ کهنهٔ نمایه با دادهٔ زنده رد می‌شود');
+    assert.equal((await h.get(`/api/market/search?q=${encodeURIComponent('قهوه')}`)).body.products.length, 0,
+      'جست‌وجو فقط از نمایه است (نه پیمایشِ همهٔ کالاها)');
+    market.clearCache();
+    const fresh = await h.get(`/api/market/search?q=${encodeURIComponent('قهوه')}`);
+    assert.deepEqual(fresh.body.products.map((p) => p.id), ['tea']);
+    //  خاموش کردنِ ویترین با برشِ ماندگار هم همان دم بیرون می‌برد (سنجشِ زنده)
+    await h.put('/api/shop/storefront', { enabled: false }, { token: a.token });
+    assert.ok(!slugsOf(await h.get('/api/market/shops')).includes(a.slug));
+    assert.equal((await h.get(`/api/market/search?q=${encodeURIComponent('ماش')}`)).body.products.length, 0);
+  } finally {
+    config.market.eligibleCacheMs = saved;
+    market.clearCache();
+  }
 });
 
 test('موجودیِ ویترین: بی shop.catalog «در حال بررسی»؛ با آن از دفترِ سرور و هرگز «موجود» ِ بی‌شاهد', async () => {
