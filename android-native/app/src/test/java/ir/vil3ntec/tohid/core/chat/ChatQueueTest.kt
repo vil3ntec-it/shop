@@ -11,8 +11,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- *  صفِ ارسال و backoff ِ چت — همان قراردادِ `server/test/chat-core.test.js` ِ وب
- *  (v3 §۳۳؛ CHAT-02/03/04/11).
+ *  صفِ ارسال و backoff ِ چتِ دکان (v3 §۳۳؛ CHAT-02/03/04/11) — بی شبکه در صف،
+ *  پس از وصل هر پیام یک بار با همان clientId، پاسخِ گم‌شده، رسیدِ واقعی.
  */
 class ChatQueueTest {
 
