@@ -15,7 +15,7 @@
  */
 const BETA = /\/beta\/sw\.js$/.test(self.location.pathname);
 const BETA_PATH = new URL('./beta/', self.location).pathname;
-const VERSION = (BETA ? 'beta-' : '') + 'tohid-shop-v58';
+const VERSION = (BETA ? 'beta-' : '') + 'tohid-shop-v59';
 const SHELL_CACHE = VERSION + '-shell';
 const FONT_CACHE = VERSION + '-fonts';
 
@@ -49,6 +49,9 @@ const SHELL_ASSETS = [
    */
   './license/sync-core.js',
   './license/account-code.js',
+  //  Sync v3 پشتِ تنظیمِ هر دستگاه (پیش‌فرض v1) و قاعدهٔ یگانهٔ مبلغی که مبدلش می‌خواند
+  './license/money.js',
+  './license/sync-v3-engine.js',
   './license/sync-engine.js',
   './license/account-ui.js',
   './license/account-ui.css',
@@ -62,10 +65,6 @@ const SHELL_ASSETS = [
   //  LOC-01/05/07/09: هستهٔ خالصِ متن و تقویم — بی آن‌ها فاکتور و تاریخ به راهِ قدیم برمی‌گردند
   './license/text-core.js',
   './license/calendar-core.js',
-  //  PAY (v3 A4): پرداختِ ترکیبی و شیفت — بی آن‌ها نصبِ آفلاین با پرچمِ روشن صندوق ندارد
-  //  (`money.js` پایین‌تر، با دفترِ قرض‌داران، هست — دو بار نه: `cache.addAll` تکرار را رد می‌کند)
-  './license/pay-core.js',
-  './license/pay-flow.js',
   './license/photo-studio.js',
   //  جای دفتر (localStorage یا IndexedDB) — بی آن، دفترِ IndexedDB روی نصبِ آفلاین باز نمی‌شد
   './license/ledger-store.js',
