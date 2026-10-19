@@ -306,6 +306,8 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/shop/trust', require('./routes/shop-trust'));
     api.use('/store', require('./routes/trust-store'));
     api.use('/admin/trust', require('./routes/admin-trust'));
+    //  کاتالوگ و موجودیِ سرور (v3 §۳۲) — پیش از `/shop`، پشتِ پرچمِ خاموشِ `shop.catalog`
+    api.use('/shop/catalog', require('./routes/catalog'));
     //  سفارشِ آنلاین (فاز ۴) — پیش از `/shop` تا `requireUser`ِ آن دو بار نرود؛
     //  زیرِ همان پیشوند، پس ACCOUNT_PREFIXESِ پنلِ خانگی دست نمی‌خورد
     api.use('/shop/orders', require('./routes/orders'));
