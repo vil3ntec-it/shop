@@ -49,9 +49,21 @@ object DevShot {
               //  پروندهٔ مشتری: cust:first · زبانه‌اش: custtab:0|1|2
               "cust" -> { java.awt.EventQueue.invokeAndWait { ir.vil3ntec.tohid.ui.screens.DeskCustomersShot.open.value = arg }; Thread.sleep(1200) }
               "custtab" -> { java.awt.EventQueue.invokeAndWait { ir.vil3ntec.tohid.ui.screens.DeskCustomersShot.tab.value = arg.toInt() }; Thread.sleep(1000) }
+              //  نمای کالای صندوق: posview:card|table — همان کلیدِ «کارتی/جدولی» (`PosShot`)
+              "posview" -> {
+                java.awt.EventQueue.invokeAndWait {
+                  ir.vil3ntec.tohid.ui.components.pos.PosShot.view.value = ir.vil3ntec.tohid.ui.components.common.ViewMode.parse(arg)
+                }
+                Thread.sleep(1000)
+              }
               //  «موردِ تازه» در همین صفحه — همان Ctrl+N
               "new" -> { java.awt.EventQueue.invokeAndWait { ir.vil3ntec.tohid.ui.AppNav.addAction.value?.invoke() }; Thread.sleep(1200) }
               "help" -> { java.awt.EventQueue.invokeAndWait { ir.vil3ntec.tohid.ui.AppNav.help.value = arg != "off" }; Thread.sleep(1500) }
+              //  محصولات: نما (prodview:card|table) و انتخابِ n ردیفِ اولِ فهرست (prodsel:3 — نوارِ کارِ گروهی)
+              "prodview" -> { java.awt.EventQueue.invokeAndWait { ir.vil3ntec.tohid.ui.screens.DeskProductsShot.view.value = arg }; Thread.sleep(1200) }
+              "prodsel" -> { java.awt.EventQueue.invokeAndWait { ir.vil3ntec.tohid.ui.screens.DeskProductsShot.select.value = arg.toInt() }; Thread.sleep(1000) }
+              //  تم: theme:DARK|LIGHT|SYSTEM — همان درخواستِ نوارِ منو (`AppNav.theme`)
+              "theme" -> { java.awt.EventQueue.invokeAndWait { ir.vil3ntec.tohid.ui.AppNav.theme.value = arg }; Thread.sleep(1500) }
               "scroll" -> { robot.mouseWheel(arg.toInt()); Thread.sleep(600) }
               "move" -> { val (x, y) = arg.split(',').map { it.trim().toInt() }; robot.mouseMove(x, y); Thread.sleep(150) }
               "rclick" -> {

@@ -203,7 +203,8 @@ async function createApp({ runMigrations = true } = {}) {
           //  F0-13: تنها خوانندهٔ مدتِ آزمایشی — همان عددِ `entitlement`
           trialDays: await plans.trialDaysOf('shop'),
           whatsapp: { number: cfg.whatsapp_number || '', message: cfg.whatsapp_message || '' },
-          minAppVersion: cfg.min_app_version || '',
+          //  §۳۸.۹: حداقلِ همان برنامه‌ای که می‌پرسد (`X-App-Id`/`?app=`؛ نبود ⇒ دکان)
+          minAppVersion: require('./lib/app-compat').minVersionOf(cfg, require('./lib/tenancy').appOfRequest(req)),
           //  ثبت‌نام سه‌مرحله‌ای با ایمیل — برنامه با این می‌فهمد این
           //  سرور مسیرهای /auth/register/* را دارد
           emailSignup: true,
@@ -294,6 +295,12 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/errors', require('./routes/errors'));
     api.use('/location', require('./routes/location'));
     api.use('/me', require('./routes/me'));
+    //  چتِ مشتری ↔ دکان (v3 §۳۳) — پشتِ پرچمِ `shop.chat`، پیش‌فرض خاموش.
+    //  پیش از `/shop` (همان دلیلِ `/shop/orders`)؛ درِ مشتری زیرِ `/store/:slug/chat`
+    //  که بی ماژولِ ویترین ۴۰۴ است و بقیهٔ `/store` را دست نمی‌زند.
+    api.use('/shop/chat', require('./routes/shop-chat'));
+    api.use('/store', require('./routes/shop-chat-store'));
+    api.use('/admin/shop-chat', require('./routes/admin-shop-chat'));
     //  اعلانِ سفارش (v3 §۳۰) — پیش از `/shop` به همان دلیلِ `/shop/orders`؛ پیش‌فرض خاموش
     api.use('/shop/order-notify', require('./routes/order-notify'));
     //  سفارشِ آنلاین (فاز ۴) — پیش از `/shop` تا `requireUser`ِ آن دو بار نرود؛
@@ -439,6 +446,8 @@ async function createApp({ runMigrations = true } = {}) {
     //  پیام‌ها و رسانه‌های چت فقط CHAT_RELAY_DAYS روز روی سرور می‌مانند؛
     //  برنامهٔ پمپ رونوشتِ خودش را دارد
     require('./lib/chat-relay').sweep().catch(err => console.error('[chat-relay]', err.message));
+    //  چتِ دکان: رسانهٔ بارگذاری‌شدهٔ بی‌پیام پس از یک ساعت (و نگهداری، اگر روشن شد)
+    require('./lib/shop-chat').sweep().catch(err => console.error('[shop-chat]', err.message));
     subs.expireDue().catch(err => console.error('[subscriptions]', err.message));
     //  خبر دادن به کسی که اشتراکش دارد تمام می‌شود — پیش از آنکه قفل
     //  شود، نه بعدش. هر آستانه فقط یک بار، پس تکراری نمی‌رود.
