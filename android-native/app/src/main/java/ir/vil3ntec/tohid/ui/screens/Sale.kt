@@ -689,7 +689,7 @@ fun SaleScreen(
         },
         cart = { revealed, dragHandle ->
           val rows = CartSummary.rows(cart, d.products)
-          Box(dragHandle.fillMaxWidth().padding(top = 52.dp, bottom = 26.dp)) { PhoneCartTitle() }
+          Box(dragHandle.fillMaxWidth().padding(top = 62.dp, bottom = 38.dp)) { PhoneCartTitle() }
           LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
             itemsIndexed(rows, key = { _, r -> r.id }) { i, r ->
               PhoneCartRow(

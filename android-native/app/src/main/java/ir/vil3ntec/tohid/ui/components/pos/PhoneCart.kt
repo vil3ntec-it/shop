@@ -138,6 +138,9 @@ val PHONE_CART_STRIP = 96.dp
 /** فاصلهٔ نوار تا لبهٔ پایین، روی فاصلهٔ نوارِ سیستم (r3: سیاهِ زیرِ نوار) */
 private val STRIP_BOTTOM = 16.dp
 
+/** کمینهٔ سیاهِ زیرِ نوار و زیرِ دکمهٔ «پرداخت» (r3/r2: محتوای نوار ۴۸dp زیرِ لبهٔ روشن، ~۸۸dp بالای لبهٔ پایین) */
+private val BOTTOM_MIN = 39.dp
+
 /** تکهٔ پیدای سطحِ کالاها وقتی سبد باز است (r2) */
 private val PEEK = 96.dp
 
@@ -171,7 +174,8 @@ fun PhoneCartThumb(thumb: CartSummary.Thumb, size: Dp = 42.dp) {
     if (image != null) {
       Image(image, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
     } else {
-      Text(thumb.initials, color = v.ink, fontSize = 16.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+      //  دایره همیشه سفید است ⇐ حرف همیشه تیره (در تمِ شب هم)
+      Text(thumb.initials, color = v.black, fontSize = 16.sp, fontWeight = FontWeight.Bold, maxLines = 1)
     }
   }
 }
@@ -272,6 +276,8 @@ fun PhoneSaleFrame(
   val scope = rememberCoroutineScope()
   val density = LocalDensity.current
   val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+  //  فاصلهٔ نوار/دکمه تا لبهٔ پایین: نوارِ سیستم + ۱۶، ولی نه کمتر از r3
+  val bottomSpace = maxOf(BOTTOM_MIN, navBottom + STRIP_BOTTOM)
   val stripShown = model.visible
   val showing = open && stripShown
 
@@ -293,7 +299,7 @@ fun PhoneSaleFrame(
 
   BoxWithConstraints(Modifier.fillMaxSize().background(v.black)) {
     val full = maxHeight
-    val stripSpace = PHONE_CART_STRIP + STRIP_BOTTOM + navBottom
+    val stripSpace = PHONE_CART_STRIP + bottomSpace
     val surfaceH by animateDpAsState(
       targetValue = if (stripShown) full - stripSpace else full,
       animationSpec = if (motion) tween(260, easing = FastOutSlowInEasing) else snap(),
@@ -333,7 +339,7 @@ fun PhoneSaleFrame(
             translationY = (1f - p) * with(density) { 56.dp.toPx() }
             alpha = p.coerceIn(0f, 1f)
           }
-          .padding(start = 36.dp, end = 28.dp, bottom = 24.dp + navBottom),
+          .padding(start = 36.dp, end = 28.dp, bottom = bottomSpace),
       ) {
         //  سرِ سبد هم کشیدنی است (به پایین ⇐ بستن) — صدازننده آن را روی عنوان می‌گذارد
         cart(showing, Modifier.draggable(drag, Orientation.Vertical, enabled = showing, onDragStopped = { settle(it) }))
@@ -345,7 +351,7 @@ fun PhoneSaleFrame(
       visible = stripShown && p < 0.5f,
       enter = if (motion) fadeIn(tween(220)) + slideInVertically(tween(260)) { it / 2 } else fadeIn(snap()),
       exit = fadeOut(if (motion) tween(140) else snap()),
-      modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = STRIP_BOTTOM + navBottom),
+      modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = bottomSpace),
     ) {
       PhoneCartStrip(
         model = model,

@@ -140,7 +140,8 @@ fun PhoneCatalog(
   onAdd: (PhoneCatalogItem) -> Unit,
 ) {
   val v = PhoneV3.colors
-  val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+  //  زیرِ نوارِ وضعیت؛ کمینهٔ ۲۴ (بلندیِ نوارِ وضعیتِ گوشی) تا در پنجرهٔ بی‌نوار هم سربرگ جای r3 بنشیند
+  val top = maxOf(WindowInsets.statusBars.asPaddingValues().calculateTopPadding(), 24.dp)
   val grid = rememberLazyStaggeredGridState()
   LaunchedEffect(scanning) { if (scanning) grid.animateScrollToItem(0) }
 
@@ -184,8 +185,7 @@ fun PhoneCatalog(
         Modifier
           .fillMaxWidth()
           .background(v.catalogPage)
-          .windowInsetsPadding(WindowInsets.statusBars)
-          .padding(top = 16.dp, start = 16.dp, end = 16.dp)
+          .padding(top = top + 16.dp, start = 16.dp, end = 16.dp)
           .height(48.dp),
       ) {
         HeaderButton("برگشت", onBack, Modifier.align(Alignment.CenterStart)) { BackChevron(v.icon) }
@@ -458,10 +458,10 @@ fun PhoneProductCard(item: PhoneCatalogItem, onAdd: () -> Unit) {
       modifier = Modifier.align(Alignment.TopStart).padding(12.dp),
     ) {
       Box(
-        Modifier.size(28.dp).clip(CircleShape).background(v.cart),
+        Modifier.size(24.dp).clip(CircleShape).background(v.cart),
         contentAlignment = Alignment.Center,
       ) {
-        Text(qty(item.inCart), color = v.onCart, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+        Text(qty(item.inCart), color = v.onCart, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
       }
     }
   }
