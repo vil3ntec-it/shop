@@ -141,6 +141,10 @@ const config = {
     subject: process.env.EMAIL_SUBJECT || '',
   },
 
+  //  هشدارِ ورود از دستگاه/شبکهٔ تازه (بندِ ۲۱.۱) — `lib/login-alerts.js`؛
+  //  `LOGIN_ALERTS=off` کلیدِ بازگشت است
+  loginAlerts: bool(process.env.LOGIN_ALERTS, true),
+
   google: {
     //  همه‌ی شناسه‌های پذیرفته‌شده — سنجشِ توکن هر کدام را قبول می‌کند.
     //  شناسه‌ی Desktop هم این‌جاست، وگرنه توکنی که خودِ ما خواستیم

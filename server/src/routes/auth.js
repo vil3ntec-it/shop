@@ -23,6 +23,7 @@ const tokens = require('../lib/tokens');
 const otp = require('../lib/otp');
 const google = require('../lib/google');
 const geo = require('../lib/geo');
+const loginAlerts = require('../lib/login-alerts');
 const terms = require('../lib/terms');
 const audit = require('../lib/audit');
 const { membershipOf } = require('../lib/shops');
@@ -238,7 +239,10 @@ function appVersionOf(req) {
 
 /** ساخت نشست تازه (توکن دسترسی + توکن تازه‌سازی). */
 async function issueSession(user, device, ip, app = 'shop', appVersion = '') {
+  //  پیش از ثبتِ دستگاه: آیا این دستگاه/شبکه برای این حساب تازه است؟ (بندِ ۲۱.۱)
+  const seen = await loginAlerts.before(user, device?.deviceId || device?.uid, ip, app);
   const dev = await upsertDevice(user.id, device, ip);
+  await loginAlerts.after(seen, { user, device: dev, ip, app });
   const access = await tokens.issue({
     kind: 'access', subjectId: user.id, deviceId: dev?.id || null,
     ttlMs: config.tokens.accessTtlMs, app, appVersion,
