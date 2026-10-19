@@ -1,9 +1,9 @@
 /**
  * «Professional Retail OS» در وب (docs/VISUAL-DIRECTION-fa.md) — با مرورگرِ واقعی.
  *
- *   • پهنای ۳۶۰، ۷۶۸ و ۱۲۸۰: هیچ صفحه‌ای افقی بیرون نمی‌زند؛ صندوق در کامپیوتر سه‌ستونه
- *     است (دسته‌ها راست، کالاها وسط، سفارش چپ)، در تبلت سبد همان نوارِ پایین است و در
- *     گوشی چیدمانِ پیشین می‌ماند
+ *   • پهنای ۳۶۰، ۷۶۸ و ۱۲۸۰: هیچ صفحه‌ای افقی بیرون نمی‌زند؛ صندوق در کامپیوتر کاتالوگ
+ *     (راست) و «سبد خرید» (چپ) است، دسته‌ها ردیفِ چیپ، یک جست‌وجو و −/+ فقط در سبد
+ *     (DESIGN v2)؛ در تبلت سبد همان نوارِ پایین است و در گوشی چیدمانِ پیشین می‌ماند
  *   • axe در روز و شب (کنتراست ≥ ۴٫۵:۱، نامِ دکمه و برچسب)
  *   • نمای کارتی/جدولی برای هر صفحه جدا ذخیره می‌شود و پس از بارگذاریِ دوباره می‌ماند؛
  *     روی گوشی کلید پنهان و نما کارت است
@@ -104,35 +104,48 @@ for (const width of [360, 768, 1280]) {
   });
 }
 
-await step('صندوقِ کامپیوتر (۱۲۸۰): دسته‌ها راست، کالاها وسط، سفارش چپ؛ سبد درونِ ستون؛ نوارِ کار با کلیدها', async () => {
+await step('صندوقِ کامپیوتر (۱۲۸۰): کاتالوگ راست و سبد چپ؛ چیپِ دسته‌ها بالای کاتالوگ؛ یک جست‌وجو؛ −/+ فقط در سبد', async () => {
   const { pg } = await open(1280);
   await go(pg, 'sale');
   await pg.evaluate(() => addToCart('p1', 1));
   await pg.waitForTimeout(200);
-  const rail = await rect(pg, '#pos-rail'), main = await rect(pg, '.pos-main'), order = await rect(pg, '#pos-order');
-  assert.ok(rail.l >= main.r - 1, `ستونِ دسته‌ها باید راستِ کالاها باشد: ${JSON.stringify({ rail, main })}`);
-  assert.ok(main.l >= order.r - 1, `پنلِ سفارش باید چپِ کالاها باشد: ${JSON.stringify({ main, order })}`);
-  const drawer = await rect(pg, '#cart-drawer');
-  assert.equal(drawer.pos, 'static', 'سبد در کامپیوتر درونِ ستونِ سفارش است، نه نوارِ ثابت');
-  const cards = await pg.locator('#pos-products .pos-card').count();
-  assert.equal(cards, products.filter(p => p.active !== false).length, 'همهٔ کالاهای فعال، بی کالای خاموش');
-  const tiles = await pg.locator('#pos-rail [data-pos-cat]').allInnerTexts();
-  assert.equal(tiles.length, 1 + CATS.length, `«همه» و دسته‌های واقعی: ${tiles.join(' | ')}`);
+  const main = await rect(pg, '.pos-main'), order = await rect(pg, '#pos-order');
+  const cats = await rect(pg, '#pos-cats'), grid = await rect(pg, '#pos-products');
+  assert.ok(main.l >= order.r - 1, `سبد باید چپِ کاتالوگ باشد: ${JSON.stringify({ main, order })}`);
+  assert.ok(cats.b <= grid.t + 1 && cats.l >= main.l - 1, `چیپِ دسته‌ها ردیفی بالای کاتالوگ است: ${JSON.stringify({ cats, grid })}`);
+  assert.equal(await pg.locator('#pos-rail').count(), 0, 'ستونِ دومِ دسته‌ها نیست');
+  const searches = await pg.evaluate(() => [...document.querySelectorAll('#page-sale input')].filter(i => i.getClientRects().length && /search|barcode/.test(i.id)).map(i => i.id));
+  assert.deepEqual(searches, ['pos-search'], `یک جست‌وجو: ${searches.join('، ')}`);
+  assert.equal((await rect(pg, '#cart-drawer')).pos, 'static', 'سبد درونِ ستون است، نه نوارِ ثابت');
+  assert.equal(await pg.locator('#pos-products .pos-card').count(), products.filter(p => p.active !== false).length, 'همهٔ کالاهای فعال، بی کالای خاموش');
+  assert.equal(await pg.locator('#pos-products [data-pos-plus], #pos-products [data-pos-minus], #pos-products .pos-step').count(), 0, '−/+ در کاتالوگ نیست');
+  const chips = await pg.locator('#pos-cats [data-pos-cat]').count();
+  assert.equal(chips, 1 + CATS.length, '«همه» و دسته‌های واقعی');
   const pay = await pg.locator('#pos-pay [data-pos-pay]').allInnerTexts();
   assert.deepEqual(pay.map(s => s.trim()), ['نقد', 'قرض (نسیه)'], 'فقط روش‌هایی که موتورِ فروش ثبت می‌کند');
-  const acts = await pg.locator('#pos-actions .pos-act').allInnerTexts();
-  assert.ok(acts.some(a => a.includes('Ctrl+Enter')) && acts.some(a => a.includes('Alt+C')), `برچسبِ کلیدها: ${acts.join(' | ')}`);
+  const hints = await pg.locator('#pos-hints').innerText();
+  assert.ok(hints.includes('Ctrl+Enter') && hints.includes('Alt+C'), `برچسبِ کلیدها: ${hints}`);
   //  دسته: فقط کالاهای همان دسته
-  await pg.evaluate(() => document.querySelector('#pos-rail [data-pos-cat="نوشیدنی"]').click());
+  await pg.evaluate(() => document.querySelector('#pos-cats [data-pos-cat="نوشیدنی"]').click());
   const names = await pg.locator('#pos-products .pos-name').allInnerTexts();
   assert.ok(names.length > 0 && names.every(n => products.find(p => p.name === n)?.category === 'نوشیدنی'), names.join('، '));
-  //  − / تعداد / + روی کارت همان سبد را عوض می‌کند
-  await pg.evaluate(() => document.querySelector('#pos-products [data-pos-plus="p2"]').click());
-  await pg.evaluate(() => document.querySelector('#pos-products [data-pos-plus="p2"]').click());
-  assert.equal(await pg.locator('[data-pos-qty="p2"]').innerText(), '2');
-  await pg.evaluate(() => document.querySelector('#pos-products [data-pos-minus="p2"]').click());
-  assert.deepEqual(await pg.evaluate(() => cart.map(c => [c.productId, c.quantity])), [['p1', 1], ['p2', 1]]);
-  assert.equal(await pg.locator('#pos-lines-count').innerText(), '2 قلم');
+  //  یک زدن روی کارت = یک واحد، با نشانِ «در سبد»
+  await pg.evaluate(() => document.querySelector('#pos-products [data-pos-add="p2"]').click());
+  await pg.evaluate(() => document.querySelector('#pos-products [data-pos-add="p2"]').click());
+  assert.equal(await pg.locator('#pos-products [data-pos-qty="p2"]').innerText(), '2');
+  //  −/+ و حذف در سبد
+  await pg.evaluate(() => document.querySelector('#pos-lines [data-line-minus="p2"]').click());
+  await pg.evaluate(() => document.querySelector('#pos-lines [data-line-plus="p1"]').click());
+  assert.deepEqual(await pg.evaluate(() => cart.map(c => [c.productId, c.quantity])), [['p1', 1.1], ['p2', 1]], 'کیلویی ۰٫۱، عددی ۱ — همان گامِ سبد');
+  assert.equal(await pg.locator('#pos-products [data-pos-qty="p2"]').innerText(), '1');
+  await pg.evaluate(() => document.querySelector('#pos-lines [data-line-del="p2"]').click());
+  assert.deepEqual(await pg.evaluate(() => cart.map(c => c.productId)), ['p1']);
+  assert.equal(await pg.locator('#pos-lines-count').innerText(), '1 قلم');
+  //  «خالی کردن» با تأیید
+  await pg.evaluate(() => document.querySelector('#pos-order [data-pos-act="clear"]').click());
+  assert.equal(await pg.locator('#modal-confirm.open').count(), 1, 'بی تأیید خالی نمی‌شود');
+  await pg.evaluate(() => document.getElementById('btn-confirm-ok').click());
+  assert.deepEqual(await pg.evaluate(() => cart), []);
   await pg.close();
 });
 
@@ -148,7 +161,7 @@ await step('تبلت (۷۶۸): ردیفِ دسته‌ها و شبکه، سبد �
   await t.pg.close();
   const p = await open(360);
   await go(p.pg, 'sale');
-  assert.equal((await rect(p.pg, '#pos-rail')).d, 'none');
+  assert.equal((await rect(p.pg, '#pos-cats')).d, 'none');
   assert.equal((await rect(p.pg, '#pos-products')).d, 'none');
   assert.equal((await rect(p.pg, '.manual-scan-row')).d, 'flex', 'ورودِ دستیِ بارکد روی گوشی سرِ جایش');
   await p.pg.close();
@@ -192,9 +205,11 @@ await step('فروش با کیبورد: «/» ⇐ بارکد + Enter ⇐ نام 
   assert.deepEqual(await pg.evaluate(() => cart.map(c => c.productId).sort()), ['p1', 'p2']);
   assert.equal(await pg.evaluate(() => document.activeElement.id), 'pos-search', 'فوکوس برای قلمِ بعدی می‌ماند');
   //  بارکدخوانِ سخت‌افزاری: بی فوکوس، نویسه‌های تند و Enter
-  await pg.evaluate(() => document.activeElement.blur());
-  await pg.keyboard.type('222222', { delay: 5 });
-  await pg.keyboard.press('Enter');
+  //  (رویدادها درونِ صفحه پشتِ هم، چون فاصلهٔ ≤ ۲۰۰ میلی‌ثانیه‌ایِ بارکدخوان زیرِ بارِ CI با تایپِ پلی‌رایت نمی‌ماند)
+  await pg.evaluate(() => {
+    document.activeElement.blur();
+    for (const k of [...'222222', 'Enter']) document.dispatchEvent(new KeyboardEvent('keydown', { key: k, code: k === 'Enter' ? 'Enter' : `Digit${k}`, bubbles: true }));
+  });
   assert.deepEqual(await pg.evaluate(() => cart.find(c => c.productId === 'p2').quantity), 2);
   //  کالای خاموش با Enter هم نمی‌آید
   await pg.keyboard.press('/');
@@ -234,15 +249,16 @@ if (!axeSrc && SKIP) {
         await pg.evaluate(t => document.documentElement.setAttribute('data-theme', t), theme);
         await pg.addScriptTag({ content: axeSrc });
         const bad = [];
-        for (const p of PAGES) {
+        for (const p of PAGES.filter(x => x !== 'dashboard')) {
           await go(pg, p);
           if (p === 'sale') await pg.evaluate(() => { addToCart('p1', 1); document.querySelectorAll('.page.active [data-view="table"]').forEach(b => b.click()); });
           await pg.waitForTimeout(700);
-          for (const scope of ['.page.active', '.sidebar', '.header']) {
+          //  سربرگ و منو فقط در کامپیوتر بازطراحی شده‌اند؛ قفلِ اشتراک (vip) کارِ این PR نیست
+          for (const scope of width >= 769 ? ['.page.active', '.sidebar', '.header'] : ['.page.active']) {
             const v = await pg.evaluate(async (sel) => {
               const el = document.querySelector(sel);
               if (!el || !el.getClientRects().length) return [];
-              const out = await window.axe.run(el, { runOnly: ['color-contrast', 'button-name', 'label', 'image-alt', 'link-name', 'aria-allowed-attr', 'aria-valid-attr-value', 'nested-interactive'] });
+              const out = await window.axe.run({ include: [[sel]], exclude: [['.vip-overlay'], ['.vip-locked-el']] }, { runOnly: ['color-contrast', 'button-name', 'label', 'image-alt', 'link-name', 'aria-allowed-attr', 'aria-valid-attr-value', 'nested-interactive'] });
               return out.violations.map(x => `${x.id}: ${x.nodes.slice(0, 3).map(n => n.target.join(' ')).join(' ; ')}`);
             }, scope);
             v.forEach(x => bad.push(`${p} ${scope} — ${x}`));

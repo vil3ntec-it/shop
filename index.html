@@ -4398,7 +4398,12 @@
 
       <!-- SALE (POS / barcode scanning) -->
       <section class="page" id="page-sale">
-        <div class="page-toolbar">
+        <!-- صندوق (VISUAL-DIRECTION §۲ + DESIGN v2): کاتالوگ راست، «سبد خرید» چپ با رنگِ خودش.
+             دسته‌ها ردیفِ چیپ بالای کاتالوگ‌اند، یک جست‌وجو، و −/+ فقط در سبد.
+             زیرِ ۶۰۰ پیکسل (گوشی) همان چیدمانِ پیشین می‌ماند. -->
+        <div class="pos" id="pos">
+        <div class="pos-main">
+        <div class="page-toolbar pos-head">
           <div class="page-title-block">
             <h2>فروش جدید</h2>
             <p>کالا را جلوی دوربین بگیرید تا خودکار به سبد اضافه شود</p>
@@ -4408,11 +4413,6 @@
           </div>
         </div>
 
-        <!-- صندوقِ سه‌ستونه (VISUAL-DIRECTION §۲): دسته‌ها راست، کالاها وسط، سفارش چپ.
-             زیرِ ۶۰۰ پیکسل (گوشی) همان چیدمانِ پیشین می‌ماند. -->
-        <div class="pos" id="pos">
-        <nav class="pos-rail" id="pos-rail" aria-label="دسته‌بندیِ کالاها"></nav>
-        <div class="pos-main">
         <div class="panel scanner-panel">
           <div class="scanner-frame">
             <video id="scanner-video" playsinline muted></video>
@@ -4438,17 +4438,19 @@
         <div class="pos-tools">
           <div class="ro-search pos-search">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-            <input id="pos-search" type="search" autocomplete="off" enterkeyhint="done" aria-label="جست‌وجوی نام یا بارکدِ کالا" placeholder="نام یا بارکدِ کالا — Enter به سبد">
+            <input id="pos-search" type="search" autocomplete="off" enterkeyhint="done" aria-label="جست‌وجوی نام یا بارکدِ کالا" aria-keyshortcuts="/" placeholder="نام یا بارکدِ کالا را بنویسید یا بخوانید — Enter به سبد">
           </div>
           <div id="pos-view"></div>
         </div>
+        <div class="pos-cats" id="pos-cats" role="group" aria-label="دسته‌بندیِ کالاها"></div>
         <div class="pos-products" id="pos-products"></div>
         </div>
 
-        <aside class="pos-order" id="pos-order" aria-label="فهرستِ سفارش">
+        <aside class="pos-order" id="pos-order" aria-label="سبد خرید">
         <div class="pos-order-head">
-          <h2>فهرستِ سفارش</h2>
+          <h2>سبد خرید</h2>
           <span class="ro-pill info plain" id="pos-lines-count">0 قلم</span>
+          <button type="button" class="pos-clear" data-pos-act="clear" disabled>خالی کردن</button>
         </div>
         <div class="page-toolbar pos-cart-title" style="margin:6px 0 10px;">
           <div class="page-title-block"><h2 style="font-size:15px;">سبد خرید</h2></div>
@@ -4481,6 +4483,8 @@
           <div class="cart-drawer-body" id="cart-drawer-body" style="display:none;">
             <div class="exp-list cart-list" id="cart-list"></div>
           </div>
+          <!-- اقلامِ سبد با −/+ برای کامپیوتر (≥ ۱۰۲۴)؛ همان سبد، همان توابع -->
+          <div class="pos-lines" id="pos-lines"></div>
           <!-- روش‌هایی که موتورِ فروشِ وب واقعاً ثبت می‌کند: نقد، و قرض (نسیه، با پرداختِ جزئی در پنجرهٔ ثبت) -->
           <div class="pos-pay" id="pos-pay" role="group" aria-label="روشِ پرداخت">
             <span class="pos-pay-label">روشِ پرداخت</span>
@@ -4505,16 +4509,14 @@
             <button class="btn btn-primary btn-sm" id="btn-finalize-sale">ثبت فروش</button>
           </div>
         </div>
+        <!-- کلیدهای صندوق (keymap)؛ هر کدام کاری است که همین صفحه دارد -->
+        <p class="pos-hints" id="pos-hints">
+          <span><span class="ro-kbd">Enter</span> افزودن</span>
+          <span><span class="ro-kbd">Ctrl+Enter</span> ثبت</span>
+          <span><span class="ro-kbd">Alt+C</span> قرض‌دار</span>
+          <span><span class="ro-kbd">/</span> جست‌وجو</span>
+        </p>
         </aside>
-        </div>
-
-        <!-- نوارِ کارِ صندوق (کامپیوتر): فقط کارهایی که امروز واقعاً هست، هر کدام با کلیدش -->
-        <div class="pos-actions" id="pos-actions" role="toolbar" aria-label="کارهای صندوق">
-          <button type="button" class="pos-act" data-pos-act="search">جست‌وجو و اسکن <span class="ro-kbd">/</span></button>
-          <button type="button" class="pos-act" data-pos-act="customer">قرض‌دار <span class="ro-kbd">Alt+C</span></button>
-          <button type="button" class="pos-act" data-pos-act="clear">سبدِ تازه</button>
-          <button type="button" class="pos-act" data-pos-act="history">تاریخچهٔ فروش <span class="ro-kbd">Alt+6</span></button>
-          <button type="button" class="pos-act primary" data-pos-act="pay">پرداخت و ثبت <span class="ro-kbd">Ctrl+Enter</span></button>
         </div>
       </section>
 
@@ -12214,13 +12216,15 @@
   });
 
   /* ==========================================================
-     صندوقِ سه‌ستونه — VISUAL-DIRECTION §۲ (همتای DeskSale، #251)
+     صندوق — VISUAL-DIRECTION §۲ + DESIGN v2 (همتای DeskSale، #251)
      ----------------------------------------------------------
-     ستونِ دسته‌ها (راست)، شبکه یا جدولِ کالا با − / تعداد / + (وسط) و
-     پنلِ سفارش (چپ، همان #cart-drawer). هر کار از همان توابعِ سبد
-     می‌گذرد (addToCart / setCartQty / quickSelectAddOne / handleBarcodeScanned)
-     پس داده، قاعدهٔ واحد، کالای غیرفعال و پیش‌نویس همان‌اند؛ این‌جا فقط
-     نما و چند کلیدِ میان‌برِ keymap (sale.customer = Alt+C، Ctrl+Enter) است.
+     کاتالوگ با ردیفِ چیپِ دسته‌ها و یک جست‌وجو؛ کارت/ردیفِ کالا با یک
+     زدن به سبد می‌رود و شمارِ «در سبد» را نشان می‌دهد. −/+ فقط در «سبد
+     خرید» است. هر کار از همان توابعِ سبد می‌گذرد (addToCart /
+     quickSelectAddOne / cartCtlStep / cartCtlTypeQty / removeFromCart /
+     handleBarcodeScanned)، پس داده، قاعدهٔ واحد، کالای غیرفعال و پیش‌نویس
+     همان‌اند؛ این‌جا فقط نما و کلیدهای keymap (sale.customer = Alt+C،
+     Ctrl+Enter = پنجرهٔ ثبت) است.
      `var` و نگهبانِ POS: renderCart() ممکن است هنگامِ بوت پیش از این بخش اجرا شود.
      ========================================================== */
   var POS = null;
@@ -12230,7 +12234,7 @@
     const q = `${formatCartQty(stock, p.unit)}${p.unit ? ' ' + p.unit : ''}`;
     if(stock <= 0) return { cls:'bad', txt:'ناموجود' };
     if(stock <= (p.minStock||0)) return { cls:'warn', txt:`کم · ${q}` };
-    return { cls:'ok', txt:`موجودی ${q}` };
+    return { cls:'ok', txt:`موجود · ${q}` };
   }
   function posMatches(p, q){
     if(!q) return true;
@@ -12242,35 +12246,27 @@
   function posList(){
     return products.filter(p=> p.active !== false && (!POS.category || p.category===POS.category) && posMatches(p, POS.query));
   }
-  function renderPosRail(){
-    const rail = document.getElementById('pos-rail');
-    if(!rail || !POS) return;
+  function renderPosCats(){
+    const row = document.getElementById('pos-cats');
+    if(!row || !POS) return;
     const act = products.filter(p=> p.active !== false);
     const cats = [...new Set(act.map(p=> p.category).filter(Boolean))].sort((a,b)=> String(a).localeCompare(String(b), 'fa'));
     if(POS.category && !cats.includes(POS.category)) POS.category = '';
-    const all = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>';
-    const tile = (val, label, n, ic)=> `<button type="button" class="pos-cat" data-pos-cat="${escapeHtml(val)}" aria-pressed="${POS.category===val}">
-        <span class="pos-cat-ic" aria-hidden="true">${ic}</span><span class="pos-cat-name">${escapeHtml(label)}</span><span class="pos-cat-n">${n}</span></button>`;
-    rail.innerHTML = tile('', 'همه', act.length, all)
-      + cats.map(c=> tile(c, c, act.filter(p=> p.category===c).length, escapeHtml(String(c)[0]))).join('');
-  }
-  function posStepHtml(p, qty){
-    const name = escapeHtml(p.name);
-    return `<div class="pos-step" role="group" aria-label="تعدادِ «${name}» در سبد">
-        <button type="button" class="pos-step-btn" data-pos-minus="${p.id}" aria-label="یکی کمتر از «${name}»"${qty>0 ? '' : ' disabled'}>−</button>
-        <output class="pos-step-qty" data-pos-qty="${p.id}">${formatCartQtyFa(qty, p.unit)}</output>
-        <button type="button" class="pos-step-btn" data-pos-plus="${p.id}" aria-label="یکی بیشتر از «${name}»">+</button>
-      </div>`;
+    const chip = (val, label, n)=> `<button type="button" class="pos-chip" data-pos-cat="${escapeHtml(val)}" aria-pressed="${POS.category===val}">${escapeHtml(label)}<span class="pos-chip-n">${formatMoney(n)}</span></button>`;
+    row.innerHTML = chip('', 'همه', act.length) + cats.map(c=> chip(c, c, act.filter(p=> p.category===c).length)).join('');
   }
   function posThumb(p){
     return p.photo
       ? `<span class="pos-thumb"><img alt="" data-product-photo="${p.id}"></span>`
-      : `<span class="pos-thumb"><span class="pos-initial" aria-hidden="true">${escapeHtml((p.name||'؟')[0])}</span></span>`;
+      : `<span class="pos-thumb is-initial"><span class="pos-initial" aria-hidden="true">${escapeHtml((p.name||'؟')[0])}</span></span>`;
+  }
+  function posBadge(p, qty){
+    return `<span class="pos-badge" data-pos-qty="${p.id}"${qty>0 ? '' : ' hidden'}>${qty>0 ? formatCartQtyFa(qty, p.unit) : ''}</span>`;
   }
   function renderPosProducts(){
     const host = document.getElementById('pos-products');
     if(!host || !POS) return;
-    renderPosRail();
+    renderPosCats();
     const all = posList();
     const list = all.slice(0, POS.limit);
     if(!all.length){
@@ -12282,35 +12278,58 @@
     host.dataset.view = mode;
     const more = all.length > list.length
       ? `<button type="button" class="btn btn-secondary btn-sm pos-more" data-pos-more>نمایشِ ${formatMoney(Math.min(POS_PAGE, all.length - list.length))} کالای دیگر (از ${formatMoney(all.length)})</button>` : '';
+    const label = (p)=> `افزودنِ «${escapeHtml(p.name)}» به سبد`;
     if(mode === 'table'){
       host.innerHTML = `<div class="ro-table-wrap"><table class="ro-table pos-table">
-        <thead><tr><th scope="col">کالا</th><th scope="col">دسته</th><th scope="col">قیمت</th><th scope="col">موجودی</th><th scope="col">تعداد</th></tr></thead>
+        <thead><tr><th scope="col">کالا</th><th scope="col">دسته</th><th scope="col">قیمت</th><th scope="col">موجودی</th><th scope="col">در سبد</th></tr></thead>
         <tbody>${list.map(p=>{
           const qty = quickSelectQtyFor(p.id); const st = posStock(p);
-          return `<tr data-pos-id="${p.id}" class="${qty>0 ? 'is-selected' : ''}">
-            <td><button type="button" class="pos-row-hit" data-pos-add="${p.id}" aria-label="افزودنِ «${escapeHtml(p.name)}» به سبد">${posThumb(p)}<b>${escapeHtml(p.name)}</b></button></td>
+          return `<tr data-pos-id="${p.id}" data-pos-add="${p.id}" class="${qty>0 ? 'is-selected' : ''}">
+            <td><button type="button" class="pos-row-hit" data-pos-add="${p.id}" aria-label="${label(p)}">${posThumb(p)}<b>${escapeHtml(p.name)}</b></button></td>
             <td class="ro-cell-sub">${escapeHtml(p.category||'')}</td>
             <td class="num">${formatMoney(p.salePrice)} افغانی</td>
             <td><span class="ro-pill ${st.cls}">${st.txt}</span></td>
-            <td>${posStepHtml(p, qty)}</td></tr>`;
+            <td>${posBadge(p, qty)}</td></tr>`;
         }).join('')}</tbody></table></div>${more}`;
     } else {
       host.innerHTML = `<div class="pos-grid">${list.map(p=>{
         const qty = quickSelectQtyFor(p.id); const st = posStock(p);
-        return `<div class="pos-card${qty>0 ? ' in-cart' : ''}" data-pos-id="${p.id}">
-          <button type="button" class="pos-card-hit" data-pos-add="${p.id}" aria-label="افزودنِ «${escapeHtml(p.name)}» به سبد">
-            ${posThumb(p)}
+        return `<button type="button" class="pos-card${qty>0 ? ' in-cart' : ''}" data-pos-id="${p.id}" data-pos-add="${p.id}" aria-label="${label(p)}">
+            ${posThumb(p)}${posBadge(p, qty)}
             <span class="pos-cat-label">${escapeHtml(p.category||'')}</span>
             <span class="pos-name">${escapeHtml(p.name)}</span>
-          </button>
-          <div class="pos-card-foot"><span class="pos-price">${formatMoney(p.salePrice)} <small>افغانی</small></span><span class="ro-pill ${st.cls}">${st.txt}</span></div>
-          ${posStepHtml(p, qty)}
-        </div>`;
+            <span class="pos-card-foot"><span class="pos-price">${formatMoney(p.salePrice)} <small>افغانی</small></span><span class="ro-pill ${st.cls}">${st.txt}</span></span>
+          </button>`;
       }).join('')}</div>${more}`;
     }
     hydrateProductPhotos(host);
   }
-  /** فقط عددِ هر کارت و شمارِ اقلام — فهرست از نو ساخته نمی‌شود تا فوکوسِ کیبورد بماند */
+  /** اقلامِ سبد برای کامپیوتر: نام و قیمتِ واحد، − / تعداد / +، مبلغ و حذف. فوکوسِ کیبورد پس از ساختن برمی‌گردد. */
+  function renderPosLines(){
+    const host = document.getElementById('pos-lines');
+    if(!host || !POS) return;
+    const a = document.activeElement;
+    const keep = a && host.contains(a) ? [...a.attributes].find(x=> x.name.startsWith('data-line-')) : null;
+    host.innerHTML = cart.map(item=>{
+      const p = products.find(x=> x.id===item.productId);
+      if(!p) return '';
+      const name = escapeHtml(p.name);
+      return `<div class="pos-line" data-line="${p.id}">
+        <div class="pos-line-main"><b>${name}</b><span>${formatMoney(p.salePrice)} افغانی${p.unit ? ' / ' + escapeHtml(p.unit) : ''}</span></div>
+        <div class="pos-step" role="group" aria-label="تعدادِ «${name}»">
+          <button type="button" class="pos-step-btn" data-line-minus="${p.id}" aria-label="یکی کمتر از «${name}»">−</button>
+          <button type="button" class="pos-step-qty" data-line-qty="${p.id}" aria-label="نوشتنِ مقدارِ «${name}»: ${formatCartQtyFa(item.quantity, p.unit)}">${formatCartQtyFa(item.quantity, p.unit)}</button>
+          <button type="button" class="pos-step-btn" data-line-plus="${p.id}" aria-label="یکی بیشتر از «${name}»">+</button>
+        </div>
+        <span class="pos-line-sum">${formatMoney(lineTotal(p.salePrice, item.quantity))}</span>
+        <button type="button" class="pos-line-del" data-line-del="${p.id}" aria-label="حذفِ «${name}» از سبد">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>`;
+    }).join('');
+    if(keep) host.querySelector(`[${keep.name}="${CSS.escape(keep.value)}"]`)?.focus();
+  }
+  /** شمارِ «در سبد» روی کارت‌ها، اقلامِ سبد و شمارِ اقلام — فهرستِ کالا از نو ساخته نمی‌شود */
   function patchPosCards(){
     if(!POS) return;
     const cnt = document.getElementById('pos-lines-count');
@@ -12320,17 +12339,19 @@
       const p = products.find(x=> x.id===id);
       const qty = quickSelectQtyFor(id);
       el.classList.toggle(el.tagName==='TR' ? 'is-selected' : 'in-cart', qty>0);
-      const out = el.querySelector('[data-pos-qty]');
-      if(out) out.textContent = formatCartQtyFa(qty, p ? p.unit : '');
-      const minus = el.querySelector('[data-pos-minus]');
-      if(minus) minus.disabled = !(qty>0);
+      const badge = el.querySelector('[data-pos-qty]');
+      if(badge){ badge.hidden = !(qty>0); badge.textContent = qty>0 ? formatCartQtyFa(qty, p ? p.unit : '') : ''; }
     });
-    document.querySelectorAll('[data-pos-act="pay"], [data-pos-act="clear"]').forEach(b=> b.disabled = !cart.length);
+    renderPosLines();
+    document.querySelectorAll('#pos-order [data-pos-act="clear"]').forEach(b=> b.disabled = !cart.length);
   }
-  function posMinusOne(id){
-    const item = cart.find(c=> c.productId===id);
-    if(!item) return;
-    setCartQty(id, Math.round((item.quantity - quickSelectStep(id))*1000)/1000);
+  /** −/+/مقدار/حذف در سبد: همان کنترل‌های نوارِ سبد، روی همان قلم */
+  function posLineAct(kind, id){
+    selectedCartId = id;
+    if(kind === 'minus') cartCtlStep(-1);
+    else if(kind === 'plus') cartCtlStep(+1);
+    else if(kind === 'qty') cartCtlTypeQty();
+    else if(kind === 'del'){ removeFromCart(id); selectedCartId = null; }
     patchPosCards();
   }
   /** Enter در کادرِ جست‌وجو: بارکدِ دقیق ⇐ همان اسکن؛ یک نتیجه ⇐ همان افزودن؛ بارکدِ ناشناس ⇐ همان «ثبت کالای تازه» */
@@ -12345,7 +12366,6 @@
       const list = posList();
       if(list.length === 1){
         quickSelectAddOne(list[0].id);
-        selectedCartId = list[0].id; renderCart();
         showToast(`${list[0].name} به سبد اضافه شد`);
       } else if(!list.length && /^[0-9A-Za-z-]{4,}$/.test(code)){
         handleBarcodeScanned(raw, {skipDedup:true});
@@ -12360,10 +12380,10 @@
   }
   function posClearCart(){
     if(!cart.length) return;
-    document.getElementById('confirm-title').textContent = 'سبدِ تازه؟';
+    document.getElementById('confirm-title').textContent = 'سبد خالی شود؟';
     document.getElementById('confirm-sub').textContent =
       `${formatMoney(cart.length)} قلمِ این سبد کنار گذاشته می‌شود. چیزی ثبت نشده و از موجودی کم نمی‌شود.`;
-    setConfirmOk('سبد را خالی کن', true);
+    setConfirmOk('خالی کن', true);
     confirmAction = ()=>{
       cart = []; saleDebtorId = null; selectedCartId = null;
       saveDraftCart(); renderCart();
@@ -12391,20 +12411,25 @@
     if(viewHost && window.TohidViewMode){
       POS.view = window.TohidViewMode.mount(viewHost, { screen:'sale', kind:'sale', onChange: renderPosProducts });
     }
-    document.getElementById('pos-rail').addEventListener('click', (e)=>{
+    document.getElementById('pos-cats').addEventListener('click', (e)=>{
       const b = e.target.closest('[data-pos-cat]');
       if(!b) return;
       POS.category = b.dataset.posCat; POS.limit = POS_PAGE;
       renderPosProducts();
-      document.querySelector(`#pos-rail [data-pos-cat="${CSS.escape(POS.category)}"]`)?.focus();
+      document.querySelector(`#pos-cats [data-pos-cat="${CSS.escape(POS.category)}"]`)?.focus();
     });
     host.addEventListener('click', (e)=>{
-      const t = e.target.closest('[data-pos-add], [data-pos-plus], [data-pos-minus], [data-pos-more]');
-      if(!t || t.disabled) return;
+      const t = e.target.closest('[data-pos-add], [data-pos-more]');
+      if(!t) return;
       if(t.dataset.posMore !== undefined){ POS.limit += POS_PAGE; renderPosProducts(); return; }
-      if(t.dataset.posMinus) posMinusOne(t.dataset.posMinus);
-      else quickSelectAddOne(t.dataset.posAdd || t.dataset.posPlus);
+      quickSelectAddOne(t.dataset.posAdd);
       patchPosCards();
+    });
+    document.getElementById('pos-lines').addEventListener('click', (e)=>{
+      const b = e.target.closest('[data-line-minus], [data-line-plus], [data-line-qty], [data-line-del]');
+      if(!b) return;
+      const kind = b.dataset.lineMinus ? 'minus' : b.dataset.linePlus ? 'plus' : b.dataset.lineQty ? 'qty' : 'del';
+      posLineAct(kind, b.dataset.lineMinus || b.dataset.linePlus || b.dataset.lineQty || b.dataset.lineDel);
     });
     const search = document.getElementById('pos-search');
     search.addEventListener('input', ()=>{ POS.query = search.value.trim(); POS.limit = POS_PAGE; renderPosProducts(); });
@@ -12420,15 +12445,9 @@
       if(b.dataset.posPay === 'credit') openPickDebtor();
       else { saleDebtorId = null; renderCartDebtorRow(); }
     });
-    document.getElementById('pos-actions').addEventListener('click', (e)=>{
-      const b = e.target.closest('[data-pos-act]');
-      if(!b || b.disabled) return;
-      const act = b.dataset.posAct;
-      if(act === 'search') search.focus();
-      else if(act === 'customer') openPickDebtor();
-      else if(act === 'clear') posClearCart();
-      else if(act === 'history') location.hash = '#sales';
-      else if(act === 'pay') posOpenCheckout(false);
+    document.getElementById('pos-order').addEventListener('click', (e)=>{
+      const b = e.target.closest('[data-pos-act="clear"]');
+      if(b && !b.disabled) posClearCart();
     });
     /* کلیدهای صندوق از keymap: Alt+C = sale.customer، Ctrl+Enter = پنجرهٔ ثبت */
     document.addEventListener('keydown', (e)=>{

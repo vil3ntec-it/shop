@@ -105,6 +105,9 @@ await step('چیدمانِ انگلیسی مثلِ پیش', async () => {
 
 await step('بارکدِ دستی با رقمِ عربی «٦٢٦…»', async () => {
   const { pg } = await open();
+  //  کادرِ «بارکدِ دستی» از ۶۰۰ پیکسل به بالا جایش را به یک جست‌وجوی صندوق داده (DESIGN v2: یک جست‌وجو)؛
+  //  همان کادر روی گوشی سرِ جایش است و همان‌جا سنجیده می‌شود
+  await pg.setViewportSize({ width: 390, height: 844 });
   await pg.fill('#in-manual-barcode', '');
   await pg.focus('#in-manual-barcode');
   await pg.keyboard.insertText('٦٢٦٠١٠٠١٢٠٠١٤');
@@ -113,6 +116,18 @@ await step('بارکدِ دستی با رقمِ عربی «٦٢٦…»', async (
   await pg.evaluate(() => handleBarcodeScanned('٦٢٦٠١٠٠١٢٠٠١٤', { skipDedup: true }));
   await pg.waitForTimeout(100);
   assert.equal(await qtyOf(pg, 'p1'), 1);
+  await pg.close();
+});
+
+await step('جست‌وجوی صندوق (کامپیوتر) با رقمِ عربی و فارسی: بارکد + Enter همان کالا را می‌آورد', async () => {
+  const { pg } = await open();
+  await pg.focus('#pos-search');
+  await pg.keyboard.insertText('٦٢٦٠١٠٠١٢٠٠١٤');
+  await pg.keyboard.press('Enter');
+  await pg.keyboard.insertText('۶۲۶۰۱۰۰۱۲۰۰۱۴');
+  await pg.keyboard.press('Enter');
+  await pg.waitForTimeout(100);
+  assert.equal(await qtyOf(pg, 'p1'), 2);
   await pg.close();
 });
 
