@@ -85,7 +85,10 @@ jobs:
           #  مجموعهٔ ثابتِ ظاهر (نسخهٔ ۲): صندوق روز و شب، کالاها، داشبورد و قرض‌داران در دو اندازهٔ واقعی
           for WH in 1280,800 1920,1080; do
             N="v2-${WH/,/x}"
-            S="$S;size:$WH;wait:1500;theme:LIGHT;go:sale;wait:2000;shot:$N-pos-light;posview:table;wait:1200;shot:$N-pos-table-light;posview:card;wait:800"
+            #  ماوس روی عنوانِ سربرگ (جای بی‌کلیک) — وگرنه کارت یا ردیفِ زیرِ ماوس رنگِ «هاور» می‌گیرد و
+            #  در عکس شبیهِ کارتِ خاموش دیده می‌شود (بازبینیِ ۱۴۰۵/۰۷/۲۷)
+            MX=$(( ${WH%,*} - 120 ))
+            S="$S;size:$WH;wait:1500;move:$MX,30;theme:LIGHT;go:sale;wait:2000;shot:$N-pos-light;posview:table;wait:1200;shot:$N-pos-table-light;posview:card;wait:800"
             S="$S;theme:DARK;wait:2000;shot:$N-pos-dark;theme:LIGHT;wait:1200"
             S="$S;go:products;wait:1800;shot:$N-products;go:dashboard;wait:1800;shot:$N-dashboard;go:debtors;wait:1800;shot:$N-debtors"
           done

@@ -1,7 +1,7 @@
 {
-  "_doc": "STF-01..03 — هستهٔ سنجشِ مجوز. همین فایل را license/perm-core.js (و نسخهٔ سرور) و PermCore.kt می‌دوانند. defaults = رفتارِ امروز (MATRIX سرور + ShopRole برنامه).",
+  "_doc": "STF-01..03 — هستهٔ سنجشِ مجوز. همین فایل را license/perm-core.js (و نسخهٔ سرور) و PermCore.kt می‌دوانند. defaults = رفتارِ امروز (MATRIX سرور + ShopRole برنامه). returns.create و «نیازمند تأیید» برای شاگرد و discount_bp: برگهٔ امضاشده (بخشِ ۱۰.۱).",
   "version": 1,
-  "keys": ["audit.view", "reports.money", "sales.cancel", "sales.discount", "settings.write"],
+  "keys": ["audit.view", "reports.money", "returns.create", "sales.cancel", "sales.discount", "settings.write"],
   "defaults": [
     { "role": "owner", "key": "sales.discount", "out": "allow" },
     { "role": "manager", "key": "sales.discount", "out": "allow" },
@@ -20,7 +20,10 @@
     { "role": "staff", "key": "reports.money", "out": "deny" },
     { "role": "cashier", "key": "sales.discount", "out": null },
     { "role": "", "key": "settings.write", "out": null },
-    { "role": "manager", "key": "data.write", "out": null }
+    { "role": "manager", "key": "data.write", "out": null },
+    { "role": "owner", "key": "returns.create", "out": "allow" },
+    { "role": "manager", "key": "returns.create", "out": "allow" },
+    { "role": "staff", "key": "returns.create", "out": "allow" }
   ],
   "resolve": [
     { "role": "staff", "layers": [], "key": "sales.discount", "out": { "mode": "deny", "caps": {} } },
@@ -30,7 +33,7 @@
     { "role": "manager", "layers": [{ "settings.write": { "mode": "deny" } }], "key": "settings.write", "out": { "mode": "deny", "caps": {} } },
     { "role": "manager", "layers": [{ "settings.write": { "mode": "deny" } }, { "settings.write": { "mode": "allow" } }], "key": "settings.write", "out": { "mode": "allow", "caps": {} } },
     { "role": "staff", "layers": [{ "settings.write": { "mode": "allow" } }], "key": "settings.write", "out": { "mode": "deny", "caps": {} } },
-    { "role": "staff", "layers": [{ "sales.discount": { "mode": "approve" } }], "key": "sales.discount", "out": { "mode": "deny", "caps": {} } },
+    { "role": "staff", "layers": [{ "sales.discount": { "mode": "approve" } }], "key": "sales.discount", "out": { "mode": "approve", "caps": {} } },
     { "role": "staff", "layers": [{ "reports.money": { "mode": "allow" } }], "key": "reports.money", "out": { "mode": "allow", "caps": {} } },
     { "role": "manager", "layers": [{ "reports.money": { "mode": "deny" } }], "key": "reports.money", "out": { "mode": "deny", "caps": {} } },
     { "role": "manager", "layers": [{ "sales.discount": { "caps": { "maxPct": 10 } } }], "key": "sales.discount", "out": { "mode": "allow", "caps": { "maxPct": 10 } } },
@@ -43,7 +46,12 @@
     { "role": "manager", "layers": [{ "sales.discount": { "mode": "bogus" } }], "key": "sales.discount", "out": { "mode": "allow", "caps": {} } },
     { "role": "manager", "layers": [null, {}, { "audit.view": "deny" }], "key": "audit.view", "out": { "mode": "allow", "caps": {} } },
     { "role": "cashier", "layers": [{ "sales.discount": { "mode": "allow" } }], "key": "sales.discount", "out": { "mode": "deny", "caps": {} } },
-    { "role": "manager", "layers": [], "key": "nope.key", "out": { "mode": "deny", "caps": {} } }
+    { "role": "manager", "layers": [], "key": "nope.key", "out": { "mode": "deny", "caps": {} } },
+    { "role": "staff", "layers": [{ "sales.cancel": { "mode": "approve" } }], "key": "sales.cancel", "out": { "mode": "approve", "caps": {} } },
+    { "role": "staff", "layers": [{ "sales.discount": { "mode": "allow", "caps": { "maxPct": 5 } } }], "key": "sales.discount", "out": { "mode": "deny", "caps": { "maxPct": 5 } } },
+    { "role": "staff", "layers": [{ "settings.write": { "mode": "approve" } }], "key": "settings.write", "out": { "mode": "deny", "caps": {} } },
+    { "role": "staff", "layers": [{ "returns.create": { "caps": { "maxAmount": 50000 } } }], "key": "returns.create", "out": { "mode": "allow", "caps": { "maxAmount": 50000 } } },
+    { "role": "manager", "layers": [{ "returns.create": { "mode": "approve" } }], "key": "returns.create", "out": { "mode": "approve", "caps": {} } }
   ],
   "evaluate": [
     { "role": "manager", "layers": [{ "sales.discount": { "caps": { "maxPct": 5 } } }], "key": "sales.discount", "req": { "pct": 5 }, "out": { "decision": "allow", "reason": "ok" } },
@@ -59,7 +67,11 @@
     { "role": "owner", "layers": [{ "sales.discount": { "caps": { "maxPct": 1 } } }], "key": "sales.discount", "req": { "pct": 50 }, "out": { "decision": "allow", "reason": "ok" } },
     { "role": "manager", "layers": [], "key": "settings.write", "req": null, "out": { "decision": "allow", "reason": "ok" } },
     { "role": "staff", "layers": [], "key": "reports.money", "req": null, "out": { "decision": "deny", "reason": "denied" } },
-    { "role": "staff", "layers": [{ "reports.money": { "mode": "allow" } }], "key": "reports.money", "req": null, "out": { "decision": "allow", "reason": "ok" } }
+    { "role": "staff", "layers": [{ "reports.money": { "mode": "allow" } }], "key": "reports.money", "req": null, "out": { "decision": "allow", "reason": "ok" } },
+    { "role": "staff", "layers": [{ "sales.discount": { "mode": "approve" } }], "key": "sales.discount", "req": { "pct": 1 }, "out": { "decision": "approve", "reason": "needs_approval" } },
+    { "role": "staff", "layers": [{ "returns.create": { "caps": { "maxAmount": 50000 } } }], "key": "returns.create", "req": { "amount": 50000 }, "out": { "decision": "allow", "reason": "ok" } },
+    { "role": "staff", "layers": [{ "returns.create": { "caps": { "maxAmount": 50000 } } }], "key": "returns.create", "req": { "amount": 50001 }, "out": { "decision": "approve", "reason": "over_cap", "cap": "maxAmount", "limit": 50000 } },
+    { "role": "owner", "layers": [{ "returns.create": { "mode": "deny" } }], "key": "returns.create", "req": { "amount": 99999999 }, "out": { "decision": "allow", "reason": "ok" } }
   ],
   "effective": [
     {
@@ -68,6 +80,7 @@
       "out": {
         "audit.view": { "mode": "allow", "caps": {} },
         "reports.money": { "mode": "deny", "caps": {} },
+        "returns.create": { "mode": "allow", "caps": {} },
         "sales.cancel": { "mode": "allow", "caps": {} },
         "sales.discount": { "mode": "allow", "caps": { "maxPct": 7 } },
         "settings.write": { "mode": "deny", "caps": {} }
@@ -78,7 +91,7 @@
     { "role": "manager", "key": "settings.write", "override": { "mode": "deny" }, "out": null },
     { "role": "manager", "key": "settings.write", "override": { "mode": "allow" }, "out": null },
     { "role": "staff", "key": "settings.write", "override": { "mode": "allow" }, "out": "exceeds_role" },
-    { "role": "staff", "key": "sales.discount", "override": { "mode": "approve" }, "out": "exceeds_role" },
+    { "role": "staff", "key": "sales.discount", "override": { "mode": "approve" }, "out": null },
     { "role": "owner", "key": "settings.write", "override": { "mode": "deny" }, "out": "owner_fixed" },
     { "role": "manager", "key": "nope.key", "override": { "mode": "deny" }, "out": "unknown_permission" },
     { "role": "cashier", "key": "settings.write", "override": { "mode": "deny" }, "out": "unknown_role" },
@@ -97,6 +110,20 @@
     { "role": "manager", "key": "settings.write", "override": { "caps": { "maxPct": 1 } }, "out": "unknown_cap" },
     { "role": "manager", "key": "sales.discount", "override": { "caps": { "maxPct": null, "maxAmount": 250000 } }, "out": null },
     { "role": "staff", "key": "reports.money", "override": { "mode": "allow" }, "out": null },
-    { "role": "staff", "key": "reports.money", "override": {}, "out": null }
+    { "role": "staff", "key": "reports.money", "override": {}, "out": null },
+    { "role": "staff", "key": "sales.cancel", "override": { "mode": "approve" }, "out": null },
+    { "role": "staff", "key": "sales.discount", "override": { "mode": "allow" }, "out": "exceeds_role" },
+    { "role": "staff", "key": "returns.create", "override": { "mode": "approve", "caps": { "maxAmount": 1000 } }, "out": null },
+    { "role": "staff", "key": "returns.create", "override": { "caps": { "maxPct": 5 } }, "out": "unknown_cap" }
+  ],
+  "discount_bp": [
+    { "discount": 0, "total": 10000, "out": 0 },
+    { "discount": -5, "total": 10000, "out": 0 },
+    { "discount": 1700, "total": 33300, "out": 495 },
+    { "discount": 50, "total": 100, "out": 0 },
+    { "discount": 2000, "total": 10000, "out": 1950 },
+    { "discount": 100, "total": 0, "out": 10000 },
+    { "discount": 500000, "total": 100000, "out": 10000 },
+    { "discount": 123456, "total": 1234567, "out": 999 }
   ]
 }
