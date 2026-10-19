@@ -168,6 +168,10 @@ router.get('/devices', async (req, res) => {
 
 router.delete('/devices/:id', async (req, res) => {
   const id = v.id(req.params.id, { field: 'شناسه دستگاه' });
+  //  ⛔ بیرون کردنِ دستگاهِ **دیگر** همان «خروج از همه»ی تکه‌تکه است، پس
+  //  همان تأییدِ دوباره را می‌خواهد (بازبینیِ امنیتی ۱۴۰۵/۰۷/۲۷، یافتهٔ ۴).
+  //  دستگاهِ خودِ همین نشست (خروج) آزاد است.
+  if (id !== req.tokenRow?.device_id) await reauth.assertFresh(req);
   const r = await query(`UPDATE devices SET status='revoked' WHERE id=$1 AND user_id=$2`, [id, req.user.id]);
   //  ⛔ نشست‌ها فقط وقتی دستگاه واقعاً مالِ همین کاربر بود — وگرنه هر کسی با
   //  شناسهٔ دستگاهِ دیگری نشستِ او را می‌کشت

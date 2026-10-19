@@ -134,7 +134,7 @@ test('مجوز و نقشِ کارمندان: هر سه مسیر با نشستِ 
   }
 });
 
-test('فقط نشستِ دکان: نشستِ کهنهٔ پمپ روی مسیرهای مشترکِ /api/auth/* مثلِ پیش از این تغییر', async () => {
+test('نشستِ کهنهٔ پمپ: نخستین رمز را بی تأییدِ دوباره نمی‌گذارد (امنیت ۶)؛ خروج از همه مثلِ پیش از این تغییر', async () => {
   //  گذاشتنِ رمز برای حسابِ بی‌رمز — یک حساب، دو نشستِ کهنه: دکان و پمپ
   const email = 'reauth-pump@test.local';
   const shopCode = await h.post('/api/auth/otp/request', { email });
@@ -147,8 +147,19 @@ test('فقط نشستِ دکان: نشستِ کهنهٔ پمپ روی مسیره
   const pumpStale = await staleSession(pumpIn.body);
 
   assertNeedsReauth(await h.post('/api/auth/password', { newPassword: 'Taze!pass12' }, { token: shopStale.accessToken }), 'password/shop');
+  /*
+   *  ⛔ بازبینیِ امنیتی ۱۴۰۵/۰۷/۲۷ (یافتهٔ ۶): تا امروز این‌جا ۲۰۰ بود — توکنِ
+   *  کهنهٔ پمپ روی حسابِ مشترکِ بی‌رمز نخستین رمز را می‌گذاشت و همان رمز
+   *  برنامهٔ دکان را باز می‌کرد. حالا در هر بخش تازگی یا کدِ ایمیل لازم است.
+   *  ورودِ تازهٔ پمپ «تازه» است (آزمونِ بعدی)، پس جریانِ عادیِ پمپ نمی‌شکند.
+   */
+  assertNeedsReauth(await h.post('/api/auth/password', { newPassword: 'Taze!pass12' }, { token: pumpStale.accessToken }), 'password/pump');
+  assert.equal((await one('SELECT password_hash FROM users WHERE email=$1', [email])).password_hash, null, 'رمزی گذاشته نشد');
+  const asked = await h.post('/api/auth/reauth/code', {}, { token: pumpStale.accessToken });
+  assert.equal(asked.status, 200, JSON.stringify(asked.body));
+  assert.equal((await h.post('/api/auth/reauth', { code: asked.body.devCode }, { token: pumpStale.accessToken })).status, 200);
   const pumpSet = await h.post('/api/auth/password', { newPassword: 'Taze!pass12' }, { token: pumpStale.accessToken });
-  assert.equal(pumpSet.status, 200, `پمپ نباید reauth_required بگیرد: ${JSON.stringify(pumpSet.body)}`);
+  assert.equal(pumpSet.status, 200, `پس از کدِ ایمیل انجام: ${JSON.stringify(pumpSet.body)}`);
 
   //  خروج از همهٔ دستگاه‌ها
   const u = await h.newUser('دوبخشیِ رمزدار');
@@ -191,4 +202,120 @@ test('بی توکن ۴۰۱؛ و کلیدِ بازگشت (AUTH_REAUTH=off) رفت
   } finally {
     config.tokens.reauthEnforced = true;
   }
+});
+
+/* ================================================================
+ *  یافته‌های بازبینیِ امنیتی (۱۴۰۵/۰۷/۲۷) — هر آزمون پیش از رفع سرخ بود.
+ * ================================================================ */
+
+const deviceOf = async (accessToken) =>
+  (await one('SELECT device_id FROM tokens WHERE token_hash=$1', [hashToken(accessToken)])).device_id;
+
+test('امنیت ۳: دعوتِ مدیر و چرخاندنِ کدِ ثابت با نشستِ کهنه ۴۰۳؛ دعوتِ شاگرد مثلِ پیش', async () => {
+  const t = await shopWithStaff('دعوتِ مدیر');
+  const owner = await staleSession(t.owner);
+  const shopId = (await one('SELECT shop_id FROM shop_members WHERE id=$1', [t.mid])).shop_id;
+  const managerCodes = async () =>
+    (await one(`SELECT COUNT(*)::int AS n FROM staff_codes WHERE shop_id=$1 AND role='manager'`, [shopId])).n;
+  const generation = async () =>
+    (await one('SELECT MAX(generation) AS g FROM staff_codes WHERE shop_id=$1 AND standing', [shopId])).g;
+  const genBefore = await generation();
+
+  assertNeedsReauth(await h.post('/api/shop/invite', { role: 'manager' }, { token: owner.accessToken }), 'invite/manager');
+  assertNeedsReauth(await h.post('/api/shop/staff-code', { role: 'manager', maxUses: 50 }, { token: owner.accessToken }), 'staff-code/manager');
+  assertNeedsReauth(await h.post('/api/shop/staff-code/rotate', {}, { token: owner.accessToken }), 'staff-code/rotate');
+  assert.equal(await managerCodes(), 0, 'هیچ کدِ مدیری ساخته نشد');
+  assert.equal(String(await generation()), String(genBefore), 'کدِ ثابت نچرخید');
+
+  //  شاگرد (و نه بالاتر) همان رفتارِ پیش را دارد
+  const staff = await h.post('/api/shop/invite', { role: 'staff' }, { token: owner.accessToken });
+  assert.equal(staff.status, 201, JSON.stringify(staff.body));
+
+  assert.equal((await reauthWithPassword(owner)).status, 200);
+  const mgr = await h.post('/api/shop/invite', { role: 'manager' }, { token: owner.accessToken });
+  assert.equal(mgr.status, 201, JSON.stringify(mgr.body));
+  const rot = await h.post('/api/shop/staff-code/rotate', {}, { token: owner.accessToken });
+  assert.equal(rot.status, 200, JSON.stringify(rot.body));
+});
+
+test('امنیت ۴: بستنِ دستگاهِ **دیگر** با نشستِ کهنه ۴۰۳ (هر دو در)؛ دستگاهِ خودِ نشست آزاد', async () => {
+  const u = await h.newUser('دستگاهِ دیگر');
+  const other = await h.post('/api/auth/login', {
+    identifier: u.email, password: u.password, device: { deviceId: 'gooshi-digar-reauth', name: 'دیگر', platform: 'test' },
+  });
+  assert.equal(other.status, 200, JSON.stringify(other.body));
+  const stale = await staleSession(u);
+  const otherId = await deviceOf(other.body.accessToken);
+  assert.ok(otherId);
+  assert.notEqual(otherId, await deviceOf(stale.accessToken));
+
+  assertNeedsReauth(await h.del(`/api/me/devices/${otherId}`, { token: stale.accessToken }), 'DELETE /me/devices/:other');
+  assertNeedsReauth(await h.del(`/api/portal/devices/${otherId}`, { token: stale.accessToken }), 'DELETE /portal/devices/:other');
+  assert.equal((await h.get('/api/me', { token: other.body.accessToken })).status, 200, 'دستگاهِ دیگر هنوز وارد است');
+
+  assert.equal((await reauthWithPassword(stale)).status, 200);
+  const gone = await h.del(`/api/me/devices/${otherId}`, { token: stale.accessToken });
+  assert.equal(gone.status, 200, JSON.stringify(gone.body));
+  assert.equal((await h.get('/api/me', { token: other.body.accessToken })).status, 401);
+
+  //  بستنِ دستگاهِ خودِ همین نشست (خروج) تأیید نمی‌خواهد
+  const v = await staleSession(await h.newUser('دستگاهِ خود'));
+  const mine = await h.del(`/api/me/devices/${await deviceOf(v.accessToken)}`, { token: v.accessToken });
+  assert.equal(mine.status, 200, JSON.stringify(mine.body));
+});
+
+test('امنیت ۴: درِ پورتال نشستِ دستگاهِ کسِ دیگری را نمی‌بندد', async () => {
+  const a = await h.newUser('پورتالِ الف');
+  const b = await h.newUser('پورتالِ ب');
+  const bDevice = await deviceOf(b.accessToken);
+  const r = await h.del(`/api/portal/devices/${bDevice}`, { token: a.accessToken });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.equal((await h.get('/api/me', { token: b.accessToken })).status, 200, 'نشستِ ب سالم ماند');
+});
+
+test('امنیت ۵: حدسِ «رمزِ فعلی» در /auth/password پشتِ همان قفلِ /auth/reauth است', async () => {
+  const u = await staleSession(await h.newUser('حدسِ رمز'));
+  const before = (await one('SELECT password_hash FROM users WHERE id=$1', [u.user.id])).password_hash;
+  const saved = config.rateLimit.lockoutTries;
+  config.rateLimit.lockoutTries = 3;
+  try {
+    for (let i = 0; i < 3; i++) {
+      const bad = await h.post('/api/auth/password', { currentPassword: `Wrong!pass${i}`, newPassword: 'Gozar!pass12' }, { token: u.accessToken });
+      assert.equal(bad.status, 401, JSON.stringify(bad.body));
+    }
+    const right = await h.post('/api/auth/password', { currentPassword: u.password, newPassword: 'Gozar!pass12' }, { token: u.accessToken });
+    assert.equal(right.status, 429, `قفل ⇒ ۴۲۹: ${JSON.stringify(right.body)}`);
+    assert.equal(right.body.error.code, 'locked_out');
+    assert.equal((await one('SELECT password_hash FROM users WHERE id=$1', [u.user.id])).password_hash, before, 'رمز عوض نشد');
+    //  همان قفل: /auth/reauth هم بسته است
+    assert.equal((await reauthWithPassword(u)).status, 429);
+  } finally {
+    config.rateLimit.lockoutTries = saved;
+  }
+});
+
+test('امنیت ۵: /auth/password سقفِ «به‌ازای هر نشست» دارد', async () => {
+  const u = await h.newUser('سقفِ نشست');
+  const stale = await staleSession(u);
+  const max = config.rateLimit.passwordSessionMax || 10;
+  for (let i = 0; i < max; i++) {
+    const bad = await h.post('/api/auth/password', { currentPassword: `Wrong!pass${i}`, newPassword: 'Gozar!pass12' }, { token: stale.accessToken });
+    assert.equal(bad.status, 401, `${i}: ${JSON.stringify(bad.body)}`);
+  }
+  const over = await h.post('/api/auth/password', { currentPassword: 'Wrong!passX', newPassword: 'Gozar!pass12' }, { token: stale.accessToken });
+  assert.equal(over.status, 429, JSON.stringify(over.body));
+  //  نشستِ دیگرِ همان آدم سطلِ خودش را دارد
+  const fresh = await h.signIn(u);
+  const ok = await h.post('/api/auth/password', { currentPassword: u.password, newPassword: 'Gozar!pass12' }, { token: fresh.accessToken });
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+});
+
+test('امنیت ۶: نشستِ تازهٔ پمپ (همین حالا وارد شده) نخستین رمز را مثلِ پیش می‌گذارد', async () => {
+  const email = 'reauth-pump-fresh@test.local';
+  const c = await h.post('/api/auth/otp/request', { email, app: 'pump' });
+  const pumpIn = await h.post('/api/auth/otp/verify', { email, code: c.body.devCode, name: 'پمپیِ تازه', app: 'pump' });
+  assert.ok([200, 201].includes(pumpIn.status), JSON.stringify(pumpIn.body));
+  const set = await h.post('/api/auth/password', { newPassword: 'Pomp!pass12' }, { token: pumpIn.body.accessToken });
+  assert.equal(set.status, 200, `جریانِ عادیِ پمپ نباید بشکند: ${JSON.stringify(set.body)}`);
+  assert.equal((await h.get('/api/pump/me', { token: pumpIn.body.accessToken })).status, 200);
 });

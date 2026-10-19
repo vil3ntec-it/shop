@@ -27,8 +27,9 @@
  * توکن بخشِ خودش را دارد (`tokens.app`، و `req.appSection` از همان ردیف).
  * پنجرهٔ «رمز را دوباره بزنید» فقط در برنامه‌های دکان هست (`ReauthHost`).
  * پمپ برنامه‌ای جداست و چنین پنجره‌ای ندارد؛ پس روی مسیرهای مشترکِ
- * `/api/auth/*` (`requireAnyUser`: گذاشتنِ رمز، خروج از همه) نشستِ پمپ یا
- * هر بخشِ دیگر **همان رفتارِ پیش از این تغییر** را دارد. `/api/me` و
+ * `/api/auth/*` (`requireAnyUser`: خروج از همه) نشستِ پمپ یا هر بخشِ دیگر
+ * **همان رفتارِ پیش از این تغییر** را دارد — جز «گذاشتنِ نخستین رمز» که در
+ * هر بخش تازگی می‌خواهد (`assertFresh(req, { allSections: true })`). `/api/me` و
  * `/api/shop/*` پشتِ `requireUser`اند و از اصل فقط توکنِ دکان را می‌پذیرند.
  *
  * ⚠️ بازگشت: `AUTH_REAUTH=off` همه را مثلِ پیش از این تغییر باز می‌کند.
@@ -74,9 +75,19 @@ function required() {
   return forbidden(MESSAGE, 'reauth_required');
 }
 
-/** همان بررسی، برای جاهایی که فقط بخشی از درخواست حساس است. */
-async function assertFresh(req) {
-  if (!enforced() || !appliesTo(req)) return;
+/**
+ *  همان بررسی، برای جاهایی که فقط بخشی از درخواست حساس است.
+ *
+ *  `allSections`: برای کارهایی که **خودِ حساب** را (نه داده‌ی یک بخش را)
+ *  می‌گیرند و در هر بخشی باید تازه باشند — امروز فقط «گذاشتنِ نخستین رمز».
+ *  ⛔ بازبینیِ امنیتی ۱۴۰۵/۰۷/۲۷: توکنِ کهنهٔ پمپ روی حسابِ مشترکِ بی‌رمز
+ *  نخستین رمز را می‌گذاشت و همان رمز برنامهٔ دکان را باز می‌کرد. نشستِ پمپ
+ *  که همین حالا وارد شده «تازه» است (`issueSession` و `app-auth` هر ورودی را
+ *  `markFresh` می‌کنند)، و کدِ ایمیل از `/api/auth/reauth` در هر بخش کار
+ *  می‌کند؛ پس جریانِ عادیِ پمپ دست نمی‌خورد.
+ */
+async function assertFresh(req, { allSections = false } = {}) {
+  if (!enforced() || (!allSections && !appliesTo(req))) return;
   if (!req.tokenRow) throw unauthorized();
   if (await freshUntil(req.tokenRow.token_hash) > now()) return;
   throw required();

@@ -79,6 +79,17 @@ const verifyLimit = rateLimit({
  */
 const probeLimit = rateLimit({ max: config.rateLimit.probeIpMax, keyPrefix: 'account-probe' });
 
+/*
+ *  ⛔ سقفِ «به‌ازای هر نشست» برای جاهایی که با یک توکنِ باز رمز سنجیده
+ *  می‌شود (`/password`ِ «رمزِ فعلی» و `/reauth`) — یک سطلِ مشترک، تا حدس
+ *  زدن میانِ این دو پخش نشود. قفلِ «شناسه + IP» با عوض کردنِ IP دور زده
+ *  می‌شد؛ این یکی به خودِ توکن بسته است (بازبینیِ امنیتی ۱۴۰۵/۰۷/۲۷، یافتهٔ ۵).
+ */
+const passwordSessionLimit = rateLimit({
+  max: config.rateLimit.passwordSessionMax, keyPrefix: 'password-session',
+  key: (req) => (req.tokenRow?.token_hash ? `t:${req.tokenRow.token_hash}` : null),
+});
+
 /** کارِ `password/forgot` با تأخیرِ یکسان (`config.otp.uniformMs`) — F0-16. */
 async function evenly(work) {
   const floor = Number(config.otp.uniformMs) || 0;
@@ -801,7 +812,7 @@ router.post('/reauth/code', requireAnyUser, sessionLimit, async (req, res, next)
  *  تأییدِ دوباره با رمز یا کد. موفق ⇒ همین نشست تا چند دقیقه «تازه» است.
  *  همان قفلِ تلاشِ ناموفقِ ورود، پس راهِ تازه‌ای برای حدس زدنِ رمز نیست.
  */
-router.post('/reauth', requireAnyUser, sessionLimit, async (req, res, next) => {
+router.post('/reauth', requireAnyUser, sessionLimit, passwordSessionLimit, async (req, res, next) => {
   const user = req.user;
   const ip = clientIp(req);
   const password = typeof req.body?.password === 'string' ? req.body.password : '';
@@ -836,17 +847,28 @@ router.post('/reauth', requireAnyUser, sessionLimit, async (req, res, next) => {
 });
 
 /** گذاشتن یا عوض کردن رمز عبور (برای کسی که با کد وارد شده). */
-router.post('/password', requireAnyUser, async (req, res, next) => {
+router.post('/password', requireAnyUser, passwordSessionLimit, async (req, res, next) => {
   const next_ = typeof req.body?.newPassword === 'string' ? req.body.newPassword : '';
   const weak = pw.checkStrength(next_);
   if (weak) return next(badRequest(weak, 'weak_password'));
 
   //  ⛔ حسابِ بی‌رمز «رمزِ فعلی» ندارد که ثابتش کند؛ بی این، هر کسی با یک
-  //  نشستِ باز رمز می‌گذاشت و حساب را از آنِ خودش می‌کرد (بندِ ۲۱.۱)
-  if (!req.user.password_hash) await reauth.assertFresh(req);
+  //  نشستِ باز رمز می‌گذاشت و حساب را از آنِ خودش می‌کرد (بندِ ۲۱.۱).
+  //  در **هر** بخش (پمپ هم): رمز مالِ حساب است، نه مالِ یک بخش — بازبینیِ
+  //  امنیتی ۱۴۰۵/۰۷/۲۷، یافتهٔ ۶. ورودِ تازه یا کدِ ایمیلِ `/reauth` کافی است.
+  if (!req.user.password_hash) await reauth.assertFresh(req, { allSections: true });
   if (req.user.password_hash) {
+    /*
+     *  ⛔ «رمزِ فعلی» همان رمزِ ورود است، پس پشتِ همان قفلِ `/reauth` و
+     *  ورود (`assertNotLocked`/`noteAttempt`، همان شناسه). تا امروز این‌جا
+     *  هیچ قفلی نبود و یک نشستِ کهنه بی‌حساب رمز را حدس می‌زد (یافتهٔ ۵).
+     */
+    const id = req.user.email || req.user.phone || req.user.id;
+    const ip = clientIp(req);
+    await assertNotLocked('user', id, ip);
     const current = typeof req.body?.currentPassword === 'string' ? req.body.currentPassword : '';
     const ok = await pw.verifyPassword(current, req.user.password_hash);
+    await noteAttempt('user', id, ip, ok);
     if (!ok) return next(unauthorized('رمز فعلی درست نیست', 'bad_credentials'));
   }
   const hash = await pw.hashPassword(next_);
