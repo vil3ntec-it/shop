@@ -106,8 +106,8 @@
   }
   body.cart-open .cartbar { opacity: 0; pointer-events: none; }
   body.phone-cart .cartbar .ttl { font-size: 22px; }
-  body.phone-cart .cartbar .thumbs { flex: none; gap: 0; }
-  body.phone-cart .cartbar .thumb { width: 48px; height: 48px; margin-inline-end: -6px; box-shadow: 0 0 0 3px var(--sheet); }
+  body.phone-cart .cartbar .thumbs { flex: none; gap: var(--s3); margin-inline-start: var(--s2); }
+  body.phone-cart .cartbar .thumb { width: 48px; height: 48px; }
   body.phone-cart .cartbar .more { margin-inline-start: var(--s2); }
   body.phone-cart .cartbar .sum { display: none; }
   body.phone-cart .cartbar .count { width: 56px; height: 56px; margin-inline-start: auto; font-size: 19px; }
