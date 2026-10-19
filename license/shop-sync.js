@@ -117,8 +117,26 @@
       if (e.status !== 401) throw e;
       const acct = getAcct();
       if (!acct.refreshToken) throw e;
+      /*
+       *  ⛔ یک تازه‌سازی برای همهٔ لایه‌ها (`TohidAccount.refresh`) — و توکنِ
+       *  تازه‌سازیِ **چرخیده** نگه داشته می‌شود. تا دیروز فقط توکنِ دسترسی
+       *  نوشته می‌شد؛ سرور توکنِ کهنه را پس از سی ثانیه «دزدی» می‌گیرد و
+       *  دومین تازه‌سازی کاربر را بیرون می‌انداخت. شرحش سرِ
+       *  `license-client.js` → `refreshSession`.
+       */
+      const acc = window.TohidAccount;
+      if (acc && typeof acc.refresh === 'function') {
+        await acc.refresh();
+        return api(path, opts);
+      }
       const r = await api('/api/v1/auth/refresh', { method: 'POST', auth: false, body: { refreshToken: acct.refreshToken } });
-      setAcct({ accessToken: r.accessToken });
+      const access = (r && (r.accessToken || r.access_token)) || '';
+      if (!access) throw new ApiError('پاسخ سرور خوانده نشد', 'invalid_response');
+      setAcct({
+        accessToken: access,
+        accessExpiresAt: r.accessExpiresAt || (Date.now() + Number(r.access_expires_in || 3600) * 1000),
+        refreshToken: r.refreshToken || r.refresh_token || acct.refreshToken,
+      });
       return api(path, opts);
     }
   }

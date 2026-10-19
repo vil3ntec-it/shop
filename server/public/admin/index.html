@@ -623,6 +623,10 @@
       </div>
       <label>یادداشتِ نسخه</label>
       <input type="text" id="dl-notes" placeholder="چه چیزی تازه شد">
+      <!-- §۳۸.۹: برنامهٔ زیرِ این نسخه «دیگر پشتیبانی نمی‌شود، به‌روز کنید» می‌بیند؛ داده قفل نمی‌شود -->
+      <label>حداقل نسخهٔ پشتیبانی‌شده</label>
+      <input type="text" id="dl-min" dir="ltr" placeholder="خالی = حداقلی نیست">
+      <p class="muted">برنامه‌ای که پایین‌تر از این باشد به‌جای «نسخهٔ تازه آمد» پیامِ «این نسخه دیگر پشتیبانی نمی‌شود» را بی دکمهٔ «بعداً» می‌بیند. هیچ داده‌ای قفل نمی‌شود.</p>
       <div class="row" style="margin-top:10px;"><button class="btn btn-sm" id="btn-dl-save">ذخیره</button></div>
       <div id="dl-msg"></div>
     </div>
@@ -1080,6 +1084,12 @@
   <!-- سابقه -->
   <!-- همگام‌سازی و امنیت: دستگاه‌ها، تعارض‌ها، خطاهای برنامه‌ها، درخواست‌های ورود -->
   <section id="tab-health" class="hidden">
+    <!-- سلامتِ سرور (§۳۸.۸، OPS-01@38) — فقط عدد و وضعیت، بی هیچ راز -->
+    <div class="panel">
+      <h2>سلامتِ سرور</h2>
+      <div class="row"><span class="badge b-mute" id="sys-overall">—</span><span class="muted" id="sys-checked"></span></div>
+      <div class="stats" id="sys-health" style="margin-top:12px;"></div>
+    </div>
     <div class="panel">
       <h2>دستگاه‌های همگام‌سازی</h2>
       <div class="row">

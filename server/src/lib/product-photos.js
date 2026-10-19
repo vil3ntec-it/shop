@@ -141,6 +141,6 @@ async function inboxDelete(ctx, id) {
 }
 
 module.exports = {
-  list, get, put, remove, sniff, MAX_BYTES, MAX_PHOTOS,
+  list, get, put, remove, sniff, checkId, MAX_BYTES, MAX_PHOTOS,
   inboxPut, inboxList, inboxGet, inboxDelete, INBOX_MAX_BYTES,
 };

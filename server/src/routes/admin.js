@@ -737,6 +737,8 @@ router.use('/shops/:id/staff-perms', require('./admin-staff-perms'));
  */
 router.use('/otp', require('./admin-otp'));
 router.use('/sync', require('./admin-sync'));
+//  سلامتِ سرور (§۳۸.۸، OPS-01@38) — فقط عدد و وضعیت، بی هیچ راز
+router.use('/system', require('./admin-system'));
 router.use('/', require('./admin-platform'));
 //  بخشِ پمپ‌بنزین — زیر همان `requireAdmin`، ولی روی دفترِ خودش
 router.use('/pump', require('./admin-pump'));

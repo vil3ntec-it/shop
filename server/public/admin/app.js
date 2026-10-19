@@ -943,8 +943,60 @@ async function loadBackups() {
   }
 }
 
+// ---------- سلامتِ سرور (§۳۸.۸، OPS-01@38) ----------
+const HEALTH_FA = { ok: 'سالم', warn: 'هشدار', down: 'خراب', unknown: 'نامعلوم' };
+const HEALTH_CLS = { ok: 'b-ok', warn: 'b-warn', down: 'b-bad', unknown: 'b-mute' };
+//  وضعیت همیشه متن + رنگ + نقطه — نه فقط رنگ
+const healthBadge = (s) => el('span', `badge ${HEALTH_CLS[s] || 'b-mute'}`, `● ${HEALTH_FA[s] || '—'}`);
+const numOr = (v) => (v === null || v === undefined ? '—' : fa(v));
+function ago(ms) {
+  if (ms === null || ms === undefined) return '—';
+  if (ms < 60_000) return `${fa(Math.round(ms / 1000))} ثانیه`;
+  if (ms < 3_600_000) return `${fa(Math.round(ms / 60_000))} دقیقه`;
+  if (ms < 172_800_000) return `${fa(Math.round(ms / 3_600_000))} ساعت`;
+  return `${fa(Math.round(ms / 86_400_000))} روز`;
+}
+
+async function loadSystemHealth() {
+  const box = $('sys-health');
+  const overall = $('sys-overall');
+  box.innerHTML = '';
+  let s;
+  try { s = await call('GET', '/admin/system/health'); } catch (err) {
+    overall.className = 'badge b-mute';
+    overall.textContent = '● نامعلوم';
+    box.appendChild(el('div', 'muted', err.message));
+    return;
+  }
+  overall.className = `badge ${HEALTH_CLS[s.status] || 'b-mute'}`;
+  overall.textContent = `● ${HEALTH_FA[s.status] || '—'}`;
+  $('sys-checked').textContent = `بررسی: ${dateTime(s.checkedAt)}`;
+  const q = s.queues || {};
+  const cards = [
+    ['API', s.api, `نسخهٔ ${s.api?.version || '—'} · روشن از ${ago((s.api?.uptimeSeconds ?? 0) * 1000)} پیش`],
+    ['دیتابیس', s.database, s.database?.latencyMs == null ? '—' : `${fa(s.database.latencyMs)} میلی‌ثانیه`],
+    ['صفِ ایمیلِ ورود', q.email, `${numOr(q.email?.queued)} در صف · ${numOr(q.email?.failed24h)} ناموفق (۲۴ ساعت)`
+      + (q.email?.worker === 'down' ? ' · کارگزار خاموش' : '')],
+    ['صفِ تلگرام', q.telegram, `${numOr(q.telegram?.pending)} در صف · قدیمی‌ترین ${ago(q.telegram?.oldestAgeMs)}`],
+    ['همگام‌سازی (۲۴ ساعت)', s.sync, `${numOr(s.sync?.clientErrors24h)} خطای برنامه · ${numOr(s.sync?.conflicts24h)} تعارض`],
+    ['فضای دیسک', s.storage, s.storage?.freePct == null ? '—' : `${fa(s.storage.freePct)}٪ آزاد`],
+    ['پشتیبانِ سرور', s.backups, !s.backups?.enabled ? 'خودکار خاموش است'
+      : s.backups?.last ? `آخرین: ${ago(s.backups.ageMs)} پیش${s.backups.encryption ? '' : ' · بی‌رمز'}` : 'هنوز پشتیبانی نیست'],
+  ];
+  for (const [label, part, line] of cards) {
+    const card = el('div', 'stat');
+    card.appendChild(el('div', 'l', label));
+    const v = el('div', 'v');
+    v.appendChild(healthBadge(part?.status));
+    card.appendChild(v);
+    card.appendChild(el('div', 'l', line));
+    box.appendChild(card);
+  }
+}
+
 // ---------- همگام‌سازی و امنیت ----------
 async function loadHealth() {
+  loadSystemHealth().catch(() => { /* بخشِ سلامت خودش پیامش را نشان می‌دهد */ });
   const app = $('health-app').value;
   const account = $('health-account').value.trim();
   const q = new URLSearchParams({ app, limit: '200', ...(account ? { account } : {}) });
@@ -1655,6 +1707,7 @@ async function loadDownloads() {
   $('dl-version').value = d.version || '';
   $('dl-url').value = d.url || '';
   $('dl-notes').value = d.notes || '';
+  $('dl-min').value = d.minVersion || '';
 }
 
 async function saveDownloads() {
@@ -1663,6 +1716,7 @@ async function saveDownloads() {
     await call('PUT', '/admin/downloads', {
       app: $('dl-app').value, version: $('dl-version').value.trim(),
       url: $('dl-url').value.trim(), notes: $('dl-notes').value.trim(),
+      minVersion: $('dl-min').value.trim(),
     });
     msg(node, 'ذخیره شد.', 'ok');
   } catch (err) { msg(node, err.message, 'bad'); }
