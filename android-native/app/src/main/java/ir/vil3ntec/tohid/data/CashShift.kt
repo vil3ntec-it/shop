@@ -13,7 +13,8 @@ import ir.vil3ntec.tohid.money
  *
  *  ── نقدِ مورد انتظار ──────────────────────────────────────────────
  *  اول صندوق
- *   + نقدِ هر فاکتورِ لغونشده (`finalTotal − debtGiven`: نقدی کامل، نسیه فقط پیش‌پرداخت)
+ *   + نقدِ هر فاکتورِ لغونشده (`finalTotal − debtGiven`: نقدی کامل، نسیه فقط پیش‌پرداخت؛
+ *     فاکتورِ با `payments` فقط ردیف‌های نقد — همان نقدِ ماندهٔ پس از پولِ پس — [saleCash])
  *   + رسیدِ قرض‌داران (`receive`)
  *   − مرجوعی‌ها (کلِ مبلغ؛ بخشی که از بدهی کم شد خودش یک `receive` است، پس خالص درست است)
  *   − مصارف − پرداخت به تأمین‌کننده − پیش‌پرداختِ خریدها
@@ -59,12 +60,24 @@ object CashShift {
   /** صندوقِ باز — اگر دو دستگاه هم‌زمان باز کرده باشند، تازه‌ترین */
   fun current(d: ShopData): Shift? = list(d).firstOrNull { it.isOpen }
 
+  /**
+   *  نقدی که این فاکتور به دخل آورد. با `payments` (PAY v3 A4) فقط ردیف‌های نوعِ نقد —
+   *  مبلغِ آن‌ها خودش پس از کمِ پولِ پس است؛ کیف پول، کارت، حواله و «به حساب» نقدِ دخل نیستند.
+   *  بی `payments` همان حسابِ امروز.
+   */
+  fun saleCash(s: Sale): Double {
+    s.payments?.takeIf { it.isNotEmpty() }?.let { list ->
+      return list.filter { it.kind == PayFlow.CASH && it.amountMinor > 0 }.sumOf { it.amountMinor } / 100.0
+    }
+    return (s.finalTotal - s.debtGiven).coerceAtLeast(0.0)
+  }
+
   fun totals(d: ShopData, from: Long, to: Long, opening: Double): Totals {
     fun inWindow(at: Long) = at in from..to
     return Totals(
       opening = opening,
       sales = d.sales.filter { it.status != "cancelled" && inWindow(it.createdAt) }
-        .sumOf { (it.finalTotal - it.debtGiven).coerceAtLeast(0.0) },
+        .sumOf { saleCash(it) },
       receipts = d.transactions.filter { it.type == "receive" && inWindow(it.createdAt) }.sumOf { it.amount },
       returns = d.saleReturns.filter { inWindow(it.createdAt) }.sumOf { it.amount },
       expenses = d.expenses.filter { inWindow(it.createdAt) }.sumOf { it.amount },

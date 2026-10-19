@@ -42,8 +42,9 @@ import kotlinx.serialization.json.put
  *  امروز (`SalesEngine` بی `settlement`، `CashShift`) دست نمی‌خورد.
  *
  *  ── شکلِ داده: فقط افزودن ────────────────────────────────────────
- *  فروش: `payments`، `tenderedMinor`، `changeMinor`؛ معنای `paymentMethod`،
- *  `paidAmount`، `remaining`، `debtGiven` همان امروز. صندوق: ردیف‌های سابقهٔ
+ *  فروش: `payments`، `tenderedMinor`، `changeMinor`؛ معنای `paidAmount`، `remaining`،
+ *  `debtGiven` همان امروز. `paymentMethod` برای خوانندهٔ کهنه خلاصه است ([legacyMethod]):
+ *  فروشی که پولِ غیرنقد دارد دیگر `cash` نیست. صندوق: ردیف‌های سابقهٔ
  *  `cash_in`/`cash_out`/`no_sale` با `refId` = همان `shift_open`، و `shift_close`
  *  با `amount` = نقدِ شمرده (همان معنای امروز) و `z` = گزارشِ Zِ هسته در لحظهٔ بستن.
  */
@@ -174,7 +175,7 @@ object PayFlow {
     }
   }
 
-  /** فیلدهای فروش از تسویه — همان معنای امروزِ فیلدهای قدیمی + سه فیلدِ تازه */
+  /** فیلدهای فروش از تسویه — معنای امروزِ فیلدهای قدیمی (`paymentMethod`: [legacyMethod]) + سه فیلدِ تازه */
   data class SaleFields(
     val paymentMethod: String,
     val paidAmount: Double,
@@ -185,8 +186,31 @@ object PayFlow {
     val changeMinor: Long,
   )
 
+  /** `paymentMethod`ِ فروشی که نقد و غیرنقد (یا چند نوعِ غیرنقد) با هم دارد */
+  const val MIXED = "mixed"
+
+  /**
+   *  `paymentMethod`ِ قدیمی از تسویه — برای خواننده‌های کهنه (فیلترِ «نقدی»ِ تاریخچه،
+   *  برچسب‌ها، گزارشِ «روش پرداخت»، برنامه‌های قدیمی و نسخهٔ وب). ردیف‌های دقیق در `payments`.
+   *   - چیزی به حساب رفت ⇒ `credit` (همان امروز؛ `SalesEngine` بدهی را با همین می‌سازد)
+   *   - فقط نقد (یا فاکتورِ صفر) ⇒ `cash`
+   *   - فقط یک نوعِ غیرنقد ⇒ همان نوع: `wallet`، `card`، `transfer`، …
+   *   - نقد + غیرنقد، یا چند نوعِ غیرنقد ⇒ [MIXED]
+   *  هر مقدارِ جز `cash`/`credit` را خوانندهٔ کهنه «نقدِ کامل» نمی‌شمارد (فیلترش `== "cash"` است)
+   *  و نسیه هم نمی‌داند (`== "credit"`)؛ پس هیچ فروشِ کارتی/کیف‌پولی به فیلترِ نقد نمی‌رود.
+   */
+  fun legacyMethod(s: Settlement): String {
+    if (s.toAccount > 0) return "credit"
+    val kinds = s.payments.filter { it.kind != ACCOUNT && it.amount > 0 }.map { it.kind }.toSet()
+    return when {
+      kinds.isEmpty() || kinds == setOf(Pay.CASH) -> CASH
+      kinds.size == 1 -> kinds.single()
+      else -> MIXED
+    }
+  }
+
   fun saleFields(s: Settlement): SaleFields = SaleFields(
-    paymentMethod = if (s.toAccount > 0) "credit" else "cash",
+    paymentMethod = legacyMethod(s),
     paidAmount = major(s.total - s.toAccount),
     remaining = major(s.toAccount),
     debtGiven = major(s.toAccount),

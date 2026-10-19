@@ -94,6 +94,9 @@ class PayFlowTest {
     val d = base.copy(sales = base.sales.map { it.copy(payments = listOf(SalePayment("hesabpay", "wallet", 40000, "pending", "R1", "manual"))) })
     val r = ok(PayFlow.report(d, AuditEntry(id = "sh-1", createdAt = c.lng("from")!!, amount = c.dbl("opening")), null, c.lng("to")!!))
     assertEquals(expectedOf(c["coreExpected"]!!.jsonObject), r.report.expected)
+    //  صندوقِ قدیمیِ همین برنامه (`CashShift`، پرچمِ خاموش) هم کیف پول را نقدِ دخل نمی‌شمارد
+    val legacy = CashShift.totals(d, c.lng("from")!!, c.lng("to")!!, c.dbl("opening")).expected
+    assertEquals(expectedOf(c["coreExpected"]!!.jsonObject)["cash"], Math.round(legacy * 100))
   }
 
   @Test fun `legacyShift ۳ - Zِ ذخیره‌شده با لغوِ بعدی ثابت؛ رفت‌وبرگشتِ JSON`() {
@@ -132,7 +135,15 @@ class PayFlowTest {
       assertEquals(name, s.due, f.payments.sumOf { it.amountMinor })
       assertEquals(name, s.toAccount, Math.round(f.debtGiven * 100))
       assertEquals(name, s.total, Math.round(f.paidAmount * 100) + Math.round(f.debtGiven * 100))
-      assertEquals(name, if (s.toAccount > 0) "credit" else "cash", f.paymentMethod)
+      //  `paymentMethod`ِ قدیمی: به حساب ⇒ credit؛ بی غیرنقد ⇒ cash؛ وگرنه هرگز cash نیست
+      val nonCash = s.payments.filter { it.kind != "cash" && it.kind != "account" }.map { it.kind }.toSet()
+      val hasCash = s.payments.any { it.kind == "cash" }
+      assertEquals(name, when {
+        s.toAccount > 0 -> "credit"
+        nonCash.isEmpty() -> "cash"
+        nonCash.size == 1 && !hasCash -> nonCash.single()
+        else -> "mixed"
+      }, f.paymentMethod)
       assertEquals(name, s.change, f.changeMinor)
       f.payments.forEach {
         if (it.kind == "cash" || it.kind == "account") assertEquals(name, "confirmed", it.status)
@@ -162,6 +173,7 @@ class PayFlowTest {
       f.payments,
     )
     assertEquals(245000L, f.payments.sumOf { it.amountMinor })
+    assertEquals("mixed", f.paymentMethod)
     val noRef = bad(PayFlow.preview(draft.copy(rows = listOf(PayFlow.DraftRow("hesabpay", "", "1450")))))
     assertEquals("REF_REQUIRED", noRef.code)
     assertEquals(0, noRef.index)
@@ -185,6 +197,18 @@ class PayFlowTest {
     assertEquals("NON_CASH_OVERPAY", bad(PayFlow.preview(PayFlow.Draft(1000.0, rows = listOf(PayFlow.DraftRow("afpay_card", "C1", "1200"))))).code)
     assertEquals(2000.0, PayFlow.saleFields(ok(PayFlow.checkout(PayFlow.Draft(2000.0, "0", customerId = "d1")))).debtGiven, 0.0)
     assertEquals(1000.0, ok(PayFlow.exactCash(PayFlow.Draft(2450.0, rows = listOf(PayFlow.DraftRow("hawala", "H", "1450"))))), 0.0)
+  }
+
+  @Test fun `paymentMethodِ قدیمی - غیرنقد هرگز cash نیست؛ ردیف‌های دقیق در payments`() {
+    fun m(d: PayFlow.Draft) = PayFlow.saleFields(ok(PayFlow.checkout(d))).paymentMethod
+    assertEquals("cash", m(PayFlow.Draft(850.0, "1000")))
+    assertEquals("card", m(PayFlow.Draft(1200.0, rows = listOf(PayFlow.DraftRow("afpay_card", "C1", "1200")))))
+    assertEquals("transfer", m(PayFlow.Draft(1200.0, rows = listOf(PayFlow.DraftRow("hawala", "H1", "1200")))))
+    assertEquals("wallet", m(PayFlow.Draft(1200.0, rows = listOf(PayFlow.DraftRow("hesabpay", "P1", "700"), PayFlow.DraftRow("m_paisa", "P2", "500")))))
+    assertEquals("mixed", m(PayFlow.Draft(1200.0, "200", listOf(PayFlow.DraftRow("afpay_card", "C1", "1000")))))
+    assertEquals("mixed", m(PayFlow.Draft(1200.0, rows = listOf(PayFlow.DraftRow("hesabpay", "P1", "700"), PayFlow.DraftRow("afpay_card", "C1", "500")))))
+    //  بدهی همان credit می‌ماند — SalesEngine بدهی را با همین می‌سازد
+    assertEquals("credit", m(PayFlow.Draft(2000.0, rows = listOf(PayFlow.DraftRow("afpay_card", "C1", "500")), customerId = "d1")))
   }
 
   private fun s12(): Pair<ShopData, AuditEntry> {
@@ -265,7 +289,7 @@ class PayFlowTest {
     val st = settled(PayFlow.Draft(2450.0, "1000", listOf(PayFlow.DraftRow("hesabpay", "HP-77", "1450"))))
     val r = SalesEngine.record(shop, cart, SalesEngine.Checkout(settlement = st), "2026-10-19", 100, newId) as SalesEngine.Result.Ok
     val s = r.data.sales.single()
-    assertEquals("cash", s.paymentMethod)
+    assertEquals("mixed", s.paymentMethod)
     assertEquals(2450.0, s.paidAmount, 0.0)
     assertEquals(0.0, s.debtGiven, 0.0)
     assertEquals(2, s.payments!!.size)
@@ -299,7 +323,7 @@ class PayFlowTest {
   }
 
   @Test fun `فاکتورِ ترکیبیِ دستگاهِ دیگر (JSON) خوانده می‌شود و چیزی گم نمی‌شود`() {
-    val web = """{"id":"w1","finalTotal":2450,"paymentMethod":"cash","paidAmount":2450,"remaining":0,"debtGiven":0,
+    val web = """{"id":"w1","finalTotal":2450,"paymentMethod":"mixed","paidAmount":2450,"remaining":0,"debtGiven":0,
       "payments":[{"method":"cash","kind":"cash","amountMinor":100000,"status":"confirmed"},
       {"method":"hesabpay","kind":"wallet","amountMinor":145000,"status":"pending","ref":"HP-77","verification":"manual"}],
       "tenderedMinor":245000,"changeMinor":0}"""

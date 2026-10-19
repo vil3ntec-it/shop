@@ -116,8 +116,9 @@ data class Sale(
   /**
    *  PAY (v3 A4) — ردیف‌های پرداختِ ترکیبی (نقد، کیف پول، کارت، حواله، به حساب)، به پول.
    *  فقط فروشی که با پرچمِ `ShopPolicy.payV2` ثبت شده دارد؛ معنای فیلدهای بالا
-   *  (`paidAmount`، `remaining`، `debtGiven`، `paymentMethod`) همان امروز است، پس
-   *  برنامهٔ کهنه همان عدد را می‌خواند. `null` نوشته نمی‌شود — مثلِ `series`.
+   *  (`paidAmount`، `remaining`، `debtGiven`) همان امروز است، پس برنامهٔ کهنه همان عدد
+   *  را می‌خواند؛ `paymentMethod` برای فروشِ غیرنقد `wallet`/`card`/`transfer`/`mixed` است
+   *  (`PayFlow.legacyMethod`). `null` نوشته نمی‌شود — مثلِ `series`.
    */
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
