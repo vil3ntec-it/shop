@@ -26,6 +26,10 @@
   var acc = window.TohidAccount;
   if (!core || !acc) return;
 
+  //  Sync v3 پشتِ تنظیمِ هر دستگاه (`tohid-sync-engine`، پیش‌فرض v1) — `license/sync-v3-engine.js`.
+  //  خاموش (پیش‌فرض) ⇒ همین موتورِ v1، بی هیچ تغییری؛ روشن ⇒ همان رابطِ `window.TohidSync` را v3 می‌سازد.
+  if (window.TohidSyncV3 && window.TohidSyncV3.choice() === 'v3' && window.TohidSyncV3.install(acc)) return;
+
   var PUSH_DEBOUNCE_MS = 500;      // بندِ ۲۰.۲
   var PUSH_TICK_MS = 2000;         // تا وقتی صف خالی نشده
   var PULL_EVERY_MS = 30000;       // وقتی سوکت قطع است
