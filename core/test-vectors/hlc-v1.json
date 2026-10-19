@@ -1,0 +1,110 @@
+{
+  "version": 1,
+  "about": "بردارهای مرجعِ HLC ِ Sync v3 — ساخته‌شده از server/src/lib/hlc.js با server/scripts/sync-v3-vectors.js. دستی ویرایش نشود.",
+  "skewMs": 300000,
+  "parse": {
+    "columns": ["in","out"],
+    "rows": [
+      ["1760000000000:3:dev-a",{"wall":1760000000000,"counter":3,"node":"dev-a"}],
+      ["000001760000000000:000003:dev-a",null],
+      ["0:0:x",{"wall":0,"counter":0,"node":"x"}],
+      ["999999999999999:999999:n",{"wall":999999999999999,"counter":999999,"node":"n"}],
+      ["1760000000000:3:a.b_c-D9",{"wall":1760000000000,"counter":3,"node":"a.b_c-D9"}],
+      ["1760000000000:3:nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn",{"wall":1760000000000,"counter":3,"node":"nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn"}],
+      ["1760000000000:3:nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn",null],
+      ["1234567890123456:0:x",null],
+      ["1:1234567:x",null],
+      ["1:2:",null],
+      [":2:x",null],
+      ["1::x",null],
+      ["-1:2:x",null],
+      ["1.5:2:x",null],
+      ["1:2:dev a",null],
+      ["1:2:dev/a",null],
+      ["1:2:a\n",null],
+      [" 1:2:a",null],
+      ["1:2:a:b",null],
+      ["",null],
+      ["abc",null],
+      ["١:٢:a",null]
+    ]
+  },
+  "format": {
+    "columns": ["wall","counter","node","out"],
+    "rows": [
+      [0,0,"x","000000000000000:000000:x"],
+      [1760000000000,3,"dev-a","001760000000000:000003:dev-a"],
+      [999999999999999,999999,"n","999999999999999:999999:n"],
+      [1,1234567,"x","000000000000001:1234567:x"],
+      [1234567890123456,0,"x","1234567890123456:000000:x"],
+      [-5,-2,"neg","000000000000000:000000:neg"]
+    ]
+  },
+  "canonical": {
+    "columns": ["in","out"],
+    "rows": [
+      ["1760000000000:3:dev-a","001760000000000:000003:dev-a"],
+      ["000001760000000000:000003:dev-a",""],
+      ["0:0:x","000000000000000:000000:x"],
+      ["999999999999999:999999:n","999999999999999:999999:n"],
+      ["1760000000000:3:a.b_c-D9","001760000000000:000003:a.b_c-D9"],
+      ["1760000000000:3:nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn","001760000000000:000003:nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn"],
+      ["1760000000000:3:nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn",""],
+      ["1234567890123456:0:x",""],
+      ["1:1234567:x",""],
+      ["1:2:",""],
+      [":2:x",""],
+      ["1::x",""],
+      ["-1:2:x",""],
+      ["1.5:2:x",""],
+      ["1:2:dev a",""],
+      ["1:2:dev/a",""],
+      ["1:2:a\n",""],
+      [" 1:2:a",""],
+      ["1:2:a:b",""],
+      ["",""],
+      ["abc",""],
+      ["١:٢:a",""]
+    ]
+  },
+  "compare": {
+    "columns": ["a","b","out"],
+    "rows": [
+      ["1:0:a","1:0:a",0],
+      ["1:0:a","1:0:b",-1],
+      ["1:0:b","1:0:a",1],
+      ["1:1:a","1:0:z",1],
+      ["2:0:a","1:999999:z",1],
+      ["000000000000001:000000:a","1:0:a",0],
+      ["1760000000000:3:dev-a","1760000000000:3:dev-B",1],
+      ["1760000000000:3:Z","1760000000000:3:a",-1],
+      ["1760000000000:3:v1.000000000000012","1760000000000:3:server",1],
+      ["999999999999999:999999:a","1:0:a",1]
+    ]
+  },
+  "fromTs": {
+    "columns": ["ts","counter","node","out"],
+    "rows": [
+      [1760000000000,0,"dev","001760000000000:000000:dev"],
+      [1760000000000,7,"dev","001760000000000:000007:dev"],
+      [0,0,"dev","000000000000000:000000:dev"],
+      [-1,2,"dev","000000000000000:000002:dev"],
+      [10000000000000000,0,"dev","999999999999999:000000:dev"],
+      [999999999999999,999999,"dev","999999999999999:999999:dev"],
+      [5,1234567,"dev","000000000000005:999999:dev"],
+      [5,-3,"dev","000000000000005:000000:dev"]
+    ]
+  },
+  "clock": {
+    "columns": ["now","op","arg","out"],
+    "scripts": [
+      {"name":"tick-monotonic","node":"dev-a","skewMs":300000,"steps":[[1000,"tick",null,"000000000001000:000000:dev-a"],[1000,"tick",null,"000000000001000:000001:dev-a"],[999,"tick",null,"000000000001000:000002:dev-a"],[1001,"tick",null,"000000000001001:000000:dev-a"],[5000,"tick",null,"000000000005000:000000:dev-a"],[5000,"peek",null,"000000000005000:000000:dev-a"]]},
+      {"name":"recv-ahead-equal-behind","node":"dev-b","skewMs":300000,"steps":[[1000,"tick",null,"000000000001000:000000:dev-b"],[1000,"recv","1200:4:server",{"skewed":false,"hlc":"000000000001200:000005:dev-b"}],[1000,"recv","1200:9:server",{"skewed":false,"hlc":"000000000001200:000010:dev-b"}],[1300,"recv","1200:1:server",{"skewed":false,"hlc":"000000000001300:000000:dev-b"}],[1300,"recv","1300:0:dev-a",{"skewed":false,"hlc":"000000000001300:000001:dev-b"}],[1300,"recv","1300:5:dev-a",{"skewed":false,"hlc":"000000000001300:000006:dev-b"}],[1300,"tick",null,"000000000001300:000007:dev-b"],[1400,"recv","1400:2:x",{"skewed":false,"hlc":"000000000001400:000003:dev-b"}]]},
+      {"name":"recv-skewed","node":"dev-c","skewMs":300000,"steps":[[10000,"tick",null,"000000000010000:000000:dev-c"],[10000,"isSkewed","310001:0:fast",true],[10000,"recv","310001:0:fast",{"skewed":true,"hlc":"000000000010000:000000:dev-c"}],[10000,"peek",null,"000000000010000:000000:dev-c"],[10000,"isSkewed","310000:0:edge",false],[10000,"recv","310000:0:edge",{"skewed":false,"hlc":"000000000310000:000001:dev-c"}],[10000,"tick",null,"000000000310000:000002:dev-c"]]},
+      {"name":"small-skew-limit","node":"dev-d","skewMs":1000,"steps":[[100,"recv","1101:0:a",{"skewed":true,"hlc":"000000000000000:000000:dev-d"}],[100,"recv","1100:0:a",{"skewed":false,"hlc":"000000000001100:000001:dev-d"}],[100,"tick",null,"000000000001100:000002:dev-d"]]},
+      {"name":"counter-overflow","node":"dev-e","skewMs":300000,"steps":[[50,"observe","50:999998:x",null],[50,"tick",null,"000000000000050:999999:dev-e"],[50,"tick",null,"000000000000051:000000:dev-e"],[50,"tick",null,"000000000000051:000001:dev-e"],[50,"peek",null,"000000000000051:000001:dev-e"]]},
+      {"name":"observe","node":"dev-f","skewMs":300000,"steps":[[10,"observe","9000:4:x",null],[10,"peek",null,"000000000009000:000004:dev-f"],[10,"observe","8000:9:x",null],[10,"peek",null,"000000000009000:000004:dev-f"],[10,"observe","9000:3:x",null],[10,"observe","9000:6:y",null],[10,"peek",null,"000000000009000:000006:dev-f"],[10,"observe","nonsense",null],[10,"tick",null,"000000000009000:000007:dev-f"],[10,"observe","99999999999:0:far-future",null],[10,"tick",null,"000099999999999:000001:dev-f"]]},
+      {"name":"recv-invalid","node":"dev-g","skewMs":300000,"steps":[[7,"recv","nonsense",{"skewed":false,"hlc":"000000000000007:000000:dev-g"}],[7,"recv","",{"skewed":false,"hlc":"000000000000007:000001:dev-g"}],[7,"isSkewed","nonsense",false],[8,"recv","8:0:a",{"skewed":false,"hlc":"000000000000008:000001:dev-g"}]]}
+    ]
+  }
+}

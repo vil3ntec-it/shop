@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.Storefront
+import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.ManageSearch
@@ -43,6 +44,7 @@ fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
   val prefs = remember { context.getSharedPreferences("tohid", android.content.Context.MODE_PRIVATE) }
   //  شاگرد این ردیف‌ها را اصلاً نمی‌بیند
   val canManage = remember { ir.vil3ntec.tohid.data.ShopRole.canOpenSettings(context) }
+  LaunchedEffect(Unit) { ir.vil3ntec.tohid.data.ShopChatSync.refreshConfig(context) }
 
   // آدرس مخزنِ به‌روزرسانی ثابت است و به کاربر نشان داده نمی‌شود؛ فقط
   // برای عیب‌یابی می‌شود با همین کلید در تنظیماتِ برنامه عوضش کرد.
@@ -184,6 +186,17 @@ fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
         tint = Shop.colors.warning,
         subtitle = "روزهای مانده، دستگاه‌ها، پرداخت‌ها و پیام‌های مدیر",
         onClick = { onOpen("myplan") },
+      )
+      /*
+       *  گفت‌وگو با مشتری (v3 §۳۳) — ⛔ فقط وقتی سرور برای همین دکان پرچمِ
+       *  `shop.chat` را روشن گفته. خاموش ⇒ نه ردیف و نه دکمه‌ای بی‌اثر.
+       */
+      if (ir.vil3ntec.tohid.data.ShopChatSync.config.value?.enabled == true) MoreCard(
+        title = "گفت‌وگو با مشتری",
+        icon = Icons.Filled.Forum,
+        tint = Shop.colors.accent,
+        subtitle = "پیام‌های مشتریانِ ویترین دربارهٔ سفارش‌ها",
+        onClick = { onOpen("chat") },
       )
       MoreCard(
         title = "پشتیبانی",

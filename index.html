@@ -9156,6 +9156,12 @@
     const series = typeof s.series === 'string' ? s.series.trim() : '';
     return series ? `${series}-${s.invoiceNumber}` : String(s.invoiceNumber);
   }
+  /* ORD-20: فاکتورِ سریِ W را سرور هنگامِ تحویلِ سفارشِ اینترنتی در دفترِ دکان می‌گذارد؛
+     از صندوق لغو نمی‌شود (برگشتِ کاملش از «سفارش‌ها»/بازپرداخت سندِ برگشت می‌سازد) —
+     همان `Sale.isOnlineOrder()` ِ برنامه. */
+  function isOnlineOrderSale(s){
+    return !!s && (s.channel === 'online' || (typeof s.series === 'string' && s.series.trim() === 'W'));
+  }
   let sales = [];            // {id,invoiceNumber,total,discountType,discountValue,discount,finalTotal,paymentMethod,debtorId,paidAmount,remaining,status,createdAt,date,syncStatus}
   let saleItems = [];        // {id,saleId,productId,quantity,unitPrice,purchasePrice,totalPrice,returnedQty}
   let returns = [];          // {id,saleId,saleItemId,productId,quantity,amount,reason,date,createdAt}
@@ -13344,6 +13350,7 @@
     const sale = sales.find(s=>s.id===saleId);
     if(!sale) return;
     if(!canCancelSale()){ showToast('لغوِ فاکتور با صاحب یا مدیرِ دکان است', 'danger'); return; }
+    if(isOnlineOrderSale(sale)){ showToast('این فاکتورِ سفارشِ اینترنتی است و از صندوق لغو نمی‌شود؛ برگشتِ کاملش از بخشِ «سفارش‌ها» ثبت می‌شود', 'danger'); return; }
     document.getElementById('confirm-title').textContent = 'لغو فروش؟';
     document.getElementById('confirm-sub').textContent = `فروش #${invoiceLabel(sale)} لغو می‌شود و موجودی کالاهای آن به انبار برمی‌گردد. سابقه فروش حذف نمی‌شود.`;
     // لغو بی دلیل ثبت نمی‌شود — همان `SalesEngine.cancel(reason)`ِ برنامه
@@ -15772,7 +15779,9 @@
      اگر پیش از آن‌ها بیاید، بی‌صدا هیچ کاری نمی‌کند. -->
 <script src="license/sync-core.js?v=3" defer></script>
 <script src="license/account-code.js?v=2" defer></script>
-<script src="license/sync-engine.js?v=5" defer></script>
+<script src="license/money.js?v=1" defer></script>
+<script src="license/sync-v3-engine.js?v=1" defer></script>
+<script src="license/sync-engine.js?v=6" defer></script>
 <script src="license/license-client.js?v=17" defer></script>
 <script src="license/shop-sync.js?v=20" defer></script>
 <script src="license/shop-ui.js?v=15" defer></script>
