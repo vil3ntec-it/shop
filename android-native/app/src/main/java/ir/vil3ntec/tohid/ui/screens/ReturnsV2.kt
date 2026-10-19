@@ -126,6 +126,8 @@ fun ReturnFlowDialog(
   var approval by remember { mutableStateOf<ReturnFlow.Approval?>(null) }
   var asking by remember { mutableStateOf(false) }
   var error by remember { mutableStateOf<String?>(null) }
+  //  تا ذخیره تمام نشده، دکمه دوباره کار نمی‌کند (دو بار زدن = یک سند)
+  var saving by remember { mutableStateOf(false) }
 
   fun number(text: String?): Double = text?.let { ir.vil3ntec.tohid.latinDigits(it).toDoubleOrNull() } ?: 0.0
 
@@ -139,7 +141,8 @@ fun ReturnFlowDialog(
   val perm = remember(total) { ReturnFlow.permDecision(role, layers, ReturnFlow.minor(total)) }
   val gate = ReturnFlow.gate(role, perm, ReturnFlow.minor(total), sale == null, damaged, ReturnFlow.minor(limit))
   val creditTo = if (mode == ReturnFlow.STORE_CREDIT) customerId else null
-  val split = (ReturnFlow.split(sale, total, mode, me, creditTo) as? ReturnFlow.Outcome.Ok)?.value
+  val prior = remember(d, sale) { sale?.let { s -> d.saleReturns.filter { it.saleId == s.id } }.orEmpty() }
+  val split = (ReturnFlow.split(sale, total, mode, me, creditTo, prior) as? ReturnFlow.Outcome.Ok)?.value
   val cartTotal = remember(d, cart) { SalesEngine.cartTotal(d, cart) }
   val approved = gate.decision == "allow" || (approval != null && ReturnFlow.canApprove(gate, approval!!.role))
 
@@ -243,6 +246,7 @@ fun ReturnFlowDialog(
               Spacer(Modifier.height(8.dp))
               if (split.account > 0) MoneyLine("کم از بدهیِ همین فاکتور", split.account)
               if (split.credit > 0) MoneyLine("اعتبارِ فروشگاه (طلبِ مشتری)", split.credit)
+              split.methods.forEach { (m, a) -> MoneyLine("پس به ${ReturnFlow.methodName(m)} (نه از دخل)", a) }
               if (split.cash > 0) MoneyLine("نقد از دخل", split.cash)
             }
           }
@@ -314,7 +318,7 @@ fun ReturnFlowDialog(
           Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("انصراف") }
             Button(
-              enabled = q != null && reason != null && approved && (!exchange || cart.isNotEmpty()),
+              enabled = !saving && q != null && reason != null && approved && (!exchange || cart.isNotEmpty()),
               onClick = {
                 val req = ReturnFlow.Request(
                   docId = docId, saleId = sale?.id,
@@ -324,25 +328,31 @@ fun ReturnFlowDialog(
                   by = me, role = role, perm = perm, limit = limit, approval = approval,
                 )
                 val now = System.currentTimeMillis()
-                if (exchange) {
+                //  دفترِ تازه و پیامِ موفقیت، یا خطا — «ثبت شد» فقط پس از نوشتنِ واقعی
+                val built: Pair<ShopData, String>? = if (exchange) {
                   when (val r = ReturnFlow.exchange(
                     d, req, cart, SalesEngine.Checkout(seller = me), saleKey, todayIso(), now, ::newId,
                     series = ir.vil3ntec.tohid.sync.DocSeries.current(context),
                   )) {
-                    is ReturnFlow.Outcome.Bad -> error = r.message
+                    is ReturnFlow.Outcome.Bad -> { error = r.message; null }
                     is ReturnFlow.Outcome.Ok -> {
-                      scope.launch { store.save(r.value.data) }
                       val due = r.value.due
-                      onPosted(docId, if (due >= 0) "تعویض ثبت شد — دریافت ${money(due)} ؋" else "تعویض ثبت شد — پرداخت ${money(-due)} ؋")
+                      r.value.data to (if (due >= 0) "تعویض ثبت شد — دریافت ${money(due)} ؋" else "تعویض ثبت شد — پرداخت ${money(-due)} ؋")
                     }
                   }
                 } else {
                   when (val r = ReturnFlow.post(d, req, todayIso(), now, ::newId)) {
-                    is ReturnFlow.Outcome.Bad -> error = r.message
-                    is ReturnFlow.Outcome.Ok -> {
-                      scope.launch { store.save(r.value.data) }
-                      onPosted(docId, "برگشت ثبت شد — ${money(r.value.total)} ؋")
-                    }
+                    is ReturnFlow.Outcome.Bad -> { error = r.message; null }
+                    is ReturnFlow.Outcome.Ok -> r.value.data to "برگشت ثبت شد — ${money(r.value.total)} ؋"
+                  }
+                }
+                if (built != null) {
+                  saving = true
+                  scope.launch {
+                    //  قفلِ نرمِ اشتراک یا خطای دیسک ⇒ `false`: هیچ «ثبت شد»ی نیست و فرم باز می‌ماند
+                    if (store.save(built.first)) onPosted(docId, built.second)
+                    else error = "ثبت نشد — دفتر نوشته نشد (اشتراک یا حافظه). چیزی ثبت نشده است."
+                    saving = false
                   }
                 }
               },
@@ -531,6 +541,7 @@ fun ReturnReceiptDialog(d: ShopData, docId: String, onDismiss: () -> Unit, onMes
             MoneyLine("مبلغِ برگشت", doc.total, strong = doc.exchange == null)
             if (doc.split.account > 0) MoneyLine("کم از بدهی", doc.split.account)
             if (doc.split.credit > 0) MoneyLine("اعتبارِ فروشگاه", doc.split.credit)
+            doc.split.methods.forEach { (m, a) -> MoneyLine("پس به ${ReturnFlow.methodName(m)}", a) }
             if (doc.split.cash > 0) MoneyLine("نقد", doc.split.cash)
             doc.due?.let { due -> MoneyLine(if (due >= 0) "دریافت از مشتری" else "پرداخت به مشتری", kotlin.math.abs(due), strong = true) }
           }

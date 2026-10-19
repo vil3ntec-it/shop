@@ -8,7 +8,8 @@
       { "id": "pC", "name": "کالای C", "unit": "عدد", "salePrice": 350, "purchasePrice": 200 },
       { "id": "pR", "name": "برنج", "unit": "کیلو", "salePrice": 300, "purchasePrice": 200 },
       { "id": "p40", "name": "کفش سایز ۴۰", "unit": "جفت", "salePrice": 1000, "purchasePrice": 600 },
-      { "id": "p42", "name": "کفش سایز ۴۲", "unit": "جفت", "salePrice": 1200, "purchasePrice": 700 }
+      { "id": "p42", "name": "کفش سایز ۴۲", "unit": "جفت", "salePrice": 1200, "purchasePrice": 700 },
+      { "id": "pM", "name": "کالای M", "unit": "عدد", "salePrice": 250, "purchasePrice": 150 }
     ],
     "warehouseEntries": [
       { "id": "wA", "productId": "pA", "units": 100, "date": "2026-09-01" },
@@ -16,7 +17,8 @@
       { "id": "wC", "productId": "pC", "units": 100, "date": "2026-09-01" },
       { "id": "wR", "productId": "pR", "units": 100, "date": "2026-09-01" },
       { "id": "w40", "productId": "p40", "units": 5, "date": "2026-09-01" },
-      { "id": "w42", "productId": "p42", "units": 5, "date": "2026-09-01" }
+      { "id": "w42", "productId": "p42", "units": 5, "date": "2026-09-01" },
+      { "id": "wM", "productId": "pM", "units": 100, "date": "2026-09-01" }
     ],
     "debtors": [
       { "id": "c1", "name": "احمد کریمی", "phone": "0790000001" },
@@ -30,7 +32,12 @@
       { "id": "s20", "invoiceNumber": 20, "debtorId": "c1", "total": 600, "discount": 0, "finalTotal": 600, "paymentMethod": "credit", "paidAmount": 100, "remaining": 500, "status": "completed", "debtGiven": 500, "debtSettled": 0, "date": "2026-10-02", "createdAt": 2000 },
       { "id": "s30", "invoiceNumber": 30, "debtorId": "c2", "total": 1000, "discount": 0, "finalTotal": 1000, "paymentMethod": "cash", "paidAmount": 1000, "remaining": 0, "status": "completed", "debtGiven": 0, "debtSettled": 0, "date": "2026-10-03", "createdAt": 3000 },
       { "id": "s40", "invoiceNumber": 40, "total": 150, "discount": 0, "finalTotal": 150, "paymentMethod": "cash", "paidAmount": 150, "remaining": 0, "status": "cancelled", "debtGiven": 0, "debtSettled": 0, "date": "2026-10-04", "createdAt": 4000 },
-      { "id": "s50", "invoiceNumber": 50, "total": 3, "discountType": "amount", "discountValue": 1, "discount": 1, "finalTotal": 2, "paymentMethod": "cash", "paidAmount": 2, "remaining": 0, "status": "completed", "debtGiven": 0, "debtSettled": 0, "date": "2026-10-05", "createdAt": 5000 }
+      { "id": "s50", "invoiceNumber": 50, "total": 3, "discountType": "amount", "discountValue": 1, "discount": 1, "finalTotal": 2, "paymentMethod": "cash", "paidAmount": 2, "remaining": 0, "status": "completed", "debtGiven": 0, "debtSettled": 0, "date": "2026-10-05", "createdAt": 5000 },
+      { "id": "s60", "invoiceNumber": 60, "total": 1000, "discount": 0, "finalTotal": 1000, "paymentMethod": "mixed", "paidAmount": 1000, "remaining": 0, "status": "completed", "debtGiven": 0, "debtSettled": 0, "date": "2026-10-06", "createdAt": 6000,
+        "payments": [
+          { "method": "cash", "kind": "cash", "amount": 40000, "status": "confirmed" },
+          { "method": "hesabpay", "kind": "wallet", "amount": 60000, "status": "pending", "ref": "HP-1", "verification": "manual" }
+        ] }
     ],
     "saleItems": [
       { "id": "i13a", "saleId": "s13", "productId": "pA", "quantity": 1, "unitPrice": 150, "purchasePrice": 100, "totalPrice": 150, "returnedQty": 0 },
@@ -41,7 +48,8 @@
       { "id": "i40", "saleId": "s40", "productId": "pA", "quantity": 1, "unitPrice": 150, "purchasePrice": 100, "totalPrice": 150, "returnedQty": 0 },
       { "id": "i50a", "saleId": "s50", "productId": "", "name": "کیسه ۱", "quantity": 1, "unitPrice": 1, "purchasePrice": 0, "totalPrice": 1, "returnedQty": 0 },
       { "id": "i50b", "saleId": "s50", "productId": "", "name": "کیسه ۲", "quantity": 1, "unitPrice": 1, "purchasePrice": 0, "totalPrice": 1, "returnedQty": 0 },
-      { "id": "i50c", "saleId": "s50", "productId": "", "name": "کیسه ۳", "quantity": 1, "unitPrice": 1, "purchasePrice": 0, "totalPrice": 1, "returnedQty": 0 }
+      { "id": "i50c", "saleId": "s50", "productId": "", "name": "کیسه ۳", "quantity": 1, "unitPrice": 1, "purchasePrice": 0, "totalPrice": 1, "returnedQty": 0 },
+      { "id": "i60", "saleId": "s60", "productId": "pM", "quantity": 4, "unitPrice": 250, "purchasePrice": 150, "totalPrice": 1000, "returnedQty": 0 }
     ],
     "returns": [],
     "stockMovements": [],
@@ -118,7 +126,10 @@
     { "name": "نقدیِ مشتری‌دار به اعتبار", "sale": "s30", "amount": 1000, "mode": "store_credit", "customer": "c2", "out": { "account": 0, "credit": 1000, "cash": 0 } },
     { "name": "بی رسید، روشِ اصلی ⇒ نقد", "sale": null, "amount": 300, "mode": "original", "out": { "account": 0, "credit": 0, "cash": 300 } },
     { "name": "اعتبار بی مشتری", "sale": null, "amount": 300, "mode": "store_credit", "error": "CUSTOMER_REQUIRED" },
-    { "name": "روشِ ناشناخته", "sale": "s13", "amount": 100, "mode": "gold", "error": "BAD_MODE" }
+    { "name": "روشِ ناشناخته", "sale": "s13", "amount": 100, "mode": "gold", "error": "BAD_MODE" },
+    { "name": "پرداختِ ترکیبی (#286)، روشِ اصلی: اول ردیفِ آخر (HesabPay)", "sale": "s60", "amount": 500, "mode": "original", "out": { "account": 0, "credit": 0, "cash": 0, "methods": { "hesabpay": 500 } } },
+    { "name": "پرداختِ ترکیبی، بیش از سهمِ HesabPay: بقیه نقد", "sale": "s60", "amount": 800, "mode": "original", "out": { "account": 0, "credit": 0, "cash": 200, "methods": { "hesabpay": 600 } } },
+    { "name": "پرداختِ ترکیبی، به انتخاب نقد: همه از دخل", "sale": "s60", "amount": 800, "mode": "cash", "out": { "account": 0, "credit": 0, "cash": 800 } }
   ],
   "post": [
     { "id": "S13", "name": "S13: خراب، ضایعات، نقد", "req": { "docId": "doc-s13", "saleId": "s13", "picks": { "i13b": { "qty": 1, "disposition": "damaged" } }, "reason": "خراب یا معیوب", "mode": "cash", "by": "صندوقدار", "role": "owner" },
@@ -126,7 +137,7 @@
         "total": 225, "split": { "account": 0, "credit": 0, "cash": 225 }, "audit": "return",
         "rows": [{ "saleItemId": "i13b", "productId": "pB", "quantity": 1, "amount": 225, "disposition": "damaged", "toAccount": 0, "toCredit": 0 }],
         "movements": [{ "productId": "pB", "type": "customer_return", "qty": 1 }, { "productId": "pB", "type": "damage", "qty": -1 }],
-        "entries": [{ "productId": "pB", "units": -1 }],
+        "entries": [{ "productId": "pB", "units": -1, "adjKind": "damage" }],
         "transactions": [], "returnedQty": { "i13b": 1 }, "debtSettled": 0,
         "stock": { "pB": 98 }
       } },
@@ -187,6 +198,22 @@
     { "id": "perm-deny", "name": "مجوزِ نقش ممنوع", "req": { "docId": "d9", "saleId": "s13", "picks": { "i13a": { "qty": 1 } }, "reason": "دیگر", "mode": "cash", "role": "staff", "perm": "deny" }, "error": "RETURN_DENIED" },
     { "id": "cancelled", "name": "فاکتورِ لغوشده", "req": { "docId": "d10", "saleId": "s40", "picks": { "i40": { "qty": 1 } }, "reason": "دیگر", "mode": "cash", "role": "owner" }, "error": "SALE_CANCELLED" },
     { "id": "sc-no-customer", "name": "اعتبار برای فروشِ بی مشتری", "req": { "docId": "d11", "saleId": "s13", "picks": { "i13a": { "qty": 1 } }, "reason": "دیگر", "mode": "store_credit", "role": "owner" }, "error": "CUSTOMER_REQUIRED" },
+    { "id": "mixed-1", "name": "پرداختِ ترکیبی: سهمِ HesabPay به همان روش، نه از دخل", "req": { "docId": "m1", "saleId": "s60", "picks": { "i60": { "qty": 2 } }, "reason": "دیگر", "mode": "original", "role": "owner" },
+      "out": {
+        "total": 500, "split": { "account": 0, "credit": 0, "cash": 0, "methods": { "hesabpay": 500 } }, "audit": "return",
+        "rows": [{ "saleItemId": "i60", "productId": "pM", "quantity": 2, "amount": 500, "disposition": "restock", "toAccount": 0, "toCredit": 0, "toMethods": { "hesabpay": 500 } }],
+        "movements": [{ "productId": "pM", "type": "customer_return", "qty": 2 }],
+        "entries": [], "transactions": [], "returnedQty": { "i60": 2 }, "debtSettled": 0, "drawer": 0,
+        "stock": { "pM": 98 }
+      } },
+    { "id": "mixed-2", "after": ["mixed-1"], "name": "برگشتِ دوم: HesabPay فقط ۱۰۰ِ مانده، بقیه نقد", "req": { "docId": "m2", "saleId": "s60", "picks": { "i60": { "qty": 2 } }, "reason": "دیگر", "mode": "original", "role": "owner" },
+      "out": {
+        "total": 500, "split": { "account": 0, "credit": 0, "cash": 400, "methods": { "hesabpay": 100 } }, "audit": "return",
+        "rows": [{ "saleItemId": "i60", "productId": "pM", "quantity": 2, "amount": 500, "disposition": "restock", "toAccount": 0, "toCredit": 0, "toMethods": { "hesabpay": 100 } }],
+        "movements": [{ "productId": "pM", "type": "customer_return", "qty": 2 }],
+        "entries": [], "transactions": [], "returnedQty": { "i60": 2 }, "debtSettled": 0, "drawer": 400,
+        "stock": { "pM": 100 }
+      } },
     { "id": "free-lines", "name": "قلمِ آزاد: بی حرکتِ انبار، گردکردن سقف دارد", "req": { "docId": "d12", "saleId": "s50", "picks": { "i50a": { "qty": 1 }, "i50b": { "qty": 1 }, "i50c": { "qty": 1 } }, "reason": "دیگر", "mode": "cash", "role": "owner" },
       "out": {
         "total": 2, "split": { "account": 0, "credit": 0, "cash": 2 }, "audit": "return",

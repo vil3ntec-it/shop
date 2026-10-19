@@ -83,6 +83,12 @@ class ReturnFlowTest {
 
   private fun stock(d: ShopData, pid: String) = ShopStore.stock(d, pid)
 
+  /** `{ "hesabpay": 500 }` ⇐ نقشه؛ نبودن = خالی */
+  private fun money(o: JsonObject, k: String): Map<String, Double> =
+    (o[k] as? JsonObject)?.mapValues { (_, v) -> v.jsonPrimitive.doubleOrNull ?: 0.0 } ?: emptyMap()
+
+  private fun split(o: JsonObject) = ReturnFlow.Split(o.num("account"), o.num("credit"), o.num("cash"), money(o, "methods"))
+
   // ══════════════════════════ بردارِ مشترک ══════════════════════════
 
   @Test
@@ -156,8 +162,7 @@ class ReturnFlowTest {
       when (val r = ReturnFlow.split(sale, c.num("amount"), c.str("mode").orEmpty(), "owner", c.str("customer"))) {
         is ReturnFlow.Outcome.Bad -> assertEquals(c.str("name"), c.str("error"), r.code)
         is ReturnFlow.Outcome.Ok -> {
-          val o = c.obj("out")
-          assertEquals(c.str("name"), ReturnFlow.Split(o.num("account"), o.num("credit"), o.num("cash")), r.value)
+          assertEquals(c.str("name"), split(c.obj("out")), r.value)
         }
       }
     }
@@ -182,15 +187,16 @@ class ReturnFlowTest {
           val out = c.obj("out")
           val after = r.value.data
           assertEquals(name, out.num("total"), r.value.total, 0.0)
-          val sp = out.obj("split")
-          assertEquals(name, ReturnFlow.Split(sp.num("account"), sp.num("credit"), sp.num("cash")), r.value.split)
+          assertEquals(name, split(out.obj("split")), r.value.split)
           assertEquals(name, out.str("audit"), after.auditLog.last().type)
 
           val rows = after.saleReturns.drop(d.saleReturns.size)
           assertEquals(name, out.arr("rows").map { x ->
             val o = x.jsonObject
-            listOf(o.str("saleItemId"), o.str("productId"), o.num("quantity"), o.num("amount"), o.str("disposition"), o.num("toAccount"), o.num("toCredit"))
-          }, rows.map { listOf(it.saleItemId, it.productId, it.quantity, it.amount, it.disposition, it.toAccount ?: 0.0, it.toCredit ?: 0.0) })
+            listOf(o.str("saleItemId"), o.str("productId"), o.num("quantity"), o.num("amount"), o.str("disposition"), o.num("toAccount"), o.num("toCredit"), money(o, "toMethods"))
+          }, rows.map { listOf(it.saleItemId, it.productId, it.quantity, it.amount, it.disposition, it.toAccount ?: 0.0, it.toCredit ?: 0.0, it.toMethods ?: emptyMap<String, Double>()) })
+          //  سهمِ دخل: کیف پول و کارت از نقدِ صندوق کم نمی‌شوند (`CashShift`)
+          if (out.containsKey("drawer")) assertEquals(name, out.num("drawer"), rows.sumOf { ReturnFlow.drawerAmount(it) }, 1e-9)
           rows.forEach { assertEquals(req.docId, it.docId) }
           out.str("approvedBy")?.let { a -> rows.forEach { assertEquals(name, a, it.approvedBy) } }
 
@@ -198,8 +204,8 @@ class ReturnFlowTest {
             val o = x.jsonObject; listOf(o.str("productId"), o.str("type"), o.num("qty"))
           }, after.stockMovements.drop(d.stockMovements.size).map { listOf(it.productId, it.type, it.qty) })
           assertEquals(name, out.arr("entries").map { x ->
-            val o = x.jsonObject; listOf(o.str("productId"), o.num("units"))
-          }, after.warehouseEntries.drop(d.warehouseEntries.size).map { listOf(it.productId, it.units) })
+            val o = x.jsonObject; listOf(o.str("productId"), o.num("units"), o.str("adjKind"))
+          }, after.warehouseEntries.drop(d.warehouseEntries.size).map { listOf(it.productId, it.units, it.adjKind) })
           assertEquals(name, out.arr("transactions").map { x ->
             val o = x.jsonObject; listOf(o.str("debtorId"), o.num("amount"))
           }, after.transactions.drop(d.transactions.size).map { listOf(it.debtorId, it.amount) })
@@ -278,6 +284,21 @@ class ReturnFlowTest {
     assertEquals(0.0, CashShift.totals(credit.data, now, now, 0.0).expected, 0.0)
     val debt = (ReturnFlow.post(d, ReturnFlow.Request(docId = "c", saleId = "s20", picks = mapOf("i20" to ReturnFlow.Pick(1.0)), reason = "دیگر"), today, now, ::newId) as ReturnFlow.Outcome.Ok).value
     assertEquals(0.0, CashShift.totals(debt.data, now, now, 0.0).expected, 0.0)
+    //  پرداختِ ترکیبی: ۵۰۰ به HesabPay پس رفت ⇒ دخل دست نمی‌خورد؛ ۸۰۰ ⇒ فقط ۲۰۰ِ نقد از دخل
+    val wallet = (ReturnFlow.post(d, ReturnFlow.Request(docId = "w1", saleId = "s60", picks = mapOf("i60" to ReturnFlow.Pick(2.0)), reason = "دیگر"), today, now, ::newId) as ReturnFlow.Outcome.Ok).value
+    assertEquals(0.0, CashShift.totals(wallet.data, now, now, 0.0).returns, 0.0)
+    val more = (ReturnFlow.post(wallet.data, ReturnFlow.Request(docId = "w2", saleId = "s60", picks = mapOf("i60" to ReturnFlow.Pick(2.0)), reason = "دیگر"), today, now, ::newId) as ReturnFlow.Outcome.Ok).value
+    assertEquals(400.0, CashShift.totals(more.data, now, now, 0.0).returns, 0.0)
+    //  رسید (نمای سند) همان تقسیم را نشان می‌دهد
+    assertEquals(mapOf("hesabpay" to 100.0), ReturnFlow.doc(more.data, "w2")!!.split.methods)
+  }
+
+  @Test
+  fun `پرداختِ ترکیبی — همان JSONِ #286 خوانده و بی تغییر نوشته می‌شود`() {
+    val s60 = ledger().sales.first { it.id == "s60" }
+    assertEquals(listOf("cash" to 40000L, "hesabpay" to 60000L), s60.payments!!.map { it.method to it.amountMinor })
+    val text = Json.encodeToString(Sale.serializer(), s60)
+    assertTrue(text, text.contains("\"amount\":60000") && !text.contains("amountMinor"))
   }
 
   @Test

@@ -299,6 +299,7 @@ object Receipt {
     row("مبلغ برگشت", afn(doc.total), p.head)
     if (doc.split.account > 0) row("کم از بدهی", afn(doc.split.account), p.body)
     if (doc.split.credit > 0) row("اعتبار فروشگاه", afn(doc.split.credit), p.body)
+    doc.split.methods.forEach { (m, a) -> row("پس به ${ir.vil3ntec.tohid.data.ReturnFlow.methodName(m)}", afn(a), p.body) }
     if (doc.split.cash > 0) row("پس‌داده نقد", afn(doc.split.cash), p.body)
 
     doc.exchange?.let { ex ->

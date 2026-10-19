@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.data
 
 import ir.vil3ntec.tohid.core.pay.PaidRow
+import ir.vil3ntec.tohid.core.pay.PayMethod
 import ir.vil3ntec.tohid.core.pay.Pay
 import ir.vil3ntec.tohid.core.pay.PayResult
 import ir.vil3ntec.tohid.core.pay.RefundInput
@@ -303,29 +304,75 @@ object ReturnFlow {
 
   /* ============================ بازپرداخت ============================ */
 
-  /** سهمِ هر مقصد (افغانی): از بدهیِ همین فاکتور، اعتبارِ فروشگاه، نقد */
-  data class Split(val account: Double, val credit: Double, val cash: Double)
+  /**
+   *  سهمِ هر مقصد (افغانی): از بدهیِ همین فاکتور، اعتبارِ فروشگاه، نقدِ دخل، و
+   *  [methods] = روش‌های غیرنقدِ اصلی (شناسهٔ روش ⇒ مبلغ) که از دخل بیرون نمی‌روند.
+   */
+  data class Split(val account: Double, val credit: Double, val cash: Double, val methods: Map<String, Double> = emptyMap())
 
   fun minor(afn: Double): Long = Math.round(afn * 100)
   private fun major(m: Long): Double = m / 100.0
 
+  /** وضع‌هایی که پولشان سرِ صندوق گرفته شده: «در انتظار»ِ ثبتِ دستیِ غیرنقد (PAY-08) هم */
+  private val TAKEN = setOf("confirmed", "partially_refunded", "pending")
+
   /**
-   *  RET-06 — تقسیمِ مبلغ میانِ مقصدها با `Pay.refund`. فاکتورِ امروز ردیفِ
-   *  پرداخت ندارد؛ از فیلدهایش ساخته می‌شود: پرداختیِ همان لحظه = نقد، بدهی =
-   *  «به حساب». بی رسید ⇒ فقط نقد.
+   *  ردیف‌های پرداختِ فاکتور از نگاهِ بازپرداخت.
+   *
+   *  با `Sale.payments` (پرداختِ ترکیبی، #286): هر ردیف به روشِ خودش؛ آنچه پیش‌تر به همان
+   *  روشِ غیرنقد پس رفته (`SaleReturn.toMethods`ِ برگشت‌های قبلی) از آن کم می‌شود تا
+   *  هیچ روشی بیش از دریافتی‌اش پس نگیرد. بی `payments` (فاکتورِ امروز): پرداختیِ همان
+   *  لحظه = نقد، بدهی = «به حساب». بی رسید ⇒ فقط نقد.
    */
-  fun split(sale: Sale?, amount: Double, mode: String, approvedBy: String, customerId: String?): Outcome<Split> {
+  private fun paidRows(sale: Sale?, amount: Double, prior: List<SaleReturn>): Pair<List<PaidRow>, List<PayMethod>?> {
+    if (sale == null) return listOf(PaidRow(Pay.CASH, minor(amount), 0, "confirmed")) to null
+    val list = sale.payments?.filter { it.amountMinor > 0 }
+    if (list.isNullOrEmpty()) {
+      val paid = minor(sale.paidAmount).coerceAtLeast(0)
+      val debt = minor(sale.debtGiven).coerceAtLeast(0)
+      return buildList {
+        add(PaidRow(Pay.CASH, max(paid, if (debt == 0L) minor(sale.finalTotal) else paid), 0, "confirmed"))
+        if (debt > 0) add(PaidRow(Pay.ACCOUNT, debt, 0, "confirmed"))
+      } to null
+    }
+    val used = HashMap<String, Long>()
+    prior.forEach { r -> r.toMethods?.forEach { (m, a) -> used[m] = (used[m] ?: 0L) + minor(a) } }
+    val known = Pay.DEFAULT_METHODS.associateBy { it.id }
+    val extra = LinkedHashMap<String, PayMethod>()
+    val rows = list.map { p ->
+      val id = when {
+        p.kind == Pay.CASH -> Pay.CASH
+        p.method == Pay.ACCOUNT || p.kind == Pay.ACCOUNT -> Pay.ACCOUNT
+        else -> p.method
+      }
+      if (id != Pay.CASH && id != Pay.ACCOUNT && id !in known && id !in extra) {
+        extra[id] = PayMethod(id, if (p.kind in Pay.KINDS && p.kind != Pay.CASH) p.kind else "other", id)
+      }
+      val status = if (p.status in TAKEN) "confirmed" else p.status
+      val back = if (id == Pay.CASH || id == Pay.ACCOUNT) 0L else minOf(used[id] ?: 0L, p.amountMinor)
+      if (back > 0) used[id] = (used[id] ?: 0L) - back
+      PaidRow(id, p.amountMinor, back, status)
+    }
+    return rows to (if (extra.isEmpty()) null else Pay.DEFAULT_METHODS + extra.values)
+  }
+
+  /**
+   *  RET-06 — تقسیمِ مبلغ میانِ مقصدها با `Pay.refund`: اول بدهیِ بازِ همین فاکتور (مثلِ
+   *  امروز)، بقیه به روشِ اصلی (هر ردیف به روشِ خودش)، نقد یا اعتبارِ فروشگاه.
+   *  [prior] = برگشت‌های پیشینِ همین فاکتور.
+   */
+  fun split(
+    sale: Sale?,
+    amount: Double,
+    mode: String,
+    approvedBy: String,
+    customerId: String?,
+    prior: List<SaleReturn> = emptyList(),
+  ): Outcome<Split> {
     if (amount <= 0) return Outcome.Ok(Split(0.0, 0.0, 0.0))
     val m = if (sale == null && mode == ORIGINAL) CASH else mode
     if (m != ORIGINAL && m != CASH && m != STORE_CREDIT) return Outcome.Bad(Code.BAD_MODE)
-    val rows = if (sale == null) {
-      listOf(PaidRow(Pay.CASH, minor(amount), 0, "confirmed"))
-    } else buildList {
-      val paid = minor(sale.paidAmount).coerceAtLeast(0)
-      val debt = minor(sale.debtGiven).coerceAtLeast(0)
-      add(PaidRow(Pay.CASH, max(paid, if (debt == 0L) minor(sale.finalTotal) else paid), 0, "confirmed"))
-      if (debt > 0) add(PaidRow(Pay.ACCOUNT, debt, 0, "confirmed"))
-    }
+    val (rows, methods) = paidRows(sale, amount, prior)
     val outstanding = if (sale == null) 0L else max(0L, minor(sale.debtGiven - sale.debtSettled))
     val r = Pay.refund(
       RefundInput(
@@ -335,23 +382,29 @@ object ReturnFlow {
         approvedBy = approvedBy.ifBlank { "owner" },
         customerId = customerId,
         accountOutstanding = outstanding,
+        methods = methods,
       )
     )
     return when (r) {
       is PayResult.Err -> Outcome.Bad(if (r.code == "CUSTOMER_REQUIRED") Code.CUSTOMER_REQUIRED else Code.REFUND_FAILED, r.code)
       is PayResult.Ok -> {
         var account = 0L; var credit = 0L; var cash = 0L
+        val other = LinkedHashMap<String, Long>()
         r.value.payouts.forEach {
           when (it.kind) {
             Pay.ACCOUNT -> account += it.amount
             Pay.STORE_CREDIT -> credit += it.amount
-            else -> cash += it.amount
+            Pay.CASH -> cash += it.amount
+            else -> other[it.method] = (other[it.method] ?: 0L) + it.amount
           }
         }
-        Outcome.Ok(Split(major(account), major(credit), major(cash)))
+        Outcome.Ok(Split(major(account), major(credit), major(cash), other.mapValues { major(it.value) }))
       }
     }
   }
+
+  /** سهمِ نقدِ دخل از یک ردیفِ برگشت: مبلغ منهای آنچه به روش‌های غیرنقد پس رفت (`CashShift`) */
+  fun drawerAmount(r: SaleReturn): Double = r.amount - (r.toMethods?.values?.sum() ?: 0.0)
 
   /* ================================ ثبت ================================ */
 
@@ -405,7 +458,8 @@ object ReturnFlow {
     if (g.decision == "approve" && (approval == null || !canApprove(g, approval.role))) return Outcome.Bad(Code.APPROVAL_REQUIRED)
     val approvedBy = if (g.decision == "approve") approval!!.by else req.by.trim()
 
-    val s = when (val r = split(sale, quote.total, req.mode, approvedBy, creditTo)) {
+    val prior = if (sale == null) emptyList() else d.saleReturns.filter { it.saleId == sale.id }
+    val s = when (val r = split(sale, quote.total, req.mode, approvedBy, creditTo, prior)) {
       is Outcome.Bad -> return r
       is Outcome.Ok -> r.value
     }
@@ -416,13 +470,25 @@ object ReturnFlow {
     val rows = ArrayList<SaleReturn>()
     val movements = ArrayList<StockMovement>()
     val entries = ArrayList<WarehouseEntry>()
-    var leftAccount = s.account
-    var leftCredit = s.credit
+    //  تقسیم به ردیف‌ها به پول (عددِ صحیح): بدهی، اعتبار، روش‌های غیرنقد، و بقیه نقد
+    var leftAccount = minor(s.account)
+    var leftCredit = minor(s.credit)
+    val leftMethods = LinkedHashMap(s.methods.mapValues { minor(it.value) })
 
     for (line in quote.lines) {
       val rowId = newId()
-      val acc = minOf(leftAccount, line.amount); leftAccount -= acc
-      val cre = minOf(leftCredit, line.amount - acc); leftCredit -= cre
+      val amt = minor(line.amount)
+      val accM = minOf(leftAccount, amt); leftAccount -= accM
+      val creM = minOf(leftCredit, amt - accM); leftCredit -= creM
+      var room = amt - accM - creM
+      val here = LinkedHashMap<String, Double>()
+      for ((m, left) in leftMethods) {
+        if (room <= 0) break
+        val take = minOf(left, room)
+        if (take > 0) { here[m] = major(take); leftMethods[m] = left - take; room -= take }
+      }
+      val acc = major(accM)
+      val cre = major(creM)
       rows += SaleReturn(
         id = rowId,
         saleId = sale?.id.orEmpty(),
@@ -439,6 +505,7 @@ object ReturnFlow {
         toAccount = acc.takeIf { it > 0 },
         toCredit = cre.takeIf { it > 0 },
         creditTo = creditTo?.takeIf { cre > 0 },
+        toMethods = here.takeIf { it.isNotEmpty() },
         unitPrice = if (sale == null) line.unitPrice else null,
         by = req.by.trim().ifEmpty { null },
         approvedBy = if (g.decision == "approve") approvedBy else null,
@@ -461,6 +528,8 @@ object ReturnFlow {
           entries += WarehouseEntry(
             id = newId(), productId = line.productId, units = -line.qty, unit = product?.unit.orEmpty(),
             date = today, notes = "ضایعاتِ برگشتی $tag — $reason", isAdjustment = true, createdAt = now,
+            //  دفترِ موجودی (`StockLedger`) اصلاح را از همین نوع می‌شناسد
+            adjKind = "damage",
           )
         }
         //  بی رسید: فروشی نیست که کم شود؛ کالای سالم با ردیفِ اصلاحی به موجودی برمی‌گردد
@@ -497,6 +566,7 @@ object ReturnFlow {
       if (s.cash > 0) add("نقد ${money(s.cash)}")
       if (s.account > 0) add("از حساب ${money(s.account)}")
       if (s.credit > 0) add("اعتبار ${money(s.credit)}")
+      s.methods.forEach { (m, a) -> add("${methodName(m)} ${money(a)}") }
     }.joinToString("، ")
     val notes = buildString {
       append("برگشت $tag به مبلغ ${money(quote.total)} افغانی — $invoice — دلیل: $reason")
@@ -605,13 +675,15 @@ object ReturnFlow {
     val total = rows.sumOf { it.amount }
     val account = rows.sumOf { it.toAccount ?: 0.0 }
     val credit = rows.sumOf { it.toCredit ?: 0.0 }
+    val methods = LinkedHashMap<String, Double>()
+    rows.forEach { r -> r.toMethods?.forEach { (m, a) -> methods[m] = (methods[m] ?: 0.0) + a } }
     return Doc(
       docId = docId,
       label = label(docId),
       sale = d.sales.find { it.id == first.saleId },
       rows = rows,
       total = total,
-      split = Split(account, credit, total - account - credit),
+      split = Split(account, credit, total - account - credit - methods.values.sum(), methods),
       reason = first.reason,
       by = first.by.orEmpty(),
       approvedBy = first.approvedBy.orEmpty(),
@@ -626,6 +698,9 @@ object ReturnFlow {
     d.saleItems.find { it.id == row.saleItemId }?.let { return SalesEngine.itemName(d, it) }
     return d.products.find { it.id == row.productId }?.name ?: "(کالا)"
   }
+
+  /** نامِ روشِ پرداخت برای رسید — همان جدولِ پیش‌فرضِ هستهٔ پرداخت */
+  fun methodName(id: String): String = Pay.DEFAULT_METHODS.firstOrNull { it.id == id }?.name ?: id
 
   fun dispositionName(v: String?): String = if (v == DAMAGED) "ضایعات" else "به موجودی"
 
