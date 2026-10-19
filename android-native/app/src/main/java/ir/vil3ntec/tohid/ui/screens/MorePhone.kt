@@ -12,7 +12,7 @@ import androidx.compose.material.icons.outlined.AdminPanelSettings
 import androidx.compose.material.icons.outlined.Badge
 import androidx.compose.material.icons.outlined.Devices
 import androidx.compose.material.icons.outlined.Forum
-import androidx.compose.material.icons.outlined.Groups
+import androidx.compose.material.icons.outlined.PeopleOutline
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.InsertChart
 import androidx.compose.material.icons.outlined.Inventory2
@@ -118,7 +118,7 @@ fun PhoneMoreScreen(d: ShopData, onOpen: (String) -> Unit) {
 
 private fun moreIcon(item: MoreLayout.Item): ImageVector? = item.settingsGroup?.let(::settingsIcon) ?: when (item.id) {
   "orders" -> Icons.Outlined.ShoppingBasket
-  "debtors" -> Icons.Outlined.Groups
+  "debtors" -> Icons.Outlined.PeopleOutline
   "sales" -> Icons.Outlined.History
   "receipts" -> Icons.AutoMirrored.Outlined.ReceiptLong
   "chat" -> Icons.Outlined.Forum

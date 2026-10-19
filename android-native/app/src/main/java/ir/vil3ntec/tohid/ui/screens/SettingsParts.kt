@@ -85,6 +85,15 @@ object SettingsNav {
   }
 }
 
+/**
+ *  پیش‌نمایشِ عکس‌های خودکار (`PhonePreview`): کلیدِ «قفلِ برنامه» را روشن نشان
+ *  بده تا کلیدِ سبزِ r5 در عکس دیده شود — رمزِ واقعی دست نمی‌خورد. در برنامهٔ
+ *  دستِ کاربر همیشه null است.
+ */
+object SettingsShot {
+  var lockOn: Boolean? = null
+}
+
 /** آیکنِ خطیِ ردیفِ هر بخش و هر گروه (r5) — همه تک‌رنگ */
 internal fun settingsIcon(key: String): ImageVector? = when (key) {
   "هشدارها" -> Icons.Outlined.Notifications

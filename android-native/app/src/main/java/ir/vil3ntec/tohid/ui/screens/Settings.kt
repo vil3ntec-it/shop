@@ -130,7 +130,7 @@ fun SettingsScreen(
   var busy by remember { mutableStateOf(false) }
   var signedIn by remember { mutableStateOf(state.accessToken != null) }
   val lockStore = remember { ir.vil3ntec.tohid.data.LockStore(context) }
-  var lockOn by remember { mutableStateOf(lockStore.enabled) }
+  var lockOn by remember { mutableStateOf(SettingsShot.lockOn ?: lockStore.enabled) }
   var askPin by remember { mutableStateOf(false) }
   var confirmClear by remember { mutableStateOf(false) }
   var confirmRotate by remember { mutableStateOf(false) }
@@ -542,14 +542,23 @@ fun SettingsScreen(
         }
 
         /* ======================== دستگاه‌های وارد شده ======================== */
-        if (signedIn) {
-          SettingsSection(
-            icon = Icons.Filled.Devices,
-            title = "دستگاه‌های وارد شده",
-            subtitle = "گوشی گم شد؟ نشستش را ببندید",
-            tint = Shop.colors.warning,
-          ) {
+        //  همیشه در فهرست (بندِ C «دستگاه‌های وصل»)؛ فهرستِ واقعی روی سرور است و
+        //  بیرون از حساب فقط همین را می‌گوید
+        SettingsSection(
+          icon = Icons.Filled.Devices,
+          title = "دستگاه‌های وارد شده",
+          subtitle = if (signedIn) "گوشی گم شد؟ نشستش را ببندید" else "دستگاه‌هایی که با این حساب وارد شده‌اند",
+          tint = Shop.colors.warning,
+          value = if (signedIn) null else "وارد نشده",
+        ) {
+          if (signedIn) {
             DeviceList(state = state, snackbarToast = ::toast)
+          } else {
+            Text(
+              "فهرستِ دستگاه‌ها و بستنِ نشستِ هر کدام روی سرور است؛ اول وارد حساب شوید.",
+              style = MaterialTheme.typography.labelSmall,
+              color = Shop.colors.muted2,
+            )
           }
         }
 

@@ -496,28 +496,28 @@ private fun ProfileRoot(
       } else Spacer(Modifier.height(24.dp))
 
       /*
-       *  عکس و کارت: عکسِ ۱۲۸dp وسط، و کارتِ شیشه‌ای ۲۲dp روی لبهٔ پایینش
-       *  می‌نشیند (r4) — کارت بعد از عکس کشیده می‌شود تا رویش باشد.
+       *  عکس و کارت: عکسِ ۱۲۸dp وسط که ۲۵dp روی لبهٔ بالای کارتِ شیشه‌ای می‌نشیند
+       *  و حلقهٔ سفیدش کامل دیده می‌شود (بندِ B) — عکس بعد از کارت کشیده می‌شود.
        */
       val avatarSize = 128.dp
-      val tuck = 22.dp
+      val overlap = 25.dp
       Box(Modifier.fillMaxWidth().offset(y = if (ownHeader) (-12).dp else 0.dp)) {
-        ProfileAvatar(
-          accountId = accountId,
-          version = avatarVersion,
-          size = avatarSize,
-          modifier = Modifier
-            .align(Alignment.TopCenter)
-            .zIndex(0f)
-            .clickable(role = Role.Button, onClickLabel = "عوض کردنِ عکس حساب", onClick = onAvatar),
-        )
         ProfileCard(
           account = account,
           shopName = shopName,
           stats = stats,
           banner = banner,
           onBanner = onBanner,
-          modifier = Modifier.padding(top = avatarSize - tuck).zIndex(1f),
+          modifier = Modifier.padding(top = avatarSize - overlap).zIndex(0f),
+        )
+        ProfileAvatar(
+          accountId = accountId,
+          version = avatarVersion,
+          size = avatarSize,
+          modifier = Modifier
+            .align(Alignment.TopCenter)
+            .zIndex(1f)
+            .clickable(role = Role.Button, onClickLabel = "عوض کردنِ عکس حساب", onClick = onAvatar),
         )
       }
       Spacer(Modifier.height(if (ownHeader) 0.dp else 12.dp))
@@ -544,8 +544,9 @@ private fun ProfileCard(
       .fillMaxWidth()
       .shadow(18.dp, shape, clip = false, ambientColor = c.ink.copy(alpha = 0.10f), spotColor = c.ink.copy(alpha = 0.12f))
       .clip(shape)
-      .background(c.cardGlass)
-      .padding(start = 24.dp, end = 24.dp, top = 24.dp, bottom = 24.dp),
+      //  شیشه: کمی از زمینه پیداست تا کادرهای سفیدِ آمار رویش دیده شوند (r4)
+      .background(c.cardGlass.copy(alpha = c.cardGlass.alpha * 0.8f))
+      .padding(start = 24.dp, end = 24.dp, top = 26.dp, bottom = 24.dp),
   ) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
       Column(Modifier.weight(1f)) {
@@ -614,9 +615,10 @@ private fun StatBox(label: String, count: Int, modifier: Modifier = Modifier) {
   Column(
     modifier
       .height(76.dp)
-      .shadow(1.dp, shape, clip = false, ambientColor = c.ink.copy(alpha = 0.06f), spotColor = c.ink.copy(alpha = 0.06f))
+      .shadow(8.dp, shape, clip = false, ambientColor = c.ink.copy(alpha = 0.10f), spotColor = c.ink.copy(alpha = 0.10f))
       .clip(shape)
-      .background(c.card)
+      //  شب: کمی روشن‌تر از کارت تا جدا خوانده شود
+      .background(if (c.bg.red < 0.3f) lerp(c.card, c.ink, 0.07f) else c.card)
       .semantics(mergeDescendants = true) {},
     horizontalAlignment = Alignment.CenterHorizontally,
     verticalArrangement = Arrangement.Center,

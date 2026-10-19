@@ -47,6 +47,7 @@ import ir.vil3ntec.tohid.ui.screens.ProfileModel
 import ir.vil3ntec.tohid.ui.screens.ProfileShot
 import ir.vil3ntec.tohid.ui.screens.SettingsLayout
 import ir.vil3ntec.tohid.ui.screens.SettingsNav
+import ir.vil3ntec.tohid.ui.screens.SettingsShot
 import ir.vil3ntec.tohid.ui.screens.MoreShot
 import ir.vil3ntec.tohid.ui.screens.PhoneMoreScreen
 import ir.vil3ntec.tohid.ui.screens.SettingsScreen
@@ -132,6 +133,10 @@ private fun PhonePreviewContent(screen: String, store: ShopStore, dark: Boolean)
         key(screen) { ProfileScreen(store = store, snackbar = snackbar, onBack = {}, onSignIn = {}, onSubscription = {}) }
       }
       "v3-settings", "v3-settings-scrolled", "v3-settings-detail" -> Box(Modifier.weight(1f).fillMaxWidth()) {
+        //  کلیدِ سبزِ «قفلِ برنامه» روشن دیده شود (r5 Face ID) — رمزِ واقعی دست نمی‌خورد
+        //  پیش از کشیدنِ صفحه (در همین گذر)، نه در اثرِ پس از آن
+        remember { SettingsShot.lockOn = true }
+        DisposableEffect(Unit) { onDispose { SettingsShot.lockOn = null } }
         LaunchedEffect(screen) {
           SettingsNav.pending.value = when (screen) {
             "v3-settings-scrolled" -> SettingsNav.Request(group = SettingsLayout.DATA)

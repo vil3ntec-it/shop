@@ -243,16 +243,16 @@ internal fun V3LargeHeader(title: String, trailing: (@Composable () -> Unit)? = 
 }
 
 /**
- *  سرخطِ گروه، بیرونِ کارت (r5): درشت و پُررنگ مثلِ «Security»ِ مرجع، با رنگِ
- *  خاکستریِ تیره (میانِ متن و متنِ کم‌رنگ) تا از نامِ ردیف‌ها جدا خوانده شود.
+ *  سرخطِ گروه، بیرونِ کارت (r5): ۱۵sp و نیم‌پُررنگ، خاکستریِ تیره (میانِ متن و
+ *  متنِ کم‌رنگ) تا از نامِ ردیف‌ها جدا خوانده شود.
  */
 @Composable
 internal fun V3GroupTitle(text: String, modifier: Modifier = Modifier) {
   val c = PhoneV3.colors
   Text(
     text,
-    style = v3Text(16, FontWeight.Bold, 22),
-    color = lerp(c.ink, c.inkMuted, 0.3f),
+    style = v3Text(15, FontWeight.SemiBold, 22),
+    color = lerp(c.ink, c.inkMuted, 0.25f),
     modifier = modifier.padding(start = 4.dp, end = 4.dp, bottom = 9.dp).semantics { heading() },
   )
 }
