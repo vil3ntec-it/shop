@@ -100,6 +100,34 @@ function zoneAt(zones, lat, lng) {
   return zones.find((z) => z.active && contains(z, lat, lng)) || null;
 }
 
+/*
+ *  ⛔ حریمِ جای دکان: «درون/بیرون» ِ پینِ خام یک پیشگوست — با جست‌وجوی دودویی
+ *  لبهٔ ناحیه تا یک متر و مرکزِ دایره (= جای دکان) دقیق پیدا می‌شد. پس پین
+ *  هرگز خام سنجیده نمی‌شود: اول به مرکزِ خانه‌ای از شبکهٔ ثابتِ جهانی (لنگر
+ *  صفر/صفر، نه جای دکان) با ضلعِ `GRID_M` می‌چسبد و پاسخ فقط تابعِ همان خانه
+ *  است ⇒ هیچ کاوشی دقیق‌تر از یک خانه نمی‌شود. همین سنجش در ثبتِ سفارش هم
+ *  هست تا «داخلِ محدوده» ِ پیش از ثبت و خودِ ثبت یکی باشند. پینِ خامِ مشتری
+ *  برای پیک در نشانیِ سفارش می‌ماند؛ فاصله و لبه هرگز گفته نمی‌شود.
+ */
+const GRID_M = 300;
+//  یک درجهٔ عرض روی همان کرهٔ `distanceM` (۲πR/۳۶۰ ≈ ۱۱۱۱۹۵ متر) ⇒ ارتفاعِ خانه دست‌کم ۳۰۰ متر
+const M_PER_DEG_LAT = 111_195;
+
+/** مرکزِ خانهٔ شبکه‌ای که پین در آن است. ردیف‌ها هم‌ارتفاع؛ پهنای خانه در هر ردیف با عرضِ مرکزِ همان ردیف. */
+function snapPin(lat, lng) {
+  const dLat = GRID_M / M_PER_DEG_LAT;
+  const cLat = Math.max(-90, Math.min(90, (Math.floor(lat / dLat) + 0.5) * dLat));
+  const dLng = GRID_M / (M_PER_DEG_LAT * Math.max(0.01, Math.cos((cLat * Math.PI) / 180)));
+  const cLng = Math.max(-180, Math.min(180, (Math.floor(lng / dLng) + 0.5) * dLng));
+  return { lat: cLat, lng: cLng };
+}
+
+/** ناحیهٔ پینِ مشتری — همیشه با مرکزِ خانهٔ شبکه، هرگز با مختصاتِ خام. */
+function zoneForPin(zones, lat, lng) {
+  const c = snapPin(lat, lng);
+  return zoneAt(zones, c.lat, c.lng);
+}
+
 // ════════════════════════════════════════════════════════════════════
 //  ردیف ⇄ نما
 // ════════════════════════════════════════════════════════════════════
@@ -399,7 +427,10 @@ async function publicInfo(sf) {
   };
 }
 
-/** «این پین در کدام ناحیه است؟» — بی ذخیره و بی ژئوکدر. */
+/**
+ * «این پین در کدام ناحیه است؟» — بی ذخیره و بی ژئوکدر؛ با خانهٔ شبکه
+ * (`zoneForPin`) و سقفِ روزانهٔ هر IP در مسیر (`storeLocateDailyMax`).
+ */
 async function locate(sf, latRaw, lngRaw) {
   const lat = Number(latRaw);
   const lng = Number(lngRaw);
@@ -408,7 +439,7 @@ async function locate(sf, latRaw, lngRaw) {
   }
   const zones = (await flagOn(sf.shop_id)) ? (await zonesOf(sf.shop_id)).filter((z) => z.active) : [];
   if (!zones.length) return { zoned: false, inZone: true, zone: null, pickup: sf.accept_pickup === true };
-  const z = zoneAt(zones, lat, lng);
+  const z = zoneForPin(zones, lat, lng);
   return { zoned: true, inZone: Boolean(z), zone: z ? publicZone(z) : null, pickup: sf.accept_pickup === true };
 }
 
@@ -454,7 +485,7 @@ async function forCheckout(run, sf, input, subtotalMinor, at, { zonesOn = false 
       let zone = null;
       let source = 'pin';
       if (address.lat !== undefined && address.lat !== null) {
-        zone = zoneAt(zones, address.lat, address.lng);
+        zone = zoneForPin(zones, address.lat, address.lng);
         if (!zone) {
           throw withData(badRequest('این نشانی بیرون از محدودهٔ ارسالِ دکان است', 'out_of_zone'),
             { pickup: sf.accept_pickup === true, zones: zones.map(publicZone) });
@@ -499,7 +530,7 @@ async function forCheckout(run, sf, input, subtotalMinor, at, { zonesOn = false 
 
 module.exports = {
   MAX_ZONES, MAX_RULES, RELEASED, ID_RE, DAY_MS, FLAG_KEY, flagOn,
-  inPolygon, distanceM, contains, zoneAt, publicZone, epochOf, localDate, addDays,
+  GRID_M, M_PER_DEG_LAT, inPolygon, distanceM, contains, zoneAt, snapPin, zoneForPin, publicZone, epochOf, localDate, addDays,
   zonesOf, rulesOf, settingsOf, saveSettings, slotsOf, slotsWithLoad, publicSlot,
   publicInfo, locate, publicSlots, forCheckout,
 };

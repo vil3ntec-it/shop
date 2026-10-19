@@ -31,6 +31,11 @@ const readLimit = rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'stor
 const checkoutLimit = rateLimit({ max: config.rateLimit.storeCheckoutMax, keyPrefix: 'store-checkout' });
 const sendCodeLimit = rateLimit({ max: config.rateLimit.storeCheckoutMax, keyPrefix: 'store-verify' });
 const codeLimit = rateLimit({ max: config.rateLimit.verifyMax, keyPrefix: 'store-verify-code' });
+//  ⛔ پیشگوی «درون/بیرون»: سقفِ روزانه به‌ازای (IP، ویترین) — نه سطلِ ربع‌ساعتهٔ خواندن
+const locateLimit = rateLimit({
+  max: config.rateLimit.storeLocateDailyMax, windowMs: 24 * 60 * 60 * 1000, keyPrefix: 'store-locate',
+  key: (req) => `${clientIp(req)}|${String(req.params.slug || '').toLowerCase()}`,
+});
 
 /** ویترینِ روشن — یا ۴۰۴. پاسخ‌ها کش نمی‌شوند (قیمت و وضعیت زنده‌اند). */
 const store = wrap(async (req, res, next) => {
@@ -66,8 +71,8 @@ router.get('/:slug/highlights', readLimit, store, wrap(async (req, res) => {
   res.json(await sf.highlights(req.store.shop_id));
 }));
 
-//  ── CHK-07/10: کدام ناحیه؟ (بی ذخیره، بی ژئوکدر) ────────────────────
-router.get('/:slug/delivery', readLimit, store, wrap(async (req, res) => {
+//  ── CHK-07/10: کدام ناحیه؟ (بی ذخیره، بی ژئوکدر؛ با خانهٔ ۳۰۰ متری) ──
+router.get('/:slug/delivery', readLimit, locateLimit, store, wrap(async (req, res) => {
   res.json(await sfd.locate(req.store, req.query.lat, req.query.lng));
 }));
 
@@ -141,10 +146,11 @@ router.get('/:slug/orders/:token/reorder', readLimit, store, wrap(async (req, re
 }));
 
 //  ── حسابِ مشتری (۲۳، CHK-01/02/09، S134/S138/S140) ───────────────────
-//  ساختن یا ورود فقط با بلیتِ تازهٔ «شماره تأیید شد»
+//  ساختن یا ورود فقط با بلیتِ «شماره تأیید شد» که همین چند دقیقه پیش صادر شده
+//  (نه هر بلیتِ ۱۴ روزه) — وگرنه یک بلیت هر چند نشستِ ۱۸۰ روزه می‌ساخت
 router.post('/:slug/account', checkoutLimit, store, wrap(async (req, res) => {
-  const phone = sf.phoneOfTicket(ticketOf(req));
-  if (!phone) throw new ApiError(401, 'verification_required', 'اول شمارهٔ خود را با کد تأیید کنید');
+  const phone = await sf.verifiedPhoneOfTicket(ticketOf(req), { maxAgeMs: config.storefront.accountTicketMaxMs });
+  if (!phone) throw new ApiError(401, 'verification_required', 'برای ورود به حساب، همین حالا شمارهٔ خود را با کد تأیید کنید');
   const out = await customers.signIn(phone, { name: req.body && req.body.name });
   await audit.log({
     shopId: req.store.shop_id, actorType: 'customer', action: 'store_customer.sign_in',
@@ -175,6 +181,16 @@ router.delete('/:slug/account', checkoutLimit, store, customer, wrap(async (req,
 
 router.post('/:slug/account/logout', checkoutLimit, store, wrap(async (req, res) => {
   res.json(await customers.signOut(sessionOf(req)));
+}));
+
+//  «خروج از همه‌جا»: همهٔ نشست‌های حساب + همهٔ بلیت‌های این شماره
+router.post('/:slug/account/logout-all', checkoutLimit, store, customer, wrap(async (req, res) => {
+  const out = await customers.signOutAll(req.customer);
+  await audit.log({
+    shopId: req.store.shop_id, actorType: 'customer', action: 'store_customer.sign_out_all',
+    targetType: 'store_customer', targetId: req.customer.id, detail: { sessions: out.signedOut }, ip: clientIp(req),
+  });
+  res.json(out);
 }));
 
 router.get('/:slug/account/orders', readLimit, store, customer, wrap(async (req, res) => {

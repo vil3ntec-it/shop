@@ -356,6 +356,13 @@ async function liveByIds(shopId, ids, run) {
 
 const RECENT_MS = 30 * 24 * 60 * 60 * 1000;
 const SHELF = 8;
+/*
+ *  ⛔ k-گمنامی: «پرفروش» و «مکمل» از سبدِ مشتری‌ها ساخته می‌شوند؛ از یک یا دو
+ *  سفارش، سبدِ یک نفر (چه خریده، با چه) را به همه نشان می‌داد. هر کالا/جفت
+ *  فقط وقتی پیشنهاد می‌شود که دست‌کم `K_ANON` سفارشِ جدا از `K_ANON` شمارهٔ جدا
+ *  پشتش باشد — چند سفارشِ یک نفر یک نفر است.
+ */
+const K_ANON = 3;
 
 /**
  * WEB-02 — «پرفروش‌ها»: بیشترین سفارشِ واقعیِ ویترینِ همین دکان در ۳۰ روزِ
@@ -370,8 +377,10 @@ async function highlights(shopId, at = now()) {
          FROM online_order_lines l JOIN online_orders o ON o.id = l.order_id
         WHERE l.shop_id = $1 AND o.shop_id = $1 AND o.source = 'storefront' AND NOT o.is_test
           AND o.created_at >= $2 AND o.status <> ALL($3::text[])
-        GROUP BY l.product_id ORDER BY 2 DESC, 3 DESC, 1 LIMIT 40`,
-      [shopId, since, sfd.RELEASED]
+        GROUP BY l.product_id
+       HAVING COUNT(DISTINCT l.order_id) >= $4 AND COUNT(DISTINCT o.customer_phone) >= $4
+        ORDER BY 2 DESC, 3 DESC, 1 LIMIT 40`,
+      [shopId, since, sfd.RELEASED, K_ANON]
     ),
     many(
       `SELECT product_id FROM storefront_products
@@ -418,14 +427,16 @@ async function productDetail(shopId, productId) {
       [shopId, p.category, p.id]
     ) : [],
     many(
-      `SELECT l2.product_id, COUNT(*)::int AS n
+      `SELECT l2.product_id, COUNT(DISTINCT o.id)::int AS n
          FROM online_order_lines l1
          JOIN online_order_lines l2 ON l2.order_id = l1.order_id AND l2.product_id <> l1.product_id
          JOIN online_orders o ON o.id = l1.order_id
         WHERE l1.shop_id = $1 AND l1.product_id = $2 AND o.source = 'storefront' AND NOT o.is_test
           AND o.created_at >= $3 AND o.status <> ALL($4::text[])
-        GROUP BY l2.product_id ORDER BY 2 DESC, 1 LIMIT 24`,
-      [shopId, p.id, now() - 3 * RECENT_MS, sfd.RELEASED]
+        GROUP BY l2.product_id
+       HAVING COUNT(DISTINCT o.id) >= $5 AND COUNT(DISTINCT o.customer_phone) >= $5
+        ORDER BY 2 DESC, 1 LIMIT 24`,
+      [shopId, p.id, now() - 3 * RECENT_MS, sfd.RELEASED, K_ANON]
     ),
   ]);
   const shelfOf = async (ids) => {
@@ -639,7 +650,7 @@ const CUSTOMER = Object.freeze({ type: 'customer', id: '' });
 
 /** شمارهٔ تأییدشده: از بلیتِ تازه، وگرنه از نشستِ حسابِ مشتری — یا null. */
 async function verifiedPhone(ticket, session) {
-  const fromTicket = phoneOfTicket(ticket);
+  const fromTicket = await verifiedPhoneOfTicket(ticket);
   if (fromTicket) return fromTicket;
   const a = session ? await require('./store-customers').auth(session) : null;
   return a ? a.customer.phone : null;
@@ -688,32 +699,75 @@ async function cancel(sf, token) {
 }
 
 // ── ۲۳: تأییدِ شمارهٔ مشتری ─────────────────────────────────────────
-//  بلیتِ امضاشده و بی‌حالت: `v1.<شماره>.<انقضا>.<HMAC>` — فقط می‌گوید «این
-//  شماره به‌تازگی با کدِ یک‌بارمصرف تأیید شد». در سرور ذخیره نمی‌شود.
+//  بلیتِ امضاشده: `v2.<شماره>.<صدور>.<انقضا>.<نسل>.<HMAC>` — می‌گوید «این
+//  شماره در لحظهٔ صدور با کدِ یک‌بارمصرف تأیید شد». خودِ بلیت در سرور ذخیره
+//  نمی‌شود؛ فقط «نسلِ» هر شماره (HMAC ِ شماره ⇒ عدد، store_phone_revocations):
+//  «خروج از همه‌جا» و پاک کردنِ حساب نسل را یکی بالا می‌برند و هر بلیتِ کهنه‌تر
+//  همان دم بی‌اعتبار است. بلیتِ v1 (پیش از نسل) همان نسلِ صفر است.
+//  ⛔ ساختن/ورود به حساب (نشستِ ۱۸۰ روزه) فقط با بلیتِ صادرشده در چند دقیقهٔ
+//  اخیر (`accountTicketMaxMs`)؛ ثبت و «سفارش‌های من» با مهلتِ کاملِ بلیت.
 
 const OTP_PURPOSE = 'store_order';
+const TICKET_V1 = /^v1\.([A-Za-z0-9_-]{4,40})\.([0-9a-z]{1,12})\.([A-Za-z0-9_-]{32})$/;
+const TICKET_V2 = /^v2\.([A-Za-z0-9_-]{4,40})\.([0-9a-z]{1,12})\.([0-9a-z]{1,12})\.([0-9a-z]{1,7})\.([A-Za-z0-9_-]{32})$/;
 
-function ticketMac(phone, exp) {
+function ticketMacV1(phone, exp) {
   return crypto.createHmac('sha256', tokenKey()).update(`customer-phone\n${phone}\n${exp}`)
     .digest('base64url').slice(0, 32);
 }
 
-function ticketOf(phone, at = now()) {
-  const exp = at + config.storefront.ticketTtlMs;
-  const b64 = Buffer.from(phone).toString('base64url');
-  return { ticket: `v1.${b64}.${exp.toString(36)}.${ticketMac(phone, exp)}`, expiresAt: exp };
+function ticketMac(phone, iat, exp, gen) {
+  return crypto.createHmac('sha256', tokenKey()).update(`customer-phone-v2\n${phone}\n${iat}\n${exp}\n${gen}`)
+    .digest('base64url').slice(0, 32);
 }
 
-/** شمارهٔ تأییدشده از بلیت — یا null (منقضی، دست‌خورده یا بی‌شکل). */
-function phoneOfTicket(ticket, at = now()) {
-  const m = /^v1\.([A-Za-z0-9_-]{4,40})\.([0-9a-z]{1,12})\.([A-Za-z0-9_-]{32})$/.exec(String(ticket || ''));
+function ticketOf(phone, at = now(), gen = 0) {
+  const exp = at + config.storefront.ticketTtlMs;
+  const b64 = Buffer.from(phone).toString('base64url');
+  const g = Math.max(0, Math.trunc(Number(gen) || 0));
+  return {
+    ticket: `v2.${b64}.${at.toString(36)}.${exp.toString(36)}.${g.toString(36)}.${ticketMac(phone, at, exp, g)}`,
+    expiresAt: exp,
+  };
+}
+
+const sameMac = (given, want) => {
+  const a = Buffer.from(given);
+  const b = Buffer.from(want);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+};
+
+/** بلیتِ سالم و نامنقضی ⇒ `{ phone, issuedAt, expiresAt, gen }` — یا null. نسل این‌جا سنجیده نمی‌شود. */
+function parseTicket(ticket, at = now()) {
+  const t = String(ticket || '');
+  let m = TICKET_V2.exec(t);
+  if (m) {
+    const phone = Buffer.from(m[1], 'base64url').toString('utf8');
+    const [iat, exp, gen] = [m[2], m[3], m[4]].map((x) => Number.parseInt(x, 36));
+    if (!/^\+[1-9]\d{7,14}$/.test(phone) || !(exp > at)) return null;
+    return sameMac(m[5], ticketMac(phone, iat, exp, gen)) ? { phone, issuedAt: iat, expiresAt: exp, gen } : null;
+  }
+  m = TICKET_V1.exec(t);
   if (!m) return null;
   const phone = Buffer.from(m[1], 'base64url').toString('utf8');
   const exp = Number.parseInt(m[2], 36);
   if (!/^\+[1-9]\d{7,14}$/.test(phone) || !(exp > at)) return null;
-  const a = Buffer.from(m[3]);
-  const b = Buffer.from(ticketMac(phone, exp));
-  return a.length === b.length && crypto.timingSafeEqual(a, b) ? phone : null;
+  return sameMac(m[3], ticketMacV1(phone, exp))
+    ? { phone, issuedAt: exp - config.storefront.ticketTtlMs, expiresAt: exp, gen: 0 } : null;
+}
+
+/**
+ * شمارهٔ تأییدشده از بلیت — یا null (منقضی، دست‌خورده، بی‌شکل، نسلِ لغوشده،
+ * یا کهنه‌تر از `maxAgeMs`). ناهم‌گام است چون نسلِ شماره را از پایگاه می‌خواند.
+ * ⛔ جای `phoneOfTicket` ِ هم‌گامِ پیشین: نامِ تازه تا فراخوانِ کهنه‌ای که
+ * await ندارد، به‌جای Promise ِ «راست» با خطای آشکار بشکند.
+ */
+async function verifiedPhoneOfTicket(ticket, { maxAgeMs = null, at = now() } = {}) {
+  const t = parseTicket(ticket, at);
+  if (!t) return null;
+  if (maxAgeMs !== null && !(t.issuedAt >= at - maxAgeMs)) return null;
+  const gen = await require('./store-customers').ticketGen(t.phone);
+  return gen === t.gen ? t.phone : null;
 }
 
 /**
@@ -745,7 +799,8 @@ async function checkVerification(body) {
   const phone = require('./validate').phone(b.phone, { required: true });
   tokenKey();
   await require('./otp').verify(phone, b.code, { purpose: OTP_PURPOSE });
-  return { phone, ...ticketOf(phone) };
+  const gen = await require('./store-customers').ticketGen(phone);
+  return { phone, ...ticketOf(phone, now(), gen) };
 }
 
 /** S138: سفارش‌های همین شمارهٔ تأییدشده در همین ویترین — از هر دستگاهی. */
@@ -1127,6 +1182,6 @@ module.exports = {
   highlights, productDetail, reorder, ordersOfPhone, verifiedPhone,
   localParts, presenceOf, statusOf,
   parseCheckout, checkout, track, cancel, tokenOf, orderIdOf,
-  ticketOf, phoneOfTicket, verificationAvailable, startVerification, checkVerification, myOrders,
+  K_ANON, ticketOf, parseTicket, verifiedPhoneOfTicket, verificationAvailable, startVerification, checkVerification, myOrders,
   settingsOf, saveSettings, declarePresence, staffProducts, setProduct,
 };

@@ -272,6 +272,12 @@ const config = {
      *  پمپ). ⚠️ پشتِ تونل و بی `TRUST_PROXY` همهٔ مشتری‌ها یک IP‌اند.
      */
     storeCheckoutMax: num(process.env.RATE_STORE_CHECKOUT_MAX, 20),
+    /*
+     *  «این پین در محدوده است؟» (‎GET /api/store/:slug/delivery‎) — به‌ازای
+     *  (IP، ویترین) در **۲۴ ساعت**. پاسخ خودش با خانهٔ ۳۰۰ متریِ شبکه است؛
+     *  این سقف جمع کردنِ همهٔ خانه‌های لبه برای برازشِ مرکز را هم کند می‌کند.
+     */
+    storeLocateDailyMax: num(process.env.RATE_STORE_LOCATE_DAILY_MAX, 60),
   },
 
   /**
@@ -290,6 +296,8 @@ const config = {
     offlineMs: num(process.env.STORE_PRESENCE_OFFLINE_MIN, 60) * 60 * 1000,
     //  ۲۳.۴ — شمارهٔ تأییدشدهٔ مشتری چند روز بی کدِ تازه می‌ماند
     ticketTtlMs: num(process.env.STORE_CUSTOMER_TICKET_DAYS, 14) * 24 * 60 * 60 * 1000,
+    //  ساختن/ورود به حسابِ مشتری فقط با بلیتی که همین چند دقیقه پیش صادر شده
+    accountTicketMaxMs: num(process.env.STORE_ACCOUNT_TICKET_MAX_MIN, 10) * 60 * 1000,
     //  CHK-02 — نشستِ حسابِ مشتری (لغوشدنی) چند روز می‌ماند
     customerSessionDays: num(process.env.STORE_CUSTOMER_SESSION_DAYS, 180),
   },

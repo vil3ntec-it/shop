@@ -11,7 +11,7 @@
 --  ⛔ سبدِ مهمان در مرورگر می‌ماند؛ ساختنِ حساب آن را جابه‌جا، تکرار یا
 --     پاک نمی‌کند (S140). سفارش‌ها همان ردیف‌های `online_orders` ِ دکان‌اند.
 --  ⛔ پاک کردنِ حساب ⇒ نشست‌ها و نشانی‌ها پاک می‌شوند؛ سفارش، سندِ دکان است و می‌ماند.
---  بازگشت: DROP سه جدول — هیچ جدولِ دیگری به این‌ها کلید ندارد.
+--  بازگشت: DROP چهار جدول — هیچ جدولِ دیگری به این‌ها کلید ندارد.
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS store_customers (
@@ -48,6 +48,16 @@ CREATE TABLE IF NOT EXISTS store_customer_addresses (
   CHECK (lat IS NOT NULL OR text <> '' OR landmark <> '')
 );
 CREATE INDEX IF NOT EXISTS ix_store_customer_addresses_customer ON store_customer_addresses(customer_id, created_at);
+
+--  نسلِ بلیت‌های هر شماره (۲۳، بازبینیِ امنیتی): «خروج از همه‌جا» و پاک کردنِ
+--  حساب یکی بالا می‌برند ⇒ هر بلیتِ «شماره تأیید شد» ِ پیشین بی‌اعتبار.
+--  کلید HMAC ِ شماره است، نه خودِ شماره — پس از پاک کردنِ حساب شمارهٔ خام نمی‌ماند.
+--  بی کلیدِ بیرونی: حساب پاک می‌شود، نسل باید بماند.
+CREATE TABLE IF NOT EXISTS store_phone_revocations (
+  phone_key      text    PRIMARY KEY,                         -- HMAC-SHA256 ِ شماره (hex)
+  gen            integer NOT NULL CHECK (gen > 0),
+  updated_at     bigint  NOT NULL
+);
 
 --  «سفارش‌های من» ِ هر ویترین با همین شماره
 CREATE INDEX IF NOT EXISTS ix_online_orders_storefront_phone

@@ -7,7 +7,8 @@
  *                 همان شماره ⇒ همان حساب؛ هیچ گذرواژه‌ای نیست.
  *   نشست ─────── `sc1.<۴۳ نویسهٔ base64url>` (۲۵۶ بیت)؛ در سرور فقط SHA-256.
  *                 انقضای مطلق (`STORE_CUSTOMER_SESSION_DAYS`، پیش‌فرض ۱۸۰ روز)،
- *                 لغو با «خروج» یا پاک کردنِ حساب؛ حسابِ مسدود ⇒ نشستی کار نمی‌کند.
+ *                 لغو با «خروج»، «خروج از همه‌جا» یا پاک کردنِ حساب؛ حسابِ مسدود ⇒
+ *                 نشستی کار نمی‌کند. دو تای آخر نسلِ بلیت‌های شماره را هم بالا می‌برند.
  *   نشانی ────── حداکثر ۱۰ نشانیِ نام‌دار؛ هر خواندن و نوشتن به شناسهٔ همین
  *                 مشتری بسته است (شناسهٔ نشانیِ دیگری ⇒ «پیدا نشد»).
  *
@@ -20,7 +21,7 @@ const { one, many, now, tx } = db;
 const config = require('../config');
 const { ulid } = require('./ulid');
 const { stripControl } = require('./validate');
-const { badRequest, notFound, conflict, forbidden } = require('../middleware/errors');
+const { badRequest, notFound, conflict, forbidden, ApiError } = require('../middleware/errors');
 
 const MAX_ADDRESSES = 10;
 const MAX_SESSIONS = 10;
@@ -106,10 +107,55 @@ async function rename(customer, body) {
   return view(r);
 }
 
-/** پاک کردنِ حساب: نشست‌ها و نشانی‌ها هم (cascade)؛ سفارش‌ها سندِ دکان‌اند و می‌مانند. */
+// ── نسلِ بلیت‌های شماره (store_phone_revocations) ──────────────────
+
+function phoneKey(phone) {
+  const secret = config.secrets.api || config.secrets.jwt;
+  if (!secret) throw new ApiError(503, 'storefront_unavailable', 'ویترین هنوز روی این سرور آماده نیست');
+  const key = crypto.createHash('sha256').update(`store-phone-revocation\n${secret}`).digest();
+  return crypto.createHmac('sha256', key).update(String(phone)).digest('hex');
+}
+
+/** نسلِ کنونیِ بلیت‌های این شماره (۰ = هرگز لغو نشده). */
+async function ticketGen(phone, run = db.query) {
+  const r = (await run('SELECT gen FROM store_phone_revocations WHERE phone_key = $1', [phoneKey(phone)])).rows[0];
+  return r ? Number(r.gen) : 0;
+}
+
+/** همهٔ بلیت‌های پیشینِ این شماره بی‌اعتبار ⇒ نسلِ تازه. */
+async function revokeTickets(phone, run = db.query) {
+  const r = (await run(
+    `INSERT INTO store_phone_revocations (phone_key, gen, updated_at) VALUES ($1, 1, $2)
+     ON CONFLICT (phone_key) DO UPDATE SET gen = store_phone_revocations.gen + 1, updated_at = EXCLUDED.updated_at
+     RETURNING gen`,
+    [phoneKey(phone), now()]
+  )).rows[0];
+  return Number(r.gen);
+}
+
+/** «خروج از همه‌جا»: همهٔ نشست‌های این حساب و همهٔ بلیت‌های این شماره. */
+async function signOutAll(customer) {
+  return tx(async (c) => {
+    const run = (sql, params) => c.query(sql, params);
+    await revokeTickets(customer.phone, run);
+    const r = await c.query(
+      'UPDATE store_customer_sessions SET revoked_at = $2 WHERE customer_id = $1 AND revoked_at IS NULL RETURNING id',
+      [customer.id, now()]
+    );
+    return { signedOut: r.rows.length, ticketsRevoked: true };
+  });
+}
+
+/**
+ * پاک کردنِ حساب: نشست‌ها و نشانی‌ها هم (cascade) و همهٔ بلیت‌های این شماره؛
+ * سفارش‌ها سندِ دکان‌اند و می‌مانند.
+ */
 async function remove(customer) {
-  await db.query('DELETE FROM store_customers WHERE id = $1', [customer.id]);
-  return { deleted: true };
+  return tx(async (c) => {
+    await revokeTickets(customer.phone, (sql, params) => c.query(sql, params));
+    await c.query('DELETE FROM store_customers WHERE id = $1', [customer.id]);
+    return { deleted: true };
+  });
 }
 
 // ── نشانی‌ها (CHK-09) ─────────────────────────────────────────────
@@ -183,5 +229,5 @@ async function removeAddress(customer, id) {
 
 module.exports = {
   MAX_ADDRESSES, MAX_SESSIONS, TOKEN_RE,
-  view, signIn, auth, signOut, rename, remove, addresses, addAddress, updateAddress, removeAddress,
+  view, signIn, auth, signOut, signOutAll, rename, remove, ticketGen, revokeTickets, addresses, addAddress, updateAddress, removeAddress,
 };

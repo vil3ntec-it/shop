@@ -17,6 +17,7 @@
  *      با قیمتِ امروز؛ عکسِ کوچکِ بانک فقط با پرچمِ دکان.
  */
 process.env.RATE_STORE_CHECKOUT_MAX = '1000';
+process.env.RATE_STORE_LOCATE_DAILY_MAX = '40';
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const h = require('./helpers');
@@ -97,6 +98,7 @@ async function ticketFor(slug, phone) {
 
 const PHONE = '0791112233';
 const PHONE_B = '0792223344';
+const PHONE_C = '0797778899';
 const INSIDE = { lat: 34.53, lng: 69.17 };
 const OUTSIDE = { lat: 34.62, lng: 69.31 };
 const NEAR_CENTER = { lat: 34.452, lng: 69.101 };
@@ -358,6 +360,70 @@ test('CHK-07/10: هزینهٔ ناحیه، «رایگان از…»، حداقل
   assert.equal(pick.body.order.deliveryFeeMinor, 0);
 });
 
+test('⛔ حریمِ جای دکان: کاوشِ دودویی با «درون/بیرون» از خانهٔ ۳۰۰ متریِ شبکه دقیق‌تر نمی‌شود؛ ثبت همان پاسخ؛ سقفِ روزانه', async () => {
+  //  بازبینیِ امنیتی: با ۱۲۱ درخواستِ بی‌توکن مرکزِ دایره (= جای دکان) با خطای صفر متر پیدا شد
+  assert.ok(sfd.GRID_M >= 300);
+  const s = await liveStore('کاوش');
+  const t = await ticketFor(s.slug, PHONE);
+  const C = { lat: 34.4512, lng: 69.1034 };
+  //  لبهٔ شمالیِ دایره درست وسطِ یک ردیفِ شبکه ⇒ هر کاوشِ «خانه‌ای» دست‌کم نیم‌خانه خطا دارد
+  const edgeLat = sfd.snapPin(C.lat + 1500 / sfd.M_PER_DEG_LAT, C.lng).lat;
+  const R = Math.round(sfd.distanceM(C.lat, C.lng, edgeLat, C.lng));
+  const zone = { name: 'دایره', kind: 'radius', centerLat: C.lat, centerLng: C.lng, radiusM: R, feeMinor: 1000, minOrderMinor: 0 };
+  assert.equal((await putDelivery(s, { zones: [zone] })).status, 200);
+
+  const inZone = async (lat, lng = C.lng) => {
+    const r = await h.get(`/api/store/${s.slug}/delivery?lat=${lat}&lng=${lng}`);
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.deepEqual(Object.keys(r.body).sort(), ['inZone', 'pickup', 'zone', 'zoned'], 'نه فاصله، نه لبه');
+    return r.body.inZone;
+  };
+  let lo = C.lat;
+  let hi = C.lat + 0.05;
+  assert.equal(await inZone(lo), true);
+  assert.equal(await inZone(hi), false);
+  for (let i = 0; i < 26; i++) {
+    const mid = (lo + hi) / 2;
+    if (await inZone(mid)) lo = mid; else hi = mid;
+  }
+  const est = (lo + hi) / 2;
+  const err = Math.abs(sfd.distanceM(C.lat, C.lng, est, C.lng) - R);
+  assert.ok(err >= sfd.GRID_M / 2 - 10, `کاوش لبه را تا ${err.toFixed(2)} متر پیدا کرد`);
+  //  آن‌چه کاوش پیدا می‌کند خطِ شبکه است، نه لبهٔ ناحیه
+  const rowM = (lat) => lat * sfd.M_PER_DEG_LAT;
+  const toGrid = Math.abs(rowM(est) - Math.round(rowM(est) / sfd.GRID_M) * sfd.GRID_M);
+  assert.ok(toGrid < 1, `فاصلهٔ برآورد تا خطِ شبکه ${toGrid.toFixed(2)} متر`);
+  //  هر دو نقطهٔ یک خانه یک پاسخ دارند (هندسهٔ خالص)
+  const zs = [{ ...zone, id: 'Z', active: true }];
+  for (let i = 0; i < 200; i++) {
+    const p = { lat: edgeLat + (Math.random() - 0.5) * 0.004, lng: C.lng + (Math.random() - 0.5) * 0.004 };
+    const c = sfd.snapPin(p.lat, p.lng);
+    assert.equal(Boolean(sfd.zoneForPin(zs, p.lat, p.lng)), Boolean(sfd.zoneAt(zs, c.lat, c.lng)));
+    const q = sfd.snapPin(c.lat + 0.3 * (p.lat - c.lat), c.lng - 0.3 * (p.lng - c.lng));
+    assert.deepEqual(q, c, 'نقطهٔ دیگرِ همان خانه همان مرکز را دارد');
+  }
+
+  //  ثبت با همان سنجشِ خانه‌ای: پینِ ۴۰ متر درونِ لبهٔ واقعی، در خانه‌ای که مرکزش بیرون است
+  const pin = { lat: edgeLat - 40 / sfd.M_PER_DEG_LAT, lng: C.lng };
+  assert.ok(sfd.distanceM(C.lat, C.lng, pin.lat, pin.lng) < R, 'پین واقعاً درونِ دایره است');
+  const said = await inZone(pin.lat, pin.lng);
+  const r = await checkout(s.slug, body({ address: { text: 'لبه', ...pin } }), { ticket: t });
+  assert.equal(r.status === 201, said, `ویترین گفت ${said}، ثبت ${r.status} ${JSON.stringify(r.body)}`);
+  if (!said) assert.equal(r.body.error.code, 'out_of_zone');
+
+  //  سقفِ روزانهٔ هر (IP، ویترین) — و پاک‌سازیِ ربع‌ساعته آن را صفر نمی‌کند
+  const max = Number(process.env.RATE_STORE_LOCATE_DAILY_MAX);
+  let used = 2 + 26 + 1;
+  while (used < max) { await inZone(C.lat); used++; }
+  const over = await h.get(`/api/store/${s.slug}/delivery?lat=${C.lat}&lng=${C.lng}`);
+  assert.equal(over.status, 429);
+  require('../src/middleware/ratelimit').sweep(Date.now() + 20 * 60 * 1000);
+  assert.equal((await h.get(`/api/store/${s.slug}/delivery?lat=${C.lat}&lng=${C.lng}`)).status, 429, 'سقفِ روزانه پس از ربع ساعت باز نمی‌شود');
+  //  ویترینِ دیگر سطلِ خودش را دارد
+  const other = await liveStore('کاوشِ دوم');
+  assert.equal((await h.get(`/api/store/${other.slug}/delivery?lat=${C.lat}&lng=${C.lng}`)).status, 200);
+});
+
 /* ══════════════════════════════════════════════════════════════════
    ۴) بازهٔ زمان‌بندی و ظرفیت
    ══════════════════════════════════════════════════════════════════ */
@@ -484,6 +550,76 @@ test('حساب: فقط با شمارهٔ تأییدشده؛ نشست جای بل
   await query(`UPDATE store_customers SET status='active' WHERE id=$1`, [made.body.customer.id]);
 });
 
+test('⛔ بلیت و نشست: حساب فقط با بلیتِ چند دقیقهٔ اخیر؛ «خروج از همه‌جا» و پاک کردنِ حساب همهٔ بلیت‌ها و نشست‌ها را می‌بندند', async () => {
+  //  بازبینیِ امنیتی: هر بلیتِ ۱۴ روزه بی‌نهایت نشستِ ۱۸۰ روزه می‌ساخت و خروج/پاک کردن بلیت را باطل نمی‌کرد
+  const sf = require('../src/lib/storefront');
+  const s = await liveStore('بلیت');
+  const LOCAL = '0795556677';
+  const PH = '+93795556677';
+  const pickup = () => body({ fulfillment: 'pickup', address: undefined }, LOCAL);
+  const fresh = async () => {
+    const a = await h.post(`/api/store/${s.slug}/verify/start`, { phone: LOCAL });
+    const c = await h.post(`/api/store/${s.slug}/verify/check`, { phone: LOCAL, code: a.body.devCode });
+    assert.equal(c.status, 200, JSON.stringify(c.body));
+    return c.body.ticket;
+  };
+  const signIn = (ticket) => h.post(`/api/store/${s.slug}/account`, {}, { headers: { 'X-Store-Ticket': ticket } });
+  const as = (session) => ({ headers: { 'X-Store-Session': session } });
+
+  //  ۱) بلیتِ امضاشده و نامنقضی ولی ۱۱ دقیقه پیش صادرشده ⇒ حساب نه؛ ثبت هنوز آری
+  const stale = sf.ticketOf(PH, Date.now() - 11 * 60 * 1000).ticket;
+  const no = await signIn(stale);
+  assert.equal(no.status, 401, 'بلیتِ کهنه نشستِ ۱۸۰ روزه نمی‌سازد');
+  assert.equal(no.body.error.code, 'verification_required');
+  assert.equal((await checkout(s.slug, pickup(), { ticket: stale })).status, 201, 'ثبت با مهلتِ کاملِ بلیت');
+
+  //  ۲) «خروج از همه‌جا»: هر دو نشست و هر بلیتِ پیشین (تازه و کهنه) بسته می‌شوند
+  const t1 = await fresh();
+  const S1 = (await signIn(t1)).body.session;
+  const S2 = (await signIn(t1)).body.session;
+  assert.ok(S1 && S2 && S1 !== S2);
+  assert.equal((await h.post(`/api/store/${s.slug}/account/logout-all`, {})).status, 401, 'بی نشست نه');
+  const all = await h.post(`/api/store/${s.slug}/account/logout-all`, {}, as(S1));
+  assert.equal(all.status, 200, JSON.stringify(all.body));
+  assert.deepEqual(all.body, { signedOut: 2, ticketsRevoked: true });
+  for (const S of [S1, S2]) assert.equal((await h.get(`/api/store/${s.slug}/account`, as(S))).status, 401);
+  for (const t of [t1, stale]) {
+    assert.equal((await signIn(t)).status, 401);
+    assert.equal((await checkout(s.slug, pickup(), { ticket: t })).status, 401);
+    assert.equal((await h.get(`/api/store/${s.slug}/orders`, { headers: { 'X-Store-Ticket': t } })).status, 401);
+  }
+  //  بلیتِ v1 (پیش از نسل) هم پس از لغو بسته است
+  const crypto = require('crypto');
+  const config = require('../src/config');
+  const key = crypto.createHash('sha256').update(`storefront-order-token\n${config.secrets.api || config.secrets.jwt}`).digest();
+  const exp = Date.now() + 86_400_000;
+  const v1 = `v1.${Buffer.from(PH).toString('base64url')}.${exp.toString(36)}.${crypto.createHmac('sha256', key).update(`customer-phone\n${PH}\n${exp}`).digest('base64url').slice(0, 32)}`;
+  assert.equal((await checkout(s.slug, pickup(), { ticket: v1 })).status, 401, 'v1 = نسلِ صفر');
+  const v1Other = (ph) => {
+    const e = Date.now() + 86_400_000;
+    return `v1.${Buffer.from(ph).toString('base64url')}.${e.toString(36)}.${crypto.createHmac('sha256', key).update(`customer-phone\n${ph}\n${e}`).digest('base64url').slice(0, 32)}`;
+  };
+  assert.equal((await checkout(s.slug, body({ fulfillment: 'pickup', address: undefined }, '0796667788'), { ticket: v1Other('+93796667788') })).status, 201,
+    'بلیتِ v1 ِ شمارهٔ هرگز لغونشده هنوز کار می‌کند');
+
+  //  ۳) کدِ تازه ⇒ بلیتِ نسلِ تازه و حساب دوباره
+  const t2 = await fresh();
+  const S3 = (await signIn(t2)).body.session;
+  assert.ok(S3);
+  assert.equal((await checkout(s.slug, pickup(), { ticket: t2 })).status, 201);
+
+  //  ۴) پاک کردنِ حساب ⇒ بلیتِ همین الانِ آن شماره هم بسته؛ شمارهٔ خام در جدولِ نسل نیست
+  assert.equal((await h.del(`/api/store/${s.slug}/account`, as(S3))).status, 200);
+  assert.equal((await checkout(s.slug, pickup(), { ticket: t2 })).status, 401);
+  assert.equal((await signIn(t2)).status, 401);
+  const rows = await query('SELECT phone_key, gen FROM store_phone_revocations');
+  assert.ok(rows.rows.some((r) => Number(r.gen) === 2), JSON.stringify(rows.rows));
+  assert.ok(!JSON.stringify(rows.rows).includes('795556677'), 'شمارهٔ خام ذخیره نمی‌شود');
+  //  بلیتِ دست‌خورده (نسلِ دیگر با همان امضا) رد
+  const forged = t2.replace(/\.([0-9a-z]{1,7})\.([A-Za-z0-9_-]{32})$/, '.2.$2');
+  assert.equal((await checkout(s.slug, pickup(), { ticket: forged })).status, 401);
+});
+
 test('S138: تاریخچهٔ حساب فقط سفارش‌های همین شماره در همین ویترین؛ صفحه‌بندی', async () => {
   const s = await liveStore('تاریخچه');
   const other = await liveStore('دکانِ دیگر');
@@ -567,9 +703,11 @@ test('WEB-08: صفحهٔ کالا با توضیح و مشخصاتِ عمومی،
   assert.deepEqual(set.body.specs, [{ name: 'وزن', value: '۱ کیلو' }]);
   //  به‌روزرسانیِ بی توضیح (برنامهٔ قدیمی) توضیح را پاک نمی‌کند
   await h.put('/api/shop/storefront/products/rice', { published: true, onlinePriceMinor: 13000 }, { token: s.token });
-  const t = await ticketFor(s.slug, PHONE);
-  assert.equal((await checkout(s.slug, body({ fulfillment: 'pickup', address: undefined,
-    lines: [{ productId: 'rice', qtyMilli: 1000 }, { productId: 'salt', qtyMilli: 1000 }] }), { ticket: t })).status, 201);
+  //  «مکمل» فقط با k-گمنامی: سه سفارش از سه شماره (برنج + نمک)
+  for (const ph of [PHONE, PHONE_B, PHONE_C]) {
+    assert.equal((await checkout(s.slug, body({ fulfillment: 'pickup', address: undefined,
+      lines: [{ productId: 'rice', qtyMilli: 1000 }, { productId: 'salt', qtyMilli: 1000 }] }, ph), { ticket: await ticketFor(s.slug, ph) })).status, 201);
+  }
 
   const r = await h.get(`/api/store/${s.slug}/products/rice`);
   assert.equal(r.status, 200, JSON.stringify(r.body));
@@ -595,16 +733,24 @@ test('WEB-02: پرفروش‌ها از سفارشِ واقعی (بی لغوشد�
   assert.deepEqual(empty.body.newArrivals.map((p) => p.id).sort(), ['oil', 'rice', 'salt']);
 
   const t = await ticketFor(s.slug, PHONE);
-  const pick = (lines) => body({ fulfillment: 'pickup', address: undefined, lines });
-  for (let i = 0; i < 2; i++) assert.equal((await checkout(s.slug, pick([{ productId: 'oil', qtyMilli: 1000 }]), { ticket: t })).status, 201);
-  const first = await checkout(s.slug, pick([{ productId: 'rice', qtyMilli: 1000 }, { productId: 'salt', qtyMilli: 3000 }]), { ticket: t });
-  //  سفارشِ لغوشده نمی‌شمارد
-  for (let i = 0; i < 3; i++) {
+  const pick = (lines, ph = PHONE) => body({ fulfillment: 'pickup', address: undefined, lines }, ph);
+  const by = async (ph, lines) => {
+    const r = await checkout(s.slug, pick(lines, ph), { ticket: await ticketFor(s.slug, ph) });
+    assert.equal(r.status, 201, JSON.stringify(r.body));
+    return r;
+  };
+  //  روغن: شش سفارش از سه شماره؛ نمک: سه سفارش از سه شماره؛ برنج: فقط یک مشتری
+  for (const ph of [PHONE, PHONE_B, PHONE_C]) for (let i = 0; i < 2; i++) await by(ph, [{ productId: 'oil', qtyMilli: 1000 }]);
+  const first = await by(PHONE, [{ productId: 'rice', qtyMilli: 1000 }, { productId: 'salt', qtyMilli: 3000 }]);
+  await by(PHONE_B, [{ productId: 'salt', qtyMilli: 1000 }]);
+  await by(PHONE_C, [{ productId: 'salt', qtyMilli: 1000 }]);
+  //  سفارشِ لغوشده نمی‌شمارد (وگرنه نمک با هفت سفارش از روغن جلو می‌زد)
+  for (let i = 0; i < 4; i++) {
     const c = await checkout(s.slug, pick([{ productId: 'salt', qtyMilli: 1000 }]), { ticket: t });
     await h.post(`/api/store/${s.slug}/orders/${c.body.order.token}/cancel`, {});
   }
   const hl = await h.get(`/api/store/${s.slug}/highlights`);
-  assert.deepEqual(hl.body.bestsellers.map((p) => p.id), ['oil', 'salt', 'rice']);
+  assert.deepEqual(hl.body.bestsellers.map((p) => p.id), ['oil', 'salt'], 'برنجِ یک مشتری پرفروش نیست (k-گمنامی)');
   //  کالای برداشته‌شده از ویترین پیشنهاد نمی‌شود
   await h.put('/api/shop/storefront/products/oil', { published: false }, { token: s.token });
   assert.ok(!(await h.get(`/api/store/${s.slug}/highlights`)).body.bestsellers.some((p) => p.id === 'oil'));
@@ -619,7 +765,27 @@ test('WEB-02: پرفروش‌ها از سفارشِ واقعی (بی لغوشد�
   const salt = re.body.lines.find((l) => l.productId === 'salt');
   assert.deepEqual([salt.available, salt.priceMinor, salt.reason], [false, null, 'not_in_store']);
   assert.equal((await h.get(`/api/store/${s.slug}/orders/AAAA.BBBB/reorder`)).status, 404);
-  assert.equal(await count(s.shopId), 6, 'خریدِ دوباره سفارشی نمی‌سازد');
+  assert.equal(await count(s.shopId), 13, 'خریدِ دوباره سفارشی نمی‌سازد');
+});
+
+test('⛔ k-گمنامی: «پرفروش» و «مکمل» از سبدِ یک یا دو مشتری ساخته نمی‌شوند — دست‌کم ۳ سفارش از ۳ شماره', async () => {
+  //  بازبینیِ حریم: از یک سفارش، سبدِ همان یک مشتری روی ویترین می‌آمد
+  assert.equal(require('../src/lib/storefront').K_ANON, 3);
+  const s = await liveStore('گمنامی');
+  const basket = (ph) => body({ fulfillment: 'pickup', address: undefined,
+    lines: [{ productId: 'rice', qtyMilli: 1000 }, { productId: 'salt', qtyMilli: 1000 }] }, ph);
+  const order = async (ph) => assert.equal((await checkout(s.slug, basket(ph), { ticket: await ticketFor(s.slug, ph) })).status, 201);
+  const look = async () => ({
+    best: (await h.get(`/api/store/${s.slug}/highlights`)).body.bestsellers.map((p) => p.id).sort(),
+    comp: (await h.get(`/api/store/${s.slug}/products/rice`)).body.complementary.map((p) => p.id),
+  });
+  //  یک مشتری با چهار سفارش هنوز «یک نفر» است
+  for (let i = 0; i < 4; i++) await order(PHONE);
+  assert.deepEqual(await look(), { best: [], comp: [] }, 'سبدِ یک نفر');
+  await order(PHONE_B);
+  assert.deepEqual(await look(), { best: [], comp: [] }, 'دو نفر هنوز کم است');
+  await order(PHONE_C);
+  assert.deepEqual(await look(), { best: ['rice', 'salt'], comp: ['salt'] });
 });
 
 test('۳۲.۳ + WEB-09: کاتالوگِ روشن (`shop.catalog`) ⇒ موجودیِ واقعی از catalog.publicStock؛ ناموجود پیشنهاد نمی‌شود', async () => {
