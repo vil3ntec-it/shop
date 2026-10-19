@@ -149,6 +149,7 @@ async function login() {
     token = out.token;
     sessionStorage.setItem(TOKEN_KEY, token);
     $('who').textContent = `${out.admin.name || out.admin.username} — ${out.admin.role === 'superadmin' ? 'مدیر ارشد' : 'مدیر'}`;
+    setRole(out.admin.role);
     show();
     await refresh();
   } catch (err) {
@@ -320,6 +321,17 @@ async function openShop(id) {
         ? `پایان: ${date(ent.subscription.endsAt)} (${fa(ent.subscription.daysLeft)} روز مانده)`
         : 'اشتراکی ثبت نشده است'));
   line.appendChild(el('span', 'muted', `ساخت دکان: ${date(d.shop.createdAt)}`));
+  //  شناسه — همان که برنامه به سرور می‌فرستد و فهرستِ کانالِ آزمایشی می‌خواهد
+  const sid = el('span', 'muted', d.shop.id);
+  sid.dir = 'ltr';
+  sid.id = 'shop-id';
+  line.appendChild(sid);
+  if (adminRole === 'superadmin') {
+    const b = el('button', 'btn btn-ghost btn-sm', 'به کانالِ آزمایشی');
+    b.id = 'btn-shop-beta';
+    b.onclick = () => addShopToBeta(d.shop.id, b);
+    line.appendChild(b);
+  }
   sum.appendChild(line);
 
   const members = $('shop-members');
@@ -876,6 +888,63 @@ async function loadPlans() {
   $('cfg-pump-currency').value = cfg.pump_currency || '';
   $('cfg-pump-trial').value = cfg.pump_trial_days || '';
   $('cfg-wamsg').value = cfg.whatsapp_message || '';
+
+  loadBeta().catch(err => msg($('beta-msg'), err.message, 'bad'));
+}
+
+// ---------- کانالِ آزمایشی (F0-27، فقط مدیرِ ارشد) ----------
+let adminRole = '';
+function setRole(role) {
+  adminRole = role || '';
+  $('beta-panel').classList.toggle('hidden', adminRole !== 'superadmin');
+}
+
+/** «a, b» یا هر خط یکی ⇒ فهرستِ بی‌تکرار؛ سرور خودش شناسهٔ ناجور را رد می‌کند */
+const idList = (text) => [...new Set(String(text || '').split(/[\s,،]+/).map(s => s.trim()).filter(Boolean))];
+
+async function loadBeta() {
+  if (adminRole !== 'superadmin') return;
+  const out = await call('GET', '/admin/release/beta');
+  $('beta-shops').value = out.shops.ids.join('\n');
+  $('beta-devices').value = out.devices.ids.join('\n');
+  const meta = (m) => `${fa(m.ids.length)} شناسه` +
+    (m.updatedAt ? ` — آخرین تغییر ${dateTime(m.updatedAt)}${m.updatedBy ? `، ${m.updatedBy}` : ''}` : '');
+  $('beta-shops-meta').textContent = meta(out.shops);
+  $('beta-devices-meta').textContent = meta(out.devices);
+}
+
+async function saveBeta() {
+  const node = $('beta-msg');
+  const shops = idList($('beta-shops').value);
+  const devices = idList($('beta-devices').value);
+  //  همان قاعدهٔ سرور (‎routes/releases.js‎) — پیش از فرستادن، با نامِ شناسهٔ ناجور
+  const bad = [...shops, ...devices].filter(x => !/^[A-Za-z0-9_-]{1,80}$/.test(x));
+  if (bad.length) return msg(node, `شناسهٔ نامعتبر: ${bad.slice(0, 3).join('، ')} — فقط حروفِ انگلیسی، رقم، - و _`, 'bad');
+  try {
+    const out = await call('PUT', '/admin/release/beta', {
+      shops,
+      devices,
+      reason: $('beta-reason').value.trim(),
+    });
+    $('beta-reason').value = '';
+    msg(node, out.changed.length ? 'ذخیره شد — از همین حالا اثر دارد.' : 'تغییری نبود.', 'ok');
+    await loadBeta();
+  } catch (err) { msg(node, err.message, 'bad'); }
+}
+
+/** دکمهٔ صفحهٔ دکان: همین دکان به فهرست افزوده می‌شود (بقیه دست نمی‌خورند) */
+async function addShopToBeta(id, btn) {
+  btn.disabled = true;
+  try {
+    const cur = await call('GET', '/admin/release/beta');
+    if (!cur.shops.ids.includes(id)) {
+      await call('PUT', '/admin/release/beta', { shops: [...cur.shops.ids, id], reason: 'از صفحهٔ دکان' });
+    }
+    btn.textContent = 'در کانالِ آزمایشی است';
+  } catch (err) {
+    btn.disabled = false;
+    btn.textContent = `نشد: ${err.message}`;
+  }
 }
 
 /**
@@ -2179,6 +2248,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-refresh').onclick = () => refresh().catch(err => alert(err.message));
   $('btn-shop-search').onclick = () => loadShops();
   $('btn-health-load').onclick = () => loadHealth().catch(err => alert(err.message));
+  $('btn-beta-save').onclick = () => saveBeta();
   $('shop-q').addEventListener('keydown', (e) => { if (e.key === 'Enter') loadShops(); });
   //  پمپ‌بنزین‌ها
   $('btn-pump-search').onclick = () => loadPump();
@@ -2290,6 +2360,7 @@ document.addEventListener('DOMContentLoaded', () => {
     call('GET', '/admin/me')
       .then(async (out) => {
         $('who').textContent = `${out.admin.name || out.admin.username} — ${out.admin.role === 'superadmin' ? 'مدیر ارشد' : 'مدیر'}`;
+        setRole(out.admin.role);
         show();
         await refresh();
       })
