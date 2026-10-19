@@ -5,22 +5,18 @@
  *   • دکانِ دیگری که فقط عضوش بود ⇒ دست نمی‌خورد، جز `resolved_by`ِ خودش
  *   • دکان‌ها و حساب‌های دیگر دست‌نخورده
  *   • پل‌ها: دکانِ زنده همان cursor و ردیف‌های پل را دارد و همگام‌سازی‌اش
- *     بی تکرار ادامه می‌دهد (پلِ ۰۹۳ اگر در همین درخت باشد)
+ *     بی تکرار ادامه می‌دهد (پلِ ۰۹۳)
  */
 process.env.RATE_LOGIN_EDGE_MAX = process.env.RATE_LOGIN_EDGE_MAX || '100000';
 process.env.SYNC_V3_ENABLED = '1';
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
 const h = require('./helpers');
 const { query, one, many, newId, now, tx } = require('../src/db');
 const hlc = require('../src/lib/hlc');
 const syncV1 = require('../src/lib/sync-v1');
 const userDelete = require('../src/lib/user-delete');
-
-const BRIDGE = fs.existsSync(path.join(__dirname, '../src/lib/sync-v3-to-v1.js'));
 
 let superTok = '';
 let n = 0;
@@ -85,12 +81,12 @@ test.before(async () => {
 });
 test.after(async () => { await h.stop(); });
 
-test('کاتالوگ همهٔ جدول‌های v3 را می‌بیند (۰۶۰، و پلِ ۰۹۳ اگر هست)', async () => {
+test('کاتالوگ همهٔ جدول‌های v3 را می‌بیند (۰۶۰ و پلِ ۰۹۳)', async () => {
   const tables = await tx((c) => userDelete.syncV3Tables(c));
   for (const t of ['sync_v3_ops', 'sync_v3_rows', 'sync_v3_conflicts', 'sync_v3_devices', 'sync_v3_bridge']) {
     assert.ok(tables.includes(t), t);
   }
-  if (BRIDGE) for (const t of ['sync_v3_v1_state', 'sync_v3_v1_out']) assert.ok(tables.includes(t), t);
+  for (const t of ['sync_v3_v1_state', 'sync_v3_v1_out']) assert.ok(tables.includes(t), t);
   //  همهٔ جدول‌های sync_v3_ در پایگاه account_id دارند ⇒ هیچ‌کدام از قلم نمی‌افتد
   const all = (await many(`SELECT table_name AS t FROM information_schema.tables
       WHERE table_schema = current_schema() AND table_name LIKE 'sync\\_v3\\_%'`)).map(r => r.t);
@@ -151,7 +147,7 @@ test('عضوِ دکانِ دیگری حذف شد ⇒ دفترِ آن دکان د
   assert.ok(await one('SELECT id FROM shops WHERE id=$1', [b.shopId]));
 });
 
-test('پلِ v3 ⇒ v1 (۰۹۳): دکانِ حذف‌شده هیچ حالتی ندارد؛ دکانِ زنده با همان cursor بی تکرار ادامه می‌دهد', { skip: BRIDGE ? false : 'پلِ ۰۹۳ (PR #287) هنوز در این درخت نیست' }, async () => {
+test('پلِ v3 ⇒ v1 (۰۹۳): دکانِ حذف‌شده هیچ حالتی ندارد؛ دکانِ زنده با همان cursor بی تکرار ادامه می‌دهد', async () => {
   const live = require('../src/lib/live-config');
   const toV1 = require('../src/lib/sync-v3-to-v1');
   const a = await shopOwner('پلِ حذفی');
