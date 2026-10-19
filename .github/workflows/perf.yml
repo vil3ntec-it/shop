@@ -6,17 +6,18 @@ name: سنجشِ کارایی (PERF)
 # ریزسنجشِ JVMِ موتورهای Kotlin. فقط گزارش است (خلاصهٔ کار + فایلِ JSON)؛ چیزی را رد
 # نمی‌کند، چون ماشینِ CI مرجع نیست و از اجرایی به اجرای دیگر فرق می‌کند.
 
+#  ⛔ صفِ Actions (#329): سه کارِ ۴۰ تا ۷۵ دقیقه‌ای روی هر PRی که مهاجرت، ویترین، سفارش یا هستهٔ
+#  موجودی/گزارش را عوض می‌کرد، بیشترِ PRها را می‌گرفت. چون این فقط گزارش است و چیزی را رد نمی‌کند:
+#  PR فقط وقتی خودِ سنجه (`bench/**`) یا این ورک‌فلو عوض شود؛ وگرنه هفته‌ای یک بار روی main، و هر وقت
+#  لازم شد Actions ⇒ «سنجشِ کارایی (PERF)» ⇒ Run workflow روی هر شاخه‌ای.
 on:
   pull_request:
     paths:
       - 'bench/**'
-      - 'server/migrations/**'
-      - 'server/src/lib/storefront.js'
-      - 'server/src/lib/orders.js'
-      - 'server/src/lib/pglite-stats.js'
-      - 'android-native/app/src/main/java/ir/vil3ntec/tohid/core/stock/**'
-      - 'android-native/app/src/main/java/ir/vil3ntec/tohid/core/report/**'
       - '.github/workflows/perf.yml'
+  schedule:
+    #  دوشنبه‌ها ۰۲:۱۷ UTC (ورودی‌ها خالی ⇐ مقیاسِ ۱، بی عکسِ کامل)
+    - cron: '17 2 * * 1'
   workflow_dispatch:
     inputs:
       scale:
@@ -28,8 +29,9 @@ on:
         default: false
 
 concurrency:
-  group: perf-${{ github.ref }}
-  cancel-in-progress: true
+  #  PR: pushِ تازه اجرای قبلیِ همان PR را لغو می‌کند. اجرای main (زمان‌بندی‌شده) و دستی وسطِ کار لغو نمی‌شود.
+  group: perf-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
