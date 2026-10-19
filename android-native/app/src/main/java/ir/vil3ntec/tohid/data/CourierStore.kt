@@ -131,16 +131,14 @@ object CourierSync {
       val q = store.queue()
       val batch = CourierQueue.batch(q)
       if (batch.isEmpty()) break
-      when (val r = repo.send(device, batch)) {
-        is ApiResult.Success -> {
-          val next = CourierQueue.applyResults(store.queue(), batch, r.value)
-          store.saveQueue(next)
-          val left = batch.count { b -> next.pending.any { it.eventId == b.eventId } }
-          sent += batch.size - left
-          if (left > 0) break   // پاسخِ ناقص ⇒ بقیه بعداً، بی حلقهٔ بی‌پایان
-        }
-        is ApiResult.Failure -> failure = r.error
-      }
+      val r = repo.send(device, batch)
+      val results = r.valueOrNull()
+      if (results == null) { failure = errorOf(r); break }
+      val next = CourierQueue.applyResults(store.queue(), batch, results)
+      store.saveQueue(next)
+      val left = batch.count { b -> next.pending.any { it.eventId == b.eventId } }
+      sent += batch.size - left
+      if (left > 0) break   // پاسخِ ناقص ⇒ بقیه بعداً، بی حلقهٔ بی‌پایان
     }
 
     //  ۲) عکس‌ها — پس از رویدادها، چون عکس فقط در «رسیدم/تحویل» پذیرفته است
@@ -149,28 +147,28 @@ object CourierSync {
       for (p in store.photos()) {
         val bytes = runCatching { store.photoFile(p.eventId).readBytes() }.getOrNull()
         if (bytes == null) { store.dropPhoto(p.eventId); continue }
-        when (val r = repo.photo(p.assignmentId, p.eventId, PhotoSyncB64.encode(bytes), p.deviceTime)) {
-          is ApiResult.Success -> store.dropPhoto(p.eventId)
-          is ApiResult.Failure -> {
-            if (r.error.code in PHOTO_FINAL) { store.dropPhoto(p.eventId); photoErrors += r.error.userMessage }
-            else { failure = r.error; break }
-          }
-        }
+        val r = repo.photo(p.assignmentId, p.eventId, PhotoSyncB64.encode(bytes), p.deviceTime)
+        if (r.isSuccess) { store.dropPhoto(p.eventId); continue }
+        val err = errorOf(r)
+        if (err.code in PHOTO_FINAL) { store.dropPhoto(p.eventId); photoErrors += err.userMessage }
+        else { failure = err; break }
       }
     }
 
     //  ۳) کارت‌ها
     if (failure == null) {
       repo.me().onSuccess { store.courierName = it.name }
-      when (val a = repo.missions("active")) {
-        is ApiResult.Success -> store.saveCards("active", a.value)
-        is ApiResult.Failure -> failure = a.error
-      }
+      val a = repo.missions("active")
+      val cards = a.valueOrNull()
+      if (cards != null) store.saveCards("active", cards) else failure = errorOf(a)
       if (failure == null) repo.missions("done").onSuccess { store.saveCards("done", it) }
       if (failure == null) store.lastSyncAt = System.currentTimeMillis()
     }
     Outcome(sent, failure, photoErrors)
   }
+
+  private fun errorOf(r: ApiResult<*>): ApiFailure =
+    (r as? ApiResult.Failure)?.error ?: ApiFailure.InvalidResponse()
 }
 
 /** base64ِ همان `PhotoSync` — `java.util.Base64` روی اندروید ۷ نیست */

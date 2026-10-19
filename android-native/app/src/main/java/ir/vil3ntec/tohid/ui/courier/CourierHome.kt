@@ -394,7 +394,7 @@ private fun MissionCardView(c: MissionCard, waiting: Boolean, onAction: (String)
       if (c.requiresCode) StatusPill("کدِ تحویل لازم", PillTone.NEUTRAL)
       if (c.photoAllowed) StatusPill("عکسِ بسته مجاز", PillTone.NEUTRAL)
       if (c.callBeforeArrival) StatusPill("مشتری خواسته پیش از رسیدن خبر شود", PillTone.NEUTRAL)
-      if (c.cashCollectedMinor != null) StatusPill("گرفته شد: ${afn(c.cashCollectedMinor)}", PillTone.SUCCESS)
+      c.cashCollectedMinor?.let { StatusPill("گرفته شد: ${afn(it)}", PillTone.SUCCESS) }
     }
     if (c.status == "failed") {
       Spacer(Modifier.height(8.dp))

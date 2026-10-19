@@ -13,7 +13,7 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 
 /**
- *  درِ پیک (`/api/courier/*`) — DLV-01/02/08/10، v3 §۳.۱۱.
+ *  درِ پیک (`/api/courier/…`) — DLV-01/02/08/10، v3 §۳.۱۱.
  *
  *  صفحه‌ها نشانیِ سرور و توکن را نمی‌دانند؛ فقط همین مخزن را صدا می‌زنند.
  *  ⛔ توکنِ پیک جز همین درها جایی را باز نمی‌کند (سرور: `403 courier_scope`).
