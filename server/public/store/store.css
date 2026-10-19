@@ -1,105 +1,56 @@
-/*
-  ویترینِ اینترنتی — همان پالتِ پنل و پورتال (public/portal/portal.css) تا یک
-  خانواده باشند. راست‌چین با ویژگی‌های منطقیِ CSS، اول برای گوشی.
-  قلم: Vazirmatn (OFL 1.1) زیرمجموعهٔ فارسی/لاتین، woff2، از همین سرور.
-  ⛔ CSP ِ این صفحه style ِ درون‌خطی نمی‌پذیرد: هیچ `style=` در HTML نیست.
-*/
-@font-face{font-family:'Vazirmatn';src:url('/kit/fonts/vazirmatn-regular.woff2') format('woff2');font-weight:400;font-display:swap;}
-@font-face{font-family:'Vazirmatn';src:url('/kit/fonts/vazirmatn-bold.woff2') format('woff2');font-weight:700;font-display:swap;}
-:root{
-  --bg:#ffffff; --surface:#f6f8fc; --surface-2:#eef2fa; --border:#e5eaf3;
-  --text:#1a2233; --muted:#5f6a7e; --primary:#2c5ce6; --on-primary:#ffffff;
-  --primary-tint:#eaf0ff; --success:#127a52; --success-tint:#e8f8f1;
-  --warning:#8a5a12; --warning-tint:#fdf3e4; --danger:#c43a3a; --danger-tint:#fdecec;
-  --radius:14px; --radius-sm:10px;
-  --shadow:0 6px 20px -8px rgba(30,50,110,.15);
-  color-scheme:light;
-}
-@media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]){
-    --bg:#0f1420; --surface:#161d2c; --surface-2:#1c2436; --border:#28324a;
-    --text:#e8edf7; --muted:#a3aec4; --primary-tint:#1b2748; --primary:#6f93ff; --on-primary:#0f1420;
-    --success:#5fd4a2; --success-tint:#12301f; --warning:#f1c27a; --warning-tint:#3a2a10;
-    --danger:#ff8a8a; --danger-tint:#3a1a1a;
-    color-scheme:dark;
-  }
-}
-*{margin:0;padding:0;box-sizing:border-box;}
-html{-webkit-text-size-adjust:100%;}
-body{
-  font-family:'Vazirmatn',Tahoma,sans-serif; background:var(--surface); color:var(--text);
-  font-size:15px; line-height:1.7; min-block-size:100vh; padding-block-end:88px;
-}
-button,input,select,textarea{font:inherit;color:inherit;}
-a{color:var(--primary);}
-[hidden]{display:none !important;}
-.sr-only{position:absolute;inline-size:1px;block-size:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;}
-.wrap{max-inline-size:960px;margin-inline:auto;padding-inline:16px;}
-.muted{color:var(--muted);font-size:13px;}
+/* ویترینِ هر دکان — فقط چیدمانِ این صفحه؛ رنگ و گوشه همه از توکن‌های /kit/kit.css. */
+.bar-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#bar-brand { min-width: 0; }
+#bar-brand .avatar { width: 32px; height: 32px; border-radius: 10px; font-size: 14px; }
+.appbar .brand { visibility: hidden; }
+.appbar.scrolled .brand, .appbar.inner .brand { visibility: visible; }
 
-/* ── سرآیند و وضعیت (۳۱.۱) ── */
-header.top{background:var(--bg);border-block-end:1px solid var(--border);padding-block:12px;position:sticky;inset-block-start:0;z-index:5;}
-.top-row{display:flex;align-items:center;justify-content:space-between;gap:12px;}
-.top-row h1{font-size:18px;font-weight:700;line-height:1.4;}
-.status{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-block-start:8px;font-size:13px;}
-.badge{display:inline-flex;align-items:center;gap:6px;padding:2px 10px;border-radius:999px;font-weight:700;font-size:12.5px;background:var(--surface-2);}
-.badge::before{content:'';inline-size:8px;block-size:8px;border-radius:50%;background:currentColor;}
-.badge.ok{background:var(--success-tint);color:var(--success);}
-.badge.warn{background:var(--warning-tint);color:var(--warning);}
-.badge.off{background:var(--danger-tint);color:var(--danger);}
+.shop-head { background: var(--zone-nav); padding: var(--s2) 0 var(--s5); border-radius: 0 0 var(--r-sheet) var(--r-sheet); }
+.shop-id { display: flex; align-items: center; gap: var(--s3); }
+.shop-id h1 { font-size: 22px; }
+.status-line { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s3); margin-top: var(--s4); font-size: 13px; color: var(--muted); }
+.status-line .accept { flex-basis: 100%; color: var(--text); }
+.status-line .notice { flex-basis: 100%; }
+.shop-head .meta { margin-top: var(--s3); }
+.shop-head .meta > span { background: var(--surface); padding: 4px 10px; border-radius: 999px; box-shadow: var(--shadow-1); color: var(--text); }
 
-/* ── دکمه و فرم ── */
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-block-size:44px;padding:8px 16px;border:none;border-radius:var(--radius-sm);background:var(--primary);color:var(--on-primary);font-weight:700;cursor:pointer;text-decoration:none;}
-.btn:disabled{opacity:.55;cursor:default;}
-.btn-ghost{background:var(--surface-2);color:var(--text);}
-.btn-block{inline-size:100%;}
-.btn-sm{min-block-size:36px;padding:4px 12px;font-size:13px;}
-.icon-btn{inline-size:40px;min-block-size:40px;padding:0;font-size:20px;line-height:1;}
-label{display:block;font-size:13px;font-weight:700;margin-block:12px 4px;}
-input[type=text],input[type=tel],input[type=search],input[type=number],textarea{
-  inline-size:100%;min-block-size:44px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);
+.p-img.photo { background: #FFFFFF; }
+
+.plain-set { border: 0; margin: 0; min-width: 0; }
+.plain-set > * + * { margin-top: var(--s4); }
+.label-lg { float: right; width: 100%; padding: 0; font-weight: 700; font-size: 17px; margin-bottom: var(--s3); }
+.label-lg + * { clear: both; }
+.pin-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s3); }
+.verify { display: grid; gap: var(--s3); padding: var(--s4); border-radius: var(--r-card); background: var(--surface-2); }
+.verify .btn { justify-self: start; }
+.code-row { display: flex; align-items: flex-end; gap: var(--s2); }
+.pay-opt { display: flex; align-items: center; gap: var(--s3); padding: var(--s3) var(--s4); border-radius: var(--r-card); background: var(--primary-tint); }
+.pay-opt input { width: 20px; height: 20px; accent-color: var(--primary); }
+.pay-opt b { display: block; }
+.pay-opt small { display: block; color: var(--muted); font-size: 12.5px; }
+.pay-opt svg { width: 24px; height: 24px; color: var(--primary); }
+
+.sum-lines { list-style: none; margin: var(--s3) 0 0; padding: 0; display: grid; gap: var(--s3); }
+.sum-lines li { display: flex; align-items: center; gap: var(--s3); font-size: 14px; }
+.sum-lines .thumb { width: 40px; height: 40px; background: var(--surface-2); color: var(--muted); }
+.sum-lines .thumb.photo { background: #FFFFFF; }
+.sum-lines .grow small { display: block; color: var(--muted); font-size: 12.5px; }
+.sum-lines .amt { flex: none; font-weight: 700; }
+.sum-lines li.bad .grow { text-decoration: line-through; opacity: .7; }
+
+.ps-img { aspect-ratio: 4 / 3; border-radius: var(--r-card); background: var(--surface-2); display: grid; place-items: center; overflow: hidden; }
+.ps-img.photo { background: #FFFFFF; }
+.ps-img img { width: 100%; height: 100%; object-fit: contain; }
+.ps-img .ph { font-size: 56px; font-weight: 700; color: var(--muted); opacity: .5; }
+.ps-price { font-size: 22px; font-weight: 700; }
+.ps-price small { font-size: 13px; font-weight: 400; color: var(--muted); }
+
+#o-title { font-size: 20px; }
+#o-steps { margin-top: var(--s5); }
+
+@media (min-width: 960px) {
+  .shop-head { padding: var(--s4) 0 var(--s6); }
+  .shop-id h1 { font-size: 28px; }
+  .shop-head .avatar.lg { width: 76px; height: 76px; border-radius: 22px; font-size: 32px; }
+  .ps-img { aspect-ratio: 16 / 10; }
 }
-textarea{min-block-size:72px;resize:vertical;}
-input:focus-visible,textarea:focus-visible,button:focus-visible,a:focus-visible{outline:3px solid var(--primary);outline-offset:2px;}
-.check{display:flex;align-items:center;gap:8px;font-weight:400;margin-block:8px;}
-.check input{inline-size:20px;block-size:20px;}
-fieldset{border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 12px;margin-block:12px;}
-legend{font-size:13px;font-weight:700;padding-inline:4px;}
-
-/* ── کاتالوگ ── */
-.search{margin-block:16px 8px;}
-.chips{display:flex;gap:8px;overflow-x:auto;padding-block:4px 8px;scrollbar-width:none;}
-.chip{flex:none;min-block-size:36px;padding:4px 14px;border-radius:999px;border:1px solid var(--border);background:var(--bg);cursor:pointer;font-size:13px;}
-.chip[aria-pressed="true"]{background:var(--primary);border-color:var(--primary);color:var(--on-primary);}
-.grid{list-style:none;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-block:8px;}
-@media (min-width:640px){.grid{grid-template-columns:repeat(3,minmax(0,1fr));}}
-@media (min-width:900px){.grid{grid-template-columns:repeat(4,minmax(0,1fr));}}
-.card{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:10px;display:flex;flex-direction:column;gap:6px;min-inline-size:0;}
-.thumb{aspect-ratio:1/1;inline-size:100%;border-radius:var(--radius-sm);background:var(--surface-2);object-fit:cover;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:700;color:var(--muted);}
-.card h3{font-size:14px;font-weight:700;line-height:1.5;overflow-wrap:anywhere;}
-.price{font-weight:700;}
-.stock{font-size:12px;color:var(--muted);}
-.stepper{display:flex;align-items:center;justify-content:space-between;gap:6px;}
-.stepper output{min-inline-size:2.5em;text-align:center;font-weight:700;}
-.empty{background:var(--bg);border:1px dashed var(--border);border-radius:var(--radius);padding:16px;text-align:center;margin-block:12px;}
-
-/* ── سبد، ثبت و سفارش ── */
-.panel{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-block:12px;box-shadow:var(--shadow);}
-.panel h2{font-size:16px;font-weight:700;margin-block-end:8px;}
-.lines{list-style:none;}
-.lines li{display:flex;align-items:center;justify-content:space-between;gap:8px;padding-block:8px;border-block-end:1px solid var(--border);}
-.lines li:last-child{border-block-end:none;}
-.line-name{min-inline-size:0;overflow-wrap:anywhere;}
-.totals{display:grid;grid-template-columns:1fr auto;gap:4px 12px;margin-block-start:8px;}
-.totals .grand{font-weight:700;font-size:16px;}
-.note{padding:10px 12px;border-radius:var(--radius-sm);margin-block:10px;font-size:13.5px;}
-.note.warn{background:var(--warning-tint);color:var(--warning);}
-.note.err{background:var(--danger-tint);color:var(--danger);}
-.note.ok{background:var(--success-tint);color:var(--success);}
-.note.info{background:var(--primary-tint);}
-.timeline{list-style:none;margin-block-start:8px;}
-.timeline li{padding-block:4px;font-size:13.5px;}
-.cart-bar{position:fixed;inset-inline:0;inset-block-end:0;padding:12px 16px calc(12px + env(safe-area-inset-bottom));background:var(--bg);border-block-start:1px solid var(--border);z-index:6;}
-.cart-bar .btn{max-inline-size:928px;margin-inline:auto;display:flex;}
-.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
-.row > *{flex:1 1 140px;}

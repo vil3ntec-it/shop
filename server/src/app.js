@@ -431,6 +431,21 @@ async function createApp({ runMigrations = true } = {}) {
   };
   app.use('/store', storeHeaders, express.static(storeDir, { index: false, maxAge: 0, etag: true }));
   app.get('/store/:slug', storeHeaders, (req, res, next) => storePage(req.params.slug, res).catch(next));
+  //  وب‌اپِ قابلِ نصبِ همان دکان (WEB-14): نام از ویترینِ باز، شروع از نشانیِ خودش
+  app.get('/store/:slug/manifest.webmanifest', (req, res, next) => storefront.open(req.params.slug).then((sf) => {
+    const onHost = storefront.slugFromHost(req.hostname) === sf.slug;
+    const start = onHost ? '/' : `/store/${sf.slug}`;
+    res.set('Cache-Control', 'no-cache').type('application/manifest+json').send(JSON.stringify({
+      name: sf.title, short_name: String(sf.title).slice(0, 12), lang: 'fa', dir: 'rtl',
+      start_url: start, scope: onHost ? '/' : `/store/${sf.slug}`, display: 'standalone',
+      background_color: '#F4F5F8', theme_color: '#5B45E0',
+      icons: [
+        { src: '/kit/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+        { src: '/kit/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+        { src: '/kit/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+      ],
+    }));
+  }).catch((err) => (err.status === 404 ? res.status(404).json({ error: { code: 'store_not_found', message: 'این ویترین پیدا نشد' } }) : next(err))));
   app.get('/', (req, res, next) => {
     const slug = storefront.slugFromHost(req.hostname);
     if (!slug) return next();

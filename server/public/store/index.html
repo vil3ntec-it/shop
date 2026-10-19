@@ -4,149 +4,227 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#E9ECF3" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0A0C11" media="(prefers-color-scheme: dark)">
 <title>ویترین</title>
-<link rel="icon" href="data:,">
+<link rel="icon" href="/kit/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/kit/icon-192.png">
 <link rel="preload" href="/kit/fonts/vazirmatn-regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/kit/kit.css">
 <link rel="stylesheet" href="/store/store.css">
+<script src="/kit/kit.js" defer></script>
 <script src="/store/store.js" defer></script>
 </head>
 <body>
-<header class="top">
-  <div class="wrap top-row">
-    <div>
-      <h1 id="store-title">ویترین</h1>
-      <p id="store-tagline" class="muted" hidden></p>
-    </div>
-    <a id="store-call" class="btn btn-ghost btn-sm" href="#" hidden>تماس با دکان</a>
-  </div>
-  <div class="wrap">
-    <div id="store-status" class="status" role="status" aria-live="polite"></div>
+<a class="skip" href="#main">پرش به محتوا</a>
+<header class="appbar">
+  <div class="wrap appbar-row">
+    <a id="to-market" class="btn btn-icon btn-ghost" href="/market/" aria-label="بازارچه" hidden></a>
+    <a id="to-catalog" class="btn btn-icon btn-ghost" href="#/" aria-label="بازگشت به کالاها" hidden></a>
+    <a class="brand grow" href="#/" id="bar-brand"><span id="bar-avatar"></span><span id="bar-title" class="bar-title">ویترین</span></a>
+    <a id="store-call" class="btn btn-icon btn-ghost" href="#" aria-label="تماس با دکان" hidden></a>
+    <a id="nav-orders" class="btn btn-icon btn-ghost" href="#/orders" aria-label="سفارش‌های من"></a>
   </div>
 </header>
 
-<main class="wrap" id="main">
-  <p id="boot" class="muted">در حالِ باز کردن…</p>
+<main id="main">
+  <p id="boot" class="wrap section muted" role="status">در حالِ باز کردن…</p>
 
   <!-- چنین ویترینی نیست یا خاموش است -->
-  <section id="view-missing" class="empty" hidden>
-    <h2>این ویترین پیدا نشد</h2>
-    <p class="muted">نشانی را دوباره ببینید یا با خودِ دکان تماس بگیرید.</p>
+  <section id="view-missing" class="wrap" hidden>
+    <div class="empty section">
+      <div class="art" id="missing-art"></div>
+      <h1>این ویترین پیدا نشد</h1>
+      <p>نشانی را دوباره ببینید یا با خودِ دکان تماس بگیرید.</p>
+      <a id="missing-market" class="btn" href="/market/" hidden>دیدنِ دکان‌های دیگر</a>
+    </div>
   </section>
 
   <!-- کاتالوگ -->
   <section id="view-catalog" hidden>
-    <form id="search-form" class="search" role="search">
-      <label for="q" class="sr-only">جست‌وجوی کالا</label>
-      <input id="q" type="search" placeholder="جست‌وجوی کالا…" autocomplete="off" enterkeyhint="search">
-    </form>
-    <div id="cats" class="chips" role="group" aria-label="دسته‌ها"></div>
-    <div id="catalog-empty" class="empty" hidden>
-      <p id="catalog-empty-text">چیزی پیدا نشد.</p>
-      <p class="muted">نامِ دیگری را امتحان کنید یا با دکان تماس بگیرید.</p>
-      <button id="clear-search" class="btn btn-ghost btn-sm" type="button">نمایشِ همهٔ کالاها</button>
-    </div>
-    <ul id="products" class="grid" aria-label="کالاها"></ul>
-    <button id="more" class="btn btn-ghost btn-block" type="button" hidden>کالاهای بیشتر</button>
-    <p class="muted"><a href="#/orders">سفارش‌های من</a></p>
-  </section>
-
-  <!-- سبد و ثبت -->
-  <section id="view-checkout" hidden>
-    <p><a href="#/">→ بازگشت به کالاها</a></p>
-    <div class="panel">
-      <h2>سبدِ خرید</h2>
-      <ul id="cart-lines" class="lines"></ul>
-      <p id="cart-empty" class="muted" hidden>سبد خالی است.</p>
-      <div class="totals">
-        <span>جمعِ کالاها</span><span id="t-subtotal"></span>
-        <span id="t-fee-label">هزینهٔ ارسال</span><span id="t-fee"></span>
-        <span class="grand">مبلغِ نهایی</span><span id="t-total" class="grand"></span>
-      </div>
-      <p id="min-order" class="note warn" hidden></p>
-    </div>
-
-    <form id="checkout-form" class="panel" novalidate>
-      <h2>ثبتِ سفارش</h2>
-      <fieldset id="fulfillment-set">
-        <legend>تحویل</legend>
-        <label class="check" id="opt-delivery"><input type="radio" name="fulfillment" value="delivery"> ارسال به نشانیِ من</label>
-        <label class="check" id="opt-pickup"><input type="radio" name="fulfillment" value="pickup"> خودم از دکان می‌گیرم</label>
-      </fieldset>
-
-      <label for="c-name">نام</label>
-      <input id="c-name" type="text" autocomplete="name" maxlength="80" required>
-      <label for="c-phone">شمارهٔ موبایل</label>
-      <input id="c-phone" type="tel" inputmode="tel" autocomplete="tel" dir="ltr" maxlength="20" required>
-
-      <div id="verify-box" class="panel">
-        <p id="verify-text" class="muted">برای ثبتِ سفارش، شماره با یک کدِ یک‌بارمصرف تأیید می‌شود. دیدن و سبد بی‌حساب است.</p>
-        <button id="verify-send" class="btn btn-ghost btn-sm" type="button">فرستادنِ کدِ تأیید</button>
-        <div id="verify-code-row" hidden>
-          <label for="v-code">کدِ تأیید</label>
-          <div class="row">
-            <input id="v-code" type="text" inputmode="numeric" autocomplete="one-time-code" dir="ltr" maxlength="8">
-            <button id="verify-check" class="btn btn-sm" type="button">تأیید</button>
+    <div class="shop-head">
+      <div class="wrap">
+        <div class="shop-id">
+          <span id="store-avatar"></span>
+          <div class="grow">
+            <h1 id="store-title">ویترین</h1>
+            <p id="store-tagline" class="muted" hidden></p>
           </div>
         </div>
-        <p id="verify-msg" class="note" hidden></p>
+        <div id="store-status" class="status-line" role="status" aria-live="polite"></div>
+        <div id="store-meta" class="meta"></div>
       </div>
-
-      <div id="address-box" hidden>
-        <label for="a-text">نشانی</label>
-        <textarea id="a-text" maxlength="300" autocomplete="street-address"></textarea>
-        <label for="a-landmark">نشانهٔ نزدیک (مثلاً «پشتِ مسجد»)</label>
-        <input id="a-landmark" type="text" maxlength="200">
-        <div class="row">
-          <button id="pin-btn" class="btn btn-ghost btn-sm" type="button">پین با موقعیتِ فعلیِ من</button>
-          <span id="pin-text" class="muted">پین اختیاری است.</span>
-        </div>
-        <label class="check"><input id="d-call" type="checkbox"> پیش از رسیدن زنگ بزنید</label>
-        <label for="d-leave">تحویل به (اختیاری، مثلاً «دربان»)</label>
-        <input id="d-leave" type="text" maxlength="80">
+    </div>
+    <div class="wrap">
+      <form id="search-form" class="search section" role="search">
+        <label for="q" class="sr-only">جست‌وجوی کالا در این دکان</label>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14z M20 20l-3.5-3.5"/></svg>
+        <input id="q" type="search" placeholder="جست‌وجوی کالا…" autocomplete="off" enterkeyhint="search" maxlength="60">
+      </form>
+      <div id="cats" class="chips section" role="group" aria-label="دسته‌ها"></div>
+      <div id="catalog-msg" class="note section" hidden role="status"></div>
+      <div id="catalog-empty" class="empty" hidden>
+        <div class="art" id="empty-art"></div>
+        <h2 id="catalog-empty-text">چیزی پیدا نشد</h2>
+        <p>نامِ دیگری را امتحان کنید یا با دکان تماس بگیرید.</p>
+        <button id="clear-search" class="btn btn-ghost" type="button">نمایشِ همهٔ کالاها</button>
       </div>
+      <ul id="products" class="grid section" aria-label="کالاها" aria-busy="true"></ul>
+      <button id="more" class="btn btn-ghost btn-block section" type="button" hidden>کالاهای بیشتر</button>
+    </div>
+  </section>
 
-      <label for="c-note">یادداشت برای دکان (اختیاری)</label>
-      <textarea id="c-note" maxlength="500"></textarea>
+  <!-- ثبتِ سفارش -->
+  <section id="view-checkout" hidden>
+    <div class="wrap section">
+      <h1>ثبتِ سفارش</h1>
+      <div class="split section">
+        <form id="checkout-form" class="stack" novalidate>
+          <fieldset class="card card-lg plain-set" id="fulfillment-set">
+            <legend class="label-lg">تحویل</legend>
+            <div class="seg" id="seg-fulfillment">
+              <label id="opt-delivery"><input type="radio" name="fulfillment" value="delivery">ارسال به نشانیِ من<small id="opt-delivery-fee"></small></label>
+              <label id="opt-pickup"><input type="radio" name="fulfillment" value="pickup">دریافت از دکان<small>رایگان</small></label>
+            </div>
+            <div id="address-box" class="stack" hidden>
+              <label class="field"><span>نشانی</span><textarea id="a-text" maxlength="300" autocomplete="street-address" placeholder="ناحیه، سرک، کوچه، شمارهٔ خانه"></textarea></label>
+              <label class="field"><span>نشانهٔ نزدیک</span><input id="a-landmark" type="text" maxlength="200" placeholder="مثلاً «پشتِ مسجد»"></label>
+              <div class="pin-row">
+                <button id="pin-btn" class="btn btn-soft btn-sm" type="button">پین با موقعیتِ فعلیِ من</button>
+                <span id="pin-text" class="muted small">پین اختیاری است؛ فقط برای پیدا کردنِ دقیق‌ترِ در.</span>
+              </div>
+              <label class="check"><input id="d-call" type="checkbox"> پیش از رسیدن زنگ بزنید</label>
+              <label class="field"><span>تحویل به (اختیاری)</span><input id="d-leave" type="text" maxlength="80" placeholder="مثلاً «دربان» یا «برادرم»"></label>
+            </div>
+          </fieldset>
 
-      <fieldset>
-        <legend>پرداخت</legend>
-        <label class="check"><input type="radio" name="payment" value="cod" checked> نقد هنگامِ تحویل</label>
-        <p class="muted">پرداختِ آنلاین هنوز فعال نیست؛ تا راه‌اندازیِ درگاه، فقط نقد هنگامِ تحویل.</p>
-      </fieldset>
+          <fieldset class="card card-lg plain-set">
+            <legend class="label-lg">شما</legend>
+            <label class="field"><span>نام</span><input id="c-name" type="text" autocomplete="name" maxlength="80" required></label>
+            <label class="field"><span>شمارهٔ موبایل</span><input id="c-phone" type="tel" inputmode="tel" autocomplete="tel" dir="ltr" maxlength="20" placeholder="07xx xxx xxx" required></label>
+            <div id="verify-box" class="verify">
+              <p id="verify-text" class="muted small">برای ثبت، شماره با یک کدِ یک‌بارمصرف تأیید می‌شود. دیدن و سبد حساب نمی‌خواهد.</p>
+              <button id="verify-send" class="btn btn-soft btn-sm" type="button">فرستادنِ کدِ تأیید</button>
+              <div id="verify-code-row" class="code-row" hidden>
+                <label class="field grow"><span>کدِ تأیید</span><input id="v-code" class="code-input" type="text" inputmode="numeric" autocomplete="one-time-code" dir="ltr" maxlength="8"></label>
+                <button id="verify-check" class="btn" type="button">تأیید</button>
+              </div>
+              <div id="verify-msg" class="note" hidden role="status"></div>
+            </div>
+            <label class="field"><span>یادداشت برای دکان (اختیاری)</span><textarea id="c-note" maxlength="500"></textarea></label>
+          </fieldset>
 
-      <p id="checkout-msg" class="note" hidden role="alert"></p>
-      <button id="submit-order" class="btn btn-block" type="submit">ثبتِ سفارش</button>
-    </form>
+          <fieldset class="card card-lg plain-set">
+            <legend class="label-lg">پرداخت</legend>
+            <label class="pay-opt"><input type="radio" name="payment" value="cod" checked><span id="pay-ico"></span><span class="grow"><b>نقد هنگامِ تحویل</b><small>پرداختِ آنلاین هنوز فعال نیست؛ تا راه‌اندازیِ درگاه، فقط نقد.</small></span></label>
+          </fieldset>
+        </form>
+
+        <aside class="aside">
+          <div class="card card-lg">
+            <div class="spread"><h2>سبدِ شما</h2><a href="#/cart" id="edit-cart" class="small">ویرایش</a></div>
+            <ul id="cart-lines" class="sum-lines"></ul>
+            <p id="cart-empty" class="muted" hidden>سبد خالی است.</p>
+            <hr class="divider">
+            <div class="sums">
+              <span>جمعِ کالاها</span><span id="t-subtotal" class="num"></span>
+              <span id="t-fee-label">هزینهٔ ارسال</span><span id="t-fee" class="num"></span>
+              <span class="grand">مبلغِ نهایی</span><span id="t-total" class="grand num"></span>
+            </div>
+            <div id="min-order" class="note warn section" hidden></div>
+            <div id="checkout-msg" class="note section" hidden role="alert"></div>
+            <button id="submit-order" class="btn btn-block section" type="submit" form="checkout-form">ثبتِ سفارش</button>
+            <p class="muted small section" id="accept-line"></p>
+          </div>
+        </aside>
+      </div>
+    </div>
   </section>
 
   <!-- رسید و پیگیری -->
   <section id="view-order" hidden>
-    <p><a href="#/">→ بازگشت به کالاها</a></p>
-    <div class="panel">
-      <h2 id="o-title">سفارش</h2>
-      <p id="o-status" class="note info"></p>
-      <ul id="o-lines" class="lines"></ul>
-      <div id="o-totals" class="totals"></div>
-      <ol id="o-timeline" class="timeline"></ol>
-      <p class="muted">این صفحه با همین نشانی دوباره باز می‌شود؛ نشانی را نگه دارید.</p>
-      <p id="o-msg" class="note" hidden role="alert"></p>
-      <button id="o-cancel" class="btn btn-ghost btn-block" type="button" hidden>لغوِ سفارش</button>
+    <div class="wrap section">
+      <div id="o-placed" class="note ok" hidden role="status"></div>
+      <div class="split section">
+        <div class="stack">
+          <div class="card card-lg">
+            <div class="spread"><h1 id="o-title">سفارش</h1><span id="o-pill"></span></div>
+            <p id="o-status" class="muted"></p>
+            <ol id="o-steps" class="steps section" aria-label="مراحلِ سفارش"></ol>
+          </div>
+          <div class="card card-lg">
+            <h2>اقلام</h2>
+            <ul id="o-lines" class="sum-lines"></ul>
+            <hr class="divider">
+            <div id="o-totals" class="sums"></div>
+          </div>
+        </div>
+        <aside class="aside stack">
+          <div class="card card-lg stack">
+            <div id="o-msg" class="note" hidden role="alert"></div>
+            <button id="o-reorder" class="btn btn-block" type="button" hidden>خریدِ دوباره</button>
+            <button id="o-cancel" class="btn btn-danger btn-block" type="button" hidden>لغوِ سفارش</button>
+            <a class="btn btn-ghost btn-block" href="#/">بازگشت به کالاها</a>
+            <p class="muted small">این صفحه با همین نشانی دوباره باز می‌شود؛ نشانی را نگه دارید.</p>
+          </div>
+        </aside>
+      </div>
     </div>
   </section>
 
-  <!-- سفارش‌های من -->
+  <!-- سفارش‌های من در همین دکان -->
   <section id="view-orders" hidden>
-    <p><a href="#/">→ بازگشت به کالاها</a></p>
-    <div class="panel">
-      <h2>سفارش‌های من</h2>
-      <ul id="my-orders" class="lines"></ul>
-      <p id="my-orders-empty" class="muted" hidden>هنوز سفارشی در این دستگاه نیست.</p>
+    <div class="wrap section stack">
+      <h1>سفارش‌های من</h1>
+      <ul id="my-orders" class="olist"></ul>
+      <div id="my-orders-empty" class="empty" hidden>
+        <div class="art" id="orders-art"></div>
+        <h2>هنوز سفارشی در این دستگاه نیست</h2>
+        <p>با شمارهٔ تأییدشده، سفارش‌های همین شماره از هر دستگاهی دیده می‌شود.</p>
+      </div>
     </div>
   </section>
 </main>
 
-<div id="cart-bar" class="cart-bar" hidden>
-  <a id="open-cart" class="btn" href="#/cart">سبد</a>
+<!-- نوارِ تیرهٔ سبد (ref-5) -->
+<button id="cart-bar" class="cartbar" type="button" hidden aria-haspopup="dialog" aria-controls="cart-sheet">
+  <span class="ttl">سبد</span>
+  <span id="bar-thumbs" class="thumbs" aria-hidden="true"></span>
+  <span class="sum"><small>جمع</small><b id="bar-total" class="num"></b></span>
+  <span id="open-cart" class="count" aria-hidden="true"></span>
+  <span id="bar-label" class="sr-only"></span>
+</button>
+
+<div id="scrim" class="scrim" hidden></div>
+
+<!-- برگهٔ تیرهٔ سبد (ref-6) -->
+<div id="cart-sheet" class="sheet dark drawer" role="dialog" aria-modal="true" aria-labelledby="cart-title" hidden>
+  <div class="sheet-head">
+    <div><h2 id="cart-title">سبدِ خرید</h2><p id="cart-shop" class="muted small"></p></div>
+    <button id="cart-close" class="btn btn-icon btn-ghost" type="button" aria-label="بستن"></button>
+  </div>
+  <div class="sheet-body">
+    <ul id="sheet-lines" class="lines"></ul>
+    <div id="sheet-deliv" class="deliv"></div>
+  </div>
+  <div class="sheet-foot">
+    <div class="total"><span>جمع:</span><b id="sheet-total" class="num"></b></div>
+    <div id="sheet-msg" class="note" hidden role="status"></div>
+    <button id="cart-next" class="btn btn-accent btn-block" type="button">ادامه</button>
+  </div>
+</div>
+
+<!-- برگهٔ کالا -->
+<div id="product-sheet" class="sheet modal" role="dialog" aria-modal="true" aria-labelledby="ps-name" hidden>
+  <div class="sheet-head">
+    <span id="ps-cat" class="pill plain"></span>
+    <button id="ps-close" class="btn btn-icon btn-ghost" type="button" aria-label="بستن"></button>
+  </div>
+  <div id="ps-img" class="ps-img"></div>
+  <h2 id="ps-name" class="section"></h2>
+  <div class="spread"><p id="ps-price" class="ps-price"></p><span id="ps-stock"></span></div>
+  <p id="ps-note" class="muted small"></p>
+  <button id="ps-add" class="btn btn-block section" type="button" data-autofocus>افزودن به سبد</button>
 </div>
 </body>
 </html>
