@@ -153,6 +153,7 @@ fun AppRoot(
         state.role?.let { ir.vil3ntec.tohid.data.ShopRole.remember(context, it) }
         //  لایه‌های مجوزِ دکان (STF-01..03) — نبودنش یعنی همان رفتارِ امروزِ نقش
         if (state.hasShop) ir.vil3ntec.tohid.data.ShopRole.rememberPolicy(context, state.policy?.toString())
+        if (state.hasShop) ir.vil3ntec.tohid.data.ShopRole.rememberShopId(context, state.shop?.id)
         //  دکان دارد: مطمئن شویم دفترِ روی گوشی هم مالِ همین دکان است.
         //  اگر حساب از دکانی به دکانِ دیگر رفته باشد، همین‌جا جابه‌جا
         //  می‌شود — وگرنه دفترِ دکانِ قبلی داخلِ دکانِ تازه می‌رفت.

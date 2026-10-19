@@ -139,8 +139,11 @@ object ApiEndpoints {
     /*  کارمندان، مجوزها و دستگاه‌ها — STF-01..03، STF-10، STF-11 */
     const val STAFF_CODE_DISABLE = "/shop/staff-code/disable"
     const val PERMISSIONS = "/shop/permissions"
+    /** کلیدِ عمومیِ تأییدِ همین دستگاه (STF-02، بخشِ ۱۰.۱) */
+    const val APPROVER_KEYS = "/shop/approver-keys"
     const val DEVICES = "/shop/devices"
     fun memberPerms(id: String) = "$PERMISSIONS/members/${enc(id)}"
+    fun approverKey(id: String) = "$APPROVER_KEYS/${enc(id)}"
     fun deviceDisable(id: String) = "$DEVICES/${enc(id)}/disable"
     fun deviceEnable(id: String) = "$DEVICES/${enc(id)}/enable"
   }

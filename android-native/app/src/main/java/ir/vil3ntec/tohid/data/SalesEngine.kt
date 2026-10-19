@@ -92,6 +92,8 @@ object SalesEngine {
     val debtorId: String? = null,
     /** سیاستِ دکان: کالای منقضی فروخته نشود (`ShopPolicy.blockExpired`) */
     val blockExpired: Boolean = false,
+    /** برگهٔ تأییدِ تخفیفِ بیش از سقف (STF-02) — همان‌طور روی فاکتور می‌نشیند */
+    val approval: kotlinx.serialization.json.JsonObject? = null,
   )
 
   data class Totals(
@@ -362,6 +364,7 @@ object SalesEngine {
       date = today,
       syncStatus = "pending",
       seller = checkout.seller.trim(),
+      approval = checkout.approval,
     )
 
     val items = mutableListOf<SaleItem>()
