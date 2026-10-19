@@ -1,0 +1,63 @@
+/* «گزارشِ تازه» در وب (license/report-ui.js) — VISUAL-DIRECTION: سطحِ تمیز، کارتِ آماری،
+   نشانِ «متن + رنگ + نقطه»، زبانهٔ قطعه‌ای، جدولِ مرتب‌شدنی. فقط توکن‌های index.html. */
+.rf-home{margin:0 0 14px;}
+.rf-kpis{display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:10px; margin:0 0 10px;}
+.rf-kpi,.rf-stat{display:flex; flex-direction:column; gap:6px; text-align:start; padding:14px; border:1px solid var(--border);
+  border-radius:12px; background:var(--surface-solid); color:var(--text); font:inherit; box-shadow:var(--shadow-sm);}
+.rf-kpi{cursor:pointer; min-height:48px;}
+.rf-kpi:hover{border-color:var(--primary);}
+.rf-kpi:focus-visible,.rf-pill:focus-visible,.rf-seg button:focus-visible,.rf-table th button:focus-visible,.rf-table-wrap:focus-visible{outline:2px solid var(--primary); outline-offset:2px;}
+.rf-kpi .t,.rf-stat .t{font-size:12px; color:var(--muted); font-weight:500;}
+.rf-kpi .v,.rf-stat .v{font-size:20px; font-weight:700; color:var(--text);}
+.rf-kpi .f{display:flex; justify-content:space-between; gap:8px; font-size:11.5px; color:var(--muted);}
+.rf-stat .p{font-size:11.5px; color:var(--muted);}
+.rf-kpi .d{font-weight:600;}
+.rf-kpi .d.good{color:var(--success);}
+.rf-kpi .d.bad{color:var(--danger);}
+.rf-kpi .d.flat{color:var(--muted);}
+.rf-stats{display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:10px; margin:0 0 12px;}
+.rf-pills{display:flex; flex-wrap:wrap; gap:8px;}
+.rf-pill{display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:999px; border:0; font:inherit;
+  font-size:12px; font-weight:600; cursor:pointer; min-height:28px;}
+p .rf-pill,.rf-note .rf-pill{cursor:default;}
+.rf-pill .dot{width:6px; height:6px; border-radius:50%; background:currentColor; flex:none;}
+.rf-success{color:var(--success); background:var(--success-tint);}
+.rf-warning{color:var(--warning); background:var(--warning-tint);}
+.rf-danger{color:var(--danger); background:var(--danger-tint);}
+.rf-neutral{color:var(--muted); background:var(--primary-tint);}
+.rf-switch{display:flex; align-items:center; gap:10px; margin:0 0 12px; padding:10px 12px; border:1px solid var(--border);
+  border-radius:12px; background:var(--surface-solid); cursor:pointer; min-height:48px;}
+.rf-switch input{width:18px; height:18px; accent-color:var(--primary);}
+.rf-switch small{display:block; color:var(--muted); font-size:11.5px;}
+.rf-head{display:flex; flex-wrap:wrap; align-items:flex-start; justify-content:space-between; gap:10px; margin:0 0 12px;}
+.rf-head h2{margin:0; font-size:18px; color:var(--text);}
+.rf-head p{margin:2px 0 0; font-size:12px; color:var(--muted);}
+.rf-actions{display:flex; gap:6px; flex-wrap:wrap;}
+.rf-bar{display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:0 0 10px;}
+.rf-bar .sp{flex:1;}
+.rf-seg{display:inline-flex; flex-wrap:wrap; gap:2px; padding:3px; border:1px solid var(--border); border-radius:10px; background:var(--bg);}
+.rf-seg button{border:1px solid transparent; background:transparent; color:var(--muted); font:inherit; font-size:13px;
+  padding:6px 12px; border-radius:8px; cursor:pointer; min-height:32px;}
+.rf-seg button[aria-pressed="true"]{background:var(--surface-solid); border-color:var(--border); color:var(--text); font-weight:700;}
+.rf-note{display:flex; flex-wrap:wrap; align-items:center; gap:8px; font-size:12px; color:var(--muted); margin:0 0 12px;}
+.rf-title{font-size:14px; margin:6px 0 8px; color:var(--text);}
+.rf-table-wrap{overflow:auto; max-height:70vh; border:1px solid var(--border); border-radius:12px; background:var(--surface-solid); margin:0 0 14px;}
+.rf-table{border-collapse:collapse; width:100%; min-width:max-content; font-size:13px; color:var(--text);}
+.rf-table th,.rf-table td{padding:7px 10px; border-bottom:1px solid var(--border); text-align:start; white-space:nowrap;}
+.rf-table th{position:sticky; top:0; z-index:1; background:var(--bg); font-weight:700;}
+.rf-table th button{border:0; background:none; font:inherit; color:inherit; cursor:pointer; padding:0;}
+.rf-table .n{text-align:end; font-variant-numeric:tabular-nums;}
+.rf-table tbody tr:nth-child(even) td{background:var(--primary-tint);}
+.rf-table tfoot td{position:sticky; bottom:0; background:var(--bg); font-weight:700;}
+.rf-sr{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap;}
+.rf-cards{display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:10px; margin:0 0 14px;}
+.rf-card{border:1px solid var(--border); border-radius:12px; background:var(--surface-solid); padding:12px 14px;}
+.rf-card h4{margin:0 0 6px; font-size:14px; color:var(--text);}
+.rf-card .l{display:flex; justify-content:space-between; gap:8px; font-size:12.5px; color:var(--muted); padding:2px 0;}
+.rf-card .l b{color:var(--text);}
+.rf-empty{padding:24px; text-align:center; color:var(--muted);}
+@media (max-width:599px){
+  .rf-kpis,.rf-stats{grid-template-columns:1fr 1fr;}
+  .rf-seg button{min-height:44px;}
+  .rf-kpi .v,.rf-stat .v{font-size:17px;}
+}
