@@ -94,13 +94,26 @@ function deriveStanding(shopId, generation) {
  *
  * `max_uses = 0` یعنی بی‌شمار: یک کد برای همه‌ی شاگردها. مهلت هم ندارد.
  */
-async function standing(shopId, createdBy = '', role = 'staff') {
+async function standing(shopId, createdBy = '', role = 'staff', { reopen = false } = {}) {
   const live = await one(
     `SELECT * FROM staff_codes WHERE shop_id=$1 AND standing AND status='active'`,
     [shopId]
   );
   if (live) {
     return { id: live.id, code: deriveStanding(shopId, live.generation), role: live.role, generation: live.generation };
+  }
+
+  //  STF-11: صاحب دکان کدِ ثابت را «خاموش» کرده — خودبه‌خود ساخته نمی‌شود.
+  //  فقط `rotateStanding` (با `reopen`) دوباره و با کدِ تازه روشنش می‌کند.
+  if (!reopen) {
+    const latest = await one(
+      `SELECT generation, role, disabled_at FROM staff_codes
+        WHERE shop_id=$1 AND standing ORDER BY generation DESC LIMIT 1`,
+      [shopId]
+    );
+    if (latest && latest.disabled_at !== null && latest.disabled_at !== undefined) {
+      return { id: null, code: null, role: latest.role, generation: Number(latest.generation), disabled: true };
+    }
   }
 
   const last = await one(
@@ -128,7 +141,21 @@ async function rotateStanding(shopId, createdBy = '') {
     `UPDATE staff_codes SET status='revoked' WHERE shop_id=$1 AND standing AND status='active'`,
     [shopId]
   );
-  return standing(shopId, createdBy);
+  return standing(shopId, createdBy, 'staff', { reopen: true });
+}
+
+/**
+ * خاموش کردنِ کدِ ثابت (STF-11 «لغو»). کدِ فعلی باطل می‌شود و تا صاحب دکان
+ * «کدِ تازه» نزند، هیچ کدِ ثابتی نیست. شاگردهای فعلی بیرون نمی‌افتند.
+ */
+async function disableStanding(shopId, createdBy = '') {
+  const cur = await standing(shopId, createdBy);
+  if (cur.disabled) return cur;
+  await query(
+    `UPDATE staff_codes SET status='revoked', disabled_at=$2 WHERE id=$1 AND shop_id=$3`,
+    [cur.id, now(), shopId]
+  );
+  return { id: null, code: null, role: cur.role, generation: cur.generation, disabled: true };
 }
 
 async function list(shopId) {
@@ -269,4 +296,4 @@ async function redeem(rawCode, userId, ip = '') {
 }
 
 module.exports = {
-  standing, rotateStanding, deriveStanding, create, list, revoke, redeem, shopIdOf, normalize, format, hashCode, PREFIX };
+  standing, rotateStanding, disableStanding, deriveStanding, create, list, revoke, redeem, shopIdOf, normalize, format, hashCode, PREFIX };

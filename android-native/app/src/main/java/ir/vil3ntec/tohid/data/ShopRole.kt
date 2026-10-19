@@ -22,6 +22,8 @@ object ShopRole {
 
   private const val PREFS = "tohid-ledger"   // کنارِ صاحبِ دفتر، تا با هم پاک شوند
   private const val KEY = "shop_role"
+  //  `policy`ِ سرور (STF-01..03) — لایه‌های دکان و همین کاربر، به همان شکلِ JSON
+  private const val POLICY = "shop_policy"
 
   /** نقش‌هایی که سرور می‌شناسد */
   const val OWNER = "owner"
@@ -44,12 +46,30 @@ object ShopRole {
   fun remember(context: Context, role: String) {
     val clean = role.trim().lowercase()
     if (clean.isBlank()) return
-    prefs(context).edit().putString(KEY, clean).apply()
+    val p = prefs(context)
+    //  نقش عوض شد ⇒ لایه‌های قبلی دیگر مالِ این نقش نیستند (تا پرسشِ بعدیِ سرور)
+    val edit = p.edit().putString(KEY, clean)
+    if (p.getString(KEY, null) != clean) edit.remove(POLICY)
+    edit.apply()
+  }
+
+  /** `policy`ِ پاسخِ `GET /api/shop`؛ null یعنی «بی لایه» = همان رفتارِ امروزِ نقش */
+  fun rememberPolicy(context: Context, policyJson: String?) {
+    val e = prefs(context).edit()
+    if (policyJson.isNullOrBlank()) e.remove(POLICY) else e.putString(POLICY, policyJson)
+    e.apply()
   }
 
   fun forget(context: Context) {
-    prefs(context).edit().remove(KEY).apply()
+    prefs(context).edit().remove(KEY).remove(POLICY).apply()
   }
+
+  /**
+   *  تصمیم با هستهٔ مشترک (`core/perm/PermCore`) — همان که سرور و وب دارند.
+   *  بی لایه دقیقاً همان `!isStaff`ِ پیشین است (آزمونِ مرجع: `PermCoreTest`).
+   */
+  fun allows(context: Context, key: String): Boolean =
+    PermPolicy.allows(current(context), prefs(context).getString(POLICY, null), key)
 
   /** شاگرد است — نه صاحب، نه مدیر */
   fun isStaff(context: Context): Boolean = current(context) == STAFF
@@ -60,16 +80,19 @@ object ShopRole {
    *  شاگرد می‌فروشد ولی نمی‌داند دکان چقدر سود می‌کند. این خواستهٔ
    *  صاحب دکان است، نه یک تصمیمِ فنی.
    */
-  fun canSeeMoney(context: Context): Boolean = !isStaff(context)
+  fun canSeeMoney(context: Context): Boolean = allows(context, "reports.money")
 
-  /** حق باز کردنِ تنظیمات */
-  fun canOpenSettings(context: Context): Boolean = !isStaff(context)
+  /** حق باز کردنِ تنظیمات — همان `settings.write`ِ سرور */
+  fun canOpenSettings(context: Context): Boolean = allows(context, "settings.write")
 
   /**
    *  تخفیف و لغوِ فاکتور — همان `sales.discount` و `sales.cancel`ِ سرور
    *  (`server/src/lib/permissions.js`). سرور opِ شاگرد را رد می‌کند؛ این‌جا
    *  فقط دکمه پنهان می‌شود تا opِ ردشده‌ای ساخته نشود.
    */
-  fun canDiscount(context: Context): Boolean = !isStaff(context)
-  fun canCancelSale(context: Context): Boolean = !isStaff(context)
+  fun canDiscount(context: Context): Boolean = allows(context, "sales.discount")
+  fun canCancelSale(context: Context): Boolean = allows(context, "sales.cancel")
+
+  /** سابقهٔ عملیات — همان `audit.view`ِ سرور */
+  fun canSeeAudit(context: Context): Boolean = allows(context, "audit.view")
 }

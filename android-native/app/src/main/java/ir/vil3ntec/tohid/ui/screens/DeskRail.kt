@@ -17,9 +17,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import ir.vil3ntec.tohid.ui.AppNav
 import ir.vil3ntec.tohid.ui.theme.Shop
 
 /** پهنای منوی کناری — محتوا به همین اندازه از کنار فاصله می‌گیرد */
@@ -38,9 +39,12 @@ object RailMode {
  *  منوی کناریِ کامپیوتر.
  *
  *  روی صفحهٔ پهن نوارِ پایینِ گوشی (پنج دکمه + «بیشتر») کنار می‌رود و همهٔ
- *  بخش‌ها یک‌جا، با میان‌برِ صفحه‌کلیدشان، در ستونِ راست دیده می‌شوند —
- *  همان چیدمانِ برنامه‌های میزکار. ترتیبِ نُه‌تای اول همان `AppNav.SHORTCUTS`
- *  است، پس «Ctrl+۴» همیشه همان چیزی است که این‌جا چهارم نوشته شده.
+ *  بخش‌ها یک‌جا در ستونِ راست دیده می‌شوند — همان چیدمانِ برنامه‌های میزکار.
+ *
+ *  از ۱۴۰۵/۰۷/۲۵ گروه‌بندی‌شده است (`DeskMenu`، v3 §۲۰.۳ و VISUAL-DIRECTION
+ *  §۳): «اصلی»، «کانال‌های فروش» و «مدیریت و سامانه»؛ بخشِ ساخته‌نشده با
+ *  برچسبِ «در دست ساخت» و بی‌کلیک. میان‌برهای Ctrl+۱…۹ عوض نشده‌اند (همان
+ *  `AppNav.SHORTCUTS`)؛ فهرستشان در راهنمای F1 است.
  */
 @Composable
 fun DeskRail(
@@ -54,18 +58,8 @@ fun DeskRail(
 ) {
   val context = LocalContext.current
   val canAdmin = ir.vil3ntec.tohid.data.ShopRole.canOpenSettings(context)
-  val main = AppNav.SHORTCUTS.mapIndexed { i, (id, label) -> Triple(id, label, "Ctrl+${i + 1}") }
-  val extra = buildList {
-    //  فقط وقتی سرور گفته بخشِ سفارش برای این دکان روشن است
-    if (ir.vil3ntec.tohid.ui.OrdersLive.enabled) add(Triple("orders", "سفارش‌ها", ""))
-    add(Triple("admin", "مرکزِ مدیریت", "Ctrl+M"))
-    add(Triple("receipts", "رسیدها", ""))
-    add(Triple("team", "کارمندان", ""))
-    add(Triple("devices", "دستگاه‌های جانبی", ""))
-    if (canAdmin) add(Triple("audit", "سابقهٔ عملیات", ""))
-    if (canAdmin) add(Triple("settings", "تنظیمات", ""))
-    add(Triple("more", "بیشتر", ""))
-  }
+  //  سفارش‌ها فقط وقتی سرور گفته بخشِ سفارش برای این دکان روشن است
+  val groups = DeskMenu.groups(canAdmin, ordersLive = ir.vil3ntec.tohid.ui.OrdersLive.enabled)
   Column(
     Modifier
       .width(if (compact) DESK_RAIL_COMPACT else DESK_RAIL_WIDTH)
@@ -79,7 +73,7 @@ fun DeskRail(
     if (!compact) {
       Row(Modifier.padding(horizontal = 10.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).background(Shop.colors.primary), contentAlignment = Alignment.Center) {
-          Icon(Icons.Filled.Storefront, null, tint = androidx.compose.ui.graphics.Color.White, modifier = Modifier.size(20.dp))
+          Icon(Icons.Filled.Storefront, null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(20.dp))
         }
         Spacer(Modifier.width(10.dp))
         Column {
@@ -87,13 +81,19 @@ fun DeskRail(
           Text("مدیریتِ دکان", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
         }
       }
-      Spacer(Modifier.height(8.dp))
-      Text("اصلی", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2, modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp))
     }
-    main.forEach { (id, label, key) -> RailItem(id, label, key, iconOf(id), current == id, onPick, compact, badges[id] ?: 0) }
-    Spacer(Modifier.height(10.dp))
-    if (!compact) Text("مدیریت", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2, modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp))
-    extra.forEach { (id, label, key) -> RailItem(id, label, key, iconOf(id), current == id, onPick, compact, badges[id] ?: 0) }
+    groups.forEachIndexed { gi, group ->
+      Spacer(Modifier.height(if (gi == 0) 4.dp else 12.dp))
+      //  عنوانِ گروه — `muted` نه `muted2`: muted2 در شب زیرِ ۴٫۵:۱ است
+      if (!compact) Text(group.title, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold, color = Shop.colors.muted, modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp))
+      else if (gi > 0) androidx.compose.material3.HorizontalDivider(Modifier.padding(horizontal = 10.dp, vertical = 4.dp), color = Shop.colors.border)
+      group.items.forEach { item ->
+        if (item.state == DeskMenu.State.SOON) {
+          //  «در دست ساخت»: دیده می‌شود ولی کلیک ندارد؛ در حالتِ فقط‌آیکن نمی‌آید
+          if (!compact) RailSoonItem(item.label, iconOf(item.id))
+        } else RailItem(item.id, item.label, item.key, iconOf(item.id), current == item.id, onPick, compact, badges[item.id] ?: 0)
+      }
+    }
     //  حالتِ منو — سه آیکنِ کوچک پایینِ منو
     Spacer(Modifier.height(14.dp))
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
@@ -110,6 +110,29 @@ fun DeskRail(
   }
 }
 
+/** بخشِ ساخته‌نشده — بی‌کلیک، با نشانِ «در دست ساخت» (متن + رنگ، نه رنگِ تنها) */
+@Composable
+private fun RailSoonItem(label: String, icon: ImageVector) {
+  Row(
+    Modifier
+      .fillMaxWidth()
+      .padding(horizontal = 12.dp, vertical = 8.dp)
+      .semantics(mergeDescendants = true) { disabled() },
+    verticalAlignment = Alignment.CenterVertically,
+  ) {
+    Icon(icon, contentDescription = null, tint = Shop.colors.muted, modifier = Modifier.size(19.dp))
+    Spacer(Modifier.width(12.dp))
+    Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, color = Shop.colors.muted, maxLines = 1)
+    Text(
+      DeskMenu.SOON_LABEL,
+      style = MaterialTheme.typography.labelSmall,
+      color = Shop.colors.muted,
+      maxLines = 1,
+      modifier = Modifier.clip(RoundedCornerShape(10.dp)).background(Shop.colors.muted.copy(alpha = 0.12f)).padding(horizontal = 6.dp, vertical = 1.dp),
+    )
+  }
+}
+
 @Composable
 private fun RailItem(id: String, label: String, key: String, icon: ImageVector, selected: Boolean, onPick: (String) -> Unit, compact: Boolean = false, badge: Int = 0) {
   if (compact) {
@@ -118,7 +141,7 @@ private fun RailItem(id: String, label: String, key: String, icon: ImageVector, 
       Modifier
         .fillMaxWidth()
         .clip(RoundedCornerShape(10.dp))
-        .background(if (selected) Shop.colors.primary.copy(alpha = 0.12f) else Shop.colors.surface.copy(alpha = 0f))
+        .background(if (selected) Shop.colors.primaryTint else Shop.colors.surface.copy(alpha = 0f))
         .clickable { onPick(id) }
         .padding(vertical = 11.dp),
       contentAlignment = Alignment.Center,
@@ -127,31 +150,35 @@ private fun RailItem(id: String, label: String, key: String, icon: ImageVector, 
     }
     return
   }
+  /*
+   *  انتخاب‌شده: زمینهٔ کم‌رنگِ اصلی، متنِ تیرهٔ پررنگ و آیکنِ رنگِ اصلی —
+   *  نه متنِ سفید روی رنگِ اصلی (در شب ۲٫۷:۱ بود، زیرِ ۴٫۵:۱).
+   */
   Row(
     Modifier
       .fillMaxWidth()
-      .clip(RoundedCornerShape(10.dp))
-      .background(if (selected) Shop.colors.primary else Shop.colors.surface.copy(alpha = 0f))
+      .clip(RoundedCornerShape(8.dp))
+      .background(if (selected) Shop.colors.primaryTint else Shop.colors.surface.copy(alpha = 0f))
       .clickable { onPick(id) }
-      .padding(horizontal = 12.dp, vertical = 10.dp),
+      .padding(horizontal = 12.dp, vertical = 9.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
-    val white = androidx.compose.ui.graphics.Color.White
-    Icon(icon, contentDescription = null, tint = if (selected) white else Shop.colors.muted, modifier = Modifier.size(19.dp))
+    Icon(icon, contentDescription = null, tint = if (selected) Shop.colors.primary else Shop.colors.muted, modifier = Modifier.size(19.dp))
     Spacer(Modifier.width(12.dp))
     Text(
       label,
       style = MaterialTheme.typography.bodyMedium,
-      color = if (selected) white else Shop.colors.text,
+      color = Shop.colors.text,
       fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+      maxLines = 1,
       modifier = Modifier.weight(1f),
     )
     //  میان‌بر فقط در راهنمای F1؛ این‌جا فقط شمارِ هشدار
     if (badge > 0) Text(
       badge.toString(),
       style = MaterialTheme.typography.labelSmall,
-      color = white,
-      modifier = Modifier.clip(RoundedCornerShape(10.dp)).background(if (selected) white.copy(alpha = 0.25f) else Shop.colors.danger).padding(horizontal = 7.dp, vertical = 1.dp),
+      color = MaterialTheme.colorScheme.onError,
+      modifier = Modifier.clip(RoundedCornerShape(10.dp)).background(Shop.colors.danger).padding(horizontal = 7.dp, vertical = 1.dp),
     )
   }
 }
@@ -172,6 +199,10 @@ private fun iconOf(id: String): ImageVector = when (id) {
   "settings" -> Icons.Filled.Settings
   "admin" -> Icons.Filled.AdminPanelSettings
   "orders" -> Icons.Filled.ShoppingBasket
-    "devices" -> Icons.Filled.Devices
+  "devices" -> Icons.Filled.Devices
+  "soon:orders" -> Icons.Filled.ShoppingCart
+  "soon:fulfil" -> Icons.Filled.Inventory
+  "soon:storefront" -> Icons.Filled.Storefront
+  "soon:delivery" -> Icons.Filled.DeliveryDining
   else -> Icons.Filled.MoreHoriz
 }

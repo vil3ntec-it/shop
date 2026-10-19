@@ -219,7 +219,7 @@ fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
           horizontalArrangement = Arrangement.SpaceBetween,
         ) {
           Text(
-            "در حال دانلود… ${progress.fa()}٪",
+            "در حال دانلود… ${progress.fa()}٪" + (UpdateManager.note?.let { " · $it" } ?: ""),
             style = MaterialTheme.typography.labelSmall,
             color = Shop.colors.muted,
           )

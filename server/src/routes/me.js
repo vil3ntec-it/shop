@@ -10,7 +10,6 @@ const { one, many, query, now } = require('../db');
 const v = require('../lib/validate');
 const { requireUser, optionalShop } = require('../middleware/auth');
 const { entitlementOf } = require('../lib/entitlement');
-const { permissionsOf } = require('../lib/permissions');
 const { FEATURES } = require('../lib/features');
 const subs = require('../lib/subscriptions');
 const plans = require('../lib/plans');
@@ -23,6 +22,10 @@ router.use(requireUser, optionalShop);
 
 router.get('/', async (req, res) => {
   const ent = req.shopId ? await entitlementOf(req.shopId) : null;
+  //  STF-01..03: فهرستِ قدیمی با لایه‌های دکان (هرگز بیش از نقش) + `policy` برای هستهٔ برنامه
+  const pol = req.member
+    ? await require('../lib/staff-perms').policyOf(req.shopId, req.member)
+    : { permissions: [], policy: null };
   res.json({
     user: publicUser(req.user),
     shop: req.member ? {
@@ -31,7 +34,8 @@ router.get('/', async (req, res) => {
       role: req.member.role,
       isOwner: req.member.role === 'owner',
     } : null,
-    permissions: req.member ? permissionsOf(req.member.role) : [],
+    permissions: pol.permissions,
+    policy: pol.policy,
     entitlement: ent ? {
       source: ent.source, features: ent.features,
       subscription: ent.subscription, trial: ent.trial,

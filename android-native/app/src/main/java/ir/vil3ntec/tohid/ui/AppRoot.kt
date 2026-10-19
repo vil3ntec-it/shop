@@ -37,6 +37,8 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -150,6 +152,8 @@ fun AppRoot(
         needsShop = !state.hasShop
         //  نقش از همین‌جا می‌آید؛ درخواستِ جدا لازم نیست
         state.role?.let { ir.vil3ntec.tohid.data.ShopRole.remember(context, it) }
+        //  لایه‌های مجوزِ دکان (STF-01..03) — نبودنش یعنی همان رفتارِ امروزِ نقش
+        if (state.hasShop) ir.vil3ntec.tohid.data.ShopRole.rememberPolicy(context, state.policy?.toString())
         //  دکان دارد: مطمئن شویم دفترِ روی گوشی هم مالِ همین دکان است.
         //  اگر حساب از دکانی به دکانِ دیگر رفته باشد، همین‌جا جابه‌جا
         //  می‌شود — وگرنه دفترِ دکانِ قبلی داخلِ دکانِ تازه می‌رفت.
@@ -192,6 +196,26 @@ fun AppRoot(
    */
   val lockStore = remember { ir.vil3ntec.tohid.data.LockStore(context) }
   var unlocked by rememberSaveable { mutableStateOf(false) }
+
+  /*
+   *  قفلِ خودکار پس از بی‌کاری — STF-05. آخرین لمس/کلید روی ساعتِ یکنوا؛
+   *  هر ۱۵ ثانیه سنجیده می‌شود. پیش‌فرض خاموش (`LockStore.idleMinutes = 0`)،
+   *  یعنی همان رفتارِ پیشین: فقط هنگامِ باز شدنِ برنامه می‌پرسد.
+   */
+  val lastActivity = remember { java.util.concurrent.atomic.AtomicLong(System.nanoTime() / 1_000_000) }
+  LaunchedEffect(unlocked) {
+    if (!unlocked) return@LaunchedEffect
+    lastActivity.set(System.nanoTime() / 1_000_000)
+    while (true) {
+      kotlinx.coroutines.delay(15_000)
+      if (ir.vil3ntec.tohid.core.perm.IdleLock.shouldLock(
+          lockStore.enabled, lockStore.idleMinutes, lastActivity.get(), System.nanoTime() / 1_000_000,
+        )) {
+        unlocked = false
+        break
+      }
+    }
+  }
 
   // یک بار، هنگام اولین اجرا: دفترِ دکان از نسخهٔ قبلی آورده می‌شود
   LaunchedEffect(Unit) {
@@ -473,6 +497,17 @@ fun AppRoot(
 
   AuroraBackground(tone = tone, animated = Motion.enabled) {
   Scaffold(
+    //  STF-05: هر لمس یا کلید (بی آنکه مصرفش کند) ساعتِ بی‌کاری را صفر می‌کند
+    modifier = Modifier
+      .pointerInput(Unit) {
+        awaitPointerEventScope {
+          while (true) {
+            awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+            lastActivity.set(System.nanoTime() / 1_000_000)
+          }
+        }
+      }
+      .onPreviewKeyEvent { lastActivity.set(System.nanoTime() / 1_000_000); false },
     containerColor = Color.Transparent,
     // سربرگ و نوارِ پایین خودشان فاصلهٔ نوارهای سیستم را می‌گیرند
     contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -657,7 +692,7 @@ fun AppRoot(
         //  مثلِ تنظیمات، سدِ دوم: اگر از هر راهِ دیگری به این مسیر
         //  برسد هم برای شاگرد باز نمی‌شود
         "audit" ->
-          if (ir.vil3ntec.tohid.data.ShopRole.canOpenSettings(context)) AuditLogScreen(data)
+          if (ir.vil3ntec.tohid.data.ShopRole.canSeeAudit(context)) AuditLogScreen(data)
           else LaunchedEffect(Unit) { open("more") }
         //  شاگرد اصلاً واردِ تنظیمات نمی‌شود. ردیفش هم در «بیشتر»
         //  نشان داده نمی‌شود، ولی این یکی سدِ دوم است: اگر از هر راهِ

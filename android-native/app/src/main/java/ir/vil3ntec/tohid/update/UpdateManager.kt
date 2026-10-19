@@ -38,6 +38,13 @@ object UpdateManager {
   var progress by mutableStateOf(-1)
     private set
 
+  /**
+   *  یک خطِ کوتاه کنارِ درصد، فقط وقتِ دانلود: «ادامه از ۴۲٪»، «اتصال قطع شد —
+   *  تلاشِ ۲ از ۸…»، «منتظرِ اینترنت…» (`ResumableDownload.statusText`)
+   */
+  var note by mutableStateOf<String?>(null)
+    private set
+
   /** کاری در جریان است (بررسی یا دانلود) */
   var busy by mutableStateOf(false)
     private set
@@ -135,16 +142,19 @@ object UpdateManager {
     busy = true
     progress = 0
     message = null
+    note = null
     job = scope.launch {
-      Updater.download(app, target) { progress = it }
+      Updater.download(app, target, onStatus = { note = it }) { progress = it }
         .onSuccess { file ->
           progress = -1
+          note = null
           ready = file
           message = Updater.lastNote
           if (andInstall) install(app)
         }
         .onFailure {
           progress = -1
+          note = null
           message = it.message ?: "دانلود ناموفق بود"
         }
       busy = false
@@ -187,6 +197,7 @@ object UpdateManager {
     job = null
     busy = false
     progress = -1
+    note = null
     message = "دانلود متوقف شد — با زدنِ دوباره از همین‌جا ادامه پیدا می‌کند."
   }
 }

@@ -98,6 +98,35 @@ class ReleaseFeedTest {
     ))
   }
 
+  // ── §۳۸.۹: حداقل نسخهٔ پشتیبانی‌شده ────────────────────────────────
+
+  @Test
+  fun `حداقل نسخه از سرور خوانده می‌شود؛ نبود یا نادرست یعنی حداقلی نیست`() {
+    val body = { min: String -> """{"tag":"tohid-native","version":"3.2.50",$min"assets":[{"name":"Tohid-Native-3.2.50.apk","size":5}]}""" }
+    assertEquals("3.2.45", ReleaseFeed.parseLatest(body(""""minVersion":"3.2.45","""), "tohid-native")!!.minVersion)
+    //  سرورِ قدیمی که minVersion نمی‌دهد
+    assertEquals("", ReleaseFeed.parseLatest(body(""), "tohid-native")!!.minVersion)
+    assertEquals("", ReleaseFeed.parseLatest(body(""""minVersion":"","""), "tohid-native")!!.minVersion)
+    assertEquals("", ReleaseFeed.parseLatest(body(""""minVersion":"سه","""), "tohid-native")!!.minVersion)
+    assertEquals("", ReleaseFeed.parseLatest(body(""""minVersion":null,"""), "tohid-native")!!.minVersion)
+  }
+
+  @Test
+  fun `زیرِ حداقل بودن عددی سنجیده می‌شود و هرگز از روی حدس نیست`() {
+    assertTrue(ReleaseFeed.belowMinimum("2.9.0", "2.10.0"))
+    assertTrue(ReleaseFeed.belowMinimum("2.14.1", "2.14.2"))
+    assertTrue(ReleaseFeed.belowMinimum("v2.14", "2.14.1"))
+    assertTrue(ReleaseFeed.belowMinimum("2.13.9-debug", "2.14"))
+    assertEquals(false, ReleaseFeed.belowMinimum("2.14.2", "2.14.2"))
+    assertEquals(false, ReleaseFeed.belowMinimum("2.14.0", "2.14"))
+    assertEquals(false, ReleaseFeed.belowMinimum("2.15.0", "2.14.2"))
+    //  حداقلِ خالی یا نادرست، یا نسخهٔ ناخوانا ⇒ هیچ پیامِ «به‌روز کنید»ی نیست
+    assertEquals(false, ReleaseFeed.belowMinimum("2.0.0", ""))
+    assertEquals(false, ReleaseFeed.belowMinimum("2.0.0", "سه"))
+    assertEquals(false, ReleaseFeed.belowMinimum("dev", "2.14.2"))
+    assertEquals(false, ReleaseFeed.belowMinimum("", "2.14.2"))
+  }
+
   @Test
   fun `شمارهٔ نادرست یا بی فهرستِ فایل یعنی به‌کار نمی‌آید`() {
     assertNull(ReleaseFeed.parseLatest("""{"tag":"tohid-native","version":"tohid-native","assets":[]}""", "tohid-native"))
