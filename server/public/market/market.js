@@ -26,7 +26,7 @@
     if (s.distanceKm !== null && s.distanceKm !== undefined) meta.appendChild(el('span', {}, K.icon('pin'), '≈ ' + K.fa(s.distanceKm, 1) + ' کیلومتر'));
     var hours = K.hours(s.status);
     if (hours) meta.appendChild(el('span', {}, K.icon('clock'), hours));
-    var sub = [s.categoryLabel, s.area].filter(Boolean).join(' · ') || (K.fa(s.productCount, 0) + ' کالا');
+    var sub = [s.categoryLabel, s.area].filter(Boolean).join('، ') || (K.fa(s.productCount, 0) + ' کالا');
     var closed = s.status && (s.status.badge === 'closed' || s.status.badge === 'offline');
     var a = el('a', { class: 'card shop-card' + (closed ? ' closed' : ''), attrs: { href: '/store/' + encodeURIComponent(s.slug), 'data-slug': s.slug } },
       K.avatar(s.title, s.accent, s.slug),
@@ -72,7 +72,7 @@
       state.offset = r.nextOffset || 0;
       $('more').hidden = !r.nextOffset;
       var cat = state.overview.categories.filter(function (c) { return c.key === state.category; })[0];
-      $('shops-title').textContent = cat ? cat.label : (state.near ? 'همهٔ دکان‌ها · نزدیک‌ترها اول' : 'همهٔ دکان‌ها');
+      $('shops-title').textContent = cat ? cat.label : (state.near ? 'همهٔ دکان‌ها، نزدیک‌ترها اول' : 'همهٔ دکان‌ها');
       $('shops-empty').hidden = r.total > 0;
       $('shops-empty-title').textContent = state.category ? 'هنوز دکانی در این دسته نیست' : 'هنوز دکانی در بازارچه نیست';
     }).catch(function (e) {
@@ -202,7 +202,7 @@
     return el('li', {}, el('a', { class: 'card prow', attrs: { href: '/store/' + encodeURIComponent(o.store.slug) + '#/o/' + o.token } },
       K.avatar(o.store.title, o.store.accent, o.store.slug, 'sm'),
       el('span', { class: 'grow' }, el('b', { text: o.store.title }),
-        el('small', { text: 'سفارشِ ' + K.fa(o.orderNo, 0) + (o.createdAt ? ' · ' + K.when(o.createdAt) : '') })),
+        el('small', { text: 'سفارشِ ' + K.fa(o.orderNo, 0) + (o.createdAt ? '، ' + K.when(o.createdAt) : '') })),
       end));
   }
   function drawOrders(list) {
@@ -212,7 +212,7 @@
   }
   function openOrders() {
     show('view-orders');
-    document.title = 'سفارش‌های من · بازارچه';
+    document.title = 'سفارش‌های من — بازارچه';
     var t = K.ticket();
     $('verify-card').hidden = Boolean(t);
     $('who').hidden = !t;

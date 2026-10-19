@@ -151,7 +151,7 @@
     if (!s) return { text: '', kind: 'off' };
     switch (s.badge) {
       case 'open_online': return { text: 'باز است', kind: 'ok' };
-      case 'open_unconfirmed': return { text: 'باز · اتصال تأیید نشده', kind: 'warn' };
+      case 'open_unconfirmed': return { text: 'باز، اتصال تأیید نشده', kind: 'warn' };
       case 'declared_until': return { text: 'آنلاین تا ' + K.clock(s.declaredUntil, s.timezone), kind: 'ok' };
       case 'closed': return { text: 'بسته است', kind: 'off' };
       case 'offline': return { text: 'موقتاً آفلاین', kind: 'off' };

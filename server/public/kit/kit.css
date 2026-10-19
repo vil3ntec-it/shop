@@ -252,7 +252,9 @@ button, input, textarea, select { font: inherit; color: inherit; }
 .p-price small { font-size: 12px; font-weight: 400; color: var(--muted); }
 .p-name { font-size: 14px; line-height: 1.55; padding-inline: var(--s1); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.9em; }
 .p-stock { padding: var(--s1) var(--s1) 0; }
-.p-stock .pill { font-size: 11.5px; min-height: 22px; padding: 2px 8px; max-width: 100%; white-space: normal; line-height: 1.45; }
+.p-stock .pill { font-size: 11.5px; min-height: 0; padding: 0; background: none; max-width: 100%; white-space: normal; line-height: 1.5; align-items: flex-start; }
+.p-stock .pill::before { margin-top: .5em; }
+.p-stock .pill.off { font-weight: 400; }
 .p-add {
   position: absolute; inset-inline-end: var(--s3); top: calc(var(--s3) + 0px); width: 40px; height: 40px; border-radius: 999px; border: 0;
   background: var(--surface); color: var(--text); box-shadow: var(--shadow-1); display: grid; place-items: center; cursor: pointer; z-index: 1;
