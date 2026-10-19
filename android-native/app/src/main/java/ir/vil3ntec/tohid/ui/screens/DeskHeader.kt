@@ -31,6 +31,9 @@ import ir.vil3ntec.tohid.ui.theme.Shape
  *  «نسخهٔ تازه» یک تراشهٔ کوچک کنارِ زنگ شد (`UpdateChip`) که با کلیک جزئیات را باز می‌کند.
  *  باقی: ☰ و برگشت، عنوان، زنگِ هشدارها، راهنمای کلیدها (F1)، و نام و نقشِ کاربر.
  */
+/** صفحه‌هایی که جست‌وجوی خودِ فهرست را دارند — سربرگ جست‌وجوی دوم نمی‌گذارد (قاعدهٔ «یک جست‌وجو») */
+private val PAGES_WITH_OWN_SEARCH = setOf("products", "debtors", "sales")
+
 @Composable
 fun DeskHeader(
   title: String,
@@ -47,6 +50,9 @@ fun DeskHeader(
   var bell by remember { mutableStateOf(false) }
   val c = Shop.colors
   val onSale = page == "sale"
+  //  صفحه‌ای که جست‌وجوی خودش را دارد (کادرِ اسکنِ صندوق، کادرِ فهرستِ کالاها/قرض‌داران/فروش‌ها):
+  //  سربرگ هیچ جست‌وجویی نمی‌گذارد — نه کادر، نه آیکن. Ctrl+K همچنان جست‌وجوی همه‌جاست.
+  val ownSearch = onSale || page in PAGES_WITH_OWN_SEARCH
 
   Row(
     Modifier
@@ -61,7 +67,7 @@ fun DeskHeader(
     Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = c.text, maxLines = 1)
     Spacer(Modifier.width(20.dp))
 
-    if (!onSale) {
+    if (!ownSearch) {
       //  جست‌وجو — کادرِ نمایشی که پنجرهٔ جست‌وجوی سریع را باز می‌کند
       Row(
         Modifier

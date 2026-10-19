@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -75,16 +76,32 @@ fun DeskRail(
       .padding(vertical = 10.dp, horizontal = 8.dp),
     verticalArrangement = Arrangement.spacedBy(2.dp),
   ) {
-    //  نشانِ برنامه
-    if (!compact) {
-      Row(Modifier.padding(horizontal = 10.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+    //  کلیدِ بازکردن/جمع‌کردنِ منو — بالای منو، همیشه پیدا (نسخهٔ ۲)؛ انتخاب برای همین صفحه
+    //  می‌ماند (صندوق `desk_rail_pos`، بقیه `desk_rail` — `AppRoot`)
+    val canToggle = mode == RailMode.FULL || mode == RailMode.COMPACT
+    if (compact) {
+      if (canToggle) RailTip("بازکردنِ منو") {
+        Box(
+          Modifier.fillMaxWidth().clip(Shape.button).clickable(onClickLabel = "بازکردنِ منو") { onMode(RailMode.FULL) }.padding(vertical = 10.dp),
+          contentAlignment = Alignment.Center,
+        ) { Icon(Icons.Filled.ViewSidebar, contentDescription = "بازکردنِ منو", tint = Shop.colors.muted, modifier = Modifier.size(20.dp)) }
+      }
+    } else {
+      //  نشانِ برنامه
+      Row(Modifier.padding(start = 10.dp, top = 10.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(34.dp).clip(Shape.button).background(Shop.colors.primary), contentAlignment = Alignment.Center) {
           Icon(Icons.Filled.Storefront, null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(20.dp))
         }
         Spacer(Modifier.width(10.dp))
-        Column {
-          Text("فروشگاه من", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Shop.colors.text)
-          Text("مدیریتِ دکان", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+        Column(Modifier.weight(1f)) {
+          Text("فروشگاه من", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Shop.colors.text, maxLines = 1)
+          Text("مدیریتِ دکان", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted, maxLines = 1)
+        }
+        if (canToggle) RailTip("جمع‌کردنِ منو (فقط آیکن)") {
+          Box(
+            Modifier.size(32.dp).clip(Shape.button).clickable(onClickLabel = "جمع‌کردنِ منو") { onMode(RailMode.COMPACT) },
+            contentAlignment = Alignment.Center,
+          ) { Icon(Icons.Filled.ViewCompact, contentDescription = "جمع‌کردنِ منو", tint = Shop.colors.muted, modifier = Modifier.size(19.dp)) }
         }
       }
     }
@@ -145,8 +162,8 @@ private fun RailSoonItem(label: String, icon: ImageVector) {
 @Composable
 private fun RailItem(id: String, label: String, key: String, icon: ImageVector, selected: Boolean, onPick: (String) -> Unit, compact: Boolean = false, badge: Int = 0) {
   if (compact) {
-    //  فقط آیکن — نام در راهنمای دکمه (برای صفحه‌خوان هم)
-    Box(
+    //  فقط آیکن — همان آیکن و همان ترتیبِ منوی کامل؛ نام در راهنمای هاور و برای صفحه‌خوان
+    RailTip(label) { Box(
       Modifier
         .fillMaxWidth()
         .clip(Shape.button)
@@ -156,7 +173,7 @@ private fun RailItem(id: String, label: String, key: String, icon: ImageVector, 
       contentAlignment = Alignment.Center,
     ) {
       Icon(icon, contentDescription = label, tint = if (selected) Shop.colors.primaryDark else Shop.colors.muted, modifier = Modifier.size(21.dp))
-    }
+    } }
     return
   }
   /*
@@ -216,4 +233,15 @@ private fun iconOf(id: String): ImageVector = when (id) {
   "soon:storefront" -> Icons.Filled.Storefront
   "soon:delivery" -> Icons.Filled.DeliveryDining
   else -> Icons.Filled.MoreHoriz
+}
+
+/** راهنمای کوچکِ هاور (و نگه‌داشتنِ انگشت) با نامِ بخش — برای منوی فقط‌آیکن */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun RailTip(label: String, content: @Composable () -> Unit) {
+  androidx.compose.material3.TooltipBox(
+    positionProvider = androidx.compose.material3.TooltipDefaults.rememberPlainTooltipPositionProvider(),
+    tooltip = { PlainTooltip { Text(label) } },
+    state = androidx.compose.material3.rememberTooltipState(),
+  ) { content() }
 }
