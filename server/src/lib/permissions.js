@@ -57,8 +57,10 @@ const MATRIX = {
   'orders.refund':        ['owner', 'manager'],
 
   //  تحویل و پیک (۲۲.۲ C) — پشتِ پرچمِ `shop.delivery`، پیش‌فرض خاموش.
-  //  «پیک» نقشِ عضویت نیست: عضوی است که ردیفِ فعالِ `shop_couriers` دارد و
-  //  فقط مأموریت‌های خودش را از `/api/courier` می‌بیند.
+  //  پیک عضوی است که ردیفِ فعالِ `shop_couriers` دارد و فقط مأموریت‌های خودش
+  //  را از `/api/courier` می‌بیند. نقشِ عضویتِ `courier` (DLV-01، مهاجرتِ ۱۰۲)
+  //  عمداً در هیچ سطرِ این جدول نیست: توکنش دامنهٔ `courier` دارد و جز درِ
+  //  پیک همه‌جا `403 courier_scope` می‌گیرد (`middleware/auth.js`).
   'delivery.view':        ['owner', 'manager', 'staff'],
   'delivery.assign':      ['owner', 'manager'],
   'delivery.handover':    ['owner', 'manager', 'staff'],
