@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.data
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -122,5 +123,72 @@ class CashShiftTest {
     assertEquals(1000.0, t.sales, 1e-9)
     assertEquals(2000.0, t.expected, 1e-9)
     assertEquals(t.expected, PayFlow.expectedCash(d, AuditEntry(id = "sh", createdAt = 100, amount = 1000.0), 200), 1e-9)
+  }
+
+  /** یافتهٔ بازبینِ پول (#286): ورود/خروجِ نقد داده است — با پرچمِ pay v2 و بی آن یک عدد */
+  @Test
+  fun `اولِ صندوق ۱۰۰۰، فروشِ کارتیِ ۵۰۰، خروجِ نقدِ ۳۰۰ ⇒ ۷۰۰ با پرچم و بی پرچم`() {
+    var d = (CashShift.open(ShopData(), 1000.0, "", "2026-10-19", 100, ::newId) as CashShift.Result.Ok).data
+    val shift = CashShift.current(d)!!
+    val f = PayFlow.saleFields(PayFlow.checkout(PayFlow.Draft(500.0, rows = listOf(PayFlow.DraftRow("afpay_card", "C1", "500")))).valueOrNull()!!)
+    d = d.copy(sales = listOf(Sale(id = "k", finalTotal = 500.0, paymentMethod = f.paymentMethod, paidAmount = f.paidAmount, payments = f.payments, createdAt = 110)))
+    val out = PayFlow.moveRow(d, shift.open, PayFlow.Move("cash_out", "300", "owner_withdrawal"), 120, ::newId).valueOrNull()!!
+    val inn = PayFlow.moveRow(d, shift.open, PayFlow.Move("cash_in", "50", "deposit"), 121, ::newId).valueOrNull()!!
+    d = d.copy(auditLog = d.auditLog + out)
+    val t = CashShift.totalsOf(d, shift, 200)
+    assertEquals(300.0, t.cashOut, 1e-9)
+    assertEquals(700.0, t.expected, 1e-9)
+    assertEquals(700.0, PayFlow.expectedCash(d, shift.open, 200), 1e-9)
+    //  ورودِ نقد هم؛ و ردیفِ صندوقِ دیگری (refId دیگر) شمرده نمی‌شود
+    d = d.copy(auditLog = d.auditLog + inn + out.copy(id = "other", refId = "another-shift"))
+    assertEquals(750.0, CashShift.totalsOf(d, shift, 200).expected, 1e-9)
+    assertEquals(750.0, PayFlow.expectedCash(d, shift.open, 200), 1e-9)
+    //  بستن هم همان عدد را می‌نویسد
+    val closed = (CashShift.close(d, 750.0, "", "", "2026-10-19", 210, ::newId) as CashShift.Result.Ok).data
+    assertTrue(closed.auditLog.last().notes.contains("بی اختلاف"))
+  }
+
+  /** یافتهٔ بازبینِ پول (#286): رسیدی که لغوِ نسیه می‌سازد فقط بدهی را می‌بندد، پولی به دخل نمی‌آورد */
+  @Test
+  fun `لغوِ فروشِ نسیه نقدِ دخل را بالا نمی‌برد؛ رسیدِ دستی و رسیدِ مرجوعی مثلِ پیش`() {
+    var d = (CashShift.open(ShopData(debtors = listOf(Debtor(id = "d1", name = "نوشا"))), 1000.0, "", "2026-10-19", 100, ::newId) as CashShift.Result.Ok).data
+    val shift = CashShift.current(d)!!
+    d = d.copy(
+      sales = listOf(
+        Sale(id = "c1", invoiceNumber = 7, finalTotal = 100.0, paymentMethod = "credit", debtorId = "d1", debtGiven = 100.0, remaining = 100.0, paidAmount = 0.0, createdAt = 110),
+      ),
+    )
+    d = (SalesEngine.cancel(d, "c1", "2026-10-19", 120, ::newId, "اشتباه") as SalesEngine.Result.Ok).data
+    val rcv = d.transactions.single()
+    assertEquals("receive", rcv.type)
+    assertEquals("c1", rcv.refId)
+    assertEquals(CashShift.CANCEL_RECEIPT, rcv.kind)
+    assertFalse(CashShift.isCashReceipt(rcv))
+    assertEquals(1000.0, CashShift.totalsOf(d, shift, 200).expected, 1e-9)
+    assertEquals(1000.0, PayFlow.expectedCash(d, shift.open, 200), 1e-9)
+    //  رسیدِ لغوِ برنامهٔ قدیمی (بی نشان، همان متنِ ثابت) هم؛ رسیدِ دستی شمرده می‌شود
+    val legacy = rcv.copy(id = "t-old", kind = null, refId = null)
+    val manual = DebtTransaction("t-man", "d1", "receive", 40.0, notes = "قسطِ ماه", createdAt = 130)
+    d = d.copy(transactions = d.transactions + legacy + manual)
+    assertFalse(CashShift.isCashReceipt(legacy))
+    assertTrue(CashShift.isCashReceipt(manual))
+    assertEquals(1040.0, CashShift.totalsOf(d, shift, 200).expected, 1e-9)
+    assertEquals(1040.0, PayFlow.expectedCash(d, shift.open, 200), 1e-9)
+    //  بدهی همان‌طور بسته می‌شود (رسیدِ لغو در دفترِ قرض‌دار هست)
+    assertEquals(100.0, d.sales.single().debtSettled, 1e-9)
+    //  مرجوعیِ نسیه: رسیدش نشان دارد ولی شمرده می‌شود تا کمِ کلِ مرجوعی را خنثی کند
+    d = d.copy(
+      sales = d.sales + Sale(id = "c2", invoiceNumber = 8, total = 100.0, finalTotal = 100.0, paymentMethod = "credit", debtorId = "d1",
+        debtGiven = 100.0, remaining = 100.0, paidAmount = 0.0, createdAt = 140),
+      saleItems = d.saleItems + SaleItem(id = "i2", saleId = "c2", productId = "", quantity = 1.0, unitPrice = 100.0, totalPrice = 100.0),
+    )
+    d = (SalesEngine.recordReturn(d, "c2", mapOf("i2" to 1.0), "خراب", "2026-10-19", 150, ::newId) as SalesEngine.Result.Ok).data
+    val ret = d.transactions.last()
+    assertEquals(CashShift.RETURN_RECEIPT to "c2", ret.kind to ret.refId)
+    assertTrue(CashShift.isCashReceipt(ret))
+    //  −۱۰۰ مرجوعی + ۱۰۰ رسیدِ مرجوعی = خالصِ صفر، مثلِ پیش
+    assertEquals(1040.0, CashShift.totalsOf(d, shift, 200).expected, 1e-9)
+    assertEquals(1040.0, PayFlow.expectedCash(d, shift.open, 200), 1e-9)
+    assertFalse(CashShift.isCashReceipt(manual.copy(id = "t-sc", kind = CashShift.STORE_CREDIT_RECEIPT)))
   }
 }

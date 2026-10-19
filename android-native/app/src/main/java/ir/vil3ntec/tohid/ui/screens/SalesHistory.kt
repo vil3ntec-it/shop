@@ -282,10 +282,14 @@ fun SalesHistoryScreen(
       text = {
         Column {
           if (t != null) {
-            listOf(
+            (listOf(
               "اول صندوق" to t.opening, "فروش نقدی" to t.sales, "رسید قرض‌داران" to t.receipts,
               "مرجوعی" to -t.returns, "مصارف" to -t.expenses, "پرداخت به تأمین‌کننده و خرید" to -t.suppliers,
-            ).forEach { (label, v) ->
+            ) + listOfNotNull(
+              //  PAY: ورود/خروجِ نقدِ صندوقِ pay v2 — داده است، با پرچمِ خاموش هم شمرده می‌شود
+              ("ورودِ نقد" to t.cashIn).takeIf { t.cashIn > 0 },
+              ("خروجِ نقد" to -t.cashOut).takeIf { t.cashOut > 0 },
+            )).forEach { (label, v) ->
               Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(label, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
                 Text("${if (v < 0) "−" else ""}${money(kotlin.math.abs(v))}", style = MaterialTheme.typography.bodySmall, color = Shop.colors.text)

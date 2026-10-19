@@ -149,6 +149,7 @@ fun ManagementScreen(d: ShopData, onOpen: (String) -> Unit) {
             HubLine("فروشِ نقدی", money(t.sales))
             HubLine("رسیدِ قرض‌داران", money(t.receipts))
             HubLine("مرجوعی و مصارف", "−" + money(t.returns + t.expenses + t.suppliers))
+            if (t.cashIn > 0 || t.cashOut > 0) HubLine("ورود و خروجِ نقد", (if (t.cashIn - t.cashOut < 0) "−" else "") + money(kotlin.math.abs(t.cashIn - t.cashOut)))
             HubLine("مورد انتظار", money(t.expected), Shop.colors.primary)
           }
         }

@@ -278,6 +278,23 @@ data class DebtTransaction(
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val dueDate: String? = null,
+  /**
+   *  ردیفِ ساختهٔ سیستم (نه دستِ کاربر): سندی که آن را ساخت — برای لغو و مرجوعی شناسهٔ
+   *  فاکتور. همان نامِ `refId`ِ `StockMovement`. ردیفِ دستی `null` است و نوشته نمی‌شود.
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val refId: String? = null,
+  /**
+   *  چرا سیستم ساختش — همان واژه‌های `StockMovement.type`:
+   *  `sale_cancel` (لغوِ فروشِ نسیه؛ بدهی بسته می‌شود، پولی به دخل نیامده)،
+   *  `customer_return` (مرجوعیِ فروشِ نسیه؛ کنارِ کمِ کلِ مرجوعی از دخل)،
+   *  `store_credit` (برای آینده: پرداخت با اعتبارِ فروشگاه). `null` = ردیفِ دستی.
+   *  صندوق `sale_cancel` و `store_credit` را نقد نمی‌شمارد (`CashShift.isCashReceipt`).
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val kind: String? = null,
 )
 
 @Serializable

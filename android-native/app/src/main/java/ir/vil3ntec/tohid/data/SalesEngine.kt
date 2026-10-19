@@ -514,6 +514,9 @@ object SalesEngine {
           date = today,
           notes = "لغو فروش — فاکتور #${sale.invoiceLabel() ?: "0"}",
           createdAt = now,
+          //  ساختهٔ سیستم: پولی به دخل نیامده، فقط بدهی بسته شد (صندوق نمی‌شمارد)
+          refId = sale.id,
+          kind = CashShift.CANCEL_RECEIPT,
         )
         updated = updated.copy(debtSettled = sale.debtSettled + outstanding)
       }
@@ -666,6 +669,9 @@ object SalesEngine {
           date = today,
           notes = "مرجوعی کالا — فاکتور #${sale.invoiceLabel() ?: "0"}",
           createdAt = now,
+          //  ساختهٔ سیستم؛ صندوق آن را کنارِ کمِ کلِ مرجوعی می‌شمارد تا خالص درست بماند
+          refId = sale.id,
+          kind = CashShift.RETURN_RECEIPT,
         )
         updatedSale = updatedSale.copy(debtSettled = sale.debtSettled + settle)
       }

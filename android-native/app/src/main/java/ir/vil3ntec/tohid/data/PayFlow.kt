@@ -346,7 +346,8 @@ object PayFlow {
       if (rows.isNotEmpty()) ev += 0 to ShiftEventInput(id = "sale:${s.id}", type = "sale", at = s.createdAt, rows = rows)
     }
     d.transactions.forEach { t ->
-      if (t.type != "receive" || !inWindow(t.createdAt) || minor(t.amount) <= 0) return@forEach
+      //  رسیدِ ساختهٔ لغو (فقط بستنِ بدهی) پولِ دخل نیست — همان `CashShift.isCashReceipt`
+      if (t.type != "receive" || !CashShift.isCashReceipt(t) || !inWindow(t.createdAt) || minor(t.amount) <= 0) return@forEach
       ev += 0 to ShiftEventInput(id = "rcv:${t.id}", type = "receipt", at = t.createdAt, method = CASH, amount = minor(t.amount))
     }
     d.auditLog.forEach { a ->
