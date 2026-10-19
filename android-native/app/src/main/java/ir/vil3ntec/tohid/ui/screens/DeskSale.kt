@@ -270,6 +270,7 @@ fun DeskSaleScreen(
         quantity = line.quantity,
         price = line.unitPrice ?: p?.salePrice ?: 0.0,
         customPrice = line.unitPrice != null,
+        category = p?.category.orEmpty(),
       )
     }
   }

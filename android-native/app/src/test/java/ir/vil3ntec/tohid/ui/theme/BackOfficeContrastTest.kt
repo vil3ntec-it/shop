@@ -86,6 +86,19 @@ class BackOfficeContrastTest {
   }
 
   @Test
+  fun `حرفِ اولِ کالا روی تهِ رنگِ دسته در روز و شب خواناست`() {
+    val bad = mutableListOf<String>()
+    for ((theme, list) in listOf("روز" to AvatarLight, "شب" to AvatarDark)) {
+      list.forEachIndexed { i, (bg, fg) -> check(bad, theme, "تهِ دستهٔ $i", fg, bg) }
+    }
+    assertTrue("زیرِ ۴٫۵:۱ — $bad", bad.isEmpty())
+    //  همان دسته ⇐ همان رنگ؛ روز و شب از پالتِ خودشان
+    assertEquals(avatarColors(LightColors, "خوراکی"), avatarColors(LightColors, " خوراکی "))
+    assertTrue(avatarColors(DarkColors, "خوراکی") in AvatarDark)
+    assertTrue(avatarColors(LightColors, "") in AvatarLight)
+  }
+
+  @Test
   fun `نسخهٔ ۲ — خطِ دور مویی است و سه ناحیه از هم جدا دیده می‌شوند`() {
     for ((theme, c) in listOf("روز" to LightColors, "شب" to DarkColors)) {
       //  «همه‌جا خطِ تیره» (نقدِ ۱۴۰۵/۰۷/۲۷): خطِ دورِ کارت حداکثر ۸٪

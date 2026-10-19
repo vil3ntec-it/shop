@@ -181,6 +181,8 @@ class OrderLineView(
   val price: Double,
   /** قیمتِ دستی (F3) — به رنگِ اصلی */
   val customPrice: Boolean,
+  /** دستهٔ کالا — رنگِ حرفِ اول همان رنگِ کارتِ کاتالوگ */
+  val category: String = "",
 )
 
 /** اقلامِ سبد (ردیفِ فشرده: عکس، نام و قیمتِ واحد، شمارنده، جمعِ ردیف) یا حالتِ خالی با راهنما */
@@ -229,7 +231,7 @@ fun OrderLines(
           .padding(horizontal = 6.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
       ) {
-        ProductThumb(line.id, line.name, 36.dp, showPhotos)
+        ProductThumb(line.id, line.name, 36.dp, showPhotos, tintKey = line.category)
         Spacer(Modifier.width(8.dp))
         Column(Modifier.weight(1f)) {
           Text(line.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis)

@@ -55,6 +55,7 @@ import ir.vil3ntec.tohid.qty
 import ir.vil3ntec.tohid.ui.screens.ProductPhoto
 import ir.vil3ntec.tohid.ui.theme.Shop
 import ir.vil3ntec.tohid.ui.theme.softCard
+import ir.vil3ntec.tohid.ui.theme.avatarColors
 import ir.vil3ntec.tohid.ui.theme.tabular
 import ir.vil3ntec.tohid.ui.theme.Shape as ShopShape
 
@@ -136,31 +137,41 @@ fun StockLine(stock: Double, minStock: Double, unit: String, modifier: Modifier 
   }
 }
 
-/** حرفِ اولِ نام روی تهِ رنگِ اصلی — جای عکسِ کالای بی‌عکس (و وقتی نمایشِ عکس خاموش است) */
+/**
+ *  حرفِ اولِ نام در دایرهٔ کوچکِ تهِ رنگِ دسته (`avatarColors`) — جای عکسِ کالای بی‌عکس (و وقتی
+ *  نمایشِ عکس خاموش است). کالاهای یک دسته یک رنگ‌اند، پس با یک نگاه کنارِ هم شناخته می‌شوند.
+ */
 @Composable
-fun ProductInitial(name: String, size: Dp, modifier: Modifier = Modifier) {
+fun ProductInitial(name: String, size: Dp, modifier: Modifier = Modifier, tintKey: String = name) {
+  val (bg, fg) = avatarColors(Shop.colors, tintKey)
   Box(
-    modifier.size(size).clip(ShopShape.button).background(Shop.colors.primaryTint),
+    modifier.size(size).clip(CircleShape).background(bg),
     contentAlignment = Alignment.Center,
   ) {
     Text(
       name.trim().take(1).ifEmpty { "؟" },
       fontSize = (size.value * 0.42f).sp,
       fontWeight = FontWeight.Bold,
-      color = Shop.colors.primaryDark,
+      color = fg,
       maxLines = 1,
     )
   }
 }
 
-/** عکسِ کالا یا حرفِ اول — یک جا برای کارت، ردیفِ جدول و ردیفِ سبد */
+/** عکسِ کالا یا حرفِ اول — یک جا برای ردیفِ جدول، ردیفِ سبد و فهرستِ مدیریت */
 @Composable
-fun ProductThumb(productId: String, name: String, size: Dp, showPhoto: Boolean, modifier: Modifier = Modifier) {
-  if (showPhoto) ProductPhoto(productId = productId, size = size, modifier = modifier, fallback = { ProductInitial(name, size) })
-  else ProductInitial(name, size, modifier)
+fun ProductThumb(productId: String, name: String, size: Dp, showPhoto: Boolean, modifier: Modifier = Modifier, tintKey: String = name) {
+  if (showPhoto) ProductPhoto(productId = productId, size = size, modifier = modifier, fallback = { ProductInitial(name, size, tintKey = tintKey) })
+  else ProductInitial(name, size, modifier, tintKey)
 }
 
-/** کارتِ کالا: عکس/حرفِ اول، نام، موجودی و قیمت؛ زدن ⇐ افزودن. نشانِ تعداد اگر در سبد است */
+/**
+ *  کارتِ کالا: عکس یا حرفِ اول (دایرهٔ کوچکِ رنگِ دسته — همان `ProductThumb`ِ فهرست‌ها)،
+ *  نام، موجودی و قیمت؛ زدن ⇐ افزودن. اگر در سبد است نشانِ «×n» کنارِ قیمت.
+ *
+ *  بازبینی (۱۴۰۵/۰۷/۲۷): جای عکسِ بزرگ نیمی از کارت را می‌گرفت و برای کالای بی‌عکس
+ *  فقط یک جعبهٔ خاکستری بود؛ حالا جای کارت مالِ نام، قیمت و موجودی است.
+ */
 @Composable
 fun ProductCard(
   product: Product,
@@ -176,57 +187,51 @@ fun ProductCard(
     append(product.name); append("، "); append(money(product.salePrice)); append(" افغانی")
     if (inCart > 0) { append("، در سبد: "); append(qty(inCart)) }
   }
-  Box(modifier) {
-    Column(
-      Modifier
-        .fillMaxWidth()
-        .softCard(c, ShopShape.card, fill = if (highlighted) c.primaryTint.compositeOver(c.surface) else c.surface)
-        .then(
-          when {
-            highlighted -> Modifier.border(2.dp, c.primary, ShopShape.card)
-            inCart > 0 -> Modifier.border(1.5.dp, c.primary.copy(alpha = 0.45f), ShopShape.card)
-            else -> Modifier
-          },
-        )
-        .semantics { selected = highlighted; contentDescription = label }
-        .clickable(onClickLabel = "افزودن به سبد", onClick = onAdd)
-        .padding(10.dp),
-    ) {
-      Box(
-        Modifier.fillMaxWidth().height(76.dp).clip(ShopShape.button).background(c.surface2),
-        contentAlignment = Alignment.Center,
-      ) {
-        ProductThumb(product.id, product.name, 60.dp, showPhoto)
-      }
-      Spacer(Modifier.height(8.dp))
-      Text(
-        product.name,
-        style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = c.text,
-        minLines = 2, maxLines = 2, overflow = TextOverflow.Ellipsis,
+  Column(
+    modifier
+      .fillMaxWidth()
+      .softCard(c, ShopShape.card, fill = if (highlighted) c.primaryTint.compositeOver(c.surface) else c.surface)
+      .then(
+        when {
+          highlighted -> Modifier.border(2.dp, c.primary, ShopShape.card)
+          inCart > 0 -> Modifier.border(1.5.dp, c.primary.copy(alpha = 0.45f), ShopShape.card)
+          else -> Modifier
+        },
       )
-      Spacer(Modifier.height(4.dp))
-      StockLine(stock, product.minStock, product.unit)
-      Spacer(Modifier.height(6.dp))
+      .semantics { selected = highlighted; contentDescription = label }
+      .clickable(onClickLabel = "افزودن به سبد", onClick = onAdd)
+      .padding(12.dp),
+  ) {
+    Row(verticalAlignment = Alignment.Top) {
+      ProductThumb(product.id, product.name, 44.dp, showPhoto, tintKey = product.category)
+      Spacer(Modifier.width(10.dp))
+      Column(Modifier.weight(1f)) {
+        Text(
+          product.name,
+          style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = c.text,
+          minLines = 2, maxLines = 2, overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(Modifier.height(2.dp))
+        StockLine(stock, product.minStock, product.unit)
+      }
+    }
+    Spacer(Modifier.height(10.dp))
+    Row(verticalAlignment = Alignment.CenterVertically) {
       Text(
         "${money(product.salePrice)} ؋",
+        Modifier.weight(1f),
         style = MaterialTheme.typography.titleMedium.tabular(), fontWeight = FontWeight.Bold, color = c.text, maxLines = 1,
       )
-    }
-    if (inCart > 0) {
-      //  نشانِ «در سبد» — گوشهٔ بالا (سمتِ شروع در راست‌به‌چپ)
-      Text(
-        "×${qty(inCart)}",
-        Modifier
-          .align(Alignment.TopStart)
-          .padding(6.dp)
-          .clip(ShopShape.chip)
-          .background(c.primary)
-          .padding(horizontal = 8.dp, vertical = 2.dp),
-        style = MaterialTheme.typography.labelMedium.tabular(),
-        fontWeight = FontWeight.Bold,
-        color = MaterialTheme.colorScheme.onPrimary,
-        maxLines = 1,
-      )
+      if (inCart > 0) {
+        Text(
+          "×${qty(inCart)}",
+          Modifier.clip(ShopShape.chip).background(c.primary).padding(horizontal = 8.dp, vertical = 2.dp),
+          style = MaterialTheme.typography.labelMedium.tabular(),
+          fontWeight = FontWeight.Bold,
+          color = MaterialTheme.colorScheme.onPrimary,
+          maxLines = 1,
+        )
+      }
     }
   }
 }
@@ -312,7 +317,7 @@ fun ProductTable(
             .padding(horizontal = 10.dp),
           verticalAlignment = Alignment.CenterVertically,
         ) {
-          ProductThumb(p.id, p.name, 32.dp, showPhotos)
+          ProductThumb(p.id, p.name, 32.dp, showPhotos, tintKey = p.category)
           Spacer(Modifier.width(10.dp))
           Column(Modifier.weight(1f)) {
             Text(p.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
