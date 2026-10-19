@@ -68,6 +68,7 @@ private val PAGE_TITLES = mapOf(
   "profile" to "حساب من",
   "team" to "کارمندان دکان",
   "orders" to "سفارش‌ها",
+  "storefront" to "ویترینِ اینترنتی",
   //  phone v3 §F: جست‌وجوی کامل و ویرایشگرِ نوارِ پایین
   ir.vil3ntec.tohid.ui.components.common.PhoneNav.SEARCH to "جست‌وجو",
   ir.vil3ntec.tohid.ui.components.common.PhoneNav.EDITOR to "نوارِ پایین",
@@ -468,6 +469,9 @@ fun AppRoot(
     "dashboard", ir.vil3ntec.tohid.ui.components.common.PhoneNav.SEARCH, ir.vil3ntec.tohid.ui.components.common.PhoneNav.EDITOR,
   )
 
+  //  ویترین (فاز ۴): فقط وقتی سرور می‌گوید روشن است، بخشش دیده می‌شود
+  LaunchedEffect(Unit) { runCatching { StorefrontGate.refresh(context) } }
+
   //  گوشیِ جفت‌شده بارکد فرستاد ⇒ صفحهٔ فروش باز می‌شود و کالا به سبد می‌رود
   LaunchedEffect(Unit) {
     ir.vil3ntec.tohid.sync.PhoneScanner.load(context)
@@ -855,6 +859,7 @@ fun AppRoot(
         )
         "team" -> TeamScreen(snackbar)
         "orders" -> OrdersScreen(snackbar) { sub = null }
+        "storefront" -> if (StorefrontGate.visible) StorefrontScreen(snackbar) else LaunchedEffect(Unit) { open("more") }
         "devices" -> DevicesScreen(data, snackbar)
         "more" -> MoreScreen(store, data, ::open)
       }

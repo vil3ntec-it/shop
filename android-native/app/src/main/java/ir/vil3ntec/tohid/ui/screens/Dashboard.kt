@@ -134,6 +134,13 @@ fun DashboardScreen(
     }
     Spacer(Modifier.height(14.dp))
 
+    /* «گزارشِ تازه» روشن: کارت‌های امروز و نشان‌های وضعیت از هستهٔ گزارش (پیش‌فرض خاموش) */
+    ReportFresh.load(context)
+    if (ReportFresh.on.value) {
+      HomeKpis(d, onOpen, canSeeMoney, columns = if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) 5 else 2)
+      Spacer(Modifier.height(14.dp))
+    }
+
     /*
      *  کامپیوتر: کارتِ فروش و اقدام کنارِ وضعیتِ دکان، و معاملاتِ اخیر کنارِ
      *  کارهای دیگر — نه پنج کارتِ تمام‌عرض زیرِ هم که نصفِ صفحه را خالی
