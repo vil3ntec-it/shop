@@ -327,7 +327,8 @@ internal fun PrintPreviewDialog(title: String, p: HwPages.Preview, onDismiss: ()
       Spacer(Modifier.height(Space.xs))
       Box(
         Modifier.fillMaxWidth().heightIn(max = 520.dp).verticalScroll(rememberScrollState())
-          .clip(Shape.card).border(1.dp, Shop.colors.border.copy(alpha = 0.4f), Shape.card).background(androidx.compose.ui.graphics.Color.White),
+          //  بی زمینهٔ ثابت: خودِ تصویرِ کاغذ سفید/سیاهِ کدر است (HardcodedColorsTest)
+          .clip(Shape.card).border(1.dp, Shop.colors.border.copy(alpha = 0.4f), Shape.card),
       ) {
         val bmp = p.bitmap
         if (bmp != null) Image(bmp.asImageBitmap(), contentDescription = "پیش‌نمایشِ کاغذ", Modifier.fillMaxWidth(),
