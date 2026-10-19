@@ -45,6 +45,10 @@ data class PhoneV3Colors(
   val tile: Color,
   val positive: Color,
   val negative: Color,
+  /** زمینهٔ سطحِ کالاها در صندوق (r3: سفیدِ گرم زیرِ کارت‌ها) — کارت‌ها روی آن `catalogCard` */
+  val catalogPage: Color,
+  /** کارتِ کالا در صندوق (r3: سفیدِ خالص) */
+  val catalogCard: Color,
 )
 
 val PhoneV3Light = PhoneV3Colors(
@@ -69,6 +73,8 @@ val PhoneV3Light = PhoneV3Colors(
   tile = Color(0xFFF4F2FA),
   positive = Color(0xFF1E9E5A),
   negative = Color(0xFFE5484D),
+  catalogPage = Color(0xFFF7F6F2),
+  catalogCard = Color(0xFFFFFFFF),
 )
 
 //  شب: سطحِ کالاها تیره می‌شود ولی زمینهٔ سبد همچنان سیاهِ کامل است
@@ -94,6 +100,8 @@ val PhoneV3Dark = PhoneV3Colors(
   tile = Color(0xFF1E1B26),
   positive = Color(0xFF34C77B),
   negative = Color(0xFFFF6B6B),
+  catalogPage = Color(0xFF17171B),
+  catalogCard = Color(0xFF232328),
 )
 
 object PhoneV3 {
@@ -115,4 +123,6 @@ object PhoneV3 {
   val navHeight = 64.dp
   /** بلندیِ ردیفِ تنظیمات (r5) */
   val rowHeight = 52.dp
+  /** کارتِ کالا در صندوق (r3) */
+  val catalogCardRadius = 20.dp
 }
