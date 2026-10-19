@@ -351,13 +351,27 @@ async function v1Guard(req, res, next) {
       const v = validateOp('shop', raw);
       if (!v.ok) return;                       //  خودِ v1 ردش می‌کند، با دلیلِ خودش
       const need = needOfV1(v.op);
-      if (need && core.defaultMode(ctx.role, need.perm) !== 'deny') cands.push({ i, op: v.op, need });
+      if (need) cands.push({ i, op: v.op, need });
     });
     if (!cands.length) return next();
     const deviceId = String(req.body?.device_id || req.body?.deviceId || '').slice(0, 64);
     const rejected = new Map();
     for (const { i, op, need } of cands) {
       const slip = isPlainObject(op.fields) && isPlainObject(op.fields.approval) ? op.fields.approval : null;
+      if (core.defaultMode(ctx.role, need.perm) === 'deny') {
+        //  نقشی که امروز این کار را ندارد (شاگرد): `authorizeOp`ِ v1 (مشترک با پمپ، دست‌نخورده)
+        //  با نقش ردش می‌کند — همان رفتار و کدِ امروز. فقط اگر برگه آورده، دلیلِ روشن‌تر:
+        //  تأییدِ شاگرد فقط از راهِ Sync v3 می‌نشیند.
+        if (!slip) continue;
+        const out = {
+          reason: 'approval_needs_v3', box: 'approval_rejected',
+          detail: { perm: need.perm, requester: ctx.userId || '', role: ctx.role || '', path: 'v1', slip_error: 'approval_needs_v3',
+            approver: typeof slip.by === 'string' ? slip.by.slice(0, 80) : '' },
+        };
+        rejected.set(i, { op_id: String(op.op_id || ''), status: 'rejected', reason: out.reason });
+        await boxV1(ctx, op, deviceId, out);
+        continue;
+      }
       const out = await judge(null, ctx, need, slip, {
         //  opِ بی زمان (برنامهٔ خیلی قدیمی) ⇒ فقط سنجشِ زمان کنار می‌رود؛ برگه هنوز یک‌بارمصرف و بسته به سند است
         opId: op.op_id, at: Number(op.ts) > 0 ? Number(op.ts) : undefined, deviceId, path: 'v1',

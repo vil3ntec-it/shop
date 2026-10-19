@@ -365,5 +365,11 @@ test('Sync v1: بیش از سقف بی برگه در جای خودش «rejected�
   //  زیرِ سقف و شاگرد (همان قاعدهٔ امروزِ v1)
   assert.equal((await push1(manager, 'm-v1', [v1sale('s-v1-ok', 100, 5)])).body.results[0].status, 'applied');
   assert.equal((await push1(staff, 's-v1', [v1sale('s-v1-st', 100, 5)])).body.results[0].reason, 'discount_not_allowed');
+  //  شاگردِ «نیازمند تأیید» با برگه از راهِ v1: دلیلِ روشن (v1ِ پمپ‌مشترک نقش را می‌سنجد)؛ برگه مصرف نمی‌شود
+  const ss = slip(ownerKey, { doc: 'sales/s-v1-st2', perm: 'sales.discount', pct_bp: 500, amount: 500 });
+  const st2 = v1sale('s-v1-st2', 100, 5, { approval: ss });
+  assert.equal((await push1(staff, 's-v1', [st2])).body.results[0].reason, 'approval_needs_v3');
+  assert.equal((await boxOf(st2.op_id)).detail.slip_error, 'approval_needs_v3');
+  assert.equal(await one('SELECT 1 FROM shop_approvals WHERE shop_id=$1 AND nonce=$2', [shopId, ss.nonce]), null);
   assert.equal((await setRole('manager', {})).status, 200);
 });
