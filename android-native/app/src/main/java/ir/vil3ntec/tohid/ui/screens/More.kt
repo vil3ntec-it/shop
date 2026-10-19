@@ -23,7 +23,6 @@ import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Devices
-import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.LocalShipping
@@ -31,6 +30,7 @@ import androidx.compose.material.icons.filled.ManageSearch
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.ShoppingBasket
+import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.filled.WorkspacePremium
 import ir.vil3ntec.tohid.ui.theme.Shop
 
