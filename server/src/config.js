@@ -335,6 +335,20 @@ const config = {
     uploadMax:      num(process.env.RATE_CHAT_UPLOAD_MAX, 60),
   },
 
+  //  اعتماد، شکایت و تخلفِ بازارچه (v3 §۳۸.۶) — پشتِ پرچمِ `market.trust`، پیش‌فرض خاموش.
+  trust: {
+    //  سقفِ ماندگار (در دیتابیس، پس از راه‌اندازیِ دوباره هم سر جاست) در ۲۴ ساعت
+    dailyPerPhone:  num(process.env.TRUST_DAILY_PER_PHONE, 5),
+    dailyPerIp:     num(process.env.TRUST_DAILY_PER_IP, 20),
+    //  سقفِ حافظه‌ای در پنجرهٔ `rateLimit.windowMs`
+    fileMax:        num(process.env.RATE_TRUST_FILE_MAX, 10),
+    fileIpMax:      num(process.env.RATE_TRUST_FILE_IP_MAX, 30),
+    uploadMax:      num(process.env.RATE_TRUST_UPLOAD_MAX, 30),
+    imageMax:       num(process.env.TRUST_IMAGE_MAX_KB, 1536) * 1024,
+    evidenceMax:    num(process.env.TRUST_EVIDENCE_MAX, 5),
+    appealDays:     num(process.env.TRUST_APPEAL_DAYS, 14),
+  },
+
   corsOrigins: list(process.env.CORS_ORIGIN || process.env.CORS_ORIGINS),
 
   allowRegistration: bool(process.env.ALLOW_REGISTRATION, true),

@@ -221,7 +221,7 @@ const MOUNTS = {
   'admin-staff-perms.js': '/admin/shops/:id/staff-perms',
   'admin-sync.js': '/admin/sync', 'admin-platform.js': '/admin', 'admin-pump.js': '/admin/pump',
   'admin-notices.js': '/admin', 'admin-sales.js': '/admin',
-  'admin-shop-chat.js': '/admin/shop-chat',
+  'admin-shop-chat.js': '/admin/shop-chat', 'admin-trust.js': '/admin/trust',
 };
 const PUBLIC = new Set(['POST /admin/login']);   // تنها درِ بی‌توکن: خودِ ورود
 
