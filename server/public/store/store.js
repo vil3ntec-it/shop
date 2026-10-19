@@ -596,9 +596,16 @@
 
   function renderOrder(o, token) {
     $('o-title').textContent = 'سفارشِ شمارهٔ ' + K.fa(o.orderNo, 0);
-    K.clear($('o-pill')).appendChild(el('span', { class: 'pill ' + K.orderKind(o.status), text: K.ORDER[o.status] || o.status }));
+    var st = $('o-status');
     var why = o.statusReason && K.REASON[o.statusReason] ? ' — ' + K.REASON[o.statusReason] : '';
-    $('o-status').textContent = (o.fulfillment === 'pickup' ? 'دریافت از دکان' : 'ارسال به نشانیِ شما') + '، ' + K.when(o.createdAt) + why;
+    st.className = 'pill ' + K.orderKind(o.status);
+    st.textContent = (K.ORDER[o.status] || o.status) + why;
+    $('o-meta').textContent = (o.fulfillment === 'pickup' ? 'دریافت از دکان' : 'ارسال به نشانیِ شما') + '، ' + K.when(o.createdAt);
+    //  ORD-16: هر تغییر با زمانش (خلاصه در پله‌ها، همه این‌جا)
+    var tl = K.clear($('o-timeline'));
+    (o.timeline || []).forEach(function (e) {
+      tl.appendChild(el('li', {}, el('span', { text: K.ORDER[e.status] || e.status }), el('span', { class: 'num', text: K.when(e.at) })));
+    });
     var steps = K.clear($('o-steps'));
     K.orderSteps(o).forEach(function (s) {
       var dot = el('span', { class: 'dot' });
@@ -653,8 +660,10 @@
         if (FINAL.indexOf(r.order.status) < 0) pollTimer = setTimeout(function () { if (!document.hidden && location.hash === '#/o/' + token) load(); else pollTimer = setTimeout(load, 20000); }, 20000);
       }).catch(function (e) {
         $('o-title').textContent = 'سفارش';
-        K.clear($('o-pill')); K.clear($('o-steps')); K.clear($('o-lines')); K.clear($('o-totals'));
-        $('o-status').textContent = e.status === 404 ? 'این سفارش پیدا نشد.' : e.message;
+        K.clear($('o-steps')); K.clear($('o-lines')); K.clear($('o-totals')); K.clear($('o-timeline'));
+        $('o-status').className = 'pill err';
+        $('o-status').textContent = e.status === 404 ? 'پیدا نشد' : 'خطا';
+        $('o-meta').textContent = e.status === 404 ? 'این سفارش پیدا نشد.' : e.message;
         $('o-cancel').hidden = true; $('o-reorder').hidden = true;
       });
     };

@@ -50,6 +50,9 @@
 
 #o-title { font-size: 20px; }
 #o-steps { margin-top: var(--s5); }
+.history summary { cursor: pointer; color: var(--primary); font-size: 13px; font-weight: 700; }
+.timeline { margin-top: var(--s2); display: grid; gap: var(--s1); }
+.timeline li { display: flex; justify-content: space-between; gap: var(--s3); font-size: 13px; color: var(--muted); }
 
 @media (min-width: 960px) {
   .shop-head { padding: var(--s4) 0 0; }
