@@ -115,8 +115,14 @@ async function open(width) {
   await pg.route(`${base}/**`, async (route) => {
     const u = new URL(route.request().url());
     if (offlinePresence && u.pathname.endsWith('/shop/storefront/presence')) return route.abort('internetdisconnected');
-    const response = await route.fetch({ url: apiBase + u.pathname + u.search });
-    await route.fulfill({ response });
+    //  درخواستِ پس‌زمینه‌ای (نوسازیِ نشست، همگام‌سازی) ممکن است وقتی هنوز در راه است صفحه بسته شود؛
+    //  آن خطا از آزمون نیست. هر خطای دیگر همچنان آزمون را می‌شکند.
+    try {
+      const response = await route.fetch({ url: apiBase + u.pathname + u.search });
+      await route.fulfill({ response });
+    } catch (e) {
+      if (!/closed|disposed/i.test(String(e && e.message || e))) throw e;
+    }
   });
   await pg.evaluate((tok) => {
     localStorage.setItem('tohid-shop-auth-v1', JSON.stringify({ method: 'local', value: '', name: 'صاحب', loginAt: 1 }));
