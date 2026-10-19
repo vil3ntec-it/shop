@@ -84,8 +84,11 @@ private val PAGE_TITLES = mapOf(
   //  قیمت‌های سرور را نشان می‌دهد، این یکی حالِ اشتراکِ خودِ این حساب.
   "myplan" to "اشتراکِ من",
   "support" to "پشتیبانی",
+  //  چتِ مشتری ↔ دکان (v3 §۳۳) — فقط وقتی سرور پرچمِ `shop.chat` را روشن گفته
+  "chat" to "گفت‌وگو با مشتری",
   "profile" to "حساب من",
   "team" to "کارمندان دکان",
+  "orders" to "سفارش‌ها",
 )
 
 /**
@@ -170,6 +173,10 @@ fun AppRoot(
         if ((failure as? ir.vil3ntec.tohid.core.net.ApiFailure)?.code == "no_shop") {
           needsShop = true
         }
+        //  این حساب حالا «پیک» است (DLV-01): سرور فقط درِ پیک را باز می‌کند ⇒ حالتِ پیک
+        if ((failure as? ir.vil3ntec.tohid.core.net.ApiFailure)?.code == "courier_scope") {
+          ir.vil3ntec.tohid.data.ShopRole.remember(context, ir.vil3ntec.tohid.data.ShopRole.COURIER)
+        }
       }
   }
 
@@ -247,6 +254,8 @@ fun AppRoot(
   LifecycleEventEffect(Lifecycle.Event.ON_STOP) {
     ir.vil3ntec.tohid.sync.AutoSync.stopPolling()
   }
+  //  بخشِ «سفارش‌ها»: فقط اگر سرور برای این دکان روشن گفته، و فقط وقتی برنامه جلوی چشم است
+  OrdersLive.Host()
 
   //  اگر دفتر دیرتر از ON_START آماده شد، همان‌جا شروع می‌کنیم
   LaunchedEffect(loaded) {
@@ -444,6 +453,8 @@ fun AppRoot(
   LaunchedEffect(Unit) {
     ir.vil3ntec.tohid.sync.PhoneScanner.load(context)
     PhotoPrefs.load(context)
+    //  چتِ دکان: پرچم را بپرس و پیام‌های مانده در صف را (اگر هست) بفرست
+    ir.vil3ntec.tohid.data.ShopChatSync.refreshConfig(context)
   }
   val phoneScan = ir.vil3ntec.tohid.sync.PhoneScanner.lastReceived.value
   LaunchedEffect(phoneScan) {
@@ -634,6 +645,7 @@ fun AppRoot(
             "products" to railBoard.outOfStock.size + railBoard.lowStock.size,
             "warehouse" to railBoard.expiring.size,
             "debtors" to railBoard.debtOverdue.size,
+            "orders" to OrdersLive.newCount,
           ),
         )
       }
@@ -782,6 +794,7 @@ fun AppRoot(
         "vip" -> VipScreen { sub = null }
         "myplan" -> MySubscriptionScreen()
         "support" -> SupportScreen { sub = null }
+        "chat" -> ShopChatScreen { sub = null }
         "profile" -> ProfileScreen(
           store = store,
           snackbar = snackbar,
@@ -790,6 +803,7 @@ fun AppRoot(
           onSubscription = { sub = "vip" },
         )
         "team" -> TeamScreen(snackbar)
+        "orders" -> OrdersScreen(snackbar) { sub = null }
         "devices" -> DevicesScreen(data, snackbar)
         "more" -> MoreScreen(store, data, ::open)
       }

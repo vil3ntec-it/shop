@@ -1,0 +1,100 @@
+/* بخشِ «سفارش‌ها» — فقط وقتی `license/orders-ui.js` آن را می‌سازد دیده می‌شود */
+
+.ord-tabs{display:flex; gap:6px; overflow-x:auto; padding:2px 0 10px; scrollbar-width:none;}
+.ord-tabs::-webkit-scrollbar{display:none;}
+.ord-tab{
+  flex:0 0 auto; display:inline-flex; align-items:center; gap:6px;
+  padding:8px 14px; border-radius:999px; border:1.5px solid var(--border);
+  background:var(--surface); color:var(--text); font:inherit; font-size:13px; font-weight:600; cursor:pointer;
+}
+.ord-tab.on{background:var(--primary); border-color:var(--primary); color:#fff;}
+.ord-count{min-width:20px; padding:0 6px; border-radius:999px; background:#b42318; color:#fff; font-size:11.5px; line-height:20px; text-align:center;}
+.ord-tab.on .ord-count{background:rgba(0,0,0,.32);}
+.ord-count[hidden]{display:none;}
+
+.ord-list{display:flex; flex-direction:column; gap:10px;}
+.ord-empty{padding:28px 12px; text-align:center; color:var(--muted); font-size:13.5px;}
+.ord-card{
+  display:flex; flex-direction:column; gap:8px; width:100%; text-align:right;
+  padding:12px 14px; border-radius:var(--radius-md); border:1px solid var(--border);
+  background:var(--surface); color:var(--text); font:inherit; cursor:pointer;
+}
+.ord-card:hover{border-color:var(--primary);}
+.ord-card-top{display:flex; align-items:center; gap:8px; min-width:0;}
+.ord-name{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600;}
+.ord-card-foot{display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:13px;}
+.ord-time{color:var(--muted); font-size:12.5px;}
+.ord-tags{display:flex; flex-wrap:wrap; gap:5px;}
+.ord-tag{padding:2px 9px; border-radius:999px; background:var(--surface-2); color:var(--text); font-size:12px;}
+.ord-tag.warn{background:var(--warning-tint); color:var(--text);}
+.ord-status{flex:0 0 auto; padding:2px 9px; border-radius:999px; font-size:12px; font-weight:700; background:var(--primary-tint); color:var(--text);}
+.ord-status.s-new{background:var(--danger-tint);}
+.ord-status.s-delivered, .ord-status.s-picked_up{background:var(--success-tint);}
+.ord-status.s-rejected, .ord-status.s-cancelled, .ord-status.s-auto_rejected,
+.ord-status.s-cancelled_by_customer, .ord-status.s-delivery_failed{background:var(--warning-tint);}
+.ord-more{margin-top:12px;}
+.ord-more[hidden]{display:none;}
+
+.ord-badge{display:inline-block; min-width:18px; margin-inline-start:6px; padding:0 5px; border-radius:999px; background:#b42318; color:#fff; font-size:11px; line-height:18px; text-align:center; font-style:normal;}
+.ord-badge[hidden]{display:none;}
+
+.ord-detail-box, .ord-new-box{max-width:560px;}
+.ord-status-line{display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:8px;}
+.ord-hint{color:var(--muted); font-size:12.5px;}
+.ord-h{margin:14px 0 6px; font-size:13px; color:var(--muted);}
+.ord-cust{display:flex; flex-wrap:wrap; align-items:center; gap:8px;}
+.ord-phone{font-weight:700; color:var(--text);}
+.ord-note{white-space:pre-wrap; color:var(--text);}
+.ord-actions{display:flex; flex-wrap:wrap; gap:8px; margin:12px 0 4px;}
+.ord-table-wrap{overflow-x:auto;}
+.ord-lines{width:100%; border-collapse:collapse; font-size:13px;}
+.ord-lines th, .ord-lines td{padding:6px 4px; border-bottom:1px solid var(--border); text-align:right; vertical-align:top;}
+.ord-lines th{color:var(--muted); font-weight:600;}
+.ord-lines small{display:block; color:var(--muted);}
+.ord-sum{display:grid; grid-template-columns:1fr auto; gap:4px 12px; margin-top:8px; font-size:13.5px;}
+.ord-sum dd{margin:0; text-align:left;}
+.ord-timeline{list-style:none; margin:0; padding:0; border-inline-start:2px solid var(--border);}
+.ord-timeline li{position:relative; display:flex; flex-direction:column; gap:2px; padding:4px 14px 10px; font-size:13px;}
+.ord-timeline li::before{content:""; position:absolute; inset-inline-start:-6px; top:9px; width:10px; height:10px; border-radius:50%; background:var(--primary);}
+.ord-timeline time{color:var(--muted); font-size:12px;}
+
+.ord-reasons{border:0; margin:0 0 12px; padding:0; display:flex; flex-direction:column; gap:8px;}
+.ord-reasons legend{font-size:12.5px; font-weight:600; color:var(--muted); margin-bottom:6px;}
+.ord-radio{display:flex; align-items:center; gap:8px; font-size:13.5px; color:var(--text); cursor:pointer;}
+.ord-err{min-height:1em; color:var(--danger); font-size:12.5px; margin:6px 0 0;}
+.ord-err:empty{display:none;}
+
+.ord-lines-box{border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px; margin:0 0 14px;}
+.ord-lines-box legend{font-size:12.5px; font-weight:600; color:var(--muted); padding:0 4px;}
+.ord-line{display:grid; grid-template-columns:minmax(0,2.2fr) minmax(0,1fr) minmax(0,1.2fr) auto; gap:6px; margin-bottom:8px;}
+.ord-line .form-input{padding:9px 8px;}
+.ord-live-note{margin:0 0 10px;}
+
+/* نشانِ وضعیت: متن + رنگ + نقطه */
+.ord-status{display:inline-flex; align-items:center; gap:6px;}
+.ord-dot{width:7px; height:7px; border-radius:50%; background:var(--primary); flex:0 0 auto;}
+.ord-status.s-new .ord-dot{background:var(--danger);}
+.ord-status.s-delivered .ord-dot, .ord-status.s-picked_up .ord-dot{background:var(--success);}
+.ord-status.s-rejected .ord-dot, .ord-status.s-cancelled .ord-dot, .ord-status.s-auto_rejected .ord-dot,
+.ord-status.s-cancelled_by_customer .ord-dot, .ord-status.s-delivery_failed .ord-dot{background:var(--warning);}
+
+/* کلیدِ نمای کارتی/جدولی */
+.ord-view{display:inline-flex; gap:2px; padding:2px; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--surface);}
+.ord-view[hidden]{display:none;}
+.ord-view-btn{display:inline-flex; align-items:center; justify-content:center; width:34px; height:30px; border:0; border-radius:6px; background:transparent; color:var(--muted); cursor:pointer;}
+.ord-view-btn[aria-pressed="true"]{background:var(--primary-tint); color:var(--text);}
+
+/* نمای جدولی */
+.ord-table{width:100%; border-collapse:collapse; font-size:13px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md);}
+.ord-table th, .ord-table td{padding:9px 10px; border-bottom:1px solid var(--border); text-align:right; white-space:nowrap;}
+.ord-table th{color:var(--muted); font-weight:600; font-size:12px;}
+.ord-table tbody tr{cursor:pointer;}
+.ord-table tbody tr:hover{background:var(--surface-2);}
+.ord-table td small{display:block; color:var(--muted); font-size:11.5px;}
+.ord-num{text-align:left !important; font-variant-numeric:tabular-nums;}
+.ord-row-open{border:0; background:transparent; color:var(--text); font:inherit; font-weight:700; cursor:pointer; padding:0;}
+
+/* اسکلتِ بارگذاری */
+.ord-skeleton{display:flex; flex-direction:column; gap:10px;}
+.ord-skeleton i{display:block; height:64px; border-radius:var(--radius-md); background:var(--surface-2);}
+.ord-empty .btn{margin-top:10px;}
