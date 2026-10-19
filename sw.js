@@ -15,7 +15,7 @@
  */
 const BETA = /\/beta\/sw\.js$/.test(self.location.pathname);
 const BETA_PATH = new URL('./beta/', self.location).pathname;
-const VERSION = (BETA ? 'beta-' : '') + 'tohid-shop-v60';
+const VERSION = (BETA ? 'beta-' : '') + 'tohid-shop-v61';
 const SHELL_CACHE = VERSION + '-shell';
 const FONT_CACHE = VERSION + '-fonts';
 
@@ -65,6 +65,11 @@ const SHELL_ASSETS = [
   //  LOC-01/05/07/09: هستهٔ خالصِ متن و تقویم — بی آن‌ها فاکتور و تاریخ به راهِ قدیم برمی‌گردند
   './license/text-core.js',
   './license/calendar-core.js',
+  //  «گزارشِ تازه»: هستهٔ مشترکِ گزارش، تابلوی خانه و صفحه‌اش — بی این‌ها روی نصبِ آفلاین بار نمی‌شدند
+  './license/report-core.js',
+  './license/report-board.js',
+  './license/report-ui.js',
+  './license/report-ui.css',
   './license/photo-studio.js',
   //  جای دفتر (localStorage یا IndexedDB) — بی آن، دفترِ IndexedDB روی نصبِ آفلاین باز نمی‌شد
   './license/ledger-store.js',
