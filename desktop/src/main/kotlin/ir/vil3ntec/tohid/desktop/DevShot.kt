@@ -74,6 +74,13 @@ object DevShot {
                 Thread.sleep(500)
               }
               "shot" -> shot(arg)
+              //  پیش‌نمایشِ گوشیِ ۳۹۰×۸۴۴ (`PhonePreview`): phone:nav|nav-dark|off — و عکس فقط از همان پنجره
+              "phone" -> { java.awt.EventQueue.invokeAndWait { PhonePreview.screen.value = arg.takeIf { it.isNotBlank() && it != "off" } }; Thread.sleep(1800) }
+              "pshot" -> {
+                val w = Window.getWindows().firstOrNull { it.isShowing && (it as? java.awt.Dialog)?.title == PhonePreview.TITLE }
+                if (w == null) shot(arg)
+                else ImageIO.write(robot.createScreenCapture(Rectangle(w.x, w.y, w.width, w.height)), "png", File(dir, "$arg.png"))
+              }
               "click" -> {
                 val (x, y) = arg.split(',').map { it.trim().toInt() }
                 robot.mouseMove(x, y); Thread.sleep(80)

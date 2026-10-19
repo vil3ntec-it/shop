@@ -81,6 +81,8 @@ jobs:
           S="$S;go:dashboard;key:F11;wait:2000;shot:16-fullscreen-dashboard"
           S="$S;help:on;wait:1500;shot:17-shortcuts-F1;help:off"
           S="$S;key:F11;wait:1500;theme:DARK;go:products;wait:1500;shot:18-products-dark;prodsel:2;wait:800;shot:18b-products-dark-bulk;prodsel:0;go:dashboard;wait:1500;shot:19-dashboard-dark;theme:LIGHT"
+          #  شاخهٔ موقتِ «پیش» (phone-ui): فقط صفحه‌های گوشیِ main در پنجرهٔ ۳۹۰×۸۴۴
+          S="wait:6000;shot:00-start;key:ESCAPE;wait:1500;phone:settings;wait:2500;pshot:b21-phone-settings;phone:settings-dark;wait:2500;pshot:b21b-phone-settings-dark;phone:profile;wait:2500;pshot:b22-phone-profile;phone:cart;wait:3000;pshot:b23-phone-cart-bar;phone:off"
           export JAVA_TOOL_OPTIONS="-Dtohid.shot=$RUNNER_TEMP/shots -Dtohid.shot.every=9000 -Dtohid.shot.exit=true -Dtohid.shot.script=$S -Dsun.jnu.encoding=UTF-8 -Dfile.encoding=UTF-8"
           timeout 600 xvfb-run -s "-screen 0 1440x900x24" ./gradlew --no-daemon -q -Pdev=true run || true
           ls -la "$RUNNER_TEMP/shots"
