@@ -52,6 +52,51 @@ function networkLabel(ip) {
   return n.includes(':') ? `${n}:…` : `${n}.x`;
 }
 
+/*
+ * ── نام و سکوی دستگاه را **خودِ درخواست** می‌گوید ───────────────────
+ * هر کس رمز یا کد را دارد می‌تواند نامِ دستگاه را «پشتیبانی: به فلان
+ * نشانی بروید» بگذارد؛ و این متن داخلِ اعلانی می‌نشیند که از طرفِ خودِ
+ * سامانه است (فیشینگ). پس:
+ *   • سکو فقط از فهرستِ شناخته‌شده، با برچسبِ خودِ سرور؛ بقیه نمی‌آید.
+ *   • نام فقط خطِ اول، بی نشانیِ وب/ایمیل/دامنه، بی رشته‌رقمِ بلند (تلفن،
+ *     کارت)، فقط حرف و رقم و فاصله و «-»/«_»، حداکثر ۲۴ نویسه، و همیشه با
+ *     برچسبِ «نامی که خودِ دستگاه گفته» — تا کسی آن را حرفِ سامانه نخواند.
+ */
+const PLATFORMS = {
+  android: 'اندروید', ios: 'آیفون', iphone: 'آیفون', ipad: 'آیپد',
+  windows: 'ویندوز', win32: 'ویندوز', linux: 'لینوکس', macos: 'مک', mac: 'مک', darwin: 'مک',
+  desktop: 'کامپیوتر', web: 'مرورگر', browser: 'مرورگر',
+};
+const DEVICE_NAME_MAX = 24;
+
+function platformLabel(raw) {
+  return PLATFORMS[String(raw || '').trim().toLowerCase()] || '';
+}
+
+function safeDeviceName(raw) {
+  const firstLine = String(raw || '').normalize('NFKC').split(/[\r\n\u2028\u2029]/)[0];
+  const words = firstLine
+    //  جهت‌دهی و دیگر نویسه‌های نامرئی (جز نیم‌فاصله) — متن را وارونه/پنهان نشان می‌دهند
+    .replace(/[\p{Cc}\p{Cf}]/gu, (ch) => (ch === '\u200c' ? ch : ''))
+    .split(/\s+/)
+    //  هر تکه‌ای که شبیهِ نشانی است کامل کنار می‌رود: ‎a://b‎، ‎www.‎، ایمیل، ‎x.yz‎
+    .filter((w) => !/:\/\/|www\.|@|[\p{L}\p{N}]\.[\p{L}\p{N}]/iu.test(w))
+    .map((w) => w
+      .replace(/[^\p{L}\p{M}\p{N}\u200c_-]/gu, '')
+      .replace(/\p{N}{5,}/gu, ''))
+    .filter(Boolean);
+  const chars = [...words.join(' ')];
+  return chars.length > DEVICE_NAME_MAX ? `${chars.slice(0, DEVICE_NAME_MAX).join('').trim()}…` : chars.join('');
+}
+
+/** «اندروید (نامی که خودِ دستگاه گفته: …)» — هر دو بخش پاک‌سازی‌شده. */
+function deviceLabel(device) {
+  const platform = platformLabel(device?.platform);
+  const name = safeDeviceName(device?.name);
+  const head = platform || 'دستگاه';
+  return name ? `${head} (نامی که خودِ دستگاه گفته: ${name})` : (platform || 'دستگاهِ بی‌نام');
+}
+
 /**
  *  عکسِ وضعیت **پیش از** ثبتِ دستگاه — بعد از `upsertDevice` دستگاهِ تازه
  *  دیگر تازه نیست و آخرین IP هم روی‌نویسی شده.
@@ -90,7 +135,7 @@ async function after(seen, { user, device, ip, app = 'shop', method = '' }) {
     const when = new Date(now()).toISOString().replace('T', ' ').slice(0, 16);
     const vars = {
       'نام': user.name || '',
-      'دستگاه': [device?.name, device?.platform].filter(Boolean).join(' · ') || 'دستگاهِ بی‌نام',
+      'دستگاه': deviceLabel(device),
       'شبکه': networkLabel(ip),
       'زمان': `${when} (UTC)`,
     };
@@ -122,4 +167,4 @@ async function after(seen, { user, device, ip, app = 'shop', method = '' }) {
   }
 }
 
-module.exports = { before, after, networkOf, networkLabel, enabled };
+module.exports = { before, after, networkOf, networkLabel, enabled, safeDeviceName, deviceLabel };

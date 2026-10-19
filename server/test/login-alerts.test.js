@@ -10,7 +10,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const h = require('./helpers');
 const config = require('../src/config');
-const { many, query } = require('../src/db');
+const { many, one, query } = require('../src/db');
+const codes = require('../src/lib/login-codes');
 
 test.before(async () => { await h.start(); });
 test.after(async () => {
@@ -122,4 +123,58 @@ test('حسابِ تازه‌ساخته (کمتر از ده دقیقه) دستگ�
   await query('UPDATE users SET created_at = created_at - 3600000 WHERE id=$1', [u.user.id]);
   assert.equal((await login(u, { device: { deviceId: 'dev-onboard-3', name: 'گوشیِ سوم', platform: 'android' } })).status, 200);
   assert.equal((await alertsOf(u.user.id)).length, 1, 'پس از پنجره، دستگاهِ تازه هشدار دارد');
+});
+
+/* ── یافته‌های بازبینیِ امنیتی ─────────────────────────────────────── */
+
+/** ورود با کدِ ایمیلی؛ کدِ خام فقط از دفتر — همان راهِ `login-contract.test.js` */
+async function emailCodeLogin(u, headers, extra = {}) {
+  const req = await h.api('POST', '/api/auth/shop/request-code', { body: { email: u.email }, headers });
+  assert.equal(req.status, 200, JSON.stringify(req.body));
+  const row = await one('SELECT code_sealed FROM login_requests WHERE request_id=$1', [req.body.request_id]);
+  const r = await h.api('POST', '/api/auth/shop/verify', {
+    body: { request_id: req.body.request_id, code: codes.unseal(row.code_sealed), ...extra }, headers,
+  });
+  //  «۶۰ ثانیه تا کدِ بعدی» را عقب می‌بریم تا ورودِ دوم منتظر نماند
+  await query('UPDATE login_requests SET created_at = created_at - 120000 WHERE request_id=$1', [req.body.request_id]);
+  return r;
+}
+
+test('ورود با کدِ ایمیلی (/api/auth/:app/verify) هم از دستگاهِ تازه هشدار می‌سازد', async () => {
+  const u = await settledUser('کدِ ایمیلی');
+  const head = { 'X-App': 'shop', 'X-Device': 'dev-email-code-1' };
+  const r = await emailCodeLogin(u, head, { device_name: 'لپ‌تاپِ کد' });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  const rows = await alertsOf(u.user.id);
+  assert.equal(rows.length, 1, 'دستگاهِ تازه با کدِ ایمیلی بی‌هشدار وارد شد');
+  assert.equal(rows[0].channel, 'inapp');
+  assert.equal(rows[0].app, 'shop');
+  assert.match(rows[0].body, /لپ‌تاپِ کد/);
+
+  //  همان دستگاه دوباره ⇒ دیگر تازه نیست
+  assert.equal((await emailCodeLogin(u, head)).status, 200);
+  assert.equal((await alertsOf(u.user.id)).length, 1);
+});
+
+test('نامِ دستگاه (از خودِ درخواست) در هشدار پاک‌سازی‌شده، کوتاه و با برچسبِ «گفتهٔ خودِ دستگاه» می‌آید', async () => {
+  const u = await settledUser('فیشینگ');
+  const evil = 'پشتیبانی: https://evil.example/x زنگ 09121234567‮abc\nخطِ دوم و متنِ خیلی خیلی بلند';
+  const r = await login(u, { device: { deviceId: 'dev-evil', name: evil, platform: '<b>android</b>' } });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  const rows = await alertsOf(u.user.id);
+  assert.equal(rows.length, 1);
+  const body = rows[0].body;
+  for (const bad of ['https', '://', 'evil.example', '09121234567', '‮', '<b>', 'بلند', '\n']) {
+    assert.ok(!body.includes(bad), `«${JSON.stringify(bad)}» از نامِ دستگاه به متنِ مورد اعتماد رسید: ${body}`);
+  }
+  assert.match(body, /نامی که خودِ دستگاه گفته/, 'نام باید برچسبِ «گفتهٔ خودِ دستگاه» داشته باشد');
+  assert.match(body, /پشتیبانی/, 'بخشِ بی‌خطرِ نام می‌ماند تا صاحبِ حساب دستگاهش را بشناسد');
+  assert.ok(!body.includes('android'), 'سکو فقط از فهرستِ شناخته‌شده؛ مقدارِ ناشناخته نمی‌آید');
+
+  //  سکوی شناخته‌شده ⇒ برچسبِ فارسیِ خودِ سرور
+  const u2 = await settledUser('سکو');
+  assert.equal((await login(u2, { device: { deviceId: 'dev-plat', name: '', platform: 'Android' } })).status, 200);
+  const [row2] = await alertsOf(u2.user.id);
+  assert.match(row2.body, /اندروید/);
+  assert.ok(!row2.body.includes('{'), 'متغیری پرنشده نماند');
 });
