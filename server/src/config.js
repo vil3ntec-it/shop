@@ -274,7 +274,9 @@ const config = {
     storeCheckoutMax: num(process.env.RATE_STORE_CHECKOUT_MAX, 20),
     //  بازارچه (`/api/market/*`): خواندن سطلِ خودش را با `generalMax` دارد؛
     //  جست‌وجوی کالا در همهٔ دکان‌ها گران‌تر است ⇒ سطلِ تنگ‌ترِ خودش، به‌ازای IP.
-    marketSearchMax: num(process.env.RATE_MARKET_SEARCH_MAX, 300),
+    //  بازبینیِ امنیتی: ۳۰۰ ⇒ ۶۰ در ربع ساعت، و سقفِ ضربه‌ای در دقیقه
+    marketSearchMax: num(process.env.RATE_MARKET_SEARCH_MAX, 60),
+    marketSearchBurstMax: num(process.env.RATE_MARKET_SEARCH_BURST_MAX, 10),
   },
 
   /**
@@ -302,6 +304,9 @@ const config = {
    */
   market: {
     gateCacheMs: num(process.env.MARKET_GATE_CACHE_MS, 30 * 1000),
+    //  «برشِ» دکان‌های در فهرست (شمارِ کالا، دیدهٔ دستگاه، نمایهٔ جست‌وجو) — یک‌پرواز.
+    //  «روشن»، «فعال» و «در فهرست» باز هم در هر درخواست زنده سنجیده می‌شوند.
+    eligibleCacheMs: num(process.env.MARKET_ELIGIBLE_CACHE_MS, 30 * 1000),
   },
 
   // CORS_ORIGIN چند دامنه را با کاما می‌پذیرد. برنامه‌ی اندروید به CORS
