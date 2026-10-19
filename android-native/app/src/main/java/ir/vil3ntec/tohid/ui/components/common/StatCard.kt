@@ -86,7 +86,8 @@ fun StatCard(
     Spacer(Modifier.height(12.dp))
     Text(value, style = MaterialTheme.typography.headlineMedium.tabular(), color = c.text, fontWeight = FontWeight.Bold, maxLines = 1)
     Spacer(Modifier.height(8.dp))
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    //  تغییر تا دو خط می‌شکند و بریده نمی‌شود (بازبینی: «کالای تازهٔ این ت…»)؛ بازه کنارش می‌ماند
+    Row(verticalAlignment = Alignment.Top) {
       if (delta != null) {
         val tint = when {
           delta.trend == Trend.FLAT -> c.muted
@@ -98,12 +99,11 @@ fun StatCard(
           Trend.DOWN -> Icons.Filled.ArrowDownward
           Trend.FLAT -> Icons.Filled.Remove
         }
-        Icon(arrow, null, tint = tint, modifier = Modifier.size(14.dp))
+        Icon(arrow, null, tint = tint, modifier = Modifier.padding(top = 1.dp).size(14.dp))
         Spacer(Modifier.width(3.dp))
-        Text(delta.text, style = MaterialTheme.typography.labelMedium, color = tint, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+        Text(delta.text, style = MaterialTheme.typography.labelMedium, color = tint, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
         Spacer(Modifier.width(8.dp))
-      }
-      Spacer(Modifier.weight(1f))
+      } else Spacer(Modifier.weight(1f))
       Text(period, style = MaterialTheme.typography.labelMedium, color = c.muted, maxLines = 1)
     }
   }
