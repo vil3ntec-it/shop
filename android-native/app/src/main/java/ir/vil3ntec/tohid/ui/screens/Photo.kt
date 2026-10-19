@@ -64,6 +64,8 @@ fun ProductPhoto(
   modifier: Modifier = Modifier,
   /** صفحهٔ خودِ کالا عکس را همیشه نشان می‌دهد — جای گذاشتنِ عکس همان‌جاست */
   force: Boolean = false,
+  /** کالای بی‌عکس: به‌جای آیکنِ خاکستریِ «عکس» این کشیده می‌شود (کارتِ صندوق: حرفِ اولِ نام) */
+  fallback: (@Composable () -> Unit)? = null,
 ) {
   val context = LocalContext.current
   //  عکس‌ها خاموش‌اند ⇒ هیچ جایی گرفته نمی‌شود و فایلی خوانده نمی‌شود
@@ -92,6 +94,8 @@ fun ProductPhoto(
         contentScale = ContentScale.Crop,
         modifier = Modifier.size(size),
       )
+    } else if (fallback != null) {
+      fallback()
     } else {
       Icon(
         Icons.Filled.Image,
