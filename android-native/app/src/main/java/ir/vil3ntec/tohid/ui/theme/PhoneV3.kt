@@ -116,3 +116,27 @@ object PhoneV3 {
   /** بلندیِ ردیفِ تنظیمات (r5) */
   val rowHeight = 52.dp
 }
+
+/**
+ *  رنگِ نشانه‌های کاشیِ «بخش‌ها»ی خانه (r7 «Payment List») — phone-v3-home.
+ *
+ *  r7 تنها جایی است که آیکنِ رنگی روی کاشیِ خیلی روشن می‌نشیند (SPEC §D)؛ آیکن‌های
+ *  بقیهٔ گوشی تک‌رنگ می‌مانند. رنگ‌های `Shop.colors` برای متن تیره شده‌اند و روی
+ *  کاشی کدر دیده می‌شدند، پس این هشت رنگ از خودِ r7 برداشته شد. شب کمی روشن‌تر.
+ */
+object PhoneV3Glyph {
+  private val light = listOf(
+    Color(0xFF7B2FF7), Color(0xFFF5A524), Color(0xFFF04848), Color(0xFF3DBE4A),
+    Color(0xFF2F5CE0), Color(0xFF22B5E0), Color(0xFFE040C8), Color(0xFF6C2BEA),
+  )
+  private val dark = listOf(
+    Color(0xFF9D6BFF), Color(0xFFFFB547), Color(0xFFFF6B6B), Color(0xFF5CD66A),
+    Color(0xFF6B8BFF), Color(0xFF4CC9F0), Color(0xFFF06BDB), Color(0xFF8B5CF6),
+  )
+
+  /** رنگِ `i`امین کاشی (چرخشی) */
+  fun of(colors: PhoneV3Colors, i: Int): Color {
+    val list = if (colors === PhoneV3Dark) dark else light
+    return list[((i % list.size) + list.size) % list.size]
+  }
+}

@@ -95,6 +95,11 @@ fun SaleScreen(
   LaunchedEffect(d.products.size, d.debtors.size) { cartStore.prune(d) }
 
   var cameraOn by rememberSaveable { mutableStateOf(true) }
+  //  «اسکنِ بارکد» از نوارِ پایینِ گوشی (phone v3 §F2) ⇐ دوربین روشن، حتی اگر خوابیده بود
+  val scanAsked = ir.vil3ntec.tohid.ui.components.common.PhoneNav.scanRequest.value
+  LaunchedEffect(scanAsked) {
+    if (scanAsked) { cameraOn = true; ir.vil3ntec.tohid.ui.components.common.PhoneNav.scanRequest.value = false }
+  }
   var granted by remember {
     mutableStateOf(
       ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED

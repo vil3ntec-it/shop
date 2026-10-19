@@ -125,7 +125,10 @@ private fun PhonePreviewContent(screen: String, store: ShopStore, dark: Boolean)
         //  مثلِ `AppRoot`: نوارِ پایین زیرِ نوارِ سبد، و تا برگه باز است کنار می‌رود
         if (!PhoneCartUi.sheetOpen.value) PhoneNavBar(tabs = PREVIEW_TABS, current = "sale", onPick = {})
       }
-      else -> {
+      //  phone-v3-home: خانهٔ r7/r6/r8، نوارِ r10 و ویرایشگرش (`PhoneV3HomePreview`)
+      else -> if (screen.startsWith("v3home")) Box(Modifier.weight(1f).fillMaxWidth()) {
+        PhoneV3HomePreview(screen, store)
+      } else {
         //  «nav» و هر نامِ ناشناس: خانه با نوارِ پایینِ قرصی
         Box(Modifier.weight(1f).fillMaxWidth()) { DashboardScreen(data) {} }
         PhoneNavBar(tabs = PREVIEW_TABS, current = "dashboard", onPick = {})
