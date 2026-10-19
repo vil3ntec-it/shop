@@ -13,11 +13,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.TextButton
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
@@ -83,36 +79,9 @@ fun MemberPermsSection(shops: ShopRepository, canEdit: Boolean, snackbar: Snackb
   val scope = rememberCoroutineScope()
   var page by remember { mutableStateOf<ShopPermsDto?>(null) }
   var busy by remember { mutableStateOf(false) }
-  //  کاری که سرور برایش «تأییدِ دوباره» خواست — پس از رمزِ درست دوباره می‌رود
-  var retry by remember { mutableStateOf<(suspend () -> Unit)?>(null) }
 
   suspend fun load() { shops.permissions().onSuccess { page = it.shop } }
   LaunchedEffect(Unit) { load() }
-
-  suspend fun savePerm(m: MemberPermsDto, key: String, want: Boolean) {
-    shops.setMemberPerms(m.id, withMode(m, key, if (want) "allow" else "deny"))
-      .onSuccess { load() }
-      .onFailure {
-        if (it.code == "reauth_required") retry = { savePerm(m, key, want) }
-        else snackbar.showSnackbar(it.userMessage)
-      }
-  }
-
-  retry?.let { again ->
-    ConfirmIdentityDialog(
-      busy = busy,
-      onDismiss = { retry = null },
-      onConfirm = { password ->
-        busy = true
-        scope.launch {
-          shops.confirmIdentity(password)
-            .onSuccess { retry = null; again() }
-            .onFailure { snackbar.showSnackbar(it.userMessage) }
-          busy = false
-        }
-      },
-    )
-  }
 
   val p = page ?: return
   val editable = p.catalog.filter { it.edit != "none" }
@@ -146,7 +115,9 @@ fun MemberPermsSection(shops: ShopRepository, canEdit: Boolean, snackbar: Snackb
             onCheckedChange = { want ->
               busy = true
               scope.launch {
-                savePerm(m, entry.key, want)
+                shops.setMemberPerms(m.id, withMode(m, entry.key, if (want) "allow" else "deny"))
+                  .onSuccess { load() }
+                  .onFailure { snackbar.showSnackbar(it.userMessage) }
                 busy = false
               }
             },
@@ -239,35 +210,4 @@ fun DevicesSection(shops: ShopRepository, canEdit: Boolean, snackbar: SnackbarHo
       },
     )
   }
-}
-
-/**
- *  «رمز را دوباره بزنید» — سرور این کار را فقط از نشستِ تازه احراز‌شده
- *  می‌پذیرد (`reauth_required`، بندِ ۲۱.۱). بستن یعنی «انجام نده».
- */
-@Composable
-private fun ConfirmIdentityDialog(busy: Boolean, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
-  var password by remember { mutableStateOf("") }
-  AlertDialog(
-    onDismissRequest = { if (!busy) onDismiss() },
-    title = { Text("تأییدِ دوبارهٔ هویت") },
-    text = {
-      Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("برای امنیتِ دکان، تغییرِ مجوزها رمزِ حساب را دوباره می‌خواهد.", style = MaterialTheme.typography.bodyMedium)
-        OutlinedTextField(
-          value = password,
-          onValueChange = { password = it },
-          singleLine = true,
-          enabled = !busy,
-          label = { Text("رمزِ حساب") },
-          visualTransformation = PasswordVisualTransformation(),
-          modifier = Modifier.fillMaxWidth(),
-        )
-      }
-    },
-    confirmButton = {
-      TextButton(onClick = { onConfirm(password) }, enabled = !busy && password.isNotEmpty()) { Text("تأیید") }
-    },
-    dismissButton = { TextButton(onClick = onDismiss, enabled = !busy) { Text("انصراف") } },
-  )
 }

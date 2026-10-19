@@ -401,6 +401,32 @@ class AuthRepository(
     Unit
   }
 
+  /* ---------------------- تأییدِ دوبارهٔ هویت (بندِ ۲۱.۱) ---------------------- */
+
+  /*
+   *  سرور کارِ حساس را فقط از نشستی می‌پذیرد که چند دقیقهٔ اخیر وارد شده یا
+   *  یکی از این دو را زده (`reauth_required`). پنجره‌اش `ui/ReauthHost` است و
+   *  تکرارِ درخواست کارِ `ApiClient` — هیچ صفحه‌ای این‌ها را خودش صدا نمی‌زند.
+   */
+
+  /** تأیید با رمزِ حساب (حسابِ رمزدار) */
+  suspend fun reauthWithPassword(password: String): ApiResult<Unit> = result {
+    api.post(ApiEndpoints.Auth.REAUTH, buildJsonObject { put("password", JsonPrimitive(password)) })
+    Unit
+  }
+
+  /** فرستادنِ کدِ تأیید به ایمیل (وگرنه شمارهٔ) خودِ حساب — برای حسابِ بی‌رمز */
+  suspend fun requestReauthCode(): ApiResult<Unit> = result {
+    api.post(ApiEndpoints.Auth.REAUTH_CODE)
+    Unit
+  }
+
+  /** تأیید با همان کد */
+  suspend fun reauthWithCode(code: String): ApiResult<Unit> = result {
+    api.post(ApiEndpoints.Auth.REAUTH, buildJsonObject { put("code", JsonPrimitive(code.trim())) })
+    Unit
+  }
+
   /* ------------------------------ خروج ------------------------------ */
 
   /**

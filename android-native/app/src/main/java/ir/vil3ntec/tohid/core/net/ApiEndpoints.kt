@@ -40,6 +40,8 @@ object ApiEndpoints {
     const val PASSWORD = "/auth/password"
     //  تأییدِ دوبارهٔ هویت پیش از کارِ حساس (بندِ ۲۱.۱ — سرور: `lib/reauth.js`)
     const val REAUTH = "/auth/reauth"
+    //  کدِ تأییدِ دوباره به ایمیل/شمارهٔ خودِ حساب — برای حسابِ بی‌رمز
+    const val REAUTH_CODE = "/auth/reauth/code"
     const val PASSWORD_FORGOT = "/auth/password/forgot"
     const val PASSWORD_RESET = "/auth/password/reset"
 
