@@ -85,27 +85,33 @@ internal val PhoneV3Colors.pressed: Color get() = lerp(card, bg, 0.9f)
  */
 internal fun Modifier.frosted(c: PhoneV3Colors): Modifier = drawBehind {
   val dark = c.bg.red < 0.3f
-  //  r4: خاکستریِ میانه با سایه‌روشنِ نرم — لبه‌ها و پایین تیره‌تر، پشتِ عکس و کارت روشن
-  val base = if (dark) c.bg else lerp(c.bg, c.inkMuted, 0.20f)
+  //  r4: خاکستریِ میانه با دو لکهٔ بزرگِ محوِ روشن با رنگِ سرد/یاسیِ کم‌رنگ، و
+  //  سایهٔ نرمِ پایین — لکه‌ها پشتِ متن‌اند و کنتراستِ نوشته‌ها دست نمی‌خورد
+  val base = if (dark) c.bg else lerp(c.bg, c.inkMuted, 0.26f)
   drawRect(base)
   val w = size.width
   val h = size.height
+  //  لکهٔ ۱: بالا، پشتِ عنوان و عکس — سفیدِ سرد
+  val cool = lerp(c.card, c.tile, 0.55f)
   drawRect(
     Brush.radialGradient(
-      listOf(c.card.copy(alpha = if (dark) 0.50f else 0.92f), c.card.copy(alpha = 0f)),
-      center = Offset(w * 0.40f, h * 0.22f), radius = w * 0.95f,
+      listOf(cool.copy(alpha = if (dark) 0.55f else 0.97f), cool.copy(alpha = if (dark) 0.25f else 0.55f), cool.copy(alpha = 0f)),
+      center = Offset(w * 0.30f, h * 0.20f), radius = w * 1.10f,
     ),
   )
+  //  لکهٔ ۲: چپِ پایین‌تر از میانه — یاسیِ خیلی کم‌رنگ
+  val lilac = lerp(c.tile, c.accent, if (dark) 0.10f else 0.09f)
   drawRect(
     Brush.radialGradient(
-      listOf(c.tile.copy(alpha = if (dark) 0.9f else 0.80f), c.tile.copy(alpha = 0f)),
-      center = Offset(w * 0.10f, h * 0.70f), radius = w * 0.70f,
+      listOf(lilac.copy(alpha = if (dark) 0.70f else 0.92f), lilac.copy(alpha = if (dark) 0.30f else 0.45f), lilac.copy(alpha = 0f)),
+      center = Offset(w * 0.05f, h * 0.66f), radius = w * 0.95f,
     ),
   )
+  //  سایهٔ نرمِ پایینِ پایان
   drawRect(
     Brush.radialGradient(
-      listOf(lerp(base, c.inkMuted, if (dark) 0.08f else 0.30f), base.copy(alpha = 0f)),
-      center = Offset(w * 1.0f, h * 0.85f), radius = w * 0.75f,
+      listOf(lerp(base, c.inkMuted, if (dark) 0.08f else 0.32f), base.copy(alpha = 0f)),
+      center = Offset(w * 0.98f, h * 0.95f), radius = w * 0.70f,
     ),
   )
 }
