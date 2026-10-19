@@ -410,9 +410,11 @@ async function postReturn(c, shopId, orderId, actor, at, onStatus) {
   const sd = row ? decode(row.data) || {} : null;
   if (!sd || row.deleted_at || sd.status === 'cancelled') return { skipped: 'sale_cancelled' };
 
+  //  قلم‌های همین فاکتور از کارنامهٔ سند (کلیدِ یکتا، بی پیمایشِ همهٔ قلم‌های دکان)
+  const itemIds = (decode(sale.lines) || []).map((l) => l.itemId).filter(Boolean);
   const itemRows = (await c.query(
-    `SELECT row_id, data, deleted_at FROM sync_rows WHERE ${ACC} AND table_name='saleItems' AND data->>'saleId' = $2
-      ORDER BY row_id`, [shopId, saleId]
+    `SELECT row_id, data, deleted_at FROM sync_rows WHERE ${ACC} AND table_name='saleItems' AND row_id = ANY($2::text[])
+      ORDER BY row_id`, [shopId, itemIds]
   )).rows.filter((r) => !r.deleted_at);
   const prior = (await c.query(
     `SELECT data FROM sync_rows WHERE ${ACC} AND table_name='returns' AND data->>'saleId' = $2 AND deleted_at IS NULL`,
