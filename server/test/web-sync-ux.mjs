@@ -14,7 +14,7 @@
  * اجرا:  node test/web-sync-ux.mjs
  */
 import { createRequire } from 'node:module';
-import { missingTool, PLAYWRIGHT_INSTALL } from './browser-guard.mjs';
+import { missingTool, PLAYWRIGHT_INSTALL, closeSafeRoute } from './browser-guard.mjs';
 import assert from 'node:assert/strict';
 import { execSync } from 'node:child_process';
 import http from 'node:http';
@@ -64,7 +64,7 @@ async function open(width) {
   pg.on('dialog', d => { dialogs.push(d.message()); d.accept(); });
   await pg.goto(url);
   const api = await pg.evaluate(() => window.TohidApiConfig.baseUrl());
-  await pg.route(`${api}/**`, r => r.abort('connectionrefused'));
+  await pg.route(`${api}/**`, closeSafeRoute(r => r.abort('connectionrefused')));
   await pg.evaluate(([d, a]) => {
     localStorage.setItem('tohid-shop-auth-v1', JSON.stringify({ method: 'local', value: '', name: 'آزمون', loginAt: 1 }));
     localStorage.setItem('tohid-shop-data-v1', JSON.stringify(d));
@@ -136,13 +136,13 @@ await step('SYN-10: صفِ پُر ⇒ خروج بسته؛ «همین حالا ه
   assert.equal(await signedIn(pg), true);
 
   //  سرور برگشت: همان دکمه صف را واقعاً خالی می‌کند و پنجره خروج را باز
-  await pg.route(`${api}/api/sync/v1/push`, async (r) => {
+  await pg.route(`${api}/api/sync/v1/push`, closeSafeRoute(async (r) => {
     const body = JSON.parse(r.request().postData() || '{}');
     await r.fulfill({
       status: 200, contentType: 'application/json',
       body: JSON.stringify({ results: (body.ops || []).map(o => ({ op_id: o.op_id, status: 'applied' })), head: 1, schema_version: body.schema_version }),
     });
-  });
+  }));
   await pg.locator('#lv-sync').click();
   await pg.waitForSelector('#lv-out', { timeout: 8000 });
   assert.equal(await pg.evaluate(() => window.TohidSync.status().queued), 0);

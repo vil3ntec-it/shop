@@ -20,6 +20,13 @@ import ir.vil3ntec.tohid.money
  *  هر کدام اگر `createdAt`ش میانِ باز و بسته شدن باشد. «برد»ِ دستی حساب
  *  نمی‌شود چون معلوم نیست پول بوده یا جنس.
  *
+ *  ⛔ فروشِ اینترنتی (فاکتورِ سریِ `W` / `channel == "online"` که سرور هنگامِ
+ *  تحویلِ سفارش می‌گذارد، ORD-20) پولِ دخل نیست: پرداختِ آنلاین نزدِ درگاه است و
+ *  نقدِ «هنگامِ تحویل» دستِ پیک تا تسویهٔ پیک (سندِ تسویه، نه صندوق). مرجوعیِ
+ *  سرور برای همان سفارش (`channel == "online"`) هم از دخل پرداخت نمی‌شود؛ مرجوعیِ
+ *  دستیِ همین دستگاه برای فاکتورِ W (پولِ نقد از دخل) مثلِ همیشه کم می‌شود.
+ *  بی پرچمِ `shop.orders.ledger` فاکتورِ W ای نیست ⇒ همان حسابِ پیشین.
+ *
  *  همان `cashShift*`ِ نسخهٔ وب.
  *  ──────────────────────────────────────────────────────────────────
  */
@@ -27,6 +34,18 @@ object CashShift {
 
   const val OPEN = "shift_open"
   const val CLOSE = "shift_close"
+  const val ONLINE = "online"
+  const val ONLINE_SERIES = "W"
+
+  /** فاکتورِ اینترنتیِ سرور — پولش به دخل نمی‌آید */
+  fun isOnline(s: Sale): Boolean = s.channel == ONLINE || s.series == ONLINE_SERIES
+
+  /**
+   *  مرجوعیِ سرور برای سفارشِ اینترنتی. ردیف‌های پیش از نشانِ `channel` با شناسهٔ
+   *  ثابتِ سرور (`w-…`، هرگز ULID ِ دستگاه) و فاکتورِ اینترنتی شناخته می‌شوند.
+   */
+  fun isOnlineReturn(r: SaleReturn, onlineSales: Set<String>): Boolean =
+    r.channel == ONLINE || (r.saleId in onlineSales && r.id.startsWith("w-"))
 
   sealed interface Result {
     data class Ok(val data: ShopData) : Result
@@ -61,12 +80,13 @@ object CashShift {
 
   fun totals(d: ShopData, from: Long, to: Long, opening: Double): Totals {
     fun inWindow(at: Long) = at in from..to
+    val online = d.sales.filter(::isOnline).mapTo(HashSet()) { it.id }
     return Totals(
       opening = opening,
-      sales = d.sales.filter { it.status != "cancelled" && inWindow(it.createdAt) }
+      sales = d.sales.filter { it.status != "cancelled" && !isOnline(it) && inWindow(it.createdAt) }
         .sumOf { (it.finalTotal - it.debtGiven).coerceAtLeast(0.0) },
       receipts = d.transactions.filter { it.type == "receive" && inWindow(it.createdAt) }.sumOf { it.amount },
-      returns = d.saleReturns.filter { inWindow(it.createdAt) }.sumOf { it.amount },
+      returns = d.saleReturns.filter { inWindow(it.createdAt) && !isOnlineReturn(it, online) }.sumOf { it.amount },
       expenses = d.expenses.filter { inWindow(it.createdAt) }.sumOf { it.amount },
       suppliers = d.supplierPayments.filter { inWindow(it.createdAt) }.sumOf { it.amount } +
         d.purchases.filter { inWindow(it.createdAt) }.sumOf { it.paidAmount },
