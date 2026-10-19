@@ -14,7 +14,7 @@ const staffCodes = require('../lib/staff-codes');
 const audit = require('../lib/audit');
 const subsLib = require('../lib/subscriptions');
 const { entitlementOf } = require('../lib/entitlement');
-const { permissionsOf } = require('../lib/permissions');
+const { permissionsOf, STAFF_ROLES } = require('../lib/permissions');
 const { requireUser, requireShop, optionalShop, requirePermission, requireFeature } = require('../middleware/auth');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
 const { badRequest, forbidden, notFound } = require('../middleware/errors');
@@ -85,16 +85,19 @@ router.get('/members', requireShop, requirePermission('members.view'), async (re
   });
 });
 
-router.patch('/members/:id', requireShop, requirePermission('members.role'), async (req, res) => {
+async function updateMemberRoute(req, res) {
   const id = v.id(req.params.id, { field: 'شناسه عضو' });
   const patch = {
-    role: req.body?.role ? v.oneOf(req.body.role, ['manager', 'staff'], { field: 'نقش' }) : undefined,
+    role: req.body?.role ? v.oneOf(req.body.role, STAFF_ROLES, { field: 'نقش' }) : undefined,
     status: req.body?.status ? v.oneOf(req.body.status, ['active', 'suspended'], { field: 'وضعیت' }) : undefined,
   };
   const row = await shops.updateMember(req.shopId, id, patch);
   await audit.log({ shopId: req.shopId, userId: req.user.id, action: 'member.updated', targetType: 'member', targetId: id, detail: patch });
   res.json({ member: { id: row.id, role: row.role, status: row.status } });
-});
+}
+router.patch('/members/:id', requireShop, requirePermission('members.role'), updateMemberRoute);
+//  برنامهٔ نصبی (HttpURLConnection) PATCH ندارد — «تغییرِ نقش» (A16) همین در را با PUT می‌زند
+router.put('/members/:id', requireShop, requirePermission('members.role'), updateMemberRoute);
 
 /**
  * برداشتنِ یک عضو.
@@ -165,7 +168,7 @@ router.post('/staff-code/rotate', requireShop, requirePermission('staffcode.crea
 // «چند کاربر روی یک دکان» قابلیت اشتراکی است؛ بررسی‌اش اینجا سمت سرور
 // انجام می‌شود، نه با پنهان کردن دکمه در گوشی.
 router.post(['/staff-code', '/invite'], requireShop, requirePermission('staffcode.create'), requireFeature('multi_device'), async (req, res, next) => {
-  const role = req.body?.role ? v.oneOf(req.body.role, ['manager', 'staff', 'courier'], { field: 'نقش' }) : 'staff';
+  const role = req.body?.role ? v.oneOf(req.body.role, [...STAFF_ROLES, 'courier'], { field: 'نقش' }) : 'staff';
   //  دعوتِ پیک (DLV-01) — پشتِ پرچمِ `shop.delivery`، پیش‌فرض خاموش؛ همان
   //  سنجش‌های `routes/delivery.js` (بی پرچم ۴۰۴، بی اشتراکِ تحویل ۴۰۳)
   if (role === 'courier') {

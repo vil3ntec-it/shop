@@ -24,6 +24,19 @@
    • سقف (caps) فقط وقتی اثر دارد که حالت allow باشد؛ عددِ بالاتر از
      سقف ⇐ approve (اگر مجوز تأییدپذیر است) وگرنه deny.
 
+   ── نقش‌ها (STF-01، بخشِ ۱۰.۱) ─────────────────────────────────────
+   owner/manager/staff همان سه نقشِ قدیم‌اند و رفتارشان عوض نمی‌شود. چهار
+   نقشِ تازه (A16) فقط وقتی کسی را می‌گیرند که صاحب دکان خودش بدهد:
+     cashier     صندوق‌دار — فروش، قرض و برگشت؛ نه انبار، نه خرید
+     storekeeper انباردار — کالا، رسیدِ انبار، خرید و شمارش؛ نه فروش و پول
+     picker      جمع‌آور — سفارشِ اینترنتی را آماده می‌کند؛ دفتر نمی‌نویسد
+     accountant  حسابدار — همه را می‌بیند (عددِ مالی و سابقه هم)، هیچ نمی‌نویسد
+   پیک (courier) عمداً این‌جا نیست: توکنش دامنهٔ خودش را دارد.
+
+   `canWrite(role, table)` = کدام جدولِ همگام‌سازی را این نقش می‌نویسد.
+   سه نقشِ قدیم «*» (همه، همان امروز)؛ نقشِ ناشناخته هیچ. سرور در هر سه
+   راهِ همگام‌سازی همین را اجرا می‌کند و برنامه پیش از ذخیره همین را می‌پرسد.
+
    این فایل هیچ چیزی از مرورگر نمی‌خواهد؛ همان کد در Node هم می‌دود.
    ========================================================== */
 (function (factory) {
@@ -38,10 +51,18 @@
   var VERSION = 1;
   var MODES = ['allow', 'approve', 'deny'];
   var RANK = { deny: 0, approve: 1, allow: 2 };
-  var ROLES = ['owner', 'manager', 'staff'];
+  var ROLES = ['owner', 'manager', 'staff', 'cashier', 'storekeeper', 'picker', 'accountant'];
 
   /** نامِ سقف ⇐ نامِ فیلدِ درخواست */
   var CAP_FIELDS = { maxPct: 'pct', maxAmount: 'amount' };
+
+  /** پیش‌فرض‌ها به ترتیبِ `ROLES` */
+  function d(owner, manager, staff, cashier, storekeeper, picker, accountant) {
+    return {
+      owner: owner, manager: manager, staff: staff,
+      cashier: cashier, storekeeper: storekeeper, picker: picker, accountant: accountant,
+    };
+  }
 
   /*
    *  فهرستِ مجوزهایی که از هسته می‌گذرند. پیش‌فرض‌ها = رفتارِ امروز:
@@ -53,34 +74,67 @@
    */
   var CATALOG = {
     'sales.discount': {
-      defaults: { owner: 'allow', manager: 'allow', staff: 'deny' },
+      defaults: d('allow', 'allow', 'deny', 'deny', 'deny', 'deny', 'deny'),
       edit: 'restrict', approvable: true, caps: ['maxPct', 'maxAmount'], display: false,
     },
     'sales.cancel': {
-      defaults: { owner: 'allow', manager: 'allow', staff: 'deny' },
+      defaults: d('allow', 'allow', 'deny', 'deny', 'deny', 'deny', 'deny'),
       edit: 'restrict', approvable: true, caps: [], display: false,
     },
     //  برگشتِ کالا و بازپرداخت (STF-03 «مبلغِ برگشت»): امروز هر عضوِ نویسنده
-    //  ثبت می‌کند، پس پیش‌فرض برای همه allow است
+    //  ثبت می‌کند، پس پیش‌فرض برای همه allow است؛ از نقش‌های تازه فقط صندوق‌دار
     'returns.create': {
-      defaults: { owner: 'allow', manager: 'allow', staff: 'allow' },
+      defaults: d('allow', 'allow', 'allow', 'allow', 'deny', 'deny', 'deny'),
       edit: 'restrict', approvable: true, caps: ['maxAmount'], display: false,
     },
     'settings.write': {
-      defaults: { owner: 'allow', manager: 'allow', staff: 'deny' },
+      defaults: d('allow', 'allow', 'deny', 'deny', 'deny', 'deny', 'deny'),
       edit: 'restrict', approvable: false, caps: [], display: false,
     },
+    //  حسابدار سابقه و عددِ مالی را می‌بیند — کارش همین است
     'audit.view': {
-      defaults: { owner: 'allow', manager: 'allow', staff: 'deny' },
+      defaults: d('allow', 'allow', 'deny', 'deny', 'deny', 'deny', 'allow'),
       edit: 'restrict', approvable: false, caps: [], display: false,
     },
     'reports.money': {
-      defaults: { owner: 'allow', manager: 'allow', staff: 'deny' },
+      defaults: d('allow', 'allow', 'deny', 'deny', 'deny', 'deny', 'allow'),
       edit: 'full', approvable: false, caps: [], display: true,
     },
   };
 
   function has(o, k) { return o != null && Object.prototype.hasOwnProperty.call(o, k); }
+
+  /*
+   *  جدول‌های همگام‌سازی که هر نقش می‌نویسد (نام‌های Sync v1/v3، همان
+   *  `SyncEngine.COLLECTIONS`ِ برنامه). «*» = همه — رفتارِ امروزِ سه نقشِ قدیم.
+   *  `auditLog` برای هر نقشِ نویسنده است: سابقهٔ همان کاری که کرده.
+   *  فروش با قلم، حرکتِ انبار، پرداختِ قرض و سابقه یک‌جا می‌نشیند؛ رسیدِ خرید
+   *  با کالا، تاریخچهٔ قیمت، رسیدِ انبار و حرکتِ انبار.
+   */
+  var WRITES = {
+    owner: '*',
+    manager: '*',
+    staff: '*',
+    cashier: ['auditLog', 'debtors', 'returns', 'saleItems', 'sales', 'stockMovements', 'transactions'],
+    storekeeper: ['auditLog', 'priceHistory', 'productCategories', 'productUnits', 'products', 'purchases',
+      'stockCounts', 'stockMovements', 'suppliers', 'warehouseEntries'],
+    picker: ['auditLog'],
+    accountant: [],
+  };
+
+  /** این نقش این جدولِ همگام‌سازی را می‌نویسد؟ نقشِ ناشناخته ⇐ نه (بسته‌به‌خطا) */
+  function canWrite(role, table) {
+    if (typeof role !== 'string' || !has(WRITES, role) || typeof table !== 'string' || !table) return false;
+    var w = WRITES[role];
+    return w === '*' || w.indexOf(table) >= 0;
+  }
+
+  /** فهرستِ جدول‌های نوشتنیِ یک نقش: «*»، فهرستِ مرتب، یا null برای نقشِ ناشناخته */
+  function writable(role) {
+    if (typeof role !== 'string' || !has(WRITES, role)) return null;
+    var w = WRITES[role];
+    return w === '*' ? '*' : w.slice().sort();
+  }
   function isCapValue(v) { return typeof v === 'number' && isFinite(v) && v >= 0; }
   function keys() { return Object.keys(CATALOG).sort(); }
 
@@ -233,6 +287,9 @@
     allows: allows,
     effective: effective,
     validate: validate,
+    WRITES: WRITES,
+    canWrite: canWrite,
+    writable: writable,
     ROUNDING_MINOR: ROUNDING_MINOR,
     discountBp: discountBp,
     discountPct: discountPct,

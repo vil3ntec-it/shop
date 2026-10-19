@@ -20,6 +20,12 @@ package ir.vil3ntec.tohid.core.perm
  *     همان کار را «مجاز» دارد (بخشِ ۱۰.۱؛ `ApprovalSlip`).
  *   • سقف فقط با حالتِ allow اثر دارد؛ بیش از سقف ⇐ approve (تأییدپذیر) یا deny.
  *
+ *  ── نقش‌ها (STF-01، A16) ────────────────────────────────────────────
+ *  owner/manager/staff همان سه نقشِ قدیم‌اند و رفتارشان عوض نمی‌شود. تازه‌ها:
+ *  cashier (صندوق‌دار)، storekeeper (انباردار)، picker (جمع‌آور) و accountant
+ *  (حسابدار، فقط‌خواندنی). `canWrite(role, table)` = جدول‌های همگام‌سازی که هر
+ *  نقش می‌نویسد؛ سه نقشِ قدیم «*». پیک این‌جا نیست (توکنش دامنهٔ خودش را دارد).
+ *
  *  Kotlin خالص است — بی android.*، بی کتابخانه.
  */
 object PermCore {
@@ -27,7 +33,7 @@ object PermCore {
   const val VERSION = 1
 
   val MODES: List<String> = listOf("allow", "approve", "deny")
-  val ROLES: List<String> = listOf("owner", "manager", "staff")
+  val ROLES: List<String> = listOf("owner", "manager", "staff", "cashier", "storekeeper", "picker", "accountant")
 
   /** نامِ سقف ⇐ نامِ فیلدِ درخواست */
   val CAP_FIELDS: Map<String, String> = mapOf("maxPct" to "pct", "maxAmount" to "amount")
@@ -53,19 +59,56 @@ object PermCore {
     val limit: Double? = null,
   )
 
-  private val OMD = mapOf("owner" to "allow", "manager" to "allow", "staff" to "deny")
-  private val ALL = mapOf("owner" to "allow", "manager" to "allow", "staff" to "allow")
+  /** پیش‌فرض‌ها به ترتیبِ `ROLES` */
+  private fun d(vararg modes: String): Map<String, String> = ROLES.zip(modes.toList()).toMap()
+
+  private val OMD = d("allow", "allow", "deny", "deny", "deny", "deny", "deny")
+  //  حسابدار سابقه و عددِ مالی را می‌بیند — کارش همین است
+  private val OMA = d("allow", "allow", "deny", "deny", "deny", "deny", "allow")
 
   /** پیش‌فرض‌ها = رفتارِ امروز (MATRIXِ سرور و ShopRoleِ برنامه) */
   val CATALOG: Map<String, Spec> = mapOf(
     "sales.discount" to Spec(OMD, "restrict", true, listOf("maxPct", "maxAmount"), false),
     "sales.cancel" to Spec(OMD, "restrict", true, emptyList(), false),
-    // برگشتِ کالا و بازپرداخت (STF-03): امروز هر عضوِ نویسنده ثبت می‌کند
-    "returns.create" to Spec(ALL, "restrict", true, listOf("maxAmount"), false),
+    // برگشتِ کالا و بازپرداخت (STF-03): امروز هر عضوِ نویسنده ثبت می‌کند؛ از نقش‌های تازه فقط صندوق‌دار
+    "returns.create" to Spec(d("allow", "allow", "allow", "allow", "deny", "deny", "deny"), "restrict", true, listOf("maxAmount"), false),
     "settings.write" to Spec(OMD, "restrict", false, emptyList(), false),
-    "audit.view" to Spec(OMD, "restrict", false, emptyList(), false),
-    "reports.money" to Spec(OMD, "full", false, emptyList(), true),
+    "audit.view" to Spec(OMA, "restrict", false, emptyList(), false),
+    "reports.money" to Spec(OMA, "full", false, emptyList(), true),
   )
+
+  /** «همه» — رفتارِ امروزِ سه نقشِ قدیم */
+  const val ALL_TABLES = "*"
+
+  /**
+   *  جدول‌های همگام‌سازی که هر نقش می‌نویسد (نام‌های Sync v1/v3، همان
+   *  `SyncEngine.COLLECTIONS`). `auditLog` برای هر نقشِ نویسنده است.
+   */
+  val WRITES: Map<String, List<String>> = mapOf(
+    "owner" to listOf(ALL_TABLES),
+    "manager" to listOf(ALL_TABLES),
+    "staff" to listOf(ALL_TABLES),
+    "cashier" to listOf("auditLog", "debtors", "returns", "saleItems", "sales", "stockMovements", "transactions"),
+    "storekeeper" to listOf(
+      "auditLog", "priceHistory", "productCategories", "productUnits", "products", "purchases",
+      "stockCounts", "stockMovements", "suppliers", "warehouseEntries",
+    ),
+    "picker" to listOf("auditLog"),
+    "accountant" to emptyList(),
+  )
+
+  /** این نقش این جدولِ همگام‌سازی را می‌نویسد؟ نقشِ ناشناخته ⇐ نه */
+  fun canWrite(role: String, table: String): Boolean {
+    val w = WRITES[role] ?: return false
+    if (table.isEmpty()) return false
+    return w == listOf(ALL_TABLES) || table in w
+  }
+
+  /** «*»، فهرستِ مرتب، یا null برای نقشِ ناشناخته — همان `writable`ِ JS */
+  fun writable(role: String): Any? {
+    val w = WRITES[role] ?: return null
+    return if (w == listOf(ALL_TABLES)) ALL_TABLES else w.sorted()
+  }
 
   private fun isCapValue(v: Any?): Boolean =
     v is Number && v.toDouble().let { it.isFinite() && it >= 0.0 }

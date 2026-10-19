@@ -36,6 +36,8 @@ for (const [name, file] of [['وب', WEB], ['سرور', SRV]]) {
     for (const c of V.effective) assert.deepEqual(P.effective(c.role, c.layers), c.out, JSON.stringify(c));
     for (const c of V.validate) assert.equal(P.validate(c.role, c.key, c.override), c.out, JSON.stringify(c));
     for (const c of V.discount_bp) assert.equal(P.discountBp(c.discount, c.total), c.out, JSON.stringify(c));
+    for (const c of V.writes) assert.equal(P.canWrite(c.role, c.table), c.out, JSON.stringify(c));
+    for (const c of V.writable) assert.deepEqual(P.writable(c.role), c.out, JSON.stringify(c));
   });
 }
 
@@ -67,4 +69,19 @@ test('لایه هرگز چیزی بیرون از نقش به فهرستِ قدی
     const got = perms.legacyPermissions(role, [grant, grant]);
     assert.deepEqual(got, permissionsOf(role), role);
   }
+});
+
+test('نقش‌های هسته همان نقش‌های MATRIX‌اند و «نوشتن» در هر دو یکی است (A16)', () => {
+  const P = require(SRV);
+  assert.deepEqual(P.ROLES, ROLES);
+  for (const role of ROLES) {
+    const w = P.writable(role);
+    assert.ok(w === '*' || Array.isArray(w), role);
+    //  data.write ⇔ دست‌کم یک جدول؛ حسابدار هیچ
+    assert.equal(can(role, 'data.write'), w === '*' || w.length > 0, role);
+  }
+  //  سه نقشِ قدیم همه‌چیز را مثلِ امروز می‌نویسند
+  for (const role of ['owner', 'manager', 'staff']) assert.equal(P.writable(role), '*', role);
+  //  پیک در هسته نیست: توکنش دامنهٔ خودش را دارد
+  assert.equal(P.canWrite('courier', 'sales'), false);
 });

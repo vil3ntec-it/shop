@@ -226,7 +226,8 @@ function card(row, viewer, at) {
     orderNo: Number(row.order_no),
     status: row.status,
     tab: S.tabOf(row, at),
-    next: S.nextFor(row, { type: 'user', role: viewer.role }),
+    //  دکمهٔ گذار فقط برای کسی که `orders.manage` دارد (حسابدار فقط می‌بیند — A16)
+    next: can(viewer.role, 'orders.manage') ? S.nextFor(row, { type: 'user', role: viewer.role }) : [],
     source: row.source,
     isTest: row.is_test === true,
     fulfillment: row.fulfillment,
