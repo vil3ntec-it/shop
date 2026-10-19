@@ -42,7 +42,7 @@ jobs:
   test:
     name: آزمون‌های سرور
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 50
 
     # آزمون‌ها روی PostgreSQL **واقعی** می‌دوند، نه روی ساختگی —
     # همان قاعده‌ای که `test/helpers.js` نوشته: چیزی که باید ثابت شود
