@@ -82,7 +82,8 @@ const overflow = (pg) => pg.evaluate(() => document.documentElement.scrollWidth 
 async function axe(pg, selector, rules) {
   if (!axeSrc) return [];
   await pg.addScriptTag({ content: axeSrc });
-  return pg.evaluate(async ([sel, r]) => (await window.axe.run(sel, { runOnly: r })).violations
+  //  دکمه‌ای که قفلِ اشتراک کم‌رنگش کرده (`vip-locked-el`/`lic-locked-el`، رفتارِ پیشین) سنجیده نمی‌شود
+  return pg.evaluate(async ([sel, r]) => (await window.axe.run({ include: [[sel]], exclude: [['.vip-locked-el'], ['.lic-locked-el']] }, { runOnly: r })).violations
     .map(v => `${v.id}: ${v.nodes.slice(0, 3).map(n => n.target.join(' ')).join(' ; ')}`), [selector, rules]);
 }
 
@@ -155,6 +156,131 @@ await step('«کاهشِ حرکت» (تنظیمِ «مثل گوشی»): جابه
   const dur = await pg.evaluate(() => getComputedStyle(document.querySelector('#bottom-nav .bn-item')).transitionDuration
     .split(',').map(s => parseFloat(s)).reduce((a, b) => Math.max(a, b), 0));
   assert.ok(dur < 0.01, `transition ${dur}s`);
+  await ctx.close();
+});
+
+/* ============================ تنظیمات: گروه‌ها ============================ */
+const SETTINGS_PANELS = [
+  'حساب و همگام‌سازی', 'کالای منقضی', 'ظاهر برنامه', 'تاریخ و رقم', 'اطلاعات فروشگاه', 'دوربین بارکدخوان',
+  'نصب برنامه روی دستگاه', 'حساب و اشتراک', 'پشتیبان‌گیری از اطلاعات', 'حساب کاربری', 'پاک‌سازی اطلاعات', 'درباره برنامه',
+];
+for (const width of [360, 390, 768]) {
+  await step(`تنظیمات در ${width}: شش گروه، همهٔ ۱۲ پنل، کارتِ گرد، بی بیرون‌زدگی، axe`, async () => {
+    const { pg, ctx, errors } = await open(width);
+    await pg.evaluate(() => goTo('settings'));
+    await pg.waitForTimeout(700);
+    const info = await pg.evaluate(() => {
+      const page = document.getElementById('page-settings');
+      const groups = [...page.querySelectorAll(':scope > .set-group')].map(g => {
+        const card = g.querySelector('.set-group-card');
+        const cs = getComputedStyle(card);
+        return {
+          title: g.querySelector('.set-group-title').textContent.trim(),
+          labelled: document.getElementById(g.getAttribute('aria-labelledby'))?.textContent.trim(),
+          radius: parseFloat(cs.borderTopLeftRadius), shadow: cs.boxShadow,
+          panels: [...card.querySelectorAll(':scope > .panel')].map(p => ({
+            title: p.querySelector('.panel-head h2')?.textContent.trim(),
+            border: getComputedStyle(p).borderTopWidth,
+          })),
+        };
+      });
+      return { groups, loose: page.querySelectorAll(':scope > .panel').length, all: page.querySelectorAll('.panel').length };
+    });
+    assert.deepEqual(info.groups.map(g => g.title), ['عمومی', 'فروش و پرداخت', 'امنیت', 'دستگاه‌ها', 'همگام‌سازی و پشتیبان', 'درباره']);
+    info.groups.forEach(g => assert.equal(g.labelled, g.title, 'aria-labelledby'));
+    assert.equal(info.loose, 0, 'پنلِ بی‌گروه');
+    assert.equal(info.all, SETTINGS_PANELS.length, 'تعدادِ پنل‌ها عوض شده');
+    assert.deepEqual(info.groups.flatMap(g => g.panels.map(p => p.title)).sort(), [...SETTINGS_PANELS].sort(), 'هر تنظیم یک بار، با همان نام');
+    for (const g of info.groups) {
+      assert.ok(g.radius >= 16, `${g.title}: گوشهٔ ${g.radius}`);
+      assert.notEqual(g.shadow, 'none', `${g.title}: سایهٔ نرم`);
+      g.panels.forEach(p => assert.equal(p.border, '0px', `${p.title}: خطِ دورِ تیره در کارتِ گروه`));
+    }
+    assert.ok(await overflow(pg) <= 0, 'بیرون‌زدگیِ افقی');
+    const v = await axe(pg, '#page-settings', ['color-contrast', 'button-name', 'aria-allowed-attr', 'aria-valid-attr-value']);
+    assert.deepEqual(v, []);
+    assert.deepEqual(errors, []);
+    await ctx.close();
+  });
+}
+
+await step('تنظیمات: انتخاب‌ها حالتِ خود را نشان می‌دهند (aria-pressed) و کار می‌کنند', async () => {
+  const { pg, ctx } = await open(390);
+  await pg.evaluate(() => goTo('settings'));
+  await pg.waitForTimeout(500);
+  const pressed = (sel) => pg.$$eval(sel, bs => bs.map(b => [b.textContent.trim(), b.getAttribute('aria-pressed')]));
+  await pg.click('#theme-toggle [data-theme-choice="dark"]');
+  await pg.waitForTimeout(200);
+  assert.equal(await pg.evaluate(() => document.documentElement.getAttribute('data-theme')), 'dark');
+  assert.deepEqual((await pressed('#theme-toggle .theme-toggle-btn')).map(x => x[1]).filter(x => x === 'true').length, 1);
+  assert.equal(await pg.getAttribute('#theme-toggle [data-theme-choice="dark"]', 'aria-pressed'), 'true');
+  await pg.click('#theme-toggle [data-theme-choice="light"]');
+  await pg.click('#expiry-policy-toggle [data-expiry-policy="block"]');
+  await pg.waitForTimeout(200);
+  assert.equal(await pg.getAttribute('#expiry-policy-toggle [data-expiry-policy="block"]', 'aria-pressed'), 'true');
+  assert.equal(await pg.getAttribute('#expiry-policy-toggle [data-expiry-policy="warn"]', 'aria-pressed'), 'false');
+  await pg.click('#expiry-policy-toggle [data-expiry-policy="warn"]');
+  await pg.waitForTimeout(200);
+  assert.equal(await pg.getAttribute('#expiry-policy-toggle [data-expiry-policy="warn"]', 'aria-pressed'), 'true');
+  await ctx.close();
+});
+
+/* ============================ حساب من ============================ */
+const ME = (days, trial = false) => ({
+  user: { name: 'نوید احمدی', email: 'owner@example.com', createdAt: '2025-03-01T00:00:00Z' },
+  shop: { name: 'دکان نمونه', isOwner: true },
+  entitlement: trial
+    ? { trial: { active: true, endsAt: new Date(Date.now() + days * 86400000).toISOString() } }
+    : { subscription: { active: days > 0, plan: 'سالانه', endsAt: new Date(Date.now() + days * 86400000).toISOString() } },
+});
+async function paintProfile(pg, me) {
+  await pg.evaluate((m) => {
+    goTo('profile');
+    window.TohidLicense = Object.assign(window.TohidLicense || {}, { isLoggedIn: () => !!m, userLabel: () => 'owner@example.com' });
+    profPaint(m);
+  }, me);
+  await pg.waitForTimeout(300);
+  return pg.evaluate(() => ({
+    role: document.getElementById('prof-role').hidden ? null : document.getElementById('prof-role').textContent.trim(),
+    stats: [...document.querySelectorAll('.prof-stat')].map(s => [s.querySelector('span').textContent, s.querySelector('b').textContent]),
+    notice: document.getElementById('prof-notice').hidden ? null : document.getElementById('prof-notice-title').textContent.trim(),
+    cta: document.getElementById('prof-notice-btn').textContent.trim(),
+  }));
+}
+
+for (const width of [360, 390, 768]) {
+  await step(`حساب من در ${width}: کارت، نقش، آمارِ واقعی، بی بیرون‌زدگی، axe`, async () => {
+    const { pg, ctx, errors } = await open(width);
+    const p = await paintProfile(pg, ME(40));
+    assert.equal(p.role, 'صاحب دکان');
+    assert.deepEqual(p.stats, [['کالا', '4'], ['فاکتور', '0'], ['قرض‌دار', '1']], 'آمار از دفترِ همین دستگاه');
+    assert.equal(p.notice, null, 'چهل روز مانده ⇒ نوارِ هشدار نیست');
+    assert.ok(await overflow(pg) <= 0, 'بیرون‌زدگیِ افقی');
+    const v = await axe(pg, '#page-profile', ['color-contrast', 'button-name', 'label', 'aria-allowed-attr']);
+    assert.deepEqual(v, []);
+    assert.deepEqual(errors, []);
+    await ctx.close();
+  });
+}
+
+await step('حساب من: نوارِ هشدار فقط وقتی واقعی است — ۵ روز، آزمایشی، تمام‌شده، بی‌حساب', async () => {
+  const { pg, ctx } = await open(390);
+  let p = await paintProfile(pg, ME(5));
+  assert.match(p.notice, /اشتراک — 5 روز مانده/); assert.equal(p.cta, 'تمدید');
+  const v = await axe(pg, '#prof-notice', ['color-contrast', 'button-name']);
+  assert.deepEqual(v, [], 'کنتراستِ نوارِ تیره');
+  p = await paintProfile(pg, ME(3, true));
+  assert.match(p.notice, /آزمایشی — 3 روز مانده/); assert.equal(p.cta, 'پلن‌ها');
+  p = await paintProfile(pg, ME(-2));
+  assert.equal(p.notice, 'اشتراک تمام شده');
+  p = await paintProfile(pg, null);
+  assert.equal(p.notice, null, 'بی‌حساب هشدارِ اشتراک ندارد');
+  assert.equal(p.role, null, 'بی‌حساب نقش ندارد');
+  //  دکمهٔ نوار همان پنجرهٔ اشتراک را باز می‌کند
+  await paintProfile(pg, ME(5));
+  await pg.evaluate(() => { window.__vipOpened = 0; window.TohidLicense.open = () => { window.__vipOpened++; }; });
+  await pg.click('#prof-notice-btn');
+  assert.equal(await pg.evaluate(() => window.__vipOpened), 1);
   await ctx.close();
 });
 

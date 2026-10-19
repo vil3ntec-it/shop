@@ -21,6 +21,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -70,15 +73,21 @@ fun SettingsSection(
     label = "chevron",
   )
 
+  //  گوشی (phone-ui): درونِ `SettingsGroup` ردیفی از کارتِ گروه است، نه کارتِ جدا
+  val grouped = LocalSettingsGrouped.current
   Column(
     Modifier
       .fillMaxWidth()
-      .glassSurface(Shape.card, colors.surface, colors.sheen, colors.border, glow = colors.glow)
+      .then(
+        if (grouped) Modifier.background(colors.surfaceSolid)
+        else Modifier.glassSurface(Shape.card, colors.surface, colors.sheen, colors.border, glow = colors.glow)
+      )
   ) {
     Row(
       Modifier
         .fillMaxWidth()
-        .clickable { open = !open }
+        .heightIn(min = 56.dp)
+        .clickable(onClickLabel = if (open) "بستن" else "باز کردن") { open = !open }
         .padding(Space.md),
       verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -105,6 +114,59 @@ fun SettingsSection(
         Modifier.padding(start = Space.md, end = Space.md, bottom = Space.md),
         content = content,
       )
+    }
+  }
+}
+
+/** درونِ `SettingsGroup` است ⇐ بخش‌ها ردیفِ کارتِ گروه‌اند (گوشی) */
+val LocalSettingsGrouped = staticCompositionLocalOf { false }
+
+/**
+ *  گروهِ تنظیمات — سرخطِ کوچک و یک کارتِ گردِ سفید (تصویرِ مرجعِ ۴، phone-ui).
+ *
+ *  بخش‌های درونش (`SettingsSection`) ردیف‌های همین کارت‌اند و میانشان یک خطِ
+ *  مویی است: زمینهٔ کارت رنگِ خط است و ردیف‌ها با یک پیکسل فاصله رویش
+ *  می‌نشینند، پس خط فقط **میانِ** ردیف‌ها دیده می‌شود. سایهٔ نرم به‌جای
+ *  خطِ دورِ تیره (design v2). `padded` برای کارتی که فرم دارد نه ردیف.
+ *
+ *  کامپیوتر (`LocalSettingsPick`): هیچ سرخط و کارتی نمی‌کشد — بخشِ انتخاب‌شده
+ *  همان‌طور که بود در ستونِ وسط می‌آید.
+ */
+@Composable
+fun SettingsGroup(
+  title: String,
+  modifier: Modifier = Modifier,
+  padded: Boolean = false,
+  content: @Composable ColumnScope.() -> Unit,
+) {
+  if (LocalSettingsPick.current != null) {
+    Column(modifier, content = content)
+    return
+  }
+  val colors = Shop.colors
+  Column(modifier.fillMaxWidth()) {
+    Text(
+      title,
+      style = MaterialTheme.typography.labelLarge,
+      color = colors.muted,
+      fontWeight = FontWeight.Bold,
+      modifier = Modifier
+        .padding(start = Space.xxs, end = Space.xxs, bottom = Space.xs)
+        .semantics { heading() },
+    )
+    Column(
+      Modifier
+        .fillMaxWidth()
+        .shadow(6.dp, Shape.card, clip = false, ambientColor = colors.text.copy(alpha = 0.10f), spotColor = colors.text.copy(alpha = 0.10f))
+        .clip(Shape.card)
+        .background(colors.border),
+      verticalArrangement = Arrangement.spacedBy(1.dp),
+    ) {
+      CompositionLocalProvider(LocalSettingsGrouped provides true) {
+        if (padded) {
+          Column(Modifier.fillMaxWidth().background(colors.surfaceSolid).padding(Space.md), content = content)
+        } else content()
+      }
     }
   }
 }

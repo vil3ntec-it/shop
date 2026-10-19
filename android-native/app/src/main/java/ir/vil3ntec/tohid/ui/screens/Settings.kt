@@ -335,7 +335,7 @@ fun SettingsScreen(
   LazyColumn(
     Modifier.fillMaxSize(),
     contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, 32.dp),
-    verticalArrangement = Arrangement.spacedBy(12.dp),
+    verticalArrangement = Arrangement.spacedBy(20.dp),
   ) {
     item {
       Text(
@@ -361,510 +361,527 @@ fun SettingsScreen(
      *  تنظیماتِ خودِ برنامه را دارد.
      */
 
-    /* ============================== هشدارها ============================== */
+    /*
+     *  گوشی (phone-ui، تصویرِ مرجعِ ۴): بخش‌ها زیرِ شش سرخط در کارت‌های گرد
+     *  (`SettingsLayout`). هیچ تنظیمی برداشته یا نام‌عوض نشده و کارِ هیچ‌کدام
+     *  عوض نشده — فقط جایشان. کامپیوتر گروه نمی‌بیند (`SettingsGroup`).
+     */
+    /* ============================ عمومی ============================ */
     item {
-      SettingsSection(
-        icon = Icons.Filled.NotificationsActive,
-        title = "هشدارها",
-        subtitle = "قرض از ${money(debtLimit)} ؋ به بالا",
-        tint = Shop.colors.warning,
-      ) {
-        Text(
-          "وقتی کالایی تمام شود، قرضِ کسی از این مبلغ بگذرد، یا اشتراک رو " +
-            "به پایان باشد، برنامه خبر می‌دهد — حتی وقتی بسته است.",
-          style = MaterialTheme.typography.bodySmall,
-          color = Shop.colors.muted,
-        )
-        Spacer(Modifier.height(10.dp))
-        TohidTextField(
-          value = debtLimitText,
-          onValueChange = { entered ->
-            //  فقط رقم؛ خالی یعنی «هشدارِ قرض را نمی‌خواهم»
-            val digits = ir.vil3ntec.tohid.normalizeDigits(entered).filter { it in '0'..'9' }
-            debtLimitText = digits
-            val value = digits.toDoubleOrNull() ?: 0.0
-            debtLimit = value
-            ir.vil3ntec.tohid.data.Watchman.setDebtLimit(context, value)
-          },
-          label = "هشدار قرض از این مبلغ به بالا (افغانی)",
-          keyboardOptions = KeyboardOptions(
-            keyboardType = KeyboardType.Number,
-            imeAction = ImeAction.Done,
-          ),
-        )
-        Spacer(Modifier.height(8.dp))
-        Text(
-          "صفر یعنی هشدارِ قرض خاموش. کالای تمام‌شده و اشتراک سرِ جایشان می‌مانند.",
-          style = MaterialTheme.typography.labelSmall,
-          color = Shop.colors.muted2,
-        )
-      }
-    }
-
-    /* ============================== ظاهر ============================== */
-    item {
-      SettingsSection(
-        icon = Icons.Filled.Palette,
-        title = "ظاهر",
-        subtitle = when (theme) {
-          ThemeChoice.LIGHT -> "روشن"
-          ThemeChoice.DARK -> "تاریک"
-          ThemeChoice.SYSTEM -> "مثل گوشی"
-        },
-        tint = Shop.colors.primary,
-      ) {
-        SegmentedChoice(
-          options = listOf(
-            ThemeChoice.LIGHT.name to "روشن",
-            ThemeChoice.DARK.name to "تاریک",
-            ThemeChoice.SYSTEM.name to "مثل گوشی",
-          ),
-          selected = theme.name,
-          onSelect = { onTheme(ThemeChoice.valueOf(it)) },
-        )
-        Spacer(Modifier.height(14.dp))
-        Text(
-          "اگر گوشی «کاهش حرکت» یا حالت ذخیرهٔ باتری روشن باشد، انیمیشن‌ها خاموش می‌شوند. با این کلید همیشه روشن می‌مانند.",
-          style = MaterialTheme.typography.labelSmall,
-          color = Shop.colors.muted2,
-        )
-        Spacer(Modifier.height(8.dp))
-        SegmentedChoice(
-          options = listOf("full" to "انیمیشن روشن", "auto" to "مثل تنظیم گوشی"),
-          selected = Motion.choice,
-          onSelect = { Motion.set(context, it) },
-        )
-      }
-    }
-
-    /* ======================== رقم و نامِ ماه (LOC-01، LOC-05) ======================== */
-    item { LocaleSection() }
-
-    /* ============================ انقضا ============================ */
-    item {
-      var blockExpired by remember { mutableStateOf(ir.vil3ntec.tohid.data.ShopPolicy.blockExpired(context)) }
-      SettingsSection(
-        icon = Icons.Filled.Lock,
-        title = "کالای منقضی",
-        subtitle = if (blockExpired) "فروخته نمی‌شود" else "فقط هشدار",
-        tint = if (blockExpired) Shop.colors.danger else Shop.colors.warning,
-      ) {
-        Text(
-          "هشدارِ انقضا همیشه هست. اگر «فروخته نشود» را بزنید، مقدارِ محموله‌های منقضی از موجودیِ فروختنی کم می‌شود و فروشِ بیش از آن ثبت نمی‌شود.",
-          style = MaterialTheme.typography.labelSmall,
-          color = Shop.colors.muted2,
-        )
-        Spacer(Modifier.height(8.dp))
-        SegmentedChoice(
-          options = listOf("warn" to "فقط هشدار", "block" to "فروخته نشود"),
-          selected = if (blockExpired) "block" else "warn",
-          onSelect = {
-            blockExpired = it == "block"
-            ir.vil3ntec.tohid.data.ShopPolicy.setBlockExpired(context, blockExpired)
-          },
-        )
-      }
-    }
-
-    /* ============================== دوربین ============================== */
-    item {
-      SettingsSection(
-        icon = Icons.Filled.PhotoCamera,
-        title = "دوربین بارکدخوان",
-        subtitle = if (cameraGranted) "اجازه داده شده" else "هنوز اجازه داده نشده",
-        tint = if (cameraGranted) Shop.colors.success else Shop.colors.warning,
-      ) {
-        Text(
-          "برنامه برای اسکن بارکد محصولات به دوربین نیاز دارد.",
-          style = MaterialTheme.typography.bodySmall,
-          color = Shop.colors.muted,
-        )
-        Spacer(Modifier.height(12.dp))
-        TohidSecondaryButton(
-          text = if (cameraGranted) "آزمایش دوربین" else "درخواست دسترسی دوربین",
-          onClick = {
-            if (cameraGranted) toast("دوربین آماده است — بارکدخوان کار می‌کند")
-            else askCamera.launch(android.Manifest.permission.CAMERA)
-          },
-          modifier = Modifier.fillMaxWidth(),
-        )
-      }
-    }
-
-    /* ========================= قفل برنامه ========================= */
-    item {
-      SettingsSection(
-        icon = Icons.Filled.Lock,
-        title = "قفل برنامه",
-        subtitle = if (lockOn) "روشن — با رمز باز می‌شود" else "خاموش",
-        tint = if (lockOn) Shop.colors.success else Shop.colors.muted,
-      ) {
-        Text(
-          "تا امروز هر کسی گوشی را برمی‌داشت، حساب‌های دکان جلویش باز بود: طلب مشتری‌ها، سود، قیمت خرید. با رمز، تا زده نشود هیچ‌چیز دیده نمی‌شود.",
-          style = MaterialTheme.typography.bodySmall,
-          color = Shop.colors.muted,
-        )
-        Spacer(Modifier.height(12.dp))
-        if (lockOn) {
-          /*
-           *  «عوض کردن رمز» تا دیروز نبود: یا رمز داشتی یا برش می‌داشتی.
-           *  حالا لازم است — رمزِ تازه شش‌رقمی است و کسی که از نسخهٔ قبل
-           *  رمزِ چهاررقمی دارد باید راهی برای بالا بردنش داشته باشد.
-           */
-          if (lockStore.isLegacyLength) {
-            Text(
-              "رمز شما چهار رقمی است. رمزهای تازه شش رقمی‌اند — اگر خواستید عوضش کنید.",
-              style = MaterialTheme.typography.labelSmall,
-              color = Shop.colors.warning,
-            )
-            Spacer(Modifier.height(10.dp))
-          }
-          TohidButton(
-            text = "عوض کردن رمز",
-            onClick = { askPin = true },
-            modifier = Modifier.fillMaxWidth(),
-          )
-          Spacer(Modifier.height(8.dp))
-          TohidSecondaryButton(
-            text = "برداشتن رمز",
-            onClick = { lockStore.set(""); lockOn = false; toast("قفل برداشته شد") },
-            modifier = Modifier.fillMaxWidth(),
-          )
-          IdleLockChoice(lockStore)   // STF-05
-        } else {
-          TohidButton(
-            text = "گذاشتن رمز",
-            onClick = { askPin = true },
-            modifier = Modifier.fillMaxWidth(),
-          )
-        }
-      }
-    }
-
-    /* ========================= رمز حساب ========================= */
-    if (signedIn) {
-      item {
+      SettingsGroup(SettingsLayout.GENERAL) {
+        /* ============================== هشدارها ============================== */
         SettingsSection(
-          icon = Icons.Filled.Password,
-          title = "تغییر رمز حساب",
-          subtitle = "رمزِ ورود به سرور",
-          tint = Shop.colors.primary,
-        ) {
-          PasswordChange(state = state, snackbarToast = ::toast)
-        }
-      }
-
-      /* ======================== دستگاه‌ها ======================== */
-      item {
-        SettingsSection(
-          icon = Icons.Filled.Devices,
-          title = "دستگاه‌های وارد شده",
-          subtitle = "گوشی گم شد؟ نشستش را ببندید",
+          icon = Icons.Filled.NotificationsActive,
+          title = "هشدارها",
+          subtitle = "قرض از ${money(debtLimit)} ؋ به بالا",
           tint = Shop.colors.warning,
         ) {
-          DeviceList(state = state, snackbarToast = ::toast)
+          Text(
+            "وقتی کالایی تمام شود، قرضِ کسی از این مبلغ بگذرد، یا اشتراک رو " +
+              "به پایان باشد، برنامه خبر می‌دهد — حتی وقتی بسته است.",
+            style = MaterialTheme.typography.bodySmall,
+            color = Shop.colors.muted,
+          )
+          Spacer(Modifier.height(10.dp))
+          TohidTextField(
+            value = debtLimitText,
+            onValueChange = { entered ->
+              //  فقط رقم؛ خالی یعنی «هشدارِ قرض را نمی‌خواهم»
+              val digits = ir.vil3ntec.tohid.normalizeDigits(entered).filter { it in '0'..'9' }
+              debtLimitText = digits
+              val value = digits.toDoubleOrNull() ?: 0.0
+              debtLimit = value
+              ir.vil3ntec.tohid.data.Watchman.setDebtLimit(context, value)
+            },
+            label = "هشدار قرض از این مبلغ به بالا (افغانی)",
+            keyboardOptions = KeyboardOptions(
+              keyboardType = KeyboardType.Number,
+              imeAction = ImeAction.Done,
+            ),
+          )
+          Spacer(Modifier.height(8.dp))
+          Text(
+            "صفر یعنی هشدارِ قرض خاموش. کالای تمام‌شده و اشتراک سرِ جایشان می‌مانند.",
+            style = MaterialTheme.typography.labelSmall,
+            color = Shop.colors.muted2,
+          )
+        }
+
+        /* ============================== ظاهر ============================== */
+        SettingsSection(
+          icon = Icons.Filled.Palette,
+          title = "ظاهر",
+          subtitle = when (theme) {
+            ThemeChoice.LIGHT -> "روشن"
+            ThemeChoice.DARK -> "تاریک"
+            ThemeChoice.SYSTEM -> "مثل گوشی"
+          },
+          tint = Shop.colors.primary,
+        ) {
+          SegmentedChoice(
+            options = listOf(
+              ThemeChoice.LIGHT.name to "روشن",
+              ThemeChoice.DARK.name to "تاریک",
+              ThemeChoice.SYSTEM.name to "مثل گوشی",
+            ),
+            selected = theme.name,
+            onSelect = { onTheme(ThemeChoice.valueOf(it)) },
+          )
+          Spacer(Modifier.height(14.dp))
+          Text(
+            "اگر گوشی «کاهش حرکت» یا حالت ذخیرهٔ باتری روشن باشد، انیمیشن‌ها خاموش می‌شوند. با این کلید همیشه روشن می‌مانند.",
+            style = MaterialTheme.typography.labelSmall,
+            color = Shop.colors.muted2,
+          )
+          Spacer(Modifier.height(8.dp))
+          SegmentedChoice(
+            options = listOf("full" to "انیمیشن روشن", "auto" to "مثل تنظیم گوشی"),
+            selected = Motion.choice,
+            onSelect = { Motion.set(context, it) },
+          )
+        }
+
+        /* ======================== رقم و نامِ ماه (LOC-01، LOC-05) ======================== */
+        LocaleSection()
+      }
+    }
+
+    /* ============================ فروش و پرداخت ============================ */
+    item {
+      SettingsGroup(SettingsLayout.SALES) {
+        /* ============================ انقضا ============================ */
+        var blockExpired by remember { mutableStateOf(ir.vil3ntec.tohid.data.ShopPolicy.blockExpired(context)) }
+        SettingsSection(
+          icon = Icons.Filled.Lock,
+          title = "کالای منقضی",
+          subtitle = if (blockExpired) "فروخته نمی‌شود" else "فقط هشدار",
+          tint = if (blockExpired) Shop.colors.danger else Shop.colors.warning,
+        ) {
+          Text(
+            "هشدارِ انقضا همیشه هست. اگر «فروخته نشود» را بزنید، مقدارِ محموله‌های منقضی از موجودیِ فروختنی کم می‌شود و فروشِ بیش از آن ثبت نمی‌شود.",
+            style = MaterialTheme.typography.labelSmall,
+            color = Shop.colors.muted2,
+          )
+          Spacer(Modifier.height(8.dp))
+          SegmentedChoice(
+            options = listOf("warn" to "فقط هشدار", "block" to "فروخته نشود"),
+            selected = if (blockExpired) "block" else "warn",
+            onSelect = {
+              blockExpired = it == "block"
+              ir.vil3ntec.tohid.data.ShopPolicy.setBlockExpired(context, blockExpired)
+            },
+          )
         }
       }
     }
 
-    /* ============================ کلیدها ============================ */
+    /* ============================ امنیت ============================ */
     item {
-      SettingsSection(
-        icon = Icons.Filled.Key,
-        title = "کد شاگرد",
-        subtitle = "کدی که کارمندتان با آن روی همین دکان می‌آید",
-        tint = Shop.colors.accent,
-      ) {
-        if (staffCode.isNotBlank()) {
-          KeyLine("کد شاگرد", staffCode) {
-            copyToClipboard(context, "کد شاگرد", staffCode)
-            toast("کد شاگرد کپی شد")
-          }
+      SettingsGroup(SettingsLayout.SECURITY) {
+        /* ========================= قفل برنامه ========================= */
+        SettingsSection(
+          icon = Icons.Filled.Lock,
+          title = "قفل برنامه",
+          subtitle = if (lockOn) "روشن — با رمز باز می‌شود" else "خاموش",
+          tint = if (lockOn) Shop.colors.success else Shop.colors.muted,
+        ) {
           Text(
-            "این کد را به شاگردتان بدهید تا در صفحهٔ ورود بزند و روی همین دکان بیاید — " +
-              "ایمیل و شماره لازم نیست. با کد، حسابِ خودش ساخته می‌شود و هر کارش در " +
-              "«سابقه عملیات» به نامِ خودش می‌نشیند. تنظیمات و عددهای سود برای او بسته است.",
-            style = MaterialTheme.typography.labelSmall,
-            color = Shop.colors.muted2,
+            "تا امروز هر کسی گوشی را برمی‌داشت، حساب‌های دکان جلویش باز بود: طلب مشتری‌ها، سود، قیمت خرید. با رمز، تا زده نشود هیچ‌چیز دیده نمی‌شود.",
+            style = MaterialTheme.typography.bodySmall,
+            color = Shop.colors.muted,
+          )
+          Spacer(Modifier.height(12.dp))
+          if (lockOn) {
+            /*
+             *  «عوض کردن رمز» تا دیروز نبود: یا رمز داشتی یا برش می‌داشتی.
+             *  حالا لازم است — رمزِ تازه شش‌رقمی است و کسی که از نسخهٔ قبل
+             *  رمزِ چهاررقمی دارد باید راهی برای بالا بردنش داشته باشد.
+             */
+            if (lockStore.isLegacyLength) {
+              Text(
+                "رمز شما چهار رقمی است. رمزهای تازه شش رقمی‌اند — اگر خواستید عوضش کنید.",
+                style = MaterialTheme.typography.labelSmall,
+                color = Shop.colors.warning,
+              )
+              Spacer(Modifier.height(10.dp))
+            }
+            TohidButton(
+              text = "عوض کردن رمز",
+              onClick = { askPin = true },
+              modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(8.dp))
+            TohidSecondaryButton(
+              text = "برداشتن رمز",
+              onClick = { lockStore.set(""); lockOn = false; toast("قفل برداشته شد") },
+              modifier = Modifier.fillMaxWidth(),
+            )
+            IdleLockChoice(lockStore)   // STF-05
+          } else {
+            TohidButton(
+              text = "گذاشتن رمز",
+              onClick = { askPin = true },
+              modifier = Modifier.fillMaxWidth(),
+            )
+          }
+        }
+
+        /* ========================= رمز حساب ========================= */
+        if (signedIn) {
+          SettingsSection(
+            icon = Icons.Filled.Password,
+            title = "تغییر رمز حساب",
+            subtitle = "رمزِ ورود به سرور",
+            tint = Shop.colors.primary,
+          ) {
+            PasswordChange(state = state, snackbarToast = ::toast)
+          }
+        }
+
+        /* ============================ کلیدها ============================ */
+        SettingsSection(
+          icon = Icons.Filled.Key,
+          title = "کد شاگرد",
+          subtitle = "کدی که کارمندتان با آن روی همین دکان می‌آید",
+          tint = Shop.colors.accent,
+        ) {
+          if (staffCode.isNotBlank()) {
+            KeyLine("کد شاگرد", staffCode) {
+              copyToClipboard(context, "کد شاگرد", staffCode)
+              toast("کد شاگرد کپی شد")
+            }
+            Text(
+              "این کد را به شاگردتان بدهید تا در صفحهٔ ورود بزند و روی همین دکان بیاید — " +
+                "ایمیل و شماره لازم نیست. با کد، حسابِ خودش ساخته می‌شود و هر کارش در " +
+                "«سابقه عملیات» به نامِ خودش می‌نشیند. تنظیمات و عددهای سود برای او بسته است.",
+              style = MaterialTheme.typography.labelSmall,
+              color = Shop.colors.muted2,
+            )
+            Spacer(Modifier.height(12.dp))
+            TohidSecondaryButton(
+              text = if (staffCodeBusy) "در حال ساخت…" else "ساخت کد تازه",
+              onClick = { if (!staffCodeBusy) confirmRotate = true },
+            )
+          } else {
+            Text(
+              if (!signedIn)
+                "کد شاگرد روی سرور ساخته می‌شود، پس اول وارد حساب شوید و دکانتان را بسازید."
+              else
+                "کد خوانده نشد — برای گرفتنش به اینترنت نیاز است. " +
+                  "همین کد در «بیشتر → کارمندان دکان» هم هست.",
+              style = MaterialTheme.typography.labelSmall,
+              color = Shop.colors.muted2,
+            )
+          }
+        }
+      }
+    }
+
+    /* ============================ دستگاه‌ها ============================ */
+    item {
+      SettingsGroup(SettingsLayout.DEVICES) {
+        /* ============================== دوربین ============================== */
+        SettingsSection(
+          icon = Icons.Filled.PhotoCamera,
+          title = "دوربین بارکدخوان",
+          subtitle = if (cameraGranted) "اجازه داده شده" else "هنوز اجازه داده نشده",
+          tint = if (cameraGranted) Shop.colors.success else Shop.colors.warning,
+        ) {
+          Text(
+            "برنامه برای اسکن بارکد محصولات به دوربین نیاز دارد.",
+            style = MaterialTheme.typography.bodySmall,
+            color = Shop.colors.muted,
           )
           Spacer(Modifier.height(12.dp))
           TohidSecondaryButton(
-            text = if (staffCodeBusy) "در حال ساخت…" else "ساخت کد تازه",
-            onClick = { if (!staffCodeBusy) confirmRotate = true },
+            text = if (cameraGranted) "آزمایش دوربین" else "درخواست دسترسی دوربین",
+            onClick = {
+              if (cameraGranted) toast("دوربین آماده است — بارکدخوان کار می‌کند")
+              else askCamera.launch(android.Manifest.permission.CAMERA)
+            },
+            modifier = Modifier.fillMaxWidth(),
           )
-        } else {
-          Text(
-            if (!signedIn)
-              "کد شاگرد روی سرور ساخته می‌شود، پس اول وارد حساب شوید و دکانتان را بسازید."
-            else
-              "کد خوانده نشد — برای گرفتنش به اینترنت نیاز است. " +
-                "همین کد در «بیشتر → کارمندان دکان» هم هست.",
-            style = MaterialTheme.typography.labelSmall,
-            color = Shop.colors.muted2,
-          )
+        }
+
+        /* ======================== دستگاه‌های وارد شده ======================== */
+        if (signedIn) {
+          SettingsSection(
+            icon = Icons.Filled.Devices,
+            title = "دستگاه‌های وارد شده",
+            subtitle = "گوشی گم شد؟ نشستش را ببندید",
+            tint = Shop.colors.warning,
+          ) {
+            DeviceList(state = state, snackbarToast = ::toast)
+          }
         }
       }
     }
 
-    /* ============================== داده‌ها ============================== */
+    /* ============================ همگام‌سازی و پشتیبان ============================ */
     item {
-      SettingsSection(
-        icon = Icons.Filled.Storage,
-        title = "داده‌ها",
-        subtitle = BackupClock.text(context),
-        tint = if (BackupClock.isStale(context)) Shop.colors.warning else Shop.colors.success,
-      ) {
-        Text(
-          "${plain(d.products.size)} کالا — ${plain(d.sales.size)} فاکتور — ${plain(d.debtors.size)} قرض‌دار",
-          style = MaterialTheme.typography.labelSmall,
-          color = Shop.colors.muted2,
-        )
-        Spacer(Modifier.height(12.dp))
-        SettingsRow(
-          icon = Icons.Filled.CloudUpload,
-          title = "گرفتن پشتیبان کامل",
-          description = "دفتر و عکس‌های کالاها، در یک فایل",
-          tint = Shop.colors.success,
-          onClick = { exportFile.launch("tohid-backup-${todayIso()}.zip") },
-        )
-        SettingsRow(
-          icon = Icons.Filled.Description,
-          title = "پشتیبان فقط دفتر",
-          description = "بدون عکس — همان فایلی که نسخهٔ وب می‌خواند",
-          tint = Shop.colors.muted,
-          onClick = { exportJson.launch("tohid-shop-backup-${todayIso()}.json") },
-        )
-        SettingsRow(
-          icon = Icons.Filled.TableChart,
-          title = "خروجی کامل داده — اکسل",
-          description = "همهٔ داده‌ها، هر بخش در یک برگه با سرستونِ فارسی",
-          tint = Shop.colors.success,
-          onClick = { exportAllXlsx.launch("tohid-export-${todayIso()}.xlsx") },
-        )
-        SettingsRow(
-          icon = Icons.Filled.Description,
-          title = "خروجی کامل داده — JSON",
-          description = "همهٔ داده‌ها با سرآیندِ نسخه‌دار، برای بردن به هر جای دیگر",
-          tint = Shop.colors.muted,
-          onClick = { exportAllJson.launch("tohid-export-${todayIso()}.json") },
-        )
-        SettingsRow(
-          icon = Icons.Filled.CloudDownload,
-          title = "بازیابی از فایل",
-          description = "جایگزینی اطلاعات فعلی با یک پشتیبان",
-          tint = Shop.colors.primary,
-          onClick = { pickFile.launch("*/*") },
-        )
+      SettingsGroup(SettingsLayout.DATA) {
+        /* ============================== داده‌ها ============================== */
+        SettingsSection(
+          icon = Icons.Filled.Storage,
+          title = "داده‌ها",
+          subtitle = BackupClock.text(context),
+          tint = if (BackupClock.isStale(context)) Shop.colors.warning else Shop.colors.success,
+        ) {
+          Text(
+            "${plain(d.products.size)} کالا — ${plain(d.sales.size)} فاکتور — ${plain(d.debtors.size)} قرض‌دار",
+            style = MaterialTheme.typography.labelSmall,
+            color = Shop.colors.muted2,
+          )
+          Spacer(Modifier.height(12.dp))
+          SettingsRow(
+            icon = Icons.Filled.CloudUpload,
+            title = "گرفتن پشتیبان کامل",
+            description = "دفتر و عکس‌های کالاها، در یک فایل",
+            tint = Shop.colors.success,
+            onClick = { exportFile.launch("tohid-backup-${todayIso()}.zip") },
+          )
+          SettingsRow(
+            icon = Icons.Filled.Description,
+            title = "پشتیبان فقط دفتر",
+            description = "بدون عکس — همان فایلی که نسخهٔ وب می‌خواند",
+            tint = Shop.colors.muted,
+            onClick = { exportJson.launch("tohid-shop-backup-${todayIso()}.json") },
+          )
+          SettingsRow(
+            icon = Icons.Filled.TableChart,
+            title = "خروجی کامل داده — اکسل",
+            description = "همهٔ داده‌ها، هر بخش در یک برگه با سرستونِ فارسی",
+            tint = Shop.colors.success,
+            onClick = { exportAllXlsx.launch("tohid-export-${todayIso()}.xlsx") },
+          )
+          SettingsRow(
+            icon = Icons.Filled.Description,
+            title = "خروجی کامل داده — JSON",
+            description = "همهٔ داده‌ها با سرآیندِ نسخه‌دار، برای بردن به هر جای دیگر",
+            tint = Shop.colors.muted,
+            onClick = { exportAllJson.launch("tohid-export-${todayIso()}.json") },
+          )
+          SettingsRow(
+            icon = Icons.Filled.CloudDownload,
+            title = "بازیابی از فایل",
+            description = "جایگزینی اطلاعات فعلی با یک پشتیبان",
+            tint = Shop.colors.primary,
+            onClick = { pickFile.launch("*/*") },
+          )
 
-        /*
-         *  نسخه‌های خودکار (نیم‌ساعته و پایانِ روز — OPS-02، `AutoBackup`).
-         *
-         *  روی خودِ گوشی می‌مانند، پس گوشی که گم شود این‌ها هم می‌روند —
-         *  برای آن، همان پشتیبانِ کامل بالا لازم است. این‌ها جلوی
-         *  چیزهای دیگری را می‌گیرند: پاک شدنِ اشتباهیِ کالا یا فاکتور،
-         *  بازیابیِ فایلِ غلط، خرابیِ دفتر.
-         */
-        if (autoBackups.isNotEmpty()) {
+          /*
+           *  نسخه‌های خودکار (نیم‌ساعته و پایانِ روز — OPS-02، `AutoBackup`).
+           *
+           *  روی خودِ گوشی می‌مانند، پس گوشی که گم شود این‌ها هم می‌روند —
+           *  برای آن، همان پشتیبانِ کامل بالا لازم است. این‌ها جلوی
+           *  چیزهای دیگری را می‌گیرند: پاک شدنِ اشتباهیِ کالا یا فاکتور،
+           *  بازیابیِ فایلِ غلط، خرابیِ دفتر.
+           */
+          if (autoBackups.isNotEmpty()) {
+            Spacer(Modifier.height(12.dp))
+            Text(
+              "نسخه‌های خودکار — هر نیم ساعت اگر دفتر عوض شده؛ ۷ روز و ۴ هفتهٔ اخیر",
+              style = MaterialTheme.typography.labelMedium,
+              color = Shop.colors.muted,
+            )
+            autoBackups.forEach { snap ->
+              SettingsRow(
+                icon = Icons.Filled.History,
+                title = ir.vil3ntec.tohid.formatMillis(snap.at),
+                description = "${plain((snap.bytes / 1024).toInt())} کیلوبایت — برای بازگرداندن بزنید",
+                tint = Shop.colors.muted,
+                onClick = {
+                  scope.launch {
+                    val opened = withContext(Dispatchers.IO) {
+                      runCatching { store.parseBackup(snap.file.readText()).getOrThrow() }
+                    }
+                    opened
+                      .onSuccess { pendingRestore = it; restorePhotos = 0; restoreError = null }
+                      .onFailure { restoreError = "این نسخه خوانده نشد" }
+                  }
+                },
+              )
+            }
+          }
+
+          /*
+           *  ── پشتیبانِ ابری ───────────────────────────────────────────
+           *
+           *  ⛔ **این تا امروز نبود.** نسخه‌های شبانه روی خودِ گوشی‌اند و
+           *  پشتیبانِ دستی هم به حافظهٔ آدمی بسته بود که سرش شلوغ است.
+           *  گوشی که گم یا آب می‌شد، کارِ چند سال با آن می‌رفت.
+           *
+           *  ⚠️ فهرست مالِ **همین دکان** است؛ شناسه‌اش از توکن می‌آید،
+           *  نه از درخواست، پس هیچ دکانی پشتیبانِ دکانِ دیگری را نمی‌بیند.
+           */
           Spacer(Modifier.height(12.dp))
           Text(
-            "نسخه‌های خودکار — هر نیم ساعت اگر دفتر عوض شده؛ ۷ روز و ۴ هفتهٔ اخیر",
+            "پشتیبان روی سرور",
             style = MaterialTheme.typography.labelMedium,
             color = Shop.colors.muted,
           )
-          autoBackups.forEach { snap ->
+          val cloud = cloudBackups
+          SettingsRow(
+            icon = Icons.Filled.CloudUpload,
+            title = if (cloudBusy) "در حال فرستادن…" else "همین حالا روی سرور بگذار",
+            description = when {
+              !signedIn -> "برای این کار باید وارد حساب شده باشید"
+              cloud == null -> "هنوز چیزی نرفته — یا نت نیست"
+              cloud.stats.count == 0 -> "هنوز چیزی نرفته"
+              else -> "${plain(cloud.stats.count)} نسخه روی سرور · " +
+                "${plain((cloud.stats.usedBytes / 1024 / 1024).toInt())} از " +
+                "${plain((cloud.stats.quotaBytes / 1024 / 1024).toInt())} مگابایت"
+            },
+            tint = Shop.colors.primary,
+            onClick = {
+              if (cloudBusy) return@SettingsRow
+              if (!signedIn) { toast("اول وارد حساب شوید"); return@SettingsRow }
+              scope.launch {
+                cloudBusy = true
+                cloudNote = null
+                val sent = AutoBackup.push(context, manual = true)
+                cloudBusy = false
+                cloudReload += 1
+                toast(
+                  if (sent) "پشتیبان روی سرور نشست"
+                  else "نرفت — نت یا حساب را ببینید. نسخهٔ روی گوشی سرِ جایش است."
+                )
+              }
+            },
+          )
+          cloudNote?.let {
+            Text(it, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+          }
+          cloud?.items?.take(5)?.forEach { b ->
             SettingsRow(
-              icon = Icons.Filled.History,
-              title = ir.vil3ntec.tohid.formatMillis(snap.at),
-              description = "${plain((snap.bytes / 1024).toInt())} کیلوبایت — برای بازگرداندن بزنید",
+              icon = Icons.Filled.CloudDone,
+              title = ir.vil3ntec.tohid.formatMillis(b.createdAt),
+              description = "${plain((b.bytes / 1024).toInt())} کیلوبایت · " +
+                (if (b.kind == "manual") "دستی" else "خودکار"),
               tint = Shop.colors.muted,
               onClick = {
+                //  ⚠️ برگرداندن از ابر عمداً این‌جا نیست: بازیابی کاری
+                //  است که برنمی‌گردد و باید از همان درِ «بازیابی از فایل»
+                //  برود تا کاربر اول ببیند داخلش چیست.
+                toast("برای برگرداندن، فایل را از پنل بگیرید و «بازیابی از فایل» را بزنید")
+              },
+            )
+          }
+
+          /*
+           *  پشتیبانِ کامل در پوشه — `BackupMirror`.
+           *  همان ZIPِ کامل (دفتر + عکس‌ها) در پوشه‌ای که دیده می‌شود؛ خودکار
+           *  با هر پشتیبانِ ۱۲ ساعته، و این‌جا «همین حالا» (پوشه + سرور با هم).
+           */
+          Spacer(Modifier.height(10.dp))
+          Text("پشتیبانِ کامل در پوشه", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
+          var mirrorTick by remember { mutableStateOf(0) }
+          val mirrorDir = remember(mirrorTick) { ir.vil3ntec.tohid.data.BackupMirror.folder(context)?.path ?: "—" }
+          val mirrorList = remember(mirrorTick) { ir.vil3ntec.tohid.data.BackupMirror.list(context) }
+          var mirrorOn by remember { mutableStateOf(ir.vil3ntec.tohid.data.BackupMirror.enabled(context)) }
+          var mirrorBusy by remember { mutableStateOf(false) }
+          SettingsRow(
+            icon = Icons.Filled.CloudUpload,
+            title = if (mirrorBusy) "در حالِ ساختن…" else "پشتیبانِ کامل همین حالا (پوشه + سرور)",
+            description = "دفتر و همهٔ عکس‌ها · ${mirrorList.size} نسخه در پوشه" +
+              (mirrorList.firstOrNull()?.let { " · آخرین: " + ir.vil3ntec.tohid.formatMillis(it.lastModified()) } ?: ""),
+            tint = Shop.colors.success,
+            onClick = {
+              if (mirrorBusy) return@SettingsRow
+              mirrorBusy = true
+              scope.launch {
+                val local = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { ir.vil3ntec.tohid.data.BackupMirror.write(context) }
+                val cloud = if (signedIn) AutoBackup.push(context, manual = true) else false
+                mirrorBusy = false
+                mirrorTick++; cloudReload += 1
+                toast(
+                  local.fold({ "در پوشه نشست" }, { "پوشه: ${it.message}" }) +
+                    if (signedIn) (if (cloud) " · روی سرور هم رفت" else " · سرور: نرفت (نت؟)") else ""
+                )
+              }
+            },
+          )
+          Text("پوشه: $mirrorDir", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+          Row(verticalAlignment = Alignment.CenterVertically) {
+            if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) {
+              TextButton(onClick = {
+                ir.vil3ntec.tohid.ui.Platform.pickFolder(mirrorDir)?.let { ir.vil3ntec.tohid.data.BackupMirror.setFolder(context, it); mirrorTick++ }
+              }) { Text("انتخابِ پوشه…") }
+              TextButton(onClick = { if (!ir.vil3ntec.tohid.ui.Platform.openFolder(mirrorDir)) toast("پوشه باز نشد") }) { Text("باز کردنِ پوشه") }
+            }
+            Spacer(Modifier.weight(1f))
+            Text("خودکار هر ۱۲ ساعت", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+            Switch(checked = mirrorOn, onCheckedChange = { mirrorOn = it; ir.vil3ntec.tohid.data.BackupMirror.setEnabled(context, it) })
+          }
+
+          /*
+           *  فشرده کردنِ دفتر.
+           *
+           *  دستی است و نه خودکار، چون یک‌طرفه است و چون با همگام‌سازی
+           *  درگیر می‌شود — شرحش سرِ `LedgerArchive`.
+           */
+          if (archivePlan.total > 0) {
+            SettingsRow(
+              icon = Icons.Filled.Compress,
+              title = "فشرده کردن دفتر",
+              description = "${plain(archivePlan.total)} ردیف سابقهٔ کهنه به بایگانی می‌رود — دفتر سبک‌تر و ثبت فروش تندتر می‌شود",
+              tint = Shop.colors.warning,
+              onClick = { confirmCompact = true },
+            )
+          }
+          if (canUndo) {
+            SettingsRow(
+              icon = Icons.Filled.Undo,
+              title = "برگرداندن به پیش از بازیابی",
+              description = "اگر فایل اشتباهی بازیابی شد",
+              tint = Shop.colors.warning,
+              onClick = {
                 scope.launch {
-                  val opened = withContext(Dispatchers.IO) {
-                    runCatching { store.parseBackup(snap.file.readText()).getOrThrow() }
-                  }
-                  opened
-                    .onSuccess { pendingRestore = it; restorePhotos = 0; restoreError = null }
-                    .onFailure { restoreError = "این نسخه خوانده نشد" }
+                  store.undoRestore()
+                    .onSuccess { canUndo = false; toast("به وضعیت پیش از بازیابی برگشت") }
+                    .onFailure { toast("برگرداندن ممکن نشد") }
                 }
               },
             )
           }
-        }
-
-        /*
-         *  ── پشتیبانِ ابری ───────────────────────────────────────────
-         *
-         *  ⛔ **این تا امروز نبود.** نسخه‌های شبانه روی خودِ گوشی‌اند و
-         *  پشتیبانِ دستی هم به حافظهٔ آدمی بسته بود که سرش شلوغ است.
-         *  گوشی که گم یا آب می‌شد، کارِ چند سال با آن می‌رفت.
-         *
-         *  ⚠️ فهرست مالِ **همین دکان** است؛ شناسه‌اش از توکن می‌آید،
-         *  نه از درخواست، پس هیچ دکانی پشتیبانِ دکانِ دیگری را نمی‌بیند.
-         */
-        Spacer(Modifier.height(12.dp))
-        Text(
-          "پشتیبان روی سرور",
-          style = MaterialTheme.typography.labelMedium,
-          color = Shop.colors.muted,
-        )
-        val cloud = cloudBackups
-        SettingsRow(
-          icon = Icons.Filled.CloudUpload,
-          title = if (cloudBusy) "در حال فرستادن…" else "همین حالا روی سرور بگذار",
-          description = when {
-            !signedIn -> "برای این کار باید وارد حساب شده باشید"
-            cloud == null -> "هنوز چیزی نرفته — یا نت نیست"
-            cloud.stats.count == 0 -> "هنوز چیزی نرفته"
-            else -> "${plain(cloud.stats.count)} نسخه روی سرور · " +
-              "${plain((cloud.stats.usedBytes / 1024 / 1024).toInt())} از " +
-              "${plain((cloud.stats.quotaBytes / 1024 / 1024).toInt())} مگابایت"
-          },
-          tint = Shop.colors.primary,
-          onClick = {
-            if (cloudBusy) return@SettingsRow
-            if (!signedIn) { toast("اول وارد حساب شوید"); return@SettingsRow }
-            scope.launch {
-              cloudBusy = true
-              cloudNote = null
-              val sent = AutoBackup.push(context, manual = true)
-              cloudBusy = false
-              cloudReload += 1
-              toast(
-                if (sent) "پشتیبان روی سرور نشست"
-                else "نرفت — نت یا حساب را ببینید. نسخهٔ روی گوشی سرِ جایش است."
-              )
-            }
-          },
-        )
-        cloudNote?.let {
-          Text(it, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
-        }
-        cloud?.items?.take(5)?.forEach { b ->
-          SettingsRow(
-            icon = Icons.Filled.CloudDone,
-            title = ir.vil3ntec.tohid.formatMillis(b.createdAt),
-            description = "${plain((b.bytes / 1024).toInt())} کیلوبایت · " +
-              (if (b.kind == "manual") "دستی" else "خودکار"),
-            tint = Shop.colors.muted,
-            onClick = {
-              //  ⚠️ برگرداندن از ابر عمداً این‌جا نیست: بازیابی کاری
-              //  است که برنمی‌گردد و باید از همان درِ «بازیابی از فایل»
-              //  برود تا کاربر اول ببیند داخلش چیست.
-              toast("برای برگرداندن، فایل را از پنل بگیرید و «بازیابی از فایل» را بزنید")
-            },
-          )
-        }
-
-        /*
-         *  پشتیبانِ کامل در پوشه — `BackupMirror`.
-         *  همان ZIPِ کامل (دفتر + عکس‌ها) در پوشه‌ای که دیده می‌شود؛ خودکار
-         *  با هر پشتیبانِ ۱۲ ساعته، و این‌جا «همین حالا» (پوشه + سرور با هم).
-         */
-        Spacer(Modifier.height(10.dp))
-        Text("پشتیبانِ کامل در پوشه", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
-        var mirrorTick by remember { mutableStateOf(0) }
-        val mirrorDir = remember(mirrorTick) { ir.vil3ntec.tohid.data.BackupMirror.folder(context)?.path ?: "—" }
-        val mirrorList = remember(mirrorTick) { ir.vil3ntec.tohid.data.BackupMirror.list(context) }
-        var mirrorOn by remember { mutableStateOf(ir.vil3ntec.tohid.data.BackupMirror.enabled(context)) }
-        var mirrorBusy by remember { mutableStateOf(false) }
-        SettingsRow(
-          icon = Icons.Filled.CloudUpload,
-          title = if (mirrorBusy) "در حالِ ساختن…" else "پشتیبانِ کامل همین حالا (پوشه + سرور)",
-          description = "دفتر و همهٔ عکس‌ها · ${mirrorList.size} نسخه در پوشه" +
-            (mirrorList.firstOrNull()?.let { " · آخرین: " + ir.vil3ntec.tohid.formatMillis(it.lastModified()) } ?: ""),
-          tint = Shop.colors.success,
-          onClick = {
-            if (mirrorBusy) return@SettingsRow
-            mirrorBusy = true
-            scope.launch {
-              val local = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { ir.vil3ntec.tohid.data.BackupMirror.write(context) }
-              val cloud = if (signedIn) AutoBackup.push(context, manual = true) else false
-              mirrorBusy = false
-              mirrorTick++; cloudReload += 1
-              toast(
-                local.fold({ "در پوشه نشست" }, { "پوشه: ${it.message}" }) +
-                  if (signedIn) (if (cloud) " · روی سرور هم رفت" else " · سرور: نرفت (نت؟)") else ""
-              )
-            }
-          },
-        )
-        Text("پوشه: $mirrorDir", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
-        Row(verticalAlignment = Alignment.CenterVertically) {
-          if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) {
-            TextButton(onClick = {
-              ir.vil3ntec.tohid.ui.Platform.pickFolder(mirrorDir)?.let { ir.vil3ntec.tohid.data.BackupMirror.setFolder(context, it); mirrorTick++ }
-            }) { Text("انتخابِ پوشه…") }
-            TextButton(onClick = { if (!ir.vil3ntec.tohid.ui.Platform.openFolder(mirrorDir)) toast("پوشه باز نشد") }) { Text("باز کردنِ پوشه") }
+          restoreError?.let {
+            Spacer(Modifier.height(8.dp))
+            Text(it, style = MaterialTheme.typography.labelMedium, color = Shop.colors.danger)
           }
-          Spacer(Modifier.weight(1f))
-          Text("خودکار هر ۱۲ ساعت", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
-          Switch(checked = mirrorOn, onCheckedChange = { mirrorOn = it; ir.vil3ntec.tohid.data.BackupMirror.setEnabled(context, it) })
-        }
-
-        /*
-         *  فشرده کردنِ دفتر.
-         *
-         *  دستی است و نه خودکار، چون یک‌طرفه است و چون با همگام‌سازی
-         *  درگیر می‌شود — شرحش سرِ `LedgerArchive`.
-         */
-        if (archivePlan.total > 0) {
-          SettingsRow(
-            icon = Icons.Filled.Compress,
-            title = "فشرده کردن دفتر",
-            description = "${plain(archivePlan.total)} ردیف سابقهٔ کهنه به بایگانی می‌رود — دفتر سبک‌تر و ثبت فروش تندتر می‌شود",
-            tint = Shop.colors.warning,
-            onClick = { confirmCompact = true },
+          Spacer(Modifier.height(12.dp))
+          TohidDangerButton(
+            text = "پاک‌سازی کامل اطلاعات",
+            onClick = { confirmClear = true },
+            modifier = Modifier.fillMaxWidth(),
           )
         }
-        if (canUndo) {
-          SettingsRow(
-            icon = Icons.Filled.Undo,
-            title = "برگرداندن به پیش از بازیابی",
-            description = "اگر فایل اشتباهی بازیابی شد",
-            tint = Shop.colors.warning,
-            onClick = {
-              scope.launch {
-                store.undoRestore()
-                  .onSuccess { canUndo = false; toast("به وضعیت پیش از بازیابی برگشت") }
-                  .onFailure { toast("برگرداندن ممکن نشد") }
-              }
-            },
-          )
-        }
-        restoreError?.let {
-          Spacer(Modifier.height(8.dp))
-          Text(it, style = MaterialTheme.typography.labelMedium, color = Shop.colors.danger)
-        }
-        Spacer(Modifier.height(12.dp))
-        TohidDangerButton(
-          text = "پاک‌سازی کامل اطلاعات",
-          onClick = { confirmClear = true },
-          modifier = Modifier.fillMaxWidth(),
-        )
       }
     }
 
     /* ============================ درباره ============================ */
     item {
-      SettingsSection(
-        icon = Icons.Filled.Info,
-        title = "درباره برنامه",
-        subtitle = "نسخهٔ ${BuildConfig.VERSION_NAME}",
-        tint = Shop.colors.muted,
-      ) {
-        Text(
-          "فروشگاه من — برنامهٔ اندروید.\nتمام اطلاعات روی همین گوشی ذخیره می‌شود؛ هر چند وقت یک‌بار پشتیبان بگیرید.",
-          style = MaterialTheme.typography.bodySmall,
-          color = Shop.colors.muted,
-        )
-        Spacer(Modifier.height(12.dp))
-        SettingsRow(
-          icon = Icons.Filled.SystemUpdate,
-          title = "دریافت آخرین نسخه",
-          description = "نسخهٔ نصب‌شده: ${BuildConfig.VERSION_NAME}",
-          tint = Shop.colors.primary,
-          onClick = onUpdates,
-        )
+      SettingsGroup(SettingsLayout.ABOUT) {
+        /* ============================ درباره ============================ */
+        SettingsSection(
+          icon = Icons.Filled.Info,
+          title = "درباره برنامه",
+          subtitle = "نسخهٔ ${BuildConfig.VERSION_NAME}",
+          tint = Shop.colors.muted,
+        ) {
+          Text(
+            "فروشگاه من — برنامهٔ اندروید.\nتمام اطلاعات روی همین گوشی ذخیره می‌شود؛ هر چند وقت یک‌بار پشتیبان بگیرید.",
+            style = MaterialTheme.typography.bodySmall,
+            color = Shop.colors.muted,
+          )
+          Spacer(Modifier.height(12.dp))
+          SettingsRow(
+            icon = Icons.Filled.SystemUpdate,
+            title = "دریافت آخرین نسخه",
+            description = "نسخهٔ نصب‌شده: ${BuildConfig.VERSION_NAME}",
+            tint = Shop.colors.primary,
+            onClick = onUpdates,
+          )
+        }
       }
     }
   }

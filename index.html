@@ -623,26 +623,81 @@
   .team-tag.gone{background:var(--danger-tint); color:var(--danger);}
   .team-empty{font-size:12.5px; color:var(--muted); padding:10px 0;}
 
-  /* ---------- حساب من ---------- */
-  .prof-hero{
-    display:flex; align-items:center; gap:14px;
-    margin-bottom:16px;
+  /* ---------- حساب من (phone-ui، تصویرِ مرجعِ ۳) ----------
+     کارتِ سفیدِ گرد با سایهٔ نرم؛ عکسِ گرد روی لبه‌اش؛ نشانِ نقش قرصِ تیره؛ سه
+     تراشهٔ آمار؛ نوارِ هشدارِ اشتراک فقط وقتی واقعی است (رنگ‌های برگهٔ تیره). */
+  .prof-card{
+    position:relative;
+    margin:46px 0 22px;
+    padding:56px 16px 16px;
+    background:var(--surface-solid);
+    border-radius:16px;
+    box-shadow:0 8px 24px -12px rgba(25,22,39,.25), 0 1px 3px rgba(25,22,39,.05);
   }
   .prof-avatar{
-    width:72px; height:72px; flex:0 0 auto;
+    position:absolute; top:-44px; left:50%; transform:translateX(-50%);
+    width:88px; height:88px;
     border-radius:50%;
-    background:linear-gradient(135deg, var(--primary), var(--accent));
-    color:#fff; font-size:28px; font-weight:800;
+    border:4px solid var(--surface-solid);
+    background:linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color:#fff; font-size:32px; font-weight:800;
     display:flex; align-items:center; justify-content:center;
-    box-shadow:var(--shadow-md);
+    box-shadow:0 8px 20px -10px rgba(25,22,39,.45);
   }
-  .prof-hero-txt{min-width:0;}
-  .prof-hero-txt b{display:block; font-size:19px; font-weight:800; color:var(--text);}
+  .prof-card-head{display:flex; align-items:center; gap:10px;}
+  .prof-hero-txt{min-width:0; flex:1 1 auto;}
+  .prof-hero-txt b{display:block; font-size:19px; font-weight:800; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   .prof-hero-txt i{
     display:block; font-style:normal; font-size:12.5px;
     color:var(--muted); margin-top:3px;
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
   }
+  .prof-role{
+    flex:0 0 auto; padding:6px 12px; border-radius:999px;
+    background:var(--nav-pill); color:var(--on-nav-pill);
+    font-size:12px; font-weight:800; white-space:nowrap;
+  }
+  .prof-stats{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-top:14px;}
+  .prof-stat{
+    display:flex; flex-direction:column; align-items:center; gap:2px;
+    padding:10px 4px; border-radius:12px; background:var(--bg);
+  }
+  .prof-stat b{font-size:17px; font-weight:800; color:var(--text);}
+  .prof-stat span{font-size:12px; color:var(--muted);}
+  .prof-notice{
+    display:flex; align-items:center; gap:10px;
+    margin-top:12px; padding:10px 10px 10px 14px;
+    border-radius:16px; background:var(--sheet); color:var(--on-sheet);
+  }
+  .prof-notice > svg{flex:0 0 auto; color:var(--sheet-accent);}
+  .prof-notice-txt{flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:2px;}
+  .prof-notice-txt b{font-size:13px; font-weight:800;}
+  .prof-notice-txt span{font-size:11.5px; color:var(--on-sheet-muted);}
+  .prof-notice-btn{
+    flex:0 0 auto; min-height:44px; padding:0 18px; border:0; border-radius:999px;
+    background:var(--sheet-accent); color:var(--on-sheet-accent);
+    font:inherit; font-size:13px; font-weight:800; cursor:pointer;
+  }
+  .prof-notice-btn:focus-visible{outline:3px solid var(--sheet-accent); outline-offset:2px;}
+
+  /* ---------- گروه‌های تنظیمات و حساب من (phone-ui، تصویرِ مرجعِ ۴) ----------
+     سرخطِ کوچک و یک کارتِ گرد؛ پنل‌های درونش ردیف‌های همان کارت‌اند. زمینهٔ
+     کارت رنگِ خطِ مویی است و پنل‌ها با یک پیکسل فاصله رویش می‌نشینند، پس خط
+     فقط **میانِ** ردیف‌ها دیده می‌شود. سایهٔ نرم به‌جای خطِ دورِ تیره (design v2). */
+  .set-group{margin-bottom:22px;}
+  .set-group:last-child{margin-bottom:0;}
+  .set-group-title{font-size:13px; font-weight:800; color:var(--muted); margin:0 4px 8px;}
+  .set-group-card{
+    display:flex; flex-direction:column; gap:1px;
+    border-radius:16px; overflow:hidden;
+    background:var(--border);
+    box-shadow:0 6px 20px -12px rgba(25,22,39,.25), 0 1px 3px rgba(25,22,39,.05);
+  }
+  .set-group-card > .panel{
+    margin:0; border:0; border-radius:0; box-shadow:none;
+    background:var(--surface-solid);
+  }
+  .page.active > .set-group{ animation:cardIn .4s cubic-bezier(.22,1,.36,1) both; }
   .form-input:disabled{ opacity:.7; cursor:not-allowed; }
 
   /* وضعیت دکان: ردیف‌های فشرده با جداکننده‌ی نازک */
@@ -5109,11 +5164,29 @@
           بازگشت به بیشتر
         </a>
 
-        <div class="prof-hero">
-          <div class="prof-avatar" id="prof-avatar">؟</div>
-          <div class="prof-hero-txt">
-            <b id="prof-name-big">حساب من</b>
-            <i id="prof-contact">—</i>
+        <!-- کارتِ «حساب من» (phone-ui، تصویرِ مرجعِ ۳): عکسِ گرد روی لبهٔ کارت، نام و راهِ تماس،
+             نشانِ نقش، سه تراشهٔ آمار از دفترِ همین دستگاه، و نوارِ هشدارِ اشتراک فقط وقتی واقعی است -->
+        <div class="prof-card" id="prof-card">
+          <div class="prof-avatar" id="prof-avatar" aria-hidden="true">؟</div>
+          <div class="prof-card-head">
+            <div class="prof-hero-txt">
+              <b id="prof-name-big">حساب من</b>
+              <i id="prof-contact" dir="auto">—</i>
+            </div>
+            <span class="prof-role" id="prof-role" hidden></span>
+          </div>
+          <div class="prof-stats" role="list" aria-label="دفترِ همین دستگاه">
+            <div class="prof-stat" role="listitem"><b id="prof-stat-products">0</b><span>کالا</span></div>
+            <div class="prof-stat" role="listitem"><b id="prof-stat-sales">0</b><span>فاکتور</span></div>
+            <div class="prof-stat" role="listitem"><b id="prof-stat-debtors">0</b><span>قرض‌دار</span></div>
+          </div>
+          <div class="prof-notice" id="prof-notice" role="status" hidden>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2h12M6 22h12M7 2v4a5 5 0 0 0 10 0V2M7 22v-4a5 5 0 0 1 10 0v4"/></svg>
+            <div class="prof-notice-txt">
+              <b id="prof-notice-title"></b>
+              <span>هیچ داده‌ای پاک نمی‌شود؛ خروجی و چاپ باز می‌ماند.</span>
+            </div>
+            <button type="button" class="prof-notice-btn" id="prof-notice-btn">تمدید</button>
           </div>
         </div>
 
@@ -5124,44 +5197,60 @@
         </div>
 
         <div id="prof-in" hidden>
-          <div class="panel">
-            <div class="panel-head"><h2>مشخصات حساب</h2></div>
-            <div class="form-group">
-              <label for="prof-name">نام و نام خانوادگی</label>
-              <input class="form-input" id="prof-name" type="text" autocomplete="name" placeholder="نامِ شما">
+          <div class="set-group" role="group" aria-labelledby="prof-g-plan">
+            <h3 class="set-group-title" id="prof-g-plan">عضویت و اشتراک</h3>
+            <div class="set-group-card">
+              <div class="panel">
+                <div class="dash-status" style="margin-bottom:0;">
+                  <div id="prof-rows"></div>
+                </div>
+                <button type="button" class="btn btn-secondary" id="prof-vip" style="margin-top:12px;">دیدن قیمت‌ها</button>
+              </div>
             </div>
-            <div class="form-group">
-              <label for="prof-email">ایمیل</label>
-              <input class="form-input" id="prof-email" type="email" disabled>
-              <p class="settings-hint" style="margin-top:6px;">ایمیل عوض نمی‌شود — راهِ ورود و بازیابیِ رمز است.</p>
-            </div>
-            <div class="form-group">
-              <label for="prof-phone">شماره موبایل</label>
-              <input class="form-input" id="prof-phone" type="tel" inputmode="tel" placeholder="0790000000">
-              <p class="settings-hint" id="prof-phone-hint" style="margin-top:6px;">یک بار ثبت می‌شود و بعد قفل می‌ماند.</p>
-            </div>
-            <p class="settings-hint" id="prof-save-msg" hidden></p>
-            <button type="button" class="btn btn-primary" id="prof-save">ذخیره تغییرات</button>
           </div>
 
-          <div class="panel">
-            <div class="panel-head"><h2>عضویت و اشتراک</h2></div>
-            <div class="dash-status" style="margin-bottom:0;">
-              <div id="prof-rows"></div>
+          <div class="set-group" role="group" aria-labelledby="prof-g-form">
+            <h3 class="set-group-title" id="prof-g-form">مشخصات حساب</h3>
+            <div class="set-group-card">
+              <div class="panel">
+                <div class="form-group">
+                  <label for="prof-name">نام و نام خانوادگی</label>
+                  <input class="form-input" id="prof-name" type="text" autocomplete="name" placeholder="نامِ شما">
+                </div>
+                <div class="form-group">
+                  <label for="prof-email">ایمیل</label>
+                  <input class="form-input" id="prof-email" type="email" disabled>
+                  <p class="settings-hint" style="margin-top:6px;">ایمیل عوض نمی‌شود — راهِ ورود و بازیابیِ رمز است.</p>
+                </div>
+                <div class="form-group">
+                  <label for="prof-phone">شماره موبایل</label>
+                  <input class="form-input" id="prof-phone" type="tel" inputmode="tel" placeholder="0790000000">
+                  <p class="settings-hint" id="prof-phone-hint" style="margin-top:6px;">یک بار ثبت می‌شود و بعد قفل می‌ماند.</p>
+                </div>
+                <p class="settings-hint" id="prof-save-msg" hidden></p>
+                <button type="button" class="btn btn-primary" id="prof-save">ذخیره تغییرات</button>
+              </div>
             </div>
-            <button type="button" class="btn btn-secondary" id="prof-vip" style="margin-top:12px;">دیدن قیمت‌ها</button>
           </div>
 
-          <div class="panel">
-            <div class="panel-head"><h2>همگام‌سازی</h2></div>
-            <p class="settings-hint" id="prof-sync-when">هنوز همگام نشده است.</p>
-            <button type="button" class="btn btn-secondary" id="prof-sync" style="margin-top:12px;">همگام‌سازی حالا</button>
+          <div class="set-group" role="group" aria-labelledby="prof-g-sync">
+            <h3 class="set-group-title" id="prof-g-sync">همگام‌سازی</h3>
+            <div class="set-group-card">
+              <div class="panel">
+                <p class="settings-hint" id="prof-sync-when">هنوز همگام نشده است.</p>
+                <button type="button" class="btn btn-secondary" id="prof-sync" style="margin-top:12px;">همگام‌سازی حالا</button>
+              </div>
+            </div>
           </div>
 
-          <div class="panel">
-            <div class="panel-head"><h2>خروج از حساب</h2></div>
-            <p class="settings-hint">اطلاعاتِ روی همین دستگاه پاک نمی‌شود؛ فقط دسترسیِ حساب بسته می‌شود.</p>
-            <button type="button" class="btn btn-danger" id="prof-logout" style="margin-top:12px;">خروج از حساب</button>
+          <div class="set-group" role="group" aria-labelledby="prof-g-out">
+            <h3 class="set-group-title" id="prof-g-out">خروج از حساب</h3>
+            <div class="set-group-card">
+              <div class="panel">
+                <p class="settings-hint">اطلاعاتِ روی همین دستگاه پاک نمی‌شود؛ فقط دسترسیِ حساب بسته می‌شود.</p>
+                <button type="button" class="btn btn-danger" id="prof-logout" style="margin-top:12px;">خروج از حساب</button>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -5249,241 +5338,268 @@
           </div>
         </div>
 
-        <!-- ==========================================================
-             حساب، اشتراک و همگام‌سازی — بندهای ۲۱٫۴ · ۲۱٫۵ · ۲۱٫۹ · ۲۱٫۱۱
-             ----------------------------------------------------------
-             ⛔ کادرِ «آدرس سرور» این‌جا **نیست** و نباید بیاید. نشانی در
-             `<meta name="tohid-api-base">` قفل است و `api-config.js`
-             نشانیِ دستی را نادیده می‌گیرد؛ قاعدهٔ صاحبِ مخزن است، نه
-             سلیقه. شرح در `docs/SYNC-CLIENT-fa.md`.
-             ========================================================== -->
-        <div class="panel" id="panel-account-sync">
-          <div class="panel-head"><h2>حساب و همگام‌سازی</h2></div>
-          <p class="settings-hint">
-            با ایمیل وارد شوید تا دفترِ دکان روی سرور بماند و روی هر گوشی و روی
-            همین سایت یکی باشد. تا وقتی وارد نشده‌اید، برنامه کاملاً آفلاین کار
-            می‌کند و هیچ قابلیتی قفل نمی‌شود.
-          </p>
-          <!-- کلاسِ پایهٔ `btn` نبود و سه دکمه با ظاهرِ خامِ مرورگر می‌آمدند؛ روی
-               دسکتاپ کنارِ هم، روی گوشی زیرِ هم -->
-          <div class="settings-actions" style="display:grid;gap:10px;margin-top:12px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));">
-            <button type="button" class="btn btn-secondary" id="btn-acct-login">ورود با ایمیل</button>
-            <button type="button" class="btn btn-secondary" id="btn-acct-plan">اشتراکِ من</button>
-            <button type="button" class="btn btn-secondary" id="btn-acct-sync">حالِ همگام‌سازی</button>
-          </div>
-        </div>
+        <!-- گروه‌های تنظیمات (phone-ui، تصویرِ مرجعِ ۴): همان پنل‌ها، همان شناسه‌ها و همان کار —
+             فقط زیرِ شش سرخط کنارِ هم نشسته‌اند (هم‌نامِ `SettingsLayout`ِ برنامه).
+             هیچ تنظیمی برداشته یا نام‌عوض نشده؛ `server/test/web-phone-ui.mjs` می‌شمارد. -->
+        <div class="set-group" role="group" aria-labelledby="set-g-general">
+          <h3 class="set-group-title" id="set-g-general">عمومی</h3>
+          <div class="set-group-card">
+            <!-- Appearance -->
+            <div class="panel">
+              <div class="panel-head"><h2>ظاهر برنامه</h2></div>
+              <div class="theme-toggle" id="theme-toggle">
+                <button type="button" class="theme-toggle-btn" data-theme-choice="light">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+                  روشن
+                </button>
+                <button type="button" class="theme-toggle-btn" data-theme-choice="dark">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                  تاریک
+                </button>
+              </div>
 
-        <!-- کالای منقضی — همان «کالای منقضی»ِ تنظیماتِ برنامه -->
-        <div class="panel">
-          <div class="panel-head"><h2>کالای منقضی</h2></div>
-          <p class="settings-hint">هشدارِ انقضا همیشه هست. اگر «فروخته نشود» را بزنید، مقدارِ محموله‌های منقضی از موجودیِ فروختنی کم می‌شود و فروشِ بیش از آن ثبت نمی‌شود.</p>
-          <div class="theme-toggle" id="expiry-policy-toggle" style="margin-top:10px;">
-            <button type="button" class="theme-toggle-btn" data-expiry-policy="warn">فقط هشدار</button>
-            <button type="button" class="theme-toggle-btn" data-expiry-policy="block">فروخته نشود</button>
-          </div>
-        </div>
-
-        <!-- Appearance -->
-        <div class="panel">
-          <div class="panel-head"><h2>ظاهر برنامه</h2></div>
-          <div class="theme-toggle" id="theme-toggle">
-            <button type="button" class="theme-toggle-btn" data-theme-choice="light">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
-              روشن
-            </button>
-            <button type="button" class="theme-toggle-btn" data-theme-choice="dark">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-              تاریک
-            </button>
-          </div>
-
-          <p class="settings-hint" style="margin-top:14px;">اگر در تنظیمات گوشی «کاهش حرکت» یا حالت ذخیره‌ی باتری روشن باشد، برنامه انیمیشن‌ها را خاموش می‌کند. با این کلید می‌توانید همیشه روشن نگهشان دارید.</p>
-          <div class="theme-toggle" id="motion-toggle" style="margin-top:8px;">
-            <button type="button" class="theme-toggle-btn" data-motion-choice="full">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4.5 13.5H11l-1 8.5 8.5-11.5H12l1-8.5z"/></svg>
-              انیمیشن روشن
-            </button>
-            <button type="button" class="theme-toggle-btn" data-motion-choice="auto">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3.5a8.5 8.5 0 1 1 0 17 8.5 8.5 0 0 1 0-17z"/><path d="M12 8v4.5l3 1.8"/></svg>
-              مثل تنظیم گوشی
-            </button>
-          </div>
-        </div>
-
-        <!-- LOC-01/05/07: رقم، نامِ ماه و نمادِ پولِ فاکتور — پیش‌فرض همان امروز (لاتین، دری، «افغانی») -->
-        <div class="panel">
-          <div class="panel-head"><h2>تاریخ و رقم</h2></div>
-          <p class="settings-hint">رقم روی صفحه و فاکتور. چیزی که ذخیره و همگام می‌شود همیشه رقمِ لاتین است؛ با عوض کردنِ این کلید هیچ داده‌ای عوض نمی‌شود.</p>
-          <div class="theme-toggle" id="digits-toggle" style="margin-top:10px;">
-            <button type="button" class="theme-toggle-btn" data-digits-choice="latn">رقمِ لاتین</button>
-            <button type="button" class="theme-toggle-btn" data-digits-choice="fa">رقمِ فارسی</button>
-          </div>
-          <p class="settings-hint" style="margin-top:14px;">نامِ ماه‌های خورشیدی: امروز <span id="months-sample">—</span></p>
-          <div class="theme-toggle" id="months-toggle" style="margin-top:8px;">
-            <button type="button" class="theme-toggle-btn" data-months-choice="fa">دری (حمل، ثور…)</button>
-            <button type="button" class="theme-toggle-btn" data-months-choice="ps">پشتو (وری، غویی…)</button>
-          </div>
-          <p class="settings-hint" style="margin-top:14px;">نمادِ پول در فاکتور. مبلغ همیشه بی اعشار است.</p>
-          <div class="theme-toggle" id="currency-toggle" style="margin-top:8px;">
-            <button type="button" class="theme-toggle-btn" data-currency-choice="word">افغانی</button>
-            <button type="button" class="theme-toggle-btn" data-currency-choice="sign">؋</button>
-          </div>
-        </div>
-
-        <!-- Store info -->
-        <div class="panel">
-          <div class="panel-head"><h2>اطلاعات فروشگاه</h2></div>
-          <div class="form-group" style="margin-bottom:12px;">
-            <label>نام فروشگاه</label>
-            <input class="form-input" id="in-settings-store-name" type="text" placeholder="مثلاً فروشگاه نور">
-          </div>
-          <button class="btn btn-primary btn-sm" id="btn-save-store-name">ذخیره</button>
-        </div>
-
-        <!-- Camera -->
-        <div class="panel">
-          <div class="panel-head">
-            <h2>دوربین بارکدخوان</h2>
-            <span class="settings-badge" id="settings-camera-support-badge">در حال بررسی…</span>
-          </div>
-          <p class="settings-hint">برنامه برای اسکن بارکد محصولات به دسترسی دوربین دستگاه نیاز دارد. با زدن دکمه زیر، برنامه دسترسی دوربین را درخواست می‌کند و تصویر آن را همین‌جا نشان می‌دهد.</p>
-          <div class="scanner-panel" style="padding:0; margin-bottom:12px; display:none;" id="settings-camera-test-wrap">
-            <div class="scanner-frame" style="max-height:220px;">
-              <video id="settings-scanner-video" playsinline muted></video>
-              <div class="scanner-guide"></div>
-              <div class="scanner-status" id="settings-scanner-status">در حال آماده‌سازی دوربین…</div>
-              <button type="button" class="btn btn-primary btn-sm scanner-retry-btn" id="btn-retry-settings-camera" style="display:none;">تلاش مجدد / اجازه دسترسی</button>
+              <p class="settings-hint" style="margin-top:14px;">اگر در تنظیمات گوشی «کاهش حرکت» یا حالت ذخیره‌ی باتری روشن باشد، برنامه انیمیشن‌ها را خاموش می‌کند. با این کلید می‌توانید همیشه روشن نگهشان دارید.</p>
+              <div class="theme-toggle" id="motion-toggle" style="margin-top:8px;">
+                <button type="button" class="theme-toggle-btn" data-motion-choice="full">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4.5 13.5H11l-1 8.5 8.5-11.5H12l1-8.5z"/></svg>
+                  انیمیشن روشن
+                </button>
+                <button type="button" class="theme-toggle-btn" data-motion-choice="auto">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3.5a8.5 8.5 0 1 1 0 17 8.5 8.5 0 0 1 0-17z"/><path d="M12 8v4.5l3 1.8"/></svg>
+                  مثل تنظیم گوشی
+                </button>
+              </div>
+            </div>
+            <!-- LOC-01/05/07: رقم، نامِ ماه و نمادِ پولِ فاکتور — پیش‌فرض همان امروز (لاتین، دری، «افغانی») -->
+            <div class="panel">
+              <div class="panel-head"><h2>تاریخ و رقم</h2></div>
+              <p class="settings-hint">رقم روی صفحه و فاکتور. چیزی که ذخیره و همگام می‌شود همیشه رقمِ لاتین است؛ با عوض کردنِ این کلید هیچ داده‌ای عوض نمی‌شود.</p>
+              <div class="theme-toggle" id="digits-toggle" style="margin-top:10px;">
+                <button type="button" class="theme-toggle-btn" data-digits-choice="latn">رقمِ لاتین</button>
+                <button type="button" class="theme-toggle-btn" data-digits-choice="fa">رقمِ فارسی</button>
+              </div>
+              <p class="settings-hint" style="margin-top:14px;">نامِ ماه‌های خورشیدی: امروز <span id="months-sample">—</span></p>
+              <div class="theme-toggle" id="months-toggle" style="margin-top:8px;">
+                <button type="button" class="theme-toggle-btn" data-months-choice="fa">دری (حمل، ثور…)</button>
+                <button type="button" class="theme-toggle-btn" data-months-choice="ps">پشتو (وری، غویی…)</button>
+              </div>
+              <p class="settings-hint" style="margin-top:14px;">نمادِ پول در فاکتور. مبلغ همیشه بی اعشار است.</p>
+              <div class="theme-toggle" id="currency-toggle" style="margin-top:8px;">
+                <button type="button" class="theme-toggle-btn" data-currency-choice="word">افغانی</button>
+                <button type="button" class="theme-toggle-btn" data-currency-choice="sign">؋</button>
+              </div>
+            </div>
+            <!-- Store info -->
+            <div class="panel">
+              <div class="panel-head"><h2>اطلاعات فروشگاه</h2></div>
+              <div class="form-group" style="margin-bottom:12px;">
+                <label>نام فروشگاه</label>
+                <input class="form-input" id="in-settings-store-name" type="text" placeholder="مثلاً فروشگاه نور">
+              </div>
+              <button class="btn btn-primary btn-sm" id="btn-save-store-name">ذخیره</button>
             </div>
           </div>
-          <div class="settings-actions-row">
-            <button class="btn btn-secondary btn-sm" id="btn-test-camera">درخواست دسترسی و تست دوربین</button>
-            <button class="btn btn-secondary btn-sm" id="btn-stop-test-camera" style="display:none;">توقف دوربین</button>
-          </div>
         </div>
 
-        <!-- Install / offline -->
-        <div class="panel">
-          <div class="panel-head">
-            <h2>نصب برنامه روی دستگاه</h2>
-            <span class="settings-badge" id="settings-install-badge">در حال بررسی…</span>
-          </div>
-          <p class="settings-hint">با نصب برنامه، آیکن آن در صفحه اصلی گوشی یا کامپیوتر ساخته می‌شود و برنامه <b>بدون اینترنت</b> هم کامل باز می‌شود. اطلاعات فروشگاه همیشه روی همین دستگاه ذخیره است.</p>
-          <div class="install-panel-row">
-            <button class="btn btn-primary btn-sm" id="btn-install-app" style="display:none;">نصب برنامه</button>
-            <span class="settings-hint" id="settings-install-hint" style="margin:0;"></span>
-          </div>
-          <!-- برنامهٔ بومیِ کامپیوتر — همان برنامهٔ گوشی، با همان حساب (desktop/) -->
-          <p class="settings-hint" id="desktop-downloads">برنامهٔ کامپیوتر (بومی، همان حساب):
-            <a href="https://api.vill3n.top/api/releases/tohid-desktop/file/Tohid-Windows-Setup.exe" rel="noopener">ویندوز</a> ·
-            <a href="https://api.vill3n.top/api/releases/tohid-desktop/file/Tohid-Mac-AppleSilicon.dmg" rel="noopener">مک (M1 به بعد)</a> ·
-            <a href="https://api.vill3n.top/api/releases/tohid-desktop/file/Tohid-Mac-Intel.dmg" rel="noopener">مک (Intel)</a> ·
-            <a href="https://api.vill3n.top/api/releases/tohid-desktop/file/Tohid-Linux.deb" rel="noopener">لینوکس</a>
-          </p>
-        </div>
-
-        <!-- حساب، اشتراک و کلیدها -->
-        <div class="panel">
-          <div class="panel-head">
-            <h2>حساب و اشتراک</h2>
-            <span class="settings-badge" id="acct-state-badge">—</span>
-          </div>
-          <div class="acct-rows" id="acct-rows"></div>
-
-          <label class="settings-key-label">کلید حساب شما</label>
-          <div class="settings-key">
-            <code id="settings-api-key" dir="ltr">—</code>
-            <button type="button" class="btn btn-secondary btn-sm" data-copy-key="settings-api-key">کپی</button>
-          </div>
-          <p class="settings-hint">این کلید فقط مالِ همین حساب است و هرگز برای کس دیگری تکرار نمی‌شود. هنگام خرید اشتراک، خودکار همراه پیام واتساپ فرستاده می‌شود تا اشتراک روی حساب خودتان فعال شود.</p>
-
-          <label class="settings-key-label" style="margin-top:16px;">کد شاگرد</label>
-          <div class="settings-key">
-            <code id="settings-staff-code" dir="ltr">—</code>
-            <button type="button" class="btn btn-secondary btn-sm" data-copy-key="settings-staff-code">کپی</button>
-          </div>
-          <p class="settings-hint">این کد را به شاگردهایتان بدهید تا در صفحه‌ی ورود بزنند و روی همین دکان بیایند.</p>
-          <button type="button" class="btn btn-secondary btn-sm" id="btn-new-staff-code" style="margin-top:8px;">ساخت کد تازه</button>
-
-          <div class="settings-actions-row" style="margin-top:16px;">
-            <button type="button" class="btn btn-primary btn-sm" id="btn-open-account">ورود / ثبت‌نام</button>
-          </div>
-        </div>
-
-        <!-- Backup -->
-        <div class="panel">
-          <div class="panel-head"><h2>پشتیبان‌گیری از اطلاعات</h2></div>
-          <p class="settings-hint">از تمام اطلاعات فروشگاه (قرض‌داران، محصولات، انبار، فروش‌ها و مصارف) یک فایل پشتیبان بگیرید یا از یک فایل قبلی بازیابی کنید.</p>
-          <div class="backup-meta" id="backup-meta">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-            <span id="backup-meta-text">هنوز پشتیبانی گرفته نشده</span>
-          </div>
-          <div class="settings-actions-row">
-            <button class="btn btn-secondary btn-sm" id="btn-export-backup">دانلود نسخه پشتیبان</button>
-            <button class="btn btn-secondary btn-sm" id="btn-import-backup">بازیابی از فایل</button>
-            <input type="file" id="in-import-backup-file" accept="application/json,.json" style="display:none;">
-          </div>
-          <!-- خروجیِ کاملِ داده برای مالک (OPS-08) — شرح در ‎license/owner-export.js‎ -->
-          <p class="settings-hint" style="margin-top:14px;">خروجی کامل داده برای خودتان: همهٔ داده‌ها در یک فایل اکسل (هر بخش یک برگه، با سرستونِ فارسی) یا JSON.</p>
-          <div class="settings-actions-row">
-            <button class="btn btn-secondary btn-sm" id="btn-owner-export-xlsx">خروجی کامل — اکسل</button>
-            <button class="btn btn-secondary btn-sm" id="btn-owner-export-json">خروجی کامل — JSON</button>
-          </div>
-
-          <!--
-            پشتیبان روی سرور.
-
-            ⛔ تا امروز نسخهٔ وب هیچ پشتیبانِ سروری نداشت: فقط «دانلودِ
-            فایل» بود، یعنی هر چه بود روی همان یک دستگاه می‌ماند. کسی که
-            مرورگرش را پاک می‌کرد یا گوشی‌اش را عوض می‌کرد، چیزی نداشت.
-
-            کاربرانِ آیفون فقط همین نسخه را دارند، پس نبودنش برای آن‌ها
-            یعنی هیچ پشتیبانِ بیرون از دستگاهی در کار نبود.
-          -->
-          <div class="backup-meta" id="cloud-backup-meta" style="margin-top:10px;">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 16.5a3.5 3.5 0 0 0-1-6.86A5 5 0 0 0 7.2 9.1 3.5 3.5 0 0 0 7 16.5"/><path d="M12 12v7m0 0 3-3m-3 3-3-3"/></svg>
-            <span id="cloud-backup-text">پشتیبان روی سرور — برای دیدن، وارد حساب شوید</span>
-          </div>
-          <div class="settings-actions-row">
-            <button class="btn btn-secondary btn-sm" id="btn-cloud-backup">همین حالا روی سرور بگذار</button>
-          </div>
-
-          <!-- F0-23 (دنباله): جای دفتر روی همین دستگاه. آزمایشی و پیش‌فرض خاموش —
-               قاعدهٔ آیفون (مشخصات ۱.۳ بند ۷). منطقش در license/ledger-store.js -->
-          <label class="check-row" style="display:flex;gap:8px;align-items:center;margin-top:14px;">
-            <input type="checkbox" id="in-ledger-idb"> نگه‌داشتنِ دفتر در IndexedDB (آزمایشی)
-          </label>
-          <p class="settings-hint" id="ledger-store-hint"></p>
-        </div>
-
-        <!-- Account -->
-        <div class="panel">
-          <div class="panel-head"><h2>حساب کاربری</h2></div>
-          <div class="auth-account-row">
-            <div class="avatar" id="settings-user-avatar">ک</div>
-            <div class="auth-account-info">
-              <b id="settings-user-name">کاربر</b>
-              <span id="settings-user-value">—</span>
+        <div class="set-group" role="group" aria-labelledby="set-g-sales">
+          <h3 class="set-group-title" id="set-g-sales">فروش و پرداخت</h3>
+          <div class="set-group-card">
+            <!-- کالای منقضی — همان «کالای منقضی»ِ تنظیماتِ برنامه -->
+            <div class="panel">
+              <div class="panel-head"><h2>کالای منقضی</h2></div>
+              <p class="settings-hint">هشدارِ انقضا همیشه هست. اگر «فروخته نشود» را بزنید، مقدارِ محموله‌های منقضی از موجودیِ فروختنی کم می‌شود و فروشِ بیش از آن ثبت نمی‌شود.</p>
+              <div class="theme-toggle" id="expiry-policy-toggle" style="margin-top:10px;">
+                <button type="button" class="theme-toggle-btn" data-expiry-policy="warn">فقط هشدار</button>
+                <button type="button" class="theme-toggle-btn" data-expiry-policy="block">فروخته نشود</button>
+              </div>
             </div>
           </div>
-          <button class="btn btn-secondary btn-sm" id="btn-logout">خروج از حساب</button>
         </div>
 
-        <!-- Danger zone -->
-        <div class="panel">
-          <div class="panel-head"><h2 style="color:var(--danger);">پاک‌سازی اطلاعات</h2></div>
-          <p class="settings-hint">تمام قرض‌داران، محصولات، انبار، فروش‌ها و مصارف ثبت‌شده روی این دستگاه برای همیشه حذف می‌شوند. پیش از پاک‌سازی، بهتر است یک نسخه پشتیبان بگیرید.</p>
-          <button class="btn btn-danger btn-sm" id="btn-clear-all-data">پاک‌سازی کامل اطلاعات</button>
-        </div>
+        <div class="set-group" role="group" aria-labelledby="set-g-security">
+          <h3 class="set-group-title" id="set-g-security">امنیت</h3>
+          <div class="set-group-card">
+            <!-- حساب، اشتراک و کلیدها -->
+            <div class="panel">
+              <div class="panel-head">
+                <h2>حساب و اشتراک</h2>
+                <span class="settings-badge" id="acct-state-badge">—</span>
+              </div>
+              <div class="acct-rows" id="acct-rows"></div>
 
-        <!-- About -->
-        <div class="panel" style="margin-bottom:0;">
-          <div class="panel-head"><h2>درباره برنامه</h2></div>
-          <p class="settings-hint">فروشگاه من — نسخه ۴ (قابل نصب و آفلاین)<br>تمام اطلاعات فقط روی همین دستگاه و در همین مرورگر ذخیره می‌شود؛ پس هر چند وقت یک‌بار نسخه پشتیبان بگیرید.</p>
-          <div class="build-stamp">
-            <span>نسخه‌ی نصب‌شده</span>
-            <b id="build-id">—</b>
+              <label class="settings-key-label">کلید حساب شما</label>
+              <div class="settings-key">
+                <code id="settings-api-key" dir="ltr">—</code>
+                <button type="button" class="btn btn-secondary btn-sm" data-copy-key="settings-api-key">کپی</button>
+              </div>
+              <p class="settings-hint">این کلید فقط مالِ همین حساب است و هرگز برای کس دیگری تکرار نمی‌شود. هنگام خرید اشتراک، خودکار همراه پیام واتساپ فرستاده می‌شود تا اشتراک روی حساب خودتان فعال شود.</p>
+
+              <label class="settings-key-label" style="margin-top:16px;">کد شاگرد</label>
+              <div class="settings-key">
+                <code id="settings-staff-code" dir="ltr">—</code>
+                <button type="button" class="btn btn-secondary btn-sm" data-copy-key="settings-staff-code">کپی</button>
+              </div>
+              <p class="settings-hint">این کد را به شاگردهایتان بدهید تا در صفحه‌ی ورود بزنند و روی همین دکان بیایند.</p>
+              <button type="button" class="btn btn-secondary btn-sm" id="btn-new-staff-code" style="margin-top:8px;">ساخت کد تازه</button>
+
+              <div class="settings-actions-row" style="margin-top:16px;">
+                <button type="button" class="btn btn-primary btn-sm" id="btn-open-account">ورود / ثبت‌نام</button>
+              </div>
+            </div>
+            <!-- Account -->
+            <div class="panel">
+              <div class="panel-head"><h2>حساب کاربری</h2></div>
+              <div class="auth-account-row">
+                <div class="avatar" id="settings-user-avatar">ک</div>
+                <div class="auth-account-info">
+                  <b id="settings-user-name">کاربر</b>
+                  <span id="settings-user-value">—</span>
+                </div>
+              </div>
+              <button class="btn btn-secondary btn-sm" id="btn-logout">خروج از حساب</button>
+            </div>
           </div>
-          <button class="btn btn-secondary btn-sm" id="btn-force-refresh" style="margin-top:10px;">دریافت آخرین نسخه</button>
+        </div>
+
+        <div class="set-group" role="group" aria-labelledby="set-g-devices">
+          <h3 class="set-group-title" id="set-g-devices">دستگاه‌ها</h3>
+          <div class="set-group-card">
+            <!-- Camera -->
+            <div class="panel">
+              <div class="panel-head">
+                <h2>دوربین بارکدخوان</h2>
+                <span class="settings-badge" id="settings-camera-support-badge">در حال بررسی…</span>
+              </div>
+              <p class="settings-hint">برنامه برای اسکن بارکد محصولات به دسترسی دوربین دستگاه نیاز دارد. با زدن دکمه زیر، برنامه دسترسی دوربین را درخواست می‌کند و تصویر آن را همین‌جا نشان می‌دهد.</p>
+              <div class="scanner-panel" style="padding:0; margin-bottom:12px; display:none;" id="settings-camera-test-wrap">
+                <div class="scanner-frame" style="max-height:220px;">
+                  <video id="settings-scanner-video" playsinline muted></video>
+                  <div class="scanner-guide"></div>
+                  <div class="scanner-status" id="settings-scanner-status">در حال آماده‌سازی دوربین…</div>
+                  <button type="button" class="btn btn-primary btn-sm scanner-retry-btn" id="btn-retry-settings-camera" style="display:none;">تلاش مجدد / اجازه دسترسی</button>
+                </div>
+              </div>
+              <div class="settings-actions-row">
+                <button class="btn btn-secondary btn-sm" id="btn-test-camera">درخواست دسترسی و تست دوربین</button>
+                <button class="btn btn-secondary btn-sm" id="btn-stop-test-camera" style="display:none;">توقف دوربین</button>
+              </div>
+            </div>
+            <!-- Install / offline -->
+            <div class="panel">
+              <div class="panel-head">
+                <h2>نصب برنامه روی دستگاه</h2>
+                <span class="settings-badge" id="settings-install-badge">در حال بررسی…</span>
+              </div>
+              <p class="settings-hint">با نصب برنامه، آیکن آن در صفحه اصلی گوشی یا کامپیوتر ساخته می‌شود و برنامه <b>بدون اینترنت</b> هم کامل باز می‌شود. اطلاعات فروشگاه همیشه روی همین دستگاه ذخیره است.</p>
+              <div class="install-panel-row">
+                <button class="btn btn-primary btn-sm" id="btn-install-app" style="display:none;">نصب برنامه</button>
+                <span class="settings-hint" id="settings-install-hint" style="margin:0;"></span>
+              </div>
+              <!-- برنامهٔ بومیِ کامپیوتر — همان برنامهٔ گوشی، با همان حساب (desktop/) -->
+              <p class="settings-hint" id="desktop-downloads">برنامهٔ کامپیوتر (بومی، همان حساب):
+                <a href="https://api.vill3n.top/api/releases/tohid-desktop/file/Tohid-Windows-Setup.exe" rel="noopener">ویندوز</a> ·
+                <a href="https://api.vill3n.top/api/releases/tohid-desktop/file/Tohid-Mac-AppleSilicon.dmg" rel="noopener">مک (M1 به بعد)</a> ·
+                <a href="https://api.vill3n.top/api/releases/tohid-desktop/file/Tohid-Mac-Intel.dmg" rel="noopener">مک (Intel)</a> ·
+                <a href="https://api.vill3n.top/api/releases/tohid-desktop/file/Tohid-Linux.deb" rel="noopener">لینوکس</a>
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="set-group" role="group" aria-labelledby="set-g-data">
+          <h3 class="set-group-title" id="set-g-data">همگام‌سازی و پشتیبان</h3>
+          <div class="set-group-card">
+            <!-- ==========================================================
+                 حساب، اشتراک و همگام‌سازی — بندهای ۲۱٫۴ · ۲۱٫۵ · ۲۱٫۹ · ۲۱٫۱۱
+                 ----------------------------------------------------------
+                 ⛔ کادرِ «آدرس سرور» این‌جا **نیست** و نباید بیاید. نشانی در
+                 `<meta name="tohid-api-base">` قفل است و `api-config.js`
+                 نشانیِ دستی را نادیده می‌گیرد؛ قاعدهٔ صاحبِ مخزن است، نه
+                 سلیقه. شرح در `docs/SYNC-CLIENT-fa.md`.
+                 ========================================================== -->
+            <div class="panel" id="panel-account-sync">
+              <div class="panel-head"><h2>حساب و همگام‌سازی</h2></div>
+              <p class="settings-hint">
+                با ایمیل وارد شوید تا دفترِ دکان روی سرور بماند و روی هر گوشی و روی
+                همین سایت یکی باشد. تا وقتی وارد نشده‌اید، برنامه کاملاً آفلاین کار
+                می‌کند و هیچ قابلیتی قفل نمی‌شود.
+              </p>
+              <!-- کلاسِ پایهٔ `btn` نبود و سه دکمه با ظاهرِ خامِ مرورگر می‌آمدند؛ روی
+                   دسکتاپ کنارِ هم، روی گوشی زیرِ هم -->
+              <div class="settings-actions" style="display:grid;gap:10px;margin-top:12px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));">
+                <button type="button" class="btn btn-secondary" id="btn-acct-login">ورود با ایمیل</button>
+                <button type="button" class="btn btn-secondary" id="btn-acct-plan">اشتراکِ من</button>
+                <button type="button" class="btn btn-secondary" id="btn-acct-sync">حالِ همگام‌سازی</button>
+              </div>
+            </div>
+            <!-- Backup -->
+            <div class="panel">
+              <div class="panel-head"><h2>پشتیبان‌گیری از اطلاعات</h2></div>
+              <p class="settings-hint">از تمام اطلاعات فروشگاه (قرض‌داران، محصولات، انبار، فروش‌ها و مصارف) یک فایل پشتیبان بگیرید یا از یک فایل قبلی بازیابی کنید.</p>
+              <div class="backup-meta" id="backup-meta">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                <span id="backup-meta-text">هنوز پشتیبانی گرفته نشده</span>
+              </div>
+              <div class="settings-actions-row">
+                <button class="btn btn-secondary btn-sm" id="btn-export-backup">دانلود نسخه پشتیبان</button>
+                <button class="btn btn-secondary btn-sm" id="btn-import-backup">بازیابی از فایل</button>
+                <input type="file" id="in-import-backup-file" accept="application/json,.json" style="display:none;">
+              </div>
+              <!-- خروجیِ کاملِ داده برای مالک (OPS-08) — شرح در ‎license/owner-export.js‎ -->
+              <p class="settings-hint" style="margin-top:14px;">خروجی کامل داده برای خودتان: همهٔ داده‌ها در یک فایل اکسل (هر بخش یک برگه، با سرستونِ فارسی) یا JSON.</p>
+              <div class="settings-actions-row">
+                <button class="btn btn-secondary btn-sm" id="btn-owner-export-xlsx">خروجی کامل — اکسل</button>
+                <button class="btn btn-secondary btn-sm" id="btn-owner-export-json">خروجی کامل — JSON</button>
+              </div>
+
+              <!--
+                پشتیبان روی سرور.
+
+                ⛔ تا امروز نسخهٔ وب هیچ پشتیبانِ سروری نداشت: فقط «دانلودِ
+                فایل» بود، یعنی هر چه بود روی همان یک دستگاه می‌ماند. کسی که
+                مرورگرش را پاک می‌کرد یا گوشی‌اش را عوض می‌کرد، چیزی نداشت.
+
+                کاربرانِ آیفون فقط همین نسخه را دارند، پس نبودنش برای آن‌ها
+                یعنی هیچ پشتیبانِ بیرون از دستگاهی در کار نبود.
+              -->
+              <div class="backup-meta" id="cloud-backup-meta" style="margin-top:10px;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 16.5a3.5 3.5 0 0 0-1-6.86A5 5 0 0 0 7.2 9.1 3.5 3.5 0 0 0 7 16.5"/><path d="M12 12v7m0 0 3-3m-3 3-3-3"/></svg>
+                <span id="cloud-backup-text">پشتیبان روی سرور — برای دیدن، وارد حساب شوید</span>
+              </div>
+              <div class="settings-actions-row">
+                <button class="btn btn-secondary btn-sm" id="btn-cloud-backup">همین حالا روی سرور بگذار</button>
+              </div>
+
+              <!-- F0-23 (دنباله): جای دفتر روی همین دستگاه. آزمایشی و پیش‌فرض خاموش —
+                   قاعدهٔ آیفون (مشخصات ۱.۳ بند ۷). منطقش در license/ledger-store.js -->
+              <label class="check-row" style="display:flex;gap:8px;align-items:center;margin-top:14px;">
+                <input type="checkbox" id="in-ledger-idb"> نگه‌داشتنِ دفتر در IndexedDB (آزمایشی)
+              </label>
+              <p class="settings-hint" id="ledger-store-hint"></p>
+            </div>
+            <!-- Danger zone -->
+            <div class="panel">
+              <div class="panel-head"><h2 style="color:var(--danger);">پاک‌سازی اطلاعات</h2></div>
+              <p class="settings-hint">تمام قرض‌داران، محصولات، انبار، فروش‌ها و مصارف ثبت‌شده روی این دستگاه برای همیشه حذف می‌شوند. پیش از پاک‌سازی، بهتر است یک نسخه پشتیبان بگیرید.</p>
+              <button class="btn btn-danger btn-sm" id="btn-clear-all-data">پاک‌سازی کامل اطلاعات</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="set-group" role="group" aria-labelledby="set-g-about">
+          <h3 class="set-group-title" id="set-g-about">درباره</h3>
+          <div class="set-group-card">
+            <!-- About -->
+            <div class="panel" style="margin-bottom:0;">
+              <div class="panel-head"><h2>درباره برنامه</h2></div>
+              <p class="settings-hint">فروشگاه من — نسخه ۴ (قابل نصب و آفلاین)<br>تمام اطلاعات فقط روی همین دستگاه و در همین مرورگر ذخیره می‌شود؛ پس هر چند وقت یک‌بار نسخه پشتیبان بگیرید.</p>
+              <div class="build-stamp">
+                <span>نسخه‌ی نصب‌شده</span>
+                <b id="build-id">—</b>
+              </div>
+              <button class="btn btn-secondary btn-sm" id="btn-force-refresh" style="margin-top:10px;">دریافت آخرین نسخه</button>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -14455,6 +14571,21 @@
     profEl('prof-contact').textContent = inAcc
       ? (user.email || user.phone || local.label || '—')
       : 'بدون حساب — همه‌چیز روی همین دستگاه';
+    //  سه تراشهٔ آمار — از دفترِ همین دستگاه، بی‌حساب هم
+    profEl('prof-stat-products').textContent = formatMoney(products.length);
+    profEl('prof-stat-sales').textContent = formatMoney(sales.length);
+    profEl('prof-stat-debtors').textContent = formatMoney(debtors.length);
+    const shopNow = (me && me.shop) || local.shop || null;
+    const roleText = !inAcc || !shopNow ? ''
+      : (shopNow.isOwner ? 'صاحب دکان' : (shopNow.role ? (TEAM_ROLES[shopNow.role] || shopNow.role) : ''));
+    profEl('prof-role').textContent = roleText;
+    profEl('prof-role').hidden = !roleText;
+    const notice = inAcc ? profNotice(me && me.entitlement, Date.now()) : null;
+    profEl('prof-notice').hidden = !notice;
+    if(notice){
+      profEl('prof-notice-title').textContent = notice.title;
+      profEl('prof-notice-btn').textContent = notice.cta;
+    }
     if(!inAcc) return;
 
     profEl('prof-name').value  = user.name || '';
@@ -14492,6 +14623,26 @@
       : 'هنوز همگام نشده است.';
   }
 
+  /**
+   *  نوارِ هشدارِ اشتراکِ کارتِ «حساب من» — فقط وقتی واقعی است: تمام شده، یا
+   *  ≤ ۷ روز (همان مرزِ `SUBSCRIPTION_WARN_DAYS`ِ برنامه و `ProfileModel.notice`).
+   *  «بدون اشتراک» هشدار نیست. ورودی همان `entitlement`ِ پاسخِ `/me`.
+   */
+  function profNotice(ent, now){
+    if(!ent) return null;
+    const WARN = 7, DAY = 86400000;
+    const left = (iso)=>{ const t = Date.parse(iso || ''); return isNaN(t) ? null : Math.ceil((t - now) / DAY); };
+    const sub = ent.subscription, tri = ent.trial;
+    const ending = (days, trial)=> ({
+      title: days > 0 ? `${trial ? 'آزمایشی' : 'اشتراک'} — ${formatMoney(days)} روز مانده` : 'امروز آخرین روزِ اشتراک است',
+      cta: trial ? 'پلن‌ها' : 'تمدید',
+    });
+    if(sub && sub.active){ const d = left(sub.endsAt); return d !== null && d <= WARN ? ending(d, false) : null; }
+    if(tri && tri.active){ const d = left(tri.endsAt); return d !== null && d <= WARN ? ending(d, true) : null; }
+    if(sub && sub.endsAt && left(sub.endsAt) !== null && left(sub.endsAt) <= 0) return { title: 'اشتراک تمام شده', cta: 'تمدید' };
+    return null;
+  }
+
   /** تازه کردن از سرور — بی‌صدا شکست می‌خورد چون صفحه از قبل پر است */
   async function profRefresh(){
     profPaint(null);
@@ -14515,6 +14666,11 @@
 
     profEl('prof-login-btn').addEventListener('click', ()=> openAuthScreen());
     profEl('prof-vip').addEventListener('click', ()=>{
+      const lic = window.TohidLicense;
+      if(lic && lic.open) lic.open();
+    });
+    //  دکمهٔ نوارِ هشدار همان «دیدن قیمت‌ها»ست — همان پنجرهٔ اشتراک
+    profEl('prof-notice-btn').addEventListener('click', ()=>{
       const lic = window.TohidLicense;
       if(lic && lic.open) lic.open();
     });
@@ -15250,6 +15406,16 @@
       showToast(blockExpiredPolicy() ? 'کالای منقضی دیگر فروخته نمی‌شود' : 'برای کالای منقضی فقط هشدار داده می‌شود');
     });
     paint();
+  })();
+
+  /* phone-ui: دکمه‌های انتخابِ تنظیمات (روشن/تاریک، انیمیشن، رقم، ماه، پول، انقضا)
+     با `.active` رنگ می‌گیرند؛ صفحه‌خوان هم همان را با `aria-pressed` بشنود. */
+  (function syncTogglePressed(){
+    const sync = (b)=> b.setAttribute('aria-pressed', b.classList.contains('active') ? 'true' : 'false');
+    document.querySelectorAll('.theme-toggle-btn').forEach(sync);
+    new MutationObserver(ms=> ms.forEach(m=>{
+      if(m.target.classList && m.target.classList.contains('theme-toggle-btn')) sync(m.target);
+    })).observe(document.body, { subtree:true, attributes:true, attributeFilter:['class'] });
   })();
 
   function buildAlerts(){

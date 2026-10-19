@@ -13,6 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AlternateEmail
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.HourglassBottom
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
@@ -26,6 +27,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
+import ir.vil3ntec.tohid.ui.theme.PhoneSheet
+import ir.vil3ntec.tohid.ui.theme.Shape
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -51,7 +58,6 @@ import ir.vil3ntec.tohid.sync.v1.SyncV1Worker
 import ir.vil3ntec.tohid.core.sync.LogoutGuard
 import ir.vil3ntec.tohid.data.BackupMirror
 import ir.vil3ntec.tohid.sync.AutoSync
-import ir.vil3ntec.tohid.ui.theme.Radius
 import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -174,54 +180,48 @@ fun ProfileScreen(
       Text("بازگشت", color = colors.primary)
     }
 
-    /* ------------------------- عکس و نام ------------------------- */
-    Column(
-      Modifier
-        .fillMaxWidth()
-        .clip(RoundedCornerShape(Radius.md))
-        .background(colors.surface)
-        .padding(vertical = 20.dp),
-      horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-      Box(contentAlignment = Alignment.BottomEnd) {
-        Avatar(
-          accountId = state.accountId.ifBlank { "local" },
-          version = avatarVersion,
-          modifier = Modifier.clickable { pickOpen = true },
-        )
-        Box(
-          Modifier
-            .size(30.dp)
-            .clip(CircleShape)
-            .background(colors.primary)
-            .clickable { pickOpen = true },
-          contentAlignment = Alignment.Center,
-        ) {
-          Icon(
-            Icons.Filled.PhotoCamera,
-            contentDescription = "عکس حساب",
-            tint = Color.White,
-            modifier = Modifier.size(16.dp),
+    /* --------------- عکس، نام، نقش، آمار و هشدار (تصویرِ مرجعِ ۳) --------------- */
+    val ledger by store.data.collectAsState()
+    //  وضعیتِ اشتراک فقط برای حسابِ واردشده خوانده می‌شود (همان پیشینِ `SubscriptionRow`)
+    val plan = if (signedIn) rememberPlan() else null
+    ProfileCard(
+      avatar = {
+        Box(contentAlignment = Alignment.BottomEnd) {
+          Avatar(
+            accountId = state.accountId.ifBlank { "local" },
+            version = avatarVersion,
+            modifier = Modifier.clickable(onClickLabel = "عوض کردنِ عکس حساب") { pickOpen = true },
           )
+          Box(
+            Modifier
+              .size(30.dp)
+              .clip(CircleShape)
+              .background(colors.primary)
+              .clickable { pickOpen = true },
+            contentAlignment = Alignment.Center,
+          ) {
+            Icon(
+              Icons.Filled.PhotoCamera,
+              contentDescription = "عکس حساب",
+              tint = Color.White,
+              modifier = Modifier.size(16.dp),
+            )
+          }
         }
-      }
-      Spacer(Modifier.height(12.dp))
-      Text(
-        name.ifBlank { "بی‌نام" },
-        style = MaterialTheme.typography.titleLarge,
-        color = colors.text,
-        fontWeight = FontWeight.Bold,
-        textAlign = TextAlign.Center,
-      )
-      val contact = phone.ifBlank { email }
-      if (contact.isNotBlank()) {
-        Spacer(Modifier.height(2.dp))
-        //  شماره و ایمیل چپ‌به‌راست خوانده می‌شوند، وگرنه `+93` ته خط می‌رود
-        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-          Text(contact, style = MaterialTheme.typography.bodySmall, color = colors.muted)
-        }
-      }
-    }
+      },
+      name = name.ifBlank { "بی‌نام" },
+      contact = phone.ifBlank { email },
+      //  نقش فقط برای حسابِ واردشده معنا دارد (همان `ShopRole`ِ سدِ تنظیمات)
+      role = if (signedIn) ProfileModel.roleLabel(ir.vil3ntec.tohid.data.ShopRole.current(context)) else null,
+      //  عددها از دفترِ همین گوشی — همان سه عددِ «داده‌ها»ی تنظیمات
+      stats = listOf(
+        "کالا" to ledger.products.size,
+        "فاکتور" to ledger.sales.size,
+        "قرض‌دار" to ledger.debtors.size,
+      ),
+      notice = plan?.let { ProfileModel.notice(it, SUBSCRIPTION_WARN_DAYS) },
+      onNotice = onSubscription,
+    )
 
     /* ------------------------- وارد نشده ------------------------- */
     if (!signedIn) {
@@ -252,182 +252,186 @@ fun ProfileScreen(
     }
 
     /* ------------------------ عضویت و اشتراک ------------------------ */
-    Spacer(Modifier.height(14.dp))
-    MembershipRow(createdAt)
-    Spacer(Modifier.height(8.dp))
-    SubscriptionRow(onClick = onSubscription)
+    Spacer(Modifier.height(20.dp))
+    SettingsGroup("حساب و اشتراک") {
+      plan?.let { SubscriptionRow(it, onClick = onSubscription) }
+      MembershipRow(createdAt)
+    }
 
     /* -------------------------- ویرایش -------------------------- */
     Spacer(Modifier.height(18.dp))
-    SectionTitle("ویرایش پروفایل")
-
-    OutlinedTextField(
-      value = name,
-      onValueChange = { name = it },
-      label = { Text("نام و نام خانوادگی") },
-      leadingIcon = { Icon(Icons.Filled.Person, contentDescription = null, tint = colors.muted) },
-      singleLine = true,
-      modifier = Modifier.fillMaxWidth(),
-    )
-
-    Spacer(Modifier.height(10.dp))
-
-    /*
-     *  ایمیل — دیده می‌شود، دست نمی‌خورد.
-     *
-     *  پنهان کردنش بدتر بود: کاربری که دو ایمیل دارد باید بتواند ببیند
-     *  با کدام وارد شده. کادرِ خاکستری با قفل، خودش می‌گوید که خواندنی
-     *  است.
-     */
-    LockedRow(
-      icon = Icons.Filled.AlternateEmail,
-      label = "ایمیل",
-      value = email.ifBlank { "ثبت نشده" },
-      note = if (email.isBlank()) "شما با شماره وارد شده‌اید"
-      else "ایمیلِ حساب عوض نمی‌شود — راهِ ورود و بازیابیِ رمز همین است",
-      ltr = email.isNotBlank(),
-    )
-
-    Spacer(Modifier.height(10.dp))
-
-    if (phone.isBlank()) {
-      /*
-       *  شماره ندارد — یک بار می‌شود ثبتش کرد.
-       *
-       *  چرا مهم است: بازیابیِ رمز و خبرهای دکان از راهِ شماره می‌روند،
-       *  و کسی که با ایمیل آمده هیچ‌کدام را ندارد.
-       */
+    SettingsGroup("ویرایش پروفایل", padded = true) {
       OutlinedTextField(
-        value = newPhone,
-        onValueChange = { newPhone = it },
-        label = { Text("شماره موبایل — یک بار ثبت می‌شود") },
-        placeholder = { Text("07XXXXXXXX") },
+        value = name,
+        onValueChange = { name = it },
+        label = { Text("نام و نام خانوادگی") },
+        leadingIcon = { Icon(Icons.Filled.Person, contentDescription = null, tint = colors.muted) },
         singleLine = true,
-        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Phone),
         modifier = Modifier.fillMaxWidth(),
       )
-      Spacer(Modifier.height(4.dp))
-      Text(
-        "شماره پس از ثبت قفل می‌شود و از برنامه عوض نمی‌شود.",
-        style = MaterialTheme.typography.labelSmall,
-        color = colors.warning,
-      )
-    } else {
+
+      Spacer(Modifier.height(10.dp))
+
+      /*
+       *  ایمیل — دیده می‌شود، دست نمی‌خورد.
+       *
+       *  پنهان کردنش بدتر بود: کاربری که دو ایمیل دارد باید بتواند ببیند
+       *  با کدام وارد شده. کادرِ خاکستری با قفل، خودش می‌گوید که خواندنی
+       *  است.
+       */
       LockedRow(
-        icon = Icons.Filled.Lock,
-        label = "شماره موبایل",
-        value = phone,
-        note = "شماره ثبت شده و قفل است",
-        ltr = true,
+        icon = Icons.Filled.AlternateEmail,
+        label = "ایمیل",
+        value = email.ifBlank { "ثبت نشده" },
+        note = if (email.isBlank()) "شما با شماره وارد شده‌اید"
+        else "ایمیلِ حساب عوض نمی‌شود — راهِ ورود و بازیابیِ رمز همین است",
+        ltr = email.isNotBlank(),
       )
-    }
 
-    Spacer(Modifier.height(16.dp))
+      Spacer(Modifier.height(10.dp))
 
-    Button(
-      onClick = {
-        val cleanName = name.trim()
-        if (cleanName.isBlank()) {
-          toast("نام را بنویسید")
-          return@Button
-        }
-        //  نامِ دکان همین‌جا و همان لحظه می‌نشیند؛ روی گوشی است و
-        //  اینترنت نمی‌خواهد
-        prefs.edit().putString("store_name", shopName.trim()).apply()
-        val claim = newPhone.trim()
-        busy = true
-        scope.launch {
-          //  نام روی گوشی همان لحظه می‌نشیند: برنامه آفلاین هم کار
-          //  می‌کند و همین نام است که در سربرگ و رسیدها دیده می‌شود
-          state.accountName = cleanName
-          name = cleanName
+      if (phone.isBlank()) {
+        /*
+         *  شماره ندارد — یک بار می‌شود ثبتش کرد.
+         *
+         *  چرا مهم است: بازیابیِ رمز و خبرهای دکان از راهِ شماره می‌روند،
+         *  و کسی که با ایمیل آمده هیچ‌کدام را ندارد.
+         */
+        OutlinedTextField(
+          value = newPhone,
+          onValueChange = { newPhone = it },
+          label = { Text("شماره موبایل — یک بار ثبت می‌شود") },
+          placeholder = { Text("07XXXXXXXX") },
+          singleLine = true,
+          keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Phone),
+          modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+          "شماره پس از ثبت قفل می‌شود و از برنامه عوض نمی‌شود.",
+          style = MaterialTheme.typography.labelSmall,
+          color = colors.warning,
+        )
+      } else {
+        LockedRow(
+          icon = Icons.Filled.Lock,
+          label = "شماره موبایل",
+          value = phone,
+          note = "شماره ثبت شده و قفل است",
+          ltr = true,
+        )
+      }
 
-          if (!Backend.isReady(context) || !Backend.isOnline(context)) {
-            busy = false
-            toast(
-              if (claim.isBlank()) "نام روی گوشی ذخیره شد — برای ثبت روی سرور به اینترنت نیاز است"
-              else "ثبتِ شماره به اینترنت نیاز دارد"
-            )
-            return@launch
+      Spacer(Modifier.height(16.dp))
+
+      Button(
+        onClick = {
+          val cleanName = name.trim()
+          if (cleanName.isBlank()) {
+            toast("نام را بنویسید")
+            return@Button
           }
+          //  نامِ دکان همین‌جا و همان لحظه می‌نشیند؛ روی گوشی است و
+          //  اینترنت نمی‌خواهد
+          prefs.edit().putString("store_name", shopName.trim()).apply()
+          val claim = newPhone.trim()
+          busy = true
+          scope.launch {
+            //  نام روی گوشی همان لحظه می‌نشیند: برنامه آفلاین هم کار
+            //  می‌کند و همین نام است که در سربرگ و رسیدها دیده می‌شود
+            state.accountName = cleanName
+            name = cleanName
 
-          Backend.account(context).updateProfile(cleanName, claim)
-            .onSuccess { done ->
-              state.accountName = done.user.name
-              state.accountEmail = done.user.email.orEmpty()
-              state.accountPhone = done.user.phone.orEmpty()
-              name = done.user.name
-              email = done.user.email.orEmpty()
-              phone = done.user.phone.orEmpty()
-              newPhone = ""
-              toast(if (claim.isNotBlank()) "شماره ثبت شد و قفل شد" else "ذخیره شد")
+            if (!Backend.isReady(context) || !Backend.isOnline(context)) {
+              busy = false
+              toast(
+                if (claim.isBlank()) "نام روی گوشی ذخیره شد — برای ثبت روی سرور به اینترنت نیاز است"
+                else "ثبتِ شماره به اینترنت نیاز دارد"
+              )
+              return@launch
             }
-            .onFailure { toast(it.userMessage) }
-          busy = false
-        }
-      },
-      enabled = !busy,
-      colors = ButtonDefaults.buttonColors(containerColor = colors.primary),
-      modifier = Modifier.fillMaxWidth(),
-    ) {
-      Text(if (busy) "در حال ذخیره…" else "ذخیره تغییرات", color = Color.White)
+
+            Backend.account(context).updateProfile(cleanName, claim)
+              .onSuccess { done ->
+                state.accountName = done.user.name
+                state.accountEmail = done.user.email.orEmpty()
+                state.accountPhone = done.user.phone.orEmpty()
+                name = done.user.name
+                email = done.user.email.orEmpty()
+                phone = done.user.phone.orEmpty()
+                newPhone = ""
+                toast(if (claim.isNotBlank()) "شماره ثبت شد و قفل شد" else "ذخیره شد")
+              }
+              .onFailure { toast(it.userMessage) }
+            busy = false
+          }
+        },
+        enabled = !busy,
+        colors = ButtonDefaults.buttonColors(containerColor = colors.primary),
+        modifier = Modifier.fillMaxWidth(),
+      ) {
+        Text(if (busy) "در حال ذخیره…" else "ذخیره تغییرات", color = Color.White)
+      }
     }
 
     /* ------------------------- دکان ------------------------- */
     Spacer(Modifier.height(20.dp))
-    SectionTitle("دکان")
-    OutlinedTextField(
-      value = shopName,
-      onValueChange = {
-        shopName = it
-        prefs.edit().putString("store_name", it.trim()).apply()
-      },
-      label = { Text("نام فروشگاه") },
-      leadingIcon = { Icon(Icons.Filled.Storefront, contentDescription = null, tint = colors.muted) },
-      singleLine = true,
-      modifier = Modifier.fillMaxWidth(),
-    )
-    Spacer(Modifier.height(4.dp))
-    Text(
-      "این نام روی سربرگ فاکتور چاپ می‌شود.",
-      style = MaterialTheme.typography.labelSmall,
-      color = colors.muted2,
-    )
+    SettingsGroup("دکان", padded = true) {
+      OutlinedTextField(
+        value = shopName,
+        onValueChange = {
+          shopName = it
+          prefs.edit().putString("store_name", it.trim()).apply()
+        },
+        label = { Text("نام فروشگاه") },
+        leadingIcon = { Icon(Icons.Filled.Storefront, contentDescription = null, tint = colors.muted) },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+      )
+      Spacer(Modifier.height(4.dp))
+      Text(
+        "این نام روی سربرگ فاکتور چاپ می‌شود.",
+        style = MaterialTheme.typography.labelSmall,
+        color = colors.muted2,
+      )
+    }
 
     /* ------------------------- همگام‌سازی ------------------------- */
     Spacer(Modifier.height(20.dp))
-    SectionTitle("همگام‌سازی")
-    InfoRow(
-      icon = Icons.Filled.Sync,
-      tint = colors.accent,
-      title = "آخرین همگام‌سازی",
-      value = maxOf(lastSyncAt, v1.lastOkAt).let { if (it > 0) formatMillis(it) else "هنوز انجام نشده" },
-      detail = "دفترِ دکان روی سرور پشتیبان می‌گیرد و روی گوشیِ دیگر هم می‌آید",
-    )
-    Spacer(Modifier.height(10.dp))
-    Button(
-      onClick = {
-        /*
-         *  ⛔ F0-02: این دکمه دورِ Sync v1 را می‌اندازد، نه راهِ قدیم.
-         *
-         *  تا این‌جا `Syncer.run` صدا زده می‌شد: push/pullِ قدیمی
-         *  (`/api/v1/shop/sync`) که مستقیم در دفتر ادغام می‌کرد و سایهٔ v1
-         *  را جلو نمی‌برد؛ v1 همان را «تغییرِ محلی» می‌دید و دوباره
-         *  می‌فرستاد — فیلدهای `$inc` (پرداخت‌ها، مانده‌ها) دو بار جمع
-         *  می‌شدند. `AutoSync` از قبل همین کار را می‌کرد؛ فقط این دکمه
-         *  جا مانده بود. کلاسِ `Syncer` حذف نمی‌شود: `AutoSync` از
-         *  `refreshLicense`ِ آن استفاده می‌کند.
-         *  سنجه: `sync/LegacySyncCallTest.kt`.
-         */
-        runCatching { SyncV1Worker.now(context) }
-          .onSuccess { toast("همگام‌سازی شروع شد؛ چند ثانیه بعد «آخرین همگام‌سازی» تازه می‌شود") }
-          .onFailure { toast(it.userText("همگام‌سازی ناموفق بود")) }
-      },
-      enabled = !syncing,
-      colors = ButtonDefaults.buttonColors(containerColor = colors.primary),
-      modifier = Modifier.fillMaxWidth(),
-    ) {
-      Text(if (syncing) "در حال همگام‌سازی…" else "همگام‌سازی حالا", color = Color.White)
+    SettingsGroup("همگام‌سازی") {
+      InfoRow(
+        icon = Icons.Filled.Sync,
+        tint = colors.accent,
+        title = "آخرین همگام‌سازی",
+        value = maxOf(lastSyncAt, v1.lastOkAt).let { if (it > 0) formatMillis(it) else "هنوز انجام نشده" },
+        detail = "دفترِ دکان روی سرور پشتیبان می‌گیرد و روی گوشیِ دیگر هم می‌آید",
+      )
+      Column(Modifier.fillMaxWidth().background(colors.surfaceSolid).padding(16.dp)) {
+        Button(
+          onClick = {
+            /*
+             *  ⛔ F0-02: این دکمه دورِ Sync v1 را می‌اندازد، نه راهِ قدیم.
+             *
+             *  تا این‌جا `Syncer.run` صدا زده می‌شد: push/pullِ قدیمی
+             *  (`/api/v1/shop/sync`) که مستقیم در دفتر ادغام می‌کرد و سایهٔ v1
+             *  را جلو نمی‌برد؛ v1 همان را «تغییرِ محلی» می‌دید و دوباره
+             *  می‌فرستاد — فیلدهای `$inc` (پرداخت‌ها، مانده‌ها) دو بار جمع
+             *  می‌شدند. `AutoSync` از قبل همین کار را می‌کرد؛ فقط این دکمه
+             *  جا مانده بود. کلاسِ `Syncer` حذف نمی‌شود: `AutoSync` از
+             *  `refreshLicense`ِ آن استفاده می‌کند.
+             *  سنجه: `sync/LegacySyncCallTest.kt`.
+             */
+            runCatching { SyncV1Worker.now(context) }
+              .onSuccess { toast("همگام‌سازی شروع شد؛ چند ثانیه بعد «آخرین همگام‌سازی» تازه می‌شود") }
+              .onFailure { toast(it.userText("همگام‌سازی ناموفق بود")) }
+          },
+          enabled = !syncing,
+          colors = ButtonDefaults.buttonColors(containerColor = colors.primary),
+          modifier = Modifier.fillMaxWidth(),
+        ) {
+          Text(if (syncing) "در حال همگام‌سازی…" else "همگام‌سازی حالا", color = Color.White)
+        }
+      }
     }
 
     /*
@@ -599,6 +603,131 @@ fun ProfileScreen(
 
 /* ============================ تکه‌ها ============================ */
 
+/**
+ *  کارتِ بالای «حساب من» (phone-ui، تصویرِ مرجعِ ۳): عکسِ گرد روی لبهٔ کارت،
+ *  نام و راهِ تماس، نشانِ نقش، سه تراشهٔ آمار از دفترِ واقعی، و نوارِ هشدارِ
+ *  اشتراک **فقط وقتی واقعی است** (`ProfileModel.notice`). سایهٔ نرم، بی خطِ دور.
+ */
+@Composable
+private fun ProfileCard(
+  avatar: @Composable () -> Unit,
+  name: String,
+  contact: String,
+  role: String?,
+  stats: List<Pair<String, Int>>,
+  notice: ProfileModel.Notice?,
+  onNotice: () -> Unit,
+) {
+  val colors = Shop.colors
+  val sheet = PhoneSheet.colors
+  Box(Modifier.fillMaxWidth().padding(top = 4.dp)) {
+    Column(
+      Modifier
+        .fillMaxWidth()
+        .padding(top = 48.dp)
+        .shadow(8.dp, Shape.card, clip = false, ambientColor = colors.text.copy(alpha = 0.10f), spotColor = colors.text.copy(alpha = 0.10f))
+        .clip(Shape.card)
+        .background(colors.surfaceSolid)
+        .padding(start = 16.dp, end = 16.dp, top = 60.dp, bottom = 16.dp),
+    ) {
+      Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+          Text(
+            name,
+            style = MaterialTheme.typography.titleLarge,
+            color = colors.text,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+          )
+          if (contact.isNotBlank()) {
+            //  شماره و ایمیل چپ‌به‌راست خوانده می‌شوند، وگرنه `+93` ته خط می‌رود
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+              Text(contact, style = MaterialTheme.typography.bodySmall, color = colors.muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+          }
+        }
+        if (role != null) {
+          Spacer(Modifier.width(8.dp))
+          Text(
+            role,
+            style = MaterialTheme.typography.labelMedium,
+            color = sheet.onNavPill,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier
+              .clip(RoundedCornerShape(percent = 50))
+              .background(sheet.navPill)
+              .padding(horizontal = 12.dp, vertical = 6.dp),
+          )
+        }
+      }
+      Spacer(Modifier.height(14.dp))
+      Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        stats.forEach { (label, count) ->
+          Column(
+            Modifier
+              .weight(1f)
+              .clip(RoundedCornerShape(12.dp))
+              .background(colors.bg)
+              .padding(vertical = 10.dp)
+              .semantics(mergeDescendants = true) {},
+            horizontalAlignment = Alignment.CenterHorizontally,
+          ) {
+            Text(ir.vil3ntec.tohid.plain(count), style = MaterialTheme.typography.titleMedium, color = colors.text, fontWeight = FontWeight.Bold)
+            Text(label, style = MaterialTheme.typography.labelSmall, color = colors.muted)
+          }
+        }
+      }
+      if (notice != null) {
+        Spacer(Modifier.height(12.dp))
+        Row(
+          Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(sheet.sheet)
+            .padding(start = 14.dp, end = 10.dp, top = 10.dp, bottom = 10.dp),
+          verticalAlignment = Alignment.CenterVertically,
+        ) {
+          Icon(Icons.Filled.HourglassBottom, contentDescription = null, tint = sheet.accent, modifier = Modifier.size(20.dp))
+          Spacer(Modifier.width(10.dp))
+          Column(Modifier.weight(1f)) {
+            Text(
+              when (notice) {
+                ProfileModel.Notice.Expired -> "اشتراک تمام شده"
+                is ProfileModel.Notice.Ending ->
+                  if (notice.days > 0) "${if (notice.trial) "آزمایشی" else "اشتراک"} — ${notice.days.fa()} روز مانده"
+                  else "امروز آخرین روزِ اشتراک است"
+              },
+              style = MaterialTheme.typography.labelLarge,
+              color = sheet.onSheet,
+              fontWeight = FontWeight.Bold,
+            )
+            Text(
+              "هیچ داده‌ای پاک نمی‌شود؛ خروجی و چاپ باز می‌ماند.",
+              style = MaterialTheme.typography.labelSmall,
+              color = sheet.onSheetMuted,
+            )
+          }
+          Spacer(Modifier.width(8.dp))
+          Text(
+            if (notice is ProfileModel.Notice.Ending && notice.trial) "پلن‌ها" else "تمدید",
+            style = MaterialTheme.typography.labelLarge,
+            color = sheet.onAccent,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier
+              .heightIn(min = 40.dp)
+              .clip(RoundedCornerShape(percent = 50))
+              .background(sheet.accent)
+              .clickable(role = Role.Button, onClick = onNotice)
+              .padding(horizontal = 16.dp, vertical = 10.dp),
+          )
+        }
+      }
+    }
+    Box(Modifier.align(Alignment.TopCenter)) { avatar() }
+  }
+}
+
 /** عکسِ حساب، یا حرفِ اولِ نام وقتی عکسی نیست */
 @Composable
 private fun Avatar(accountId: String, version: Int, modifier: Modifier = Modifier) {
@@ -655,22 +784,16 @@ private fun MembershipRow(createdAt: Long) {
 }
 
 /**
- *  وضعیتِ اشتراک، در همین صفحه.
- *
- *  از یک هفته به پایین قرمز می‌شود — همان مرزی که نشانِ سربرگ و کارتِ
- *  صفحهٔ اشتراک با آن قرمز می‌شوند (`SUBSCRIPTION_WARN_DAYS`).
+ *  وضعیتِ اشتراکِ همین حساب — مجوزِ امضاشدهٔ روی گوشی، وگرنه حرفِ سرور.
+ *  تصمیم در `ProfileModel.plan` است (خالص و آزمون‌شده)؛ ردیفِ «اشتراک» و
+ *  نوارِ هشدارِ کارتِ بالا هر دو از همین می‌خوانند.
  */
 @Composable
-private fun SubscriptionRow(onClick: () -> Unit) {
+private fun rememberPlan(): ProfileModel.Plan {
   val context = LocalContext.current
-  val colors = Shop.colors
   val status = remember {
     runCatching { LicenseGuard.status(context, SyncStore(context)) }.getOrNull()
   }
-  val localDays = status?.daysLeft() ?: 0
-  val expired = status?.state == License.State.EXPIRED || status?.state == License.State.GRACE
-  val localActive = status?.state == License.State.ACTIVE
-
   /*
    *  و اگر مجوزی روی گوشی نیست، از خودِ سرور بپرس.
    *
@@ -692,17 +815,31 @@ private fun SubscriptionRow(onClick: () -> Unit) {
    */
   LaunchedEffect(Unit) { SubscriptionPulse.refresh(context) }
 
-  val serverOn = SubscriptionPulse.active && SubscriptionPulse.days > 0
-  val serverTrialOn = serverOn && SubscriptionPulse.trial
+  return ProfileModel.plan(
+    localActive = status?.state == License.State.ACTIVE,
+    localDays = status?.daysLeft() ?: 0,
+    localExpired = status?.state == License.State.EXPIRED || status?.state == License.State.GRACE,
+    serverActive = SubscriptionPulse.active,
+    serverDays = SubscriptionPulse.days,
+    serverTrial = SubscriptionPulse.trial,
+    warnDays = SUBSCRIPTION_WARN_DAYS,
+  )
+}
 
-  val active = localActive || serverOn
-  val days = when {
-    localActive -> localDays
-    serverOn -> SubscriptionPulse.days
-    else -> 0
-  }
-  val trial = !localActive && serverTrialOn
-  val urgent = expired || (active && days <= SUBSCRIPTION_WARN_DAYS)
+/**
+ *  وضعیتِ اشتراک، در همین صفحه.
+ *
+ *  از یک هفته به پایین قرمز می‌شود — همان مرزی که نشانِ سربرگ و کارتِ
+ *  صفحهٔ اشتراک با آن قرمز می‌شوند (`SUBSCRIPTION_WARN_DAYS`).
+ */
+@Composable
+private fun SubscriptionRow(plan: ProfileModel.Plan, onClick: () -> Unit) {
+  val colors = Shop.colors
+  val active = plan.active
+  val expired = plan.expired
+  val trial = plan.trial
+  val days = plan.days
+  val urgent = plan.urgent
 
   InfoRow(
     icon = if (urgent) Icons.Filled.HourglassBottom
@@ -740,11 +877,11 @@ private fun InfoRow(
   onClick: (() -> Unit)? = null,
 ) {
   val colors = Shop.colors
+  //  phone-ui: ردیفِ یک کارتِ گروه (`SettingsGroup`) — گوشه و خطِ دور مالِ کارت است
   Row(
     Modifier
       .fillMaxWidth()
-      .clip(RoundedCornerShape(Radius.sm))
-      .background(colors.surface)
+      .background(colors.surfaceSolid)
       .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
       .padding(horizontal = 14.dp, vertical = 12.dp),
     verticalAlignment = Alignment.CenterVertically,
@@ -760,6 +897,14 @@ private fun InfoRow(
       Text(title, style = MaterialTheme.typography.labelMedium, color = colors.muted)
       Text(value, style = MaterialTheme.typography.bodyMedium, color = tint, fontWeight = FontWeight.Bold)
       Text(detail, style = MaterialTheme.typography.labelSmall, color = colors.muted2)
+    }
+    if (onClick != null) {
+      Icon(
+        Icons.Filled.ChevronLeft,
+        contentDescription = null,
+        tint = colors.muted2,
+        modifier = Modifier.size(20.dp),
+      )
     }
   }
 }

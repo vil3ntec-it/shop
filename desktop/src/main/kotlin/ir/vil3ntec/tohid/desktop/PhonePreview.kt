@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
@@ -33,6 +34,8 @@ import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.ui.components.common.NavTab
 import ir.vil3ntec.tohid.ui.components.common.PhoneNavBar
 import ir.vil3ntec.tohid.ui.screens.DashboardScreen
+import ir.vil3ntec.tohid.ui.screens.ProfileScreen
+import ir.vil3ntec.tohid.ui.screens.SettingsScreen
 import ir.vil3ntec.tohid.ui.theme.Shop
 import ir.vil3ntec.tohid.ui.theme.ThemeChoice
 import ir.vil3ntec.tohid.ui.theme.TohidTheme
@@ -80,7 +83,7 @@ fun PhonePreviewWindow(store: ShopStore, context: android.content.Context) {
     ) {
       TohidTheme(if (dark) ThemeChoice.DARK else ThemeChoice.LIGHT) {
         CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-          PhonePreviewContent(screen, store)
+          PhonePreviewContent(screen, store, dark)
         }
       }
     }
@@ -88,10 +91,19 @@ fun PhonePreviewWindow(store: ShopStore, context: android.content.Context) {
 }
 
 @Composable
-private fun PhonePreviewContent(screen: String, store: ShopStore) {
+private fun PhonePreviewContent(screen: String, store: ShopStore, dark: Boolean) {
   val data by store.data.collectAsState()
+  val snackbar = remember { SnackbarHostState() }
   Column(Modifier.fillMaxSize().background(Shop.colors.bg)) {
     when (screen) {
+      //  تنظیماتِ گوشی: گروه‌ها و کارت‌های گرد (`SettingsGroup`)
+      "settings" -> Box(Modifier.weight(1f).fillMaxWidth()) {
+        SettingsScreen(store, data, snackbar, if (dark) ThemeChoice.DARK else ThemeChoice.LIGHT, {}, {})
+      }
+      //  «حساب من»: کارتِ عکس، نقش، آمار و گروه‌ها
+      "profile" -> Box(Modifier.weight(1f).fillMaxWidth()) {
+        ProfileScreen(store = store, snackbar = snackbar, onBack = {}, onSignIn = {}, onSubscription = {})
+      }
       else -> {
         //  «nav» و هر نامِ ناشناس: خانه با نوارِ پایینِ قرصی
         Box(Modifier.weight(1f).fillMaxWidth()) { DashboardScreen(data) {} }
