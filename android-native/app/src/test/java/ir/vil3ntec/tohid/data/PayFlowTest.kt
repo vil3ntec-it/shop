@@ -25,10 +25,10 @@ import org.junit.Test
 import java.io.File
 
 /**
- *  سیم‌کشیِ پرداخت و صندوق (v3 A4؛ S01، S06، S12) — `PayFlow`، هم‌زادِ `license/pay-flow.js`.
+ *  سیم‌کشیِ پرداخت و صندوق (v3 A4؛ S01، S06، S12) — `PayFlow` (فقط برنامه‌های بومی).
  *
- *  همان بردارِ مرجعِ هسته (`core/test-vectors/pay-v1.json`) و همان سناریوهای
- *  `server/test/pay-flow.test.js`:
+ *  همان بردارِ مرجعِ هسته (`core/test-vectors/pay-v1.json`) که `PayCoreTest` و
+ *  `server/test/pay-core.test.js` می‌خوانند:
  *   - `legacyShift`: دفترِ بی فیلدِ تازه از راهِ سیم‌کشی همان عددِ `CashShift.totals`ِ امروز؛
  *     با `payments` همان `coreExpected`؛ Zِ ذخیره‌شده با لغوِ بعدی ثابت.
  *   - `settle`: فیلدهای فروش از هر تسویهٔ موفقِ بردار همان معنای امروز را دارند.
@@ -298,7 +298,7 @@ class PayFlowTest {
     for (k in listOf("by", "approvedBy", "reason", "note", "z")) assertFalse(k, a.containsKey(k))
   }
 
-  @Test fun `فاکتورِ ترکیبیِ وب در برنامه خوانده می‌شود و چیزی گم نمی‌شود`() {
+  @Test fun `فاکتورِ ترکیبیِ دستگاهِ دیگر (JSON) خوانده می‌شود و چیزی گم نمی‌شود`() {
     val web = """{"id":"w1","finalTotal":2450,"paymentMethod":"cash","paidAmount":2450,"remaining":0,"debtGiven":0,
       "payments":[{"method":"cash","kind":"cash","amountMinor":100000,"status":"confirmed"},
       {"method":"hesabpay","kind":"wallet","amountMinor":145000,"status":"pending","ref":"HP-77","verification":"manual"}],

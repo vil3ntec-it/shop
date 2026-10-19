@@ -31,9 +31,9 @@ import kotlinx.serialization.json.put
 /**
  *  سیم‌کشیِ پرداخت و صندوق — PAY-01..07، 11..15، 19 (v3 A4).
  *
- *  هم‌زادِ `license/pay-flow.js`؛ هر دو روی همان هستهٔ `core/pay/{Payment,Shift}.kt` /
- *  `license/pay-core.js` و همان بردارِ مرجع (`core/test-vectors/pay-v1.json`) سنجیده
- *  می‌شوند (`PayFlowTest`، `server/test/pay-flow.test.js`). یکی را عوض کنی، دیگری هم.
+ *  فقط برنامه‌های بومی (اندروید و کامپیوتر؛ دستورِ صاحبِ مخزن: سامانهٔ دکان با برنامه‌هاست،
+ *  نه وب). روی هستهٔ `core/pay/{Payment,Shift}.kt` و با همان بردارِ مرجع
+ *  (`core/test-vectors/pay-v1.json`) سنجیده می‌شود (`PayFlowTest`).
  *
  *  خالص است: نه Context، نه ساعت، نه دیسک. دفتر، ساعت و شناسه را صفحه می‌دهد.
  *
@@ -75,7 +75,7 @@ object PayFlow {
   /** روش‌های ردیفِ پنل: روشن و غیرنقد (کیف پول، کارت، حواله) */
   fun panelMethods(): List<PayMethod> = Pay.DEFAULT_METHODS.filter { it.enabled && it.kind != CASH }
 
-  // ── خطا و پیام (همان متنِ pay-flow.js) ────────────────────
+  // ── خطا و پیام ─────────────────────────────────────────
   data class Problem(
     val code: String,
     /** ردیفِ پنل که خطا دارد؛ ‎-1 یعنی نقد یا کلِ فاکتور */
@@ -202,7 +202,7 @@ object PayFlow {
   }
 
   /**
-   *  ردیف‌های پرداختِ ترکیبی روی فاکتور و رسید (برچسب، افغانی) — همان `invoicePayLines`ِ وب.
+   *  ردیف‌های پرداختِ ترکیبی روی فاکتور و رسید (برچسب، افغانی).
    *  فاکتورِ بی `payments` (امروز، یا پرچمِ خاموش) هیچ ردیفی نمی‌گیرد.
    */
   fun receiptLines(s: Sale): List<Pair<String, Double>> {
@@ -413,7 +413,7 @@ object PayFlow {
     }
   }
 
-  /** Zِ ذخیره‌شده (از وب یا برنامه) ⇒ گزارش؛ `null` اگر خوانا نیست */
+  /** Zِ ذخیره‌شده (از هر دستگاه) ⇒ گزارش؛ `null` اگر خوانا نیست */
   fun reportOf(j: JsonObject): ShiftReport? = runCatching {
     fun JsonObject.l(k: String) = (this[k] as? JsonPrimitive)?.longOrNull ?: 0L
     fun JsonObject.s(k: String) = (this[k] as? JsonPrimitive)?.takeIf { it !is JsonNull }?.contentOrNull

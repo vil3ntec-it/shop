@@ -133,7 +133,7 @@ data class Sale(
 )
 
 /**
- *  یک ردیفِ پرداختِ فاکتور — همان `payments[]`ِ وب (`license/pay-flow.js`).
+ *  یک ردیفِ پرداختِ فاکتور (`Sale.payments`) — به پول، نام‌ها همان `PaymentRow`ِ هسته.
  *  غیرنقد «ثبتِ دستی، در انتظار» است (`status = pending`، `verification = manual`)
  *  تا تأییدِ قابلِ اتکا برسد (PAY-08)؛ نقد و «به حساب» تأییدشده‌اند.
  */
