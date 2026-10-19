@@ -272,6 +272,9 @@ const config = {
      *  پمپ). ⚠️ پشتِ تونل و بی `TRUST_PROXY` همهٔ مشتری‌ها یک IP‌اند.
      */
     storeCheckoutMax: num(process.env.RATE_STORE_CHECKOUT_MAX, 20),
+    //  بازارچه (`/api/market/*`): خواندن سطلِ خودش را با `generalMax` دارد؛
+    //  جست‌وجوی کالا در همهٔ دکان‌ها گران‌تر است ⇒ سطلِ تنگ‌ترِ خودش، به‌ازای IP.
+    marketSearchMax: num(process.env.RATE_MARKET_SEARCH_MAX, 300),
   },
 
   /**
@@ -290,6 +293,15 @@ const config = {
     offlineMs: num(process.env.STORE_PRESENCE_OFFLINE_MIN, 60) * 60 * 1000,
     //  ۲۳.۴ — شمارهٔ تأییدشدهٔ مشتری چند روز بی کدِ تازه می‌ماند
     ticketTtlMs: num(process.env.STORE_CUSTOMER_TICKET_DAYS, 14) * 24 * 60 * 60 * 1000,
+  },
+
+  /**
+   * بازارچه (`lib/market.js`، پرچمِ `market.directory`). نتیجهٔ دروازهٔ هر دکان
+   * (پرچم‌ها و اشتراک) این‌قدر در حافظه می‌ماند؛ «روشن»، «فعال» و «در فهرست»
+   * همیشه زنده خوانده می‌شوند. ۰ ⇒ بی حافظه.
+   */
+  market: {
+    gateCacheMs: num(process.env.MARKET_GATE_CACHE_MS, 30 * 1000),
   },
 
   // CORS_ORIGIN چند دامنه را با کاما می‌پذیرد. برنامه‌ی اندروید به CORS
