@@ -33,6 +33,7 @@ object ApiEndpoints {
     //  ورود شاگرد فقط با کد — نه ایمیل، نه شماره، نه رمز
     const val STAFF = "/auth/staff"
     const val GOOGLE = "/auth/google"
+    const val GOOGLE_LINK_CODE = "/auth/google/link-code"
     const val REFRESH = "/auth/refresh"
     const val LOGOUT = "/auth/logout"
     const val OTP_REQUEST = "/auth/otp/request"

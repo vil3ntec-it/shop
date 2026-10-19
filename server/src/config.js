@@ -157,6 +157,9 @@ const config = {
     //  ‎invalid_client‎ می‌افتد.
     desktopClientId: (process.env.GOOGLE_DESKTOP_CLIENT_ID || '').trim(),
     certsUrl:  process.env.GOOGLE_CERTS_URL || 'https://www.googleapis.com/oauth2/v3/certs',
+    //  ⛔ بندِ ۲۹.۲ قاعدهٔ ۵: گوگل فقط با اثباتِ روشِ قبلیِ حساب وصل می‌شود.
+    //  `1` فقط کلیدِ بازگشتِ اضطراری به وصلِ خودکار با ایمیلِ تأییدشده است.
+    legacyEmailLink: bool(process.env.GOOGLE_EMAIL_AUTOLINK, false),
   },
 
   /*

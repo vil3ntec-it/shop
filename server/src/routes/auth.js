@@ -648,21 +648,103 @@ router.post('/otp/verify', verifyLimit, async (req, res, next) => {
 });
 
 // ---------- ورود با گوگل ----------
+/*
+ *  ⛔ بندِ ۲۹.۲ قاعدهٔ ۵ و AUTH-04 — «برابر بودنِ ایمیل به‌تنهایی مجوزِ ادغام نیست».
+ *
+ *  تا دیروز اگر شناسهٔ گوگل (`sub`) هنوز به حسابی وصل نبود، حسابی که همان
+ *  ایمیل را داشت **بی هیچ پرسشی** برداشته و گوگل به آن چسبانده می‌شد. یعنی
+ *  هر کسی که یک حسابِ گوگل با نشانیِ ایمیلِ شما داشت (دامنهٔ ایمیلی که دستِ
+ *  دیگری افتاده، حسابِ Workspaceِ بازیافته…) بی رمز وارد دکانِ شما می‌شد.
+ *
+ *  حالا وصل شدن فقط وقتی است که روشِ **قبلیِ** همان حساب هم ثابت شود: رمزِ
+ *  حساب (`password`) یا کدی که به ایمیلِ حساب رفته (`code`، از
+ *  `POST /google/link-code`). بی آن، پاسخ ۴۰۹ `google_link_required` است و
+ *  برنامه همان‌جا رمز یا کد را می‌خواهد. کسی که گوگلش از قبل وصل است (یافتن
+ *  با `sub`) هیچ تغییری نمی‌بیند.
+ *
+ *  بازگشت: `GOOGLE_EMAIL_AUTOLINK=1` رفتارِ قبلی را برمی‌گرداند (فقط برای
+ *  اضطرار؛ هر اتصال هنوز در سابقه `auth.identity_linked` می‌نشیند).
+ */
+const LINK_METHODS_MESSAGE = 'این ایمیل از قبل حساب دارد. برای وصل کردنِ گوگل به همان حساب، رمزِ حساب را بزنید یا کدی را که به همین ایمیل می‌فرستیم وارد کنید.';
+
+/** حسابِ موجودی که این ایمیل را دارد و هنوز این گوگل به آن وصل نیست. */
+async function accountOfGoogleEmail(profile) {
+  if (!profile.email) return null;
+  return one('SELECT * FROM users WHERE email=$1', [profile.email]);
+}
+
+/**
+ *  اثباتِ روشِ قبلیِ حساب — رمز یا کدِ ایمیل. هر دو پشتِ همان قفلِ تلاشِ
+ *  ناموفقِ ورودِ عادی‌اند، پس این در راهِ تازه‌ای برای حدس زدنِ رمز نیست.
+ *  @returns {Promise<'password'|'email_code'|null>}
+ */
+async function proveExistingMethod(user, body, ip) {
+  const password = typeof body?.password === 'string' ? body.password : '';
+  const code = String(body?.code || body?.emailCode || '').trim();
+  if (password) {
+    await assertNotLocked('user', user.email, ip);
+    let ok = false;
+    if (user.password_hash) ok = await pw.verifyPassword(password, user.password_hash);
+    else await pw.burnTime(password);
+    await noteAttempt('user', user.email, ip, ok);
+    if (!ok) throw unauthorized('رمزِ همین حساب درست نیست', 'bad_credentials');
+    await clearAttempts('user', user.email);
+    return 'password';
+  }
+  if (code) {
+    await assertNotLocked('otp', user.email, ip);
+    try {
+      await otp.verify(user.email, code, { purpose: 'link' });
+    } catch (err) {
+      await noteAttempt('otp', user.email, ip, false);
+      throw err;
+    }
+    await noteAttempt('otp', user.email, ip, true);
+    await clearAttempts('otp', user.email);
+    return 'email_code';
+  }
+  return null;
+}
+
+function linkRequired(res, user) {
+  return res.status(409).json({
+    error: {
+      code: 'google_link_required',
+      message: LINK_METHODS_MESSAGE,
+      //  فقط به دارندهٔ توکنِ معتبرِ گوگلِ همین ایمیل گفته می‌شود — کسی که
+      //  ایمیل را نمی‌تواند ثابت کند به این‌جا نمی‌رسد
+      link: {
+        email: user.email,
+        methods: [...(user.password_hash ? ['password'] : []), 'email_code'],
+      },
+    },
+  });
+}
+
 router.post('/google', authLimit, async (req, res, next) => {
   const idToken = req.body?.idToken || req.body?.id_token;
   const profile = await google.verifyIdToken(idToken);
+  const ip = clientIp(req);
 
-  // اول با شناسه‌ی گوگل، بعد با ایمیلِ تأییدشده
-  let user = null;
-  const identity = await one(
+  //  اول با شناسه‌ی گوگل — حسابی که گوگلش از قبل وصل است همان‌طور وارد می‌شود
+  let user = await one(
     `SELECT u.* FROM user_identities i JOIN users u ON u.id = i.user_id
       WHERE i.provider='google' AND i.subject=$1`,
     [profile.sub]
   );
-  if (identity) user = identity;
 
-  if (!user && profile.email && profile.emailVerified) {
-    user = await one('SELECT * FROM users WHERE email=$1', [profile.email]);
+  let linkedVia = '';
+  if (!user) {
+    const existing = await accountOfGoogleEmail(profile);
+    if (existing) {
+      if (config.google.legacyEmailLink && profile.emailVerified) {
+        linkedVia = 'email_auto';
+      } else {
+        linkedVia = await proveExistingMethod(existing, req.body, ip);
+        if (!linkedVia) return linkRequired(res, existing);
+      }
+      user = existing;
+    }
   }
 
   let created = false;
@@ -679,15 +761,45 @@ router.post('/google', authLimit, async (req, res, next) => {
   }
   if (user.status !== 'active') return next(forbidden('این حساب غیرفعال است', 'account_disabled'));
 
-  await query(
+  const linked = await query(
     `INSERT INTO user_identities (id, user_id, provider, subject, email, created_at)
      VALUES ($1,$2,'google',$3,$4,$5) ON CONFLICT (provider, subject) DO NOTHING`,
     [newId('idn'), user.id, profile.sub, profile.email || '', now()]
   );
+  if (linkedVia && linked.rowCount) {
+    await audit.log({
+      actorType: 'user', userId: user.id, action: 'auth.identity_linked',
+      targetType: 'user', targetId: user.id, detail: { provider: 'google', via: linkedVia }, ip,
+    });
+  }
 
-  const session = await issueSession(user, req.body?.device, clientIp(req), appOf(req), appVersionOf(req));
-  await audit.log({ actorType: 'user', userId: user.id, action: created ? 'auth.register' : 'auth.login', detail: { method: 'google' }, ip: clientIp(req) });
+  const session = await issueSession(user, req.body?.device, ip, appOf(req), appVersionOf(req));
+  await audit.log({ actorType: 'user', userId: user.id, action: created ? 'auth.register' : 'auth.login', detail: { method: 'google' }, ip });
   res.status(created ? 201 : 200).json({ created, ...(await loginPayload(user, session)) });
+});
+
+/**
+ *  کدِ اثبات برای وصل کردنِ گوگل — به ایمیلِ **خودِ حساب** می‌رود.
+ *
+ *  فقط کسی که توکنِ معتبرِ گوگل با همان ایمیل دارد می‌تواند بخواهدش، و کد
+ *  `purpose='link'` دارد: نه برای ورود کار می‌کند و نه برای بازیابیِ رمز.
+ *  حسابی که نیست یا گوگلش از قبل وصل است کدی نمی‌گیرد (پاسخ همان ۲۰۰ است).
+ */
+router.post('/google/link-code', authLimit, otpLimit, async (req, res) => {
+  const profile = await google.verifyIdToken(req.body?.idToken || req.body?.id_token);
+  const already = await one(
+    `SELECT 1 FROM user_identities WHERE provider='google' AND subject=$1`, [profile.sub]
+  );
+  const existing = already ? null : await accountOfGoogleEmail(profile);
+  let out = {};
+  if (existing) {
+    out = await otp.request(existing.email, { purpose: 'link', ip: clientIp(req), app: appOf(req) });
+  }
+  res.json({
+    ok: true, sent: !!existing, email: profile.email || null,
+    resendSeconds: Math.ceil(config.otp.resendMs / 1000),
+    ...(out.devCode ? { devCode: out.devCode } : {}),
+  });
 });
 
 // ---------- تازه‌سازی نشست ----------
