@@ -622,6 +622,29 @@ test('WEB-02: پرفروش‌ها از سفارشِ واقعی (بی لغوشد�
   assert.equal(await count(s.shopId), 6, 'خریدِ دوباره سفارشی نمی‌سازد');
 });
 
+test('۳۲.۳ + WEB-09: کاتالوگِ روشن (`shop.catalog`) ⇒ موجودیِ واقعی از catalog.publicStock؛ ناموجود پیشنهاد نمی‌شود', async () => {
+  const s = await liveStore('موجودی');
+  const before = await h.get(`/api/store/${s.slug}/products`);
+  assert.ok(before.body.items.every((p) => p.stock.status === 'unverified'), 'پرچمِ کاتالوگ خاموش ⇒ «در حال بررسی»');
+  await setFlag(s.shopId, 'shop.catalog', true);
+  const p = await push(s.token, [{
+    op_id: `op-${uniq()}`, ts: Date.now(), table: 'warehouseEntries', row_id: `we-${uniq()}`, type: 'insert',
+    fields: { productId: 'rice', units: 10, cartons: 0, perCarton: 0, unit: 'کیلو', price: 100, createdAt: Date.now() },
+  }]);
+  assert.equal(p.status, 200, JSON.stringify(p.body));
+  const list = await h.get(`/api/store/${s.slug}/products`);
+  const st = Object.fromEntries(list.body.items.map((x) => [x.id, x.stock.status]));
+  assert.ok(['in_stock', 'in_warehouse'].includes(st.rice), JSON.stringify(st));
+  assert.equal(st.oil, 'out_of_stock');
+  assert.equal(st.salt, 'out_of_stock');
+  const detail = await h.get(`/api/store/${s.slug}/products/rice`);
+  assert.deepEqual(detail.body.similar, [], 'ناموجود در «مشابه» نیست');
+  const hl = await h.get(`/api/store/${s.slug}/highlights`);
+  assert.deepEqual(hl.body.newArrivals.map((x) => x.id), ['rice']);
+  //  کالای ناموجود در صفحهٔ خودش دیده می‌شود ولی «ناموجود»
+  assert.equal((await h.get(`/api/store/${s.slug}/products/oil`)).body.product.stock.status, 'out_of_stock');
+});
+
 test('WEB-16: عکسِ کوچکِ بانک فقط با پرچمِ دکان؛ وگرنه عکسِ همگام‌شده؛ منتشرنشده هرگز', async () => {
   const s = await liveStore('عکس');
   const legacy = F.jpeg(320, 320, { seed: 71 });
