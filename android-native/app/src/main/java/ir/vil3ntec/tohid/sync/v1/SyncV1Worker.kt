@@ -39,9 +39,15 @@ class SyncV1Worker(context: Context, params: WorkerParameters) : CoroutineWorker
   override suspend fun doWork(): Result {
     val app = applicationContext
     if (!Backend.isReady(app)) return Result.success()
+    //  حسابِ پیک دفترِ دکان ندارد (DLV-01): سرور ۴۰۳ می‌دهد، پس اصلاً نمی‌پرسیم
+    if (ir.vil3ntec.tohid.data.ShopRole.isCourier(app)) return Result.success()
 
     val store = ShopStore(app)
     store.load()
+    //  Sync v3 پشتِ تنظیمِ هر دستگاه (پیش‌فرض v1): همین کارگر، موتورِ دیگر
+    if (ir.vil3ntec.tohid.sync.v3.SyncChoice.isV3(app)) {
+      return if (ir.vil3ntec.tohid.sync.v3.SyncV3Runner.of(app).work(store)) Result.success() else Result.retry()
+    }
     val engine = SyncV1Engine.of(app)
     engine.rebind()
 

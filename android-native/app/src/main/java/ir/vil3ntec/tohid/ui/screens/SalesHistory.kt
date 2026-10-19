@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.ui.screens
 
 import ir.vil3ntec.tohid.data.invoiceLabel
+import ir.vil3ntec.tohid.data.isOnlineOrder
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -583,12 +584,15 @@ private fun SaleRow(
   val cancelled = sale.status == "cancelled"
   //  RET-12 — سندهای برگشتِ تازهٔ همین فاکتور، برای چاپِ دوبارهٔ رسید
   val returnDocs = if (returnsV2) d.saleReturns.filter { it.saleId == sale.id }.mapNotNull { it.docId }.distinct() else emptyList()
+  //  ORD-20: فاکتورِ سریِ W را سرور هنگامِ تحویلِ سفارشِ اینترنتی ساخته — لغو و «اصلاح» ندارد
+  val online = sale.isOnlineOrder()
   val debtor = sale.debtorId?.let { id -> d.debtors.find { it.id == id } }
   val canReturn = !cancelled && d.saleItems.any { it.saleId == sale.id && SalesEngine.returnable(it) > 0 }
   var menu by remember { mutableStateOf(false) }
 
   val kindTint = when {
     cancelled -> Shop.colors.danger
+    online -> Shop.colors.primary
     sale.paymentMethod == "credit" -> Shop.colors.warning
     else -> Shop.colors.success
   }
@@ -614,6 +618,7 @@ private fun SaleRow(
       InvoiceCell(
         when {
           cancelled -> "لغوشده"
+          online -> "اینترنتی"
           sale.paymentMethod == "credit" -> "نسیه"
           else -> "نقدی"
         },
@@ -647,7 +652,7 @@ private fun SaleRow(
               onClick = { menu = false; onReturnReceipt(id) },
             )
           }
-          if (!cancelled) {
+          if (!cancelled && !online) {
             DropdownMenuItem(text = { Text("اصلاح فاکتور") }, onClick = { menu = false; onReopen() })
             DropdownMenuItem(
               text = { Text("لغو فروش", color = Shop.colors.danger) },
