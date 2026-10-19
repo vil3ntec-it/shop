@@ -46,6 +46,9 @@ function errorHandler(err, req, res, _next) {
   if (status >= 500) console.error(`[error] ${ref}${err.step ? ` @${err.step}` : ''}`, req.method, req.path, err);
   res.status(status).json({
     error: {
+      //  جزئیاتِ قابلِ نمایش (مثلاً «فقط ۱ عدد قابلِ سفارش است»: `lines`) — فقط برای
+      //  خطای نمایش‌دادنی؛ کد و پیام همیشه بر آن جلو می‌افتند
+      ...(exposed && status < 500 && err.data && typeof err.data === 'object' && !Array.isArray(err.data) ? err.data : {}),
       code: err.code || (status >= 500 ? 'internal' : 'error'),
       message: exposed
         ? err.message
