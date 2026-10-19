@@ -1655,6 +1655,7 @@ async function loadDownloads() {
   $('dl-version').value = d.version || '';
   $('dl-url').value = d.url || '';
   $('dl-notes').value = d.notes || '';
+  $('dl-min').value = d.minVersion || '';
 }
 
 async function saveDownloads() {
@@ -1663,6 +1664,7 @@ async function saveDownloads() {
     await call('PUT', '/admin/downloads', {
       app: $('dl-app').value, version: $('dl-version').value.trim(),
       url: $('dl-url').value.trim(), notes: $('dl-notes').value.trim(),
+      minVersion: $('dl-min').value.trim(),
     });
     msg(node, 'ذخیره شد.', 'ok');
   } catch (err) { msg(node, err.message, 'bad'); }
