@@ -249,11 +249,17 @@ button, input, textarea, select { font: inherit; color: inherit; }
 .p-open { all: unset; display: flex; flex-direction: column; gap: 2px; cursor: pointer; border-radius: 12px; }
 .p-open:focus-visible { box-shadow: var(--shadow-focus); }
 .p-img { position: relative; aspect-ratio: 1; border-radius: 12px; background: var(--surface-2); display: grid; place-items: center; overflow: hidden; margin-bottom: var(--s2); }
-.p-img img { width: 100%; height: 100%; object-fit: contain; }
 .p-img .ph { font-size: 34px; font-weight: 700; color: var(--muted); opacity: .55; }
-.p-price { font-size: 17px; font-weight: 700; padding-inline: var(--s1); }
+.p-price { font-size: 22px; line-height: 1.3; font-weight: 700; padding-inline: var(--s1); }
 .p-price small { font-size: 12px; font-weight: 400; color: var(--muted); }
-.p-name { font-size: 14px; line-height: 1.55; padding-inline: var(--s1); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.9em; }
+.p-name { font-size: 14px; font-weight: 700; color: var(--text); line-height: 1.5; padding-inline: var(--s1); margin-top: 2px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 3em; }
+.p-unit { font-size: 12px; color: var(--muted); padding-inline: var(--s1); }
+/* عکسِ کالا روی کاشیِ روشنِ گرد با فاصله؛ زمینهٔ سفیدِ خودِ عکس در کاشی حل می‌شود (multiply)،
+   پس در تمِ تاریک هم مربعِ سفیدِ تند دیده نمی‌شود */
+.tile { --tile: #F1F2F5; background: var(--tile); }
+.tile img { width: 100%; height: 100%; object-fit: contain; mix-blend-mode: multiply; }
+.p-img.tile { padding: 12%; }
+@media (prefers-color-scheme: dark) { .tile { --tile: #E6E7EC; } }
 .p-stock { padding: var(--s1) var(--s1) 0; }
 .p-stock .pill { font-size: 11.5px; min-height: 0; padding: 0; background: none; max-width: 100%; white-space: normal; line-height: 1.5; align-items: flex-start; }
 .p-stock .pill::before { margin-top: .5em; }
@@ -415,7 +421,7 @@ dialog.confirm .row { justify-content: flex-end; margin-top: var(--s4); }
 .prow { display: flex; align-items: center; gap: var(--s3); color: var(--text); padding: var(--s3); transition: box-shadow .15s; }
 .prow:hover { text-decoration: none; box-shadow: var(--shadow-2); }
 .pimg { flex: none; width: 64px; height: 64px; border-radius: 12px; background: var(--surface-2); display: grid; place-items: center; overflow: hidden; }
-.pimg img { width: 100%; height: 100%; object-fit: contain; }
+.pimg.tile { padding: 6px; }
 .pimg .ph { font-weight: 700; font-size: 22px; color: var(--muted); opacity: .6; }
 .prow .grow > b { display: block; font-size: 15px; line-height: 1.5; }
 .prow .grow > small { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; color: var(--muted); font-size: 12.5px; margin-top: 2px; }

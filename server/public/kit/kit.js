@@ -66,7 +66,10 @@
   };
 
   // ── عدد، پول، زمان ──
-  K.fa = function (n, d) { return Number(n).toLocaleString('fa-AF', { maximumFractionDigits: d === undefined ? 2 : d }); };
+  //  جداکنندهٔ هزارگانِ فارسی «٬» و اعشارِ «٫» (نه ویرگول و نقطهٔ لاتین)
+  K.fa = function (n, d) {
+    return Number(n).toLocaleString('fa-AF', { maximumFractionDigits: d === undefined ? 2 : d }).replace(/,/g, '٬').replace(/\./g, '٫');
+  };
   K.money = function (minor) { return K.fa(Math.round(Number(minor)) / 100) + ' افغانی'; };
   K.qty = function (milli) { return K.fa(Number(milli) / 1000, 3); };
   /** همان گردکردنِ سرور: هر قلم به افغانیِ کامل (order-states.lineTotalMinor). */
