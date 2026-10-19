@@ -84,6 +84,8 @@ private val PAGE_TITLES = mapOf(
   //  قیمت‌های سرور را نشان می‌دهد، این یکی حالِ اشتراکِ خودِ این حساب.
   "myplan" to "اشتراکِ من",
   "support" to "پشتیبانی",
+  //  چتِ مشتری ↔ دکان (v3 §۳۳) — فقط وقتی سرور پرچمِ `shop.chat` را روشن گفته
+  "chat" to "گفت‌وگو با مشتری",
   "profile" to "حساب من",
   "team" to "کارمندان دکان",
 )
@@ -444,6 +446,8 @@ fun AppRoot(
   LaunchedEffect(Unit) {
     ir.vil3ntec.tohid.sync.PhoneScanner.load(context)
     PhotoPrefs.load(context)
+    //  چتِ دکان: پرچم را بپرس و پیام‌های مانده در صف را (اگر هست) بفرست
+    ir.vil3ntec.tohid.data.ShopChatSync.refreshConfig(context)
   }
   val phoneScan = ir.vil3ntec.tohid.sync.PhoneScanner.lastReceived.value
   LaunchedEffect(phoneScan) {
@@ -782,6 +786,7 @@ fun AppRoot(
         "vip" -> VipScreen { sub = null }
         "myplan" -> MySubscriptionScreen()
         "support" -> SupportScreen { sub = null }
+        "chat" -> ShopChatScreen { sub = null }
         "profile" -> ProfileScreen(
           store = store,
           snackbar = snackbar,
