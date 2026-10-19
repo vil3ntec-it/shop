@@ -209,11 +209,17 @@ fun DebtorsSearchField(value: String, onValueChange: (String) -> Unit, modifier:
     value = value,
     onValueChange = onValueChange,
     label = { Text("جستجوی نام یا شماره") },
-    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-    trailingIcon = {
-      when {
-        value.isNotBlank() -> RoundIcon(Icons.Filled.Close, "پاک کردن جستجو", Color.Transparent, c.muted) { onValueChange("") }
-        voice != null -> RoundIcon(Icons.Filled.Mic, "جستجوی صوتی", c.accentSoft, c.accentInk) { voice() }
+    //  خانهٔ ۴۸dpِ آیکن‌ها صریح است: گوشی خودش همین را می‌دهد (اندازهٔ لمسیِ کمینه)، ولی
+    //  پیش‌نمایشِ کامپیوتر نه — و بی آن ذره‌بین و میکروفون به لبهٔ کادر می‌چسبیدند
+    leadingIcon = {
+      Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) { Icon(Icons.Filled.Search, contentDescription = null) }
+    },
+    trailingIcon = if (value.isBlank() && voice == null) null else {
+      {
+        Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+          if (value.isNotBlank()) RoundIcon(Icons.Filled.Close, "پاک کردن جستجو", Color.Transparent, c.muted) { onValueChange("") }
+          else if (voice != null) RoundIcon(Icons.Filled.Mic, "جستجوی صوتی", c.accentSoft, c.accentInk) { voice() }
+        }
       }
     },
     singleLine = true,
