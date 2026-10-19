@@ -174,6 +174,8 @@ object LedgerEngine {
     /** هزینهٔ جانبیِ همین خرید (کرایه، گمرک) به افغانی — روی بهای کالا، نه بدهیِ تأمین‌کننده (PUR-06) */
     val landedCost: Double? = null,
     val userId: String? = null,
+    /** سررسیدِ پرداخت (`yyyy-MM-dd`، PUR-07)؛ `null` یا خالی = ندارد */
+    val dueDate: String? = null,
   )
 
   /**
@@ -196,6 +198,8 @@ object LedgerEngine {
     if (draft.quantity.isNaN() || draft.quantity <= 0) return Result.Failed("مقدار معتبر وارد کنید")
     if (draft.purchasePrice.isNaN() || draft.purchasePrice < 0) return Result.Failed("قیمت خرید معتبر وارد کنید")
     if (draft.landedCost != null && (draft.landedCost.isNaN() || draft.landedCost < 0)) return Result.Failed("هزینهٔ جانبی درست نیست")
+    val due = draft.dueDate?.trim()?.ifEmpty { null }
+    if (due != null && !ir.vil3ntec.tohid.core.stock.StockCore.isoDateOk(due)) return Result.Failed("سررسید درست نیست")
     val landed = draft.landedCost?.takeIf { it > 0 }
 
     val date = draft.date.ifBlank { today }
@@ -280,6 +284,7 @@ object LedgerEngine {
           debt = totalAmount - paid,
           warehouseEntryId = entryId,
           createdAt = now,
+          dueDate = due,
         ),
         stockMovements = d.stockMovements + StockMovement(
           id = newId(),
