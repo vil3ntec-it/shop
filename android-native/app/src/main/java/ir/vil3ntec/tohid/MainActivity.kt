@@ -64,7 +64,11 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
      *  ⚠️ هیچ‌کدام خطا بیرون نمی‌دهند: برنامه باید بی‌اینترنت و بی‌حساب
      *  هم کامل بالا بیاید.
      */
-    runCatching {
+    //  حالتِ پیک (DLV-01): دفترِ دکانی در کار نیست — نه کارِ دوره‌ای، نه سوکت
+    ir.vil3ntec.tohid.data.ShopRole.courierMode.value = ir.vil3ntec.tohid.data.ShopRole.isCourier(applicationContext)
+    if (ir.vil3ntec.tohid.data.ShopRole.courierMode.value) {
+      runCatching { ir.vil3ntec.tohid.sync.v1.SyncV1Worker.cancel(applicationContext) }
+    } else runCatching {
       ir.vil3ntec.tohid.sync.v1.SyncV1Worker.schedule(applicationContext)
       live = ir.vil3ntec.tohid.sync.v1.LiveSocket(applicationContext) {
         ir.vil3ntec.tohid.sync.v1.SyncV1Worker.now(applicationContext)
@@ -85,6 +89,14 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
       // دروازهٔ ورود فقط بارِ اول می‌آید: یا وارد می‌شوید یا «ادامه بدون
       // حساب» را می‌زنید. از آن به بعد سرِ راه کسی نمی‌ایستد.
       var welcomed by remember { mutableStateOf(prefs.getBoolean("welcomed", false)) }
+      //  نقشِ نشست: «پیک» ⇒ حالتِ پیک به‌جای دکان — زنده، از هر راهی که نقش عوض شود
+      val courier by ir.vil3ntec.tohid.data.ShopRole.courierMode.collectAsState()
+      LaunchedEffect(courier) {
+        runCatching {
+          if (courier) ir.vil3ntec.tohid.sync.v1.SyncV1Worker.cancel(applicationContext)
+          else ir.vil3ntec.tohid.sync.v1.SyncV1Worker.schedule(applicationContext)   // KEEP: بی اثرِ دوم
+        }
+      }
 
       TohidTheme(theme) {
         // کلِ برنامه راست‌به‌چپ است
@@ -94,6 +106,12 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
               prefs.edit().putBoolean("welcomed", true).apply()
               welcomed = true
             }
+          } else if (courier) {
+            ir.vil3ntec.tohid.ui.courier.CourierHome(onSignedOut = {
+              //  خروج از حسابِ پیک ⇒ صفحهٔ ورود؛ دفترِ دکانِ این گوشی دست نخورده است
+              prefs.edit().putBoolean("welcomed", false).apply()
+              welcomed = false
+            })
           } else {
             AppRoot(
               store = store,

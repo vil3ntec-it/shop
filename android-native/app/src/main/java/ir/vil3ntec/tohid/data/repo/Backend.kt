@@ -77,7 +77,8 @@ object Backend {
 
     //  ورود با کدِ شش‌رقمیِ ایمیلی — کنارِ `auth`، نه جایش
     val codeLogin = CodeLoginRepository(api, tokens)
-    val shop = ShopRepository(api)
+    val shop = ShopRepository(api, tokens)
+    val courier = CourierRepository(api)
     val account = AccountRepository(api)
     val sync = SyncRepository(api)
     val events = EventsRepository(api)
@@ -111,6 +112,7 @@ object Backend {
   fun auth(context: Context): AuthRepository = of(context).auth
   fun codeLogin(context: Context): CodeLoginRepository = of(context).codeLogin
   fun shop(context: Context): ShopRepository = of(context).shop
+  fun courier(context: Context): CourierRepository = of(context).courier
   fun account(context: Context): AccountRepository = of(context).account
   fun sync(context: Context): SyncRepository = of(context).sync
   fun events(context: Context): EventsRepository = of(context).events

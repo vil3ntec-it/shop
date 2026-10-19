@@ -143,6 +143,26 @@ object ApiEndpoints {
     fun memberPerms(id: String) = "$PERMISSIONS/members/${enc(id)}"
     fun deviceDisable(id: String) = "$DEVICES/${enc(id)}/disable"
     fun deviceEnable(id: String) = "$DEVICES/${enc(id)}/enable"
+
+    /**
+     *  وضعیتِ تحویل و پیکِ دکان (`readable`/`entitled`) — صفحهٔ کارمندان با
+     *  همین «دعوتِ پیک» را نشان می‌دهد (DLV-01، پشتِ پرچمِ `shop.delivery`).
+     */
+    const val DELIVERY_CONFIG = "/shop/delivery/config"
+  }
+
+  /* ------------------------------ پیک ------------------------------ */
+
+  /**
+   *  درِ پیک — DLV-01، v3 §۳.۱۱. توکنِ پیک فقط همین‌ها را باز می‌کند؛ هر
+   *  مسیرِ دیگر `403 courier_scope` است.
+   */
+  object Courier {
+    const val ME = "/courier/me"
+    const val MISSIONS = "/courier/missions"
+    const val EVENTS = "/courier/events"
+    fun missions(scope: String) = "$MISSIONS?scope=${enc(scope)}"
+    fun photos(assignmentId: String) = "$MISSIONS/${enc(assignmentId)}/photos"
   }
 
   /* ------------------------------ همگام‌سازی ------------------------------ */
