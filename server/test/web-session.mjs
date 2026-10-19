@@ -19,7 +19,7 @@
  * اجرا:  TEST_DATABASE_URL=pglite:memory node test/web-session.mjs
  */
 import { createRequire } from 'node:module';
-import { missingTool, PLAYWRIGHT_INSTALL } from './browser-guard.mjs';
+import { missingTool, PLAYWRIGHT_INSTALL, closeSafeRoute } from './browser-guard.mjs';
 import assert from 'node:assert/strict';
 import { execSync } from 'node:child_process';
 import http from 'node:http';
@@ -204,7 +204,7 @@ for (const [label, fulfil] of [
   ['خطای سرور (۵۰۲)', (route) => route.fulfill({ status: 502, contentType: 'text/html', body: 'Bad Gateway' })],
 ]) {
   await step(`${label} وسطِ تازه‌سازی ⇒ نشست پاک نمی‌شود و پس از وصل شدن کار می‌کند`, async () => {
-    await page.route('**/auth/refresh', fulfil);
+    await page.route('**/auth/refresh', closeSafeRoute(fulfil));
     try {
       await anHourLater();
       const before = await stored();
