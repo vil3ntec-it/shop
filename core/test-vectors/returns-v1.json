@@ -1,0 +1,202 @@
+{
+  "_doc": "RET-01..08، 10، 12، 13 — برگشت و تعویض. همین فایل را ReturnFlow.kt ِ گوشی و کامپیوتر (ReturnFlowTest) می‌دواند. عددها دستی و از روی قاعدهٔ مشخصات نوشته شده‌اند (S13: ۲۵۰ − ۲۵ = ۲۲۵)، نه از خروجیِ کد. مبلغ‌ها افغانی‌اند؛ gate به پول (یک‌صدمِ افغانی).",
+  "version": 1,
+  "ledger": {
+    "products": [
+      { "id": "pA", "name": "کالای A", "unit": "عدد", "salePrice": 150, "purchasePrice": 100 },
+      { "id": "pB", "name": "کالای B", "unit": "عدد", "salePrice": 250, "purchasePrice": 150 },
+      { "id": "pC", "name": "کالای C", "unit": "عدد", "salePrice": 350, "purchasePrice": 200 },
+      { "id": "pR", "name": "برنج", "unit": "کیلو", "salePrice": 300, "purchasePrice": 200 },
+      { "id": "p40", "name": "کفش سایز ۴۰", "unit": "جفت", "salePrice": 1000, "purchasePrice": 600 },
+      { "id": "p42", "name": "کفش سایز ۴۲", "unit": "جفت", "salePrice": 1200, "purchasePrice": 700 }
+    ],
+    "warehouseEntries": [
+      { "id": "wA", "productId": "pA", "units": 100, "date": "2026-09-01" },
+      { "id": "wB", "productId": "pB", "units": 100, "date": "2026-09-01" },
+      { "id": "wC", "productId": "pC", "units": 100, "date": "2026-09-01" },
+      { "id": "wR", "productId": "pR", "units": 100, "date": "2026-09-01" },
+      { "id": "w40", "productId": "p40", "units": 5, "date": "2026-09-01" },
+      { "id": "w42", "productId": "p42", "units": 5, "date": "2026-09-01" }
+    ],
+    "debtors": [
+      { "id": "c1", "name": "احمد کریمی", "phone": "0790000001" },
+      { "id": "c2", "name": "زهرا نوری", "phone": "0790000002" }
+    ],
+    "transactions": [
+      { "id": "t20", "debtorId": "c1", "type": "give", "amount": 500, "date": "2026-10-02", "notes": "فروش نسیه — فاکتور #20" }
+    ],
+    "sales": [
+      { "id": "s13", "invoiceNumber": 13, "series": "B1", "total": 1000, "discountType": "percent", "discountValue": 10, "discount": 100, "finalTotal": 900, "paymentMethod": "cash", "paidAmount": 900, "remaining": 0, "status": "completed", "debtGiven": 0, "debtSettled": 0, "date": "2026-10-01", "createdAt": 1000 },
+      { "id": "s20", "invoiceNumber": 20, "debtorId": "c1", "total": 600, "discount": 0, "finalTotal": 600, "paymentMethod": "credit", "paidAmount": 100, "remaining": 500, "status": "completed", "debtGiven": 500, "debtSettled": 0, "date": "2026-10-02", "createdAt": 2000 },
+      { "id": "s30", "invoiceNumber": 30, "debtorId": "c2", "total": 1000, "discount": 0, "finalTotal": 1000, "paymentMethod": "cash", "paidAmount": 1000, "remaining": 0, "status": "completed", "debtGiven": 0, "debtSettled": 0, "date": "2026-10-03", "createdAt": 3000 },
+      { "id": "s40", "invoiceNumber": 40, "total": 150, "discount": 0, "finalTotal": 150, "paymentMethod": "cash", "paidAmount": 150, "remaining": 0, "status": "cancelled", "debtGiven": 0, "debtSettled": 0, "date": "2026-10-04", "createdAt": 4000 },
+      { "id": "s50", "invoiceNumber": 50, "total": 3, "discountType": "amount", "discountValue": 1, "discount": 1, "finalTotal": 2, "paymentMethod": "cash", "paidAmount": 2, "remaining": 0, "status": "completed", "debtGiven": 0, "debtSettled": 0, "date": "2026-10-05", "createdAt": 5000 }
+    ],
+    "saleItems": [
+      { "id": "i13a", "saleId": "s13", "productId": "pA", "quantity": 1, "unitPrice": 150, "purchasePrice": 100, "totalPrice": 150, "returnedQty": 0 },
+      { "id": "i13b", "saleId": "s13", "productId": "pB", "quantity": 2, "unitPrice": 250, "purchasePrice": 150, "totalPrice": 500, "returnedQty": 0 },
+      { "id": "i13c", "saleId": "s13", "productId": "pC", "quantity": 1, "unitPrice": 350, "purchasePrice": 200, "totalPrice": 350, "returnedQty": 0 },
+      { "id": "i20", "saleId": "s20", "productId": "pR", "quantity": 2, "unitPrice": 300, "purchasePrice": 200, "totalPrice": 600, "returnedQty": 0 },
+      { "id": "i30", "saleId": "s30", "productId": "p40", "quantity": 1, "unitPrice": 1000, "purchasePrice": 600, "totalPrice": 1000, "returnedQty": 0 },
+      { "id": "i40", "saleId": "s40", "productId": "pA", "quantity": 1, "unitPrice": 150, "purchasePrice": 100, "totalPrice": 150, "returnedQty": 0 },
+      { "id": "i50a", "saleId": "s50", "productId": "", "name": "کیسه ۱", "quantity": 1, "unitPrice": 1, "purchasePrice": 0, "totalPrice": 1, "returnedQty": 0 },
+      { "id": "i50b", "saleId": "s50", "productId": "", "name": "کیسه ۲", "quantity": 1, "unitPrice": 1, "purchasePrice": 0, "totalPrice": 1, "returnedQty": 0 },
+      { "id": "i50c", "saleId": "s50", "productId": "", "name": "کیسه ۳", "quantity": 1, "unitPrice": 1, "purchasePrice": 0, "totalPrice": 1, "returnedQty": 0 }
+    ],
+    "returns": [],
+    "stockMovements": [],
+    "auditLog": []
+  },
+  "find": [
+    { "q": "TR1:s13", "out": ["s13"] },
+    { "q": "B1-13", "out": ["s13"] },
+    { "q": "b1-13", "out": ["s13"] },
+    { "q": "#۱۳", "out": ["s13"] },
+    { "q": "TR1#B1-13", "out": ["s13"] },
+    { "q": "20", "out": ["s20"] },
+    { "q": "احمد", "out": ["s20"] },
+    { "q": "۰۷۹۰۰۰۰۰۰۲", "out": ["s30"] },
+    { "q": "40", "out": ["s40"] },
+    { "q": "TR1:nope", "out": [] },
+    { "q": "  ", "out": [] },
+    { "q": "کسی‌نیست", "out": [] }
+  ],
+  "quote": [
+    { "name": "S13: یکی از دو B، سهمِ تخفیف ۲۵", "sale": "s13", "picks": { "i13b": { "qty": 1, "disposition": "damaged" } },
+      "out": { "lines": [{ "saleItemId": "i13b", "qty": 1, "amount": 225, "disposition": "damaged" }], "total": 225 } },
+    { "name": "همهٔ فاکتورِ S13 = مبلغِ نهایی", "sale": "s13", "picks": { "i13a": { "qty": 1 }, "i13b": { "qty": 2 }, "i13c": { "qty": 1 } },
+      "out": { "lines": [{ "saleItemId": "i13a", "qty": 1, "amount": 135, "disposition": "restock" }, { "saleItemId": "i13b", "qty": 2, "amount": 450, "disposition": "restock" }, { "saleItemId": "i13c", "qty": 1, "amount": 315, "disposition": "restock" }], "total": 900 } },
+    { "name": "بیش از فروخته‌شده", "sale": "s13", "picks": { "i13b": { "qty": 3 } }, "error": "QTY_EXCEEDS" },
+    { "name": "اعشار برای واحدِ «عدد»", "sale": "s13", "picks": { "i13b": { "qty": 1.5 } }, "error": "BAD_QTY" },
+    { "name": "مقدارِ منفی", "sale": "s13", "picks": { "i13b": { "qty": -1 } }, "error": "BAD_QTY" },
+    { "name": "مقصدِ ناشناخته", "sale": "s13", "picks": { "i13b": { "qty": 1, "disposition": "lost" } }, "error": "BAD_DISPOSITION" },
+    { "name": "فاکتورِ لغوشده (RET-13)", "sale": "s40", "picks": { "i40": { "qty": 1 } }, "error": "SALE_CANCELLED" },
+    { "name": "فاکتورِ ناموجود", "sale": "nope", "picks": {}, "error": "SALE_NOT_FOUND" },
+    { "name": "هیچ مقدار", "sale": "s13", "picks": { "i13b": { "qty": 0 } }, "error": "NOTHING_TO_RETURN" },
+    { "name": "نیم کیلو از فروشِ نسیه", "sale": "s20", "picks": { "i20": { "qty": 0.5 } },
+      "out": { "lines": [{ "saleItemId": "i20", "qty": 0.5, "amount": 150, "disposition": "restock" }], "total": 150 } },
+    { "name": "گردکردن از مبلغِ نهایی بیشتر نمی‌شود", "sale": "s50", "picks": { "i50a": { "qty": 1 }, "i50b": { "qty": 1 }, "i50c": { "qty": 1 } },
+      "out": { "lines": [{ "saleItemId": "i50a", "qty": 1, "amount": 1, "disposition": "restock" }, { "saleItemId": "i50b", "qty": 1, "amount": 1, "disposition": "restock" }, { "saleItemId": "i50c", "qty": 1, "amount": 0, "disposition": "restock" }], "total": 2 } }
+  ],
+  "quoteNoReceipt": [
+    { "name": "دو A به قیمتِ ۱۵۰", "free": [{ "productId": "pA", "qty": 2, "unitPrice": 150 }], "out": { "total": 300 } },
+    { "name": "یک و نیم کیلو برنج", "free": [{ "productId": "pR", "qty": 1.5, "unitPrice": 300, "disposition": "damaged" }], "out": { "total": 450 } },
+    { "name": "اعشار برای «عدد»", "free": [{ "productId": "pA", "qty": 1.5, "unitPrice": 150 }], "error": "BAD_QTY" },
+    { "name": "کالای ناموجود", "free": [{ "productId": "pX", "qty": 1, "unitPrice": 150 }], "error": "UNKNOWN_PRODUCT" },
+    { "name": "قیمتِ منفی", "free": [{ "productId": "pA", "qty": 1, "unitPrice": -5 }], "error": "BAD_PRICE" },
+    { "name": "خالی", "free": [], "error": "NOTHING_TO_RETURN" }
+  ],
+  "gate": [
+    { "role": "owner", "perm": null, "amountMinor": 99999999, "noReceipt": true, "damaged": true, "limitMinor": 100000, "out": { "decision": "allow", "reasons": [], "approver": "manager" } },
+    { "role": "staff", "perm": null, "amountMinor": 22500, "noReceipt": false, "damaged": false, "limitMinor": 0, "out": { "decision": "allow", "reasons": [], "approver": "manager" } },
+    { "role": "staff", "perm": null, "amountMinor": 22500, "noReceipt": false, "damaged": true, "limitMinor": 0, "out": { "decision": "approve", "reasons": ["damaged"], "approver": "manager" } },
+    { "role": "staff", "perm": null, "amountMinor": 30000, "noReceipt": true, "damaged": false, "limitMinor": 0, "out": { "decision": "approve", "reasons": ["no_receipt"], "approver": "manager" } },
+    { "role": "manager", "perm": null, "amountMinor": 30000, "noReceipt": true, "damaged": true, "limitMinor": 0, "out": { "decision": "allow", "reasons": [], "approver": "manager" } },
+    { "role": "manager", "perm": null, "amountMinor": 150000, "noReceipt": false, "damaged": false, "limitMinor": 100000, "out": { "decision": "approve", "reasons": ["over_limit"], "approver": "owner" } },
+    { "role": "manager", "perm": null, "amountMinor": 100000, "noReceipt": false, "damaged": false, "limitMinor": 100000, "out": { "decision": "allow", "reasons": [], "approver": "manager" } },
+    { "role": "staff", "perm": null, "amountMinor": 150000, "noReceipt": true, "damaged": false, "limitMinor": 100000, "out": { "decision": "approve", "reasons": ["over_limit", "no_receipt"], "approver": "owner" } },
+    { "role": "staff", "perm": "deny", "amountMinor": 100, "noReceipt": false, "damaged": false, "limitMinor": 0, "out": { "decision": "deny", "reasons": ["perm_denied"], "approver": "owner" } },
+    { "role": "staff", "perm": "approve", "amountMinor": 100, "noReceipt": false, "damaged": false, "limitMinor": 0, "out": { "decision": "approve", "reasons": ["over_limit"], "approver": "owner" } },
+    { "role": "staff", "perm": "allow", "amountMinor": 100, "noReceipt": false, "damaged": false, "limitMinor": 0, "out": { "decision": "allow", "reasons": [], "approver": "manager" } },
+    { "role": "", "perm": null, "amountMinor": 5, "noReceipt": true, "damaged": true, "limitMinor": 1, "out": { "decision": "allow", "reasons": [], "approver": "manager" } },
+    { "role": "cashier", "perm": null, "amountMinor": 5, "noReceipt": true, "damaged": false, "limitMinor": 0, "out": { "decision": "approve", "reasons": ["no_receipt"], "approver": "manager" } }
+  ],
+  "canApprove": [
+    { "gate": { "decision": "approve", "reasons": ["no_receipt"], "approver": "manager" }, "role": "manager", "out": true },
+    { "gate": { "decision": "approve", "reasons": ["no_receipt"], "approver": "manager" }, "role": "owner", "out": true },
+    { "gate": { "decision": "approve", "reasons": ["no_receipt"], "approver": "manager" }, "role": "staff", "out": false },
+    { "gate": { "decision": "approve", "reasons": ["over_limit"], "approver": "owner" }, "role": "manager", "out": false },
+    { "gate": { "decision": "approve", "reasons": ["over_limit"], "approver": "owner" }, "role": "owner", "out": true },
+    { "gate": { "decision": "deny", "reasons": ["perm_denied"], "approver": "owner" }, "role": "owner", "out": false },
+    { "gate": { "decision": "allow", "reasons": [], "approver": "manager" }, "role": "staff", "out": true }
+  ],
+  "split": [
+    { "name": "نقدیِ S13 به روشِ اصلی", "sale": "s13", "amount": 225, "mode": "original", "out": { "account": 0, "credit": 0, "cash": 225 } },
+    { "name": "نسیه: اول بدهیِ همین فاکتور", "sale": "s20", "amount": 150, "mode": "original", "out": { "account": 150, "credit": 0, "cash": 0 } },
+    { "name": "نسیه، همه، نقد: بدهی ۵۰۰ و نقد ۱۰۰", "sale": "s20", "amount": 600, "mode": "cash", "out": { "account": 500, "credit": 0, "cash": 100 } },
+    { "name": "نسیه، همه، اعتبار: بدهی ۵۰۰ و اعتبار ۱۰۰", "sale": "s20", "amount": 600, "mode": "store_credit", "customer": "c1", "out": { "account": 500, "credit": 100, "cash": 0 } },
+    { "name": "نقدیِ مشتری‌دار به اعتبار", "sale": "s30", "amount": 1000, "mode": "store_credit", "customer": "c2", "out": { "account": 0, "credit": 1000, "cash": 0 } },
+    { "name": "بی رسید، روشِ اصلی ⇒ نقد", "sale": null, "amount": 300, "mode": "original", "out": { "account": 0, "credit": 0, "cash": 300 } },
+    { "name": "اعتبار بی مشتری", "sale": null, "amount": 300, "mode": "store_credit", "error": "CUSTOMER_REQUIRED" },
+    { "name": "روشِ ناشناخته", "sale": "s13", "amount": 100, "mode": "gold", "error": "BAD_MODE" }
+  ],
+  "post": [
+    { "id": "S13", "name": "S13: خراب، ضایعات، نقد", "req": { "docId": "doc-s13", "saleId": "s13", "picks": { "i13b": { "qty": 1, "disposition": "damaged" } }, "reason": "خراب یا معیوب", "mode": "cash", "by": "صندوقدار", "role": "owner" },
+      "out": {
+        "total": 225, "split": { "account": 0, "credit": 0, "cash": 225 }, "audit": "return",
+        "rows": [{ "saleItemId": "i13b", "productId": "pB", "quantity": 1, "amount": 225, "disposition": "damaged", "toAccount": 0, "toCredit": 0 }],
+        "movements": [{ "productId": "pB", "type": "customer_return", "qty": 1 }, { "productId": "pB", "type": "damage", "qty": -1 }],
+        "entries": [{ "productId": "pB", "units": -1 }],
+        "transactions": [], "returnedQty": { "i13b": 1 }, "debtSettled": 0,
+        "stock": { "pB": 98 }
+      } },
+    { "id": "S13-again", "after": ["S13"], "name": "همان سند دوباره ثبت نمی‌شود", "req": { "docId": "doc-s13", "saleId": "s13", "picks": { "i13b": { "qty": 1 } }, "reason": "دیگر", "mode": "cash", "role": "owner" }, "error": "ALREADY_POSTED" },
+    { "id": "S13-over", "after": ["S13"], "name": "برگشتِ دوباره بیش از فروخته‌شده نه", "req": { "docId": "doc-s13-2", "saleId": "s13", "picks": { "i13b": { "qty": 2 } }, "reason": "دیگر", "mode": "cash", "role": "owner" }, "error": "QTY_EXCEEDS" },
+    { "id": "S13-rest", "after": ["S13"], "name": "برگشتِ واحدِ دومِ B به موجودی", "req": { "docId": "doc-s13-3", "saleId": "s13", "picks": { "i13b": { "qty": 1 } }, "reason": "پشیمانیِ مشتری", "mode": "original", "role": "owner" },
+      "out": {
+        "total": 225, "split": { "account": 0, "credit": 0, "cash": 225 }, "audit": "return",
+        "rows": [{ "saleItemId": "i13b", "productId": "pB", "quantity": 1, "amount": 225, "disposition": "restock", "toAccount": 0, "toCredit": 0 }],
+        "movements": [{ "productId": "pB", "type": "customer_return", "qty": 1 }],
+        "entries": [], "transactions": [], "returnedQty": { "i13b": 1 }, "debtSettled": 0,
+        "stock": { "pB": 99 }
+      } },
+    { "id": "no-reason", "name": "دلیل اجباری است (RET-08)", "req": { "docId": "d1", "saleId": "s13", "picks": { "i13a": { "qty": 1 } }, "reason": "  ", "mode": "cash", "role": "owner" }, "error": "REASON_REQUIRED" },
+    { "id": "credit-1kg", "name": "نسیه: یک کیلو از بدهی کم می‌شود", "req": { "docId": "d2", "saleId": "s20", "picks": { "i20": { "qty": 1 } }, "reason": "دیگر", "mode": "original", "role": "manager" },
+      "out": {
+        "total": 300, "split": { "account": 300, "credit": 0, "cash": 0 }, "audit": "return",
+        "rows": [{ "saleItemId": "i20", "productId": "pR", "quantity": 1, "amount": 300, "disposition": "restock", "toAccount": 300, "toCredit": 0 }],
+        "movements": [{ "productId": "pR", "type": "customer_return", "qty": 1 }],
+        "entries": [], "transactions": [{ "debtorId": "c1", "amount": 300 }], "returnedQty": { "i20": 1 }, "debtSettled": 300,
+        "stock": { "pR": 99 }
+      } },
+    { "id": "credit-all-sc", "name": "نسیه، همه به اعتبار: بدهی صفر و ۱۰۰ طلبِ مشتری", "req": { "docId": "d3", "saleId": "s20", "picks": { "i20": { "qty": 2 } }, "reason": "دیگر", "mode": "store_credit", "role": "owner" },
+      "out": {
+        "total": 600, "split": { "account": 500, "credit": 100, "cash": 0 }, "audit": "return",
+        "rows": [{ "saleItemId": "i20", "productId": "pR", "quantity": 2, "amount": 600, "disposition": "restock", "toAccount": 500, "toCredit": 100 }],
+        "movements": [{ "productId": "pR", "type": "customer_return", "qty": 2 }],
+        "entries": [], "transactions": [{ "debtorId": "c1", "amount": 500 }, { "debtorId": "c1", "amount": 100 }], "returnedQty": { "i20": 2 }, "debtSettled": 500,
+        "stock": { "pR": 100 }
+      } },
+    { "id": "nr-staff", "name": "بی رسید، شاگرد بی تأیید (S14)", "req": { "docId": "d4", "free": [{ "productId": "pA", "qty": 2, "unitPrice": 150 }], "reason": "دیگر", "mode": "cash", "role": "staff" }, "error": "APPROVAL_REQUIRED" },
+    { "id": "nr-staff-staffok", "name": "تأییدِ شاگردِ دیگر کافی نیست", "req": { "docId": "d4", "free": [{ "productId": "pA", "qty": 2, "unitPrice": 150 }], "reason": "دیگر", "mode": "cash", "role": "staff", "approval": { "by": "شاگرد ۲", "role": "staff" } }, "error": "APPROVAL_REQUIRED" },
+    { "id": "nr-staff-ok", "name": "بی رسید با تأییدِ مدیر", "req": { "docId": "d5", "free": [{ "productId": "pA", "qty": 2, "unitPrice": 150 }], "reason": "دیگر", "mode": "original", "by": "شاگرد", "role": "staff", "approval": { "by": "مدیر", "role": "manager" } },
+      "out": {
+        "total": 300, "split": { "account": 0, "credit": 0, "cash": 300 }, "audit": "return_no_receipt", "approvedBy": "مدیر",
+        "rows": [{ "saleItemId": "", "productId": "pA", "quantity": 2, "amount": 300, "disposition": "restock", "toAccount": 0, "toCredit": 0 }],
+        "movements": [{ "productId": "pA", "type": "customer_return", "qty": 2 }],
+        "entries": [{ "productId": "pA", "units": 2 }], "transactions": [], "returnedQty": {}, "debtSettled": 0,
+        "stock": { "pA": 101 }
+      } },
+    { "id": "nr-damaged-sc", "name": "بی رسید، ضایعات، اعتبار به مشتری", "req": { "docId": "d6", "free": [{ "productId": "pR", "qty": 1.5, "unitPrice": 300, "disposition": "damaged" }], "reason": "خراب یا معیوب", "mode": "store_credit", "customerId": "c2", "role": "owner" },
+      "out": {
+        "total": 450, "split": { "account": 0, "credit": 450, "cash": 0 }, "audit": "return_no_receipt",
+        "rows": [{ "saleItemId": "", "productId": "pR", "quantity": 1.5, "amount": 450, "disposition": "damaged", "toAccount": 0, "toCredit": 450 }],
+        "movements": [{ "productId": "pR", "type": "customer_return", "qty": 1.5 }, { "productId": "pR", "type": "damage", "qty": -1.5 }],
+        "entries": [], "transactions": [{ "debtorId": "c2", "amount": 450 }], "returnedQty": {}, "debtSettled": 0,
+        "stock": { "pR": 98 }
+      } },
+    { "id": "over-limit-manager", "name": "بالای سقفِ مدیر، تأییدِ مدیرِ دیگر کافی نیست (S14)", "req": { "docId": "d7", "saleId": "s13", "picks": { "i13c": { "qty": 1 } }, "reason": "دیگر", "mode": "cash", "role": "manager", "limit": 100, "approval": { "by": "مدیر ۲", "role": "manager" } }, "error": "APPROVAL_REQUIRED" },
+    { "id": "over-limit-owner", "name": "بالای سقف با تأییدِ صاحب", "req": { "docId": "d8", "saleId": "s13", "picks": { "i13c": { "qty": 1 } }, "reason": "دیگر", "mode": "cash", "role": "manager", "limit": 100, "approval": { "by": "صاحب", "role": "owner" } },
+      "out": {
+        "total": 315, "split": { "account": 0, "credit": 0, "cash": 315 }, "audit": "return", "approvedBy": "صاحب",
+        "rows": [{ "saleItemId": "i13c", "productId": "pC", "quantity": 1, "amount": 315, "disposition": "restock", "toAccount": 0, "toCredit": 0 }],
+        "movements": [{ "productId": "pC", "type": "customer_return", "qty": 1 }],
+        "entries": [], "transactions": [], "returnedQty": { "i13c": 1 }, "debtSettled": 0,
+        "stock": { "pC": 100 }
+      } },
+    { "id": "perm-deny", "name": "مجوزِ نقش ممنوع", "req": { "docId": "d9", "saleId": "s13", "picks": { "i13a": { "qty": 1 } }, "reason": "دیگر", "mode": "cash", "role": "staff", "perm": "deny" }, "error": "RETURN_DENIED" },
+    { "id": "cancelled", "name": "فاکتورِ لغوشده", "req": { "docId": "d10", "saleId": "s40", "picks": { "i40": { "qty": 1 } }, "reason": "دیگر", "mode": "cash", "role": "owner" }, "error": "SALE_CANCELLED" },
+    { "id": "sc-no-customer", "name": "اعتبار برای فروشِ بی مشتری", "req": { "docId": "d11", "saleId": "s13", "picks": { "i13a": { "qty": 1 } }, "reason": "دیگر", "mode": "store_credit", "role": "owner" }, "error": "CUSTOMER_REQUIRED" },
+    { "id": "free-lines", "name": "قلمِ آزاد: بی حرکتِ انبار، گردکردن سقف دارد", "req": { "docId": "d12", "saleId": "s50", "picks": { "i50a": { "qty": 1 }, "i50b": { "qty": 1 }, "i50c": { "qty": 1 } }, "reason": "دیگر", "mode": "cash", "role": "owner" },
+      "out": {
+        "total": 2, "split": { "account": 0, "credit": 0, "cash": 2 }, "audit": "return",
+        "rows": [
+          { "saleItemId": "i50a", "productId": "", "quantity": 1, "amount": 1, "disposition": "restock", "toAccount": 0, "toCredit": 0 },
+          { "saleItemId": "i50b", "productId": "", "quantity": 1, "amount": 1, "disposition": "restock", "toAccount": 0, "toCredit": 0 },
+          { "saleItemId": "i50c", "productId": "", "quantity": 1, "amount": 0, "disposition": "restock", "toAccount": 0, "toCredit": 0 }
+        ],
+        "movements": [], "entries": [], "transactions": [], "returnedQty": { "i50a": 1, "i50b": 1, "i50c": 1 }, "debtSettled": 0,
+        "stock": {}
+      } }
+  ]
+}

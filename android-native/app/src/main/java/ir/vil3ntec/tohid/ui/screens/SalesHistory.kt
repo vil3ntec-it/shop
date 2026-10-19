@@ -72,6 +72,24 @@ fun SalesHistoryScreen(
 
   val roleContext = androidx.compose.ui.platform.LocalContext.current
   val canCancel = remember { ir.vil3ntec.tohid.data.ShopRole.canCancelSale(roleContext) }
+  //  RET (v3 §۶.۸) — «برگشت و تعویضِ تازه»؛ خاموش ⇒ همان پنجرهٔ مرجوعیِ امروز
+  val returnsShot = ReturnsShot.open.value
+  val returnsV2 = remember { ir.vil3ntec.tohid.data.ReturnSettings.enabled(roleContext) } || returnsShot != null
+  var noReceipt by remember { mutableStateOf(false) }
+  var receiptFor by remember { mutableStateOf<String?>(null) }
+  var scanReceipt by remember { mutableStateOf(false) }
+  //  عکسِ CI (`DevShot`): فرمِ برگشتِ تازه‌ترین فاکتورِ زنده، یا برگشتِ بی رسید
+  LaunchedEffect(returnsShot) {
+    when (returnsShot) {
+      "first" -> {
+        noReceipt = false
+        returnFor = d.sales.filter { s -> s.status != "cancelled" && d.saleItems.any { it.saleId == s.id && SalesEngine.returnable(it) > 0 } }
+          .maxByOrNull { it.createdAt }
+      }
+      "none" -> { returnFor = null; noReceipt = true }
+      "close" -> { returnFor = null; noReceipt = false }
+    }
+  }
   fun toast(text: String) {
     scope.launch { snackbar.showSnackbar(text) }
   }
@@ -101,6 +119,10 @@ fun SalesHistoryScreen(
    *  صفحه از نو انجام می‌شد — روی همهٔ فاکتورهای تاریخِ دکان.
    */
   val shown = remember(d, filter, term, month) {
+    //  RET-01 — QRِ رسید (اسکنر یا دوربین) همان فاکتور را پیدا می‌کند
+    if (returnsV2 && term.startsWith(ir.vil3ntec.tohid.data.ReturnFlow.CODE_PREFIX.take(3))) {
+      return@remember ir.vil3ntec.tohid.data.ReturnFlow.find(d, term)
+    }
     val debtorNames = d.debtors.associate { it.id to it.name }
     d.sales
       .filter {
@@ -186,10 +208,25 @@ fun SalesHistoryScreen(
             IconButton(onClick = { search = "" }) {
               Icon(Icons.Filled.Close, contentDescription = "پاک کردن جستجو", tint = Shop.colors.muted)
             }
+          } else if (returnsV2 && !ir.vil3ntec.tohid.ui.Platform.DESKTOP) {
+            //  گوشی: QRِ رسید با دوربین؛ کامپیوتر: اسکنرِ دستی همین کادر را پر می‌کند
+            ScanIconButton(onClick = { scanReceipt = true })
           }
         },
         modifier = Modifier.fillMaxWidth(),
       )
+      if (returnsV2) {
+        Spacer(Modifier.height(8.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+          Text(
+            "برای برگشت، QRِ رسید را اسکن کنید یا شماره و نامِ مشتری را بنویسید.",
+            style = MaterialTheme.typography.labelSmall,
+            color = Shop.colors.muted,
+            modifier = Modifier.weight(1f),
+          )
+          OutlinedButton(onClick = { noReceipt = true }) { Text("برگشتِ بی رسید") }
+        }
+      }
       Spacer(Modifier.height(10.dp))
     }
 
@@ -254,6 +291,8 @@ fun SalesHistoryScreen(
           last = index == shown.lastIndex,
           onInvoice = { invoiceFor = sale },
           onReturn = { returnFor = sale },
+          returnsV2 = returnsV2,
+          onReturnReceipt = { receiptFor = it },
           //  لغو و «ویرایش در سبد» (که خودش لغو است) فقط با صاحب و مدیر —
           //  سرور هم opِ لغوِ شاگرد را رد می‌کند (`sales.cancel`)
           onCancel = { if (canCancel) cancelFor = sale else toast(CANCEL_DENIED) },
@@ -374,7 +413,40 @@ fun SalesHistoryScreen(
     InvoiceDialog(d = d, sale = sale, onDismiss = { invoiceFor = null }, onMessage = ::toast)
   }
 
-  returnFor?.let { sale ->
+  //  RET (تنظیم روشن): فرمِ تازه و رسیدِ برگشت؛ خاموش ⇒ پایین، همان پنجرهٔ امروز
+  if (returnsV2) {
+    returnFor?.let { sale ->
+      ReturnFlowDialog(
+        d = d, sale = sale, store = store,
+        onDismiss = { returnFor = null },
+        onPosted = { id, note -> returnFor = null; toast(note); receiptFor = id },
+        prefill = returnsShot == "first",
+      )
+    }
+    if (noReceipt) {
+      ReturnFlowDialog(
+        d = d, sale = null, store = store,
+        onDismiss = { noReceipt = false },
+        onPosted = { id, note -> noReceipt = false; toast(note); receiptFor = id },
+      )
+    }
+    receiptFor?.let { id -> ReturnReceiptDialog(d = d, docId = id, onDismiss = { receiptFor = null }, onMessage = ::toast) }
+    if (scanReceipt) {
+      BarcodeScanSheet(
+        onDismiss = { scanReceipt = false },
+        onCode = { code ->
+          scanReceipt = false
+          search = code
+          //  یک فاکتورِ زنده ⇒ همان لحظه فرمِ برگشت
+          ir.vil3ntec.tohid.data.ReturnFlow.find(d, code).singleOrNull()?.takeIf { it.status != "cancelled" }?.let { returnFor = it }
+        },
+        title = "اسکنِ QRِ رسید",
+        qr = true,
+      )
+    }
+  }
+
+  if (!returnsV2) returnFor?.let { sale ->
     ReturnDialog(
       d = d,
       sale = sale,
@@ -505,8 +577,12 @@ private fun SaleRow(
   onReturn: () -> Unit,
   onCancel: () -> Unit,
   onReopen: () -> Unit,
+  returnsV2: Boolean = false,
+  onReturnReceipt: (String) -> Unit = {},
 ) {
   val cancelled = sale.status == "cancelled"
+  //  RET-12 — سندهای برگشتِ تازهٔ همین فاکتور، برای چاپِ دوبارهٔ رسید
+  val returnDocs = if (returnsV2) d.saleReturns.filter { it.saleId == sale.id }.mapNotNull { it.docId }.distinct() else emptyList()
   val debtor = sale.debtorId?.let { id -> d.debtors.find { it.id == id } }
   val canReturn = !cancelled && d.saleItems.any { it.saleId == sale.id && SalesEngine.returnable(it) > 0 }
   var menu by remember { mutableStateOf(false) }
@@ -563,7 +639,13 @@ private fun SaleRow(
         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
           DropdownMenuItem(text = { Text("دیدن فاکتور") }, onClick = { menu = false; onInvoice() })
           if (canReturn) {
-            DropdownMenuItem(text = { Text("مرجوعی") }, onClick = { menu = false; onReturn() })
+            DropdownMenuItem(text = { Text(if (returnsV2) "برگشت یا تعویض" else "مرجوعی") }, onClick = { menu = false; onReturn() })
+          }
+          returnDocs.forEach { id ->
+            DropdownMenuItem(
+              text = { Text("رسیدِ برگشت ${ir.vil3ntec.tohid.data.ReturnFlow.label(id)}") },
+              onClick = { menu = false; onReturnReceipt(id) },
+            )
           }
           if (!cancelled) {
             DropdownMenuItem(text = { Text("اصلاح فاکتور") }, onClick = { menu = false; onReopen() })

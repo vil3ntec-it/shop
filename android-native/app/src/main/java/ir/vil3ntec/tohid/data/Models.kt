@@ -162,6 +162,49 @@ data class SaleReturn(
   val reason: String = "",
   val date: String = "",
   val createdAt: Long = 0,
+  /*
+   *  RET (v3 §۶.۸) — فقط برگشتِ پرچم‌دار (`ReturnSettings.enabled`، `ReturnFlow.post`).
+   *  برگشتِ امروز هیچ‌کدام را ندارد و ⛔ `null` نوشته نمی‌شود (`EncodeDefault.NEVER`،
+   *  مثلِ `Sale.series`)، پس ردیفِ قدیمی بایت‌به‌بایت همان می‌ماند.
+   */
+  /** سندِ برگشت: ردیف‌های یک برگشت یک `docId` دارند؛ تکرارِ همان سند دوباره ثبت نمی‌شود */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val docId: String? = null,
+  /** `restock` (به موجودی) | `damaged` (ضایعات) */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val disposition: String? = null,
+  /** حالتِ بازپرداختِ انتخاب‌شده: `original` | `cash` | `store_credit` */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val refund: String? = null,
+  /** سهمِ این ردیف که از بدهیِ بازِ همین فاکتور کم شد (افغانی)؛ بقیه نقد یا اعتبار */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val toAccount: Double? = null,
+  /** سهمِ این ردیف که اعتبارِ فروشگاه شد (افغانی) — به حسابِ `creditTo` */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val toCredit: Double? = null,
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val creditTo: String? = null,
+  /** فقط برگشتِ بی رسید: قیمتِ واحدی که پس داده شد */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val unitPrice: Double? = null,
+  /** ثبت‌کننده و تأییدکننده (برای گزارشِ ضدتقلب) */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val by: String? = null,
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val approvedBy: String? = null,
+  /** تعویض: فاکتورِ تازه‌ای که در همان جریان زده شد */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val exchangeSaleId: String? = null,
 )
 
 @Serializable
