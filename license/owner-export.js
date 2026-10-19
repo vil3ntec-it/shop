@@ -116,6 +116,7 @@
     syncStatus: 'وضعیت همگام‌سازی',
     cancelReason: 'دلیل لغو',
     seller: 'فروشنده',
+    approval: 'تأییدِ مدیر',
     quantity: 'تعداد',
     unitPrice: 'قیمت واحد',
     totalPrice: 'جمع قلم',

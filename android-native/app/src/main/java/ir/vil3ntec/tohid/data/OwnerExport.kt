@@ -157,6 +157,7 @@ object OwnerExport {
     "syncStatus" to "وضعیت همگام‌سازی",
     "cancelReason" to "دلیل لغو",
     "seller" to "فروشنده",
+    "approval" to "تأییدِ مدیر",
     "quantity" to "تعداد",
     "unitPrice" to "قیمت واحد",
     "totalPrice" to "جمع قلم",

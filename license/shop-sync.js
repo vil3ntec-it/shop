@@ -512,8 +512,7 @@
       //  نقش بیرونِ `shop` می‌آید (`role`، `isOwner`)؛ کنارِ دکان نگه داشته
       //  می‌شود تا صفحه بداند تخفیف و لغو با این حساب هست یا نه، و «نقشِ شما»
       //  در نمایه دیگر «—» نماند.
-      //  `policy`: لایه‌های مجوز برای `TohidPerm` (STF-01..03) — نبودنش یعنی همان رفتارِ امروزِ نقش
-      const shop = r.shop ? Object.assign({}, r.shop, { role: r.role || '', isOwner: !!r.isOwner, policy: r.policy || null }) : null;
+      const shop = r.shop ? Object.assign({}, r.shop, { role: r.role || '', isOwner: !!r.isOwner }) : null;
       setState({ shop, members: r.members || [] });
       assignInvoiceBlock(r);
       return r;

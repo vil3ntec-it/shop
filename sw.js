@@ -15,7 +15,7 @@
  */
 const BETA = /\/beta\/sw\.js$/.test(self.location.pathname);
 const BETA_PATH = new URL('./beta/', self.location).pathname;
-const VERSION = (BETA ? 'beta-' : '') + 'tohid-shop-v58';
+const VERSION = (BETA ? 'beta-' : '') + 'tohid-shop-v57';
 const SHELL_CACHE = VERSION + '-shell';
 const FONT_CACHE = VERSION + '-fonts';
 
@@ -73,10 +73,6 @@ const SHELL_ASSETS = [
   //  بخشِ «سفارش‌ها» (فاز ۴) — پشتِ پرچمِ سرور؛ خاموش ⇒ هیچ کاری نمی‌کند
   './license/orders-ui.js',
   './license/orders-ui.css',
-  //  STF-02/03/04: هستهٔ مجوز، برگهٔ امضاشده و PINِ هر کاربر
-  './license/perm-core.js',
-  './license/approval-core.js',
-  './license/staff-approval.js',
   //  خوانندهٔ بارکد برای آیفون — Safari «BarcodeDetector» ندارد و دوربین همیشه
   //  همین را بار می‌کند؛ بی آن، نصبِ تازه بی اینترنت اصلاً اسکن نمی‌کرد
   './license/vendor/zxing-0.21.3.min.js',

@@ -5216,13 +5216,6 @@
             <button type="button" class="btn btn-secondary" id="team-new-code-close" style="margin-top:12px;">فهمیدم، ببند</button>
           </div>
 
-          <!-- STF-02/04: PIN و کلیدِ تأییدِ همین مرورگر — فقط صاحب و مدیر -->
-          <div class="panel" data-sa-panel hidden>
-            <div class="panel-head"><h2>PIN و کلیدِ تأیید</h2></div>
-            <p class="settings-hint">با این PIN روی همین مرورگر تخفیفِ بیش از سقفِ کارمند را تأیید می‌کنید. PIN و کلیدِ خصوصی از این مرورگر بیرون نمی‌روند.</p>
-            <div id="team-approver-body"></div>
-          </div>
-
           <div class="panel">
             <div class="panel-head">
               <h2>کارمندان</h2>
@@ -6257,8 +6250,6 @@
       <div class="form-group" data-discount-only>
         <input class="form-input" id="co-discount-value" type="number" min="0" step="0.01" placeholder="مقدار تخفیف را وارد کنید (اختیاری)" value="0">
         <div class="field-error" id="co-discount-error">مقدار تخفیف نامعتبر است.</div>
-        <!-- S08: تخفیفِ بیش از سقف ⇒ «نیازمند تأیید» و PINِ مدیر (STF-02) -->
-        <div class="co-approval" id="co-approval" hidden></div>
       </div>
       <div class="checkout-summary-row"><span>تخفیف</span><b id="co-discount-amount">0 افغانی</b></div>
       <div class="checkout-summary-row total"><span>مبلغ نهایی</span><b id="co-final-total">0 افغانی</b></div>
@@ -12850,7 +12841,6 @@
     document.getElementById('co-discount-amount').textContent = formatMoney(discount)+' افغانی';
     document.getElementById('co-final-total').textContent = formatMoney(finalTotal)+' افغانی';
     document.getElementById('co-debtor-group').style.display = coPaymentType==='credit' ? '' : 'none';
-    paintApproval(discount, subtotal);
 
     const paidInput = document.getElementById('co-paid-amount');
     let paid = parseFloat(normalizeDigits(paidInput.value));
@@ -12879,71 +12869,7 @@
     const sh = window.TohidShop && window.TohidShop.state && window.TohidShop.state.shop;
     return (sh && sh.role) || '';
   }
-  /* STF-02/03: تصمیمِ تخفیف با همان هستهٔ سرور (`TohidPerm`) و لایه‌های دکان.
-     بی هسته یا بی لایه همان رفتارِ امروز: صاحب و مدیر آزاد، شاگرد ممنوع.
-     «نیازمند تأیید» کادرِ تخفیف را نشان می‌دهد؛ ثبت فقط با برگهٔ امضاشده. */
-  function permLayers(){
-    const sh = window.TohidShop && window.TohidShop.state && window.TohidShop.state.shop;
-    const p = sh && sh.policy;
-    return (p && Array.isArray(p.layers)) ? p.layers : [];
-  }
-  function discountDecision(discount, subtotal){
-    const P = window.TohidPerm;
-    const role = shopRole() || 'owner';
-    if(!P) return { decision: role === 'staff' ? 'deny' : 'allow', reason: 'no_core' };
-    const d = Math.round((discount||0)*100);
-    const req = d > 0 ? { pct: P.discountPct(d, Math.round((subtotal||0)*100)), amount: d } : null;
-    return P.evaluate(role, permLayers(), 'sales.discount', req);
-  }
-  function canDiscount(){ return discountDecision(0, 0).decision !== 'deny'; }
-  let coApproval = null;
-  function approvalNeed(discount, subtotal){
-    const P = window.TohidPerm;
-    const d = Math.round(discount*100), t = Math.round(subtotal*100);
-    return { perm:'sales.discount', doc:'sales/' + (draftSaleKey || ''), pct_bp: P ? P.discountBp(d, t) : 10000, amount: d };
-  }
-  /** FREE | NEEDS | APPROVED | DENIED — همان `DiscountGate`ِ برنامه */
-  function discountGate(discount, subtotal){
-    if(Math.round((discount||0)*100) <= 0) return 'FREE';
-    const dec = discountDecision(discount, subtotal);
-    if(dec.decision === 'allow') return 'FREE';
-    if(dec.decision !== 'approve') return 'DENIED';
-    const A = window.TohidApproval;
-    if(coApproval && draftSaleKey && A && A.covers(coApproval, approvalNeed(discount, subtotal)) === null) return 'APPROVED';
-    return 'NEEDS';
-  }
-  function paintApproval(discount, subtotal){
-    const box = document.getElementById('co-approval');
-    if(!box) return 'FREE';
-    const gate = discountGate(discount, subtotal);
-    if(window.TohidStaffApproval) window.TohidStaffApproval.ensureCss();
-    box.hidden = gate === 'FREE';
-    if(gate === 'FREE'){ box.innerHTML = ''; return gate; }
-    if(gate === 'APPROVED'){ box.innerHTML = '<span class="sa-pill ok">تأیید شد</span>'; return gate; }
-    if(gate === 'DENIED'){ box.innerHTML = '<span class="sa-pill bad">این تخفیف برای شما ممنوع است</span>'; return gate; }
-    const dec = discountDecision(discount, subtotal);
-    const note = dec.cap === 'maxPct' ? `بیش از سقفِ ${formatMoney(dec.limit)}٪ِ شما` : 'بیش از اختیارِ شما';
-    box.innerHTML = `<span class="sa-pill warn">نیازمند تأیید</span><span class="sa-note">${escapeHtml(note)}</span>`
-      + '<button type="button" class="btn btn-secondary btn-sm" id="co-approval-ask">درخواستِ تأیید</button>';
-    document.getElementById('co-approval-ask').addEventListener('click', askDiscountApproval);
-    return gate;
-  }
-  /** S07/S08: پنجرهٔ تأیید — PINِ مدیر یا صاحبِ دکان روی همین مرورگر */
-  async function askDiscountApproval(){
-    const SA = window.TohidStaffApproval;
-    const { subtotal, discount } = computeCheckoutTotals();
-    if(!SA || !draftSaleKey){ showToast('درخواستِ تأیید روی این مرورگر آماده نیست', 'danger'); return; }
-    const sh = window.TohidShop;
-    const slip = await SA.request({
-      title: 'تأییدِ تخفیف',
-      summary: `تخفیفِ ${formatMoney(discount)} افغانی روی فاکتورِ ${formatMoney(subtotal)} افغانی`,
-      shopId: (sh && sh.state && sh.state.shop && sh.state.shop.id) || '',
-      requesterId: (sh && sh.account && sh.account.userId) || '',
-      need: approvalNeed(discount, subtotal),
-    });
-    if(slip){ coApproval = slip; showToast('تخفیف تأیید شد'); }
-    refreshCheckoutModal();
-  }
+  function canDiscount(){ return shopRole() !== 'staff'; }
   function canCancelSale(){ return shopRole() !== 'staff'; }
 
   function openSaleCheckoutModal(){
@@ -12956,7 +12882,6 @@
     document.querySelectorAll('#co-discount-type .seg-btn').forEach(b=> b.classList.toggle('active', b.dataset.val==='percent'));
     document.querySelectorAll('#co-payment-type .seg-btn').forEach(b=> b.classList.toggle('active', b.dataset.val===coPaymentType));
     document.getElementById('co-discount-value').value = 0;
-    coApproval = null;
     // تخفیف فقط با صاحب و مدیر — سرور هم opِ تخفیفِ شاگرد را رد می‌کند (`sales.discount`)
     document.querySelectorAll('[data-discount-only]').forEach(el=> el.style.display = canDiscount() ? '' : 'none');
     document.getElementById('co-debtor-group').style.display = preset ? '' : 'none';
@@ -13042,10 +12967,6 @@
     }
 
     const { subtotal, discountValue, discount, finalTotal } = computeCheckoutTotals();
-    //  S08: تخفیفِ بیش از سقف فقط با برگهٔ امضاشده (سرور هم بی آن رد می‌کند)
-    const gate = discountGate(discount, subtotal);
-    if(gate === 'DENIED'){ showToast('این تخفیف برای شما ممنوع است', 'danger'); return; }
-    if(gate === 'NEEDS'){ return askDiscountApproval(); }
 
     let paid = parseFloat(normalizeDigits(document.getElementById('co-paid-amount').value));
     const paidGroup = document.getElementById('co-paid-amount').closest('.form-group');
@@ -13075,11 +12996,8 @@
       debtGiven: (debtorId && remaining>0) ? remaining : 0, debtSettled: 0,
       createdAt: Date.now(), date: todayISO(), syncStatus:'pending',
       //  فروشنده — نامِ حسابِ واردشده؛ گزارشِ «فروش هر کاربر» از همین می‌خواند
-      seller: String(((getAuth()||{}).name) || '').trim(),
-      //  برگهٔ تأییدِ تخفیف (STF-02) — فقط وقتی لازم بوده
-      ...(gate === 'APPROVED' && coApproval ? { approval: coApproval } : {})
+      seller: String(((getAuth()||{}).name) || '').trim()
     });
-    coApproval = null;
     cart.forEach(item=>{
       const p = products.find(x=>x.id===item.productId);
       if(!p) return;
@@ -14772,7 +14690,6 @@
     }
     teamEl('team-gate').hidden = true;
     teamEl('team-in').hidden = false;
-    if(window.TohidStaffApproval) window.TohidStaffApproval.renderSetup(teamEl('team-approver-body'));
     try{
       teamPaintMembers(await sh.apiAuth('/api/v1/shop/members'));
     }catch(err){
@@ -15828,11 +15745,7 @@
 <script src="license/account-code.js?v=2" defer></script>
 <script src="license/sync-engine.js?v=5" defer></script>
 <script src="license/license-client.js?v=17" defer></script>
-<script src="license/shop-sync.js?v=21" defer></script>
-<!-- STF-02/03/04: هستهٔ مجوز، «برگهٔ امضاشده» و PINِ هر کاربر (بخشِ ۱۰.۱/۱۰.۲) -->
-<script src="license/perm-core.js?v=1" defer></script>
-<script src="license/approval-core.js?v=1" defer></script>
-<script src="license/staff-approval.js?v=1" defer></script>
+<script src="license/shop-sync.js?v=20" defer></script>
 <script src="license/shop-ui.js?v=15" defer></script>
 <script src="license/vip.js?v=17" defer></script>
 <script src="license/support.js?v=16" defer></script>
