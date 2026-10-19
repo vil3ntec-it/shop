@@ -49,7 +49,9 @@ function randomBody() {
  * دو کد یکسان صادر نمی‌شود.
  */
 async function create(shopId, createdBy, { role = 'staff', expiresAt = null, maxUses = 1 } = {}) {
-  if (!['manager', 'staff'].includes(role)) throw badRequest('نقش کد معتبر نیست');
+  //  'courier' (DLV-01) فقط کدِ یک‌بارِ دعوت است — کدِ ثابت همیشه شاگرد/مدیر.
+  //  پرچمِ `shop.delivery` را مسیرِ `/api/shop/invite` پیش از این می‌سنجد.
+  if (!['manager', 'staff', 'courier'].includes(role)) throw badRequest('نقش کد معتبر نیست');
   if (maxUses < 0 || maxUses > 500) throw badRequest('تعداد استفاده معتبر نیست');
   if (expiresAt !== null && (!Number.isFinite(expiresAt) || expiresAt <= now())) {
     throw badRequest('تاریخ انقضا باید در آینده باشد');
@@ -214,6 +216,13 @@ async function redeem(rawCode, userId, ip = '') {
   }
   const codeHash = hashCode(normalized);
 
+  //  کدِ دعوتِ پیک (DLV-01) فقط وقتی پرچمِ تحویلِ همان دکان روشن است
+  const peek = await one('SELECT shop_id, role FROM staff_codes WHERE code_hash=$1', [codeHash]);
+  if (peek && peek.role === 'courier') {
+    const st = await require('./delivery').stateOf(peek.shop_id);
+    if (!st.readable) throw notFound('تحویل و پیک برای این دکان روشن نیست', 'delivery_disabled');
+  }
+
   return tx(async (c) => {
     const { rows } = await c.query(
       'SELECT * FROM staff_codes WHERE code_hash=$1 FOR UPDATE', [codeHash]
@@ -278,6 +287,10 @@ async function redeem(rawCode, userId, ip = '') {
          VALUES ($1,$2,$3,$4,'active',$5,$5)`,
         [newId('mem'), code.shop_id, userId, code.role, t]
       );
+    }
+
+    if (code.role === 'courier') {
+      await require('./delivery').enrollCourierMember(c, code.shop_id, userId, code.created_by, t);
     }
 
     const used = code.used_count + 1;

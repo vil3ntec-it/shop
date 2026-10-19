@@ -252,6 +252,61 @@ class HttpEngine(
       runCatching { connection.disconnect() }
     }
   }
+
+  /**
+   *  گرفتنِ **بایت‌های خام** (عکس و صدای چتِ دکان، v3 §۳۳) — همان نشانی،
+   *  پیشوندِ پیداشده، سرآیندهای هویت و همان قاعدهٔ خطا؛ فقط بدنه JSON نیست.
+   *
+   *  ⚠️ سقف دارد: پاسخی بزرگ‌تر از `maxBytes` خوانده نمی‌شود (نه OOM، نه
+   *  دانلودِ بی‌پایان روی اینترنتِ گران). یک بار، بی تلاشِ خودکار: صفحه
+   *  خودش «دوباره» دارد.
+   */
+  suspend fun fetchBytes(path: String, token: String?, maxBytes: Int = 8 * 1024 * 1024): ByteArray =
+    withContext(Dispatchers.IO) {
+      val base = baseUrl()
+      ApiConfig.reject(base, allowInsecure)?.let { reason ->
+        throw if (reason == ApiConfig.Rejection.MISSING) ApiFailure.NotConfigured()
+        else ApiFailure.BadConfiguration(reason.message)
+      }
+      if (!online()) throw ApiFailure.Offline()
+      val url = runCatching { URL(ApiConfig.urlOf(base, path, prefix)) }.getOrNull()
+        ?: throw ApiFailure.BadConfiguration("نشانی سرور درست نیست")
+      val connection = runCatching { url.openConnection() as HttpURLConnection }.getOrNull()
+        ?: throw ApiFailure.BadConfiguration("نشانی سرور درست نیست")
+      try {
+        connection.requestMethod = "GET"
+        connection.connectTimeout = ApiConfig.CONNECT_TIMEOUT_MS
+        connection.readTimeout = ApiConfig.READ_TIMEOUT_MS
+        if (token != null) connection.setRequestProperty("Authorization", "Bearer $token")
+        runCatching { identity() }.getOrNull()?.forEach { (k, v) ->
+          if (v.isNotBlank()) connection.setRequestProperty(k, v)
+        }
+        val status = connection.responseCode
+        if (status !in 200..299) {
+          val text = connection.errorStream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
+          throw ApiFailure.fromHttp(status, text, authenticated = token != null)
+        }
+        val tooBig = { ApiFailure.Invalid("فایل بزرگ‌تر از سقفِ مجاز است", "too_large") }
+        if (connection.contentLengthLong > maxBytes) throw tooBig()
+        connection.inputStream.use { input ->
+          val out = java.io.ByteArrayOutputStream()
+          val buf = ByteArray(16 * 1024)
+          while (true) {
+            val n = input.read(buf)
+            if (n < 0) break
+            out.write(buf, 0, n)
+            if (out.size() > maxBytes) throw tooBig()
+          }
+          out.toByteArray()
+        }
+      } catch (failure: ApiFailure) {
+        throw failure
+      } catch (error: Throwable) {
+        throw ApiFailure.fromException(error)
+      } finally {
+        runCatching { connection.disconnect() }
+      }
+    }
 }
 
 /**
