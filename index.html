@@ -158,17 +158,6 @@
     --aurora-1:rgba(124,92,255,.30);
     --aurora-2:rgba(0,195,154,.24);
     --aurora-3:rgba(255,95,162,.20);
-    /* برگهٔ تیرهٔ سبد و قرصِ نوارِ پایینِ گوشی — عدد به عدد همان `Theme.kt`
-       (sheet، onSheet، …؛ `WebPaletteParityTest`). متن ≥ ۴٫۵:۱ روی برگه. */
-    --sheet:#17151f;
-    --on-sheet:#ffffff;
-    --on-sheet-muted:#b8b3cc;
-    --sheet-accent:#b9a6ff;
-    --on-sheet-accent:#17151f;
-    --sheet-line:rgba(255,255,255,.14);
-    --sheet-raised:rgba(255,255,255,.08);
-    --nav-pill:#17151f;
-    --on-nav-pill:#ffffff;
     --radius-sm:16px;
     --radius-md:20px;
     --radius-lg:24px;
@@ -210,15 +199,6 @@
     --aurora-1:rgba(124,92,255,.55);
     --aurora-2:rgba(0,195,154,.38);
     --aurora-3:rgba(255,95,162,.34);
-    --sheet:#221f33;
-    --on-sheet:#f0eef8;
-    --on-sheet-muted:#b3aec8;
-    --sheet-accent:#a78bff;
-    --on-sheet-accent:#14102a;
-    --sheet-line:rgba(255,255,255,.14);
-    --sheet-raised:rgba(255,255,255,.08);
-    --nav-pill:#f0eef8;
-    --on-nav-pill:#17151f;
     --shadow-sm:0 1px 2px rgba(0,0,0,.4);
     --shadow-md:0 10px 30px -12px rgba(0,0,0,.7);
   }
@@ -624,81 +604,26 @@
   .team-tag.gone{background:var(--danger-tint); color:var(--danger);}
   .team-empty{font-size:12.5px; color:var(--muted); padding:10px 0;}
 
-  /* ---------- حساب من (phone-ui، تصویرِ مرجعِ ۳) ----------
-     کارتِ سفیدِ گرد با سایهٔ نرم؛ عکسِ گرد روی لبه‌اش؛ نشانِ نقش قرصِ تیره؛ سه
-     تراشهٔ آمار؛ نوارِ هشدارِ اشتراک فقط وقتی واقعی است (رنگ‌های برگهٔ تیره). */
-  .prof-card{
-    position:relative;
-    margin:46px 0 22px;
-    padding:56px 16px 16px;
-    background:var(--surface-solid);
-    border-radius:16px;
-    box-shadow:0 8px 24px -12px rgba(25,22,39,.25), 0 1px 3px rgba(25,22,39,.05);
+  /* ---------- حساب من ---------- */
+  .prof-hero{
+    display:flex; align-items:center; gap:14px;
+    margin-bottom:16px;
   }
   .prof-avatar{
-    position:absolute; top:-44px; left:50%; transform:translateX(-50%);
-    width:88px; height:88px;
+    width:72px; height:72px; flex:0 0 auto;
     border-radius:50%;
-    border:4px solid var(--surface-solid);
-    background:linear-gradient(135deg, var(--primary), var(--primary-dark));
-    color:#fff; font-size:32px; font-weight:800;
+    background:linear-gradient(135deg, var(--primary), var(--accent));
+    color:#fff; font-size:28px; font-weight:800;
     display:flex; align-items:center; justify-content:center;
-    box-shadow:0 8px 20px -10px rgba(25,22,39,.45);
+    box-shadow:var(--shadow-md);
   }
-  .prof-card-head{display:flex; align-items:center; gap:10px;}
-  .prof-hero-txt{min-width:0; flex:1 1 auto;}
-  .prof-hero-txt b{display:block; font-size:19px; font-weight:800; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .prof-hero-txt{min-width:0;}
+  .prof-hero-txt b{display:block; font-size:19px; font-weight:800; color:var(--text);}
   .prof-hero-txt i{
     display:block; font-style:normal; font-size:12.5px;
     color:var(--muted); margin-top:3px;
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
   }
-  .prof-role{
-    flex:0 0 auto; padding:6px 12px; border-radius:999px;
-    background:var(--nav-pill); color:var(--on-nav-pill);
-    font-size:12px; font-weight:800; white-space:nowrap;
-  }
-  .prof-stats{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-top:14px;}
-  .prof-stat{
-    display:flex; flex-direction:column; align-items:center; gap:2px;
-    padding:10px 4px; border-radius:12px; background:var(--bg);
-  }
-  .prof-stat b{font-size:17px; font-weight:800; color:var(--text);}
-  .prof-stat span{font-size:12px; color:var(--muted);}
-  .prof-notice{
-    display:flex; align-items:center; gap:10px;
-    margin-top:12px; padding:10px 10px 10px 14px;
-    border-radius:16px; background:var(--sheet); color:var(--on-sheet);
-  }
-  .prof-notice > svg{flex:0 0 auto; color:var(--sheet-accent);}
-  .prof-notice-txt{flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:2px;}
-  .prof-notice-txt b{font-size:13px; font-weight:800;}
-  .prof-notice-txt span{font-size:11.5px; color:var(--on-sheet-muted);}
-  .prof-notice-btn{
-    flex:0 0 auto; min-height:44px; padding:0 18px; border:0; border-radius:999px;
-    background:var(--sheet-accent); color:var(--on-sheet-accent);
-    font:inherit; font-size:13px; font-weight:800; cursor:pointer;
-  }
-  .prof-notice-btn:focus-visible{outline:3px solid var(--sheet-accent); outline-offset:2px;}
-
-  /* ---------- گروه‌های تنظیمات و حساب من (phone-ui، تصویرِ مرجعِ ۴) ----------
-     سرخطِ کوچک و یک کارتِ گرد؛ پنل‌های درونش ردیف‌های همان کارت‌اند. زمینهٔ
-     کارت رنگِ خطِ مویی است و پنل‌ها با یک پیکسل فاصله رویش می‌نشینند، پس خط
-     فقط **میانِ** ردیف‌ها دیده می‌شود. سایهٔ نرم به‌جای خطِ دورِ تیره (design v2). */
-  .set-group{margin-bottom:22px;}
-  .set-group:last-child{margin-bottom:0;}
-  .set-group-title{font-size:13px; font-weight:800; color:var(--muted); margin:0 4px 8px;}
-  .set-group-card{
-    display:flex; flex-direction:column; gap:1px;
-    border-radius:16px; overflow:hidden;
-    background:var(--border);
-    box-shadow:0 6px 20px -12px rgba(25,22,39,.25), 0 1px 3px rgba(25,22,39,.05);
-  }
-  .set-group-card > .panel{
-    margin:0; border:0; border-radius:0; box-shadow:none;
-    background:var(--surface-solid);
-  }
-  .page.active > .set-group{ animation:cardIn .4s cubic-bezier(.22,1,.36,1) both; }
   .form-input:disabled{ opacity:.7; cursor:not-allowed; }
 
   /* وضعیت دکان: ردیف‌های فشرده با جداکننده‌ی نازک */
@@ -870,53 +795,80 @@
 
   /* ---------- Bottom navigation (mobile) ---------- */
   /* ==========================================================
-     نوارِ پایین — قرصِ شناور با تبِ فعالِ تیره (phone-ui، تصویرِ مرجعِ ۳)؛
-     همان `PhoneNavBar`ِ برنامهٔ نیتیو.
+     نوارِ پایین — همان نوارِ شناورِ برنامه‌ی نیتیو (TohidNavBar).
 
-     تبِ فعال یک قرصِ پُر است با آیکن و برچسب؛ بقیه فقط آیکن‌اند و برچسبشان
-     برای صفحه‌خوان می‌ماند (`.bn-label` پنهانِ دیدنی). هر تب ≥ ۴۸ پیکسل.
-     design v2: سایهٔ نرم، بی خطِ دورِ تیره. «کاهشِ حرکت» با قاعدهٔ سراسریِ
-     پایینِ همین برگه خاموش می‌شود.
+     نوار یک قرصِ گِردِ جدا از لبه‌ی صفحه است، نه خطی که به ته چسبیده،
+     و روی تبِ فعال یک «چراغ» دارد: یک نوارِ نازکِ نور بالای تب، و
+     مخروطی که از همان‌جا رو به پایین پهن و کم‌رنگ می‌شود.
+
+     چراغ نرم جابه‌جا می‌شود، نه اینکه خاموش و روشن شود — همان حسِ
+     «منبعِ نور از این تب کنده شد و رفت روی آن یکی». جابه‌جایی با
+     transition روی دو متغیرِ CSS انجام می‌شود که فقط موقعِ عوض‌شدنِ
+     صفحه یک بار نوشته می‌شوند؛ هیچ کارِ هر-فریمی در JS نیست.
      ========================================================== */
   .bottom-nav{
+    --lamp-x:50%;
+    --lamp-w:0px;
+    --lamp-on:0;
     position:fixed;
     bottom:calc(var(--bottomnav-gap) + env(safe-area-inset-bottom));
     inset-inline:var(--bottomnav-gap);
     height:var(--bottomnav-h);
-    background:var(--surface-solid);
+    background:var(--surface);
+    -webkit-backdrop-filter:blur(16px);
+    backdrop-filter:blur(16px);
+    border:1px solid var(--border);
     border-radius:calc(var(--bottomnav-h) / 2);
-    box-shadow:0 10px 30px -10px rgba(25,22,39,.28), 0 2px 6px rgba(25,22,39,.06);
-    display:flex; align-items:center; gap:2px;
-    padding:0 5px;
+    box-shadow:var(--shadow-md);
+    display:flex;
     z-index:30;
+    overflow:hidden;
+    isolation:isolate;
   }
+  /* نوارِ نور — درست بالای تبِ فعال */
+  .bottom-nav::before{
+    content:''; position:absolute; z-index:1; pointer-events:none;
+    top:5px; height:3px; border-radius:3px;
+    inset-inline-start:calc(var(--lamp-x) - var(--lamp-w) * .20);
+    width:calc(var(--lamp-w) * .40);
+    background:var(--primary);
+    opacity:var(--lamp-on);
+    transition:inset-inline-start .38s cubic-bezier(.22,1,.36,1),
+               width .38s cubic-bezier(.22,1,.36,1), opacity .3s ease;
+  }
+  /* مخروطِ نور — از همان نوار به پایین باز می‌شود و محو می‌شود */
+  .bottom-nav::after{
+    content:''; position:absolute; z-index:0; pointer-events:none;
+    top:8px; bottom:0;
+    inset-inline-start:calc(var(--lamp-x) - var(--lamp-w) * 1.2);
+    width:calc(var(--lamp-w) * 2.4);
+    opacity:var(--lamp-on);
+    /* دو لایه: حبابِ خودِ چراغ درست زیرِ نوار، و مخروطی که پایین‌تر می‌رود.
+       هر دو خیلی قبل از لبه‌ی جعبه محو می‌شوند تا مخروط لبه‌ی تیز نگیرد. */
+    background:
+      radial-gradient(ellipse 26% 34% at 50% 0%,
+        color-mix(in srgb, var(--primary) 42%, transparent) 0%,
+        color-mix(in srgb, var(--primary) 14%, transparent) 45%,
+        transparent 78%),
+      radial-gradient(ellipse 46% 108% at 50% 0%,
+        color-mix(in srgb, var(--primary) 22%, transparent) 0%,
+        color-mix(in srgb, var(--primary) 9%, transparent) 34%,
+        transparent 76%);
+    transition:inset-inline-start .38s cubic-bezier(.22,1,.36,1),
+               width .38s cubic-bezier(.22,1,.36,1), opacity .3s ease;
+  }
+  .bn-item{ position:relative; z-index:2; }
   .bn-item{
-    position:relative;
-    flex:1 1 0; min-width:48px; height:52px;
-    display:flex; flex-direction:row; align-items:center; justify-content:center;
-    gap:8px;
-    border-radius:999px;
-    color:var(--muted);
-    font-size:13px;
-    font-weight:700;
+    flex:1;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:4px;
+    color:var(--muted-2);
+    font-size:10.5px;
+    font-weight:600;
     text-decoration:none;
-    white-space:nowrap;
   }
-  /* پس از قاعدهٔ عمومیِ «حسِ لمس» هم بماند (ویژگیِ بالاتر) */
-  .bottom-nav .bn-item{
-    transition:flex-grow .26s cubic-bezier(.22,1,.36,1), background-color .26s ease,
-               color .2s ease, transform .13s cubic-bezier(.22,1,.36,1);
-  }
-  .bn-item .ic{width:22px; height:22px; display:flex; align-items:center; justify-content:center; flex:0 0 auto;}
-  .bn-item .ic svg{width:22px; height:22px;}
-  .bn-item.active{flex-grow:2.6; background:var(--nav-pill); color:var(--on-nav-pill); padding-inline:12px;}
-  /* برچسبِ تبِ غیرفعال دیده نمی‌شود ولی نامِ پیوند می‌ماند */
-  .bn-item:not(.active) .bn-label{
-    position:absolute; width:1px; height:1px; overflow:hidden;
-    clip:rect(0 0 0 0); clip-path:inset(50%); white-space:nowrap;
-  }
-  .bn-item .bn-label{overflow:hidden; text-overflow:ellipsis; min-width:0;}
-  .bn-item:focus-visible{outline:3px solid var(--primary); outline-offset:2px;}
+  .bn-item .ic{width:21px; height:21px; display:flex; align-items:center; justify-content:center;}
+  .bn-item.active{color:var(--primary);}
 
   @media(min-width:769px){
     .bottom-nav{display:none;}
@@ -2596,146 +2548,6 @@
   .cart-total{display:flex; flex-direction:column; gap:2px; font-size:11.5px; color:var(--muted); font-weight:600; flex:1; min-width:0;}
   .cart-total strong{font-size:16px; color:var(--text); font-weight:800;}
   .cart-summary-bar .btn{flex-shrink:0;}
-
-  /* ==========================================================
-     سبدِ صندوق در گوشی (phone-ui، تصویرهای مرجعِ ۵ و ۶) — فقط زیرِ ۷۶۹ پیکسل.
-
-     بسته: نوارِ تیرهٔ گرد بالای نوارِ پایین — «سبد»، عکسِ گردِ تازه‌ترین قلم‌ها
-     (یا حرفِ اول)، مبلغ، و دایرهٔ شمار. کلِ نوار یک دکمه است (`.cbar-open`).
-     باز: برگهٔ تیرهٔ تمام‌قد از پایین؛ بالای صفحه گوشه‌های پایینِ گرد می‌گیرد
-     (دو گوشهٔ تیرهٔ `::before`)؛ ردیف‌ها − مقدار +؛ قرض‌دار؛ جمعِ درشت؛ و همان
-     «ثبت فروش» تمام‌عرض. رنگ‌ها از `--sheet*`؛ «کاهشِ حرکت» با قاعدهٔ سراسری.
-     کامپیوتر و تبلتِ پهن همان کشوی پیشین را دارند.
-     ========================================================== */
-  .cbar-open, .cbar-label, .cbar-thumbs, .cbar-count, .csheet-head, .cart-row-step{ display:none; }
-  @media(max-width:768px){
-    .cart-drawer{
-      bottom:calc(var(--bottomnav-space) + 8px);
-      inset-inline:12px;
-      border:0; border-radius:28px;
-      background:var(--sheet); color:var(--on-sheet);
-      box-shadow:0 16px 32px -14px rgba(0,0,0,.5);
-    }
-    .cart-drawer .cart-summary-bar{
-      position:relative; background:transparent;
-      min-height:64px; padding:10px 10px 10px 16px; gap:10px;
-    }
-    .cart-drawer .cart-total strong{ color:var(--on-sheet); }
-    .cart-drawer .cart-total span{ color:var(--on-sheet-muted); }
-
-    /* ---- نوارِ جمع‌شده ---- */
-    .cart-drawer:not(.open) .cart-debtor-row,
-    .cart-drawer:not(.open) .cart-ctl,
-    .cart-drawer:not(.open) .cart-summary-bar .btn{ display:none !important; }
-    .cart-drawer:not(.open) .cbar-open{
-      display:block; position:absolute; inset:0; z-index:1;
-      width:100%; height:100%; margin:0; padding:0;
-      background:transparent; border:0; border-radius:28px; cursor:pointer;
-    }
-    .cart-drawer:not(.open) .cbar-open:focus-visible{ outline:3px solid var(--sheet-accent); outline-offset:3px; }
-    .cart-drawer:not(.open) .cbar-label{ display:block; flex:0 0 auto; font-size:16px; font-weight:800; color:var(--on-sheet); }
-    .cart-drawer:not(.open) .cbar-thumbs{ display:flex; align-items:center; gap:6px; flex:0 1 auto; min-width:0; }
-    .cbar-thumb{
-      width:36px; height:36px; flex:0 0 auto;
-      border-radius:50%; overflow:hidden;
-      background:var(--on-sheet); color:var(--sheet);
-      display:flex; align-items:center; justify-content:center;
-      font-size:14px; font-weight:800;
-    }
-    .cbar-thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
-    .cbar-more{ font-size:12px; font-weight:700; color:var(--on-sheet-muted); }
-    .cart-drawer:not(.open) .cart-total{ align-items:flex-end; text-align:end; }
-    .cart-drawer:not(.open) .cart-total span{ display:none; }
-    .cart-drawer:not(.open) .cbar-count{
-      display:flex; align-items:center; justify-content:center; flex:0 0 auto;
-      width:44px; height:44px; border-radius:50%;
-      background:var(--sheet-accent); color:var(--on-sheet-accent);
-      font-size:16px; font-weight:800;
-    }
-
-    /* ---- برگهٔ باز ---- */
-    .cart-drawer.open{
-      top:12vh; bottom:0; inset-inline:0; z-index:70;
-      display:flex; flex-direction:column;
-      border-radius:0; overflow:visible; box-shadow:none;
-      padding:18px 18px calc(14px + env(safe-area-inset-bottom));
-      animation:cartSheetUp .32s cubic-bezier(.22,1,.36,1) both;
-    }
-    @keyframes cartSheetUp{ from{ transform:translateY(100%); } to{ transform:none; } }
-    /* بالای برگه: دو گوشهٔ تیره ⇐ صفحه گوشه‌های پایینِ گرد می‌گیرد */
-    .cart-drawer.open::before{
-      content:''; position:absolute; bottom:100%; inset-inline:0; height:28px; pointer-events:none;
-      background:
-        radial-gradient(circle at 100% 0, transparent 27.5px, var(--sheet) 28px) left bottom / 28px 28px no-repeat,
-        radial-gradient(circle at 0 0, transparent 27.5px, var(--sheet) 28px) right bottom / 28px 28px no-repeat;
-    }
-    /* زدنِ صفحهٔ بالای برگه، برگه را می‌بندد (کنترلگرِ کلیکِ «بستن») */
-    .cart-drawer.open::after{ content:''; position:absolute; bottom:100%; inset-inline:0; height:100vh; }
-    .cart-drawer.open .csheet-head{ display:flex; align-items:center; gap:10px; order:0; margin-bottom:6px; }
-    .csheet-title{ font-size:26px; font-weight:800; color:var(--on-sheet); margin:0; }
-    .csheet-count{ font-size:14px; color:var(--on-sheet-muted); flex:1 1 auto; }
-    .csheet-close{
-      width:44px; height:44px; flex:0 0 auto; border-radius:50%;
-      border:0; background:var(--sheet-raised); color:var(--on-sheet);
-      display:flex; align-items:center; justify-content:center; cursor:pointer;
-    }
-    .csheet-close:focus-visible, .cart-step-btn:focus-visible, .cart-step-qty:focus-visible{ outline:3px solid var(--sheet-accent); outline-offset:2px; }
-    .cart-drawer.open .cart-drawer-body{
-      order:1; flex:1 1 auto; max-height:none; min-height:0;
-      overflow-y:auto; padding:0; border:0;
-    }
-    .cart-drawer.open .cart-list{ gap:0; }
-    .cart-drawer.open .cart-row{
-      background:transparent; border:0; box-shadow:none; border-radius:0;
-      padding:10px 0; gap:10px; color:var(--on-sheet);
-      border-bottom:1px solid var(--sheet-line);
-    }
-    .cart-drawer.open .cart-row.picked{ background:transparent; box-shadow:none; }
-    .cart-drawer.open .cart-row .prod-thumb, .cart-drawer.open .cart-row .exp-icon{
-      width:40px; height:40px; border-radius:50%; flex:0 0 auto;
-      background:var(--on-sheet); color:var(--sheet);
-    }
-    .cart-drawer.open .cart-row-name{ color:var(--on-sheet); white-space:normal; font-size:14px; line-height:1.5; }
-    .cart-drawer.open .cart-row-qty{ display:none; }
-    .cart-drawer.open .cart-row-step{
-      display:flex; align-items:center; flex:0 0 auto;
-      border-radius:999px; background:var(--sheet-raised);
-    }
-    .cart-step-btn, .cart-step-qty{
-      min-width:40px; height:40px; padding:0 6px; border:0; border-radius:999px;
-      background:transparent; color:var(--on-sheet);
-      font:inherit; font-size:18px; font-weight:800; cursor:pointer;
-    }
-    .cart-step-qty{ font-size:12.5px; white-space:nowrap; }
-    .cart-drawer.open .cart-row-sum{ color:var(--on-sheet-muted); min-width:0; font-size:12.5px; }
-    .cart-drawer.open .cart-debtor-row{ order:2; margin:10px 0 0; padding:0; border:0; background:transparent; }
-    .cart-drawer.open .cart-debtor-btn{
-      min-height:52px; border-radius:16px;
-      background:var(--sheet-raised); border:1.5px dashed var(--sheet-line); color:var(--on-sheet);
-    }
-    .cart-drawer.open .cart-debtor-row.picked .cart-debtor-btn{ border-style:solid; border-color:var(--sheet-accent); background:var(--sheet-raised); color:var(--on-sheet); }
-    .cart-drawer.open .cd-txt i{ color:var(--on-sheet-muted); }
-    .cart-drawer.open .cart-debtor-btn .cd-ic,
-    .cart-drawer.open .cart-debtor-row.picked .cd-ic{ background:var(--sheet-raised); color:var(--sheet-accent); }
-    .cart-drawer.open .cart-debtor-clear{ background:var(--sheet-raised); color:var(--on-sheet); border-color:transparent; }
-    .cart-drawer.open .cart-summary-bar{
-      order:3; flex-wrap:wrap; cursor:default;
-      padding:14px 0 0; margin-top:12px; border-top:1px solid var(--sheet-line);
-    }
-    .cart-drawer.open .cart-total{ flex-direction:row; align-items:baseline; justify-content:space-between; width:100%; flex:1 1 100%; }
-    .cart-drawer.open .cart-total span{ font-size:15px; }
-    .cart-drawer.open .cart-total strong{ font-size:26px; }
-    .cart-drawer.open .cart-ctl{ display:none !important; }
-    .cart-drawer.open .cart-summary-bar .btn{
-      flex:1 1 100%; min-height:54px; border:0; border-radius:999px; box-shadow:none;
-      background:var(--sheet-accent); color:var(--on-sheet-accent);
-      font-size:16px; font-weight:800;
-    }
-    body.cart-sheet-open{ overflow:hidden; }
-    body.cart-sheet-open #sup{ display:none; }
-    /* دکمهٔ پشتیبانی بالای نوارِ سبد، نه رویش */
-    html #sup{ bottom:calc(78px + var(--bottom-bar-h, 0px) + env(safe-area-inset-bottom, 0px)); }
-  }
 
   /* dashboard recent expenses */
   .mini-exp-row{
@@ -4655,12 +4467,6 @@
           </div>
         </div>
         <div class="cart-drawer" id="cart-drawer" style="display:none;">
-          <!-- گوشی (phone-ui، تصویرِ مرجعِ ۶): سرِ برگهٔ تیرهٔ سبد — فقط وقتی برگه در گوشی باز است -->
-          <div class="csheet-head">
-            <h2 class="csheet-title">سبد</h2>
-            <span class="csheet-count" data-cart-count-text></span>
-            <button type="button" class="csheet-close" data-cart-close aria-label="بستنِ سبد"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
-          </div>
           <div class="cart-debtor-row" id="cart-debtor-row">
             <button type="button" class="cart-debtor-btn" data-pick-debtor>
               <span class="cd-ic">
@@ -4679,10 +4485,6 @@
             <div class="exp-list cart-list" id="cart-list"></div>
           </div>
           <div class="cart-summary-bar" id="cart-summary-bar">
-            <!-- گوشی (تصویرِ مرجعِ ۵): نوارِ تیرهٔ جمع‌شده — کلِ نوار یک دکمه است که برگه را باز می‌کند -->
-            <button type="button" class="cbar-open" data-cart-open aria-expanded="false" aria-controls="cart-drawer-body" aria-label="باز کردنِ سبد"></button>
-            <span class="cbar-label" aria-hidden="true">سبد</span>
-            <span class="cbar-thumbs" data-cart-thumbs aria-hidden="true"></span>
             <div class="cart-total">
               <span>مجموع</span>
               <strong id="cart-total-amount">0 افغانی</strong>
@@ -4697,7 +4499,6 @@
               <button type="button" class="cart-ctl-btn" data-ctl-qty aria-label="نوشتنِ مقدار" style="width:auto;padding-inline:10px;font-size:12px;">مقدار</button>
             </div>
             <button class="btn btn-primary btn-sm" id="btn-finalize-sale">ثبت فروش</button>
-            <span class="cbar-count" data-cart-count aria-hidden="true">0</span>
           </div>
         </div>
       </section>
@@ -4736,12 +4537,6 @@
         <div class="quick-select-empty" id="quick-select-empty" style="display:none;">محصولی در این دسته‌بندی نیست</div>
 
         <div class="cart-drawer" id="qs-cart-drawer" style="display:none;">
-          <!-- گوشی (phone-ui، تصویرِ مرجعِ ۶): سرِ برگهٔ تیرهٔ سبد — فقط وقتی برگه در گوشی باز است -->
-          <div class="csheet-head">
-            <h2 class="csheet-title">سبد</h2>
-            <span class="csheet-count" data-cart-count-text></span>
-            <button type="button" class="csheet-close" data-cart-close aria-label="بستنِ سبد"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
-          </div>
           <div class="cart-debtor-row" id="qs-cart-debtor-row">
             <button type="button" class="cart-debtor-btn" data-pick-debtor>
               <span class="cd-ic">
@@ -4760,10 +4555,6 @@
             <div class="exp-list cart-list" id="qs-cart-list"></div>
           </div>
           <div class="cart-summary-bar" id="qs-cart-summary-bar">
-            <!-- گوشی (تصویرِ مرجعِ ۵): نوارِ تیرهٔ جمع‌شده — کلِ نوار یک دکمه است که برگه را باز می‌کند -->
-            <button type="button" class="cbar-open" data-cart-open aria-expanded="false" aria-controls="qs-cart-drawer-body" aria-label="باز کردنِ سبد"></button>
-            <span class="cbar-label" aria-hidden="true">سبد</span>
-            <span class="cbar-thumbs" data-cart-thumbs aria-hidden="true"></span>
             <div class="cart-total">
               <span>مجموع</span>
               <strong id="qs-cart-total-amount">0 افغانی</strong>
@@ -4778,7 +4569,6 @@
               <button type="button" class="cart-ctl-btn" data-ctl-qty aria-label="نوشتنِ مقدار" style="width:auto;padding-inline:10px;font-size:12px;">مقدار</button>
             </div>
             <button type="button" class="btn btn-primary btn-sm" id="btn-qs-finalize-sale">ثبت فروش</button>
-            <span class="cbar-count" data-cart-count aria-hidden="true">0</span>
           </div>
         </div>
       </section>
@@ -5327,29 +5117,11 @@
           بازگشت به بیشتر
         </a>
 
-        <!-- کارتِ «حساب من» (phone-ui، تصویرِ مرجعِ ۳): عکسِ گرد روی لبهٔ کارت، نام و راهِ تماس،
-             نشانِ نقش، سه تراشهٔ آمار از دفترِ همین دستگاه، و نوارِ هشدارِ اشتراک فقط وقتی واقعی است -->
-        <div class="prof-card" id="prof-card">
-          <div class="prof-avatar" id="prof-avatar" aria-hidden="true">؟</div>
-          <div class="prof-card-head">
-            <div class="prof-hero-txt">
-              <b id="prof-name-big">حساب من</b>
-              <i id="prof-contact" dir="auto">—</i>
-            </div>
-            <span class="prof-role" id="prof-role" hidden></span>
-          </div>
-          <div class="prof-stats" role="list" aria-label="دفترِ همین دستگاه">
-            <div class="prof-stat" role="listitem"><b id="prof-stat-products">0</b><span>کالا</span></div>
-            <div class="prof-stat" role="listitem"><b id="prof-stat-sales">0</b><span>فاکتور</span></div>
-            <div class="prof-stat" role="listitem"><b id="prof-stat-debtors">0</b><span>قرض‌دار</span></div>
-          </div>
-          <div class="prof-notice" id="prof-notice" role="status" hidden>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2h12M6 22h12M7 2v4a5 5 0 0 0 10 0V2M7 22v-4a5 5 0 0 1 10 0v4"/></svg>
-            <div class="prof-notice-txt">
-              <b id="prof-notice-title"></b>
-              <span>هیچ داده‌ای پاک نمی‌شود؛ خروجی و چاپ باز می‌ماند.</span>
-            </div>
-            <button type="button" class="prof-notice-btn" id="prof-notice-btn">تمدید</button>
+        <div class="prof-hero">
+          <div class="prof-avatar" id="prof-avatar">؟</div>
+          <div class="prof-hero-txt">
+            <b id="prof-name-big">حساب من</b>
+            <i id="prof-contact">—</i>
           </div>
         </div>
 
@@ -5360,60 +5132,44 @@
         </div>
 
         <div id="prof-in" hidden>
-          <div class="set-group" role="group" aria-labelledby="prof-g-plan">
-            <h3 class="set-group-title" id="prof-g-plan">عضویت و اشتراک</h3>
-            <div class="set-group-card">
-              <div class="panel">
-                <div class="dash-status" style="margin-bottom:0;">
-                  <div id="prof-rows"></div>
-                </div>
-                <button type="button" class="btn btn-secondary" id="prof-vip" style="margin-top:12px;">دیدن قیمت‌ها</button>
-              </div>
+          <div class="panel">
+            <div class="panel-head"><h2>مشخصات حساب</h2></div>
+            <div class="form-group">
+              <label for="prof-name">نام و نام خانوادگی</label>
+              <input class="form-input" id="prof-name" type="text" autocomplete="name" placeholder="نامِ شما">
             </div>
+            <div class="form-group">
+              <label for="prof-email">ایمیل</label>
+              <input class="form-input" id="prof-email" type="email" disabled>
+              <p class="settings-hint" style="margin-top:6px;">ایمیل عوض نمی‌شود — راهِ ورود و بازیابیِ رمز است.</p>
+            </div>
+            <div class="form-group">
+              <label for="prof-phone">شماره موبایل</label>
+              <input class="form-input" id="prof-phone" type="tel" inputmode="tel" placeholder="0790000000">
+              <p class="settings-hint" id="prof-phone-hint" style="margin-top:6px;">یک بار ثبت می‌شود و بعد قفل می‌ماند.</p>
+            </div>
+            <p class="settings-hint" id="prof-save-msg" hidden></p>
+            <button type="button" class="btn btn-primary" id="prof-save">ذخیره تغییرات</button>
           </div>
 
-          <div class="set-group" role="group" aria-labelledby="prof-g-form">
-            <h3 class="set-group-title" id="prof-g-form">مشخصات حساب</h3>
-            <div class="set-group-card">
-              <div class="panel">
-                <div class="form-group">
-                  <label for="prof-name">نام و نام خانوادگی</label>
-                  <input class="form-input" id="prof-name" type="text" autocomplete="name" placeholder="نامِ شما">
-                </div>
-                <div class="form-group">
-                  <label for="prof-email">ایمیل</label>
-                  <input class="form-input" id="prof-email" type="email" disabled>
-                  <p class="settings-hint" style="margin-top:6px;">ایمیل عوض نمی‌شود — راهِ ورود و بازیابیِ رمز است.</p>
-                </div>
-                <div class="form-group">
-                  <label for="prof-phone">شماره موبایل</label>
-                  <input class="form-input" id="prof-phone" type="tel" inputmode="tel" placeholder="0790000000">
-                  <p class="settings-hint" id="prof-phone-hint" style="margin-top:6px;">یک بار ثبت می‌شود و بعد قفل می‌ماند.</p>
-                </div>
-                <p class="settings-hint" id="prof-save-msg" hidden></p>
-                <button type="button" class="btn btn-primary" id="prof-save">ذخیره تغییرات</button>
-              </div>
+          <div class="panel">
+            <div class="panel-head"><h2>عضویت و اشتراک</h2></div>
+            <div class="dash-status" style="margin-bottom:0;">
+              <div id="prof-rows"></div>
             </div>
+            <button type="button" class="btn btn-secondary" id="prof-vip" style="margin-top:12px;">دیدن قیمت‌ها</button>
           </div>
 
-          <div class="set-group" role="group" aria-labelledby="prof-g-sync">
-            <h3 class="set-group-title" id="prof-g-sync">همگام‌سازی</h3>
-            <div class="set-group-card">
-              <div class="panel">
-                <p class="settings-hint" id="prof-sync-when">هنوز همگام نشده است.</p>
-                <button type="button" class="btn btn-secondary" id="prof-sync" style="margin-top:12px;">همگام‌سازی حالا</button>
-              </div>
-            </div>
+          <div class="panel">
+            <div class="panel-head"><h2>همگام‌سازی</h2></div>
+            <p class="settings-hint" id="prof-sync-when">هنوز همگام نشده است.</p>
+            <button type="button" class="btn btn-secondary" id="prof-sync" style="margin-top:12px;">همگام‌سازی حالا</button>
           </div>
 
-          <div class="set-group" role="group" aria-labelledby="prof-g-out">
-            <h3 class="set-group-title" id="prof-g-out">خروج از حساب</h3>
-            <div class="set-group-card">
-              <div class="panel">
-                <p class="settings-hint">اطلاعاتِ روی همین دستگاه پاک نمی‌شود؛ فقط دسترسیِ حساب بسته می‌شود.</p>
-                <button type="button" class="btn btn-danger" id="prof-logout" style="margin-top:12px;">خروج از حساب</button>
-              </div>
-            </div>
+          <div class="panel">
+            <div class="panel-head"><h2>خروج از حساب</h2></div>
+            <p class="settings-hint">اطلاعاتِ روی همین دستگاه پاک نمی‌شود؛ فقط دسترسیِ حساب بسته می‌شود.</p>
+            <button type="button" class="btn btn-danger" id="prof-logout" style="margin-top:12px;">خروج از حساب</button>
           </div>
         </div>
       </section>
@@ -5501,268 +5257,241 @@
           </div>
         </div>
 
-        <!-- گروه‌های تنظیمات (phone-ui، تصویرِ مرجعِ ۴): همان پنل‌ها، همان شناسه‌ها و همان کار —
-             فقط زیرِ شش سرخط کنارِ هم نشسته‌اند (هم‌نامِ `SettingsLayout`ِ برنامه).
-             هیچ تنظیمی برداشته یا نام‌عوض نشده؛ `server/test/web-phone-ui.mjs` می‌شمارد. -->
-        <div class="set-group" role="group" aria-labelledby="set-g-general">
-          <h3 class="set-group-title" id="set-g-general">عمومی</h3>
-          <div class="set-group-card">
-            <!-- Appearance -->
-            <div class="panel">
-              <div class="panel-head"><h2>ظاهر برنامه</h2></div>
-              <div class="theme-toggle" id="theme-toggle">
-                <button type="button" class="theme-toggle-btn" data-theme-choice="light">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
-                  روشن
-                </button>
-                <button type="button" class="theme-toggle-btn" data-theme-choice="dark">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-                  تاریک
-                </button>
-              </div>
-
-              <p class="settings-hint" style="margin-top:14px;">اگر در تنظیمات گوشی «کاهش حرکت» یا حالت ذخیره‌ی باتری روشن باشد، برنامه انیمیشن‌ها را خاموش می‌کند. با این کلید می‌توانید همیشه روشن نگهشان دارید.</p>
-              <div class="theme-toggle" id="motion-toggle" style="margin-top:8px;">
-                <button type="button" class="theme-toggle-btn" data-motion-choice="full">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4.5 13.5H11l-1 8.5 8.5-11.5H12l1-8.5z"/></svg>
-                  انیمیشن روشن
-                </button>
-                <button type="button" class="theme-toggle-btn" data-motion-choice="auto">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3.5a8.5 8.5 0 1 1 0 17 8.5 8.5 0 0 1 0-17z"/><path d="M12 8v4.5l3 1.8"/></svg>
-                  مثل تنظیم گوشی
-                </button>
-              </div>
-            </div>
-            <!-- LOC-01/05/07: رقم، نامِ ماه و نمادِ پولِ فاکتور — پیش‌فرض همان امروز (لاتین، دری، «افغانی») -->
-            <div class="panel">
-              <div class="panel-head"><h2>تاریخ و رقم</h2></div>
-              <p class="settings-hint">رقم روی صفحه و فاکتور. چیزی که ذخیره و همگام می‌شود همیشه رقمِ لاتین است؛ با عوض کردنِ این کلید هیچ داده‌ای عوض نمی‌شود.</p>
-              <div class="theme-toggle" id="digits-toggle" style="margin-top:10px;">
-                <button type="button" class="theme-toggle-btn" data-digits-choice="latn">رقمِ لاتین</button>
-                <button type="button" class="theme-toggle-btn" data-digits-choice="fa">رقمِ فارسی</button>
-              </div>
-              <p class="settings-hint" style="margin-top:14px;">نامِ ماه‌های خورشیدی: امروز <span id="months-sample">—</span></p>
-              <div class="theme-toggle" id="months-toggle" style="margin-top:8px;">
-                <button type="button" class="theme-toggle-btn" data-months-choice="fa">دری (حمل، ثور…)</button>
-                <button type="button" class="theme-toggle-btn" data-months-choice="ps">پشتو (وری، غویی…)</button>
-              </div>
-              <p class="settings-hint" style="margin-top:14px;">نمادِ پول در فاکتور. مبلغ همیشه بی اعشار است.</p>
-              <div class="theme-toggle" id="currency-toggle" style="margin-top:8px;">
-                <button type="button" class="theme-toggle-btn" data-currency-choice="word">افغانی</button>
-                <button type="button" class="theme-toggle-btn" data-currency-choice="sign">؋</button>
-              </div>
-            </div>
-            <!-- Store info -->
-            <div class="panel">
-              <div class="panel-head"><h2>اطلاعات فروشگاه</h2></div>
-              <div class="form-group" style="margin-bottom:12px;">
-                <label>نام فروشگاه</label>
-                <input class="form-input" id="in-settings-store-name" type="text" placeholder="مثلاً فروشگاه نور">
-              </div>
-              <button class="btn btn-primary btn-sm" id="btn-save-store-name">ذخیره</button>
-            </div>
+        <!-- ==========================================================
+             حساب، اشتراک و همگام‌سازی — بندهای ۲۱٫۴ · ۲۱٫۵ · ۲۱٫۹ · ۲۱٫۱۱
+             ----------------------------------------------------------
+             ⛔ کادرِ «آدرس سرور» این‌جا **نیست** و نباید بیاید. نشانی در
+             `<meta name="tohid-api-base">` قفل است و `api-config.js`
+             نشانیِ دستی را نادیده می‌گیرد؛ قاعدهٔ صاحبِ مخزن است، نه
+             سلیقه. شرح در `docs/SYNC-CLIENT-fa.md`.
+             ========================================================== -->
+        <div class="panel" id="panel-account-sync">
+          <div class="panel-head"><h2>حساب و همگام‌سازی</h2></div>
+          <p class="settings-hint">
+            با ایمیل وارد شوید تا دفترِ دکان روی سرور بماند و روی هر گوشی و روی
+            همین سایت یکی باشد. تا وقتی وارد نشده‌اید، برنامه کاملاً آفلاین کار
+            می‌کند و هیچ قابلیتی قفل نمی‌شود.
+          </p>
+          <!-- کلاسِ پایهٔ `btn` نبود و سه دکمه با ظاهرِ خامِ مرورگر می‌آمدند؛ روی
+               دسکتاپ کنارِ هم، روی گوشی زیرِ هم -->
+          <div class="settings-actions" style="display:grid;gap:10px;margin-top:12px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));">
+            <button type="button" class="btn btn-secondary" id="btn-acct-login">ورود با ایمیل</button>
+            <button type="button" class="btn btn-secondary" id="btn-acct-plan">اشتراکِ من</button>
+            <button type="button" class="btn btn-secondary" id="btn-acct-sync">حالِ همگام‌سازی</button>
           </div>
         </div>
 
-        <div class="set-group" role="group" aria-labelledby="set-g-sales">
-          <h3 class="set-group-title" id="set-g-sales">فروش و پرداخت</h3>
-          <div class="set-group-card">
-            <!-- کالای منقضی — همان «کالای منقضی»ِ تنظیماتِ برنامه -->
-            <div class="panel">
-              <div class="panel-head"><h2>کالای منقضی</h2></div>
-              <p class="settings-hint">هشدارِ انقضا همیشه هست. اگر «فروخته نشود» را بزنید، مقدارِ محموله‌های منقضی از موجودیِ فروختنی کم می‌شود و فروشِ بیش از آن ثبت نمی‌شود.</p>
-              <div class="theme-toggle" id="expiry-policy-toggle" style="margin-top:10px;">
-                <button type="button" class="theme-toggle-btn" data-expiry-policy="warn">فقط هشدار</button>
-                <button type="button" class="theme-toggle-btn" data-expiry-policy="block">فروخته نشود</button>
-              </div>
-            </div>
+        <!-- کالای منقضی — همان «کالای منقضی»ِ تنظیماتِ برنامه -->
+        <div class="panel">
+          <div class="panel-head"><h2>کالای منقضی</h2></div>
+          <p class="settings-hint">هشدارِ انقضا همیشه هست. اگر «فروخته نشود» را بزنید، مقدارِ محموله‌های منقضی از موجودیِ فروختنی کم می‌شود و فروشِ بیش از آن ثبت نمی‌شود.</p>
+          <div class="theme-toggle" id="expiry-policy-toggle" style="margin-top:10px;">
+            <button type="button" class="theme-toggle-btn" data-expiry-policy="warn">فقط هشدار</button>
+            <button type="button" class="theme-toggle-btn" data-expiry-policy="block">فروخته نشود</button>
           </div>
         </div>
 
-        <div class="set-group" role="group" aria-labelledby="set-g-security">
-          <h3 class="set-group-title" id="set-g-security">امنیت</h3>
-          <div class="set-group-card">
-            <!-- حساب، اشتراک و کلیدها -->
-            <div class="panel">
-              <div class="panel-head">
-                <h2>حساب و اشتراک</h2>
-                <span class="settings-badge" id="acct-state-badge">—</span>
-              </div>
-              <div class="acct-rows" id="acct-rows"></div>
+        <!-- Appearance -->
+        <div class="panel">
+          <div class="panel-head"><h2>ظاهر برنامه</h2></div>
+          <div class="theme-toggle" id="theme-toggle">
+            <button type="button" class="theme-toggle-btn" data-theme-choice="light">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+              روشن
+            </button>
+            <button type="button" class="theme-toggle-btn" data-theme-choice="dark">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+              تاریک
+            </button>
+          </div>
 
-              <label class="settings-key-label">کلید حساب شما</label>
-              <div class="settings-key">
-                <code id="settings-api-key" dir="ltr">—</code>
-                <button type="button" class="btn btn-secondary btn-sm" data-copy-key="settings-api-key">کپی</button>
-              </div>
-              <p class="settings-hint">این کلید فقط مالِ همین حساب است و هرگز برای کس دیگری تکرار نمی‌شود. هنگام خرید اشتراک، خودکار همراه پیام واتساپ فرستاده می‌شود تا اشتراک روی حساب خودتان فعال شود.</p>
-
-              <label class="settings-key-label" style="margin-top:16px;">کد شاگرد</label>
-              <div class="settings-key">
-                <code id="settings-staff-code" dir="ltr">—</code>
-                <button type="button" class="btn btn-secondary btn-sm" data-copy-key="settings-staff-code">کپی</button>
-              </div>
-              <p class="settings-hint">این کد را به شاگردهایتان بدهید تا در صفحه‌ی ورود بزنند و روی همین دکان بیایند.</p>
-              <button type="button" class="btn btn-secondary btn-sm" id="btn-new-staff-code" style="margin-top:8px;">ساخت کد تازه</button>
-
-              <div class="settings-actions-row" style="margin-top:16px;">
-                <button type="button" class="btn btn-primary btn-sm" id="btn-open-account">ورود / ثبت‌نام</button>
-              </div>
-            </div>
-            <!-- Account -->
-            <div class="panel">
-              <div class="panel-head"><h2>حساب کاربری</h2></div>
-              <div class="auth-account-row">
-                <div class="avatar" id="settings-user-avatar">ک</div>
-                <div class="auth-account-info">
-                  <b id="settings-user-name">کاربر</b>
-                  <span id="settings-user-value">—</span>
-                </div>
-              </div>
-              <button class="btn btn-secondary btn-sm" id="btn-logout">خروج از حساب</button>
-            </div>
+          <p class="settings-hint" style="margin-top:14px;">اگر در تنظیمات گوشی «کاهش حرکت» یا حالت ذخیره‌ی باتری روشن باشد، برنامه انیمیشن‌ها را خاموش می‌کند. با این کلید می‌توانید همیشه روشن نگهشان دارید.</p>
+          <div class="theme-toggle" id="motion-toggle" style="margin-top:8px;">
+            <button type="button" class="theme-toggle-btn" data-motion-choice="full">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4.5 13.5H11l-1 8.5 8.5-11.5H12l1-8.5z"/></svg>
+              انیمیشن روشن
+            </button>
+            <button type="button" class="theme-toggle-btn" data-motion-choice="auto">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3.5a8.5 8.5 0 1 1 0 17 8.5 8.5 0 0 1 0-17z"/><path d="M12 8v4.5l3 1.8"/></svg>
+              مثل تنظیم گوشی
+            </button>
           </div>
         </div>
 
-        <div class="set-group" role="group" aria-labelledby="set-g-devices">
-          <h3 class="set-group-title" id="set-g-devices">دستگاه‌ها</h3>
-          <div class="set-group-card">
-            <!-- Camera -->
-            <div class="panel">
-              <div class="panel-head">
-                <h2>دوربین بارکدخوان</h2>
-                <span class="settings-badge" id="settings-camera-support-badge">در حال بررسی…</span>
-              </div>
-              <p class="settings-hint">برنامه برای اسکن بارکد محصولات به دسترسی دوربین دستگاه نیاز دارد. با زدن دکمه زیر، برنامه دسترسی دوربین را درخواست می‌کند و تصویر آن را همین‌جا نشان می‌دهد.</p>
-              <div class="scanner-panel" style="padding:0; margin-bottom:12px; display:none;" id="settings-camera-test-wrap">
-                <div class="scanner-frame" style="max-height:220px;">
-                  <video id="settings-scanner-video" playsinline muted></video>
-                  <div class="scanner-guide"></div>
-                  <div class="scanner-status" id="settings-scanner-status">در حال آماده‌سازی دوربین…</div>
-                  <button type="button" class="btn btn-primary btn-sm scanner-retry-btn" id="btn-retry-settings-camera" style="display:none;">تلاش مجدد / اجازه دسترسی</button>
-                </div>
-              </div>
-              <div class="settings-actions-row">
-                <button class="btn btn-secondary btn-sm" id="btn-test-camera">درخواست دسترسی و تست دوربین</button>
-                <button class="btn btn-secondary btn-sm" id="btn-stop-test-camera" style="display:none;">توقف دوربین</button>
-              </div>
-            </div>
-            <!-- Install / offline -->
-            <div class="panel">
-              <div class="panel-head">
-                <h2>نصب برنامه روی دستگاه</h2>
-                <span class="settings-badge" id="settings-install-badge">در حال بررسی…</span>
-              </div>
-              <p class="settings-hint">با نصب برنامه، آیکن آن در صفحه اصلی گوشی یا کامپیوتر ساخته می‌شود و برنامه <b>بدون اینترنت</b> هم کامل باز می‌شود. اطلاعات فروشگاه همیشه روی همین دستگاه ذخیره است.</p>
-              <div class="install-panel-row">
-                <button class="btn btn-primary btn-sm" id="btn-install-app" style="display:none;">نصب برنامه</button>
-                <span class="settings-hint" id="settings-install-hint" style="margin:0;"></span>
-              </div>
-              <!-- برنامهٔ بومیِ کامپیوتر — همان برنامهٔ گوشی، با همان حساب (desktop/) -->
-              <p class="settings-hint" id="desktop-downloads">برنامهٔ کامپیوتر (بومی، همان حساب):
-                <a href="https://api.vill3n.top/api/releases/tohid-desktop/file/Tohid-Windows-Setup.exe" rel="noopener">ویندوز</a> ·
-                <a href="https://api.vill3n.top/api/releases/tohid-desktop/file/Tohid-Mac-AppleSilicon.dmg" rel="noopener">مک (M1 به بعد)</a> ·
-                <a href="https://api.vill3n.top/api/releases/tohid-desktop/file/Tohid-Mac-Intel.dmg" rel="noopener">مک (Intel)</a> ·
-                <a href="https://api.vill3n.top/api/releases/tohid-desktop/file/Tohid-Linux.deb" rel="noopener">لینوکس</a>
-              </p>
-            </div>
+        <!-- LOC-01/05/07: رقم، نامِ ماه و نمادِ پولِ فاکتور — پیش‌فرض همان امروز (لاتین، دری، «افغانی») -->
+        <div class="panel">
+          <div class="panel-head"><h2>تاریخ و رقم</h2></div>
+          <p class="settings-hint">رقم روی صفحه و فاکتور. چیزی که ذخیره و همگام می‌شود همیشه رقمِ لاتین است؛ با عوض کردنِ این کلید هیچ داده‌ای عوض نمی‌شود.</p>
+          <div class="theme-toggle" id="digits-toggle" style="margin-top:10px;">
+            <button type="button" class="theme-toggle-btn" data-digits-choice="latn">رقمِ لاتین</button>
+            <button type="button" class="theme-toggle-btn" data-digits-choice="fa">رقمِ فارسی</button>
+          </div>
+          <p class="settings-hint" style="margin-top:14px;">نامِ ماه‌های خورشیدی: امروز <span id="months-sample">—</span></p>
+          <div class="theme-toggle" id="months-toggle" style="margin-top:8px;">
+            <button type="button" class="theme-toggle-btn" data-months-choice="fa">دری (حمل، ثور…)</button>
+            <button type="button" class="theme-toggle-btn" data-months-choice="ps">پشتو (وری، غویی…)</button>
+          </div>
+          <p class="settings-hint" style="margin-top:14px;">نمادِ پول در فاکتور. مبلغ همیشه بی اعشار است.</p>
+          <div class="theme-toggle" id="currency-toggle" style="margin-top:8px;">
+            <button type="button" class="theme-toggle-btn" data-currency-choice="word">افغانی</button>
+            <button type="button" class="theme-toggle-btn" data-currency-choice="sign">؋</button>
           </div>
         </div>
 
-        <div class="set-group" role="group" aria-labelledby="set-g-data">
-          <h3 class="set-group-title" id="set-g-data">همگام‌سازی و پشتیبان</h3>
-          <div class="set-group-card">
-            <!-- ==========================================================
-                 حساب، اشتراک و همگام‌سازی — بندهای ۲۱٫۴ · ۲۱٫۵ · ۲۱٫۹ · ۲۱٫۱۱
-                 ----------------------------------------------------------
-                 ⛔ کادرِ «آدرس سرور» این‌جا **نیست** و نباید بیاید. نشانی در
-                 `<meta name="tohid-api-base">` قفل است و `api-config.js`
-                 نشانیِ دستی را نادیده می‌گیرد؛ قاعدهٔ صاحبِ مخزن است، نه
-                 سلیقه. شرح در `docs/SYNC-CLIENT-fa.md`.
-                 ========================================================== -->
-            <div class="panel" id="panel-account-sync">
-              <div class="panel-head"><h2>حساب و همگام‌سازی</h2></div>
-              <p class="settings-hint">
-                با ایمیل وارد شوید تا دفترِ دکان روی سرور بماند و روی هر گوشی و روی
-                همین سایت یکی باشد. تا وقتی وارد نشده‌اید، برنامه کاملاً آفلاین کار
-                می‌کند و هیچ قابلیتی قفل نمی‌شود.
-              </p>
-              <!-- کلاسِ پایهٔ `btn` نبود و سه دکمه با ظاهرِ خامِ مرورگر می‌آمدند؛ روی
-                   دسکتاپ کنارِ هم، روی گوشی زیرِ هم -->
-              <div class="settings-actions" style="display:grid;gap:10px;margin-top:12px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));">
-                <button type="button" class="btn btn-secondary" id="btn-acct-login">ورود با ایمیل</button>
-                <button type="button" class="btn btn-secondary" id="btn-acct-plan">اشتراکِ من</button>
-                <button type="button" class="btn btn-secondary" id="btn-acct-sync">حالِ همگام‌سازی</button>
-              </div>
+        <!-- Store info -->
+        <div class="panel">
+          <div class="panel-head"><h2>اطلاعات فروشگاه</h2></div>
+          <div class="form-group" style="margin-bottom:12px;">
+            <label>نام فروشگاه</label>
+            <input class="form-input" id="in-settings-store-name" type="text" placeholder="مثلاً فروشگاه نور">
+          </div>
+          <button class="btn btn-primary btn-sm" id="btn-save-store-name">ذخیره</button>
+        </div>
+
+        <!-- Camera -->
+        <div class="panel">
+          <div class="panel-head">
+            <h2>دوربین بارکدخوان</h2>
+            <span class="settings-badge" id="settings-camera-support-badge">در حال بررسی…</span>
+          </div>
+          <p class="settings-hint">برنامه برای اسکن بارکد محصولات به دسترسی دوربین دستگاه نیاز دارد. با زدن دکمه زیر، برنامه دسترسی دوربین را درخواست می‌کند و تصویر آن را همین‌جا نشان می‌دهد.</p>
+          <div class="scanner-panel" style="padding:0; margin-bottom:12px; display:none;" id="settings-camera-test-wrap">
+            <div class="scanner-frame" style="max-height:220px;">
+              <video id="settings-scanner-video" playsinline muted></video>
+              <div class="scanner-guide"></div>
+              <div class="scanner-status" id="settings-scanner-status">در حال آماده‌سازی دوربین…</div>
+              <button type="button" class="btn btn-primary btn-sm scanner-retry-btn" id="btn-retry-settings-camera" style="display:none;">تلاش مجدد / اجازه دسترسی</button>
             </div>
-            <!-- Backup -->
-            <div class="panel">
-              <div class="panel-head"><h2>پشتیبان‌گیری از اطلاعات</h2></div>
-              <p class="settings-hint">از تمام اطلاعات فروشگاه (قرض‌داران، محصولات، انبار، فروش‌ها و مصارف) یک فایل پشتیبان بگیرید یا از یک فایل قبلی بازیابی کنید.</p>
-              <div class="backup-meta" id="backup-meta">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-                <span id="backup-meta-text">هنوز پشتیبانی گرفته نشده</span>
-              </div>
-              <div class="settings-actions-row">
-                <button class="btn btn-secondary btn-sm" id="btn-export-backup">دانلود نسخه پشتیبان</button>
-                <button class="btn btn-secondary btn-sm" id="btn-import-backup">بازیابی از فایل</button>
-                <input type="file" id="in-import-backup-file" accept="application/json,.json" style="display:none;">
-              </div>
-              <!-- خروجیِ کاملِ داده برای مالک (OPS-08) — شرح در ‎license/owner-export.js‎ -->
-              <p class="settings-hint" style="margin-top:14px;">خروجی کامل داده برای خودتان: همهٔ داده‌ها در یک فایل اکسل (هر بخش یک برگه، با سرستونِ فارسی) یا JSON.</p>
-              <div class="settings-actions-row">
-                <button class="btn btn-secondary btn-sm" id="btn-owner-export-xlsx">خروجی کامل — اکسل</button>
-                <button class="btn btn-secondary btn-sm" id="btn-owner-export-json">خروجی کامل — JSON</button>
-              </div>
-
-              <!--
-                پشتیبان روی سرور.
-
-                ⛔ تا امروز نسخهٔ وب هیچ پشتیبانِ سروری نداشت: فقط «دانلودِ
-                فایل» بود، یعنی هر چه بود روی همان یک دستگاه می‌ماند. کسی که
-                مرورگرش را پاک می‌کرد یا گوشی‌اش را عوض می‌کرد، چیزی نداشت.
-
-                کاربرانِ آیفون فقط همین نسخه را دارند، پس نبودنش برای آن‌ها
-                یعنی هیچ پشتیبانِ بیرون از دستگاهی در کار نبود.
-              -->
-              <div class="backup-meta" id="cloud-backup-meta" style="margin-top:10px;">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 16.5a3.5 3.5 0 0 0-1-6.86A5 5 0 0 0 7.2 9.1 3.5 3.5 0 0 0 7 16.5"/><path d="M12 12v7m0 0 3-3m-3 3-3-3"/></svg>
-                <span id="cloud-backup-text">پشتیبان روی سرور — برای دیدن، وارد حساب شوید</span>
-              </div>
-              <div class="settings-actions-row">
-                <button class="btn btn-secondary btn-sm" id="btn-cloud-backup">همین حالا روی سرور بگذار</button>
-              </div>
-
-              <!-- F0-23 (دنباله): جای دفتر روی همین دستگاه. آزمایشی و پیش‌فرض خاموش —
-                   قاعدهٔ آیفون (مشخصات ۱.۳ بند ۷). منطقش در license/ledger-store.js -->
-              <label class="check-row" style="display:flex;gap:8px;align-items:center;margin-top:14px;">
-                <input type="checkbox" id="in-ledger-idb"> نگه‌داشتنِ دفتر در IndexedDB (آزمایشی)
-              </label>
-              <p class="settings-hint" id="ledger-store-hint"></p>
-            </div>
-            <!-- Danger zone -->
-            <div class="panel">
-              <div class="panel-head"><h2 style="color:var(--danger);">پاک‌سازی اطلاعات</h2></div>
-              <p class="settings-hint">تمام قرض‌داران، محصولات، انبار، فروش‌ها و مصارف ثبت‌شده روی این دستگاه برای همیشه حذف می‌شوند. پیش از پاک‌سازی، بهتر است یک نسخه پشتیبان بگیرید.</p>
-              <button class="btn btn-danger btn-sm" id="btn-clear-all-data">پاک‌سازی کامل اطلاعات</button>
-            </div>
+          </div>
+          <div class="settings-actions-row">
+            <button class="btn btn-secondary btn-sm" id="btn-test-camera">درخواست دسترسی و تست دوربین</button>
+            <button class="btn btn-secondary btn-sm" id="btn-stop-test-camera" style="display:none;">توقف دوربین</button>
           </div>
         </div>
 
-        <div class="set-group" role="group" aria-labelledby="set-g-about">
-          <h3 class="set-group-title" id="set-g-about">درباره</h3>
-          <div class="set-group-card">
-            <!-- About -->
-            <div class="panel" style="margin-bottom:0;">
-              <div class="panel-head"><h2>درباره برنامه</h2></div>
-              <p class="settings-hint">فروشگاه من — نسخه ۴ (قابل نصب و آفلاین)<br>تمام اطلاعات فقط روی همین دستگاه و در همین مرورگر ذخیره می‌شود؛ پس هر چند وقت یک‌بار نسخه پشتیبان بگیرید.</p>
-              <div class="build-stamp">
-                <span>نسخه‌ی نصب‌شده</span>
-                <b id="build-id">—</b>
-              </div>
-              <button class="btn btn-secondary btn-sm" id="btn-force-refresh" style="margin-top:10px;">دریافت آخرین نسخه</button>
+        <!-- Install / offline -->
+        <div class="panel">
+          <div class="panel-head">
+            <h2>نصب برنامه روی دستگاه</h2>
+            <span class="settings-badge" id="settings-install-badge">در حال بررسی…</span>
+          </div>
+          <p class="settings-hint">با نصب برنامه، آیکن آن در صفحه اصلی گوشی یا کامپیوتر ساخته می‌شود و برنامه <b>بدون اینترنت</b> هم کامل باز می‌شود. اطلاعات فروشگاه همیشه روی همین دستگاه ذخیره است.</p>
+          <div class="install-panel-row">
+            <button class="btn btn-primary btn-sm" id="btn-install-app" style="display:none;">نصب برنامه</button>
+            <span class="settings-hint" id="settings-install-hint" style="margin:0;"></span>
+          </div>
+          <!-- برنامهٔ بومیِ کامپیوتر — همان برنامهٔ گوشی، با همان حساب (desktop/) -->
+          <p class="settings-hint" id="desktop-downloads">برنامهٔ کامپیوتر (بومی، همان حساب):
+            <a href="https://api.vill3n.top/api/releases/tohid-desktop/file/Tohid-Windows-Setup.exe" rel="noopener">ویندوز</a> ·
+            <a href="https://api.vill3n.top/api/releases/tohid-desktop/file/Tohid-Mac-AppleSilicon.dmg" rel="noopener">مک (M1 به بعد)</a> ·
+            <a href="https://api.vill3n.top/api/releases/tohid-desktop/file/Tohid-Mac-Intel.dmg" rel="noopener">مک (Intel)</a> ·
+            <a href="https://api.vill3n.top/api/releases/tohid-desktop/file/Tohid-Linux.deb" rel="noopener">لینوکس</a>
+          </p>
+        </div>
+
+        <!-- حساب، اشتراک و کلیدها -->
+        <div class="panel">
+          <div class="panel-head">
+            <h2>حساب و اشتراک</h2>
+            <span class="settings-badge" id="acct-state-badge">—</span>
+          </div>
+          <div class="acct-rows" id="acct-rows"></div>
+
+          <label class="settings-key-label">کلید حساب شما</label>
+          <div class="settings-key">
+            <code id="settings-api-key" dir="ltr">—</code>
+            <button type="button" class="btn btn-secondary btn-sm" data-copy-key="settings-api-key">کپی</button>
+          </div>
+          <p class="settings-hint">این کلید فقط مالِ همین حساب است و هرگز برای کس دیگری تکرار نمی‌شود. هنگام خرید اشتراک، خودکار همراه پیام واتساپ فرستاده می‌شود تا اشتراک روی حساب خودتان فعال شود.</p>
+
+          <label class="settings-key-label" style="margin-top:16px;">کد شاگرد</label>
+          <div class="settings-key">
+            <code id="settings-staff-code" dir="ltr">—</code>
+            <button type="button" class="btn btn-secondary btn-sm" data-copy-key="settings-staff-code">کپی</button>
+          </div>
+          <p class="settings-hint">این کد را به شاگردهایتان بدهید تا در صفحه‌ی ورود بزنند و روی همین دکان بیایند.</p>
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-new-staff-code" style="margin-top:8px;">ساخت کد تازه</button>
+
+          <div class="settings-actions-row" style="margin-top:16px;">
+            <button type="button" class="btn btn-primary btn-sm" id="btn-open-account">ورود / ثبت‌نام</button>
+          </div>
+        </div>
+
+        <!-- Backup -->
+        <div class="panel">
+          <div class="panel-head"><h2>پشتیبان‌گیری از اطلاعات</h2></div>
+          <p class="settings-hint">از تمام اطلاعات فروشگاه (قرض‌داران، محصولات، انبار، فروش‌ها و مصارف) یک فایل پشتیبان بگیرید یا از یک فایل قبلی بازیابی کنید.</p>
+          <div class="backup-meta" id="backup-meta">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            <span id="backup-meta-text">هنوز پشتیبانی گرفته نشده</span>
+          </div>
+          <div class="settings-actions-row">
+            <button class="btn btn-secondary btn-sm" id="btn-export-backup">دانلود نسخه پشتیبان</button>
+            <button class="btn btn-secondary btn-sm" id="btn-import-backup">بازیابی از فایل</button>
+            <input type="file" id="in-import-backup-file" accept="application/json,.json" style="display:none;">
+          </div>
+          <!-- خروجیِ کاملِ داده برای مالک (OPS-08) — شرح در ‎license/owner-export.js‎ -->
+          <p class="settings-hint" style="margin-top:14px;">خروجی کامل داده برای خودتان: همهٔ داده‌ها در یک فایل اکسل (هر بخش یک برگه، با سرستونِ فارسی) یا JSON.</p>
+          <div class="settings-actions-row">
+            <button class="btn btn-secondary btn-sm" id="btn-owner-export-xlsx">خروجی کامل — اکسل</button>
+            <button class="btn btn-secondary btn-sm" id="btn-owner-export-json">خروجی کامل — JSON</button>
+          </div>
+
+          <!--
+            پشتیبان روی سرور.
+
+            ⛔ تا امروز نسخهٔ وب هیچ پشتیبانِ سروری نداشت: فقط «دانلودِ
+            فایل» بود، یعنی هر چه بود روی همان یک دستگاه می‌ماند. کسی که
+            مرورگرش را پاک می‌کرد یا گوشی‌اش را عوض می‌کرد، چیزی نداشت.
+
+            کاربرانِ آیفون فقط همین نسخه را دارند، پس نبودنش برای آن‌ها
+            یعنی هیچ پشتیبانِ بیرون از دستگاهی در کار نبود.
+          -->
+          <div class="backup-meta" id="cloud-backup-meta" style="margin-top:10px;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 16.5a3.5 3.5 0 0 0-1-6.86A5 5 0 0 0 7.2 9.1 3.5 3.5 0 0 0 7 16.5"/><path d="M12 12v7m0 0 3-3m-3 3-3-3"/></svg>
+            <span id="cloud-backup-text">پشتیبان روی سرور — برای دیدن، وارد حساب شوید</span>
+          </div>
+          <div class="settings-actions-row">
+            <button class="btn btn-secondary btn-sm" id="btn-cloud-backup">همین حالا روی سرور بگذار</button>
+          </div>
+
+          <!-- F0-23 (دنباله): جای دفتر روی همین دستگاه. آزمایشی و پیش‌فرض خاموش —
+               قاعدهٔ آیفون (مشخصات ۱.۳ بند ۷). منطقش در license/ledger-store.js -->
+          <label class="check-row" style="display:flex;gap:8px;align-items:center;margin-top:14px;">
+            <input type="checkbox" id="in-ledger-idb"> نگه‌داشتنِ دفتر در IndexedDB (آزمایشی)
+          </label>
+          <p class="settings-hint" id="ledger-store-hint"></p>
+        </div>
+
+        <!-- Account -->
+        <div class="panel">
+          <div class="panel-head"><h2>حساب کاربری</h2></div>
+          <div class="auth-account-row">
+            <div class="avatar" id="settings-user-avatar">ک</div>
+            <div class="auth-account-info">
+              <b id="settings-user-name">کاربر</b>
+              <span id="settings-user-value">—</span>
             </div>
           </div>
+          <button class="btn btn-secondary btn-sm" id="btn-logout">خروج از حساب</button>
+        </div>
+
+        <!-- Danger zone -->
+        <div class="panel">
+          <div class="panel-head"><h2 style="color:var(--danger);">پاک‌سازی اطلاعات</h2></div>
+          <p class="settings-hint">تمام قرض‌داران، محصولات، انبار، فروش‌ها و مصارف ثبت‌شده روی این دستگاه برای همیشه حذف می‌شوند. پیش از پاک‌سازی، بهتر است یک نسخه پشتیبان بگیرید.</p>
+          <button class="btn btn-danger btn-sm" id="btn-clear-all-data">پاک‌سازی کامل اطلاعات</button>
+        </div>
+
+        <!-- About -->
+        <div class="panel" style="margin-bottom:0;">
+          <div class="panel-head"><h2>درباره برنامه</h2></div>
+          <p class="settings-hint">فروشگاه من — نسخه ۴ (قابل نصب و آفلاین)<br>تمام اطلاعات فقط روی همین دستگاه و در همین مرورگر ذخیره می‌شود؛ پس هر چند وقت یک‌بار نسخه پشتیبان بگیرید.</p>
+          <div class="build-stamp">
+            <span>نسخه‌ی نصب‌شده</span>
+            <b id="build-id">—</b>
+          </div>
+          <button class="btn btn-secondary btn-sm" id="btn-force-refresh" style="margin-top:10px;">دریافت آخرین نسخه</button>
         </div>
       </section>
 
@@ -12390,9 +12119,8 @@
     const p = products.find(x=>x.id===productId);
     if(item && p){
       document.querySelectorAll(`[data-cart-row="${productId}"]`).forEach(row=>{
-        row.querySelectorAll('[data-cart-qty]').forEach(qtyEl=>{
-          qtyEl.textContent = `${formatCartQtyFa(item.quantity, p.unit)} ${p.unit}`;
-        });
+        const qtyEl = row.querySelector('[data-cart-qty]');
+        if(qtyEl) qtyEl.textContent = `${formatCartQtyFa(item.quantity, p.unit)} ${p.unit}`;
         const amtEl = row.querySelector('[data-cart-line]');
         if(amtEl) amtEl.textContent = formatMoney(lineTotal(p.salePrice,item.quantity))+' افغانی';
       });
@@ -12402,8 +12130,6 @@
       const el = document.getElementById(id);
       if(el) el.textContent = total;
     });
-    paintCartBar('');
-    paintCartBar('qs-');
     patchQuickTile(productId);
   }
 
@@ -12442,11 +12168,6 @@
           : `<div class="exp-icon">${escapeHtml((p.name||'؟')[0])}</div>`}
         <div class="cart-row-name">${escapeHtml(p.name)}</div>
         <div class="cart-row-qty" data-cart-qty>${formatCartQtyFa(item.quantity, p.unit)} ${escapeHtml(p.unit)}</div>
-        <div class="cart-row-step">
-          <button type="button" class="cart-step-btn" data-line-step="-1" aria-label="یکی کمتر ${escapeHtml(p.name)}">−</button>
-          <button type="button" class="cart-step-qty" data-line-qty data-cart-qty aria-label="نوشتنِ مقدارِ ${escapeHtml(p.name)}">${formatCartQtyFa(item.quantity, p.unit)} ${escapeHtml(p.unit)}</button>
-          <button type="button" class="cart-step-btn" data-line-step="1" aria-label="یکی بیشتر ${escapeHtml(p.name)}">+</button>
-        </div>
         <div class="cart-row-sum" data-cart-line>${formatMoney(lineSum)} افغانی</div>
       </div>`;
   }
@@ -12463,7 +12184,6 @@
       list.innerHTML=''; drawer.style.display='none';
       if(body) body.style.display='none';
       drawer.classList.remove('open');
-      syncCartSheetState();
       return;
     }
     if(emptyPanel) emptyPanel.style.display='none';
@@ -12471,69 +12191,11 @@
     list.innerHTML = cart.map(cartItemHtml).join('');
     hydrateProductPhotos(list);
     if(totalEl) totalEl.textContent = formatMoney(cartTotal())+' افغانی';
-    paintCartBar(prefix);
 
     // کنترل‌ها فقط وقتی دیده می‌شوند که کالایی انتخاب شده باشد
     const ctl = document.getElementById(prefix+'cart-ctl');
     if(ctl) ctl.hidden = !(selectedCartId && cart.some(c=>c.productId===selectedCartId));
   }
-  /* ==========================================================
-     سبدِ گوشی (phone-ui، تصویرهای مرجعِ ۵ و ۶) — زیرِ ۷۶۹ پیکسل.
-
-     همان کشوی سبد است با ظاهرِ دیگر: بسته ⇐ نوارِ تیره با «سبد»، عکسِ گردِ
-     تازه‌ترین قلم‌ها (یا حرفِ اولشان)، مبلغ و دایرهٔ شمار؛ باز ⇐ برگهٔ تیرهٔ
-     تمام‌قد با ردیف‌های − مقدار +، قرض‌دار، جمع و همان «ثبت فروش». داده و
-     کارها همان‌اند (`cart`، `setCartQty`، `openSaleCheckoutModal`).
-     ========================================================== */
-  //  تابع، نه ثابت: `renderCart` ممکن است پیش از رسیدن به این خط صدا زده شود
-  function cartSheetMode(){ return window.matchMedia('(max-width: 768px)').matches; }
-  function cartInitial(name){
-    const m = String(name || '').match(/[\p{L}\p{N}]/u);
-    return m ? m[0].toUpperCase() : '؟';
-  }
-  /** نوارِ جمع‌شده: عکس‌ها، شمار، و نامِ دسترس‌پذیرِ دکمه */
-  function paintCartBar(prefix){
-    const drawer = document.getElementById(prefix+'cart-drawer');
-    if(!drawer) return;
-    const lines = cart.map(c=> products.find(x=>x.id===c.productId)).filter(Boolean);
-    const n = lines.length;
-    const thumbs = drawer.querySelector('[data-cart-thumbs]');
-    if(thumbs){
-      thumbs.innerHTML = lines.slice(-3).reverse().map(p=> `<span class="cbar-thumb">${p.photo
-          ? `<img alt="" data-product-photo="${p.id}">`
-          : escapeHtml(cartInitial(p.name))}</span>`).join('')
-        + (n > 3 ? `<span class="cbar-more">+${formatMoney(n - 3)}</span>` : '');
-      hydrateProductPhotos(thumbs);
-    }
-    const count = drawer.querySelector('[data-cart-count]');
-    if(count) count.textContent = formatMoney(n);
-    const head = drawer.querySelector('[data-cart-count-text]');
-    if(head) head.textContent = `${formatMoney(n)} قلم`;
-    const opener = drawer.querySelector('[data-cart-open]');
-    if(opener) opener.setAttribute('aria-label', `سبد، ${formatMoney(n)} قلم، ${formatMoney(cartTotal())} افغانی — باز کردن`);
-  }
-  /** باز/بسته کردنِ کشو — همان کارِ زدنِ نوار در کامپیوتر؛ در گوشی برگهٔ تمام‌قد */
-  function setCartDrawerOpen(drawer, open){
-    const body = drawer.querySelector('.cart-drawer-body');
-    if(body) body.style.display = open ? '' : 'none';
-    drawer.classList.toggle('open', open);
-    const opener = drawer.querySelector('[data-cart-open]');
-    if(opener) opener.setAttribute('aria-expanded', open ? 'true' : 'false');
-    syncCartSheetState();
-    syncBottomBarHeight();
-    if(cartSheetMode()){
-      if(open) drawer.querySelector('[data-cart-close]')?.focus({ preventScroll:true });
-      else if(drawer.contains(document.activeElement) || document.activeElement === document.body) opener?.focus({ preventScroll:true });
-    }
-  }
-  /** برگهٔ باز در گوشی ⇐ صفحه زیرش اسکرول نمی‌شود و دکمهٔ پشتیبانی کنار می‌رود */
-  function syncCartSheetState(){
-    const on = cartSheetMode() && !!document.querySelector('.page.active .cart-drawer.open');
-    document.body.classList.toggle('cart-sheet-open', on);
-  }
-  document.addEventListener('tohid:page-change', syncCartSheetState);
-  window.matchMedia('(max-width: 768px)').addEventListener('change', syncCartSheetState);
-
   /* از نو ساختنِ کامل — فقط وقتی ردیفی اضافه یا کم شده باشد */
   function renderCart(){
     renderCartDrawer('', true);
@@ -12869,31 +12531,29 @@
   document.addEventListener('click', (e)=>{
     const row = e.target.closest('[data-cart-row]');
     if(!row) return;
-    //  − مقدار + ِ برگهٔ گوشی کارِ خودش را می‌کند (پایین)، نه انتخابِ ردیف
-    if(e.target.closest('[data-line-step], [data-line-qty]')) return;
     const id = row.dataset.cartRow;
     selectedCartId = (selectedCartId === id) ? null : id;   // دوباره بزنی، بسته می‌شود
     renderCart();
     if(navigator.vibrate) navigator.vibrate(12);
   });
 
-  function cartCtlStep(dir, id = selectedCartId){
-    if(!id) return;
-    const item = cart.find(c=>c.productId===id);
+  function cartCtlStep(dir){
+    if(!selectedCartId) return;
+    const item = cart.find(c=>c.productId===selectedCartId);
     if(!item) return;
     const p = products.find(x=>x.id===item.productId);
     const step = cartStepFor(p ? p.unit : 'عدد');
     const next = Math.round((item.quantity + dir*step)*1000)/1000;
-    if(next <= 0){ removeFromCart(id); if(selectedCartId === id) selectedCartId = null; return; }
-    setCartQty(id, next);
+    if(next <= 0){ removeFromCart(selectedCartId); selectedCartId = null; return; }
+    setCartQty(selectedCartId, next);
   }
 
   /* مقدارِ دقیق — و اگر کالا واحدِ فروشِ دوم دارد (مثلاً گرم از کالای کیلویی)،
      به همان واحد پرسیده و با ضریبش به واحدِ موجودی تبدیل می‌شود.
      همان `SalesEngine.toStockQty`ِ برنامه. */
-  function cartCtlTypeQty(id = selectedCartId){
-    if(!id) return;
-    const item = cart.find(c=>c.productId===id);
+  function cartCtlTypeQty(){
+    if(!selectedCartId) return;
+    const item = cart.find(c=>c.productId===selectedCartId);
     const p = item && products.find(x=>x.id===item.productId);
     if(!p) return;
     const second = p.saleUnit && p.unitFactor > 0;
@@ -12908,16 +12568,6 @@
     if(stockQty > available){ showToast(stockShortMessage(p, stockQty, available), 'danger'); return; }
     setCartQty(p.id, stockQty);
   }
-
-  //  برگهٔ سبدِ گوشی: − / مقدار / + روی همان ردیف (همان پله و همان کادرِ مقدار)
-  document.addEventListener('click', (e)=>{
-    const b = e.target.closest('[data-line-step], [data-line-qty]');
-    if(!b) return;
-    const row = b.closest('[data-cart-row]');
-    if(!row) return;
-    if(b.hasAttribute('data-line-qty')) cartCtlTypeQty(row.dataset.cartRow);
-    else cartCtlStep(Number(b.dataset.lineStep) || 0, row.dataset.cartRow);
-  });
 
   document.addEventListener('click', (e)=>{
     if(e.target.closest('[data-ctl-qty]')){ cartCtlTypeQty(); return; }
@@ -12942,21 +12592,9 @@
     const body = drawer.querySelector('.cart-drawer-body');
     if(!body) return;
     const isOpen = body.style.display !== 'none';
-    setCartDrawerOpen(drawer, !isOpen);
-  });
-  //  گوشی: «×»ِ سرِ برگه، زدنِ بالای برگه (روی صفحه) و Esc برگه را می‌بندند
-  document.addEventListener('click', (e)=>{
-    const close = e.target.closest('[data-cart-close]');
-    const drawer = close ? close.closest('.cart-drawer')
-      : (e.target.classList && e.target.classList.contains('cart-drawer') && e.target.classList.contains('open')
-         && e.clientY < e.target.getBoundingClientRect().top ? e.target : null);
-    if(drawer) setCartDrawerOpen(drawer, false);
-  });
-  document.addEventListener('keydown', (e)=>{
-    if(e.key !== 'Escape' || !document.body.classList.contains('cart-sheet-open')) return;
-    if(document.querySelector('.modal-scrim.open')) return;   // پنجرهٔ پرداخت رویش است
-    const drawer = document.querySelector('.page.active .cart-drawer.open');
-    if(drawer){ e.preventDefault(); setCartDrawerOpen(drawer, false); }
+    body.style.display = isOpen ? 'none' : '';
+    drawer.classList.toggle('open', !isOpen);
+    syncBottomBarHeight();
   });
 
   // ---- پردازش نتیجه اسکن (از دوربین، ورود دستی، یا اسکنر سخت‌افزاری) ----
@@ -14770,13 +14408,35 @@
       a.className = 'bn-item';
       a.dataset.page = p.id;
       a.href = `#${p.id}`;
-      a.innerHTML = `<span class="ic" aria-hidden="true">${p.icon}</span><span class="bn-label">${p.label}</span>`;
+      a.innerHTML = `<span class="ic">${p.icon}</span><span>${p.label}</span>`;
       bottomNav.appendChild(a);
     }
   });
 
   const EXTRA_PAGES = ['debtor-account', 'quick-sale', 'supplier-account', 'receipts', 'profile', 'team', 'product', 'admin', 'devices', 'orders'];
 
+  /**
+   *  چراغِ نوارِ پایین را می‌برد روی تبِ فعال.
+   *
+   *  فقط دو متغیرِ CSS می‌نویسد و بس؛ خودِ جابه‌جایی را transition انجام
+   *  می‌دهد، پس هیچ کارِ هر-فریمی در JS نیست. اگر صفحه‌ی باز در نوارِ
+   *  پایین نباشد (مثلاً «گزارشات»)، چراغ خاموش می‌شود.
+   */
+  function moveNavLamp(){
+    if(!bottomNav) return;
+    const on = bottomNav.querySelector('.bn-item.active');
+    if(!on){ bottomNav.style.setProperty('--lamp-on','0'); return; }
+    const bar = bottomNav.getBoundingClientRect();
+    const it  = on.getBoundingClientRect();
+    // فاصله از لبه‌ی آغازِ نوار — در راست‌به‌چپ یعنی از راست
+    const rtl = getComputedStyle(bottomNav).direction === 'rtl';
+    const start = rtl ? (bar.right - it.right) : (it.left - bar.left);
+    bottomNav.style.setProperty('--lamp-x', (start + it.width/2) + 'px');
+    bottomNav.style.setProperty('--lamp-w', it.width + 'px');
+    bottomNav.style.setProperty('--lamp-on','1');
+  }
+  // اگر پهنای صفحه عوض شد، چراغ سرِ جایش برگردد
+  window.addEventListener('resize', moveNavLamp);
 
 
   /* ==========================================================
@@ -14825,21 +14485,6 @@
     profEl('prof-contact').textContent = inAcc
       ? (user.email || user.phone || local.label || '—')
       : 'بدون حساب — همه‌چیز روی همین دستگاه';
-    //  سه تراشهٔ آمار — از دفترِ همین دستگاه، بی‌حساب هم
-    profEl('prof-stat-products').textContent = formatMoney(products.length);
-    profEl('prof-stat-sales').textContent = formatMoney(sales.length);
-    profEl('prof-stat-debtors').textContent = formatMoney(debtors.length);
-    const shopNow = (me && me.shop) || local.shop || null;
-    const roleText = !inAcc || !shopNow ? ''
-      : (shopNow.isOwner ? 'صاحب دکان' : (shopNow.role ? (TEAM_ROLES[shopNow.role] || shopNow.role) : ''));
-    profEl('prof-role').textContent = roleText;
-    profEl('prof-role').hidden = !roleText;
-    const notice = inAcc ? profNotice(me && me.entitlement, Date.now()) : null;
-    profEl('prof-notice').hidden = !notice;
-    if(notice){
-      profEl('prof-notice-title').textContent = notice.title;
-      profEl('prof-notice-btn').textContent = notice.cta;
-    }
     if(!inAcc) return;
 
     profEl('prof-name').value  = user.name || '';
@@ -14877,26 +14522,6 @@
       : 'هنوز همگام نشده است.';
   }
 
-  /**
-   *  نوارِ هشدارِ اشتراکِ کارتِ «حساب من» — فقط وقتی واقعی است: تمام شده، یا
-   *  ≤ ۷ روز (همان مرزِ `SUBSCRIPTION_WARN_DAYS`ِ برنامه و `ProfileModel.notice`).
-   *  «بدون اشتراک» هشدار نیست. ورودی همان `entitlement`ِ پاسخِ `/me`.
-   */
-  function profNotice(ent, now){
-    if(!ent) return null;
-    const WARN = 7, DAY = 86400000;
-    const left = (iso)=>{ const t = Date.parse(iso || ''); return isNaN(t) ? null : Math.ceil((t - now) / DAY); };
-    const sub = ent.subscription, tri = ent.trial;
-    const ending = (days, trial)=> ({
-      title: days > 0 ? `${trial ? 'آزمایشی' : 'اشتراک'} — ${formatMoney(days)} روز مانده` : 'امروز آخرین روزِ اشتراک است',
-      cta: trial ? 'پلن‌ها' : 'تمدید',
-    });
-    if(sub && sub.active){ const d = left(sub.endsAt); return d !== null && d <= WARN ? ending(d, false) : null; }
-    if(tri && tri.active){ const d = left(tri.endsAt); return d !== null && d <= WARN ? ending(d, true) : null; }
-    if(sub && sub.endsAt && left(sub.endsAt) !== null && left(sub.endsAt) <= 0) return { title: 'اشتراک تمام شده', cta: 'تمدید' };
-    return null;
-  }
-
   /** تازه کردن از سرور — بی‌صدا شکست می‌خورد چون صفحه از قبل پر است */
   async function profRefresh(){
     profPaint(null);
@@ -14920,11 +14545,6 @@
 
     profEl('prof-login-btn').addEventListener('click', ()=> openAuthScreen());
     profEl('prof-vip').addEventListener('click', ()=>{
-      const lic = window.TohidLicense;
-      if(lic && lic.open) lic.open();
-    });
-    //  دکمهٔ نوارِ هشدار همان «دیدن قیمت‌ها»ست — همان پنجرهٔ اشتراک
-    profEl('prof-notice-btn').addEventListener('click', ()=>{
       const lic = window.TohidLicense;
       if(lic && lic.open) lic.open();
     });
@@ -15429,11 +15049,9 @@
     document.getElementById('page-'+pageId)?.classList.add('active');
 
     document.querySelectorAll('.nav-item, .bn-item').forEach(el=>{
-      const on = el.dataset.page===pageId;
-      el.classList.toggle('active', on);
-      //  صفحه‌خوان هم بداند کدام تب باز است
-      if(on) el.setAttribute('aria-current', 'page'); else el.removeAttribute('aria-current');
+      el.classList.toggle('active', el.dataset.page===pageId);
     });
+    moveNavLamp();
 
     if(pageId==='debtor-account'){
       const d = debtors.find(x=>x.id===currentAccountDebtorId);
@@ -15660,16 +15278,6 @@
       showToast(blockExpiredPolicy() ? 'کالای منقضی دیگر فروخته نمی‌شود' : 'برای کالای منقضی فقط هشدار داده می‌شود');
     });
     paint();
-  })();
-
-  /* phone-ui: دکمه‌های انتخابِ تنظیمات (روشن/تاریک، انیمیشن، رقم، ماه، پول، انقضا)
-     با `.active` رنگ می‌گیرند؛ صفحه‌خوان هم همان را با `aria-pressed` بشنود. */
-  (function syncTogglePressed(){
-    const sync = (b)=> b.setAttribute('aria-pressed', b.classList.contains('active') ? 'true' : 'false');
-    document.querySelectorAll('.theme-toggle-btn').forEach(sync);
-    new MutationObserver(ms=> ms.forEach(m=>{
-      if(m.target.classList && m.target.classList.contains('theme-toggle-btn')) sync(m.target);
-    })).observe(document.body, { subtree:true, attributes:true, attributeFilter:['class'] });
   })();
 
   function buildAlerts(){
@@ -16135,7 +15743,9 @@
      اگر پیش از آن‌ها بیاید، بی‌صدا هیچ کاری نمی‌کند. -->
 <script src="license/sync-core.js?v=3" defer></script>
 <script src="license/account-code.js?v=2" defer></script>
-<script src="license/sync-engine.js?v=5" defer></script>
+<script src="license/money.js?v=1" defer></script>
+<script src="license/sync-v3-engine.js?v=1" defer></script>
+<script src="license/sync-engine.js?v=6" defer></script>
 <script src="license/license-client.js?v=17" defer></script>
 <script src="license/shop-sync.js?v=20" defer></script>
 <script src="license/shop-ui.js?v=15" defer></script>

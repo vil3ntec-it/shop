@@ -198,38 +198,35 @@
     return li;
   }
 
-  //  کارتِ کالا: «افزودن» (هر زدن یکی بیشتر) و نشانِ «N در سبد» — − و + فقط در برگهٔ سبد (design v2)
   function renderStepper(box, p) {
     box.textContent = '';
     var line = cart[p.id];
-    var add = document.createElement('button');
-    add.type = 'button'; add.className = 'btn btn-sm btn-block';
-    add.textContent = line ? 'یکی دیگر' : 'افزودن به سبد';
-    add.setAttribute('aria-label', 'افزودنِ ' + p.name + ' به سبد');
-    add.addEventListener('click', function () {
-      setQty(p, (cart[p.id] ? cart[p.id].qtyMilli : 0) + 1000);
-      renderStepper(box, p);
-    });
-    box.appendChild(add);
-    var li = box.parentNode;
-    if (!li) return;
-    var badge = li.querySelector('.qty-badge');
-    if (line) {
-      if (!badge) { badge = document.createElement('span'); badge.className = 'qty-badge'; li.appendChild(badge); }
-      badge.textContent = qty(line.qtyMilli) + ' در سبد';
-    } else if (badge) badge.remove();
+    if (!line) {
+      var add = document.createElement('button');
+      add.type = 'button'; add.className = 'btn btn-sm btn-block'; add.textContent = 'افزودن به سبد';
+      add.setAttribute('aria-label', 'افزودنِ ' + p.name + ' به سبد');
+      add.addEventListener('click', function () { setQty(p, 1000); renderStepper(box, p); });
+      box.appendChild(add);
+      return;
+    }
+    box.className = 'stepper';
+    var minus = document.createElement('button');
+    minus.type = 'button'; minus.className = 'btn btn-ghost icon-btn'; minus.textContent = '−';
+    minus.setAttribute('aria-label', 'یکی کمتر ' + p.name);
+    var out = document.createElement('output'); out.textContent = qty(line.qtyMilli);
+    var plus = document.createElement('button');
+    plus.type = 'button'; plus.className = 'btn icon-btn'; plus.textContent = '+';
+    plus.setAttribute('aria-label', 'یکی بیشتر ' + p.name);
+    minus.addEventListener('click', function () { setQty(p, line.qtyMilli - 1000); renderStepper(box, p); });
+    plus.addEventListener('click', function () { setQty(p, line.qtyMilli + 1000); renderStepper(box, p); });
+    box.append(minus, out, plus);
   }
 
-  function setQty(p, milli, deferSheet) {
+  function setQty(p, milli) {
     if (p.maxQtyMilli && milli > p.maxQtyMilli) milli = p.maxQtyMilli;
     if (milli <= 0) delete cart[p.id];
     else cart[p.id] = { qtyMilli: milli, name: p.name, unit: p.unit, priceMinor: p.priceMinor, maxQtyMilli: p.maxQtyMilli || null };
     saveCart();
-    //  از کادرِ مقدار: پس از جابه‌جاییِ تمرکز (Tab) دوباره چیده شود تا تمرکز گم نشود
-    if (!$('cart-sheet').hidden) {
-      if (!count()) closeSheet();
-      else { renderSheetSummary(); if (deferSheet) setTimeout(renderSheetLines, 0); else renderSheetLines(); }
-    }
   }
 
   function count() { return Object.keys(cart).length; }
@@ -241,130 +238,10 @@
     }, 0);
   }
 
-  // ── سبدِ تیره (phone-ui، تصویرهای مرجعِ ۵ و ۶) ──
-  function initial(name) {
-    var m = String(name || '').match(/[\p{L}\p{N}]/u);
-    return m ? m[0].toUpperCase() : '؟';
-  }
-  function thumb(id, cls) {
-    var l = cart[id], item = catalog.items[id];
-    var el = document.createElement('span'); el.className = cls;
-    if (item && item.photo) {
-      var img = document.createElement('img');
-      img.alt = ''; img.loading = 'lazy'; img.decoding = 'async';
-      img.src = '/api/store/' + encodeURIComponent(slug) + '/products/' + encodeURIComponent(id) + '/photo';
-      el.appendChild(img);
-    } else el.textContent = initial(l && l.name);
-    return el;
-  }
   function renderCartBar() {
     var n = count();
-    var ids = Object.keys(cart);
-    var box = $('cart-thumbs');
-    box.textContent = '';
-    ids.slice(-3).reverse().forEach(function (id) { box.appendChild(thumb(id, 'cbar-thumb')); });
-    if (n > 3) { var more = document.createElement('span'); more.className = 'cbar-more'; more.textContent = '+' + fa(n - 3, 0); box.appendChild(more); }
-    $('cart-bar-total').textContent = money(subtotal());
-    $('cart-bar-count').textContent = fa(n, 0);
-    $('open-cart').setAttribute('aria-label', 'سبد، ' + fa(n, 0) + ' قلم، ' + money(subtotal()) + ' — باز کردن');
-    $('cart-bar').hidden = n === 0 || $('view-catalog').hidden || !$('cart-sheet').hidden;
-  }
-
-  function lineMinor(l) { return Math.floor((l.qtyMilli * l.priceMinor + 50000) / 100000) * 100; }
-  function parseQty(v) {
-    var t = String(v || '').replace(/[۰-۹]/g, function (d) { return String(d.charCodeAt(0) - 0x06F0); })
-      .replace(/[٠-٩]/g, function (d) { return String(d.charCodeAt(0) - 0x0660); }).replace(/[٫,]/g, '.').trim();
-    var n = Number(t);
-    return isFinite(n) ? Math.round(n * 1000) : NaN;
-  }
-  function sheetLine(id) {
-    var l = cart[id];
-    var p = { id: id, name: l.name, unit: l.unit, priceMinor: l.priceMinor, maxQtyMilli: l.maxQtyMilli };
-    var li = document.createElement('li');
-    var name = document.createElement('span'); name.className = 'csheet-name';
-    var b = document.createElement('b'); b.textContent = l.name + (l.unavailable ? ' (دیگر در ویترین نیست)' : '');
-    var d = document.createElement('span'); d.className = 'csheet-muted';
-    d.textContent = qty(l.qtyMilli) + ' ' + (l.unit || '') + ' × ' + money(l.priceMinor) + ' = ' + money(lineMinor(l));
-    name.append(b, d);
-    var step = document.createElement('span'); step.className = 'csheet-step';
-    var minus = document.createElement('button'); minus.type = 'button'; minus.textContent = '−';
-    minus.setAttribute('aria-label', (l.qtyMilli <= 1000 ? 'حذفِ ' : 'یکی کمتر ') + l.name);
-    minus.addEventListener('click', function () { setQty(p, l.qtyMilli - 1000); refreshCards(); });
-    var input = document.createElement('input'); input.type = 'text'; input.inputMode = 'decimal';
-    input.value = qty(l.qtyMilli); input.setAttribute('aria-label', 'مقدارِ ' + l.name);
-    input.addEventListener('change', function () {
-      var m = parseQty(input.value);
-      if (isNaN(m) || m < 0) { input.value = qty(l.qtyMilli); return; }
-      setQty(p, m, true); refreshCards();
-    });
-    var plus = document.createElement('button'); plus.type = 'button'; plus.textContent = '+';
-    plus.setAttribute('aria-label', 'یکی بیشتر ' + l.name);
-    plus.addEventListener('click', function () { setQty(p, l.qtyMilli + 1000); refreshCards(); });
-    step.append(minus, input, plus);
-    li.append(thumb(id, 'csheet-thumb'), name, step);
-    return li;
-  }
-  function renderSheet() {
-    if (!count()) { closeSheet(); return; }
-    renderSheetLines();
-    renderSheetSummary();
-  }
-  function renderSheetLines() {
-    if ($('cart-sheet').hidden) return;
-    var ul = $('sheet-lines');
-    var focused = document.activeElement && ul.contains(document.activeElement) ? document.activeElement.getAttribute('aria-label') : null;
-    ul.textContent = '';
-    Object.keys(cart).forEach(function (id) { ul.appendChild(sheetLine(id)); });
-    if (focused) { var again = ul.querySelector('[aria-label="' + CSS.escape(focused) + '"]'); if (again) again.focus(); }
-  }
-  function renderSheetSummary() {
-    var n = count();
-    $('cart-sheet-count').textContent = fa(n, 0) + ' قلم';
-    //  ارسال: هزینه و حداقلِ سفارش از تنظیمِ خودِ دکان (سرور)؛ آستانهٔ «ارسالِ رایگان»
-    //  در تنظیمِ سرور نیست، پس ساخته نمی‌شود
-    var sub = subtotal();
-    var delivery = store.fulfillment && store.fulfillment.delivery;
-    $('sheet-delivery').hidden = !delivery && !(store.minOrderMinor > 0);
-    var fee = store.deliveryFeeMinor || 0;
-    $('sheet-delivery-fee').textContent = delivery ? (fee ? money(fee) : 'رایگان') : '';
-    var notes = [];
-    if (delivery) notes.push(fulfillment() === 'delivery' ? 'ارسال به نشانیِ شما' : (store.fulfillment.pickup ? 'اگر «ارسال» را انتخاب کنید' : 'ارسال به نشانیِ شما'));
-    var short = store.minOrderMinor - sub;
-    if (store.minOrderMinor > 0) notes.push(short > 0 ? 'حداقلِ سفارش ' + money(store.minOrderMinor) + '؛ ' + money(short) + ' دیگر' : 'حداقلِ سفارش رسید');
-    $('sheet-delivery-note').textContent = notes.join(' · ');
-    var bar = $('sheet-progress');
-    bar.hidden = !(store.minOrderMinor > 0);
-    if (!bar.hidden) {
-      var pct = Math.max(0, Math.min(100, Math.round(sub / store.minOrderMinor * 100)));
-      bar.setAttribute('aria-valuenow', String(pct));
-      bar.style.setProperty('--p', pct + '%');
-    }
-    var withFee = fulfillment() === 'delivery';
-    $('sheet-total-label').textContent = withFee ? 'مبلغِ نهایی' : 'جمعِ کالاها';
-    $('sheet-total').textContent = money(sub + (withFee ? fee : 0));
-  }
-  function refreshCards() {
-    Object.keys(catalog.items).forEach(function (id) {
-      var box = document.querySelector('#products li[data-id="' + CSS.escape(id) + '"] > div:last-child');
-      if (box) renderStepper(box, catalog.items[id]);
-    });
-  }
-  function openSheet() {
-    if (!count()) return;
-    $('cart-sheet').hidden = false;
-    renderSheet();
-    $('open-cart').setAttribute('aria-expanded', 'true');
-    document.body.classList.add('sheet-open');
-    renderCartBar();
-    $('close-cart').focus({ preventScroll: true });
-  }
-  function closeSheet() {
-    if ($('cart-sheet').hidden) return;
-    $('cart-sheet').hidden = true;
-    $('open-cart').setAttribute('aria-expanded', 'false');
-    document.body.classList.remove('sheet-open');
-    renderCartBar();
-    if (!$('cart-bar').hidden) $('open-cart').focus({ preventScroll: true });
+    $('open-cart').textContent = 'سبد: ' + fa(n, 0) + ' قلم · ' + money(subtotal());
+    $('cart-bar').hidden = n === 0 || $('view-catalog').hidden;
   }
 
   // ── سبد و ثبت ──
@@ -631,10 +508,6 @@
     var h = location.hash || '#/';
     if (h.indexOf('#/o/') === 0) return openOrder(h.slice(4));
     if (h === '#/orders') return openOrders();
-    //  برگهٔ سبد مالِ کاتالوگ است؛ «ادامه» به همان صفحهٔ ثبتِ پیشین می‌رود
-    if (h !== '#/' && h !== '' && h !== '#') {
-      $('cart-sheet').hidden = true; $('open-cart').setAttribute('aria-expanded', 'false'); document.body.classList.remove('sheet-open');
-    }
     if (h === '#/cart') { show('view-checkout'); return renderCheckout(); }
     show('view-catalog');
     renderCartBar();
@@ -685,24 +558,6 @@
     $('verify-check').addEventListener('click', checkCode);
     $('pin-btn').addEventListener('click', takePin);
     $('checkout-form').addEventListener('submit', submitOrder);
-    $('open-cart').addEventListener('click', openSheet);
-    $('close-cart').addEventListener('click', closeSheet);
-    //  زدنِ صفحهٔ بالای برگه (لایهٔ `::after`) برگه را می‌بندد
-    $('cart-sheet').addEventListener('click', function (e) {
-      if (e.target === $('cart-sheet') && e.clientY < $('cart-sheet').getBoundingClientRect().top) closeSheet();
-    });
-    document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape' && !$('cart-sheet').hidden) { e.preventDefault(); closeSheet(); }
-    });
-    $('cart-sheet').addEventListener('keydown', function (e) {
-      if (e.key !== 'Tab') return;
-      //  تمرکز درونِ برگه می‌ماند (aria-modal)
-      var f = Array.prototype.filter.call($('cart-sheet').querySelectorAll('button, input, a[href]'), function (el) { return !el.disabled && el.offsetParent !== null; });
-      if (!f.length) return;
-      var first = f[0], last = f[f.length - 1];
-      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
-      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
-    });
     window.addEventListener('hashchange', route);
     window.addEventListener('storage', function (e) { if (e.key === KEY_CART) { cart = load(KEY_CART, {}); route(); } });
     boot();

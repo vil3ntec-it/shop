@@ -9,9 +9,6 @@
  *   • CSP ِ سخت: هیچ نقضی (بی اسکریپت یا style ِ درون‌خطی)؛
  *   • وضعیتِ دکان (۳۱.۱) دیده می‌شود و هیچ دکمهٔ «پرداختِ آنلاین» ِ ساختگی نیست؛
  *   • جست‌وجو، سبد، تأییدِ شماره با کد، ثبت ⇒ رسید؛ مبلغِ روی صفحه همان سرور؛
- *   • نوار و برگهٔ تیرهٔ سبد (phone-ui): نوار فقط با سبدِ پُر (عکس/حرفِ اول، شمار،
- *     مبلغ)، کارت فقط «افزودن» و نشانِ مقدار، برگه با − مقدار + و مقدارِ نوشتنی،
- *     ردیفِ ارسال از تنظیمِ سرور، Esc و زدنِ بالا، کاهشِ حرکت، axe و بی بیرون‌زدگی؛
  *   • دسترس‌پذیری (axe-core): کنتراست، نامِ دکمه، برچسبِ فیلد، پیوند.
  */
 import { createRequire } from 'node:module';
@@ -132,13 +129,9 @@ ok((await page.textContent('#catalog-empty')).includes('پیدا نشد'), 'صف
 await page.click('#clear-search');
 await page.waitForFunction(() => document.querySelectorAll('#products li').length === 2, null, { timeout: 5000 });
 
-ok(!(await page.isVisible('#cart-bar')), 'سبدِ خالی ⇒ نوارِ سبد نیست');
 const rice = page.locator('#products li[data-id="rice"]');
 await rice.getByRole('button', { name: /افزودن/ }).click();
-//  design v2: کارت فقط «افزودن» دارد (هر زدن یکی بیشتر) و نشانِ مقدار — − و + فقط در برگه
-await rice.getByRole('button', { name: /افزودن/ }).click();
-ok((await rice.getByRole('button', { name: /یکی کمتر|یکی بیشتر/ }).count()) === 0, 'کارتِ کالا − / + ندارد');
-ok((await rice.locator('.qty-badge').textContent()).includes('۲ در سبد'), 'نشانِ «۲ در سبد» روی کارت');
+await rice.getByRole('button', { name: /یکی بیشتر/ }).click();
 const oil = page.locator('#products li[data-id="oil"]');
 await oil.getByRole('button', { name: /افزودن/ }).click();
 ok(await page.isVisible('#cart-bar'), 'نوارِ سبد پیدا شد');
@@ -146,65 +139,8 @@ await page.reload();
 await page.waitForSelector('#products li');
 ok((await page.textContent('#open-cart')).includes('۲'), 'سبدِ مهمان با تازه‌سازی می‌ماند (S132)');
 
-//  ── نوار و برگهٔ تیرهٔ سبد (phone-ui، تصویرهای مرجعِ ۵ و ۶) ──
-const bar = await page.evaluate(() => ({
-  thumbs: [...document.querySelectorAll('#cart-thumbs .cbar-thumb')].map((t) => t.textContent.trim()),
-  count: document.getElementById('cart-bar-count').textContent.trim(),
-  total: document.getElementById('cart-bar-total').textContent,
-  name: document.getElementById('open-cart').getAttribute('aria-label'),
-  bg: getComputedStyle(document.getElementById('open-cart')).backgroundColor,
-  h: document.getElementById('open-cart').getBoundingClientRect().height,
-}));
-ok(bar.thumbs.join(',') === 'ر,ب' && bar.count === '۲' && bar.total.includes('۵۴۱') && /۲ قلم/.test(bar.name) && bar.h >= 48,
-  'نوار: حرفِ اولِ تازه‌ترین‌ها، شمار، مبلغ، نامِ دسترس‌پذیر، ≥ ۴۸', JSON.stringify(bar));
 await page.click('#open-cart');
-await page.waitForSelector('#cart-sheet:not([hidden])');
-const sheetState = await page.evaluate(() => ({
-  role: document.getElementById('cart-sheet').getAttribute('role'),
-  focus: document.activeElement && document.activeElement.id,
-  lines: document.querySelectorAll('#sheet-lines li').length,
-  barHidden: document.getElementById('cart-bar').hidden,
-  expanded: document.getElementById('open-cart').getAttribute('aria-expanded'),
-  fee: document.getElementById('sheet-delivery-fee').textContent,
-  delivery: !document.getElementById('sheet-delivery').hidden,
-  progress: !document.getElementById('sheet-progress').hidden,
-  total: document.getElementById('sheet-total').textContent,
-}));
-ok(sheetState.role === 'dialog' && sheetState.focus === 'close-cart' && sheetState.lines === 2 && sheetState.barHidden && sheetState.expanded === 'true',
-  'برگه باز شد: پنجره، تمرکز روی «بستن»، دو ردیف، نوار کنار رفت', JSON.stringify(sheetState));
-ok(sheetState.delivery && sheetState.fee.includes('۵۰') && !sheetState.progress && sheetState.total.includes('۵۴۱'),
-  'ردیفِ ارسال: هزینهٔ واقعیِ دکان (۵۰)، بی نوارِ پیشرفتِ ساختگی (حداقلِ سفارش صفر)، جمعِ کالاها', JSON.stringify(sheetState));
-const oilLine = page.locator('#sheet-lines li', { hasText: 'روغن' });
-await oilLine.getByRole('button', { name: /یکی بیشتر/ }).click();
-ok((await page.textContent('#sheet-total')).includes('۸۴۱'), '+ در برگه: ۲ روغن ⇒ ۸۴۱');
-await page.locator('#sheet-lines li', { hasText: 'روغن' }).getByRole('button', { name: /یکی کمتر/ }).click();
-ok((await page.textContent('#sheet-total')).includes('۵۴۱'), '− در برگه ⇒ ۵۴۱');
-await page.locator('#sheet-lines li', { hasText: 'برنج' }).getByRole('textbox', { name: /مقدار/ }).fill('۳');
-await page.keyboard.press('Tab');
-ok((await page.textContent('#sheet-total')).includes('۶۶۲'), 'مقدارِ نوشتنی (رقمِ فارسی): ۳ برنج ⇒ ۳۶۲ + ۳۰۰ = ۶۶۲', await page.textContent('#sheet-total'));
-await page.locator('#sheet-lines li', { hasText: 'برنج' }).getByRole('textbox', { name: /مقدار/ }).fill('2');
-await page.keyboard.press('Tab');
-ok((await page.textContent('#sheet-total')).includes('۵۴۱'), 'برگشت به ۲ برنج');
-for (const w of [360, 390, 768]) {
-  await page.setViewportSize({ width: w, height: 760 });
-  const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-  ok(over <= 0, `برگهٔ باز بی بیرون‌زدگی در ${w}`, `${over}px`);
-}
-await page.setViewportSize({ width: 360, height: 760 });
-await page.keyboard.press('Escape');
-await page.waitForSelector('#cart-sheet', { state: 'hidden' });
-ok(await page.evaluate(() => document.activeElement && document.activeElement.id === 'open-cart'), 'Esc برگه را می‌بندد و تمرکز به نوار برمی‌گردد');
-await page.click('#open-cart');
-await page.waitForSelector('#cart-sheet:not([hidden])');
-await page.mouse.click(180, 30);
-await page.waitForSelector('#cart-sheet', { state: 'hidden' });
-ok(true, 'زدنِ بالای برگه، برگه را می‌بندد');
-
-await page.click('#open-cart');
-await page.waitForSelector('#cart-sheet:not([hidden])');
-await page.click('#sheet-continue');
 await page.waitForSelector('#view-checkout:not([hidden])');
-ok(await page.evaluate(() => document.getElementById('cart-sheet').hidden && !document.body.classList.contains('sheet-open')), '«ادامه» ⇒ همان صفحهٔ ثبتِ پیشین، برگه بسته');
 await page.check('input[name="fulfillment"][value="pickup"]');
 //  ۱۲۰٫۵ × ۲ = ۲۴۱ + ۳۰۰ = ۵۴۱
 ok((await page.textContent('#t-total')).includes('۵۴۱'), 'جمعِ سبد پیش از ثبت (CHK-04)', await page.textContent('#t-total'));
@@ -222,28 +158,6 @@ await page.waitForFunction(() => !document.getElementById('submit-order').disabl
 ok(true, 'شماره تأیید شد و «ثبت» باز شد');
 
 if (axeSrc) {
-  //  برگهٔ تیرهٔ سبد، روز و شب، و «کاهشِ حرکت»
-  for (const scheme of ['light', 'dark']) {
-    const sc = await browser.newContext({ viewport: { width: 390, height: 844 }, bypassCSP: true, colorScheme: scheme, reducedMotion: 'reduce' });
-    const sp = await sc.newPage();
-    await sp.goto(`${base}/store/${slug}`);
-    await sp.waitForSelector('#products li');
-    await sp.locator('#products li[data-id="rice"]').getByRole('button', { name: /افزودن/ }).click();
-    await sp.click('#open-cart');
-    await sp.waitForSelector('#cart-sheet:not([hidden])');
-    const anim = await sp.evaluate(() => getComputedStyle(document.getElementById('cart-sheet')).animationName);
-    ok(anim === 'none', `کاهشِ حرکت (${scheme}): برگه بی انیمیشن`, anim);
-    await sp.addScriptTag({ content: axeSrc });
-    const out = await sp.evaluate(async () => (await window.axe.run('#cart-sheet',
-      { runOnly: ['color-contrast', 'button-name', 'label', 'aria-dialog-name', 'aria-valid-attr-value'] })).violations
-      .map((x) => `${x.id}: ${x.nodes.slice(0, 2).map((n) => n.target.join(' ')).join(' ; ')}`));
-    ok(out.length === 0, `دسترس‌پذیریِ برگهٔ سبد (${scheme})`, out.join(' | '));
-    await sp.click('#close-cart');
-    await sp.addScriptTag({ content: axeSrc });
-    const outBar = await sp.evaluate(async () => (await window.axe.run('#cart-bar', { runOnly: ['color-contrast', 'button-name'] })).violations.map((x) => x.id));
-    ok(outBar.length === 0, `دسترس‌پذیریِ نوارِ سبد (${scheme})`, outBar.join(' | '));
-    await sc.close();
-  }
   const axeCtx = await browser.newContext({ viewport: { width: 360, height: 760 }, bypassCSP: true });
   const ap = await axeCtx.newPage();
   const v = [];

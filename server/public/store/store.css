@@ -13,10 +13,6 @@
   --warning:#8a5a12; --warning-tint:#fdf3e4; --danger:#c43a3a; --danger-tint:#fdecec;
   --radius:14px; --radius-sm:10px;
   --shadow:0 6px 20px -8px rgba(30,50,110,.15);
-  /* سبدِ تیرهٔ گوشی (phone-ui): متن ≥ ۴٫۵:۱ روی برگه، شکل ≥ ۳:۱ (web-store.mjs با axe) */
-  --sheet:#141a29; --on-sheet:#ffffff; --on-sheet-muted:#b4bdd0;
-  --sheet-accent:#8fb0ff; --on-sheet-accent:#0f1420;
-  --sheet-line:rgba(255,255,255,.14); --sheet-raised:rgba(255,255,255,.08);
   color-scheme:light;
 }
 @media (prefers-color-scheme: dark){
@@ -25,7 +21,6 @@
     --text:#e8edf7; --muted:#a3aec4; --primary-tint:#1b2748; --primary:#6f93ff; --on-primary:#0f1420;
     --success:#5fd4a2; --success-tint:#12301f; --warning:#f1c27a; --warning-tint:#3a2a10;
     --danger:#ff8a8a; --danger-tint:#3a1a1a;
-    --sheet:#1f2840; --on-sheet:#eef2fa; --on-sheet-muted:#a9b4cc;
     color-scheme:dark;
   }
 }
@@ -104,53 +99,7 @@ legend{font-size:13px;font-weight:700;padding-inline:4px;}
 .note.info{background:var(--primary-tint);}
 .timeline{list-style:none;margin-block-start:8px;}
 .timeline li{padding-block:4px;font-size:13.5px;}
-/* ── سبد: نوار و برگهٔ تیره (phone-ui، تصویرهای مرجعِ ۵ و ۶) ──
-   نوار فقط با سبدِ پُر؛ کلِ نوار یک دکمه است. برگه از پایین بالا می‌آید و بالای
-   صفحه گوشه‌های پایینِ گرد می‌گیرد (دو گوشهٔ تیرهٔ `::before`). کارت‌های کالا
-   فقط «افزودن» و نشانِ مقدار دارند؛ − و + فقط در برگه (design v2). */
-.cart-bar{position:fixed;inset-inline:0;inset-block-end:0;padding:8px 12px calc(10px + env(safe-area-inset-bottom));z-index:6;pointer-events:none;}
-.cbar{pointer-events:auto;display:flex;align-items:center;gap:10px;inline-size:100%;max-inline-size:928px;min-block-size:64px;margin-inline:auto;padding:10px 10px 10px 18px;border:0;border-radius:28px;background:var(--sheet);color:var(--on-sheet);box-shadow:0 16px 32px -14px rgba(0,0,0,.5);cursor:pointer;text-align:start;}
-.cbar:focus-visible{outline:3px solid var(--sheet-accent);outline-offset:3px;}
-.cbar-label{font-size:16px;font-weight:700;flex:none;}
-.cbar-thumbs{display:flex;align-items:center;gap:6px;flex:0 1 auto;min-inline-size:0;overflow:hidden;}
-.cbar-thumb,.csheet-thumb{inline-size:36px;block-size:36px;flex:none;border-radius:50%;overflow:hidden;background:var(--on-sheet);color:var(--sheet);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;}
-.cbar-thumb img,.csheet-thumb img{inline-size:100%;block-size:100%;object-fit:cover;display:block;}
-.cbar-more{font-size:12px;font-weight:700;color:var(--on-sheet-muted);flex:none;}
-.cbar-total{flex:1 1 auto;text-align:end;font-weight:700;white-space:nowrap;}
-.cbar-count{flex:none;inline-size:44px;block-size:44px;border-radius:50%;background:var(--sheet-accent);color:var(--on-sheet-accent);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;}
-.csheet{position:fixed;inset-inline:0;inset-block:12vh 0;z-index:20;display:flex;flex-direction:column;background:var(--sheet);color:var(--on-sheet);padding:18px 18px calc(14px + env(safe-area-inset-bottom));animation:csheet-up .32s cubic-bezier(.22,1,.36,1) both;}
-.csheet[hidden]{display:none !important;}
-.csheet::before{content:'';position:absolute;inset-block-end:100%;inset-inline:0;block-size:28px;pointer-events:none;background:radial-gradient(circle at 100% 0,transparent 27.5px,var(--sheet) 28px) left bottom/28px 28px no-repeat,radial-gradient(circle at 0 0,transparent 27.5px,var(--sheet) 28px) right bottom/28px 28px no-repeat;}
-.csheet::after{content:'';position:absolute;inset-block-end:100%;inset-inline:0;block-size:100vh;}
-@keyframes csheet-up{from{transform:translateY(100%);}to{transform:none;}}
-.csheet > *{max-inline-size:928px;inline-size:100%;margin-inline:auto;}
-.csheet-head{display:flex;align-items:center;gap:10px;margin-block-end:6px;}
-.csheet-head h2{font-size:26px;font-weight:700;line-height:1.4;}
-.csheet-muted{color:var(--on-sheet-muted);font-size:13.5px;}
-.csheet-head .csheet-muted{flex:1;}
-.csheet-close{inline-size:44px;block-size:44px;flex:none;border-radius:50%;border:0;background:var(--sheet-raised);color:var(--on-sheet);font-size:24px;line-height:1;cursor:pointer;}
-.csheet-lines{list-style:none;flex:1 1 auto;min-block-size:0;overflow-y:auto;}
-.csheet-lines li{display:flex;align-items:center;gap:10px;padding-block:10px;border-block-end:1px solid var(--sheet-line);}
-.csheet-lines .csheet-thumb{inline-size:40px;block-size:40px;}
-.csheet-name{flex:1 1 auto;min-inline-size:0;display:flex;flex-direction:column;}
-.csheet-name b{font-size:14px;overflow-wrap:anywhere;}
-.csheet-step{display:flex;align-items:center;flex:none;border-radius:999px;background:var(--sheet-raised);}
-.csheet-step button{inline-size:40px;block-size:40px;border:0;border-radius:50%;background:transparent;color:var(--on-sheet);font-size:20px;font-weight:700;cursor:pointer;}
-.csheet-step input{inline-size:3.2em;block-size:40px;min-block-size:0;padding:0;border:0;border-radius:8px;background:transparent;color:var(--on-sheet);text-align:center;font-weight:700;}
-.csheet-step input:focus-visible,.csheet-step button:focus-visible,.csheet-close:focus-visible,.csheet-primary:focus-visible{outline:3px solid var(--sheet-accent);outline-offset:2px;}
-.csheet-delivery{display:flex;align-items:flex-start;gap:10px;padding-block:12px;border-block-end:1px solid var(--sheet-line);}
-.csheet-ic{inline-size:40px;block-size:40px;flex:none;border-radius:50%;background:var(--sheet-raised);color:var(--sheet-accent);display:flex;align-items:center;justify-content:center;}
-.csheet-delivery-txt{flex:1 1 auto;display:flex;flex-direction:column;gap:4px;min-inline-size:0;}
-.csheet-progress{block-size:6px;max-inline-size:200px;border-radius:999px;background:var(--sheet-line);overflow:hidden;}
-.csheet-progress i{display:block;block-size:100%;inline-size:var(--p,0%);border-radius:inherit;background:var(--sheet-accent);}
-.csheet-fee{font-weight:700;white-space:nowrap;}
-.csheet-total{display:flex;align-items:baseline;justify-content:space-between;padding-block:14px 12px;}
-.csheet-total strong{font-size:26px;}
-.csheet-primary{display:flex;align-items:center;justify-content:center;min-block-size:54px;border-radius:999px;background:var(--sheet-accent);color:var(--on-sheet-accent);font-weight:700;font-size:16px;text-decoration:none;}
-body.sheet-open{overflow:hidden;}
-/* نشانِ «در سبد» روی کارتِ کالا */
-.card{position:relative;}
-.qty-badge{position:absolute;inset-block-start:16px;inset-inline-start:16px;padding:2px 10px;border-radius:999px;background:var(--sheet);color:var(--on-sheet);font-size:12px;font-weight:700;}
-@media (prefers-reduced-motion: reduce){.csheet{animation:none;}}
+.cart-bar{position:fixed;inset-inline:0;inset-block-end:0;padding:12px 16px calc(12px + env(safe-area-inset-bottom));background:var(--bg);border-block-start:1px solid var(--border);z-index:6;}
+.cart-bar .btn{max-inline-size:928px;margin-inline:auto;display:flex;}
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
 .row > *{flex:1 1 140px;}
