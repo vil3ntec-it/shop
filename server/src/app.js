@@ -203,7 +203,8 @@ async function createApp({ runMigrations = true } = {}) {
           //  F0-13: تنها خوانندهٔ مدتِ آزمایشی — همان عددِ `entitlement`
           trialDays: await plans.trialDaysOf('shop'),
           whatsapp: { number: cfg.whatsapp_number || '', message: cfg.whatsapp_message || '' },
-          minAppVersion: cfg.min_app_version || '',
+          //  §۳۸.۹: حداقلِ همان برنامه‌ای که می‌پرسد (`X-App-Id`/`?app=`؛ نبود ⇒ دکان)
+          minAppVersion: require('./lib/app-compat').minVersionOf(cfg, require('./lib/tenancy').appOfRequest(req)),
           //  ثبت‌نام سه‌مرحله‌ای با ایمیل — برنامه با این می‌فهمد این
           //  سرور مسیرهای /auth/register/* را دارد
           emailSignup: true,
@@ -307,6 +308,8 @@ async function createApp({ runMigrations = true } = {}) {
     //  `/store` — پیشوندِ تازه ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی (دستورالعمل در PR)
     api.use('/shop/storefront', require('./routes/storefront-admin'));
     api.use('/store', require('./routes/storefront'));
+    //  بانکِ تصاویر (v3 ۳۷) — پشتِ پرچمِ `shop.image_bank`، پیش‌فرض خاموش
+    api.use('/shop/images', require('./routes/shop-images'));
     //  تحویل و پیک (۲۲.۲ C) — همان قاعده؛ درهای پیک زیرِ `/courier` (۳.۱۱)
     api.use('/shop/delivery', require('./routes/delivery'));
     api.use('/courier', require('./routes/courier'));
@@ -364,6 +367,8 @@ async function createApp({ runMigrations = true } = {}) {
      */
     api.use('/admin', require('./routes/admin-notices'));
     api.use('/admin', require('./routes/admin-sales'));
+    //  بانکِ مرکزیِ تصاویر (v3 ۳۷.۳) — پشتِ پرچمِ `image_bank.central`، پیش‌فرض خاموش
+    api.use('/admin/image-bank', require('./routes/admin-image-bank'));
     api.use('/portal', require('./routes/portal'));
     api.use('/rep', require('./routes/rep'));       // شورا چ۳: نمایندهٔ فروش — فقط فروش‌های خودش
     api.get('/downloads', require('./routes/portal').downloadsHandler);

@@ -677,6 +677,30 @@ await step('قالبِ آمادهٔ اعلان از پنل ویرایش می‌�
     `عنوانِ قالب باید عوض شده باشد — ${row.title}`);
 });
 
+// ── §۳۸.۹: حداقل نسخهٔ پشتیبانی‌شده از همان فرمِ «نشانیِ دانلود» ──
+await step('حداقل نسخه: از پنل ذخیره می‌شود، نادرست رد می‌شود و دوباره خوانده می‌شود', async () => {
+  await openTab('sales');
+  await page.selectOption('#dl-app', 'shop');
+  await page.fill('#dl-version', '2.14.2');
+  await page.fill('#dl-min', '2.14.0');
+  await page.click('#btn-dl-save');
+  await page.waitForFunction(() => /ذخیره شد/.test(document.getElementById('dl-msg').textContent), null, { timeout: 10_000 });
+  assert.equal((await one(`SELECT value FROM app_config WHERE key='min_app_version_shop'`)).value, '2.14.0');
+
+  //  ۴۰۰ِ عمدی در کنسولِ مرورگر «Failed to load resource» می‌نویسد — همان یکی کنار می‌رود
+  const errorsBefore = consoleErrors.length;
+  await page.fill('#dl-min', '9.0.0');
+  await page.click('#btn-dl-save');
+  await page.waitForFunction(() => /بالاتر/.test(document.getElementById('dl-msg').textContent), null, { timeout: 10_000 });
+  assert.equal((await one(`SELECT value FROM app_config WHERE key='min_app_version_shop'`)).value, '2.14.0');
+  const extra = consoleErrors.splice(errorsBefore);
+  assert.ok(extra.every((e) => /400/.test(e)), extra.join(' | '));
+
+  await page.fill('#dl-min', '');
+  await openTab('sales');
+  assert.equal(await page.inputValue('#dl-min'), '2.14.0', 'پس از بازخوانی همان مقدارِ ذخیره‌شده');
+});
+
 await step('همگام‌سازی و امنیت: دستگاه‌ها، خطاها و درخواست‌های ورود بی خطا پر می‌شوند', async () => {
   await openTab('health');
   await page.waitForTimeout(400);
@@ -684,8 +708,53 @@ await step('همگام‌سازی و امنیت: دستگاه‌ها، خطاه�
     const rows = await page.locator(`#${id} tr`).count();
     assert.ok(rows >= 1, `${id} خالی ماند`);
   }
+  //  §۳۸.۸، OPS-01@38: کارت‌های سلامتِ سرور با وضعیتِ متنی (نه فقط رنگ)
+  await page.waitForFunction(() => document.querySelectorAll('#sys-health .stat').length === 7, null, { timeout: 10_000 });
+  assert.match((await page.locator('#sys-overall').textContent()).trim(), /^● (سالم|هشدار|خراب|نامعلوم)$/);
+  const cardsText = await page.locator('#sys-health').textContent();
+  assert.match(cardsText, /دیتابیس/);
+  assert.ok(!/postgres(ql)?:\/\//i.test(cardsText), 'نشانیِ دیتابیس در کارت‌ها');
   const csp = await page.evaluate(async () => (await fetch('/admin/')).headers.get('content-security-policy'));
   assert.match(csp || '', /script-src 'self'/);
+});
+
+// ── F0-27: کانالِ آزمایشی — مدیرِ ارشد از پنل دکان و دستگاه را می‌افزاید ──
+await step('کانالِ آزمایشی: ذخیره در live_config و سابقه؛ شناسهٔ ناجور پیامِ قرمز و بی‌تغییر', async () => {
+  await openTab('plans');
+  await page.waitForSelector('#beta-panel:not(.hidden)', { timeout: 10_000 });
+  await page.fill('#beta-shops', 'shop_panel_1\nshop_panel_2');
+  await page.fill('#beta-devices', 'dev_panel_1, dev_panel_1');
+  await page.fill('#beta-reason', 'آزمونِ پنل');
+  await page.click('#btn-beta-save');
+  await page.waitForSelector('#beta-msg .msg-ok', { timeout: 10_000 });
+  const val = async (key) => {
+    const r = await one(`SELECT value FROM live_config WHERE scope='release' AND key=$1`, [key]);
+    return typeof r.value === 'string' ? JSON.parse(r.value) : r.value;
+  };
+  assert.deepEqual(await val('beta.shops'), ['shop_panel_1', 'shop_panel_2']);
+  assert.deepEqual(await val('beta.devices'), ['dev_panel_1']);
+  const a = await one(`SELECT detail FROM audit_logs WHERE action='admin.release_beta_set' ORDER BY created_at DESC LIMIT 1`);
+  const d = typeof a.detail === 'string' ? JSON.parse(a.detail) : a.detail;
+  assert.equal(d.reason, 'آزمونِ پنل');
+  assert.equal(d.shops.added, 'shop_panel_1, shop_panel_2');
+  assert.match(await page.textContent('#beta-shops-meta'), /relroot|admin/);
+
+  await page.fill('#beta-shops', 'bad id!');
+  await page.click('#btn-beta-save');
+  await page.waitForSelector('#beta-msg .msg-bad', { timeout: 10_000 });
+  assert.deepEqual(await val('beta.shops'), ['shop_panel_1', 'shop_panel_2'], 'شناسهٔ ناجور چیزی را عوض نکرد');
+});
+
+await step('کانالِ آزمایشی: دکمهٔ صفحهٔ دکان همان دکان را می‌افزاید', async () => {
+  await openTab('shops');
+  await page.click('#shops-body tr:first-child button');
+  await page.waitForSelector('#shop-detail:not(.hidden) #btn-shop-beta', { timeout: 10_000 });
+  const id = (await page.textContent('#shop-id')).trim();
+  await page.click('#btn-shop-beta');
+  await page.waitForFunction(() => document.querySelector('#btn-shop-beta')?.textContent?.includes('در کانالِ آزمایشی است'), null, { timeout: 10_000 });
+  const r = await one(`SELECT value FROM live_config WHERE scope='release' AND key='beta.shops'`);
+  const ids = typeof r.value === 'string' ? JSON.parse(r.value) : r.value;
+  assert.deepEqual(ids, ['shop_panel_1', 'shop_panel_2', id], 'بقیهٔ فهرست دست نخورد');
 });
 
 // ── F0-15: ورودِ دومرحله‌ایِ اختیاری — روشن کردن و ورود با کد، از خودِ پنل ──

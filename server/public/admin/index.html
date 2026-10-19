@@ -501,6 +501,35 @@
       <div id="cfg-msg"></div>
     </div>
 
+    <!--
+      F0-27: کانالِ آزمایشی — دکان یا دستگاهی که این‌جا باشد هر مرجِ main را از
+      «به‌روزرسانی»ِ داخلِ برنامه می‌گیرد. فقط مدیرِ ارشد (‎/api/admin/release/beta‎)؛
+      هر ذخیره با «افزوده/برداشته» و دلیل در «سابقه».
+    -->
+    <div class="panel hidden" id="beta-panel">
+      <div class="panel-head"><h2>کانالِ آزمایشی</h2></div>
+      <p class="muted">دکان یا دستگاهی که این‌جا باشد، هر نسخهٔ تازه را از «به‌روزرسانی»ِ داخلِ برنامه می‌گیرد؛ بقیه فقط نسخهٔ پایدار. هر خط یک شناسه — شناسهٔ دکان بالای صفحهٔ همان دکان (زبانهٔ «دکان‌ها»)، شناسهٔ دستگاه در «همگام‌سازی و امنیت». برداشتن از فهرست نسخهٔ نصب‌شده را پایین نمی‌آورد.</p>
+      <div class="grid grid-2">
+        <div>
+          <label for="beta-shops">دکان‌ها</label>
+          <textarea id="beta-shops" rows="5" dir="ltr"></textarea>
+          <div class="muted" id="beta-shops-meta"></div>
+        </div>
+        <div>
+          <label for="beta-devices">دستگاه‌ها</label>
+          <textarea id="beta-devices" rows="5" dir="ltr"></textarea>
+          <div class="muted" id="beta-devices-meta"></div>
+        </div>
+      </div>
+      <label for="beta-reason">دلیل (اختیاری؛ در سابقه می‌ماند)</label>
+      <input type="text" id="beta-reason" maxlength="200">
+      <button class="btn" id="btn-beta-save" style="margin-top:12px;">ذخیره</button>
+      <div id="beta-msg"></div>
+      <p class="muted">انتشارهای آزمایشی:
+        <a href="https://github.com/vil3ntec-it/shop/releases/tag/tohid-native-beta" target="_blank" rel="noopener">اندروید</a> ·
+        <a href="https://github.com/vil3ntec-it/shop/releases/tag/tohid-desktop-beta" target="_blank" rel="noopener">کامپیوتر</a></p>
+    </div>
+
     <div class="panel">
       <div class="panel-head"><h2>پلن‌های اشتراکِ دکان</h2></div>
       <div class="table-scroll">
@@ -623,6 +652,10 @@
       </div>
       <label>یادداشتِ نسخه</label>
       <input type="text" id="dl-notes" placeholder="چه چیزی تازه شد">
+      <!-- §۳۸.۹: برنامهٔ زیرِ این نسخه «دیگر پشتیبانی نمی‌شود، به‌روز کنید» می‌بیند؛ داده قفل نمی‌شود -->
+      <label>حداقل نسخهٔ پشتیبانی‌شده</label>
+      <input type="text" id="dl-min" dir="ltr" placeholder="خالی = حداقلی نیست">
+      <p class="muted">برنامه‌ای که پایین‌تر از این باشد به‌جای «نسخهٔ تازه آمد» پیامِ «این نسخه دیگر پشتیبانی نمی‌شود» را بی دکمهٔ «بعداً» می‌بیند. هیچ داده‌ای قفل نمی‌شود.</p>
       <div class="row" style="margin-top:10px;"><button class="btn btn-sm" id="btn-dl-save">ذخیره</button></div>
       <div id="dl-msg"></div>
     </div>
@@ -1080,6 +1113,12 @@
   <!-- سابقه -->
   <!-- همگام‌سازی و امنیت: دستگاه‌ها، تعارض‌ها، خطاهای برنامه‌ها، درخواست‌های ورود -->
   <section id="tab-health" class="hidden">
+    <!-- سلامتِ سرور (§۳۸.۸، OPS-01@38) — فقط عدد و وضعیت، بی هیچ راز -->
+    <div class="panel">
+      <h2>سلامتِ سرور</h2>
+      <div class="row"><span class="badge b-mute" id="sys-overall">—</span><span class="muted" id="sys-checked"></span></div>
+      <div class="stats" id="sys-health" style="margin-top:12px;"></div>
+    </div>
     <div class="panel">
       <h2>دستگاه‌های همگام‌سازی</h2>
       <div class="row">
