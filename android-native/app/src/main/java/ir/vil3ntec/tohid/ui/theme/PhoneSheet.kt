@@ -9,9 +9,9 @@ import androidx.compose.ui.graphics.luminance
  *  (phone-ui، تصویرهای مرجعِ ۳، ۵ و ۶؛ VISUAL-DIRECTION §۴).
  *
  *  جدا از `ShopColors` نگه داشته شده تا پالتِ اصلی (`Theme.kt`، مالِ design-v2)
- *  دست نخورد. همان مقدارها در `index.html` با نامِ `--sheet*` و `--nav-pill*`
- *  هستند و `PhoneSheetParityTest` عدد به عدد می‌سنجد. متن روی برگه ≥ ۴٫۵:۱ و
- *  شکلِ غیرمتنی ≥ ۳:۱ (`PhoneSheetParityTest`).
+ *  دست نخورد. فقط برنامهٔ بومی (گوشیِ اندروید؛ پیش‌نمایشِ گوشیِ `DevShot`) — نسخهٔ
+ *  وب به سفارشِ صاحب محصول دست نمی‌خورد. متن روی برگه ≥ ۴٫۵:۱ و شکلِ غیرمتنی
+ *  ≥ ۳:۱ (`PhoneSheetContrastTest`).
  *
  *   • `sheet` زمینهٔ تیرهٔ نوار و برگهٔ سبد؛ `onSheet`/`onSheetMuted` متن رویش.
  *   • `accent`/`onAccent` دایرهٔ شمار و دکمهٔ اصلیِ برگه — همان بنفشِ برنامه در
