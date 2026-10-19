@@ -89,8 +89,10 @@ test('هیچ لایه‌ای بیش از نقش نمی‌دهد و چیزِ اج
   const tok = { token: t.owner.accessToken };
   const cases = [
     ['/api/shop/permissions/roles/staff', { 'settings.write': { mode: 'allow' } }, 'exceeds_role'],
-    ['/api/shop/permissions/roles/manager', { 'sales.discount': { caps: { maxPct: 5 } } }, 'not_enforceable_yet'],
-    ['/api/shop/permissions/roles/manager', { 'sales.cancel': { mode: 'deny' } }, 'not_enforceable_yet'],
+    //  تخفیف و لغو از ۱۴۰۵/۰۷/۲۷ در سرور اجرا می‌شوند (staff-approval.test.js)؛ ولی شاگرد «مجاز» نمی‌گیرد
+    ['/api/shop/permissions/roles/staff', { 'sales.discount': { mode: 'allow' } }, 'exceeds_role'],
+    ['/api/shop/permissions/roles/staff', { 'sales.cancel': { mode: 'allow' } }, 'exceeds_role'],
+    ['/api/shop/permissions/roles/manager', { 'returns.create': { caps: { maxPct: 5 } } }, 'unknown_cap'],
     ['/api/shop/permissions/roles/manager', { 'settings.write': { mode: 'approve' } }, 'not_approvable'],
     ['/api/shop/permissions/roles/manager', { 'data.write': { mode: 'deny' } }, 'unknown_permission'],
     ['/api/shop/permissions/roles/owner', { 'settings.write': { mode: 'deny' } }, 'owner_fixed'],
@@ -102,6 +104,11 @@ test('هیچ لایه‌ای بیش از نقش نمی‌دهد و چیزِ اج
     assert.equal(r.status, 400, `${url} ${JSON.stringify(perms)}`);
     assert.equal(r.body.error.code, code, `${url} ${JSON.stringify(perms)}`);
   }
+  //  کلیدهای پولی حالا که سرور اجرایشان می‌کند ذخیره می‌شوند
+  for (const perms of [{ 'sales.discount': { caps: { maxPct: 5 } } }, { 'sales.cancel': { mode: 'deny' } }]) {
+    assert.equal((await h.put('/api/shop/permissions/roles/manager', { perms }, tok)).status, 200, JSON.stringify(perms));
+  }
+  assert.equal((await h.put('/api/shop/permissions/roles/manager', { perms: {} }, tok)).status, 200);
   //  شاگرد با «بدنهٔ دست‌ساز» مجوز نمی‌گیرد و مدیر هم لایه نمی‌نویسد
   const sid = (await h.get('/api/shop/permissions', tok)).body.shop.members.find((m) => m.role === 'staff').userId;
   const grant = await h.put(`/api/shop/permissions/members/${sid}`, { perms: { 'audit.view': { mode: 'allow' } } }, tok);
