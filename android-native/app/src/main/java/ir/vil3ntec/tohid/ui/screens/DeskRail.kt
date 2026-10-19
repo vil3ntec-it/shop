@@ -58,7 +58,8 @@ fun DeskRail(
 ) {
   val context = LocalContext.current
   val canAdmin = ir.vil3ntec.tohid.data.ShopRole.canOpenSettings(context)
-  val groups = DeskMenu.groups(canAdmin)
+  //  سفارش‌ها فقط وقتی سرور گفته بخشِ سفارش برای این دکان روشن است
+  val groups = DeskMenu.groups(canAdmin, ordersLive = ir.vil3ntec.tohid.ui.OrdersLive.enabled)
   Column(
     Modifier
       .width(if (compact) DESK_RAIL_COMPACT else DESK_RAIL_WIDTH)
@@ -197,7 +198,8 @@ private fun iconOf(id: String): ImageVector = when (id) {
   "audit" -> Icons.Filled.History
   "settings" -> Icons.Filled.Settings
   "admin" -> Icons.Filled.AdminPanelSettings
-    "devices" -> Icons.Filled.Devices
+  "orders" -> Icons.Filled.ShoppingBasket
+  "devices" -> Icons.Filled.Devices
   "soon:orders" -> Icons.Filled.ShoppingCart
   "soon:fulfil" -> Icons.Filled.Inventory
   "soon:storefront" -> Icons.Filled.Storefront
