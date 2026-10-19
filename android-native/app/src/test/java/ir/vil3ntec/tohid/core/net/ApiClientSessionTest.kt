@@ -121,6 +121,100 @@ class ApiClientSessionTest {
     assertEquals("salem", store.refreshToken)
   }
 
+  /*
+   *  ── تازه‌سازیِ چرخشی (بندِ ۲۹.۲ و ۲۳.۴ سندِ v3: «بستن و باز کردن یا قطع و
+   *  وصلِ اینترنت نباید کاربر را بی‌دلیل خارج کند») ───────────────────────
+   *  سرورِ واقعی در هر `/auth/refresh` توکنِ تازه‌سازیِ **تازه** می‌دهد و
+   *  قبلی را می‌بندد؛ اگر قبلی پس از سی ثانیه برگردد «دزدی» حساب می‌شود و
+   *  کلِ نشستِ آن دستگاه بسته می‌شود (`refresh_reused`). برنامه تا امروز
+   *  توکنِ تازه را دور می‌ریخت، پس دومین تازه‌سازی — یعنی حدودِ دو ساعت
+   *  کار، یا فردای همان روز — کاربر را بیرون می‌انداخت.
+   */
+  @Test
+  fun `توکنِ تازه‌سازیِ چرخیده ذخیره می‌شود و دومین تازه‌سازی هم بیرون نمی‌اندازد`() {
+    //  سرورِ چرخشی، همان‌طور که `lib/tokens.rotateRefresh` رفتار می‌کند
+    var live = "r0"
+    var generation = 0
+    handle(ApiEndpoints.Auth.REFRESH) { request ->
+      if (request.body.contains("\"$live\"")) {
+        generation++
+        live = "r$generation"
+        200 to """{"accessToken":"a$generation","accessExpiresAt":${1000 + generation},"refreshToken":"$live"}"""
+      } else {
+        401 to """{"error":{"code":"refresh_reused","message":"این نشست جای دیگری هم به کار رفته و بسته شد"}}"""
+      }
+    }
+    //  هر توکنِ دسترسی فقط یک بار پذیرفته می‌شود — یعنی هر درخواستِ بعدی
+    //  دوباره به تازه‌سازی می‌خورد، مثلِ گذشتنِ یک ساعت
+    val used = mutableSetOf<String>()
+    handle(ApiEndpoints.Shop.ME) { request ->
+      if (request.bearer.startsWith("a") && used.add(request.bearer)) 200 to """{"shop":{"id":"shp_1"}}"""
+      else 401 to """{"error":{"code":"invalid_token"}}"""
+    }
+
+    val store = tokens(access = "pir", refresh = "r0")
+    var told = false
+    val client = clientWith(store) { told = true }
+    runBlocking { client.get(ApiEndpoints.Shop.ME) }
+    assertEquals("توکنِ چرخیده باید جای قبلی بنشیند", "r1", store.refreshToken)
+    runBlocking { client.get(ApiEndpoints.Shop.ME) }
+    runBlocking { client.get(ApiEndpoints.Shop.ME) }
+
+    assertFalse("سه تازه‌سازیِ پیاپی نباید کاربر را بیرون بیندازد", told)
+    assertEquals("r3", store.refreshToken)
+    assertEquals("a3", store.accessToken)
+    assertEquals(1003L, store.accessExpiresAt)
+  }
+
+  @Test
+  fun `نام‌های قراردادِ ورود هم خوانده می‌شوند`() {
+    //  `/auth/refresh` هر دو شکل را می‌فرستد؛ اگر روزی فقط شکلِ قرارداد ماند،
+    //  توکنِ چرخیده نباید گم شود
+    handle(ApiEndpoints.Auth.REFRESH) { 200 to """{"access_token":"tazeh","refresh_token":"r-tazeh","access_expires_in":3600}""" }
+    handle(ApiEndpoints.Shop.ME) { request ->
+      if (request.bearer == "tazeh") 200 to "{}" else 401 to """{"error":{"code":"invalid_token"}}"""
+    }
+    val store = tokens(access = "pir", refresh = "r-pir")
+    runBlocking { clientWith(store).get(ApiEndpoints.Shop.ME) }
+    assertEquals("tazeh", store.accessToken)
+    assertEquals("r-tazeh", store.refreshToken)
+    assertTrue("مهلت از `access_expires_in` ساخته شود", store.accessExpiresAt > System.currentTimeMillis())
+  }
+
+  @Test
+  fun `سقفِ نرخ روی تازه‌سازی نشست را پاک نمی‌کند`() {
+    handle(ApiEndpoints.Shop.ME) { 401 to """{"error":{"code":"invalid_token"}}""" }
+    handle(ApiEndpoints.Auth.REFRESH) { 429 to """{"error":{"code":"rate_limited","message":"درخواست‌ها زیاد بود"}}""" }
+
+    val store = tokens(access = "pir", refresh = "salem")
+    var told = false
+    val failure = runCatching {
+      runBlocking { clientWith(store) { told = true }.get(ApiEndpoints.Shop.ME) }
+    }.exceptionOrNull()
+
+    assertTrue(failure is ApiFailure.RateLimited)
+    assertFalse("۴۲۹ یعنی «الان نه»، نه «نشست مرد»", told)
+    assertEquals("salem", store.refreshToken)
+    assertEquals("pir", store.accessToken)
+  }
+
+  @Test
+  fun `پاسخِ غیرِ JSON روی تازه‌سازی (پورتالِ وای‌فای) نشست را پاک نمی‌کند`() {
+    handle(ApiEndpoints.Shop.ME) { 401 to """{"error":{"code":"invalid_token"}}""" }
+    //  وای‌فایِ هتل یا صفحهٔ «بسته تمام شد»ِ اپراتور: ۲۰۰ با HTML
+    handle(ApiEndpoints.Auth.REFRESH) { 200 to "<html>لطفاً وارد شوید</html>" }
+
+    val store = tokens(access = "pir", refresh = "salem")
+    var told = false
+    val failure = runCatching {
+      runBlocking { clientWith(store) { told = true }.get(ApiEndpoints.Shop.ME) }
+    }.exceptionOrNull()
+
+    assertTrue(failure is ApiFailure.InvalidResponse)
+    assertFalse(told)
+    assertEquals("salem", store.refreshToken)
+  }
+
   @Test
   fun `بدونِ توکنِ تازه‌سازی، همان یک بار تمام است`() {
     handle(ApiEndpoints.Shop.ME) { 401 to """{"error":{"code":"invalid_token"}}""" }
