@@ -133,7 +133,7 @@
     return '/api/store/' + encodeURIComponent(slug) + '/products/' + encodeURIComponent(id) + '/photo';
   }
   function productRow(p) {
-    var img = el('span', { class: 'pimg' });
+    var img = el('span', { class: 'pimg' + (p.photo ? ' tile' : '') });
     if (p.photo) img.appendChild(el('img', { attrs: { src: photoUrl(p.shop.slug, p.id), alt: '', loading: 'lazy', decoding: 'async', width: '64', height: '64' } }));
     else img.appendChild(el('span', { class: 'ph', text: p.name.slice(0, 1), attrs: { 'aria-hidden': 'true' } }));
     return el('li', {}, el('a', { class: 'card prow', attrs: { href: '/store/' + encodeURIComponent(p.shop.slug) + '#/p/' + encodeURIComponent(p.id) } },
