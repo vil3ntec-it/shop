@@ -1,9 +1,12 @@
 package ir.vil3ntec.tohid.sync.v1
 
 import ir.vil3ntec.tohid.data.ShopData
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.encoding.CompositeDecoder
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNames
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -109,6 +112,37 @@ object LedgerDiff {
     INC_FIELDS[table]?.contains(field) == true
 
   /**
+   *  نامِ فیلدهایی که مدلِ **همین نسخه** برای هر مجموعه می‌شناسد — نامِ
+   *  سریال و نام‌های `@JsonNames`، خوانده از خودِ `ShopData.serializer()`،
+   *  پس فیلدِ تازهٔ مدل بی هیچ فهرستِ دستی همین‌جا هم هست.
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  private val MODEL_FIELDS: Map<String, Set<String>> by lazy {
+    val root = ShopData.serializer().descriptor
+    COLLECTIONS.associateWith { key ->
+      val at = root.getElementIndex(key)
+      if (at == CompositeDecoder.UNKNOWN_NAME) return@associateWith emptySet()
+      val row = root.getElementDescriptor(at).getElementDescriptor(0)
+      val names = HashSet<String>()
+      for (i in 0 until row.elementsCount) {
+        names += row.getElementName(i)
+        for (a in row.getElementAnnotations(i)) if (a is JsonNames) names += a.names
+      }
+      names
+    }
+  }
+
+  /**
+   *  آیا مدلِ این نسخه کلیدِ [key] را در ردیف‌های [table] می‌شناسد؟
+   *  مجموعه‌ای که مدل ندارد (نباید پیش بیاید) «می‌شناسد» حساب می‌شود، یعنی
+   *  همان رفتارِ پیشین.
+   */
+  fun isModelField(table: String, key: String): Boolean {
+    val known = MODEL_FIELDS[table]
+    return known.isNullOrEmpty() || key in known
+  }
+
+  /**
    *  دفتر به شکلِ JSON — همان شکلی که روی خط می‌رود.
    *
    *  ⛔ **عددها به شکلِ جاوااسکریپت نوشته می‌شوند**، یعنی `120` نه
@@ -176,6 +210,12 @@ object LedgerDiff {
    *
    *  فیلدی که از ردیف برداشته شده با `null`ِ صریح می‌رود، وگرنه سرور
    *  مقدارِ قدیمی را برای همیشه نگه می‌دارد.
+   *
+   *  ⛔ **فقط فیلدی که مدلِ همین نسخه می‌شناسد** (`isModelField`). کلیدی که
+   *  مدل ندارد را برنامهٔ تازه‌تر یا سرور نوشته (`payments`، `approval`،
+   *  `orderId`، …)؛ دفترِ این نسخه آن را از درِ مدل نمی‌خواند، پس «نبودنش»
+   *  در `after` یعنی «نمی‌شناسم»، نه «کاربر پاکش کرد». پیش از A00 همین‌جا
+   *  `null` می‌رفت و دادهٔ نسخهٔ تازه‌تر روی سرور پاک می‌شد.
    */
   fun changedFields(table: String, before: JsonObject, after: JsonObject): JsonObject? {
     val out = LinkedHashMap<String, JsonElement>()
@@ -197,6 +237,7 @@ object LedgerDiff {
     }
     for ((k, v) in before) {
       if (k == "id" || after.containsKey(k) || v is JsonNull) continue
+      if (!isModelField(table, k)) continue
       out[k] = JsonNull
     }
     return if (out.isEmpty()) null else JsonObject(out)
@@ -211,6 +252,14 @@ object LedgerDiff {
    *
    *  ترتیبِ خروجی همان ترتیبِ خودِ فهرست‌هاست، تا «فاکتور پیش از اقلامش»
    *  بماند.
+   *
+   *  ⛔ **مقایسه به زبانِ مدل** (A00): سایه می‌تواند ردیفِ خامِ سرور باشد
+   *  (Snapshot، `unionRows`، سایه‌ای که نسخهٔ پیشین روی دیسک گذاشته) —
+   *  با پیش‌فرض‌هایی که ندارد یا کلیدِ تودرتویی (`payments[].custody`) که
+   *  مدل نمی‌شناسد. ردیفی که خام با دفتر فرق دارد یک بار از درِ مدل رد
+   *  می‌شود (`modelView`) و تفاضل با همان گرفته می‌شود؛ پس ردیفی که کاربر
+   *  دست نزده هیچ opی نمی‌سازد و فیلدی که عوض نشده، حتی اگر مدل بخشی از
+   *  درونش را نشناسد، دوباره نوشته نمی‌شود.
    */
   fun diff(shadow: JsonObject?, next: JsonObject, now: Long = System.currentTimeMillis()): List<SyncOp> {
     val ops = ArrayList<SyncOp>()
@@ -218,6 +267,10 @@ object LedgerDiff {
       val before = rowsOf(shadow, table).associateBy { idOf(it) }
       val after = rowsOf(next, table)
       val afterIds = HashSet<String>(after.size)
+      //  فقط ردیف‌هایی که خام فرق دارند — معمولاً همان چند ردیفی که کاربر عوض کرده
+      val view = modelView(table, after.mapNotNull { row ->
+        before[idOf(row)]?.takeIf { changedFields(table, bodyOf(it), bodyOf(row)) != null }
+      })
 
       for (row in after) {
         val id = idOf(row)
@@ -226,7 +279,7 @@ object LedgerDiff {
         if (was == null) {
           ops += SyncOp(Ulid.next(now), now, table, id, SyncOp.INSERT, bodyOf(row))
         } else {
-          val fields = changedFields(table, bodyOf(was), bodyOf(row))
+          val fields = changedFields(table, bodyOf(view[id] ?: was), bodyOf(row))
           if (fields != null) ops += SyncOp(Ulid.next(now), now, table, id, SyncOp.UPDATE, fields)
         }
       }
@@ -251,6 +304,55 @@ object LedgerDiff {
       }
     }
     return ops
+  }
+
+  /**
+   *  ردیف‌های خامِ [rows] از جدولِ [table] همان‌طور که مدلِ این نسخه
+   *  می‌نویسدشان (پیش‌فرض‌ها پر، کلیدِ ناشناخته بیرون)، به شناسه.
+   *  ردیفی که مدل نتواند بخواند بیرون می‌ماند و تفاضلش خام گرفته می‌شود.
+   */
+  private fun modelView(table: String, rows: List<JsonObject>): Map<String, JsonObject> {
+    if (rows.isEmpty()) return emptyMap()
+    fun shape(list: List<JsonObject>): List<JsonObject>? = try {
+      rowsOf(toJson(fromJson(JsonObject(mapOf(table to JsonArray(list))))), table)
+    } catch (_: Exception) {
+      null
+    }
+    shape(rows)?.takeIf { it.size == rows.size }?.let { all -> return all.associateBy { idOf(it) } }
+    //  یک ردیفِ ناخوانا بقیه را از راهِ مدل بیرون نیندازد
+    val out = HashMap<String, JsonObject>()
+    for (r in rows) shape(listOf(r))?.singleOrNull()?.let { out[idOf(it)] = it }
+    return out
+  }
+
+  /**
+   *  درختِ [next] (از درِ مدل) + کلیدهایی از همان ردیف در [shadow] که مدلِ
+   *  این نسخه نمی‌شناسد — رفت‌وبرگشتِ JSON ِ خام (A00).
+   *
+   *  سایه‌ای که با این ساخته شود آنچه برنامهٔ تازه‌تر یا سرور روی ردیف
+   *  گذاشته (`payments`، `orderId`، …) را نگه می‌دارد؛ `changedFields` هم
+   *  هرگز برای آن‌ها `null` نمی‌سازد. ردیفی که در [next] نیست (پاک‌شده)
+   *  همان‌طور بیرون می‌ماند.
+   */
+  fun keepUnknown(shadow: JsonObject?, next: JsonObject): JsonObject {
+    if (shadow == null) return next
+    var out: LinkedHashMap<String, JsonElement>? = null
+    for (table in COLLECTIONS) {
+      val before = rowsOf(shadow, table).associateBy { idOf(it) }
+      val rows = next[table] as? JsonArray
+      if (before.isEmpty() || rows == null) continue
+      var changed = false
+      val list = rows.map { r ->
+        val row = r as? JsonObject ?: return@map r
+        val was = before[idOf(row)] ?: return@map r
+        val extra = was.filterKeys { it !in row && !isModelField(table, it) }
+        if (extra.isEmpty()) return@map r
+        changed = true
+        JsonObject(LinkedHashMap<String, JsonElement>(row).apply { putAll(extra) })
+      }
+      if (changed) (out ?: LinkedHashMap<String, JsonElement>(next).also { out = it })[table] = JsonArray(list)
+    }
+    return out?.let { JsonObject(it) } ?: next
   }
 
   /**
@@ -331,7 +433,9 @@ object LedgerDiff {
       raw
     }
     //  ⚠️ پیش‌فرضِ مدل جای فهرستی که در درخت نبود نمی‌نشیند (شرح بالای `LIST_COLLECTIONS`)
-    return keepListsOf(raw, shaped)
+    //  و کلیدی که مدل نمی‌شناسد در ردیف می‌ماند (A00، `keepUnknown`): سایه همان
+    //  چیزی را دارد که سرور دارد؛ `fromJson` ِ دفتر آن را نادیده می‌گیرد
+    return keepListsOf(raw, keepUnknown(raw, shaped))
   }
 
   private fun keepListsOf(src: JsonObject, dst: JsonObject): JsonObject {
