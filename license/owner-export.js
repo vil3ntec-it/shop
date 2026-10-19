@@ -64,6 +64,8 @@
     id: 'شناسه',
     name: 'نام',
     phone: 'تلفن',
+    dueDate: 'سررسید',
+    creditLimit: 'سقف اعتبار',
     notes: 'یادداشت',
     createdAt: 'زمان ثبت (UTC)',
     date: 'تاریخ',

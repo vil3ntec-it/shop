@@ -203,7 +203,8 @@ async function createApp({ runMigrations = true } = {}) {
           //  F0-13: تنها خوانندهٔ مدتِ آزمایشی — همان عددِ `entitlement`
           trialDays: await plans.trialDaysOf('shop'),
           whatsapp: { number: cfg.whatsapp_number || '', message: cfg.whatsapp_message || '' },
-          minAppVersion: cfg.min_app_version || '',
+          //  §۳۸.۹: حداقلِ همان برنامه‌ای که می‌پرسد (`X-App-Id`/`?app=`؛ نبود ⇒ دکان)
+          minAppVersion: require('./lib/app-compat').minVersionOf(cfg, require('./lib/tenancy').appOfRequest(req)),
           //  ثبت‌نام سه‌مرحله‌ای با ایمیل — برنامه با این می‌فهمد این
           //  سرور مسیرهای /auth/register/* را دارد
           emailSignup: true,
