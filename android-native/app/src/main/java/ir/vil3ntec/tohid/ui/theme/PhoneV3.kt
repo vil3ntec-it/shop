@@ -45,6 +45,12 @@ data class PhoneV3Colors(
   val tile: Color,
   val positive: Color,
   val negative: Color,
+  /**
+   *  نقطهٔ «در انتظار» (حالتِ پیک: کارِ هنوز به دکان نرسیده، مأموریتِ تازه).
+   *  کهربایی، چون زردِ سبد (`cart`) فقط مالِ سبد است و سبز/سرخ معنای دیگر دارند.
+   *  پیش‌فرض دارد تا سازنده‌های روشن/تیره دست نخورند.
+   */
+  val waiting: Color = Color(0xFFF59E0B),
 )
 
 val PhoneV3Light = PhoneV3Colors(
