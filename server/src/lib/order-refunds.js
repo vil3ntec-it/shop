@@ -215,6 +215,11 @@ async function record(shopId, orderId, { key, body, actor }) {
       'UPDATE online_orders SET status=$3, status_reason=$4, version=version+1, updated_at=$5 WHERE shop_id=$1 AND id=$2',
       [shopId, row.id, to, to === row.status ? row.status_reason : '', at]
     );
+    //  ORD-20: همان قلّابِ `orders.applyTransition` — بازپرداختِ کامل ⇒ سندِ برگشتِ فاکتورِ W
+    //  در دفترِ دکان، در همین تراکنش (بی فاکتورِ W ⇒ هیچ)
+    if (to !== row.status) {
+      await require('./order-ledger').onOrderStatus(c, shopId, { id: row.id, from: row.status, to }, actor, at);
+    }
     const entry = (await c.query('SELECT * FROM online_order_refunds WHERE id=$1', [entryId])).rows[0];
     return { replayed: false, from: row.status, to, entry: entryOut(entry) };
   });
