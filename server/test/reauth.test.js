@@ -134,6 +134,36 @@ test('مجوز و نقشِ کارمندان: هر سه مسیر با نشستِ 
   }
 });
 
+test('فقط نشستِ دکان: نشستِ کهنهٔ پمپ روی مسیرهای مشترکِ /api/auth/* مثلِ پیش از این تغییر', async () => {
+  //  گذاشتنِ رمز برای حسابِ بی‌رمز — یک حساب، دو نشستِ کهنه: دکان و پمپ
+  const email = 'reauth-pump@test.local';
+  const shopCode = await h.post('/api/auth/otp/request', { email });
+  const made = await h.post('/api/auth/otp/verify', { email, code: shopCode.body.devCode, name: 'دوبخشی' });
+  assert.equal(made.status, 201, JSON.stringify(made.body));
+  const pumpCode = await h.post('/api/auth/otp/request', { email, app: 'pump' });
+  const pumpIn = await h.post('/api/auth/otp/verify', { email, code: pumpCode.body.devCode, app: 'pump' });
+  assert.ok([200, 201].includes(pumpIn.status), JSON.stringify(pumpIn.body));
+  const shopStale = await staleSession(made.body);
+  const pumpStale = await staleSession(pumpIn.body);
+
+  assertNeedsReauth(await h.post('/api/auth/password', { newPassword: 'Taze!pass12' }, { token: shopStale.accessToken }), 'password/shop');
+  const pumpSet = await h.post('/api/auth/password', { newPassword: 'Taze!pass12' }, { token: pumpStale.accessToken });
+  assert.equal(pumpSet.status, 200, `پمپ نباید reauth_required بگیرد: ${JSON.stringify(pumpSet.body)}`);
+
+  //  خروج از همهٔ دستگاه‌ها
+  const u = await h.newUser('دوبخشیِ رمزدار');
+  const pump = await h.signIn(u, 'pump');
+  assertNeedsReauth(await h.post('/api/auth/logout-all', {}, { token: (await staleSession(u)).accessToken }), 'logout-all/shop');
+  const out = await h.post('/api/auth/logout-all', {}, { token: (await staleSession(pump)).accessToken });
+  assert.equal(out.status, 200, `پمپ نباید reauth_required بگیرد: ${JSON.stringify(out.body)}`);
+  assert.equal(out.body.app, 'pump');
+
+  //  `/api/me` اصلاً توکنِ پمپ را نمی‌پذیرد (`requireUser`) — پس این‌جا چیزی برای پمپ عوض نشده
+  const pumpAgain = await h.signIn(u, 'pump');
+  assert.equal((await h.get('/api/pump/me', { token: pumpAgain.accessToken })).status, 200, 'نشستِ پمپ سالم است');
+  assert.equal((await h.put('/api/me', { phone: '09121112233' }, { token: pumpAgain.accessToken })).status, 401);
+});
+
 test('تازگی به همان نشست بسته است، و پس از پنجره تمام می‌شود', async () => {
   const u = await h.newUser('پنجره');
   const a = await staleSession(u);

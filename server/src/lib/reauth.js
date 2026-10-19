@@ -23,6 +23,14 @@
  * هفت‌روزه (`db.js`) و همان نمایه — بی جدول یا مهاجرتِ تازه. به توکنِ
  * دسترسیِ همین نشست بسته است، پس در دستگاهِ دیگر یا با توکنِ دیگر کار نمی‌کند.
  *
+ * ── فقط نشستِ برنامهٔ دکان ─────────────────────────────────────────
+ * توکن بخشِ خودش را دارد (`tokens.app`، و `req.appSection` از همان ردیف).
+ * پنجرهٔ «رمز را دوباره بزنید» فقط در برنامه‌های دکان هست (`ReauthHost`).
+ * پمپ برنامه‌ای جداست و چنین پنجره‌ای ندارد؛ پس روی مسیرهای مشترکِ
+ * `/api/auth/*` (`requireAnyUser`: گذاشتنِ رمز، خروج از همه) نشستِ پمپ یا
+ * هر بخشِ دیگر **همان رفتارِ پیش از این تغییر** را دارد. `/api/me` و
+ * `/api/shop/*` پشتِ `requireUser`اند و از اصل فقط توکنِ دکان را می‌پذیرند.
+ *
  * ⚠️ بازگشت: `AUTH_REAUTH=off` همه را مثلِ پیش از این تغییر باز می‌کند.
  */
 const config = require('../config');
@@ -34,6 +42,10 @@ const SCOPE = 'session_auth';
 const MESSAGE = 'برای امنیتِ حساب، این کار فقط چند دقیقه پس از ورود ممکن است. رمز (یا کدِ ایمیل) را دوباره بزنید، یا یک بار خارج و دوباره وارد شوید.';
 
 function enforced() { return config.tokens.reauthEnforced !== false; }
+
+/** بخش‌هایی که پنجرهٔ تأییدِ دوباره دارند — بخشِ ناشناخته/خالی یعنی دکان (پیش‌فرضِ توکن) */
+const APPS = new Set(['shop']);
+function appliesTo(req) { return APPS.has(req.appSection || 'shop'); }
 function windowMs() { return Math.max(60_000, Number(config.tokens.reauthWindowMs) || 600_000); }
 
 /** این نشست همین حالا احراز شد (ورود یا تأییدِ دوباره). */
@@ -64,7 +76,7 @@ function required() {
 
 /** همان بررسی، برای جاهایی که فقط بخشی از درخواست حساس است. */
 async function assertFresh(req) {
-  if (!enforced()) return;
+  if (!enforced() || !appliesTo(req)) return;
   if (!req.tokenRow) throw unauthorized();
   if (await freshUntil(req.tokenRow.token_hash) > now()) return;
   throw required();
@@ -75,4 +87,4 @@ function requireRecentAuth(req, res, next) {
   assertFresh(req).then(() => next(), next);
 }
 
-module.exports = { markFresh, freshUntil, assertFresh, requireRecentAuth, enforced, windowMs, SCOPE, MESSAGE };
+module.exports = { markFresh, freshUntil, assertFresh, requireRecentAuth, enforced, appliesTo, windowMs, SCOPE, MESSAGE };
