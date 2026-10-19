@@ -23,8 +23,18 @@ object ReleaseFeed {
 
   data class Asset(val name: String, val size: Long, val url: String = "")
 
-  /** پاسخِ `/api/releases/<برچسب>/latest` */
-  data class Latest(val tag: String, val version: String, val notes: String, val assets: List<Asset>) {
+  /**
+   *  پاسخِ `/api/releases/<برچسب>/latest`.
+   *  `minVersion` (§۳۸.۹): حداقل نسخهٔ پشتیبانی‌شده؛ خالی ⇒ حداقلی نیست
+   *  (سرورِ قدیمی آن را نمی‌دهد ⇒ همان رفتارِ پیشین).
+   */
+  data class Latest(
+    val tag: String,
+    val version: String,
+    val notes: String,
+    val assets: List<Asset>,
+    val minVersion: String = "",
+  ) {
     val hasSums: Boolean get() = assets.any { it.name.equals(SUMS, true) }
   }
 
@@ -63,7 +73,27 @@ object ReleaseFeed {
     val list = r.optJSONArray("assets") ?: return null
     val assets = (0 until list.length()).map { list.getJSONObject(it) }
       .map { Asset(it.getString("name"), it.optLong("size")) }
-    return Latest(tag, version, str(r, "notes"), assets)
+    val min = str(r, "minVersion").trim().takeIf { VERSION.matches(it) }.orEmpty()
+    return Latest(tag, version, str(r, "notes"), assets, min)
+  }
+
+  /**
+   *  §۳۸.۹: آیا این نسخه از حداقلِ پشتیبانی‌شده پایین‌تر است؟ مقایسهٔ عددی
+   *  (۲٫۱۰ > ۲٫۹). حداقلِ خالی یا نادرست، یا نسخهٔ ناخوانا ⇒ نه — «به‌روز
+   *  کنید» هیچ‌وقت از روی حدس گفته نمی‌شود.
+   */
+  fun belowMinimum(current: String, min: String): Boolean {
+    val m = min.trim()
+    val c = current.trim().removePrefix("v").substringBefore('-')
+    if (!VERSION.matches(m) || !VERSION.matches(c)) return false
+    val a = c.split('.').map { it.toInt() }
+    val b = m.split('.').map { it.toInt() }
+    for (i in 0 until maxOf(a.size, b.size)) {
+      val x = a.getOrElse(i) { 0 }
+      val y = b.getOrElse(i) { 0 }
+      if (x != y) return x < y
+    }
+    return false
   }
 
   /**
