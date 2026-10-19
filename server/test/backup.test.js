@@ -33,9 +33,11 @@ async function sql(url, text) {
 
 test.before(async () => { await h.start(); });
 test.after(async () => {
+  //  ⚠️ پیش از `h.stop()`: پس از بستنِ سرور و استخرِ دیتابیس، DROP DATABASE
+  //  روی PostgreSQL گاهی تمام نمی‌شد و آزمون تا سقفِ زمانِ CI می‌ماند
+  await sql(adminUrl, `DROP DATABASE IF EXISTS ${RESTORE_DB}`).catch(() => {});
   await h.stop();
   await fs.rm(BACKUP_DIR, { recursive: true, force: true });
-  await sql(adminUrl, `DROP DATABASE IF EXISTS ${RESTORE_DB}`).catch(() => {});
 });
 
 test('پشتیبان بدون رمز ساخته می‌شود و روی سرور تازه بازمی‌گردد', async () => {
