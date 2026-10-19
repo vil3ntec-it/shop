@@ -85,7 +85,8 @@ fun MemberPermsSection(shops: ShopRepository, canEdit: Boolean, snackbar: Snackb
 
   val p = page ?: return
   val editable = p.catalog.filter { it.edit != "none" }
-  val staff = p.members.filter { it.role != "owner" }
+  //  پیک (DLV-01) لایهٔ مجوز ندارد: توکنش جز درِ پیک جایی را باز نمی‌کند
+  val staff = p.members.filter { it.role != "owner" && it.role != "courier" }
   if (editable.isEmpty() || staff.isEmpty()) return
 
   SectionTitle("مجوزِ کارمندان")
