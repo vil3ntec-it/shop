@@ -564,7 +564,8 @@ fun AppRoot(
     bottomBar = {
       if (Platform.DESKTOP) DeskStatusBar(data)
       //  قرصِ شناور با تبِ فعالِ تیره (phone-ui، تصویرِ مرجعِ ۳) — همان تب‌ها و همان مقصدها
-      else if (!wide) ir.vil3ntec.tohid.ui.components.common.PhoneNavBar(
+      //  برگهٔ تیرهٔ سبد که باز است، تا ته می‌رسد و نوار رویش نمی‌نشیند
+      else if (!wide && !ir.vil3ntec.tohid.ui.components.pos.PhoneCartUi.sheetOpen.value) ir.vil3ntec.tohid.ui.components.common.PhoneNavBar(
         tabs = TABS.map { ir.vil3ntec.tohid.ui.components.common.NavTab(it.id, it.label, it.icon) },
         current = if (sub == null) tab else null,
         onPick = { tab = it; sub = null },

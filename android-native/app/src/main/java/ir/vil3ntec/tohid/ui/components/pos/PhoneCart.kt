@@ -47,6 +47,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -97,6 +98,14 @@ import kotlin.math.roundToInt
  */
 object PhoneCartShot {
   val open = mutableStateOf(false)
+}
+
+/**
+ *  برگهٔ سبد همین حالا باز است؟ — `AppRoot` تا وقتی باز است نوارِ پایینِ قرصی را
+ *  نمی‌کشد تا برگه مثلِ تصویرِ مرجعِ ۶ تا تهِ صفحه برسد و چیزی رویش نیفتد.
+ */
+object PhoneCartUi {
+  val sheetOpen = mutableStateOf(false)
 }
 
 /** عکسِ گردِ یک قلم، یا حرفِ اولِ نامش وقتی عکسی نیست (یا عکس‌ها خاموش‌اند) */
@@ -207,8 +216,12 @@ fun BoxScope.PhoneCartLayer(
     PhoneCartBar(model, onOpen)
   }
 
+  val showing = open && model.visible
+  LaunchedEffect(showing) { PhoneCartUi.sheetOpen.value = showing }
+  DisposableEffect(Unit) { onDispose { PhoneCartUi.sheetOpen.value = false } }
+
   val p by animateFloatAsState(
-    targetValue = if (open && model.visible) 1f else 0f,
+    targetValue = if (showing) 1f else 0f,
     animationSpec = tween(ms, easing = FastOutSlowInEasing),
     label = "cartSheet",
   )
