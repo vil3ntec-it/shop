@@ -193,19 +193,31 @@ ok(await page.isVisible('#cart-bar') && (await page.textContent('#open-cart')).i
 await noOverflow(page, 'ویترین');
 await axe(page, 'ویترین');
 
+//  گوشی = مدلِ مرجعِ صاحب محصول (phone-v3 r3 بسته / r2 باز)
+const opened = (pg) => pg.waitForFunction(() => document.body.classList.contains('cart-open') || document.getElementById('cart-sheet').classList.contains('on'), null, { timeout: 10000 });
+const closed = (pg) => pg.waitForFunction(() => !document.body.classList.contains('cart-open') && !document.getElementById('cart-sheet').classList.contains('on'), null, { timeout: 10000 });
+ok(await page.evaluate(() => document.body.classList.contains('phone-cart') && getComputedStyle(document.body).backgroundColor === 'rgb(13, 13, 15)'
+  && getComputedStyle(document.getElementById('surface')).borderBottomLeftRadius === '36px'), 'گوشی با سبدِ پُر: پایهٔ سیاه و سطحِ روشن با گوشهٔ ۳۶ (r3)');
+ok(await page.evaluate(() => getComputedStyle(document.getElementById('open-cart')).backgroundColor === 'rgb(255, 194, 74)'), 'دایرهٔ زردِ شمار (r3)');
 await page.click('#cart-bar');
-await page.waitForSelector('#cart-sheet.on');
-ok(await page.isHidden('#cart-bar'), 'نوار زیرِ برگهٔ باز پنهان است');
+await opened(page);
+ok(await page.evaluate(() => document.getElementById('cart-bar').inert && document.getElementById('surface').inert), 'سبدِ باز: نوار و سطحِ زیرین از دسترسِ صفحه‌کلید بیرون‌اند');
+await page.locator('#sheet-lines li').filter({ hasText: 'برنج' }).getByRole('button', { name: /تغییرِ تعداد/ }).click();
 await page.locator('#sheet-lines li').filter({ hasText: 'برنج' }).getByRole('button', { name: /یکی بیشتر/ }).click();
 //  ۱۲۰٫۵ × ۲ = ۲۴۱ + ۳۰۰ = ۵۴۱ + ارسالِ ۵۰ = ۵۹۱
 await page.waitForFunction(() => document.getElementById('sheet-total').textContent.includes('۵۹۱'), null, { timeout: 5000 });
 ok(true, 'برگهٔ سبد: −/+ و جمع با هزینهٔ ارسال (CHK-04)');
 await axe(page, 'برگهٔ تیرهٔ سبد');
 await page.keyboard.press('Escape');
-await page.waitForFunction(() => !document.getElementById('cart-sheet').classList.contains('on'));
-ok(await page.isVisible('#cart-bar'), 'Esc برگه را می‌بندد و نوار برمی‌گردد');
+await closed(page);
+ok(await page.isVisible('#cart-bar'), 'Esc سبد را می‌بندد و نوار برمی‌گردد');
 await page.click('#cart-bar');
-await page.waitForSelector('#cart-sheet.on');
+await opened(page);
+await page.click('#surface-cap');
+await closed(page);
+ok(true, 'زدنِ بخشِ روشنِ بالا سبد را می‌بندد (r2 ⇐ r3)');
+await page.click('#cart-bar');
+await opened(page);
 await page.click('#cart-next');
 
 //  ── ثبت ──
@@ -254,7 +266,7 @@ ok(await page.isHidden('#o-cancel'), 'پس از قبول، لغوِ رایگان
 
 //  خریدِ دوباره ⇒ همان اقلام با قیمتِ امروز به سبد
 await page.click('#o-reorder');
-await page.waitForSelector('#cart-sheet.on', { timeout: 10000 });
+await opened(page);
 ok((await page.locator('#sheet-lines li').count()) === 2, 'خریدِ دوباره: اقلام با قیمتِ امروز در سبد (WEB-12)');
 await page.click('#cart-next');
 await page.waitForSelector('#view-checkout:not([hidden])');
@@ -291,7 +303,7 @@ await dp.goto(`${base}/store/${ga.slug}`);
 await dp.waitForSelector('#products li[data-id]');
 await dp.locator('#products li[data-id="rice"]').getByRole('button', { name: /افزودن/ }).click();
 await dp.click('#cart-bar');
-await dp.waitForSelector('#cart-sheet.on');
+await opened(dp);
 await axe(dp, 'برگهٔ سبد (تاریک)');
 await dark.close();
 
