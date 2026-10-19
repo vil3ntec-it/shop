@@ -37,7 +37,7 @@ function requireUserOf(app) {
     try {
       const token = bearer(req);
       if (!token) return next(unauthorized());
-      const row = await tokens.verify(token, 'access', app);
+      const row = await tokens.verify(token, 'access', app, { anyScope: true });
       if (!row) return invalidToken(token, next);
       req.appSection = app;
       return userFromToken(req, res, next, row);
@@ -63,16 +63,40 @@ async function requireUser(req, res, next) {
   try {
     const token = bearer(req);
     if (!token) return next(unauthorized());
-    const row = await tokens.verify(token, 'access', 'shop');
+    const row = await tokens.verify(token, 'access', 'shop', { anyScope: true });
     if (!row) return invalidToken(token, next);
     req.appSection = 'shop';
     return userFromToken(req, res, next, row);
   } catch (err) { next(err); }
 }
 
+/**
+ * دامنهٔ پیک — DLV-01، v3 §۳.۱۱.
+ *
+ * توکنی که `scope='courier'` دارد (و عضوی که نقشش «پیک» است) فقط از درهایی
+ * می‌گذرد که خودشان `req.courierScope` را روشن کرده‌اند: یعنی فقط
+ * `routes/courier.js`. هر درِ دیگر — `/api/shop/*`، `/api/me`، صورت‌حساب،
+ * رمز — `403 courier_scope` است، نه «نشست منقضی شد» که برنامه را در
+ * حلقهٔ ورود بیندازد.
+ */
+const COURIER_SCOPE_MESSAGE = 'حسابِ پیک فقط به صفحهٔ مأموریت‌های خودش دسترسی دارد';
+
+function courierScopeDenied(req, next) {
+  return next(forbidden(COURIER_SCOPE_MESSAGE, 'courier_scope'));
+}
+
+/** درِ پیک این را صدا می‌زند، پیش از `requireUser`. */
+function allowCourierScope(req, res, next) {
+  req.courierScope = true;
+  next();
+}
+
 /** بدنهٔ مشترکِ هر دو — از روی ردیفِ توکن، کاربر و دستگاه را می‌آورد. */
 async function userFromToken(req, res, next, row) {
   try {
+    if (row.scope && !(row.scope === tokens.COURIER_SCOPE && req.courierScope === true)) {
+      return courierScopeDenied(req, next);
+    }
 
     const user = await one('SELECT * FROM users WHERE id=$1', [row.subject_id]);
     if (!user) return next(unauthorized('حساب پیدا نشد', 'invalid_token'));
@@ -119,7 +143,7 @@ async function requireAnyUser(req, res, next) {
   try {
     const token = bearer(req);
     if (!token) return next(unauthorized());
-    const row = await tokens.verify(token, 'access', null);
+    const row = await tokens.verify(token, 'access', null, { anyScope: true });
     if (!row) return invalidToken(token, next);
     req.appSection = row.app || 'shop';
     return userFromToken(req, res, next, row);
@@ -132,6 +156,8 @@ async function requireShop(req, res, next) {
     if (!req.user) return next(unauthorized());
     const member = await membershipOf(req.user.id);
     if (!member) return next(forbidden('برای این حساب دکانی ثبت نشده است', 'no_shop'));
+    //  نقشِ پیک — حتی با توکنی که پیش از پیک شدن گرفته شده
+    if (member.role === 'courier' && req.courierScope !== true) return courierScopeDenied(req, next);
     req.member = member;
     req.shopId = member.shop_id;
     req.role = member.role;
@@ -209,6 +235,7 @@ async function optionalShop(req, res, next) {
   try {
     if (req.user) {
       const member = await membershipOf(req.user.id);
+      if (member && member.role === 'courier' && req.courierScope !== true) return courierScopeDenied(req, next);
       if (member) {
         req.member = member;
         req.shopId = member.shop_id;
@@ -334,6 +361,7 @@ function requireSuperAdmin(req, res, next) {
 }
 
 module.exports = {
+  allowCourierScope, COURIER_SCOPE_MESSAGE,
   bearer, requireUser, requireUserOf, requireAnyUser, requirePumpUser, requireShop, optionalShop, requireDataWrite,
   requirePermission, requireFeature, requireAdmin, requireSuperAdmin,
   //  بخشِ پمپ‌بنزین
