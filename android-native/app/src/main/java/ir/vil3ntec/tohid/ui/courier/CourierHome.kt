@@ -47,6 +47,7 @@ import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Directions
+import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.LocalShipping
@@ -58,6 +59,7 @@ import androidx.compose.material.icons.outlined.Phone
 import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.TableRows
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.Icon
@@ -99,7 +101,7 @@ import ir.vil3ntec.tohid.fa
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.ui.components.common.ScreenKind
 import ir.vil3ntec.tohid.ui.components.common.ViewMode
-import ir.vil3ntec.tohid.ui.components.common.ViewModeToggle
+import ir.vil3ntec.tohid.ui.components.common.ViewModePref
 import ir.vil3ntec.tohid.ui.components.common.rememberViewMode
 import ir.vil3ntec.tohid.ui.screens.Motion
 import ir.vil3ntec.tohid.ui.screens.PhotoSourceSheet
@@ -407,9 +409,18 @@ internal fun CourierBoard(
             verticalArrangement = Arrangement.spacedBy(12.dp),
           ) {
             item(key = "head") {
-              //  کلیدِ کارت/جدول فقط روی صفحهٔ پهن (گوشی همیشه کارت است)
+              //  کلیدِ کارت/جدول فقط روی صفحهٔ پهن (گوشی همیشه کارت است)؛ تک‌رنگ مثلِ بقیهٔ دکمه‌های گرد
               val wide = LocalConfiguration.current.screenWidthDp >= 600
-              BoardHeader(name, syncing, onRefresh = onRefresh, onSignOut = { askSignOut = true }) { if (wide) ViewModeToggle(view) }
+              BoardHeader(name, syncing, onRefresh = onRefresh, onSignOut = { askSignOut = true }) {
+                if (wide && view.toggleVisible) {
+                  val toTable = view.mode == ViewMode.CARD
+                  RoundIconButton(
+                    if (toTable) Icons.Outlined.TableRows else Icons.Outlined.GridView,
+                    if (toTable) "نمای جدولی" else "نمای کارتی",
+                    { view.set(ViewModePref.other(view.mode)) },
+                  )
+                }
+              }
             }
             item(key = "sync") { SyncLine(syncing, waitingTotal, lastError) }
             itemsIndexed(queue.rejected, key = { _, r -> "rej-" + r.event.eventId }) { _, r ->
