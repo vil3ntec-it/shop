@@ -10,9 +10,7 @@ import ir.vil3ntec.tohid.core.stock.StockDoc
 import ir.vil3ntec.tohid.core.stock.StockMode
 import ir.vil3ntec.tohid.core.stock.StockResult
 import ir.vil3ntec.tohid.core.stock.UnitCost
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneOffset
+import ir.vil3ntec.tohid.core.calendar.CivilDays
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
@@ -51,10 +49,26 @@ object StockLedger {
   fun milli(q: Double): Long = if (q.isFinite()) Math.round(q * 1000.0) else 0L
   fun minor(a: Double?): Long = if (a != null && a.isFinite()) Math.round(a * 100.0) else 0L
 
-  private fun dayMs(iso: String): Long =
-    if (StockCore.isoDateOk(iso)) LocalDate.parse(iso).toEpochDay() * 86_400_000L else 0L
+  /*  بی java.time: اندرویدِ ۷ (minSdk ۲۴) آن را ندارد. روزِ JDNِ ۱۹۷۰-۰۱-۰۱ = ۲۴۴۰۵۸۸. */
+  private const val EPOCH_JDN = 2_440_588
+  private const val DAY_MS = 86_400_000L
 
-  private fun isoOf(ms: Long): String = Instant.ofEpochMilli(ms).atOffset(ZoneOffset.UTC).toLocalDate().toString()
+  /** نیمه‌شبِ UTCِ یک روزِ `yyyy-MM-dd` (میلی‌ثانیه)؛ تاریخِ نادرست ⇒ ۰ */
+  fun dayMs(iso: String): Long {
+    if (!StockCore.isoDateOk(iso)) return 0L
+    val jdn = CivilDays.jdnOfIso(iso) ?: return 0L
+    return (jdn - EPOCH_JDN).toLong() * DAY_MS
+  }
+
+  /** روزِ UTCِ یک لحظه، `yyyy-MM-dd` */
+  fun isoOf(ms: Long): String = CivilDays.isoOf((Math.floorDiv(ms, DAY_MS) + EPOCH_JDN).toInt())
+
+  /** فاصلهٔ دو روزِ `yyyy-MM-dd` (b − a)؛ نادرست ⇒ null */
+  fun daysBetween(a: String, b: String): Int? {
+    val x = CivilDays.jdnOfIso(a) ?: return null
+    val y = CivilDays.jdnOfIso(b) ?: return null
+    return y - x
+  }
 
   private fun atOf(createdAt: Long, date: String): Long {
     if (createdAt > 0) return createdAt

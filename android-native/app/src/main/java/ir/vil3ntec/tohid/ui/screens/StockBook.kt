@@ -240,7 +240,7 @@ private fun LotPills(lots: List<StockLedger.LotLine>, today: String) {
         l.qtyMilli < 0 -> PillTone.DANGER
         l.expiryDate == null -> PillTone.NEUTRAL
         l.expiryDate < today -> PillTone.DANGER
-        java.time.LocalDate.parse(l.expiryDate).toEpochDay() - java.time.LocalDate.parse(today).toEpochDay() <= 30 -> PillTone.WARNING
+        (StockLedger.daysBetween(today, l.expiryDate) ?: Int.MAX_VALUE) <= 30 -> PillTone.WARNING
         else -> PillTone.SUCCESS
       }
       val parts = listOfNotNull(StockActions.lotLabel(l.lotId), milliText(l.qtyMilli), l.expiryDate?.let { formatDate(it) }, l.location.takeIf { it.isNotEmpty() })
@@ -278,6 +278,17 @@ private fun PositionsTab(d: ShopData, v: StockLedger.View, today: String, filter
     pv.locations.filter { it.qtyMilli != 0L }.joinToString(" · ") { "${StockActions.locationLabel(it.location)}: ${milliText(it.qtyMilli)}" }.ifEmpty { "—" }
   fun unitText(pv: StockLedger.ProductView) = pv.unitCostMinor?.let { minorText(it) } ?: "نامعلوم"
 
+  val posColumns = listOf(
+    TableColumn<PosRow>("کالا", 220.dp, sortKey = { it.name }) { it.name },
+    TableColumn<PosRow>("موجودی", 110.dp, sortKey = { it.pv.qtyMilli }, numeric = true,
+      tint = { r -> if (r.pv.qtyMilli < 0) Shop.colors.danger else Shop.colors.text }) { "${milliText(it.pv.qtyMilli)} ${it.unit}".trim() },
+    TableColumn<PosRow>("بهای میانگینِ واحد", 130.dp, sortKey = { it.pv.unitCostMinor ?: Long.MIN_VALUE }, numeric = true) { unitText(it.pv) },
+    TableColumn<PosRow>("ارزش", 120.dp, sortKey = { it.pv.valueMinor }, numeric = true) { minorText(it.pv.valueMinor) },
+    TableColumn<PosRow>("محل‌ها", 200.dp) { locText(it.pv) },
+    TableColumn<PosRow>("سری‌ها (FEFO)", 220.dp) { r -> r.pv.lots.joinToString(" · ") { "${StockActions.lotLabel(it.lotId)} ${milliText(it.qtyMilli)}" + (it.expiryDate?.let { e -> " (${formatDate(e)})" } ?: "") }.ifEmpty { "—" } },
+  )
+  val posState = rememberTableState(posColumns)
+
   LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 96.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
     item {
       TableToolbar(
@@ -295,17 +306,7 @@ private fun PositionsTab(d: ShopData, v: StockLedger.View, today: String, filter
     if (rows.isEmpty()) {
       item { EmptyNote("کالایی با این فیلتر نیست") }
     } else if (mode.mode == ViewMode.TABLE) {
-      val columns = listOf(
-        TableColumn<PosRow>("کالا", 220.dp, sortKey = { it.name }) { it.name },
-        TableColumn<PosRow>("موجودی", 110.dp, sortKey = { it.pv.qtyMilli }, numeric = true,
-          tint = { r -> if (r.pv.qtyMilli < 0) Shop.colors.danger else Shop.colors.text }) { "${milliText(it.pv.qtyMilli)} ${it.unit}".trim() },
-        TableColumn<PosRow>("بهای میانگینِ واحد", 130.dp, sortKey = { it.pv.unitCostMinor ?: Long.MIN_VALUE }, numeric = true) { unitText(it.pv) },
-        TableColumn<PosRow>("ارزش", 120.dp, sortKey = { it.pv.valueMinor }, numeric = true) { minorText(it.pv.valueMinor) },
-        TableColumn<PosRow>("محل‌ها", 200.dp) { locText(it.pv) },
-        TableColumn<PosRow>("سری‌ها (FEFO)", 220.dp) { r -> r.pv.lots.joinToString(" · ") { "${StockActions.lotLabel(it.lotId)} ${milliText(it.qtyMilli)}" + (it.expiryDate?.let { e -> " (${formatDate(e)})" } ?: "") }.ifEmpty { "—" } },
-      )
-      val state = rememberTableState(columns)
-      dataTable(sortRows(rows, columns, state), columns, state, key = { it.id }, onOpen = { onTransfer(it.id) }, onMenu = { onTransfer(it.id) })
+      dataTable(sortRows(rows, posColumns, posState), posColumns, posState, key = { it.id }, onOpen = { onTransfer(it.id) }, onMenu = { onTransfer(it.id) })
     } else {
       items(rows, key = { it.id }) { r ->
         Panel(Modifier.fillMaxWidth()) {
@@ -355,14 +356,29 @@ private fun LedgerTab(d: ShopData, v: StockLedger.View, onExport: (ReportCsv.She
       v.rows,
       StockLedger.RowFilter(
         productId = product, location = loc, types = type?.let { setOf(it) }, userId = who,
-        from = fromIso?.let { java.time.LocalDate.parse(it).toEpochDay() * 86_400_000L },
-        to = toIso?.let { java.time.LocalDate.parse(it).toEpochDay() * 86_400_000L + 86_399_999L },
+        from = fromIso?.let { StockLedger.dayMs(it) },
+        to = toIso?.let { StockLedger.dayMs(it) + 86_399_999L },
       ),
     ).asReversed()
   }
   val users = remember(v) { v.rows.map { it.userId }.distinct().sorted() }
   val prods = remember(v, names) { v.rows.map { it.productId }.distinct().map { it to (names[it] ?: "(کالای حذف‌شده)") }.sortedBy { it.second } }
   val locations = remember(d) { StockLedger.locations(d) }
+
+  val ledgerColumns = listOf(
+    TableColumn<StockLedger.Row>("کالا", 200.dp) { names[it.productId] ?: "(کالای حذف‌شده)" },
+    TableColumn<StockLedger.Row>("روز", 100.dp) { formatDate(it.day) },
+    TableColumn<StockLedger.Row>("نوع", 130.dp) { StockActions.TYPE_LABEL[it.type] ?: it.type },
+    TableColumn<StockLedger.Row>("محل", 130.dp) { StockActions.locationLabel(it.location) },
+    TableColumn<StockLedger.Row>("مقدار", 90.dp, numeric = true, tint = { r -> if (r.qtyMilli < 0) Shop.colors.danger else Shop.colors.success }) {
+      (if (it.qtyMilli > 0) "+" else "") + milliText(it.qtyMilli)
+    },
+    TableColumn<StockLedger.Row>("بهای موقت", 110.dp, numeric = true) { minorText(it.costMinor) + if (it.costAdjustMinor != 0L) " (تعدیل ${minorText(it.costAdjustMinor)})" else "" },
+    TableColumn<StockLedger.Row>("کاربر", 110.dp) { StockActions.userLabel(it.userId) },
+    TableColumn<StockLedger.Row>("دلیل", 180.dp) { it.reason },
+    TableColumn<StockLedger.Row>("سری", 100.dp) { if (it.lotId.isEmpty()) "" else StockActions.lotLabel(it.lotId) },
+  )
+  val ledgerState = rememberTableState(ledgerColumns)
 
   LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 96.dp)) {
     item {
@@ -390,21 +406,7 @@ private fun LedgerTab(d: ShopData, v: StockLedger.View, onExport: (ReportCsv.She
     if (rows.isEmpty()) {
       item { EmptyNote("حرکتی با این فیلتر نیست") }
     } else {
-      val columns = listOf(
-        TableColumn<StockLedger.Row>("کالا", 200.dp) { names[it.productId] ?: "(کالای حذف‌شده)" },
-        TableColumn<StockLedger.Row>("روز", 100.dp) { formatDate(it.day) },
-        TableColumn<StockLedger.Row>("نوع", 130.dp) { StockActions.TYPE_LABEL[it.type] ?: it.type },
-        TableColumn<StockLedger.Row>("محل", 130.dp) { StockActions.locationLabel(it.location) },
-        TableColumn<StockLedger.Row>("مقدار", 90.dp, numeric = true, tint = { r -> if (r.qtyMilli < 0) Shop.colors.danger else Shop.colors.success }) {
-          (if (it.qtyMilli > 0) "+" else "") + milliText(it.qtyMilli)
-        },
-        TableColumn<StockLedger.Row>("بهای موقت", 110.dp, numeric = true) { minorText(it.costMinor) + if (it.costAdjustMinor != 0L) " (تعدیل ${minorText(it.costAdjustMinor)})" else "" },
-        TableColumn<StockLedger.Row>("کاربر", 110.dp) { StockActions.userLabel(it.userId) },
-        TableColumn<StockLedger.Row>("دلیل", 180.dp) { it.reason },
-        TableColumn<StockLedger.Row>("سری", 100.dp) { if (it.lotId.isEmpty()) "" else StockActions.lotLabel(it.lotId) },
-      )
-      val state = rememberTableState(columns)
-      dataTable(rows.take(limit), columns, state, key = { it.id }, onOpen = {}, onMenu = {})
+      dataTable(rows.take(limit), ledgerColumns, ledgerState, key = { it.id }, onOpen = {}, onMenu = {})
       if (rows.size > limit) item { TextButton(onClick = { limit += 300 }) { Text("${rows.size - limit} ردیفِ دیگر") } }
     }
   }
@@ -520,7 +522,7 @@ private fun CountTab(
   LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 96.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
     item {
       Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        StatCard("شمرده", review.lines.size.toString(), "از ${formatDate(java.time.Instant.ofEpochMilli(dr.startedAt).atZone(java.time.ZoneId.systemDefault()).toLocalDate().toString())}", Modifier.widthIn(min = 130.dp))
+        StatCard("شمرده", review.lines.size.toString(), "شروع: ${ir.vil3ntec.tohid.spanText(dr.startedAt)}", Modifier.widthIn(min = 130.dp))
         StatCard("منطبق", review.matched.toString(), "بی اختلاف", Modifier.widthIn(min = 120.dp))
         StatCard("مغایر", review.variance.toString(), "ثبت می‌شود", Modifier.widthIn(min = 120.dp))
         StatCard("شمرده‌نشده", review.uncounted.toString(), "دست نمی‌خورند", Modifier.widthIn(min = 130.dp))
