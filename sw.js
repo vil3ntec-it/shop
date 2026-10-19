@@ -15,7 +15,7 @@
  */
 const BETA = /\/beta\/sw\.js$/.test(self.location.pathname);
 const BETA_PATH = new URL('./beta/', self.location).pathname;
-const VERSION = (BETA ? 'beta-' : '') + 'tohid-shop-v56';
+const VERSION = (BETA ? 'beta-' : '') + 'tohid-shop-v59';
 const SHELL_CACHE = VERSION + '-shell';
 const FONT_CACHE = VERSION + '-fonts';
 
@@ -73,6 +73,9 @@ const SHELL_ASSETS = [
   //  دفترِ قرض‌داران (پول به واحدِ کوچک + DebtBook) — بی این دو، حسابِ ردیف‌ها روی نصبِ آفلاین نمی‌آمد
   './license/money.js',
   './license/debt-book.js',
+  //  بخشِ «سفارش‌ها» (فاز ۴) — پشتِ پرچمِ سرور؛ خاموش ⇒ هیچ کاری نمی‌کند
+  './license/orders-ui.js',
+  './license/orders-ui.css',
   //  خوانندهٔ بارکد برای آیفون — Safari «BarcodeDetector» ندارد و دوربین همیشه
   //  همین را بار می‌کند؛ بی آن، نصبِ تازه بی اینترنت اصلاً اسکن نمی‌کرد
   './license/vendor/zxing-0.21.3.min.js',
