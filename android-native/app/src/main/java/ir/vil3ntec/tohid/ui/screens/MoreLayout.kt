@@ -7,8 +7,8 @@ package ir.vil3ntec.tohid.ui.screens
  *  «تنظیمات» **آخرین** گروه است (ردیف‌هایش گروه‌های خودِ تنظیمات‌اند و صفحهٔ
  *  تنظیمات را روی همان گروه باز می‌کنند). هر مسیری که «بیشترِ» پیشین داشت این‌جا
  *  هم هست (`MoreLayoutTest`)؛ دسترسیِ نقش‌ها همان است: سابقهٔ عملیات، کارمندان و
- *  تنظیمات فقط برای کسی که تنظیمات را باز می‌کند، سفارش‌ها و گفت‌وگو فقط وقتی
- *  سرور برای این دکان روشن گفته.
+ *  تنظیمات فقط برای کسی که تنظیمات را باز می‌کند، سفارش‌ها، ویترین و گفت‌وگو فقط
+ *  وقتی سرور برای این دکان روشن گفته.
  */
 object MoreLayout {
   /** `route` مسیرِ صفحهٔ برنامه است؛ `settingsGroup` یعنی «تنظیمات را روی این گروه باز کن» */
@@ -32,9 +32,12 @@ object MoreLayout {
     newOrders: Int,
     chatOn: Boolean,
     version: String,
+    /** ویترین: سرور روشنش کرده و کاربر حقِ مدیریتش را دارد (`StorefrontGate.visible`) */
+    storefrontOn: Boolean = false,
   ): List<Group> = buildList {
     add(Group("فروش و مشتری", buildList {
       if (ordersOn) add(Item("orders", "سفارش‌ها", "orders", if (newOrders > 0) "$newOrders تازه" else null))
+      if (storefrontOn) add(Item("storefront", "ویترینِ اینترنتی", "storefront"))
       add(Item("debtors", "قرض‌داران", "debtors"))
       add(Item("sales", "تاریخچهٔ فروش", "sales"))
       add(Item("receipts", "رسیدها", "receipts"))

@@ -24,27 +24,39 @@ class SettingsLayoutTest {
   private val sectionTitle = Regex("""SettingsSection\(\s*icon\s*=[^\n]*\n\s*title\s*=\s*"([^"]+)"""")
 
   /**
-   *  عنوان‌های گروه‌ها از متنِ خودِ `SettingsLayout.kt`. کامپیوتر پیش از کامپایل
-   *  چند عبارت را عوض می‌کند (`phrases` در `desktop/build.gradle.kts`، مثلاً
-   *  «دوربین بارکدخوان» ⇐ «بارکدخوان»)، پس متن با متن سنجیده می‌شود نه با شیءِ کامپایل‌شده.
+   *  بخش‌های گروه‌ها از **متنِ** خودِ `SettingsLayout.kt` — نه از شیءِ کامپایل‌شده.
+   *
+   *  کامپیوتر پیش از کامپایل چند عبارت را در کدِ اندروید عوض می‌کند (`phrases` در
+   *  `desktop/build.gradle.kts`، مثلاً «دوربین بارکدخوان» ⇐ «بارکدخوان»)، ولی این
+   *  آزمون متنِ خام را می‌خواند؛ پس متن با متن سنجیده می‌شود و از شیءِ کامپایل‌شده
+   *  فقط شمار. ردیف‌های گروه یا رشته‌اند یا نامِ یک `const val` در همان فایل؛ پیوندها
+   *  (کلیدهای `LINKS`) بخش نیستند و کنار می‌روند.
    */
-  private val layoutTitles: List<String> by lazy {
-    Regex("""Group\(\s*[A-Z]+\s*,\s*listOf\(([^)]*)\)""").findAll(src("SettingsLayout.kt"))
-      .flatMap { g -> Regex("\"([^\"]+)\"").findAll(g.groupValues[1]).map { it.groupValues[1] } }
+  private val layoutSections: List<String> by lazy {
+    val text = src("SettingsLayout.kt")
+    val consts = Regex("""const val ([A-Z_]+) = "([^"]+)"""").findAll(text)
+      .associate { it.groupValues[1] to it.groupValues[2] }
+    val linksBlock = Regex("""val LINKS[^=]*= mapOf\(([^)]*)\)""").find(text)?.groupValues?.get(1).orEmpty()
+    val links = Regex("""([A-Z_]+) to """).findAll(linksBlock).mapNotNull { consts[it.groupValues[1]] }.toSet()
+    Regex("""Group\(\s*[A-Z]+\s*,\s*listOf\(([^)]*)\)""").findAll(text)
+      .flatMap { g ->
+        Regex(""""([^"]+)"|\b([A-Z_]+)\b""").findAll(g.groupValues[1]).mapNotNull { m ->
+          m.groupValues[1].ifEmpty { null } ?: consts[m.groupValues[2]]
+        }
+      }
+      .filterNot { it in links }
       .toList()
   }
 
   @Test
   fun `هر بخشِ تنظیمات دقیقاً در یک گروه است`() {
-    //  متنِ خام خوانده می‌شود ولی کامپیوتر در ساخت «دوربین بارکدخوان» را «بارکدخوان»
-    //  می‌کند (`phrases`ِ desktop/build.gradle.kts) ⇐ همان را این‌جا هم یکی می‌گیریم
     val found = (sectionTitle.findAll(src("Settings.kt")) + sectionTitle.findAll(src("LocaleSection.kt")))
-      .map { it.groupValues[1] }.map { if (it == "دوربین بارکدخوان") SettingsLayout.CAMERA else it }.toList()
+      .map { it.groupValues[1] }.toList()
     assertTrue("بخشی پیدا نشد — الگوی متن عوض شده؟", found.size >= 10)
     assertEquals("بخشِ تکراری در کد", found.size, found.toSet().size)
-    assertEquals(found.toSet(), layoutTitles.toSet())
-    assertEquals("متنِ گروه‌ها با شیءِ کامپایل‌شده نمی‌خواند", layoutTitles.size, SettingsLayout.sections.size)
-    assertEquals("بخشِ تکراری در گروه‌ها", SettingsLayout.sections.size, SettingsLayout.sections.toSet().size)
+    assertEquals(found.toSet(), layoutSections.toSet())
+    assertEquals("بخشِ تکراری در گروه‌ها", layoutSections.size, layoutSections.toSet().size)
+    assertEquals("متنِ گروه‌ها با شیءِ کامپایل‌شده نمی‌خواند", layoutSections.size, SettingsLayout.sections.size)
     SettingsLayout.sections.forEach { assertTrue("$it گروه ندارد", SettingsLayout.groupOf(it) != null) }
   }
 

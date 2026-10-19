@@ -19,6 +19,7 @@ import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.LocalShipping
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.ShoppingBasket
+import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material.icons.outlined.SupportAgent
 import androidx.compose.material.icons.outlined.SystemUpdate
 import androidx.compose.material.icons.outlined.WorkspacePremium
@@ -62,6 +63,7 @@ fun PhoneMoreScreen(d: ShopData, onOpen: (String) -> Unit) {
     newOrders = ir.vil3ntec.tohid.ui.OrdersLive.newCount,
     chatOn = ir.vil3ntec.tohid.data.ShopChatSync.config.value?.enabled == true,
     version = BuildConfig.VERSION_NAME,
+    storefrontOn = StorefrontGate.visible,
   )
   var page by rememberSaveable { mutableStateOf<String?>(null) }
   BackHandler(enabled = page != null) { page = null }
@@ -118,6 +120,7 @@ fun PhoneMoreScreen(d: ShopData, onOpen: (String) -> Unit) {
 
 private fun moreIcon(item: MoreLayout.Item): ImageVector? = item.settingsGroup?.let(::settingsIcon) ?: when (item.id) {
   "orders" -> Icons.Outlined.ShoppingBasket
+  "storefront" -> Icons.Outlined.Storefront
   "debtors" -> Icons.Outlined.PeopleOutline
   "sales" -> Icons.Outlined.History
   "receipts" -> Icons.AutoMirrored.Outlined.ReceiptLong

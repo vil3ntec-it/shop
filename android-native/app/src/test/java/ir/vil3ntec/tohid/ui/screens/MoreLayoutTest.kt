@@ -15,10 +15,10 @@ class MoreLayoutTest {
 
   @Test
   fun `هر مسیری که «بیشترِ» پیشین داشت هنوز هست — و قرض‌داران که از نوار رفت`() {
-    val all = MoreLayout.groups(canManage = true, ordersOn = true, newOrders = 0, chatOn = true, version = "2.14.3")
+    val all = MoreLayout.groups(canManage = true, ordersOn = true, newOrders = 0, chatOn = true, version = "2.14.3", storefrontOn = true)
     val before = setOf(
       "orders", "admin", "devices", "warehouse", "expenses", "receipts", "sales",
-      "purchasing", "reports", "audit", "team", "myplan", "chat", "support",
+      "purchasing", "reports", "audit", "team", "myplan", "chat", "support", "storefront",
     )
     assertTrue((before - routes(all)).toString(), routes(all).containsAll(before))
     assertTrue("debtors" in routes(all))
@@ -46,9 +46,10 @@ class MoreLayoutTest {
   }
 
   @Test
-  fun `سفارش و گفت‌وگو فقط وقتی سرور روشن گفته؛ شمارِ تازه‌ها روی ردیف`() {
+  fun `سفارش، ویترین و گفت‌وگو فقط وقتی سرور روشن گفته؛ شمارِ تازه‌ها روی ردیف`() {
     val off = routes(MoreLayout.groups(true, ordersOn = false, newOrders = 3, chatOn = false, version = "1"))
-    assertFalse("orders" in off); assertFalse("chat" in off)
+    assertFalse("orders" in off); assertFalse("chat" in off); assertFalse("storefront" in off)
+    assertTrue("storefront" in routes(MoreLayout.groups(true, false, 0, false, "1", storefrontOn = true)))
     val on = MoreLayout.groups(true, ordersOn = true, newOrders = 3, chatOn = true, version = "1")
     assertEquals("3 تازه", on.flatMap { it.items }.first { it.id == "orders" }.value)
     assertEquals(null, MoreLayout.groups(true, true, 0, true, "1").flatMap { it.items }.first { it.id == "orders" }.value)
