@@ -457,7 +457,7 @@ private fun ProductTable(
             checked = isSel, onCheckedChange = { onToggle(p.id) },
             modifier = Modifier.semantics { contentDescription = "انتخابِ ${p.name}" },
           )
-          Box(Modifier.size(36.dp), contentAlignment = Alignment.Center) { ProductThumb(p.id, p.name, 36.dp, photos) }
+          Box(Modifier.size(36.dp), contentAlignment = Alignment.Center) { ProductThumb(p.id, p.name, 36.dp, photos, tintKey = p.category) }
           Spacer(Modifier.width(10.dp))
           Column(Modifier.weight(1f)) {
             //  نام تا دو خط می‌شکند، بریده نمی‌شود
@@ -528,12 +528,15 @@ private fun ProductGrid(
           val (t, tone) = pill(ProductListModel.status(p, stock))
           StatusPill(t, tone)
         }
-        Box(Modifier.fillMaxWidth().height(76.dp).clip(Shape.button).background(c.surface2), contentAlignment = Alignment.Center) {
-          ProductThumb(p.id, p.name, 60.dp, PhotoPrefs.show.value)
+        //  همان دایرهٔ کوچکِ عکس/حرفِ اولِ صندوق کنارِ نام — نه جای عکسِ بزرگِ خاکستری
+        Row(verticalAlignment = Alignment.Top) {
+          ProductThumb(p.id, p.name, 44.dp, PhotoPrefs.show.value, tintKey = p.category)
+          Spacer(Modifier.width(10.dp))
+          Column(Modifier.weight(1f)) {
+            Text(p.name, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = c.text)
+            Text(p.category.ifBlank { "بی‌دسته" }, maxLines = 1, style = MaterialTheme.typography.labelSmall, color = c.muted)
+          }
         }
-        Spacer(Modifier.height(6.dp))
-        Text(p.name, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = c.text)
-        Text(p.category.ifBlank { "بی‌دسته" }, maxLines = 1, style = MaterialTheme.typography.labelSmall, color = c.muted)
         Spacer(Modifier.height(6.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
           Text("${money(p.salePrice)} ؋", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = c.text, maxLines = 1)
