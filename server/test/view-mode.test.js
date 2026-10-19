@@ -74,7 +74,7 @@ test('نمای دیگر و مرزِ گوشی', () => {
   assert.equal(vm.other('card'), 'table');
   assert.equal(vm.other('table'), 'card');
   assert.equal(vm.formFactor(360), 'phone');
-  assert.equal(vm.formFactor(599), 'phone');
-  assert.equal(vm.formFactor(600), 'large');
+  assert.equal(vm.formFactor(639), 'phone');
+  assert.equal(vm.formFactor(640), 'large');
   assert.equal(vm.formFactor(1280), 'large');
 });
