@@ -290,10 +290,17 @@ test('تعارض: دو دستگاه یک فیلد را بی‌خبر از هم �
     d.products = d.products.map((x) => (x.id === P1.id ? { ...x, name } : x));
     dev.ledger.write(d);
   };
+  const lastHlc = (dev) => dev.engine.outbox[dev.engine.outbox.length - 1].ops[0].hlc;
   edit(A, 'نامِ A');
   assert.equal(await A.engine.record(), 1);
+  const hA = lastHlc(A);
+  //  هر دستگاه با ساعتِ تصحیح‌شدهٔ خودش (rawNow + offsetMs) مُهر می‌زند و offsetها تا ده‌ها ms فرق دارند؛
+  //  «B بعدتر» یعنی بعدتر روی ساعتِ B: صبر تا ساعتِ B از wallِ A بگذرد
+  while (B.engine.now() <= V3.hlc.parse(hA).wall) await new Promise((r) => setTimeout(r, 5));
   edit(B, 'نامِ B');
-  assert.equal(await B.engine.record(), 1);          //  HLCِ B تازه‌تر است
+  assert.equal(await B.engine.record(), 1);
+  const hB = lastHlc(B);
+  assert.ok(V3.hlc.compare(hB, hA) > 0, `HLCِ B تازه‌تر است: ${hB} > ${hA}`);
   assert.equal((await A.engine.pushOnce()).ok, true);
   const pb = await B.engine.pushOnce();
   assert.equal(pb.ok, true);
