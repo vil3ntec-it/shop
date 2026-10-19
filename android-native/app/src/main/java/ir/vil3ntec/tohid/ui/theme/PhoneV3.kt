@@ -116,3 +116,134 @@ object PhoneV3 {
   /** بلندیِ ردیفِ تنظیمات (r5) */
   val rowHeight = 52.dp
 }
+
+/* ======================= قرض‌داران (r9-debtors.jpg) ======================= */
+
+/**
+ *  رنگ‌های صفحهٔ قرض‌داران — r9، به خواستِ صاحب محصول «همین مدلِ دقیق».
+ *
+ *  r9 عکسِ خودِ همین برنامه پیش از تخت شدنِ صفحه‌های کار است (۱۴۰۵/۰۷/۲۵)؛
+ *  پس عددها همان پالتِ آن روز است و با همان عکس سنجیده شده: زمینهٔ بنفشِ
+ *  بسیار کم‌رنگ با سه لکهٔ نورِ آرورا (همان `AuroraTone.Debt`: صورتی، بنفش،
+ *  نارنجی)، سطحِ ۹۵٪ سفید با لبهٔ سفید (بی خطِ تیره)، قرمز و سبزِ نیم‌شفاف
+ *  روی کارت. فقط همین صفحه این‌ها را دارد؛ بقیهٔ گوشی همان `PhoneV3Colors`.
+ */
+data class PhoneV3DebtColors(
+  /** زمینهٔ صفحه (r9: #F2F0FB) */
+  val page: Color,
+  /** لکهٔ صورتیِ بالا-چپ؛ آلفا = شدتِ وسطِ لکه */
+  val blobPink: Color,
+  /** لکهٔ بنفشِ راست-پایین (r9: وسطش #D4CBFA) */
+  val blobViolet: Color,
+  /** لکهٔ گرمِ پایین-چپ، بسیار کم‌رنگ */
+  val blobWarm: Color,
+  /** کارتِ سه‌عددی و تراشه‌های انتخاب‌نشده */
+  val surface: Color,
+  /** لبهٔ سطح‌ها و دکمه‌های ریزِ × و مداد — سفید، نه خطِ تیره */
+  val edge: Color,
+  val ink: Color,
+  /** متنِ زیرِ مبلغ، تراشهٔ انتخاب‌نشده، آیکنِ × و مداد و ساعت */
+  val muted: Color,
+  /** «N مورد» و برچسبِ عددهای کارتِ بالا */
+  val muted2: Color,
+  /** خطِ دورِ کادرِ جستجو (r9: #D8D6E1 روی زمینه) */
+  val fieldEdge: Color,
+  /** تراشهٔ انتخاب‌شده و دکمهٔ «قرض‌دار تازه» (پرکردن) */
+  val accent: Color,
+  val onAccent: Color,
+  /** بنفش برای آیکن و متن روی زمینه: میکروفون، کادرِ جستجوی فعال */
+  val accentInk: Color,
+  /** دایرهٔ میکروفون */
+  val accentSoft: Color,
+  /** بدهکار: خطِ دور و مبلغ */
+  val owe: Color,
+  /** بدهکار: پرکردنِ کارت — روی زمینه ترکیب می‌شود و توپر کشیده می‌شود تا لکهٔ نورِ زیرش متن را کم‌رنگ نکند */
+  val oweTint: Color,
+  /** حسابِ صاف (یا موجودی): خطِ دور و مبلغ */
+  val settled: Color,
+  val settledTint: Color,
+)
+
+val PhoneV3DebtLight = PhoneV3DebtColors(
+  page = Color(0xFFF2F0FA),
+  blobPink = Color(0x33FF5FA2),
+  blobViolet = Color(0x407C5CFF),
+  blobWarm = Color(0x26FF9A3D),
+  surface = Color(0xF2FFFFFF),
+  edge = Color(0xE6FFFFFF),
+  ink = Color(0xFF191627),
+  muted = Color(0xFF635C86),
+  muted2 = Color(0xFF6A6390),
+  fieldEdge = Color(0x1F191627),
+  accent = Color(0xFF6F50F0),
+  onAccent = Color(0xFFFFFFFF),
+  accentInk = Color(0xFF6F50F0),
+  accentSoft = Color(0x246F50F0),
+  //  r9: #BF2C2C؛ یک پله تیره‌تر تا روی کارتِ صورتی ≥ ۴٫۵:۱ (۴٫۳۸ ⇐ ۴٫۶۱) — به چشم همان
+  owe = Color(0xFFB92A2A),
+  oweTint = Color(0x1FD93B3B),
+  settled = Color(0xFF08745E),
+  settledTint = Color(0x1F0FA98A),
+)
+
+//  شب: همان پالتِ شبِ آن روز (بنفشِ تیره، نه سیاه). «N مورد» یک پله روشن‌تر
+//  از آن روز تا روی زمینهٔ تیره ≥ ۴٫۵:۱ بماند
+val PhoneV3DebtDark = PhoneV3DebtColors(
+  page = Color(0xFF0B0A14),
+  blobPink = Color(0x40FF5FA2),
+  blobViolet = Color(0x597C5CFF),
+  blobWarm = Color(0x26FF9A3D),
+  surface = Color(0xF0141221),
+  edge = Color(0x1AFFFFFF),
+  ink = Color(0xFFF0EEF8),
+  muted = Color(0xFFA8A3BC),
+  muted2 = Color(0xFF9A95B2),
+  fieldEdge = Color(0x26FFFFFF),
+  accent = Color(0xFF6F50F0),
+  onAccent = Color(0xFFFFFFFF),
+  accentInk = Color(0xFFA78BFF),
+  accentSoft = Color(0x33A78BFF),
+  owe = Color(0xFFFF7A7A),
+  oweTint = Color(0x33FF7A7A),
+  settled = Color(0xFF5CE0BC),
+  settledTint = Color(0x335CE0BC),
+)
+
+/**
+ *  اندازه‌های r9 به dp، از همان عکس سنجیده (۲٫۲۵ پیکسل = ۱dp: لبهٔ ۱۶dp همان
+ *  ۳۶ پیکسلِ عکس است، دکمهٔ ۲۲dp همان ۴۸ پیکسل).
+ */
+object PhoneV3Debt {
+  /** تمِ جاری از روشنیِ زمینهٔ `Shop.colors` — مثلِ `PhoneV3.colors` */
+  val colors: PhoneV3DebtColors
+    @Composable get() = of(Shop.colors.bg)
+
+  fun of(bg: Color): PhoneV3DebtColors = if (bg.luminance() < 0.5f) PhoneV3DebtDark else PhoneV3DebtLight
+
+  /**
+   *  r9 روی صفحهٔ ۶۶۸dp گرفته شده که متنِ برنامه را ۱٫۱۲ برابر می‌کند
+   *  (`TohidTheme`)؛ این صفحه همان ضریب را روی هر دستگاه ثابت نگه می‌دارد تا
+   *  گوشی هم همان اندازه‌های r9 را ببیند.
+   */
+  const val typeScale = 1.12f
+  /** کارتِ سه‌عددی و کارتِ هر قرض‌دار (r9: ۴۵ پیکسل) */
+  val cardRadius = 20.dp
+  /** کادرِ جستجو (r9: ۲۸ پیکسل) */
+  val fieldRadius = 12.dp
+  /** دایرهٔ میکروفون */
+  val micSize = 34.dp
+  /** دکمه‌های ریزِ × و مدادِ گوشهٔ کارت */
+  val cornerButton = 22.dp
+  val cornerButtonRadius = 7.dp
+  val cardBorder = 1.2.dp
+  /** لبهٔ صفحه */
+  val gutter = 16.dp
+  /** فاصلهٔ کارت‌ها */
+  val gap = 8.dp
+  /** کمینهٔ پهنای کارت: سه ستون روی گوشیِ ۳۶۰ تا ۴۷۰dp */
+  val tileMin = 104.dp
+  /** تبلت: همان چهار ستونِ r9 روی ۶۶۸dp */
+  val tileMinTablet = 132.dp
+  /** دکمهٔ گردِ «قرض‌دار تازه» */
+  val fabSize = 56.dp
+}
