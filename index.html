@@ -1226,6 +1226,16 @@
   .seg-toggle{display:flex; gap:8px;}
   .seg-btn{flex:1; padding:9px 10px; border-radius:10px; border:1.5px solid var(--border); background:var(--surface); color:var(--text); font-family:inherit; font-size:13px; cursor:pointer;}
   .seg-btn.active{background:var(--primary); border-color:var(--primary); color:#fff;}
+  /* PAY (v3 A4): ردیفِ روشِ پرداخت و شمارشِ اسکناس — همان کارت و حاشیهٔ فرم‌ها */
+  .pay-row{display:grid; grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) minmax(0,1fr) auto; gap:6px; align-items:center; margin-bottom:8px;}
+  .pay-row.bad .form-input{border-color:var(--danger);}
+  .pay-row .pay-del{min-width:36px; min-height:36px;}
+  @media (max-width:520px){ .pay-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;} .pay-row select{grid-column:1 / -1;} }
+  .denom-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:8px; margin-bottom:10px;}
+  .denom-grid label{display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text);}
+  .denom-grid .form-input{min-width:0;}
+  .pay-pill{display:inline-flex; align-items:center; gap:5px; font-size:11.5px; padding:2px 8px; border-radius:999px; background:var(--warning-tint); color:var(--warning);}
+  .pay-pill::before{content:""; width:6px; height:6px; border-radius:50%; background:currentColor;}
 
   /* ---------- برگه‌ی فشرده (فرم‌های کوتاه) ---------- */
   .sheet-grip{
@@ -1773,6 +1783,9 @@
     body *{visibility:hidden;}
     #invoice-print-area, #invoice-print-area *{visibility:visible;}
     #invoice-print-area{position:fixed; top:0; right:0; left:0; padding:10px;}
+    /* PAY-15: گزارشِ X/Z ِ صندوق */
+    #shift-print-area, #shift-print-area *{visibility:visible;}
+    #shift-print-area{position:fixed; top:0; right:0; left:0; padding:10px;}
   }
 
   /* ۸۰ میلی‌متر — چاپگرهای پیشخان */
@@ -4547,6 +4560,10 @@
             <div class="empty-sub" id="shift-sub"></div>
           </div>
           <button type="button" class="btn btn-secondary btn-sm" id="btn-shift-history">سابقه</button>
+          <!-- PAY-12، 15، 19 — فقط با پرچمِ «پرداختِ ترکیبی و شیفت» و صندوقِ باز -->
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-shift-move" style="display:none;">ورود/خروجِ نقد</button>
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-shift-nosale" style="display:none;">کشو بی فروش</button>
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-shift-x" style="display:none;">گزارش X</button>
           <button type="button" class="btn btn-primary btn-sm" id="btn-shift-toggle">باز کردن</button>
         </div>
 
@@ -5242,6 +5259,16 @@
           <div class="theme-toggle" id="expiry-policy-toggle" style="margin-top:10px;">
             <button type="button" class="theme-toggle-btn" data-expiry-policy="warn">فقط هشدار</button>
             <button type="button" class="theme-toggle-btn" data-expiry-policy="block">فروخته نشود</button>
+          </div>
+        </div>
+
+        <!-- PAY (v3 A4): پرداختِ ترکیبی و صندوقِ شیفت — همان «پرداخت و صندوق»ِ تنظیماتِ برنامه؛ پیش‌فرض خاموش -->
+        <div class="panel">
+          <div class="panel-head"><h2>پرداخت و صندوق</h2></div>
+          <p class="settings-hint">«ترکیبی» یعنی: نقد و کیف پول/کارت/حواله در یک فاکتور (با شمارهٔ مرجع، به‌صورتِ «ثبتِ دستی، در انتظار»)، پولِ پس فقط از نقد، باقی‌مانده به حسابِ مشتری؛ و صندوقِ شیفت با ورود/خروجِ نقد، کشو بی فروش، گزارش X و بستن با شمارشِ اسکناس. فقط روی همین دستگاه. برنامه‌های قدیمی فاکتورِ تازه را می‌خوانند، ولی پرداختِ کیف‌پولی را در صندوقِ خودشان نقد می‌شمارند.</p>
+          <div class="theme-toggle" id="pay-mode-toggle" style="margin-top:10px;">
+            <button type="button" class="theme-toggle-btn" data-pay-mode="legacy">نقد و نسیه (امروز)</button>
+            <button type="button" class="theme-toggle-btn" data-pay-mode="v2">ترکیبی و شیفت</button>
           </div>
         </div>
 
@@ -5957,19 +5984,78 @@
       </button>
     </div>
     <div id="shift-breakdown"></div>
+    <!-- PAY-13: شمارشِ اسکناس (فقط با پرچم) -->
+    <div id="shift-denoms-wrap" hidden>
+      <div class="denom-grid" id="shift-denoms"></div>
+      <div class="checkout-summary-row total"><span>نقدِ شمرده</span><b id="shift-denoms-total">0 افغانی</b></div>
+    </div>
     <div class="form-group">
       <label id="shift-amount-label">پولِ اولِ صندوق</label>
       <input class="form-input" id="in-shift-amount" inputmode="decimal">
       <div class="empty-sub" id="shift-diff"></div>
     </div>
     <div class="form-group" id="fg-shift-note">
-      <label>یادداشت (اختیاری)</label>
+      <label id="shift-note-label">یادداشت (اختیاری)</label>
       <input class="form-input" id="in-shift-note" maxlength="120">
+      <div class="field-error" id="shift-v2-error" role="alert" style="display:block;"></div>
     </div>
     <div id="shift-history-list" style="max-height:50vh; overflow:auto;"></div>
     <div style="display:flex; gap:8px; justify-content:flex-end;">
       <button type="button" class="btn btn-secondary" data-close-modal="modal-shift">انصراف</button>
       <button type="button" class="btn btn-primary" id="btn-shift-save">باز کن</button>
+    </div>
+  </div>
+</div>
+
+<!-- PAY-12، 19: ورود/خروجِ نقد با دلیل و باز کردنِ کشو بی فروش با تأیید — فقط با پرچم -->
+<div class="modal-scrim" id="modal-shift-move">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="shift-move-title">ورود/خروجِ نقد</h3>
+      <button class="modal-close" data-close-modal="modal-shift-move" aria-label="بستن">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="form-group" id="fg-move-type">
+      <div class="seg-toggle" id="shift-move-type">
+        <button type="button" class="seg-btn active" data-val="cash_out">خروج از دخل</button>
+        <button type="button" class="seg-btn" data-val="cash_in">ورود به دخل</button>
+      </div>
+    </div>
+    <div class="form-group" id="fg-move-reason">
+      <label for="in-move-reason">دلیل</label>
+      <select class="form-input" id="in-move-reason"></select>
+    </div>
+    <div class="form-group" id="fg-move-amount">
+      <label for="in-move-amount">مبلغ (افغانی)</label>
+      <input class="form-input" id="in-move-amount" inputmode="decimal" autocomplete="off">
+    </div>
+    <div class="form-group">
+      <label for="in-move-note" id="move-note-label">توضیح</label>
+      <input class="form-input" id="in-move-note" maxlength="120" autocomplete="off">
+    </div>
+    <div class="empty-sub" id="shift-move-approver"></div>
+    <div class="field-error" id="shift-move-error" role="alert" style="display:block; min-height:1.2em;"></div>
+    <div style="display:flex; gap:8px; justify-content:flex-end;">
+      <button type="button" class="btn btn-secondary" data-close-modal="modal-shift-move">انصراف</button>
+      <button type="button" class="btn btn-primary" id="btn-shift-move-save">ثبت</button>
+    </div>
+  </div>
+</div>
+
+<!-- PAY-15: گزارشِ X (میانِ شیفت) و Z (پایانِ شیفت) — فقط با پرچم -->
+<div class="modal-scrim" id="modal-shift-report">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="shift-report-title">گزارش X</h3>
+      <button class="modal-close" data-close-modal="modal-shift-report" aria-label="بستن">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div id="shift-print-area"></div>
+    <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:10px;">
+      <button type="button" class="btn btn-secondary" data-close-modal="modal-shift-report">بستن</button>
+      <button type="button" class="btn btn-primary" id="btn-shift-report-print">چاپ</button>
     </div>
   </div>
 </div>
@@ -6155,6 +6241,28 @@
       <div class="checkout-summary-row"><span>تخفیف</span><b id="co-discount-amount">0 افغانی</b></div>
       <div class="checkout-summary-row total"><span>مبلغ نهایی</span><b id="co-final-total">0 افغانی</b></div>
 
+      <!-- PAY (v3 A4): پنلِ پرداختِ ترکیبی — فقط با پرچمِ «پرداختِ ترکیبی و شیفت»؛ خاموش ⇒ همان نقد/نسیهٔ پایین -->
+      <div id="co-pay-v2" hidden>
+        <div class="form-group">
+          <label for="co-cash">نقدِ دریافتی <span class="empty-sub">— Enter روی کادرِ خالی = نقدِ دقیق</span></label>
+          <div style="display:flex; gap:8px;">
+            <input class="form-input" id="co-cash" inputmode="decimal" autocomplete="off" placeholder="0" style="flex:1;">
+            <button type="button" class="btn btn-secondary" id="co-exact">نقدِ دقیق</button>
+          </div>
+        </div>
+        <div id="co-pay-rows"></div>
+        <button type="button" class="btn btn-secondary btn-sm" id="co-add-method" style="margin-bottom:10px;">+ روشِ دیگر (PgDn)</button>
+        <div class="form-group">
+          <label for="co-pay-customer">مشتری — باقی‌مانده به حسابش می‌رود</label>
+          <select class="form-input" id="co-pay-customer"></select>
+        </div>
+        <div class="checkout-summary-row"><span>دریافتی</span><b id="co-pay-tendered">0 افغانی</b></div>
+        <div class="checkout-summary-row"><span>پولِ پس (فقط از نقد)</span><b id="co-pay-change">0 افغانی</b></div>
+        <div class="checkout-summary-row"><span id="co-pay-left-label">باقی‌مانده</span><b id="co-pay-left">0 افغانی</b></div>
+        <div class="field-error" id="co-pay-error" role="alert" style="display:block; min-height:1.2em;"></div>
+      </div>
+
+      <div id="co-pay-legacy">
       <div class="form-group">
         <label>نوع فروش</label>
         <div class="seg-toggle" id="co-payment-type">
@@ -6173,6 +6281,7 @@
         <div class="field-error" id="co-paid-error">مبلغ پرداختی نامعتبر است.</div>
       </div>
       <div class="checkout-summary-row"><span>باقی‌مانده</span><b id="co-remaining">0 افغانی</b></div>
+      </div>
 
       <div class="modal-actions">
         <button type="button" class="btn btn-secondary" data-close-modal="modal-sale-checkout">انصراف</button>
@@ -6257,6 +6366,10 @@
      بی defer، چون اسکریپتِ پایین همان لحظهٔ بالا آمدن تاریخ و ماه می‌سازد. -->
 <script src="license/text-core.js?v=1"></script>
 <script src="license/calendar-core.js?v=1"></script>
+<!-- PAY (v3 A4): هستهٔ پول و پرداخت و سیم‌کشی‌اش — فقط با پرچمِ «پرداختِ ترکیبی و شیفت» (`tohid-pay-v2`) به کار می‌آیند -->
+<script src="license/money.js?v=1"></script>
+<script src="license/pay-core.js?v=1"></script>
+<script src="license/pay-flow.js?v=1"></script>
 <script>
   /* ==========================================================
      DEBTORS SYSTEM — state, rendering, and interactions
@@ -10967,14 +11080,129 @@
   }
   function renderShiftPanel(){
     const sh = currentShift();
+    const v2 = payV2On();
+    ['btn-shift-move','btn-shift-nosale','btn-shift-x'].forEach(id=> document.getElementById(id).style.display = v2 && sh ? '' : 'none');
     document.getElementById('shift-title').textContent = sh ? `صندوق باز — از ${new Date(sh.open.createdAt).toLocaleString('fa-IR-u-nu-latn')}` : 'صندوق بسته است';
-    document.getElementById('shift-sub').textContent = sh ? `نقدِ مورد انتظار در دخل: ${formatMoney(shiftTotals(sh, Date.now()).expected)} افغانی` : '';
+    document.getElementById('shift-sub').textContent = !sh ? '' : v2 ? shiftV2Sub(sh) : `نقدِ مورد انتظار در دخل: ${formatMoney(shiftTotals(sh, Date.now()).expected)} افغانی`;
     document.getElementById('btn-shift-toggle').textContent = sh ? 'بستن صندوق' : 'باز کردن';
   }
+
+  /* ---------- PAY (v3 A4): صندوقِ شیفت با هستهٔ `pay-core.js` — فقط با پرچمِ `tohid-pay-v2` ----------
+     رویدادها ردیفِ سابقه‌اند (cash_in/cash_out/no_sale با refId = همان shift_open)؛ بستن همان
+     shift_close است با `z`. خاموش ⇒ همان `shiftTotals` و فرمِ یک‌عددیِ امروز. */
+  function payLedger(){ return { sales, transactions, returns, expenses, supplierPayments, purchases, auditLog }; }
+  function shiftWho(){ return String(((getAuth()||{}).name) || '').trim(); }
+  //  شمارشِ کور (PAY-13): صندوقدار (شاگرد) مبلغِ مورد انتظار و اختلاف را نمی‌بیند؛ صاحب و مدیر می‌بینند
+  function shiftBlind(){ return shopRole() === 'staff'; }
+  function moveReasonLabel(r){ return ({ deposit:'واریز به دخل', owner_withdrawal:'برداشتِ مالک', petty_expense:'پرداختِ کوچک', other:'دیگر' })[r] || r; }
+  function payAfn(m){ return formatMoney(TohidPayFlow.major(m || 0)) + ' افغانی'; }
+  function shiftV2Sub(sh){
+    const r = TohidPayFlow.report(payLedger(), sh.open, null, Date.now());
+    if(!r.ok) return TohidPayFlow.message(r);
+    const skipped = r.skipped.length ? ` — ${r.skipped.length} خروجِ دفتر بیش از نقدِ دخل بود و حساب نشد (بررسیِ مدیر)` : '';
+    return (shiftBlind() ? 'شمارشِ کور: مبلغِ مورد انتظار پس از بستن به مدیر نشان داده می‌شود' : `نقدِ مورد انتظار در دخل: ${payAfn(r.report.expected.cash)}`) + skipped;
+  }
+  function shiftReportHtml(rep){
+    const F = TohidPayFlow;
+    const view = shiftBlind() ? TohidPay.cashierView(rep) : rep;
+    const row = (l, v, strong)=> `<div class="checkout-summary-row${strong ? ' total' : ''}"><span>${l}</span><b>${v}</b></div>`;
+    const at = t=> escapeHtml(new Date(t).toLocaleString('fa-IR-u-nu-latn'));
+    let h = `<div class="empty-sub">${escapeHtml(appSettings.storeName || 'فروشگاه')} — ${rep.kind === 'Z' ? 'گزارش Z (پایانِ شیفت)' : 'گزارش X (میانِ شیفت)'}</div>`
+      + row('باز شد', at(rep.openedAt)) + row(rep.kind === 'Z' ? 'بسته شد' : 'زمانِ گزارش', at(rep.at))
+      + (rep.by ? row('کاربر', escapeHtml(rep.by)) : '') + row('اولِ صندوق', payAfn(rep.float));
+    Object.keys(rep.methods || {}).forEach(id=>{
+      const m = rep.methods[id];
+      if(m.sales) h += row(`${escapeHtml(F.methodName(id))} — فروش`, payAfn(m.sales));
+      if(m.receipts) h += row(`${escapeHtml(F.methodName(id))} — رسیدِ قرض‌داران`, payAfn(m.receipts));
+      if(m.refunds) h += row(`${escapeHtml(F.methodName(id))} — مرجوعی`, '−' + payAfn(m.refunds));
+    });
+    h += row('ورود به دخل', payAfn(rep.moves.in)) + row('خروج از دخل', '−' + payAfn(rep.moves.out))
+      + row('کشو بی فروش', formatMoney(rep.events.noSale) + ' بار');
+    if(view.expected) Object.keys(view.expected).forEach(id=> h += row(`مورد انتظار — ${escapeHtml(F.methodName(id))}`, payAfn(view.expected[id]), id === F.CASH));
+    if(rep.kind === 'Z'){
+      Object.keys(rep.denominations || {}).sort((a,b)=> b - a).forEach(d=> h += row(`${formatMoney(Number(d)/100)} × ${formatMoney(rep.denominations[d])}`, payAfn(Number(d) * rep.denominations[d])));
+      h += row('نقدِ شمرده', payAfn((rep.counted || {})[F.CASH]), true);
+      if(view.variance) Object.keys(view.variance).forEach(id=>{
+        const v = view.variance[id];
+        h += row(`اختلاف — ${escapeHtml(F.methodName(id))}`, v === null ? 'شمرده نشد' : v === 0 ? 'بی اختلاف' : (v > 0 ? 'اضافه ' : 'کسری ') + payAfn(Math.abs(v)));
+      });
+      if(rep.reason) h += row('دلیلِ اختلاف', escapeHtml(rep.reason));
+      if(rep.needsReview) h += `<div class="empty-sub" style="color:var(--warning);">اختلاف خودکار اصلاح نمی‌شود — برای بررسیِ مدیر ثبت شد.</div>`;
+    }
+    return h;
+  }
+  function openShiftReport(rep){
+    document.getElementById('shift-report-title').textContent = rep.kind === 'Z' ? 'گزارش Z' : 'گزارش X';
+    document.getElementById('shift-print-area').innerHTML = shiftReportHtml(rep);
+    openModal('modal-shift-report');
+  }
+  function shiftDenomCounts(){
+    const out = {};
+    document.querySelectorAll('#shift-denoms [data-denom]').forEach(el=>{
+      const t = normalizeDigits(el.value).trim();
+      if(t !== '') out[el.dataset.denom] = /^\d+$/.test(t) ? Number(t) : -1;
+    });
+    return out;
+  }
+  function shiftDenomTotal(){
+    document.getElementById('shift-denoms-total').textContent = payAfn(TohidPayFlow.countTotal(shiftDenomCounts()));
+  }
+  let shiftMoveMode = 'cash_out';
+  function openShiftMove(mode){
+    shiftMoveMode = mode;
+    const ns = mode === 'no_sale';
+    document.getElementById('shift-move-title').textContent = ns ? 'باز کردنِ کشو بی فروش' : 'ورود/خروجِ نقد';
+    ['fg-move-type','fg-move-reason','fg-move-amount'].forEach(id=> document.getElementById(id).hidden = ns);
+    document.getElementById('move-note-label').textContent = ns ? 'دلیلِ باز کردنِ کشو' : 'توضیح (برای «دیگر» لازم)';
+    document.getElementById('in-move-amount').value = '';
+    document.getElementById('in-move-note').value = '';
+    document.getElementById('shift-move-error').textContent = '';
+    document.getElementById('shift-move-approver').textContent = !ns ? ''
+      : shiftBlind() ? 'باز کردنِ کشو بی فروش تأییدِ صاحب یا مدیر می‌خواهد؛ با حسابِ صاحب یا مدیر وارد شوید.'
+      : `تأییدکننده: ${shiftWho() || 'همین حساب'} — کشوِ برقی هنوز وصل نیست؛ این‌جا فقط با دلیل و تأیید ثبت می‌شود.`;
+    document.getElementById('btn-shift-move-save').disabled = ns && shiftBlind();
+    if(!ns) setShiftMoveType('cash_out');
+    openModal('modal-shift-move');
+  }
+  function setShiftMoveType(t){
+    shiftMoveMode = t;
+    document.querySelectorAll('#shift-move-type .seg-btn').forEach(b=> b.classList.toggle('active', b.dataset.val === t));
+    document.getElementById('in-move-reason').innerHTML = TohidPay.MOVE_REASONS[t].map(r=> `<option value="${r}">${moveReasonLabel(r)}</option>`).join('');
+  }
+  document.getElementById('shift-move-type').addEventListener('click', (e)=>{
+    const b = e.target.closest('.seg-btn'); if(b) setShiftMoveType(b.dataset.val);
+  });
+  document.getElementById('btn-shift-move').addEventListener('click', ()=> openShiftMove('cash_out'));
+  document.getElementById('btn-shift-nosale').addEventListener('click', ()=> openShiftMove('no_sale'));
+  document.getElementById('btn-shift-x').addEventListener('click', ()=>{
+    const sh = currentShift(); if(!sh) return;
+    const r = TohidPayFlow.report(payLedger(), sh.open, null, Date.now(), { by: shiftWho() });
+    if(!r.ok){ showToast(TohidPayFlow.message(r), 'danger'); return; }
+    openShiftReport(r.report);
+  });
+  document.getElementById('btn-shift-report-print').addEventListener('click', ()=> window.print());
+  document.getElementById('btn-shift-move-save').addEventListener('click', ()=>{
+    const sh = currentShift(); const err = document.getElementById('shift-move-error');
+    if(!sh){ err.textContent = TohidPayFlow.message({ error:'SHIFT_CLOSED' }); return; }
+    const ns = shiftMoveMode === 'no_sale', who = shiftWho(), note = document.getElementById('in-move-note').value.trim();
+    const m = ns ? { type:'no_sale', reason: note, by: who, approvedBy: shiftBlind() ? '' : (who || 'صاحب/مدیر') }
+      : { type: shiftMoveMode, amount: normalizeDigits(document.getElementById('in-move-amount').value), reason: document.getElementById('in-move-reason').value, note, by: who };
+    const now = Date.now();
+    const r = TohidPayFlow.moveRow(payLedger(), sh.open, m, now, uid);
+    if(!r.ok){ err.textContent = TohidPayFlow.message(r); return; }
+    r.row.date = todayISO();
+    r.row.notes = ns ? `کشو بی فروش — ${note}` + (r.row.approvedBy ? ` — تأیید: ${r.row.approvedBy}` : '')
+      : `${shiftMoveMode === 'cash_in' ? 'ورود به دخل' : 'خروج از دخل'}: ${moveReasonLabel(r.row.reason)} — ${formatMoney(r.row.amount)} افغانی` + (note ? ` — ${note}` : '') + (who ? ` — ${who}` : '');
+    auditLog.push(r.row);
+    saveState();
+    closeModal('modal-shift-move');
+    renderShiftPanel();
+    showToast(ns ? 'باز کردنِ کشو ثبت شد' : 'ثبت شد');
+  });
   let shiftMode = 'open';
   function shiftDiffText(){
     const sh = currentShift(); const el = document.getElementById('shift-diff');
-    if(shiftMode !== 'close' || !sh){ el.textContent=''; return; }
+    if(shiftMode !== 'close' || !sh || payV2On()){ el.textContent=''; return; }
     const v = importNumber(document.getElementById('in-shift-amount').value);
     if(!document.getElementById('in-shift-amount').value.trim() || !Number.isFinite(v)){ el.textContent=''; return; }
     const diff = v - shiftTotals(sh, Date.now()).expected;
@@ -11002,26 +11230,70 @@
         + row('مرجوعی', -t.returns) + row('مصارف', -t.expenses) + row('پرداخت به تأمین‌کننده و خرید', -t.suppliers)
         + row('مورد انتظار', t.expected, true);
     } else bd.innerHTML = '';
+    //  PAY-13، 14 — بستن با شمارشِ اسکناس؛ اختلافِ بالای آستانه دلیل می‌خواهد
+    const v2close = payV2On() && !hist && !!sh;
+    document.getElementById('shift-denoms-wrap').hidden = !v2close;
+    document.getElementById('in-shift-amount').closest('.form-group').hidden = hist || v2close;
+    document.getElementById('shift-note-label').textContent = v2close ? 'دلیلِ اختلاف (بالای ۵۰ افغانی لازم است)' : 'یادداشت (اختیاری)';
+    document.getElementById('shift-v2-error').textContent = '';
+    if(v2close){
+      document.getElementById('shift-denoms').innerHTML = TohidPay.denominations(false).slice().reverse().map(d=>
+        `<label>${formatMoney(d/100)} ×<input class="form-input" data-denom="${d}" inputmode="numeric" autocomplete="off" placeholder="0"></label>`).join('');
+      shiftDenomTotal();
+      const r = TohidPayFlow.report(payLedger(), sh.open, null, Date.now());
+      bd.innerHTML = !r.ok ? '' : shiftBlind()
+        ? '<div class="empty-sub">شمارشِ کور: اسکناس‌ها را بشمارید؛ مبلغِ مورد انتظار پس از بستن به مدیر نشان داده می‌شود.</div>'
+        : `<div class="checkout-summary-row total"><span>نقدِ مورد انتظار</span><b>${payAfn(r.report.expected.cash)}</b></div>`;
+    }
     document.getElementById('shift-history-list').innerHTML = hist ? (shiftList().slice(0,60).map(s=>
       `<div class="exp-card" style="display:block;"><div>${escapeHtml(new Date(s.open.createdAt).toLocaleString('fa-IR-u-nu-latn'))} — ${escapeHtml(s.open.notes)}</div>
-       <div class="empty-sub">${s.close ? escapeHtml(new Date(s.close.createdAt).toLocaleString('fa-IR-u-nu-latn') + ' — ' + s.close.notes) : 'هنوز باز است'}</div></div>`).join('')
+       <div class="empty-sub">${s.close ? escapeHtml(new Date(s.close.createdAt).toLocaleString('fa-IR-u-nu-latn') + ' — ' + s.close.notes) : 'هنوز باز است'}</div>
+       ${s.close && s.close.z && window.TohidPayFlow ? `<button type="button" class="btn btn-secondary btn-sm" data-shift-z="${escapeHtml(s.close.id)}">گزارش Z</button>` : ''}</div>`).join('')
       || '<div class="empty-sub">هنوز صندوقی باز نشده.</div>') : '';
     openModal('modal-shift');
   }
   document.getElementById('btn-shift-toggle').addEventListener('click', ()=> openShiftModal(currentShift() ? 'close' : 'open'));
   document.getElementById('btn-shift-history').addEventListener('click', ()=> openShiftModal('history'));
   document.getElementById('in-shift-amount').addEventListener('input', shiftDiffText);
+  document.getElementById('shift-denoms').addEventListener('input', shiftDenomTotal);
+  document.getElementById('shift-history-list').addEventListener('click', (e)=>{
+    const b = e.target.closest('[data-shift-z]'); if(!b) return;
+    const row = auditLog.find(a=> a.id === b.dataset.shiftZ);
+    if(row && row.z){ closeModal('modal-shift'); openShiftReport(row.z); }
+  });
   document.getElementById('btn-shift-save').addEventListener('click', ()=>{
     const raw = document.getElementById('in-shift-amount').value;
     const v = importNumber(raw);
-    if(!raw.trim() || !(v >= 0)){ showToast('مبلغ درست نیست', 'danger'); return; }
     const who = String(((getAuth()||{}).name) || '').trim();
     const sh = currentShift();
+    //  بستنِ با پرچم شمارشِ اسکناس دارد، نه کادرِ یک‌عددی
+    if(!(sh && payV2On()) && (!raw.trim() || !(v >= 0))){ showToast('مبلغ درست نیست', 'danger'); return; }
     const now = Date.now();
     if(!sh){
       auditLog.push({ id: uid(), type:'shift_open', date: todayISO(), refId: null, amount: v, createdAt: now,
         notes: `باز کردنِ صندوق با ${formatMoney(v)} افغانی` + (who ? ` — ${who}` : '') });
       showToast('صندوق باز شد');
+    } else if(payV2On()){
+      const note = document.getElementById('in-shift-note').value.trim();
+      const r = TohidPayFlow.closeRow(payLedger(), sh.open, { counts: shiftDenomCounts(), by: who, blind: shiftBlind(), reason: note }, now, uid);
+      if(!r.ok){
+        const msg = r.error === 'REASON_REQUIRED' ? 'اختلافِ شمارش از آستانهٔ ۵۰ افغانی بیشتر است؛ دلیل بنویسید' : TohidPayFlow.message(r);
+        document.getElementById('shift-v2-error').textContent = msg;
+        if(r.error === 'REASON_REQUIRED') document.getElementById('in-shift-note').focus();
+        return;
+      }
+      const z = r.report, cash = TohidPayFlow.CASH, vc = z.variance[cash];
+      r.row.date = todayISO();
+      r.row.notes = `بستنِ صندوق: مورد انتظار ${formatMoney(TohidPayFlow.major(z.expected[cash]||0))}، شمرده ${formatMoney(r.row.amount)}، `
+        + (vc === 0 ? 'بی اختلاف' : vc > 0 ? `اضافه ${formatMoney(TohidPayFlow.major(vc))}` : `کسری ${formatMoney(TohidPayFlow.major(-vc))}`)
+        + ([note, who].filter(Boolean).length ? ' — ' + [note, who].filter(Boolean).join(' — ') : '');
+      auditLog.push(r.row);
+      saveState();
+      closeModal('modal-shift');
+      renderShiftPanel();
+      showToast('صندوق بسته شد');
+      openShiftReport(z);
+      return;
     } else {
       const t = shiftTotals(sh, now);
       const diff = v - t.expected;
@@ -12473,6 +12745,7 @@
     }
     const remaining = Math.max(0, finalTotal - paid);
     document.getElementById('co-remaining').textContent = formatMoney(remaining)+' افغانی';
+    if(payV2On()) refreshPayV2();
   }
 
   function populateCheckoutDebtorSelect(){
@@ -12511,8 +12784,10 @@
     ['co-discount-error','co-debtor-error','co-paid-error'].forEach(id=>{
       document.getElementById(id).closest('.form-group')?.classList.remove('error');
     });
+    setupPayV2(preset);
     refreshCheckoutModal();
     openModal('modal-sale-checkout');
+    if(payV2On()) setTimeout(()=> document.getElementById('co-cash').focus(), 0);
   }
 
   document.getElementById('btn-finalize-sale').addEventListener('click', openSaleCheckoutModal);
@@ -12534,6 +12809,117 @@
   });
   document.getElementById('co-discount-value').addEventListener('input', refreshCheckoutModal);
   document.getElementById('co-paid-amount').addEventListener('input', refreshCheckoutModal);
+
+  /* ---- PAY (v3 A4): پنلِ پرداختِ ترکیبی — فقط با پرچمِ `tohid-pay-v2`؛ حساب همه از `TohidPayFlow`
+     (هستهٔ `pay-core.js`)، همان `PayFlow`ِ برنامه. خاموش ⇒ این بخش پنهان و همان نقد/نسیهٔ امروز. ---- */
+  let coPayRows = [];   // [{method, ref, amount}] — متنِ همان کادرها
+  function payV2On(){ try{ return localStorage.getItem('tohid-pay-v2')==='1' && !!window.TohidPayFlow; }catch(e){ return false; } }
+  function setPayV2(on){ try{ localStorage.setItem('tohid-pay-v2', on ? '1' : '0'); }catch(e){} }
+  function setupPayV2(preset){
+    const on = payV2On();
+    document.getElementById('co-pay-v2').hidden = !on;
+    document.getElementById('co-pay-legacy').hidden = on;
+    if(!on) return;
+    coPaymentType = 'cash';
+    coPayRows = [];
+    document.getElementById('co-cash').value = '';
+    const sel = document.getElementById('co-pay-customer');
+    sel.innerHTML = '<option value="">— بی مشتری —</option>' + debtors.map(d=>`<option value="${escapeHtml(d.id)}">${escapeHtml(d.name)}</option>`).join('');
+    sel.value = preset || '';
+    renderPayRows();
+  }
+  function payDraft(){
+    return {
+      total: computeCheckoutTotals().finalTotal,
+      cash: normalizeDigits(document.getElementById('co-cash').value),
+      rows: coPayRows.map(r=> ({ method: r.method, ref: r.ref, amount: normalizeDigits(r.amount) })),
+      customerId: document.getElementById('co-pay-customer').value || undefined,
+    };
+  }
+  function renderPayRows(){
+    const opts = TohidPayFlow.panelMethods();
+    document.getElementById('co-pay-rows').innerHTML = coPayRows.map((r, i)=> `
+      <div class="pay-row" data-pay-row="${i}">
+        <select class="form-input" data-pay-f="method" aria-label="روشِ پرداخت">${opts.map(m=>
+          `<option value="${escapeHtml(m.id)}"${m.id===r.method?' selected':''}>${escapeHtml(m.name)}</option>`).join('')}</select>
+        <input class="form-input" data-pay-f="ref" placeholder="شمارهٔ مرجع" autocomplete="off" value="${escapeHtml(r.ref)}">
+        <input class="form-input" data-pay-f="amount" inputmode="decimal" placeholder="مبلغ" autocomplete="off" value="${escapeHtml(r.amount)}">
+        <button type="button" class="btn btn-secondary btn-sm pay-del" data-pay-del="${i}" aria-label="حذفِ این روش">✕</button>
+      </div>`).join('');
+    refreshPayV2();
+  }
+  function addPayRow(){
+    const first = TohidPayFlow.panelMethods()[0];
+    coPayRows.push({ method: first ? first.id : '', ref:'', amount:'' });
+    renderPayRows();
+    const el = document.querySelector(`[data-pay-row="${coPayRows.length-1}"] [data-pay-f="ref"]`);
+    if(el) el.focus();
+  }
+  function cyclePayMethod(i, step){
+    const ids = TohidPayFlow.panelMethods().map(m=> m.id);
+    const at = ids.indexOf(coPayRows[i].method);
+    coPayRows[i].method = ids[(at + step + ids.length) % ids.length];
+    renderPayRows();
+    const el = document.querySelector(`[data-pay-row="${i}"] [data-pay-f="ref"]`);
+    if(el) el.focus();
+  }
+  function refreshPayV2(){
+    const err = document.getElementById('co-pay-error');
+    document.querySelectorAll('.pay-row').forEach(el=> el.classList.remove('bad'));
+    const r = TohidPayFlow.preview(payDraft());
+    if(!r.ok){
+      err.textContent = TohidPayFlow.message(r);
+      if(r.index >= 0) document.querySelector(`[data-pay-row="${r.index}"]`)?.classList.add('bad');
+      return r;
+    }
+    const afn = m=> formatMoney(TohidPayFlow.major(m)) + ' افغانی';
+    document.getElementById('co-pay-tendered').textContent = afn(r.tendered);
+    document.getElementById('co-pay-change').textContent = afn(r.change);
+    document.getElementById('co-pay-left-label').textContent = r.toAccount > 0 ? 'به حسابِ مشتری' : 'باقی‌مانده';
+    document.getElementById('co-pay-left').textContent = afn(r.remaining);
+    err.textContent = r.status === 'short' && (r.tendered > 0 || coPayRows.length) ? TohidPayFlow.message({ error:'SHORT', remaining:r.remaining }) : '';
+    return r;
+  }
+  function fillExactCash(){
+    const r = TohidPayFlow.exactCash(payDraft());
+    if(!r.ok){ refreshPayV2(); return; }
+    document.getElementById('co-cash').value = r.amount > 0 ? String(r.amount) : '';
+    refreshPayV2();
+  }
+  document.getElementById('co-exact').addEventListener('click', ()=>{ fillExactCash(); document.getElementById('co-cash').focus(); });
+  document.getElementById('co-add-method').addEventListener('click', addPayRow);
+  document.getElementById('co-cash').addEventListener('input', refreshPayV2);
+  document.getElementById('co-pay-customer').addEventListener('change', refreshPayV2);
+  document.getElementById('co-pay-rows').addEventListener('input', (e)=>{
+    const row = e.target.closest('[data-pay-row]'); if(!row) return;
+    const f = e.target.dataset.payF; if(!f) return;
+    coPayRows[Number(row.dataset.payRow)][f] = e.target.value;
+    refreshPayV2();
+  });
+  document.getElementById('co-pay-rows').addEventListener('change', (e)=>{
+    const row = e.target.closest('[data-pay-row]');
+    if(row && e.target.dataset.payF === 'method'){ coPayRows[Number(row.dataset.payRow)].method = e.target.value; refreshPayV2(); }
+  });
+  document.getElementById('co-pay-rows').addEventListener('click', (e)=>{
+    const b = e.target.closest('[data-pay-del]'); if(!b) return;
+    coPayRows.splice(Number(b.dataset.payDel), 1);
+    renderPayRows();
+    document.getElementById('co-cash').focus();
+  });
+  /* کلیدها (S01، S06): Enter روی نقدِ خالی = نقدِ دقیق؛ Enter در مرجع ⇒ مبلغ؛ PgDn/PgUp ⇒ روشِ بعدی/قبلی */
+  document.getElementById('form-sale-checkout').addEventListener('keydown', (e)=>{
+    if(!payV2On()) return;
+    const row = e.target.closest && e.target.closest('[data-pay-row]');
+    if(e.key === 'PageDown' || e.key === 'PageUp'){
+      e.preventDefault();
+      if(row) cyclePayMethod(Number(row.dataset.payRow), e.key === 'PageDown' ? 1 : -1);
+      else if(e.key === 'PageDown') addPayRow();
+      return;
+    }
+    if(e.key !== 'Enter' || e.isComposing) return;
+    if(e.target.id === 'co-cash' && !e.target.value.trim()){ e.preventDefault(); fillExactCash(); return; }
+    if(row && e.target.dataset.payF === 'ref'){ e.preventDefault(); row.querySelector('[data-pay-f="amount"]').focus(); }
+  });
 
   // ---- ثبت نهایی فروش (پس از تایید در Modal تسویه) ----
   /* POS-14 — دکمهٔ «تایید و ثبت فروش» تا پایانِ ثبت قفل است، و فروش با کلیدِ
@@ -12587,7 +12973,20 @@
 
     const { subtotal, discountValue, discount, finalTotal } = computeCheckoutTotals();
 
-    let paid = parseFloat(normalizeDigits(document.getElementById('co-paid-amount').value));
+    let paid, remaining, debtorId = null, pay = null;
+    if(payV2On()){
+      //  PAY (v3 A4): تسویه از هسته؛ فروشِ ناتمام (باقی‌ماندهٔ بی مشتری) ثبت نمی‌شود
+      const r = TohidPayFlow.checkout(payDraft());
+      if(!r.ok){
+        document.getElementById('co-pay-error').textContent = TohidPayFlow.message(r);
+        showToast(TohidPayFlow.message(r), 'danger');
+        return;
+      }
+      pay = r.fields;
+      paid = pay.paidAmount; remaining = pay.remaining;
+      debtorId = document.getElementById('co-pay-customer').value || null;
+    } else {
+    paid = parseFloat(normalizeDigits(document.getElementById('co-paid-amount').value));
     const paidGroup = document.getElementById('co-paid-amount').closest('.form-group');
     if(isNaN(paid) || paid<0){
       paidGroup.classList.add('error'); return;
@@ -12595,28 +12994,29 @@
     paidGroup.classList.remove('error');
     if(coPaymentType==='cash') paid = finalTotal; // فروش نقدی همیشه به صورت کامل تسویه می‌شود
     paid = Math.min(paid, finalTotal);
-    const remaining = Math.max(0, finalTotal - paid);
+    remaining = Math.max(0, finalTotal - paid);
 
-    let debtorId = null;
     if(coPaymentType==='credit' && remaining>0){
       debtorId = document.getElementById('co-debtor-select').value;
       const debtorGroup = document.getElementById('co-debtor-group');
       if(!debtorId){ debtorGroup.classList.add('error'); return; }
       debtorGroup.classList.remove('error');
     }
+    }
 
     const saleId = draftSaleKey || uid();
     const invoiceNumber = nextInvoiceNo++;
-    sales.push({
+    sales.push(Object.assign({
       id: saleId, invoiceNumber,
       total: subtotal, discountType: coDiscountType, discountValue, discount,
-      finalTotal, paymentMethod: coPaymentType, debtorId,
+      finalTotal, paymentMethod: pay ? pay.paymentMethod : coPaymentType, debtorId,
       paidAmount: paid, remaining, status:'completed',
       debtGiven: (debtorId && remaining>0) ? remaining : 0, debtSettled: 0,
       createdAt: Date.now(), date: todayISO(), syncStatus:'pending',
       //  فروشنده — نامِ حسابِ واردشده؛ گزارشِ «فروش هر کاربر» از همین می‌خواند
       seller: String(((getAuth()||{}).name) || '').trim()
-    });
+    }, //  PAY (v3 A4): فقط با پرچم — فیلدِ تازه، معنای فیلدهای بالا همان امروز
+    pay ? { payments: pay.payments, tenderedMinor: pay.tenderedMinor, changeMinor: pay.changeMinor } : {}));
     cart.forEach(item=>{
       const p = products.find(x=>x.id===item.productId);
       if(!p) return;
@@ -12645,7 +13045,7 @@
     renderProducts(); renderWarehouseList(); renderWarehouseDashboard(); renderSalesTrendChart();
     renderDebtors(); renderDashboard();
     closeModal('modal-sale-checkout');
-    showToast(`فروش به مبلغ ${formatMoney(finalTotal)} افغانی ثبت شد`);
+    showToast(`فروش به مبلغ ${formatMoney(finalTotal)} افغانی ثبت شد` + (pay && pay.changeMinor > 0 ? ` — پولِ پس: ${formatMoney(TohidPayFlow.major(pay.changeMinor))}` : ''));
     if(navigator.vibrate) navigator.vibrate([40,40,40]);
     openInvoiceModal(saleId);
   }
@@ -12653,6 +13053,16 @@
   /* ==========================================================
      فاکتور — نمایش، چاپ
   ========================================================== */
+  /* PAY (v3 A4): ردیف‌های پرداختِ ترکیبی روی فاکتور — فقط فاکتوری که `payments` دارد */
+  function invoicePayLines(sale){
+    if(!Array.isArray(sale.payments) || !sale.payments.length || !window.TohidPayFlow) return '';
+    const F = window.TohidPayFlow;
+    const lines = sale.payments.filter(p=> p.method !== F.ACCOUNT).map(p=>
+      `<div><span>${escapeHtml(F.methodName(p.method))}${p.status==='pending' ? ' (ثبتِ دستی)' : ''}${p.ref ? ' — ' + escapeHtml(rcText(p.ref)) : ''}</span><b>${rcAfn(F.major(p.amountMinor||0))}</b></div>`);
+    if(sale.tenderedMinor > 0) lines.push(`<div><span>دریافتی</span><b>${rcAfn(F.major(sale.tenderedMinor))}</b></div>`);
+    if(sale.changeMinor > 0) lines.push(`<div><span>پولِ پس</span><b>${rcAfn(F.major(sale.changeMinor))}</b></div>`);
+    return lines.join('');
+  }
   function invoiceHtml(sale){
     const items = saleItems.filter(si=>si.saleId===sale.id);
     const debtor = sale.debtorId ? debtors.find(d=>d.id===sale.debtorId) : null;
@@ -12690,6 +13100,7 @@
         <div class="grand"><span>مبلغ نهایی</span><b>${rcAfn(sale.finalTotal)}</b></div>
         <div><span>مبلغ پرداختی</span><b>${rcAfn(sale.paidAmount||0)}</b></div>
         <div><span>باقی‌مانده</span><b>${rcAfn(sale.remaining||0)}</b></div>
+        ${invoicePayLines(sale)}
         ${debtor ? `<div><span>قرض‌دار</span><b>${escapeHtml(debtor.name)}</b></div>` : ''}
       </div>`;
   }
@@ -14895,6 +15306,19 @@
       const b = e.target.closest('[data-expiry-policy]'); if(!b) return;
       setBlockExpiredPolicy(b.dataset.expiryPolicy==='block'); paint();
       showToast(blockExpiredPolicy() ? 'کالای منقضی دیگر فروخته نمی‌شود' : 'برای کالای منقضی فقط هشدار داده می‌شود');
+    });
+    paint();
+  })();
+
+  (function wirePayMode(){
+    const box = document.getElementById('pay-mode-toggle');
+    if(!box) return;
+    const paint = ()=> box.querySelectorAll('[data-pay-mode]').forEach(b=>
+      b.classList.toggle('active', (b.dataset.payMode==='v2') === payV2On()));
+    box.addEventListener('click', (e)=>{
+      const b = e.target.closest('[data-pay-mode]'); if(!b) return;
+      setPayV2(b.dataset.payMode==='v2'); paint(); renderShiftPanel();
+      showToast(payV2On() ? 'پرداختِ ترکیبی و صندوقِ شیفت روشن شد' : 'برگشت به نقد و نسیهٔ امروز');
     });
     paint();
   })();

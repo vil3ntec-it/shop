@@ -15,7 +15,7 @@
  */
 const BETA = /\/beta\/sw\.js$/.test(self.location.pathname);
 const BETA_PATH = new URL('./beta/', self.location).pathname;
-const VERSION = (BETA ? 'beta-' : '') + 'tohid-shop-v53';
+const VERSION = (BETA ? 'beta-' : '') + 'tohid-shop-v54';
 const SHELL_CACHE = VERSION + '-shell';
 const FONT_CACHE = VERSION + '-fonts';
 
@@ -62,6 +62,10 @@ const SHELL_ASSETS = [
   //  LOC-01/05/07/09: هستهٔ خالصِ متن و تقویم — بی آن‌ها فاکتور و تاریخ به راهِ قدیم برمی‌گردند
   './license/text-core.js',
   './license/calendar-core.js',
+  //  PAY (v3 A4): پرداختِ ترکیبی و شیفت — بی آن‌ها نصبِ آفلاین با پرچمِ روشن صندوق ندارد
+  './license/money.js',
+  './license/pay-core.js',
+  './license/pay-flow.js',
   './license/photo-studio.js',
   //  جای دفتر (localStorage یا IndexedDB) — بی آن، دفترِ IndexedDB روی نصبِ آفلاین باز نمی‌شد
   './license/ledger-store.js',
