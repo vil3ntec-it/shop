@@ -88,6 +88,9 @@ object Backend {
 
     //  پشتیبانِ ابری — فهرست و فرستادنِ فایلِ همین دکان
     val backups = BackupRepository(api)
+
+    /** چتِ مشتری ↔ دکان (v3 §۳۳) — پشتِ پرچمِ `shop.chat` */
+    val shopChat = ShopChatRepository(api)
   }
 
   private fun of(context: Context): Wiring =
@@ -113,6 +116,7 @@ object Backend {
   fun events(context: Context): EventsRepository = of(context).events
   fun support(context: Context): SupportRepository = of(context).support
   fun backups(context: Context): BackupRepository = of(context).backups
+  fun shopChat(context: Context): ShopChatRepository = of(context).shopChat
 
   /** آیا برنامه هم نشانی دارد و هم حساب — یعنی اصلاً می‌شود به سرور زد */
   fun isReady(context: Context): Boolean =

@@ -113,4 +113,18 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
     runCatching { live?.disconnect() }
     super.onDestroy()
   }
+
+  /*
+   *  چتِ دکان (v3 §۳۳، CHAT-04): «خوانده شد» فقط وقتی برنامه واقعاً جلوی
+   *  چشم است. برنامه در پس‌زمینه پیام را می‌گیرد («رسید») ولی «خواند» نه.
+   */
+  override fun onResume() {
+    super.onResume()
+    ir.vil3ntec.tohid.data.ShopChatSync.foreground = true
+  }
+
+  override fun onPause() {
+    ir.vil3ntec.tohid.data.ShopChatSync.foreground = false
+    super.onPause()
+  }
 }

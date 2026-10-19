@@ -241,6 +241,17 @@ object ApiEndpoints {
     const val PUSH = "/support/push"
   }
 
+  /**
+   *  چتِ مشتری ↔ دکان، سمتِ کارمند (v3 §۳۳؛ سرور: PR #259). ⛔ پشتِ پرچمِ
+   *  `shop.chat`: تا `CONFIG` نگوید `enabled`، برنامه بخش را نشان نمی‌دهد.
+   */
+  object ShopChat {
+    const val CONFIG = "/shop/chat/config"
+    const val CONVERSATIONS = "/shop/chat/conversations"
+
+    fun conversation(id: String): String = "$CONVERSATIONS/${enc(id)}"
+  }
+
   /* ------------------------------ تپشِ بازدید ------------------------------ */
 
   /**
