@@ -6,102 +6,94 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.unit.dp
 
 /**
- *  توکن‌های ظاهرِ گوشی، نسخهٔ ۳ — بازسازیِ دقیق از روی تصویرهای مرجعِ صاحب محصول
- *  (سبدِ r2/r3، حسابِ r4، تنظیماتِ r5، کارتِ کششیِ r6، خانهٔ r7، آمارِ r8).
- *
- *  پایه خنثی است (سفید، خاکستریِ روشن، سیاه) و آیکن‌ها تک‌رنگ؛ بنفش فقط برای
- *  خانه و آمار (r7/r8) و زرد فقط برای سبد (r2/r3). رنگِ تازه فقط از همین‌جا.
+ *  توکن‌های ظاهرِ گوشی، نسخهٔ ۳. شکل از تصویرهای مرجعِ صاحب محصول (سبدِ r2/r3،
+ *  حسابِ r4، تنظیماتِ r5، کارتِ کششیِ r6، خانهٔ r7، آمارِ r8) و رنگ از سیستمِ
+ *  رنگِ VILL3N (دستورِ صاحب محصول، ۱۴۰۵/۰۷/۲۸): برندِ سبزآبیِ #108B81 به‌جای بنفش،
+ *  زمینه/کارت/سطحِ درونی با مرزِ دیدنی در هر دو تم. رنگِ تازه فقط از همین‌جا.
  */
 data class PhoneV3Colors(
-  /** زمینهٔ صفحه (r5) */
+  /** زمینهٔ صفحه (سطحِ صفر) */
   val bg: Color,
-  /** کارت‌ها و سطحِ سفیدِ کالاها در صندوق */
+  /** کارت‌ها و سطحِ کالاها در صندوق (سطحِ یک) */
   val card: Color,
-  /** کارتِ نیمه‌شفافِ حساب (r4) */
+  /** کارتِ حساب (r4) */
   val cardGlass: Color,
   val ink: Color,
   val inkMuted: Color,
-  /** خطِ مویی میانِ ردیف‌های یک گروه */
+  /** مرزِ کارت و خطِ میانِ ردیف‌های یک گروه */
   val hairline: Color,
   /** آیکنِ خطیِ تک‌رنگ */
   val icon: Color,
   val chevron: Color,
-  /** سطحِ سیاه: زمینهٔ سبد، قرصِ فعالِ نوار، کارتِ کششی، دکمهٔ اسکن */
+  /** سطحِ تیرهٔ وارونه: زمینهٔ سبد، قرصِ فعالِ نوار، کارتِ کششی، دکمهٔ اسکن */
   val black: Color,
-  /** دایرهٔ آیکن روی سیاه (ردیفِ «مشتری» در سبد) */
+  /** دایرهٔ آیکن روی سطحِ تیره (ردیفِ «مشتری» در سبد) */
   val blackRaised: Color,
   val onBlack: Color,
   val onBlackMuted: Color,
-  /** بنفشِ خانه و آمار (r7/r8) */
+  /** رنگِ برند: سرِ خانه، آمار، کارِ اصلی */
   val accent: Color,
   val accentDeep: Color,
   val onAccent: Color,
-  /** زردِ سبد: دایرهٔ شمار و دکمهٔ «پرداخت» (r2/r3) */
+  /** سبد روی سطحِ تیره: دایرهٔ شمار و دکمهٔ «پرداخت» */
   val cart: Color,
   val onCart: Color,
-  /** کلیدِ روشن (r5) */
+  /** کلیدِ روشن */
   val toggleOn: Color,
-  /** کاشیِ بخش‌ها (r7) */
+  /** کاشیِ بخش‌ها و سطحِ درونی (سطحِ دو) */
   val tile: Color,
   val positive: Color,
   val negative: Color,
-  /** زمینهٔ سطحِ کالاها در صندوق (r3: سفیدِ گرم زیرِ کارت‌ها) — کارت‌ها روی آن `catalogCard` */
-  val catalogPage: Color,
-  /** کارتِ کالا در صندوق (r3: سفیدِ خالص) */
-  val catalogCard: Color,
 )
 
 val PhoneV3Light = PhoneV3Colors(
-  bg = Color(0xFFF2F2F5),
+  bg = Color(0xFFF3F6FA),
   card = Color(0xFFFFFFFF),
-  cardGlass = Color(0xD9FFFFFF),
-  ink = Color(0xFF111114),
-  inkMuted = Color(0xFF8A8A94),
-  hairline = Color(0xFFECECF0),
-  icon = Color(0xFF1C1C21),
-  chevron = Color(0xFFB9B9C2),
-  black = Color(0xFF0D0D0F),
-  blackRaised = Color(0xFF1F1F23),
-  onBlack = Color(0xFFFFFFFF),
-  onBlackMuted = Color(0xFF9A9AA3),
-  accent = Color(0xFF6C2BEA),
-  accentDeep = Color(0xFF2A0E5E),
+  cardGlass = Color(0xF2FFFFFF),
+  ink = Color(0xFF17212B),
+  inkMuted = Color(0xFF5B687A),
+  hairline = Color(0xFFD5DEE9),
+  icon = Color(0xFF64748B),
+  chevron = Color(0xFF7B8798),
+  black = Color(0xFF0B1220),
+  blackRaised = Color(0xFF162235),
+  onBlack = Color(0xFFF1F5F9),
+  onBlackMuted = Color(0xFFB6C2D2),
+  accent = Color(0xFF108B81),
+  accentDeep = Color(0xFF08665F),
   onAccent = Color(0xFFFFFFFF),
-  cart = Color(0xFFFFC24A),
-  onCart = Color(0xFF111114),
-  toggleOn = Color(0xFF34C759),
-  tile = Color(0xFFF4F2FA),
-  positive = Color(0xFF1E9E5A),
-  negative = Color(0xFFE5484D),
-  catalogPage = Color(0xFFF7F6F2),
-  catalogCard = Color(0xFFFFFFFF),
+  cart = Color(0xFF19A985),
+  onCart = Color(0xFF041B15),
+  toggleOn = Color(0xFF108B81),
+  tile = Color(0xFFF8FAFC),
+  positive = Color(0xFF15803D),
+  negative = Color(0xFFB91C1C),
 )
 
-//  شب: سطحِ کالاها تیره می‌شود ولی زمینهٔ سبد همچنان سیاهِ کامل است
+//  شب: کارت هرگز در زمینه گم نمی‌شود (#0B1220 ⇐ #162235 ⇐ #203149) و سبد روی تیره‌ترین سطح است
 val PhoneV3Dark = PhoneV3Colors(
-  bg = Color(0xFF0B0B0D),
-  card = Color(0xFF17171B),
-  cardGlass = Color(0xCC1C1C21),
-  ink = Color(0xFFF2F2F5),
-  inkMuted = Color(0xFF9A9AA5),
-  hairline = Color(0xFF26262C),
-  icon = Color(0xFFE6E6EB),
-  chevron = Color(0xFF5C5C66),
-  black = Color(0xFF000000),
-  blackRaised = Color(0xFF1F1F23),
-  onBlack = Color(0xFFFFFFFF),
-  onBlackMuted = Color(0xFF9A9AA3),
-  accent = Color(0xFF8B5CF6),
-  accentDeep = Color(0xFF2A0E5E),
+  bg = Color(0xFF0B1220),
+  card = Color(0xFF162235),
+  cardGlass = Color(0xF2162235),
+  ink = Color(0xFFF1F5F9),
+  inkMuted = Color(0xFFB6C2D2),
+  hairline = Color(0xFF34445A),
+  icon = Color(0xFFA3B2C5),
+  chevron = Color(0xFF94A3B8),
+  black = Color(0xFF050A14),
+  blackRaised = Color(0xFF162235),
+  onBlack = Color(0xFFF1F5F9),
+  onBlackMuted = Color(0xFFB6C2D2),
+  //  سرِ خانه و کارت‌های آمار متنِ سفید دارند ⇒ همان برندِ روز (سفید روی #108B81 و #08665F خواناست)
+  accent = Color(0xFF108B81),
+  accentDeep = Color(0xFF08665F),
   onAccent = Color(0xFFFFFFFF),
-  cart = Color(0xFFFFC24A),
-  onCart = Color(0xFF111114),
-  toggleOn = Color(0xFF30D158),
-  tile = Color(0xFF1E1B26),
-  positive = Color(0xFF34C77B),
-  negative = Color(0xFFFF6B6B),
-  catalogPage = Color(0xFF17171B),
-  catalogCard = Color(0xFF232328),
+  cart = Color(0xFF19A985),
+  onCart = Color(0xFF041B15),
+  toggleOn = Color(0xFF19A985),
+  tile = Color(0xFF203149),
+  positive = Color(0xFF86EFAC),
+  negative = Color(0xFFFCA5A5),
 )
 
 object PhoneV3 {
@@ -123,6 +115,4 @@ object PhoneV3 {
   val navHeight = 64.dp
   /** بلندیِ ردیفِ تنظیمات (r5) */
   val rowHeight = 52.dp
-  /** کارتِ کالا در صندوق (r3) */
-  val catalogCardRadius = 20.dp
 }

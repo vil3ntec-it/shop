@@ -10,6 +10,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
@@ -67,7 +68,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
@@ -107,7 +110,7 @@ import ir.vil3ntec.tohid.ui.theme.PhoneV3
  *    ۳) «پرفروش‌ها»: قرص‌های یک‌ضربه‌ای (نام + قیمت) — هنگامِ جستجو پنهان
  *    ۴) کاشیِ سه‌ستونه (~۱۰۰dp) یا فهرستِ ۵۲dp، پرفروش‌ترین اول
  *  زدن ⇐ +۱ (لرزش و پرشِ کوچک)؛ کالای وزنی ⇐ صفحه‌کلید؛ نگه داشتن ⇐ صفحه‌کلید.
- *  در سبد ⇐ دایرهٔ زردِ مقدار و «−». رنگ‌ها فقط از `PhoneV3`.
+ *  در سبد ⇐ دایرهٔ رنگیِ مقدار و «−». رنگ‌ها فقط از `PhoneV3`.
  */
 
 /** یک کالا — فقط داده‌ای که کاشی و ردیف نشان می‌دهند */
@@ -166,11 +169,11 @@ fun PhoneCatalog(
       Spacer(Modifier.width(2.dp))
       SearchField(search, onSearch, Modifier.weight(1f))
       Spacer(Modifier.width(8.dp))
-      RoundButton(if (scanning) "بستنِ اسکن" else "اسکنِ بارکد", onScan, 44.dp, v.catalogCard) {
+      RoundButton(if (scanning) "بستنِ اسکن" else "اسکنِ بارکد", onScan, 44.dp, v.card) {
         Icon(if (scanning) Icons.Outlined.Close else Icons.Outlined.QrCodeScanner, null, tint = v.icon, modifier = Modifier.size(22.dp))
       }
       Spacer(Modifier.width(6.dp))
-      RoundButton(if (listMode) "نمایِ کاشی" else "نمایِ فهرست", onToggleMode, 44.dp, v.catalogCard) {
+      RoundButton(if (listMode) "نمایِ کاشی" else "نمایِ فهرست", onToggleMode, 44.dp, v.card) {
         Icon(if (listMode) Icons.Outlined.GridView else Icons.Outlined.ViewList, null, tint = v.icon, modifier = Modifier.size(22.dp))
       }
     }
@@ -227,7 +230,7 @@ private fun RoundButton(label: String, onClick: () -> Unit, size: Dp, bg: Color?
     Modifier
       .size(size)
       .clip(CircleShape)
-      .then(if (bg != null) Modifier.background(bg) else Modifier)
+      .then(if (bg != null) Modifier.background(bg).border(1.dp, PhoneV3.colors.hairline, CircleShape) else Modifier)
       .clickable(role = Role.Button, onClick = onClick)
       .semantics { contentDescription = label },
     contentAlignment = Alignment.Center,
@@ -262,7 +265,8 @@ private fun SearchField(value: String, onValueChange: (String) -> Unit, modifier
     modifier
       .height(44.dp)
       .clip(RoundedCornerShape(percent = 50))
-      .background(v.catalogCard)
+      .background(v.card)
+      .border(1.dp, v.hairline, RoundedCornerShape(percent = 50))
       .padding(start = 14.dp, end = 4.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
@@ -311,7 +315,7 @@ private fun CategoryChips(
     categories.forEach { c ->
       Chip(c, selected = category == c, onClick = { onCategory(if (category == c) null else c) }, onHold = { onHold(c) })
     }
-    RoundButton("دستهٔ تازه", onAdd, 32.dp, PhoneV3.colors.catalogCard) {
+    RoundButton("دستهٔ تازه", onAdd, 32.dp, PhoneV3.colors.card) {
       Icon(Icons.Outlined.Add, contentDescription = null, tint = PhoneV3.colors.icon, modifier = Modifier.size(16.dp))
     }
   }
@@ -325,7 +329,9 @@ private fun Chip(text: String, selected: Boolean, onClick: () -> Unit, onHold: (
     Modifier
       .height(32.dp)
       .clip(RoundedCornerShape(percent = 50))
-      .background(if (selected) v.ink else v.catalogCard)
+      //  انتخاب ⇐ رنگِ برند (نشانِ روشنِ فعال)؛ بقیه کارت با مرز
+      .background(if (selected) v.accent else v.card)
+      .border(1.dp, if (selected) v.accent else v.hairline, RoundedCornerShape(percent = 50))
       .combinedClickable(
         role = Role.Tab,
         onLongClickLabel = if (onHold != null) "حذفِ این دسته" else null,
@@ -337,7 +343,7 @@ private fun Chip(text: String, selected: Boolean, onClick: () -> Unit, onHold: (
   ) {
     Text(
       text,
-      color = if (selected) v.catalogCard else v.ink,
+      color = if (selected) v.onAccent else v.ink,
       fontSize = 13.sp,
       fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
       maxLines = 1,
@@ -367,7 +373,8 @@ private fun BestsellerRow(items: List<PhoneCatalogItem>, onTap: (PhoneCatalogIte
           .graphicsLayer { scaleX = pop.value; scaleY = pop.value }
           .alpha(if (b.stock <= 0) SOLD_OUT_ALPHA else 1f)
           .clip(RoundedCornerShape(percent = 50))
-          .background(if (b.inCart > 0) v.cart else v.catalogCard)
+          .background(if (b.inCart > 0) v.cart else v.card)
+          .border(1.dp, if (b.inCart > 0) v.cart else v.hairline, RoundedCornerShape(percent = 50))
           .clickable(role = Role.Button, onClickLabel = if (b.weighed) "وزن کردن" else "یکی به سبد") {
             if (b.stock > 0) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
             onTap(b)
@@ -404,8 +411,8 @@ private fun rememberAddPop(inCart: Double): Animatable<Float, AnimationVector1D>
 }
 
 /**
- *  دایرهٔ ۳۲dpِ آغازِ کاشی/ردیف: عکس، یا حرفِ اول؛ در سبد ⇐ زرد با مقدار (نشانِ مقدار).
- *  عکس‌دار و در سبد ⇐ نشانِ زردِ کوچک روی گوشهٔ عکس.
+ *  دایرهٔ ۳۲dpِ آغازِ کاشی/ردیف: عکس، یا حرفِ اول؛ در سبد ⇐ رنگیِ سبد با مقدار (نشانِ مقدار).
+ *  عکس‌دار و در سبد ⇐ نشانِ کوچکِ رنگِ سبد روی گوشهٔ عکس.
  */
 @Composable
 private fun ItemThumb(item: PhoneCatalogItem) {
@@ -446,7 +453,7 @@ private fun MinusButton(item: PhoneCatalogItem, size: Dp, onMinus: (PhoneCatalog
 /**
  *  کاشیِ کوچکِ کالا (~۱۰۰dp): دایرهٔ ۳۲ و نامِ دوخطیِ ۱۳sp، قیمتِ پررنگِ ۱۴sp، موجودیِ
  *  کوچکِ خاکستری (سرخ «تمام شد»). فشردن ⇐ ۰٫۹۶؛ زدن ⇐ +۱ با لرزش و پرش (وزنی ⇐
- *  صفحه‌کلید)؛ نگه داشتن ⇐ صفحه‌کلید. در سبد ⇐ مقدارِ زرد و «−».
+ *  صفحه‌کلید)؛ نگه داشتن ⇐ صفحه‌کلید. در سبد ⇐ مقدارِ رنگیِ سبد و «−».
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -476,7 +483,8 @@ fun PhoneTile(
       .heightIn(min = 100.dp)
       .graphicsLayer { val s = press * pop.value; scaleX = s; scaleY = s }
       .clip(RoundedCornerShape(PhoneV3.tileRadius))
-      .background(v.catalogCard)
+      .background(v.card)
+      .border(1.dp, v.hairline, RoundedCornerShape(PhoneV3.tileRadius))
       .combinedClickable(
         interactionSource = interaction,
         indication = null,
@@ -538,7 +546,7 @@ fun PhoneTile(
 
 /**
  *  ردیفِ فهرست (۵۲dp): دایره، نام، قیمت · موجودی. زدنِ ردیف ⇐ +۱ (وزنی ⇐ صفحه‌کلید)؛
- *  در سبد ⇐ دایرهٔ زردِ مقدار و «−»ِ کوچک در انتها — مثلِ کاشی، نه بزرگ‌تر.
+ *  در سبد ⇐ دایرهٔ رنگیِ مقدار و «−»ِ کوچک در انتها — مثلِ کاشی، نه بزرگ‌تر.
  *  ردیف‌ها یک کارتِ سفیدِ پیوسته با خطِ مویی‌اند (مثلِ گروه‌های r5).
  */
 @OptIn(ExperimentalFoundationApi::class)
@@ -569,11 +577,24 @@ fun PhoneListRow(
       .fillMaxWidth()
       .height(52.dp)
       .clip(shape)
-      .background(v.catalogCard)
+      .background(v.card)
       .drawBehind {
+        //  مرزِ کلِ گروه: مستطیلِ گردی که برای ردیفِ میانی از بالا و پایین بیرون می‌زند و
+        //  بریده می‌شود ⇐ فقط لبه‌های همین ردیف می‌مانند (بی خطِ دوتایی میانِ ردیف‌ها)
+        val sw = 1.dp.toPx()
+        val rad = r.toPx()
+        val top = if (first) sw / 2 else -rad * 2
+        val bottom = if (last) size.height - sw / 2 else size.height + rad * 2
+        drawRoundRect(
+          hairline,
+          topLeft = Offset(sw / 2, top),
+          size = Size(size.width - sw, bottom - top),
+          cornerRadius = CornerRadius(rad, rad),
+          style = Stroke(width = sw),
+        )
         if (!last) {
-          val y = size.height - 0.5.dp.toPx()
-          drawLine(hairline, Offset(0f, y), Offset(size.width, y), strokeWidth = 1.dp.toPx())
+          val y = size.height - sw / 2
+          drawLine(hairline, Offset(0f, y), Offset(size.width, y), strokeWidth = sw)
         }
       }
       .combinedClickable(
@@ -604,7 +625,7 @@ fun PhoneListRow(
         )
       }
     }
-    //  مقدار همان دایرهٔ زردِ آغاز است (مثلِ کاشی)؛ این‌جا فقط «−»ِ کوچک
+    //  مقدار همان دایرهٔ رنگیِ آغاز است (مثلِ کاشی)؛ این‌جا فقط «−»ِ کوچک
     if (item.inCart > 0) Box(Modifier.alpha(dim)) { MinusButton(item, 28.dp, onMinus) }
   }
 }

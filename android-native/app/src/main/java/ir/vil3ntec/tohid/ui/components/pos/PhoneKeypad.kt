@@ -109,7 +109,7 @@ fun BoxScope.PhoneQtyKeypad(
     Box(
       Modifier
         .fillMaxSize()
-        .background(Color.Black.copy(alpha = 0.45f))
+        .background(PhoneV3.colors.black.copy(alpha = 0.5f))
         .clickable(
           interactionSource = remember { MutableInteractionSource() },
           indication = null,
@@ -148,7 +148,7 @@ private fun KeypadSheet(
     Modifier
       .fillMaxWidth()
       .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
-      .background(v.catalogCard)
+      .background(v.card)
       //  زدن روی خودِ برگه آن را نمی‌بندد
       .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = {})
       .padding(start = 20.dp, end = 20.dp, top = 10.dp, bottom = 16.dp + navBottom),
@@ -207,11 +207,11 @@ private fun KeypadSheet(
             .weight(1f)
             .height(36.dp)
             .clip(RoundedCornerShape(percent = 50))
-            .background(if (on) v.ink else v.bg)
+            .background(if (on) v.accent else v.bg)
             .clickable(role = Role.Button) { text = p },
           contentAlignment = Alignment.Center,
         ) {
-          Text(qty(p.toDouble()), color = if (on) v.catalogCard else v.ink, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+          Text(qty(p.toDouble()), color = if (on) v.onAccent else v.ink, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
         }
       }
     }

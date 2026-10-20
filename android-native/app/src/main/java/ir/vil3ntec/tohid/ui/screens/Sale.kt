@@ -534,14 +534,14 @@ fun SaleScreen(
 
   /*
    *  گوشی (نسخهٔ ۳): همان دوربینِ پیوسته، بارکدِ دستی، «هر اسکن» و «قلم آزاد» — با رنگ‌های
-   *  خودِ سبد (سطحِ سیاه، دکمهٔ زرد، چیپ‌های خاکستری و انتخابِ زرد)، نه بنفشِ برنامه.
+   *  خودِ سبد (سطحِ تیره، دکمهٔ رنگی، چیپ‌های خاکستری و انتخابِ رنگِ سبد)، نه رنگِ دیگرِ برنامه.
    */
   val phoneScanPanel: @Composable () -> Unit = {
     val v = PhoneV3.colors
     Column(
       Modifier
         .fillMaxWidth()
-        .clip(RoundedCornerShape(PhoneV3.catalogCardRadius))
+        .clip(RoundedCornerShape(PhoneV3.tileRadius))
         .background(v.black)
         .padding(12.dp),
     ) {
@@ -1380,7 +1380,7 @@ fun CartBar(
  */
 private const val CAMERA_IDLE_MS = 3L * 60L * 1000L
 
-/** قرصِ کوچکِ صندوقِ گوشیِ نسخهٔ ۳ (زرد یا خاکستری روی سیاه) — کادرِ اسکن */
+/** قرصِ کوچکِ صندوقِ گوشیِ نسخهٔ ۳ (رنگِ سبد یا خاکستری روی سطحِ تیره) — کادرِ اسکن */
 @Composable
 private fun V3Pill(text: String, bg: Color, fg: Color, height: androidx.compose.ui.unit.Dp = 44.dp, onClick: () -> Unit) {
   Box(

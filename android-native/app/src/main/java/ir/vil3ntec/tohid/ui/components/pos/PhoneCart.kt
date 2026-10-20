@@ -17,6 +17,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.Orientation
@@ -97,7 +98,7 @@ import kotlinx.coroutines.withContext
  *  ┌ سطحِ روشنِ کالاها (گوشه‌های پایینِ ۳۶) ┐   ← بسته: تا بالای نوار
  *  │  …                                       │
  *  └──────────────────────────────────────────┘
- *     سبد  ◯ ◯ ◯ +۲                       (۴)     ← نوار روی خودِ زمینهٔ سیاه؛ نه قاب، نه قرص
+ *     سبد  ◯ ◯ ◯ +۲                       (۴)     ← نوار روی خودِ زمینهٔ تیره؛ نه قاب، نه قرص
  *
  *  باز: همان سطح با فنر بالا می‌رود تا فقط ۹۶dpِ پایینش دیده بماند، و سبد روی زمینهٔ
  *  سیاه پیدا می‌شود (ردیف‌ها پله‌پله می‌آیند). زدنِ تکهٔ روشنِ بالا، کشیدن به پایین یا
@@ -207,8 +208,8 @@ private fun PopIn(content: @Composable () -> Unit) {
 }
 
 /**
- *  نوارِ سبد (r3): «سبد»، تا سه عکسِ گردِ تازه‌ترین قلم‌ها، «+N» و دایرهٔ زردِ شمار.
- *  روی خودِ زمینهٔ سیاه است — بی قاب و بی سایه. کلِ نوار یک دکمه است و سبد را باز
+ *  نوارِ سبد (r3): «سبد»، تا سه عکسِ گردِ تازه‌ترین قلم‌ها، «+N» و دایرهٔ رنگیِ شمار.
+ *  روی خودِ زمینهٔ تیره است — بی قاب و بی سایه. کلِ نوار یک دکمه است و سبد را باز
  *  می‌کند. `pulse` با هر افزودن بالا می‌رود ⇐ دایرهٔ شمار و نوار کمی می‌پرند.
  */
 @Composable
@@ -263,11 +264,11 @@ fun PhoneCartStrip(model: CartSummary.Model, pulse: Int, onOpen: () -> Unit, mod
 }
 
 /**
- *  قابِ صندوقِ گوشی: زمینهٔ سیاه، سطحِ کالاها با گوشه‌های پایینِ گرد، نوارِ سبد، و
+ *  قابِ صندوقِ گوشی: زمینهٔ تیره، سطحِ کالاها با گوشه‌های پایینِ گرد، نوارِ سبد، و
  *  سبدِ باز زیرِ سطح. تمام‌صفحه است؛ صدازننده هیچ سربرگ و نوارِ دیگری رویش نمی‌گذارد.
  *
  *  @param catalog سطحِ کالاها؛ `bottomGap` فاصلهٔ لازم زیرِ آخرین کارت است
- *  @param cart سبدِ باز روی سیاه؛ `revealed` برای پله‌پله آمدنِ ردیف‌ها و `dragHandle`
+ *  @param cart سبدِ باز روی سطحِ تیره؛ `revealed` برای پله‌پله آمدنِ ردیف‌ها و `dragHandle`
  *    برای سرِ سبد (کشیدن به پایین ⇐ بستن)
  */
 @Composable
@@ -338,7 +339,7 @@ fun PhoneSaleFrame(
       scope.launch { progress.snapTo((progress.value - delta / travel).coerceIn(0f, 1f)) }
     }
 
-    /* ---------------- سبدِ باز، روی خودِ سیاه (r2) ---------------- */
+    /* ---------------- سبدِ باز، روی خودِ سطحِ تیره (r2) ---------------- */
     if (p > 0.001f) {
       Column(
         Modifier
@@ -383,7 +384,9 @@ fun PhoneSaleFrame(
           shape = surfaceShape
           clip = true
         }
-        .background(v.catalogPage),
+        .background(v.bg)
+        //  لبهٔ سطح روی زمینهٔ تیره همیشه دیده شود (به‌ویژه در شب: #0B1220 روی #050A14)
+        .border(1.dp, v.hairline, surfaceShape),
     ) {
       catalog(if (stripShown) 24.dp else 24.dp + navBottom)
       if (p > 0.001f) {
@@ -547,7 +550,7 @@ private fun CartStepButton(icon: ImageVector, label: String, tint: androidx.comp
 
 /**
  *  ردیفِ «Delivery»ِ r2 برای «مشتری» و «تخفیف»: دایرهٔ تیرهٔ برآمده با آیکنِ خطیِ
- *  زرد، عنوانِ سفید، توضیحِ خاکستری و چیزی در انتها (مبلغ یا ×).
+ *  رنگِ سبد، عنوانِ روشن، توضیحِ خاکستری و چیزی در انتها (مبلغ یا ×).
  */
 @Composable
 fun PhoneCartInfoRow(
@@ -621,7 +624,7 @@ fun PhoneCartTotal(total: Double) {
   }
 }
 
-/** دکمهٔ زردِ قرصیِ تمام‌عرض (r2: «Next») — همان پنجرهٔ تسویهٔ پیشین را باز می‌کند */
+/** دکمهٔ رنگیِ قرصیِ تمام‌عرض (r2: «Next») — همان پنجرهٔ تسویهٔ پیشین را باز می‌کند */
 @Composable
 fun PhoneCartPay(label: String, onClick: () -> Unit, enabled: Boolean = true) {
   val v = PhoneV3.colors
