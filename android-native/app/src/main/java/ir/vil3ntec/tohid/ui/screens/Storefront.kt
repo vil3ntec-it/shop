@@ -68,8 +68,9 @@ private const val PENDING_KEY = "pending-presence"
 /**
  *  ویترینِ اینترنتی — صفحهٔ صاحب دکان (WEB-01/03، PRD-27، §۳۱ PRES).
  *
- *  چهار برگه: «وضعیت» (همان که مشتری می‌بیند + اعلامِ آنلاین/آفلاین)،
- *  «تنظیمات»، «کالاها» (انتشار، قیمتِ آنلاین، سقفِ تعداد، توضیح و مشخصات، گروهی)
+ *  پنج برگه: «وضعیت» (همان که مشتری می‌بیند + اعلامِ آنلاین/آفلاین)،
+ *  «تنظیمات»، «کالاها» (انتشار، قیمتِ آنلاین، سقفِ تعداد، توضیح و مشخصات، گروهی)،
+ *  «بازارچه» (نمایش در فهرستِ عمومیِ دکان‌ها، `StorefrontMarket.kt`)
  *  و «ارسال و زمان» (ناحیه‌ها و بازه‌ها — `StorefrontDelivery.kt`).
  *  هر کار فقط پس از پاسخِ سرور «ثبت شد» می‌گوید (PRES-09).
  */
@@ -107,7 +108,7 @@ fun StorefrontScreen(snackbar: SnackbarHostState) {
         }
         TohidFilterRow(
           //  «ارسال و زمان» فقط وقتی سرور پرچمِ جدای `shop.storefront.zones` را روشن گفته
-          options = listOf("status" to "وضعیت", "settings" to "تنظیمات", "products" to "کالاها") +
+          options = listOf("status" to "وضعیت", "settings" to "تنظیمات", "products" to "کالاها", "market" to "بازارچه") +
             (if (c.zones) listOf("delivery" to "ارسال و زمان") else emptyList()),
           selected = tab,
           onSelect = { tab = it },
@@ -121,6 +122,8 @@ fun StorefrontScreen(snackbar: SnackbarHostState) {
           } else if (settings == null) {
             TohidEmptyState("اول ویترین را بسازید", "در «تنظیمات» نشانی و نام را بنویسید و ذخیره کنید.", actionText = "رفتن به تنظیمات", onAction = { tab = "settings" })
           } else StorefrontDeliveryPane(snackbar)
+          //  «نمایش در بازارچه» — دادهٔ جدا و ذخیرهٔ جدا (`StorefrontMarket.kt`)
+          "market" -> MarketPane(c, snackbar)
           else -> if (settings == null) {
             TohidEmptyState("اول ویترین را بسازید", "در «تنظیمات» نشانی و نام را بنویسید و ذخیره کنید.", actionText = "رفتن به تنظیمات", onAction = { tab = "settings" })
           } else ProductsPane(repo, snackbar)
@@ -386,7 +389,7 @@ private fun SettingsPane(settings: StorefrontSettingsDto?, repo: StorefrontRepos
 }
 
 @Composable
-private fun SwitchRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+internal fun SwitchRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
   Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable { onChange(!checked) }, verticalAlignment = Alignment.CenterVertically) {
     Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
     Switch(checked = checked, onCheckedChange = onChange)

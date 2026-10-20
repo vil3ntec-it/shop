@@ -27,10 +27,17 @@ let A; let S; let C; let rice; let oil; let first;
 async function go(dev, id, to, from, extra = {}) {
   return dev.api('POST', `/shop/orders/${id}/transition`, { to, from, ...extra });
 }
+//  DESIGN v2: کارتِ کالا «یک زدن = یک واحد» (−/+ فقط در سبد)
 async function addToCart(page, id, times = 1) {
   const li = page.locator(`#products li[data-id="${id}"]`);
-  await li.getByRole('button', { name: /افزودن/ }).click();
-  for (let i = 1; i < times; i++) await li.getByRole('button', { name: /یکی بیشتر/ }).click();
+  for (let i = 0; i < times; i++) await li.getByRole('button', { name: /افزودن/ }).click();
+}
+//  نوارِ سبد ⇐ سبدِ باز (در گوشی مدلِ r3/r2) ⇐ «ادامه» ⇐ ثبت
+async function toCheckout(page) {
+  await page.click('#open-cart');
+  await page.waitForFunction(() => document.body.classList.contains('cart-open') || document.getElementById('cart-sheet').classList.contains('on'), null, { timeout: 10_000 });
+  await page.click('#cart-next');
+  await page.waitForSelector('#view-checkout:not([hidden])');
 }
 
 await E.step('E2E-MKT-01.0', 'A کالا می‌سازد و همگام می‌کند؛ ویترین روشن و دو کالا منتشر', async () => {
@@ -47,14 +54,13 @@ await E.step('E2E-MKT-01', 'مهمان کالا را می‌بیند و سبد �
   C = await E.page('customer');
   const { page } = C;
   await page.goto(`${E.apiBase}/store/${SLUG}`);
-  await page.waitForSelector('#products li', { timeout: 15_000 });
-  assert.equal(await page.locator('#products li').count(), 2);
+  await page.waitForSelector('#products li[data-id]', { timeout: 15_000 });
+  assert.equal(await page.locator('#products li[data-id]').count(), 2);
   await addToCart(page, rice, 2);
   await addToCart(page, oil, 1);
   await page.reload();
-  await page.waitForSelector('#products li');
-  await page.click('#open-cart');
-  await page.waitForSelector('#view-checkout:not([hidden])');
+  await page.waitForSelector('#products li[data-id]');
+  await toCheckout(page);
   await page.check('input[name="fulfillment"][value="pickup"]');
   assert.match(await page.textContent('#t-total'), /۵۴۰|540/, 'جمعِ سبد: ۱۲۰×۲ + ۳۰۰');
   assert.equal(await page.isDisabled('#submit-order'), true, 'بی تأییدِ شماره «ثبت» باز است');
@@ -93,10 +99,9 @@ await E.step('E2E-MKT-02', 'S32: قیمت بینِ سبد و ثبت در برن�
 await E.step('E2E-ORD-03', 'S41: جوابِ «ثبت» وسطِ راه گم می‌شود و مشتری دوباره می‌زند ⇐ فقط یک سفارش', async () => {
   const { page } = C;
   await page.goto(`${E.apiBase}/store/${SLUG}#/`);
-  await page.waitForSelector('#products li');
+  await page.waitForSelector('#products li[data-id]');
   await addToCart(page, oil, 1);
-  await page.click('#open-cart');
-  await page.waitForSelector('#view-checkout:not([hidden])');
+  await toCheckout(page);
   await page.check('input[name="fulfillment"][value="pickup"]');
   let cut = 0;
   await page.route('**/checkout', async (route) => {
