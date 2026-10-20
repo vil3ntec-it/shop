@@ -46,6 +46,8 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import ir.vil3ntec.tohid.ui.theme.DarkColors
+import ir.vil3ntec.tohid.ui.theme.Brand
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -177,11 +179,12 @@ private const val LOCKING = true
  *  است — نشانِ افتخار، لبه‌ی درخشان، دکمه‌ی اصلی — فقط رنگش عوض شد. چون
  *  بیرونِ کامپوز تعریف می‌شوند، مقدارها همان مقدارهای پالت‌اند.
  */
-private val GOLD_PALE = Color(0xFFB9A6FF)
-private val GOLD_SOFT = Color(0xFFA78BFF)
-private val GOLD = Color(0xFF7C5CFF)
-private val GOLD_DEEP = Color(0xFF5B3FE0)
-private val GOLD_INK = Color(0xFFFFFFFF)
+//  ۱۴۰۵/۰۷/۲۸: بنفش ⇐ سبزآبیِ برندِ VILL3N (روشن، سیر، پررنگ) — همان عددهای پالت، نه عددِ تازه
+private val GOLD_PALE = DarkColors.brandText
+private val GOLD_SOFT = DarkColors.brandPrimary
+private val GOLD = Brand.primary
+private val GOLD_DEEP = Brand.deep
+private val GOLD_INK = Color.White
 
 /** خودِ فلز: روشن، سیر، دوباره روشن — نه یک زردِ تخت */
 private val GOLD_SWEEP = Brush.linearGradient(

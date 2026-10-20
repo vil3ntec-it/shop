@@ -148,13 +148,13 @@ fun ProductDetailScreen(
               .offset(x = (-4).dp, y = (-4).dp)
               .size(22.dp)
               .clip(RoundedCornerShape(11.dp))
-              .background(Shop.colors.primary),
+              .background(Shop.colors.button.primary.bg),
             contentAlignment = Alignment.Center,
           ) {
             Icon(
               Icons.Filled.PhotoCamera,
               contentDescription = "عکس محصول",
-              tint = Color.White,
+              tint = Shop.colors.button.primary.text,
               modifier = Modifier.size(13.dp),
             )
           }
