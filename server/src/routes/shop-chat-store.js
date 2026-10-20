@@ -7,7 +7,8 @@
  * قراردادی که این‌جا از ویترین لازم است، فقط دو تابع:
  *
  *   open(slug)            ⇒ ردیفِ ویترینِ روشن با `shop_id` — یا خطای ۴۰۴
- *   phoneOfTicket(ticket) ⇒ شمارهٔ ‎+93…‎ ِ تأییدشده — یا null (منقضی/دست‌خورده)
+ *   verifiedPhoneOfTicket(ticket) ⇒ (ناهم‌گام) شمارهٔ ‎+93…‎ ِ تأییدشده — یا null
+ *                                   (منقضی، دست‌خورده یا لغوشده با «خروج از همه‌جا»)
  *
  * تا ویترین روی سرور نیست، این درها همان ۴۰۴ ِ «ویترین نیست» را می‌دهند.
  *
@@ -44,12 +45,12 @@ function storefront() {
 const customer = wrap(async (req, res, next) => {
   res.set('Cache-Control', 'no-store');
   const sf = storefront();
-  if (!sf || typeof sf.open !== 'function' || typeof sf.phoneOfTicket !== 'function') {
+  if (!sf || typeof sf.open !== 'function' || typeof sf.verifiedPhoneOfTicket !== 'function') {
     throw notFound('این ویترین پیدا نشد', 'store_not_found');
   }
   const store = await sf.open(req.params.slug);
   if (!(await chat.flagOf(store.shop_id))) throw notFound('چت برای این دکان روشن نیست', 'chat_disabled');
-  const phone = sf.phoneOfTicket(req.get('x-store-ticket') || '');
+  const phone = await sf.verifiedPhoneOfTicket(req.get('x-store-ticket') || '');
   if (!phone) throw new ApiError(401, 'verification_required', 'برای چت با دکان، شمارهٔ خود را تأیید کنید');
   req.chatViewer = { side: 'customer', shopId: store.shop_id, phone };
   next();
