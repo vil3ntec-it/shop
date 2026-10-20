@@ -388,6 +388,7 @@ html[data-i18n="wait"] body { visibility: hidden; }
 .shop-link:focus-visible::after { box-shadow: var(--shadow-focus); }
 .shop-card .pills { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s1) var(--s2); margin-top: var(--s2); }
 .pill.new { background: var(--c4-bg); color: var(--c4); }
+.shop-card .pills .pill { white-space: normal; max-width: 100%; line-height: 1.4; padding-block: 3px; }
 .shop-card .sub { color: var(--muted); font-size: 14px; margin-top: var(--s3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .shop-card .meta { margin-top: var(--s3); gap: var(--s1) var(--s5); font-size: 13.5px; }
 .shop-card .go { display: flex; align-items: center; justify-content: center; min-height: 42px; margin-top: auto; border-radius: var(--r-ctl); background: var(--selected); color: var(--link); font-weight: 700; font-size: 14px; }
