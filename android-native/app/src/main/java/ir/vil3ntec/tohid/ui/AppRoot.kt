@@ -90,6 +90,8 @@ private val PAGE_TITLES = mapOf(
   "team" to "کارمندان دکان",
   "orders" to "سفارش‌ها",
   "storefront" to "ویترینِ اینترنتی",
+  //  میزِ تحویل (C01) — فقط وقتی سرور پرچمِ `shop.delivery` را روشن گفته
+  "delivery" to "میزِ تحویل",
 )
 
 /**
@@ -469,6 +471,7 @@ fun AppRoot(
 
   //  ویترین (فاز ۴): فقط وقتی سرور می‌گوید روشن است، بخشش دیده می‌شود
   LaunchedEffect(Unit) { runCatching { StorefrontGate.refresh(context) } }
+  LaunchedEffect(Unit) { runCatching { DeliveryGate.refresh(context) } }
 
   //  گوشیِ جفت‌شده بارکد فرستاد ⇒ صفحهٔ فروش باز می‌شود و کالا به سبد می‌رود
   LaunchedEffect(Unit) {
@@ -828,6 +831,7 @@ fun AppRoot(
         "team" -> TeamScreen(snackbar)
         "orders" -> OrdersScreen(snackbar) { sub = null }
         "storefront" -> if (StorefrontGate.visible) StorefrontScreen(snackbar) else LaunchedEffect(Unit) { open("more") }
+        "delivery" -> DeliveryScreen(snackbar) { open("more") }
         "devices" -> DevicesScreen(data, snackbar)
         "more" -> MoreScreen(store, data, ::open)
       }
