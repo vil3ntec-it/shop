@@ -179,4 +179,60 @@ class ShopperApiTest {
     assertEquals("v2.t", t.ticket)
     assertTrue(""""code":"123456"""" in bodies[1])
   }
+
+  /** صاحب دکان روی همین گوشی وارد شده — توکن و شناسهٔ دستگاهش نباید با خریدار برود */
+  private val owner = object : ir.vil3ntec.tohid.core.net.TokenStorage {
+    override var accessToken: String? = "owner-access"
+    override var refreshToken: String? = "owner-refresh"
+    override var accessExpiresAt: Long = 0
+    override fun save(access: String?, refresh: String?, expiresAt: Long) = Unit
+    override fun clear() = Unit
+  }
+
+  @Test
+  fun `خریدار بی توکن و بی شناسهٔ دستگاهِ صاحب دکان`() = runBlocking {
+    val seen = mutableListOf<TestHttpServer.Request>()
+    server.at("/market") { r -> seen += r; ok("""{"shopCount":0,"categories":[]}""") }
+    server.at("/store/nan/checkout") { r -> seen += r; ok("""{"order":${Fixtures.order()}}""") }
+    val client = clientOf(server, owner, mapOf("X-App" to "shop", "X-Device" to "owner-device-1", "X-App-Version" to "2.14.2"))
+    val shopper = ShopperApi(client, { PhoneTicket("+93700000001", "v2.t", clock.at + 60_000) }, clock.now)
+    shopper.overview()
+    shopper.checkout("nan", Json.parseToJsonElement("{}").jsonObject, "app-abcdefgh")
+    assertEquals(2, seen.size)
+    seen.forEach { r ->
+      assertEquals("", r.bearer)
+      assertNull(r.headers["authorization"])
+      assertNull(r.headers["x-device"])
+      assertEquals("shop", r.headers["x-app"])
+    }
+    assertEquals("v2.t", seen[1].headers["x-store-ticket"])
+  }
+
+  @Test
+  fun `سرآیندِ درخواست جای توکن و هویتِ برنامه را نمی‌گیرد`() = runBlocking {
+    var req: TestHttpServer.Request? = null
+    server.at("/health") { r -> req = r; ok("{}") }
+    val client = clientOf(server, owner, mapOf("X-App" to "shop", "X-Device" to "owner-device-1"))
+    client.getPublic(
+      "/health",
+      mapOf("Authorization" to "Bearer forged", "x-app" to "admin", "X-Device" to "forged", "X-Store-Ticket" to "v2.t"),
+    )
+    val r = req!!
+    assertNull(r.headers["authorization"])
+    assertEquals("shop", r.headers["x-app"])
+    assertEquals("owner-device-1", r.headers["x-device"])
+    assertEquals("v2.t", r.headers["x-store-ticket"])
+  }
+
+  @Test
+  fun `«سفارش‌های من» ِ یک ویترین و عکسِ کالا`() = runBlocking {
+    server.at("/store/nan/orders") { r ->
+      if (r.headers["x-store-ticket"] == "v2.t") ok("""{"orders":[{"orderNo":4,"status":"new","totalMinor":900,"itemsCount":1,"createdAt":5,"token":"t4"}]}""")
+      else err(401, "verification_required")
+    }
+    server.at("/store/nan/products/p1/thumb") { ok("IMG") }
+    ticket = PhoneTicket("+93700000001", "v2.t", clock.at + 60_000)
+    assertEquals("t4", api().storeOrders("nan").valueOrNull()!!.single().token)
+    assertEquals("IMG", String(api().photo("nan", "p1").valueOrNull()!!))
+  }
 }

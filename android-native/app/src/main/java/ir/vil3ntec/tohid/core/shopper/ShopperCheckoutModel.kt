@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import java.util.concurrent.atomic.AtomicInteger
 
 data class CheckoutState(
   val loading: Boolean = true,
@@ -29,9 +30,14 @@ data class CheckoutState(
   val issue: CheckoutIssue? = null,
   /** قیمت‌هایی که سرور هنگامِ ثبت عوض‌شده گفت — برای جملهٔ «اگر می‌پذیرید، دوباره بزنید» */
   val priceChanges: List<PriceChange> = emptyList(),
+  /**
+   *  شرایطِ دکان (هزینهٔ ارسال، حداقل، ناحیه‌ها) کهنه است و هنوز تازه نشد —
+   *  ثبت بسته است تا همان بدنه با همان جمعِ کهنه دوباره نرود.
+   */
+  val termsStale: Boolean = false,
   val placed: PlacedOrder? = null,
 ) {
-  val canSubmit: Boolean get() = !loading && !submitting && store != null && problems.isEmpty()
+  val canSubmit: Boolean get() = !loading && !submitting && !termsStale && store != null && problems.isEmpty()
 }
 
 /**
@@ -40,8 +46,8 @@ data class CheckoutState(
  *  خواندنِ خطای سرور (S135، CHK-17/19) یک‌جا است.
  *
  *  ⛔ هیچ مبلغی این‌جا «قطعی» نیست: سرور همان لحظه قیمت و هزینه را حساب
- *  می‌کند و جمعِ دیده‌شده را می‌سنجد؛ اختلاف ⇒ ثبت نمی‌شود و تغییر نشان
- *  داده می‌شود.
+ *  می‌کند و جمعِ دیده‌شده را می‌سنجد؛ اختلاف ⇒ ثبت نمی‌شود، سبد و شرایطِ
+ *  دکان (هزینه، حداقل، ناحیه) از نو خوانده می‌شوند و تغییر نشان داده می‌شود.
  */
 class ShopperCheckoutModel(
   private val api: ShopperApi,
@@ -54,6 +60,10 @@ class ShopperCheckoutModel(
 ) {
   private val flow = MutableStateFlow(CheckoutState(cart = carts.cart(slug)))
   val state: StateFlow<CheckoutState> = flow.asStateFlow()
+
+  /** فقط پاسخِ آخرین «کدام ناحیه؟» و آخرین بازه‌ها اعمال می‌شود */
+  private val locateGen = AtomicInteger()
+  private val slotsGen = AtomicInteger()
 
   /** پروفایلِ ویترین، تازه کردنِ سبد، پر کردنِ فرم از دفعهٔ پیش و بازه‌ها */
   suspend fun load() {
@@ -98,23 +108,38 @@ class ShopperCheckoutModel(
   /** پینِ تحویل؛ ارسالِ ناحیه‌دار ⇒ «کدام ناحیه؟» از سرور */
   suspend fun setPin(pin: GeoPoint?) {
     setForm(flow.value.form.copy(pin = pin))
-    flow.update { it.copy(located = null) }
-    val store = flow.value.store ?: return
-    if (pin == null || !store.delivery.zoned) return
-    flow.update { it.copy(locating = true) }
+    locate()
+  }
+
+  /** @return ناحیه دانسته شد (یا لازم نبود) */
+  private suspend fun locate(): Boolean {
+    val gen = locateGen.incrementAndGet()
+    val pin = flow.value.form.pin
+    val store = flow.value.store
+    if (pin == null || store == null || !store.delivery.zoned) {
+      flow.update { it.copy(located = null, locating = false) }
+      recompute()
+      return true
+    }
+    flow.update { it.copy(located = null, locating = true) }
     val r = api.locate(slug, pin)
-    if (flow.value.form.pin != pin) return
+    if (gen != locateGen.get()) return false
     flow.update { it.copy(locating = false, located = r.valueOrNull()) }
     recompute()
+    return r.isSuccess
   }
 
   suspend fun loadSlots() {
-    val store = flow.value.store ?: return
+    val gen = slotsGen.incrementAndGet()
+    val store = flow.value.store
     val f = flow.value.form.fulfillment
-    if (!store.delivery.scheduling.of(f) || !ShopperCheckout.offers(store, f)) return
+    if (store == null || !store.delivery.scheduling.of(f) || !ShopperCheckout.offers(store, f)) {
+      flow.update { it.copy(slotsLoading = false) }
+      return
+    }
     flow.update { it.copy(slotsLoading = true) }
     val r = api.slots(slug, f)
-    if (flow.value.form.fulfillment != f) return
+    if (gen != slotsGen.get()) return
     flow.update { it.copy(slotsLoading = false, slots = r.valueOrNull() ?: it.slots) }
     recompute()
   }
@@ -129,10 +154,13 @@ class ShopperCheckoutModel(
 
   /**
    *  ثبت. @return سفارشِ ثبت‌شده — یا null (مسئلهٔ فرم یا خطای سرور در `state`).
-   *  دوباره زدن پس از قطعِ شبکه با همان بدنه همان کلید را می‌فرستد.
+   *  دوباره زدن پس از قطعِ شبکه با همان بدنه همان کلید را می‌فرستد؛ شرایطِ کهنه
+   *  اول تازه می‌شود و تا نشده، چیزی نمی‌رود.
    */
   suspend fun submit(): PlacedOrder? {
+    if (flow.value.submitting) return null
     flow.update { it.copy(attempted = true, issue = null) }
+    if (flow.value.termsStale && !refreshTerms()) return null
     recompute()
     val s = flow.value
     val store = s.store ?: return null
@@ -156,11 +184,40 @@ class ShopperCheckoutModel(
       is ApiResult.Failure -> {
         val issue = ShopperCheckout.interpret(r.error)
         val changes = apply(issue)
-        flow.update { it.copy(submitting = false, issue = issue, priceChanges = changes) }
+        flow.update { it.copy(submitting = false, issue = issue, priceChanges = changes, termsStale = staleAfter(issue)) }
+        if (flow.value.termsStale) refreshTerms()
         recompute()
         null
       }
     }
+  }
+
+  /**
+   *  هزینهٔ ارسال، حداقل، ناحیه‌ها و روش‌های دکان از نو — پس از خطایی که
+   *  می‌گوید این‌ها عوض شده‌اند. پین باشد، «کدام ناحیه» هم از نو.
+   *  @return تازه شد؛ نشد ⇒ ثبت بسته می‌ماند (`termsStale`)
+   */
+  private suspend fun refreshTerms(): Boolean {
+    val home = api.store(slug).valueOrNull() ?: return false
+    val store = home.store
+    flow.update { it.copy(store = store, verificationAvailable = home.verification.available) }
+    val form = flow.value.form
+    if (!ShopperCheckout.offers(store, form.fulfillment)) {
+      setForm(form.copy(fulfillment = ShopperCheckout.defaultFulfillment(store), slotStartsAt = null))
+      flow.update { it.copy(slots = null) }
+    }
+    if (!locate()) return false
+    loadSlots()
+    flow.update { it.copy(termsStale = false) }
+    recompute()
+    return true
+  }
+
+  /** خطاهایی که یعنی «شرایطِ دکان عوض شده» — جمعِ کهنه دوباره نباید برود */
+  private fun staleAfter(issue: CheckoutIssue): Boolean = when (issue) {
+    is CheckoutIssue.PriceChanged, is CheckoutIssue.BelowMin, is CheckoutIssue.OutOfZone,
+    is CheckoutIssue.ZoneNeeded, CheckoutIssue.FulfillmentGone -> true
+    else -> false
   }
 
   /** اثرِ خطای سرور روی سبد، بلیت و بازه‌ها — تا دفعهٔ بعد درست برود */
@@ -168,6 +225,7 @@ class ShopperCheckoutModel(
     is CheckoutIssue.PriceChanged -> carts.applyQuote(slug, issue.quote)
     is CheckoutIssue.Unavailable -> { carts.markUnavailable(slug, issue.productIds); emptyList() }
     is CheckoutIssue.OverLimit -> { carts.applyLimit(slug, issue.productId, issue.maxQtyMilli); emptyList() }
+    //  فقط ۴۰۱ یعنی بلیتِ باطل؛ ۴۰۳ ِ «شماره فرق دارد» بلیت را نگه می‌دارد
     is CheckoutIssue.NeedsVerification -> { tickets.forget(); emptyList() }
     is CheckoutIssue.SlotNeeded -> {
       flow.update { st -> st.copy(slots = st.slots?.copy(slots = issue.slots)) }
@@ -182,8 +240,8 @@ class ShopperCheckoutModel(
   }
 
   private fun recompute() {
+    val cart = carts.cart(slug)
     flow.update { s ->
-      val cart = carts.cart(slug)
       val store = s.store ?: return@update s.copy(cart = cart)
       val zone = ShopperCheckout.zoneOf(store, s.form, s.located)
       s.copy(

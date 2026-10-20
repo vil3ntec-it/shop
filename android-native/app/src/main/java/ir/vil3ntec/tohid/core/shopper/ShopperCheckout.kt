@@ -13,7 +13,9 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.security.SecureRandom
 import kotlin.random.Random
+import kotlin.random.asKotlinRandom
 
 /** فرمِ ثبتِ سفارش — همان میدان‌های ویترینِ وب (CHK-01..12). */
 data class CheckoutForm(
@@ -34,7 +36,7 @@ data class CheckoutForm(
 
 /** چرا هنوز نمی‌شود ثبت کرد — صفحه کنارِ همان میدان می‌گوید. */
 enum class FormProblem {
-  CART_EMPTY, CART_UNAVAILABLE, FULFILLMENT_REQUIRED, NAME_REQUIRED, PHONE_INVALID, PHONE_NOT_VERIFIED,
+  CART_EMPTY, CART_UNAVAILABLE, TOO_MANY_LINES, QTY_OVER_LIMIT, FULFILLMENT_REQUIRED, NAME_REQUIRED, PHONE_INVALID, PHONE_NOT_VERIFIED,
   ADDRESS_REQUIRED, ZONE_REQUIRED, OUT_OF_ZONE, SLOT_REQUIRED, SLOT_UNAVAILABLE, BELOW_MIN_ORDER,
 }
 
@@ -65,8 +67,11 @@ sealed class CheckoutIssue {
 
   data class BelowMin(val minOrderMinor: Long) : CheckoutIssue()
 
-  /** بلیت باطل یا شماره همان شمارهٔ تأییدشده نیست ⇒ دوباره تأیید */
+  /** بلیت در سرور باطل است (۴۰۱) ⇒ بلیتِ این دستگاه پاک و دوباره تأیید */
   object NeedsVerification : CheckoutIssue()
+
+  /** شمارهٔ فرم همان شمارهٔ بلیت نیست (۴۰۳) ⇒ همین شماره را تأیید کن؛ بلیت می‌ماند */
+  object PhoneMismatch : CheckoutIssue()
 
   data class OutOfZone(val zones: List<DeliveryZone>, val pickup: Boolean) : CheckoutIssue()
 
@@ -145,6 +150,8 @@ object ShopperCheckout {
     val out = mutableListOf<FormProblem>()
     if (cart == null || cart.lines.isEmpty()) out += FormProblem.CART_EMPTY
     else if (cart.hasUnavailable) out += FormProblem.CART_UNAVAILABLE
+    if (cart != null && cart.lines.size > MAX_CHECKOUT_LINES) out += FormProblem.TOO_MANY_LINES
+    if (cart != null && cart.lines.any { it.qtyMilli > qtyCap(it.maxQtyMilli) }) out += FormProblem.QTY_OVER_LIMIT
     if (!offers(store, form.fulfillment)) out += FormProblem.FULFILLMENT_REQUIRED
     if (form.name.isBlank()) out += FormProblem.NAME_REQUIRED
     val phone = LocaleFormat.normalizePhone(form.phone)
@@ -213,7 +220,8 @@ object ShopperCheckout {
         if (id.isNotEmpty() && max != null) CheckoutIssue.OverLimit(id, max) else null
       }
       "below_min_order" -> CheckoutIssue.BelowMin(ApiJson.long(d, "minOrderMinor"))
-      "verification_required", "phone_not_verified" -> CheckoutIssue.NeedsVerification
+      "verification_required" -> CheckoutIssue.NeedsVerification
+      "phone_not_verified" -> CheckoutIssue.PhoneMismatch
       "out_of_zone" -> CheckoutIssue.OutOfZone(zones(d), ApiJson.bool(d, "pickup"))
       "zone_required", "bad_zone" -> CheckoutIssue.ZoneNeeded(zones(d))
       "slot_required", "slot_unavailable", "slot_full" ->
@@ -239,7 +247,8 @@ object ShopperCheckout {
  */
 class CheckoutKeys(
   private val storage: ShopperStorage,
-  private val random: Random = Random.Default,
+  /** ⛔ رمزنگارانه: کلیدِ قابلِ حدس یعنی دیدنِ پاسخِ سفارشِ دیگری با «دوباره‌پخش» */
+  private val random: Random = SecureRandom().asKotlinRandom(),
 ) {
   @Serializable
   private data class Entry(val slug: String, val body: String, val key: String)

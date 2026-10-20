@@ -28,8 +28,8 @@ object NoTokens : TokenStorage {
   override fun clear() = Unit
 }
 
-fun clientOf(server: TestHttpServer): ApiClient =
-  ApiClient(HttpEngine(baseUrl = { server.baseUrl }, allowInsecure = true), NoTokens)
+fun clientOf(server: TestHttpServer, tokens: TokenStorage = NoTokens, identity: Map<String, String> = emptyMap()): ApiClient =
+  ApiClient(HttpEngine(baseUrl = { server.baseUrl }, allowInsecure = true, identity = { identity }), tokens)
 
 /** مسیرِ سرورِ آزمایشی با پیشوندِ نسخه‌دار */
 fun TestHttpServer.at(path: String, handler: (TestHttpServer.Request) -> Pair<Int, String>) = on("/api/v1$path", handler)
@@ -65,11 +65,16 @@ object Fixtures {
 
   const val TOKEN = "01JABCDEFGHJKMNPQRSTVWXYZ0.abcdefghijklmnopqrstuvwxyzABCDEF"
 
-  fun order(status: String = "new", timeline: String = """[{"status":"new","at":1000}]""", fulfillment: String = "delivery") =
+  fun order(
+    status: String = "new",
+    timeline: String = """[{"status":"new","at":1000}]""",
+    fulfillment: String = "delivery",
+    updatedAt: Long = 2000,
+  ) =
     """{"token":"$TOKEN","orderNo":17,"status":"$status","statusReason":"","fulfillment":"$fulfillment",
     "paymentMethod":"cod","paymentStatus":"unpaid","currency":"AFN","itemsCount":1,
     "lines":[{"productId":"p1","name":"نان","unit":"عدد","qtyMilli":2000,"unitPriceMinor":1500,"lineTotalMinor":3000,"note":""}],
     "subtotalMinor":3000,"discountMinor":0,"deliveryFeeMinor":5000,"totalMinor":8000,"readyAt":null,
-    "scheduledFor":null,"slotEndsAt":null,"zoneName":"","createdAt":1000,"updatedAt":2000,
+    "scheduledFor":null,"slotEndsAt":null,"zoneName":"","createdAt":1000,"updatedAt":$updatedAt,
     "canCancel":${status == "new"},"timeline":$timeline}"""
 }

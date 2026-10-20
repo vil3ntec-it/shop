@@ -30,7 +30,7 @@ class ShopperApi(
   /* ------------------------------ بازارچه ------------------------------ */
 
   suspend fun overview(): ApiResult<MarketOverview> = ApiResult.of {
-    ApiJson.decode<MarketOverview>(api.getPublic(ApiEndpoints.Market.HOME))
+    ApiJson.decode<MarketOverview>(get(ApiEndpoints.Market.HOME))
   }
 
   /**
@@ -52,7 +52,7 @@ class ShopperApi(
         "first" to first.take(MAX_FIRST).joinToString(","), "lat" to near?.lat, "lng" to near?.lng,
       ),
     )
-    ApiJson.decode<ShopPage>(api.getPublic(path))
+    ApiJson.decode<ShopPage>(get(path))
   }
 
   /** دست‌کم دو حرف (همان قاعدهٔ سرور، `query_too_short`) */
@@ -61,7 +61,7 @@ class ShopperApi(
       ApiEndpoints.Market.SEARCH,
       mapOf("q" to query.trim(), "lat" to near?.lat, "lng" to near?.lng),
     )
-    ApiJson.decode<MarketSearch>(api.getPublic(path))
+    ApiJson.decode<MarketSearch>(get(path))
   }
 
   /**
@@ -74,7 +74,7 @@ class ShopperApi(
       mapOf("category" to category, "lat" to near?.lat, "lng" to near?.lng),
     )
     try {
-      ApiJson.decode<MarketFeed>(api.getPublic(path))
+      ApiJson.decode<MarketFeed>(get(path))
     } catch (missing: ApiFailure.NotFound) {
       if (missing.code == ROUTE_MISSING) null else throw missing
     }
@@ -82,18 +82,18 @@ class ShopperApi(
 
   /** «سفارش‌های من» از همهٔ ویترین‌ها — بی بلیت ⇒ ۴۰۱ `verification_required` */
   suspend fun myOrders(): ApiResult<List<MarketOrder>> = ApiResult.of {
-    val body = api.getPublic(ApiEndpoints.Market.ORDERS, ticketHeader())
+    val body = get(ApiEndpoints.Market.ORDERS, ticketHeader())
     ApiJson.decodeAt<List<MarketOrder>>(body, "orders").orEmpty()
   }
 
   /* ------------------------------ ویترینِ یک دکان ------------------------------ */
 
   suspend fun store(slug: String): ApiResult<StoreHome> = ApiResult.of {
-    ApiJson.decode<StoreHome>(api.getPublic(ApiEndpoints.Store.home(slug)))
+    ApiJson.decode<StoreHome>(get(ApiEndpoints.Store.home(slug)))
   }
 
   suspend fun highlights(slug: String): ApiResult<Highlights> = ApiResult.of {
-    ApiJson.decode<Highlights>(api.getPublic(ApiEndpoints.Store.highlights(slug)))
+    ApiJson.decode<Highlights>(get(ApiEndpoints.Store.highlights(slug)))
   }
 
   suspend fun catalog(
@@ -107,7 +107,7 @@ class ShopperApi(
       ApiEndpoints.Store.products(slug),
       mapOf("q" to query.trim(), "category" to category, "cursor" to cursor, "limit" to limit),
     )
-    ApiJson.decode<CatalogPage>(api.getPublic(path))
+    ApiJson.decode<CatalogPage>(get(path))
   }
 
   /**
@@ -117,23 +117,23 @@ class ShopperApi(
   suspend fun productsByIds(slug: String, ids: Collection<String>): ApiResult<List<StoreProduct>> = ApiResult.of {
     ids.distinct().chunked(MAX_IDS).flatMap { chunk ->
       val path = ApiEndpoints.withQuery(ApiEndpoints.Store.products(slug), mapOf("ids" to chunk.joinToString(",")))
-      ApiJson.decode<CatalogPage>(api.getPublic(path)).items
+      ApiJson.decode<CatalogPage>(get(path)).items
     }
   }
 
   suspend fun product(slug: String, id: String): ApiResult<ProductDetail> = ApiResult.of {
-    ApiJson.decode<ProductDetail>(api.getPublic(ApiEndpoints.Store.product(slug, id)))
+    ApiJson.decode<ProductDetail>(get(ApiEndpoints.Store.product(slug, id)))
   }
 
   suspend fun slots(slug: String, fulfillment: String): ApiResult<SlotList> = ApiResult.of {
     val path = ApiEndpoints.withQuery(ApiEndpoints.Store.slots(slug), mapOf("fulfillment" to fulfillment))
-    ApiJson.decode<SlotList>(api.getPublic(path))
+    ApiJson.decode<SlotList>(get(path))
   }
 
   /** ناحیهٔ پین — بی ذخیره در سرور؛ سقفِ روزانه به‌ازای هر دکان */
   suspend fun locate(slug: String, pin: GeoPoint): ApiResult<ZoneLookup> = ApiResult.of {
     val path = ApiEndpoints.withQuery(ApiEndpoints.Store.delivery(slug), mapOf("lat" to pin.lat, "lng" to pin.lng))
-    ApiJson.decode<ZoneLookup>(api.getPublic(path))
+    ApiJson.decode<ZoneLookup>(get(path))
   }
 
   /* ------------------------------ تأییدِ شماره ------------------------------ */
@@ -144,12 +144,12 @@ class ShopperApi(
    */
   suspend fun startVerification(phone: String, slug: String? = null): ApiResult<CodeSent> = ApiResult.of {
     val path = if (slug == null) ApiEndpoints.Market.VERIFY_START else ApiEndpoints.Store.verifyStart(slug)
-    ApiJson.decode<CodeSent>(api.postPublic(path, buildJsonObject { put("phone", phone) }))
+    ApiJson.decode<CodeSent>(post(path, buildJsonObject { put("phone", phone) }))
   }
 
   suspend fun checkVerification(phone: String, code: String, slug: String? = null): ApiResult<PhoneTicket> = ApiResult.of {
     val path = if (slug == null) ApiEndpoints.Market.VERIFY_CHECK else ApiEndpoints.Store.verifyCheck(slug)
-    ApiJson.decode<PhoneTicket>(api.postPublic(path, buildJsonObject { put("phone", phone); put("code", code) }))
+    ApiJson.decode<PhoneTicket>(post(path, buildJsonObject { put("phone", phone); put("code", code) }))
   }
 
   /* ------------------------------ سفارش ------------------------------ */
@@ -160,25 +160,51 @@ class ShopperApi(
    *  خطاها `ApiFailure` با `detail` اند — `ShopperCheckout.interpret` می‌خواندشان.
    */
   suspend fun checkout(slug: String, body: JsonObject, key: String): ApiResult<PlacedOrder> = ApiResult.of {
-    val out = api.postPublic(ApiEndpoints.Store.checkout(slug), body, ticketHeader() + (IDEMPOTENCY to key))
+    val out = post(ApiEndpoints.Store.checkout(slug), body, ticketHeader() + (IDEMPOTENCY to key))
     val order = ApiJson.decodeAt<PublicOrder>(out, "order") ?: throw ApiFailure.InvalidResponse()
     PlacedOrder(order, replayed = ApiJson.bool(out, "replayed"))
   }
 
   suspend fun track(slug: String, token: String): ApiResult<PublicOrder> = ApiResult.of {
-    ApiJson.decodeAt<PublicOrder>(api.getPublic(ApiEndpoints.Store.order(slug, token)), "order")
+    ApiJson.decodeAt<PublicOrder>(get(ApiEndpoints.Store.order(slug, token)), "order")
       ?: throw ApiFailure.InvalidResponse()
   }
 
   /** لغوِ رایگان تا پیش از قبولِ دکان؛ بعدش ۴۰۹ `cannot_cancel` */
   suspend fun cancel(slug: String, token: String): ApiResult<PublicOrder> = ApiResult.of {
-    ApiJson.decodeAt<PublicOrder>(api.postPublic(ApiEndpoints.Store.cancel(slug, token), EMPTY), "order")
+    ApiJson.decodeAt<PublicOrder>(post(ApiEndpoints.Store.cancel(slug, token), EMPTY), "order")
       ?: throw ApiFailure.InvalidResponse()
   }
 
   suspend fun reorder(slug: String, token: String): ApiResult<Reorder> = ApiResult.of {
-    ApiJson.decode<Reorder>(api.getPublic(ApiEndpoints.Store.reorder(slug, token)))
+    ApiJson.decode<Reorder>(get(ApiEndpoints.Store.reorder(slug, token)))
   }
+
+  /**
+   *  «سفارش‌های من» در یک ویترین — جایگزینِ `myOrders` وقتی بازارچه روی این سرور
+   *  خاموش است (پرچمِ `market.directory`، پیش‌فرض خاموش). بی بلیت ⇒ ۴۰۱.
+   */
+  suspend fun storeOrders(slug: String): ApiResult<List<MarketOrder>> = ApiResult.of {
+    ApiJson.decodeAt<List<MarketOrder>>(get(ApiEndpoints.Store.orders(slug), ticketHeader()), "orders").orEmpty()
+  }
+
+  /** عکسِ کالا (`thumb` برای کارت، وگرنه اندازهٔ صفحهٔ کالا) */
+  suspend fun photo(slug: String, productId: String, thumb: Boolean = true): ApiResult<ByteArray> = ApiResult.of {
+    api.getPublicBytes(
+      if (thumb) ApiEndpoints.Store.thumb(slug, productId) else ApiEndpoints.Store.photo(slug, productId),
+      anonymous = true,
+    )
+  }
+
+  /*
+   *  ⛔ همهٔ درخواست‌ها بی شناسهٔ دستگاه (`anonymous`): خریدار و صاحب دکانی که
+   *  همین گوشی را دارد، در سرور به هم پیوند نمی‌خورند.
+   */
+  private suspend fun get(path: String, headers: Map<String, String> = emptyMap()): JsonObject =
+    api.getPublic(path, headers, anonymous = true)
+
+  private suspend fun post(path: String, body: JsonObject, headers: Map<String, String> = emptyMap()): JsonObject =
+    api.postPublic(path, body, headers, anonymous = true)
 
   private fun ticketHeader(): Map<String, String> =
     ticket()?.takeIf { it.validAt(now()) }?.let { mapOf(TICKET to it.ticket) }.orEmpty()

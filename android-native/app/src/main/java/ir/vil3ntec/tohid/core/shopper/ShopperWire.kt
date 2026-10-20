@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.core.shopper
 
+import ir.vil3ntec.tohid.core.storefront.MarketCategoryDto
 import kotlinx.serialization.Serializable
 
 /*
@@ -17,6 +18,10 @@ import kotlinx.serialization.Serializable
 /* ------------------------------ وضعیتِ دکان (§۳۱.۱) ------------------------------ */
 
 /**
+ *  هم‌شکلِ `PresenceStatusDto` (`data/repo/StorefrontRepository.kt`، برگهٔ ویترینِ صاحب
+ *  دکان). هسته نمی‌تواند به `data.repo` تکیه کند؛ یکی شدنشان = بردنِ آن مدل به
+ *  `core/storefront` و عوض کردنِ importِ صفحهٔ ویترین — کارِ گروهِ همان صفحه (G8).
+ *
  *  `badge`: open_online | open_unconfirmed | declared_until | closed | offline
  *  `orderAcceptance`: accepting | delayed | later — سفارش در هر سه ثبت می‌شود؛
  *  فقط می‌گوید کی بررسی می‌شود.
@@ -46,15 +51,13 @@ data class Fulfillment(val delivery: Boolean = false, val pickup: Boolean = fals
 /* ------------------------------ بازارچه ------------------------------ */
 
 @Serializable
-data class MarketCategory(val key: String = "", val label: String = "", val count: Int = 0)
-
-@Serializable
 data class Availability(val available: Boolean = false)
 
 @Serializable
 data class MarketOverview(
   val shopCount: Int = 0,
-  val categories: List<MarketCategory> = emptyList(),
+  /** همان مدلِ دستهٔ برگهٔ «بازارچه» ِ صاحب دکان (`MarketListing`)، با شمارِ دکان‌ها */
+  val categories: List<MarketCategoryDto> = emptyList(),
   val verification: Availability = Availability(),
 )
 

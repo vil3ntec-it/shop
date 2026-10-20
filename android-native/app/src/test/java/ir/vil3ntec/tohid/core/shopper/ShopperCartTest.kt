@@ -155,6 +155,28 @@ class ShopperCartTest {
   }
 
   @Test
+  fun `سقفِ سرور — ۱۰۰ قلم و مقدارِ هر قلم حتی بی سقفِ کالا`() {
+    val c = carts()
+    (1..MAX_CHECKOUT_LINES).forEach { assertTrue(c.add(shop, product("p$it")) is AddOutcome.Added) }
+    assertEquals(AddOutcome.CartFull(MAX_CHECKOUT_LINES), c.add(shop, product("extra")))
+    //  قلمِ موجود هنوز بیشتر می‌شود
+    assertEquals(AddOutcome.Added(2000), c.add(shop, product("p1")))
+    c.setQty("nan", "p2", MAX_QTY_MILLI * 3)
+    assertEquals(MAX_QTY_MILLI, c.cart("nan")!!.qtyOf("p2"))
+    assertEquals(AddOutcome.AtLimit(MAX_QTY_MILLI), c.add(shop, product("p2")))
+  }
+
+  @Test
+  fun `افزودنِ هم‌زمان از چند رشته هیچ واحدی را گم نمی‌کند`() {
+    val c = carts()
+    c.add(shop, product("p1"))
+    val threads = (1..8).map { Thread { repeat(50) { c.increment("nan", "p1") } } }
+    threads.forEach { it.start() }
+    threads.forEach { it.join() }
+    assertEquals(401_000L, c.cart("nan")!!.qtyOf("p1"))
+  }
+
+  @Test
   fun `شمارِ واحدها برای نشانِ سبد`() {
     val c = carts()
     c.add(shop, product("p1"))

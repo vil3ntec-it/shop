@@ -91,16 +91,19 @@ class HttpEngine(
     raw: RawBody? = null,
     /**
      *  سرآیندهای همین درخواست (مثلِ بلیتِ شمارهٔ خریدار `X-Store-Ticket` یا
-     *  `Idempotency-Key`). ⛔ چیزِ شناسایی‌کنندهٔ کاربر جز همان بلیت‌ها نه.
+     *  `Idempotency-Key`). ⛔ چیزِ شناسایی‌کنندهٔ کاربر جز همان بلیت‌ها نه؛
+     *  توکن و هویتِ برنامه را نمی‌توانند عوض کنند (`PROTECTED_HEADERS`).
      */
     headers: Map<String, String> = emptyMap(),
+    /** بی شناسهٔ دستگاه (`X-Device`) — درخواست‌های خریدار (`DEVICE_HEADERS`) */
+    anonymous: Boolean = false,
   ): JsonObject = withContext(Dispatchers.IO) {
     var attempt = 0
     var wait = ApiConfig.RETRY_BACKOFF_MS
 
     while (true) {
       try {
-        return@withContext once(method, path, body, token, raw, headers)
+        return@withContext once(method, path, body, token, raw, headers, anonymous)
       } catch (failure: ApiFailure) {
         val canRetry = idempotent && failure.retryable && attempt < ApiConfig.MAX_RETRIES
         if (!canRetry) throw failure
@@ -126,10 +129,11 @@ class HttpEngine(
     token: String?,
     raw: RawBody? = null,
     headers: Map<String, String> = emptyMap(),
+    anonymous: Boolean = false,
   ): JsonObject {
     val first = prefix
     try {
-      return attempt(method, path, body, token, first, raw, headers)
+      return attempt(method, path, body, token, first, raw, headers, anonymous)
     } catch (failure: ApiFailure) {
       /*
        *  ── چرا رمزِ غلط از این آزمون بیرون است ────────────────────────
@@ -167,7 +171,7 @@ class HttpEngine(
        *  **انجام نداده**. چیزی دو بار ثبت نمی‌شود.
        */
       val value = try {
-        attempt(method, path, body, token, other, headers = headers)
+        attempt(method, path, body, token, other, headers = headers, anonymous = anonymous)
       } catch (_: ApiFailure) {
         //  دومی هم نشد: خطای **اولی** را می‌گوییم، چون پاسخِ مسیرِ اصلی
         //  است و پیامش به کار می‌آید
@@ -189,6 +193,7 @@ class HttpEngine(
     prefix: String,
     raw: RawBody? = null,
     headers: Map<String, String> = emptyMap(),
+    anonymous: Boolean = false,
   ): JsonObject {
     val base = baseUrl()
     ApiConfig.reject(base, allowInsecure)?.let { reason ->
@@ -209,11 +214,7 @@ class HttpEngine(
       connection.connectTimeout = ApiConfig.CONNECT_TIMEOUT_MS
       connection.readTimeout = ApiConfig.READ_TIMEOUT_MS
       connection.setRequestProperty("Accept", "application/json")
-      if (token != null) connection.setRequestProperty("Authorization", "Bearer $token")
-      runCatching { identity() }.getOrNull()?.forEach { (k, v) ->
-        if (v.isNotBlank()) connection.setRequestProperty(k, v)
-      }
-      headers.forEach { (k, v) -> if (v.isNotBlank()) connection.setRequestProperty(k, v) }
+      stamp(connection, token, headers, anonymous)
 
       /*
        *  ⚠️ **بدنهٔ خام، نه JSON.**
@@ -262,6 +263,32 @@ class HttpEngine(
   }
 
   /**
+   *  توکن، هویتِ برنامه و سرآیندهای همین درخواست — به همین ترتیب و فقط این‌جا.
+   *
+   *  ⛔ سرآیندِ درخواست هرگز جای توکن یا هویتِ برنامه را نمی‌گیرد: «توکنِ صاحب
+   *  دکان در درخواستِ خریدار نیست» ساختاری است، نه قرارِ صدازننده.
+   *  ⛔ `anonymous`: شناسهٔ دستگاه نمی‌رود، تا سرور نتواند شمارهٔ خریدار و
+   *  سفارش‌هایش را به دستگاهِ صاحب دکانی که همین گوشی را دارد پیوند بزند.
+   */
+  private fun stamp(connection: HttpURLConnection, token: String?, headers: Map<String, String>, anonymous: Boolean) {
+    if (token != null) connection.setRequestProperty("Authorization", "Bearer $token")
+    runCatching { identity() }.getOrNull()?.forEach { (k, v) ->
+      if (v.isNotBlank() && !(anonymous && k.lowercase() in DEVICE_HEADERS)) connection.setRequestProperty(k, v)
+    }
+    headers.forEach { (k, v) ->
+      if (v.isNotBlank() && k.lowercase() !in PROTECTED_HEADERS) connection.setRequestProperty(k, v)
+    }
+  }
+
+  companion object {
+    /** نامِ کوچکِ سرآیندهایی که فقط خودِ این لایه می‌گذارد */
+    val PROTECTED_HEADERS: Set<String> = setOf("authorization", "x-app", "x-app-id", "x-device", "x-app-version", "cookie")
+
+    /** هویتِ دستگاه — در درخواستِ `anonymous` نمی‌رود */
+    val DEVICE_HEADERS: Set<String> = setOf("x-device")
+  }
+
+  /**
    *  گرفتنِ **بایت‌های خام** (عکس و صدای چتِ دکان، v3 §۳۳) — همان نشانی،
    *  پیشوندِ پیداشده، سرآیندهای هویت و همان قاعدهٔ خطا؛ فقط بدنه JSON نیست.
    *
@@ -269,7 +296,12 @@ class HttpEngine(
    *  دانلودِ بی‌پایان روی اینترنتِ گران). یک بار، بی تلاشِ خودکار: صفحه
    *  خودش «دوباره» دارد.
    */
-  suspend fun fetchBytes(path: String, token: String?, maxBytes: Int = 8 * 1024 * 1024): ByteArray =
+  suspend fun fetchBytes(
+    path: String,
+    token: String?,
+    maxBytes: Int = 8 * 1024 * 1024,
+    anonymous: Boolean = false,
+  ): ByteArray =
     withContext(Dispatchers.IO) {
       val base = baseUrl()
       ApiConfig.reject(base, allowInsecure)?.let { reason ->
@@ -285,10 +317,7 @@ class HttpEngine(
         connection.requestMethod = "GET"
         connection.connectTimeout = ApiConfig.CONNECT_TIMEOUT_MS
         connection.readTimeout = ApiConfig.READ_TIMEOUT_MS
-        if (token != null) connection.setRequestProperty("Authorization", "Bearer $token")
-        runCatching { identity() }.getOrNull()?.forEach { (k, v) ->
-          if (v.isNotBlank()) connection.setRequestProperty(k, v)
-        }
+        stamp(connection, token, emptyMap(), anonymous)
         val status = connection.responseCode
         if (status !in 200..299) {
           val text = connection.errorStream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()

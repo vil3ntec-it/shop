@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.core.shopper
 
 import ir.vil3ntec.tohid.core.net.ApiFailure
 import ir.vil3ntec.tohid.core.net.ApiResult
+import ir.vil3ntec.tohid.core.storefront.MarketCategoryDto
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,7 +18,7 @@ data class HomeState(
   /** بازارچه روی این سرور هنوز باز نیست (`market_not_found`) — نه خطا، یک وضعیت */
   val marketClosed: Boolean = false,
   val shopCount: Int = 0,
-  val categories: List<MarketCategory> = emptyList(),
+  val categories: List<MarketCategoryDto> = emptyList(),
   val verificationAvailable: Boolean = false,
   /** دستهٔ برگزیده؛ «» ⇒ همه */
   val category: String = "",
@@ -53,12 +54,14 @@ class ShopperHomeModel(
   val state: StateFlow<HomeState> = flow.asStateFlow()
 
   private val listGen = AtomicInteger()
+  private val moreGen = AtomicInteger()
   private val searchGen = AtomicInteger()
 
   suspend fun load() = coroutineScope {
     val gen = listGen.incrementAndGet()
     val s = flow.value
-    flow.update { it.copy(loading = true, failure = null) }
+    //  «بیشتر» ِ نیمه‌کاره مالِ فهرستِ قبلی است — پاسخش کنار گذاشته می‌شود
+    flow.update { it.copy(loading = true, failure = null, loadingMore = false) }
     val overview = async { api.overview() }
     val shops = async { api.shops(category = s.category, first = favourites.slugs(), near = s.near) }
     val feed = async { api.feed(category = s.category, near = s.near) }
@@ -101,9 +104,14 @@ class ShopperHomeModel(
     val offset = s.nextOffset ?: return
     if (s.loadingMore || s.loading) return
     val gen = listGen.get()
+    val more = moreGen.incrementAndGet()
     flow.update { it.copy(loadingMore = true) }
     val r = api.shops(category = s.category, offset = offset, first = favourites.slugs(), near = s.near)
-    if (gen != listGen.get()) return
+    //  فهرست از نو خوانده شد ⇒ این صفحه مالِ فهرستِ قبلی است؛ پرچم فقط اگر «بیشترِ» تازه‌تری نیست
+    if (gen != listGen.get()) {
+      if (more == moreGen.get()) flow.update { it.copy(loadingMore = false) }
+      return
+    }
     when (r) {
       is ApiResult.Success -> flow.update {
         val seen = it.shops.map { c -> c.slug }.toSet()

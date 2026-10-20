@@ -158,7 +158,8 @@ class ShopperCheckoutTest {
     )
     assertEquals(CheckoutIssue.BelowMin(15000), ShopperCheckout.interpret(failure(400, "below_min_order", """"minOrderMinor":15000""")))
     assertEquals(CheckoutIssue.NeedsVerification, ShopperCheckout.interpret(failure(401, "verification_required")))
-    assertEquals(CheckoutIssue.NeedsVerification, ShopperCheckout.interpret(failure(403, "phone_not_verified")))
+    //  ۴۰۳ ِ «شماره فرق دارد» بلیت را باطل نمی‌کند
+    assertEquals(CheckoutIssue.PhoneMismatch, ShopperCheckout.interpret(failure(403, "phone_not_verified")))
     val zones = """"zones":[{"id":"z1","name":"مرکز","feeMinor":3000,"minOrderMinor":0,"freeOverMinor":null}]"""
     assertEquals(
       CheckoutIssue.OutOfZone(listOf(DeliveryZone("z1", "مرکز", 3000, 0, null)), pickup = true),
@@ -186,6 +187,17 @@ class ShopperCheckoutTest {
     assertNotEquals(k1, k2)
     keys.drop("nan")
     assertNotEquals(k2, keys.keyFor("nan", b))
+  }
+
+  @Test
+  fun `سقفِ قلم‌ها و مقدارِ هر قلم پیش از فرستادن`() {
+    verify()
+    val many = ShopCart("nan", lines = (1..101).map { CartLine("p$it", "کالا", priceMinor = 1000, qtyMilli = 1000) })
+    assertTrue(FormProblem.TOO_MANY_LINES in ShopperCheckout.problems(flat, many, form, tickets, null, null))
+    val big = ShopCart("nan", lines = listOf(CartLine("p1", "نان", priceMinor = 20000, qtyMilli = 3000, maxQtyMilli = 2000)))
+    assertEquals(listOf(FormProblem.QTY_OVER_LIMIT), ShopperCheckout.problems(flat, big, form, tickets, null, null))
+    val huge = ShopCart("nan", lines = listOf(CartLine("p1", "نان", priceMinor = 20000, qtyMilli = MAX_QTY_MILLI + 1000)))
+    assertEquals(listOf(FormProblem.QTY_OVER_LIMIT), ShopperCheckout.problems(flat, huge, form, tickets, null, null))
   }
 
   @Test

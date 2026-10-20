@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.core.shopper
 
 import ir.vil3ntec.tohid.core.money.Rounding
+import ir.vil3ntec.tohid.core.storefront.StorefrontOwner
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -63,6 +64,9 @@ sealed class AddOutcome {
 
   /** ناموجود، «قابلِ سفارش نیست» یا بی‌قیمت */
   object NotOrderable : AddOutcome()
+
+  /** سبد به سقفِ قلم‌های یک سفارش رسید (`MAX_CHECKOUT_LINES` ِ سرور) */
+  data class CartFull(val maxLines: Int) : AddOutcome()
 }
 
 /** نتیجهٔ تازه کردنِ سبد با قیمت و موجودیِ امروز */
@@ -74,6 +78,13 @@ data class RefreshNotice(val priceChanged: Int, val gone: Int) {
 data class PriceChange(val productId: String, val name: String, val beforeMinor: Long, val afterMinor: Long)
 
 const val QTY_STEP = 1000L
+
+/** همان سقف‌های `parseCheckout` ِ سرور: قلم‌های یک سفارش و مقدارِ هر قلم */
+const val MAX_CHECKOUT_LINES = 100
+const val MAX_QTY_MILLI = StorefrontOwner.MAX_QTY_MILLI
+
+/** سقفِ مقدارِ یک قلم: سقفِ خودِ کالا اگر هست، و هرگز بیش از سقفِ سرور */
+fun qtyCap(maxQtyMilli: Long?): Long = maxQtyMilli?.let { minOf(it, MAX_QTY_MILLI) } ?: MAX_QTY_MILLI
 
 /**
  *  سبدهای مهمانِ همهٔ دکان‌ها روی همین دستگاه.
@@ -104,9 +115,11 @@ class ShopperCarts(
   fun add(shop: CartShop, product: StoreProduct): AddOutcome {
     val price = product.priceMinor
     if (price == null || !product.stock.orderable) return AddOutcome.NotOrderable
-    val current = cart(shop.slug)?.qtyOf(product.id) ?: 0
+    val existing = cart(shop.slug)
+    val current = existing?.qtyOf(product.id) ?: 0
+    if (current == 0L && (existing?.lines?.size ?: 0) >= MAX_CHECKOUT_LINES) return AddOutcome.CartFull(MAX_CHECKOUT_LINES)
     val max = product.maxQtyMilli
-    if (max != null && current + QTY_STEP > max) return AddOutcome.AtLimit(max)
+    if (current + QTY_STEP > qtyCap(max)) return AddOutcome.AtLimit(qtyCap(max))
     val line = CartLine(
       productId = product.id, name = product.name, unit = product.unit, priceMinor = price,
       qtyMilli = current + QTY_STEP, maxQtyMilli = max, photo = product.photo,
@@ -119,14 +132,17 @@ class ShopperCarts(
   @Synchronized
   fun setQty(slug: String, productId: String, qtyMilli: Long) {
     val line = cart(slug)?.line(productId) ?: return
-    val clamped = line.maxQtyMilli?.let { minOf(qtyMilli, it) } ?: qtyMilli
+    val clamped = minOf(qtyMilli, qtyCap(line.maxQtyMilli))
     edit(slug) { lines ->
       if (clamped <= 0) lines.filterNot { it.productId == productId } else lines.upsert(line.copy(qtyMilli = clamped))
     }
   }
 
+  /** خواندن و نوشتن زیرِ همان قفل — دو ضربهٔ هم‌زمان دو واحد می‌شود، نه یکی */
+  @Synchronized
   fun increment(slug: String, productId: String) = setQty(slug, productId, (cart(slug)?.qtyOf(productId) ?: 0) + QTY_STEP)
 
+  @Synchronized
   fun decrement(slug: String, productId: String) = setQty(slug, productId, (cart(slug)?.qtyOf(productId) ?: 0) - QTY_STEP)
 
   @Synchronized
@@ -161,7 +177,7 @@ class ShopperCarts(
         line.copy(
           name = p.name, unit = p.unit, priceMinor = price, maxQtyMilli = p.maxQtyMilli,
           photo = p.photo, unavailable = false,
-          qtyMilli = p.maxQtyMilli?.let { minOf(line.qtyMilli, it) } ?: line.qtyMilli,
+          qtyMilli = minOf(line.qtyMilli, qtyCap(p.maxQtyMilli)),
         )
       }
     }
@@ -210,14 +226,18 @@ class ShopperCarts(
   /** «خریدِ دوباره»: فقط قلم‌های موجود با قیمتِ امروز، روی سبدِ همان دکان */
   @Synchronized
   fun fillFromReorder(shop: CartShop, reorder: Reorder): Int {
-    val ok = reorder.lines.filter { it.available && it.priceMinor != null && it.qtyMilli > 0 }
+    val have = cart(shop.slug)?.lines?.map { it.productId }?.toSet().orEmpty()
+    val room = (MAX_CHECKOUT_LINES - have.size).coerceAtLeast(0)
+    val fresh = reorder.lines.filter { it.available && it.priceMinor != null && it.qtyMilli > 0 }
+    //  سقفِ قلم‌ها: آن‌چه از قبل در سبد است جا دارد؛ قلمِ تازه تا جا هست
+    val ok = fresh.filter { it.productId in have } + fresh.filterNot { it.productId in have }.take(room)
     if (ok.isEmpty()) return 0
     edit(shop.slug, shop) { lines ->
       ok.fold(lines) { acc, r ->
         acc.upsert(
           CartLine(
             productId = r.productId, name = r.name, unit = r.unit, priceMinor = r.priceMinor ?: 0,
-            qtyMilli = r.maxQtyMilli?.let { minOf(r.qtyMilli, it) } ?: r.qtyMilli, maxQtyMilli = r.maxQtyMilli,
+            qtyMilli = minOf(r.qtyMilli, qtyCap(r.maxQtyMilli)), maxQtyMilli = r.maxQtyMilli,
           ),
         )
       }

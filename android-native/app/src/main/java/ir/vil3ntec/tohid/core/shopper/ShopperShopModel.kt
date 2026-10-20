@@ -43,6 +43,7 @@ class ShopperShopModel(
   val state: StateFlow<ShopState> = flow.asStateFlow()
 
   private val listGen = AtomicInteger()
+  private val moreGen = AtomicInteger()
 
   suspend fun load() = coroutineScope {
     flow.update { it.copy(loading = true, failure = null, notFound = false) }
@@ -55,12 +56,13 @@ class ShopperShopModel(
         shelves.cancel()
       }
       is ApiResult.Success -> {
+        //  قفسه‌ها اختیاری‌اند: نشد ⇒ بی قفسه، نه خطای صفحه
+        val shelf = shelves.await().valueOrNull()
         flow.update {
           it.copy(
             loading = false, store = h.value.store,
             verificationAvailable = h.value.verification.available, marketAvailable = h.value.market.available,
-            //  قفسه‌ها اختیاری‌اند: نشد ⇒ بی قفسه، نه خطای صفحه
-            highlights = shelves.await().valueOrNull(),
+            highlights = shelf,
           )
         }
         reloadList()
@@ -84,9 +86,14 @@ class ShopperShopModel(
     val cursor = s.nextCursor ?: return
     if (s.loadingMore || s.loadingList) return
     val gen = listGen.get()
+    val more = moreGen.incrementAndGet()
     flow.update { it.copy(loadingMore = true) }
     val r = api.catalog(slug, s.query, s.category, cursor)
-    if (gen != listGen.get()) return
+    //  فهرست از نو خوانده شد ⇒ این صفحه مالِ فهرستِ قبلی است؛ پرچم فقط اگر «بیشترِ» تازه‌تری نیست
+    if (gen != listGen.get()) {
+      if (more == moreGen.get()) flow.update { it.copy(loadingMore = false) }
+      return
+    }
     flow.update {
       when (r) {
         is ApiResult.Success -> {
@@ -104,7 +111,7 @@ class ShopperShopModel(
   private suspend fun reloadList() {
     val gen = listGen.incrementAndGet()
     val s = flow.value
-    flow.update { it.copy(loadingList = true, listFailure = null) }
+    flow.update { it.copy(loadingList = true, listFailure = null, loadingMore = false) }
     val r = api.catalog(slug, s.query, s.category)
     if (gen != listGen.get()) return
     flow.update {
