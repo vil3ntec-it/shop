@@ -12,6 +12,10 @@ const v = require('../lib/validate');
 const shops = require('../lib/shops');
 const staffCodes = require('../lib/staff-codes');
 const audit = require('../lib/audit');
+const { requireRecentAuth, assertFresh } = require('../lib/reauth');
+
+/** نقش‌هایی که کدِ دعوتشان تأییدِ دوباره نمی‌خواهد — هر نقشِ دیگری (مدیر و هر نقشِ تازهٔ بالاتر) می‌خواهد. */
+const INVITE_WITHOUT_REAUTH = new Set(['staff', 'courier']);
 const subsLib = require('../lib/subscriptions');
 const { entitlementOf } = require('../lib/entitlement');
 const { permissionsOf } = require('../lib/permissions');
@@ -85,7 +89,8 @@ router.get('/members', requireShop, requirePermission('members.view'), async (re
   });
 });
 
-router.patch('/members/:id', requireShop, requirePermission('members.role'), async (req, res) => {
+//  ⛔ نقشِ کارمند = مجوزهایش ⇒ فقط از نشستِ تازه احراز‌شده (بندِ ۲۱.۱، `lib/reauth`)
+router.patch('/members/:id', requireShop, requirePermission('members.role'), requireRecentAuth, async (req, res) => {
   const id = v.id(req.params.id, { field: 'شناسه عضو' });
   const patch = {
     role: req.body?.role ? v.oneOf(req.body.role, ['manager', 'staff'], { field: 'نقش' }) : undefined,
@@ -156,7 +161,9 @@ router.post('/staff-code/disable', requireShop, requirePermission('staffcode.rev
 });
 
 /** عوض کردن کد ثابت — برای وقتی که لو رفته باشد. شاگردهای فعلی می‌مانند. */
-router.post('/staff-code/rotate', requireShop, requirePermission('staffcode.create'), requireFeature('multi_device'), async (req, res) => {
+//  ⛔ کدِ تازه = درِ تازه به دکان (و کدِ خاموش‌شده را دوباره باز می‌کند) ⇒ فقط
+//  از نشستِ تازه احراز‌شده (بازبینیِ امنیتی ۱۴۰۵/۰۷/۲۷، یافتهٔ ۳؛ `lib/reauth`)
+router.post('/staff-code/rotate', requireShop, requirePermission('staffcode.create'), requireFeature('multi_device'), requireRecentAuth, async (req, res) => {
   const out = await staffCodes.rotateStanding(req.shopId, req.user.id);
   await audit.log({ shopId: req.shopId, userId: req.user.id, action: 'staff_code.rotated', targetType: 'staff_code', targetId: out.id, detail: { generation: out.generation } });
   res.json({ code: out.code, id: out.id, role: out.role, generation: out.generation, standing: true });
@@ -166,6 +173,11 @@ router.post('/staff-code/rotate', requireShop, requirePermission('staffcode.crea
 // انجام می‌شود، نه با پنهان کردن دکمه در گوشی.
 router.post(['/staff-code', '/invite'], requireShop, requirePermission('staffcode.create'), requireFeature('multi_device'), async (req, res, next) => {
   const role = req.body?.role ? v.oneOf(req.body.role, ['manager', 'staff', 'courier'], { field: 'نقش' }) : 'staff';
+  //  ⛔ کدِ دعوتِ نقشِ **بالاتر از شاگرد** یک درِ پشتیِ ماندگار است: نشستِ کهنهٔ
+  //  صاحب دکان (گوشیِ باز، توکنِ دزدیده) با آن مدیرِ تازه می‌ساخت که پس از
+  //  بیرون کردنِ نشست هم می‌ماند. پس همان تأییدِ دوبارهٔ «عوض کردنِ نقش»
+  //  (`PATCH /members/:id`) را می‌خواهد. شاگرد و پیک مثلِ پیش (یافتهٔ ۳).
+  if (!INVITE_WITHOUT_REAUTH.has(role)) await assertFresh(req);
   //  دعوتِ پیک (DLV-01) — پشتِ پرچمِ `shop.delivery`، پیش‌فرض خاموش؛ همان
   //  سنجش‌های `routes/delivery.js` (بی پرچم ۴۰۴، بی اشتراکِ تحویل ۴۰۳)
   let maxUses, expiresAt;
