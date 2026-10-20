@@ -19,14 +19,14 @@
  */
 const { createHmac, randomBytes, timingSafeEqual } = require('crypto');
 const { query, one, many, newId, now } = require('../db');
-const config = require('../config');
+const { serverSecret } = require('./server-secret');
 const { badRequest, notFound, conflict } = require('../middleware/errors');
 
 const KINDS = ['app', 'site', 'service'];
 const STATUSES = ['active', 'paused', 'archived'];
 
 function pepper() {
-  return config.secrets.api || config.secrets.jwt || 'shop-managed-apps';
+  return serverSecret(['api', 'jwt'], 'shop-managed-apps');
 }
 
 function hashKey(raw) {
@@ -194,4 +194,4 @@ async function checkHealth({ timeoutMs = 8000 } = {}) {
   return out;
 }
 
-module.exports = { list, get, create, update, remove, rotateKey, bySecret, checkHealth, shape, cleanSlug, KINDS, STATUSES };
+module.exports = { list, get, create, update, remove, rotateKey, bySecret, checkHealth, shape, cleanSlug, hashKey, KINDS, STATUSES };

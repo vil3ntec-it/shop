@@ -200,10 +200,15 @@ router.get('/users/:id/delete-preview', async (req, res, next) => {
 
 router.delete('/users/:id', requireSuperAdmin, async (req, res, next) => {
   const id = v.id(req.params.id);
+  //  `confirm` = ایمیل، شماره یا شناسهٔ همان حساب (`confirmWith`ِ پیش‌نمایش)؛ `confirmEmail` نامِ دیروز
+  const confirm = v.text(req.body?.confirm ?? req.query?.confirm, { max: 200 });
   const confirmEmail = v.text(req.body?.confirmEmail ?? req.query?.confirmEmail, { max: 200 });
-  const out = await require('../lib/user-delete').remove(id, { confirmEmail });
+  const out = await require('../lib/user-delete').remove(id, { confirm, confirmEmail });
   if (!out.ok && out.code === 'not_found') return next(notFound('کاربر پیدا نشد'));
-  if (!out.ok) return next(badRequest('برای حذف، ایمیلِ همین حساب را دقیق بنویسید', 'confirm_mismatch'));
+  if (!out.ok) {
+    const what = { email: 'ایمیلِ', phone: 'شمارهٔ', id: 'شناسهٔ' }[out.confirmWith] || 'ایمیلِ';
+    return next(badRequest(`برای حذف، ${what} همین حساب را دقیق بنویسید`, 'confirm_mismatch'));
+  }
   await audit.log({
     actorType: 'admin', userId: req.admin.id, action: 'admin.user_deleted', targetType: 'user', targetId: id,
     detail: { email: out.user.email, stations: out.stations, shops: out.shops, rows: out.rows },

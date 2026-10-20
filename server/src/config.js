@@ -69,6 +69,13 @@ const config = {
     accessTtlMs:  num(process.env.ACCESS_TOKEN_TTL_MIN, 60) * 60 * 1000,
     refreshTtlMs: num(process.env.REFRESH_TOKEN_TTL_DAYS, 90) * 24 * 60 * 60 * 1000,
     adminTtlMs:   num(process.env.ADMIN_TOKEN_TTL_HOURS, 12) * 60 * 60 * 1000,
+    /*
+     *  تأییدِ دوباره برای کارهای حساس (بندِ ۲۱.۱) — `lib/reauth.js`.
+     *  پنجره: چند دقیقه پس از ورود یا تأییدِ دوباره، همان نشست «تازه» است.
+     *  `AUTH_REAUTH=off` کلیدِ بازگشت است (رفتارِ پیش از این تغییر).
+     */
+    reauthWindowMs: num(process.env.REAUTH_WINDOW_MIN, 10) * 60 * 1000,
+    reauthEnforced: bool(process.env.AUTH_REAUTH, true),
   },
 
   otp: {
@@ -157,6 +164,9 @@ const config = {
     //  ‎invalid_client‎ می‌افتد.
     desktopClientId: (process.env.GOOGLE_DESKTOP_CLIENT_ID || '').trim(),
     certsUrl:  process.env.GOOGLE_CERTS_URL || 'https://www.googleapis.com/oauth2/v3/certs',
+    //  ⛔ بندِ ۲۹.۲ قاعدهٔ ۵: گوگل فقط با اثباتِ روشِ قبلیِ حساب وصل می‌شود.
+    //  `1` فقط کلیدِ بازگشتِ اضطراری به وصلِ خودکار با ایمیلِ تأییدشده است.
+    legacyEmailLink: bool(process.env.GOOGLE_EMAIL_AUTOLINK, false),
   },
 
   /*
@@ -211,6 +221,10 @@ const config = {
     windowMs:     num(process.env.RATE_WINDOW_MS, 15 * 60 * 1000),
     authMax:      num(process.env.RATE_AUTH_MAX, 10),
     otpMax:       num(process.env.RATE_OTP_MAX, 5),
+    //  کدِ وصلِ گوگل (`/auth/google/link-code`) به‌ازای «ایمیلِ توکن + IP».
+    //  کلیدِ `otpMax` از بدنه می‌آید و این مسیر ایمیلی در بدنه ندارد، پس
+    //  تا امروز فقط به‌ازای IP شمرده می‌شد.
+    linkCodeMax:  num(process.env.RATE_LINK_CODE_MAX, 3),
     //  ⛔ F0-16 — `register/start` و `password/forgot` به‌ازای هر **IP**. سقفِ
     //  `otpMax` به‌ازای هر ایمیل است، پس امتحانِ هزار ایمیلِ گوناگون از یک
     //  جا هیچ سقفی نداشت. سی در ربع ساعت برای یک کافی‌نت هم بس است.
@@ -231,6 +245,10 @@ const config = {
     //  است (ساعتی یک بار) و یک دکانِ چندگوشی‌ای پشتِ یک اینترنت
     //  نباید همدیگر را ببندند.
     sessionMax:   num(process.env.RATE_SESSION_MAX, 120),
+    //  سنجیدنِ رمز با یک توکنِ باز (`/auth/password`، `/auth/reauth`) — به‌ازای
+    //  **هر نشست**، نه هر IP (بازبینیِ امنیتی ۱۴۰۵/۰۷/۲۷). ده در پنجره برای
+    //  آدمِ واقعی بس است؛ حدس زدن را از یک توکنِ دزدیده کند می‌کند.
+    passwordSessionMax: num(process.env.RATE_PASSWORD_SESSION_MAX, 10),
     //  پیامِ همگانی — عمداً تنگ: یک اشتباه نباید هزار پیام بفرستد.
     //  از محیط خوانده می‌شود تا آزمون‌ها بتوانند چند بار بزنند و
     //  خودِ سقف هم جدا سنجیده شود.
@@ -272,6 +290,12 @@ const config = {
      *  پمپ). ⚠️ پشتِ تونل و بی `TRUST_PROXY` همهٔ مشتری‌ها یک IP‌اند.
      */
     storeCheckoutMax: num(process.env.RATE_STORE_CHECKOUT_MAX, 20),
+    /*
+     *  «این پین در محدوده است؟» (‎GET /api/store/:slug/delivery‎) — به‌ازای
+     *  (IP، ویترین) در **۲۴ ساعت**. پاسخ خودش با خانهٔ ۳۰۰ متریِ شبکه است؛
+     *  این سقف جمع کردنِ همهٔ خانه‌های لبه برای برازشِ مرکز را هم کند می‌کند.
+     */
+    storeLocateDailyMax: num(process.env.RATE_STORE_LOCATE_DAILY_MAX, 60),
     //  بازارچه (`/api/market/*`): خواندن سطلِ خودش را با `generalMax` دارد؛
     //  جست‌وجوی کالا در همهٔ دکان‌ها گران‌تر است ⇒ سطلِ تنگ‌ترِ خودش، به‌ازای IP.
     //  بازبینیِ امنیتی سقفِ ضربه‌ای در دقیقه گذاشت. ⚠️ اپراتورهای موبایل (CGNAT) صدها
@@ -299,6 +323,10 @@ const config = {
     offlineMs: num(process.env.STORE_PRESENCE_OFFLINE_MIN, 60) * 60 * 1000,
     //  ۲۳.۴ — شمارهٔ تأییدشدهٔ مشتری چند روز بی کدِ تازه می‌ماند
     ticketTtlMs: num(process.env.STORE_CUSTOMER_TICKET_DAYS, 14) * 24 * 60 * 60 * 1000,
+    //  ساختن/ورود به حسابِ مشتری فقط با بلیتی که همین چند دقیقه پیش صادر شده
+    accountTicketMaxMs: num(process.env.STORE_ACCOUNT_TICKET_MAX_MIN, 10) * 60 * 1000,
+    //  CHK-02 — نشستِ حسابِ مشتری (لغوشدنی) چند روز می‌ماند
+    customerSessionDays: num(process.env.STORE_CUSTOMER_SESSION_DAYS, 180),
   },
 
   /**
@@ -354,6 +382,20 @@ const config = {
     //  به‌ازای هر فرستنده (مشتری: دکان+شماره، کارمند: کاربر) در پنجرهٔ `rateLimit.windowMs`
     sendMax:        num(process.env.RATE_CHAT_SEND_MAX, 300),
     uploadMax:      num(process.env.RATE_CHAT_UPLOAD_MAX, 60),
+  },
+
+  //  اعتماد، شکایت و تخلفِ بازارچه (v3 §۳۸.۶) — پشتِ پرچمِ `market.trust`، پیش‌فرض خاموش.
+  trust: {
+    //  سقفِ ماندگار (در دیتابیس، پس از راه‌اندازیِ دوباره هم سر جاست) در ۲۴ ساعت
+    dailyPerPhone:  num(process.env.TRUST_DAILY_PER_PHONE, 5),
+    dailyPerIp:     num(process.env.TRUST_DAILY_PER_IP, 20),
+    //  سقفِ حافظه‌ای در پنجرهٔ `rateLimit.windowMs`
+    fileMax:        num(process.env.RATE_TRUST_FILE_MAX, 10),
+    fileIpMax:      num(process.env.RATE_TRUST_FILE_IP_MAX, 30),
+    uploadMax:      num(process.env.RATE_TRUST_UPLOAD_MAX, 30),
+    imageMax:       num(process.env.TRUST_IMAGE_MAX_KB, 1536) * 1024,
+    evidenceMax:    num(process.env.TRUST_EVIDENCE_MAX, 5),
+    appealDays:     num(process.env.TRUST_APPEAL_DAYS, 14),
   },
 
   corsOrigins: list(process.env.CORS_ORIGIN || process.env.CORS_ORIGINS),

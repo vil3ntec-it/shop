@@ -63,6 +63,13 @@ const PUMP_TABLES = [
   'Invoice', 'StaffMember', 'AttendanceRow', 'SalaryPayment', 'StaffShortage', 'StaffShortSettle',
   //  بقیه
   'VoiceTemplate', 'Camera', 'ExtraIncome', 'RateHistoryEntry', 'SectionNote', 'SectionNoteDraft',
+  //  ⛔ جدول‌های تازه‌ترِ برنامه (۱۴۰۵/۰۷/۲۸): حوالهٔ تیل، مخزن‌های شماره‌دار، تقسیمِ
+  //  خرید روی مخزن، کالیبرهٔ پایه و تبدیلِ تیل. نبودنشان این‌جا یعنی هر opشان
+  //  «جدولِ ناشناس» می‌گرفت و کامپیوترِ دوم هیچ‌وقت آن‌ها را نمی‌دید. برنامه از همین
+  //  نسخه opهای ‎unknown_table‎ را دوباره می‌فرستد. ⚠️ برنامه schemaی پمپ را بالا
+  //  نبرده (هنوز ۱) و فیلدِ موجودی‌ای عوض نشده، پس پلهٔ تازه‌ای در migrations نیست —
+  //  بالا بردنش یعنی ۴۲۶ و ایستادنِ کلِ همگام‌سازی تا به‌روز شدنِ همین سرور.
+  'HawalaQuota', 'FuelTank', 'TankFill', 'PumpCalibration', 'FuelConversion',
   //  ⚠️ `AppUser` (رمزِ محلی)، `Setting`، `TrashItem` و `AuditEntry`
   //  عمداً نیستند: مالِ همان کامپیوترند، نه دفترِ مشترک.
 ];
