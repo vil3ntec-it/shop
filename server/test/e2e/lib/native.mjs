@@ -131,9 +131,11 @@ function nestedModel(type) {
  * `encodeToJsonElement` (با `encodeDefaults`) می‌بیند: کلیدِ ناشناختهٔ مدل می‌افتد، پیش‌فرض‌ها
  * پر می‌شوند، `@EncodeDefault(NEVER)` با مقدارِ پیش‌فرض نوشته نمی‌شود، `@JsonNames` خوانده می‌شود.
  */
-export function project(cls, src) {
+export function project(cls, src, keep = null) {
   const out = {};
   for (const f of MODELS[cls]) {
+    //  ساختِ قدیمی‌تر فیلدِ تازه‌ترِ مدل را ندارد ([oldModelOf])
+    if (keep && !keep(f.key)) continue;
     let v = src[f.key];
     if (v === undefined) for (const a of f.aliases || []) if (src[a] !== undefined) { v = src[a]; break; }
     if (v === undefined) v = f.def;
@@ -150,14 +152,31 @@ export function project(cls, src) {
 export const COLLECTION_MODEL = Object.fromEntries((MODELS.ShopData || [])
   .map((f) => [f.key, (/^List<(\w+)>$/.exec(f.type) || [])[1]]).filter(([, c]) => c && MODELS[c]));
 
-/** همهٔ ردیف‌های مجموعه‌ها از درِ مدل؛ بقیهٔ کلیدهای دفتر دست نمی‌خورند */
-export function projectLedger(tree) {
+/**
+ * همهٔ ردیف‌های مجموعه‌ها از درِ مدل؛ بقیهٔ کلیدهای دفتر دست نمی‌خورند. [keepOf]: مدلِ ساختی
+ * قدیمی‌تر از `Models.kt` ِ امروز (مجموعه ⇒ پالایهٔ کلید، یا null یعنی همان مدلِ امروز).
+ */
+export function projectLedger(tree, keepOf = null) {
   const out = { ...tree };
   for (const c of core.COLLECTIONS) {
     if (!Array.isArray(tree[c]) || !COLLECTION_MODEL[c]) continue;
-    out[c] = tree[c].map((r) => project(COLLECTION_MODEL[c], r));
+    const keep = keepOf ? keepOf(c) : null;
+    out[c] = tree[c].map((r) => project(COLLECTION_MODEL[c], r, keep));
   }
   return out;
+}
+
+/** فهرستِ منجمدِ تورِ سرور: مدلِ دفترِ ساخت‌های پیش از A00، هر فیلد با کفِ نسخه‌اش */
+const newerFields = require(path.join(ROOT, 'server', 'src', 'lib', 'newer-fields.js'));
+
+/**
+ * مدلِ دفترِ ساختِ نصب‌شدهٔ پیش از A00 با شمارهٔ [version]: فقط فیلدهایی که آن ساخت می‌شناخت
+ * (`newer-fields.knows`) — نه `Models.kt` ِ امروز، که فیلدهای پس از A00 (`orderId`، `payments`، …)
+ * را هم دارد و ساختِ قدیمی را «داناتر» از آن‌چه بود نشان می‌داد.
+ */
+function oldModelOf(version) {
+  const client = newerFields.clientOf(version);
+  return (table) => (newerFields.PRE_A00[table] ? (key) => newerFields.knows(client, table, key) : null);
 }
 
 /*
@@ -191,7 +210,7 @@ export const KOTLIN = {
 };
 
 /** ساختِ نصب‌شدهٔ پیش از A00: همان `applyRemote` ِ از درِ مدل، بی قاعده‌های تازه */
-export const PRE_A00 = Object.freeze({ applyRemoteShaped: true, snapshotShaped: false, keepsUnknownFields: false, diffInModelTerms: false, capsA00: false });
+export const PRE_A00 = Object.freeze({ applyRemoteShaped: true, snapshotShaped: false, keepsUnknownFields: false, diffInModelTerms: false, capsA00: false, frozenModel: true });
 /** وب: دفترِ خام، هیچ مدلی در کار نیست */
 const NO_MODEL = Object.freeze({ applyRemoteShaped: false, snapshotShaped: false, keepsUnknownFields: false, diffInModelTerms: false, capsA00: false });
 
@@ -247,6 +266,8 @@ export class NativeDevice {
     this.appVersion = appVersion;
     this.kotlin = raw ? NO_MODEL : kotlin;
     this.raw = raw;
+    //  مدلِ دفترِ همین ساخت: امروز ⇒ `Models.kt`؛ ساختِ پیش از A00 ⇒ فهرستِ منجمدِ همان نسخه
+    this.keepOf = this.kotlin.frozenModel ? oldModelOf(appVersion) : null;
     this.deviceId = deviceId || `e2e-${label}-${randomUUID().slice(0, 8)}`.replace(/[^A-Za-z0-9_-]/g, '');
     this.seller = seller || label;
     this.offline = false;
@@ -351,7 +372,7 @@ export class NativeDevice {
   save(next) {
     //  A00: تفاضل به زبانِ مدل (`modelView`) — برای ردیفی که خام برابر است همان نتیجه را دارد
     const k = this.kotlin;
-    const base = k.diffInModelTerms ? projectLedger(this.shadow) : this.shadow;
+    const base = k.diffInModelTerms ? projectLedger(this.shadow, this.keepOf) : this.shadow;
     const ops = dropUnknownRemovals(core.diff(base, next).ops, k);
     if (ops.length) this.queue.push(...ops);
     this.shadow = core.shadowOf(next);
@@ -404,7 +425,7 @@ export class NativeDevice {
   /** `SyncCommit.absorb`: دفتر و سایه هر دو با همان opها جلو می‌روند */
   absorb(ops) {
     //  `LedgerDiff.applyRemote` خروجی را از درِ مدل رد می‌کند: کلیدِ ناشناخته در دفتر و سایه نمی‌ماند
-    const shape = this.kotlin.applyRemoteShaped ? projectLedger : (x) => x;
+    const shape = this.kotlin.applyRemoteShaped ? (x) => projectLedger(x, this.keepOf) : (x) => x;
     this.ledger = shape(core.applyRemote(this.ledger, ops).data);
     this.shadow = core.shadowOf(shape(core.applyRemote(this.shadow, ops).data));
   }
@@ -418,8 +439,8 @@ export class NativeDevice {
       const next = core.fromSnapshot(r.body, this.ledger);
       //  `restoreFromServer`: دفتر = fromJson(next) (از درِ مدل)؛ سایه = `writeShadow(next)` —
       //  از A00 از درِ مدل (`modelTree`)، پیش از آن خام
-      this.ledger = this.raw ? next : projectLedger(next);
-      this.shadow = core.shadowOf(this.kotlin.snapshotShaped ? projectLedger(next) : next);
+      this.ledger = this.raw ? next : projectLedger(next, this.keepOf);
+      this.shadow = core.shadowOf(this.kotlin.snapshotShaped ? projectLedger(next, this.keepOf) : next);
       this.cursor = Number(r.body.cursor || 0);
       this.snapshotAt = Date.now();
       return { ok: true, rows: Number(r.body.rows || 0) };
