@@ -90,6 +90,7 @@ private val PAGE_TITLES = mapOf(
   "team" to "کارمندان دکان",
   "orders" to "سفارش‌ها",
   "storefront" to "ویترینِ اینترنتی",
+  "promos" to "تخفیف‌ها",
   //  میزِ تحویل (C01) — فقط وقتی سرور پرچمِ `shop.delivery` را روشن گفته
   "delivery" to "میزِ تحویل",
 )
@@ -263,6 +264,8 @@ fun AppRoot(
   }
   //  بخشِ «سفارش‌ها»: فقط اگر سرور برای این دکان روشن گفته، و فقط وقتی برنامه جلوی چشم است
   OrdersLive.Host(store)
+  //  تخفیف‌های دکان (PRM): پیش‌فرض خاموش؛ نسخهٔ همین دستگاه برای کارِ آفلاین
+  PromoLive.Host()
 
   //  اگر دفتر دیرتر از ON_START آماده شد، همان‌جا شروع می‌کنیم
   LaunchedEffect(loaded) {
@@ -816,6 +819,10 @@ fun AppRoot(
         "team" -> TeamScreen(snackbar)
         "orders" -> OrdersScreen(store, snackbar) { sub = null }
         "storefront" -> if (StorefrontGate.visible) StorefrontScreen(snackbar) else LaunchedEffect(Unit) { open("more") }
+        //  مثلِ تنظیمات: فقط صاحب و مدیر (`settings.write`)؛ سرور هم همین را می‌سنجد
+        "promos" ->
+          if (ir.vil3ntec.tohid.data.ShopRole.canOpenSettings(context)) PromosScreen(data, snackbar)
+          else LaunchedEffect(Unit) { open("more") }
         "delivery" -> DeliveryScreen(snackbar) { open("more") }
         "devices" -> DevicesScreen(data, snackbar)
         "more" -> MoreScreen(store, data, ::open)
