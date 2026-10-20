@@ -84,9 +84,12 @@ private val PAGE_TITLES = mapOf(
   //  قیمت‌های سرور را نشان می‌دهد، این یکی حالِ اشتراکِ خودِ این حساب.
   "myplan" to "اشتراکِ من",
   "support" to "پشتیبانی",
+  //  چتِ مشتری ↔ دکان (v3 §۳۳) — فقط وقتی سرور پرچمِ `shop.chat` را روشن گفته
+  "chat" to "گفت‌وگو با مشتری",
   "profile" to "حساب من",
   "team" to "کارمندان دکان",
   "orders" to "سفارش‌ها",
+  "storefront" to "ویترینِ اینترنتی",
 )
 
 /**
@@ -170,6 +173,10 @@ fun AppRoot(
         //  گفته باشد این حساب دکانی ندارد، همان جوابِ «ندارد» است
         if ((failure as? ir.vil3ntec.tohid.core.net.ApiFailure)?.code == "no_shop") {
           needsShop = true
+        }
+        //  این حساب حالا «پیک» است (DLV-01): سرور فقط درِ پیک را باز می‌کند ⇒ حالتِ پیک
+        if ((failure as? ir.vil3ntec.tohid.core.net.ApiFailure)?.code == "courier_scope") {
+          ir.vil3ntec.tohid.data.ShopRole.remember(context, ir.vil3ntec.tohid.data.ShopRole.COURIER)
         }
       }
   }
@@ -443,10 +450,15 @@ fun AppRoot(
     if (TABS.any { it.id == target }) { tab = target; sub = null } else sub = target
   }
 
+  //  ویترین (فاز ۴): فقط وقتی سرور می‌گوید روشن است، بخشش دیده می‌شود
+  LaunchedEffect(Unit) { runCatching { StorefrontGate.refresh(context) } }
+
   //  گوشیِ جفت‌شده بارکد فرستاد ⇒ صفحهٔ فروش باز می‌شود و کالا به سبد می‌رود
   LaunchedEffect(Unit) {
     ir.vil3ntec.tohid.sync.PhoneScanner.load(context)
     PhotoPrefs.load(context)
+    //  چتِ دکان: پرچم را بپرس و پیام‌های مانده در صف را (اگر هست) بفرست
+    ir.vil3ntec.tohid.data.ShopChatSync.refreshConfig(context)
   }
   val phoneScan = ir.vil3ntec.tohid.sync.PhoneScanner.lastReceived.value
   LaunchedEffect(phoneScan) {
@@ -786,6 +798,7 @@ fun AppRoot(
         "vip" -> VipScreen { sub = null }
         "myplan" -> MySubscriptionScreen()
         "support" -> SupportScreen { sub = null }
+        "chat" -> ShopChatScreen { sub = null }
         "profile" -> ProfileScreen(
           store = store,
           snackbar = snackbar,
@@ -795,6 +808,7 @@ fun AppRoot(
         )
         "team" -> TeamScreen(snackbar)
         "orders" -> OrdersScreen(snackbar) { sub = null }
+        "storefront" -> if (StorefrontGate.visible) StorefrontScreen(snackbar) else LaunchedEffect(Unit) { open("more") }
         "devices" -> DevicesScreen(data, snackbar)
         "more" -> MoreScreen(store, data, ::open)
       }

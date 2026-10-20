@@ -192,7 +192,7 @@ async function unregister(token) {
  * شاگردِ یک دکان `user_id`ِ دیگری دارد ولی باید خبرِ همان دکان را
  * بگیرد.
  */
-async function targetsFor({ userId = '', adminId = '', shopId = '', stationId = '', deviceUid = '', app = '', allAdmins = false, exceptUserId = '' }) {
+async function targetsFor({ userId = '', adminId = '', shopId = '', stationId = '', deviceUid = '', app = '', allAdmins = false, exceptUserId = '', onlyUserIds = null }) {
   const where = [];
   const args = [];
   if (userId)    { args.push(userId);    where.push(`user_id = $${args.length}`); }
@@ -208,6 +208,11 @@ async function targetsFor({ userId = '', adminId = '', shopId = '', stationId = 
   //  فروشنده با هر فروش یک زنگ روی گوشیِ خودش می‌شنید و همان روزِ اول
   //  اعلان‌ها را خاموش می‌کرد.
   if (exceptUserId) { args.push(exceptUserId); sql += ` AND user_id <> $${args.length}`; }
+  //  فقط همین کاربرها (مثلاً اعلانِ سفارش فقط برای دارندگانِ `orders.view`)؛ فهرستِ خالی ⇒ هیچ‌کس
+  if (Array.isArray(onlyUserIds)) {
+    if (!onlyUserIds.length) return [];
+    args.push(onlyUserIds.map(String)); sql += ` AND user_id = ANY($${args.length}::text[])`;
+  }
   return many(sql, args);
 }
 

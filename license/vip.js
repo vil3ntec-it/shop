@@ -122,7 +122,47 @@
     return (ENT.features || []).includes(key);
   }
 
-  async function refresh() {
+  /*
+   * پاسخِ `/api/v1/billing/status` ⇐ شکلِ ENT.
+   *
+   * ⛔ سرور (`routes/me.js` ‏`subscriptionHandler`) دسترسی را **تخت** می‌دهد:
+   * `{source, status, active, plan, endsAt, trial, features, …}`. این‌جا فقط
+   * `data.entitlement` خوانده می‌شد که هرگز نمی‌آید؛ پس ENT همیشه «مهمان» می‌ماند و
+   * صندوق و قرض‌داران برای دکانِ واردشده با آزمایشی یا اشتراکِ فعال هم قفل بود.
+   * شکلِ قدیمِ `{entitlement}` هم هنوز پذیرفته است.
+   */
+  function entitlementFrom(data) {
+    if (!data || typeof data !== 'object') return null;
+    if (data.entitlement && Array.isArray(data.entitlement.features)) return data.entitlement;
+    if (!Array.isArray(data.features)) return null;
+    return {
+      source: data.source || 'none',
+      //  رایگان‌ها برای همه باز است — همان فهرستِ سرور؛ پاسخِ «بی‌دکان» آن‌ها را نمی‌فرستد
+      features: FREE.concat(data.features.filter(k => !FREE.includes(k))),
+      free: FREE, core: CORE,
+      trial: data.trial || { used: false, active: false, daysLeft: 0 },
+      subscription: {
+        status: data.status || 'none', active: !!data.active, plan: data.plan || '',
+        startsAt: data.startsAt || 0, endsAt: data.endsAt || 0, daysLeft: data.daysLeft || 0,
+      },
+      isPaid: data.source === 'subscription',
+      message: data.message || '',
+    };
+  }
+
+  /*
+   * ⛔ یک پرسش در هر زمان. `TohidLicense.sync()` در پایان `tohid:license-change`
+   * می‌فرستد و همین فایل با همان رویداد `refresh` می‌کرد: refresh ⇐ sync ⇐ رویداد ⇐
+   * refresh … حلقهٔ بی‌پایان، چند درخواست در ثانیه از هر برگهٔ واردشده تا سقفِ
+   * درخواستِ سرور پر شود. رویدادی که وسطِ همین پرسش برسد به همین پرسش می‌پیوندد.
+   */
+  let inflight = null;
+  function refresh() {
+    if (!inflight) inflight = doRefresh().finally(() => { inflight = null; });
+    return inflight;
+  }
+
+  async function doRefresh() {
     const base = serverUrl();
     if (!base) return ENT;
     const headers = { 'Content-Type': 'application/json' };
@@ -131,9 +171,9 @@
     try {
       const res = await fetch(base + '/api/v1/billing/status', { headers });
       if (!res.ok) return ENT;
-      const data = await res.json();
-      if (data && data.entitlement) {
-        ENT = data.entitlement;
+      const next = entitlementFrom(await res.json());
+      if (next) {
+        ENT = next;
         write(ENT_KEY, ENT);
         apply();
       }
@@ -333,7 +373,8 @@
         if (!page) return;
         let ov = page.querySelector(':scope > .vip-overlay');
         if (!locked.includes(feature)) { if (ov) ov.remove(); return; }
-        if (ov) return;
+        //  هنوز قفل ولی دلیل عوض شده (مهمان ⇐ واردشده ⇐ آزمایشیِ تمام‌شده): متن تازه شود
+        if (ov) { const p = ov.querySelector('.vip-card p'); if (p) p.textContent = reasonText(); return; }
         ov = document.createElement('div');
         ov.className = 'vip-overlay';
         ov.innerHTML = `
@@ -806,6 +847,13 @@
     setInterval(refresh, 10 * 60 * 1000);
     window.addEventListener('online', refresh);
     document.addEventListener('tohid:license-change', refresh);
+    //  «ورود با ایمیل» (account-ui.js) همین را می‌فرستد؛ بی آن قفل و «حساب رایگان بسازید»
+    //  تا بارِ دوبارهٔ صفحه می‌ماند. خروج هم سربرگ و قفل را همان لحظه درست می‌کند.
+    const acc = window.TohidAccount;
+    if (acc && typeof acc.on === 'function') {
+      acc.on('signed-in', refresh);
+      acc.on('signed-out', apply);
+    }
   }
 
   window.TohidVip = {
