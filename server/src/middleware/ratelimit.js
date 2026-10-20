@@ -7,6 +7,8 @@ const config = require('../config');
 const { tooMany } = require('./errors');
 
 const buckets = new Map();
+//  پنجرهٔ هر سطل (کلید ⇒ میلی‌ثانیه) تا پاک‌سازی سقفِ روزانه را با ربع ساعت نبُرد
+const windows = new Map();
 
 /**
  * IPِ کاربر برای سقفِ نرخ.
@@ -38,6 +40,7 @@ function rateLimit({ max, windowMs = config.rateLimit.windowMs, keyPrefix = '', 
     const t = Date.now();
     let hits = buckets.get(key);
     if (!hits) { hits = []; buckets.set(key, hits); }
+    windows.set(key, windowMs);
     // حذف درخواست‌های خارج از پنجره
     while (hits.length && hits[0] <= t - windowMs) hits.shift();
     if (hits.length >= max) {
@@ -49,16 +52,21 @@ function rateLimit({ max, windowMs = config.rateLimit.windowMs, keyPrefix = '', 
   };
 }
 
-// پاک‌سازی دوره‌ای تا حافظه رشد نکند
-const sweeper = setInterval(() => {
-  const cutoff = Date.now() - config.rateLimit.windowMs;
+/**
+ * پاک‌سازی دوره‌ای تا حافظه رشد نکند — هر سطل با پنجرهٔ **خودش**.
+ * ⛔ تا پیش از این همه با `windowMs` ِ پیش‌فرض (ربع ساعت) پاک می‌شدند، پس
+ * سقفِ روزانه پس از ربع ساعت عملاً صفر می‌شد.
+ */
+function sweep(t = Date.now()) {
   for (const [k, hits] of buckets) {
+    const cutoff = t - (windows.get(k) || config.rateLimit.windowMs);
     while (hits.length && hits[0] <= cutoff) hits.shift();
-    if (!hits.length) buckets.delete(k);
+    if (!hits.length) { buckets.delete(k); windows.delete(k); }
   }
-}, 60_000);
+}
+const sweeper = setInterval(() => sweep(), 60_000);
 if (sweeper.unref) sweeper.unref();
 
-function resetAll() { buckets.clear(); }
+function resetAll() { buckets.clear(); windows.clear(); }
 
-module.exports = { rateLimit, clientIp, resetAll };
+module.exports = { rateLimit, clientIp, resetAll, sweep };

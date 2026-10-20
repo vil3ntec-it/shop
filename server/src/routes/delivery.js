@@ -76,11 +76,14 @@ router.post('/couriers', requirePermission('delivery.couriers'), needWrite, wrap
   res.status(201).json({ courier });
 }));
 
-router.patch('/couriers/:id', requirePermission('delivery.couriers'), needWrite, wrap(async (req, res) => {
+const updateCourier = wrap(async (req, res) => {
   const courier = await delivery.updateCourier(req.shopId, req.params.id, req.body);
   await log(req, 'delivery.courier.update', 'shop_courier', courier.id, { active: courier.active, cashCapMinor: courier.cashCapMinor });
   res.json({ courier });
-}));
+});
+router.patch('/couriers/:id', requirePermission('delivery.couriers'), needWrite, updateCourier);
+//  همان کار با POST — `HttpURLConnection`ِ JVM (برنامهٔ کامپیوتر) PATCH را نمی‌فرستد
+router.post('/couriers/:id', requirePermission('delivery.couriers'), needWrite, updateCourier);
 
 // ── مأموریت‌ها ───────────────────────────────────────────────────────
 
@@ -156,6 +159,21 @@ router.get('/photos/:photoId', requirePermission('delivery.photo'), wrap(async (
   res.set('Content-Type', p.mime);
   res.set('Cache-Control', 'private, no-store');
   res.send(p.data);
+}));
+
+// ── شرکتِ پیکِ بیرونی (DLV-19) ──────────────────────────────────────
+
+/**
+ * فهرستِ شرکت‌ها کرایه‌ها را نشان می‌دهد ⇒ فقط کسی که می‌سپارد (`delivery.assign`)،
+ * نه هر نقشی که `delivery.view` دارد (صندوق‌دار، جمع‌کننده…).
+ */
+router.get('/external', requirePermission('delivery.assign'), wrap(async (req, res) => {
+  res.json(await delivery.externalCompanies(req.shopId));
+}));
+
+/** تطبیقِ صورت‌حساب: پول است ⇒ همان دسترسیِ تسویه (صاحب/مدیر). */
+router.get('/external/statement', requirePermission('delivery.settle'), wrap(async (req, res) => {
+  res.json(await delivery.externalStatement(req.shopId, { name: req.query.name, from: req.query.from, to: req.query.to }));
 }));
 
 // ── تسویهٔ پیک ───────────────────────────────────────────────────────
