@@ -230,6 +230,10 @@ for (const [label, fulfil] of [
 
 await step('نشستی که سرور واقعاً بسته (خروج از همهٔ دستگاه‌ها) ⇒ پاک می‌شود — رفتارِ درست سرِ جایش است', async () => {
   const s = await stored();
+  //  «خروج از همه» کارِ حساس است (بندِ ۲۱.۱، `lib/reauth.js`): این نشست ساعت‌ها
+  //  پیش وارد شده و فقط تازه‌سازی شده، پس اول رمز دوباره زده می‌شود
+  const again = await post('/api/auth/reauth', { password }, s.accessToken);
+  assert.equal(again.status, 200, JSON.stringify(again.body));
   const out1 = await post('/api/auth/logout-all', {}, s.accessToken);
   assert.equal(out1.status, 200, JSON.stringify(out1.body));
   const out = await inPage(() => window.TohidAccount.authFetch('/api/me/heartbeat'));

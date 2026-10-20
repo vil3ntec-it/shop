@@ -33,11 +33,16 @@ object ApiEndpoints {
     //  ورود شاگرد فقط با کد — نه ایمیل، نه شماره، نه رمز
     const val STAFF = "/auth/staff"
     const val GOOGLE = "/auth/google"
+    const val GOOGLE_LINK_CODE = "/auth/google/link-code"
     const val REFRESH = "/auth/refresh"
     const val LOGOUT = "/auth/logout"
     const val OTP_REQUEST = "/auth/otp/request"
     const val OTP_VERIFY = "/auth/otp/verify"
     const val PASSWORD = "/auth/password"
+    //  تأییدِ دوبارهٔ هویت پیش از کارِ حساس (بندِ ۲۱.۱ — سرور: `lib/reauth.js`)
+    const val REAUTH = "/auth/reauth"
+    //  کدِ تأییدِ دوباره به ایمیل/شمارهٔ خودِ حساب — برای حسابِ بی‌رمز
+    const val REAUTH_CODE = "/auth/reauth/code"
     const val PASSWORD_FORGOT = "/auth/password/forgot"
     const val PASSWORD_RESET = "/auth/password/reset"
 

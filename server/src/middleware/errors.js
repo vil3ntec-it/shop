@@ -43,7 +43,10 @@ function errorHandler(err, req, res, _next) {
   const status = err.status || 500;
   const exposed = err.expose === true || status < 500;
   const ref = status >= 500 ? errorRef() : '';
-  if (status >= 500) console.error(`[error] ${ref}${err.step ? ` @${err.step}` : ''}`, req.method, req.path, err);
+  if (status >= 500) {
+    console.error(`[error] ${ref}${err.step ? ` @${err.step}` : ''}`, req.method,
+      require('../lib/log-redact').redactPath(req.originalUrl || req.path), err);
+  }
   res.status(status).json({
     error: {
       //  جزئیاتِ قابلِ نمایش (مثلاً «فقط ۱ عدد قابلِ سفارش است»: `lines`) — فقط برای
