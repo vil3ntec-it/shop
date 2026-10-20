@@ -184,7 +184,7 @@ fun BulkConfirmDialog(
       Button(
         onClick = { onConfirm(reason.trim()) },
         enabled = ready,
-        colors = if (destructive) ButtonDefaults.buttonColors(containerColor = c.danger) else ButtonDefaults.buttonColors(),
+        colors = if (destructive) ButtonDefaults.buttonColors(containerColor = c.button.danger.bg, contentColor = c.button.danger.text) else ButtonDefaults.buttonColors(),
       ) { Text(confirmLabel) }
     },
     dismissButton = { TextButton(onClick = onDismiss) { Text("انصراف") } },

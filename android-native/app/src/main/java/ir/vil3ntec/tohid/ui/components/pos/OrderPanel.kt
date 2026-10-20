@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.ShoppingBasket
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -87,9 +88,10 @@ fun OrderPanel(
   headerActions: @Composable RowScope.() -> Unit = {},
 ) {
   val c = Shop.colors
-  Column(modifier.zone(c.zoneCart).padding(14.dp)) {
+  //  VILL3N: سبد پنلِ مرزدار است (سطحِ درونی + خطِ دورِ کارت) — جدا از کاتالوگ روی زمینه
+  Column(modifier.zone(c.zoneCart, border = c.borderCard).padding(14.dp)) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-      Icon(Icons.Filled.ShoppingBasket, contentDescription = null, tint = c.primaryDark, modifier = Modifier.size(22.dp))
+      Icon(Icons.Filled.ShoppingBasket, contentDescription = null, tint = c.iconActive, modifier = Modifier.size(22.dp))
       Spacer(Modifier.width(8.dp))
       Text("سبد خرید", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = c.text)
       Spacer(Modifier.width(8.dp))
@@ -381,6 +383,13 @@ fun OrderActions(
     onClick = onPost,
     enabled = canPost && !posting,
     shape = ShopShape.button,
+    //  دکمهٔ اصلی و حالتِ غیرفعالش از توکن‌های دکمه (VILL3N §۷)
+    colors = ButtonDefaults.buttonColors(
+      containerColor = Shop.colors.button.primary.bg,
+      contentColor = Shop.colors.button.primary.text,
+      disabledContainerColor = Shop.colors.button.disabled.bg,
+      disabledContentColor = Shop.colors.button.disabled.text,
+    ),
     modifier = Modifier.fillMaxWidth().height(54.dp),
   ) {
     Text(if (posting) "در حالِ ثبت…" else "ثبتِ فروش", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1)
