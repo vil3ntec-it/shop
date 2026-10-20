@@ -15,8 +15,9 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: tohid-admin-${{ github.ref }}
-  cancel-in-progress: true
+  #  PR: pushِ تازه اجرای قبلیِ همان PR را لغو می‌کند. اجرای main (انتشار) هرگز وسطِ کار لغو نمی‌شود.
+  group: tohid-admin-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: write
