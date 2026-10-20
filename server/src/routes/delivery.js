@@ -163,7 +163,11 @@ router.get('/photos/:photoId', requirePermission('delivery.photo'), wrap(async (
 
 // ── شرکتِ پیکِ بیرونی (DLV-19) ──────────────────────────────────────
 
-router.get('/external', wrap(async (req, res) => {
+/**
+ * فهرستِ شرکت‌ها کرایه‌ها را نشان می‌دهد ⇒ فقط کسی که می‌سپارد (`delivery.assign`)،
+ * نه هر نقشی که `delivery.view` دارد (صندوق‌دار، جمع‌کننده…).
+ */
+router.get('/external', requirePermission('delivery.assign'), wrap(async (req, res) => {
   res.json(await delivery.externalCompanies(req.shopId));
 }));
 

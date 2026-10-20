@@ -170,4 +170,8 @@ data class Statement(
   val rows: List<StatementRow>,
   /** بیش از سقفِ یک بار (۱۰۰۰ ردیف) بود ⇒ بازه را کوچک‌تر کنید */
   val truncated: Boolean = false,
+  /** جمعِ سرور: کرایهٔ تحویل‌شده‌ها (دکان به شرکت بدهکار است) */
+  val deliveredFareMinor: Long = 0,
+  /** جمعِ سرور: نقدِ COD که شرکت از مشتری گرفت (شرکت به دکان بدهکار است) */
+  val deliveredCashMinor: Long = 0,
 )

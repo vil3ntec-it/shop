@@ -9,6 +9,10 @@ import ir.vil3ntec.tohid.core.orders.OrderDraft
  *  سرور). صورت‌حساب = مبلغِ کل (لازم)، شمارِ سفارش‌ها (اختیاری) و — اگر
  *  شرکت ریز داده — هر خط: «شمارهٔ رهگیری یا #شمارهٔ سفارش» و مبلغ.
  *
+ *  ⛔ دو پولِ جدا در دو جهت: کرایه را دکان به شرکت بدهکار است؛ نقدِ «پرداخت
+ *     هنگامِ تحویل» را که شرکت از مشتری گرفته، شرکت به دکان بدهکار است.
+ *     پس «صورت‌حساب درست است» هرگز یعنی «همهٔ صورت‌حساب را بپرداز» نیست
+ *     وقتی نقدِ دکان نزدِ شرکت است — خالص در هر دو جهت گفته می‌شود.
  *  ⛔ هیچ اختلافی خودکار «درست» حساب نمی‌شود: هر خط یکی از این‌هاست و
  *     جمع‌ها جدا نشان داده می‌شوند (DEL-02: اختلاف پنهان نمی‌ماند).
  */
@@ -40,6 +44,8 @@ object InvoiceCheck {
     val status: String,
     val ourFareMinor: Long?,
     val billedMinor: Long?,
+    /** نقدی که شرکت برای همین سفارش از مشتری گرفت (مالِ دکان) */
+    val cashMinor: Long? = null,
   )
 
   data class Result(
@@ -51,9 +57,22 @@ object InvoiceCheck {
     /** صورت‌حساب − دفترِ ما؛ مثبت یعنی شرکت بیشتر خواسته */
     val amountDiffMinor: Long,
     val countDiff: Int?,
+    /** نقدِ COD که شرکت از مشتری‌ها گرفت و باید به دکان بدهد */
+    val cashHeldMinor: Long,
   ) {
     val problems: List<Item> get() = items.filter { it.kind != Kind.MATCHED }
-    val ok: Boolean get() = amountDiffMinor == 0L && (countDiff ?: 0) == 0 && problems.isEmpty()
+
+    /** کرایه‌ها، شمار و ریز با دفترِ ما یکی است (دربارهٔ نقد چیزی نمی‌گوید) */
+    val invoiceMatches: Boolean get() = amountDiffMinor == 0L && (countDiff ?: 0) == 0 && problems.isEmpty()
+
+    /** خالص طبقِ صورت‌حساب: مثبت ⇒ دکان به شرکت می‌دهد؛ منفی ⇒ شرکت به دکان */
+    val netToCompanyByInvoiceMinor: Long get() = billedTotalMinor - cashHeldMinor
+
+    /** خالص طبقِ دفترِ ما: کرایهٔ تحویل‌شده‌ها − نقدِ نزدِ شرکت */
+    val netToCompanyByLedgerMinor: Long get() = ourDeliveredFareMinor - cashHeldMinor
+
+    /** «همهٔ صورت‌حساب را بپرداز» فقط وقتی درست است که همه یکی است و نقدی نزدِ شرکت نیست */
+    val ok: Boolean get() = invoiceMatches && cashHeldMinor == 0L
   }
 
   /**
@@ -100,7 +119,7 @@ object InvoiceCheck {
           continue
         }
         if (!seen.add(row.assignmentId)) {
-          items += Item(Kind.DUPLICATE, l.key, row.orderNo, row.status, row.fareMinor, l.amountMinor)
+          items += Item(Kind.DUPLICATE, l.key, row.orderNo, row.status, row.fareMinor, l.amountMinor, row.cashCollectedMinor)
           continue
         }
         billed += row.assignmentId
@@ -109,10 +128,10 @@ object InvoiceCheck {
           l.amountMinor != null && l.amountMinor != row.fareMinor -> Kind.AMOUNT_DIFF
           else -> Kind.MATCHED
         }
-        items += Item(kind, l.key, row.orderNo, row.status, row.fareMinor, l.amountMinor)
+        items += Item(kind, l.key, row.orderNo, row.status, row.fareMinor, l.amountMinor, row.cashCollectedMinor)
       }
       for (r in delivered) if (r.assignmentId !in billed) {
-        items += Item(Kind.NOT_BILLED, r.externalRef.ifEmpty { "#${r.orderNo}" }, r.orderNo, r.status, r.fareMinor, null)
+        items += Item(Kind.NOT_BILLED, r.externalRef.ifEmpty { "#${r.orderNo}" }, r.orderNo, r.status, r.fareMinor, null, r.cashCollectedMinor)
       }
     }
     val ourFare = delivered.sumOf { it.fareMinor }
@@ -124,14 +143,23 @@ object InvoiceCheck {
       billedTotalMinor = invoiceTotalMinor,
       amountDiffMinor = invoiceTotalMinor - ourFare,
       countDiff = invoiceCount?.let { it - delivered.size },
+      cashHeldMinor = delivered.sumOf { it.cashCollectedMinor ?: 0L },
     )
   }
 
-  /** اول شمارهٔ رهگیریِ شرکت؛ اگر نبود «#۱۲» یا «۱۲» = شمارهٔ سفارش */
+  /**
+   *  اول شمارهٔ رهگیریِ شرکت؛ اگر نبود «#۱۲» یا «۱۲» = شمارهٔ سفارش. سفارشی
+   *  که دوباره سپرده شده چند ردیف دارد ⇒ ردیفِ «تحویل شد» مقدم است، نه
+   *  نخستین تلاشِ ناموفق.
+   */
   private fun find(rows: List<StatementRow>, rawKey: String): StatementRow? {
     val key = OrderDraft.latin(rawKey).trim()
-    rows.firstOrNull { it.externalRef.isNotEmpty() && it.externalRef.equals(key, ignoreCase = true) }?.let { return it }
+    val byRef = rows.filter { it.externalRef.isNotEmpty() && it.externalRef.equals(key, ignoreCase = true) }
+    if (byRef.isNotEmpty()) return preferDelivered(byRef)
     val no = key.removePrefix("#").toLongOrNull() ?: return null
-    return rows.firstOrNull { it.orderNo == no }
+    return preferDelivered(rows.filter { it.orderNo == no })
   }
+
+  private fun preferDelivered(candidates: List<StatementRow>): StatementRow? =
+    candidates.firstOrNull { it.status == "delivered" } ?: candidates.firstOrNull()
 }

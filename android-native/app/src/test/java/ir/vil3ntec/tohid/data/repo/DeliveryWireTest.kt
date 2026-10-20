@@ -98,9 +98,11 @@ class DeliveryWireTest {
     val st = DeliveryWire.statement(obj("""
       {"name":"پیک‌رسان","truncated":false,"rows":[{"assignmentId":"A","orderId":"O","orderNo":11,"externalRef":"TRK-1",
         "status":"delivered","fareMinor":15000,"expectedCollectMinor":1240000,"cashCollectedMinor":1240000,"deliveredAt":9,"createdAt":3}],
-       "totals":{"count":1}}
+       "totals":{"count":1,"delivered":1,"deliveredFareMinor":15000,"deliveredCashMinor":1240000}}
     """))
     assertEquals("TRK-1", st.rows.single().externalRef)
+    assertEquals("کرایه‌ای که دکان بدهکار است", 15_000, st.deliveredFareMinor)
+    assertEquals("نقدی که شرکت از مشتری گرفت — گم نمی‌شود", 1_240_000, st.deliveredCashMinor)
     assertEquals(1_240_000L, st.rows.single().cashCollectedMinor)
     assertFalse(st.truncated)
   }

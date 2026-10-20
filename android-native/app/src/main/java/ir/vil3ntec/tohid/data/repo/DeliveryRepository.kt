@@ -26,7 +26,8 @@ import kotlinx.serialization.json.JsonObject
  */
 class DeliveryRepository(private val api: ApiClient) {
 
-  data class Assigned(val mission: Mission, val code: String?)
+  /** `replayed`: همین کلید پیش‌تر ثبت شده بود ⇒ سرور کد را دوباره نمی‌دهد (فقط HMAC دارد) */
+  data class Assigned(val mission: Mission, val code: String?, val replayed: Boolean = false)
   data class Settled(val settlement: Settlement, val rows: List<SettleRow>, val replayed: Boolean)
 
   suspend fun config(): ApiResult<DeskConfig> = result { DeliveryWire.config(api.get(Delivery.CONFIG)) }
@@ -38,10 +39,11 @@ class DeliveryRepository(private val api: ApiClient) {
   suspend fun board(scope: String): ApiResult<List<Mission>> =
     result { DeliveryWire.rows(api.get(Delivery.board(scope)), "items", DeliveryWire::mission) }
 
-  suspend fun assign(orderId: String, body: JsonObject): ApiResult<Assigned> = result {
-    val out = api.post(Delivery.assign(orderId), body)
+  /** سپردن با `Idempotency-Key` — پاسخِ گم‌شده پس از ثبت «ناموفق» دیده نمی‌شود */
+  suspend fun assign(orderId: String, body: JsonObject, key: String): ApiResult<Assigned> = result {
+    val out = api.postKeyed(Delivery.assign(orderId), body, key)
     val m = (out["assignment"] as? JsonObject)?.let(DeliveryWire::mission) ?: throw ApiFailure.InvalidResponse()
-    Assigned(m, CourierWire.str(out, "code").ifBlank { null })
+    Assigned(m, CourierWire.str(out, "code").ifBlank { null }, CourierWire.bool(out, "replayed"))
   }
 
   /** کدِ تازه — کدِ قبلی باطل و شمارِ تلاش صفر می‌شود */
@@ -50,13 +52,13 @@ class DeliveryRepository(private val api: ApiClient) {
   }
 
   /** گذارِ کارمند (`DeliveryWire.statusJson`) — ردِ کسب‌وکاری = `ApiFailure` با پیامِ سرور */
-  suspend fun status(assignmentId: String, body: JsonObject): ApiResult<Mission> = result {
-    val out = api.post(Delivery.status(assignmentId), body)
+  suspend fun status(assignmentId: String, body: JsonObject, key: String): ApiResult<Mission> = result {
+    val out = api.postKeyed(Delivery.status(assignmentId), body, key)
     (out["assignment"] as? JsonObject)?.let(DeliveryWire::mission) ?: throw ApiFailure.InvalidResponse()
   }
 
-  suspend fun recall(assignmentId: String, reason: String, note: String): ApiResult<Mission> = result {
-    val out = api.post(Delivery.recall(assignmentId), DeliveryWire.recallJson(reason, note))
+  suspend fun recall(assignmentId: String, reason: String, note: String, key: String): ApiResult<Mission> = result {
+    val out = api.postKeyed(Delivery.recall(assignmentId), DeliveryWire.recallJson(reason, note), key)
     (out["assignment"] as? JsonObject)?.let(DeliveryWire::mission) ?: throw ApiFailure.InvalidResponse()
   }
 
@@ -84,8 +86,26 @@ class DeliveryRepository(private val api: ApiClient) {
   suspend fun statement(name: String, from: Long?, to: Long?): ApiResult<Statement> =
     result { DeliveryWire.statement(api.get(Delivery.statement(name, from, to))) }
 
+  /**
+   *  کلیدِ یکتایی برای یک فرم: تا بدنه همان است، کلید همان می‌ماند (دوباره
+   *  زدن پس از قطعِ نت ⇒ همان کار در سرور)؛ بدنهٔ دیگر ⇒ کلیدِ تازه، چون
+   *  سرور کلیدِ تکراری با بدنهٔ دیگر را `idempotency_key_reused` رد می‌کند.
+   */
+  class OnceKey(private val make: () -> String = ::newKey) {
+    private var body: JsonObject? = null
+    private var key: String = ""
+
+    fun of(next: JsonObject): String {
+      if (next != body || key.isEmpty()) {
+        body = next
+        key = make()
+      }
+      return key
+    }
+  }
+
   companion object {
-    /** کلیدِ یکتاییِ تسویه — یک بار برای هر فرم */
+    /** کلیدِ یکتایی (`KEY_RE`ِ سرور: ۸ تا ۱۲۸ نویسهٔ [A-Za-z0-9_.:-]) */
     fun newKey(): String = "dsk-" + java.util.UUID.randomUUID().toString()
   }
 }

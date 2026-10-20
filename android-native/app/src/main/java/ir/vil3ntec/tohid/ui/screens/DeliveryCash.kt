@@ -437,6 +437,20 @@ private val KIND_LABEL = mapOf(
   InvoiceCheck.Kind.NOT_BILLED to "تحویل شده ولی در صورت‌حساب نیست",
 )
 
+/**
+ *  خالصِ حساب با شرکت در یک جهتِ روشن: مثبت ⇒ دکان به شرکت می‌دهد؛ منفی ⇒
+ *  شرکت (که نقدِ COD را گرفته) به دکان می‌دهد.
+ */
+@Composable
+private fun NetLine(label: String, netToCompanyMinor: Long) {
+  val c = Shop.colors
+  when {
+    netToCompanyMinor > 0 -> SumLine("$label: دکان به شرکت می‌دهد", afn(netToCompanyMinor), strong = true)
+    netToCompanyMinor < 0 -> SumLine("$label: شرکت به دکان می‌دهد", afn(-netToCompanyMinor), strong = true, tone = c.warning)
+    else -> SumLine(label, "بی‌حساب", strong = true, tone = c.success)
+  }
+}
+
 @Composable
 private fun InvoiceSheet(co: ExternalCompany, repo: DeliveryRepository, onDismiss: () -> Unit) {
   val c = Shop.colors
@@ -475,10 +489,30 @@ private fun InvoiceSheet(co: ExternalCompany, repo: DeliveryRepository, onDismis
       val delivered = s.rows.filter { it.status == "delivered" }
       SumLine("سپرده به این شرکت", "${s.rows.size} سفارش")
       SumLine("تحویل‌شده در دفترِ ما", "${delivered.size} سفارش")
-      SumLine("کرایهٔ تحویل‌شده‌ها", afn(delivered.sumOf { it.fareMinor }), strong = true)
+      SumLine("کرایهٔ تحویل‌شده‌ها (دکان به شرکت بدهکار)", afn(s.deliveredFareMinor), strong = true)
+      //  نقدِ «پرداخت هنگامِ تحویل» که شرکت از مشتری گرفت — مالِ دکان است
+      SumLine(
+        "نقدی که شرکت از مشتری‌ها گرفت (شرکت به دکان بدهکار)", afn(s.deliveredCashMinor), strong = true,
+        tone = if (s.deliveredCashMinor > 0) c.warning else null,
+      )
+      NetLine("خالص طبقِ دفترِ ما", s.deliveredFareMinor - s.deliveredCashMinor)
       val notDone = s.rows.count { it.status != "delivered" }
       if (notDone > 0) SumLine("ناموفق، برگشت یا هنوز در راه", "$notDone سفارش", tone = c.warning)
       if (s.truncated) Text("بیش از ۱۰۰۰ سفارش — بازهٔ کوتاه‌تری بگیرید.", style = MaterialTheme.typography.bodySmall, color = c.warning)
+      if (s.rows.isNotEmpty()) {
+        DeskSection("سفارش‌های سپرده به ${co.name}")
+        s.rows.forEach { r ->
+          Text(
+            "#${r.orderNo}" + (if (r.externalRef.isNotEmpty()) " · ${r.externalRef}" else "") + " · ${DeliveryText.status(r.status)}" +
+              " · کرایه ${afn(r.fareMinor)}" +
+              (r.cashCollectedMinor?.takeIf { it > 0 }?.let { cash -> " · نقدِ گرفته ${afn(cash)}" } ?: "") +
+              (if (r.status == "delivered" && r.expectedCollectMinor > 0 && (r.cashCollectedMinor ?: 0L) != r.expectedCollectMinor)
+                " · موردِ انتظار ${afn(r.expectedCollectMinor)}" else ""),
+            style = MaterialTheme.typography.bodySmall,
+            color = if (r.status == "delivered") c.text else c.muted,
+          )
+        }
+      }
 
       DeskSection("صورت‌حسابِ شرکت")
       val totalMinor = if (total.isBlank()) null else minorOf(total)
@@ -501,8 +535,13 @@ private fun InvoiceSheet(co: ExternalCompany, repo: DeliveryRepository, onDismis
 
       result?.let { r ->
         HorizontalDivider(color = c.border.copy(alpha = 0.5f))
-        if (r.ok) StatusPill("صورت‌حساب با دفترِ ما یکی است", PillTone.SUCCESS)
-        else StatusPill("اختلاف هست — پیش از پرداخت بررسی کنید", PillTone.WARNING)
+        when {
+          r.ok -> StatusPill("صورت‌حساب با دفترِ ما یکی است", PillTone.SUCCESS)
+          //  ⛔ کرایه درست است ولی نقدِ دکان نزدِ شرکت است ⇒ «همه را بپرداز» نیست
+          r.invoiceMatches -> StatusPill("کرایه‌ها درست است — ولی نقدِ دکان نزدِ شرکت است؛ فقط خالص حساب شود", PillTone.WARNING)
+          else -> StatusPill("اختلاف هست — پیش از پرداخت بررسی کنید", PillTone.WARNING)
+        }
+        NetLine("خالص طبقِ صورت‌حساب", r.netToCompanyByInvoiceMinor)
         SumLine(
           "مبلغ: صورت‌حساب − دفترِ ما", afn(r.amountDiffMinor), strong = true,
           tone = if (r.amountDiffMinor == 0L) c.success else c.danger,
@@ -514,6 +553,7 @@ private fun InvoiceSheet(co: ExternalCompany, repo: DeliveryRepository, onDismis
             item.key + (item.orderNo?.let { n -> " (#$n)" } ?: "") + " — ${KIND_LABEL[item.kind]}" +
               (item.billedMinor?.let { b -> " · صورت‌حساب ${afn(b)}" } ?: "") +
               (item.ourFareMinor?.let { f -> " · دفترِ ما ${afn(f)}" } ?: "") +
+              (item.cashMinor?.takeIf { it > 0 }?.let { cash -> " · نقدِ گرفته ${afn(cash)}" } ?: "") +
               (if (item.status.isNotEmpty() && item.status != "delivered") " · ${DeliveryText.status(item.status)}" else ""),
             style = MaterialTheme.typography.bodySmall, color = tone,
           )

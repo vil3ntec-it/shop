@@ -154,13 +154,14 @@ private suspend fun ordersOf(repo: OrdersRepository, tab: String, pages: Int = 4
   return ApiResult.Success(out)
 }
 
-private suspend fun loadDesk(repo: DeliveryRepository, orders: OrdersRepository): ApiResult<DeskData> {
+private suspend fun loadDesk(repo: DeliveryRepository, orders: OrdersRepository, withCompanies: Boolean): ApiResult<DeskData> {
   val couriers = when (val r = repo.couriers()) { is ApiResult.Failure -> return ApiResult.Failure(r.error); is ApiResult.Success -> r.value }
   val live = when (val r = repo.board("live")) { is ApiResult.Failure -> return ApiResult.Failure(r.error); is ApiResult.Success -> r.value }
   val preparing = when (val r = ordersOf(orders, "preparing")) { is ApiResult.Failure -> return ApiResult.Failure(r.error); is ApiResult.Success -> r.value }
   val ready = when (val r = ordersOf(orders, "ready")) { is ApiResult.Failure -> return ApiResult.Failure(r.error); is ApiResult.Success -> r.value }
-  //  فهرستِ شرکت‌ها فقط پیش‌فرضِ فرم است؛ نیامدنش میز را نمی‌بندد
-  val companies = repo.companies().valueOrNull().orEmpty()
+  //  فهرستِ شرکت‌ها کرایه دارد ⇒ فقط با `delivery.assign` (سرور هم همین را می‌خواهد)؛
+  //  پیش‌فرضِ فرم است و نیامدنش میز را نمی‌بندد
+  val companies = if (withCompanies) repo.companies().valueOrNull().orEmpty() else emptyList()
   return ApiResult.Success(DeskData(couriers, live, (preparing + ready).distinctBy { it.id }, companies))
 }
 
@@ -198,7 +199,7 @@ fun DeliveryScreen(snackbar: SnackbarHostState, onLeave: () -> Unit) {
 
   LaunchedEffect(reload, rev) {
     loading = true
-    loadDesk(repo, ordersRepo)
+    loadDesk(repo, ordersRepo, withCompanies = cfg.perms.assign)
       .onSuccess { data = it; error = null }
       .onFailure { f ->
         if (f.code == "delivery_disabled") { DeliveryGate.refresh(context); onLeave() }
@@ -246,12 +247,12 @@ fun DeliveryScreen(snackbar: SnackbarHostState, onLeave: () -> Unit) {
     DeskStats(d, onTab = { tab = it })
     Spacer(Modifier.height(10.dp))
     SegmentedTabs(
-      tabs = listOf(
-        SegmentTab("assign", "سپردن", d.toAssign.size),
-        SegmentTab("couriers", "پیک‌ها و نقد", d.couriers.size),
-        SegmentTab("pickup", "دریافتِ حضوری", d.pickups.size),
-        SegmentTab("external", "شرکت‌های بیرونی", d.companies.size),
-      ),
+      tabs = buildList {
+        add(SegmentTab("assign", "سپردن", d.toAssign.size))
+        add(SegmentTab("couriers", "پیک‌ها و نقد", d.couriers.size))
+        add(SegmentTab("pickup", "دریافتِ حضوری", d.pickups.size))
+        if (cfg.perms.assign) add(SegmentTab("external", "شرکت‌های بیرونی", d.companies.size))
+      },
       selected = tab,
       onSelect = { tab = it },
       modifier = Modifier.horizontalScroll(rememberScrollState()),
@@ -266,7 +267,7 @@ fun DeliveryScreen(snackbar: SnackbarHostState, onLeave: () -> Unit) {
       "assign" -> AssignTab(d, cfg, writable, repo, snackbar, table = view.mode == ViewMode.TABLE, onChanged = refresh)
       "couriers" -> CouriersTab(d, cfg, writable, repo, snackbar, onChanged = refresh)
       "pickup" -> PickupTab(d, cfg, writable, repo, ordersRepo, snackbar, onChanged = refresh)
-      "external" -> CompaniesTab(d, cfg, repo)
+      "external" -> if (cfg.perms.assign) CompaniesTab(d, cfg, repo) else LaunchedEffect(Unit) { tab = "assign" }
     }
   }
 }

@@ -106,6 +106,8 @@ internal fun AssignDialog(
   var fare by remember { mutableStateOf("") }
   var busy by remember { mutableStateOf(false) }
   var err by remember { mutableStateOf<String?>(null) }
+  //  یک کلیدِ یکتایی برای همین فرم — پاسخِ گم‌شده پس از ثبت، با دوباره زدن همان کار است
+  val keys = remember { DeliveryRepository.OnceKey() }
 
   val chosen = d.couriers.firstOrNull { it.id == courierId }
   val fits = chosen?.let { CourierCash.fits(it, expected) } ?: true
@@ -192,7 +194,7 @@ internal fun AssignDialog(
               mode = mode, courierId = courierId, externalName = company, externalRef = ref,
               fareMinor = fareMinor ?: 0L, overrideCashCap = override,
             )
-            repo.assign(order.id, body)
+            repo.assign(order.id, body, keys.of(body))
               .onSuccess { onDone(it.mission, it.code) }
               .onFailure { err = it.userMessage }
             busy = false
@@ -246,7 +248,7 @@ internal fun AutoAssignDialog(
       var replan = false
       picks@ for (pick in p.picks) {
         val body = DeliveryWire.assignJson("shop_courier", courierId = pick.courierId, fareMinor = fareMinor ?: 0L)
-        when (val r = repo.assign(pick.orderId, body)) {
+        when (val r = repo.assign(pick.orderId, body, DeliveryRepository.newKey())) {
           is ApiResult.Success -> {
             ok += "#${pick.orderNo} ⇐ ${pick.courierName}"
             remaining = remaining.filter { it.orderId != pick.orderId }
@@ -352,6 +354,8 @@ internal fun MissionActionDialog(
   var code by remember { mutableStateOf("") }
   var busy by remember { mutableStateOf(false) }
   var err by remember { mutableStateOf<String?>(null) }
+  //  یک کلیدِ یکتایی برای همین فرم — پاسخِ گم‌شده پس از ثبت، با دوباره زدن همان کار است
+  val keys = remember { DeliveryRepository.OnceKey() }
 
   val reasonKey = when (act) {
     DeskActions.Act.WITHDRAW -> "withdrawn"
@@ -377,7 +381,7 @@ internal fun MissionActionDialog(
     scope.launch {
       when (act) {
         DeskActions.Act.NEW_CODE -> repo.newCode(m.id).onSuccess { onCode(it) }.onFailure { err = it.userMessage }
-        DeskActions.Act.RECALL -> repo.recall(m.id, reason, note)
+        DeskActions.Act.RECALL -> repo.recall(m.id, reason, note, keys.of(DeliveryWire.recallJson(reason, note)))
           .onSuccess { onDone("سفارش #${m.orderNo}: فراخوانی فرستاده شد؛ پیک بسته را برمی‌گرداند") }
           .onFailure { err = it.userMessage }
         else -> {
@@ -386,7 +390,7 @@ internal fun MissionActionDialog(
             to = to, from = m.status, reason = reason, note = note, code = code.trim(),
             cashCollectedMinor = if (deliver) cashMinor else null, cashReason = if (cashDiffers) cashReason else "",
           )
-          repo.status(m.id, body)
+          repo.status(m.id, body, keys.of(body))
             .onSuccess { onDone("سفارش #${m.orderNo}: ${DeliveryText.status(it.status)}") }
             .onFailure { f ->
               if (f.code == "status_changed") onDone("وضعیتِ این مأموریت همین حالا جای دیگری عوض شد؛ میز تازه شد.")
@@ -498,6 +502,7 @@ internal fun ColumnScope.PickupTab(
   var shownCode by remember { mutableStateOf<Pair<Long, String>?>(null) }
   var newCodeFor by remember { mutableStateOf<Mission?>(null) }
   var busyId by remember { mutableStateOf<String?>(null) }
+  val pickupKeys = remember { HashMap<String, DeliveryRepository.OnceKey>() }
 
   val q = OrderDraft.latin(query).removePrefix("#").trim()
   val list = d.pickups.filter { o ->
@@ -546,10 +551,13 @@ internal fun ColumnScope.PickupTab(
               TohidButton("ساختنِ کدِ دریافت", busy = busyId == o.id, enabled = busyId == null, onClick = {
                 busyId = o.id
                 scope.launch {
-                  repo.assign(o.id, DeliveryWire.assignJson("pickup"))
+                  val body = DeliveryWire.assignJson("pickup")
+                  repo.assign(o.id, body, pickupKeys.getOrPut(o.id) { DeliveryRepository.OnceKey() }.of(body))
                     .onSuccess { a ->
                       onChanged()
                       if (a.code != null) shownCode = o.orderNo to a.code
+                      //  کد پیش‌تر ساخته شده و پاسخش گم شده بود؛ سرور فقط HMACش را دارد
+                      else snackbar.showSnackbar("کدِ دریافتِ سفارش #${o.orderNo} پیش‌تر ساخته شده بود؛ برای دیدنش «کدِ تازه» بزنید.")
                     }
                     .onFailure { snackbar.showSnackbar(it.userMessage) }
                   busyId = null
@@ -620,6 +628,8 @@ private fun PickupHandoverDialog(
   var cashReason by remember { mutableStateOf("") }
   var busy by remember { mutableStateOf(false) }
   var err by remember { mutableStateOf<String?>(null) }
+  //  یک کلیدِ یکتایی برای همین فرم — پاسخِ گم‌شده پس از ثبت، با دوباره زدن همان کار است
+  val keys = remember { DeliveryRepository.OnceKey() }
   val cashMinor = minorOf(cash)
   val differs = cashMinor != null && cashMinor != m.expectedCollectMinor
   val valid = cashMinor != null && (!differs || cashReason.isNotEmpty()) &&
@@ -668,7 +678,7 @@ private fun PickupHandoverDialog(
               to = "delivered", from = m.status, note = note, code = if (manual) "" else code,
               cashCollectedMinor = cashMinor, cashReason = if (differs) cashReason else "",
             )
-            when (val r = repo.status(m.id, body)) {
+            when (val r = repo.status(m.id, body, keys.of(body))) {
               is ApiResult.Failure -> {
                 err = r.error.userMessage
                 if (r.error.code == "bad_code") code = ""

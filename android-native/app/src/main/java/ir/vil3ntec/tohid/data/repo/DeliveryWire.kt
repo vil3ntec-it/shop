@@ -200,6 +200,8 @@ object DeliveryWire {
       )
     },
     truncated = bool(o, "truncated"),
+    deliveredFareMinor = (o["totals"] as? JsonObject)?.let { long(it, "deliveredFareMinor") } ?: 0L,
+    deliveredCashMinor = (o["totals"] as? JsonObject)?.let { long(it, "deliveredCashMinor") } ?: 0L,
   )
 
   fun <T> rows(o: JsonObject, key: String, map: (JsonObject) -> T?): List<T> =

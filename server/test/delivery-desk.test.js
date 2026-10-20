@@ -184,6 +184,7 @@ test('شرکتِ بیرونی (DLV-19): فهرست با کرایهٔ آخرین 
   assert.equal(row1.cashCollectedMinor, TOTAL);
   assert.equal(row1.orderNo > 0, true);
   assert.equal(st.body.rows.find((r) => r.externalRef === 'TRK-2').status, 'failed');
+  //  نقدِ COD که شرکت از مشتری گرفته — مالِ دکان است و در تطبیق از کرایه کم می‌شود
   assert.deepEqual(st.body.totals, { count: 2, delivered: 1, deliveredFareMinor: 15_000, deliveredCashMinor: TOTAL });
   assert.equal(st.body.truncated, false);
 
@@ -195,10 +196,15 @@ test('شرکتِ بیرونی (DLV-19): فهرست با کرایهٔ آخرین 
   assert.equal((await h.get('/api/shop/delivery/external/statement', { token: a.token })).status, 400);
   assert.equal((await h.get(q('پیک‌رسانِ شهر', '&from=abc'), { token: a.token })).status, 400);
 
-  //  شاگرد فهرست را می‌بیند (برای فرمِ سپردن) ولی صورت‌حسابِ پولی را نه
+  //  کرایه‌ها پول است: شاگرد (فقط delivery.view) نه فهرست را می‌بیند نه صورت‌حساب را؛ مدیر هر دو
   const staff = await member(a.shopId, 'staff', 'شاگردِ بیرونی');
-  assert.equal((await h.get('/api/shop/delivery/external', { token: staff.token })).status, 200);
+  const staffList = await h.get('/api/shop/delivery/external', { token: staff.token });
+  assert.equal(staffList.status, 403);
+  assert.equal(staffList.body.error.code, 'permission_denied');
   assert.equal((await h.get(q('پیک‌رسانِ شهر'), { token: staff.token })).status, 403);
+  const manager = await member(a.shopId, 'manager', 'مدیرِ بیرونی');
+  assert.equal((await h.get('/api/shop/delivery/external', { token: manager.token })).status, 200);
+  assert.equal((await h.get(q('پیک‌رسانِ شهر'), { token: manager.token })).status, 200);
 
   //  دکانِ دیگر هیچ‌چیزِ این دکان را نمی‌بیند
   const b = await shopOwner('بیرونیِ دیگر');

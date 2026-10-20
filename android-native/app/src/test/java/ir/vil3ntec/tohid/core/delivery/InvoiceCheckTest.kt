@@ -76,6 +76,41 @@ class InvoiceCheckTest {
     assertFalse(r.ok)
   }
 
+  @Test fun `نقدِ COD نزدِ شرکت — صورت‌حسابِ درست هم «همه را بپرداز» نیست و خالص در دو جهت`() {
+    val cod = listOf(
+      StatementRow("C1", orderNo = 31, externalRef = "TRK-31", status = "delivered", fareMinor = 15_000, expectedCollectMinor = 1_240_000, cashCollectedMinor = 1_240_000),
+      StatementRow("C2", orderNo = 32, externalRef = "TRK-32", status = "delivered", fareMinor = 15_000, cashCollectedMinor = 0),
+      StatementRow("C3", orderNo = 33, externalRef = "TRK-33", status = "failed", fareMinor = 15_000, cashCollectedMinor = null),
+    )
+    val lines = InvoiceCheck.parse("TRK-31 150\nTRK-32 150").lines
+    val r = InvoiceCheck.check(cod, invoiceTotalMinor = 30_000, invoiceCount = 2, lines = lines)
+    assertTrue("کرایه‌ها و ریز درست است", r.invoiceMatches)
+    assertFalse("ولی ۱۲٬۴۰۰ افغانیِ دکان نزدِ شرکت است ⇒ «یکی است، بپرداز» گفته نمی‌شود", r.ok)
+    assertEquals(1_240_000, r.cashHeldMinor)
+    assertEquals("شرکت به دکان می‌دهد", -1_210_000, r.netToCompanyByInvoiceMinor)
+    assertEquals(-1_210_000, r.netToCompanyByLedgerMinor)
+    assertEquals(1_240_000L, r.items.first { it.key == "TRK-31" }.cashMinor)
+
+    //  بی نقد: صورت‌حسابِ درست یعنی همان را بپرداز
+    val noCash = InvoiceCheck.check(cod.map { it.copy(cashCollectedMinor = 0) }, 30_000, 2, lines)
+    assertTrue(noCash.ok)
+    assertEquals("دکان به شرکت می‌دهد", 30_000, noCash.netToCompanyByInvoiceMinor)
+  }
+
+  @Test fun `سفارشِ دوباره‌سپرده — شمارهٔ سفارش به تلاشِ تحویل‌شده می‌خورد نه نخستین`() {
+    val retried = listOf(
+      StatementRow("R1", orderNo = 21, externalRef = "", status = "failed", fareMinor = 15_000, createdAt = 1),
+      StatementRow("R2", orderNo = 21, externalRef = "", status = "delivered", fareMinor = 15_000, createdAt = 2),
+    )
+    val r = InvoiceCheck.check(retried, 15_000, 1, InvoiceCheck.parse("#21 150").lines)
+    assertEquals(listOf(InvoiceCheck.Kind.MATCHED), r.items.map { it.kind })
+    assertEquals("delivered", r.items.single().status)
+    assertTrue(r.ok)
+    //  دو خط برای همان سفارش: دومی به تلاشِ ناموفق می‌خورد؟ نه — همان تحویل‌شده ⇒ تکراری
+    val twice = InvoiceCheck.check(retried, 30_000, 2, InvoiceCheck.parse("#21 150\n21 150").lines)
+    assertEquals(listOf(InvoiceCheck.Kind.MATCHED, InvoiceCheck.Kind.DUPLICATE), twice.items.map { it.kind })
+  }
+
   @Test fun `شمارهٔ سفارشِ بی # هم پیدا می‌شود، ولی رهگیری مقدم است`() {
     val r = InvoiceCheck.check(rows, 35_000, null, listOf(InvoiceCheck.Line("13", null), InvoiceCheck.Line("TRK-4", null)))
     assertEquals(listOf(InvoiceCheck.Kind.MATCHED, InvoiceCheck.Kind.MATCHED, InvoiceCheck.Kind.NOT_BILLED), r.items.map { it.kind })
