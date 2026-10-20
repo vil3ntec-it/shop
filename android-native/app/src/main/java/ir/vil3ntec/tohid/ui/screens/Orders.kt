@@ -136,6 +136,19 @@ fun OrdersScreen(store: ShopStore, snackbar: SnackbarHostState, onLeave: () -> U
         onAction = { scope.launch { OrdersLive.reconcile(context, store, force = true) } },
       )
     }
+    //  تحویل‌هایی که این حساب نمی‌تواند فروش یا لغوشان را بنویسد (پرچمِ سرورِ همان سفارش:
+    //  اجازه یا سقفِ تخفیفِ همین کاربر) — منتظرِ دستگاهِ صاحب یا مدیر
+    val waiting = OrdersLive.waiting.value
+    if (waiting.isNotEmpty()) {
+      Spacer(Modifier.height(8.dp))
+      FulfillNotice(
+        title = "${waiting.size} سفارشِ تحویل‌شده منتظرِ دستگاهِ صاحب یا مدیر است",
+        body = (listOf("این حساب فروش یا لغوِ این‌ها را نمی‌تواند ثبت کند (اجازه یا سقفِ تخفیف)؛ با باز شدنِ برنامه روی دستگاهِ صاحب یا مدیر خودکار ثبت می‌شود.") +
+          waiting.take(3).map { it.message }).joinToString("\n"),
+        action = null,
+        onAction = {},
+      )
+    }
     //  فروش ثبت شد ولی کالا در دفتر کم بود (INV-19: ثبت‌شده رد نمی‌شود) — ورودِ انبار را درست کنید
     val shortfalls = OrdersLive.shortfalls.value
     if (shortfalls.isNotEmpty()) {
@@ -465,7 +478,7 @@ private fun OrderDetailSheet(
         )
       } else if (OrderFulfillment.needsSale(ledger, o, OrdersLive.handoverSince())) {
         Spacer(Modifier.height(8.dp))
-        val able = cfg.permissions.manage && OrdersLive.canRecord(cfg, o)
+        val able = cfg.permissions.manage && OrdersLive.canRecord(cfg, o) && !OrdersLive.isWaiting(o.id)
         FulfillNotice(
           title = "فروشِ این سفارش هنوز در دفترِ دکان نیست — موجودی کم نشده",
           body = OrdersLive.unposted.value.firstOrNull { it.orderId == o.id }?.message
@@ -476,10 +489,10 @@ private fun OrderDetailSheet(
       }
       if (sold != null && OrderFulfillment.needsReverse(ledger, o)) {
         Spacer(Modifier.height(8.dp))
-        val able = cfg.permissions.manage && OrdersLive.canReverse(cfg)
+        val able = cfg.permissions.manage && OrdersLive.canReverse(cfg, o) && !OrdersLive.isWaiting(o.id)
         FulfillNotice(
           title = "کالای این سفارش به دکان برگشته ولی فروشش هنوز لغو نشده",
-          body = if (able) "لغوِ همان فاکتور موجودی را برمی‌گرداند؛ پولی از دخل جابه‌جا نمی‌شود." else OrdersLive.SKIPPED_NOTE,
+          body = if (able) "لغوِ همان فاکتور موجودی را برمی‌گرداند؛ پولی از دخل جابه‌جا نمی‌شود." else OrdersLive.SKIPPED_REVERSE_NOTE,
           action = if (able) "لغوِ فروشِ تحویل" else null,
           onAction = { if (!busy) scope.launch { busy = true; postSale(o); busy = false } },
         )

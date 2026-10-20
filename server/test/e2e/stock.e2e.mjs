@@ -63,6 +63,8 @@ let A; let last; let rice; let lastOrders;
 await E.step('E2E-STK.0', 'کالاها از برنامهٔ دکان (۱ «روغنِ آخر»، ۳ «برنج») و ویترین', async () => {
   A = await E.device('A-owner-phone', owner.email);
   assert.equal((await A.firstSync()).ok, true);
+  //  برنامهٔ «فروشِ تحویل» دکان را می‌بیند ⇒ کفِ تحویلِ همین دکان (پیش از هر سفارش)
+  assert.ok(E.ok(await A.ordersConfig(), 'config ِ سفارش‌ها').handoverSince > 0);
   last = A.stockIn({ name: 'روغنِ آخر', price: 300, cost: 250, units: 1 });
   rice = A.stockIn({ name: 'برنج', price: 100, cost: 70, units: 3 });
   await A.drain();
@@ -194,7 +196,8 @@ await E.step('E2E-STK.courier', 'تحویلی که دستگاه نزده (پیک
   await walk(A, id, [...TO_READY.slice(0, 3), ['out_for_delivery', 'packed'], ['delivered', 'out_for_delivery']]);
   assert.equal((await stockOf(A, rice)).levels.shop_floor, 1000, 'سرور کم نکرد');
   const items = E.ok(await A.api('GET', '/shop/orders/handover?since=0'), 'تحویل‌های بی‌فروش').items;
-  assert.deepEqual(items.map((x) => x.id), [id]);
+  //  `recordable`: سرور برای همین کاربر و همین سفارش می‌گوید ثبت پذیرفته می‌شود (صاحب ⇒ بله)
+  assert.deepEqual(items.map((x) => [x.id, x.recordable]), [[id, true]]);
   //  `OrdersLive.reconcile`: هر ردیف ⇒ همان ثبت (کالا رفته ⇒ کمبود رد نمی‌کند، فقط گزارش)
   for (const it of items) assert.equal(A.fulfillOrder(it).ok, true);
   await A.drain();

@@ -70,6 +70,12 @@ object OrdersLive {
   /** فروش ثبت شد ولی کالا در دفتر کم بود (موجودی منفی) — INV-19: ثبت‌شده رد نمی‌شود، فقط گفته می‌شود */
   val shortfalls = mutableStateOf<List<Unposted>>(emptyList())
 
+  /**
+   *  تحویل‌هایی که فروش یا لغوشان را **این حساب** نمی‌تواند بنویسد (پرچمِ سرورِ همان سفارش:
+   *  اجازه یا سقفِ تخفیفِ همین کاربر) ⇒ منتظرِ دستگاهِ صاحب یا مدیر. فهرستِ «سفارش‌ها» می‌شماردشان.
+   */
+  val waiting = mutableStateOf<List<Unposted>>(emptyList())
+
   sealed interface Posted {
     data object Saved : Posted
     data object Already : Posted
@@ -83,22 +89,33 @@ object OrdersLive {
   /** حداکثر صفحه در هر دورِ [reconcile] (۲۰ تا در هر صفحه) */
   const val HANDOVER_PAGES = 10
   const val SKIPPED_NOTE = "فروشِ این تحویل را دستگاهی با اجازهٔ ثبتِ فروش (صاحب یا مدیر) ثبت می‌کند؛ موجودی همان‌جا کم می‌شود."
+  const val SKIPPED_REVERSE_NOTE = "لغوِ فروشِ این سفارشِ برگشته را دستگاهی با اجازهٔ لغوِ فروش (صاحب یا مدیر) ثبت می‌کند؛ موجودی همان‌جا برمی‌گردد."
+  const val NO_FLOOR_NOTE = "سرور هنوز کفِ تحویلِ این دکان را نگفته؛ بخشِ «سفارش‌ها» را یک بار دوباره باز کنید."
 
   private val postLock = Mutex()
   @Volatile private var handoverRev = Long.MIN_VALUE
   @Volatile private var handoverAt = 0L
 
-  /** سرور «فروشِ تحویل» را دارد و نقشِ این حساب می‌تواند فروشِ [o] را بنویسد (با تخفیف ⇒ اجازهٔ تخفیف) */
+  /**
+   *  سرور «فروشِ تحویل» را دارد و این حساب فروشِ [o] را می‌تواند بنویسد — ردیفِ `handover` با
+   *  پرچمِ سرورِ همان سفارش (`recordable`: اجازهٔ مؤثر و سقفِ تخفیفِ همین کاربر)، وگرنه اجازهٔ
+   *  کلیِ نقش ([OrderFulfillment.allowed]).
+   */
   fun canRecord(cfg: OrdersConfigDto?, o: OrderDto? = null): Boolean {
-    if (cfg == null || !cfg.saleOnHandover || !cfg.permissions.recordSale) return false
-    return o == null || o.discountMinor <= 0 || cfg.permissions.saleDiscount
+    if (cfg == null || !cfg.saleOnHandover) return false
+    return if (o == null) cfg.permissions.recordSale else OrderFulfillment.allowed(o.copy(action = "sale"), cfg.permissions)
   }
 
-  /** لغوِ فروشِ تحویلِ برگشته — Sync v1 لغو را فقط با `sales.cancel` می‌پذیرد */
-  fun canReverse(cfg: OrdersConfigDto?): Boolean =
-    cfg != null && cfg.saleOnHandover && cfg.permissions.saleCancel
+  /** لغوِ فروشِ تحویلِ برگشته — پرچمِ `reversible` ِ همان سفارش، وگرنه `sales.cancel` ِ نقش */
+  fun canReverse(cfg: OrdersConfigDto?, o: OrderDto? = null): Boolean {
+    if (cfg == null || !cfg.saleOnHandover) return false
+    return if (o == null) cfg.permissions.saleCancel else OrderFulfillment.allowed(o.copy(action = "reverse"), cfg.permissions)
+  }
 
-  /** کفِ سرور برای «تحویلِ تازه» — همهٔ دستگاه‌های دکان یکی (`order-ledger.FLOOR`) */
+  /** این سفارش منتظرِ دستگاهِ صاحب یا مدیر است (این حساب نمی‌تواند) */
+  fun isWaiting(orderId: String): Boolean = waiting.value.any { it.orderId == orderId }
+
+  /** کفِ همین دکان روی سرور (`order-ledger.claimFloor`) — نیامده ⇒ هیچ تحویلی «تازه» نیست */
   fun handoverSince(): Long = config.value?.handoverSince ?: Long.MAX_VALUE
 
   private fun isoDay(at: Long): String {
@@ -123,7 +140,12 @@ object OrdersLive {
     val cfg = config.value
     val reverse = item.action == "reverse"
     if (!store.loaded.value) return@withLock Posted.Failed("دفترِ دکان هنوز باز نشده؛ کمی بعد دوباره بزنید")
-    if (if (reverse) !canReverse(cfg) else !canRecord(cfg, item)) return@withLock Posted.Skipped(SKIPPED_NOTE)
+    if (if (reverse) !canReverse(cfg, item) else !canRecord(cfg, item)) {
+      //  پرچمِ سرورِ همین سفارش برای همین کاربر: منتظرِ دستگاهِ صاحب یا مدیر (فهرست می‌شماردش)
+      note(waiting, item, "سفارش #${item.orderNo} — " + if (reverse) "لغوِ فروشِ برگشته" else "ثبتِ فروشِ تحویل")
+      return@withLock Posted.Skipped(if (reverse) SKIPPED_REVERSE_NOTE else SKIPPED_NOTE)
+    }
+    note(waiting, item, null)
     val at = (if (reverse) item.returnedAt else OrderFulfillment.handedOverAt(item)) ?: System.currentTimeMillis()
     val day = isoDay(at)
     val seller = runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrDefault("")
@@ -161,7 +183,8 @@ object OrdersLive {
   suspend fun postById(context: Context, store: ShopStore, orderId: String): Posted {
     val cfg = config.value ?: return Posted.Skipped(SKIPPED_NOTE)
     if (!cfg.saleOnHandover) return Posted.Skipped(SKIPPED_NOTE)
-    return when (val r = repository(context).handover(cfg.handoverSince, orderId = orderId)) {
+    val since = cfg.handoverSince ?: return Posted.Skipped(NO_FLOOR_NOTE)
+    return when (val r = repository(context).handover(since, orderId = orderId)) {
       is ApiResult.Failure -> Posted.Failed(r.error.userMessage)
       is ApiResult.Success -> {
         val item = r.value.items.firstOrNull { it.id == orderId } ?: r.value.reversals.firstOrNull { it.id == orderId }
@@ -191,24 +214,32 @@ object OrdersLive {
   }
 
   /**
-   *  تحویل‌های بی‌فروش و برگشته‌های لغونشدهٔ سرور ⇒ همین دفتر. فقط وقتی سرور توانا و نقشِ این
-   *  حساب توانا است؛ صفحه‌به‌صفحه (`after`) تا سفارشِ گیرکرده جلوی بقیه را نگیرد؛ بی تغییرِ صف کم‌پرسش.
+   *  تحویل‌های بی‌فروش و برگشته‌های لغونشدهٔ سرور ⇒ همین دفتر؛ هر ردیف با پرچمِ سرورِ خودش
+   *  (`recordable`/`reversible`) — آن‌چه این حساب نمی‌تواند در [waiting] می‌ماند تا فهرست بشماردش
+   *  (پس حتی دستگاهی که هیچ فروشی نمی‌نویسد هم می‌پرسد). صفحه‌به‌صفحه (`after`) تا سفارشِ گیرکرده
+   *  جلوی بقیه را نگیرد؛ بی تغییرِ صف کم‌پرسش. دورِ کامل ⇒ [waiting] ِ تازه (ثبت‌شده‌ها جای دیگر می‌روند).
    */
   suspend fun reconcile(context: Context, store: ShopStore, force: Boolean = false) {
     val cfg = config.value ?: return
     if (!cfg.permissions.manage || !cfg.saleOnHandover || !store.loaded.value) return
-    if (!canRecord(cfg) && !canReverse(cfg)) return
+    val since = cfg.handoverSince ?: return
     val now = System.currentTimeMillis()
     if (!force && rev.value == handoverRev && now - handoverAt < HANDOVER_MS) return
     handoverRev = rev.value
     handoverAt = now
+    val left = HashSet<String>()
     var after: String? = null
     for (page in 0 until HANDOVER_PAGES) {
-      val r = repository(context).handover(cfg.handoverSince, after = after)
+      val r = repository(context).handover(since, after = after)
       val p = (r as? ApiResult.Success)?.value ?: return
-      for (o in p.items) applyItem(context, store, o)
-      if (page == 0) for (o in p.reversals) applyItem(context, store, o)
-      after = p.nextAfter ?: return
+      for (o in p.items) if (applyItem(context, store, o) is Posted.Skipped) left += o.id
+      if (page == 0) for (o in p.reversals) if (applyItem(context, store, o) is Posted.Skipped) left += o.id
+      after = p.nextAfter
+      if (after == null) {
+        //  همهٔ صفحه‌ها دیده شد ⇒ منتظرهایی که دیگر در فهرستِ سرور نیستند (جای دیگر ثبت شد) می‌روند
+        waiting.value = waiting.value.filter { it.orderId in left }
+        return
+      }
     }
   }
 
@@ -234,7 +265,10 @@ object OrdersLive {
   private fun apply(cfg: OrdersConfigDto?) {
     known = true
     config.value = cfg
-    if (cfg == null) { counts.value = emptyMap(); rev.value = 0; unposted.value = emptyList(); shortfalls.value = emptyList() }
+    if (cfg == null) {
+      counts.value = emptyMap(); rev.value = 0
+      unposted.value = emptyList(); shortfalls.value = emptyList(); waiting.value = emptyList()
+    }
   }
 
   suspend fun pollSummary(context: Context) {

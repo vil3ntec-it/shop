@@ -69,6 +69,8 @@ await E.step('E2E-DLV.0', 'کالا از برنامه، ویترین روشن، 
   K = await E.device('K-courier-phone', courierAcct.email);
   clerk = await E.device('W-clerk-phone', clerkAcct.email);
   assert.equal((await A.firstSync()).ok, true);
+  //  برنامهٔ «فروشِ تحویل» دکان را می‌بیند ⇒ کفِ تحویلِ همین دکان (پیش از هر سفارش)
+  assert.ok(E.ok(await A.ordersConfig(), 'config ِ سفارش‌ها').handoverSince > 0);
   rice = A.stockIn({ name: 'برنج', price: 600, cost: 450, units: 5 });
   await A.drain();
   E.ok(await A.api('PUT', '/shop/storefront', { slug: SLUG, enabled: true, title: 'ویترینِ ارسال', contactPhone: '0700000003', deliveryFeeMinor: 4000, minOrderMinor: 0 }), 'ویترین');

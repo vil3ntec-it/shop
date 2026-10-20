@@ -27,8 +27,12 @@ import kotlinx.serialization.json.put
  */
 class OrdersRepository(private val api: ApiClient) {
 
+  /**
+   *  `caps=saleOnHandover`: این برنامه فروشِ تحویل را خودش ثبت می‌کند ⇒ سرور کفِ تحویلِ این دکان
+   *  را (اگر نیست) همین لحظه می‌گذارد؛ تحویلِ پیش از آن هرگز فروش نمی‌گیرد.
+   */
   suspend fun config(): ApiResult<OrdersConfigDto> =
-    result { ApiJson.decode<OrdersConfigDto>(api.get("$ROOT/config")) }
+    result { ApiJson.decode<OrdersConfigDto>(api.get("$ROOT/config?caps=saleOnHandover")) }
 
   suspend fun summary(): ApiResult<OrdersSummaryDto> =
     result { ApiJson.decode<OrdersSummaryDto>(api.get("$ROOT/summary")) }

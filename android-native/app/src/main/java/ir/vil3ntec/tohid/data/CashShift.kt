@@ -46,19 +46,25 @@ object CashShift {
     s.series == ONLINE_SERIES || (s.channel == ONLINE && !paidAtCounter(s))
 
   /**
-   *  سفارشِ «تحویل در دکان» که مشتری سرِ پیشخوان نقد داد: ردیفِ پرداختِ نقدِ بی‌امانت
+   *  سفارشی که مشتری سرِ پیشخوان گرفت و نقد داد (`OrderFulfillment.atCounter`، حتی سفارشِ
+   *  «ارسال»): ردیفِ پرداختِ نقدِ بی‌امانت
    *  (`kind = cash`، بی `custody`) — همان نقدِ عادیِ دخل. نقدِ پیک `custody = courier` دارد.
    */
   fun paidAtCounter(s: Sale): Boolean =
     s.payments?.any { it.kind == "cash" && it.custody == null && it.amountMinor > 0 } == true
 
   /**
-   *  مرجوعیِ فاکتورِ اینترنتیِ بیرونِ دخل ([isOnline]) — هیچ‌وقت از دخل نیست: نقدِ پیک هرگز به
-   *  دخل نیامده بود و پولِ آنلاین از راهِ دفترِ بازپرداختِ سفارش برمی‌گردد. (پیش‌تر مرجوعیِ
-   *  دستیِ همین دستگاه برای این فاکتورها از دخل کم می‌شد و صندوق اضافه نشان می‌داد.)
+   *  مرجوعیِ بیرون از دخل: ردیفی که خودش `channel = online` دارد — مرجوعیِ سرور برای سفارشِ
+   *  اینترنتی، یا مرجوعیِ پیوسته به بازپرداختی که بیرون از دخل داده شد — و ردیف‌های سرورِ پیش
+   *  از نشانِ `channel` (شناسهٔ ثابتِ `w-…`، هرگز ULID ِ دستگاه) بر فاکتورِ اینترنتی.
+   *  ⛔ مرجوعیِ **دستیِ** همین صندوق — حتی برای فروشِ آنلاین یا پیک (`o-…`، `w-…`) — پولی است که
+   *  از همین دخل رفت ⇒ کم می‌شود (تصمیمِ صاحبِ مخزن، بازبینیِ دومِ #340؛ پسِ تحویلِ ناموفق
+   *  «لغو» است، نه مرجوعی ⇒ اثری بر دخل ندارد).
+   *  ⛔ دفترِ بازپرداختِ سفارش (`order-refunds`) امروز فقط `cash` دارد و نشانِ «بیرون از دخل»
+   *  ندارد؛ پس امروز هیچ مرجوعیِ دستی‌ای `channel = online` نمی‌گیرد.
    */
   fun isOnlineReturn(r: SaleReturn, onlineSales: Set<String>): Boolean =
-    r.channel == ONLINE || r.saleId in onlineSales
+    r.channel == ONLINE || (r.saleId in onlineSales && r.id.startsWith("w-"))
 
   sealed interface Result {
     data class Ok(val data: ShopData) : Result

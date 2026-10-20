@@ -487,10 +487,14 @@ export class NativeDevice {
     if (fee > 0) rows.push([`${saleId}-fee`, fee]);
     const finalTotal = o.totalMinor / 100;
     let pay;
+    //  `OrderFulfillment.atCounter`: نخستین گذارِ تحویل «مشتری گرفت» ⇒ نقدِ پیشخوان (حتی سفارشِ «ارسال»)
+    const first = (o.events || []).filter((e) => e.kind === 'status' && ['picked_up', 'out_for_delivery', 'delivered'].includes(e.toStatus))
+      .sort((a, b) => a.at - b.at)[0];
+    const atCounter = first ? first.toStatus === 'picked_up' : o.status === 'picked_up';
     if (o.paymentMethod === 'online') {
       const paid = o.paymentStatus === 'paid';
       pay = { method: 'online', rows: [{ method: 'online', kind: 'other', amount: o.totalMinor, status: paid ? 'confirmed' : 'pending', ...(paid ? { verification: 'provider' } : {}) }] };
-    } else if (o.fulfillment === 'delivery') {
+    } else if (o.fulfillment === 'delivery' && !atCounter) {
       pay = { method: 'cod', rows: [{ method: 'cod', kind: 'cash', amount: o.totalMinor, status: 'pending', custody: 'courier' }] };
     } else {
       pay = { method: 'cash', rows: [{ method: 'cash', kind: 'cash', amount: o.totalMinor, status: 'confirmed' }] };
@@ -549,19 +553,31 @@ export class NativeDevice {
     const today = todayOf(now);
     const reason = 'سفارشِ اینترنتی به دکان برگشت';
     const label = `${sale.series}-${sale.invoiceNumber}`;
-    for (const it of d.saleItems.filter((x) => x.saleId === saleId && x.productId && x.quantity - x.returnedQty > 0)) {
+    //  همگام‌سازیِ نیمه (حرکت یا ممیزیِ لغو از دستگاهِ دیگر رسیده) ⇒ شناسهٔ تکراری ساخته نمی‌شود
+    const moved = new Set(d.stockMovements.map((m) => m.id));
+    for (const it of d.saleItems.filter((x) => x.saleId === saleId && x.productId && x.quantity - x.returnedQty > 0 && !moved.has(`${x.id}-x`))) {
       d.stockMovements.push(row('StockMovement', {
         id: `${it.id}-x`, productId: it.productId, type: 'sale_cancel', qty: it.quantity - it.returnedQty, date: today,
         notes: `لغو فروش — فاکتور #${label} — ${reason}`, refId: saleId, createdAt: now,
       }));
     }
     Object.assign(sale, { status: 'cancelled', cancelReason: reason });
-    d.auditLog.push(row('AuditEntry', {
-      id: `${saleId}-x`, type: 'cancel_sale', date: today, refId: saleId,
-      notes: `لغو فروش فاکتور #${label} — سفارشِ اینترنتی #${o.orderNo}: ${reason}`, createdAt: now,
-    }));
+    if (!d.auditLog.some((a) => a.id === `${saleId}-x`)) {
+      d.auditLog.push(row('AuditEntry', {
+        id: `${saleId}-x`, type: 'cancel_sale', date: today, refId: saleId,
+        notes: `لغو فروش فاکتور #${label} — سفارشِ اینترنتی #${o.orderNo}: ${reason}`, createdAt: now,
+      }));
+    }
     this.save(d);
     return { ok: true, saleId };
+  }
+
+  /**
+   * `OrdersRepository.config` ِ برنامه: `caps=saleOnHandover` ⇒ سرور کفِ تحویلِ این دکان را (اگر
+   * نیست) همین لحظه می‌گذارد؛ تحویلِ پیش از آن هرگز فروش نمی‌گیرد.
+   */
+  ordersConfig() {
+    return this.api('GET', '/shop/orders/config?caps=saleOnHandover');
   }
 
   /** `DebtorEngine.addTransaction(kind = RECEIVE)` */

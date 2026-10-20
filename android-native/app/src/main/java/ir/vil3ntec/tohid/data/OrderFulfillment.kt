@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.data
 
 import ir.vil3ntec.tohid.core.model.OrderDto
+import ir.vil3ntec.tohid.core.model.OrderPermsDto
 import ir.vil3ntec.tohid.money
 
 /**
@@ -22,13 +23,17 @@ import ir.vil3ntec.tohid.money
  *  • برگشت به دکان (`returned_to_store`/`restocked`) ⇒ [reverse] همان فروش را **لغو** می‌کند:
  *    موجودی یک بار برمی‌گردد، صندوق و گزارش دیگر نمی‌شمارندش. (مرجوعی نه: `returnedQty` در
  *    Sync v1 شمارندهٔ `$inc` است و دو دستگاه آن را دو بار می‌افزودند؛ وضعیت تکرارپذیر است.)
+ *    حرکت یا ممیزیِ لغوی که از دستگاهِ دیگر پیش‌تر رسیده دوباره ساخته نمی‌شود (شناسهٔ تکراری نه).
  *  • قیمت‌ها همانِ سفارش‌اند (به پول، دقیق)؛ هزینهٔ ارسال یک قلمِ آزاد است (بی اثر بر
  *    موجودی)؛ تخفیفِ سفارش تخفیفِ فاکتور.
  *  • پول ([paymentOf]) — همیشه `channel = online`:
  *      آنلاین‌پرداخت ⇒ `online` و ردیفِ `other`؛ نقدِ هنگامِ تحویل با پیک ⇒ `cod` و ردیفِ
- *      نقدِ `custody = courier` (تا تسویهٔ پیک پولِ دخل نیست)؛ «تحویل در دکان» و نقد سرِ
- *      پیشخوان ⇒ `cash` و ردیفِ نقدِ بی‌امانت — تنها حالتی که به دخل می‌آید
- *      (`CashShift.paidAtCounter`).
+ *      نقدِ `custody = courier` (تا تسویهٔ پیک پولِ دخل نیست)؛ کالایی که مشتری **سرِ پیشخوان**
+ *      گرفت ([atCounter]: «تحویل در دکان»، یا سفارشِ «ارسال» که مشتری خودش در دکان گرفت) و
+ *      نقد داد ⇒ `cash` و ردیفِ نقدِ بی‌امانت — تنها حالتی که به دخل می‌آید
+ *      (`CashShift.paidAtCounter`). مرجوعیِ دستیِ بعدی همیشه از دخل است (`CashShift`).
+ *  • اجازه ([allowed]): پرچمِ سرور برای همین کاربر و همین سفارش (`recordable`/`reversible`)
+ *    بر اجازهٔ کلیِ نقش جلو می‌افتد — سقفِ درصد/مبلغِ تخفیفِ هر کاربر همان‌جا سنجیده شده.
  *  • موجودی: پیش از گذار (`allowShortage = false`) همان سیاستِ صندوق — بیش از موجودی (جمعِ
  *    قلم‌های هر کالا) نه، با پیامِ روشن. پس از تحویل (کالا رفته است) فروش **ثبت می‌شود** و
  *    کمبود فقط گزارش می‌شود ([Result.Ok.short]) — INV-19: «ثبت‌شده رد نمی‌شود».
@@ -43,9 +48,14 @@ object OrderFulfillment {
   /** همان `HANDED_OVER` ِ `server/src/lib/order-ledger.js` */
   val HANDED_OVER: Set<String> = setOf("picked_up", "out_for_delivery", "delivered")
 
-  /** کالا بیرونِ دکان است ⇒ فروش باید در دفتر باشد — همان `OUT_OF_SHOP` ِ سرور */
-  val OUT_OF_SHOP: Set<String> =
-    setOf("picked_up", "out_for_delivery", "delivered", "delivery_failed", "retry_scheduled", "return_requested")
+  /**
+   *  کالا بیرونِ دکان است ⇒ فروش باید در دفتر باشد — همان `OUT_OF_SHOP` ِ سرور.
+   *  `refunded_partial`: بخشی از پول برگشت ولی کالا پیشِ مشتری ماند.
+   */
+  val OUT_OF_SHOP: Set<String> = setOf(
+    "picked_up", "out_for_delivery", "delivered", "delivery_failed", "retry_scheduled", "return_requested",
+    "refunded_partial",
+  )
 
   /** کالا به دکان برگشت ⇒ فروشِ تحویل لغو می‌شود — همان `BACK_IN_SHOP` ِ سرور */
   val BACK_IN_SHOP: Set<String> = setOf("returned_to_store", "restocked")
@@ -91,6 +101,26 @@ object OrderFulfillment {
   fun needsReverse(d: ShopData, o: OrderDto): Boolean =
     !o.isTest && o.status in BACK_IN_SHOP && d.sales.any { it.id == saleIdOf(o.id) && it.status != "cancelled" }
 
+  /**
+   *  این دستگاه کارِ ردیفِ [o] را می‌تواند بنویسد؟ (Sync v1 همان را از این کاربر می‌پذیرد.)
+   *  `sale`: پرچمِ سرور `recordable`، وگرنه (سرورِ کهنه) اجازهٔ کلیِ نقش با تخفیف ⇒ `saleDiscount`؛
+   *  `reverse`: `reversible`، وگرنه `saleCancel`. بی `recordSale` هیچ.
+   */
+  fun allowed(o: OrderDto, perms: OrderPermsDto): Boolean {
+    if (!perms.recordSale) return false
+    return if (o.action == "reverse") o.reversible ?: perms.saleCancel
+    else o.recordable ?: (o.discountMinor <= 0 || perms.saleDiscount)
+  }
+
+  /**
+   *  کالا سرِ پیشخوانِ دکان به دستِ مشتری رسید — نخستین گذارِ تحویلش «مشتری گرفت» (`picked_up`)
+   *  بود، نه «به پیک داده شد». نوعِ سفارش («ارسال» یا «تحویل در دکان») مهم نیست.
+   */
+  fun atCounter(o: OrderDto): Boolean {
+    val first = o.events.filter { it.kind == "status" && it.toStatus in HANDED_OVER }.minByOrNull { it.at }
+    return first?.toStatus == "picked_up" || (first == null && o.status == "picked_up")
+  }
+
   sealed interface Result {
     /** [short]: کالاهایی که پس از تحویل از موجودیِ دفتر بیشتر بودند (موجودی منفی شد) */
     data class Ok(val data: ShopData, val saleId: String, val short: List<String> = emptyList()) : Result
@@ -109,7 +139,7 @@ object OrderFulfillment {
         status = if (paid) "confirmed" else "pending", verification = if (paid) "provider" else null,
       )))
     }
-    o.fulfillment == "delivery" -> Pay("cod", listOf(SalePayment(
+    o.fulfillment == "delivery" && !atCounter(o) -> Pay("cod", listOf(SalePayment(
       method = "cod", kind = "cash", amountMinor = o.totalMinor, status = "pending", custody = "courier",
     )))
     else -> Pay("cash", listOf(SalePayment(method = "cash", kind = "cash", amountMinor = o.totalMinor, status = "confirmed")))
@@ -275,8 +305,10 @@ object OrderFulfillment {
     val sale = d.sales.firstOrNull { it.id == saleId } ?: return Result.Already(saleId)
     if (sale.status == "cancelled") return Result.Already(saleId)
     val label = sale.invoiceLabel() ?: "0"
+    //  همگام‌سازیِ نیمه (حرکت یا ممیزیِ لغو از دستگاهِ دیگر رسیده، وضعیتِ فاکتور هنوز نه) ⇒ همان‌ها
+    val moved = d.stockMovements.mapTo(HashSet()) { it.id }
     val back = d.saleItems
-      .filter { it.saleId == saleId && it.productId.isNotBlank() && it.quantity - it.returnedQty > 0 }
+      .filter { it.saleId == saleId && it.productId.isNotBlank() && it.quantity - it.returnedQty > 0 && "${it.id}-x" !in moved }
       .map {
         StockMovement(
           id = "${it.id}-x", productId = it.productId, type = "sale_cancel", qty = it.quantity - it.returnedQty,
@@ -284,14 +316,18 @@ object OrderFulfillment {
         )
       }
     val updated = sale.copy(status = "cancelled", cancelReason = REVERSE_REASON)
+    val auditId = reverseAuditIdOf(o.id)
+    val audit = if (d.auditLog.any { it.id == auditId }) emptyList() else listOf(
+      AuditEntry(
+        id = auditId, type = "cancel_sale", date = today, refId = saleId,
+        notes = "لغو فروش فاکتور #$label — سفارشِ اینترنتی #${o.orderNo}: $REVERSE_REASON", createdAt = now,
+      ),
+    )
     return Result.Ok(
       d.copy(
         sales = d.sales.map { if (it.id == saleId) updated else it },
         stockMovements = d.stockMovements + back,
-        auditLog = d.auditLog + AuditEntry(
-          id = reverseAuditIdOf(o.id), type = "cancel_sale", date = today, refId = saleId,
-          notes = "لغو فروش فاکتور #$label — سفارشِ اینترنتی #${o.orderNo}: $REVERSE_REASON", createdAt = now,
-        ),
+        auditLog = d.auditLog + audit,
       ),
       saleId,
     )

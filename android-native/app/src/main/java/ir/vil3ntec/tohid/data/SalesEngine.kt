@@ -611,8 +611,6 @@ object SalesEngine {
         reason = reason,
         date = today,
         createdAt = now,
-        //  مرجوعیِ فاکتورِ اینترنتیِ بیرونِ دخل (آنلاین، پیک): پولش از راهِ سفارش برمی‌گردد
-        channel = if (CashShift.isOnline(sale)) CashShift.ONLINE else null,
       )
       //  قلمِ آزاد کالایی ندارد، پس حرکتِ انبار هم نمی‌سازد — وگرنه ردیفی
       //  با شناسهٔ کالای خالی در گردشِ موجودی می‌نشست
