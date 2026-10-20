@@ -9,6 +9,7 @@ const subs = require('./lib/subscriptions');
 const { rateLimit } = require('./middleware/ratelimit');
 const { notFoundHandler, errorHandler } = require('./middleware/errors');
 const { requireUser, optionalShop } = require('./middleware/auth');
+const { redactPath } = require('./lib/log-redact');
 
 async function createApp({ runMigrations = true } = {}) {
   const app = express();
@@ -64,7 +65,7 @@ async function createApp({ runMigrations = true } = {}) {
       return next(err);
     }
     const tooBig = err.type === 'entity.too.large';
-    console.warn(`[body] ${req.method} ${req.path.slice(0, 120)} — ${err.type}`);
+    console.warn(`[body] ${req.method} ${redactPath(req.originalUrl)} — ${err.type}`);
     res.status(tooBig ? 413 : 400).json({
       error: {
         code: tooBig ? 'body_too_large' : 'bad_json',
@@ -120,14 +121,14 @@ async function createApp({ runMigrations = true } = {}) {
 
   // ---- ثبت درخواست‌ها ----
   // فقط روش، مسیر، وضعیت و زمان پاسخ. هیچ بدنه، رمز، کد یا توکنی نوشته
-  // نمی‌شود؛ حتی مسیرهایی که شناسه دارند کوتاه می‌شوند.
+  // نمی‌شود؛ بخشِ توکن‌مانندِ مسیر `:tok` می‌شود و مسیر کوتاه می‌شود.
   app.use((req, res, next) => {
     const started = Date.now();
     res.on('finish', () => {
       const ms = Date.now() - started;
       if (res.statusCode >= 400 || ms > 1000 || config.env !== 'production') {
-        const path = req.originalUrl.split('?')[0].slice(0, 120);
-        console.log(`${req.method} ${path} ${res.statusCode} ${ms}ms`);
+        //  ⛔ توکن در مسیر (پیگیریِ سفارش، پرونده، دعوت…) ⇒ `:tok` (lib/log-redact.js)
+        console.log(`${req.method} ${redactPath(req.originalUrl)} ${res.statusCode} ${ms}ms`);
       }
     });
     next();
@@ -309,6 +310,11 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/shop/chat', require('./routes/shop-chat'));
     api.use('/store', require('./routes/shop-chat-store'));
     api.use('/admin/shop-chat', require('./routes/admin-shop-chat'));
+    //  شکایت و تخلفِ بازارچه (v3 §۳۸.۶) — پشتِ پرچمِ `market.trust`، پیش‌فرض خاموش.
+    //  همان قاعده: دکان پیش از `/shop`، مشتری زیرِ `/store/:slug/trust`، مدیر زیرِ `/admin/trust`.
+    api.use('/shop/trust', require('./routes/shop-trust'));
+    api.use('/store', require('./routes/trust-store'));
+    api.use('/admin/trust', require('./routes/admin-trust'));
     //  کاتالوگ و موجودیِ سرور (v3 §۳۲) — پیش از `/shop`، پشتِ پرچمِ خاموشِ `shop.catalog`
     api.use('/shop/catalog', require('./routes/catalog'));
     //  اعلانِ سفارش (v3 §۳۰) — پیش از `/shop` به همان دلیلِ `/shop/orders`؛ پیش‌فرض خاموش
@@ -329,6 +335,8 @@ async function createApp({ runMigrations = true } = {}) {
     //  تحویل و پیک (۲۲.۲ C) — همان قاعده؛ درهای پیک زیرِ `/courier` (۳.۱۱)
     api.use('/shop/delivery', require('./routes/delivery'));
     api.use('/courier', require('./routes/courier'));
+    //  تخفیف‌ها و قاعده‌های قیمت (PRM) — کلیدِ دکان، پیش‌فرض خاموش
+    api.use('/shop/promos', require('./routes/shop-promos'));
     api.use('/shop', require('./routes/shop'));
     /*
      *  بخشِ پمپ‌بنزین — دفترِ جدا، همان دستگاهِ اشتراک.
@@ -441,6 +449,21 @@ async function createApp({ runMigrations = true } = {}) {
   };
   app.use('/store', storeHeaders, express.static(storeDir, { index: false, maxAge: 0, etag: true }));
   app.get('/store/:slug', storeHeaders, (req, res, next) => storePage(req.params.slug, res).catch(next));
+  //  وب‌اپِ قابلِ نصبِ همان دکان (WEB-14): نام از ویترینِ باز، شروع از نشانیِ خودش
+  app.get('/store/:slug/manifest.webmanifest', (req, res, next) => storefront.open(req.params.slug).then((sf) => {
+    const onHost = storefront.slugFromHost(req.hostname) === sf.slug;
+    const start = onHost ? '/' : `/store/${sf.slug}`;
+    res.set('Cache-Control', 'no-cache').type('application/manifest+json').send(JSON.stringify({
+      name: sf.title, short_name: String(sf.title).slice(0, 12), lang: 'fa', dir: 'rtl',
+      start_url: start, scope: onHost ? '/' : `/store/${sf.slug}`, display: 'standalone',
+      background_color: '#F4F5F8', theme_color: '#5B45E0',
+      icons: [
+        { src: '/kit/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+        { src: '/kit/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+        { src: '/kit/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+      ],
+    }));
+  }).catch((err) => (err.status === 404 ? res.status(404).json({ error: { code: 'store_not_found', message: 'این ویترین پیدا نشد' } }) : next(err))));
   app.get('/', (req, res, next) => {
     const slug = storefront.slugFromHost(req.hostname);
     if (!slug) return next();

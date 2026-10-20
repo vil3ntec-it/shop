@@ -6,6 +6,7 @@ import ir.vil3ntec.tohid.data.Sale
 import ir.vil3ntec.tohid.data.SaleItem
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.StockMovement
+import ir.vil3ntec.tohid.sync.v1.LedgerDiff
 import ir.vil3ntec.tohid.sync.v1.SyncCommit
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
@@ -46,6 +47,8 @@ class SyncV3EngineTest {
     val requests = ArrayList<String>()
     val pushSizes = ArrayList<Int>()
     val formats = ArrayList<String>()
+    /** A00: آیا هر push نشانِ `caps` داشت */
+    val caps = ArrayList<Boolean>()
     val conflicts = ArrayList<JsonObject>()
     private var seq = 0L
 
@@ -116,6 +119,7 @@ class SyncV3EngineTest {
       }
       val ops = body.getValue("ops").jsonArray.map { it.jsonObject }
       pushSizes += ops.size
+      caps += body.containsKey("caps")
       formats += str(body, "format").ifEmpty { "v3" }
       if (str(body, "format") == "v2") {
         //  سرورِ واقعی ویرایشِ سندِ مالی را به صندوقِ تعارض می‌برد؛ هر op ِ v2 یک پاسخ، با
@@ -275,6 +279,32 @@ class SyncV3EngineTest {
     saleItems = listOf(SaleItem(id = "si1", saleId = "s1", productId = "p1", quantity = 2.0, unitPrice = 115.5, totalPrice = 231.0)),
     stockMovements = listOf(StockMovement(id = "m1", productId = "p1", type = "sale", qty = -2.0)),
   )
+
+  /**
+   *  A00: opی که ساختِ پیش از A00 ساخته و پس از به‌روزرسانی هنوز در صف است بی `caps` می‌رود
+   *  تا تورِ سرور `null` ِ کهنه‌اش را بپالاید؛ op ِ تازهٔ همین ساخت با `caps`.
+   */
+  @Test fun legacyOpsOfAPreA00BuildGoWithoutCaps_newOnesWithCaps() {
+    val server = FakeServer()
+    val a = Device("dev-legacy", server, baseData)
+    assertTrue(a.sync().ok)
+    assertTrue("push ِ همین ساخت نشان دارد", server.caps.all { it })
+    server.caps.clear()
+    a.edit { d -> d.copy(products = d.products.map { it.copy(name = "شیرِ تازه") }) }
+    assertEquals(1, a.engine.record(a.ledger.data))
+    //  همین op را «ساختِ پیش از A00» ساخته بود: سایهٔ بی مهر؛ برنامه به‌روز و دوباره باز شد
+    a.store.meta = a.store.meta!!.copy(shadow = LedgerDiff.unstamped(a.store.meta!!.shadow))
+    a.engine = a.make()
+    a.engine.recover(a.ledger.data)
+    assertTrue(a.store.meta!!.legacyOpsUpTo.isNotEmpty())
+    assertTrue(a.sync(first = false).ok)
+    assertEquals(listOf(false), server.caps)
+    a.edit { d -> d.copy(products = d.products.map { it.copy(name = "شیرِ تازه‌تر") }) }
+    assertEquals(1, a.engine.record(a.ledger.data))
+    assertTrue(a.sync(first = false).ok)
+    assertEquals(listOf(false, true), server.caps)
+    assertEquals("", a.store.meta!!.legacyOpsUpTo)
+  }
 
   @Test fun firstUploadUsesFromLegacyAndOneTxThenSecondDeviceFromSnapshot() {
     val server = FakeServer()

@@ -819,7 +819,9 @@
     if (!b) return { ok: true, sent: 0 };
     //  `queued` = آنچه پس از همین دسته می‌ماند — نگهبانِ خروجِ سرور (SYN-10) از همین می‌خواند
     var body = { device_id: this.deviceId, protocol: this.protocol, ops: b.ops, queued: Math.max(0, this.queued() - b.ops.length),
-      clock_offset_ms: this.meta.offsetMs || 0 };
+      clock_offset_ms: this.meta.offsetMs || 0,
+      //  A00: وب ردیفِ خام را نگه می‌دارد؛ سرور تورِ ساخت‌های پیشین را برایش کنار می‌گذارد (newer-fields.js)
+      client: 'web' };
     if (this.meta.lastError) body.last_error = this.meta.lastError;
     if (b.fmt === 'v2') { body.format = 'v2'; body.schema_version = LEGACY_SCHEMA; }
     var r;

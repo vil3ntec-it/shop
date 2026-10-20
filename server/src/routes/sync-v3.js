@@ -24,6 +24,7 @@ const { promisify } = require('util');
 const config = require('../config');
 const sync = require('../lib/sync-v3');
 const syncEpoch = require('../lib/sync-epoch');
+const newerFields = require('../lib/newer-fields');
 const { rateLimit } = require('../middleware/ratelimit');
 const { requireSyncAccount, requireSyncWrite } = require('../lib/sync-v1-auth');
 const { forbidden, badRequest, notFoundHandler } = require('../middleware/errors');
@@ -69,17 +70,23 @@ router.get('/hello', (req, res) => {
 router.post('/push', requireSyncWrite, async (req, res, next) => {
   try {
     const b = req.body || {};
+    const appVersion = String(req.headers['x-app-version'] || '').slice(0, 32);
+    //  A00: `null` ِ ساختِ پیش از A00 برای فیلدی که نمی‌شناسد کنار می‌رود (‎lib/newer-fields.js‎)
+    const fl = newerFields.filterOps(b.ops, {
+      version: appVersion, shape: b.format === 'v2' ? 'v1' : 'v3', caps: b.caps, client: b.client,
+    });
     const out = await sync.push(req.sync, {
       deviceId: deviceOf(b),
       protocol: b.protocol,
       format: b.format === 'v2' ? 'v2' : 'v3',
       schemaVersion: Number(b.schema_version || b.schemaVersion || 0),
-      ops: b.ops,
-      appVersion: String(req.headers['x-app-version'] || '').slice(0, 32),
+      ops: fl.ops,
+      appVersion,
       queued: b.queued,
       lastError: b.last_error,
       clockOffsetMs: b.clock_offset_ms,
     });
+    out.results = newerFields.mergeResults(fl, out.results);
     await send(req, res, { ok: true, ...out, cursor: out.head });
   } catch (err) {
     //  برنامه جلوتر از سرور است: هیچ چیزی اعمال نشد و opها روی برنامه می‌مانند
