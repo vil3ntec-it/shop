@@ -46,11 +46,17 @@ class OrdersRepository(private val api: ApiClient) {
 
   /**
    *  سفارش‌های تحویل‌شده (مشتری گرفت / به پیک داده شد / رسید) که فروششان هنوز در دفترِ
-   *  همگام‌شدهٔ دکان نیست — `OrderFulfillment` برای هر کدام فروشِ عادی می‌سازد. [since]: فقط
-   *  تحویل‌های پس از نخستین به‌کارگیریِ همین قابلیت روی این دستگاه.
+   *  همگام‌شدهٔ دکان نیست (`items`)، و برگشته‌هایی که فروششان لغو نشده (`reversals`).
+   *  [since]: کفِ سرور؛ [after]: صفحهٔ بعد؛ [orderId]: فقط همان سفارش (پیش از هر ثبت).
    */
-  suspend fun handover(since: Long): ApiResult<HandoverPageDto> =
-    result { ApiJson.decode<HandoverPageDto>(api.get("$ROOT/handover?since=$since&limit=20")) }
+  suspend fun handover(since: Long, after: String? = null, orderId: String? = null): ApiResult<HandoverPageDto> = result {
+    val q = buildString {
+      append("$ROOT/handover?since=").append(since).append("&limit=20")
+      if (!after.isNullOrBlank()) append("&after=").append(enc(after))
+      if (!orderId.isNullOrBlank()) append("&orderId=").append(enc(orderId))
+    }
+    ApiJson.decode<HandoverPageDto>(api.get(q))
+  }
 
   suspend fun create(clientKey: String, body: OrderDraft.Body): ApiResult<OrderDto> =
     result { order(api.post(ROOT, createJson(clientKey, body))) }

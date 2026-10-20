@@ -125,7 +125,7 @@ fun OrdersScreen(store: ShopStore, snackbar: SnackbarHostState, onLeave: () -> U
       "اعلانِ فوری (وقتی برنامه بسته است) هنوز وصل نیست؛ تا برنامه باز است، صف هر چند ثانیه خودش تازه می‌شود.",
       style = MaterialTheme.typography.labelSmall, color = colors.muted,
     )
-    //  تحویل‌هایی که فروششان ثبت نشد (کمبود، قفل…) — موجودی تا ثبتِ فروش کم نشده است
+    //  تحویل‌هایی که فروششان ثبت نشد (قفل، دیسک…) — موجودی تا ثبتِ فروش کم نشده است
     val unposted = OrdersLive.unposted.value
     if (unposted.isNotEmpty()) {
       Spacer(Modifier.height(8.dp))
@@ -134,6 +134,17 @@ fun OrdersScreen(store: ShopStore, snackbar: SnackbarHostState, onLeave: () -> U
         body = unposted.take(3).joinToString("\n") { it.message },
         action = "دوباره ثبت کن",
         onAction = { scope.launch { OrdersLive.reconcile(context, store, force = true) } },
+      )
+    }
+    //  فروش ثبت شد ولی کالا در دفتر کم بود (INV-19: ثبت‌شده رد نمی‌شود) — ورودِ انبار را درست کنید
+    val shortfalls = OrdersLive.shortfalls.value
+    if (shortfalls.isNotEmpty()) {
+      Spacer(Modifier.height(8.dp))
+      FulfillNotice(
+        title = "موجودیِ ${shortfalls.size} کالا پس از تحویل منفی شد — ورودِ انبار را درست کنید",
+        body = shortfalls.take(3).joinToString("\n") { it.message },
+        action = null,
+        onAction = {},
       )
     }
     Spacer(Modifier.height(10.dp))
@@ -356,11 +367,19 @@ private fun OrderDetailSheet(
       .onFailure { if (order == null) { error = it.userMessage } }
   }
 
-  /** فروشِ تحویلِ سفارش در همین دفتر (یکتا با شناسهٔ سفارش) — نتیجه همیشه گفته می‌شود */
+  /**
+   *  فروشِ تحویل (یا لغوِ آن برای سفارشِ برگشته) در همین دفتر — همیشه پس از پرسیدن از سرور
+   *  (`OrdersLive.postById`)؛ یکتا با شناسهٔ سفارش. نتیجه همیشه گفته می‌شود.
+   */
   suspend fun postSale(o: OrderDto) {
-    when (val r = OrdersLive.post(context, store, o)) {
-      OrdersLive.Posted.Saved -> snackbar.showSnackbar("فروشِ سفارش #${o.orderNo} ثبت شد؛ موجودی کم شد و همگام می‌شود")
+    val back = o.status in OrderFulfillment.BACK_IN_SHOP
+    when (val r = OrdersLive.postById(context, store, o.id)) {
+      OrdersLive.Posted.Saved -> snackbar.showSnackbar(
+        if (back) "فروشِ سفارش #${o.orderNo} لغو شد؛ کالا به موجودی برگشت و همگام می‌شود"
+        else "فروشِ سفارش #${o.orderNo} ثبت شد؛ موجودی کم شد و همگام می‌شود"
+      )
       OrdersLive.Posted.Already -> Unit
+      is OrdersLive.Posted.Skipped -> snackbar.showSnackbar(r.message)
       is OrdersLive.Posted.Failed -> snackbar.showSnackbar(r.message)
     }
   }
@@ -370,7 +389,7 @@ private fun OrderDetailSheet(
     if (busy) return
     //  تحویل ⇒ فروش در همین دفتر: پیش از فرستادنِ گذار سنجیده می‌شود (سیاستِ موجودیِ صندوق)؛
     //  کمبود ⇒ گذار نمی‌رود و پیام روشن است، نه سفارشِ «تحویل‌شده» بی فروش
-    if (to in OrderFulfillment.HANDED_OVER && OrderFulfillment.saleOf(ledger, o.id) == null && !o.isTest) {
+    if (to in OrderFulfillment.HANDED_OVER && OrdersLive.canRecord(cfg, o) && OrderFulfillment.saleOf(ledger, o.id) == null && !o.isTest) {
       val dry = OrderFulfillment.fulfill(
         ledger, o, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(),
         blockExpired = ir.vil3ntec.tohid.data.ShopPolicy.blockExpired(context),
@@ -390,7 +409,7 @@ private fun OrderDetailSheet(
           act = null
           onChanged()
           scope.launch { snackbar.showSnackbar("سفارش #${it.orderNo}: ${OrderText.status(it.status)}") }
-          if (it.status in OrderFulfillment.HANDED_OVER) postSale(it)
+          if (it.status in OrderFulfillment.HANDED_OVER || it.status in OrderFulfillment.BACK_IN_SHOP) postSale(it)
         }
         .onFailure { f ->
           if (f.code == "status_changed") {
@@ -398,8 +417,8 @@ private fun OrderDetailSheet(
             scope.launch { snackbar.showSnackbar("وضعیتِ این سفارش همین حالا جای دیگری عوض شد؛ وضعیتِ تازه را ببینید.") }
             repo.get(o.id).onSuccess {
               order = it
-              //  دستگاهِ دیگر یا پیک تحویل داد ⇒ فروش (یکتا) همین‌جا هم ثبت می‌شود
-              if (OrderFulfillment.needsSale(ledger, it)) postSale(it)
+              //  دستگاهِ دیگر یا پیک تحویل داد ⇒ فقط اگر سرور هم بگوید لازم است (postSale می‌پرسد)
+              if (OrderFulfillment.needsSale(ledger, it, OrdersLive.handoverSince()) || OrderFulfillment.needsReverse(ledger, it)) postSale(it)
             }
             onChanged()
           } else if (act != null) {
@@ -444,13 +463,24 @@ private fun OrderDetailSheet(
           "فروشِ تحویل: فاکتور #${sold.invoiceLabel() ?: "—"} — برگشتِ کالا با «مرجوعیِ» همین فاکتور در «فروش‌ها»",
           style = MaterialTheme.typography.bodySmall, color = c.muted,
         )
-      } else if (OrderFulfillment.needsSale(ledger, o)) {
+      } else if (OrderFulfillment.needsSale(ledger, o, OrdersLive.handoverSince())) {
         Spacer(Modifier.height(8.dp))
+        val able = cfg.permissions.manage && OrdersLive.canRecord(cfg, o)
         FulfillNotice(
           title = "فروشِ این سفارش هنوز در دفترِ دکان نیست — موجودی کم نشده",
           body = OrdersLive.unposted.value.firstOrNull { it.orderId == o.id }?.message
-            ?: "کالا از دکان بیرون رفته؛ فروش را با قیمت‌های همین سفارش ثبت کنید.",
-          action = if (cfg.permissions.manage) "ثبتِ فروش" else null,
+            ?: if (able) "کالا از دکان بیرون رفته؛ فروش را با قیمت‌های همین سفارش ثبت کنید." else OrdersLive.SKIPPED_NOTE,
+          action = if (able) "ثبتِ فروش" else null,
+          onAction = { if (!busy) scope.launch { busy = true; postSale(o); busy = false } },
+        )
+      }
+      if (sold != null && OrderFulfillment.needsReverse(ledger, o)) {
+        Spacer(Modifier.height(8.dp))
+        val able = cfg.permissions.manage && OrdersLive.canReverse(cfg)
+        FulfillNotice(
+          title = "کالای این سفارش به دکان برگشته ولی فروشش هنوز لغو نشده",
+          body = if (able) "لغوِ همان فاکتور موجودی را برمی‌گرداند؛ پولی از دخل جابه‌جا نمی‌شود." else OrdersLive.SKIPPED_NOTE,
+          action = if (able) "لغوِ فروشِ تحویل" else null,
           onAction = { if (!busy) scope.launch { busy = true; postSale(o); busy = false } },
         )
       }

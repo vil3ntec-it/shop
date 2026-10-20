@@ -53,11 +53,12 @@ object CashShift {
     s.payments?.any { it.kind == "cash" && it.custody == null && it.amountMinor > 0 } == true
 
   /**
-   *  مرجوعیِ سرور برای سفارشِ اینترنتی. ردیف‌های پیش از نشانِ `channel` با شناسهٔ
-   *  ثابتِ سرور (`w-…`، هرگز ULID ِ دستگاه) و فاکتورِ اینترنتی شناخته می‌شوند.
+   *  مرجوعیِ فاکتورِ اینترنتیِ بیرونِ دخل ([isOnline]) — هیچ‌وقت از دخل نیست: نقدِ پیک هرگز به
+   *  دخل نیامده بود و پولِ آنلاین از راهِ دفترِ بازپرداختِ سفارش برمی‌گردد. (پیش‌تر مرجوعیِ
+   *  دستیِ همین دستگاه برای این فاکتورها از دخل کم می‌شد و صندوق اضافه نشان می‌داد.)
    */
   fun isOnlineReturn(r: SaleReturn, onlineSales: Set<String>): Boolean =
-    r.channel == ONLINE || (r.saleId in onlineSales && r.id.startsWith("w-"))
+    r.channel == ONLINE || r.saleId in onlineSales
 
   sealed interface Result {
     data class Ok(val data: ShopData) : Result
