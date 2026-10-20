@@ -320,13 +320,39 @@ class AuthRepository(
     )
   }
 
-  suspend fun loginWithGoogle(idToken: String): ApiResult<SessionDto> = result {
+  /**
+   *  ورود با گوگل.
+   *
+   *  ⛔ اگر این ایمیل از قبل حسابی دارد که گوگلش وصل نیست، سرور ۴۰۹
+   *  `google_link_required` می‌دهد (بندِ ۲۹.۲ قاعدهٔ ۵): باید روشِ قبلیِ
+   *  همان حساب ثابت شود — `password` یا کدی که `requestGoogleLinkCode` به
+   *  ایمیلِ حساب می‌فرستد (`code`). بی این‌ها همان ورودِ همیشگی است.
+   */
+  suspend fun loginWithGoogle(
+    idToken: String,
+    password: String? = null,
+    code: String? = null,
+  ): ApiResult<SessionDto> = result {
     keep(
       api.postPublic(
         ApiEndpoints.Auth.GOOGLE,
-        buildJsonObject { put("idToken", JsonPrimitive(idToken)); putApp() },
+        buildJsonObject {
+          put("idToken", JsonPrimitive(idToken))
+          if (!password.isNullOrEmpty()) put("password", JsonPrimitive(password))
+          if (!code.isNullOrBlank()) put("code", JsonPrimitive(code.trim()))
+          putApp()
+        },
       )
     )
+  }
+
+  /** کدِ اثبات برای وصل کردنِ گوگل — به ایمیلِ خودِ حساب می‌رود. */
+  suspend fun requestGoogleLinkCode(idToken: String): ApiResult<Unit> = result {
+    api.postPublic(
+      ApiEndpoints.Auth.GOOGLE_LINK_CODE,
+      buildJsonObject { put("idToken", JsonPrimitive(idToken)); putApp() },
+    )
+    Unit
   }
 
   /* ------------------------------ کد یک‌بارمصرف ------------------------------ */

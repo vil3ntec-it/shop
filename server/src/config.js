@@ -157,6 +157,9 @@ const config = {
     //  ‎invalid_client‎ می‌افتد.
     desktopClientId: (process.env.GOOGLE_DESKTOP_CLIENT_ID || '').trim(),
     certsUrl:  process.env.GOOGLE_CERTS_URL || 'https://www.googleapis.com/oauth2/v3/certs',
+    //  ⛔ بندِ ۲۹.۲ قاعدهٔ ۵: گوگل فقط با اثباتِ روشِ قبلیِ حساب وصل می‌شود.
+    //  `1` فقط کلیدِ بازگشتِ اضطراری به وصلِ خودکار با ایمیلِ تأییدشده است.
+    legacyEmailLink: bool(process.env.GOOGLE_EMAIL_AUTOLINK, false),
   },
 
   /*
@@ -211,6 +214,10 @@ const config = {
     windowMs:     num(process.env.RATE_WINDOW_MS, 15 * 60 * 1000),
     authMax:      num(process.env.RATE_AUTH_MAX, 10),
     otpMax:       num(process.env.RATE_OTP_MAX, 5),
+    //  کدِ وصلِ گوگل (`/auth/google/link-code`) به‌ازای «ایمیلِ توکن + IP».
+    //  کلیدِ `otpMax` از بدنه می‌آید و این مسیر ایمیلی در بدنه ندارد، پس
+    //  تا امروز فقط به‌ازای IP شمرده می‌شد.
+    linkCodeMax:  num(process.env.RATE_LINK_CODE_MAX, 3),
     //  ⛔ F0-16 — `register/start` و `password/forgot` به‌ازای هر **IP**. سقفِ
     //  `otpMax` به‌ازای هر ایمیل است، پس امتحانِ هزار ایمیلِ گوناگون از یک
     //  جا هیچ سقفی نداشت. سی در ربع ساعت برای یک کافی‌نت هم بس است.
