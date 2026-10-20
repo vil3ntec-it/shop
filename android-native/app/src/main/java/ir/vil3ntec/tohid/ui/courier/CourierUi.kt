@@ -101,11 +101,16 @@ import kotlinx.coroutines.delay
  *  (design-ref/vill3n/courier-ref.jpg)، رنگ فقط از سیستمِ رنگِ VILL3N
  *  (`PhoneV3.colors` و `PhoneV3.ui`): زمینهٔ روشن، کارتِ سفید با مرزِ دیدنی و سایهٔ
  *  سبک، سطحِ تیرهٔ سرمه‌ای، دکمهٔ اصلیِ سبزآبی. هر حرکت با `Motion.enabled` خاموش.
+ *
+ *  ⚠️ همه `Courier*` و درونِ همین بسته‌اند، عمداً: کیتِ مشترکِ گوشیِ نسخهٔ ۳
+ *  (V3Scaffold، V3ListRow، V3Sheet، حرکت‌ها) جدا ساخته می‌شود؛ وقتی رسید، این
+ *  تکه‌های عمومی (برگه، دکمه، کادر، زبانه) یکی‌یکی جایشان را به کیت می‌دهند و
+ *  فقط تکه‌های خاصِ پیک (کارتِ مأموریت، نوارِ پله‌ها، پیگیری) می‌مانند.
  */
 
-internal val PillShape = RoundedCornerShape(percent = 50)
-internal val CardShape = RoundedCornerShape(20.dp)
-internal val GroupShape = RoundedCornerShape(16.dp)
+internal val CourierPillShape = RoundedCornerShape(percent = 50)
+internal val CourierCardShape = RoundedCornerShape(20.dp)
+internal val CourierGroupShape = RoundedCornerShape(16.dp)
 private val FieldShape = RoundedCornerShape(14.dp)
 private val SheetShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
 
@@ -114,7 +119,7 @@ internal fun motionMs(ms: Int): Int = if (Motion.enabled) ms else 0
 
 /** متنِ برنامه با همان قلمِ فارسیِ تم، فقط اندازه و وزن عوض می‌شود */
 @Composable
-internal fun v3Style(size: TextUnit, weight: FontWeight = FontWeight.Normal): TextStyle =
+internal fun courierText(size: TextUnit, weight: FontWeight = FontWeight.Normal): TextStyle =
   MaterialTheme.typography.bodyLarge.copy(
     fontSize = size,
     fontWeight = weight,
@@ -123,14 +128,14 @@ internal fun v3Style(size: TextUnit, weight: FontWeight = FontWeight.Normal): Te
   )
 
 /** کارت: رنگ + مرزِ دیدنی + سایهٔ سبک (سیستمِ رنگ §۶: سایه هرگز جای مرز نیست) */
-internal fun Modifier.v3Card(p: PhoneV3Colors, shape: Shape = CardShape, elevation: Dp = 4.dp): Modifier =
+internal fun Modifier.courierCard(p: PhoneV3Colors, shape: Shape = CourierCardShape, elevation: Dp = 4.dp): Modifier =
   this
     .shadow(elevation, shape, clip = false, ambientColor = p.black.copy(alpha = 0.08f), spotColor = p.black.copy(alpha = 0.08f))
     .background(p.card, shape)
     .border(1.dp, p.hairline, shape)
 
 /** سطحِ تیرهٔ سرمه‌ای (کارتِ «مأموریتِ جاری»، برگهٔ پیگیری) */
-internal fun Modifier.v3Dark(p: PhoneV3Colors, shape: Shape = CardShape): Modifier =
+internal fun Modifier.courierDark(p: PhoneV3Colors, shape: Shape = CourierCardShape): Modifier =
   this.background(p.black, shape).border(1.dp, p.blackRaised, shape)
 
 /** فشار = کمی کوچک شدن (بخشِ G) */
@@ -145,17 +150,17 @@ private fun pressScale(interaction: MutableInteractionSource, pressed: Float = 0
   return scale
 }
 
-internal enum class ButtonTone { BRAND, NEGATIVE }
+internal enum class CourierTone { BRAND, NEGATIVE }
 
 /** دکمهٔ اصلیِ هر پله — قرصِ سبزآبی، ۵۶dp؛ متن با پله عوض می‌شود و نرم می‌لغزد */
 @Composable
-internal fun V3PrimaryButton(
+internal fun CourierPrimaryButton(
   text: String,
   onClick: () -> Unit,
   modifier: Modifier = Modifier,
   enabled: Boolean = true,
   busy: Boolean = false,
-  tone: ButtonTone = ButtonTone.BRAND,
+  tone: CourierTone = CourierTone.BRAND,
   icon: ImageVector? = null,
   onDark: Boolean = false,
 ) {
@@ -165,7 +170,7 @@ internal fun V3PrimaryButton(
   val bg by animateColorAsState(
     when {
       !enabled -> ui.disabledBg
-      tone == ButtonTone.NEGATIVE -> ui.danger
+      tone == CourierTone.NEGATIVE -> ui.danger
       onDark -> ui.primaryOnDark
       else -> ui.primary
     },
@@ -173,7 +178,7 @@ internal fun V3PrimaryButton(
   )
   val fg = when {
     !enabled -> ui.disabledFg
-    tone == ButtonTone.NEGATIVE -> ui.onDanger
+    tone == CourierTone.NEGATIVE -> ui.onDanger
     onDark -> ui.onPrimaryOnDark
     else -> ui.onPrimary
   }
@@ -181,7 +186,7 @@ internal fun V3PrimaryButton(
     modifier
       .height(56.dp)
       .graphicsLayer { scaleX = scale; scaleY = scale }
-      .clip(PillShape)
+      .clip(CourierPillShape)
       .background(bg)
       .clickable(
         interactionSource = interaction,
@@ -211,7 +216,7 @@ internal fun V3PrimaryButton(
             Icon(icon, contentDescription = null, tint = fg, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(8.dp))
           }
-          Text(label, style = v3Style(17.sp, FontWeight.Bold), color = fg, maxLines = 1, overflow = TextOverflow.Ellipsis)
+          Text(label, style = courierText(17.sp, FontWeight.Bold), color = fg, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
       }
     }
@@ -220,12 +225,12 @@ internal fun V3PrimaryButton(
 
 /** دکمهٔ دوم — «خنثی» ِ سیستمِ رنگ (روی سرمه‌ای: سطحِ برآمده) */
 @Composable
-internal fun V3SecondaryButton(
+internal fun CourierSecondaryButton(
   text: String,
   onClick: () -> Unit,
   modifier: Modifier = Modifier,
   icon: ImageVector? = null,
-  tone: ButtonTone = ButtonTone.BRAND,
+  tone: CourierTone = CourierTone.BRAND,
   enabled: Boolean = true,
   onDark: Boolean = false,
 ) {
@@ -239,7 +244,7 @@ internal fun V3SecondaryButton(
   }
   val fg = when {
     !enabled -> ui.disabledFg
-    tone == ButtonTone.NEGATIVE -> if (onDark) PhoneV3UiDarkNegative else ui.cancelled.fg
+    tone == CourierTone.NEGATIVE -> if (onDark) PhoneV3UiDarkNegative else ui.cancelled.fg
     onDark -> p.onBlack
     else -> ui.neutralFg
   }
@@ -247,7 +252,7 @@ internal fun V3SecondaryButton(
     modifier
       .height(52.dp)
       .graphicsLayer { scaleX = scale; scaleY = scale }
-      .clip(PillShape)
+      .clip(CourierPillShape)
       .background(bg)
       .clickable(
         interactionSource = interaction,
@@ -264,7 +269,7 @@ internal fun V3SecondaryButton(
         Icon(icon, contentDescription = null, tint = fg, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(8.dp))
       }
-      Text(text, style = v3Style(15.sp, FontWeight.SemiBold), color = fg, maxLines = 1, overflow = TextOverflow.Ellipsis)
+      Text(text, style = courierText(15.sp, FontWeight.SemiBold), color = fg, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
   }
 }
@@ -275,7 +280,7 @@ private val PhoneV3UiDarkNegative: Color
 
 /** دکمهٔ گرد با آیکنِ خطی (مثلِ زنگِ مرجع) — ۴۴dp، با چرخش هنگامِ کار و نقطهٔ تازه */
 @Composable
-internal fun RoundIconButton(
+internal fun CourierRoundButton(
   icon: ImageVector,
   contentDescription: String,
   onClick: () -> Unit,
@@ -300,7 +305,7 @@ internal fun RoundIconButton(
       Modifier
         .fillMaxSize()
         .graphicsLayer { scaleX = scale; scaleY = scale }
-        .v3Card(p, CircleShape, elevation = 2.dp)
+        .courierCard(p, CircleShape, elevation = 2.dp)
         .clip(CircleShape)
         .clickable(
           interactionSource = interaction,
@@ -328,42 +333,42 @@ internal fun RoundIconButton(
 
 /** برچسبِ وضعیت: متن + رنگ + نقطه روی زمینهٔ کم‌رنگِ همان وضعیت (§۸) */
 @Composable
-internal fun TonePill(text: String, tone: PhoneV3Tone, modifier: Modifier = Modifier) {
+internal fun CourierPill(text: String, tone: PhoneV3Tone, modifier: Modifier = Modifier) {
   val fg by animateColorAsState(tone.fg, animationSpec = tween(motionMs(260)), label = "pillFg")
   val bg by animateColorAsState(tone.bg, animationSpec = tween(motionMs(260)), label = "pillBg")
   Row(
-    modifier.background(bg, PillShape).padding(horizontal = 10.dp, vertical = 4.dp),
+    modifier.background(bg, CourierPillShape).padding(horizontal = 10.dp, vertical = 4.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
     Box(Modifier.size(7.dp).background(fg, CircleShape))
     Spacer(Modifier.width(6.dp))
     Crossfade(targetState = text, animationSpec = tween(motionMs(220)), label = "pillText") { t ->
-      Text(t, style = v3Style(12.sp, FontWeight.SemiBold), color = fg, maxLines = 1)
+      Text(t, style = courierText(12.sp, FontWeight.SemiBold), color = fg, maxLines = 1)
     }
   }
 }
 
 /** برچسبِ اطلاعات با آیکنِ خطی (نقد، کدِ تحویل، …) روی سطحِ درونی */
 @Composable
-internal fun InfoChip(icon: ImageVector, text: String, positive: Boolean = false) {
+internal fun CourierInfoChip(icon: ImageVector, text: String, positive: Boolean = false) {
   val p = PhoneV3.colors
   val ui = PhoneV3.ui
   val fg = if (positive) ui.success.fg else p.ink
   Row(
-    Modifier.background(if (positive) ui.success.bg else p.tile, PillShape)
-      .border(1.dp, if (positive) ui.success.bg else p.hairline, PillShape)
+    Modifier.background(if (positive) ui.success.bg else p.tile, CourierPillShape)
+      .border(1.dp, if (positive) ui.success.bg else p.hairline, CourierPillShape)
       .padding(horizontal = 10.dp, vertical = 5.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
     Icon(icon, contentDescription = null, tint = if (positive) ui.success.fg else p.icon, modifier = Modifier.size(16.dp))
     Spacer(Modifier.width(6.dp))
-    Text(text, style = v3Style(13.sp, FontWeight.Medium), color = fg, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    Text(text, style = courierText(13.sp, FontWeight.Medium), color = fg, maxLines = 1, overflow = TextOverflow.Ellipsis)
   }
 }
 
 /** یادداشتِ هشدار (دکان پس خواسته، …) — متن و رنگ و آیکن، نه فقط رنگ */
 @Composable
-internal fun WarnNote(text: String) {
+internal fun CourierWarnNote(text: String) {
   val ui = PhoneV3.ui
   Row(
     Modifier.fillMaxWidth().background(ui.cancelled.bg, RoundedCornerShape(14.dp)).padding(12.dp),
@@ -371,7 +376,7 @@ internal fun WarnNote(text: String) {
   ) {
     Icon(Icons.Outlined.Info, contentDescription = null, tint = ui.cancelled.fg, modifier = Modifier.size(20.dp))
     Spacer(Modifier.width(10.dp))
-    Text(text, style = v3Style(14.sp, FontWeight.Medium), color = ui.cancelled.fg)
+    Text(text, style = courierText(14.sp, FontWeight.Medium), color = ui.cancelled.fg)
   }
 }
 
@@ -380,7 +385,7 @@ internal fun WarnNote(text: String) {
  *  مثلِ «Tracking / Shipping Detail» ِ مرجع) قرصِ سبزآبیِ روشن.
  */
 @Composable
-internal fun TwoTabs(
+internal fun CourierTabs(
   first: Pair<String, Int?>,
   second: Pair<String, Int?>,
   firstSelected: Boolean,
@@ -390,7 +395,7 @@ internal fun TwoTabs(
 ) {
   val p = PhoneV3.colors
   val ui = PhoneV3.ui
-  val track = if (onDark) Modifier.background(p.blackRaised, PillShape) else Modifier.v3Card(p, PillShape, elevation = 2.dp)
+  val track = if (onDark) Modifier.background(p.blackRaised, CourierPillShape) else Modifier.courierCard(p, CourierPillShape, elevation = 2.dp)
   BoxWithConstraints(modifier.fillMaxWidth().height(48.dp).then(track).padding(4.dp)) {
     val half = maxWidth / 2
     val x by animateDpAsState(
@@ -398,7 +403,7 @@ internal fun TwoTabs(
       animationSpec = if (Motion.enabled) spring(dampingRatio = 0.8f, stiffness = 500f) else snap(),
       label = "tabX",
     )
-    Box(Modifier.offset(x = x).width(half).fillMaxHeight().background(if (onDark) ui.primaryOnDark else ui.primary, PillShape))
+    Box(Modifier.offset(x = x).width(half).fillMaxHeight().background(if (onDark) ui.primaryOnDark else ui.primary, CourierPillShape))
     Row(Modifier.fillMaxSize()) {
       listOf(first to true, second to false).forEach { (tab, isFirst) ->
         val selected = isFirst == firstSelected
@@ -406,15 +411,15 @@ internal fun TwoTabs(
         val off = if (onDark) p.onBlackMuted else p.ink
         val fg by animateColorAsState(if (selected) on else off, tween(motionMs(200)), label = "tabFg")
         Row(
-          Modifier.weight(1f).fillMaxHeight().clip(PillShape)
+          Modifier.weight(1f).fillMaxHeight().clip(CourierPillShape)
             .clickable(role = Role.Tab) { onSelect(isFirst) },
           horizontalArrangement = Arrangement.Center,
           verticalAlignment = Alignment.CenterVertically,
         ) {
-          Text(tab.first, style = v3Style(14.sp, FontWeight.Bold), color = fg, maxLines = 1)
+          Text(tab.first, style = courierText(14.sp, FontWeight.Bold), color = fg, maxLines = 1)
           tab.second?.let {
             Spacer(Modifier.width(6.dp))
-            Text("$it", style = v3Style(13.sp, FontWeight.Medium), color = fg.copy(alpha = 0.7f))
+            Text("$it", style = courierText(13.sp, FontWeight.Medium), color = fg.copy(alpha = 0.7f))
           }
         }
       }
@@ -424,7 +429,7 @@ internal fun TwoTabs(
 
 /** کادرِ ورودی: برچسب بالا، سطحِ درونی با مرزِ دیدنی */
 @Composable
-internal fun V3Field(
+internal fun CourierField(
   value: String,
   onValueChange: (String) -> Unit,
   label: String,
@@ -437,13 +442,13 @@ internal fun V3Field(
   big: Boolean = false,
 ) {
   val p = PhoneV3.colors
-  val style = v3Style(if (big) 24.sp else 17.sp, if (big) FontWeight.Bold else FontWeight.Medium).copy(
+  val style = courierText(if (big) 24.sp else 17.sp, if (big) FontWeight.Bold else FontWeight.Medium).copy(
     color = p.ink,
     textDirection = if (ltr) TextDirection.Ltr else TextDirection.Content,
   )
   Column(modifier.fillMaxWidth()) {
     if (label.isNotEmpty()) {
-      Text(label, style = v3Style(13.sp, FontWeight.Medium), color = p.inkMuted, modifier = Modifier.padding(start = 4.dp, bottom = 6.dp))
+      Text(label, style = courierText(13.sp, FontWeight.Medium), color = p.inkMuted, modifier = Modifier.padding(start = 4.dp, bottom = 6.dp))
     }
     BasicTextField(
       value = value,
@@ -473,9 +478,9 @@ internal fun V3Field(
 
 /** کادرِ جست‌وجوی قرصی (مثلِ «Resi number» ِ مرجع) با ذره‌بینِ خطی */
 @Composable
-internal fun SearchPill(value: String, onValueChange: (String) -> Unit, placeholder: String, icon: ImageVector) {
+internal fun CourierSearch(value: String, onValueChange: (String) -> Unit, placeholder: String, icon: ImageVector) {
   val p = PhoneV3.colors
-  val style = v3Style(15.sp, FontWeight.Medium).copy(color = p.ink)
+  val style = courierText(15.sp, FontWeight.Medium).copy(color = p.ink)
   BasicTextField(
     value = value,
     onValueChange = onValueChange,
@@ -486,7 +491,7 @@ internal fun SearchPill(value: String, onValueChange: (String) -> Unit, placehol
     modifier = Modifier.fillMaxWidth(),
     decorationBox = { inner ->
       Row(
-        Modifier.fillMaxWidth().height(50.dp).background(p.card, PillShape).border(1.dp, p.hairline, PillShape)
+        Modifier.fillMaxWidth().height(50.dp).background(p.card, CourierPillShape).border(1.dp, p.hairline, CourierPillShape)
           .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
       ) {
@@ -503,19 +508,19 @@ internal fun SearchPill(value: String, onValueChange: (String) -> Unit, placehol
 
 /** گروهِ انتخابِ یکی از چند (دلیل‌ها) — تیکِ برند کنارِ انتخاب */
 @Composable
-internal fun ChoiceGroup(options: List<Pair<String, String>>, selected: String, onSelect: (String) -> Unit) {
+internal fun CourierChoices(options: List<Pair<String, String>>, selected: String, onSelect: (String) -> Unit) {
   val p = PhoneV3.colors
   val ui = PhoneV3.ui
-  Column(Modifier.fillMaxWidth().background(p.tile, GroupShape).border(1.dp, p.hairline, GroupShape)) {
+  Column(Modifier.fillMaxWidth().background(p.tile, CourierGroupShape).border(1.dp, p.hairline, CourierGroupShape)) {
     options.forEachIndexed { i, (id, label) ->
       val on = id == selected
       Row(
-        Modifier.fillMaxWidth().heightIn(min = 52.dp).clip(GroupShape)
+        Modifier.fillMaxWidth().heightIn(min = 52.dp).clip(CourierGroupShape)
           .clickable(role = Role.RadioButton) { onSelect(id) }
           .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
       ) {
-        Text(label, style = v3Style(15.sp, if (on) FontWeight.Bold else FontWeight.Normal), color = p.ink, modifier = Modifier.weight(1f))
+        Text(label, style = courierText(15.sp, if (on) FontWeight.Bold else FontWeight.Normal), color = p.ink, modifier = Modifier.weight(1f))
         val fill by animateColorAsState(if (on) ui.primary else p.card, tween(motionMs(180)), label = "choice")
         Box(
           Modifier.size(24.dp).background(fill, CircleShape).border(1.dp, if (on) ui.primary else p.hairline, CircleShape),
@@ -534,7 +539,7 @@ internal fun ChoiceGroup(options: List<Pair<String, String>>, selected: String, 
  *  ورود = بالا آمدن با فنر و تیره شدنِ زمینه؛ زدنِ زمینه یا «برگشت» = بستن.
  */
 @Composable
-internal fun V3Sheet(onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
+internal fun CourierSheet(onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
   val p = PhoneV3.colors
   androidx.activity.compose.BackHandler(onBack = onDismiss)
   var on by remember { mutableStateOf(false) }
@@ -564,7 +569,7 @@ internal fun V3Sheet(onDismiss: () -> Unit, content: @Composable ColumnScope.() 
           .verticalScroll(rememberScrollState())
           .padding(start = 20.dp, end = 20.dp, top = 10.dp, bottom = 20.dp),
       ) {
-        Box(Modifier.align(Alignment.CenterHorizontally).width(40.dp).height(4.dp).background(p.hairline, PillShape))
+        Box(Modifier.align(Alignment.CenterHorizontally).width(40.dp).height(4.dp).background(p.hairline, CourierPillShape))
         Spacer(Modifier.height(16.dp))
         content()
       }
@@ -574,26 +579,26 @@ internal fun V3Sheet(onDismiss: () -> Unit, content: @Composable ColumnScope.() 
 
 /** عنوانِ برگه */
 @Composable
-internal fun SheetTitle(text: String, sub: String? = null) {
+internal fun CourierSheetTitle(text: String, sub: String? = null) {
   val p = PhoneV3.colors
-  Text(text, style = v3Style(22.sp, FontWeight.Bold), color = p.ink)
+  Text(text, style = courierText(22.sp, FontWeight.Bold), color = p.ink)
   if (!sub.isNullOrBlank()) {
     Spacer(Modifier.height(4.dp))
-    Text(sub, style = v3Style(14.sp), color = p.inkMuted)
+    Text(sub, style = courierText(14.sp), color = p.inkMuted)
   }
 }
 
 /** سرخطِ بخش (مثلِ «Current Tracking» ِ مرجع) با پیوندِ اختیاریِ «همه» */
 @Composable
-internal fun SectionHead(title: String, action: String? = null, onAction: (() -> Unit)? = null) {
+internal fun CourierSectionHead(title: String, action: String? = null, onAction: (() -> Unit)? = null) {
   val p = PhoneV3.colors
   val ui = PhoneV3.ui
   Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-    Text(title, style = v3Style(17.sp, FontWeight.Bold), color = p.ink, modifier = Modifier.weight(1f))
+    Text(title, style = courierText(17.sp, FontWeight.Bold), color = p.ink, modifier = Modifier.weight(1f))
     if (action != null && onAction != null) {
       Text(
-        action, style = v3Style(14.sp, FontWeight.SemiBold), color = ui.iconActive,
-        modifier = Modifier.clip(PillShape).clickable(role = Role.Button, onClick = onAction).padding(horizontal = 8.dp, vertical = 4.dp),
+        action, style = courierText(14.sp, FontWeight.SemiBold), color = ui.iconActive,
+        modifier = Modifier.clip(CourierPillShape).clickable(role = Role.Button, onClick = onAction).padding(horizontal = 8.dp, vertical = 4.dp),
       )
     }
   }
@@ -601,7 +606,7 @@ internal fun SectionHead(title: String, action: String? = null, onAction: (() ->
 
 /** ورودِ پلکانیِ ردیفِ فهرست (بخشِ G): کم‌رنگ ⇐ پُررنگ و کمی بالا آمدن، فقط بارِ اول */
 @Composable
-internal fun rememberAppear(key: String, index: Int, seen: MutableSet<String>): Animatable<Float, AnimationVector1D> {
+internal fun rememberCourierAppear(key: String, index: Int, seen: MutableSet<String>): Animatable<Float, AnimationVector1D> {
   val first = key !in seen
   val appear = remember(key) { Animatable(if (first && Motion.enabled) 0f else 1f) }
   LaunchedEffect(key) {
@@ -616,11 +621,11 @@ internal fun rememberAppear(key: String, index: Int, seen: MutableSet<String>): 
 
 /** عددِ وسطِ برگه (مبلغِ نقد) — بزرگ و پُررنگ */
 @Composable
-internal fun BigAmount(label: String, amount: String) {
+internal fun CourierBigAmount(label: String, amount: String) {
   val p = PhoneV3.colors
   Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-    Text(label, style = v3Style(14.sp), color = p.inkMuted, textAlign = TextAlign.Center)
+    Text(label, style = courierText(14.sp), color = p.inkMuted, textAlign = TextAlign.Center)
     Spacer(Modifier.height(2.dp))
-    Text(amount, style = v3Style(34.sp, FontWeight.Bold), color = p.ink, textAlign = TextAlign.Center, maxLines = 1)
+    Text(amount, style = courierText(34.sp, FontWeight.Bold), color = p.ink, textAlign = TextAlign.Center, maxLines = 1)
   }
 }

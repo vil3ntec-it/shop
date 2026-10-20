@@ -69,38 +69,38 @@ internal fun CourierJoinScreen(
     Modifier.fillMaxSize().background(p.bg).statusBarsPadding().navigationBarsPadding().imePadding(),
   ) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-      RoundIconButton(Icons.AutoMirrored.Outlined.ArrowBack, "بازگشت", onBack)
+      CourierRoundButton(Icons.AutoMirrored.Outlined.ArrowBack, "بازگشت", onBack)
     }
     Column(
       Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)
         .graphicsLayer { alpha = rise.value; translationY = (1f - rise.value) * 16.dp.toPx() },
     ) {
       Spacer(Modifier.height(8.dp))
-      Box(Modifier.size(72.dp).v3Card(p, CircleShape, elevation = 8.dp), contentAlignment = Alignment.Center) {
+      Box(Modifier.size(72.dp).courierCard(p, CircleShape, elevation = 8.dp), contentAlignment = Alignment.Center) {
         Icon(Icons.Outlined.LocalShipping, contentDescription = null, tint = p.icon, modifier = Modifier.size(32.dp))
       }
       Spacer(Modifier.height(18.dp))
-      Text("ورودِ پیک", style = v3Style(30.sp, FontWeight.Bold), color = p.ink)
+      Text("ورودِ پیک", style = courierText(30.sp, FontWeight.Bold), color = p.ink)
       Spacer(Modifier.height(6.dp))
       Text(
         "کدِ دعوتی را که صاحب دکان به شما داده بزنید. ایمیل و رمز لازم نیست.",
-        style = v3Style(15.sp), color = p.inkMuted,
+        style = courierText(15.sp), color = p.inkMuted,
       )
       Spacer(Modifier.height(20.dp))
-      Column(Modifier.fillMaxWidth().v3Card(p).padding(18.dp)) {
-        V3Field(name, onName, "نام شما", placeholder = "مثلاً کریم")
+      Column(Modifier.fillMaxWidth().courierCard(p).padding(18.dp)) {
+        CourierField(name, onName, "نام شما", placeholder = "مثلاً کریم")
         Spacer(Modifier.height(14.dp))
-        V3Field(
+        CourierField(
           code, onCode, "کدِ دعوت", placeholder = "SHG-XXXX-XXXX-XXXX", ltr = true,
           capitalization = KeyboardCapitalization.Characters,
         )
         if (!error.isNullOrBlank()) {
           Spacer(Modifier.height(10.dp))
-          Text(error, style = v3Style(14.sp, FontWeight.Medium), color = p.negative)
+          Text(error, style = courierText(14.sp, FontWeight.Medium), color = p.negative)
         }
       }
       Spacer(Modifier.height(16.dp))
-      Column(Modifier.fillMaxWidth().v3Card(p, GroupShape, elevation = 6.dp).padding(horizontal = 16.dp, vertical = 6.dp)) {
+      Column(Modifier.fillMaxWidth().courierCard(p, CourierGroupShape, elevation = 6.dp).padding(horizontal = 16.dp, vertical = 6.dp)) {
         JoinPoint(Icons.Outlined.Place, "فقط مأموریت‌های خودتان، با نشانه و نشانی", divider = true)
         JoinPoint(Icons.Outlined.CloudOff, "بی اینترنت هم ثبت می‌شود و بعد خودش می‌رود", divider = true)
         JoinPoint(Icons.Outlined.Payments, "نقدِ هر سفارش جدا ثبت می‌شود", divider = false)
@@ -108,7 +108,7 @@ internal fun CourierJoinScreen(
       Spacer(Modifier.height(20.dp))
     }
     Box(Modifier.fillMaxWidth().padding(16.dp)) {
-      V3PrimaryButton(
+      CourierPrimaryButton(
         "پیوستن", onJoin, Modifier.fillMaxWidth(),
         enabled = code.isNotBlank(), busy = busy,
       )
@@ -122,7 +122,7 @@ private fun JoinPoint(icon: ImageVector, text: String, divider: Boolean) {
   Row(Modifier.fillMaxWidth().heightIn(min = 52.dp), verticalAlignment = Alignment.CenterVertically) {
     Icon(icon, contentDescription = null, tint = p.icon, modifier = Modifier.size(22.dp))
     Spacer(Modifier.width(12.dp))
-    Text(text, style = v3Style(14.sp), color = p.ink, modifier = Modifier.weight(1f))
+    Text(text, style = courierText(14.sp), color = p.ink, modifier = Modifier.weight(1f))
   }
   if (divider) Box(Modifier.fillMaxWidth().padding(start = 34.dp).height(1.dp).background(p.hairline))
 }

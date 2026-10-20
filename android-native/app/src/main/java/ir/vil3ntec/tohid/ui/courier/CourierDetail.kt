@@ -118,10 +118,10 @@ internal fun CourierDetailPage(
   val waiting = CourierQueue.pendingFor(queue, c.id).isNotEmpty()
   Column(Modifier.fillMaxSize()) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-      RoundIconButton(Icons.AutoMirrored.Outlined.ArrowBack, "بازگشت", onBack)
+      CourierRoundButton(Icons.AutoMirrored.Outlined.ArrowBack, "بازگشت", onBack)
       Text(
         "سفارشِ #${c.orderNo.fa()}",
-        style = v3Style(18.sp, FontWeight.Bold), color = p.ink, textAlign = TextAlign.Center,
+        style = courierText(18.sp, FontWeight.Bold), color = p.ink, textAlign = TextAlign.Center,
         modifier = Modifier.weight(1f),
       )
       Spacer(Modifier.width(44.dp))
@@ -130,9 +130,9 @@ internal fun CourierDetailPage(
     Spacer(Modifier.height(14.dp))
     //  برگهٔ تیرهٔ پایین (مرجع: Tracking Detail / Shipping Detail)
     Column(Modifier.weight(1f).fillMaxWidth().background(p.black, SheetTop).padding(top = 10.dp)) {
-      Box(Modifier.align(Alignment.CenterHorizontally).width(40.dp).height(4.dp).background(p.blackRaised, PillShape))
+      Box(Modifier.align(Alignment.CenterHorizontally).width(40.dp).height(4.dp).background(p.blackRaised, CourierPillShape))
       Spacer(Modifier.height(12.dp))
-      TwoTabs(
+      CourierTabs(
         "جزئیاتِ پیگیری" to null, "جزئیاتِ ارسال" to null,
         firstSelected = detailTab == "track",
         onSelect = { onDetailTab(if (it) "track" else "ship") },
@@ -164,7 +164,7 @@ internal fun CourierDetailPage(
 private fun RouteCard(c: MissionCard, shopName: String, live: Boolean, onNavigate: () -> Unit) {
   val p = PhoneV3.colors
   val dark = PhoneV3UiDark
-  Column(Modifier.padding(horizontal = 16.dp).fillMaxWidth().v3Dark(p).padding(16.dp)) {
+  Column(Modifier.padding(horizontal = 16.dp).fillMaxWidth().courierDark(p).padding(16.dp)) {
     Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
       Column(Modifier.width(24.dp).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
         Spacer(Modifier.height(20.dp))
@@ -175,23 +175,23 @@ private fun RouteCard(c: MissionCard, shopName: String, live: Boolean, onNavigat
       }
       Spacer(Modifier.width(12.dp))
       Column(Modifier.weight(1f)) {
-        Text("از", style = v3Style(12.sp), color = p.onBlackMuted)
-        Text(shopName.ifBlank { "دکان" }, style = v3Style(15.sp, FontWeight.Bold), color = p.onBlack)
+        Text("از", style = courierText(12.sp), color = p.onBlackMuted)
+        Text(shopName.ifBlank { "دکان" }, style = courierText(15.sp, FontWeight.Bold), color = p.onBlack)
         Spacer(Modifier.height(10.dp))
         Box(Modifier.fillMaxWidth().height(1.dp).background(p.blackRaised))
         Spacer(Modifier.height(10.dp))
-        Text("به", style = v3Style(12.sp), color = p.onBlackMuted)
+        Text("به", style = courierText(12.sp), color = p.onBlackMuted)
         if (live) {
-          Text(c.landmark.ifBlank { "—" }, style = v3Style(16.sp, FontWeight.Bold), color = p.onBlack)
-          if (c.addressText.isNotBlank()) Text(c.addressText, style = v3Style(13.sp), color = p.onBlackMuted)
+          Text(c.landmark.ifBlank { "—" }, style = courierText(16.sp, FontWeight.Bold), color = p.onBlack)
+          if (c.addressText.isNotBlank()) Text(c.addressText, style = courierText(13.sp), color = p.onBlackMuted)
         } else {
-          Text("نشانی پس از پایانِ کار دیگر نشان داده نمی‌شود", style = v3Style(13.sp), color = p.onBlackMuted)
+          Text("نشانی پس از پایانِ کار دیگر نشان داده نمی‌شود", style = courierText(13.sp), color = p.onBlackMuted)
         }
       }
     }
     if (live && c.lat != null && c.lng != null) {
       Spacer(Modifier.height(14.dp))
-      V3SecondaryButton("مسیریابی", onNavigate, Modifier.fillMaxWidth(), icon = Icons.Outlined.Directions, onDark = true)
+      CourierSecondaryButton("مسیریابی", onNavigate, Modifier.fillMaxWidth(), icon = Icons.Outlined.Directions, onDark = true)
     }
   }
 }
@@ -202,11 +202,11 @@ private fun TrackTab(c: MissionCard, queue: QueueState, waiting: Boolean, live: 
   val dark = PhoneV3UiDark
   Row(verticalAlignment = Alignment.Bottom) {
     Column(Modifier.weight(1f)) {
-      Text("شمارهٔ سفارش", style = v3Style(12.sp), color = p.onBlackMuted)
-      Text("#${c.orderNo.fa()}", style = v3Style(22.sp, FontWeight.Bold), color = p.onBlack)
+      Text("شمارهٔ سفارش", style = courierText(12.sp), color = p.onBlackMuted)
+      Text("#${c.orderNo.fa()}", style = courierText(22.sp, FontWeight.Bold), color = p.onBlack)
     }
-    if (waiting) { TonePill("در صف", dark.awaiting); Spacer(Modifier.width(6.dp)) }
-    TonePill(STATUS_LABEL[c.status] ?: c.status, statusTone(c.status, dark))
+    if (waiting) { CourierPill("در صف", dark.awaiting); Spacer(Modifier.width(6.dp)) }
+    CourierPill(STATUS_LABEL[c.status] ?: c.status, statusTone(c.status, dark))
   }
   if (live && reached(c.status) >= 0) {
     Spacer(Modifier.height(14.dp))
@@ -214,15 +214,15 @@ private fun TrackTab(c: MissionCard, queue: QueueState, waiting: Boolean, live: 
   }
   if (c.recallRequested && live) {
     Spacer(Modifier.height(12.dp))
-    WarnNote("دکان این سفارش را پس خواسته است — بسته را برگردانید.")
+    CourierWarnNote("دکان این سفارش را پس خواسته است — بسته را برگردانید.")
   }
   Spacer(Modifier.height(18.dp))
   val rows = CourierBoardModel.track(c, queue)
   if (rows.isEmpty()) {
-    Text("خطِ زمانی پس از همگام‌سازی با دکان می‌آید.", style = v3Style(13.sp), color = p.onBlackMuted)
+    Text("خطِ زمانی پس از همگام‌سازی با دکان می‌آید.", style = courierText(13.sp), color = p.onBlackMuted)
   }
   rows.forEachIndexed { i, r ->
-    val appear = rememberAppear("t-${c.id}-${r.at}-$i", i, seen)
+    val appear = rememberCourierAppear("t-${c.id}-${r.at}-$i", i, seen)
     TrackRowView(r, last = i == rows.lastIndex, modifier = Modifier.graphicsLayer {
       alpha = appear.value
       translationY = (1f - appear.value) * 16.dp.toPx()
@@ -261,16 +261,16 @@ private fun TrackRowView(r: TrackRow, last: Boolean, modifier: Modifier) {
     Column(Modifier.weight(1f).padding(bottom = 18.dp)) {
       Text(
         trackTitle(r),
-        style = v3Style(15.sp, if (r.current) FontWeight.Bold else FontWeight.Medium),
+        style = courierText(15.sp, if (r.current) FontWeight.Bold else FontWeight.Medium),
         color = if (r.current) p.onBlack else p.onBlack.copy(alpha = 0.82f),
       )
       val sub = trackSub(r)
-      if (sub.isNotBlank()) Text(sub, style = v3Style(12.sp), color = p.onBlackMuted)
+      if (sub.isNotBlank()) Text(sub, style = courierText(12.sp), color = p.onBlackMuted)
     }
     Spacer(Modifier.width(8.dp))
     Column(horizontalAlignment = Alignment.End) {
-      Text(clock(r.at), style = v3Style(13.sp, FontWeight.Medium), color = p.onBlack)
-      Text(formatMillis(r.at), style = v3Style(11.sp), color = p.onBlackMuted)
+      Text(clock(r.at), style = courierText(13.sp, FontWeight.Medium), color = p.onBlack)
+      Text(formatMillis(r.at), style = courierText(11.sp), color = p.onBlackMuted)
     }
   }
 }
@@ -300,13 +300,13 @@ private fun ShipTab(c: MissionCard, live: Boolean) {
   if (live && c.phoneMasked.isNotBlank()) DarkKV("شماره (پوشیده)", c.phoneMasked, false, ltr = true)
   if (!live) {
     Spacer(Modifier.height(10.dp))
-    Text("مشتری و نشانی پس از پایانِ کار از این گوشی پاک شد.", style = v3Style(13.sp), color = p.onBlackMuted)
+    Text("مشتری و نشانی پس از پایانِ کار از این گوشی پاک شد.", style = courierText(13.sp), color = p.onBlackMuted)
   }
   if (c.status == "failed") {
     Spacer(Modifier.height(10.dp))
     Text(
       "اگر دوباره نمی‌روید، بسته را به دکان برگردانید؛ برگشت را دکان هنگامِ تحویل گرفتن ثبت می‌کند.",
-      style = v3Style(13.sp), color = dark.awaiting.fg,
+      style = courierText(13.sp), color = dark.awaiting.fg,
     )
   }
 }
@@ -315,12 +315,12 @@ private fun ShipTab(c: MissionCard, live: Boolean) {
 private fun DarkKV(label: String, value: String, strong: Boolean, ltr: Boolean = false) {
   val p = PhoneV3.colors
   Row(Modifier.fillMaxWidth().heightIn(min = 46.dp).padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-    Text(label, style = v3Style(14.sp), color = p.onBlackMuted)
+    Text(label, style = courierText(14.sp), color = p.onBlackMuted)
     //  مقدار ته ردیف (مثلِ «Shipping Detail» ِ مرجع)؛ متنِ بلند دوخطی می‌شود
     Spacer(Modifier.weight(1f).widthIn(min = 12.dp))
     Text(
       value,
-      style = v3Style(if (strong) 16.sp else 14.sp, if (strong) FontWeight.Bold else FontWeight.Medium)
+      style = courierText(if (strong) 16.sp else 14.sp, if (strong) FontWeight.Bold else FontWeight.Medium)
         .copy(textDirection = if (ltr) TextDirection.Ltr else TextDirection.Content),
       color = p.onBlack, textAlign = TextAlign.End,
       modifier = Modifier.widthIn(max = 220.dp),
@@ -337,15 +337,15 @@ private fun ActionArea(c: MissionCard, actions: List<String>, onAction: (String)
   val photo = c.photoAllowed && c.status == "arrived"
   Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
     positive.firstOrNull()?.let { to ->
-      V3PrimaryButton(actionLabel(c.status, to), { onAction(to) }, Modifier.fillMaxWidth(), onDark = true)
+      CourierPrimaryButton(actionLabel(c.status, to), { onAction(to) }, Modifier.fillMaxWidth(), onDark = true)
     }
     val rest = positive.drop(1)
     if (rest.isNotEmpty() || photo || negative.isNotEmpty()) {
       Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        rest.forEach { to -> V3SecondaryButton(actionLabel(c.status, to), { onAction(to) }, Modifier.weight(1f), onDark = true) }
-        if (photo) V3SecondaryButton("عکسِ بسته", onPhoto, Modifier.weight(1f), icon = Icons.Outlined.PhotoCamera, onDark = true)
+        rest.forEach { to -> CourierSecondaryButton(actionLabel(c.status, to), { onAction(to) }, Modifier.weight(1f), onDark = true) }
+        if (photo) CourierSecondaryButton("عکسِ بسته", onPhoto, Modifier.weight(1f), icon = Icons.Outlined.PhotoCamera, onDark = true)
         negative.forEach { to ->
-          V3SecondaryButton(actionLabel(c.status, to), { onAction(to) }, Modifier.weight(1f), tone = ButtonTone.NEGATIVE, onDark = true)
+          CourierSecondaryButton(actionLabel(c.status, to), { onAction(to) }, Modifier.weight(1f), tone = CourierTone.NEGATIVE, onDark = true)
         }
       }
     }
