@@ -77,9 +77,9 @@ class ShopperLinksTest {
 
   @Test
   fun `مسیرِ برنامه`() {
-    assertEquals("shopper/shop/nan", ShopperRoutes.of(ShopperLink.Shop("nan")))
-    assertEquals("shopper/shop/nan?product=p%3A1", ShopperRoutes.of(ShopperLink.Shop("nan", productId = "p:1")))
-    assertEquals("shopper/cart/nan", ShopperRoutes.of(ShopperLink.Shop("nan", openCart = true)))
-    assertEquals("shopper/order/nan/t", ShopperRoutes.of(ShopperLink.Order("nan", "t")))
+    assertEquals("shopper/shop/nan", ShopperPaths.of(ShopperLink.Shop("nan")))
+    assertEquals("shopper/shop/nan?product=p%3A1", ShopperPaths.of(ShopperLink.Shop("nan", productId = "p:1")))
+    assertEquals("shopper/cart/nan", ShopperPaths.of(ShopperLink.Shop("nan", openCart = true)))
+    assertEquals("shopper/order/nan/t", ShopperPaths.of(ShopperLink.Order("nan", "t")))
   }
 }

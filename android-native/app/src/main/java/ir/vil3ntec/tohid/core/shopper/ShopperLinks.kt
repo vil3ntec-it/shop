@@ -12,7 +12,7 @@ sealed class ShopperLink {
 }
 
 /** مسیرهای حالتِ «خرید» در مسیریابِ برنامه */
-object ShopperRoutes {
+object ShopperPaths {
   const val HOME = "shopper/home"
   const val SHOP = "shopper/shop/{slug}"
   const val ORDERS = "shopper/orders"
@@ -69,7 +69,7 @@ object ShopperLinks {
    *  `shopper/cart/{slug}`، `shopper/shop/{slug}?product=…`) — یا null.
    *  @param hosts میزبان‌های دیگری که پیوندشان پذیرفته است (سرورِ تنظیم‌شدهٔ برنامه)
    */
-  fun parse(uri: String, hosts: Set<String> = emptySet()): String? = link(uri, hosts)?.let(ShopperRoutes::of)
+  fun parse(uri: String, hosts: Set<String> = emptySet()): String? = link(uri, hosts)?.let(ShopperPaths::of)
 
   fun validSlug(slug: String): Boolean =
     StorefrontOwner.SLUG_RE.matches(slug) && !slug.contains("--") && slug !in StorefrontOwner.RESERVED
