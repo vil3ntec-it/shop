@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.data
 
 import ir.vil3ntec.tohid.core.model.OrderCustomerDto
 import ir.vil3ntec.tohid.core.model.OrderDto
+import ir.vil3ntec.tohid.core.model.OrderEventDto
 import ir.vil3ntec.tohid.core.model.OrderLineDto
 import ir.vil3ntec.tohid.sync.v1.LedgerDiff
 import org.junit.Assert.assertEquals
@@ -15,10 +16,13 @@ import org.junit.Test
  *  سایت و سرور به موجودی دست نمی‌زنند؛ کسر فقط همین‌جاست.
  *
  *    • همان `SalesEngine.record`: موجودی یک بار کم، قیمت‌ها و جمع‌ها دقیقاً همانِ سفارش؛
- *    • یکتا با شناسهٔ سفارش: تکرار ⇒ «پیش‌تر ثبت شده»؛ دو دستگاه ⇒ همان ردیف‌ها و پس از
- *      همگام‌سازی یک فروش و یک بار کسر؛ فاکتورِ W ِ قدیمی هم «فروخته» شمرده می‌شود؛
- *    • کمبود ⇒ سیاستِ صندوق با پیامِ روشن (جمعِ قلم‌های یک کالا با هم)؛
- *    • پول: آنلاین و نقدِ پیک بیرونِ دخل، نقدِ سرِ پیشخوان در دخل (`CashShift`).
+ *    • یکتا و یکسان با شناسهٔ سفارش: سریِ O و شمارهٔ سفارش، زمانِ گذار؛ تکرار ⇒ «پیش‌تر ثبت
+ *      شده»؛ دو دستگاه ⇒ همان ردیف‌ها با همان مقدارها و پس از همگام‌سازی یک فروش و یک بار کسر؛
+ *      فاکتورِ W ِ قدیمی هم «فروخته» شمرده می‌شود؛
+ *    • کمبود ⇒ پیش از گذار سیاستِ صندوق با پیامِ روشن (جمعِ قلم‌های یک کالا با هم)؛ پس از تحویل
+ *      ثبت با کمبودِ گزارش‌شده (INV-19)؛
+ *    • برگشت به دکان ⇒ لغوِ همان فروش، تکرارپذیر حتی از دو دستگاه؛
+ *    • پول: آنلاین و نقدِ پیک بیرونِ دخل (فروش و مرجوعی)، نقدِ سرِ پیشخوان در دخل (`CashShift`).
  *  قرینهٔ JS: `server/test/e2e/lib/native.mjs` (`fulfillOrder`) در `stock.e2e.mjs`.
  */
 class OrderFulfillmentTest {
@@ -46,13 +50,15 @@ class OrderFulfillmentTest {
     feeMinor: Long = 0,
     discountMinor: Long = 1000,
     phone: String? = null,
+    status: String = "picked_up",
+    events: List<OrderEventDto> = listOf(OrderEventDto(kind = "status", fromStatus = "ready_for_pickup", toStatus = "picked_up", at = 5_000L)),
   ): OrderDto {
     val subtotal = lines.sumOf { it.lineTotalMinor }
     return OrderDto(
-      id = "01ORDER", orderNo = 12, status = "picked_up", fulfillment = fulfillment, paymentMethod = paymentMethod,
+      id = "01ORDER", orderNo = 12, status = status, fulfillment = fulfillment, paymentMethod = paymentMethod,
       paymentStatus = paymentStatus, customer = OrderCustomerDto(name = "احمد", phone = phone),
       subtotalMinor = subtotal, discountMinor = discountMinor, deliveryFeeMinor = feeMinor,
-      totalMinor = subtotal - discountMinor + feeMinor, lines = lines,
+      totalMinor = subtotal - discountMinor + feeMinor, lines = lines, events = events,
     )
   }
 
@@ -63,7 +69,7 @@ class OrderFulfillmentTest {
 
   @Test
   fun `تحویل ⇒ فروشِ عادی با شناسه‌های ثابت، قیمت‌های دقیقِ سفارش و یک بار کسرِ موجودی`() {
-    val r = ok(OrderFulfillment.fulfill(ledger(), order(), "2026-10-19", 1_000L, series = "A1", seller = "علی"))
+    val r = ok(OrderFulfillment.fulfill(ledger(), order(), "2026-10-19", 1_000L, seller = "علی"))
     val d = r.data
     val sale = d.sales.single()
     assertEquals("o-01ORDER", sale.id)
@@ -72,8 +78,11 @@ class OrderFulfillmentTest {
     assertEquals(12L, sale.orderNo)
     assertEquals("online", sale.channel)
     assertTrue(sale.isOnlineOrder())
-    assertEquals("A1-7", sale.invoiceLabel())
-    assertEquals(8, d.nextInvoiceNo)
+    //  سریِ O و شمارهٔ همان سفارش؛ شمارندهٔ فاکتورِ دستگاه دست نمی‌خورد
+    assertEquals("O-12", sale.invoiceLabel())
+    assertEquals(7, d.nextInvoiceNo)
+    assertEquals(1_000L, sale.createdAt)
+    assertEquals("2026-10-19", sale.date)
     assertEquals("علی", sale.seller)
     assertEquals(185.5, sale.total, 1e-9)
     assertEquals(10.0, sale.discount, 1e-9)
@@ -110,26 +119,74 @@ class OrderFulfillmentTest {
     assertEquals(OrderFulfillment.Result.Already("o-01ORDER"), again)
     val legacy = ledger().copy(sales = listOf(Sale(id = "w-01ORDER", series = "W", channel = "online")))
     assertEquals(OrderFulfillment.Result.Already("w-01ORDER"), OrderFulfillment.fulfill(legacy, order(), "2026-10-19", 3L))
-    assertFalse(OrderFulfillment.needsSale(legacy, order()))
-    assertTrue(OrderFulfillment.needsSale(ledger(), order()))
-    assertFalse("سفارشِ آزمایشی هرگز", OrderFulfillment.needsSale(ledger(), order().copy(isTest = true)))
-    assertFalse("پیش از تحویل نه", OrderFulfillment.needsSale(ledger(), order().copy(status = "packed")))
+    assertFalse(OrderFulfillment.needsSale(legacy, order(), since = 0L))
+    assertTrue(OrderFulfillment.needsSale(ledger(), order(), since = 0L))
+    assertFalse("سفارشِ آزمایشی هرگز", OrderFulfillment.needsSale(ledger(), order().copy(isTest = true), since = 0L))
+    assertFalse("پیش از تحویل نه", OrderFulfillment.needsSale(ledger(), order().copy(status = "packed"), since = 0L))
   }
 
   @Test
   fun `دو دستگاه هم‌زمان تحویل را ثبت می‌کنند ⇒ پس از همگام‌سازی یک فروش و یک بار کسر`() {
+    //  دستگاهِ B شمارندهٔ فاکتورِ دیگری دارد؛ زمان = زمانِ گذارِ تحویل (برای هر دو یکی)
     val base = ledger()
-    val a = ok(OrderFulfillment.fulfill(base, order(), "2026-10-19", 10L, series = "A1")).data
-    val b = ok(OrderFulfillment.fulfill(base, order(), "2026-10-19", 11L, series = "B1")).data
-    //  همان شناسه‌ها روی هر دو دستگاه
-    assertEquals(a.saleItems.map { it.id }, b.saleItems.map { it.id })
-    assertEquals(a.stockMovements.map { it.id }, b.stockMovements.map { it.id })
+    val at = OrderFulfillment.handedOverAt(order())!!
+    val a = ok(OrderFulfillment.fulfill(base, order(), "2026-10-19", at, seller = "x")).data
+    val b = ok(OrderFulfillment.fulfill(base.copy(nextInvoiceNo = 40), order(), "2026-10-19", at, seller = "x")).data
+    //  همان ردیف‌ها با همان مقدارها روی هر دو دستگاه ⇒ ادغام هیچ تعارضی ندارد
+    assertEquals(a.sales, b.sales)
+    assertEquals(a.saleItems, b.saleItems)
+    assertEquals(a.stockMovements, b.stockMovements)
+    assertEquals(a.auditLog, b.auditLog)
     //  opهای B (همان که B به سرور می‌فرستد) روی دفترِ A
     val opsB = LedgerDiff.diff(LedgerDiff.shadowOf(base), LedgerDiff.toJson(b))
     val merged = LedgerDiff.fromJson(LedgerDiff.applyRemote(LedgerDiff.toJson(a), opsB))
     assertEquals(1, merged.sales.size)
     assertEquals(2, merged.saleItems.size)
     assertEquals(8.5, ShopStore.stock(merged, "p1"), 1e-9)
+  }
+
+  @Test
+  fun `پس از تحویل (کالا رفته) کمبود رد نمی‌کند — ثبت با موجودیِ منفی و گزارشِ کمبود (INV-19)`() {
+    val r = ok(OrderFulfillment.fulfill(ledger(riceUnits = 1.0), order(), "2026-10-19", 1L, allowShortage = true))
+    assertEquals(1, r.short.size)
+    assertTrue(r.short.single().contains("برنج"))
+    assertEquals(-0.5, ShopStore.stock(r.data, "p1"), 1e-9)
+    assertTrue("ورودِ انبارِ کمکی در دفتر نمی‌نشیند", r.data.warehouseEntries.none { it.id.startsWith("o-cover") })
+    assertEquals(2, r.data.warehouseEntries.size)
+  }
+
+  @Test
+  fun `needsSale فقط تحویلِ پس از کفِ سرور را می‌خواهد`() {
+    val o = order()
+    assertTrue(OrderFulfillment.needsSale(ledger(), o, since = 5_000L))
+    assertFalse("تحویلِ پیش از کف", OrderFulfillment.needsSale(ledger(), o, since = 5_001L))
+    assertFalse("بی گذارِ تحویل", OrderFulfillment.needsSale(ledger(), o.copy(events = emptyList()), since = 0L))
+    assertTrue("زمانِ فهرستِ سرور", OrderFulfillment.needsSale(ledger(), o.copy(events = emptyList(), handedOverAt = 9_000L), since = 6_000L))
+  }
+
+  @Test
+  fun `برگشت به دکان ⇒ لغوِ همان فروش؛ تکرار و دستگاهِ دوم دو بار برنمی‌گردانند؛ دخل دست نمی‌خورد`() {
+    val sent = order(fulfillment = "delivery", status = "out_for_delivery", events = listOf(
+      OrderEventDto(kind = "status", fromStatus = "packed", toStatus = "out_for_delivery", at = 5_000L),
+    ))
+    val base = ok(OrderFulfillment.fulfill(ledger(), sent, "2026-10-19", 5_000L)).data
+    assertEquals(8.5, ShopStore.stock(base, "p1"), 1e-9)
+    val back = sent.copy(status = "restocked")
+    assertTrue(OrderFulfillment.needsReverse(base, back))
+    assertFalse(OrderFulfillment.needsReverse(base, sent))
+    val a = (OrderFulfillment.reverse(base, back, "2026-10-20", 9_000L) as OrderFulfillment.Result.Ok).data
+    assertEquals("cancelled", a.sales.single().status)
+    assertEquals(10.0, ShopStore.stock(a, "p1"), 1e-9)
+    assertEquals(listOf("o-01ORDER-1-x"), a.stockMovements.filter { it.type == "sale_cancel" }.map { it.id })
+    assertEquals(OrderFulfillment.Result.Already("o-01ORDER"), OrderFulfillment.reverse(a, back, "2026-10-20", 9_100L))
+    assertFalse(OrderFulfillment.needsReverse(a, back))
+    //  دستگاهِ B هم برمی‌گرداند؛ opهای B روی A ⇒ همان لغو، موجودی یک بار
+    val b = (OrderFulfillment.reverse(base, back, "2026-10-20", 9_000L) as OrderFulfillment.Result.Ok).data
+    val opsB = LedgerDiff.diff(LedgerDiff.shadowOf(base), LedgerDiff.toJson(b))
+    val merged = LedgerDiff.fromJson(LedgerDiff.applyRemote(LedgerDiff.toJson(a), opsB))
+    assertEquals(10.0, ShopStore.stock(merged, "p1"), 1e-9)
+    assertEquals(1, merged.sales.size)
+    assertEquals(0.0, drawer(merged.sales.single()).sales, 1e-9)
   }
 
   @Test
@@ -234,5 +291,39 @@ class OrderFulfillmentTest {
     val back = SalesEngine.recordReturn(d, "o-01ORDER", mapOf("o-01ORDER-1" to 1.5), "", "2026-10-19", 3L, { "r${seq++}" })
     assertTrue("$back", back is SalesEngine.Result.Ok)
     assertEquals(10.0, ShopStore.stock((back as SalesEngine.Result.Ok).data, "p1"), 1e-9)
+  }
+
+  /** دخلِ یک صندوقِ باز با یک فروش و مرجوعی‌های داده‌شده */
+  private fun drawerWith(d: ShopData): CashShift.Totals {
+    var seq = 0
+    var x = (CashShift.open(ShopData(), 1000.0, "", "2026-10-19", 100, { "s${seq++}" }) as CashShift.Result.Ok).data
+    x = x.copy(sales = d.sales.map { it.copy(createdAt = 110) }, saleReturns = d.saleReturns.map { it.copy(createdAt = 120) })
+    return CashShift.totalsOf(x, CashShift.current(x)!!, 200)
+  }
+
+  @Test
+  fun `مرجوعیِ فروشِ آنلاین یا پیک از دخل کم نمی‌شود؛ مرجوعیِ نقدِ پیشخوان کم می‌شود`() {
+    for ((o, inDrawer) in listOf(
+      order(paymentMethod = "online", paymentStatus = "paid") to false,
+      order(fulfillment = "delivery") to false,
+      order(fulfillment = "pickup") to true,
+    )) {
+      val d = ok(OrderFulfillment.fulfill(ledger(), o, "2026-10-19", 1L)).data
+      var seq = 0
+      val back = (SalesEngine.recordReturn(d, "o-01ORDER", mapOf("o-01ORDER-1" to 1.5), "", "2026-10-19", 3L, { "r${seq++}" })
+        as SalesEngine.Result.Ok).data
+      val r = back.saleReturns.single()
+      val t = drawerWith(back)
+      if (inDrawer) {
+        assertNull(r.channel)
+        assertEquals(175.5, t.sales, 1e-9)
+        assertEquals(r.amount, t.returns, 1e-9)
+      } else {
+        assertEquals("مرجوعیِ ${o.paymentMethod}/${o.fulfillment} بیرونِ دخل", "online", r.channel)
+        assertEquals(0.0, t.sales, 1e-9)
+        assertEquals(0.0, t.returns, 1e-9)
+        assertEquals(1000.0, t.expected, 1e-9)
+      }
+    }
   }
 }

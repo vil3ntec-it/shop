@@ -441,11 +441,12 @@ export class NativeDevice {
    * `OrderFulfillment.fulfill` (+ `OrdersLive.post`): تحویلِ سفارشِ آنلاین ⇒ یک فروشِ عادی در
    * همین دفتر با شناسه‌های ثابتِ سفارش (`o-<سفارش>`، `o-<سفارش>-<قلم>`، `…-m`، `…-a`)،
    * قیمت‌های دقیقِ سفارش، هزینهٔ ارسال به‌صورتِ قلمِ آزاد، `channel = online` و روشِ پرداختِ
-   * واقعی. سیاستِ موجودیِ صندوق: بیش از موجودی (جمعِ قلم‌های هر کالا) ⇒ خطای روشن.
-   * order: جزئیاتِ سفارش (`GET /shop/orders/:id` یا یک ردیفِ `GET /shop/orders/handover`).
-   * @returns {{ok:true, saleId:string, already?:true} | {ok:false, message:string}}
+   * واقعی؛ سریِ `O` با شمارهٔ سفارش و زمانِ گذارِ تحویل (یکسان روی هر دستگاه). موجودی: پیش از
+   * گذار (`allowShortage: false`) سیاستِ صندوق؛ پس از تحویل ثبت با کمبودِ گزارش‌شده (INV-19).
+   * order: یک ردیفِ `GET /shop/orders/handover` (یا جزئیاتِ سفارش با خطِ زمانی).
+   * @returns {{ok:true, saleId:string, already?:true, short?:string[]} | {ok:false, message:string}}
    */
-  fulfillOrder(o) {
+  fulfillOrder(o, { allowShortage = true } = {}) {
     const d = clone(this.ledger);
     const saleId = `o-${o.id}`;
     const have = d.sales.find((s) => s.orderId === o.id || s.id === saleId || s.id === `w-${o.id}`);
@@ -454,7 +455,9 @@ export class NativeDevice {
     const tag = `سفارش #${o.orderNo}: `;
     const lines = [...(o.lines || [])].sort((a, b) => a.lineNo - b.lineNo);
     if (!lines.length) return { ok: false, message: `قلم‌های سفارش #${o.orderNo} نیامد؛ سفارش را دوباره باز کنید` };
-    const now = this.now();
+    //  `handedOverAt`: زمان و روزِ فاکتور = زمانِ گذارِ تحویل (نه لحظهٔ ثبت)
+    const evAt = (o.events || []).filter((e) => e.kind === 'status' && ['picked_up', 'out_for_delivery', 'delivered'].includes(e.toStatus)).map((e) => e.at);
+    const now = o.handedOverAt || (evAt.length ? Math.min(...evAt) : this.now());
     const today = todayOf(now);
     const byId = new Map(d.products.map((p) => [p.id, p]));
     const plan = lines.map((l) => {
@@ -470,9 +473,14 @@ export class NativeDevice {
       if (!x.p.active) return { ok: false, message: `${tag}«${x.p.name}» غیرفعال است` };
       need.set(x.p.id, (need.get(x.p.id) || 0) + x.q);
     }
+    const short = [];
     for (const [pid, q] of need) {
       const available = this.stock(pid, d);
-      if (q > available + 1e-9) return { ok: false, message: `${tag}از «${byId.get(pid).name}» فقط ${available} مانده` };
+      if (q <= available + 1e-9) continue;
+      const msg = `از «${byId.get(pid).name}» فقط ${available} مانده`;
+      //  پیش از گذار: سیاستِ صندوق؛ پس از تحویل (کالا رفته): ثبت و گزارشِ کمبود (INV-19)
+      if (!allowShortage) return { ok: false, message: tag + msg };
+      short.push(msg);
     }
     const fee = Number(o.deliveryFeeMinor || 0);
     const rows = plan.map((x) => [x.itemId, x.totalMinor]);
@@ -490,13 +498,15 @@ export class NativeDevice {
     const digits = (s) => String(s || '').replace(/\D/g, '').slice(-9);
     const phone = digits(o.customer && o.customer.phone);
     const debtor = phone.length >= 7 ? d.debtors.find((x) => digits(x.phone) === phone) : null;
-    const invoiceNumber = d.nextInvoiceNo || 1;
+    //  سریِ O و شمارهٔ همان سفارش؛ شمارندهٔ فاکتورِ دستگاه دست نمی‌خورد
+    const invoiceNumber = Number(o.orderNo);
+    const label = `O-${invoiceNumber}`;
     const discount = Number(o.discountMinor || 0) / 100;
     d.sales.push(row('Sale', {
       id: saleId, invoiceNumber, total: rows.reduce((s, r) => s + r[1], 0) / 100, discountType: 'amount',
       discountValue: discount, discount, finalTotal, paymentMethod: pay.method, debtorId: debtor ? debtor.id : null,
       paidAmount: finalTotal, remaining: 0, status: 'completed', debtGiven: 0, debtSettled: 0, createdAt: now, date: today,
-      syncStatus: 'pending', seller: this.seller, orderId: o.id, orderNo: o.orderNo, payments: pay.rows, channel: 'online',
+      syncStatus: 'pending', seller: this.seller, orderId: o.id, orderNo: o.orderNo, series: 'O', payments: pay.rows, channel: 'online',
     }));
     for (const x of plan) {
       const total = x.totalMinor / 100;
@@ -515,14 +525,41 @@ export class NativeDevice {
       if (!x.p) continue;
       d.stockMovements.push(row('StockMovement', {
         id: `${x.itemId}-m`, productId: x.p.id, type: 'sale', qty: -x.q, date: today,
-        notes: `فاکتور #${invoiceNumber} — سفارشِ اینترنتی #${o.orderNo}`, refId: saleId, createdAt: now,
+        notes: `فاکتور #${label} — سفارشِ اینترنتی #${o.orderNo}`, refId: saleId, createdAt: now,
       }));
     }
     d.auditLog.push(row('AuditEntry', {
       id: `${saleId}-a`, type: 'sale', date: today, refId: saleId,
-      notes: `ثبت فروش فاکتور #${invoiceNumber} — سفارشِ اینترنتی #${o.orderNo} به مبلغ ${money(finalTotal)} افغانی`, createdAt: now,
+      notes: `ثبت فروش فاکتور #${label} — سفارشِ اینترنتی #${o.orderNo} به مبلغ ${money(finalTotal)} افغانی`, createdAt: now,
     }));
-    d.nextInvoiceNo = invoiceNumber + 1;
+    this.save(d);
+    return { ok: true, saleId, short };
+  }
+
+  /**
+   * `OrderFulfillment.reverse`: سفارشِ برگشته به دکان ⇒ لغوِ فروشِ `o-<سفارش>` با شناسه‌های ثابت
+   * (وضعیت، نه شمارنده ⇒ تکرار و دستگاهِ دوم بی‌اثر).
+   */
+  reverseOrder(o) {
+    const d = clone(this.ledger);
+    const saleId = `o-${o.id}`;
+    const sale = d.sales.find((s) => s.id === saleId);
+    if (!sale || sale.status === 'cancelled') return { ok: true, already: true, saleId };
+    const now = o.returnedAt || this.now();
+    const today = todayOf(now);
+    const reason = 'سفارشِ اینترنتی به دکان برگشت';
+    const label = `${sale.series}-${sale.invoiceNumber}`;
+    for (const it of d.saleItems.filter((x) => x.saleId === saleId && x.productId && x.quantity - x.returnedQty > 0)) {
+      d.stockMovements.push(row('StockMovement', {
+        id: `${it.id}-x`, productId: it.productId, type: 'sale_cancel', qty: it.quantity - it.returnedQty, date: today,
+        notes: `لغو فروش — فاکتور #${label} — ${reason}`, refId: saleId, createdAt: now,
+      }));
+    }
+    Object.assign(sale, { status: 'cancelled', cancelReason: reason });
+    d.auditLog.push(row('AuditEntry', {
+      id: `${saleId}-x`, type: 'cancel_sale', date: today, refId: saleId,
+      notes: `لغو فروش فاکتور #${label} — سفارشِ اینترنتی #${o.orderNo}: ${reason}`, createdAt: now,
+    }));
     this.save(d);
     return { ok: true, saleId };
   }

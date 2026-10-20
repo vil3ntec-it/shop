@@ -10,7 +10,8 @@
  *     روشن، موجودی منفی نمی‌شود)؛ «قبول» را سرور برای موجودی رد نمی‌کند؛ دکان با دلیل رد می‌کند.
  *   • «مشتری گرفت» در برنامه ⇒ فروشِ `o-<سفارش>` ⇒ پس از همگام‌سازی −N همه‌جا (سرور، سایت در همان
  *     خواندنِ بعدی، دستگاهِ دیگر)؛ تلاشِ دوباره و دستگاهِ دوم دو بار کم نمی‌کنند.
- *   • تحویلی که دستگاه نزده (پیک) از `GET /shop/orders/handover` به برنامه می‌رسد.
+ *   • تحویلی که دستگاه نزده (پیک) از `GET /shop/orders/handover` به برنامه می‌رسد؛ برنامه پیش از
+ *     **هر** ثبت از سرور می‌پرسد (`?orderId=`). سفارشِ برگشته به دکان ⇒ لغوِ همان فروش، یک بار.
  *   • گزارشِ تطبیقِ سرور (دفترِ گردش = بازپخش) سبز است.
  *
  * پرچم‌ها فقط برای همین دکان (live_config): shop.orders، shop.storefront، shop.catalog.
@@ -40,6 +41,20 @@ const orderId = async (no) => (await db.one('SELECT id FROM online_orders WHERE 
 const detail = async (dev, id) => E.ok(await dev.api('GET', `/shop/orders/${id}`), 'جزئیاتِ سفارش').order;
 async function walk(dev, id, steps) {
   for (const [to, from, x] of steps) E.ok(await dev.api('POST', `/shop/orders/${id}/transition`, { to, from, ...(x || {}) }), `${from} ⇐ ${to}`);
+}
+/** `OrdersLive.postById`: پیش از هر ثبت از سرور — ردیفِ `items` یا `reversals` ِ همان سفارش، یا هیچ */
+async function confirm(dev, id) {
+  const r = E.ok(await dev.api('GET', `/shop/orders/handover?since=0&orderId=${id}`), 'تحویل؟');
+  return r.items.find((x) => x.id === id) || r.reversals.find((x) => x.id === id) || null;
+}
+/** ویترین پس از push: خواندن تا عددِ تازه (مهلتِ پرسشِ هر دکان `CATALOG_REFRESH_THROTTLE_MS`، پیش‌فرض ۵۰۰ms) */
+async function siteUntil(id, ok, ms = 3000) {
+  const t0 = performance.now();
+  for (;;) {
+    const pub = await site(id);
+    if (ok(pub) || performance.now() - t0 > ms) return { pub, waited: performance.now() - t0 };
+    await new Promise((r) => setTimeout(r, 50));
+  }
 }
 const TO_READY = [['accepted', 'new', { readyInMinutes: 10 }], ['picking', 'accepted'], ['packed', 'picking'], ['ready_for_pickup', 'packed']];
 
@@ -79,9 +94,9 @@ await E.step('INV-06', 'فروشنده همان واحد را در دکان می
   await A.drain();
   assert.equal(A.dropped.length, 0, `opِ فروشِ دکان رد شد: ${JSON.stringify(A.dropped)}`);
   assert.equal((await stockOf(A, last)).levels.shop_floor, 0);
-  assert.equal((await site(last)).status, 'out_of_stock', 'سایت همان خواندنِ بعدی');
-  //  تحویلِ سفارشِ اول: برنامه کمبود را با پیامِ روشن می‌گوید و چیزی ثبت نمی‌کند
-  const f = A.fulfillOrder(await detail(A, lastOrders[0]));
+  assert.equal((await siteUntil(last, (p) => p.status === 'out_of_stock')).pub.status, 'out_of_stock', 'سایت');
+  //  تحویلِ سفارشِ اول: پیش‌سنجِ برنامه پیش از گذار کمبود را با پیامِ روشن می‌گوید و چیزی ثبت نمی‌کند
+  const f = A.fulfillOrder(await detail(A, lastOrders[0]), { allowShortage: false });
   assert.equal(f.ok, false);
   assert.match(f.message, /روغنِ آخر/);
   assert.equal(A.stock(last), 0, 'موجودی منفی نشد');
@@ -100,7 +115,7 @@ await E.step('CHK-18.accept', 'CHK-18: «قبول» را سرور برای مو�
   assert.equal(rep.ok, true, JSON.stringify(rep.mismatches));
 }, { needs: ['INV-06'] });
 
-let pickupId; let C;
+let pickupId; let C; let itemA; let itemC;
 await E.step('E2E-STK.online', 'سفارشِ اینترنتیِ ۲ «برنج» ⇐ تا «تحویل» هیچ کسری نیست؛ «مشتری گرفت» در برنامه ⇐ فروشِ عادی ⇐ −۲ همه‌جا', async () => {
   //  دستگاهِ C پیش از تحویل همگام شده (برای سنجشِ «دستگاهِ دوم» در گامِ بعد)
   C = await E.device('C-counter-desktop', owner.email);
@@ -117,23 +132,28 @@ await E.step('E2E-STK.online', 'سفارشِ اینترنتیِ ۲ «برنج» 
   const pending = E.ok(await A.api('GET', '/shop/orders/handover?since=0'), 'تحویل‌های بی‌فروش').items;
   assert.deepEqual(pending.map((x) => x.id), [pickupId]);
 
-  //  برنامه: همان لحظهٔ «مشتری گرفت» فروش را ثبت و همگام می‌کند (`OrdersLive.post` ⇒ `AutoSync.now`)
+  //  هر دو دستگاه پیش از ثبت از سرور می‌پرسند — هم‌زمان، پیش از push ِ دیگری (بدترین حالت)
+  itemA = await confirm(A, pickupId);
+  itemC = await confirm(C, pickupId);
+  assert.ok(itemA && itemC);
+  //  برنامه: همان لحظهٔ «مشتری گرفت» فروش را ثبت و همگام می‌کند (`OrdersLive.postById` ⇒ `AutoSync.now`)
   const t0 = performance.now();
-  const f = A.fulfillOrder(await detail(A, pickupId));
+  const f = A.fulfillOrder(itemA);
   assert.equal(f.ok, true, f.message);
   assert.equal(f.saleId, `o-${pickupId}`);
   assert.equal(A.stock(rice), 1, 'برنامهٔ دکان همان لحظه');
   await A.drain();
   const pushed = performance.now();
-  const pub = await site(rice);
-  const seen = performance.now();
-  assert.equal(pub.sellableMilli, 1000, `سایت همان خواندنِ بعدی: ${JSON.stringify(pub)}`);
-  console.log(`     ⏱ تأخیر: ثبتِ فروش ⇐ push ${Math.round(pushed - t0)}ms · ⇐ خواندنِ سایت ${Math.round(seen - pushed)}ms · کل ${Math.round(seen - t0)}ms`);
+  const { pub, waited } = await siteUntil(rice, (p) => p.sellableMilli === 1000);
+  assert.equal(pub.sellableMilli, 1000, `سایت: ${JSON.stringify(pub)}`);
+  console.log(`     ⏱ تأخیر: ثبتِ فروش ⇐ push ${Math.round(pushed - t0)}ms · ⇐ سایت ${Math.round(waited)}ms (مهلتِ پرسشِ ویترین ≤۵۰۰ms) · کل ${Math.round(pushed - t0 + waited)}ms`);
   const st = await stockOf(A, rice);
   assert.deepEqual([st.levels.shop_floor, st.reservedMilli], [1000, 0]);
   const sale = A.ledger.sales.find((s) => s.id === `o-${pickupId}`);
   assert.equal(sale.channel, 'online');
   assert.equal(sale.orderId, pickupId);
+  assert.equal(`${sale.series}-${sale.invoiceNumber}`, `O-${sale.orderNo}`, 'سریِ O و شمارهٔ سفارش');
+  assert.equal(sale.createdAt, itemA.handedOverAt, 'زمانِ فاکتور = زمانِ گذارِ تحویل');
   assert.equal(sale.paymentMethod, 'cash', 'تحویل در دکان، نقد سرِ پیشخوان');
   assert.deepEqual(E.ok(await A.api('GET', '/shop/orders/handover?since=0'), 'تحویل‌ها').items, []);
   const rep = E.ok(await A.api('GET', '/shop/catalog/report'), 'تطبیق');
@@ -141,10 +161,12 @@ await E.step('E2E-STK.online', 'سفارشِ اینترنتیِ ۲ «برنج» 
 }, { needs: ['E2E-STK.0'] });
 
 await E.step('E2E-STK.pos-view', '§۳۲.۲: دستگاهِ دیگر پس از همگام‌سازی همان موجودیِ سرور را دارد؛ تلاشِ دوباره و تحویلِ هم‌زمانِ دستگاهِ دوم دو بار کم نمی‌کنند', async () => {
-  //  C هنوز pull نکرده و همان سفارش را (هم‌زمان با A) تحویل می‌زند ⇒ همان شناسه‌ها
-  const fc = C.fulfillOrder(await detail(C, pickupId));
+  //  C پیش از push ِ A تأیید گرفته بود و هنوز pull نکرده ⇒ همان سفارش را ثبت می‌کند ⇒ همان ردیف‌ها و مقدارها
+  const fc = C.fulfillOrder(itemC);
   assert.equal(fc.ok, true, fc.message);
   assert.equal(fc.saleId, `o-${pickupId}`);
+  const mine = (d) => { const x = { ...d.ledger.sales.find((s) => s.id === `o-${pickupId}`) }; delete x.seller; return x; };
+  assert.deepEqual(mine(C), mine(A), 'دو دستگاه همان فاکتور را می‌سازند (سری، شماره، زمان، مبلغ)');
   await C.drain();
   await A.drain();
   const server = (await stockOf(A, rice)).levels.shop_floor / 1000;
@@ -153,15 +175,15 @@ await E.step('E2E-STK.pos-view', '§۳۲.۲: دستگاهِ دیگر پس از �
   assert.equal(C.stock(rice), server, `برنامهٔ C ${C.stock(rice)}، سرور ${server}`);
   assert.equal(A.ledger.sales.filter((s) => s.orderId === pickupId).length, 1);
   assert.equal(C.ledger.sales.filter((s) => s.orderId === pickupId).length, 1);
-  //  تلاشِ دوباره روی A ⇒ «پیش‌تر ثبت شده»
-  const again = A.fulfillOrder(await detail(A, pickupId));
-  assert.equal(again.already, true);
+  //  تلاشِ دوباره: سرور می‌گوید دیگر لازم نیست؛ و دفترِ A هم «پیش‌تر ثبت شده»
+  assert.equal(await confirm(A, pickupId), null);
+  assert.equal(A.fulfillOrder(itemA).already, true);
   //  دستگاهِ تازه با Snapshot
   const B = await E.device('B-new-phone', owner.email);
   assert.equal((await B.firstSync()).ok, true);
   assert.equal(B.stock(rice), server);
-  assert.equal(B.fulfillOrder(await detail(B, pickupId)).already, true);
-  assert.equal((await site(rice)).sellableMilli, 1000);
+  assert.equal(B.fulfillOrder(itemA).already, true);
+  assert.equal((await siteUntil(rice, (p) => p.sellableMilli === 1000)).pub.sellableMilli, 1000);
 }, { needs: ['E2E-STK.online'] });
 
 await E.step('E2E-STK.courier', 'تحویلی که دستگاه نزده (پیک «ارسال شد»/«رسید») ⇐ handover ⇐ همان فروش در برنامه؛ نقدِ پیک بیرونِ دخل', async () => {
@@ -173,17 +195,52 @@ await E.step('E2E-STK.courier', 'تحویلی که دستگاه نزده (پیک
   assert.equal((await stockOf(A, rice)).levels.shop_floor, 1000, 'سرور کم نکرد');
   const items = E.ok(await A.api('GET', '/shop/orders/handover?since=0'), 'تحویل‌های بی‌فروش').items;
   assert.deepEqual(items.map((x) => x.id), [id]);
-  //  `OrdersLive.reconcile`: هر ردیف ⇒ همان `post`
+  //  `OrdersLive.reconcile`: هر ردیف ⇒ همان ثبت (کالا رفته ⇒ کمبود رد نمی‌کند، فقط گزارش)
   for (const it of items) assert.equal(A.fulfillOrder(it).ok, true);
   await A.drain();
   assert.equal((await stockOf(A, rice)).levels.shop_floor, 0);
   assert.equal(A.stock(rice), 0);
-  assert.equal((await site(rice)).status, 'out_of_stock');
+  assert.equal((await siteUntil(rice, (p) => p.status === 'out_of_stock')).pub.status, 'out_of_stock');
   const sale = A.ledger.sales.find((s) => s.orderId === id);
   assert.equal(sale.paymentMethod, 'cod');
   assert.deepEqual(sale.payments.map((p) => [p.kind, p.custody]), [['cash', 'courier']]);
   const rep = E.ok(await A.api('GET', '/shop/catalog/report'), 'تطبیق');
   assert.equal(rep.ok, true, JSON.stringify(rep.mismatches));
 }, { needs: ['E2E-STK.online'] });
+
+await E.step('E2E-STK.returned', 'ارسال ⇐ فروشِ تحویل ⇐ «تحویل نشد» ⇐ برگشت به دکان ⇐ قفسه ⇐ برنامه همان فروش را لغو می‌کند؛ دو دستگاه، یک بار برگشت', async () => {
+  A.addEntry(rice, 2, 70);
+  await A.drain();
+  const c = await customer('0791000005');
+  const o = E.ok(await c([{ productId: rice, qtyMilli: 1000 }], { fulfillment: 'delivery', address: { landmark: 'پشتِ نانوایی' } }), 'سفارشِ ارسالی', 201).order;
+  const id = await orderId(o.orderNo);
+  await walk(A, id, [...TO_READY.slice(0, 3), ['out_for_delivery', 'packed']]);
+  const sent = await confirm(A, id);
+  assert.equal(sent.action, 'sale');
+  assert.equal(A.fulfillOrder(sent).ok, true);
+  await A.drain();
+  assert.equal((await stockOf(A, rice)).levels.shop_floor, 1000, 'کالا با پیک رفت');
+  await walk(A, id, [['delivery_failed', 'out_for_delivery', { reason: 'no_answer' }], ['retry_scheduled', 'delivery_failed'],
+    ['returned_to_store', 'retry_scheduled'], ['restocked', 'returned_to_store']]);
+  //  دو دستگاه هر دو برگشت را می‌بینند و لغو می‌کنند
+  await C.drain();
+  const back = await confirm(A, id);
+  assert.equal(back.action, 'reverse');
+  const backC = await confirm(C, id);
+  assert.equal(A.reverseOrder(back).ok, true);
+  assert.equal(C.reverseOrder(backC).ok, true);
+  await A.drain();
+  await C.drain();
+  await A.drain();
+  const server = (await stockOf(A, rice)).levels.shop_floor;
+  assert.equal(server, 2000, 'یک بار برگشت');
+  assert.equal(A.stock(rice), 2);
+  assert.equal(C.stock(rice), 2);
+  assert.equal(A.ledger.sales.find((s) => s.id === `o-${id}`).status, 'cancelled');
+  assert.equal(await confirm(A, id), null, 'دیگر کاری نمانده');
+  assert.equal((await siteUntil(rice, (p) => p.sellableMilli === 2000)).pub.sellableMilli, 2000);
+  const rep = E.ok(await A.api('GET', '/shop/catalog/report'), 'تطبیق');
+  assert.equal(rep.ok, true, JSON.stringify(rep.mismatches));
+}, { needs: ['E2E-STK.courier'] });
 
 await E.finish();

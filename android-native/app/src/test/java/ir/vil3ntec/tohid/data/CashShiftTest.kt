@@ -59,16 +59,17 @@ class CashShiftTest {
         SaleReturn(id = "w-o1-1-r", saleId = "w-o1", saleItemId = "w-o1-1", amount = 900.0, createdAt = 140, channel = "online"),
         //  ردیفِ سرور پیش از نشانِ `channel`: شناسهٔ ثابتِ `w-…` بر فاکتورِ اینترنتی
         SaleReturn(id = "w-o2-1-r", saleId = "w-o2", saleItemId = "w-o2-1", amount = 700.0, createdAt = 141),
-        //  مرجوعیِ دستیِ همین صندوق برای فاکتورِ W: نقد از دخل رفت ⇒ کم می‌شود
+        //  مرجوعیِ دستیِ همین دستگاه برای فاکتورِ اینترنتی (بازبینیِ پول، #340): پولش از راهِ
+        //  سفارش برمی‌گردد، نه از دخل ⇒ کم نمی‌شود (پیش‌تر کم می‌شد و صندوق اضافه نشان می‌داد)
         SaleReturn(id = "01JDEVICERETURN0000000000", saleId = "w-o3", amount = 100.0, createdAt = 142),
         SaleReturn(id = "r-pos", saleId = "s1", amount = 20.0, createdAt = 143),
       ),
     )
     val t = CashShift.totalsOf(d, CashShift.current(d)!!, 200)
     assertEquals(500.0, t.sales, 1e-9)
-    assertEquals(120.0, t.returns, 1e-9)
-    //  ۱۰۰۰ + ۵۰۰ − ۱۰۰ − ۲۰
-    assertEquals(1380.0, t.expected, 1e-9)
+    assertEquals(20.0, t.returns, 1e-9)
+    //  ۱۰۰۰ + ۵۰۰ − ۲۰ (فقط مرجوعیِ فروشِ صندوق)
+    assertEquals(1480.0, t.expected, 1e-9)
     assertTrue(CashShift.isOnline(d.sales[1]))
     assertTrue(!CashShift.isOnline(d.sales[0]))
   }
