@@ -139,6 +139,27 @@ test('۲) کدِ درست ⇒ توکن‌ها؛ همان کد بارِ دوم �
   assert.equal(again.body.error, 'CODE_EXPIRED');
 });
 
+test('۲ب) ورود با کدِ ایمیل خودش احراز است: کارِ حساس بلافاصله بی تأییدِ دوباره؛ نشستِ تازه‌شده نه', async () => {
+  const email = freshEmail();
+  const req = await post(`/api/auth/${APP}/request-code`, { email });
+  const ok = await post(`/api/auth/${APP}/verify`, { request_id: req.body.request_id, code: await codeOf(req.body.request_id) });
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+
+  //  بی این، حسابِ بی‌رمز درست پس از ورود برای گذاشتنِ رمز ۴۰۳ `reauth_required` می‌گرفت
+  const set = await h.api('POST', '/api/auth/password',
+    { body: { newPassword: 'Taze!pass12' }, headers: HEAD, token: ok.body.access_token });
+  assert.equal(set.status, 200, JSON.stringify(set.body));
+
+  //  تازه‌سازی احراز نیست — همان قاعدهٔ `lib/reauth`
+  const refreshed = await h.api('POST', '/api/auth/refresh',
+    { body: { refreshToken: ok.body.refresh_token }, headers: HEAD });
+  assert.equal(refreshed.status, 200, JSON.stringify(refreshed.body));
+  const stale = await h.api('PUT', '/api/me',
+    { body: { phone: '09121234567' }, headers: HEAD, token: refreshed.body.accessToken });
+  assert.equal(stale.status, 403, JSON.stringify(stale.body));
+  assert.equal(stale.body.error.code, 'reauth_required');
+});
+
 /* ------------------------------------------------------------------ ۳ */
 
 test('۳) پنج کدِ اشتباه ⇒ ۴۲۳ قفل، و باز شدنش پس از پایانِ مهلت', async () => {
