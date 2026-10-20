@@ -671,6 +671,29 @@ function returnOwnerOf(g, parents) {
     && ((g.docId && p.rows.has(g.docId)) || (p.sale !== '' && p.sale === g.sale && sameSave(p, g.rows[0].op)))) || null;
 }
 
+/**
+ * سندِ برگشتِ این دسته دنبالهٔ ثبتی است که بخشی از آن در دستهٔ پیشینِ همین دستگاه **پذیرفته**
+ * شد؟ (ثبتِ بزرگ‌تر از یک دسته — همان docId، یا همان فاکتور با همان ts — که ردیفی از آن در
+ * oplog هست). تصمیمِ سند همان بخشِ اول است؛ دنباله جدا داوری نمی‌شود.
+ */
+async function acceptedPartOf(ctx, deviceId, g) {
+  const first = g.rows[0].op;
+  const ids = g.rows.map((r) => String(r.op.row_id));
+  const ts = tsOf(first);
+  const hit = g.docId
+    ? await one(
+      `SELECT 1 AS x FROM oplog WHERE app='shop' AND account_kind='shop' AND account_id=$1 AND table_name='returns'
+          AND device_id=$2 AND fields->>'docId' = $3 AND NOT (row_id = ANY($4::text[])) LIMIT 1`,
+      [ctx.accountId, deviceId, g.docId, ids])
+    : g.sale && ts
+      ? await one(
+        `SELECT 1 AS x FROM oplog WHERE app='shop' AND account_kind='shop' AND account_id=$1 AND table_name='returns'
+            AND device_id=$2 AND client_ts=$3 AND fields->>'saleId' = $4 AND NOT (row_id = ANY($5::text[])) LIMIT 1`,
+        [ctx.accountId, deviceId, ts, g.sale, ids])
+      : null;
+  return !!hit;
+}
+
 /** ردیف‌های سندِ پیوسته به سندِ ردشده: نشانی‌هایش به آن اضافه می‌شود (برای همراه‌های بعدی) */
 function absorb(p, g) {
   for (const r of g.rows) {
@@ -760,6 +783,15 @@ async function v1Guard(req, res, next) {
         if (owner) {
           for (const m of g.rows) reject(m, 'tx_rejected');
           absorb(owner, g);
+          continue;
+        }
+        //  دنبالهٔ ثبتی که بخشِ اولش پیش‌تر پذیرفته شد: تصمیمِ سند همان بخشِ اول است — وگرنه
+        //  ردیف‌ها و حرکت‌های پذیرفته بی شمارنده‌ها و رسیدِ مشترکِ ثبت (پشتِ سرِ همین ردیف‌ها) می‌ماندند
+        if (await acceptedPartOf(ctx, deviceId, g)) {
+          if (g.sale) {
+            if (!tally.has(g.sale)) tally.set(g.sale, await returnedTotal(null, ctx, g.sale));
+            tally.set(g.sale, tally.get(g.sale) + g.amount);
+          }
           continue;
         }
       }

@@ -577,25 +577,31 @@ test('v3: دنبالهٔ tx ِ ردشده پس از کنار گذاشتنِ صن
   assert.deepEqual(why(await push3(manager, 'm3-dm', [item(2)])), ['applied']);
 });
 
-test('v1: ثبتِ برگشتِ بزرگ‌تر از یک دسته (برگشت‌ها پیش از شمارنده‌ها) — بخشِ اولِ زیرِ سقف، کل بیش از سقف ⇒ بقیه و شمارنده‌ها رد', async () => {
+test('v1 (P-K): ثبتِ برگشتِ بزرگ‌تر از یک دسته — بخشِ اولِ زیرِ سقف پذیرفته شد ⇒ دنباله، شمارنده‌ها و رسید هم می‌نشینند', async () => {
   await ownerSale('s-big', 5000);
   const sv = save();
-  //  ۲۳۰ ردیف × ۲٫۵ = ۵۷۵ > ۵۰۰؛ دستهٔ اول ۲۰۰ ردیف = ۵۰۰ (زیرِ سقف)
+  //  ۲۳۰ ردیف × ۲٫۵ = ۵۷۵ > ۵۰۰؛ دستهٔ اول ۲۰۰ ردیف = ۵۰۰ (زیرِ سقف). برگشت‌ها پیش از شمارنده‌ها (`DIFF_ORDER`)
   const rows = Array.from({ length: 230 }, (_, i) =>
     sv.op('returns', `r-big-${i}`, 'insert', { saleId: 's-big', saleItemId: 's-big-i1', quantity: 0.1, amount: 2.5, createdAt: sv.at }));
-  const counters = [
+  const tail = [
     sv.op('sales', 's-big', 'update', { debtSettled: { $inc: 575 } }),
     sv.op('saleItems', 's-big-i1', 'update', { returnedQty: { $inc: 23 } }),
+    sv.op('transactions', 's-big-rcv', 'insert', { debtorId: 'd-1', type: 'receive', amount: 575, createdAt: sv.at, refId: 's-big', kind: 'customer_return' }),
+    sv.op('stockMovements', 's-big-m', 'insert', { productId: 'p-gc', type: 'customer_return', qty: 23, refId: 'r-big-0', createdAt: sv.at }),
   ];
   const b1 = await push1(staff, 's-big', rows.slice(0, 200));
   assert.ok(b1.body.results.every((x) => x.status === 'applied'), JSON.stringify(b1.body.results.slice(0, 2)));
-  const b2 = await push1(staff, 's-big', [...rows.slice(200), ...counters]);
-  assert.ok(why(b2).slice(0, 30).every((x) => x === 'approval_required'), why(b2).join(','));
-  assert.deepEqual(why(b2).slice(30), ['tx_rejected', 'tx_rejected']);
-  const total = await one(`SELECT COALESCE(SUM((data->>'amount')::numeric),0) AS t FROM sync_rows
-    WHERE account_id=$1 AND table_name='returns' AND data->>'saleId'='s-big' AND deleted_at IS NULL`, [shopId]);
-  assert.ok(Number(total.t) <= 500, `برگشتِ ثبت‌شده از سقف گذشت: ${total.t}`);
-  assert.equal(Number((await row1('sales', 's-big')).data.debtSettled), 0);
+  //  دنباله جدا داوری نمی‌شود: تصمیمِ ثبت همان بخشِ اول است
+  const b2 = await push1(staff, 's-big', [...rows.slice(200), ...tail]);
+  assert.ok(b2.body.results.every((x) => x.status === 'applied'), why(b2).join(','));
+  assert.equal(Number((await row1('sales', 's-big')).data.debtSettled), 575);
+  assert.equal(Number((await row1('saleItems', 's-big-i1')).data.returnedQty), 23);
+  assert.ok(await row1('transactions', 's-big-rcv'));
+  //  ثبتِ تازهٔ دیگری روی همان فاکتور (ts ِ دیگر) دوباره با سقفِ تجمعی داوری می‌شود
+  const next = save();
+  assert.deepEqual(why(await push1(staff, 's-big', [next.op('returns', 'r-big-next', 'insert', { saleId: 's-big', amount: 1, createdAt: next.at })])), ['approval_required']);
+  //  دستگاهِ دیگر با همان ts دنبالهٔ این ثبت نیست
+  assert.deepEqual(why(await push1(staff, 's-big-other', [sv.op('returns', 'r-big-x', 'insert', { saleId: 's-big', amount: 1, createdAt: sv.at })])), ['approval_required']);
 });
 
 test('v3: صاحبِ دکان روی همان دستگاه با صندوقِ ردشدهٔ مدیر نگه داشته نمی‌شود', async () => {
