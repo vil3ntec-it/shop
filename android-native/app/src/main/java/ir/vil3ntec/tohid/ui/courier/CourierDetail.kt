@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -314,14 +315,15 @@ private fun ShipTab(c: MissionCard, live: Boolean) {
 private fun DarkKV(label: String, value: String, strong: Boolean, ltr: Boolean = false) {
   val p = PhoneV3.colors
   Row(Modifier.fillMaxWidth().heightIn(min = 46.dp).padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-    Text(label, style = v3Style(14.sp), color = p.onBlackMuted, modifier = Modifier.weight(1f))
-    Spacer(Modifier.width(12.dp))
+    Text(label, style = v3Style(14.sp), color = p.onBlackMuted)
+    //  مقدار ته ردیف (مثلِ «Shipping Detail» ِ مرجع)؛ متنِ بلند دوخطی می‌شود
+    Spacer(Modifier.weight(1f).widthIn(min = 12.dp))
     Text(
       value,
       style = v3Style(if (strong) 16.sp else 14.sp, if (strong) FontWeight.Bold else FontWeight.Medium)
         .copy(textDirection = if (ltr) TextDirection.Ltr else TextDirection.Content),
       color = p.onBlack, textAlign = TextAlign.End,
-      modifier = Modifier.weight(1.4f, fill = false),
+      modifier = Modifier.widthIn(max = 220.dp),
     )
   }
   Box(Modifier.fillMaxWidth().height(1.dp).background(p.blackRaised))

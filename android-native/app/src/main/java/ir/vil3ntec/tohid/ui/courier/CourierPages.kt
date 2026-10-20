@@ -585,7 +585,11 @@ private fun CashList(summary: CourierSummary, lastSyncAt: Long) {
                 Text("#${u.orderNo.fa()}", style = v3Style(14.sp, FontWeight.Bold), color = p.ink, modifier = Modifier.width(64.dp))
                 Text("${formatMillis(u.deliveredAt)} · ${clock(u.deliveredAt)}", style = v3Style(12.sp), color = p.inkMuted, modifier = Modifier.weight(1f))
                 Column(horizontalAlignment = Alignment.End) {
-                  Text(afn(u.cashCollectedMinor), style = v3Style(14.sp, FontWeight.Bold), color = p.ink)
+                  //  سفارشِ پیش‌پرداخت: نقدی در دستِ پیک نیست (فقط کرایه‌اش در تسویه می‌آید)
+                  Text(
+                    if (u.cashCollectedMinor == 0L && u.expectedCollectMinor == 0L) "بی نقد" else afn(u.cashCollectedMinor),
+                    style = v3Style(14.sp, FontWeight.Bold), color = p.ink,
+                  )
                   if (u.cashCollectedMinor != u.expectedCollectMinor) {
                     Text("از ${afn(u.expectedCollectMinor)}", style = v3Style(11.sp), color = ui.awaiting.fg)
                   }
