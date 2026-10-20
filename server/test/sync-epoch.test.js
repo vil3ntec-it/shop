@@ -181,10 +181,10 @@ test('خاموش‌کن (SYNC_EPOCH_ENABLED=false) ⇒ ۴۰۴ و pull ِ v3 بی
   }
 });
 
-test('بی توکن ⇒ ۴۰۱؛ حسابِ پمپ دوران نمی‌گیرد', async () => {
+test('بی توکن ⇒ ۴۰۱؛ توکنِ پمپ ⇒ ۴۰۱ (همان قاعدهٔ همهٔ مسیرهای /api/shop)', async () => {
   assert.equal((await h.api('GET', '/api/shop/sync-epoch')).status, 401);
   const pump = await h.newUser('پمپ‌دارِ دوران', 'pump');
   const r = await h.api('GET', '/api/shop/sync-epoch', { token: pump.accessToken, headers: { 'X-App': 'pump' } });
-  assert.ok([403, 404].includes(r.status), `${r.status} ${JSON.stringify(r.body)}`);
+  assert.equal(r.status, 401, `${r.status} ${JSON.stringify(r.body)}`);
   assert.equal(r.body?.epoch, undefined);
 });
