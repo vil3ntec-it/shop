@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.ui.v3
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -18,14 +20,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,16 +43,13 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.i18n.StrKit
 import ir.vil3ntec.tohid.ui.screens.MotionSpec
-import ir.vil3ntec.tohid.ui.screens.V3BackButton
-import ir.vil3ntec.tohid.ui.screens.V3RoundButton
-import ir.vil3ntec.tohid.ui.screens.v3Text
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 
 /** یک کارِ سربرگ (حداکثر دو تا): آیکنِ گرد با برچسبِ دسترس‌پذیری و نقطهٔ اختیاری */
@@ -56,6 +57,14 @@ data class V3Action(
   val icon: ImageVector,
   val label: String,
   val dot: Boolean = false,
+  val onClick: () -> Unit,
+)
+
+/** یک کارِ منوی «…» سربرگ — در برگهٔ پایین، مثلِ برگهٔ کارهای iOS */
+data class V3MenuItem(
+  val icon: ImageVector,
+  val label: String,
+  val danger: Boolean = false,
   val onClick: () -> Unit,
 )
 
@@ -75,7 +84,7 @@ class V3HeaderState {
   /** صفر = باز، یک = جمع */
   val fraction: Float get() = if (max <= 0f) 0f else (-offset / max).coerceIn(0f, 1f)
 
-  /** دکمهٔ شناور با پیمایش به پایین کوچک می‌شود */
+  /** آخرین جهتِ پیمایش پایین بود؟ (دکمهٔ شناور جمع می‌شود) */
   var scrolledDown by mutableStateOf(false)
     internal set
 
@@ -91,15 +100,16 @@ class V3HeaderState {
 fun rememberV3HeaderState(): V3HeaderState = remember { V3HeaderState() }
 
 /**
- *  قابِ هر صفحهٔ گوشیِ نسخهٔ ۳ — جای خالیِ سربرگِ آبیِ قدیم (`TohidTopBar`).
+ *  قابِ هر صفحهٔ گوشیِ نسخهٔ ۳ — جای سربرگِ آبیِ قدیم (`TohidTopBar`).
  *
- *  سربرگ: دکمهٔ گردِ برگشت در آغاز (اگر راهی به عقب هست)، تا دو کارِ گرد در
- *  پایان، و عنوانِ درشتِ ۳۰sp زیرش که با پیمایش جمع می‌شود و عنوانِ کوچکِ
- *  وسط جایش را می‌گیرد (مثلِ iOS). `subtitle` یک خطِ خاکستری زیرِ عنوانِ درشت.
+ *  بالا: دکمهٔ گردِ برگشت در آغاز (اگر راهی به عقب هست)، تا دو کار و «…» در
+ *  پایان، و عنوانِ درشتِ ۳۰sp زیرش که با پیمایش جمع می‌شود و عنوانِ کوچکِ وسط
+ *  جایش را می‌گیرد (مثلِ iOS). زیرِ عنوان به ترتیب: `notice` (نوارِ اشتراک/
+ *  به‌روزرسانی که پوسته می‌دهد)، `search` و `chips` — این سه جمع نمی‌شوند.
  *
  *  پایین: `bottomReserve` جای نوارِ شناورِ پایین است (صفحه‌های نوار)، و
- *  `bottomBar` دکمهٔ چسبانِ پایین (فرم‌ها)؛ هر دو در `PaddingValues`ِ محتوا
- *  حساب شده‌اند تا آخرین ردیف زیرِ چیزی نماند. `fab` با پیمایش کوچک می‌شود.
+ *  `bottomBar` نوارِ چسبان (فرم‌ها، `V3ActionBar`)؛ هر دو در `PaddingValues`ِ
+ *  محتوا حساب شده‌اند تا آخرین ردیف زیرِ چیزی نماند. `fab` با پیمایش جمع می‌شود.
  */
 @Composable
 fun V3Scaffold(
@@ -108,6 +118,10 @@ fun V3Scaffold(
   subtitle: String? = null,
   onBack: (() -> Unit)? = null,
   actions: List<V3Action> = emptyList(),
+  overflow: List<V3MenuItem> = emptyList(),
+  search: (@Composable () -> Unit)? = null,
+  chips: (@Composable () -> Unit)? = null,
+  notice: (@Composable () -> Unit)? = LocalV3Notice.current,
   bottomReserve: Dp = 0.dp,
   /** false ⇒ فقط عنوانِ کوچکِ وسط (فرم‌ها و صفحه‌های کوتاه) */
   largeTitle: Boolean = true,
@@ -142,13 +156,18 @@ fun V3Scaffold(
     }
   }
   var barHeight by remember { mutableFloatStateOf(0f) }
-  val navInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+  var menuOpen by remember { mutableStateOf(false) }
+  val navInset = LocalV3SystemBottom.current ?: WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
   val bottomBarHeight = with(density) { barHeight.toDp() }
+  val headerActions = actions.take(2) + if (overflow.isEmpty()) emptyList() else listOf(V3Action(Icons.Outlined.MoreHoriz, StrKit.more) { menuOpen = true })
 
   Box(modifier.fillMaxSize().background(c.bg)) {
     Column(Modifier.fillMaxSize().nestedScroll(connection)) {
-      V3HeaderBar(title, onBack, actions.take(2), showTitle = !largeTitle || state.fraction > 0.65f, divider = if (largeTitle) state.fraction else 1f)
+      V3HeaderBar(title, onBack, headerActions, showTitle = !largeTitle || state.fraction > 0.65f, divider = if (largeTitle) state.fraction else 1f)
       if (largeTitle) V3LargeTitle(title, subtitle, state)
+      if (notice != null) Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) { notice() }
+      if (search != null) Box(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 8.dp)) { search() }
+      if (chips != null) Box(Modifier.fillMaxWidth().padding(bottom = 8.dp)) { chips() }
       Box(Modifier.weight(1f).fillMaxWidth()) {
         content(PaddingValues(bottom = bottomReserve + bottomBarHeight + (if (bottomBar == null) navInset else 0.dp) + 16.dp))
       }
@@ -158,8 +177,8 @@ fun V3Scaffold(
         Modifier
           .align(Alignment.BottomCenter)
           .fillMaxWidth()
-          .onSizeChanged { barHeight = it.height.toFloat() }
-          .padding(bottom = bottomReserve),
+          .padding(bottom = bottomReserve)
+          .onSizeChanged { barHeight = it.height.toFloat() },
       ) { bottomBar() }
     }
     if (fab != null) {
@@ -170,7 +189,29 @@ fun V3Scaffold(
       ) { fab(!state.scrolledDown) }
     }
   }
+  if (menuOpen) {
+    V3Sheet(onDismiss = { menuOpen = false }) { closer ->
+      V3Card(padding = PaddingValues(vertical = 4.dp)) {
+        overflow.forEachIndexed { i, item ->
+          if (i > 0) V3Divider(start = 64.dp)
+          V3ListRow(item.label, icon = item.icon, danger = item.danger, chevron = false, onClick = { closer.close(item.onClick) })
+        }
+      }
+    }
+  }
 }
+
+/**
+ *  نوارِ پیامِ پوسته (اشتراک رو به پایان، نسخهٔ تازه) که `V3Scaffold` بی‌پارامترِ
+ *  `notice` خودش زیرِ عنوان می‌گذارد — پوسته (`AppRoot`) یک بار فراهمش می‌کند.
+ */
+val LocalV3Notice = androidx.compose.runtime.compositionLocalOf<(@Composable () -> Unit)?> { null }
+
+/**
+ *  پوسته‌ای که خودش جای نوارِ سیستم (پایین) را گرفته این را `0.dp` می‌گذارد تا
+ *  `V3Scaffold`/`V3FormBar` دوباره حسابش نکنند؛ null ⇒ خودشان می‌سنجند.
+ */
+val LocalV3SystemBottom = androidx.compose.runtime.compositionLocalOf<Dp?> { null }
 
 private val LARGE = 52.dp
 private val LARGE_WITH_SUB = 74.dp
@@ -186,13 +227,13 @@ internal fun V3HeaderBar(
   divider: Float,
 ) {
   val c = PhoneV3.colors
+  val alpha by animateFloatAsState(if (showTitle) 1f else 0f, MotionSpec.tweenOf(150), label = "barTitle")
   Column(Modifier.fillMaxWidth().background(c.bg).windowInsetsPadding(WindowInsets.statusBars)) {
     Box(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 16.dp), contentAlignment = Alignment.Center) {
       if (onBack != null) Box(Modifier.align(Alignment.CenterStart)) { V3BackButton(onBack) }
-      val alpha by androidx.compose.animation.core.animateFloatAsState(if (showTitle) 1f else 0f, MotionSpec.tweenOf(150), label = "barTitle")
       Text(
         title,
-        style = v3Text(17, FontWeight.SemiBold, 24),
+        style = V3Type.headline,
         color = c.ink,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
@@ -203,12 +244,12 @@ internal fun V3HeaderBar(
         Row(Modifier.align(Alignment.CenterEnd)) {
           actions.forEachIndexed { i, a ->
             if (i > 0) Spacer(Modifier.width(8.dp))
-            V3RoundButton(a.icon, a.label, size = 44.dp, iconSize = 22.dp, dot = a.dot, onClick = a.onClick)
+            V3IconButton(a.icon, a.label, dot = a.dot, onClick = a.onClick)
           }
         }
       }
     }
-    Box(Modifier.fillMaxWidth().height(1.dp).graphicsLayer { alpha = divider }.background(c.hairline))
+    Box(Modifier.fillMaxWidth().height(1.dp).graphicsLayer { this.alpha = divider }.background(c.hairline))
   }
 }
 
@@ -225,22 +266,34 @@ private fun V3LargeTitle(title: String, subtitle: String?, state: V3HeaderState)
         .fillMaxWidth()
         .padding(start = 20.dp, end = 20.dp)
         .graphicsLayer {
-          val f = state.fraction
-          alpha = (1f - f * 1.6f).coerceIn(0f, 1f)
+          alpha = (1f - state.fraction * 1.6f).coerceIn(0f, 1f)
           translationY = state.offset * 0.35f
         },
     ) {
-      Text(
-        title,
-        style = v3Text(30, FontWeight.Bold, 40),
-        color = c.ink,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        modifier = Modifier.semantics { heading() },
-      )
-      if (subtitle != null) {
-        Text(subtitle, style = v3Text(13, FontWeight.Medium, 19), color = c.inkMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
-      }
+      Text(title, style = V3Type.largeTitle, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.semantics { heading() })
+      if (subtitle != null) Text(subtitle, style = V3Type.subhead, color = c.inkMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+  }
+}
+
+/**
+ *  دو ستونِ صفحهٔ پهن (کامپیوتر، تبلتِ افقی): فهرست در آغاز با پهنای ثابت و
+ *  جزئیات در بقیه؛ بی جزئیات ⇒ فقط فهرست. روی گوشی صفحه‌ها همان فهرست را
+ *  می‌کشند و جزئیات مسیرِ خودش است.
+ */
+@Composable
+fun V3TwoPane(
+  modifier: Modifier = Modifier,
+  listWidth: Dp = 400.dp,
+  list: @Composable () -> Unit,
+  detail: (@Composable () -> Unit)? = null,
+) {
+  val c = PhoneV3.colors
+  Row(modifier.fillMaxSize().background(c.bg)) {
+    Box(Modifier.width(listWidth).fillMaxHeight()) { list() }
+    if (detail != null) {
+      Box(Modifier.width(1.dp).fillMaxHeight().background(c.hairline))
+      Box(Modifier.weight(1f).fillMaxHeight()) { detail() }
     }
   }
 }

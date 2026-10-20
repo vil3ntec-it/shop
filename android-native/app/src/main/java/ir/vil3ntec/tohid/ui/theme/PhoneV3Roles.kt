@@ -69,6 +69,13 @@ object PhoneV3Roles {
     V3Tone.ERROR -> status(c, V3Status.CANCELLED).let { it.copy(border = if (dark(c)) Color(0xFF7A2A31) else Color(0xFFFBC4C4)) }
   }
 
+  /** آیکنِ پیام — مثلِ متن، جز هشدارِ روز (انحرافِ تأییدشده: #B45309 تا روی زرد ≥ ۳:۱) */
+  fun toneIcon(c: PhoneV3Colors, t: V3Tone): Color =
+    if (t == V3Tone.WARNING && !dark(c)) Color(0xFFB45309) else tone(c, t).fg
+
+  /** کارِ خطرناک روی سطحِ تیرهٔ وارونه (نوارِ انتخاب، سبد) — در هر دو تم */
+  val dangerOnInverse: Color = Color(0xFFFCA5A5)
+
   /** §۴/§۵: مرزِ کادرِ ورودی (borderInput) و زمینه‌اش (سطحِ تعاملی) */
   fun inputBorder(c: PhoneV3Colors): Color = if (dark(c)) Color(0xFF40516A) else Color(0xFFC5D0DE)
   fun inputFill(c: PhoneV3Colors): Color = if (dark(c)) Color(0xFF203149) else Color(0xFFFFFFFF)

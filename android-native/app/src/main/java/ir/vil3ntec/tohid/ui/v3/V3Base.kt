@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.v3
 
+import ir.vil3ntec.tohid.core.i18n.StrKit
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
@@ -125,7 +126,7 @@ fun V3IconButton(
 @Composable
 fun V3BackButton(onClick: () -> Unit) {
   val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
-  V3IconButton(if (rtl) Icons.Outlined.ChevronRight else Icons.Outlined.ChevronLeft, StrV3.back, size = 44.dp, iconSize = 24.dp, onClick = onClick)
+  V3IconButton(if (rtl) Icons.Outlined.ChevronRight else Icons.Outlined.ChevronLeft, StrKit.back, size = 44.dp, iconSize = 24.dp, onClick = onClick)
 }
 
 /**

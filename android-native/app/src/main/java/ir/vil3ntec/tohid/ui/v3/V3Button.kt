@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.v3
 
+import ir.vil3ntec.tohid.core.i18n.StrKit
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.fadeIn
@@ -75,7 +76,7 @@ fun V3Button(
       .then(if (pair.border != pair.bg && enabled) Modifier.border(1.dp, pair.border, shape) else Modifier)
       .semantics {
         if (!enabled) disabled()
-        if (loading) stateDescription = StrV3.working
+        if (loading) stateDescription = StrKit.working
       }
       .padding(horizontal = 18.dp),
     horizontalArrangement = Arrangement.Center,

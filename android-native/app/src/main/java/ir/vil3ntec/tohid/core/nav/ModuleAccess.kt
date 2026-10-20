@@ -3,9 +3,9 @@ package ir.vil3ntec.tohid.core.nav
 /**
  *  نیازِ یک ماژول، صفحه یا ورودی — همان سدهای امروزِ برنامه، یک‌جا نام‌گذاری‌شده:
  *  `MANAGE` = `ShopRole.canOpenSettings` (تنظیمات، کارمندان)، `AUDIT` = `canSeeAudit`،
- *  و سه پرچمِ سرور (سفارشِ زنده، ویترین، گفت‌وگو).
+ *  و چهار پرچمِ سرور (سفارشِ زنده، ویترین، گفت‌وگو، میزِ تحویل).
  */
-enum class Need { MANAGE, AUDIT, ORDERS_LIVE, STOREFRONT, CHAT }
+enum class Need { MANAGE, AUDIT, ORDERS_LIVE, STOREFRONT, CHAT, DELIVERY }
 
 /** جای نشستنِ یک ورودیِ ماژول */
 enum class Place {

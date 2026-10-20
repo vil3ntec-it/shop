@@ -9,6 +9,16 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.EventBusy
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Password
+import androidx.compose.material.icons.filled.Devices
+import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.outlined.Backup
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.CallToAction
@@ -62,6 +72,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 /** گوشی: فهرست یا صفحهٔ یک بخش؛ null یعنی کامپیوتر (`LocalSettingsPick`) */
 sealed interface PhoneSettingsMode {
   class Root(val open: (String) -> Unit) : PhoneSettingsMode
+  /** صفحهٔ یک گروه (`settings/security`): فقط ردیف‌های همان گروه */
+  class Group(val title: String, val open: (String) -> Unit) : PhoneSettingsMode
   class Detail(val title: String) : PhoneSettingsMode
 }
 
@@ -78,10 +90,18 @@ object SettingsNav {
   val pending = mutableStateOf<Request?>(null)
   var origin by mutableStateOf("more")
 
+  /** تنظیمات روی یک گروه یا یک بخش — همان مسیرِ `SettingsPaths` (برگشت به `from`) */
   fun open(from: String, group: String? = null, detail: String? = null) {
     origin = from
     pending.value = if (group == null && detail == null) null else Request(group, detail)
-    ir.vil3ntec.tohid.ui.AppNav.go("settings")
+    val paths = ir.vil3ntec.tohid.ui.v3.settings.SettingsPaths
+    ir.vil3ntec.tohid.ui.AppNav.go(
+      when {
+        detail != null -> paths.section(detail)
+        group != null -> paths.group(group)
+        else -> paths.ROOT
+      },
+    )
   }
 }
 
@@ -121,6 +141,34 @@ internal fun settingsIcon(key: String): ImageVector? = when (key) {
 }
 
 /**
+ *  رنگِ نشانهٔ ردیف‌های تنظیمات (VILL3N r7) به گروهِ هر بخش — همان رنگِ گروه در
+ *  «بیشتر»، تا یک بخش همه‌جا یک رنگ داشته باشد.
+ */
+internal fun settingsHue(key: String): ir.vil3ntec.tohid.ui.v3.V3Hue? = when (SettingsLayout.groupOf(key) ?: key) {
+  SettingsLayout.GENERAL -> ir.vil3ntec.tohid.ui.v3.V3Hue.BLUE
+  SettingsLayout.SECURITY -> ir.vil3ntec.tohid.ui.v3.V3Hue.BRAND
+  SettingsLayout.SALES -> ir.vil3ntec.tohid.ui.v3.V3Hue.ORANGE
+  SettingsLayout.DEVICES -> ir.vil3ntec.tohid.ui.v3.V3Hue.TEAL
+  SettingsLayout.DATA -> ir.vil3ntec.tohid.ui.v3.V3Hue.PURPLE
+  SettingsLayout.ABOUT -> ir.vil3ntec.tohid.ui.v3.V3Hue.BLUE
+  else -> null
+}
+
+/** فهرستِ ستونِ کناریِ تنظیماتِ کامپیوتر (پیش‌تر درونِ `AppRoot`) */
+fun deskSettingsSections(): List<Pair<String, ImageVector>> = listOf(
+  "هشدارها" to Icons.Filled.NotificationsActive,
+  "ظاهر" to Icons.Filled.Palette,
+  "تاریخ و رقم" to Icons.Filled.Event,
+  "کالای منقضی" to Icons.Filled.EventBusy,
+  "قفل برنامه" to Icons.Filled.Lock,
+  "تغییر رمز حساب" to Icons.Filled.Password,
+  "دستگاه‌های وارد شده" to Icons.Filled.Devices,
+  "کد شاگرد" to Icons.Filled.Key,
+  "داده‌ها" to Icons.Filled.Storage,
+  "درباره برنامه" to Icons.Filled.Info,
+)
+
+/**
  *  یک بخشِ تنظیمات.
  *
  *  `value` مقدارِ کوتاهِ خاکستریِ ته ردیف است (r5)، و `toggle`/`onToggle` کلیدِ
@@ -152,6 +200,16 @@ fun SettingsSection(
       value = value,
       toggle = toggle,
       onToggle = onToggle,
+      hue = settingsHue(title),
+      onClick = { mode.open(title) },
+    )
+    is PhoneSettingsMode.Group -> V3Row(
+      icon = settingsIcon(title) ?: icon,
+      label = SettingsLayout.labelOf(title),
+      value = value,
+      toggle = toggle,
+      onToggle = onToggle,
+      hue = settingsHue(title),
       onClick = { mode.open(title) },
     )
     is PhoneSettingsMode.Detail -> if (mode.title == title) SettingsDetailBody(subtitle, content)
@@ -183,8 +241,9 @@ private fun SettingsDetailBody(subtitle: String, content: @Composable ColumnScop
 @Composable
 fun SettingsLink(title: String, value: String? = null, onClick: () -> Unit) {
   if (LocalSettingsPick.current != null) return
-  if (LocalPhoneSettings.current !is PhoneSettingsMode.Root) return
-  V3Row(icon = settingsIcon(title), label = SettingsLayout.labelOf(title), value = value, onClick = onClick)
+  val mode = LocalPhoneSettings.current
+  if (mode !is PhoneSettingsMode.Root && mode !is PhoneSettingsMode.Group) return
+  V3Row(icon = settingsIcon(title), label = SettingsLayout.labelOf(title), value = value, hue = settingsHue(title), onClick = onClick)
 }
 
 /**
@@ -199,7 +258,13 @@ fun SettingsGroup(
   modifier: Modifier = Modifier,
   content: @Composable ColumnScope.() -> Unit,
 ) {
-  if (LocalSettingsPick.current != null || LocalPhoneSettings.current !is PhoneSettingsMode.Root) {
+  val mode = LocalPhoneSettings.current
+  if (mode is PhoneSettingsMode.Group) {
+    //  صفحهٔ یک گروه: فقط کارتِ همان گروه (عنوانش در سربرگ است)
+    if (mode.title == title) Column(modifier.fillMaxWidth()) { V3Card(content = content) }
+    return
+  }
+  if (LocalSettingsPick.current != null || mode !is PhoneSettingsMode.Root) {
     Column(modifier, content = content)
     return
   }
@@ -432,7 +497,8 @@ fun DeskSettings(sections: List<Pair<String, ImageVector>>, content: @Composable
     val given = sections.toMap()
     SettingsLayout.deskOrder(sections.map { it.first }).map { it to (given[it] ?: settingsIcon(it) ?: Icons.Outlined.Settings) }
   }
-  var pick by rememberSaveable { mutableStateOf(all.first().first) }
+  val target = LocalSettingsTarget.current.section
+  var pick by rememberSaveable { mutableStateOf(target?.takeIf { t -> all.any { it.first == t } } ?: all.first().first) }
   Row(Modifier.fillMaxSize().padding(16.dp)) {
     Column(
       Modifier

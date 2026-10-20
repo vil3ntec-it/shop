@@ -167,7 +167,7 @@ internal fun Modifier.appear(p: Float): Modifier = graphicsLayer {
   translationY = (1f - p) * 10.dp.toPx()
 }
 
-/** دکمهٔ گردِ سفید با سایهٔ نرم (زنگِ r4، برگشتِ r5) */
+/** دکمهٔ گردِ سفید با سایهٔ نرم (زنگِ r4، برگشتِ r5) — همان `V3IconButton`ِ کیت */
 @Composable
 internal fun V3RoundButton(
   icon: ImageVector,
@@ -176,46 +176,11 @@ internal fun V3RoundButton(
   iconSize: Dp = 22.dp,
   dot: Boolean = false,
   onClick: () -> Unit,
-) {
-  val c = PhoneV3.colors
-  Box {
-    Box(
-      Modifier
-        .v3PressScale(onClick, description)
-        .size(size)
-        .shadow(6.dp, CircleShape, clip = false, ambientColor = c.ink.copy(alpha = 0.10f), spotColor = c.ink.copy(alpha = 0.10f))
-        .clip(CircleShape)
-        .background(c.card)
-        .border(1.dp, c.border, CircleShape),
-      contentAlignment = Alignment.Center,
-    ) {
-      Icon(icon, contentDescription = description, tint = c.icon, modifier = Modifier.size(iconSize))
-    }
-    if (dot) {
-      Box(
-        Modifier
-          .align(Alignment.TopEnd)
-          .padding(top = size * 0.2f, end = size * 0.22f)
-          .size(9.dp)
-          .clip(CircleShape)
-          .background(c.card)
-          .padding(1.5.dp)
-          .clip(CircleShape)
-          .background(c.negative),
-      )
-    }
-  }
-}
+) = ir.vil3ntec.tohid.ui.v3.V3IconButton(icon, description, size, iconSize, dot, onClick)
 
-/** دکمهٔ برگشت: در راست‌به‌چپ رو به راست (سمتِ آغاز) */
+/** دکمهٔ برگشت: در راست‌به‌چپ رو به راست (سمتِ آغاز) — همان `V3BackButton`ِ کیت */
 @Composable
-internal fun V3BackButton(onClick: () -> Unit) {
-  val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
-  V3RoundButton(
-    if (rtl) Icons.Outlined.ChevronRight else Icons.Outlined.ChevronLeft,
-    "بازگشت", size = 44.dp, iconSize = 24.dp, onClick = onClick,
-  )
-}
+internal fun V3BackButton(onClick: () -> Unit) = ir.vil3ntec.tohid.ui.v3.V3BackButton(onClick)
 
 /** سربرگِ r5: دکمهٔ گردِ برگشت در آغاز، عنوانِ وسط */
 @Composable
@@ -270,31 +235,19 @@ internal fun V3GroupTitle(text: String, modifier: Modifier = Modifier) {
   )
 }
 
-/** کارتِ گروه (شکلِ r5): گوشهٔ ۱۸ و مرزِ دیدنیِ ۱dp در هر دو تم (VILL3N §۶)، بی سایهٔ سنگین */
+/** کارتِ گروه (شکلِ r5): گوشهٔ ۱۸ و مرزِ دیدنیِ ۱dp در هر دو تم (VILL3N §۶) — همان `V3Card`ِ کیت */
 @Composable
 internal fun V3Card(
   modifier: Modifier = Modifier,
   radius: Dp = PhoneV3.groupRadius,
   padding: PaddingValues = PaddingValues(vertical = 8.dp),
   content: @Composable ColumnScope.() -> Unit,
-) {
-  val c = PhoneV3.colors
-  val shape = RoundedCornerShape(radius)
-  Column(
-    modifier
-      .fillMaxWidth()
-      .clip(shape)
-      .background(c.card)
-      .border(1.dp, c.border, shape)
-      .padding(padding),
-    content = content,
-  )
-}
+) = ir.vil3ntec.tohid.ui.v3.V3Card(modifier, radius, padding, content)
 
 /**
- *  ردیفِ r5: کاشیِ خاکستریِ روشن با آیکنِ خطیِ تک‌رنگ، نام، و در پایان مقدارِ
- *  خاکستری / کلیدِ سبز / فلشِ کم‌رنگ. `tile = false` همان ردیفِ فهرستِ r4 است
- *  (آیکنِ بی‌کاشی، ردیفِ بلندتر).
+ *  ردیفِ r5 — همان `V3ListRow`ِ کیت (یک پیاده‌سازی برای «بیشتر»، «تنظیمات» و
+ *  «حساب من»): کاشیِ آیکن (رنگیِ `hue` یا خاکستری)، نام، و در پایان مقدار /
+ *  کلید / فلش. `tile = false` همان ردیفِ فهرستِ r4 است.
  */
 @Composable
 internal fun V3Row(
@@ -309,117 +262,33 @@ internal fun V3Row(
   toggle: Boolean? = null,
   onToggle: ((Boolean) -> Unit)? = null,
   chevron: Boolean = true,
+  hue: ir.vil3ntec.tohid.ui.v3.V3Hue? = null,
   onClick: (() -> Unit)? = null,
-) {
-  val c = PhoneV3.colors
-  val ink = if (danger) c.negative else c.ink
-  Row(
-    modifier
-      .fillMaxWidth()
-      .heightIn(min = height)
-      .v3Press(c.pressed, label = label, onClick = onClick)
-      .padding(start = if (tile) 12.dp else 22.dp, end = 16.dp, top = 6.dp, bottom = 6.dp),
-    verticalAlignment = Alignment.CenterVertically,
-  ) {
-    if (icon != null) {
-      if (tile) {
-        Box(
-          Modifier.size(40.dp).clip(RoundedCornerShape(11.dp)).background(c.iconTile),
-          contentAlignment = Alignment.Center,
-        ) { Icon(icon, contentDescription = null, tint = if (danger) c.negative else c.icon, modifier = Modifier.size(21.dp)) }
-        Spacer(Modifier.width(12.dp))
-      } else {
-        Icon(icon, contentDescription = null, tint = if (danger) c.negative else c.icon, modifier = Modifier.size(24.dp))
-        Spacer(Modifier.width(14.dp))
-      }
-    }
-    Column(Modifier.weight(1f)) {
-      Text(label, style = v3Text(15, FontWeight.Medium, 22), color = ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-      if (description != null) {
-        Text(description, style = v3Text(12, FontWeight.Medium, 17), color = c.inkMuted, maxLines = 2, overflow = TextOverflow.Ellipsis)
-      }
-    }
-    if (value != null) {
-      Spacer(Modifier.width(8.dp))
-      Text(
-        value,
-        style = v3Text(13, FontWeight.Medium, 18),
-        color = c.inkMuted,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        modifier = Modifier.widthIn(max = 150.dp),
-      )
-    }
-    when {
-      toggle != null -> { Spacer(Modifier.width(10.dp)); V3Toggle(toggle, label, onToggle) }
-      onClick != null && chevron -> {
-        Spacer(Modifier.width(4.dp))
-        //  فلشِ «جلو»: در راست‌به‌چپ رو به چپ (سمتِ پایان)
-        val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
-        //  r5: فلشِ خاکستریِ کم‌رنگ؛ فهرستِ r4: فلشِ تیره
-        Icon(
-          if (rtl) Icons.Outlined.ChevronLeft else Icons.Outlined.ChevronRight,
-          contentDescription = null, tint = if (tile) c.chevron else c.icon, modifier = Modifier.size(22.dp),
-        )
-      }
-    }
-  }
-}
+) = ir.vil3ntec.tohid.ui.v3.V3ListRow(
+  title = label,
+  modifier = modifier,
+  subtitle = description,
+  icon = icon,
+  hue = hue,
+  tile = tile,
+  value = value,
+  trailing = toggle?.let { on -> { ir.vil3ntec.tohid.ui.v3.V3Toggle(on, label, onToggle) } },
+  danger = danger,
+  chevron = chevron,
+  minHeight = height,
+  onClick = onClick,
+)
 
 /** خطِ مویی میانِ ردیف‌های فهرستِ r4 (سراسری) */
 @Composable
-internal fun V3Divider(start: Dp = 0.dp) {
-  Box(Modifier.padding(start = start).fillMaxWidth().height(1.dp).background(PhoneV3.colors.hairline))
-}
+internal fun V3Divider(start: Dp = 0.dp) = ir.vil3ntec.tohid.ui.v3.V3Divider(start)
 
-/**
- *  کلیدِ سبزِ r5 (Face ID) — قرصی با گویِ سفید که می‌لغزد؛ رنگ و جای گوی
- *  انیمیشن دارند. در راست‌به‌چپ «روشن» یعنی گوی در پایان (چپ).
- */
+/** کلیدِ r5 — همان `V3Toggle`ِ کیت */
 @Composable
-internal fun V3Toggle(checked: Boolean, label: String, onToggle: ((Boolean) -> Unit)?) {
-  val c = PhoneV3.colors
-  val x by animateDpAsState(if (checked) 22.dp else 2.dp, if (Motion.enabled) spring<Dp>(dampingRatio = 0.7f, stiffness = 600f) else tween<Dp>(0), label = "knob")
-  val track by animateColorAsState(if (checked) c.toggleOn else lerp(c.hairline, c.inkMuted, 0.18f), tween(ms(200)), label = "track")
-  Box(
-    Modifier
-      .size(width = 51.dp, height = 31.dp)
-      .clip(RoundedCornerShape(percent = 50))
-      .background(track)
-      .then(
-        if (onToggle != null) Modifier.toggleable(value = checked, role = Role.Switch, onValueChange = onToggle)
-        else Modifier,
-      ),
-    contentAlignment = Alignment.CenterStart,
-  ) {
-    Box(
-      Modifier
-        .offset(x = x)
-        .size(27.dp)
-        .shadow(2.dp, CircleShape, clip = false)
-        .clip(CircleShape)
-        .background(c.onBlack),
-    )
-  }
-}
+internal fun V3Toggle(checked: Boolean, label: String, onToggle: ((Boolean) -> Unit)?) =
+  ir.vil3ntec.tohid.ui.v3.V3Toggle(checked, label, onToggle)
 
-/**
- *  جابه‌جاییِ زیرصفحه‌ها (بندِ G): رفتن به عمق از سمتِ پایان می‌لغزد و کم‌رنگ
- *  پیدا می‌شود (~۲۲۰ms)، برگشت از سمتِ آغاز. با «کاهشِ حرکت» بی‌درنگ.
- */
+/** جابه‌جاییِ زیرصفحه‌ها (بندِ G) — همان `V3PageSwitch`ِ کیت (shared-axis، آینه در راست‌به‌چپ) */
 @Composable
-internal fun <T> V3Pages(target: T, depth: (T) -> Int, content: @Composable (T) -> Unit) {
-  val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
-  AnimatedContent(
-    targetState = target,
-    transitionSpec = {
-      val forward = depth(targetState) >= depth(initialState)
-      //  «پایان» در راست‌به‌چپ سمتِ چپ است
-      val fromEnd = if (rtl) -1 else 1
-      val sign = if (forward) fromEnd else -fromEnd
-      (slideInHorizontally(tween<IntOffset>(ms(220), easing = FastOutSlowInEasing)) { sign * it / 4 } + fadeIn(tween(ms(220))))
-        .togetherWith(fadeOut(tween(ms(120))))
-    },
-    label = "v3pages",
-  ) { content(it) }
-}
+internal fun <T> V3Pages(target: T, depth: (T) -> Int, content: @Composable (T) -> Unit) =
+  ir.vil3ntec.tohid.ui.v3.V3PageSwitch(target, depth, content = content)

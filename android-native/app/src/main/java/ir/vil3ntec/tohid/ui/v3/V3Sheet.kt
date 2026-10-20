@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.v3
 
+import ir.vil3ntec.tohid.core.i18n.StrKit
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,6 +18,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -128,7 +130,7 @@ fun V3ConfirmSheet(
     Text(message, style = v3Text(14, FontWeight.Medium, 21), color = c.inkMuted, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
     Spacer(Modifier.height(20.dp))
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-      V3Button(StrV3.cancel, { closer.close() }, Modifier.weight(1f), kind = V3ButtonKind.NEUTRAL)
+      V3Button(StrKit.cancel, { closer.close() }, Modifier.weight(1f), kind = V3ButtonKind.NEUTRAL)
       V3Button(confirm, { closer.close(onConfirm) }, Modifier.weight(1f), kind = if (danger) V3ButtonKind.DANGER else V3ButtonKind.PRIMARY, haptic = true)
     }
   }
@@ -147,7 +149,7 @@ fun V3PickerSheet(
   onPick: (String) -> Unit,
   onDismiss: () -> Unit,
   allowNew: Boolean = true,
-  newLabel: String = StrV3.addNew,
+  newLabel: String = StrKit.addNew,
 ) {
   val c = PhoneV3.colors
   var query by remember { mutableStateOf("") }
@@ -157,8 +159,8 @@ fun V3PickerSheet(
       V3TextField(
         value = query,
         onValueChange = { query = it },
-        label = if (adding) newLabel else StrV3.search,
-        placeholder = if (adding) null else StrV3.searchHint,
+        label = if (adding) newLabel else StrKit.search,
+        placeholder = if (adding) null else StrKit.searchHint,
         modifier = Modifier.fillMaxWidth(),
       )
       Spacer(Modifier.height(10.dp))
@@ -172,35 +174,26 @@ fun V3PickerSheet(
             title = o,
             minHeight = 50.dp,
             chevron = false,
-            trailing = if (o == selected) ({ Icon(Icons.Outlined.Check, contentDescription = StrV3.selected, tint = PhoneV3Roles.brandText(c), modifier = Modifier.size(20.dp)) }) else null,
+            trailing = if (o == selected) ({ Icon(Icons.Outlined.Check, contentDescription = StrKit.selected, tint = PhoneV3Roles.brandText(c), modifier = Modifier.size(20.dp)) }) else null,
             onClick = { closer.close { onPick(o) } },
           )
         }
       }
     } else if (!adding && query.isNotBlank()) {
-      Text(StrV3.nothingFound, style = v3Text(14, FontWeight.Medium, 20), color = c.inkMuted, modifier = Modifier.padding(vertical = 12.dp))
+      Text(StrKit.nothingFound, style = v3Text(14, FontWeight.Medium, 20), color = c.inkMuted, modifier = Modifier.padding(vertical = 12.dp))
     }
     if (allowNew) {
       Spacer(Modifier.height(12.dp))
       if (adding) {
         V3Button(
-          StrV3.add,
+          StrKit.add,
           { val v = query.trim(); if (v.isNotEmpty()) closer.close { onPick(v) } },
           Modifier.fillMaxWidth(),
           enabled = query.isNotBlank(),
         )
       } else {
-        V3Button(newLabel, { adding = true; query = "" }, Modifier.fillMaxWidth(), kind = V3ButtonKind.SECONDARY, icon = androidx.compose.material.icons.Icons.Outlined.Check.let { androidx.compose.material.icons.Icons.Outlined.Add })
+        V3Button(newLabel, { adding = true; query = "" }, Modifier.fillMaxWidth(), kind = V3ButtonKind.SECONDARY, icon = Icons.Outlined.Add)
       }
     }
-  }
-}
-
-/** خطِ مویی میانِ ردیف‌های یک کارت (از `start` به بعد، زیرِ متن نه زیرِ آیکن) */
-@Composable
-fun V3Divider(start: androidx.compose.ui.unit.Dp = 0.dp) {
-  Row(Modifier.fillMaxWidth()) {
-    Spacer(Modifier.width(start))
-    Box(Modifier.weight(1f).height(1.dp).background(PhoneV3.colors.hairline))
   }
 }

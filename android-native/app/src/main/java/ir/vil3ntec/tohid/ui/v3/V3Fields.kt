@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.v3
 
+import ir.vil3ntec.tohid.core.i18n.StrKit
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
@@ -45,6 +46,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.OffsetMapping
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
@@ -68,6 +70,11 @@ enum class V3FieldKind {
   /** بارکد: فقط رقم و حرفِ لاتین، دکمهٔ اسکن در پایان */
   BARCODE,
   PHONE,
+  EMAIL,
+  /** رمز: نوشته پنهان */
+  PASSWORD,
+  /** تاریخِ `yyyy-MM-dd` (`V3DateField`) */
+  DATE,
 }
 
 /**
@@ -127,7 +134,11 @@ fun V3TextField(
       textStyle = v3Text(16, FontWeight.Medium, 22).copy(color = ink),
       cursorBrush = SolidColor(PhoneV3Roles.focus(c)),
       interactionSource = source,
-      visualTransformation = if (kind == V3FieldKind.MONEY) MoneyMask else VisualTransformation.None,
+      visualTransformation = when (kind) {
+        V3FieldKind.MONEY -> MoneyMask
+        V3FieldKind.PASSWORD -> PasswordVisualTransformation()
+        else -> VisualTransformation.None
+      },
       keyboardOptions = KeyboardOptions(keyboardType = keyboard(kind), imeAction = imeAction),
       keyboardActions = KeyboardActions(onAny = { onImeAction?.invoke() }),
       modifier = Modifier
@@ -164,10 +175,10 @@ fun V3TextField(
                 .size(38.dp)
                 .clip(RoundedCornerShape(9.dp))
                 .background(PhoneV3Roles.button(c, ir.vil3ntec.tohid.ui.theme.V3ButtonKind.PRIMARY).bg)
-                .v3Pressable(label = StrV3.scanBarcode, haptic = true, onClick = onScan),
+                .v3Pressable(label = StrKit.scanBarcode, haptic = true, onClick = onScan),
               contentAlignment = Alignment.Center,
             ) {
-              Icon(Icons.Outlined.QrCodeScanner, contentDescription = StrV3.scanBarcode, tint = PhoneV3Roles.button(c, ir.vil3ntec.tohid.ui.theme.V3ButtonKind.PRIMARY).fg, modifier = Modifier.size(20.dp))
+              Icon(Icons.Outlined.QrCodeScanner, contentDescription = StrKit.scanBarcode, tint = PhoneV3Roles.button(c, ir.vil3ntec.tohid.ui.theme.V3ButtonKind.PRIMARY).fg, modifier = Modifier.size(20.dp))
             }
           }
         }
@@ -200,8 +211,10 @@ fun V3TextField(
 
 private fun keyboard(kind: V3FieldKind) = when (kind) {
   V3FieldKind.NUMBER, V3FieldKind.MONEY -> KeyboardType.Decimal
-  V3FieldKind.BARCODE -> KeyboardType.Number
+  V3FieldKind.BARCODE, V3FieldKind.DATE -> KeyboardType.Number
   V3FieldKind.PHONE -> KeyboardType.Phone
+  V3FieldKind.EMAIL -> KeyboardType.Email
+  V3FieldKind.PASSWORD -> KeyboardType.Password
   V3FieldKind.TEXT -> KeyboardType.Text
 }
 
@@ -210,7 +223,9 @@ internal fun clean(kind: V3FieldKind, raw: String): String = when (kind) {
   V3FieldKind.NUMBER, V3FieldKind.MONEY -> V3Numbers.keepOneDot(numericInput(raw))
   V3FieldKind.BARCODE -> normalizeDigits(raw).filter { it.isLetterOrDigit() && it.code < 128 }
   V3FieldKind.PHONE -> normalizeDigits(raw).filter { it.isDigit() || it == '+' }
-  V3FieldKind.TEXT -> raw
+  V3FieldKind.DATE -> normalizeDigits(raw).filter { it in '0'..'9' || it == '-' }
+  V3FieldKind.EMAIL -> raw.trim()
+  V3FieldKind.TEXT, V3FieldKind.PASSWORD -> raw
 }
 
 /** کمک‌های خالصِ کادرِ عدد (آزمون: `V3NumbersTest`) */

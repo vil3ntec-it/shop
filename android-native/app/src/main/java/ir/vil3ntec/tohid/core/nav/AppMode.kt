@@ -52,7 +52,7 @@ object AppModes {
 
   /** خانهٔ هر حالت */
   fun home(mode: AppMode): String = when (mode) {
-    AppMode.SHOP -> "dashboard"
+    AppMode.SHOP -> "home"
     AppMode.COURIER -> "courier"
     AppMode.SHOPPER -> "shopper/home"
   }

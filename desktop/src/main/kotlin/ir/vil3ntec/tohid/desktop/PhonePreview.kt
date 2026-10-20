@@ -80,7 +80,7 @@ object PhonePreview {
 }
 
 private val PREVIEW_TABS = listOf(
-  NavTab("dashboard", "خانه", Icons.Filled.GridView),
+  NavTab("home", "خانه", Icons.Filled.GridView),
   NavTab("sale", "فروش", Icons.Filled.PointOfSale),
   NavTab("debtors", "قرض‌داران", Icons.Filled.Groups),
   NavTab("products", "محصولات", Icons.Filled.ShoppingBag),
@@ -90,8 +90,14 @@ private val PREVIEW_TABS = listOf(
 @Composable
 fun PhonePreviewWindow(store: ShopStore, context: android.content.Context) {
   val requested = PhonePreview.screen.value ?: return
-  val dark = requested.endsWith("-dark")
-  val screen = requested.removeSuffix("-dark")
+  //  پسوندها: `-dark` تمِ شب، `-en` انگلیسی (چپ‌به‌راست) — به همین ترتیب
+  val en = requested.endsWith("-en")
+  val dark = requested.removeSuffix("-en").endsWith("-dark")
+  val screen = requested.removeSuffix("-en").removeSuffix("-dark")
+  DisposableEffect(en) {
+    ir.vil3ntec.tohid.core.i18n.I18n.source = { if (en) ir.vil3ntec.tohid.core.i18n.Lang.EN else ir.vil3ntec.tohid.core.i18n.Lang.FA }
+    onDispose { ir.vil3ntec.tohid.core.i18n.I18n.source = { ir.vil3ntec.tohid.core.i18n.Lang.FA } }
+  }
   DialogWindow(
     onCloseRequest = { PhonePreview.screen.value = null },
     title = PhonePreview.TITLE,
@@ -105,8 +111,8 @@ fun PhonePreviewWindow(store: ShopStore, context: android.content.Context) {
       LocalConfiguration provides Configuration(390, 844),
     ) {
       TohidTheme(if (dark) ThemeChoice.DARK else ThemeChoice.LIGHT) {
-        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-          PhonePreviewContent(screen, store, dark)
+        CompositionLocalProvider(LocalLayoutDirection provides if (en) LayoutDirection.Ltr else LayoutDirection.Rtl) {
+          key(requested) { PhonePreviewContent(screen, store, dark) }
         }
       }
     }
@@ -118,6 +124,23 @@ private fun PhonePreviewContent(screen: String, store: ShopStore, dark: Boolean)
   val data by store.data.collectAsState()
   val snackbar = remember { SnackbarHostState() }
   Column(Modifier.fillMaxSize().background(Shop.colors.bg)) {
+    //  عکس‌های گروه‌ها (`shots/<Group>Shots.kt`): g:<گروه>:<حالت>
+    if (screen.startsWith("g:")) {
+      val (group, name) = screen.removePrefix("g:").split(':', limit = 2).let { it[0] to it.getOrElse(1) { "" } }
+      val shot = ir.vil3ntec.tohid.desktop.shots.ShotRegistry.find(group, name)
+      Box(Modifier.weight(1f).fillMaxWidth()) {
+        if (shot != null) {
+          DisposableEffect(screen) {
+            shot.prepare()
+            onDispose { shot.cleanup() }
+          }
+          val route = shot.route
+          if (route != null) ir.vil3ntec.tohid.desktop.shots.V3RoutePreview(route, store, dark)
+          else shot.content?.invoke(store)
+        }
+      }
+      return@Column
+    }
     when (screen) {
       //  تنظیماتِ گوشی: گروه‌ها و کارت‌های گرد (`SettingsGroup`)
       "settings" -> Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -204,7 +227,7 @@ private fun PhonePreviewContent(screen: String, store: ShopStore, dark: Boolean)
       } else {
         //  «nav» و هر نامِ ناشناس: خانه با نوارِ پایینِ قرصی
         Box(Modifier.weight(1f).fillMaxWidth()) { DashboardScreen(data) {} }
-        PhoneNavBar(tabs = PREVIEW_TABS, current = "dashboard", onPick = {})
+        PhoneNavBar(tabs = PREVIEW_TABS, current = "home", onPick = {})
       }
     }
   }

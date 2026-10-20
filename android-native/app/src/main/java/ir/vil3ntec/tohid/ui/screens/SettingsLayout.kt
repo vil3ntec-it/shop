@@ -40,8 +40,8 @@ object SettingsLayout {
 
   /** ردیفی که صفحهٔ دیگری از برنامه را باز می‌کند ⇐ مسیرِ همان صفحه */
   val LINKS: Map<String, String> = mapOf(
-    NAV_BAR to "nav-editor",
-    PRINTER to "devices",
+    NAV_BAR to "settings/general/navbar",
+    PRINTER to "devices?tab=printers",
   )
 
   val GROUPS: List<Group> = listOf(

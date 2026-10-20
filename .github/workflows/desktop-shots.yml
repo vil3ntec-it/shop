@@ -32,7 +32,7 @@ jobs:
   shots:
     name: عکس از همهٔ بخش‌ها
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 50
     env:
       LC_ALL: C.UTF-8
       LANG: C.UTF-8
@@ -121,6 +121,19 @@ jobs:
           timeout 600 xvfb-run -s "-screen 0 1440x900x24" ./gradlew --no-daemon -q -Pdev=true run || true
           ls -la "$RUNNER_TEMP/shots"
           test -n "$(ls "$RUNNER_TEMP/shots")"
+
+      #  بازسازیِ VILL3N: کیت و هر گروه (`desktop/.../shots/<Group>Shots.kt`) — هر حالت
+      #  روشن/تیره × فارسی/انگلیسی در shots/v3/<گروه>/<حالت>-<تم>-<زبان>.png
+      - name: عکس‌های کیت و گروه‌های نسخهٔ ۳
+        working-directory: desktop
+        env:
+          TOHID_DATA_DIR: ${{ runner.temp }}/tohid-data
+        run: |
+          mkdir -p "$RUNNER_TEMP/shots/v3"
+          S="wait:6000;key:ESCAPE;wait:1500;groupshots:all"
+          export JAVA_TOOL_OPTIONS="-Dtohid.shot=$RUNNER_TEMP/shots/v3 -Dtohid.shot.every=9000 -Dtohid.shot.exit=true -Dtohid.shot.script=$S -Dsun.jnu.encoding=UTF-8 -Dfile.encoding=UTF-8"
+          timeout 900 xvfb-run -s "-screen 0 1440x900x24" ./gradlew --no-daemon -q -Pdev=true run || true
+          find "$RUNNER_TEMP/shots/v3" -name '*.png' | wc -l
 
       - uses: actions/upload-artifact@v4
         with:

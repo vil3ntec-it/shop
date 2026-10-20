@@ -76,6 +76,20 @@ object DevShot {
               "shot" -> shot(arg)
               //  پیش‌نمایشِ گوشیِ ۳۹۰×۸۴۴ (`PhonePreview`): phone:nav|nav-dark|off — و عکس فقط از همان پنجره
               "phone" -> { java.awt.EventQueue.invokeAndWait { PhonePreview.screen.value = arg.takeIf { it.isNotBlank() && it != "off" } }; Thread.sleep(1800) }
+              //  عکس‌های گروه‌ها: groupshots:<گروه|all> ⇒ هر حالت روشن/تیره × فارسی/انگلیسی در <پوشه>/<گروه>/
+              "groupshots" -> for (g in ir.vil3ntec.tohid.desktop.shots.ShotRegistry.of(arg)) {
+                val out = File(dir, g.group).apply { mkdirs() }
+                for (s in g.shots) for (dark in listOf(false, true)) for (en in listOf(false, true)) {
+                  val name = "g:${g.group}:${s.name}" + (if (dark) "-dark" else "") + (if (en) "-en" else "")
+                  java.awt.EventQueue.invokeAndWait { PhonePreview.screen.value = name }
+                  Thread.sleep(2400)
+                  val w = Window.getWindows().firstOrNull { it.isShowing && (it as? java.awt.Dialog)?.title == PhonePreview.TITLE }
+                  val file = File(out, "${s.name}-${if (dark) "dark" else "light"}-${if (en) "en" else "fa"}.png")
+                  if (w != null) ImageIO.write(robot.createScreenCapture(Rectangle(w.x, w.y, w.width, w.height)), "png", file)
+                }
+                java.awt.EventQueue.invokeAndWait { PhonePreview.screen.value = null }
+                Thread.sleep(600)
+              }
               "pshot" -> {
                 val w = Window.getWindows().firstOrNull { it.isShowing && (it as? java.awt.Dialog)?.title == PhonePreview.TITLE }
                 if (w == null) shot(arg)

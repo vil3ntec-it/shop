@@ -1,5 +1,10 @@
 package ir.vil3ntec.tohid.ui.v3
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
@@ -11,8 +16,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import ir.vil3ntec.tohid.ui.screens.V3Card
 import ir.vil3ntec.tohid.ui.screens.V3GroupTitle
 import ir.vil3ntec.tohid.ui.screens.v3Text
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
@@ -58,5 +63,14 @@ fun V3Section(
         modifier = Modifier.padding(start = 6.dp, end = 6.dp, top = 6.dp),
       )
     }
+  }
+}
+
+/** خطِ مویی میانِ ردیف‌های یک کارت (از `start` به بعد، زیرِ متن نه زیرِ آیکن) */
+@Composable
+fun V3Divider(start: Dp = 0.dp) {
+  Row(Modifier.fillMaxWidth()) {
+    Spacer(Modifier.width(start))
+    Box(Modifier.weight(1f).height(1.dp).background(PhoneV3.colors.hairline))
   }
 }

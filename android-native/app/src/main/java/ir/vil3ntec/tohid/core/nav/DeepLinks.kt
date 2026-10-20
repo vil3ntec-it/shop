@@ -5,14 +5,14 @@ package ir.vil3ntec.tohid.core.nav
  *
  *  • `vill3n://app/<مسیر>?<پرسش>` ⇐ همان مسیرِ برنامه (اعلان‌ها، هشدارها،
  *    میان‌برها): `vill3n://app/settings/security`، `vill3n://app/products?filter=out`.
- *  • ویترینِ دکان، با همان شکلی که سرور امروز می‌سازد (D-06): زیردامنهٔ
- *    `https://<slug>.vill3n.top/`، مسیرِ `https://<هر میزبانِ vill3n.top>/store/<slug>`،
- *    و نشانیِ کوتاهِ `https://vill3n.top/<slug>` (QRِ دکان) ⇐ حالتِ «خرید» روی همان
- *    دکان: `shopper/shop/<slug>`. پیگیریِ سفارشِ ویترین (`…/store/<slug>#/o/<توکن>`)
- *    ⇐ `shopper/order/<توکن>`.
- *  قاعدهٔ نامِ دکان و نام‌های رزرو عیناً همان `server/src/lib/storefront.js` است تا
- *  پیوندی که سرور نمی‌سازد، این‌جا هم دکان حساب نشود؛ نشانی‌های دیگرِ سایت
- *  (بازارچه، پنل، API) پیوندِ برنامه نیستند و در مرورگر می‌مانند.
+ *  • ویترینِ دکان، با همان دو شکلی که سرور امروز می‌سازد (D-06، QRِ دکان):
+ *    زیردامنهٔ `https://<slug>.vill3n.top/` و مسیرِ `https://<میزبان>/store/<slug>`
+ *    (میزبان: `vill3n.top` و زیردامنه‌هایش، یا میزبانِ سرورِ همین ساخت که صدازننده در
+ *    `hosts` می‌دهد) ⇐ حالتِ «خرید» روی همان دکان: `shopper/shop/<slug>`.
+ *    پیگیریِ سفارشِ ویترین (`…/store/<slug>#/o/<توکن>`) ⇐ `shopper/order/<slug>/<توکن>`.
+ *  شکل‌ها همان `ShopperLinks.parse`ِ هستهٔ خرید (#355) است؛ پس از ادغامش همین‌جا به
+ *  آن سپرده می‌شود. قاعدهٔ نامِ دکان و نام‌های رزرو عیناً `server/src/lib/storefront.js`؛
+ *  نشانی‌های دیگرِ سایت (بازارچه، پنل، API) پیوندِ برنامه نیستند و در مرورگر می‌مانند.
  */
 data class DeepLink(val mode: AppMode, val path: String)
 
@@ -23,27 +23,26 @@ object DeepLinks {
 
   /** `SLUG_RE`ِ سرور */
   private val SLUG = Regex("^[a-z0-9][a-z0-9-]{1,30}[a-z0-9]$")
-  /** `RESERVED`ِ سرور + بخش‌های اولِ مسیرِ خودِ سایت */
+  /** `RESERVED`ِ سرور */
   val RESERVED: Set<String> = setOf(
     "api", "www", "admin", "panel", "portal", "sdk", "shop", "store", "stores", "beta", "app", "apps",
     "pump", "mail", "smtp", "imap", "pop", "ftp", "ns1", "ns2", "cdn", "static", "assets", "help",
     "support", "status", "docs", "blog", "dev", "test", "staging", "login", "auth", "account",
     "billing", "pay", "payment", "download", "downloads", "home", "vill3n", "tohid", "official",
-    "market", "kit", "courier",
   )
   private val TOKEN = Regex("^[A-Za-z0-9_.-]{1,160}$")
 
   /** پیوندِ برنامه برای یک مسیر — همان رشته‌ای که اعلان‌ها و میان‌برها می‌سازند */
   fun appLink(path: String): String = "$SCHEME://$APP_HOST/" + RoutePaths.normalize(path)
 
-  fun parse(raw: String?): DeepLink? {
+  fun parse(raw: String?, hosts: Set<String> = emptySet()): DeepLink? {
     val url = raw?.trim().orEmpty()
     if (url.isEmpty() || "://" !in url) return null
     val scheme = url.substringBefore("://").lowercase()
     val rest = url.substringAfter("://")
     return when (scheme) {
       SCHEME -> app(rest)
-      "https", "http" -> site(rest)
+      "https", "http" -> site(rest, hosts.map { it.lowercase() }.toSet())
       else -> null
     }
   }
@@ -60,22 +59,22 @@ object DeepLinks {
     return DeepLink(mode, path)
   }
 
-  private fun site(rest: String): DeepLink? {
+  private fun site(rest: String, hosts: Set<String>): DeepLink? {
     val host = rest.substringBefore('/').substringBefore('?').substringBefore('#').substringBefore(':').lowercase()
-    val afterHost = rest.substring(rest.indexOfFirst { it == '/' || it == '?' || it == '#' }.let { if (it < 0) rest.length else it })
+    val cut = rest.indexOfFirst { it == '/' || it == '?' || it == '#' }
+    val afterHost = if (cut < 0) "" else rest.substring(cut)
     val fragment = afterHost.substringAfter('#', "")
     val parts = afterHost.substringBefore('#').substringBefore('?').split('/').filter { it.isNotEmpty() }.map(RoutePaths::decode)
-    val sub = host.removeSuffix(".$DOMAIN").takeIf { host.endsWith(".$DOMAIN") }
-    val slug: String? = when {
-      host != DOMAIN && sub == null -> return null
+    val ours = host == DOMAIN || host.endsWith(".$DOMAIN") || host in hosts
+    if (!ours) return null
+    val sub = host.removeSuffix(".$DOMAIN").takeIf { host.endsWith(".$DOMAIN") && '.' !in it }
+    val slug: String = when {
       parts.size >= 2 && parts[0] == "store" -> parts[1]
-      sub != null && sub !in RESERVED && '.' !in sub && parts.isEmpty() -> sub
-      sub == null && parts.size == 1 -> parts[0]
-      else -> null
-    }?.lowercase()?.takeIf { SLUG.matches(it) && it !in RESERVED }
-    if (slug == null) return null
+      sub != null && sub !in RESERVED && parts.isEmpty() -> sub
+      else -> return null
+    }.lowercase().takeIf { SLUG.matches(it) && it !in RESERVED } ?: return null
     val order = fragment.removePrefix("/").takeIf { it.startsWith("o/") }?.removePrefix("o/")?.takeIf { TOKEN.matches(it) }
-    return if (order != null) DeepLink(AppMode.SHOPPER, "shopper/order/" + RoutePaths.encode(order))
+    return if (order != null) DeepLink(AppMode.SHOPPER, "shopper/order/$slug/" + RoutePaths.encode(order))
     else DeepLink(AppMode.SHOPPER, "shopper/shop/$slug")
   }
 }
