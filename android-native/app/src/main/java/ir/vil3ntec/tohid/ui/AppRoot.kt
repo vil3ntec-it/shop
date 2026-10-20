@@ -72,6 +72,8 @@ private val PAGE_TITLES = mapOf(
   //  phone v3 §F: جست‌وجوی کامل و ویرایشگرِ نوارِ پایین
   ir.vil3ntec.tohid.ui.components.common.PhoneNav.SEARCH to "جست‌وجو",
   ir.vil3ntec.tohid.ui.components.common.PhoneNav.EDITOR to "نوارِ پایین",
+  //  میزِ تحویل (C01) — فقط وقتی سرور پرچمِ `shop.delivery` را روشن گفته
+  "delivery" to "میزِ تحویل",
 )
 
 /**
@@ -117,6 +119,10 @@ fun AppRoot(
   var sub by rememberSaveable { mutableStateOf<String?>(null) }
   // صفحهٔ ورود، وقتی از دکمهٔ حسابِ سربرگ باز شود
   var authOpen by rememberSaveable { mutableStateOf(false) }
+
+  //  «رمز را دوباره بزنید» برای هر کارِ حساس (`reauth_required`، بندِ ۲۱.۱):
+  //  یک پنجره برای همهٔ صفحه‌ها؛ `ApiClient` پس از تأیید همان درخواست را دوباره می‌فرستد
+  ReauthHost()
 
   /*
    *  دکانِ حساب — پرسیدنش فقط وقتی معلوم شود که ندارد.
@@ -471,6 +477,7 @@ fun AppRoot(
 
   //  ویترین (فاز ۴): فقط وقتی سرور می‌گوید روشن است، بخشش دیده می‌شود
   LaunchedEffect(Unit) { runCatching { StorefrontGate.refresh(context) } }
+  LaunchedEffect(Unit) { runCatching { DeliveryGate.refresh(context) } }
 
   //  گوشیِ جفت‌شده بارکد فرستاد ⇒ صفحهٔ فروش باز می‌شود و کالا به سبد می‌رود
   LaunchedEffect(Unit) {
@@ -860,6 +867,7 @@ fun AppRoot(
         "team" -> TeamScreen(snackbar)
         "orders" -> OrdersScreen(snackbar) { sub = null }
         "storefront" -> if (StorefrontGate.visible) StorefrontScreen(snackbar) else LaunchedEffect(Unit) { open("more") }
+        "delivery" -> DeliveryScreen(snackbar) { open("more") }
         "devices" -> DevicesScreen(data, snackbar)
         "more" -> MoreScreen(store, data, ::open)
       }
