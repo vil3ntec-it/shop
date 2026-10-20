@@ -515,7 +515,7 @@ private fun ProductGrid(
       Column(
         Modifier
           .softCard(c, Shape.card, fill = if (p.id == openId) c.primaryTint.compositeOver(c.surface) else c.surface)
-          .then(if (highlighted) Modifier.border(2.dp, c.primary, Shape.card) else Modifier)
+          .then(if (highlighted) Modifier.border(2.dp, c.focus, Shape.card) else Modifier)
           .clickable { onOpen(p.id) }
           .padding(10.dp),
       ) {
@@ -576,8 +576,8 @@ private fun QuickField(
     modifier
       .height(40.dp)
       .clip(Shape.field)
-      .background(c.surface2)
-      .border(1.dp, if (focused) c.primary else c.surface2, Shape.field)
+      .background(c.fieldBg)
+      .border(1.dp, if (focused) c.focus else c.fieldBorder, Shape.field)
       .padding(horizontal = 10.dp),
     contentAlignment = Alignment.CenterStart,
   ) {
@@ -587,7 +587,7 @@ private fun QuickField(
       onValueChange = { onChange(if (numeric) ir.vil3ntec.tohid.numericInput(it) else it) },
       singleLine = true,
       textStyle = MaterialTheme.typography.bodyMedium.copy(color = c.text),
-      cursorBrush = androidx.compose.ui.graphics.SolidColor(c.primary),
+      cursorBrush = androidx.compose.ui.graphics.SolidColor(c.focus),
       modifier = Modifier
         .fillMaxWidth()
         .onFocusChanged { focused = it.isFocused }
