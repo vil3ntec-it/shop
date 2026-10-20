@@ -38,8 +38,8 @@ router.get('/', readLimit, on, wrap(async (req, res) => {
 }));
 
 router.get('/shops', readLimit, on, wrap(async (req, res) => {
-  const { q, category, lat, lng, limit, offset } = req.query;
-  res.json(await market.shops({ q, category, lat, lng, limit, offset }));
+  const { q, category, lat, lng, limit, offset, first } = req.query;
+  res.json(await market.shops({ q, category, lat, lng, limit, offset, first }));
 }));
 
 //  خانه: اول کالا (قفسهٔ دکان‌ها، «پرفروش» و «ارزان‌تر» ِ واقعی)، بعد دکان‌های پیشنهادی
