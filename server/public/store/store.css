@@ -4,8 +4,8 @@
   قلم: Vazirmatn (OFL 1.1) زیرمجموعهٔ فارسی/لاتین، woff2، از همین سرور.
   ⛔ CSP ِ این صفحه style ِ درون‌خطی نمی‌پذیرد: هیچ `style=` در HTML نیست.
 */
-@font-face{font-family:'Vazirmatn';src:url('/store/fonts/vazirmatn-regular.woff2') format('woff2');font-weight:400;font-display:swap;}
-@font-face{font-family:'Vazirmatn';src:url('/store/fonts/vazirmatn-bold.woff2') format('woff2');font-weight:700;font-display:swap;}
+@font-face{font-family:'Vazirmatn';src:url('/kit/fonts/vazirmatn-regular.woff2') format('woff2');font-weight:400;font-display:swap;}
+@font-face{font-family:'Vazirmatn';src:url('/kit/fonts/vazirmatn-bold.woff2') format('woff2');font-weight:700;font-display:swap;}
 :root{
   --bg:#ffffff; --surface:#f6f8fc; --surface-2:#eef2fa; --border:#e5eaf3;
   --text:#1a2233; --muted:#5f6a7e; --primary:#2c5ce6; --on-primary:#ffffff;
