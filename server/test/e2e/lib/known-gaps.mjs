@@ -16,24 +16,12 @@ export const KNOWN_GAPS = [
     ref: 'RET-07 (STATUS: ناقص) — SalesEngine.recordReturn مقصدِ برگشت (موجودی/ضایعات) ندارد؛ کالای «خراب» به موجودیِ فروختنی برمی‌گردد',
   },
   {
-    scenario: 'stock', step: 'CHK-18.accept', match: /قبولِ سفارشِ بی‌موجودی پذیرفته شد/,
-    ref: 'باگ — اصلاح در PR #308 (catalog.onOrderStatus رزروِ بی‌پشتوانه را بی‌مهلت می‌کرد)',
-  },
-  {
     scenario: 'stock', step: 'E2E-STK.pos-view', match: /فروشِ اینترنتی به دفترِ دستگاه برنمی‌گردد/,
     ref: '§۳۲.۲ بندهای ۱ و ۴ — MISSING: کسرِ سفارشِ اینترنتی فقط در دفترِ سرور (#263) است و به دفترِ برنامهٔ دکان (ShopStore.stock) برنمی‌گردد',
   },
   {
-    scenario: 'security', step: 'E2E-SEC-13.op-children', match: /قلمِ بی‌فاکتور روی سرور ماند/,
-    ref: 'باگ — BLOCKED: authorizeOp در server/src/lib/sync-v1.js (مشترک با پمپ، دست‌نزدنی) فقط سرِ فاکتور را رد می‌کند؛ تصمیمِ نشستِ اصلی لازم است',
-  },
-  {
     scenario: 'ops', step: 'E2E-OPS-14.replay', match: /فروشِ پس از پشتیبان روی سرورِ بازیابی‌شده نیست/,
     ref: '§۹.۵ — MISSING: پس از بازیابیِ سرور، برنامه cursor ِ جلوتر از سرِ دفترِ سرور را تشخیص نمی‌دهد و opهای «اعمال‌شده» را دوباره نمی‌فرستد',
-  },
-  {
-    scenario: 'admin', step: 'E2E-ADM.counts', match: /Sync v1 شمرده نمی‌شود/,
-    ref: 'باگ — اصلاح در PR #310 (GET /api/admin/shops/:id فقط راهِ قدیم را می‌شمرد)',
   },
 ];
 
