@@ -1,0 +1,246 @@
+package ir.vil3ntec.tohid.ui.v3
+
+import androidx.compose.animation.core.Animatable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.Velocity
+import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.ui.screens.MotionSpec
+import ir.vil3ntec.tohid.ui.screens.V3BackButton
+import ir.vil3ntec.tohid.ui.screens.V3RoundButton
+import ir.vil3ntec.tohid.ui.screens.v3Text
+import ir.vil3ntec.tohid.ui.theme.PhoneV3
+
+/** یک کارِ سربرگ (حداکثر دو تا): آیکنِ گرد با برچسبِ دسترس‌پذیری و نقطهٔ اختیاری */
+data class V3Action(
+  val icon: ImageVector,
+  val label: String,
+  val dot: Boolean = false,
+  val onClick: () -> Unit,
+)
+
+/**
+ *  حالتِ سربرگِ جمع‌شونده: `offset` از صفر (باز) تا `-max` (جمع). محتوای
+ *  پیمایش‌پذیرِ زیرِ آن (هر `LazyColumn` یا `verticalScroll`) با `nestedScroll`
+ *  اول عنوانِ درشت را جمع می‌کند و بعد خودش می‌رود؛ برگشت در بالای فهرست باز
+ *  می‌کند. رها کردن در میانه با فنر به نزدیک‌ترین حالت می‌نشیند.
+ */
+@Stable
+class V3HeaderState {
+  var max by mutableFloatStateOf(0f)
+    internal set
+  var offset by mutableFloatStateOf(0f)
+    internal set
+
+  /** صفر = باز، یک = جمع */
+  val fraction: Float get() = if (max <= 0f) 0f else (-offset / max).coerceIn(0f, 1f)
+
+  /** دکمهٔ شناور با پیمایش به پایین کوچک می‌شود */
+  var scrolledDown by mutableStateOf(false)
+    internal set
+
+  internal fun consume(dy: Float): Float {
+    val next = (offset + dy).coerceIn(-max, 0f)
+    val used = next - offset
+    offset = next
+    return used
+  }
+}
+
+@Composable
+fun rememberV3HeaderState(): V3HeaderState = remember { V3HeaderState() }
+
+/**
+ *  قابِ هر صفحهٔ گوشیِ نسخهٔ ۳ — جای خالیِ سربرگِ آبیِ قدیم (`TohidTopBar`).
+ *
+ *  سربرگ: دکمهٔ گردِ برگشت در آغاز (اگر راهی به عقب هست)، تا دو کارِ گرد در
+ *  پایان، و عنوانِ درشتِ ۳۰sp زیرش که با پیمایش جمع می‌شود و عنوانِ کوچکِ
+ *  وسط جایش را می‌گیرد (مثلِ iOS). `subtitle` یک خطِ خاکستری زیرِ عنوانِ درشت.
+ *
+ *  پایین: `bottomReserve` جای نوارِ شناورِ پایین است (صفحه‌های نوار)، و
+ *  `bottomBar` دکمهٔ چسبانِ پایین (فرم‌ها)؛ هر دو در `PaddingValues`ِ محتوا
+ *  حساب شده‌اند تا آخرین ردیف زیرِ چیزی نماند. `fab` با پیمایش کوچک می‌شود.
+ */
+@Composable
+fun V3Scaffold(
+  title: String,
+  modifier: Modifier = Modifier,
+  subtitle: String? = null,
+  onBack: (() -> Unit)? = null,
+  actions: List<V3Action> = emptyList(),
+  bottomReserve: Dp = 0.dp,
+  /** false ⇒ فقط عنوانِ کوچکِ وسط (فرم‌ها و صفحه‌های کوتاه) */
+  largeTitle: Boolean = true,
+  state: V3HeaderState = rememberV3HeaderState(),
+  fab: (@Composable BoxScope.(expanded: Boolean) -> Unit)? = null,
+  bottomBar: (@Composable () -> Unit)? = null,
+  content: @Composable (PaddingValues) -> Unit,
+) {
+  val c = PhoneV3.colors
+  val density = LocalDensity.current
+  val maxPx = with(density) { (if (subtitle != null) LARGE_WITH_SUB else LARGE).toPx() }
+  SideEffect { state.max = if (largeTitle) maxPx else 0f }
+  val settle = remember { Animatable(0f) }
+  val connection = remember(state) {
+    object : NestedScrollConnection {
+      override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+        if (available.y < -1f) state.scrolledDown = true else if (available.y > 1f) state.scrolledDown = false
+        return if (available.y < 0f) Offset(0f, state.consume(available.y)) else Offset.Zero
+      }
+
+      override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset =
+        if (available.y > 0f) Offset(0f, state.consume(available.y)) else Offset.Zero
+
+      override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
+        val f = state.fraction
+        if (f > 0f && f < 1f) {
+          settle.snapTo(state.offset)
+          settle.animateTo(if (f > 0.5f) -state.max else 0f, MotionSpec.headerSettle) { state.offset = value }
+        }
+        return Velocity.Zero
+      }
+    }
+  }
+  var barHeight by remember { mutableFloatStateOf(0f) }
+  val navInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+  val bottomBarHeight = with(density) { barHeight.toDp() }
+
+  Box(modifier.fillMaxSize().background(c.bg)) {
+    Column(Modifier.fillMaxSize().nestedScroll(connection)) {
+      V3HeaderBar(title, onBack, actions.take(2), showTitle = !largeTitle || state.fraction > 0.65f, divider = if (largeTitle) state.fraction else 1f)
+      if (largeTitle) V3LargeTitle(title, subtitle, state)
+      Box(Modifier.weight(1f).fillMaxWidth()) {
+        content(PaddingValues(bottom = bottomReserve + bottomBarHeight + (if (bottomBar == null) navInset else 0.dp) + 16.dp))
+      }
+    }
+    if (bottomBar != null) {
+      Box(
+        Modifier
+          .align(Alignment.BottomCenter)
+          .fillMaxWidth()
+          .onSizeChanged { barHeight = it.height.toFloat() }
+          .padding(bottom = bottomReserve),
+      ) { bottomBar() }
+    }
+    if (fab != null) {
+      Box(
+        Modifier
+          .align(Alignment.BottomEnd)
+          .padding(end = 16.dp, bottom = bottomReserve + bottomBarHeight + (if (bottomReserve == 0.dp && bottomBar == null) navInset else 0.dp) + 16.dp),
+      ) { fab(!state.scrolledDown) }
+    }
+  }
+}
+
+private val LARGE = 52.dp
+private val LARGE_WITH_SUB = 74.dp
+
+/** ردیفِ بالای سربرگ: برگشت، عنوانِ کوچکِ وسط (وقتی جمع شده)، و کارها */
+@Composable
+internal fun V3HeaderBar(
+  title: String,
+  onBack: (() -> Unit)?,
+  actions: List<V3Action>,
+  showTitle: Boolean,
+  /** پیدا شدنِ خطِ مویی زیرِ سربرگ (۰ تا ۱) */
+  divider: Float,
+) {
+  val c = PhoneV3.colors
+  Column(Modifier.fillMaxWidth().background(c.bg).windowInsetsPadding(WindowInsets.statusBars)) {
+    Box(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 16.dp), contentAlignment = Alignment.Center) {
+      if (onBack != null) Box(Modifier.align(Alignment.CenterStart)) { V3BackButton(onBack) }
+      val alpha by androidx.compose.animation.core.animateFloatAsState(if (showTitle) 1f else 0f, MotionSpec.tweenOf(150), label = "barTitle")
+      Text(
+        title,
+        style = v3Text(17, FontWeight.SemiBold, 24),
+        color = c.ink,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        textAlign = TextAlign.Center,
+        modifier = Modifier.padding(horizontal = 104.dp).graphicsLayer { this.alpha = alpha },
+      )
+      if (actions.isNotEmpty()) {
+        Row(Modifier.align(Alignment.CenterEnd)) {
+          actions.forEachIndexed { i, a ->
+            if (i > 0) Spacer(Modifier.width(8.dp))
+            V3RoundButton(a.icon, a.label, size = 44.dp, iconSize = 22.dp, dot = a.dot, onClick = a.onClick)
+          }
+        }
+      }
+    }
+    Box(Modifier.fillMaxWidth().height(1.dp).graphicsLayer { alpha = divider }.background(c.hairline))
+  }
+}
+
+/** عنوانِ درشتِ جمع‌شونده (و زیرعنوانِ اختیاری) */
+@Composable
+private fun V3LargeTitle(title: String, subtitle: String?, state: V3HeaderState) {
+  val c = PhoneV3.colors
+  val density = LocalDensity.current
+  val full = if (subtitle != null) LARGE_WITH_SUB else LARGE
+  val visible = with(density) { (full.toPx() + state.offset).coerceAtLeast(0f).toDp() }
+  Box(Modifier.fillMaxWidth().height(visible).background(c.bg)) {
+    Column(
+      Modifier
+        .fillMaxWidth()
+        .padding(start = 20.dp, end = 20.dp)
+        .graphicsLayer {
+          val f = state.fraction
+          alpha = (1f - f * 1.6f).coerceIn(0f, 1f)
+          translationY = state.offset * 0.35f
+        },
+    ) {
+      Text(
+        title,
+        style = v3Text(30, FontWeight.Bold, 40),
+        color = c.ink,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier.semantics { heading() },
+      )
+      if (subtitle != null) {
+        Text(subtitle, style = v3Text(13, FontWeight.Medium, 19), color = c.inkMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+      }
+    }
+  }
+}
