@@ -123,11 +123,15 @@ async function open(slug) {
   const s = str(slug).toLowerCase();
   const gone = () => notFound('این ویترین پیدا نشد', 'store_not_found');
   if (!SLUG_RE.test(s)) throw gone();
+  //  جریمهٔ «تعلیقِ ویترین» (v3 §۳۸.۶) ⇒ همان «نیست»؛ تنظیماتِ ویترین دست نمی‌خورد.
   const row = await one(
-    `SELECT sf.*, s.status AS shop_status FROM storefronts sf JOIN shops s ON s.id = sf.shop_id WHERE sf.slug = $1`,
+    `SELECT sf.*, s.status AS shop_status,
+            EXISTS (SELECT 1 FROM trust_sanctions ts WHERE ts.shop_id = sf.shop_id
+                      AND ts.kind = 'suspend_storefront' AND ts.lifted_at IS NULL) AS trust_suspended
+       FROM storefronts sf JOIN shops s ON s.id = sf.shop_id WHERE sf.slug = $1`,
     [s]
   );
-  if (!row || row.enabled !== true || row.shop_status !== 'active') throw gone();
+  if (!row || row.enabled !== true || row.shop_status !== 'active' || row.trust_suspended === true) throw gone();
   if (!(await stateOf(row.shop_id)).enabled) throw gone();
   return row;
 }
@@ -274,8 +278,12 @@ function productView(row) {
 const PRODUCT_COLS = `r.row_id AS id, r.data, sp.online_price_minor, sp.max_qty_milli,
   EXISTS (SELECT 1 FROM product_photos ph WHERE ph.app = 'shop' AND ph.account_id = sp.shop_id
             AND ph.product_id = r.row_id AND ph.data IS NOT NULL) AS has_photo`;
+//  جریمهٔ «پنهان کردنِ کالا» (v3 §۳۸.۶، `trust_sanctions`) کالا را از کاتالوگ، عکس
+//  و ثبتِ سفارش کنار می‌گذارد؛ `published` ِ خودِ دکان دست نمی‌خورد. بی جریمه ⇒ همان قبلی.
 const PRODUCT_FROM = `storefront_products sp
-  JOIN sync_rows r ON ${SHOP_ROWS} AND r.account_id = sp.shop_id AND r.row_id = sp.product_id`;
+  JOIN sync_rows r ON ${SHOP_ROWS} AND r.account_id = sp.shop_id AND r.row_id = sp.product_id
+   AND NOT EXISTS (SELECT 1 FROM trust_sanctions ts WHERE ts.shop_id = sp.shop_id AND ts.product_id = sp.product_id
+                     AND ts.kind = 'hide_listing' AND ts.lifted_at IS NULL)`;
 
 async function categories(shopId) {
   const rows = await many(
