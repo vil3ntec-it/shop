@@ -12,12 +12,14 @@
  * آن لایه‌ها را؛ پس لایه فقط می‌تواند ببندد. تنها کلیدِ «full»
  * (`reports.money`) نمایشی است و از هیچ مسیرِ سرور نمی‌گذرد.
  *
- * ── چرا فقط سه کلید قابل‌ویرایش است ─────────────────────────────────
- * تخفیف و لغو (`sales.discount`، `sales.cancel`) با op در Sync v1 می‌آیند و
- * `authorizeOp` (در `sync-v1.js`، مشترک با پمپ) فقط نقش را می‌بیند. اگر
- * این‌جا تنگشان کنیم، فقط دکمه پنهان می‌شود و سرور همچنان می‌پذیرد — و
- * پنهان کردنِ دکمه امنیت نیست (بخشِ ۲۹.۲ بندِ ۱۱). پس تا آن سنجش (با
- * «برگهٔ امضاشده»ی بخشِ ۱۰.۱) ساخته نشود، رد می‌شوند: `not_enforceable_yet`.
+ * ── کدام کلید قابل‌ویرایش است ───────────────────────────────────────
+ * فقط کلیدی که سرور واقعاً اجرایش می‌کند (پنهان کردنِ دکمه امنیت نیست،
+ * بخشِ ۲۹.۲ بندِ ۱۱). تخفیف، لغو و برگشت (`sales.discount`، `sales.cancel`،
+ * `returns.create`) با op می‌آیند؛ از ۱۴۰۵/۰۷/۲۷ هر دو راه می‌سنجندشان:
+ * Sync v3 در `authorize`ِ `sync-v3.js` و Sync v1 در `v1Guard`
+ * (`staff-approval.js`، پیش از `sync-v1.js`ِ مشترک با پمپ که دست نمی‌خورد).
+ * «نیازمند تأیید» فقط با «برگهٔ امضاشده»ی بخشِ ۱۰.۱ پذیرفته می‌شود.
+ * کلیدِ تازه‌ای که هنوز اجرا نمی‌شود رد می‌شود: `not_enforceable_yet`.
  */
 const core = require('./perm-core');
 const { can, permissionsOf } = require('./permissions');
@@ -25,7 +27,11 @@ const { one, many, query, now } = require('../db');
 const { badRequest, notFound } = require('../middleware/errors');
 
 /** کلیدهایی که سرور امروز واقعاً اجرا می‌کند (یا فقط نمایشی‌اند) */
-const SERVER_EDITABLE = Object.freeze(['audit.view', 'reports.money', 'settings.write']);
+const SERVER_EDITABLE = Object.freeze([
+  'audit.view', 'reports.money', 'settings.write',
+  //  اجرا در همگام‌سازی، با سقف و برگهٔ امضاشده — `staff-approval.js`
+  'sales.discount', 'sales.cancel', 'returns.create',
+]);
 const EDITABLE_ROLES = Object.freeze(['manager', 'staff']);
 
 const MESSAGES = {
