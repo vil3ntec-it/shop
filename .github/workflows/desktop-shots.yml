@@ -87,6 +87,16 @@ jobs:
           S="$S;phone:v3-profile;wait:1800;pshot:phone-v3-profile-in;phone:v3-profile-dark;wait:1500;pshot:phone-v3-profile-in-dark;phone:v3-profile-out;wait:1800;pshot:phone-v3-profile-out;phone:v3-profile-out-dark;wait:1500;pshot:phone-v3-profile-out-dark"
           S="$S;phone:v3-settings;wait:1800;pshot:phone-v3-settings-top;phone:v3-settings-dark;wait:1500;pshot:phone-v3-settings-top-dark;phone:v3-settings-scrolled;wait:1800;pshot:phone-v3-settings-scrolled;phone:v3-settings-scrolled-dark;wait:1500;pshot:phone-v3-settings-scrolled-dark;phone:v3-settings-detail;wait:1800;pshot:phone-v3-settings-detail;phone:v3-settings-detail-dark;wait:1500;pshot:phone-v3-settings-detail-dark"
           S="$S;phone:v3-more;wait:1800;pshot:phone-v3-more-top;phone:v3-more-dark;wait:1500;pshot:phone-v3-more-top-dark;phone:v3-more-bottom;wait:2000;pshot:phone-v3-more-bottom;phone:v3-more-bottom-dark;wait:1500;pshot:phone-v3-more-bottom-dark;phone:off"
+          #  phone-v3-home: خانهٔ r7، کارتِ کششیِ r6، آمارِ r8، نوارِ r10 (هر موردِ فعال + تمدید)، ویرایشگرِ نوار، نوارِ سفارشی، جست‌وجو
+          H="phone:v3home;wait:1500;pshot:phone-v3-home-01-home;phone:v3home-dark;wait:1500;pshot:phone-v3-home-01b-home-dark"
+          H="$H;phone:v3home-pull;wait:1800;pshot:phone-v3-home-02-pull;phone:v3home-pull-dark;wait:1800;pshot:phone-v3-home-02b-pull-dark"
+          H="$H;phone:v3home-stats;wait:1800;pshot:phone-v3-home-03-stats;phone:v3home-stats-dark;wait:1800;pshot:phone-v3-home-03b-stats-dark"
+          H="$H;phone:v3home-navs;wait:1500;pshot:phone-v3-home-04-nav-states;phone:v3home-navs-dark;wait:1500;pshot:phone-v3-home-04b-nav-states-dark"
+          H="$H;phone:v3home-renew;wait:1500;pshot:phone-v3-home-05-renew-pill"
+          H="$H;phone:v3home-big;wait:1500;pshot:phone-v3-home-06-big-long-name;phone:v3home-big-pull;wait:1800;pshot:phone-v3-home-06b-big-pull;phone:v3home-big-stats;wait:1800;pshot:phone-v3-home-06c-big-stats"
+          H="$H;phone:v3home-editor;wait:1500;pshot:phone-v3-home-07-nav-editor;phone:v3home-editor-dark;wait:1500;pshot:phone-v3-home-07b-nav-editor-dark"
+          H="$H;phone:v3home-custom;wait:1500;pshot:phone-v3-home-08-custom-nav;phone:v3home-search;wait:1500;pshot:phone-v3-home-09-search;phone:off"
+          S="$S;$H"
           export JAVA_TOOL_OPTIONS="-Dtohid.shot=$RUNNER_TEMP/shots -Dtohid.shot.every=9000 -Dtohid.shot.exit=true -Dtohid.shot.script=$S -Dsun.jnu.encoding=UTF-8 -Dfile.encoding=UTF-8"
           timeout 600 xvfb-run -s "-screen 0 1440x900x24" ./gradlew --no-daemon -q -Pdev=true run || true
           ls -la "$RUNNER_TEMP/shots"

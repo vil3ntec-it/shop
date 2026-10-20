@@ -71,7 +71,19 @@ private fun todayIso(): String =
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun DashboardScreen(d: ShopData, onOpen: (String) -> Unit = {}) {
+fun DashboardScreen(
+  d: ShopData,
+  bottomReserve: androidx.compose.ui.unit.Dp = ir.vil3ntec.tohid.ui.components.common.PhoneNav.RESERVE,
+  onOpen: (String) -> Unit = {},
+) {
+  /*
+   *  phone v3 §D: عرضِ گوشی (و تبلت، که همان نوارِ پایینِ گوشی را دارد) خانهٔ تازه را
+   *  می‌گیرد — r7 + کارتِ کششیِ r6 + آمارِ r8 با کشیدن به چپ. صفحهٔ پهن همین داشبورد.
+   */
+  if (screenSize() != Screen.WIDE) {
+    PhoneHomeScreen(d, onOpen, bottomReserve)
+    return
+  }
   val context = LocalContext.current
   val storeName = remember {
     context.getSharedPreferences("tohid", android.content.Context.MODE_PRIVATE)
