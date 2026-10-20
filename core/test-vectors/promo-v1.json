@@ -1,0 +1,3573 @@
+{
+ "version": 1,
+ "about": "بردارهای مرجعِ هستهٔ تخفیف (PRM-01..09، 11، 12، 17). هر مبلغ عددِ صحیح به واحدِ کوچک (۱۰۰ = یک افغانی)، هر مقدار به هزارم. کاتلین (core/promo/PromoCore.kt) و JS (license/promo-core.js) هر دو باید همهٔ این‌ها را بگذرانند. عددها دستی و از روی قاعده نوشته شده‌اند، نه از خروجیِ کد. ردیف‌های نمونه: A=۱۰۰ (بها ۶۰، drinks، s1)، B=۲۵۰ (بها ۲۰۰، snacks، s2)، C=۳۵۰ (بها نامعلوم، drinks، s2)، W=۱۱۵ در کیلو (fruit).",
+ "kinds": [
+  "percent",
+  "amount",
+  "price",
+  "tiers",
+  "bxgy",
+  "bundle",
+  "threshold"
+ ],
+ "stacks": [
+  "exclusive",
+  "best",
+  "combine"
+ ],
+ "channels": [
+  "pos",
+  "online"
+ ],
+ "normalizeCode": [
+  {
+   "in": "sale-10",
+   "out": "SALE10"
+  },
+  {
+   "in": " vip ۲۰ ",
+   "out": "VIP20"
+  },
+  {
+   "in": "ab‌c",
+   "out": "ABC"
+  },
+  {
+   "in": "Xmas_٢٠٢٦",
+   "out": "XMAS_2026"
+  },
+  {
+   "in": "",
+   "out": ""
+  },
+  {
+   "in": "ÄB",
+   "out": "ÄB"
+  }
+ ],
+ "isoDow": [
+  {
+   "date": "2026-10-19",
+   "out": 1
+  },
+  {
+   "date": "2026-10-23",
+   "out": 5
+  },
+  {
+   "date": "2024-02-29",
+   "out": 4
+  },
+  {
+   "date": "2000-01-01",
+   "out": 6
+  },
+  {
+   "date": "1970-01-01",
+   "out": 4
+  },
+  {
+   "date": "1969-12-31",
+   "out": 3
+  },
+  {
+   "date": "2026-02-30",
+   "out": 0
+  },
+  {
+   "date": "2026-1-5",
+   "out": 0
+  }
+ ],
+ "window": [
+  {
+   "window": {},
+   "at": null,
+   "out": true
+  },
+  {
+   "window": {
+    "start": 1020,
+    "end": 1140
+   },
+   "at": {
+    "date": "2026-10-19",
+    "minute": 1020
+   },
+   "out": true
+  },
+  {
+   "window": {
+    "start": 1020,
+    "end": 1140
+   },
+   "at": {
+    "date": "2026-10-19",
+    "minute": 1140
+   },
+   "out": false
+  },
+  {
+   "window": {
+    "start": 1020,
+    "end": 1140
+   },
+   "at": {
+    "date": "2026-10-19",
+    "minute": 1019
+   },
+   "out": false
+  },
+  {
+   "window": {
+    "start": 1320,
+    "end": 120,
+    "days": [
+     5
+    ]
+   },
+   "at": {
+    "date": "2026-10-23",
+    "minute": 1380
+   },
+   "out": true
+  },
+  {
+   "window": {
+    "start": 1320,
+    "end": 120,
+    "days": [
+     5
+    ]
+   },
+   "at": {
+    "date": "2026-10-24",
+    "minute": 60
+   },
+   "out": true
+  },
+  {
+   "window": {
+    "start": 1320,
+    "end": 120,
+    "days": [
+     5
+    ]
+   },
+   "at": {
+    "date": "2026-10-24",
+    "minute": 1380
+   },
+   "out": false
+  },
+  {
+   "window": {
+    "start": 1320,
+    "end": 120,
+    "days": [
+     5
+    ]
+   },
+   "at": {
+    "date": "2026-10-23",
+    "minute": 60
+   },
+   "out": false
+  },
+  {
+   "window": {
+    "start": 1320,
+    "end": 120,
+    "days": [
+     5
+    ]
+   },
+   "at": {
+    "date": "2026-10-24",
+    "minute": 120
+   },
+   "out": false
+  },
+  {
+   "window": {
+    "start": 1320,
+    "end": 120,
+    "days": [
+     5
+    ]
+   },
+   "at": {
+    "date": "2026-10-24",
+    "minute": 180
+   },
+   "out": false
+  },
+  {
+   "window": {
+    "from": "2026-10-01",
+    "to": "2026-10-31"
+   },
+   "at": {
+    "date": "2026-10-31",
+    "minute": 0
+   },
+   "out": true
+  },
+  {
+   "window": {
+    "from": "2026-10-01",
+    "to": "2026-10-31"
+   },
+   "at": {
+    "date": "2026-11-01",
+    "minute": 0
+   },
+   "out": false
+  },
+  {
+   "window": {
+    "from": "2026-10-01",
+    "to": "2026-10-31"
+   },
+   "at": {
+    "date": "2026-09-30",
+    "minute": 1439
+   },
+   "out": false
+  },
+  {
+   "window": {
+    "except": [
+     "2026-10-20"
+    ]
+   },
+   "at": {
+    "date": "2026-10-20",
+    "minute": 600
+   },
+   "out": false
+  },
+  {
+   "window": {
+    "except": [
+     "2026-10-20"
+    ]
+   },
+   "at": {
+    "date": "2026-10-21",
+    "minute": 600
+   },
+   "out": true
+  },
+  {
+   "window": {
+    "to": "2026-10-19",
+    "start": 1320,
+    "end": 120
+   },
+   "at": {
+    "date": "2026-10-20",
+    "minute": 30
+   },
+   "out": true
+  },
+  {
+   "window": {
+    "days": [
+     6,
+     7
+    ]
+   },
+   "at": {
+    "date": "2026-10-24",
+    "minute": 600
+   },
+   "out": true
+  },
+  {
+   "window": {
+    "days": [
+     6,
+     7
+    ]
+   },
+   "at": {
+    "date": "2026-10-23",
+    "minute": 600
+   },
+   "out": false
+  },
+  {
+   "window": {
+    "start": 0,
+    "end": 60
+   },
+   "at": null,
+   "out": false
+  },
+  {
+   "window": {
+    "start": 0,
+    "end": 60
+   },
+   "at": {
+    "date": "2026-02-30",
+    "minute": 10
+   },
+   "out": false
+  },
+  {
+   "window": {
+    "start": 0,
+    "end": 60
+   },
+   "at": {
+    "date": "2026-10-19",
+    "minute": 1440
+   },
+   "out": false
+  },
+  {
+   "window": {
+    "start": 1200,
+    "end": 1440
+   },
+   "at": {
+    "date": "2026-10-19",
+    "minute": 1439
+   },
+   "out": true
+  }
+ ],
+ "validate": [
+  {
+   "rule": {
+    "id": "p",
+    "name": "۱۰٪",
+    "kind": "percent",
+    "bp": 1000
+   },
+   "out": []
+  },
+  {
+   "rule": {},
+   "out": [
+    "id",
+    "name",
+    "kind"
+   ]
+  },
+  {
+   "rule": {
+    "id": "p",
+    "name": " ‌ ",
+    "kind": "percent",
+    "bp": 1000
+   },
+   "out": [
+    "name"
+   ]
+  },
+  {
+   "rule": {
+    "id": "p",
+    "name": "n",
+    "kind": "percent",
+    "bp": 0
+   },
+   "out": [
+    "bp"
+   ]
+  },
+  {
+   "rule": {
+    "id": "p",
+    "name": "n",
+    "kind": "percent",
+    "bp": 10001
+   },
+   "out": [
+    "bp"
+   ]
+  },
+  {
+   "rule": {
+    "id": "p",
+    "name": "n",
+    "kind": "percent",
+    "bp": 10000
+   },
+   "out": []
+  },
+  {
+   "rule": {
+    "id": "p",
+    "name": "n",
+    "kind": "percent",
+    "bp": 10.5
+   },
+   "out": [
+    "bp"
+   ]
+  },
+  {
+   "rule": {
+    "id": "m",
+    "name": "n",
+    "kind": "amount",
+    "amountMinor": 1550
+   },
+   "out": [
+    "amount"
+   ]
+  },
+  {
+   "rule": {
+    "id": "m",
+    "name": "n",
+    "kind": "amount",
+    "amountMinor": 0
+   },
+   "out": [
+    "amount"
+   ]
+  },
+  {
+   "rule": {
+    "id": "m",
+    "name": "n",
+    "kind": "amount",
+    "amountMinor": 1000
+   },
+   "out": [],
+   "step": 500
+  },
+  {
+   "rule": {
+    "id": "m",
+    "name": "n",
+    "kind": "amount",
+    "amountMinor": 1200
+   },
+   "out": [
+    "amount"
+   ],
+   "step": 500
+  },
+  {
+   "rule": {
+    "id": "t",
+    "name": "n",
+    "kind": "tiers",
+    "tiers": [
+     {
+      "min": 5000,
+      "bp": 500
+     },
+     {
+      "min": 3000,
+      "bp": 1000
+     }
+    ]
+   },
+   "out": [
+    "tiers"
+   ]
+  },
+  {
+   "rule": {
+    "id": "t",
+    "name": "n",
+    "kind": "tiers",
+    "tiers": [
+     {
+      "min": 3000,
+      "bp": 1000
+     },
+     {
+      "min": 6000,
+      "bp": 500
+     }
+    ]
+   },
+   "out": [
+    "tiers"
+   ]
+  },
+  {
+   "rule": {
+    "id": "t",
+    "name": "n",
+    "kind": "tiers",
+    "tiers": []
+   },
+   "out": [
+    "tiers"
+   ]
+  },
+  {
+   "rule": {
+    "id": "t",
+    "name": "n",
+    "kind": "tiers",
+    "tiers": [
+     {
+      "min": 3000,
+      "bp": 500
+     },
+     {
+      "min": 6000,
+      "bp": 1000
+     }
+    ]
+   },
+   "out": []
+  },
+  {
+   "rule": {
+    "id": "t",
+    "name": "n",
+    "kind": "tiers",
+    "tiers": [
+     {
+      "min": 3000,
+      "amountMinor": 500
+     }
+    ]
+   },
+   "out": [
+    "tiers"
+   ]
+  },
+  {
+   "rule": {
+    "id": "h",
+    "name": "n",
+    "kind": "threshold",
+    "tiers": [
+     {
+      "min": 50000,
+      "bp": 500
+     },
+     {
+      "min": 100000,
+      "amountMinor": 10000
+     }
+    ]
+   },
+   "out": [
+    "tiers"
+   ]
+  },
+  {
+   "rule": {
+    "id": "h",
+    "name": "n",
+    "kind": "threshold",
+    "tiers": [
+     {
+      "min": 40000,
+      "amountMinor": 5000
+     },
+     {
+      "min": 80000,
+      "amountMinor": 12000
+     }
+    ]
+   },
+   "out": []
+  },
+  {
+   "rule": {
+    "id": "h",
+    "name": "n",
+    "kind": "threshold",
+    "tiers": [
+     {
+      "min": 40000,
+      "amountMinor": 5000
+     },
+     {
+      "min": 80000,
+      "amountMinor": 5000
+     }
+    ]
+   },
+   "out": [
+    "tiers"
+   ]
+  },
+  {
+   "rule": {
+    "id": "x",
+    "name": "n",
+    "kind": "bxgy",
+    "buy": 0,
+    "get": 1,
+    "bp": 10000
+   },
+   "out": [
+    "bxgy"
+   ]
+  },
+  {
+   "rule": {
+    "id": "x",
+    "name": "n",
+    "kind": "bxgy",
+    "buy": 2,
+    "get": 1
+   },
+   "out": [
+    "bxgy"
+   ]
+  },
+  {
+   "rule": {
+    "id": "x",
+    "name": "n",
+    "kind": "bxgy",
+    "buy": 2,
+    "get": 1,
+    "bp": 10000
+   },
+   "out": []
+  },
+  {
+   "rule": {
+    "id": "b",
+    "name": "n",
+    "kind": "bundle",
+    "qty": 1,
+    "priceMinor": 10000
+   },
+   "out": [
+    "bundle"
+   ]
+  },
+  {
+   "rule": {
+    "id": "b",
+    "name": "n",
+    "kind": "bundle",
+    "qty": 3,
+    "priceMinor": 10050
+   },
+   "out": [
+    "bundle"
+   ]
+  },
+  {
+   "rule": {
+    "id": "b",
+    "name": "n",
+    "kind": "bundle",
+    "qty": 3,
+    "priceMinor": 25000
+   },
+   "out": []
+  },
+  {
+   "rule": {
+    "id": "g",
+    "name": "n",
+    "kind": "price",
+    "prices": []
+   },
+   "out": [
+    "prices"
+   ]
+  },
+  {
+   "rule": {
+    "id": "g",
+    "name": "n",
+    "kind": "price",
+    "prices": [
+     {
+      "productId": "A",
+      "unitMinor": 8000
+     },
+     {
+      "productId": "A",
+      "unitMinor": 7000
+     }
+    ]
+   },
+   "out": [
+    "prices"
+   ]
+  },
+  {
+   "rule": {
+    "id": "g",
+    "name": "n",
+    "kind": "price",
+    "prices": [
+     {
+      "productId": "A",
+      "unitMinor": 8000
+     }
+    ],
+    "groups": [
+     "vip"
+    ]
+   },
+   "out": []
+  },
+  {
+   "rule": {
+    "id": "w",
+    "name": "n",
+    "kind": "percent",
+    "bp": 100,
+    "window": {
+     "from": "2026-11-01",
+     "to": "2026-10-01"
+    }
+   },
+   "out": [
+    "window"
+   ]
+  },
+  {
+   "rule": {
+    "id": "w",
+    "name": "n",
+    "kind": "percent",
+    "bp": 100,
+    "window": {
+     "start": 600
+    }
+   },
+   "out": [
+    "window"
+   ]
+  },
+  {
+   "rule": {
+    "id": "w",
+    "name": "n",
+    "kind": "percent",
+    "bp": 100,
+    "window": {
+     "start": 600,
+     "end": 600
+    }
+   },
+   "out": [
+    "window"
+   ]
+  },
+  {
+   "rule": {
+    "id": "w",
+    "name": "n",
+    "kind": "percent",
+    "bp": 100,
+    "window": {
+     "days": [
+      0
+     ]
+    }
+   },
+   "out": [
+    "window"
+   ]
+  },
+  {
+   "rule": {
+    "id": "w",
+    "name": "n",
+    "kind": "percent",
+    "bp": 100,
+    "window": {
+     "from": "2026-13-01"
+    }
+   },
+   "out": [
+    "window"
+   ]
+  },
+  {
+   "rule": {
+    "id": "w",
+    "name": "n",
+    "kind": "percent",
+    "bp": 100,
+    "window": {
+     "except": [
+      "2026-02-29"
+     ]
+    }
+   },
+   "out": [
+    "window"
+   ]
+  },
+  {
+   "rule": {
+    "id": "w",
+    "name": "n",
+    "kind": "percent",
+    "bp": 100,
+    "window": {
+     "start": 1320,
+     "end": 120,
+     "days": [
+      5
+     ],
+     "from": "2026-10-01",
+     "to": "2026-10-31",
+     "except": [
+      "2026-10-30"
+     ]
+    }
+   },
+   "out": []
+  },
+  {
+   "rule": {
+    "id": "c",
+    "name": "n",
+    "kind": "percent",
+    "bp": 100,
+    "code": "ab"
+   },
+   "out": [
+    "code"
+   ]
+  },
+  {
+   "rule": {
+    "id": "c",
+    "name": "n",
+    "kind": "percent",
+    "bp": 100,
+    "code": "sale-10"
+   },
+   "out": []
+  },
+  {
+   "rule": {
+    "id": "c",
+    "name": "n",
+    "kind": "percent",
+    "bp": 100,
+    "code": "تخفیف"
+   },
+   "out": [
+    "code"
+   ]
+  },
+  {
+   "rule": {
+    "id": "s",
+    "name": "n",
+    "kind": "percent",
+    "bp": 100,
+    "stack": "weird"
+   },
+   "out": [
+    "stack"
+   ]
+  },
+  {
+   "rule": {
+    "id": "s",
+    "name": "n",
+    "kind": "percent",
+    "bp": 100,
+    "channels": [
+     "shop"
+    ]
+   },
+   "out": [
+    "channel"
+   ]
+  },
+  {
+   "rule": {
+    "id": "u",
+    "name": "n",
+    "kind": "percent",
+    "bp": 100,
+    "maxUses": -1
+   },
+   "out": [
+    "uses"
+   ]
+  },
+  {
+   "rule": {
+    "id": "u",
+    "name": "n",
+    "kind": "percent",
+    "bp": 100,
+    "priority": 5000
+   },
+   "out": [
+    "priority"
+   ]
+  },
+  {
+   "rule": {
+    "id": "k",
+    "name": "n",
+    "kind": "loyalty"
+   },
+   "out": [
+    "kind"
+   ]
+  }
+ ],
+ "evaluate": [
+  {
+   "name": "بی قاعده: همان جمعِ امروز",
+   "cart": {
+    "lines": [
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 2000,
+      "unitMinor": 10000,
+      "costMinor": 6000,
+      "category": "drinks",
+      "supplierId": "s1"
+     },
+     {
+      "key": "b",
+      "productId": "B",
+      "qtyMilli": 1000,
+      "unitMinor": 25000,
+      "costMinor": 20000,
+      "category": "snacks",
+      "supplierId": "s2"
+     }
+    ]
+   },
+   "rules": [],
+   "out": {
+    "subtotalMinor": 45000,
+    "discountMinor": 0,
+    "totalMinor": 45000,
+    "lines": [
+     {
+      "key": "a",
+      "amountMinor": 20000,
+      "discountMinor": 0,
+      "netMinor": 20000
+     },
+     {
+      "key": "b",
+      "amountMinor": 25000,
+      "discountMinor": 0,
+      "netMinor": 25000
+     }
+    ],
+    "applied": [],
+    "codes": []
+   }
+  },
+  {
+   "name": "درصد روی همه",
+   "cart": {
+    "lines": [
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 2000,
+      "unitMinor": 10000,
+      "costMinor": 6000,
+      "category": "drinks",
+      "supplierId": "s1"
+     },
+     {
+      "key": "b",
+      "productId": "B",
+      "qtyMilli": 1000,
+      "unitMinor": 25000,
+      "costMinor": 20000,
+      "category": "snacks",
+      "supplierId": "s2"
+     }
+    ]
+   },
+   "rules": [
+    {
+     "id": "p10",
+     "name": "ده درصد",
+     "kind": "percent",
+     "bp": 1000
+    }
+   ],
+   "out": {
+    "subtotalMinor": 45000,
+    "discountMinor": 4500,
+    "totalMinor": 40500,
+    "lines": [
+     {
+      "key": "a",
+      "amountMinor": 20000,
+      "discountMinor": 2000,
+      "netMinor": 18000
+     },
+     {
+      "key": "b",
+      "amountMinor": 25000,
+      "discountMinor": 2500,
+      "netMinor": 22500
+     }
+    ],
+    "applied": [
+     {
+      "id": "p10",
+      "name": "ده درصد",
+      "discountMinor": 4500
+     }
+    ],
+    "codes": []
+   }
+  },
+  {
+   "name": "کفِ بهای خرید: ۳۰٪ به بها می‌خورد",
+   "cart": {
+    "lines": [
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 2000,
+      "unitMinor": 10000,
+      "costMinor": 6000,
+      "category": "drinks",
+      "supplierId": "s1"
+     },
+     {
+      "key": "b",
+      "productId": "B",
+      "qtyMilli": 1000,
+      "unitMinor": 25000,
+      "costMinor": 20000,
+      "category": "snacks",
+      "supplierId": "s2"
+     }
+    ]
+   },
+   "rules": [
+    {
+     "id": "p30",
+     "name": "سی",
+     "kind": "percent",
+     "bp": 3000
+    }
+   ],
+   "out": {
+    "subtotalMinor": 45000,
+    "discountMinor": 11000,
+    "totalMinor": 34000,
+    "lines": [
+     {
+      "key": "a",
+      "amountMinor": 20000,
+      "discountMinor": 6000,
+      "netMinor": 14000
+     },
+     {
+      "key": "b",
+      "amountMinor": 25000,
+      "discountMinor": 5000,
+      "netMinor": 20000
+     }
+    ],
+    "applied": [
+     {
+      "id": "p30",
+      "name": "سی",
+      "discountMinor": 11000
+     }
+    ],
+    "codes": []
+   }
+  },
+  {
+   "name": "زیرِ بها فقط با allowBelowCost",
+   "cart": {
+    "lines": [
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 2000,
+      "unitMinor": 10000,
+      "costMinor": 6000,
+      "category": "drinks",
+      "supplierId": "s1"
+     },
+     {
+      "key": "b",
+      "productId": "B",
+      "qtyMilli": 1000,
+      "unitMinor": 25000,
+      "costMinor": 20000,
+      "category": "snacks",
+      "supplierId": "s2"
+     }
+    ]
+   },
+   "rules": [
+    {
+     "id": "p30",
+     "name": "سی",
+     "kind": "percent",
+     "bp": 3000,
+     "allowBelowCost": true
+    }
+   ],
+   "out": {
+    "subtotalMinor": 45000,
+    "discountMinor": 13500,
+    "totalMinor": 31500,
+    "lines": [
+     {
+      "key": "a",
+      "amountMinor": 20000,
+      "discountMinor": 6000,
+      "netMinor": 14000
+     },
+     {
+      "key": "b",
+      "amountMinor": 25000,
+      "discountMinor": 7500,
+      "netMinor": 17500
+     }
+    ],
+    "applied": [
+     {
+      "id": "p30",
+      "name": "سی",
+      "discountMinor": 13500
+     }
+    ],
+    "codes": []
+   }
+  },
+  {
+   "name": "مبلغِ ثابت از هر واحد، فقط کالای A",
+   "cart": {
+    "lines": [
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 2000,
+      "unitMinor": 10000,
+      "costMinor": 6000,
+      "category": "drinks",
+      "supplierId": "s1"
+     },
+     {
+      "key": "b",
+      "productId": "B",
+      "qtyMilli": 1000,
+      "unitMinor": 25000,
+      "costMinor": 20000,
+      "category": "snacks",
+      "supplierId": "s2"
+     }
+    ]
+   },
+   "rules": [
+    {
+     "id": "m15",
+     "name": "۱۵ افغانی",
+     "kind": "amount",
+     "amountMinor": 1500,
+     "scope": {
+      "products": [
+       "A"
+      ]
+     }
+    }
+   ],
+   "out": {
+    "subtotalMinor": 45000,
+    "discountMinor": 3000,
+    "totalMinor": 42000,
+    "lines": [
+     {
+      "key": "a",
+      "amountMinor": 20000,
+      "discountMinor": 3000,
+      "netMinor": 17000
+     },
+     {
+      "key": "b",
+      "amountMinor": 25000,
+      "discountMinor": 0,
+      "netMinor": 25000
+     }
+    ],
+    "applied": [
+     {
+      "id": "m15",
+      "name": "۱۵ افغانی",
+      "discountMinor": 3000
+     }
+    ],
+    "codes": []
+   }
+  },
+  {
+   "name": "مبلغِ ثابت روی کالای وزنی: نیمه رو به بالا",
+   "cart": {
+    "lines": [
+     {
+      "key": "w",
+      "productId": "W",
+      "qtyMilli": 1500,
+      "unitMinor": 11500,
+      "costMinor": 0,
+      "category": "fruit",
+      "supplierId": "s3"
+     }
+    ]
+   },
+   "rules": [
+    {
+     "id": "m3",
+     "name": "۳ در کیلو",
+     "kind": "amount",
+     "amountMinor": 300
+    }
+   ],
+   "out": {
+    "subtotalMinor": 17300,
+    "discountMinor": 500,
+    "totalMinor": 16800,
+    "lines": [
+     {
+      "key": "w",
+      "amountMinor": 17300,
+      "discountMinor": 500,
+      "netMinor": 16800
+     }
+    ],
+    "applied": [
+     {
+      "id": "m3",
+      "name": "۳ در کیلو",
+      "discountMinor": 500
+     }
+    ],
+    "codes": []
+   }
+  },
+  {
+   "name": "قیمتِ گروهِ مشتری",
+   "cart": {
+    "lines": [
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 2000,
+      "unitMinor": 10000,
+      "costMinor": 6000,
+      "category": "drinks",
+      "supplierId": "s1"
+     },
+     {
+      "key": "b",
+      "productId": "B",
+      "qtyMilli": 1000,
+      "unitMinor": 25000,
+      "costMinor": 20000,
+      "category": "snacks",
+      "supplierId": "s2"
+     }
+    ],
+    "group": "vip"
+   },
+   "rules": [
+    {
+     "id": "g1",
+     "name": "قیمتِ ویژه",
+     "kind": "price",
+     "prices": [
+      {
+       "productId": "A",
+       "unitMinor": 8000
+      }
+     ],
+     "groups": [
+      "vip"
+     ]
+    }
+   ],
+   "out": {
+    "subtotalMinor": 45000,
+    "discountMinor": 4000,
+    "totalMinor": 41000,
+    "lines": [
+     {
+      "key": "a",
+      "amountMinor": 20000,
+      "discountMinor": 4000,
+      "netMinor": 16000
+     },
+     {
+      "key": "b",
+      "amountMinor": 25000,
+      "discountMinor": 0,
+      "netMinor": 25000
+     }
+    ],
+    "applied": [
+     {
+      "id": "g1",
+      "name": "قیمتِ ویژه",
+      "discountMinor": 4000
+     }
+    ],
+    "codes": []
+   }
+  },
+  {
+   "name": "قیمتِ گروه برای مشتریِ بی گروه نیست",
+   "cart": {
+    "lines": [
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 2000,
+      "unitMinor": 10000,
+      "costMinor": 6000,
+      "category": "drinks",
+      "supplierId": "s1"
+     },
+     {
+      "key": "b",
+      "productId": "B",
+      "qtyMilli": 1000,
+      "unitMinor": 25000,
+      "costMinor": 20000,
+      "category": "snacks",
+      "supplierId": "s2"
+     }
+    ]
+   },
+   "rules": [
+    {
+     "id": "g1",
+     "name": "قیمتِ ویژه",
+     "kind": "price",
+     "prices": [
+      {
+       "productId": "A",
+       "unitMinor": 8000
+      }
+     ],
+     "groups": [
+      "vip"
+     ]
+    }
+   ],
+   "out": {
+    "subtotalMinor": 45000,
+    "discountMinor": 0,
+    "totalMinor": 45000,
+    "lines": [
+     {
+      "key": "a",
+      "amountMinor": 20000,
+      "discountMinor": 0,
+      "netMinor": 20000
+     },
+     {
+      "key": "b",
+      "amountMinor": 25000,
+      "discountMinor": 0,
+      "netMinor": 25000
+     }
+    ],
+    "applied": [],
+    "codes": []
+   }
+  },
+  {
+   "name": "پله‌ای بر اساسِ تعداد",
+   "cart": {
+    "lines": [
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 5000,
+      "unitMinor": 10000,
+      "costMinor": 6000,
+      "category": "drinks",
+      "supplierId": "s1"
+     },
+     {
+      "key": "b",
+      "productId": "B",
+      "qtyMilli": 6000,
+      "unitMinor": 25000,
+      "costMinor": 20000,
+      "category": "snacks",
+      "supplierId": "s2"
+     },
+     {
+      "key": "c",
+      "productId": "C",
+      "qtyMilli": 2000,
+      "unitMinor": 35000,
+      "costMinor": 0,
+      "category": "drinks",
+      "supplierId": "s2"
+     }
+    ]
+   },
+   "rules": [
+    {
+     "id": "t1",
+     "name": "پله‌ای",
+     "kind": "tiers",
+     "tiers": [
+      {
+       "min": 3000,
+       "bp": 500
+      },
+      {
+       "min": 6000,
+       "bp": 1000
+      }
+     ]
+    }
+   ],
+   "out": {
+    "subtotalMinor": 270000,
+    "discountMinor": 17500,
+    "totalMinor": 252500,
+    "lines": [
+     {
+      "key": "a",
+      "amountMinor": 50000,
+      "discountMinor": 2500,
+      "netMinor": 47500
+     },
+     {
+      "key": "b",
+      "amountMinor": 150000,
+      "discountMinor": 15000,
+      "netMinor": 135000
+     },
+     {
+      "key": "c",
+      "amountMinor": 70000,
+      "discountMinor": 0,
+      "netMinor": 70000
+     }
+    ],
+    "applied": [
+     {
+      "id": "t1",
+      "name": "پله‌ای",
+      "discountMinor": 17500
+     }
+    ],
+    "codes": []
+   }
+  },
+  {
+   "name": "بخر ۲ بگیر ۱",
+   "cart": {
+    "lines": [
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 7000,
+      "unitMinor": 10000,
+      "costMinor": 6000,
+      "category": "drinks",
+      "supplierId": "s1"
+     }
+    ]
+   },
+   "rules": [
+    {
+     "id": "x1",
+     "name": "۲+۱",
+     "kind": "bxgy",
+     "buy": 2,
+     "get": 1,
+     "bp": 10000,
+     "scope": {
+      "products": [
+       "A"
+      ]
+     }
+    }
+   ],
+   "out": {
+    "subtotalMinor": 70000,
+    "discountMinor": 20000,
+    "totalMinor": 50000,
+    "lines": [
+     {
+      "key": "a",
+      "amountMinor": 70000,
+      "discountMinor": 20000,
+      "netMinor": 50000
+     }
+    ],
+    "applied": [
+     {
+      "id": "x1",
+      "name": "۲+۱",
+      "discountMinor": 20000
+     }
+    ],
+    "codes": []
+   }
+  },
+  {
+   "name": "هر ۵ تا، دو ارزان‌ترین رایگان — کفِ بها",
+   "cart": {
+    "lines": [
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 3000,
+      "unitMinor": 10000,
+      "costMinor": 6000,
+      "category": "drinks",
+      "supplierId": "s1"
+     },
+     {
+      "key": "c",
+      "productId": "C",
+      "qtyMilli": 2000,
+      "unitMinor": 35000,
+      "costMinor": 0,
+      "category": "drinks",
+      "supplierId": "s2"
+     },
+     {
+      "key": "b",
+      "productId": "B",
+      "qtyMilli": 1000,
+      "unitMinor": 25000,
+      "costMinor": 20000,
+      "category": "snacks",
+      "supplierId": "s2"
+     }
+    ]
+   },
+   "rules": [
+    {
+     "id": "mm",
+     "name": "۵تایی",
+     "kind": "bxgy",
+     "buy": 3,
+     "get": 2,
+     "bp": 10000,
+     "scope": {
+      "categories": [
+       "drinks"
+      ]
+     }
+    }
+   ],
+   "out": {
+    "subtotalMinor": 125000,
+    "discountMinor": 12000,
+    "totalMinor": 113000,
+    "lines": [
+     {
+      "key": "a",
+      "amountMinor": 30000,
+      "discountMinor": 12000,
+      "netMinor": 18000
+     },
+     {
+      "key": "c",
+      "amountMinor": 70000,
+      "discountMinor": 0,
+      "netMinor": 70000
+     },
+     {
+      "key": "b",
+      "amountMinor": 25000,
+      "discountMinor": 0,
+      "netMinor": 25000
+     }
+    ],
+    "applied": [
+     {
+      "id": "mm",
+      "name": "۵تایی",
+      "discountMinor": 12000
+     }
+    ],
+    "codes": []
+   }
+  },
+  {
+   "name": "هر ۵ تا، دو ارزان‌ترین رایگان — با اجازهٔ زیرِ بها",
+   "cart": {
+    "lines": [
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 3000,
+      "unitMinor": 10000,
+      "costMinor": 6000,
+      "category": "drinks",
+      "supplierId": "s1"
+     },
+     {
+      "key": "c",
+      "productId": "C",
+      "qtyMilli": 2000,
+      "unitMinor": 35000,
+      "costMinor": 0,
+      "category": "drinks",
+      "supplierId": "s2"
+     },
+     {
+      "key": "b",
+      "productId": "B",
+      "qtyMilli": 1000,
+      "unitMinor": 25000,
+      "costMinor": 20000,
+      "category": "snacks",
+      "supplierId": "s2"
+     }
+    ]
+   },
+   "rules": [
+    {
+     "id": "mm",
+     "name": "۵تایی",
+     "kind": "bxgy",
+     "buy": 3,
+     "get": 2,
+     "bp": 10000,
+     "allowBelowCost": true,
+     "scope": {
+      "categories": [
+       "drinks"
+      ]
+     }
+    }
+   ],
+   "out": {
+    "subtotalMinor": 125000,
+    "discountMinor": 20000,
+    "totalMinor": 105000,
+    "lines": [
+     {
+      "key": "a",
+      "amountMinor": 30000,
+      "discountMinor": 20000,
+      "netMinor": 10000
+     },
+     {
+      "key": "c",
+      "amountMinor": 70000,
+      "discountMinor": 0,
+      "netMinor": 70000
+     },
+     {
+      "key": "b",
+      "amountMinor": 25000,
+      "discountMinor": 0,
+      "netMinor": 25000
+     }
+    ],
+    "applied": [
+     {
+      "id": "mm",
+      "name": "۵تایی",
+      "discountMinor": 20000
+     }
+    ],
+    "codes": []
+   }
+  },
+  {
+   "name": "دومی نصف قیمت",
+   "cart": {
+    "lines": [
+     {
+      "key": "b",
+      "productId": "B",
+      "qtyMilli": 3000,
+      "unitMinor": 25000,
+      "costMinor": 20000,
+      "category": "snacks",
+      "supplierId": "s2"
+     }
+    ]
+   },
+   "rules": [
+    {
+     "id": "h",
+     "name": "دومی نصف",
+     "kind": "bxgy",
+     "buy": 1,
+     "get": 1,
+     "bp": 5000,
+     "scope": {
+      "products": [
+       "B"
+      ]
+     }
+    }
+   ],
+   "out": {
+    "subtotalMinor": 75000,
+    "discountMinor": 12500,
+    "totalMinor": 62500,
+    "lines": [
+     {
+      "key": "b",
+      "amountMinor": 75000,
+      "discountMinor": 12500,
+      "netMinor": 62500
+     }
+    ],
+    "applied": [
+     {
+      "id": "h",
+      "name": "دومی نصف",
+      "discountMinor": 12500
+     }
+    ],
+    "codes": []
+   }
+  },
+  {
+   "name": "بسته با قیمتِ ثابت: گران‌ترها در بسته",
+   "cart": {
+    "lines": [
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 2000,
+      "unitMinor": 10000,
+      "costMinor": 6000,
+      "category": "drinks",
+      "supplierId": "s1"
+     },
+     {
+      "key": "c",
+      "productId": "C",
+      "qtyMilli": 2000,
+      "unitMinor": 35000,
+      "costMinor": 0,
+      "category": "drinks",
+      "supplierId": "s2"
+     }
+    ]
+   },
+   "rules": [
+    {
+     "id": "bd",
+     "name": "سه‌تایی ۲۵۰",
+     "kind": "bundle",
+     "qty": 3,
+     "priceMinor": 25000,
+     "scope": {
+      "categories": [
+       "drinks"
+      ]
+     }
+    }
+   ],
+   "out": {
+    "subtotalMinor": 90000,
+    "discountMinor": 55000,
+    "totalMinor": 35000,
+    "lines": [
+     {
+      "key": "a",
+      "amountMinor": 20000,
+      "discountMinor": 6900,
+      "netMinor": 13100
+     },
+     {
+      "key": "c",
+      "amountMinor": 70000,
+      "discountMinor": 48100,
+      "netMinor": 21900
+     }
+    ],
+    "applied": [
+     {
+      "id": "bd",
+      "name": "سه‌تایی ۲۵۰",
+      "discountMinor": 55000
+     }
+    ],
+    "codes": []
+   }
+  },
+  {
+   "name": "بسته: سهمِ ردیفِ پُرشده به بقیه می‌رسد",
+   "cart": {
+    "lines": [
+     {
+      "key": "b",
+      "productId": "B",
+      "qtyMilli": 1000,
+      "unitMinor": 25000,
+      "costMinor": 20000,
+      "category": "snacks",
+      "supplierId": "s2"
+     },
+     {
+      "key": "c",
+      "productId": "C",
+      "qtyMilli": 2000,
+      "unitMinor": 35000,
+      "costMinor": 0,
+      "category": "drinks",
+      "supplierId": "s2"
+     }
+    ]
+   },
+   "rules": [
+    {
+     "id": "bd",
+     "name": "سه‌تایی ۳۰۰",
+     "kind": "bundle",
+     "qty": 3,
+     "priceMinor": 30000,
+     "scope": {
+      "products": [
+       "B",
+       "C"
+      ]
+     }
+    }
+   ],
+   "out": {
+    "subtotalMinor": 95000,
+    "discountMinor": 65000,
+    "totalMinor": 30000,
+    "lines": [
+     {
+      "key": "b",
+      "amountMinor": 25000,
+      "discountMinor": 5000,
+      "netMinor": 20000
+     },
+     {
+      "key": "c",
+      "amountMinor": 70000,
+      "discountMinor": 60000,
+      "netMinor": 10000
+     }
+    ],
+    "applied": [
+     {
+      "id": "bd",
+      "name": "سه‌تایی ۳۰۰",
+      "discountMinor": 65000
+     }
+    ],
+    "codes": []
+   }
+  },
+  {
+   "name": "آستانهٔ مبلغ: درصد و پخش با بزرگ‌ترین باقی‌مانده",
+   "cart": {
+    "lines": [
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 2000,
+      "unitMinor": 10000,
+      "costMinor": 6000,
+      "category": "drinks",
+      "supplierId": "s1"
+     },
+     {
+      "key": "c",
+      "productId": "C",
+      "qtyMilli": 1000,
+      "unitMinor": 35000,
+      "costMinor": 0,
+      "category": "drinks",
+      "supplierId": "s2"
+     }
+    ]
+   },
+   "rules": [
+    {
+     "id": "th",
+     "name": "خریدِ بالای ۵۰۰",
+     "kind": "threshold",
+     "tiers": [
+      {
+       "min": 50000,
+       "bp": 500
+      },
+      {
+       "min": 100000,
+       "bp": 1000
+      }
+     ]
+    }
+   ],
+   "out": {
+    "subtotalMinor": 55000,
+    "discountMinor": 2800,
+    "totalMinor": 52200,
+    "lines": [
+     {
+      "key": "a",
+      "amountMinor": 20000,
+      "discountMinor": 1000,
+      "netMinor": 19000
+     },
+     {
+      "key": "c",
+      "amountMinor": 35000,
+      "discountMinor": 1800,
+      "netMinor": 33200
+     }
+    ],
+    "applied": [
+     {
+      "id": "th",
+      "name": "خریدِ بالای ۵۰۰",
+      "discountMinor": 2800
+     }
+    ],
+    "codes": []
+   }
+  },
+  {
+   "name": "آستانه نرسیده",
+   "cart": {
+    "lines": [
+     {
+      "key": "b",
+      "productId": "B",
+      "qtyMilli": 1000,
+      "unitMinor": 25000,
+      "costMinor": 20000,
+      "category": "snacks",
+      "supplierId": "s2"
+     }
+    ]
+   },
+   "rules": [
+    {
+     "id": "ta",
+     "name": "۵۰ از ۴۰۰",
+     "kind": "threshold",
+     "tiers": [
+      {
+       "min": 40000,
+       "amountMinor": 5000
+      }
+     ]
+    }
+   ],
+   "out": {
+    "subtotalMinor": 25000,
+    "discountMinor": 0,
+    "totalMinor": 25000,
+    "lines": [
+     {
+      "key": "b",
+      "amountMinor": 25000,
+      "discountMinor": 0,
+      "netMinor": 25000
+     }
+    ],
+    "applied": [],
+    "codes": []
+   }
+  },
+  {
+   "name": "آستانهٔ مبلغ: مبلغِ ثابت",
+   "cart": {
+    "lines": [
+     {
+      "key": "b",
+      "productId": "B",
+      "qtyMilli": 1000,
+      "unitMinor": 25000,
+      "costMinor": 20000,
+      "category": "snacks",
+      "supplierId": "s2"
+     },
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 2000,
+      "unitMinor": 10000,
+      "costMinor": 6000,
+      "category": "drinks",
+      "supplierId": "s1"
+     }
+    ]
+   },
+   "rules": [
+    {
+     "id": "ta",
+     "name": "۵۰ از ۴۰۰",
+     "kind": "threshold",
+     "tiers": [
+      {
+       "min": 40000,
+       "amountMinor": 5000
+      }
+     ]
+    }
+   ],
+   "out": {
+    "subtotalMinor": 45000,
+    "discountMinor": 5000,
+    "totalMinor": 40000,
+    "lines": [
+     {
+      "key": "b",
+      "amountMinor": 25000,
+      "discountMinor": 2800,
+      "netMinor": 22200
+     },
+     {
+      "key": "a",
+      "amountMinor": 20000,
+      "discountMinor": 2200,
+      "netMinor": 17800
+     }
+    ],
+    "applied": [
+     {
+      "id": "ta",
+      "name": "۵۰ از ۴۰۰",
+      "discountMinor": 5000
+     }
+    ],
+    "codes": []
+   }
+  },
+  {
+   "name": "بهترین قیمت: فقط بزرگ‌تر",
+   "cart": {
+    "lines": [
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 2000,
+      "unitMinor": 10000,
+      "costMinor": 6000,
+      "category": "drinks",
+      "supplierId": "s1"
+     },
+     {
+      "key": "b",
+      "productId": "B",
+      "qtyMilli": 1000,
+      "unitMinor": 25000,
+      "costMinor": 20000,
+      "category": "snacks",
+      "supplierId": "s2"
+     }
+    ]
+   },
+   "rules": [
+    {
+     "id": "p10",
+     "name": "ده درصد",
+     "kind": "percent",
+     "bp": 1000
+    },
+    {
+     "id": "p5",
+     "name": "پنج",
+     "kind": "percent",
+     "bp": 500,
+     "priority": 5
+    }
+   ],
+   "out": {
+    "subtotalMinor": 45000,
+    "discountMinor": 4500,
+    "totalMinor": 40500,
+    "lines": [
+     {
+      "key": "a",
+      "amountMinor": 20000,
+      "discountMinor": 2000,
+      "netMinor": 18000
+     },
+     {
+      "key": "b",
+      "amountMinor": 25000,
+      "discountMinor": 2500,
+      "netMinor": 22500
+     }
+    ],
+    "applied": [
+     {
+      "id": "p10",
+      "name": "ده درصد",
+      "discountMinor": 4500
+     }
+    ],
+    "codes": []
+   }
+  },
+  {
+   "name": "انحصاری بر بقیه مقدم است، حتی کوچک‌تر",
+   "cart": {
+    "lines": [
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 2000,
+      "unitMinor": 10000,
+      "costMinor": 6000,
+      "category": "drinks",
+      "supplierId": "s1"
+     },
+     {
+      "key": "b",
+      "productId": "B",
+      "qtyMilli": 1000,
+      "unitMinor": 25000,
+      "costMinor": 20000,
+      "category": "snacks",
+      "supplierId": "s2"
+     }
+    ]
+   },
+   "rules": [
+    {
+     "id": "p10",
+     "name": "ده درصد",
+     "kind": "percent",
+     "bp": 1000
+    },
+    {
+     "id": "x",
+     "name": "انحصاری",
+     "kind": "amount",
+     "amountMinor": 500,
+     "stack": "exclusive",
+     "priority": 1
+    }
+   ],
+   "out": {
+    "subtotalMinor": 45000,
+    "discountMinor": 1500,
+    "totalMinor": 43500,
+    "lines": [
+     {
+      "key": "a",
+      "amountMinor": 20000,
+      "discountMinor": 1000,
+      "netMinor": 19000
+     },
+     {
+      "key": "b",
+      "amountMinor": 25000,
+      "discountMinor": 500,
+      "netMinor": 24500
+     }
+    ],
+    "applied": [
+     {
+      "id": "x",
+      "name": "انحصاری",
+      "discountMinor": 1500
+     }
+    ],
+    "codes": []
+   }
+  },
+  {
+   "name": "دو انحصاری: اولویتِ بیشتر",
+   "cart": {
+    "lines": [
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 2000,
+      "unitMinor": 10000,
+      "costMinor": 6000,
+      "category": "drinks",
+      "supplierId": "s1"
+     },
+     {
+      "key": "b",
+      "productId": "B",
+      "qtyMilli": 1000,
+      "unitMinor": 25000,
+      "costMinor": 20000,
+      "category": "snacks",
+      "supplierId": "s2"
+     }
+    ]
+   },
+   "rules": [
+    {
+     "id": "x1",
+     "name": "یک",
+     "kind": "amount",
+     "amountMinor": 500,
+     "stack": "exclusive",
+     "priority": 1
+    },
+    {
+     "id": "x2",
+     "name": "دو",
+     "kind": "percent",
+     "bp": 100,
+     "stack": "exclusive",
+     "priority": 2
+    }
+   ],
+   "out": {
+    "subtotalMinor": 45000,
+    "discountMinor": 500,
+    "totalMinor": 44500,
+    "lines": [
+     {
+      "key": "a",
+      "amountMinor": 20000,
+      "discountMinor": 200,
+      "netMinor": 19800
+     },
+     {
+      "key": "b",
+      "amountMinor": 25000,
+      "discountMinor": 300,
+      "netMinor": 24700
+     }
+    ],
+    "applied": [
+     {
+      "id": "x2",
+      "name": "دو",
+      "discountMinor": 500
+     }
+    ],
+    "codes": []
+   }
+  },
+  {
+   "name": "ترکیبی: ردیفی بعد آستانه روی مانده",
+   "cart": {
+    "lines": [
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 2000,
+      "unitMinor": 10000,
+      "costMinor": 6000,
+      "category": "drinks",
+      "supplierId": "s1"
+     },
+     {
+      "key": "b",
+      "productId": "B",
+      "qtyMilli": 1000,
+      "unitMinor": 25000,
+      "costMinor": 20000,
+      "category": "snacks",
+      "supplierId": "s2"
+     }
+    ]
+   },
+   "rules": [
+    {
+     "id": "c2",
+     "name": "آستانه",
+     "kind": "threshold",
+     "stack": "combine",
+     "tiers": [
+      {
+       "min": 40000,
+       "bp": 1000
+      }
+     ]
+    },
+    {
+     "id": "c1",
+     "name": "ده",
+     "kind": "percent",
+     "bp": 1000,
+     "stack": "combine"
+    }
+   ],
+   "out": {
+    "subtotalMinor": 45000,
+    "discountMinor": 8600,
+    "totalMinor": 36400,
+    "lines": [
+     {
+      "key": "a",
+      "amountMinor": 20000,
+      "discountMinor": 3800,
+      "netMinor": 16200
+     },
+     {
+      "key": "b",
+      "amountMinor": 25000,
+      "discountMinor": 4800,
+      "netMinor": 20200
+     }
+    ],
+    "applied": [
+     {
+      "id": "c1",
+      "name": "ده",
+      "discountMinor": 4500
+     },
+     {
+      "id": "c2",
+      "name": "آستانه",
+      "discountMinor": 4100
+     }
+    ],
+    "codes": []
+   }
+  },
+  {
+   "name": "ترکیبی: آستانه پس از تخفیفِ ردیف نمی‌رسد",
+   "cart": {
+    "lines": [
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 2000,
+      "unitMinor": 10000,
+      "costMinor": 6000,
+      "category": "drinks",
+      "supplierId": "s1"
+     },
+     {
+      "key": "b",
+      "productId": "B",
+      "qtyMilli": 1000,
+      "unitMinor": 25000,
+      "costMinor": 20000,
+      "category": "snacks",
+      "supplierId": "s2"
+     }
+    ]
+   },
+   "rules": [
+    {
+     "id": "c1",
+     "name": "بیست",
+     "kind": "percent",
+     "bp": 2000,
+     "stack": "combine"
+    },
+    {
+     "id": "c2",
+     "name": "آستانه",
+     "kind": "threshold",
+     "stack": "combine",
+     "tiers": [
+      {
+       "min": 40000,
+       "amountMinor": 3000
+      }
+     ]
+    }
+   ],
+   "out": {
+    "subtotalMinor": 45000,
+    "discountMinor": 9000,
+    "totalMinor": 36000,
+    "lines": [
+     {
+      "key": "a",
+      "amountMinor": 20000,
+      "discountMinor": 4000,
+      "netMinor": 16000
+     },
+     {
+      "key": "b",
+      "amountMinor": 25000,
+      "discountMinor": 5000,
+      "netMinor": 20000
+     }
+    ],
+    "applied": [
+     {
+      "id": "c1",
+      "name": "بیست",
+      "discountMinor": 9000
+     }
+    ],
+    "codes": []
+   }
+  },
+  {
+   "name": "بهترین + ترکیبی",
+   "cart": {
+    "lines": [
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 2000,
+      "unitMinor": 10000,
+      "costMinor": 6000,
+      "category": "drinks",
+      "supplierId": "s1"
+     },
+     {
+      "key": "b",
+      "productId": "B",
+      "qtyMilli": 1000,
+      "unitMinor": 25000,
+      "costMinor": 20000,
+      "category": "snacks",
+      "supplierId": "s2"
+     }
+    ]
+   },
+   "rules": [
+    {
+     "id": "p10",
+     "name": "ده درصد",
+     "kind": "percent",
+     "bp": 1000
+    },
+    {
+     "id": "p15",
+     "name": "پانزده B",
+     "kind": "percent",
+     "bp": 1500,
+     "scope": {
+      "products": [
+       "B"
+      ]
+     }
+    },
+    {
+     "id": "a1",
+     "name": "۱۰ از A",
+     "kind": "amount",
+     "amountMinor": 1000,
+     "stack": "combine",
+     "scope": {
+      "products": [
+       "A"
+      ]
+     }
+    }
+   ],
+   "out": {
+    "subtotalMinor": 45000,
+    "discountMinor": 6500,
+    "totalMinor": 38500,
+    "lines": [
+     {
+      "key": "a",
+      "amountMinor": 20000,
+      "discountMinor": 4000,
+      "netMinor": 16000
+     },
+     {
+      "key": "b",
+      "amountMinor": 25000,
+      "discountMinor": 2500,
+      "netMinor": 22500
+     }
+    ],
+    "applied": [
+     {
+      "id": "a1",
+      "name": "۱۰ از A",
+      "discountMinor": 2000
+     },
+     {
+      "id": "p10",
+      "name": "ده درصد",
+      "discountMinor": 4500
+     }
+    ],
+    "codes": []
+   }
+  },
+  {
+   "name": "کد: واردشده با خط‌تیره و حرفِ کوچک",
+   "cart": {
+    "lines": [
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 1000,
+      "unitMinor": 10000,
+      "costMinor": 6000,
+      "category": "drinks",
+      "supplierId": "s1"
+     }
+    ],
+    "coupons": [
+     "sale-10"
+    ]
+   },
+   "rules": [
+    {
+     "id": "k10",
+     "name": "کدِ ده",
+     "kind": "percent",
+     "bp": 1000,
+     "code": "SALE10",
+     "stack": "combine"
+    }
+   ],
+   "out": {
+    "subtotalMinor": 10000,
+    "discountMinor": 1000,
+    "totalMinor": 9000,
+    "lines": [
+     {
+      "key": "a",
+      "amountMinor": 10000,
+      "discountMinor": 1000,
+      "netMinor": 9000
+     }
+    ],
+    "applied": [
+     {
+      "id": "k10",
+      "name": "کدِ ده",
+      "discountMinor": 1000
+     }
+    ],
+    "codes": [
+     {
+      "code": "SALE10",
+      "status": "applied"
+     }
+    ]
+   }
+  },
+  {
+   "name": "کد: بی کد اعمال نمی‌شود",
+   "cart": {
+    "lines": [
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 1000,
+      "unitMinor": 10000,
+      "costMinor": 6000,
+      "category": "drinks",
+      "supplierId": "s1"
+     }
+    ]
+   },
+   "rules": [
+    {
+     "id": "k10",
+     "name": "کدِ ده",
+     "kind": "percent",
+     "bp": 1000,
+     "code": "SALE10",
+     "stack": "combine"
+    }
+   ],
+   "out": {
+    "subtotalMinor": 10000,
+    "discountMinor": 0,
+    "totalMinor": 10000,
+    "lines": [
+     {
+      "key": "a",
+      "amountMinor": 10000,
+      "discountMinor": 0,
+      "netMinor": 10000
+     }
+    ],
+    "applied": [],
+    "codes": []
+   }
+  },
+  {
+   "name": "کد: ظرفیت پُر، کدِ ناشناس",
+   "cart": {
+    "lines": [
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 1000,
+      "unitMinor": 10000,
+      "costMinor": 6000,
+      "category": "drinks",
+      "supplierId": "s1"
+     }
+    ],
+    "coupons": [
+     "sale10",
+     "nope1",
+     "SALE10"
+    ]
+   },
+   "rules": [
+    {
+     "id": "k10",
+     "name": "کدِ ده",
+     "kind": "percent",
+     "bp": 1000,
+     "code": "SALE10",
+     "stack": "combine",
+     "maxUses": 5,
+     "uses": 5
+    }
+   ],
+   "out": {
+    "subtotalMinor": 10000,
+    "discountMinor": 0,
+    "totalMinor": 10000,
+    "lines": [
+     {
+      "key": "a",
+      "amountMinor": 10000,
+      "discountMinor": 0,
+      "netMinor": 10000
+     }
+    ],
+    "applied": [],
+    "codes": [
+     {
+      "code": "SALE10",
+      "status": "used_up"
+     },
+     {
+      "code": "NOPE1",
+      "status": "unknown"
+     }
+    ]
+   }
+  },
+  {
+   "name": "کد: ظرفیت هنوز مانده",
+   "cart": {
+    "lines": [
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 1000,
+      "unitMinor": 10000,
+      "costMinor": 6000,
+      "category": "drinks",
+      "supplierId": "s1"
+     }
+    ],
+    "coupons": [
+     "SALE10"
+    ]
+   },
+   "rules": [
+    {
+     "id": "k10",
+     "name": "کدِ ده",
+     "kind": "percent",
+     "bp": 1000,
+     "code": "SALE10",
+     "stack": "combine",
+     "maxUses": 5,
+     "uses": 4
+    }
+   ],
+   "out": {
+    "subtotalMinor": 10000,
+    "discountMinor": 1000,
+    "totalMinor": 9000,
+    "lines": [
+     {
+      "key": "a",
+      "amountMinor": 10000,
+      "discountMinor": 1000,
+      "netMinor": 9000
+     }
+    ],
+    "applied": [
+     {
+      "id": "k10",
+      "name": "کدِ ده",
+      "discountMinor": 1000
+     }
+    ],
+    "codes": [
+     {
+      "code": "SALE10",
+      "status": "applied"
+     }
+    ]
+   }
+  },
+  {
+   "name": "کد: بیرونِ بازه",
+   "cart": {
+    "lines": [
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 1000,
+      "unitMinor": 10000,
+      "costMinor": 6000,
+      "category": "drinks",
+      "supplierId": "s1"
+     }
+    ],
+    "coupons": [
+     "SALE10"
+    ],
+    "at": {
+     "date": "2026-10-19",
+     "minute": 600
+    }
+   },
+   "rules": [
+    {
+     "id": "k10",
+     "name": "کدِ ده",
+     "kind": "percent",
+     "bp": 1000,
+     "code": "SALE10",
+     "stack": "combine",
+     "window": {
+      "days": [
+       7
+      ]
+     }
+    }
+   ],
+   "out": {
+    "subtotalMinor": 10000,
+    "discountMinor": 0,
+    "totalMinor": 10000,
+    "lines": [
+     {
+      "key": "a",
+      "amountMinor": 10000,
+      "discountMinor": 0,
+      "netMinor": 10000
+     }
+    ],
+    "applied": [],
+    "codes": [
+     {
+      "code": "SALE10",
+      "status": "inactive"
+     }
+    ]
+   }
+  },
+  {
+   "name": "کد: معتبر ولی بی اثر روی این سبد",
+   "cart": {
+    "lines": [
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 1000,
+      "unitMinor": 10000,
+      "costMinor": 6000,
+      "category": "drinks",
+      "supplierId": "s1"
+     }
+    ],
+    "coupons": [
+     "SALE10"
+    ]
+   },
+   "rules": [
+    {
+     "id": "k10",
+     "name": "کدِ ده",
+     "kind": "percent",
+     "bp": 1000,
+     "code": "SALE10",
+     "stack": "combine",
+     "scope": {
+      "products": [
+       "C"
+      ]
+     }
+    }
+   ],
+   "out": {
+    "subtotalMinor": 10000,
+    "discountMinor": 0,
+    "totalMinor": 10000,
+    "lines": [
+     {
+      "key": "a",
+      "amountMinor": 10000,
+      "discountMinor": 0,
+      "netMinor": 10000
+     }
+    ],
+    "applied": [],
+    "codes": [
+     {
+      "code": "SALE10",
+      "status": "no_effect"
+     }
+    ]
+   }
+  },
+  {
+   "name": "ردیفِ noPromo و قلمِ آزاد بیرون‌اند",
+   "cart": {
+    "lines": [
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 2000,
+      "unitMinor": 10000,
+      "costMinor": 6000,
+      "category": "drinks",
+      "supplierId": "s1",
+      "noPromo": true
+     },
+     {
+      "key": "b",
+      "productId": "B",
+      "qtyMilli": 1000,
+      "unitMinor": 25000,
+      "costMinor": 20000,
+      "category": "snacks",
+      "supplierId": "s2"
+     },
+     {
+      "key": "f",
+      "productId": "",
+      "qtyMilli": 1000,
+      "unitMinor": 5000
+     }
+    ]
+   },
+   "rules": [
+    {
+     "id": "p10",
+     "name": "ده درصد",
+     "kind": "percent",
+     "bp": 1000
+    }
+   ],
+   "out": {
+    "subtotalMinor": 50000,
+    "discountMinor": 2500,
+    "totalMinor": 47500,
+    "lines": [
+     {
+      "key": "a",
+      "amountMinor": 20000,
+      "discountMinor": 0,
+      "netMinor": 20000
+     },
+     {
+      "key": "b",
+      "amountMinor": 25000,
+      "discountMinor": 2500,
+      "netMinor": 22500
+     },
+     {
+      "key": "f",
+      "amountMinor": 5000,
+      "discountMinor": 0,
+      "netMinor": 5000
+     }
+    ],
+    "applied": [
+     {
+      "id": "p10",
+      "name": "ده درصد",
+      "discountMinor": 2500
+     }
+    ],
+    "codes": []
+   }
+  },
+  {
+   "name": "مبلغِ ردیف از موتورِ امروز می‌آید",
+   "cart": {
+    "lines": [
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 2000,
+      "unitMinor": 10000,
+      "costMinor": 6000,
+      "category": "drinks",
+      "supplierId": "s1",
+      "amountMinor": 19900
+     }
+    ]
+   },
+   "rules": [
+    {
+     "id": "p10",
+     "name": "ده درصد",
+     "kind": "percent",
+     "bp": 1000
+    }
+   ],
+   "out": {
+    "subtotalMinor": 19900,
+    "discountMinor": 2000,
+    "totalMinor": 17900,
+    "lines": [
+     {
+      "key": "a",
+      "amountMinor": 19900,
+      "discountMinor": 2000,
+      "netMinor": 17900
+     }
+    ],
+    "applied": [
+     {
+      "id": "p10",
+      "name": "ده درصد",
+      "discountMinor": 2000
+     }
+    ],
+    "codes": []
+   }
+  },
+  {
+   "name": "قاعدهٔ غیرفعال و نامعتبر نادیده",
+   "cart": {
+    "lines": [
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 2000,
+      "unitMinor": 10000,
+      "costMinor": 6000,
+      "category": "drinks",
+      "supplierId": "s1"
+     }
+    ]
+   },
+   "rules": [
+    {
+     "id": "p10",
+     "name": "ده درصد",
+     "kind": "percent",
+     "bp": 1000,
+     "active": false
+    },
+    {
+     "id": "bad",
+     "name": "بد",
+     "kind": "percent",
+     "bp": 0
+    }
+   ],
+   "out": {
+    "subtotalMinor": 20000,
+    "discountMinor": 0,
+    "totalMinor": 20000,
+    "lines": [
+     {
+      "key": "a",
+      "amountMinor": 20000,
+      "discountMinor": 0,
+      "netMinor": 20000
+     }
+    ],
+    "applied": [],
+    "codes": []
+   }
+  },
+  {
+   "name": "کانالِ اینترنتی در صندوق نیست",
+   "cart": {
+    "lines": [
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 2000,
+      "unitMinor": 10000,
+      "costMinor": 6000,
+      "category": "drinks",
+      "supplierId": "s1"
+     }
+    ],
+    "channel": "pos"
+   },
+   "rules": [
+    {
+     "id": "p10",
+     "name": "ده درصد",
+     "kind": "percent",
+     "bp": 1000,
+     "channels": [
+      "online"
+     ]
+    }
+   ],
+   "out": {
+    "subtotalMinor": 20000,
+    "discountMinor": 0,
+    "totalMinor": 20000,
+    "lines": [
+     {
+      "key": "a",
+      "amountMinor": 20000,
+      "discountMinor": 0,
+      "netMinor": 20000
+     }
+    ],
+    "applied": [],
+    "codes": []
+   }
+  },
+  {
+   "name": "کانالِ درست",
+   "cart": {
+    "lines": [
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 2000,
+      "unitMinor": 10000,
+      "costMinor": 6000,
+      "category": "drinks",
+      "supplierId": "s1"
+     }
+    ],
+    "channel": "online"
+   },
+   "rules": [
+    {
+     "id": "p10",
+     "name": "ده درصد",
+     "kind": "percent",
+     "bp": 1000,
+     "channels": [
+      "online"
+     ]
+    }
+   ],
+   "out": {
+    "subtotalMinor": 20000,
+    "discountMinor": 2000,
+    "totalMinor": 18000,
+    "lines": [
+     {
+      "key": "a",
+      "amountMinor": 20000,
+      "discountMinor": 2000,
+      "netMinor": 18000
+     }
+    ],
+    "applied": [
+     {
+      "id": "p10",
+      "name": "ده درصد",
+      "discountMinor": 2000
+     }
+    ],
+    "codes": []
+   }
+  },
+  {
+   "name": "مستثنا بر شامل مقدم است",
+   "cart": {
+    "lines": [
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 1000,
+      "unitMinor": 10000,
+      "costMinor": 6000,
+      "category": "drinks",
+      "supplierId": "s1"
+     },
+     {
+      "key": "c",
+      "productId": "C",
+      "qtyMilli": 1000,
+      "unitMinor": 35000,
+      "costMinor": 0,
+      "category": "drinks",
+      "supplierId": "s2"
+     }
+    ]
+   },
+   "rules": [
+    {
+     "id": "p10",
+     "name": "ده درصد",
+     "kind": "percent",
+     "bp": 1000,
+     "scope": {
+      "categories": [
+       "drinks"
+      ],
+      "exProducts": [
+       "C"
+      ]
+     }
+    }
+   ],
+   "out": {
+    "subtotalMinor": 45000,
+    "discountMinor": 1000,
+    "totalMinor": 44000,
+    "lines": [
+     {
+      "key": "a",
+      "amountMinor": 10000,
+      "discountMinor": 1000,
+      "netMinor": 9000
+     },
+     {
+      "key": "c",
+      "amountMinor": 35000,
+      "discountMinor": 0,
+      "netMinor": 35000
+     }
+    ],
+    "applied": [
+     {
+      "id": "p10",
+      "name": "ده درصد",
+      "discountMinor": 1000
+     }
+    ],
+    "codes": []
+   }
+  },
+  {
+   "name": "دامنهٔ تأمین‌کننده",
+   "cart": {
+    "lines": [
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 1000,
+      "unitMinor": 10000,
+      "costMinor": 6000,
+      "category": "drinks",
+      "supplierId": "s1"
+     },
+     {
+      "key": "b",
+      "productId": "B",
+      "qtyMilli": 1000,
+      "unitMinor": 25000,
+      "costMinor": 20000,
+      "category": "snacks",
+      "supplierId": "s2"
+     },
+     {
+      "key": "c",
+      "productId": "C",
+      "qtyMilli": 1000,
+      "unitMinor": 35000,
+      "costMinor": 0,
+      "category": "drinks",
+      "supplierId": "s2"
+     }
+    ]
+   },
+   "rules": [
+    {
+     "id": "p10",
+     "name": "ده درصد",
+     "kind": "percent",
+     "bp": 1000,
+     "scope": {
+      "suppliers": [
+       "s2"
+      ]
+     }
+    }
+   ],
+   "out": {
+    "subtotalMinor": 70000,
+    "discountMinor": 6000,
+    "totalMinor": 64000,
+    "lines": [
+     {
+      "key": "a",
+      "amountMinor": 10000,
+      "discountMinor": 0,
+      "netMinor": 10000
+     },
+     {
+      "key": "b",
+      "amountMinor": 25000,
+      "discountMinor": 2500,
+      "netMinor": 22500
+     },
+     {
+      "key": "c",
+      "amountMinor": 35000,
+      "discountMinor": 3500,
+      "netMinor": 31500
+     }
+    ],
+    "applied": [
+     {
+      "id": "p10",
+      "name": "ده درصد",
+      "discountMinor": 6000
+     }
+    ],
+    "codes": []
+   }
+  },
+  {
+   "name": "بهای نامعلوم (۰): کف صفر",
+   "cart": {
+    "lines": [
+     {
+      "key": "c",
+      "productId": "C",
+      "qtyMilli": 2000,
+      "unitMinor": 35000,
+      "costMinor": 0,
+      "category": "drinks",
+      "supplierId": "s2"
+     }
+    ]
+   },
+   "rules": [
+    {
+     "id": "f1",
+     "name": "یکی مفت",
+     "kind": "bxgy",
+     "buy": 1,
+     "get": 1,
+     "bp": 10000,
+     "scope": {
+      "products": [
+       "C"
+      ]
+     }
+    }
+   ],
+   "out": {
+    "subtotalMinor": 70000,
+    "discountMinor": 35000,
+    "totalMinor": 35000,
+    "lines": [
+     {
+      "key": "c",
+      "amountMinor": 70000,
+      "discountMinor": 35000,
+      "netMinor": 35000
+     }
+    ],
+    "applied": [
+     {
+      "id": "f1",
+      "name": "یکی مفت",
+      "discountMinor": 35000
+     }
+    ],
+    "codes": []
+   }
+  },
+  {
+   "name": "ساعتِ خوش: داخلِ بازه",
+   "cart": {
+    "lines": [
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 1000,
+      "unitMinor": 10000,
+      "costMinor": 6000,
+      "category": "drinks",
+      "supplierId": "s1"
+     }
+    ],
+    "at": {
+     "date": "2026-10-19",
+     "minute": 1080
+    }
+   },
+   "rules": [
+    {
+     "id": "hh",
+     "name": "ساعتِ خوش",
+     "kind": "percent",
+     "bp": 2000,
+     "window": {
+      "start": 1020,
+      "end": 1140
+     }
+    }
+   ],
+   "out": {
+    "subtotalMinor": 10000,
+    "discountMinor": 2000,
+    "totalMinor": 8000,
+    "lines": [
+     {
+      "key": "a",
+      "amountMinor": 10000,
+      "discountMinor": 2000,
+      "netMinor": 8000
+     }
+    ],
+    "applied": [
+     {
+      "id": "hh",
+      "name": "ساعتِ خوش",
+      "discountMinor": 2000
+     }
+    ],
+    "codes": []
+   }
+  },
+  {
+   "name": "ساعتِ خوش: بیرونِ بازه",
+   "cart": {
+    "lines": [
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 1000,
+      "unitMinor": 10000,
+      "costMinor": 6000,
+      "category": "drinks",
+      "supplierId": "s1"
+     }
+    ],
+    "at": {
+     "date": "2026-10-19",
+     "minute": 1200
+    }
+   },
+   "rules": [
+    {
+     "id": "hh",
+     "name": "ساعتِ خوش",
+     "kind": "percent",
+     "bp": 2000,
+     "window": {
+      "start": 1020,
+      "end": 1140
+     }
+    }
+   ],
+   "out": {
+    "subtotalMinor": 10000,
+    "discountMinor": 0,
+    "totalMinor": 10000,
+    "lines": [
+     {
+      "key": "a",
+      "amountMinor": 10000,
+      "discountMinor": 0,
+      "netMinor": 10000
+     }
+    ],
+    "applied": [],
+    "codes": []
+   }
+  },
+  {
+   "name": "بازه بی زمانِ سبد: اعمال نمی‌شود",
+   "cart": {
+    "lines": [
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 1000,
+      "unitMinor": 10000,
+      "costMinor": 6000,
+      "category": "drinks",
+      "supplierId": "s1"
+     }
+    ]
+   },
+   "rules": [
+    {
+     "id": "hh",
+     "name": "ساعتِ خوش",
+     "kind": "percent",
+     "bp": 2000,
+     "window": {
+      "start": 1020,
+      "end": 1140
+     }
+    }
+   ],
+   "out": {
+    "subtotalMinor": 10000,
+    "discountMinor": 0,
+    "totalMinor": 10000,
+    "lines": [
+     {
+      "key": "a",
+      "amountMinor": 10000,
+      "discountMinor": 0,
+      "netMinor": 10000
+     }
+    ],
+    "applied": [],
+    "codes": []
+   }
+  },
+  {
+   "name": "درصد روی وزنی: ۱۷٫۳ ⇒ ۱۷",
+   "cart": {
+    "lines": [
+     {
+      "key": "w",
+      "productId": "W",
+      "qtyMilli": 1500,
+      "unitMinor": 11500,
+      "costMinor": 0,
+      "category": "fruit",
+      "supplierId": "s3"
+     }
+    ]
+   },
+   "rules": [
+    {
+     "id": "p10",
+     "name": "ده درصد",
+     "kind": "percent",
+     "bp": 1000
+    }
+   ],
+   "out": {
+    "subtotalMinor": 17300,
+    "discountMinor": 1700,
+    "totalMinor": 15600,
+    "lines": [
+     {
+      "key": "w",
+      "amountMinor": 17300,
+      "discountMinor": 1700,
+      "netMinor": 15600
+     }
+    ],
+    "applied": [
+     {
+      "id": "p10",
+      "name": "ده درصد",
+      "discountMinor": 1700
+     }
+    ],
+    "codes": []
+   }
+  },
+  {
+   "name": "درصد روی وزنی: ۲۵٫۹۵ ⇒ ۲۶",
+   "cart": {
+    "lines": [
+     {
+      "key": "w",
+      "productId": "W",
+      "qtyMilli": 1500,
+      "unitMinor": 11500,
+      "costMinor": 0,
+      "category": "fruit",
+      "supplierId": "s3"
+     }
+    ]
+   },
+   "rules": [
+    {
+     "id": "p15",
+     "name": "پانزده",
+     "kind": "percent",
+     "bp": 1500
+    }
+   ],
+   "out": {
+    "subtotalMinor": 17300,
+    "discountMinor": 2600,
+    "totalMinor": 14700,
+    "lines": [
+     {
+      "key": "w",
+      "amountMinor": 17300,
+      "discountMinor": 2600,
+      "netMinor": 14700
+     }
+    ],
+    "applied": [
+     {
+      "id": "p15",
+      "name": "پانزده",
+      "discountMinor": 2600
+     }
+    ],
+    "codes": []
+   }
+  },
+  {
+   "name": "پلهٔ ۱ (بی گردکردن)",
+   "cart": {
+    "lines": [
+     {
+      "key": "q",
+      "productId": "Q",
+      "qtyMilli": 1000,
+      "unitMinor": 12345
+     }
+    ],
+    "stepMinor": 1
+   },
+   "rules": [
+    {
+     "id": "p10",
+     "name": "ده درصد",
+     "kind": "percent",
+     "bp": 1000
+    }
+   ],
+   "out": {
+    "subtotalMinor": 12345,
+    "discountMinor": 1235,
+    "totalMinor": 11110,
+    "lines": [
+     {
+      "key": "q",
+      "amountMinor": 12345,
+      "discountMinor": 1235,
+      "netMinor": 11110
+     }
+    ],
+    "applied": [
+     {
+      "id": "p10",
+      "name": "ده درصد",
+      "discountMinor": 1235
+     }
+    ],
+    "codes": []
+   }
+  },
+  {
+   "name": "عددِ بیرون از بازهٔ امن ⇒ خطا",
+   "cart": {
+    "lines": [
+     {
+      "key": "z",
+      "productId": "Z",
+      "qtyMilli": 1000000,
+      "unitMinor": 9000000000000
+     }
+    ]
+   },
+   "rules": [],
+   "error": true
+  }
+ ]
+}
