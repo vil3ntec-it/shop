@@ -45,6 +45,13 @@ products.forEach((p, i) => {
   stockMovements.push({ id: id('m'), productId: p.id, type: 'purchase_in', qty: units, date: e.date, notes: 'موجودیِ اول', refId: e.id, createdAt: e.createdAt });
 });
 
+//  «دفترِ موجودی» (موتورِ تازه، فقط وقتی تنظیمش روشن شود دیده می‌شود): هزینهٔ جانبیِ یک ورود و یک
+//  انتقال به انبارِ پشتی — هر دو فیلدِ افزودنی‌اند و موجودیِ موتورِ امروز را عوض نمی‌کنند
+warehouseEntries[0].landedCost = 120;
+warehouseEntries[0].landedCostMinor = 12000;
+stockMovements.push({ id: id('m'), productId: 'p1', type: 'transfer', qty: 10, date: iso(now - 20 * day), notes: 'پر کردنِ انبارِ پشتی',
+  refId: null, createdAt: now - 20 * day, userId: 'علی', reason: 'پر کردنِ انبارِ پشتی', locationId: '', toLocationId: 'انبارِ پشتی' });
+
 const stockLeft = Object.fromEntries(warehouseEntries.map(w => [w.productId, w.units]));
 const debtors = [
   { id: 'c1', name: 'احمد کریمی', phone: '0700123456', notes: 'همسایهٔ دکان', createdAt: now - 25 * day },
@@ -100,7 +107,9 @@ const expenses = [
 
 const suppliers = [{ id: 'sp1', name: 'شرکت پخش البرز', phone: '0791112233', address: 'کابل، مندوی', notes: '', createdAt: now - 35 * day }];
 const purchases = [{ id: 'pu1', productId: 'p1', supplierId: 'sp1', quantity: 20, unit: 'کیلوگرم', purchasePrice: 95, totalAmount: 1900,
-  date: iso(now - 8 * day), notes: '', paidAmount: 1000, debt: 900, warehouseEntryId: null, createdAt: now - 8 * day }];
+  date: iso(now - 8 * day), notes: '', paidAmount: 1000, debt: 900, warehouseEntryId: null, createdAt: now - 8 * day,
+  //  سررسیدِ پرداخت (PUR-07، افزودنی) — یادآورِ «سررسید گذشته» در صفحهٔ خرید
+  dueDate: iso(now - 2 * day) }];
 
 //  صندوقِ باز از امروز صبح
 const shiftOpen = new Date(); shiftOpen.setHours(8, 0, 0, 0);

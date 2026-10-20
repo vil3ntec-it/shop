@@ -90,6 +90,7 @@ private val PAGE_TITLES = mapOf(
   "team" to "کارمندان دکان",
   "orders" to "سفارش‌ها",
   "storefront" to "ویترینِ اینترنتی",
+  "stockbook" to "دفترِ موجودی",
 )
 
 /**
@@ -717,6 +718,7 @@ fun AppRoot(
                 "ظاهر" to androidx.compose.material.icons.Icons.Filled.Palette,
                 "تاریخ و رقم" to androidx.compose.material.icons.Icons.Filled.Event,
                 "کالای منقضی" to androidx.compose.material.icons.Icons.Filled.EventBusy,
+                ir.vil3ntec.tohid.ui.screens.STOCK_SETTINGS_TITLE to androidx.compose.material.icons.Icons.Filled.SwapHoriz,
                 "قفل برنامه" to androidx.compose.material.icons.Icons.Filled.Lock,
                 "تغییر رمز حساب" to androidx.compose.material.icons.Icons.Filled.Password,
                 "دستگاه‌های وارد شده" to androidx.compose.material.icons.Icons.Filled.Devices,
@@ -794,7 +796,10 @@ fun AppRoot(
           openProductId = pendingProduct,
           newBarcode = pendingBarcode,
           onConsumed = { pendingBarcode = null; pendingProduct = null },
+          onStockBook = { open("stockbook") },
         )
+        //  «دفترِ موجودی» — موتورِ تازهٔ موجودی و بها (پیش‌فرض خاموش؛ خاموش ⇒ فقط راهِ تنظیمات)
+        "stockbook" -> ir.vil3ntec.tohid.ui.screens.StockBookScreen(store, data, snackbar) { open("settings") }
         "vip" -> VipScreen { sub = null }
         "myplan" -> MySubscriptionScreen()
         "support" -> SupportScreen { sub = null }

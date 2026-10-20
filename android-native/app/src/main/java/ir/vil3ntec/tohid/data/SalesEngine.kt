@@ -43,6 +43,8 @@ object SalesEngine {
     val quantity: Double,
     val unitPrice: Double? = null,
     val label: String = "",
+    /** سریِ اسکن‌شده (موتورِ تازهٔ موجودی، `StockLedger`) — فروش اول از همین برداشته می‌شود */
+    val lotId: String? = null,
   ) {
     /** ردیفی که کالای ثبت‌شده‌ای پشتش نیست */
     val free: Boolean get() = label.isNotBlank()
@@ -207,6 +209,10 @@ object SalesEngine {
     return cart.map { if (it.productId == productId) it.copy(unitPrice = clean) else it }
   }
 
+  /** سریِ ترجیحیِ یک ردیف (اسکنِ سری)؛ `null` یعنی همان FEFO */
+  fun setLineLot(cart: List<CartLine>, productId: String, lotId: String?): List<CartLine> =
+    cart.map { if (it.productId == productId) it.copy(lotId = lotId?.takeIf { l -> l.isNotEmpty() }) else it }
+
   /** تعیینِ تعداد. صفر یا کمتر یعنی حذفِ ردیف. */
   fun setCartQty(cart: List<CartLine>, productId: String, quantity: Double): List<CartLine> {
     if (quantity <= 0) return cart.filter { it.productId != productId }
@@ -316,6 +322,31 @@ object SalesEngine {
       if (line.quantity > available) return Result.Failed(shortageMessage(p, line.quantity, available))
     }
 
+    /*
+     *  موتورِ تازهٔ موجودی و بها (`StockLedger`، تنظیمِ دکان؛ پیش‌فرض خاموش ⇒ `null`):
+     *  سنجشِ هسته در حالتِ local — بیش از موجودیِ **سالم** و سریِ منقضی بسته است
+     *  (INV-19، بخشِ ۳.۶)؛ بهای موقتِ هر قلم به میانگینِ موزون؛ سریِ اسکن‌شده اول.
+     */
+    val stockPlan: Map<Int, StockLedger.Check>? = if (!StockLedger.isOn(d)) null else {
+      val idx = cart.indices.filter { i -> !cart[i].free && d.products.any { it.id == cart[i].productId } }
+      val view = StockLedger.replay(d, idx.map { cart[it].productId }.distinct())
+      val checks = StockLedger.checkCart(
+        view, idx.map { i -> StockLedger.Line(cart[i].productId, StockLedger.milli(cart[i].quantity), cart[i].lotId) }, today,
+      )
+      idx.zip(checks).toMap()
+    }
+    stockPlan?.forEach { (i, c) ->
+      if (c.ok) return@forEach
+      val p = d.products.first { it.id == cart[i].productId }
+      val avail = (c.availableMilli ?: 0L) / 1000.0
+      return Result.Failed(
+        if (c.error == "expired_stock") {
+          "از «${p.name}» ${ir.vil3ntec.tohid.qty((c.expiredMilli ?: 0L) / 1000.0)} واحد منقضی است؛ " +
+            "فقط ${ir.vil3ntec.tohid.qty(avail)} واحدِ سالم مانده"
+        } else shortageMessage(p, cart[i].quantity, avail)
+      )
+    }
+
     val t = totals(d, cart, checkout)
 
     // فروشِ نقدی همیشه کامل تسویه می‌شود
@@ -366,7 +397,7 @@ object SalesEngine {
 
     val items = mutableListOf<SaleItem>()
     val movements = mutableListOf<StockMovement>()
-    cart.forEach { line ->
+    cart.forEachIndexed { lineIndex, line ->
       /*
        *  قلمِ آزاد: نه کالایی دارد، نه حرکتِ انبار می‌سازد، نه بهای
        *  تمام‌شده. سودش برابرِ کلِ مبلغش حساب می‌شود، چون خریدش جای دیگری
@@ -385,21 +416,24 @@ object SalesEngine {
           totalPrice = lineTotal(price, line.quantity),
           returnedQty = 0.0,
         )
-        return@forEach
+        return@forEachIndexed
       }
 
-      val p = d.products.find { it.id == line.productId } ?: return@forEach
+      val p = d.products.find { it.id == line.productId } ?: return@forEachIndexed
       //  قیمتِ دستیِ همین ردیف، وگرنه قیمتِ خودِ کالا
       val unit = line.unitPrice ?: p.salePrice
+      //  موتورِ تازه: بهای موقت = میانگینِ موزون؛ نامعلوم (کالای بی ورود) ⇒ همان قیمتِ خریدِ امروز
+      val planned = stockPlan?.get(lineIndex)?.takeIf { it.ok && !it.unknownCost }
       items += SaleItem(
         id = newId(),
         saleId = saleId,
         productId = p.id,
         quantity = line.quantity,
         unitPrice = unit,
-        purchasePrice = p.purchasePrice,
+        purchasePrice = planned?.let { it.unitCostMinor / 100.0 } ?: p.purchasePrice,
         totalPrice = lineTotal(unit, line.quantity),
         returnedQty = 0.0,
+        lotId = if (stockPlan != null) line.lotId?.takeIf { it.isNotEmpty() } else null,
       )
       movements += StockMovement(
         id = newId(),

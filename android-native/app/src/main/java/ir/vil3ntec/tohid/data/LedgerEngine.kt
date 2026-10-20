@@ -170,6 +170,12 @@ object LedgerEngine {
     /** تاریخِ انقضا و تولیدِ همین محموله (اختیاری) — روی ورودِ انبار می‌نشیند */
     val expiryDate: String = "",
     val productionDate: String = "",
+    /*  موتورِ تازهٔ موجودی (`StockLedger`) — `null` = فرمِ امروز (خاموش) */
+    /** هزینهٔ جانبیِ همین خرید (کرایه، گمرک) به افغانی — روی بهای کالا، نه بدهیِ تأمین‌کننده (PUR-06) */
+    val landedCost: Double? = null,
+    val userId: String? = null,
+    /** سررسیدِ پرداخت (`yyyy-MM-dd`، PUR-07)؛ `null` یا خالی = ندارد */
+    val dueDate: String? = null,
   )
 
   /**
@@ -191,6 +197,10 @@ object LedgerEngine {
       ?: return Result.Failed("محصول را انتخاب کنید")
     if (draft.quantity.isNaN() || draft.quantity <= 0) return Result.Failed("مقدار معتبر وارد کنید")
     if (draft.purchasePrice.isNaN() || draft.purchasePrice < 0) return Result.Failed("قیمت خرید معتبر وارد کنید")
+    if (draft.landedCost != null && (draft.landedCost.isNaN() || draft.landedCost < 0)) return Result.Failed("هزینهٔ جانبی درست نیست")
+    val due = draft.dueDate?.trim()?.ifEmpty { null }
+    if (due != null && !ir.vil3ntec.tohid.core.stock.StockCore.isoDateOk(due)) return Result.Failed("سررسید درست نیست")
+    val landed = draft.landedCost?.takeIf { it > 0 }
 
     val date = draft.date.ifBlank { today }
     val unit = draft.unit.ifBlank { product.unit }
@@ -257,6 +267,9 @@ object LedgerEngine {
           createdAt = now,
           expiryDate = draft.expiryDate,
           productionDate = draft.productionDate,
+          landedCost = landed,
+          landedCostMinor = landed?.let(StockLedger::minor),
+          userId = draft.userId?.trim()?.ifEmpty { null },
         ),
         purchases = d.purchases + Purchase(
           id = purchaseId,
@@ -272,6 +285,7 @@ object LedgerEngine {
           debt = totalAmount - paid,
           warehouseEntryId = entryId,
           createdAt = now,
+          dueDate = due,
         ),
         stockMovements = d.stockMovements + StockMovement(
           id = newId(),
