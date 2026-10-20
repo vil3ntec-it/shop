@@ -206,6 +206,29 @@ const man = await (await fetch(`${base}/store/${slug}/manifest.webmanifest`)).js
 ok(man.name === 'ویترینِ آزمایشی' && man.start_url === `/store/${slug}` && man.icons.length === 3, 'وب‌اپِ قابلِ نصبِ همین دکان (WEB-14)');
 ok((await fetch(`${base}/store/no-such-store/manifest.webmanifest`)).status === 404, 'manifest ِ ویترینِ ناموجود ⇒ ۴۰۴');
 
+//  سه زبان (دودی): en چپ‌به‌راست و ps راست‌به‌چپ — ویترین، سبد، ثبت؛ axe در هر دو جهت
+for (const [lang, dir, stock, ck] of [['en', 'ltr', 'Stock is being checked', 'Checkout'], ['ps', 'rtl', 'موجودیت لا کتل کېږي', 'فرمایش ثبتول']]) {
+  const lc = await browser.newContext({ viewport: { width: 390, height: 844 }, bypassCSP: Boolean(axeSrc) });
+  const lp = await lc.newPage();
+  lp.on('pageerror', (e) => errors.push(String(e)));
+  await lp.goto(`${base}/store/${slug}?lang=${lang}`);
+  await lp.waitForSelector('#products li[data-id]', { timeout: 15000 });
+  ok((await lp.getAttribute('html', 'dir')) === dir && (await lp.getAttribute('html', 'lang')) === lang, `${lang}: جهت و زبانِ ویترین`);
+  ok((await lp.locator('#products li[data-id]').count()) === 2 && (await lp.textContent('#stock-note')).includes(stock), `${lang}: کاتالوگ و یادداشتِ موجودی`);
+  await lp.locator('#products li[data-id] .p-add').first().click();
+  await lp.goto(`${base}/store/${slug}?lang=${lang}#/checkout`);
+  await lp.waitForSelector('#view-checkout:not([hidden])');
+  ok((await lp.textContent('#view-checkout h1')) === ck, `${lang}: صفحهٔ ثبت`);
+  const over = await lp.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  ok(over <= 0, `${lang}: بی بیرون‌زدگی`, `${over}px`);
+  if (axeSrc) {
+    await lp.addScriptTag({ content: axeSrc });
+    const v = await lp.evaluate(async () => (await window.axe.run(document, { runOnly: ['color-contrast', 'button-name', 'label', 'image-alt', 'link-name'] })).violations.map((x) => x.id));
+    ok(v.length === 0, `دسترس‌پذیری (axe-core): ثبت (${lang})`, v.join(' | '));
+  }
+  await lc.close();
+}
+
 await page.goto(`${base}/store/no-such-store`);
 await page.waitForSelector('#view-missing:not([hidden])', { timeout: 10000 });
 ok(true, 'ویترینِ ناموجود: «پیدا نشد»');
@@ -213,8 +236,9 @@ ok(true, 'ویترینِ ناموجود: «پیدا نشد»');
 ok(violations.length === 0, 'هیچ نقضِ CSP', violations.join(' | '));
 ok(errors.length === 0, 'بی خطای جاوااسکریپت', errors.join(' | '));
 const jsSize = fs.statSync(path.join(import.meta.dirname, '..', 'public', 'store', 'store.js')).size
-  + fs.statSync(path.join(import.meta.dirname, '..', 'public', 'kit', 'kit.js')).size;
-ok(jsSize < 75 * 1024, 'جاوااسکریپتِ صفحه (کیت + ویترین) زیرِ ۷۵KB (۳.۱۰)', `${jsSize} بایت، فشرده‌نشده`);
+  + fs.statSync(path.join(import.meta.dirname, '..', 'public', 'kit', 'kit.js')).size
+  + fs.statSync(path.join(import.meta.dirname, '..', 'public', 'kit', 'boot.js')).size;
+ok(jsSize < 75 * 1024, 'جاوااسکریپتِ صفحه (آغاز + کیت + ویترین) زیرِ ۷۵KB (۳.۱۰)', `${jsSize} بایت، فشرده‌نشده`);
 
 await ctx.close();
 await browser.close();

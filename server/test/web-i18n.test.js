@@ -1,0 +1,105 @@
+'use strict';
+/**
+ * سه زبانِ وبِ خریدار (fa پیش‌فرض، en، ps) — واژه‌نامه‌های server/public/kit/i18n.
+ *
+ * آن‌چه این پرونده قفل می‌کند (بی مرورگر و بی پایگاه):
+ *   ۱) هر کلیدی که کیت، بازارچه و ویترین به کار می‌برند (K.t، data-t/ta/tp و
+ *      خانواده‌های پویا: دستهٔ دکان، وضعیت و دلیلِ سفارش، پذیرش) در هر سه زبان هست.
+ *   ۲) سه واژه‌نامه همان کلیدها را دارند (جز شکلِ مفردِ اختیاریِ «‎.1‎»)، و جای‌نگهدارهای
+ *      {…} ِ هر متن در سه زبان یکی است.
+ *   ۳) en هیچ حرفِ فارسی/پشتو ندارد؛ هیچ متنِ خالی نیست.
+ *   ۴) در JS ِ صفحه‌ها هیچ متنِ فارسیِ ثابت نمانده (همه از واژه‌نامه).
+ *   ۵) هر کدِ خطای سرور که صفحه نشان می‌دهد ترجمهٔ خودش را دارد.
+ */
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+
+const pub = path.join(__dirname, '..', 'public');
+const read = (f) => fs.readFileSync(path.join(pub, f), 'utf8');
+const LANGS = ['fa', 'en', 'ps'];
+const dict = Object.fromEntries(LANGS.map((l) => [l, JSON.parse(read(`kit/i18n/${l}.json`))]));
+const SOURCES = ['kit/kit.js', 'market/market.js', 'store/store.js', 'market/index.html', 'store/index.html'];
+const ARABIC = /[\u0600-\u06FF]/;
+
+function usedKeys() {
+  const keys = new Set();
+  for (const f of SOURCES) {
+    const s = read(f);
+    for (const m of s.matchAll(/\b(?:K\.)?t\(\s*'([a-z][\w.]*[\w])'/g)) keys.add(m[1]);
+    for (const m of s.matchAll(/\bt\(\s*[^'()]*\?\s*'([a-z][\w.]*)'\s*:\s*'([a-z][\w.]*)'/g)) { keys.add(m[1]); keys.add(m[2]); }
+    for (const m of s.matchAll(/label: '([a-z][\w.]*)'/g)) keys.add(m[1]);
+    for (const m of s.matchAll(/\['((?:od|ck)\.[\w.]+)',/g)) keys.add(m[1]);
+    for (const m of s.matchAll(/data-t[ap]?="([^"]+)"/g)) keys.add(m[1]);
+    for (const m of s.matchAll(/K\.has\('([a-z][\w.]*[\w])'\)/g)) keys.add(m[1]);
+  }
+  //  خانواده‌های پویا از منبعِ سرور
+  const { CATEGORIES } = require('../src/lib/market');
+  const { ORDER_STATUSES, REASONS } = require('../src/lib/order-states');
+  for (const c of CATEGORIES) keys.add(`cat.${c.key}`);
+  for (const s of ORDER_STATUSES) keys.add(`order.${s}`);
+  for (const r of new Set(Object.values(REASONS).flat())) keys.add(`reason.${r}`);
+  for (const a of ['accepting', 'delayed', 'later']) keys.add(`accept.${a}`);
+  return keys;
+}
+const holes = (s) => [...String(s).matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort().join(',');
+
+test('هر کلیدِ به‌کاررفته در هر سه زبان هست', () => {
+  const keys = usedKeys();
+  assert.ok(keys.size > 250, `کلیدها پیدا شدند (${keys.size})`);
+  for (const l of LANGS) {
+    const missing = [...keys].filter((k) => typeof dict[l][k] !== 'string');
+    assert.deepEqual(missing, [], `${l}: کلیدِ ناموجود`);
+  }
+});
+
+test('سه واژه‌نامه همان کلیدها و همان جای‌نگهدارها را دارند؛ هیچ متنی خالی نیست', () => {
+  const base = (d) => Object.keys(d).filter((k) => !k.endsWith('.1')).sort();
+  assert.deepEqual(base(dict.en), base(dict.fa), 'en = fa');
+  assert.deepEqual(base(dict.ps), base(dict.fa), 'ps = fa');
+  for (const l of LANGS) {
+    for (const [k, v] of Object.entries(dict[l])) {
+      assert.ok(typeof v === 'string' && v.trim(), `${l}.${k} خالی است`);
+      const ref = dict.fa[k.replace(/\.1$/, '')];
+      //  شکلِ مفرد شمار را خودش می‌نویسد ({n} ندارد)
+      const want = k.endsWith('.1') ? holes(ref).replace(/(^|,)n(,|$)/, '$1').replace(/^,|,$/g, '') : holes(ref);
+      assert.equal(holes(v), want, `${l}.${k}: جای‌نگهدارها`);
+    }
+  }
+  //  کلیدِ مفرد فقط برای کلیدی که {n} دارد
+  for (const l of LANGS) {
+    for (const k of Object.keys(dict[l]).filter((x) => x.endsWith('.1'))) {
+      assert.ok(/\{n\}/.test(dict.fa[k.slice(0, -2)]), `${l}.${k} بی {n}`);
+    }
+  }
+});
+
+test('انگلیسی هیچ حرفِ فارسی/پشتو ندارد؛ فارسی و پشتو فارسی‌نویس‌اند', () => {
+  const bad = Object.entries(dict.en).filter(([, v]) => ARABIC.test(v)).map(([k]) => k);
+  assert.deepEqual(bad, []);
+  for (const l of ['fa', 'ps']) {
+    const latinOnly = Object.entries(dict[l]).filter(([k, v]) => !ARABIC.test(v) && !/^(sep|dist|title\.market|a\.logo)$/.test(k) && /[a-z]{3}/i.test(v)).map(([k]) => k);
+    assert.deepEqual(latinOnly, [], `${l}: متنِ ترجمه‌نشده`);
+  }
+  //  پشتو با فارسی یکی نیست (جز چند واژهٔ مشترکِ واقعی)
+  const same = Object.keys(dict.fa).filter((k) => dict.ps[k] === dict.fa[k] && ARABIC.test(dict.fa[k]));
+  assert.ok(same.length < 15, `پشتو بیش از اندازه همان فارسی است: ${same.join(' ')}`);
+});
+
+test('در JS ِ صفحه‌ها متنِ فارسیِ ثابت نمانده', () => {
+  for (const f of ['kit/kit.js', 'market/market.js', 'store/store.js']) {
+    const lines = read(f).split('\n').filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).map((l) => l.replace(/\s\/\/.*$/, ''));
+    //  استثنا: نامِ خودِ زبان‌ها در گزینش‌گر و رقم/جداکنندهٔ فارسی (نه متن)
+    const hits = lines.filter((l) => [...l.matchAll(/'([^'\\]*)'/g)].some((m) => ARABIC.test(m[1]) && !/^(فارسی|پښتو|[۰-۹٬٫]+)$/.test(m[1])));
+    assert.deepEqual(hits, [], `${f}: متنِ ثابت`);
+  }
+});
+
+test('کدهای خطای سرور که صفحه نشان می‌دهد ترجمه دارند', () => {
+  const codes = ['verification_unavailable', 'verification_required', 'phone_not_verified', 'otp_wrong', 'otp_expired',
+    'otp_locked', 'otp_used', 'otp_not_found', 'otp_required', 'otp_resend_wait', 'otp_daily_limit', 'rate_limited',
+    'product_unavailable', 'qty_over_limit', 'below_min_order', 'fulfillment_unavailable', 'bad_address', 'bad_customer',
+    'bad_lines', 'store_not_found', 'market_not_found', 'order_not_found', 'cannot_cancel', 'query_too_short', 'bad_location'];
+  for (const l of LANGS) for (const c of codes) assert.ok(dict[l][`err.${c}`], `${l}: err.${c}`);
+});

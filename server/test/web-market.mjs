@@ -146,29 +146,64 @@ const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, lo
 const page = await ctx.newPage();
 watch(page);
 
-//  ── خانه ──
+//  ── خانه: اول کالا (دستورِ صاحب محصول)، بعد دکان‌های پیشنهادی ──
 await page.goto(`${base}/market/`);
-await page.waitForSelector('#shops li a.shop-card', { timeout: 15000 });
+await page.waitForSelector('#items li[data-id]', { timeout: 15000 });
 ok(await page.evaluate(() => document.documentElement.dir === 'rtl' && document.documentElement.lang === 'fa'), 'راست‌چین و فارسی');
-const cards = await page.$$eval('#shops a.shop-card', (as) => as.map((a) => a.getAttribute('href')));
-ok(cards.length === 2 && cards.includes(`/store/${ga.slug}`) && cards.includes(`/store/${gb.slug}`), 'خانه: فقط دکان‌های در فهرست', cards.join());
+const firstSection = await page.evaluate(() => {
+  const feed = [...document.querySelectorAll('#feed > section')].filter((s) => !s.hidden);
+  return feed.map((s) => s.id);
+});
+ok(firstSection.indexOf('items-sec') >= 0 && firstSection.indexOf('items-sec') < firstSection.indexOf('sug-sec'), 'خانه: کالاها پیش از دکان‌ها', firstSection.join());
+const shopsOfItems = await page.$$eval('#items li[data-shop]', (ls) => [...new Set(ls.map((l) => l.getAttribute('data-shop')))].sort());
+ok(JSON.stringify(shopsOfItems) === JSON.stringify([gb.slug, ga.slug].sort()), 'کالاهای خانه فقط از دکان‌های در فهرست', shopsOfItems.join());
+const cards = await page.$$eval('#sug a.shop-card', (as) => as.map((a) => a.getAttribute('href')));
+ok(cards.length === 2 && cards.includes(`/store/${ga.slug}`) && cards.includes(`/store/${gb.slug}`), 'دکان‌های پیشنهادی: فقط در فهرست', cards.join());
 const homeText = await page.textContent('main');
-ok(homeText.includes('سوپرمارکتِ آزمایشی') && !homeText.includes('بیرون از فهرست'), 'دکانِ «نخواسته در فهرست» دیده نمی‌شود');
-ok(/باز است|بسته است|آفلاین|آنلاین تا/.test(await page.textContent('#shops')), 'وضعیتِ باز/بسته روی کارت (۳۱.۱)');
+ok(homeText.includes('سوپرمارکتِ آزمایشی') && !homeText.includes('بیرون از فهرست') && !homeText.includes('چای'), 'دکان و کالای «نخواسته در فهرست» دیده نمی‌شود');
+ok(/باز است|بسته است|آفلاین|آنلاین تا/.test(await page.textContent('#sug')), 'وضعیتِ باز/بسته روی کارت (۳۱.۱)');
+ok(await page.isHidden('#pop-sec') && await page.isHidden('#deal-sec'), 'بی سفارش و بی قیمتِ آنلاینِ کمتر: «پرفروش» و «ارزان‌تر» نیستند (بی دادهٔ ساختگی)');
+ok(!/★|امتیاز|VIP|دستیار|هوشمند/.test(homeText), 'بی امتیاز، VIP یا دستیارِ ساختگی');
 ok((await page.locator('input[type="search"]').count()) === 1, 'یک جعبهٔ جست‌وجو در صفحه');
 await noOverflow(page, 'خانه');
 await axe(page, 'خانه');
 
 await page.click('#cats button[data-cat="bakery"]');
+await page.waitForFunction((s) => { const l = [...document.querySelectorAll('#items li[data-shop]')]; return l.length > 0 && l.every((x) => x.getAttribute('data-shop') === s); }, gb.slug, { timeout: 5000 });
+ok((await page.$$eval('#sug a.shop-card', (as) => as.map((a) => a.getAttribute('href')))).join() === `/store/${gb.slug}`, 'تراشهٔ دسته: کالا و دکانِ نانوایی');
+await page.click('#cats button[data-cat=""]');
+await page.waitForFunction(() => new Set([...document.querySelectorAll('#items li[data-shop]')].map((x) => x.getAttribute('data-shop'))).size === 2, null, { timeout: 5000 });
+
+//  افزودن از خانه به سبدِ همان دکان ⇒ نوارِ سبد (مدلِ r3)
+await page.locator('#items li[data-id="naan"]').getByRole('button', { name: /افزودن/ }).click();
+await page.waitForSelector('#cart-bar:not([hidden])', { timeout: 5000 });
+ok((await page.evaluate((s) => JSON.parse(localStorage.getItem(`store-cart:${s}`)).naan.qtyMilli, gb.slug)) === 1000, 'افزودن از خانه: یک واحد در سبدِ همان دکان');
+await page.click('#cart-bar');
+await page.waitForFunction(() => document.body.classList.contains('cart-open'), null, { timeout: 5000 });
+ok((await page.getAttribute('#sheet-lines a.cline-main', 'href')) === `/store/${gb.slug}#/cart`, 'سبدهای خانه: هر دکان جدا، با پیوند به سبدِ همان دکان');
+await axe(page, 'سبدهای خانه (r2)');
+await page.keyboard.press('Escape');
+await page.waitForFunction(() => !document.body.classList.contains('cart-open'), null, { timeout: 5000 });
+await page.evaluate((s) => localStorage.removeItem(`store-cart:${s}`), gb.slug);
+
+//  همهٔ دکان‌ها
+await page.goto(`${base}/market/#/shops`);
+await page.waitForSelector('#shops li a.shop-card', { timeout: 10000 });
+const all = await page.$$eval('#shops a.shop-card', (as) => as.map((a) => a.getAttribute('href')));
+ok(all.length === 2 && all.includes(`/store/${ga.slug}`) && all.includes(`/store/${gb.slug}`), 'همهٔ دکان‌ها: فقط در فهرست', all.join());
+await page.click('#shop-cats button[data-cat="bakery"]');
 await page.waitForFunction(() => document.querySelectorAll('#shops a.shop-card').length === 1, null, { timeout: 5000 });
 ok((await page.getAttribute('#shops a.shop-card', 'href')) === `/store/${gb.slug}`, 'تراشهٔ دسته: فقط نانوایی');
-await page.click('#cats button[data-cat=""]');
+await page.click('#shop-cats button[data-cat=""]');
 await page.waitForFunction(() => document.querySelectorAll('#shops a.shop-card').length === 2, null, { timeout: 5000 });
-
-await page.click('#locate');
+await page.click('#locate2');
 await page.waitForFunction(() => /نزدیک/.test(document.getElementById('shops-title').textContent), null, { timeout: 10000 }).catch(() => {});
 ok(true, '«نزدیکِ من» اختیاری است و بی آن هم فهرست کامل است');
+await noOverflow(page, 'همهٔ دکان‌ها');
+await axe(page, 'همهٔ دکان‌ها');
 
+await page.goto(`${base}/market/`);
+await page.waitForSelector('#items li[data-id]');
 await page.fill('#q', 'برن');
 await page.waitForSelector('#r-products li a', { timeout: 10000 });
 const hit = await page.getAttribute('#r-products li a', 'href');
@@ -201,9 +236,9 @@ await axe(page, 'ویترین');
 //  گوشی = مدلِ مرجعِ صاحب محصول (phone-v3 r3 بسته / r2 باز)
 const opened = (pg) => pg.waitForFunction(() => document.body.classList.contains('cart-open') || document.getElementById('cart-sheet').classList.contains('on'), null, { timeout: 10000 });
 const closed = (pg) => pg.waitForFunction(() => !document.body.classList.contains('cart-open') && !document.getElementById('cart-sheet').classList.contains('on'), null, { timeout: 10000 });
-ok(await page.evaluate(() => document.body.classList.contains('phone-cart') && getComputedStyle(document.body).backgroundColor === 'rgb(13, 13, 15)'
-  && getComputedStyle(document.getElementById('surface')).borderBottomLeftRadius === '36px'), 'گوشی با سبدِ پُر: پایهٔ سیاه و سطحِ روشن با گوشهٔ ۳۶ (r3)');
-ok(await page.evaluate(() => getComputedStyle(document.getElementById('open-cart')).backgroundColor === 'rgb(255, 194, 74)'), 'دایرهٔ زردِ شمار (r3)');
+ok(await page.evaluate(() => document.body.classList.contains('phone-cart') && getComputedStyle(document.body).backgroundColor === 'rgb(11, 18, 32)'
+  && getComputedStyle(document.getElementById('surface')).borderBottomLeftRadius === '36px'), 'گوشی با سبدِ پُر: پایهٔ تیرهٔ VILL3N و سطحِ روشن با گوشهٔ ۳۶ (شکلِ r3)');
+ok(await page.evaluate(() => getComputedStyle(document.getElementById('open-cart')).backgroundColor === 'rgb(25, 169, 133)'), 'دایرهٔ فیروزه‌ایِ شمار (#19A985، شکلِ r3)');
 await page.click('#cart-bar');
 await opened(page);
 ok(await page.evaluate(() => document.getElementById('cart-bar').inert && document.getElementById('surface').inert), 'سبدِ باز: نوار و سطحِ زیرین از دسترسِ صفحه‌کلید بیرون‌اند');
@@ -302,7 +337,7 @@ await axe(page, 'سفارش‌های من');
 const dark = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'fa-AF', colorScheme: 'dark' });
 const dp = await dark.newPage(); watch(dp);
 await dp.goto(`${base}/market/`);
-await dp.waitForSelector('#shops li a.shop-card');
+await dp.waitForSelector('#items li[data-id]');
 await axe(dp, 'خانه (تاریک)');
 await dp.goto(`${base}/store/${ga.slug}`);
 await dp.waitForSelector('#products li[data-id]');
@@ -335,6 +370,88 @@ await dark.close();
   await c2.close();
 }
 
+//  ── سه زبان: fa (پیش‌فرض)، en (چپ‌به‌راست)، ps — خانه، دکان، ثبت؛ axe در هر دو جهت ──
+const ARABIC = /[؀-ۿ]/;
+for (const [lang, dir, cur, title] of [['en', 'ltr', 'AFN', 'Checkout'], ['ps', 'rtl', 'افغانۍ', 'فرمایش ثبتول']]) {
+  for (const scheme of ['light', 'dark']) {
+    const c = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'fa-AF', colorScheme: scheme });
+    const p = await c.newPage(); watch(p);
+    await p.goto(`${base}/market/?lang=${lang}`);
+    await p.waitForSelector('#items li[data-id]', { timeout: 15000 });
+    ok(await p.evaluate((l) => document.documentElement.lang === l, lang) && (await p.getAttribute('html', 'dir')) === dir, `${lang}: زبان و جهتِ صفحه (${dir})`);
+    if (scheme === 'light') {
+      //  متنِ رابط (نه نامِ دکان و کالا که دادهٔ خودِ دکان است)
+      const ui = await p.evaluate(() => [...document.querySelectorAll('[data-t]')].filter((x) => x.offsetParent !== null).map((x) => x.textContent).join(' | '));
+      ok(lang === 'en' ? !ARABIC.test(ui) : !/خانه|دکان‌ها|سفارش‌ها|تنظیمات/.test(ui), `${lang}: متنِ رابط به همین زبان`, ui.slice(0, 120));
+      const price = await p.textContent('#items li[data-id] .p-price');
+      ok(lang === 'en' ? /^\d[\d,.]*\s*AFN$/.test(price.trim()) : /^[۰-۹٬٫]+\s*افغانۍ$/.test(price.trim()), `${lang}: رقم و واحدِ پول`, price);
+      await noOverflow(p, `خانه (${lang})`);
+    }
+    await axe(p, `خانه (${lang}، ${scheme})`);
+    await p.goto(`${base}/store/${ga.slug}`);
+    await p.waitForSelector('#products li[data-id]');
+    ok(lang === 'en' ? /Open|Closed|offline|Online/.test(await p.textContent('#store-status')) : /پرانیستی|تړلی|آفلاین|آنلاین/.test(await p.textContent('#store-status')), `${lang}: وضعیتِ دکان به همین زبان`);
+    await p.locator('#products li[data-id="rice"] .p-add').click();
+    if (scheme === 'light') await noOverflow(p, `ویترین (${lang})`);
+    await axe(p, `ویترین (${lang}، ${scheme})`);
+    await p.click('#cart-bar');
+    await opened(p);
+    ok((await p.textContent('#sheet-total')).includes(cur), `${lang}: جمعِ سبد با واحدِ همین زبان`);
+    await axe(p, `سبد (${lang}، ${scheme})`);
+    await p.click('#cart-next');
+    await p.waitForSelector('#view-checkout:not([hidden])');
+    ok((await p.textContent('#view-checkout h1')) === title, `${lang}: صفحهٔ ثبت`, await p.textContent('#view-checkout h1'));
+    if (scheme === 'light') {
+      //  خطای سرور با واژه‌نامه، نه متنِ خامِ فارسیِ سرور
+      await p.fill('#c-phone', '0793334455');
+      await p.click('#verify-send');
+      await p.waitForSelector('#verify-code-row:not([hidden])', { timeout: 10000 });
+      await p.fill('#v-code', '000000');
+      await p.click('#verify-check');
+      await p.waitForFunction(() => document.getElementById('verify-msg').className.includes('err'), null, { timeout: 10000 });
+      const em = await p.textContent('#verify-msg');
+      ok(lang === 'en' ? !ARABIC.test(em) && em.length > 5 : !/کد درست نیست/.test(em), `${lang}: پیامِ خطای سرور ترجمه شد`, em);
+      await noOverflow(p, `ثبت (${lang})`);
+    }
+    await axe(p, `ثبت (${lang}، ${scheme})`);
+    await c.close();
+  }
+}
+//  گزینش‌گرِ زبان (کره در نوارِ بالا) ⇒ ماندگار در localStorage؛ ‎?lang=‎ جلوتر
+{
+  const c = await browser.newContext({ viewport: { width: 1280, height: 800 }, locale: 'fa-AF' });
+  const p = await c.newPage(); watch(p);
+  await p.goto(`${base}/market/`);
+  await p.waitForSelector('#items li[data-id]');
+  await p.click('.topbar [data-act="lang"]');
+  await p.waitForSelector('dialog.confirm[open] input[name="lang"]');
+  await Promise.all([p.waitForNavigation(), p.click('dialog.confirm input[name="lang"][value="en"]')]);
+  await p.waitForSelector('#items li[data-id]');
+  ok((await p.getAttribute('html', 'lang')) === 'en' && (await p.evaluate(() => localStorage.getItem('vill3n-lang'))) === 'en', 'گزینش‌گرِ زبان: انگلیسی و ماندگار');
+  ok(await p.evaluate(() => { const s = document.querySelector('.side').getBoundingClientRect(); return s.left < 10; }), 'en: نوارِ کناری در چپ (آینه)');
+  await axe(p, 'خانه (en، کامپیوتر)');
+  await p.goto(`${base}/market/?lang=ps`);
+  await p.waitForSelector('#items li[data-id]');
+  ok((await p.getAttribute('html', 'lang')) === 'ps' && await p.evaluate(() => { const s = document.querySelector('.side').getBoundingClientRect(); return s.right > innerWidth - 10; }), '‎?lang=ps‎ جلوتر از انتخابِ قبلی؛ نوارِ کناری در راست');
+  await p.goto(`${base}/market/?lang=fa`);
+  await c.close();
+}
+
+//  ── کیو‌آر/نشانیِ دکان: ‎{slug}.vill3n.top‎ (همان که برنامه نشان می‌دهد) مستقیم همان دکان ──
+{
+  const sub = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium/chrome-linux/chrome', args: ['--host-resolver-rules=MAP *.vill3n.top 127.0.0.1'] })
+    .catch(() => chromium.launch({ args: ['--host-resolver-rules=MAP *.vill3n.top 127.0.0.1'] }));
+  const c = await sub.newContext({ viewport: { width: 390, height: 844 }, locale: 'fa-AF' });
+  const p = await c.newPage(); watch(p);
+  await p.goto(`http://${ga.slug}.vill3n.top:${server.address().port}/`);
+  await p.waitForSelector('#products li[data-id]', { timeout: 15000 });
+  ok((await p.textContent('#store-title')) === 'سوپرمارکتِ آزمایشی' && (await p.locator('#products li[data-id]').count()) === 2, 'نشانیِ دکان (کیو‌آر): مستقیم همان دکان با کالاهایش');
+  const top = await p.evaluate(() => document.getElementById('products').getBoundingClientRect().top);
+  ok(top < 844, 'کالاها در همان نمای اول (بی پیمایش)', `${Math.round(top)}px`);
+  await c.close();
+  await sub.close();
+}
+
 //  ── نصب، اندازه و جداییِ برنامهٔ مدیریت ──
 const man = await (await fetch(`${base}/market/manifest.webmanifest`)).json();
 ok(man.start_url === '/market/' && man.icons.length >= 2, 'manifest ِ بازارچه');
@@ -344,8 +461,10 @@ ok(sman.name === 'سوپرمارکتِ آزمایشی' && sman.start_url === `/s
 ok((await fetch(`${base}/store/${gc.slug}/manifest.webmanifest`)).status === 200, 'دکانِ بیرون از فهرست ویترینِ خودش را دارد');
 const pub = path.join(import.meta.dirname, '..', 'public');
 const size = (...f) => f.reduce((s, x) => s + fs.statSync(path.join(pub, x)).size, 0);
-ok(size('kit/kit.js', 'market/market.js') < 75 * 1024, 'JS ِ بازارچه زیرِ ۷۵KB', `${size('kit/kit.js', 'market/market.js')} بایت`);
-ok(size('kit/kit.js', 'store/store.js') < 75 * 1024, 'JS ِ ویترین زیرِ ۷۵KB', `${size('kit/kit.js', 'store/store.js')} بایت`);
+ok(size('kit/boot.js', 'kit/kit.js', 'market/market.js') < 75 * 1024, 'JS ِ بازارچه زیرِ ۷۵KB', `${size('kit/boot.js', 'kit/kit.js', 'market/market.js')} بایت`);
+ok(size('kit/boot.js', 'kit/kit.js', 'store/store.js') < 75 * 1024, 'JS ِ ویترین زیرِ ۷۵KB', `${size('kit/boot.js', 'kit/kit.js', 'store/store.js')} بایت`);
+//  واژه‌نامه دادهٔ JSON است (نه اسکریپت) و فقط زبانِ همان صفحه بار می‌شود
+for (const l of ['fa', 'en', 'ps']) ok(size(`kit/i18n/${l}.json`) < 24 * 1024, `واژه‌نامهٔ ${l} کوچک است`, `${size(`kit/i18n/${l}.json`)} بایت`);
 const html = ['market/index.html', 'market/market.js', 'store/index.html', 'store/store.js', 'kit/kit.js'].map((f) => fs.readFileSync(path.join(pub, f), 'utf8')).join('\n');
 ok(!/index\.html|\/admin\b|\/portal\b|\/pos\b/.test(html), 'هیچ پیوندی به برنامهٔ مدیریتِ دکان، پنل یا صندوق');
 ok(!/<script(?![^>]*\bsrc=)[^>]*>/i.test(html) && !/\sstyle=/.test(html) && !/\son[a-z]+=/i.test(html), 'بی اسکریپت، style یا رویدادِ درون‌خطی');
