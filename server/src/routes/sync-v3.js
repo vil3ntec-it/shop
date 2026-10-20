@@ -6,6 +6,7 @@
  *   POST /api/sync/v3/push                  opهای v3 (یا صفِ v2 با format=v2)
  *   GET  /api/sync/v3/pull                  اثرِ opهای دستگاه‌های دیگر (gzip)
  *   GET  /api/sync/v3/snapshot              ردیف‌های زنده + cursor (gzip)
+ *   POST /api/sync/v3/deleted               §۹.۵: کدام ردیفِ تنهای دستگاه این‌جا حذف‌شده است
  *   GET  /api/sync/v3/status                نقطهٔ وضعیت (SYN-08) و دستگاه‌ها (SYN-10)
  *   POST /api/sync/v3/report                تعدادِ منتظر، خطای آخر، اختلافِ ساعت
  *   GET  /api/sync/v3/conflicts             صندوقِ تعارض و وظیفه‌ها (SYN-07)
@@ -25,7 +26,7 @@ const sync = require('../lib/sync-v3');
 const syncEpoch = require('../lib/sync-epoch');
 const { rateLimit } = require('../middleware/ratelimit');
 const { requireSyncAccount, requireSyncWrite } = require('../lib/sync-v1-auth');
-const { forbidden, notFoundHandler } = require('../middleware/errors');
+const { forbidden, badRequest, notFoundHandler } = require('../middleware/errors');
 const v = require('../lib/validate');
 
 const gzip = promisify(zlib.gzip);
@@ -108,6 +109,22 @@ router.get('/pull', async (req, res, next) => {
 
 router.get('/snapshot', async (req, res, next) => {
   try { await send(req, res, { ok: true, ...(await sync.snapshot(req.sync)) }); } catch (err) { next(err); }
+});
+
+/**
+ * §۹.۵: پس از بازیابیِ سرور، پیش از ساختنِ دوبارهٔ دفتر — از ردیف‌های تنهای دستگاه (نه در
+ * Snapshot) کدام این‌جا حذف‌شده است؟ همان‌ها کنار می‌روند و بقیه «درج» می‌روند
+ * (`SyncV3Engine.rebuild`، وبِ v3). فقط خواندن. `{rows:[{table,row_id}]}` (≤ ۵۰۰) ⇐ `{deleted}`
+ */
+router.post('/deleted', async (req, res, next) => {
+  try {
+    if (!config.syncEpoch.enabled) return notFoundHandler(req, res);
+    const rows = req.body && req.body.rows;
+    if (!Array.isArray(rows) || rows.length > syncEpoch.MAX_ASK) {
+      return next(badRequest(`فهرستِ ردیف‌ها لازم است (حداکثر ${syncEpoch.MAX_ASK})`, 'bad_rows'));
+    }
+    res.json({ ok: true, deleted: await syncEpoch.deletedRows(req.sync, 'v3', rows), server_time: Date.now() });
+  } catch (err) { next(err); }
 });
 
 router.get('/status', async (req, res, next) => {

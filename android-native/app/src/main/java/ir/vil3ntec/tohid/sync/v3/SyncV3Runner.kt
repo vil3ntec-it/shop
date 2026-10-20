@@ -6,6 +6,7 @@ import ir.vil3ntec.tohid.core.net.ApiClient
 import ir.vil3ntec.tohid.core.net.ApiFailure
 import ir.vil3ntec.tohid.core.sync.ReplayBook
 import ir.vil3ntec.tohid.data.DiskWrite
+import ir.vil3ntec.tohid.data.LedgerArchive
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.data.repo.Backend
@@ -150,6 +151,7 @@ class SyncV3Runner private constructor(context: Context) {
       deviceId = SyncStore(app).deviceUid,
       ledger = ledger,
       withLock = { block -> synchronized(lock()) { block() } },
+      archived = { LedgerArchive.archivedIds(app) },
     ).load().also { engine = it }
   }
 
@@ -175,7 +177,8 @@ class SyncV3Runner private constructor(context: Context) {
       dropped = s.rejected,
       cursor = e.meta.cursor,
       lastOkAt = s.lastOkAt,
-      lastError = s.lastError,
+      //  §۹.۵: هشدارِ پوششِ دفترچه — نوشته، ولی چراغ را قرمز نمی‌کند
+      lastError = s.lastError.ifBlank { s.notice },
       holding = s.upgradeRequired,
       upgradeAvailable = false,
       schemaVersion = LedgerDiff.SCHEMA_VERSION,

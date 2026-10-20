@@ -67,6 +67,7 @@ test.after(async () => { await h.stop(); });
 function webV1(token, deviceId) {
   const store = new Map();
   const calls = [];
+  const quota = { full: false };
   const acc = {
     account: () => ({ userId: 'u-web' }),
     configured: () => true,
@@ -89,7 +90,12 @@ function webV1(token, deviceId) {
   };
   const sandbox = {
     window,
-    localStorage: { getItem: (k) => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)), removeItem: (k) => store.delete(k) },
+    localStorage: {
+      getItem: (k) => (store.has(k) ? store.get(k) : null),
+      //  «حافظهٔ مرورگر پر است»: نوشتنِ صف و سایه شکست می‌خورد، دفتر نه
+      setItem: (k, v) => { if (quota.full && /oplog|shadow/.test(k)) throw new Error('QuotaExceededError'); store.set(k, String(v)); },
+      removeItem: (k) => store.delete(k),
+    },
     navigator: { onLine: true },
     document: { addEventListener: () => {}, hidden: false },
     CustomEvent: class { constructor(type, init) { this.type = type; this.detail = init && init.detail; } },
@@ -98,7 +104,11 @@ function webV1(token, deviceId) {
   vm.runInNewContext(ENGINE, sandbox, { filename: 'sync-engine.js' });
   let ledger = {};
   window.TohidSync.bind({ read: () => ledger, write: (d) => { ledger = JSON.parse(JSON.stringify(d)); } });
-  return { sync: window.TohidSync, calls, get ledger() { return ledger; }, state: () => window.TohidSync._state() };
+  return {
+    sync: window.TohidSync, calls, quota, get ledger() { return ledger; }, state: () => window.TohidSync._state(),
+    /** ذخیرهٔ برنامه: دفتر ⇐ `recordChange` */
+    edit(fn) { ledger = fn(JSON.parse(JSON.stringify(ledger))); return window.TohidSync.recordChange('edit'); },
+  };
 }
 
 const pushV1 = (ops) => h.api('POST', '/api/sync/v1/push', {
@@ -141,6 +151,47 @@ test('وب v1: پس از بازیابی دلتای دوباره‌فرستاده
   assert.equal(W.calls.filter((c) => c === 'GET /api/sync/v1/snapshot').length, snaps + 1);
   assert.equal(W.state().restorePending, false);
   assert.equal(sale().paidAmount, 150);
+});
+
+test('وب v1: فروشِ پس از پشتیبانِ همین مرورگر پس از بازیابی می‌ماند و «درج» می‌رود؛ حذف‌شدهٔ سرور زنده نمی‌شود؛ ثبت‌نشده زیرِ Snapshot نمی‌رود', async () => {
+  //  بازبینِ دوم، B1(c): پیش‌تر دفتر همان Snapshot می‌شد و فروشِ خودِ مرورگر پاک
+  const W = webV1(owner.accessToken, 'web-w2');
+  await W.sync.firstSync();
+  const ins = (row, fields) => ({ op_id: oid(), ts: Date.now(), table: 'products', row_id: row, type: 'insert', fields });
+  assert.equal((await pushV1([ins('p-w2-gone', { name: 'رفتنی' }), ins('p-w2-keep', { name: 'ماندنی', salePrice: 10 })])).status, 200);
+  await W.sync.sync();
+  assert.ok(W.ledger.products.some((p) => p.id === 'p-w2-gone'));
+
+  const TABLES = ['oplog', 'sync_rows', 'sync_devices', 'sync_conflicts'];
+  const last = await backup(TABLES, 'oplog_server_seq_seq');
+  assert.equal(W.edit((d) => ({ ...d, sales: [...(d.sales || []), { id: 's-w2-late', total: 70, finalTotal: 70, paidAmount: 70, remaining: 0, status: 'completed' }] })), 1);
+  await W.sync.sync();
+  assert.equal(W.state().lastError || '', '');
+  assert.ok(await one("SELECT 1 AS x FROM sync_rows WHERE row_id='s-w2-late' AND deleted_at IS NULL"));
+
+  await restore(TABLES, 'oplog_server_seq_seq', last);
+  assert.equal(await one("SELECT 1 AS x FROM sync_rows WHERE row_id='s-w2-late'"), null, 'سرورِ برگشته فروش را ندارد');
+  //  پس از بازیابی برنامهٔ دیگری کالایی را پاک می‌کند که این مرورگر هنوز دارد
+  assert.equal((await pushV1([{ op_id: oid(), ts: Date.now(), table: 'products', row_id: 'p-w2-gone', type: 'delete' }])).status, 200);
+
+  //  حافظهٔ پر: ویرایشِ قیمت در دفتر نشست ولی op نشد ⇒ ساختن نه، «در انتظار» می‌ماند
+  W.quota.full = true;
+  assert.equal(W.edit((d) => ({ ...d, products: d.products.map((p) => (p.id === 'p-w2-keep' ? { ...p, salePrice: 12 } : p)) })), 0);
+  await W.sync.sync();
+  assert.equal(W.state().restorePending, true, 'تغییرِ ثبت‌نشده زیرِ Snapshot رفت');
+  assert.equal(W.ledger.products.find((p) => p.id === 'p-w2-keep').salePrice, 12);
+  W.quota.full = false;
+  await W.sync.sync();
+  await W.sync.sync();
+
+  assert.equal(W.state().restorePending, false);
+  assert.ok(W.ledger.sales.some((x) => x.id === 's-w2-late'), 'فروشِ پس از پشتیبانِ مرورگر پاک شد');
+  assert.ok(await one("SELECT 1 AS x FROM sync_rows WHERE row_id='s-w2-late' AND deleted_at IS NULL"), 'فروش دوباره «درج» نرفت');
+  assert.equal(W.ledger.products.some((p) => p.id === 'p-w2-gone'), false, 'کالای حذف‌شده روی مرورگر ماند');
+  assert.ok(await one("SELECT 1 AS x FROM sync_rows WHERE row_id='p-w2-gone' AND deleted_at IS NOT NULL"), 'کالای حذف‌شده زنده شد');
+  const keep = await one("SELECT data FROM sync_rows WHERE row_id='p-w2-keep'");
+  assert.equal(Number(keep.data.salePrice), 12, 'ویرایشِ ثبت‌نشده گم شد');
+  assert.equal(W.sync.queueSize(), 0);
 });
 
 /* -------------------------------------------------------------- وب v3 */
@@ -186,4 +237,42 @@ test('وب v3: پس از بازیابی دلتای دوباره‌فرستاده
   assert.equal((await X.sync()).ok, true);
   assert.equal(calls.filter((c) => c.endsWith(' /api/sync/v3/snapshot')).length, snaps + 1, 'بالا آمدنِ عادی: Snapshot ِ دوباره نه');
   assert.equal(sale().paidAmount, 150);
+});
+
+test('وب v3: فروشِ پس از پشتیبانِ همین دستگاه پس از بازیابی می‌ماند و «درج» می‌رود؛ حذف‌شدهٔ سرور زنده نمی‌شود', async () => {
+  //  بازبینِ دوم، B1(c) برای v3
+  const real = V3.FetchTransport(h.base(), owner.accessToken);
+  const calls = [];
+  const transport = { async request(method, p, body) { calls.push(`${method} ${p.split('?')[0]}`); return real.request(method, p, body); } };
+  let state = {};
+  const ledger = { read: () => state, write: (d) => { state = core.cloneLedger(d); } };
+  const Y = new V3.Engine({ transport, store: new V3.MemoryStore(), ledger, deviceId: 'web-v3-y', random: () => 0.5 });
+  Y.keepLocalOnly = true;
+  assert.equal((await Y.sync()).ok, true);
+  let tick = 0;
+  const H = () => hlc.format({ wall: Date.now() + 10_000 + (++tick), counter: 0, node: 'native-q' });
+  const push = (ops) => h.api('POST', '/api/sync/v3/push', { token: owner.accessToken, body: { device_id: 'native-q', protocol: 3, ops } });
+  assert.equal((await push([{ op_id: oid(), hlc: H(), table: 'products', row_id: 'p-y-gone', kind: 'insert', fields: { name: 'رفتنی' } }])).status, 200);
+  assert.equal((await Y.sync()).ok, true);
+  assert.ok((state.products || []).some((p) => p.id === 'p-y-gone'));
+
+  const TABLES = ['sync_v3_ops', 'sync_v3_rows', 'sync_v3_devices', 'sync_v3_conflicts'];
+  const last = await backup(TABLES, 'sync_v3_ops_server_seq_seq');
+  state = { ...state, sales: [...(state.sales || []), { id: 's-y-late', total: 80, finalTotal: 80, paidAmount: 80, remaining: 0, status: 'completed' }] };
+  assert.equal((await Y.sync()).ok, true);
+  assert.ok(await one("SELECT 1 AS x FROM sync_v3_rows WHERE row_id='s-y-late' AND deleted_at IS NULL"));
+
+  await restore(TABLES, 'sync_v3_ops_server_seq_seq', last);
+  assert.equal(await one("SELECT 1 AS x FROM sync_v3_rows WHERE row_id='s-y-late'"), null);
+  assert.equal((await push([{ op_id: oid(), hlc: H(), table: 'products', row_id: 'p-y-gone', kind: 'delete', fields: {} }])).status, 200);
+
+  assert.equal((await Y.sync()).ok, true);
+  assert.equal((await Y.sync()).ok, true);
+  assert.equal(Y.meta.restorePending, false);
+  assert.ok(calls.includes('POST /api/sync/v3/deleted'), 'از سرور پرسیده نشد');
+  assert.ok(state.sales.some((x) => x.id === 's-y-late'), 'فروشِ پس از پشتیبانِ دستگاه پاک شد');
+  assert.ok(await one("SELECT 1 AS x FROM sync_v3_rows WHERE row_id='s-y-late' AND deleted_at IS NULL"), 'فروش دوباره «درج» نرفت');
+  assert.equal(state.products.some((p) => p.id === 'p-y-gone'), false, 'کالای حذف‌شده روی دستگاه ماند');
+  assert.ok(await one("SELECT 1 AS x FROM sync_v3_rows WHERE row_id='p-y-gone' AND deleted_at IS NOT NULL"), 'کالای حذف‌شده زنده شد');
+  assert.equal(Y.outbox.length, 0);
 });

@@ -26,8 +26,11 @@
  * ⇒ هر opِ این حساب با شمارهٔ ≤ پایه در دیتابیس هست.
  *
  * دستگاه (SyncV1Engine / SyncV3Engine / وب / NativeDevice ِ آزمونِ سرتاسری) id را با آخرین
- * idی که دیده مقایسه می‌کند؛ عوض شده ⇒ opهای پذیرفته‌شدهٔ خودش با شمارهٔ > پایه را با همان
- * op_id دوباره می‌فرستد و دفترش را از Snapshot ِ سرور از نو می‌سازد (`core/sync/RestoreReplay.kt`).
+ * idی که دیده مقایسه می‌کند؛ عوض شده ⇒ opهای پذیرفته‌شدهٔ خودش و (v1) opهای دیگران که گرفته
+ * بود با شمارهٔ > پایه را به ترتیبِ سرور و با همان op_id دوباره می‌فرستد و دفترش را «نگه‌دارِ
+ * محلی» از نو می‌سازد: Snapshot + ردیف‌های تنهای خودش، جز آنچه این‌جا حذف‌شده است
+ * (`deletedRows`، `POST /api/shop/sync-epoch/deleted` و `/api/sync/v3/deleted`) —
+ * `core/sync/RestoreReplay.kt` و `sync/v1/V1Restore.kt`.
  *
  * ⛔ `lib/sync-v1.js` و مسیرهای پمپ دست نمی‌خورند؛ دورانِ v1 از درِ جدای
  *    `GET /api/shop/sync-epoch` و دورانِ v3 در پاسخِ pull ِ خودِ v3 می‌رود.
@@ -73,18 +76,43 @@ async function save(epoch) {
   );
 }
 
+/** نامِ نشستِ pg_dump ِ پشتیبان (`PGAPPNAME` در `backup.dump`) — تا بالا آمدن آن را بشناسد */
+const BACKUP_APP = 'vil3n-sync-backup';
+
+/**
+ * پشتیبانی همین حالا در جریان است؟ (`scripts/backup.js` در فرایندِ جدا، هم‌زمان با بالا آمدنِ
+ * سرور) — نشانِ آن «در پشتیبان» است، نه «از پشتیبان برگشته». PGlite یا بی دسترسی ⇒ نه.
+ */
+async function backupRunning() {
+  try {
+    const r = await one(
+      'SELECT 1 AS x FROM pg_stat_activity WHERE application_name = $1 AND pid <> pg_backend_pid() LIMIT 1', [BACKUP_APP]
+    );
+    return !!r;
+  } catch { return false; }
+}
+
 /**
  * در بالا آمدنِ سرور (`'boot'`) یا پس از بازگرداندنِ پشتیبان (`'restore'`).
  *   • نبودِ دوران ⇒ نخستین دوران (برنامه‌ای که هیچ idی ندیده فقط آن را نگه می‌دارد).
  *   • `'restore'`، نشانِ پشتیبان در دیتابیس، یا ردیفِ خراب ⇒ id ِ تازه و seq = سرِ دفتر.
  *   • وگرنه (بالا آمدنِ عادی) ⇒ همان id و seq.
+ *
+ * چرخهٔ نشان:
+ *   • پشتیبانی که هم‌زمان در فرایندِ جدا در جریان است (`busy`) ⇒ نشانش نه شمرده و نه پاک
+ *     می‌شود (وگرنه فایلش شاید بی نشان می‌ماند).
+ *   • نشانِ پشتیبانِ کشته‌شده (فرایند وسطِ کار افتاد و پاکش نکرد) ⇒ «بازیابی» شمرده می‌شود و
+ *     بی‌ضرر است: پایه = سرِ دفترِ همین لحظه، و برنامه‌ای که بالای پایه هیچ ندیده و نفرستاده
+ *     (`RestoreReplay.plan`) فقط id را نگه می‌دارد — نه دوباره‌فرستادن، نه ساختنِ دوباره.
  * @returns {Promise<object>} دورانِ نشسته
  */
-async function rotate(reason = 'boot', { seqOf = maxSeq } = {}) {
+async function rotate(reason = 'boot', { seqOf = maxSeq, busy = backupRunning } = {}) {
   const t = now();
   const row = await one('SELECT value FROM app_config WHERE key = $1', [KEY]);
   const prev = row ? parse(row.value) : null;
-  const markers = await query("SELECT key FROM app_config WHERE key LIKE 'sync.backup_marker.%'");
+  const markers = reason === 'restore' || !(await busy())
+    ? await query("SELECT key FROM app_config WHERE key LIKE 'sync.backup_marker.%'")
+    : { rows: [] };
   const restored = reason === 'restore' || markers.rows.length > 0 || (row && !prev);
   let epoch;
   if (prev && !restored) {
@@ -101,7 +129,7 @@ async function rotate(reason = 'boot', { seqOf = maxSeq } = {}) {
     };
   }
   await save(epoch);
-  if (markers.rows.length) await query("DELETE FROM app_config WHERE key LIKE 'sync.backup_marker.%'");
+  for (const m of markers.rows) await query('DELETE FROM app_config WHERE key = $1', [m.key]);
   return epoch;
 }
 
@@ -133,24 +161,82 @@ async function forAccount(ctx, line = 'v1') {
   return { id: e.id, at: Number(e.restored_at || e.at) || 0, base: Number(base.m) || 0, head: Number(head.m) || 0 };
 }
 
+/** خبرِ سامانه‌ای در «سابقه»ی پنل (همان راهِ `backup.unencrypted`)؛ دیتابیسِ خاموش ⇒ فقط لاگ */
+function alert(action, detail) {
+  console.warn(`[sync-epoch] ${action}: ${detail.error || ''}`);
+  return require('./audit').log({ actorType: 'system', action, detail })
+    .catch((e) => console.error(`[sync-epoch] ${action} (سابقه هم ننشست):`, e.message));
+}
+
 /**
  * نشانِ «این دیتابیس در پشتیبان است» — پیش از گرفتنِ پشتیبان می‌نشیند (پس در فایل هست) و
  * پس از آن از دیتابیسِ زنده پاک می‌شود. دیتابیسی که از آن فایل برگردد، در نخستین بالا آمدن
- * دورانِ بازیابیِ تازه می‌گیرد. شکست ⇒ پشتیبان بی نشان (همان رفتارِ پیشین)، نه بی پشتیبان.
+ * دورانِ بازیابیِ تازه می‌گیرد. شکست ⇒ پشتیبان بی نشان (همان رفتارِ پیشین)، نه بی پشتیبان —
+ * ولی دیده می‌شود: خبرِ `backup.sync_marker_failed` در «سابقه»ی پنل (بازیابی از چنین فایلی را
+ * `scripts/restore.js` با `rotate('restore')` جبران می‌کند؛ بالا آمدنِ سادهٔ سرور نه).
  * @returns {Promise<() => Promise<void>>} پاک‌کننده
  */
-async function markBackup() {
+async function markBackup({ q = query } = {}) {
   const key = MARKER + newId('bk');
   try {
-    await query('INSERT INTO app_config (key, value, updated_at) VALUES ($1,$2,$3)', [key, JSON.stringify({ at: now() }), now()]);
+    await q('INSERT INTO app_config (key, value, updated_at) VALUES ($1,$2,$3)', [key, JSON.stringify({ at: now() }), now()]);
   } catch (e) {
-    console.error('[sync-epoch] نشانِ پشتیبان نشست:', e.message);
+    await alert('backup.sync_marker_failed', { error: String((e && e.message) || e).slice(0, 300) });
     return async () => {};
   }
   return async () => {
-    await query('DELETE FROM app_config WHERE key = $1', [key])
-      .catch((e) => console.error('[sync-epoch] نشانِ پشتیبان پاک نشد:', e.message));
+    try {
+      await q('DELETE FROM app_config WHERE key = $1', [key]);
+    } catch (e) {
+      //  نشانِ مانده در دیتابیسِ زنده ⇒ بالا آمدنِ بعدی «بازیابی» می‌شمارد — بی‌ضرر (شرحِ `rotate`)
+      await alert('backup.sync_marker_left', { key, error: String((e && e.message) || e).slice(0, 300) });
+    }
   };
 }
 
-module.exports = { rotate, current, forAccount, markBackup, maxSeq, KEY, MARKER };
+/** بیشترین ردیف در یک پرسشِ `deletedRows` */
+const MAX_ASK = 500;
+
+/**
+ * از ردیف‌هایی که فقط روی یک دستگاه مانده‌اند (نه در Snapshot)، کدام روی سرور «حذف‌شده» است؟
+ * — پیش از ساختنِ دوبارهٔ دفتر پس از بازیابی (`V1Restore.rebuild`، `SyncV3Engine.rebuild`، وب):
+ * ردیفِ تنهای دستگاه می‌ماند و «درج» می‌رود، **مگر** این‌جا حذف‌شده باشد (درجِ دوباره زنده‌اش
+ * می‌کرد). Snapshot ردیفِ حذف‌شده ندارد و `listDeleted` ِ v1 سقفِ ۵۰۰ دارد.
+ * فقط خواندن؛ فقط ردیف‌های همین حساب. جدولِ ناشناخته و شناسهٔ بد نادیده.
+ * @param ctx  {app, accountKind, accountId}
+ * @param {'v1'|'v3'} line
+ * @param {Array<{table:string,row_id:string}>} rows حداکثر `MAX_ASK`
+ * @returns {Promise<Array<{table:string,row_id:string}>>} با همان نامِ جدولی که دستگاه فرستاد
+ */
+async function deletedRows(ctx, line, rows) {
+  const v3 = line === 'v3';
+  const canon = v3
+    ? (t) => (require('./sync-v3-schema').specOf(t) ? t : '')
+    : (t) => require('./sync-v1').tableOf(ctx.app, t);
+  const byTable = new Map();
+  for (const r of Array.isArray(rows) ? rows.slice(0, MAX_ASK) : []) {
+    const name = typeof r?.table === 'string' ? r.table : '';
+    const id = typeof r?.row_id === 'string' ? r.row_id : '';
+    const t = name && canon(name);
+    if (!t || !id || id.length > 128) continue;
+    if (!byTable.has(t)) byTable.set(t, new Map());
+    const g = byTable.get(t);
+    if (!g.has(id)) g.set(id, new Set());
+    g.get(id).add(name);
+  }
+  const table = v3 ? 'sync_v3_rows' : 'sync_rows';
+  const out = [];
+  for (const [t, g] of byTable) {
+    const res = await query(
+      `SELECT row_id FROM ${table} WHERE app=$1 AND account_kind=$2 AND account_id=$3 AND table_name=$4
+         AND row_id = ANY($5::text[]) AND deleted_at IS NOT NULL`,
+      [ctx.app, ctx.accountKind, ctx.accountId, t, [...g.keys()]]
+    );
+    for (const x of res.rows) for (const name of g.get(x.row_id) || []) out.push({ table: name, row_id: x.row_id });
+  }
+  return out;
+}
+
+module.exports = {
+  rotate, current, forAccount, markBackup, deletedRows, backupRunning, maxSeq, KEY, MARKER, BACKUP_APP, MAX_ASK,
+};

@@ -5,6 +5,7 @@ import ir.vil3ntec.tohid.core.sync.RestoreReplay
 import ir.vil3ntec.tohid.core.sync.v3.HlcClock
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.sync.v1.LedgerDiff
+import ir.vil3ntec.tohid.sync.v1.RestoreMerge
 import ir.vil3ntec.tohid.sync.v1.SyncCommit
 import ir.vil3ntec.tohid.sync.v1.SyncOp
 import kotlinx.serialization.Serializable
@@ -105,6 +106,8 @@ data class V3Meta(
   val epoch: String = "",
   /** سرور برگشته و دفتر هنوز از Snapshot از نو ساخته نشده — تا آن وقت Pull نه */
   val restorePending: Boolean = false,
+  /** دفترچه همهٔ پنجرهٔ پس از پایه را نداشت — هشدار تا `RESTORE_NOTICE_MS` */
+  val restoreNoticeAt: Long = 0,
 )
 
 /** انبارِ محلی؛ هر `save` یک نوشتنِ اتمی (فایلِ کناری + fsync + جابه‌جایی). */
@@ -131,6 +134,8 @@ data class V3Status(
   val clockOffsetMs: Long,
   val initialized: Boolean,
   val busy: Boolean,
+  /** §۹.۵: هشدارِ «دفترچه همهٔ پنجره را نداشت» — نوشته، ولی حال را «شکست» نمی‌کند */
+  val notice: String = "",
 ) {
   /** SYN-10: تا صفر نشده، خروج و حذفِ دستگاه فقط با خروجیِ اجباری */
   val unsynced: Boolean get() = queued > 0
@@ -162,6 +167,8 @@ internal class SyncV3Engine(
   val protocol: Int = PROTOCOL,
   /** همان قفلی که `ShopStore` هنگامِ نوشتن می‌گیرد — نوشتن در دفتر و سایه زیرِ آن */
   private val withLock: (() -> Unit) -> Unit = { it() },
+  /** §۹.۵: شناسهٔ ردیف‌های بایگانی‌شدهٔ دفتر (`LedgerArchive.archivedIds`) — از Snapshot برنمی‌گردند */
+  private val archived: () -> Map<String, Set<String>> = { emptyMap() },
 ) {
   val deviceId: String = deviceId.replace(Regex("[^A-Za-z0-9_.-]"), "-").take(64).ifEmpty { "device" }
 
@@ -267,9 +274,10 @@ internal class SyncV3Engine(
       q > 0 -> "pending"
       else -> "synced"
     }
+    val notice = if (m.restoreNoticeAt > 0 && now() - m.restoreNoticeAt < RESTORE_NOTICE_MS) RESTORE_NOTICE else ""
     return V3Status(
       state, q, queue.rejected.size, m.conflictsOpen, m.lastOkAt, m.lastError, m.lastErrorAt,
-      m.upgradeProtocol > 0, m.offsetMs, m.initialized, busy,
+      m.upgradeProtocol > 0, m.offsetMs, m.initialized, busy, notice,
     )
   }
 
@@ -504,23 +512,29 @@ internal class SyncV3Engine(
      *  (از cursor ِ کهنه) نشانده نمی‌شود.
      */
     val book = store.replay
+    book?.begin(since)
     val plan = RestoreReplay.plan(meta.epoch, since, RestoreReplay.Epoch.from(body["epoch"])) { book?.hasAbove(it) == true }
     if (plan.restore) {
       var replayed = 0
       withLock {
         if (book != null) {
           val have = queue.outbox.mapTo(HashSet()) { it.id }
+          var seq = queue.seq
           val again = book.replayAbove(plan.base)
             .mapNotNull { s -> runCatching { entryJson.decodeFromJsonElement(V3Entry.serializer(), s.body) }.getOrNull() }
             .filter { have.add(it.id) }
+            //  کلیدِ تازه (همان op_idها): کلیدِ کهنه شاید با ورودیِ همین حالا در صف یکی باشد و
+            //  `settle` هر دو را با هم برمی‌داشت
+            .map { seq += 1; it.copy(key = "e" + seq.toString().padStart(12, '0')) }
           if (again.isNotEmpty()) {
-            val q = queue.copy(outbox = again + queue.outbox)
+            val q = queue.copy(outbox = again + queue.outbox, seq = seq)
             store.saveQueue(q)
             queue = q
             replayed = again.size
           }
         }
-        save(meta.copy(epoch = plan.epoch, restorePending = true))
+        val gap = book != null && book.floor() > plan.base
+        save(meta.copy(epoch = plan.epoch, restorePending = true, restoreNoticeAt = if (gap) now() else meta.restoreNoticeAt))
       }
       return V3Step(ok = true, replayed = replayed)
     }
@@ -543,26 +557,71 @@ internal class SyncV3Engine(
   }
 
   /**
-   *  §۹.۵: پس از بازیابیِ سرور و خالی شدنِ صف — دفتر = Snapshot ِ سرور، سایه و cursor با آن
-   *  (ژورنالِ `SyncCommit.rebuild`)، بعد «در انتظار» برداشته می‌شود. ورودی‌ای که وسطِ گرفتنِ
-   *  Snapshot به صف آمد ⇒ این بار نه؛ دورِ بعد پس از فرستادنِ آن (تغییرِ نرفته از دفتر گم نمی‌شود).
+   *  §۹.۵: پس از بازیابیِ سرور و خالی شدنِ صف — «نگه‌دارِ محلی» (شرح سرِ `sync/v1/V1Restore.kt`):
+   *  دفتر = Snapshot ِ سرور + ردیف‌هایی که فقط این‌جا هستند (جز بایگانی‌شده‌ها و آنچه سرور
+   *  حذف‌شده می‌داند)؛ سایه = Snapshot ⇒ ردیف‌های تنها «درج» به صف می‌روند. cursor = سرِ Snapshot
+   *  (ژورنالِ `SyncCommit.rebuild`)، بعد «در انتظار» برداشته می‌شود.
+   *  ⛔ فقط با صفِ خالی و تفاضلِ هیچ (پس از ثبتِ همین لحظه): تغییرِ نرفته اول می‌رود.
+   *  ⛔ شکست در میانه ⇒ همان‌جا با دفترِ همین حالا تمام یا برگردانده می‌شود.
    */
   suspend fun rebuild(): V3Step {
     val r = tryCall("GET", "/snapshot") ?: return fail(0, null)
     val body = r.body
     if (r.status != 200 || body == null) return fail(r.status, body)
-    if ((body["complete"] as? JsonPrimitive)?.content == "false") return V3Step(ok = false)
+    if ((body["complete"] as? JsonPrimitive)?.content == "false") {
+      //  سرور هنوز دفترِ v1 را به v3 نرسانده: دورِ بعد دوباره — و دیده شود (Pull تا آن وقت نه)
+      var out = V3Step(ok = false)
+      withLock {
+        val attempt = meta.attempt + 1
+        save(meta.copy(attempt = attempt, lastError = INCOMPLETE_MESSAGE, lastErrorAt = now()))
+        out = V3Step(ok = false, retryInMs = backoffMs(attempt - 1, random()))
+      }
+      return out
+    }
     val legacy = V3Convert.snapshotToLegacy(body)
     val cursor = (body["cursor"] as? JsonPrimitive)?.content?.toLongOrNull() ?: return V3Step(ok = false)
+    var ask: List<RestoreMerge.Row> = emptyList()
+    withLock { if (meta.restorePending) ask = RestoreMerge.localOnly(legacy, LedgerDiff.toJson(ledger.read()), archived()) }
+    val gone = if (ask.isEmpty()) emptySet() else (deleted(ask) ?: return fail(0, null))
     withLock {
-      if (queue.outbox.isEmpty() && meta.restorePending) {
+      if (meta.restorePending && queue.outbox.isEmpty()) {
         val current = ledger.read()
-        val server = LedgerDiff.fromSnapshot(legacy, LedgerDiff.toJson(current))
-        commit.rebuild(server, emptyList(), current, cursor) { next -> ledger.write(next) }
-        save(meta.copy(restorePending = false, lastOkAt = now()))
+        //  تغییری که ثبت نشده بود ⇒ اول op شود و برود؛ ساختن دورِ بعد
+        if (commit.record(current) == 0) {
+          val (next, shadow) = RestoreMerge.merge(legacy, LedgerDiff.toJson(current), gone, archived())
+          try {
+            val written = commit.rebuild(next, shadow, current, cursor) { ledger.write(it) }
+            save(meta.copy(restorePending = false, lastOkAt = now()))
+            //  ردیف‌های تنهای این دستگاه ⇒ «درج»
+            commit.record(written)
+          } catch (e: Exception) {
+            runCatching { commit.recover(ledger.read()) }
+            throw e
+          }
+        }
       }
     }
     return V3Step(ok = true)
+  }
+
+  /** `POST /deleted` در دسته‌های ۵۰۰تایی؛ ۴۰۴ ⇒ هیچ (نگه داشتن بهتر از گم کردن)؛ نرسید ⇒ null */
+  private suspend fun deleted(rows: List<RestoreMerge.Row>): Set<RestoreMerge.Row>? {
+    val out = HashSet<RestoreMerge.Row>()
+    for (chunk in rows.distinct().chunked(DELETED_CHUNK)) {
+      val body = buildJsonObject {
+        put("rows", JsonArray(chunk.map { x -> buildJsonObject { put("table", JsonPrimitive(x.table)); put("row_id", JsonPrimitive(x.id)) } }))
+      }
+      val r = tryCall("POST", "/deleted", body) ?: return null
+      if (r.status == 404) return out
+      if (r.status != 200 || r.body == null) return null
+      for (e in (r.body["deleted"] as? JsonArray).orEmpty()) {
+        val o = e as? JsonObject ?: continue
+        val t = (o["table"] as? JsonPrimitive)?.content ?: continue
+        val id = (o["row_id"] as? JsonPrimitive)?.content ?: continue
+        out += RestoreMerge.Row(t, id)
+      }
+    }
+    return out
   }
 
   suspend fun fetchConflicts(all: Boolean = false): List<JsonObject>? {
@@ -596,12 +655,12 @@ internal class SyncV3Engine(
       recordNow()
       pushAll()?.let { return it }
       //  §۹.۵: سرور برگشته بود (پیش از این دور) و صف خالی شد ⇒ دفتر از Snapshot از نو
-      if (meta.restorePending && queue.outbox.isEmpty()) rebuild().let { if (!it.ok) return it }
+      restoreStep()?.let { return it }
       pullAll()?.let { return it }
       //  همین دور برگشتنِ سرور دیده شد ⇒ ورودی‌های دوباره‌آمده می‌روند، دفتر از نو، بعد Pull
       if (meta.restorePending) {
         pushAll()?.let { return it }
-        if (queue.outbox.isEmpty()) rebuild().let { if (!it.ok) return it }
+        restoreStep()?.let { return it }
         pullAll()?.let { return it }
       }
       if (meta.conflictsDirty || now() - conflictsAt > 5 * 60 * 1000L) {
@@ -612,6 +671,14 @@ internal class SyncV3Engine(
     } finally {
       busy = false
     }
+  }
+
+  /** §۹.۵: «در انتظار» و صفِ خالی ⇒ ساختنِ دوباره و فرستادنِ ردیف‌های تنها؛ شکست ⇒ همان قدم */
+  private suspend fun restoreStep(): V3Step? {
+    if (!meta.restorePending || queue.outbox.isNotEmpty()) return null
+    val r = rebuild()
+    if (!r.ok) return r
+    return pushAll()
   }
 
   /** Push تا خالی شدنِ صف؛ شکست ⇒ همان قدم، وگرنه null */
@@ -648,5 +715,13 @@ internal class SyncV3Engine(
     const val MAX_BACKOFF_MS = 5 * 60 * 1000L
     val DONE = setOf("applied", "partial", "conflict", "duplicate")
     const val UPGRADE_MESSAGE = "همگام‌سازی نگه داشته شد: برنامه را به‌روز کنید. تغییرهای شما روی همین دستگاه مانده‌اند."
+
+    /** §۹.۵: سقفِ `POST /api/sync/v3/deleted` (`sync-epoch.MAX_ASK`) */
+    const val DELETED_CHUNK = 500
+    const val INCOMPLETE_MESSAGE = "سرور پس از بازیابی هنوز دفتر را آماده نکرده است؛ چند دقیقهٔ دیگر خودش دوباره امتحان می‌کند."
+    const val RESTORE_NOTICE_MS = 3 * 24 * 60 * 60_000L
+    const val RESTORE_NOTICE =
+      "سرور از پشتیبان برگشت و این دستگاه همهٔ کارهای پس از پشتیبان را نگه نداشته بود؛ " +
+        "فروش‌ها و ردیف‌های تازهٔ همین دستگاه فرستاده شدند، ولی ویرایش‌های پیش از آن را یک بار با دفتر بسنجید."
   }
 }

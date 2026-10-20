@@ -661,8 +661,6 @@
     if (r.status !== 200 || !r.body) return this.fail(r.status, r.body);
     if (r.body.complete === false) return { ok: false, reason: 'incomplete' };
     return this.locked(async function () {
-    //  §۹.۵ (`rebuild`): ورودی‌ای که وسطِ گرفتنِ Snapshot به صف آمد ⇒ این بار نه
-    if (o.requireEmptyOutbox && this.outbox.length) return { ok: false, reason: 'busy' };
     var legacy = snapshotToLegacy(r.body);
     var C = Core();
     var data = this.ledger.read() || {};
@@ -899,6 +897,7 @@
      *  پایه چیزی دیده ⇒ «در انتظار»؛ این صفحه (از cursor ِ کهنه) نشانده نمی‌شود. وب دفترچهٔ
      *  opهای فرستاده ندارد: opهای گم‌شدهٔ خودش دوباره نمی‌روند، فقط دو بار نشاندن بسته است.
      */
+    //  وب دفترچهٔ opهای فرستاده ندارد: «نگه‌دارِ محلی» در `rebuild` ردیف‌های تازهٔ همین دستگاه را نگه می‌دارد
     var ep = r.body.epoch;
     if (ep && typeof ep.id === 'string' && ep.id && Number.isFinite(Number(ep.base)) && Number.isFinite(Number(ep.head))) {
       var known = this.meta.epoch || '';
@@ -986,12 +985,12 @@
       await this.record();
       var step = await this.pushAll();
       if (step) return step;
-      //  §۹.۵: سرور برگشته بود و صف خالی شد ⇒ دفتر از Snapshot از نو، بعد Pull
-      if (this.meta.restorePending && !this.outbox.length && (step = await this.rebuild())) return step;
+      //  §۹.۵: سرور برگشته بود و صف خالی شد ⇒ دفتر از نو (نگه‌دارِ محلی)، تنهاها می‌روند، بعد Pull
+      if ((step = await this.restoreStep())) return step;
       if ((step = await this.pullAll())) return step;
       if (this.meta.restorePending) {
         if ((step = await this.pushAll())) return step;
-        if (!this.outbox.length && (step = await this.rebuild())) return step;
+        if ((step = await this.restoreStep())) return step;
         if ((step = await this.pullAll())) return step;
       }
       if (this.meta.conflictsDirty || !this.conflictsFetchedAt || this.now() - this.conflictsFetchedAt > 5 * 60 * 1000) {
@@ -1025,11 +1024,63 @@
     return null;
   };
 
-  /** §۹.۵: دفتر = Snapshot ِ سرور (صفِ خالی)، بعد «در انتظار» برداشته می‌شود؛ شکست ⇒ همان قدم */
+  /** §۹.۵: «در انتظار» و صفِ خالی ⇒ ساختنِ دوباره و فرستادنِ ردیف‌های تنها؛ شکست ⇒ همان قدم */
+  Engine.prototype.restoreStep = async function () {
+    if (!this.meta.restorePending || this.outbox.length) return null;
+    var step = await this.rebuild();
+    if (step) return step;
+    return this.pushAll();
+  };
+
+  var INCOMPLETE = 'سرور پس از بازیابی هنوز دفتر را آماده نکرده است؛ چند دقیقهٔ دیگر خودش دوباره امتحان می‌کند.';
+
+  /**
+   *  §۹.۵ — «نگه‌دارِ محلی» (`core.restoreMerge`، قرینهٔ `V1Restore.kt`): دفتر = Snapshot + ردیف‌هایی
+   *  که فقط این‌جا هستند (جز آنچه سرور حذف‌شده می‌داند — `POST /deleted`)؛ سایه = Snapshot ⇒
+   *  تنهاها «درج» می‌روند. پیش‌تر دفتر همان Snapshot می‌شد و فروشِ پس از پشتیبانِ همین دستگاه
+   *  پاک می‌شد.
+   *  ⛔ فقط با صفِ خالی و تفاضلِ هیچ (پس از ثبتِ همین لحظه، زیرِ همان قفل): تغییرِ ثبت‌نشده زیرِ
+   *     Snapshot نمی‌رود.
+   *  ⛔ اول سایه و cursor، بعد دفتر: نوشتنِ دفتر شکست ⇒ سایه و cursor ِ پیشین برمی‌گردند.
+   *  Snapshot ِ ناقص ⇒ دورِ بعد، با خطای دیدنی.
+   *  @returns null یا همان قدمِ شکست
+   */
   Engine.prototype.rebuild = async function () {
-    var res = await this.initialize({ keepLocalOnly: false, requireEmptyOutbox: true });
-    if (!res.ok) return res.reason === 'busy' ? null : res;
-    await this.locked(function () { return this.persist({ restorePending: false }); });
+    var r = await this.call('GET', '/snapshot');
+    if (r.status !== 200 || !r.body) return this.fail(r.status, r.body);
+    if (r.body.complete === false) {
+      await this.locked(function () { return this.persist({ lastError: INCOMPLETE, lastErrorAt: this.now() }); });
+      this.emit();
+      return { ok: false, reason: 'incomplete' };
+    }
+    var C = Core();
+    var legacy = snapshotToLegacy(r.body);
+    var ask = C.restoreLocalOnly(legacy, this.ledger.read() || {});
+    var gone = [];
+    for (var i = 0; i < ask.length; i += 500) {
+      var d = await this.call('POST', '/deleted', { rows: ask.slice(i, i + 500) });
+      if (d.status === 404) break;
+      if (d.status !== 200 || !d.body) return this.fail(d.status, d.body);
+      gone = gone.concat(Array.isArray(d.body.deleted) ? d.body.deleted : []);
+    }
+    await this.locked(async function () {
+      if (!this.meta.restorePending || this.outbox.length) return;
+      await this.recordNow();
+      var data = this.ledger.read();
+      if (this.outbox.length || !data || C.diff(this.meta.shadow || {}, data).ops.length) return;
+      var merged = C.restoreMerge(legacy, data, gone);
+      var before = { shadow: this.meta.shadow, cursor: this.meta.cursor };
+      await this.persist({ shadow: C.shadowOf(merged.shadow), cursor: legacy.cursor });
+      try {
+        this.ledger.write(merged.ledger);
+      } catch (e) {
+        await this.persist(before);
+        throw e;
+      }
+      await this.persist({ restorePending: false, lastOkAt: this.now() });
+      //  ردیف‌های تنهای این دستگاه ⇒ «درج»
+      await this.recordNow();
+    });
     this.emit();
     return null;
   };

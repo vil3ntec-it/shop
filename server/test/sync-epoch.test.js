@@ -188,3 +188,110 @@ test('بی توکن ⇒ ۴۰۱؛ توکنِ پمپ ⇒ ۴۰۱ (همان قاعد
   assert.equal(r.status, 401, `${r.status} ${JSON.stringify(r.body)}`);
   assert.equal(r.body?.epoch, undefined);
 });
+
+/* ---------------------------------------------- چرخهٔ نشانِ پشتیبان (بازبینیِ دوم) */
+
+test('نشانِ پشتیبانِ کشته‌شده (پاک نشد) ⇒ بالا آمدنِ بعدی دورانِ تازه با پایه = سرِ دفتر: بی‌ضرر', async () => {
+  const p = await push(owner.accessToken, [v1op('p-ep-k1', { name: 'نمک' })]);
+  const head = p.body.results[0].server_seq;
+  const old = await ep();
+  //  پشتیبان نشان گذاشت و فرایند وسطِ کار افتاد ⇒ نشان در دیتابیسِ زنده ماند
+  await epoch.markBackup();
+  assert.equal(await markers(), 1);
+  await epoch.rotate('boot', { busy: async () => false });
+  const e = await ep();
+  assert.notEqual(e.id, old.id);
+  assert.equal(e.base, head, 'پایه همان سرِ دفترِ زنده');
+  assert.equal(e.head, head);
+  assert.equal(await markers(), 0);
+  //  دستگاهی که تا همین‌جا همه را دیده: cursor ≤ پایه و چیزی بالای آن نفرستاده ⇒ `RestoreReplay.plan`
+  //  هیچ کاری نمی‌کند (قرینه در `RestoreReplayTest` و `E2E-OPS-14.crashed-marker`)
+});
+
+test('پشتیبانی که هم‌زمان در فرایندِ جدا در جریان است: بالا آمدنِ سرور نشانش را نه می‌شمارد نه پاک می‌کند', async () => {
+  const old = await ep();
+  const unmark = await epoch.markBackup();
+  await epoch.rotate('boot', { busy: async () => true });
+  assert.equal((await ep()).id, old.id, 'پشتیبانِ در جریان «بازیابی» نیست');
+  assert.equal(await markers(), 1, 'نشانِ پشتیبانِ در جریان سرِ جایش ماند');
+  await unmark();
+  assert.equal(await markers(), 0);
+  //  `rotate('restore')` همیشه بازیابی است
+  await epoch.rotate('restore', { busy: async () => true });
+  assert.notEqual((await ep()).id, old.id);
+  assert.equal(await epoch.backupRunning(), false, 'PGlite: pg_stat_activity نیست ⇒ نه');
+});
+
+test('نشانِ پشتیبان ننشست یا پاک نشد ⇒ خبرِ سامانه‌ای در «سابقه»ی پنل (نه فقط لاگ)', async () => {
+  const fail = async () => { throw new Error('disk full'); };
+  const unmark = await epoch.markBackup({ q: fail });
+  await unmark();
+  const a = await one("SELECT detail FROM audit_logs WHERE action='backup.sync_marker_failed' ORDER BY created_at DESC LIMIT 1");
+  assert.ok(a, 'خبرِ «نشان ننشست» ثبت نشد');
+  assert.match(JSON.stringify(a.detail), /disk full/);
+  let calls = 0;
+  const flaky = async (sql, args) => { calls += 1; if (calls === 2) throw new Error('gone away'); return query(sql, args); };
+  const unmark2 = await epoch.markBackup({ q: flaky });
+  await unmark2();
+  assert.ok(await one("SELECT 1 AS x FROM audit_logs WHERE action='backup.sync_marker_left'"), 'خبرِ «نشان ماند» ثبت نشد');
+  await query("DELETE FROM app_config WHERE key LIKE 'sync.backup_marker.%'");
+});
+
+test('بازگرداندن: داده نشست ولی دوران تازه نشد ⇒ «بازیابی شد» با epochError ِ جدا، نه شکست', async () => {
+  const backup = require('../src/lib/backup');
+  const ok = await backup.afterRestore({ ok: true, bytes: 10 }, config.db.url, { rotate: async () => ({ id: 'ep_x' }) });
+  assert.deepEqual(ok, { ok: true, bytes: 10, epoch: 'ep_x' });
+  const bad = await backup.afterRestore({ ok: true, bytes: 10 }, config.db.url, { rotate: async () => { throw new Error('locked'); } });
+  assert.equal(bad.ok, true);
+  assert.equal(bad.epoch, false);
+  assert.equal(bad.epochError, 'locked');
+  assert.ok(await one("SELECT 1 AS x FROM audit_logs WHERE action='backup.sync_epoch_failed'"));
+  const other = await backup.afterRestore({ ok: true, bytes: 1 }, 'postgres://elsewhere/db', { rotate: async () => { throw new Error('نباید'); } });
+  assert.equal(other.epoch, false, 'دیتابیسِ دیگر ⇒ دورانِ این سرور دست نمی‌خورد');
+});
+
+/* ---------------------------------------------- کدام ردیفِ تنهای دستگاه حذف‌شده است */
+
+test('v1: /sync-epoch/deleted فقط ردیف‌های حذف‌شدهٔ همین دکان را می‌گوید', async () => {
+  const del = { op_id: opId(), ts: Date.now(), table: 'products', row_id: 'p-del-1', type: 'delete' };
+  const r = await push(owner.accessToken, [v1op('p-del-1', { name: 'رفته' }), v1op('p-live-1', { name: 'مانده' }), del]);
+  assert.deepEqual(r.body.results.map((x) => x.status), ['applied', 'applied', 'applied']);
+  const ask = (token, rows) => h.api('POST', '/api/shop/sync-epoch/deleted', { token, body: { rows }, headers: { 'X-App': 'shop' } });
+  const out = await ask(owner.accessToken, [
+    { table: 'products', row_id: 'p-del-1' }, { table: 'products', row_id: 'p-live-1' },
+    { table: 'products', row_id: 'p-never' }, { table: 'nope', row_id: 'p-del-1' }, { table: 'products' },
+  ]);
+  assert.equal(out.status, 200, JSON.stringify(out.body));
+  assert.deepEqual(out.body.deleted, [{ table: 'products', row_id: 'p-del-1' }]);
+  //  دکانِ دیگر همان شناسه را نمی‌بیند
+  let other = await h.newUser('صاحبِ دکانِ دیگر', 'shop');
+  await h.api('POST', '/api/shop', { token: other.accessToken, body: { name: 'دکانِ دیگرِ دوران' } });
+  other = await h.signIn(other, 'shop');
+  const o = await ask(other.accessToken, [{ table: 'products', row_id: 'p-del-1' }]);
+  assert.equal(o.status, 200, JSON.stringify(o.body));
+  assert.deepEqual(o.body.deleted, []);
+  assert.equal((await ask(owner.accessToken, new Array(501).fill({ table: 'products', row_id: 'x' }))).status, 400);
+  assert.equal((await ask(owner.accessToken, 'x')).status, 400);
+  assert.equal((await h.api('POST', '/api/shop/sync-epoch/deleted', { body: { rows: [] } })).status, 401);
+  config.syncEpoch.enabled = false;
+  try { assert.equal((await ask(owner.accessToken, [])).status, 404); } finally { config.syncEpoch.enabled = true; }
+});
+
+test('v3: /api/sync/v3/deleted همان، روی sync_v3_rows', async () => {
+  const hlc = require('../src/lib/hlc');
+  let tick = 0;
+  const H = () => hlc.format({ wall: Date.now() + (++tick), counter: 0, node: 'epoch-v3' });
+  const p3 = (ops) => h.api('POST', '/api/sync/v3/push', { token: owner.accessToken, body: { device_id: 'epoch-v3', protocol: 3, ops } });
+  const ins = (row) => ({ op_id: opId(), hlc: H(), table: 'products', row_id: row, kind: 'insert', fields: { name: row } });
+  const r = await p3([ins('p3-del'), ins('p3-live')]);
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  const d = await p3([{ op_id: opId(), hlc: H(), table: 'products', row_id: 'p3-del', kind: 'delete', fields: {} }]);
+  assert.equal(d.status, 200, JSON.stringify(d.body));
+  const out = await h.api('POST', '/api/sync/v3/deleted', {
+    token: owner.accessToken,
+    body: { rows: [{ table: 'products', row_id: 'p3-del' }, { table: 'products', row_id: 'p3-live' }, { table: 'nope', row_id: 'p3-del' }] },
+  });
+  assert.equal(out.status, 200, JSON.stringify(out.body));
+  assert.deepEqual(out.body.deleted, [{ table: 'products', row_id: 'p3-del' }]);
+  assert.equal((await h.api('POST', '/api/sync/v3/deleted', { token: owner.accessToken, body: {} })).status, 400);
+});

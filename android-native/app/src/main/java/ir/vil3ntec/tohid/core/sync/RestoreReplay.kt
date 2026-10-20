@@ -9,6 +9,7 @@ import kotlinx.serialization.json.buildJsonObject
 import java.io.File
 import java.io.FileOutputStream
 import java.io.RandomAccessFile
+import kotlin.math.max
 import kotlin.math.min
 
 /**
@@ -25,12 +26,15 @@ import kotlin.math.min
  *  سرور «دورانِ بازیابی» دارد (`server/src/lib/sync-epoch.js`): `id` فقط با بازیابی عوض
  *  می‌شود (نه با بالا آمدنِ عادی) و `base` سرِ دفترِ همین حساب در لحظهٔ بازیابی است.
  *  دستگاه، اگر `id` عوض شده و پس از `base` چیزی دیده یا فرستاده:
- *   ۱) opهای پذیرفته‌شدهٔ **خودش** با `server_seq > base` را با **همان op_id** جلوی صف
- *      می‌گذارد (`ReplayBook`) — سرور می‌شناسد ⇒ «duplicate»، نمی‌شناسد ⇒ دوباره «applied».
+ *   ۱) opهای پذیرفته‌شدهٔ **خودش** و opهای دیگران که **گرفته بود** (`ReplayBook`) با
+ *      `server_seq > base` را **به ترتیبِ همان شماره** و با **همان op_id** جلوی صف می‌گذارد —
+ *      سرور می‌شناسد ⇒ «duplicate»، نمی‌شناسد ⇒ دوباره «applied». نخستین دستگاهی که برسد
+ *      پنجره را به ترتیبِ پیش از بازیابی می‌نشاند (درج پیش از `$inc`)، حتی برای دستگاهی که برنگردد.
  *   ۲) «در انتظارِ ساختنِ دوباره» می‌ماند: Pull نمی‌کند تا صف خالی شود.
- *   ۳) دفتر را از Snapshot ِ سرور از نو می‌سازد و opهای همین حالا در صف را رویش
- *      می‌نشاند؛ سایه و cursor با آن (ژورنالِ `SyncCommit`). از این پس همه‌چیز به ترتیبِ
- *      سرور — opِ دوباره‌فرستادهٔ دستگاهِ دیگر یک بار می‌نشیند و همهٔ دستگاه‌ها یکی می‌شوند.
+ *   ۳) دفتر را «نگه‌دارِ محلی» از نو می‌سازد: Snapshot ِ سرور + ردیف‌هایی که فقط این‌جا هستند
+ *      (جز بایگانی‌شده‌ها و حذف‌شده‌های سرور)؛ سایه = Snapshot ⇒ تنهاها «درج» می‌روند؛ cursor با
+ *      آن (ژورنالِ `SyncCommit`). از این پس همه‌چیز به ترتیبِ سرور — opِ دوباره‌فرستادهٔ دستگاهِ
+ *      دیگر یک بار می‌نشیند و همهٔ دستگاه‌ها یکی می‌شوند.
  *  بالا آمدنِ عادیِ سرور: همان `id` ⇒ هیچ کاری.
  *
  *  منطقِ خالص، بی اندروید — همان را `V1Restore`، `SyncV3Engine` و دستگاهِ آزمونِ
@@ -82,10 +86,23 @@ object RestoreReplay {
 }
 
 /**
- *  دفترچهٔ opهای **خودِ** این دستگاه که سرور پذیرفت (applied/duplicate)، با `server_seq` —
- *  برای دوباره فرستادن پس از بازیابیِ سرور. آخرین `CAP` تا، هر حساب جدا.
+ *  دفترچهٔ opهایی که سرور **پیش از بازیابی** داشت، با `server_seq` — برای دوباره فرستادن پس
+ *  از بازیابیِ سرور. هر حساب جدا؛ آخرین `CAP` تا.
+ *   • `sent`: opهای خودِ این دستگاه که سرور پذیرفت (applied/duplicate) — **پیش از** بیرون رفتن
+ *     از صف.
+ *   • `seen`: opهای دستگاه‌های دیگر که Pull آورد — **پیش از** نشاندن روی دفتر (v1). opِ خودِ
+ *     سرور (`SERVER_DEVICE`: سفارشِ اینترنتی، برگرداندنِ تعارض…) نوشته نمی‌شود: پرونده‌اش
+ *     روی سرور با همان بازیابی برگشته و دوباره فرستادنش موجودیِ سفارشِ نبوده را کم می‌کرد.
+ *  `replayAbove` هر دو را **به ترتیبِ server_seq** و با همان op_id می‌دهد: دستگاهی که زودتر برسد
+ *  همه را به همان ترتیبِ پیش از بازیابی می‌نشاند (درجِ فروش پیش از `$inc`ِ مرجوعیِ دستگاهِ دیگر
+ *  روی همان قلم) و بقیه «duplicate» می‌گیرند — حتی اگر دستگاهِ سازنده هرگز برنگردد.
  *
- *  ⚠️ پیش از بیرون رفتن از صف نوشته می‌شود؛ opِ بی شماره (`seq ≤ 0`) نوشته نمی‌شود.
+ *  پوشش: `floor` = بالاترین شماره‌ای که دفترچه دیگر ندارد — هنگامِ ساختن cursor ِ همان لحظه
+ *  (برنامه‌ای که پس از کار کردن به‌روز شد) و پس از هر فشرده کردن بالاترین شمارهٔ رفته. پایهٔ
+ *  بازیابی زیرِ آن ⇒ بخشی از پنجره پوشیده نیست (`V1Restore` هشدار می‌دهد؛ ردیف‌های تنهای دستگاه
+ *  با ساختنِ دوبارهٔ «نگه‌دارِ محلی» باز هم می‌مانند).
+ *
+ *  ⚠️ opِ بی شماره (`seq ≤ 0`) و شناسهٔ نادرست نوشته نمی‌شود.
  *  ⚠️ فقط افزودن (هر خط یک رکورد، با fsync)؛ خطِ نیمه‌کارهٔ قطعِ برق نادیده گرفته می‌شود.
  *  فشرده کردن با `DiskWrite` (F0-01).
  *  ⚠️ هیچ شکستی این‌جا همگام‌سازی را نمی‌خواباند: نوشتنِ ناموفق فقط یعنی آن op پس از
@@ -93,22 +110,44 @@ object RestoreReplay {
  */
 class ReplayBook(private val file: File, private val cap: Int = CAP) {
 
-  /** یک opِ پذیرفته‌شده: `body` همان چیزی است که دوباره فرستاده می‌شود */
-  data class Sent(val id: String, val seq: Long, val body: JsonObject)
+  /** یک op ِ پذیرفته یا گرفته‌شده: `body` همان چیزی است که دوباره فرستاده می‌شود؛ `device` فقط برای `seen` */
+  data class Sent(val id: String, val seq: Long, val body: JsonObject, val device: String = "")
 
   private val json = Json { ignoreUnknownKeys = true; isLenient = true }
-  private var ids: HashSet<String>? = null
-  private var top = 0L
+  /** op_id ⇒ آخرین server_seq */
+  private var latest: HashMap<String, Long>? = null
   private var lines = 0
+  private var floor = 0L
+
+  /**
+   *  نخستین بار برای این حساب (فایل نیست): `floor` = cursor ِ همین حالا — آنچه پیش از آن بود
+   *  در دفترچه نیست. هر دور صدا زده می‌شود و جز بارِ نخست کاری نمی‌کند.
+   */
+  @Synchronized
+  fun begin(cursor: Long) {
+    if (runCatching { file.exists() && file.length() > 0 }.getOrDefault(true)) return
+    if (append(floorLine(max(0L, cursor)))) {
+      floor = max(0L, cursor)
+      latest = HashMap()
+      lines = 0
+    }
+  }
 
   /** opهای خودِ دستگاه که سرور پذیرفت — **پیش از** `ack`ِ صف */
   @Synchronized
-  fun sent(items: List<Sent>) {
+  fun sent(items: List<Sent>) = write(items)
+
+  /** opهای دستگاه‌های دیگر که Pull آورد — **پیش از** نشاندن روی دفتر؛ opِ خودِ سرور نه */
+  @Synchronized
+  fun seen(items: List<Sent>) = write(items.filter { it.device.isNotEmpty() && it.device != SERVER_DEVICE })
+
+  private fun write(items: List<Sent>) {
     val ok = items.filter { it.seq > 0 && ID.matches(it.id) }
     if (ok.isEmpty()) return
-    val set = loaded()
+    val map = loaded()
     val text = buildString {
       for (s in ok) {
+        //  ترتیبِ کلیدها ثابت: `loaded` فقط سرِ خط را می‌خواند
         append(buildJsonObject {
           put("id", JsonPrimitive(s.id))
           put("q", JsonPrimitive(s.seq))
@@ -118,22 +157,26 @@ class ReplayBook(private val file: File, private val cap: Int = CAP) {
       }
     }
     if (!append(text)) return
-    ok.forEach { set += it.id; if (it.seq > top) top = it.seq }
+    ok.forEach { map[it.id] = it.seq }
     lines += ok.size
-    if (lines > cap + cap / 2) { compact(); ids = null }
+    if (lines > cap + cap / 2) { compact(); latest = null }
   }
 
-  /** پیش‌تر پذیرفته شده بود؟ (ردِ دوباره‌فرستاده «انجام‌شده» است، نه ردشده‌ای که کاربر ببیند) */
+  /** پیش‌تر پذیرفته یا گرفته شده بود؟ (ردِ دوباره‌فرستاده «انجام‌شده» است، نه ردشده‌ای که کاربر ببیند) */
   @Synchronized
   fun wasSent(id: String): Boolean = id.isNotEmpty() && id in loaded()
 
-  /** opی با شمارهٔ بالای این پایه هست؟ */
+  /** opی که **آخرین** شماره‌اش بالای این پایه است هست؟ */
   @Synchronized
-  fun hasAbove(base: Long): Boolean { loaded(); return top > base }
+  fun hasAbove(base: Long): Boolean = loaded().values.any { it > base }
+
+  /** بالاترین شماره‌ای که دفترچه دیگر ندارد (شرحِ بالا) */
+  @Synchronized
+  fun floor(): Long { loaded(); return floor }
 
   /**
-   *  opهای پذیرفته‌شده با `server_seq > base` به ترتیبِ نخستین فرستادن. همان op اگر دو بار
-   *  پذیرفته شده (پس از بازیابیِ پیشین)، آخرین شماره‌اش حساب است.
+   *  opهایی که آخرین `server_seq`شان بالای پایه است، **به ترتیبِ همان شماره**. همان op اگر دو
+   *  بار پذیرفته شده (پس از بازیابیِ پیشین)، آخرین شماره‌اش حساب است.
    */
   @Synchronized
   fun replayAbove(base: Long): List<Sent> {
@@ -143,27 +186,32 @@ class ReplayBook(private val file: File, private val cap: Int = CAP) {
       val prev = byId[s.id]
       byId[s.id] = if (prev == null) s else prev.copy(seq = s.seq)
     }
-    return byId.values.filter { it.seq > base }
+    return byId.values.filter { it.seq > base }.sortedBy { it.seq }
   }
 
   @Synchronized
   fun count(): Int { loaded(); return lines }
 
-  private fun loaded(): HashSet<String> {
-    ids?.let { return it }
-    val set = HashSet<String>()
+  /** فقط سرِ هر خط (شناسه و شماره) — بی تجزیهٔ کاملِ هزاران op در هر بالا آمدن */
+  private fun loaded(): HashMap<String, Long> {
+    latest?.let { return it }
+    val map = HashMap<String, Long>()
     var n = 0
-    var max = 0L
+    var low = 0L
     for (line in read()) {
-      val s = parse(line) ?: continue
-      set += s.id
+      val f = FLOOR.matchEntire(line)
+      if (f != null) { f.groupValues[1].toLongOrNull()?.let { low = max(low, it) }; continue }
+      val m = HEAD.find(line) ?: continue
+      if (!line.endsWith("}}")) continue                       //  خطِ نیمه‌کارهٔ قطعِ برق
+      val seq = m.groupValues[2].toLongOrNull() ?: continue
+      if (seq <= 0) continue
+      map[m.groupValues[1]] = seq
       n++
-      if (s.seq > max) max = s.seq
     }
     lines = n
-    top = max
-    ids = set
-    return set
+    floor = low
+    latest = map
+    return map
   }
 
   private fun parse(line: String): Sent? = runCatching {
@@ -190,20 +238,41 @@ class ReplayBook(private val file: File, private val cap: Int = CAP) {
 
   private fun lastByte(): Int = RandomAccessFile(file, "r").use { it.seek(it.length() - 1); it.read() }
 
-  /** آخرین `cap` خط می‌ماند؛ شکست ⇒ همان فایل، و تلاشِ دوباره در افزودنِ بعدی */
+  private fun floorLine(seq: Long) = "{\"floor\":$seq}\n"
+
+  /**
+   *  آخرین `cap` رکورد می‌ماند و `floor` بالاترین شمارهٔ رفته می‌شود؛ شکست ⇒ همان فایل، و
+   *  تلاشِ دوباره در افزودنِ بعدی.
+   */
   private fun compact() {
     runCatching {
-      val keep = read().takeLast(cap)
-      DiskWrite.text(file, keep.joinToString("") { it + "\n" })
+      var low = 0L
+      val entries = ArrayList<Pair<String, Long>>()
+      for (line in read()) {
+        val f = FLOOR.matchEntire(line)
+        if (f != null) { f.groupValues[1].toLongOrNull()?.let { low = max(low, it) }; continue }
+        val m = HEAD.find(line) ?: continue
+        if (!line.endsWith("}}")) continue
+        entries += line to (m.groupValues[2].toLongOrNull() ?: continue)
+      }
+      if (entries.size <= cap) return@runCatching
+      val gone = entries.subList(0, entries.size - cap).maxOf { it.second }
+      val keep = entries.subList(entries.size - cap, entries.size)
+      DiskWrite.text(file, floorLine(max(low, gone)) + keep.joinToString("") { it.first + "\n" })
     }
   }
 
   companion object {
-    /** opهای خودِ دستگاه: یک دکانِ پرکار روزی چند هزار op — بیش از یک هفته */
-    const val CAP = 10_000
+    /** opهای خودِ دستگاه و گرفته‌شده‌ها: دکانِ پرکار با چند دستگاه روزی چند هزار op — چند روز */
+    const val CAP = 20_000
+
+    /** `SERVER_DEVICE` ِ `server/src/lib/sync-v1.js` و `sync-v3.js` */
+    const val SERVER_DEVICE = "server"
 
     /** op_idِ v1 و v3 — بی فاصله و بی خطِ تازه */
     private val ID = Regex("^[A-Za-z0-9_.:-]{1,128}$")
+    private val HEAD = Regex("^\\{\"id\":\"([A-Za-z0-9_.:-]{1,128})\",\"q\":(\\d{1,18}),\"op\":\\{")
+    private val FLOOR = Regex("^\\{\"floor\":(\\d{1,18})\\}$")
 
     fun inDir(dir: File, name: String): ReplayBook = ReplayBook(File(dir, "$name-sent.jsonl"))
   }

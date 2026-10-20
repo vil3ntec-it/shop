@@ -105,14 +105,58 @@ class RestoreReplayTest {
     assertFalse(b.hasAbove(0))
   }
 
-  @Test fun `همان op دو بار پذیرفته شد ⇒ یک بار، جای نخست، شمارهٔ آخر`() {
+  @Test fun `همان op دو بار پذیرفته شد ⇒ یک بار، با شمارهٔ آخر و به ترتیبِ همان`() {
     val b = book()
     b.sent(listOf(ReplayBook.Sent("o1", 50, op("o1")), ReplayBook.Sent("o2", 60, op("o2"))))
     //  پس از بازیابیِ پیشین دوباره رفت و شمارهٔ تازه گرفت
     b.sent(listOf(ReplayBook.Sent("o1", 140, op("o1"))))
     assertEquals(listOf("o1"), b.replayAbove(100).map { it.id })
-    assertEquals(listOf("o1", "o2"), b.replayAbove(10).map { it.id })
-    assertEquals(140L, b.replayAbove(10).first().seq)
+    assertEquals(listOf("o2", "o1"), b.replayAbove(10).map { it.id })
+    assertEquals(140L, b.replayAbove(10).last().seq)
+  }
+
+  @Test fun `hasAbove با آخرین شمارهٔ هر op — شمارهٔ کهنهٔ بالاتر حساب نیست`() {
+    //  بازبینِ دوم: پیش‌تر بیشینهٔ همهٔ شماره‌ها بود
+    val b = book()
+    b.sent(listOf(ReplayBook.Sent("o1", 150, op("o1"))))
+    //  بازیابیِ پیشین: همان op دوباره رفت و این بار ۱۲۰ گرفت
+    b.sent(listOf(ReplayBook.Sent("o1", 120, op("o1"))))
+    assertFalse(b.hasAbove(130))
+    assertTrue(b.hasAbove(119))
+    assertFalse(book().hasAbove(130))
+    assertEquals(emptyList<ReplayBook.Sent>(), book().replayAbove(130))
+  }
+
+  @Test fun `گرفته‌ها و فرستاده‌ها با هم، به ترتیبِ سرور؛ opِ خودِ سرور و بی‌دستگاه نه`() {
+    val b = book()
+    b.sent(listOf(ReplayBook.Sent("mine-2", 102, op("mine-2"))))
+    b.seen(listOf(
+      ReplayBook.Sent("theirs-1", 101, op("theirs-1"), device = "dev-a"),
+      ReplayBook.Sent("srv-1", 103, op("srv-1"), device = ReplayBook.SERVER_DEVICE),
+      ReplayBook.Sent("anon", 104, op("anon")),
+      ReplayBook.Sent("theirs-5", 105, op("theirs-5"), device = "dev-c"),
+    ))
+    assertEquals(listOf("theirs-1", "mine-2", "theirs-5"), b.replayAbove(100).map { it.id })
+    assertTrue("ردِ دوباره‌فرستادهٔ گرفته‌شده هم بی‌صدا", b.wasSent("theirs-1"))
+    assertFalse(b.wasSent("srv-1"))
+    assertFalse(b.wasSent("anon"))
+    assertEquals(listOf("theirs-1", "mine-2", "theirs-5"), book().replayAbove(100).map { it.id })
+  }
+
+  @Test fun `پوشش — نخستین بار cursor ِ همان لحظه، فشرده کردن بالاترین شمارهٔ رفته`() {
+    val b = book(cap = 4)
+    b.begin(cursor = 70)
+    assertEquals(70L, b.floor())
+    b.begin(cursor = 500)
+    assertEquals("فقط بارِ نخست", 70L, book(cap = 4).floor())
+    for (i in 1..7) b.sent(listOf(ReplayBook.Sent("o$i", 100L + i, op("o$i"))))
+    val c = book(cap = 4)
+    assertTrue("کهنه‌ها رفتند ⇒ پایه زیرِ ۱۰۳ پوشیده نیست", c.floor() >= 103)
+    assertTrue(c.replayAbove(0).all { it.seq > c.floor() })
+    val fresh = ReplayBook(File(dir, "y-sent.jsonl"))
+    fresh.begin(cursor = 0)
+    assertEquals(0L, fresh.floor())
+    assertEquals(0, fresh.count())
   }
 
   @Test fun `wasSent — فقط opی که پذیرفته شده`() {

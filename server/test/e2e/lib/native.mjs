@@ -51,14 +51,25 @@ export function restorePlan(known, cursor, server, sentAbove = () => false) {
   return { epoch: server.id, restore: cursor > base || sentAbove(base), base };
 }
 
-/** `ReplayBook.replayAbove`: ترتیبِ نخستین فرستادن، آخرین server_seq ِ هر op_id */
+/** `ReplayBook.replayAbove`: آخرین server_seq ِ هر op_id، به ترتیبِ همان شماره (خودی و گرفته‌شده با هم) */
 export function replayAbove(sent, base) {
   const byId = new Map();
   for (const s of sent) {
     const prev = byId.get(s.id);
     byId.set(s.id, prev ? { ...prev, seq: s.seq } : s);
   }
-  return [...byId.values()].filter((s) => s.seq > base);
+  return [...byId.values()].filter((s) => s.seq > base).sort((a, b) => a.seq - b.seq);
+}
+
+/** `SERVER_DEVICE` ِ `sync-v1.js` — opِ خودِ سرور در دفترچه نمی‌نشیند */
+export const SERVER_DEVICE = 'server';
+
+/** opِ گرفته‌شده ⇒ همان بدنه‌ای که دوباره فرستاده می‌شود (`SyncOp.fromJson(…).toJson()`) */
+function opOf(o) {
+  const op = { op_id: o.op_id, ts: Number(o.ts) || 0, table: o.table, row_id: o.row_id, type: o.type };
+  if (o.type !== 'delete') op.fields = o.fields || {};
+  op.hash = core.hashOf(op);
+  return op;
 }
 
 /* ═══════════════════════════ Models.kt ⇒ شکلِ ردیف ═══════════════════════════ */
@@ -173,7 +184,8 @@ export class NativeDevice {
     //  §۹.۵ (`V1Restore`): دورانِ بازیابیِ سرور، «در انتظارِ ساختنِ دوباره» و دفترچهٔ `ReplayBook`
     this.epoch = '';
     this.restorePending = false;
-    this.sent = [];          //  …-sent.jsonl: {id, seq, op} ِ پذیرفته‌شده‌های خودِ دستگاه
+    this.sent = [];          //  …-sent.jsonl: {id, seq, op} ِ پذیرفته‌شده‌ها و گرفته‌شده‌ها (`sent` + `seen`)
+    this.replayedIds = new Set();
     this.replayed = 0;
     this.rebuilt = 0;
     this.lastError = '';
@@ -272,31 +284,80 @@ export class NativeDevice {
     let r;
     try { r = await this.api('GET', '/shop/sync-epoch'); } catch { return; }
     if (r.status !== 200) return;                              //  سرورِ کهنه/خاموش/خطا ⇒ رفتارِ پیشین
-    const top = this.sent.reduce((m, x) => Math.max(m, x.seq), 0);
-    const plan = restorePlan(this.epoch, this.cursor, epochFrom(r.body?.epoch), (base) => top > base);
+    const latest = new Map();
+    for (const x of this.sent) latest.set(x.id, x.seq);
+    const plan = restorePlan(this.epoch, this.cursor, epochFrom(r.body?.epoch), (base) => [...latest.values()].some((q) => q > base));
     if (!plan.restore) { this.epoch = plan.epoch; return; }
-    //  `OpQueue.pushFront`: جلوی صف، همان op_id، بی تکرارِ آنچه در صف هست
+    //  `OpQueue.pushFront`: جلوی صف، به ترتیبِ سرور، همان op_id، بی تکرارِ آنچه در صف هست
     const have = new Set(this.queue.map((o) => o.op_id));
     const again = replayAbove(this.sent, plan.base).filter((x) => !have.has(x.id) && have.add(x.id)).map((x) => x.op);
     this.queue.unshift(...again);
     this.replayed += again.length;
+    for (const o of again) this.replayedIds.add(o.op_id);
     //  `SyncStateV1.commitRestore`
     this.epoch = plan.epoch;
     this.restorePending = true;
   }
 
-  /** `V1Restore.rebuild` + `SyncCommit.rebuild`: دفتر = Snapshot + opهای همین حالا در صف */
+  /**
+   *  `V1Restore.rebuild` + `SyncCommit.rebuild` — «نگه‌دارِ محلی»: دفتر = Snapshot + ردیف‌هایی که فقط
+   *  این‌جا هستند (جز آنچه سرور حذف‌شده می‌داند)؛ سایه = Snapshot ⇒ تنهاها «درج» به صف. فقط با صفِ
+   *  خالی و تفاضلِ هیچ (پس از ثبتِ همین لحظه).
+   */
   async rebuild() {
     const r = await this.api('GET', '/sync/v1/snapshot');
     if (r.status !== 200) return false;
-    let next = core.fromSnapshot(r.body, this.ledger);
-    if (this.queue.length) next = core.applyRemote(next, this.queue).data;
-    this.ledger = next;
-    this.shadow = core.shadowOf(next);
+    const ask = core.restoreLocalOnly(r.body, this.ledger);
+    let gone = [];
+    for (let i = 0; i < ask.length; i += 500) {
+      const d = await this.api('POST', '/shop/sync-epoch/deleted', { rows: ask.slice(i, i + 500) });
+      if (d.status === 404) break;
+      if (d.status !== 200) return false;
+      gone = gone.concat(d.body.deleted || []);
+    }
+    this.asked = (this.asked || 0) + ask.length;
+    if (this.queue.length) return false;
+    if (this.save(this.ledger) > 0) return false;
+    const merged = core.restoreMerge(r.body, this.ledger, gone);
+    this.ledger = merged.ledger;
+    this.shadow = core.shadowOf(merged.shadow);
     this.cursor = Number(r.body.cursor || 0);
     this.restorePending = false;
     this.rebuilt++;
+    this.save(this.ledger);
     return true;
+  }
+
+  /** `SyncV1Engine.pushAll`: همهٔ صف در دسته‌ها؛ پذیرفته‌ها پیش از بیرون رفتن در دفترچه */
+  async pushAll() {
+    let guard = 0;
+    while (this.queue.length && guard++ < 500) {
+      //  `OpQueue.batch()`: حداکثر ۲۰۰ op و ۲۵۶KB
+      const batch = [];
+      let size = 2;
+      for (const op of this.queue) {
+        const s = Buffer.byteLength(JSON.stringify(op)) + 1;
+        if (batch.length >= 200 || (batch.length && size + s > 256 * 1024)) break;
+        size += s;
+        batch.push(op);
+      }
+      const r = await this.api('POST', '/sync/v1/push', { device_id: this.deviceId, schema_version: core.SCHEMA_VERSION, queued: this.queue.length, ops: batch });
+      if (r.status === 426) { this.holding = true; this.lastError = r.body?.message || 'upgrade'; return { ok: false, status: 426 }; }
+      if (r.status !== 200) { this.lastError = `${r.status} ${r.body?.error?.code || ''}`.trim(); return { ok: false, status: r.status, body: r.body }; }
+      this.holding = false;
+      const res = r.body.results || [];
+      const ok = new Set(res.filter((x) => x.status === 'applied' || x.status === 'duplicate').map((x) => x.op_id));
+      //  `V1Restore.accepted`: پذیرفته‌شده‌ها با server_seq — پیش از بیرون رفتن از صف
+      const seqOf = new Map(res.filter((x) => ok.has(x.op_id) && Number(x.server_seq) > 0).map((x) => [x.op_id, Number(x.server_seq)]));
+      for (const op of batch) if (seqOf.has(op.op_id)) this.sent.push({ id: op.op_id, seq: seqOf.get(op.op_id), op });
+      //  `V1Restore.isReplay`: ردِ opِ دوباره‌فرستاده ردشده‌ای نیست که کاربر ببیند
+      const sentIds = new Set(this.sent.map((x) => x.id));
+      const bad = res.filter((x) => !ok.has(x.op_id));
+      for (const b of bad) if (!sentIds.has(b.op_id)) this.dropped.push({ ...batch.find((o) => o.op_id === b.op_id), why: b.reason || b.status });
+      const gone = new Set([...ok, ...bad.map((b) => b.op_id)]);
+      this.queue = this.queue.filter((o) => !gone.has(o.op_id));
+    }
+    return null;
   }
 
   /** `SyncV1Engine.runOnce`: دوران ⇒ همهٔ صف در دسته‌ها ⇒ (در انتظار و صفِ خالی ⇒ از نو) ⇒ pull تا تهِ cursor */
@@ -304,38 +365,15 @@ export class NativeDevice {
     if (this.offline) { this.lastError = 'offline'; return { ok: false, offline: true }; }
     try {
       await this.checkEpoch();
-      let guard = 0;
-      while (this.queue.length && guard++ < 500) {
-        //  `OpQueue.batch()`: حداکثر ۲۰۰ op و ۲۵۶KB
-        const batch = [];
-        let size = 2;
-        for (const op of this.queue) {
-          const s = Buffer.byteLength(JSON.stringify(op)) + 1;
-          if (batch.length >= 200 || (batch.length && size + s > 256 * 1024)) break;
-          size += s;
-          batch.push(op);
-        }
-        const r = await this.api('POST', '/sync/v1/push', { device_id: this.deviceId, schema_version: core.SCHEMA_VERSION, queued: this.queue.length, ops: batch });
-        if (r.status === 426) { this.holding = true; this.lastError = r.body?.message || 'upgrade'; return { ok: false, status: 426 }; }
-        if (r.status !== 200) { this.lastError = `${r.status} ${r.body?.error?.code || ''}`.trim(); return { ok: false, status: r.status, body: r.body }; }
-        this.holding = false;
-        const res = r.body.results || [];
-        const ok = new Set(res.filter((x) => x.status === 'applied' || x.status === 'duplicate').map((x) => x.op_id));
-        //  `V1Restore.accepted`: پذیرفته‌شده‌ها با server_seq — پیش از بیرون رفتن از صف
-        const seqOf = new Map(res.filter((x) => ok.has(x.op_id) && Number(x.server_seq) > 0).map((x) => [x.op_id, Number(x.server_seq)]));
-        for (const op of batch) if (seqOf.has(op.op_id)) this.sent.push({ id: op.op_id, seq: seqOf.get(op.op_id), op });
-        //  `V1Restore.isReplay`: ردِ opِ دوباره‌فرستاده ردشده‌ای نیست که کاربر ببیند
-        const sentIds = new Set(this.sent.map((x) => x.id));
-        const bad = res.filter((x) => !ok.has(x.op_id));
-        for (const b of bad) if (!sentIds.has(b.op_id)) this.dropped.push({ ...batch.find((o) => o.op_id === b.op_id), why: b.reason || b.status });
-        const gone = new Set([...ok, ...bad.map((b) => b.op_id)]);
-        this.queue = this.queue.filter((o) => !gone.has(o.op_id));
-      }
-      if (this.restorePending && !this.queue.length) await this.rebuild();
+      let step = await this.pushAll();
+      if (step) return step;
+      if (this.restorePending && !this.queue.length && await this.rebuild() && (step = await this.pushAll())) return step;
       for (let i = 0; !this.restorePending && i < 50; i++) {
         const r = await this.api('GET', `/sync/v1/pull?device_id=${encodeURIComponent(this.deviceId)}&since=${this.cursor}`);
         if (r.status !== 200) { this.lastError = `${r.status} ${r.body?.error?.code || ''}`.trim(); return { ok: false, status: r.status, body: r.body }; }
         const ops = r.body.ops || [];
+        //  `ReplayBook.seen`: گرفته‌ها با شماره و دستگاه — پیش از نشاندن؛ opِ خودِ سرور نه
+        for (const o of ops) if (o.device_id && o.device_id !== SERVER_DEVICE && Number(o.server_seq) > 0) this.sent.push({ id: o.op_id, seq: Number(o.server_seq), op: opOf(o) });
         if (ops.length) this.absorb(ops);
         this.cursor = Number(r.body.cursor || this.cursor);
         if (!r.body.has_more) break;

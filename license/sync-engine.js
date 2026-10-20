@@ -375,9 +375,12 @@
      ----------------------------------------------------------
      «دورانِ بازیابی» فقط با بازیابی عوض می‌شود. عوض شده و این مرورگر پس از پایه چیزی
      دیده ⇒ «در انتظار»: Pull نه (opِ دوباره‌فرستادهٔ برنامه‌های دیگر روی دفترِ کهنه دو بار
-     می‌نشست)، صف فرستاده می‌شود و بعد دفتر از Snapshot از نو.
+     می‌نشست)، صف فرستاده می‌شود و بعد دفتر از نو — «نگه‌دارِ محلی» (`core.restoreMerge`):
+     Snapshot + ردیف‌هایی که فقط این‌جا هستند (جز آنچه سرور حذف‌شده می‌داند) ⇒ فروشِ پس از
+     پشتیبانِ همین مرورگر «درج» دوباره می‌رود، پاک نمی‌شود.
      ⚠️ وب دفترچهٔ opهای فرستاده ندارد (سهمیهٔ localStorage با دفترِ خودِ دکان شریک است)، پس
-     opهای «اعمال‌شده»ی گم‌شدهٔ همین مرورگر دوباره نمی‌روند — فقط دو بار نشاندن بسته است.
+     ویرایشِ «اعمال‌شده»ی گم‌شدهٔ همین مرورگر روی ردیفی که سرور دارد (مثلاً دریافتِ دیگری روی
+     فاکتورِ پیش از پشتیبان) دوباره نمی‌رود — ردیفِ تازه می‌ماند و می‌رود.
      سرورِ کهنه یا خاموش (۴۰۴) ⇒ همان رفتارِ پیشین.
      ========================================================== */
   function epochOf(r) {
@@ -401,16 +404,51 @@
     else if (known !== ep.id) patchState({ epoch: ep.id });
   }
 
-  /** پس از خالی شدنِ صف: دفتر = Snapshot؛ ذخیره‌ای که وسطِ گرفتن رسید ⇒ این بار نه */
+  /** از ردیف‌های تنهای این مرورگر کدام روی سرور حذف‌شده است؛ ۴۰۴ ⇒ هیچ (نگه داشتن بهتر از گم کردن) */
+  async function deletedOf(rows) {
+    var out = [];
+    for (var i = 0; i < rows.length; i += 500) {
+      var r;
+      try {
+        r = await acc.authFetch('/api/shop/sync-epoch/deleted', { method: 'POST', body: { rows: rows.slice(i, i + 500) } });
+      } catch (e) {
+        if (e && e.status === 404) return out;
+        throw e;
+      }
+      if (r && Array.isArray(r.deleted)) out = out.concat(r.deleted);
+    }
+    return out;
+  }
+
+  /**
+   *  پس از خالی شدنِ صف: دفتر = Snapshot + ردیف‌های تنهای این مرورگر؛ سایه = Snapshot ⇒ تنهاها
+   *  «درج» می‌روند. ⛔ فقط با صفِ خالی و تفاضلِ هیچ (پس از ثبتِ همین لحظه): تغییرِ ثبت‌نشده
+   *  (حافظهٔ پر) زیرِ Snapshot نمی‌رود. ⛔ اول سایه، بعد دفتر: شکستِ هر کدام ⇒ هیچ چیزی عوض نشده.
+   */
   async function rebuildFromServer() {
     var r = await acc.authFetch('/api/sync/v1/snapshot');
-    if (queue().size() > 0) return false;
     var data = ledger.read();
     if (!data) return false;
-    var next = core.fromSnapshot(r, data);
-    ledger.write(next);
-    setShadow(next);
+    var gone = [];
+    var ask = core.restoreLocalOnly(r, data);
+    if (ask.length) gone = await deletedOf(ask);
+    //  هر چه وسطِ این درخواست‌ها رسید اول ثبت شود
+    recordChange('restore');
+    if (queue().size() > 0) return false;
+    data = ledger.read();
+    var base = shadow();
+    if (!data || !base || core.diff(base, data).ops.length) return false;
+    var merged = core.restoreMerge(r, data, gone);
+    if (!setShadow(merged.shadow)) return false;
+    try {
+      ledger.write(merged.ledger);
+    } catch (e) {
+      setShadow(base);
+      throw e;
+    }
     patchState({ cursor: Number(r.cursor || 0), snapshotAt: Date.now(), restorePending: false });
+    //  ردیف‌های تنهای این مرورگر ⇒ «درج»
+    recordChange('restore');
     return true;
   }
 
@@ -436,7 +474,14 @@
         if (!out.sent) break;
         head = out.head;
       }
-      if (state().restorePending && queue().size() === 0 && await rebuildFromServer()) head = 1;
+      if (state().restorePending && queue().size() === 0 && await rebuildFromServer()) {
+        head = 1;
+        //  ردیف‌های تنها همین حالا بروند
+        for (var again = 0; queue().size() > 0 && again < 200; again++) {
+          var sent = await pushOnce();
+          if (!sent.sent) break;
+        }
+      }
       var pulled = state().restorePending ? 0 : await pullOnce();
       succeeded();
       if (pulled || head) announce();

@@ -85,10 +85,12 @@ async function dump({ kind = 'manual', dir = null } = {}) {
   const target = path.join(dir || dirFor(kind), base);
   const tmp = `${target}.part`;
 
+  //  §۹.۵: نامِ نشست تا سروری که هم‌زمان بالا می‌آید نشانِ همین پشتیبان را «برگشته از پشتیبان»
+  //  نشمارد (`sync-epoch.backupRunning`)
   const dump = spawn(config.backup.pgDump, [
     config.db.url,
     '--no-owner', '--no-privileges', '--format=plain', '--encoding=UTF8',
-  ], { stdio: ['ignore', 'pipe', 'pipe'] });
+  ], { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, PGAPPNAME: require('./sync-epoch').BACKUP_APP } });
 
   let stderr = '';
   dump.stderr.on('data', d => { stderr += d.toString(); });
@@ -280,12 +282,26 @@ async function restore(file, { databaseUrl = config.db.url } = {}) {
       ? resolve({ ok: true, bytes: sql.length })
       : reject(new Error(`بازیابی شکست خورد: ${err.trim().slice(0, 500)}`)));
     psql.stdin.end(sql);
-  }).then(async (out) => {
-    //  §۹.۵: همین دیتابیس برگشت ⇒ دورانِ بازیابیِ تازه، حتی بی بالا آمدنِ دوبارهٔ سرور
-    //  (`scripts/restore.js` نشانیِ مقصد را پیش از بارِ پیکربندی در DATABASE_URL می‌گذارد)
-    if (databaseUrl === config.db.url) await require('./sync-epoch').rotate('restore');
-    return out;
-  });
+  }).then((out) => afterRestore(out, databaseUrl));
+}
+
+/**
+ * §۹.۵: همین دیتابیس برگشت ⇒ دورانِ بازیابیِ تازه، حتی بی بالا آمدنِ دوبارهٔ سرور
+ * (`scripts/restore.js` نشانیِ مقصد را پیش از بارِ پیکربندی در DATABASE_URL می‌گذارد).
+ * دادهٔ پشتیبان **نشسته است**؛ شکستِ این گام بازیابی را «شکست‌خورده» نمی‌کند ولی جدا گزارش
+ * می‌شود (`epochError`) — تا تازه شدنِ دوران، برنامه‌ها فقط از نشانِ پشتیبان (بالا آمدنِ سرور) یا
+ * از «cursor جلوتر از سرِ دفترِ سرور» برگشتن را می‌فهمند.
+ */
+async function afterRestore(out, databaseUrl, { rotate = (r) => require('./sync-epoch').rotate(r) } = {}) {
+  if (databaseUrl !== config.db.url) return { ...out, epoch: false };
+  try {
+    const e = await rotate('restore');
+    return { ...out, epoch: e.id };
+  } catch (e) {
+    const msg = String((e && e.message) || e).slice(0, 300);
+    await require('./audit').log({ actorType: 'system', action: 'backup.sync_epoch_failed', detail: { error: msg } }).catch(() => {});
+    return { ...out, epoch: false, epochError: msg };
+  }
 }
 
 /** زمان‌بندی خودکار: روزانه، هفتگی (یکشنبه) و ماهانه (اول ماه). */
@@ -306,4 +322,4 @@ function schedule() {
   return timer;
 }
 
-module.exports = { run, list, prune, restore, decode, schedule, KINDS, dirFor, UNENCRYPTED_WARNING };
+module.exports = { run, list, prune, restore, afterRestore, decode, schedule, KINDS, dirFor, UNENCRYPTED_WARNING };

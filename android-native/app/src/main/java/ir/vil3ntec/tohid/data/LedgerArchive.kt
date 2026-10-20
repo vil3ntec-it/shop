@@ -190,6 +190,20 @@ object LedgerArchive {
     return runCatching { json.decodeFromString<Archive>(f.readText()) }.getOrDefault(Archive())
   }
 
+  /**
+   *  §۹.۵: شناسهٔ ردیف‌های بایگانی‌شده، هر مجموعه — ساختنِ دوبارهٔ دفتر از Snapshot پس از
+   *  بازیابیِ سرور (`V1Restore`، `SyncV3Engine.rebuild`) آن‌ها را به دفتر برنمی‌گرداند؛ وگرنه
+   *  هم در دفتر بودند هم در بایگانی و «خروجیِ صاحب» دو بار می‌شمرد.
+   */
+  fun archivedIds(context: Context): Map<String, Set<String>> {
+    val a = readArchive(context)
+    return mapOf(
+      "stockMovements" to a.stockMovements.mapTo(HashSet()) { it.id },
+      "priceHistory" to a.priceHistory.mapTo(HashSet()) { it.id },
+      "auditLog" to a.auditLog.mapTo(HashSet()) { it.id },
+    )
+  }
+
   /** اندازهٔ فایلِ بایگانی، برای نشان دادن در تنظیمات */
   fun archiveBytes(context: Context): Long = file(context).let { if (it.exists()) it.length() else 0L }
 

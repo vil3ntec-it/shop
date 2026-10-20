@@ -79,6 +79,8 @@ object ApiEndpoints {
     fun pull(deviceId: String, since: Long) = "/sync/v1/pull?device_id=$deviceId&since=$since"
     /** «دورانِ» سرور پس از بازیابی (§۹.۵) — فقط دکان، جدا از مسیرهای مشترک با پمپ */
     const val EPOCH = "/shop/sync-epoch"
+    /** از ردیف‌های تنهای دستگاه کدام روی سرور حذف‌شده است (§۹.۵، پیش از ساختنِ دوبارهٔ دفتر) */
+    const val DELETED = "/shop/sync-epoch/deleted"
     /** مسیرِ سوکتِ زنده — نسبت به ریشهٔ سرور، نه به پیشوندِ API. */
     const val LIVE_PATH = "/api/sync/v1/live"
     /** بلیتِ یک‌بارمصرفِ ۶۰ ثانیه‌ای برای سوکت (F0-11) — توکن دیگر در آدرس نمی‌رود. */

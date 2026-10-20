@@ -24,6 +24,15 @@ const { closeDb } = require('../src/db');
 backup.restore(file)
   .then(async (out) => {
     console.log(`بازیابی انجام شد (${Math.round(out.bytes / 1024)} کیلوبایت SQL).`);
+    if (out.epochError) {
+      //  دادهٔ پشتیبان نشسته است؛ فقط «دورانِ بازیابی» تازه نشد — جدا و روشن، با کدِ خروجِ جدا
+      console.error(`⚠️ داده برگشت ولی دورانِ بازیابیِ همگام‌سازی تازه نشد: ${out.epochError}\n`
+        + '   سرور را یک بار دوباره بالا بیاورید (نشانِ پشتیبان در دیتابیس هست)، یا با همین DATABASE_URL:\n'
+        + '   node -e "require(\'./src/lib/sync-epoch\').rotate(\'restore\').then(() => process.exit(0))"\n'
+        + '   تا آن وقت فروش‌های پس از پشتیبان روی برنامه‌ها می‌مانند و دوباره فرستاده نمی‌شوند.');
+      await closeDb();
+      process.exit(2);
+    }
     await closeDb();
   })
   .catch(async (e) => { console.error('✖', e.message); await closeDb(); process.exit(1); });

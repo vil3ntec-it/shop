@@ -3,6 +3,7 @@ package ir.vil3ntec.tohid.sync.v1
 import android.content.Context
 import ir.vil3ntec.tohid.core.config.AppConfig
 import ir.vil3ntec.tohid.core.sync.ReplayBook
+import ir.vil3ntec.tohid.data.LedgerArchive
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.sync.SyncStore
@@ -66,7 +67,9 @@ class SyncV1Engine private constructor(context: Context) {
   private var restore = restoreFor(accountKey)
 
   private fun restoreFor(key: String) =
-    V1Restore(state, queue, ReplayBook.inDir(app.filesDir, "sync-replay-${OpQueue.fileKey(key)}"), commit)
+    V1Restore(state, queue, ReplayBook.inDir(app.filesDir, "sync-replay-${OpQueue.fileKey(key)}"), commit) {
+      LedgerArchive.archivedIds(app)
+    }
 
   private val gate = Mutex()
   private val _status = MutableStateFlow(snapshotStatus())
@@ -184,7 +187,7 @@ class SyncV1Engine private constructor(context: Context) {
         val client = SyncV1Client(Backend.api(app))
         val device = store.deviceUid
 
-        //  §۹.۵: سرور از پشتیبان برگشته؟ (هر دور) opهای گم‌شدهٔ همین دستگاه جلوی صف
+        //  §۹.۵: سرور از پشتیبان برگشته؟ (هر دور) opهای گم‌شده — خودِ دستگاه و گرفته‌شده‌ها — به ترتیبِ سرور جلوی صف
         val epoch = try {
           client.epoch()
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
@@ -195,52 +198,32 @@ class SyncV1Engine private constructor(context: Context) {
         synchronized(this) { restore.check(epoch) }
 
         //  صف را تا ته خالی می‌کنیم، دسته‌دسته
-        var guard = 0
-        while (queue.size() > 0 && guard < 500) {
-          guard++
-          val batch = queue.batch()
-          if (batch.isEmpty()) break
-          val out = try {
-            client.push(device, batch, queue.size())
-          } catch (upgrade: SyncV1Client.UpgradeRequired) {
-            //  سرور عقب‌تر است: هیچ opی پاک نمی‌شود
-            state.holding = true
-            state.lastError = upgrade.reason
-            publish()
-            return@withLock Result.failure(upgrade)
-          }
-          state.holding = false
-          state.serverSchema = out.serverSchema
-          state.upgradeAvailable = out.upgradeAvailable
+        pushAll(client, device)?.let { return@withLock Result.failure(it) }
 
-          val accepted = out.results.filter { it.accepted }.map { it.opId }
-          val rejected = out.results.filter { !it.accepted }
-          if (accepted.isNotEmpty()) {
-            //  §۹.۵: پذیرفته‌شده‌ها با server_seq کنارِ صف — **پیش از** بیرون رفتن از آن — تا
-            //  اگر سرور از پشتیبان برگشت، با همان op_id دوباره بروند (`V1Restore`)
-            restore.accepted(batch, out.results)
-            queue.ack(accepted)
-          }
-          //  ردِ opِ دوباره‌فرستاده (پیش‌تر پذیرفته شده بود) ردشده‌ای نیست که کاربر ببیند
-          val (replayed, refused) = rejected.partition { restore.isReplay(it.opId) }
-          if (replayed.isNotEmpty()) queue.ack(replayed.map { it.opId })
-          if (refused.isNotEmpty()) {
-            //  ردشده‌ها از صف بیرون می‌روند — وگرنه صف تا ابد قفل
-            //  می‌کند — ولی بی‌صدا نه.
-            val ids = refused.map { it.opId }.toHashSet()
-            queue.drop(batch.filter { it.opId in ids }, "rejected")
-            queue.ack(ids)
-          }
-          state.lastPushAt = System.currentTimeMillis()
-        }
-
-        //  §۹.۵: سرور برگشته و صف خالی شد ⇒ دفتر از Snapshot از نو، opهای همین حالا در صف رویش.
-        //  تا آن وقت Pull نه — opِ دوباره‌فرستادهٔ دستگاهِ دیگر روی دفترِ کهنه دو بار می‌نشست.
+        /*
+         *  §۹.۵: سرور برگشته و صف خالی شد ⇒ دفتر از Snapshot از نو، ردیف‌های تنهای همین دستگاه
+         *  (جز آنچه سرور حذف‌شده می‌داند) می‌مانند و «درج» می‌روند. تا آن وقت Pull نه — opِ
+         *  دوباره‌فرستادهٔ دستگاهِ دیگر روی دفترِ کهنه دو بار می‌نشست.
+         */
         if (state.restorePending && queue.size() == 0) {
           val snapshot = client.snapshot()
-          synchronized(this) {
+          val ask = synchronized(this) { restore.localOnly(snapshot, read()) }
+          val gone = if (ask.isEmpty()) emptySet() else client.deleted(ask)
+          val built = synchronized(this) {
             if (commit.pending()) commit.recover(read())
-            if (restore.rebuild(snapshot, read(), write)) state.snapshotAt = System.currentTimeMillis()
+            try {
+              restore.rebuild(snapshot, read(), gone, write)
+            } catch (e: Throwable) {
+              //  نیمه‌کاره در همین اجرا: همان‌جا با دفترِ همین حالا تمام یا برگردانده می‌شود
+              //  (همان کارِ `absorbRemote`) — ژورنالِ ساختنِ دوباره هیچ‌گاه بی‌صدا پاک نمی‌شود
+              runCatching { commit.recover(read()) }
+              throw e
+            }
+          }
+          if (built) {
+            state.snapshotAt = System.currentTimeMillis()
+            //  ردیف‌های تنها (اگر بود) همین حالا بروند
+            pushAll(client, device)?.let { return@withLock Result.failure(it) }
           }
         }
 
@@ -249,6 +232,8 @@ class SyncV1Engine private constructor(context: Context) {
         while (!state.restorePending && rounds < 50) {
           rounds++
           val got = client.pull(device, state.cursor)
+          //  §۹.۵: opهای دیگران با شماره‌شان — **پیش از** نشاندن — برای دوباره فرستادن پس از بازیابی
+          if (got.seen.isNotEmpty()) restore.seen(got.seen)
           if (got.ops.isNotEmpty()) absorbRemote(got.ops, read, write, got.cursor)
           state.cursor = got.cursor
           state.lastPullAt = System.currentTimeMillis()
@@ -271,6 +256,52 @@ class SyncV1Engine private constructor(context: Context) {
         publish()
       }
     }
+
+  /**
+   *  صف تا ته، دسته‌دسته. ۴۲۶ ⇒ هیچ opی پاک نمی‌شود و همان خطا برمی‌گردد؛ وگرنه null.
+   *
+   *  ⛔ پذیرفته‌شده‌ها با server_seq کنارِ صف (`V1Restore.accepted`) **پیش از** بیرون رفتن از آن —
+   *  تا اگر سرور از پشتیبان برگشت، با همان op_id دوباره بروند (§۹.۵).
+   */
+  private suspend fun pushAll(client: SyncV1Client, device: String): Throwable? {
+    var guard = 0
+    while (queue.size() > 0 && guard < 500) {
+      guard++
+      val batch = queue.batch()
+      if (batch.isEmpty()) break
+      val out = try {
+        client.push(device, batch, queue.size())
+      } catch (upgrade: SyncV1Client.UpgradeRequired) {
+        //  سرور عقب‌تر است: هیچ opی پاک نمی‌شود
+        state.holding = true
+        state.lastError = upgrade.reason
+        publish()
+        return upgrade
+      }
+      state.holding = false
+      state.serverSchema = out.serverSchema
+      state.upgradeAvailable = out.upgradeAvailable
+
+      val accepted = out.results.filter { it.accepted }.map { it.opId }
+      val rejected = out.results.filter { !it.accepted }
+      if (accepted.isNotEmpty()) {
+        restore.accepted(batch, out.results)
+        queue.ack(accepted)
+      }
+      //  ردِ opِ دوباره‌فرستاده (پیش‌تر پذیرفته یا گرفته شده بود) ردشده‌ای نیست که کاربر ببیند
+      val (replayed, refused) = rejected.partition { restore.isReplay(it.opId) }
+      if (replayed.isNotEmpty()) queue.ack(replayed.map { it.opId })
+      if (refused.isNotEmpty()) {
+        //  ردشده‌ها از صف بیرون می‌روند — وگرنه صف تا ابد قفل
+        //  می‌کند — ولی بی‌صدا نه.
+        val ids = refused.map { it.opId }.toHashSet()
+        queue.drop(batch.filter { it.opId in ids }, "rejected")
+        queue.ack(ids)
+      }
+      state.lastPushAt = System.currentTimeMillis()
+    }
+    return null
+  }
 
   /**
    *  هم‌ترازیِ یک‌باره با سرور — پیش از نخستین دورِ این حساب روی این دستگاه.
@@ -438,7 +469,8 @@ class SyncV1Engine private constructor(context: Context) {
       dropped = runCatching { queue.droppedCount() }.getOrDefault(0),
       cursor = state.cursor,
       lastOkAt = state.lastOkAt,
-      lastError = state.lastError,
+      //  §۹.۵: هشدارِ «دفترچه همهٔ پنجره را نداشت» — نوشته، ولی چراغ را قرمز نمی‌کند
+      lastError = state.lastError.ifBlank { notice() },
       holding = state.holding,
       upgradeAvailable = state.upgradeAvailable,
       schemaVersion = LedgerDiff.SCHEMA_VERSION,
@@ -448,6 +480,12 @@ class SyncV1Engine private constructor(context: Context) {
   }
 
   internal fun publish() { _status.value = snapshotStatus() }
+
+  /** §۹.۵: پس از بازیابیِ سروری که دفترچه همهٔ پنجره‌اش را نداشت، چند روز دیده شود */
+  private fun notice(): String {
+    val at = runCatching { state.restoreNoticeAt }.getOrDefault(0L)
+    return if (at > 0 && System.currentTimeMillis() - at < RESTORE_NOTICE_MS) RESTORE_NOTICE else ""
+  }
 
   fun queueSize(): Int = queue.size()
   fun droppedOps(): List<JsonObject> = queue.dropped()
@@ -468,6 +506,12 @@ class SyncV1Engine private constructor(context: Context) {
   companion object {
     const val MIN_BACKOFF_MS = 2_000L
     const val MAX_BACKOFF_MS = 5 * 60_000L
+
+    /** §۹.۵: هشدارِ پوششِ دفترچه، سه روز */
+    const val RESTORE_NOTICE_MS = 3 * 24 * 60 * 60_000L
+    const val RESTORE_NOTICE =
+      "سرور از پشتیبان برگشت و این دستگاه همهٔ کارهای پس از پشتیبان را نگه نداشته بود؛ " +
+        "فروش‌ها و ردیف‌های تازهٔ همین دستگاه فرستاده شدند، ولی ویرایش‌های پیش از آن را یک بار با دفتر بسنجید."
 
     @Volatile private var instance: SyncV1Engine? = null
 
