@@ -627,7 +627,10 @@ test('دسترسی و جدایی: دکانِ دیگر، پیکِ دیگر، شا
     assert.equal(r.body.results[0].code, 'assignment_not_found');
   }
   assert.equal((await h.get('/api/courier/missions', { token: c2.token })).body.items.length, 0);
-  assert.equal((await h.get(`/api/shop/delivery/assignments/${id}/photos`, { token: b.token })).body.items.length, 0);
+  //  مأموریتِ دکانِ دیگر: همان ۴۰۴ِ بقیهٔ درهای شناسه‌دار (پیش‌تر ۲۰۰ و فهرستِ خالی) و هیچ عکسی
+  const foreign = await h.get(`/api/shop/delivery/assignments/${id}/photos`, { token: b.token });
+  assert.equal(foreign.status, 404, JSON.stringify(foreign.body));
+  assert.equal(foreign.body.items, undefined);
 
   //  عکس بی رضایتِ مشتری ⇒ ۴۰۳ و هیچ بایتی
   await sendOk(c1.token, [ev(id, 'assigned'), ev(id, 'picked_up'), ev(id, 'arrived')]);
