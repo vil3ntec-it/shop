@@ -27,6 +27,10 @@ object DebtorDetailModel {
       .map { (date, rows) -> Day(date, rows) }
       .sortedWith(compareByDescending<Day> { if (it.date == UNDATED) "" else it.date })
 
+  /** همهٔ ردیف‌ها در یک فهرست، به همان ترتیبِ `days` (روزِ تازه‌تر اول) — بی سرخطِ روز */
+  fun rows(transactions: List<DebtTransaction>, hidden: Set<String> = emptySet()): List<DebtTransaction> =
+    days(transactions, hidden).flatMap { it.rows }
+
   /** ردیفِ بی‌تاریخ (پشتیبانِ خیلی قدیمی) — ته فهرست */
   const val UNDATED = "—"
 
@@ -37,6 +41,9 @@ object DebtorDetailModel {
   }
 
   fun totals(account: DebtorEngine.Account): Totals = Totals(account.given, account.received, account.balance)
+
+  /** صفر (با کسرِ ریزِ اعشار) — عددِ خنثی، بی رنگِ بدهی یا رسید */
+  fun isZero(value: Double): Boolean = kotlin.math.abs(value) <= EPSILON
 
   private const val EPSILON = 0.001
 

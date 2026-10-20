@@ -127,6 +127,8 @@ object DebtorDetailShot {
   val drawer = mutableStateOf<Boolean?>(null)
   /** برگهٔ «ثبتِ تراکنش» باز باشد */
   val composer = mutableStateOf(false)
+  /** برگهٔ جزئیاتِ این تراکنش باز باشد */
+  val txSheet = mutableStateOf<String?>(null)
 }
 
 private const val PREFS = "tohid-debtor-detail"
@@ -144,7 +146,10 @@ internal fun DebtorDetailScreen(
   onEdit: () -> Unit,
   onDelete: () -> Unit,
   onDeleteTx: (String) -> Unit,
+  /** رسیدِ چاپی/فرستادنی */
   onOpenTx: (String) -> Unit,
+  /** گذاشتن/عوض کردنِ سررسیدِ یک برد — همان پنجرهٔ قبلی */
+  onDue: (String) -> Unit,
 ) {
   val c = PhoneV3.colors
   val context = LocalContext.current
@@ -152,7 +157,11 @@ internal fun DebtorDetailScreen(
   val debtor = account.debtor
   //  دفترِ همین مشتری: اقلام، تخصیصِ پرداخت، سررسید و ماندهٔ پس از هر ردیف
   val book = remember(d, debtor.id) { DebtBook.book(d, debtor.id, todayIso()) }
-  val days = remember(account.transactions, hiddenTx) { DebtorDetailModel.days(account.transactions, hiddenTx) }
+  val rows = remember(account.transactions, hiddenTx) { DebtorDetailModel.rows(account.transactions, hiddenTx) }
+  //  برگهٔ جزئیاتِ یک ردیف (زدنِ ردیف)
+  var sheetTx by rememberSaveable { mutableStateOf<String?>(null) }
+  val shotTx = DebtorDetailShot.txSheet.value
+  LaunchedEffect(shotTx) { if (shotTx != null) sheetTx = shotTx }
   val totals = DebtorDetailModel.totals(account)
 
   //  کشو: بازی/بستگی‌اش روی دستگاه می‌ماند — کسی که بسته‌اش کرده، هر بار نمی‌بندد
@@ -225,9 +234,9 @@ internal fun DebtorDetailScreen(
             LazyColumn(
               Modifier.fillMaxSize(),
               contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 104.dp),
-              verticalArrangement = Arrangement.spacedBy(8.dp),
+              verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-              transactionItems(days, book, account, onCompose, onDeleteTx, onOpenTx)
+              transactionItems(rows, book, account, onCompose, onDeleteTx, onShow = { sheetTx = it }, onReceipt = onOpenTx)
             }
             ComposerBar(Modifier.align(Alignment.BottomCenter), onCompose)
           }
@@ -239,16 +248,37 @@ internal fun DebtorDetailScreen(
             LazyColumn(
               Modifier.fillMaxSize(),
               contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 2.dp, bottom = 104.dp),
-              verticalArrangement = Arrangement.spacedBy(8.dp),
+              verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-              item(key = "drawer") { ActionDrawer(account, book, actions, open = drawerOpen, onToggle = ::toggleDrawer, onAction = ::run) }
+              item(key = "drawer") {
+                Box(Modifier.padding(bottom = 4.dp)) {
+                  ActionDrawer(account, book, actions, open = drawerOpen, onToggle = ::toggleDrawer, onAction = ::run)
+                }
+              }
               item(key = "totals") { TotalsCard(totals) }
-              transactionItems(days, book, account, onCompose, onDeleteTx, onOpenTx)
+              transactionItems(rows, book, account, onCompose, onDeleteTx, onShow = { sheetTx = it }, onReceipt = onOpenTx)
             }
             ComposerBar(Modifier.align(Alignment.BottomCenter), onCompose)
           }
         }
       }
+    }
+  }
+
+  sheetTx?.let { id ->
+    val tx = account.transactions.find { it.id == id }
+    if (tx == null || id in hiddenTx) {
+      LaunchedEffect(id) { sheetTx = null; DebtorDetailShot.txSheet.value = null }
+    } else {
+      TxDetailSheet(
+        tx = tx,
+        entry = book?.entry(id),
+        book = book,
+        onDismiss = { sheetTx = null; DebtorDetailShot.txSheet.value = null },
+        onReceipt = { sheetTx = null; onOpenTx(id) },
+        onDue = if (tx.type == "give") ({ sheetTx = null; onDue(id) }) else null,
+        onDelete = { sheetTx = null; onDeleteTx(id) },
+      )
     }
   }
 }
@@ -402,7 +432,7 @@ private fun DrawerInfo(account: DebtorEngine.Account, book: DebtBook.Book?) {
 
 /** قرصِ وضعیت (VILL3N §۸): نقطه + متن به رنگِ وضعیت روی زمینهٔ همان وضعیت */
 @Composable
-private fun StatusPill(text: String, fg: Color, bg: Color, icon: ImageVector? = null) {
+internal fun StatusPill(text: String, fg: Color, bg: Color, icon: ImageVector? = null) {
   Row(
     Modifier.clip(RoundedCornerShape(50)).background(bg).padding(horizontal = 10.dp, vertical = 5.dp),
     verticalAlignment = Alignment.CenterVertically,
@@ -416,18 +446,26 @@ private fun StatusPill(text: String, fg: Color, bg: Color, icon: ImageVector? = 
 
 /* ------------------------------ سه عدد ------------------------------ */
 
-/** کل برد · کل رسید · الباقی — یک کارت، سه ستونِ هم‌وزن، عددها با شمارشِ نرم */
+/**
+ *  کل برد · کل رسید · الباقی — یک کارت، سه ستونِ هم‌وزن، عددها با شمارشِ نرم.
+ *  صفر خنثی است (`inkMuted`): نه قرمزِ بدهی، نه سبزِ رسید.
+ */
 @Composable
 private fun TotalsCard(t: DebtorDetailModel.Totals) {
+  val c = PhoneV3.colors
   val dc = PhoneV3Debt.colors
-  V3Card(radius = 18.dp, padding = PaddingValues(vertical = 14.dp)) {
+  V3Card(radius = 16.dp, padding = PaddingValues(vertical = 9.dp)) {
     Row(Modifier.fillMaxWidth()) {
-      TotalCell(StrDebtor.given, t.given, dc.owe, Modifier.weight(1f))
-      TotalCell(StrDebtor.received, t.received, dc.settled, Modifier.weight(1f))
+      TotalCell(StrDebtor.given, t.given, if (DebtorDetailModel.isZero(t.given)) c.inkMuted else dc.owe, Modifier.weight(1f))
+      TotalCell(StrDebtor.received, t.received, if (DebtorDetailModel.isZero(t.received)) c.inkMuted else dc.settled, Modifier.weight(1f))
       TotalCell(
         StrDebtor.balance,
         kotlin.math.abs(t.balance),
-        if (t.owes) dc.owe else dc.settled,
+        when {
+          t.settled -> c.inkMuted
+          t.owes -> dc.owe
+          else -> dc.settled
+        },
         Modifier.weight(1f),
         settled = t.settled,
       )
@@ -440,11 +478,11 @@ private fun TotalCell(label: String, value: Double, tint: Color, modifier: Modif
   val c = PhoneV3.colors
   val shown = rememberCountUp(value)
   Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-    Text(label, style = v3Text(12, FontWeight.Medium, 16), color = c.inkMuted, maxLines = 1)
-    Spacer(Modifier.height(4.dp))
+    Text(label, style = v3Text(11, FontWeight.Medium, 15), color = c.inkMuted, maxLines = 1)
+    Spacer(Modifier.height(1.dp))
     Text(
       if (settled) StrDebtor.settled else money(shown),
-      style = v3Text(19, FontWeight.Bold, 26),
+      style = v3Text(17, FontWeight.Bold, 23),
       color = tint,
       maxLines = 1,
       overflow = TextOverflow.Ellipsis,
@@ -465,68 +503,56 @@ private fun rememberCountUp(target: Double): Double {
 
 /* ------------------------------ تراکنش‌ها ------------------------------ */
 
-@OptIn(ExperimentalFoundationApi::class)
+/**
+ *  «تراکنش‌ها · N» در یک خطِ فشرده، بعد ردیف‌های یک‌خطی (تازه‌ترین اول). سرخطِ
+ *  روز نیست — تاریخ داخلِ خودِ ردیف است. زدنِ ردیف ⇐ برگهٔ جزئیات.
+ */
 private fun LazyListScope.transactionItems(
-  days: List<DebtorDetailModel.Day>,
+  rows: List<DebtTransaction>,
   book: DebtBook.Book?,
   account: DebtorEngine.Account,
   onCompose: (DebtorEngine.Kind) -> Unit,
   onDeleteTx: (String) -> Unit,
-  onOpenTx: (String) -> Unit,
+  onShow: (String) -> Unit,
+  onReceipt: (String) -> Unit,
 ) {
   item(key = "tx-title") {
     val c = PhoneV3.colors
-    Row(Modifier.fillMaxWidth().padding(top = 6.dp, start = 4.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-      Text(StrDebtor.transactions, style = v3Text(17, FontWeight.Bold, 24), color = c.ink, modifier = Modifier.weight(1f).semantics { heading() })
-      Text(ir.vil3ntec.tohid.plain(days.sumOf { it.rows.size }), style = v3Text(13, FontWeight.Medium, 18), color = c.inkMuted)
-    }
+    Text(
+      "${StrDebtor.transactions} · ${ir.vil3ntec.tohid.plain(rows.size)}",
+      style = v3Text(15, FontWeight.Bold, 20),
+      color = c.ink,
+      modifier = Modifier.padding(start = 4.dp, end = 4.dp, top = 8.dp, bottom = 2.dp).semantics { heading() },
+    )
   }
-  if (days.isEmpty()) {
+  if (rows.isEmpty()) {
     item(key = "tx-empty") { EmptyTransactions { onCompose(DebtorEngine.Kind.GIVE) } }
   }
-  var shown = 0
-  days.forEach { day ->
-    stickyHeader(key = "day-${day.date}") { DayHeader(day.date) }
-    val start = shown
-    itemsIndexed(day.rows, key = { _, tx -> tx.id }) { i, tx ->
-      val p = rememberAppear(((start + i).coerceAtMost(8)) * 35)
-      Box(Modifier.appear(p).then(if (Motion.enabled) Modifier.animateItem() else Modifier)) {
-        TxRow(tx, book?.entry(tx.id), book, onDelete = { onDeleteTx(tx.id) }, onOpen = { onOpenTx(tx.id) })
-      }
+  itemsIndexed(rows, key = { _, tx -> tx.id }) { i, tx ->
+    val p = rememberAppear(i.coerceAtMost(10) * 25)
+    Box(Modifier.appear(p).then(if (Motion.enabled) Modifier.animateItem() else Modifier)) {
+      TxRow(tx, book?.entry(tx.id), onShow = { onShow(tx.id) }, onReceipt = { onReceipt(tx.id) }, onDelete = { onDeleteTx(tx.id) })
     }
-    shown += day.rows.size
   }
   if (account.sales.isNotEmpty()) {
     item(key = "sales") { InvoicesCard(account) }
   }
 }
 
-/** سرخطِ چسبانِ روز — روی زمینهٔ صفحه، تا ردیف‌ها از زیرش رد شوند */
-@Composable
-private fun DayHeader(date: String) {
-  val c = PhoneV3.colors
-  Box(Modifier.fillMaxWidth().background(c.bg).padding(horizontal = 4.dp, vertical = 6.dp)) {
-    Text(
-      if (date == DebtorDetailModel.UNDATED) date else formatDate(date),
-      style = v3Text(13, FontWeight.SemiBold, 18),
-      color = c.inkMuted,
-    )
-  }
-}
-
 /**
- *  ردیفِ تراکنش (V3): نشانِ برد/رسید، عنوان، یادداشت، جزئیاتِ دفتر، و مبلغ. زدن ⇐
- *  رسیدش؛ لمسِ طولانی ⇐ منو؛ کشیدن به سمتِ آغاز ⇐ حذف (با برگرداندن).
+ *  ردیفِ یک‌خطیِ تراکنش (~۴۶dp): همهٔ ردیف به رنگِ نوعش — برد قرمز، رسید سبز —
+ *  و فقط سه چیز: تاریخ، مبلغ با علامت، و ماندهٔ پس از همین ردیف. بقیه در برگه.
+ *  زدن ⇐ برگهٔ جزئیات؛ لمسِ طولانی ⇐ منو؛ کشیدن به سمتِ آغاز ⇐ حذف با برگرداندن.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun TxRow(tx: DebtTransaction, entry: DebtBook.Entry?, book: DebtBook.Book?, onDelete: () -> Unit, onOpen: () -> Unit) {
+private fun TxRow(tx: DebtTransaction, entry: DebtBook.Entry?, onShow: () -> Unit, onReceipt: () -> Unit, onDelete: () -> Unit) {
   val c = PhoneV3.colors
   val dc = PhoneV3Debt.colors
   val give = tx.type == "give"
   val tint = if (give) dc.owe else dc.settled
   val wash = if (give) dc.oweTint else dc.settledTint
-  val shape = RoundedCornerShape(16.dp)
+  val shape = RoundedCornerShape(12.dp)
   var menu by remember { mutableStateOf(false) }
   @Suppress("DEPRECATION")
   val swipe = rememberSwipeToDismissBoxState(
@@ -538,11 +564,8 @@ private fun TxRow(tx: DebtTransaction, entry: DebtBook.Entry?, book: DebtBook.Bo
     state = swipe,
     enableDismissFromStartToEnd = false,
     backgroundContent = {
-      Box(
-        Modifier.fillMaxSize().clip(shape).background(dc.oweTint).padding(horizontal = 20.dp),
-        contentAlignment = Alignment.CenterEnd,
-      ) {
-        Icon(Icons.Outlined.DeleteOutline, contentDescription = StrDebtor.delete, tint = dc.owe)
+      Box(Modifier.fillMaxSize().clip(shape).background(c.tile).padding(horizontal = 16.dp), contentAlignment = Alignment.CenterEnd) {
+        Icon(Icons.Outlined.DeleteOutline, contentDescription = StrDebtor.delete, tint = dc.owe, modifier = Modifier.size(20.dp))
       }
     },
   ) {
@@ -550,101 +573,52 @@ private fun TxRow(tx: DebtTransaction, entry: DebtBook.Entry?, book: DebtBook.Bo
       Row(
         Modifier
           .fillMaxWidth()
+          .height(46.dp)
           .clip(shape)
-          .background(c.card)
-          .border(1.dp, c.hairline, shape)
+          .background(wash)
           .combinedClickable(
             interactionSource = remember { MutableInteractionSource() },
             indication = null,
             role = Role.Button,
+            onClickLabel = StrDebtor.details,
             onLongClick = { menu = true },
-            onClick = onOpen,
+            onClick = onShow,
           )
-          .padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.Top,
+          .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
       ) {
-        Box(Modifier.size(38.dp).clip(CircleShape).background(wash), contentAlignment = Alignment.Center) {
-          Icon(if (give) Icons.Outlined.NorthEast else Icons.Outlined.SouthWest, contentDescription = null, tint = tint, modifier = Modifier.size(19.dp))
-        }
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-          Text(if (give) StrDebtor.giveTitle else StrDebtor.receiveTitle, style = v3Text(15, FontWeight.SemiBold, 21), color = c.ink)
-          if (tx.notes.isNotBlank()) {
-            Text(tx.notes, style = v3Text(13, FontWeight.Normal, 19), color = c.inkMuted, maxLines = 2, overflow = TextOverflow.Ellipsis)
-          }
-          if (entry != null && book != null) {
-            Spacer(Modifier.height(6.dp))
-            EntryDetails(book, entry, dc)
-          }
-        }
-        Spacer(Modifier.width(10.dp))
-        Column(horizontalAlignment = Alignment.End) {
-          Text("${if (give) "+" else "−"}${money(tx.amount)}", style = v3Text(16, FontWeight.Bold, 22), color = tint)
-          Spacer(Modifier.height(4.dp))
-          StatusPill(if (give) StrDebtor.giveTag else StrDebtor.receiveTag, tint, wash)
+        Icon(if (give) Icons.Outlined.NorthEast else Icons.Outlined.SouthWest, contentDescription = if (give) StrDebtor.giveTag else StrDebtor.receiveTag, tint = tint, modifier = Modifier.size(15.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(
+          if (tx.date.isBlank()) DebtorDetailModel.UNDATED else formatDate(tx.date),
+          style = v3Text(12, FontWeight.Normal, 16),
+          color = c.inkMuted,
+          maxLines = 1,
+          modifier = Modifier.width(74.dp),
+        )
+        Text(
+          "${if (give) "+" else "−"}${money(tx.amount)}",
+          style = v3Text(15, FontWeight.Bold, 20),
+          color = tint,
+          maxLines = 1,
+          textAlign = TextAlign.Center,
+          modifier = Modifier.weight(1f),
+        )
+        entry?.let { e ->
+          Text(
+            StrDebtor.balanceAfterShort(DebtBook.show(e.balanceAfter)),
+            style = v3Text(12, FontWeight.Medium, 16),
+            color = c.inkMuted,
+            maxLines = 1,
+          )
         }
       }
       DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-        DropdownMenuItem(text = { Text(StrDebtor.receiveTag) }, leadingIcon = { Icon(Icons.AutoMirrored.Outlined.ReceiptLong, null) }, onClick = { menu = false; onOpen() })
+        DropdownMenuItem(text = { Text(StrDebtor.details) }, onClick = { menu = false; onShow() })
+        DropdownMenuItem(text = { Text(StrDebtor.receiptPrint) }, leadingIcon = { Icon(Icons.AutoMirrored.Outlined.ReceiptLong, null) }, onClick = { menu = false; onReceipt() })
         DropdownMenuItem(text = { Text(StrDebtor.delete, color = dc.owe) }, leadingIcon = { Icon(Icons.Outlined.DeleteOutline, null, tint = dc.owe) }, onClick = { menu = false; onDelete() })
       }
     }
-  }
-}
-
-/**
- *  جزئیاتِ دفترِ یک ردیف (همان `DebtEntryDetail`، با رنگ‌های V3): اقلامِ برد، تخفیف و
- *  پرداختِ همان لحظه، سررسید و باز/تسویه، این‌که رسید بابتِ کدام برد بود، و ماندهٔ پس از ردیف.
- */
-@Composable
-private fun EntryDetails(book: DebtBook.Book, e: DebtBook.Entry, dc: PhoneV3DebtColors, maxLines: Int = 6) {
-  val c = PhoneV3.colors
-  val small = v3Text(12, FontWeight.Normal, 17)
-  Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-    e.lines.take(maxLines).forEach { l ->
-      val unit = if (l.unit.isNotBlank()) " ${l.unit}" else ""
-      Text(
-        "• ${l.name} — ${qty(l.quantity)}$unit × ${DebtBook.show(l.unitPrice)} = ${DebtBook.show(l.total)}" +
-          if (l.returned > 0) " (مرجوعی ${qty(l.returned)})" else "",
-        style = small, color = c.inkMuted,
-      )
-    }
-    if (e.lines.size > maxLines) Text("+${e.lines.size - maxLines} قلمِ دیگر — در رسید", style = small, color = c.inkMuted)
-    e.sale?.takeIf { e.give && e.lines.isNotEmpty() }?.let { s ->
-      val bits = listOfNotNull(
-        s.discount.takeIf { it > 0 }?.let { "تخفیف ${DebtBook.show(DebtBook.minor(it))}" },
-        s.paidAmount.takeIf { it > 0 }?.let { "پرداختِ همان لحظه ${DebtBook.show(DebtBook.minor(it))}" },
-      )
-      if (bits.isNotEmpty()) Text(bits.joinToString(" · "), style = small, color = c.inkMuted)
-    }
-    if (e.give && e.amount.minor > 0) {
-      Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-        e.dueDate?.let { due ->
-          StatusPill(
-            "سررسید ${formatDate(due)}${if (e.overdue) " — گذشته" else ""}",
-            if (e.overdue) dc.owe else dc.info,
-            if (e.overdue) dc.oweTint else dc.infoTint,
-          )
-        }
-        StatusPill(
-          if (e.paid) "تسویه شد" else "باز ${DebtBook.show(e.open)}",
-          if (e.paid) dc.settled else dc.wait,
-          if (e.paid) dc.settledTint else dc.waitTint,
-        )
-      }
-    }
-    if (!e.give && e.allocations.isNotEmpty()) {
-      Text(
-        "بابتِ " + e.allocations.joinToString("، ") { a ->
-          val g = book.entry(a.txId)
-          val what = g?.invoiceLabel?.let { "فاکتور #$it" } ?: "برد ${g?.tx?.date?.let(::formatDate).orEmpty()}"
-          "$what (${DebtBook.show(a.amount)})"
-        },
-        style = small, color = c.inkMuted,
-      )
-    }
-    if (!e.give && e.open.minor > 0) Text("پیش‌پرداخت ${DebtBook.show(e.open)}", style = small, color = dc.settled)
-    Text("مانده پس از این ردیف: ${DebtBook.state(e.balanceAfter)}", style = small, color = c.inkMuted)
   }
 }
 

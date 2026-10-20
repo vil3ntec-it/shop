@@ -200,6 +200,7 @@ fun DebtorsScreen(
       onDelete = { confirmDelete = account.debtor },
       onDeleteTx = { deleteLater(DebtorDetailModel.PendingDelete.Transaction(it), StrDebtor.txDeleted) },
       onOpenTx = { receiptFor = it },
+      onDue = { dueFor = it },
     )
   } else {
     /*

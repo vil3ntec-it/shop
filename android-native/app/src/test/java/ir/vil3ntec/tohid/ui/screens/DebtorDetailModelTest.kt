@@ -40,6 +40,13 @@ class DebtorDetailModelTest {
   }
 
   @Test
+  fun `فهرستِ یک‌خطی — همان ترتیبِ روزها، بی سرخط، بی ردیفِ پنهان`() {
+    val list = listOf(tx("c", "2026-10-13", at = 30), tx("b", "2026-10-12", at = 20), tx("b2", "2026-10-12", at = 19), tx("a", "2026-10-10", at = 10))
+    assertEquals(listOf("c", "b", "b2", "a"), DebtorDetailModel.rows(list).map { it.id })
+    assertEquals(listOf("c", "a"), DebtorDetailModel.rows(list, hidden = setOf("b", "b2")).map { it.id })
+  }
+
+  @Test
   fun `بی‌تاریخ ته فهرست`() {
     val days = DebtorDetailModel.days(listOf(tx("old", ""), tx("new", "2026-10-01")))
     assertEquals(listOf("2026-10-01", DebtorDetailModel.UNDATED), days.map { it.date })
@@ -80,6 +87,10 @@ class DebtorDetailModelTest {
     assertEquals(600.0, t.received, 0.0)
     assertTrue(t.settled)
     assertFalse(t.owes)
+    //  صفر (با کسرِ ریزِ اعشار) خنثی کشیده می‌شود
+    assertTrue(DebtorDetailModel.isZero(0.0))
+    assertTrue(DebtorDetailModel.isZero(0.1 + 0.2 - 0.3))
+    assertFalse(DebtorDetailModel.isZero(1.0))
   }
 
   @Test
