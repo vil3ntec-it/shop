@@ -196,6 +196,12 @@ data class PhoneV3DebtColors(
   /** قرصِ «N روز»: جفتِ خنثیِ «غیرفعال» */
   val pill: Color,
   val onPill: Color,
+  /** وضعیتِ «در انتظار» (کهربایی): بردِ باز در حسابِ یک نفر */
+  val wait: Color,
+  val waitTint: Color,
+  /** وضعیتِ «در راه» (آبی): سررسیدِ پیشِ رو */
+  val info: Color,
+  val infoTint: Color,
 )
 
 val PhoneV3DebtLight = PhoneV3DebtColors(
@@ -219,6 +225,10 @@ val PhoneV3DebtLight = PhoneV3DebtColors(
   settledTint = Color(0xFFDCFCE7),
   pill = Color(0xFFE2E8F0),
   onPill = Color(0xFF475569),
+  wait = Color(0xFF92400E),
+  waitTint = Color(0xFFFEF3C7),
+  info = Color(0xFF1D4ED8),
+  infoTint = Color(0xFFDBEAFE),
 )
 
 //  شب: دکمهٔ اصلی جفتِ شبِ سیستم (#19A985 با متنِ #041B15)؛ قرمز و خنثیِ شب را
@@ -243,6 +253,10 @@ val PhoneV3DebtDark = PhoneV3DebtColors(
   settledTint = Color(0xFF123C2B),
   pill = Color(0xFF29374A),
   onPill = Color(0xFFCBD5E1),
+  wait = Color(0xFFFCD34D),
+  waitTint = Color(0xFF3D2E0A),
+  info = Color(0xFF93C5FD),
+  infoTint = Color(0xFF172554),
 )
 
 /**

@@ -48,6 +48,7 @@ import ir.vil3ntec.tohid.data.DebtTransaction
 import ir.vil3ntec.tohid.data.Debtor
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.ui.screens.DashboardScreen
+import ir.vil3ntec.tohid.ui.screens.DebtorDetailShot
 import ir.vil3ntec.tohid.ui.screens.DebtorsScreen
 import ir.vil3ntec.tohid.ui.screens.PhoneDebtorsShot
 import ir.vil3ntec.tohid.ui.screens.ProfileScreen
@@ -193,6 +194,17 @@ private fun PhonePreviewContent(screen: String, store: ShopStore, dark: Boolean)
         //  میکروفونِ کادرِ جستجو همان‌طور که اندروید نشان می‌دهد (کامپیوتر خودش پنهانش می‌کند)
         LaunchedEffect(Unit) { PhoneDebtorsShot.mic.value = true }
         //  پوستهٔ v3: قرض‌داران از «بیشتر» باز می‌شود ⇒ سربرگِ خودِ صفحه با برگشت
+        LaunchedEffect(Unit) { DebtorDetailShot.open.value = null }
+        DebtorsScreen(store, demo, snackbar, showHeader = true, onBack = {})
+      }
+      //  حسابِ یک قرض‌دار (owner-feedback-2): کشوی بسته، کشوی باز، برگهٔ «ثبتِ تراکنش»، بی تراکنش
+      "debtor-detail", "debtor-detail-drawer", "debtor-detail-composer", "debtor-detail-empty" -> Box(Modifier.weight(1f).fillMaxWidth()) {
+        val demo = remember(screen) { debtorDetailDemo(screen) }
+        LaunchedEffect(screen) {
+          DebtorDetailShot.drawer.value = screen == "debtor-detail-drawer"
+          DebtorDetailShot.composer.value = screen == "debtor-detail-composer"
+          DebtorDetailShot.open.value = "dd-h"
+        }
         DebtorsScreen(store, demo, snackbar, showHeader = true, onBack = {})
       }
       //  گوشی نسخهٔ ۳، صندوق (r3 بسته / r2 باز): v3cart-closed|open|empty|long|long-open|scan
@@ -208,6 +220,31 @@ private fun PhonePreviewContent(screen: String, store: ShopStore, dark: Boolean)
       }
     }
   }
+}
+
+/**
+ *  دفترِ ساختگیِ عکس‌های حسابِ یک قرض‌دار — همان «haroon» ِ عکسِ صاحب محصول با
+ *  شماره، و چند ردیف در چند روز (برد با یادداشت، برد با سررسید، رسید، بردِ امروز)؛
+ *  «empty» همان نفر بی هیچ تراکنش.
+ */
+private fun debtorDetailDemo(screen: String): ShopData {
+  val now = System.currentTimeMillis()
+  val dayMs = 86_400_000L
+  val today = java.time.LocalDate.now()
+  var seq = 0
+  fun tx(type: String, amount: Double, daysAgo: Long, notes: String = "", due: String? = null) = DebtTransaction(
+    id = "dd-t${seq++}", debtorId = "dd-h", type = type, amount = amount,
+    date = today.minusDays(daysAgo).toString(), notes = notes, createdAt = now - daysAgo * dayMs - seq,
+    dueDate = due,
+  )
+  val debtor = Debtor(id = "dd-h", name = "haroon", phone = "0792236008", notes = "مشتریِ همیشگی — پنجشنبه‌ها حساب می‌کند")
+  val rows = if (screen == "debtor-detail-empty") emptyList() else listOf(
+    tx("give", 600.0, 6, "آرد و روغن"),
+    tx("give", 1_200.0, 3, due = today.plusDays(10).toString()),
+    tx("receive", 500.0, 1, "نقد"),
+    tx("give", 250.0, 0),
+  )
+  return ShopData(debtors = listOf(debtor), transactions = rows)
 }
 
 /**
