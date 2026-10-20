@@ -14,6 +14,7 @@
  */
 const express = require('express');
 const sf = require('../lib/storefront');
+const sfd = require('../lib/storefront-delivery');
 const audit = require('../lib/audit');
 const { can } = require('../lib/permissions');
 const { requireUser, requireShop, requirePermission } = require('../middleware/auth');
@@ -45,6 +46,8 @@ router.get('/config', wrap(async (req, res) => {
     ...st,
     settings: st.flag ? await sf.settingsOf(req.shopId) : null,
     permissions: { manage: can(req.role, 'settings.write') },
+    //  برگهٔ «ارسال و زمان» فقط با پرچمِ جدای `shop.storefront.zones`
+    zones: st.flag ? await sfd.flagOn(req.shopId) : false,
   });
 }));
 
@@ -61,6 +64,27 @@ router.put('/', requirePermission('settings.write'), needFlag, needWrite, wrap(a
 router.post('/presence', requirePermission('settings.write'), needFlag, needWrite, wrap(async (req, res) => {
   const out = await sf.declarePresence(req.shopId, req.body, {
     userId: req.user.id, deviceId: req.get('x-device') || '',
+  });
+  res.json(out);
+}));
+
+//  ── ناحیه‌های ارسال و بازه‌های زمان‌بندی (CHK-06/07/10/12) ─────────────
+const needZones = wrap(async (req, res, next) => {
+  if (!(await sfd.flagOn(req.shopId))) return next(forbidden('ناحیه و زمان‌بندی برای این دکان روشن نیست', 'zones_disabled'));
+  next();
+});
+
+router.get('/delivery', requirePermission('data.read'), needFlag, needZones, wrap(async (req, res) => {
+  res.json(await sfd.settingsOf(req.shopId));
+}));
+
+router.put('/delivery', requirePermission('settings.write'), needFlag, needZones, needWrite, wrap(async (req, res) => {
+  const out = await sfd.saveSettings(req.shopId, req.body, req.user.id);
+  await audit.log({
+    shopId: req.shopId, userId: req.user.id, action: 'storefront.delivery',
+    targetType: 'storefront', targetId: req.shopId,
+    detail: { zones: out.zones.length, slotRules: out.slotRules.length, allowAsap: out.allowAsap, slotDays: out.slotDays },
+    ip: clientIp(req),
   });
   res.json(out);
 }));
