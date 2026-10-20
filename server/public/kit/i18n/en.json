@@ -149,7 +149,7 @@
   "stock.unk": "Stock is being checked",
   "add.one": "Add {name} to cart",
   "add.more": "Add one more {name} — {q} in cart",
-  "p.per": "per {unit}",
+  "p.per": "/ {unit}",
   "p.was": "In store",
   "p.off": "{n}% off",
   "p.details": "details",

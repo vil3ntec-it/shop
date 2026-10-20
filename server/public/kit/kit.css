@@ -525,7 +525,11 @@ a.p-open:hover { text-decoration: none; }
 @keyframes bump { 40% { transform: scale(1.18); } }
 @keyframes pop { from { transform: scale(.6); opacity: 0; } }
 @keyframes rowin { from { opacity: 0; transform: translateY(12px); } }
-@media (min-width: 600px) { .cartbar { bottom: var(--s4); border-radius: var(--r-sheet); width: calc(100% - var(--s8)); } }
+@media (min-width: 600px) {
+  .cartbar { bottom: var(--s4); border-radius: var(--r-sheet); width: calc(100% - var(--s8)); }
+  /* تیره: نوارِ شناور با پس‌زمینه یکی نشود */
+  [data-theme="dark"] .cartbar { box-shadow: 0 0 0 1px var(--line), 0 -8px 30px rgba(0, 0, 0, .45); }
+}
 
 /* ── سطرهای سبد روی پایهٔ تیره (r2) ─────────────────── */
 .cline { display: block; padding: var(--s2) 0; }
