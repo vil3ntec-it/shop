@@ -53,6 +53,22 @@ class ApiClient(
   suspend fun post(path: String, body: JsonObject = EMPTY): JsonObject =
     authorized("POST", path, body, idempotent = false)
 
+  /**
+   *  نوشتنِ JSON با `Idempotency-Key` — سرور همان کلید را «همان کار» می‌داند
+   *  و پاسخِ قبلی را برمی‌گرداند. پس اگر پاسخ پس از ثبت گم شد (قطعِ نت،
+   *  مهلت)، تلاشِ دوبارهٔ خودکار بی‌خطر است و کار «ناموفق» دیده نمی‌شود.
+   *  فقط برای درهایی که سرورشان کلید را می‌خواند.
+   */
+  suspend fun postKeyed(path: String, body: JsonObject, idempotencyKey: String): JsonObject =
+    authorized(
+      "POST", path, null, idempotent = true,
+      raw = RawBody(
+        body.toString().toByteArray(Charsets.UTF_8),
+        "application/json; charset=utf-8",
+        mapOf("Idempotency-Key" to idempotencyKey),
+      ),
+    )
+
   suspend fun put(path: String, body: JsonObject = EMPTY): JsonObject =
     authorized("PUT", path, body, idempotent = false)
 
