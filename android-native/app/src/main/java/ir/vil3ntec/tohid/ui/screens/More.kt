@@ -19,6 +19,7 @@ import ir.vil3ntec.tohid.update.UpdateManager
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.DeliveryDining
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.AdminPanelSettings
@@ -193,6 +194,14 @@ fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
        *  گفت‌وگو با مشتری (v3 §۳۳) — ⛔ فقط وقتی سرور برای همین دکان پرچمِ
        *  `shop.chat` را روشن گفته. خاموش ⇒ نه ردیف و نه دکمه‌ای بی‌اثر.
        */
+      //  میزِ تحویل (C01): فقط وقتی سرور پرچمِ `shop.delivery` را روشن گفته
+      if (DeliveryGate.visible) MoreCard(
+        title = StrNav.deliveryDesk,
+        icon = Icons.Filled.DeliveryDining,
+        tint = Shop.colors.primary,
+        subtitle = StrNav.deliverySub,
+        onClick = { onOpen("delivery") },
+      )
       if (ir.vil3ntec.tohid.data.ShopChatSync.config.value?.enabled == true) MoreCard(
         title = Str.customerChat,
         icon = Icons.Filled.Forum,
