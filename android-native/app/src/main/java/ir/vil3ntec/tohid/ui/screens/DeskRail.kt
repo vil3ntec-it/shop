@@ -15,6 +15,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -70,8 +71,10 @@ fun DeskRail(
     Modifier
       .width(if (compact) DESK_RAIL_COMPACT else DESK_RAIL_WIDTH)
       .fillMaxHeight()
-      //  نسخهٔ ۲: ناحیهٔ منو رنگِ خودش را دارد (خاکستری-آبیِ سرد)، نه سفیدِ هم‌رنگِ کارت‌ها
+      //  نسخهٔ ۲: ناحیهٔ منو رنگِ خودش را دارد، نه سفیدِ هم‌رنگِ کارت‌ها. VILL3N: «پنلِ کناری
+      //  جدا از محتوا» ⇒ زمینهٔ فرعی + یک خطِ جداکننده رو به محتوا
       .background(Shop.colors.zoneNav)
+      .railEdge(Shop.colors.divider)
       .verticalScroll(rememberScrollState())
       .padding(vertical = 10.dp, horizontal = 8.dp),
     verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -89,8 +92,8 @@ fun DeskRail(
     } else {
       //  نشانِ برنامه
       Row(Modifier.padding(start = 10.dp, top = 10.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(34.dp).clip(Shape.button).background(Shop.colors.primary), contentAlignment = Alignment.Center) {
-          Icon(Icons.Filled.Storefront, null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(20.dp))
+        Box(Modifier.size(34.dp).clip(Shape.button).background(Shop.colors.brandPrimary), contentAlignment = Alignment.Center) {
+          Icon(Icons.Filled.Storefront, null, tint = Shop.colors.button.primary.text, modifier = Modifier.size(20.dp))
         }
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
@@ -123,10 +126,10 @@ fun DeskRail(
       listOf(RailMode.FULL to Icons.Filled.ViewSidebar, RailMode.COMPACT to Icons.Filled.ViewCompact, RailMode.HIDDEN to Icons.Filled.VisibilityOff).forEach { (m, ic) ->
         Box(
           Modifier.size(30.dp).clip(RoundedCornerShape(8.dp))
-            .background(if (mode == m) Shop.colors.primary.copy(alpha = 0.12f) else Shop.colors.surface.copy(alpha = 0f))
+            .background(if (mode == m) Shop.colors.surfaceSelected else Shop.colors.surface.copy(alpha = 0f))
             .clickable { onMode(m) },
           contentAlignment = Alignment.Center,
-        ) { Icon(ic, null, tint = if (mode == m) Shop.colors.primary else Shop.colors.muted, modifier = Modifier.size(17.dp)) }
+        ) { Icon(ic, null, tint = if (mode == m) Shop.colors.iconActive else Shop.colors.icon, modifier = Modifier.size(17.dp)) }
         Spacer(Modifier.width(4.dp))
       }
     }
@@ -172,7 +175,7 @@ private fun RailItem(id: String, label: String, key: String, icon: ImageVector, 
         .padding(vertical = 10.dp),
       contentAlignment = Alignment.Center,
     ) {
-      Icon(icon, contentDescription = label, tint = if (selected) Shop.colors.primaryDark else Shop.colors.muted, modifier = Modifier.size(21.dp))
+      Icon(icon, contentDescription = label, tint = if (selected) Shop.colors.iconActive else Shop.colors.icon, modifier = Modifier.size(21.dp))
     } }
     return
   }
@@ -190,7 +193,7 @@ private fun RailItem(id: String, label: String, key: String, icon: ImageVector, 
       .padding(horizontal = 12.dp, vertical = 8.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
-    Icon(icon, contentDescription = null, tint = if (selected) Shop.colors.primaryDark else Shop.colors.muted, modifier = Modifier.size(19.dp))
+    Icon(icon, contentDescription = null, tint = if (selected) Shop.colors.iconActive else Shop.colors.icon, modifier = Modifier.size(19.dp))
     Spacer(Modifier.width(12.dp))
     Text(
       label,
@@ -244,4 +247,10 @@ private fun RailTip(label: String, content: @Composable () -> Unit) {
     tooltip = { PlainTooltip { Text(label) } },
     state = androidx.compose.material3.rememberTooltipState(),
   ) { content() }
+}
+
+/** خطِ یک‌پیکسلیِ لبهٔ منو رو به محتوا — در راست‌به‌چپ سمتِ چپِ منو */
+private fun Modifier.railEdge(color: androidx.compose.ui.graphics.Color): Modifier = drawBehind {
+  val x = if (layoutDirection == androidx.compose.ui.unit.LayoutDirection.Rtl) 0.5f else size.width - 0.5f
+  drawLine(color, androidx.compose.ui.geometry.Offset(x, 0f), androidx.compose.ui.geometry.Offset(x, size.height), strokeWidth = 1.dp.toPx())
 }
