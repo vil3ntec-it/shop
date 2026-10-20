@@ -644,8 +644,9 @@ private fun StatBox(label: String, count: Int, modifier: Modifier = Modifier) {
 private fun PlanBanner(b: ProfileModel.Banner, modifier: Modifier = Modifier, onClick: () -> Unit) {
   val c = PhoneV3.colors
   val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
-  //  r4: خاکستریِ میانه در یک سر، سیاه در سرِ دیگر — شیبِ یکنواخت
-  val light = lerp(c.black, c.onBlackMuted, 0.72f)
+  //  r4: خاکستریِ میانه در یک سر، سیاه در سرِ دیگر — شیبِ یکنواخت. سرِ روشن سقف دارد
+  //  (۰٫۴۰) تا متنِ سفید و زیرعنوان روی روشن‌ترین جا هم ≥ ۴٫۵:۱ بمانند (عنوان ~۶٫۵، زیرعنوان ~۵٫۲)
+  val light = lerp(c.black, c.onBlackMuted, 0.40f)
   val stops = if (rtl) listOf(c.black, lerp(c.black, light, 0.35f), light) else listOf(light, lerp(c.black, light, 0.35f), c.black)
   Row(
     modifier
@@ -660,7 +661,7 @@ private fun PlanBanner(b: ProfileModel.Banner, modifier: Modifier = Modifier, on
     Spacer(Modifier.width(12.dp))
     Column(Modifier.weight(1f)) {
       Text(b.title, style = v3Text(14, FontWeight.Bold, 20), color = c.onBlack, maxLines = 1, overflow = TextOverflow.Ellipsis)
-      Text(b.subtitle, style = v3Text(11, FontWeight.Medium, 16), color = c.onBlack.copy(alpha = 0.78f), maxLines = 2, overflow = TextOverflow.Ellipsis)
+      Text(b.subtitle, style = v3Text(11, FontWeight.Medium, 16), color = c.onBlack.copy(alpha = 0.85f), maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
     Spacer(Modifier.width(8.dp))
     Box(
