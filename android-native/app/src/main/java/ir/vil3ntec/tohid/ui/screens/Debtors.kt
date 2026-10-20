@@ -168,7 +168,7 @@ fun DebtorsScreen(
     val wideTable = !phone && view.mode == ViewMode.TABLE
     val motion = Motion.enabled
 
-    //  r9 (`PhoneDebtors.kt`): زمینهٔ آرورای بنفش، کارتِ سه‌عددی، جستجو با
+    //  شکلِ r9 با رنگ‌های VILL3N (`PhoneDebtors.kt`): کارتِ سه‌عددی، جستجو با
     //  میکروفون، تراشه‌های ترتیب و شبکهٔ کارت‌های قرمز/سبز
     PhoneDebtorsTheme {
       DebtorsBackdrop {

@@ -60,13 +60,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.compositeOver
-import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -94,7 +90,7 @@ import ir.vil3ntec.tohid.ui.theme.shopTypography
  *  r9 عکسِ همین صفحه پیش از تخت شدنِ صفحه‌های کار است؛ پس این‌جا همان
  *  چیدمان (کارتِ سه‌عددی، کادرِ جستجو با میکروفون، «N مورد» و تراشه‌های
  *  ترتیب، شبکهٔ کارت‌های قرمز/سبز با × و مداد و قرصِ روز) با همان اندازه‌ها
- *  و رنگ‌های آن روز کشیده می‌شود. رنگ‌ها فقط از `PhoneV3Debt` (ui/theme)؛
+ *  کشیده می‌شود؛ رنگ‌ها از سیستمِ VILL3N و فقط از `PhoneV3Debt` (ui/theme)؛
  *  منطق (جست‌وجو، ترتیب، عددها، روز) فقط از `DebtorListModel`.
  */
 
@@ -113,43 +109,14 @@ fun PhoneDebtorsTheme(content: @Composable () -> Unit) {
 /* ------------------------------ زمینه ------------------------------ */
 
 /**
- *  زمینهٔ بنفشِ کم‌رنگ با سه لکهٔ نور — همان آرورای `AuroraTone.Debt` ِ r9:
- *  صورتی بالای کنجِ چپ، بنفش در راست پایینِ میانه، گرمِ کم‌رنگ پایینِ چپ.
+ *  زمینهٔ صفحه — سطحِ صفرِ سیستمِ VILL3N (#F3F6FA، شب #0B1220)، تخت.
  *
- *  لکهٔ مه‌آلودِ آن روز (دایره + تاریِ ۱۲۰dp) این‌جا گرادیانِ شعاعیِ ساکن با
- *  افتِ گاوسی است: همان رنگ در هر نقطهٔ r9 (سنجیده)، بی هزینهٔ تاری و بی
- *  حرکتِ بی‌پایان — پس «حذفِ انیمیشن‌ها»ی گوشی هم چیزی را عوض نمی‌کند.
+ *  r9 روی آرورای بنفش بود؛ از ۱۴۰۵/۰۷/۲۸ رنگ‌ها از سیستمِ VILL3N می‌آید و r9 فقط
+ *  شکل است — پس لکه‌های نور رفتند و کارت‌ها با مرزِ دیدنی از زمینه جدا می‌شوند.
  */
 @Composable
 fun DebtorsBackdrop(modifier: Modifier = Modifier, content: @Composable BoxScope.() -> Unit) {
-  val c = PhoneV3Debt.colors
-  val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
-  Box(
-    modifier
-      .fillMaxSize()
-      .background(c.page)
-      .drawBehind {
-        //  «انتها»ی صفحه در راست‌به‌چپ سمتِ چپ است؛ در چپ‌به‌راست قرینه
-        fun x(fromEnd: Dp): Float = if (rtl) fromEnd.toPx() else size.width - fromEnd.toPx()
-        fun xStart(fromStart: Dp): Float = if (rtl) size.width - fromStart.toPx() else fromStart.toPx()
-        glow(c.blobPink, Offset(x(100.dp), (-40).dp.toPx()), 85.dp.toPx())
-        glow(c.blobViolet, Offset(xStart(83.dp), size.height * 0.56f), 67.dp.toPx())
-        glow(c.blobWarm, Offset(x(40.dp), size.height + 20.dp.toPx()), 90.dp.toPx())
-      },
-    content = content,
-  )
-}
-
-/** افتِ گاوسیِ exp(−r²/2σ²) تا ۳σ، با هشت ایستگاه */
-private fun DrawScope.glow(color: Color, center: Offset, sigma: Float) {
-  val radius = sigma * 3f
-  val stops = floatArrayOf(0f, 0.15f, 0.3f, 0.45f, 0.6f, 0.75f, 0.9f, 1f)
-  val pairs = stops.map { t ->
-    val r = t * 3f
-    val f = if (t >= 1f) 0f else kotlin.math.exp(-(r * r) / 2f)
-    t to color.copy(alpha = color.alpha * f)
-  }.toTypedArray()
-  drawCircle(brush = Brush.radialGradient(*pairs, center = center, radius = radius), radius = radius, center = center)
+  Box(modifier.fillMaxSize().background(PhoneV3Debt.colors.page), content = content)
 }
 
 /* ------------------------------ سربرگ ------------------------------ */
@@ -236,7 +203,7 @@ private fun RowScope.StatCell(label: String, value: String, tint: Color, c: Phon
     Text(
       label,
       style = MaterialTheme.typography.labelSmall,
-      color = c.muted2,
+      color = c.muted,
       maxLines = 1,
       overflow = TextOverflow.Ellipsis,
       textAlign = TextAlign.Center,
@@ -247,7 +214,7 @@ private fun RowScope.StatCell(label: String, value: String, tint: Color, c: Phon
 /* ------------------------------ جستجو ------------------------------ */
 
 /**
- *  کادرِ خط‌دارِ بی‌زمینه با ذره‌بین در ابتدا و دایرهٔ بنفشِ میکروفون در انتها.
+ *  کادرِ خط‌دارِ بی‌زمینه با ذره‌بین در ابتدا و دایرهٔ سبزآبیِ کم‌رنگِ میکروفون در انتها.
  *
  *  میکروفون همان تشخیصِ گفتارِ گوشی است (`rememberVoiceSearch`)؛ جایی که
  *  نیست (کامپیوتر، گوشیِ بی برنامهٔ گفتار) کشیده نمی‌شود. تا چیزی نوشته
@@ -283,13 +250,13 @@ fun DebtorsSearchField(value: String, onValueChange: (String) -> Unit, modifier:
       unfocusedTextColor = c.ink,
       focusedContainerColor = Color.Transparent,
       unfocusedContainerColor = Color.Transparent,
-      focusedBorderColor = c.accentInk,
+      focusedBorderColor = c.accentText,
       unfocusedBorderColor = c.fieldEdge,
-      focusedLabelColor = c.accentInk,
+      focusedLabelColor = c.accentText,
       unfocusedLabelColor = c.muted,
-      focusedLeadingIconColor = c.muted,
-      unfocusedLeadingIconColor = c.muted,
-      cursorColor = c.accentInk,
+      focusedLeadingIconColor = c.icon,
+      unfocusedLeadingIconColor = c.icon,
+      cursorColor = c.accentText,
     ),
     modifier = modifier.fillMaxWidth(),
   )
@@ -324,7 +291,7 @@ private fun RoundIcon(icon: ImageVector, description: String, fill: Color, tint:
 /* ------------------------------ ترتیب ------------------------------ */
 
 /**
- *  «N مورد» و چهار تراشهٔ ترتیب — انتخاب‌شده بنفشِ پر با ✓ و متنِ سفیدِ
+ *  «N مورد» و چهار تراشهٔ ترتیب — انتخاب‌شده رنگِ برندِ پر با ✓ و متنِ روشنِ
  *  پررنگ، بقیه قرصِ سفید. رنگِ تراشه نرم عوض می‌شود و ✓ باز می‌شود؛ روی
  *  گوشیِ باریک ردیف تا لبهٔ صفحه افقی اسکرول می‌شود و تا چیزی پشتِ لبه
  *  مانده، لبهٔ انتها محو می‌شود تا پیدا باشد که ادامه دارد.
@@ -347,7 +314,7 @@ fun DebtorsSortRow(current: DebtorListModel.Sort, count: Int, onPick: (DebtorLis
       Text(
         "${plain(count)} مورد",
         style = MaterialTheme.typography.labelSmall,
-        color = c.muted2,
+        color = c.muted,
         modifier = Modifier.padding(end = 2.dp),
       )
       DebtorListModel.Sort.entries.forEach { option ->
@@ -387,8 +354,8 @@ private fun Modifier.bleed(gutter: Dp): Modifier = layout { measurable, constrai
 private fun SortChip(label: String, picked: Boolean, c: PhoneV3DebtColors, onClick: () -> Unit) {
   val source = remember { MutableInteractionSource() }
   val pressed by source.collectIsPressedAsState()
-  val fill by animateColorAsState(if (picked) c.accent else c.surface, Springs.effect, label = "chip")
-  val edge by animateColorAsState(if (picked) c.accent else c.edge, Springs.effect, label = "chip-edge")
+  val fill by animateColorAsState(if (picked) c.accentActive else c.surface, Springs.effect, label = "chip")
+  val edge by animateColorAsState(if (picked) c.accentActive else c.edge, Springs.effect, label = "chip-edge")
   val ink by animateColorAsState(if (picked) c.onAccent else c.muted, Springs.effect, label = "chip-ink")
   val shape = RoundedCornerShape(50)
   Row(
@@ -445,7 +412,7 @@ fun DebtorTile(
   val c = PhoneV3Debt.colors
   val tint = if (row.owes) c.owe else c.settled
   //  توپر روی زمینه: لکهٔ نورِ پشتِ کارت متنِ قرمز/سبز را کم‌رنگ نمی‌کند
-  val fill = (if (row.owes) c.oweTint else c.settledTint).compositeOver(c.page)
+  val fill = if (row.owes) c.oweTint else c.settledTint
   val shape = RoundedCornerShape(PhoneV3Debt.cardRadius)
   val source = remember { MutableInteractionSource() }
   val pressed by source.collectIsPressedAsState()
@@ -535,13 +502,13 @@ private fun DaysPill(text: String, c: PhoneV3DebtColors) {
   Row(
     Modifier
       .clip(RoundedCornerShape(50))
-      .background(c.page.copy(alpha = 0.7f))
+      .background(c.pill)
       .padding(horizontal = 7.dp, vertical = 3.dp),
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(3.dp),
   ) {
-    Icon(Icons.Filled.Schedule, contentDescription = null, tint = c.muted, modifier = Modifier.size(11.dp))
-    Text(text, style = MaterialTheme.typography.labelSmall, color = c.muted, fontWeight = FontWeight.Normal, maxLines = 1)
+    Icon(Icons.Filled.Schedule, contentDescription = null, tint = c.onPill, modifier = Modifier.size(11.dp))
+    Text(text, style = MaterialTheme.typography.labelSmall, color = c.onPill, fontWeight = FontWeight.Normal, maxLines = 1)
   }
 }
 
@@ -562,12 +529,12 @@ private fun CornerButton(
       .size(PhoneV3Debt.cornerButton)
       .pressScale(pressed)
       .clip(shape)
-      .background(c.page)
+      .background(c.surface)
       .border(1.dp, c.edge, shape)
       .clickable(interactionSource = source, indication = LocalIndication.current, role = Role.Button, onClick = onClick),
     contentAlignment = Alignment.Center,
   ) {
-    Icon(icon, contentDescription = description, tint = c.muted, modifier = Modifier.size(12.dp))
+    Icon(icon, contentDescription = description, tint = c.icon, modifier = Modifier.size(12.dp))
   }
 }
 
@@ -622,7 +589,7 @@ fun DebtorsEmptyCard(
 }
 
 /**
- *  دکمهٔ گردِ «قرض‌دار تازه» — بیرون از قابِ r9 (پایینِ صفحه)، بنفشِ همان
+ *  دکمهٔ گردِ «قرض‌دار تازه» — بیرون از قابِ r9 (پایینِ صفحه)، رنگِ برندِ همان
  *  تراشه. Ctrl+N و فرمانِ `new:` ِ عکس‌برداری هم همین را می‌زنند (`AppNav.addAction`).
  */
 @Composable

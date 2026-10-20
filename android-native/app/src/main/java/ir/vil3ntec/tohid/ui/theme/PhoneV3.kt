@@ -120,96 +120,97 @@ object PhoneV3 {
 /* ======================= قرض‌داران (r9-debtors.jpg) ======================= */
 
 /**
- *  رنگ‌های صفحهٔ قرض‌داران — r9، به خواستِ صاحب محصول «همین مدلِ دقیق».
+ *  رنگ‌های صفحهٔ قرض‌داران — سیستمِ رنگِ VILL3N (۱۴۰۵/۰۷/۲۸)؛ r9 فقط شکل است.
  *
- *  r9 عکسِ خودِ همین برنامه پیش از تخت شدنِ صفحه‌های کار است (۱۴۰۵/۰۷/۲۵)؛
- *  پس عددها همان پالتِ آن روز است و با همان عکس سنجیده شده: زمینهٔ بنفشِ
- *  بسیار کم‌رنگ با سه لکهٔ نورِ آرورا (همان `AuroraTone.Debt`: صورتی، بنفش،
- *  نارنجی)، سطحِ ۹۵٪ سفید با لبهٔ سفید (بی خطِ تیره)، قرمز و سبزِ نیم‌شفاف
- *  روی کارت. فقط همین صفحه این‌ها را دارد؛ بقیهٔ گوشی همان `PhoneV3Colors`.
+ *  زمینه/کارت/مرز همان `PhoneV3Colors` است (کارتِ سفید با مرزِ دیدنی روی زمینهٔ
+ *  #F3F6FA، و در شب #162235 روی #0B1220). مبلغ با `negative`/`positive`؛ کارتِ هر
+ *  نفر با جفتِ رنگِ وضعیت (بدهکار = «لغوشده»ِ قرمز، صاف = «تحویل‌شده»ِ سبز)، و قرصِ
+ *  روز با جفتِ خنثیِ «غیرفعال» و آیکنِ ساعت — رنگ هرگز تنها نیست، برچسب کنارش است.
+ *  رنگِ تازه فقط جفت‌های وضعیتِ شب است که فایلِ سیستم تعریفشان را به ما سپرده.
  */
 data class PhoneV3DebtColors(
-  /** زمینهٔ صفحه (r9: #F2F0FB) */
+  /** زمینهٔ صفحه (سطحِ صفر) */
   val page: Color,
-  /** لکهٔ صورتیِ بالا-چپ؛ آلفا = شدتِ وسطِ لکه */
-  val blobPink: Color,
-  /** لکهٔ بنفشِ راست-پایین (r9: وسطش #D4CBFA) */
-  val blobViolet: Color,
-  /** لکهٔ گرمِ پایین-چپ، بسیار کم‌رنگ */
-  val blobWarm: Color,
-  /** کارتِ سه‌عددی و تراشه‌های انتخاب‌نشده */
+  /** کارتِ سه‌عددی، تراشهٔ انتخاب‌نشده، دکمه‌های × و مداد (سطحِ یک) */
   val surface: Color,
-  /** لبهٔ سطح‌ها و دکمه‌های ریزِ × و مداد — سفید، نه خطِ تیره */
+  /** مرزِ کارت‌ها — در هر دو تم دیدنی */
   val edge: Color,
   val ink: Color,
-  /** متنِ زیرِ مبلغ، تراشهٔ انتخاب‌نشده، آیکنِ × و مداد و ساعت */
+  /** متنِ دوم: برچسبِ عددها، «N مورد»، زیرِ مبلغ، تراشهٔ انتخاب‌نشده */
   val muted: Color,
-  /** «N مورد» و برچسبِ عددهای کارتِ بالا */
-  val muted2: Color,
-  /** خطِ دورِ کادرِ جستجو (r9: #D8D6E1 روی زمینه) */
+  /** آیکنِ خطی: ذره‌بین، × و مداد */
+  val icon: Color,
+  /** خطِ دورِ کادرِ جستجو */
   val fieldEdge: Color,
-  /** تراشهٔ انتخاب‌شده و دکمهٔ «قرض‌دار تازه» (پرکردن) */
+  /** کارِ اصلی: دکمهٔ گردِ «+» */
   val accent: Color,
+  /** متن/آیکن روی `accent` و روی `accentActive` */
   val onAccent: Color,
-  /** بنفش برای آیکن و متن روی زمینه: میکروفون، کادرِ جستجوی فعال */
+  /** فعال/انتخاب‌شده (primaryDeep): تراشهٔ ترتیبِ انتخاب‌شده — متنِ سفید رویش ≥ ۴٫۵:۱ */
+  val accentActive: Color,
+  /** آیکنِ فعال (iconActive): میکروفون */
   val accentInk: Color,
-  /** دایرهٔ میکروفون */
+  /** متنِ برند روی زمینه: برچسب، مرز و نشانگرِ کادرِ جستجوی فعال */
+  val accentText: Color,
+  /** سطحِ انتخاب‌شده: دایرهٔ میکروفون و دایرهٔ آیکنِ حالتِ خالی */
   val accentSoft: Color,
-  /** بدهکار: خطِ دور و مبلغ */
+  /** بدهکار: مبلغ و مرزِ کارت (`negative`) */
   val owe: Color,
-  /** بدهکار: پرکردنِ کارت — روی زمینه ترکیب می‌شود و توپر کشیده می‌شود تا لکهٔ نورِ زیرش متن را کم‌رنگ نکند */
+  /** بدهکار: زمینهٔ کارت (وضعیتِ قرمز) */
   val oweTint: Color,
-  /** حسابِ صاف (یا موجودی): خطِ دور و مبلغ */
+  /** صاف یا موجودی‌دار: مبلغ و مرزِ کارت (`positive`) */
   val settled: Color,
   val settledTint: Color,
+  /** قرصِ «N روز»: جفتِ خنثیِ «غیرفعال» */
+  val pill: Color,
+  val onPill: Color,
 )
 
 val PhoneV3DebtLight = PhoneV3DebtColors(
-  page = Color(0xFFF2F0FA),
-  blobPink = Color(0x33FF5FA2),
-  blobViolet = Color(0x407C5CFF),
-  //  r9 پایینِ چپ تقریباً بی‌رنگ است (#F3EDF1)
-  blobWarm = Color(0x14FF9A3D),
-  surface = Color(0xF2FFFFFF),
-  edge = Color(0xE6FFFFFF),
-  ink = Color(0xFF191627),
-  muted = Color(0xFF635C86),
-  muted2 = Color(0xFF6A6390),
-  fieldEdge = Color(0x1F191627),
-  accent = Color(0xFF6F50F0),
-  onAccent = Color(0xFFFFFFFF),
-  //  r9: #6F51F1؛ یک پله تیره‌تر تا برچسبِ جستجوی فعال روی زمینه ≥ ۴٫۵:۱ (۴٫۵۶ ⇐ ۴٫۸۱)
-  accentInk = Color(0xFF6B4CEC),
-  accentSoft = Color(0x246F50F0),
-  //  r9: #BF2C2C؛ یک پله تیره‌تر تا روی کارتِ صورتی ≥ ۴٫۵:۱ (۴٫۳۸ ⇐ ۴٫۶۱) — به چشم همان
-  owe = Color(0xFFB92A2A),
-  oweTint = Color(0x1FD93B3B),
-  //  r9: #08745E؛ یک پله تیره‌تر تا روی کارتِ سبز با فاصله ≥ ۴٫۵:۱ (۴٫۵۱ ⇐ ۴٫۷۶)
-  settled = Color(0xFF07705B),
-  settledTint = Color(0x1F0FA98A),
+  page = PhoneV3Light.bg,
+  surface = PhoneV3Light.card,
+  edge = PhoneV3Light.hairline,
+  ink = PhoneV3Light.ink,
+  muted = PhoneV3Light.inkMuted,
+  icon = PhoneV3Light.icon,
+  fieldEdge = Color(0xFFC5D0DE),
+  accent = PhoneV3Light.accent,
+  onAccent = PhoneV3Light.onAccent,
+  //  سفید روی #108B81 فقط ۴٫۱۷:۱ است (برای آیکنِ «+» بس، برای متنِ تراشه نه)
+  accentActive = PhoneV3Light.accentDeep,
+  accentInk = PhoneV3Light.accent,
+  accentText = PhoneV3Light.accentDeep,
+  accentSoft = Color(0xFFE0F2EF),
+  owe = PhoneV3Light.negative,
+  oweTint = Color(0xFFFEE2E2),
+  settled = PhoneV3Light.positive,
+  settledTint = Color(0xFFDCFCE7),
+  pill = Color(0xFFE2E8F0),
+  onPill = Color(0xFF475569),
 )
 
-//  شب: همان پالتِ شبِ آن روز (بنفشِ تیره، نه سیاه). «N مورد» یک پله روشن‌تر
-//  از آن روز تا روی زمینهٔ تیره ≥ ۴٫۵:۱ بماند
+//  شب: دکمهٔ اصلی جفتِ شبِ سیستم (#19A985 با متنِ #041B15)؛ قرمز و خنثیِ شب را
+//  سیستم به ما سپرده — هم‌خانوادهٔ سبزِ شبِ خودش (#123C2B / #86EFAC)
 val PhoneV3DebtDark = PhoneV3DebtColors(
-  page = Color(0xFF0B0A14),
-  blobPink = Color(0x40FF5FA2),
-  blobViolet = Color(0x597C5CFF),
-  blobWarm = Color(0x1AFF9A3D),
-  surface = Color(0xF0141221),
-  edge = Color(0x1AFFFFFF),
-  ink = Color(0xFFF0EEF8),
-  muted = Color(0xFFA8A3BC),
-  muted2 = Color(0xFF9A95B2),
-  fieldEdge = Color(0x26FFFFFF),
-  accent = Color(0xFF6F50F0),
-  onAccent = Color(0xFFFFFFFF),
-  accentInk = Color(0xFFA78BFF),
-  accentSoft = Color(0x33A78BFF),
-  owe = Color(0xFFFF7A7A),
-  oweTint = Color(0x33FF7A7A),
-  settled = Color(0xFF5CE0BC),
-  settledTint = Color(0x335CE0BC),
+  page = PhoneV3Dark.bg,
+  surface = PhoneV3Dark.card,
+  edge = PhoneV3Dark.hairline,
+  ink = PhoneV3Dark.ink,
+  muted = PhoneV3Dark.inkMuted,
+  icon = PhoneV3Dark.icon,
+  fieldEdge = Color(0xFF40516A),
+  accent = PhoneV3Dark.cart,
+  onAccent = PhoneV3Dark.onCart,
+  accentActive = PhoneV3Dark.cart,
+  accentInk = Color(0xFF6EE7D1),
+  accentText = Color(0xFF6EE7D1),
+  accentSoft = Color(0xFF123C3A),
+  owe = PhoneV3Dark.negative,
+  oweTint = Color(0xFF3F1A1F),
+  settled = PhoneV3Dark.positive,
+  settledTint = Color(0xFF123C2B),
+  pill = Color(0xFF29374A),
+  onPill = Color(0xFFCBD5E1),
 )
 
 /**
