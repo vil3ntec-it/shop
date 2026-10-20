@@ -57,6 +57,8 @@ data class CourierSummary(
   val cashCapMinor: Long = 0,
   val headroomMinor: Long = 0,
   val unsettled: List<UnsettledDelivery> = emptyList(),
+  /** شمارِ همهٔ تحویل‌های تسویه‌نشده — فهرست تا ۵۰ می‌آید، جمعِ «در دست» همه را دارد */
+  val unsettledCount: Int = 0,
   val settlements: List<CourierSettlement> = emptyList(),
   val today: PeriodStats = PeriodStats(),
   val week: PeriodStats = PeriodStats(),
@@ -82,8 +84,6 @@ data class BellItems(val newMissions: Int, val recalls: Int, val rejectedEvents:
 }
 
 object CourierBoardModel {
-
-  private const val DAY = 86_400_000L
 
   /** ترتیبِ «مأموریتِ جاری»: هر چه به مشتری نزدیک‌تر، جلوتر */
   private val PRIORITY = listOf("arrived", "moving", "picked_up", "assigned", "failed", "requested")
@@ -139,21 +139,18 @@ object CourierBoardModel {
     return all.mapIndexed { i, r -> if (i == idx) r.copy(current = true) else r }
   }
 
-  /** آغازِ روزِ گوشی (`offsetMillis` = اختلافِ منطقهٔ زمانی با UTC) */
-  fun dayStart(now: Long, offsetMillis: Long): Long =
-    (now + offsetMillis).floorDiv(DAY) * DAY - offsetMillis
+  /** درگیر = نقدِ در دست + نقدِ مأموریت‌های زنده (همان `CourierCash.committed` ِ دکان) */
+  fun committed(s: CourierSummary): Long = s.cashInHandMinor + s.liveExpectedMinor
 
-  /** آغازِ هفته از شنبه (تقویمِ افغانستان) */
-  fun weekStart(now: Long, offsetMillis: Long): Long {
-    val day = dayStart(now, offsetMillis)
-    val epochDay = (day + offsetMillis).floorDiv(DAY)
-    //  ۱۹۷۰/۰۱/۰۳ شنبه بود (روزِ ۲ از آغازِ شمارش)
-    val sinceSaturday = (epochDay - 2).mod(7L)
-    return day - sinceSaturday * DAY
+  /**
+   *  پُریِ سقف ۰ تا ۱۰۰ — همان `CourierCash.usePercent` ِ میزِ دکان: سقفِ صفر یعنی
+   *  «نقد نگیرد» (سپردنِ هر سفارشِ نقدی رد می‌شود)، پس هر نقدِ درگیری = ۱۰۰٪.
+   */
+  fun capPercent(s: CourierSummary): Int = when {
+    s.cashCapMinor <= 0L -> if (committed(s) > 0L) 100 else 0
+    else -> minOf(100L, committed(s) * 100 / s.cashCapMinor).toInt()
   }
 
-  /** پُریِ سقف: (در دست + در راه) / سقف — ۰ تا ۱، بی سقف ۰ */
-  fun capUse(s: CourierSummary): Float =
-    if (s.cashCapMinor <= 0) 0f
-    else ((s.cashInHandMinor + s.liveExpectedMinor).toDouble() / s.cashCapMinor).coerceIn(0.0, 1.0).toFloat()
+  /** سقفِ صفر ⇒ پیک نقد نمی‌گیرد */
+  fun noCash(s: CourierSummary): Boolean = s.cashCapMinor <= 0L
 }

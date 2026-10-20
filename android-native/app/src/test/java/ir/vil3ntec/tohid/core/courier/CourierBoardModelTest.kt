@@ -79,22 +79,14 @@ class CourierBoardModelTest {
     assertTrue(withPhoto[1].current)
   }
 
-  @Test fun `روز و هفتهٔ گوشی — آغازِ روز به وقتِ محلی و هفته از شنبه`() {
-    val kabul = (4 * 60 + 30) * 60_000L
-    //  ۲۰۲۶-۱۰-۲۰ ساعتِ ۰۲:۰۰ به وقتِ UTC = ۰۶:۳۰ کابل (سه‌شنبه)
-    val now = 1_792_454_400_000L + 2 * 3_600_000L
-    val day = CourierBoardModel.dayStart(now, kabul)
-    assertEquals(1_792_454_400_000L - kabul, day)
-    val week = CourierBoardModel.weekStart(now, kabul)
-    //  سه‌شنبه ⇐ شنبه: سه روز پیش
-    assertEquals(day - 3 * 86_400_000L, week)
-    //  خودِ شنبه آغازِ هفته است
-    assertEquals(week, CourierBoardModel.weekStart(week + 1_000L, kabul))
-  }
-
-  @Test fun `پُریِ سقف میانِ صفر و یک؛ بی سقف صفر`() {
-    assertEquals(0.65f, CourierBoardModel.capUse(CourierSummary(cashInHandMinor = 98_000, liveExpectedMinor = 552_000, cashCapMinor = 1_000_000)), 0.0001f)
-    assertEquals(1f, CourierBoardModel.capUse(CourierSummary(cashInHandMinor = 2_000_000, cashCapMinor = 1_000_000)), 0f)
-    assertEquals(0f, CourierBoardModel.capUse(CourierSummary(cashInHandMinor = 5)), 0f)
+  @Test fun `پُریِ سقف همان CourierCash ِ دکان است — سقفِ صفر یعنی نقد نگیرد`() {
+    assertEquals(65, CourierBoardModel.capPercent(CourierSummary(cashInHandMinor = 98_000, liveExpectedMinor = 552_000, cashCapMinor = 1_000_000)))
+    assertEquals(100, CourierBoardModel.capPercent(CourierSummary(cashInHandMinor = 2_000_000, cashCapMinor = 1_000_000)))
+    //  سقفِ صفر: هر نقدِ درگیری ۱۰۰٪، بی نقد ۰٪ — و «نقد نگیرد»
+    assertEquals(100, CourierBoardModel.capPercent(CourierSummary(liveExpectedMinor = 5, cashCapMinor = 0)))
+    assertEquals(0, CourierBoardModel.capPercent(CourierSummary(cashCapMinor = 0)))
+    assertTrue(CourierBoardModel.noCash(CourierSummary(cashCapMinor = 0)))
+    assertFalse(CourierBoardModel.noCash(CourierSummary(cashCapMinor = 1)))
+    assertEquals(650_000L, CourierBoardModel.committed(CourierSummary(cashInHandMinor = 98_000, liveExpectedMinor = 552_000)))
   }
 }

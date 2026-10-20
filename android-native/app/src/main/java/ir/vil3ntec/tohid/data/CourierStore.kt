@@ -1,7 +1,6 @@
 package ir.vil3ntec.tohid.data
 
 import android.content.Context
-import ir.vil3ntec.tohid.core.courier.CourierBoardModel
 import ir.vil3ntec.tohid.core.courier.CourierQueue
 import ir.vil3ntec.tohid.core.courier.CourierSummary
 import ir.vil3ntec.tohid.core.courier.MissionCard
@@ -115,6 +114,8 @@ object CourierSync {
     val sent: Int = 0,
     val failure: ApiFailure? = null,
     val photoErrors: List<String> = emptyList(),
+    /** «نقدِ من»/آمار تازه نشد (کارت‌ها شاید شدند) — صفحه باید بگوید، نه عددِ کهنه را «همین حالا» نشان دهد */
+    val summaryFailure: ApiFailure? = null,
   ) {
     val ok: Boolean get() = failure == null
   }
@@ -132,6 +133,7 @@ object CourierSync {
     val device = runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).deviceUid }.getOrDefault("")
     var sent = 0
     var failure: ApiFailure? = null
+    var summaryFailure: ApiFailure? = null
 
     //  ۱) صفِ رویدادها، بسته به بسته
     while (failure == null) {
@@ -169,16 +171,16 @@ object CourierSync {
       val cards = a.valueOrNull()
       if (cards != null) store.saveCards("active", cards) else failure = errorOf(a)
       if (failure == null) repo.missions("done").onSuccess { store.saveCards("done", it) }
-      //  «نقدِ من» و آمار با روز و هفتهٔ گوشی (شنبه)؛ سرورِ کهنه (۴۰۴) ⇒ همان آخرین
+      //  «نقدِ من» و آمار — مرزِ روز و هفته با سرور (وقتِ دکان). شکست پنهان نمی‌ماند:
+      //  آخرین پاسخ با زمانِ خودِ سرور می‌ماند و خطا به صفحه می‌رسد
       if (failure == null) {
-        val now = System.currentTimeMillis()
-        val off = java.util.TimeZone.getDefault().getOffset(now).toLong()
-        repo.summary(CourierBoardModel.dayStart(now, off), CourierBoardModel.weekStart(now, off))
-          .onSuccess { store.saveSummary(it) }
+        val r = repo.summary()
+        val x = r.valueOrNull()
+        if (x != null) store.saveSummary(x) else summaryFailure = errorOf(r)
       }
       if (failure == null) store.lastSyncAt = System.currentTimeMillis()
     }
-    Outcome(sent, failure, photoErrors)
+    Outcome(sent, failure, photoErrors, summaryFailure)
   }
 
   private fun errorOf(r: ApiResult<*>): ApiFailure =
