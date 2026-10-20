@@ -166,6 +166,51 @@ internal class SyncCommit(private val journal: Journal, private val parts: Parts
   fun pending(): Boolean = journal.exists()
 
   /**
+   *  A00 — درمانِ سایهٔ ساختِ پیش از A00، یک بار: هنگامِ شروع (`recover` ِ موتورها) با
+   *  دفترِ روی دیسک و **پیش از نخستین تفاضل**. سایهٔ بی مهر (`LedgerDiff.SHADOW_STAMP`)
+   *  یعنی ساختِ پیشین نوشته‌اش؛ سایهٔ Snapshot ِ آن ساخت‌ها ردیفِ خامِ سرور بود و کلیدهایی
+   *  داشت که دفترِ آن ساخت نمی‌شناخت. این ساخت آن کلیدها را می‌شناسد ولی دفتر پیش‌فرضشان
+   *  را دارد، پس بی درمان نخستین ذخیرهٔ بی‌ربط پیش‌فرض را روی مقدارِ سرور می‌نوشت
+   *  (`LedgerDiff.healShadow`). سایهٔ درمان‌شده با مهر نوشته می‌شود؛ بارِ بعد کاری نمی‌کند.
+   *
+   *  @return true اگر سایه درمان و مهر شد
+   */
+  fun heal(ledger: ShopData, force: Boolean = false): Boolean {
+    if (journal.exists()) recover(ledger)
+    val shadow = parse(parts.shadow()) ?: return false
+    if (!force && LedgerDiff.isStamped(shadow)) return false
+    val healed = LedgerDiff.modelTree(LedgerDiff.healShadow(shadow, LedgerDiff.toJson(ledger)))
+    parts.commit(LedgerDiff.shadowOf(healed).toString(), null)
+    return true
+  }
+
+  /** نتیجهٔ `start`: بازیابیِ ژورنال، درمان، و نشانِ opهای ساختِ پیشین در صف ("" یعنی هیچ) */
+  data class Start(val outcome: Outcome, val healed: Boolean, val legacyUpTo: String)
+
+  /**
+   *  شروعِ برنامه (`recover` ِ موتورهای v1 و v3) با دفترِ روی دیسک — A00:
+   *   ۱) مهرِ سایه **پیش از** بازیابی خوانده می‌شود: بازیابیِ ژورنالِ «ثبت» ِ ساختِ پیشین
+   *      سایه‌ای مهردار ولی درمان‌نشده می‌نویسد (شاخهٔ «دفترِ آن لحظه در دست نیست»)؛
+   *   ۲) ژورنال بازیابی می‌شود (opهای ساختِ پیشین با همان `op_id` در صف برمی‌گردند)؛
+   *   ۳) اگر سایه بی مهر بود: بزرگ‌ترین `op_id` ِ صف (ULID به ترتیبِ زمان است) **پیش از** مهر
+   *      به [keepLegacy] سپرده می‌شود — دسته‌ای که op ِ کوچک‌تر یا برابر دارد بی `caps` می‌رود
+   *      تا تورِ سرور `null` ِ کهنهٔ آن ساخت را بپالاید (`LedgerDiff.capsFor`) — و بعد درمان.
+   *      اگر برنامه میانِ این دو بسته شود، سایه هنوز بی مهر است و بارِ بعد همین تکرار می‌شود.
+   */
+  fun start(ledger: ShopData, keepLegacy: (String) -> Unit = {}): Start {
+    val wasStamped = parse(parts.shadow())?.let { LedgerDiff.isStamped(it) } ?: true
+    val outcome = if (journal.exists()) recover(ledger) else Outcome.NONE
+    if (wasStamped) return Start(outcome, false, "")
+    val upTo = parts.queued().maxOrNull().orEmpty()
+    if (upTo.isNotEmpty()) keepLegacy(upTo)
+    return Start(outcome, heal(ledger, force = true), upTo)
+  }
+
+  /** همان سایه با یا بی مهرِ A00 — ژورنالِ ساختِ پیشین اثرِ انگشتِ سایهٔ بی مهر را دارد */
+  private fun same(candidate: String, target: String): Boolean =
+    sha(candidate) == target || sha(LedgerDiff.unstamped(candidate)) == target
+
+  /**
    *  بازیابی هنگامِ شروع (`ShopStore.load`) یا پیش از کارِ بعدی.
    *
    *  | سایهٔ روی دیسک        | تصمیم                                              |
@@ -196,7 +241,7 @@ internal class SyncCommit(private val journal: Journal, private val parts: Parts
         val have = parts.queued()
         parts.push(j.ops.filter { it.opId !in have })
         val mine = ledger?.let { LedgerDiff.shadowOf(LedgerDiff.toJson(it)).toString() }
-        val next = if (mine != null && sha(mine) == j.shadow) {
+        val next = if (mine != null && same(mine, j.shadow)) {
           mine
         } else {
           //  دفترِ آن لحظه در دست نیست: سایهٔ پیشین + همین opها. بیشترین
@@ -208,13 +253,16 @@ internal class SyncCommit(private val journal: Journal, private val parts: Parts
       }
 
       j.stage == Journal.ABSORB -> {
+        //  ⚠️ (پیشین، پیگیریِ A00) اثرِ انگشتِ دفتر به مدلِ همین ساخت بسته است: ژورنالی که ساختِ
+        //  پیشین نوشته و پس از آن مدل فیلدی گرفته، این‌جا «ننشسته» خوانده می‌شود (BACK) حتی اگر
+        //  دفتر نشسته بود ⇐ همان opها دوباره گرفته می‌شوند. این‌جا درست نشده است.
         val tree = ledger?.let { LedgerDiff.toJson(it) }
         if (tree == null || sha(tree.toString()) != j.ledger) {
           //  دفتر ننشسته بود ⇒ هیچ چیزی عوض نشده؛ همان opها دوباره گرفته می‌شوند
           Outcome.BACK
         } else {
           val next = absorbedShadow(current, j.ops, tree)
-          if (sha(next) == j.shadow) {
+          if (same(next, j.shadow)) {
             parts.commit(next, j.cursor)
             Outcome.FORWARD
           } else {
