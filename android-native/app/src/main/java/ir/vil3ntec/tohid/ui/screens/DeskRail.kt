@@ -63,6 +63,7 @@ fun DeskRail(
     canAdmin,
     ordersLive = ir.vil3ntec.tohid.ui.OrdersLive.enabled,
     storefrontLive = StorefrontGate.visible,
+    deliveryLive = DeliveryGate.visible,
   )
   Column(
     Modifier
@@ -209,6 +210,7 @@ private fun iconOf(id: String): ImageVector = when (id) {
   "promos" -> Icons.Filled.LocalOffer
   "devices" -> Icons.Filled.Devices
   "storefront" -> Icons.Filled.Storefront
+  "delivery" -> Icons.Filled.DeliveryDining
   "soon:orders" -> Icons.Filled.ShoppingCart
   "soon:fulfil" -> Icons.Filled.Inventory
   "soon:storefront" -> Icons.Filled.Storefront

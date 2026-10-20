@@ -91,6 +91,8 @@ private val PAGE_TITLES = mapOf(
   "orders" to "سفارش‌ها",
   "storefront" to "ویترینِ اینترنتی",
   "promos" to "تخفیف‌ها",
+  //  میزِ تحویل (C01) — فقط وقتی سرور پرچمِ `shop.delivery` را روشن گفته
+  "delivery" to "میزِ تحویل",
 )
 
 /**
@@ -136,6 +138,10 @@ fun AppRoot(
   var sub by rememberSaveable { mutableStateOf<String?>(null) }
   // صفحهٔ ورود، وقتی از دکمهٔ حسابِ سربرگ باز شود
   var authOpen by rememberSaveable { mutableStateOf(false) }
+
+  //  «رمز را دوباره بزنید» برای هر کارِ حساس (`reauth_required`، بندِ ۲۱.۱):
+  //  یک پنجره برای همهٔ صفحه‌ها؛ `ApiClient` پس از تأیید همان درخواست را دوباره می‌فرستد
+  ReauthHost()
 
   /*
    *  دکانِ حساب — پرسیدنش فقط وقتی معلوم شود که ندارد.
@@ -455,6 +461,7 @@ fun AppRoot(
 
   //  ویترین (فاز ۴): فقط وقتی سرور می‌گوید روشن است، بخشش دیده می‌شود
   LaunchedEffect(Unit) { runCatching { StorefrontGate.refresh(context) } }
+  LaunchedEffect(Unit) { runCatching { DeliveryGate.refresh(context) } }
 
   //  گوشیِ جفت‌شده بارکد فرستاد ⇒ صفحهٔ فروش باز می‌شود و کالا به سبد می‌رود
   LaunchedEffect(Unit) {
@@ -816,6 +823,7 @@ fun AppRoot(
         "promos" ->
           if (ir.vil3ntec.tohid.data.ShopRole.canOpenSettings(context)) PromosScreen(data, snackbar)
           else LaunchedEffect(Unit) { open("more") }
+        "delivery" -> DeliveryScreen(snackbar) { open("more") }
         "devices" -> DevicesScreen(data, snackbar)
         "more" -> MoreScreen(store, data, ::open)
       }
