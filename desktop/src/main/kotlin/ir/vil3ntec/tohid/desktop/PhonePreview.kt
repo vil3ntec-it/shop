@@ -13,6 +13,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -187,6 +188,9 @@ private fun PhonePreviewContent(screen: String, store: ShopStore, dark: Boolean)
         //  نسخهٔ ۳: صندوقِ گوشی تمام‌صفحه است و نوارِ پایین رویش نمی‌آید (r3 — نوارِ سبد جایش است)
         if (!PhoneCartUi.saleActive.value && !PhoneCartUi.sheetOpen.value) PhoneNavBar(tabs = PREVIEW_TABS, current = "sale", onPick = {})
       }
+      //  حالتِ پیک (phone-v3-courier-*): ورود، فهرست، جزئیات، تأییدِ نقد، تحویل‌شده، خالی — دادهٔ نمایشی
+      "courier-join", "courier-list", "courier-detail", "courier-cod", "courier-delivered", "courier-empty" ->
+        Box(Modifier.weight(1f).fillMaxWidth()) { key(screen) { CourierPreview(screen.removePrefix("courier-")) } }
       //  قرض‌دارانِ گوشی (r9): سه نفرِ r9، هشت نفر با نام و مبلغِ بلند، و خالی — با دفترِ ساختگیِ خودش
       "debtors-r9", "debtors-many", "debtors-empty" -> Box(Modifier.weight(1f).fillMaxWidth()) {
         val demo = remember(screen) { debtorsDemo(screen, System.currentTimeMillis()) }

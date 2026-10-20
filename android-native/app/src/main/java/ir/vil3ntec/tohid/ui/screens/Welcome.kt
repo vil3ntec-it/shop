@@ -220,6 +220,8 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
   var showPassword by rememberSaveable { mutableStateOf(false) }
 
   var staffCode by rememberSaveable { mutableStateOf("") }
+  //  صفحهٔ «ورودِ پیک» — همان کدِ شاگرد، با توضیحِ مخصوصِ پیک
+  var courierJoin by rememberSaveable { mutableStateOf(false) }
   var busy by remember { mutableStateOf(false) }
   var error by remember { mutableStateOf<String?>(null) }
   var note by remember { mutableStateOf<String?>(null) }
@@ -314,6 +316,84 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
   }
 
   /**
+   *  پیوستن با کدِ شاگرد — کدِ دعوتِ پیک هم همین است. کشوی «کد شاگرد دارم» و
+   *  صفحهٔ «ورودِ پیک» (`CourierJoinScreen`) هر دو همین را صدا می‌زنند؛ منطق
+   *  یک جاست و از بدنهٔ همان دکمه بی‌تغییر جابه‌جا شده است.
+   */
+  fun joinWithStaffCode() {
+    val entered = StaffCode.clean(staffCode)
+    //  قالبِ کد را سرور می‌شناسد، نه گوشی. اینجا فقط
+    //  «چیزی زده شده؟» سنجیده می‌شود؛ بقیه‌اش با سرور
+    //  است و پیامِ ردّش هم از همان‌جا می‌آید.
+    if (!StaffCode.usable(entered)) {
+      error = "کد را کامل بزنید."
+      return
+    }
+    busy = true; error = null
+    scope.launch {
+      /*
+       *  کد خودش اعتبارنامه است.
+       *
+       *  تا دیروز اینجا نوشته بود «اول وارد حساب خود
+       *  شوید» — یعنی صاحب دکان که کد را به شاگردش
+       *  می‌داد، باید یک مرحلهٔ دیگر هم برایش توضیح
+       *  می‌داد، و شاگردی که ایمیل و شماره ندارد اصلاً
+       *  وارد نمی‌شد.
+       *
+       *  حالا سرور خودش برای همین دستگاه یک حسابِ
+       *  شاگرد می‌سازد و روی همان دکان می‌نشاندش. اگر
+       *  کسی از قبل واردِ حسابی باشد، همان حساب به
+       *  دکان می‌پیوندد و حسابِ تازه‌ای ساخته نمی‌شود.
+       */
+      if (Backend.tokens(context).signedIn) {
+        //  از قبل واردِ حسابی است — همان حساب به دکان
+        //  می‌پیوندد و حسابِ تازه‌ای ساخته نمی‌شود
+        shops.join(entered)
+          .onSuccess { shopState ->
+            //  نقش همین‌جا نوشته می‌شود، نه در تازه‌سازیِ
+            //  بعدی: کسی که با کد پیوسته «شاگرد» است و
+            //  نباید حتی یک لحظه تنظیمات را باز ببیند
+            shopState.role?.let {
+              ir.vil3ntec.tohid.data.ShopRole.remember(context, it)
+            }
+            runCatching {
+              LedgerOwner.shopChanged(
+                context, store, shopState.shop?.id.orEmpty(),
+              )
+            }
+            onDone()
+          }
+          .onFailure { fail(it) }
+      } else {
+        auth.loginWithStaffCode(
+          code = entered,
+          name = name.trim(),
+          deviceUid = state.deviceUid,
+          deviceName = android.os.Build.MODEL ?: "گوشی",
+        )
+          .onSuccess { session ->
+            SavedLogins.remember(context, entered, session.user.name)
+            session.shop?.role?.let {
+              ir.vil3ntec.tohid.data.ShopRole.remember(context, it)
+            }
+            //  دفترِ روی گوشی باید مالِ همین حساب و همین
+            //  دکان باشد، وگرنه دفترِ قبلی با اولین
+            //  همگام‌سازی صاف می‌رفت داخلِ دکانِ تازه
+            runCatching {
+              LedgerOwner.signedIn(
+                context, store, session.user.id, session.shop?.id.orEmpty(),
+              )
+            }
+            state.rememberAccount(session.user)
+            onDone()
+          }
+          .onFailure { fail(it) }
+      }
+      busy = false
+    }
+  }
+
+  /**
    *  ورود انجام شد.
    *
    *  توکن‌ها را مخزن ذخیره کرده؛ اینجا فقط چیزهای نمایشی می‌ماند.
@@ -359,6 +439,25 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
    *  شماره و کد و دکمه‌ها همه با هم. حالا وقتی کد فرستاده شد، یک صفحهٔ
    *  جدا می‌آید که فقط یک کار دارد. منطقِ ورود همان است؛ فقط جایش عوض شده.
    */
+  /*
+   *  «ورودِ پیک» (DLV-01): همان کدِ شاگرد و همان `joinWithStaffCode`، فقط با
+   *  صفحه‌ای که برای پیک توضیح می‌دهد چه می‌بیند. نقشِ «پیک» را سرور از روی
+   *  کد می‌دهد و `MainActivity` خودش حالتِ پیک را باز می‌کند.
+   */
+  if (courierJoin) {
+    ir.vil3ntec.tohid.ui.courier.CourierJoinScreen(
+      name = name,
+      onName = { name = it; error = null },
+      code = staffCode,
+      onCode = { staffCode = it.uppercase(); error = null },
+      busy = busy,
+      error = error,
+      onJoin = { joinWithStaffCode() },
+      onBack = { courierJoin = false; error = null },
+    )
+    return
+  }
+
   /*
    *  پلهٔ سومِ ثبت‌نام: لوکیشن و شرایط و ضوابط.
    *
@@ -1058,78 +1157,7 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
                 TextButton(
                   enabled = !busy && staffCode.isNotBlank(),
                   contentPadding = PaddingValues(horizontal = 8.dp),
-                  onClick = {
-                    val entered = StaffCode.clean(staffCode)
-                    //  قالبِ کد را سرور می‌شناسد، نه گوشی. اینجا فقط
-                    //  «چیزی زده شده؟» سنجیده می‌شود؛ بقیه‌اش با سرور
-                    //  است و پیامِ ردّش هم از همان‌جا می‌آید.
-                    if (!StaffCode.usable(entered)) {
-                      error = "کد را کامل بزنید."
-                      return@TextButton
-                    }
-                    busy = true; error = null
-                    scope.launch {
-                      /*
-                       *  کد خودش اعتبارنامه است.
-                       *
-                       *  تا دیروز اینجا نوشته بود «اول وارد حساب خود
-                       *  شوید» — یعنی صاحب دکان که کد را به شاگردش
-                       *  می‌داد، باید یک مرحلهٔ دیگر هم برایش توضیح
-                       *  می‌داد، و شاگردی که ایمیل و شماره ندارد اصلاً
-                       *  وارد نمی‌شد.
-                       *
-                       *  حالا سرور خودش برای همین دستگاه یک حسابِ
-                       *  شاگرد می‌سازد و روی همان دکان می‌نشاندش. اگر
-                       *  کسی از قبل واردِ حسابی باشد، همان حساب به
-                       *  دکان می‌پیوندد و حسابِ تازه‌ای ساخته نمی‌شود.
-                       */
-                      if (Backend.tokens(context).signedIn) {
-                        //  از قبل واردِ حسابی است — همان حساب به دکان
-                        //  می‌پیوندد و حسابِ تازه‌ای ساخته نمی‌شود
-                        shops.join(entered)
-                          .onSuccess { shopState ->
-                            //  نقش همین‌جا نوشته می‌شود، نه در تازه‌سازیِ
-                            //  بعدی: کسی که با کد پیوسته «شاگرد» است و
-                            //  نباید حتی یک لحظه تنظیمات را باز ببیند
-                            shopState.role?.let {
-                              ir.vil3ntec.tohid.data.ShopRole.remember(context, it)
-                            }
-                            runCatching {
-                              LedgerOwner.shopChanged(
-                                context, store, shopState.shop?.id.orEmpty(),
-                              )
-                            }
-                            onDone()
-                          }
-                          .onFailure { fail(it) }
-                      } else {
-                        auth.loginWithStaffCode(
-                          code = entered,
-                          name = name.trim(),
-                          deviceUid = state.deviceUid,
-                          deviceName = android.os.Build.MODEL ?: "گوشی",
-                        )
-                          .onSuccess { session ->
-                            SavedLogins.remember(context, entered, session.user.name)
-                            session.shop?.role?.let {
-                              ir.vil3ntec.tohid.data.ShopRole.remember(context, it)
-                            }
-                            //  دفترِ روی گوشی باید مالِ همین حساب و همین
-                            //  دکان باشد، وگرنه دفترِ قبلی با اولین
-                            //  همگام‌سازی صاف می‌رفت داخلِ دکانِ تازه
-                            runCatching {
-                              LedgerOwner.signedIn(
-                                context, store, session.user.id, session.shop?.id.orEmpty(),
-                              )
-                            }
-                            state.rememberAccount(session.user)
-                            onDone()
-                          }
-                          .onFailure { fail(it) }
-                      }
-                      busy = false
-                    }
-                  },
+                  onClick = { joinWithStaffCode() },
                 ) { Text("پیوستن", color = Shop.colors.primary, style = MaterialTheme.typography.labelMedium) }
               },
             )
@@ -1139,6 +1167,17 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
               color = Shop.colors.muted2,
               modifier = Modifier.padding(top = 6.dp, start = 4.dp),
             )
+            //  پیک هم با همین کد می‌آید؛ صفحهٔ خودش توضیح می‌دهد چه می‌بیند
+            TextButton(
+              onClick = { courierJoin = true; error = null },
+              contentPadding = PaddingValues(horizontal = 4.dp),
+            ) {
+              Text(
+                "پیک هستید؟ صفحهٔ ورودِ پیک",
+                style = MaterialTheme.typography.labelLarge,
+                color = BLUE,
+              )
+            }
 
             /*
              *  نشانیِ سرور اینجا نیست و هیچ‌جای دیگر هم نیست.
