@@ -21,6 +21,17 @@ const ROLES = ['owner', 'manager', 'staff', 'cashier', 'storekeeper', 'picker', 
 /** نقش‌هایی که صاحب دکان به کارمند می‌دهد (کد، تغییرِ نقش، لایهٔ نقش) — پیک جداست */
 const STAFF_ROLES = Object.freeze(ROLES.filter((r) => r !== 'owner'));
 
+/**
+ * نقش در فیلدِ قدیمِ `role`ِ پاسخ‌ها (`/api/shop`، `/api/me`، ورود، پیوستن).
+ * نسخه‌های پیش از A16 نقشِ ناشناخته را «مدیر» می‌پنداشتند (`isStaff` = «== staff»)؛
+ * پس چهار نقشِ تازه آن‌جا «staff» می‌روند تا برنامهٔ قدیم دست‌کم مثلِ شاگرد ببندد.
+ * نقشِ واقعی در فیلدِ تازهٔ `actualRole` است. سدِ واقعی همیشه همین سرور است.
+ */
+const LEGACY_AS_STAFF = Object.freeze(['cashier', 'storekeeper', 'picker', 'accountant']);
+function legacyRole(role) {
+  return LEGACY_AS_STAFF.includes(role) ? 'staff' : role;
+}
+
 /** کوتاه‌نویسیِ نقش‌های تازه در سطرهای جدول */
 const CSH = 'cashier';
 const STK = 'storekeeper';
@@ -102,4 +113,4 @@ function permissionsOf(role) {
   return Object.keys(MATRIX).filter(k => can(role, k));
 }
 
-module.exports = { ROLES, STAFF_ROLES, MATRIX, can, permissionsOf };
+module.exports = { ROLES, STAFF_ROLES, MATRIX, can, permissionsOf, legacyRole };

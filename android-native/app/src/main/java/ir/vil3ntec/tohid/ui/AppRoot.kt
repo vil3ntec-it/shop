@@ -154,7 +154,7 @@ fun AppRoot(
       .onSuccess { state ->
         needsShop = !state.hasShop
         //  نقش از همین‌جا می‌آید؛ درخواستِ جدا لازم نیست
-        state.role?.let { ir.vil3ntec.tohid.data.ShopRole.remember(context, it) }
+        state.effectiveRole?.let { ir.vil3ntec.tohid.data.ShopRole.remember(context, it) }
         //  لایه‌های مجوزِ دکان (STF-01..03) — نبودنش یعنی همان رفتارِ امروزِ نقش
         if (state.hasShop) ir.vil3ntec.tohid.data.ShopRole.rememberPolicy(context, state.policy?.toString())
         //  دکان دارد: مطمئن شویم دفترِ روی گوشی هم مالِ همین دکان است.

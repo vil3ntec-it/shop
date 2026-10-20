@@ -40,6 +40,8 @@ class SyncV3EngineTest {
     var time = 1_800_000_000_000L
     var offline = false
     var loseNext = 0
+    /** Pushِ این دستگاه‌ها ۴۰۳ می‌گیرد (نقش یا اشتراک) — Pull باز است */
+    val pushForbidden = HashSet<String>()
     var pageSize = 1000
     val requests = ArrayList<String>()
     val pushSizes = ArrayList<Int>()
@@ -63,6 +65,9 @@ class SyncV3EngineTest {
       requests += "$method ${path.substringBefore('?')}"
       if (offline) throw IOException("offline")
       val r = when {
+        path == "/push" && device in pushForbidden -> V3Response(403, buildJsonObject {
+          put("error", buildJsonObject { put("code", JsonPrimitive("permission_denied")); put("message", JsonPrimitive("اجازه‌ی ثبت اطلاعات ندارید")) })
+        })
         path == "/push" -> push(device, body!!)
         path.startsWith("/pull") -> pull(device, path)
         path == "/snapshot" -> snapshot()
@@ -309,6 +314,28 @@ class SyncV3EngineTest {
     assertTrue(server.pushSizes.all { it <= SyncV3Engine.MAX_OPS })
     assertEquals(450, server.rows.keys.count { it.first == "products" })
     assertEquals(750L, long(server.row("products", "bulk-7"), "salePriceMinor"))
+  }
+
+  /**
+   *  A16: Pushِ ۴۰۳ (نقش یا اشتراک) Pull را نمی‌خواباند — دستگاه دادهٔ دکان را
+   *  همچنان می‌گیرد و opهای خودش در صف می‌مانند تا وقتی سرور بپذیرد یا op به op رد کند.
+   */
+  @Test fun forbiddenPushStillPulls() {
+    val server = FakeServer()
+    val a = Device("dev-a", server, baseData).also { assertTrue(it.sync().ok) }
+    val acc = Device("dev-acc", server, ShopData()).also { assertTrue(it.sync().ok) }
+    acc.edit { d -> d.copy(products = d.products + Product(id = "p-local", name = "محلی")) }
+    server.pushForbidden += "dev-acc"
+    a.edit { d -> d.copy(products = d.products.map { it.copy(name = "شیرِ تازه") }) }
+    assertTrue(a.sync().ok)
+
+    val r = acc.sync(first = false)
+    assertFalse(r.ok)
+    assertEquals(403, r.status)
+    assertEquals("Pull با وجودِ ۴۰۳ِ Push رفت", "شیرِ تازه", acc.ledger.data.products.single { it.id == "p1" }.name)
+    assertEquals("opِ خودِ دستگاه گم نمی‌شود", 1, acc.engine.queued())
+    assertNull(server.row("products", "p-local"))
+    assertEquals("failed", acc.engine.status().state)
   }
 
   @Test fun rejectedLeavesQueueButStaysVisibleAndLocalSaleIsKept() {

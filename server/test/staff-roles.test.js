@@ -22,6 +22,8 @@ const syncV1 = require('../src/lib/sync-v1');
 const { permissionsOf } = require('../src/lib/permissions');
 
 const NEW_ROLES = ['cashier', 'storekeeper', 'picker', 'accountant'];
+/** نقشی که در فیلدِ قدیمِ `role` می‌رود: نسخه‌های قدیمِ برنامه نقشِ ناشناخته را «مدیر» می‌پنداشتند */
+const LEGACY = { owner: 'owner', manager: 'manager', staff: 'staff', cashier: 'staff', storekeeper: 'staff', picker: 'staff', accountant: 'staff' };
 
 let admin = '';
 let shopId = '';
@@ -77,6 +79,8 @@ test.before(async () => {
     const u = await h.newUser(`کارمندِ ${role}`, 'shop');
     const joined = await h.post('/api/shop/join', { code }, { token: u.accessToken });
     assert.ok([200, 201].includes(joined.status), `${role}: ${JSON.stringify(joined.body)}`);
+    assert.equal(joined.body.role, LEGACY[role], `${role} join legacy`);
+    assert.equal(joined.body.actualRole, role, `${role} join actual`);
     T[role] = await h.signIn(u, 'shop');
   }
 });
@@ -84,13 +88,24 @@ test.after(async () => { await h.stop(); });
 
 /* ------------------------------------------------------- نقش و مجوزها */
 
-test('هر نقشِ تازه با کدِ دعوت می‌پیوندد و /api/shop همان نقش و فهرستِ MATRIX را برمی‌گرداند', async () => {
+test('هر نقشِ تازه با کدِ دعوت می‌پیوندد؛ فیلدِ قدیمِ role برای نسخهٔ قدیم «staff» و نقشِ واقعی در actualRole', async () => {
   for (const role of ['owner', 'manager', 'staff', ...NEW_ROLES]) {
     const shop = await h.get('/api/shop', { token: T[role].accessToken });
     assert.equal(shop.status, 200, role);
-    assert.equal(shop.body.role, role);
+    assert.equal(shop.body.role, LEGACY[role], role);
+    assert.equal(shop.body.actualRole, role, role);
+    assert.equal(shop.body.isOwner, role === 'owner');
     assert.deepEqual(shop.body.permissions, permissionsOf(role), role);
     assert.equal(shop.body.policy.role, role);
+    //  /api/me و پاسخِ ورود هم همین‌طور
+    const me = await h.get('/api/me', { token: T[role].accessToken });
+    assert.equal(me.body.shop.role, LEGACY[role], `me ${role}`);
+    assert.equal(me.body.shop.actualRole, role, `me ${role}`);
+    assert.equal(T[role].shop.role, LEGACY[role], `login ${role}`);
+    assert.equal(T[role].shop.actualRole, role, `login ${role}`);
+    const perms = await h.get('/api/shop/permissions', { token: T[role].accessToken });
+    assert.equal(perms.body.role, LEGACY[role], `permissions ${role}`);
+    assert.equal(perms.body.actualRole, role, `permissions ${role}`);
   }
   //  آزمونِ مرجع: سه نقشِ قدیم دقیقاً همان فهرستِ پیش از A16
   assert.deepEqual(permissionsOf('staff'), ['shop.view', 'subscription.view', 'data.read', 'data.write', 'data.delete.own',
@@ -128,7 +143,7 @@ test('درهای /api/shop: مدیریتِ کارمند، تنظیمات و سا
   const to = await h.patch(`/api/shop/members/${mid}`, { role: 'cashier' }, { token: T.owner.accessToken });
   assert.equal(to.status, 200, JSON.stringify(to.body));
   assert.equal(to.body.member.role, 'cashier');
-  assert.equal((await h.get('/api/shop', { token: T.staff.accessToken })).body.role, 'cashier');
+  assert.equal((await h.get('/api/shop', { token: T.staff.accessToken })).body.actualRole, 'cashier');
   //  برنامهٔ نصبی همان در را با PUT می‌زند (HttpURLConnection PATCH ندارد)
   const viaPut = await h.put(`/api/shop/members/${mid}`, { role: 'accountant' }, { token: T.owner.accessToken });
   assert.equal(viaPut.status, 200, JSON.stringify(viaPut.body));
@@ -228,7 +243,7 @@ test('Sync v1: صندوق‌دار می‌فروشد ولی خرید و مصرف
   assert.equal(await inOplog(buy[4].op_id), true);
 });
 
-test('Sync v1: انباردار کالا و خرید می‌نویسد ولی فروش نه؛ جمع‌آور فقط سابقه؛ حسابدار هیچ (۴۰۳)', async () => {
+test('Sync v1: انباردار کالا و خرید می‌نویسد ولی فروش نه؛ جمع‌آور فقط سابقه؛ حسابدار هیچ (op به op، نه ۴۰۳ِ کلِ دسته)', async () => {
   const goods = await push1('storekeeper', [
     v1op('products', 'p-stk', { name: 'برنج', salePrice: 50 }),
     v1op('purchases', 'pu-stk', { productId: 'p-stk', quantity: 10, totalAmount: 300 }),
@@ -252,9 +267,13 @@ test('Sync v1: انباردار کالا و خرید می‌نویسد ولی ف
   ]);
   assert.deepEqual(reasons(pick), ['applied', 'table_not_allowed']);
 
-  const acc = await push1('accountant', [v1op('auditLog', 'a-acc', { type: 'x' })]);
-  assert.equal(acc.status, 403);
-  assert.equal(acc.body.error.code, 'permission_denied');
+  //  ۴۰۳ِ کلِ دسته دستگاهِ حسابدار را از Pull هم می‌انداخت (opِ ماندهٔ پیش از تغییرِ نقش)؛
+  //  حالا هر op جدا «table_not_allowed» می‌گیرد و دستگاه آن را از صف بیرون می‌اندازد
+  const accOps = [v1op('auditLog', 'a-acc', { type: 'x' }), v1op('sales', 's-acc', { total: 1, discount: 0, finalTotal: 1, status: 'completed' })];
+  const acc = await push1('accountant', accOps);
+  assert.equal(acc.status, 200, JSON.stringify(acc.body));
+  assert.deepEqual(reasons(acc), ['table_not_allowed', 'table_not_allowed']);
+  for (const o of accOps) assert.equal(await inOplog(o.op_id), false, o.table);
   //  ولی می‌خواند
   const pull = await h.api('GET', '/api/sync/v1/pull?device_id=r1-accountant&since=0', {
     token: T.accountant.accessToken, headers: { 'X-App': 'shop' },
@@ -308,8 +327,9 @@ test('Sync v3: جدولِ بیرون از نقش کلِ tx را برمی‌گر�
   assert.deepEqual(reasons(p), ['table_not_allowed']);
 
   const a = await push3('accountant', [v3op('a', 'auditLog', 'a3-acc', { type: 'x' })]);
-  assert.equal(a.status, 403);
-  assert.equal(a.body.error.code, 'permission_denied');
+  assert.equal(a.status, 200, JSON.stringify(a.body));
+  assert.deepEqual(reasons(a), ['table_not_allowed']);
+  assert.equal(await inV3('a3-acc'), false);
 
   //  مرجع: شاگرد هنوز خرید می‌نویسد
   const st = await push3('staff', [v3op('s', 'purchases', 'pu3-stf', { productId: 'p1', quantityMilli: 1000, totalAmountMinor: 100 })]);
@@ -344,4 +364,71 @@ test('راهِ قدیم: /api/sync و درهای دفترِ /api/* (routes/data)
   const acc = await h.post('/api/products', { data: { name: 'x' } }, { token: T.accountant.accessToken });
   assert.equal(acc.status, 403);
   assert.equal((await h.get('/api/products', { token: T.accountant.accessToken })).status, 200);
+});
+
+/* ---------------------------------------- نوشتن بیرون از همگام‌سازی */
+
+test('عکسِ کالا، صندوقِ عکس، بانکِ تصویر و پشتیبانِ حساب فقط در حدِ نقش', async () => {
+  //  PNGِ ۱×۱ (سرور عکسِ کمتر از ۱۰۰ بایت را «خالی» می‌داند ⇒ دنباله‌ای از صفر)
+  const png = Buffer.concat([Buffer.from('89504e470d0a1a0a0000000d4948445200000001000000010806000000'
+    + '1f15c4890000000d49444154789c63f8ffff3f0005fe02fea7d6a5d60000000049454e44ae426082', 'hex'), Buffer.alloc(160)])
+    .toString('base64');
+  const photo = (role, id) => h.api('PUT', `/api/sync/v1/photos/${id}`, {
+    token: T[role].accessToken, headers: { 'X-App': 'shop' }, body: { data: png, device_id: `ph-${role}` },
+  });
+  assert.equal((await photo('storekeeper', 'p-ph-stk')).status, 200);
+  assert.equal((await photo('staff', 'p-ph-stf')).status, 200, 'مرجع: شاگرد همان امروز');
+  for (const role of ['cashier', 'picker']) {
+    const r = await photo(role, `p-ph-${role}`);
+    assert.equal(r.status, 403, role);
+    assert.equal(r.body.error.code, 'table_not_allowed', role);
+    const del = await h.api('DELETE', '/api/sync/v1/photos/p-ph-stk', { token: T[role].accessToken, headers: { 'X-App': 'shop' } });
+    assert.equal(del.status, 403, `${role} delete`);
+    const inbox = await h.api('POST', '/api/sync/v1/photo-inbox', {
+      token: T[role].accessToken, headers: { 'X-App': 'shop' }, body: { data: png, pair: 'x', device_id: 'ph' },
+    });
+    assert.equal(inbox.status, 403, `${role} inbox`);
+  }
+  assert.equal((await photo('accountant', 'p-ph-acc')).status, 403);
+
+  //  بانکِ تصویر: نوشتن یعنی کالا
+  const flag = await h.put('/api/admin/pump/live-config', { scope: shopId, key: 'shop.image_bank', value: true }, { token: admin });
+  assert.equal(flag.status, 200, JSON.stringify(flag.body));
+  for (const role of ['cashier', 'picker']) {
+    const r = await h.post('/api/shop/images/select', {}, { token: T[role].accessToken });
+    assert.equal(r.status, 403, role);
+    assert.equal(r.body.error.code, 'table_not_allowed', role);
+  }
+  const sk = await h.post('/api/shop/images/select', {}, { token: T.storekeeper.accessToken });
+  assert.notEqual(sk.body?.error?.code, 'table_not_allowed');
+  assert.notEqual(sk.body?.error?.code, 'permission_denied');
+
+  //  پشتیبانِ حساب: فقط نقش‌های «*» بالا می‌فرستند؛ دیدن برای همه باز است
+  const data = Buffer.from(JSON.stringify({ products: [] }));
+  for (const role of NEW_ROLES) {
+    const up = await h.raw('POST', '/api/me/backups?ext=json&kind=manual', data, { token: T[role].accessToken });
+    assert.equal(up.status, 403, role);
+    assert.equal(up.body.error.code, 'permission_denied', role);
+    assert.equal((await h.get('/api/me/backups', { token: T[role].accessToken })).status, 200, role);
+  }
+  const ok = await h.raw('POST', '/api/me/backups?ext=json&kind=manual', data, { token: T.staff.accessToken });
+  assert.equal(ok.status, 201, JSON.stringify(ok.body));
+});
+
+test('اعلانِ سفارشِ تازه فقط برای رسیدگی‌کنندهٔ سفارش؛ «باز شد»ِ حسابدار اعلانِ دکان را نمی‌بندد', async () => {
+  const notify = require('../src/lib/order-notify');
+  const ids = new Set(await notify.recipientIds(shopId));
+  for (const role of ['owner', 'manager', 'staff', 'cashier', 'picker']) assert.ok(ids.has(T[role].user.id), role);
+  for (const role of ['storekeeper', 'accountant']) assert.ok(!ids.has(T[role].user.id), role);
+
+  const ack = (role, body) => h.post('/api/shop/order-notify/onf_none/ack', body, { token: T[role].accessToken });
+  for (const body of [{ kind: 'opened' }, {}]) {
+    const r = await ack('accountant', body);
+    assert.equal(r.status, 403, JSON.stringify(body));
+    assert.equal(r.body.error.code, 'permission_denied');
+  }
+  //  «رسید» فقط ثبت است و برای حسابدار هم باز است (این‌جا پرچم خاموش است)
+  assert.notEqual((await ack('accountant', { kind: 'received' })).body?.error?.code, 'permission_denied');
+  assert.notEqual((await ack('picker', { kind: 'opened' })).body?.error?.code, 'permission_denied');
+  assert.notEqual((await ack('staff', {})).body?.error?.code, 'permission_denied');
 });

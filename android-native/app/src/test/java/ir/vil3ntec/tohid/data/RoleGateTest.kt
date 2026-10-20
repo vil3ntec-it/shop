@@ -89,6 +89,14 @@ class RoleGateTest {
     assertEquals(emptyList<String>(), PermCore.writable("accountant"))
     assertTrue(PermCore.allows("accountant", null, "reports.money"))
     assertTrue(PermCore.allows("accountant", null, "audit.view"))
+    //  راستیِ شرح: عددهای مالی فقط نمایشی است (`display`)، پس هیچ «نمی‌تواند»ی از آن نمی‌گوید
+    assertTrue(PermCore.CATALOG.getValue("reports.money").display)
+    for (role in listOf("staff", "cashier", "storekeeper", "picker")) {
+      val info = RoleInfo.of(role)!!
+      assertTrue(role, info.cannot.none { "مالی" in it })
+      assertEquals(role, RoleInfo.MONEY_HIDDEN_NOTE, info.note)
+      assertTrue(role, !PermCore.allows(role, null, "reports.money"))
+    }
     //  صندوق‌دار برگشت می‌زند، انباردار و جمع‌آور نه
     assertTrue(PermCore.allows("cashier", null, "returns.create"))
     assertTrue(!PermCore.allows("storekeeper", null, "returns.create"))

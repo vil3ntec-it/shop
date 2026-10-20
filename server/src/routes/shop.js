@@ -14,7 +14,7 @@ const staffCodes = require('../lib/staff-codes');
 const audit = require('../lib/audit');
 const subsLib = require('../lib/subscriptions');
 const { entitlementOf } = require('../lib/entitlement');
-const { permissionsOf, STAFF_ROLES } = require('../lib/permissions');
+const { permissionsOf, STAFF_ROLES, legacyRole } = require('../lib/permissions');
 const { requireUser, requireShop, optionalShop, requirePermission, requireFeature } = require('../middleware/auth');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
 const { badRequest, forbidden, notFound } = require('../middleware/errors');
@@ -31,7 +31,9 @@ function shopPayload(shop, member, extra = {}) {
       ownerUserId: shop.owner_user_id, createdAt: Number(shop.created_at),
       maxMembers: shop.max_members,
     },
-    role: member.role,
+    //  A16: نسخهٔ قدیم فقط `role` را می‌خواند ⇐ نقشِ تازه آن‌جا «staff»؛ نقشِ واقعی در `actualRole`
+    role: legacyRole(member.role),
+    actualRole: member.role,
     isOwner: member.role === 'owner',
     permissions: permissionsOf(member.role),
     ...extra,

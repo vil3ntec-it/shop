@@ -650,6 +650,9 @@ private fun RoleDetails(role: String) {
         color = colors.muted,
       )
     }
+    if (info.note.isNotEmpty()) {
+      Text(info.note, style = MaterialTheme.typography.labelSmall, color = colors.muted2)
+    }
   }
 }
 
