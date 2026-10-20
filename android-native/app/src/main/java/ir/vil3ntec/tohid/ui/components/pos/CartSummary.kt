@@ -136,6 +136,16 @@ object CartSummary {
  *  متن پله‌پله کوچک می‌شود.
  */
 object PhoneSaleText {
+  /**
+   *  مبلغ با «؋» برای همهٔ جاهای صندوقِ گوشی. منفی درونِ جداسازِ چپ‌به‌راست
+   *  (U+2066 … U+2069) می‌نشیند تا در متنِ راست‌به‌چپ «-» پیش از رقم بماند
+   *  («-99,999 ؋») و پسِ عدد نیفتد («99,999-»). مثبت همان `money` است.
+   */
+  fun amount(value: Double): String {
+    val m = ir.vil3ntec.tohid.money(value)
+    return if (m.startsWith("-")) "⁦$m⁩ ؋" else "$m ؋"
+  }
+
   /** قیمتِ پررنگِ کاشیِ کوچکِ کالا (۱۴sp؛ متنِ کامل با «؋») — کاشی ۱۰۱dp جا دارد */
   fun priceSp(text: String): Int = when {
     text.length <= 9 -> 14

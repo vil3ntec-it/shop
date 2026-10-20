@@ -166,7 +166,7 @@ private fun KeypadSheet(
           overflow = TextOverflow.Ellipsis,
           modifier = Modifier.semantics { heading() },
         )
-        Text("${money(req.price)} ؋ / $unit", color = v.inkMuted, fontSize = 13.sp, maxLines = 1)
+        Text("${PhoneSaleText.amount(req.price)} / $unit", color = v.inkMuted, fontSize = 13.sp, maxLines = 1)
       }
       Box(
         Modifier.size(40.dp).clip(CircleShape).background(v.bg).clickable(role = Role.Button, onClick = onDismiss)
@@ -189,7 +189,7 @@ private fun KeypadSheet(
       Text(unit, color = v.inkMuted, fontSize = 16.sp, maxLines = 1, modifier = Modifier.padding(bottom = 8.dp))
     }
     Text(
-      error ?: "= ${money(req.price * value)} ؋",
+      error ?: "= ${PhoneSaleText.amount(req.price * value)}",
       color = if (error != null) v.negative else v.inkMuted,
       fontSize = 13.sp,
       maxLines = 2,

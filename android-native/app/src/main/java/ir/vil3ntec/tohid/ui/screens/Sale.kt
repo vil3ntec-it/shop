@@ -39,6 +39,7 @@ import ir.vil3ntec.tohid.ui.components.pos.PhoneCartUi
 import ir.vil3ntec.tohid.ui.components.pos.PhoneCatalog
 import ir.vil3ntec.tohid.ui.components.pos.PhoneCatalogItem
 import ir.vil3ntec.tohid.ui.components.pos.PhoneSaleFrame
+import ir.vil3ntec.tohid.ui.components.pos.PhoneSaleText
 import ir.vil3ntec.tohid.ui.components.pos.CatalogSearch
 import ir.vil3ntec.tohid.ui.components.pos.PhoneKeypadRequest
 import ir.vil3ntec.tohid.ui.components.pos.PhoneQtyKeypad
@@ -916,8 +917,8 @@ fun SaleScreen(
                   index = rows.size + 1,
                   revealed = revealed,
                   onClick = null,
-                  //  بی نشانهٔ منفی: عنوان خودش «تخفیف» است و «−» در راست‌به‌چپ پسِ عدد می‌افتاد
-                  trailing = { PhoneCartAmount("${money(off)} ؋") },
+                  //  «-99,999 ؋»: منفی در جداسازِ چپ‌به‌راست، تا «-» پسِ عدد نیفتد
+                  trailing = { PhoneCartAmount(PhoneSaleText.amount(-off)) },
                 )
               }
             }

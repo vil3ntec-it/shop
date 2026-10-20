@@ -378,7 +378,7 @@ private fun BestsellerRow(items: List<PhoneCatalogItem>, onTap: (PhoneCatalogIte
         val on = if (b.inCart > 0) v.onCart else v.ink
         Text(b.name, color = on, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 116.dp))
         Spacer(Modifier.width(6.dp))
-        Text("${money(b.price)} ؋", color = on, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+        Text(PhoneSaleText.amount(b.price), color = on, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
       }
     } }
   }
@@ -467,7 +467,7 @@ fun PhoneTile(
     label = "tilePress",
   )
   val pop = rememberAddPop(item.inCart)
-  val priceText = "${money(item.price)} ؋"
+  val priceText = PhoneSaleText.amount(item.price)
   val stockText = PhoneSaleText.stock(item.stock, item.unit)
   val out = item.stock <= 0
   Column(
@@ -537,7 +537,8 @@ fun PhoneTile(
 }
 
 /**
- *  ردیفِ فهرست (۵۲dp): دایره، نام، قیمت · موجودی، و در انتها «+» (در سبد ⇐ «−» مقدار «+»).
+ *  ردیفِ فهرست (۵۲dp): دایره، نام، قیمت · موجودی. زدنِ ردیف ⇐ +۱ (وزنی ⇐ صفحه‌کلید)؛
+ *  در سبد ⇐ دایرهٔ زردِ مقدار و «−»ِ کوچک در انتها — مثلِ کاشی، نه بزرگ‌تر.
  *  ردیف‌ها یک کارتِ سفیدِ پیوسته با خطِ مویی‌اند (مثلِ گروه‌های r5).
  */
 @OptIn(ExperimentalFoundationApi::class)
@@ -558,7 +559,7 @@ fun PhoneListRow(
     topStart = if (first) r else 0.dp, topEnd = if (first) r else 0.dp,
     bottomStart = if (last) r else 0.dp, bottomEnd = if (last) r else 0.dp,
   )
-  val priceText = "${money(item.price)} ؋"
+  val priceText = PhoneSaleText.amount(item.price)
   val stockText = PhoneSaleText.stock(item.stock, item.unit)
   val hairline = v.hairline
   val out = item.stock <= 0
@@ -603,22 +604,7 @@ fun PhoneListRow(
         )
       }
     }
-    Row(Modifier.alpha(dim), verticalAlignment = Alignment.CenterVertically) {
-      if (item.inCart > 0) {
-        MinusButton(item, 34.dp, onMinus)
-        Text(
-          qty(item.inCart),
-          color = v.ink,
-          fontSize = 14.sp,
-          fontWeight = FontWeight.Bold,
-          maxLines = 1,
-          textAlign = TextAlign.Center,
-          modifier = Modifier.widthIn(min = 28.dp),
-        )
-      }
-      RoundButton("یکی بیشتر ${item.name}", { if (!out) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onTap(item) }, 34.dp, v.cart) {
-        Icon(Icons.Outlined.Add, contentDescription = null, tint = v.onCart, modifier = Modifier.size(20.dp))
-      }
-    }
+    //  مقدار همان دایرهٔ زردِ آغاز است (مثلِ کاشی)؛ این‌جا فقط «−»ِ کوچک
+    if (item.inCart > 0) Box(Modifier.alpha(dim)) { MinusButton(item, 28.dp, onMinus) }
   }
 }

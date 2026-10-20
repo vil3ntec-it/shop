@@ -215,7 +215,7 @@ private fun PopIn(content: @Composable () -> Unit) {
 fun PhoneCartStrip(model: CartSummary.Model, pulse: Int, onOpen: () -> Unit, modifier: Modifier = Modifier) {
   val v = PhoneV3.colors
   val density = LocalDensity.current
-  val spoken = "سبد، ${plain(model.count)} قلم، ${money(model.total)} ؋"
+  val spoken = "سبد، ${plain(model.count)} قلم، ${PhoneSaleText.amount(model.total)}"
   val bump = remember { Animatable(1f) }
   val first = remember { pulse }
   LaunchedEffect(pulse) {
@@ -483,13 +483,13 @@ fun PhoneCartRow(
         modifier = Modifier.weight(1f),
       )
       Spacer(Modifier.width(12.dp))
-      Text("${money(row.lineTotal)} ؋", color = v.onBlackMuted, fontSize = 14.sp, maxLines = 1)
+      Text(PhoneSaleText.amount(row.lineTotal), color = v.onBlackMuted, fontSize = 14.sp, maxLines = 1)
     }
     if (expanded) {
       Spacer(Modifier.height(12.dp))
       Row(Modifier.padding(start = 64.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(
-          "${money(row.unitPrice)} ؋${if (row.unit.isNotBlank()) " / ${row.unit}" else ""}" +
+          "${PhoneSaleText.amount(row.unitPrice)}${if (row.unit.isNotBlank()) " / ${row.unit}" else ""}" +
             if (row.custom && !row.free) " · قیمتِ دستی" else "",
           color = v.onBlackMuted,
           fontSize = 12.sp,
@@ -605,7 +605,7 @@ fun PhoneCartAmount(text: String) {
 @Composable
 fun PhoneCartTotal(total: Double) {
   val v = PhoneV3.colors
-  val text = "${money(total)} ؋"
+  val text = PhoneSaleText.amount(total)
   Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
     Text("جمع:", color = v.onBlack, fontSize = 24.sp, fontWeight = FontWeight.Normal, maxLines = 1)
     Spacer(Modifier.width(16.dp))

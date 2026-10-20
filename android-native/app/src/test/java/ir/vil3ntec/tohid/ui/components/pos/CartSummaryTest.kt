@@ -108,6 +108,18 @@ class CartSummaryTest {
 /** اندازهٔ قلمِ مبلغ‌های درشت و خطِ موجودیِ کارت (نسخهٔ ۳) */
 class PhoneSaleTextTest {
   @Test
+  fun `مبلغِ منفی در جداسازِ چپ‌به‌راست، مثبت ساده`() {
+    assertEquals("⁦-99,999⁩ ؋", PhoneSaleText.amount(-99_999.0))
+    assertEquals("⁦-1,234,567⁩ ؋", PhoneSaleText.amount(-1_234_567.0))
+    assertEquals("240 ؋", PhoneSaleText.amount(240.0))
+    assertEquals("0 ؋", PhoneSaleText.amount(0.0))
+    //  گردشده به صفر ⇐ بی نشانه
+    assertEquals("0 ؋", PhoneSaleText.amount(-0.4))
+    //  «-» همیشه نخستین نویسهٔ درونِ جداساز است، نه پسِ رقم
+    assertTrue(PhoneSaleText.amount(-5.0).startsWith("⁦-5"))
+  }
+
+  @Test
   fun `مبلغِ دراز کوچک‌تر می‌شود و هرگز بزرگ‌تر نه`() {
     val texts = listOf("85 ؋", "1,650 ؋", "12,500 ؋", "1,234,567 ؋", "12,345,678 ؋", "1,234,567,890 ؋")
     val price = texts.map { PhoneSaleText.priceSp(it) }
