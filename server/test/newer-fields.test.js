@@ -2,9 +2,10 @@
 /**
  * تورِ ایمنیِ «فیلدی که ساختِ پیش از A00 نمی‌شناسد» — A00 (`src/lib/newer-fields.js`).
  *
- *   ۱) برنامه از `X-App-Version`: گوشی `3.2.N` و کامپیوتر `1.0.N` با کفِ خودشان؛ وب
- *      (`3.2`، بی شمارهٔ ساخت)، خطِ ناشناختهٔ بالاتر (`4.x`، `2.x`) و ساختِ A00 به بعد
- *      از تور می‌گذرند؛ `3.2.0`، نسخهٔ نخوانا و بی‌سرآیند قدیمی‌ترین‌اند.
+ *   ۱) برنامه: نشانِ صریحِ بدنه اول — `caps: ["a00"]` (ساختِ A00 به بعد) و `client: "web"`
+ *      یا `caps: ["raw"]` (وب) از تور می‌گذرند؛ بعد `X-App-Version`: گوشی `3.2.N` و کامپیوتر
+ *      `1.0.N` با کفِ خودشان؛ صفحهٔ وبِ مانده در حافظه (`3.2` بی شمارهٔ ساخت)، پوستهٔ وبِ
+ *      قدیمی (`2.x`) و خطِ بالاتر (`4.x`) هم می‌گذرند؛ `3.2.0`، نخوانا و بی‌سرآیند قدیمی‌ترین‌اند.
  *   ۲) ساختِ پیش از A00: فقط `null` ِ کلیدی که آن ساخت نمی‌شناسد کنار می‌رود — فیلدِ
  *      بیرونِ `PRE_A00` (تازه‌تر از A00)، یا فیلدی که کفش بالاتر از آن ساخت است (فیلدِ
  *      ناتهیِ `active` ِ ۳.۲.۳۰۰ که null اش Pull ِ ساختِ تازه را می‌انداخت).
@@ -26,8 +27,8 @@ const op = (op_id, table, type, fields, rawTable = table) => {
 const v3 = (op_id, table, kind, fields) => ({ op_id, table, row_id: `${table}-1`, kind, fields, hlc: 'x' });
 
 /** میان‌افزار با درخواست و پاسخِ ساختگی؛ پاسخِ «v1» برای هر op ِ رسیده applied است */
-function run(ops, { version = '3.2.400', app = 'shop', kind = 'shop' } = {}) {
-  const req = { sync: { app, accountKind: kind, accountId: 'shop_1' }, body: { ops }, headers: { 'x-app-version': version } };
+function run(ops, { version = '3.2.400', app = 'shop', kind = 'shop', extra = {} } = {}) {
+  const req = { sync: { app, accountKind: kind, accountId: 'shop_1' }, body: { ops, ...extra }, headers: { 'x-app-version': version } };
   let sent = null;
   const res = { json: (b) => { sent = b; return b; } };
   let passed = null;
@@ -36,21 +37,22 @@ function run(ops, { version = '3.2.400', app = 'shop', kind = 'shop' } = {}) {
   return { passed, results: sent.results };
 }
 
-test('برنامه از X-App-Version', () => {
-  assert.deepEqual(N.clientOf('3.2'), { bypass: 'web' });
+test('برنامه: نشانِ صریحِ بدنه، بعد X-App-Version', () => {
+  assert.deepEqual(N.clientOf('3.2.0', { caps: ['a00'] }), { bypass: 'a00' }, 'نشانِ A00 بر نسخه می‌چربد');
+  assert.deepEqual(N.clientOf('', { caps: ['x', 'a00'] }), { bypass: 'a00' });
+  assert.deepEqual(N.clientOf('', { client: 'web' }), { bypass: 'web' });
+  assert.deepEqual(N.clientOf('3.2.100', { caps: ['raw'] }), { bypass: 'web' });
+  assert.deepEqual(N.clientOf('3.2.100', { caps: 'a00' }), { line: 'phone', v: '3.2.100' }, 'caps باید فهرست باشد');
+  assert.deepEqual(N.clientOf('3.2'), { bypass: 'web-cached' }, 'صفحهٔ وبِ پیش از نشان');
+  assert.deepEqual(N.clientOf('2.0.5'), { bypass: 'web-wrapper' }, 'پوستهٔ وبِ قدیمی');
   assert.deepEqual(N.clientOf('4.0.12'), { bypass: 'newer-line' });
-  assert.deepEqual(N.clientOf('2.0.5'), { bypass: 'newer-line' }, 'کامپیوتر 2.x');
   assert.deepEqual(N.clientOf('3.2.400'), { line: 'phone', v: '3.2.400' });
+  assert.deepEqual(N.clientOf('3.3.1'), { line: 'phone', v: '3.3.1' }, 'بی نشان، فقط کف‌ها');
   assert.deepEqual(N.clientOf('1.0.300'), { line: 'desktop', v: '1.0.300' });
   assert.deepEqual(N.clientOf('3.2.0'), { line: 'phone', v: '3.2.0' }, 'ساختِ آزمایشی ⇒ قدیمی');
+  assert.deepEqual(N.clientOf('0.9.1'), { line: null, v: '0.9.1' });
   assert.deepEqual(N.clientOf(''), { line: null, v: '' });
   assert.deepEqual(N.clientOf('nope'), { line: null, v: '' });
-  assert.equal(N.A00.phone, null, 'تا انتشارِ #341 هیچ ساختی از تور نمی‌گذرد');
-  const a00 = { phone: '3.2.700', desktop: '1.0.400' };
-  assert.deepEqual(N.clientOf('3.2.700', a00), { bypass: 'a00' });
-  assert.deepEqual(N.clientOf('3.3.1', a00), { bypass: 'a00' });
-  assert.deepEqual(N.clientOf('3.2.699', a00), { line: 'phone', v: '3.2.699' });
-  assert.deepEqual(N.clientOf('1.0.400', a00), { bypass: 'a00' });
 });
 
 test('ساختِ پیش از A00 چه می‌شناسد', () => {
@@ -70,6 +72,7 @@ test('ساختِ پیش از A00 چه می‌شناسد', () => {
   assert.equal(N.knows(at('3.2.9999'), 'sales', 'orderId'), false, 'بیرونِ PRE_A00 ⇒ هیچ ساختِ پیش از A00');
   assert.equal(N.knows(at('3.2.9999'), 'sales', 'payments'), false);
   assert.equal(N.knows(N.clientOf('3.2'), 'debtors', 'creditLimit'), true, 'وب از تور می‌گذرد');
+  assert.equal(N.knows(N.clientOf('3.2.400', { caps: ['a00'] }), 'sales', 'orderId'), true, 'ساختِ A00 فیلدِ تازه را می‌شناسد');
 });
 
 test('v1: opِ پالایش‌شده از validateOp می‌گذرد و پاسخ‌ها سرِ جایشان', () => {
@@ -100,7 +103,9 @@ test('ساختی که فیلد را می‌شناسد، و وب، می‌توا�
   assert.equal(run(ops, { version: '3.2.600' }).passed[0], ops[0]);
   assert.equal(run(ops, { version: '3.2.600' }).passed[1], ops[1]);
   const web = run(ops, { version: '3.2' });
-  assert.equal(web.passed, ops, 'وب: دستِ نخورده');
+  assert.equal(web.passed, ops, 'وبِ مانده در حافظه: دستِ نخورده');
+  assert.equal(run(ops, { version: '', extra: { client: 'web' } }).passed, ops, 'وب با نشانِ client');
+  assert.equal(run(ops, { version: '3.2.100', extra: { caps: ['a00'] } }).passed, ops, 'ساختِ A00 با نشانِ caps');
   assert.deepEqual(run(ops, { version: '1.0.200' }).passed.map((o) => o.op_id), [], 'کامپیوترِ پیش از کفِ هر دو');
 });
 
@@ -120,6 +125,11 @@ test('v3: پسوندِ واحد و opِ تهی‌شده', () => {
     [['a', '', 'creditLimitMinor'], ['b', 'stale_null_ignored', 'orderId'], ['c', '', ''], ['d', '', '']]);
   assert.equal(N.filterOps(ops, { version: '3.2.466', shape: 'v3' }).ops.length, 3, 'سقفِ اعتبار از 3.2.466');
   assert.equal(N.filterOps(ops, { version: '3.2', shape: 'v3' }).ops, ops);
+  assert.equal(N.filterOps(ops, { version: '3.2.100', shape: 'v3', caps: ['a00'] }).ops, ops);
+  assert.equal(N.filterOps(ops, { version: '3.2.100', shape: 'v3', client: 'web' }).ops, ops);
+  //  کلیدِ ناشناخته با پسوندِ واحد همان ناشناخته است
+  assert.deepEqual(N.filterOps([v3('x', 'products', 'update', { futureMinor: null, name: 'n' })],
+    { version: '3.2.400', shape: 'v3' }).ops[0].fields, { name: 'n' });
 });
 
 test('پمپ و حسابِ غیرِ دکان دست نمی‌خورند', () => {

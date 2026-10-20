@@ -166,6 +166,29 @@ internal class SyncCommit(private val journal: Journal, private val parts: Parts
   fun pending(): Boolean = journal.exists()
 
   /**
+   *  A00 — درمانِ سایهٔ ساختِ پیش از A00، یک بار: هنگامِ شروع (`recover` ِ موتورها) با
+   *  دفترِ روی دیسک و **پیش از نخستین تفاضل**. سایهٔ بی مهر (`LedgerDiff.SHADOW_STAMP`)
+   *  یعنی ساختِ پیشین نوشته‌اش؛ سایهٔ Snapshot ِ آن ساخت‌ها ردیفِ خامِ سرور بود و کلیدهایی
+   *  داشت که دفترِ آن ساخت نمی‌شناخت. این ساخت آن کلیدها را می‌شناسد ولی دفتر پیش‌فرضشان
+   *  را دارد، پس بی درمان نخستین ذخیرهٔ بی‌ربط پیش‌فرض را روی مقدارِ سرور می‌نوشت
+   *  (`LedgerDiff.healShadow`). سایهٔ درمان‌شده با مهر نوشته می‌شود؛ بارِ بعد کاری نمی‌کند.
+   *
+   *  @return true اگر سایه درمان و مهر شد
+   */
+  fun heal(ledger: ShopData): Boolean {
+    if (journal.exists()) recover(ledger)
+    val shadow = parse(parts.shadow()) ?: return false
+    if (LedgerDiff.isStamped(shadow)) return false
+    val healed = LedgerDiff.modelTree(LedgerDiff.healShadow(shadow, LedgerDiff.toJson(ledger)))
+    parts.commit(LedgerDiff.shadowOf(healed).toString(), null)
+    return true
+  }
+
+  /** همان سایه با یا بی مهرِ A00 — ژورنالِ ساختِ پیشین اثرِ انگشتِ سایهٔ بی مهر را دارد */
+  private fun same(candidate: String, target: String): Boolean =
+    sha(candidate) == target || sha(LedgerDiff.unstamped(candidate)) == target
+
+  /**
    *  بازیابی هنگامِ شروع (`ShopStore.load`) یا پیش از کارِ بعدی.
    *
    *  | سایهٔ روی دیسک        | تصمیم                                              |
@@ -196,7 +219,7 @@ internal class SyncCommit(private val journal: Journal, private val parts: Parts
         val have = parts.queued()
         parts.push(j.ops.filter { it.opId !in have })
         val mine = ledger?.let { LedgerDiff.shadowOf(LedgerDiff.toJson(it)).toString() }
-        val next = if (mine != null && sha(mine) == j.shadow) {
+        val next = if (mine != null && same(mine, j.shadow)) {
           mine
         } else {
           //  دفترِ آن لحظه در دست نیست: سایهٔ پیشین + همین opها. بیشترین
@@ -214,7 +237,7 @@ internal class SyncCommit(private val journal: Journal, private val parts: Parts
           Outcome.BACK
         } else {
           val next = absorbedShadow(current, j.ops, tree)
-          if (sha(next) == j.shadow) {
+          if (same(next, j.shadow)) {
             parts.commit(next, j.cursor)
             Outcome.FORWARD
           } else {

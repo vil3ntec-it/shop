@@ -23,34 +23,32 @@
  * تازه‌تر (`active`، `unitFactor`) حیاتی است: `null` روی سرور `fromJson` ِ ساختِ
  * تازه را در Pull می‌انداخت و همگام‌سازی می‌ایستاد.
  *
- * کی از تور می‌گذرد (هیچ کاری نمی‌شود):
- *   • ساختِ A00 به بعد (`A00`، نخستین ساختِ منتشرشده با #341) — کلیدِ ناشناخته را
- *     null نمی‌کند، پس فیلدِ تازه‌ای که پس از A00 به مدل بیاید هیچ ردیفی این‌جا
- *     لازم ندارد؛
- *   • وب (`X-App-Version` بی شمارهٔ ساخت، `3.2` از `<meta tohid-app-version>`):
- *     ردیفِ JSON ِ خام را نگه می‌دارد و هرگز null ِ کهنه نمی‌فرستد؛ `null` اش
- *     یعنی کاربر پاک کرد (سقفِ اعتبار) و باید بنشیند؛
- *   • خطِ ناشناختهٔ بالاتر (گوشی 4.x، کامپیوتر 2.x) — از همهٔ کف‌ها جلوتر است.
+ * کی از تور می‌گذرد (هیچ کاری نمی‌شود) — نشانِ صریح، نه حدس از شمارهٔ ساخت:
+ *   • `caps: ["a00"]` در بدنهٔ push (v1 و v3): ساختِ A00 به بعد (`LedgerDiff.SYNC_CAPS`)
+ *     کلیدِ ناشناخته را null نمی‌کند؛ ساختِ پیشین هرگز این نشان را نمی‌فرستد. پس فیلدِ
+ *     تازه‌ای که پس از A00 به مدل بیاید هیچ ردیفی این‌جا لازم ندارد و `PRE_A00` منجمد است؛
+ *   • `client: "web"` (یا `caps: ["raw"]`): موتورهای همگام‌سازیِ وب (`license/sync-engine.js`،
+ *     `license/sync-v3-engine.js`) ردیفِ JSON ِ خام را نگه می‌دارند و هرگز null ِ کهنه
+ *     نمی‌فرستند؛ `null` شان یعنی کاربر پاک کرد (سقفِ اعتبار) و باید بنشیند. صفحهٔ وبی
+ *     که پیش از این نشان در حافظهٔ مرورگر مانده با `X-App-Version` ِ بی شمارهٔ ساخت
+ *     (`3.2` از `<meta tohid-app-version>`) شناخته می‌شود؛
+ *   • عددِ اصلیِ ۲ (پوستهٔ وبِ قدیمی که همان کدِ وب را اجرا می‌کند) و خطِ ناشناختهٔ
+ *     بالاتر (گوشی 4.x به بعد).
  * ساختِ آزمایشیِ `3.2.0`، نسخهٔ نخوانا و نبودِ سرآیند «قدیمی‌ترین» حساب می‌شوند.
  *
  * ⚠️ بدترین خطای این تور «مقدارِ کهنه می‌ماند» است، هرگز «داده پاک می‌شود».
  * ⛔ `sync-v1.js` (مشترک با پمپ) دست نمی‌خورد: v1 از درِ میان‌افزارِ فقط‌دکانِ
  *    `routes/sync-v1.js` (پس از `v1Guard`) و v3 در خودِ `routes/sync-v3.js`.
- * ⛔ `PRE_A00` را عوض نکنید جز برای اصلاحِ کفِ یک فیلدِ پیش از A00؛ فیلدِ تازه این‌جا
- *    نمی‌آید. `A00` را پس از نخستین ساختِ منتشرشده با #341 پر کنید
- *    (`test/newer-fields-baseline.test.js` تا آن روز فیلدِ تازهٔ مدل را نمی‌پذیرد).
+ * ⛔ `PRE_A00` منجمد است (`test/newer-fields-baseline.test.js`): فیلدِ تازه این‌جا
+ *    نمی‌آید؛ تنها دلیلِ دست زدن، اصلاحِ کفِ یک فیلدِ پیش از A00 است.
  */
 const compat = require('./app-compat');
 
 /** گوشی (`android-native`، `3.2.N`) و کامپیوتر (`desktop`، `1.0.N`) — `N` شمارهٔ اجرای CI */
 const LINES = Object.freeze({ 3: 'phone', 1: 'desktop' });
 
-/**
- * نخستین ساختِ منتشرشده (اجرای موفقِ main) که #341 را دارد. `null` تا منتشر شود:
- * تا آن روز هیچ ساختی از تور نمی‌گذرد و `null` ِ فیلدِ بیرونِ `PRE_A00` از هیچ
- * برنامه‌ای پذیرفته نمی‌شود (کهنه می‌ماند، پاک نمی‌شود).
- */
-const A00 = Object.freeze({ phone: null, desktop: null });
+/** نشانِ ساختِ A00 به بعد در `caps` ِ بدنهٔ push — همان `LedgerDiff.SYNC_CAPS` */
+const CAP_A00 = 'a00';
 
 const ALL = null;
 const since = (phone, desktop) => Object.freeze({ phone, desktop });
@@ -80,19 +78,22 @@ const hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
 const isPlainObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 
 /**
- * برنامهٔ پشتِ `X-App-Version`.
+ * برنامهٔ پشتِ push: اول نشانِ صریحِ بدنه (`caps`، `client`)، بعد `X-App-Version`.
  * @returns {{bypass: string} | {line: string|null, v: string}}
  */
-function clientOf(version, a00 = A00) {
+function clientOf(version, { caps = [], client = '' } = {}) {
+  const list = Array.isArray(caps) ? caps.map(String) : [];
+  if (list.includes(CAP_A00)) return { bypass: 'a00' };
+  if (String(client) === 'web' || list.includes('raw')) return { bypass: 'web' };
   const v = compat.valid(version);
   if (!v) return { line: null, v: '' };                       // نبود یا نخوانا ⇒ قدیمی‌ترین
   const parts = v.split('.');
-  if (parts.length === 2) return { bypass: 'web' };            // وب: بی شمارهٔ ساخت
+  if (parts.length === 2) return { bypass: 'web-cached' };     // صفحهٔ وبِ پیش از نشان: بی شمارهٔ ساخت
   const major = Number(parts[0]);
   const line = LINES[major];
-  if (!line) return major > 0 ? { bypass: 'newer-line' } : { line: null, v };
-  if (a00[line] && compat.compare(v, a00[line]) >= 0) return { bypass: 'a00' };
-  return { line, v };
+  if (line) return { line, v };
+  if (major === 2) return { bypass: 'web-wrapper' };           // پوستهٔ وبِ قدیمی: همان کدِ وب
+  return major > 3 ? { bypass: 'newer-line' } : { line: null, v };
 }
 
 /** آیا ساختِ پیش از A00 ِ [client] کلیدِ [key] ِ جدولِ [table] را می‌شناسد؟ */
@@ -114,11 +115,12 @@ function legacyKey(table, key, shape) {
 }
 
 /**
- * پالایشِ یک دسته. `shape`: `v1` (همان شکلِ v1 — و صفِ v2 ِ راهِ v3) یا `v3`.
+ * پالایشِ یک دسته. `shape`: `v1` (همان شکلِ v1 — و صفِ v2 ِ راهِ v3) یا `v3`؛ `caps` و
+ * `client` همان فیلدهای بدنهٔ push.
  * @returns {{ops:Array, length:number, dropped:Map<number,object>, trimmed:Map<string,string[]>, client:object}}
  */
-function filterOps(ops, { version = '', shape = 'v1', a00 = A00 } = {}) {
-  const client = clientOf(version, a00);
+function filterOps(ops, { version = '', shape = 'v1', caps = [], client: who = '' } = {}) {
+  const client = clientOf(version, { caps, client: who });
   const res = { ops, length: Array.isArray(ops) ? ops.length : 0, dropped: new Map(), trimmed: new Map(), client };
   if (client.bypass || !Array.isArray(ops) || !ops.length) return res;
   const { tableOf, hashOf } = require('./sync-v1');
@@ -167,7 +169,10 @@ function v1NewerFields(req, res, next) {
   const ctx = req.sync;
   if (!ctx || ctx.app !== 'shop' || ctx.accountKind !== 'shop') return next();
   try {
-    const fl = filterOps(req.body?.ops, { version: String(req.headers['x-app-version'] || '').slice(0, 32), shape: 'v1' });
+    const fl = filterOps(req.body?.ops, {
+      version: String(req.headers['x-app-version'] || '').slice(0, 32), shape: 'v1',
+      caps: req.body?.caps, client: req.body?.client,
+    });
     if (!fl.dropped.size && !fl.trimmed.size) return next();
     req.body.ops = fl.ops;
     const send = res.json.bind(res);
@@ -179,4 +184,4 @@ function v1NewerFields(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { PRE_A00, A00, LINES, clientOf, knows, filterOps, mergeResults, v1NewerFields };
+module.exports = { PRE_A00, CAP_A00, LINES, clientOf, knows, filterOps, mergeResults, v1NewerFields };

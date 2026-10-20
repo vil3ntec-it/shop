@@ -258,6 +258,21 @@ class UnknownFieldsTest {
     assertEquals("{\"series\":null}", LedgerDiff.changedFields("sales", known, JsonObject(emptyMap())).toString())
   }
 
+  /** یک ردیفِ ناخوانا بقیه را خام نگه نمی‌دارد: هر ردیف جدا از درِ مدل */
+  @Test
+  fun modelTree_oneUnreadableRow_othersStillShaped() {
+    val tree = buildJsonObject {
+      put("products", JsonArray(listOf(
+        buildJsonObject { put("id", "p-ok"); put("name", "x"); put("futureX", "f") },
+        buildJsonObject { put("id", "p-bad"); put("salePrice", "abc"); put("futureY", "g") },
+      )))
+    }
+    val rows = (LedgerDiff.modelTree(tree)["products"] as JsonArray).map { it as JsonObject }
+    assertEquals(null, rows[0]["futureX"])
+    assertEquals(JsonPrimitive(true), rows[0]["active"])                 //  پیش‌فرضِ مدل پر شد
+    assertEquals(JsonPrimitive("g"), rows[1]["futureY"])                 //  ناخوانا همان‌طور خام
+  }
+
   @Test
   fun modelFields_comeFromTheModelOfThisBuild() {
     assertTrue(LedgerDiff.isModelField("sales", "series"))

@@ -132,6 +132,18 @@ object LedgerDiff {
     }
   }
 
+  /** فقط نام‌های سریال — همان کلیدهایی که `toJson` می‌نویسد */
+  @OptIn(ExperimentalSerializationApi::class)
+  private val MODEL_KEYS: Map<String, List<String>> by lazy {
+    val root = ShopData.serializer().descriptor
+    COLLECTIONS.associateWith { key ->
+      val at = root.getElementIndex(key)
+      if (at == CompositeDecoder.UNKNOWN_NAME) return@associateWith emptyList()
+      val row = root.getElementDescriptor(at).getElementDescriptor(0)
+      (0 until row.elementsCount).map { row.getElementName(it) }
+    }
+  }
+
   /**
    *  آیا مدلِ این نسخه کلیدِ [key] را در ردیف‌های [table] می‌شناسد؟
    *  مجموعه‌ای که مدل ندارد (نباید پیش بیاید) «می‌شناسد» حساب می‌شود، یعنی
@@ -189,6 +201,74 @@ object LedgerDiff {
     for (key in COLLECTIONS) put(key, tree[key] as? JsonArray ?: JsonArray(emptyList()))
     //  فهرست‌ها: نبودنِ کلید یعنی «هنوز هیچ‌وقت نرفته» — همان‌طور می‌ماند
     for (key in LIST_COLLECTIONS) (tree[key] as? JsonArray)?.let { put(key, it) }
+    put(SHADOW_STAMP, JsonPrimitive(1))
+  }
+
+  /**
+   *  مهرِ سایه‌ای که ساختِ A00 یا تازه‌تر نوشته — یعنی سایه از درِ مدلِ همان ساخت است
+   *  (`modelTree`). هر سایه‌ای که از `shadowOf` بگذرد مهر دارد؛ ساختِ پیش از A00 سایه را
+   *  بی آن می‌نویسد (کلیدی بیرونِ مجموعه‌ها را نگه نمی‌داشت). شرح سرِ `SyncCommit.heal`.
+   */
+  const val SHADOW_STAMP = "a00"
+
+  /**
+   *  توانِ این ساخت که با هر push (v1 و v3) می‌رود — `caps`. `a00` یعنی «کلیدی را که
+   *  مدلم نمی‌شناسد هرگز null نمی‌کنم»؛ سرور برای آن تورِ ساخت‌های پیشین را کنار
+   *  می‌گذارد (`server/src/lib/newer-fields.js`). ساختِ پیش از A00 هرگز آن را نمی‌فرستد.
+   */
+  val SYNC_CAPS: List<String> = listOf("a00")
+
+  fun capsJson(): JsonArray = JsonArray(SYNC_CAPS.map { JsonPrimitive(it) })
+
+  fun isStamped(shadow: JsonObject): Boolean = shadow[SHADOW_STAMP] != null
+
+  /** همان سایه بی مهر — ژورنالی که ساختِ پیش از A00 نوشته اثرِ انگشتِ سایهٔ بی مهر را دارد */
+  fun unstamped(shadow: String): String {
+    val o = runCatching { Json.parseToJsonElement(shadow) as? JsonObject }.getOrNull() ?: return shadow
+    return if (o.containsKey(SHADOW_STAMP)) JsonObject(o - SHADOW_STAMP).toString() else shadow
+  }
+
+  /**
+   *  درمانِ سایهٔ بی مهر (ساختِ پیش از A00) با دفترِ روی دیسک — یک بار، هنگامِ نخستین
+   *  شروع پس از به‌روزرسانی و پیش از نخستین تفاضل (`SyncCommit.heal`).
+   *
+   *  سایهٔ Snapshot ِ آن ساخت‌ها ردیفِ خامِ سرور بود: کلیدهایی داشت که دفترِ آن ساخت
+   *  نمی‌شناخت (`active = false`، `seller = "x"`). این ساخت آن‌ها را می‌شناسد ولی دفتر
+   *  پیش‌فرض‌شان را دارد ⇐ نخستین ذخیرهٔ بی‌ربط پیش‌فرض را روی مقدارِ سرور می‌نوشت. پس
+   *  برای هر ردیفی که در هر دو هست، هر کلیدِ مدل که دفتر ندارد یا پیش‌فرض دارد، مقدارِ
+   *  دفتر در سایه می‌نشیند. شمارنده‌های `$inc` (`INC_FIELDS`) کنار می‌مانند: همهٔ ساخت‌ها
+   *  آن‌ها را می‌شناختند و درمانشان فقط می‌توانست دلتای ثبت‌نشده‌ای را بپوشاند.
+   */
+  fun healShadow(shadow: JsonObject, ledger: JsonObject): JsonObject {
+    val out = LinkedHashMap<String, JsonElement>(shadow)
+    for (table in COLLECTIONS) {
+      val mine = rowsOf(ledger, table).associateBy { idOf(it) }
+      val rows = shadow[table] as? JsonArray ?: continue
+      if (mine.isEmpty()) continue
+      val defaults = defaultRow(table)
+      val keys = MODEL_KEYS[table].orEmpty()
+      out[table] = JsonArray(rows.map { r ->
+        val row = r as? JsonObject ?: return@map r
+        val led = mine[idOf(row)] ?: return@map r
+        val fixed = LinkedHashMap<String, JsonElement>(row)
+        for (k in keys) {
+          if (k == "id" || isInc(table, k)) continue
+          val lv = led[k]
+          val atDefault = lv == null || defaults?.get(k)?.let { OpHash.canonical(it) == OpHash.canonical(lv) } == true
+          if (!atDefault) continue
+          if (lv == null) fixed.remove(k) else fixed[k] = lv
+        }
+        JsonObject(fixed)
+      })
+    }
+    return JsonObject(out)
+  }
+
+  /** ردیفِ تهیِ مدل (فقط شناسه) — پیش‌فرضِ هر فیلد؛ null اگر مدل بی فیلدِ دیگری نسازدش */
+  private fun defaultRow(table: String): JsonObject? = try {
+    rowsOf(toJson(fromJson(JsonObject(mapOf(table to JsonArray(listOf(buildJsonObject { put("id", JsonPrimitive("_")) })))))), table).firstOrNull()
+  } catch (_: Exception) {
+    null
   }
 
   private fun rowsOf(tree: JsonObject?, key: String): List<JsonObject> =
@@ -348,9 +428,17 @@ object LedgerDiff {
     val shaped = try {
       toJson(fromJson(tree))
     } catch (_: Exception) {
-      return tree
+      null
     }
-    return keepListsOf(tree, shaped)
+    if (shaped != null) return keepListsOf(tree, shaped)
+    //  یک ردیفِ ناخوانا بقیه را خام نگه ندارد: هر ردیف جدا (`modelView`)، ناخوانا همان‌طور
+    val out = LinkedHashMap<String, JsonElement>(tree)
+    for (table in COLLECTIONS) {
+      val rows = tree[table] as? JsonArray ?: continue
+      val view = modelView(table, rowsOf(tree, table))
+      out[table] = JsonArray(rows.map { r -> (r as? JsonObject)?.let { view[idOf(it)] } ?: r })
+    }
+    return JsonObject(out)
   }
 
   /**

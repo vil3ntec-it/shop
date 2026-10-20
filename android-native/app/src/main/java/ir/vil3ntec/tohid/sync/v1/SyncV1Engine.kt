@@ -98,12 +98,15 @@ class SyncV1Engine private constructor(context: Context) {
   fun recover(ledger: ShopData) {
     //  Sync v3 پشتِ تنظیمِ هر دستگاه (پیش‌فرض v1) — شرح سرِ `sync/v3/SyncV3Runner.kt`
     if (SyncChoice.isV3(app)) { SyncV3Runner.of(app).recover(ledger); return }
-    if (!commit.pending()) return
-    if (commit.recover(ledger) == SyncCommit.Outcome.MISMATCH) {
-      //  نباید پیش بیاید؛ اگر آمد، دیده شود
-      state.lastError = "ژورنالِ همگام‌سازی با سایه نخواند"
+    if (commit.pending()) {
+      if (commit.recover(ledger) == SyncCommit.Outcome.MISMATCH) {
+        //  نباید پیش بیاید؛ اگر آمد، دیده شود
+        state.lastError = "ژورنالِ همگام‌سازی با سایه نخواند"
+      }
+      publish()
     }
-    publish()
+    //  A00: سایهٔ بی مهرِ ساختِ پیشین، یک بار و پیش از نخستین تفاضل (شرح سرِ `SyncCommit.heal`)
+    runCatching { commit.heal(ledger) }
   }
 
   /* ==========================================================

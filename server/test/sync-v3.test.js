@@ -673,4 +673,20 @@ test('A00: null ِ ساختِ پیش از A00 برای فیلدی که نمی‌
   await as('3.2', [upd({ futureX: null })]);
   row = await rowOf('products', 'p-a00');
   assert.deepEqual([row.data.subcategory, row.data.futureX], [null, null]);
+
+  //  نامِ v3 با پسوندِ واحد: `salePriceMinor` همان `salePrice` است که همهٔ ساخت‌ها می‌شناسند؛
+  //  `futureYMinor` ناشناخته می‌ماند
+  await as('3.2.9999', [upd({ futureYMinor: 5 })]);
+  const minor = await as('3.2.290', [upd({ salePriceMinor: null, futureYMinor: null })]);
+  assert.deepEqual(minor.body.results[0].ignored, ['futureYMinor']);
+  row = await rowOf('products', 'p-a00');
+  assert.deepEqual([row.data.salePriceMinor, row.data.futureYMinor], [null, 5]);
+
+  //  نشانِ صریح: ساختِ A00 (`caps`) و وب (`client`) از تور می‌گذرند، هر نسخه‌ای بگویند
+  const marked = (body, ops) => h.api('POST', '/api/sync/v3/push', {
+    token: owner.accessToken, headers: { 'X-App-Version': '3.2.1' }, body: { device_id: A, protocol: 3, ops, ...body },
+  });
+  await marked({ caps: ['a00'] }, [upd({ futureYMinor: null })]);
+  row = await rowOf('products', 'p-a00');
+  assert.equal(row.data.futureYMinor, null);
 });

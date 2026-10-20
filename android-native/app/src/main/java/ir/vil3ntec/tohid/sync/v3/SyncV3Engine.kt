@@ -226,8 +226,12 @@ internal class SyncV3Engine(
   }
 
   /** commitی که برنامه وسطش بسته شد — هنگامِ شروع، با دفترِ روی دیسک */
-  fun recover(onDisk: ShopData): SyncCommit.Outcome =
-    if (commit.pending()) commit.recover(onDisk) else SyncCommit.Outcome.NONE
+  fun recover(onDisk: ShopData): SyncCommit.Outcome {
+    val out = if (commit.pending()) commit.recover(onDisk) else SyncCommit.Outcome.NONE
+    //  A00: سایهٔ بی مهرِ ساختِ پیشین، یک بار و پیش از نخستین تفاضل (شرح سرِ `SyncCommit.heal`)
+    if (meta.initialized) runCatching { commit.heal(onDisk) }
+    return out
+  }
 
   fun queued(): Int = queue.outbox.sumOf { it.size }
   fun rejected(): List<V3Entry> = queue.rejected
@@ -392,6 +396,7 @@ internal class SyncV3Engine(
     val body = buildJsonObject {
       put("device_id", JsonPrimitive(deviceId))
       put("protocol", JsonPrimitive(protocol))
+      put("caps", LedgerDiff.capsJson())
       put("ops", JsonArray(b.ops))
       //  آنچه پس از همین دسته می‌ماند — نگهبانِ خروجِ سرور (SYN-10) از همین می‌خواند
       put("queued", JsonPrimitive(max(0, queued() - b.ops.size)))

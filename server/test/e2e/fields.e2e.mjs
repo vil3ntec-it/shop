@@ -4,8 +4,9 @@
  * برنامهٔ تازه‌تر (یا سرور) روی یک فاکتور فیلدی می‌نویسد که مدلِ این ساخت ندارد. دستگاه‌ها
  * همان قاعده‌های `LedgerDiff.kt` ِ همین مخزن را دارند (`lib/native.mjs` ⇐ `KOTLIN`)؛ پس
  * برگشتِ هر یک از قاعده‌های A00 در کاتلین همین‌جا قرمز می‌شود. فیلدهای `future*` عمداً در
- * فهرستِ منجمدِ تورِ سرور (`src/lib/newer-fields.js → PRE_A00`) نیستند؛ تا کفِ A00 پر نشده تور
- * `null` ِ هر ساختی را برای آن‌ها کنار می‌گذارد، پس گام‌های برنامه opهای **فرستاده‌شده** را می‌سنجند.
+ * فهرستِ منجمدِ تورِ سرور (`src/lib/newer-fields.js → PRE_A00`) نیستند و دستگاه‌های این ساخت با
+ * `caps: ["a00"]` از تور می‌گذرند؛ پس هر null ای که برسد روی سرور می‌نشیند و گام‌ها هم opهای
+ * **فرستاده‌شده** را می‌سنجند هم ردیفِ سرور را.
  *
  *   UF.0        برنامهٔ تازه‌تر فیلدِ تازه روی فاکتور می‌نویسد
  *   UF.pull     دستگاهِ موجود: Pull و ویرایشِ بی‌ربط ⇒ هیچ opی روی آن فاکتور؛ سایه فقط از درِ مدل
@@ -154,6 +155,7 @@ await E.step('UF.net', 'ساختِ پیش از A00 null می‌فرستد ⇐ س
   P.addDebtor('قدیمی');
   const bad = P.queue.find((o) => o.row_id === saleId);
   assert.ok(bad && bad.fields.orderId === null, `ساختِ پیش از A00 باید همان null را بسازد: ${JSON.stringify(P.queue)}`);
+  assert.deepEqual(P.marks(), {}, 'ساختِ پیش از A00 نشانِ caps ندارد');
   const r = E.ok(await P.api('POST', '/sync/v1/push', {
     device_id: P.deviceId, schema_version: core.SCHEMA_VERSION, queued: P.queue.length, ops: P.queue,
   }), 'push');
@@ -164,16 +166,24 @@ await E.step('UF.net', 'ساختِ پیش از A00 null می‌فرستد ⇐ س
   assert.equal(now.orderId, 'ord_e2e', 'تورِ سرور orderId را نگه نداشت');
   assert.equal(now.channel, 'online');
   //  همان «پاک کردنِ channel» از ساختِ قدیمی کنار می‌رود، از ساختی که آن را می‌شناسد می‌نشیند
-  const clear = (dev) => {
-    const op = { op_id: core.ulid(Date.now()), ts: Date.now(), table: 'sales', row_id: saleId, type: 'update', fields: { channel: null } };
-    return dev.api('POST', '/sync/v1/push', { device_id: dev.deviceId, schema_version: core.SCHEMA_VERSION, queued: 1, ops: [{ ...op, hash: core.hashOf(op) }] });
+  const clear = (dev, fields = { channel: null }) => {
+    const op = { op_id: core.ulid(Date.now()), ts: Date.now(), table: 'sales', row_id: saleId, type: 'update', fields };
+    return dev.api('POST', '/sync/v1/push', {
+      device_id: dev.deviceId, schema_version: core.SCHEMA_VERSION, queued: 1, ops: [{ ...op, hash: core.hashOf(op) }], ...dev.marks(),
+    });
   };
   E.ok(await clear(P), 'push');
   assert.equal((await row('sales', saleId)).channel, 'online', 'ساختِ 3.2.400 channel را نمی‌شناسد');
+  //  نشانِ caps بر نسخه می‌چربد: همان نسخهٔ قدیمی با نشانِ a00 یعنی ساختِ A00 (هرگز null ِ ناشناخته نمی‌فرستد)
   E.ok(await clear(A), 'push');
   now = await row('sales', saleId);
   assert.equal(now.channel, null, 'ساختِ تازه باید بتواند channel را پاک کند');
   assert.equal(now.orderId, 'ord_e2e');
+  //  فیلدِ پس از A00 (بیرونِ PRE_A00): بی نشان کنار می‌رود، با نشانِ caps می‌نشیند
+  E.ok(await clear(P, { orderId: null }), 'push');
+  assert.equal((await row('sales', saleId)).orderId, 'ord_e2e');
+  E.ok(await clear(A, { orderId: null }), 'push');
+  assert.equal((await row('sales', saleId)).orderId, null, 'ساختِ A00 (caps) از تور می‌گذرد');
 }, { needs: ['UF.0'] });
 
 await E.finish();

@@ -40,6 +40,7 @@ class SyncV1Client(private val api: ApiClient) {
       put("device_id", JsonPrimitive(deviceId))
       put("schema_version", JsonPrimitive(LedgerDiff.SCHEMA_VERSION))
       put("queued", JsonPrimitive(queued))
+      put("caps", LedgerDiff.capsJson())
       put("ops", JsonArray(ops.map { it.toJson() }))
     }
     val res = try {

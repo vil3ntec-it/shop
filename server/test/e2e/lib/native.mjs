@@ -167,12 +167,15 @@ export function projectLedger(tree) {
  *   • A00 سایهٔ Snapshot (`SyncV1Engine.writeShadow` با `modelTree(`) از درِ مدل است؛ پیش از
  *     آن خام بود — ردیف‌های سرور با کلیدهایی که دفتر نمی‌تواند نگه دارد؛
  *   • A00 `changedFields` با `isModelField(`: کلیدی که مدل نمی‌شناسد هرگز `null` نمی‌شود؛
- *   • A00 `diff` با `modelView(`: ردیفی که خام فرق دارد به زبانِ مدل سنجیده می‌شود.
+ *   • A00 `diff` با `modelView(`: ردیفی که خام فرق دارد به زبانِ مدل سنجیده می‌شود؛
+ *   • A00 `SyncV1Client.push` با `"caps"`: نشانِ `a00` که سرور با آن تورِ ساخت‌های پیشین را
+ *     کنار می‌گذارد (`server/src/lib/newer-fields.js`). دستگاهِ «وب» (`raw`) `client: "web"` می‌فرستد.
  * سایه هیچ‌وقت کلیدی را که مدل نمی‌شناسد نگه نمی‌دارد (بازبینیِ #341، B1).
  */
 const KT = (...p) => fs.readFileSync(path.join(ROOT, 'android-native', 'app', 'src', 'main', 'java', 'ir', 'vil3ntec', 'tohid', 'sync', 'v1', ...p), 'utf8');
 const LEDGER_DIFF_KT = KT('LedgerDiff.kt');
 const SYNC_V1_ENGINE_KT = KT('SyncV1Engine.kt');
+const SYNC_V1_CLIENT_KT = KT('SyncV1Client.kt');
 const bodyOf = (name, src = LEDGER_DIFF_KT) => {
   const at = src.indexOf(`fun ${name}(`);
   if (at < 0) return '';
@@ -184,12 +187,13 @@ export const KOTLIN = {
   snapshotShaped: /modelTree\(/.test(bodyOf('writeShadow', SYNC_V1_ENGINE_KT)),
   keepsUnknownFields: /isModelField\(/.test(bodyOf('changedFields')),
   diffInModelTerms: /modelView\(/.test(bodyOf('diff')),
+  capsA00: /put\("caps"/.test(bodyOf('push', SYNC_V1_CLIENT_KT)),
 };
 
 /** ساختِ نصب‌شدهٔ پیش از A00: همان `applyRemote` ِ از درِ مدل، بی قاعده‌های تازه */
-export const PRE_A00 = Object.freeze({ applyRemoteShaped: true, snapshotShaped: false, keepsUnknownFields: false, diffInModelTerms: false });
+export const PRE_A00 = Object.freeze({ applyRemoteShaped: true, snapshotShaped: false, keepsUnknownFields: false, diffInModelTerms: false, capsA00: false });
 /** وب: دفترِ خام، هیچ مدلی در کار نیست */
-const NO_MODEL = Object.freeze({ applyRemoteShaped: false, snapshotShaped: false, keepsUnknownFields: false, diffInModelTerms: false });
+const NO_MODEL = Object.freeze({ applyRemoteShaped: false, snapshotShaped: false, keepsUnknownFields: false, diffInModelTerms: false, capsA00: false });
 
 /** کلیدهایی که مدلِ ردیف‌های این مجموعه می‌شناسد (با `@JsonNames`)؛ null یعنی مدل ندارد */
 const knownKeys = (table) => {
@@ -337,6 +341,12 @@ export class NativeDevice {
 
   /* ---------------- همگام‌سازیِ v1 ---------------- */
 
+  /** نشانِ صریحِ بدنهٔ push: `caps: ["a00"]` ِ ساختِ A00 به بعد، یا `client: "web"` ِ وب */
+  marks() {
+    if (this.raw) return { client: 'web' };
+    return this.kotlin.capsA00 ? { caps: ['a00'] } : {};
+  }
+
   /** `ShopStore.save` ⇒ `SyncV1Engine.record`: تفاضل با سایه ⇒ صف */
   save(next) {
     //  A00: تفاضل به زبانِ مدل (`modelView`) — برای ردیفی که خام برابر است همان نتیجه را دارد
@@ -364,7 +374,7 @@ export class NativeDevice {
           size += s;
           batch.push(op);
         }
-        const r = await this.api('POST', '/sync/v1/push', { device_id: this.deviceId, schema_version: core.SCHEMA_VERSION, queued: this.queue.length, ops: batch });
+        const r = await this.api('POST', '/sync/v1/push', { device_id: this.deviceId, schema_version: core.SCHEMA_VERSION, queued: this.queue.length, ops: batch, ...this.marks() });
         if (r.status === 426) { this.holding = true; this.lastError = r.body?.message || 'upgrade'; return { ok: false, status: 426 }; }
         if (r.status !== 200) { this.lastError = `${r.status} ${r.body?.error?.code || ''}`.trim(); return { ok: false, status: r.status, body: r.body }; }
         this.holding = false;

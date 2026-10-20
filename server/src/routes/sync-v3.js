@@ -70,7 +70,9 @@ router.post('/push', requireSyncWrite, async (req, res, next) => {
     const b = req.body || {};
     const appVersion = String(req.headers['x-app-version'] || '').slice(0, 32);
     //  A00: `null` ِ ساختِ پیش از A00 برای فیلدی که نمی‌شناسد کنار می‌رود (‎lib/newer-fields.js‎)
-    const fl = newerFields.filterOps(b.ops, { version: appVersion, shape: b.format === 'v2' ? 'v1' : 'v3' });
+    const fl = newerFields.filterOps(b.ops, {
+      version: appVersion, shape: b.format === 'v2' ? 'v1' : 'v3', caps: b.caps, client: b.client,
+    });
     const out = await sync.push(req.sync, {
       deviceId: deviceOf(b),
       protocol: b.protocol,
