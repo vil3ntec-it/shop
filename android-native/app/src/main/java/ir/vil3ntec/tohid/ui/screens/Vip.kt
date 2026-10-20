@@ -510,10 +510,11 @@ fun VipScreen(onDismiss: () -> Unit) {
           verticalAlignment = Alignment.CenterVertically,
         ) {
           Box(
-            Modifier.size(36.dp).clip(RoundedCornerShape(18.dp)).background(colors.warning),
+            Modifier.size(36.dp).clip(RoundedCornerShape(18.dp)).background(colors.status.awaitingApproval.fg),
             contentAlignment = Alignment.Center,
           ) {
-            Icon(Icons.Filled.Lock, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+            //  جفتِ وارونهٔ «در انتظار»: در شب آیکنِ تیره روی کهربایی (سفید روی #FCD34D ۱٫۵:۱ بود)
+            Icon(Icons.Filled.Lock, contentDescription = null, tint = colors.status.awaitingApproval.bg, modifier = Modifier.size(18.dp))
           }
           Spacer(Modifier.width(12.dp))
           Column(Modifier.weight(1f)) {
