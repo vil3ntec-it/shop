@@ -69,8 +69,13 @@ router.post('/live/ticket', (req, res) => {
  *  ‎lib/staff-approval.js‎. حسابِ پمپ بی هیچ کاری از آن رد می‌شود.
  */
 const { v1Guard: shopStaffGuard } = require('../lib/staff-approval');
+/*
+ *  دکان: `null` ِ صریحِ نسخهٔ قدیمی‌تر برای فیلدی که هنوز نمی‌شناسد کنار
+ *  می‌رود (A00) — ‎lib/newer-fields.js‎. پمپ از آن هم بی هیچ کاری رد می‌شود.
+ */
+const { v1NewerFields: shopNewerFields } = require('../lib/newer-fields');
 
-router.post('/push', requireSyncWrite, pumpServicesOnly, shopStaffGuard, async (req, res, next) => {
+router.post('/push', requireSyncWrite, pumpServicesOnly, shopStaffGuard, shopNewerFields, async (req, res, next) => {
   try {
     const deviceId = v.id(req.body?.device_id || req.body?.deviceId, {
       field: 'شناسه دستگاه', required: true, max: 64,
