@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.key
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -39,8 +41,18 @@ import ir.vil3ntec.tohid.ui.components.pos.PhoneCartUi
 import ir.vil3ntec.tohid.ui.screens.QuickSaleScreen
 import ir.vil3ntec.tohid.ui.components.common.NavTab
 import ir.vil3ntec.tohid.ui.components.common.PhoneNavBar
+import ir.vil3ntec.tohid.ui.components.common.NavLayouts
+import ir.vil3ntec.tohid.ui.components.common.PhoneNav
+import androidx.compose.ui.Alignment
 import ir.vil3ntec.tohid.ui.screens.DashboardScreen
 import ir.vil3ntec.tohid.ui.screens.ProfileScreen
+import ir.vil3ntec.tohid.ui.screens.ProfileModel
+import ir.vil3ntec.tohid.ui.screens.ProfileShot
+import ir.vil3ntec.tohid.ui.screens.SettingsLayout
+import ir.vil3ntec.tohid.ui.screens.SettingsNav
+import ir.vil3ntec.tohid.ui.screens.SettingsShot
+import ir.vil3ntec.tohid.ui.screens.MoreShot
+import ir.vil3ntec.tohid.ui.screens.PhoneMoreScreen
 import ir.vil3ntec.tohid.ui.screens.SettingsScreen
 import ir.vil3ntec.tohid.ui.theme.Shop
 import ir.vil3ntec.tohid.ui.theme.ThemeChoice
@@ -104,7 +116,52 @@ private fun PhonePreviewContent(screen: String, store: ShopStore, dark: Boolean)
     when (screen) {
       //  تنظیماتِ گوشی: گروه‌ها و کارت‌های گرد (`SettingsGroup`)
       "settings" -> Box(Modifier.weight(1f).fillMaxWidth()) {
-        SettingsScreen(store, data, snackbar, if (dark) ThemeChoice.DARK else ThemeChoice.LIGHT, {}, {})
+        SettingsScreen(store, data, snackbar, if (dark) ThemeChoice.DARK else ThemeChoice.LIGHT, {}, onUpdates = {})
+      }
+      /*
+       *  گوشی نسخهٔ ۳ — «حساب من» (r4)، «تنظیمات» (r5) و «بیشتر»: حسابِ نمایشی برای
+       *  «واردشده» (`ProfileShot`)، و بازکردنِ تنظیمات روی یک گروه یا یک بخش
+       *  (`SettingsNav`) — همان راهی که «بیشتر ⇐ تنظیمات» می‌رود.
+       */
+      "v3-profile", "v3-profile-out" -> Box(Modifier.weight(1f).fillMaxWidth()) {
+        val signedIn = screen == "v3-profile"
+        DisposableEffect(screen) {
+          ProfileShot.account.value =
+            if (signedIn) ProfileModel.Account(true, "احمد ولی‌زاده", "ahmad@example.af", "0700123456", "owner")
+            else ProfileModel.Account(signedIn = false, name = "")
+          ProfileShot.plan.value =
+            if (signedIn) ProfileModel.Plan(active = true, expired = false, trial = false, days = 12, urgent = false) else null
+          onDispose { ProfileShot.account.value = null; ProfileShot.plan.value = null }
+        }
+        //  مثلِ `AppRoot`ِ گوشی: صفحه تا ته و نوارِ شناورِ r10 رویش، با دایرهٔ «حساب» فعال
+        key(screen) {
+          ProfileScreen(store = store, snackbar = snackbar, onBack = {}, onSignIn = {}, onSubscription = {}, bottomReserve = PhoneNav.RESERVE)
+        }
+        PhoneNavBar(NavLayouts.DEFAULT, "profile", onPick = {}, onEdit = null, modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth())
+      }
+      "v3-settings", "v3-settings-scrolled", "v3-settings-detail" -> Box(Modifier.weight(1f).fillMaxWidth()) {
+        //  کلیدِ سبزِ «قفلِ برنامه» روشن دیده شود (r5 Face ID) — رمزِ واقعی دست نمی‌خورد
+        //  پیش از کشیدنِ صفحه (در همین گذر)، نه در اثرِ پس از آن
+        remember { SettingsShot.lockOn = true }
+        DisposableEffect(Unit) { onDispose { SettingsShot.lockOn = null } }
+        LaunchedEffect(screen) {
+          SettingsNav.pending.value = when (screen) {
+            "v3-settings-scrolled" -> SettingsNav.Request(group = SettingsLayout.DATA)
+            "v3-settings-detail" -> SettingsNav.Request(detail = "ظاهر")
+            else -> SettingsNav.Request(group = SettingsLayout.GENERAL)
+          }
+        }
+        key(screen) {
+          SettingsScreen(store, data, snackbar, if (dark) ThemeChoice.DARK else ThemeChoice.LIGHT, {}, onBack = {}, onUpdates = {})
+        }
+      }
+      "v3-more", "v3-more-bottom" -> Box(Modifier.weight(1f).fillMaxWidth()) {
+        DisposableEffect(screen) {
+          MoreShot.scrollToEnd.value = screen == "v3-more-bottom"
+          onDispose { MoreShot.scrollToEnd.value = false }
+        }
+        key(screen) { PhoneMoreScreen(data, bottomReserve = PhoneNav.RESERVE) {} }
+        PhoneNavBar(NavLayouts.DEFAULT, "more", onPick = {}, onEdit = null, modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth())
       }
       //  «حساب من»: کارتِ عکس، نقش، آمار و گروه‌ها
       "profile" -> Box(Modifier.weight(1f).fillMaxWidth()) {
