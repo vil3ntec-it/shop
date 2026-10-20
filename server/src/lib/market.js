@@ -244,6 +244,8 @@ async function eligible(at = now()) {
 }
 
 const ACCEPT_RANK = { accepting: 0, delayed: 1, later: 2 };
+const NEW_MS = 30 * 24 * 60 * 60 * 1000;
+const FIRST_MAX = 20;
 
 /** مختصاتِ درشت (یک‌صدمِ درجه) از ورودی — یا null. */
 function geoOf(lat, lng) {
@@ -295,6 +297,8 @@ function cardOf(e, near) {
     currency: 'AFN',
     productCount: e.productCount,
     distanceKm: hasGeo ? distanceKm(near, { lat: Number(r.m_lat), lng: Number(r.m_lng) }) : null,
+    //  «تازه» فقط از تاریخِ واقعیِ ساختِ ویترین (بی امتیازِ ساختگی؛ امتیازِ واقعی هنوز نیست)
+    isNew: Number(r.created_at) > Date.now() - NEW_MS,
   };
 }
 
@@ -331,20 +335,29 @@ async function overview(at = now()) {
   };
 }
 
-/** فهرستِ دکان‌ها: جست‌وجو در نام/شعار/ناحیه، دسته، و «نزدیکِ من» اختیاری. */
-async function shops({ q, category, lat, lng, limit, offset } = {}, at = now()) {
+/**
+ * فهرستِ دکان‌ها: جست‌وجو در نام/شعار/ناحیه، دسته، «نزدیکِ من» اختیاری، و `first` (تا ۲۰
+ * نشانیِ دلخواهِ همان مرورگر، اول؛ ذخیره نمی‌شود). جلدِ هر کارت عکسِ یکی از کالاهای خودِ
+ * دکان است (قفسهٔ حافظه‌دار)، وگرنه null.
+ */
+async function shops({ q, category, lat, lng, limit, offset, first } = {}, at = now()) {
   const lim = Math.min(MAX_PAGE, Math.max(1, Number.parseInt(limit, 10) || PAGE));
   const off = Math.max(0, Math.min(MAX_CANDIDATES, Number.parseInt(offset, 10) || 0));
   const near = geoOf(lat, lng);
   const cat = str(category);
   if (cat && !CATEGORY_KEYS.has(cat)) throw badRequest('دستهٔ دکان معتبر نیست', 'bad_category');
   const needle = sf.normalize(text(q, 60));
+  const pin = new Set(str(first).toLowerCase().split(',').map((x) => x.trim()).filter((x) => /^[a-z0-9-]{3,32}$/.test(x)).slice(0, FIRST_MAX));
   const cards = (await eligible(at))
-    .map((e) => cardOf(e, near))
-    .filter((c) => (!cat || c.category === cat) && matchesShop(c, needle))
-    .sort(rank(near));
+    .map((e) => ({ id: e.row.shop_id, c: cardOf(e, near) }))
+    .filter((x) => (!cat || x.c.category === cat) && matchesShop(x.c, needle))
+    .sort((a, b) => (pin.has(b.c.slug) - pin.has(a.c.slug)) || rank(near)(a.c, b.c));
   const page = cards.slice(off, off + lim);
-  return { shops: page, total: cards.length, nextOffset: off + lim < cards.length ? off + lim : null };
+  const sh = await mapAsync(page, (x) => shelfOf(x.id));
+  return {
+    shops: page.map((x, j) => ({ ...x.c, cover: (sh[j].find((p) => p.photo) || {}).id || null })),
+    total: cards.length, nextOffset: off + lim < cards.length ? off + lim : null,
+  };
 }
 
 /**

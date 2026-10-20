@@ -212,3 +212,28 @@ test('⛔ DoS: قفسه و فهرست‌های سراسری `feedCacheMs` می�
     await h.put('/api/shop/storefront', { enabled: false }, { token: s.token });
   }
 });
+
+test('کارتِ دکان: جلد از عکسِ کالای خودش، «تازه» فقط از تاریخِ واقعیِ ساخت، دلخواه‌ها (first) اول', async () => {
+  await setFlag('all', 'market.directory', true);
+  const a = await liveStore('جلد', { products: [['c1', 'قند', 50]] });
+  const b = await liveStore('کهنه', { products: [['k1', 'نمک', 20]] });
+  await query(
+    `INSERT INTO product_photos (app, account_id, product_id, data, hash, size, rev, updated_at)
+     VALUES ('shop', $1, 'c1', $2, 'h2', 4, 1, $3)`,
+    [a.shopId, Buffer.from([0xff, 0xd8, 0xff, 0xe0]), now()]
+  );
+  await query('UPDATE storefronts SET created_at = $1 WHERE shop_id = $2', [now() - 90 * 24 * 60 * 60 * 1000, b.shopId]);
+  const r = await h.get('/api/market/shops');
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  const by = Object.fromEntries(r.body.shops.map((s) => [s.slug, s]));
+  assert.equal(by[a.slug].cover, 'c1', 'جلد = عکسِ کالای خودِ دکان');
+  assert.equal(by[b.slug].cover, null, 'بی عکس ⇒ بی جلد');
+  assert.equal(by[a.slug].isNew, true);
+  assert.equal(by[b.slug].isNew, false, 'ویترینِ ۹۰ روزه «تازه» نیست');
+  assert.ok(r.body.shops.every((s) => s.rating === undefined), 'بی امتیازِ ساختگی');
+  //  دلخواه‌های همین مرورگر اول، بی دخل در فهرست و دسته
+  const f = await h.get(`/api/market/shops?first=${b.slug},bad%20slug,not-listed-x`);
+  assert.equal(f.body.shops[0].slug, b.slug);
+  assert.equal(f.body.total, r.body.total, 'first فقط ترتیب را عوض می‌کند');
+  for (const s of [a, b]) await h.put('/api/shop/storefront', { enabled: false }, { token: s.token });
+});
