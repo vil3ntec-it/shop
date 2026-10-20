@@ -486,34 +486,44 @@ test('v1: دنبالهٔ سندِ برگشتِ ردشده (همان فاکتور
   assert.deepEqual(why(await push1(staff, 's-pb', [other.op('returns', 'r-pb-9', 'insert', { saleId: 's-pb', amount: 100, createdAt: other.at })])), ['applied']);
 });
 
-test('v1: دو دستگاهِ هم‌زمان روی یک فاکتور هر دو زیرِ سقف نمی‌گذرند (قفلِ سقفِ تجمعی)', async () => {
-  await ownerSale('s-cc', 2000);
-  const a = save();
-  const b = save();
+test('v3: دو دستگاهِ هم‌زمان روی یک فاکتور هر دو زیرِ سقف نمی‌گذرند (قفلِ درونِ تراکنشِ push)', async () => {
+  const a = tx3(undefined);
+  const b = tx3(undefined);
   const [ra, rb] = await Promise.all([
-    push1(staff, 's-cc-a', [a.op('returns', 'r-cc-a', 'insert', { saleId: 's-cc', amount: 300, createdAt: a.at })]),
-    push1(staff, 's-cc-b', [b.op('returns', 'r-cc-b', 'insert', { saleId: 's-cc', amount: 300, createdAt: b.at })]),
+    push3(staff, 's3-cc-a', [a.op('returns', 'r3-cc-a', 'insert', { saleId: 's3-cc', amountMinor: 30000 })]),
+    push3(staff, 's3-cc-b', [b.op('returns', 'r3-cc-b', 'insert', { saleId: 's3-cc', amountMinor: 30000 })]),
   ]);
   assert.deepEqual([...why(ra), ...why(rb)].sort(), ['applied', 'approval_required']);
 });
 
-test('برگشت در v1 و v3 تا رها شدنِ قفلِ سقفِ تجمعیِ دکان صبر می‌کند (داوری تا نوشتن پشتِ سرِ هم)', async () => {
-  const approvals = require('../src/lib/staff-approval');
-  await ownerSale('s-lk', 2000);
-  const release = await approvals.returnsLock(shopId);
-  let done1 = false;
-  let done3 = false;
+test('درخواستِ نیمه‌کاره (قطعِ اتصال) چیزی را نگه نمی‌دارد — برگشتِ بعدی بی‌درنگ می‌نشیند (v1 و v3)', async () => {
+  await ownerSale('s-ab', 5000);
+  const send = (path, body, ms) => {
+    const ctl = new AbortController();
+    const p = fetch(`${h.base()}${path}`, {
+      method: 'POST', signal: ctl.signal,
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${staff.accessToken}` },
+      body: JSON.stringify(body),
+    }).then((r) => r.text()).catch(() => null);
+    setTimeout(() => ctl.abort(), ms);
+    return p;
+  };
+  //  یک برگشتِ بزرگ در جریان است؛ درخواست‌های دیگر وسطِ کار (یا وسطِ صبر) قطع می‌شوند
+  const big = save();
+  const slow = push1(staff, 's-ab-big', Array.from({ length: 150 }, (_, i) =>
+    big.op('returns', `r-ab-big-${i}`, 'insert', { saleId: 's-ab', amount: 1, createdAt: big.at })));
+  for (const ms of [0, 2, 10, 30]) {
+    const sv = save();
+    await send('/api/sync/v1/push', { device_id: `s-ab-${ms}`, schema_version: 1,
+      ops: [sv.op('returns', `r-ab-${ms}`, 'insert', { saleId: 's-ab', amount: 10, createdAt: sv.at })] }, ms);
+    await send('/api/sync/v3/push', { device_id: `s3-ab-${ms}`, protocol: 3,
+      ops: [tx3(undefined).op('returns', `r3-ab-${ms}`, 'insert', { saleId: 's-ab', amountMinor: 1000 })] }, ms);
+  }
+  const deadline = (p) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('درخواستِ بعدی گیر کرد')), 5000))]);
+  assert.equal((await deadline(slow)).status, 200);
   const sv = save();
-  const p1 = push1(staff, 's-lk', [sv.op('returns', 'r-lk-1', 'insert', { saleId: 's-lk', amount: 100, createdAt: sv.at })])
-    .then((r) => { done1 = true; return r; });
-  const p3 = push3(staff, 's-lk3', [tx3(undefined).op('returns', 'r-lk-3', 'insert', { saleId: 's-lk', amountMinor: 10000 })])
-    .then((r) => { done3 = true; return r; });
-  await new Promise((r) => setTimeout(r, 400));
-  assert.equal(done1, false, 'v1 بی قفل جلو رفت');
-  assert.equal(done3, false, 'v3 بی قفل جلو رفت');
-  await release();
-  assert.deepEqual(why(await p1), ['applied']);
-  assert.deepEqual(why(await p3), ['applied']);
+  assert.equal((await deadline(push1(staff, 's-ab-next', [sv.op('returns', 'r-ab-next', 'insert', { saleId: 's-ab', amount: 10, createdAt: sv.at })]))).status, 200);
+  assert.equal((await deadline(push3(staff, 's3-ab-next', [tx3(undefined).op('returns', 'r3-ab-next', 'insert', { saleId: 's-ab', amountMinor: 1000 })]))).status, 200);
 });
 
 test('سقفِ تجمعی هر دو دفتر را می‌شمارد (v1 و v3، هر ردیف یک بار) و برگشتِ لغوشده را نه', async () => {
@@ -565,4 +575,35 @@ test('v3: دنبالهٔ tx ِ ردشده پس از کنار گذاشتنِ صن
   const box = (await boxes(head.op_id))[0];
   assert.equal((await h.post(`/api/sync/v3/conflicts/${box.id}/resolve`, { action: 'dismiss' }, { token: owner.accessToken })).status, 200);
   assert.deepEqual(why(await push3(manager, 'm3-dm', [item(2)])), ['applied']);
+});
+
+test('v1: ثبتِ برگشتِ بزرگ‌تر از یک دسته (برگشت‌ها پیش از شمارنده‌ها) — بخشِ اولِ زیرِ سقف، کل بیش از سقف ⇒ بقیه و شمارنده‌ها رد', async () => {
+  await ownerSale('s-big', 5000);
+  const sv = save();
+  //  ۲۳۰ ردیف × ۲٫۵ = ۵۷۵ > ۵۰۰؛ دستهٔ اول ۲۰۰ ردیف = ۵۰۰ (زیرِ سقف)
+  const rows = Array.from({ length: 230 }, (_, i) =>
+    sv.op('returns', `r-big-${i}`, 'insert', { saleId: 's-big', saleItemId: 's-big-i1', quantity: 0.1, amount: 2.5, createdAt: sv.at }));
+  const counters = [
+    sv.op('sales', 's-big', 'update', { debtSettled: { $inc: 575 } }),
+    sv.op('saleItems', 's-big-i1', 'update', { returnedQty: { $inc: 23 } }),
+  ];
+  const b1 = await push1(staff, 's-big', rows.slice(0, 200));
+  assert.ok(b1.body.results.every((x) => x.status === 'applied'), JSON.stringify(b1.body.results.slice(0, 2)));
+  const b2 = await push1(staff, 's-big', [...rows.slice(200), ...counters]);
+  assert.ok(why(b2).slice(0, 30).every((x) => x === 'approval_required'), why(b2).join(','));
+  assert.deepEqual(why(b2).slice(30), ['tx_rejected', 'tx_rejected']);
+  const total = await one(`SELECT COALESCE(SUM((data->>'amount')::numeric),0) AS t FROM sync_rows
+    WHERE account_id=$1 AND table_name='returns' AND data->>'saleId'='s-big' AND deleted_at IS NULL`, [shopId]);
+  assert.ok(Number(total.t) <= 500, `برگشتِ ثبت‌شده از سقف گذشت: ${total.t}`);
+  assert.equal(Number((await row1('sales', 's-big')).data.debtSettled), 0);
+});
+
+test('v3: صاحبِ دکان روی همان دستگاه با صندوقِ ردشدهٔ مدیر نگه داشته نمی‌شود', async () => {
+  const n3 = tx3(undefined);
+  assert.deepEqual(why(await push3(manager, 'shared-pos', [
+    n3.op('sales', 's3-own', 'insert', { totalMinor: 10000, discountMinor: 3000, finalTotalMinor: 7000, status: 'completed' }),
+  ])), ['approval_required']);
+  assert.deepEqual(why(await push3(owner, 'shared-pos', [
+    n3.op('saleItems', 's3-own-i', 'insert', { saleId: 's3-own', productId: 'p-gc', quantityMilli: 1000, unitPriceMinor: 10000 }),
+  ])), ['applied']);
 });

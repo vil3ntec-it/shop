@@ -212,9 +212,16 @@ object LedgerDiff {
    *  ترتیبِ خروجی همان ترتیبِ خودِ فهرست‌هاست، تا «فاکتور پیش از اقلامش»
    *  بماند.
    */
+  /**
+   *  ترتیبِ opهای یک ثبت: ردیف‌های برگشت پیش از شمارنده‌هایشان (`debtSettled` ِ فاکتور، `returnedQty` ِ
+   *  قلم، اصلاحِ انبار) — اگر ثبتِ بزرگ ناچار در دو دسته برود (`OpQueue.cut`)، سرِ برگشت در دستهٔ اول
+   *  داوری می‌شود و شمارنده‌ها پشتِ سرش. همان `DIFF_ORDER` ِ `sync-core.js`.
+   */
+  private val DIFF_ORDER = listOf("returns") + COLLECTIONS.filter { it != "returns" }
+
   fun diff(shadow: JsonObject?, next: JsonObject, now: Long = System.currentTimeMillis()): List<SyncOp> {
     val ops = ArrayList<SyncOp>()
-    for (table in COLLECTIONS) {
+    for (table in DIFF_ORDER) {
       val before = rowsOf(shadow, table).associateBy { idOf(it) }
       val after = rowsOf(next, table)
       val afterIds = HashSet<String>(after.size)

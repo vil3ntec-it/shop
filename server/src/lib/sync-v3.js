@@ -766,12 +766,10 @@ async function push(ctx, { deviceId, protocol = PROTOCOL, format = 'v3', schemaV
   await ready();
   const t = now();
 
-  //  سقفِ تجمعیِ برگشت: از خواندنِ جمع تا نوشتن، با v1 و v3 ِ هم‌زمانِ همین دکان پشتِ سرِ هم
-  const release = groups ? await approvals.returnsLock(ctx.accountId) : null;
-  let out;
-  try {
-  out = await tx(async (c) => {
+  const out = await tx(async (c) => {
     await lock(c, ctx);
+    //  سقفِ تجمعیِ برگشت: از خواندنِ جمع تا نوشتن در همین تراکنش (با پایانش آزاد)
+    if (groups) await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [approvals.returnsLockKey(ctx.accountId)]);
     //  روشن: قفلِ v1 هم، و v1 ⇒ v3 کامل پیش از اعمال ⇒ داوریِ این opها همهٔ v1 را دیده است
     const v1 = toV1On ? await openToV1(c, ctx, t) : null;
     const dev = (await c.query(
@@ -783,7 +781,7 @@ async function push(ctx, { deviceId, protocol = PROTOCOL, format = 'v3', schemaV
 
     //  دنبالهٔ tx ای که سرش در دستهٔ پیشینِ همین دستگاه با سقف/تأیید رد شد (tx ِ بزرگ‌تر از یک
     //  دسته) ⇒ همان رد — فقط صندوقِ باز، تا یک روز، و تا وقتی سرش ننشسته
-    const txs = plan.filter((u) => u.tx && !u.broken).map((u) => u.tx);
+    const txs = ctx.role === 'owner' ? [] : plan.filter((u) => u.tx && !u.broken).map((u) => u.tx);
     if (txs.length) {
       const held = await approvals.heldTxs(c, ctx, deviceId, txs);
       for (const u of plan) {
@@ -861,9 +859,6 @@ async function push(ctx, { deviceId, protocol = PROTOCOL, format = 'v3', schemaV
     });
     return { results, applied, head: await headSeq(c, ctx) };
   });
-  } finally {
-    if (release) await release();
-  }
   return { ...out, protocol: PROTOCOL, server_time: now(), hlc: clock.peek() };
 }
 
