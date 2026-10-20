@@ -67,8 +67,9 @@ private const val PENDING_KEY = "pending-presence"
 /**
  *  ویترینِ اینترنتی — صفحهٔ صاحب دکان (WEB-01/03، PRD-27، §۳۱ PRES).
  *
- *  سه برگه: «وضعیت» (همان که مشتری می‌بیند + اعلامِ آنلاین/آفلاین)،
- *  «تنظیمات» و «کالاها» (انتشار، قیمتِ آنلاین، سقفِ تعداد، گروهی).
+ *  چهار برگه: «وضعیت» (همان که مشتری می‌بیند + اعلامِ آنلاین/آفلاین)،
+ *  «تنظیمات»، «کالاها» (انتشار، قیمتِ آنلاین، سقفِ تعداد، گروهی) و
+ *  «بازارچه» (نمایش در فهرستِ عمومیِ دکان‌ها، `StorefrontMarket.kt`).
  *  هر کار فقط پس از پاسخِ سرور «ثبت شد» می‌گوید (PRES-09).
  */
 @Composable
@@ -104,7 +105,7 @@ fun StorefrontScreen(snackbar: SnackbarHostState) {
           Text("اشتراکِ این دکان ویترین را در بر ندارد؛ تغییرها ذخیره نمی‌شوند.", color = Shop.colors.warning, style = MaterialTheme.typography.bodySmall)
         }
         TohidFilterRow(
-          options = listOf("status" to "وضعیت", "settings" to "تنظیمات", "products" to "کالاها"),
+          options = listOf("status" to "وضعیت", "settings" to "تنظیمات", "products" to "کالاها", "market" to "بازارچه"),
           selected = tab,
           onSelect = { tab = it },
         )
@@ -112,6 +113,8 @@ fun StorefrontScreen(snackbar: SnackbarHostState) {
         when (tab) {
           "status" -> PresencePane(settings, repo, snackbar) { tab = "settings" }
           "settings" -> SettingsPane(settings, repo, snackbar)
+          //  «نمایش در بازارچه» — دادهٔ جدا و ذخیرهٔ جدا (`StorefrontMarket.kt`)
+          "market" -> MarketPane(c, snackbar)
           else -> if (settings == null) {
             TohidEmptyState("اول ویترین را بسازید", "در «تنظیمات» نشانی و نام را بنویسید و ذخیره کنید.", actionText = "رفتن به تنظیمات", onAction = { tab = "settings" })
           } else ProductsPane(repo, snackbar)
@@ -377,7 +380,7 @@ private fun SettingsPane(settings: StorefrontSettingsDto?, repo: StorefrontRepos
 }
 
 @Composable
-private fun SwitchRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+internal fun SwitchRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
   Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable { onChange(!checked) }, verticalAlignment = Alignment.CenterVertically) {
     Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
     Switch(checked = checked, onCheckedChange = onChange)
