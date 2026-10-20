@@ -72,18 +72,17 @@ class ReportBridgeParityTest {
     }
   }
 
-  /** فروشِ برنامه همه «حضوری» است: مدل کانال ندارد (سفارشِ اینترنتی هنوز به دفترِ برنامه نمی‌آید) */
+  /** مدلِ برنامه حالا `Sale.channel` دارد (#275/#321)، پس تفکیکِ کانال هم عیناً همان مرجع است */
   @Test
-  fun `فروش با تفکیک‌ها همان است، جز کانال که همه حضوری است`() {
+  fun `فروش با همهٔ تفکیک‌ها، کانال هم، همان است`() {
     cases("sales").forEach { c ->
       val name = c.getValue("name").jsonPrimitive.content
       val want = c.getValue("expect").jsonObject
       val r = sales(bridged(c.getValue("ledger").jsonPrimitive.content), opts(c))
       val got = json.encodeToJsonElement(ReportCore.SalesReport.serializer(), r).jsonObject
-      for (k in listOf("from", "to", "costing", "totals", "product", "category", "user", "hour", "payment")) {
+      for (k in listOf("from", "to", "costing", "totals", "product", "category", "user", "hour", "payment", "channel")) {
         assertEquals("$name · $k", want.getValue(k), got.getValue(k))
       }
-      assertTrue(name, r.channel.all { it.key == "pos" })
       assertEquals(name, r.totals.netSales, r.channel.sumOf { it.netSales })
     }
   }
