@@ -26,6 +26,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -92,20 +93,20 @@ import androidx.compose.ui.unit.sp
 import ir.vil3ntec.tohid.ui.screens.Motion
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Colors
+import ir.vil3ntec.tohid.ui.theme.PhoneV3Tone
 import kotlinx.coroutines.delay
 
 /*
- *  تکه‌های ظاهرِ گوشیِ نسخهٔ ۳ برای حالتِ پیک (design-ref/phone-v3/SPEC.md).
- *
- *  فقط از توکن‌های `PhoneV3`: زمینهٔ خاکستریِ روشن، کارتِ سفید با سایهٔ نرم
- *  (نه خطِ تیره)، آیکنِ خطیِ تک‌رنگ، دکمهٔ اصلیِ قرصیِ پُررنگ و بزرگ برای
- *  کارِ یک‌دستی. هر حرکت با `Motion.enabled` خاموش می‌شود (بخشِ G).
+ *  تکه‌های ظاهرِ حالتِ پیک: شکل از گوشیِ نسخهٔ ۳ و مرجعِ پیکِ صاحب محصول
+ *  (design-ref/vill3n/courier-ref.jpg)، رنگ فقط از سیستمِ رنگِ VILL3N
+ *  (`PhoneV3.colors` و `PhoneV3.ui`): زمینهٔ روشن، کارتِ سفید با مرزِ دیدنی و سایهٔ
+ *  سبک، سطحِ تیرهٔ سرمه‌ای، دکمهٔ اصلیِ سبزآبی. هر حرکت با `Motion.enabled` خاموش.
  */
 
 internal val PillShape = RoundedCornerShape(percent = 50)
-internal val CardShape = RoundedCornerShape(24.dp)
-internal val GroupShape = RoundedCornerShape(PhoneV3.groupRadius)
-private val FieldShape = RoundedCornerShape(16.dp)
+internal val CardShape = RoundedCornerShape(20.dp)
+internal val GroupShape = RoundedCornerShape(16.dp)
+private val FieldShape = RoundedCornerShape(14.dp)
 private val SheetShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
 
 /** مدتِ حرکت — صفر وقتی کاربر یا گوشی حرکت را خاموش کرده */
@@ -121,11 +122,16 @@ internal fun v3Style(size: TextUnit, weight: FontWeight = FontWeight.Normal): Te
     letterSpacing = 0.sp,
   )
 
-/** کارتِ سفید با سایهٔ نرم — جای خطِ دورِ تیره */
-internal fun Modifier.v3Card(p: PhoneV3Colors, shape: Shape = CardShape, elevation: Dp = 10.dp): Modifier =
+/** کارت: رنگ + مرزِ دیدنی + سایهٔ سبک (سیستمِ رنگ §۶: سایه هرگز جای مرز نیست) */
+internal fun Modifier.v3Card(p: PhoneV3Colors, shape: Shape = CardShape, elevation: Dp = 4.dp): Modifier =
   this
-    .shadow(elevation, shape, clip = false, ambientColor = p.black.copy(alpha = 0.10f), spotColor = p.black.copy(alpha = 0.10f))
+    .shadow(elevation, shape, clip = false, ambientColor = p.black.copy(alpha = 0.08f), spotColor = p.black.copy(alpha = 0.08f))
     .background(p.card, shape)
+    .border(1.dp, p.hairline, shape)
+
+/** سطحِ تیرهٔ سرمه‌ای (کارتِ «مأموریتِ جاری»، برگهٔ پیگیری) */
+internal fun Modifier.v3Dark(p: PhoneV3Colors, shape: Shape = CardShape): Modifier =
+  this.background(p.black, shape).border(1.dp, p.blackRaised, shape)
 
 /** فشار = کمی کوچک شدن (بخشِ G) */
 @Composable
@@ -139,9 +145,9 @@ private fun pressScale(interaction: MutableInteractionSource, pressed: Float = 0
   return scale
 }
 
-internal enum class ButtonTone { INK, NEGATIVE }
+internal enum class ButtonTone { BRAND, NEGATIVE }
 
-/** دکمهٔ اصلیِ هر پله — قرصِ پُررنگ، ۵۶dp، با جابه‌جاییِ نرمِ متن وقتی پله عوض می‌شود */
+/** دکمهٔ اصلیِ هر پله — قرصِ سبزآبی، ۵۶dp؛ متن با پله عوض می‌شود و نرم می‌لغزد */
 @Composable
 internal fun V3PrimaryButton(
   text: String,
@@ -149,24 +155,27 @@ internal fun V3PrimaryButton(
   modifier: Modifier = Modifier,
   enabled: Boolean = true,
   busy: Boolean = false,
-  tone: ButtonTone = ButtonTone.INK,
+  tone: ButtonTone = ButtonTone.BRAND,
   icon: ImageVector? = null,
+  onDark: Boolean = false,
 ) {
-  val p = PhoneV3.colors
+  val ui = PhoneV3.ui
   val interaction = remember { MutableInteractionSource() }
   val scale = pressScale(interaction)
   val bg by animateColorAsState(
     when {
-      !enabled -> p.hairline
-      tone == ButtonTone.NEGATIVE -> p.negative
-      else -> p.ink
+      !enabled -> ui.disabledBg
+      tone == ButtonTone.NEGATIVE -> ui.danger
+      onDark -> ui.primaryOnDark
+      else -> ui.primary
     },
     animationSpec = tween(motionMs(200)), label = "primaryBg",
   )
   val fg = when {
-    !enabled -> p.inkMuted
-    tone == ButtonTone.NEGATIVE -> p.onBlack
-    else -> p.card
+    !enabled -> ui.disabledFg
+    tone == ButtonTone.NEGATIVE -> ui.onDanger
+    onDark -> ui.onPrimaryOnDark
+    else -> ui.onPrimary
   }
   Box(
     modifier
@@ -209,30 +218,37 @@ internal fun V3PrimaryButton(
   }
 }
 
-/** دکمهٔ دوم — قرصِ خاکستریِ روشن روی کارتِ سفید، بی خطِ دور */
+/** دکمهٔ دوم — «خنثی» ِ سیستمِ رنگ (روی سرمه‌ای: سطحِ برآمده) */
 @Composable
 internal fun V3SecondaryButton(
   text: String,
   onClick: () -> Unit,
   modifier: Modifier = Modifier,
   icon: ImageVector? = null,
-  tone: ButtonTone = ButtonTone.INK,
+  tone: ButtonTone = ButtonTone.BRAND,
   enabled: Boolean = true,
+  onDark: Boolean = false,
 ) {
   val p = PhoneV3.colors
+  val ui = PhoneV3.ui
   val interaction = remember { MutableInteractionSource() }
   val scale = pressScale(interaction)
+  val bg = when {
+    onDark -> p.blackRaised
+    else -> ui.neutralBg
+  }
   val fg = when {
-    !enabled -> p.chevron
-    tone == ButtonTone.NEGATIVE -> p.negative
-    else -> p.ink
+    !enabled -> ui.disabledFg
+    tone == ButtonTone.NEGATIVE -> if (onDark) PhoneV3UiDarkNegative else ui.cancelled.fg
+    onDark -> p.onBlack
+    else -> ui.neutralFg
   }
   Box(
     modifier
       .height(52.dp)
       .graphicsLayer { scaleX = scale; scaleY = scale }
       .clip(PillShape)
-      .background(p.bg)
+      .background(bg)
       .clickable(
         interactionSource = interaction,
         indication = LocalIndication.current,
@@ -253,7 +269,11 @@ internal fun V3SecondaryButton(
   }
 }
 
-/** دکمهٔ گردِ سفید با آیکنِ خطی (مثلِ زنگِ r4) — ۴۴dp، با چرخش هنگامِ کار */
+/** متنِ «ناموفق/رد» روی سطحِ سرمه‌ای — همان سرخِ وضعیتِ «لغو»ِ شب */
+private val PhoneV3UiDarkNegative: Color
+  get() = ir.vil3ntec.tohid.ui.theme.PhoneV3UiDark.cancelled.fg
+
+/** دکمهٔ گرد با آیکنِ خطی (مثلِ زنگِ مرجع) — ۴۴dp، با چرخش هنگامِ کار و نقطهٔ تازه */
 @Composable
 internal fun RoundIconButton(
   icon: ImageVector,
@@ -262,8 +282,10 @@ internal fun RoundIconButton(
   enabled: Boolean = true,
   spin: Boolean = false,
   size: Dp = 44.dp,
+  dot: Boolean = false,
 ) {
   val p = PhoneV3.colors
+  val ui = PhoneV3.ui
   val interaction = remember { MutableInteractionSource() }
   val scale = pressScale(interaction, 0.92f)
   val angle = if (spin && Motion.enabled) {
@@ -273,56 +295,67 @@ internal fun RoundIconButton(
       animationSpec = infiniteRepeatable(tween(900, easing = LinearEasing)), label = "spinAngle",
     ).value
   } else 0f
-  Box(
-    Modifier
-      .size(size)
-      .graphicsLayer { scaleX = scale; scaleY = scale }
-      .v3Card(p, CircleShape, elevation = 6.dp)
-      .clip(CircleShape)
-      .clickable(
-        interactionSource = interaction,
-        indication = LocalIndication.current,
-        enabled = enabled,
-        role = Role.Button,
-        onClick = onClick,
-      ),
-    contentAlignment = Alignment.Center,
-  ) {
-    Icon(
-      icon, contentDescription = contentDescription,
-      tint = if (enabled || spin) p.icon else p.chevron,
-      modifier = Modifier.size(22.dp).rotate(angle),
-    )
-  }
-}
-
-/** برچسبِ کوچکِ قرصی: نقطهٔ رنگی + متن (وضعیت همیشه متن + رنگ + نقطه) */
-@Composable
-internal fun DotChip(text: String, dot: Color, modifier: Modifier = Modifier, fill: Color? = null) {
-  val p = PhoneV3.colors
-  val dotColor by animateColorAsState(dot, animationSpec = tween(motionMs(260)), label = "dot")
-  Row(
-    modifier.background(fill ?: p.bg, PillShape).padding(horizontal = 10.dp, vertical = 5.dp),
-    verticalAlignment = Alignment.CenterVertically,
-  ) {
-    Box(Modifier.size(7.dp).background(dotColor, CircleShape))
-    Spacer(Modifier.width(6.dp))
-    Crossfade(targetState = text, animationSpec = tween(motionMs(220)), label = "chipText") { t ->
-      Text(t, style = v3Style(12.sp, FontWeight.Medium), color = p.ink, maxLines = 1)
+  Box(Modifier.size(size)) {
+    Box(
+      Modifier
+        .fillMaxSize()
+        .graphicsLayer { scaleX = scale; scaleY = scale }
+        .v3Card(p, CircleShape, elevation = 2.dp)
+        .clip(CircleShape)
+        .clickable(
+          interactionSource = interaction,
+          indication = LocalIndication.current,
+          enabled = enabled,
+          role = Role.Button,
+          onClick = onClick,
+        ),
+      contentAlignment = Alignment.Center,
+    ) {
+      Icon(
+        icon, contentDescription = contentDescription,
+        tint = if (enabled || spin) p.ink else p.chevron,
+        modifier = Modifier.size(22.dp).rotate(angle),
+      )
+    }
+    if (dot) {
+      Box(
+        Modifier.align(Alignment.TopEnd).padding(top = 9.dp, end = 10.dp).size(9.dp)
+          .background(ui.danger, CircleShape).border(1.5.dp, p.card, CircleShape),
+      )
     }
   }
 }
 
-/** برچسبِ اطلاعات با آیکنِ خطی (نقد، کدِ تحویل، عکس، …) */
+/** برچسبِ وضعیت: متن + رنگ + نقطه روی زمینهٔ کم‌رنگِ همان وضعیت (§۸) */
+@Composable
+internal fun TonePill(text: String, tone: PhoneV3Tone, modifier: Modifier = Modifier) {
+  val fg by animateColorAsState(tone.fg, animationSpec = tween(motionMs(260)), label = "pillFg")
+  val bg by animateColorAsState(tone.bg, animationSpec = tween(motionMs(260)), label = "pillBg")
+  Row(
+    modifier.background(bg, PillShape).padding(horizontal = 10.dp, vertical = 4.dp),
+    verticalAlignment = Alignment.CenterVertically,
+  ) {
+    Box(Modifier.size(7.dp).background(fg, CircleShape))
+    Spacer(Modifier.width(6.dp))
+    Crossfade(targetState = text, animationSpec = tween(motionMs(220)), label = "pillText") { t ->
+      Text(t, style = v3Style(12.sp, FontWeight.SemiBold), color = fg, maxLines = 1)
+    }
+  }
+}
+
+/** برچسبِ اطلاعات با آیکنِ خطی (نقد، کدِ تحویل، …) روی سطحِ درونی */
 @Composable
 internal fun InfoChip(icon: ImageVector, text: String, positive: Boolean = false) {
   val p = PhoneV3.colors
-  val fg = if (positive) p.positive else p.ink
+  val ui = PhoneV3.ui
+  val fg = if (positive) ui.success.fg else p.ink
   Row(
-    Modifier.background(p.bg, PillShape).padding(horizontal = 10.dp, vertical = 6.dp),
+    Modifier.background(if (positive) ui.success.bg else p.tile, PillShape)
+      .border(1.dp, if (positive) ui.success.bg else p.hairline, PillShape)
+      .padding(horizontal = 10.dp, vertical = 5.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
-    Icon(icon, contentDescription = null, tint = if (positive) p.positive else p.icon, modifier = Modifier.size(16.dp))
+    Icon(icon, contentDescription = null, tint = if (positive) ui.success.fg else p.icon, modifier = Modifier.size(16.dp))
     Spacer(Modifier.width(6.dp))
     Text(text, style = v3Style(13.sp, FontWeight.Medium), color = fg, maxLines = 1, overflow = TextOverflow.Ellipsis)
   }
@@ -331,57 +364,65 @@ internal fun InfoChip(icon: ImageVector, text: String, positive: Boolean = false
 /** یادداشتِ هشدار (دکان پس خواسته، …) — متن و رنگ و آیکن، نه فقط رنگ */
 @Composable
 internal fun WarnNote(text: String) {
-  val p = PhoneV3.colors
+  val ui = PhoneV3.ui
   Row(
-    Modifier.fillMaxWidth().background(p.negative.copy(alpha = 0.10f), RoundedCornerShape(14.dp)).padding(12.dp),
+    Modifier.fillMaxWidth().background(ui.cancelled.bg, RoundedCornerShape(14.dp)).padding(12.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
-    Icon(Icons.Outlined.Info, contentDescription = null, tint = p.negative, modifier = Modifier.size(20.dp))
+    Icon(Icons.Outlined.Info, contentDescription = null, tint = ui.cancelled.fg, modifier = Modifier.size(20.dp))
     Spacer(Modifier.width(10.dp))
-    Text(text, style = v3Style(14.sp, FontWeight.Medium), color = p.negative)
+    Text(text, style = v3Style(14.sp, FontWeight.Medium), color = ui.cancelled.fg)
   }
 }
 
-/** دو زبانهٔ «فعال / پایان‌یافته» — قرصِ پُررنگِ انتخاب با فنر جابه‌جا می‌شود */
+/**
+ *  دو زبانه — قرصِ انتخاب با فنر جابه‌جا می‌شود. روی سطحِ سرمه‌ای (برگهٔ پیگیری،
+ *  مثلِ «Tracking / Shipping Detail» ِ مرجع) قرصِ سبزآبیِ روشن.
+ */
 @Composable
 internal fun TwoTabs(
-  first: Pair<String, Int>,
-  second: Pair<String, Int>,
+  first: Pair<String, Int?>,
+  second: Pair<String, Int?>,
   firstSelected: Boolean,
   onSelect: (Boolean) -> Unit,
   modifier: Modifier = Modifier,
+  onDark: Boolean = false,
 ) {
   val p = PhoneV3.colors
-  BoxWithConstraints(
-    modifier.fillMaxWidth().height(52.dp).v3Card(p, PillShape, elevation = 6.dp).padding(4.dp),
-  ) {
+  val ui = PhoneV3.ui
+  val track = if (onDark) Modifier.background(p.blackRaised, PillShape) else Modifier.v3Card(p, PillShape, elevation = 2.dp)
+  BoxWithConstraints(modifier.fillMaxWidth().height(48.dp).then(track).padding(4.dp)) {
     val half = maxWidth / 2
     val x by animateDpAsState(
       targetValue = if (firstSelected) 0.dp else half,
       animationSpec = if (Motion.enabled) spring(dampingRatio = 0.8f, stiffness = 500f) else snap(),
       label = "tabX",
     )
-    Box(Modifier.offset(x = x).width(half).fillMaxHeight().background(p.ink, PillShape))
+    Box(Modifier.offset(x = x).width(half).fillMaxHeight().background(if (onDark) ui.primaryOnDark else ui.primary, PillShape))
     Row(Modifier.fillMaxSize()) {
       listOf(first to true, second to false).forEach { (tab, isFirst) ->
         val selected = isFirst == firstSelected
-        val fg by animateColorAsState(if (selected) p.card else p.ink, tween(motionMs(200)), label = "tabFg")
+        val on = if (onDark) ui.onPrimaryOnDark else ui.onPrimary
+        val off = if (onDark) p.onBlackMuted else p.ink
+        val fg by animateColorAsState(if (selected) on else off, tween(motionMs(200)), label = "tabFg")
         Row(
           Modifier.weight(1f).fillMaxHeight().clip(PillShape)
             .clickable(role = Role.Tab) { onSelect(isFirst) },
           horizontalArrangement = Arrangement.Center,
           verticalAlignment = Alignment.CenterVertically,
         ) {
-          Text(tab.first, style = v3Style(15.sp, FontWeight.Bold), color = fg)
-          Spacer(Modifier.width(6.dp))
-          Text("${tab.second}", style = v3Style(13.sp, FontWeight.Medium), color = fg.copy(alpha = 0.65f))
+          Text(tab.first, style = v3Style(14.sp, FontWeight.Bold), color = fg, maxLines = 1)
+          tab.second?.let {
+            Spacer(Modifier.width(6.dp))
+            Text("$it", style = v3Style(13.sp, FontWeight.Medium), color = fg.copy(alpha = 0.7f))
+          }
         }
       }
     }
   }
 }
 
-/** کادرِ ورودیِ نسخهٔ ۳: برچسب بالا، زمینهٔ خاکستریِ روشن، گوشهٔ ۱۶ */
+/** کادرِ ورودی: برچسب بالا، سطحِ درونی با مرزِ دیدنی */
 @Composable
 internal fun V3Field(
   value: String,
@@ -401,7 +442,9 @@ internal fun V3Field(
     textDirection = if (ltr) TextDirection.Ltr else TextDirection.Content,
   )
   Column(modifier.fillMaxWidth()) {
-    Text(label, style = v3Style(13.sp, FontWeight.Medium), color = p.inkMuted, modifier = Modifier.padding(start = 4.dp, bottom = 6.dp))
+    if (label.isNotEmpty()) {
+      Text(label, style = v3Style(13.sp, FontWeight.Medium), color = p.inkMuted, modifier = Modifier.padding(start = 4.dp, bottom = 6.dp))
+    }
     BasicTextField(
       value = value,
       onValueChange = onValueChange,
@@ -412,13 +455,14 @@ internal fun V3Field(
       modifier = Modifier.fillMaxWidth(),
       decorationBox = { inner ->
         Box(
-          Modifier.fillMaxWidth().heightIn(min = if (big) 64.dp else 56.dp)
-            .background(p.bg, FieldShape)
+          Modifier.fillMaxWidth().heightIn(min = if (big) 64.dp else 54.dp)
+            .background(p.tile, FieldShape)
+            .border(1.dp, p.hairline, FieldShape)
             .padding(horizontal = 16.dp, vertical = 12.dp),
           contentAlignment = Alignment.CenterStart,
         ) {
           if (value.isEmpty() && placeholder.isNotEmpty()) {
-            Text(placeholder, style = style.copy(color = p.inkMuted.copy(alpha = 0.75f)), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(placeholder, style = style.copy(color = p.inkMuted.copy(alpha = 0.8f)), maxLines = 1, overflow = TextOverflow.Ellipsis)
           }
           inner()
         }
@@ -427,11 +471,42 @@ internal fun V3Field(
   }
 }
 
-/** گروهِ انتخابِ یکی از چند (دلیل‌ها) — مثلِ کارت‌های r5، تیکِ پُررنگ کنارِ انتخاب */
+/** کادرِ جست‌وجوی قرصی (مثلِ «Resi number» ِ مرجع) با ذره‌بینِ خطی */
+@Composable
+internal fun SearchPill(value: String, onValueChange: (String) -> Unit, placeholder: String, icon: ImageVector) {
+  val p = PhoneV3.colors
+  val style = v3Style(15.sp, FontWeight.Medium).copy(color = p.ink)
+  BasicTextField(
+    value = value,
+    onValueChange = onValueChange,
+    singleLine = true,
+    textStyle = style,
+    cursorBrush = SolidColor(p.ink),
+    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+    modifier = Modifier.fillMaxWidth(),
+    decorationBox = { inner ->
+      Row(
+        Modifier.fillMaxWidth().height(50.dp).background(p.card, PillShape).border(1.dp, p.hairline, PillShape)
+          .padding(horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+      ) {
+        Icon(icon, contentDescription = null, tint = p.icon, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(10.dp))
+        Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+          if (value.isEmpty()) Text(placeholder, style = style.copy(color = p.inkMuted), maxLines = 1)
+          inner()
+        }
+      }
+    },
+  )
+}
+
+/** گروهِ انتخابِ یکی از چند (دلیل‌ها) — تیکِ برند کنارِ انتخاب */
 @Composable
 internal fun ChoiceGroup(options: List<Pair<String, String>>, selected: String, onSelect: (String) -> Unit) {
   val p = PhoneV3.colors
-  Column(Modifier.fillMaxWidth().background(p.bg, GroupShape)) {
+  val ui = PhoneV3.ui
+  Column(Modifier.fillMaxWidth().background(p.tile, GroupShape).border(1.dp, p.hairline, GroupShape)) {
     options.forEachIndexed { i, (id, label) ->
       val on = id == selected
       Row(
@@ -441,9 +516,12 @@ internal fun ChoiceGroup(options: List<Pair<String, String>>, selected: String, 
         verticalAlignment = Alignment.CenterVertically,
       ) {
         Text(label, style = v3Style(15.sp, if (on) FontWeight.Bold else FontWeight.Normal), color = p.ink, modifier = Modifier.weight(1f))
-        val fill by animateColorAsState(if (on) p.ink else p.card, tween(motionMs(180)), label = "choice")
-        Box(Modifier.size(24.dp).background(fill, CircleShape), contentAlignment = Alignment.Center) {
-          if (on) Icon(Icons.Outlined.Check, contentDescription = null, tint = p.card, modifier = Modifier.size(16.dp))
+        val fill by animateColorAsState(if (on) ui.primary else p.card, tween(motionMs(180)), label = "choice")
+        Box(
+          Modifier.size(24.dp).background(fill, CircleShape).border(1.dp, if (on) ui.primary else p.hairline, CircleShape),
+          contentAlignment = Alignment.Center,
+        ) {
+          if (on) Icon(Icons.Outlined.Check, contentDescription = null, tint = ui.onPrimary, modifier = Modifier.size(16.dp))
         }
       }
       if (i < options.lastIndex) Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(1.dp).background(p.hairline))
@@ -494,7 +572,7 @@ internal fun V3Sheet(onDismiss: () -> Unit, content: @Composable ColumnScope.() 
   }
 }
 
-/** عنوانِ برگه — بزرگ و پُررنگ مثلِ r2 */
+/** عنوانِ برگه */
 @Composable
 internal fun SheetTitle(text: String, sub: String? = null) {
   val p = PhoneV3.colors
@@ -502,6 +580,22 @@ internal fun SheetTitle(text: String, sub: String? = null) {
   if (!sub.isNullOrBlank()) {
     Spacer(Modifier.height(4.dp))
     Text(sub, style = v3Style(14.sp), color = p.inkMuted)
+  }
+}
+
+/** سرخطِ بخش (مثلِ «Current Tracking» ِ مرجع) با پیوندِ اختیاریِ «همه» */
+@Composable
+internal fun SectionHead(title: String, action: String? = null, onAction: (() -> Unit)? = null) {
+  val p = PhoneV3.colors
+  val ui = PhoneV3.ui
+  Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+    Text(title, style = v3Style(17.sp, FontWeight.Bold), color = p.ink, modifier = Modifier.weight(1f))
+    if (action != null && onAction != null) {
+      Text(
+        action, style = v3Style(14.sp, FontWeight.SemiBold), color = ui.iconActive,
+        modifier = Modifier.clip(PillShape).clickable(role = Role.Button, onClick = onAction).padding(horizontal = 8.dp, vertical = 4.dp),
+      )
+    }
   }
 }
 
@@ -520,7 +614,7 @@ internal fun rememberAppear(key: String, index: Int, seen: MutableSet<String>): 
   return appear
 }
 
-/** عددِ وسطِ برگه (مبلغِ نقد) — بزرگ و پُررنگ مثلِ r8 */
+/** عددِ وسطِ برگه (مبلغِ نقد) — بزرگ و پُررنگ */
 @Composable
 internal fun BigAmount(label: String, amount: String) {
   val p = PhoneV3.colors

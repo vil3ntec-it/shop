@@ -45,11 +45,10 @@ data class PhoneV3Colors(
   val positive: Color,
   val negative: Color,
   /**
-   *  نقطهٔ «در انتظار» (حالتِ پیک: کارِ هنوز به دکان نرسیده، مأموریتِ تازه).
-   *  کهربایی، چون زردِ سبد (`cart`) فقط مالِ سبد است و سبز/سرخ معنای دیگر دارند.
-   *  پیش‌فرض دارد تا سازنده‌های روشن/تیره دست نخورند.
+   *  «در انتظار» (حالتِ پیک: کارِ هنوز به دکان نرسیده، مأموریتِ تازه) — همان
+   *  رنگِ متنِ وضعیتِ «در انتظارِ تأیید»ِ سیستمِ رنگ (§۸)؛ شب روشن‌تر.
    */
-  val waiting: Color = Color(0xFFF59E0B),
+  val waiting: Color = Color(0xFF92400E),
 )
 
 val PhoneV3Light = PhoneV3Colors(
@@ -100,6 +99,7 @@ val PhoneV3Dark = PhoneV3Colors(
   tile = Color(0xFF203149),
   positive = Color(0xFF86EFAC),
   negative = Color(0xFFFCA5A5),
+  waiting = Color(0xFFFCD34D),
 )
 
 object PhoneV3 {
@@ -121,4 +121,78 @@ object PhoneV3 {
   val navHeight = 64.dp
   /** بلندیِ ردیفِ تنظیمات (r5) */
   val rowHeight = 52.dp
+
+  /** دکمه‌ها، آیکنِ فعال و رنگِ وضعیت‌ها (سیستمِ رنگِ VILL3N §۷/§۸) برای تمِ جاری */
+  val ui: PhoneV3Ui
+    @Composable get() = if (Shop.colors.bg.luminance() < 0.5f) PhoneV3UiDark else PhoneV3UiLight
 }
+
+/** یک جفتِ رنگِ وضعیت: متن/آیکن روی زمینهٔ کم‌رنگ — هرگز رنگ بی برچسب */
+data class PhoneV3Tone(val fg: Color, val bg: Color)
+
+/**
+ *  رنگ‌های کار و وضعیت از سیستمِ رنگِ VILL3N (۱۴۰۵/۰۷/۲۸) — جدا از `PhoneV3Colors`
+ *  تا سازنده‌های آن دست نخورند. وضعیتِ سفارش برای مشتری، دکان، پیک و مدیر یک معنا
+ *  دارد (§۸). `onDark*` برای سطحِ تیرهٔ سرمه‌ای در هر دو تم (کارتِ «مأموریتِ جاری»،
+ *  برگهٔ پیگیری): دکمهٔ اصلی #19A985 با متنِ #041B15.
+ */
+data class PhoneV3Ui(
+  val primary: Color,
+  val onPrimary: Color,
+  val primaryOnDark: Color,
+  val onPrimaryOnDark: Color,
+  val secondaryBg: Color,
+  val secondaryFg: Color,
+  val secondaryBorder: Color,
+  val neutralBg: Color,
+  val neutralFg: Color,
+  val danger: Color,
+  val onDanger: Color,
+  val disabledBg: Color,
+  val disabledFg: Color,
+  /** آیکنِ فعال/برند */
+  val iconActive: Color,
+  val success: PhoneV3Tone,
+  val delivery: PhoneV3Tone,
+  val awaiting: PhoneV3Tone,
+  val cancelled: PhoneV3Tone,
+  val preparing: PhoneV3Tone,
+  val inactive: PhoneV3Tone,
+)
+
+private val StatusDark = listOf(
+  PhoneV3Tone(Color(0xFF86EFAC), Color(0xFF123C2B)),
+  PhoneV3Tone(Color(0xFF93C5FD), Color(0xFF172A4D)),
+  PhoneV3Tone(Color(0xFFFCD34D), Color(0xFF3A2C0B)),
+  PhoneV3Tone(Color(0xFFFCA5A5), Color(0xFF3F1A1A)),
+  PhoneV3Tone(Color(0xFF67E8F9), Color(0xFF0F3640)),
+  PhoneV3Tone(Color(0xFFB6C2D2), Color(0xFF203149)),
+)
+
+val PhoneV3UiLight = PhoneV3Ui(
+  primary = Color(0xFF108B81), onPrimary = Color(0xFFFFFFFF),
+  primaryOnDark = Color(0xFF19A985), onPrimaryOnDark = Color(0xFF041B15),
+  secondaryBg = Color(0xFFFFFFFF), secondaryFg = Color(0xFF08665F), secondaryBorder = Color(0xFFB8DCD5),
+  neutralBg = Color(0xFFE8EDF3), neutralFg = Color(0xFF344256),
+  danger = Color(0xFFDC2626), onDanger = Color(0xFFFFFFFF),
+  disabledBg = Color(0xFFE2E8F0), disabledFg = Color(0xFF94A3B8),
+  iconActive = Color(0xFF108B81),
+  success = PhoneV3Tone(Color(0xFF15803D), Color(0xFFDCFCE7)),
+  delivery = PhoneV3Tone(Color(0xFF1D4ED8), Color(0xFFDBEAFE)),
+  awaiting = PhoneV3Tone(Color(0xFF92400E), Color(0xFFFEF3C7)),
+  cancelled = PhoneV3Tone(Color(0xFFB91C1C), Color(0xFFFEE2E2)),
+  preparing = PhoneV3Tone(Color(0xFF0E7490), Color(0xFFCFFAFE)),
+  inactive = PhoneV3Tone(Color(0xFF475569), Color(0xFFE2E8F0)),
+)
+
+val PhoneV3UiDark = PhoneV3Ui(
+  primary = Color(0xFF19A985), onPrimary = Color(0xFF041B15),
+  primaryOnDark = Color(0xFF19A985), onPrimaryOnDark = Color(0xFF041B15),
+  secondaryBg = Color(0xFF162235), secondaryFg = Color(0xFF6EE7D1), secondaryBorder = Color(0xFF40516A),
+  neutralBg = Color(0xFF203149), neutralFg = Color(0xFFF1F5F9),
+  danger = Color(0xFFDC2626), onDanger = Color(0xFFFFFFFF),
+  disabledBg = Color(0xFF203149), disabledFg = Color(0xFF64748B),
+  iconActive = Color(0xFF6EE7D1),
+  success = StatusDark[0], delivery = StatusDark[1], awaiting = StatusDark[2],
+  cancelled = StatusDark[3], preparing = StatusDark[4], inactive = StatusDark[5],
+)

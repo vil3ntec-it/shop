@@ -1,8 +1,14 @@
 package ir.vil3ntec.tohid.data.repo
 
 import ir.vil3ntec.tohid.core.courier.CourierEvent
+import ir.vil3ntec.tohid.core.courier.CourierSettlement
+import ir.vil3ntec.tohid.core.courier.CourierSummary
 import ir.vil3ntec.tohid.core.courier.EventResult
 import ir.vil3ntec.tohid.core.courier.MissionCard
+import ir.vil3ntec.tohid.core.courier.MissionStep
+import ir.vil3ntec.tohid.core.courier.PeriodStats
+import ir.vil3ntec.tohid.core.courier.UnsettledDelivery
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -63,6 +69,59 @@ object CourierWire {
       photoAllowed = bool(o, "photoAllowed"),
       recallRequested = o["recall"].let { it != null && it !is JsonNull },
       updatedAt = long(o, "updatedAt") ?: 0L,
+      timeline = (o["timeline"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonObject)?.let(::step) },
+    )
+  }
+
+  /** یک رویدادِ `timeline`؛ بی زمان ⇒ null */
+  fun step(o: JsonObject): MissionStep? {
+    val at = long(o, "at") ?: return null
+    return MissionStep(kind = str(o, "kind"), to = str(o, "to"), at = at, reason = str(o, "reason"), by = str(o, "by"))
+  }
+
+  /** `GET /api/courier/summary` ⇒ «نقدِ من» و آمار؛ کلیدِ ناپیدا ⇒ صفر/خالی */
+  fun summary(o: JsonObject): CourierSummary {
+    val shop = o["shop"] as? JsonObject ?: JsonObject(emptyMap())
+    val cash = o["cash"] as? JsonObject ?: JsonObject(emptyMap())
+    val stats = o["stats"] as? JsonObject ?: JsonObject(emptyMap())
+    fun period(x: JsonObject?): PeriodStats = if (x == null) PeriodStats() else PeriodStats(
+      from = long(x, "from") ?: 0L,
+      delivered = (long(x, "delivered") ?: 0L).toInt(),
+      failed = (long(x, "failed") ?: 0L).toInt(),
+      collectedCashMinor = long(x, "collectedCashMinor") ?: 0L,
+      fareMinor = long(x, "fareMinor") ?: 0L,
+    )
+    return CourierSummary(
+      shopName = str(shop, "name"),
+      shopPhone = str(shop, "phone"),
+      cashInHandMinor = long(cash, "inHandMinor") ?: 0L,
+      liveExpectedMinor = long(cash, "liveExpectedMinor") ?: 0L,
+      cashCapMinor = long(cash, "capMinor") ?: 0L,
+      headroomMinor = long(cash, "headroomMinor") ?: 0L,
+      unsettled = (o["unsettled"] as? JsonArray).orEmpty().mapNotNull { el ->
+        (el as? JsonObject)?.let {
+          UnsettledDelivery(
+            orderNo = long(it, "orderNo") ?: 0L, deliveredAt = long(it, "deliveredAt") ?: 0L,
+            expectedCollectMinor = long(it, "expectedCollectMinor") ?: 0L,
+            cashCollectedMinor = long(it, "cashCollectedMinor") ?: 0L, fareMinor = long(it, "fareMinor") ?: 0L,
+          )
+        }
+      },
+      settlements = (o["settlements"] as? JsonArray).orEmpty().mapNotNull { el ->
+        (el as? JsonObject)?.let {
+          CourierSettlement(
+            settleNo = long(it, "settleNo") ?: 0L, at = long(it, "at") ?: 0L, status = str(it, "status"),
+            assignmentsCount = (long(it, "assignmentsCount") ?: 0L).toInt(),
+            collectedCashMinor = long(it, "collectedCashMinor") ?: 0L, fareTotalMinor = long(it, "fareTotalMinor") ?: 0L,
+            handoverDueMinor = long(it, "handoverDueMinor") ?: 0L, receivedMinor = long(it, "receivedMinor") ?: 0L,
+            shortageMinor = long(it, "shortageMinor") ?: 0L, excessMinor = long(it, "excessMinor") ?: 0L,
+            reason = str(it, "reason"),
+          )
+        }
+      },
+      today = period(stats["today"] as? JsonObject),
+      week = period(stats["week"] as? JsonObject),
+      serverTime = long(o, "serverTime") ?: 0L,
     )
   }
 

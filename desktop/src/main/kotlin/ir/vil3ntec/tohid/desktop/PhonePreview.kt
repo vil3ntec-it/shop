@@ -126,8 +126,9 @@ private fun PhonePreviewContent(screen: String, store: ShopStore, dark: Boolean)
         //  مثلِ `AppRoot`: نوارِ پایین زیرِ نوارِ سبد، و تا برگه باز است کنار می‌رود
         if (!PhoneCartUi.sheetOpen.value) PhoneNavBar(tabs = PREVIEW_TABS, current = "sale", onPick = {})
       }
-      //  حالتِ پیک (phone-v3-courier-*): ورود، فهرست، جزئیات، تأییدِ نقد، تحویل‌شده، خالی — دادهٔ نمایشی
-      "courier-join", "courier-list", "courier-detail", "courier-cod", "courier-delivered", "courier-empty" ->
+      //  حالتِ پیک (phone-v3-courier-*): ورود، خانه، مسیر، نقدِ من، پیگیری، ارسال، آمار، حساب، تأییدِ نقد — دادهٔ نمایشی
+      "courier-join", "courier-home", "courier-route", "courier-cash", "courier-track", "courier-ship",
+      "courier-stats", "courier-account", "courier-cod" ->
         Box(Modifier.weight(1f).fillMaxWidth()) { key(screen) { CourierPreview(screen.removePrefix("courier-")) } }
       else -> {
         //  «nav» و هر نامِ ناشناس: خانه با نوارِ پایینِ قرصی
