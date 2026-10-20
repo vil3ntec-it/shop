@@ -33,7 +33,7 @@ class NavCoreTest {
   }
 
   @Test
-  fun `پشته: رفتن، برگشت، تب و برگشت به صفحه‌ای که پایین‌تر هست`() {
+  fun `پشته — رفتن، برگشت، تب و برگشت به صفحه‌ای که پایین‌تر هست`() {
     var s = NavStack.of("home")
     s = s.push("more"); assertEquals(Move.PUSH, s.move)
     s = s.push("settings/security"); assertEquals(listOf("home", "more", "settings/security"), s.entries)
@@ -60,7 +60,7 @@ class NavCoreTest {
   }
 
   @Test
-  fun `پیوندِ برنامه: vill3n__app با حالتِ درست`() {
+  fun `پیوندِ برنامه — vill3n__app با حالتِ درست`() {
     assertEquals(DeepLink(AppMode.SHOP, "settings/security"), DeepLinks.parse("vill3n://app/settings/security"))
     assertEquals(DeepLink(AppMode.SHOP, "products?filter=out"), DeepLinks.parse("vill3n://app/products?filter=out"))
     assertEquals(AppMode.SHOPPER, DeepLinks.parse("vill3n://app/shopper/home")!!.mode)
@@ -73,7 +73,7 @@ class NavCoreTest {
   }
 
   @Test
-  fun `ویترین: همان دو شکلی که سرور می‌سازد ⇐ حالتِ خرید`() {
+  fun `ویترین — همان دو شکلی که سرور می‌سازد ⇐ حالتِ خرید`() {
     assertEquals(DeepLink(AppMode.SHOPPER, "shopper/shop/karim-store"), DeepLinks.parse("https://karim-store.vill3n.top/"))
     assertEquals(DeepLink(AppMode.SHOPPER, "shopper/shop/karim-store"), DeepLinks.parse("https://vill3n.top/store/karim-store"))
     assertEquals(DeepLink(AppMode.SHOPPER, "shopper/shop/karim-store"), DeepLinks.parse("https://api.vill3n.top/store/Karim-Store?x=1"))
@@ -93,7 +93,7 @@ class NavCoreTest {
   }
 
   @Test
-  fun `حالت‌ها: خرید همیشه؛ نصبِ پیشین همان رفتارِ امروز`() {
+  fun `حالت‌ها — خرید همیشه؛ نصبِ پیشین همان رفتارِ امروز`() {
     val shop = ModeFacts(shopMember = true, courier = false)
     val courier = ModeFacts(shopMember = false, courier = true)
     val none = ModeFacts(shopMember = false, courier = false)
@@ -110,7 +110,7 @@ class NavCoreTest {
   }
 
   @Test
-  fun `دسترسی: نیاز و پرچم با هم`() {
+  fun `دسترسی — نیاز و پرچم با هم`() {
     val a = Access(granted = setOf(Need.MANAGE), flags = setOf("module.x"))
     assertTrue(a.allows(setOf(Need.MANAGE), "module.x"))
     assertFalse(a.allows(setOf(Need.MANAGE, Need.CHAT)))
