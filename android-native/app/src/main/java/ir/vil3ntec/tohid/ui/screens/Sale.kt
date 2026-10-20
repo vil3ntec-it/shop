@@ -638,9 +638,9 @@ fun SaleScreen(
             multiplier = m
           }
         }
-        Spacer(Modifier.width(6.dp))
-        V3Pill("+ قلم آزاد", v.onBlack, v.black, height = 36.dp) { freeLine = true }
       }
+      Spacer(Modifier.height(10.dp))
+      V3Pill("+ قلم آزاد", v.onBlack, v.black, height = 36.dp) { freeLine = true }
     }
   }
 
@@ -916,7 +916,8 @@ fun SaleScreen(
                   index = rows.size + 1,
                   revealed = revealed,
                   onClick = null,
-                  trailing = { PhoneCartAmount("−${money(off)} ؋") },
+                  //  بی نشانهٔ منفی: عنوان خودش «تخفیف» است و «−» در راست‌به‌چپ پسِ عدد می‌افتاد
+                  trailing = { PhoneCartAmount("${money(off)} ؋") },
                 )
               }
             }
