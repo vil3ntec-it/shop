@@ -14,12 +14,13 @@ const {
 } = require('crypto');
 const { query, one, many, newId, now } = require('../db');
 const config = require('../config');
+const { serverSecret } = require('./server-secret');
 const settings = require('./sms-settings');
 const { sectionOf } = require('./tenancy');
 const { badRequest, tooMany, forbidden, upstream } = require('../middleware/errors');
 
 function pepper() {
-  return config.secrets.otp || config.secrets.api || 'shop-otp-pepper';
+  return serverSecret(['otp', 'api'], 'shop-otp-pepper');
 }
 
 function hashCode(destination, code) {
