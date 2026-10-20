@@ -32,21 +32,24 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: server-${{ github.ref }}
-  cancel-in-progress: true
+  #  PR: pushِ تازه اجرای قبلیِ همان PR را لغو می‌کند. اجرای main (و برچسب‌ها) هرگز وسطِ کار لغو نمی‌شود.
+  group: server-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
 
 jobs:
-  test:
-    name: آزمون‌های سرور
+  # ⛔ تا ۱۴۰۵/۰۷/۲۷ همهٔ این‌ها در یک کار و پشتِ‌سرِهم می‌دوید (PostgreSQL، PGlite،
+  # Electron، کرومیوم و سناریوهای سرتاسری) و با رشدِ آزمون‌ها به سقفِ ۵۰ دقیقه می‌خورد ⇒
+  # «لغو» بی هیچ آزمونِ قرمزی. حالا پنج کارِ هم‌زمان‌اند و کارِ پایانی با همان نامِ
+  # همیشگی («آزمون‌های سرور») فقط وقتی سبز است که همه سبز باشند — پس قاعدهٔ مرج و نامِ
+  # چکی که منتظرش هستیم عوض نمی‌شود.
+  pg:
+    name: آزمون‌های سرور روی PostgreSQL
     runs-on: ubuntu-latest
-    timeout-minutes: 50
+    timeout-minutes: 45
 
-    # آزمون‌ها روی PostgreSQL **واقعی** می‌دوند، نه روی ساختگی —
-    # همان قاعده‌ای که `test/helpers.js` نوشته: چیزی که باید ثابت شود
-    # «این سیستم واقعاً کار می‌کند» است.
     services:
       postgres:
         image: postgres:16
@@ -79,12 +82,44 @@ jobs:
         working-directory: server
         run: npm test
 
+  pglite:
+    name: آزمون‌های سرور روی PGlite
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: نصبِ وابستگی‌ها
+        working-directory: server
+        run: npm ci || npm install
+
       # همان آزمون‌ها روی PGlite — راهی که پنلِ سرورِ خانگی این سرور را با آن
       # بالا می‌آورد (بی داکر، بی PostgreSQL). اگر SQLی فقط روی pg کار کند،
       # این‌جا سرخ می‌شود، نه روی کامپیوترِ صاحبِ سامانه.
       - name: آزمون‌های سرور روی PGlite
         working-directory: server
         run: npm run test:pglite
+
+  electron:
+    name: آزمون‌های سرور زیرِ Electron
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: نصبِ وابستگی‌ها
+        working-directory: server
+        run: npm ci || npm install
 
       # ⛔ **و همان آزمون‌ها زیرِ خودِ Electron** — همان Nodeی که مرکز فرمان
       # این سرور را با آن بالا می‌آورد (`ELECTRON_RUN_AS_NODE`). کتابخانهٔ رمزش
@@ -98,6 +133,39 @@ jobs:
           npm install -g electron@38
           ELECTRON_RUN_AS_NODE=1 "$(npm root -g)/electron/dist/electron" -e "console.log('electron', process.versions.electron, 'openssl', process.versions.openssl)"
           ELECTRON_RUN_AS_NODE=1 "$(npm root -g)/electron/dist/electron" scripts/test-pglite.js
+
+  browser:
+    name: آزمون‌های مرورگر (پنل، وب، ویترین) و باتِ پمپ
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: shop
+          POSTGRES_PASSWORD: shoppass
+          POSTGRES_DB: shop_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      TEST_DATABASE_URL: postgres://shop:shoppass@127.0.0.1:5432/shop_test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: نصبِ وابستگی‌ها
+        working-directory: server
+        run: npm ci || npm install
 
       # پنل جاوااسکریپتِ مرورگر است و هیچ آزمونِ سمتِ سروری آن را
       # نمی‌سنجد: یک `onclick`ِ جانشانده یا یک شناسه‌ی غلط فقط وقتی
@@ -163,3 +231,65 @@ jobs:
             exit 0
           fi
           SHOP_SERVER="$GITHUB_WORKSPACE/server" TEST_DATABASE_URL=pglite:memory bash /tmp/pump/telegram-bot/run-tests.sh
+
+  e2e:
+    name: سناریوهای سرتاسری (E2E)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: نصبِ وابستگی‌ها
+        working-directory: server
+        run: npm ci || npm install
+
+      # پنل جاوااسکریپتِ مرورگر است و هیچ آزمونِ سمتِ سروری آن را
+      # نمی‌سنجد: یک `onclick`ِ جانشانده یا یک شناسه‌ی غلط فقط وقتی
+      # پیدا می‌شد که صاحبِ سامانه دکمه را می‌زد و هیچ اتفاقی نمی‌افتاد.
+      # ⚠️ سراسری نصب می‌شود، نه در `server/`: سرور عمداً فقط دو
+      # وابستگی دارد و یک `devDependency`ی چندصد مگابایتی همان قاعده
+      # را می‌شکست. خودِ سنجه از `npm root -g` پیدایش می‌کند.
+      # F0-17: نبودِ پلی‌رایت یا axe-core حالا آزمون را **قرمز** می‌کند
+      # (`server/test/browser-guard.mjs`)، نه «رد» با کدِ ۰.
+      - name: کرومیوم برای آزمونِ پنل
+        run: |
+          npm install -g playwright@1.56.1 axe-core@4.10.3
+          npx playwright install --with-deps chromium
+
+      # سناریوهای سرتاسری (E2E-*، S*): دستگاه‌های برنامهٔ دکان در سطحِ پروتکل (همان opها، JSON و
+      # سرآیندهای اندروید/کامپیوتر)، ویترین و پنلِ مدیر در کرومیوم. هر سناریو PGlite ِ خودش را دارد
+      # و چند تا هم‌زمان می‌دوند (TEST_DATABASE_URL ِ بالا را نمی‌خوانند). جدولِ گام‌ها در لاگ؛
+      # «شکافِ شناخته» (test/e2e/lib/known-gaps.mjs) قرمز نیست ولی دیده می‌شود.
+      - name: سناریوهای سرتاسری (E2E)
+        working-directory: server
+        env:
+          E2E_RESULTS_DIR: ${{ runner.temp }}/e2e
+        run: npm run test:e2e
+
+      - name: نتیجه و عکس‌های سناریوهای سرتاسری
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results
+          path: ${{ runner.temp }}/e2e
+          if-no-files-found: ignore
+          retention-days: 14
+
+  test:
+    name: آزمون‌های سرور
+    runs-on: ubuntu-latest
+    needs: [pg, pglite, electron, browser, e2e]
+    if: always()
+    timeout-minutes: 5
+    steps:
+      - name: همهٔ کارهای آزمون سبزند؟
+        run: |
+          echo '${{ toJSON(needs) }}'
+          for r in "${{ needs.pg.result }}" "${{ needs.pglite.result }}" "${{ needs.electron.result }}" "${{ needs.browser.result }}" "${{ needs.e2e.result }}"; do
+            [ "$r" = "success" ] || { echo "::error::یکی از کارهای آزمون سبز نیست: $r"; exit 1; }
+          done

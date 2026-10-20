@@ -895,14 +895,27 @@
       //  دفتر هنوز به صفحه بسته نیست: cursor جلو نمی‌رود
       if (!data) return { ok: false, applied: 0, reason: 'no_ledger' };
       var C = Core();
-      var next = C.applyRemote(data, legacy).data;
       var before = fingerprint(C.canonical(this.meta.shadow || {}));
       var shadow = C.shadowOf(C.applyRemote(this.meta.shadow || {}, legacy).data);
-      await this.store.commit({ journal: {
-        stage: 'absorb', before: before, after: fingerprint(C.canonical(shadow)),
-        ledger: ledgerPrint(next), cursor: cursor, ops: legacy,
-      } });
-      this.failpoint('after-journal');
+      var next = null;
+      for (var tries = 0; tries < 5 && data && !next; tries++) {
+        var planned = ledgerPrint(C.applyRemote(data, legacy).data);
+        await this.store.commit({ journal: {
+          stage: 'absorb', before: before, after: fingerprint(C.canonical(shadow)),
+          ledger: planned, cursor: cursor, ops: legacy,
+        } });
+        this.failpoint('after-journal');
+        //  ذخیرهٔ UI ممکن است وسطِ همین await نشسته باشد: دفتر را دوباره بخوان و op را روی نسخهٔ تازه بنشان
+        //  (خواندن تا نوشتن بی await است). اگر دفترِ نشسته با ژورنال نمی‌خواند، ژورنال دوباره نوشته می‌شود
+        data = this.ledger.read();
+        var fresh = data ? C.applyRemote(data, legacy).data : null;
+        if (fresh && ledgerPrint(fresh) === planned) next = fresh;
+      }
+      if (!next) {
+        //  دفتر پیوسته عوض می‌شود یا نیست: چیزی نوشته نمی‌شود، cursor جلو نمی‌رود؛ همان صفحه دوباره می‌آید
+        await this.store.commit({ journal: null });
+        return { ok: false, applied: 0, reason: data ? 'ledger_busy' : 'no_ledger' };
+      }
       this.ledger.write(next);
       this.failpoint('after-ledger');
       patch.shadow = shadow;
