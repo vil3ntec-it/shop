@@ -25,6 +25,7 @@
   I.pencil = 'M4 20l1-5L16 4l4 4L9 19z M14 6l4 4';
   I.shirt = 'M8 3L3 6l2 4 2-1v12h10V9l2 1 2-4-5-3c-.5 1.5-2 2.5-4 2.5S8.5 4.5 8 3z';
   I.device = 'M7 2.5h10v19H7z M11 18.5h2';
+  I.heart = 'M12 20s-7.5-4.6-9-9.2C2 7.6 4.2 5 7 5c2 0 3.3 1.1 5 3 1.7-1.9 3-3 5-3 2.8 0 5 2.6 4 5.8-1.5 4.6-9 9.2-9 9.2z';
   /** نشانه و رنگِ هر دسته (رنگ‌های کمکیِ سامانه؛ قرمز فقط برای هشدارِ واقعی) */
   var CAT = {
     '': ['grid', 5], grocery: ['cart', 2], bakery: ['bread', 3], produce: ['apple', 1], butcher: ['meat', 4], dairy: ['milk', 2],
@@ -39,30 +40,53 @@
     state.view = id;
     K.nav({ 'view-home': 'home', 'view-shops': 'shops', 'view-orders': 'orders' }[id] || '');
     renderCarts();
+    if (id === 'view-home' && state.overview) fitCats();
   }
 
-  // ── کارتِ دکان: جلد از عکسِ یکی از کالاهای خودش، وگرنه حرفِ اول با رنگِ دکان ──
+  // ── دلخواه‌ها (فقط روی همین مرورگر؛ سرور فقط ترتیب را با ‎first=‎ می‌گیرد و نگه نمی‌دارد) ──
+  var KEY_FAVS = 'vill3n-favs';
+  function favs() { var f = K.load(KEY_FAVS, []); return Array.isArray(f) ? f.filter(function (x) { return typeof x === 'string'; }).slice(0, 20) : []; }
+  function favQs() { var f = favs(); return f.length ? '&first=' + encodeURIComponent(f.join(',')) : ''; }
+  function favBtn(s) {
+    var on = favs().indexOf(s.slug) >= 0;
+    var b = el('button', { class: 'fav', attrs: { type: 'button', 'aria-pressed': String(on), 'aria-label': t(on ? 'fav.remove' : 'fav.add', { name: s.title }) } }, K.icon('heart'));
+    b.addEventListener('click', function () {
+      var f = favs(); var i = f.indexOf(s.slug);
+      if (i >= 0) f.splice(i, 1); else f.unshift(s.slug);
+      K.save(KEY_FAVS, f.slice(0, 20));
+      var now = i < 0;
+      Array.prototype.forEach.call(document.querySelectorAll('.shop-card[data-slug="' + CSS.escape(s.slug) + '"] .fav'), function (x) {
+        x.setAttribute('aria-pressed', String(now));
+        x.setAttribute('aria-label', t(now ? 'fav.remove' : 'fav.add', { name: s.title }));
+      });
+      K.toast(t(now ? 'fav.added' : 'fav.removed', { name: s.title }));
+    });
+    return b;
+  }
+
+  // ── کارتِ دکان، همان آناتومیِ مرجع: جلدِ مربعیِ واقعی، نام، «تازه»/وضعیت، یک خط شرح،
+  //    «N کالا» و ارسال، دکمهٔ نرمِ «مشاهدهٔ فروشگاه»، قلب. بی امتیازِ ساختگی ──
   function shopCard(s) {
-    var meta = el('div', { class: 'meta' });
-    meta.appendChild(el('span', {}, K.icon('bag'), t('n.items', { n: K.fa(s.productCount, 0) })));
+    var meta = el('div', { class: 'meta' }, el('span', {}, K.icon('store'), t('n.items', { n: K.fa(s.productCount, 0) })));
     if (s.fulfillment.delivery) meta.appendChild(el('span', {}, K.icon('truck'), s.deliveryFeeMinor > 0 ? t('ship.fee', { fee: K.money(s.deliveryFeeMinor) }) : t('ship.free')));
-    if (s.fulfillment.pickup) meta.appendChild(el('span', {}, K.icon('box'), t('pickup')));
-    if (s.minOrderMinor > 0) meta.appendChild(el('span', { text: t('min.order', { m: K.money(s.minOrderMinor) }) }));
+    else if (s.fulfillment.pickup) meta.appendChild(el('span', {}, K.icon('box'), t('pickup')));
     if (s.distanceKm !== null && s.distanceKm !== undefined) meta.appendChild(el('span', {}, K.icon('pin'), t('dist', { n: K.fa(s.distanceKm, 1) })));
-    var hours = K.hours(s.status);
-    if (hours) meta.appendChild(el('span', {}, K.icon('clock'), hours));
     var cover = el('span', { class: 'cover' + (s.cover ? ' tile' : '') });
-    if (s.cover) cover.appendChild(el('img', { attrs: { src: K.photo(s.slug, s.cover), alt: '', loading: 'lazy', decoding: 'async', width: '76', height: '76' } }));
+    if (s.cover) cover.appendChild(el('img', { attrs: { src: K.photo(s.slug, s.cover), alt: '', loading: 'lazy', decoding: 'async', width: '84', height: '84' } }));
     else cover.appendChild(K.avatar(s.title, s.accent, s.slug));
-    var pills = el('div', { class: 'pills' }, K.pill(s.status));
-    if (s.category) pills.appendChild(el('span', { class: 'pill plain', text: t('cat.' + s.category) }));
-    var sub = s.tagline || s.area || '';
+    var pills = el('div', { class: 'pills' });
+    if (s.isNew) pills.appendChild(el('span', { class: 'pill plain new', text: t('shop.new') }));
+    pills.appendChild(K.pill(s.status));
+    var sub = s.tagline || [s.category ? t('cat.' + s.category) : '', s.area].filter(Boolean).join(t('sep'));
     var closed = s.status && (s.status.badge === 'closed' || s.status.badge === 'offline');
-    var a = el('a', { class: 'card shop-card' + (closed ? ' closed' : ''), attrs: { href: '/store/' + encodeURIComponent(s.slug), 'data-slug': s.slug } },
-      el('span', { class: 'top' }, cover, el('span', { class: 'grow' }, el('h3', { text: s.title }), pills, sub ? el('p', { class: 'sub', text: sub }) : null)),
+    var card = el('article', { class: 'card shop-card' + (closed ? ' closed' : ''), attrs: { 'data-slug': s.slug } },
+      el('div', { class: 'top' }, cover,
+        el('div', { class: 'grow' }, el('h3', {}, el('a', { class: 'shop-link', text: s.title, attrs: { href: '/store/' + encodeURIComponent(s.slug) } })), pills),
+        favBtn(s)),
+      sub ? el('p', { class: 'sub', text: sub }) : null,
       meta,
-      el('span', { class: 'go' }, t('shop.go'), K.icon('chev')));
-    return el('li', {}, a);
+      el('span', { class: 'go', attrs: { 'aria-hidden': 'true' } }, t('shop.go')));
+    return el('li', {}, card);
   }
 
   function skeleton(ul, n, tall) {
@@ -98,20 +122,26 @@
     renderCarts();
   }
 
-  // ── دسته‌ها: تراشه با نشانهٔ رنگی ──
+  // ── دسته‌ها: یک ردیف تراشه با نشانهٔ رنگی + «همه دسته‌بندی‌ها» (باز کردنِ همه) ──
   function chip(c, on) {
     var k = CAT[c.key] || CAT.other;
     return el('button', {
       class: 'chip', attrs: { type: 'button', 'aria-pressed': String(state.category === c.key), 'data-cat': c.key },
       on: { click: function () { on(c.key); } },
-    }, el('span', { class: 'ico k' + k[1] }, K.icon(k[0])), c.key ? t('cat.' + c.key) : t('all'), el('span', { class: 'count', text: K.fa(c.count, 0) }));
+    }, el('span', { class: 'ico k' + k[1] }, K.icon(k[0])), c.key ? t('cat.' + c.key) : t('all'));
   }
   function renderCats() {
-    var cats = [{ key: '', count: state.overview.shopCount }].concat(state.overview.categories);
+    var cats = [{ key: '' }].concat(state.overview.categories);
     ['cats', 'shop-cats'].forEach(function (id) {
       var box = K.clear($(id));
       cats.forEach(function (c) { box.appendChild(chip(c, selectCategory)); });
     });
+    fitCats();
+  }
+  /** تراشه‌ای که در ردیفِ بستهٔ کامپیوتر پنهان مانده از دسترسِ صفحه‌کلید هم بیرون است. */
+  function fitCats() {
+    var box = $('cats'); var first = box.firstChild;
+    Array.prototype.forEach.call(box.children, function (c) { c.inert = Boolean(first) && !box.classList.contains('open') && c.offsetTop > first.offsetTop + 4; });
   }
   function selectCategory(key) {
     state.category = key;
@@ -123,8 +153,9 @@
     return c ? t('cat.' + c.key) : '';
   }
   function nearQs() { return state.near ? '&lat=' + state.near.lat + '&lng=' + state.near.lng : ''; }
+  function catQs() { return state.category ? '&category=' + encodeURIComponent(state.category) : ''; }
 
-  // ── خانه: اول کالا ──
+  // ── خانه: مثلِ مرجع، اول «دکان‌های پیشنهادی» (هر دکان یک کارت)، بعد ردیف‌های کالا ──
   function fill(id, list) {
     var ul = K.clear($(id));
     list.forEach(function (p) { ul.appendChild(productCard(p)); });
@@ -132,28 +163,27 @@
   }
   function loadFeed() {
     var seq = ++feedSeq;
-    skeleton($('items'), 8, true);
-    $('items').setAttribute('aria-busy', 'true');
-    var qs = '?limit=24' + (state.category ? '&category=' + encodeURIComponent(state.category) : '') + nearQs();
-    return K.api(API + '/products' + qs).then(function (r) {
+    skeleton($('sug'), 6);
+    $('sug').setAttribute('aria-busy', 'true');
+    var shops = K.api(API + '/shops?limit=9' + catQs() + favQs()).then(function (r) {
+      if (seq !== feedSeq) return;
+      var ul = K.clear($('sug'));
+      r.shops.forEach(function (s) { ul.appendChild(shopCard(s)); });
+      $('sug-empty').hidden = r.total > 0;
+      $('sug-empty-title').textContent = t(state.category ? 'shops.none.cat' : 'shops.none');
+      $('home-note').hidden = true;
+    });
+    var rows = K.api(API + '/products?limit=1' + catQs()).then(function (r) {
       if (seq !== feedSeq) return;
       $('pop-sec').hidden = fill('pop', r.popular) === 0;
       $('pop-why').textContent = t('pop.why', { d: K.fa(r.windowDays || 30, 0) });
       $('deal-sec').hidden = fill('deal', r.deals) === 0;
-      var n = fill('items', r.items);
-      $('items-title').lastChild.textContent = state.near ? t('items.near') : (catLabel() ? t('items.cat', { c: catLabel() }) : t('items.all'));
-      $('items-empty').hidden = n > 0;
-      $('items-empty-title').textContent = t(state.category ? 'items.none.cat' : 'items.none');
-      var sug = K.clear($('sug'));
-      r.shops.forEach(function (s) { sug.appendChild(shopCard(s)); });
-      $('sug-sec').hidden = r.shops.length === 0;
-      $('sug-more').hidden = r.shopTotal <= r.shops.length;
-      $('home-note').hidden = true;
-    }).catch(function (e) {
+    });
+    return Promise.all([shops, rows]).catch(function (e) {
       if (seq !== feedSeq) return;
-      K.clear($('items'));
+      K.clear($('sug'));
       K.note($('home-note'), 'err', e.message);
-    }).then(function () { $('items').setAttribute('aria-busy', 'false'); });
+    }).then(function () { $('sug').setAttribute('aria-busy', 'false'); });
   }
 
   // ── همهٔ دکان‌ها ──
@@ -161,8 +191,7 @@
     var ul = $('shops');
     if (!more) { state.offset = 0; skeleton(ul, 6); }
     ul.setAttribute('aria-busy', 'true');
-    var qs = '?limit=24&offset=' + state.offset + (state.category ? '&category=' + encodeURIComponent(state.category) : '') + nearQs();
-    return K.api(API + '/shops' + qs).then(function (r) {
+    return K.api(API + '/shops?limit=24&offset=' + state.offset + catQs() + nearQs() + favQs()).then(function (r) {
       if (!more) K.clear(ul);
       r.shops.forEach(function (s) { ul.appendChild(shopCard(s)); });
       state.offset = r.nextOffset || 0;
@@ -185,14 +214,13 @@
       //  همین‌جا به حدودِ یک کیلومتر گرد می‌شود؛ ذخیره نمی‌شود (privacy.html)
       state.near = { lat: Math.round(pos.coords.latitude * 100) / 100, lng: Math.round(pos.coords.longitude * 100) / 100 };
       b.disabled = false;
-      ['locate', 'locate2'].forEach(function (id) { $(id).setAttribute('aria-pressed', 'true'); });
-      if (state.view === 'view-shops') loadShops(false); else loadFeed();
+      b.setAttribute('aria-pressed', 'true');
+      loadShops(false);
     }, function () {
       b.disabled = false;
       K.toast(t('loc.fail'));
     }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 });
   }
-
   // ── سبدهای همین دستگاه: نوارِ تیره (r3) و برگهٔ باز (r2)؛ هر دکان جدا ──
   function openCarts() {
     var out = [];
@@ -427,8 +455,12 @@
       setTimeout(function () { $('q').focus(); }, 30);
     });
     $('more').addEventListener('click', function () { loadShops(true); });
-    $('locate').addEventListener('click', locate);
     $('locate2').addEventListener('click', locate);
+    $('cats-all').addEventListener('click', function () {
+      var open = $('cats').classList.toggle('open');
+      $('cats-all').setAttribute('aria-expanded', String(open));
+      fitCats();
+    });
     $('v-send').addEventListener('click', sendCode);
     $('verify-card').addEventListener('submit', checkCode);
     $('who-out').addEventListener('click', function () { K.setTicket(null); K.account(); openOrders(); });
@@ -436,6 +468,7 @@
     $('cart-close').addEventListener('click', closeCart);
     K.onPhone(function () { if (K.cartIsOpen()) closeCart(); renderCarts(); });
     window.addEventListener('hashchange', route);
+    window.addEventListener('resize', fitCats, { passive: true });
     //  سبدی که در زبانهٔ دیگر (ویترینِ دکان) عوض شد
     window.addEventListener('storage', function (e) { if (e.key && e.key.indexOf('store-cart') === 0) renderCarts(); });
     window.addEventListener('pageshow', function (e) { if (e.persisted) renderCarts(); });

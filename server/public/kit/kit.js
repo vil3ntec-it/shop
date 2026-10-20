@@ -412,7 +412,8 @@
   }
   var ready = Promise.all([
     V.dict.then(function (d) { DICT = d || {}; }),
-    new Promise(function (r) { if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', r); else r(); }),
+    //  کیت «defer» است: تا DOMContentLoaded صبر می‌کند تا اسکریپتِ صفحه هم اجرا شده باشد
+    new Promise(function (r) { if (document.readyState === 'complete') r(); else document.addEventListener('DOMContentLoaded', r); }),
   ]).then(function () {
     translate(document);
     document.documentElement.removeAttribute('data-i18n');

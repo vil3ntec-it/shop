@@ -87,18 +87,21 @@
             </svg>
           </div>
 
-          <div id="cats" class="chips section" role="group" data-ta="a.shopcat" aria-label="دستهٔ دکان"></div>
+          <div class="cat-row section">
+            <div id="cats" class="chips" role="group" data-ta="a.shopcat" aria-label="دستهٔ دکان"></div>
+            <button id="cats-all" class="chip all-cats" type="button" aria-expanded="false" aria-controls="cats" data-ta="cats.all" aria-label="همه دسته‌بندی‌ها"><span class="ico k5" data-i="grid"></span><span data-t="cats.all">همه دسته‌بندی‌ها</span></button>
+          </div>
           <div id="home-note" class="note section" hidden role="status"></div>
 
           <!-- نتیجهٔ جست‌وجو -->
           <section id="results" class="section" hidden aria-live="polite">
-            <div id="r-products-sec" hidden>
-              <div class="section-head"><h2 data-t="r.products">کالاها</h2><p data-t="r.products.p">قیمت و موجودیِ نهایی در صفحهٔ دکان</p></div>
-              <ul id="r-products" class="grid"></ul>
-            </div>
-            <div id="r-shops-sec" class="section" hidden>
+            <div id="r-shops-sec" hidden>
               <div class="section-head"><h2 data-t="nav.shops">دکان‌ها</h2></div>
               <ul id="r-shops" class="shop-grid"></ul>
+            </div>
+            <div id="r-products-sec" class="section" hidden>
+              <div class="section-head"><h2 data-t="r.products">کالاها</h2><p data-t="r.products.p">قیمت و موجودیِ نهایی در صفحهٔ دکان</p></div>
+              <ul id="r-products" class="grid"></ul>
             </div>
             <div id="r-empty" class="empty" hidden>
               <div class="art" data-i="search"></div>
@@ -108,7 +111,20 @@
             </div>
           </section>
 
+          <!-- مثلِ مرجع: اول دکان‌ها (هر دکان یک کارت)، بعد ردیف‌های کالا -->
           <div id="feed">
+            <section id="sug-sec" class="section" aria-labelledby="sug-title">
+              <div class="section-head">
+                <h2 id="sug-title" data-i="spark" data-t="sug.title">دکان‌های پیشنهادی</h2>
+                <a id="sug-more" class="link" href="#/shops"><span data-t="see.all">مشاهدهٔ همه</span><span class="arrow" data-i="back"></span></a>
+              </div>
+              <ul id="sug" class="shop-grid" aria-busy="true"></ul>
+              <div id="sug-empty" class="empty" hidden>
+                <div class="art" data-i="store"></div>
+                <h2 id="sug-empty-title" data-t="shops.none.cat">هنوز دکانی در این دسته نیست</h2>
+                <p data-t="try.cat">دستهٔ دیگری را ببینید.</p>
+              </div>
+            </section>
             <section id="pop-sec" class="section" hidden aria-labelledby="pop-title">
               <div class="section-head"><h2 id="pop-title" data-i="flame" data-t="pop.title">پرفروش‌های بازارچه</h2><p id="pop-why"></p></div>
               <ul id="pop" class="rail products"></ul>
@@ -116,25 +132,6 @@
             <section id="deal-sec" class="section" hidden aria-labelledby="deal-title">
               <div class="section-head"><h2 id="deal-title" data-i="tag" data-t="deal.title">ارزان‌تر از قیمتِ دکان</h2><p data-t="deal.why">قیمتِ آنلاینِ خودِ دکان کمتر است</p></div>
               <ul id="deal" class="rail products"></ul>
-            </section>
-            <section id="items-sec" class="section" aria-labelledby="items-title">
-              <div class="section-head">
-                <h2 id="items-title" data-i="bag" data-t="items.all">کالاهای دکان‌ها</h2>
-                <button id="locate" class="btn btn-ghost btn-sm" type="button" data-i="locate" data-t="near.me">نزدیکِ من</button>
-              </div>
-              <ul id="items" class="grid" aria-busy="true"></ul>
-              <div id="items-empty" class="empty" hidden>
-                <div class="art" data-i="bag"></div>
-                <h2 id="items-empty-title" data-t="items.none">هنوز کالایی این‌جا نیست</h2>
-                <p data-t="try.cat">دستهٔ دیگری را ببینید.</p>
-              </div>
-            </section>
-            <section id="sug-sec" class="section" aria-labelledby="sug-title">
-              <div class="section-head">
-                <h2 id="sug-title" data-i="store" data-t="sug.title">دکان‌های پیشنهادی</h2>
-                <a id="sug-more" class="link" href="#/shops" data-t="see.all">مشاهدهٔ همه</a>
-              </div>
-              <ul id="sug" class="shop-grid"></ul>
             </section>
           </div>
         </div>

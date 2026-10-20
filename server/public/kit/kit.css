@@ -370,21 +370,34 @@ html[data-i18n="wait"] body { visibility: hidden; }
 .meta > span { display: inline-flex; align-items: center; gap: var(--s1); }
 .meta svg { width: 16px; height: 16px; flex: none; color: var(--icon); }
 
-/* ── کارتِ دکان (دکان‌های پیشنهادی) ────────────────── */
-.shop-grid { display: grid; grid-template-columns: 1fr; gap: var(--s3); }
-.shop-card { display: flex; flex-direction: column; gap: var(--s3); color: var(--text); transition: box-shadow .15s, transform .15s, border-color .15s; height: 100%; }
-.shop-card:hover { text-decoration: none; box-shadow: var(--shadow-2); border-color: var(--btn2-line); }
-.shop-card .top { display: flex; align-items: flex-start; gap: var(--s3); }
-.shop-card .cover { flex: none; width: 76px; height: 76px; border-radius: var(--r-card); overflow: hidden; display: grid; place-items: center; }
-.shop-card .cover.tile { padding: 8px; background: var(--tile); }
-.shop-card .cover .avatar { width: 76px; height: 76px; border-radius: var(--r-card); font-size: 30px; }
-.shop-card h3 { font-size: 16px; line-height: 1.45; }
-.shop-card .pills { display: flex; flex-wrap: wrap; gap: var(--s1) var(--s2); margin-top: var(--s1); }
-.shop-card .sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
-.shop-card .meta { margin-top: auto; }
-.shop-card .go { display: flex; align-items: center; justify-content: center; gap: var(--s2); min-height: 42px; border-radius: var(--r-ctl); background: var(--surface-2); border: 1px solid var(--divider); color: var(--link); font-weight: 700; font-size: 14px; }
-.shop-card .go svg { width: 18px; height: 18px; }
-.shop-card:hover .go { background: var(--primary-tint); border-color: var(--btn2-line); }
+/* ── کارتِ دکان (همان آناتومیِ مرجعِ VILL3N): جلدِ مربعی، نام، «تازه»/وضعیت، شرح،
+   «N کالا» و ارسال، دکمهٔ نرمِ «مشاهدهٔ فروشگاه»، قلب. کلِ کارت با پیوندِ نام باز می‌شود ── */
+.shop-grid { display: grid; grid-template-columns: 1fr; gap: var(--s4); }
+.shop-card { position: relative; display: flex; flex-direction: column; height: 100%; padding: var(--s4); border-radius: var(--r-feat); color: var(--text); transition: box-shadow .15s, border-color .15s; }
+.shop-card:hover { box-shadow: var(--shadow-2); border-color: var(--btn2-line); }
+.shop-card .top { display: flex; align-items: flex-start; gap: var(--s4); }
+.shop-card .cover { flex: none; width: 84px; height: 84px; border-radius: var(--r-card); overflow: hidden; display: grid; place-items: center; background: var(--surface-2); }
+.shop-card .cover.tile { padding: 6px; background: var(--tile); }
+.shop-card .cover .avatar { width: 84px; height: 84px; border-radius: var(--r-card); font-size: 32px; }
+.shop-card .grow { padding-top: 2px; }
+.shop-card h3 { font-size: 17px; line-height: 1.5; }
+.shop-link { color: var(--text); }
+.shop-link:hover { text-decoration: none; }
+.shop-link::after { content: ''; position: absolute; inset: 0; border-radius: inherit; z-index: 1; }
+.shop-link:focus-visible { box-shadow: none; }
+.shop-link:focus-visible::after { box-shadow: var(--shadow-focus); }
+.shop-card .pills { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s1) var(--s2); margin-top: var(--s2); }
+.pill.new { background: var(--c4-bg); color: var(--c4); }
+.shop-card .sub { color: var(--muted); font-size: 14px; margin-top: var(--s3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shop-card .meta { margin-top: var(--s3); gap: var(--s1) var(--s5); font-size: 13.5px; }
+.shop-card .go { display: flex; align-items: center; justify-content: center; min-height: 42px; margin-top: auto; border-radius: var(--r-ctl); background: var(--selected); color: var(--link); font-weight: 700; font-size: 14px; }
+.shop-card .meta { margin-bottom: var(--s4); }
+.shop-card:hover .go { background: var(--primary-tint); box-shadow: inset 0 0 0 1px var(--btn2-line); }
+.fav { position: relative; z-index: 2; flex: none; display: grid; place-items: center; width: 40px; height: 40px; margin: -6px; border: 0; border-radius: 999px; background: transparent; color: var(--icon); cursor: pointer; }
+.fav:hover { background: var(--surface-2); color: var(--text); }
+.fav svg { width: 24px; height: 24px; }
+.fav[aria-pressed="true"] { color: var(--err); }
+.fav[aria-pressed="true"] svg path { fill: currentColor; }
 .shop-card.closed .cover { filter: grayscale(.5); opacity: .85; }
 .rail { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(260px, 82%); gap: var(--s3); overflow-x: auto; padding: var(--s1) var(--s4) var(--s3); margin-inline: calc(var(--s4) * -1); scroll-snap-type: x mandatory; scroll-padding-inline: var(--s4); scrollbar-width: none; }
 .rail::-webkit-scrollbar { display: none; }
@@ -695,7 +708,7 @@ dialog.confirm .seg { margin-top: var(--s2); }
   .topbar-row { min-height: 76px; }
   .wrap { padding-inline: var(--s6); }
   .grid { grid-template-columns: repeat(auto-fill, minmax(176px, 1fr)); }
-  .shop-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .shop-grid { gap: var(--s5); }
   .plist, .olist { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .rail { grid-auto-columns: minmax(300px, 32%); margin-inline: 0; padding-inline: 0; }
   .rail.products { grid-auto-columns: 196px; grid-auto-flow: column; padding-bottom: var(--s2); }
@@ -721,6 +734,7 @@ dialog.confirm .seg { margin-top: var(--s2); }
   .sheet.modal::before { display: none; }
   .cartbar { inset-inline-start: var(--side-w); width: min(560px, calc(100% - var(--side-w) - var(--s8))); }
 }
+@media (min-width: 1200px) { .shop-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (min-width: 600px) and (max-width: 1023px) {
   .sheet.drawer { max-width: 600px; }
   .cartbar { bottom: calc(var(--bnav-h) + var(--s3) + env(safe-area-inset-bottom)); }
