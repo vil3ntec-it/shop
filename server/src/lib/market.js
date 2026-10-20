@@ -397,7 +397,8 @@ async function search({ q, lat, lng, limit } = {}, at = now()) {
 // ════════════════════════════════════════════════════════════════════
 
 async function myOrders(ticket) {
-  const phone = sf.phoneOfTicket(ticket);
+  //  ناهم‌گام: نسلِ بلیتِ شماره (خروج از همه‌جا / پاک کردنِ حساب) هم سنجیده می‌شود
+  const phone = await sf.verifiedPhoneOfTicket(ticket);
   if (!phone) throw new ApiError(401, 'verification_required', 'برای دیدنِ سفارش‌ها، شمارهٔ خود را تأیید کنید');
   const rows = await many(
     `SELECT o.id, o.shop_id, o.order_no, o.status, o.total_minor, o.items_count, o.fulfillment, o.created_at,

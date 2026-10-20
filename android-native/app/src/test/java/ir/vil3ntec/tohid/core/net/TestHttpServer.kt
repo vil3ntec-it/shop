@@ -25,7 +25,7 @@ class TestHttpServer {
     val path: String,
     val bearer: String,
     val body: String,
-    /** سرآیندها با نامِ کوچک — برای سنجیدنِ بلیت و کلیدِ یکتایی */
+    /** همهٔ سرآیندها با نامِ کوچک — مثلاً `idempotency-key` یا `x-store-ticket` */
     val headers: Map<String, String> = emptyMap(),
     /** پرسمانِ خام (بی `?`) */
     val query: String = "",
@@ -79,10 +79,10 @@ class TestHttpServer {
       //  پرسمان برای مسیریابی کنار گذاشته می‌شود
       val path = parts[1].substringBefore('?')
       val query = parts[1].substringAfter('?', "")
-      val headers = HashMap<String, String>()
 
       var bearer = ""
       var length = 0
+      val headers = HashMap<String, String>()
       while (true) {
         val header = readLine(input) ?: break
         if (header.isEmpty()) break

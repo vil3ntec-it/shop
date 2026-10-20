@@ -596,7 +596,9 @@ private fun SectionsGrid(tiles: List<HomeSections.Tile>, onOpen: (String) -> Uni
           Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
             PressBox(Modifier.size(58.dp), scaleTo = 0.9f, label = t.label, onClick = { onOpen(t.route) }) {
               Box(
-                Modifier.fillMaxSize().clip(RoundedCornerShape(PhoneV3.tileRadius)).background(p.tile),
+                //  VILL3N §۶: سطحِ درونی روی برگهٔ سفید با مرزِ دیدنی، نه سفید روی سفید
+                Modifier.fillMaxSize().clip(RoundedCornerShape(PhoneV3.tileRadius)).background(p.tile)
+                  .border(1.dp, p.hairline, RoundedCornerShape(PhoneV3.tileRadius)),
                 contentAlignment = Alignment.Center,
               ) {
                 Icon(tileIcon(t.id), contentDescription = null, tint = PhoneV3Palette.glyph(p, tileHue(t.id)), modifier = Modifier.size(28.dp))
@@ -717,7 +719,8 @@ private fun AlertCard(a: HomeAlerts.Alert, bg: Color, modifier: Modifier, onClic
 private fun CalmCard(modifier: Modifier) {
   val p = PhoneV3.colors
   Row(
-    modifier.fillMaxWidth().height(104.dp).clip(RoundedCornerShape(22.dp)).background(p.tile).padding(horizontal = 20.dp),
+    modifier.fillMaxWidth().height(104.dp).clip(RoundedCornerShape(22.dp)).background(p.tile)
+      .border(1.dp, p.hairline, RoundedCornerShape(22.dp)).padding(horizontal = 20.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
     Icon(Icons.Outlined.CheckCircle, contentDescription = null, tint = p.positive, modifier = Modifier.size(34.dp))
