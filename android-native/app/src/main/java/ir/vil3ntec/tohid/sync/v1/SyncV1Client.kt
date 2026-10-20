@@ -3,6 +3,7 @@ package ir.vil3ntec.tohid.sync.v1
 import ir.vil3ntec.tohid.core.net.ApiClient
 import ir.vil3ntec.tohid.core.net.ApiEndpoints
 import ir.vil3ntec.tohid.core.net.ApiFailure
+import ir.vil3ntec.tohid.core.sync.RestoreReplay
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -54,6 +55,7 @@ class SyncV1Client(private val api: ApiClient) {
         opId = (o["op_id"] as? JsonPrimitive)?.content.orEmpty(),
         status = (o["status"] as? JsonPrimitive)?.content.orEmpty(),
         reason = (o["reason"] as? JsonPrimitive)?.content.orEmpty(),
+        seq = num(o, "server_seq") ?: 0L,
       )
     }
     return PushResult(
@@ -75,6 +77,20 @@ class SyncV1Client(private val api: ApiClient) {
       hasMore = (res["has_more"] as? JsonPrimitive)?.content?.toBooleanStrictOrNull() == true,
       serverSchema = (num(res, "schema_version") ?: 0L).toInt(),
     )
+  }
+
+  /**
+   *  «دورانِ» سرور برای همین حساب (§۹.۵، `core/sync/RestoreReplay.kt`).
+   *  ۴۰۴ (سرورِ کهنه یا خاموش‌کنِ `SYNC_EPOCH_ENABLED`) ⇒ null ⇒ همان رفتارِ پیشین.
+   */
+  suspend fun epoch(): RestoreReplay.Epoch? {
+    val res = try {
+      api.get(ApiEndpoints.SyncV1.EPOCH)
+    } catch (failure: ApiFailure) {
+      if (failure.status == 404) return null
+      throw failure
+    }
+    return RestoreReplay.Epoch.from(res["epoch"])
   }
 
   suspend fun snapshot(): JsonObject = api.get(ApiEndpoints.SyncV1.SNAPSHOT)

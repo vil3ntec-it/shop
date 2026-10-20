@@ -77,6 +77,8 @@ object ApiEndpoints {
     const val SNAPSHOT = "/sync/v1/snapshot"
     const val STATUS = "/sync/v1/status"
     fun pull(deviceId: String, since: Long) = "/sync/v1/pull?device_id=$deviceId&since=$since"
+    /** «دورانِ» سرور پس از بازیابی (§۹.۵) — فقط دکان، جدا از مسیرهای مشترک با پمپ */
+    const val EPOCH = "/shop/sync-epoch"
     /** مسیرِ سوکتِ زنده — نسبت به ریشهٔ سرور، نه به پیشوندِ API. */
     const val LIVE_PATH = "/api/sync/v1/live"
     /** بلیتِ یک‌بارمصرفِ ۶۰ ثانیه‌ای برای سوکت (F0-11) — توکن دیگر در آدرس نمی‌رود. */

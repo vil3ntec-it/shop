@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.sync.v1
 
 import android.content.Context
 import ir.vil3ntec.tohid.core.config.AppConfig
+import ir.vil3ntec.tohid.core.sync.ReplayBook
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.sync.SyncStore
@@ -61,6 +62,12 @@ class SyncV1Engine private constructor(context: Context) {
   private fun commitFor(key: String) =
     SyncCommit(SyncCommit.Journal(java.io.File(app.filesDir, "sync-journal-${OpQueue.fileKey(key)}.json")), parts)
 
+  /** §۹.۵: سرور از پشتیبان برگشت — شرح سرِ `V1Restore` و `core/sync/RestoreReplay.kt` */
+  private var restore = restoreFor(accountKey)
+
+  private fun restoreFor(key: String) =
+    V1Restore(state, queue, ReplayBook.inDir(app.filesDir, "sync-replay-${OpQueue.fileKey(key)}"), commit)
+
   private val gate = Mutex()
   private val _status = MutableStateFlow(snapshotStatus())
   val status: StateFlow<SyncStatus> = _status.asStateFlow()
@@ -87,6 +94,7 @@ class SyncV1Engine private constructor(context: Context) {
     state = SyncStateV1(app, accountKey)
     queue = OpQueue(app, accountKey)
     commit = commitFor(accountKey)
+    restore = restoreFor(accountKey)
     publish()
   }
 
@@ -176,6 +184,16 @@ class SyncV1Engine private constructor(context: Context) {
         val client = SyncV1Client(Backend.api(app))
         val device = store.deviceUid
 
+        //  §۹.۵: سرور از پشتیبان برگشته؟ (هر دور) opهای گم‌شدهٔ همین دستگاه جلوی صف
+        val epoch = try {
+          client.epoch()
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+          throw cancelled
+        } catch (_: Throwable) {
+          null
+        }
+        synchronized(this) { restore.check(epoch) }
+
         //  صف را تا ته خالی می‌کنیم، دسته‌دسته
         var guard = 0
         while (queue.size() > 0 && guard < 500) {
@@ -197,20 +215,38 @@ class SyncV1Engine private constructor(context: Context) {
 
           val accepted = out.results.filter { it.accepted }.map { it.opId }
           val rejected = out.results.filter { !it.accepted }
-          if (accepted.isNotEmpty()) queue.ack(accepted)
-          if (rejected.isNotEmpty()) {
+          if (accepted.isNotEmpty()) {
+            //  §۹.۵: پذیرفته‌شده‌ها با server_seq کنارِ صف — **پیش از** بیرون رفتن از آن — تا
+            //  اگر سرور از پشتیبان برگشت، با همان op_id دوباره بروند (`V1Restore`)
+            restore.accepted(batch, out.results)
+            queue.ack(accepted)
+          }
+          //  ردِ opِ دوباره‌فرستاده (پیش‌تر پذیرفته شده بود) ردشده‌ای نیست که کاربر ببیند
+          val (replayed, refused) = rejected.partition { restore.isReplay(it.opId) }
+          if (replayed.isNotEmpty()) queue.ack(replayed.map { it.opId })
+          if (refused.isNotEmpty()) {
             //  ردشده‌ها از صف بیرون می‌روند — وگرنه صف تا ابد قفل
             //  می‌کند — ولی بی‌صدا نه.
-            val ids = rejected.map { it.opId }.toHashSet()
+            val ids = refused.map { it.opId }.toHashSet()
             queue.drop(batch.filter { it.opId in ids }, "rejected")
             queue.ack(ids)
           }
           state.lastPushAt = System.currentTimeMillis()
         }
 
+        //  §۹.۵: سرور برگشته و صف خالی شد ⇒ دفتر از Snapshot از نو، opهای همین حالا در صف رویش.
+        //  تا آن وقت Pull نه — opِ دوباره‌فرستادهٔ دستگاهِ دیگر روی دفترِ کهنه دو بار می‌نشست.
+        if (state.restorePending && queue.size() == 0) {
+          val snapshot = client.snapshot()
+          synchronized(this) {
+            if (commit.pending()) commit.recover(read())
+            if (restore.rebuild(snapshot, read(), write)) state.snapshotAt = System.currentTimeMillis()
+          }
+        }
+
         //  Pull — تا وقتی سرور بگوید چیزِ دیگری هست
         var rounds = 0
-        while (rounds < 50) {
+        while (!state.restorePending && rounds < 50) {
           rounds++
           val got = client.pull(device, state.cursor)
           if (got.ops.isNotEmpty()) absorbRemote(got.ops, read, write, got.cursor)
@@ -329,6 +365,14 @@ class SyncV1Engine private constructor(context: Context) {
 
   suspend fun restoreFromServer(read: () -> ShopData, write: suspend (ShopData) -> Unit): Int {
     val client = SyncV1Client(Backend.api(app))
+    //  §۹.۵: دورانِ پیش از Snapshot — دفتر حالا همان سرور است، پس همان دوران و دیگر «در انتظار» نه
+    val epoch = try {
+      client.epoch()
+    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+      throw cancelled
+    } catch (_: Throwable) {
+      null
+    }
     val body = client.snapshot()
     val next = LedgerDiff.fromSnapshot(body, LedgerDiff.toJson(read()))
     write(LedgerDiff.fromJson(next))
@@ -338,6 +382,7 @@ class SyncV1Engine private constructor(context: Context) {
     state.snapshotAt = System.currentTimeMillis()
     state.lastOkAt = System.currentTimeMillis()
     state.lastError = ""
+    if (epoch != null) state.commitRestore(epoch.id, false)
     publish()
     return (body["rows"] as? kotlinx.serialization.json.JsonPrimitive)?.content?.toIntOrNull() ?: 0
   }

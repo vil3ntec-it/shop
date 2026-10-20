@@ -373,6 +373,15 @@ const config = {
   syncV3: {
     enabled: bool(process.env.SYNC_V3_ENABLED, false),
   },
+  /*
+   *  «دورانِ» همگام‌سازی پس از بازیابی (§۹.۵، `lib/sync-epoch.js`) — فقط دکان.
+   *  روشن به‌طورِ پیش‌فرض چون جلوی گم شدنِ فروشِ پس از پشتیبان را می‌گیرد و در کارِ
+   *  عادی هیچ رفتاری را عوض نمی‌کند. `false` ⇒ `GET /api/shop/sync-epoch` ۴۰۴ و
+   *  pull ِ v3 بی دوران ⇒ برنامه همان رفتارِ پیشین.
+   */
+  syncEpoch: {
+    enabled: bool(process.env.SYNC_EPOCH_ENABLED, true),
+  },
 };
 
 /** بررسی پیکربندی هنگام راه‌اندازی — بهتر است سرور بالا نیاید تا ناامن کار کند. */

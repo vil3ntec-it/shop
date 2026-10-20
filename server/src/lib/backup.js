@@ -59,7 +59,22 @@ function warnUnencrypted(kind) {
   }).catch(() => {});
 }
 
-async function run({ kind = 'manual', dir = null } = {}) {
+/**
+ * §۹.۵: پیش از گرفتنِ پشتیبان نشانِ «در پشتیبان» در دیتابیس می‌نشیند و پس از آن پاک می‌شود
+ * (`lib/sync-epoch.js → markBackup`). دیتابیسی که از این فایل برگردد آن را دارد و در نخستین
+ * بالا آمدن «دورانِ بازیابیِ» تازه می‌گیرد ⇒ برنامه‌ها opهای پس از پشتیبان را دوباره می‌فرستند.
+ */
+async function run(opts = {}) {
+  if (!KINDS.includes(opts.kind || 'manual')) throw new Error('نوع پشتیبان معتبر نیست');
+  const unmark = await require('./sync-epoch').markBackup();
+  try {
+    return await dump(opts);
+  } finally {
+    await unmark();
+  }
+}
+
+async function dump({ kind = 'manual', dir = null } = {}) {
   if (!KINDS.includes(kind)) throw new Error('نوع پشتیبان معتبر نیست');
   await ensureDirs();
 
@@ -265,6 +280,11 @@ async function restore(file, { databaseUrl = config.db.url } = {}) {
       ? resolve({ ok: true, bytes: sql.length })
       : reject(new Error(`بازیابی شکست خورد: ${err.trim().slice(0, 500)}`)));
     psql.stdin.end(sql);
+  }).then(async (out) => {
+    //  §۹.۵: همین دیتابیس برگشت ⇒ دورانِ بازیابیِ تازه، حتی بی بالا آمدنِ دوبارهٔ سرور
+    //  (`scripts/restore.js` نشانیِ مقصد را پیش از بارِ پیکربندی در DATABASE_URL می‌گذارد)
+    if (databaseUrl === config.db.url) await require('./sync-epoch').rotate('restore');
+    return out;
   });
 }
 

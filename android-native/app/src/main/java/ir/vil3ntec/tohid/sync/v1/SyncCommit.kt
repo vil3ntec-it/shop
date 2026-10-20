@@ -163,6 +163,33 @@ internal class SyncCommit(private val journal: Journal, private val parts: Parts
     journal.clear()
   }
 
+  /**
+   *  §۹.۵ — ساختنِ دوبارهٔ دفتر پس از بازیابیِ سرور (`V1Restore.rebuild`، `SyncV3Engine.rebuild`):
+   *  دفتر = Snapshot ِ سرور + opهای همین حالا در صف (هنوز نرفته)؛ سایه = همان؛ cursor = سرِ
+   *  Snapshot. ژورنال ⇐ دفتر ⇐ سایه + cursor ⇐ پاک کردنِ ژورنال؛ بسته شدن در میانه ⇒ دفتر
+   *  نشسته؟ تمام می‌شود : هیچ چیزی عوض نشده و دورِ بعد دوباره ساخته می‌شود.
+   *
+   *  @param server دفترِ Snapshot با بخش‌های محلیِ همین دستگاه (`LedgerDiff.fromSnapshot`)
+   *  @param queued opهای در صف — روی Snapshot نشانده می‌شوند تا تغییرِ نرفته از دفتر گم نشود
+   *  @param cursor سرِ همان Snapshot
+   */
+  fun rebuild(server: JsonObject, queued: List<SyncOp>, current: ShopData, cursor: Long, writeLedger: (ShopData) -> Unit) {
+    if (journal.exists()) recover(current)
+    val ledger = LedgerDiff.fromJson(if (queued.isEmpty()) server else LedgerDiff.applyRemote(server, queued))
+    val tree = LedgerDiff.toJson(ledger)
+    val before = parts.shadow()
+    val shadow = LedgerDiff.shadowOf(tree).toString()
+    journal.write(
+      Journal.Entry(
+        Journal.REBUILD, before = sha(before), shadow = sha(shadow),
+        ledger = sha(tree.toString()), cursor = cursor,
+      ),
+    )
+    writeLedger(ledger)
+    parts.commit(shadow, cursor)
+    journal.clear()
+  }
+
   fun pending(): Boolean = journal.exists()
 
   /**
@@ -214,6 +241,22 @@ internal class SyncCommit(private val journal: Journal, private val parts: Parts
           Outcome.BACK
         } else {
           val next = absorbedShadow(current, j.ops, tree)
+          if (sha(next) == j.shadow) {
+            parts.commit(next, j.cursor)
+            Outcome.FORWARD
+          } else {
+            Outcome.MISMATCH
+          }
+        }
+      }
+
+      j.stage == Journal.REBUILD -> {
+        val tree = ledger?.let { LedgerDiff.toJson(it) }
+        if (tree == null || sha(tree.toString()) != j.ledger) {
+          //  دفترِ تازه ننشسته بود ⇒ هیچ چیزی عوض نشده؛ «در انتظارِ ساختنِ دوباره» می‌ماند
+          Outcome.BACK
+        } else {
+          val next = LedgerDiff.shadowOf(tree).toString()
           if (sha(next) == j.shadow) {
             parts.commit(next, j.cursor)
             Outcome.FORWARD
@@ -305,6 +348,7 @@ internal class SyncCommit(private val journal: Journal, private val parts: Parts
     companion object {
       const val RECORD = "record"
       const val ABSORB = "absorb"
+      const val REBUILD = "rebuild"
     }
   }
 

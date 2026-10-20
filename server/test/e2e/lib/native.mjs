@@ -16,6 +16,8 @@
  *     `WarehouseEngine.kt`، `SalesEngine.kt`، `DebtorEngine.kt` و `CashShift.kt` برگردانده
  *     شده‌اند (نامِ تابعِ کاتلین کنارِ هر کدام).
  *   • «حالتِ هواپیما»: `offline = true` ⇒ هیچ درخواستی بیرون نمی‌رود (همان `Backend.isOnline`).
+ *   • پس از بازیابیِ سرور (§۹.۵): دوران، دوباره‌فرستادن و ساختنِ دوباره از Snapshot همان
+ *     `sync/v1/V1Restore.kt` و `core/sync/RestoreReplay.kt` (`restorePlan`، `replayAbove`).
  */
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
@@ -27,6 +29,37 @@ const ROOT = path.join(import.meta.dirname, '..', '..', '..', '..');
 export const core = require(path.join(ROOT, 'license', 'sync-core.js'));
 export const MODELS_KT = path.join(ROOT, 'android-native', 'app', 'src', 'main', 'java', 'ir', 'vil3ntec', 'tohid', 'data', 'Models.kt');
 export const APP_VERSION = JSON.parse(fs.readFileSync(path.join(ROOT, 'server', 'package.json'), 'utf8')).version;
+
+/* ---- §۹.۵ — قرینهٔ سطر به سطرِ `core/sync/RestoreReplay.kt` و `sync/v1/V1Restore.kt` ---- */
+
+/** `RestoreReplay.Epoch.from` */
+export function epochFrom(e) {
+  if (!e || typeof e !== 'object' || typeof e.id !== 'string' || !e.id) return null;
+  const base = Number(e.base);
+  const head = Number(e.head);
+  if (!Number.isInteger(base) || !Number.isInteger(head) || base < 0 || head < 0) return null;
+  return { id: e.id, base, head };
+}
+
+/** `RestoreReplay.plan` ⇒ {epoch, restore, base} */
+export function restorePlan(known, cursor, server, sentAbove = () => false) {
+  if (!server) return { epoch: known, restore: false, base: 0 };
+  const base = Math.min(server.base, server.head);
+  const rotated = known !== '' && known !== server.id;
+  const behind = cursor > server.head;
+  if (!rotated && !behind) return { epoch: server.id, restore: false, base };
+  return { epoch: server.id, restore: cursor > base || sentAbove(base), base };
+}
+
+/** `ReplayBook.replayAbove`: ترتیبِ نخستین فرستادن، آخرین server_seq ِ هر op_id */
+export function replayAbove(sent, base) {
+  const byId = new Map();
+  for (const s of sent) {
+    const prev = byId.get(s.id);
+    byId.set(s.id, prev ? { ...prev, seq: s.seq } : s);
+  }
+  return [...byId.values()].filter((s) => s.seq > base);
+}
 
 /* ═══════════════════════════ Models.kt ⇒ شکلِ ردیف ═══════════════════════════ */
 
@@ -137,6 +170,12 @@ export class NativeDevice {
     this.dropped = [];
     this.cursor = 0;
     this.snapshotAt = 0;
+    //  §۹.۵ (`V1Restore`): دورانِ بازیابیِ سرور، «در انتظارِ ساختنِ دوباره» و دفترچهٔ `ReplayBook`
+    this.epoch = '';
+    this.restorePending = false;
+    this.sent = [];          //  …-sent.jsonl: {id, seq, op} ِ پذیرفته‌شده‌های خودِ دستگاه
+    this.replayed = 0;
+    this.rebuilt = 0;
     this.lastError = '';
     this.holding = false;
     this.requests = [];
@@ -228,10 +267,43 @@ export class NativeDevice {
     return ops.length;
   }
 
-  /** `SyncV1Engine.runOnce`: همهٔ صف در دسته‌ها، بعد pull تا تهِ cursor */
+  /** `V1Restore.check` — هر دور: دورانِ سرور؛ بازیابی ⇒ opهای خودِ دستگاه جلوی صف و «در انتظار» */
+  async checkEpoch() {
+    let r;
+    try { r = await this.api('GET', '/shop/sync-epoch'); } catch { return; }
+    if (r.status !== 200) return;                              //  سرورِ کهنه/خاموش/خطا ⇒ رفتارِ پیشین
+    const top = this.sent.reduce((m, x) => Math.max(m, x.seq), 0);
+    const plan = restorePlan(this.epoch, this.cursor, epochFrom(r.body?.epoch), (base) => top > base);
+    if (!plan.restore) { this.epoch = plan.epoch; return; }
+    //  `OpQueue.pushFront`: جلوی صف، همان op_id، بی تکرارِ آنچه در صف هست
+    const have = new Set(this.queue.map((o) => o.op_id));
+    const again = replayAbove(this.sent, plan.base).filter((x) => !have.has(x.id) && have.add(x.id)).map((x) => x.op);
+    this.queue.unshift(...again);
+    this.replayed += again.length;
+    //  `SyncStateV1.commitRestore`
+    this.epoch = plan.epoch;
+    this.restorePending = true;
+  }
+
+  /** `V1Restore.rebuild` + `SyncCommit.rebuild`: دفتر = Snapshot + opهای همین حالا در صف */
+  async rebuild() {
+    const r = await this.api('GET', '/sync/v1/snapshot');
+    if (r.status !== 200) return false;
+    let next = core.fromSnapshot(r.body, this.ledger);
+    if (this.queue.length) next = core.applyRemote(next, this.queue).data;
+    this.ledger = next;
+    this.shadow = core.shadowOf(next);
+    this.cursor = Number(r.body.cursor || 0);
+    this.restorePending = false;
+    this.rebuilt++;
+    return true;
+  }
+
+  /** `SyncV1Engine.runOnce`: دوران ⇒ همهٔ صف در دسته‌ها ⇒ (در انتظار و صفِ خالی ⇒ از نو) ⇒ pull تا تهِ cursor */
   async sync() {
     if (this.offline) { this.lastError = 'offline'; return { ok: false, offline: true }; }
     try {
+      await this.checkEpoch();
       let guard = 0;
       while (this.queue.length && guard++ < 500) {
         //  `OpQueue.batch()`: حداکثر ۲۰۰ op و ۲۵۶KB
@@ -249,12 +321,18 @@ export class NativeDevice {
         this.holding = false;
         const res = r.body.results || [];
         const ok = new Set(res.filter((x) => x.status === 'applied' || x.status === 'duplicate').map((x) => x.op_id));
-        const bad = res.filter((x) => !(x.status === 'applied' || x.status === 'duplicate'));
-        for (const b of bad) this.dropped.push({ ...batch.find((o) => o.op_id === b.op_id), why: b.reason || b.status });
+        //  `V1Restore.accepted`: پذیرفته‌شده‌ها با server_seq — پیش از بیرون رفتن از صف
+        const seqOf = new Map(res.filter((x) => ok.has(x.op_id) && Number(x.server_seq) > 0).map((x) => [x.op_id, Number(x.server_seq)]));
+        for (const op of batch) if (seqOf.has(op.op_id)) this.sent.push({ id: op.op_id, seq: seqOf.get(op.op_id), op });
+        //  `V1Restore.isReplay`: ردِ opِ دوباره‌فرستاده ردشده‌ای نیست که کاربر ببیند
+        const sentIds = new Set(this.sent.map((x) => x.id));
+        const bad = res.filter((x) => !ok.has(x.op_id));
+        for (const b of bad) if (!sentIds.has(b.op_id)) this.dropped.push({ ...batch.find((o) => o.op_id === b.op_id), why: b.reason || b.status });
         const gone = new Set([...ok, ...bad.map((b) => b.op_id)]);
         this.queue = this.queue.filter((o) => !gone.has(o.op_id));
       }
-      for (let i = 0; i < 50; i++) {
+      if (this.restorePending && !this.queue.length) await this.rebuild();
+      for (let i = 0; !this.restorePending && i < 50; i++) {
         const r = await this.api('GET', `/sync/v1/pull?device_id=${encodeURIComponent(this.deviceId)}&since=${this.cursor}`);
         if (r.status !== 200) { this.lastError = `${r.status} ${r.body?.error?.code || ''}`.trim(); return { ok: false, status: r.status, body: r.body }; }
         const ops = r.body.ops || [];
@@ -280,6 +358,8 @@ export class NativeDevice {
   async firstSync() {
     const rows = core.COLLECTIONS.reduce((s, c) => s + (this.ledger[c] || []).length, 0);
     if (rows === 0) {
+      //  `restoreFromServer`: دورانِ پیش از Snapshot — دستگاهِ تازه هم بداند Snapshot ِ کدام دوران است (§۹.۵)
+      const ep = await this.api('GET', '/shop/sync-epoch').catch(() => null);
       const r = await this.api('GET', '/sync/v1/snapshot');
       if (r.status !== 200) return { ok: false, status: r.status, body: r.body };
       const next = core.fromSnapshot(r.body, this.ledger);
@@ -287,6 +367,8 @@ export class NativeDevice {
       this.shadow = core.shadowOf(next);
       this.cursor = Number(r.body.cursor || 0);
       this.snapshotAt = Date.now();
+      const seen = ep && ep.status === 200 ? epochFrom(ep.body?.epoch) : null;
+      if (seen) { this.epoch = seen.id; this.restorePending = false; }
       return { ok: true, rows: Number(r.body.rows || 0) };
     }
     this.queue.push(...core.diff({}, this.ledger).ops);

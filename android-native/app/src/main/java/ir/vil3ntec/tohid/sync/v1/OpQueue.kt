@@ -24,7 +24,7 @@ import java.io.File
  *  ⚠️ نوشتن اتمی است (فایلِ کناری، بعد جابه‌جایی): اگر وسطِ نوشتن باتری
  *  تمام شود، صف نصفه نمی‌ماند.
  */
-class OpQueue(context: Context, accountKey: String) {
+class OpQueue(context: Context, accountKey: String) : V1Restore.Queue {
 
   private val json = Json { ignoreUnknownKeys = true; isLenient = true }
   private val dir = context.applicationContext.filesDir
@@ -45,7 +45,7 @@ class OpQueue(context: Context, accountKey: String) {
   @Volatile private var cachedDropped: Int = -1
 
   @Synchronized
-  fun all(): List<SyncOp> = read(file).mapNotNull { SyncOp.fromJson(it) }
+  override fun all(): List<SyncOp> = read(file).mapNotNull { SyncOp.fromJson(it) }
 
   @Synchronized
   fun size(): Int {
@@ -72,6 +72,24 @@ class OpQueue(context: Context, accountKey: String) {
     }
     //  اگر نگرفت، `record()` سایه را جلو نمی‌برد و تغییر دفعهٔ بعد دوباره op می‌شود
     if (!write(file, list)) throw java.io.IOException("صفِ همگام‌سازی روی حافظه نوشته نشد")
+  }
+
+  /**
+   *  opهایی که پس از بازیابیِ سرور دوباره باید بروند — **جلوی** صف (پیش از تغییرهای
+   *  تازه‌تر، به همان ترتیبِ نخستین فرستادن) و با **همان op_id** (F0-05). opی که همین
+   *  حالا در صف هست دوباره نمی‌آید. §۹.۵، `core/sync/RestoreReplay.kt`.
+   *
+   *  @return چند op به صف آمد
+   */
+  @Synchronized
+  override fun pushFront(ops: List<SyncOp>): Int {
+    if (ops.isEmpty()) return 0
+    val list = read(file)
+    val have = list.mapNotNullTo(HashSet()) { (it["op_id"] as? JsonPrimitive)?.content }
+    val add = ops.filter { it.opId.isNotEmpty() && have.add(it.opId) }.map { it.toJson() }
+    if (add.isEmpty()) return 0
+    if (!write(file, add + list)) throw java.io.IOException("صفِ همگام‌سازی روی حافظه نوشته نشد")
+    return add.size
   }
 
   /**

@@ -10,7 +10,7 @@ import android.content.Context
  *  نفرِ بعدی می‌فرستاد — همان چاله‌ای که `ShopStore` برای خودِ دفتر
  *  بسته است.
  */
-class SyncStateV1(context: Context, private val accountKey: String) {
+class SyncStateV1(context: Context, private val accountKey: String) : V1Restore.State {
 
   private val prefs = context.applicationContext
     .getSharedPreferences("tohid-sync-v1", Context.MODE_PRIVATE)
@@ -38,7 +38,7 @@ class SyncStateV1(context: Context, private val accountKey: String) {
 
   private fun k(name: String) = "$accountKey.$name"
 
-  var cursor: Long
+  override var cursor: Long
     get() = prefs.getLong(k("cursor"), 0)
     set(v) = prefs.edit().putLong(k("cursor"), v).apply()
 
@@ -94,6 +94,21 @@ class SyncStateV1(context: Context, private val accountKey: String) {
   var snapshotAt: Long
     get() = prefs.getLong(k("snapshotAt"), 0)
     set(v) = prefs.edit().putLong(k("snapshotAt"), v).apply()
+
+  /** «دورانِ بازیابیِ» سروری که این حساب آخرین بار دید — §۹.۵، `core/sync/RestoreReplay.kt` */
+  override var epoch: String
+    get() = prefs.getString(k("epoch"), "").orEmpty()
+    set(v) = prefs.edit().putString(k("epoch"), v).apply()
+
+  /** سرور برگشته و دفتر هنوز از Snapshot از نو ساخته نشده — تا آن وقت Pull نه (`V1Restore`) */
+  override val restorePending: Boolean
+    get() = prefs.getBoolean(k("restorePending"), false)
+
+  override fun adoptEpoch(epoch: String) { this.epoch = epoch }
+
+  /** دوران و «در انتظار» با هم و همزمان (`commit`، نه `apply`) — شرح سرِ `V1Restore` */
+  override fun commitRestore(epoch: String, pending: Boolean): Boolean =
+    prefs.edit().putString(k("epoch"), epoch).putBoolean(k("restorePending"), pending).commit()
 
   /** زمانِ «هم‌ترازیِ یک‌باره» با سرور — شرح سرِ `SyncV1Engine.prepare` */
   var reconciledAt: Long
