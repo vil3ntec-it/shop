@@ -114,6 +114,8 @@ fun ProfileScreen(
   onBack: () -> Unit,
   onSignIn: () -> Unit,
   onSubscription: () -> Unit,
+  /** جای نوارِ شناورِ پایین وقتی صفحه زیرِ آن کشیده می‌شود (زمینهٔ مه‌گرفته تا ته) */
+  bottomReserve: Dp = 0.dp,
 ) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
@@ -221,6 +223,7 @@ fun ProfileScreen(
           banner = ProfileModel.banner(signedIn, plan, SUBSCRIPTION_WARN_DAYS, ::plain),
           menu = ProfileModel.menu(signedIn, canSettings),
           alerts = alerts.size,
+          bottomReserve = bottomReserve,
           onBell = { alertsOpen = true },
           onAvatar = { pickOpen = true },
           onBanner = { action ->
@@ -466,6 +469,7 @@ private fun ProfileRoot(
   banner: ProfileModel.Banner,
   menu: List<ProfileModel.MenuItem>,
   alerts: Int,
+  bottomReserve: Dp,
   onBell: () -> Unit,
   onAvatar: () -> Unit,
   onBanner: (ProfileModel.Action) -> Unit,
@@ -522,7 +526,7 @@ private fun ProfileRoot(
       }
       Spacer(Modifier.height(if (ownHeader) 0.dp else 12.dp))
       ProfileMenu(menu, onMenu)
-      Spacer(Modifier.height(24.dp))
+      Spacer(Modifier.height(24.dp + bottomReserve))
     }
   }
 }

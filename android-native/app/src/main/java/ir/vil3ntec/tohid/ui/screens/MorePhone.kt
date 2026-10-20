@@ -51,7 +51,12 @@ object MoreShot {
  *  (`UpdateControls`) و شمارِ دفتر.
  */
 @Composable
-fun PhoneMoreScreen(d: ShopData, onOpen: (String) -> Unit) {
+fun PhoneMoreScreen(
+  d: ShopData,
+  /** جای نوارِ شناورِ پایین وقتی صفحه زیرِ آن کشیده می‌شود */
+  bottomReserve: androidx.compose.ui.unit.Dp = 0.dp,
+  onOpen: (String) -> Unit,
+) {
   val context = LocalContext.current
   val c = PhoneV3.colors
   //  شاگرد سابقه، کارمندان و تنظیمات را نمی‌بیند (همان سدِ `canOpenSettings`)
@@ -84,7 +89,7 @@ fun PhoneMoreScreen(d: ShopData, onOpen: (String) -> Unit) {
           Column(Modifier.widthIn(max = 560.dp).fillMaxWidth()) {
             Spacer(Modifier.height(6.dp))
             V3LargeHeader("بیشتر")
-            Column(Modifier.padding(start = 20.dp, end = 20.dp, bottom = 32.dp)) {
+            Column(Modifier.padding(start = 20.dp, end = 20.dp, bottom = 32.dp + bottomReserve)) {
               groups.forEach { g ->
                 V3GroupTitle(g.title, Modifier.padding(top = 14.dp))
                 V3Card {

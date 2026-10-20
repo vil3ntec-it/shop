@@ -85,35 +85,31 @@ internal val PhoneV3Colors.pressed: Color get() = lerp(card, bg, 0.9f)
  */
 internal fun Modifier.frosted(c: PhoneV3Colors): Modifier = drawBehind {
   val dark = c.bg.red < 0.3f
-  //  r4: خاکستریِ میانه با دو لکهٔ بزرگِ محوِ روشن با رنگِ سرد/یاسیِ کم‌رنگ، و
-  //  سایهٔ نرمِ پایین — لکه‌ها پشتِ متن‌اند و کنتراستِ نوشته‌ها دست نمی‌خورد
-  val base = if (dark) c.bg else lerp(c.bg, c.inkMuted, 0.26f)
+  /*
+   *  r4: خاکستریِ سردِ یاسی با لکه‌های بزرگِ محو — سایهٔ تیره کنارِ زنگ و عکس، روشنِ
+   *  سرد پشتِ عنوان، یاسیِ کم‌رنگ پشتِ لبهٔ کارت، و دو لکهٔ دیگر در حاشیه‌های پایین.
+   *  تفاوتِ روشنی در سربرگ حدودِ ۶۰ از ۲۵۵ (مثلِ r4)؛ عنوانِ سیاه روی تیره‌ترین
+   *  جا هم بیش از ۹ به ۱ کنتراست دارد. جای لکه‌ها در راست‌به‌چپ قرینه است.
+   */
+  val base = if (dark) c.bg else lerp(lerp(c.bg, c.inkMuted, 0.16f), c.accent, 0.035f)
   drawRect(base)
   val w = size.width
   val h = size.height
-  //  لکهٔ ۱: بالا، پشتِ عنوان و عکس — سفیدِ سرد
-  val cool = lerp(c.card, c.tile, 0.55f)
-  drawRect(
+  val rtl = layoutDirection == LayoutDirection.Rtl
+  fun blob(x: Float, y: Float, r: Float, color: Color, a0: Float, a1: Float) = drawRect(
     Brush.radialGradient(
-      listOf(cool.copy(alpha = if (dark) 0.55f else 0.97f), cool.copy(alpha = if (dark) 0.25f else 0.55f), cool.copy(alpha = 0f)),
-      center = Offset(w * 0.30f, h * 0.20f), radius = w * 1.10f,
+      listOf(color.copy(alpha = a0), color.copy(alpha = a1), color.copy(alpha = 0f)),
+      center = Offset(w * (if (rtl) x else 1f - x), h * y), radius = w * r,
     ),
   )
-  //  لکهٔ ۲: چپِ پایین‌تر از میانه — یاسیِ خیلی کم‌رنگ
-  val lilac = lerp(c.tile, c.accent, if (dark) 0.10f else 0.09f)
-  drawRect(
-    Brush.radialGradient(
-      listOf(lilac.copy(alpha = if (dark) 0.70f else 0.92f), lilac.copy(alpha = if (dark) 0.30f else 0.45f), lilac.copy(alpha = 0f)),
-      center = Offset(w * 0.05f, h * 0.66f), radius = w * 0.95f,
-    ),
-  )
-  //  سایهٔ نرمِ پایینِ پایان
-  drawRect(
-    Brush.radialGradient(
-      listOf(lerp(base, c.inkMuted, if (dark) 0.08f else 0.32f), base.copy(alpha = 0f)),
-      center = Offset(w * 0.98f, h * 0.95f), radius = w * 0.70f,
-    ),
-  )
+  val shade = if (dark) c.black else lerp(base, c.ink, 0.20f)
+  val cool = lerp(c.card, c.tile, 0.5f)
+  val lilac = lerp(c.tile, c.accent, 0.14f)
+  blob(0.10f, 0.15f, 0.60f, shade, 0.90f, 0.45f)
+  blob(0.80f, 0.04f, 0.65f, cool, if (dark) 0.60f else 0.95f, if (dark) 0.30f else 0.55f)
+  blob(0.58f, 0.25f, 0.55f, lilac, if (dark) 0.55f else 0.85f, if (dark) 0.25f else 0.40f)
+  blob(1.00f, 0.56f, 0.50f, if (dark) c.black else lerp(base, c.ink, 0.18f), 0.85f, 0.40f)
+  blob(0.00f, 0.86f, 0.60f, cool, if (dark) 0.45f else 0.90f, if (dark) 0.20f else 0.45f)
 }
 
 /** پُرشدنِ نرمِ هنگامِ فشار + زدن؛ بی موجِ رنگی (r5) */
