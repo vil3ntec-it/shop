@@ -11,6 +11,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
+import ir.vil3ntec.tohid.core.delivery.HandedOverOrder
+import ir.vil3ntec.tohid.core.delivery.HandoverSale
+import ir.vil3ntec.tohid.core.delivery.HandoverSaleHook
+import ir.vil3ntec.tohid.core.delivery.HandoverSaleResult
 import ir.vil3ntec.tohid.core.model.OrderDto
 import ir.vil3ntec.tohid.core.model.OrdersConfigDto
 import ir.vil3ntec.tohid.core.net.ApiResult
@@ -167,6 +171,26 @@ object OrdersLive {
   }
 
   /**
+   *  قلابِ «میزِ تحویل» (#337، `core/delivery/HandoverSale`): دریافتِ حضوری ⇒ همان [postById]
+   *  (پرسیدن از سرور، یکتا با شناسهٔ سفارش). یک بار در [Host]؛ با `applicationContext`.
+   *  Saved ⇒ Recorded("o-<سفارش>") · Already ⇒ AlreadyRecorded · Skipped/Failed ⇒ Failed(پیام).
+   */
+  fun installHandoverHook(context: Context, store: ShopStore) {
+    val app = context.applicationContext
+    HandoverSale.hook = object : HandoverSaleHook {
+      override suspend fun record(order: HandedOverOrder): HandoverSaleResult =
+        when (val r = postById(app, store, order.orderId)) {
+          Posted.Saved -> HandoverSaleResult.Recorded(OrderFulfillment.saleIdOf(order.orderId))
+          Posted.Already -> HandoverSaleResult.AlreadyRecorded(
+            OrderFulfillment.saleOf(store.data.value, order.orderId)?.id ?: OrderFulfillment.saleIdOf(order.orderId)
+          )
+          is Posted.Skipped -> HandoverSaleResult.Failed(r.message)
+          is Posted.Failed -> HandoverSaleResult.Failed(r.message)
+        }
+    }
+  }
+
+  /**
    *  تحویل‌های بی‌فروش و برگشته‌های لغونشدهٔ سرور ⇒ همین دفتر. فقط وقتی سرور توانا و نقشِ این
    *  حساب توانا است؛ صفحه‌به‌صفحه (`after`) تا سفارشِ گیرکرده جلوی بقیه را نگیرد؛ بی تغییرِ صف کم‌پرسش.
    */
@@ -236,6 +260,8 @@ object OrdersLive {
   @Composable
   fun Host(store: ShopStore) {
     val context = LocalContext.current
+    //  میزِ تحویل همین درِ ثبت را صدا می‌زند (#337)
+    LaunchedEffect(store) { installHandoverHook(context, store) }
     var foreground by remember { mutableStateOf(false) }
     LifecycleEventEffect(Lifecycle.Event.ON_START) { foreground = true }
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { foreground = false }

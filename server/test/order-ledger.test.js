@@ -449,7 +449,24 @@ test('کسرِ سفارش‌محورِ پیشین (res:…:sale) بی فاکتو
   assert.equal(await count("SELECT COUNT(*)::int AS n FROM stock_tasks WHERE shop_id=$1 AND status='open' AND kind='reservation_short'", [a.shopId]), 0);
   const rep = await h.get('/api/shop/catalog/report?productId=p-rice', { token: a.token });
   assert.equal(rep.body.ok, true, JSON.stringify(rep.body.mismatches));
-  //  دوباره خواندن چیزی را دو بار جبران نمی‌کند
-  await require('../src/lib/catalog').refresh(a.shopId, { full: true });
+  //  یک سطر در دفترِ ممیزیِ دکان با شمارش‌ها
+  const audits = await many(`SELECT actor_type, detail FROM audit_logs WHERE shop_id=$1 AND action='stock.order_stock_retired'`, [a.shopId]);
+  assert.equal(audits.length, 1);
+  assert.equal(audits[0].actor_type, 'system');
+  const det = typeof audits[0].detail === 'string' ? JSON.parse(audits[0].detail) : audits[0].detail;
+  assert.deepEqual([det.undoneMoves, det.undoneMilli, det.keptWithW, det.releasedHolds, det.releasedMilli, det.dismissedTasks],
+    [1, 1500, 1, 1, 700, 1]);
+  //  دوباره خواندن (و حتی دوباره دویدن پس از راه‌اندازیِ دوباره) چیزی را دو بار جبران نمی‌کند
+  const catalog = require('../src/lib/catalog');
+  await catalog.refresh(a.shopId, { full: true });
   assert.equal((await levels(a)).levels.shop_floor, 9500);
+  const again = await tx((c) => catalog.retireOrderStock(c, a.shopId, now()));
+  assert.equal(again.changed, false, JSON.stringify(again.audit));
+  assert.equal((await many(`SELECT 1 FROM audit_logs WHERE shop_id=$1 AND action='stock.order_stock_retired'`, [a.shopId])).length, 1);
+  //  دکانی بی ردیفِ سفارش‌محورِ پیشین (یا پرچمِ هرگز روشن‌نشده) ⇒ هیچ سطر و هیچ حرکت
+  const clean = await shopWithStock('بی‌کسرِ قدیمی');
+  await levels(clean);
+  assert.equal((await many(`SELECT 1 FROM audit_logs WHERE shop_id=$1 AND action='stock.order_stock_retired'`, [clean.shopId])).length, 0);
+  assert.equal(await count(`SELECT COUNT(*)::int AS n FROM stock_moves WHERE shop_id=$1 AND source='system'`, [clean.shopId]), 0);
+  assert.equal((await tx((c) => catalog.retireOrderStock(c, clean.shopId, now()))).changed, false);
 });

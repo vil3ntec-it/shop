@@ -115,10 +115,12 @@ function atOf(d, at) {
  */
 async function ingestTx(c, shopId, at, settings, { full = false } = {}) {
   await stock.lock(c, shopId);
+  //  کنار گذاشتنِ موجودیِ سفارش‌محورِ پیشین — فقط دکانی که ردیفِ آن را دارد؛ پس از COMMIT در
+  //  `refresh` در دفترِ ممیزی نوشته و «انجام‌شده» علامت می‌خورد
+  let retiredNow = null;
   if (!retired.has(shopId)) {
-    const out = await retireOrderStock(c, shopId, at);
-    if (out.touched.length) await stock.checkProducts(c, shopId, out.touched.sort(), settings, at);
-    retired.add(shopId);
+    retiredNow = await retireOrderStock(c, shopId, at);
+    if (retiredNow.touched.length) await stock.checkProducts(c, shopId, retiredNow.touched.sort(), settings, at);
   }
   const fmt = settings.syncSource === 'v3' ? 'v3' : 'v1';
   const T = TABLES[fmt];
@@ -250,7 +252,7 @@ async function ingestTx(c, shopId, at, settings, { full = false } = {}) {
     [shopId, fmt, wm, at]
   );
   if (touched.size) await stock.checkProducts(c, shopId, [...touched].sort(), settings, at);
-  return { products, moves, source: fmt };
+  return { products, moves, source: fmt, retired: retiredNow };
 }
 
 /**
@@ -302,7 +304,18 @@ async function refresh(shopId, { full = false, maxAgeMs = 0, at = now(), throttl
     if (lastCheck.size > 10_000) lastCheck.clear();
     if (!(await hasNewer(shopId))) return { skipped: true };
   }
-  return tx(async (c) => ingestTx(c, shopId, at, await stock.settingsOf(shopId, c), { full }));
+  const out = await tx(async (c) => ingestTx(c, shopId, at, await stock.settingsOf(shopId, c), { full }));
+  if (out.retired) {
+    retired.add(shopId);
+    if (out.retired.changed) {
+      //  یک سطر در دفترِ ممیزیِ دکان، فقط وقتی چیزی عوض شد (دورِ دوم ⇒ هیچ)
+      await require('./audit').log({
+        shopId, actorType: 'system', action: 'stock.order_stock_retired', targetType: 'shop', targetId: String(shopId),
+        detail: out.retired.audit,
+      });
+    }
+  }
+  return out;
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -322,10 +335,24 @@ const retired = new Set();
  *      (کنار گذاشتنِ این حرکت‌ها هنگامِ خواندن امن‌تر نبود: سهمِ W را دوباره بی‌کسر می‌کرد.)
  *   ۲) رزروِ «نگه‌داشته» ⇒ آزاد، با همان حرکتِ release (`res:<رزرو>:release`).
  *   ۳) وظیفه‌های بازِ «رزروِ بی‌پشتوانه» و «انتقال برای رزرو» ⇒ کنار گذاشته، با توضیح.
- * درونِ تراکنشِ ingest (قفلِ دکان گرفته شده)؛ بی ردیفِ قدیمی ⇒ سه پرسشِ خالی، یک بار.
+ *
+ * فقط دکانی که `shop.catalog` برایش **روزی روشن بوده**: ingest فقط با پرچمِ روشن می‌دود، و
+ * کاری انجام می‌شود فقط اگر ردیفِ سفارش‌محوری (`stock_reservations` یا حرکتِ `source = order`)
+ * هست — که هر دو را فقط کدِ پیشین و فقط با پرچمِ روشن می‌نوشت. دیگر دکان‌ها ⇒ یک پرسشِ خالی.
+ * تکرارپذیر: کلیدِ `undo:` یکتاست، رزروِ آزادشده دیگر «نگه‌داشته» نیست، وظیفهٔ بسته باز نیست ⇒
+ * دورِ دوم (حتی پس از راه‌اندازیِ دوباره) هیچ نمی‌نویسد. شمارش‌ها در `audit` ⇒ دفترِ ممیزی.
+ * درونِ تراکنشِ ingest (قفلِ دکان گرفته شده).
  */
 async function retireOrderStock(c, shopId, at) {
   const touched = new Set();
+  const none = { changed: false, touched: [], audit: null };
+  const legacy = (await c.query(
+    `SELECT EXISTS (SELECT 1 FROM stock_reservations WHERE shop_id=$1)
+         OR EXISTS (SELECT 1 FROM stock_moves WHERE shop_id=$1 AND source='order') AS any`, [shopId]
+  )).rows[0];
+  if (!legacy || !legacy.any) return none;
+  let undoneMilli = 0;
+  let keptWithW = 0;
   const sold = (await c.query(
     `SELECT m.product_id, m.location, m.qty_milli, m.source_key, m.ref_id FROM stock_moves m
       WHERE m.shop_id=$1 AND m.source='order' AND m.type='sale'
@@ -336,7 +363,8 @@ async function retireOrderStock(c, shopId, at) {
     const w = await c.query(
       'SELECT 1 FROM stock_sources WHERE shop_id=$1 AND source_key LIKE $2 LIMIT 1', [shopId, `si:w-${m.ref_id}-%`]
     );
-    if (w.rows.length) continue;
+    if (w.rows.length) { keptWithW += 1; continue; }
+    undoneMilli += num(m.qty_milli);
     await stock.postMove(c, shopId, {
       productId: m.product_id, location: m.location, type: 'customer_return', qtyMilli: num(m.qty_milli),
       mode: 'recorded', source: 'system', sourceKey: `undo:${m.source_key}`, refType: 'order', refId: m.ref_id,
@@ -356,12 +384,19 @@ async function retireOrderStock(c, shopId, at) {
       actorType: 'system', actorId: '', reason: 'reservations_retired', at,
     }, at);
   }
-  await c.query(
+  const tasks = await c.query(
     `UPDATE stock_tasks SET status='dismissed', resolved_by='system', resolved_at=$2, updated_at=$2,
             note='سفارشِ آنلاین دیگر موجودی رزرو نمی‌کند (تصمیمِ صاحبِ مخزن)'
       WHERE shop_id=$1 AND status='open' AND kind IN ('reservation_short', 'transfer_needed')`, [shopId, at]
   );
-  return { undone: touched.size, released: held.length, touched: [...touched] };
+  const undone = sold.length - keptWithW;
+  const dismissed = tasks.rowCount || 0;
+  const audit = {
+    reason: 'online_orders_no_longer_touch_stock', undoneMoves: undone, undoneMilli, keptWithW,
+    releasedHolds: held.length, releasedMilli: held.reduce((s, r) => s + num(r.qty_milli), 0),
+    dismissedTasks: dismissed, products: [...touched].sort().slice(0, 50),
+  };
+  return { changed: undone + held.length + dismissed > 0, touched: [...touched], audit };
 }
 
 // ════════════════════════════════════════════════════════════════════
