@@ -3,6 +3,7 @@ package ir.vil3ntec.tohid.ui.screens
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -548,8 +549,9 @@ private fun ProfileCard(
       .fillMaxWidth()
       .shadow(18.dp, shape, clip = false, ambientColor = c.ink.copy(alpha = 0.10f), spotColor = c.ink.copy(alpha = 0.12f))
       .clip(shape)
-      //  شیشه: کمی از زمینه پیداست تا کادرهای سفیدِ آمار رویش دیده شوند (r4)
+      //  شیشه: کمی از زمینه پیداست تا کادرهای سفیدِ آمار رویش دیده شوند (r4)، با مرزِ دیدنی
       .background(c.cardGlass.copy(alpha = c.cardGlass.alpha * 0.8f))
+      .border(1.dp, c.border, shape)
       .padding(start = 24.dp, end = 24.dp, top = 26.dp, bottom = 24.dp),
   ) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -619,10 +621,11 @@ private fun StatBox(label: String, count: Int, modifier: Modifier = Modifier) {
   Column(
     modifier
       .height(76.dp)
-      .shadow(8.dp, shape, clip = false, ambientColor = c.ink.copy(alpha = 0.10f), spotColor = c.ink.copy(alpha = 0.10f))
+      .shadow(6.dp, shape, clip = false, ambientColor = c.ink.copy(alpha = 0.08f), spotColor = c.ink.copy(alpha = 0.08f))
       .clip(shape)
-      //  شب: کمی روشن‌تر از کارت تا جدا خوانده شود
-      .background(if (c.bg.red < 0.3f) lerp(c.card, c.ink, 0.07f) else c.card)
+      //  سطحِ درونی با مرز: روز سفید روی شیشه، شب `tile` روی کارت (VILL3N §۶)
+      .background(if (c.isDark) c.tile else c.card)
+      .border(1.dp, c.border, shape)
       .semantics(mergeDescendants = true) {},
     horizontalAlignment = Alignment.CenterHorizontally,
     verticalArrangement = Arrangement.Center,
@@ -684,7 +687,8 @@ private fun ProfileMenu(items: List<ProfileModel.MenuItem>, onClick: (ProfileMod
       .fillMaxWidth()
       .shadow(12.dp, shape, clip = false, ambientColor = c.ink.copy(alpha = 0.08f), spotColor = c.ink.copy(alpha = 0.08f))
       .clip(shape)
-      .background(c.cardGlass),
+      .background(c.cardGlass)
+      .border(1.dp, c.border, shape),
   ) {
     items.forEachIndexed { i, item ->
       if (i > 0) V3Divider()
@@ -730,6 +734,7 @@ private fun ProfileAvatar(accountId: String, version: Int, size: Dp, modifier: M
       .shadow(10.dp, CircleShape, clip = false, ambientColor = c.ink.copy(alpha = 0.12f), spotColor = c.ink.copy(alpha = 0.12f))
       .clip(CircleShape)
       .background(c.card)
+      .border(1.dp, c.border, CircleShape)
       .padding(4.dp)
       .clip(CircleShape)
       .background(Brush.linearGradient(listOf(c.tile, lerp(c.tile, c.inkMuted, 0.28f)))),
@@ -899,20 +904,25 @@ private fun v3FieldColors(c: PhoneV3Colors) = OutlinedTextFieldDefaults.colors(
   unfocusedTextColor = c.ink,
 )
 
-/** دکمهٔ اصلیِ تک‌رنگ: قرصِ سیاه با متنِ سفید (در شب برعکس) */
+/**
+ *  دکمهٔ اصلی (VILL3N §۷): روز برندِ #108B81 با متنِ سفید، شب #19A985 با متنِ تیره
+ *  (همان جفتِ `cart`/`onCart`)؛ غیرفعال کم‌رنگ.
+ */
 @Composable
 internal fun V3PrimaryButton(text: String, enabled: Boolean = true, onClick: () -> Unit) {
   val c = PhoneV3.colors
+  val bg = if (c.isDark) c.cart else c.accent
+  val fg = if (c.isDark) c.onCart else c.onAccent
   Box(
     Modifier
       .then(if (enabled) Modifier.v3PressScale(onClick, text) else Modifier)
       .fillMaxWidth()
       .height(52.dp)
       .clip(RoundedCornerShape(percent = 50))
-      .background(if (enabled) c.ink else c.ink.copy(alpha = 0.4f)),
+      .background(if (enabled) bg else c.hairline),
     contentAlignment = Alignment.Center,
   ) {
-    Text(text, style = v3Text(15, FontWeight.SemiBold, 22), color = c.card)
+    Text(text, style = v3Text(15, FontWeight.SemiBold, 22), color = if (enabled) fg else c.inkMuted)
   }
 }
 

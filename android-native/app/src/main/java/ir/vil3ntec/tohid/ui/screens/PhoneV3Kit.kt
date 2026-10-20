@@ -12,6 +12,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -56,6 +57,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Colors
+import ir.vil3ntec.tohid.ui.theme.PhoneV3Support
 import kotlinx.coroutines.delay
 
 /**
@@ -73,25 +75,31 @@ internal fun v3Text(size: Int, weight: FontWeight = FontWeight.Medium, line: Int
 
 private fun ms(full: Int): Int = if (Motion.enabled) full else 0
 
-/** زمینهٔ کاشیِ آیکنِ ردیف (r5): خاکستریِ خیلی روشن، نه رنگی */
-internal val PhoneV3Colors.iconTile: Color get() = lerp(card, bg, 0.75f)
+/** شب؟ (کارت و زمینهٔ تیره) */
+internal val PhoneV3Colors.isDark: Boolean get() = bg.red < 0.3f
+
+/** زمینهٔ کاشیِ آیکنِ ردیف (r5): سطحِ درونی، نه رنگی — روز نزدیکِ زمینه، شب `tile` */
+internal val PhoneV3Colors.iconTile: Color get() = if (isDark) tile else lerp(card, bg, 0.9f)
 
 /** پُرشدنِ ردیف هنگامِ فشار */
-internal val PhoneV3Colors.pressed: Color get() = lerp(card, bg, 0.9f)
+internal val PhoneV3Colors.pressed: Color get() = if (isDark) tile else lerp(card, bg, 0.9f)
+
+/** مرزِ دیدنیِ هر کارت در هر دو تم (VILL3N §۶: کارتِ سفید روی زمینهٔ روشن بی مرز نه) */
+internal val PhoneV3Colors.border: Color get() = hairline
 
 /**
  *  زمینهٔ مه‌گرفتهٔ «حساب من» (r4): خاکستریِ روشن با دو لکهٔ بزرگِ محوِ روشن و
  *  سایهٔ نرمِ پایین — نه یک‌دست. همه از توکن‌های `PhoneV3` ساخته می‌شوند.
  */
 internal fun Modifier.frosted(c: PhoneV3Colors): Modifier = drawBehind {
-  val dark = c.bg.red < 0.3f
+  val dark = c.isDark
   /*
-   *  r4: خاکستریِ سردِ یاسی با لکه‌های بزرگِ محو — سایهٔ تیره کنارِ زنگ و عکس، روشنِ
-   *  سرد پشتِ عنوان، یاسیِ کم‌رنگ پشتِ لبهٔ کارت، و دو لکهٔ دیگر در حاشیه‌های پایین.
-   *  تفاوتِ روشنی در سربرگ حدودِ ۶۰ از ۲۵۵ (مثلِ r4)؛ عنوانِ سیاه روی تیره‌ترین
-   *  جا هم بیش از ۹ به ۱ کنتراست دارد. جای لکه‌ها در راست‌به‌چپ قرینه است.
+   *  شکل از r4، رنگ از VILL3N: زمینهٔ خاکستری‌آبیِ روشن با لکه‌های بزرگِ محو —
+   *  سایهٔ سردِ کنارِ زنگ و عکس، روشن پشتِ عنوان، سبزآبیِ برند پشتِ لبهٔ کارت، آبیِ
+   *  کم‌رنگ در حاشیهٔ پایان و سبزآبیِ پشتیبان پایین. تفاوتِ روشنی در سربرگ ~۴۵ از
+   *  ۲۵۵؛ متنِ تیره روی تیره‌ترین جا هم بیش از ۷ به ۱. جای لکه‌ها در راست‌به‌چپ قرینه.
    */
-  val base = if (dark) c.bg else lerp(lerp(c.bg, c.inkMuted, 0.16f), c.accent, 0.035f)
+  val base = if (dark) c.bg else lerp(c.bg, c.inkMuted, 0.10f)
   drawRect(base)
   val w = size.width
   val h = size.height
@@ -102,14 +110,16 @@ internal fun Modifier.frosted(c: PhoneV3Colors): Modifier = drawBehind {
       center = Offset(w * (if (rtl) x else 1f - x), h * y), radius = w * r,
     ),
   )
-  val shade = if (dark) c.black else lerp(base, c.ink, 0.20f)
-  val cool = lerp(c.card, c.tile, 0.5f)
-  val lilac = lerp(c.tile, c.accent, 0.14f)
-  blob(0.10f, 0.15f, 0.60f, shade, 0.90f, 0.45f)
-  blob(0.80f, 0.04f, 0.65f, cool, if (dark) 0.60f else 0.95f, if (dark) 0.30f else 0.55f)
-  blob(0.58f, 0.25f, 0.55f, lilac, if (dark) 0.55f else 0.85f, if (dark) 0.25f else 0.40f)
-  blob(1.00f, 0.56f, 0.50f, if (dark) c.black else lerp(base, c.ink, 0.18f), 0.85f, 0.40f)
-  blob(0.00f, 0.86f, 0.60f, cool, if (dark) 0.45f else 0.90f, if (dark) 0.20f else 0.45f)
+  val shade = if (dark) c.black else lerp(base, c.ink, 0.16f)
+  val light = if (dark) lerp(c.card, c.tile, 0.6f) else c.card
+  val brand = lerp(c.card, c.accent, if (dark) 0.30f else 0.20f)
+  val sky = lerp(c.card, PhoneV3Support.blue, if (dark) 0.28f else 0.16f)
+  val mint = lerp(c.card, PhoneV3Support.teal, if (dark) 0.26f else 0.18f)
+  blob(0.10f, 0.15f, 0.60f, shade, 0.85f, 0.40f)
+  blob(0.80f, 0.04f, 0.65f, light, if (dark) 0.55f else 0.95f, if (dark) 0.25f else 0.55f)
+  blob(0.58f, 0.25f, 0.58f, brand, if (dark) 0.60f else 0.85f, if (dark) 0.25f else 0.40f)
+  blob(1.00f, 0.56f, 0.50f, sky, if (dark) 0.55f else 0.90f, if (dark) 0.22f else 0.45f)
+  blob(0.00f, 0.86f, 0.60f, mint, if (dark) 0.50f else 0.90f, if (dark) 0.20f else 0.45f)
 }
 
 /** پُرشدنِ نرمِ هنگامِ فشار + زدن؛ بی موجِ رنگی (r5) */
@@ -175,7 +185,8 @@ internal fun V3RoundButton(
         .size(size)
         .shadow(6.dp, CircleShape, clip = false, ambientColor = c.ink.copy(alpha = 0.10f), spotColor = c.ink.copy(alpha = 0.10f))
         .clip(CircleShape)
-        .background(c.card),
+        .background(c.card)
+        .border(1.dp, c.border, CircleShape),
       contentAlignment = Alignment.Center,
     ) {
       Icon(icon, contentDescription = description, tint = c.icon, modifier = Modifier.size(iconSize))
@@ -259,7 +270,7 @@ internal fun V3GroupTitle(text: String, modifier: Modifier = Modifier) {
   )
 }
 
-/** کارتِ سفیدِ گروه (r5): گوشهٔ ۱۸، بی خطِ دور و بی سایه */
+/** کارتِ گروه (شکلِ r5): گوشهٔ ۱۸ و مرزِ دیدنیِ ۱dp در هر دو تم (VILL3N §۶)، بی سایهٔ سنگین */
 @Composable
 internal fun V3Card(
   modifier: Modifier = Modifier,
@@ -267,11 +278,14 @@ internal fun V3Card(
   padding: PaddingValues = PaddingValues(vertical = 8.dp),
   content: @Composable ColumnScope.() -> Unit,
 ) {
+  val c = PhoneV3.colors
+  val shape = RoundedCornerShape(radius)
   Column(
     modifier
       .fillMaxWidth()
-      .clip(RoundedCornerShape(radius))
-      .background(PhoneV3.colors.card)
+      .clip(shape)
+      .background(c.card)
+      .border(1.dp, c.border, shape)
       .padding(padding),
     content = content,
   )
