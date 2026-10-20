@@ -318,6 +318,26 @@ test('دسته سقفِ خودِ سرور را رعایت می‌کند: ۲۰۰ 
   assert.ok(batch.length >= 1, 'دستِ‌کم یک op باید برود، وگرنه صف قفل می‌شود');
 });
 
+test('دسته وسطِ یک ثبت (یک ts) بریده نمی‌شود — همان قاعدهٔ OpQueue.cut ِ برنامه', () => {
+  //  ثبتِ اول ۱۵۰ op؛ ثبتِ دوم (برگشت: شمارنده‌های فاکتور و قلم پیش از ردیفِ برگشت) ۸۰ op
+  const q = new core.OpQueue(makeDisk().io, 'oplog');
+  const ops = [];
+  for (let i = 0; i < 150; i++) ops.push({ op_id: 'a' + i, ts: 1000, table: 'products', row_id: 'pa' + i, type: 'update', fields: { name: 'x' } });
+  for (let i = 0; i < 80; i++) ops.push({ op_id: 'b' + i, ts: 2000, table: 'saleItems', row_id: 'si' + i, type: 'update', fields: { returnedQty: { $inc: 1 } } });
+  q.push(ops);
+  const first = q.batch();
+  assert.equal(first.length, 150);
+  assert.ok(first.every((o) => o.ts === 1000));
+  //  ثبتی که خودش از سقف بزرگ‌تر است ناچار بریده می‌شود (دستهٔ خالی = صفِ قفل)
+  const big = new core.OpQueue(makeDisk().io, 'oplog');
+  const one = [];
+  for (let i = 0; i < 260; i++) one.push({ op_id: 'c' + i, ts: 3000, table: 'products', row_id: 'pc' + i, type: 'update', fields: { name: 'y' } });
+  big.push(one);
+  assert.equal(big.batch().length, 200);
+  //  ثبت کامل جا شد ⇒ همان دستهٔ همیشه
+  assert.equal(q.batch(500).length, 230);
+});
+
 test('فقط opهای پذیرفته‌شده از صف می‌روند؛ بقیه سرِ جایشان می‌مانند', () => {
   const q = new core.OpQueue(makeDisk().io, 'oplog');
   q.push([{ op_id: 'a' }, { op_id: 'b' }, { op_id: 'c' }]);

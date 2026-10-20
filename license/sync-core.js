@@ -656,6 +656,11 @@
    *
    *  ⚠️ و اگر خودِ یک op از سقف بزرگ‌تر باشد، باز هم تنها می‌رود:
    *  دستهٔ خالی یعنی صفی که تا ابد گیر کرده.
+   *
+   *  ⚠️ یک ثبت (همهٔ opهای یک diff، یک `ts`) وسطِ دو دسته بریده نمی‌شود — همان
+   *  `OpQueue.cut`ِ برنامه: سرِ سند (فاکتور، برگشت) و همراه‌هایش (شمارنده‌ها، قلم،
+   *  تراکنش) اگر جدا بروند، سرور ممکن بود سند را رد کند ولی شمارنده‌های دستهٔ پیش
+   *  نشسته باشند. مگر کلِ دسته همان یک ثبت باشد.
    */
   OpQueue.prototype.batch = function (maxOps, maxBytes) {
     var cap = maxOps || 200;
@@ -663,11 +668,18 @@
     var list = this.all();
     var out = [];
     var size = 2;
-    for (var i = 0; i < list.length && out.length < cap; i++) {
+    var i;
+    for (i = 0; i < list.length && out.length < cap; i++) {
       var s = utf8Bytes(JSON.stringify(list[i])).length + 1;
       if (out.length && size + s > bytes) break;
       size += s;
       out.push(list[i]);
+    }
+    var ts = out.length ? out[out.length - 1].ts : null;
+    if (i < list.length && typeof ts === 'number' && ts > 0 && list[i].ts === ts) {
+      var start = out.length - 1;
+      while (start > 0 && out[start - 1].ts === ts) start--;
+      if (start > 0) out = out.slice(0, start);
     }
     return out;
   };

@@ -3,6 +3,7 @@ package ir.vil3ntec.tohid.sync.v3
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.Sale
 import ir.vil3ntec.tohid.data.SaleItem
+import ir.vil3ntec.tohid.data.SaleReturn
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.StockMovement
 import ir.vil3ntec.tohid.sync.v1.SyncCommit
@@ -441,5 +442,25 @@ class SyncV3EngineTest {
     val moves = server.log.filter { it.rowId.startsWith("cnt-") }
     assertEquals(60, moves.size)
     assertTrue(moves.none { it.tx.startsWith("tx.") })
+  }
+
+  @Test fun returnRowsGoBeforeTheirCountersInsideTheTx() {
+    val server = FakeServer()
+    val a = Device("dev-a", server, baseData).also { assertTrue(it.sync().ok) }
+    a.edit { d ->
+      d.copy(
+        sales = d.sales.map { if (it.id == "s1") it.copy(debtSettled = 50.0) else it },
+        saleItems = d.saleItems.map { if (it.id == "si1") it.copy(returnedQty = 1.0) else it },
+        saleReturns = d.saleReturns + SaleReturn(id = "r1", saleId = "s1", saleItemId = "si1", productId = "p1", quantity = 1.0, amount = 115.5),
+      )
+    }
+    assertTrue(a.sync().ok)
+    val head = server.log.single { it.rowId == "r1" }
+    val counters = server.log.filter { (it.rowId == "s1" || it.rowId == "si1") && it.kind == "delta" }
+    assertEquals(2, counters.size)
+    //  سرِ برگشت پیش از شمارنده‌هایش، همه یک tx
+    assertTrue(counters.all { it.seq > head.seq })
+    assertTrue(head.tx.startsWith("tx."))
+    assertTrue(counters.all { it.tx == head.tx })
   }
 }
