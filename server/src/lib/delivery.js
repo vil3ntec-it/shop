@@ -876,6 +876,9 @@ async function putPhoto(shopId, assignmentId, body, actor) {
 }
 
 async function listPhotos(shopId, assignmentId) {
+  //  مأموریتِ دکانِ دیگر (یا ناموجود) همان ۴۰۴ِ بقیهٔ درهای شناسه‌دار است، نه «۲۰۰ و فهرستِ خالی»
+  const own = await one('SELECT 1 AS ok FROM delivery_assignments WHERE shop_id=$1 AND id=$2', [shopId, String(assignmentId || '')]);
+  if (!own) throw notFound('مأموریت پیدا نشد', 'assignment_not_found');
   const rows = await many(
     `SELECT id, assignment_id, order_id, courier_id, mime, size, hash, consent, device_time, created_at
        FROM delivery_photos WHERE shop_id=$1 AND assignment_id=$2 ORDER BY created_at, id`,
