@@ -57,7 +57,10 @@ fun WarehouseScreen(
   openProductId: String? = null,
   newBarcode: String? = null,
   onConsumed: () -> Unit = {},
+  /** «دفترِ موجودی» — فقط وقتی موتورِ تازهٔ موجودی و بها روشن است */
+  onStockBook: () -> Unit = {},
 ) {
+  val stockOn = ir.vil3ntec.tohid.data.StockLedger.isOn(d)
   val scope = rememberCoroutineScope()
 
   var search by rememberSaveable { mutableStateOf("") }
@@ -181,10 +184,24 @@ fun WarehouseScreen(
           Text("ورود کالا به انبار")
         }
         Spacer(Modifier.height(8.dp))
-        OutlinedButton(onClick = { stockCount = true }, modifier = Modifier.fillMaxWidth()) {
+        //  موتورِ تازه روشن ⇒ شمارش با بازبینی در «دفترِ موجودی» (INV-09/10)؛ خاموش ⇒ همان برگهٔ امروز
+        OutlinedButton(
+          onClick = { if (stockOn) { StockBookNav.tab.value = "count"; onStockBook() } else stockCount = true },
+          modifier = Modifier.fillMaxWidth(),
+        ) {
           Icon(Icons.Filled.Inventory2, contentDescription = null, modifier = Modifier.size(18.dp))
           Spacer(Modifier.width(6.dp))
           Text("انبارگردانی")
+        }
+        if (stockOn) {
+          Spacer(Modifier.height(8.dp))
+          OutlinedButton(onClick = onStockBook, modifier = Modifier.fillMaxWidth()) {
+            Icon(Icons.Filled.Inventory2, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+            Text("دفترِ موجودی — بها، سری، محل و دفترِ حرکت")
+          }
+          Spacer(Modifier.height(8.dp))
+          StockStrip(d, onStockBook)
         }
         Spacer(Modifier.height(8.dp))
         OutlinedButton(
@@ -448,11 +465,13 @@ fun WarehouseScreen(
       d = d,
       productId = productId,
       onDismiss = { adjustFor = null },
-      onSave = { quantity, increase, reason, kind ->
+      onSave = { quantity, increase, reason, kind, adjKind ->
         apply(
           WarehouseEngine.adjustStock(
             d, productId, quantity, increase, reason, kind,
             todayIso(), System.currentTimeMillis(), ::newId,
+            adjKind = adjKind,
+            userId = if (adjKind != null) runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrNull() else null,
           ),
           "با موفقیت ثبت شد",
         ) { adjustFor = null }

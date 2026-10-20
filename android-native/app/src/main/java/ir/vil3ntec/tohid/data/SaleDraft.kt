@@ -45,14 +45,16 @@ data class SaleDraft(
     val quantity: Double,
     val unitPrice: Double? = null,
     val label: String = "",
+    /** سریِ اسکن‌شده (افزودنی) */
+    val lotId: String? = null,
   )
 
-  fun cart(): List<SalesEngine.CartLine> = lines.map { SalesEngine.CartLine(it.productId, it.quantity, it.unitPrice, it.label) }
+  fun cart(): List<SalesEngine.CartLine> = lines.map { SalesEngine.CartLine(it.productId, it.quantity, it.unitPrice, it.label, it.lotId) }
 
   companion object {
     fun of(key: String?, cart: List<SalesEngine.CartLine>, debtorId: String?, now: Long) = SaleDraft(
       key = key,
-      lines = cart.map { Line(it.productId, it.quantity, it.unitPrice, it.label) },
+      lines = cart.map { Line(it.productId, it.quantity, it.unitPrice, it.label, it.lotId) },
       debtorId = debtorId,
       savedAt = now,
     )

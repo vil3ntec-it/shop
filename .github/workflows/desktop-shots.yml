@@ -87,6 +87,11 @@ jobs:
           S="$S;go:team;wait:1500;shot:15-team"
           S="$S;go:devices;wait:1500;shot:15b-devices"
           S="$S;go:vip;wait:1500;shot:15c-subscription-offline-code"
+          #  دفترِ موجودی (موتورِ تازهٔ موجودی و بها): خاموش ⇐ روشن با همان راهِ تنظیمات ⇐ زبانه‌ها، انتقال، انبار
+          S="$S;go:stockbook;wait:1500;shot:20-stockbook-off;stock:on;wait:3000;shot:20b-stockbook-positions"
+          S="$S;stocktab:ledger;wait:1500;shot:20c-stockbook-ledger;stocktab:review;wait:1200;shot:20d-stockbook-review"
+          S="$S;stockcount:4;stocktab:count;wait:1800;shot:20e-stockbook-count;stock:transfer;wait:1200;shot:20f-stockbook-transfer;key:ESCAPE;wait:800"
+          S="$S;go:warehouse;wait:1800;shot:20g-warehouse-stock-on"
           S="$S;go:dashboard;key:F11;wait:2000;shot:16-fullscreen-dashboard"
           S="$S;help:on;wait:1500;shot:17-shortcuts-F1;help:off"
           S="$S;key:F11;wait:1500;theme:DARK;go:products;wait:1500;shot:18-products-dark;prodsel:2;wait:800;shot:18b-products-dark-bulk;prodsel:0;go:dashboard;wait:1500;shot:19-dashboard-dark;theme:LIGHT"

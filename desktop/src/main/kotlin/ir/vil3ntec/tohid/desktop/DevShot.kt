@@ -62,6 +62,17 @@ object DevShot {
               //  محصولات: نما (prodview:card|table) و انتخابِ n ردیفِ اولِ فهرست (prodsel:3 — نوارِ کارِ گروهی)
               "prodview" -> { java.awt.EventQueue.invokeAndWait { ir.vil3ntec.tohid.ui.screens.DeskProductsShot.view.value = arg }; Thread.sleep(1200) }
               "prodsel" -> { java.awt.EventQueue.invokeAndWait { ir.vil3ntec.tohid.ui.screens.DeskProductsShot.select.value = arg.toInt() }; Thread.sleep(1000) }
+              //  دفترِ موجودی: stock:on (روشن کردنِ تنظیم با همان راهِ کارتِ تنظیمات) · stock:transfer (پنجرهٔ انتقال)
+              //  · stocktab:pos|ledger|review|count · stockcount:n (شمارشِ نمونهٔ n کالا)
+              "stock" -> {
+                java.awt.EventQueue.invokeAndWait {
+                  if (arg == "transfer") ir.vil3ntec.tohid.ui.screens.StockBookNav.transfer.value = true
+                  else ir.vil3ntec.tohid.ui.screens.StockBookNav.enable.value = arg == "on"
+                }
+                Thread.sleep(1500)
+              }
+              "stocktab" -> { java.awt.EventQueue.invokeAndWait { ir.vil3ntec.tohid.ui.screens.StockBookNav.tab.value = arg }; Thread.sleep(1200) }
+              "stockcount" -> { java.awt.EventQueue.invokeAndWait { ir.vil3ntec.tohid.ui.screens.StockBookNav.count.value = arg.toInt() }; Thread.sleep(1200) }
               //  تم: theme:DARK|LIGHT|SYSTEM — همان درخواستِ نوارِ منو (`AppNav.theme`)
               "theme" -> { java.awt.EventQueue.invokeAndWait { ir.vil3ntec.tohid.ui.AppNav.theme.value = arg }; Thread.sleep(1500) }
               "scroll" -> { robot.mouseWheel(arg.toInt()); Thread.sleep(600) }

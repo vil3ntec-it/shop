@@ -385,6 +385,9 @@ private fun PurchaseDialog(
   onSave: (LedgerEngine.PurchaseDraft) -> Unit,
 ) {
   var productId by remember { mutableStateOf<String?>(null) }
+  val stockOn = ir.vil3ntec.tohid.data.StockLedger.isOn(d)
+  var landed by remember { mutableStateOf("") }
+  val context = androidx.compose.ui.platform.LocalContext.current
   var quantity by remember { mutableStateOf("") }
   var price by remember { mutableStateOf("") }
   var paid by remember { mutableStateOf("") }
@@ -453,6 +456,12 @@ private fun PurchaseDialog(
         Spacer(Modifier.height(12.dp))
         AmountField(paid, { paid = it }, "پرداخت‌شده (خالی یعنی نسیه)")
 
+        //  موتورِ تازهٔ موجودی (روشن): هزینهٔ جانبی (PUR-06) — روی بهای کالا، نه بدهیِ تأمین‌کننده
+        if (stockOn) {
+          Spacer(Modifier.height(12.dp))
+          NumberField(landed, { landed = it }, "هزینهٔ جانبی (کرایه، گمرک) — اختیاری", Modifier.fillMaxWidth())
+        }
+
         Spacer(Modifier.height(12.dp))
         DateField(date) { date = it }
 
@@ -475,6 +484,8 @@ private fun PurchaseDialog(
                   paidAmount = paid.toDoubleOrNull() ?: 0.0,
                   date = date,
                   notes = notes.trim(),
+                  landedCost = if (!stockOn) null else if (landed.isBlank()) 0.0 else landed.toDoubleOrNull() ?: -1.0,
+                  userId = if (!stockOn) null else runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrNull(),
                 )
               )
             },

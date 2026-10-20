@@ -174,7 +174,9 @@ fun SaleScreen(
       toast("${hit.count} کالا با این بخشِ بارکد می‌خوانند — کد را کامل کنید یا از فهرست انتخاب کنید")
       return
     }
-    val productId = (hit as? BarcodeMatch.Hit.Product)?.id
+    //  موتورِ تازهٔ موجودی (روشن): بارکدِ ناشناس که «سری»ِ یک کالاست ⇒ همان کالا، و فروش اول از همین سری
+    val lotHit = if (hit is BarcodeMatch.Hit.Product) null else ir.vil3ntec.tohid.data.StockActions.lotForCode(d, code)
+    val productId = (hit as? BarcodeMatch.Hit.Product)?.id ?: lotHit?.first
     if (productId == null) {
       ScanFeedback.unknown(context)
       // بارکد گم نمی‌شود: هم در کادرِ دستی می‌ماند، هم می‌شود همان‌جا
@@ -202,7 +204,7 @@ fun SaleScreen(
     val added = SalesEngine.addToCartCapped(
       cartStore.lines.value, productId, multiplier.toDouble(), ShopStore.stock(d, productId),
     )
-    cartStore.set(added.cart)
+    cartStore.set(if (lotHit != null) SalesEngine.setLineLot(added.cart, productId, lotHit.second) else added.cart)
     selectedId = productId
     if (added.capped) {
       ScanFeedback.unknown(context)
@@ -212,7 +214,13 @@ fun SaleScreen(
       //  اگر از نیمهٔ بارکد شناخته شد، همان را بگو — فروشنده باید بداند
       //  که کدِ کامل خوانده نشده، تا اگر کالا آن نبود بفهمد
       val whole = (hit as? BarcodeMatch.Hit.Product)?.exact ?: true
-      toast(if (whole) "${product.name} به سبد اضافه شد" else "${product.name} — از نیمهٔ بارکد شناخته شد")
+      toast(
+        when {
+          lotHit != null -> "${product.name} — سری ${lotHit.second} به سبد اضافه شد"
+          whole -> "${product.name} به سبد اضافه شد"
+          else -> "${product.name} — از نیمهٔ بارکد شناخته شد"
+        }
+      )
     }
   }
 
