@@ -225,6 +225,7 @@ const MOUNTS = {
   'admin-shop-chat.js': '/admin/shop-chat',
   'admin-image-bank.js': '/admin/image-bank',
   'admin-release.js': '/admin/release',
+  'admin-trust.js': '/admin/trust',
 };
 const PUBLIC = new Set(['POST /admin/login']);   // تنها درِ بی‌توکن: خودِ ورود
 

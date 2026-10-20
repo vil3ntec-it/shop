@@ -105,12 +105,21 @@ class SyncStateV1(context: Context, private val accountKey: String) {
     get() = prefs.getBoolean("errorReports", true)
     set(v) = prefs.edit().putBoolean("errorReports", v).apply()
 
+  /**
+   *  A00: بزرگ‌ترین `op_id` ِ صف در نخستین شروع پس از به‌روزرسانی از ساختِ پیش از A00
+   *  (`SyncCommit.start`)؛ "" یعنی هیچ. با `commit()` ِ هم‌زمان، چون باید پیش از مهرِ سایه
+   *  روی دیسک باشد.
+   */
+  var legacyOpsUpTo: String
+    get() = prefs.getString(k("legacyOpsUpTo"), "") ?: ""
+    set(v) { prefs.edit().putString(k("legacyOpsUpTo"), v).commit() }
+
   fun reset() {
     prefs.edit()
       .remove(k("cursor")).remove(k("shadow")).remove(k("lastOkAt"))
       .remove(k("lastPushAt")).remove(k("lastPullAt")).remove(k("lastError"))
       .remove(k("holding")).remove(k("upgrade")).remove(k("serverSchema"))
-      .remove(k("snapshotAt"))
+      .remove(k("snapshotAt")).remove(k("legacyOpsUpTo"))
       .apply()
   }
 }
