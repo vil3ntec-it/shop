@@ -122,9 +122,11 @@ private fun PhonePreviewContent(screen: String, store: ShopStore, dark: Boolean)
         }
         QuickSaleScreen(store, cartStore, data, snackbar) {}
         }
-        //  مثلِ `AppRoot`: نوارِ پایین زیرِ نوارِ سبد، و تا برگه باز است کنار می‌رود
-        if (!PhoneCartUi.sheetOpen.value) PhoneNavBar(tabs = PREVIEW_TABS, current = "sale", onPick = {})
+        //  نسخهٔ ۳: صندوقِ گوشی تمام‌صفحه است و نوارِ پایین رویش نمی‌آید (r3 — نوارِ سبد جایش است)
+        if (!PhoneCartUi.saleActive.value && !PhoneCartUi.sheetOpen.value) PhoneNavBar(tabs = PREVIEW_TABS, current = "sale", onPick = {})
       }
+      //  گوشی نسخهٔ ۳، صندوق (r3 بسته / r2 باز): v3cart-closed|open|empty|long|long-open|scan
+      in PHONE_V3_CART -> Box(Modifier.weight(1f).fillMaxWidth()) { PhoneV3CartPreview(screen, store, data, snackbar) }
       //  phone-v3-home: خانهٔ r7/r6/r8، نوارِ r10 و ویرایشگرش (`PhoneV3HomePreview`)
       //  «nav» (عکسِ 20-phone-nav) هم همان خانه با نوارِ r10 روی آن، مثلِ `AppRoot`
       else -> if (screen.startsWith("v3home") || screen == "nav") Box(Modifier.weight(1f).fillMaxWidth()) {
