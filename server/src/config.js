@@ -274,9 +274,13 @@ const config = {
     storeCheckoutMax: num(process.env.RATE_STORE_CHECKOUT_MAX, 20),
     //  بازارچه (`/api/market/*`): خواندن سطلِ خودش را با `generalMax` دارد؛
     //  جست‌وجوی کالا در همهٔ دکان‌ها گران‌تر است ⇒ سطلِ تنگ‌ترِ خودش، به‌ازای IP.
-    //  بازبینیِ امنیتی: ۳۰۰ ⇒ ۶۰ در ربع ساعت، و سقفِ ضربه‌ای در دقیقه
-    marketSearchMax: num(process.env.RATE_MARKET_SEARCH_MAX, 60),
-    marketSearchBurstMax: num(process.env.RATE_MARKET_SEARCH_BURST_MAX, 10),
+    //  بازبینیِ امنیتی سقفِ ضربه‌ای در دقیقه گذاشت. ⚠️ اپراتورهای موبایل (CGNAT) صدها
+    //  مشتری را پشتِ یک IP می‌برند؛ ۱۰ در دقیقه و ۶۰ در ربع ساعت یعنی مشتریِ عادی ۴۲۹ می‌گرفت.
+    //  حالا ۳۰ در دقیقه و ۳۰۰ در ربع ساعت (میانگینِ ۲۰ در دقیقه). سپرِ دیتابیس فقط این سقف
+    //  نیست: برشِ یک‌پروازِ دکان‌ها (eligibleCacheMs)، نمایهٔ باریکِ market_search، دست‌کم دو
+    //  حرف و سقفِ نتیجه سرِ جایشان‌اند.
+    marketSearchMax: num(process.env.RATE_MARKET_SEARCH_MAX, 300),
+    marketSearchBurstMax: num(process.env.RATE_MARKET_SEARCH_BURST_MAX, 30),
   },
 
   /**
