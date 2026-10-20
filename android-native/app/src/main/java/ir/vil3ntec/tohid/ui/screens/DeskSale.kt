@@ -307,7 +307,7 @@ fun DeskSaleScreen(
             unfocusedContainerColor = c.fieldBg,
             focusedContainerColor = c.fieldBg,
             unfocusedBorderColor = c.fieldBorder,
-            focusedBorderColor = c.primary,
+            focusedBorderColor = c.focus,
           ),
           leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null, tint = c.muted) },
           placeholder = { Text("بارکد را بخوانید یا نامِ کالا را بنویسید — ۳* پیش از آن یعنی سه تا", maxLines = 1, overflow = TextOverflow.Ellipsis, color = c.muted) },

@@ -193,8 +193,9 @@ fun ProductCard(
       .softCard(c, ShopShape.card, fill = if (highlighted) c.primaryTint.compositeOver(c.surface) else c.surface)
       .then(
         when {
-          highlighted -> Modifier.border(2.dp, c.primary, ShopShape.card)
-          inCart > 0 -> Modifier.border(1.5.dp, c.primary.copy(alpha = 0.45f), ShopShape.card)
+          //  VILL3N: گزینهٔ فعال خطِ برند می‌گیرد (پررنگ برای کلید، نازک برای «در سبد»)
+          highlighted -> Modifier.border(2.dp, c.focus, ShopShape.card)
+          inCart > 0 -> Modifier.border(1.5.dp, c.brandPrimary, ShopShape.card)
           else -> Modifier
         },
       )
@@ -225,10 +226,10 @@ fun ProductCard(
       if (inCart > 0) {
         Text(
           "×${qty(inCart)}",
-          Modifier.clip(ShopShape.chip).background(c.primary).padding(horizontal = 8.dp, vertical = 2.dp),
+          Modifier.clip(ShopShape.chip).background(c.button.primary.bg).padding(horizontal = 8.dp, vertical = 2.dp),
           style = MaterialTheme.typography.labelMedium.tabular(),
           fontWeight = FontWeight.Bold,
-          color = MaterialTheme.colorScheme.onPrimary,
+          color = c.button.primary.text,
           maxLines = 1,
         )
       }

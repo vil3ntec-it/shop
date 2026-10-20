@@ -63,7 +63,7 @@ private fun CategoryChip(cat: PosCategory, on: Boolean, target: Dp, onClick: () 
       .heightIn(min = target)
       .clip(ShopShape.chip)
       .background(if (on) c.primaryTint else c.surface)
-      .then(if (on) Modifier.border(1.dp, c.primary.copy(alpha = 0.35f), ShopShape.chip) else Modifier.border(1.dp, c.border, ShopShape.chip))
+      .then(if (on) Modifier.border(1.dp, c.focus, ShopShape.chip) else Modifier.border(1.dp, c.border, ShopShape.chip))
       .selectable(selected = on, role = Role.Tab, onClick = onClick)
       .padding(horizontal = 14.dp),
     verticalAlignment = Alignment.CenterVertically,
