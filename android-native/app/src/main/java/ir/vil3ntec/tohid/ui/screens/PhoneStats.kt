@@ -67,6 +67,7 @@ import ir.vil3ntec.tohid.data.ReportEngine
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
+import ir.vil3ntec.tohid.ui.theme.PhoneV3Palette
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -144,13 +145,13 @@ fun PhoneStatsPage(d: ShopData, bottomReserve: Dp, pages: Int, currentPage: Int,
     PairedBars(view.bars, Modifier.fillMaxWidth().height(236.dp), key = period)
     Spacer(Modifier.height(14.dp))
     Row(horizontalArrangement = Arrangement.spacedBy(20.dp), verticalAlignment = Alignment.CenterVertically) {
-      StatsLegend(salesInk(), "فروش")
-      StatsLegend(p.accent, "مصارف و خرید")
+      StatsLegend(PhoneV3Palette.chartSales(p), "فروش")
+      StatsLegend(PhoneV3Palette.chartCost(p), "مصارف و خرید")
     }
     Spacer(Modifier.height(24.dp))
     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
       MoneyCard("فروش", view.periodSales, p.accentDeep, Icons.Rounded.ArrowDownward, Modifier.weight(1f))
-      MoneyCard("مصارف و خرید", view.periodSpend, p.accent, Icons.Rounded.ArrowUpward, Modifier.weight(1f))
+      MoneyCard("مصارف و خرید", view.periodSpend, PhoneV3Palette.chartCost(p), Icons.Rounded.ArrowUpward, Modifier.weight(1f))
     }
     Spacer(Modifier.height(bottomReserve + navBottom + 20.dp))
   }
@@ -214,9 +215,9 @@ private fun PairedBars(bars: List<StatsBar>, modifier: Modifier, key: Any) {
   val axis = StatsBuckets.axisMax(maxV)
   val axisStyle = MaterialTheme.typography.labelMedium.copy(color = p.inkMuted, fontSize = 12.sp)
   val labelStyle = MaterialTheme.typography.labelMedium.copy(color = p.inkMuted, fontSize = 12.sp)
-  val dark = salesInk()
-  val purple = p.accent
-  val grid = p.hairline
+  val dark = PhoneV3Palette.chartSales(p)
+  val purple = PhoneV3Palette.chartCost(p)
+  val grid = PhoneV3Palette.chartGrid(p)
   val desc = bars.joinToString("، ") { "${it.label}: فروش ${money(it.sales)}، مصارف ${money(it.spend)}" }
   Canvas(modifier.semantics { contentDescription = desc }) {
     val labelH = 26.dp.toPx()
@@ -261,13 +262,6 @@ private fun PairedBars(bars: List<StatsBar>, modifier: Modifier, key: Any) {
       drawText(t, topLeft = Offset(center - t.size.width / 2f, size.height - t.size.height.toFloat()))
     }
   }
-}
-
-/** ستونِ «فروش»: سیاهِ r8؛ در شب همان رنگِ متن تا روی زمینهٔ تیره دیده شود */
-@Composable
-private fun salesInk(): Color {
-  val p = PhoneV3.colors
-  return if (p === ir.vil3ntec.tohid.ui.theme.PhoneV3Dark) p.ink else p.black
 }
 
 /** دو کارتِ بنفشِ پایینِ r8: آیکنِ گرد با پیکان، برچسب، مبلغِ سفید و نقشِ پیکانِ بزرگ */

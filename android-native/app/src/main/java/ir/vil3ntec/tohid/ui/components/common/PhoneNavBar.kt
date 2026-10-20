@@ -139,11 +139,11 @@ object PhoneNav {
     else -> Icons.Filled.Menu
   }
 
-  /** دایرهٔ خاکستریِ موردِ فعال — روز همان زمینهٔ صفحه، شب کمی روشن‌تر از قرص */
-  fun highlight(p: PhoneV3Colors) = if (p === PhoneV3Dark) p.hairline else p.bg
+  /** دایرهٔ موردِ فعال — surfaceSelectedِ VILL3N (شکلِ r10: دایرهٔ روشن زیرِ آیکنِ پُر) */
+  fun highlight(p: PhoneV3Colors) = ir.vil3ntec.tohid.ui.theme.PhoneV3Palette.selected(p)
 
-  /** لبهٔ خاکستریِ روشنِ هر تکه (r10) — بی آن، سفید روی صفحهٔ سفید گم می‌شد */
-  fun edge(p: PhoneV3Colors) = if (p === PhoneV3Dark) p.hairline else p.chevron.copy(alpha = 0.55f)
+  /** لبهٔ هر تکه = borderCard؛ بی آن، سفید روی صفحهٔ سفید گم می‌شد */
+  fun edge(p: PhoneV3Colors) = p.hairline
 }
 
 /**
@@ -320,7 +320,7 @@ private fun NavIcon(
       .graphicsLayer { scaleX = press * bounce.value; scaleY = press * bounce.value },
     contentAlignment = Alignment.Center,
   ) {
-    val tint = if (active) p.ink else p.icon
+    val tint = if (active) ir.vil3ntec.tohid.ui.theme.PhoneV3Palette.iconActive(p) else p.icon
     Icon(PhoneNav.icon(id, false), null, tint = tint, modifier = Modifier.size(24.dp).graphicsLayer { alpha = 1f - filled })
     Icon(PhoneNav.icon(id, true), null, tint = tint, modifier = Modifier.size(24.dp).graphicsLayer { alpha = filled })
   }

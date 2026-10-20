@@ -75,7 +75,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -104,7 +103,7 @@ import ir.vil3ntec.tohid.sync.v1.SyncDot
 import ir.vil3ntec.tohid.ui.OrdersLive
 import ir.vil3ntec.tohid.ui.components.common.PhoneNav
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
-import ir.vil3ntec.tohid.ui.theme.PhoneV3Glyph
+import ir.vil3ntec.tohid.ui.theme.PhoneV3Palette
 import kotlinx.coroutines.launch
 
 /**
@@ -414,7 +413,7 @@ private fun HomeHeader(
   val sheetRadius = 26.dp
   val zone = top + headerContent + card
   val purple = Brush.linearGradient(
-    listOf(lerp(p.accentDeep, p.accent, 0.55f), p.accentDeep),
+    listOf(p.accent, p.accentDeep),
     start = Offset(Float.POSITIVE_INFINITY, 0f),
     end = Offset(0f, Float.POSITIVE_INFINITY),
   )
@@ -561,6 +560,15 @@ fun PressBox(
   ) { content() }
 }
 
+/** رنگِ هر کاشی از پالتِ پشتیبانِ VILL3N — ثابت برای هر بخش، نه به ترتیبِ جا */
+private fun tileHue(id: String): PhoneV3Palette.Hue = when (id) {
+  "products", "receipts", "more" -> PhoneV3Palette.Hue.BRAND
+  "warehouse", "orders" -> PhoneV3Palette.Hue.ORANGE
+  "debtors", "team" -> PhoneV3Palette.Hue.BLUE
+  "expenses", "sales" -> PhoneV3Palette.Hue.PURPLE
+  else -> PhoneV3Palette.Hue.TEAL
+}
+
 /** r7: نشانهٔ پُر و رنگی روی کاشیِ روشن — تنها جای آیکنِ پُرِ رنگی در گوشی (SPEC §D) */
 private fun tileIcon(id: String): ImageVector = when (id) {
   "products" -> Icons.Rounded.LocalOffer
@@ -591,7 +599,7 @@ private fun SectionsGrid(tiles: List<HomeSections.Tile>, onOpen: (String) -> Uni
                 Modifier.fillMaxSize().clip(RoundedCornerShape(PhoneV3.tileRadius)).background(p.tile),
                 contentAlignment = Alignment.Center,
               ) {
-                Icon(tileIcon(t.id), contentDescription = null, tint = PhoneV3Glyph.of(p, i), modifier = Modifier.size(28.dp))
+                Icon(tileIcon(t.id), contentDescription = null, tint = PhoneV3Palette.glyph(p, tileHue(t.id)), modifier = Modifier.size(28.dp))
                 if (t.id == "orders" && OrdersLive.newCount > 0) Box(
                   Modifier.align(Alignment.TopEnd).padding(8.dp).size(8.dp).clip(CircleShape).background(p.negative),
                 )
