@@ -44,7 +44,12 @@ import ir.vil3ntec.tohid.ui.components.common.PhoneNavBar
 import ir.vil3ntec.tohid.ui.components.common.NavLayouts
 import ir.vil3ntec.tohid.ui.components.common.PhoneNav
 import androidx.compose.ui.Alignment
+import ir.vil3ntec.tohid.data.DebtTransaction
+import ir.vil3ntec.tohid.data.Debtor
+import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.ui.screens.DashboardScreen
+import ir.vil3ntec.tohid.ui.screens.DebtorsScreen
+import ir.vil3ntec.tohid.ui.screens.PhoneDebtorsShot
 import ir.vil3ntec.tohid.ui.screens.ProfileScreen
 import ir.vil3ntec.tohid.ui.screens.ProfileModel
 import ir.vil3ntec.tohid.ui.screens.ProfileShot
@@ -182,6 +187,14 @@ private fun PhonePreviewContent(screen: String, store: ShopStore, dark: Boolean)
         //  نسخهٔ ۳: صندوقِ گوشی تمام‌صفحه است و نوارِ پایین رویش نمی‌آید (r3 — نوارِ سبد جایش است)
         if (!PhoneCartUi.saleActive.value && !PhoneCartUi.sheetOpen.value) PhoneNavBar(tabs = PREVIEW_TABS, current = "sale", onPick = {})
       }
+      //  قرض‌دارانِ گوشی (r9): سه نفرِ r9، هشت نفر با نام و مبلغِ بلند، و خالی — با دفترِ ساختگیِ خودش
+      "debtors-r9", "debtors-many", "debtors-empty" -> Box(Modifier.weight(1f).fillMaxWidth()) {
+        val demo = remember(screen) { debtorsDemo(screen, System.currentTimeMillis()) }
+        //  میکروفونِ کادرِ جستجو همان‌طور که اندروید نشان می‌دهد (کامپیوتر خودش پنهانش می‌کند)
+        LaunchedEffect(Unit) { PhoneDebtorsShot.mic.value = true }
+        //  پوستهٔ v3: قرض‌داران از «بیشتر» باز می‌شود ⇒ سربرگِ خودِ صفحه با برگشت
+        DebtorsScreen(store, demo, snackbar, showHeader = true, onBack = {})
+      }
       //  گوشی نسخهٔ ۳، صندوق (r3 بسته / r2 باز): v3cart-closed|open|empty|long|long-open|scan
       in PHONE_V3_CART -> Box(Modifier.weight(1f).fillMaxWidth()) { PhoneV3CartPreview(screen, store, data, snackbar) }
       //  phone-v3-home: خانهٔ r7/r6/r8، نوارِ r10 و ویرایشگرش (`PhoneV3HomePreview`)
@@ -194,5 +207,60 @@ private fun PhonePreviewContent(screen: String, store: ShopStore, dark: Boolean)
         PhoneNavBar(tabs = PREVIEW_TABS, current = "dashboard", onPick = {})
       }
     }
+  }
+}
+
+/**
+ *  دفترِ ساختگیِ عکس‌های قرض‌داران — فقط قرض‌دار و تراکنش، بی‌ربط به دفترِ نمایشی.
+ *
+ *  • r9: همان سه نفرِ r9 — «جلیل» ۱٬۰۰۰ بی شماره، «haroon» ۶۰۰ با شماره (هر دو
+ *    شش روز)، و «haroon» ِ صاف با رسیدِ ۱۰٬۰۰۰.
+ *  • many: هشت نفر با نامِ بلند، مبلغِ درشت، قرضِ کهنه، موجودی‌دار و صاف.
+ *  • empty: هیچ.
+ */
+private fun debtorsDemo(screen: String, now: Long): ShopData {
+  val day = 86_400_000L
+  var seq = 0
+  fun tx(debtorId: String, type: String, amount: Double, daysAgo: Long) =
+    DebtTransaction(id = "demo-t${seq++}", debtorId = debtorId, type = type, amount = amount, createdAt = now - daysAgo * day)
+  return when (screen) {
+    "debtors-r9" -> ShopData(
+      debtors = listOf(
+        Debtor(id = "r9-j", name = "جلیل"),
+        Debtor(id = "r9-h6", name = "haroon", phone = "0792236008"),
+        Debtor(id = "r9-h0", name = "haroon"),
+      ),
+      transactions = listOf(
+        tx("r9-j", "give", 1000.0, 6),
+        tx("r9-h6", "give", 600.0, 6),
+        tx("r9-h0", "give", 10000.0, 9),
+        tx("r9-h0", "receive", 10000.0, 2),
+      ),
+    )
+    "debtors-many" -> ShopData(
+      debtors = listOf(
+        Debtor(id = "m1", name = "محمد عبدالرحیم صدیقی"),
+        Debtor(id = "m2", name = "عبدالرحمن نورزاد", phone = "+93700123456"),
+        Debtor(id = "m3", name = "Mohammad Haroon Rahimi"),
+        Debtor(id = "m4", name = "شرکت ترانسپورتی برادران حیدری", phone = "0799111222"),
+        Debtor(id = "m5", name = "زرغونه"),
+        Debtor(id = "m6", name = "گل‌احمد"),
+        Debtor(id = "m7", name = "نجیب‌الله", phone = "0788000111"),
+        Debtor(id = "m8", name = "فریدون"),
+      ),
+      transactions = listOf(
+        tx("m1", "give", 12_345_678.0, 12),
+        tx("m2", "give", 4_500_000.0, 3),
+        tx("m3", "give", 987_654.0, 64),
+        tx("m4", "give", 250_000.0, 45),
+        tx("m5", "give", 8_000.0, 20),
+        tx("m5", "receive", 8_000.0, 5),
+        tx("m6", "receive", 1_500.0, 2),
+        tx("m7", "give", 75.0, 0),
+        tx("m8", "give", 3_000_000.0, 400),
+        tx("m8", "receive", 120_000.0, 30),
+      ),
+    )
+    else -> ShopData()
   }
 }
