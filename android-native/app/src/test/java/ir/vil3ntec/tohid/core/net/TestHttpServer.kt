@@ -20,7 +20,14 @@ import java.util.concurrent.atomic.AtomicInteger
 class TestHttpServer {
 
   /** آنچه از یک درخواست لازم داریم */
-  class Request(val method: String, val path: String, val bearer: String, val body: String)
+  class Request(
+    val method: String,
+    val path: String,
+    val bearer: String,
+    val body: String,
+    /** همهٔ سرآیندها با نامِ کوچک — مثلاً `idempotency-key` */
+    val headers: Map<String, String> = emptyMap(),
+  )
 
   private val socket = ServerSocket(0, 16, InetAddress.getByName("127.0.0.1"))
   private val routes = HashMap<String, (Request) -> Pair<Int, String>>()
@@ -66,11 +73,13 @@ class TestHttpServer {
 
       var bearer = ""
       var length = 0
+      val headers = HashMap<String, String>()
       while (true) {
         val header = readLine(input) ?: break
         if (header.isEmpty()) break
         val name = header.substringBefore(':').trim().lowercase()
         val value = header.substringAfter(':').trim()
+        headers[name] = value
         if (name == "authorization") bearer = value.removePrefix("Bearer ")
         if (name == "content-length") length = value.toIntOrNull() ?: 0
       }
@@ -91,7 +100,7 @@ class TestHttpServer {
         404 to """{"error":{"code":"not_found","message":"این مسیر وجود ندارد"}}"""
       } else {
         counts[path]?.incrementAndGet()
-        handler(Request(method, path, bearer, body))
+        handler(Request(method, path, bearer, body, headers))
       }
 
       val payload = text.toByteArray(Charsets.UTF_8)

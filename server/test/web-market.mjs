@@ -467,8 +467,11 @@ for (const [lang, dir, cur, title] of [['en', 'ltr', 'AFN', 'Checkout'], ['ps', 
   await p.goto(`http://${ga.slug}.vill3n.top:${server.address().port}/`);
   await p.waitForSelector('#products li[data-id]', { timeout: 15000 });
   ok((await p.textContent('#store-title')) === 'سوپرمارکتِ آزمایشی' && (await p.locator('#products li[data-id]').count()) === 2, 'نشانیِ دکان (کیو‌آر): مستقیم همان دکان با کالاهایش');
-  const top = await p.evaluate(() => document.getElementById('products').getBoundingClientRect().top);
-  ok(top < 844, 'کالاها در همان نمای اول (بی پیمایش)', `${Math.round(top)}px`);
+  //  «پیشنهادِ همین دکان» (#301: پرفروش یا تازهٔ واقعی) هم کالای همین دکان است
+  const top = await p.evaluate(() => document.querySelector('li.p-card').getBoundingClientRect().top);
+  ok(top < 844 - 120, 'کالاهای همین دکان در همان نمای اول (بی پیمایش)', `${Math.round(top)}px`);
+  ok(await p.isVisible('#picks') && (await p.locator('#picks-list li.p-card').count()) > 0 && /تازه|پرفروش/.test(await p.textContent('#picks-why')),
+    '«پیشنهادِ همین دکان» فقط از دادهٔ واقعیِ #301 (تازه‌های ۳۰ روز / پرفروشِ k-گمنام)', await p.textContent('#picks-why'));
   await c.close();
   await sub.close();
 }

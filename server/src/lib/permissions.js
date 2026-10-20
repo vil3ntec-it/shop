@@ -73,6 +73,11 @@ const MATRIX = {
   'chat.view':            ['owner', 'manager', 'staff'],
   'chat.reply':           ['owner', 'manager', 'staff'],
   'chat.moderate':        ['owner', 'manager'],
+
+  //  شکایت و تخلفِ بازارچه (v3 §۳۸.۶) — پشتِ پرچمِ `market.trust`، پیش‌فرض خاموش.
+  //  دیدنِ پرونده‌های دکان، پاسخ و اعتراض فقط صاحب و مدیر؛ هویتِ شاکی برای هیچ‌کدام نیست.
+  'trust.view':           ['owner', 'manager'],
+  'trust.respond':        ['owner', 'manager'],
 };
 
 function can(role, permission) {
