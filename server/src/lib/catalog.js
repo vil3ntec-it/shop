@@ -115,6 +115,11 @@ function atOf(d, at) {
  */
 async function ingestTx(c, shopId, at, settings, { full = false } = {}) {
   await stock.lock(c, shopId);
+  if (!retired.has(shopId)) {
+    const out = await retireOrderStock(c, shopId, at);
+    if (out.touched.length) await stock.checkProducts(c, shopId, out.touched.sort(), settings, at);
+    retired.add(shopId);
+  }
   const fmt = settings.syncSource === 'v3' ? 'v3' : 'v1';
   const T = TABLES[fmt];
   const rd = reader(fmt);
@@ -255,7 +260,8 @@ async function ingestTx(c, shopId, at, settings, { full = false } = {}) {
  */
 async function prepare(shopId, { at = now() } = {}) {
   if (!(await stock.flagOf(shopId))) return null;
-  return refresh(shopId, { maxAgeMs: 1, at });
+  //  ساختِ سفارش کم‌شمار است ⇒ بی مهلتِ پرسش (فقط خواندنِ ویترین/بازار مهلت دارد)
+  return refresh(shopId, { maxAgeMs: 1, at, throttle: false });
 }
 
 /**
@@ -275,14 +281,87 @@ async function hasNewer(shopId) {
   return !!r;
 }
 
+/** فاصلهٔ کمینهٔ دو پرسشِ «ردیفِ تازه؟» برای یک دکان در خواندنِ پرترافیکِ ویترین/بازار */
+const REFRESH_THROTTLE_MS = (() => {
+  const v = Number(process.env.CATALOG_REFRESH_THROTTLE_MS);
+  return Number.isSafeInteger(v) && v >= 0 ? v : 500;
+})();
+const lastCheck = new Map();
+
 /**
  * همگام‌سازیِ کاتالوگ در تراکنشِ خودش. `maxAgeMs` (خواندنِ ویترین/بازار) ⇒ فقط وقتی
- * دفترِ دستگاه‌ها ردیفِ تازه دارد خوانده می‌شود؛ پس **همان خواندنِ بعدی** پس از
- * رسیدنِ فروشِ دستگاه عددِ تازه را می‌بیند و بارِ خواندنِ پیاپیِ بی‌تغییر هیچ است.
+ * دفترِ دستگاه‌ها ردیفِ تازه دارد خوانده می‌شود، و برای هر دکان حداکثر هر
+ * [REFRESH_THROTTLE_MS] یک بار پرسیده می‌شود؛ پس فروشِ رسیده حداکثر همین‌قدر بعد در
+ * ویترین است و خواندنِ پیاپیِ بی‌تغییر بار ندارد.
  */
-async function refresh(shopId, { full = false, maxAgeMs = 0, at = now() } = {}) {
-  if (maxAgeMs > 0 && !full && !(await hasNewer(shopId))) return { skipped: true };
+async function refresh(shopId, { full = false, maxAgeMs = 0, at = now(), throttle = true } = {}) {
+  if (maxAgeMs > 0 && !full) {
+    const t = Date.now();
+    if (throttle && t - (lastCheck.get(shopId) || 0) < REFRESH_THROTTLE_MS) return { skipped: true, throttled: true };
+    lastCheck.set(shopId, t);
+    if (lastCheck.size > 10_000) lastCheck.clear();
+    if (!(await hasNewer(shopId))) return { skipped: true };
+  }
   return tx(async (c) => ingestTx(c, shopId, at, await stock.settingsOf(shopId, c), { full }));
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  کنار گذاشتنِ موجودیِ سفارش‌محورِ پیشین (یک بار برای هر دکان)
+// ════════════════════════════════════════════════════════════════════
+
+const retired = new Set();
+
+/**
+ * پیش از تصمیمِ صاحبِ مخزن، `shop.catalog` سفارش را رزرو و هنگامِ تحویل «کسرِ قطعی»
+ * (`res:<رزرو>:sale:<مکان>`، `source = order`) می‌کرد — کسری که دستگاه هرگز ندید. حالا موجودیِ
+ * سرور فقط دفترِ دستگاه‌هاست، پس:
+ *   ۱) هر کسرِ سفارشی که فاکتورِ W ندارد ⇒ یک حرکتِ جبرانیِ هم‌اندازه (`customer_return`،
+ *      `source = system`، کلیدِ `undo:<کلید>`). دفتر فقط افزوده می‌شود، چیزی پاک یا ویرایش
+ *      نمی‌شود و تطبیق (INV-16) همان می‌ماند. کسری که فاکتورِ W دارد (پیش‌ثبتِ `si:w-…` در
+ *      `stock_sources`) دست نمی‌خورد: دستگاه همان W را کم کرده، پس سرور و دستگاه یکی‌اند.
+ *      (کنار گذاشتنِ این حرکت‌ها هنگامِ خواندن امن‌تر نبود: سهمِ W را دوباره بی‌کسر می‌کرد.)
+ *   ۲) رزروِ «نگه‌داشته» ⇒ آزاد، با همان حرکتِ release (`res:<رزرو>:release`).
+ *   ۳) وظیفه‌های بازِ «رزروِ بی‌پشتوانه» و «انتقال برای رزرو» ⇒ کنار گذاشته، با توضیح.
+ * درونِ تراکنشِ ingest (قفلِ دکان گرفته شده)؛ بی ردیفِ قدیمی ⇒ سه پرسشِ خالی، یک بار.
+ */
+async function retireOrderStock(c, shopId, at) {
+  const touched = new Set();
+  const sold = (await c.query(
+    `SELECT m.product_id, m.location, m.qty_milli, m.source_key, m.ref_id FROM stock_moves m
+      WHERE m.shop_id=$1 AND m.source='order' AND m.type='sale'
+        AND NOT EXISTS (SELECT 1 FROM stock_moves x WHERE x.shop_id=m.shop_id AND x.source_key = 'undo:' || m.source_key)
+      ORDER BY m.created_at, m.id`, [shopId]
+  )).rows;
+  for (const m of sold) {
+    const w = await c.query(
+      'SELECT 1 FROM stock_sources WHERE shop_id=$1 AND source_key LIKE $2 LIMIT 1', [shopId, `si:w-${m.ref_id}-%`]
+    );
+    if (w.rows.length) continue;
+    await stock.postMove(c, shopId, {
+      productId: m.product_id, location: m.location, type: 'customer_return', qtyMilli: num(m.qty_milli),
+      mode: 'recorded', source: 'system', sourceKey: `undo:${m.source_key}`, refType: 'order', refId: m.ref_id,
+      actorType: 'system', actorId: '', reason: 'order_stock_retired', at,
+    }, at);
+    touched.add(m.product_id);
+  }
+  const held = (await c.query(
+    `UPDATE stock_reservations SET status='released', closed_at=$2, close_reason='reservations_retired'
+      WHERE shop_id=$1 AND status='held' RETURNING id, product_id, order_id, qty_milli`, [shopId, at]
+  )).rows;
+  for (const r of held) {
+    await stock.insertMove(c, shopId, {
+      productId: r.product_id, location: '', type: 'release', qtyMilli: num(r.qty_milli),
+      deltaOnHand: 0, deltaReserved: -num(r.qty_milli), mode: 'local', source: 'system',
+      sourceKey: `res:${r.id}:release`, refType: 'order', refId: r.order_id,
+      actorType: 'system', actorId: '', reason: 'reservations_retired', at,
+    }, at);
+  }
+  await c.query(
+    `UPDATE stock_tasks SET status='dismissed', resolved_by='system', resolved_at=$2, updated_at=$2,
+            note='سفارشِ آنلاین دیگر موجودی رزرو نمی‌کند (تصمیمِ صاحبِ مخزن)'
+      WHERE shop_id=$1 AND status='open' AND kind IN ('reservation_short', 'transfer_needed')`, [shopId, at]
+  );
+  return { undone: touched.size, released: held.length, touched: [...touched] };
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -744,7 +823,7 @@ async function requireEnabled(shopId) {
 
 module.exports = {
   MANUAL, TRANSFER_LOCS,
-  ingestTx, refresh, hasNewer, prepare, freshness, badgeOf, publicStock,
+  ingestTx, refresh, hasNewer, retireOrderStock, REFRESH_THROTTLE_MS, prepare, freshness, badgeOf, publicStock,
   list, detail, moves, tasks, resolveTask,
   parseManual, manualMove, setLow,
   toStockLines, checkOrder, requireEnabled,

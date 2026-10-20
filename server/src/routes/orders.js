@@ -49,6 +49,7 @@ const needWrite = wrap(async (req, res, next) => {
 
 router.get('/config', wrap(async (req, res) => {
   const st = await orders.stateOf(req.shopId);
+  const ledger = require('../lib/order-ledger');
   res.json({
     ...st,
     //  دفترِ بازپرداخت (§۳۸.۷، FIN-01) — پیش‌فرض خاموش
@@ -56,9 +57,15 @@ router.get('/config', wrap(async (req, res) => {
     tabs: S.TABS,
     reasons: S.REASONS,
     sources: orders.STAFF_SOURCES,
-    permissions: Object.fromEntries(
-      ['create', 'manage', 'contact', 'refund'].map((k) => [k, can(req.role, `orders.${k}`)])
-    ),
+    //  «فروشِ تحویل در برنامه» (تصمیمِ صاحبِ مخزن): برنامه فقط وقتی سرور این را می‌گوید فروش
+    //  می‌سازد (سرورِ کهنه هنوز خودش کم می‌کرد ⇒ دو بار)؛ تحویلِ پیش از `handoverSince` هرگز.
+    saleOnHandover: true,
+    handoverSince: ledger.FLOOR,
+    permissions: {
+      ...Object.fromEntries(['create', 'manage', 'contact', 'refund'].map((k) => [k, can(req.role, `orders.${k}`)])),
+      //  همان سنجشِ Sync v1: نقشی که این‌ها را ندارد فروش را فقط روی دستگاهِ خودش نگه می‌داشت
+      ...ledger.capsOf(req.role),
+    },
   });
 }));
 
@@ -88,7 +95,7 @@ router.get('/reconciliation', needFlag, requirePermission('orders.refund'), wrap
  */
 router.get('/handover', needFlag, requirePermission('orders.manage'), wrap(async (req, res) => {
   res.json(await require('../lib/order-ledger').handoverPending(req.shopId, {
-    since: req.query.since, limit: req.query.limit,
+    since: req.query.since, limit: req.query.limit, after: req.query.after, orderId: req.query.orderId,
   }, actorOf(req)));
 }));
 
