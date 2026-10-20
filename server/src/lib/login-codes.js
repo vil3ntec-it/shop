@@ -26,7 +26,7 @@
 const { randomInt, randomBytes, createHmac, createHash, createCipheriv, createDecipheriv, timingSafeEqual } = require('crypto');
 const { notifyPanel } = require('./panel-live');
 const { query, one, many, now } = require('../db');
-const config = require('../config');
+const { serverSecret } = require('./server-secret');
 const { sectionOf } = require('./tenancy');
 
 // ---------- ثابت‌ها (ثانیه، همان عددهای پرامپت) ----------
@@ -90,7 +90,7 @@ function mask(email) {
 
 // ---------- کد: ساخت، هش، مهروموم ----------
 
-function pepper() { return config.secrets.otp || config.secrets.api || 'shop-otp-pepper'; }
+function pepper() { return serverSecret(['otp', 'api'], 'shop-otp-pepper'); }
 function genCode() { return String(randomInt(0, 1_000_000)).padStart(6, '0'); }
 function hashCode(app, email, code) {
   return createHmac('sha256', pepper()).update(`${app}\n${email}\n${code}`).digest('hex');
