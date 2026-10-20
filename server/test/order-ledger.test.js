@@ -50,7 +50,7 @@ async function setFlag(scope, key, value) {
 }
 
 /** دکان + صاحب با توکنِ دستگاه، پرچم‌های سفارش و کاتالوگ روشن، یک کالا و ۱۰ کیلو ورودِ انبار از دستگاهِ A */
-async function shopWithStock(name, { catalogOn = true } = {}) {
+async function shopWithStock(name, { catalogOn = true, claim = true } = {}) {
   let u = await h.newUser(name, 'shop');
   const made = await h.post('/api/shop', { name: `دکانِ ${name}` }, { token: u.accessToken });
   assert.equal(made.status, 201, JSON.stringify(made.body));
@@ -71,8 +71,13 @@ async function shopWithStock(name, { catalogOn = true } = {}) {
   const r = await push(u.accessToken, DEV_A, ops);
   assert.equal(r.status, 200, JSON.stringify(r.body));
   assert.ok(r.body.results.every((x) => x.status === 'applied'), JSON.stringify(r.body.results));
+  //  برنامهٔ «فروشِ تحویل» نخستین بار config را می‌پرسد ⇒ کفِ تحویلِ همین دکان (پیش از هر سفارش)
+  if (claim) assert.ok((await appConfig(u.accessToken)).body.handoverSince > 0);
   return { ...u, token: u.accessToken, shopId };
 }
+
+/** همان `OrdersRepository.config` ِ برنامه: توانِ «فروشِ تحویل» را می‌گوید */
+const appConfig = (token, caps = 'saleOnHandover') => h.get(`/api/shop/orders/config?caps=${caps}`, { token });
 
 const push = (token, device, ops) => h.api('POST', '/api/sync/v1/push', {
   token, body: { device_id: device, schema_version: 3, ops }, headers: { 'X-App': 'shop', 'X-Device': device },
@@ -314,11 +319,11 @@ test('سنجشِ فقط‌خواندنیِ ساختِ سفارش: بیش از م
 
 /* ══════════════════════ بازبینیِ #340: اجازه، کف، صفحه، برگشت، کسرِ قدیمی ══════════════════════ */
 
-async function staffOf(a, name) {
+async function staffOf(a, name, role = 'staff') {
   const u = await h.newUser(name, 'shop');
   await query(
     `INSERT INTO shop_members (id, shop_id, user_id, role, status, created_at, updated_at)
-     VALUES ($1,$2,$3,'staff','active',$4,$4)`, [newId('mem'), a.shopId, u.user.id, now()]
+     VALUES ($1,$2,$3,$4,'active',$5,$5)`, [newId('mem'), a.shopId, u.user.id, role, now()]
   );
   return { ...u, token: u.accessToken };
 }
@@ -328,7 +333,8 @@ test('config: سرور «فروشِ تحویل» و کفش را می‌گوید�
   const a = await shopWithStock('اجازه');
   const own = (await h.get('/api/shop/orders/config', { token: a.token })).body;
   assert.equal(own.saleOnHandover, true);
-  assert.equal(own.handoverSince, ledger.FLOOR);
+  assert.equal(own.handoverSince, await ledger.floorOf(a.shopId), 'کفِ ذخیره‌شدهٔ همین دکان');
+  assert.ok(own.handoverSince > 0 && own.handoverSince <= Date.now());
   assert.deepEqual([own.permissions.recordSale, own.permissions.saleDiscount, own.permissions.saleCancel], [true, true, true]);
   const s = await staffOf(a, 'شاگردِ اجازه');
   const st = (await h.get('/api/shop/orders/config', { token: s.token })).body;
@@ -419,7 +425,7 @@ test('برگشت به دکان پس از فروشِ تحویل ⇒ در reversal
   assert.equal((await levels(a)).levels.shop_floor, 10000, 'یک بار برگشت');
 });
 
-test('کسرِ سفارش‌محورِ پیشین (res:…:sale) بی فاکتورِ W ⇒ حرکتِ جبرانی؛ با W ⇒ می‌ماند؛ رزروِ نگه‌داشته آزاد؛ وظیفه‌های رزرو بسته', async () => {
+test('کسرِ سفارش‌محورِ پیشین (res:…:sale) بی فاکتورِ W ⇒ حرکتِ جبرانی؛ با W ⇒ می‌ماند (هر قلم جدا)؛ رزروِ نگه‌داشته آزاد؛ وظیفه‌های رزرو بسته', async () => {
   const a = await shopWithStock('قدیمی‌کسر');
   const stock = require('../src/lib/stock');
   const t = now();
@@ -438,13 +444,24 @@ test('کسرِ سفارش‌محورِ پیشین (res:…:sale) بی فاکتو
       deltaReserved: 700, mode: 'local', source: 'order', sourceKey: 'res:rsv-legacy:reserve', refType: 'order',
       refId: 'ord-legacy-3', actorType: 'user', actorId: '', reason: 'order', at: t }, t);
     await stock.openTask(c, a.shopId, { kind: 'reservation_short', productId: 'p-rice', dedupe: 'short:p-rice', detail: {} }, t);
+    //  سفارشِ دوقلمی: هر دو قلم کسرِ سرور داشتند، فاکتورِ W فقط قلمِ ۱ را دارد ⇒ قلمِ ۲ جبران می‌شود
+    for (const [line, q] of [[1, 200], [2, 300]]) {
+      await c.query(`INSERT INTO stock_reservations (id, shop_id, order_id, line_no, product_id, branch_id, qty_milli, status, expires_at, created_at, closed_at)
+                     VALUES ($1,$2,'ord-legacy-4',$3,'p-rice','',$4,'committed',NULL,$5,$5)`, [`rsv-l4-${line}`, a.shopId, line, q, t]);
+      await move(c, `res:rsv-l4-${line}:sale:shop_floor`, 'ord-legacy-4', q);
+    }
+    await c.query(`INSERT INTO stock_sources (shop_id, source_key, product_id, posted_milli, rev, updated_at)
+                   VALUES ($1,'si:w-ord-legacy-4-1','p-rice',-200,0,$2)`, [a.shopId, t]);
   });
   //  نخستین خواندنِ کاتالوگ ⇒ کنار گذاشتن (یک بار)
   const st = await levels(a);
-  assert.equal(st.levels.shop_floor, 9500, '۱۰ − ۱٫۵ + ۱٫۵ (جبران) − ۰٫۵ (پشتِ W، می‌ماند)');
+  assert.equal(st.levels.shop_floor, 9300, '۱۰ − ۱٫۵ + ۱٫۵ (جبران) − ۰٫۵ (پشتِ W) − ۰٫۲ (قلمِ ۱ پشتِ W) − ۰٫۳ + ۰٫۳ (قلمِ ۲ بی W)');
   assert.equal(st.reservedMilli, 0);
-  const undo = await many(`SELECT source, type, qty_milli, ref_id FROM stock_moves WHERE shop_id=$1 AND source_key LIKE 'undo:%'`, [a.shopId]);
-  assert.deepEqual(undo.map((m) => [m.source, m.type, Number(m.qty_milli), m.ref_id]), [['system', 'customer_return', 1500, 'ord-legacy-1']]);
+  const undo = await many(`SELECT source, type, qty_milli, ref_id, source_key FROM stock_moves WHERE shop_id=$1 AND source_key LIKE 'undo:%' ORDER BY source_key`, [a.shopId]);
+  assert.deepEqual(undo.map((m) => [m.source, m.type, Number(m.qty_milli), m.ref_id, m.source_key]), [
+    ['system', 'customer_return', 1500, 'ord-legacy-1', 'undo:res:legacy1:sale:shop_floor'],
+    ['system', 'customer_return', 300, 'ord-legacy-4', 'undo:res:rsv-l4-2:sale:shop_floor'],
+  ]);
   assert.equal((await one('SELECT status FROM stock_reservations WHERE id=$1', ['rsv-legacy'])).status, 'released');
   assert.equal(await count("SELECT COUNT(*)::int AS n FROM stock_tasks WHERE shop_id=$1 AND status='open' AND kind='reservation_short'", [a.shopId]), 0);
   const rep = await h.get('/api/shop/catalog/report?productId=p-rice', { token: a.token });
@@ -455,11 +472,11 @@ test('کسرِ سفارش‌محورِ پیشین (res:…:sale) بی فاکتو
   assert.equal(audits[0].actor_type, 'system');
   const det = typeof audits[0].detail === 'string' ? JSON.parse(audits[0].detail) : audits[0].detail;
   assert.deepEqual([det.undoneMoves, det.undoneMilli, det.keptWithW, det.releasedHolds, det.releasedMilli, det.dismissedTasks],
-    [1, 1500, 1, 1, 700, 1]);
+    [2, 1800, 2, 1, 700, 1]);
   //  دوباره خواندن (و حتی دوباره دویدن پس از راه‌اندازیِ دوباره) چیزی را دو بار جبران نمی‌کند
   const catalog = require('../src/lib/catalog');
   await catalog.refresh(a.shopId, { full: true });
-  assert.equal((await levels(a)).levels.shop_floor, 9500);
+  assert.equal((await levels(a)).levels.shop_floor, 9300);
   const again = await tx((c) => catalog.retireOrderStock(c, a.shopId, now()));
   assert.equal(again.changed, false, JSON.stringify(again.audit));
   assert.equal((await many(`SELECT 1 FROM audit_logs WHERE shop_id=$1 AND action='stock.order_stock_retired'`, [a.shopId])).length, 1);
@@ -469,4 +486,139 @@ test('کسرِ سفارش‌محورِ پیشین (res:…:sale) بی فاکتو
   assert.equal((await many(`SELECT 1 FROM audit_logs WHERE shop_id=$1 AND action='stock.order_stock_retired'`, [clean.shopId])).length, 0);
   assert.equal(await count(`SELECT COUNT(*)::int AS n FROM stock_moves WHERE shop_id=$1 AND source='system'`, [clean.shopId]), 0);
   assert.equal((await tx((c) => catalog.retireOrderStock(c, clean.shopId, now()))).changed, false);
+});
+
+test('کنار گذاشتنِ کسرِ قدیمی از راهِ «حرکتِ دستی» (نخستین کارِ کاتالوگ) هم یک سطرِ ممیزی دارد', async () => {
+  const a = await shopWithStock('قدیمی‌دستی');
+  const stock = require('../src/lib/stock');
+  const t = now();
+  await tx((c) => stock.postMove(c, a.shopId, {
+    productId: 'p-rice', location: 'shop_floor', type: 'sale', qtyMilli: 400, mode: 'recorded', source: 'order',
+    sourceKey: 'res:legacy-mm:sale:shop_floor', refType: 'order', refId: 'ord-legacy-mm', actorType: 'user', actorId: '',
+    reason: 'order_fulfilled', at: t,
+  }, t));
+  //  نخستین کارِ کاتالوگِ این دکان پس از به‌کارگیری: حرکتِ دستی (نه خواندن)
+  const r = await h.post('/api/shop/catalog/moves', { kind: 'adjust', productId: 'p-rice', location: 'shop_floor', qtyMilli: 100, reason: 'شمارش' },
+    { token: a.token, headers: { 'Idempotency-Key': `ledger-mm-${Date.now()}` } });
+  assert.ok([200, 201].includes(r.status), JSON.stringify(r.body));
+  const audits = await many(`SELECT actor_type, detail FROM audit_logs WHERE shop_id=$1 AND action='stock.order_stock_retired'`, [a.shopId]);
+  assert.equal(audits.length, 1, 'سطرِ ممیزی از راهِ حرکتِ دستی');
+  const det = typeof audits[0].detail === 'string' ? JSON.parse(audits[0].detail) : audits[0].detail;
+  assert.deepEqual([det.undoneMoves, det.undoneMilli], [1, 400]);
+  assert.equal((await levels(a)).levels.shop_floor, 10100, '۱۰ − ۰٫۴ + ۰٫۴ (جبران) + ۰٫۱ (اصلاح)');
+  assert.equal((await many(`SELECT 1 FROM audit_logs WHERE shop_id=$1 AND action='stock.order_stock_retired'`, [a.shopId])).length, 1, 'یک بار');
+});
+
+/* ══════════════════════ بازبینیِ دومِ #340: کفِ هر دکان، اجازهٔ هر سفارش، بازپرداختِ جزئی ══════════════════════ */
+
+test('کفِ هر دکان: نخستین config ِ برنامهٔ «فروشِ تحویل» (caps) — نه زودتر از زمانِ به‌کارگیری؛ تحویلِ پیش از آن هرگز', async () => {
+  const a = await shopWithStock('کفِ دکان', { claim: false });
+  const early = await newOrder(a);
+  await walk(a, early.id, TO_PICKED_UP);
+  //  هنوز هیچ برنامهٔ «فروشِ تحویل» این دکان را ندیده ⇒ هیچ فهرستی، حتی با since=0
+  let r = (await handover(a)).body;
+  assert.deepEqual([r.items, r.reversals, r.since], [[], [], null]);
+  //  برنامهٔ کهنه (بی caps) کف نمی‌گذارد
+  assert.equal((await h.get('/api/shop/orders/config', { token: a.token })).body.handoverSince, null);
+  assert.equal(await count('SELECT COUNT(*)::int AS n FROM live_config WHERE scope=$1 AND key=$2', [a.shopId, ledger.FLOOR_KEY]), 0);
+  assert.equal(await ledger.floorOf(a.shopId), null);
+
+  await tick();
+  const t0 = Date.now();
+  const cfg = (await appConfig(a.token)).body;
+  assert.ok(cfg.handoverSince >= t0 && cfg.handoverSince <= Date.now(), `${cfg.handoverSince} ≥ ${t0}`);
+  //  دستگاهِ دوم، نقشِ دیگر یا دوباره ⇒ همان کف (نخستین بار می‌ماند)
+  await tick();
+  const s = await staffOf(a, 'شاگردِ کف');
+  assert.equal((await appConfig(s.token, 'other,saleOnHandover')).body.handoverSince, cfg.handoverSince);
+  assert.equal((await h.get('/api/shop/orders/config', { token: a.token })).body.handoverSince, cfg.handoverSince);
+  //  تحویلِ پیش از کف هرگز — نه در فهرست، نه با orderId
+  assert.deepEqual((await handover(a)).body.items, []);
+  assert.deepEqual((await h.get(`/api/shop/orders/handover?since=0&orderId=${early.id}`, { token: a.token })).body.items, []);
+  await tick();
+  const late = await newOrder(a);
+  await walk(a, late.id, TO_PICKED_UP);
+  r = (await handover(a)).body;
+  assert.deepEqual(r.items.map((x) => x.id), [late.id]);
+  assert.equal(r.since, cfg.handoverSince);
+
+  //  زمانِ به‌کارگیری (env) دیرتر از کفِ ذخیره‌شده ⇒ همان جلو می‌افتد
+  const deploy = Date.now() + 60_000;
+  process.env.ORDERS_HANDOVER_FLOOR_MS = String(deploy);
+  try {
+    assert.equal((await appConfig(a.token)).body.handoverSince, deploy);
+    assert.deepEqual((await handover(a)).body.items, []);
+    const fresh = await shopWithStock('کفِ پس از به‌کارگیری', { claim: false });
+    assert.equal((await appConfig(fresh.token)).body.handoverSince, deploy, 'نه زودتر از زمانِ به‌کارگیری');
+  } finally {
+    delete process.env.ORDERS_HANDOVER_FLOOR_MS;
+  }
+});
+
+test('handover: اجازهٔ هر سفارش از اجازهٔ مؤثرِ همین کاربر (لایه‌های نقش و عضو) و درصدِ تخفیفِ همان سفارش', async () => {
+  const a = await shopWithStock('اجازهٔ سفارش');
+  const m = await staffOf(a, 'مدیرِ سقف', 'manager');
+  const s = await staffOf(a, 'شاگردِ سفارش');
+  //  جمعِ اقلام ۱۸۵ افغانی: بی تخفیف، ۵ افغانی (۲٫۷٪)، ۱۵ افغانی (۸٫۱٪)
+  const plain = await newOrder(a, { discountMinor: 0 });
+  const small = await newOrder(a, { discountMinor: 500 });
+  const big = await newOrder(a, { discountMinor: 1500 });
+  for (const o of [plain, small, big]) await walk(a, o.id, TO_PICKED_UP);
+  const flags = async (u) => {
+    const r = await handover(u);
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    return [plain, small, big].map((o) => r.body.items.find((x) => x.id === o.id).recordable);
+  };
+  const setRole = (role, perms) => h.put(`/api/shop/permissions/roles/${role}`, { perms }, { token: a.token });
+  const setMember = (u, perms) => h.put(`/api/shop/permissions/members/${u.user.id}`, { perms }, { token: a.token });
+
+  assert.deepEqual(await flags(a), [true, true, true], 'صاحب');
+  assert.deepEqual(await flags(m), [true, true, true], 'مدیر بی لایه');
+  assert.deepEqual(await flags(s), [true, false, false], 'شاگرد: تخفیف ندارد');
+  //  لایهٔ نقش: سقفِ ۵٪ ⇒ تخفیفِ ۸٫۱٪ نیازمندِ تأیید است و Sync v1 ردش می‌کند
+  const role = await setRole('manager', { 'sales.discount': { caps: { maxPct: 5 } } });
+  assert.equal(role.status, 200, JSON.stringify(role.body));
+  assert.deepEqual(await flags(m), [true, true, false], 'مدیر با سقفِ ۵٪');
+  //  همان داوریِ Sync v1: فروشِ ۸٫۱٪ از دستگاهِ همین مدیر بی برگه رد می‌شود
+  const ops = appSaleOps((await h.get(`/api/shop/orders/${big.id}`, { token: a.token })).body.order);
+  const pushed = await push(m.token, 'dev-ledger-mgr', ops);
+  assert.equal(pushed.status, 200, JSON.stringify(pushed.body));
+  const head = pushed.body.results.find((x) => x.op_id === ops[0].op_id);
+  assert.deepEqual([head.status, head.reason], ['rejected', 'approval_required']);
+  //  لایهٔ همین کاربر: سقفِ مبلغِ ۴ افغانی ⇒ تخفیفِ ۵ افغانی هم نه
+  const mem = await setMember(m, { 'sales.discount': { caps: { maxAmount: 400 } } });
+  assert.equal(mem.status, 200, JSON.stringify(mem.body));
+  assert.deepEqual(await flags(m), [true, false, false], 'مدیر با سقفِ مبلغِ خودش');
+  assert.deepEqual(await flags(a), [true, true, true], 'صاحب را لایه‌ای قفل نمی‌کند');
+
+  //  برگشته به دکان با فروشِ زنده ⇒ reversible همان سنجشِ لغو
+  const r0 = await h.post('/api/shop/orders', { source: 'phone', fulfillment: 'delivery', paymentMethod: 'cod',
+    customer: { name: 'احمد', phone: '0791234567' }, address: { landmark: 'کنارِ مسجد' }, lines: riceLine(1000) },
+  { token: a.token, headers: { 'Idempotency-Key': `ledger-rev-${Date.now()}` } });
+  assert.equal(r0.status, 201, JSON.stringify(r0.body));
+  const id = r0.body.order.id;
+  await walk(a, id, ['accepted', 'picking', 'packed', 'out_for_delivery']);
+  const order = (await h.get(`/api/shop/orders/${id}`, { token: a.token })).body.order;
+  assert.equal((await push(a.token, DEV_A, appSaleOps(order))).status, 200);
+  await h.post(`/api/shop/orders/${id}/transition`, { to: 'delivery_failed', reason: 'no_answer' }, { token: a.token });
+  await walk(a, id, ['retry_scheduled', 'returned_to_store']);
+  const rev = async (u) => (await handover(u)).body.reversals.find((x) => x.id === id).reversible;
+  assert.equal(await rev(a), true);
+  assert.equal(await rev(m), true);
+  assert.equal(await rev(s), false, 'شاگرد لغو ندارد');
+  assert.equal((await setRole('manager', { 'sales.cancel': { mode: 'approve' } })).status, 200);
+  assert.equal(await rev(m), false, 'مدیرِ «نیازمندِ تأیید» برای لغو');
+  assert.equal(await rev(a), true);
+});
+
+test('بازپرداختِ جزئی (کالا پیشِ مشتری ماند) بی فروش ⇒ در فهرستِ تحویل؛ پس از فروش نه', async () => {
+  const a = await shopWithStock('بازپرداختِ جزئی');
+  const order = await newOrder(a);
+  await walk(a, order.id, [...TO_PICKED_UP, 'return_requested', 'refunded_partial']);
+  const r = (await handover(a)).body;
+  assert.deepEqual(r.items.map((x) => [x.id, x.status, x.recordable]), [[order.id, 'refunded_partial', true]]);
+  assert.ok(ledger.OUT_OF_SHOP.includes('refunded_partial'));
+  const full = (await h.get(`/api/shop/orders/${order.id}`, { token: a.token })).body.order;
+  assert.equal((await push(a.token, DEV_A, appSaleOps(full))).status, 200);
+  assert.deepEqual((await handover(a)).body.items, []);
 });

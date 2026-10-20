@@ -4,6 +4,7 @@ import ir.vil3ntec.tohid.core.model.OrderCustomerDto
 import ir.vil3ntec.tohid.core.model.OrderDto
 import ir.vil3ntec.tohid.core.model.OrderEventDto
 import ir.vil3ntec.tohid.core.model.OrderLineDto
+import ir.vil3ntec.tohid.core.model.OrderPermsDto
 import ir.vil3ntec.tohid.sync.v1.LedgerDiff
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -22,7 +23,9 @@ import org.junit.Test
  *    • کمبود ⇒ پیش از گذار سیاستِ صندوق با پیامِ روشن (جمعِ قلم‌های یک کالا با هم)؛ پس از تحویل
  *      ثبت با کمبودِ گزارش‌شده (INV-19)؛
  *    • برگشت به دکان ⇒ لغوِ همان فروش، تکرارپذیر حتی از دو دستگاه؛
- *    • پول: آنلاین و نقدِ پیک بیرونِ دخل (فروش و مرجوعی)، نقدِ سرِ پیشخوان در دخل (`CashShift`).
+ *    • پول: فروشِ آنلاین و نقدِ پیک بیرونِ دخل، نقدِ سرِ پیشخوان (حتی سفارشِ «ارسال» که مشتری در دکان
+ *      گرفت) در دخل؛ مرجوعیِ دستی همیشه از دخل (`CashShift`)، جز مرجوعیِ پیوسته به بازپرداختِ بیرون از دخل.
+ *    • اجازهٔ هر سفارش: پرچمِ سرور (`recordable`/`reversible`) بر اجازهٔ کلیِ نقش جلو می‌افتد.
  *  قرینهٔ JS: `server/test/e2e/lib/native.mjs` (`fulfillOrder`) در `stock.e2e.mjs`.
  */
 class OrderFulfillmentTest {
@@ -252,9 +255,15 @@ class OrderFulfillmentTest {
     assertNull(unpaid.payments!!.single().verification)
   }
 
+  /** سفارشِ «ارسال» که پیک برد (نخستین گذارِ تحویل «به پیک داده شد») */
+  private fun sent(paymentMethod: String = "cod", status: String = "out_for_delivery") = order(
+    fulfillment = "delivery", paymentMethod = paymentMethod, status = status,
+    events = listOf(OrderEventDto(kind = "status", fromStatus = "packed", toStatus = "out_for_delivery", at = 5_000L)),
+  )
+
   @Test
   fun `نقدِ هنگامِ تحویل با پیک ⇒ cod با ردیفِ نقدِ custody=courier؛ تا تسویهٔ پیک پولِ دخل نیست`() {
-    val sale = ok(OrderFulfillment.fulfill(ledger(), order(fulfillment = "delivery"), "2026-10-19", 1L)).data.sales.single()
+    val sale = ok(OrderFulfillment.fulfill(ledger(), sent(), "2026-10-19", 1L)).data.sales.single()
     assertEquals("cod", sale.paymentMethod)
     val row = sale.payments!!.single()
     assertEquals("cash", row.kind)
@@ -283,6 +292,27 @@ class OrderFulfillmentTest {
   }
 
   @Test
+  fun `سفارشِ «ارسال» که مشتری سرِ پیشخوان گرفت ⇒ نقدِ دخل، نه نقدِ پیک`() {
+    //  نخستین گذارِ تحویل «مشتری گرفت» (picked_up) — هر نوعِ سفارش
+    val counter = order(fulfillment = "delivery")
+    assertTrue(OrderFulfillment.atCounter(counter))
+    val sale = ok(OrderFulfillment.fulfill(ledger(), counter, "2026-10-19", 1L)).data.sales.single()
+    assertEquals("cash", sale.paymentMethod)
+    val row = sale.payments!!.single()
+    assertEquals("cash", row.kind)
+    assertNull(row.custody)
+    assertEquals("confirmed", row.status)
+    assertTrue(CashShift.paidAtCounter(sale))
+    assertEquals(175.5, drawer(sale).sales, 1e-9)
+    //  گذارِ «رسید» پس از «مشتری گرفت» هم پیشخوان است؛ «ارسال» با پیک نه
+    assertTrue(OrderFulfillment.atCounter(counter.copy(status = "return_requested")))
+    assertFalse(OrderFulfillment.atCounter(sent()))
+    assertFalse(OrderFulfillment.atCounter(sent(status = "delivered")))
+    //  پرداختِ آنلاین همان آنلاین می‌ماند
+    assertEquals("online", OrderFulfillment.paymentOf(counter.copy(paymentMethod = "online")).method)
+  }
+
+  @Test
   fun `فروشِ تحویل از صندوق لغو نمی‌شود؛ برگشتِ کالا مرجوعیِ عادی است`() {
     val d = ok(OrderFulfillment.fulfill(ledger(), order(), "2026-10-19", 1L)).data
     val cancel = SalesEngine.cancel(d, "o-01ORDER", "2026-10-19", 2L, { "c" }, reason = "x")
@@ -302,28 +332,71 @@ class OrderFulfillmentTest {
   }
 
   @Test
-  fun `مرجوعیِ فروشِ آنلاین یا پیک از دخل کم نمی‌شود؛ مرجوعیِ نقدِ پیشخوان کم می‌شود`() {
-    for ((o, inDrawer) in listOf(
-      order(paymentMethod = "online", paymentStatus = "paid") to false,
-      order(fulfillment = "delivery") to false,
-      order(fulfillment = "pickup") to true,
+  fun `مرجوعیِ دستیِ فروشِ تحویل (آنلاین، پیک، پیشخوان) از دخل کم می‌شود؛ پیوسته به بازپرداختِ بیرون از دخل نه`() {
+    //  تصمیمِ صاحبِ مخزن (بازبینیِ دومِ #340): مرجوعیِ دستی پولی است که از همین صندوق رفت
+    for ((o, saleInDrawer) in listOf(
+      order(paymentMethod = "online", paymentStatus = "paid") to 0.0,
+      sent() to 0.0,
+      order(fulfillment = "pickup") to 175.5,
     )) {
       val d = ok(OrderFulfillment.fulfill(ledger(), o, "2026-10-19", 1L)).data
       var seq = 0
       val back = (SalesEngine.recordReturn(d, "o-01ORDER", mapOf("o-01ORDER-1" to 1.5), "", "2026-10-19", 3L, { "r${seq++}" })
         as SalesEngine.Result.Ok).data
       val r = back.saleReturns.single()
+      assertNull("مرجوعیِ ${o.paymentMethod}/${o.fulfillment} نشانِ «بیرون از دخل» ندارد", r.channel)
       val t = drawerWith(back)
-      if (inDrawer) {
-        assertNull(r.channel)
-        assertEquals(175.5, t.sales, 1e-9)
-        assertEquals(r.amount, t.returns, 1e-9)
-      } else {
-        assertEquals("مرجوعیِ ${o.paymentMethod}/${o.fulfillment} بیرونِ دخل", "online", r.channel)
-        assertEquals(0.0, t.sales, 1e-9)
-        assertEquals(0.0, t.returns, 1e-9)
-        assertEquals(1000.0, t.expected, 1e-9)
-      }
+      assertEquals(saleInDrawer, t.sales, 1e-9)
+      assertEquals(r.amount, t.returns, 1e-9)
+      assertEquals(1000.0 + saleInDrawer - r.amount, t.expected, 1e-9)
+      //  استثنا: مرجوعیِ پیوسته به بازپرداختی که بیرون از دخل داده شد (`channel = online`) ⇒ نه
+      val outside = drawerWith(back.copy(saleReturns = back.saleReturns.map { it.copy(channel = CashShift.ONLINE) }))
+      assertEquals(0.0, outside.returns, 1e-9)
+      assertEquals(1000.0 + saleInDrawer, outside.expected, 1e-9)
     }
+  }
+
+  @Test
+  fun `برگشتِ تکراری — حرکت و ممیزیِ لغوی که از دستگاهِ دیگر رسیده دوباره ساخته نمی‌شود`() {
+    val base = ok(OrderFulfillment.fulfill(ledger(), sent(), "2026-10-19", 5_000L)).data
+    val back = sent(status = "returned_to_store")
+    val a = ok(OrderFulfillment.reverse(base, back, "2026-10-20", 9_000L)).data
+    //  همگام‌سازیِ نیمه: حرکت‌ها و ممیزیِ لغو رسیده‌اند، وضعیتِ فاکتور هنوز نه
+    val partial = a.copy(sales = base.sales)
+    assertTrue(OrderFulfillment.needsReverse(partial, back))
+    val again = ok(OrderFulfillment.reverse(partial, back, "2026-10-20", 9_100L)).data
+    assertEquals("cancelled", again.sales.single().status)
+    assertEquals(again.stockMovements.size, again.stockMovements.map { it.id }.toSet().size)
+    assertEquals(again.auditLog.size, again.auditLog.map { it.id }.toSet().size)
+    assertEquals(a.stockMovements, again.stockMovements)
+    assertEquals(10.0, ShopStore.stock(again, "p1"), 1e-9)
+  }
+
+  @Test
+  fun `بازپرداختِ جزئی (کالا پیشِ مشتری ماند) هنوز فروش می‌خواهد`() {
+    val o = order(status = "refunded_partial")
+    assertTrue("refunded_partial" in OrderFulfillment.OUT_OF_SHOP)
+    assertTrue(OrderFulfillment.needsSale(ledger(), o, since = 0L))
+    assertFalse(OrderFulfillment.needsSale(ledger(), o.copy(status = "refunded_full"), since = 0L))
+  }
+
+  @Test
+  fun `اجازهٔ هر سفارش — پرچمِ سرور بر اجازهٔ کلیِ نقش جلو می‌افتد`() {
+    val all = OrderPermsDto(manage = true, recordSale = true, saleDiscount = true, saleCancel = true)
+    val clerk = OrderPermsDto(manage = true, recordSale = true)
+    val o = order()
+    //  سرورِ بی پرچم: اجازهٔ کلیِ نقش (تخفیف ⇒ sales.discount)
+    assertTrue(OrderFulfillment.allowed(o, all))
+    assertFalse(OrderFulfillment.allowed(o, clerk))
+    assertTrue(OrderFulfillment.allowed(o.copy(discountMinor = 0), clerk))
+    //  پرچمِ سرور (سقفِ درصد/مبلغِ همین کاربر برای همین سفارش)
+    assertFalse(OrderFulfillment.allowed(o.copy(action = "sale", recordable = false), all))
+    assertTrue(OrderFulfillment.allowed(o.copy(action = "sale", recordable = true), clerk))
+    assertFalse("بی ثبتِ فروش هیچ", OrderFulfillment.allowed(o.copy(action = "sale", recordable = true), OrderPermsDto()))
+    //  لغو
+    assertTrue(OrderFulfillment.allowed(o.copy(action = "reverse"), all))
+    assertFalse(OrderFulfillment.allowed(o.copy(action = "reverse"), clerk))
+    assertFalse(OrderFulfillment.allowed(o.copy(action = "reverse", reversible = false), all))
+    assertTrue(OrderFulfillment.allowed(o.copy(action = "reverse", reversible = true), clerk))
   }
 }
