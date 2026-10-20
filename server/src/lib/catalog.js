@@ -305,17 +305,23 @@ async function refresh(shopId, { full = false, maxAgeMs = 0, at = now(), throttl
     if (!(await hasNewer(shopId))) return { skipped: true };
   }
   const out = await tx(async (c) => ingestTx(c, shopId, at, await stock.settingsOf(shopId, c), { full }));
-  if (out.retired) {
-    retired.add(shopId);
-    if (out.retired.changed) {
-      //  یک سطر در دفترِ ممیزیِ دکان، فقط وقتی چیزی عوض شد (دورِ دوم ⇒ هیچ)
-      await require('./audit').log({
-        shopId, actorType: 'system', action: 'stock.order_stock_retired', targetType: 'shop', targetId: String(shopId),
-        detail: out.retired.audit,
-      });
-    }
-  }
+  await afterIngest(shopId, out);
   return out;
+}
+
+/**
+ * پس از **کامیتِ** تراکنشی که `ingestTx` در آن دوید (خواندنِ کاتالوگ یا حرکتِ دستی): کنار
+ * گذاشتنِ کسرِ سفارشیِ پیشین انجام‌شده است ⇒ دکان دیگر سنجیده نمی‌شود، و اگر چیزی عوض شد یک
+ * سطر در دفترِ ممیزیِ دکان (دورِ دوم ⇒ هیچ). تراکنشِ برگشت‌خورده به این‌جا نمی‌رسد.
+ */
+async function afterIngest(shopId, out) {
+  if (!out || !out.retired) return;
+  retired.add(shopId);
+  if (!out.retired.changed) return;
+  await require('./audit').log({
+    shopId, actorType: 'system', action: 'stock.order_stock_retired', targetType: 'shop', targetId: String(shopId),
+    detail: out.retired.audit,
+  });
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -324,14 +330,31 @@ async function refresh(shopId, { full = false, maxAgeMs = 0, at = now(), throttl
 
 const retired = new Set();
 
+/** آیا کسرِ سفارشیِ [m] قلمِ W ِ خودش را دارد؟ (دستگاه همان را کم کرده ⇒ نگه داشتن) */
+async function keptByW(c, shopId, m) {
+  const has = async (sql, key) => (await c.query(sql, [shopId, key])).rows.length > 0;
+  const res = /^res:([^:]+):sale:/.exec(String(m.source_key || ''));
+  if (res) {
+    const line = (await c.query(
+      'SELECT order_id, line_no FROM stock_reservations WHERE shop_id=$1 AND id=$2', [shopId, res[1]]
+    )).rows[0];
+    if (line) {
+      return has('SELECT 1 FROM stock_sources WHERE shop_id=$1 AND source_key=$2 LIMIT 1', `si:w-${line.order_id}-${Number(line.line_no)}`);
+    }
+  }
+  return has('SELECT 1 FROM stock_sources WHERE shop_id=$1 AND source_key LIKE $2 LIMIT 1', `si:w-${m.ref_id}-%`);
+}
+
 /**
  * پیش از تصمیمِ صاحبِ مخزن، `shop.catalog` سفارش را رزرو و هنگامِ تحویل «کسرِ قطعی»
  * (`res:<رزرو>:sale:<مکان>`، `source = order`) می‌کرد — کسری که دستگاه هرگز ندید. حالا موجودیِ
  * سرور فقط دفترِ دستگاه‌هاست، پس:
  *   ۱) هر کسرِ سفارشی که فاکتورِ W ندارد ⇒ یک حرکتِ جبرانیِ هم‌اندازه (`customer_return`،
  *      `source = system`، کلیدِ `undo:<کلید>`). دفتر فقط افزوده می‌شود، چیزی پاک یا ویرایش
- *      نمی‌شود و تطبیق (INV-16) همان می‌ماند. کسری که فاکتورِ W دارد (پیش‌ثبتِ `si:w-…` در
- *      `stock_sources`) دست نمی‌خورد: دستگاه همان W را کم کرده، پس سرور و دستگاه یکی‌اند.
+ *      نمی‌شود و تطبیق (INV-16) همان می‌ماند. کسری که قلمِ فاکتورِ W دارد دست نمی‌خورد: دستگاه
+ *      همان W را کم کرده، پس سرور و دستگاه یکی‌اند. سنجش **هر قلم جدا** ([keptByW]): رزروِ همان
+ *      کسر (`res:<رزرو>:…`) ⇒ قلمِ سفارش ⇒ پیش‌ثبتِ همان قلمِ W (`si:w-<سفارش>-<قلم>`)؛ رزروِ
+ *      گم‌شده ⇒ هر قلمِ W ِ همان سفارش (محتاطانه: نگه داشتن).
  *      (کنار گذاشتنِ این حرکت‌ها هنگامِ خواندن امن‌تر نبود: سهمِ W را دوباره بی‌کسر می‌کرد.)
  *   ۲) رزروِ «نگه‌داشته» ⇒ آزاد، با همان حرکتِ release (`res:<رزرو>:release`).
  *   ۳) وظیفه‌های بازِ «رزروِ بی‌پشتوانه» و «انتقال برای رزرو» ⇒ کنار گذاشته، با توضیح.
@@ -360,10 +383,7 @@ async function retireOrderStock(c, shopId, at) {
       ORDER BY m.created_at, m.id`, [shopId]
   )).rows;
   for (const m of sold) {
-    const w = await c.query(
-      'SELECT 1 FROM stock_sources WHERE shop_id=$1 AND source_key LIKE $2 LIMIT 1', [shopId, `si:w-${m.ref_id}-%`]
-    );
-    if (w.rows.length) { keptWithW += 1; continue; }
+    if (await keptByW(c, shopId, m)) { keptWithW += 1; continue; }
     undoneMilli += num(m.qty_milli);
     await stock.postMove(c, shopId, {
       productId: m.product_id, location: m.location, type: 'customer_return', qtyMilli: num(m.qty_milli),
@@ -718,7 +738,8 @@ async function manualMove(shopId, { key, body, actor }) {
   const m = parseManual(body);
   const hash = hashOf(body);
   const at = now();
-  return tx(async (c) => {
+  let ingested = null;
+  const out = await tx(async (c) => {
     await stock.lock(c, shopId);
     const prev = (await c.query(
       `SELECT * FROM stock_moves WHERE shop_id=$1 AND source_key = ANY($2::text[]) ORDER BY source_key`, [shopId, staffKeys(k)]
@@ -729,7 +750,7 @@ async function manualMove(shopId, { key, body, actor }) {
     }
     const settings = await stock.settingsOf(shopId, c);
     //  دفترِ دستگاه پیش از اصلاح: شمارش و انتقال روی موجودیِ امروز حساب شوند
-    await ingestTx(c, shopId, at, settings);
+    ingested = await ingestTx(c, shopId, at, settings);
     const p = (await c.query('SELECT product_id FROM catalog_products WHERE shop_id=$1 AND product_id=$2', [shopId, m.productId])).rows[0];
     if (!p) throw notFound('کالا پیدا نشد', 'product_not_found');
 
@@ -765,6 +786,9 @@ async function manualMove(shopId, { key, body, actor }) {
     )).rows;
     return { moves: rows.map(moveView), replayed: false, unchanged: false };
   });
+  //  کنار گذاشتنِ کسرِ سفارشیِ پیشین در همین تراکنش ⇒ همان سطرِ ممیزیِ خواندنِ کاتالوگ
+  await afterIngest(shopId, ingested);
+  return out;
 }
 
 /** آستانهٔ «موجودیِ کم» برای یک مکان (§۳۲.۲ بندِ ۷)؛ null ⇒ برداشتنِ آستانه. */

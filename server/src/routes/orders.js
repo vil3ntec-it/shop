@@ -50,6 +50,12 @@ const needWrite = wrap(async (req, res, next) => {
 router.get('/config', wrap(async (req, res) => {
   const st = await orders.stateOf(req.shopId);
   const ledger = require('../lib/order-ledger');
+  //  برنامه‌ای که «فروشِ تحویل» دارد (`caps=saleOnHandover`) ⇒ کفِ تحویلِ این دکان (یک بار، همین
+  //  لحظه)؛ برنامهٔ کهنه یا پنل ⇒ فقط خواندن (تا هیچ برنامه‌ای کف نگذاشته: null ⇒ هیچ فروشی)
+  const caps = String(req.query.caps || '').split(',').map((s) => s.trim());
+  const handoverSince = caps.includes(ledger.SALE_CAP)
+    ? await ledger.claimFloor(req.shopId, req.user.id)
+    : await ledger.sinceOf(req.shopId);
   res.json({
     ...st,
     //  دفترِ بازپرداخت (§۳۸.۷، FIN-01) — پیش‌فرض خاموش
@@ -60,10 +66,10 @@ router.get('/config', wrap(async (req, res) => {
     //  «فروشِ تحویل در برنامه» (تصمیمِ صاحبِ مخزن): برنامه فقط وقتی سرور این را می‌گوید فروش
     //  می‌سازد (سرورِ کهنه هنوز خودش کم می‌کرد ⇒ دو بار)؛ تحویلِ پیش از `handoverSince` هرگز.
     saleOnHandover: true,
-    handoverSince: ledger.FLOOR,
+    handoverSince,
     permissions: {
       ...Object.fromEntries(['create', 'manage', 'contact', 'refund'].map((k) => [k, can(req.role, `orders.${k}`)])),
-      //  همان سنجشِ Sync v1: نقشی که این‌ها را ندارد فروش را فقط روی دستگاهِ خودش نگه می‌داشت
+      //  اجازهٔ کلیِ نقش (برای نمایش)؛ تصمیمِ هر سفارش `recordable`/`reversible` ِ `GET /handover` است
       ...ledger.capsOf(req.role),
     },
   });

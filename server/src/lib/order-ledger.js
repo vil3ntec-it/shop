@@ -18,12 +18,18 @@
  *   جاافتاده ─ [handoverPending]: سفارش‌های بیرون‌رفته‌ای که فروشی (`o-…` یا فاکتورِ W ِ
  *            قدیمی `w-…`) در دفترِ همگام‌شدهٔ دکان ندارند، و سفارش‌های برگشته‌ای که فروشِ
  *            لغونشده دارند. برنامه پیش از **هر** ثبت همین را برای همان سفارش می‌پرسد.
- *   کف ───── [FLOOR] (زمانِ به‌کارگیریِ این قابلیت روی سرور؛ `ORDERS_HANDOVER_FLOOR_MS`):
- *            تحویلِ پیش از آن هرگز فهرست نمی‌شود — آن روزها یا فاکتورِ W بود، یا کسرِ سروری
- *            (`res:…:sale`)، یا فروشِ دستیِ صندوق.
- *   اجازه ── [capsOf]: فقط نقشی که `sales`/`saleItems`/`stockMovements`/`auditLog` را می‌نویسد
- *            (و با تخفیف، `sales.discount`؛ برای لغو، `sales.cancel`) ثبت می‌کند؛ وگرنه
- *            Sync v1 ردیف را رد می‌کرد و فروش فقط روی همان دستگاه می‌ماند.
+ *   کف ───── **هر دکان جدا** ([claimFloor]): نخستین باری که برنامه‌ای که «فروشِ تحویل» را دارد
+ *            (`GET /orders/config?caps=saleOnHandover`) این دکان را دید، در «تنظیماتِ زنده»
+ *            (`live_config`، scope = دکان، کلیدِ [FLOOR_KEY]) — یک بار، هرگز جابه‌جا. هرگز زودتر
+ *            از زمانِ به‌کارگیری ([deployFloor]، `ORDERS_HANDOVER_FLOOR_MS`). تحویلِ پیش از کف
+ *            هرگز فهرست نمی‌شود — آن روزها یا فاکتورِ W بود، یا کسرِ سروری (`res:…:sale`)، یا
+ *            فروشِ دستیِ صندوق؛ و تا هیچ برنامه‌ای کف نگذاشته، هیچ (برنامهٔ کهنه فروش نمی‌سازد).
+ *   اجازه ── **هر سفارش جدا** ([judgeOf] ⇒ `recordable`/`reversible` روی هر ردیف): همان سنجشِ
+ *            Sync v1 برای **همین کاربر** — نوشتنِ `sales`/`saleItems`/`stockMovements`/`auditLog`
+ *            ([capsOf])، و با تخفیف `sales.discount` با اجازهٔ مؤثر (لایه‌های نقش و عضو،
+ *            `perm-core.evaluate`) روی درصد و مبلغِ تخفیفِ **همین سفارش**؛ برای لغو `sales.cancel`.
+ *            «نیازمندِ تأیید» یا بیش از سقف ⇒ نه (v1 بی برگه ردش می‌کرد و فروش فقط روی همان دستگاه
+ *            می‌ماند) ⇒ برنامه آن را به دستگاهِ صاحب/مدیر می‌سپارد و در فهرست می‌شمارد.
  *
  * فاکتورهای W ِ پیش از این تصمیم (`order_ledger_docs`، migration 095، و حلقه‌هایشان در
  * `hash_chain`) دست‌نخورده می‌مانند؛ این پرونده فقط می‌خواندشان (`docsOf`) و برنامه آن‌ها
@@ -33,24 +39,39 @@
  * ⛔ `lib/sync-v1.js` دست نمی‌خورد.
  */
 const { can } = require('./permissions');
+const core = require('./perm-core');
+const staffPerms = require('./staff-perms');
 
 const SERIES = 'W';
 /** سریِ فاکتورِ تحویلِ سفارش در برنامه (هیچ دستگاهی آن را نمی‌گیرد: `doc-series.LETTERS` بی O) */
 const ORDER_SERIES = 'O';
 /** گذارهایی که کالا را از دکان بیرون می‌برند ⇒ برنامه فروش را ثبت می‌کند */
 const HANDED_OVER = Object.freeze(['picked_up', 'out_for_delivery', 'delivered']);
-/** وضعیت‌هایی که کالا هنوز بیرون است ⇒ فروش باید در دفتر باشد */
+/**
+ * وضعیت‌هایی که کالا هنوز بیرون است ⇒ فروش باید در دفتر باشد. `refunded_partial`: بخشی از پول
+ * برگشت ولی کالا پیشِ مشتری ماند (`refunded_full` نه: کالا یا پولش کامل برگشته است).
+ */
 const OUT_OF_SHOP = Object.freeze([
   'picked_up', 'out_for_delivery', 'delivered', 'delivery_failed', 'retry_scheduled', 'return_requested',
+  'refunded_partial',
 ]);
 /** کالا به دکان برگشت ⇒ فروشِ تحویل لغو می‌شود */
 const BACK_IN_SHOP = Object.freeze(['returned_to_store', 'restocked']);
 const MAX_PENDING = 50;
-/** کف: زمانِ به‌کارگیریِ «فروشِ تحویل در برنامه» روی سرور (پیش‌فرض: روزِ ادغام) */
-const FLOOR = (() => {
+/** کلیدِ کفِ هر دکان در «تنظیماتِ زنده» (scope = شناسهٔ دکان) */
+const FLOOR_KEY = 'shop.orders.handover_floor';
+/** پرچمِ توانِ برنامه در `GET /orders/config?caps=…` */
+const SALE_CAP = 'saleOnHandover';
+
+/**
+ * زمانِ به‌کارگیریِ این قابلیت روی سرور (`ORDERS_HANDOVER_FLOOR_MS`، میلی‌ثانیه) — کفِ هیچ دکانی
+ * پیش از آن نیست. بی env ⇒ ۰: کفِ ذخیره‌شده خودش لحظهٔ نخستین config پس از به‌کارگیری است.
+ * هر بار خوانده می‌شود (عوض کردنش راه‌اندازیِ دوباره نمی‌خواهد).
+ */
+function deployFloor() {
   const v = Number(process.env.ORDERS_HANDOVER_FLOOR_MS);
-  return Number.isSafeInteger(v) && v > 0 ? v : Date.UTC(2026, 9, 20);
-})();
+  return Number.isSafeInteger(v) && v > 0 ? v : 0;
+}
 /** جدول‌هایی که ثبتِ فروشِ تحویل می‌نویسد */
 const SALE_TABLES = Object.freeze(['sales', 'saleItems', 'stockMovements', 'auditLog']);
 
@@ -98,6 +119,59 @@ function docView(r) {
   };
 }
 
+/** کفِ ذخیره‌شدهٔ دکان (میلی‌ثانیه) — یا null اگر هنوز هیچ برنامهٔ «فروشِ تحویل» آن را ندیده */
+async function floorOf(shopId) {
+  const db = require('../db');
+  const r = await db.one('SELECT value FROM live_config WHERE scope=$1 AND key=$2', [String(shopId), FLOOR_KEY]);
+  const v = r ? Number(decode(r.value)) : NaN;
+  return Number.isSafeInteger(v) && v > 0 ? v : null;
+}
+
+/** کفِ مؤثرِ دکان: max(کفِ ذخیره‌شده، زمانِ به‌کارگیری) — یا null (هیچ تحویلی فهرست نمی‌شود) */
+async function sinceOf(shopId) {
+  const v = await floorOf(shopId);
+  return v === null ? null : Math.max(v, deployFloor());
+}
+
+/**
+ * برنامه‌ای که «فروشِ تحویل» دارد این دکان را می‌بیند ⇒ کف اگر نیست همین لحظه (زمانِ سرور) گذاشته
+ * می‌شود؛ هست ⇒ دست نمی‌خورد (دو دستگاهِ هم‌زمان: نخستین درج می‌ماند). ⇒ کفِ مؤثر.
+ */
+async function claimFloor(shopId, by = '') {
+  const have = await sinceOf(shopId);
+  if (have !== null) return have;
+  const db = require('../db');
+  await require('./live-config').setOnce(String(shopId), FLOOR_KEY, Math.max(db.now(), deployFloor()), `app:${String(by || '')}`.slice(0, 80));
+  return sinceOf(shopId);
+}
+
+/**
+ * اجازهٔ ثبت و لغوِ فروشِ تحویل برای **همین کاربر** و **همین سفارش** — همان سنجشی که Sync v1
+ * (`authorizeOp` + `staff-approval.v1Guard`) روی opهای همان فروش می‌کند:
+ *   ثبت ⇒ [capsOf].recordSale؛ با تخفیف: `can(sales.discount)` و `evaluate(sales.discount,
+ *          {pct, amount})` = allow — درصد از جمعِ پیش از تخفیف (قلم‌ها + کرایه = `sale.total`).
+ *   لغو ⇒ recordSale، `can(sales.cancel)` و `evaluate(sales.cancel)` = allow.
+ * «نیازمندِ تأیید» = نه: برنامه برگه‌ای نمی‌آورد و v1 بی برگه ردش می‌کند.
+ */
+async function judgeOf(shopId, viewer) {
+  const role = viewer && viewer.role;
+  const base = capsOf(role);
+  const layers = await staffPerms.layersFor(shopId, role, viewer && viewer.id);
+  const allow = (perm, req) => core.evaluate(role, layers, perm, req).decision === 'allow';
+  return {
+    recordable(o) {
+      if (!base.recordSale) return false;
+      const d = Number(o.discountMinor) || 0;
+      if (d <= 0) return true;
+      const bp = core.discountBp(d, (Number(o.subtotalMinor) || 0) + (Number(o.deliveryFeeMinor) || 0));
+      return can(role, 'sales.discount') && allow('sales.discount', { pct: bp / 100, amount: d });
+    },
+    reversible(o) {
+      return base.recordSale && can(role, 'sales.cancel') && allow('sales.cancel', { amount: Number(o.totalMinor) || 0 });
+    },
+  };
+}
+
 /** سندهای W ِ قدیمیِ یک سفارش (پنل و آزمون) */
 async function docsOf(run, orderId) {
   const q = typeof run === 'function' ? run : (t, p) => run.query(t, p);
@@ -115,21 +189,24 @@ function parseAfter(raw) {
  * سفارش‌هایی که برنامه باید برایشان کاری بکند — فقط‌خواندنی، به ترتیبِ زمانِ تحویل.
  *
  *   items ────── `action: 'sale'`: بیرون رفته (OUT_OF_SHOP)، **یکی از** گذارهای تحویلش
- *                از `max(since, FLOOR)` به بعد است (سفارشی که پیش از آن «ارسال» و پس از آن
+ *                از `max(since, کفِ دکان)` به بعد است (سفارشی که پیش از آن «ارسال» و پس از آن
  *                «رسید» شده هم می‌آید)، و هیچ فروشی (`o-…`/`w-…`) در دفترِ همگام‌شده ندارد.
+ *                `recordable`: همین کاربر می‌تواند فروشِ همین سفارش را بنویسد ([judgeOf]).
  *                صفحه‌بندی با `after` (`<زمان>:<شناسه>`)؛ سفارشی که برنامه نتوانست ثبت کند
  *                (کمبود، اجازه) جلوی بقیه را نمی‌گیرد.
- *   reversals ── `action: 'reverse'`: به دکان برگشته و فروشِ `o-…` ِ لغونشده دارد.
+ *   reversals ── `action: 'reverse'`: به دکان برگشته و فروشِ `o-…` ِ لغونشده دارد؛ `reversible`.
  *   `orderId` ⇒ فقط همان سفارش (برنامه پیش از هر ثبتِ دستی یا پس از «وضعیت عوض شد» می‌پرسد).
- * سفارشِ آزمایشی هرگز.
+ * سفارشِ آزمایشی هرگز. دکانی که هنوز کف ندارد ⇒ هیچ (`since: null`).
  */
 async function handoverPending(shopId, { since = 0, after = '', orderId = '', limit } = {}, viewer) {
   const db = require('../db');
   const orders = require('./orders');
   const lim = Math.min(Math.max(Number(limit) || 20, 1), MAX_PENDING);
-  const asked = Number(since);
-  const from = Math.max(FLOOR, Number.isSafeInteger(asked) && asked > 0 ? asked : 0);
   const cur = parseAfter(after);
+  const floor = await sinceOf(shopId);
+  if (floor === null) return { items: [], reversals: [], since: null, nextAfter: null, serverTime: Date.now() };
+  const asked = Number(since);
+  const from = Math.max(floor, Number.isSafeInteger(asked) && asked > 0 ? asked : 0);
   const only = String(orderId || '').slice(0, 64);
   const v3 = (await db.one("SELECT to_regclass('sync_v3_rows') AS t")).t;
   const rowsOf = (table, cond) => `SELECT 1 FROM ${table} r WHERE r.app='shop' AND r.account_kind='shop'
@@ -177,10 +254,14 @@ async function handoverPending(shopId, { since = 0, after = '', orderId = '', li
     rparams
   );
 
+  const judge = await judgeOf(shopId, viewer);
   const view = async (r, action) => {
     const o = await orders.get(shopId, r.id, viewer);
     const at = Number(r.at);
-    return { ...o, action, saleId: saleIdOf(r.id), ...(action === 'sale' ? { handedOverAt: at } : { returnedAt: at }) };
+    return {
+      ...o, action, saleId: saleIdOf(r.id),
+      ...(action === 'sale' ? { handedOverAt: at, recordable: judge.recordable(o) } : { returnedAt: at, reversible: judge.reversible(o) }),
+    };
   };
   const items = [];
   for (const r of page) items.push(await view(r, 'sale'));
@@ -194,6 +275,6 @@ async function handoverPending(shopId, { since = 0, after = '', orderId = '', li
 }
 
 module.exports = {
-  SERIES, ORDER_SERIES, HANDED_OVER, OUT_OF_SHOP, BACK_IN_SHOP, MAX_PENDING, FLOOR, SALE_TABLES,
-  saleIdOf, legacySaleIdOf, chainOf, docsOf, capsOf, handoverPending,
+  SERIES, ORDER_SERIES, HANDED_OVER, OUT_OF_SHOP, BACK_IN_SHOP, MAX_PENDING, FLOOR_KEY, SALE_CAP, SALE_TABLES,
+  saleIdOf, legacySaleIdOf, chainOf, docsOf, capsOf, judgeOf, deployFloor, floorOf, sinceOf, claimFloor, handoverPending,
 };
