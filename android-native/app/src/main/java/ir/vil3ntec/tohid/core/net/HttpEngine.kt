@@ -89,13 +89,18 @@ class HttpEngine(
     token: String? = null,
     idempotent: Boolean = method == "GET",
     raw: RawBody? = null,
+    /**
+     *  سرآیندهای همین درخواست (مثلِ بلیتِ شمارهٔ خریدار `X-Store-Ticket` یا
+     *  `Idempotency-Key`). ⛔ چیزِ شناسایی‌کنندهٔ کاربر جز همان بلیت‌ها نه.
+     */
+    headers: Map<String, String> = emptyMap(),
   ): JsonObject = withContext(Dispatchers.IO) {
     var attempt = 0
     var wait = ApiConfig.RETRY_BACKOFF_MS
 
     while (true) {
       try {
-        return@withContext once(method, path, body, token, raw)
+        return@withContext once(method, path, body, token, raw, headers)
       } catch (failure: ApiFailure) {
         val canRetry = idempotent && failure.retryable && attempt < ApiConfig.MAX_RETRIES
         if (!canRetry) throw failure
@@ -120,10 +125,11 @@ class HttpEngine(
     body: JsonObject?,
     token: String?,
     raw: RawBody? = null,
+    headers: Map<String, String> = emptyMap(),
   ): JsonObject {
     val first = prefix
     try {
-      return attempt(method, path, body, token, first, raw)
+      return attempt(method, path, body, token, first, raw, headers)
     } catch (failure: ApiFailure) {
       /*
        *  ── چرا رمزِ غلط از این آزمون بیرون است ────────────────────────
@@ -161,7 +167,7 @@ class HttpEngine(
        *  **انجام نداده**. چیزی دو بار ثبت نمی‌شود.
        */
       val value = try {
-        attempt(method, path, body, token, other)
+        attempt(method, path, body, token, other, headers = headers)
       } catch (_: ApiFailure) {
         //  دومی هم نشد: خطای **اولی** را می‌گوییم، چون پاسخِ مسیرِ اصلی
         //  است و پیامش به کار می‌آید
@@ -182,6 +188,7 @@ class HttpEngine(
     token: String?,
     prefix: String,
     raw: RawBody? = null,
+    headers: Map<String, String> = emptyMap(),
   ): JsonObject {
     val base = baseUrl()
     ApiConfig.reject(base, allowInsecure)?.let { reason ->
@@ -206,6 +213,7 @@ class HttpEngine(
       runCatching { identity() }.getOrNull()?.forEach { (k, v) ->
         if (v.isNotBlank()) connection.setRequestProperty(k, v)
       }
+      headers.forEach { (k, v) -> if (v.isNotBlank()) connection.setRequestProperty(k, v) }
 
       /*
        *  ⚠️ **بدنهٔ خام، نه JSON.**

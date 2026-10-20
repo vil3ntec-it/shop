@@ -40,11 +40,12 @@ class ApiClient(
 
   /* ------------------------ درخواست‌های بی‌نیاز به ورود ------------------------ */
 
-  suspend fun getPublic(path: String): JsonObject =
-    engine.send("GET", path, token = null)
+  /** @param headers سرآیندهای همین درخواست — مثلِ بلیتِ شمارهٔ خریدار (`X-Store-Ticket`) */
+  suspend fun getPublic(path: String, headers: Map<String, String> = emptyMap()): JsonObject =
+    engine.send("GET", path, token = null, headers = headers)
 
-  suspend fun postPublic(path: String, body: JsonObject): JsonObject =
-    engine.send("POST", path, body = body, token = null)
+  suspend fun postPublic(path: String, body: JsonObject, headers: Map<String, String> = emptyMap()): JsonObject =
+    engine.send("POST", path, body = body, token = null, headers = headers)
 
   /* ------------------------ درخواست‌های حساب‌دار ------------------------ */
 
