@@ -16,6 +16,11 @@ on:
       - '.github/workflows/spec.yml'
   workflow_dispatch:
 
+concurrency:
+  #  PR: pushِ تازه اجرای قبلیِ همان PR را لغو می‌کند. اجرای main هرگز وسطِ کار لغو نمی‌شود.
+  group: spec-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
 
