@@ -199,6 +199,23 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+      #  فقط شاخهٔ پیش‌نمایشِ گوشی نسخهٔ ۳: پیوندِ مستقیم برای دیدنِ صاحب محصول.
+      #  پسوند عمداً `.apk` نیست تا هیچ برنامهٔ نصب‌شده‌ای آن را به‌روزرسانی نپندارد.
+      - name: پیش‌نمایش برای صاحب محصول
+        if: ${{ github.ref == 'refs/heads/ccr-3a0d593c-ac0jpj-phone-v3-preview' }}
+        working-directory: android-native
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          f=out/VILL3N-phone-v3-preview.apk.preview
+          cp app/build/outputs/apk/release/app-release.apk "$f"
+          if ! gh release view tohid-native-preview -R "${{ github.repository }}" >/dev/null 2>&1; then
+            gh release create tohid-native-preview -R "${{ github.repository }}" --prerelease --target "${{ github.sha }}" \
+              -t "پیش‌نمایشِ گوشی نسخهٔ ۳ — فقط برای دیدن" \
+              -n "پیش‌نمایشِ کارِ در جریان برای صاحب محصول؛ به‌روزرسانیِ برنامه‌ها نیست. پس از دانلود، پسوندِ .preview را بردارید تا .apk شود."
+          fi
+          gh release upload tohid-native-preview "$f" --clobber -R "${{ github.repository }}"
+
       # ⛔ فقط از main به گوشی‌ها می‌رسد. پیش‌تر هر push روی شاخه‌ی
       # `claude/**` برچسب را جابه‌جا و APK را جایگزین می‌کرد؛ یعنی کارِ
       # نیمه‌تمام و بازبینی‌نشده خودکار روی گوشیِ همه‌ی دکان‌ها می‌نشست.
