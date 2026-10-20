@@ -1,0 +1,98 @@
+/**
+ * Tests for the quality gate itself: ratchet arithmetic, detectors and the
+ * committed baseline. Run: node --test tools/quality/
+ */
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import { checkPerFile, lowerPerFile, lowerTotals, attribute } from './lib/ratchet.mjs';
+import { lineCount, findAll, duplicateMigrations } from './lib/measure.mjs';
+import { DUPLICATE_HELPERS, PRODUCT_LITERAL, MAX_LINES, MIGRATION_NAME, isSource, globToRegExp } from './rules.mjs';
+import { parseLcov } from './checks/coverage.mjs';
+
+const rule = (id) => DUPLICATE_HELPERS.find((r) => r.id === id);
+const hits = (id, text) => findAll(text, rule(id).pattern, rule(id).confirm).length;
+
+test('per-file caps: listed files may not grow, others get the default cap', () => {
+  const caps = { 'big.kt': 900, 'shrunk.kt': 1000 };
+  const current = new Map([['big.kt', 901], ['shrunk.kt', 950], ['new.kt', 801], ['small.kt', 10]]);
+  const { over, lowerable } = checkPerFile(caps, current, MAX_LINES);
+  assert.deepEqual(over.map((o) => [o.file, o.listed]), [['big.kt', true], ['new.kt', false]]);
+  assert.deepEqual(lowerable.map((l) => l.file), ['shrunk.kt']);
+});
+
+test('lowering never raises a cap and drops files back under the limit or deleted', () => {
+  const caps = { 'a.kt': 900, 'b.kt': 900, 'gone.kt': 1200, 'fixed.kt': 850 };
+  const next = lowerPerFile(caps, new Map([['a.kt', 950], ['b.kt', 820], ['fixed.kt', 700]]), MAX_LINES);
+  assert.deepEqual(next, { 'a.kt': 900, 'b.kt': 820 });
+  assert.deepEqual(lowerTotals({ afn: 3, minorOf: 2 }, { afn: 1, minorOf: 5 }), { afn: 1, minorOf: 2 });
+});
+
+test('attribution: only a change that touched the file and made it worse is "introduced"', () => {
+  const changed = new Map([['grew.js', 'grew.js'], ['same.js', 'same.js'], ['added.js', null], ['moved.js', 'old.js']]);
+  const before = { 'grew.js': 5, 'same.js': 7, 'old.js': 3 };
+  const at = (base) => (base == null ? null : before[base]);
+  assert.equal(attribute('grew.js', 6, changed, at), 'introduced');
+  assert.equal(attribute('same.js', 7, changed, at), 'pre-existing');
+  assert.equal(attribute('added.js', 1, changed, at), 'introduced');
+  assert.equal(attribute('moved.js', 3, changed, at), 'pre-existing');
+  assert.equal(attribute('untouched.js', 99, changed, at), 'pre-existing');
+  assert.equal(attribute('x.js', 1, null, at), 'unknown');
+});
+
+test('duplicate migration numbers are found; distinct numbers pass', () => {
+  assert.deepEqual(duplicateMigrations(['101_a.sql', '102_b.sql', '102_c.sql', '0102_d.sql'], MIGRATION_NAME),
+    [{ number: 102, files: ['0102_d.sql', '102_b.sql', '102_c.sql'] }]);
+  assert.deepEqual(duplicateMigrations(['001_a.sql', '002_b.sql', 'notes.txt'], MIGRATION_NAME), []);
+});
+
+test('helper detectors: real declarations count, comments and look-alikes do not', () => {
+  assert.equal(hits('afn', 'private fun afn(minor: Long): String = ""\nfun Long.afn() = 1\n// fun afn(x)'), 2);
+  assert.equal(hits('minorOf', 'internal fun minorOf(text: String): Long? = null\nval y = minorOf(t)'), 1);
+  assert.equal(hits('StatusPill', 'private fun StatusPill(text: String) {}\nStatusPill("a")'), 1);
+  const htmlEsc = "function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }";
+  const csvEsc = 'const esc = (v) => /[",\\n]/.test(v) ? `"${v}"` : v;';
+  assert.equal(hits('html-escape', `${htmlEsc}\n${csvEsc}`), 1);
+  assert.equal(hits('secret-derivation', "return config.secrets.api || config.secrets.jwt || 'x';"), 1);
+  assert.equal(hits('secret-derivation', 'if (!config.secrets.api || config.secrets.api.length < 24) {}'), 0);
+});
+
+test("product literals: comparisons and case labels count, plain values do not", () => {
+  const n = (s) => findAll(s, PRODUCT_LITERAL.pattern).length;
+  assert.equal(n("if (app === 'pump') {}\nif ('shop' !== kind) {}\nswitch (a) { case \"pump\": }"), 3);
+  assert.equal(n("const app = 'pump';\n// if (app === 'shop')"), 0);
+});
+
+test('source files: tests, vectors, vendor and the frozen app are excluded', () => {
+  assert.ok(isSource('server/src/lib/delivery.js'));
+  assert.ok(isSource('android-native/app/src/main/java/a/Sale.kt'));
+  for (const f of ['server/test/a.test.js', 'android-native/app/src/test/java/a/SaleTest.kt',
+    'core/test-vectors/x.json', 'server/public/vendor/lib.js', 'x.min.js', 'index.html', 'README.md']) {
+    assert.equal(isSource(f), false, f);
+  }
+});
+
+test('glob matching for ESLint scopes', () => {
+  const core = globToRegExp('license/*-core.js');
+  assert.ok(core.test('license/pay-core.js'));
+  assert.equal(core.test('license/sub/pay-core.js'), false);
+  const server = globToRegExp('server/src/**/*.js');
+  assert.ok(server.test('server/src/app.js'));
+  assert.ok(server.test('server/src/lib/delivery.js'));
+  assert.equal(server.test('server/test/a.js'), false);
+});
+
+test('lcov parsing and line counting', () => {
+  assert.deepEqual(parseLcov('SF:src/a.js\nDA:1,1\nLF:10\nLH:7\nend_of_record\n'), [{ file: 'src/a.js', found: 10, hit: 7 }]);
+  assert.equal(lineCount('a\nb\n'), 2);
+  assert.equal(lineCount(''), 0);
+});
+
+test('the committed baseline is well formed', () => {
+  const b = JSON.parse(fs.readFileSync(new URL('./baseline.json', import.meta.url), 'utf8'));
+  for (const [f, n] of Object.entries(b.fileSize)) assert.ok(Number.isInteger(n) && n > MAX_LINES, f);
+  for (const [f, n] of Object.entries(b.productLiterals)) assert.ok(Number.isInteger(n) && n > 0, f);
+  assert.deepEqual(Object.keys(b.duplicateHelpers).sort(), DUPLICATE_HELPERS.map((r) => r.id).sort());
+  for (const n of Object.values(b.duplicateHelpers)) assert.ok(Number.isInteger(n) && n >= 0);
+  assert.ok(b.frozen['index.html'].lines > 0 && b.frozen['index.html'].bytes > 0);
+});
