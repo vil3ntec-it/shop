@@ -72,6 +72,8 @@ fun PhoneMoreScreen(
   )
   var page by rememberSaveable { mutableStateOf<String?>(null) }
   BackHandler(enabled = page != null) { page = null }
+  //  زیرِ نوارِ شناور: جای نوار و نوارِ سیستم، مثلِ خانه
+  val navBottom = if (bottomReserve > 0.dp) WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() else 0.dp
   val scroll = rememberScrollState()
 
   val toEnd = MoreShot.scrollToEnd.value
@@ -89,7 +91,7 @@ fun PhoneMoreScreen(
           Column(Modifier.widthIn(max = 560.dp).fillMaxWidth()) {
             Spacer(Modifier.height(6.dp))
             V3LargeHeader("بیشتر")
-            Column(Modifier.padding(start = 20.dp, end = 20.dp, bottom = 32.dp + bottomReserve)) {
+            Column(Modifier.padding(start = 20.dp, end = 20.dp, bottom = 32.dp + bottomReserve + navBottom)) {
               groups.forEach { g ->
                 V3GroupTitle(g.title, Modifier.padding(top = 14.dp))
                 V3Card {
@@ -117,7 +119,7 @@ fun PhoneMoreScreen(
           }
         }
       } else {
-        MoreAppPage(d, onBack = { page = null })
+        MoreAppPage(d, bottomReserve + navBottom, onBack = { page = null })
       }
     }
   }
@@ -146,12 +148,12 @@ private fun moreIcon(item: MoreLayout.Item): ImageVector? = item.settingsGroup?.
 
 /** زیرصفحهٔ «نسخه و به‌روزرسانی»: کنترل‌های به‌روزرسانی و شمارِ دفتر */
 @Composable
-private fun MoreAppPage(d: ShopData, onBack: () -> Unit) {
+private fun MoreAppPage(d: ShopData, bottom: androidx.compose.ui.unit.Dp, onBack: () -> Unit) {
   val c = PhoneV3.colors
   Column(Modifier.fillMaxSize()) {
     V3Header("نسخه و به‌روزرسانی", onBack)
     Column(
-      Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, bottom = 32.dp),
+      Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, bottom = 32.dp + bottom),
     ) {
       //  نسخهٔ بازار خودش را به‌روز نمی‌کند — به‌روزرسانی فقط از خودِ بازار (قانونِ بازار)
       if (BuildConfig.STORE != "bazaar") {

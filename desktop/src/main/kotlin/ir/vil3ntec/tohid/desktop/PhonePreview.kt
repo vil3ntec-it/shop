@@ -151,9 +151,14 @@ private fun PhonePreviewContent(screen: String, store: ShopStore, dark: Boolean)
             else -> SettingsNav.Request(group = SettingsLayout.GENERAL)
           }
         }
+        //  مثلِ `AppRoot`ِ گوشی: تا ته و نوارِ شناورِ r10 رویش (تنظیمات تب نیست ⇐ هیچ موردی فعال نیست)
         key(screen) {
-          SettingsScreen(store, data, snackbar, if (dark) ThemeChoice.DARK else ThemeChoice.LIGHT, {}, onBack = {}, onUpdates = {})
+          SettingsScreen(
+            store, data, snackbar, if (dark) ThemeChoice.DARK else ThemeChoice.LIGHT, {},
+            onBack = {}, bottomReserve = PhoneNav.RESERVE, onUpdates = {},
+          )
         }
+        PhoneNavBar(NavLayouts.DEFAULT, "settings", onPick = {}, onEdit = null, modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth())
       }
       "v3-more", "v3-more-bottom" -> Box(Modifier.weight(1f).fillMaxWidth()) {
         DisposableEffect(screen) {

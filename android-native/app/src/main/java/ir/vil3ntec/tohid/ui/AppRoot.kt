@@ -464,10 +464,14 @@ fun AppRoot(
     !ir.vil3ntec.tohid.ui.components.pos.PhoneCartUi.sheetOpen.value
   val navReserve = ir.vil3ntec.tohid.ui.components.common.PhoneNav.RESERVE +
     (if (renewDays != null) ir.vil3ntec.tohid.ui.components.common.PhoneNav.RENEW_RESERVE else 0.dp)
-  //  صفحه‌هایی که سربرگِ خودشان را دارند (r7 خانه، جست‌وجو، ویرایشگرِ نوار)
+  //  صفحه‌هایی که سربرگِ خودشان را دارند (r7 خانه، جست‌وجو، ویرایشگرِ نوار، و r4/r5:
+  //  «حساب من» با عنوانِ درشت و زنگ، «تنظیمات» و «بیشتر» با سربرگِ خودشان)
   val ownHeader = phoneNav && current in setOf(
     "dashboard", ir.vil3ntec.tohid.ui.components.common.PhoneNav.SEARCH, ir.vil3ntec.tohid.ui.components.common.PhoneNav.EDITOR,
+    "profile", "settings", "more",
   )
+  //  صفحه‌هایی که تا تهِ صفحه زیرِ نوارِ شناور کشیده می‌شوند و جای نوار را خودشان نگه می‌دارند
+  val underNav = setOf("dashboard", "profile", "more", "settings")
 
   //  ویترین (فاز ۴): فقط وقتی سرور می‌گوید روشن است، بخشش دیده می‌شود
   LaunchedEffect(Unit) { runCatching { StorefrontGate.refresh(context) } }
@@ -581,8 +585,8 @@ fun AppRoot(
        *  نمی‌شود و خروجی و چاپ باز می‌مانند؛ همین را هم صریح می‌گوید،
        *  وگرنه کاربر گمان می‌کند دفترش رفته.
        */
-      //  خانهٔ گوشی همین را در کارت‌های «هشدارها و پیام‌ها» دارد
-      if (!(phoneNav && current == "dashboard")) SubscriptionBanner { sub = "myplan" }
+      //  خانهٔ گوشی همین را در کارت‌های «هشدارها و پیام‌ها» دارد، و «حساب من» در نوارِ تیرهٔ کارتش
+      if (!(phoneNav && (current == "dashboard" || current == "profile"))) SubscriptionBanner { sub = "myplan" }
       //  نسخهٔ تازه — بررسیِ خودکار و نصب با یک دکمه (اندروید و کامپیوتر)
       UpdateBanner()
       }
@@ -704,7 +708,7 @@ fun AppRoot(
       //  جای نوارِ شناور: خانه خودش زیرِ نوار می‌کشد؛ صفحهٔ بی‌نوار (فروش) فقط نوارِ سیستم
       val pageBottom = when {
         !phoneNav -> 0.dp
-        navVisible && current == "dashboard" -> 0.dp
+        navVisible && current in underNav -> 0.dp
         navVisible -> navReserve + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
         else -> WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
       }
@@ -764,7 +768,11 @@ fun AppRoot(
                 "درباره برنامه" to androidx.compose.material.icons.Icons.Filled.Info,
               ),
             ) { SettingsScreen(store, data, snackbar, theme, onTheme) { open("more") } }
-            else SettingsScreen(store, data, snackbar, theme, onTheme) { open("more") }
+            else SettingsScreen(
+              store, data, snackbar, theme, onTheme,
+              onBack = { if (sub != null) sub = null else open("dashboard") },
+              bottomReserve = if (navVisible) navReserve else 0.dp,
+            ) { open("more") }
           } else {
             LaunchedEffect(Unit) { open("more") }
           }
@@ -856,12 +864,13 @@ fun AppRoot(
           onBack = { if (sub != null) sub = null else open("dashboard") },
           onSignIn = { authOpen = true },
           onSubscription = { sub = "vip" },
+          bottomReserve = if (navVisible) navReserve else 0.dp,
         )
         "team" -> TeamScreen(snackbar)
         "orders" -> OrdersScreen(snackbar) { sub = null }
         "storefront" -> if (StorefrontGate.visible) StorefrontScreen(snackbar) else LaunchedEffect(Unit) { open("more") }
         "devices" -> DevicesScreen(data, snackbar)
-        "more" -> MoreScreen(store, data, ::open)
+        "more" -> MoreScreen(store, data, ::open, bottomReserve = if (navVisible) navReserve else 0.dp)
       }
       }
       }

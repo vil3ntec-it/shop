@@ -259,6 +259,7 @@ fun ProfileScreen(
           },
           createdAt = createdAt,
           busy = busy,
+          bottom = if (bottomReserve > 0.dp) bottomReserve + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() else 0.dp,
           onBack = { page = ROOT },
           onPhoto = { pickOpen = true },
           onSave = save@{
@@ -527,7 +528,9 @@ private fun ProfileRoot(
       }
       Spacer(Modifier.height(if (ownHeader) 0.dp else 12.dp))
       ProfileMenu(menu, onMenu)
-      Spacer(Modifier.height(24.dp + bottomReserve))
+      //  زیرِ نوارِ شناور: جای نوار و نوارِ سیستم، مثلِ خانه
+      val navBottom = if (bottomReserve > 0.dp) WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() else 0.dp
+      Spacer(Modifier.height(24.dp + bottomReserve + navBottom))
     }
   }
 }
@@ -769,6 +772,8 @@ private fun ProfileEditPage(
   onShopName: (String) -> Unit,
   createdAt: Long,
   busy: Boolean,
+  /** جای نوارِ شناور زیرِ صفحه */
+  bottom: Dp,
   onBack: () -> Unit,
   onPhoto: () -> Unit,
   onSave: () -> Unit,
@@ -786,7 +791,7 @@ private fun ProfileEditPage(
       Modifier
         .fillMaxSize()
         .verticalScroll(rememberScrollState())
-        .padding(start = 16.dp, end = 16.dp, bottom = 32.dp),
+        .padding(start = 16.dp, end = 16.dp, bottom = 32.dp + bottom),
       horizontalAlignment = Alignment.CenterHorizontally,
     ) {
       Column(Modifier.widthIn(max = 520.dp).fillMaxWidth()) {

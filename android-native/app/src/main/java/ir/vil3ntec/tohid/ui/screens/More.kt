@@ -39,11 +39,17 @@ import ir.vil3ntec.tohid.ui.theme.Shop
  *  نوارِ پایین جا نمی‌شوند.
  */
 @Composable
-fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
+fun MoreScreen(
+  store: ShopStore,
+  d: ShopData,
+  onOpen: (String) -> Unit,
+  /** گوشی: جای نوارِ شناور وقتی صفحه تا ته زیرِ آن کشیده می‌شود (`AppRoot`) */
+  bottomReserve: androidx.compose.ui.unit.Dp = 0.dp,
+) {
   //  گوشی نسخهٔ ۳ (بندِ F): کارت‌های گروهیِ r5 و «تنظیمات» در ته — `PhoneMoreScreen`.
   //  کامپیوتر همین صفحهٔ پیشین را نگه می‌دارد.
   if (!ir.vil3ntec.tohid.ui.Platform.DESKTOP) {
-    PhoneMoreScreen(d, onOpen = onOpen)
+    PhoneMoreScreen(d, bottomReserve = bottomReserve, onOpen = onOpen)
     return
   }
   val context = LocalContext.current

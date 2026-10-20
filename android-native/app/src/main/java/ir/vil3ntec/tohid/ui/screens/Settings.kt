@@ -96,6 +96,8 @@ fun SettingsScreen(
   onTheme: (ThemeChoice) -> Unit,
   /** گوشی: برگشت از ریشهٔ تنظیمات؛ null ⇒ همان صفحه‌ای که تنظیمات را باز کرد (`SettingsNav.origin`) */
   onBack: (() -> Unit)? = null,
+  /** گوشی: جای نوارِ شناور وقتی صفحه تا ته زیرِ آن کشیده می‌شود (`AppRoot`) */
+  bottomReserve: androidx.compose.ui.unit.Dp = 0.dp,
   onUpdates: () -> Unit,
 ) {
   val context = LocalContext.current
@@ -964,7 +966,7 @@ fun SettingsScreen(
       body()
     }
   } else {
-    PhoneSettingsFrame(onBack = onBack, body = body)
+    PhoneSettingsFrame(onBack = onBack, bottomReserve = bottomReserve, body = body)
   }
 
   /* ---------------------------- پنجره‌ها ---------------------------- */
