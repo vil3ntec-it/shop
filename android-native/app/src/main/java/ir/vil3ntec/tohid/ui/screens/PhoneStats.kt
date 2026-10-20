@@ -243,8 +243,12 @@ private fun PairedBars(bars: List<StatsBar>, modifier: Modifier, key: Any) {
       //  راست‌به‌چپ: بازهٔ نخست در راست
       val center = if (rtl) plotEnd - slot * (i + 0.5f) else plotStart + slot * (i + 0.5f)
       val g = grow.getOrNull(i)?.value ?: 1f
+      //  صفر (کمتر از نیم افغانی) ⇒ هیچ ستونی؛ مقدارِ کوچکِ ناصفر ⇒ دست‌کم یک ستونِ کوتاهِ خوانا، نه نقطه
+      val minH = maxOf(barW * 1.8f, 6.dp.toPx())
       fun bar(v: Double, left: Float, color: Color) {
-        val h = (if (axis > 0) (v / axis).toFloat() else 0f).coerceIn(0f, 1f) * chartH * g
+        if (v < 0.5 || axis <= 0) return
+        val full = maxOf((v / axis).toFloat().coerceIn(0f, 1f) * chartH, minH)
+        val h = full * g
         if (h <= 0.5f) return
         drawRoundRect(color, Offset(left, chartBottom - h), Size(barW, h), CornerRadius(barW / 2f, barW / 2f))
       }
