@@ -26,7 +26,11 @@ const require = createRequire(import.meta.url);
 const ROOT = path.join(import.meta.dirname, '..', '..', '..', '..');
 export const core = require(path.join(ROOT, 'license', 'sync-core.js'));
 export const MODELS_KT = path.join(ROOT, 'android-native', 'app', 'src', 'main', 'java', 'ir', 'vil3ntec', 'tohid', 'data', 'Models.kt');
-export const APP_VERSION = JSON.parse(fs.readFileSync(path.join(ROOT, 'server', 'package.json'), 'utf8')).version;
+/**
+ * `X-App-Version` ِ پیش‌فرضِ دستگاه‌ها: گوشیِ `3.2.N` بالاتر از کفِ همهٔ فیلدهای
+ * `server/src/lib/newer-fields.js` (A00) — همان قالبی که برنامهٔ واقعی می‌فرستد.
+ */
+export const APP_VERSION = '3.2.9999';
 
 /* ═══════════════════════════ Models.kt ⇒ شکلِ ردیف ═══════════════════════════ */
 
@@ -50,15 +54,24 @@ export function parseModels(file = MODELS_KT) {
   while ((m = re.exec(text))) {
     const fields = [];
     let never = false;
+    let serial = null;
+    let aliases = [];
     for (const raw of m[2].split('\n')) {
       const line = raw.replace(/\/\/.*$/, '').trim();
       if (!line) continue;
       if (/@EncodeDefault\(EncodeDefault\.Mode\.NEVER\)/.test(line)) never = true;
-      const f = /^(?:@SerialName\("([^"]+)"\)\s*)?val (\w+):\s*([^=]+?)(?:\s*=\s*(.+?))?,?$/.exec(line.replace(/^@\w+(\([^)]*\))?\s+(?=@SerialName|val )/, ''));
+      //  حاشیه‌نویسی می‌تواند روی خطِ خودش باشد (`@SerialName("amount")` بالای `val`)
+      const sn = /@SerialName\("([^"]+)"\)/.exec(line);
+      if (sn) serial = sn[1];
+      const jn = /@JsonNames\(([^)]*)\)/.exec(line);
+      if (jn) aliases = [...jn[1].matchAll(/"([^"]+)"/g)].map((x) => x[1]);
+      const f = /(?:^|\s)val (\w+):\s*([^=]+?)(?:\s*=\s*(.+?))?,?$/.exec(line);
       if (!f) continue;
-      const def = f[4] !== undefined ? literal(f[4]) : null;
-      fields.push({ name: f[2], key: f[1] || f[2], type: f[3].trim(), required: f[4] === undefined, def: def ? def.v : undefined, expr: def ? null : (f[4] || null), never });
+      const def = f[3] !== undefined ? literal(f[3]) : null;
+      fields.push({ name: f[1], key: serial || f[1], aliases, type: f[2].trim(), required: f[3] === undefined, def: def ? def.v : undefined, expr: def ? null : (f[3] || null), never });
       never = false;
+      serial = null;
+      aliases = [];
     }
     out[m[1]] = fields;
   }
@@ -102,6 +115,108 @@ export function emptyLedger() {
   return d;
 }
 
+/* ═══════════════ گذر از درِ مدل: `LedgerDiff.fromJson` ⇐ `toJson` ═══════════════ */
+
+/** نوعِ فیلد ⇒ مدلِ تو در تو (`List<SalePayment>?`، `Address?`) یا null */
+function nestedModel(type) {
+  const l = /^List<(\w+)>\??$/.exec(type);
+  if (l && MODELS[l[1]]) return { list: true, cls: l[1] };
+  const o = /^(\w+)\??$/.exec(type);
+  if (o && MODELS[o[1]]) return { list: false, cls: o[1] };
+  return null;
+}
+
+/**
+ * یک ردیف همان‌طور که برنامه پس از `decodeFromJsonElement` (با `ignoreUnknownKeys`) و
+ * `encodeToJsonElement` (با `encodeDefaults`) می‌بیند: کلیدِ ناشناختهٔ مدل می‌افتد، پیش‌فرض‌ها
+ * پر می‌شوند، `@EncodeDefault(NEVER)` با مقدارِ پیش‌فرض نوشته نمی‌شود، `@JsonNames` خوانده می‌شود.
+ */
+export function project(cls, src) {
+  const out = {};
+  for (const f of MODELS[cls]) {
+    let v = src[f.key];
+    if (v === undefined) for (const a of f.aliases || []) if (src[a] !== undefined) { v = src[a]; break; }
+    if (v === undefined) v = f.def;
+    if (v === undefined) continue;
+    const nm = nestedModel(f.type);
+    if (nm && v !== null) v = nm.list ? (Array.isArray(v) ? v.map((x) => project(nm.cls, x)) : v) : project(nm.cls, v);
+    if (f.never && (v === null || JSON.stringify(v) === JSON.stringify(f.def))) continue;
+    out[f.key] = v;
+  }
+  return out;
+}
+
+/** مدلِ ردیف‌های هر مجموعه از `ShopData` (کلیدِ `@SerialName`، مثلاً `returns`) */
+export const COLLECTION_MODEL = Object.fromEntries((MODELS.ShopData || [])
+  .map((f) => [f.key, (/^List<(\w+)>$/.exec(f.type) || [])[1]]).filter(([, c]) => c && MODELS[c]));
+
+/** همهٔ ردیف‌های مجموعه‌ها از درِ مدل؛ بقیهٔ کلیدهای دفتر دست نمی‌خورند */
+export function projectLedger(tree) {
+  const out = { ...tree };
+  for (const c of core.COLLECTIONS) {
+    if (!Array.isArray(tree[c]) || !COLLECTION_MODEL[c]) continue;
+    out[c] = tree[c].map((r) => project(COLLECTION_MODEL[c], r));
+  }
+  return out;
+}
+
+/*
+ * رفتارِ همین لحظهٔ `LedgerDiff.kt` ِ برنامه — از خودِ کدِ کاتلین خوانده می‌شود تا شبیه‌سازی از
+ * برنامه جدا نیفتد (و آزمونِ سرتاسری با برگشتِ هر یک از این قاعده‌ها در کاتلین قرمز شود):
+ *   • `applyRemote` خروجی را از درِ مدل رد می‌کند (دفتر و سایه هر دو)؛
+ *   • A00 سایهٔ Snapshot (`SyncV1Engine.writeShadow` با `modelTree(`) از درِ مدل است؛ پیش از
+ *     آن خام بود — ردیف‌های سرور با کلیدهایی که دفتر نمی‌تواند نگه دارد؛
+ *   • A00 `changedFields` با `isModelField(`: کلیدی که مدل نمی‌شناسد هرگز `null` نمی‌شود؛
+ *   • A00 `diff` با `modelView(`: ردیفی که خام فرق دارد به زبانِ مدل سنجیده می‌شود؛
+ *   • A00 `SyncV1Client.push` با `"caps"`: نشانِ `a00` که سرور با آن تورِ ساخت‌های پیشین را
+ *     کنار می‌گذارد (`server/src/lib/newer-fields.js`). دستگاهِ «وب» (`raw`) `client: "web"` می‌فرستد.
+ * سایه هیچ‌وقت کلیدی را که مدل نمی‌شناسد نگه نمی‌دارد (بازبینیِ #341، B1).
+ */
+const KT = (...p) => fs.readFileSync(path.join(ROOT, 'android-native', 'app', 'src', 'main', 'java', 'ir', 'vil3ntec', 'tohid', 'sync', 'v1', ...p), 'utf8');
+const LEDGER_DIFF_KT = KT('LedgerDiff.kt');
+const SYNC_V1_ENGINE_KT = KT('SyncV1Engine.kt');
+const SYNC_V1_CLIENT_KT = KT('SyncV1Client.kt');
+const bodyOf = (name, src = LEDGER_DIFF_KT) => {
+  const at = src.indexOf(`fun ${name}(`);
+  if (at < 0) return '';
+  const end = src.indexOf('\n  }\n', at);
+  return src.slice(at, end < 0 ? undefined : end);
+};
+export const KOTLIN = {
+  applyRemoteShaped: /fromJson\(|modelTree\(/.test(bodyOf('applyRemote')),
+  snapshotShaped: /modelTree\(/.test(bodyOf('writeShadow', SYNC_V1_ENGINE_KT)),
+  keepsUnknownFields: /isModelField\(/.test(bodyOf('changedFields')),
+  diffInModelTerms: /modelView\(/.test(bodyOf('diff')),
+  capsA00: /put\("caps"/.test(bodyOf('push', SYNC_V1_CLIENT_KT)),
+};
+
+/** ساختِ نصب‌شدهٔ پیش از A00: همان `applyRemote` ِ از درِ مدل، بی قاعده‌های تازه */
+export const PRE_A00 = Object.freeze({ applyRemoteShaped: true, snapshotShaped: false, keepsUnknownFields: false, diffInModelTerms: false, capsA00: false });
+/** وب: دفترِ خام، هیچ مدلی در کار نیست */
+const NO_MODEL = Object.freeze({ applyRemoteShaped: false, snapshotShaped: false, keepsUnknownFields: false, diffInModelTerms: false, capsA00: false });
+
+/** کلیدهایی که مدلِ ردیف‌های این مجموعه می‌شناسد (با `@JsonNames`)؛ null یعنی مدل ندارد */
+const knownKeys = (table) => {
+  const cls = COLLECTION_MODEL[table];
+  return cls ? new Set(MODELS[cls].flatMap((f) => [f.key, ...(f.aliases || [])])) : null;
+};
+
+/** همان پالایشِ `changedFields` ِ کاتلین: حذفِ کلیدی که مدل نمی‌شناسد op نمی‌شود */
+function dropUnknownRemovals(ops, flags = KOTLIN) {
+  if (!flags.keepsUnknownFields) return ops;
+  const out = [];
+  for (const op of ops) {
+    const known = op.type === 'update' ? knownKeys(op.table) : null;
+    if (!known) { out.push(op); continue; }
+    const fields = {};
+    for (const [k, v] of Object.entries(op.fields || {})) if (!(v === null && !known.has(k))) fields[k] = v;
+    if (Object.keys(fields).length === Object.keys(op.fields || {}).length) { out.push(op); continue; }
+    if (!Object.keys(fields).length) continue;
+    out.push({ ...op, fields, hash: core.hashOf({ ...op, fields }) });
+  }
+  return out;
+}
+
 const clone = (x) => JSON.parse(JSON.stringify(x));
 const todayOf = (t) => {
   const d = new Date(t);
@@ -121,10 +236,17 @@ export class NativeDevice {
    * @param {object} [o]
    * @param {string} [o.deviceId]  `store.deviceUid`
    * @param {string} [o.seller]    نامِ فروشنده روی فاکتور
+   * @param {string} [o.appVersion] سرآیندِ `X-App-Version` (گوشی `3.2.N`، کامپیوتر `1.0.N`)
+   * @param {object} [o.kotlin]    قاعده‌های `LedgerDiff` ِ همین ساخت؛ پیش‌فرض همان کدِ امروز (`KOTLIN`).
+   *                               `PRE_A00` = ساختِ نصب‌شدهٔ پیش از A00
+   * @param {boolean} [o.raw]      دفترِ JSON ِ خام بی مدل — همان وب (`license/sync-core.js`)
    */
-  constructor(E, label, { deviceId = null, seller = '' } = {}) {
+  constructor(E, label, { deviceId = null, seller = '', appVersion = APP_VERSION, kotlin = KOTLIN, raw = false } = {}) {
     this.E = E;
     this.label = label;
+    this.appVersion = appVersion;
+    this.kotlin = raw ? NO_MODEL : kotlin;
+    this.raw = raw;
     this.deviceId = deviceId || `e2e-${label}-${randomUUID().slice(0, 8)}`.replace(/[^A-Za-z0-9_-]/g, '');
     this.seller = seller || label;
     this.offline = false;
@@ -149,7 +271,7 @@ export class NativeDevice {
       'Content-Type': 'application/json',
       'X-App': 'shop',
       'X-Device': this.deviceId,
-      'X-App-Version': APP_VERSION,
+      'X-App-Version': this.appVersion,
       'X-Request-Id': randomUUID(),
       ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}),
       ...extra,
@@ -219,9 +341,18 @@ export class NativeDevice {
 
   /* ---------------- همگام‌سازیِ v1 ---------------- */
 
+  /** نشانِ صریحِ بدنهٔ push: `caps: ["a00"]` ِ ساختِ A00 به بعد، یا `client: "web"` ِ وب */
+  marks() {
+    if (this.raw) return { client: 'web' };
+    return this.kotlin.capsA00 ? { caps: ['a00'] } : {};
+  }
+
   /** `ShopStore.save` ⇒ `SyncV1Engine.record`: تفاضل با سایه ⇒ صف */
   save(next) {
-    const { ops } = core.diff(this.shadow, next);
+    //  A00: تفاضل به زبانِ مدل (`modelView`) — برای ردیفی که خام برابر است همان نتیجه را دارد
+    const k = this.kotlin;
+    const base = k.diffInModelTerms ? projectLedger(this.shadow) : this.shadow;
+    const ops = dropUnknownRemovals(core.diff(base, next).ops, k);
     if (ops.length) this.queue.push(...ops);
     this.shadow = core.shadowOf(next);
     this.ledger = next;
@@ -243,7 +374,7 @@ export class NativeDevice {
           size += s;
           batch.push(op);
         }
-        const r = await this.api('POST', '/sync/v1/push', { device_id: this.deviceId, schema_version: core.SCHEMA_VERSION, queued: this.queue.length, ops: batch });
+        const r = await this.api('POST', '/sync/v1/push', { device_id: this.deviceId, schema_version: core.SCHEMA_VERSION, queued: this.queue.length, ops: batch, ...this.marks() });
         if (r.status === 426) { this.holding = true; this.lastError = r.body?.message || 'upgrade'; return { ok: false, status: 426 }; }
         if (r.status !== 200) { this.lastError = `${r.status} ${r.body?.error?.code || ''}`.trim(); return { ok: false, status: r.status, body: r.body }; }
         this.holding = false;
@@ -272,8 +403,10 @@ export class NativeDevice {
 
   /** `SyncCommit.absorb`: دفتر و سایه هر دو با همان opها جلو می‌روند */
   absorb(ops) {
-    this.ledger = core.applyRemote(this.ledger, ops).data;
-    this.shadow = core.shadowOf(core.applyRemote(this.shadow, ops).data);
+    //  `LedgerDiff.applyRemote` خروجی را از درِ مدل رد می‌کند: کلیدِ ناشناخته در دفتر و سایه نمی‌ماند
+    const shape = this.kotlin.applyRemoteShaped ? projectLedger : (x) => x;
+    this.ledger = shape(core.applyRemote(this.ledger, ops).data);
+    this.shadow = core.shadowOf(shape(core.applyRemote(this.shadow, ops).data));
   }
 
   /** `SyncV1Engine.firstSync`: دفترِ خالی ⇒ Snapshot؛ وگرنه کلِ دفتر یک بار */
@@ -283,8 +416,10 @@ export class NativeDevice {
       const r = await this.api('GET', '/sync/v1/snapshot');
       if (r.status !== 200) return { ok: false, status: r.status, body: r.body };
       const next = core.fromSnapshot(r.body, this.ledger);
-      this.ledger = next;
-      this.shadow = core.shadowOf(next);
+      //  `restoreFromServer`: دفتر = fromJson(next) (از درِ مدل)؛ سایه = `writeShadow(next)` —
+      //  از A00 از درِ مدل (`modelTree`)، پیش از آن خام
+      this.ledger = this.raw ? next : projectLedger(next);
+      this.shadow = core.shadowOf(this.kotlin.snapshotShaped ? projectLedger(next) : next);
       this.cursor = Number(r.body.cursor || 0);
       this.snapshotAt = Date.now();
       return { ok: true, rows: Number(r.body.rows || 0) };
