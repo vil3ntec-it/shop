@@ -49,6 +49,8 @@ import ir.vil3ntec.tohid.data.SalesEngine
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.ui.theme.Shop
 import ir.vil3ntec.tohid.ui.theme.Shape as ShopShape
+import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.core.i18n.Str
 
 /*
  *  پنلِ سفارش (VISUAL-DIRECTION §۲، سمتِ چپ در RTL): سربرگ با شمارِ اقلام،
@@ -76,8 +78,8 @@ fun OrderPanel(
   ) {
     Column(Modifier.padding(14.dp)) {
       Row(verticalAlignment = Alignment.CenterVertically) {
-        Text("فهرستِ سفارش", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Shop.colors.text)
-        CountPill("$itemCount قلم")
+        Text(StrSale.orderList, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Shop.colors.text)
+        CountPill(StrSale.linesCount(itemCount))
       }
       Spacer(Modifier.height(10.dp))
       customer()
@@ -117,15 +119,15 @@ fun CustomerRow(
   onPick: () -> Unit,
   onRemove: () -> Unit,
 ) {
-  Text("مشتری ($pickHint)", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
+  Text(StrSale.customerKey(pickHint), style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
   Spacer(Modifier.height(4.dp))
   Row(verticalAlignment = Alignment.CenterVertically) {
     OutlinedButton(onClick = onPick, modifier = Modifier.weight(1f).heightIn(min = target)) {
       Icon(Icons.Filled.Person, contentDescription = null, modifier = Modifier.size(18.dp))
       Spacer(Modifier.width(6.dp))
-      Text(name ?: "مشتریِ گذری", maxLines = 1, overflow = TextOverflow.Ellipsis)
+      Text(name ?: Str.walkIn, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
-    if (name != null) TextButton(onClick = onRemove, modifier = Modifier.heightIn(min = target)) { Text("برداشتن") }
+    if (name != null) TextButton(onClick = onRemove, modifier = Modifier.heightIn(min = target)) { Text(StrSale.remove) }
   }
   detail?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted) }
 }
@@ -161,10 +163,10 @@ fun OrderLines(
     ) {
       Icon(Icons.Filled.ShoppingBasket, contentDescription = null, tint = Shop.colors.muted2, modifier = Modifier.size(28.dp))
       Spacer(Modifier.height(6.dp))
-      Text("سبد خالی است", style = MaterialTheme.typography.titleSmall, color = Shop.colors.text)
+      Text(Str.cartEmpty, style = MaterialTheme.typography.titleSmall, color = Shop.colors.text)
       Spacer(Modifier.height(4.dp))
       Text(
-        "بارکد را بخوانید، نام را بنویسید و Enter بزنید، یا روی کاشیِ کالا بزنید.",
+        StrSale.scanHint,
         style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted, textAlign = TextAlign.Center,
       )
     }
@@ -178,7 +180,7 @@ fun OrderLines(
           .fillMaxWidth()
           .background(if (on) Shop.colors.primaryTint else Color.Transparent)
           .semantics { this.selected = on }
-          .clickable(onClickLabel = "انتخابِ ردیف") { onSelect(line.id) }
+          .clickable(onClickLabel = StrSale.selectRow) { onSelect(line.id) }
           .padding(horizontal = 6.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
       ) {
@@ -188,7 +190,7 @@ fun OrderLines(
           Text(
             "${money(line.price)} ؋",
             Modifier
-              .clickable(onClickLabel = "ویرایشِ تعداد و قیمت") { onEdit(line.id) }
+              .clickable(onClickLabel = StrSale.editQtyPrice) { onEdit(line.id) }
               .semantics { role = Role.Button },
             style = MaterialTheme.typography.labelSmall,
             color = if (line.customPrice) Shop.colors.primary else Shop.colors.muted,
@@ -217,7 +219,7 @@ fun PaymentSummary(
   payable: Double,
   extra: @Composable () -> Unit = {},
 ) {
-  Text("خلاصهٔ پرداخت", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
+  Text(StrSale.paymentSummary, style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
   Spacer(Modifier.height(4.dp))
   rows.forEach { r ->
     Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -237,7 +239,7 @@ fun PaymentSummary(
       .padding(horizontal = 12.dp, vertical = 10.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
-    Text("مبلغِ قابلِ پرداخت", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = Shop.colors.text)
+    Text(StrSale.payable, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = Shop.colors.text)
     Text("${money(payable)} ؋", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = Shop.colors.text)
   }
 }
@@ -250,7 +252,7 @@ fun PaymentMethodGrid(
   target: Dp,
   onSelect: (PosPayMethod) -> Unit,
 ) {
-  Text("روشِ پرداخت", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
+  Text(StrSale.payMethod, style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
   Spacer(Modifier.height(4.dp))
   Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
     methods.forEach { m ->
@@ -287,10 +289,10 @@ fun OrderActions(
     OutlinedButton(onClick = onPrint, enabled = canPrint, modifier = Modifier.weight(1f).height(52.dp)) {
       Icon(Icons.Filled.Print, contentDescription = null, modifier = Modifier.size(18.dp))
       Spacer(Modifier.width(6.dp))
-      Text("چاپِ آخر $printHint", maxLines = 1)
+      Text(StrSale.printLast(printHint), maxLines = 1)
     }
     Button(onClick = onPost, enabled = canPost && !posting, modifier = Modifier.weight(1.6f).height(52.dp)) {
-      Text(if (posting) "در حالِ ثبت…" else "ثبتِ فروش  ($postHint)", style = MaterialTheme.typography.titleMedium, maxLines = 1)
+      Text(if (posting) StrSale.posting else StrSale.recordSaleKey(postHint), style = MaterialTheme.typography.titleMedium, maxLines = 1)
     }
   }
 }

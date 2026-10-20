@@ -6,6 +6,8 @@ import ir.vil3ntec.tohid.data.CartQuery
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.SalesEngine
 import ir.vil3ntec.tohid.data.ShopData
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrSale
 
 /*
  *  منطقِ خالصِ صندوقِ کامپیوتر (VISUAL-DIRECTION §۲) — بی Compose و بی اندروید،
@@ -17,7 +19,7 @@ import ir.vil3ntec.tohid.data.ShopData
 data class PosCategory(val name: String?, val label: String, val count: Int)
 
 object PosCatalog {
-  const val ALL_LABEL = "همه"
+  val ALL_LABEL: String get() = Str.all
 
   /**
    *  «همه» و دسته‌های واقعیِ دکان با شمارِ کالای **فعال**. ترتیب همان
@@ -125,8 +127,8 @@ object PosPayments {
    */
   fun configured(): List<PosPayMethod> = SalesEngine.Payment.entries.map {
     when (it) {
-      SalesEngine.Payment.CASH -> PosPayMethod(it, "نقدی", needsCustomer = false)
-      SalesEngine.Payment.CREDIT -> PosPayMethod(it, "نسیه", needsCustomer = true)
+      SalesEngine.Payment.CASH -> PosPayMethod(it, Str.cashSale, needsCustomer = false)
+      SalesEngine.Payment.CREDIT -> PosPayMethod(it, Str.credit, needsCustomer = true)
     }
   }
 }
@@ -141,8 +143,8 @@ object PosSummary {
    *  «مبلغِ قابلِ پرداخت» جدا و درشت نشان داده می‌شود (`Totals.finalTotal`).
    */
   fun rows(t: SalesEngine.Totals): List<PosSummaryRow> = buildList {
-    add(PosSummaryRow("جمع", t.subtotal))
-    if (t.discount > 0) add(PosSummaryRow("تخفیف", t.discount, negative = true))
+    add(PosSummaryRow(StrSale.subtotal, t.subtotal))
+    if (t.discount > 0) add(PosSummaryRow(Str.discount, t.discount, negative = true))
   }
 }
 

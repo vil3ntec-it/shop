@@ -19,6 +19,9 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.data.DashboardEngine
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.ui.theme.Shop
+import ir.vil3ntec.tohid.core.i18n.StrNav
+import ir.vil3ntec.tohid.core.i18n.Str
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 
 /**
  *  سربرگِ کامپیوتر — به‌جای نوارِ آبیِ پهنِ گوشی.
@@ -49,8 +52,8 @@ fun DeskHeader(
       .padding(horizontal = 14.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
-    IconButton(onClick = onMenu) { Icon(Icons.Filled.Menu, "منو", tint = Shop.colors.text) }
-    if (onBack != null) IconButton(onClick = onBack) { Icon(Icons.Filled.ArrowForward, "برگشت", tint = Shop.colors.text) }
+    IconButton(onClick = onMenu) { Icon(Icons.Filled.Menu, Str.menu, tint = Shop.colors.text) }
+    if (onBack != null) IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, Str.back, tint = Shop.colors.text) }
     Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Shop.colors.text, maxLines = 1)
     Spacer(Modifier.width(24.dp))
 
@@ -70,7 +73,7 @@ fun DeskHeader(
     ) {
       Icon(Icons.Filled.Search, null, tint = Shop.colors.muted, modifier = Modifier.size(20.dp))
       Spacer(Modifier.width(8.dp))
-      Text("جست‌وجوی کالا، بارکد، مشتری، فاکتور یا صفحه…", Modifier.weight(1f), color = Shop.colors.muted, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
+      Text(StrNav.searchPlaceholder, Modifier.weight(1f), color = Shop.colors.muted, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
       Text("Ctrl+K", Modifier.clip(RoundedCornerShape(6.dp)).border(1.dp, Shop.colors.border, RoundedCornerShape(6.dp)).padding(horizontal = 6.dp, vertical = 1.dp), style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
     }
     Spacer(Modifier.weight(0.2f))
@@ -79,7 +82,7 @@ fun DeskHeader(
     Box {
       IconButton(onClick = { bell = true }) {
         BadgedBox(badge = { if (board.alertCount > 0) Badge { Text(board.alertCount.toString()) } }) {
-          Icon(Icons.Filled.Notifications, "هشدارها", tint = Shop.colors.text)
+          Icon(Icons.Filled.Notifications, Str.alerts, tint = Shop.colors.text)
         }
       }
       DropdownMenu(expanded = bell, onDismissRequest = { bell = false }) {
@@ -96,26 +99,26 @@ fun DeskHeader(
             onClick = { bell = false; onOpen(to) },
           )
         }
-        item("ناموجود", board.outOfStock.size, Shop.colors.danger, "dashboard")
-        item("کم‌موجود", board.lowStock.size, Shop.colors.warning, "dashboard")
-        item("نزدیکِ انقضا", board.expiring.size, Shop.colors.warning, "dashboard")
-        item("قرضِ بیش از ۶۰ روز", board.debtOverdue.size, Shop.colors.danger, "debtors")
+        item(Str.outOfStock, board.outOfStock.size, Shop.colors.danger, "dashboard")
+        item(Str.lowStock, board.lowStock.size, Shop.colors.warning, "dashboard")
+        item(StrNav.nearExpiry, board.expiring.size, Shop.colors.warning, "dashboard")
+        item(Str.overdue60, board.debtOverdue.size, Shop.colors.danger, "debtors")
       }
     }
     //  میان‌برها — همیشه پیدا، نه فقط با F1
     TextButton(onClick = { ir.vil3ntec.tohid.ui.AppNav.help.value = true }) {
       Icon(Icons.Filled.Keyboard, null, tint = Shop.colors.text, modifier = Modifier.size(20.dp))
       Spacer(Modifier.width(4.dp))
-      Text("میان‌برها", color = Shop.colors.text)
+      Text(StrNav.shortcuts, color = Shop.colors.text)
       Spacer(Modifier.width(6.dp))
       Text("F1", Modifier.clip(RoundedCornerShape(6.dp)).border(1.dp, Shop.colors.border, RoundedCornerShape(6.dp)).padding(horizontal = 5.dp), style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
     }
-    IconButton(onClick = { onOpen("settings") }) { Icon(Icons.Filled.Settings, "تنظیمات", tint = Shop.colors.text) }
+    IconButton(onClick = { onOpen("settings") }) { Icon(Icons.Filled.Settings, Str.settings, tint = Shop.colors.text) }
     Spacer(Modifier.width(6.dp))
     Button(onClick = { onOpen("sale") }, shape = RoundedCornerShape(20.dp)) {
       Icon(Icons.Filled.Add, null, modifier = Modifier.size(18.dp))
       Spacer(Modifier.width(6.dp))
-      Text("فروشِ تازه  Ctrl+2")
+      Text(StrNav.newSaleCtrl)
     }
     Spacer(Modifier.width(10.dp))
     UserChip(onOpen)
@@ -132,12 +135,12 @@ fun DeskHeader(
 private fun UserChip(onOpen: (String) -> Unit) {
   val context = androidx.compose.ui.platform.LocalContext.current
   val name = remember(context) { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrDefault("").trim() }
-  val role = remember(context) { DeskMenu.roleLabel(ir.vil3ntec.tohid.data.ShopRole.current(context)) }
-  val shown = name.ifEmpty { "بی‌حساب" }
+  val role = DeskMenu.roleLabel(remember(context) { ir.vil3ntec.tohid.data.ShopRole.current(context) })
+  val shown = name.ifEmpty { StrNav.noAccount }
   Row(
     Modifier
       .clip(RoundedCornerShape(20.dp))
-      .clickable(onClickLabel = "حساب من") { onOpen("profile") }
+      .clickable(onClickLabel = Str.myAccount) { onOpen("profile") }
       .padding(horizontal = 6.dp, vertical = 4.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {

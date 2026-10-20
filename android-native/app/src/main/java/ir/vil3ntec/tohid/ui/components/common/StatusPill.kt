@@ -20,6 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.ui.theme.Shape
 import ir.vil3ntec.tohid.ui.theme.Shop
+import ir.vil3ntec.tohid.core.i18n.Str
 
 /**
  *  نشانِ وضعیت — «متن + رنگ + نقطه»، هرگز رنگِ تنها (v3 §۱۹.۱۱،
@@ -33,7 +34,7 @@ fun StatusPill(text: String, tone: PillTone, modifier: Modifier = Modifier) {
       .clip(Shape.badge)
       .background(bg)
       .padding(horizontal = 9.dp, vertical = 3.dp)
-      .semantics { contentDescription = "وضعیت: $text" },
+      .semantics { contentDescription = Str.statusOf(text) },
     verticalAlignment = Alignment.CenterVertically,
   ) {
     Box(Modifier.size(6.dp).clip(CircleShape).background(fg))

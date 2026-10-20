@@ -47,6 +47,7 @@ import ir.vil3ntec.tohid.ui.Platform
 import ir.vil3ntec.tohid.ui.theme.Elevation
 import ir.vil3ntec.tohid.ui.theme.Shape
 import ir.vil3ntec.tohid.ui.theme.Shop
+import ir.vil3ntec.tohid.core.i18n.Str
 
 /** یک کارِ گروهی. `destructive` ⇒ رنگِ خطر؛ تأیید و دلیل کارِ صفحه است (`BulkConfirmDialog`) */
 data class BulkAction(
@@ -83,7 +84,7 @@ fun BulkActionBar(
     horizontalArrangement = Arrangement.spacedBy(6.dp),
   ) {
     Text(
-      "$count انتخاب‌شده",
+      Str.selectedCount(count),
       style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = c.text,
       modifier = Modifier.padding(horizontal = 6.dp),
     )
@@ -109,7 +110,7 @@ fun BulkActionBar(
         .size(h)
         .clip(Shape.button)
         .clickable(role = Role.Button, onClick = onClose)
-        .semantics { contentDescription = "لغوِ انتخاب" }
+        .semantics { contentDescription = Str.clearSelection }
         .padding(8.dp),
     )
   }
@@ -145,7 +146,7 @@ fun BulkConfirmDialog(
     text = {
       Column(Modifier.widthIn(min = 360.dp, max = 560.dp)) {
         Text(
-          "$changing مورد تغییر می‌کند" + if (rows.size > changing) " · ${rows.size - changing} مورد بی‌تغییر می‌ماند" else "",
+          Str.bulkWillChange(changing) + if (rows.size > changing) " · " + Str.bulkUnchanged(rows.size - changing) else "",
           style = MaterialTheme.typography.titleSmall, color = c.text,
         )
         if (note != null) {
@@ -162,7 +163,7 @@ fun BulkConfirmDialog(
             Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
               Text(r.label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
               Spacer(Modifier.width(8.dp))
-              StatusPill(if (r.changes) "تغییر" else "بی‌تغییر", if (r.changes) (if (destructive) PillTone.DANGER else PillTone.SUCCESS) else PillTone.NEUTRAL)
+              StatusPill(if (r.changes) Str.change else Str.unchanged, if (r.changes) (if (destructive) PillTone.DANGER else PillTone.SUCCESS) else PillTone.NEUTRAL)
             }
             if (r.note.isNotEmpty()) Text(r.note, Modifier.padding(start = 10.dp, end = 10.dp, bottom = 6.dp), style = MaterialTheme.typography.bodySmall, color = c.muted)
             HorizontalDivider(color = c.border)
@@ -173,7 +174,7 @@ fun BulkConfirmDialog(
           OutlinedTextField(
             value = reason,
             onValueChange = { reason = it },
-            label = { Text("دلیل (اجباری — در سابقهٔ عملیات می‌ماند)") },
+            label = { Text(Str.reasonRequired) },
             singleLine = true,
             isError = reason.isNotEmpty() && !BulkModel.reasonValid(reason),
             modifier = Modifier.fillMaxWidth(),
@@ -188,7 +189,7 @@ fun BulkConfirmDialog(
         colors = if (destructive) ButtonDefaults.buttonColors(containerColor = c.danger) else ButtonDefaults.buttonColors(),
       ) { Text(confirmLabel) }
     },
-    dismissButton = { TextButton(onClick = onDismiss) { Text("انصراف") } },
+    dismissButton = { TextButton(onClick = onDismiss) { Text(Str.cancel) } },
   )
 }
 
@@ -204,10 +205,10 @@ fun BulkResultDialog(title: String, results: List<BulkRowResult>, onDismiss: () 
     text = {
       Column(Modifier.widthIn(min = 360.dp, max = 560.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-          StatusPill("$ok موفق", PillTone.SUCCESS)
+          StatusPill(Str.okCount(ok), PillTone.SUCCESS)
           if (failed > 0) {
             Spacer(Modifier.width(8.dp))
-            StatusPill("$failed ناموفق", PillTone.DANGER)
+            StatusPill(Str.failedCount(failed), PillTone.DANGER)
           }
         }
         Spacer(Modifier.height(8.dp))
@@ -219,13 +220,13 @@ fun BulkResultDialog(title: String, results: List<BulkRowResult>, onDismiss: () 
                 Text(r.note, style = MaterialTheme.typography.bodySmall, color = c.muted)
               }
               Spacer(Modifier.width(8.dp))
-              StatusPill(if (r.ok) "موفق" else "ناموفق", if (r.ok) PillTone.SUCCESS else PillTone.DANGER)
+              StatusPill(if (r.ok) Str.success else Str.failure, if (r.ok) PillTone.SUCCESS else PillTone.DANGER)
             }
             HorizontalDivider(color = c.border)
           }
         }
       }
     },
-    confirmButton = { TextButton(onClick = onDismiss) { Text("بستن") } },
+    confirmButton = { TextButton(onClick = onDismiss) { Text(Str.close) } },
   )
 }
