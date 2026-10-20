@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.qty
 import ir.vil3ntec.tohid.ui.theme.Shop
 import ir.vil3ntec.tohid.ui.theme.Shape as ShopShape
+import ir.vil3ntec.tohid.core.i18n.Str
 
 /** پهنای ستونِ دسته‌ها */
 val CategoryRailWidth: Dp = 104.dp
@@ -77,7 +78,7 @@ private fun CategoryTile(c: PosCategory, on: Boolean, target: Dp, onClick: () ->
       .heightIn(min = maxOf(target, 72.dp))
       .semantics {
         role = Role.Tab
-        contentDescription = "${c.label}، ${c.count} کالا"
+        contentDescription = Str.categoryA11y(c.label, c.count)
       },
   ) {
     Column(

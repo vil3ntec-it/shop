@@ -22,6 +22,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.ui.theme.Shop
+import ir.vil3ntec.tohid.core.i18n.StrNav
+import ir.vil3ntec.tohid.core.i18n.Str
 
 /** پهنای منوی کناری — محتوا به همین اندازه از کنار فاصله می‌گیرد */
 val DESK_RAIL_WIDTH = 212.dp
@@ -81,8 +83,8 @@ fun DeskRail(
         }
         Spacer(Modifier.width(10.dp))
         Column {
-          Text("فروشگاه من", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Shop.colors.text)
-          Text("مدیریتِ دکان", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+          Text(Str.appName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Shop.colors.text)
+          Text(StrNav.shopManagement, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
         }
       }
     }

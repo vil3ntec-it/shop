@@ -367,7 +367,8 @@ fun TohidTheme(
       else -> 1f
     }
     //  رقمِ صفحه، انتخابِ دکان (LOC-05) — با زدنِ کلید کلِ برنامه عوض می‌شود
-    val digits = ir.vil3ntec.tohid.LocaleChoice.digits
+    //  انگلیسی همیشه رقمِ لاتین؛ فارسی و پشتو همان انتخابِ دکان
+    val digits = ir.vil3ntec.tohid.LocaleChoice.screenDigits
     val type = remember(scale, digits) { shopTypography(scale, digits) }
     MaterialTheme(colorScheme = scheme, typography = type, shapes = ShopShapes) {
       if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) {

@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.ui.Platform
 import ir.vil3ntec.tohid.ui.theme.Shape
 import ir.vil3ntec.tohid.ui.theme.Shop
+import ir.vil3ntec.tohid.core.i18n.Str
 
 /**
  *  نوارِ ابزارِ جدول — VISUAL-DIRECTION §۳ بند ۳.
@@ -115,7 +116,7 @@ fun SearchBox(
     }
     if (query.isNotEmpty()) {
       Icon(
-        Icons.Filled.Close, "پاک‌کردنِ جست‌وجو", tint = c.muted,
+        Icons.Filled.Close, Str.clearSearch, tint = c.muted,
         modifier = Modifier.size(28.dp).clip(Shape.button).clickable(role = Role.Button) { onQuery("") }.padding(5.dp),
       )
     }

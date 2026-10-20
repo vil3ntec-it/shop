@@ -22,6 +22,9 @@ import ir.vil3ntec.tohid.LocaleText
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.I18n
 
 /**
  *  فاکتور، به‌صورت تصویر.
@@ -103,9 +106,11 @@ object Receipt {
       val half = (inner / 2).toInt()
       val right = layout(label, paint, half, Layout.Alignment.ALIGN_NORMAL)
       val left = layout(value, paint, half, Layout.Alignment.ALIGN_OPPOSITE)
+      //  راست‌به‌چپ: برچسب راست، مبلغ چپ؛ انگلیسی برعکس
+      val rtl = I18n.lang.rtl
       if (canvas != null) {
-        canvas.save(); canvas.translate(pad + inner - half, y); right.draw(canvas); canvas.restore()
-        canvas.save(); canvas.translate(pad, y); left.draw(canvas); canvas.restore()
+        canvas.save(); canvas.translate(if (rtl) pad + inner - half else pad, y); right.draw(canvas); canvas.restore()
+        canvas.save(); canvas.translate(if (rtl) pad else pad + inner - half, y); left.draw(canvas); canvas.restore()
       }
       y += maxOf(right.height, left.height)
     }
@@ -126,26 +131,27 @@ object Receipt {
 
     //  رقمِ فاکتور همان انتخابِ دکان است (LOC-05)؛ مبلغ بی اعشار با «افغانی» یا «؋» (LOC-07).
     //  پیش‌فرض (لاتین، «افغانی») دقیقاً همان متنِ پیشین است (`LocaleTextTest`).
-    val digits = LocaleChoice.digits
+    //  زبانِ فاکتور همان زبانِ برنامه است؛ انگلیسی همیشه رقمِ لاتین و میلادی (مگر خودِ دکان‌دار تقویم را عوض کرده باشد)
+    val digits = LocaleChoice.screenDigits
     val symbol = LocaleChoice.symbol
     fun num(value: Double) = LocaleText.amount(value, digits)
-    fun afn(value: Double) = LocaleText.afghani(value, digits, symbol)
+    fun afn(value: Double) = I18n.money(value, I18n.lang, digits, symbol)
 
     /* ------------------------------ سربرگ ------------------------------ */
-    line(storeName.ifBlank { "فروشگاه" }, title, Layout.Alignment.ALIGN_CENTER)
+    line(storeName.ifBlank { StrSale.storeFallback }, title, Layout.Alignment.ALIGN_CENTER)
     gap(0.3f)
-    line(LocaleText.digitsIn("فاکتور فروش #${sale.invoiceLabel() ?: "—"}", digits), head, Layout.Alignment.ALIGN_CENTER)
+    line(LocaleText.digitsIn(StrSale.saleInvoiceNo(sale.invoiceLabel() ?: "—"), digits), head, Layout.Alignment.ALIGN_CENTER)
     gap(0.3f)
 
     val time = runCatching {
       SimpleDateFormat("HH:mm", Locale.US).format(Date(if (sale.createdAt > 0) sale.createdAt else System.currentTimeMillis()))
     }.getOrDefault("")
     val kind = when {
-      sale.status == "cancelled" -> "لغوشده"
-      sale.paymentMethod == "credit" -> "نسیه"
-      else -> "نقدی"
+      sale.status == "cancelled" -> StrSale.cancelled
+      sale.paymentMethod == "credit" -> Str.credit
+      else -> Str.cashSale
     }
-    line("${LocaleText.date(sale.date, digits)} — ${LocaleText.digitsIn(time, digits)}   ($kind)", small, Layout.Alignment.ALIGN_CENTER)
+    line("${LocaleText.digitsIn(ir.vil3ntec.tohid.displayDate(sale.date), digits)} — ${LocaleText.digitsIn(time, digits)}   ($kind)", small, Layout.Alignment.ALIGN_CENTER)
 
     rule(thick = true)
 
@@ -157,24 +163,24 @@ object Receipt {
       line(name, body)
       val detail = "${num(item.quantity)}${if (unit.isNotBlank()) " $unit" else ""} × ${num(item.unitPrice)}"
       row(detail, num(item.totalPrice), small)
-      if (item.returnedQty > 0) line("مرجوعی: ${num(item.returnedQty)}", small)
+      if (item.returnedQty > 0) line(StrSale.returned(num(item.returnedQty)), small)
       gap(0.25f)
     }
 
     rule()
 
     /* ------------------------------ جمع‌ها ------------------------------ */
-    row("جمع اقلام", afn(sale.total), body)
-    row("تخفیف", afn(sale.discount), body)
+    row(StrSale.itemsTotal, afn(sale.total), body)
+    row(Str.discount, afn(sale.discount), body)
     rule()
-    row("مبلغ نهایی", afn(sale.finalTotal), head)
-    row("پرداختی", afn(sale.paidAmount), body)
-    row("باقی‌مانده", afn(sale.remaining), body)
-    if (debtor != null) row("قرض‌دار", debtor.name, body)
+    row(StrSale.finalAmount, afn(sale.finalTotal), head)
+    row(StrSale.paid, afn(sale.paidAmount), body)
+    row(StrSale.remaining, afn(sale.remaining), body)
+    if (debtor != null) row(Str.debtor, debtor.name, body)
 
     rule(thick = true)
     gap(0.4f)
-    line("تشکر از خرید شما", small, Layout.Alignment.ALIGN_CENTER)
+    line(StrSale.thanks, small, Layout.Alignment.ALIGN_CENTER)
     y += pad * 1.5f
 
     return y
@@ -199,7 +205,7 @@ object Receipt {
         .setAlignment(align)
         // متن فارسی است، پس جهتِ پایه راست‌به‌چپ است — وگرنه نقطه و
         // پرانتز و عدد سرِ جای اشتباه می‌افتند
-        .setTextDirection(android.text.TextDirectionHeuristics.RTL)
+        .setTextDirection(if (I18n.lang.rtl) android.text.TextDirectionHeuristics.RTL else android.text.TextDirectionHeuristics.LTR)
         .setIncludePad(false)
         .build()
     } else {
