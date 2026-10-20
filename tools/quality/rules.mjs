@@ -77,9 +77,14 @@ export const PRODUCT_LITERAL = {
   pattern: /[!=]==?\s*['"](?:pump|shop)['"]|['"](?:pump|shop)['"]\s*[!=]==?|\bcase\s+['"](?:pump|shop)['"]/g,
 };
 
-/** Migrations: numbers must be unique (the only blocking check). */
+/**
+ * Migrations: numbers must be unique (the only blocking check). migrate.js
+ * applies every `.sql` in the folder, so the number is the leading digits of
+ * any such name; a name not like NNN_name.sql is still a migration (warned).
+ */
 export const MIGRATIONS_DIR = 'server/migrations';
-export const MIGRATION_NAME = /^(\d{3,})_[a-z0-9_]+\.sql$/;
+export const MIGRATION_NUMBER = /^(\d+)/;
+export const MIGRATION_NAME = /^\d{3,}_[a-z0-9_]+\.sql$/;
 
 /** ESLint (correctness only, pinned; run with npx so package.json is untouched) on changed files matching these. */
 export const ESLINT_PACKAGE = 'eslint@9.39.5';

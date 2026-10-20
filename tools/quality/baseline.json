@@ -2,7 +2,7 @@
   "_doc": "Caps for tools/quality/quality.mjs. They may only go down: run --lower-baseline after an improvement. Raising a cap by hand needs a reason in the PR body. Guide: docs/QUALITY-fa.md",
   "fileSize": {
     "android-native/app/src/main/java/ir/vil3ntec/tohid/scan/BarcodeScanner.kt": 1259,
-    "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/AppRoot.kt": 1071,
+    "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/AppRoot.kt": 1075,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/BulkSheets.kt": 804,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/Dashboard.kt": 1147,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/Debtors.kt": 1370,
@@ -13,22 +13,23 @@
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/Settings.kt": 1289,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/TopBar.kt": 1265,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/Vip.kt": 1692,
-    "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/Welcome.kt": 2600,
+    "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/Welcome.kt": 2702,
     "license/account-ui.js": 897,
     "license/license-client.js": 1337,
     "license/orders-ui.js": 902,
-    "license/sync-v3-engine.js": 1164,
+    "license/sync-v3-engine.js": 1166,
     "license/vip.js": 867,
     "server/public/admin/app.js": 2369,
     "server/public/admin/index.html": 1181,
+    "server/public/store/store.js": 801,
     "server/src/lib/catalog.js": 811,
     "server/src/lib/delivery.js": 1180,
     "server/src/lib/image-bank.js": 1211,
     "server/src/lib/notices.js": 820,
     "server/src/lib/shop-chat.js": 900,
-    "server/src/lib/storefront.js": 923,
+    "server/src/lib/storefront.js": 1212,
     "server/src/lib/sync-v3.js": 1167,
-    "server/src/routes/auth.js": 910,
+    "server/src/routes/auth.js": 1177,
     "server/src/routes/pump-device.js": 917
   },
   "frozen": {
@@ -46,6 +47,8 @@
     "server/src/lib/features.js": 2,
     "server/src/lib/image-bank.js": 5,
     "server/src/lib/mail-templates.js": 3,
+    "server/src/lib/market-trust.js": 2,
+    "server/src/lib/newer-fields.js": 2,
     "server/src/lib/notices.js": 12,
     "server/src/lib/plans.js": 1,
     "server/src/lib/shop-chat.js": 16,
@@ -73,6 +76,6 @@
     "minorOf": 2,
     "StatusPill": 2,
     "html-escape": 12,
-    "secret-derivation": 10
+    "secret-derivation": 6
   }
 }

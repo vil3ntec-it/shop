@@ -7,8 +7,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { checkPerFile, lowerPerFile, lowerTotals, attribute } from './lib/ratchet.mjs';
 import { lineCount, findAll, duplicateMigrations } from './lib/measure.mjs';
-import { DUPLICATE_HELPERS, PRODUCT_LITERAL, MAX_LINES, MIGRATION_NAME, isSource, globToRegExp } from './rules.mjs';
+import { DUPLICATE_HELPERS, PRODUCT_LITERAL, MAX_LINES, MIGRATION_NUMBER, isSource, globToRegExp } from './rules.mjs';
 import { parseLcov } from './checks/coverage.mjs';
+import { migrationFindings } from './checks/migrations.mjs';
 
 const rule = (id) => DUPLICATE_HELPERS.find((r) => r.id === id);
 const hits = (id, text) => findAll(text, rule(id).pattern, rule(id).confirm).length;
@@ -40,10 +41,25 @@ test('attribution: only a change that touched the file and made it worse is "int
   assert.equal(attribute('x.js', 1, null, at), 'unknown');
 });
 
-test('duplicate migration numbers are found; distinct numbers pass', () => {
-  assert.deepEqual(duplicateMigrations(['101_a.sql', '102_b.sql', '102_c.sql', '0102_d.sql'], MIGRATION_NAME),
-    [{ number: 102, files: ['0102_d.sql', '102_b.sql', '102_c.sql'] }]);
-  assert.deepEqual(duplicateMigrations(['001_a.sql', '002_b.sql', 'notes.txt'], MIGRATION_NAME), []);
+test('duplicate migration numbers are found, malformed names included; distinct numbers pass', () => {
+  assert.deepEqual(duplicateMigrations(['101_a.sql', '102_b.sql', '102_c.sql', '0102_d.sql', '102-E.sql'], MIGRATION_NUMBER),
+    [{ number: 102, files: ['0102_d.sql', '102-E.sql', '102_b.sql', '102_c.sql'] }]);
+  assert.deepEqual(duplicateMigrations(['001_a.sql', '002_b.sql', 'notes.sql'], MIGRATION_NUMBER), []);
+});
+
+test('migrations block only the change that adds a duplicate; one already on main is a warning', () => {
+  const files = ['server/migrations/115_a.sql', 'server/migrations/115_b.sql', 'server/migrations/116_Foo.sql',
+    'server/migrations/116-bar.sql', 'server/migrations/117_c.sql'];
+  //  this PR added 116-bar.sql (116_Foo.sql is on main); 115 was duplicated before it
+  const changed = new Map([['server/migrations/116-bar.sql', null], ['server/migrations/117_c.sql', 'server/migrations/117_c.sql']]);
+  const { dups, badNames } = migrationFindings(files, changed);
+  assert.deepEqual(dups.map((d) => [d.number, d.cause, d.added]), [[115, 'pre-existing', []], [116, 'introduced', ['116-bar.sql']]]);
+  assert.deepEqual(badNames, ['116_Foo.sql', '116-bar.sql']);
+  //  a rename onto a used number counts as adding; no parent commit ⇒ unknown (not blocking)
+  const renamed = migrationFindings(files, new Map([['server/migrations/116_Foo.sql', 'server/migrations/120_x.sql']]));
+  assert.equal(renamed.dups.find((d) => d.number === 116).cause, 'introduced');
+  assert.ok(migrationFindings(files, null).dups.every((d) => d.cause === 'unknown'));
+  assert.deepEqual(migrationFindings(files, new Map()).dups.map((d) => d.cause), ['pre-existing', 'pre-existing']);
 });
 
 test('helper detectors: real declarations count, comments and look-alikes do not', () => {

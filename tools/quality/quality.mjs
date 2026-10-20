@@ -56,9 +56,14 @@ function context(options) {
     if (!cache.has(f)) cache.set(f, read(f));
     return cache.get(f);
   };
+  let baseline = null;
   return {
     options,
-    baseline: fs.existsSync(BASELINE) ? JSON.parse(fs.readFileSync(BASELINE, 'utf8')) : {},
+    /** read on first use only: the blocking migrations check never depends on baseline.json */
+    get baseline() {
+      baseline ??= fs.existsSync(BASELINE) ? JSON.parse(fs.readFileSync(BASELINE, 'utf8')) : {};
+      return baseline;
+    },
     files: trackedFiles(),
     changed: changedFiles(),
     read: cached,
@@ -97,8 +102,10 @@ function main() {
   for (const check of GROUPS[options.check]) {
     const res = check.run(ctx);
     parts.push(res.markdown);
+    //  a blocking check fails only on what this change surely caused; report-only checks also on «unknown»
+    const counts = check.blocking ? (v) => v.cause === 'introduced' : (v) => v.cause !== 'pre-existing';
     for (const v of res.violations) {
-      if (v.cause === 'pre-existing') continue;
+      if (!counts(v)) continue;
       caused++;
       if (v.file) annotate(v.file, v.message, { line: v.line, level: check.blocking ? 'error' : 'warning' });
     }
