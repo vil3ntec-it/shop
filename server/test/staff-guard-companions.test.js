@@ -450,3 +450,119 @@ test('v3 (f): برنامهٔ کهنهٔ بی tx — فاکتور و برگشتِ
   assert.deepEqual(why(rr), ['tx_rejected', 'tx_rejected', 'approval_required', 'tx_rejected']);
   assert.equal(Number((await row3('saleItems', 's3-nr-i')).data.returnedQtyMilli || 0), 0);
 });
+
+/* ------------------------------------------- بازبینیِ سوم: دفترِ پایه، دنباله، هم‌زمانی */
+
+test('v1 (B1): دفترِ پایهٔ بریده در دو دسته (یک ts) — «برد»ِ فاکتورهای پذیرفته با سرِ ردشدهٔ دستهٔ دوم گم نمی‌شود', async () => {
+  const ts = (clock += 1000);
+  const base = save(ts);
+  const s1 = v1CreditSale(base, 's-pd-1', { legacy: true, discount: 0, at: ts - 90_000 });
+  const s2 = v1CreditSale(base, 's-pd-2', { legacy: true, discount: 0, at: ts - 60_000 });
+  const s3 = v1CreditSale(base, 's-pd-3', { legacy: true, at: ts - 30_000 });
+  assert.deepEqual(why(await push1(manager, 'm-pd', [s1[0], s2[0]])), ['applied', 'applied']);
+  //  دستهٔ دوم فقط یک «سر» دارد (فاکتورِ ردشده)؛ بردهای دو فاکتورِ پذیرفته همان ts و همان قرض‌دار
+  const r = await push1(manager, 'm-pd', [s3[0], s1[2], s2[2], s3[2]]);
+  assert.deepEqual(why(r), ['approval_required', 'applied', 'applied', 'tx_rejected']);
+  assert.ok(await row1('transactions', 's-pd-1-give'));
+  assert.ok(await row1('transactions', 's-pd-2-give'));
+});
+
+test('v1: دنبالهٔ سندِ برگشتِ ردشده (همان فاکتور و همان ثبت، دستهٔ بعد) جدا داوری نمی‌شود', async () => {
+  await ownerSale('s-pb', 2000);
+  const sv = save();
+  const r1 = await push1(staff, 's-pb', [
+    sv.op('returns', 'r-pb-1', 'insert', { saleId: 's-pb', amount: 300, createdAt: sv.at }),
+    sv.op('returns', 'r-pb-2', 'insert', { saleId: 's-pb', amount: 300, createdAt: sv.at }),
+  ]);
+  assert.deepEqual(why(r1), ['approval_required', 'approval_required']);
+  const r2 = await push1(staff, 's-pb', [
+    sv.op('returns', 'r-pb-3', 'insert', { saleId: 's-pb', amount: 100, createdAt: sv.at }),
+    sv.op('stockMovements', 'r-pb-3-m', 'insert', { productId: 'p-gc', type: 'customer_return', qty: 1, refId: 'r-pb-3', createdAt: sv.at }),
+  ]);
+  assert.deepEqual(why(r2), ['tx_rejected', 'tx_rejected']);
+  assert.equal(await row1('returns', 'r-pb-3'), null);
+  //  برگشتِ تازهٔ دیگری روی همان فاکتور (ثبتِ دیگر) جدا داوری می‌شود
+  const other = save();
+  assert.deepEqual(why(await push1(staff, 's-pb', [other.op('returns', 'r-pb-9', 'insert', { saleId: 's-pb', amount: 100, createdAt: other.at })])), ['applied']);
+});
+
+test('v1: دو دستگاهِ هم‌زمان روی یک فاکتور هر دو زیرِ سقف نمی‌گذرند (قفلِ سقفِ تجمعی)', async () => {
+  await ownerSale('s-cc', 2000);
+  const a = save();
+  const b = save();
+  const [ra, rb] = await Promise.all([
+    push1(staff, 's-cc-a', [a.op('returns', 'r-cc-a', 'insert', { saleId: 's-cc', amount: 300, createdAt: a.at })]),
+    push1(staff, 's-cc-b', [b.op('returns', 'r-cc-b', 'insert', { saleId: 's-cc', amount: 300, createdAt: b.at })]),
+  ]);
+  assert.deepEqual([...why(ra), ...why(rb)].sort(), ['applied', 'approval_required']);
+});
+
+test('برگشت در v1 و v3 تا رها شدنِ قفلِ سقفِ تجمعیِ دکان صبر می‌کند (داوری تا نوشتن پشتِ سرِ هم)', async () => {
+  const approvals = require('../src/lib/staff-approval');
+  await ownerSale('s-lk', 2000);
+  const release = await approvals.returnsLock(shopId);
+  let done1 = false;
+  let done3 = false;
+  const sv = save();
+  const p1 = push1(staff, 's-lk', [sv.op('returns', 'r-lk-1', 'insert', { saleId: 's-lk', amount: 100, createdAt: sv.at })])
+    .then((r) => { done1 = true; return r; });
+  const p3 = push3(staff, 's-lk3', [tx3(undefined).op('returns', 'r-lk-3', 'insert', { saleId: 's-lk', amountMinor: 10000 })])
+    .then((r) => { done3 = true; return r; });
+  await new Promise((r) => setTimeout(r, 400));
+  assert.equal(done1, false, 'v1 بی قفل جلو رفت');
+  assert.equal(done3, false, 'v3 بی قفل جلو رفت');
+  await release();
+  assert.deepEqual(why(await p1), ['applied']);
+  assert.deepEqual(why(await p3), ['applied']);
+});
+
+test('سقفِ تجمعی هر دو دفتر را می‌شمارد (v1 و v3، هر ردیف یک بار) و برگشتِ لغوشده را نه', async () => {
+  await ownerSale('s-led', 2000);
+  //  ۳۰۰ از راهِ v3
+  const t = tx3(undefined);
+  assert.deepEqual(why(await push3(staff, 's-led3', [t.op('returns', 'r-led-3', 'insert', { saleId: 's-led', amountMinor: 30000 })])), ['applied']);
+  //  ۳۰۰ ِ دیگر از راهِ v1 ⇒ جمع ۶۰۰
+  const sv = save();
+  assert.deepEqual(why(await push1(staff, 's-led1', [sv.op('returns', 'r-led-1', 'insert', { saleId: 's-led', amount: 300, createdAt: sv.at })])), ['approval_required']);
+  //  صاحب برگشتِ v3 را لغو می‌کند ⇒ دیگر شمرده نمی‌شود
+  const c = tx3(undefined);
+  assert.deepEqual(why(await push3(owner, 'o-led', [c.op('returns', 'r-led-3', 'cancel', undefined, { reason: 'اشتباه' })])), ['applied']);
+  const sv2 = save();
+  assert.deepEqual(why(await push1(staff, 's-led1', [sv2.op('returns', 'r-led-1b', 'insert', { saleId: 's-led', amount: 300, createdAt: sv2.at })])), ['applied']);
+});
+
+test('v3: یک tx با برگشتِ دو فاکتور ⇒ دو سند، هر کدام با سقفِ فاکتورِ خودش', async () => {
+  const t = tx3('tx.pf');
+  const r = await push3(staff, 's3-pf', [
+    t.op('returns', 'r3-pf-a', 'insert', { saleId: 's3-pf-a', amountMinor: 30000 }),
+    t.op('returns', 'r3-pf-b', 'insert', { saleId: 's3-pf-b', amountMinor: 30000 }),
+  ]);
+  assert.deepEqual(why(r), ['applied', 'applied']);
+});
+
+test('v3 ِ بی tx: همراهِ دستهٔ بعدِ همان دستگاه با سندِ ردشده برمی‌گردد؛ دستگاهِ دیگر نه', async () => {
+  const n3 = tx3(undefined);
+  assert.deepEqual(why(await push3(manager, 'm3-pc', [
+    n3.op('sales', 's3-pc', 'insert', { totalMinor: 10000, discountMinor: 3000, finalTotalMinor: 7000, status: 'completed', debtorId: 'd-1' }),
+  ])), ['approval_required']);
+  const r = await push3(manager, 'm3-pc', [
+    n3.op('saleItems', 's3-pc-i', 'insert', { saleId: 's3-pc', productId: 'p-gc', quantityMilli: 1000, unitPriceMinor: 10000 }),
+    n3.op('transactions', 's3-pc-give', 'insert', { debtorId: 'd-1', type: 'give', amountMinor: 7000, refId: 's3-pc', kind: 'sale_credit' }),
+    n3.op('products', 'p3-pc-free', 'insert', { name: 'شکر' }),
+  ]);
+  assert.deepEqual(why(r), ['tx_rejected', 'tx_rejected', 'applied']);
+  assert.deepEqual(why(await push3(manager, 'm3-pc-other', [
+    n3.op('saleItems', 's3-pc-i2', 'insert', { saleId: 's3-pc', productId: 'p-gc', quantityMilli: 1000, unitPriceMinor: 10000 }),
+  ])), ['applied']);
+});
+
+test('v3: دنبالهٔ tx ِ ردشده پس از کنار گذاشتنِ صندوق دیگر نگه داشته نمی‌شود', async () => {
+  const t = tx3('tx.dismiss3');
+  const head = t.op('sales', 's3-dm', 'insert', { totalMinor: 10000, discountMinor: 3000, finalTotalMinor: 7000, status: 'completed' });
+  const item = (k) => t.op('saleItems', `s3-dm-i${k}`, 'insert', { saleId: 's3-dm', productId: 'p-gc', quantityMilli: 1000, unitPriceMinor: 10000 });
+  assert.deepEqual(why(await push3(manager, 'm3-dm', [head, item(0)])), ['approval_required', 'tx_rejected']);
+  assert.deepEqual(why(await push3(manager, 'm3-dm', [item(1)])), ['tx_rejected']);
+  const box = (await boxes(head.op_id))[0];
+  assert.equal((await h.post(`/api/sync/v3/conflicts/${box.id}/resolve`, { action: 'dismiss' }, { token: owner.accessToken })).status, 200);
+  assert.deepEqual(why(await push3(manager, 'm3-dm', [item(2)])), ['applied']);
+});

@@ -154,6 +154,36 @@ object ApiEndpoints {
     const val DELIVERY_CONFIG = "/shop/delivery/config"
   }
 
+  /* ------------------------------ میزِ تحویلِ دکان ------------------------------ */
+
+  /**
+   *  میزِ تحویل (C01؛ DLV-03/11/12/13/15/19) — `server/src/routes/delivery.js`.
+   *  بی پرچمِ `shop.delivery` همه ۴۰۴ است جز `CONFIG`.
+   */
+  object Delivery {
+    const val ROOT = "/shop/delivery"
+    const val CONFIG = "$ROOT/config"
+    const val COURIERS = "$ROOT/couriers"
+    const val EXTERNAL = "$ROOT/external"
+    const val SETTLEMENTS = "$ROOT/settlements"
+
+    fun board(scope: String) = "$ROOT/assignments?scope=${enc(scope)}"
+    fun assign(orderId: String) = "$ROOT/orders/${enc(orderId)}/assign"
+    fun status(assignmentId: String) = "$ROOT/assignments/${enc(assignmentId)}/status"
+    fun code(assignmentId: String) = "$ROOT/assignments/${enc(assignmentId)}/code"
+    fun recall(assignmentId: String) = "$ROOT/assignments/${enc(assignmentId)}/recall"
+    /** POST (همان PATCHِ سرور) — JVMِ کامپیوتر PATCH نمی‌فرستد */
+    fun courier(id: String) = "$COURIERS/${enc(id)}"
+    fun settlementPreview(courierId: String) = "$COURIERS/${enc(courierId)}/settlement-preview"
+    fun settle(courierId: String) = "$COURIERS/${enc(courierId)}/settlements"
+    fun settlements(courierId: String, limit: Int) = "$SETTLEMENTS?courierId=${enc(courierId)}&limit=$limit"
+    fun statement(name: String, from: Long?, to: Long?) = buildString {
+      append("$EXTERNAL/statement?name=").append(enc(name))
+      if (from != null) append("&from=").append(from)
+      if (to != null) append("&to=").append(to)
+    }
+  }
+
   /* ------------------------------ پیک ------------------------------ */
 
   /**

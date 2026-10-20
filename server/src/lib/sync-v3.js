@@ -757,6 +757,8 @@ async function push(ctx, { deviceId, protocol = PROTOCOL, format = 'v3', schemaV
   //  هر سندِ پولی با همراه‌هایش یک واحد (همه یا هیچ)
   const groups = approvals.returnGroupsOf(units.flatMap((u) => u.items.flatMap((it) => it.ops)));
   const plan = approvals.bundleV3(units, groups);
+  //  همراهِ بی tx ِ سندی که در دستهٔ پیشینِ همین دستگاه رد شد ⇒ همان رد
+  await approvals.holdV3Units(ctx, deviceId, plan);
 
   //  پلِ v3 ⇒ v1 (پرچمِ دکان): بیشترِ عقب‌ماندگیِ v1 ⇒ v3 بیرونِ تراکنشِ push
   const toV1On = await toV1.enabled(ctx);
@@ -764,7 +766,11 @@ async function push(ctx, { deviceId, protocol = PROTOCOL, format = 'v3', schemaV
   await ready();
   const t = now();
 
-  const out = await tx(async (c) => {
+  //  سقفِ تجمعیِ برگشت: از خواندنِ جمع تا نوشتن، با v1 و v3 ِ هم‌زمانِ همین دکان پشتِ سرِ هم
+  const release = groups ? await approvals.returnsLock(ctx.accountId) : null;
+  let out;
+  try {
+  out = await tx(async (c) => {
     await lock(c, ctx);
     //  روشن: قفلِ v1 هم، و v1 ⇒ v3 کامل پیش از اعمال ⇒ داوریِ این opها همهٔ v1 را دیده است
     const v1 = toV1On ? await openToV1(c, ctx, t) : null;
@@ -775,19 +781,17 @@ async function push(ctx, { deviceId, protocol = PROTOCOL, format = 'v3', schemaV
     let applied = 0;
     let sp = 0;
 
-    //  دنبالهٔ tx ای که سرش در دستهٔ پیشین با سقف/تأیید رد شد (tx ِ بزرگ‌تر از یک دسته) ⇒ همان رد
+    //  دنبالهٔ tx ای که سرش در دستهٔ پیشینِ همین دستگاه با سقف/تأیید رد شد (tx ِ بزرگ‌تر از یک
+    //  دسته) ⇒ همان رد — فقط صندوقِ باز، تا یک روز، و تا وقتی سرش ننشسته
     const txs = plan.filter((u) => u.tx && !u.broken).map((u) => u.tx);
     if (txs.length) {
-      const held = (await c.query(
-        `SELECT detail->>'tx' AS tx, loser_op_id FROM sync_v3_conflicts
-          WHERE ${ACC} AND kind = ANY($4::text[]) AND detail->>'tx' = ANY($5::text[])`,
-        [...acc(ctx), approvals.HOLD_KINDS, txs]
-      )).rows;
+      const held = await approvals.heldTxs(c, ctx, deviceId, txs);
       for (const u of plan) {
-        const hits = u.tx ? held.filter((r) => r.tx === u.tx) : [];
+        const heads = u.tx ? held.get(u.tx) : null;
+        if (!heads) continue;
         //  همان tx دوباره (پاسخ گم شد) ⇒ دوباره داوری می‌شود، نه «دنباله»
-        const again = hits.some((r) => u.items.some((it) => it.ops.some((o) => o.op_id === r.loser_op_id)));
-        if (hits.length && !again) u.broken = true;
+        const again = u.items.some((it) => it.ops.some((o) => heads.has(o.op_id)));
+        if (!again) u.broken = true;
       }
     }
 
@@ -816,7 +820,12 @@ async function push(ctx, { deviceId, protocol = PROTOCOL, format = 'v3', schemaV
         if (failed.box) {
           const b = failed.box;
           await addConflict(c, ctx, { table: b.table, row_id: b.row_id, loser_op_id: b.op_id, loser_device: deviceId },
-            b.kind, t, { dedupe: `perm:${b.op_id}`, detail: unit.tx ? { ...b.detail, tx: unit.tx } : b.detail });
+            b.kind, t, { dedupe: `perm:${b.op_id}`, detail: {
+              ...b.detail,
+              //  نشانی‌های سند برای همراهِ دستهٔ بعد (v3 ِ بی tx، `holdV3Units`) و دنبالهٔ همان tx
+              ...approvals.holdInfoV3(unit.items.flatMap((it) => it.ops).find((o) => o.op_id === b.op_id) || {}, groups),
+              ...(unit.tx ? { tx: unit.tx } : {}),
+            } });
         }
         for (const it of unit.items) {
           const mine = local.find(l => l.it === it);
@@ -852,6 +861,9 @@ async function push(ctx, { deviceId, protocol = PROTOCOL, format = 'v3', schemaV
     });
     return { results, applied, head: await headSeq(c, ctx) };
   });
+  } finally {
+    if (release) await release();
+  }
   return { ...out, protocol: PROTOCOL, server_time: now(), hlc: clock.peek() };
 }
 

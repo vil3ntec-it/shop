@@ -210,8 +210,11 @@ internal class SyncV3Engine(
     //  بقیه (دفترِ چندفاکتوری: نخستین بارگذاری، بازگردانیِ پشتیبان؛ یا ثبتِ بی سند) ⇒ همان سقفِ [TX_GROUP_MAX]
     val single = headsOf(drafts.filter { it.doc }.map { it.op }).size == 1
     val tx = if (docOps >= 2 && (single || docOps <= TX_GROUP_MAX)) "tx.${ops.first().opId}" else null
+    //  درونِ tx سرِ برگشت (ردیف‌های returns) پیش از شمارنده‌هایش (debtSettled ِ فاکتور، returnedQty ِ قلم):
+    //  اگر tx ِ بزرگ ناچار در دو دسته برود، سر در دستهٔ اول داوری می‌شود و دنباله با آن برمی‌گردد
+    val ordered = if (tx == null) drafts else drafts.filter { it.op.table == "returns" } + drafts.filter { it.op.table != "returns" }
     var seq = startSeq
-    val entries = drafts.map { d ->
+    val entries = ordered.map { d ->
       seq += 1
       val v3ops = if (tx != null && d.doc) d.ops.map { JsonObject(it + ("tx" to JsonPrimitive(tx))) } else d.ops
       V3Entry(
