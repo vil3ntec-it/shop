@@ -30,9 +30,10 @@ on:
         default: beta
 
 concurrency:
-  #  انتشارِ پایدار با pushِ بعدی لغو نشود
-  group: tohid-native-${{ github.ref }}-${{ inputs.channel || 'push' }}
-  cancel-in-progress: true
+  #  انتشارِ پایدار با pushِ بعدی لغو نشود. PR: pushِ تازه اجرای قبلیِ همان PR را لغو می‌کند؛
+  #  اجرای main (انتشارِ آزمایشی) هرگز وسطِ کار لغو نمی‌شود.
+  group: tohid-native-${{ github.event.pull_request.number || github.ref }}-${{ inputs.channel || 'push' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: write
