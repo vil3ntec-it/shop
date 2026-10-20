@@ -13,12 +13,37 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.activity.compose.BackHandler
+import androidx.compose.material.icons.outlined.LocalOffer
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.PhotoCamera
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.unit.sp
+import ir.vil3ntec.tohid.data.WarehouseEngine
 import ir.vil3ntec.tohid.ui.components.pos.CartSummary
-import ir.vil3ntec.tohid.ui.components.pos.PhoneCartDebtor
-import ir.vil3ntec.tohid.ui.components.pos.PhoneCartFooter
-import ir.vil3ntec.tohid.ui.components.pos.PhoneCartHeader
-import ir.vil3ntec.tohid.ui.components.pos.PhoneCartLayer
-import ir.vil3ntec.tohid.ui.components.pos.PhoneCartLine
+import ir.vil3ntec.tohid.ui.components.pos.PhoneCartAmount
+import ir.vil3ntec.tohid.ui.components.pos.PhoneCartClear
+import ir.vil3ntec.tohid.ui.components.pos.PhoneCartInfoRow
+import ir.vil3ntec.tohid.ui.components.pos.PhoneCartPay
+import ir.vil3ntec.tohid.ui.components.pos.PhoneCartRow
+import ir.vil3ntec.tohid.ui.components.pos.PhoneCartShot
+import ir.vil3ntec.tohid.ui.components.pos.PhoneCartTitle
+import ir.vil3ntec.tohid.ui.components.pos.PhoneCartTotal
+import ir.vil3ntec.tohid.ui.components.pos.PhoneCartUi
+import ir.vil3ntec.tohid.ui.components.pos.PhoneCatalog
+import ir.vil3ntec.tohid.ui.components.pos.PhoneCatalogItem
+import ir.vil3ntec.tohid.ui.components.pos.PhoneSaleFrame
+import ir.vil3ntec.tohid.ui.components.pos.PhoneSaleText
+import ir.vil3ntec.tohid.ui.components.pos.CatalogSearch
+import ir.vil3ntec.tohid.ui.components.pos.PhoneKeypadRequest
+import ir.vil3ntec.tohid.ui.components.pos.PhoneQtyKeypad
+import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -79,7 +104,13 @@ fun SaleScreen(
   d: ShopData,
   snackbar: SnackbarHostState,
   onQuickSale: () -> Unit,
-  onRegisterBarcode: (String) -> Unit,
+  /**
+   *  گوشی (نسخهٔ ۳): پیکانِ برگشتِ سربرگ و دکمهٔ برگشتِ خودِ گوشی — null ⇐ خانه.
+   *  تبلت و کامپیوتر به آن کاری ندارند.
+   */
+  onBack: (() -> Unit)? = null,
+  /** «ثبت کالا»ِ بارکدِ ناشناس؛ null ⇐ دکمه‌ای نیست و بارکد در کادرِ دستیِ اسکن می‌ماند */
+  onRegisterBarcode: ((String) -> Unit)?,
 ) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
@@ -94,7 +125,8 @@ fun SaleScreen(
   // کالای حذف‌شده نباید در سبد بماند
   LaunchedEffect(d.products.size, d.debtors.size) { cartStore.prune(d) }
 
-  var cameraOn by rememberSaveable { mutableStateOf(true) }
+  //  گوشی (نسخهٔ ۳): دوربین فقط با زدنِ «اسکن» در سربرگ روشن می‌شود؛ صفحه خودش کاتالوگ است
+  var cameraOn by rememberSaveable { mutableStateOf(!phone) }
   //  «اسکنِ بارکد» از نوارِ پایینِ گوشی (phone v3 §F2) ⇐ دوربین روشن، حتی اگر خوابیده بود
   val scanAsked = ir.vil3ntec.tohid.ui.components.common.PhoneNav.scanRequest.value
   LaunchedEffect(scanAsked) {
@@ -120,7 +152,7 @@ fun SaleScreen(
 
   // دوربین با باز شدنِ صفحه خودش روشن می‌شود؛ همان چیزی که خواسته شده بود
   LaunchedEffect(Unit) {
-    if (!granted) askCamera.launch(Manifest.permission.CAMERA)
+    if (!granted && !phone) askCamera.launch(Manifest.permission.CAMERA)
   }
 
   /*
@@ -198,10 +230,10 @@ fun SaleScreen(
       scope.launch {
         val answer = snackbar.showSnackbar(
           message = "بارکد ناشناس — این کالا هنوز ثبت نشده است",
-          actionLabel = "ثبت کالا",
+          actionLabel = if (onRegisterBarcode != null) "ثبت کالا" else null,
           duration = SnackbarDuration.Long,
         )
-        if (answer == SnackbarResult.ActionPerformed) onRegisterBarcode(code)
+        if (answer == SnackbarResult.ActionPerformed) onRegisterBarcode?.invoke(code)
       }
       return
     }
@@ -256,6 +288,368 @@ fun SaleScreen(
    *  `focusable` روی همین جعبه لازم است تا وقتی هیچ کادری باز نیست،
    *  رویدادِ کلید اصلاً به درختِ صفحه برسد.
    */
+  /* ------------------ گوشی، نسخهٔ ۳: حالت و کارهای کاتالوگ ------------------ */
+
+  var scanOpen by rememberSaveable { mutableStateOf(false) }
+  var phoneSearch by rememberSaveable { mutableStateOf("") }
+  var category by rememberSaveable { mutableStateOf<String?>(null) }
+  var expandedLine by remember { mutableStateOf<String?>(null) }
+  var newCategory by rememberSaveable { mutableStateOf<String?>(null) }
+  var confirmDeleteCategory by remember { mutableStateOf<String?>(null) }
+  //  دسته‌ای که پاک شد، انتخاب نمی‌ماند
+  LaunchedEffect(d.productCategories) { if (category != null && category !in d.productCategories) category = null }
+
+  //  هر بار که چیزی به سبد افزوده شد (کارت، اسکن، +، گوشیِ جفت‌شده) نوار می‌پرد
+  val cartQty = cart.sumOf { it.quantity }
+  var lastQty by remember { mutableStateOf(cartQty) }
+  var pulse by remember { mutableStateOf(0) }
+  LaunchedEffect(cartQty) {
+    if (cartQty > lastQty) pulse++
+    lastQty = cartQty
+  }
+
+  //  عکسِ خودکار (`PhoneCartShot`) — در نسخهٔ دستِ کاربر هرگز روشن نمی‌شود
+  val shotOpen = PhoneCartShot.open.value
+  LaunchedEffect(shotOpen) { if (phone && shotOpen) cartOpen = true }
+  val shotExpand = PhoneCartShot.expand.value
+  LaunchedEffect(shotExpand) { if (phone && shotExpand != null) expandedLine = shotExpand }
+
+  fun openScanner() {
+    scanOpen = true
+    cameraOn = true
+    gate.reset()
+    lastScanAt = System.currentTimeMillis()
+    if (!granted) askCamera.launch(Manifest.permission.CAMERA)
+  }
+
+  fun closeScanner() {
+    scanOpen = false
+    cameraOn = false
+  }
+
+  //  دکمهٔ سیاهِ بارکدِ نوارِ پایین (بیرون از این صفحه) صندوق را با دوربینِ باز می‌خواهد
+  val scanAsk = PhoneCartUi.scanRequest.value
+  LaunchedEffect(scanAsk) {
+    if (phone && scanAsk) {
+      openScanner()
+      PhoneCartUi.scanRequest.value = false
+    }
+  }
+
+  val goBack: () -> Unit = onBack ?: { ir.vil3ntec.tohid.ui.AppNav.go("dashboard") }
+
+  /** زدنِ کارت: یک پله، با نگهبانِ موجودی — همان قاعدهٔ «انتخاب محصول» */
+  fun phoneAdd(productId: String) {
+    val p = d.products.find { it.id == productId } ?: return
+    val added = SalesEngine.addToCartCapped(
+      cartStore.lines.value, p.id, SalesEngine.cartStep(p.unit), ShopStore.stock(d, p.id),
+    )
+    if (added.capped) {
+      Haptics.confirm(context)
+      //  «تمام شد»: همان پیامِ موتورِ فروش (جنس هست؟ اول ورودیِ انبار)؛ بخشی ماند ⇐ چقدر هست
+      toast(
+        if (added.available <= 0) SalesEngine.shortageMessage(p, SalesEngine.cartStep(p.unit), added.available)
+        else "${p.name} فقط ${qty(added.available)}${if (p.unit.isNotBlank()) " ${p.unit}" else ""} موجود است"
+      )
+      if (added.cart === cartStore.lines.value) return
+    }
+    cartStore.set(added.cart)
+    selectedId = p.id
+  }
+
+  /** −/+ِ یک ردیفِ سبد. «+» کالا هم از موجودی جلو نمی‌زند؛ ردیفِ آزاد موجودی ندارد */
+  fun phoneStep(row: CartSummary.Row, sign: Int) {
+    val lines = cartStore.lines.value
+    if (sign > 0 && row.hasProduct) {
+      val p = d.products.find { it.id == row.id } ?: return
+      val added = SalesEngine.addToCartCapped(lines, p.id, row.step, ShopStore.stock(d, p.id))
+      if (added.capped) {
+        toast("${p.name} فقط ${qty(added.available)}${if (p.unit.isNotBlank()) " ${p.unit}" else ""} موجود است")
+      }
+      cartStore.set(added.cart)
+      return
+    }
+    val next = row.quantity + sign * row.step
+    cartStore.set(SalesEngine.setCartQty(lines, row.id, next))
+    if (next <= 0) {
+      if (selectedId == row.id) selectedId = null
+      if (expandedLine == row.id) expandedLine = null
+    }
+  }
+
+  /*
+   *  کاتالوگ: نمایهٔ جستجو (کلیدهای نرمال) و ترتیبِ پرفروش‌ترین فقط با تغییرِ کالاها یا
+   *  فروش‌ها ساخته می‌شود، نه با هر حرف (سنجشِ کارایی: ۲۶۴–۴۴۹ms برای هر کلید). کالای
+   *  غیرفعال در فروش نمی‌آید — سابقه‌اش در گزارش‌ها می‌ماند.
+   */
+  val popularity = remember(d.sales, d.saleItems, phone) {
+    if (phone) CatalogSearch.popularity(d.sales, d.saleItems) else emptyMap()
+  }
+  val searchIndex = remember(d.products, popularity, phone) {
+    CatalogSearch.index(if (phone) d.products else emptyList(), popularity)
+  }
+  val productById = remember(d.products) { d.products.associateBy { it.id } }
+  val inCartQty = remember(cart) { cart.groupBy { it.productId }.mapValues { (_, l) -> l.sumOf { it.quantity } } }
+  fun catalogItem(p: ir.vil3ntec.tohid.data.Product) = PhoneCatalogItem(
+    id = p.id,
+    name = p.name,
+    price = p.salePrice,
+    unit = p.unit,
+    stock = ShopStore.stock(d, p.id),
+    hasPhoto = p.photo,
+    inCart = inCartQty[p.id] ?: 0.0,
+    weighed = SalesEngine.isFractionalUnit(p.unit),
+  )
+  val shownIds = remember(searchIndex, phoneSearch, category) { CatalogSearch.search(searchIndex, phoneSearch, category) }
+  val catalogItems = remember(shownIds, productById, inCartQty, d) { shownIds.mapNotNull { productById[it]?.let(::catalogItem) } }
+  val bestsellers = remember(searchIndex, productById, inCartQty, d) {
+    CatalogSearch.top(searchIndex).mapNotNull { productById[it]?.let(::catalogItem) }
+  }
+
+  //  کاشی یا فهرست — همان انبارِ `ViewModePref` (کارت = کاشی، جدول = فهرست)، برای هر کاربر
+  val modeStore = remember(context) {
+    ir.vil3ntec.tohid.ui.components.common.ViewModePref.Store.of(
+      context.getSharedPreferences(ir.vil3ntec.tohid.ui.components.common.ViewModePref.PREFS, android.content.Context.MODE_PRIVATE)
+    )
+  }
+  val modeKey = remember(context) {
+    val user = runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountId }.getOrDefault("")
+    ir.vil3ntec.tohid.ui.components.common.ViewModePref.key(user, "sale-phone")
+  }
+  var listMode by remember {
+    mutableStateOf(
+      ir.vil3ntec.tohid.ui.components.common.ViewMode.parse(runCatching { modeStore.get(modeKey) }.getOrNull()) ==
+        ir.vil3ntec.tohid.ui.components.common.ViewMode.TABLE
+    )
+  }
+  fun toggleMode() {
+    listMode = !listMode
+    val mode = if (listMode) ir.vil3ntec.tohid.ui.components.common.ViewMode.TABLE else ir.vil3ntec.tohid.ui.components.common.ViewMode.CARD
+    runCatching { modeStore.put(modeKey, mode.id) }
+  }
+
+  //  صفحه‌کلیدِ مقدار/وزن (نگه داشتن، یا زدنِ کالای وزنی)
+  var keypadFor by remember { mutableStateOf<String?>(null) }
+  fun phoneTap(item: PhoneCatalogItem) { if (item.weighed) keypadFor = item.id else phoneAdd(item.id) }
+  fun phoneMinus(item: PhoneCatalogItem) {
+    val p = productById[item.id] ?: return
+    val lines = cartStore.lines.value
+    val now = lines.find { it.productId == p.id }?.quantity ?: return
+    val next = now - SalesEngine.cartStep(p.unit)
+    cartStore.set(SalesEngine.setCartQty(lines, p.id, next))
+    if (next <= 0 && selectedId == p.id) selectedId = null
+  }
+
+  //  عکس‌های خودکار: نما، جستجو و صفحه‌کلید
+  val shotList = PhoneCartShot.list.value
+  LaunchedEffect(shotList) { if (phone && shotList != null) listMode = shotList }
+  val shotSearch = PhoneCartShot.search.value
+  LaunchedEffect(shotSearch) { if (phone && shotSearch != null) phoneSearch = shotSearch }
+  val shotKeypad = PhoneCartShot.keypad.value
+  LaunchedEffect(shotKeypad) { if (phone && shotKeypad != null) keypadFor = shotKeypad }
+
+  /*
+   *  دوربین، بارکدِ دستی و «هر اسکن» — یک‌جا تا تبلت (کادرِ بالای صفحه) و گوشیِ
+   *  نسخهٔ ۳ (کادرِ زیرِ سربرگ با زدنِ «اسکن») یک چیز را نشان دهند، نه دو نسخه.
+   */
+  val scanControls: @Composable () -> Unit = {
+    ScannerFrame(
+      on = cameraOn && granted,
+      status = status,
+      error = statusError,
+      onGrant = { askCamera.launch(Manifest.permission.CAMERA) },
+      granted = granted,
+      onStart = { cameraOn = true },
+      scanner = {
+        CameraScanner(
+          onCode = { onBarcode(it) },
+          onStatus = { text, isError -> status = text; statusError = isError },
+          modifier = Modifier.fillMaxSize(),
+          //  سدِ خوانشِ دروغین از همین می‌فهمد کجا سخت بگیرد:
+          //  کالای خودِ دکان همان فریمِ اول می‌رود توی سبد، ولی کدی
+          //  که در فهرست نیست باید چند بار یکسان خوانده شود.
+          //  خوانشِ نصفه تقریباً همیشه از دستهٔ دوم است.
+          isKnown = { index.containsKey(it) },
+        )
+      },
+    )
+
+    Spacer(Modifier.height(12.dp))
+
+    Row(verticalAlignment = Alignment.CenterVertically) {
+      OutlinedTextField(
+        value = manual,
+        onValueChange = { manual = it },
+        placeholder = { Text("یا بارکد را دستی وارد کنید") },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Search),
+        /*
+         *  ضربدرِ پاک‌کردن.
+         *
+         *  بارکدِ ناشناس خودش در این کادر می‌نشیند تا گم نشود؛ ولی
+         *  تا حالا برای برداشتنش باید رقم‌به‌رقم پاک می‌شد. حالا یک
+         *  زدن بس است. فقط وقتی چیزی نوشته شده نشان داده می‌شود تا
+         *  کادرِ خالی شلوغ نشود.
+         */
+        trailingIcon = {
+          if (manual.isNotEmpty()) {
+            IconButton(onClick = { manual = "" }) {
+              Icon(
+                Icons.Filled.Close,
+                contentDescription = "پاک کردن بارکد",
+                tint = Shop.colors.muted,
+              )
+            }
+          }
+        },
+        modifier = Modifier.weight(1f),
+      )
+      Spacer(Modifier.width(8.dp))
+      Button(
+        onClick = {
+          val code = manual.trim()
+          if (code.isNotEmpty()) {
+            onBarcode(code, skipDedup = true)
+            if (index.containsKey(code)) manual = ""
+          }
+        },
+      ) { Text("جستجو") }
+    }
+
+    Spacer(Modifier.height(12.dp))
+
+    Row(verticalAlignment = Alignment.CenterVertically) {
+      Text("هر اسکن:", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
+      Spacer(Modifier.width(10.dp))
+      listOf(1, 2, 5, 10).forEach { m ->
+        MultiplierChip(m, m == multiplier) { multiplier = m }
+        Spacer(Modifier.width(6.dp))
+      }
+    }
+  }
+
+  /** «جستجو»ِ بارکدِ دستی — همان کارِ دکمهٔ تبلت */
+  fun searchManual() {
+    val code = manual.trim()
+    if (code.isNotEmpty()) {
+      onBarcode(code, skipDedup = true)
+      if (index.containsKey(code)) manual = ""
+    }
+  }
+
+  /*
+   *  گوشی (نسخهٔ ۳): همان دوربینِ پیوسته، بارکدِ دستی، «هر اسکن» و «قلم آزاد» — با رنگ‌های
+   *  خودِ سبد (سطحِ تیره، دکمهٔ رنگی، چیپ‌های خاکستری و انتخابِ رنگِ سبد)، نه رنگِ دیگرِ برنامه.
+   */
+  val phoneScanPanel: @Composable () -> Unit = {
+    val v = PhoneV3.colors
+    Column(
+      Modifier
+        .fillMaxWidth()
+        .clip(RoundedCornerShape(PhoneV3.tileRadius))
+        .background(v.black)
+        .padding(12.dp),
+    ) {
+      Box(
+        Modifier
+          .fillMaxWidth()
+          .height(200.dp)
+          .clip(RoundedCornerShape(16.dp))
+          .background(v.blackRaised),
+        contentAlignment = Alignment.Center,
+      ) {
+        if (cameraOn && granted) {
+          CameraScanner(
+            onCode = { onBarcode(it) },
+            onStatus = { text, isError -> status = text; statusError = isError },
+            modifier = Modifier.fillMaxSize(),
+            isKnown = { index.containsKey(it) },
+          )
+          ScanLine(Modifier.fillMaxWidth(0.86f).height(120.dp))
+          Text(
+            status,
+            color = if (statusError) v.negative else v.onBlack,
+            fontSize = 12.sp,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            modifier = Modifier
+              .align(Alignment.BottomCenter)
+              .fillMaxWidth()
+              .background(v.black.copy(alpha = 0.55f))
+              .padding(horizontal = 12.dp, vertical = 6.dp),
+          )
+        } else {
+          Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(Icons.Outlined.PhotoCamera, contentDescription = null, tint = v.onBlackMuted, modifier = Modifier.size(30.dp))
+            Spacer(Modifier.height(8.dp))
+            Text(
+              if (granted) "دوربین خاموش است" else "برای اسکن، اجازهٔ دوربین لازم است",
+              color = v.onBlackMuted,
+              fontSize = 13.sp,
+            )
+            Spacer(Modifier.height(10.dp))
+            V3Pill(if (granted) "روشن کردن دوربین" else "اجازه دادن", v.cart, v.onCart) {
+              if (granted) {
+                cameraOn = true
+                gate.reset()
+                lastScanAt = System.currentTimeMillis()
+              } else askCamera.launch(Manifest.permission.CAMERA)
+            }
+          }
+        }
+      }
+      Spacer(Modifier.height(10.dp))
+      Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+          Modifier
+            .weight(1f)
+            .height(44.dp)
+            .clip(RoundedCornerShape(percent = 50))
+            .background(v.blackRaised)
+            .padding(start = 14.dp, end = 4.dp),
+          verticalAlignment = Alignment.CenterVertically,
+        ) {
+          Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+            if (manual.isEmpty()) Text("یا بارکد را دستی وارد کنید", color = v.onBlackMuted, fontSize = 14.sp, maxLines = 1)
+            BasicTextField(
+              value = manual,
+              onValueChange = { manual = it },
+              singleLine = true,
+              textStyle = TextStyle(color = v.onBlack, fontSize = 15.sp),
+              cursorBrush = SolidColor(v.cart),
+              keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Search),
+              keyboardActions = KeyboardActions(onSearch = { searchManual() }),
+              modifier = Modifier.fillMaxWidth(),
+            )
+          }
+          if (manual.isNotEmpty()) {
+            IconButton(onClick = { manual = "" }, modifier = Modifier.size(36.dp)) {
+              Icon(Icons.Filled.Close, contentDescription = "پاک کردن بارکد", tint = v.onBlackMuted, modifier = Modifier.size(18.dp))
+            }
+          }
+        }
+        Spacer(Modifier.width(8.dp))
+        V3Pill("جستجو", v.cart, v.onCart) { searchManual() }
+      }
+      Spacer(Modifier.height(10.dp))
+      Row(
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+      ) {
+        Text("هر اسکن:", color = v.onBlackMuted, fontSize = 12.sp, maxLines = 1)
+        listOf(1, 2, 5, 10).forEach { m ->
+          val on = m == multiplier
+          V3Pill("×${ir.vil3ntec.tohid.plain(m)}", if (on) v.cart else v.blackRaised, if (on) v.onCart else v.onBlack, height = 36.dp) {
+            multiplier = m
+          }
+        }
+      }
+      Spacer(Modifier.height(10.dp))
+      V3Pill("+ قلم آزاد", v.onBlack, v.black, height = 36.dp) { freeLine = true }
+    }
+  }
+
   val hid = remember { HidScan() }
   val hidFocus = remember { FocusRequester() }
   LaunchedEffect(Unit) { runCatching { hidFocus.requestFocus() } }
@@ -293,7 +687,8 @@ fun SaleScreen(
         false
       }
   ) {
-    LazyColumn(
+    //  گوشی (نسخهٔ ۳) کاتالوگ و سبدِ r3/r2 را پایین‌تر می‌کشد؛ این فهرست فقط تبلت است
+    if (!phone) LazyColumn(
       Modifier.fillMaxSize(),
       contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, if (cart.isEmpty()) 24.dp else if (phone) 104.dp else 200.dp),
     ) {
@@ -331,79 +726,7 @@ fun SaleScreen(
       /* --------------------------- دوربین --------------------------- */
       item {
         Panel {
-          ScannerFrame(
-            on = cameraOn && granted,
-            status = status,
-            error = statusError,
-            onGrant = { askCamera.launch(Manifest.permission.CAMERA) },
-            granted = granted,
-            onStart = { cameraOn = true },
-            scanner = {
-              CameraScanner(
-                onCode = { onBarcode(it) },
-                onStatus = { text, isError -> status = text; statusError = isError },
-                modifier = Modifier.fillMaxSize(),
-                //  سدِ خوانشِ دروغین از همین می‌فهمد کجا سخت بگیرد:
-                //  کالای خودِ دکان همان فریمِ اول می‌رود توی سبد، ولی کدی
-                //  که در فهرست نیست باید چند بار یکسان خوانده شود.
-                //  خوانشِ نصفه تقریباً همیشه از دستهٔ دوم است.
-                isKnown = { index.containsKey(it) },
-              )
-            },
-          )
-
-          Spacer(Modifier.height(12.dp))
-
-          Row(verticalAlignment = Alignment.CenterVertically) {
-            OutlinedTextField(
-              value = manual,
-              onValueChange = { manual = it },
-              placeholder = { Text("یا بارکد را دستی وارد کنید") },
-              singleLine = true,
-              keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Search),
-              /*
-               *  ضربدرِ پاک‌کردن.
-               *
-               *  بارکدِ ناشناس خودش در این کادر می‌نشیند تا گم نشود؛ ولی
-               *  تا حالا برای برداشتنش باید رقم‌به‌رقم پاک می‌شد. حالا یک
-               *  زدن بس است. فقط وقتی چیزی نوشته شده نشان داده می‌شود تا
-               *  کادرِ خالی شلوغ نشود.
-               */
-              trailingIcon = {
-                if (manual.isNotEmpty()) {
-                  IconButton(onClick = { manual = "" }) {
-                    Icon(
-                      Icons.Filled.Close,
-                      contentDescription = "پاک کردن بارکد",
-                      tint = Shop.colors.muted,
-                    )
-                  }
-                }
-              },
-              modifier = Modifier.weight(1f),
-            )
-            Spacer(Modifier.width(8.dp))
-            Button(
-              onClick = {
-                val code = manual.trim()
-                if (code.isNotEmpty()) {
-                  onBarcode(code, skipDedup = true)
-                  if (index.containsKey(code)) manual = ""
-                }
-              },
-            ) { Text("جستجو") }
-          }
-
-          Spacer(Modifier.height(12.dp))
-
-          Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("هر اسکن:", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
-            Spacer(Modifier.width(10.dp))
-            listOf(1, 2, 5, 10).forEach { m ->
-              MultiplierChip(m, m == multiplier) { multiplier = m }
-              Spacer(Modifier.width(6.dp))
-            }
-          }
+          scanControls()
         }
         Spacer(Modifier.height(16.dp))
       }
@@ -513,22 +836,194 @@ fun SaleScreen(
       )
     }
 
-    /* ------------- گوشی: نوار و برگهٔ تیرهٔ سبد (phone-ui) ------------- */
+    /* ------------- گوشی، نسخهٔ ۳: کاتالوگِ r3 و سبدِ r2 ------------- */
     if (phone) {
-      PhoneSaleCartLayer(
-        d = d,
-        cart = cart,
-        cartDebtorId = cartDebtorId,
-        cartStore = cartStore,
+      //  دکمهٔ برگشتِ گوشی: اول کادرِ اسکن، بعد خانه (سبدِ باز را خودِ قاب می‌بندد)
+      BackHandler(onBack = { if (scanOpen) closeScanner() else goBack() })
+      PhoneSaleFrame(
+        model = CartSummary.of(cart, d.products, SalesEngine.cartTotal(d, cart)),
         open = cartOpen,
         onOpen = { cartOpen = true },
-        onClose = { cartOpen = false },
-        onEdit = { editLine = it },
-        onRemoved = { if (selectedId == it) selectedId = null },
-        onPickDebtor = { pickDebtor = true },
-        onCheckout = { checkout = true },
+        onClose = { cartOpen = false; expandedLine = null },
+        pulse = pulse,
+        catalog = { bottomGap ->
+          PhoneCatalog(
+            items = catalogItems,
+            bestsellers = bestsellers,
+            categories = d.productCategories,
+            category = category,
+            onCategory = { category = it },
+            onCategoryHold = { confirmDeleteCategory = it },
+            onAddCategory = { newCategory = "" },
+            search = phoneSearch,
+            onSearch = { phoneSearch = it },
+            listMode = listMode,
+            onToggleMode = { toggleMode() },
+            onBack = goBack,
+            onScan = { if (scanOpen) closeScanner() else openScanner() },
+            scanning = scanOpen,
+            scanPanel = { phoneScanPanel() },
+            emptyText = when {
+              d.products.isEmpty() -> "هنوز محصولی ثبت نشده."
+              phoneSearch.isNotBlank() -> "کالایی با «${phoneSearch.trim()}» پیدا نشد"
+              else -> "محصولی در این دسته‌بندی نیست"
+            },
+            bottomGap = bottomGap,
+            onTap = { phoneTap(it) },
+            onHold = { keypadFor = it.id },
+            onMinus = { phoneMinus(it) },
+          )
+        },
+        cart = { revealed, dragHandle ->
+          val rows = CartSummary.rows(cart, d.products)
+          Box(dragHandle.fillMaxWidth().padding(top = 62.dp, bottom = 38.dp)) { PhoneCartTitle() }
+          //  ردیف‌ها می‌لغزند؛ «مشتری» و «تخفیف» زیرشان می‌مانند و هرگز پشتِ «جمع:» نمی‌روند
+          Box(Modifier.weight(1f).fillMaxWidth()) {
+            Column(Modifier.fillMaxWidth()) {
+              LazyColumn(Modifier.weight(1f, fill = false).fillMaxWidth()) {
+                itemsIndexed(rows, key = { _, r -> r.id }) { i, r ->
+                  PhoneCartRow(
+                    row = r,
+                    index = i,
+                    revealed = revealed,
+                    expanded = expandedLine == r.id,
+                    onToggle = { expandedLine = if (expandedLine == r.id) null else r.id },
+                    onMinus = { phoneStep(r, -1) },
+                    onPlus = { phoneStep(r, +1) },
+                    onRemove = {
+                      Haptics.confirm(context)
+                      cartStore.set(SalesEngine.setCartQty(cartStore.lines.value, r.id, 0.0))
+                      if (selectedId == r.id) selectedId = null
+                      if (expandedLine == r.id) expandedLine = null
+                    },
+                    onEdit = { editLine = r.id },
+                  )
+                }
+              }
+              val debtorName = cartDebtorId?.let { id -> d.debtors.find { it.id == id }?.name }
+              PhoneCartInfoRow(
+                icon = Icons.Outlined.Person,
+                title = debtorName ?: "مشتری گذری",
+                hint = cartDebtorId?.let { id -> debtStateText(d, id) } ?: "برای فروشِ نسیه، قرض‌دار را انتخاب کنید",
+                index = rows.size,
+                revealed = revealed,
+                onClick = { pickDebtor = true },
+                onClickLabel = "انتخابِ قرض‌دار",
+                trailing = {
+                  if (debtorName != null) PhoneCartClear("برداشتنِ قرض‌دار") { cartStore.setDebtor(null) }
+                },
+              )
+              val off = CartSummary.manualDiscount(cart, d.products)
+              if (off > 0) {
+                PhoneCartInfoRow(
+                  icon = Icons.Outlined.LocalOffer,
+                  title = "تخفیف",
+                  hint = "قیمتِ دستیِ کمتر از قیمتِ کالا — در جمع حساب شده است",
+                  index = rows.size + 1,
+                  revealed = revealed,
+                  onClick = null,
+                  //  «-99,999 ؋»: منفی در جداسازِ چپ‌به‌راست، تا «-» پسِ عدد نیفتد
+                  trailing = { PhoneCartAmount(PhoneSaleText.amount(-off)) },
+                )
+              }
+            }
+          }
+          Spacer(Modifier.height(16.dp))
+          PhoneCartTotal(SalesEngine.cartTotal(d, cart))
+          Spacer(Modifier.height(36.dp))
+          PhoneCartPay("پرداخت", onClick = { checkout = true })
+        },
+      )
+      PhoneQtyKeypad(
+        request = keypadFor?.let { id -> productById[id] }?.let { p ->
+          PhoneKeypadRequest(p.id, p.name, p.unit, p.salePrice, SalesEngine.isFractionalUnit(p.unit), inCartQty[p.id] ?: 0.0)
+        },
+        problem = { req, q ->
+          val p = productById[req.id]
+          val stock = ShopStore.stock(d, req.id)
+          when {
+            p == null -> null
+            SalesEngine.quantityProblem(p, q) != null -> SalesEngine.quantityProblem(p, q)
+            stock <= 0 -> SalesEngine.shortageMessage(p, q, stock)
+            q > stock -> "فقط ${qty(stock)}${if (p.unit.isNotBlank()) " ${p.unit}" else ""} موجود است"
+            else -> null
+          }
+        },
+        onDismiss = { keypadFor = null },
+        onConfirm = { req, q ->
+          val lines = cartStore.lines.value
+          val next = when {
+            lines.any { it.productId == req.id } -> SalesEngine.setCartQty(lines, req.id, q)
+            q > 0 -> SalesEngine.addToCart(lines, req.id, q)
+            else -> lines
+          }
+          cartStore.set(next)
+          if (q > 0) selectedId = req.id else if (selectedId == req.id) selectedId = null
+          keypadFor = null
+        },
       )
     }
+  }
+
+  /* ------------------ گوشی: دستهٔ تازه و حذفِ دسته ------------------ */
+
+  newCategory?.let { value ->
+    AlertDialog(
+      onDismissRequest = { newCategory = null },
+      containerColor = Shop.colors.surfaceSolid,
+      title = { Text("دسته‌بندیِ تازه", color = Shop.colors.text) },
+      text = {
+        OutlinedTextField(
+          value = value,
+          onValueChange = { newCategory = it },
+          placeholder = { Text("نام دسته‌بندی را بنویسید…") },
+          singleLine = true,
+        )
+      },
+      confirmButton = {
+        TextButton(onClick = {
+          when (val result = WarehouseEngine.addCategory(d, value)) {
+            is WarehouseEngine.Result.Failed -> toast(result.message)
+            is WarehouseEngine.Result.Ok -> {
+              scope.launch { store.save(result.data) }
+              toast("دسته‌بندی اضافه شد")
+              category = value.trim()
+              newCategory = null
+            }
+          }
+        }) { Text("افزودن") }
+      },
+      dismissButton = { TextButton(onClick = { newCategory = null }) { Text("انصراف") } },
+    )
+  }
+
+  confirmDeleteCategory?.let { name ->
+    AlertDialog(
+      onDismissRequest = { confirmDeleteCategory = null },
+      containerColor = Shop.colors.surfaceSolid,
+      title = { Text("حذف دسته‌بندی؟", color = Shop.colors.text) },
+      text = {
+        Text(
+          "دسته‌بندی «$name» حذف می‌شود. محصولات این دسته حذف نمی‌شوند، فقط دیگر در این دسته‌بندی فیلتر نمی‌شوند.",
+          style = MaterialTheme.typography.bodySmall,
+          color = Shop.colors.muted,
+        )
+      },
+      confirmButton = {
+        TextButton(onClick = {
+          when (val result = WarehouseEngine.removeCategory(d, name)) {
+            is WarehouseEngine.Result.Failed -> toast(result.message)
+            is WarehouseEngine.Result.Ok -> {
+              scope.launch { store.save(result.data) }
+              toast("دسته‌بندی حذف شد")
+              if (category == name) category = null
+            }
+          }
+          confirmDeleteCategory = null
+        }) { Text("حذف", color = Shop.colors.danger) }
+      },
+      dismissButton = { TextButton(onClick = { confirmDeleteCategory = null }) { Text("انصراف") } },
+    )
   }
 
   /* --------------------------- پنجره‌ها --------------------------- */
@@ -644,84 +1139,6 @@ fun debtStateText(d: ShopData, debtorId: String): String {
     amount > 0 -> "${money(amount)} ؋ بدهکار"
     amount < 0 -> "${money(-amount)} ؋ موجودی دارد"
     else -> "حساب صاف است"
-  }
-}
-
-/**
- *  سبدِ گوشی برای صندوق و «انتخاب محصول» (phone-ui، تصویرهای مرجعِ ۵ و ۶).
- *
- *  همان داده و همان کارهای پیشین — فقط جایشان: ردیف‌ها (− مقدار +، زدنِ مقدار ⇐
- *  کادرِ «تعداد و قیمت» اگر `onEdit` باشد)، قرض‌دار، جمع، و دکمهٔ اصلی که همان
- *  `CheckoutDialog` را باز می‌کند. ردیفِ «ارسال» در صندوق نیست.
- */
-@Composable
-internal fun BoxScope.PhoneSaleCartLayer(
-  d: ShopData,
-  cart: List<SalesEngine.CartLine>,
-  cartDebtorId: String?,
-  cartStore: CartStore,
-  open: Boolean,
-  onOpen: () -> Unit,
-  onClose: () -> Unit,
-  onEdit: ((String) -> Unit)?,
-  onRemoved: (String) -> Unit,
-  onPickDebtor: () -> Unit,
-  onCheckout: () -> Unit,
-) {
-  PhoneCartLayer(
-    model = CartSummary.of(
-      cart.map { line ->
-        val product = d.products.find { it.id == line.productId }
-        CartSummary.Line(line.productId, product?.name ?: line.label, product != null)
-      },
-      SalesEngine.cartTotal(d, cart),
-    ),
-    open = open,
-    onOpen = onOpen,
-    onClose = onClose,
-  ) {
-    PhoneCartHeader(cart.size, onClose)
-    Spacer(Modifier.height(4.dp))
-    LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
-      items(cart, key = { it.productId }) { line ->
-        val product = d.products.find { it.id == line.productId }
-        //  همان دو گونه ردیفِ پیشین: کالای ثبت‌شده و «قلمِ آزاد»
-        if (product == null && !line.free) return@items
-        val name = product?.name ?: line.label
-        val price = line.unitPrice ?: product?.salePrice ?: 0.0
-        val unit = product?.unit.orEmpty()
-        val step = if (product != null) SalesEngine.cartStep(product.unit) else 1.0
-        val custom = line.free || line.unitPrice != null
-        PhoneCartLine(
-          thumb = CartSummary.Thumb(line.productId, CartSummary.initials(name), product != null),
-          name = name,
-          detail = "${qty(line.quantity)}${if (unit.isNotBlank()) " $unit" else ""} × ${money(price)} = " +
-            "${money(SalesEngine.lineTotal(price, line.quantity))} ؋" + if (custom) "  (قیمت دستی)" else "",
-          qtyText = qty(line.quantity),
-          lastStep = line.quantity <= step,
-          onMinus = {
-            cartStore.set(SalesEngine.setCartQty(cart, line.productId, line.quantity - step))
-            if (line.quantity <= step) onRemoved(line.productId)
-          },
-          onPlus = { cartStore.set(SalesEngine.setCartQty(cart, line.productId, line.quantity + step)) },
-          onEdit = onEdit?.let { edit -> { edit(line.productId) } },
-        )
-      }
-    }
-    Spacer(Modifier.height(10.dp))
-    val debtorName = cartDebtorId?.let { id -> d.debtors.find { it.id == id }?.name }
-    PhoneCartDebtor(
-      name = debtorName,
-      note = cartDebtorId?.let { id -> debtStateText(d, id) },
-      onPick = onPickDebtor,
-      onClear = { cartStore.setDebtor(null) },
-    )
-    Spacer(Modifier.height(14.dp))
-    PhoneCartFooter(
-      total = SalesEngine.cartTotal(d, cart),
-      primary = if (debtorName != null) "ثبت نسیه" else "پرداخت و ثبت فروش",
-      onPrimary = onCheckout,
-    )
   }
 }
 
@@ -967,3 +1384,19 @@ fun CartBar(
  *  می‌شود و آدم را عصبانی می‌کند؛ بلندتر از این، دیگر صرفه‌جویی نیست.
  */
 private const val CAMERA_IDLE_MS = 3L * 60L * 1000L
+
+/** قرصِ کوچکِ صندوقِ گوشیِ نسخهٔ ۳ (رنگِ سبد یا خاکستری روی سطحِ تیره) — کادرِ اسکن */
+@Composable
+private fun V3Pill(text: String, bg: Color, fg: Color, height: androidx.compose.ui.unit.Dp = 44.dp, onClick: () -> Unit) {
+  Box(
+    Modifier
+      .height(height)
+      .clip(RoundedCornerShape(percent = 50))
+      .background(bg)
+      .clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onClick)
+      .padding(horizontal = 16.dp),
+    contentAlignment = Alignment.Center,
+  ) {
+    Text(text, color = fg, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+  }
+}

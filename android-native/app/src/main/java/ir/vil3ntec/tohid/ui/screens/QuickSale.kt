@@ -71,6 +71,23 @@ fun QuickSaleScreen(
   snackbar: SnackbarHostState,
   onBack: () -> Unit,
 ) {
+  /*
+   *  گوشی (نسخهٔ ۳): صندوقِ گوشی خودش همین کاتالوگ است (r3 + سبدِ r2) — همان صفحه با
+   *  پیکانِ برگشتِ همین‌جا. دو کاتالوگِ جدا برای یک کار، همان «تکراری»ای بود که رد شد.
+   */
+  if (screenSize() == Screen.PHONE) {
+    SaleScreen(
+      store = store,
+      cartStore = cartStore,
+      d = d,
+      snackbar = snackbar,
+      onQuickSale = {},
+      onBack = onBack,
+      onRegisterBarcode = null,
+    )
+    return
+  }
+
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
 
@@ -92,12 +109,9 @@ fun QuickSaleScreen(
   var newCategory by rememberSaveable { mutableStateOf<String?>(null) }
   var confirmDeleteCategory by remember { mutableStateOf<String?>(null) }
   var cartOpen by rememberSaveable { mutableStateOf(false) }
-  //  phone-ui: گوشی نوار و برگهٔ تیرهٔ سبد دارد؛ تبلت همان کشوی پیشین
-  val phone = screenSize() == Screen.PHONE
+  //  گوشی بالاتر به `SaleScreen` رفت؛ این‌جا فقط تبلت است
+  val phone = false
   LaunchedEffect(cart.isEmpty()) { if (cart.isEmpty()) cartOpen = false }
-  //  عکسِ خودکار (`PhoneCartShot`) — در نسخهٔ دستِ کاربر هرگز روشن نمی‌شود
-  val shotOpen = ir.vil3ntec.tohid.ui.components.pos.PhoneCartShot.open.value
-  LaunchedEffect(shotOpen) { if (shotOpen) cartOpen = true }
   var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
   var pickDebtor by rememberSaveable { mutableStateOf(false) }
   var checkout by rememberSaveable { mutableStateOf(false) }
@@ -345,23 +359,6 @@ fun QuickSaleScreen(
       }
     }
 
-    /* ------------- گوشی: نوار و برگهٔ تیرهٔ سبد (phone-ui) ------------- */
-    if (phone) {
-      PhoneSaleCartLayer(
-        d = d,
-        cart = cart,
-        cartDebtorId = cartDebtorId,
-        cartStore = cartStore,
-        open = cartOpen,
-        onOpen = { cartOpen = true },
-        onClose = { cartOpen = false },
-        //  «انتخاب محصول» کادرِ تعداد و قیمت نداشت — همان می‌ماند
-        onEdit = null,
-        onRemoved = { if (selectedId == it) selectedId = null },
-        onPickDebtor = { pickDebtor = true },
-        onCheckout = { checkout = true },
-      )
-    }
   }
 
   /* ---------------------------- پنجره‌ها ---------------------------- */
