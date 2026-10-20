@@ -6,7 +6,7 @@ import org.junit.Test
 
 class ShopperLinksTest {
 
-  private fun parse(s: String, hosts: Set<String> = emptySet()) = ShopperLinks.parse(s, hosts = hosts)
+  private fun parse(s: String, hosts: Set<String> = emptySet()) = ShopperLinks.link(s, hosts)
 
   @Test
   fun `زیردامنهٔ ویترین`() {
@@ -47,6 +47,32 @@ class ShopperLinksTest {
     assertNull(parse("https://vill3n.top/market"))
     assertNull(parse("https://vill3n.top/store/NAN_1"))
     assertNull(parse("not a link at all"))
+  }
+
+  @Test
+  fun `نشانیِ کوتاهِ دامنه و پیوندِ خودِ برنامه`() {
+    assertEquals(ShopperLink.Shop("nan"), parse("https://vill3n.top/nan"))
+    //  مسیرهای خودِ سایت دکان نیستند
+    assertNull(parse("https://vill3n.top/kit"))
+    assertNull(parse("https://shop.example.af/nan", hosts = setOf("shop.example.af")))
+    assertEquals(ShopperLink.Shop("nan"), parse("vill3n://app/nan"))
+    assertEquals(ShopperLink.Shop("nan"), parse("vill3n://app/shopper/shop/nan"))
+    assertEquals(ShopperLink.Shop("nan", productId = "p:1"), parse("vill3n://app/shopper/shop/nan?product=p%3A1"))
+    assertEquals(ShopperLink.Shop("nan", openCart = true), parse("vill3n://app/shopper/cart/nan"))
+    assertEquals(ShopperLink.Order("nan", Fixtures.TOKEN), parse("vill3n://app/shopper/order/nan/${Fixtures.TOKEN}"))
+    assertNull(parse("vill3n://app/shopper/order/nan/bad"))
+    assertNull(parse("vill3n://other/nan"))
+    assertNull(parse("vill3n://app/settings/security"))
+  }
+
+  @Test
+  fun `درِ بیرونی — پیوند به مسیرِ برنامه`() {
+    assertEquals("shopper/shop/nan", ShopperLinks.parse("https://nan.vill3n.top"))
+    assertEquals("shopper/shop/nan?product=p-12", ShopperLinks.parse("https://vill3n.top/store/nan#/p/p-12"))
+    assertEquals("shopper/order/nan/${Fixtures.TOKEN}", ShopperLinks.parse("https://nan.vill3n.top/#/o/${Fixtures.TOKEN}"))
+    assertEquals("shopper/cart/nan", ShopperLinks.parse("vill3n://app/shopper/cart/nan"))
+    assertEquals("shopper/shop/nan", ShopperLinks.parse("https://shop.example.af/store/nan", hosts = setOf("shop.example.af")))
+    assertNull(ShopperLinks.parse("https://evil.example/store/nan"))
   }
 
   @Test
