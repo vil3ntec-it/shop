@@ -613,3 +613,57 @@ test('v3: صاحبِ دکان روی همان دستگاه با صندوقِ ر�
     n3.op('saleItems', 's3-own-i', 'insert', { saleId: 's3-own', productId: 'p-gc', quantityMilli: 1000, unitPriceMinor: 10000 }),
   ])), ['applied']);
 });
+
+/* ---------------------------------------- P-K: دنبالهٔ ثبتِ پذیرفته — docId، ts، فاکتور */
+
+test('v1 (P-K، docId): دنباله با همان docId و همان ts می‌نشیند؛ همان docId با ts ِ تازه دوباره داوری می‌شود', async () => {
+  await ownerSale('s-dk', 5000);
+  const sv = save();
+  const D = 'rd-dk';
+  const row = (id, amount) => sv.op('returns', id, 'insert', { docId: D, saleId: 's-dk', amount, createdAt: sv.at });
+  assert.deepEqual(why(await push1(staff, 's-dk', [row('r-dk-1', 250), row('r-dk-2', 250)])), ['applied', 'applied']);
+  const r2 = await push1(staff, 's-dk', [row('r-dk-3', 100),
+    sv.op('sales', 's-dk', 'update', { debtSettled: { $inc: 600 } })]);
+  assert.deepEqual(why(r2), ['applied', 'applied']);
+  assert.equal(Number((await row1('sales', 's-dk')).data.debtSettled), 600);
+  const later = save();
+  assert.deepEqual(why(await push1(staff, 's-dk', [later.op('returns', 'r-dk-4', 'insert', { docId: D, saleId: 's-dk', amount: 1, createdAt: later.at })])),
+    ['approval_required']);
+});
+
+test('v1 (P-K، R1): همان docId روی فاکتورِ دیگر دنباله نیست — سقف داوری می‌شود', async () => {
+  await ownerSale('s-r1a', 5000);
+  await ownerSale('s-r1b', 9000);
+  const sv = save();
+  const D = 'rd-r1';
+  assert.deepEqual(why(await push1(staff, 's-r1', [sv.op('returns', 'r-r1-1', 'insert', { docId: D, saleId: 's-r1a', amount: 10, createdAt: sv.at })])), ['applied']);
+  const r = await push1(staff, 's-r1', [sv.op('returns', 'r-r1-2', 'insert', { docId: D, saleId: 's-r1b', amount: 4000, createdAt: sv.at })]);
+  assert.deepEqual(why(r), ['approval_required']);
+});
+
+test('v1 (P-K، R2): همان docId و همان فاکتور با ts ِ ساختگیِ پیشین دنباله نیست', async () => {
+  await ownerSale('s-r2', 9000);
+  const sv = save();
+  const D = 'rd-r2';
+  assert.deepEqual(why(await push1(staff, 's-r2', [sv.op('returns', 'r-r2-1', 'insert', { docId: D, saleId: 's-r2', amount: 10, createdAt: sv.at })])), ['applied']);
+  const forged = { op_id: oid(), table: 'returns', row_id: 'r-r2-2', type: 'insert', ts: sv.at - 5000,
+    fields: { docId: D, saleId: 's-r2', amount: 4000, createdAt: sv.at - 5000 } };
+  assert.deepEqual(why(await push1(staff, 's-r2', [forged])), ['approval_required']);
+});
+
+test('v1 (P-K، R3): مبلغِ دنباله پیش از داوریِ سندِ دیگرِ همان فاکتور در همان دسته به جمع می‌رود', async () => {
+  await ownerSale('s-r3', 9000);
+  const sv = save();
+  //  بخشِ اول ۳۰۰ (زیرِ سقف)
+  assert.deepEqual(why(await push1(staff, 's-r3', [
+    sv.op('returns', 'r-r3-1', 'insert', { saleId: 's-r3', amount: 150, createdAt: sv.at }),
+    sv.op('returns', 'r-r3-2', 'insert', { saleId: 's-r3', amount: 150, createdAt: sv.at }),
+  ])), ['applied', 'applied']);
+  //  دسته با دنباله (۱۵۰، جمع ۴۵۰) شروع می‌شود؛ سندِ تازهٔ ۱۰۰ در همان دسته ⇒ ۵۵۰ > ۵۰۰
+  const next = save();
+  const r = await push1(staff, 's-r3', [
+    sv.op('returns', 'r-r3-3', 'insert', { saleId: 's-r3', amount: 150, createdAt: sv.at }),
+    next.op('returns', 'r-r3-new', 'insert', { saleId: 's-r3', amount: 100, createdAt: next.at }),
+  ]);
+  assert.deepEqual(why(r), ['applied', 'approval_required']);
+});

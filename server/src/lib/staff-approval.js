@@ -673,24 +673,21 @@ function returnOwnerOf(g, parents) {
 
 /**
  * سندِ برگشتِ این دسته دنبالهٔ ثبتی است که بخشی از آن در دستهٔ پیشینِ همین دستگاه **پذیرفته**
- * شد؟ (ثبتِ بزرگ‌تر از یک دسته — همان docId، یا همان فاکتور با همان ts — که ردیفی از آن در
- * oplog هست). تصمیمِ سند همان بخشِ اول است؛ دنباله جدا داوری نمی‌شود.
+ * شد؟ ثبتِ بزرگ‌تر از یک دسته فقط با یک ts بریده می‌شود (`OpQueue.batch`/`cut`)، پس دنباله همان
+ * ts، همان دستگاه، همان فاکتور (و اگر هست همان docId) را دارد و ردیفی از آن در oplog هست.
+ * تصمیمِ سند همان بخشِ اول است. (docId ِ تکراری روی فاکتورِ دیگر یا با ts ِ دیگر دنباله نیست.)
  */
 async function acceptedPartOf(ctx, deviceId, g) {
   const first = g.rows[0].op;
-  const ids = g.rows.map((r) => String(r.op.row_id));
   const ts = tsOf(first);
-  const hit = g.docId
-    ? await one(
-      `SELECT 1 AS x FROM oplog WHERE app='shop' AND account_kind='shop' AND account_id=$1 AND table_name='returns'
-          AND device_id=$2 AND fields->>'docId' = $3 AND NOT (row_id = ANY($4::text[])) LIMIT 1`,
-      [ctx.accountId, deviceId, g.docId, ids])
-    : g.sale && ts
-      ? await one(
-        `SELECT 1 AS x FROM oplog WHERE app='shop' AND account_kind='shop' AND account_id=$1 AND table_name='returns'
-            AND device_id=$2 AND client_ts=$3 AND fields->>'saleId' = $4 AND NOT (row_id = ANY($5::text[])) LIMIT 1`,
-        [ctx.accountId, deviceId, ts, g.sale, ids])
-      : null;
+  if (!ts || (!g.docId && !g.sale)) return false;
+  const hit = await one(
+    `SELECT 1 AS x FROM oplog WHERE app='shop' AND account_kind='shop' AND account_id=$1 AND table_name='returns'
+        AND op_type='insert' AND device_id=$2 AND client_ts=$3
+        AND ($4::text = '' OR fields->>'docId' = $4) AND ($5::text = '' OR fields->>'saleId' = $5)
+        AND NOT (row_id = ANY($6::text[])) LIMIT 1`,
+    [ctx.accountId, deviceId, ts, g.docId || '', g.sale || '', g.rows.map((r) => String(r.op.row_id))]
+  );
   return !!hit;
 }
 
@@ -773,25 +770,33 @@ async function v1Guard(req, res, next) {
     const groups = groupReturns(live.filter((x) => x.need && x.need.perm === 'returns.create'));
     const judged = new Set();
     const tally = new Map();                     //  فاکتور ⇒ جمعِ برگشتِ ثبت‌شده + پذیرفتهٔ همین دسته
+    //  گذرِ اول: دنبالهٔ ثبتی که بخشِ اولش پذیرفته شد — تصمیمِ سند همان بخشِ اول است و مبلغش پیش از
+    //  داوریِ سندهای دیگرِ همین دسته به جمعِ فاکتور می‌رود. فقط سندی که دسته با ts ِ آن شروع می‌شود
+    //  می‌تواند دنباله باشد (بُرش فقط سرِ دسته را دنباله می‌کند) — بی پرس‌وجو برای بقیه.
+    const lead = valid.length ? tsOf(valid[0].op) : 0;
+    const continued = new Set();
+    for (const g of new Set(groups.values())) {
+      if (!lead || tsOf(g.rows[0].op) !== lead || returnOwnerOf(g, held0)) continue;
+      if (!(await acceptedPartOf(ctx, deviceId, g))) continue;
+      continued.add(g);
+      if (g.sale) {
+        if (!tally.has(g.sale)) tally.set(g.sale, await returnedTotal(null, ctx, g.sale));
+        tally.set(g.sale, tally.get(g.sale) + g.amount);
+      }
+    }
     for (const x of live) {
       if (!x.need) continue;
       const g = groups.get(x.op) || null;
       if (g) {
         if (judged.has(g)) continue;
         judged.add(g);
+        //  دنبالهٔ ثبتی که بخشِ اولش پذیرفته شد (گذرِ اول): وگرنه ردیف‌ها و حرکت‌های پذیرفته بی
+        //  شمارنده‌ها و رسیدِ مشترکِ ثبت (پشتِ سرِ همین ردیف‌ها) می‌ماندند
+        if (continued.has(g)) continue;
         const owner = returnOwnerOf(g, parents.concat(held0));
         if (owner) {
           for (const m of g.rows) reject(m, 'tx_rejected');
           absorb(owner, g);
-          continue;
-        }
-        //  دنبالهٔ ثبتی که بخشِ اولش پیش‌تر پذیرفته شد: تصمیمِ سند همان بخشِ اول است — وگرنه
-        //  ردیف‌ها و حرکت‌های پذیرفته بی شمارنده‌ها و رسیدِ مشترکِ ثبت (پشتِ سرِ همین ردیف‌ها) می‌ماندند
-        if (await acceptedPartOf(ctx, deviceId, g)) {
-          if (g.sale) {
-            if (!tally.has(g.sale)) tally.set(g.sale, await returnedTotal(null, ctx, g.sale));
-            tally.set(g.sale, tally.get(g.sale) + g.amount);
-          }
           continue;
         }
       }
