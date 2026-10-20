@@ -43,7 +43,7 @@ fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
   //  گوشی نسخهٔ ۳ (بندِ F): کارت‌های گروهیِ r5 و «تنظیمات» در ته — `PhoneMoreScreen`.
   //  کامپیوتر همین صفحهٔ پیشین را نگه می‌دارد.
   if (!ir.vil3ntec.tohid.ui.Platform.DESKTOP) {
-    PhoneMoreScreen(d, onOpen)
+    PhoneMoreScreen(d, onOpen = onOpen)
     return
   }
   val context = LocalContext.current
