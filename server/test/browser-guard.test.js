@@ -16,7 +16,7 @@ const os = require('node:os');
 const path = require('node:path');
 
 const DIR = __dirname;
-const FILES = ['admin-panel.mjs', 'web-backup.mjs', 'web-ui.mjs', 'portal-rep.mjs'];
+const FILES = ['admin-panel.mjs', 'web-backup.mjs', 'web-ui.mjs', 'portal-rep.mjs', 'web-sync-v3.mjs'];
 
 // محیطی که پلی‌رایت در آن پیدا نمی‌شود: `npm root -g` به پوشه‌ای خالی
 // می‌رود و NODE_PATH خالی است.
@@ -45,6 +45,30 @@ test('SKIP_BROWSER_TESTS=1: ردِ آگاهانه با پیامِ بلند و ک
   const r = run('web-ui.mjs', { SKIP_BROWSER_TESTS: '1' });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /آگاهانه رد شد/);
+});
+
+test('closeSafeRoute: فقط خطای «صفحه/پاسخ بسته شد» نادیده گرفته می‌شود، بقیه بالا می‌رود', async () => {
+  const { closeSafeRoute, isClosedTargetError } = await import('./browser-guard.mjs');
+  const closed = [
+    'route.fetch: Target page, context or browser has been closed',
+    'route.abort: Target closed',
+    'route.fulfill: Fetch response has been disposed',
+  ];
+  for (const message of closed) {
+    assert.equal(isClosedTargetError(new Error(message)), true, message);
+    const h = closeSafeRoute(async () => { throw new Error(message); });
+    assert.equal(await h({}, {}), undefined);
+  }
+  for (const message of ['route.continue: Route is already handled!', 'net::ERR_FAILED', 'bad']) {
+    assert.equal(isClosedTargetError(new Error(message)), false, message);
+    const h = closeSafeRoute(async () => { throw new Error(message); });
+    await assert.rejects(h({}, {}), { message });
+  }
+  //  گردانندهٔ سالم: همان آرگومان‌ها و همان مقدار
+  const seen = [];
+  const ok = closeSafeRoute(async (route, request) => { seen.push(route, request); return 'done'; });
+  assert.equal(await ok('r', 'q'), 'done');
+  assert.deepEqual(seen, ['r', 'q']);
 });
 
 test.after(() => fs.rmSync(emptyPrefix, { recursive: true, force: true }));

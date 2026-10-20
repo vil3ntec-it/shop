@@ -14,7 +14,7 @@
  * اجرا:  node test/web-locale.mjs   (نبودِ پلی‌رایت قرمز است، نه «رد» — F0-17)
  */
 import { createRequire } from 'node:module';
-import { missingTool, PLAYWRIGHT_INSTALL } from './browser-guard.mjs';
+import { missingTool, PLAYWRIGHT_INSTALL, closeSafeRoute } from './browser-guard.mjs';
 import assert from 'node:assert/strict';
 import { execSync } from 'node:child_process';
 import http from 'node:http';
@@ -63,7 +63,7 @@ const pg = await ctx.newPage();
 const errors = [];
 pg.on('pageerror', e => errors.push(String(e)));
 //  Google Fonts بیرون از آزمون است؛ وزیرمتنِ محلی همان فایل‌های مخزن است
-await pg.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
+await pg.route(/fonts\.(googleapis|gstatic)\.com/, closeSafeRoute(r => r.abort()));
 await pg.goto(url);
 await pg.evaluate(d => {
   localStorage.setItem('tohid-shop-data-v1', JSON.stringify(d));

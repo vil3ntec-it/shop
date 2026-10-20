@@ -301,6 +301,10 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/shop/chat', require('./routes/shop-chat'));
     api.use('/store', require('./routes/shop-chat-store'));
     api.use('/admin/shop-chat', require('./routes/admin-shop-chat'));
+    //  کاتالوگ و موجودیِ سرور (v3 §۳۲) — پیش از `/shop`، پشتِ پرچمِ خاموشِ `shop.catalog`
+    api.use('/shop/catalog', require('./routes/catalog'));
+    //  اعلانِ سفارش (v3 §۳۰) — پیش از `/shop` به همان دلیلِ `/shop/orders`؛ پیش‌فرض خاموش
+    api.use('/shop/order-notify', require('./routes/order-notify'));
     //  سفارشِ آنلاین (فاز ۴) — پیش از `/shop` تا `requireUser`ِ آن دو بار نرود؛
     //  زیرِ همان پیشوند، پس ACCOUNT_PREFIXESِ پنلِ خانگی دست نمی‌خورد
     api.use('/shop/orders', require('./routes/orders'));
@@ -308,6 +312,10 @@ async function createApp({ runMigrations = true } = {}) {
     //  `/store` — پیشوندِ تازه ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی (دستورالعمل در PR)
     api.use('/shop/storefront', require('./routes/storefront-admin'));
     api.use('/store', require('./routes/storefront'));
+    //  بازارچه (WEB، §۲۳) — پشتِ پرچمِ `market.directory`، پیش‌فرض خاموش. درِ دکان
+    //  پیش از `/shop`؛ درِ عمومی `/market` — پیشوندِ تازه ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی
+    api.use('/shop/market', require('./routes/market-admin'));
+    api.use('/market', require('./routes/market'));
     //  بانکِ تصاویر (v3 ۳۷) — پشتِ پرچمِ `shop.image_bank`، پیش‌فرض خاموش
     api.use('/shop/images', require('./routes/shop-images'));
     //  تحویل و پیک (۲۲.۲ C) — همان قاعده؛ درهای پیک زیرِ `/courier` (۳.۱۱)
@@ -430,6 +438,17 @@ async function createApp({ runMigrations = true } = {}) {
     if (!slug) return next();
     storeHeaders(req, res, () => storePage(slug, res).catch(next));
   });
+  // ---- بازارچه (WEB، §۲۳؛ پرچمِ `market.directory`) و کیتِ مشترکِ وبِ خریدار ----
+  //  همان سرآیندهای سختِ ویترین (CSP بی unsafe-inline). بازارچهٔ خاموش ⇒ همان پوسته
+  //  با ۴۰۴ و پیامِ «هنوز باز نیست». هیچ پیوندی به برنامهٔ مدیریتِ دکان نیست.
+  const kitDir = path.join(__dirname, '..', 'public', 'kit');
+  const marketDir = path.join(__dirname, '..', 'public', 'market');
+  const market = require('./lib/market');
+  app.use('/kit', storeHeaders, express.static(kitDir, { index: false, maxAge: 0, etag: true }));
+  app.get(['/market', '/market/'], storeHeaders, (req, res, next) => market.directoryOn().then((on) => {
+    res.status(on ? 200 : 404).set('Cache-Control', 'no-cache').sendFile('index.html', { root: marketDir });
+  }).catch(next));
+  app.use('/market', storeHeaders, express.static(marketDir, { index: false, maxAge: 0, etag: true }));
 
   app.get('/', (req, res) => res.redirect('/admin/'));
 

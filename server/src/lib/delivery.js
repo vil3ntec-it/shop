@@ -265,6 +265,33 @@ async function createCourier(shopId, body, actor) {
   return courierRowView(r.rows[0]);
 }
 
+/**
+ * عضوِ تازه با نقشِ «پیک» (DLV-01) — درونِ تراکنشِ `staffCodes.redeem`.
+ *
+ *  • ردیفِ `shop_couriers` اگر نبود ساخته می‌شود (نام و شماره از حساب، سقفِ
+ *    نقدِ پیش‌فرضِ D-18). ردیفِ موجود دست نمی‌خورد: اگر صاحب دکان پیک را
+ *    غیرفعال کرده، دعوتِ تازه بی‌صدا فعالش نمی‌کند.
+ *  • ⛔ همهٔ نشست‌های دکانیِ این حساب باطل می‌شوند: توکنی که پیش از پیک
+ *    شدن گرفته شده دامنه ندارد و نباید زنده بماند. نشستِ تازه (ورود با کد
+ *    یا پاسخِ `/api/shop/join`) از عضویتِ تازه دامنهٔ `courier` می‌گیرد.
+ */
+async function enrollCourierMember(c, shopId, userId, createdBy, at) {
+  const u = (await c.query('SELECT name, phone FROM users WHERE id=$1', [userId])).rows[0] || {};
+  const v = require('./validate');
+  let phone = '';
+  try { phone = v.phone(u.phone) || ''; } catch { phone = ''; }
+  await c.query(
+    `INSERT INTO shop_couriers (id, shop_id, user_id, name, phone, cash_cap_minor, active, created_by, created_at, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,true,$7,$8,$8) ON CONFLICT (shop_id, user_id) DO NOTHING`,
+    [ulid(at), shopId, userId, text(u.name, 80) || 'پیک', phone, DEFAULT_CASH_CAP_MINOR, createdBy || '', at]
+  );
+  await c.query(
+    `UPDATE tokens SET revoked_at=$1 WHERE subject_id=$2 AND revoked_at IS NULL
+        AND kind IN ('access','refresh') AND COALESCE(app,'shop')='shop'`,
+    [at, userId]
+  );
+}
+
 async function updateCourier(shopId, id, body) {
   const b = body && typeof body === 'object' ? body : {};
   const c = await one('SELECT * FROM shop_couriers WHERE shop_id=$1 AND id=$2', [shopId, idOf(id, 'courier_not_found')]);
@@ -849,6 +876,9 @@ async function putPhoto(shopId, assignmentId, body, actor) {
 }
 
 async function listPhotos(shopId, assignmentId) {
+  //  مأموریتِ دکانِ دیگر (یا ناموجود) همان ۴۰۴ِ بقیهٔ درهای شناسه‌دار است، نه «۲۰۰ و فهرستِ خالی»
+  const own = await one('SELECT 1 AS ok FROM delivery_assignments WHERE shop_id=$1 AND id=$2', [shopId, String(assignmentId || '')]);
+  if (!own) throw notFound('مأموریت پیدا نشد', 'assignment_not_found');
   const rows = await many(
     `SELECT id, assignment_id, order_id, courier_id, mime, size, hash, consent, device_time, created_at
        FROM delivery_photos WHERE shop_id=$1 AND assignment_id=$2 ORDER BY created_at, id`,
@@ -1055,7 +1085,7 @@ function staffActor(req) {
 
 module.exports = {
   FLAG_KEY, FEATURE_KEY, KEY_RE, DEFAULT_CASH_CAP_MINOR, CODE_MAX_ATTEMPTS,
-  stateOf, staffActor, courierOfUser, listCouriers, createCourier, updateCourier,
+  stateOf, staffActor, courierOfUser, listCouriers, createCourier, updateCourier, enrollCourierMember,
   assign, regenerateCode, courierEvents, staffEvent, recall, missions, forOrder, board,
   putPhoto, listPhotos, getPhoto, settlementPreview, settle, listSettlements, getSettlement,
   eventKey,

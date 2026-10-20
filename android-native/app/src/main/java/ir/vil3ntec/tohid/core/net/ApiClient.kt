@@ -89,14 +89,18 @@ class ApiClient(
     contentType: String = "application/octet-stream",
   ): JsonObject = authorized("PUT", path, null, idempotent = true, raw = RawBody(bytes, contentType))
 
-  /** خواندنِ یک فایل (نه JSON) با همان نشست و همان تازه‌سازیِ توکن */
+  /**
+   *  گرفتنِ **بایت‌های خام** با توکن (رسانهٔ چتِ دکان، فایلِ بانکِ تصاویر) —
+   *  همان تازه‌سازیِ یک‌باره‌ی نشستِ پیر که `authorized` دارد. سقفِ ۸ مگِ
+   *  `fetchBytes` بالاتر از بزرگ‌ترین فایلِ بانک (۲ مگ) است.
+   */
   suspend fun getBytes(path: String): ByteArray {
     val token = tokens.accessToken ?: throw ApiFailure.SessionExpired()
     return try {
-      engine.sendForBytes("GET", path, token)
+      engine.fetchBytes(path, token)
     } catch (failure: ApiFailure) {
       if (failure !is ApiFailure.SessionExpired) throw failure
-      engine.sendForBytes("GET", path, renew(usedToken = token))
+      engine.fetchBytes(path, renew(usedToken = token))
     }
   }
 
