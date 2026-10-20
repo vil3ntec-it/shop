@@ -44,7 +44,7 @@ import kotlin.math.sin
 enum class AuroraTone { Brand, Debt, Cash, Stock }
 
 /** نارنجیِ کمکی — برای حال‌هایی که پرامپت طراحی نارنجی خواسته */
-private val AuroraWarm = Color(0x59FF9A3D)
+private val AuroraWarm = Brand.orange.copy(alpha = 0.35f)
 
 @Composable
 private fun tonePalette(tone: AuroraTone): List<Color> {
@@ -196,7 +196,7 @@ fun Modifier.glassSurface(
   sheen: Color,
   border: Color,
   strong: Boolean = false,
-  glow: Color = Color(0x1F7C5CFF),
+  glow: Color = LightColors.glow,
   /** شیشهٔ واقعی فقط برای صفحهٔ آغاز/ورود؛ صفحه‌های کار کارتِ توپر می‌گیرند */
   decorative: Boolean = false,
 ): Modifier {
@@ -212,10 +212,9 @@ fun Modifier.glassSurface(
   //  ۱۴۰۵/۰۷/۲۵ صفحه‌های کارِ گوشی هم (VISUAL-DIRECTION §۱). شیشه، درخشش و
   //  لبهٔ نورانی فقط با `decorative = true`
   if (ir.vil3ntec.tohid.ui.Platform.DESKTOP || !decorative) {
-    //  نسخهٔ ۲: سایهٔ نرمِ پهن به‌جای خطِ تیرهٔ ۱۲٪ (نقدِ صاحب محصول: «همه‌جا خطِ
-    //  تیره»)؛ لبه فقط مویی، از همان `border`ِ تم (۷٪). همان `softCard`.
+    //  VILL3N: همان `softCard` — سایهٔ سبک و خطِ دورِ دیدنیِ `borderCard`ِ تم
     val light = tint.luminance() > 0.5f
-    val shadowColor = if (light) Color(0xB3101828) else Color(0xFF000000)
+    val shadowColor = if (light) LightColors.shadow else DarkColors.shadow
     return this
       .shadow(elevation = if (strong) Elevation.lifted else Elevation.card, shape = shape, ambientColor = shadowColor, spotColor = shadowColor)
       .clip(shape)
