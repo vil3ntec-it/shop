@@ -63,7 +63,7 @@ class CourierCodecTest {
     val s = CourierSummary(
       shopName = "دکان", shopPhone = "0700000000", cashInHandMinor = 98_000, liveExpectedMinor = 552_000,
       cashCapMinor = 1_000_000, headroomMinor = 350_000,
-      unsettled = listOf(UnsettledDelivery(1038, 5, 98_000, 98_000, 5_000)),
+      unsettled = listOf(UnsettledDelivery(1038, 5, 98_000, 98_000, 5_000)), unsettledCount = 57,
       settlements = listOf(CourierSettlement(11, 7, "confirmed", 4, 920_000, 28_000, 920_000, 900_000, 20_000, 0, "کسری")),
       today = PeriodStats(1, 2, 1, 98_000, 11_000), week = PeriodStats(0, 14, 2, 3_120_000, 76_000), serverTime = 9,
     )

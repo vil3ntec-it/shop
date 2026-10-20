@@ -74,6 +74,7 @@ class CourierWireTest {
       {"courier":{"name":"پیک","active":true},"shop":{"name":"دکان","phone":"0700000000"},
        "cash":{"inHandMinor":98000,"liveExpectedMinor":552000,"capMinor":1000000,"headroomMinor":350000,"liveCount":3},
        "unsettled":[{"orderNo":1038,"deliveredAt":5,"expectedCollectMinor":98000,"cashCollectedMinor":98000,"fareMinor":5000}],
+       "unsettledCount":57,
        "settlements":[{"settleNo":11,"at":7,"status":"confirmed","assignmentsCount":4,"collectedCashMinor":920000,
          "fareTotalMinor":28000,"handoverDueMinor":920000,"receivedMinor":900000,"shortageMinor":20000,"excessMinor":0,"reason":"کسری"}],
        "stats":{"today":{"from":1,"delivered":2,"failed":1,"collectedCashMinor":98000,"fareMinor":11000},
@@ -85,6 +86,7 @@ class CourierWireTest {
     assertEquals(98_000L, s.cashInHandMinor)
     assertEquals(350_000L, s.headroomMinor)
     assertEquals(1038L, s.unsettled.single().orderNo)
+    assertEquals(57, s.unsettledCount)
     assertEquals(20_000L, s.settlements.single().shortageMinor)
     assertEquals(2, s.today.delivered)
     assertEquals(3_120_000L, s.week.collectedCashMinor)

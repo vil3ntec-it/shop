@@ -251,8 +251,16 @@ private fun SettlementSheet(cr: CourierRow, repo: DeliveryRepository, onDismiss:
         }
       }
       val needReason = receivedMinor != null && t.reasonRequired
-      TohidTextField(reason, { reason = it.take(200) }, label = if (needReason) "دلیلِ اختلاف (لازم)" else "دلیل (اختیاری)")
-      TohidTextField(note, { note = it.take(300) }, label = "یادداشت (اختیاری)", singleLine = false)
+      //  دلیل در «نقدِ من» ِ برنامهٔ پیک دیده می‌شود (`/api/courier/summary`)؛ یادداشت نه
+      TohidTextField(
+        reason, { reason = it.take(200) },
+        label = if (needReason) "دلیلِ اختلاف (لازم)" else "دلیل (اختیاری)",
+        supporting = "پیک این دلیل را در «نقدِ من» می‌بیند.",
+      )
+      TohidTextField(
+        note, { note = it.take(300) }, label = "یادداشت (اختیاری)", singleLine = false,
+        supporting = "فقط دکان می‌بیند.",
+      )
       ErrorLine(err)
       val valid = receivedMinor != null && (handed.isBlank() || handedMinor != null) && (!needReason || reason.isNotBlank())
       TohidButton(

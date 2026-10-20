@@ -219,7 +219,7 @@ private fun PhonePreviewContent(screen: String, store: ShopStore, dark: Boolean)
         if (!PhoneCartUi.saleActive.value && !PhoneCartUi.sheetOpen.value) PhoneNavBar(tabs = PREVIEW_TABS, current = "sale", onPick = {})
       }
       //  حالتِ پیک (phone-v3-courier-*): ورود، خانه، مسیر، نقدِ من، پیگیری، ارسال، آمار، حساب، تأییدِ نقد — دادهٔ نمایشی
-      "courier-join", "courier-home", "courier-route", "courier-cash", "courier-track", "courier-ship",
+      "courier-join", "courier-home", "courier-route", "courier-cash", "courier-cash0", "courier-track", "courier-ship",
       "courier-stats", "courier-account", "courier-cod" ->
         Box(Modifier.weight(1f).fillMaxWidth()) { key(screen) { CourierPreview(screen.removePrefix("courier-")) } }
       //  قرض‌دارانِ گوشی (r9): سه نفرِ r9، هشت نفر با نام و مبلغِ بلند، و خالی — با دفترِ ساختگیِ خودش
