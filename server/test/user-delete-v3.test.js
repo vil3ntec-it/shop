@@ -186,3 +186,55 @@ test('پلِ v3 ⇒ v1 (۰۹۳): دکانِ حذف‌شده هیچ حالتی ن
   assert.equal((await one('SELECT COUNT(*)::int AS n FROM oplog WHERE account_id=$1', [b.shopId])).n, oplogBefore + 1);
   assert.equal((await one(`SELECT COUNT(*)::int AS n FROM sync_v3_ops WHERE account_id=$1 AND origin='v1' AND row_id='p-after'`, [b.shopId])).n, 0);
 });
+
+/* ── `sync_v3_rows.created_by` در دکانِ کارفرما (یافتهٔ بازبینیِ امنیتی) ──
+ * شناسهٔ دستگاهِ شاگردِ حذف‌شده در ردیف‌های دکانِ کارفرما می‌ماند. ناشناس
+ * می‌شود — ولی نه با خالی‌کردن: ردیفِ «بی‌سازنده» را هر شاگردی حذف می‌کند
+ * (`sync-v3.authorize`)، پس اجازه باید همان امروز بماند. */
+test('شاگردِ حذف‌شده: created_by‌ِ ردیف‌هایش در دکانِ کارفرما ناشناس می‌شود؛ اجازهٔ حذف باز نمی‌شود؛ تبلتِ مشترک دست نمی‌خورد', async () => {
+  const b = await shopOwner('کارفرمای سازنده');
+  const join = async (name) => {
+    const u = await h.newUser(name, 'shop');
+    await query(`INSERT INTO shop_members (id, shop_id, user_id, role, status, created_at, updated_at)
+                 VALUES ($1,$2,$3,'staff','active',$4,$4)`, [newId('mem'), b.shopId, u.user.id, now()]);
+    return h.signIn(u, 'shop');
+  };
+  const s = await join('شاگردِ رفتنی');
+  const t = await join('همکارِ ماندنی');
+  const D1 = (await one(`SELECT device_uid FROM devices WHERE user_id=$1 AND device_uid LIKE 'dev-shop-%'`, [s.user.id])).device_uid;
+  //  تبلتِ صندوقِ مشترک: هر دو شاگرد با همان دستگاه وارد شده‌اند
+  const D2 = `tablet-${b.shopId}`.slice(0, 60);
+  for (const who of [s, t]) {
+    const r = await h.post('/api/auth/login', { identifier: who.email, password: who.password, app: 'shop',
+      device: { deviceId: D2, name: 'تبلتِ صندوق', platform: 'android' } });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+  }
+  const ins = (row) => ({ op_id: oid(), hlc: H('n'), table: 'debtors', row_id: row, kind: 'insert', fields: { name: row } });
+  for (const [tok, dev, row] of [[s.accessToken, D1, 'cb-s1'], [s.accessToken, D2, 'cb-s2'], [b.accessToken, `${b.shopId}-own`, 'cb-b']]) {
+    const r = await v3push(tok, dev, [ins(row)]);
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.equal(r.body.results[0].status, 'applied', JSON.stringify(r.body));
+  }
+  const by = async (row) => (await one(
+    `SELECT created_by FROM sync_v3_rows WHERE account_id=$1 AND table_name='debtors' AND row_id=$2`, [b.shopId, row])).created_by;
+  assert.equal(await by('cb-s1'), D1);
+  const before = await v3Counts(b.shopId);
+
+  const out = await del(s);
+  assert.equal(out.rows.sync_v3, 0, 'هیچ ردیفِ v3ای از دکانِ کارفرما حذف نشد');
+  assert.equal(out.rows.sync_v3_created_by, 1);
+  assert.deepEqual(await v3Counts(b.shopId), before);
+  assert.notEqual(await by('cb-s1'), D1, 'شناسهٔ دستگاهِ حسابِ حذف‌شده ماند');
+  assert.ok(await by('cb-s1'), '⛔ خالی نه — ردیفِ بی‌سازنده را هر شاگردی حذف می‌کند');
+  assert.equal((await one('SELECT COUNT(*)::int AS n FROM sync_v3_rows WHERE created_by=$1', [D1])).n, 0);
+  assert.equal(await by('cb-s2'), D2, 'تبلتِ مشترکِ همکارِ ماندنی مالِ اوست');
+  assert.equal(await by('cb-b'), `${b.shopId}-own`, 'ردیفِ صاحبِ دکان دست نخورد');
+
+  //  اجازه‌ها همان امروز: شاگردِ دیگر ردیفِ ناشناس را حذف نمی‌کند، صاحبِ دکان می‌کند؛ تبلتِ مشترک هنوز «خودی» است
+  const del3 = (tok, dev, row) => v3push(tok, dev, [{ op_id: oid(), hlc: H('n'), table: 'debtors', row_id: row, kind: 'delete' }]);
+  for (const dev of [`${t.user.id}-phone`, D2]) {
+    assert.equal((await del3(t.accessToken, dev, 'cb-s1')).body.results[0].reason, 'delete_not_allowed', dev);
+  }
+  assert.equal((await del3(t.accessToken, D2, 'cb-s2')).body.results[0].status, 'applied');
+  assert.equal((await del3(b.accessToken, `${b.shopId}-own`, 'cb-s1')).body.results[0].status, 'applied');
+});
