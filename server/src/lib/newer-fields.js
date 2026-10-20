@@ -1,145 +1,182 @@
 'use strict';
 /**
- * تورِ ایمنیِ سرور: «برنامهٔ قدیمی فیلدِ تازه را null نمی‌کند» — A00.
+ * تورِ ایمنیِ سرور: «ساختِ پیش از A00 فیلدی را که نمی‌شناسد null نمی‌کند» — A00 (#341).
  *
  * ── مشکل ─────────────────────────────────────────────────────────────
  * برنامهٔ دکان دفتر را از درِ مدلِ خودش می‌خواند (`ignoreUnknownKeys`). تا پیش
  * از A00، `LedgerDiff.changedFields` هر کلیدی را که در سایه بود و در دفتر نه
- * «پاک‌شده» می‌دید و `null` ِ صریح می‌فرستاد. پس نسخهٔ قدیمی‌تر با نخستین
+ * «پاک‌شده» می‌دید و `null` ِ صریح می‌فرستاد. پس ساختِ قدیمی‌تر با نخستین
  * ذخیره پس از Snapshot (گوشیِ نو، «بازیابی از سرور») یا هر ویرایشِ آن ردیف،
- * فیلدی را که نسخهٔ تازه‌تر یا خودِ سرور نوشته بود (`payments`، `approval`،
- * `orderId`، …) روی سرور پاک می‌کرد. برنامه از A00 این کار را نمی‌کند، ولی
- * نسخه‌های نصب‌شدهٔ پیشین هنوز روی گوشی‌ها و کامپیوترها هستند.
+ * فیلدی را که ساختِ تازه‌تر یا خودِ سرور نوشته بود (`payments`، `approval`،
+ * `orderId`، …) روی سرور پاک می‌کرد. ساخت‌های A00 به بعد هرگز چنین `null`ی
+ * نمی‌فرستند، ولی ساخت‌های پیشین هنوز روی گوشی‌ها و کامپیوترها نصب‌اند.
  *
  * ── راه ──────────────────────────────────────────────────────────────
- * `REGISTRY`: برای هر فیلدِ «تازه»، نخستین نسخه از هر خطِ برنامه که آن را
- * می‌شناسد (کلید = عددِ اصلیِ نسخه: گوشی `3.2.N`، کامپیوتر `1.0.N`؛ `N` شمارهٔ
- * ساختِ CI است). `null` ِ صریح برای چنین فیلدی از برنامه‌ای که `X-App-Version`
- * اش پایین‌تر است کنار می‌رود — فقط همان کلید؛ بقیهٔ op و اثرِ انگشتش (hash
- * دوباره ساخته می‌شود) دست نمی‌خورد. opی که جز آن چیزی نداشت به `sync-v1.js`
- * نمی‌رسد (ویرایشِ تهی ردیفِ پاک‌شده را زنده می‌کرد) و پاسخش «applied» ِ بی‌اثر
- * است تا برنامه آن را از صف بردارد.
+ * `PRE_A00`: فهرستِ **منجمدِ** فیلدهایی که ساخت‌های پیش از A00 می‌شناسند، هر
+ * کدام با نخستین ساختِ **منتشرشده** (اجرای موفقِ `tohid-native.yml` /
+ * `tohid-desktop.yml` روی main) که آن را دارد؛ `ALL` یعنی از نخستین ساخت
+ * (گوشی 3.2.274، کامپیوتر 1.0.13). `null` ِ صریح از ساختِ پیش از A00 برای
+ * کلیدی که آن ساخت نمی‌شناسد کنار می‌رود — فقط همان کلید؛ بقیهٔ op و اثرِ
+ * انگشتش (hash دوباره ساخته می‌شود) دست نمی‌خورد. opی که جز آن چیزی نداشت به
+ * دفتر نمی‌رسد (ویرایشِ تهی ردیفِ پاک‌شده را زنده می‌کرد) و پاسخش «applied» ِ
+ * بی‌اثر است تا برنامه آن را از صف بردارد. این برای فیلدِ ناتهیِ مدل‌های
+ * تازه‌تر (`active`، `unitFactor`) حیاتی است: `null` روی سرور `fromJson` ِ ساختِ
+ * تازه را در Pull می‌انداخت و همگام‌سازی می‌ایستاد.
  *
- *   `null` به‌جای نسخه ⇒ هیچ نسخهٔ منتشرشده‌ای آن را نمی‌شناسد ⇒ `null` ِ
- *   هیچ برنامه‌ای پذیرفته نمی‌شود. نسخهٔ نخوانا یا بی‌سرآیند ⇒ «نمی‌شناسد».
+ * کی از تور می‌گذرد (هیچ کاری نمی‌شود):
+ *   • ساختِ A00 به بعد (`A00`، نخستین ساختِ منتشرشده با #341) — کلیدِ ناشناخته را
+ *     null نمی‌کند، پس فیلدِ تازه‌ای که پس از A00 به مدل بیاید هیچ ردیفی این‌جا
+ *     لازم ندارد؛
+ *   • وب (`X-App-Version` بی شمارهٔ ساخت، `3.2` از `<meta tohid-app-version>`):
+ *     ردیفِ JSON ِ خام را نگه می‌دارد و هرگز null ِ کهنه نمی‌فرستد؛ `null` اش
+ *     یعنی کاربر پاک کرد (سقفِ اعتبار) و باید بنشیند؛
+ *   • خطِ ناشناختهٔ بالاتر (گوشی 4.x، کامپیوتر 2.x) — از همهٔ کف‌ها جلوتر است.
+ * ساختِ آزمایشیِ `3.2.0`، نسخهٔ نخوانا و نبودِ سرآیند «قدیمی‌ترین» حساب می‌شوند.
  *
  * ⚠️ بدترین خطای این تور «مقدارِ کهنه می‌ماند» است، هرگز «داده پاک می‌شود».
- * ⛔ `sync-v1.js` (مشترک با پمپ) دست نمی‌خورد: میان‌افزارِ فقط‌دکانِ همان درِ
- *    `v1Guard` (`routes/sync-v1.js`). پمپ بی هیچ کاری از آن رد می‌شود.
- *
- * ── قاعده برای هر PR که فیلد به مدلِ برنامه می‌افزاید ──────────────────
- * همان فیلد را با `null` این‌جا بنویسید؛ پس از نخستین ساختِ `main` که آن را
- * دارد، شمارهٔ همان ساخت (گوشی و کامپیوتر) جای `null` می‌نشیند.
+ * ⛔ `sync-v1.js` (مشترک با پمپ) دست نمی‌خورد: v1 از درِ میان‌افزارِ فقط‌دکانِ
+ *    `routes/sync-v1.js` (پس از `v1Guard`) و v3 در خودِ `routes/sync-v3.js`.
+ * ⛔ `PRE_A00` را عوض نکنید جز برای اصلاحِ کفِ یک فیلدِ پیش از A00؛ فیلدِ تازه این‌جا
+ *    نمی‌آید. `A00` را پس از نخستین ساختِ منتشرشده با #341 پر کنید
+ *    (`test/newer-fields-baseline.test.js` تا آن روز فیلدِ تازهٔ مدل را نمی‌پذیرد).
  */
 const compat = require('./app-compat');
 
-/** گوشی (`android-native`، `3.2.N`) و کامپیوتر (`desktop`، `1.0.N`) */
-const since = (phone, desktop) => Object.freeze({ 3: phone, 1: desktop });
+/** گوشی (`android-native`، `3.2.N`) و کامپیوتر (`desktop`، `1.0.N`) — `N` شمارهٔ اجرای CI */
+const LINES = Object.freeze({ 3: 'phone', 1: 'desktop' });
 
-/*
- * شمارهٔ ساخت = نخستین اجرای موفقِ `tohid-native.yml` / `tohid-desktop.yml` روی
- * main که کامیتِ آن فیلد را دارد (اگر نبود، نخستین اجرای پس از آن).
+/**
+ * نخستین ساختِ منتشرشده (اجرای موفقِ main) که #341 را دارد. `null` تا منتشر شود:
+ * تا آن روز هیچ ساختی از تور نمی‌گذرد و `null` ِ فیلدِ بیرونِ `PRE_A00` از هیچ
+ * برنامه‌ای پذیرفته نمی‌شود (کهنه می‌ماند، پاک نمی‌شود).
  */
-const REGISTRY = Object.freeze({
-  shop: Object.freeze({
-    sales: Object.freeze({
-      series: since('3.2.405', '1.0.152'),          // F0-03 (705eae7)
-      channel: since('3.2.522', '1.0.333'),         // ORD-20 (49d1a91)
-      orderId: null, orderNo: null,                 // فاکتورِ سفارشِ اینترنتی (ORD-20)
-      approval: null,                               // برگهٔ تأیید (#283/#284)
-      payments: null, tenderedMinor: null, changeMinor: null, // پرداختِ ترکیبی (#286)
-    }),
-    saleItems: Object.freeze({ lotId: null, locationId: null }), // #315
-    returns: Object.freeze({
-      channel: since('3.2.582', '1.0.333'),         // ORD-20 (380d223)
-      userId: null,                                 // #315
-      docId: null, disposition: null, refund: null, toAccount: null, toCredit: null, // #318
-      creditTo: null, unitPrice: null, by: null, approvedBy: null, exchangeSaleId: null,
-    }),
-    debtors: Object.freeze({ creditLimit: since('3.2.466', '1.0.217') }), // CRM-03 (e577c9e)
-    warehouseEntries: Object.freeze({ landedCost: null, locationId: null, userId: null, adjKind: null, lotId: null }), // #315
-    purchases: Object.freeze({ landedCost: null }), // #315
-    stockMovements: Object.freeze({ userId: null, reason: null, locationId: null, toLocationId: null, lotId: null }), // #315
-  }),
+const A00 = Object.freeze({ phone: null, desktop: null });
+
+const ALL = null;
+const since = (phone, desktop) => Object.freeze({ phone, desktop });
+const f = (o) => Object.freeze(o);
+
+/* eslint-disable max-len */
+/** منجمد — مدل‌های دفترِ ساخت‌های پیش از A00 (`android-native/.../data/Models.kt` روی main ِ #341) */
+const PRE_A00 = Object.freeze({
+  products: f({ id: ALL, name: ALL, category: ALL, unit: ALL, purchasePrice: ALL, salePrice: ALL, wholesalePrice: ALL, minStock: ALL, notes: ALL, barcodes: ALL, photo: ALL, createdAt: ALL, subcategory: since('3.2.300', '1.0.39'), supplierId: since('3.2.300', '1.0.39'), active: since('3.2.300', '1.0.39'), saleUnit: since('3.2.300', '1.0.39'), unitFactor: since('3.2.300', '1.0.39') }),
+  warehouseEntries: f({ id: ALL, productId: ALL, cartons: ALL, perCarton: ALL, units: ALL, unit: ALL, price: ALL, date: ALL, notes: ALL, isAdjustment: ALL, purchaseId: ALL, createdAt: ALL, expiryDate: since('3.2.280', '1.0.19'), batch: since('3.2.280', '1.0.19'), productionDate: since('3.2.300', '1.0.39') }),
+  sales: f({ id: ALL, invoiceNumber: ALL, total: ALL, discountType: ALL, discountValue: ALL, discount: ALL, finalTotal: ALL, paymentMethod: ALL, debtorId: ALL, paidAmount: ALL, remaining: ALL, status: ALL, debtGiven: ALL, debtSettled: ALL, createdAt: ALL, date: ALL, syncStatus: ALL, cancelReason: since('3.2.300', '1.0.39'), seller: since('3.2.300', '1.0.39'), series: since('3.2.405', '1.0.152'), channel: since('3.2.522', '1.0.366') }),
+  saleItems: f({ id: ALL, saleId: ALL, productId: ALL, name: ALL, quantity: ALL, unitPrice: ALL, purchasePrice: ALL, totalPrice: ALL, returnedQty: ALL }),
+  returns: f({ id: ALL, saleId: ALL, saleItemId: ALL, productId: ALL, quantity: ALL, amount: ALL, reason: ALL, date: ALL, createdAt: ALL, channel: since('3.2.615', '1.0.366') }),
+  debtors: f({ id: ALL, name: ALL, phone: ALL, notes: ALL, createdAt: ALL, creditLimit: since('3.2.466', '1.0.217') }),
+  transactions: f({ id: ALL, debtorId: ALL, type: ALL, amount: ALL, date: ALL, notes: ALL, createdAt: ALL, dueDate: since('3.2.466', '1.0.217') }),
+  expenses: f({ id: ALL, title: ALL, category: ALL, amount: ALL, date: ALL, notes: ALL, createdAt: ALL }),
+  suppliers: f({ id: ALL, name: ALL, phone: ALL, address: ALL, notes: ALL, createdAt: ALL }),
+  purchases: f({ id: ALL, productId: ALL, supplierId: ALL, quantity: ALL, unit: ALL, purchasePrice: ALL, totalAmount: ALL, date: ALL, notes: ALL, paidAmount: ALL, debt: ALL, warehouseEntryId: ALL, createdAt: ALL, invoiceNo: since('3.2.337', '1.0.88') }),
+  supplierPayments: f({ id: ALL, supplierId: ALL, amount: ALL, date: ALL, notes: ALL, createdAt: ALL }),
+  stockMovements: f({ id: ALL, productId: ALL, type: ALL, qty: ALL, date: ALL, notes: ALL, refId: ALL, createdAt: ALL }),
+  priceHistory: f({ id: ALL, productId: ALL, oldPrice: ALL, newPrice: ALL, date: ALL, createdAt: ALL }),
+  auditLog: f({ id: ALL, type: ALL, date: ALL, refId: ALL, notes: ALL, createdAt: ALL, amount: since('3.2.300', '1.0.39') }),
 });
+/* eslint-enable max-len */
 
-/** آیا برنامه با نسخهٔ [version] فیلدی با این [floors] را می‌شناسد؟ */
-function knows(version, floors) {
-  if (!floors) return false;
-  const v = compat.valid(version);
-  if (!v) return false;
-  const floor = floors[Number(v.split('.')[0])];
-  return Boolean(floor) && compat.compare(v, floor) >= 0;
-}
-
+const hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
 const isPlainObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 
 /**
- * کلیدهای `null` ِ کهنهٔ یک op. ورودی همان opِ خام است (نامِ جدول هر شکلی که
- * برنامه فرستاده؛ `table` نامِ قانونیِ آن).
- * @returns {string[]} کلیدهایی که باید کنار بروند
+ * برنامهٔ پشتِ `X-App-Version`.
+ * @returns {{bypass: string} | {line: string|null, v: string}}
  */
-function staleNulls(app, table, fields, version) {
-  const reg = REGISTRY[app]?.[table];
-  if (!reg || !isPlainObject(fields)) return [];
-  const out = [];
-  for (const [k, v] of Object.entries(fields)) {
-    if (v !== null || !Object.prototype.hasOwnProperty.call(reg, k)) continue;
-    if (!knows(version, reg[k])) out.push(k);
-  }
-  return out;
+function clientOf(version, a00 = A00) {
+  const v = compat.valid(version);
+  if (!v) return { line: null, v: '' };                       // نبود یا نخوانا ⇒ قدیمی‌ترین
+  const parts = v.split('.');
+  if (parts.length === 2) return { bypass: 'web' };            // وب: بی شمارهٔ ساخت
+  const major = Number(parts[0]);
+  const line = LINES[major];
+  if (!line) return major > 0 ? { bypass: 'newer-line' } : { line: null, v };
+  if (a00[line] && compat.compare(v, a00[line]) >= 0) return { bypass: 'a00' };
+  return { line, v };
+}
+
+/** آیا ساختِ پیش از A00 ِ [client] کلیدِ [key] ِ جدولِ [table] را می‌شناسد؟ */
+function knows(client, table, key) {
+  if (client.bypass) return true;
+  const t = PRE_A00[table];
+  if (!t || !hasOwn(t, key)) return false;                     // فیلدی که پس از A00 آمد، یا ناشناخته
+  const floor = t[key];
+  if (!floor) return true;                                     // از نخستین ساخت
+  return Boolean(client.line) && compat.compare(client.v, floor[client.line]) >= 0;
+}
+
+/** نامِ v3 ⇒ نامِ دفتر: پسوندِ واحد (`creditLimitMinor`، `qtyMilli`) برداشته می‌شود */
+function legacyKey(table, key, shape) {
+  const t = PRE_A00[table];
+  if (shape !== 'v3' || !t || hasOwn(t, key)) return key;
+  const m = /^(.+)(Minor|Milli)$/.exec(key);
+  return m && hasOwn(t, m[1]) ? m[1] : key;
 }
 
 /**
- * میان‌افزارِ `POST /sync/v1/push` — فقط حسابِ دکان، پس از `v1Guard`.
- * opها را پیش از `sync-v1.js` پالایش می‌کند و پاسخ را دوباره به ترتیبِ اصلی
- * برمی‌گرداند (همان الگوی `v1Guard`).
+ * پالایشِ یک دسته. `shape`: `v1` (همان شکلِ v1 — و صفِ v2 ِ راهِ v3) یا `v3`.
+ * @returns {{ops:Array, length:number, dropped:Map<number,object>, trimmed:Map<string,string[]>, client:object}}
  */
+function filterOps(ops, { version = '', shape = 'v1', a00 = A00 } = {}) {
+  const client = clientOf(version, a00);
+  const res = { ops, length: Array.isArray(ops) ? ops.length : 0, dropped: new Map(), trimmed: new Map(), client };
+  if (client.bypass || !Array.isArray(ops) || !ops.length) return res;
+  const { tableOf, hashOf } = require('./sync-v1');
+  const out = [];
+  let touched = false;
+  ops.forEach((raw, i) => {
+    if (!isPlainObject(raw) || !isPlainObject(raw.fields)) { out.push(raw); return; }
+    const rawTable = raw.table ?? raw.table_name ?? raw.tableName;
+    const table = tableOf('shop', rawTable);
+    const kind = shape === 'v3' ? raw.kind : (raw.type ?? raw.op_type ?? raw.opType);
+    if (!table || (kind !== 'insert' && kind !== 'update')) { out.push(raw); return; }
+    const stale = Object.keys(raw.fields)
+      .filter((k) => raw.fields[k] === null && !knows(client, table, legacyKey(table, k, shape)));
+    if (!stale.length) { out.push(raw); return; }
+    touched = true;
+    const fields = { ...raw.fields };
+    for (const k of stale) delete fields[k];
+    const opId = String(raw.op_id ?? raw.opId ?? '');
+    if (!Object.keys(fields).length) {
+      res.dropped.set(i, { op_id: opId, status: 'applied', server_seq: null, ignored: stale, reason: 'stale_null_ignored' });
+      return;
+    }
+    res.trimmed.set(opId, stale);
+    const next = { ...raw, fields };
+    //  اثرِ انگشتِ v1 روی همان نامِ جدولی است که برنامه فرستاده (`validateOp`)
+    if (shape !== 'v3' && raw.hash) {
+      next.hash = hashOf({ table: rawTable, row_id: raw.row_id ?? raw.rowId ?? raw.id, type: kind, fields });
+    }
+    out.push(next);
+  });
+  if (touched) res.ops = out;
+  return res;
+}
+
+/** پاسخ‌های دستهٔ پالایش‌شده ⇒ به ترتیبِ دستهٔ اصلی، با `ignored` برای opِ کوتاه‌شده */
+function mergeResults(fl, results) {
+  if (!Array.isArray(results) || (!fl.dropped.size && !fl.trimmed.size)) return results;
+  const rest = results.map((r) => (r && fl.trimmed.has(r.op_id) ? { ...r, ignored: fl.trimmed.get(r.op_id) } : r));
+  const merged = [];
+  for (let i = 0; i < fl.length; i++) merged.push(fl.dropped.has(i) ? fl.dropped.get(i) : rest.shift());
+  return merged.filter(Boolean).concat(rest);
+}
+
+/** میان‌افزارِ `POST /sync/v1/push` — فقط حسابِ دکان، پس از `v1Guard` (همان الگو) */
 function v1NewerFields(req, res, next) {
   const ctx = req.sync;
   if (!ctx || ctx.app !== 'shop' || ctx.accountKind !== 'shop') return next();
   try {
-    const ops = Array.isArray(req.body?.ops) ? req.body.ops : null;
-    if (!ops || !ops.length) return next();
-    const version = String(req.headers['x-app-version'] || '').slice(0, 32);
-    const { validateOp, hashOf } = require('./sync-v1');
-    const dropped = new Map();                 // i ⇒ پاسخِ بی‌اثر
-    const trimmed = new Map();                 // op_id ⇒ کلیدهای کنارگذاشته
-    const out = [];
-    ops.forEach((raw, i) => {
-      const v = validateOp('shop', raw);
-      if (!v.ok || v.op.type === 'delete') { out.push(raw); return; }
-      const stale = staleNulls('shop', v.op.table, v.op.fields, version);
-      if (!stale.length) { out.push(raw); return; }
-      const fields = { ...v.op.fields };
-      for (const k of stale) delete fields[k];
-      const opId = String(v.op.op_id);
-      if (!Object.keys(fields).length) {
-        dropped.set(i, { op_id: opId, status: 'applied', server_seq: null, ignored: stale, reason: 'stale_null_ignored' });
-        return;
-      }
-      trimmed.set(opId, stale);
-      //  اثرِ انگشت روی همان نامِ جدولی است که برنامه فرستاده (`validateOp`)
-      const rawTable = raw.table ?? raw.table_name ?? raw.tableName;
-      out.push({
-        ...raw, fields,
-        ...(raw.hash ? { hash: hashOf({ table: rawTable, row_id: v.op.row_id, type: v.op.type, fields }) } : {}),
-      });
-    });
-    if (!dropped.size && !trimmed.size) return next();
-    req.body.ops = out;
+    const fl = filterOps(req.body?.ops, { version: String(req.headers['x-app-version'] || '').slice(0, 32), shape: 'v1' });
+    if (!fl.dropped.size && !fl.trimmed.size) return next();
+    req.body.ops = fl.ops;
     const send = res.json.bind(res);
     res.json = (body) => {
-      if (body && body.ok && Array.isArray(body.results)) {
-        const rest = body.results.map((r) => (r && trimmed.has(r.op_id) ? { ...r, ignored: trimmed.get(r.op_id) } : r));
-        const merged = [];
-        for (let i = 0; i < ops.length; i++) merged.push(dropped.has(i) ? dropped.get(i) : rest.shift());
-        body.results = merged.filter(Boolean).concat(rest);
-      }
+      if (body && body.ok && Array.isArray(body.results)) body.results = mergeResults(fl, body.results);
       return send(body);
     };
     next();
   } catch (err) { next(err); }
 }
 
-module.exports = { REGISTRY, knows, staleNulls, v1NewerFields };
+module.exports = { PRE_A00, A00, LINES, clientOf, knows, filterOps, mergeResults, v1NewerFields };

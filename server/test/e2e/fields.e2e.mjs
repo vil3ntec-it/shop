@@ -4,16 +4,18 @@
  * برنامهٔ تازه‌تر (یا سرور) روی یک فاکتور فیلدی می‌نویسد که مدلِ این ساخت ندارد. دستگاه‌ها
  * همان قاعده‌های `LedgerDiff.kt` ِ همین مخزن را دارند (`lib/native.mjs` ⇐ `KOTLIN`)؛ پس
  * برگشتِ هر یک از قاعده‌های A00 در کاتلین همین‌جا قرمز می‌شود. فیلدهای `future*` عمداً در
- * فهرستِ تورِ سرور (`src/lib/newer-fields.js`) نیستند تا فقط کارِ خودِ برنامه سنجیده شود.
+ * فهرستِ منجمدِ تورِ سرور (`src/lib/newer-fields.js → PRE_A00`) نیستند؛ تا کفِ A00 پر نشده تور
+ * `null` ِ هر ساختی را برای آن‌ها کنار می‌گذارد، پس گام‌های برنامه opهای **فرستاده‌شده** را می‌سنجند.
  *
  *   UF.0        برنامهٔ تازه‌تر فیلدِ تازه روی فاکتور می‌نویسد
- *   UF.pull     دستگاهِ موجود: Pull و ویرایشِ بی‌ربط ⇒ هیچ opی روی آن فاکتور؛ سایه کلید را نگه داشته
+ *   UF.pull     دستگاهِ موجود: Pull و ویرایشِ بی‌ربط ⇒ هیچ opی روی آن فاکتور؛ سایه فقط از درِ مدل
  *   UF.snapshot گوشیِ نو (Snapshot) و ویرایشِ بی‌ربط ⇒ هیچ opی روی آن؛ ردیفِ سرور دست‌نخورده
  *   UF.edit     گوشیِ نو همان فاکتور را لغو می‌کند ⇒ فقط status و cancelReason، بی null
  *   UF.clear    پاک کردنِ فیلدی که مدل می‌شناسد (سقفِ اعتبار) هنوز null می‌فرستد و می‌نشیند
  *   UF.web      وب (دفترِ JSON ِ خام) هم چیزی را null نمی‌کند ⇒ هستهٔ JS تغییری لازم ندارد
- *   UF.net      ساختِ نصب‌شدهٔ پیش از A00 همان null را می‌فرستد ⇐ سرور برای فیلدِ فهرست‌شده کنارش
- *               می‌گذارد؛ ساختی که فیلد را می‌شناسد هنوز می‌تواند پاکش کند
+ *   UF.web-clear وب سقفِ اعتبار را پاک می‌کند ⇒ null روی سرور می‌نشیند (وب از تورِ سرور می‌گذرد)
+ *   UF.net      ساختِ نصب‌شدهٔ پیش از A00 همان null را می‌فرستد ⇐ سرور برای کلیدی که آن ساخت
+ *               نمی‌شناسد کنارش می‌گذارد؛ ساختی که فیلد را می‌شناسد هنوز می‌تواند پاکش کند
  *
  * اجرا:  node test/e2e/fields.e2e.mjs
  */
@@ -57,10 +59,12 @@ await E.step('UF.0', 'برنامهٔ تازه‌تر روی فاکتور فیل�
   assert.deepEqual(pick(before, Object.keys(FUTURE)), FUTURE);
 });
 
-await E.step('UF.pull', 'دستگاهِ موجود Pull می‌کند و قرض‌دار می‌سازد ⇒ هیچ opی روی فاکتور؛ سایه کلیدِ ناشناخته را دارد', async () => {
+await E.step('UF.pull', 'دستگاهِ موجود Pull می‌کند و قرض‌دار می‌سازد ⇒ هیچ opی روی فاکتور؛ سایه فقط از درِ مدل', async () => {
   await A.drain();
+  //  B1 (بازبینیِ #341): سایه کلیدی را که دفتر نمی‌تواند نگه دارد ندارد، وگرنه ساختِ بعدی که آن را
+  //  می‌شناسد در نخستین ذخیره برای همهٔ ردیف‌ها null می‌فرستاد
   const shadowRow = A.shadow.sales.find((s) => s.id === saleId);
-  assert.deepEqual(pick(shadowRow, Object.keys(FUTURE)), FUTURE, `سایه کلیدِ ناشناخته را انداخت (KOTLIN=${JSON.stringify(KOTLIN)})`);
+  assert.deepEqual(pick(shadowRow, Object.keys(FUTURE)), { futureNote: undefined, futureLines: undefined });
   A.addDebtor('احمد');
   const sent = A.queue.slice();
   await A.drain();
@@ -118,6 +122,24 @@ await E.step('UF.web', 'وب (دفترِ JSON ِ خام) از Snapshot و ویر
   await W.drain();
   assert.deepEqual(touching(sent, saleId), []);
   assert.deepEqual(pick(await row('sales', saleId), Object.keys(FUTURE)), FUTURE);
+}, { needs: ['UF.0'] });
+
+await E.step('UF.web-clear', 'وب سقفِ اعتبارِ یک قرض‌دار را پاک می‌کند ⇒ null روی سرور می‌نشیند (وب از تور می‌گذرد)', async () => {
+  await A.drain();
+  const id = A.addDebtor('سقفِ وب');
+  const d = structuredClone(A.ledger);
+  d.debtors.find((x) => x.id === id).creditLimit = 700;
+  A.save(d);
+  await A.drain();
+  const W = await E.device('W2-web', owner.email, { raw: true, appVersion: '3.2' });
+  assert.equal((await W.firstSync()).ok, true);
+  const e = structuredClone(W.ledger);
+  delete e.debtors.find((x) => x.id === id).creditLimit;            //  `index.html`: delete ⇐ sync-core null
+  W.save(e);
+  const sent = W.queue.slice();
+  await W.drain();
+  assert.deepEqual(touching(sent, id), ['update debtors {"creditLimit":null}']);
+  assert.equal((await row('debtors', id)).creditLimit, null, 'تورِ سرور پاک کردنِ وب را کنار گذاشت');
 }, { needs: ['UF.0'] });
 
 await E.step('UF.net', 'ساختِ پیش از A00 null می‌فرستد ⇐ سرور فیلدِ فهرست‌شده را نگه می‌دارد؛ ساختی که فیلد را می‌شناسد پاکش می‌کند', async () => {

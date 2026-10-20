@@ -18,18 +18,21 @@ import java.io.File
 import java.nio.file.Files
 
 /**
- *  A00 — کلیدی که مدلِ **این** نسخه نمی‌شناسد هرگز `null` نمی‌رود.
+ *  A00 — کلیدی که مدلِ **این** ساخت نمی‌شناسد هرگز `null` نمی‌رود.
  *
  *  ردیفِ سرور فیلدهایی دارد که برنامهٔ تازه‌تر یا خودِ سرور نوشته
  *  (`payments`، `approval`، `orderId`، … — این‌جا با نام‌های ساختگیِ `future*`
  *  تا روزی که مدل یکی از آن‌ها را بشناسد آزمون معنایش را از دست ندهد).
- *  برنامهٔ قدیمی‌تر دفتر را از درِ مدل می‌خواند (`ignoreUnknownKeys`) و آن
- *  کلیدها در دفترش نیستند. پیش از این، `changedFields` هر کلیدی را که در
- *  سایه بود و در دفتر نه «پاک‌شده» می‌دید و `null` ِ صریح می‌فرستاد ⇐ سرور
- *  دادهٔ برنامهٔ تازه‌تر را از دست می‌داد. سنجه‌ها:
- *   • ویرایشِ بی‌ربط پس از Snapshot یا Pull هیچ opی روی آن ردیف نمی‌سازد؛
+ *  برنامه دفتر را از درِ مدل می‌خواند (`ignoreUnknownKeys`) و آن کلیدها در
+ *  دفترش نیستند. پیش از A00، `changedFields` هر کلیدی را که در سایه بود و در
+ *  دفتر نه «پاک‌شده» می‌دید و `null` ِ صریح می‌فرستاد ⇐ سرور دادهٔ برنامهٔ
+ *  تازه‌تر را از دست می‌داد. سنجه‌ها:
+ *   • ویرایشِ بی‌ربط پس از Snapshot (تازه یا سایهٔ خامِ ساختِ پیشین) یا Pull
+ *     هیچ opی روی آن ردیف نمی‌سازد؛
  *   • ویرایشِ همان ردیف فقط فیلدهای عوض‌شدهٔ مدل را می‌فرستد، بی هیچ `null`؛
- *   • سایه کلیدهای ناشناخته را نگه می‌دارد (رفت‌وبرگشتِ JSON ِ خام)؛
+ *   • **به‌روزرسانی**: سایه هیچ‌وقت کلیدی را که دفترِ همین ساخت نمی‌تواند نگه
+ *     دارد ندارد — وگرنه ساختِ بعدی که آن کلید را می‌شناسد، در نخستین ذخیره
+ *     آن را برای همهٔ ردیف‌ها `null` می‌فرستاد (بازبینیِ #341، B1)؛
  *   • پاک کردنِ واقعیِ فیلدی که مدل می‌شناسد هنوز `null` می‌فرستد.
  */
 class UnknownFieldsTest {
@@ -98,8 +101,17 @@ class UnknownFieldsTest {
     put("cursor", 9)
   }
 
-  /** `SyncV1Engine.restoreFromServer`: دفتر از درِ مدل، سایه همان درختِ Snapshot */
+  /** `SyncV1Engine.restoreFromServer` ِ همین ساخت: دفتر و سایه هر دو از درِ مدل (`writeShadow`) */
   private fun restored(body: JsonObject): Disk {
+    val disk = Disk()
+    val next = LedgerDiff.fromSnapshot(body, LedgerDiff.toJson(ShopData()))
+    disk.ledger = LedgerDiff.fromJson(next)
+    disk.shadow = LedgerDiff.shadowOf(LedgerDiff.modelTree(next)).toString()
+    return disk
+  }
+
+  /** همان کار در ساخت‌های پیش از A00: سایه = درختِ خامِ Snapshot — هنوز روی گوشی‌ها هست */
+  private fun restoredByOldBuild(body: JsonObject): Disk {
     val disk = Disk()
     val next = LedgerDiff.fromSnapshot(body, LedgerDiff.toJson(ShopData()))
     disk.ledger = LedgerDiff.fromJson(next)
@@ -107,58 +119,114 @@ class UnknownFieldsTest {
     return disk
   }
 
-  private fun shadowRow(disk: Disk, table: String, id: String): JsonObject =
-    ((Json.parseToJsonElement(disk.shadow) as JsonObject)[table] as JsonArray)
-      .map { it as JsonObject }.first { (it["id"] as JsonPrimitive).content == id }
+  /** کلیدهایی در سایه که مدلِ این ساخت نمی‌شناسد — پس از هر نوشتنِ همین ساخت باید خالی باشد */
+  private fun strangers(disk: Disk): List<String> {
+    val tree = Json.parseToJsonElement(disk.shadow) as JsonObject
+    return LedgerDiff.COLLECTIONS.flatMap { t ->
+      ((tree[t] as? JsonArray) ?: JsonArray(emptyList())).flatMap { r ->
+        (r as JsonObject).keys.filter { !LedgerDiff.isModelField(t, it) }.map { "$t.$it" }
+      }
+    }
+  }
 
   private fun describe(ops: List<SyncOp>) = ops.map { "${it.type} ${it.table}/${it.rowId} ${it.fields}" }
   private fun msg(ops: List<SyncOp>) = describe(ops).toString()
+  private fun heads(ops: List<SyncOp>) = ops.map { "${it.type} ${it.table}/${it.rowId}" }
 
   @Test
   fun snapshot_thenUnrelatedEdit_sendsNothingForTheNewerRow() {
     val disk = restored(snapshotBody("sales" to listOf("w-1" to serverSale())))
     val ops = save(disk, disk.ledger.copy(debtors = listOf(Debtor(id = "d-1", name = "احمد", createdAt = 1L))))
-    assertEquals(msg(ops), listOf("debtors"), ops.map { it.table })
-    //  سایهٔ تازه کلیدهای ناشناخته را نگه داشته است
-    val row = shadowRow(disk, "sales", "w-1")
-    for ((k, v) in future) assertEquals(k, v, row[k])
-    //  و ذخیرهٔ بعدی هم چیزی برای آن ردیف نمی‌سازد
+    assertEquals(msg(ops), listOf("insert debtors/d-1"), heads(ops))
+  }
+
+  @Test
+  fun oldBuildRawSnapshotShadow_thenUnrelatedEdit_sendsNothingForTheNewerRow() {
+    val disk = restoredByOldBuild(snapshotBody("sales" to listOf("w-1" to serverSale())))
+    val ops = save(disk, disk.ledger.copy(debtors = listOf(Debtor(id = "d-1", name = "احمد", createdAt = 1L))))
+    assertEquals(msg(ops), listOf("insert debtors/d-1"), heads(ops))
+    //  پس از نخستین ذخیره سایه از درِ مدل است
+    assertEquals(emptyList<String>(), strangers(disk))
     val again = save(disk, disk.ledger.copy(debtors = disk.ledger.debtors + Debtor(id = "d-2", name = "کریم", createdAt = 2L)))
-    assertEquals(msg(again), listOf("insert debtors/d-2"), again.map { "${it.type} ${it.table}/${it.rowId}" })
+    assertEquals(msg(again), listOf("insert debtors/d-2"), heads(again))
   }
 
   @Test
   fun snapshot_thenEditSameRow_sendsOnlyTheChangedModelFields() {
-    val disk = restored(snapshotBody("sales" to listOf("w-1" to serverSale())))
-    val sale = disk.ledger.sales.single()
-    val ops = save(disk, disk.ledger.copy(sales = listOf(sale.copy(status = "cancelled", cancelReason = "مشتری نخواست"))))
-    assertEquals(msg(ops), 1, ops.size)
-    assertEquals(SyncOp.UPDATE, ops[0].type)
-    assertEquals(setOf("status", "cancelReason"), ops[0].fields!!.keys)
-    assertFalse(describe(ops).toString(), ops[0].fields!!.values.any { it is JsonNull })
+    for (disk in listOf(restored(snapshotBody("sales" to listOf("w-1" to serverSale()))),
+      restoredByOldBuild(snapshotBody("sales" to listOf("w-1" to serverSale()))))) {
+      val sale = disk.ledger.sales.single()
+      val ops = save(disk, disk.ledger.copy(sales = listOf(sale.copy(status = "cancelled", cancelReason = "مشتری نخواست"))))
+      assertEquals(msg(ops), 1, ops.size)
+      assertEquals(SyncOp.UPDATE, ops[0].type)
+      assertEquals(setOf("status", "cancelReason"), ops[0].fields!!.keys)
+      assertFalse(msg(ops), ops[0].fields!!.values.any { it is JsonNull })
+    }
   }
 
   @Test
-  fun pull_thenUnrelatedEdit_keepsUnknownKeysAndSendsNoNull() {
+  fun pull_thenUnrelatedEdit_sendsNoNull() {
     val disk = Disk()
     save(disk, ShopData())                                                   // سایهٔ پایه
     val op = SyncOp("op-w-1", 1L, "sales", "w-1", SyncOp.INSERT, serverSale())
     session(disk).absorb(listOf(op), disk.ledger, 10L) { disk.ledger = it }
-    for ((k, v) in future) assertEquals(k, v, shadowRow(disk, "sales", "w-1")[k])
     val ops = save(disk, disk.ledger.copy(debtors = listOf(Debtor(id = "d-1", name = "احمد", createdAt = 1L))))
-    assertEquals(msg(ops), listOf("insert debtors/d-1"), ops.map { "${it.type} ${it.table}/${it.rowId}" })
-    //  بعد ویرایشِ همان فاکتور: فقط همان فیلد
+    assertEquals(msg(ops), listOf("insert debtors/d-1"), heads(ops))
     val sale = disk.ledger.sales.single()
     val edit = save(disk, disk.ledger.copy(sales = listOf(sale.copy(cancelReason = "x"))))
     assertEquals(msg(edit), listOf("update sales/w-1 {\"cancelReason\":\"x\"}"), describe(edit))
   }
 
+  /**
+   *  B1 (بازبینیِ #341): هر راهی که سایه می‌نویسد — Snapshot، Pull، ثبتِ محلی و بازیابی
+   *  پس از بسته شدن — کلیدی را که دفترِ همین ساخت نمی‌تواند نگه دارد در سایه نمی‌گذارد.
+   *  اگر می‌گذاشت (`keepUnknown` ِ نخستین نسخهٔ A00)، ساختِ بعدی که آن کلید را می‌شناسد
+   *  دفتری بی آن و سایه‌ای با آن می‌دید و نخستین ذخیرهٔ بی‌ربط `{کلید: null}` (یا پیش‌فرض)
+   *  را برای همهٔ آن ردیف‌ها می‌فرستاد.
+   */
+  @Test
+  fun upgrade_noShadowWriteKeepsKeysTheLedgerCannotHold() {
+    val disk = restored(snapshotBody("sales" to listOf("w-1" to serverSale())))
+    assertEquals("Snapshot", emptyList<String>(), strangers(disk))
+
+    val update = SyncOp("op-w-2", 2L, "sales", "w-1", SyncOp.UPDATE, buildJsonObject { put("futureOrderId", "ord_02"); put("futureNote", "x") })
+    val insert = SyncOp("op-w-3", 3L, "sales", "w-3", SyncOp.INSERT, serverSale())
+    session(disk).absorb(listOf(update, insert), disk.ledger, 11L) { disk.ledger = it }
+    assertEquals("Pull", emptyList<String>(), strangers(disk))
+
+    save(disk, disk.ledger.copy(debtors = listOf(Debtor(id = "d-1", name = "احمد", createdAt = 1L))))
+    assertEquals("ثبت", emptyList<String>(), strangers(disk))
+
+    val next = disk.ledger.copy(debtors = disk.ledger.debtors + Debtor(id = "d-2", name = "کریم", createdAt = 2L))
+    disk.ledger = next
+    runCatching { session(disk, crash = true).record(next) }
+    assertEquals(SyncCommit.Outcome.FORWARD, session(disk).recover(disk.ledger))
+    assertEquals("بازیابی", emptyList<String>(), strangers(disk))
+  }
+
+  /** ساختی که سقفِ اعتبار را نمی‌شناخت سایه‌ای بی آن گذاشته؛ ساختِ تازه (که می‌شناسد) با ذخیرهٔ بی‌ربط چیزی نمی‌فرستد */
+  @Test
+  fun upgrade_fromBuildThatDidNotKnowAField_firstUnrelatedSaveSendsNothing() {
+    val disk = Disk()
+    val old = ShopData(debtors = listOf(Debtor(id = "d-1", name = "احمد", createdAt = 1L)))
+    disk.ledger = old
+    disk.shadow = LedgerDiff.shadowOf(JsonObject(LedgerDiff.toJson(old) + ("debtors" to JsonArray(listOf(
+      buildJsonObject { put("id", "d-1"); put("name", "احمد"); put("phone", ""); put("notes", ""); put("createdAt", 1) },
+    ))))).toString()
+    val ops = save(disk, old.copy(debtors = old.debtors + Debtor(id = "d-2", name = "کریم", createdAt = 2L)))
+    assertEquals(msg(ops), listOf("insert debtors/d-2"), heads(ops))
+  }
+
   @Test
   fun snapshotRowMissingModelDefaults_isNotEchoedBack() {
     //  ردیفی که وب یا نسخهٔ قدیمی بی پیش‌فرض‌ها نوشته: ویرایشِ بی‌ربط آن را «پر» نمی‌فرستد
-    val disk = restored(snapshotBody("debtors" to listOf("d-old" to buildJsonObject { put("name", "قدیمی"); put("legacyNote", "x") })))
-    val ops = save(disk, disk.ledger.copy(debtors = disk.ledger.debtors + Debtor(id = "d-new", name = "تازه", createdAt = 1L)))
-    assertEquals(msg(ops), listOf("insert debtors/d-new"), ops.map { "${it.type} ${it.table}/${it.rowId}" })
+    for (disk in listOf(
+      restored(snapshotBody("debtors" to listOf("d-old" to buildJsonObject { put("name", "قدیمی"); put("legacyNote", "x") }))),
+      restoredByOldBuild(snapshotBody("debtors" to listOf("d-old" to buildJsonObject { put("name", "قدیمی"); put("legacyNote", "x") }))),
+    )) {
+      val ops = save(disk, disk.ledger.copy(debtors = disk.ledger.debtors + Debtor(id = "d-new", name = "تازه", createdAt = 1L)))
+      assertEquals(msg(ops), listOf("insert debtors/d-new"), heads(ops))
+    }
   }
 
   @Test
@@ -171,14 +239,12 @@ class UnknownFieldsTest {
   }
 
   @Test
-  fun crashAfterPush_recoversForwardWithTheSameShadow() {
-    val disk = restored(snapshotBody("sales" to listOf("w-1" to serverSale())))
+  fun crashAfterPush_recoversForward_withoutNulls() {
+    val disk = restoredByOldBuild(snapshotBody("sales" to listOf("w-1" to serverSale())))
     val next = disk.ledger.copy(debtors = listOf(Debtor(id = "d-1", name = "احمد", createdAt = 1L)))
     disk.ledger = next
     runCatching { session(disk, crash = true).record(next) }
-    //  شروعِ دوباره: ژورنال سایهٔ «پس از» را از همان دفتر دوباره می‌سازد
     assertEquals(SyncCommit.Outcome.FORWARD, session(disk).recover(disk.ledger))
-    for ((k, v) in future) assertEquals(k, v, shadowRow(disk, "sales", "w-1")[k])
     assertEquals(listOf("debtors"), disk.queue.map { it.table })
   }
 

@@ -83,17 +83,9 @@ internal class SyncCommit(private val journal: Journal, private val parts: Parts
     }
     val ops = LedgerDiff.diff(shadow, tree)
     if (ops.isEmpty()) return 0
-    commitOps(ops, before, recorded(shadow, tree))
+    commitOps(ops, before, LedgerDiff.shadowOf(tree).toString())
     return ops.size
   }
-
-  /**
-   *  سایه پس از ثبتِ محلی: دفترِ تازه + کلیدهایی از همان ردیف‌ها که مدلِ این
-   *  نسخه نمی‌شناسد (A00، `LedgerDiff.keepUnknown`). `recover` همین را از
-   *  همان دفتر دوباره می‌سازد، پس اثرِ انگشتِ ژورنال یکی درمی‌آید.
-   */
-  private fun recorded(shadow: JsonObject?, tree: JsonObject): String =
-    LedgerDiff.shadowOf(LedgerDiff.keepUnknown(shadow, tree)).toString()
 
   /** کلِ دفتر یک‌جا — فقط دستگاهِ نخست (`SyncV1Engine.baseline`). */
   fun baseline(data: ShopData): Int {
@@ -101,7 +93,7 @@ internal class SyncCommit(private val journal: Journal, private val parts: Parts
     val before = parts.shadow()
     val tree = LedgerDiff.toJson(data)
     val ops = LedgerDiff.diff(null, tree)
-    commitOps(ops, before, recorded(parse(before), tree))
+    commitOps(ops, before, LedgerDiff.shadowOf(tree).toString())
     return ops.size
   }
 
@@ -203,7 +195,7 @@ internal class SyncCommit(private val journal: Journal, private val parts: Parts
         //  opها با همان `op_id` — اگر پیش‌تر رفته باشند سرور «تکراری» می‌گوید
         val have = parts.queued()
         parts.push(j.ops.filter { it.opId !in have })
-        val mine = ledger?.let { recorded(parse(current), LedgerDiff.toJson(it)) }
+        val mine = ledger?.let { LedgerDiff.shadowOf(LedgerDiff.toJson(it)).toString() }
         val next = if (mine != null && sha(mine) == j.shadow) {
           mine
         } else {

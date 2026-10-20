@@ -26,7 +26,11 @@ const require = createRequire(import.meta.url);
 const ROOT = path.join(import.meta.dirname, '..', '..', '..', '..');
 export const core = require(path.join(ROOT, 'license', 'sync-core.js'));
 export const MODELS_KT = path.join(ROOT, 'android-native', 'app', 'src', 'main', 'java', 'ir', 'vil3ntec', 'tohid', 'data', 'Models.kt');
-export const APP_VERSION = JSON.parse(fs.readFileSync(path.join(ROOT, 'server', 'package.json'), 'utf8')).version;
+/**
+ * `X-App-Version` ِ پیش‌فرضِ دستگاه‌ها: گوشیِ `3.2.N` بالاتر از کفِ همهٔ فیلدهای
+ * `server/src/lib/newer-fields.js` (A00) — همان قالبی که برنامهٔ واقعی می‌فرستد.
+ */
+export const APP_VERSION = '3.2.9999';
 
 /* ═══════════════════════════ Models.kt ⇒ شکلِ ردیف ═══════════════════════════ */
 
@@ -160,29 +164,32 @@ export function projectLedger(tree) {
  * رفتارِ همین لحظهٔ `LedgerDiff.kt` ِ برنامه — از خودِ کدِ کاتلین خوانده می‌شود تا شبیه‌سازی از
  * برنامه جدا نیفتد (و آزمونِ سرتاسری با برگشتِ هر یک از این قاعده‌ها در کاتلین قرمز شود):
  *   • `applyRemote` خروجی را از درِ مدل رد می‌کند (دفتر و سایه هر دو)؛
- *   • `fromSnapshot` خام است: سایهٔ گوشیِ نو همان ردیف‌های سرور است، دفتر از درِ مدل؛
+ *   • A00 سایهٔ Snapshot (`SyncV1Engine.writeShadow` با `modelTree(`) از درِ مدل است؛ پیش از
+ *     آن خام بود — ردیف‌های سرور با کلیدهایی که دفتر نمی‌تواند نگه دارد؛
  *   • A00 `changedFields` با `isModelField(`: کلیدی که مدل نمی‌شناسد هرگز `null` نمی‌شود؛
- *   • A00 `diff` با `modelView(`: ردیفی که خام فرق دارد به زبانِ مدل سنجیده می‌شود؛
- *   • A00 `applyRemote` و `SyncCommit.record` با `keepUnknown(`: سایه کلیدِ ناشناخته را نگه می‌دارد.
+ *   • A00 `diff` با `modelView(`: ردیفی که خام فرق دارد به زبانِ مدل سنجیده می‌شود.
+ * سایه هیچ‌وقت کلیدی را که مدل نمی‌شناسد نگه نمی‌دارد (بازبینیِ #341، B1).
  */
-const LEDGER_DIFF_KT = fs.readFileSync(path.join(ROOT, 'android-native', 'app', 'src', 'main', 'java', 'ir', 'vil3ntec', 'tohid', 'sync', 'v1', 'LedgerDiff.kt'), 'utf8');
-const bodyOf = (name) => {
-  const at = LEDGER_DIFF_KT.indexOf(`fun ${name}(`);
+const KT = (...p) => fs.readFileSync(path.join(ROOT, 'android-native', 'app', 'src', 'main', 'java', 'ir', 'vil3ntec', 'tohid', 'sync', 'v1', ...p), 'utf8');
+const LEDGER_DIFF_KT = KT('LedgerDiff.kt');
+const SYNC_V1_ENGINE_KT = KT('SyncV1Engine.kt');
+const bodyOf = (name, src = LEDGER_DIFF_KT) => {
+  const at = src.indexOf(`fun ${name}(`);
   if (at < 0) return '';
-  const end = LEDGER_DIFF_KT.indexOf('\n  }\n', at);
-  return LEDGER_DIFF_KT.slice(at, end < 0 ? undefined : end);
+  const end = src.indexOf('\n  }\n', at);
+  return src.slice(at, end < 0 ? undefined : end);
 };
 export const KOTLIN = {
-  applyRemoteShaped: /fromJson\(/.test(bodyOf('applyRemote')),
+  applyRemoteShaped: /fromJson\(|modelTree\(/.test(bodyOf('applyRemote')),
+  snapshotShaped: /modelTree\(/.test(bodyOf('writeShadow', SYNC_V1_ENGINE_KT)),
   keepsUnknownFields: /isModelField\(/.test(bodyOf('changedFields')),
   diffInModelTerms: /modelView\(/.test(bodyOf('diff')),
-  shadowKeepsUnknown: /keepUnknown\(/.test(bodyOf('applyRemote')),
 };
 
-/** ساختِ نصب‌شدهٔ پیش از A00: همان `applyRemote` ِ از درِ مدل، بی سه قاعدهٔ تازه */
-export const PRE_A00 = Object.freeze({ applyRemoteShaped: true, keepsUnknownFields: false, diffInModelTerms: false, shadowKeepsUnknown: false });
+/** ساختِ نصب‌شدهٔ پیش از A00: همان `applyRemote` ِ از درِ مدل، بی قاعده‌های تازه */
+export const PRE_A00 = Object.freeze({ applyRemoteShaped: true, snapshotShaped: false, keepsUnknownFields: false, diffInModelTerms: false });
 /** وب: دفترِ خام، هیچ مدلی در کار نیست */
-const NO_MODEL = Object.freeze({ applyRemoteShaped: false, keepsUnknownFields: false, diffInModelTerms: false, shadowKeepsUnknown: false });
+const NO_MODEL = Object.freeze({ applyRemoteShaped: false, snapshotShaped: false, keepsUnknownFields: false, diffInModelTerms: false });
 
 /** کلیدهایی که مدلِ ردیف‌های این مجموعه می‌شناسد (با `@JsonNames`)؛ null یعنی مدل ندارد */
 const knownKeys = (table) => {
@@ -202,23 +209,6 @@ function dropUnknownRemovals(ops, flags = KOTLIN) {
     if (Object.keys(fields).length === Object.keys(op.fields || {}).length) { out.push(op); continue; }
     if (!Object.keys(fields).length) continue;
     out.push({ ...op, fields, hash: core.hashOf({ ...op, fields }) });
-  }
-  return out;
-}
-
-/** `LedgerDiff.keepUnknown`: ردیف‌های `next` + کلیدهای ناشناختهٔ مدل از همان ردیف در `shadow` */
-export function keepUnknown(shadow, next) {
-  const out = { ...next };
-  for (const c of core.COLLECTIONS) {
-    const known = knownKeys(c);
-    if (!known || !Array.isArray(next[c]) || !Array.isArray(shadow?.[c])) continue;
-    const before = new Map(shadow[c].map((r) => [r.id, r]));
-    out[c] = next[c].map((r) => {
-      const was = before.get(r.id);
-      if (!was) return r;
-      const extra = Object.fromEntries(Object.entries(was).filter(([k]) => !(k in r) && !known.has(k)));
-      return Object.keys(extra).length ? { ...r, ...extra } : r;
-    });
   }
   return out;
 }
@@ -354,7 +344,7 @@ export class NativeDevice {
     const base = k.diffInModelTerms ? projectLedger(this.shadow) : this.shadow;
     const ops = dropUnknownRemovals(core.diff(base, next).ops, k);
     if (ops.length) this.queue.push(...ops);
-    this.shadow = core.shadowOf(k.shadowKeepsUnknown ? keepUnknown(this.shadow, next) : next);
+    this.shadow = core.shadowOf(next);
     this.ledger = next;
     return ops.length;
   }
@@ -403,12 +393,10 @@ export class NativeDevice {
 
   /** `SyncCommit.absorb`: دفتر و سایه هر دو با همان opها جلو می‌روند */
   absorb(ops) {
-    //  `LedgerDiff.applyRemote` خروجی را از درِ مدل رد می‌کند؛ از A00 کلیدی که مدل نمی‌شناسد
-    //  در ردیف می‌ماند (`keepUnknown`) — دفتر از `fromJson` بی آن است، سایه با آن
+    //  `LedgerDiff.applyRemote` خروجی را از درِ مدل رد می‌کند: کلیدِ ناشناخته در دفتر و سایه نمی‌ماند
     const shape = this.kotlin.applyRemoteShaped ? projectLedger : (x) => x;
-    const keep = (raw) => (this.kotlin.shadowKeepsUnknown ? keepUnknown(raw, shape(raw)) : shape(raw));
     this.ledger = shape(core.applyRemote(this.ledger, ops).data);
-    this.shadow = core.shadowOf(keep(core.applyRemote(this.shadow, ops).data));
+    this.shadow = core.shadowOf(shape(core.applyRemote(this.shadow, ops).data));
   }
 
   /** `SyncV1Engine.firstSync`: دفترِ خالی ⇒ Snapshot؛ وگرنه کلِ دفتر یک بار */
@@ -418,9 +406,10 @@ export class NativeDevice {
       const r = await this.api('GET', '/sync/v1/snapshot');
       if (r.status !== 200) return { ok: false, status: r.status, body: r.body };
       const next = core.fromSnapshot(r.body, this.ledger);
-      //  `restoreFromServer`: دفتر = fromJson(next) (از درِ مدل)؛ سایه = next ِ خام (`writeShadow`)
+      //  `restoreFromServer`: دفتر = fromJson(next) (از درِ مدل)؛ سایه = `writeShadow(next)` —
+      //  از A00 از درِ مدل (`modelTree`)، پیش از آن خام
       this.ledger = this.raw ? next : projectLedger(next);
-      this.shadow = core.shadowOf(next);
+      this.shadow = core.shadowOf(this.kotlin.snapshotShaped ? projectLedger(next) : next);
       this.cursor = Number(r.body.cursor || 0);
       this.snapshotAt = Date.now();
       return { ok: true, rows: Number(r.body.rows || 0) };

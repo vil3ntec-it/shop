@@ -416,8 +416,14 @@ class SyncV1Engine private constructor(context: Context) {
     return runCatching { json.parseToJsonElement(raw) as? JsonObject }.getOrNull()
   }
 
+  /**
+   *  سایهٔ Snapshot (`prepare`، `restoreFromServer`) — ⛔ A00: از درِ مدلِ همین ساخت
+   *  (`LedgerDiff.modelTree`)، مثلِ `SyncV3Engine.shape`. ردیفِ خامِ سرور کلیدهایی دارد که
+   *  دفترِ این ساخت نمی‌تواند نگه دارد؛ اگر در سایه می‌ماندند، پس از به‌روزرسانی به ساختی
+   *  که آن‌ها را می‌شناسد نخستین ذخیرهٔ بی‌ربط همه را `null` می‌فرستاد.
+   */
   private fun writeShadow(tree: JsonObject) {
-    state.shadow = LedgerDiff.shadowOf(tree).toString()
+    state.shadow = LedgerDiff.shadowOf(LedgerDiff.modelTree(tree)).toString()
   }
 
   companion object {

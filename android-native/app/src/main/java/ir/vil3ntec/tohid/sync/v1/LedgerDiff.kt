@@ -253,13 +253,18 @@ object LedgerDiff {
    *  ترتیبِ خروجی همان ترتیبِ خودِ فهرست‌هاست، تا «فاکتور پیش از اقلامش»
    *  بماند.
    *
-   *  ⛔ **مقایسه به زبانِ مدل** (A00): سایه می‌تواند ردیفِ خامِ سرور باشد
-   *  (Snapshot، `unionRows`، سایه‌ای که نسخهٔ پیشین روی دیسک گذاشته) —
-   *  با پیش‌فرض‌هایی که ندارد یا کلیدِ تودرتویی (`payments[].custody`) که
-   *  مدل نمی‌شناسد. ردیفی که خام با دفتر فرق دارد یک بار از درِ مدل رد
-   *  می‌شود (`modelView`) و تفاضل با همان گرفته می‌شود؛ پس ردیفی که کاربر
-   *  دست نزده هیچ opی نمی‌سازد و فیلدی که عوض نشده، حتی اگر مدل بخشی از
-   *  درونش را نشناسد، دوباره نوشته نمی‌شود.
+   *  ⛔ **مقایسه به زبانِ مدل** (A00): سایه‌ای که ساخت‌های پیش از A00 از
+   *  Snapshot روی دیسک گذاشته‌اند ردیفِ خامِ سرور است — با پیش‌فرض‌هایی که
+   *  ندارد یا کلیدِ تودرتویی (`payments[].custody`) که مدل نمی‌شناسد. ردیفی
+   *  که خام با دفتر فرق دارد یک بار از درِ مدل رد می‌شود (`modelView`) و
+   *  تفاضل با همان گرفته می‌شود؛ پس ردیفی که کاربر دست نزده هیچ opی نمی‌سازد
+   *  و فیلدی که عوض نشده، حتی اگر مدل بخشی از درونش را نشناسد، دوباره نوشته
+   *  نمی‌شود.
+   *
+   *  ⚠️ حدِ این قاعده: فیلدی که کاربر **واقعاً** ویرایش کرده کامل با شکلِ مدلِ
+   *  همین ساخت می‌رود؛ کلیدِ تودرتویی که مدل درونِ همان فیلد نمی‌شناسد
+   *  (مثلاً `custody` در یک قلمِ `payments` که این ساخت فقط بخشی از آن را
+   *  دارد) با آن ویرایش بازنویسی می‌شود.
    */
   fun diff(shadow: JsonObject?, next: JsonObject, now: Long = System.currentTimeMillis()): List<SyncOp> {
     val ops = ArrayList<SyncOp>()
@@ -326,33 +331,26 @@ object LedgerDiff {
   }
 
   /**
-   *  درختِ [next] (از درِ مدل) + کلیدهایی از همان ردیف در [shadow] که مدلِ
-   *  این نسخه نمی‌شناسد — رفت‌وبرگشتِ JSON ِ خام (A00).
+   *  درخت از درِ مدلِ **همین ساخت** — همان شکلی که دفتر روی دیسک دارد:
+   *  پیش‌فرض‌ها پر، کلیدی که مدل نمی‌شناسد بیرون؛ فهرست‌های تنظیماتی فقط اگر
+   *  در خودِ درخت بودند (شرح بالای `LIST_COLLECTIONS`). اگر مدل نتواند بخواندش،
+   *  همان درختِ خام.
    *
-   *  سایه‌ای که با این ساخته شود آنچه برنامهٔ تازه‌تر یا سرور روی ردیف
-   *  گذاشته (`payments`، `orderId`، …) را نگه می‌دارد؛ `changedFields` هم
-   *  هرگز برای آن‌ها `null` نمی‌سازد. ردیفی که در [next] نیست (پاک‌شده)
-   *  همان‌طور بیرون می‌ماند.
+   *  ⛔ A00: **هر سایه‌ای که روی دیسک می‌نشیند از همین در می‌گذرد** (`applyRemote`،
+   *  `SyncCommit.record`، و Snapshot در `SyncV1Engine.writeShadow`). سایه هرگز
+   *  کلیدی را که دفترِ همین ساخت نمی‌تواند نگه دارد ندارد؛ وگرنه پس از
+   *  به‌روزرسانی به ساختی که آن کلید را می‌شناسد، دفتر (که آن را نداشت) و
+   *  سایه (که داشت) فرق می‌کردند و نخستین ذخیرهٔ بی‌ربط آن را برای همهٔ
+   *  ردیف‌ها `null` یا پیش‌فرض می‌فرستاد. کلیدِ ناشناخته فقط روی سرور می‌ماند
+   *  و `changedFields` هرگز برایش `null` نمی‌سازد.
    */
-  fun keepUnknown(shadow: JsonObject?, next: JsonObject): JsonObject {
-    if (shadow == null) return next
-    var out: LinkedHashMap<String, JsonElement>? = null
-    for (table in COLLECTIONS) {
-      val before = rowsOf(shadow, table).associateBy { idOf(it) }
-      val rows = next[table] as? JsonArray
-      if (before.isEmpty() || rows == null) continue
-      var changed = false
-      val list = rows.map { r ->
-        val row = r as? JsonObject ?: return@map r
-        val was = before[idOf(row)] ?: return@map r
-        val extra = was.filterKeys { it !in row && !isModelField(table, it) }
-        if (extra.isEmpty()) return@map r
-        changed = true
-        JsonObject(LinkedHashMap<String, JsonElement>(row).apply { putAll(extra) })
-      }
-      if (changed) (out ?: LinkedHashMap<String, JsonElement>(next).also { out = it })[table] = JsonArray(list)
+  fun modelTree(tree: JsonObject): JsonObject {
+    val shaped = try {
+      toJson(fromJson(tree))
+    } catch (_: Exception) {
+      return tree
     }
-    return out?.let { JsonObject(it) } ?: next
+    return keepListsOf(tree, shaped)
   }
 
   /**
@@ -427,15 +425,8 @@ object LedgerDiff {
      *  ⚠️ و اگر روزی ردیفی برسد که مدل نتواند بخواندش، درختِ خام برمی‌گردد:
      *  یک پژواکِ اضافه بهتر از پرتاب شدنِ استثنا وسطِ همگام‌سازی است.
      */
-    val shaped = try {
-      toJson(fromJson(raw))
-    } catch (_: Exception) {
-      raw
-    }
     //  ⚠️ پیش‌فرضِ مدل جای فهرستی که در درخت نبود نمی‌نشیند (شرح بالای `LIST_COLLECTIONS`)
-    //  و کلیدی که مدل نمی‌شناسد در ردیف می‌ماند (A00، `keepUnknown`): سایه همان
-    //  چیزی را دارد که سرور دارد؛ `fromJson` ِ دفتر آن را نادیده می‌گیرد
-    return keepListsOf(raw, keepUnknown(raw, shaped))
+    return modelTree(raw)
   }
 
   private fun keepListsOf(src: JsonObject, dst: JsonObject): JsonObject {
