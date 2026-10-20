@@ -35,12 +35,13 @@ class SyncV1Client(private val api: ApiClient) {
    *  @throws UpgradeRequired وقتی برنامه از سرور جلوتر است (۴۲۶). هیچ
    *          opی اعمال نشده و صف **دست نمی‌خورد**.
    */
-  suspend fun push(deviceId: String, ops: List<SyncOp>, queued: Int): PushResult {
+  suspend fun push(deviceId: String, ops: List<SyncOp>, queued: Int, caps: Boolean = true): PushResult {
     val body = buildJsonObject {
       put("device_id", JsonPrimitive(deviceId))
       put("schema_version", JsonPrimitive(LedgerDiff.SCHEMA_VERSION))
       put("queued", JsonPrimitive(queued))
-      put("caps", LedgerDiff.capsJson())
+      //  A00: دستهٔ دارای op ِ ساختِ پیش از A00 بی نشان (`LedgerDiff.capsFor`)
+      if (caps) put("caps", LedgerDiff.capsJson())
       put("ops", JsonArray(ops.map { it.toJson() }))
     }
     val res = try {

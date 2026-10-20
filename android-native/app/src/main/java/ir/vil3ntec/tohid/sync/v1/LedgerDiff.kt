@@ -220,6 +220,21 @@ object LedgerDiff {
 
   fun capsJson(): JsonArray = JsonArray(SYNC_CAPS.map { JsonPrimitive(it) })
 
+  /**
+   *  آیا op را ساختِ پیش از A00 ساخته؟ [upTo] بزرگ‌ترین `op_id` ِ صف در نخستین شروع پس از
+   *  به‌روزرسانی است (`SyncCommit.start`)؛ `op_id` ULID است و به ترتیبِ زمان، و opِ v3 ِ
+   *  برآمده از آن `ULID.پسوند` است.
+   */
+  fun isLegacyOp(opId: String, upTo: String): Boolean =
+    upTo.isNotEmpty() && opId.substringBefore('.') <= upTo
+
+  /**
+   *  `caps` برای این دسته؟ دسته‌ای که حتی یک op ِ ساختِ پیش از A00 دارد بی نشان می‌رود تا
+   *  تورِ سرور `null` ِ کهنهٔ آن ساخت را بپالاید؛ opِ تازهٔ همان دسته هرگز چنین `null`ی ندارد
+   *  و بدترین اثرِ تور بر آن «کهنه ماندن» است.
+   */
+  fun capsFor(opIds: Collection<String>, upTo: String): Boolean = opIds.none { isLegacyOp(it, upTo) }
+
   fun isStamped(shadow: JsonObject): Boolean = shadow[SHADOW_STAMP] != null
 
   /** همان سایه بی مهر — ژورنالی که ساختِ پیش از A00 نوشته اثرِ انگشتِ سایهٔ بی مهر را دارد */

@@ -98,15 +98,14 @@ class SyncV1Engine private constructor(context: Context) {
   fun recover(ledger: ShopData) {
     //  Sync v3 پشتِ تنظیمِ هر دستگاه (پیش‌فرض v1) — شرح سرِ `sync/v3/SyncV3Runner.kt`
     if (SyncChoice.isV3(app)) { SyncV3Runner.of(app).recover(ledger); return }
-    if (commit.pending()) {
-      if (commit.recover(ledger) == SyncCommit.Outcome.MISMATCH) {
-        //  نباید پیش بیاید؛ اگر آمد، دیده شود
-        state.lastError = "ژورنالِ همگام‌سازی با سایه نخواند"
-      }
-      publish()
+    //  A00: مهرِ سایه پیش از بازیابی خوانده می‌شود؛ سایهٔ بی مهرِ ساختِ پیشین یک بار و پیش از
+    //  نخستین تفاضل درمان، و opهای آن ساخت در صف نشان می‌شوند (شرح سرِ `SyncCommit.start`)
+    val start = commit.start(ledger) { upTo -> state.legacyOpsUpTo = upTo }
+    if (start.outcome == SyncCommit.Outcome.MISMATCH) {
+      //  نباید پیش بیاید؛ اگر آمد، دیده شود
+      state.lastError = "ژورنالِ همگام‌سازی با سایه نخواند"
     }
-    //  A00: سایهٔ بی مهرِ ساختِ پیشین، یک بار و پیش از نخستین تفاضل (شرح سرِ `SyncCommit.heal`)
-    runCatching { commit.heal(ledger) }
+    if (start.outcome != SyncCommit.Outcome.NONE) publish()
   }
 
   /* ==========================================================
@@ -185,8 +184,11 @@ class SyncV1Engine private constructor(context: Context) {
           guard++
           val batch = queue.batch()
           if (batch.isEmpty()) break
+          //  A00: opهای ساختِ پیش از A00 بی `caps` می‌روند تا تورِ سرور null ِ کهنه‌شان را بپالاید
+          val legacy = state.legacyOpsUpTo
+          if (legacy.isNotEmpty() && queue.all().none { LedgerDiff.isLegacyOp(it.opId, legacy) }) state.legacyOpsUpTo = ""
           val out = try {
-            client.push(device, batch, queue.size())
+            client.push(device, batch, queue.size(), caps = LedgerDiff.capsFor(batch.map { it.opId }, state.legacyOpsUpTo))
           } catch (upgrade: SyncV1Client.UpgradeRequired) {
             //  سرور عقب‌تر است: هیچ opی پاک نمی‌شود
             state.holding = true

@@ -175,13 +175,35 @@ internal class SyncCommit(private val journal: Journal, private val parts: Parts
    *
    *  @return true اگر سایه درمان و مهر شد
    */
-  fun heal(ledger: ShopData): Boolean {
+  fun heal(ledger: ShopData, force: Boolean = false): Boolean {
     if (journal.exists()) recover(ledger)
     val shadow = parse(parts.shadow()) ?: return false
-    if (LedgerDiff.isStamped(shadow)) return false
+    if (!force && LedgerDiff.isStamped(shadow)) return false
     val healed = LedgerDiff.modelTree(LedgerDiff.healShadow(shadow, LedgerDiff.toJson(ledger)))
     parts.commit(LedgerDiff.shadowOf(healed).toString(), null)
     return true
+  }
+
+  /** نتیجهٔ `start`: بازیابیِ ژورنال، درمان، و نشانِ opهای ساختِ پیشین در صف ("" یعنی هیچ) */
+  data class Start(val outcome: Outcome, val healed: Boolean, val legacyUpTo: String)
+
+  /**
+   *  شروعِ برنامه (`recover` ِ موتورهای v1 و v3) با دفترِ روی دیسک — A00:
+   *   ۱) مهرِ سایه **پیش از** بازیابی خوانده می‌شود: بازیابیِ ژورنالِ «ثبت» ِ ساختِ پیشین
+   *      سایه‌ای مهردار ولی درمان‌نشده می‌نویسد (شاخهٔ «دفترِ آن لحظه در دست نیست»)؛
+   *   ۲) ژورنال بازیابی می‌شود (opهای ساختِ پیشین با همان `op_id` در صف برمی‌گردند)؛
+   *   ۳) اگر سایه بی مهر بود: بزرگ‌ترین `op_id` ِ صف (ULID به ترتیبِ زمان است) **پیش از** مهر
+   *      به [keepLegacy] سپرده می‌شود — دسته‌ای که op ِ کوچک‌تر یا برابر دارد بی `caps` می‌رود
+   *      تا تورِ سرور `null` ِ کهنهٔ آن ساخت را بپالاید (`LedgerDiff.capsFor`) — و بعد درمان.
+   *      اگر برنامه میانِ این دو بسته شود، سایه هنوز بی مهر است و بارِ بعد همین تکرار می‌شود.
+   */
+  fun start(ledger: ShopData, keepLegacy: (String) -> Unit = {}): Start {
+    val wasStamped = parse(parts.shadow())?.let { LedgerDiff.isStamped(it) } ?: true
+    val outcome = if (journal.exists()) recover(ledger) else Outcome.NONE
+    if (wasStamped) return Start(outcome, false, "")
+    val upTo = parts.queued().maxOrNull().orEmpty()
+    if (upTo.isNotEmpty()) keepLegacy(upTo)
+    return Start(outcome, heal(ledger, force = true), upTo)
   }
 
   /** همان سایه با یا بی مهرِ A00 — ژورنالِ ساختِ پیشین اثرِ انگشتِ سایهٔ بی مهر را دارد */
@@ -231,6 +253,9 @@ internal class SyncCommit(private val journal: Journal, private val parts: Parts
       }
 
       j.stage == Journal.ABSORB -> {
+        //  ⚠️ (پیشین، پیگیریِ A00) اثرِ انگشتِ دفتر به مدلِ همین ساخت بسته است: ژورنالی که ساختِ
+        //  پیشین نوشته و پس از آن مدل فیلدی گرفته، این‌جا «ننشسته» خوانده می‌شود (BACK) حتی اگر
+        //  دفتر نشسته بود ⇐ همان opها دوباره گرفته می‌شوند. این‌جا درست نشده است.
         val tree = ledger?.let { LedgerDiff.toJson(it) }
         if (tree == null || sha(tree.toString()) != j.ledger) {
           //  دفتر ننشسته بود ⇒ هیچ چیزی عوض نشده؛ همان opها دوباره گرفته می‌شوند

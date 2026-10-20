@@ -152,6 +152,64 @@ class ShadowStampTest {
     assertEquals(7L, disk.cursor)
   }
 
+  /**
+   *  بازبینیِ #341 (repro2/HealOrderReproTest): ژورنالِ «ثبت» ِ ساختِ پیشین که اثرِ انگشتش با مدلِ
+   *  این ساخت نمی‌خواند ⇒ بازیابی از شاخهٔ «دفترِ آن لحظه در دست نیست» سایه‌ای **مهردار ولی
+   *  درمان‌نشده** می‌نوشت و درمانِ بعدی آن را رد می‌کرد ⇒ نخستین ذخیره `{creditLimit: null}`.
+   *  `start` مهر را پیش از بازیابی می‌خواند (همان کارِ `recover` ِ موتورها).
+   */
+  @Test
+  fun oldRecordJournal_fallbackBranch_isStillHealed() {
+    val disk = Disk()
+    val d1 = Debtor(id = "d-1", name = "a", createdAt = 1L)
+    val ledger0 = ShopData(debtors = listOf(d1))
+    val tree = LedgerDiff.toJson(ledger0)
+    //  سایهٔ خامِ Snapshot ِ ساختِ پیشین با کلیدی که آن ساخت نمی‌شناخت
+    val raw = (tree["debtors"] as JsonArray).map { JsonObject((it as JsonObject) + ("creditLimit" to JsonPrimitive(500))) }
+    disk.shadow = LedgerDiff.unstamped(LedgerDiff.shadowOf(JsonObject(tree + ("debtors" to JsonArray(raw)))).toString())
+    //  ساختِ پیشین: ذخیره‌ای که d-2 را افزود، ژورنال نوشته شد و پیش از سایه بسته شد
+    val d2 = Debtor(id = "d-2", name = "b", createdAt = 2L)
+    val ledger1 = ledger0.copy(debtors = ledger0.debtors + d2)
+    val d2row = (LedgerDiff.toJson(ShopData(debtors = listOf(d2)))["debtors"] as JsonArray)[0] as JsonObject
+    val op = SyncOp("01OLDOP0000000000000000000", 1L, "debtors", "d-2", SyncOp.INSERT, JsonObject(d2row - "id"))
+    SyncCommit.Journal(journalFile).write(SyncCommit.Journal.Entry(SyncCommit.Journal.RECORD,
+      before = SyncCommit.sha(disk.shadow), shadow = "old-model-shape-sha", ops = listOf(op)))
+    disk.ledger = ledger1
+    var marked = ""
+    val start = session(disk).start(ledger1) { marked = it }
+    assertEquals(SyncCommit.Outcome.FORWARD, start.outcome)
+    assertTrue(start.healed)
+    assertEquals("01OLDOP0000000000000000000", marked)
+    val ops = save(disk, ledger1.copy(debtors = ledger1.debtors + Debtor(id = "d-3", name = "c", createdAt = 3L)))
+    assertEquals(listOf("insert debtors/d-3"), heads(ops))
+  }
+
+  /** opهایی که ساختِ پیشین در صف گذاشته نشان می‌شوند (بزرگ‌ترین `op_id`)، پیش از مهر */
+  @Test
+  fun start_marksTheOldBuildsQueuedOps_beforeStamping() {
+    val disk = oldBuildRestored()
+    val old = listOf(SyncOp(Ulid.next(1_000L), 1_000L, "debtors", "d-x", SyncOp.INSERT, buildJsonObject { put("name", "x") }),
+      SyncOp(Ulid.next(2_000L), 2_000L, "debtors", "d-y", SyncOp.INSERT, buildJsonObject { put("name", "y") }))
+    disk.queue += old
+    var stampedWhenMarked: Boolean? = null
+    val start = session(disk).start(disk.ledger) {
+      stampedWhenMarked = LedgerDiff.isStamped(Json.parseToJsonElement(disk.shadow) as JsonObject)
+    }
+    assertEquals(old.maxOf { it.opId }, start.legacyUpTo)
+    assertEquals("نشان پیش از مهر روی دیسک", false, stampedWhenMarked)
+    //  دسته‌ای که op ِ پیشین دارد بی caps؛ op ِ تازهٔ همین ساخت (و پسوندِ v3 اش) با caps
+    val fresh = save(disk, disk.ledger.copy(debtors = listOf(Debtor(id = "d-1", name = "احمد", createdAt = 1L))))
+    assertFalse(LedgerDiff.capsFor(old.map { it.opId } + fresh.map { it.opId }, start.legacyUpTo))
+    assertTrue(LedgerDiff.capsFor(fresh.map { it.opId }, start.legacyUpTo))
+    assertFalse(LedgerDiff.capsFor(listOf(old[0].opId + ".u"), start.legacyUpTo))
+    assertTrue(LedgerDiff.capsFor(fresh.map { it.opId + ".u" }, start.legacyUpTo))
+    assertTrue(LedgerDiff.capsFor(old.map { it.opId }, ""))
+    //  شروعِ بعدی: سایه مهر دارد ⇒ نه درمان، نه نشانِ تازه
+    var again = ""
+    assertEquals("", session(disk).start(disk.ledger) { again = it }.legacyUpTo)
+    assertEquals("", again)
+  }
+
   /** ژورنالِ «ثبت» ِ ساختِ پیشین که پس از صف و پیش از سایه بسته شد */
   @Test
   fun recordJournalFromOldBuild_finishesForward() {

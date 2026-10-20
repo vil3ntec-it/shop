@@ -98,6 +98,8 @@ data class V3Meta(
   val conflictsDirty: Boolean = false,
   val pushBytes: Int = SyncV3Engine.MIN_BYTES,
   val pullBytes: Int = SyncV3Engine.MIN_BYTES,
+  /** A00: بزرگ‌ترین شناسهٔ صف در نخستین شروع پس از ساختِ پیش از A00 — شرح سرِ `SyncCommit.start` */
+  val legacyOpsUpTo: String = "",
 )
 
 /** انبارِ محلی؛ هر `save` یک نوشتنِ اتمی (فایلِ کناری + fsync + جابه‌جایی). */
@@ -227,10 +229,10 @@ internal class SyncV3Engine(
 
   /** commitی که برنامه وسطش بسته شد — هنگامِ شروع، با دفترِ روی دیسک */
   fun recover(onDisk: ShopData): SyncCommit.Outcome {
-    val out = if (commit.pending()) commit.recover(onDisk) else SyncCommit.Outcome.NONE
-    //  A00: سایهٔ بی مهرِ ساختِ پیشین، یک بار و پیش از نخستین تفاضل (شرح سرِ `SyncCommit.heal`)
-    if (meta.initialized) runCatching { commit.heal(onDisk) }
-    return out
+    if (!meta.initialized) return if (commit.pending()) commit.recover(onDisk) else SyncCommit.Outcome.NONE
+    //  A00: مهرِ سایه پیش از بازیابی خوانده می‌شود؛ سایهٔ بی مهرِ ساختِ پیشین یک بار و پیش از
+    //  نخستین تفاضل درمان، و opهای آن ساخت در صف نشان می‌شوند (شرح سرِ `SyncCommit.start`)
+    return commit.start(onDisk) { upTo -> save(meta.copy(legacyOpsUpTo = upTo)) }.outcome
   }
 
   fun queued(): Int = queue.outbox.sumOf { it.size }
@@ -393,10 +395,14 @@ internal class SyncV3Engine(
   suspend fun pushOnce(): V3Step {
     if (meta.upgradeProtocol > 0) return V3Step(ok = false, upgrade = true, stopped = true)
     val b = nextBatch() ?: return V3Step(ok = true)
+    //  A00: opهای ساختِ پیش از A00 بی `caps` می‌روند تا تورِ سرور null ِ کهنه‌شان را بپالاید
+    val legacy = meta.legacyOpsUpTo
+    if (legacy.isNotEmpty() && queue.outbox.none { LedgerDiff.isLegacyOp(it.id, legacy) }) save(meta.copy(legacyOpsUpTo = ""))
+    val caps = LedgerDiff.capsFor(b.entries.map { it.id }, meta.legacyOpsUpTo)
     val body = buildJsonObject {
       put("device_id", JsonPrimitive(deviceId))
       put("protocol", JsonPrimitive(protocol))
-      put("caps", LedgerDiff.capsJson())
+      if (caps) put("caps", LedgerDiff.capsJson())
       put("ops", JsonArray(b.ops))
       //  آنچه پس از همین دسته می‌ماند — نگهبانِ خروجِ سرور (SYN-10) از همین می‌خواند
       put("queued", JsonPrimitive(max(0, queued() - b.ops.size)))
