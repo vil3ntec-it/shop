@@ -17,6 +17,7 @@
 const { one, many, tx, newId, now } = require('../db');
 const { badRequest, forbidden } = require('../middleware/errors');
 const { can } = require('./permissions');
+const permCore = require('./perm-core');
 
 /** نام مجموعه در برنامه → جدول دیتابیس. هر چیز بیرون این فهرست رد می‌شود. */
 const TABLES = {
@@ -83,6 +84,15 @@ async function pushChanges(ctx, changes) {
     return { applied: 0, skipped: 0, conflicts: [], rev: await currentRev(shopId) };
   }
   if (!can(role, 'data.write')) throw forbidden('اجازه‌ی ثبت اطلاعات ندارید', 'permission_denied');
+  //  A16: جدولی که این نقش نمی‌نویسد ⇒ کلِ دسته رد (همه یا هیچ؛ `/api/data/sales/full`
+  //  هم همین‌جا می‌رسد). سه نقشِ قدیم «*»اند و این‌جا هرگز گیر نمی‌کنند.
+  const offTable = changes.find((ch) => {
+    const col = String(ch?.collection || '');
+    return Object.prototype.hasOwnProperty.call(TABLES, col) && !permCore.canWrite(role, col);
+  });
+  if (offTable) {
+    throw forbidden(`این کار در حدِ نقشِ شما نیست (${String(offTable.collection)})`, 'table_not_allowed');
+  }
 
   return tx(async (c) => {
     let rev = await reserveRevs(c, shopId, changes.length);

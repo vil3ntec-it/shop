@@ -428,6 +428,10 @@ function openTask(c, ctx, { kind, table, rowId, dedupe, detail, t }) {
 async function authorize(c, ctx, op, row, deviceId, origin) {
   if (origin === 'v1' || origin === 'server') return null;      //  v1 خودش سنجیده بود (و `v1Guard`)
   const role = ctx.role;
+  //  A16: جدولی که این نقش نمی‌نویسد (صندوق‌دار خرید، انباردار فروش، حسابدار هیچ).
+  //  سه نقشِ قدیم «*»اند، پس برای آن‌ها هیچ چیز عوض نمی‌شود. ردِ یک op کلِ
+  //  واحدِ tx را برمی‌گرداند، پس قلم و حرکتِ انبارِ همان سند هم نمی‌نشیند.
+  if (!permCore.canWrite(role, op.table)) return 'table_not_allowed';
   const own = !!row && row.created_by === deviceId;
   if (op.kind === 'delete' && op.spec.policy === 'master') {
     if (can(role, 'data.delete.any')) return null;

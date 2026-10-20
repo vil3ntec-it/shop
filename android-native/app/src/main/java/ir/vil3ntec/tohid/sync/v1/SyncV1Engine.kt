@@ -177,6 +177,9 @@ class SyncV1Engine private constructor(context: Context) {
         val device = store.deviceUid
 
         //  صف را تا ته خالی می‌کنیم، دسته‌دسته
+        //  A16: Pushِ ۴۰۳ (نقش یا اشتراک) Pull را نمی‌خواباند — opها در صف می‌مانند و
+        //  دادهٔ دکان همچنان می‌رسد؛ خطا پس از Pull گزارش می‌شود.
+        var refused: ir.vil3ntec.tohid.core.net.ApiFailure? = null
         var guard = 0
         while (queue.size() > 0 && guard < 500) {
           guard++
@@ -190,6 +193,10 @@ class SyncV1Engine private constructor(context: Context) {
             state.lastError = upgrade.reason
             publish()
             return@withLock Result.failure(upgrade)
+          } catch (denied: ir.vil3ntec.tohid.core.net.ApiFailure) {
+            if (denied.status != 403) throw denied
+            refused = denied
+            break
           }
           state.holding = false
           state.serverSchema = out.serverSchema
@@ -220,6 +227,11 @@ class SyncV1Engine private constructor(context: Context) {
           if (!got.hasMore) break
         }
 
+        refused?.let { denied ->
+          attempt++
+          state.lastError = denied.userMessage
+          return@withLock Result.failure(denied)
+        }
         attempt = 0
         state.lastError = ""
         state.lastOkAt = System.currentTimeMillis()

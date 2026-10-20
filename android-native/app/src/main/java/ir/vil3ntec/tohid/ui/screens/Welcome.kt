@@ -323,7 +323,7 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
     SavedLogins.remember(context, identifier, display)
     //  نقش را همین‌جا می‌دانیم؛ صبر کردن تا اولین پرسشِ سرور یعنی
     //  شاگرد یک لحظه تنظیمات را باز می‌بیند
-    session.shop?.role?.let { ir.vil3ntec.tohid.data.ShopRole.remember(context, it) }
+    session.shop?.effectiveRole?.let { ir.vil3ntec.tohid.data.ShopRole.remember(context, it) }
     /*
      *  پیش از هر چیز، دفترِ روی گوشی باید مالِ همین حساب باشد.
      *
@@ -1091,7 +1091,7 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
                             //  نقش همین‌جا نوشته می‌شود، نه در تازه‌سازیِ
                             //  بعدی: کسی که با کد پیوسته «شاگرد» است و
                             //  نباید حتی یک لحظه تنظیمات را باز ببیند
-                            shopState.role?.let {
+                            shopState.effectiveRole?.let {
                               ir.vil3ntec.tohid.data.ShopRole.remember(context, it)
                             }
                             runCatching {
@@ -1111,7 +1111,7 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
                         )
                           .onSuccess { session ->
                             SavedLogins.remember(context, entered, session.user.name)
-                            session.shop?.role?.let {
+                            session.shop?.effectiveRole?.let {
                               ir.vil3ntec.tohid.data.ShopRole.remember(context, it)
                             }
                             //  دفترِ روی گوشی باید مالِ همین حساب و همین

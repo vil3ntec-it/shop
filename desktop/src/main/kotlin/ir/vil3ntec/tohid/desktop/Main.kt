@@ -204,6 +204,8 @@ fun main() {
           //  Ctrl+K ⇒ جست‌وجوی سریع (صفحه، کالا، بارکد، قرض‌دار)
           mod && e.key == Key.K -> { ir.vil3ntec.tohid.ui.AppNav.palette.value = !ir.vil3ntec.tohid.ui.AppNav.palette.value; true }
           mod && e.key == Key.M -> { ir.vil3ntec.tohid.ui.AppNav.go("admin"); true }
+          //  Ctrl+L ⇒ قفلِ صندوق (STF-04)؛ سبدِ نیمه‌کاره می‌ماند
+          mod && e.key == Key.L -> { ir.vil3ntec.tohid.ui.AppNav.lock(); true }
           //  Ctrl+N ⇒ «تازه»ِ همین صفحه (قرض‌دار، کالا، مصرف، تأمین‌کننده)
           mod && e.key == Key.N -> ir.vil3ntec.tohid.ui.AppNav.addAction.value?.let { it(); true } ?: false
           e.key == Key.Escape -> BackDispatcher.dispatch()

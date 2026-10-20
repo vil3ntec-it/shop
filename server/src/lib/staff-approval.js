@@ -30,6 +30,12 @@
  *     (مشترک با پمپ) دست نمی‌خورد؛ opِ ناروا پیش از آن از دسته بیرون می‌آید و
  *     پاسخش «rejected» با همان دلیل در جای خودش برمی‌گردد. پمپ از این
  *     میان‌افزار بی هیچ کاری رد می‌شود.
+ *
+ * ── جدولِ نوشتنیِ هر نقش (STF-01، A16) ───────────────────────────────
+ * `v1Guard` پیش از همهٔ این‌ها `canWrite`ِ هسته را می‌سنجد: opی که جدولش در
+ * حدِ نقش نیست `table_not_allowed` می‌گیرد و هر opِ همین دسته که با
+ * `refId`/`saleId`/`purchaseId`/`returnId` به آن بسته است `tx_rejected`.
+ * سه نقشِ قدیم «*»اند، پس این شاخه برایشان هرگز کاری نمی‌کند.
  */
 const crypto = require('crypto');
 const core = require('./perm-core');
@@ -361,6 +367,16 @@ function companionOf(parent, need, op) {
   return false;
 }
 
+/** فیلدهایی که opِ همراه با آن به سندِ پدر اشاره می‌کند */
+const REF_FIELDS = Object.freeze(['refId', 'saleId', 'purchaseId', 'returnId']);
+
+/** opِ `op` به ردیفِ `parent` بسته است؟ (برای ردِ جدولیِ A16) */
+function refersTo(parent, op) {
+  if (op.table === parent.table && op.row_id === parent.row_id) return true;
+  const f = isPlainObject(op.fields) ? op.fields : {};
+  return REF_FIELDS.some((k) => typeof f[k] === 'string' && f[k] !== '' && f[k] === parent.row_id);
+}
+
 /**
  * `authorizeOp`ِ v1 این opِ فروش را حتماً با نقش رد می‌کند؟ همان دو شرطِ
  * خودش (با همان `can`)، فقط برای opی که فیلد دارد — حذف راهِ «حذفِ مالِ
@@ -395,14 +411,16 @@ async function v1Guard(req, res, next) {
     const { validateOp } = require('./sync-v1');
     const valid = [];
     const cands = [];
+    const blocked = [];                        //  A16: جدولی که این نقش نمی‌نویسد
     ops.forEach((raw, i) => {
       const v = validateOp('shop', raw);
       if (!v.ok) return;                       //  خودِ v1 ردش می‌کند، با دلیلِ خودش
       valid.push({ i, op: v.op });
+      if (!core.canWrite(ctx.role, v.op.table)) { blocked.push({ i, op: v.op }); return; }
       const need = needOfV1(v.op);
       if (need) cands.push({ i, op: v.op, need });
     });
-    if (!cands.length) return next();
+    if (!cands.length && !blocked.length) return next();
     //  op_idِ ثبت‌شده (هر حسابی — op_id در oplog یکتاست) را خودِ v1 جواب می‌دهد:
     //  «تکراری» برای همین حساب، op_id_taken برای دیگری. نه داوری، نه صندوق.
     const seen = new Set((await many(
@@ -411,8 +429,22 @@ async function v1Guard(req, res, next) {
     const deviceId = String(req.body?.device_id || req.body?.deviceId || '').slice(0, 64);
     const rejected = new Map();
     const parents = [];
-    for (const { i, op, need } of cands) {
+    const tableParents = [];
+    for (const { i, op } of blocked) {
       if (seen.has(String(op.op_id))) continue;
+      rejected.set(i, { op_id: String(op.op_id || ''), status: 'rejected', reason: 'table_not_allowed' });
+      tableParents.push(op);
+    }
+    //  همراه‌های سندِ بیرون از نقش با آن برمی‌گردند — پیش از داوریِ برگه، تا
+    //  برگه‌ای برای opی که به‌هرحال نمی‌نشیند خرج نشود
+    for (const p of tableParents) {
+      for (const { i, op } of valid) {
+        if (rejected.has(i) || seen.has(String(op.op_id)) || !refersTo(p, op)) continue;
+        rejected.set(i, { op_id: String(op.op_id || ''), status: 'rejected', reason: 'tx_rejected' });
+      }
+    }
+    for (const { i, op, need } of cands) {
+      if (seen.has(String(op.op_id)) || rejected.has(i)) continue;
       const slip = isPlainObject(op.fields) && isPlainObject(op.fields.approval) ? op.fields.approval : null;
       if (core.defaultMode(ctx.role, need.perm) === 'deny') {
         //  نقشی که امروز این کار را ندارد (شاگرد): `authorizeOp`ِ v1 (مشترک با پمپ، دست‌نخورده)

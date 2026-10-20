@@ -270,7 +270,9 @@ async function loginPayload(user, session) {
   return {
     user: publicUser(user),
     shop: member ? {
-      id: member.shop_id, name: member.shop_name || '', role: member.role,
+      id: member.shop_id, name: member.shop_name || '',
+      //  A16: نقشِ تازه در فیلدِ قدیم «staff» (نسخهٔ قدیم)، نقشِ واقعی در `actualRole`
+      role: require('../lib/permissions').legacyRole(member.role), actualRole: member.role,
     } : null,
     ...session,
   };

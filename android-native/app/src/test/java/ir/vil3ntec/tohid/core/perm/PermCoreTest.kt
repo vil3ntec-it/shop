@@ -95,6 +95,32 @@ class PermCoreTest {
     }
   }
 
+  /** جدول‌های نوشتنیِ هر نقش (A16) — همان `canWrite`/`writable`ِ JS */
+  @Test fun writes() {
+    for (c in list("writes")) {
+      assertEquals(c.toString(), c.getValue("out").jsonPrimitive.content.toBoolean(), PermCore.canWrite(c.s("role"), c.s("table")))
+    }
+    for (c in list("writable")) {
+      val want: Any? = when (val o = c.getValue("out")) {
+        is JsonNull -> null
+        is kotlinx.serialization.json.JsonArray -> o.map { it.jsonPrimitive.content }
+        else -> o.jsonPrimitive.content
+      }
+      assertEquals(c.toString(), want, PermCore.writable(c.s("role")))
+    }
+  }
+
+  /** نقش‌های تازه هیچ‌کدام از سه نقشِ قدیم را عوض نکرده‌اند (آزمونِ مرجع) */
+  @Test fun legacyRolesUnchanged() {
+    assertEquals(listOf("owner", "manager", "staff"), PermCore.ROLES.take(3))
+    for (role in listOf("owner", "manager", "staff")) {
+      assertEquals(role, PermCore.ALL_TABLES, PermCore.writable(role))
+      assertEquals(role, true, PermCore.canWrite(role, "anything"))
+    }
+    assertEquals(false, PermCore.canWrite("courier", "sales"))
+    assertEquals(emptyList<String>(), PermCore.writable("accountant"))
+  }
+
   /** «نیازمند تأیید» برای شاگرد پذیرفته است ولی «مجاز» نه (بخشِ ۱۰.۱) */
   @Test fun staffApproveButNeverAllow() {
     val approve = listOf(mapOf("sales.discount" to mapOf("mode" to "approve")))
