@@ -100,6 +100,25 @@ import ir.vil3ntec.tohid.ui.theme.PhoneV3UiDark
 private fun lastSyncText(at: Long): String =
   if (at <= 0) "هنوز با دکان همگام نشده است" else "آخرین به‌روزرسانی: ${formatMillis(at)} · ${clock(at)}"
 
+/** «تا کی» ِ عددهای نقد و آمار — زمانِ خودِ سرور در همان پاسخ، نه ساعتِ همگام‌سازیِ گوشی */
+private fun asOfText(s: CourierSummary): String =
+  if (s.serverTime <= 0) "زمانِ این عددها معلوم نیست" else "تا ${formatMillis(s.serverTime)} · ${clock(s.serverTime)} (زمانِ دکان)"
+
+/** تازه کردنِ «نقدِ من»/آمار نشد ⇒ پیدا، تا عددِ کهنه تازه دیده نشود */
+@Composable
+private fun StaleNote(error: String?) {
+  if (error.isNullOrBlank()) return
+  val ui = PhoneV3.ui
+  Row(
+    Modifier.fillMaxWidth().background(ui.awaiting.bg, CourierGroupShape).padding(horizontal = 12.dp, vertical = 10.dp),
+    verticalAlignment = Alignment.CenterVertically,
+  ) {
+    Icon(Icons.Outlined.ReportProblem, contentDescription = null, tint = ui.awaiting.fg, modifier = Modifier.size(18.dp))
+    Spacer(Modifier.width(8.dp))
+    Text("تازه نشد: $error — عددها مالِ همان زمانِ پایین‌اند.", style = courierText(13.sp, FontWeight.Medium), color = ui.awaiting.fg)
+  }
+}
+
 /** فشردنِ کاشی‌ها (بخشِ G) */
 @Composable
 private fun Modifier.pressable(onClick: () -> Unit, role: Role = Role.Button, enabled: Boolean = true): Modifier {
@@ -394,7 +413,7 @@ internal fun CourierStatsTab(
   summary: CourierSummary?,
   week: Boolean,
   onWeek: (Boolean) -> Unit,
-  lastSyncAt: Long,
+  staleError: String?,
   syncing: Boolean,
   onRefresh: () -> Unit,
   onCash: () -> Unit,
@@ -416,19 +435,21 @@ internal fun CourierStatsTab(
         if (syncing) null else onRefresh,
       )
     } else {
-      StatsBody(summary, week, lastSyncAt, onCash)
+      StaleNote(staleError)
+      StatsBody(summary, week, onCash)
     }
   }
 }
 
 @Composable
-private fun StatsBody(summary: CourierSummary, week: Boolean, lastSyncAt: Long, onCash: () -> Unit) {
+private fun StatsBody(summary: CourierSummary, week: Boolean, onCash: () -> Unit) {
   val p = PhoneV3.colors
   Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
     val s = if (week) summary.week else summary.today
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
       StatTile("تحویل‌شده", s.delivered.fa(), Icons.Outlined.TaskAlt, Modifier.weight(1f))
-      StatTile("ناموفق / برگشتی", s.failed.fa(), Icons.Outlined.ReportProblem, Modifier.weight(1f))
+      //  فقط «تحویل نشد» ِ خودِ پیک، به زمانِ همان رویداد (برگشتِ دکان این نیست)
+      StatTile("ناموفق", s.failed.fa(), Icons.Outlined.ReportProblem, Modifier.weight(1f))
     }
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
       StatTile("نقدِ گرفته‌شده", afn(s.collectedCashMinor), Icons.Outlined.Payments, Modifier.weight(1f))
@@ -441,7 +462,8 @@ private fun StatsBody(summary: CourierSummary, week: Boolean, lastSyncAt: Long, 
       CourierPrimaryButton("دیدنِ نقدِ من", onCash, Modifier.fillMaxWidth(), onDark = true, icon = Icons.Outlined.Payments)
     }
     Text(
-      (if (week) "از شنبهٔ همین هفته" else "از آغازِ امروز") + " · " + lastSyncText(lastSyncAt),
+      //  مرزها را سرور به وقتِ دکان ساخته است (آغازِ هفتهٔ دکان)
+      (if (week) "از آغازِ هفتهٔ دکان، ${formatMillis(s.from)}" else "از آغازِ امروزِ دکان") + " · " + asOfText(summary),
       style = courierText(12.sp), color = p.inkMuted, modifier = Modifier.padding(horizontal = 4.dp),
     )
   }
@@ -538,7 +560,7 @@ private fun AccountRow(icon: ImageVector, label: String, value: String, ltr: Boo
 /* ============================== «نقدِ من» ============================== */
 
 @Composable
-internal fun CourierCashPage(summary: CourierSummary?, lastSyncAt: Long, syncing: Boolean, onBack: () -> Unit, onRefresh: () -> Unit) {
+internal fun CourierCashPage(summary: CourierSummary?, staleError: String?, syncing: Boolean, onBack: () -> Unit, onRefresh: () -> Unit) {
   val p = PhoneV3.colors
   val ui = PhoneV3.ui
   Column(Modifier.fillMaxSize()) {
@@ -552,13 +574,13 @@ internal fun CourierCashPage(summary: CourierSummary?, lastSyncAt: Long, syncing
         EmptyCard("هنوز از دکان نیامده", "به اینترنت که وصل شوید، نقدِ در دست و تسویه‌ها این‌جا می‌آید.", if (syncing) null else onRefresh)
       }
     } else {
-      CashList(summary, lastSyncAt)
+      CashList(summary, staleError)
     }
   }
 }
 
 @Composable
-private fun CashList(summary: CourierSummary, lastSyncAt: Long) {
+private fun CashList(summary: CourierSummary, staleError: String?) {
   val p = PhoneV3.colors
   val ui = PhoneV3.ui
     LazyColumn(
@@ -566,12 +588,13 @@ private fun CashList(summary: CourierSummary, lastSyncAt: Long) {
       contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 28.dp),
       verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+      if (!staleError.isNullOrBlank()) item(key = "stale") { StaleNote(staleError) }
       item(key = "hero") { CashHero(summary) }
       item(key = "note") {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 4.dp)) {
           Icon(Icons.Outlined.Info, contentDescription = null, tint = p.icon, modifier = Modifier.size(16.dp))
           Spacer(Modifier.width(6.dp))
-          Text("تسویه را دکان ثبت می‌کند؛ این‌جا فقط دیدن است. " + lastSyncText(lastSyncAt), style = courierText(12.sp), color = p.inkMuted)
+          Text("تسویه را دکان ثبت می‌کند؛ این‌جا فقط دیدن است. " + asOfText(summary), style = courierText(12.sp), color = p.inkMuted)
         }
       }
       item(key = "un-h") { CourierSectionHead("تحویل‌شده، هنوز تسویه‌نشده") }
@@ -596,6 +619,16 @@ private fun CashList(summary: CourierSummary, lastSyncAt: Long) {
                 }
               }
               if (i < summary.unsettled.lastIndex) Box(Modifier.fillMaxWidth().height(1.dp).background(p.hairline))
+            }
+            //  فهرست تا ۵۰ می‌آید؛ جمعِ بالا همه را دارد
+            val more = summary.unsettledCount - summary.unsettled.size
+            if (more > 0) {
+              Box(Modifier.fillMaxWidth().height(1.dp).background(p.hairline))
+              Text(
+                "+${more.fa()} موردِ دیگر — در جمعِ «نقدِ در دست» آمده است",
+                style = courierText(13.sp, FontWeight.Medium), color = p.inkMuted,
+                modifier = Modifier.padding(vertical = 12.dp),
+              )
             }
           }
         }
@@ -633,8 +666,9 @@ private fun CashList(summary: CourierSummary, lastSyncAt: Long) {
 private fun CashHero(s: CourierSummary) {
   val p = PhoneV3.colors
   val dark = PhoneV3UiDark
-  val use = CourierBoardModel.capUse(s)
-  val fill by animateFloatAsState(use, if (Motion.enabled) tween(600, delayMillis = 120) else snap(), label = "capUse")
+  val pct = CourierBoardModel.capPercent(s)
+  val noCash = CourierBoardModel.noCash(s)
+  val fill by animateFloatAsState(pct / 100f, if (Motion.enabled) tween(600, delayMillis = 120) else snap(), label = "capUse")
   Column(Modifier.fillMaxWidth().courierDark(p).padding(18.dp)) {
     Text("نقدِ در دستِ شما", style = courierText(13.sp), color = p.onBlackMuted)
     Text(afn(s.cashInHandMinor), style = courierText(30.sp, FontWeight.Bold), color = p.onBlack)
@@ -642,17 +676,19 @@ private fun CashHero(s: CourierSummary) {
     Box(Modifier.fillMaxWidth().height(8.dp).background(p.blackRaised, CourierPillShape)) {
       Box(
         Modifier.fillMaxHeight().fillMaxWidth(fill)
-          .background(if (use >= 0.85f) dark.awaiting.fg else dark.primaryOnDark, CourierPillShape),
+          .background(if (pct >= 85) dark.awaiting.fg else dark.primaryOnDark, CourierPillShape),
       )
     }
     Spacer(Modifier.height(6.dp))
     Text(
-      if (s.cashCapMinor > 0) "پُریِ سقف (در دست + در راه): ${(use * 100).toInt().fa()}٪" else "سقفی برای شما تعیین نشده است",
+      //  سقفِ صفر در دکان یعنی «نقد نگیرد»: سفارشِ نقدی به این پیک سپرده نمی‌شود
+      if (noCash) "سقفِ نقدِ شما صفر است: نقد نگیرد — سفارشِ نقدی سپرده نمی‌شود"
+      else "پُریِ سقف (در دست + در راه): ${pct.fa()}٪",
       style = courierText(12.sp), color = p.onBlackMuted,
     )
     Spacer(Modifier.height(14.dp))
     Row(Modifier.fillMaxWidth()) {
-      CashFigure("سقف", afn(s.cashCapMinor), Modifier.weight(1f))
+      CashFigure("سقف", if (noCash) "نقد نگیرد" else afn(s.cashCapMinor), Modifier.weight(1f))
       CashFigure("در راه", afn(s.liveExpectedMinor), Modifier.weight(1f))
       CashFigure("جای خالی", afn(s.headroomMinor), Modifier.weight(1f))
     }

@@ -107,6 +107,7 @@ object CourierWire {
           )
         }
       },
+      unsettledCount = (long(o, "unsettledCount") ?: 0L).toInt(),
       settlements = (o["settlements"] as? JsonArray).orEmpty().mapNotNull { el ->
         (el as? JsonObject)?.let {
           CourierSettlement(

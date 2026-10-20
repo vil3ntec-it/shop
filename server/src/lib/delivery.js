@@ -21,6 +21,8 @@ const { one, many, now, tx } = db;
 const D = require('./delivery-states');
 const orders = require('./orders');
 const { ulid } = require('./ulid');
+const calendar = require('./calendar-core');
+const { localParts } = require('./storefront');
 const { stable } = require('./idempotency');
 const { can } = require('./permissions');
 const { sniff, MAX_BYTES: PHOTO_MAX_BYTES } = require('./product-photos');
@@ -810,22 +812,39 @@ function courierSettlementView(s) {
   };
 }
 
-function sinceOf(v, fallback, at) {
-  if (v === undefined || v === '') return fallback;
-  const x = Number(v);
-  if (!Number.isSafeInteger(x) || x < 0 || x > at) throw badRequest('آغازِ بازه معتبر نیست', 'bad_range');
-  return x;
+/**
+ * آغازِ «امروز» و «این هفته» به وقتِ دکان — منطقهٔ زمانیِ ویترین (§۳۱، پیش‌فرض
+ * Asia/Kabul؛ `storefront.localParts`) و آغازِ هفتهٔ دکان (`calendar-core.weekStartOf`،
+ * همتای `BusinessDay`؛ دکان هنوز قاعدهٔ هفتهٔ جدا ندارد ⇒ قاعدهٔ پیش‌فرضِ همان‌جا).
+ * ⛔ ساعتِ گوشیِ پیک مرجع نیست: گوشیِ جلوافتاده «امروزِ آینده» نمی‌فرستد.
+ * منطقه‌های زمانیِ بی ساعتِ تابستانی (کابل) دقیق‌اند؛ در منطقه‌های دیگر مرزِ
+ * هفته در روزِ تغییرِ ساعت تا یک ساعت جابه‌جا می‌شود.
+ */
+function periodStarts(at, timezone) {
+  let tz = timezone || 'Asia/Kabul';
+  let local;
+  try { local = localParts(at, tz); } catch { tz = 'Asia/Kabul'; local = localParts(at, tz); }
+  const today = at - local.minutes * 60_000 - (at % 60_000);
+  const weekDate = calendar.weekStartOf(local.date);
+  const back = calendar.jdnOfIso(local.date) - calendar.jdnOfIso(weekDate);
+  return { timezone: tz, date: local.date, weekDate, today, week: today - back * 86_400_000 };
 }
 
 /**
  * «نقدِ من» و آمارِ پیک (DLV-11/12؛ فقط خواندن). ⛔ فقط دادهٔ همین پیک در همین
  * دکان. «جای خالی» با همان سنجهٔ سپردن حساب می‌شود (در دست + موردِ انتظارِ
- * مأموریت‌های زنده در برابرِ سقف). آغازِ «امروز» و «هفته» را برنامه به وقتِ
- * خودِ گوشی می‌فرستد (روزِ دکان)؛ بی آن ۲۴ ساعت و ۷ روزِ گذشته.
+ * مأموریت‌های زنده در برابرِ سقف؛ سقفِ صفر = «نقد نگیرد»). مرزِ روز و هفته را
+ * سرور به وقتِ دکان می‌سازد (`periodStarts`).
  */
-async function courierSummary(shopId, courier, { today, week } = {}) {
+async function courierSummary(shopId, courier) {
   const at = now();
-  const from = { today: sinceOf(today, at - 86_400_000, at), week: sinceOf(week, at - 7 * 86_400_000, at) };
+  const shop = await one(
+    `SELECT s.name, COALESCE(sf.title, '') AS title, COALESCE(sf.contact_phone, '') AS phone,
+            COALESCE(sf.timezone, '') AS timezone
+       FROM shops s LEFT JOIN storefronts sf ON sf.shop_id = s.id WHERE s.id=$1`,
+    [shopId]
+  );
+  const from = periodStarts(at, shop?.timezone);
   const st = await cashStats(viaDb, shopId, courier.id);
   const cap = Number(courier.cash_cap_minor);
   const unsettled = await many(
@@ -833,6 +852,12 @@ async function courierSummary(shopId, courier, { today, week } = {}) {
       ORDER BY a.delivered_at DESC, a.id LIMIT 50`,
     [shopId, courier.id]
   );
+  //  شمارِ کل، تا فهرستِ ۵۰تایی بگوید «+N مورد دیگر» (جمعِ «در دست» همه را دارد)
+  const unsettledCount = Number((await one(
+    `SELECT COUNT(*)::int AS n FROM delivery_assignments
+      WHERE shop_id=$1 AND courier_id=$2 AND status='delivered' AND settlement_id=''`,
+    [shopId, courier.id]
+  )).n);
   const settlements = await many(
     'SELECT * FROM courier_settlements WHERE shop_id=$1 AND courier_id=$2 ORDER BY created_at DESC, id LIMIT 20',
     [shopId, courier.id]
@@ -840,25 +865,28 @@ async function courierSummary(shopId, courier, { today, week } = {}) {
   const period = async (since) => {
     const r = await one(
       `SELECT COUNT(*) FILTER (WHERE status='delivered' AND delivered_at >= $3)::int AS delivered,
-              COUNT(*) FILTER (WHERE status IN ('failed','returned') AND updated_at >= $3)::int AS failed,
               COALESCE(SUM(cash_collected_minor) FILTER (WHERE status='delivered' AND delivered_at >= $3), 0) AS collected,
               COALESCE(SUM(fare_minor) FILTER (WHERE status='delivered' AND delivered_at >= $3), 0) AS fares
          FROM delivery_assignments WHERE shop_id=$1 AND courier_id=$2`,
       [shopId, courier.id, since]
     );
+    //  «ناموفق» = مأموریت‌هایی که خودِ پیک در همین بازه «تحویل نشد» زد — به زمانِ
+    //  همان رویداد، نه updated_at (پس‌خواستن آن را جابه‌جا می‌کرد) و نه «برگشت»ِ دکان
+    const f = await one(
+      `SELECT COUNT(DISTINCT e.assignment_id)::int AS n
+         FROM delivery_events e JOIN delivery_assignments a ON a.id = e.assignment_id
+        WHERE a.shop_id=$1 AND a.courier_id=$2 AND e.shop_id=$1 AND e.kind='status'
+          AND e.to_status='failed' AND e.actor_type='courier' AND e.server_time >= $3`,
+      [shopId, courier.id, since]
+    );
     return {
-      from: since, delivered: Number(r.delivered), failed: Number(r.failed),
+      from: since, delivered: Number(r.delivered), failed: Number(f.n),
       collectedCashMinor: Number(r.collected), fareMinor: Number(r.fares),
     };
   };
-  const shop = await one(
-    `SELECT s.name, COALESCE(sf.title, '') AS title, COALESCE(sf.contact_phone, '') AS phone
-       FROM shops s LEFT JOIN storefronts sf ON sf.shop_id = s.id WHERE s.id=$1`,
-    [shopId]
-  );
   return {
     courier: { name: courier.name, active: courier.active === true },
-    shop: { name: shop?.name || shop?.title || '', phone: shop?.phone || '' },
+    shop: { name: shop?.name || shop?.title || '', phone: shop?.phone || '', timezone: from.timezone },
     cash: {
       inHandMinor: st.held, liveExpectedMinor: st.live_expected, capMinor: cap,
       headroomMinor: Math.max(0, cap - st.held - st.live_expected), liveCount: st.live,
@@ -870,6 +898,7 @@ async function courierSummary(shopId, courier, { today, week } = {}) {
         cashCollectedMinor: v.cashCollectedMinor, fareMinor: v.fareMinor,
       };
     }),
+    unsettledCount,
     settlements: settlements.map(courierSettlementView),
     stats: { today: await period(from.today), week: await period(from.week) },
     serverTime: at,
@@ -1282,7 +1311,7 @@ function staffActor(req) {
 
 module.exports = {
   FLAG_KEY, FEATURE_KEY, KEY_RE, DEFAULT_CASH_CAP_MINOR, CODE_MAX_ATTEMPTS,
-  stateOf, staffActor, courierOfUser, listCouriers, createCourier, updateCourier, enrollCourierMember,
+  periodStarts, stateOf, staffActor, courierOfUser, listCouriers, createCourier, updateCourier, enrollCourierMember,
   assign, regenerateCode, courierEvents, staffEvent, recall, missions, courierSummary, forOrder, board,
   putPhoto, listPhotos, getPhoto, settlementPreview, settle, listSettlements, getSettlement,
   externalCompanies, externalStatement, eventKey,
