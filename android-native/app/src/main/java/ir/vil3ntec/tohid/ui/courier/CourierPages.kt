@@ -105,7 +105,7 @@ private fun lastSyncText(at: Long): String =
 
 /** «تا کی» ِ عددهای نقد و آمار — زمانِ خودِ سرور در همان پاسخ، نه ساعتِ همگام‌سازیِ گوشی */
 private fun asOfText(s: CourierSummary): String =
-  if (s.serverTime <= 0) "زمانِ این عددها معلوم نیست" else "تا ${formatMillis(s.serverTime)} · ${clock(s.serverTime)} (زمانِ دکان)"
+  if (s.serverTime <= 0) "زمانِ این عددها معلوم نیست" else "تا ${formatMillis(s.serverTime)} · ${clock(s.serverTime)}، طبقِ سرور"
 
 /** تازه کردنِ «نقدِ من»/آمار نشد ⇒ پیدا، تا عددِ کهنه تازه دیده نشود */
 @Composable
