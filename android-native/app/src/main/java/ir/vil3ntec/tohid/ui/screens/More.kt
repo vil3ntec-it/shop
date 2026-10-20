@@ -40,6 +40,12 @@ import ir.vil3ntec.tohid.ui.theme.Shop
  */
 @Composable
 fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
+  //  گوشی نسخهٔ ۳ (بندِ F): کارت‌های گروهیِ r5 و «تنظیمات» در ته — `PhoneMoreScreen`.
+  //  کامپیوتر همین صفحهٔ پیشین را نگه می‌دارد.
+  if (!ir.vil3ntec.tohid.ui.Platform.DESKTOP) {
+    PhoneMoreScreen(d, onOpen = onOpen)
+    return
+  }
   val context = LocalContext.current
   val prefs = remember { context.getSharedPreferences("tohid", android.content.Context.MODE_PRIVATE) }
   //  شاگرد این ردیف‌ها را اصلاً نمی‌بیند
@@ -50,19 +56,7 @@ fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
   // برای عیب‌یابی می‌شود با همین کلید در تنظیماتِ برنامه عوضش کرد.
   val repo = remember { prefs.getString("update_repo", "vil3ntec-it/shop") ?: "vil3ntec-it/shop" }
 
-  /*
-   *  وضعیتِ به‌روزرسانی مالِ این صفحه نیست، مالِ خودِ برنامه است.
-   *
-   *  وقتی اینجا نگه داشته می‌شد، بیرون رفتن از صفحه هم دانلود را می‌کشت و
-   *  هم نوارِ پیشرفت را پاک می‌کرد. حالا با برگشتن، همان نوار سرِ جایش
-   *  است و کار ادامه دارد.
-   */
-  val status = UpdateManager.message
-  val found = UpdateManager.release
-  val progress = UpdateManager.progress
-  val busy = UpdateManager.busy
-  val ready = UpdateManager.ready
-  val needsPermission = UpdateManager.needsPermission
+  //  وضعیتِ به‌روزرسانی مالِ خودِ برنامه است (`UpdateManager`)، نه این صفحه — `UpdateControls`
 
   Column(
     Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)
@@ -222,7 +216,57 @@ fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
     if (BuildConfig.STORE != "bazaar") {
     Spacer(Modifier.height(20.dp))
     SectionTitle("به‌روزرسانی برنامه")
+    Panel { UpdateControls(repo) }
+    }
+
+    /*
+     *  «وضعیت» ته صفحه است، نه سرِ آن.
+     *
+     *  شمارشِ اجناس و فاکتورها خواندنی است ولی کاری با آن نمی‌شود کرد؛
+     *  چیزی که کاربر برای آن این صفحه را باز می‌کند، خودِ بخش‌هاست.
+     *  وقتی این پنل بالا بود، فهرستِ بخش‌ها زیرِ خطِ دید می‌افتاد و برای
+     *  رسیدن به «انبار» باید از روی شش عدد رد می‌شد.
+     */
+    Spacer(Modifier.height(20.dp))
+    SectionTitle("وضعیت")
     Panel {
+      InfoRow("نسخه", BuildConfig.VERSION_NAME)
+      InfoRow("اجناس", d.products.size.fa())
+      InfoRow("فاکتورها", d.sales.size.fa())
+      InfoRow("قرض‌داران", d.debtors.size.fa())
+      InfoRow("مصارف", d.expenses.size.fa())
+      InfoRow("تأمین‌کننده‌ها", d.suppliers.size.fa())
+    }
+
+    Spacer(Modifier.height(24.dp))
+  }
+}
+
+/** نشانیِ مخزنِ به‌روزرسانی — ثابت؛ فقط برای عیب‌یابی با همین کلید عوض می‌شود */
+@Composable
+internal fun rememberUpdateRepo(): String {
+  val context = LocalContext.current
+  return remember {
+    context.getSharedPreferences("tohid", android.content.Context.MODE_PRIVATE)
+      .getString("update_repo", "vil3ntec-it/shop") ?: "vil3ntec-it/shop"
+  }
+}
+
+/**
+ *  بررسی، دانلود و نصبِ نسخهٔ تازه — همان کارِ پیشینِ «بیشتر»، جدا شده تا
+ *  صفحهٔ «بیشتر»ِ گوشی (زیرصفحهٔ «نسخه و به‌روزرسانی») هم همین را بکشد.
+ *  وضعیت مالِ `UpdateManager` است، نه این صفحه: بیرون رفتن دانلود را نمی‌کشد.
+ */
+@Composable
+internal fun UpdateControls(repo: String) {
+  val context = LocalContext.current
+  val status = UpdateManager.message
+  val found = UpdateManager.release
+  val progress = UpdateManager.progress
+  val busy = UpdateManager.busy
+  val ready = UpdateManager.ready
+  val needsPermission = UpdateManager.needsPermission
+  Column {
       Text(
         "نسخهٔ تازه از همین‌جا گرفته و نصب می‌شود؛ اطلاعات دکان دست‌نخورده می‌ماند.",
         style = MaterialTheme.typography.bodySmall,
@@ -328,29 +372,6 @@ fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
         Text(it, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
       }
     }
-    }
-
-    /*
-     *  «وضعیت» ته صفحه است، نه سرِ آن.
-     *
-     *  شمارشِ اجناس و فاکتورها خواندنی است ولی کاری با آن نمی‌شود کرد؛
-     *  چیزی که کاربر برای آن این صفحه را باز می‌کند، خودِ بخش‌هاست.
-     *  وقتی این پنل بالا بود، فهرستِ بخش‌ها زیرِ خطِ دید می‌افتاد و برای
-     *  رسیدن به «انبار» باید از روی شش عدد رد می‌شد.
-     */
-    Spacer(Modifier.height(20.dp))
-    SectionTitle("وضعیت")
-    Panel {
-      InfoRow("نسخه", BuildConfig.VERSION_NAME)
-      InfoRow("اجناس", d.products.size.fa())
-      InfoRow("فاکتورها", d.sales.size.fa())
-      InfoRow("قرض‌داران", d.debtors.size.fa())
-      InfoRow("مصارف", d.expenses.size.fa())
-      InfoRow("تأمین‌کننده‌ها", d.suppliers.size.fa())
-    }
-
-    Spacer(Modifier.height(24.dp))
-  }
 }
 
 @Composable

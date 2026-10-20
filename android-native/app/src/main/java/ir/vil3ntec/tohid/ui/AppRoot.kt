@@ -69,6 +69,9 @@ private val PAGE_TITLES = mapOf(
   "team" to "کارمندان دکان",
   "orders" to "سفارش‌ها",
   "storefront" to "ویترینِ اینترنتی",
+  //  phone v3 §F: جست‌وجوی کامل و ویرایشگرِ نوارِ پایین
+  ir.vil3ntec.tohid.ui.components.common.PhoneNav.SEARCH to "جست‌وجو",
+  ir.vil3ntec.tohid.ui.components.common.PhoneNav.EDITOR to "نوارِ پایین",
 )
 
 /**
@@ -425,9 +428,46 @@ fun AppRoot(
     }
   }
 
-  fun open(target: String) {
-    if (TABS.any { it.id == target }) { tab = target; sub = null } else sub = target
+  /*
+   *  phone v3 §F/§F2: نوارِ پایینِ گوشی قابلِ تنظیم است (`NavLayouts`). هر چه در نوار
+   *  نشسته «تب» است (بی دکمهٔ برگشت)، بقیه زیرصفحه. کامپیوتر و صفحهٔ پهن همان `TABS`.
+   */
+  val phoneNav = !wide
+  val navAllowed = ir.vil3ntec.tohid.ui.components.common.NavCatalog.allowed(
+    canManage = ir.vil3ntec.tohid.data.ShopRole.canOpenSettings(context),
+    ordersLive = OrdersLive.enabled,
+  )
+  val navUser = runCatching { syncState.accountId }.getOrDefault("")
+  LaunchedEffect(navUser, navAllowed) {
+    ir.vil3ntec.tohid.ui.components.common.PhoneNav.layout.value =
+      ir.vil3ntec.tohid.ui.components.common.PhoneNav.load(context, navAllowed)
   }
+  val navLayout = ir.vil3ntec.tohid.ui.components.common.NavLayouts.normalize(
+    ir.vil3ntec.tohid.ui.components.common.PhoneNav.layout.value, navAllowed,
+  )
+  val navRoutes = navLayout.ids.mapNotNull { ir.vil3ntec.tohid.ui.components.common.NavCatalog.of(it)?.route }.toSet() + "dashboard"
+
+  fun open(target: String) {
+    val isTab = if (phoneNav) target in navRoutes else TABS.any { it.id == target }
+    if (isTab) { tab = target; sub = null } else sub = target
+  }
+  //  گوشی: برگشت از تبِ دیگر به خانه، نه بستنِ برنامه
+  BackHandler(enabled = phoneNav && sub == null && tab != "dashboard") { tab = "dashboard" }
+  //  اشتراکی که تا ۳ روزِ دیگر تمام می‌شود ⇐ قرصِ سیاهِ «تمدیدِ اشتراک» بالای نوار (r10)
+  var renewDays by remember { mutableStateOf<Int?>(null) }
+  LaunchedEffect(tab, sub, loaded) {
+    renewDays = runCatching { ir.vil3ntec.tohid.sync.v1.SoftLock.warnDays(context) }.getOrNull()?.takeIf { it in 0..3 }
+  }
+  val current = sub ?: tab
+  //  نوار روی صفحهٔ فروش نیست (نوارِ سیاهِ سبد جایش است) و در ویرایشگرِ خودش هم پیش‌نمایشِ خودش را دارد
+  val navVisible = phoneNav && current !in setOf("sale", "quick", ir.vil3ntec.tohid.ui.components.common.PhoneNav.EDITOR) &&
+    !ir.vil3ntec.tohid.ui.components.pos.PhoneCartUi.sheetOpen.value
+  val navReserve = ir.vil3ntec.tohid.ui.components.common.PhoneNav.RESERVE +
+    (if (renewDays != null) ir.vil3ntec.tohid.ui.components.common.PhoneNav.RENEW_RESERVE else 0.dp)
+  //  صفحه‌هایی که سربرگِ خودشان را دارند (r7 خانه، جست‌وجو، ویرایشگرِ نوار)
+  val ownHeader = phoneNav && current in setOf(
+    "dashboard", ir.vil3ntec.tohid.ui.components.common.PhoneNav.SEARCH, ir.vil3ntec.tohid.ui.components.common.PhoneNav.EDITOR,
+  )
 
   //  ویترین (فاز ۴): فقط وقتی سرور می‌گوید روشن است، بخشش دیده می‌شود
   LaunchedEffect(Unit) { runCatching { StorefrontGate.refresh(context) } }
@@ -517,7 +557,7 @@ fun AppRoot(
         onMenu = { onMenuPress() },
         onSearch = { AppNav.palette.value = true },
         onOpen = ::open,
-      ) else
+      ) else if (!ownHeader)
       TohidTopBar(
         title = PAGE_TITLES[sub ?: tab] ?: "فروشگاه من",
         d = data,
@@ -526,7 +566,7 @@ fun AppRoot(
         onSettings = { sub = "settings" },
         //  کلیدِ حساب، صفحهٔ حساب را باز می‌کند نه صفحهٔ ورود را.
         //  کسی که سال‌ها وارد بوده، با زدنش فرمِ ورود می‌دید.
-        onAccount = { sub = "profile" },
+        onAccount = { open("profile") },
         onOpen = ::open,
         //  زیرصفحه که باز است، سربرگ راهِ برگشت نشان می‌دهد؛ روی تبِ
         //  اصلی جایی برای برگشتن نیست و دکمه هم ساخته نمی‌شود
@@ -541,7 +581,8 @@ fun AppRoot(
        *  نمی‌شود و خروجی و چاپ باز می‌مانند؛ همین را هم صریح می‌گوید،
        *  وگرنه کاربر گمان می‌کند دفترش رفته.
        */
-      SubscriptionBanner { sub = "myplan" }
+      //  خانهٔ گوشی همین را در کارت‌های «هشدارها و پیام‌ها» دارد
+      if (!(phoneNav && current == "dashboard")) SubscriptionBanner { sub = "myplan" }
       //  نسخهٔ تازه — بررسیِ خودکار و نصب با یک دکمه (اندروید و کامپیوتر)
       UpdateBanner()
       }
@@ -575,13 +616,7 @@ fun AppRoot(
     //  «نسخهٔ دسکتاپ نباید نسخهٔ موبایلِ بزرگ‌شده باشد»
     bottomBar = {
       if (Platform.DESKTOP) DeskStatusBar(data)
-      //  قرصِ شناور با تبِ فعالِ تیره (phone-ui، تصویرِ مرجعِ ۳) — همان تب‌ها و همان مقصدها
-      //  برگهٔ تیرهٔ سبد که باز است، تا ته می‌رسد و نوار رویش نمی‌نشیند
-      else if (!wide && !ir.vil3ntec.tohid.ui.components.pos.PhoneCartUi.sheetOpen.value) ir.vil3ntec.tohid.ui.components.common.PhoneNavBar(
-        tabs = TABS.map { ir.vil3ntec.tohid.ui.components.common.NavTab(it.id, it.label, it.icon) },
-        current = if (sub == null) tab else null,
-        onPick = { tab = it; sub = null },
-      )
+      //  گوشی: نوارِ شناورِ r10 پایینِ محتوا می‌نشیند (پایین‌تر، درونِ صفحه) تا خانه زیرش دیده شود
     },
   ) { padding ->
     editProduct?.let { form ->
@@ -666,12 +701,35 @@ fun AppRoot(
         railMode == RailMode.COMPACT -> DESK_RAIL_COMPACT
         else -> 0.dp
       }
-      PageWidth(Modifier.padding(start = railPad)) {
+      //  جای نوارِ شناور: خانه خودش زیرِ نوار می‌کشد؛ صفحهٔ بی‌نوار (فروش) فقط نوارِ سیستم
+      val pageBottom = when {
+        !phoneNav -> 0.dp
+        navVisible && current == "dashboard" -> 0.dp
+        navVisible -> navReserve + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+        else -> WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+      }
+      //  §G: «حساب»، «تنظیمات»، «بیشتر»، جست‌وجو و ویرایشگرِ نوار از سمتِ پایان می‌لغزند
+      val sideRoutes = setOf(
+        "more", "profile", "settings",
+        ir.vil3ntec.tohid.ui.components.common.PhoneNav.SEARCH, ir.vil3ntec.tohid.ui.components.common.PhoneNav.EDITOR,
+      )
+      val endSign = if (androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl) -1 else 1
+      PageWidth(Modifier.padding(start = railPad, bottom = pageBottom)) {
       AnimatedContent(
         targetState = sub ?: tab,
         transitionSpec = {
-          (fadeIn(tween(220)) + slideInVertically(tween(260)) { it / 22 })
-            .togetherWith(fadeOut(tween(150)))
+          when {
+            !Motion.enabled -> androidx.compose.animation.EnterTransition.None togetherWith androidx.compose.animation.ExitTransition.None
+            phoneNav && targetState in sideRoutes ->
+              (androidx.compose.animation.slideInHorizontally(tween(220)) { w -> endSign * w / 3 } + fadeIn(tween(220)))
+                .togetherWith(fadeOut(tween(140)))
+            phoneNav && initialState in sideRoutes ->
+              fadeIn(tween(200)).togetherWith(
+                androidx.compose.animation.slideOutHorizontally(tween(200)) { w -> endSign * w / 3 } + fadeOut(tween(200)),
+              )
+            else -> (fadeIn(tween(220)) + slideInVertically(tween(260)) { it / 22 })
+              .togetherWith(fadeOut(tween(150)))
+          }
         },
         label = "page",
       ) { current ->
@@ -712,7 +770,19 @@ fun AppRoot(
           }
         "expenses" -> ExpensesScreen(store, data, snackbar)
         "dashboard" -> if (Platform.DESKTOP) DeskDashboardScreen(data, ::open) { id -> openProduct = id; sub = "product" }
-          else DashboardScreen(data, ::open)
+          else DashboardScreen(data, bottomReserve = navReserve, onOpen = ::open)
+        //  phone v3 §F: جست‌وجوی کامل (کالا، مشتری، فاکتور، بخش) با بارکد
+        ir.vil3ntec.tohid.ui.components.common.PhoneNav.SEARCH -> PhoneSearchScreen(
+          d = data,
+          onOpen = ::open,
+          onProduct = { id -> openProduct = id; sub = "product" },
+          onBack = { if (sub != null) sub = null else open("dashboard") },
+          bottomReserve = 0.dp,
+        )
+        //  §F2: ویرایشگرِ نوار — از نگه‌داشتنِ نوار و از تنظیمات ← عمومی ← «نوارِ پایین»
+        ir.vil3ntec.tohid.ui.components.common.PhoneNav.EDITOR -> NavEditorScreen(navAllowed) {
+          if (sub != null) sub = null else open("dashboard")
+        }
         "product" -> {
           val id = openProduct
           if (id == null) sub = null
@@ -783,7 +853,7 @@ fun AppRoot(
         "profile" -> ProfileScreen(
           store = store,
           snackbar = snackbar,
-          onBack = { sub = null },
+          onBack = { if (sub != null) sub = null else open("dashboard") },
           onSignIn = { authOpen = true },
           onSubscription = { sub = "vip" },
         )
@@ -795,6 +865,21 @@ fun AppRoot(
       }
       }
       }
+      //  phone v3 §F/§F2: نوارِ شناورِ r10 — دایرهٔ شروع، قرص، دایرهٔ پایان؛ نگه‌داشتن = ویرایشگر
+      if (navVisible) ir.vil3ntec.tohid.ui.components.common.PhoneNavBar(
+        layout = navLayout,
+        current = current,
+        onPick = { item ->
+          if (item.id == ir.vil3ntec.tohid.ui.components.common.NavCatalog.SCAN) {
+            ir.vil3ntec.tohid.ui.components.common.PhoneNav.scanRequest.value = true
+          }
+          open(item.route)
+        },
+        onEdit = { open(ir.vil3ntec.tohid.ui.components.common.PhoneNav.EDITOR) },
+        modifier = Modifier.align(Alignment.BottomCenter),
+        renewDays = renewDays,
+        onRenew = { open("vip") },
+      )
     }
   }
   }
