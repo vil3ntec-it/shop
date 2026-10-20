@@ -6,6 +6,7 @@ import ir.vil3ntec.tohid.sync.v1.SyncStateV1
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -31,13 +32,17 @@ class RestoreReplayDesktopTest {
     assertEquals(0, q.pushFront(emptyList()))
   }
 
-  @Test fun `دوران و cursor ِ پایین‌آمده با هم روی دیسک`() {
+  @Test fun `دوران و «در انتظارِ ساختنِ دوباره» با هم روی دیسک`() {
     val s = SyncStateV1(DesktopContext, key)
     s.cursor = 120
     s.epoch = "ep_old"
-    assertTrue(s.commitEpoch("ep_new", 100))
+    assertFalse(s.restorePending)
+    assertTrue(s.commitRestore("ep_new", true))
     val again = SyncStateV1(DesktopContext, key)
     assertEquals("ep_new", again.epoch)
-    assertEquals(100L, again.cursor)
+    assertTrue(again.restorePending)
+    assertEquals("cursor دست نخورد (Snapshot عوضش می‌کند)", 120L, again.cursor)
+    assertTrue(s.commitRestore("ep_new", false))
+    assertFalse(SyncStateV1(DesktopContext, key).restorePending)
   }
 }

@@ -371,6 +371,50 @@
   }
 
   /* ==========================================================
+     §۹.۵ — سرور از پشتیبان برگشت (`server/src/lib/sync-epoch.js`)
+     ----------------------------------------------------------
+     «دورانِ بازیابی» فقط با بازیابی عوض می‌شود. عوض شده و این مرورگر پس از پایه چیزی
+     دیده ⇒ «در انتظار»: Pull نه (opِ دوباره‌فرستادهٔ برنامه‌های دیگر روی دفترِ کهنه دو بار
+     می‌نشست)، صف فرستاده می‌شود و بعد دفتر از Snapshot از نو.
+     ⚠️ وب دفترچهٔ opهای فرستاده ندارد (سهمیهٔ localStorage با دفترِ خودِ دکان شریک است)، پس
+     opهای «اعمال‌شده»ی گم‌شدهٔ همین مرورگر دوباره نمی‌روند — فقط دو بار نشاندن بسته است.
+     سرورِ کهنه یا خاموش (۴۰۴) ⇒ همان رفتارِ پیشین.
+     ========================================================== */
+  function epochOf(r) {
+    var ep = r && r.epoch;
+    if (!ep || typeof ep.id !== 'string' || !ep.id) return null;
+    var base = Number(ep.base);
+    var head = Number(ep.head);
+    if (!Number.isFinite(base) || !Number.isFinite(head) || base < 0 || head < 0) return null;
+    return { id: ep.id, base: Math.min(base, head), head: head };
+  }
+
+  async function checkEpoch() {
+    var ep;
+    try { ep = epochOf(await acc.authFetch('/api/shop/sync-epoch')); } catch (e) { return; }
+    if (!ep) return;
+    var st = state();
+    var known = st.epoch || '';
+    var cursor = Number(st.cursor || 0);
+    var restored = (known !== '' && known !== ep.id) || cursor > ep.head;
+    if (restored && cursor > ep.base) patchState({ epoch: ep.id, restorePending: true });
+    else if (known !== ep.id) patchState({ epoch: ep.id });
+  }
+
+  /** پس از خالی شدنِ صف: دفتر = Snapshot؛ ذخیره‌ای که وسطِ گرفتن رسید ⇒ این بار نه */
+  async function rebuildFromServer() {
+    var r = await acc.authFetch('/api/sync/v1/snapshot');
+    if (queue().size() > 0) return false;
+    var data = ledger.read();
+    if (!data) return false;
+    var next = core.fromSnapshot(r, data);
+    ledger.write(next);
+    setShadow(next);
+    patchState({ cursor: Number(r.cursor || 0), snapshotAt: Date.now(), restorePending: false });
+    return true;
+  }
+
+  /* ==========================================================
      ۴) حلقهٔ اصلی
      ========================================================== */
   async function pump() {
@@ -381,6 +425,7 @@
     announce();
     try {
       ensureListShadow();
+      await checkEpoch();
       var head = 0;
       var q = queue();
       var guard = 0;
@@ -391,7 +436,8 @@
         if (!out.sent) break;
         head = out.head;
       }
-      var pulled = await pullOnce();
+      if (state().restorePending && queue().size() === 0 && await rebuildFromServer()) head = 1;
+      var pulled = state().restorePending ? 0 : await pullOnce();
       succeeded();
       if (pulled || head) announce();
     } catch (e) {
@@ -407,12 +453,16 @@
      ۵) Snapshot — گوشیِ نو، یک بار
      ========================================================== */
   async function restoreFromServer() {
+    //  §۹.۵: دورانِ پیش از Snapshot — دفتر حالا همان سرور است، پس همان دوران
+    var ep = null;
+    try { ep = epochOf(await acc.authFetch('/api/shop/sync-epoch')); } catch (e) { /* سرورِ کهنه */ }
     var r = await acc.authFetch('/api/sync/v1/snapshot');
     var data = ledger.read() || {};
     var next = core.fromSnapshot(r, data);
     ledger.write(next);
     setShadow(next);
     patchState({ cursor: Number(r.cursor || 0), snapshotAt: Date.now(), lastOkAt: Date.now(), lastError: '' });
+    if (ep) patchState({ epoch: ep.id, restorePending: false });
     announce();
     return { rows: Number(r.rows || 0), cursor: Number(r.cursor || 0) };
   }

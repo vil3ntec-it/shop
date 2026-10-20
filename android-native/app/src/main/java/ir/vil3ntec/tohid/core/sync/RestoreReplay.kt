@@ -12,35 +12,33 @@ import java.io.RandomAccessFile
 import kotlin.math.min
 
 /**
- *  سرور از پشتیبان برگشت؟ opهای «اعمال‌شده»ای که دیگر ندارد دوباره برود — §۹.۵
- *  («بازیابی تا آخرین پشتیبان و سپس اعمالِ opهای صف»)، سناریوی E2E-OPS-14.replay.
+ *  سرور از پشتیبان برگشت؟ — §۹.۵ («بازیابی تا آخرین پشتیبان و سپس اعمالِ opهای صف»)،
+ *  سناریوی E2E-OPS-14.replay.
  *
  *  ── مشکل ─────────────────────────────────────────────────────────────
  *  پس از بازیابیِ سرور، فروشی که پس از پشتیبان رسیده بود روی سرور نیست، ولی دستگاه
  *  آن را «applied» گرفته و از صف بیرون کرده؛ cursorش هم از سرِ دفترِ سرور جلوتر است.
- *  پس هیچ‌وقت دوباره نمی‌رود. و opهای تازهٔ دستگاه‌های دیگر که شمارهٔ کوچک‌تر از
- *  cursor ِ این دستگاه می‌گیرند، هرگز به این دستگاه نمی‌رسند.
+ *  دفترِ دستگاه هم opهای دیگران را به ترتیبِ پیش از بازیابی نشانده — ترتیبی که سرورِ
+ *  برگشته دیگر ندارد.
  *
  *  ── راه ──────────────────────────────────────────────────────────────
- *  سرور با هر بالا آمدن «دوران»ی تازه دارد (`server/src/lib/sync-epoch.js`): `id`،
- *  `base` (سرِ دفترِ همین حساب در لحظهٔ بالا آمدن) و `head`. دستگاه:
- *   ۱) `id` عوض شده (یا cursor از `head` جلوتر است) ⇒ opهای پذیرفته‌شدهٔ **خودش** با
- *      `server_seq > base` را با **همان op_id** جلوی صف می‌گذارد. سرور op_id را
- *      می‌شناسد ⇒ «duplicate»؛ نمی‌شناسد ⇒ دوباره «applied». هیچ opِ تازه‌ای ساخته
- *      نمی‌شود (F0-05).
- *   ۲) cursor تا `base` پایین می‌آید ⇒ opهای تازهٔ دیگران پس از بازیابی هم می‌رسند.
- *   ۳) opِ رسیده‌ای که op_idش را پیش‌تر نشانده یا فرستاده (`ReplayBook.unknown`)
- *      دوباره نشانده نمی‌شود — دستگاهِ دیگر هم opهای گم‌شده‌اش را دوباره می‌فرستد و
- *      `$inc`ِ تکراری موجودی را دو بار کم می‌کرد.
- *  بالا آمدنِ عادی (بی بازیابی): `base` = سرِ دفتر ⇒ cursor عوض نمی‌شود و opِ بالای
- *  `base` نیست ⇒ هیچ کاری.
+ *  سرور «دورانِ بازیابی» دارد (`server/src/lib/sync-epoch.js`): `id` فقط با بازیابی عوض
+ *  می‌شود (نه با بالا آمدنِ عادی) و `base` سرِ دفترِ همین حساب در لحظهٔ بازیابی است.
+ *  دستگاه، اگر `id` عوض شده و پس از `base` چیزی دیده یا فرستاده:
+ *   ۱) opهای پذیرفته‌شدهٔ **خودش** با `server_seq > base` را با **همان op_id** جلوی صف
+ *      می‌گذارد (`ReplayBook`) — سرور می‌شناسد ⇒ «duplicate»، نمی‌شناسد ⇒ دوباره «applied».
+ *   ۲) «در انتظارِ ساختنِ دوباره» می‌ماند: Pull نمی‌کند تا صف خالی شود.
+ *   ۳) دفتر را از Snapshot ِ سرور از نو می‌سازد و opهای همین حالا در صف را رویش
+ *      می‌نشاند؛ سایه و cursor با آن (ژورنالِ `SyncCommit`). از این پس همه‌چیز به ترتیبِ
+ *      سرور — opِ دوباره‌فرستادهٔ دستگاهِ دیگر یک بار می‌نشیند و همهٔ دستگاه‌ها یکی می‌شوند.
+ *  بالا آمدنِ عادیِ سرور: همان `id` ⇒ هیچ کاری.
  *
- *  منطقِ خالص، بی اندروید — همان را `SyncV1Engine`، `SyncV3Engine` و دستگاهِ آزمونِ
+ *  منطقِ خالص، بی اندروید — همان را `V1Restore`، `SyncV3Engine` و دستگاهِ آزمونِ
  *  سرتاسری (`server/test/e2e/lib/native.mjs`) می‌خوانند.
  */
 object RestoreReplay {
 
-  /** «دوران»ی که سرور می‌گوید: `GET /api/shop/sync-epoch` (v1) یا `epoch` در pull ِ v3. */
+  /** «دورانِ بازیابی» که سرور می‌گوید: `GET /api/shop/sync-epoch` (v1) یا `epoch` در pull ِ v3. */
   data class Epoch(val id: String, val base: Long, val head: Long) {
     companion object {
       /** `{id, base, head}`؛ هر چیزِ ناقص ⇒ null (سرورِ کهنه یا خاموش ⇒ همان رفتارِ پیشین) */
@@ -57,67 +55,58 @@ object RestoreReplay {
   }
 
   /**
-   *  @property epoch       دورانی که از این پس نگه داشته می‌شود
-   *  @property cursor      cursorی که pull از آن ادامه می‌دهد
-   *  @property replayAbove null ⇒ کاری نیست؛ وگرنه opهای پذیرفته‌شدهٔ خودِ دستگاه با
-   *            `server_seq` بزرگ‌تر از این (یا نامعلوم) دوباره فرستاده می‌شوند
+   *  @property epoch   دورانی که از این پس نگه داشته می‌شود
+   *  @property restore true ⇒ opهای خودِ دستگاه بالای `base` دوباره و دفتر از Snapshot از نو
+   *  @property base    پایهٔ بازیابی
    */
-  data class Plan(val epoch: String, val cursor: Long, val replayAbove: Long?) {
-    val restored: Boolean get() = replayAbove != null
-  }
+  data class Plan(val epoch: String, val restore: Boolean, val base: Long)
 
   /**
-   *  @param known  دورانی که این حساب آخرین بار دید؛ خالی ⇒ نخستین بار
-   *  @param cursor cursor ِ همین حالا
-   *  @param server دورانِ سرور؛ null ⇒ هیچ تغییری
+   *  @param known     دورانی که این حساب آخرین بار دید؛ خالی ⇒ نخستین بار
+   *  @param cursor    cursor ِ همین حالا
+   *  @param server    دورانِ سرور؛ null ⇒ هیچ تغییری
+   *  @param sentAbove آیا این دستگاه opی با `server_seq` بالای این پایه فرستاده است
    */
-  fun plan(known: String, cursor: Long, server: Epoch?): Plan {
-    if (server == null) return Plan(known, cursor, null)
+  fun plan(known: String, cursor: Long, server: Epoch?, sentAbove: (Long) -> Boolean = { false }): Plan {
+    if (server == null) return Plan(known, false, 0)
+    val base = min(server.base, server.head)
     val rotated = known.isNotEmpty() && known != server.id
     //  cursor جلوتر از سرِ دفترِ سرور فقط با برگشتنِ سرور ممکن است — حتی با همان دوران
-    //  (بازیابی بی بالا آمدنِ دوباره) یا نخستین بار (برنامه پس از بازیابی به‌روز شد)
+    //  (بازیابی از پشتیبانِ بی نشان) یا نخستین بار (برنامه پس از بازیابی به‌روز شد)
     val behind = cursor > server.head
-    if (!rotated && !behind) return Plan(server.id, cursor, null)
-    val base = min(server.base, server.head)
-    return Plan(server.id, min(cursor, base), base)
+    if (!rotated && !behind) return Plan(server.id, false, base)
+    //  دستگاهی که پس از پایه هیچ ندیده و نفرستاده چیزی برای جبران ندارد: opهای دوباره‌فرستادهٔ
+    //  دیگران برایش تازه‌اند و یک بار می‌نشینند
+    return Plan(server.id, cursor > base || sentAbove(base), base)
   }
 }
 
 /**
- *  دفترچهٔ کنارِ صف برای `RestoreReplay`، هر حساب جدا:
- *   • `…-sent.jsonl` — opهای **خودِ** این دستگاه که سرور پذیرفت (applied/duplicate)، با
- *     `server_seq`؛ برای دوباره فرستادن پس از بازیابی. آخرین `SENT_CAP` تا.
- *   • `…-seen.jsonl` — op_idِ opهای رسیده‌ای که روی دفتر نشستند؛ برای اینکه opِ دوباره
- *     فرستاده‌شدهٔ دستگاهِ دیگر دو بار ننشیند. آخرین `SEEN_CAP` تا.
+ *  دفترچهٔ opهای **خودِ** این دستگاه که سرور پذیرفت (applied/duplicate)، با `server_seq` —
+ *  برای دوباره فرستادن پس از بازیابیِ سرور. آخرین `CAP` تا، هر حساب جدا.
  *
- *  ⚠️ فقط افزودن (هر خط یک رکورد، با fsync)؛ خطِ نیمه‌کارهٔ قطعِ برق نادیده گرفته
- *  می‌شود. فشرده کردن با `DiskWrite` (F0-01).
+ *  ⚠️ پیش از بیرون رفتن از صف نوشته می‌شود؛ opِ بی شماره (`seq ≤ 0`) نوشته نمی‌شود.
+ *  ⚠️ فقط افزودن (هر خط یک رکورد، با fsync)؛ خطِ نیمه‌کارهٔ قطعِ برق نادیده گرفته می‌شود.
+ *  فشرده کردن با `DiskWrite` (F0-01).
  *  ⚠️ هیچ شکستی این‌جا همگام‌سازی را نمی‌خواباند: نوشتنِ ناموفق فقط یعنی آن op پس از
  *  بازیابیِ بعدی دوباره نمی‌رود — همان رفتارِ پیش از این دفترچه.
- *  ⚠️ «دیده شد» فقط **پس از** نشستن روی دفتر نوشته می‌شود: اگر پیش از آن بسته شود،
- *  همان opها با cursor ِ قدیم دوباره می‌آیند و این بار نشانده می‌شوند.
  */
-class ReplayBook(
-  private val sentFile: File,
-  private val seenFile: File,
-  private val sentCap: Int = SENT_CAP,
-  private val seenCap: Int = SEEN_CAP,
-) {
+class ReplayBook(private val file: File, private val cap: Int = CAP) {
 
   /** یک opِ پذیرفته‌شده: `body` همان چیزی است که دوباره فرستاده می‌شود */
   data class Sent(val id: String, val seq: Long, val body: JsonObject)
 
   private val json = Json { ignoreUnknownKeys = true; isLenient = true }
-  private var known: HashSet<String>? = null
-  private var sentLines = 0
-  private var seenLines = 0
+  private var ids: HashSet<String>? = null
+  private var top = 0L
+  private var lines = 0
 
-  /** opهای خودِ دستگاه که سرور پذیرفت — پس از `ack`ِ صف */
+  /** opهای خودِ دستگاه که سرور پذیرفت — **پیش از** `ack`ِ صف */
   @Synchronized
   fun sent(items: List<Sent>) {
-    val ok = items.filter { ID.matches(it.id) }
+    val ok = items.filter { it.seq > 0 && ID.matches(it.id) }
     if (ok.isEmpty()) return
-    val ids = loaded()
+    val set = loaded()
     val text = buildString {
       for (s in ok) {
         append(buildJsonObject {
@@ -128,110 +117,94 @@ class ReplayBook(
         append('\n')
       }
     }
-    if (!append(sentFile, text)) return
-    ok.forEach { ids += it.id }
-    sentLines += ok.size
-    if (sentLines > sentCap + sentCap / 2) { sentLines = compact(sentFile, sentCap, sentLines); known = null }
+    if (!append(text)) return
+    ok.forEach { set += it.id; if (it.seq > top) top = it.seq }
+    lines += ok.size
+    if (lines > cap + cap / 2) { compact(); ids = null }
   }
 
-  /** op_idِ opهای رسیده که روی دفتر نشستند — پس از `SyncCommit.absorb` */
+  /** پیش‌تر پذیرفته شده بود؟ (ردِ دوباره‌فرستاده «انجام‌شده» است، نه ردشده‌ای که کاربر ببیند) */
   @Synchronized
-  fun seen(ids: Collection<String>) {
-    val ok = ids.filter { ID.matches(it) }
-    if (ok.isEmpty()) return
-    val set = loaded()
-    if (!append(seenFile, ok.joinToString("") { it + "\n" })) return
-    set += ok
-    seenLines += ok.size
-    if (seenLines > seenCap + seenCap / 2) { seenLines = compact(seenFile, seenCap, seenLines); known = null }
-  }
+  fun wasSent(id: String): Boolean = id.isNotEmpty() && id in loaded()
 
+  /** opی با شمارهٔ بالای این پایه هست؟ */
   @Synchronized
-  fun knows(id: String): Boolean = id.isNotEmpty() && id in loaded()
-
-  /** فقط آن‌هایی که این دستگاه نه فرستاده و نه نشانده است — ترتیب همان */
-  @Synchronized
-  fun <T> unknown(items: List<T>, idOf: (T) -> String): List<T> {
-    if (items.isEmpty()) return items
-    val set = loaded()
-    if (set.isEmpty()) return items
-    return items.filter { idOf(it) !in set }
-  }
+  fun hasAbove(base: Long): Boolean { loaded(); return top > base }
 
   /**
-   *  opهای پذیرفته‌شده با `server_seq > base` (یا نامعلوم) به ترتیبِ نخستین فرستادن.
-   *  همان op اگر دو بار پذیرفته شده (پس از بازیابیِ پیشین)، آخرین شماره‌اش حساب است.
+   *  opهای پذیرفته‌شده با `server_seq > base` به ترتیبِ نخستین فرستادن. همان op اگر دو بار
+   *  پذیرفته شده (پس از بازیابیِ پیشین)، آخرین شماره‌اش حساب است.
    */
   @Synchronized
   fun replayAbove(base: Long): List<Sent> {
     val byId = LinkedHashMap<String, Sent>()
-    for (line in lines(sentFile)) {
+    for (line in read()) {
       val s = parse(line) ?: continue
       val prev = byId[s.id]
       byId[s.id] = if (prev == null) s else prev.copy(seq = s.seq)
     }
-    return byId.values.filter { it.seq <= 0 || it.seq > base }
+    return byId.values.filter { it.seq > base }
   }
 
   @Synchronized
-  fun sentCount(): Int { loaded(); return sentLines }
-
-  @Synchronized
-  fun seenCount(): Int { loaded(); return seenLines }
+  fun count(): Int { loaded(); return lines }
 
   private fun loaded(): HashSet<String> {
-    known?.let { return it }
+    ids?.let { return it }
     val set = HashSet<String>()
-    var sent = 0
-    for (line in lines(sentFile)) { val s = parse(line) ?: continue; set += s.id; sent++ }
-    var seen = 0
-    for (line in lines(seenFile)) { val id = line.trim(); if (ID.matches(id)) { set += id; seen++ } }
-    sentLines = sent
-    seenLines = seen
-    known = set
+    var n = 0
+    var max = 0L
+    for (line in read()) {
+      val s = parse(line) ?: continue
+      set += s.id
+      n++
+      if (s.seq > max) max = s.seq
+    }
+    lines = n
+    top = max
+    ids = set
     return set
   }
 
   private fun parse(line: String): Sent? = runCatching {
     val o = json.parseToJsonElement(line) as? JsonObject ?: return null
     val id = (o["id"] as? JsonPrimitive)?.content ?: return null
-    val seq = (o["q"] as? JsonPrimitive)?.content?.toLongOrNull() ?: 0L
+    val seq = (o["q"] as? JsonPrimitive)?.content?.toLongOrNull() ?: return null
     val body = o["op"] as? JsonObject ?: return null
-    if (!ID.matches(id)) null else Sent(id, seq, body)
+    if (seq <= 0 || !ID.matches(id)) null else Sent(id, seq, body)
   }.getOrNull()
 
-  private fun lines(f: File): List<String> =
-    runCatching { if (f.exists()) f.readLines(Charsets.UTF_8).filter { it.isNotBlank() } else emptyList() }
+  private fun read(): List<String> =
+    runCatching { if (file.exists()) file.readLines(Charsets.UTF_8).filter { it.isNotBlank() } else emptyList() }
       .getOrDefault(emptyList())
 
-  private fun append(f: File, text: String): Boolean = runCatching {
-    f.parentFile?.mkdirs()
+  private fun append(text: String): Boolean = runCatching {
+    file.parentFile?.mkdirs()
     //  خطِ نیمه‌کارهٔ قطعِ برق: رکوردِ تازه از سرِ خطِ تازه، نه چسبیده به آن
-    val lead = if (f.length() > 0 && lastByte(f) != '\n'.code) "\n" else ""
-    FileOutputStream(f, true).use { out ->
+    val lead = if (file.length() > 0 && lastByte() != '\n'.code) "\n" else ""
+    FileOutputStream(file, true).use { out ->
       out.write((lead + text).toByteArray(Charsets.UTF_8))
       out.fd.sync()
     }
   }.isSuccess
 
-  private fun lastByte(f: File): Int = RandomAccessFile(f, "r").use { it.seek(it.length() - 1); it.read() }
+  private fun lastByte(): Int = RandomAccessFile(file, "r").use { it.seek(it.length() - 1); it.read() }
 
   /** آخرین `cap` خط می‌ماند؛ شکست ⇒ همان فایل، و تلاشِ دوباره در افزودنِ بعدی */
-  private fun compact(f: File, cap: Int, current: Int): Int = runCatching {
-    val keep = lines(f).takeLast(cap)
-    DiskWrite.text(f, keep.joinToString("") { it + "\n" })
-    keep.size
-  }.getOrDefault(current)
+  private fun compact() {
+    runCatching {
+      val keep = read().takeLast(cap)
+      DiskWrite.text(file, keep.joinToString("") { it + "\n" })
+    }
+  }
 
   companion object {
     /** opهای خودِ دستگاه: یک دکانِ پرکار روزی چند هزار op — بیش از یک هفته */
-    const val SENT_CAP = 10_000
-    const val SEEN_CAP = 20_000
+    const val CAP = 10_000
 
-    /** op_idِ v1 و v3 و کلیدِ صفِ v3 — بی فاصله و بی خطِ تازه */
+    /** op_idِ v1 و v3 — بی فاصله و بی خطِ تازه */
     private val ID = Regex("^[A-Za-z0-9_.:-]{1,128}$")
 
-    fun inDir(dir: File, name: String): ReplayBook =
-      ReplayBook(File(dir, "$name-sent.jsonl"), File(dir, "$name-seen.jsonl"))
+    fun inDir(dir: File, name: String): ReplayBook = ReplayBook(File(dir, "$name-sent.jsonl"))
   }
 }

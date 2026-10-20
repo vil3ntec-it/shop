@@ -24,7 +24,7 @@ import java.io.File
  *  ⚠️ نوشتن اتمی است (فایلِ کناری، بعد جابه‌جایی): اگر وسطِ نوشتن باتری
  *  تمام شود، صف نصفه نمی‌ماند.
  */
-class OpQueue(context: Context, accountKey: String) {
+class OpQueue(context: Context, accountKey: String) : V1Restore.Queue {
 
   private val json = Json { ignoreUnknownKeys = true; isLenient = true }
   private val dir = context.applicationContext.filesDir
@@ -45,7 +45,7 @@ class OpQueue(context: Context, accountKey: String) {
   @Volatile private var cachedDropped: Int = -1
 
   @Synchronized
-  fun all(): List<SyncOp> = read(file).mapNotNull { SyncOp.fromJson(it) }
+  override fun all(): List<SyncOp> = read(file).mapNotNull { SyncOp.fromJson(it) }
 
   @Synchronized
   fun size(): Int {
@@ -82,7 +82,7 @@ class OpQueue(context: Context, accountKey: String) {
    *  @return چند op به صف آمد
    */
   @Synchronized
-  fun pushFront(ops: List<SyncOp>): Int {
+  override fun pushFront(ops: List<SyncOp>): Int {
     if (ops.isEmpty()) return 0
     val list = read(file)
     val have = list.mapNotNullTo(HashSet()) { (it["op_id"] as? JsonPrimitive)?.content }

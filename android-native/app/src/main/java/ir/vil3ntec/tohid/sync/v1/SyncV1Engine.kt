@@ -3,7 +3,6 @@ package ir.vil3ntec.tohid.sync.v1
 import android.content.Context
 import ir.vil3ntec.tohid.core.config.AppConfig
 import ir.vil3ntec.tohid.core.sync.ReplayBook
-import ir.vil3ntec.tohid.core.sync.RestoreReplay
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.sync.SyncStore
@@ -45,8 +44,6 @@ class SyncV1Engine private constructor(context: Context) {
   private var accountKey: String = keyOf()
   private var state = SyncStateV1(app, accountKey)
   private var queue = OpQueue(app, accountKey)
-  /** opهای پذیرفته‌شده و رسیده، برای پس از بازیابیِ سرور — §۹.۵، `checkEpoch` */
-  private var replay = replayFor(accountKey)
 
   /**
    *  سه تکهٔ حال (صف، سایه، cursor) برای commitِ ژورنالی — F0-05، شرح سرِ
@@ -65,7 +62,11 @@ class SyncV1Engine private constructor(context: Context) {
   private fun commitFor(key: String) =
     SyncCommit(SyncCommit.Journal(java.io.File(app.filesDir, "sync-journal-${OpQueue.fileKey(key)}.json")), parts)
 
-  private fun replayFor(key: String) = ReplayBook.inDir(app.filesDir, "sync-replay-${OpQueue.fileKey(key)}")
+  /** §۹.۵: سرور از پشتیبان برگشت — شرح سرِ `V1Restore` و `core/sync/RestoreReplay.kt` */
+  private var restore = restoreFor(accountKey)
+
+  private fun restoreFor(key: String) =
+    V1Restore(state, queue, ReplayBook.inDir(app.filesDir, "sync-replay-${OpQueue.fileKey(key)}"), commit)
 
   private val gate = Mutex()
   private val _status = MutableStateFlow(snapshotStatus())
@@ -75,9 +76,6 @@ class SyncV1Engine private constructor(context: Context) {
   @Volatile var liveConnected: Boolean = false
     internal set
   @Volatile private var attempt = 0
-  /** آخرین پرسشِ «دوران» (§۹.۵)؛ `epochDue` ⇒ دورِ بعد بی‌درنگ بپرس */
-  @Volatile private var epochCheckedAt = 0L
-  @Volatile private var epochDue = true
 
   /**
    *  کلیدِ حساب — شناسهٔ کاربر اگر معلوم باشد، وگرنه نامِ حساب، وگرنه
@@ -96,8 +94,7 @@ class SyncV1Engine private constructor(context: Context) {
     state = SyncStateV1(app, accountKey)
     queue = OpQueue(app, accountKey)
     commit = commitFor(accountKey)
-    replay = replayFor(accountKey)
-    epochDue = true
+    restore = restoreFor(accountKey)
     publish()
   }
 
@@ -187,8 +184,15 @@ class SyncV1Engine private constructor(context: Context) {
         val client = SyncV1Client(Backend.api(app))
         val device = store.deviceUid
 
-        //  §۹.۵: سرور از پشتیبان برگشته؟ opهای گم‌شدهٔ همین دستگاه جلوی صف، cursor تا پایه
-        checkEpoch(client)
+        //  §۹.۵: سرور از پشتیبان برگشته؟ (هر دور) opهای گم‌شدهٔ همین دستگاه جلوی صف
+        val epoch = try {
+          client.epoch()
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+          throw cancelled
+        } catch (_: Throwable) {
+          null
+        }
+        synchronized(this) { restore.check(epoch) }
 
         //  صف را تا ته خالی می‌کنیم، دسته‌دسته
         var guard = 0
@@ -212,38 +216,41 @@ class SyncV1Engine private constructor(context: Context) {
           val accepted = out.results.filter { it.accepted }.map { it.opId }
           val rejected = out.results.filter { !it.accepted }
           if (accepted.isNotEmpty()) {
+            //  §۹.۵: پذیرفته‌شده‌ها با server_seq کنارِ صف — **پیش از** بیرون رفتن از آن — تا
+            //  اگر سرور از پشتیبان برگشت، با همان op_id دوباره بروند (`V1Restore`)
+            restore.accepted(batch, out.results)
             queue.ack(accepted)
-            //  §۹.۵: پذیرفته‌شده‌ها با server_seq کنارِ صف می‌مانند تا اگر سرور از پشتیبان
-            //  برگشت، با همان op_id دوباره بروند (`checkEpoch`)
-            val seqOf = out.results.filter { it.accepted }.associate { it.opId to it.seq }
-            replay.sent(batch.filter { it.opId in seqOf }.map { ReplayBook.Sent(it.opId, seqOf[it.opId] ?: 0L, it.toJson()) })
           }
-          if (rejected.isNotEmpty()) {
+          //  ردِ opِ دوباره‌فرستاده (پیش‌تر پذیرفته شده بود) ردشده‌ای نیست که کاربر ببیند
+          val (replayed, refused) = rejected.partition { restore.isReplay(it.opId) }
+          if (replayed.isNotEmpty()) queue.ack(replayed.map { it.opId })
+          if (refused.isNotEmpty()) {
             //  ردشده‌ها از صف بیرون می‌روند — وگرنه صف تا ابد قفل
             //  می‌کند — ولی بی‌صدا نه.
-            val ids = rejected.map { it.opId }.toHashSet()
+            val ids = refused.map { it.opId }.toHashSet()
             queue.drop(batch.filter { it.opId in ids }, "rejected")
             queue.ack(ids)
           }
           state.lastPushAt = System.currentTimeMillis()
         }
 
+        //  §۹.۵: سرور برگشته و صف خالی شد ⇒ دفتر از Snapshot از نو، opهای همین حالا در صف رویش.
+        //  تا آن وقت Pull نه — opِ دوباره‌فرستادهٔ دستگاهِ دیگر روی دفترِ کهنه دو بار می‌نشست.
+        if (state.restorePending && queue.size() == 0) {
+          val snapshot = client.snapshot()
+          synchronized(this) {
+            if (commit.pending()) commit.recover(read())
+            if (restore.rebuild(snapshot, read(), write)) state.snapshotAt = System.currentTimeMillis()
+          }
+        }
+
         //  Pull — تا وقتی سرور بگوید چیزِ دیگری هست
         var rounds = 0
-        while (rounds < 50) {
+        while (!state.restorePending && rounds < 50) {
           rounds++
-          val since = state.cursor
-          val got = client.pull(device, since)
-          //  §۹.۵: opی که این دستگاه پیش‌تر نشانده یا فرستاده (دوباره‌فرستادهٔ دستگاهِ دیگر
-          //  پس از بازیابیِ سرور) دوباره نمی‌نشیند — `$inc` دو بار کم نمی‌شود
-          val fresh = replay.unknown(got.ops) { it.opId }
-          if (fresh.isNotEmpty()) {
-            absorbRemote(fresh, read, write, got.cursor)
-            replay.seen(fresh.map { it.opId })
-          }
+          val got = client.pull(device, state.cursor)
+          if (got.ops.isNotEmpty()) absorbRemote(got.ops, read, write, got.cursor)
           state.cursor = got.cursor
-          //  سرِ دفترِ سرور پشتِ cursor ⇒ سرور برگشته؛ دوران دورِ بعد بی‌درنگ پرسیده شود
-          if (got.head in 0 until since) epochDue = true
           state.lastPullAt = System.currentTimeMillis()
           if (got.serverSchema > 0) state.serverSchema = got.serverSchema
           if (!got.hasMore) break
@@ -264,42 +271,6 @@ class SyncV1Engine private constructor(context: Context) {
         publish()
       }
     }
-
-  /**
-   *  سرور از پشتیبان برگشته؟ — §۹.۵، شرح سرِ `core/sync/RestoreReplay.kt`.
-   *
-   *  هر دقیقه یک بار (یا بی‌درنگ وقتی pull سرِ دفترِ سرور را پشتِ cursor دید) دورانِ
-   *  سرور خوانده می‌شود. عوض شده ⇒ opهای پذیرفته‌شدهٔ همین دستگاه با `server_seq`
-   *  بالاتر از پایه، با همان op_id، جلوی صف و cursor تا پایه — زیرِ قفلِ `record()`.
-   *  بالا آمدنِ عادیِ سرور ⇒ پایه همان سرِ دفتر است و هیچ چیزی عوض نمی‌شود.
-   *  سرورِ کهنه یا خاموش (۴۰۴) یا نرسیدن ⇒ همان رفتارِ پیشین؛ دورِ همگام‌سازی نمی‌خوابد.
-   */
-  private suspend fun checkEpoch(client: SyncV1Client) {
-    val t = System.currentTimeMillis()
-    if (!epochDue && t - epochCheckedAt < EPOCH_EVERY_MS) return
-    epochCheckedAt = t
-    val server = try {
-      client.epoch()
-    } catch (cancelled: kotlinx.coroutines.CancellationException) {
-      throw cancelled
-    } catch (_: Throwable) {
-      return
-    }
-    epochDue = false
-    if (server == null) return
-    synchronized(this) {
-      val plan = RestoreReplay.plan(state.epoch, state.cursor, server)
-      val base = plan.replayAbove
-      if (base == null) {
-        if (plan.epoch != state.epoch) state.epoch = plan.epoch
-        return
-      }
-      //  اول صف (فایل، اتمی)، بعد دوران + cursor با هم: بسته شدن در میانه ⇒ دورِ بعد
-      //  همان را می‌بیند و `pushFront` opِ در صف را دوباره نمی‌آورد
-      queue.pushFront(replay.replayAbove(base).mapNotNull { SyncOp.fromJson(it.body) })
-      if (!state.commitEpoch(plan.epoch, plan.cursor)) throw java.io.IOException("دورانِ همگام‌سازی روی دیسک ننشست")
-    }
-  }
 
   /**
    *  هم‌ترازیِ یک‌باره با سرور — پیش از نخستین دورِ این حساب روی این دستگاه.
@@ -394,6 +365,14 @@ class SyncV1Engine private constructor(context: Context) {
 
   suspend fun restoreFromServer(read: () -> ShopData, write: suspend (ShopData) -> Unit): Int {
     val client = SyncV1Client(Backend.api(app))
+    //  §۹.۵: دورانِ پیش از Snapshot — دفتر حالا همان سرور است، پس همان دوران و دیگر «در انتظار» نه
+    val epoch = try {
+      client.epoch()
+    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+      throw cancelled
+    } catch (_: Throwable) {
+      null
+    }
     val body = client.snapshot()
     val next = LedgerDiff.fromSnapshot(body, LedgerDiff.toJson(read()))
     write(LedgerDiff.fromJson(next))
@@ -403,6 +382,7 @@ class SyncV1Engine private constructor(context: Context) {
     state.snapshotAt = System.currentTimeMillis()
     state.lastOkAt = System.currentTimeMillis()
     state.lastError = ""
+    if (epoch != null) state.commitRestore(epoch.id, false)
     publish()
     return (body["rows"] as? kotlinx.serialization.json.JsonPrimitive)?.content?.toIntOrNull() ?: 0
   }
@@ -488,8 +468,6 @@ class SyncV1Engine private constructor(context: Context) {
   companion object {
     const val MIN_BACKOFF_MS = 2_000L
     const val MAX_BACKOFF_MS = 5 * 60_000L
-    /** پرسیدنِ «دوران» (§۹.۵) — یک درخواستِ کوچک در دقیقه، نه در هر دور */
-    const val EPOCH_EVERY_MS = 60_000L
 
     @Volatile private var instance: SyncV1Engine? = null
 

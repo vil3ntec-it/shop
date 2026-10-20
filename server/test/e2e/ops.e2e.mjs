@@ -33,7 +33,7 @@ const owner = await E.owner('owner-ops@e2e.local', 'صاحبِ پشتیبان', 
 const staff = await E.staff(owner, 'staff-ops@e2e.local', 'شاگردِ پشتیبان');
 for (const k of ['shop.orders', 'shop.orders.refunds', 'shop.catalog']) await E.flag(owner.shopId, k, true);
 
-let A; let B; let rice; let orderId; let before; let file; let child; let R; let lateSale; let s1Id; let s1Item; let late;
+let A; let B; let J; let rice; let orderId; let before; let file; let child; let R; let lateSale; let s1Id; let s1Item; let late;
 
 await E.step('E2E-OPS-14.0', 'دکانِ واقعی: فروش، نسیه، دریافت، مرجوعی، سفارش و بازپرداخت', async () => {
   A = await E.device('A-owner-phone', owner.email);
@@ -68,6 +68,25 @@ await E.step('E2E-OPS-14.0', 'دکانِ واقعی: فروش، نسیه، در�
     debtor,
   };
 });
+
+await E.step('E2E-OPS-14.plain-restart', 'بالا آمدنِ عادیِ سرور میانِ رفت‌وآمدِ دو دستگاه: نه دوباره‌فرستادن، نه ساختنِ دوباره، دوران همان', async () => {
+  const epoch = require('../../src/lib/sync-epoch');
+  const id = (await epoch.current()).id;
+  await epoch.rotate('boot');
+  A.sell({ lines: [{ id: rice, qty: 1 }] });
+  await A.drain();
+  await epoch.rotate('boot');
+  await B.drain();
+  await A.drain();
+  assert.equal((await epoch.current()).id, id, 'بالا آمدنِ عادی دورانِ بازیابی را عوض نمی‌کند');
+  for (const d of [A, B]) {
+    assert.equal(d.epoch, id, d.label);
+    assert.equal(d.replayed, 0, `${d.label}: چیزی دوباره رفت`);
+    assert.equal(d.rebuilt, 0, `${d.label}: از نو ساخته شد`);
+    assert.equal(d.restorePending, false, d.label);
+  }
+  assert.equal(A.stock(rice), B.stock(rice));
+}, { needs: ['E2E-OPS-14.0'] });
 
 await E.step('E2E-OPS-14.backup', 'پشتیبانِ رمزدارِ سرور: متنِ دکان در فایل خوانا نیست؛ بی عبارت یا با عبارتِ غلط باز نمی‌شود', async () => {
   const backup = require('../../src/lib/backup');
@@ -106,6 +125,26 @@ await E.step('E2E-OPS-14.late', 'پس از پشتیبان: شاگرد یک فر�
   assert.equal(B.stock(rice), late.stock);
 }, { needs: ['E2E-OPS-14.backup'] });
 
+await E.step('E2E-OPS-14.late-edit', 'پس از پشتیبان: یک فیلد در دو دستگاه — شاگرد قیمت را ۱۱۱ و صاحب پس از دیدنِ آن ۲۲۲ می‌کند', async () => {
+  B.setSalePrice(rice, 111);
+  late.bOps.push(...B.queue.map((o) => o.op_id));
+  await B.drain();
+  await A.drain();
+  assert.equal(A.ledger.products.find((p) => p.id === rice).salePrice, 111);
+  A.setSalePrice(rice, 222);
+  late.aOps.push(...A.queue.map((o) => o.op_id));
+  await A.drain();
+  await B.drain();
+  assert.equal(B.ledger.products.find((p) => p.id === rice).salePrice, 222);
+}, { needs: ['E2E-OPS-14.late'] });
+
+await E.step('E2E-OPS-14.late-join', 'پس از پشتیبان: دستگاهِ تازه‌ای با Snapshot می‌آید (مرجوعیِ $inc و فروشِ تازه را در Snapshot دارد)', async () => {
+  J = await E.device('J-late-tablet', owner.email);
+  assert.equal((await J.firstSync()).ok, true);
+  assert.equal(J.ledger.saleItems.find((x) => x.id === s1Item).returnedQty, late.returned);
+  assert.ok(J.ledger.sales.some((x) => x.id === lateSale));
+}, { needs: ['E2E-OPS-14.late'] });
+
 await E.step('E2E-OPS-14.restore', 'سرورِ تازه از همان فایل در پوشهٔ تازه بالا می‌آید (فرایندِ جدا)', async () => {
   const backup = require('../../src/lib/backup');
   const tar = await backup.decode(file);
@@ -131,7 +170,7 @@ function moved(dev, label) {
   Object.assign(d, {
     token: dev.token, refreshToken: dev.refreshToken, ledger: dev.ledger, shadow: dev.shadow, queue: dev.queue.slice(), cursor: dev.cursor, snapshotAt: dev.snapshotAt,
     //  دورانِ دیده‌شده و دفترچهٔ `ReplayBook` هم روی همان دستگاه می‌مانند (§۹.۵)
-    epoch: dev.epoch, sent: dev.sent.slice(), seen: new Set(dev.seen),
+    epoch: dev.epoch, restorePending: dev.restorePending, sent: dev.sent.slice(),
   });
   return d;
 }
@@ -159,19 +198,25 @@ await E.step('E2E-OPS-14.consistent', 'پس از بازیابی: دفتر، مو
   assert.equal(rep.ok, true, JSON.stringify(rep.mismatches));
 }, { needs: ['E2E-OPS-14.restore'] });
 
-await E.step('E2E-OPS-14.replay', '§۹.۵: کارهای «پس از آخرین پشتیبان» از هر دو دستگاه دوباره به سرورِ بازیابی‌شده می‌رسند و هیچ دستگاهی opِ دوباره‌رسیده را دو بار نمی‌نشاند', async () => {
+await E.step('E2E-OPS-14.replay', '§۹.۵: کارهای «پس از آخرین پشتیبان» از هر دو دستگاه دوباره به سرورِ بازیابی‌شده می‌رسند؛ همه از Snapshot از نو و یکی با سرور — هیچ opی دو بار نمی‌نشیند', async () => {
   const returned = (d) => d.ledger.saleItems.find((x) => x.id === s1Item).returnedQty;
-  //  ۱) شاگرد: دورانِ تازه ⇒ فقط opهای پس از پشتیبانِ خودش، با همان op_id، جلوی صف
-  const B2 = moved(B, 'B-after-restore');
-  const r = await B2.sync();
-  assert.equal(r.ok, true, JSON.stringify(r));
-  assert.equal(B2.replayed, late.bOps.length, `شاگرد دوباره فرستاد: ${B2.replayed}، opهای پس از پشتیبانش: ${late.bOps.length}`);
-  assert.equal(B2.queue.length, 0);
-  //  ۲) صاحب: مرجوعیِ پس از پشتیبانش دوباره می‌رود؛ فروشِ دوباره‌رسیدهٔ شاگرد را که پیش‌تر داشت دوباره نمی‌نشاند
+  const price = (d) => d.ledger.products.find((x) => x.id === rice).salePrice;
+  //  بازبین #۱: اول صاحب، بعد شاگرد دوباره می‌فرستند (عکسِ ترتیبِ ویرایشِ قیمت)
   const A3 = moved(A, 'A-after-restore');
-  assert.equal((await A3.sync()).ok, true);
+  assert.equal((await A3.sync()).ok, true, A3.lastError);
   assert.equal(A3.replayed, late.aOps.length, `صاحب دوباره فرستاد: ${A3.replayed}، opهای پس از پشتیبانش: ${late.aOps.length}`);
-  //  ۳) شاگرد دوباره: مرجوعیِ دوباره‌رسیدهٔ صاحب (returnedQty: {$inc: 1}) را پیش‌تر نشانده بود
+  const B2 = moved(B, 'B-after-restore');
+  assert.equal((await B2.sync()).ok, true, B2.lastError);
+  assert.equal(B2.replayed, late.bOps.length, `شاگرد دوباره فرستاد: ${B2.replayed}، opهای پس از پشتیبانش: ${late.bOps.length}`);
+  //  بازبین #۲: دستگاهی که پس از پشتیبان با Snapshot آمد
+  //  نشستش پس از پشتیبان ساخته شده بود و در سرورِ برگشته نیست ⇒ ورودِ دوباره (همان حساب)؛
+  //  حالِ همگام‌سازیِ دستگاه (دوران، cursor، دفتر) سرِ جایش می‌ماند
+  const J2 = moved(J, 'J-after-restore');
+  assert.equal((await J2.api('GET', `/sync/v1/status?device_id=${J2.deviceId}`)).status, 401);
+  Object.assign(J2, { token: A.token, refreshToken: A.refreshToken });
+  assert.equal((await J2.sync()).ok, true, J2.lastError);
+  assert.equal(J2.replayed, 0);
+  assert.equal((await A3.sync()).ok, true);
   assert.equal((await B2.sync()).ok, true);
 
   const N = new NativeDevice(R, 'N2-new-device');
@@ -179,15 +224,20 @@ await E.step('E2E-OPS-14.replay', '§۹.۵: کارهای «پس از آخرین 
   N.refreshToken = A.refreshToken;
   assert.equal((await N.firstSync()).ok, true);
   assert.ok(N.ledger.sales.some((s) => s.id === lateSale), 'فروشِ پس از پشتیبان روی سرورِ بازیابی‌شده نیست و دستگاه هم دوباره نمی‌فرستد (cursor ِ دستگاه از سرِ دفترِ سرور جلوتر است)');
-  assert.equal(returned(N), late.returned, 'سرور: مرجوعیِ پس از پشتیبان نرسید');
-  for (const [d, who] of [[A3, 'گوشیِ صاحب'], [B2, 'دستگاهِ شاگرد']]) {
+  assert.equal(returned(N), late.returned, 'سرور: مرجوعیِ پس از پشتیبان نرسید یا دو بار رسید');
+  for (const [d, who] of [[A3, 'گوشیِ صاحب'], [B2, 'دستگاهِ شاگرد'], [J2, 'تبلتِ تازه']]) {
+    assert.equal(d.restorePending, false, `${who}: در انتظار ماند`);
+    assert.equal(d.rebuilt, 1, `${who}: از Snapshot از نو ساخته نشد`);
     assert.equal(returned(d), late.returned, `${who}: opِ دوباره‌رسیده دو بار نشست (returnedQty ${returned(d)} ≠ ${late.returned})`);
+    assert.equal(price(d), price(N), `${who}: قیمت با سرور یکی نیست (${price(d)} ≠ ${price(N)})`);
     assert.equal(d.ledger.sales.filter((s) => s.id === lateSale).length, 1, who);
-    assert.equal(d.stock(rice), late.stock, `${who}: موجودی`);
+    assert.equal(d.stock(rice), N.stock(rice), `${who}: موجودی`);
+    assert.deepEqual(d.ledger.sales.map((x) => x.id).sort(), N.ledger.sales.map((x) => x.id).sort(), `${who}: فروش‌ها`);
     assert.ok(d.cursor <= N.cursor, `${who}: cursor (${d.cursor}) از سرِ دفترِ سرور (${N.cursor}) جلوتر ماند`);
+    assert.equal(d.queue.length, 0, who);
   }
   assert.equal(N.stock(rice), late.stock, 'سرور: موجودی همان پیش از بازیابی');
-}, { needs: ['E2E-OPS-14.restore', 'E2E-OPS-14.late'] });
+}, { needs: ['E2E-OPS-14.restore', 'E2E-OPS-14.late-edit', 'E2E-OPS-14.late-join'] });
 
 if (child) child.kill('SIGTERM');
 await E.finish();

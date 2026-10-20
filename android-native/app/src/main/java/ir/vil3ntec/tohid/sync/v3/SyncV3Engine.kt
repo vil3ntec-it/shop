@@ -101,8 +101,10 @@ data class V3Meta(
   val conflictsDirty: Boolean = false,
   val pushBytes: Int = SyncV3Engine.MIN_BYTES,
   val pullBytes: Int = SyncV3Engine.MIN_BYTES,
-  /** «دورانِ» سروری که آخرین بار دیده شد — §۹.۵، `core/sync/RestoreReplay.kt` */
+  /** «دورانِ بازیابیِ» سروری که آخرین بار دیده شد — §۹.۵، `core/sync/RestoreReplay.kt` */
   val epoch: String = "",
+  /** سرور برگشته و دفتر هنوز از Snapshot از نو ساخته نشده — تا آن وقت Pull نه */
+  val restorePending: Boolean = false,
 )
 
 /** انبارِ محلی؛ هر `save` یک نوشتنِ اتمی (فایلِ کناری + fsync + جابه‌جایی). */
@@ -112,7 +114,7 @@ internal interface V3Store {
   fun loadQueue(): V3Queue?
   fun saveQueue(queue: V3Queue)
   val journal: SyncCommit.Journal
-  /** ورودی‌های پذیرفته‌شده و op_idهای رسیده برای پس از بازیابیِ سرور (§۹.۵)؛ null ⇒ نیست */
+  /** ورودی‌های پذیرفته‌شده برای دوباره فرستادن پس از بازیابیِ سرور (§۹.۵)؛ null ⇒ نیست */
   val replay: ReplayBook? get() = null
 }
 
@@ -178,7 +180,16 @@ internal class SyncV3Engine(
   /** ورودیِ صف ⇄ JSON برای دفترچهٔ `ReplayBook` (§۹.۵) */
   private val entryJson = Json { ignoreUnknownKeys = true }
 
-  private fun opIdOf(o: JsonObject): String = (o["op_id"] as? JsonPrimitive)?.content.orEmpty()
+  /**
+   *  `server_seq` ِ پاسخِ یک op: v3 خودش دارد؛ v2 در `converted[]` (opهای v3ی که از آن ساخته
+   *  شد). نبود (v2ی که چیزی برای دفتر نداشت) ⇒ ۰ ⇒ در دفترچه نمی‌نشیند.
+   */
+  private fun seqOf(r: JsonObject): Long {
+    (r["server_seq"] as? JsonPrimitive)?.content?.toLongOrNull()?.let { return it }
+    return (r["converted"] as? JsonArray).orEmpty()
+      .mapNotNull { ((it as? JsonObject)?.get("server_seq") as? JsonPrimitive)?.content?.toLongOrNull() }
+      .maxOrNull() ?: 0L
+  }
 
   val clock = HlcClock(this.deviceId, { now() })
 
@@ -441,6 +452,11 @@ internal class SyncV3Engine(
       at += n
       if (mine.size < n || mine.any { it == null }) continue          //  بی پاسخ ⇒ می‌ماند
       val statuses = mine.map { (it!!["status"] as? JsonPrimitive)?.content.orEmpty() }
+      //  §۹.۵: ردِ ورودیِ دوباره‌فرستاده (پیش‌تر پذیرفته شده بود) ⇒ «انجام‌شده»، نه ردشده‌ای که کاربر ببیند
+      if ("rejected" in statuses && store.replay?.wasSent(e.id) == true) {
+        done += e.key
+        continue
+      }
       if ("rejected" in statuses) {
         seq += 1
         rejected += e.copy(
@@ -453,16 +469,16 @@ internal class SyncV3Engine(
       if (statuses.all { it in DONE }) {
         done += e.key
         if (statuses.any { it == "conflict" || it == "partial" }) conflict = true
-        val s = mine.maxOfOrNull { (it!!["server_seq"] as? JsonPrimitive)?.content?.toLongOrNull() ?: 0L } ?: 0L
-        accepted += ReplayBook.Sent(e.key, s, entryJson.encodeToJsonElement(V3Entry.serializer(), e) as JsonObject)
+        val s = mine.maxOfOrNull { seqOf(it!!) } ?: 0L
+        if (s > 0) accepted += ReplayBook.Sent(e.id, s, entryJson.encodeToJsonElement(V3Entry.serializer(), e) as JsonObject)
       }
     }
+    //  §۹.۵: پذیرفته‌شده‌ها با server_seq کنارِ صف — **پیش از** بیرون رفتن از آن — تا اگر سرور
+    //  از پشتیبان برگشت، با همان op_idها دوباره بروند (`pullOnce`)
+    store.replay?.sent(accepted)
     val q = queue.copy(outbox = queue.outbox.filter { it.key !in done }, rejected = queue.rejected + rejected, seq = seq)
     store.saveQueue(q)
     queue = q
-    //  §۹.۵: پذیرفته‌شده‌ها با server_seq کنارِ صف می‌مانند تا اگر سرور از پشتیبان برگشت،
-    //  با همان op_idها دوباره بروند (`pullOnce`)
-    store.replay?.sent(accepted)
     save(meta.copy(
       attempt = 0, lastError = "", lastErrorAt = 0, lastOkAt = t, lastPushAt = t,
       pushBytes = min(MAX_BYTES, meta.pushBytes * 2), conflictsDirty = meta.conflictsDirty || conflict,
@@ -472,28 +488,31 @@ internal class SyncV3Engine(
 
   suspend fun pullOnce(): V3Step {
     if (meta.upgradeProtocol > 0) return V3Step(ok = false, upgrade = true, stopped = true)
+    //  §۹.۵: سرور برگشته و دفتر هنوز از نو ساخته نشده ⇒ Pull نه (opِ دوباره‌فرستادهٔ دیگران
+    //  روی دفترِ کهنه دو بار می‌نشست) — `sync` پس از خالی شدنِ صف `rebuild` می‌کند
+    if (meta.restorePending) return V3Step(ok = true)
     val since = meta.cursor
     val budget = meta.pullBytes.coerceIn(MIN_BYTES, MAX_BYTES)
     val r = tryCall("GET", "/pull?device_id=$deviceId&since=$since&max_bytes=$budget") ?: return fail(0, null)
     val body = r.body
     if (r.status != 200 || body == null) return fail(r.status, body)
     val cursor = ((body["cursor"] as? JsonPrimitive)?.content?.toLongOrNull() ?: since).coerceAtLeast(since)
-    val book = store.replay
 
     /*
      *  §۹.۵: سرور از پشتیبان برگشته؟ (شرح سرِ `core/sync/RestoreReplay.kt`) — ورودی‌های
-     *  پذیرفته‌شدهٔ همین دستگاه بالای پایه، با همان op_idها، جلوی صف؛ cursor تا پایه. اگر
-     *  cursor پایین آمد این صفحه (از cursor ِ کهنه) نشانده نمی‌شود و pull از پایه ادامه می‌یابد.
+     *  پذیرفته‌شدهٔ همین دستگاه بالای پایه، با همان op_idها، جلوی صف و «در انتظار»؛ این صفحه
+     *  (از cursor ِ کهنه) نشانده نمی‌شود.
      */
-    val plan = RestoreReplay.plan(meta.epoch, since, RestoreReplay.Epoch.from(body["epoch"]))
-    var replayed = 0
-    plan.replayAbove?.let { base ->
+    val book = store.replay
+    val plan = RestoreReplay.plan(meta.epoch, since, RestoreReplay.Epoch.from(body["epoch"])) { book?.hasAbove(it) == true }
+    if (plan.restore) {
+      var replayed = 0
       withLock {
         if (book != null) {
-          val have = queue.outbox.mapTo(HashSet()) { it.key }
-          val again = book.replayAbove(base)
+          val have = queue.outbox.mapTo(HashSet()) { it.id }
+          val again = book.replayAbove(plan.base)
             .mapNotNull { s -> runCatching { entryJson.decodeFromJsonElement(V3Entry.serializer(), s.body) }.getOrNull() }
-            .filter { have.add(it.key) }
+            .filter { have.add(it.id) }
           if (again.isNotEmpty()) {
             val q = queue.copy(outbox = again + queue.outbox)
             store.saveQueue(q)
@@ -501,16 +520,13 @@ internal class SyncV3Engine(
             replayed = again.size
           }
         }
-        if (plan.cursor < since) save(meta.copy(epoch = plan.epoch, cursor = plan.cursor))
+        save(meta.copy(epoch = plan.epoch, restorePending = true))
       }
-      if (plan.cursor < since) return V3Step(ok = true, hasMore = true, replayed = replayed)
+      return V3Step(ok = true, replayed = replayed)
     }
 
-    //  opی که این دستگاه پیش‌تر نشانده (دوباره‌فرستادهٔ دستگاهِ دیگر پس از بازیابی) دوباره
-    //  نمی‌نشیند — `$inc` دو بار جمع نمی‌شود
-    val all = (body["ops"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }
-    val items = book?.unknown(all) { opIdOf(it) } ?: all
-    val legacy = items.mapNotNull(V3Convert::effectToLegacy)
+    val items = (body["ops"] as? JsonArray).orEmpty()
+    val legacy = items.mapNotNull { (it as? JsonObject)?.let(V3Convert::effectToLegacy) }
     withLock {
       if (legacy.isNotEmpty()) {
         //  ژورنال ⇐ دفتر ⇐ سایه + cursor ⇐ پاک کردنِ ژورنال (شرح سرِ `SyncCommit.absorb`)
@@ -521,11 +537,32 @@ internal class SyncV3Engine(
         cursor = cursor, lastPullAt = t, lastOkAt = t, attempt = 0, lastError = "", lastErrorAt = 0,
         pullBytes = min(MAX_BYTES, budget * 2), epoch = plan.epoch,
       ))
-      //  «دیده شد» فقط پس از نشستن روی دفتر (شرح سرِ `ReplayBook`)
-      book?.seen(items.map { opIdOf(it) })
     }
     val more = (body["has_more"] as? JsonPrimitive)?.content == "true"
-    return V3Step(ok = true, applied = legacy.size, hasMore = more, replayed = replayed)
+    return V3Step(ok = true, applied = legacy.size, hasMore = more)
+  }
+
+  /**
+   *  §۹.۵: پس از بازیابیِ سرور و خالی شدنِ صف — دفتر = Snapshot ِ سرور، سایه و cursor با آن
+   *  (ژورنالِ `SyncCommit.rebuild`)، بعد «در انتظار» برداشته می‌شود. ورودی‌ای که وسطِ گرفتنِ
+   *  Snapshot به صف آمد ⇒ این بار نه؛ دورِ بعد پس از فرستادنِ آن (تغییرِ نرفته از دفتر گم نمی‌شود).
+   */
+  suspend fun rebuild(): V3Step {
+    val r = tryCall("GET", "/snapshot") ?: return fail(0, null)
+    val body = r.body
+    if (r.status != 200 || body == null) return fail(r.status, body)
+    if ((body["complete"] as? JsonPrimitive)?.content == "false") return V3Step(ok = false)
+    val legacy = V3Convert.snapshotToLegacy(body)
+    val cursor = (body["cursor"] as? JsonPrimitive)?.content?.toLongOrNull() ?: return V3Step(ok = false)
+    withLock {
+      if (queue.outbox.isEmpty() && meta.restorePending) {
+        val current = ledger.read()
+        val server = LedgerDiff.fromSnapshot(legacy, LedgerDiff.toJson(current))
+        commit.rebuild(server, emptyList(), current, cursor) { next -> ledger.write(next) }
+        save(meta.copy(restorePending = false, lastOkAt = now()))
+      }
+    }
+    return V3Step(ok = true)
   }
 
   suspend fun fetchConflicts(all: Boolean = false): List<JsonObject>? {
@@ -557,25 +594,15 @@ internal class SyncV3Engine(
         if (!init.ok) return init
       }
       recordNow()
-      for (i in 0 until ROUNDS) {
-        if (queue.outbox.isEmpty()) break
-        val p = pushOnce()
-        if (!p.ok) return p
-        if (p.done == 0 && p.rejected == 0) break
-      }
-      var replayed = 0
-      for (i in 0 until ROUNDS) {
-        val q = pullOnce()
-        if (!q.ok) return q
-        replayed += q.replayed
-        if (!q.hasMore) break
-      }
-      //  §۹.۵: ورودی‌هایی که پس از بازیابیِ سرور دوباره جلوی صف آمدند، همین دور بروند
-      if (replayed > 0) for (i in 0 until ROUNDS) {
-        if (queue.outbox.isEmpty()) break
-        val p = pushOnce()
-        if (!p.ok) return p
-        if (p.done == 0 && p.rejected == 0) break
+      pushAll()?.let { return it }
+      //  §۹.۵: سرور برگشته بود (پیش از این دور) و صف خالی شد ⇒ دفتر از Snapshot از نو
+      if (meta.restorePending && queue.outbox.isEmpty()) rebuild().let { if (!it.ok) return it }
+      pullAll()?.let { return it }
+      //  همین دور برگشتنِ سرور دیده شد ⇒ ورودی‌های دوباره‌آمده می‌روند، دفتر از نو، بعد Pull
+      if (meta.restorePending) {
+        pushAll()?.let { return it }
+        if (queue.outbox.isEmpty()) rebuild().let { if (!it.ok) return it }
+        pullAll()?.let { return it }
       }
       if (meta.conflictsDirty || now() - conflictsAt > 5 * 60 * 1000L) {
         conflictsAt = now()
@@ -585,6 +612,27 @@ internal class SyncV3Engine(
     } finally {
       busy = false
     }
+  }
+
+  /** Push تا خالی شدنِ صف؛ شکست ⇒ همان قدم، وگرنه null */
+  private suspend fun pushAll(): V3Step? {
+    for (i in 0 until ROUNDS) {
+      if (queue.outbox.isEmpty()) break
+      val p = pushOnce()
+      if (!p.ok) return p
+      if (p.done == 0 && p.rejected == 0) break
+    }
+    return null
+  }
+
+  /** Pull تا آخر؛ شکست ⇒ همان قدم، وگرنه null */
+  private suspend fun pullAll(): V3Step? {
+    for (i in 0 until ROUNDS) {
+      val q = pullOnce()
+      if (!q.ok) return q
+      if (!q.hasMore) break
+    }
+    return null
   }
 
   private fun JsonArray?.orEmpty(): List<kotlinx.serialization.json.JsonElement> = this ?: emptyList()

@@ -30,8 +30,6 @@ class SyncV1Client(private val api: ApiClient) {
     val cursor: Long,
     val hasMore: Boolean,
     val serverSchema: Int,
-    /** سرِ دفترِ سرور برای این حساب؛ نبود ⇒ ‎-1‎. کمتر از `since` ⇒ سرور برگشته (§۹.۵) */
-    val head: Long = -1L,
   )
 
   /**
@@ -78,7 +76,6 @@ class SyncV1Client(private val api: ApiClient) {
       cursor = num(res, "cursor") ?: since,
       hasMore = (res["has_more"] as? JsonPrimitive)?.content?.toBooleanStrictOrNull() == true,
       serverSchema = (num(res, "schema_version") ?: 0L).toInt(),
-      head = num(res, "head") ?: -1L,
     )
   }
 
