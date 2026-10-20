@@ -109,7 +109,7 @@ async function gateOf(row) {
   return ok;
 }
 
-function clearCache() { gates.clear(); shelves.clear(); lists = null; invalidate(); }
+function clearCache() { gates.clear(); shelves.clear(); stocks.clear(); pop.by = new Map(); pop.day = -1; deals = null; invalidate(); }
 
 async function filterAsync(list, fn) {
   const out = [];
@@ -164,7 +164,7 @@ async function reindex(sigs, ids) {
   }
 }
 
-const counters = { builds: 0 };
+const counters = { builds: 0, shelves: 0, popular: 0, deals: 0 };
 
 /** برای پایش و آزمون: چند بار برش از نو ساخته شد. */
 function stats() { return { ...counters }; }
@@ -273,7 +273,7 @@ function categoryOf(key) {
 }
 
 /** کارتِ عمومیِ دکان — بی شناسهٔ داخلی، شماره، صاحب یا مختصات. */
-function cardOf(e, near) {
+function cardOf(e, near, at = now()) {
   const r = e.row;
   const s = e.status;
   const cat = categoryOf(r.m_category);
@@ -298,7 +298,7 @@ function cardOf(e, near) {
     productCount: e.productCount,
     distanceKm: hasGeo ? distanceKm(near, { lat: Number(r.m_lat), lng: Number(r.m_lng) }) : null,
     //  «تازه» فقط از تاریخِ واقعیِ ساختِ ویترین (بی امتیازِ ساختگی؛ امتیازِ واقعی هنوز نیست)
-    isNew: Number(r.created_at) > Date.now() - NEW_MS,
+    isNew: Number(r.created_at) > at - NEW_MS,
   };
 }
 
@@ -349,13 +349,16 @@ async function shops({ q, category, lat, lng, limit, offset, first } = {}, at = 
   const needle = sf.normalize(text(q, 60));
   const pin = new Set(str(first).toLowerCase().split(',').map((x) => x.trim()).filter((x) => /^[a-z0-9-]{3,32}$/.test(x)).slice(0, FIRST_MAX));
   const cards = (await eligible(at))
-    .map((e) => ({ id: e.row.shop_id, c: cardOf(e, near) }))
+    .map((e) => ({ id: e.row.shop_id, c: cardOf(e, near, at) }))
     .filter((x) => (!cat || x.c.category === cat) && matchesShop(x.c, needle))
     .sort((a, b) => (pin.has(b.c.slug) - pin.has(a.c.slug)) || rank(near)(a.c, b.c));
   const page = cards.slice(off, off + lim);
   const sh = await mapAsync(page, (x) => shelfOf(x.id));
+  //  ⛔ جلد هم زنده سنجیده می‌شود (منتشرشده، زنده، بی جریمه)
+  const cand = page.map((x, j) => ({ shopId: x.id, ids: sh[j].filter((p) => p.photo).slice(0, 2).map((p) => p.id) }));
+  const live = await liveViews(cand.flatMap((c) => c.ids.map((id) => ({ shopId: c.shopId, id }))));
   return {
-    shops: page.map((x, j) => ({ ...x.c, cover: (sh[j].find((p) => p.photo) || {}).id || null })),
+    shops: page.map((x, j) => ({ ...x.c, cover: cand[j].ids.find((id) => live.has(pairKey(x.id, id))) || null })),
     total: cards.length, nextOffset: off + lim < cards.length ? off + lim : null,
   };
 }
@@ -371,7 +374,7 @@ async function search({ q, lat, lng, limit } = {}, at = now()) {
   const near = geoOf(lat, lng);
   const lim = Math.min(MAX_PRODUCTS, Math.max(1, Number.parseInt(limit, 10) || 24));
   const list = await eligible(at);
-  const cards = list.map((e) => cardOf(e, near));
+  const cards = list.map((e) => cardOf(e, near, at));
   const matched = CATEGORIES.find((c) => sf.normalize(c.label) === needle || c.label.split(' و ').some((p) => sf.normalize(p) === needle));
   const shopHits = cards.filter((c) => matchesShop(c, needle)).sort(rank(near)).slice(0, 12);
 
@@ -406,30 +409,41 @@ async function search({ q, lat, lng, limit } = {}, at = now()) {
 }
 
 // ════════════════════════════════════════════════════════════════════
-//  خانهٔ بازارچه: اول کالا، بعد دکان (WEB-02؛ دستورِ صاحب محصول)
+//  خانهٔ بازارچه: قفسه‌ها، «پرفروش» و «ارزان‌تر از قیمتِ دکان» (WEB-02)
 // ════════════════════════════════════════════════════════════════════
 //
 //  «قفسهٔ» هر دکان = تا SHELF کالای منتشرشده، زنده و قیمت‌دار (عکس‌دارها اول،
-//  بعد به ترتیبِ نام) که موجودیِ دانسته‌اش «ناموجود» نیست. قفسه و دو فهرستِ
-//  سراسری `feedCacheMs` در حافظه می‌مانند ⇒ درخواستِ بی‌توکن پایگاه را نمی‌کوبد.
-//  ⛔ هیچ عددِ ساختگی: «پرفروش» فقط از سفارشِ واقعیِ ویترین با k-گمنامی (دست‌کم
-//  K_ANON سفارشِ جدا از K_ANON شمارهٔ جدا در ۳۰ روز، بی آزمایشی/ردشده/لغوشده —
-//  همان قاعدهٔ #301)؛ «ارزان‌تر از قیمتِ دکان» فقط وقتی قیمتِ آنلاینِ خودِ صاحب
-//  دکان کمتر از قیمتِ فروشِ دفترش است. نبودِ داده ⇒ فهرستِ خالی.
+//  بعد به ترتیبِ نام) که موجودیِ دانسته‌اش «ناموجود» نیست؛ `feedCacheMs` در حافظه.
+//  ⛔ هیچ عددِ ساختگی و هیچ رتبه‌بندیِ فروش میانِ دکان‌ها:
+//   - «پرفروش» ِ هر دکان = تا PER_SHOP کالای پرفروشِ **خودِ همان دکان** با k-گمنامی
+//     (دست‌کم K_ANON سفارشِ جدا از K_ANON شمارهٔ جدا، بی آزمایشی/ردشده/لغوشده — همان
+//     قاعدهٔ #301)، در بازهٔ ثابتِ [آغازِ امروز − ۳۰ روز، آغازِ امروز) به وقتِ UTC ⇒ در
+//     طولِ روز تکان نمی‌خورد و سفارشِ تازه را لو نمی‌دهد. ترتیبِ درونِ دکان با بذرِ روز.
+//   - «ارزان‌تر از قیمتِ دکان» فقط برای دکانی که صاحبش `showDeals` را روشن کرده
+//     (پیش‌فرض خاموش ⇒ قیمتِ دفتر هرگز منتشر نمی‌شود)، و تا PER_SHOP کالا از هر دکان.
+//   - هر دو فهرست به نوبت از دکان‌ها و به ترتیبِ رتبهٔ خودِ دکان (rank) — نه حجمِ فروش و
+//     نه درصدِ تخفیف ⇒ یک دکان نه فهرست را پر می‌کند نه با قیمتِ دفترِ بادکرده بالا می‌رود.
+//  ⛔ هر پاسخ شناسه‌های کالا را زنده دوباره می‌سنجد (منتشرشده، زنده، بی جریمهٔ
+//  «پنهان کردن») و نما را از همان ردیفِ زنده می‌سازد؛ فقط موجودی تا `feedCacheMs` کهنه است.
 
 const FEED_SHOPS = 24;
 const SHELF = 8;
 const FEED_MAX = 48;
 const LIST_MAX = 12;
+const PER_SHOP = 2;
 const POPULAR_DAYS = 30;
+const DAY_MS = 24 * 60 * 60 * 1000;
 //  همان قاعدهٔ «پرفروش» ِ ویترین (#301): k-گمنامی و وضعیت‌های آزادشده
 const { K_ANON } = sf;
 const { RELEASED } = require('./storefront-delivery');
 
-const shelves = new Map();   // shop_id → { at, items }
-let lists = null;            // { at, key, popular, deals }
+const shelves = new Map();   // shop_id → { at, items } یا { pending }
+const pop = { day: -1, by: new Map(), flight: null };   // shop_id → [product_id] برای یک روز
+let deals = null;            // { at, key, by: Map(shop_id → [product_id]) } یا { key, pending }
+const stocks = new Map();    // `${shop}\0${id}` → { at, stock }
 
 const suggestable = (p) => !['out_of_stock', 'unavailable'].includes(p.stock && p.stock.status);
+const pairKey = (shopId, id) => `${shopId}\u0000${id}`;
 
 /** نمای عمومیِ کالا + قیمتِ فروشِ دفتر فقط وقتی قیمتِ آنلاینِ صاحب دکان کمتر از آن است. */
 function viewOf(row) {
@@ -453,81 +467,183 @@ async function withStock(shopId, items) {
   return st ? items.map((p) => ({ ...p, stock: st.get(p.id) || p.stock })) : items;
 }
 
-async function shelfOf(shopId) {
+/** یک‌پرواز: هم‌زمان‌ها همان یک پرسش را منتظر می‌مانند؛ پاک کردنِ حافظه نتیجهٔ نیمه‌کاره را دور می‌ریزد. */
+function shelfOf(shopId) {
   const ttl = config.market.feedCacheMs;
   const hit = shelves.get(shopId);
-  if (ttl > 0 && hit && Date.now() - hit.at < ttl) return hit.items;
+  if (hit && hit.pending) return hit.pending;
+  if (ttl > 0 && hit && Date.now() - hit.at < ttl) return Promise.resolve(hit.items);
+  const slot = {};
+  slot.pending = loadShelf(shopId).then(
+    (items) => { if (shelves.get(shopId) === slot) { if (ttl > 0) shelves.set(shopId, { at: Date.now(), items }); else shelves.delete(shopId); } return items; },
+    (err) => { if (shelves.get(shopId) === slot) shelves.delete(shopId); throw err; }
+  );
+  if (shelves.size > 5000) shelves.clear();
+  shelves.set(shopId, slot);
+  return slot.pending;
+}
+
+async function loadShelf(shopId) {
+  counters.shelves++;
   const rows = await many(
     `SELECT ${sf.PRODUCT_COLS} FROM ${sf.PRODUCT_FROM}
       WHERE sp.shop_id = $1 AND sp.published AND ${sf.LIVE_PRODUCT} AND COALESCE(r.data->>'name', '') <> ''
       ORDER BY has_photo DESC, COALESCE(r.data->>'name', ''), r.row_id LIMIT $2`,
     [shopId, SHELF * 2]
   );
-  const items = (await withStock(shopId, rows.map(viewOf).filter((p) => p.priceMinor !== null && p.name)))
+  return (await withStock(shopId, rows.map(viewOf).filter((p) => p.priceMinor !== null && p.name)))
     .filter(suggestable).slice(0, SHELF);
-  if (shelves.size > 5000) shelves.clear();
-  shelves.set(shopId, { at: Date.now(), items });
-  return items;
 }
 
-/** کالاهای چند دکان با موجودیِ هر دکان؛ ناموجودِ دانسته بیرون. */
-async function liveWithStock(pairs) {
-  const by = new Map();
-  for (const x of pairs) { if (!by.has(x.shopId)) by.set(x.shopId, []); by.get(x.shopId).push(x.p); }
-  const done = new Map();
-  await mapAsync([...by], async ([shopId, ps]) => {
-    for (const p of await withStock(shopId, ps)) done.set(`${shopId}\u0000${p.id}`, p);
-  });
-  return pairs.map((x) => ({ shopId: x.shopId, p: done.get(`${x.shopId}\u0000${x.p.id}`) })).filter((x) => x.p && suggestable(x.p));
+/**
+ * ⛔ سنجشِ زندهٔ هر پاسخ: از جفت‌های (دکان، کالا) فقط آن‌هایی که همین حالا منتشرشده،
+ * زنده و بی جریمه‌اند — با نمای تازه از همان ردیف. یک پرسش با کلیدِ اصلی.
+ */
+async function liveViews(pairs) {
+  const out = new Map();
+  const uniq = [...new Map(pairs.map((x) => [pairKey(x.shopId, x.id), x])).values()];
+  if (!uniq.length) return out;
+  const rows = await many(
+    `SELECT sp.shop_id, ${sf.PRODUCT_COLS} FROM ${sf.PRODUCT_FROM}
+      WHERE (sp.shop_id, sp.product_id) IN (SELECT * FROM unnest($1::text[], $2::text[]))
+        AND sp.published AND ${sf.LIVE_PRODUCT} AND COALESCE(r.data->>'name', '') <> ''`,
+    [uniq.map((x) => x.shopId), uniq.map((x) => x.id)]
+  );
+  for (const r of rows) {
+    const p = viewOf(r);
+    if (p.priceMinor !== null && p.name) out.set(pairKey(r.shop_id, r.id), p);
+  }
+  return out;
 }
 
-/** «پرفروش» و «ارزان‌تر از قیمتِ دکان» در همهٔ دکان‌های در فهرست. */
-async function globalLists(ids, at) {
+/** موجودیِ چند کالا از چند دکان؛ `feedCacheMs` در حافظه. ناموجودِ دانسته بیرون. */
+async function stocked(pairs) {
   const ttl = config.market.feedCacheMs;
-  const key = ids.join(',');
-  if (ttl > 0 && lists && lists.key === key && Date.now() - lists.at < ttl) return lists;
-  if (!ids.length) return { popular: [], deals: [] };
-  const [best, cheap] = await Promise.all([
-    many(
-      `SELECT l.shop_id, l.product_id
+  const t = Date.now();
+  const need = new Map();
+  for (const x of pairs) {
+    const hit = stocks.get(pairKey(x.shopId, x.p.id));
+    if (ttl > 0 && hit && t - hit.at < ttl) continue;
+    if (!need.has(x.shopId)) need.set(x.shopId, []);
+    need.get(x.shopId).push(x.p);
+  }
+  const fresh = new Map();
+  await mapAsync([...need], async ([shopId, ps]) => {
+    for (const p of await withStock(shopId, ps)) fresh.set(pairKey(shopId, p.id), p.stock);
+  });
+  if (stocks.size > 10000) stocks.clear();
+  if (ttl > 0) for (const [k, stock] of fresh) stocks.set(k, { at: t, stock });
+  return pairs.map((x) => {
+    const k = pairKey(x.shopId, x.p.id);
+    const stock = fresh.has(k) ? fresh.get(k) : (stocks.get(k) || {}).stock;
+    return { shopId: x.shopId, p: stock ? { ...x.p, stock } : x.p };
+  }).filter((x) => suggestable(x.p));
+}
+
+/** بذرِ روز (FNV-1a): ترتیبِ درونِ هر دکان هر روز ثابت، و چیزی از حجمِ فروش نمی‌گوید. */
+function seeded(day, s) {
+  let h = (2166136261 ^ day) >>> 0;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+  return h;
+}
+
+/** «پرفروش» ِ هر دکان برای همان روز — هر دکان جدا و فقط از سفارش‌های خودش. */
+async function loadPopular(ids, day) {
+  counters.popular++;
+  const end = day * DAY_MS;
+  const rows = await many(
+    `SELECT shop_id, product_id FROM (
+       SELECT l.shop_id, l.product_id,
+              ROW_NUMBER() OVER (PARTITION BY l.shop_id ORDER BY COUNT(DISTINCT l.order_id) DESC, l.product_id) AS n
          FROM online_order_lines l JOIN online_orders o ON o.id = l.order_id
         WHERE o.shop_id = ANY($1::text[]) AND l.shop_id = o.shop_id AND o.source = 'storefront' AND NOT o.is_test
-          AND o.created_at >= $2 AND o.status <> ALL($3::text[]) AND l.product_id <> ''
+          AND o.created_at >= $2 AND o.created_at < $3 AND o.status <> ALL($4::text[]) AND l.product_id <> ''
         GROUP BY l.shop_id, l.product_id
-       HAVING COUNT(DISTINCT l.order_id) >= $4 AND COUNT(DISTINCT o.customer_phone) >= $4
-        ORDER BY COUNT(DISTINCT l.order_id) DESC, SUM(l.qty_milli) DESC, l.shop_id, l.product_id LIMIT 48`,
-      [ids, at - POPULAR_DAYS * 24 * 60 * 60 * 1000, RELEASED, K_ANON]
-    ),
-    many(
-      `SELECT sp.shop_id, ${sf.PRODUCT_COLS} FROM ${sf.PRODUCT_FROM}
+       HAVING COUNT(DISTINCT l.order_id) >= $5 AND COUNT(DISTINCT o.customer_phone) >= $5
+     ) t WHERE n <= $6`,
+    [ids, end - POPULAR_DAYS * DAY_MS, end, RELEASED, K_ANON, PER_SHOP]
+  );
+  if (pop.day !== day) return;
+  const by = new Map(ids.map((id) => [id, []]));
+  for (const r of rows) by.get(r.shop_id).push(r.product_id);
+  for (const [id, list] of by) pop.by.set(id, list.sort((a, b) => seeded(day, `${id}\u0000${a}`) - seeded(day, `${id}\u0000${b}`)));
+}
+
+async function popularOf(ids, at) {
+  const day = Math.floor(at / DAY_MS);
+  //  feedCacheMs=0 (آزمون) ⇒ بی حافظه؛ وگرنه یک بار در روز برای هر دکان
+  if (pop.day !== day || !(config.market.feedCacheMs > 0)) { pop.day = day; pop.by = new Map(); pop.flight = null; }
+  for (let i = 0; i < 3; i++) {
+    const missing = ids.filter((id) => !pop.by.has(id));
+    if (!missing.length) break;
+    if (pop.flight) { await pop.flight.catch(() => {}); continue; }
+    const f = loadPopular(missing, day);
+    pop.flight = f;
+    try { await f; } finally { if (pop.flight === f) pop.flight = null; }
+  }
+  return pop.by;
+}
+
+/** «ارزان‌تر» ِ دکان‌هایی که صاحبشان خواسته (`market_listings.show_deals`)، تا PER_SHOP از هر دکان. */
+async function loadDeals(ids) {
+  counters.deals++;
+  const rows = ids.length ? await many(
+    `SELECT shop_id, id FROM (
+       SELECT sp.shop_id, r.row_id AS id,
+              ROW_NUMBER() OVER (PARTITION BY sp.shop_id
+                ORDER BY sp.online_price_minor::numeric / ROUND((r.data->>'salePrice')::numeric * 100), r.row_id) AS n
+         FROM ${sf.PRODUCT_FROM}
+         JOIN market_listings ml ON ml.shop_id = sp.shop_id AND ml.show_deals
         WHERE sp.shop_id = ANY($1::text[]) AND sp.published AND ${sf.LIVE_PRODUCT}
           AND COALESCE(r.data->>'name', '') <> '' AND sp.online_price_minor IS NOT NULL
           AND (r.data->>'salePrice') ~ '^[0-9]{1,12}([.][0-9]{1,4})?$'
           AND sp.online_price_minor < ROUND((r.data->>'salePrice')::numeric * 100)
-        ORDER BY sp.online_price_minor::numeric / ROUND((r.data->>'salePrice')::numeric * 100), sp.shop_id, r.row_id
-        LIMIT 48`,
-      [ids]
-    ),
-  ]);
-  const live = best.length ? await many(
-    `SELECT sp.shop_id, ${sf.PRODUCT_COLS} FROM ${sf.PRODUCT_FROM}
-      WHERE (sp.shop_id, sp.product_id) IN (SELECT * FROM unnest($1::text[], $2::text[]))
-        AND sp.published AND ${sf.LIVE_PRODUCT}`,
-    [best.map((r) => r.shop_id), best.map((r) => r.product_id)]
+     ) t WHERE n <= $2`,
+    [ids, PER_SHOP * 2]
   ) : [];
-  const byKey = new Map(live.map((r) => [`${r.shop_id}\u0000${r.id}`, r]));
-  const popular = best.map((b) => byKey.get(`${b.shop_id}\u0000${b.product_id}`)).filter(Boolean)
-    .map((r) => ({ shopId: r.shop_id, p: viewOf(r) }));
-  const deals = cheap.map((r) => ({ shopId: r.shop_id, p: viewOf(r) }));
-  const ok = (x) => x.p.priceMinor !== null && x.p.name;
-  const out = {
-    at: Date.now(), key,
-    popular: await liveWithStock(popular.filter(ok)),
-    deals: (await liveWithStock(deals.filter(ok))).filter((x) => x.p.regularPriceMinor > 0),
-  };
-  lists = out;
+  const by = new Map();
+  for (const r of rows) { if (!by.has(r.shop_id)) by.set(r.shop_id, []); by.get(r.shop_id).push(r.id); }
+  return by;
+}
+
+function dealsOf(ids) {
+  const ttl = config.market.feedCacheMs;
+  const key = ids.slice().sort().join(',');
+  if (deals && deals.key === key && deals.pending) return deals.pending;
+  if (ttl > 0 && deals && deals.key === key && deals.by && Date.now() - deals.at < ttl) return Promise.resolve(deals.by);
+  const slot = { key };
+  slot.pending = loadDeals(ids).then(
+    (by) => { if (deals === slot) deals = ttl > 0 ? { at: Date.now(), key, by } : null; return by; },
+    (err) => { if (deals === slot) deals = null; throw err; }
+  );
+  deals = slot;
+  return slot.pending;
+}
+
+/** به نوبت از دکان‌ها، به ترتیبِ رتبهٔ دکان: اولیِ هر دکان، بعد دومیِ هر دکان، … */
+function roundRobin(shopIds, by, max) {
+  const out = [];
+  for (let i = 0; i < PER_SHOP * 2 && out.length < max; i++) {
+    for (const shopId of shopIds) {
+      const id = (by.get(shopId) || [])[i];
+      if (id !== undefined && out.length < max) out.push({ shopId, id });
+    }
+  }
   return out;
 }
+
+/** هر دکان حداکثر PER_SHOP کالا در فهرست. */
+function capPerShop(list, max) {
+  const n = new Map();
+  return list.filter((x) => {
+    const c = n.get(x.shopId) || 0;
+    if (c >= PER_SHOP) return false;
+    n.set(x.shopId, c + 1);
+    return true;
+  }).slice(0, max);
+}
+
+const withoutLedger = ({ regularPriceMinor: _r, ...rest }) => rest;
 
 function feedItem(card, p) {
   return {
@@ -542,34 +658,57 @@ function feedItem(card, p) {
 }
 
 /**
- * نمای اولِ خانه: کالاهای دکان‌های بالای رتبه (به نوبت از هر دکان، «نزدیکِ من»
- * ⇒ نزدیک‌ترها اول)، «پرفروش» و «ارزان‌تر از قیمتِ دکان» ِ واقعی، و دکان‌های
- * پیشنهادی با عکسِ یکی از کالاهای خودشان.
+ * نمای خانه: کالاهای دکان‌های بالای رتبه (به نوبت از هر دکان، «نزدیکِ من» ⇒
+ * نزدیک‌ترها اول)، «پرفروش» و «ارزان‌تر از قیمتِ دکان» ِ واقعی، و دکان‌های پیشنهادی
+ * با عکسِ یکی از کالاهای خودشان. `only=lists` ⇒ فقط دو فهرست (بی قفسه و دکان).
  */
-async function feed({ category, lat, lng, limit } = {}, at = now()) {
+async function feed({ category, lat, lng, limit, only } = {}, at = now()) {
   const near = geoOf(lat, lng);
   const cat = str(category);
   if (cat && !CATEGORY_KEYS.has(cat)) throw badRequest('دستهٔ دکان معتبر نیست', 'bad_category');
+  const listsOnly = str(only) === 'lists';
   const lim = Math.min(FEED_MAX, Math.max(1, Number.parseInt(limit, 10) || 24));
   const list = await eligible(at);
-  const cards = list.map((e) => ({ id: e.row.shop_id, c: cardOf(e, near) }));
+  const cards = list.map((e) => ({ id: e.row.shop_id, c: cardOf(e, near, at) }));
   const byId = new Map(cards.map((x) => [x.id, x.c]));
   const inCat = cards.filter((x) => !cat || x.c.category === cat).sort((a, b) => rank(near)(a.c, b.c));
-  const top = inCat.slice(0, FEED_SHOPS);
-  const sh = await mapAsync(top, (x) => shelfOf(x.id));
-  const items = [];
-  for (let i = 0; i < SHELF && items.length < lim; i++) {
-    top.forEach((x, j) => { if (sh[j][i] && items.length < lim) items.push(feedItem(x.c, sh[j][i])); });
+  const ids = inCat.map((x) => x.id);
+
+  //  نامزدها: قفسه‌ها (فقط به اندازهٔ نیاز)، و دو فهرست به نوبت از دکان‌ها
+  const top = listsOnly ? [] : inCat.slice(0, Math.min(FEED_SHOPS, Math.max(lim, 6)));
+  const [sh, popBy, dealBy] = await Promise.all([
+    mapAsync(top, (x) => shelfOf(x.id)), popularOf(ids, at), dealsOf(cards.map((x) => x.id)),
+  ]);
+  const shelfPairs = [];
+  for (let i = 0; i < SHELF && shelfPairs.length < lim; i++) {
+    top.forEach((x, j) => { if (sh[j][i] && shelfPairs.length < lim) shelfPairs.push({ shopId: x.id, id: sh[j][i].id, stock: sh[j][i].stock }); });
   }
-  const g = await globalLists(cards.map((x) => x.id).sort(), at);
-  const allowed = new Set(inCat.map((x) => x.id));
-  const pick = (arr) => arr.filter((x) => allowed.has(x.shopId)).slice(0, LIST_MAX).map((x) => feedItem(byId.get(x.shopId), x.p));
+  const covers = top.slice(0, 6).map((x, j) => ({ shopId: x.id, ids: sh[j].filter((p) => p.photo).slice(0, 2).map((p) => p.id) }));
+  const popPairs = roundRobin(ids, popBy, LIST_MAX * 2);
+  const dealPairs = roundRobin(ids, dealBy, LIST_MAX * 2);
+
+  //  ⛔ سنجشِ زنده در همین پاسخ
+  const live = await liveViews([
+    ...shelfPairs, ...popPairs, ...dealPairs,
+    ...covers.flatMap((c) => c.ids.map((id) => ({ shopId: c.shopId, id }))),
+  ]);
+  const fresh = (pairs) => pairs.map((x) => ({ shopId: x.shopId, p: live.get(pairKey(x.shopId, x.id)) })).filter((x) => x.p);
+  //  ⛔ قیمتِ فروشِ دفتر فقط برای دکانی که صاحبش «ارزان‌تر» را روشن کرده؛ جای دیگر هرگز
+  const optIn = new Set(dealBy.keys());
+  const pub = (x) => (optIn.has(x.shopId) || x.p.regularPriceMinor === undefined ? x.p : withoutLedger(x.p));
+  const shelfStock = new Map(shelfPairs.map((x) => [pairKey(x.shopId, x.id), x.stock]));
+  const items = fresh(shelfPairs).map((x) => ({ shopId: x.shopId, p: { ...x.p, stock: shelfStock.get(pairKey(x.shopId, x.p.id)) || x.p.stock } }));
+  const popular = capPerShop(await stocked(fresh(popPairs)), LIST_MAX);
+  const dealList = capPerShop((await stocked(fresh(dealPairs))).filter((x) => x.p.regularPriceMinor > 0), LIST_MAX);
+  const out = (x) => feedItem(byId.get(x.shopId), pub(x));
   return {
-    items,
-    popular: pick(g.popular),
-    deals: pick(g.deals),
+    items: items.map(out),
+    popular: popular.map(out),
+    deals: dealList.map(out),
     windowDays: POPULAR_DAYS,
-    shops: top.slice(0, 6).map((x, j) => ({ ...x.c, cover: (sh[j].find((p) => p.photo) || {}).id || null })),
+    shops: top.slice(0, 6).map((x, j) => ({
+      ...x.c, cover: covers[j].ids.find((id) => live.has(pairKey(x.id, id))) || null,
+    })),
     shopTotal: inCat.length,
   };
 }
@@ -609,6 +748,8 @@ function listingView(row) {
     listed: row ? row.listed === true : false,
     category: row ? row.category : '',
     area: row ? row.area : '',
+    //  «ارزان‌تر از قیمتِ دکان»: قیمتِ فروشِ دفتر در بازارچه — پیش‌فرض خاموش، فقط صاحبِ دکان
+    showDeals: row ? row.show_deals === true : false,
     //  به صاحبِ دکان خودش برمی‌گردد (درشت)، هرگز به مشتری
     location: row && row.geo_lat !== null && row.geo_lat !== undefined
       ? { lat: Number(row.geo_lat) / 100, lng: Number(row.geo_lng) / 100 } : null,
@@ -621,8 +762,8 @@ async function listingOf(shopId) {
   return listingView(await one('SELECT * FROM market_listings WHERE shop_id = $1', [shopId]));
 }
 
-/** فقط فیلدهای آمده عوض می‌شوند. */
-async function saveListing(shopId, body, userId) {
+/** فقط فیلدهای آمده عوض می‌شوند. `showDeals` را فقط صاحبِ دکان عوض می‌کند. */
+async function saveListing(shopId, body, userId, { owner = false } = {}) {
   const b = obj(body);
   const has = (k) => Object.prototype.hasOwnProperty.call(b, k);
   const cur = await one('SELECT * FROM market_listings WHERE shop_id = $1', [shopId]);
@@ -632,6 +773,7 @@ async function saveListing(shopId, body, userId) {
     area: cur ? cur.area : '',
     lat: cur && cur.geo_lat !== null ? Number(cur.geo_lat) : null,
     lng: cur && cur.geo_lng !== null ? Number(cur.geo_lng) : null,
+    showDeals: cur ? cur.show_deals === true : false,
   };
   if (has('listed')) {
     if (typeof b.listed !== 'boolean') throw badRequest('«در فهرست» باید بله یا نه باشد', 'bad_listed');
@@ -643,6 +785,13 @@ async function saveListing(shopId, body, userId) {
     v.category = c;
   }
   if (has('area')) v.area = text(b.area, 60);
+  if (has('showDeals')) {
+    if (typeof b.showDeals !== 'boolean') throw badRequest('«ارزان‌تر از قیمتِ دکان» باید بله یا نه باشد', 'bad_show_deals');
+    if (b.showDeals !== v.showDeals && !owner) {
+      throw forbidden('نشان دادنِ قیمتِ دفتر در بازارچه را فقط صاحبِ دکان روشن یا خاموش می‌کند', 'deals_owner_only');
+    }
+    v.showDeals = b.showDeals;
+  }
   if (has('location')) {
     if (b.location === null) { v.lat = null; v.lng = null; } else {
       const g = geoOf(obj(b.location).lat, obj(b.location).lng);
@@ -651,15 +800,16 @@ async function saveListing(shopId, body, userId) {
     }
   }
   const row = await one(
-    `INSERT INTO market_listings (shop_id, listed, category, area, geo_lat, geo_lng, updated_by, updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+    `INSERT INTO market_listings (shop_id, listed, category, area, geo_lat, geo_lng, show_deals, updated_by, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
      ON CONFLICT (shop_id) DO UPDATE SET listed = EXCLUDED.listed, category = EXCLUDED.category,
        area = EXCLUDED.area, geo_lat = EXCLUDED.geo_lat, geo_lng = EXCLUDED.geo_lng,
-       updated_by = EXCLUDED.updated_by, updated_at = EXCLUDED.updated_at
+       show_deals = EXCLUDED.show_deals, updated_by = EXCLUDED.updated_by, updated_at = EXCLUDED.updated_at
      RETURNING *`,
-    [shopId, v.listed, v.category, v.area, v.lat, v.lng, userId || '', now()]
+    [shopId, v.listed, v.category, v.area, v.lat, v.lng, v.showDeals, userId || '', now()]
   );
   gates.delete(shopId);
+  deals = null;   // خاموش کردنِ «ارزان‌تر» همان دم
   invalidate();   // «در فهرست باشم» ِ صاحب دکان همان دم دیده شود
   return listingView(row);
 }

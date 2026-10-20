@@ -305,6 +305,8 @@ const config = {
     //  حرف و سقفِ نتیجه سرِ جایشان‌اند.
     marketSearchMax: num(process.env.RATE_MARKET_SEARCH_MAX, 300),
     marketSearchBurstMax: num(process.env.RATE_MARKET_SEARCH_BURST_MAX, 30),
+    //  خانهٔ بازارچه (`/api/market/products`): همان ۳۰ در دقیقه، سطلِ جدا
+    marketFeedBurstMax: num(process.env.RATE_MARKET_FEED_BURST_MAX, 30),
   },
 
   /**
