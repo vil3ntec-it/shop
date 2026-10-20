@@ -204,11 +204,11 @@ class ReturnFlowTest {
             val o = x.jsonObject; listOf(o.str("productId"), o.str("type"), o.num("qty"))
           }, after.stockMovements.drop(d.stockMovements.size).map { listOf(it.productId, it.type, it.qty) })
           assertEquals(name, out.arr("entries").map { x ->
-            val o = x.jsonObject; listOf(o.str("productId"), o.num("units"), o.str("adjKind"))
-          }, after.warehouseEntries.drop(d.warehouseEntries.size).map { listOf(it.productId, it.units, it.adjKind) })
+            val o = x.jsonObject; listOf(o.str("productId"), o.num("units"), o.str("adjKind"), o.str("refId"))
+          }, after.warehouseEntries.drop(d.warehouseEntries.size).map { listOf(it.productId, it.units, it.adjKind, it.refId) })
           assertEquals(name, out.arr("transactions").map { x ->
-            val o = x.jsonObject; listOf(o.str("debtorId"), o.num("amount"))
-          }, after.transactions.drop(d.transactions.size).map { listOf(it.debtorId, it.amount) })
+            val o = x.jsonObject; listOf(o.str("debtorId"), o.num("amount"), o.str("refId"), o.str("kind"))
+          }, after.transactions.drop(d.transactions.size).map { listOf(it.debtorId, it.amount, it.refId, it.kind) })
 
           val returned = out.obj("returnedQty")
           after.saleItems.forEach { si ->
@@ -356,6 +356,55 @@ class ReturnFlowTest {
       """{"id":"r1","saleId":"s","saleItemId":"i","productId":"p","quantity":1.0,"amount":225.0,"reason":"","date":"2026-10-19","createdAt":1}""",
       text,
     )
+  }
+
+  @Test
+  fun `ردیفِ دستیِ انبار و حساب بی refId و kind همان JSONِ قبلی است`() {
+    val j = Json { encodeDefaults = true }
+    assertEquals(
+      """{"id":"t1","debtorId":"c1","type":"receive","amount":300.0,"date":"2026-10-19","notes":"","createdAt":1}""",
+      j.encodeToString(DebtTransaction.serializer(), DebtTransaction(id = "t1", debtorId = "c1", type = "receive", amount = 300.0, date = "2026-10-19", createdAt = 1)),
+    )
+    val e = j.encodeToString(WarehouseEntry.serializer(), WarehouseEntry(id = "w1", productId = "p", units = 2.0))
+    assertFalse(e, e.contains("refId"))
+    //  سندِ برگشت هر دو را می‌نویسد و برنامهٔ تازه همان را می‌خواند
+    val t = DebtTransaction(id = "t2", refId = "doc", kind = "customer_return")
+    assertEquals(t, json.decodeFromString(DebtTransaction.serializer(), j.encodeToString(DebtTransaction.serializer(), t)))
+  }
+
+  /**
+   *  فاکتورِ آنلاین (`Sale.channel = online`): پولِ خودِ فاکتور به دخل نیامده (`CashShift.isOnline`)،
+   *  ولی مرجوعیِ **دستیِ** همین صندوق پولی است که از همین دخل رفت ⇒ کم می‌شود (تصمیمِ صاحبِ
+   *  مخزن در بازبینیِ #340). پس ردیفِ برگشتِ دستگاه `channel` نمی‌گیرد: `SaleReturn.channel = online`
+   *  یعنی «بیرون از دخل» و `CashShift` کلِ آن ردیف را نمی‌شمارد. بازپرداخت به درگاه از راهِ
+   *  `toMethods` بیرون از دخل است ([ReturnFlow.drawerAmount]). آنلاین بودن از `saleId` پیداست.
+   */
+  @Test
+  fun `برگشتِ فروشِ آنلاین — نقدِ پیشخوان از دخل کم می‌شود، درگاه نه؛ ردیف channel نمی‌گیرد`() {
+    val base = ledger()
+    fun online(vararg pay: SalePayment) = base.copy(sales = base.sales.map {
+      if (it.id == "s13") it.copy(channel = CashShift.ONLINE, payments = pay.toList()) else it
+    })
+    fun returned(d: ShopData, doc: String): ShopData {
+      val r = ReturnFlow.post(d, ReturnFlow.Request(docId = doc, saleId = "s13", picks = mapOf("i13b" to ReturnFlow.Pick(1.0)), reason = "دیگر"), today, now, ::newId)
+      return (r as ReturnFlow.Outcome.Ok).value.data
+    }
+    fun rows(d: ShopData, doc: String) = d.saleReturns.filter { it.docId == doc }
+    fun drawer(d: ShopData) = CashShift.totals(d, now, now, 0.0).returns
+
+    //  نقدِ هنگامِ تحویل که پیک آورد (`custody = courier`)؛ مشتری کالا را به پیشخوان پس آورد
+    val cod = online(SalePayment(method = "cod", kind = "cash", amountMinor = 90_000, status = "confirmed", custody = "courier"))
+    val cash = returned(cod, "on-cash")
+    assertEquals(listOf(225.0), rows(cash, "on-cash").map { it.amount })
+    assertEquals(listOf<String?>(null), rows(cash, "on-cash").map { it.channel })
+    assertEquals(225.0, drawer(cash), 0.0)
+
+    //  پرداختِ درگاه ⇒ به همان روش پس می‌رود، نه از دخل
+    val gateway = online(SalePayment(method = "online", kind = "other", amountMinor = 90_000, status = "confirmed", verification = "provider"))
+    val back = returned(gateway, "on-gw")
+    assertEquals(listOf(mapOf("online" to 225.0)), rows(back, "on-gw").map { it.toMethods })
+    assertEquals(listOf<String?>(null), rows(back, "on-gw").map { it.channel })
+    assertEquals(0.0, drawer(back), 0.0)
   }
 
   @Test

@@ -1,5 +1,5 @@
 {
-  "_doc": "RET-01..08، 10، 12، 13 — برگشت و تعویض. همین فایل را ReturnFlow.kt ِ گوشی و کامپیوتر (ReturnFlowTest) می‌دواند. عددها دستی و از روی قاعدهٔ مشخصات نوشته شده‌اند (S13: ۲۵۰ − ۲۵ = ۲۲۵)، نه از خروجیِ کد. مبلغ‌ها افغانی‌اند؛ gate به پول (یک‌صدمِ افغانی).",
+  "_doc": "RET-01..08، 10، 12، 13 — برگشت و تعویض. همین فایل را ReturnFlow.kt ِ گوشی و کامپیوتر (ReturnFlowTest) می‌دواند. عددها دستی و از روی قاعدهٔ مشخصات نوشته شده‌اند (S13: ۲۵۰ − ۲۵ = ۲۲۵)، نه از خروجیِ کد. مبلغ‌ها افغانی‌اند؛ gate به پول (یک‌صدمِ افغانی). هر ردیفِ انبار و حسابی که سند می‌سازد refId = docId دارد (نشانیِ سند برای نگهبانِ کارمند، #339)؛ رسیدِ حساب kind = customer_return دارد (واژهٔ #286) — سهمِ اعتبار هم، چون کنارِ کمِ کلِ مرجوعی از دخل خنثی می‌شود و store_credit را صندوق نقد نمی‌شمارد.",
   "version": 1,
   "ledger": {
     "products": [
@@ -137,7 +137,7 @@
         "total": 225, "split": { "account": 0, "credit": 0, "cash": 225 }, "audit": "return",
         "rows": [{ "saleItemId": "i13b", "productId": "pB", "quantity": 1, "amount": 225, "disposition": "damaged", "toAccount": 0, "toCredit": 0 }],
         "movements": [{ "productId": "pB", "type": "customer_return", "qty": 1 }, { "productId": "pB", "type": "damage", "qty": -1 }],
-        "entries": [{ "productId": "pB", "units": -1, "adjKind": "damage" }],
+        "entries": [{ "productId": "pB", "units": -1, "adjKind": "damage", "refId": "doc-s13" }],
         "transactions": [], "returnedQty": { "i13b": 1 }, "debtSettled": 0,
         "stock": { "pB": 98 }
       } },
@@ -157,7 +157,7 @@
         "total": 300, "split": { "account": 300, "credit": 0, "cash": 0 }, "audit": "return",
         "rows": [{ "saleItemId": "i20", "productId": "pR", "quantity": 1, "amount": 300, "disposition": "restock", "toAccount": 300, "toCredit": 0 }],
         "movements": [{ "productId": "pR", "type": "customer_return", "qty": 1 }],
-        "entries": [], "transactions": [{ "debtorId": "c1", "amount": 300 }], "returnedQty": { "i20": 1 }, "debtSettled": 300,
+        "entries": [], "transactions": [{ "debtorId": "c1", "amount": 300, "refId": "d2", "kind": "customer_return" }], "returnedQty": { "i20": 1 }, "debtSettled": 300,
         "stock": { "pR": 99 }
       } },
     { "id": "credit-all-sc", "name": "نسیه، همه به اعتبار: بدهی صفر و ۱۰۰ طلبِ مشتری", "req": { "docId": "d3", "saleId": "s20", "picks": { "i20": { "qty": 2 } }, "reason": "دیگر", "mode": "store_credit", "role": "owner" },
@@ -165,7 +165,7 @@
         "total": 600, "split": { "account": 500, "credit": 100, "cash": 0 }, "audit": "return",
         "rows": [{ "saleItemId": "i20", "productId": "pR", "quantity": 2, "amount": 600, "disposition": "restock", "toAccount": 500, "toCredit": 100 }],
         "movements": [{ "productId": "pR", "type": "customer_return", "qty": 2 }],
-        "entries": [], "transactions": [{ "debtorId": "c1", "amount": 500 }, { "debtorId": "c1", "amount": 100 }], "returnedQty": { "i20": 2 }, "debtSettled": 500,
+        "entries": [], "transactions": [{ "debtorId": "c1", "amount": 500, "refId": "d3", "kind": "customer_return" }, { "debtorId": "c1", "amount": 100, "refId": "d3", "kind": "customer_return" }], "returnedQty": { "i20": 2 }, "debtSettled": 500,
         "stock": { "pR": 100 }
       } },
     { "id": "nr-staff", "name": "بی رسید، شاگرد بی تأیید (S14)", "req": { "docId": "d4", "free": [{ "productId": "pA", "qty": 2, "unitPrice": 150 }], "reason": "دیگر", "mode": "cash", "role": "staff" }, "error": "APPROVAL_REQUIRED" },
@@ -175,7 +175,7 @@
         "total": 300, "split": { "account": 0, "credit": 0, "cash": 300 }, "audit": "return_no_receipt", "approvedBy": "مدیر",
         "rows": [{ "saleItemId": "", "productId": "pA", "quantity": 2, "amount": 300, "disposition": "restock", "toAccount": 0, "toCredit": 0 }],
         "movements": [{ "productId": "pA", "type": "customer_return", "qty": 2 }],
-        "entries": [{ "productId": "pA", "units": 2 }], "transactions": [], "returnedQty": {}, "debtSettled": 0,
+        "entries": [{ "productId": "pA", "units": 2, "refId": "d5" }], "transactions": [], "returnedQty": {}, "debtSettled": 0,
         "stock": { "pA": 101 }
       } },
     { "id": "nr-damaged-sc", "name": "بی رسید، ضایعات، اعتبار به مشتری", "req": { "docId": "d6", "free": [{ "productId": "pR", "qty": 1.5, "unitPrice": 300, "disposition": "damaged" }], "reason": "خراب یا معیوب", "mode": "store_credit", "customerId": "c2", "role": "owner" },
@@ -183,7 +183,7 @@
         "total": 450, "split": { "account": 0, "credit": 450, "cash": 0 }, "audit": "return_no_receipt",
         "rows": [{ "saleItemId": "", "productId": "pR", "quantity": 1.5, "amount": 450, "disposition": "damaged", "toAccount": 0, "toCredit": 450 }],
         "movements": [{ "productId": "pR", "type": "customer_return", "qty": 1.5 }, { "productId": "pR", "type": "damage", "qty": -1.5 }],
-        "entries": [], "transactions": [{ "debtorId": "c2", "amount": 450 }], "returnedQty": {}, "debtSettled": 0,
+        "entries": [], "transactions": [{ "debtorId": "c2", "amount": 450, "refId": "d6", "kind": "customer_return" }], "returnedQty": {}, "debtSettled": 0,
         "stock": { "pR": 98 }
       } },
     { "id": "over-limit-manager", "name": "بالای سقفِ مدیر، تأییدِ مدیرِ دیگر کافی نیست (S14)", "req": { "docId": "d7", "saleId": "s13", "picks": { "i13c": { "qty": 1 } }, "reason": "دیگر", "mode": "cash", "role": "manager", "limit": 100, "approval": { "by": "مدیر ۲", "role": "manager" } }, "error": "APPROVAL_REQUIRED" },

@@ -53,6 +53,14 @@ object ReturnFlow {
   const val CASH = "cash"
   const val STORE_CREDIT = "store_credit"
 
+  /**
+   *  `DebtTransaction.kind`ِ رسیدِ حسابی که سندِ برگشت می‌سازد (واژهٔ #286) — سهمِ اعتبارِ فروشگاه
+   *  هم، نه `store_credit`: کلِ مرجوعی از دخل کم می‌شود ([drawerAmount]) و همین رسید آن را خنثی
+   *  می‌کند، ولی `store_credit` (پرداخت با اعتبار) را صندوق نقد نمی‌شمارد و دخل کم می‌آمد.
+   *  `refId`ِ همهٔ ردیف‌های انبار و حسابِ سند = `docId` (نگهبانِ کارمندِ سرور، #339).
+   */
+  const val RECEIPT_KIND = "customer_return"
+
   /** RET-08 — فهرستِ پیش‌فرضِ دلیل‌ها؛ دلیل اجباری است */
   val REASONS: List<String> = listOf(
     "خراب یا معیوب",
@@ -510,6 +518,8 @@ object ReturnFlow {
         by = req.by.trim().ifEmpty { null },
         approvedBy = if (g.decision == "approve") approvedBy else null,
         exchangeSaleId = req.exchangeSaleId,
+        //  `channel` نه، حتی برای فروشِ آنلاین: `online` روی مرجوعی یعنی «بیرون از دخل» و `CashShift`
+        //  کلِ ردیف را نمی‌شمارد، ولی نقدِ این برگشت از همین دخل رفت (#340)؛ درگاه از راهِ `toMethods`
       )
       if (sale != null) {
         val i = items.indexOfFirst { it.id == line.saleItemId }
@@ -529,7 +539,7 @@ object ReturnFlow {
             id = newId(), productId = line.productId, units = -line.qty, unit = product?.unit.orEmpty(),
             date = today, notes = "ضایعاتِ برگشتی $tag — $reason", isAdjustment = true, createdAt = now,
             //  دفترِ موجودی (`StockLedger`) اصلاح را از همین نوع می‌شناسد
-            adjKind = "damage",
+            adjKind = "damage", refId = req.docId,
           )
         }
         //  بی رسید: فروشی نیست که کم شود؛ کالای سالم با ردیفِ اصلاحی به موجودی برمی‌گردد
@@ -537,6 +547,7 @@ object ReturnFlow {
           entries += WarehouseEntry(
             id = newId(), productId = line.productId, units = line.qty, unit = product?.unit.orEmpty(),
             date = today, notes = "برگشتِ بی رسید $tag — $reason", isAdjustment = true, createdAt = now,
+            refId = req.docId,
           )
         }
       }
@@ -551,14 +562,14 @@ object ReturnFlow {
     if (sale != null && s.account > 0 && sale.debtorId != null) {
       transactions += DebtTransaction(
         id = newId(), debtorId = sale.debtorId, type = "receive", amount = s.account, date = today,
-        notes = "برگشت $tag — $invoice", createdAt = now,
+        notes = "برگشت $tag — $invoice", createdAt = now, refId = req.docId, kind = RECEIPT_KIND,
       )
       updatedSale = sale.copy(debtSettled = sale.debtSettled + s.account)
     }
     if (creditTo != null && s.credit > 0) {
       transactions += DebtTransaction(
         id = newId(), debtorId = creditTo, type = "receive", amount = s.credit, date = today,
-        notes = "اعتبارِ فروشگاه — برگشت $tag — $invoice", createdAt = now,
+        notes = "اعتبارِ فروشگاه — برگشت $tag — $invoice", createdAt = now, refId = req.docId, kind = RECEIPT_KIND,
       )
     }
 

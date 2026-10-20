@@ -67,6 +67,15 @@ data class WarehouseEntry(
   val isAdjustment: Boolean = false,
   /** اگر این ورودی از ثبتِ یک خرید آمده باشد، شناسهٔ همان خرید */
   val purchaseId: String? = null,
+  /**
+   *  ردیفِ ساختهٔ سیستم از یک سند (مثلاً اصلاحِ انبارِ برگشتِ ضایعات یا بی رسید): شناسهٔ
+   *  همان سند (`docId` ِ برگشت). سرور با آن می‌داند اگر سند رد شد این ردیف هم با آن برگردد
+   *  (`staff-approval.js`، `companionOf`). ورودِ دستیِ کالا `null` است و نوشته نمی‌شود —
+   *  ردیفِ قدیمی بایت‌به‌بایت همان می‌ماند.
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val refId: String? = null,
   val createdAt: Long = 0,
   /**
    *  تاریخِ انقضای همین محموله (`yyyy-MM-dd`)؛ خالی یعنی «انقضا ندارد یا
@@ -332,6 +341,23 @@ data class DebtTransaction(
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val dueDate: String? = null,
+  /**
+   *  ردیفِ ساختهٔ سیستم (نه دستِ کاربر): سندی که آن را ساخت — برای لغو و مرجوعی شناسهٔ
+   *  فاکتور. همان نامِ `refId`ِ `StockMovement`. ردیفِ دستی `null` است و نوشته نمی‌شود.
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val refId: String? = null,
+  /**
+   *  چرا سیستم ساختش — همان واژه‌های `StockMovement.type`:
+   *  `sale_cancel` (لغوِ فروشِ نسیه؛ بدهی بسته می‌شود، پولی به دخل نیامده)،
+   *  `customer_return` (مرجوعیِ فروشِ نسیه؛ کنارِ کمِ کلِ مرجوعی از دخل)،
+   *  `store_credit` (برای آینده: پرداخت با اعتبارِ فروشگاه). `null` = ردیفِ دستی.
+   *  صندوق `sale_cancel` و `store_credit` را نقد نمی‌شمارد (`CashShift.isCashReceipt`).
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val kind: String? = null,
 )
 
 @Serializable
