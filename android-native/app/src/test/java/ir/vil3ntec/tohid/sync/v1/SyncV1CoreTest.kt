@@ -325,4 +325,21 @@ class SyncV1CoreTest {
     //  ثبت کامل جا شد ⇒ همان دستهٔ همیشه
     assertEquals(230, OpQueue.cut(ops, sizes, maxOps = 500, maxBytes = 1_000_000).size)
   }
+
+  @Test
+  fun `در یک ثبت ردیف‌های برگشت پیش از شمارنده‌هایشان می‌روند`() {
+    //  اگر ثبتِ بزرگِ برگشت ناچار بریده شود، سرِ برگشت در دستهٔ اول داوری می‌شود و شمارنده‌ها پشتش
+    val one = empty().copy(
+      sales = listOf(Sale(id = "s1", finalTotal = 900.0)),
+      saleItems = listOf(SaleItem(id = "si1", saleId = "s1", quantity = 3.0)),
+    )
+    val two = one.copy(
+      sales = listOf(Sale(id = "s1", finalTotal = 900.0, debtSettled = 600.0)),
+      saleItems = listOf(SaleItem(id = "si1", saleId = "s1", quantity = 3.0, returnedQty = 2.0)),
+      saleReturns = listOf(ir.vil3ntec.tohid.data.SaleReturn(id = "r1", saleId = "s1", saleItemId = "si1", quantity = 2.0, amount = 600.0)),
+    )
+    val order = LedgerDiff.diff(LedgerDiff.shadowOf(LedgerDiff.toJson(one)), LedgerDiff.toJson(two)).map { it.table }
+    assertEquals(order.toString(), "returns", order.first())
+    assertTrue(order.toString(), order.indexOf("sales") > 0 && order.indexOf("saleItems") > 0)
+  }
 }

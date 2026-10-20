@@ -35,7 +35,7 @@ const crypto = require('crypto');
 const core = require('./perm-core');
 const slipCore = require('./approval-core');
 const staffPerms = require('./staff-perms');
-const { one, many, query, newId, now, isPglite, getPool } = require('../db');
+const { one, many, query, newId, now } = require('../db');
 const { badRequest, forbidden, notFound, conflict } = require('../middleware/errors');
 const hlc = require('./hlc');
 
@@ -397,44 +397,13 @@ async function returnedTotal(q, ctx, saleId) {
 }
 
 /**
- * قفلِ «سقفِ برگشتِ تجمعی»ِ یک دکان: از داوری تا نوشتنِ برگشت، تا دو دستگاهِ هم‌زمان هر دو
- * زیرِ سقف نگذرند. درون‌فرایندی (pglite و یک فرایند) + قفلِ نشستِ Postgres روی یک اتصالِ جدا
- * (چند فرایند). @returns تابعِ رها کردن (یک بار)
+ * کلیدِ قفلِ «سقفِ برگشتِ تجمعی»ِ یک دکان — فقط داخلِ تراکنشِ push ِ v3
+ * (`pg_advisory_xact_lock`، بی اتصالِ جدا، با پایانِ تراکنش آزاد).
+ * ⚠️ محدودیتِ شناخته: v1 قفل نمی‌گیرد (نگهبان بیرون از تراکنشِ v1 است)؛ دو دستگاهِ v1 ِ
+ * هم‌زمان روی یک فاکتور ممکن است هر دو زیرِ سقف بگذرند. هیچ داده‌ای گم نمی‌شود؛ فقط سقف
+ * یک بار بیش از اندازه پذیرفته می‌شود.
  */
-const localLocks = new Map();
-async function returnsLock(shopId) {
-  const key = `staff-returns:${shopId}`;
-  const prev = localLocks.get(key) || Promise.resolve();
-  let free;
-  const mine = new Promise((r) => { free = r; });
-  const chain = prev.then(() => mine);
-  localLocks.set(key, chain);
-  await prev;
-  let pg = null;
-  if (!isPglite()) {
-    try {
-      pg = await getPool().connect();
-      await pg.query('SELECT pg_advisory_lock(hashtext($1))', [key]);
-    } catch (err) {
-      if (pg) pg.release();
-      free();
-      if (localLocks.get(key) === chain) localLocks.delete(key);
-      throw err;
-    }
-  }
-  let done = false;
-  return async () => {
-    if (done) return;
-    done = true;
-    try {
-      if (pg) await pg.query('SELECT pg_advisory_unlock(hashtext($1))', [key]);
-    } finally {
-      if (pg) pg.release();
-      free();
-      if (localLocks.get(key) === chain) localLocks.delete(key);
-    }
-  };
-}
+function returnsLockKey(shopId) { return `staff-returns:${shopId}`; }
 
 /** سندهای برگشتِ یک دستهٔ v3 (opهای سنجیده‌شده، بومی یا مبدلِ v2) — یا null */
 function returnGroupsOf(ops) {
@@ -727,7 +696,8 @@ async function rememberHeld(p) {
  * (همه‌چیز «مجاز»؛ هرگز سندِ ردشده ندارد) بی هیچ پرس‌وجویی رد می‌شوند.
  *
  * سندی که تصمیمش allow نیست از دسته بیرون می‌آید و پاسخش در جای خودش «rejected» است:
- *   • فاکتور (تخفیف/لغو) هر op جدا؛ برگشت هر سند یک بار، با سقفِ تجمعیِ فاکتور.
+ *   • فاکتور (تخفیف/لغو) هر op جدا؛ برگشت هر سند یک بار، با سقفِ تجمعیِ فاکتور (بی قفل —
+ *     محدودیتِ شناختهٔ دو دستگاهِ هم‌زمان: `returnsLockKey`).
  *   • همراه‌هایش (`companionOf`/`looseOf`) با `tx_rejected` — در همین دسته، یا دسته‌های بعدِ
  *     همین دستگاه تا وقتی سند ننشسته (`heldParents`). وضعیتِ تازه‌ای نیست: هر برنامه‌ای
  *     (حتی کهنه) فقط applied/duplicate/rejected می‌بیند؛ ردیفی که معلوم نیست مالِ سند است اعمال می‌شود.
@@ -741,7 +711,6 @@ async function v1Guard(req, res, next) {
   const ctx = req.sync;
   if (!ctx || ctx.app !== 'shop' || ctx.accountKind !== 'shop' || !ctx.accountId) return next();
   if (ctx.role === 'owner') return next();
-  let release = null;
   try {
     const ops = Array.isArray(req.body?.ops) ? req.body.ops : null;
     if (!ops || !ops.length) return next();
@@ -779,12 +748,6 @@ async function v1Guard(req, res, next) {
 
     //  ۱) سرِ سندها — فاکتور هر op جدا، برگشت هر سند یک بار با سقفِ تجمعیِ فاکتور
     const groups = groupReturns(live.filter((x) => x.need && x.need.perm === 'returns.create'));
-    if (groups.size) {
-      //  از خواندنِ جمعِ برگشت‌ها تا نوشتنِ برگشت در v1: دو دستگاهِ هم‌زمان هر دو زیرِ سقف نگذرند
-      release = await returnsLock(ctx.accountId);
-      res.once('finish', release);
-      res.once('close', release);
-    }
     const judged = new Set();
     const tally = new Map();                     //  فاکتور ⇒ جمعِ برگشتِ ثبت‌شده + پذیرفتهٔ همین دسته
     for (const x of live) {
@@ -876,10 +839,7 @@ async function v1Guard(req, res, next) {
       return send(body);
     };
     next();
-  } catch (err) {
-    if (release) await release().catch(() => {});
-    next(err);
-  }
+  } catch (err) { next(err); }
 }
 
 // ---------- v3 ِ بی tx: همراه‌ها با سندشان یک واحد ----------
@@ -989,6 +949,8 @@ function holdInfoV3(op, groups) {
  * @returns شمارِ واحدهای شکسته
  */
 async function holdV3Units(ctx, deviceId, units) {
+  //  صاحبِ دکان هرگز رد نمی‌شود و صندوقِ کسِ دیگری (حتی روی همان دستگاه) نگهش نمی‌دارد
+  if (ctx.role === 'owner') return 0;
   const loose = units.filter((u) => !u.tx && !u.broken && u.items.every((it) => !it.v2));
   if (!loose.length) return 0;
   const views = loose.flatMap((u) => u.items.flatMap((it) => it.ops.map(v3View)));
@@ -1062,5 +1024,5 @@ module.exports = {
   keyIdOf, parsePublicKey, registerKey, listKeys, revokeKey,
   needOf, needOfV1, verifySignature, acceptSlip, judge, wallOf, slipOf, v1Guard, listApprovals,
   returnDocKey, groupReturns, returnGroupsOf, judgeGroup, companionOf, bundleV3, HOLD_KINDS,
-  returnsLock, returnedTotal, holdInfoV3, holdV3Units, heldTxs,
+  returnsLockKey, returnedTotal, holdInfoV3, holdV3Units, heldTxs,
 };

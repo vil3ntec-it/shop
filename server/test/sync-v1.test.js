@@ -380,3 +380,19 @@ test('version-health: دستگاه‌ها و خطاهای یک نسخه شمرد
   assert.equal((await ask('abc')).status, 400);
   assert.equal((await h.api('GET', '/api/admin/sync/version-health?app=shop&version=9.8.7')).status, 401);
 });
+
+/* ---------------------------- جدول‌های تازه‌ترِ برنامهٔ پمپ (۱۴۰۵/۰۷/۲۸) */
+
+test('پمپ: حواله، مخزن‌ها، تقسیمِ خرید، کالیبره و تبدیلِ تیل «جدولِ ناشناس» نیستند', () => {
+  const sync = require('../src/lib/sync-v1');
+  for (const t of ['HawalaQuota', 'FuelTank', 'TankFill', 'PumpCalibration', 'FuelConversion']) {
+    assert.equal(sync.tableOf('pump', t), t, `${t} در فهرستِ سفیدِ پمپ نیست — opهایش رد می‌شدند`);
+    const v = sync.validateOp('pump', {
+      op_id: '01J' + 'A'.repeat(23), table: t, row_id: 'r-' + t, type: 'insert', ts: Date.now(), fields: { Num: 1 },
+    });
+    assert.notEqual(v.reason, 'unknown_table', t);
+  }
+  //  ⛔ و فهرست باز نشده: نامِ بیگانه همچنان رد
+  assert.equal(sync.tableOf('pump', 'AppUser'), '');
+  assert.equal(sync.tableOf('pump', 'Setting'), '');
+});

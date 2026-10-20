@@ -338,6 +338,23 @@ test('دسته وسطِ یک ثبت (یک ts) بریده نمی‌شود — ه�
   assert.equal(q.batch(500).length, 230);
 });
 
+test('در یک ثبت ردیف‌های برگشت پیش از شمارنده‌هایشان (فاکتور، قلم، اصلاحِ انبار) می‌روند', () => {
+  const before = {
+    sales: [{ id: 's1', finalTotal: 900, debtSettled: 0 }],
+    saleItems: [{ id: 'si1', saleId: 's1', quantity: 3, returnedQty: 0 }],
+  };
+  const after = {
+    warehouseEntries: [{ id: 'w1', productId: 'p1', units: -1, isAdjustment: true }],
+    sales: [{ id: 's1', finalTotal: 900, debtSettled: 600 }],
+    saleItems: [{ id: 'si1', saleId: 's1', quantity: 3, returnedQty: 2 }],
+    returns: [{ id: 'r1', saleId: 's1', saleItemId: 'si1', quantity: 2, amount: 600 }],
+  };
+  const { ops } = core.diff(before, after, { ts: 5 });
+  const order = ops.map((o) => o.table);
+  assert.equal(order[0], 'returns', order.join(','));
+  for (const t of ['warehouseEntries', 'sales', 'saleItems']) assert.ok(order.indexOf(t) > 0, order.join(','));
+});
+
 test('فقط opهای پذیرفته‌شده از صف می‌روند؛ بقیه سرِ جایشان می‌مانند', () => {
   const q = new core.OpQueue(makeDisk().io, 'oplog');
   q.push([{ op_id: 'a' }, { op_id: 'b' }, { op_id: 'c' }]);

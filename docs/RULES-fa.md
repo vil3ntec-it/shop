@@ -1357,6 +1357,11 @@ ADMIN_BOOTSTRAP_USER / ADMIN_BOOTSTRAP_PASSWORD
 
 شرحِ کامل: `docs/LOGIN-fa.md` و `docs/SYNC-v1-fa.md`.
 
+- ⛔ **هر جدولِ همگام‌شوندهٔ برنامهٔ پمپ در `PUMP_TABLES` است** (۱۴۰۵/۰۷/۲۸، 2.14.4):
+  `HawalaQuota`، `FuelTank`، `TankFill`، `PumpCalibration` و `FuelConversion` نبودند و هر
+  opشان «جدولِ ناشناس» می‌گرفت — کامپیوترِ دوم هیچ‌وقت حواله و مخزن‌ها را نمی‌دید. جدولِ
+  تازهٔ برنامه یعنی همین فهرست هم؛ برنامه opهای `unknown_table` را با هر روشن شدن دوباره
+  می‌فرستد. آزمون: `sync-v1.test.js`.
 - ⛔ **کد هیچ‌جا خام نمی‌ماند**: در دفتر `HMAC(app \n email \n code)` و یک
   نسخهٔ AES-GCM که تنها مصرفش «نمایش به مدیر» است و با مصرف یا انقضا پاک
   می‌شود. در لاگ هیچ‌وقت.

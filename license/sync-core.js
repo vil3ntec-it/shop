@@ -68,6 +68,12 @@
     'suppliers', 'purchases', 'supplierPayments',
     'stockMovements', 'priceHistory', 'auditLog',
   ];
+  /**
+   *  ترتیبِ opهای یک ثبت (`diff`): ردیف‌های برگشت پیش از شمارنده‌هایشان (`debtSettled` ِ فاکتور،
+   *  `returnedQty` ِ قلم، اصلاحِ انبار). اگر ثبتِ بزرگ ناچار در دو دسته برود، سرِ برگشت در
+   *  دستهٔ اول داوری می‌شود و شمارنده‌ها پشتِ سرش — نه شمارندهٔ نشسته بی برگشت. همان `LedgerDiff`.
+   */
+  var DIFF_ORDER = ['returns'].concat(COLLECTIONS.filter(function (c) { return c !== 'returns'; }));
 
   /* ==========================================================
      ۱-ب) فهرست‌های تنظیماتی — F0-04 (پلهٔ ۳)
@@ -393,8 +399,8 @@
     var ops = [];
     var counts = { insert: 0, update: 0, delete: 0 };
 
-    for (var c = 0; c < COLLECTIONS.length; c++) {
-      var key = COLLECTIONS[c];
+    for (var c = 0; c < DIFF_ORDER.length; c++) {
+      var key = DIFF_ORDER[c];
       var before = indexById(shadow && shadow[key]);
       var after = indexById(next && next[key]);
       var id;
