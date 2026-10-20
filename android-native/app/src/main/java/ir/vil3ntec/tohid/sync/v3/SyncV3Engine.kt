@@ -205,12 +205,11 @@ internal class SyncV3Engine(
       if (doc) docOps += conv.ops.size
       drafts += Draft(op, V3Entry.V3, conv.ops, "", doc)
     }
-    //  یک ثبت = یک سند (فاکتور با قلم‌ها، لغو، برگشت…) ⇒ همیشه یک tx، هر اندازه: ردِ سند
-    //  (سقف/تأیید) همه را با هم برمی‌گرداند، وگرنه فاکتورِ ۶۰قلمیِ ردشده قلم و بردش را جا می‌گذاشت.
-    //  دفترِ چندفاکتوری (نخستین بارگذاری، بازگردانیِ پشتیبان) سند به سند نیست ⇒ همان سقفِ [TX_GROUP_MAX]
-    val heads = drafts.filter { it.doc && (it.op.table == "sales" || it.op.table == "purchases") }
-      .mapTo(HashSet()) { it.op.table + "/" + it.op.rowId }.size
-    val tx = if (docOps >= 2 && (heads <= 1 || docOps <= TX_GROUP_MAX)) "tx.${ops.first().opId}" else null
+    //  یک ثبت = یک سند (فاکتور با قلم‌ها، لغو، برگشتِ یک فاکتور، یک خرید) ⇒ همیشه یک tx، هر اندازه:
+    //  ردِ سند (سقف/تأیید) همه را با هم برمی‌گرداند، وگرنه فاکتورِ ۶۰قلمیِ ردشده قلم و بردش را جا می‌گذاشت.
+    //  بقیه (دفترِ چندفاکتوری: نخستین بارگذاری، بازگردانیِ پشتیبان؛ یا ثبتِ بی سند) ⇒ همان سقفِ [TX_GROUP_MAX]
+    val single = headsOf(drafts.filter { it.doc }.map { it.op }).size == 1
+    val tx = if (docOps >= 2 && (single || docOps <= TX_GROUP_MAX)) "tx.${ops.first().opId}" else null
     var seq = startSeq
     val entries = drafts.map { d ->
       seq += 1
@@ -221,6 +220,23 @@ internal class SyncV3Engine(
       )
     }
     return entries to seq
+  }
+
+  /**
+   *  «سر»های یک ثبت: هر فاکتور/خریدی که عوض شد، و هر فاکتوری که برگشتی رویش آمد (برگشتِ بی رسید:
+   *  سندِ خودش). یکی ⇒ یک سند.
+   */
+  private fun headsOf(ops: List<SyncOp>): Set<String> = ops.mapNotNullTo(HashSet()) { op ->
+    when (op.table) {
+      "sales", "purchases" -> op.table + "/" + op.rowId
+      "returns" -> if (op.type != SyncOp.INSERT) null else {
+        val f = op.fields
+        val sale = (f?.get("saleId") as? JsonPrimitive)?.content.orEmpty()
+        val doc = (f?.get("docId") as? JsonPrimitive)?.content.orEmpty()
+        if (sale.isNotEmpty()) "sales/$sale" else "returns/" + doc.ifEmpty { op.rowId }
+      }
+      else -> null
+    }
   }
 
   fun load(): SyncV3Engine {

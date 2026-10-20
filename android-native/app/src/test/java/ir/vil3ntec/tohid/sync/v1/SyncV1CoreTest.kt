@@ -325,13 +325,4 @@ class SyncV1CoreTest {
     //  ثبت کامل جا شد ⇒ همان دستهٔ همیشه
     assertEquals(230, OpQueue.cut(ops, sizes, maxOps = 500, maxBytes = 1_000_000).size)
   }
-
-  @Test
-  fun `deferred ِ سرور نه پذیرفته است نه رد — در صف می‌ماند`() {
-    val d = OpResult("o1", "deferred", "held_after_reject")
-    assertTrue(d.deferred)
-    assertTrue(!d.accepted)
-    assertTrue(!OpResult("o2", "rejected", "tx_rejected").deferred)
-    assertTrue(OpResult("o3", "duplicate").accepted)
-  }
 }

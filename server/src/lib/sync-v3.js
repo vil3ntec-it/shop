@@ -753,8 +753,10 @@ async function push(ctx, { deviceId, protocol = PROTOCOL, format = 'v3', schemaV
     }
   });
 
-  //  سندهای برگشتِ این دسته (جمعِ ردیف‌ها زیرِ یک سقف و یک برگه)
+  //  سندهای برگشتِ این دسته (یک برگه و یک تصمیم؛ سقفِ تجمعیِ فاکتور)، و برنامهٔ کهنهٔ بی tx:
+  //  هر سندِ پولی با همراه‌هایش یک واحد (همه یا هیچ)
   const groups = approvals.returnGroupsOf(units.flatMap((u) => u.items.flatMap((it) => it.ops)));
+  const plan = approvals.bundleV3(units, groups);
 
   //  پلِ v3 ⇒ v1 (پرچمِ دکان): بیشترِ عقب‌ماندگیِ v1 ⇒ v3 بیرونِ تراکنشِ push
   const toV1On = await toV1.enabled(ctx);
@@ -774,14 +776,14 @@ async function push(ctx, { deviceId, protocol = PROTOCOL, format = 'v3', schemaV
     let sp = 0;
 
     //  دنبالهٔ tx ای که سرش در دستهٔ پیشین با سقف/تأیید رد شد (tx ِ بزرگ‌تر از یک دسته) ⇒ همان رد
-    const txs = units.filter((u) => u.tx && !u.broken).map((u) => u.tx);
+    const txs = plan.filter((u) => u.tx && !u.broken).map((u) => u.tx);
     if (txs.length) {
       const held = (await c.query(
         `SELECT detail->>'tx' AS tx, loser_op_id FROM sync_v3_conflicts
           WHERE ${ACC} AND kind = ANY($4::text[]) AND detail->>'tx' = ANY($5::text[])`,
         [...acc(ctx), approvals.HOLD_KINDS, txs]
       )).rows;
-      for (const u of units) {
+      for (const u of plan) {
         const hits = u.tx ? held.filter((r) => r.tx === u.tx) : [];
         //  همان tx دوباره (پاسخ گم شد) ⇒ دوباره داوری می‌شود، نه «دنباله»
         const again = hits.some((r) => u.items.some((it) => it.ops.some((o) => o.op_id === r.loser_op_id)));
@@ -789,7 +791,7 @@ async function push(ctx, { deviceId, protocol = PROTOCOL, format = 'v3', schemaV
       }
     }
 
-    for (const unit of units) {
+    for (const unit of plan) {
       if (unit.broken) {
         for (const it of unit.items) results[it.i] = { op_id: it.ops[0].op_id, status: 'rejected', reason: 'tx_rejected' };
         continue;

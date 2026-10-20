@@ -434,5 +434,12 @@ class SyncV3EngineTest {
     //  (هر فاکتورِ قدیمی tx ِ خودش را از `V3Convert` دارد — درج + شمارنده — ولی نه یک tx برای همه)
     assertTrue(bulk.none { it.tx.startsWith("tx.") })
     assertEquals(60, bulk.map { it.tx }.toSet().size)
+
+    //  ثبتِ بی سند (۶۰ حرکتِ انبار، مثلِ شمارش) ⇒ هم سند به سند نیست، همان سقفِ ۵۰
+    a.edit { d -> d.copy(stockMovements = d.stockMovements + (0 until 60).map { StockMovement(id = "cnt-$it", productId = "p1", type = "adjustment", qty = 1.0) }) }
+    assertTrue(a.sync().ok)
+    val moves = server.log.filter { it.rowId.startsWith("cnt-") }
+    assertEquals(60, moves.size)
+    assertTrue(moves.none { it.tx.startsWith("tx.") })
   }
 }
