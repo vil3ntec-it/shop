@@ -103,3 +103,68 @@ test('حسابِ ناموجود ⇒ ۴۰۴، پیش‌نمایش هم', async ()
   assert.equal((await h.get('/api/admin/users/usr_nope/delete-preview', { token: superTok })).status, 404);
   assert.equal((await h.api('DELETE', '/api/admin/users/usr_nope', { token: superTok, body: { confirmEmail: 'a@b.c' } })).status, 404);
 });
+
+/* ── حسابِ بی ایمیل (یافتهٔ بازبینیِ امنیتی) ──────────────────────────
+ * تا امروز تأیید فقط «ایمیلِ همین حساب» بود؛ شاگردِ ورود‌با‌کد (نه ایمیل،
+ * نه شماره) و حسابِ فقط‌شماره هرگز حذف نمی‌شدند (`confirm_mismatch`)، و
+ * کدهای یک‌بارمصرفِ فرستاده به شماره هم پاک نمی‌شد. */
+
+const delUser = (id, body) => h.api('DELETE', `/api/admin/users/${id}`, { token: superTok, body });
+
+test('حسابِ فقط‌شماره: تأیید با همان شماره (در هر قالب)؛ کدهای یک‌بارمصرفِ آن شماره هم می‌روند', async () => {
+  const phone = '0795551234';
+  const asked = await h.post('/api/auth/otp/request', { phone });
+  assert.equal(asked.status, 200, JSON.stringify(asked.body));
+  const made = await h.post('/api/auth/otp/verify', { phone, code: asked.body.devCode, name: 'فقط‌شماره' });
+  assert.equal(made.status, 201, JSON.stringify(made.body));
+  const id = made.body.user.id;
+  const stored = await one('SELECT phone, email FROM users WHERE id=$1', [id]);
+  assert.ok(stored.phone && !stored.email, JSON.stringify(stored));
+  assert.ok(await count('SELECT COUNT(*)::int AS n FROM otp_codes WHERE destination=$1', [stored.phone]) > 0, 'کدِ واقعیِ این شماره در دفتر');
+
+  const pv = await h.get(`/api/admin/users/${id}/delete-preview`, { token: superTok });
+  assert.equal(pv.status, 200);
+  assert.equal(pv.body.confirmWith, 'phone', 'پنل باید بداند چه چیزی را بخواهد');
+
+  const wrong = await delUser(id, { confirm: '0795550000' });
+  assert.equal(wrong.status, 400);
+  assert.equal(wrong.body.error.code, 'confirm_mismatch');
+  assert.ok(await one('SELECT id FROM users WHERE id=$1', [id]), 'تأییدِ نادرست چیزی را نبرد');
+
+  const done = await delUser(id, { confirm: '+93 795 551 234' });
+  assert.equal(done.status, 200, JSON.stringify(done.body));
+  assert.equal(await one('SELECT id FROM users WHERE id=$1', [id]), null);
+  assert.equal(await count('SELECT COUNT(*)::int AS n FROM otp_codes WHERE destination=$1', [stored.phone]), 0,
+    'کدِ یک‌بارمصرفِ فرستاده به شماره ماند');
+});
+
+test('شاگردِ ورود‌با‌کد (نه ایمیل، نه شماره): تأیید با شناسهٔ خودِ حساب', async () => {
+  const o = await h.newUser('صاحبِ دکانِ شاگرد', 'shop');
+  assert.equal((await h.post('/api/shop', { name: 'دکانِ شاگرد' }, { token: o.accessToken })).status, 201);
+  const code = (await h.get('/api/shop/staff-code', { token: o.accessToken })).body.code;
+  const s = await h.post('/api/auth/staff-login', { code, name: 'شاگردِ بی‌ایمیل', device: { uid: 'staff-phone-del', name: 'گوشی', platform: 'android' } });
+  assert.equal(s.status, 201, JSON.stringify(s.body));
+  const id = s.body.user.id;
+  const row = await one('SELECT email, phone FROM users WHERE id=$1', [id]);
+  assert.ok(!row.email && !row.phone, JSON.stringify(row));
+
+  assert.equal((await h.get(`/api/admin/users/${id}/delete-preview`, { token: superTok })).body.confirmWith, 'id');
+  for (const bad of [{}, { confirmEmail: '' }, { confirm: '' }, { confirm: id.toUpperCase() }]) {
+    const r = await delUser(id, bad);
+    assert.equal(r.status, 400, JSON.stringify(bad));
+    assert.equal(r.body.error.code, 'confirm_mismatch');
+  }
+  const done = await delUser(id, { confirm: id });
+  assert.equal(done.status, 200, JSON.stringify(done.body));
+  assert.equal(await one('SELECT id FROM users WHERE id=$1', [id]), null);
+  assert.equal(await count('SELECT COUNT(*)::int AS n FROM shop_members WHERE user_id=$1', [id]), 0);
+  //  دکانِ صاحب دست نخورد
+  assert.equal((await h.get('/api/shop/members', { token: o.accessToken })).status, 200);
+});
+
+test('حسابِ ایمیل‌دار مثلِ پیش: فقط ایمیل؛ شناسه جای آن را نمی‌گیرد', async () => {
+  const u = await h.newUser('ایمیل‌دار', 'shop');
+  assert.equal((await h.get(`/api/admin/users/${u.user.id}/delete-preview`, { token: superTok })).body.confirmWith, 'email');
+  assert.equal((await delUser(u.user.id, { confirm: u.user.id })).status, 400);
+  assert.equal((await delUser(u.user.id, { confirm: u.user.email })).status, 200);
+});

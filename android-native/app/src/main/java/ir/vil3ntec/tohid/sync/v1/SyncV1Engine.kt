@@ -98,12 +98,14 @@ class SyncV1Engine private constructor(context: Context) {
   fun recover(ledger: ShopData) {
     //  Sync v3 پشتِ تنظیمِ هر دستگاه (پیش‌فرض v1) — شرح سرِ `sync/v3/SyncV3Runner.kt`
     if (SyncChoice.isV3(app)) { SyncV3Runner.of(app).recover(ledger); return }
-    if (!commit.pending()) return
-    if (commit.recover(ledger) == SyncCommit.Outcome.MISMATCH) {
+    //  A00: مهرِ سایه پیش از بازیابی خوانده می‌شود؛ سایهٔ بی مهرِ ساختِ پیشین یک بار و پیش از
+    //  نخستین تفاضل درمان، و opهای آن ساخت در صف نشان می‌شوند (شرح سرِ `SyncCommit.start`)
+    val start = commit.start(ledger) { upTo -> state.legacyOpsUpTo = upTo }
+    if (start.outcome == SyncCommit.Outcome.MISMATCH) {
       //  نباید پیش بیاید؛ اگر آمد، دیده شود
       state.lastError = "ژورنالِ همگام‌سازی با سایه نخواند"
     }
-    publish()
+    if (start.outcome != SyncCommit.Outcome.NONE) publish()
   }
 
   /* ==========================================================
@@ -182,8 +184,11 @@ class SyncV1Engine private constructor(context: Context) {
           guard++
           val batch = queue.batch()
           if (batch.isEmpty()) break
+          //  A00: opهای ساختِ پیش از A00 بی `caps` می‌روند تا تورِ سرور null ِ کهنه‌شان را بپالاید
+          val legacy = state.legacyOpsUpTo
+          if (legacy.isNotEmpty() && queue.all().none { LedgerDiff.isLegacyOp(it.opId, legacy) }) state.legacyOpsUpTo = ""
           val out = try {
-            client.push(device, batch, queue.size())
+            client.push(device, batch, queue.size(), caps = LedgerDiff.capsFor(batch.map { it.opId }, state.legacyOpsUpTo))
           } catch (upgrade: SyncV1Client.UpgradeRequired) {
             //  سرور عقب‌تر است: هیچ opی پاک نمی‌شود
             state.holding = true
@@ -416,8 +421,14 @@ class SyncV1Engine private constructor(context: Context) {
     return runCatching { json.parseToJsonElement(raw) as? JsonObject }.getOrNull()
   }
 
+  /**
+   *  سایهٔ Snapshot (`prepare`، `restoreFromServer`) — ⛔ A00: از درِ مدلِ همین ساخت
+   *  (`LedgerDiff.modelTree`)، مثلِ `SyncV3Engine.shape`. ردیفِ خامِ سرور کلیدهایی دارد که
+   *  دفترِ این ساخت نمی‌تواند نگه دارد؛ اگر در سایه می‌ماندند، پس از به‌روزرسانی به ساختی
+   *  که آن‌ها را می‌شناسد نخستین ذخیرهٔ بی‌ربط همه را `null` می‌فرستاد.
+   */
   private fun writeShadow(tree: JsonObject) {
-    state.shadow = LedgerDiff.shadowOf(tree).toString()
+    state.shadow = LedgerDiff.shadowOf(LedgerDiff.modelTree(tree)).toString()
   }
 
   companion object {

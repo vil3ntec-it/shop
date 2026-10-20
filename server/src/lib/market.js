@@ -422,8 +422,9 @@ const SHELF = 8;
 const FEED_MAX = 48;
 const LIST_MAX = 12;
 const POPULAR_DAYS = 30;
-const K_ANON = 3;
-const RELEASED = ['rejected', 'auto_rejected', 'cancelled_by_customer', 'cancelled'];
+//  همان قاعدهٔ «پرفروش» ِ ویترین (#301): k-گمنامی و وضعیت‌های آزادشده
+const { K_ANON } = sf;
+const { RELEASED } = require('./storefront-delivery');
 
 const shelves = new Map();   // shop_id → { at, items }
 let lists = null;            // { at, key, popular, deals }
@@ -578,7 +579,8 @@ async function feed({ category, lat, lng, limit } = {}, at = now()) {
 // ════════════════════════════════════════════════════════════════════
 
 async function myOrders(ticket) {
-  const phone = sf.phoneOfTicket(ticket);
+  //  ناهم‌گام: نسلِ بلیتِ شماره (خروج از همه‌جا / پاک کردنِ حساب) هم سنجیده می‌شود
+  const phone = await sf.verifiedPhoneOfTicket(ticket);
   if (!phone) throw new ApiError(401, 'verification_required', 'برای دیدنِ سفارش‌ها، شمارهٔ خود را تأیید کنید');
   const rows = await many(
     `SELECT o.id, o.shop_id, o.order_no, o.status, o.total_minor, o.items_count, o.fulfillment, o.created_at,
