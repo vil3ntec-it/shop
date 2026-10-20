@@ -109,7 +109,7 @@ async function gateOf(row) {
   return ok;
 }
 
-function clearCache() { gates.clear(); invalidate(); }
+function clearCache() { gates.clear(); shelves.clear(); lists = null; invalidate(); }
 
 async function filterAsync(list, fn) {
   const out = [];
@@ -393,6 +393,174 @@ async function search({ q, lat, lng, limit } = {}, at = now()) {
 }
 
 // ════════════════════════════════════════════════════════════════════
+//  خانهٔ بازارچه: اول کالا، بعد دکان (WEB-02؛ دستورِ صاحب محصول)
+// ════════════════════════════════════════════════════════════════════
+//
+//  «قفسهٔ» هر دکان = تا SHELF کالای منتشرشده، زنده و قیمت‌دار (عکس‌دارها اول،
+//  بعد به ترتیبِ نام) که موجودیِ دانسته‌اش «ناموجود» نیست. قفسه و دو فهرستِ
+//  سراسری `feedCacheMs` در حافظه می‌مانند ⇒ درخواستِ بی‌توکن پایگاه را نمی‌کوبد.
+//  ⛔ هیچ عددِ ساختگی: «پرفروش» فقط از سفارشِ واقعیِ ویترین با k-گمنامی (دست‌کم
+//  K_ANON سفارشِ جدا از K_ANON شمارهٔ جدا در ۳۰ روز، بی آزمایشی/ردشده/لغوشده —
+//  همان قاعدهٔ #301)؛ «ارزان‌تر از قیمتِ دکان» فقط وقتی قیمتِ آنلاینِ خودِ صاحب
+//  دکان کمتر از قیمتِ فروشِ دفترش است. نبودِ داده ⇒ فهرستِ خالی.
+
+const FEED_SHOPS = 24;
+const SHELF = 8;
+const FEED_MAX = 48;
+const LIST_MAX = 12;
+const POPULAR_DAYS = 30;
+const K_ANON = 3;
+const RELEASED = ['rejected', 'auto_rejected', 'cancelled_by_customer', 'cancelled'];
+
+const shelves = new Map();   // shop_id → { at, items }
+let lists = null;            // { at, key, popular, deals }
+
+const suggestable = (p) => !['out_of_stock', 'unavailable'].includes(p.stock && p.stock.status);
+
+/** نمای عمومیِ کالا + قیمتِ فروشِ دفتر فقط وقتی قیمتِ آنلاینِ صاحب دکان کمتر از آن است. */
+function viewOf(row) {
+  const p = sf.productView(row);
+  if (row.online_price_minor === null || row.online_price_minor === undefined || p.priceMinor === null) return p;
+  const d = typeof row.data === 'string' ? JSON.parse(row.data) : row.data || {};
+  const sale = Math.round(Number(d.salePrice) * 100);
+  return Number.isSafeInteger(sale) && sale > p.priceMinor ? { ...p, regularPriceMinor: sale } : p;
+}
+
+async function mapAsync(list, fn) {
+  const out = [];
+  for (let i = 0; i < list.length; i += GATE_BATCH) out.push(...await Promise.all(list.slice(i, i + GATE_BATCH).map(fn)));
+  return out;
+}
+
+/** ۳۲.۳: موجودیِ دانسته از دفترِ سرور (پرچمِ `shop.catalog`)؛ خاموش ⇒ همان «در حال بررسی». */
+async function withStock(shopId, items) {
+  if (!items.length) return items;
+  const st = await require('./catalog').publicStock(shopId, items.map((p) => p.id));
+  return st ? items.map((p) => ({ ...p, stock: st.get(p.id) || p.stock })) : items;
+}
+
+async function shelfOf(shopId) {
+  const ttl = config.market.feedCacheMs;
+  const hit = shelves.get(shopId);
+  if (ttl > 0 && hit && Date.now() - hit.at < ttl) return hit.items;
+  const rows = await many(
+    `SELECT ${sf.PRODUCT_COLS} FROM ${sf.PRODUCT_FROM}
+      WHERE sp.shop_id = $1 AND sp.published AND ${sf.LIVE_PRODUCT} AND COALESCE(r.data->>'name', '') <> ''
+      ORDER BY has_photo DESC, COALESCE(r.data->>'name', ''), r.row_id LIMIT $2`,
+    [shopId, SHELF * 2]
+  );
+  const items = (await withStock(shopId, rows.map(viewOf).filter((p) => p.priceMinor !== null && p.name)))
+    .filter(suggestable).slice(0, SHELF);
+  if (shelves.size > 5000) shelves.clear();
+  shelves.set(shopId, { at: Date.now(), items });
+  return items;
+}
+
+/** کالاهای چند دکان با موجودیِ هر دکان؛ ناموجودِ دانسته بیرون. */
+async function liveWithStock(pairs) {
+  const by = new Map();
+  for (const x of pairs) { if (!by.has(x.shopId)) by.set(x.shopId, []); by.get(x.shopId).push(x.p); }
+  const done = new Map();
+  await mapAsync([...by], async ([shopId, ps]) => {
+    for (const p of await withStock(shopId, ps)) done.set(`${shopId}\u0000${p.id}`, p);
+  });
+  return pairs.map((x) => ({ shopId: x.shopId, p: done.get(`${x.shopId}\u0000${x.p.id}`) })).filter((x) => x.p && suggestable(x.p));
+}
+
+/** «پرفروش» و «ارزان‌تر از قیمتِ دکان» در همهٔ دکان‌های در فهرست. */
+async function globalLists(ids, at) {
+  const ttl = config.market.feedCacheMs;
+  const key = ids.join(',');
+  if (ttl > 0 && lists && lists.key === key && Date.now() - lists.at < ttl) return lists;
+  if (!ids.length) return { popular: [], deals: [] };
+  const [best, cheap] = await Promise.all([
+    many(
+      `SELECT l.shop_id, l.product_id
+         FROM online_order_lines l JOIN online_orders o ON o.id = l.order_id
+        WHERE o.shop_id = ANY($1::text[]) AND l.shop_id = o.shop_id AND o.source = 'storefront' AND NOT o.is_test
+          AND o.created_at >= $2 AND o.status <> ALL($3::text[]) AND l.product_id <> ''
+        GROUP BY l.shop_id, l.product_id
+       HAVING COUNT(DISTINCT l.order_id) >= $4 AND COUNT(DISTINCT o.customer_phone) >= $4
+        ORDER BY COUNT(DISTINCT l.order_id) DESC, SUM(l.qty_milli) DESC, l.shop_id, l.product_id LIMIT 48`,
+      [ids, at - POPULAR_DAYS * 24 * 60 * 60 * 1000, RELEASED, K_ANON]
+    ),
+    many(
+      `SELECT sp.shop_id, ${sf.PRODUCT_COLS} FROM ${sf.PRODUCT_FROM}
+        WHERE sp.shop_id = ANY($1::text[]) AND sp.published AND ${sf.LIVE_PRODUCT}
+          AND COALESCE(r.data->>'name', '') <> '' AND sp.online_price_minor IS NOT NULL
+          AND (r.data->>'salePrice') ~ '^[0-9]{1,12}([.][0-9]{1,4})?$'
+          AND sp.online_price_minor < ROUND((r.data->>'salePrice')::numeric * 100)
+        ORDER BY sp.online_price_minor::numeric / ROUND((r.data->>'salePrice')::numeric * 100), sp.shop_id, r.row_id
+        LIMIT 48`,
+      [ids]
+    ),
+  ]);
+  const live = best.length ? await many(
+    `SELECT sp.shop_id, ${sf.PRODUCT_COLS} FROM ${sf.PRODUCT_FROM}
+      WHERE (sp.shop_id, sp.product_id) IN (SELECT * FROM unnest($1::text[], $2::text[]))
+        AND sp.published AND ${sf.LIVE_PRODUCT}`,
+    [best.map((r) => r.shop_id), best.map((r) => r.product_id)]
+  ) : [];
+  const byKey = new Map(live.map((r) => [`${r.shop_id}\u0000${r.id}`, r]));
+  const popular = best.map((b) => byKey.get(`${b.shop_id}\u0000${b.product_id}`)).filter(Boolean)
+    .map((r) => ({ shopId: r.shop_id, p: viewOf(r) }));
+  const deals = cheap.map((r) => ({ shopId: r.shop_id, p: viewOf(r) }));
+  const ok = (x) => x.p.priceMinor !== null && x.p.name;
+  const out = {
+    at: Date.now(), key,
+    popular: await liveWithStock(popular.filter(ok)),
+    deals: (await liveWithStock(deals.filter(ok))).filter((x) => x.p.regularPriceMinor > 0),
+  };
+  lists = out;
+  return out;
+}
+
+function feedItem(card, p) {
+  return {
+    id: p.id, name: p.name, unit: p.unit, category: p.category, priceMinor: p.priceMinor,
+    ...(p.regularPriceMinor ? { regularPriceMinor: p.regularPriceMinor } : {}),
+    maxQtyMilli: p.maxQtyMilli, photo: p.photo, stock: p.stock,
+    shop: {
+      slug: card.slug, title: card.title, accent: card.accent,
+      badge: card.status.badge, orderAcceptance: card.status.orderAcceptance, distanceKm: card.distanceKm,
+    },
+  };
+}
+
+/**
+ * نمای اولِ خانه: کالاهای دکان‌های بالای رتبه (به نوبت از هر دکان، «نزدیکِ من»
+ * ⇒ نزدیک‌ترها اول)، «پرفروش» و «ارزان‌تر از قیمتِ دکان» ِ واقعی، و دکان‌های
+ * پیشنهادی با عکسِ یکی از کالاهای خودشان.
+ */
+async function feed({ category, lat, lng, limit } = {}, at = now()) {
+  const near = geoOf(lat, lng);
+  const cat = str(category);
+  if (cat && !CATEGORY_KEYS.has(cat)) throw badRequest('دستهٔ دکان معتبر نیست', 'bad_category');
+  const lim = Math.min(FEED_MAX, Math.max(1, Number.parseInt(limit, 10) || 24));
+  const list = await eligible(at);
+  const cards = list.map((e) => ({ id: e.row.shop_id, c: cardOf(e, near) }));
+  const byId = new Map(cards.map((x) => [x.id, x.c]));
+  const inCat = cards.filter((x) => !cat || x.c.category === cat).sort((a, b) => rank(near)(a.c, b.c));
+  const top = inCat.slice(0, FEED_SHOPS);
+  const sh = await mapAsync(top, (x) => shelfOf(x.id));
+  const items = [];
+  for (let i = 0; i < SHELF && items.length < lim; i++) {
+    top.forEach((x, j) => { if (sh[j][i] && items.length < lim) items.push(feedItem(x.c, sh[j][i])); });
+  }
+  const g = await globalLists(cards.map((x) => x.id).sort(), at);
+  const allowed = new Set(inCat.map((x) => x.id));
+  const pick = (arr) => arr.filter((x) => allowed.has(x.shopId)).slice(0, LIST_MAX).map((x) => feedItem(byId.get(x.shopId), x.p));
+  return {
+    items,
+    popular: pick(g.popular),
+    deals: pick(g.deals),
+    windowDays: POPULAR_DAYS,
+    shops: top.slice(0, 6).map((x, j) => ({ ...x.c, cover: (sh[j].find((p) => p.photo) || {}).id || null })),
+    shopTotal: inCat.length,
+  };
+}
+
+// ════════════════════════════════════════════════════════════════════
 //  «سفارش‌های من» از همهٔ ویترین‌ها (S138)
 // ════════════════════════════════════════════════════════════════════
 
@@ -490,6 +658,6 @@ async function requireStorefrontFlag(shopId) {
 
 module.exports = {
   FLAG_KEY, CATEGORIES,
-  directoryOn, requireOn, clearCache, stats, eligible, overview, shops, search, myOrders,
+  directoryOn, requireOn, clearCache, stats, eligible, overview, shops, search, feed, myOrders,
   geoOf, distanceKm, listingOf, saveListing, requireStorefrontFlag,
 };

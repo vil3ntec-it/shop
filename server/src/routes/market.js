@@ -42,6 +42,12 @@ router.get('/shops', readLimit, on, wrap(async (req, res) => {
   res.json(await market.shops({ q, category, lat, lng, limit, offset }));
 }));
 
+//  خانه: اول کالا (قفسهٔ دکان‌ها، «پرفروش» و «ارزان‌تر» ِ واقعی)، بعد دکان‌های پیشنهادی
+router.get('/products', readLimit, on, wrap(async (req, res) => {
+  const { category, lat, lng, limit } = req.query;
+  res.json(await market.feed({ category, lat, lng, limit }));
+}));
+
 router.get('/search', searchBurst, searchLimit, on, wrap(async (req, res) => {
   const { q, lat, lng, limit } = req.query;
   res.json(await market.search({ q, lat, lng, limit }));
