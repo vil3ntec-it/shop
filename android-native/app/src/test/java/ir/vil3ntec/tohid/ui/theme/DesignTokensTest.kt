@@ -10,12 +10,11 @@ import org.junit.Test
 import java.io.File
 
 /**
- *  توکن‌های طراحی — MASTER-SPEC ۵.۴ و VISUAL-DIRECTION «نسخهٔ ۲».
+ *  توکن‌های طراحی — MASTER-SPEC ۵.۴ و سیستمِ رنگِ VILL3N (§۱۱).
  *
- *  ۱. گِردیِ همهٔ نقش‌ها (`Shape`، `Radius`، `ShopShapes`) همان جدولِ نسخهٔ ۲ است:
- *     کنترل ۱۲، کارت ۱۶، پنل/پنجره ۲۰، تراشه قرصی. عدد فقط با تصمیمِ ظاهری این‌جا
- *     عوض می‌شود (نسخهٔ ۱: کامپیوتر ۶/۸/۱۰، لمسی ۱۸/۲۰/۲۸ — نقدِ صاحب محصول در ۱۴۰۵/۰۷/۲۷:
- *     «همهٔ جعبه‌ها چهارگوش و تیزند»).
+ *  ۱. گِردیِ همهٔ نقش‌ها (`Shape`، `Radius`، `ShopShapes`) همان جدولِ VILL3N است:
+ *     دکمه و کادر ۱۰، کارت ۱۲، کارتِ ویژه/پنجره ۱۶، تراشه قرصی. عدد فقط با تصمیمِ
+ *     ظاهری این‌جا عوض می‌شود (نسخهٔ ۲: ۱۲/۱۶/۲۰؛ نسخهٔ ۱: کامپیوتر ۶/۸/۱۰، لمسی ۱۸/۲۰/۲۸).
  *  ۲. یک پلهٔ گِردی برای همهٔ سکوها (کامپیوتر = لمسی = وب)، ۸ تا ۲۰ و روی پلهٔ ۲.
  *     فاصله‌ها روی پلهٔ ۴ (شبکهٔ ۸ با نیم‌پلهٔ ۴).
  *  ۳. تایپوگرافیِ وزیرمتن با آزمونِ پشتو (۵.۴): همهٔ وزن‌های برنامه و وب حرف‌های ویژهٔ پشتو،
@@ -30,40 +29,40 @@ class DesignTokensTest {
   private fun round(desk: Int, touch: Int) = RoundedCornerShape(pick(desk, touch))
 
   @Test
-  fun `گِردیِ نقش‌ها همان جدولِ نسخهٔ ۲ است — کنترل ۱۲، کارت ۱۶، پنل ۲۰، تراشه قرصی`() {
-    assertEquals(round(12, 12), Shape.button)
-    assertEquals(round(12, 12), Shape.field)
-    assertEquals(round(16, 16), Shape.card)
-    assertEquals(round(20, 20), Shape.cardLarge)
-    assertEquals(round(20, 20), Shape.dialog)
-    assertEquals(RoundedCornerShape(topStart = pick(20, 20), topEnd = pick(20, 20)), Shape.sheet)
+  fun `گِردیِ نقش‌ها همان جدولِ VILL3N است — دکمه و کادر ۱۰، کارت ۱۲، کارتِ ویژه ۱۶، تراشه قرصی`() {
+    assertEquals(round(10, 10), Shape.button)
+    assertEquals(round(10, 10), Shape.field)
+    assertEquals(round(12, 12), Shape.card)
+    assertEquals(round(16, 16), Shape.cardLarge)
+    assertEquals(round(16, 16), Shape.dialog)
+    assertEquals(RoundedCornerShape(topStart = pick(16, 16), topEnd = pick(16, 16)), Shape.sheet)
     assertEquals(RoundedCornerShape(999.dp), Shape.chip)
     assertEquals(RoundedCornerShape(999.dp), Shape.badge)
     assertEquals(round(10, 10), Shape.icon)
 
-    assertEquals(pick(12, 12), Radius.sm)
-    assertEquals(pick(16, 16), Radius.md)
-    assertEquals(pick(20, 20), Radius.lg)
+    assertEquals(pick(10, 10), Radius.sm)
+    assertEquals(pick(12, 12), Radius.md)
+    assertEquals(pick(16, 16), Radius.lg)
 
     //  کادرِ متن و منوی متریال از extraSmall ⇒ کنترل؛ کارت از medium؛ پنجره از extraLarge
-    assertEquals(round(12, 12), ShopShapes.extraSmall)
+    assertEquals(round(10, 10), ShopShapes.extraSmall)
     //  تراشه‌های متریال از small ⇒ قرصیِ کامل («chips/pills full»)
     assertEquals(RoundedCornerShape(999.dp), ShopShapes.small)
-    assertEquals(round(16, 16), ShopShapes.medium)
-    assertEquals(round(16, 16), ShopShapes.large)
-    assertEquals(round(20, 20), ShopShapes.extraLarge)
+    assertEquals(round(12, 12), ShopShapes.medium)
+    assertEquals(round(12, 12), ShopShapes.large)
+    assertEquals(round(16, 16), ShopShapes.extraLarge)
 
-    assertEquals(12.dp, Corner.CONTROL)
-    assertEquals(16.dp, Corner.CARD)
-    assertEquals(20.dp, Corner.PANEL)
+    assertEquals(10.dp, Corner.CONTROL)
+    assertEquals(12.dp, Corner.CARD)
+    assertEquals(16.dp, Corner.PANEL)
   }
 
   @Test
   fun `فاصله و سایه همان عددهای پیشین‌اند`() {
     assertEquals(listOf(4, 8, 12, 16, 20, 24, 32).map { it.dp }, listOf(Space.xxs, Space.xs, Space.sm, Space.md, Space.lg, Space.xl, Space.xxl))
     assertEquals(listOf(0, 1, 6, 10).map { it.dp }, listOf(Elevation.flat, Elevation.raised, Elevation.floating, Elevation.overlay))
-    //  نسخهٔ ۲: سایهٔ نرمِ کارت و چیزِ شناور — کارت پایین‌تر از شناور
-    assertEquals(listOf(6, 14).map { it.dp }, listOf(Elevation.card, Elevation.lifted))
+    //  VILL3N §۱۱: سایهٔ سبکِ کارت (0 3px 12px) و کارتِ ویژه/شناور (0 8px 24px) — کارت پایین‌تر
+    assertEquals(listOf(3, 8).map { it.dp }, listOf(Elevation.card, Elevation.lifted))
   }
 
   @Test

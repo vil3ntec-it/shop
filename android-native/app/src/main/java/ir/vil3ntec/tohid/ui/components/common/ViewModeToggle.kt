@@ -109,7 +109,7 @@ fun ViewModeToggle(state: ViewModeState, modifier: Modifier = Modifier) {
         Icon(
           if (m == ViewMode.CARD) Icons.Filled.GridView else Icons.Filled.TableRows,
           contentDescription = null,
-          tint = if (on) colors.primary else colors.muted,
+          tint = if (on) colors.iconActive else colors.icon,
           modifier = Modifier.size(18.dp),
         )
       }

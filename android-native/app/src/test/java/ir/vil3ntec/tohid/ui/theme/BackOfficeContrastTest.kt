@@ -69,28 +69,54 @@ class BackOfficeContrastTest {
       //  شمارِ زبانه: متن روی تینتِ خنثی
       check(bad, theme, "text روی شمارِ زبانه", c.text, c.muted.copy(alpha = NEUTRAL_TINT).compositeOver(c.bg))
     }
-    //  متنِ دکمهٔ اصلی و دکمهٔ حذف — همان onPrimary/onError ِ TohidTheme
-    check(bad, "روز", "onPrimary روی primary", Color.White, LightColors.primary)
-    check(bad, "شب", "onPrimary روی primary", Color(0xFF04121F), DarkColors.primary)
-    check(bad, "روز", "onError روی danger", Color.White, LightColors.danger)
-    check(bad, "شب", "onError روی danger", Color(0xFF2A0B09), DarkColors.danger)
+    //  متنِ دکمهٔ اصلی و دکمهٔ حذف — همان onPrimary/onError ِ طرحِ متریالِ TohidTheme
+    //  (`materialScheme`)، و رنگِ اصلی/خطای متریال به‌عنوانِ متن روی کارت و پنجره:
+    //  `TextButton`، `OutlinedButton` و برچسبِ کادرِ فعال با `primary` نوشته می‌شوند.
+    for ((theme, c) in listOf("روز" to LightColors, "شب" to DarkColors)) {
+      val m = materialScheme(c)
+      check(bad, theme, "onPrimary روی primary", m.onPrimary, m.primary)
+      check(bad, theme, "onError روی error", m.onError, m.error)
+      check(bad, theme, "primary (متنِ TextButton) روی surface", m.primary, m.surface)
+      check(bad, theme, "error (متنِ خطا) روی surface", m.error, m.surface)
+      check(bad, theme, "onSurfaceVariant روی surface", m.onSurfaceVariant, m.surface)
+      check(bad, theme, "onPrimaryContainer روی primaryContainer", m.onPrimaryContainer, m.primaryContainer)
+      check(bad, theme, "onSecondaryContainer روی secondaryContainer", m.onSecondaryContainer, m.secondaryContainer)
+      check(bad, theme, "inverseOnSurface روی inverseSurface (اسنک‌بار)", m.inverseOnSurface, m.inverseSurface)
+      check(bad, theme, "inversePrimary روی inverseSurface (کارِ اسنک‌بار)", m.inversePrimary, m.inverseSurface)
+    }
     assertTrue("زیرِ ۴٫۵:۱ — $bad", bad.isEmpty())
   }
 
   @Test
-  fun `سطح‌های کارِ روز توپرند — شیشه نیست`() {
-    //  VISUAL-DIRECTION §۱ بند ۱: کارتِ سفیدِ توپر روی زمینهٔ خنثی
-    assertEquals(1f, LightColors.surface.alpha)
-    assertEquals(1f, LightColors.surfaceSolid.alpha)
-    assertTrue("خطِ دورِ کارت باید تیره و نازک باشد، نه لبهٔ سفیدِ شیشه", LightColors.border.luminance() < 0.1f && LightColors.border.alpha < 0.2f)
+  fun `سطح‌های کار توپرند و خطِ دورِ کارت دیدنی است — شیشه نیست`() {
+    //  VISUAL-DIRECTION §۱ بند ۱: کارتِ سفیدِ توپر روی زمینهٔ خنثی.
+    //  VILL3N §۶ (جای قاعدهٔ «خطِ مویی ۷٪»ِ نسخهٔ ۲): «کارتِ سفید روی زمینهٔ روشن بی خطِ
+    //  دورِ دیدنی نه؛ سایه جای خط را نمی‌گیرد» ⇒ خطِ دور توپر و از کارت و زمینه تیره‌تر.
+    for ((theme, c) in listOf("روز" to LightColors, "شب" to DarkColors)) {
+      for ((name, v) in listOf("surface" to c.surface, "surfaceSolid" to c.surfaceSolid, "border" to c.border, "fieldBorder" to c.fieldBorder)) {
+        assertEquals("$theme: $name توپر است", 1f, v.alpha)
+      }
+      if (theme == "روز") {
+        assertTrue("روز: خطِ دورِ کارت تیره‌تر از کارت و زمینه", c.border.luminance() < c.surface.luminance() && c.border.luminance() < c.bg.luminance())
+        assertTrue("روز: خطِ کادرِ ورودی پررنگ‌تر از خطِ کارت", c.fieldBorder.luminance() < c.border.luminance())
+      } else {
+        assertTrue("شب: خطِ دورِ کارت روشن‌تر از کارت و زمینه", c.border.luminance() > c.surface.luminance() && c.border.luminance() > c.bg.luminance())
+        assertTrue("شب: خطِ کادرِ ورودی پررنگ‌تر از خطِ کارت", c.fieldBorder.luminance() > c.border.luminance())
+      }
+      //  «دیدنی»: دستِ‌کم ۱٫۲۵:۱ با کارت و با زمینه (روز: ۱٫۳۶ و ۱٫۲۵؛ شب: ۱٫۶۱ و ۱٫۸۹)
+      assertTrue("$theme: خطِ دور روی کارت ${contrast(c.border, c.surface)}", contrast(c.border, c.surface) >= 1.25f)
+      assertTrue("$theme: خطِ دور روی زمینه ${contrast(c.border, c.bg)}", contrast(c.border, c.bg) >= 1.24f)
+    }
   }
 
   @Test
-  fun `نسخهٔ ۲ — خطِ دور مویی است و سه ناحیه از هم جدا دیده می‌شوند`() {
+  fun `زمینه، کارت و سطحِ درونی جدا دیده می‌شوند و ناحیه‌ها هم‌رنگ نیستند`() {
     for ((theme, c) in listOf("روز" to LightColors, "شب" to DarkColors)) {
-      //  «همه‌جا خطِ تیره» (نقدِ ۱۴۰۵/۰۷/۲۷): خطِ دورِ کارت حداکثر ۸٪
-      assertTrue("$theme: خطِ دورِ کارت ${c.border.alpha} مویی نیست", c.border.alpha <= 0.08f)
-      //  کارت، منو، کاتالوگ (bg) و سبد هر کدام رنگِ خودشان را دارند — «همهٔ جعبه‌ها یک رنگ‌اند»
+      //  VILL3N §۶: سطحِ ۰ ≠ ۱ ≠ ۲، و «کارت در شب هرگز با زمینه یکی نشود»
+      val levels = listOf(c.background, c.backgroundSubtle, c.surface, c.surfaceElevated, c.surfaceSelected)
+      assertEquals("$theme: دو سطح هم‌رنگ‌اند", levels.size, levels.toSet().size)
+      assertTrue("$theme: کارت باید روشن‌تر از زمینه باشد", c.surface.luminance() > c.bg.luminance())
+      //  کارت، منو، کاتالوگ (bg) و سبد هر کدام رنگِ خودشان را دارند — «همهٔ جعبه‌ها یک رنگ‌اند» (نقدِ نسخهٔ ۲)
       val zones = listOf(c.surface, c.zoneNav, c.bg, c.zoneCart)
       assertEquals("$theme: دو ناحیه هم‌رنگ‌اند", zones.size, zones.toSet().size)
       for (z in listOf(c.zoneNav, c.zoneCart, c.surface, c.bg)) assertEquals("$theme: ناحیه توپر است", 1f, z.alpha)
