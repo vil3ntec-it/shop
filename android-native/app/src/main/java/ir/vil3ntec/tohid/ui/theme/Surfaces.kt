@@ -12,20 +12,21 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /*
- *  سطح‌های نسخهٔ ۲ — VISUAL-DIRECTION «نسخهٔ ۲».
+ *  سطح‌ها — سیستمِ رنگِ VILL3N (§۶).
  *
- *  صاحب محصول (۱۴۰۵/۰۷/۲۷): «همه‌جا خطِ تیره، همهٔ جعبه‌ها یک رنگ، هیچ چیز
- *  شناخته نمی‌شود». پس:
- *   • کارت = سطحِ سفید + گوشهٔ ۱۶ + سایهٔ نرمِ پهن + لبهٔ مویی (۷٪). خطِ تیره نه.
- *   • ناحیه = زمینهٔ رنگیِ خودش (منو، کاتالوگ، سبد)، نه یک کارتِ دیگر با همان رنگ.
+ *  سطحِ ۰ زمینهٔ صفحه، ۱ کارت و پنل، ۲ بخشِ درونی؛ هر کدام رنگِ خودش. کارت =
+ *  `surface` + خطِ دورِ یک‌پیکسلیِ `borderCard` + سایهٔ سبک. «کارتِ سفید روی زمینهٔ
+ *  سفید بی خطِ دورِ دیدنی نه؛ سایه هرگز جای خط را نمی‌گیرد.» در شب هم خطِ دورِ
+ *  خاکستری و سطح‌های جدا (کارت هرگز با زمینه یکی نمی‌شود).
  *  صفحه‌ها رنگ و گوشه را از این‌جا می‌گیرند، نه عدد در صفحه (`HardcodedColorsTest`).
  */
 
 /**
- *  کارتِ نرم: سایهٔ پهن و کم‌رنگ، گوشهٔ گرد و لبهٔ مویی.
+ *  کارت: سطحِ ۱، گوشهٔ گرد، خطِ دورِ `borderCard` و سایهٔ سبک.
  *
  *  رنگِ سایه ضریب است، نه رنگِ نهایی: Compose آن را در آلفای سایهٔ سامانه
- *  (حدودِ ۱۹٪) ضرب می‌کند؛ پس `ShopColors.shadow` با آلفای بالا سایه‌ای کم‌رنگ می‌دهد.
+ *  ضرب می‌کند (`ShopColors.shadow`). `hairline = false` فقط برای چیزی که خطِ
+ *  دورِ خودش را جدا می‌کشد.
  */
 fun Modifier.softCard(
   colors: ShopColors,
@@ -37,23 +38,29 @@ fun Modifier.softCard(
   .shadow(elevation, shape, clip = false, ambientColor = colors.shadow, spotColor = colors.shadow)
   .clip(shape)
   .background(fill, shape)
-  .then(if (hairline) Modifier.border(1.dp, colors.border, shape) else Modifier)
+  .then(if (hairline) Modifier.border(1.dp, colors.borderCard, shape) else Modifier)
 
-/** ناحیه (منو، کاتالوگ، سبد): زمینهٔ رنگیِ گرد، بی سایه و بی خط */
-fun Modifier.zone(fill: Color, shape: androidx.compose.ui.graphics.Shape = Shape.cardLarge): Modifier =
-  this.clip(shape).background(fill, shape)
+/**
+ *  ناحیه (منو، کاتالوگ، سبد): زمینهٔ رنگیِ گرد، بی سایه. با `border` مرزِ ناحیه
+ *  دیده می‌شود («میزِ کامپیوتر: پنلِ کناری جدا از محتوا»).
+ */
+fun Modifier.zone(
+  fill: Color,
+  shape: androidx.compose.ui.graphics.Shape = Shape.cardLarge,
+  border: Color? = null,
+): Modifier =
+  this.clip(shape).background(fill, shape).then(if (border != null) Modifier.border(1.dp, border, shape) else Modifier)
 
 /** گوشهٔ گزینهٔ درونِ شیار — ۳ کمتر از کنترل تا با فاصلهٔ ۳ هم‌مرکز بنشیند */
 val SegmentInnerShape = RoundedCornerShape(Corner.CONTROL - 3.dp)
 
 /**
- *  شیارِ کنترلِ قطعه‌ای (زبانه‌ها، کلیدِ نما، روشِ پرداخت): زمینهٔ فرورفته و گزینهٔ
- *  انتخاب‌شدهٔ سفیدِ برآمده — نه خطِ دور دورِ هر گزینه. شیار همان رنگِ سردِ
- *  `zoneNav` است: در روز کمی تیره‌تر از زمینه و در شب تیره‌تر از کارت.
+ *  شیارِ کنترلِ قطعه‌ای (زبانه‌ها، کلیدِ نما، روشِ پرداخت): زمینهٔ فرعیِ فرورفته
+ *  (`backgroundSubtle`) و گزینهٔ انتخاب‌شدهٔ برآمده روی کارت — نه خطِ دور دورِ هر گزینه.
  */
 fun Modifier.segmentTrack(colors: ShopColors): Modifier =
-  this.clip(Shape.button).background(colors.zoneNav, Shape.button).padding(3.dp)
+  this.clip(Shape.button).background(colors.backgroundSubtle, Shape.button).padding(3.dp)
 
-/** گزینهٔ انتخاب‌شده درونِ `segmentTrack` */
+/** گزینهٔ انتخاب‌شده درونِ `segmentTrack`: سطحِ کارت با خطِ دور */
 fun Modifier.segmentSelected(colors: ShopColors): Modifier =
   this.softCard(colors, SegmentInnerShape, fill = colors.surface, elevation = Elevation.raised)

@@ -62,11 +62,11 @@ fun StatCard(
   onClick: (() -> Unit)? = null,
 ) {
   val c = Shop.colors
-  //  نسخهٔ ۲: کارتِ نرم (سایه، گوشهٔ ۱۶، لبهٔ مویی) — نه خطِ دورِ تیره
+  //  VILL3N: کارتِ سطحِ ۱ با خطِ دورِ دیدنی و سایهٔ سبک؛ کارتِ انتخاب‌شده خطِ برند
   Column(
     modifier
       .softCard(c, Shape.card)
-      .then(if (selected) Modifier.border(2.dp, c.primary, Shape.card) else Modifier)
+      .then(if (selected) Modifier.border(2.dp, c.focus, Shape.card) else Modifier)
       .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClickLabel = "نمایشِ فهرست", onClick = onClick) else Modifier)
       .semantics {
         contentDescription = listOfNotNull(title, value, delta?.text, period).joinToString("، ")
@@ -76,8 +76,8 @@ fun StatCard(
   ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
       if (icon != null) {
-        Box(Modifier.size(32.dp).clip(Shape.icon).background(c.primaryTint), contentAlignment = Alignment.Center) {
-          Icon(icon, null, tint = c.primaryDark, modifier = Modifier.size(18.dp))
+        Box(Modifier.size(32.dp).clip(Shape.icon).background(c.surfaceSelected), contentAlignment = Alignment.Center) {
+          Icon(icon, null, tint = c.iconActive, modifier = Modifier.size(18.dp))
         }
         Spacer(Modifier.width(10.dp))
       }

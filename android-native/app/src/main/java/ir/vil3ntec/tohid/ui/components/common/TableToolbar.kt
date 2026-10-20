@@ -110,7 +110,7 @@ fun SearchBox(
         onValueChange = onQuery,
         singleLine = true,
         textStyle = MaterialTheme.typography.bodyMedium.copy(color = c.text),
-        cursorBrush = SolidColor(c.primary),
+        cursorBrush = SolidColor(c.focus),
         modifier = Modifier.fillMaxWidth().then(if (focus != null) Modifier.focusRequester(focus) else Modifier),
       )
     }
@@ -145,7 +145,7 @@ fun <T> FilterMenu(
         .height(h)
         .clip(Shape.button)
         .background(if (selected != null) c.primaryTint else c.fieldBg)
-        .border(1.dp, if (selected != null) c.primary.copy(alpha = 0.35f) else c.fieldBorder, Shape.button)
+        .border(1.dp, if (selected != null) c.focus else c.fieldBorder, Shape.button)
         .clickable(role = Role.DropdownList) { open = true }
         .padding(horizontal = 12.dp),
       verticalAlignment = Alignment.CenterVertically,
