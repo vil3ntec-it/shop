@@ -48,6 +48,19 @@ router.get('/me', wrap(async (req, res) => {
   });
 }));
 
+/**
+ * «نقدِ من» و آمار (DLV-11/12، فقط خواندن): نقدِ در دست، سقف و جای خالی،
+ * تحویل‌شده‌های تسویه‌نشده، تسویه‌های خودش، شمارِ امروز/هفته و نام و شمارهٔ
+ * دکان (برای «تماس با دکان»). `?today=&week=` = آغازِ بازه به میلی‌ثانیه.
+ * ⛔ فقط دادهٔ همین پیک؛ پیکِ دیگر یا دکانِ دیگر هیچ‌چیزِ این را نمی‌بیند.
+ */
+router.get('/summary', wrap(async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json(await delivery.courierSummary(req.shopId, req.courier, {
+    today: req.query.today, week: req.query.week,
+  }));
+}));
+
 router.get('/missions', wrap(async (req, res) => {
   res.json(await delivery.missions(req.shopId, req.courier.id, {
     scope: String(req.query.scope || 'active'), limit: req.query.limit,

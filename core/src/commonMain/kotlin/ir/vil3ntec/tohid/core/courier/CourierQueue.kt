@@ -272,6 +272,8 @@ data class MissionCard(
   val photoAllowed: Boolean = false,
   val recallRequested: Boolean = false,
   val updatedAt: Long = 0,
+  /** خطِ زمانی به زمانِ سرور (`CourierBoardModel.track`) — بی نشانی، پس پس از پایان هم می‌ماند */
+  val timeline: List<MissionStep> = emptyList(),
 )
 
 object MissionView {

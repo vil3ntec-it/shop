@@ -58,6 +58,42 @@ class CourierWireTest {
     assertNull(CourierWire.card(obj("""{"status":"moving"}""")))
   }
 
+  @Test fun `خطِ زمانیِ مأموریت و «نقدِ من» همان کلیدهای سرور را می‌خوانند`() {
+    val c = CourierWire.card(obj("""
+      {"id":"A","orderNo":12,"status":"moving","timeline":[
+        {"kind":"created","to":"requested","at":100,"reason":"","by":"shop"},
+        {"kind":"status","to":"failed","at":200,"reason":"no_answer","by":"courier"},
+        {"kind":"status","to":"moving"}]}
+    """))!!
+    assertEquals(2, c.timeline.size)
+    assertEquals("no_answer", c.timeline[1].reason)
+    assertEquals("courier", c.timeline[1].by)
+    assertTrue(CourierWire.card(obj("""{"id":"B","status":"moving"}"""))!!.timeline.isEmpty())
+
+    val s = CourierWire.summary(obj("""
+      {"courier":{"name":"پیک","active":true},"shop":{"name":"دکان","phone":"0700000000"},
+       "cash":{"inHandMinor":98000,"liveExpectedMinor":552000,"capMinor":1000000,"headroomMinor":350000,"liveCount":3},
+       "unsettled":[{"orderNo":1038,"deliveredAt":5,"expectedCollectMinor":98000,"cashCollectedMinor":98000,"fareMinor":5000}],
+       "settlements":[{"settleNo":11,"at":7,"status":"confirmed","assignmentsCount":4,"collectedCashMinor":920000,
+         "fareTotalMinor":28000,"handoverDueMinor":920000,"receivedMinor":900000,"shortageMinor":20000,"excessMinor":0,"reason":"کسری"}],
+       "stats":{"today":{"from":1,"delivered":2,"failed":1,"collectedCashMinor":98000,"fareMinor":11000},
+                "week":{"from":0,"delivered":14,"failed":2,"collectedCashMinor":3120000,"fareMinor":76000}},
+       "serverTime":9}
+    """))
+    assertEquals("دکان", s.shopName)
+    assertEquals("0700000000", s.shopPhone)
+    assertEquals(98_000L, s.cashInHandMinor)
+    assertEquals(350_000L, s.headroomMinor)
+    assertEquals(1038L, s.unsettled.single().orderNo)
+    assertEquals(20_000L, s.settlements.single().shortageMinor)
+    assertEquals(2, s.today.delivered)
+    assertEquals(3_120_000L, s.week.collectedCashMinor)
+    //  کلیدِ ناپیدا ⇒ صفر/خالی، نه خطا
+    val empty = CourierWire.summary(obj("{}"))
+    assertEquals(0L, empty.cashCapMinor)
+    assertTrue(empty.settlements.isEmpty())
+  }
+
   @Test fun `پاسخِ رویداد`() {
     val r = CourierWire.result(obj("""{"eventId":"cev-x","status":"rejected","code":"bad_code","message":"کد درست نیست"}"""))
     assertEquals("rejected", r.status)
