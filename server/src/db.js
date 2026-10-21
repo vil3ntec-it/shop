@@ -41,12 +41,21 @@ function pgliteDir(url = config.db.url) {
 
 let pool = null;
 let shuttingDown = false;
+/**
+ * `closeDb()` زده شده (خاموش شدن، یا پایانِ یک فایلِ آزمون). سنجشِ
+ * پس‌زمینهٔ `healthy()` (تیکِ ۵ثانیه‌ایِ app.js) دیتابیس را دوباره باز
+ * نمی‌کند؛ فقط کارِ واقعی (`query`/`tx`) باز می‌کند.
+ * ⛔ بی این، تیک پس از بستن استخرِ تازه‌ای می‌ساخت که اتصالش هرگز ۳۰ ثانیه
+ * بیکار نمی‌ماند ⇒ فرآیندِ آزمون روی PostgreSQL گاهی هرگز تمام نمی‌شد.
+ */
+let closed = false;
 
 // ── PostgreSQL ──────────────────────────────────────────────────────────────
 
 function getPool() {
   if (isPglite()) return litePool();
   if (pool) return pool;
+  closed = false;
   const { Pool } = require('pg');
   pool = new Pool({
     connectionString: config.db.url,
@@ -69,6 +78,7 @@ const txStore = new AsyncLocalStorage();
 async function getLite() {
   if (lite) return lite;
   if (!litePromise) {
+    closed = false;
     litePromise = (async () => {
       const { PGlite, types } = require('@electric-sql/pglite');
       const dir = pgliteDir();
@@ -174,6 +184,7 @@ async function tx(fn) {
 }
 
 async function healthy() {
+  if (closed) return false;
   try {
     const r = await query('SELECT 1 AS ok');
     return r.rows[0].ok === 1;
@@ -183,6 +194,7 @@ async function healthy() {
 }
 
 async function closeDb() {
+  closed = true;
   if (isPglite()) {
     if (!lite) return;
     const db = lite;
