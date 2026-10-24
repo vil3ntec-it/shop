@@ -111,9 +111,8 @@ class ApiClient(
   ): JsonObject = authorized("PUT", path, null, idempotent = true, raw = RawBody(bytes, contentType))
 
   /**
-   *  گرفتنِ **بایت‌های خام** با توکن (رسانهٔ چتِ دکان، فایلِ بانکِ تصاویر) —
-   *  همان تازه‌سازیِ یک‌باره‌ی نشستِ پیر که `authorized` دارد. سقفِ ۸ مگِ
-   *  `fetchBytes` بالاتر از بزرگ‌ترین فایلِ بانک (۲ مگ) است.
+   *  گرفتنِ **بایت‌های خام** با توکن (رسانهٔ چتِ دکان) — همان تازه‌سازیِ
+   *  یک‌باره‌ی نشستِ پیر که `authorized` دارد.
    */
   suspend fun getBytes(path: String): ByteArray {
     val token = tokens.accessToken ?: throw ApiFailure.SessionExpired()

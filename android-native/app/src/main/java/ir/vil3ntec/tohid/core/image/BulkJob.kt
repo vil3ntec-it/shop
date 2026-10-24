@@ -63,6 +63,8 @@ class BulkJob(val id: String, var replace: Boolean = false, val rows: MutableLis
     /** عکسِ کالا روی همین دستگاه گذاشته شد */
     var local: Boolean = false,
     val upload: Upload = Upload(),
+    /** ضلعِ بزرگِ اصل زیرِ `ImagePrep.MIN_SIDE` بود (هشدار، نه رد) */
+    var small: Boolean = false,
   )
 
   data class Counts(
@@ -71,6 +73,16 @@ class BulkJob(val id: String, var replace: Boolean = false, val rows: MutableLis
   )
 
   private val FINAL = setOf(Status.DONE, Status.FAILED, Status.PENDING_BANK, Status.WORKING, Status.NOT_IMAGE)
+
+  /**
+   *  هیچ ردیفی دیگر کاری با فایلش ندارد: انجام‌شده، عکس‌نبود، تکراری، یا ناموفق.
+   *  (مبهم، بی‌تطبیق و عکس‌دار هنوز با انتخابِ کاربر راه می‌افتند.)
+   *  ⇒ `BulkStore.tidy` پوشهٔ فایل‌ها را کامل پاک می‌کند.
+   */
+  fun settled(): Boolean = rows.all { it.status in SETTLED }
+
+  /** ردیف هنوز ممکن است فایلِ آماده‌اش را بخواهد */
+  fun needsFile(r: Row): Boolean = r.status !in SETTLED || r.status == Status.FAILED
 
   /**
    *  وضعیتِ ردیف‌هایی که هنوز کارشان شروع نشده: تکراری، کالای یکسان،
@@ -86,10 +98,20 @@ class BulkJob(val id: String, var replace: Boolean = false, val rows: MutableLis
         continue
       }
       if (!seenSum.add(r.sum)) { r.status = Status.DUPLICATE; continue }
-      if (r.productId.isEmpty()) { r.status = if (r.candidates.size > 1) Status.AMBIGUOUS else Status.UNMATCHED; continue }
+      if (r.productId.isEmpty()) {
+        //  نامزدِ حذف‌شده نامزد نیست؛ «مبهم» حتی با یک نامزد (دو راهِ تطبیق دو جواب دادند)
+        r.candidates = r.candidates.filter { photoOf(it) != null }
+        r.status = if (r.candidates.isNotEmpty()) Status.AMBIGUOUS else Status.UNMATCHED
+        continue
+      }
       if (!seenProduct.add(r.productId)) { r.status = Status.SAME_PRODUCT; continue }
       val has = photoOf(r.productId)
-      if (has == null) { r.status = Status.UNMATCHED; r.productId = ""; continue }
+      if (has == null) {
+        r.candidates = r.candidates.filter { it != r.productId && photoOf(it) != null }
+        r.productId = ""
+        r.status = if (r.candidates.isNotEmpty()) Status.AMBIGUOUS else Status.UNMATCHED
+        continue
+      }
       r.status = if (has && !replace) Status.HAS_PHOTO else Status.READY
     }
     return this
@@ -137,6 +159,7 @@ class BulkJob(val id: String, var replace: Boolean = false, val rows: MutableLis
         put("key", r.key); put("file", r.file); put("size", r.size); put("sum", r.sum)
         put("status", r.status.wire); put("product", r.productId); put("how", r.how); put("note", r.note)
         put("local", r.local)
+        put("small", r.small)
         put("candidates", JsonArray(r.candidates.map { JsonPrimitive(it) }))
         put("up", buildJsonObject {
           put("image", r.upload.imageId); put("version", r.upload.version)
@@ -147,6 +170,7 @@ class BulkJob(val id: String, var replace: Boolean = false, val rows: MutableLis
   }.toString()
 
   companion object {
+    private val SETTLED = setOf(Status.DONE, Status.FAILED, Status.NOT_IMAGE, Status.DUPLICATE, Status.SAME_PRODUCT)
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
     /** خراب یا نسخهٔ ناشناخته ⇒ null (کارِ تازه، نه برنامهٔ خراب) */
@@ -162,7 +186,7 @@ class BulkJob(val id: String, var replace: Boolean = false, val rows: MutableLis
         Row(
           key = r.n("key").toInt(), file = r.s("file"), size = r.n("size"), sum = r.s("sum"),
           status = Status.of(r.s("status")), productId = r.s("product"), how = r.s("how"), note = r.s("note"),
-          local = r.b("local"),
+          local = r.b("local"), small = r.b("small"),
           candidates = r["candidates"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty(),
           upload = Upload(up.s("image"), up.n("version").toInt().coerceAtLeast(1), up.b("display"), up.b("thumb"), up.b("selected")),
         )

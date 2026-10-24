@@ -6,9 +6,14 @@ import java.io.ByteArrayOutputStream
  *  فرادادهٔ JPEG — خواندنِ orientation و برداشتنِ EXIF/GPS/XMP/IPTC/توضیح،
  *  بی هیچ کتابخانه (همتای `server/src/lib/image-bytes.js`).
  *
- *  ⛔ فقط سرآیند خوانده می‌شود؛ دادهٔ فشرده پس از SOS دست‌نخورده کپی می‌شود.
- *  ⛔ APP0 (JFIF)، APP2 (رنگ‌نمای ICC) و APP14 (Adobe) می‌مانند — بی آن‌ها
- *     رنگ یا رمزگشایی عوض می‌شود. بقیهٔ APPn و COM می‌روند.
+ *  ⛔ فقط سرآیند خوانده می‌شود؛ دادهٔ فشرده پس از SOS دست‌نخورده کپی می‌شود و
+ *     **در EOI بریده** — هرچه پس از EOI چسبیده (تصویرِ دومِ MPF با EXIFِ خودش،
+ *     دادهٔ دلخواه) می‌رود.
+ *  ⛔ APP0 (JFIF)، APP2 فقط وقتی `ICC_PROFILE` است (رنگ‌نما؛ APP2ِ MPF/FPXR
+ *     می‌رود) و APP14 (Adobe) می‌مانند — بی آن‌ها رنگ یا رمزگشایی عوض می‌شود.
+ *     بقیهٔ APPn و COM می‌روند.
+ *  ⛔ `strip` فقط روی خروجیِ بازکدگذاری‌شدهٔ خودِ برنامه (`Bitmap.compress`)
+ *     اجرا می‌شود؛ قطعه‌های میانِ اسکن‌های JPEGِ پیش‌رونده همان‌طور کپی می‌شوند.
  */
 object JpegMeta {
 
@@ -45,12 +50,40 @@ object JpegMeta {
   fun hasExif(b: ByteArray): Boolean = runCatching { segments(b).any { isExif(b, it) } }.getOrDefault(false)
 
   /** هر قطعهٔ فرادادهٔ حساس (APP1/APP13/COM و دیگر APPnها) */
-  fun hasMetadata(b: ByteArray): Boolean = runCatching { segments(b).any { !keep(it.marker) } }.getOrDefault(false)
+  fun hasMetadata(b: ByteArray): Boolean = runCatching { segments(b).any { !keep(b, it) } }.getOrDefault(false)
 
-  private fun keep(m: Int): Boolean = when (m) {
-    0xE0, 0xE2, 0xEE -> true                  // JFIF، ICC، Adobe
+  private fun isIcc(b: ByteArray, s: Segment): Boolean =
+    s.end - s.start >= 16 && String(b, s.start + 4, 12, Charsets.ISO_8859_1) == "ICC_PROFILE\u0000"
+
+  private fun keep(b: ByteArray, s: Segment): Boolean = when (s.marker) {
+    0xE0, 0xEE -> true                        // JFIF، Adobe
+    0xE2 -> isIcc(b, s)                       // فقط رنگ‌نمای ICC؛ MPF/FPXR نه
     in 0xE1..0xEF, 0xFE -> false              // EXIF/XMP، IPTC، توضیح و دیگر APPn
     else -> true                              // DQT، SOF، DHT، DRI، SOS…
+  }
+
+  /**
+   *  پایانِ EOI پس از نخستین SOS؛ نبود ⇒ پایانِ فایل. در دادهٔ فشرده هر 0xFF یا
+   *  0x00 (پرکن)، RSTn یا 0xFF دارد؛ قطعه‌های میانِ اسکن‌ها با طولشان رد می‌شوند.
+   */
+  private fun eoiEnd(b: ByteArray, from: Int): Int {
+    var i = from
+    while (i + 1 < b.size) {
+      if (u8(b, i) != 0xFF) { i++; continue }
+      val m = u8(b, i + 1)
+      when {
+        m == 0xD9 -> return i + 2
+        m == 0xFF -> i++
+        m == 0x00 || m in 0xD0..0xD7 -> i += 2
+        else -> {
+          if (i + 4 > b.size) return b.size
+          val len = u16be(b, i + 2)
+          if (len < 2) return b.size
+          i += 2 + len
+        }
+      }
+    }
+    return b.size
   }
 
   /** orientationِ EXIF (۱..۸)؛ نبود یا خراب ⇒ ۱ */
@@ -84,8 +117,8 @@ object JpegMeta {
     val out = ByteArrayOutputStream(b.size)
     out.write(b, 0, 2)                        // SOI
     for (s in segs) {
-      if (s.marker == 0xDA) { out.write(b, s.start, b.size - s.start); break }
-      if (keep(s.marker)) out.write(b, s.start, s.end - s.start)
+      if (s.marker == 0xDA) { out.write(b, s.start, eoiEnd(b, s.end).coerceAtMost(b.size) - s.start); break }
+      if (keep(b, s)) out.write(b, s.start, s.end - s.start)
     }
     return out.toByteArray()
   }

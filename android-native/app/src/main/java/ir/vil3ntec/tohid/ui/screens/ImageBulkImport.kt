@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
@@ -50,6 +51,7 @@ import ir.vil3ntec.tohid.ui.components.common.PillTone
 import ir.vil3ntec.tohid.ui.components.common.StatusPill
 import ir.vil3ntec.tohid.ui.theme.Shop
 import ir.vil3ntec.tohid.ui.theme.Space
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 /**
@@ -71,6 +73,8 @@ fun ImageBulkImportSheet(store: ShopStore, d: ShopData, onDismiss: () -> Unit) {
   var stop by remember { mutableStateOf(false) }
   var message by remember { mutableStateOf<String?>(null) }
   var resumed by remember { mutableStateOf(false) }
+  //  تیکِ «جایگزینی» با کالای عکس‌دار ⇒ پیش از شروع، شمارِ عکس‌هایی که جایگزین می‌شوند
+  var confirmReplace by remember { mutableIntStateOf(0) }
 
   LaunchedEffect(Unit) {
     if (ImageBank.enabled.value == null) ImageBank.refresh(context)
@@ -85,9 +89,15 @@ fun ImageBulkImportSheet(store: ShopStore, d: ShopData, onDismiss: () -> Unit) {
   val pick = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
     if (uris.isEmpty()) return@rememberLauncherForActivityResult
     scope.launch {
-      message = "در حالِ خواندنِ ${uris.size} فایل…"
-      job = ImageBulk.add(context, job, uris, store.data.value)
-      message = null
+      message = "در حالِ آماده‌سازیِ ${uris.size} فایل…"
+      try {
+        job = ImageBulk.add(context, job, uris, store.data.value) { i, n -> message = "در حالِ آماده‌سازیِ عکسِ $i از $n…" }
+        message = null
+      } catch (c: CancellationException) {
+        throw c
+      } catch (e: Exception) {
+        message = "خواندنِ فایل‌ها نیمه‌کاره ماند — دوباره انتخاب کنید"
+      }
       tick++
     }
   }
@@ -103,21 +113,53 @@ fun ImageBulkImportSheet(store: ShopStore, d: ShopData, onDismiss: () -> Unit) {
           tick++
           try {
             ImageBulk.process(context, store, j, r)
+          } catch (c: CancellationException) {
+            throw c
           } catch (f: Exception) {
             if (ImageBank.transient(f)) { message = "اینترنت قطع شد — ورود متوقف شد؛ بعداً «ادامهٔ ورود» را بزنید"; break }
             r.status = BulkJob.Status.FAILED
             r.note = f.message ?: "خطا"
+          } catch (_: OutOfMemoryError) {
+            r.status = BulkJob.Status.FAILED
+            r.note = "حافظهٔ دستگاه برای این عکس کافی نبود"
           }
           ImageBulk.save(context, j)
+          ImageBulk.tidy(context, j)
           tick++
         }
       } finally {
         if (j.rows.any { it.status == BulkJob.Status.WORKING }) j.reopen()
         ImageBulk.save(context, j)
+        ImageBulk.tidy(context, j)
         running = false
         tick++
       }
     }
+  }
+
+  /** شروع؛ با «جایگزینی» اول تأیید که چند عکسِ فعلی جایگزین می‌شود */
+  fun start() {
+    val j = job ?: return
+    val n = if (j.replace) j.rows.count { r ->
+      r.status == BulkJob.Status.READY && !r.local && store.data.value.products.any { it.id == r.productId && it.photo }
+    } else 0
+    if (n > 0) confirmReplace = n else run()
+  }
+
+  if (confirmReplace > 0) {
+    AlertDialog(
+      onDismissRequest = { confirmReplace = 0 },
+      containerColor = colors.surfaceSolid,
+      title = { Text("$confirmReplace عکس جایگزین می‌شود", color = colors.text) },
+      text = {
+        Text(
+          "عکسِ فعلیِ $confirmReplace کالا با عکسِ تازه جایگزین می‌شود و عکسِ قبلی برنمی‌گردد.",
+          color = colors.muted, style = MaterialTheme.typography.bodySmall,
+        )
+      },
+      confirmButton = { Button(onClick = { confirmReplace = 0; run() }) { Text("جایگزین کن") } },
+      dismissButton = { TextButton(onClick = { confirmReplace = 0 }) { Text("انصراف") } },
+    )
   }
 
   AdaptiveSheet(onDismissRequest = { stop = true; onDismiss() }, containerColor = colors.bg) {
@@ -183,7 +225,7 @@ fun ImageBulkImportSheet(store: ShopStore, d: ShopData, onDismiss: () -> Unit) {
       Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         if (running) OutlinedButton(onClick = { stop = true }) { Text("توقف") }
         else if (j != null && j.startable()) {
-          Button(onClick = { run() }) {
+          Button(onClick = { start() }) {
             Text(if (j.rows.any { it.status == BulkJob.Status.DONE || it.status == BulkJob.Status.PENDING_BANK }) "ادامهٔ ورود" else "شروعِ ورود")
           }
         }

@@ -82,6 +82,21 @@ class JpegMetaTest {
     assertArrayEquals(out, JpegMeta.strip(out))
   }
 
+  @Test fun `strip — APP2ِ غیرِ ICC (MPF) و هرچه پس از EOI می‌رود`() {
+    val mpf = seg(0xE2, "MPF\u0000MM\u0000\u002A".toByteArray(Charsets.ISO_8859_1))
+    val tail = byteArrayOf(0xFF.toByte(), 0xD8.toByte()) + seg(0xE1, exif(6, false)) + "GPS 34.5,69.1".toByteArray(Charsets.ISO_8859_1)
+    val src = jpeg(mpf) + tail
+    val out = JpegMeta.strip(src)
+    val text = String(out, Charsets.ISO_8859_1)
+    assertFalse(text.contains("MPF") || text.contains("Exif") || text.contains("34.5"))
+    assertTrue(text.contains("ICC_PROFILE"))
+    assertEquals(listOf(0xE0, 0xE2, 0xDB, 0xC0, 0xDA), JpegMeta.segments(out).map { it.marker })
+    //  دقیقاً تا EOI؛ دادهٔ فشرده (با 0xFF00ِ پرکن) دست‌نخورده
+    assertEquals(0xD9, out.last().toInt() and 0xFF)
+    assertArrayEquals(scan + byteArrayOf(0xFF.toByte(), 0xD9.toByte()), out.copyOfRange(out.size - scan.size - 2, out.size))
+    assertArrayEquals(out, JpegMeta.strip(out))
+  }
+
   @Test(expected = IllegalArgumentException::class)
   fun `JPEGِ بریده خطاست، نه خروجیِ نیمه`() {
     val src = jpeg(seg(0xE1, exif(6, false)))

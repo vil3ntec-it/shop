@@ -174,59 +174,6 @@ class HttpEngine(
     }
   }
 
-  /**
-   *  پاسخِ **خام** — فایلِ عکسِ بانکِ تصاویر (`/shop/images/file/…`).
-   *
-   *  همان نشانی، پیشوندِ کارکرده، سرآیندهای هویت و همان خطاها؛ فقط بدنهٔ
-   *  پاسخ بایت است، نه JSON. پیشوندِ دیگر امتحان نمی‌شود: این مسیرها فقط
-   *  از نشانی‌ای می‌آیند که خودِ سرور در پاسخِ JSON داده است.
-   */
-  suspend fun sendForBytes(
-    method: String,
-    path: String,
-    token: String?,
-    raw: RawBody? = null,
-  ): ByteArray = withContext(Dispatchers.IO) {
-    val base = baseUrl()
-    ApiConfig.reject(base, allowInsecure)?.let { reason ->
-      throw if (reason == ApiConfig.Rejection.MISSING) ApiFailure.NotConfigured()
-      else ApiFailure.BadConfiguration(reason.message)
-    }
-    if (!online()) throw ApiFailure.Offline()
-    val url = runCatching { URL(ApiConfig.urlOf(base, path, prefix)) }.getOrNull()
-      ?: throw ApiFailure.BadConfiguration("نشانی سرور درست نیست")
-    val connection = runCatching { url.openConnection() as HttpURLConnection }.getOrNull()
-      ?: throw ApiFailure.BadConfiguration("نشانی سرور درست نیست")
-    try {
-      connection.requestMethod = method
-      connection.connectTimeout = ApiConfig.CONNECT_TIMEOUT_MS
-      connection.readTimeout = ApiConfig.READ_TIMEOUT_MS
-      if (token != null) connection.setRequestProperty("Authorization", "Bearer $token")
-      runCatching { identity() }.getOrNull()?.forEach { (k, v) ->
-        if (v.isNotBlank()) connection.setRequestProperty(k, v)
-      }
-      if (raw != null) {
-        connection.doOutput = true
-        connection.setRequestProperty("Content-Type", raw.contentType)
-        raw.headers.forEach { (k, v) -> connection.setRequestProperty(k, v) }
-        connection.setFixedLengthStreamingMode(raw.bytes.size)
-        connection.outputStream.use { it.write(raw.bytes) }
-      }
-      val status = connection.responseCode
-      if (status !in 200..299) {
-        val text = connection.errorStream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
-        throw ApiFailure.fromHttp(status, text, authenticated = token != null)
-      }
-      connection.inputStream.use { it.readBytes() }
-    } catch (failure: ApiFailure) {
-      throw failure
-    } catch (error: Throwable) {
-      throw ApiFailure.fromException(error)
-    } finally {
-      runCatching { connection.disconnect() }
-    }
-  }
-
   /** یک تلاش با یک پیشوندِ مشخص */
   private fun attempt(
     method: String,

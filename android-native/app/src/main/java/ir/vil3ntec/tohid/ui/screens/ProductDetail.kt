@@ -107,10 +107,8 @@ fun ProductDetailScreen(
             d.copy(products = d.products.map { if (it.id == product.id) it.copy(photo = true) else it })
           )
         }
-        ir.vil3ntec.tohid.sync.PhotoSync.changed(context, product.id)
-        //  بانکِ تصاویرِ روشن ⇒ عکسِ خودِ دکان با نسخهٔ کوچک هم به بانکِ همین دکان (در صف)
-        ir.vil3ntec.tohid.data.ImageBank.enqueueOwn(context, product.id)
-        scope.launch { runCatching { ir.vil3ntec.tohid.data.ImageBank.drain(context) } }
+        //  همگام‌سازیِ امروز + بانکِ تصاویرِ روشن ⇒ عکسِ خودِ دکان به بانکِ همین دکان (در صف)
+        ir.vil3ntec.tohid.data.ImageBank.photoSaved(context, product.id, own = true, scope = scope)
         photoVersion++
       }
     }
@@ -134,7 +132,8 @@ fun ProductDetailScreen(
           val cur = store.data.value
           store.save(cur.copy(products = cur.products.map { if (it.id == product.id) it.copy(photo = true) else it }))
         }
-        ir.vil3ntec.tohid.sync.PhotoSync.changed(context, product.id)
+        //  عکسِ مرکزی: فقط همگام‌سازیِ امروز؛ عکسِ قدیمیِ در صفِ بانک دیگر فرستاده نمی‌شود
+        ir.vil3ntec.tohid.data.ImageBank.photoSaved(context, product.id, own = false)
         photoVersion++
       }
     }

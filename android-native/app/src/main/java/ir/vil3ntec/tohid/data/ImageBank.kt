@@ -3,13 +3,20 @@ package ir.vil3ntec.tohid.data
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Matrix
+import android.graphics.Paint
 import androidx.compose.runtime.mutableStateOf
 import ir.vil3ntec.tohid.core.image.BulkJob
 import ir.vil3ntec.tohid.core.image.ImagePrep
 import ir.vil3ntec.tohid.core.image.JpegMeta
 import ir.vil3ntec.tohid.core.net.ApiFailure
 import ir.vil3ntec.tohid.data.repo.Backend
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -26,6 +33,7 @@ import kotlinx.serialization.json.put
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.net.URLEncoder
+import java.security.MessageDigest
 
 /**
  *  بانکِ تصاویر — سمتِ برنامه (گوشی و کامپیوتر؛ v3 ۳۴، ۳۶.۸، ۳۷.۵ تا ۳۷.۷).
@@ -55,9 +63,11 @@ object ImageBank {
       val c = Backend.api(context).get("$BASE/config")
       val on = c["enabled"]?.jsonPrimitive?.booleanOrNull == true
       enabled.value = on
-      if (on) runCatching { drain(context) }
+      if (on) try { drain(context) } catch (c: CancellationException) { throw c } catch (_: Exception) {}
       on
-    } catch (f: Throwable) {
+    } catch (c: CancellationException) {
+      throw c
+    } catch (f: Exception) {
       if (!transient(f)) enabled.value = false
       enabled.value == true
     }
@@ -169,14 +179,21 @@ object ImageBank {
 
   /* ------------------------- آماده‌سازی روی دستگاه ------------------------- */
 
-  class Prepared(val display: ByteArray, val thumb: ByteArray?, val width: Int, val height: Int, val small: Boolean)
+  class Prepared(val display: ByteArray, val thumb: ByteArray?, val small: Boolean)
 
-  /** آلفا روی زمینهٔ سفید — PNGِ شفاف در JPEG سیاه نشود */
-  private fun onWhite(c: Int): Int {
-    val a = c ushr 24
-    if (a == 255) return c
-    fun ch(v: Int) = (v * a + 255 * (255 - a)) / 255
-    return (0xFF shl 24) or (ch((c shr 16) and 0xFF) shl 16) or (ch((c shr 8) and 0xFF) shl 8) or ch(c and 0xFF)
+  /**
+   *  چرخشِ EXIF با `Matrix` و آلفا روی زمینهٔ سفید (PNGِ شفاف در JPEG سیاه
+   *  نشود) در یک کشیدن — بی آرایهٔ پیکسل. بومِ تازه، `src` دست‌نخورده.
+   */
+  fun upright(src: Bitmap, orientation: Int): Bitmap {
+    val o = if (orientation in 2..8) orientation else 1
+    val size = ImagePrep.oriented(src.width, src.height, o)
+    val out = Bitmap.createBitmap(size.w, size.h, Bitmap.Config.ARGB_8888)
+    Canvas(out).apply {
+      drawColor(Color.WHITE)
+      drawBitmap(src, Matrix().apply { setValues(ImagePrep.exifMatrix(o, src.width, src.height)) }, Paint(Paint.FILTER_BITMAP_FLAG))
+    }
+    return out
   }
 
   /**
@@ -197,27 +214,26 @@ object ImageBank {
     val fit = ImagePrep.fit(decoded.width, decoded.height, ImagePrep.DISPLAY_SIDE)
     val scaled = if (fit.w != decoded.width || fit.h != decoded.height) Bitmap.createScaledBitmap(decoded, fit.w, fit.h, true) else decoded
     if (scaled !== decoded) decoded.recycle()
-    val px = IntArray(scaled.width * scaled.height)
-    scaled.getPixels(px, 0, scaled.width, 0, 0, scaled.width, scaled.height)
-    for (i in px.indices) px[i] = onWhite(px[i])
-    val (opx, osz) = ImagePrep.orient(px, scaled.width, scaled.height, orientation)
-    scaled.recycle()
-    val upright = Bitmap.createBitmap(opx, osz.w, osz.h, Bitmap.Config.ARGB_8888)
-    fun encode(s: ImagePrep.Size, q: Int): ByteArray {
-      val b = if (s.w == upright.width && s.h == upright.height) upright else Bitmap.createScaledBitmap(upright, s.w, s.h, true)
-      val out = ByteArrayOutputStream()
-      b.compress(Bitmap.CompressFormat.JPEG, q, out)
-      if (b !== upright) b.recycle()
-      return JpegMeta.strip(out.toByteArray())
+    val straight = try { upright(scaled, orientation) } finally { scaled.recycle() }
+    val osz = ImagePrep.Size(straight.width, straight.height)
+    try {
+      fun encode(s: ImagePrep.Size, q: Int): ByteArray {
+        val b = if (s.w == straight.width && s.h == straight.height) straight else Bitmap.createScaledBitmap(straight, s.w, s.h, true)
+        val out = ByteArrayOutputStream()
+        b.compress(Bitmap.CompressFormat.JPEG, q, out)
+        if (b !== straight) b.recycle()
+        return JpegMeta.strip(out.toByteArray())
+      }
+      val (display, dsz) = ImagePrep.encodeUnder(osz, ImagePrep.DISPLAY_BYTES, ::encode)
+      val (thumb, tsz) = ImagePrep.encodeUnder(ImagePrep.fit(dsz.w, dsz.h, ImagePrep.THUMB_SIDE), ImagePrep.THUMB_BYTES, ::encode)
+      Prepared(display, thumb.takeIf { ImagePrep.aspectOk(tsz, dsz) }, small = maxOf(w0, h0) < ImagePrep.MIN_SIDE)
+    } finally {
+      straight.recycle()
     }
-    val (display, dsz) = ImagePrep.encodeUnder(osz, ImagePrep.DISPLAY_BYTES, ::encode)
-    val (thumb, tsz) = ImagePrep.encodeUnder(ImagePrep.fit(dsz.w, dsz.h, ImagePrep.THUMB_SIDE), ImagePrep.THUMB_BYTES, ::encode)
-    upright.recycle()
-    Prepared(
-      display, thumb.takeIf { ImagePrep.aspectOk(tsz, dsz) }, dsz.w, dsz.h,
-      small = maxOf(w0, h0) < ImagePrep.MIN_SIDE,
-    )
   }
+
+  fun sha256(b: ByteArray): String =
+    MessageDigest.getInstance("SHA-256").digest(b).joinToString("") { "%02x".format(it) }
 
   /**
    *  عکسِ خودِ دکان روی بانک: اصل ← نسخهٔ نمایش ← کوچک ← انتخاب به‌عنوانِ عکسِ
@@ -226,7 +242,11 @@ object ImageBank {
   suspend fun uploadOwn(context: Context, productId: String, prep: Prepared, up: BulkJob.Upload, onStep: () -> Unit = {}) {
     val api = Backend.api(context)
     if (up.imageId.isEmpty()) {
-      val r = api.postBytes("$BASE?product_id=${enc(productId)}&role=main", prep.display, "image/jpeg")
+      //  POST خودکار تکرار نمی‌شود (`postBytes`)؛ کلید تا سرور هم تکرارِ پس از قطعی را «همان کار» بداند
+      val r = api.postBytes(
+        "$BASE?product_id=${enc(productId)}&role=main", prep.display, "image/jpeg",
+        mapOf("Idempotency-Key" to sha256(prep.display)),
+      )
       up.imageId = r["id"]?.jsonPrimitive?.contentOrNull ?: throw ApiFailure.InvalidResponse()
       up.version = r["version"]?.jsonPrimitive?.intOrNull ?: 1
       onStep()
@@ -247,6 +267,13 @@ object ImageBank {
   private fun prefs(context: Context) = context.applicationContext.getSharedPreferences("tohid-imgbank", 0)
   private val lock = Mutex()
 
+  /**
+   *  ⛔ هر ردیفِ صف شمارهٔ نسل (`g:<id>`) دارد: عکسِ تازه‌تر نسل را بالا می‌برد و
+   *     `done`/پیشرفتِ عکسِ قدیمی‌تر (که هنوز در راه بود) فقط با همان نسل اثر
+   *     دارد — عکسِ تازه با پایانِ قدیمی از صف نمی‌افتد و پیشرفتش را نمی‌گیرد.
+   */
+  private fun gen(p: android.content.SharedPreferences, id: String) = p.getLong("g:$id", 0L)
+
   /** عکسِ تازهٔ کالا (از استودیو) با بانکِ روشن ⇒ در صف برای بانکِ همین دکان */
   fun enqueueOwn(context: Context, productId: String) {
     if (enabled.value != true) return
@@ -254,24 +281,52 @@ object ImageBank {
       val p = prefs(context)
       val set = (p.getStringSet("own", emptySet()) ?: emptySet()).toMutableSet()
       set += productId
-      p.edit().putStringSet("own", set).remove("up:$productId").apply()
+      p.edit().putStringSet("own", set).putLong("g:$productId", gen(p, productId) + 1).remove("up:$productId").apply()
     }
+  }
+
+  /** عکسِ کالا از راهِ دیگری آمد (بانکِ مرکزی، ورودِ گروهی) ⇒ عکسِ قدیمیِ در صف دیگر فرستاده نشود */
+  private fun dropOwn(context: Context, productId: String) {
+    synchronized(this) {
+      val p = prefs(context)
+      val set = (p.getStringSet("own", emptySet()) ?: emptySet()).toMutableSet()
+      if (productId !in set && !p.contains("g:$productId")) return
+      set -= productId
+      p.edit().putStringSet("own", set).putLong("g:$productId", gen(p, productId) + 1).remove("up:$productId").apply()
+    }
+  }
+
+  /**
+   *  «عکسِ کالا روی دستگاه گذاشته شد» — یک جا برای همهٔ راه‌ها: همگام‌سازیِ امروز
+   *  (`PhotoSync`) و اگر عکسِ خودِ دکان است (`own`) صفِ بانک و فرستادن در `scope`.
+   */
+  fun photoSaved(context: Context, productId: String, own: Boolean, scope: CoroutineScope? = null) {
+    ir.vil3ntec.tohid.sync.PhotoSync.changed(context, productId)
+    if (!own) { dropOwn(context, productId); return }
+    if (enabled.value != true) return
+    enqueueOwn(context, productId)
+    scope?.launch { try { drain(context) } catch (c: CancellationException) { throw c } catch (_: Exception) {} }
   }
 
   suspend fun drain(context: Context) = lock.withLock {
     if (enabled.value != true) return@withLock
     val p = prefs(context)
     for (id in (p.getStringSet("own", emptySet()) ?: emptySet()).toList()) {
+      val g = synchronized(this) { gen(p, id) }
+      fun same() = gen(p, id) == g
       val done = {
         synchronized(this) {
-          val set = (p.getStringSet("own", emptySet()) ?: emptySet()).toMutableSet()
-          set -= id
-          p.edit().putStringSet("own", set).remove("up:$id").apply()
+          if (same()) {
+            val set = (p.getStringSet("own", emptySet()) ?: emptySet()).toMutableSet()
+            set -= id
+            p.edit().putStringSet("own", set).remove("up:$id").remove("g:$id").apply()
+          }
         }
       }
       val bytes = withContext(Dispatchers.IO) { PhotoStore.bytes(context, id) }
       if (bytes == null) { done(); continue }
-      val saved = p.getString("up:$id", null)?.split('|')
+      //  پیشرفت با نسلش ذخیره می‌شود؛ پیشرفتِ نسلِ دیگر یعنی از نو
+      val saved = p.getString("up:$id", null)?.split('|')?.takeIf { it.getOrNull(0) == g.toString() }?.drop(1)
       val up = BulkJob.Upload(
         imageId = saved?.getOrNull(0).orEmpty(), version = saved?.getOrNull(1)?.toIntOrNull() ?: 1,
         display = saved?.getOrNull(2) == "1", thumb = saved?.getOrNull(3) == "1", selected = saved?.getOrNull(4) == "1",
@@ -279,9 +334,13 @@ object ImageBank {
       try {
         val prep = prepare(bytes)
         uploadOwn(context, id, prep, up) {
-          p.edit().putString("up:$id", listOf(up.imageId, up.version, if (up.display) 1 else 0, if (up.thumb) 1 else 0, if (up.selected) 1 else 0).joinToString("|")).apply()
+          synchronized(this) {
+            if (same()) p.edit().putString("up:$id", listOf(g, up.imageId, up.version, if (up.display) 1 else 0, if (up.thumb) 1 else 0, if (up.selected) 1 else 0).joinToString("|")).apply()
+          }
         }
         done()
+      } catch (c: CancellationException) {
+        throw c
       } catch (f: Throwable) {
         if (transient(f)) return@withLock
         done()   //  عکس روی دستگاه و همگام‌سازیِ امروز سرِ جایش است؛ فقط بانک نپذیرفت

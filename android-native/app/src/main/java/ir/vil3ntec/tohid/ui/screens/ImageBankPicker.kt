@@ -31,7 +31,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -43,17 +42,22 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.image.ImagePrep
 import ir.vil3ntec.tohid.core.net.ApiFailure
 import ir.vil3ntec.tohid.data.ImageBank
 import ir.vil3ntec.tohid.ui.components.common.PillTone
 import ir.vil3ntec.tohid.ui.components.common.StatusPill
 import ir.vil3ntec.tohid.ui.theme.Shop
 import ir.vil3ntec.tohid.ui.theme.Space
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  *  «انتخاب از بانکِ تصاویر» (v3 ۳۷.۵، ۳۷.۶) — گوشی و کامپیوتر. همتای وب:
@@ -87,7 +91,6 @@ fun ImageBankPicker(
   var stateTone by remember { mutableStateOf(PillTone.NEUTRAL) }
   var loading by remember { mutableStateOf(false) }
   var open by remember { mutableStateOf<ImageBank.Hit?>(null) }
-  val thumbs = remember { mutableStateMapOf<String, ImageBitmap?>() }
 
   fun search(more: Boolean) {
     val text = query.trim()
@@ -110,6 +113,8 @@ fun ImageBankPicker(
           f is ApiFailure.Forbidden -> { ImageBank.enabled.value = false; "بانکِ تصاویر برای این دکان روشن نیست." }
           else -> "خطای سرور: ${f.userMessage}"
         }
+      } catch (c: CancellationException) {
+        throw c
       } catch (e: Exception) {
         stateTone = PillTone.DANGER
         state = "پاسخِ سرور خوانده نشد"
@@ -145,13 +150,13 @@ fun ImageBankPicker(
         }
         Spacer(Modifier.height(Space.xs))
         Column(Modifier.heightIn(max = 440.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-          items.forEach { h -> HitCard(h, thumbs) { open = h } }
+          items.forEach { h -> HitCard(h) { open = h } }
           if (next != null) OutlinedButton(onClick = { search(true) }, enabled = !loading, modifier = Modifier.align(Alignment.CenterHorizontally)) {
             Text("نتیجه‌های بیشتر")
           }
         }
       } else {
-        HitDetail(hit, productId, name, barcode, hasPhoto, thumbs, onBack = { open = null }, onChosen = onChosen)
+        HitDetail(hit, productId, name, barcode, hasPhoto, onBack = { open = null }, onChosen = onChosen)
       }
     }
   }
@@ -169,30 +174,56 @@ private fun spec(h: ImageBank.Hit): String = listOfNotNull(
   if (h.packCount > 1) "${h.packCount} عددی" else null, h.packaging.ifBlank { null },
 ).joinToString(" · ")
 
-/** عکسِ بانک با نشستِ کاربر؛ یک بار برای هر نشانی */
+/**
+ *  عکس‌های کوچکِ بانک — کشِ LRU برای همهٔ بازشدن‌ها (نه نقشهٔ بی‌سقفِ هر برگه).
+ *  کلید = نشانی + اندازهٔ پیکسلی.
+ */
+private object BankThumbs {
+  private const val MAX = 48
+  private val map = object : LinkedHashMap<String, ImageBitmap>(16, 0.75f, true) {
+    override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, ImageBitmap>?) = size > MAX
+  }
+  @Synchronized fun get(k: String): ImageBitmap? = map[k]
+  @Synchronized fun put(k: String, v: ImageBitmap) { map[k] = v }
+}
+
+/** عکسِ بانک با نشستِ کاربر؛ رمزگشایی بیرون از نخِ اصلی و فقط به اندازهٔ کادر */
 @Composable
-private fun BankImage(url: String?, cache: MutableMap<String, ImageBitmap?>, size: Dp, placeholder: String) {
+private fun BankImage(url: String?, size: Dp, placeholder: String) {
   val context = LocalContext.current
-  LaunchedEffect(url) {
-    if (url != null && !cache.containsKey(url)) {
-      cache[url] = runCatching {
-        val b = ImageBank.file(context, url)
-        BitmapFactory.decodeByteArray(b, 0, b.size)?.asImageBitmap()
-      }.getOrNull()
+  val px = with(LocalDensity.current) { size.roundToPx() }.coerceAtLeast(1)
+  val key = url?.let { "$it@$px" }
+  var img by remember(key) { mutableStateOf(key?.let(BankThumbs::get)) }
+  LaunchedEffect(key) {
+    if (url == null || key == null || img != null) return@LaunchedEffect
+    img = try {
+      val b = ImageBank.file(context, url)
+      withContext(Dispatchers.Default) {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeStream(b.inputStream(), null, bounds)
+        val opts = BitmapFactory.Options().apply {
+          inSampleSize = if (bounds.outWidth > 0 && bounds.outHeight > 0) ImagePrep.sampleSize(bounds.outWidth, bounds.outHeight, px) else 1
+        }
+        BitmapFactory.decodeStream(b.inputStream(), null, opts)?.asImageBitmap()
+      }?.also { BankThumbs.put(key, it) }
+    } catch (c: CancellationException) {
+      throw c
+    } catch (_: Exception) {
+      null
     }
   }
   Box(
     Modifier.size(size).clip(RoundedCornerShape(10.dp)).background(Shop.colors.surface2),
     contentAlignment = Alignment.Center,
   ) {
-    val img = url?.let { cache[it] }
-    if (img != null) Image(img, contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.size(size))
+    val shown = img
+    if (shown != null) Image(shown, contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.size(size))
     else Text(placeholder, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2)
   }
 }
 
 @Composable
-private fun HitCard(h: ImageBank.Hit, cache: MutableMap<String, ImageBitmap?>, onOpen: () -> Unit) {
+private fun HitCard(h: ImageBank.Hit, onOpen: () -> Unit) {
   val colors = Shop.colors
   Row(
     Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).border(BorderStroke(1.dp, colors.border), RoundedCornerShape(12.dp))
@@ -200,7 +231,7 @@ private fun HitCard(h: ImageBank.Hit, cache: MutableMap<String, ImageBitmap?>, o
     verticalAlignment = Alignment.Top,
   ) {
     val img = h.images.firstOrNull()
-    BankImage(img?.thumb ?: img?.display, cache, 64.dp, "بی عکس")
+    BankImage(img?.thumb ?: img?.display, 64.dp, "بی عکس")
     Spacer(Modifier.width(Space.sm))
     Column(Modifier.weight(1f)) {
       Text(h.name, style = MaterialTheme.typography.bodyMedium, color = colors.text, fontWeight = FontWeight.SemiBold)
@@ -220,7 +251,6 @@ private fun HitDetail(
   name: String,
   barcode: String,
   hasPhoto: Boolean,
-  cache: MutableMap<String, ImageBitmap?>,
   onBack: () -> Unit,
   onChosen: (ByteArray) -> Unit,
 ) {
@@ -239,13 +269,13 @@ private fun HitDetail(
   Column(Modifier.heightIn(max = 560.dp).verticalScroll(rememberScrollState())) {
     TextButton(onClick = onBack) { Text("بازگشت به نتیجه‌ها") }
     val img = h.images.getOrNull(chosen)
-    BankImage(img?.display ?: img?.thumb, cache, 220.dp, "این کالا در بانک عکسِ تأییدشده ندارد")
+    BankImage(img?.display ?: img?.thumb, 220.dp, "این کالا در بانک عکسِ تأییدشده ندارد")
     if (h.images.size > 1) {
       Spacer(Modifier.height(6.dp))
       Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         h.images.forEachIndexed { i, im ->
           Box(Modifier.border(BorderStroke(if (i == chosen) 2.dp else 0.dp, colors.primary), RoundedCornerShape(10.dp)).clickable { chosen = i }) {
-            BankImage(im.thumb, cache, 52.dp, "${i + 1}")
+            BankImage(im.thumb, 52.dp, "${i + 1}")
           }
         }
       }
@@ -285,6 +315,8 @@ private fun HitDetail(
               "image_not_selectable", "version_not_approved" -> "این عکس دیگر در بانک قابلِ انتخاب نیست"
               else -> if (f is ApiFailure.Offline || f is ApiFailure.Timeout) "اینترنت قطع است — دوباره امتحان کنید" else f.userMessage
             }
+          } catch (c: CancellationException) {
+            throw c
           } catch (e: Exception) {
             problem = e.message ?: "عکس گرفته نشد"
           } finally {

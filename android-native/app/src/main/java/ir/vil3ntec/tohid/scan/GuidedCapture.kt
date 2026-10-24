@@ -69,8 +69,10 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import ir.vil3ntec.tohid.core.image.CaptureQuality
 import ir.vil3ntec.tohid.core.image.ImagePrep
 import ir.vil3ntec.tohid.core.image.JpegMeta
+import ir.vil3ntec.tohid.data.ImageBank
 import ir.vil3ntec.tohid.ui.components.common.PillTone
 import ir.vil3ntec.tohid.ui.components.common.StatusPill
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -100,6 +102,12 @@ private class Shot(val file: File, val image: ImageBitmap, val verdict: CaptureQ
 /** بزرگ‌ترین ضلعِ عکسی که به استودیو می‌رود — استودیو خودش ۱۲۰۰ و ۸۰۰ را می‌سازد */
 private const val SHOT_SIDE = 1600
 
+/** پیش‌نمایشِ بازبینی در حافظه — نه خودِ عکسِ ۱۶۰۰ پیکسلی */
+private const val PREVIEW_SIDE = 720
+
+/** بیشترین عکسِ نگه‌داشته؛ عکسِ تازه‌تر قدیمی‌ترینِ غیرِ «پیشنهادی» را کنار می‌زند */
+private const val MAX_SHOTS = 5
+
 @Composable
 fun GuidedCaptureDialog(onDismiss: () -> Unit, onAccepted: (Uri) -> Unit) {
   val context = LocalContext.current
@@ -117,6 +125,11 @@ fun GuidedCaptureDialog(onDismiss: () -> Unit, onAccepted: (Uri) -> Unit) {
   val dir = remember { File(context.cacheDir, "guided").apply { if (!exists()) mkdirs() else listFiles()?.forEach { it.delete() } } }
   val shots = remember { mutableStateListOf<Shot>() }
   var review by remember { mutableStateOf<Int?>(null) }
+  //  بستن ⇒ عکسِ خام و عکس‌های برداشته‌نشده پاک؛ فقط عکسِ پذیرفته برای استودیو می‌ماند
+  var accepted by remember { mutableStateOf<File?>(null) }
+  DisposableEffect(Unit) {
+    onDispose { dir.listFiles()?.forEach { if (it != accepted) it.delete() } }
+  }
   var busy by remember { mutableStateOf(false) }
   var problem by remember { mutableStateOf<String?>(null) }
   val capture = remember { ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY).build() }
@@ -127,8 +140,8 @@ fun GuidedCaptureDialog(onDismiss: () -> Unit, onAccepted: (Uri) -> Unit) {
     }
   }
 
-  /** عکسِ گرفته‌شده ⇒ ایستاده، بی EXIF، ≤۱۶۰۰ پیکسل + سنجش */
-  suspend fun process(raw: File): Shot = withContext(Dispatchers.Default) {
+  /** عکسِ گرفته‌شده ⇒ ایستاده، بی EXIF، ≤۱۶۰۰ پیکسل + سنجش؛ پیش‌نمایش ≤۷۲۰ */
+  fun shoot(raw: File): Shot {
     val bytes = raw.readBytes()
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
@@ -137,18 +150,34 @@ fun GuidedCaptureDialog(onDismiss: () -> Unit, onAccepted: (Uri) -> Unit) {
     val fit = ImagePrep.fit(decoded.width, decoded.height, SHOT_SIDE)
     val scaled = if (fit.w != decoded.width || fit.h != decoded.height) Bitmap.createScaledBitmap(decoded, fit.w, fit.h, true) else decoded
     if (scaled !== decoded) decoded.recycle()
-    val px = IntArray(scaled.width * scaled.height)
-    scaled.getPixels(px, 0, scaled.width, 0, 0, scaled.width, scaled.height)
-    val (opx, size) = ImagePrep.orient(px, scaled.width, scaled.height, JpegMeta.orientation(bytes))
-    scaled.recycle()
-    val verdict = CaptureQuality.judge(CaptureQuality.measure(opx, size.w, size.h))
-    val upright = Bitmap.createBitmap(opx, size.w, size.h, Bitmap.Config.ARGB_8888)
+    //  چرخشِ EXIF با Matrix (بی آرایهٔ دومِ پیکسل)
+    val upright = try { ImageBank.upright(scaled, JpegMeta.orientation(bytes)) } finally { scaled.recycle() }
+    val px = IntArray(upright.width * upright.height)
+    upright.getPixels(px, 0, upright.width, 0, 0, upright.width, upright.height)
+    val verdict = CaptureQuality.judge(CaptureQuality.measure(px, upright.width, upright.height))
     val out = File(dir, "shot-${System.currentTimeMillis()}.jpg")
     val buf = java.io.ByteArrayOutputStream()
     upright.compress(Bitmap.CompressFormat.JPEG, 92, buf)
     out.writeBytes(JpegMeta.strip(buf.toByteArray()))
-    raw.delete()
-    Shot(out, upright.asImageBitmap(), verdict)
+    val p = ImagePrep.fit(upright.width, upright.height, PREVIEW_SIDE)
+    val preview = if (p.w == upright.width && p.h == upright.height) upright else Bitmap.createScaledBitmap(upright, p.w, p.h, true)
+    if (preview !== upright) upright.recycle()
+    return Shot(out, preview.asImageBitmap(), verdict)
+  }
+
+  /** خامِ دوربین در هر حال پاک می‌شود */
+  suspend fun process(raw: File): Shot = withContext(Dispatchers.Default) {
+    try { shoot(raw) } finally { raw.delete() }
+  }
+
+  fun add(shot: Shot) {
+    shots += shot
+    if (shots.size > MAX_SHOTS) {
+      val best = CaptureQuality.best(shots.map { it.verdict })
+      val drop = shots.indices.first { it != best && it != shots.lastIndex }
+      shots.removeAt(drop).file.delete()
+    }
+    review = shots.lastIndex
   }
 
   fun take() {
@@ -162,13 +191,19 @@ fun GuidedCaptureDialog(onDismiss: () -> Unit, onAccepted: (Uri) -> Unit) {
       object : ImageCapture.OnImageSavedCallback {
         override fun onImageSaved(output: ImageCapture.OutputFileResults) {
           scope.launch {
-            runCatching { process(raw) }
-              .onSuccess { shots += it; review = shots.lastIndex }
-              .onFailure { problem = "عکس آماده نشد — دوباره بگیرید" }
-            busy = false
+            try {
+              add(process(raw))
+            } catch (c: CancellationException) {
+              throw c
+            } catch (_: Throwable) {
+              problem = "عکس آماده نشد — دوباره بگیرید"
+            } finally {
+              busy = false
+            }
           }
         }
         override fun onError(exception: ImageCaptureException) {
+          raw.delete()
           problem = "عکس گرفته نشد — دوباره بگیرید"
           busy = false
         }
@@ -225,6 +260,7 @@ fun GuidedCaptureDialog(onDismiss: () -> Unit, onAccepted: (Uri) -> Unit) {
         }
       }
       review?.let { idx -> Review(shots, idx, onPick = { review = it }, onRetake = { review = null }) { s ->
+        accepted = s.file
         onAccepted(Uri.fromFile(s.file))
       } }
     }

@@ -13,7 +13,7 @@ import kotlin.math.roundToInt
  *    display  ≤۱۲۰۰ پیکسل و ≤۶۰۰KB — همان که «اصل» و «نمایش» می‌شود
  *    thumb    ≤۴۰۰ پیکسل و ≤۱۵۰KB، با همان نسبت (مرزِ ۲٪ِ سرور)
  *  سرور نسخهٔ کوچکِ بزرگ‌تر از اصل، نسبتِ ناجور یا EXIF orientation > ۱ را
- *  رد می‌کند؛ پس چرخش **روی پیکسل‌ها** می‌نشیند (`orient`) و هیچ EXIFی
+ *  رد می‌کند؛ پس چرخش **روی پیکسل‌ها** می‌نشیند (`exifMatrix`) و هیچ EXIFی
  *  نمی‌ماند (`JpegMeta.strip`).
  *  ──────────────────────────────────────────────────────────────────
  */
@@ -62,31 +62,28 @@ object ImagePrep {
   fun tooManyPixels(w: Int, h: Int): Boolean = w.toLong() * h > MAX_PIXELS
 
   /**
-   *  چرخش/آینهٔ EXIF روی پیکسل‌های ARGB ⇒ تصویرِ ایستاده (orientation ۱).
+   *  چرخش/آینهٔ EXIF به‌صورتِ ماتریسِ نگاشت ⇒ تصویرِ ایستاده (orientation ۱).
+   *  خروجی همان ترتیبِ `android.graphics.Matrix.setValues` است:
+   *    x' = v0·x + v1·y + v2 ،  y' = v3·x + v4·y + v5   (مختصاتِ پیوسته، اندازهٔ `w`×`h`ِ مبدأ)
+   *  بومِ مقصد `oriented(w, h, o)` است؛ چرخشِ ۹۰°ی با جابه‌جاییِ صحیح شبکهٔ
+   *  پیکسل را دقیق روی شبکه می‌نشاند (بی تاری، بی آرایهٔ پیکسلِ دوم).
    *  جدولِ EXIF: ۲ آینهٔ افقی · ۳ ۱۸۰° · ۴ آینهٔ عمودی · ۵ ترانهاده ·
    *  ۶ ۹۰° ساعت‌گرد · ۷ ترانهادهٔ معکوس · ۸ ۹۰° پادساعت‌گرد.
    */
-  fun orient(px: IntArray, w: Int, h: Int, orientation: Int): Pair<IntArray, Size> {
-    require(px.size >= w * h) { "پیکسل کم است" }
-    if (orientation !in 2..8) return px to Size(w, h)
-    val out = oriented(w, h, orientation)
-    val dst = IntArray(out.w * out.h)
-    for (y in 0 until out.h) {
-      val row = y * out.w
-      for (x in 0 until out.w) {
-        val (sx, sy) = when (orientation) {
-          2 -> (w - 1 - x) to y
-          3 -> (w - 1 - x) to (h - 1 - y)
-          4 -> x to (h - 1 - y)
-          5 -> y to x
-          6 -> y to (h - 1 - x)
-          7 -> (w - 1 - y) to (h - 1 - x)
-          else -> (w - 1 - y) to x          // ۸
-        }
-        dst[row + x] = px[sy * w + sx]
-      }
+  fun exifMatrix(orientation: Int, w: Int, h: Int): FloatArray {
+    val fw = w.toFloat()
+    val fh = h.toFloat()
+    val v = when (orientation) {
+      2 -> floatArrayOf(-1f, 0f, fw, 0f, 1f, 0f)
+      3 -> floatArrayOf(-1f, 0f, fw, 0f, -1f, fh)
+      4 -> floatArrayOf(1f, 0f, 0f, 0f, -1f, fh)
+      5 -> floatArrayOf(0f, 1f, 0f, 1f, 0f, 0f)
+      6 -> floatArrayOf(0f, -1f, fh, 1f, 0f, 0f)
+      7 -> floatArrayOf(0f, -1f, fh, -1f, 0f, fw)
+      8 -> floatArrayOf(0f, 1f, 0f, -1f, 0f, fw)
+      else -> floatArrayOf(1f, 0f, 0f, 0f, 1f, 0f)
     }
-    return dst to out
+    return v + floatArrayOf(0f, 0f, 1f)
   }
 
   /**

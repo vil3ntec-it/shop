@@ -2,9 +2,11 @@ package ir.vil3ntec.tohid.core.image
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 /** ورودِ گروهیِ عکس: تطبیقِ فایل با کالا و کارِ ادامه‌پذیر (v3 ۳۶.۸، IMG-01/02/09/14). */
 class BulkImportTest {
@@ -47,6 +49,127 @@ class BulkImportTest {
     assertEquals("csv_barcode", BulkMatch.match("label 1.jpg", items, csv).how)
     assertEquals("oil", BulkMatch.match("x.jpg", items, csv).productId)
     assertTrue(BulkMatch.parseCsv("a,b\n1,2").isEmpty())                      // سرستونِ ناشناخته
+  }
+
+  /** همان سه نمونهٔ بازبینی: پسوندِ شماره بخشی از نامِ کالا بود و کالای دیگری گرفته می‌شد */
+  @Test fun `نامِ کامل اول؛ بی پسوند فقط وقتی کامل هیچ نیافت؛ دو جوابِ متفاوت ⇒ مبهم`() {
+    val aa = BulkMatch.Item("aa", "باتری قلمی", emptyList())
+    val aa4 = BulkMatch.Item("aa4", "باتری قلمی (4)", emptyList())
+    val pack = BulkMatch.Item("pack", "Pack", emptyList())
+    val pack12 = BulkMatch.Item("pack12", "Pack-12", emptyList())
+    val ean8 = BulkMatch.Item("ean8", "کالای هشت‌رقمی", listOf("12345678"))
+    val code10 = BulkMatch.Item("code10", "کدِ ده‌رقمی", listOf("1234567812"))
+    fun ambiguous(file: String, list: List<BulkMatch.Item>, vararg ids: String) {
+      val r = BulkMatch.match(file, list)
+      assertEquals(file, BulkMatch.Status.AMBIGUOUS, r.status)
+      assertEquals(file, "", r.productId)
+      assertEquals(file, ids.toList(), r.candidates)
+    }
+    fun matched(file: String, list: List<BulkMatch.Item>, id: String) {
+      val r = BulkMatch.match(file, list)
+      assertEquals(file, BulkMatch.Status.MATCHED, r.status)
+      assertEquals(file, id, r.productId)
+    }
+    //  هر دو کالا هست ⇒ مبهم، هیچ‌کدام خودکار نه
+    ambiguous("باتری قلمی (4).jpg", listOf(aa, aa4), "aa", "aa4")
+    ambiguous("Pack-12.jpg", listOf(pack, pack12), "pack", "pack12")
+    ambiguous("12345678-12.jpg", listOf(ean8, code10), "ean8", "code10")
+    //  فقط کالای نامِ کامل ⇒ همان (پیش از این کالای بی پسوند گرفته می‌شد یا هیچ)
+    matched("باتری قلمی (4).jpg", listOf(aa4), "aa4")
+    matched("Pack-12.jpg", listOf(pack12), "pack12")
+    matched("12345678-12.jpg", listOf(code10), "code10")
+    //  نامِ کامل هیچ نیافت ⇒ بی پسوندِ شماره (نسخهٔ دومِ عکسِ همان کالا)
+    matched("باتری قلمی (4).jpg", listOf(aa), "aa")
+    matched("Pack-12.jpg", listOf(pack), "pack")
+    matched("12345678-12.jpg", listOf(ean8), "ean8")
+    assertEquals("barcode", BulkMatch.match("12345678-12.jpg", listOf(ean8)).how)
+    //  دو راه، همان کالا ⇒ تطبیق
+    matched("Pack-12.jpg", listOf(BulkMatch.Item("p", "Pack", listOf()), BulkMatch.Item("q", "Other", listOf())), "p")
+  }
+
+  @Test fun `CSV — بارکد و نامِ دو کالا ⇒ مبهم؛ نامِ فایلِ تکراری ⇒ مبهم، نه آخری برنده`() {
+    val csv = LinkedHashMap<String, List<BulkMatch.CsvRow>>()
+    BulkMatch.parseCsv(
+      "image_filename,barcode,name\n" +
+        "a.jpg,6260000000017,نمک\n" +          // بارکد ⇒ برنج، نام ⇒ نمک
+        "b.jpg,6260000000017,برنج\n" +         // هر دو برنج
+        "c.jpg,6260000000017,\n" +             // دو ردیف، دو کالا
+        "c.jpg,6260000000024,\n" +
+        "d.jpg,6260000000024,\n" +             // ردیفِ عیناً تکراری ⇒ یکی
+        "d.jpg,6260000000024,\n" +
+        "e.jpg,6260000000024,\n" +             // دو ردیفِ متفاوت، همان کالا
+        "e.jpg,,نمک\n" +
+        "f.jpg,6260000000017,\n",
+      csv,
+    )
+    //  CSVِ دوم همان نامِ فایل را جورِ دیگری می‌گوید
+    BulkMatch.parseCsv("file;name\nF.JPG;روغن نباتی\n", csv)
+    fun r(f: String) = BulkMatch.match(f, items, csv)
+    assertEquals(BulkMatch.Status.AMBIGUOUS, r("a.jpg").status)
+    assertEquals(listOf("rice", "salt"), r("a.jpg").candidates)
+    assertEquals("csv_conflict", r("a.jpg").how)
+    assertEquals("rice", r("b.jpg").productId)
+    assertEquals(BulkMatch.Status.AMBIGUOUS, r("c.jpg").status)
+    assertEquals(listOf("rice", "salt"), r("c.jpg").candidates)
+    assertEquals("csv_duplicate", r("c.jpg").how)
+    assertEquals(1, csv["d.jpg"]!!.size)
+    assertEquals("salt", r("d.jpg").productId)
+    assertEquals("salt", r("e.jpg").productId)
+    assertEquals(BulkMatch.Status.AMBIGUOUS, r("f.jpg").status)
+    assertEquals(listOf("rice", "oil"), r("f.jpg").candidates)
+    //  مبهم با یک نامزد هم «مبهم» است، نه تطبیقِ خودکار؛ نامزدِ حذف‌شده ⇒ بی‌تطبیق
+    val j = BulkJob("j")
+    j.rows += BulkJob.Row(1, "x.jpg", 1, "x", candidates = listOf("rice"))
+    j.plan { photos[it] }
+    assertEquals(BulkJob.Status.AMBIGUOUS, j.rows[0].status)
+    j.rows[0].status = BulkJob.Status.NEW
+    j.plan { null }
+    assertEquals(BulkJob.Status.UNMATCHED, j.rows[0].status)
+  }
+
+  /**
+   *  بازبینی: اصلِ سیصد عکس در `filesDir/image-bulk` می‌ماند و پشتیبانِ ابری
+   *  (سقفِ ۲۵ مگ) را پر می‌کرد. حالا فقط نسخهٔ آماده زیرِ `no_backup` و پایانِ کار ⇒ خالی.
+   */
+  @Test fun `ورودِ گروهی هیچ فایلی زیرِ پوشه‌های پشتیبان‌دار نمی‌گذارد و پایانِ کار پوشه را خالی می‌کند`() {
+    val app = java.nio.file.Files.createTempDirectory("app").toFile()
+    try {
+      val backedUp = listOf(File(app, "files"), File(app, "shared_prefs"), File(app, "databases")).onEach { it.mkdirs() }
+      val noBackup = File(app, "no_backup").apply { mkdirs() }
+      val store = BulkStore.under(noBackup)
+      assertTrue(store.root.canonicalPath.startsWith(noBackup.canonicalPath + File.separator))
+
+      //  «افزودن»: هر فایلِ متمایز فقط نسخهٔ آماده (بی EXIF) را می‌گذارد
+      val j = job().plan { photos[it] }
+      for (r in j.rows) if (!store.has(r.sum)) store.put(r.sum, "display-${r.sum}".toByteArray(), "thumb".toByteArray())
+      store.save(j)
+      store.tidy(j)
+      assertFalse(store.has("s5"))                     // کالای یکسان — دیگر لازم نیست
+      assertNotNull(store.get("s3"))                   // مبهم — هنوز با انتخابِ کاربر راه می‌افتد
+      assertEquals("display-s1", String(store.get("s1")!!.display))
+
+      //  پردازش: انجام‌شده ⇒ فایلش پاک
+      j.rows[0].status = BulkJob.Status.DONE
+      j.rows[1].status = BulkJob.Status.DONE
+      store.tidy(j)
+      assertFalse(store.has("s1")); assertFalse(store.has("s2")); assertTrue(store.has("s4"))
+
+      //  همه نهایی (ناموفق هم) ⇒ کلِ پوشهٔ فایل‌ها
+      j.rows[3].status = BulkJob.Status.DONE
+      j.rows[4].status = BulkJob.Status.FAILED
+      j.rows[6].status = BulkJob.Status.DONE
+      assertTrue(j.settled())
+      store.save(j)
+      store.tidy(j)
+      assertEquals(listOf("job.json"), store.root.list()!!.toList())
+      assertNull(store.get("s4"))
+      for (d in backedUp) assertTrue("${d.name} باید خالی بماند", d.walk().none { it.isFile })
+      assertEquals(j.toJson(), store.load()!!.toJson())
+      store.clear()
+      assertFalse(store.root.exists())
+    } finally {
+      app.deleteRecursively()
+    }
   }
 
   @Test fun `GTIN — رقمِ کنترل`() {

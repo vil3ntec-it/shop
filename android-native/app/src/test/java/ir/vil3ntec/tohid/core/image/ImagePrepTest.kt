@@ -55,7 +55,7 @@ class ImagePrepTest {
    */
   @Test fun `چرخش و آینهٔ EXIF روی پیکسل‌ها — هر هشت حالت`() {
     val px = intArrayOf(1, 2, 3, 4, 5, 6)
-    fun o(n: Int) = ImagePrep.orient(px, 3, 2, n)
+    fun o(n: Int) = draw(px, 3, 2, n)
     assertArrayEquals(intArrayOf(1, 2, 3, 4, 5, 6), o(1).first)
     assertArrayEquals(intArrayOf(3, 2, 1, 6, 5, 4), o(2).first)           // آینهٔ افقی
     assertArrayEquals(intArrayOf(6, 5, 4, 3, 2, 1), o(3).first)           // ۱۸۰
@@ -67,6 +67,36 @@ class ImagePrepTest {
     for (n in 5..8) assertEquals(ImagePrep.Size(2, 3), o(n).second)
     //  ۶: گوشهٔ بالا-چپِ اصل بالا-راست می‌نشیند (همان آزمونِ کرومیومِ وب)
     assertEquals(1, o(6).first[1])
+  }
+
+  /**
+   *  همان کاری که `Canvas.drawBitmap(src, Matrix(exifMatrix))` می‌کند: مرکزِ هر
+   *  پیکسلِ مبدأ با ماتریس نگاشته می‌شود و پیکسلِ مقصد همان‌جاست. هر خانهٔ
+   *  مقصد دقیقاً یک بار پر شود (چرخشِ ۹۰°ی روی شبکه، بی تاری).
+   */
+  private fun draw(px: IntArray, w: Int, h: Int, o: Int): Pair<IntArray, ImagePrep.Size> {
+    val m = ImagePrep.exifMatrix(o, w, h)
+    assertEquals(9, m.size)
+    val size = ImagePrep.oriented(w, h, o)
+    val dst = IntArray(size.w * size.h) { -1 }
+    for (y in 0 until h) for (x in 0 until w) {
+      val cx = x + 0.5f
+      val cy = y + 0.5f
+      val dx = kotlin.math.floor(m[0] * cx + m[1] * cy + m[2]).toInt()
+      val dy = kotlin.math.floor(m[3] * cx + m[4] * cy + m[5]).toInt()
+      assertTrue("o=$o بیرون از بوم", dx in 0 until size.w && dy in 0 until size.h)
+      assertEquals("o=$o دو بار", -1, dst[dy * size.w + dx])
+      dst[dy * size.w + dx] = px[y * w + x]
+    }
+    return dst to size
+  }
+
+  @Test fun `ماتریسِ EXIF هر هشت حالت را روی شبکه می‌نشاند — مربع و مستطیل`() {
+    for ((w, h) in listOf(1 to 1, 4 to 4, 7 to 3, 2 to 9)) for (o in 0..9) {
+      val (out, size) = draw(IntArray(w * h) { it }, w, h, o)
+      assertEquals(ImagePrep.oriented(w, h, if (o in 2..8) o else 1), size)
+      assertTrue(out.none { it < 0 })
+    }
   }
 
   @Test fun `کدگذاری زیرِ سقف — کیفیت پله‌ای، بعد کوچک‌تر`() {
