@@ -30,7 +30,7 @@ object Space {
  *  اگر گوشهٔ تیز داشته باشد، به کلِ صفحه چسبیده به نظر می‌رسد.
  */
 object Shape {
-  //  کامپیوتر: گوشه‌های کم‌گرد — شرح سرِ `ShopShapes`
+  //  VILL3N: دکمه و کادر ۱۰، کارت ۱۲، کارتِ ویژه/پنجره ۱۶ — جدولِ `Corner`
   val button = RoundedCornerShape(Corner.button.current)
   val field = RoundedCornerShape(Corner.field.current)
   val card = RoundedCornerShape(Corner.card.current)
@@ -47,9 +47,12 @@ object Shape {
 /**
  *  جدولِ گِردی — تنها جایی که عددِ گوشه نوشته می‌شود (MASTER-SPEC ۵.۴).
  *
- *  `Shape`، `Radius` و `ShopShapes` همه از این‌جا می‌خوانند. هر نقش دو عدد دارد:
- *  کامپیوتر (۴ تا ۱۲ پیکسل، RULES «ظاهرِ کامپیوتری») و لمسی (گوشی و تبلت).
- *  `DesignTokensTest` بازه‌ها را می‌پاید و عددهای پیش از یکی شدن را نگه می‌دارد.
+ *  **VILL3N (۱۴۰۵/۰۷/۲۸، دستورِ صاحب محصول، §۱۱):** دکمه و کادرِ ورودی ۱۰، کارت ۱۲،
+ *  کارتِ ویژه و پنل/پنجره ۱۶، تراشه و نشان قرصیِ کامل (`Shape.chip`). یک پله برای
+ *  کامپیوتر، گوشی و وب. پیش از این (نسخهٔ ۲): ۱۲/۱۶/۲۰؛ نسخهٔ ۱: کامپیوتر ۴ تا ۱۲ و
+ *  گوشی ۱۶ تا ۲۸. `DesignTokensTest` همین عددها را می‌پاید و `WebPaletteParityTest`
+ *  `--radius-*`ِ وب را. (گوشیِ نسخهٔ ۳ گِردیِ بزرگ‌ترِ تأییدشدهٔ خودش را برای شیت و
+ *  کارتِ پروفایل نگه می‌دارد — `PhoneV3.kt`.)
  */
 object Corner {
   class Token(val name: String, val desk: Dp, val touch: Dp) {
@@ -57,40 +60,52 @@ object Corner {
     val current: Dp get() = if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) desk else touch
   }
 
+  /** کنترل‌ها: دکمه، کادرِ ورودی، زبانه، شمارنده */
+  val CONTROL = 10.dp
+  /** کارت‌ها و کاشی‌ها */
+  val CARD = 12.dp
+  /** کارتِ ویژه، پنلِ بزرگ و پنجره */
+  val PANEL = 16.dp
+
   //  نقش‌ها (`Shape`)
-  val button = Token("button", 6.dp, 18.dp)
-  val field = Token("field", 6.dp, 16.dp)
-  val card = Token("card", 8.dp, 20.dp)
-  val cardLarge = Token("cardLarge", 10.dp, 24.dp)
+  val button = Token("button", CONTROL, CONTROL)
+  val field = Token("field", CONTROL, CONTROL)
+  val card = Token("card", CARD, CARD)
+  val cardLarge = Token("cardLarge", PANEL, PANEL)
   /** پنجره و برگهٔ پایین */
-  val dialog = Token("dialog", 10.dp, 28.dp)
-  val icon = Token("icon", 6.dp, 12.dp)
+  val dialog = Token("dialog", PANEL, PANEL)
+  val icon = Token("icon", CONTROL, CONTROL)
 
-  //  پنل‌ها (`Radius`) — لمسی‌اش همان `--radius-sm/md/lg`ِ وب است
-  val panelSm = Token("panelSm", 6.dp, 16.dp)
-  val panelMd = Token("panelMd", 8.dp, 20.dp)
-  val panelLg = Token("panelLg", 12.dp, 28.dp)
+  //  پنل‌ها (`Radius`) — همان `--radius-sm/md/lg`ِ وب
+  val panelSm = Token("panelSm", CONTROL, CONTROL)
+  val panelMd = Token("panelMd", CARD, CARD)
+  val panelLg = Token("panelLg", PANEL, PANEL)
 
-  //  اجزای آمادهٔ متریال (`ShopShapes`)
-  val extraSmall = Token("extraSmall", 4.dp, 12.dp)
-  val small = Token("small", 6.dp, 16.dp)
-  val medium = Token("medium", 8.dp, 18.dp)
-  val large = Token("large", 10.dp, 20.dp)
-  val extraLarge = Token("extraLarge", 12.dp, 28.dp)
+  //  اجزای آمادهٔ متریال (`ShopShapes`): کادرِ متن و منو از extraSmall، کارت از medium، پنجره از extraLarge.
+  //  `small` (تراشه‌های متریال) عدد نیست: قرصیِ کامل، همان `Shape.chip`
+  val extraSmall = Token("extraSmall", CONTROL, CONTROL)
+  val medium = Token("medium", CARD, CARD)
+  val large = Token("large", CARD, CARD)
+  val extraLarge = Token("extraLarge", PANEL, PANEL)
 
-  val ALL = listOf(button, field, card, cardLarge, dialog, icon, panelSm, panelMd, panelLg, extraSmall, small, medium, large, extraLarge)
+  val ALL = listOf(button, field, card, cardLarge, dialog, icon, panelSm, panelMd, panelLg, extraSmall, medium, large, extraLarge)
 }
 
 /**
- *  سایه — کم و کم‌تر.
+ *  سایه.
  *
- *  در صفحه‌ای که پر از کارت است، سایهٔ زیاد همه‌چیز را شناور و شلوغ نشان
- *  می‌دهد. جداکردنِ کارت‌ها کارِ حاشیه و رنگِ زمینه است، نه سایه؛ سایه
- *  فقط برای چیزی که واقعاً روی بقیه است — نوارِ سبد، شیت، منو.
+ *  VILL3N §۱۱: سایهٔ کارت سبک است (`0 3px 12px rgba(15,23,42,.06)`) و کارتِ ویژه
+ *  کمی بیشتر (`0 8px 24px rgba(15,23,42,.09)`). سایه **جای خطِ دور را نمی‌گیرد**:
+ *  کارت همیشه `borderCard` دارد (`softCard`). رنگِ سایه `ShopColors.shadow`.
+ *  پیش از این (نسخهٔ ۲): کارت ۶ و شناور ۱۴ با خطِ مویی.
  */
 object Elevation {
   val flat = 0.dp
   val raised = 1.dp
   val floating = 6.dp
   val overlay = 10.dp
+  /** سایهٔ سبکِ کارت (`softCard`) */
+  val card = 3.dp
+  /** کارتِ ویژه، نوارِ شناور، منوی باز، سبد */
+  val lifted = 8.dp
 }

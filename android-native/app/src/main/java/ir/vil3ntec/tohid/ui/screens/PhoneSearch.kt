@@ -80,7 +80,8 @@ fun PhoneSearchScreen(
   LaunchedEffect(Unit) { if (initialQuery.isEmpty()) runCatching { focus.requestFocus() } }
   val hits = remember(d, query) { paletteSearch(d, query, limit = 60) }
   val invoices = remember(d, query) { invoiceSearch(d, query) }
-  val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+  //  پوسته‌ای که خودش نوارِ سیستم را گرفته `LocalV3SystemBottom = 0.dp` می‌دهد (بی دوباره‌شماری)
+  val navBottom = ir.vil3ntec.tohid.ui.v3.LocalV3SystemBottom.current ?: WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
   Column(
     Modifier.fillMaxSize().background(p.bg).windowInsetsPadding(WindowInsets.statusBars)

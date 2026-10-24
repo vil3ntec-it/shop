@@ -120,6 +120,9 @@ fun SaleScreen(
   val phone = screenSize() == Screen.PHONE
   var cartOpen by rememberSaveable { mutableStateOf(false) }
   LaunchedEffect(cart.isEmpty()) { if (cart.isEmpty()) cartOpen = false }
+  //  PRM: تخفیف‌های خودکار — کلیدِ دکان خاموش ⇒ null و `priced` همان `cart` است
+  val promo = ir.vil3ntec.tohid.ui.PromoLive.rememberOutcome(d, cart)
+  val priced = ir.vil3ntec.tohid.data.PromoEngine.priced(cart, promo)
 
   // کالای حذف‌شده نباید در سبد بماند
   LaunchedEffect(d.products.size, d.debtors.size) { cartStore.prune(d) }
@@ -815,6 +818,22 @@ fun SaleScreen(
             Spacer(Modifier.height(8.dp))
           }
         }
+        //  PRM-18: هر تخفیفِ اعمال‌شده یک ردیف با نامش، و کادرِ کد اگر قاعدهٔ کددار هست
+        if (promo != null && promo.applied.isNotEmpty()) {
+          item(key = "promo-lines") { ir.vil3ntec.tohid.ui.components.pos.PromoLines(promo.applied) }
+        }
+        if (ir.vil3ntec.tohid.ui.PromoLive.snap.value.active && ir.vil3ntec.tohid.ui.PromoLive.snap.value.hasCodes) {
+          item(key = "promo-code") {
+            Panel {
+              ir.vil3ntec.tohid.ui.components.pos.PromoCodeField(
+                codes = promo?.codes.orEmpty(),
+                entered = ir.vil3ntec.tohid.ui.PromoLive.coupons.value,
+                onAdd = { ir.vil3ntec.tohid.ui.PromoLive.addCoupon(it) },
+                onRemove = { ir.vil3ntec.tohid.ui.PromoLive.removeCoupon(it) },
+              )
+            }
+          }
+        }
       }
     }
 
@@ -826,7 +845,7 @@ fun SaleScreen(
       modifier = Modifier.align(Alignment.BottomCenter),
     ) {
       CartBar(
-        total = SalesEngine.cartTotal(d, cart),
+        total = SalesEngine.cartTotal(d, priced),
         debtorName = cartDebtorId?.let { id -> d.debtors.find { it.id == id }?.name },
         debtorNote = cartDebtorId?.let { id -> debtStateText(d, id) },
         onPickDebtor = { pickDebtor = true },
@@ -840,7 +859,7 @@ fun SaleScreen(
       //  دکمهٔ برگشتِ گوشی: اول کادرِ اسکن، بعد خانه (سبدِ باز را خودِ قاب می‌بندد)
       BackHandler(onBack = { if (scanOpen) closeScanner() else goBack() })
       PhoneSaleFrame(
-        model = CartSummary.of(cart, d.products, SalesEngine.cartTotal(d, cart)),
+        model = CartSummary.of(cart, d.products, SalesEngine.cartTotal(d, priced)),
         open = cartOpen,
         onOpen = { cartOpen = true },
         onClose = { cartOpen = false; expandedLine = null },
@@ -928,7 +947,7 @@ fun SaleScreen(
             }
           }
           Spacer(Modifier.height(16.dp))
-          PhoneCartTotal(SalesEngine.cartTotal(d, cart))
+          PhoneCartTotal(SalesEngine.cartTotal(d, priced))
           Spacer(Modifier.height(36.dp))
           PhoneCartPay("پرداخت", onClick = { checkout = true })
         },
@@ -1080,7 +1099,8 @@ fun SaleScreen(
   if (checkout) {
     CheckoutDialog(
       d = d,
-      cart = cart,
+      //  جمع و ثبت با قیمتِ پس از تخفیف‌های خودکار (خاموش ⇒ همان سبد)
+      cart = priced,
       presetDebtorId = cartDebtorId,
       onDismiss = { checkout = false },
       busy = cartStore.posting.collectAsState().value,
@@ -1091,7 +1111,7 @@ fun SaleScreen(
         //  POS-14: یک ثبت در هر لحظه با کلیدِ فاکتور؛ سبد فقط پس از نوشتنِ دفتر پاک می‌شود
         scope.launch { when (val posted = cartStore.post(store) { key ->
           SalesEngine.record(
-          d, cart, options,
+          d, priced, options,
           today = ir.vil3ntec.tohid.todayIso(),
           now = System.currentTimeMillis(),
           newId = ::newId,

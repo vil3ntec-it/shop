@@ -298,7 +298,7 @@ fun WarehouseScreen(
 
     AddFab(
       label = "کالای تازه",
-      containerColor = Shop.colors.primary,
+      containerColor = Shop.colors.button.primary.bg,
       onClick = { bulkProduct = true },
       modifier = Modifier.align(Alignment.BottomStart).padding(16.dp).popIn(),
     )
