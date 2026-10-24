@@ -53,8 +53,17 @@ class ShopStore(private val context: Context) {
   suspend fun load() {
     withContext(Dispatchers.IO) {
       //  SEC-01: بازسازیِ نیمه‌کاره پیش از خواندنِ دفتر تمام یا دور ریخته می‌شود (`SyncRebuild.atLoad`)
-      runCatching { recoverRebuild() }
-      if (file.exists()) {
+      val stuck = runCatching { recoverRebuild() }.getOrElse { rebuildMark.exists() && rebuildSide.exists() }
+      if (stuck) {
+        /*
+         *  ⛔ سایه همین حالا سایهٔ سرور است ولی جابه‌جایی جا نیفتاد: دفترِ قدیم (شاید خواندنی)
+         *  کنارِ سایهٔ تازه نوشته نمی‌شود — وگرنه نخستین ذخیره برای هر ردیفی که فقط سرور دارد
+         *  DELETE می‌ساخت. همان نگهبانِ «دفترِ خوانده‌نشده»: نوشتن بسته، راهِ برگشت «دوباره
+         *  امتحان» (همین جابه‌جایی) یا «بازسازی از سرور».
+         */
+        _unreadable.value = AtRestException.Kind.IO
+        _data.value = ShopData()
+      } else if (file.exists()) {
         //  SEC-01: دفترِ ساده همان‌طور خوانده می‌شود؛ رمزدار با کلیدِ همین دستگاه
         val text = try {
           AtRest.readText(context, file).also { _unreadable.value = null }
@@ -235,6 +244,7 @@ class ShopStore(private val context: Context) {
         "${out.count} تغییرِ این دستگاه هنوز به سرور نرسیده؛ اول باید برسند تا گم نشوند. به اینترنت وصل شوید و دوباره امتحان کنید.",
       )
       is SyncRebuild.Outcome.Done -> {
+        //  کفِ شمارهٔ فاکتور پس از افزودنِ ردیف‌های پشتیبان هم (درونِ `withBackupRows`)
         val merged = backup?.let { SyncRebuild.withBackupRows(out.ledger, it, out.before) } ?: out.ledger
         val done = "دفتر از سرور بازسازی شد (${out.rows} ردیف)."
         when {
@@ -264,13 +274,29 @@ class ShopStore(private val context: Context) {
 
   /** دو گامِ فایلیِ بازسازی، زیرِ قفلِ موتور: کناری + نشان، و جابه‌جایی */
   private val staging = object : SyncRebuild.Staging {
+    /** دفتری که همین بازسازی گذاشت — برای شناختنِ جابه‌جاییِ تمام‌شده به دستِ دیگری */
+    @Volatile private var staged: ShopData? = null
+
     override fun stage(next: ShopData, shadowSha: String) {
       AtRest.writeText(context, rebuildSide, json.encodeToString(next))
       DiskWrite.text(rebuildMark, shadowSha)
+      staged = next
     }
 
     override fun swap() {
-      if (!finishRebuild()) throw java.io.IOException("دفترِ بازسازی‌شده جا نیفتاد؛ با باز شدنِ دوبارهٔ برنامه تمام می‌شود")
+      if (finishRebuild()) { staged = null; return }
+      //  کارگرِ پس‌زمینه (نمونهٔ دیگرِ همین کلاس) زودتر تمامش کرد؟ نشان و کناری رفته‌اند و دفترِ
+      //  روی دیسک همان است که این بازسازی گذاشت ⇒ تمام شده است، نه «جا نیفتاد»
+      val side = rebuildSide.exists()
+      val mark = rebuildMark.exists()
+      val onDisk = if (!side && !mark) runCatching { json.decodeFromString<ShopData>(AtRest.readText(context, file)) }.getOrNull() else null
+      if (SyncRebuild.swappedElsewhere(side, mark, onDisk, staged)) {
+        _unreadable.value = null
+        _data.value = onDisk!!
+        staged = null
+        return
+      }
+      throw java.io.IOException("دفترِ بازسازی‌شده جا نیفتاد؛ با «دوباره امتحان» یا باز شدنِ دوبارهٔ برنامه تمام می‌شود")
     }
   }
 
@@ -294,20 +320,48 @@ class ShopStore(private val context: Context) {
     return true
   }
 
-  /** هنگامِ باز شدن: بازسازی‌ای که میانِ سایه و جابه‌جایی بسته شد تمام می‌شود؛ پیش از سایه، دور ریخته */
-  private fun recoverRebuild() {
+  /**
+   *  هنگامِ باز شدن: بازسازی‌ای که میانِ سایه و جابه‌جایی بسته شد تمام می‌شود؛ پیش از سایه، دور ریخته.
+   *  وقتی همین فرایند وسطِ بازسازی است (`SyncV1Engine.rebuilding` — مثلاً کارگرِ پس‌زمینه دفتر را
+   *  می‌خواند) به هیچ‌کدام دست نمی‌زند.
+   *
+   *  @return `true` یعنی سایه با نشان می‌خواند ولی جابه‌جایی **نشد** — `load` نوشتن را می‌بندد
+   */
+  private fun recoverRebuild(): Boolean {
     val mark = rebuildMark
     val side = rebuildSide
-    if (!mark.exists() && !side.exists()) return
+    if (!mark.exists() && !side.exists()) return false
     val engine = SyncV1Engine.of(context)
+    if (engine.rebuilding) return false
     val marker = if (mark.exists()) runCatching { mark.readText().trim() }.getOrNull() else null
-    synchronized(engine) {
+    return synchronized(engine) {
       //  Sync v3 بازسازی ندارد ⇒ نشان هرگز نمی‌خواند ⇒ دور ریخته
       when (SyncRebuild.atLoad(marker, side.isFile, if (SyncChoice.isV3(context)) "" else engine.shadowSha())) {
-        SyncRebuild.AtLoad.FINISH -> finishRebuild()
-        SyncRebuild.AtLoad.DISCARD -> { side.delete(); mark.delete() }
-        SyncRebuild.AtLoad.NONE -> Unit
+        SyncRebuild.AtLoad.FINISH -> !finishRebuild()
+        SyncRebuild.AtLoad.DISCARD -> { side.delete(); mark.delete(); false }
+        SyncRebuild.AtLoad.NONE -> false
       }
+    }
+  }
+
+  /**
+   *  خواندن ⇐ تبدیل ⇐ نوشتن **زیرِ همان قفلِ موتور** (`synchronized(engine)`) که نشاندنِ
+   *  opهای رسیده هم زیرِ آن است: [transform] همیشه تازه‌ترین دفتر را می‌گیرد، نه نسخهٔ کهنهٔ
+   *  صفحه — نوشتنی که در پس‌زمینه می‌رود (فروشِ تحویلِ سفارش) چیزی از دیگران را پاک نمی‌کند.
+   *  [transform] باید سبک و خالص باشد. `null` ⇒ چیزی برای نوشتن نبود. قفلِ نرم مثلِ [save].
+   *  @return null (هیچ) · true (نوشته شد) · false (قفلِ نرم یا دیسک)
+   */
+  suspend fun update(transform: (ShopData) -> ShopData?): Boolean? = withContext(Dispatchers.IO) {
+    val engine = SyncV1Engine.of(context)
+    synchronized(engine) {
+      val cur = _data.value
+      val next = transform(cur) ?: return@synchronized null
+      if (touchesPaid(cur, next) && SoftLock.isLocked(context)) {
+        SoftLock.noteBlocked()
+        _blocked.tryEmit(Unit)
+        return@synchronized false
+      }
+      writeLocked(engine, next)
     }
   }
 
@@ -341,6 +395,7 @@ class ShopStore(private val context: Context) {
     return LedgerWriter(engine, { _data.value }) { next -> writeLocked(engine, next) }
   }
 
+  /** بدنهٔ نوشتن؛ فراخوان قفلِ موتور را گرفته است ([LedgerWriter]، و [update] با `synchronized(engine)`) */
   private fun writeLocked(engine: SyncV1Engine, next: ShopData): Boolean {
     /*
      *  ⛔ دفتری که به دیسک نرسید op نمی‌سازد (F0-01). وگرنه opها به سرور

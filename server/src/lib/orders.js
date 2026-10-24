@@ -11,9 +11,12 @@
  *   خواندن ─ کارتِ سبکِ هر برگه (ORD-11/12) با صفحه‌بندیِ کلیدی، شمارش‌ها،
  *           و جزئیات با خطِ زمانی (ORD-16).
  *
- * قلّاب‌های گذار: رزرو و کسرِ قطعیِ موجودی (CHK-18) در `lib/catalog.js` (پرچمِ
- * `shop.catalog`)، سپس فاکتورِ سریِ W و سندِ برگشت (ORD-20) در `lib/order-ledger.js`
- * (پرچمِ `shop.orders.ledger`). سفارشِ دستیِ کارمند قیمت را خودش می‌گوید، درست مثلِ صندوق؛
+ * ⛔ موجودی (تصمیمِ صاحبِ مخزن، ۱۴۰۵/۰۷/۲۷): سفارش موجودیِ سرور را **نه رزرو می‌کند نه
+ * کم** و هیچ ردیفی در دفترِ دکان نمی‌نویسد. ساختِ سفارش با پرچمِ `shop.catalog` فقط
+ * می‌سنجد (`catalog.checkOrder`). وقتی دکان سفارش را تحویل می‌دهد (مشتری گرفت / به پیک
+ * داده شد / رسید)، **برنامهٔ دکان** یک فروشِ عادی با `orderId` ثبت می‌کند
+ * (`OrderFulfillment.kt`) و موجودی با همگام‌سازی همه‌جا کم می‌شود؛ `handoverPending`
+ * سفارش‌های تحویل‌شدهٔ بی‌فروش را به برنامه می‌دهد. سفارشِ دستیِ کارمند قیمت را خودش می‌گوید، درست مثلِ صندوق؛
  * سفارشِ ویترین قیمت را از دفترِ سرور می‌گیرد (`price` در `create`،
  * ‎lib/storefront.js‎).
  */
@@ -305,8 +308,8 @@ async function create(shopId, { key, body, actor, price, notify }) {
   const at = now();
   let input = price ? null : parseCreate(body, at);
   const hash = hashOf(body);
-  //  QA #263: نخستین خواندنِ کاملِ دفترِ دستگاه (پرچمِ `shop.catalog`) در تراکنشِ خودش و
-  //  **پیش از** تراکنش و قفلِ سفارش؛ سفارشِ آزمایشی موجودی را لمس نمی‌کند.
+  //  QA #263: خواندنِ دفترِ دستگاه (پرچمِ `shop.catalog`) در تراکنشِ خودش و **پیش از**
+  //  تراکنش و قفلِ سفارش؛ سفارشِ آزمایشی موجودی را نمی‌سنجد.
   if (!(input && input.isTest)) await require('./catalog').prepare(shopId, { at });
 
   return tx(async (c) => {
@@ -324,6 +327,9 @@ async function create(shopId, { key, body, actor, price, notify }) {
       return { order: await loadDetail(run, shopId, prev.id, actor), replayed: true };
     }
     if (price) input = await price(run, at);
+    //  کاتالوگ (v3 §۳۲): پرچمِ `shop.catalog` روشن ⇒ فقط سنجش — کالای ناموجود/غیرفعال،
+    //  واحدِ ناشناس، یا بیش از موجودیِ همین لحظه ⇒ خطا پیش از هر نوشتنی. ⛔ بی رزرو.
+    await require('./catalog').checkOrder(c, shopId, { lines: input.lines, isTest: input.isTest });
 
     const no = Number((await c.query(
       'SELECT COALESCE(MAX(order_no), 0) + 1 AS n FROM online_orders WHERE shop_id=$1', [shopId]
@@ -352,9 +358,6 @@ async function create(shopId, { key, body, actor, price, notify }) {
           l.lineTotalMinor, l.note, l.substitution]
       );
     }
-    //  کاتالوگ و موجودی (v3 §۳۲.۲، CHK-18): پرچمِ `shop.catalog` روشن ⇒ رزروِ اتمی در همین
-    //  تراکنش؛ کمبود ⇒ ۴۰۹ و کلِ سفارش برمی‌گردد. خاموش ⇒ هیچ (همان رفتارِ پیشین).
-    await require('./catalog').onOrderCreated(c, shopId, { orderId: id, lines: input.lines, at, actor, isTest: input.isTest });
     await c.query(
       `INSERT INTO online_order_events (id, order_id, shop_id, seq, kind, from_status, to_status,
          actor_type, actor_id, reason, note, detail, created_at)
@@ -420,12 +423,7 @@ function parseTransition(input) {
 /** گذارِ وضعیت (شرح و پارامترها در بالا) — ورودی پیش از باز شدنِ تراکنش سنجیده می‌شود. */
 async function transition(shopId, id, input, actor) {
   const p = parseTransition(input);
-  //  قبول ممکن است رزرو بخواهد ⇒ نخستین خواندنِ کاملِ دفتر بیرون از تراکنشِ گذار (QA #263)
-  if (p.to === 'accepted') await require('./catalog').prepare(shopId);
-  const out = await tx((c) => applyTransition(c, shopId, id, p, actor));
-  //  پس از COMMIT: دستگاه‌های وصل سندِ W را همین حالا بگیرند
-  if (out.ledger && out.ledger.head) require('./order-ledger').notify(shopId, out.ledger.head);
-  return out;
+  return tx((c) => applyTransition(c, shopId, id, p, actor));
 }
 
 /**
@@ -470,9 +468,7 @@ async function applyTransition(c, shopId, id, { to, expected, reason, note, read
         WHERE shop_id=$1 AND id=$2`,
       [shopId, row.id, to, reason, readyAt ?? null, at]
     );
-    //  کاتالوگ و موجودی (v3 §۳۲.۲): قبول ⇒ رزرو می‌ماند · رد/لغو ⇒ آزاد · تحویل ⇒ کسرِ قطعی؛
-    //  کمبود هنگامِ قبول ⇒ ۴۰۹ و گذار برمی‌گردد. بی رزرو و پرچمِ خاموش ⇒ هیچ.
-    await require('./catalog').onOrderStatus(c, shopId, { id: row.id, from: row.status, to }, actor, at);
+    //  ⛔ موجودی: هیچ (تصمیمِ صاحبِ مخزن) — تحویل را برنامهٔ دکان با فروشِ عادی ثبت می‌کند.
     await c.query(
       `INSERT INTO online_order_events (id, order_id, shop_id, seq, kind, from_status, to_status,
          actor_type, actor_id, reason, note, detail, created_at)
@@ -480,10 +476,7 @@ async function applyTransition(c, shopId, id, { to, expected, reason, note, read
       [ulid(at), row.id, shopId, seq, row.status, to, actor.type, actor.id || '', reason, note,
         JSON.stringify(readyAt ? { readyAt } : {}), at]
     );
-    //  ORD-20: تحویل ⇒ فاکتورِ سریِ W در دفترِ دستگاه‌های دکان؛ بازپرداختِ کامل ⇒ سندِ برگشت.
-    //  پرچمِ خاموشِ `shop.orders.ledger` ⇒ هیچ. هر خطا کلِ گذار را برمی‌گرداند (سند و گذار با هم).
-    const ledger = await require('./order-ledger').onOrderStatus(c, shopId, { id: row.id, from: row.status, to }, actor, at);
-    return { order: await loadDetail(run, shopId, row.id, actor), unchanged: false, from: row.status, to, ledger };
+    return { order: await loadDetail(run, shopId, row.id, actor), unchanged: false, from: row.status, to };
   }
 }
 

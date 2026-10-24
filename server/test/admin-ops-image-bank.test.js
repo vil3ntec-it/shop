@@ -81,3 +81,44 @@ test('batches: شمارِ فایل و ردیف به‌ازای هر دسته، �
   assert.ok(row.created_at > 0);
   assert.deepEqual([list.body.items[1].files, list.body.items[1].rows], [0, 0]);
 });
+
+test('review: صف با دلیلِ تطبیق، کالاهای ممکن با اندازه، تکراری و نشانیِ فایل (IMG-02، IMG-PRO-07، IMG-BANK-17، IMG-09، IMG-BANK-13)', async () => {
+  for (const size of ['1', '5']) {
+    const p = await AD('POST', '/products', { name: 'روغن آفتاب', brand: 'زر', size_value: size, size_unit: 'l', sku: `OIL-${size}` });
+    assert.equal(p.status, 201, JSON.stringify(p.body));
+  }
+  const b = await AD('POST', '/batches', { license_source: 'کاتالوگ', license_status: 'licensed', commercial_use: true });
+  const id = b.body.id;
+  const same = F.jpeg(800, 600, { seed: ++seed });
+  await ADR('PUT', `/batches/${id}/files/oil.jpg`, same);
+  await ADR('PUT', `/batches/${id}/files/oil-copy.jpg`, same);
+  await ADR('PUT', `/batches/${id}/files/soap.jpg`, F.jpeg(800, 600, { seed: ++seed }));
+  const csv = ['sku,barcode,name,brand,size,unit,image_path,license_status',
+    ',,روغن آفتاب,زر,,,oil.jpg,', 'SOAP-1,,صابون گل,گل,100,g,soap.jpg,', ',,روغن آفتاب,زر,,,oil-copy.jpg,'].join('\n');
+  const run = await AD('POST', `/batches/${id}/rows`, { csv });
+  assert.deepEqual(run.body.counts, { ambiguous: 2, ok: 1 });
+
+  const r = await AD('GET', '/review?status=NEEDS_REVIEW&space=pending');
+  assert.equal(r.status, 200, JSON.stringify(r.body).slice(0, 300));
+  assert.equal(r.headers.get('cache-control'), 'no-store');
+  const byRow = Object.fromEntries(run.body.rows.map((x) => [x.row_no, x.image_id]));
+  const item = (rowNo) => r.body.items.find((x) => x.id === byRow[rowNo]);
+  //  مبهم: وصل نیست، دلیل «چند کالای هم‌نام»، دو کالای ممکن با اندازه و SKU
+  const oil = item(2);
+  assert.equal(oil.match_status, 'ambiguous');
+  assert.deepEqual(oil.match_reasons, ['name_many']);
+  assert.equal(oil.product, null);
+  assert.deepEqual(oil.candidates.map((c) => `${c.size_value}${c.size_unit}:${c.sku}`).sort(), ['1l:OIL-1', '5l:OIL-5']);
+  assert.match(oil.file.url, /^\/api\/admin\/image-bank\/file\/[^/]+\/1\/original$/);
+  assert.equal(oil.license.status, 'licensed');
+  //  همان فایل دوباره ⇒ فقط نشانِ تکراری (IMG-BANK-13)
+  assert.deepEqual(item(4).duplicate_of, [oil.id]);
+  //  کالای تازه: وصل، با SKU
+  const soap = item(3);
+  assert.equal(soap.product.sku, 'SOAP-1');
+  assert.deepEqual(soap.match_reasons, ['new_product']);
+  assert.deepEqual(soap.candidates, []);
+  //  فایلِ همان نشانی واقعاً سرو می‌شود
+  const file = await h.download(oil.file.url, { token: admin });
+  assert.equal(file.status, 200);
+});
