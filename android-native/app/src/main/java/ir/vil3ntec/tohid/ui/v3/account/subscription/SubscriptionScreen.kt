@@ -212,7 +212,7 @@ internal fun RouteScope.SubscriptionRoute() {
   LaunchedEffect(signedIn) { refresh() }
   SubscriptionContent(
     ui,
-    onBack = if (nav.canBack) ({ back() }) else null,
+    onBack = backOrNull,
     onRefresh = { scope.launch { refresh() } },
     onOpen = { nav.open(it) },
   )

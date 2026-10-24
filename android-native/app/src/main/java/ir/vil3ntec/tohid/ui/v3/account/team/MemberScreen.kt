@@ -54,7 +54,7 @@ import kotlinx.coroutines.launch
 
 /** کارهای صفحهٔ یک کارمند */
 internal class MemberActions(
-  val back: () -> Unit,
+  val back: (() -> Unit)?,
   val toggle: (key: String, on: Boolean) -> Unit,
   val block: (deviceId: String) -> Unit,
   val unblock: (deviceId: String) -> Unit,
@@ -145,7 +145,7 @@ internal fun RouteScope.MemberRoute(id: String) {
   MemberContent(
     team, member, canEdit, busy,
     MemberActions(
-      back = { back() },
+      back = backOrNull,
       toggle = { key, on ->
         val layer = member?.let { MemberModel.permsOf(team.perms, it) }
         if (layer != null) {

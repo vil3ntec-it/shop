@@ -87,7 +87,7 @@ internal fun ProfileEditContent(
   onShopName: (String) -> Unit,
   onPhoto: () -> Unit,
   onSave: () -> Unit,
-  onBack: () -> Unit,
+  onBack: (() -> Unit)?,
 ) {
   val c = PhoneV3.colors
   V3Form(
@@ -244,7 +244,7 @@ internal fun RouteScope.ProfileEditRoute() {
     onShopName = { shop = it },
     onPhoto = { sheet = true },
     onSave = ::save,
-    onBack = { back() },
+    onBack = backOrNull,
   )
   if (sheet) AvatarSourceSheet(picker) { sheet = false }
 }

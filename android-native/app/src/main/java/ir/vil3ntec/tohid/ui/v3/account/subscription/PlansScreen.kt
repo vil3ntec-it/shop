@@ -87,7 +87,7 @@ internal data class PlansUi(
 )
 
 internal class PlansActions(
-  val back: () -> Unit,
+  val back: (() -> Unit)?,
   val pick: (String) -> Unit,
   val buy: () -> Unit,
   val open: (String) -> Unit,
@@ -236,7 +236,7 @@ internal fun RouteScope.PlansRoute() {
       options = options, picked = picked, currency = currency, signedIn = signedIn, salesNumber = salesNumber,
     ),
     PlansActions(
-      back = { back() },
+      back = backOrNull,
       pick = { chosen = it },
       buy = {
         //  ثبتِ درخواست بی‌صداست: اگر نگرفت، واتساپ همچنان باز می‌شود

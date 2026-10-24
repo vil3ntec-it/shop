@@ -40,7 +40,6 @@ import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.sync.License
 import ir.vil3ntec.tohid.sync.LicenseGuard
 import ir.vil3ntec.tohid.sync.SyncStore
-import ir.vil3ntec.tohid.ui.Platform
 import ir.vil3ntec.tohid.ui.screens.SUBSCRIPTION_WARN_DAYS
 import ir.vil3ntec.tohid.ui.screens.SubscriptionPulse
 import ir.vil3ntec.tohid.ui.screens.frosted
@@ -56,6 +55,7 @@ import ir.vil3ntec.tohid.ui.v3.account.AccountLinks
 import ir.vil3ntec.tohid.ui.v3.account.AccountPaths
 import ir.vil3ntec.tohid.ui.v3.account.AccountSession
 import ir.vil3ntec.tohid.ui.v3.modes.ModeSwitcher
+import ir.vil3ntec.tohid.ui.v3.nav.LocalDeskLayout
 import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
 import ir.vil3ntec.tohid.ui.v3.rememberV3Stagger
 import ir.vil3ntec.tohid.ui.v3.v3Pressable
@@ -199,7 +199,7 @@ internal fun RouteScope.ProfileRoute() {
     menu = ProfileHomeModel.menu(signedIn, canSettings),
     alerts = alerts,
   )
-  ProfileContent(ui, bottomReserve, onOpen = { nav.open(it) }, modes = if (Platform.DESKTOP) null else ({ ModeSwitcher() }))
+  ProfileContent(ui, bottomReserve, onOpen = { nav.open(it) }, modes = if (LocalDeskLayout.current) null else ({ ModeSwitcher() }))
 }
 
 /** وضعیتِ اشتراکِ همین حساب — مجوزِ امضاشدهٔ گوشی، وگرنه حرفِ سرور (`SubscriptionPulse`) */

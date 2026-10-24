@@ -64,7 +64,7 @@ internal fun RouteScope.TeamRoute() {
   TeamContent(
     team, signedIn, owner, rotating,
     TeamActions(
-      back = if (nav.canBack) ({ back() }) else null,
+      back = backOrNull,
       signIn = { nav.open(AccountLinks.SIGN_IN) },
       copy = { code ->
         clipboard.setText(AnnotatedString(code))

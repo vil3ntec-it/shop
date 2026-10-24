@@ -240,7 +240,7 @@ internal fun RouteScope.SupportRoute() {
 
   SupportContent(
     SupportUi(SupportModel.items(messages, System.currentTimeMillis(), pending), greeting, loading, error, draft, pending != null),
-    onBack = if (nav.canBack) ({ back() }) else null,
+    onBack = backOrNull,
     onDraft = { draft = it },
     onSend = {
       val body = draft.trim()
