@@ -55,6 +55,7 @@ import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
 import ir.vil3ntec.tohid.ui.theme.V3Tone
 import ir.vil3ntec.tohid.ui.v3.rememberCountUp
+import ir.vil3ntec.tohid.ui.v3.v3PagerItem
 import ir.vil3ntec.tohid.ui.v3.v3Pressable
 
 /**
@@ -136,18 +137,21 @@ internal fun HomePullCard(
       modifier = Modifier.fillMaxWidth(),
       flingBehavior = PagerDefaults.flingBehavior(faces, snapAnimationSpec = MotionSpec.sheet()),
     ) { page ->
-      if (page == 0) {
-        val profit = view.profit
-        PullFace(
-          label = StrHome.drawer + " · " + if (view.shiftOpen) StrHome.drawerCash else StrHome.todayCashClosed,
-          amount = view.cash,
-          line = when {
-            profit == null -> StrHome.invoicesToday(view.todayCount)
-            profit < 0 -> StrHome.todayLoss + " " + "${money(kotlin.math.abs(profit))} ؋"
-            else -> StrHome.todayProfit + " " + "${money(profit)} ؋"
-          },
-        )
-      } else HomeSafeFace()
+      //  روی کناری کمی کوچک و کم‌رنگ؛ با کشیدن پا‌به‌پای انگشت بزرگ و پررنگ می‌شود
+      Box(Modifier.v3PagerItem(faces, page)) {
+        if (page == 0) {
+          val profit = view.profit
+          PullFace(
+            label = StrHome.drawer + " · " + if (view.shiftOpen) StrHome.drawerCash else StrHome.todayCashClosed,
+            amount = view.cash,
+            line = when {
+              profit == null -> StrHome.invoicesToday(view.todayCount)
+              profit < 0 -> StrHome.todayLoss + " " + "${money(kotlin.math.abs(profit))} ؋"
+              else -> StrHome.todayProfit + " " + "${money(profit)} ؋"
+            },
+          )
+        } else HomeSafeFace()
+      }
     }
     Spacer(Modifier.height(10.dp))
     PagerDots(2, faces.currentPage, p.onBlack, p.onBlack.copy(alpha = 0.3f))

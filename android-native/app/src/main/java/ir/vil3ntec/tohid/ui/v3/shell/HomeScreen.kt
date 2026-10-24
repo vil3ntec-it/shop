@@ -116,7 +116,7 @@ fun HomeScreen(d: ShopData, onOpen: (String) -> Unit, bottomReserve: Dp, shot: H
 @Composable
 private fun HomeStatsPage(d: ShopData, bottomReserve: Dp, pages: Int, current: Int, big: Boolean) {
   val stats = HomePager.stats
-  if (stats != null) stats(bottomReserve, pages, current) else PhoneStatsPage(d, bottomReserve, pages, current, big = big)
+  if (stats != null) stats(d, bottomReserve, pages, current) else PhoneStatsPage(d, bottomReserve, pages, current, big = big)
 }
 
 @Composable

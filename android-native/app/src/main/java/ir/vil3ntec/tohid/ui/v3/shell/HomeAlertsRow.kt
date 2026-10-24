@@ -49,6 +49,7 @@ import ir.vil3ntec.tohid.ui.screens.v3Text
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
 import ir.vil3ntec.tohid.ui.v3.rememberV3Stagger
+import ir.vil3ntec.tohid.ui.v3.v3AnimateItem
 import ir.vil3ntec.tohid.ui.v3.v3Pressable
 import ir.vil3ntec.tohid.ui.v3.v3Stagger
 
@@ -98,7 +99,7 @@ internal fun HomeAlertsRow(alerts: List<HomeAlerts.Alert>, onOpen: (String) -> U
             AlertCard(
               a,
               if (i % 2 == 0) p.accentDeep else p.accent,
-              Modifier.animateItem().v3Stagger(stagger, a.kind.name + a.route, i).width(w).height(164.dp),
+              Modifier.v3AnimateItem(this).v3Stagger(stagger, a.kind.name + a.route, i).width(w).height(164.dp),
               onCard = { onOpen(a.route) },
               onAction = { onOpen(a.actionRoute) },
             )

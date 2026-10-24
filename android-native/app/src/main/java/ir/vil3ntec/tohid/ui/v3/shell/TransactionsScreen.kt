@@ -39,6 +39,7 @@ import ir.vil3ntec.tohid.ui.v3.V3EmptyState
 import ir.vil3ntec.tohid.ui.v3.V3Scaffold
 import ir.vil3ntec.tohid.ui.v3.V3Segmented
 import ir.vil3ntec.tohid.ui.v3.rememberV3Stagger
+import ir.vil3ntec.tohid.ui.v3.v3AnimateItem
 import ir.vil3ntec.tohid.ui.v3.v3Pressable
 import ir.vil3ntec.tohid.ui.v3.v3Stagger
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
@@ -120,7 +121,7 @@ fun TransactionsScreen(d: ShopData, initialKind: Transactions.Kind?, onOpen: (St
         verticalArrangement = Arrangement.spacedBy(10.dp),
       ) {
         itemsIndexed(list, key = { _, t -> t.key }) { i, tx ->
-          TxRow(tx, today, onClick = { open = tx }, modifier = Modifier.animateItem().v3Stagger(stagger, tx.key, i))
+          TxRow(tx, today, onClick = { open = tx }, modifier = Modifier.v3AnimateItem(this).v3Stagger(stagger, tx.key, i))
         }
       }
     }

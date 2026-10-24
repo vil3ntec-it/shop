@@ -62,6 +62,7 @@ import ir.vil3ntec.tohid.ui.v3.V3IconTile
 import ir.vil3ntec.tohid.ui.v3.V3SearchField
 import ir.vil3ntec.tohid.ui.v3.nav.V3Modules
 import ir.vil3ntec.tohid.ui.v3.rememberV3Stagger
+import ir.vil3ntec.tohid.ui.v3.v3AnimateItem
 import ir.vil3ntec.tohid.ui.v3.v3Pressable
 import ir.vil3ntec.tohid.ui.v3.v3Stagger
 import kotlinx.coroutines.Dispatchers
@@ -134,7 +135,7 @@ fun SearchScreen(
             item(key = "g:" + g.kind) {
               val open = g.kind in expanded
               //  گروهِ تازه/رفته با جابه‌جاییِ نرم؛ ردیف‌های تازهٔ «همهٔ n نتیجه» پلکانی می‌آیند
-              Box(Modifier.animateItem()) {
+              Box(Modifier.v3AnimateItem(this)) {
                 HitCard(g, if (open) g.hits else g.hits.take(PREVIEW), showMore = !open && g.total > PREVIEW, onMore = { expanded = expanded + g.kind }, onOpen = onOpen)
               }
             }

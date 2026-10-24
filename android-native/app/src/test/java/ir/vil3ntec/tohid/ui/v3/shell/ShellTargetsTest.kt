@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.v3.shell
 
+import ir.vil3ntec.tohid.core.nav.AppMode
+import ir.vil3ntec.tohid.core.nav.DeepLinks
 import ir.vil3ntec.tohid.data.Reminders
 import ir.vil3ntec.tohid.data.Watchman
 import ir.vil3ntec.tohid.ui.screens.HomeAlerts
@@ -59,5 +61,19 @@ class ShellTargetsTest {
     assertEquals("home", Reminders.LINK)
     listOf(Watchman.LINK_STOCK_OUT, Watchman.LINK_DEBTS, Watchman.LINK_SUBSCRIPTION, Watchman.LINK_NEWS, Watchman.linkDebtor("d 1"), Reminders.LINK)
       .forEach(::resolves)
+  }
+
+  @Test
+  fun `پیوندِ اعلان همان مسیر را در حالتِ دکان باز می‌کند`() {
+    //  همان رشته‌ای که PendingIntent در `data` می‌گذارد و MainActivity با `DeepLinks.parse` می‌خواند
+    listOf(Watchman.LINK_STOCK_OUT, Watchman.LINK_DEBTS, Watchman.LINK_SUBSCRIPTION, Watchman.LINK_NEWS, Watchman.linkDebtor("d7"), Reminders.LINK)
+      .forEach { path ->
+        val link = DeepLinks.parse(DeepLinks.appLink(path))
+        assertNotNull("پیوند خوانده نشد: $path", link)
+        assertEquals(AppMode.SHOP, link!!.mode)
+        assertEquals(path, link.path)
+        resolves(link.path)
+      }
+    assertEquals("vill3n://app/products?filter=out", DeepLinks.appLink(Watchman.LINK_STOCK_OUT))
   }
 }
