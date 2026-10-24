@@ -54,6 +54,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import ir.vil3ntec.tohid.ui.theme.LightColors
 import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -133,14 +134,16 @@ import kotlinx.coroutines.launch
  *  صفحهٔ ورودِ برنامه‌های بانکی. رنگِ تمِ برنامه بعد از ورود شروع می‌شود.
  *  در تمِ تاریک، خودِ پس‌زمینه تیره کشیده می‌شود و این‌ها روی آن می‌نشینند.
  */
-private val INK_LIGHT = Color(0xFF17255A)
-private val INK_SOFT_LIGHT = Color(0xFF5C6B90)
-//  رنگِ کادرها و دکمه‌های صفحه‌ی ورود، هم‌رنگِ تمِ تازه.
-//  پس‌زمینه‌ی این صفحه (`WelcomeDecor.kt`) رنگِ خودش را جدا دارد و یک
-//  نقطه هم عوض نشده.
-private val BLUE = Color(0xFF7C5CFF)
-private val BLUE_DEEP = Color(0xFF5B3FE0)
-private val FIELD_LINE_LIGHT = Color(0xFFE1E8F5)
+private val INK_LIGHT = LightColors.textPrimary
+private val INK_SOFT_LIGHT = LightColors.textSecondary
+//  رنگِ کادرها و دکمه‌های صفحه‌ی ورود — از ۱۴۰۵/۰۷/۲۸ سبزآبیِ برندِ VILL3N به‌جای بنفش.
+//  `BLUE` (نامِ تاریخی) متن، پیوند و خطِ فعال است ⇒ برندِ خوانا (روز #08665F، شب #6EE7D1)؛
+//  `BLUE_DEEP` پُرِ دکمهٔ اصلی است ⇒ همان جفتِ دکمهٔ اصلیِ برنامه.
+private val BLUE: Color
+  @Composable get() = Shop.colors.brandText
+private val BLUE_DEEP: Color
+  @Composable get() = Shop.colors.button.primary.bg
+private val FIELD_LINE_LIGHT = LightColors.borderInput
 
 /*
  *  متنِ روی پس‌زمینه — نه روی کادرها.
@@ -2221,7 +2224,7 @@ private fun GradientButton(
       )
       .clip(shape)
       .background(
-        if (live) Brush.horizontalGradient(listOf(BLUE_DEEP, BLUE, Color(0xFF00C39A)))
+        if (live) SolidColor(BLUE_DEEP)
         else Brush.horizontalGradient(listOf(disabledFace, disabledFace))
       )
       .clickable(
@@ -2254,12 +2257,12 @@ private fun GradientButton(
       )
     }
     if (busy) {
-      CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(22.dp))
+      CircularProgressIndicator(color = Shop.colors.button.primary.text, strokeWidth = 2.dp, modifier = Modifier.size(22.dp))
     } else {
       Text(
         text,
         style = MaterialTheme.typography.titleMedium,
-        color = if (live) Color.White else inkSoft,
+        color = if (live) Shop.colors.button.primary.text else inkSoft,
         fontWeight = FontWeight.Bold,
       )
     }
@@ -2478,7 +2481,7 @@ private fun BrandMark() {
         .size(72.dp)
         .alpha(breathe * 0.4f)
         .clip(RoundedCornerShape(24.dp))
-        .background(colors.primary)
+        .background(colors.brandPrimary)
     )
     Canvas(Modifier.size(78.dp).graphicsLayer { rotationZ = spin }) {
       // یک کمانِ طلایی، نه یک حلقهٔ کامل: حلقهٔ کامل که بچرخد، دیده

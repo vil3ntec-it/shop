@@ -56,10 +56,10 @@ object ReturnFlow {
   /**
    *  `DebtTransaction.kind`ِ رسیدِ حسابی که سندِ برگشت می‌سازد (واژهٔ #286) — سهمِ اعتبارِ فروشگاه
    *  هم، نه `store_credit`: کلِ مرجوعی از دخل کم می‌شود ([drawerAmount]) و همین رسید آن را خنثی
-   *  می‌کند، ولی `store_credit` (پرداخت با اعتبار) را صندوق نقد نمی‌شمارد و دخل کم می‌آمد.
-   *  `refId`ِ همهٔ ردیف‌های انبار و حسابِ سند = `docId` (نگهبانِ کارمندِ سرور، #339).
+   *  می‌کند، ولی `store_credit` (پرداخت با اعتبار) را صندوق نقد نمی‌شمارد ([CashShift.isCashReceipt])
+   *  و دخل کم می‌آمد. `refId`ِ همهٔ ردیف‌های انبار و حسابِ سند = `docId` (نگهبانِ کارمندِ سرور، #339).
    */
-  const val RECEIPT_KIND = "customer_return"
+  const val RECEIPT_KIND = CashShift.RETURN_RECEIPT
 
   /** RET-08 — فهرستِ پیش‌فرضِ دلیل‌ها؛ دلیل اجباری است */
   val REASONS: List<String> = listOf(

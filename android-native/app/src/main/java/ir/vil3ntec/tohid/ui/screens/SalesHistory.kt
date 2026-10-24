@@ -128,8 +128,8 @@ fun SalesHistoryScreen(
     d.sales
       .filter {
         when (filter) {
-          "cash" -> it.status != "cancelled" && it.paymentMethod == "cash"
-          "credit" -> it.status != "cancelled" && it.paymentMethod == "credit"
+          //  PAY (v3 A4): گروه از `payments` اگر هست — کارت و کیف پول و حواله «نقدی» نیستند
+          "cash", "credit", ir.vil3ntec.tohid.data.PayFlow.NON_CASH -> it.status != "cancelled" && ir.vil3ntec.tohid.data.PayFlow.payGroup(it) == filter
           "cancelled" -> it.status == "cancelled"
           else -> true
         }
@@ -151,6 +151,8 @@ fun SalesHistoryScreen(
   var shiftHistory by remember { mutableStateOf(false) }
   val me = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(roleContext).accountName }.getOrDefault("") }
   val shift = remember(d) { ir.vil3ntec.tohid.data.CashShift.current(d) }
+  //  PAY (v3 A4): صندوقِ شیفت با هستهٔ pay-core — فقط با پرچم (`ShiftPanelV2`)؛ خاموش ⇒ کارتِ امروز
+  val payV2 = remember { ir.vil3ntec.tohid.data.ShopPolicy.payV2(roleContext) }
 
   LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
     item {
@@ -172,7 +174,10 @@ fun SalesHistoryScreen(
       Spacer(Modifier.height(12.dp))
     }
 
-    item {
+    if (payV2) item {
+      ShiftPanelV2(d = d, store = store, me = me, toast = ::toast)
+      Spacer(Modifier.height(12.dp))
+    } else item {
       Panel {
         Row(verticalAlignment = Alignment.CenterVertically) {
           Column(Modifier.weight(1f)) {
@@ -236,7 +241,7 @@ fun SalesHistoryScreen(
         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
       ) {
-        listOf("all" to "همه", "cash" to "نقدی", "credit" to "نسیه", "cancelled" to "لغوشده").forEach { (id, label) ->
+        listOf("all" to "همه", "cash" to "نقدی", "credit" to "نسیه", ir.vil3ntec.tohid.data.PayFlow.NON_CASH to "غیرنقد", "cancelled" to "لغوشده").forEach { (id, label) ->
           FilterChip(selected = filter == id, onClick = { filter = id }, label = { Text(label) })
         }
       }
@@ -316,10 +321,14 @@ fun SalesHistoryScreen(
       text = {
         Column {
           if (t != null) {
-            listOf(
+            (listOf(
               "اول صندوق" to t.opening, "فروش نقدی" to t.sales, "رسید قرض‌داران" to t.receipts,
               "مرجوعی" to -t.returns, "مصارف" to -t.expenses, "پرداخت به تأمین‌کننده و خرید" to -t.suppliers,
-            ).forEach { (label, v) ->
+            ) + listOfNotNull(
+              //  PAY: ورود/خروجِ نقدِ صندوقِ pay v2 — داده است، با پرچمِ خاموش هم شمرده می‌شود
+              ("ورودِ نقد" to t.cashIn).takeIf { t.cashIn > 0 },
+              ("خروجِ نقد" to -t.cashOut).takeIf { t.cashOut > 0 },
+            )).forEach { (label, v) ->
               Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(label, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
                 Text("${if (v < 0) "−" else ""}${money(kotlin.math.abs(v))}", style = MaterialTheme.typography.bodySmall, color = Shop.colors.text)
@@ -593,7 +602,7 @@ private fun SaleRow(
   val kindTint = when {
     cancelled -> Shop.colors.danger
     online -> Shop.colors.primary
-    sale.paymentMethod == "credit" -> Shop.colors.warning
+    ir.vil3ntec.tohid.data.PayFlow.payGroup(sale) == "credit" -> Shop.colors.warning
     else -> Shop.colors.success
   }
 
@@ -619,8 +628,7 @@ private fun SaleRow(
         when {
           cancelled -> "لغوشده"
           online -> "اینترنتی"
-          sale.paymentMethod == "credit" -> "نسیه"
-          else -> "نقدی"
+          else -> ir.vil3ntec.tohid.data.PayFlow.payLabel(sale, cash = "نقدی")
         },
         0.8f,
         tint = kindTint,

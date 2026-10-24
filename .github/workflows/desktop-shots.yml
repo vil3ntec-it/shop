@@ -85,6 +85,10 @@ jobs:
           S="$S;go:expenses;wait:1500;shot:11-expenses"
           S="$S;go:more;wait:1500;shot:12-more"
           S="$S;go:settings;wait:1500;shot:13-settings"
+          #  دستگاه‌ها (HW): صفحه، پیش‌نمایشِ بی چاپگرِ برگهٔ آزمون، برچسب و برگهٔ A4، و نمایشگرِ مشتری با یک سبد
+          S="$S;go:devices;wait:1500;shot:14-devices;hwshot:receipt;wait:1500;shot:14b-print-preview-receipt;hwshot:close"
+          S="$S;hwshot:label;wait:1200;shot:14c-print-preview-label;hwshot:close;hwshot:a4;wait:1500;shot:14d-print-preview-a4;hwshot:close"
+          S="$S;hwshot:customer;go:sale;wait:1500;type:626001007;key:ENTER;wait:1500;shot:14e-customer-display;hwshot:nocustomer"
           S="$S;go:audit;wait:1500;shot:14-audit-log"
           S="$S;go:team;wait:1500;shot:15-team"
           S="$S;go:devices;wait:1500;shot:15b-devices"
