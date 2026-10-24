@@ -30,6 +30,7 @@ object V3Modules {
   val ALL: List<AppModule> by lazy {
     listOf(
       FoundationModule,
+      ScanModule,
       ShellModule,
       OnboardingModule,
       SalesModule,

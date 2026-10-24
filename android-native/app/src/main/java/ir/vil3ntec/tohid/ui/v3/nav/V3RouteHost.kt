@@ -67,7 +67,7 @@ private fun RouteContent(path: String, nav: V3Nav, shell: ShellContext) {
       val serverFlag = (r.module.needs + r.route.needs).any { it != Need.MANAGE && it != Need.AUDIT && it !in shell.access.granted }
       val moduleOff = (r.module.flag != null && r.module.flag !in shell.access.flags) || (r.route.flag != null && r.route.flag !in shell.access.flags)
       if (serverFlag || moduleOff) Blocked(StrKit.notOnTitle, r.route.title(), Icons.Outlined.ToggleOff, nav)
-      else Blocked(StrKit.noAccessTitle, r.route.title(), Icons.Outlined.Lock, nav, StrKit.noAccessBody)
+      else Blocked(StrKit.noAccessTitle, r.route.title(), Icons.Outlined.Lock, nav, r.route.deniedBody?.invoke() ?: StrKit.noAccessBody)
     }
     else -> {
       val scope = RouteScope(r.args, nav, shell)

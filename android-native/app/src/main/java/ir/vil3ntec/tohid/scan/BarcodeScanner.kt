@@ -287,6 +287,8 @@ private const val READY_TEXT = "آماده اسکن — بارکد را جلوی
  *  @param isKnown آیا این کد در فهرستِ کالاهای دکان هست. سد از همین
  *    می‌فهمد کجا سخت بگیرد و کجا نه — شرحش سرِ `BarcodeGuard`. پیش‌فرضش
  *    «نمی‌دانم» است، پس صفحه‌ای که فهرست ندارد هم کار می‌کند.
+ *  @param qr فقط QR بخوان و متنِ خام را بی سدِ بارکد بده (`scan?kind=qr`)؛
+ *    پیش‌فرض همان قالب‌های بارکدِ فروش.
  */
 @SuppressLint("UnsafeOptInUsageError")
 @Composable
@@ -295,6 +297,7 @@ fun CameraScanner(
   onStatus: (String, Boolean) -> Unit,
   modifier: Modifier = Modifier,
   isKnown: (String) -> Boolean = { false },
+  qr: Boolean = false,
 ) {
   val context = LocalContext.current
   val lifecycleOwner = LocalLifecycleOwner.current
@@ -439,7 +442,7 @@ fun CameraScanner(
         flashReady = runCatching { camera.cameraInfo.hasFlashUnit() }.getOrDefault(false)
         flashOn = false
 
-        val client = buildScanner(maxZoom) { wanted -> pilot.zoomTo(wanted) }
+        val client = buildScanner(maxZoom, qr) { wanted -> pilot.zoomTo(wanted) }
         scanner = client
         //  سدِ خوانشِ دروغین. یکی برای هر بار باز شدنِ دوربین، چون
         //  شمارشِ تکرارش مالِ همین نشست است. فهرستِ کالاها را از راهِ
@@ -532,7 +535,8 @@ fun CameraScanner(
                 if (read != null && value != null) {
                   //  از این پس، فوکوس و نورسنجی سراغِ همین کادر می‌رود
                   box(read, frameW, frameH, rotation)?.let { pilot.aimAt(it) }
-                  if (guard.trust(value, kindOf(read.format))) {
+                  //  QR تصحیحِ خطای خودش را دارد (ML Kit فقط کدِ درست‌خوانده را می‌دهد)؛ سدِ بارکد مالِ فروش است
+                  if (qr || guard.trust(value, kindOf(read.format))) {
                     lamp.done(now)
                     latestCode(value)
                   }
@@ -714,8 +718,9 @@ private fun sizeWanted(size: Size): ResolutionSelector =
  *  بچسباند به لنز تا بارکد بزرگ شود — و آن فاصله زیرِ کمترین فاصلهٔ فوکوس
  *  است و **هیچ‌وقت** تیز نمی‌شود.
  */
-private fun buildScanner(maxZoom: Float, onZoom: (Float) -> Boolean): MlKitScanner {
-  val builder = BarcodeScannerOptions.Builder().setBarcodeFormats(FORMATS)
+private fun buildScanner(maxZoom: Float, qr: Boolean, onZoom: (Float) -> Boolean): MlKitScanner {
+  //  `qr`: فقط QR (`scan?kind=qr`، پیوندِ دکان و …)؛ قالب‌های بارکدِ فروش دست نمی‌خورند
+  val builder = BarcodeScannerOptions.Builder().setBarcodeFormats(if (qr) Barcode.FORMAT_QR_CODE else FORMATS)
   //  اگر دوربینِ گوشی بزرگ‌نمایی ندارد، این قابلیت هم معنایی ندارد
   if (maxZoom > 1.05f) {
     val callback = ZoomSuggestionOptions.ZoomCallback { wanted -> onZoom(wanted) }

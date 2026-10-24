@@ -67,7 +67,6 @@ import ir.vil3ntec.tohid.ui.screens.RailMode
 import ir.vil3ntec.tohid.ui.screens.Screen
 import ir.vil3ntec.tohid.ui.screens.ShopSetupScreen
 import ir.vil3ntec.tohid.ui.screens.StorefrontGate
-import ir.vil3ntec.tohid.ui.screens.SubscriptionBanner
 import ir.vil3ntec.tohid.ui.screens.TohidLoadingState
 import ir.vil3ntec.tohid.ui.screens.screenSize
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
@@ -413,8 +412,7 @@ fun AppRoot(
           onSearch = { AppNav.palette.value = true },
           onOpen = { nav.open(it) },
         )
-        SubscriptionBanner { nav.open("subscription") }
-        UpdateBanner()
+        CompositionLocalProvider(ir.vil3ntec.tohid.ui.v3.nav.LocalV3Nav provides nav) { ir.vil3ntec.tohid.ui.v3.shell.ShellNotice() }
       }
     },
     //  پیام‌ها بالای صفحه می‌آیند، سرِ راهِ هیچ‌چیز نیستند
@@ -486,7 +484,7 @@ fun AppRoot(
         LocalV3Toasts provides toasts,
         //  نوارِ سیستم را پوسته همین‌جا حساب کرده است
         LocalV3SystemBottom provides 0.dp,
-        LocalV3Notice provides { SubscriptionBanner { nav.open("subscription") }; UpdateBanner() },
+        LocalV3Notice provides { ir.vil3ntec.tohid.ui.v3.shell.ShellNotice() },
       ) {
         PageWidth(Modifier.padding(start = railPad, bottom = pageBottom)) {
           V3RouteHost(nav, shell, Modifier.fillMaxSize())
