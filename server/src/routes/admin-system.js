@@ -12,6 +12,8 @@
  *                                      فقط مدیرِ ارشد، فقط‌خواندنی، با یک ردیفِ سابقه
  *   GET /api/admin/system/reconciliation ⇐ تطبیقِ فروشِ آنلاین، لغو، بازپرداخت، نقدِ
  *                                      پیک و تسویه به‌ازای هر دکان (E2E-ADM-15)؛ فقط ارشد
+ *   GET /api/admin/system/sms-usage  ⇐ مصرف و هزینهٔ پیامکِ هر دکان (OPS-09)؛ فقط ارشد
+ *   PUT /api/admin/system/sms-cost   ⇐ بهای هر تکهٔ پیامک (واحدِ خُرد)؛ فقط ارشد، با سابقه
  *
  * زیرِ `requireAdmin`ِ `routes/admin.js` سوار است. فقط عدد و وضعیت؛ هیچ
  * راز، نشانی یا دادهٔ مشتری (شرح در `lib/system-health.js`).
@@ -67,6 +69,21 @@ router.get('/reconciliation', requireSuperAdmin, async (req, res, next) => {
   try {
     res.set('Cache-Control', 'no-store');
     res.json(await health.reconciliation({ from: req.query?.from, to: req.query?.to }));
+  } catch (err) { next(err); }
+});
+
+/** ⛔ هزینهٔ پلتفرم ⇒ فقط مدیرِ ارشد (`lib/sms-usage.js`، دفترِ ۱۲۰). */
+router.get('/sms-usage', requireSuperAdmin, async (req, res, next) => {
+  try {
+    res.set('Cache-Control', 'no-store');
+    res.json(await require('../lib/sms-usage').report({ days: req.query?.days }));
+  } catch (err) { next(err); }
+});
+
+/** نوشتن و سابقه (پیش و پس) در خودِ `setUnitCost`؛ نادرست ⇒ ۴۰۰ bad_sms_cost و بی‌تغییر. */
+router.put('/sms-cost', requireSuperAdmin, async (req, res, next) => {
+  try {
+    res.json(await require('../lib/sms-usage').setUnitCost(req.body?.unitCostMinor, { adminId: req.admin.id, ip: clientIp(req) }));
   } catch (err) { next(err); }
 });
 
