@@ -47,6 +47,17 @@ class NavCoreTest {
   }
 
   @Test
+  fun `برگشت از مسیری که نتیجه داد و برداشته شد هیچ نمی‌کند — صفحهٔ صدازننده می‌ماند`() {
+    //  فرمِ کالا ⇐ برگهٔ اسکن ⇐ `finish(code)` (برداشته شد) ⇐ برگه `onDismiss` هم می‌زند
+    var s = NavStack.of("home").push("products/new").push("scan")
+    assertTrue(s.isTop("scan"))
+    s = s.pop()
+    assertFalse("برگهٔ اسکن دیگر بالا نیست", s.isTop("scan"))
+    assertTrue(s.isTop("/products/new/"))
+    assertEquals(listOf("home", "products/new"), s.entries)
+  }
+
+  @Test
   fun `پشته از اندازه نمی‌گذرد و ریشه می‌ماند؛ پرشِ هم‌سطحِ کامپیوتر`() {
     var s = NavStack.of("home")
     repeat(40) { s = s.push("p/$it") }

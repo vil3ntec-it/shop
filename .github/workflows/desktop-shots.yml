@@ -194,6 +194,15 @@ jobs:
             rm -rf "pr/$SAFE" && mkdir -p "pr/$SAFE" && cp "$SHOTS"/*.png "pr/$SAFE/"
             date +%s > "pr/$SAFE/.stamp"
             readme "pr/$SAFE" "عکس‌های شاخهٔ $BR"
+            #  کیت و گروه‌های نسخهٔ ۳ (`groupshots`): pr/<شاخه>/v3/<گروه>/<حالت>-<تم>-<زبان>.png
+            if [ -d "$SHOTS/v3" ]; then
+              cp -r "$SHOTS/v3" "pr/$SAFE/" 2>/dev/null || true
+              for g in "pr/$SAFE"/v3/*/; do
+                if ls "$g"*.png >/dev/null 2>&1; then readme "${g%/}" "نسخهٔ ۳ — $(basename "$g")"; fi
+              done
+              { echo "---"; echo; echo "## نسخهٔ ۳ (هر گروه)"; echo
+                for g in "pr/$SAFE"/v3/*/; do n=$(basename "$g"); echo "- [$n](v3/$n/README.md)"; done; } >> "pr/$SAFE/README.md"
+            fi
             NOW=$(date +%s)
             for d in pr/*/; do
               s=$(cat "$d.stamp" 2>/dev/null || true); [[ "$s" =~ ^[0-9]+$ ]] || s=0
