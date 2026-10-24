@@ -9,6 +9,7 @@ import ir.vil3ntec.tohid.core.hw.MonoImage
 import ir.vil3ntec.tohid.core.hw.PrinterProfile
 import ir.vil3ntec.tohid.core.receipt.DiscountLine
 import ir.vil3ntec.tohid.core.receipt.LineView
+import ir.vil3ntec.tohid.core.receipt.PaymentLine
 import ir.vil3ntec.tohid.core.receipt.ReceiptDoc
 import ir.vil3ntec.tohid.core.receipt.ReceiptFormat
 import ir.vil3ntec.tohid.core.receipt.ReceiptInput
@@ -19,12 +20,12 @@ import ir.vil3ntec.tohid.core.receipt.ReceiptRaster
 import ir.vil3ntec.tohid.core.receipt.ReceiptTokens
 import ir.vil3ntec.tohid.core.receipt.ShopHeader
 import ir.vil3ntec.tohid.data.LedgerOwner
+import ir.vil3ntec.tohid.data.PayFlow
 import ir.vil3ntec.tohid.data.ReceiptProfileStore
 import ir.vil3ntec.tohid.data.Sale
 import ir.vil3ntec.tohid.data.SalesEngine
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.invoiceLabel
-import ir.vil3ntec.tohid.data.isOnlineOrder
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -83,17 +84,15 @@ object Receipts {
       dateIso = sale.date,
       time = time,
       cashier = sale.seller,
-      kind = when {
-        sale.isOnlineOrder() -> labels.online
-        sale.paymentMethod == "credit" -> labels.credit
-        else -> labels.cash
-      },
+      //  PAY (v3 A4): برچسب و ردیف‌های پرداخت همان `PayFlow` ِ تاریخچه و جزئیات
+      kind = PayFlow.payLabel(sale, cash = labels.cash),
       cancelled = sale.status == "cancelled",
       items = items,
       subtotal = sale.total,
       discounts = listOf(DiscountLine(labels.discount, sale.discount)),
       total = sale.finalTotal,
-      payments = emptyList(),
+      //  ردیف‌های روش، «دریافتی» و «پولِ پس» — فقط فاکتوری که `payments` دارد؛ وگرنه «پرداختی»
+      payments = PayFlow.receiptLines(sale).map { (label, amount) -> PaymentLine(label, amount) },
       paid = sale.paidAmount,
       remaining = sale.remaining,
       debtorName = sale.debtorId?.let { id -> d.debtors.find { it.id == id }?.name },

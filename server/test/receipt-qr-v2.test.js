@@ -11,7 +11,6 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const R = require('../src/lib/receipt-token');
 
 const ROOT = path.join(__dirname, '..', '..');
 const QV = JSON.parse(fs.readFileSync(path.join(ROOT, 'core', 'test-vectors', 'receipt-qr-v1.json'), 'utf8'));
@@ -47,12 +46,13 @@ test('receipt-qr-v1: هر ماتریس اندازهٔ نسخهٔ خودش را �
   }
 });
 
-test('receipt-qr-v1: نشانیِ واقعیِ فاکتور (ریشه + /r/<نشان>/<توکن>) در بردار هست و سرور آن را می‌شناسد', () => {
+test('receipt-qr-v1: نشانیِ واقعیِ فاکتور (ریشه + /r/<نشان>/<توکن>) در بردار هست، با قالبِ درستِ نشان و توکن', () => {
   const real = QV.cases.filter((c) => /\/r\/[0-9a-z]{8}\/[0-9a-z]{26}$/.test(c.text));
   assert.ok(real.length >= 3);
   for (const c of real) {
     const [, tag, token] = /\/r\/([0-9a-z]{8})\/([0-9a-z]{26})$/.exec(c.text);
-    assert.equal(R.normalizeTag(tag), tag);
-    assert.equal(R.normalizeToken(token), token);
+    //  همان الفبای Crockford ِ کوچکِ `receipt-v1.json`؛ نویسهٔ اولِ توکن ۰ تا ۷
+    assert.match(tag, /^[0-9a-hjkmnp-tv-z]{8}$/);
+    assert.match(token, /^[0-7][0-9a-hjkmnp-tv-z]{25}$/);
   }
 });

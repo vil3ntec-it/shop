@@ -73,7 +73,8 @@ class PrintQueueTest {
     val q2 = PrintQueue()
     q2.restore(saved)
     assertEquals(listOf("b", "c"), q2.all().map { it.id })
-    assertEquals(PrintQueue.Status.Busy(saved[0], 1), q2.status())
+    //  برگشته از فایل ⇒ `restored` (رسید نشانِ «چاپِ دوباره» می‌گیرد)
+    assertEquals(PrintQueue.Status.Busy(saved[0].copy(restored = true), 1), q2.status())
     q2.succeeded("b"); q2.succeeded("c")
     assertEquals(PrintQueue.Status.Idle, q2.status())
   }

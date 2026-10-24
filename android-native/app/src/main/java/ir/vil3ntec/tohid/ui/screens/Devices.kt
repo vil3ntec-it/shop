@@ -45,11 +45,17 @@ fun DevicesScreen(data: ir.vil3ntec.tohid.data.ShopData, snackbar: SnackbarHostS
   fun toast(t: String) { scope.launch { snackbar.showSnackbar(t) } }
   LaunchedEffect(Unit) { PhoneScanner.load(context); PhotoPrefs.load(context) }
 
+  //  تنظیمِ چاپگر و کشو فقط صاحب و مدیر (`settings.write`)؛ باز کردنِ کشو با `drawer.open`
+  //  نقش یا سیاستِ دکان که عوض شد (پاسخِ تازهٔ سرور) همین‌جا دوباره سنجیده می‌شود
+  val policy by ir.vil3ntec.tohid.data.ShopRole.policyVersion.collectAsState()
+  val canAdmin = remember(policy) { ir.vil3ntec.tohid.data.ShopRole.canOpenSettings(context) }
+  val canDrawer = remember(policy) { ir.vil3ntec.tohid.data.ShopRole.canOpenDrawer(context) }
+
   val wide = screenSize() == Screen.WIDE
   val left: @Composable () -> Unit = {
-    PrintersPanel(::toast)
+    PrintersPanel(::toast, canAdmin, canDrawer)
     Spacer(Modifier.height(14.dp))
-    PrintQueuePanel(::toast)
+    PrintQueuePanel(::toast, canAdmin, canDrawer)
     Spacer(Modifier.height(14.dp))
     LabelsPanel(data, ::toast)
     Spacer(Modifier.height(14.dp))
@@ -99,7 +105,7 @@ private fun Head(icon: ImageVector, title: String, sub: String) {
 /* ============================== چاپگرها ============================== */
 
 @Composable
-private fun PrintersPanel(toast: (String) -> Unit) {
+private fun PrintersPanel(toast: (String) -> Unit, canAdmin: Boolean, canDrawer: Boolean) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
   var tick by remember { mutableStateOf(0) }
@@ -129,24 +135,28 @@ private fun PrintersPanel(toast: (String) -> Unit) {
             (if (p.drawer && !p.isLabel) " · کشو" else ""),
             style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
         }
-        TextButton(onClick = { editing = p }) { Text("تنظیم") }
+        if (canAdmin) TextButton(onClick = { editing = p }) { Text("تنظیم") }
         TextButton(onClick = {
           toast("برگهٔ آزمون به «${p.name}» رفت…")
           scope.launch { toast(PrinterRegistry.testPrint(context, p) ?: "چاپِ آزمون انجام شد") }
         }) { Text("آزمون") }
-        if (!isDefault) TextButton(onClick = { PrinterRegistry.makeDefault(context, p); tick++ }) { Text("پیش‌فرض") }
-        IconButton(onClick = { PrinterRegistry.remove(context, p.id); tick++ }) {
+        if (canAdmin && !isDefault) TextButton(onClick = { PrinterRegistry.makeDefault(context, p); tick++ }) { Text("پیش‌فرض") }
+        if (canAdmin) IconButton(onClick = { PrinterRegistry.remove(context, p.id); tick++ }) {
           Icon(Icons.Filled.Delete, contentDescription = "حذف", tint = Shop.colors.danger)
         }
       }
     }
     Spacer(Modifier.height(8.dp))
-    OutlinedTextField(value = name, onValueChange = { name = it.take(40) }, singleLine = true,
-      label = { Text("نامِ چاپگرِ تازه (اختیاری)") }, modifier = Modifier.fillMaxWidth())
-    Spacer(Modifier.height(6.dp))
-    Button(onClick = { adding = true }) {
-      Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-      Spacer(Modifier.width(6.dp)); Text("افزودنِ چاپگر")
+    if (!canAdmin) {
+      Text("افزودن و تنظیمِ چاپگر و کشو فقط برای صاحب و مدیرِ دکان است.", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+    } else {
+      OutlinedTextField(value = name, onValueChange = { name = it.take(40) }, singleLine = true,
+        label = { Text("نامِ چاپگرِ تازه (اختیاری)") }, modifier = Modifier.fillMaxWidth())
+      Spacer(Modifier.height(6.dp))
+      Button(onClick = { adding = true }) {
+        Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(6.dp)); Text("افزودنِ چاپگر")
+      }
     }
     Spacer(Modifier.height(6.dp))
     Text(
@@ -154,10 +164,10 @@ private fun PrintersPanel(toast: (String) -> Unit) {
       style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2,
     )
   }
-  editing?.let { p ->
-    PrinterSettingsDialog(p, onDismiss = { editing = null }, onSaved = { editing = null; tick++; toast("تنظیمِ چاپگر ذخیره شد") }, toast = toast)
+  editing?.takeIf { canAdmin }?.let { p ->
+    PrinterSettingsDialog(p, onDismiss = { editing = null }, onSaved = { editing = null; tick++; toast("تنظیمِ چاپگر ذخیره شد") }, toast = toast, canDrawer = canDrawer)
   }
-  if (adding) {
+  if (adding && canAdmin) {
     PrinterDialog(
       onDismiss = { adding = false },
       actionLabel = "ثبتِ چاپگر",

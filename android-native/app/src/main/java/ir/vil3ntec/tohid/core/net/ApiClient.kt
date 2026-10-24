@@ -101,11 +101,14 @@ class ApiClient(
   )
 
   /**
-   *  جایگزین کردنِ یک فایلِ خام (لوگوی فاکتور، `PUT /shop/receipt-profile/logo`).
-   *  برخلافِ [postBytes] تکرارپذیر است: همان بایت‌ها دوباره همان نتیجه را می‌دهند.
+   *  فرستادنِ فایل با PUT — نسخهٔ کوچکِ عکس در بانکِ تصاویر. سرور برای همان
+   *  بایت‌ها همان پاسخ را می‌دهد (یک‌بارنویس)، پس تکرار بی‌خطر است.
    */
-  suspend fun putBytes(path: String, bytes: ByteArray, contentType: String = "application/octet-stream"): JsonObject =
-    authorized("PUT", path, null, idempotent = true, raw = RawBody(bytes, contentType, emptyMap()))
+  suspend fun putBytes(
+    path: String,
+    bytes: ByteArray,
+    contentType: String = "application/octet-stream",
+  ): JsonObject = authorized("PUT", path, null, idempotent = true, raw = RawBody(bytes, contentType))
 
   /**
    *  گرفتنِ **بایت‌های خام** با توکن (رسانهٔ چتِ دکان) — همان تازه‌سازیِ

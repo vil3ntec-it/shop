@@ -24,7 +24,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import ir.vil3ntec.tohid.LocaleChoice
 import ir.vil3ntec.tohid.LocaleText
-import ir.vil3ntec.tohid.core.hw.EscPos
 import ir.vil3ntec.tohid.core.hw.NciScale
 import ir.vil3ntec.tohid.core.hw.PrintQueue
 import ir.vil3ntec.tohid.core.hw.WeightBarcode
@@ -104,8 +103,12 @@ private fun dryRun(context: android.content.Context, what: String): Pair<String,
   else -> null
 }
 
+/**
+ *  `canAdmin` (`settings.write`): «چاپِ خودکار» و «چاپِ معوق» فقط برای صاحب و مدیر.
+ *  `canDrawer` (`drawer.open`): «باز کردنِ کشو» بی فروش — با دلیل و ردیفِ `no_sale`.
+ */
 @Composable
-internal fun PrintQueuePanel(toast: (String) -> Unit) {
+internal fun PrintQueuePanel(toast: (String) -> Unit, canAdmin: Boolean = false, canDrawer: Boolean = false) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
   LaunchedEffect(Unit) { PrintSpooler.start(context) }
@@ -156,12 +159,26 @@ internal fun PrintQueuePanel(toast: (String) -> Unit) {
       }
     }
     Spacer(Modifier.height(Space.xs))
-    HwSwitchRow("چاپِ خودکارِ فاکتور پس از هر فروش", "روی چاپگرِ پیش‌فرض. خاموش = مثلِ همیشه فقط با دکمهٔ «چاپ».", auto) {
-      auto = it; PrintSpooler.setAutoPrint(context, it)
+    if (canAdmin) {
+      HwSwitchRow("چاپِ خودکارِ فاکتور پس از هر فروش", "روی چاپگرِ پیش‌فرض. خاموش = مثلِ همیشه فقط با دکمهٔ «چاپ».", auto) {
+        auto = it; PrintSpooler.setAutoPrint(context, it)
+      }
+      HwSwitchRow("چاپِ معوق", "روشن: تا چاپگر برگردد خودش هر دقیقه تلاش می‌کند. خاموش: پس از چند تلاش می‌ایستد و می‌پرسد.", deferred) {
+        deferred = it; PrintSpooler.setDeferred(context, it)
+      }
+    } else {
+      Text("چاپِ خودکار: ${if (auto) "روشن" else "خاموش"} · چاپِ معوق: ${if (deferred) "روشن" else "خاموش"} — تنظیمش با صاحب یا مدیرِ دکان است.",
+        style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
     }
-    HwSwitchRow("چاپِ معوق", "روشن: تا چاپگر برگردد خودش هر دقیقه تلاش می‌کند. خاموش: پس از چند تلاش می‌ایستد و می‌پرسد.", deferred) {
-      deferred = it; PrintSpooler.setDeferred(context, it)
+    //  HW-03: کشو بی فروش — فقط با مجوز، با دلیل، و همیشه در سابقهٔ دکان
+    val drawerPrinter = remember(tick) { PrinterRegistry.defaultSaved(context)?.takeIf { it.drawer } }
+    var openDrawer by remember { mutableStateOf(false) }
+    if (drawerPrinter != null) {
+      Spacer(Modifier.height(Space.xs))
+      OutlinedButton(enabled = canDrawer, onClick = { openDrawer = true }) { Text("باز کردنِ کشو") }
+      if (!canDrawer) Text("باز کردنِ کشو بی فروش فقط برای صاحب و مدیر است.", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
     }
+    if (openDrawer && drawerPrinter != null) OpenDrawerDialog(drawerPrinter, onDismiss = { openDrawer = false }, toast = toast)
     OutlinedButton(onClick = {
       scope.launch { dry = withContext(Dispatchers.IO) { runCatching { dryRun(context, "receipt") }.getOrElse { toast("پیش‌نمایش ساخته نشد: ${it.message}"); null } } }
     }) { Text("پیش‌نمایشِ برگهٔ آزمون (بی چاپگر)") }
@@ -200,7 +217,13 @@ private fun HwSwitchRow(title: String, note: String, on: Boolean, onChange: (Boo
  *  بی چاپگر هم می‌شود دید چه بیرون می‌آید.
  */
 @Composable
-internal fun PrinterSettingsDialog(initial: PrinterRegistry.Saved, onDismiss: () -> Unit, onSaved: () -> Unit, toast: (String) -> Unit) {
+internal fun PrinterSettingsDialog(
+  initial: PrinterRegistry.Saved,
+  onDismiss: () -> Unit,
+  onSaved: () -> Unit,
+  toast: (String) -> Unit,
+  canDrawer: Boolean = false,
+) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
   var s by remember { mutableStateOf(initial) }
@@ -209,6 +232,7 @@ internal fun PrinterSettingsDialog(initial: PrinterRegistry.Saved, onDismiss: ()
   var probe by remember { mutableStateOf<String?>(null) }
   var pickLogo by remember { mutableStateOf(false) }
   var hasLogo by remember { mutableStateOf(HwPages.hasLogo(context)) }
+  var drawerTest by remember { mutableStateOf(false) }
 
   fun work(label: String, block: suspend () -> String?) {
     busy = true
@@ -284,12 +308,8 @@ internal fun PrinterSettingsDialog(initial: PrinterRegistry.Saved, onDismiss: ()
             probe = r?.message ?: "نشانیِ چاپگر خوانده نشد"
           }
         }) { Text("بررسیِ اتصال") }
-        if (!s.isLabel && s.drawer) OutlinedButton(enabled = !busy, onClick = {
-          work("کشو باز شد") {
-            val link = ThermalPrinter.Link.parse(s.link) ?: return@work "نشانیِ چاپگر خوانده نشد"
-            ThermalPrinter.send(context, link, EscPos.drawerOnly(s.profile()))
-          }
-        }) { Text("آزمونِ کشو") }
+        //  آزمونِ کشو هم کشو را بی فروش باز می‌کند ⇒ همان «باز کردنِ کشو»: مجوز، دلیل، سابقه
+        if (!s.isLabel && s.drawer && canDrawer) OutlinedButton(enabled = !busy, onClick = { drawerTest = true }) { Text("آزمونِ کشو") }
         OutlinedButton(enabled = !busy, onClick = { work("برگهٔ آزمون چاپ شد") { PrinterRegistry.testPrint(context, s) } }) { Text("برگهٔ آزمون") }
       }
       Spacer(Modifier.height(Space.sm))
@@ -306,6 +326,44 @@ internal fun PrinterSettingsDialog(initial: PrinterRegistry.Saved, onDismiss: ()
     if (err == null) { hasLogo = true; s = s.copy(logo = true) } else toast(err)
   }
   preview?.let { PrintPreviewDialog("پیش‌نمایشِ چاپ — بی کاغذ", it) { preview = null } }
+  if (drawerTest) OpenDrawerDialog(s, initialReason = "آزمونِ کشو", onDismiss = { drawerTest = false }, toast = toast)
+}
+
+/**
+ *  «باز کردنِ کشو» بی فروش (HW-03): دلیل اجباری، یک ضربه بیرون از صف و یک
+ *  ردیفِ `no_sale` در سابقهٔ دکان (`PrintSpooler.openDrawer`). مجوز را صدازننده سنجیده.
+ */
+@Composable
+internal fun OpenDrawerDialog(printer: PrinterRegistry.Saved, initialReason: String = "", onDismiss: () -> Unit, toast: (String) -> Unit) {
+  val context = LocalContext.current
+  val scope = rememberCoroutineScope()
+  var reason by remember { mutableStateOf(initialReason) }
+  var busy by remember { mutableStateOf(false) }
+  AlertDialog(
+    onDismissRequest = { if (!busy) onDismiss() },
+    title = { Text("باز کردنِ کشو بی فروش") },
+    text = {
+      Column {
+        Text("در سابقهٔ دکان ثبت می‌شود: چه کسی، کی، از کدام دستگاه و چرا.",
+          style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
+        Spacer(Modifier.height(Space.xs))
+        OutlinedTextField(value = reason, onValueChange = { reason = it.take(80) }, singleLine = true,
+          label = { Text("دلیل") }, modifier = Modifier.fillMaxWidth())
+      }
+    },
+    confirmButton = {
+      Button(enabled = !busy && reason.isNotBlank(), onClick = {
+        busy = true
+        scope.launch {
+          val msg = PrintSpooler.openDrawer(context, printer, reason)
+          busy = false
+          onDismiss()
+          toast(msg)
+        }
+      }) { Text("باز کردنِ کشو") }
+    },
+    dismissButton = { TextButton(enabled = !busy, onClick = onDismiss) { Text("انصراف") } },
+  )
 }
 
 @Composable

@@ -21,8 +21,8 @@ import java.security.MessageDigest
 
 /**
  *  هستهٔ دستگاه‌ها (HW-01..04، HW-09، POS-29) روی بردارهای مشترکِ
- *  `core/test-vectors/hw-v1.json` — همان فایلی که `license/hw-core.js`
- *  (server/test/hw-core.test.js) می‌دواند. بایت‌ها باید یکی باشند.
+ *  `core/test-vectors/hw-v1.json` — همان فایلی که پیاده‌سازیِ مرجعِ
+ *  `server/test/hw-core-ref.js` (با server/test/hw-core.test.js) می‌دواند. بایت‌ها باید یکی باشند.
  *
  *  `legacyRaster` از کدِ پیش از این تغییر گرفته شده (همان الگوریتمِ
  *  `ThermalPrinter.writeImage`): پیش‌فرضِ پروفایل باید عیناً همان باشد.

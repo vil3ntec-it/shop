@@ -70,8 +70,11 @@ object HwPages {
   /** پهنای پایهٔ اندازهٔ قلم — همان نسبتِ `Receipt` روی ۸۰ میلی‌متر */
   private const val PAPER_FONT_BASE = 576
 
-  /** چند تصویر زیرِ هم، هر کدام وسطِ کاغذ */
+  /** چند تصویر زیرِ هم، هر کدام وسطِ کاغذ. تکهٔ پهن‌تر از کاغذ بی‌صدا بریده نمی‌شود — خطا می‌دهد. */
   fun stack(width: Int, parts: List<MonoImage>, gap: Int = 8): MonoImage {
+    parts.firstOrNull { it.width > width }?.let {
+      throw IllegalArgumentException("پهنای تکه (${it.width} نقطه) از پهنای کاغذ ($width نقطه) بیشتر است")
+    }
     val h = parts.sumOf { it.height } + gap * (parts.size - 1).coerceAtLeast(0)
     val out = MonoImage(width, h.coerceAtLeast(1))
     var y = 0
@@ -82,16 +85,15 @@ object HwPages {
   /* ============================ فاکتور ============================ */
 
   /**
-   *  بایت‌های فاکتور با پروفایلِ چاپگر: نشانِ دکان (اگر روشن است)، خودِ
-   *  فاکتور، و کشو (اگر خواسته شد). بی نشان و بی کشو عیناً همان
-   *  `ThermalPrinter.render`ِ پیشین است.
+   *  بایت‌های فاکتور با پروفایلِ چاپگر: نشانِ دکان (اگر روشن است) و خودِ
+   *  فاکتور. بی نشان عیناً همان `ThermalPrinter.render`ِ پیشین است.
+   *  ضربهٔ کشو هرگز این‌جا نیست — جدا و یک‌باره می‌رود (`PrintSpooler.kick`).
    */
   fun saleBytes(
     context: Context,
     d: ShopData,
     sale: Sale,
     printer: PrinterRegistry.Saved,
-    openDrawer: Boolean,
     copyMark: String? = null,
   ): ByteArray {
     val profile = printer.profile()
@@ -100,7 +102,7 @@ object HwPages {
     //  دستگاه فقط برای دکانی می‌ماند که هنوز لوگوی همگام ندارد
     val legacy = if (profile.logo && ReceiptProfileStore.current(context).logoHash == null) logoMono(context, profile.paperDots) else null
     val page = if (legacy != null) stack(profile.paperDots, listOf(legacy, receipt), gap = 12) else receipt
-    return EscPos.document(page, profile, openDrawer)
+    return EscPos.document(page, profile)
   }
 
   /* ============================ برگهٔ آزمون ============================ */
@@ -214,23 +216,46 @@ object HwPages {
 
   fun hasLogo(context: Context): Boolean = logoFile(context).isFile
 
-  /** نشان از گالری/فایل؛ حداکثر ۵۷۶ نقطه پهنا ذخیره می‌شود */
+  /**
+   *  نشان از گالری/فایل؛ حداکثر ۵۷۶ نقطه پهنا ذخیره می‌شود. عکسِ دوربین
+   *  (۴۰۰۰ نقطه) اول با `inSampleSize` کوچک خوانده می‌شود تا حافظه پر نشود.
+   */
   fun saveLogo(context: Context, uri: Uri): String? = runCatching {
-    val src = context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) }
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return "تصویر خوانده نشد"
+    var sample = 1
+    while (bounds.outWidth / (sample * 2) >= 576) sample *= 2
+    val src = context.contentResolver.openInputStream(uri)
+      ?.use { BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = sample }) }
       ?: return "تصویر خوانده نشد"
     val w = minOf(src.width, 576)
     val h = (src.height.toFloat() * w / src.width).toInt().coerceAtLeast(1)
     val scaled = if (w == src.width) src else Bitmap.createScaledBitmap(src, w, h, true)
-    logoFile(context).outputStream().use { scaled.compress(Bitmap.CompressFormat.PNG, 100, it) }
+    try {
+      logoFile(context).outputStream().use { scaled.compress(Bitmap.CompressFormat.PNG, 100, it) }
+    } finally {
+      if (scaled !== src) scaled.recycle()
+      src.recycle()
+    }
+    synchronized(logoCache) { logoCache.clear() }
     null
   }.getOrElse { "نشان ذخیره نشد: ${it.message}" }
 
-  fun removeLogo(context: Context) { logoFile(context).delete() }
+  fun removeLogo(context: Context) {
+    logoFile(context).delete()
+    synchronized(logoCache) { logoCache.clear() }
+  }
+
+  /** نشانِ یک‌بیتی به ازای (پهنای کاغذ، زمانِ پرونده) — هر فاکتور از نو خوانده و کشیده نشود */
+  private val logoCache = HashMap<Pair<Int, Long>, MonoImage>()
 
   /** نشان، یک‌بیتی، حداکثر ۶۰٪ِ پهنای کاغذ و ۱۶۰ نقطه بلندی */
   fun logoMono(context: Context, paperDots: Int): MonoImage? {
     val f = logoFile(context)
     if (!f.isFile) return null
+    val key = paperDots to f.lastModified()
+    synchronized(logoCache) { logoCache[key] }?.let { return it }
     val src = BitmapFactory.decodeFile(f.path) ?: return null
     val maxW = (paperDots * 0.6f).toInt()
     var w = minOf(src.width, maxW)
@@ -238,8 +263,15 @@ object HwPages {
     if (h > 160) { w = (w * 160f / h).toInt().coerceAtLeast(1); h = 160 }
     val scaled = Bitmap.createScaledBitmap(src, w, h, true)
     val px = IntArray(w * h)
-    scaled.getPixels(px, 0, w, 0, 0, w, h)
-    return MonoImage.fromArgb(px, w, h, w)
+    try {
+      scaled.getPixels(px, 0, w, 0, 0, w, h)
+    } finally {
+      if (scaled !== src) scaled.recycle()
+      src.recycle()
+    }
+    val mono = MonoImage.fromArgb(px, w, h, w)
+    synchronized(logoCache) { logoCache.clear(); logoCache[key] = mono }
+    return mono
   }
 
   /* ============================ پیش‌نمایش ============================ */
