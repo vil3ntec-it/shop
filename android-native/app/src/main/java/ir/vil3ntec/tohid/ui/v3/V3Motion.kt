@@ -61,7 +61,10 @@ object V3Transitions {
   /** جهتِ «پایان» در راست‌به‌چپ منفی است (چپ) */
   private fun endSign(dir: LayoutDirection) = if (dir == LayoutDirection.Rtl) -1 else 1
 
-  fun page(move: Move, dir: LayoutDirection): ContentTransform {
+  /**
+   *  @param forward فقط برای `SWITCH` (تب): تبِ تازه بعد از تبِ پیشین در نوار است ⇒ از سمتِ پایان می‌آید
+   */
+  fun page(move: Move, dir: LayoutDirection, forward: Boolean = true): ContentTransform {
     if (!Motion.enabled) return EnterTransition.None togetherWith ExitTransition.None
     val end = endSign(dir)
     return when (move) {
@@ -75,7 +78,18 @@ object V3Transitions {
         (slideInHorizontally(MotionSpec.pageOffset) { w -> -end * (w * 3 / 10) } + fadeIn(tween(MotionTokens.LONG), initialAlpha = DIM))
           .togetherWith(slideOutHorizontally(MotionSpec.pageOffset) { w -> end * w })
           .apply { targetContentZIndex = -1f }
-      Move.SWITCH, Move.NONE ->
+      //  تب (shared-axis X): لغزشِ کوتاه (۱۰٪) + محو به سمتِ ترتیبِ تب‌ها، آینه در RTL
+      Move.SWITCH -> {
+        val s = if (forward) end else -end
+        (slideInHorizontally(tween(MotionTokens.LONG, easing = MotionTokens.EmphasizedDecelerate)) { w -> s * w / 10 } +
+          fadeIn(tween(MotionTokens.MEDIUM, delayMillis = 40, easing = MotionTokens.EmphasizedDecelerate)))
+          .togetherWith(
+            slideOutHorizontally(tween(MotionTokens.MEDIUM, easing = MotionTokens.EmphasizedAccelerate)) { w -> -s * w / 10 } +
+              fadeOut(tween(MotionTokens.SHORT, easing = MotionTokens.EmphasizedAccelerate)),
+          )
+      }
+      //  هم‌سطح بی جهت (کامپیوتر، عوض شدنِ حالت): محو و کمی بزرگ‌شدن
+      Move.NONE ->
         (fadeIn(tween(MotionTokens.MEDIUM, delayMillis = 60, easing = MotionTokens.EmphasizedDecelerate)) +
           scaleIn(tween(MotionTokens.MEDIUM, delayMillis = 60, easing = MotionTokens.EmphasizedDecelerate), initialScale = 0.98f))
           .togetherWith(fadeOut(tween(90)))

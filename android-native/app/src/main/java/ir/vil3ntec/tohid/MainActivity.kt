@@ -137,7 +137,7 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
           //  عوض شدنِ حالت (سوییچرِ «حساب من»، پیوند) با محو و بزرگ‌شدنِ نرم
           AnimatedContent(
             targetState = screen,
-            transitionSpec = { V3Transitions.page(Move.SWITCH, ir.vil3ntec.tohid.ui.directionOf(LocaleChoice.lang)) },
+            transitionSpec = { V3Transitions.page(Move.NONE, ir.vil3ntec.tohid.ui.directionOf(LocaleChoice.lang)) },
             label = "mode",
           ) { s ->
             when (s) {

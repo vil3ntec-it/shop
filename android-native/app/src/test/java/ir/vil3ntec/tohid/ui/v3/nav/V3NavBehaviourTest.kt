@@ -44,6 +44,18 @@ class V3NavBehaviourTest {
   }
 
   @Test
+  fun `جهتِ لغزشِ تب از ترتیبِ نوار`() {
+    val n = nav()
+    n.tabOrder = listOf("home", "sale", "products", "more")
+    n.open("products")
+    assertTrue(n.tabForward)
+    n.open("sale")
+    assertFalse(n.tabForward)
+    n.open("more")
+    assertTrue(n.tabForward)
+  }
+
+  @Test
   fun `حالتِ صفحه فقط تا وقتی در پشته‌ای هست نگه داشته می‌شود`() {
     val n = nav()
     n.open("products")

@@ -65,6 +65,7 @@
   <uses-feature android:name="android.hardware.usb.host" android:required="false" />
 
   <application
+      android:enableOnBackInvokedCallback="true"
       android:allowBackup="true"
       android:dataExtractionRules="@xml/backup_rules"
       android:fullBackupContent="@xml/backup_rules_legacy"

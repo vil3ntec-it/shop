@@ -213,7 +213,7 @@ fun V3Scaffold(
     }
   }
   if (menuOpen) {
-    V3Sheet(onDismiss = { menuOpen = false }) { closer ->
+    V3Sheet(onDismiss = { menuOpen = false }, detents = false) { closer ->
       V3Card(padding = PaddingValues(vertical = 4.dp)) {
         overflow.forEachIndexed { i, item ->
           if (i > 0) V3Divider(start = 64.dp)

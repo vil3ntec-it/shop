@@ -77,6 +77,11 @@ fun V3Sheet(
    *  برگه `heightIn(max = …)` می‌خواهد؛ برگه‌ای که خودش تمام‌قد Lazy دارد `scroll = false` بدهد.
    */
   scroll: Boolean = true,
+  /**
+   *  ایستگاه‌های نیمه/کامل: برگهٔ بلند اول تا نیمه باز می‌شود، با کشیدن کامل، و با سرعتِ رها کردن
+   *  جا می‌افتد. برگهٔ کوتاه همان بلندیِ خودش است. تأیید و منو `false` (همیشه کامل).
+   */
+  detents: Boolean = true,
   content: @Composable ColumnScope.(V3SheetCloser) -> Unit,
 ) {
   val c = PhoneV3.colors
@@ -84,7 +89,7 @@ fun V3Sheet(
   val allowHide = remember { booleanArrayOf(false) }
   val canHide by rememberUpdatedState(dismissible)
   val state = rememberModalBottomSheetState(
-    skipPartiallyExpanded = true,
+    skipPartiallyExpanded = !detents,
     confirmValueChange = { it != SheetValue.Hidden || canHide || allowHide[0] },
   )
   val scope = rememberCoroutineScope()
@@ -146,7 +151,7 @@ fun V3ConfirmSheet(
   danger: Boolean = true,
 ) {
   val c = PhoneV3.colors
-  V3Sheet(onDismiss = onDismiss) { closer ->
+  V3Sheet(onDismiss = onDismiss, detents = false) { closer ->
     if (icon != null) {
       val tone = PhoneV3Roles.tone(c, if (danger) V3Tone.ERROR else V3Tone.INFO)
       Box(

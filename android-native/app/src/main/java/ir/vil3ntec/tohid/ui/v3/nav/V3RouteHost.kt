@@ -12,6 +12,13 @@ import androidx.compose.material.icons.outlined.ExploreOff
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.ToggleOff
 import androidx.compose.runtime.Composable
+import ir.vil3ntec.tohid.ui.screens.Motion
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
@@ -56,13 +63,33 @@ fun V3RouteHost(nav: V3Nav, shell: ShellContext, modifier: Modifier = Modifier) 
     seen.filter { it !in alive }.forEach { saved.removeState(it); seen.remove(it) }
   }
 
+  //  برگشتِ پیش‌نما (اندروید ۱۴+): صفحه پا‌به‌پای انگشت کمی کنار می‌رود و کوچک می‌شود؛
+  //  رها ⇒ برگشت، لغو ⇒ سرِ جا. اندرویدِ قدیم و کامپیوتر: همان برگشتِ ساده (AUDIT-NAV M2)
+  var backProgress by remember { mutableFloatStateOf(0f) }
+  PredictiveBackHandler(enabled = stack.canPop && nav.gate == null && !topIsSheet) { events ->
+    try {
+      events.collect { e -> if (Motion.enabled) backProgress = e.progress }
+      nav.back()
+    } finally {
+      backProgress = 0f
+    }
+  }
+  val endSign = if (dir == LayoutDirection.Rtl) -1f else 1f
+
   CompositionLocalProvider(LocalV3Nav provides nav) {
     AnimatedContent(
       targetState = base,
       //  صفحهٔ زیرِ برگه تا ۰٫۹۶ کوچک می‌شود (`V3Sheet` خودش را می‌شمارد)
-      modifier = modifier.v3BehindSheet(),
+      modifier = modifier.v3BehindSheet().graphicsLayer {
+        val p = backProgress
+        if (p > 0f) {
+          translationX = endSign * size.width * 0.12f * p
+          scaleX = 1f - 0.08f * p
+          scaleY = scaleX
+        }
+      },
       //  کامپیوتر/پهن: صفحه‌ها هم‌سطح‌اند ⇐ محو، نه لغزشِ تمام‌عرض
-      transitionSpec = { V3Transitions.page(if (nav.wide) Move.SWITCH else nav.move, dir) },
+      transitionSpec = { V3Transitions.page(if (nav.wide) Move.NONE else nav.move, dir, nav.tabForward) },
       label = "route",
     ) { path ->
       saved.SaveableStateProvider(path) { RouteContent(path, nav, shell) }

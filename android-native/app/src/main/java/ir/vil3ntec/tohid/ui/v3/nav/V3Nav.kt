@@ -99,9 +99,17 @@ class V3Nav(private val table: RouteTable, val home: String, initial: NavStack) 
   /** مسیرهایی که هنوز در پشته‌ای هستند (پشتهٔ جاری، پشتهٔ تب‌های دیگر، دروازه) — بقیه فراموش می‌شوند */
   internal val alive: Set<String> get() = stack.entries.toSet() + tabStacks.values.flatten() + listOfNotNull(gate)
 
+  /** ترتیبِ تب‌های نوار (پوسته می‌گذارد) — جهتِ لغزشِ تب از روی همین */
+  var tabOrder: List<String> = emptyList()
+
+  /** آخرین عوض شدنِ تب رو به جلو (تبِ بعدی در نوار) بود؟ */
+  var tabForward: Boolean = true
+    private set
+
   private fun toTab(p: String) {
     val target = RoutePaths.normalize(p.substringBefore('?'))
     val from = RoutePaths.normalize(stack.root.substringBefore('?'))
+    tabForward = tabOrder.indexOf(target) >= tabOrder.indexOf(from)
     if (target == from) { stack = stack.switchTab(p); return }
     tabStacks[from] = stack.entries
     val saved = tabStacks.remove(target)

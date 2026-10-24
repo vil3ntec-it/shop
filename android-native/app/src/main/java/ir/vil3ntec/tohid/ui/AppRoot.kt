@@ -315,6 +315,7 @@ fun AppRoot(
   val navRoutes = navLayout.ids.mapNotNull { NavCatalog.of(it)?.route?.substringBefore('?') }.toSet() + "home"
   nav.wide = wide
   nav.sectionsRoot = if (phoneNav) NavCatalog.MORE else "home"
+  nav.tabOrder = if (phoneNav) listOf("home") + navLayout.ids.mapNotNull { NavCatalog.of(it)?.route?.substringBefore('?') } else DESK_TABS.toList()
   nav.isTab = { base -> if (phoneNav) base in navRoutes else base in DESK_TABS }
   BackHandler(enabled = nav.canBack) { nav.back() }
 
