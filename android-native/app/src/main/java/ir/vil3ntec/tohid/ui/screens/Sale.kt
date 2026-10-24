@@ -148,6 +148,15 @@ fun SaleScreen(
     scope.launch { snackbar.showSnackbar(text) }
   }
 
+  //  HW-02/03: چاپِ خودکار یا کشوی پس از فروش که نشد همین‌جا، سرِ صندوق، گفته می‌شود
+  val printNotice by ir.vil3ntec.tohid.print.PrintSpooler.tillNotice
+  LaunchedEffect(printNotice) {
+    printNotice?.let { n ->
+      ir.vil3ntec.tohid.print.PrintSpooler.consumed(n)
+      snackbar.showSnackbar(n.text, duration = SnackbarDuration.Long)
+    }
+  }
+
   /** یک بارکد — چه از دوربین، چه دستی، چه از بارکدخوانِ سخت‌افزاری */
   fun onBarcode(raw: String, skipDedup: Boolean = false, fromPhone: Boolean = false) {
     val code = raw.trim()

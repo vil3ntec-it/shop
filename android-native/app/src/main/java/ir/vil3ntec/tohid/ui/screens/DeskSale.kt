@@ -152,6 +152,15 @@ fun DeskSaleScreen(
 
   fun toast(text: String) { scope.launch { snackbar.showSnackbar(text) } }
 
+  //  HW-02/03: چاپِ خودکار یا کشوی پس از فروش که نشد همین‌جا، سرِ صندوق، گفته می‌شود
+  val printNotice by ir.vil3ntec.tohid.print.PrintSpooler.tillNotice
+  LaunchedEffect(printNotice) {
+    printNotice?.let { n ->
+      ir.vil3ntec.tohid.print.PrintSpooler.consumed(n)
+      snackbar.showSnackbar(n.text, duration = SnackbarDuration.Long)
+    }
+  }
+
   val index = remember(d.products) { ShopStore.barcodeIndex(d) }
 
   //  «۳*کد» ⇐ (۳، «کد») — رقمِ فارسی هم (F0-06، `CartQuery`)

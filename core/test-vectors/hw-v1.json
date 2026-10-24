@@ -1,5 +1,5 @@
 {
- "_doc": "HW-01..04، HW-09، POS-29 — بردارهای مشترکِ ESC/POS، بارکد، برچسب و ترازو. همین فایل را license/hw-core.js (server/test/hw-core.test.js) و core/hw/*.kt (HwCoreTest.kt) می‌دوانند. legacyRaster از کدِ پیش از این تغییر (toEscPosِ thermal-print.js، همان ThermalPrinter.render) گرفته شده: پیش‌فرضِ پروفایل باید همان بایت‌ها را بدهد.",
+ "_doc": "HW-01..04، HW-09، POS-29 — بردارهای مشترکِ ESC/POS، بارکد، برچسب و ترازو. همین فایل را پیاده‌سازیِ مرجعِ server/test/hw-core-ref.js (با server/test/hw-core.test.js) و core/hw/*.kt (HwCoreTest.kt) می‌دوانند. legacyRaster از کدِ پیش از این تغییر (toEscPosِ thermal-print.js، همان ThermalPrinter.render) گرفته شده: پیش‌فرضِ پروفایل باید همان بایت‌ها را بدهد.",
  "version": 1,
  "pattern": "pixel(x,y) = RGBA((37x+11y)&255, (13x+29y)&255, (7x+3y)&255, (x+2y)%7==0 ? 100 : 255); تصویر = fromRgba(pattern, w, h, w)",
  "legacyRaster": [

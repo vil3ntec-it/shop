@@ -375,7 +375,8 @@ fun InvoiceDialog(
       onDismiss = { printer = false },
       onPrint = { address, width ->
         printer = false
-        if (ir.vil3ntec.tohid.print.PrintLog.wasPrinted(context, sale.id)) reprint = address to width
+        //  چاپ‌شده روی همین دستگاه، یا چاپِ دوباره‌ای که از دستگاهِ دیگری در سابقهٔ دکان آمده
+        if (ir.vil3ntec.tohid.print.PrintLog.wasPrinted(context, sale.id) || d.auditLog.any { it.type == "reprint" && it.refId == sale.id }) reprint = address to width
         else send(address, width, null)
       },
     )

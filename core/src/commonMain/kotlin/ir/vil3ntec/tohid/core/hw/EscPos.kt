@@ -83,10 +83,16 @@ object EscPos {
    *  کلِ کارِ چاپ. ترتیب:
    *    `ESC @` ← (کشو) ← تصویر ← سطرهای خالی ← برش
    *
-   *  کشو **پیش از** تصویر باز می‌شود: فروشنده بقیهٔ پول را همان وقت که
-   *  رسید چاپ می‌شود می‌دهد، و اگر چاپ نیمه‌کاره بماند کشو باز شده است.
+   *  `openDrawer` فقط برای بردارهای مشترک و پیش‌نمایش است. صفِ چاپ هرگز
+   *  کشو را درونِ کار نمی‌گذارد: ضربهٔ کشو جدا و یک‌باره می‌رود
+   *  (`drawerOnly`، `KickOnce`) و `withoutDrawerKick` هر بایتِ صف را پاک می‌کند.
+   *
+   *  تصویرِ پهن‌تر از کاغذ پذیرفته نمی‌شود — چاپگر لبه‌اش را بی‌صدا می‌بُرد.
    */
   fun document(image: MonoImage, profile: PrinterProfile, openDrawer: Boolean = false): ByteArray {
+    require(image.width <= profile.paperDots) {
+      "پهنای تصویر (${image.width} نقطه) از پهنای کاغذ (${profile.paperDots} نقطه) بیشتر است"
+    }
     val out = Bytes()
     out.add(INIT)
     if (openDrawer) out.add(drawerKick(profile.drawerPin))
@@ -96,8 +102,22 @@ object EscPos {
     return out.toByteArray()
   }
 
-  /** فقط کشو — فروشِ نقدی وقتی «چاپِ خودکار» خاموش است، یا آزمونِ کشو */
+  /** فقط کشو — یک‌باره و بیرون از صف: پس از فروشِ نقدی یا «باز کردنِ کشو» */
   fun drawerOnly(profile: PrinterProfile): ByteArray = INIT + drawerKick(profile.drawerPin)
+
+  /**
+   *  ضربهٔ کشو (`ESC p m t1 t2`) از سرِ کار برداشته می‌شود — همان جایی که
+   *  `document` می‌گذارد (پس از `ESC @`، یا سرِ کار). تصویر با `GS v 0`
+   *  یا `ESC 3` آغاز می‌شود، پس این پنج بایت با دادهٔ تصویر قاطی نمی‌شوند.
+   */
+  fun withoutDrawerKick(bytes: ByteArray): ByteArray {
+    fun kickAt(i: Int) = bytes.size >= i + 5 && bytes[i] == 0x1B.toByte() && bytes[i + 1] == 0x70.toByte()
+    return when {
+      kickAt(0) -> bytes.copyOfRange(5, bytes.size)
+      bytes.size >= 2 && bytes[0] == INIT[0] && bytes[1] == INIT[1] && kickAt(2) -> INIT + bytes.copyOfRange(7, bytes.size)
+      else -> bytes
+    }
+  }
 
   /**
    *  `GS v 0` — تصویر تکه‌تکه، هر تکه `BAND_ROWS` سطر.

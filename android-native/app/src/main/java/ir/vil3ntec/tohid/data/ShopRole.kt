@@ -114,4 +114,11 @@ object ShopRole {
 
   /** سابقهٔ عملیات — همان `audit.view`ِ سرور */
   fun canSeeAudit(context: Context): Boolean = allows(context, "audit.view")
+
+  /**
+   *  باز کردنِ دستیِ کشو بی فروش (`no_sale`) — `drawer.open`ِ هسته. شاگرد
+   *  پیش‌فرض نه؛ «نیازمندِ تأیید» هم این‌جا یعنی نه (برگهٔ تأیید هنوز در
+   *  برنامه نیست)، همان کشوی بی فروشِ #286.
+   */
+  fun canOpenDrawer(context: Context): Boolean = allows(context, "drawer.open")
 }

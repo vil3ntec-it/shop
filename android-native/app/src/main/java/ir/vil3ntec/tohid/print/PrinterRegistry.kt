@@ -98,11 +98,15 @@ object PrinterRegistry {
 
   fun defaultLink(context: Context): String? = prefs(context).getString("printer_address", null)
 
-  /** چاپگرِ رسیدِ پیش‌فرض با پروفایلش؛ چاپگری که فقط نشانی‌اش هست ⇒ پروفایلِ پیش‌فرض */
+  /**
+   *  چاپگرِ رسیدِ پیش‌فرض با پروفایلش؛ چاپگری که فقط نشانی‌اش هست ⇒ پروفایلِ پیش‌فرض.
+   *  چاپگرِ برچسب هرگز رسید (یا ضربهٔ کشو) نمی‌گیرد ⇒ `null`.
+   */
   fun defaultSaved(context: Context): Saved? {
     val link = defaultLink(context)?.takeIf { it.isNotBlank() } ?: return null
-    return list(context).firstOrNull { it.link == link }
+    val saved = list(context).firstOrNull { it.link == link }
       ?: Saved("default", "چاپگرِ فاکتور", link, prefs(context).getInt("printer_width", ThermalPrinter.WIDTH_58MM))
+    return saved.takeIf { !it.isLabel }
   }
 
   /** پروفایلِ چاپگری که با این نشانی ثبت شده؛ نبود ⇒ همان عرض و بقیه پیش‌فرض */

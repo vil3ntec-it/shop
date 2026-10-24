@@ -11,6 +11,12 @@ package ir.vil3ntec.tohid.core.hw
  *    • **چاپِ دوباره هرگز فروش نمی‌سازد**: کارِ صف فقط شناسهٔ فروش و
  *      بایت‌های آماده را دارد؛ صف به دفتر دست نمی‌زند.
  *    • رسیدِ خودکارِ یک فروش دو بار در صف نمی‌نشیند.
+ *    • **کشو هرگز در صف نمی‌نشیند** (HW-03): ضربهٔ کشو «همین حالا یا هرگز»
+ *      است — نه در صف، نه در فایل، نه تلاشِ دوباره. وگرنه تلاشِ دوباره یا
+ *      بازگشتِ صف پس از بسته شدنِ برنامه کشو را بی فروش باز می‌کرد.
+ *    • تلاشِ دوبارهٔ رسید (`attempts > 0`) یا رسیدی که پس از بازگشتِ صف
+ *      چاپ می‌شود نسخهٔ «چاپِ دوباره» را می‌برد (`needsCopyMark`): شاید
+ *      تلاشِ پیشین نیمه‌کاره روی کاغذ آمده باشد.
  */
 class PrintQueue(
   private val backoffMs: List<Long> = listOf(2_000, 5_000, 15_000, 30_000, 60_000),
@@ -39,7 +45,12 @@ class PrintQueue(
     val lastError: String? = null,
     /** پله‌ها تمام شد و «چاپِ معوق» خاموش است — منتظرِ کاربر */
     val held: Boolean = false,
-  )
+    /** از فایلِ صف برگشته (پس از بسته شدنِ برنامه) — ذخیره نمی‌شود */
+    val restored: Boolean = false,
+  ) {
+    /** این تلاش نسخهٔ «چاپِ دوباره» را می‌برد: رسیدی که پیش‌تر تلاش شده یا از فایل برگشته */
+    val needsCopyMark: Boolean get() = kind == Kind.RECEIPT && (attempts > 0 || restored)
+  }
 
   sealed interface Status {
     /** صف خالی */
@@ -62,6 +73,7 @@ class PrintQueue(
 
   /** @return `false` اگر همین رسیدِ خودکار از پیش در صف باشد */
   fun enqueue(job: Job): Boolean {
+    require(job.kind != Kind.DRAWER) { "کشو در صف نمی‌رود — همین حالا یا هرگز" }
     require(job.kind != Kind.REPRINT || job.reason.isNotBlank()) { "چاپِ دوباره دلیل می‌خواهد" }
     if (job.kind == Kind.RECEIPT && job.saleId != null &&
       jobs.any { it.kind == Kind.RECEIPT && it.saleId == job.saleId }
@@ -117,9 +129,42 @@ class PrintQueue(
     }
   }
 
-  /** بازگرداندنِ صفِ ذخیره‌شده پس از بسته شدنِ برنامه — به همان ترتیب */
+  /**
+   *  بازگرداندنِ صفِ ذخیره‌شده پس از بسته شدنِ برنامه — به همان ترتیب.
+   *  کارِ کشو (از نسخه‌ای کهنه) دور ریخته می‌شود و هر رسید `restored` می‌شود.
+   */
   fun restore(saved: List<Job>) {
     jobs.clear()
-    jobs.addAll(saved)
+    jobs.addAll(saved.filter { it.kind != Kind.DRAWER }.map { it.copy(restored = true) })
+  }
+
+  companion object {
+    /**
+     *  بایت‌هایی که این تلاش به چاپگر می‌برد. `read(true)` = نسخهٔ «چاپِ دوباره».
+     *  رسیدی که نسخهٔ نشان‌دار ندارد `null` می‌شود (چاپِ بی‌نشانِ دوباره بدتر از
+     *  نبودنش است) و ضربهٔ کشو، اگر بایتی از نسخه‌ای کهنه داشته باشد، برداشته می‌شود.
+     */
+    fun payload(job: Job, read: (copy: Boolean) -> ByteArray?): ByteArray? =
+      read(job.needsCopyMark)?.let(EscPos::withoutDrawerKick)
+  }
+}
+
+/**
+ *  ضربهٔ کشو «همین حالا یا هرگز» (HW-03): فقط یک بار، و فقط اگر تا `windowMs`
+ *  پس از درخواست به چاپگر رسید. نه صف دارد، نه فایل، نه تلاشِ دوباره.
+ */
+class KickOnce(private val requestedAt: Long, private val windowMs: Long = WINDOW_MS) {
+  private var used = false
+
+  /** `true` فقط یک بار و فقط در مهلت */
+  fun take(now: Long): Boolean {
+    if (used || now - requestedAt > windowMs) return false
+    used = true
+    return true
+  }
+
+  companion object {
+    /** چاپگرِ مشغول تا این مدت صبر می‌شود؛ پس از آن کشو باز نمی‌شود */
+    const val WINDOW_MS = 3_000L
   }
 }
