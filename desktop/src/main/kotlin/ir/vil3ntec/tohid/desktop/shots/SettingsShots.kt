@@ -59,7 +59,7 @@ object SettingsShots : GroupShots {
     ),
     Shot("sync-staff", content = { StaffPreview("settings/data/sync", it) }),
     Shot("backup", route = "settings/data/backup"),
-    Shot("backup-wipe", route = "settings/data/backup", prepare = { SettingsShotState.wipeSheet = true }, cleanup = { SettingsShotState.wipeSheet = false }),
+    Shot("backup-wipe", route = "settings/data/backup?shot=wipe", prepare = { SettingsShotState.wipeSheet = true }, cleanup = { SettingsShotState.wipeSheet = false }),
     Shot("devices-printers", route = "devices?tab=printers"),
     Shot("devices-phone", route = "devices?tab=phone"),
   )

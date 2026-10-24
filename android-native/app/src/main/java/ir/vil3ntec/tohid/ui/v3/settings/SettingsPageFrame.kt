@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.ui.v3.settings
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -85,7 +86,8 @@ private class StaggeredList(private val base: LazyListScope, private val stagger
     base.item(key, contentType) {
       val scope = this
       //  ردیفِ کلیددار آمدن و رفتنش هم حرکت دارد (`v3AnimateItem`)
-      Box((if (key != null) Modifier.v3AnimateItem(scope) else Modifier).v3Stagger(state, id, index)) { scope.content() }
+      //  ستون، نه Box: ردیفی که چند بخش دارد (کارت + توضیح) روی هم نمی‌افتد
+      Column((if (key != null) Modifier.v3AnimateItem(scope) else Modifier).v3Stagger(state, id, index)) { scope.content() }
     }
   }
 }
