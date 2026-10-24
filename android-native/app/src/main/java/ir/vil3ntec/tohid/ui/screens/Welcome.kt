@@ -226,6 +226,8 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
   var busy by remember { mutableStateOf(false) }
   var error by remember { mutableStateOf<String?>(null) }
   var note by remember { mutableStateOf<String?>(null) }
+  //  گوگلی که باید به حسابِ موجود وصل شود — شرحش سرِ `GoogleLinkDialog`
+  var googleLink by remember { mutableStateOf<GoogleLinkAsk?>(null) }
 
   /*
    *  خطای هر کادر، چسبیده به خودِ کادر.
@@ -916,7 +918,13 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
                     } else {
                       auth.loginWithGoogle(account.idToken)
                         .onSuccess { finish(account.email, it) }
-                        .onFailure { fail(it) }
+                        .onFailure {
+                          if (it is ApiFailure.Conflict && it.code == "google_link_required") {
+                            googleLink = GoogleLinkAsk(account.idToken, account.email, it.message.orEmpty())
+                          } else {
+                            fail(it)
+                          }
+                        }
                     }
                   }
                   .onFailure { error = it.userText("ورود با گوگل انجام نشد") }
@@ -924,6 +932,32 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
               }
             }
           }
+        }
+
+        googleLink?.let { ask ->
+          GoogleLinkDialog(
+            ask = ask,
+            busy = busy,
+            onDismiss = { googleLink = null },
+            onSendCode = {
+              busy = true
+              scope.launch {
+                auth.requestGoogleLinkCode(ask.idToken)
+                  .onSuccess { googleLink = ask.copy(codeSent = true, problem = null) }
+                  .onFailure { googleLink = ask.copy(problem = it.userText("کد فرستاده نشد")) }
+                busy = false
+              }
+            },
+            onProve = { secret, isCode ->
+              busy = true
+              scope.launch {
+                auth.loginWithGoogle(ask.idToken, password = secret.takeUnless { isCode }, code = secret.takeIf { isCode })
+                  .onSuccess { googleLink = null; finish(ask.email, it) }
+                  .onFailure { googleLink = ask.copy(problem = it.userText("وصل نشد")) }
+                busy = false
+              }
+            },
+          )
         }
 
         /*
@@ -2333,6 +2367,74 @@ private fun GoogleMark() {
  *  مسیرِ سرور همه سرِ جایشان‌اند. این را `true` کنید و کلید برمی‌گردد.
  */
 private const val GOOGLE_LOGIN = false
+
+/** گوگلی که منتظرِ اثباتِ روشِ قبلیِ حساب است (۴۰۹ `google_link_required`). */
+private data class GoogleLinkAsk(
+  val idToken: String,
+  val email: String,
+  val message: String,
+  val codeSent: Boolean = false,
+  val problem: String? = null,
+)
+
+/**
+ *  «این ایمیل از قبل حساب دارد» — وصل کردنِ گوگل به همان حساب.
+ *
+ *  ⛔ بندِ ۲۹.۲ قاعدهٔ ۵: برابر بودنِ ایمیل به‌تنهایی کافی نیست. کاربر رمزِ
+ *  همان حساب را می‌زند، یا کدی که به ایمیلِ حساب می‌رود. بستن یعنی «وصل
+ *  نکن» — هیچ حسابِ تازه‌ای ساخته نمی‌شود و حسابِ قبلی دست نمی‌خورد.
+ */
+@Composable
+private fun GoogleLinkDialog(
+  ask: GoogleLinkAsk,
+  busy: Boolean,
+  onDismiss: () -> Unit,
+  onSendCode: () -> Unit,
+  onProve: (secret: String, isCode: Boolean) -> Unit,
+) {
+  var secret by remember(ask.codeSent) { mutableStateOf("") }
+  AlertDialog(
+    onDismissRequest = { if (!busy) onDismiss() },
+    title = { Text("وصل کردنِ گوگل به حسابِ موجود") },
+    text = {
+      Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(
+          ask.message.ifBlank {
+            "این ایمیل از قبل حساب دارد. برای وصل کردنِ گوگل، رمزِ همان حساب یا کدی را که به ایمیل می‌فرستیم وارد کنید."
+          },
+          style = MaterialTheme.typography.bodyMedium,
+        )
+        Text(ask.email, style = MaterialTheme.typography.labelLarge)
+        OutlinedTextField(
+          value = secret,
+          onValueChange = { secret = it },
+          singleLine = true,
+          enabled = !busy,
+          label = { Text(if (ask.codeSent) "کدِ ایمیل" else "رمزِ همین حساب") },
+          visualTransformation = if (ask.codeSent) VisualTransformation.None else PasswordVisualTransformation(),
+          keyboardOptions = KeyboardOptions(
+            keyboardType = if (ask.codeSent) KeyboardType.NumberPassword else KeyboardType.Password,
+          ),
+          modifier = Modifier.fillMaxWidth(),
+        )
+        if (!ask.codeSent) {
+          TextButton(onClick = onSendCode, enabled = !busy) { Text("رمز را نمی‌دانم — کد به ایمیل بفرست") }
+        } else {
+          Text("کد به همین ایمیل رفت.", style = MaterialTheme.typography.labelMedium)
+        }
+        ask.problem?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelMedium) }
+      }
+    },
+    confirmButton = {
+      TextButton(onClick = { onProve(secret, ask.codeSent) }, enabled = !busy && secret.isNotBlank()) {
+        Text("وصل و ورود")
+      }
+    },
+    dismissButton = {
+      TextButton(onClick = onDismiss, enabled = !busy) { Text("وصل نکن") }
+    },
+  )
+}
 
 private const val G_BLUE =
   "M45.12 24.5c0-1.56-.14-3.06-.4-4.5H24v8.51h11.84c-.51 2.75-2.06 5.08-4.39 6.64v5.52h7.11" +
