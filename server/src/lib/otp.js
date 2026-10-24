@@ -350,20 +350,25 @@ async function sender(destination, smsCfg = null) {
  *  فقط وقتی پیامکِ واقعی می‌رود (شماره، و راهِ ارسال `log` نیست). عددها از
  *  `config.otp.smsGuard` (متغیرهای OTP_SMS_*) می‌آیند.
  *
- *  ⛔ شمارهٔ «آشنا» معاف است: شماره‌ای که پیش‌تر کدی را درست زده
- *  (`otp_codes.consumed_at`) یا مشتریِ ویترین است (`store_customers`). پس پشتِ
+ *  ⛔ شمارهٔ «آشنا» (شماره‌ای که پیش‌تر کدی را درست زده، `otp_codes.consumed_at`،
+ *  یا مشتریِ ویترین است، `store_customers`) از سقفِ IP و بلوک معاف است. پس پشتِ
  *  NAT ِ اپراتور، کافی‌نت یا وای‌فای ِ دکان، کاربرِ آشنا هرگز پشتِ سقفِ IP
  *  نمی‌ماند (همان قاعدهٔ «بی قفلِ اینترنتِ مشترک» ِ routes/auth.js)، و بستنِ
  *  عمدیِ یک بلوک یا همهٔ شماره‌های خارجی فقط شماره‌های تازه را چند دقیقه نگه می‌دارد.
+ *  ⚠️ ولی آشنا شدن ارزان است (یک کدِ درست)، پس آشنا **مرزِ خودش** را دارد:
+ *  سقفِ خارجیِ جدا (knownForeignPhones، کلِ سرور) و فقط knownExtra پیامک بیش از
+ *  dailyMax در روز.
  *  ⚠️ `users.phone` آشنا شمرده نمی‌شود: تا AUTH-08 شماره بی کد روی حساب می‌نشیند.
  *
- *  سه سنجهٔ ساعتی، فقط برای شمارهٔ ناآشنا، از `otp_codes` (تلاشِ ناموفق هم
- *  ردیفِ `via = 'failed'` می‌ماند و شمرده می‌شود؛ `log` نه):
- *    - یک IP: ipPhones شمارهٔ جدا ⇒ ۴۲۹ sms_ip_limit
- *    - یک بلوکِ هزارتایی (شماره بی سه رقمِ آخر): blockPhones ⇒ sms_prefix_limit
- *    - شماره‌های بیرون از پیش‌شمارهٔ کشور، کلِ سرور: foreignPhones ⇒ sms_foreign_limit
+ *  سه سنجهٔ ساعتی از `otp_codes` (`log` شمرده نمی‌شود):
+ *    - یک IP، فقط ناآشنا: ipPhones شمارهٔ جدا ⇒ ۴۲۹ sms_ip_limit
+ *    - یک بلوکِ هزارتایی (شماره بی سه رقمِ آخر)، فقط ناآشنا: blockPhones ⇒ sms_prefix_limit
+ *      (این دو تلاشِ ناموفق، `via = 'failed'`، را هم می‌شمارند)
+ *    - شماره‌های بیرون از پیش‌شمارهٔ کشور، کلِ سرور: ناآشنا foreignPhones، آشنا
+ *      knownForeignPhones ⇒ sms_foreign_limit. تلاشِ ناموفق این‌جا شمرده **نمی‌شود**
+ *      تا قطعیِ سرویسِ پیامک خودش سقفِ خارجی را پر نکند.
  *  سقفِ روزانهٔ سراسری از دفترِ یگانهٔ `sms_usage` (فقط پیامکِ واقعیِ رفته،
- *  همهٔ هدف‌ها): ناآشنا dailyMax، آشنا سهمِ جدای knownDailyMax ⇒ sms_daily_ceiling.
+ *  همهٔ هدف‌ها): ناآشنا dailyMax، آشنا dailyMax + knownExtra ⇒ sms_daily_ceiling.
  *  پر شدنش روزی یک بار در سابقه (`sms.daily_ceiling`) و پنل می‌نشیند.
  *  ⛔ مسیرهای پمپ (`senders.sms` ِ مستقیم در vip-codes) این‌جا نمی‌آیند.
  */
@@ -383,10 +388,11 @@ async function isKnown(destination) {
   return Boolean(r && r.known);
 }
 
-async function distinctPhones(where, params) {
+async function distinctPhones(where, params, { failed = true } = {}) {
   const r = await one(
     `SELECT COUNT(DISTINCT destination)::int AS n FROM otp_codes
-      WHERE created_at > $1 AND destination NOT LIKE '%@%' AND via <> 'log' AND destination <> $2 AND ${where}`,
+      WHERE created_at > $1 AND destination NOT LIKE '%@%' AND via <> 'log' ${failed ? '' : "AND via <> 'failed'"}
+        AND destination <> $2 AND ${where}`,
     params
   );
   return r.n;
@@ -408,7 +414,7 @@ async function dailyCeiling(known, at) {
     console.error('[otp] دفترِ پیامک خوانده نشد؛ سقفِ روزانه این بار سنجیده نشد:', err.message);
     return null;
   }
-  const cap = known ? lim.knownDailyMax : lim.dailyMax;
+  const cap = lim.dailyMax + (known ? lim.knownExtra : 0);
   if (sent < cap) return null;
   const tag = `${new Date(at).toISOString().slice(0, 10)}|${known ? 'known' : 'new'}`;
   if (!ceilingAlerted.has(tag)) {
@@ -417,7 +423,8 @@ async function dailyCeiling(known, at) {
     await require('./audit').log({
       actorType: 'system', action: 'sms.daily_ceiling', detail: { cap, sent, scope: known ? 'known' : 'new' },
     }).catch(() => {});
-    require('./panel-live').notifyPanel('codes');
+    //  خبرِ پنل هرگز نباید ۴۲۹ را ۵۰۰ کند
+    try { require('./panel-live').notifyPanel('codes'); } catch (err) { console.error('[otp] پنل', err.message); }
   }
   return tooMany('سقفِ روزانهٔ پیامکِ سرور پر شده است؛ فعلاً با ایمیل وارد شوید یا بعداً امتحان کنید', 'sms_daily_ceiling');
 }
@@ -437,10 +444,12 @@ async function smsGuard(destination, { ip = '', at = now() } = {}) {
     if (await distinctPhones('destination LIKE $3', [since, destination, `${block}%`]) >= lim.blockPhones) {
       throw tooMany('فرستادنِ کد به این دسته از شماره‌ها فعلاً بسته است؛ کمی بعد دوباره امتحان کنید', 'sms_prefix_limit');
     }
-    if (!destination.startsWith(HOME_CC)
-        && await distinctPhones('destination NOT LIKE $3', [since, destination, `${HOME_CC}%`]) >= lim.foreignPhones) {
-      throw tooMany('فرستادنِ کد به شماره‌های خارجی فعلاً بسته است؛ کمی بعد دوباره امتحان کنید', 'sms_foreign_limit');
-    }
+  }
+  //  خارجی: ناآشنا (تازه) سقفِ کوچک، آشنا سقفِ جدا و بزرگ‌تر؛ تلاشِ ناموفق شمرده نمی‌شود
+  const foreignCap = known ? lim.knownForeignPhones : (fresh ? lim.foreignPhones : null);
+  if (foreignCap !== null && !destination.startsWith(HOME_CC)
+      && await distinctPhones('destination NOT LIKE $3', [since, destination, `${HOME_CC}%`], { failed: false }) >= foreignCap) {
+    throw tooMany('فرستادنِ کد به شماره‌های خارجی فعلاً بسته است؛ کمی بعد دوباره امتحان کنید', 'sms_foreign_limit');
   }
   const full = await dailyCeiling(known, at);
   if (full) throw full;

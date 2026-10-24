@@ -3,8 +3,10 @@
  * SEC-06 — سقفِ هزینهٔ پیامک و ضدِ SMS pumping در lib/otp.js.
  *
  *   - شمارهٔ ناآشنا: سقفِ IP، بلوکِ هزارتایی و شمارهٔ خارجی (ساعتی) ⇒ ۴۲۹.
- *   - شمارهٔ آشنا (کدی را درست زده / مشتریِ ویترین) از هر سه معاف است ⇒ NAT ِ
- *     مشترک کاربرِ واقعی را قفل نمی‌کند؛ سقفِ روزانهٔ جدا دارد.
+ *   - شمارهٔ آشنا (کدی را درست زده / مشتریِ ویترین) از IP و بلوک معاف است ⇒ NAT ِ
+ *     مشترک کاربرِ واقعی را قفل نمی‌کند؛ ولی سقفِ خارجیِ جدا و فقط knownExtra
+ *     پیامک بیش از dailyMax دارد (آشنا شدن ارزان است).
+ *   - قطعیِ سرویس (ارسالِ ناموفق) سقفِ خارجی را پر نمی‌کند.
  *   - تلاشِ ناموفق در سنجه‌ها می‌ماند، ولی «فاصلهٔ ارسالِ دوباره»، سقفِ هر شماره و
  *     کدِ زندهٔ پیشین را خراب نمی‌کند.
  *   - سقفِ روزانهٔ سراسری از sms_usage: فقط پیامکِ واقعیِ رفته (نه log، نه ناموفق،
@@ -15,7 +17,8 @@
  */
 Object.assign(process.env, {
   OTP_SMS_IP_PHONES: '3', OTP_SMS_BLOCK_PHONES: '3', OTP_SMS_FOREIGN_PHONES: '4',
-  OTP_SMS_DAILY_MAX: '40', OTP_SMS_KNOWN_DAILY_MAX: '60', OTP_DAILY_MAX: '4', OTP_RESEND_SECONDS: '120',
+  OTP_SMS_KNOWN_FOREIGN_PHONES: '7', OTP_SMS_DAILY_MAX: '40', OTP_SMS_KNOWN_EXTRA: '20',
+  OTP_DAILY_MAX: '4', OTP_RESEND_SECONDS: '120',
 });
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -104,12 +107,25 @@ test('بلوک و خارجی: ناآشنا بسته، آشنا آزاد؛ تلا
   assert.equal(await code(otp.request(known, { ip: '203.0.113.201' })), 'ok', 'آشنا در همان بلوک آزاد');
   assert.equal(await code(otp.request('+93792001999', { ip: '203.0.113.202' })), 'ok', 'بلوکِ دیگر آزاد');
 
-  //  خارجی
+  //  خارجی: قطعیِ سرویس (۵ ارسالِ ناموفق) سقف را پر نمی‌کند
+  failNext = 5;
+  for (let i = 0; i < 5; i++) {
+    assert.equal(await code(otp.request(`+4478${pad(i)}00123`, { ip: `192.0.2.${150 + i}` })), 'delivery_failed');
+  }
   for (let i = 0; i < L.foreignPhones; i++) {
     assert.equal(await code(otp.request(`+4477${pad(i)}00123`, { ip: `192.0.2.${i + 1}` })), 'ok');
   }
   assert.equal(await code(otp.request('+4477999001234', { ip: '192.0.2.200' })), 'sms_foreign_limit');
   assert.equal(await code(otp.request('+93793000123', { ip: '192.0.2.201' })), 'ok');
+  //  آشنای خارجی سقفِ جدا و بزرگ‌تر دارد (۷)، ولی بی‌مرز نیست
+  const kf = ['+4479100001234', '+4479200001234', '+4479300001234', '+4479400001234'];
+  for (const p of kf) {
+    await query(`INSERT INTO store_customers (id, phone, created_at, updated_at) VALUES ($1,$2,$3,$3)`, [newId('scu'), p, now()]);
+  }
+  for (const p of kf.slice(0, L.knownForeignPhones - L.foreignPhones)) {
+    assert.equal(await code(otp.request(p, { ip: '192.0.2.210' })), 'ok', 'آشنای خارجی پس از پر شدنِ سهمِ ناآشنا');
+  }
+  assert.equal(await code(otp.request(kf[3], { ip: '192.0.2.211' })), 'sms_foreign_limit', 'آشنا هم مرزِ خودش را دارد');
 });
 
 test('ارسالِ ناموفق: ردیف بی کد می‌ماند، ولی تلاشِ دوباره، سقفِ هر شماره و کدِ زندهٔ پیشین سالم‌اند', async () => {
@@ -144,9 +160,10 @@ test('سقفِ روزانه: فقط پیامکِ واقعیِ رفته در ۲۴
   const known = '+93795900123';
   await makeKnown(known, '192.0.2.150');
   //  کهنه، ناموفق و log شمرده نمی‌شوند
-  await seed(L.knownDailyMax, t - 25 * 3600_000);
-  await seed(L.knownDailyMax, t - 3600_000, { ok: false });
-  await seed(L.knownDailyMax, t - 3600_000, { via: 'log' });
+  const big = L.dailyMax + L.knownExtra;
+  await seed(big, t - 25 * 3600_000);
+  await seed(big, t - 3600_000, { ok: false });
+  await seed(big, t - 3600_000, { via: 'log' });
   assert.equal(await code(otp.request('+93795000123', { ip: '192.0.2.100' })), 'ok');
   //  ناآشنا به dailyMax می‌رسد؛ آشنا هنوز نه
   await seed(L.dailyMax - base - 2, t - 3600_000);
@@ -155,10 +172,17 @@ test('سقفِ روزانه: فقط پیامکِ واقعیِ رفته در ۲۴
   assert.equal(await code(otp.request(known, { ip: '192.0.2.103' })), 'ok', 'آشنا سهمِ جدای خودش را دارد');
   const alerts = await query(`SELECT detail FROM audit_logs WHERE action='sms.daily_ceiling'`);
   assert.equal(alerts.rows.length, 1, 'هشدار روزی یک بار، نه به‌ازای هر درخواست');
-  //  آشنا هم سقفِ خودش را دارد
-  await seed(L.knownDailyMax, t - 3600_000);
+  //  آشنا فقط knownExtra بیش از dailyMax دارد
+  await seed(L.knownExtra, t - 3600_000);
   await query(`UPDATE otp_codes SET created_at = created_at - 200000 WHERE destination=$1`, [known]);
-  assert.equal(await code(otp.request(known, { ip: '192.0.2.104' })), 'sms_daily_ceiling');
+  //  خطای خبرِ پنل ۴۲۹ را ۵۰۰ نمی‌کند (نخستین هشدارِ سهمِ آشنا همین‌جاست)
+  const panel = require('../src/lib/panel-live');
+  const realNotify = panel.notifyPanel;
+  panel.notifyPanel = () => { throw new Error('panel down'); };
+  try {
+    assert.equal(await code(otp.request(known, { ip: '192.0.2.104' })), 'sms_daily_ceiling');
+  } finally { panel.notifyPanel = realNotify; }
+  assert.equal((await query(`SELECT 1 FROM audit_logs WHERE action='sms.daily_ceiling'`)).rows.length, 2, 'یک هشدار برای هر سهم');
   //  ایمیل و راهِ log هزینه ندارند ⇒ سقف نمی‌گیرند
   assert.equal(await code(otp.request('ceiling@test.local', { ip: '192.0.2.105' })), 'ok');
   await settings.save({ provider: 'log' });

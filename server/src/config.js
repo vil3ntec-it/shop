@@ -101,15 +101,17 @@ const config = {
     uniformMs:  num(process.env.OTP_UNIFORM_MS, 1500),
     /*
      *  SEC-06 — سقفِ هزینه و ضدِ SMS pumping (`lib/otp.js`)؛ فقط پیامکِ واقعی.
-     *  شمارهٔ «آشنا» (پیش‌تر کدی را درست زده یا مشتریِ ویترین است) از سه سنجهٔ
-     *  ساعتی معاف است و سقفِ روزانهٔ جدای خودش را دارد.
+     *  شمارهٔ «آشنا» (پیش‌تر کدی را درست زده یا مشتریِ ویترین است) از سقفِ IP و
+     *  بلوک معاف است، سقفِ خارجیِ جدا و بالاتر دارد، و فقط knownExtra پیامک بیش
+     *  از dailyMax (آشنا شدن با یک کد ارزان است؛ سهمش کوچک می‌ماند).
      */
     smsGuard: {
       ipPhones:      num(process.env.OTP_SMS_IP_PHONES, 10),        // شمارهٔ ناآشنای جدا از یک IP در ساعت
       blockPhones:   num(process.env.OTP_SMS_BLOCK_PHONES, 10),     // در یک بلوکِ هزارتایی در ساعت
-      foreignPhones: num(process.env.OTP_SMS_FOREIGN_PHONES, 20),   // شمارهٔ خارجیِ جدا در ساعت، کلِ سرور
-      dailyMax:      num(process.env.OTP_SMS_DAILY_MAX, 2000),      // پیامکِ واقعی در ۲۴ ساعت، برای شمارهٔ ناآشنا
-      knownDailyMax: num(process.env.OTP_SMS_KNOWN_DAILY_MAX, 10000), // همان، برای شمارهٔ آشنا
+      foreignPhones: num(process.env.OTP_SMS_FOREIGN_PHONES, 20),   // شمارهٔ خارجیِ ناآشنای جدا در ساعت، کلِ سرور
+      knownForeignPhones: num(process.env.OTP_SMS_KNOWN_FOREIGN_PHONES, 200), // همان برای آشنا
+      dailyMax:      num(process.env.OTP_SMS_DAILY_MAX, 2000),      // پیامکِ واقعی در ۲۴ ساعت، کلِ سرور
+      knownExtra:    num(process.env.OTP_SMS_KNOWN_EXTRA, 500),     // سهمِ افزودهٔ شمارهٔ آشنا بر dailyMax
     },
   },
 
