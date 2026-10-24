@@ -577,7 +577,15 @@
     payment: ['فروش به تفکیک روش پرداخت', 'روش پرداخت'], channel: ['فروش به تفکیک کانال', 'کانال'],
   };
   var UNKNOWN = { product: 'قلم آزاد', category: 'بی‌دسته', user: 'نامعلوم', hour: 'نامعلوم', payment: 'نامعلوم', channel: 'نامعلوم' };
-  var KNOWN = { payment: { cash: 'نقد', credit: 'نسیه' }, channel: { pos: 'حضوری', online: 'اینترنتی' } };
+  //  PAY (v3 A4): مقدارهای تازهٔ paymentMethod (PayFlow.legacyMethod) — همان KNOWNِ ReportTables.kt
+  var KNOWN = {
+    payment: {
+      cash: 'نقد', credit: 'نسیه', card: 'کارت', wallet: 'کیف پول', transfer: 'حواله',
+      store_credit: 'اعتبار فروشگاه', gift_card: 'کارت هدیه', other: 'سایر', mixed: 'ترکیبی',
+      online: 'پرداختِ آنلاین', cod: 'نقد هنگامِ تحویل',
+    },
+    channel: { pos: 'حضوری', online: 'اینترنتی' },
+  };
   var SALES_COLS = [
     ['invoices', 'فاکتور', 'count'], ['qty', 'مقدار', 'qty'], ['gross', 'جمع پیش از تخفیف', 'money'],
     ['discount', 'تخفیف', 'money'], ['sales', 'فروش', 'money'], ['returns', 'برگشتی', 'money'],
