@@ -1,0 +1,162 @@
+{
+  "at": "2026-10-19T19:14:28.874Z",
+  "env": {
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "cores": 4,
+    "memGB": 16,
+    "os": "linux 6.18.44-fc-v139",
+    "node": "v22.22.0",
+    "driver": "pglite"
+  },
+  "scale": 1,
+  "reps": 15,
+  "dataset": {
+    "products": 20000,
+    "sales": 200000,
+    "saleItems": 300000,
+    "customers": 5000,
+    "activeDebtors": 2000,
+    "suppliers": 500,
+    "expenses": 3000,
+    "days": 365,
+    "transactions": 25628,
+    "warehouseEntries": 41159,
+    "returns": 430,
+    "genMs": 4970,
+    "syncRows": 595717
+  },
+  "seed": {
+    "ms": 281988,
+    "rowsPerSec": 2113,
+    "maintenance": {
+      "kind": "pglite-stats.analyzeNow",
+      "ms": 14450
+    }
+  },
+  "sync": {
+    "snapshotGzip": {
+      "n": 1,
+      "p50": 59247.2,
+      "p95": 59247.2,
+      "p99": 59247.2,
+      "max": 59247.2,
+      "errors": 0,
+      "bytes": 131159964
+    }
+  },
+  "burst": null,
+  "catalog": {
+    "storeHome": {
+      "n": 15,
+      "p50": 235.2,
+      "p95": 338.7,
+      "p99": 338.7,
+      "max": 338.7,
+      "errors": 0,
+      "bytes": 709
+    },
+    "publicFirstPage": {
+      "n": 15,
+      "p50": 48.2,
+      "p95": 112.5,
+      "p99": 112.5,
+      "max": 112.5,
+      "errors": 0,
+      "bytes": 9156
+    },
+    "publicSearch": {
+      "n": 15,
+      "p50": 460.8,
+      "p95": 560.3,
+      "p99": 560.3,
+      "max": 560.3,
+      "errors": 0,
+      "bytes": 8679
+    },
+    "publicCategory": {
+      "n": 15,
+      "p50": 203.3,
+      "p95": 289.6,
+      "p99": 289.6,
+      "max": 289.6,
+      "errors": 0,
+      "bytes": 9070
+    },
+    "publicPage51": {
+      "n": 15,
+      "p50": 55.7,
+      "p95": 97,
+      "p99": 97,
+      "max": 97,
+      "errors": 0,
+      "bytes": 21323
+    },
+    "ownerFirstPage": {
+      "n": 15,
+      "p50": 61.8,
+      "p95": 91.5,
+      "p99": 91.5,
+      "max": 91.5,
+      "errors": 0,
+      "bytes": 26830
+    },
+    "ownerMiddlePage": {
+      "n": 15,
+      "p50": 80,
+      "p95": 180.7,
+      "p99": 180.7,
+      "max": 180.7,
+      "errors": 0,
+      "bytes": 27211
+    }
+  },
+  "orders": {},
+  "plans": {
+    "pull": {
+      "ms": 17.7,
+      "seqScan": false,
+      "nodes": "Limit > Index Scan(idx_oplog_account_seq)"
+    },
+    "head": {
+      "ms": 0.3,
+      "seqScan": false,
+      "nodes": "Result > Limit > Index Only Scan(idx_oplog_account_seq)"
+    },
+    "pushRowLock": {
+      "ms": 0,
+      "seqScan": false,
+      "nodes": "Index Scan(sync_rows_pkey)"
+    },
+    "deleteOwnerCheck": {
+      "ms": 23.2,
+      "seqScan": false,
+      "nodes": "Limit > Sort > Index Scan(idx_oplog_row)"
+    },
+    "snapshot": {
+      "ms": 10919.9,
+      "seqScan": false,
+      "nodes": "Index Scan(sync_rows_pkey)"
+    },
+    "catalogFirstPage": {
+      "ms": 27.6,
+      "seqScan": false,
+      "nodes": "Limit > Nested Loop > Index Scan(ix_sync_rows_shop_product_name) > Index Only Scan(ix_storefront_products_published)"
+    },
+    "catalogSearch": {
+      "ms": 480.7,
+      "seqScan": false,
+      "nodes": "Limit > Sort > Merge Join > Index Only Scan(ix_storefront_products_published) > Index Scan(sync_rows_pkey)"
+    },
+    "ordersList": {
+      "ms": 0.1,
+      "seqScan": true,
+      "nodes": "Limit > Sort > Seq Scan(online_orders)"
+    }
+  },
+  "memory": {
+    "snapshotRssDeltaMB": 724,
+    "rssMB": 1535,
+    "heapMB": 248
+  },
+  "totalMs": 440875
+}

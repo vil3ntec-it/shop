@@ -1,0 +1,125 @@
+package ir.vil3ntec.tohid.core.image
+
+import java.io.ByteArrayOutputStream
+
+/**
+ *  فرادادهٔ JPEG — خواندنِ orientation و برداشتنِ EXIF/GPS/XMP/IPTC/توضیح،
+ *  بی هیچ کتابخانه (همتای `server/src/lib/image-bytes.js`).
+ *
+ *  ⛔ فقط سرآیند خوانده می‌شود؛ دادهٔ فشرده پس از SOS دست‌نخورده کپی می‌شود و
+ *     **در EOI بریده** — هرچه پس از EOI چسبیده (تصویرِ دومِ MPF با EXIFِ خودش،
+ *     دادهٔ دلخواه) می‌رود.
+ *  ⛔ APP0 (JFIF)، APP2 فقط وقتی `ICC_PROFILE` است (رنگ‌نما؛ APP2ِ MPF/FPXR
+ *     می‌رود) و APP14 (Adobe) می‌مانند — بی آن‌ها رنگ یا رمزگشایی عوض می‌شود.
+ *     بقیهٔ APPn و COM می‌روند.
+ *  ⛔ `strip` فقط روی خروجیِ بازکدگذاری‌شدهٔ خودِ برنامه (`Bitmap.compress`)
+ *     اجرا می‌شود؛ قطعه‌های میانِ اسکن‌های JPEGِ پیش‌رونده همان‌طور کپی می‌شوند.
+ */
+object JpegMeta {
+
+  data class Segment(val marker: Int, val start: Int, val end: Int)
+
+  private fun u8(b: ByteArray, i: Int) = b[i].toInt() and 0xFF
+  private fun u16be(b: ByteArray, i: Int) = (u8(b, i) shl 8) or u8(b, i + 1)
+
+  fun isJpeg(b: ByteArray): Boolean = b.size >= 4 && u8(b, 0) == 0xFF && u8(b, 1) == 0xD8
+
+  /** قطعه‌های پیش از SOS (خودِ SOS آخرینِ فهرست است). خراب ⇒ خطا. */
+  fun segments(b: ByteArray): List<Segment> {
+    require(isJpeg(b)) { "JPEG نیست" }
+    val out = ArrayList<Segment>()
+    var i = 2
+    while (i + 4 <= b.size) {
+      require(u8(b, i) == 0xFF) { "نشانگرِ JPEG خراب است" }
+      var m = u8(b, i + 1)
+      while (m == 0xFF && i + 2 < b.size) { i++; m = u8(b, i + 1) }
+      if (m == 0xD8 || m == 0x01 || m in 0xD0..0xD7) { i += 2; continue }
+      val len = u16be(b, i + 2)
+      require(len >= 2 && i + 2 + len <= b.size) { "طولِ قطعهٔ JPEG خراب است" }
+      out += Segment(m, i, i + 2 + len)
+      if (m == 0xDA) return out
+      i += 2 + len
+    }
+    throw IllegalArgumentException("JPEG بی دادهٔ تصویر (SOS) تمام شد")
+  }
+
+  private fun isExif(b: ByteArray, s: Segment): Boolean =
+    s.marker == 0xE1 && s.end - s.start >= 10 &&
+      String(b, s.start + 4, 6, Charsets.ISO_8859_1) == "Exif\u0000\u0000"
+
+  fun hasExif(b: ByteArray): Boolean = runCatching { segments(b).any { isExif(b, it) } }.getOrDefault(false)
+
+  /** هر قطعهٔ فرادادهٔ حساس (APP1/APP13/COM و دیگر APPnها) */
+  fun hasMetadata(b: ByteArray): Boolean = runCatching { segments(b).any { !keep(b, it) } }.getOrDefault(false)
+
+  private fun isIcc(b: ByteArray, s: Segment): Boolean =
+    s.end - s.start >= 16 && String(b, s.start + 4, 12, Charsets.ISO_8859_1) == "ICC_PROFILE\u0000"
+
+  private fun keep(b: ByteArray, s: Segment): Boolean = when (s.marker) {
+    0xE0, 0xEE -> true                        // JFIF، Adobe
+    0xE2 -> isIcc(b, s)                       // فقط رنگ‌نمای ICC؛ MPF/FPXR نه
+    in 0xE1..0xEF, 0xFE -> false              // EXIF/XMP، IPTC، توضیح و دیگر APPn
+    else -> true                              // DQT، SOF، DHT، DRI، SOS…
+  }
+
+  /**
+   *  پایانِ EOI پس از نخستین SOS؛ نبود ⇒ پایانِ فایل. در دادهٔ فشرده هر 0xFF یا
+   *  0x00 (پرکن)، RSTn یا 0xFF دارد؛ قطعه‌های میانِ اسکن‌ها با طولشان رد می‌شوند.
+   */
+  private fun eoiEnd(b: ByteArray, from: Int): Int {
+    var i = from
+    while (i + 1 < b.size) {
+      if (u8(b, i) != 0xFF) { i++; continue }
+      val m = u8(b, i + 1)
+      when {
+        m == 0xD9 -> return i + 2
+        m == 0xFF -> i++
+        m == 0x00 || m in 0xD0..0xD7 -> i += 2
+        else -> {
+          if (i + 4 > b.size) return b.size
+          val len = u16be(b, i + 2)
+          if (len < 2) return b.size
+          i += 2 + len
+        }
+      }
+    }
+    return b.size
+  }
+
+  /** orientationِ EXIF (۱..۸)؛ نبود یا خراب ⇒ ۱ */
+  fun orientation(b: ByteArray): Int = runCatching {
+    val seg = segments(b).firstOrNull { isExif(b, it) } ?: return 1
+    val t = seg.start + 10                     // آغازِ TIFF
+    val end = seg.end
+    if (t + 8 > end) return 1
+    val le = when (String(b, t, 2, Charsets.ISO_8859_1)) { "II" -> true; "MM" -> false; else -> return 1 }
+    fun r16(i: Int): Int = if (le) u8(b, i) or (u8(b, i + 1) shl 8) else u16be(b, i)
+    fun r32(i: Int): Long = if (le) (r16(i).toLong() or (r16(i + 2).toLong() shl 16))
+      else ((r16(i).toLong() shl 16) or r16(i + 2).toLong())
+    if (r16(t + 2) != 42) return 1
+    val ifd = t + r32(t + 4).toInt()
+    if (ifd + 2 > end) return 1
+    val n = r16(ifd)
+    for (k in 0 until n) {
+      val e = ifd + 2 + k * 12
+      if (e + 12 > end) return 1
+      if (r16(e) == 0x0112) {
+        val v = r16(e + 8)
+        return if (v in 1..8) v else 1
+      }
+    }
+    1
+  }.getOrDefault(1)
+
+  /** همان JPEG بی فرادادهٔ حساس؛ دادهٔ تصویر بایت‌به‌بایت همان است. */
+  fun strip(b: ByteArray): ByteArray {
+    val segs = segments(b)
+    val out = ByteArrayOutputStream(b.size)
+    out.write(b, 0, 2)                        // SOI
+    for (s in segs) {
+      if (s.marker == 0xDA) { out.write(b, s.start, eoiEnd(b, s.end).coerceAtMost(b.size) - s.start); break }
+      if (keep(b, s)) out.write(b, s.start, s.end - s.start)
+    }
+    return out.toByteArray()
+  }
+}

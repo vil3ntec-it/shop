@@ -537,13 +537,13 @@ private fun QuickTile(
       Box(
         Modifier
           .clip(RoundedCornerShape(8.dp))
-          .background(Shop.colors.primary)
+          .background(Shop.colors.button.primary.bg)
           .padding(horizontal = 8.dp, vertical = 3.dp),
       ) {
         Text(
           "${qty(inCart)}${if (unit.isNotBlank()) " $unit" else ""} در سبد",
           style = MaterialTheme.typography.labelSmall,
-          color = Color.White,
+          color = Shop.colors.button.primary.text,
           fontWeight = FontWeight.Bold,
         )
       }
