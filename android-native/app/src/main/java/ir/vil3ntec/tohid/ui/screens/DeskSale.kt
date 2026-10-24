@@ -108,6 +108,9 @@ fun DeskSaleScreen(
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
   val cart by cartStore.lines.collectAsState()
+  //  HW-10: نمایشگرِ مشتری (پنجرهٔ دوم) — فقط وقتی باز است کاری می‌کند
+  val customerOpen by ir.vil3ntec.tohid.hw.CustomerFacing.open
+  LaunchedEffect(cart, d, customerOpen) { ir.vil3ntec.tohid.hw.CustomerFacing.showCart(d, cart) }
   val cartDebtorId by cartStore.debtorId.collectAsState()
   LaunchedEffect(d.products.size, d.debtors.size) { cartStore.prune(d) }
   //  PRM: تخفیف‌های خودکار — کلیدِ دکان خاموش ⇒ null و `priced` همان `cart` است
@@ -153,6 +156,15 @@ fun DeskSaleScreen(
 
   fun toast(text: String) { scope.launch { snackbar.showSnackbar(text) } }
 
+  //  HW-02/03: چاپِ خودکار یا کشوی پس از فروش که نشد همین‌جا، سرِ صندوق، گفته می‌شود
+  val printNotice by ir.vil3ntec.tohid.print.PrintSpooler.tillNotice
+  LaunchedEffect(printNotice) {
+    printNotice?.let { n ->
+      ir.vil3ntec.tohid.print.PrintSpooler.consumed(n)
+      snackbar.showSnackbar(n.text, duration = SnackbarDuration.Long)
+    }
+  }
+
   val index = remember(d.products) { ShopStore.barcodeIndex(d) }
 
   //  «۳*کد» ⇐ (۳، «کد») — رقمِ فارسی هم (F0-06، `CartQuery`)
@@ -178,8 +190,22 @@ fun DeskSaleScreen(
   fun add(product: Product, count: Double) =
     applyAdded(product, SalesEngine.addToCartCapped(cartStore.lines.value, product.id, count, ShopStore.stock(d, product.id)))
 
+  /**
+   *  POS-29: برچسبِ ترازو (فقط اگر دکان قاعده‌اش را روشن کرده باشد) — وزن
+   *  به سبد؛ رقمِ کنترلِ غلط رد. `false` ⇒ برچسبِ ترازو نیست، راهِ همیشگی.
+   */
+  fun scaleLabel(code: String, dd: ShopData): Boolean =
+    when (val m = ir.vil3ntec.tohid.data.ScaleLabels.match(
+      ir.vil3ntec.tohid.data.ScaleLabels.rules(context), code, ShopStore.barcodeIndex(dd), dd.products,
+    )) {
+      null -> false
+      is ir.vil3ntec.tohid.data.ScaleLabels.Match.Rejected -> { ScanFeedback.unknown(context); toast(m.message); true }
+      is ir.vil3ntec.tohid.data.ScaleLabels.Match.Weighed -> { add(m.product, m.quantity); true }
+    }
+
   /** Enter در کادر: بارکدِ کامل ⇐ همان؛ وگرنه پیشنهادِ برجسته (`PosSearch`) */
   fun submit() {
+    if (scaleLabel(query, d)) { query = ""; return }
     when (val hit = PosSearch.resolve(query, index, d.products, matches, hint)) {
       PosHit.None -> Unit
       is PosHit.Inactive -> toast("«${hit.product.name}» غیرفعال است")
@@ -202,6 +228,7 @@ fun DeskSaleScreen(
   val latestD by rememberUpdatedState(d)
   fun fromScanner(code: String): Boolean {
     val dd = latestD
+    if (scaleLabel(code, dd)) return true
     when (val hit = BarcodeMatch.find(code, ShopStore.barcodeIndex(dd))) {
       is BarcodeMatch.Hit.Product -> dd.products.firstOrNull { it.id == hit.id }?.let {
         if (!it.active) toast("«${it.name}» غیرفعال است") else add(it, 1.0)
@@ -260,6 +287,7 @@ fun DeskSaleScreen(
       is SalePost.Outcome.Refused -> toast(posted.message)
       is SalePost.Outcome.Done -> {
         val r = posted.ok
+        ir.vil3ntec.tohid.hw.CustomerFacing.sold(r.data.sales.last().finalTotal)
         selected = null; discountText = ""; paidText = ""; payment = SalesEngine.Payment.CASH
         payOpen = false
         lastInvoice = r.data to r.saleId
