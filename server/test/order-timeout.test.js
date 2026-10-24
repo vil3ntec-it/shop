@@ -8,6 +8,9 @@
  *   - سفارشِ «بعداً» (دکانِ بسته) مُهر نمی‌خورد و هرگز خودکار رد نمی‌شود.
  *   - سفارشی که پیش از مهلت پذیرفته شد دست نمی‌خورد.
  *   - دو جاروبِ هم‌زمان ⇒ هر سفارش یک بار رد و یک رویدادِ وضعیت.
+ *   - «با تأخیر» (اتصالِ تأییدنشده) و سفارشِ زمان‌بندی‌شده مُهر نمی‌خورند؛ arm با
+ *     ساعتِ ساختِ سفارش می‌سنجد.
+ *   - سفارشِ خطادار صف را نمی‌گیرد؛ ردِ خودکار سابقه و اعلانِ دکان دارد.
  */
 process.env.RATE_STORE_CHECKOUT_MAX = '200';
 const test = require('node:test');
@@ -16,6 +19,10 @@ const h = require('./helpers');
 const { query, one, newId, now } = require('../src/db');
 const { resetAll } = require('../src/middleware/ratelimit');
 const timeout = require('../src/lib/order-timeout');
+const STALE = require('../src/config').storefront.staleMs;
+const sfRow = (shopId) => one('SELECT * FROM storefronts WHERE shop_id=$1', [shopId]);
+const seenAt = (shopId, t) => query(
+  `UPDATE sync_devices SET last_seen_at=$2 WHERE app='shop' AND account_kind='shop' AND account_id=$1`, [shopId, t]);
 
 let admin = '';
 let seq = 0;
@@ -99,6 +106,9 @@ test('دکانِ پذیرا: مهلت = ثبت + ۱۵ دقیقه؛ پس از آ�
   const row = await one('SELECT status, status_reason FROM online_orders WHERE id=$1', [o.id]);
   assert.deepEqual([row.status, row.status_reason], ['auto_rejected', 'timeout']);
   assert.deepEqual(await statusEvents(o.id), [{ to_status: 'auto_rejected', actor_type: 'system', reason: 'timeout' }]);
+  //  سابقه، حتی بی پرچمِ اعلان
+  const aud = await one(`SELECT actor_type, detail FROM audit_logs WHERE action='order.auto_rejected' AND target_id=$1`, [o.id]);
+  assert.equal(aud.actor_type, 'system');
 
   //  مشتری: «سفارش‌های من» با همان بلیت
   const mine = await h.get(`/api/store/${s.slug}/orders`, { headers: { 'X-Store-Ticket': await ticketFor(s.slug, '0791113001') } });
@@ -156,4 +166,67 @@ test('دو جاروبِ هم‌زمان: هر سفارش یک بار رد و ی�
     assert.deepEqual((await statusEvents(o.id)).map((e) => e.to_status), ['auto_rejected']);
   }
   assert.equal(await timeout.sweep(at + MIN), 0, 'جاروبِ بعدی کاری ندارد');
+});
+
+test('«با تأخیر» (اتصالِ تأییدنشده) مُهر نمی‌خورد؛ arm با ساعتِ ساختِ سفارش می‌سنجد', async () => {
+  const s = await liveStore('تأخیر');
+  await seenAt(s.shopId, now() - STALE - MIN);
+  const o = await order(s, '0791113007');
+  assert.equal(o.accept_deadline_at, null, 'delayed ⇒ بی زمان‌سنج');
+
+  //  مرز: در لحظهٔ ساخت هنوز «تأییدشده» بود، چند ثانیه بعد نه
+  const created = Number(o.created_at);
+  await seenAt(s.shopId, created - STALE + 1000);
+  const sf = await sfRow(s.shopId);
+  assert.equal(await timeout.arm(sf, o.id, { at: created + 5000 }), null, 'ساعتِ دیرتر ⇒ دیگر نمی‌پذیرفت');
+  assert.equal(await timeout.arm(sf, o.id, { at: created }), created + timeout.ACCEPT_TIMEOUT_MS, 'ساعتِ ساخت ⇒ می‌پذیرفت');
+});
+
+test('سفارشِ زمان‌بندی‌شده «بعداً» است و مُهر نمی‌خورد', async () => {
+  const s = await liveStore('زمان‌بندی');
+  const o = await order(s, '0791113008');
+  await query('UPDATE online_orders SET accept_deadline_at=NULL, scheduled_for=$2 WHERE id=$1', [o.id, now() + 24 * 60 * MIN]);
+  const sf = await sfRow(s.shopId);
+  assert.equal(await timeout.arm(sf, o.id, { at: Number(o.created_at) }), null);
+  await query('UPDATE online_orders SET scheduled_for=NULL WHERE id=$1', [o.id]);
+  assert.ok(await timeout.arm(sf, o.id, { at: Number(o.created_at) }), 'بی زمان‌بندی همان سفارش مُهر می‌خورد');
+});
+
+test('سفارشِ خطادار صف را نمی‌گیرد؛ پس از چند بار زمان‌سنجش برداشته می‌شود؛ ردِ خودکار به دکان اعلان می‌دهد', async () => {
+  const s = await liveStore('خطادار');
+  await setFlag(s.shopId, 'shop.order_notify', true);
+  const bad = await order(s, '0791113009');
+  const good = await order(s, '0791113010');
+  const orders = require('../src/lib/orders');
+  const push = require('../src/lib/push');
+  const realTransition = orders.transition;
+  const realSend = push.sendTo;
+  const pushed = [];
+  orders.transition = async (shopId, id, ...rest) => {
+    if (id === bad.id) throw new Error('boom');
+    return realTransition(shopId, id, ...rest);
+  };
+  push.sendTo = async (target, msg) => { pushed.push({ target, msg }); return { sent: 1, total: 1 }; };
+  try {
+    let at = Math.max(Number(bad.accept_deadline_at), Number(good.accept_deadline_at));
+    assert.ok(await timeout.sweep(at) >= 1);
+    assert.equal((await one('SELECT status FROM online_orders WHERE id=$1', [good.id])).status, 'auto_rejected');
+    assert.equal(Number((await one('SELECT accept_deadline_at FROM online_orders WHERE id=$1', [bad.id])).accept_deadline_at),
+      at + timeout.RETRY_MS, 'مهلتِ خطادار جلو رفت');
+    //  اعلانِ دکان از همان راهِ اعلانِ سفارش
+    const m = pushed.find((p) => p.msg.data.orderId === good.id);
+    assert.equal(m.msg.data.type, 'order_auto_rejected');
+    assert.equal(m.target.shopId, s.shopId);
+    assert.ok(m.target.onlyUserIds.includes(s.user.id), 'صاحبِ دکان گیرنده است');
+    for (let i = 1; i < timeout.MAX_FAILURES; i++) {
+      at += timeout.RETRY_MS;
+      await timeout.sweep(at);
+    }
+    const row = await one('SELECT status, accept_deadline_at FROM online_orders WHERE id=$1', [bad.id]);
+    assert.deepEqual([row.status, row.accept_deadline_at], ['new', null], 'زمان‌سنج برداشته شد؛ سفارش تازه ماند');
+    assert.ok(await one(`SELECT 1 AS x FROM audit_logs WHERE action='order.auto_reject_failed' AND target_id=$1`, [bad.id]));
+  } finally {
+    orders.transition = realTransition;
+    push.sendTo = realSend;
+  }
 });

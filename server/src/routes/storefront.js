@@ -144,7 +144,8 @@ router.post('/:slug/checkout', checkoutLimit, store, wrap(async (req, res) => {
   }
   //  ORD-05: زمان‌سنجِ قبول — فقط اگر دکان همین لحظه می‌پذیرد (سفارشِ «بعداً» نه).
   //  شکستش سفارش را پس نمی‌گیرد؛ فقط این سفارش بی زمان‌سنج می‌ماند.
-  await orderTimeout.arm(req.store, out.orderId).catch((err) => console.error('[order-timeout] arm', err.message));
+  await orderTimeout.arm(req.store, out.orderId, { at: out.order.createdAt })
+    .catch((err) => console.error('[order-timeout] arm', err.message));
   await audit.log({
     shopId: req.store.shop_id, actorType: 'customer', action: 'order.create',
     targetType: 'online_order', targetId: out.orderId,
