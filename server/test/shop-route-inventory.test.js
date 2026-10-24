@@ -27,6 +27,7 @@ const { many, one, query, newId, now } = require('../src/db');
 const { can } = require('../src/lib/permissions');
 const chat = require('../src/lib/shop-chat');
 const orders = require('../src/lib/orders');
+const trust = require('../src/lib/market-trust');
 
 test.before(async () => { await h.start(); });
 test.after(async () => { await h.stop(); });
@@ -187,7 +188,7 @@ test('هر مسیرِ خصوصیِ /api/shop: بی توکن و با توکنِ �
    مسیرِ شناسه‌دارِ تازه‌ای که ردیفِ واقعی برایش این‌جا ساخته نشود، آزمون را سرخ می‌کند. */
 
 const FLAGS = ['shop.orders', 'shop.orders.refunds', 'shop.delivery', 'shop.chat', 'shop.catalog',
-  'shop.storefront', 'shop.image_bank', 'shop.order_notify'];
+  'shop.storefront', 'shop.image_bank', 'shop.order_notify', 'market.trust'];
 
 /**
  * شناسه‌هایی که ردیفِ سراسری نیستند، کلیدِ فضای خودِ هر دکان‌اند: نامِ نقش، و
@@ -363,6 +364,16 @@ async function seedShop(a) {
     { rule: { name: 'تخفیفِ الف', kind: 'percent', bp: 1000 } }, { token: a.accessToken });
   assert.equal(promo.status, 200, JSON.stringify(promo.body));
 
+  //  شکایتِ بازارچه از «الف» + پاسخِ دکان — از لایهٔ اعتماد، همان راهِ مشتریِ ویترین
+  const filed = await trust.file({ shop_id: a.shopId }, { phone: '+93791112244', ip: '' },
+    { subject: 'shop', category: 'rude', body: 'فروشنده بد برخورد کرد' }, 'complaint');
+  assert.equal(filed.duplicate, false, JSON.stringify(filed));
+  ids.trustCase = (await one('SELECT id FROM trust_cases WHERE shop_id=$1 ORDER BY created_at LIMIT 1', [a.shopId]))?.id;
+  assert.ok(ids.trustCase, 'پروندهٔ شکایتِ الف');
+  const resp = await h.post(`/api/shop/trust/cases/${ids.trustCase}/responses`,
+    { body: 'پوزش؛ پیگیری شد', clientId: `client-${fresh('t')}-0000` }, { token: a.accessToken });
+  assert.equal(resp.status, 201, JSON.stringify(resp.body));
+
   return { ids, staff, courier };
 }
 
@@ -393,6 +404,7 @@ function concreteFor(ids) {
     [/^(\/shop\/devices\/):id/, ids.device],
     [/^(\/shop\/approver-keys\/):id/, ids.approverKey],
     [/^(\/shop\/promos\/rules\/):id/, ids.promoRule],
+    [/^(\/shop\/trust\/cases\/):id/, ids.trustCase],
   ];
   const QUERY = { 'DELETE /shop/chat/conversations/:id/messages/:mid': '?for=all' };
   return (r) => {
@@ -430,6 +442,8 @@ function bodyFor(r, ids) {
     'PUT /shop/permissions/members/:id': { perms: {} },
     'PUT /shop/permissions/roles/:role': { perms: {} },
     'PUT /shop/promos/rules/:id': { rule: { name: 'تخفیفِ ب', kind: 'percent', bp: 500 } },
+    'POST /shop/trust/cases/:id/responses': { body: 'پاسخِ ب', clientId: `client-${fresh('t')}-0000` },
+    'POST /shop/trust/cases/:id/appeal': { body: 'اعتراضِ «ب» به این تصمیم' },
   };
   return B[key] ?? (r.method === 'GET' || r.method === 'DELETE' ? null : {});
 }
