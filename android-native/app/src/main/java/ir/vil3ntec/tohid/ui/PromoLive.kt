@@ -278,8 +278,9 @@ object PromoLive {
 
   /** کدهای سبد ⇒ حافظه و پیش‌نویسِ فاکتور (N3) */
   fun setCoupons(codes: List<String>) {
+    //  وسطِ جابه‌جاییِ فاکتور (POS-12) سبد قفل است ⇒ کد هم نمی‌نشیند
+    if (draft?.setCoupons(codes) == false) return
     coupons.value = codes
-    draft?.setCoupons(codes)
   }
 
   /** افزودنِ کدی که صندوقدار زد (نرمال‌شده، بی تکرار) */

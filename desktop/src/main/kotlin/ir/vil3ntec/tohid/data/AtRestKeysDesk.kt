@@ -7,10 +7,6 @@ import ir.vil3ntec.tohid.desktop.DesktopContext
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.attribute.AclEntry
-import java.nio.file.attribute.AclEntryFlag
-import java.nio.file.attribute.AclEntryPermission
-import java.nio.file.attribute.AclEntryType
 import java.nio.file.attribute.AclFileAttributeView
 import java.nio.file.attribute.PosixFilePermission
 import java.security.SecureRandom
@@ -59,28 +55,38 @@ object AtRestKeys {
 
   private val isWindows: Boolean = System.getProperty("os.name").orEmpty().startsWith("Windows", ignoreCase = true)
 
+  /** SIDهای شناخته‌شده — به هر زبانی که ویندوز باشد همین‌اند (نامِ «SYSTEM»/«Administrators» ترجمه می‌شود) */
+  internal const val SID_SYSTEM = "S-1-5-18"
+  internal const val SID_ADMINS = "S-1-5-32-544"
+
+  /**
+   *  فرمانِ `icacls`: ارثِ پوشهٔ بالا بریده (`/inheritance:r`)، و فقط صاحب + SYSTEM +
+   *  Administrators با **SID** (`*S-…`، نه نامِ انگلیسی) — پیگیریِ #331.
+   */
+  internal fun aclCommand(path: String, owner: String, directory: Boolean): List<String> {
+    val perm = if (directory) "(OI)(CI)F" else "F"
+    return listOf("icacls", path, "/inheritance:r", "/grant:r", "$owner:$perm", "*$SID_SYSTEM:$perm", "*$SID_ADMINS:$perm")
+  }
+
   /**
    *  ویندوز: DACLِ تازه — صاحبِ فایل، SYSTEM و Administrators، همهٔ اجازه‌ها — جای ورودی‌های
-   *  ارث‌برده (حساب‌های عادیِ دیگر و Users بیرون می‌مانند).
+   *  ارث‌برده (حساب‌های عادیِ دیگر و Users بیرون می‌مانند). SYSTEM و Administrators می‌مانند تا
+   *  پشتیبانِ فایلیِ ویندوز و مدیرِ دستگاه کلید را هم ببرند.
    *  @return `null` اگر این سیستم ACL ندارد
    */
   internal fun ownerOnlyAcl(p: Path): Boolean? {
     val view = Files.getFileAttributeView(p, AclFileAttributeView::class.java) ?: return null
     return runCatching {
-      val lookup = p.fileSystem.userPrincipalLookupService
-      //  صاحب، و SYSTEM و Administrators تا پشتیبانِ فایلیِ ویندوز (و مدیرِ دستگاه) کلید را هم ببرند
-      val principals = listOf(view.owner) + listOf("NT AUTHORITY\\SYSTEM", "BUILTIN\\Administrators")
-        .mapNotNull { runCatching { lookup.lookupPrincipalByName(it) }.getOrNull() }
-      val entries = principals.distinct().map { who ->
-        AclEntry.newBuilder()
-          .setType(AclEntryType.ALLOW)
-          .setPrincipal(who)
-          .setPermissions(java.util.EnumSet.allOf(AclEntryPermission::class.java))
-          .apply { if (Files.isDirectory(p)) setFlags(AclEntryFlag.FILE_INHERIT, AclEntryFlag.DIRECTORY_INHERIT) }
-          .build()
+      val proc = ProcessBuilder(aclCommand(p.toAbsolutePath().toString(), view.owner.name, Files.isDirectory(p)))
+        .redirectErrorStream(true)
+        .start()
+      proc.inputStream.readBytes()
+      if (!proc.waitFor(30, java.util.concurrent.TimeUnit.SECONDS)) {
+        proc.destroyForcibly()
+        false
+      } else {
+        proc.exitValue() == 0 && view.acl.any { it.principal() == view.owner }
       }
-      view.acl = entries
-      view.acl.size == entries.size
     }.getOrDefault(false)
   }
 

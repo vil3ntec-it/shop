@@ -264,7 +264,7 @@ fun AppRoot(
     ir.vil3ntec.tohid.sync.AutoSync.stopPolling()
   }
   //  بخشِ «سفارش‌ها»: فقط اگر سرور برای این دکان روشن گفته، و فقط وقتی برنامه جلوی چشم است
-  OrdersLive.Host()
+  OrdersLive.Host(store)
   //  تخفیف‌های دکان (PRM): پیش‌فرض خاموش؛ نسخهٔ همین دستگاه برای کارِ آفلاین؛ کدها با پیش‌نویسِ سبد
   PromoLive.Host(cartStore)
 
@@ -777,6 +777,7 @@ fun AppRoot(
                 "ظاهر" to androidx.compose.material.icons.Icons.Filled.Palette,
                 "تاریخ و رقم" to androidx.compose.material.icons.Icons.Filled.Event,
                 "کالای منقضی" to androidx.compose.material.icons.Icons.Filled.EventBusy,
+                ir.vil3ntec.tohid.ui.components.pos.HeldInvoicePrefs.SECTION to androidx.compose.material.icons.Icons.Filled.Layers,
                 ir.vil3ntec.tohid.ui.screens.RETURN_SETTINGS_TITLE to androidx.compose.material.icons.Icons.Filled.SwapHoriz,
                 "قفل برنامه" to androidx.compose.material.icons.Icons.Filled.Lock,
                 ir.vil3ntec.tohid.ui.screens.SECURITY_SECTION_TITLE to androidx.compose.material.icons.Icons.Filled.Security,
@@ -869,7 +870,7 @@ fun AppRoot(
           onSubscription = { sub = "vip" },
         )
         "team" -> TeamScreen(snackbar)
-        "orders" -> OrdersScreen(snackbar) { sub = null }
+        "orders" -> OrdersScreen(store, snackbar) { sub = null }
         "storefront" -> if (StorefrontGate.visible) StorefrontScreen(snackbar) else LaunchedEffect(Unit) { open("more") }
         //  مثلِ تنظیمات: فقط صاحب و مدیر (`settings.write`)؛ سرور هم همین را می‌سنجد
         "promos" ->

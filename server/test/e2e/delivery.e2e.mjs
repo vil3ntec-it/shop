@@ -7,7 +7,8 @@
  *   نقد تحویل می‌دهد؛ مشتری «تحویل شد» را می‌بیند و چیزی از پیک و کد نمی‌بیند؛ تسویهٔ پیک
  *   نقد را از کرایه جدا نگه می‌دارد، کسری را با دلیل ثبت می‌کند و تسویهٔ دوباره را رد.
  *   سفارشِ دوم: ناموفق ⇐ تلاشِ دوباره ⇐ ناموفق ⇐ برگشت به دکان ⇐ بازگشت به قفسه؛ پولی گرفته
- *   نشده، و موجودیِ رزروشده (پرچمِ shop.catalog) آزاد می‌شود.
+ *   نشده. ⛔ موجودی (تصمیمِ صاحبِ مخزن): سرور هیچ رزرو و کسری ندارد؛ تحویلِ پیک از
+ *   `GET /shop/orders/handover` به برنامهٔ دکان می‌رسد و همان‌جا فروشِ عادی ثبت می‌شود.
  *
  * پرچم‌ها فقط برای همین دکان (live_config): shop.orders، shop.storefront، shop.delivery، shop.catalog.
  * اجرا:  node test/e2e/delivery.e2e.mjs
@@ -68,6 +69,8 @@ await E.step('E2E-DLV.0', 'کالا از برنامه، ویترین روشن، 
   K = await E.device('K-courier-phone', courierAcct.email);
   clerk = await E.device('W-clerk-phone', clerkAcct.email);
   assert.equal((await A.firstSync()).ok, true);
+  //  برنامهٔ «فروشِ تحویل» دکان را می‌بیند ⇒ کفِ تحویلِ همین دکان (پیش از هر سفارش)
+  assert.ok(E.ok(await A.ordersConfig(), 'config ِ سفارش‌ها').handoverSince > 0);
   rice = A.stockIn({ name: 'برنج', price: 600, cost: 450, units: 5 });
   await A.drain();
   E.ok(await A.api('PUT', '/shop/storefront', { slug: SLUG, enabled: true, title: 'ویترینِ ارسال', contactPhone: '0700000003', deliveryFeeMinor: 4000, minOrderMinor: 0 }), 'ویترین');
@@ -145,12 +148,21 @@ await E.step('E2E-CASH-09', 'S40: تسویهٔ پیک — نقد و کرایه �
   assert.equal(rep.totals.settlements, 1);
 }, { needs: ['E2E-DLV-07'] });
 
-await E.step('E2E-DLV-08', 'S39: ناموفق ⇐ تلاشِ دوباره ⇐ ناموفق ⇐ برگشت به دکان ⇐ قفسه؛ پولی گرفته نشده و رزرو آزاد', async () => {
-  const before = E.ok(await A.api('GET', `/shop/catalog/products/${rice}`), 'کاتالوگ').product.stock;
-  assert.equal(before.levels.shop_floor, 3000, `تحویلِ سفارشِ اول (۲ از ۵) از قفسه کم نشد: ${JSON.stringify(before)}`);
+await E.step('E2E-DLV-08', 'S39: ناموفق ⇐ تلاشِ دوباره ⇐ ناموفق ⇐ برگشت به دکان ⇐ قفسه؛ پولی گرفته نشده و موجودی دست نخورده', async () => {
+  const shelf = async () => {
+    const st = E.ok(await A.api('GET', `/shop/catalog/products/${rice}`), 'کاتالوگ').product.stock;
+    return [st.levels.shop_floor, st.reservedMilli, st.sellableMilli];
+  };
+  //  «رسید» ِ پیک سرور را کم نمی‌کند؛ برنامهٔ دکان تحویلِ بی‌فروش را از handover می‌گیرد و فروش را ثبت می‌کند
+  assert.deepEqual(await shelf(), [5000, 0, 5000], 'سرور برای سفارش کم نمی‌کند');
+  const pending = E.ok(await A.api('GET', '/shop/orders/handover?since=0'), 'تحویل‌های بی‌فروش').items;
+  assert.deepEqual(pending.map((x) => x.status), ['delivered']);
+  for (const it of pending) assert.equal(A.fulfillOrder(it).ok, true);
+  await A.drain();
+  const before = await shelf();
+  assert.deepEqual(before, [3000, 0, 3000], 'فروشِ تحویلِ سفارشِ اول (۲ از ۵) از قفسه کم شد');
   const o = await deliveryOrder(1, 'پشتِ نانوایی');
-  const held = E.ok(await A.api('GET', `/shop/catalog/products/${rice}`), 'کاتالوگ').product.stock;
-  assert.ok(JSON.stringify(held) !== JSON.stringify(before), `سفارش رزرو نساخت: ${JSON.stringify(held)}`);
+  assert.deepEqual(await shelf(), before, 'سفارش رزرو نمی‌سازد و موجودی را عوض نمی‌کند');
   await prepare(o.id);
   const asg = E.ok(await A.api('POST', `/shop/delivery/orders/${o.id}/assign`, { mode: 'shop_courier', courierId, fareMinor: 5000 }, { headers: { 'Idempotency-Key': E.key('asg') } }), 'سپردن', 201).assignment.id;
   await courierOk([event(asg, 'assigned'), event(asg, 'picked_up')]);
@@ -169,8 +181,9 @@ await E.step('E2E-DLV-08', 'S39: ناموفق ⇐ تلاشِ دوباره ⇐ ن
   E.ok(await A.api('POST', `/shop/orders/${o.id}/transition`, { to: 'restocked', from: 'returned_to_store' }), 'بازگشت به قفسه');
   row = await order(o.id);
   assert.equal(row.status, 'restocked');
-  const after = E.ok(await A.api('GET', `/shop/catalog/products/${rice}`), 'کاتالوگ').product.stock;
-  assert.deepEqual(after, before, 'پس از برگشت به قفسه، موجودی و رزرو باید همان پیش از سفارش باشند');
+  assert.deepEqual(await shelf(), before, 'پس از برگشت به قفسه، موجودی همان پیش از سفارش است');
+  //  سفارشِ برگشته دیگر «بیرون» نیست ⇒ فروشی هم لازم ندارد
+  assert.deepEqual(E.ok(await A.api('GET', '/shop/orders/handover?since=0'), 'تحویل‌ها').items, []);
   const cs = E.ok(await A.api('GET', '/shop/delivery/couriers'), 'پیک‌ها').items.find((c) => c.id === courierId);
   assert.equal(cs.cashHeldMinor, 0);
   const t = E.ok(await cust.track(o.token), 'پیگیری').order;

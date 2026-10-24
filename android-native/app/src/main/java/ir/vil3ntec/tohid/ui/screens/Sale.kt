@@ -83,6 +83,8 @@ fun SaleScreen(
   //  PRM: تخفیف‌های خودکار — کلیدِ دکان خاموش ⇒ null و `priced` همان `cart` است
   val promo = ir.vil3ntec.tohid.ui.PromoLive.rememberOutcome(d, cart)
   val priced = ir.vil3ntec.tohid.data.PromoEngine.priced(cart, promo)
+  //  POS-12: همان سبدی که `priced` از آن ساخته شد — ثبت با سبدِ عوض‌شده نه
+  val pricedFrom = cart
 
   // کالای حذف‌شده نباید در سبد بماند
   LaunchedEffect(d.products.size, d.debtors.size) { cartStore.prune(d) }
@@ -141,6 +143,23 @@ fun SaleScreen(
   var editLine by remember { mutableStateOf<String?>(null) }
   var freeLine by rememberSaveable { mutableStateOf(false) }
 
+  //  POS-12: چند فاکتورِ هم‌زمان (تنظیمِ «چند فاکتورِ هم‌زمان»، پیش‌فرض خاموش). تخفیف و
+  //  پرداختِ گوشی در پنجرهٔ پرداخت است؛ آنچه با فاکتور آمد (مثلاً از کامپیوتر) فقط
+  //  برای همان فاکتور می‌ماند — با نگه‌داشتنِ دوباره گم نمی‌شود و تخفیفِ پنجره از آن پر می‌شود
+  var keptExtras by remember { mutableStateOf<Pair<String, ir.vil3ntec.tohid.data.HeldExtras>?>(null) }
+  fun extrasNow() = keptExtras?.takeIf { it.first == cartStore.snapshot().key }?.second ?: ir.vil3ntec.tohid.data.HeldExtras()
+  val dataLoaded by store.loaded.collectAsState()
+  val held = ir.vil3ntec.tohid.ui.components.pos.rememberHeldInvoices(
+    cartStore, d, snackbar, dataLoaded,
+    extras = { extrasNow() },
+    onSwitched = { x ->
+      keptExtras = cartStore.snapshot().key?.let { it to x }
+      selectedId = null; multiplier = 1
+      //  پنجرهٔ پرداخت مالِ فاکتورِ قبلی بود
+      checkout = false
+    },
+  )
+
   val gate = remember { ScanGate() }
   val index = remember(d.products) { ShopStore.barcodeIndex(d) }
 
@@ -183,7 +202,8 @@ fun SaleScreen(
       is ir.vil3ntec.tohid.data.ScaleLabels.Match.Rejected -> { ScanFeedback.unknown(context); toast(w.message); return }
       is ir.vil3ntec.tohid.data.ScaleLabels.Match.Weighed -> {
         val added = SalesEngine.addToCartCapped(cartStore.lines.value, w.product.id, w.quantity, ShopStore.stock(d, w.product.id))
-        cartStore.set(added.cart)
+        //  POS-12: وسطِ جابه‌جاییِ فاکتور سبد قفل است ⇒ اضافه نشد
+        if (!cartStore.set(added.cart)) { ScanFeedback.unknown(context); toast(CartStore.NOT_ADDED); return }
         selectedId = w.product.id
         if (added.capped) { ScanFeedback.unknown(context); toast("${w.product.name} فقط ${qty(added.available)} ${w.product.unit} موجود است") }
         else { ScanFeedback.ok(context); toast("${w.product.name} — ${qty(w.quantity)} ${w.product.unit} به سبد اضافه شد") }
@@ -230,7 +250,8 @@ fun SaleScreen(
     val added = SalesEngine.addToCartCapped(
       cartStore.lines.value, productId, multiplier.toDouble(), ShopStore.stock(d, productId),
     )
-    cartStore.set(added.cart)
+    //  POS-12: وسطِ جابه‌جاییِ فاکتور سبد قفل است ⇒ اضافه نشد
+    if (!cartStore.set(added.cart)) { ScanFeedback.unknown(context); toast(CartStore.NOT_ADDED); return }
     selectedId = productId
     if (added.capped) {
       ScanFeedback.unknown(context)
@@ -422,6 +443,7 @@ fun SaleScreen(
       }
 
       /* ---------------------------- سبد ---------------------------- */
+      item { ir.vil3ntec.tohid.ui.components.pos.HeldInvoiceBar(held, Modifier.padding(bottom = 8.dp)) }
       item {
         Row(
           Modifier.fillMaxWidth(),
@@ -601,6 +623,7 @@ fun SaleScreen(
       cart = priced,
       promo = promo,
       presetDebtorId = cartDebtorId,
+      presetDiscount = extrasNow().discount,
       onDismiss = { checkout = false },
       busy = cartStore.posting.collectAsState().value,
       //  برگهٔ تأییدِ تخفیف (S08) به شناسهٔ همین فاکتور بسته است
@@ -609,6 +632,10 @@ fun SaleScreen(
         //  دو ضربهٔ پشتِ سرِ هم پیش از بسته شدنِ پنجره: دومی همان سبدِ قبلی
         //  را دوباره ثبت می‌کرد. `checkout` همان لحظه خوانده می‌شود.
         if (!checkout) return@CheckoutDialog
+        //  POS-12: سبد همین حالا با جابه‌جایی عوض شد ⇒ ردیف‌های قبلی با کلیدِ فاکتورِ دیگر ثبت نشوند
+        if (!ir.vil3ntec.tohid.data.HeldRules.shownIsCurrent(pricedFrom, cartStore.lines.value)) {
+          toast("سبد همین حالا عوض شد — دوباره بزنید"); return@CheckoutDialog
+        }
         //  POS-14: یک ثبت در هر لحظه با کلیدِ فاکتور؛ سبد فقط پس از نوشتنِ دفتر پاک می‌شود
         //  S2: با تخفیفِ خودکار، نشانِ قیمتِ فهرست و سهمِ هر قاعده روی فاکتور (خاموش ⇒ همان)
         scope.launch { when (val posted = cartStore.post(store) { key -> ir.vil3ntec.tohid.data.PromoEngine.stamp(
