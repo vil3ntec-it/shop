@@ -82,6 +82,7 @@ jobs:
           S="$S;go:products;wait:1500;shot:06-products-table"
           S="$S;prodsel:3;wait:800;shot:06b-products-bulk-bar;prodview:card;wait:1200;shot:06c-products-cards;prodsel:0;prodview:table;wait:800"
           S="$S;go:sales;wait:1500;shot:07-sales-history-cash-shift"
+          S="$S;ret:first;wait:1500;shot:07b-return-form;ret:none;wait:1500;shot:07c-return-no-receipt;ret:close;wait:800"
           S="$S;go:purchasing;wait:1500;shot:08-purchasing;new:;wait:1200;shot:08b-purchase-invoice-new;key:ESCAPE;wait:800"
           S="$S;go:reports;wait:1500;shot:09-reports"
           S="$S;move:700,500;scroll:8;shot:10-reports-lower"

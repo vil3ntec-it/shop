@@ -57,6 +57,8 @@ object DevShot {
               //  پروندهٔ مشتری: cust:first · زبانه‌اش: custtab:0|1|2
               "cust" -> { java.awt.EventQueue.invokeAndWait { ir.vil3ntec.tohid.ui.screens.DeskCustomersShot.open.value = arg }; Thread.sleep(1200) }
               "custtab" -> { java.awt.EventQueue.invokeAndWait { ir.vil3ntec.tohid.ui.screens.DeskCustomersShot.tab.value = arg.toInt() }; Thread.sleep(1000) }
+              //  برگشت و تعویض (RET): ret:first (فرمِ تازه‌ترین فاکتور) · ret:none (بی رسید) · ret:close
+              "ret" -> { java.awt.EventQueue.invokeAndWait { ir.vil3ntec.tohid.ui.screens.ReturnsShot.open.value = arg }; Thread.sleep(1200) }
               //  نمای کالای صندوق: posview:card|table — همان کلیدِ «کارتی/جدولی» (`PosShot`)
               "posview" -> {
                 java.awt.EventQueue.invokeAndWait {
