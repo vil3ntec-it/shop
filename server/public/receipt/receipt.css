@@ -1,0 +1,40 @@
+/*
+ * فاکتورِ عمومی (QRِ هر فاکتور) — همان ترتیبِ فاکتورِ کاغذی، روی توکن‌های `/kit/kit.css`.
+ * CSP: بی style ِ درون‌خطی و بی منبعِ بیرونی؛ هیچ رنگ یا گوشه‌ای این‌جا ثابت نوشته نمی‌شود.
+ */
+.receipt-page {
+  min-height: 100vh; display: flex; justify-content: center; align-items: flex-start;
+  padding: var(--s6) var(--s4) calc(var(--s8) + env(safe-area-inset-bottom));
+}
+
+.slip {
+  width: 100%; max-width: 420px; background: var(--surface); color: var(--text);
+  border-radius: var(--r-card); box-shadow: var(--shadow-1); padding: var(--s6) var(--s5);
+}
+.slip-state { display: grid; gap: var(--s3); justify-items: center; text-align: center; }
+
+.slip-head { display: grid; gap: var(--s1); justify-items: center; text-align: center; padding-bottom: var(--s4); }
+.slip-logo { max-width: 60%; max-height: 96px; object-fit: contain; margin-bottom: var(--s2); }
+
+.slip-banner {
+  margin: var(--s2) 0; padding: var(--s2) var(--s3); border-radius: var(--r-ctl);
+  background: var(--danger-tint); color: var(--danger); font-weight: 700; text-align: center;
+}
+
+.slip-rows, .slip-items, .slip-count {
+  margin: 0; padding: var(--s3) 0; border-top: 1px dashed var(--field-line);
+}
+.slip-rows:empty { display: none; }
+.slip-row { display: flex; justify-content: space-between; gap: var(--s3); }
+.slip-row dt { color: var(--muted); }
+.slip-row dd { margin: 0; font-feature-settings: 'tnum'; text-align: start; }
+.slip-row.is-total { font-size: 18px; font-weight: 700; padding-top: var(--s2); }
+.slip-row.is-total dt { color: var(--text); }
+
+.slip-items { list-style: none; display: grid; gap: var(--s3); }
+.slip-item-name { font-weight: 700; overflow-wrap: anywhere; }
+.slip-item-line { display: flex; justify-content: space-between; gap: var(--s3); color: var(--muted); font-feature-settings: 'tnum'; }
+.slip-item-total { color: var(--text); }
+.slip-item-returned { color: var(--warning); font-size: 13px; }
+
+.slip-footer { border-top: 1px dashed var(--field-line); padding-top: var(--s4); text-align: center; overflow-wrap: anywhere; }
