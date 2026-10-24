@@ -47,11 +47,19 @@ class StorefrontRepository(private val api: ApiClient) {
     ApiJson.decode<StorefrontProductPageDto>(api.get("$ROOT/products$q"))
   }
 
-  suspend fun setProduct(id: String, published: Boolean, onlinePriceMinor: Long?, maxQtyMilli: Long?): ApiResult<Unit> = result {
+  /** `description`/`specs` ِ null ⇒ نفرستاده ⇒ سرور همان قبلی را نگه می‌دارد */
+  suspend fun setProduct(
+    id: String, published: Boolean, onlinePriceMinor: Long?, maxQtyMilli: Long?,
+    description: String? = null, specs: List<Pair<String, String>>? = null,
+  ): ApiResult<Unit> = result {
     val body = buildJsonObject {
       put("published", published)
       put("onlinePriceMinor", onlinePriceMinor?.let { JsonPrimitive(it) } ?: JsonNull)
       put("maxQtyMilli", maxQtyMilli?.let { JsonPrimitive(it) } ?: JsonNull)
+      description?.let { put("description", it) }
+      specs?.let { list ->
+        put("specs", JsonArray(list.map { buildJsonObject { put("name", it.first); put("value", it.second) } }))
+      }
     }
     api.put("$ROOT/products/" + java.net.URLEncoder.encode(id, "UTF-8").replace("+", "%20"), body)
     Unit
@@ -78,6 +86,8 @@ data class StorefrontConfigDto(
   val enabled: Boolean = false,
   val settings: StorefrontSettingsDto? = null,
   val permissions: StorefrontPermsDto = StorefrontPermsDto(),
+  /** پرچمِ جدای ناحیه و زمان‌بندی (`shop.storefront.zones`)؛ سرورِ قدیمی نمی‌فرستد ⇒ خاموش */
+  val zones: Boolean = false,
 )
 
 @Serializable
@@ -145,7 +155,13 @@ data class StorefrontProductDto(
   val published: Boolean = false,
   val onlinePriceMinor: Long? = null,
   val active: Boolean = true,
+  /** WEB-08: توضیح و مشخصاتِ عمومی (سرورِ قدیمی‌تر نمی‌فرستد ⇒ خالی) */
+  val description: String = "",
+  val specs: List<StorefrontSpecDto> = emptyList(),
 )
+
+@Serializable
+data class StorefrontSpecDto(val name: String = "", val value: String = "")
 
 @Serializable
 data class StorefrontProductPageDto(

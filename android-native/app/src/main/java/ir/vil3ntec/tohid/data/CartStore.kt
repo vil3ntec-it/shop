@@ -35,6 +35,11 @@ class CartStore(context: Context) : HeldCart {
 
   private val prefs = context.getSharedPreferences("tohid", Context.MODE_PRIVATE)
   private val file = File(context.filesDir, FILE)
+  /** برای چاپ و کشوی پس از فروش (HW-02/03) — هر دو پیش‌فرض خاموش */
+  private val app: Context = context.applicationContext ?: context
+
+  //  رسیدهایی که پیش از بسته شدنِ برنامه در صفِ چاپ ماندند، به ترتیب ادامه پیدا کنند
+  init { runCatching { ir.vil3ntec.tohid.print.PrintSpooler.start(app) } }
 
   private val initial: SaleDraft? = load()
 
@@ -104,7 +109,12 @@ class CartStore(context: Context) : HeldCart {
   suspend fun post(store: ShopStore, record: (key: String) -> SalesEngine.Result): SalePost.Outcome {
     //  ضربه‌ای که پس از پایانِ ثبتِ قبلی رسید سبدِ کهنهٔ صفحه را در دست دارد، نه سبدِ تازه را
     if (_lines.value.isEmpty()) return SalePost.Outcome.Busy
-    return poster.run(saleKey(), record, { store.save(it) }) { done -> if (key == done) clear() }
+    val out = poster.run(saleKey(), record, { store.save(it) }) { done -> if (key == done) clear() }
+    //  فروش ثبت شده و روی دیسک است؛ چاپ پس از آن و جدا از آن (S16: چاپگرِ خاموش فروش را نگه نمی‌دارد)
+    if (out is SalePost.Outcome.Done) {
+      runCatching { ir.vil3ntec.tohid.print.PrintSpooler.afterSale(app, out.ok.data, out.ok.saleId) }
+    }
+    return out
   }
 
   /** پاسخِ پرسشِ بازیابی: `keep` = ادامه با همین ردیف‌ها؛ `null` = دور انداختن */

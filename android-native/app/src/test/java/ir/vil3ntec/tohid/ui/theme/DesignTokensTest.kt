@@ -10,12 +10,13 @@ import org.junit.Test
 import java.io.File
 
 /**
- *  توکن‌های طراحی — MASTER-SPEC ۵.۴.
+ *  توکن‌های طراحی — MASTER-SPEC ۵.۴ و سیستمِ رنگِ VILL3N (§۱۱).
  *
- *  ۱. آزمونِ مرجع: گِردیِ همهٔ نقش‌ها (`Shape`، `Radius`، `ShopShapes`) همان عددِ پیش از
- *     یکی شدن در `Corner` است. پس یکی کردن ظاهر را عوض نکرده است. عدد فقط با تصمیمِ ظاهری
- *     این‌جا عوض می‌شود.
- *  ۲. کامپیوتر: گوشه‌ها ۴ تا ۱۲ (RULES «ظاهرِ کامپیوتری»). فاصله‌ها روی پلهٔ ۴ (۵.۴).
+ *  ۱. گِردیِ همهٔ نقش‌ها (`Shape`، `Radius`، `ShopShapes`) همان جدولِ VILL3N است:
+ *     دکمه و کادر ۱۰، کارت ۱۲، کارتِ ویژه/پنجره ۱۶، تراشه قرصی. عدد فقط با تصمیمِ
+ *     ظاهری این‌جا عوض می‌شود (نسخهٔ ۲: ۱۲/۱۶/۲۰؛ نسخهٔ ۱: کامپیوتر ۶/۸/۱۰، لمسی ۱۸/۲۰/۲۸).
+ *  ۲. یک پلهٔ گِردی برای همهٔ سکوها (کامپیوتر = لمسی = وب)، ۸ تا ۲۰ و روی پلهٔ ۲.
+ *     فاصله‌ها روی پلهٔ ۴ (شبکهٔ ۸ با نیم‌پلهٔ ۴).
  *  ۳. تایپوگرافیِ وزیرمتن با آزمونِ پشتو (۵.۴): همهٔ وزن‌های برنامه و وب حرف‌های ویژهٔ پشتو،
  *     رقم‌های فارسی و عربی و نیم‌فاصله را دارند.
  *
@@ -28,39 +29,49 @@ class DesignTokensTest {
   private fun round(desk: Int, touch: Int) = RoundedCornerShape(pick(desk, touch))
 
   @Test
-  fun `گِردیِ نقش‌ها همان عددهای پیشین است`() {
-    assertEquals(round(6, 18), Shape.button)
-    assertEquals(round(6, 16), Shape.field)
-    assertEquals(round(8, 20), Shape.card)
-    assertEquals(round(10, 24), Shape.cardLarge)
-    assertEquals(round(10, 28), Shape.dialog)
-    assertEquals(RoundedCornerShape(topStart = pick(10, 28), topEnd = pick(10, 28)), Shape.sheet)
+  fun `گِردیِ نقش‌ها همان جدولِ VILL3N است — دکمه و کادر ۱۰، کارت ۱۲، کارتِ ویژه ۱۶، تراشه قرصی`() {
+    assertEquals(round(10, 10), Shape.button)
+    assertEquals(round(10, 10), Shape.field)
+    assertEquals(round(12, 12), Shape.card)
+    assertEquals(round(16, 16), Shape.cardLarge)
+    assertEquals(round(16, 16), Shape.dialog)
+    assertEquals(RoundedCornerShape(topStart = pick(16, 16), topEnd = pick(16, 16)), Shape.sheet)
     assertEquals(RoundedCornerShape(999.dp), Shape.chip)
     assertEquals(RoundedCornerShape(999.dp), Shape.badge)
-    assertEquals(round(6, 12), Shape.icon)
+    assertEquals(round(10, 10), Shape.icon)
 
-    assertEquals(pick(6, 16), Radius.sm)
-    assertEquals(pick(8, 20), Radius.md)
-    assertEquals(pick(12, 28), Radius.lg)
+    assertEquals(pick(10, 10), Radius.sm)
+    assertEquals(pick(12, 12), Radius.md)
+    assertEquals(pick(16, 16), Radius.lg)
 
-    assertEquals(round(4, 12), ShopShapes.extraSmall)
-    assertEquals(round(6, 16), ShopShapes.small)
-    assertEquals(round(8, 18), ShopShapes.medium)
-    assertEquals(round(10, 20), ShopShapes.large)
-    assertEquals(round(12, 28), ShopShapes.extraLarge)
+    //  کادرِ متن و منوی متریال از extraSmall ⇒ کنترل؛ کارت از medium؛ پنجره از extraLarge
+    assertEquals(round(10, 10), ShopShapes.extraSmall)
+    //  تراشه‌های متریال از small ⇒ قرصیِ کامل («chips/pills full»)
+    assertEquals(RoundedCornerShape(999.dp), ShopShapes.small)
+    assertEquals(round(12, 12), ShopShapes.medium)
+    assertEquals(round(12, 12), ShopShapes.large)
+    assertEquals(round(16, 16), ShopShapes.extraLarge)
+
+    assertEquals(10.dp, Corner.CONTROL)
+    assertEquals(12.dp, Corner.CARD)
+    assertEquals(16.dp, Corner.PANEL)
   }
 
   @Test
   fun `فاصله و سایه همان عددهای پیشین‌اند`() {
     assertEquals(listOf(4, 8, 12, 16, 20, 24, 32).map { it.dp }, listOf(Space.xxs, Space.xs, Space.sm, Space.md, Space.lg, Space.xl, Space.xxl))
     assertEquals(listOf(0, 1, 6, 10).map { it.dp }, listOf(Elevation.flat, Elevation.raised, Elevation.floating, Elevation.overlay))
+    //  VILL3N §۱۱: سایهٔ سبکِ کارت (0 3px 12px) و کارتِ ویژه/شناور (0 8px 24px) — کارت پایین‌تر
+    assertEquals(listOf(3, 8).map { it.dp }, listOf(Elevation.card, Elevation.lifted))
   }
 
   @Test
-  fun `همهٔ گِردی‌ها از جدولِ Corner می‌آیند`() {
+  fun `همهٔ گِردی‌ها از جدولِ Corner می‌آیند — یک پله برای همهٔ سکوها`() {
     for (c in Corner.ALL) {
-      assertTrue("${c.name}: گوشهٔ کامپیوتر ${c.desk} بیرون از ۴ تا ۱۲", c.desk in 4.dp..12.dp)
-      assertTrue("${c.name}: گوشهٔ لمسی ${c.touch} بیرون از ۱۲ تا ۲۸", c.touch in 12.dp..28.dp)
+      assertTrue("${c.name}: گوشهٔ کامپیوتر ${c.desk} بیرون از ۸ تا ۲۰", c.desk in 8.dp..20.dp)
+      assertTrue("${c.name}: گوشهٔ لمسی ${c.touch} بیرون از ۸ تا ۲۰", c.touch in 8.dp..20.dp)
+      //  نسخهٔ ۲: کامپیوتر، گوشی و وب یک عدد دارند (نسخهٔ ۱ دو ستونِ جدا داشت)
+      assertEquals("${c.name}: کامپیوتر و لمسی یکی", c.desk, c.touch)
       assertEquals("${c.name}: روی پلهٔ ۲", 0f, c.desk.value % 2f + c.touch.value % 2f)
       assertEquals(if (desk) c.desk else c.touch, c.current)
     }
