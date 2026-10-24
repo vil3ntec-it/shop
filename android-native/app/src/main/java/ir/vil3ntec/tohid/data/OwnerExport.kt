@@ -159,6 +159,7 @@ object OwnerExport {
     "syncStatus" to "وضعیت همگام‌سازی",
     "cancelReason" to "دلیل لغو",
     "seller" to "فروشنده",
+    "approval" to "تأییدِ مدیر",
     "payments" to "ردیف‌های پرداخت",
     "tenderedMinor" to "دریافتی (پول)",
     "changeMinor" to "پول پس (پول)",

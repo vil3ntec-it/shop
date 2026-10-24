@@ -158,6 +158,15 @@ data class Sale(
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val series: String? = null,
   /**
+   *  «برگهٔ امضاشده»ی تأییدِ تخفیفِ بیش از سقف (STF-02، بخشِ ۱۰.۱؛
+   *  `core/perm/ApprovalSlip`). سرور با آن تخفیف را می‌پذیرد و سابقه نامِ
+   *  تأییدکننده و دلیل را دارد. فقط وقتی هست که تأیید لازم بوده؛ `null`
+   *  نوشته نمی‌شود (همان دلیلِ `series`).
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val approval: kotlinx.serialization.json.JsonObject? = null,
+  /**
    *  PAY (v3 A4) — ردیف‌های پرداختِ ترکیبی (نقد، کیف پول، کارت، حواله، به حساب)، به پول.
    *  فقط فروشی که با پرچمِ `ShopPolicy.payV2` ثبت شده دارد؛ معنای فیلدهای بالا
    *  (`paidAmount`، `remaining`، `debtGiven`) همان امروز است، پس برنامهٔ کهنه همان عدد

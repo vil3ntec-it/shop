@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.data.BarcodeMatch
 import ir.vil3ntec.tohid.data.CartQuery
 import ir.vil3ntec.tohid.data.CartStore
+import ir.vil3ntec.tohid.data.DiscountGate
 import ir.vil3ntec.tohid.data.SalePost
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.SalesEngine
@@ -139,7 +140,8 @@ fun DeskSaleScreen(
   val showPhotos = PhotoPrefs.show.value
   val posting by cartStore.posting.collectAsState()
 
-  val canDiscount = remember { ir.vil3ntec.tohid.data.ShopRole.canDiscount(context) }
+  //  «نیازمند تأیید» هم کادرِ تخفیف را نشان می‌دهد؛ فقط «ممنوع» پنهانش می‌کند (STF-02)
+  val canDiscount = remember { ir.vil3ntec.tohid.data.ShopRole.mayDiscount(context) }
   val blockExpired = remember { ir.vil3ntec.tohid.data.ShopPolicy.blockExpired(context) }
   //  PAY (v3 A4): پرداختِ ترکیبی — فقط با پرچم؛ F9 پنلِ پرداخت را باز می‌کند، F12 نقدِ دقیق
   val payV2 = remember { ir.vil3ntec.tohid.data.ShopPolicy.payV2(context) }
@@ -277,11 +279,23 @@ fun DeskSaleScreen(
   val discountBad = canDiscount && numberInvalid(discountText)
   val paidBad = payment == SalesEngine.Payment.CREDIT && numberInvalid(paidText)
 
+  //  S08: تخفیفِ بیش از سقف ⇒ «درخواستِ تأیید» با PINِ مدیر — همان تصمیمِ سرور
+  var approval by remember { mutableStateOf<ir.vil3ntec.tohid.core.perm.ApprovalSlip.Slip?>(null) }
+  var askApproval by remember { mutableStateOf(false) }
+  val saleKey = remember(cart) { if (cart.isEmpty()) null else cartStore.saleKey() }
+  val discountDecision = ir.vil3ntec.tohid.data.ShopRole.decide(
+    context, "sales.discount", DiscountGate.req(totals.discount, totals.subtotal),
+  )
+  val gate = DiscountGate.state(discountDecision.decision, saleKey, totals.discount, totals.subtotal, approval)
+
   /** `settled` = تسویهٔ پنلِ پرداخت (با پرچم)؛ با پرچم و بی آن (F12، Ctrl+Enter) ⇒ نقدِ دقیق */
   fun finish(settled: ir.vil3ntec.tohid.core.pay.Settlement? = null) {
     if (cart.isEmpty()) { toast("سبد خالی است"); return }
     if (discountBad || (!payV2 && paidBad)) { toast("عددِ «${if (discountBad) "تخفیف" else "دریافتی"}» درست نیست"); return }
     if (!payV2 && payment == SalesEngine.Payment.CREDIT && cartDebtorId == null) { toast("فروشِ نسیه مشتری می‌خواهد — F2"); pickDebtor = true; return }
+    if (gate == DiscountGate.State.DENIED) { toast("این تخفیف برای شما ممنوع است"); return }
+    if (gate == DiscountGate.State.NEEDS_APPROVAL) { askApproval = true; return }
+    val signed = if (gate == DiscountGate.State.APPROVED) approval?.let(DiscountGate::json) else null
     val st = if (!payV2) null else settled ?: when (
       val r = ir.vil3ntec.tohid.data.PayFlow.checkout(
         ir.vil3ntec.tohid.data.PayFlow.Draft(totals.finalTotal, cash = totals.finalTotal.toBigDecimal().stripTrailingZeros().toPlainString(), customerId = cartDebtorId),
@@ -290,7 +304,7 @@ fun DeskSaleScreen(
       is ir.vil3ntec.tohid.data.PayFlow.Outcome.Ok -> r.value
       is ir.vil3ntec.tohid.data.PayFlow.Outcome.Bad -> { toast(ir.vil3ntec.tohid.data.PayFlow.message(r.problem)); return }
     }
-    val sale = checkout.copy(settlement = st)
+    val sale = checkout.copy(settlement = st, approval = signed)
     //  POS-14: F9ِ پشتِ‌سرِهم یک فروش می‌سازد؛ سبد فقط پس از نوشتنِ دفتر پاک می‌شود
     scope.launch { when (val posted = cartStore.post(store) { key ->
       SalesEngine.record(d, priced, sale, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId,
@@ -301,7 +315,7 @@ fun DeskSaleScreen(
       is SalePost.Outcome.Done -> {
         val r = posted.ok
         ir.vil3ntec.tohid.hw.CustomerFacing.sold(r.data.sales.last().finalTotal)
-        selected = null; discountText = ""; paidText = ""; payment = SalesEngine.Payment.CASH
+        selected = null; discountText = ""; paidText = ""; payment = SalesEngine.Payment.CASH; approval = null
         payOpen = false
         lastInvoice = r.data to r.saleId
         val change = st?.change ?: 0L
@@ -491,6 +505,28 @@ fun DeskSaleScreen(
         PaymentSummary(PromoSummary.rows(totals, promo), totals.finalTotal) {
           if (canDiscount) {
             MiniNumberField("تخفیف", discountText, { discountText = numericInput(it) }, discountBad, "٪")
+            //  S08: تخفیفِ بیش از سقف ⇒ «درخواستِ تأیید» با PINِ مدیر — همان تصمیمِ سرور
+            when (gate) {
+              DiscountGate.State.NEEDS_APPROVAL -> Row(
+                Modifier.fillMaxWidth().padding(top = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+              ) {
+                ir.vil3ntec.tohid.ui.components.common.StatusPill(
+                  "نیازمند تأیید", ir.vil3ntec.tohid.ui.components.common.PillTone.WARNING,
+                )
+                Spacer(Modifier.weight(1f))
+                OutlinedButton(onClick = { askApproval = true }, enabled = !posting) { Text("درخواستِ تأیید (F9)") }
+              }
+              DiscountGate.State.APPROVED -> ir.vil3ntec.tohid.ui.components.common.StatusPill(
+                "تأیید شد", ir.vil3ntec.tohid.ui.components.common.PillTone.SUCCESS, Modifier.padding(top = 6.dp),
+              )
+              DiscountGate.State.DENIED -> ir.vil3ntec.tohid.ui.components.common.StatusPill(
+                "این تخفیف برای شما ممنوع است", ir.vil3ntec.tohid.ui.components.common.PillTone.DANGER,
+                Modifier.padding(top = 6.dp),
+              )
+              DiscountGate.State.FREE -> Unit
+            }
           }
         }
       },
@@ -615,6 +651,18 @@ fun DeskSaleScreen(
         },
       )
     }
+  }
+  if (askApproval && saleKey != null) {
+    ir.vil3ntec.tohid.ui.components.staff.ApprovalDialog(
+      title = "تأییدِ تخفیف",
+      summary = "تخفیفِ ${money(totals.discount)} ؋ روی فاکتورِ ${money(totals.subtotal)} ؋" +
+        if (discountDecision.cap == "maxPct") " — سقفِ صندوقدار ${qty(discountDecision.limit ?: 0.0)}٪" else "",
+      shopId = ir.vil3ntec.tohid.data.ShopRole.shopId(context),
+      requesterUserId = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountId }.getOrDefault("") },
+      need = DiscountGate.need(saleKey, totals.discount, totals.subtotal),
+      onApproved = { approval = it; askApproval = false; refocus() },
+      onDismiss = { askApproval = false; refocus() },
+    )
   }
   if (payOpen) {
     PayPanelDialog(

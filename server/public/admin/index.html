@@ -93,6 +93,7 @@
     <button class="tab" data-tab="backups">پشتیبان‌ها</button>
     <button class="tab" data-tab="health">همگام‌سازی و امنیت</button>
     <button class="tab" data-tab="ops">عملیات</button>
+    <button class="tab" data-tab="imgbank">بانکِ تصاویر</button>
     <button class="tab" data-tab="audit">سابقه</button>
   </nav>
 
@@ -1179,6 +1180,77 @@
     </div>
   </section>
 
+  <section id="tab-imgbank" class="hidden">
+    <!-- ماژولِ image-bank.js — ورودِ گروهی و گزارش (IMG-01، IMG-03، IMG-BANK-01، IMG-PRO-09) -->
+    <div class="panel hidden" id="ib-off">
+      <h2>بانکِ تصاویر</h2>
+      <div class="msg msg-warn">بانکِ مرکزیِ تصاویر روشن نیست (پرچمِ <code>image_bank.central</code>). تا روشن نشود هیچ ورودی پذیرفته نمی‌شود.</div>
+    </div>
+    <div class="hidden" id="ib-on">
+      <div class="panel">
+        <h2>ورودِ گروهی: پوشه + CSV</h2>
+        <div id="ib-msg"></div>
+        <div class="grid grid-3">
+          <div><label for="ib-lic-source">منبعِ مجوز</label><input type="text" id="ib-lic-source" placeholder="مثلاً کاتالوگِ تأمین‌کننده"></div>
+          <div><label for="ib-lic-status">وضعیتِ مجوز</label>
+            <select id="ib-lic-status"><option value="unknown">نامعلوم</option><option value="licensed">مجوزدار</option><option value="restricted">محدود</option><option value="denied">ممنوع</option></select></div>
+          <div><label for="ib-note">یادداشت</label><input type="text" id="ib-note"></div>
+        </div>
+        <div class="row" style="margin-top:10px;">
+          <label style="margin:0;"><input type="checkbox" id="ib-lic-commercial"> استفادهٔ تجاری مجاز است</label>
+          <button class="btn btn-sm" id="btn-ib-new">دستهٔ تازه</button>
+        </div>
+        <div class="table-scroll" style="margin-top:12px;">
+          <table>
+            <thead><tr><th>ساخت</th><th>مجوز</th><th>وضعیت</th><th>فایل</th><th>ردیف</th><th></th></tr></thead>
+            <tbody id="ib-batches"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="panel hidden" id="ib-work">
+        <div class="panel-head">
+          <h2>دستهٔ <span id="ib-batch-id"></span> — <span id="ib-batch-status"></span></h2>
+          <div class="row">
+            <button class="btn btn-sm btn-warn" id="btn-ib-pause">توقف</button>
+            <button class="btn btn-sm" id="btn-ib-resume">ادامه</button>
+            <button class="btn btn-sm btn-danger" id="btn-ib-cancel">لغو</button>
+          </div>
+        </div>
+        <div class="grid grid-2">
+          <div><label for="ib-folder">پوشهٔ عکس‌ها</label><input type="file" id="ib-folder" webkitdirectory multiple></div>
+          <div><label for="ib-files">یا چند فایل</label><input type="file" id="ib-files" multiple accept="image/*"></div>
+        </div>
+        <div class="row" style="margin-top:10px;">
+          <button class="btn btn-sm" id="btn-ib-upload">بارگذاریِ فایل‌ها</button>
+          <span class="muted" id="ib-progress"></span>
+        </div>
+        <div class="row" style="margin-top:14px;">
+          <div><label for="ib-csv">فایلِ CSV (sku,barcode,name,brand,size,unit,image_path,…)</label><input type="file" id="ib-csv" accept=".csv,text/csv"></div>
+          <span class="muted" id="ib-csv-info"></span>
+          <button class="btn btn-sm btn-ghost" id="btn-ib-dry">پیش‌نمایش</button>
+          <button class="btn btn-sm" id="btn-ib-run">ثبت</button>
+        </div>
+        <div class="row" style="margin-top:8px;"><span class="muted" id="ib-preview-label"></span><span class="row" id="ib-preview"></span></div>
+        <h2 style="margin-top:16px;">گزارشِ دسته</h2>
+        <div class="row"><span class="row" id="ib-rep-counts"></span><button class="btn btn-sm btn-ghost" id="btn-ib-csv-out">دانلودِ گزارشِ خطا (CSV)</button></div>
+        <h2 style="margin-top:14px;">فایل‌های خراب <span class="muted" id="ib-rep-files-count"></span></h2>
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>فایل</th><th>دلیل</th><th>کد</th></tr></thead>
+            <tbody id="ib-rep-files"></tbody>
+          </table>
+        </div>
+        <h2 style="margin-top:14px;">ردیف‌های ناموفق، مبهم یا نیازمندِ بررسی</h2>
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>ردیف</th><th>وضعیت</th><th>دلیل</th><th>کد</th></tr></thead>
+            <tbody id="ib-rep-rows"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <section id="tab-audit" class="hidden">
     <div class="panel">
       <h2>سابقه عملیات</h2>
@@ -1194,5 +1266,6 @@
 
 <script src="app.js"></script>
 <script src="ops.js"></script>
+<script src="image-bank.js"></script>
 </body>
 </html>

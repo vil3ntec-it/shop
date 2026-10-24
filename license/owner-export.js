@@ -118,6 +118,7 @@
     syncStatus: 'وضعیت همگام‌سازی',
     cancelReason: 'دلیل لغو',
     seller: 'فروشنده',
+    approval: 'تأییدِ مدیر',
     //  PAY (v3 A4): فقط فروش و صندوقِ پرچم‌دار
     payments: 'ردیف‌های پرداخت',
     tenderedMinor: 'دریافتی (پول)',

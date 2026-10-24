@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- نامِ نسخهٔ پیش‌نمایش (buildTypeِ preview) — جای app_nameِ src/main می‌نشیند -->
+<resources>
+  <string name="app_name">توحید · پیش‌نمایش</string>
+</resources>

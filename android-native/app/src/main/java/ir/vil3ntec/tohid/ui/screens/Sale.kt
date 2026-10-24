@@ -610,6 +610,8 @@ fun SaleScreen(
       presetDebtorId = cartDebtorId,
       onDismiss = { checkout = false },
       busy = cartStore.posting.collectAsState().value,
+      //  برگهٔ تأییدِ تخفیف (S08) به شناسهٔ همین فاکتور بسته است
+      saleKey = remember(cart) { cartStore.saleKey() },
       onConfirm = { options ->
         //  دو ضربهٔ پشتِ سرِ هم پیش از بسته شدنِ پنجره: دومی همان سبدِ قبلی
         //  را دوباره ثبت می‌کرد. `checkout` همان لحظه خوانده می‌شود.
