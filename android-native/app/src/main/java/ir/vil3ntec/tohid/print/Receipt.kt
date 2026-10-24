@@ -43,6 +43,8 @@ object Receipt {
     sale: Sale,
     storeName: String,
     width: Int,
+    /** HW-02: «چاپِ دوباره» زیرِ سربرگ — رسیدِ دوم با رسیدِ اول اشتباه نشود. `null` ⇒ مثلِ همیشه */
+    copyMark: String? = null,
   ): Bitmap {
     val regular = font(context, R.font.vazirmatn_regular)
     val bold = font(context, R.font.vazirmatn_bold)
@@ -60,11 +62,11 @@ object Receipt {
 
     // یک بار برای اندازه‌گیری، یک بار برای کشیدن — تا ارتفاعِ تصویر
     // دقیقاً اندازهٔ محتوا باشد و کاغذِ خالی هدر نرود
-    val height = draw(null, context, d, sale, debtor, items, storeName, width, pad, inner, title, head, body, small)
+    val height = draw(null, context, d, sale, debtor, items, storeName, width, pad, inner, title, head, body, small, copyMark)
     val bitmap = Bitmap.createBitmap(width, height.toInt().coerceAtLeast(1), Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
     canvas.drawColor(Color.WHITE)
-    draw(canvas, context, d, sale, debtor, items, storeName, width, pad, inner, title, head, body, small)
+    draw(canvas, context, d, sale, debtor, items, storeName, width, pad, inner, title, head, body, small, copyMark)
     return bitmap
   }
 
@@ -84,6 +86,7 @@ object Receipt {
     head: TextPaint,
     body: TextPaint,
     small: TextPaint,
+    copyMark: String? = null,
   ): Float {
     var y = pad
 
@@ -136,6 +139,7 @@ object Receipt {
     gap(0.3f)
     line(LocaleText.digitsIn("فاکتور فروش #${sale.invoiceLabel() ?: "—"}", digits), head, Layout.Alignment.ALIGN_CENTER)
     gap(0.3f)
+    if (copyMark != null) { line(copyMark, head, Layout.Alignment.ALIGN_CENTER); gap(0.3f) }
 
     val time = runCatching {
       SimpleDateFormat("HH:mm", Locale.US).format(Date(if (sale.createdAt > 0) sale.createdAt else System.currentTimeMillis()))
@@ -182,17 +186,17 @@ object Receipt {
 
   /* ------------------------------ ابزارها ------------------------------ */
 
-  private fun font(context: Context, id: Int): Typeface =
+  internal fun font(context: Context, id: Int): Typeface =
     runCatching { ResourcesCompat.getFont(context, id) }.getOrNull() ?: Typeface.DEFAULT
 
-  private fun paint(typeface: Typeface, size: Float) = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+  internal fun paint(typeface: Typeface, size: Float) = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
     this.typeface = typeface
     textSize = size
     color = Color.BLACK
   }
 
   @Suppress("DEPRECATION")
-  private fun layout(text: String, paint: TextPaint, width: Int, align: Layout.Alignment): StaticLayout {
+  internal fun layout(text: String, paint: TextPaint, width: Int, align: Layout.Alignment): StaticLayout {
     val w = width.coerceAtLeast(1)
     return if (android.os.Build.VERSION.SDK_INT >= 23) {
       StaticLayout.Builder.obtain(text, 0, text.length, paint, w)

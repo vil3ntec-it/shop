@@ -124,17 +124,38 @@ class ShopStore(private val context: Context) {
    *
    *  @return آیا به دیسک رسید
    */
-  private suspend fun writeInternal(next: ShopData): Boolean = withContext(Dispatchers.IO) {
-    //  نوشتن و op ساختن زیرِ همان قفلی که نشاندنِ opهای رسیده دارد
-    //  (`SyncV1Engine.absorbRemote`) — شرحش همان‌جا
+  private suspend fun writeInternal(next: ShopData): Boolean = withContext(Dispatchers.IO) { writer().save(next) }
+
+  /**
+   *  ردیفِ سابقه (`auditLog`) روی دفترِ **همان لحظه** — خواندن و نوشتن زیرِ
+   *  همان قفلِ `writeInternal`. برای هر نوشتنِ پس‌زمینه (کشوی بی فروش، چاپِ
+   *  دوبارهٔ صفِ چاپ): `save(store.data.value.copy(…))` در فاصلهٔ خواندن تا
+   *  گرفتنِ قفل فروشِ هم‌زمان را گم می‌کرد و opِ حذفش را به سرور می‌فرستاد.
+   *  فقط بخشِ «همیشه باز» را می‌نویسد، پس قفلِ نرم ردش نمی‌کند.
+   *
+   *  @return آیا به دیسک رسید؛ پیش از بارِ دفتر هرگز (دفترِ خالی روی دفترِ واقعی نمی‌نشیند)
+   */
+  suspend fun appendAudit(row: (ShopData) -> AuditEntry): Boolean = withContext(Dispatchers.IO) {
+    if (!_loaded.value) return@withContext false
+    writer().edit(LedgerWriter.appendAudit(row))
+  }
+
+  /**
+   *  نوشتن و op ساختن زیرِ همان قفلی که نشاندنِ opهای رسیده دارد
+   *  (`SyncV1Engine.absorbRemote`) — شرحش همان‌جا.
+   */
+  private fun writer(): LedgerWriter {
     val engine = SyncV1Engine.of(context)
-    synchronized(engine) {
+    return LedgerWriter(engine, { _data.value }) { next -> writeLocked(engine, next) }
+  }
+
+  private fun writeLocked(engine: SyncV1Engine, next: ShopData): Boolean {
     /*
      *  ⛔ دفتری که به دیسک نرسید op نمی‌سازد (F0-01). وگرنه opها به سرور
      *  می‌رفتند و سایه جلو می‌رفت، ولی پس از بستن و باز کردن دفترِ کهنه
      *  می‌ماند و تفاضلِ بعدی همان ردیف‌ها را «حذف‌شده» به سرور می‌فرستاد.
      */
-    if (!writeToDisk(next)) return@synchronized false
+    if (!writeToDisk(next)) return false
     /*
      *  ⛔ **تنها درِ نوشتن در دفتر همین‌جاست** و هر تغییری از همین‌جا رد
      *  می‌شود. پس دفترِ تغییرات (Sync v1) هم همین‌جا نوشته می‌شود:
@@ -152,8 +173,7 @@ class ShopStore(private val context: Context) {
       val made = engine.record(next)
       if (made > 0) SyncV1Worker.now(context)
     }
-    true
-    }
+    return true
   }
 
   /**
