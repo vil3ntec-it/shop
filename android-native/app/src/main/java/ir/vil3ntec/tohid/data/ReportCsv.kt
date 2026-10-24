@@ -104,7 +104,7 @@ object ReportCsv {
           s.date,
           round(s.total), round(s.discount), round(s.finalTotal),
           round(s.paidAmount), round(s.remaining),
-          if (s.paymentMethod == "credit") "نسیه" else "نقدی",
+          PayFlow.payLabel(s, cash = "نقدی"),
           if (s.status == "cancelled") "لغو‌شده" else "ثبت‌شده",
           s.cancelReason,
           s.seller,
@@ -224,6 +224,7 @@ object ReportCsv {
     "customer_return" -> "مرجوعی مشتری"
     "supplier_return" -> "برگشت به تأمین‌کننده"
     "adjustment" -> "اصلاح موجودی"
+    "damage" -> "ضایعات"
     else -> type
   }
 }

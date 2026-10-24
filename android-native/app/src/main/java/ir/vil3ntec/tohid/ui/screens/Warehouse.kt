@@ -76,6 +76,8 @@ fun WarehouseScreen(
   var confirmDelete by remember { mutableStateOf<Product?>(null) }
   var movementsFor by remember { mutableStateOf<Product?>(null) }
   var stockCount by remember { mutableStateOf(false) }
+  //  ورودِ گروهیِ عکس (v3 ۳۶.۸) — کارِ صاحب/مدیر
+  var imageBulk by remember { mutableStateOf(false) }
   //  ورودِ گروهی از CSV — پیش‌نمایش پیش از ثبت
   var importPlan by remember { mutableStateOf<ir.vil3ntec.tohid.data.ProductImport.Plan?>(null) }
   //  فیلترِ انقضا: null همه، "expired" منقضی، "near" نزدیک به انقضا
@@ -212,6 +214,14 @@ fun WarehouseScreen(
           Spacer(Modifier.width(6.dp))
           Text("ورود کالا از فایل اکسل (CSV)")
         }
+        if (ir.vil3ntec.tohid.data.ShopRole.current(context) != ir.vil3ntec.tohid.data.ShopRole.STAFF) {
+          Spacer(Modifier.height(8.dp))
+          OutlinedButton(onClick = { imageBulk = true }, modifier = Modifier.fillMaxWidth()) {
+            Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+            Text("ورودِ گروهیِ عکس‌ها")
+          }
+        }
         Spacer(Modifier.height(14.dp))
       }
 
@@ -315,7 +325,7 @@ fun WarehouseScreen(
 
     AddFab(
       label = "کالای تازه",
-      containerColor = Shop.colors.primary,
+      containerColor = Shop.colors.button.primary.bg,
       onClick = { bulkProduct = true },
       modifier = Modifier.align(Alignment.BottomStart).padding(16.dp).popIn(),
     )
@@ -360,6 +370,8 @@ fun WarehouseScreen(
       },
     )
   }
+
+  if (imageBulk) ImageBulkImportSheet(store, d) { imageBulk = false }
 
   importPlan?.let { plan ->
     AlertDialog(
@@ -728,5 +740,6 @@ private fun movementLabel(type: String): String = when (type) {
   "sale_cancel" -> "لغو فروش"
   "supplier_return" -> "برگشت به تأمین‌کننده"
   "adjustment" -> "اصلاح موجودی"
+  "damage" -> "ضایعات"
   else -> type
 }

@@ -83,6 +83,7 @@
     purchaseId: 'شناسهٔ خرید',
     warehouseEntryId: 'شناسهٔ ورودی انبار',
     refId: 'شناسهٔ مرجع',
+    kind: 'نوعِ ردیفِ سیستمی',
     purchasePrice: 'قیمت خرید',
     salePrice: 'قیمت فروش',
     wholesalePrice: 'قیمت عمده',
@@ -117,11 +118,29 @@
     syncStatus: 'وضعیت همگام‌سازی',
     cancelReason: 'دلیل لغو',
     seller: 'فروشنده',
+    //  PAY (v3 A4): فقط فروش و صندوقِ پرچم‌دار
+    payments: 'ردیف‌های پرداخت',
+    tenderedMinor: 'دریافتی (پول)',
+    changeMinor: 'پول پس (پول)',
+    by: 'کاربر',
+    approvedBy: 'تأییدکننده',
+    note: 'توضیح',
+    z: 'گزارش Z',
     quantity: 'تعداد',
     unitPrice: 'قیمت واحد',
     totalPrice: 'جمع قلم',
     returnedQty: 'تعداد برگشتی',
     reason: 'دلیل',
+    //  برگشت و تعویض (RET، فقط با تنظیمِ روشن)
+    docId: 'سند برگشت',
+    disposition: 'مقصد کالا',
+    refund: 'روش بازپرداخت',
+    toAccount: 'کسر از بدهی',
+    toCredit: 'اعتبار فروشگاه',
+    creditTo: 'صاحب اعتبار',
+    toMethods: 'به روش‌های دیگر',
+    exchangeSaleId: 'فاکتور تعویض',
+    adjKind: 'نوعِ اصلاح',
     address: 'نشانی',
     totalAmount: 'مبلغ کل',
     debt: 'بدهی',
@@ -136,9 +155,8 @@
     locationId: 'محل',
     toLocationId: 'محلِ مقصد',
     userId: 'کاربر',
-    adjKind: 'نوعِ اصلاح',
-    lotId: 'سری',
-    by: 'ثبت‌کننده'
+    lotId: 'سری'
+    //  `adjKind` و `by` بالاتر (RET/PAY) آمده‌اند — کلیدِ تکراری برچسبِ آن‌ها را عوض می‌کرد
   };
 
   /** کلیدهای سرآیند — داده نیستند و برگه نمی‌شوند */

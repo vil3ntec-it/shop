@@ -19,12 +19,14 @@ import ir.vil3ntec.tohid.update.UpdateManager
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.DeliveryDining
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.LocalOffer
 import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.ManageSearch
 import androidx.compose.material.icons.filled.Payments
@@ -167,6 +169,14 @@ fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
         subtitle = "کد پیوستن بسازید و دسترسی شاگردها را ببندید",
         onClick = { onOpen("team") },
       )
+      //  تخفیف‌ها (PRM) — صاحب و مدیر؛ کلیدِ دکان پیش‌فرض خاموش است
+      if (canManage) MoreCard(
+        title = "تخفیف‌ها",
+        icon = Icons.Filled.LocalOffer,
+        tint = Shop.colors.success,
+        subtitle = "تخفیفِ خودکار، بخر X بگیر Y، بسته، ساعتِ خوش و کدِ تخفیف",
+        onClick = { onOpen("promos") },
+      )
       /*
        *  پشتیبانی — برای همه، نه فقط صاحب دکان.
        *
@@ -191,6 +201,14 @@ fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
        *  گفت‌وگو با مشتری (v3 §۳۳) — ⛔ فقط وقتی سرور برای همین دکان پرچمِ
        *  `shop.chat` را روشن گفته. خاموش ⇒ نه ردیف و نه دکمه‌ای بی‌اثر.
        */
+      //  میزِ تحویل (C01): فقط وقتی سرور پرچمِ `shop.delivery` را روشن گفته
+      if (DeliveryGate.visible) MoreCard(
+        title = "میزِ تحویل",
+        icon = Icons.Filled.DeliveryDining,
+        tint = Shop.colors.primary,
+        subtitle = "سپردن به پیک، نقدِ پیک‌ها و تسویه، دریافتِ حضوری با کد",
+        onClick = { onOpen("delivery") },
+      )
       if (ir.vil3ntec.tohid.data.ShopChatSync.config.value?.enabled == true) MoreCard(
         title = "گفت‌وگو با مشتری",
         icon = Icons.Filled.Forum,

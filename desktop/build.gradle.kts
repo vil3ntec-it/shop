@@ -83,10 +83,15 @@ val replaced = listOf(
   //  چاپِ گزارش: اندروید روی PDFِ چاپ رسم می‌کند، این‌جا `PrinterJob`ِ جاوا —
   //  نه مرورگر (برنامهٔ کامپیوتر سایت نیست)
   "print/ReportPrint.kt",
+  //  برگهٔ A4ِ برچسب (HW-04): اندروید PDFِ چاپ، این‌جا `PrinterJob`
+  "print/LabelSheetPrint.kt",
   //  کلیکِ راست = منوی کارها (گوشی: لمسِ طولانی)
   "ui/PressMenu.kt",
   //  «این کامپیوتر است» — اندازه‌ها، پنجره‌ها و نوارهای کامپیوتری (‎ui/Platform.kt‎)
   "ui/Platform.kt",
+  //  بانکِ تصاویر: دوربینِ راهنما فقط گوشی است؛ نامِ فایل از دیسک، نه ContentResolver
+  "scan/GuidedCapture.kt",
+  "data/FileName.kt",
 ).map { "ir/vil3ntec/tohid/$it" }
 
 val generated = layout.buildDirectory.dir("generated/tohid")

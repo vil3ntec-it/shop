@@ -60,6 +60,17 @@ class DeskMenuTest {
   }
 
   @Test
+  fun `میزِ تحویل فقط با روشن بودنِ shop_delivery زنده است و به مسیرِ AppRoot می‌رود`() {
+    val root = File(ui!!, "AppRoot.kt").readText()
+    val off = DeskMenu.groups(true, shortcuts()).flatMap { it.items }.map { it.id }
+    assertTrue("soon:delivery" in off && "delivery" !in off)
+    val on = DeskMenu.groups(true, shortcuts(), deliveryLive = true).flatMap { it.items }
+    assertEquals(DeskMenu.State.LIVE, on.single { it.id == "delivery" }.state)
+    assertTrue("soon:delivery" !in on.map { it.id })
+    assertTrue(Regex("""\n\s*"delivery"\s*->""").containsMatchIn(root))
+  }
+
+  @Test
   fun `سفارش‌ها فقط با روشن بودنِ بخش زنده است و به مسیرِ AppRoot می‌رود`() {
     val root = File(ui!!, "AppRoot.kt").readText()
     val off = DeskMenu.groups(true, shortcuts()).flatMap { it.items }.map { it.id }
