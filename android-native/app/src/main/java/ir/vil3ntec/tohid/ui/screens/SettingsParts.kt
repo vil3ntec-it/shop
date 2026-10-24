@@ -14,6 +14,8 @@ import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.EventBusy
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Password
 import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.Key
@@ -160,7 +162,9 @@ fun deskSettingsSections(): List<Pair<String, ImageVector>> = listOf(
   "ظاهر" to Icons.Filled.Palette,
   "تاریخ و رقم" to Icons.Filled.Event,
   "کالای منقضی" to Icons.Filled.EventBusy,
+  RETURN_SETTINGS_TITLE to Icons.Filled.SwapHoriz,
   "قفل برنامه" to Icons.Filled.Lock,
+  SECURITY_SECTION_TITLE to Icons.Filled.Security,
   "تغییر رمز حساب" to Icons.Filled.Password,
   "دستگاه‌های وارد شده" to Icons.Filled.Devices,
   "کد شاگرد" to Icons.Filled.Key,

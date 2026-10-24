@@ -150,6 +150,7 @@ private fun Basics(segment: Int, onSegment: (Int) -> Unit) {
       V3StatusPill(V3Status.CANCELLED, "لغو شد")
       V3StatusPill(V3Status.REVIEW, "نیاز به بررسی")
       V3StatusPill(V3Status.INACTIVE, "غیرفعال")
+      V3StatusPill(V3Status.WARNING, "کم‌موجود")
     }
   }
 }

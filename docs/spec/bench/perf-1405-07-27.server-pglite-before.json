@@ -1,0 +1,211 @@
+{
+  "at": "2026-10-19T18:47:08.449Z",
+  "env": {
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "cores": 4,
+    "memGB": 16,
+    "os": "linux 6.18.44-fc-v139",
+    "node": "v22.22.0",
+    "driver": "pglite"
+  },
+  "scale": 1,
+  "reps": 30,
+  "dataset": {
+    "products": 20000,
+    "sales": 200000,
+    "saleItems": 300000,
+    "customers": 5000,
+    "activeDebtors": 2000,
+    "suppliers": 500,
+    "expenses": 3000,
+    "days": 365,
+    "transactions": 25628,
+    "warehouseEntries": 41159,
+    "returns": 430,
+    "genMs": 3010,
+    "syncRows": 595717
+  },
+  "seed": {
+    "ms": 273332,
+    "rowsPerSec": 2179,
+    "droppedIndexes": [
+      "ix_sync_rows_shop_product_name"
+    ],
+    "maintenance": null
+  },
+  "sync": {
+    "pullFirstPage": {
+      "n": 30,
+      "p50": 161.6,
+      "p95": 267.4,
+      "p99": 268.4,
+      "max": 268.4,
+      "errors": 0,
+      "bytes": 210775
+    },
+    "pullMiddle": {
+      "n": 30,
+      "p50": 139.1,
+      "p95": 262.1,
+      "p99": 331.8,
+      "max": 331.8,
+      "errors": 0,
+      "bytes": 331731
+    },
+    "pullIncremental": {
+      "n": 30,
+      "p50": 52.7,
+      "p95": 127.7,
+      "p99": 153.6,
+      "max": 153.6,
+      "errors": 0,
+      "bytes": 6024
+    },
+    "pushSale": {
+      "n": 30,
+      "p50": 91.9,
+      "p95": 192.9,
+      "p99": 236.3,
+      "max": 236.3,
+      "errors": 0,
+      "bytes": 666
+    },
+    "pushBatch200": {
+      "n": 10,
+      "p50": 2314.4,
+      "p95": 4242.7,
+      "p99": 4242.7,
+      "max": 4242.7,
+      "errors": 0,
+      "bytes": 22752
+    },
+    "catchUp": {
+      "ops": 598277,
+      "pages": 599,
+      "totalMs": 111965,
+      "page": {
+        "n": 599,
+        "p50": 157.2,
+        "p95": 271.8,
+        "p99": 327.6,
+        "max": 1764.8
+      }
+    }
+  },
+  "burst": {
+    "devices": 10,
+    "requests": 100,
+    "errors": 0,
+    "totalMs": 10753,
+    "rps": 9,
+    "n": 100,
+    "p50": 868.4,
+    "p95": 1804.8,
+    "p99": 2840.4,
+    "max": 2948.9
+  },
+  "catalog": {},
+  "orders": {
+    "create": {
+      "n": 500,
+      "p50": 70.1,
+      "p95": 114.7,
+      "p99": 143.8,
+      "max": 280.6,
+      "errors": 0,
+      "bytes": 1297
+    },
+    "list_new": {
+      "n": 30,
+      "p50": 42.7,
+      "p95": 63,
+      "p99": 102.1,
+      "max": 102.1,
+      "errors": 0,
+      "bytes": 25527
+    },
+    "list_preparing": {
+      "n": 30,
+      "p50": 36,
+      "p95": 69.2,
+      "p99": 73.2,
+      "max": 73.2,
+      "errors": 0,
+      "bytes": 48
+    },
+    "list_done": {
+      "n": 30,
+      "p50": 28.6,
+      "p95": 70.7,
+      "p99": 1441.3,
+      "max": 1441.3,
+      "errors": 0,
+      "bytes": 43
+    },
+    "summary": {
+      "n": 30,
+      "p50": 27.5,
+      "p95": 57.4,
+      "p99": 57.6,
+      "max": 57.6,
+      "errors": 0,
+      "bytes": 150
+    },
+    "detail": {
+      "n": 30,
+      "p50": 36.5,
+      "p95": 72.7,
+      "p99": 116.5,
+      "max": 116.5,
+      "errors": 0,
+      "bytes": 1434
+    }
+  },
+  "plans": {
+    "pull": {
+      "ms": 11.4,
+      "seqScan": false,
+      "nodes": "Limit > Index Scan(idx_oplog_account_seq)"
+    },
+    "head": {
+      "ms": 0.1,
+      "seqScan": false,
+      "nodes": "Result > Limit > Index Only Scan(idx_oplog_account_seq)"
+    },
+    "pushRowLock": {
+      "ms": 3.2,
+      "seqScan": false,
+      "nodes": "Index Scan(sync_rows_pkey)"
+    },
+    "deleteOwnerCheck": {
+      "ms": 126.5,
+      "seqScan": false,
+      "nodes": "Limit > Index Scan(idx_oplog_account_seq)"
+    },
+    "snapshot": {
+      "ms": 8793.9,
+      "seqScan": false,
+      "nodes": "Index Scan(sync_rows_pkey)"
+    },
+    "catalogFirstPage": {
+      "ms": 791.6,
+      "seqScan": false,
+      "nodes": "Limit > Sort > Nested Loop > Index Scan(sync_rows_pkey) > Index Only Scan(ix_storefront_products_published)"
+    },
+    "catalogSearch": {
+      "ms": 463.4,
+      "seqScan": false,
+      "nodes": "Limit > Sort > Nested Loop > Index Scan(sync_rows_pkey) > Index Only Scan(ix_storefront_products_published)"
+    },
+    "ordersList": {
+      "ms": 0.2,
+      "seqScan": false,
+      "nodes": "Limit > Index Only Scan(ix_online_orders_shop_status)"
+    }
+  },
+  "memory": {
+    "rssMB": 882,
+    "heapMB": 329
+  },
+  "totalMs": 538624
+}

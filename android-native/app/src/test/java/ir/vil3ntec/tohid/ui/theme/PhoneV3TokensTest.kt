@@ -29,7 +29,7 @@ class PhoneV3TokensTest {
       assertEquals(s.surfaceElevated, p.tile)
       assertEquals(s.status.delivered.fg, p.positive)
       assertEquals(s.status.cancelled.fg, p.negative)
-      assertEquals("رنگِ «در صف» ِ پیک", s.status.awaitingApproval.fg, p.waiting)
+      assertEquals("رنگِ «در صف» ِ پیک (هشدار، کهربایی)", s.status.warning.fg, p.waiting)
     }
     assertSame(PhoneV3Dark, PhoneV3.of(DarkColors.background))
     assertSame(PhoneV3Light, PhoneV3.of(LightColors.background))

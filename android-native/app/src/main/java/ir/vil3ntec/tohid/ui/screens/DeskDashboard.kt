@@ -172,7 +172,7 @@ fun DeskDashboardScreen(d: ShopData, onOpen: (String) -> Unit, onProduct: (Strin
           val who = s.debtorId?.let { id -> d.debtors.find { it.id == id }?.name } ?: "مشتریِ گذری"
           ListRow(
             "#${s.invoiceLabel() ?: "-"} · $who",
-            "${formatDate(s.date)} · ${if (s.paymentMethod == "credit") "نسیه" else "نقد"}",
+            "${formatDate(s.date)} · ${ir.vil3ntec.tohid.data.PayFlow.payLabel(s)}",
             "${money(s.finalTotal)} ؋",
           ) { onOpen("sales") }
         }

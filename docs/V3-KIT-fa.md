@@ -20,8 +20,9 @@
 | `V3SearchField`، `V3ToggleRow`، `V3PickerRow`، `V3DateField`، `V3Toggle` | ورودی‌های دیگر | یک جست‌وجو در هر صفحه. |
 | `V3Chip`، `V3AddChip`، `V3ChipRow`، `V3Segmented(options, selected, onSelect)` | فیلتر و تب | نشانگرِ لغزانِ فنری. |
 | `V3Sheet(onDismiss, title?, dismissible = true) { closer -> }`، `V3ConfirmSheet(...)`، `V3PickerSheet(...)` | برگه | بستن با حرکت: `closer.close { بعد }`. کارِ پاک‌کننده = `V3ConfirmSheet` با متنِ هشدارِ موتور. `dismissible = false` (نمایشِ یک‌بارهٔ کد): زدنِ بیرون، کشیدن و «برگشت» نمی‌بندند، فقط `closer`. محتوا پیمایش می‌شود (`scroll = true`)؛ فهرستِ Lazy درونِ برگه `heightIn(max = …)` می‌خواهد، یا `scroll = false`. |
+| `V3FormSheet(title, dirty, onClose, scroll = true) { sheet -> }` | فرم در برگه (ورود، اصلاح، پرداخت) | همان `V3Sheet` با نگهبانِ «دور ریخته شود؟»: اگر `dirty` است، کشیدن، زدنِ پس‌زمینه و «برگشت» اول `V3ConfirmSheet` (`StrKit.discardTitle/Body/discard`) می‌آورد؛ «ادامهٔ ویرایش» برگه را با همان وضع دوباره باز می‌کند (حالتِ فرم را بیرونِ برگه نگه دارید). کارِ تمام‌شده: `sheet.finish { بعد }` — بستن بی پرسش. `scroll = false` وقتی فرم خودش بخشِ پیمایش‌پذیر و دکمهٔ چسبان دارد. |
 | `V3Stat(label, value, format)` + `V3StatGrid` | آمار و پول | شمارندهٔ عدد، عددِ پایانی دقیق. |
-| `V3StatusPill(V3Status, label)` | وضعیتِ سفارش (§۸) | نقطه + برچسب، هفت وضعیت. |
+| `V3StatusPill(V3Status, label)` | وضعیت (§۸) | نقطه + برچسب. `AWAITING` فقط «در انتظارِ تأیید» است (بنفش، همان بنفشِ `REVIEW`)؛ هشدار — کم‌موجود، نزدیکِ انقضا، سقف، اختلاف، رو به پایان — `WARNING` (کهربایی). در صفحه‌های قدیم همین جدایی `PillTone.AWAITING` / `WARNING` است. |
 | `V3HeroCard(title, value, label?, caption?, chips: List<V3HeroChip>, pages, page, onBell?, bellDot)` | کادرِ بزرگِ خانه و کادرِ کشیدنی | **یک قالب** برای «فروشِ امروز»، «صندوق»، «گاوصندوق» و کادری که پایین کشیده می‌شود: گرادیانِ تم (۱۳۵°، آینه در RTL)، دو دایرهٔ نرمِ رنگِ همراه، متنِ سفید، تا ۳ تراشهٔ شیشه‌ای (`V3HeroChip(label, icon?) { }`)، زنگ و نشانگرِ صفحه. شعاع ۲۸، بلندیِ ثابتِ ۲۱۲dp (با درشتیِ نوشته تا ×۱٫۳)؛ حاشیهٔ ۱۶ از لبه را صدازننده می‌دهد. |
 | `V3InvoiceItems(items: List<V3InvoiceLine>, title?, footer?)` | اقلامِ فاکتور | `V3InvoiceLine(name, detail, total, note?)` با متنِ از پیش قالب‌شده (پول را موتورِ صدازننده می‌سازد)؛ همان کارتِ اقلامِ برگهٔ تراکنشِ قرض‌دار. |
 | `V3Message(V3Tone, title, body?, action?)` | پیام (§۹) | |
@@ -52,7 +53,8 @@
 | گوشه‌ها | `PhoneV3.groupRadius` ۲۰، `PhoneV3.tileRadius` ۱۴، کاشیِ آیکن ۱۲، کادرِ بزرگ ۲۸ | همهٔ کارت‌ها و برگه‌ها از همین؛ عددِ دستی نه. |
 
 رنگ‌های معنایی (موفق، خطر، هشدار، وضعیت‌ها) به تم بستگی ندارند. انحراف‌های ثبت‌شده (کنتراستِ AA) سرِ `ShopThemes.kt`
-و در `Vill3nPaletteTest`؛ عددهای سه تم در `ThemeV2PaletteTest`. وب (`index.html`) همان «آسمان» است (`WebPaletteParityTest`).
+و در `Vill3nPaletteTest`؛ عددهای سه تم در `ThemeV2PaletteTest`. **وبِ منجمد** (`index.html`) پالتِ VILL3N ِ خودش را نگه می‌دارد —
+تصمیمِ صاحب‌کار: وب فقط درمانِ ایمنیِ داده می‌گیرد، نه رنگ (`WebPaletteParityTest` همان را ثابت نگه می‌دارد).
 نمونهٔ زنده: `ui/v3/gallery/ThemeGallery.kt` (عکس‌های `groupshots:foundation` ⇐ `theme-sky|ocean|dusk`).
 
 ## حرکت (مثلِ اپل، سبک — همه پشتِ `Motion.enabled`)

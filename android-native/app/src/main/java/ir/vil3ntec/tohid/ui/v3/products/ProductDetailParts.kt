@@ -61,7 +61,7 @@ private fun unitOf(p: Product) = if (p.unit.isNotBlank()) " ${p.unit}" else ""
 
 private fun statusPill(s: Status): Pair<V3Status, String> = when (s) {
   Status.OUT -> V3Status.CANCELLED to StrProducts.statusOut
-  Status.LOW -> V3Status.AWAITING to StrProducts.statusLow
+  Status.LOW -> V3Status.WARNING to StrProducts.statusLow
   Status.INACTIVE -> V3Status.INACTIVE to StrProducts.statusInactive
   Status.ACTIVE -> V3Status.DELIVERED to StrProducts.statusOk
 }

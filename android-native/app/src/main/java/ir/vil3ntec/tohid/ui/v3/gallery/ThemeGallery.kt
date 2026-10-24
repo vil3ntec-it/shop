@@ -4,6 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -92,9 +93,10 @@ fun ThemeGallery() {
       V3Button("ثبتِ فروش", onClick = {}, modifier = Modifier.weight(1f))
       V3Button("پیش‌نویس", onClick = {}, kind = V3ButtonKind.SECONDARY, modifier = Modifier.weight(1f))
     }
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
       V3StatusPill(V3Status.DELIVERED, "تحویل شد")
       V3StatusPill(V3Status.AWAITING, "در انتظارِ تأیید")
+      V3StatusPill(V3Status.WARNING, "کم‌موجود")
       V3StatusPill(V3Status.CANCELLED, "لغو")
     }
     V3Card {

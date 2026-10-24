@@ -147,7 +147,7 @@ internal class BackupController(
   }
 
   fun readSnapshot(snap: AutoBackup.Snapshot) = scope.launch {
-    withContext(Dispatchers.IO) { runCatching { store.parseBackup(snap.file.readText()).getOrThrow() } }
+    withContext(Dispatchers.IO) { runCatching { store.parseBackup(ir.vil3ntec.tohid.data.AtRest.readText(context, snap.file)).getOrThrow() } }
       .onSuccess { pendingRestore = it; restorePhotos = 0; restoreError = null }
       .onFailure { restoreError = StrSettings.snapshotUnreadable }
   }

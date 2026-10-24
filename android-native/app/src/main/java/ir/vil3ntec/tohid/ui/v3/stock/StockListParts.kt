@@ -140,8 +140,8 @@ internal fun stockRowSubtitle(row: StockRowUi): String = listOfNotNull(
 internal fun stockPill(row: StockRowUi): Pair<V3Status, String>? = when {
   row.expired -> V3Status.CANCELLED to StrStock.pillExpired
   row.level == StockLevel.OUT -> V3Status.CANCELLED to StrStock.pillOut
-  row.level == StockLevel.LOW -> V3Status.AWAITING to StrStock.pillLow
-  row.expiresInDays != null -> V3Status.AWAITING to StrStock.pillExpiring
+  row.level == StockLevel.LOW -> V3Status.WARNING to StrStock.pillLow
+  row.expiresInDays != null -> V3Status.WARNING to StrStock.pillExpiring
   else -> null
 }
 
