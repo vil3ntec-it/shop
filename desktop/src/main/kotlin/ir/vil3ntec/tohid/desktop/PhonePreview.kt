@@ -47,7 +47,10 @@ import androidx.compose.ui.Alignment
 import ir.vil3ntec.tohid.data.DebtTransaction
 import ir.vil3ntec.tohid.data.Debtor
 import ir.vil3ntec.tohid.data.ShopData
+import ir.vil3ntec.tohid.data.Sale
+import ir.vil3ntec.tohid.data.SaleItem
 import ir.vil3ntec.tohid.ui.screens.DashboardScreen
+import ir.vil3ntec.tohid.ui.screens.DebtorDetailShot
 import ir.vil3ntec.tohid.ui.screens.DebtorsScreen
 import ir.vil3ntec.tohid.ui.screens.PhoneDebtorsShot
 import ir.vil3ntec.tohid.ui.screens.ProfileScreen
@@ -220,6 +223,19 @@ private fun PhonePreviewContent(screen: String, store: ShopStore, dark: Boolean)
         //  میکروفونِ کادرِ جستجو همان‌طور که اندروید نشان می‌دهد (کامپیوتر خودش پنهانش می‌کند)
         LaunchedEffect(Unit) { PhoneDebtorsShot.mic.value = true }
         //  پوستهٔ v3: قرض‌داران از «بیشتر» باز می‌شود ⇒ سربرگِ خودِ صفحه با برگشت
+        LaunchedEffect(Unit) { DebtorDetailShot.open.value = null }
+        DebtorsScreen(store, demo, snackbar, showHeader = true, onBack = {})
+      }
+      //  حسابِ یک قرض‌دار (owner-feedback-2): کشوی بسته، کشوی باز، برگهٔ «ثبتِ تراکنش»، بی تراکنش
+      "debtor-detail", "debtor-detail-drawer", "debtor-detail-composer", "debtor-detail-empty",
+      "debtor-detail-long", "debtor-detail-tx" -> Box(Modifier.weight(1f).fillMaxWidth()) {
+        val demo = remember(screen) { debtorDetailDemo(screen) }
+        LaunchedEffect(screen) {
+          DebtorDetailShot.drawer.value = screen == "debtor-detail-drawer"
+          DebtorDetailShot.composer.value = screen == "debtor-detail-composer"
+          DebtorDetailShot.txSheet.value = if (screen == "debtor-detail-tx") "dd-invoice" else null
+          DebtorDetailShot.open.value = "dd-h"
+        }
         DebtorsScreen(store, demo, snackbar, showHeader = true, onBack = {})
       }
       //  گوشی نسخهٔ ۳، صندوق (r3 بسته / r2 باز): v3cart-closed|open|empty|long|long-open|scan
@@ -235,6 +251,50 @@ private fun PhonePreviewContent(screen: String, store: ShopStore, dark: Boolean)
       }
     }
   }
+}
+
+/**
+ *  دفترِ ساختگیِ عکس‌های حسابِ یک قرض‌دار — همان «haroon» ِ عکسِ صاحب محصول با
+ *  شماره، و چند ردیف در چند روز (برد با یادداشت، برد با سررسید، رسید، بردِ امروز)؛
+ *  «empty» همان نفر بی هیچ تراکنش.
+ */
+private fun debtorDetailDemo(screen: String): ShopData {
+  val now = System.currentTimeMillis()
+  val dayMs = 86_400_000L
+  val today = java.time.LocalDate.now()
+  var seq = 0
+  fun tx(type: String, amount: Double, daysAgo: Long, notes: String = "", due: String? = null, id: String? = null) = DebtTransaction(
+    id = id ?: "dd-t${seq++}", debtorId = "dd-h", type = type, amount = amount,
+    date = today.minusDays(daysAgo).toString(), notes = notes, createdAt = now - daysAgo * dayMs - seq++,
+    dueDate = due,
+  )
+  val debtor = Debtor(id = "dd-h", name = "haroon", phone = "0792236008", notes = "مشتریِ همیشگی — پنجشنبه‌ها حساب می‌کند")
+  //  بردِ فاکتوردار: «فاکتور #12» در شرحِ ردیف ⇐ همان فاکتور و اقلامش (`DebtBook`)
+  val sale = Sale(
+    id = "dd-sale", invoiceNumber = 12, debtorId = "dd-h", total = 1_200.0, finalTotal = 1_200.0,
+    paymentMethod = "credit", remaining = 1_200.0, debtGiven = 1_200.0, date = today.minusDays(3).toString(), createdAt = now - 3 * dayMs,
+  )
+  val items = listOf(
+    SaleItem(id = "dd-i1", saleId = "dd-sale", name = "آرد ۲۵ کیلویی", quantity = 2.0, unitPrice = 350.0, totalPrice = 700.0),
+    SaleItem(id = "dd-i2", saleId = "dd-sale", name = "روغن ۵ لیتری", quantity = 1.0, unitPrice = 300.0, totalPrice = 300.0),
+    SaleItem(id = "dd-i3", saleId = "dd-sale", name = "شکر", quantity = 2.0, unitPrice = 100.0, totalPrice = 200.0),
+  )
+  val base = listOf(
+    tx("give", 600.0, 6, "آرد و روغن"),
+    tx("give", 1_200.0, 3, "فروشِ نسیه — فاکتور #12", due = today.plusDays(10).toString(), id = "dd-invoice"),
+    tx("receive", 500.0, 1, "نقد"),
+    tx("give", 250.0, 0),
+  )
+  val rows = when (screen) {
+    "debtor-detail-empty" -> emptyList()
+    //  فهرستِ بلند: پانزده ردیف در بیست روز — برای دیدنِ تراکمِ ردیف‌ها
+    "debtor-detail-long" -> base + (1..11).map { i ->
+      val give = i % 3 != 0
+      tx(if (give) "give" else "receive", (i * 137 % 900 + 100).toDouble(), (6 + i).toLong())
+    }
+    else -> base
+  }
+  return ShopData(debtors = listOf(debtor), transactions = rows, sales = if (rows.isEmpty()) emptyList() else listOf(sale), saleItems = items)
 }
 
 /**
