@@ -452,7 +452,7 @@ async function createApp({ runMigrations = true } = {}) {
     res.set('Cache-Control', 'no-cache').type('application/manifest+json').send(JSON.stringify({
       name: sf.title, short_name: String(sf.title).slice(0, 12), lang: 'fa', dir: 'rtl',
       start_url: start, scope: onHost ? '/' : `/store/${sf.slug}`, display: 'standalone',
-      background_color: '#F4F5F8', theme_color: '#5B45E0',
+      background_color: '#F3F6FA', theme_color: '#108B81',
       icons: [
         { src: '/kit/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
         { src: '/kit/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
