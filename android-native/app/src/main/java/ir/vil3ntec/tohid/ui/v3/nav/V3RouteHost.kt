@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.v3.nav
 
+import ir.vil3ntec.tohid.core.nav.Move
+import ir.vil3ntec.tohid.ui.v3.v3BehindSheet
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -47,8 +49,10 @@ fun V3RouteHost(nav: V3Nav, shell: ShellContext, modifier: Modifier = Modifier) 
   CompositionLocalProvider(LocalV3Nav provides nav) {
     AnimatedContent(
       targetState = base,
-      modifier = modifier,
-      transitionSpec = { V3Transitions.page(nav.move, dir) },
+      //  صفحهٔ زیرِ برگه تا ۰٫۹۶ کوچک می‌شود (`V3Sheet` خودش را می‌شمارد)
+      modifier = modifier.v3BehindSheet(),
+      //  کامپیوتر/پهن: صفحه‌ها هم‌سطح‌اند ⇐ محو، نه لغزشِ تمام‌عرض
+      transitionSpec = { V3Transitions.page(if (nav.wide) Move.SWITCH else nav.move, dir) },
       label = "route",
     ) { path ->
       saved.SaveableStateProvider(path) { RouteContent(path, nav, shell) }
