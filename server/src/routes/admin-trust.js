@@ -1,6 +1,7 @@
 'use strict';
 /**
- * صفِ رسیدگی به شکایت و تخلفِ بازارچه — `/api/admin/trust` (v3 §۳۸.۶؛ ABUSE-01).
+ * صفِ رسیدگی به شکایت و تخلفِ بازارچه — `/api/admin/trust` (v3 §۳۸.۶؛ ABUSE-01)؛
+ * و `GET /report`، گزارشِ سوءاستفادهٔ هر دکان برای پنل (OPS-09).
  *
  * فقط مدیرِ ارشد. هر دیدنِ پرونده/مدرک و هر نوشتن در سابقهٔ عملیات می‌نشیند
  * (§۳۹.۸). تصمیم، رأیِ اعتراض و برداشتنِ جریمه بی دلیلِ نوشته انجام نمی‌شوند
@@ -16,6 +17,7 @@ const audit = require('../lib/audit');
 const { requireReason } = require('../lib/admin-access');
 const { requireAdmin, requireSuperAdmin } = require('../middleware/auth');
 const { clientIp } = require('../middleware/ratelimit');
+const { many } = require('../db');
 
 const router = express.Router();
 router.use(requireAdmin);
@@ -27,6 +29,59 @@ router.get('/cases', requireSuperAdmin, wrap(async (req, res) => {
   await log(req, { action: 'admin.trust_queue_viewed', detail: { count: cases.length } });
   res.set('Cache-Control', 'no-store');
   res.json({ cases });
+}));
+
+/**
+ * گزارشِ سوءاستفاده برای پنلِ VILL3N (OPS-09): به‌ازای هر دکان در بازه — شمارِ
+ * پرونده، در جریان، واردشده/ردشده، شدید، نشان‌دار (همان متن/همان IP) و جریمهٔ
+ * فعال؛ و دسته‌ها. فقط‌خواندنی و فقط شمار؛ نه متنِ شکایت، نه شمارهٔ شاکی. دیدنش
+ * مثلِ دیدنِ صف سابقه دارد.
+ */
+const REPORT_DAYS = Object.freeze({ def: 30, max: 366 });
+const REPORT_SHOPS = 200;
+router.get('/report', requireSuperAdmin, wrap(async (req, res) => {
+  const raw = Number(req.query.days);
+  const days = Number.isInteger(raw) ? Math.min(REPORT_DAYS.max, Math.max(1, raw)) : REPORT_DAYS.def;
+  const since = Date.now() - days * 24 * 60 * 60 * 1000;
+  const [shops, categories] = await Promise.all([
+    many(
+      `SELECT c.shop_id, COALESCE(s.name, '') AS shop_name, COUNT(*)::int AS cases,
+              COUNT(*) FILTER (WHERE c.status IN ('open','in_review','appealed'))::int AS pending,
+              COUNT(*) FILTER (WHERE c.outcome = 'upheld' AND c.appeal_outcome <> 'reversed')::int AS upheld,
+              COUNT(*) FILTER (WHERE c.outcome = 'dismissed' OR c.appeal_outcome = 'reversed')::int AS dismissed,
+              COUNT(*) FILTER (WHERE c.severity = 'high')::int AS high,
+              COUNT(*) FILTER (WHERE c.kind = 'complaint')::int AS complaints,
+              COUNT(*) FILTER (WHERE c.kind = 'report')::int AS reports,
+              COUNT(*) FILTER (WHERE jsonb_array_length(c.flags) > 0)::int AS flagged,
+              MAX(c.created_at) AS last_at,
+              (SELECT COUNT(*)::int FROM trust_sanctions t WHERE t.shop_id = c.shop_id AND t.lifted_at IS NULL) AS active_sanctions
+         FROM trust_cases c LEFT JOIN shops s ON s.id = c.shop_id
+        WHERE c.created_at >= $1
+        GROUP BY c.shop_id, s.name
+        ORDER BY upheld DESC, high DESC, cases DESC, c.shop_id
+        LIMIT ${REPORT_SHOPS + 1}`,
+      [since]
+    ),
+    many(
+      `SELECT kind, category, COUNT(*)::int AS n FROM trust_cases WHERE created_at >= $1
+        GROUP BY kind, category ORDER BY n DESC, kind, category`,
+      [since]
+    ),
+  ]);
+  const list = shops.slice(0, REPORT_SHOPS).map((r) => ({
+    shopId: r.shop_id, shopName: r.shop_name, cases: r.cases, pending: r.pending, upheld: r.upheld,
+    dismissed: r.dismissed, high: r.high, complaints: r.complaints, reports: r.reports, flagged: r.flagged,
+    activeSanctions: r.active_sanctions, lastAt: Number(r.last_at) || null,
+  }));
+  const sum = (k) => list.reduce((a, r) => a + r[k], 0);
+  await log(req, { action: 'admin.trust_report_viewed', detail: { days, shops: list.length } });
+  res.set('Cache-Control', 'no-store');
+  res.json({
+    days, since, truncated: shops.length > REPORT_SHOPS,
+    totals: { cases: sum('cases'), pending: sum('pending'), upheld: sum('upheld'), dismissed: sum('dismissed'), high: sum('high'), flagged: sum('flagged') },
+    categories: categories.map((c) => ({ kind: c.kind, category: c.category, count: c.n })),
+    shops: list,
+  });
 }));
 
 router.get('/cases/:id', requireSuperAdmin, wrap(async (req, res) => {

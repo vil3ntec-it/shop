@@ -853,6 +853,28 @@ await step('عملیات: تطبیقِ فروشِ آنلاین همان عددِ
   if (process.env.PANEL_SHOTS) await page.screenshot({ path: `${process.env.PANEL_SHOTS}/e2e-adm-15.png`, fullPage: true });
 });
 
+// ── OPS-09: گزارشِ سوءاستفادهٔ هر دکان ─────────────────────────────
+await step('عملیات: گزارشِ سوءاستفادهٔ هر دکان، فقط شمار و بی متنِ شکایت', async () => {
+  const id = 'tc_' + require('node:crypto').randomBytes(12).toString('hex');
+  await query(
+    `INSERT INTO trust_cases (id, shop_id, kind, subject, category, severity, body, status, outcome, reporter_key, flags, created_at, updated_at)
+     VALUES ($1,$2,'complaint','shop','fraud','high','متنِ محرمانهٔ پنل','decided','upheld','rk-panel','[]'::jsonb,$3,$3)`,
+    [id, owner.shopId, now()]
+  );
+  await openTab('ops');
+  await page.waitForSelector('#ops-abuse-tools:not(.hidden)', { timeout: 10_000 });
+  await page.click('#btn-ops-abuse');
+  const row = `#ops-abuse tr[data-shop="${owner.shopId}"]`;
+  await page.waitForSelector(row, { timeout: 10_000 });
+  const cells = await page.locator(`${row} td`).allTextContents();
+  assert.match(cells[1], /^۱ \(۱ شکایت، ۰ گزارش\)$/);
+  assert.equal(cells[3], '۱');
+  assert.equal(cells[5], '۱');
+  assert.match(await page.locator('#ops-abuse-cats').textContent(), /کلاه‌برداری: ۱/);
+  assert.ok(!(await page.locator('#tab-ops').textContent()).includes('متنِ محرمانهٔ پنل'), 'متنِ شکایت در پنل');
+  await query('DELETE FROM trust_cases WHERE id=$1', [id]);
+});
+
 // ── SEC-02: بررسیِ زنجیرهٔ هش از پنل — سالم، بعد دست‌کاری‌شده ──────────
 await step('عملیات: بررسیِ زنجیرهٔ هش؛ دست‌کاری با نخستین حلقهٔ شکسته و دلیل دیده می‌شود', async () => {
   const store = require('../src/lib/hash-chain-store');
