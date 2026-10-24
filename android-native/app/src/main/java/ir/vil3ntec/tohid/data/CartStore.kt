@@ -83,23 +83,27 @@ class CartStore(context: Context) : HeldCart {
   /** POS-12: جابه‌جاییِ فاکتور در جریان است ⇒ سبد دست نمی‌خورد (`HeldCart.freeze`) */
   @Volatile private var frozen = false
 
-  fun set(lines: List<SalesEngine.CartLine>) {
-    if (frozen) return
+  /** `false` ⇒ وسطِ جابه‌جاییِ فاکتور بود و چیزی عوض نشد — صفحه باید بگوید (`NOT_ADDED`) */
+  fun set(lines: List<SalesEngine.CartLine>): Boolean {
+    if (frozen) return false
     //  سبدِ خالی کلید ندارد؛ نخستین قلم کلیدِ تازه می‌سازد
     key = if (lines.isEmpty()) null else key ?: newKey()
     _lines.value = lines
     persist()
+    return true
   }
 
-  fun setDebtor(id: String?) {
-    if (frozen) return
+  fun setDebtor(id: String?): Boolean {
+    if (frozen) return false
     _debtorId.value = id
     persist()
+    return true
   }
 
-  fun clear() {
-    if (frozen) return
+  fun clear(): Boolean {
+    if (frozen) return false
     wipe()
+    return true
   }
 
   private fun wipe() {
@@ -185,6 +189,8 @@ class CartStore(context: Context) : HeldCart {
 
   companion object {
     const val FILE = "sale-draft.json"
+    /** POS-12 — اسکنی که وسطِ جابه‌جاییِ فاکتور رسید و به سبد نرفت */
+    const val NOT_ADDED = "فاکتور در حالِ جابه‌جایی بود — کالا اضافه نشد؛ دوباره اسکن کنید"
     // همان کلیدِ نسخهٔ وب — فقط برای آوردنِ پیش‌نویسِ نسخهٔ پیش
     private const val LEGACY_KEY = "tohid-shop-draft-cart-v1"
     private const val LEGACY_DEBTOR_KEY = "tohid-shop-draft-cart-debtor"

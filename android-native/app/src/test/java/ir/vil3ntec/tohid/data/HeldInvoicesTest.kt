@@ -376,6 +376,34 @@ class HeldInvoicesTest {
     assertNull(HeldRules.resume(old, "O", SaleDraft(), HeldExtras(), now, "A").let { (it as HeldRules.Result.Ok).extras.payment })
   }
 
+  /** نسیهٔ بی‌مشتری نسیه می‌ماند (ثبت خودش مشتری می‌خواهد)؛ نبودِ روش ⇒ مشتری دارد ⇒ نسیه */
+  @Test
+  fun `روشِ پرداخت پس از جابه‌جایی`() {
+    val credit = SalesEngine.Payment.CREDIT; val cash = SalesEngine.Payment.CASH
+    assertEquals(credit, HeldRules.paymentAfterSwitch(credit, null))
+    assertEquals(credit, HeldRules.paymentAfterSwitch(credit, "d1"))
+    assertEquals(cash, HeldRules.paymentAfterSwitch(cash, "d1"))
+    assertEquals(credit, HeldRules.paymentAfterSwitch(null, "d1"))
+    assertEquals(cash, HeldRules.paymentAfterSwitch(null, null))
+  }
+
+  /**
+   *  X→Y→X′: `StateFlow` نشانیِ تازهٔ X′ را دارد ولی `collectAsState` (برابر با X) آن را
+   *  نمی‌فرستد و صفحه X را نگه می‌دارد — مقایسهٔ نشانی F12 را برای همیشه رد می‌کرد.
+   */
+  @Test
+  fun `سبدِ کشیده‌شده با برابریِ مقدار سنجیده می‌شود`() {
+    val x = listOf(SalesEngine.CartLine("p1", 2.0), SalesEngine.CartLine("free", 1.0, 50.0, "کیسه"))
+    val y = x + SalesEngine.CartLine("p2", 1.0)
+    val x2 = y.dropLast(1).map { it.copy() }
+    val flow = kotlinx.coroutines.flow.MutableStateFlow(x)
+    flow.value = y; flow.value = x2
+    assertTrue("نشانی تازه است", flow.value !== x)
+    assertTrue(HeldRules.shownIsCurrent(x, flow.value))
+    assertFalse(HeldRules.shownIsCurrent(x, y))
+    assertFalse(HeldRules.shownIsCurrent(x, listOf(SalesEngine.CartLine("p1", 3.0), x[1])))
+  }
+
   /** اسکن و F12 که وسطِ جابه‌جایی (هنگامِ هر نوشتن و عوض کردنِ سبد) می‌رسند به هیچ فاکتوری نمی‌رسند */
   @Test
   fun `اسکن و F12 وسطِ جابه‌جایی رد می‌شوند و هیچ فاکتوری خراب نمی‌شود`() = runBlocking<Unit> {

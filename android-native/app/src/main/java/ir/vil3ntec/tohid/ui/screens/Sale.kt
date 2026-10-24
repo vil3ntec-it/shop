@@ -202,7 +202,8 @@ fun SaleScreen(
       is ir.vil3ntec.tohid.data.ScaleLabels.Match.Rejected -> { ScanFeedback.unknown(context); toast(w.message); return }
       is ir.vil3ntec.tohid.data.ScaleLabels.Match.Weighed -> {
         val added = SalesEngine.addToCartCapped(cartStore.lines.value, w.product.id, w.quantity, ShopStore.stock(d, w.product.id))
-        cartStore.set(added.cart)
+        //  POS-12: وسطِ جابه‌جاییِ فاکتور سبد قفل است ⇒ اضافه نشد
+        if (!cartStore.set(added.cart)) { ScanFeedback.unknown(context); toast(CartStore.NOT_ADDED); return }
         selectedId = w.product.id
         if (added.capped) { ScanFeedback.unknown(context); toast("${w.product.name} فقط ${qty(added.available)} ${w.product.unit} موجود است") }
         else { ScanFeedback.ok(context); toast("${w.product.name} — ${qty(w.quantity)} ${w.product.unit} به سبد اضافه شد") }
@@ -249,7 +250,8 @@ fun SaleScreen(
     val added = SalesEngine.addToCartCapped(
       cartStore.lines.value, productId, multiplier.toDouble(), ShopStore.stock(d, productId),
     )
-    cartStore.set(added.cart)
+    //  POS-12: وسطِ جابه‌جاییِ فاکتور سبد قفل است ⇒ اضافه نشد
+    if (!cartStore.set(added.cart)) { ScanFeedback.unknown(context); toast(CartStore.NOT_ADDED); return }
     selectedId = productId
     if (added.capped) {
       ScanFeedback.unknown(context)
@@ -628,7 +630,9 @@ fun SaleScreen(
         //  را دوباره ثبت می‌کرد. `checkout` همان لحظه خوانده می‌شود.
         if (!checkout) return@CheckoutDialog
         //  POS-12: سبد همین حالا با جابه‌جایی عوض شد ⇒ ردیف‌های قبلی با کلیدِ فاکتورِ دیگر ثبت نشوند
-        if (pricedFrom !== cartStore.lines.value) return@CheckoutDialog
+        if (!ir.vil3ntec.tohid.data.HeldRules.shownIsCurrent(pricedFrom, cartStore.lines.value)) {
+          toast("سبد همین حالا عوض شد — دوباره بزنید"); return@CheckoutDialog
+        }
         //  POS-14: یک ثبت در هر لحظه با کلیدِ فاکتور؛ سبد فقط پس از نوشتنِ دفتر پاک می‌شود
         scope.launch { when (val posted = cartStore.post(store) { key ->
           SalesEngine.record(

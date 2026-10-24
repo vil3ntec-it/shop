@@ -108,6 +108,20 @@ object HeldRules {
     data class Refused(val message: String) : Result
   }
 
+  /**
+   *  روشِ پرداختِ صفحه پس از جابه‌جایی: همان که با فاکتور نگه داشته شد (نسیهٔ بی‌مشتری
+   *  هم — ثبت خودش مشتری می‌خواهد)؛ نبود (فاکتورِ تازه، نسخهٔ پیش) ⇒ مشتری دارد ⇒ نسیه.
+   */
+  fun paymentAfterSwitch(saved: SalesEngine.Payment?, debtorId: String?): SalesEngine.Payment =
+    saved ?: if (debtorId != null) SalesEngine.Payment.CREDIT else SalesEngine.Payment.CASH
+
+  /**
+   *  سبدی که صفحه کشید هنوز همان سبدِ `CartStore` است؟ برابریِ مقدار، نه نشانی:
+   *  `StateFlow` مقدارِ برابر با نشانیِ تازه را به `collectAsState` نمی‌رساند و
+   *  مقایسهٔ نشانی پس از X→Y→X′ ثبت را برای همیشه رد می‌کرد.
+   */
+  fun shownIsCurrent(shown: List<SalesEngine.CartLine>, now: List<SalesEngine.CartLine>): Boolean = shown == now
+
   fun clean(s: String?, max: Int): String = s.orEmpty().replace(Regex("\\s+"), " ").trim().take(max)
 
   private fun free(used: Collection<Int>): Int? = (1..MAX_OPEN).firstOrNull { it !in used }

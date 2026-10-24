@@ -188,7 +188,8 @@ fun DeskSaleScreen(
   }
 
   fun applyAdded(product: Product, added: SalesEngine.Added) {
-    cartStore.set(added.cart)
+    //  POS-12: وسطِ جابه‌جاییِ فاکتور سبد قفل است ⇒ اضافه نشد؛ بوقِ خطا تا دوباره اسکن شود
+    if (!cartStore.set(added.cart)) { ScanFeedback.unknown(context); toast(CartStore.NOT_ADDED); return }
     selected = product.id
     if (added.capped) {
       ScanFeedback.unknown(context)
@@ -278,7 +279,7 @@ fun DeskSaleScreen(
   fun finish(settled: ir.vil3ntec.tohid.core.pay.Settlement? = null) {
     if (cart.isEmpty()) { toast("سبد خالی است"); return }
     //  POS-12: صفحه هنوز سبدِ پیش از جابه‌جایی را دارد ⇒ ردیف‌هایش با کلیدِ فاکتورِ دیگر ثبت می‌شد
-    if (pricedFrom !== cartStore.lines.value || checkout.debtorId != cartStore.debtorId.value ||
+    if (!ir.vil3ntec.tohid.data.HeldRules.shownIsCurrent(pricedFrom, cartStore.lines.value) || checkout.debtorId != cartStore.debtorId.value ||
       inputsFrom != listOf<Any?>(discountText, paidText, payment)
     ) {
       toast("سبد همین حالا عوض شد — دوباره بزنید"); return
@@ -368,10 +369,9 @@ fun DeskSaleScreen(
       discountText = x.discount; paidText = x.paid; selected = null
       //  پنلِ پرداخت مالِ فاکتورِ قبلی بود
       payOpen = false
-      //  روشِ پرداخت با فاکتور برمی‌گردد؛ نبود (فاکتورِ تازه، نسخهٔ پیش) یا نسیهٔ بی‌مشتری ⇒ قاعدهٔ صفحه: مشتری ⇒ نسیه
+      //  روشِ پرداخت با فاکتور برمی‌گردد (نسیهٔ بی‌مشتری هم: `finish` مشتری می‌خواهد و فهرست را باز می‌کند)
       val debtorNow = cartStore.debtorId.value
-      payment = x.payment?.takeUnless { it == SalesEngine.Payment.CREDIT && debtorNow == null }
-        ?: if (debtorNow != null) SalesEngine.Payment.CREDIT else SalesEngine.Payment.CASH
+      payment = ir.vil3ntec.tohid.data.HeldRules.paymentAfterSwitch(x.payment, debtorNow)
       switchedDebtor = debtorNow
     },
     onFocusBack = { refocus() },
