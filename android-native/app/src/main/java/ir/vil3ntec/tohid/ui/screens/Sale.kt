@@ -148,6 +148,15 @@ fun SaleScreen(
     scope.launch { snackbar.showSnackbar(text) }
   }
 
+  //  HW-02/03: چاپِ خودکار یا کشوی پس از فروش که نشد همین‌جا، سرِ صندوق، گفته می‌شود
+  val printNotice by ir.vil3ntec.tohid.print.PrintSpooler.tillNotice
+  LaunchedEffect(printNotice) {
+    printNotice?.let { n ->
+      ir.vil3ntec.tohid.print.PrintSpooler.consumed(n)
+      snackbar.showSnackbar(n.text, duration = SnackbarDuration.Long)
+    }
+  }
+
   /** یک بارکد — چه از دوربین، چه دستی، چه از بارکدخوانِ سخت‌افزاری */
   fun onBarcode(raw: String, skipDedup: Boolean = false, fromPhone: Boolean = false) {
     val code = raw.trim()
@@ -165,6 +174,22 @@ fun SaleScreen(
     //  کار در جریان است؛ دوربین نباید بخوابد
     lastScanAt = System.currentTimeMillis()
     if (!skipDedup && !gate.accept(code)) return
+
+    //  POS-29: برچسبِ ترازو — فقط اگر دکان قاعده‌اش را روشن کرده باشد (پیش‌فرض خاموش)
+    when (val w = ir.vil3ntec.tohid.data.ScaleLabels.match(
+      ir.vil3ntec.tohid.data.ScaleLabels.rules(context), code, index, d.products,
+    )) {
+      null -> Unit
+      is ir.vil3ntec.tohid.data.ScaleLabels.Match.Rejected -> { ScanFeedback.unknown(context); toast(w.message); return }
+      is ir.vil3ntec.tohid.data.ScaleLabels.Match.Weighed -> {
+        val added = SalesEngine.addToCartCapped(cartStore.lines.value, w.product.id, w.quantity, ShopStore.stock(d, w.product.id))
+        cartStore.set(added.cart)
+        selectedId = w.product.id
+        if (added.capped) { ScanFeedback.unknown(context); toast("${w.product.name} فقط ${qty(added.available)} ${w.product.unit} موجود است") }
+        else { ScanFeedback.ok(context); toast("${w.product.name} — ${qty(w.quantity)} ${w.product.unit} به سبد اضافه شد") }
+        return
+      }
+    }
 
     /*
      *  شناختنِ کالا — کامل، و اگر نشد از نیمهٔ بارکد.
@@ -578,6 +603,8 @@ fun SaleScreen(
       presetDebtorId = cartDebtorId,
       onDismiss = { checkout = false },
       busy = cartStore.posting.collectAsState().value,
+      //  برگهٔ تأییدِ تخفیف (S08) به شناسهٔ همین فاکتور بسته است
+      saleKey = remember(cart) { cartStore.saleKey() },
       onConfirm = { options ->
         //  دو ضربهٔ پشتِ سرِ هم پیش از بسته شدنِ پنجره: دومی همان سبدِ قبلی
         //  را دوباره ثبت می‌کرد. `checkout` همان لحظه خوانده می‌شود.

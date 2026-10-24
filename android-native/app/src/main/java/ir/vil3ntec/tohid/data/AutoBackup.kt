@@ -175,7 +175,9 @@ object AutoBackup {
        */
       val ledger = File(context.filesDir, "shop-data.json")
       if (!ledger.exists() || ledger.length() == 0L) return false
-      val ledgerJson = ledger.readText(Charsets.UTF_8)
+      //  SEC-01: دفترِ رمزدار باز می‌شود — پشتیبانِ بیرون‌رفته با کلیدِ دستگاه
+      //  رمز نمی‌شود (بند ۱۰٫۳)؛ دفترِ خوانده‌نشده هم هیچ‌وقت «پشتیبان» نمی‌شود
+      val ledgerJson = AtRest.readText(context, ledger)
 
       val bytes = java.io.ByteArrayOutputStream().use { out ->
         BackupBundle.write(context, out, ledgerJson).getOrThrow()

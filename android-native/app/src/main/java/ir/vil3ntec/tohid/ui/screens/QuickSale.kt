@@ -427,6 +427,8 @@ fun QuickSaleScreen(
       presetDebtorId = cartDebtorId,
       onDismiss = { checkout = false },
       busy = cartStore.posting.collectAsState().value,
+      //  برگهٔ تأییدِ تخفیف (S08) به شناسهٔ همین فاکتور بسته است
+      saleKey = remember(cart) { cartStore.saleKey() },
       onConfirm = { options ->
         if (!checkout) return@CheckoutDialog
         //  POS-14: یک ثبت در هر لحظه با کلیدِ فاکتور؛ سبد فقط پس از نوشتنِ دفتر پاک می‌شود
