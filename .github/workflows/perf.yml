@@ -1,0 +1,123 @@
+name: سنجشِ کارایی (PERF)
+
+# PERF-01/02/03/06 و بخشِ ۹.۲: سرور با دادهٔ مرجعِ بزرگ (۲۰k کالا، ۲۰۰k فاکتور با
+# ۳۰۰k قلم، ۵k مشتری؛ `bench/datagen.mjs`، seed ثابت، بی دادهٔ واقعی) — **جدا** روی
+# PostgreSQL ِ واقعی و روی PGlite (۲۹.۶ بند ۸: یکی را به دیگری تعمیم نده) — و
+# ریزسنجشِ JVMِ موتورهای Kotlin. فقط گزارش است (خلاصهٔ کار + فایلِ JSON)؛ چیزی را رد
+# نمی‌کند، چون ماشینِ CI مرجع نیست و از اجرایی به اجرای دیگر فرق می‌کند.
+
+#  ⛔ صفِ Actions (#329): سه کارِ ۴۰ تا ۷۵ دقیقه‌ای روی هر PRی که مهاجرت، ویترین، سفارش یا هستهٔ
+#  موجودی/گزارش را عوض می‌کرد، بیشترِ PRها را می‌گرفت. چون این فقط گزارش است و چیزی را رد نمی‌کند:
+#  PR فقط وقتی خودِ سنجه (`bench/**`) یا این ورک‌فلو عوض شود؛ وگرنه هفته‌ای یک بار روی main، و هر وقت
+#  لازم شد Actions ⇒ «سنجشِ کارایی (PERF)» ⇒ Run workflow روی هر شاخه‌ای.
+on:
+  pull_request:
+    paths:
+      - 'bench/**'
+      - '.github/workflows/perf.yml'
+  schedule:
+    #  دوشنبه‌ها ۰۲:۱۷ UTC (ورودی‌ها خالی ⇐ مقیاسِ ۱، بی عکسِ کامل)
+    - cron: '17 2 * * 1'
+  workflow_dispatch:
+    inputs:
+      scale:
+        description: 'مقیاسِ دادهٔ مرجع (۱ = کامل)'
+        default: '1'
+      snapshot:
+        description: 'عکسِ کاملِ Sync v1 را هم بسنج (سنگین)'
+        type: boolean
+        default: false
+
+concurrency:
+  #  PR: pushِ تازه اجرای قبلیِ همان PR را لغو می‌کند. اجرای main (زمان‌بندی‌شده) و دستی وسطِ کار لغو نمی‌شود.
+  group: perf-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  server:
+    name: سرور — ${{ matrix.db }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        db: [postgres, pglite]
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: shop
+          POSTGRES_PASSWORD: shoppass
+          POSTGRES_DB: shop_bench
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: نصبِ وابستگی‌ها
+        working-directory: server
+        run: npm ci || npm install
+      - name: سنجش
+        env:
+          SCALE: ${{ inputs.scale || '1' }}
+          SNAPSHOT: ${{ inputs.snapshot && 'yes' || '' }}
+        run: |
+          if [ "${{ matrix.db }}" = postgres ]; then DB=postgres://shop:shoppass@127.0.0.1:5432/shop_bench; else DB="pglite:$RUNNER_TEMP/pglite-bench"; fi
+          SKIP=snapshot; [ -n "$SNAPSHOT" ] && SKIP=none
+          node --max-old-space-size=6144 bench/server.mjs --db "$DB" --scale "$SCALE" --skip "$SKIP" \
+            --json "perf-server-${{ matrix.db }}.json" | tee perf-server.log
+          {
+            echo "### سرور — ${{ matrix.db }} (مقیاس $SCALE)"
+            echo '```'
+            grep -E '^  |^──' perf-server.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: perf-server-${{ matrix.db }}
+          path: perf-server-${{ matrix.db }}.json
+          if-no-files-found: ignore
+
+  engines:
+    name: موتورهای Kotlin (JVM)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      - name: دادهٔ مرجع و سنجش
+        env:
+          SCALE: ${{ inputs.scale || '1' }}
+        run: |
+          node bench/kotlin/ledger.mjs "$RUNNER_TEMP/ledger.json" "$SCALE"
+          ./desktop/gradlew --no-daemon -q -p bench/kotlin installDist
+          bench/kotlin/build/install/engine-bench/bin/engine-bench "$RUNNER_TEMP/ledger.json" --json perf-engines.json | tee perf-engines.log
+          {
+            echo "### موتورهای Kotlin (مقیاس $SCALE)"
+            echo '```'
+            cat perf-engines.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: perf-engines
+          path: perf-engines.json
+          if-no-files-found: ignore

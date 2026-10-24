@@ -110,6 +110,9 @@ fun ProfileScreen(
   //  SYN-10: صفِ پُر ⇒ خروج بسته؛ «خروجِ اجباری» = پشتیبانِ دیدنی + دو تأیید
   var blockSignOut by remember { mutableStateOf(false) }
   var forcedBackup by remember { mutableStateOf<String?>(null) }
+  //  SEC-01: دفترِ رمزدارِ خوانده‌نشده پشتیبانِ پوشه نمی‌دهد ⇒ خروجِ اجباری با دو تأیید، بی پشتیبان
+  val unreadable by store.unreadable.collectAsState()
+  var forceUnreadable by remember { mutableStateOf(false) }
 
   /*
    *  نامِ دکان — همان‌جایی که تنظیمات هم از آن می‌خواند
@@ -193,14 +196,14 @@ fun ProfileScreen(
           Modifier
             .size(30.dp)
             .clip(CircleShape)
-            .background(colors.primary)
+            .background(colors.button.primary.bg)
             .clickable { pickOpen = true },
           contentAlignment = Alignment.Center,
         ) {
           Icon(
             Icons.Filled.PhotoCamera,
             contentDescription = "عکس حساب",
-            tint = Color.White,
+            tint = colors.button.primary.text,
             modifier = Modifier.size(16.dp),
           )
         }
@@ -244,9 +247,9 @@ fun ProfileScreen(
         Spacer(Modifier.height(12.dp))
         Button(
           onClick = onSignIn,
-          colors = ButtonDefaults.buttonColors(containerColor = colors.primary),
+          colors = ButtonDefaults.buttonColors(containerColor = colors.button.primary.bg, contentColor = colors.button.primary.text),
           modifier = Modifier.fillMaxWidth(),
-        ) { Text("ورود یا ساختنِ حساب", color = Color.White) }
+        ) { Text("ورود یا ساختنِ حساب", color = colors.button.primary.text) }
       }
       return@Column
     }
@@ -367,10 +370,10 @@ fun ProfileScreen(
         }
       },
       enabled = !busy,
-      colors = ButtonDefaults.buttonColors(containerColor = colors.primary),
+      colors = ButtonDefaults.buttonColors(containerColor = colors.button.primary.bg, contentColor = colors.button.primary.text),
       modifier = Modifier.fillMaxWidth(),
     ) {
-      Text(if (busy) "در حال ذخیره…" else "ذخیره تغییرات", color = Color.White)
+      Text(if (busy) "در حال ذخیره…" else "ذخیره تغییرات", color = colors.button.primary.text)
     }
 
     /* ------------------------- دکان ------------------------- */
@@ -424,10 +427,10 @@ fun ProfileScreen(
           .onFailure { toast(it.userText("همگام‌سازی ناموفق بود")) }
       },
       enabled = !syncing,
-      colors = ButtonDefaults.buttonColors(containerColor = colors.primary),
+      colors = ButtonDefaults.buttonColors(containerColor = colors.button.primary.bg, contentColor = colors.button.primary.text),
       modifier = Modifier.fillMaxWidth(),
     ) {
-      Text(if (syncing) "در حال همگام‌سازی…" else "همگام‌سازی حالا", color = Color.White)
+      Text(if (syncing) "در حال همگام‌سازی…" else "همگام‌سازی حالا", color = colors.button.primary.text)
     }
 
     /*
@@ -499,7 +502,13 @@ fun ProfileScreen(
             Spacer(Modifier.height(8.dp))
             Text(v1.lastError, style = MaterialTheme.typography.labelMedium, color = colors.danger)
           }
-          if (verdict is LogoutGuard.Block) {
+          if (verdict is LogoutGuard.Block && unreadable != null) {
+            //  پشتیبانِ پوشه از دفترِ خوانده‌نشده ساخته نمی‌شود؛ صف را «همین حالا همگام کن» می‌فرستد
+            Spacer(Modifier.height(8.dp))
+            TextButton(enabled = !busy, onClick = { blockSignOut = false; forceUnreadable = true }) {
+              Text(LogoutGuard.FORCE_UNREADABLE, color = colors.danger)
+            }
+          } else if (verdict is LogoutGuard.Block) {
             Spacer(Modifier.height(8.dp))
             TextButton(enabled = !busy, onClick = {
               busy = true
@@ -529,6 +538,26 @@ fun ProfileScreen(
       },
       dismissButton = {
         TextButton(enabled = !busy, onClick = { blockSignOut = false }) { Text(LogoutGuard.STAY, color = colors.muted) }
+      },
+    )
+  }
+
+  if (forceUnreadable) {
+    val pending = (LogoutGuard.decide(v1.queued, AutoSync.pendingCount) as? LogoutGuard.Block)?.pending ?: 0
+    AlertDialog(
+      onDismissRequest = { forceUnreadable = false },
+      containerColor = colors.bg,
+      title = { Text(LogoutGuard.FORCE_TITLE, color = colors.text) },
+      text = { Text(LogoutGuard.forceUnreadableMessage(pending), color = colors.muted) },
+      confirmButton = {
+        TextButton(enabled = !busy, onClick = {
+          forceUnreadable = false
+          //  کلیکِ «خروج بی پشتیبان» تأییدِ اول بود، این دومی است
+          if (LogoutGuard.canForceUnreadable(unreadable != null, confirmations = 2)) signOutNow()
+        }) { Text("باز هم خارج شو", color = colors.danger) }
+      },
+      dismissButton = {
+        TextButton(onClick = { forceUnreadable = false }) { Text(LogoutGuard.STAY, color = colors.muted) }
       },
     )
   }

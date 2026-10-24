@@ -8,13 +8,22 @@ on:
   pull_request:
     paths:
       - 'desktop/**'
-      - 'android-native/app/src/main/**'
+      #  نصاب و بستهٔ «همهٔ کامپیوترها» در هیچ عکسی دیده نمی‌شوند
+      - '!desktop/installer/**'
+      - '!desktop/setup-all/**'
+      #  کامپیوتر از اندروید فقط کدِ Kotlin و سه پوشهٔ res (قلم، صدا، نشان) را برمی‌دارد
+      #  (`androidSources` و `copyRes` در desktop/build.gradle.kts)؛ مانیفست و بقیهٔ res فقط اندرویدند
+      - 'android-native/app/src/main/java/**'
+      - 'android-native/app/src/main/res/font/**'
+      - 'android-native/app/src/main/res/raw/**'
+      - 'android-native/app/src/main/res/drawable-xxxhdpi/**'
       - '.github/workflows/desktop-shots.yml'
   workflow_dispatch:
 
 concurrency:
-  group: desktop-shots-${{ github.ref }}
-  cancel-in-progress: true
+  #  PR: pushِ تازه اجرای قبلیِ همان PR را لغو می‌کند؛ اجرای دستی لغو نمی‌شود
+  group: desktop-shots-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: write
@@ -54,8 +63,9 @@ jobs:
           TOHID_DATA_DIR: ${{ runner.temp }}/tohid-data
         run: |
           mkdir -p "$RUNNER_TEMP/shots"
-          #  ساختِ dev صفحهٔ خوش‌آمد را خودش رد می‌کند (پنجره در گوشهٔ ۰،۰ است)
-          S="wait:6000;shot:00-start;key:ESCAPE;wait:1500;shot:01-dashboard"
+          #  ساختِ دو صفحهٔ خوش‌آمد را خودش رد می‌کند (پنجره در گوشهٔ ۰،۰ است).
+          #  نمایشگر ۱۹۲۰×۱۰۸۰ است و پنجره با size: اندازه می‌گیرد؛ عکس فقط خودِ پنجره است.
+          S="size:1280,800;wait:6000;shot:00-start;key:ESCAPE;wait:1500;shot:01-dashboard"
           S="$S;go:admin;wait:2000;shot:01b-admin-center;move:700,500;scroll:8;wait:600;shot:01c-admin-center-lower"
           S="$S;go:sale;wait:1500;shot:02-sale"
           #  صندوقِ سه‌ستونه با سه قلم (اسکن، «3*» و نام + Enter) و نمای جدولیِ کالا
@@ -68,21 +78,41 @@ jobs:
           S="$S;go:products;wait:1500;shot:06-products-table"
           S="$S;prodsel:3;wait:800;shot:06b-products-bulk-bar;prodview:card;wait:1200;shot:06c-products-cards;prodsel:0;prodview:table;wait:800"
           S="$S;go:sales;wait:1500;shot:07-sales-history-cash-shift"
+          S="$S;ret:first;wait:1500;shot:07b-return-form;ret:none;wait:1500;shot:07c-return-no-receipt;ret:close;wait:800"
           S="$S;go:purchasing;wait:1500;shot:08-purchasing;new:;wait:1200;shot:08b-purchase-invoice-new;key:ESCAPE;wait:800"
           S="$S;go:reports;wait:1500;shot:09-reports"
           S="$S;move:700,500;scroll:8;shot:10-reports-lower"
           S="$S;go:expenses;wait:1500;shot:11-expenses"
           S="$S;go:more;wait:1500;shot:12-more"
           S="$S;go:settings;wait:1500;shot:13-settings"
+          #  دستگاه‌ها (HW): صفحه، پیش‌نمایشِ بی چاپگرِ برگهٔ آزمون، برچسب و برگهٔ A4، و نمایشگرِ مشتری با یک سبد
+          S="$S;go:devices;wait:1500;shot:14-devices;hwshot:receipt;wait:1500;shot:14b-print-preview-receipt;hwshot:close"
+          S="$S;hwshot:label;wait:1200;shot:14c-print-preview-label;hwshot:close;hwshot:a4;wait:1500;shot:14d-print-preview-a4;hwshot:close"
+          S="$S;hwshot:customer;go:sale;wait:1500;type:626001007;key:ENTER;wait:1500;shot:14e-customer-display;hwshot:nocustomer"
           S="$S;go:audit;wait:1500;shot:14-audit-log"
           S="$S;go:team;wait:1500;shot:15-team"
           S="$S;go:devices;wait:1500;shot:15b-devices"
           S="$S;go:vip;wait:1500;shot:15c-subscription-offline-code"
+          #  تخفیف‌ها (PRM): پنج قاعدهٔ نمونه (`PromoLive.demo`)، سبدِ همان ۰۲b با ردیف‌های تخفیف و کادرِ کد، صفحهٔ مدیر و ویرایشگر
+          S="$S;promo:demo;go:sale;wait:1500;shot:20-sale-promos;go:promos;wait:1500;shot:21-promos-table;new:;wait:1200;shot:22-promo-editor;key:ESCAPE;wait:800"
           S="$S;go:dashboard;key:F11;wait:2000;shot:16-fullscreen-dashboard"
           S="$S;help:on;wait:1500;shot:17-shortcuts-F1;help:off"
           S="$S;key:F11;wait:1500;theme:DARK;go:products;wait:1500;shot:18-products-dark;prodsel:2;wait:800;shot:18b-products-dark-bulk;prodsel:0;go:dashboard;wait:1500;shot:19-dashboard-dark;theme:LIGHT"
+          #  مجموعهٔ ثابتِ ظاهر (نسخهٔ ۲): صندوق روز و شب، کالاها، داشبورد و قرض‌داران در دو اندازهٔ واقعی
+          for WH in 1280,800 1920,1080; do
+            N="v2-${WH/,/x}"
+            #  ماوس روی عنوانِ سربرگ (جای بی‌کلیک) — وگرنه کارت یا ردیفِ زیرِ ماوس رنگِ «هاور» می‌گیرد و
+            #  در عکس شبیهِ کارتِ خاموش دیده می‌شود (بازبینیِ ۱۴۰۵/۰۷/۲۷)
+            MX=$(( ${WH%,*} - 120 ))
+            S="$S;size:$WH;wait:1500;move:$MX,30;theme:LIGHT;go:sale;wait:2000;shot:$N-pos-light;posview:table;wait:1200;shot:$N-pos-table-light;posview:card;wait:800"
+            S="$S;theme:DARK;wait:2000;shot:$N-pos-dark;theme:LIGHT;wait:1200"
+            S="$S;go:products;wait:1800;shot:$N-products;go:dashboard;wait:1800;shot:$N-dashboard;go:debtors;wait:1800;shot:$N-debtors"
+          done
+          #  سیستمِ رنگِ VILL3N: صفحه‌هایی که بالا فقط در روز گرفته می‌شوند، در شب هم؛ و سفارش‌ها در هر دو
+          S="$S;size:1280,800;move:1160,30;theme:DARK;wait:1500;go:debtors;wait:1800;shot:vill3n-debtors-dark;go:settings;wait:1800;shot:vill3n-settings-dark"
+          S="$S;go:orders;wait:1800;shot:vill3n-orders-dark;theme:LIGHT;wait:1500;go:orders;wait:1800;shot:vill3n-orders-light"
           export JAVA_TOOL_OPTIONS="-Dtohid.shot=$RUNNER_TEMP/shots -Dtohid.shot.every=9000 -Dtohid.shot.exit=true -Dtohid.shot.script=$S -Dsun.jnu.encoding=UTF-8 -Dfile.encoding=UTF-8"
-          timeout 600 xvfb-run -s "-screen 0 1440x900x24" ./gradlew --no-daemon -q -Pdev=true run || true
+          timeout 780 xvfb-run -s "-screen 0 1920x1080x24" ./gradlew --no-daemon -q -Pdev=true run || true
           ls -la "$RUNNER_TEMP/shots"
           test -n "$(ls "$RUNNER_TEMP/shots")"
 
@@ -92,19 +122,72 @@ jobs:
           path: ${{ runner.temp }}/shots
           retention-days: 14
 
-      #  شاخهٔ جدا، هر بار از نو — فقط عکس‌ها و یک README
+      #  شاخهٔ جدای desktop-screenshots:
+      #   • ریشه = عکس‌ها و README ِ آخرین اجرا، مثلِ پیش (خطِ ۳ِ README شاخهٔ منبع را می‌گوید)؛
+      #   • pr/<شاخه>/ = عکس‌ها و README ِ هر شاخهٔ کار. هر اجرا فقط پوشهٔ خودش و مجموعهٔ ریشه را عوض
+      #     می‌کند و بقیه را از سرِ همان لحظهٔ شاخه نگه می‌دارد؛ پوشه‌ای که ۲۱ روز اجرا نداشته برداشته می‌شود.
+      #  ⛔ پیش‌تر `git init` + `push -f`: هر اجرا پوشهٔ همهٔ شاخه‌های دیگر را پاک می‌کرد و دو اجرای
+      #  هم‌زمان «cannot lock ref … expected …» می‌گرفتند. حالا هر تلاش از سرِ تازهٔ شاخه ساخته می‌شود و
+      #  فقط با `--force-with-lease=<همان سر>` می‌رود: مقایسه‌وجابه‌جاییِ اتمی؛ اگر اجرای دیگری در این
+      #  فاصله فرستاده باشد رد می‌شود و از سرِ تازه دوباره، تا ۶ بار با فاصلهٔ فزاینده. هیچ pushِ کورِ -f
+      #  نمانده. تاریخچه عمداً یک commit می‌ماند: pushِ عادی (fast-forward) چند مگابایت عکسِ **هر**
+      #  اجرا را برای همیشه در مخزن نگه می‌داشت و هر cloneِ کامل سنگین می‌شد.
       - name: انتشار در شاخهٔ desktop-screenshots
+        env:
+          URL: https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
         run: |
-          cd "$RUNNER_TEMP/shots"
-          {
-            echo "# عکس‌های برنامهٔ کامپیوتر"
-            echo
-            echo "از \`${GITHUB_SHA::7}\` (${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}) — دفترِ نمایشی، نمایشگرِ مجازیِ ۱۴۴۰×۹۰۰."
-            echo
-            for f in *.png; do echo "## ${f%.png}"; echo; echo "![${f%.png}]($f)"; echo; done
-          } > README.md
-          git init -q -b desktop-screenshots
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A && git commit -q -m "عکس‌های برنامهٔ کامپیوتر از ${GITHUB_SHA::7}"
-          git push -q -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" desktop-screenshots
+          shopt -s nullglob
+          REF=refs/heads/desktop-screenshots
+          BR="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+          SAFE=$(printf '%s' "$BR" | tr -c 'A-Za-z0-9._-' '-')
+          SHOTS="$RUNNER_TEMP/shots"
+          PUB="$RUNNER_TEMP/pub"
+          #  اندازه‌های واقعیِ عکس‌ها از سرآیندِ PNG — درست، هر اندازهٔ نمایشگر یا پنجره‌ای که اجرا داشته باشد
+          DIMS=$(python3 -c 'import struct,sys; print("، ".join("%d×%d" % s for s in sorted({struct.unpack(">II", open(f, "rb").read(24)[16:24]) for f in sys.argv[1:]})))' "$SHOTS"/*.png)
+          readme() {  # $1 = پوشه، $2 = عنوان
+            {
+              echo "# $2"
+              echo
+              echo "از \`${GITHUB_SHA::7}\` (${BR}) — دفترِ نمایشی روی نمایشگرِ مجازی؛ اندازهٔ عکس‌ها: ${DIMS}."
+              echo
+              for f in "$1"/*.png; do b=$(basename "$f" .png); echo "## $b"; echo; echo "![$b]($b.png)"; echo; done
+            } > "$1/README.md"
+          }
+          for i in 1 2 3 4 5 6; do
+            cd "$RUNNER_TEMP" && rm -rf "$PUB"
+            #  سرِ کنونیِ شاخه؛ «نیست» (کدِ ۲) با خطای شبکه یکی گرفته نمی‌شود
+            if git ls-remote --exit-code "$URL" "$REF" >/dev/null; then
+              git clone -q --depth 1 --branch desktop-screenshots "$URL" "$PUB" || { sleep $(( (1 << i) + RANDOM % 5 )); continue; }
+              LEASE="$REF:$(git -C "$PUB" rev-parse HEAD)"
+            elif [ $? -eq 2 ]; then
+              git init -q -b desktop-screenshots "$PUB"
+              LEASE="$REF:"   # خالی = شاخه نباید باشد
+            else
+              sleep $(( (1 << i) + RANDOM % 5 )); continue
+            fi
+            cd "$PUB"
+            find . -maxdepth 1 -name '*.png' -delete
+            cp "$SHOTS"/*.png .
+            rm -rf "pr/$SAFE" && mkdir -p "pr/$SAFE" && cp "$SHOTS"/*.png "pr/$SAFE/"
+            date +%s > "pr/$SAFE/.stamp"
+            readme "pr/$SAFE" "عکس‌های شاخهٔ $BR"
+            NOW=$(date +%s)
+            for d in pr/*/; do
+              s=$(cat "$d.stamp" 2>/dev/null || true); [[ "$s" =~ ^[0-9]+$ ]] || s=0
+              [ $((NOW - s)) -le 1814400 ] || rm -rf "$d"
+            done
+            readme . "عکس‌های برنامهٔ کامپیوتر"
+            { echo "---"; echo; echo "## پوشهٔ هر شاخه"; echo
+              for d in pr/*/; do n=${d#pr/}; echo "- [${n%/}](${d}README.md)"; done; } >> README.md
+            git checkout -q --orphan publish
+            git add -A
+            git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -q -m "عکس‌های برنامهٔ کامپیوتر از ${GITHUB_SHA::7} (${BR})"
+            if git push -q --force-with-lease="$LEASE" "$URL" "HEAD:$REF"; then
+              echo "منتشر شد (تلاشِ $i): https://github.com/${GITHUB_REPOSITORY}/tree/desktop-screenshots/pr/$SAFE"
+              exit 0
+            fi
+            echo "::warning::سرِ desktop-screenshots در این فاصله عوض شد یا فرستادن نشد (تلاشِ $i) — از سرِ تازه دوباره"
+            sleep $(( (1 << i) + RANDOM % 5 ))
+          done
+          echo "::error::انتشارِ عکس‌ها پس از ۶ تلاش نشد"; exit 1

@@ -23,8 +23,10 @@ const tokens = require('../lib/tokens');
 const otp = require('../lib/otp');
 const google = require('../lib/google');
 const geo = require('../lib/geo');
+const loginAlerts = require('../lib/login-alerts');
 const terms = require('../lib/terms');
 const audit = require('../lib/audit');
+const reauth = require('../lib/reauth');
 const { membershipOf } = require('../lib/shops');
 const staffCodes = require('../lib/staff-codes');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
@@ -77,6 +79,17 @@ const verifyLimit = rateLimit({
  *  به‌ازای ایمیل است و جلوی امتحانِ هزار ایمیلِ گوناگون از یک جا را نمی‌گرفت.
  */
 const probeLimit = rateLimit({ max: config.rateLimit.probeIpMax, keyPrefix: 'account-probe' });
+
+/*
+ *  ⛔ سقفِ «به‌ازای هر نشست» برای جاهایی که با یک توکنِ باز رمز سنجیده
+ *  می‌شود (`/password`ِ «رمزِ فعلی» و `/reauth`) — یک سطلِ مشترک، تا حدس
+ *  زدن میانِ این دو پخش نشود. قفلِ «شناسه + IP» با عوض کردنِ IP دور زده
+ *  می‌شد؛ این یکی به خودِ توکن بسته است (بازبینیِ امنیتی ۱۴۰۵/۰۷/۲۷، یافتهٔ ۵).
+ */
+const passwordSessionLimit = rateLimit({
+  max: config.rateLimit.passwordSessionMax, keyPrefix: 'password-session',
+  key: (req) => (req.tokenRow?.token_hash ? `t:${req.tokenRow.token_hash}` : null),
+});
 
 /** کارِ `password/forgot` با تأخیرِ یکسان (`config.otp.uniformMs`) — F0-16. */
 async function evenly(work) {
@@ -238,7 +251,10 @@ function appVersionOf(req) {
 
 /** ساخت نشست تازه (توکن دسترسی + توکن تازه‌سازی). */
 async function issueSession(user, device, ip, app = 'shop', appVersion = '') {
+  //  پیش از ثبتِ دستگاه: آیا این دستگاه/شبکه برای این حساب تازه است؟ (بندِ ۲۱.۱)
+  const seen = await loginAlerts.before(user, device?.deviceId || device?.uid, ip, app);
   const dev = await upsertDevice(user.id, device, ip);
+  await loginAlerts.after(seen, { user, device: dev, ip, app });
   const access = await tokens.issue({
     kind: 'access', subjectId: user.id, deviceId: dev?.id || null,
     ttlMs: config.tokens.accessTtlMs, app, appVersion,
@@ -248,6 +264,8 @@ async function issueSession(user, device, ip, app = 'shop', appVersion = '') {
     ttlMs: config.tokens.refreshTtlMs, app, appVersion,
   });
   await query('UPDATE users SET last_login_at=$2 WHERE id=$1', [user.id, now()]);
+  //  ورود خودش احراز است: تا چند دقیقه کارهای حساس بی پرسشِ دوباره (`lib/reauth`)
+  await reauth.markFresh({ accessToken: access.token, ip });
   return {
     accessToken: access.token,
     accessExpiresAt: access.expiresAt,
@@ -650,21 +668,168 @@ router.post('/otp/verify', verifyLimit, async (req, res, next) => {
 });
 
 // ---------- ورود با گوگل ----------
+/*
+ *  ⛔ بندِ ۲۹.۲ قاعدهٔ ۵ و AUTH-04 — «برابر بودنِ ایمیل به‌تنهایی مجوزِ ادغام نیست».
+ *
+ *  تا دیروز اگر شناسهٔ گوگل (`sub`) هنوز به حسابی وصل نبود، حسابی که همان
+ *  ایمیل را داشت **بی هیچ پرسشی** برداشته و گوگل به آن چسبانده می‌شد. یعنی
+ *  هر کسی که یک حسابِ گوگل با نشانیِ ایمیلِ شما داشت (دامنهٔ ایمیلی که دستِ
+ *  دیگری افتاده، حسابِ Workspaceِ بازیافته…) بی رمز وارد دکانِ شما می‌شد.
+ *
+ *  حالا وصل شدن فقط وقتی است که روشِ **قبلیِ** همان حساب هم ثابت شود: رمزِ
+ *  حساب (`password`) یا کدی که به ایمیلِ حساب رفته (`code`، از
+ *  `POST /google/link-code`). بی آن، پاسخ ۴۰۹ `google_link_required` است و
+ *  برنامه همان‌جا رمز یا کد را می‌خواهد. کسی که گوگلش از قبل وصل است (یافتن
+ *  با `sub`) هیچ تغییری نمی‌بیند.
+ *
+ *  بازگشت: `GOOGLE_EMAIL_AUTOLINK=1` رفتارِ قبلی را برمی‌گرداند (فقط برای
+ *  اضطرار؛ هر اتصال هنوز در سابقه `auth.identity_linked` می‌نشیند).
+ */
+const LINK_METHODS_MESSAGE = 'این ایمیل از قبل حساب دارد. برای وصل کردنِ گوگل به همان حساب، رمزِ حساب را بزنید یا کدی را که به همین ایمیل می‌فرستیم وارد کنید.';
+
+/*
+ *  ⛔ بازبینیِ امنیتی ۱۴۰۵/۰۷/۲۷ — گوگلِ «ایمیلِ تأییدنشده».
+ *
+ *  گوگل اجازه می‌دهد حسابی با نشانیِ ایمیلِ کسِ دیگری ساخته شود بی آن‌که آن
+ *  ایمیل تأیید شود؛ توکنش `email_verified=false` دارد و هیچ چیزی دربارهٔ
+ *  مالکیتِ ایمیل ثابت نمی‌کند. تا امروز چنین توکنی (۱) برای ایمیلِ کسی که
+ *  هنوز حساب نداشت **حساب می‌ساخت** — مهاجم پیش از قربانی جا را می‌گرفت و
+ *  پس از «رمزِ فراموش‌شده»ی قربانی هم با همان گوگل وارد می‌شد — و (۲) برای
+ *  حسابِ موجود «این ایمیل حساب دارد + روش‌هایش» را می‌گفت و کدِ وصل را به
+ *  صندوقِ قربانی می‌فرستاد (بمبارانِ ایمیل).
+ *
+ *  حالا ساختن و وصل کردن فقط با ایمیلِ تأییدشده است. پاسخِ تأییدنشده برای
+ *  ایمیلِ دارای حساب و بی‌حساب **یکی** است. شناسه‌ای که از قبل وصل است
+ *  (یافتن با `sub`) همان‌طور وارد می‌شود؛ «رمزِ فراموش‌شده» شناسه‌های
+ *  تأییدنشده را جدا می‌کند (`unlinkUnverifiedGoogle`).
+ */
+const GOOGLE_UNVERIFIED_MESSAGE = 'ایمیلِ این حسابِ گوگل نزدِ خودِ گوگل تأیید نشده است، پس با آن نمی‌شود حساب ساخت یا به حسابی وصل شد. اول ایمیل را در حسابِ گوگل تأیید کنید، یا با ایمیل و رمز/کدِ ایمیل وارد شوید.';
+
+/** حسابِ موجودی که این ایمیل را دارد و هنوز این گوگل به آن وصل نیست — فقط برای ایمیلِ تأییدشده. */
+async function accountOfGoogleEmail(profile) {
+  if (!profile.email || !profile.emailVerified) return null;
+  return one('SELECT * FROM users WHERE email=$1', [profile.email]);
+}
+
+/**
+ *  شناسه‌های گوگلی که تأییدِ ایمیلشان ثابت نیست (`email_verified` نه `true`:
+ *  تأییدنشده یا ردیفِ قدیمیِ نامعلوم) از حساب جدا می‌شوند — پس از اینکه
+ *  کسی مالکیتِ ایمیلِ حساب را با کد ثابت کرد. گوگلِ قدیمیِ صاحبِ حساب که
+ *  دوباره با توکنِ تأییدشده وارد شده `true` است و می‌ماند؛ آن‌که جدا شد با
+ *  رمزِ تازه دوباره وصل می‌شود.
+ */
+async function unlinkUnverifiedGoogle(userId, ip, reason) {
+  const gone = await query(
+    `DELETE FROM user_identities
+      WHERE user_id=$1 AND provider='google' AND email_verified IS NOT TRUE`, [userId]
+  );
+  if (gone.rowCount) {
+    await audit.log({
+      actorType: 'user', userId, action: 'auth.identity_unlinked',
+      targetType: 'user', targetId: userId, detail: { provider: 'google', reason, count: gone.rowCount }, ip,
+    });
+  }
+  return gone.rowCount;
+}
+
+/**
+ *  سقفِ کدِ وصل به‌ازای «ایمیلِ توکن + IP». کلیدِ `otpLimit` از بدنه می‌آید
+ *  و این مسیر ایمیلی در بدنه ندارد (فقط توکن)، پس پس از خواندنِ توکن شمرده می‌شود.
+ */
+const linkCodeLimit = rateLimit({
+  max: config.rateLimit.linkCodeMax, keyPrefix: 'google-link-code',
+  key: (req) => (req.googleProfile?.email ? `${req.googleProfile.email.toLowerCase()}|${clientIp(req)}` : null),
+});
+async function readGoogleProfile(req, res, next) {
+  req.googleProfile = await google.verifyIdToken(req.body?.idToken || req.body?.id_token);
+  next();
+}
+
+/**
+ *  اثباتِ روشِ قبلیِ حساب — رمز یا کدِ ایمیل. هر دو پشتِ همان قفلِ تلاشِ
+ *  ناموفقِ ورودِ عادی‌اند، پس این در راهِ تازه‌ای برای حدس زدنِ رمز نیست.
+ *  @returns {Promise<'password'|'email_code'|null>}
+ */
+async function proveExistingMethod(user, body, ip) {
+  const password = typeof body?.password === 'string' ? body.password : '';
+  const code = String(body?.code || body?.emailCode || '').trim();
+  if (password) {
+    await assertNotLocked('user', user.email, ip);
+    let ok = false;
+    if (user.password_hash) ok = await pw.verifyPassword(password, user.password_hash);
+    else await pw.burnTime(password);
+    await noteAttempt('user', user.email, ip, ok);
+    if (!ok) throw unauthorized('رمزِ همین حساب درست نیست', 'bad_credentials');
+    await clearAttempts('user', user.email);
+    return 'password';
+  }
+  if (code) {
+    await assertNotLocked('otp', user.email, ip);
+    try {
+      await otp.verify(user.email, code, { purpose: 'link' });
+    } catch (err) {
+      await noteAttempt('otp', user.email, ip, false);
+      throw err;
+    }
+    await noteAttempt('otp', user.email, ip, true);
+    await clearAttempts('otp', user.email);
+    return 'email_code';
+  }
+  return null;
+}
+
+function linkRequired(res, user) {
+  return res.status(409).json({
+    error: {
+      code: 'google_link_required',
+      message: LINK_METHODS_MESSAGE,
+      //  فقط به دارندهٔ توکنِ معتبرِ گوگلِ همین ایمیل گفته می‌شود — کسی که
+      //  ایمیل را نمی‌تواند ثابت کند به این‌جا نمی‌رسد
+      link: {
+        email: user.email,
+        methods: [...(user.password_hash ? ['password'] : []), 'email_code'],
+      },
+    },
+  });
+}
+
 router.post('/google', authLimit, async (req, res, next) => {
   const idToken = req.body?.idToken || req.body?.id_token;
   const profile = await google.verifyIdToken(idToken);
+  const ip = clientIp(req);
 
-  // اول با شناسه‌ی گوگل، بعد با ایمیلِ تأییدشده
-  let user = null;
-  const identity = await one(
+  //  اول با شناسه‌ی گوگل — حسابی که گوگلش از قبل وصل است همان‌طور وارد می‌شود
+  let user = await one(
     `SELECT u.* FROM user_identities i JOIN users u ON u.id = i.user_id
       WHERE i.provider='google' AND i.subject=$1`,
     [profile.sub]
   );
-  if (identity) user = identity;
 
-  if (!user && profile.email && profile.emailVerified) {
-    user = await one('SELECT * FROM users WHERE email=$1', [profile.email]);
+  let linkedVia = '';
+  if (user) {
+    //  ردیفِ قدیمی (پیش از ستون) با هر ورودِ تأییدشده «تأییدشده» می‌شود
+    if (profile.emailVerified) {
+      await query(
+        `UPDATE user_identities SET email_verified=true
+          WHERE provider='google' AND subject=$1 AND email_verified IS NOT TRUE`, [profile.sub]
+      );
+    }
+  } else {
+    //  ساختن یا وصل کردن فقط با ایمیلِ تأییدشده — پیش از هر جست‌وجو، تا
+    //  پاسخ برای ایمیلِ دارای حساب و بی‌حساب یکی باشد
+    if (profile.email && !profile.emailVerified) {
+      return next(forbidden(GOOGLE_UNVERIFIED_MESSAGE, 'google_email_unverified'));
+    }
+    const existing = await accountOfGoogleEmail(profile);
+    if (existing) {
+      if (config.google.legacyEmailLink && profile.emailVerified) {
+        linkedVia = 'email_auto';
+      } else {
+        linkedVia = await proveExistingMethod(existing, req.body, ip);
+        if (!linkedVia) return linkRequired(res, existing);
+      }
+      user = existing;
+    }
   }
 
   let created = false;
@@ -681,15 +846,47 @@ router.post('/google', authLimit, async (req, res, next) => {
   }
   if (user.status !== 'active') return next(forbidden('این حساب غیرفعال است', 'account_disabled'));
 
-  await query(
-    `INSERT INTO user_identities (id, user_id, provider, subject, email, created_at)
-     VALUES ($1,$2,'google',$3,$4,$5) ON CONFLICT (provider, subject) DO NOTHING`,
-    [newId('idn'), user.id, profile.sub, profile.email || '', now()]
+  const linked = await query(
+    `INSERT INTO user_identities (id, user_id, provider, subject, email, email_verified, created_at)
+     VALUES ($1,$2,'google',$3,$4,$5,$6) ON CONFLICT (provider, subject) DO NOTHING`,
+    [newId('idn'), user.id, profile.sub, profile.email || '', !!profile.emailVerified, now()]
   );
+  if (linkedVia && linked.rowCount) {
+    await audit.log({
+      actorType: 'user', userId: user.id, action: 'auth.identity_linked',
+      targetType: 'user', targetId: user.id, detail: { provider: 'google', via: linkedVia }, ip,
+    });
+  }
 
-  const session = await issueSession(user, req.body?.device, clientIp(req), appOf(req), appVersionOf(req));
-  await audit.log({ actorType: 'user', userId: user.id, action: created ? 'auth.register' : 'auth.login', detail: { method: 'google' }, ip: clientIp(req) });
+  const session = await issueSession(user, req.body?.device, ip, appOf(req), appVersionOf(req));
+  await audit.log({ actorType: 'user', userId: user.id, action: created ? 'auth.register' : 'auth.login', detail: { method: 'google' }, ip });
   res.status(created ? 201 : 200).json({ created, ...(await loginPayload(user, session)) });
+});
+
+/**
+ *  کدِ اثبات برای وصل کردنِ گوگل — به ایمیلِ **خودِ حساب** می‌رود.
+ *
+ *  فقط کسی که توکنِ معتبرِ گوگل با همان ایمیل دارد می‌تواند بخواهدش، و کد
+ *  `purpose='link'` دارد: نه برای ورود کار می‌کند و نه برای بازیابیِ رمز.
+ *  حسابی که نیست یا گوگلش از قبل وصل است کدی نمی‌گیرد (پاسخ همان ۲۰۰ است).
+ *  ⛔ گوگلِ تأییدنشده هم کدی نمی‌گیرد و همان پاسخِ «حساب نیست» را می‌بیند
+ *  (`accountOfGoogleEmail`)؛ و سقفِ «ایمیل + IP» (`linkCodeLimit`) دارد.
+ */
+router.post('/google/link-code', authLimit, otpLimit, readGoogleProfile, linkCodeLimit, async (req, res) => {
+  const profile = req.googleProfile;
+  const already = await one(
+    `SELECT 1 FROM user_identities WHERE provider='google' AND subject=$1`, [profile.sub]
+  );
+  const existing = already ? null : await accountOfGoogleEmail(profile);
+  let out = {};
+  if (existing) {
+    out = await otp.request(existing.email, { purpose: 'link', ip: clientIp(req), app: appOf(req) });
+  }
+  res.json({
+    ok: true, sent: !!existing, email: profile.email || null,
+    resendSeconds: Math.ceil(config.otp.resendMs / 1000),
+    ...(out.devCode ? { devCode: out.devCode } : {}),
+  });
 });
 
 // ---------- تازه‌سازی نشست ----------
@@ -771,22 +968,92 @@ router.post('/logout', sessionLimit, async (req, res) => {
  * نه از بدنه. پس «خروج از همه» در برنامهٔ دکان نشستِ پمپِ همان آدم را
  * دست نمی‌زند و برعکس — همان قاعدهٔ «دو بخش، دو دفتر».
  */
-router.post('/logout-all', requireAnyUser, async (req, res) => {
+router.post('/logout-all', requireAnyUser, reauth.requireRecentAuth, async (req, res) => {
   const app = req.appSection || 'shop';
   const n = await tokens.revokeAllForSubject(req.user.id, null, app);
   await audit.log({ actorType: 'user', userId: req.user.id, action: 'auth.logout_all', detail: { sessions: n, app } });
   res.json({ ok: true, sessions: n, app });
 });
 
+/* ---------- تأییدِ دوبارهٔ هویت برای کارهای حساس (بندِ ۲۱.۱) ---------- */
+
+/** مقصدِ کدِ تأییدِ دوباره: ایمیلِ حساب، وگرنه شمارهٔ آن. */
+function reauthDestination(user) {
+  return user.email || user.phone || '';
+}
+
+/**
+ *  کد برای تأییدِ دوباره — فقط به ایمیل/شمارهٔ **خودِ حساب**، با
+ *  `purpose='reauth'`؛ نه برای ورود کار می‌کند و نه برای بازیابی.
+ */
+router.post('/reauth/code', requireAnyUser, sessionLimit, async (req, res, next) => {
+  const to = reauthDestination(req.user);
+  if (!to) return next(badRequest('این حساب ایمیل یا شماره ندارد که کد به آن برود', 'no_destination'));
+  const out = await otp.request(to, { purpose: 'reauth', ip: clientIp(req), app: req.appSection || 'shop' });
+  res.json({ ok: true, sent: true, resendSeconds: Math.ceil(config.otp.resendMs / 1000), ...(out.devCode ? { devCode: out.devCode } : {}) });
+});
+
+/**
+ *  تأییدِ دوباره با رمز یا کد. موفق ⇒ همین نشست تا چند دقیقه «تازه» است.
+ *  همان قفلِ تلاشِ ناموفقِ ورود، پس راهِ تازه‌ای برای حدس زدنِ رمز نیست.
+ */
+router.post('/reauth', requireAnyUser, sessionLimit, passwordSessionLimit, async (req, res, next) => {
+  const user = req.user;
+  const ip = clientIp(req);
+  const password = typeof req.body?.password === 'string' ? req.body.password : '';
+  const code = String(req.body?.code || '').trim();
+  let method = '';
+  if (password) {
+    const id = user.email || user.phone || user.id;
+    await assertNotLocked('user', id, ip);
+    let ok = false;
+    if (user.password_hash) ok = await pw.verifyPassword(password, user.password_hash);
+    else await pw.burnTime(password);
+    await noteAttempt('user', id, ip, ok);
+    if (!ok) return next(unauthorized('رمز درست نیست', 'bad_credentials'));
+    method = 'password';
+  } else if (code) {
+    const to = reauthDestination(user);
+    await assertNotLocked('otp', to, ip);
+    try {
+      await otp.verify(to, code, { purpose: 'reauth' });
+    } catch (err) {
+      await noteAttempt('otp', to, ip, false);
+      return next(err);
+    }
+    await noteAttempt('otp', to, ip, true);
+    method = 'code';
+  } else {
+    return next(badRequest('رمز یا کد لازم است', 'reauth_proof_required'));
+  }
+  await reauth.markFresh({ tokenHash: req.tokenRow.token_hash, ip });
+  await audit.log({ actorType: 'user', userId: user.id, action: 'auth.reauth', detail: { method }, ip });
+  res.json({ ok: true, freshUntil: await reauth.freshUntil(req.tokenRow.token_hash) });
+});
+
 /** گذاشتن یا عوض کردن رمز عبور (برای کسی که با کد وارد شده). */
-router.post('/password', requireAnyUser, async (req, res, next) => {
+router.post('/password', requireAnyUser, passwordSessionLimit, async (req, res, next) => {
   const next_ = typeof req.body?.newPassword === 'string' ? req.body.newPassword : '';
   const weak = pw.checkStrength(next_);
   if (weak) return next(badRequest(weak, 'weak_password'));
 
+  //  ⛔ حسابِ بی‌رمز «رمزِ فعلی» ندارد که ثابتش کند؛ بی این، هر کسی با یک
+  //  نشستِ باز رمز می‌گذاشت و حساب را از آنِ خودش می‌کرد (بندِ ۲۱.۱).
+  //  در **هر** بخش (پمپ هم): رمز مالِ حساب است، نه مالِ یک بخش — بازبینیِ
+  //  امنیتی ۱۴۰۵/۰۷/۲۷، یافتهٔ ۶. ورودِ تازه یا کدِ ایمیلِ `/reauth` کافی است.
+  if (!req.user.password_hash) await reauth.assertFresh(req, { allSections: true });
   if (req.user.password_hash) {
+    /*
+     *  ⛔ «رمزِ فعلی» همان رمزِ ورود است، پس پشتِ همان قفلِ `/reauth` و
+     *  ورود (`assertNotLocked`/`noteAttempt`، همان شناسه). تا امروز این‌جا
+     *  هیچ قفلی نبود و یک نشستِ کهنه بی‌حساب رمز را حدس می‌زد (یافتهٔ ۵).
+     */
+    const id = req.user.email || req.user.phone || req.user.id;
+    const ip = clientIp(req);
+    await assertNotLocked('user', id, ip);
     const current = typeof req.body?.currentPassword === 'string' ? req.body.currentPassword : '';
     const ok = await pw.verifyPassword(current, req.user.password_hash);
+    await noteAttempt('user', id, ip, ok);
     if (!ok) return next(unauthorized('رمز فعلی درست نیست', 'bad_credentials'));
   }
   const hash = await pw.hashPassword(next_);
@@ -895,6 +1162,10 @@ router.post('/password/reset', verifyLimit, async (req, res, next) => {
   const hash = await pw.hashPassword(password);
   await query('UPDATE users SET password_hash=$2, updated_at=$3 WHERE id=$1', [user.id, hash, now()]);
   await tokens.revokeAllForSubject(user.id);
+  //  ⛔ صاحبِ ایمیل همین حالا مالکیت را با کد ثابت کرد: گوگلی که تأییدِ
+  //  ایمیلش ثابت نیست (مثلاً کسی که پیش از او با گوگلِ تأییدنشده همین
+  //  ایمیل را گرفته بود) دیگر راهی به این حساب ندارد
+  await unlinkUnverifiedGoogle(user.id, clientIp(req), 'password_reset_unverified');
   await audit.log({ actorType: 'user', userId: user.id, action: 'auth.password_reset', ip: clientIp(req) });
 
   //  و همان‌جا واردش می‌کنیم؛ کسی که تازه رمز گذاشته نباید دوباره بزندش

@@ -32,8 +32,9 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: server-${{ github.ref }}
-  cancel-in-progress: true
+  #  PR: pushِ تازه اجرای قبلیِ همان PR را لغو می‌کند. اجرای main (و برچسب‌ها) هرگز وسطِ کار لغو نمی‌شود.
+  group: server-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -218,6 +219,12 @@ jobs:
       - name: آزمونِ ویترین
         working-directory: server
         run: npm run test:web-store
+
+      # بازارچه (WEB، §۲۳): از خانه تا لغوِ سفارش با کرومیومِ واقعی — جداییِ دکان‌ها،
+      # سبدِ ماندگار، قیمتِ عوض‌شده (۴۰۹)، پیگیری، CSP ِ سخت، axe روشن/تاریک، بی بیرون‌زدگی
+      - name: آزمونِ بازارچه
+        working-directory: server
+        run: npm run test:web-market
 
       # باتِ پمپ در ریپوی پمپ است (telegram-bot/) ولی داخلِ همین سرور اجرا می‌شود؛
       # پس هر تغییرِ سرورِ حساب با آزمون‌های خودِ بات هم سنجیده می‌شود تا بات نشکند.

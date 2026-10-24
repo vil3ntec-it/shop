@@ -75,6 +75,9 @@ object PermCore {
     "settings.write" to Spec(OMD, "restrict", false, emptyList(), false),
     "audit.view" to Spec(OMA, "restrict", false, emptyList(), false),
     "reports.money" to Spec(OMA, "full", false, emptyList(), true),
+    // HW-03: باز کردنِ دستیِ کشو بی فروش (`no_sale`)؛ شاگرد فقط با تأییدکننده — همان no_sale ِ #286.
+    // نقش‌های تازه هم «ممنوع» (صندوق‌دار هم: لایهٔ نقش می‌تواند «با تأیید» کند، مثلِ شاگرد)
+    "drawer.open" to Spec(OMD, "restrict", true, emptyList(), false),
   )
 
   /** «همه» — رفتارِ امروزِ سه نقشِ قدیم */
@@ -88,7 +91,8 @@ object PermCore {
     "owner" to listOf(ALL_TABLES),
     "manager" to listOf(ALL_TABLES),
     "staff" to listOf(ALL_TABLES),
-    "cashier" to listOf("auditLog", "debtors", "returns", "saleItems", "sales", "stockMovements", "transactions"),
+    //  `warehouseEntries`: اصلاحِ موجودیِ برگشتِ ضایعات و بی‌رسید (#318) همراهِ همان برگشت
+    "cashier" to listOf("auditLog", "debtors", "returns", "saleItems", "sales", "stockMovements", "transactions", "warehouseEntries"),
     "storekeeper" to listOf(
       "auditLog", "priceHistory", "productCategories", "productUnits", "products", "purchases",
       "stockCounts", "stockMovements", "suppliers", "warehouseEntries",

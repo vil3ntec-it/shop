@@ -320,13 +320,39 @@ class AuthRepository(
     )
   }
 
-  suspend fun loginWithGoogle(idToken: String): ApiResult<SessionDto> = result {
+  /**
+   *  ورود با گوگل.
+   *
+   *  ⛔ اگر این ایمیل از قبل حسابی دارد که گوگلش وصل نیست، سرور ۴۰۹
+   *  `google_link_required` می‌دهد (بندِ ۲۹.۲ قاعدهٔ ۵): باید روشِ قبلیِ
+   *  همان حساب ثابت شود — `password` یا کدی که `requestGoogleLinkCode` به
+   *  ایمیلِ حساب می‌فرستد (`code`). بی این‌ها همان ورودِ همیشگی است.
+   */
+  suspend fun loginWithGoogle(
+    idToken: String,
+    password: String? = null,
+    code: String? = null,
+  ): ApiResult<SessionDto> = result {
     keep(
       api.postPublic(
         ApiEndpoints.Auth.GOOGLE,
-        buildJsonObject { put("idToken", JsonPrimitive(idToken)); putApp() },
+        buildJsonObject {
+          put("idToken", JsonPrimitive(idToken))
+          if (!password.isNullOrEmpty()) put("password", JsonPrimitive(password))
+          if (!code.isNullOrBlank()) put("code", JsonPrimitive(code.trim()))
+          putApp()
+        },
       )
     )
+  }
+
+  /** کدِ اثبات برای وصل کردنِ گوگل — به ایمیلِ خودِ حساب می‌رود. */
+  suspend fun requestGoogleLinkCode(idToken: String): ApiResult<Unit> = result {
+    api.postPublic(
+      ApiEndpoints.Auth.GOOGLE_LINK_CODE,
+      buildJsonObject { put("idToken", JsonPrimitive(idToken)); putApp() },
+    )
+    Unit
   }
 
   /* ------------------------------ کد یک‌بارمصرف ------------------------------ */
@@ -398,6 +424,32 @@ class AuthRepository(
         put("newPassword", JsonPrimitive(fresh))
       },
     )
+    Unit
+  }
+
+  /* ---------------------- تأییدِ دوبارهٔ هویت (بندِ ۲۱.۱) ---------------------- */
+
+  /*
+   *  سرور کارِ حساس را فقط از نشستی می‌پذیرد که چند دقیقهٔ اخیر وارد شده یا
+   *  یکی از این دو را زده (`reauth_required`). پنجره‌اش `ui/ReauthHost` است و
+   *  تکرارِ درخواست کارِ `ApiClient` — هیچ صفحه‌ای این‌ها را خودش صدا نمی‌زند.
+   */
+
+  /** تأیید با رمزِ حساب (حسابِ رمزدار) */
+  suspend fun reauthWithPassword(password: String): ApiResult<Unit> = result {
+    api.post(ApiEndpoints.Auth.REAUTH, buildJsonObject { put("password", JsonPrimitive(password)) })
+    Unit
+  }
+
+  /** فرستادنِ کدِ تأیید به ایمیل (وگرنه شمارهٔ) خودِ حساب — برای حسابِ بی‌رمز */
+  suspend fun requestReauthCode(): ApiResult<Unit> = result {
+    api.post(ApiEndpoints.Auth.REAUTH_CODE)
+    Unit
+  }
+
+  /** تأیید با همان کد */
+  suspend fun reauthWithCode(code: String): ApiResult<Unit> = result {
+    api.post(ApiEndpoints.Auth.REAUTH, buildJsonObject { put("code", JsonPrimitive(code.trim())) })
     Unit
   }
 

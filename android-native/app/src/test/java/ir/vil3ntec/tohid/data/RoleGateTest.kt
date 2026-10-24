@@ -69,6 +69,15 @@ class RoleGateTest {
     assertNull(RoleGate.blocked("storekeeper", base, product))
     assertEquals("expenses", RoleGate.blocked("storekeeper", base, expense))
 
+    //  برگشتِ ضایعات (#318): ردیفِ برگشت + اصلاحِ موجودی در رسیدِ انبار + حرکتِ انبار
+    val damagedReturn = base.copy(
+      saleReturns = listOf(SaleReturn(id = "r1")),
+      warehouseEntries = listOf(WarehouseEntry(id = "w1", productId = "p1")),
+      stockMovements = listOf(StockMovement(id = "m3", productId = "p1")),
+    )
+    assertNull(RoleGate.blocked("cashier", base, damagedReturn))
+    assertEquals("returns", RoleGate.blocked("storekeeper", base, damagedReturn))
+
     assertEquals("sales", RoleGate.blocked("picker", base, sale))
     assertNull(RoleGate.blocked("picker", base, base.copy(auditLog = listOf(AuditEntry(id = "a")))))
 

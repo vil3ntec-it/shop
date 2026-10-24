@@ -11,7 +11,12 @@ const config = require('../config');
 const v = require('../lib/validate');
 const shops = require('../lib/shops');
 const staffCodes = require('../lib/staff-codes');
+const receiptProfile = require('../lib/receipt-profile');
 const audit = require('../lib/audit');
+const { requireRecentAuth, assertFresh } = require('../lib/reauth');
+
+/** نقش‌هایی که کدِ دعوتشان تأییدِ دوباره نمی‌خواهد — هر نقشِ دیگری (مدیر و هر نقشِ تازهٔ بالاتر) می‌خواهد. */
+const INVITE_WITHOUT_REAUTH = new Set(['staff', 'courier']);
 const subsLib = require('../lib/subscriptions');
 const { entitlementOf } = require('../lib/entitlement');
 const { permissionsOf, STAFF_ROLES, legacyRole } = require('../lib/permissions');
@@ -87,6 +92,7 @@ router.get('/members', requireShop, requirePermission('members.view'), async (re
   });
 });
 
+//  ⛔ نقشِ کارمند = مجوزهایش ⇒ فقط از نشستِ تازه احراز‌شده (بندِ ۲۱.۱، `lib/reauth`)
 async function updateMemberRoute(req, res) {
   const id = v.id(req.params.id, { field: 'شناسه عضو' });
   const patch = {
@@ -97,9 +103,10 @@ async function updateMemberRoute(req, res) {
   await audit.log({ shopId: req.shopId, userId: req.user.id, action: 'member.updated', targetType: 'member', targetId: id, detail: patch });
   res.json({ member: { id: row.id, role: row.role, status: row.status } });
 }
-router.patch('/members/:id', requireShop, requirePermission('members.role'), updateMemberRoute);
-//  برنامهٔ نصبی (HttpURLConnection) PATCH ندارد — «تغییرِ نقش» (A16) همین در را با PUT می‌زند
-router.put('/members/:id', requireShop, requirePermission('members.role'), updateMemberRoute);
+router.patch('/members/:id', requireShop, requirePermission('members.role'), requireRecentAuth, updateMemberRoute);
+//  برنامهٔ نصبی (HttpURLConnection) PATCH ندارد — «تغییرِ نقش» (A16) همین در را با PUT می‌زند،
+//  با همان تأییدِ دوبارهٔ هویت
+router.put('/members/:id', requireShop, requirePermission('members.role'), requireRecentAuth, updateMemberRoute);
 
 /**
  * برداشتنِ یک عضو.
@@ -161,7 +168,9 @@ router.post('/staff-code/disable', requireShop, requirePermission('staffcode.rev
 });
 
 /** عوض کردن کد ثابت — برای وقتی که لو رفته باشد. شاگردهای فعلی می‌مانند. */
-router.post('/staff-code/rotate', requireShop, requirePermission('staffcode.create'), requireFeature('multi_device'), async (req, res) => {
+//  ⛔ کدِ تازه = درِ تازه به دکان (و کدِ خاموش‌شده را دوباره باز می‌کند) ⇒ فقط
+//  از نشستِ تازه احراز‌شده (بازبینیِ امنیتی ۱۴۰۵/۰۷/۲۷، یافتهٔ ۳؛ `lib/reauth`)
+router.post('/staff-code/rotate', requireShop, requirePermission('staffcode.create'), requireFeature('multi_device'), requireRecentAuth, async (req, res) => {
   const out = await staffCodes.rotateStanding(req.shopId, req.user.id);
   await audit.log({ shopId: req.shopId, userId: req.user.id, action: 'staff_code.rotated', targetType: 'staff_code', targetId: out.id, detail: { generation: out.generation } });
   res.json({ code: out.code, id: out.id, role: out.role, generation: out.generation, standing: true });
@@ -171,16 +180,39 @@ router.post('/staff-code/rotate', requireShop, requirePermission('staffcode.crea
 // انجام می‌شود، نه با پنهان کردن دکمه در گوشی.
 router.post(['/staff-code', '/invite'], requireShop, requirePermission('staffcode.create'), requireFeature('multi_device'), async (req, res, next) => {
   const role = req.body?.role ? v.oneOf(req.body.role, [...STAFF_ROLES, 'courier'], { field: 'نقش' }) : 'staff';
+  //  ⛔ کدِ دعوتِ نقشِ **بالاتر از شاگرد** یک درِ پشتیِ ماندگار است: نشستِ کهنهٔ
+  //  صاحب دکان (گوشیِ باز، توکنِ دزدیده) با آن مدیرِ تازه می‌ساخت که پس از
+  //  بیرون کردنِ نشست هم می‌ماند. پس همان تأییدِ دوبارهٔ «عوض کردنِ نقش»
+  //  (`PATCH /members/:id`) را می‌خواهد. شاگرد و پیک مثلِ پیش (یافتهٔ ۳).
+  //  A16: نقش‌های تازه هم تأیید می‌خواهند — انباردار اصلاحِ موجودی و حسابدار
+  //  سابقه و عددِ مالی دارد که شاگرد ندارد؛ یک قاعده برای همه، نه فهرستِ استثنا.
+  if (!INVITE_WITHOUT_REAUTH.has(role)) await assertFresh(req);
   //  دعوتِ پیک (DLV-01) — پشتِ پرچمِ `shop.delivery`، پیش‌فرض خاموش؛ همان
   //  سنجش‌های `routes/delivery.js` (بی پرچم ۴۰۴، بی اشتراکِ تحویل ۴۰۳)
+  let maxUses, expiresAt;
   if (role === 'courier') {
     const st = await require('../lib/delivery').stateOf(req.shopId);
     if (!st.readable) return next(notFound('تحویل و پیک برای این دکان روشن نیست', 'delivery_disabled'));
     if (!st.entitled) return next(forbidden('این قابلیت نیازمندِ اشتراک است', 'subscription_required'));
+    //  دعوتِ پیک: فقط ۱ بار و با مهلت (QA #282). بی مهلت ⇐ ۷۲ ساعت؛ ۰ («همیشه») یا بیش از سقف رد می‌شود
+    const C = staffCodes.COURIER_INVITE;
+    const rawUses = req.body?.maxUses;
+    maxUses = rawUses === undefined || rawUses === null || rawUses === '' ? C.maxUses : Number(rawUses);
+    if (maxUses !== C.maxUses) return next(badRequest('کدِ دعوتِ پیک فقط یک بار مصرف می‌شود', 'courier_invite_single_use'));
+    const raw = req.body?.expiresInDays;
+    if (raw === undefined || raw === null || raw === '') expiresAt = now() + C.defaultTtlMs;
+    else {
+      const d = Math.trunc(Number(raw));
+      if (!Number.isFinite(d) || d < 1 || d > C.maxDays) {
+        return next(badRequest(`مهلتِ کدِ دعوتِ پیک باید ۱ تا ${C.maxDays.toLocaleString('fa-IR')} روز باشد`, 'courier_invite_expiry'));
+      }
+      expiresAt = now() + d * 24 * 3600 * 1000;
+    }
+  } else {
+    maxUses = v.integer(req.body?.maxUses, { field: 'تعداد استفاده', min: 0, max: 500, def: 1 });
+    const days = v.integer(req.body?.expiresInDays, { field: 'مهلت', min: 0, max: 3650, def: 0 });
+    expiresAt = days ? now() + days * 24 * 3600 * 1000 : null;
   }
-  const maxUses = v.integer(req.body?.maxUses, { field: 'تعداد استفاده', min: 0, max: 500, def: 1 });
-  const days = v.integer(req.body?.expiresInDays, { field: 'مهلت', min: 0, max: 3650, def: 0 });
-  const expiresAt = days ? now() + days * 24 * 3600 * 1000 : null;
 
   const out = await staffCodes.create(req.shopId, req.user.id, { role, expiresAt, maxUses });
   await audit.log({ shopId: req.shopId, userId: req.user.id, action: 'staff_code.created', targetType: 'staff_code', targetId: out.id, detail: { role, maxUses, expiresAt } });
@@ -244,11 +276,19 @@ router.get('/settings', requireShop, async (req, res) => {
 
 router.put('/settings', requireShop, requirePermission('settings.write'), async (req, res) => {
   const data = v.payload(req.body?.settings, { max: 128 * 1024, field: 'تنظیمات' });
+  //  کلیدِ `receipt` (سربرگ و لوگوی فاکتور) فقط از `/api/shop/receipt-profile` نوشته
+  //  می‌شود: این جایگزینیِ کلِ سند نه آن را می‌نویسد نه پاکش می‌کند.
+  const rest = { ...data };
+  delete rest[receiptProfile.KEY];
   const row = await one(
     `INSERT INTO shop_settings (shop_id, data, rev, updated_at) VALUES ($1,$2::jsonb,1,$3)
-     ON CONFLICT (shop_id) DO UPDATE SET data=excluded.data, rev=shop_settings.rev+1, updated_at=excluded.updated_at
+     ON CONFLICT (shop_id) DO UPDATE SET
+       data = CASE WHEN shop_settings.data ? '${receiptProfile.KEY}'
+                   THEN excluded.data || jsonb_build_object('${receiptProfile.KEY}', shop_settings.data->'${receiptProfile.KEY}')
+                   ELSE excluded.data END,
+       rev=shop_settings.rev+1, updated_at=excluded.updated_at
      RETURNING data, rev`,
-    [req.shopId, JSON.stringify(data), now()]
+    [req.shopId, JSON.stringify(rest), now()]
   );
   res.json({ settings: row.data, rev: Number(row.rev) });
 });

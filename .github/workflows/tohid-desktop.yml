@@ -22,6 +22,8 @@ on:
       - 'core/**'
       #  بردارهای مرجعِ مشترک با JS (StockCoreVectorsTest همین‌ها را می‌خواند)
       - 'license/test-vectors/**'
+      #  گامِ ۵ِ آزمونِ نصاب (`install.ps1` با PowerShell 5.1) — تا امروز در PR اصلاً نمی‌دوید
+      - 'install.ps1'
       - '.github/workflows/tohid-desktop.yml'
   #  ⛔ F0-27: push به main فقط کانالِ آزمایشی (`tohid-desktop-beta`). برچسبِ پایدار
   #  (`tohid-desktop`، همان که همهٔ کامپیوترها و صفحهٔ دانلود می‌خوانند) فقط از
@@ -35,8 +37,10 @@ on:
         default: beta
 
 concurrency:
-  group: tohid-desktop-${{ github.ref }}-${{ inputs.channel || 'push' }}
-  cancel-in-progress: true
+  #  PR: pushِ تازه اجرای قبلیِ همان PR را لغو می‌کند؛ اجرای main (انتشارِ آزمایشی) و انتشارِ
+  #  پایدار هرگز وسطِ کار لغو نمی‌شوند.
+  group: tohid-desktop-${{ github.event.pull_request.number || github.ref }}-${{ inputs.channel || 'push' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: write
@@ -50,13 +54,33 @@ jobs:
       #  نامِ آزمون‌ها فارسی است؛ بی UTF-8 کامپایلر نامِ فایلِ کلاس را نمی‌سازد
       LC_ALL: C.UTF-8
       LANG: C.UTF-8
+    outputs:
+      installer: ${{ steps.installer.outputs.changed }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          #  دو commit: در PR، HEAD همان commitِ ادغام است و HEAD^1 سرِ main ⇒ فهرستِ فایل‌های PR (پایین)
+          fetch-depth: 2
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
       - uses: gradle/actions/setup-gradle@v4
+
+      #  آیا این PR خودِ ساختِ نصاب را عوض کرده؟ آن‌وقت نصاب‌ها بی برچسب هم ساخته و آزموده می‌شوند
+      #  (کارِ «نصاب» پایین). اگر فهرست به دست نیاید، محتاطانه «بله».
+      - name: آیا نصاب‌ها هم ساخته شوند
+        id: installer
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          files=$(git diff --name-only HEAD^1 HEAD) || { echo "changed=true" >> "$GITHUB_OUTPUT"; exit 0; }
+          re='^(desktop/(installer|setup-all|gradle)/|desktop/(build|settings)\.gradle\.kts$|desktop/gradle\.properties$|install\.ps1$|\.github/workflows/tohid-desktop\.yml$)'
+          if grep -qE "$re" <<<"$files"; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "::notice title=نصاب::این PR ساختِ نصاب را عوض کرده ⇒ نصاب‌ها ساخته و نصب‌شان آزموده می‌شود"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: وابستگی‌ها
         working-directory: desktop
@@ -129,11 +153,22 @@ jobs:
       - name: آزمونِ ذخیره
         working-directory: desktop
         shell: bash
-        run: ./gradlew --no-daemon test --tests 'ir.vil3ntec.tohid.desktop.ShopStoreDiskTest' --tests 'ir.vil3ntec.tohid.data.DiskWriteTest' --tests 'ir.vil3ntec.tohid.data.LocalSnapshotsTest'
+        #  SEC-01: کوچِ رمزِ دفتر (جایگزینیِ اتمی، کنار گذاشتنِ دفترِ خوانده‌نشده) روی ویندوزِ واقعی
+        run: ./gradlew --no-daemon test --tests 'ir.vil3ntec.tohid.desktop.ShopStoreDiskTest' --tests 'ir.vil3ntec.tohid.data.DiskWriteTest' --tests 'ir.vil3ntec.tohid.data.LocalSnapshotsTest' --tests 'ir.vil3ntec.tohid.desktop.AtRestDiskTest' --tests 'ir.vil3ntec.tohid.core.atrest.AtRestTest'
 
+  #  ⛔ ۱۴۰۵/۰۷/۲۷: پنج نصاب (دو ویندوز، دو مک، لینوکس؛ هر کدام تا ۴۰ دقیقه با نصبِ واقعی) روی
+  #  **هر** pushِ هر PRِ برنامه گلوگاهِ صفِ Actions بودند. حالا در PR فقط وقتی ساخته می‌شوند که
+  #  برچسبِ `build-installer` روی PR باشد (از pushِ بعدی یا close/reopen) یا خودِ PR ساختِ نصاب را
+  #  عوض کرده باشد (گامِ «آیا نصاب‌ها هم ساخته شوند» بالا). push به main، Run workflow (هر شاخه‌ای) و
+  #  بقیهٔ رویدادها مثلِ قبل همیشه می‌سازند، پس هیچ نصابی بی همین آزمون‌ها منتشر نمی‌شود.
+  #  کامپایل و آزمون (`check`) و ذخیره روی ویندوز (`disk-windows`) در هر PR مثلِ قبل می‌دوند.
   package:
     name: نصاب ${{ matrix.label }}
     needs: check
+    if: >-
+      github.event_name != 'pull_request'
+      || contains(github.event.pull_request.labels.*.name, 'build-installer')
+      || needs.check.outputs.installer == 'true'
     strategy:
       fail-fast: false
       matrix:

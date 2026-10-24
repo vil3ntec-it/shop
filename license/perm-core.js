@@ -100,6 +100,12 @@
       defaults: d('allow', 'allow', 'deny', 'deny', 'deny', 'deny', 'allow'),
       edit: 'full', approvable: false, caps: [], display: true,
     },
+    //  HW-03: باز کردنِ دستیِ کشو بی فروش (`no_sale`)؛ شاگرد فقط با تأییدکننده — همان no_sale ِ #286.
+    //  نقش‌های تازه هم «ممنوع» (صندوق‌دار هم: لایهٔ نقش می‌تواند «با تأیید» کند، مثلِ شاگرد)
+    'drawer.open': {
+      defaults: d('allow', 'allow', 'deny', 'deny', 'deny', 'deny', 'deny'),
+      edit: 'restrict', approvable: true, caps: [], display: false,
+    },
   };
 
   function has(o, k) { return o != null && Object.prototype.hasOwnProperty.call(o, k); }
@@ -110,12 +116,15 @@
    *  `auditLog` برای هر نقشِ نویسنده است: سابقهٔ همان کاری که کرده.
    *  فروش با قلم، حرکتِ انبار، پرداختِ قرض و سابقه یک‌جا می‌نشیند؛ رسیدِ خرید
    *  با کالا، تاریخچهٔ قیمت، رسیدِ انبار و حرکتِ انبار.
+   *  صندوق‌دار `warehouseEntries` هم دارد: برگشتِ ضایعات و برگشتِ بی‌رسید (RET، #318)
+   *  اصلاحِ موجودی را با همان ردیف‌ها همراهِ برگشت می‌نویسد. محدود کردن به «فقط ردیفِ
+   *  اصلاحیِ بسته به برگشت» سنجشِ ردیف است، نه جدول — کارِ جداگانهٔ بعدی.
    */
   var WRITES = {
     owner: '*',
     manager: '*',
     staff: '*',
-    cashier: ['auditLog', 'debtors', 'returns', 'saleItems', 'sales', 'stockMovements', 'transactions'],
+    cashier: ['auditLog', 'debtors', 'returns', 'saleItems', 'sales', 'stockMovements', 'transactions', 'warehouseEntries'],
     storekeeper: ['auditLog', 'priceHistory', 'productCategories', 'productUnits', 'products', 'purchases',
       'stockCounts', 'stockMovements', 'suppliers', 'warehouseEntries'],
     picker: ['auditLog'],

@@ -115,8 +115,13 @@ test('هر نقشِ تازه با کدِ دعوت می‌پیوندد؛ فیلد
     'subscription.request', 'data.read', 'data.write', 'data.delete.any', 'data.delete.own', 'sales.discount', 'sales.cancel',
     'settings.write', 'stock.view', 'stock.move', 'stock.adjust', 'reports.view', 'audit.view', 'orders.view', 'orders.create',
     'orders.manage', 'orders.contact', 'orders.refund', 'delivery.view', 'delivery.assign', 'delivery.handover',
-    'delivery.couriers', 'delivery.settle', 'delivery.photo', 'chat.view', 'chat.reply', 'chat.moderate']);
-  assert.equal(permissionsOf('owner').length, 38);
+    'delivery.couriers', 'delivery.settle', 'delivery.photo', 'chat.view', 'chat.reply', 'chat.moderate',
+    'trust.view', 'trust.respond']);
+  assert.equal(permissionsOf('owner').length, 40);
+  //  پرونده‌های اعتماد و شکایتِ بازارچه (main، §۳۸.۶) فقط صاحب و مدیر — هیچ نقشِ تازه
+  for (const role of NEW_ROLES) {
+    assert.ok(!permissionsOf(role).some((k) => k.startsWith('trust.')), role);
+  }
   //  حسابدار عددِ مالی و سابقه را می‌بیند؛ بقیهٔ تازه‌ها نه
   const acc = (await h.get('/api/shop', { token: T.accountant.accessToken })).body.policy.effective;
   assert.equal(acc['reports.money'].mode, 'allow');
@@ -241,6 +246,21 @@ test('Sync v1: صندوق‌دار می‌فروشد ولی خرید و مصرف
   assert.deepEqual(reasons(r), ['tx_rejected', 'table_not_allowed', 'tx_rejected', 'table_not_allowed', 'applied']);
   for (const o of buy.slice(0, 4)) assert.equal(await inOplog(o.op_id), false, o.table);
   assert.equal(await inOplog(buy[4].op_id), true);
+
+  //  برگشتِ ضایعات (#318): برگشت + اصلاحِ موجودی در رسیدِ انبار + حرکتِ انبار — همه در حدِ صندوق‌دار
+  const ret = [
+    v1op('returns', 'r1-csh', { saleId: 's1-csh', saleItemId: 'si1-csh', productId: 'p1', quantity: 1, amount: 100, docId: 'rd1-csh' }),
+    v1op('warehouseEntries', 'w1-csh', { productId: 'p1', units: -1, isAdjustment: true, adjKind: 'damage', refId: 'rd1-csh' }),
+    v1op('stockMovements', 'm4-csh', { productId: 'p1', type: 'damage', qty: -1, refId: 'r1-csh' }),
+  ];
+  const back = await push1('cashier', ret);
+  assert.equal(back.status, 200, JSON.stringify(back.body));
+  assert.deepEqual(reasons(back), ['applied', 'applied', 'applied']);
+  //  ولی انباردار برگشت نمی‌زند
+  const sk = await push1('storekeeper', [
+    v1op('returns', 'r1-stk', { saleId: 's1-csh', saleItemId: 'si1-csh', productId: 'p1', quantity: 1, amount: 100 }),
+  ]);
+  assert.deepEqual(reasons(sk), ['table_not_allowed']);
 });
 
 test('Sync v1: انباردار کالا و خرید می‌نویسد ولی فروش نه؛ جمع‌آور فقط سابقه؛ حسابدار هیچ (op به op، نه ۴۰۳ِ کلِ دسته)', async () => {

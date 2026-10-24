@@ -27,6 +27,7 @@ const approvals = require('../lib/staff-approval');
 const { can, legacyRole } = require('../lib/permissions');
 const { requireShop, requirePermission } = require('../middleware/auth');
 const { clientIp } = require('../middleware/ratelimit');
+const { requireRecentAuth } = require('../lib/reauth');
 
 const router = express.Router();
 
@@ -37,7 +38,8 @@ router.get('/permissions', requireShop, async (req, res) => {
   res.json(out);
 });
 
-router.put('/permissions/roles/:role', requireShop, requirePermission('members.role'), async (req, res) => {
+//  ⛔ تغییرِ مجوزها فقط از نشستِ تازه احراز‌شده (بندِ ۲۱.۱، `lib/reauth`)
+router.put('/permissions/roles/:role', requireShop, requirePermission('members.role'), requireRecentAuth, async (req, res) => {
   const role = v.text(req.params.role, { max: 20, required: true, field: 'نقش' });
   const layer = await perms.setRoleLayer(req.shopId, role, req.body?.perms, req.user.id);
   await audit.log({
@@ -47,7 +49,7 @@ router.put('/permissions/roles/:role', requireShop, requirePermission('members.r
   res.json({ role, perms: layer, shop: await perms.overview(req.shopId) });
 });
 
-router.put('/permissions/members/:id', requireShop, requirePermission('members.role'), async (req, res) => {
+router.put('/permissions/members/:id', requireShop, requirePermission('members.role'), requireRecentAuth, async (req, res) => {
   const id = v.id(req.params.id, { field: 'شناسه عضو' });
   const { member, layer } = await perms.setMemberLayer(req.shopId, id, req.body?.perms, req.user.id);
   await audit.log({

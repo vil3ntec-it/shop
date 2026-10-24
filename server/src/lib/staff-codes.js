@@ -48,6 +48,14 @@ function randomBody() {
  * تا وقتی کدی یکتا نشده، دوباره تولید می‌شود — پس حتی با میلیون‌ها دکان
  * دو کد یکسان صادر نمی‌شود.
  */
+/**
+ * دعوتِ پیک (DLV-01): یک‌بارمصرف، با مهلتِ پیش‌فرضِ ۷۲ ساعت و حداکثر ۷ روز
+ * (برنامهٔ گوشی پیش‌فرض ۷ روز می‌فرستد). کدِ بی‌شمار یا بی‌مهلت را می‌شد در
+ * گروه پخش کرد و هر کس با آن پیکِ همین دکان می‌شد.
+ */
+const DAY_MS = 24 * 3600 * 1000;
+const COURIER_INVITE = Object.freeze({ maxUses: 1, defaultTtlMs: 72 * 3600 * 1000, maxDays: 7 });
+
 async function create(shopId, createdBy, { role = 'staff', expiresAt = null, maxUses = 1 } = {}) {
   //  'courier' (DLV-01) فقط کدِ یک‌بارِ دعوت است — کدِ ثابت همیشه شاگرد/مدیر.
   //  پرچمِ `shop.delivery` را مسیرِ `/api/shop/invite` پیش از این می‌سنجد.
@@ -55,6 +63,13 @@ async function create(shopId, createdBy, { role = 'staff', expiresAt = null, max
   if (maxUses < 0 || maxUses > 500) throw badRequest('تعداد استفاده معتبر نیست');
   if (expiresAt !== null && (!Number.isFinite(expiresAt) || expiresAt <= now())) {
     throw badRequest('تاریخ انقضا باید در آینده باشد');
+  }
+  //  کدِ پیک یک‌بارمصرف و با مهلت است (QA #282) — سدِّ دوم پشتِ مسیرِ `/invite`
+  if (role === 'courier') {
+    if (maxUses !== COURIER_INVITE.maxUses) throw badRequest('کدِ دعوتِ پیک فقط یک بار مصرف می‌شود', 'courier_invite_single_use');
+    if (expiresAt === null || expiresAt > now() + COURIER_INVITE.maxDays * DAY_MS) {
+      throw badRequest(`کدِ دعوتِ پیک باید مهلت داشته باشد (۱ تا ${COURIER_INVITE.maxDays.toLocaleString('fa-IR')} روز)`, 'courier_invite_expiry');
+    }
   }
 
   for (let attempt = 0; attempt < 8; attempt++) {
@@ -309,4 +324,5 @@ async function redeem(rawCode, userId, ip = '') {
 }
 
 module.exports = {
-  standing, rotateStanding, disableStanding, deriveStanding, create, list, revoke, redeem, shopIdOf, normalize, format, hashCode, PREFIX };
+  standing, rotateStanding, disableStanding, deriveStanding, create, list, revoke, redeem, shopIdOf, normalize, format, hashCode, PREFIX,
+  COURIER_INVITE };

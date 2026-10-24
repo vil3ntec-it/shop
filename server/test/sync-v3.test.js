@@ -650,3 +650,43 @@ test('v1 و پمپ دست‌نخورده: v3 در oplogِ v1 نمی‌نویسد
   const after = await one(`SELECT COUNT(*)::int AS n FROM oplog`);
   assert.equal(after.n, before.n);
 });
+
+test('A00: null ِ ساختِ پیش از A00 برای فیلدی که نمی‌شناسد کنار می‌رود؛ ساختی که می‌شناسد و وب پاکش می‌کنند', async () => {
+  const as = (version, ops) => h.api('POST', '/api/sync/v3/push', {
+    token: owner.accessToken, headers: { 'X-App-Version': version }, body: { device_id: A, protocol: 3, ops },
+  });
+  const upd = (fields) => ({ op_id: oid(), hlc: H(A), table: 'products', row_id: 'p-a00', kind: 'update', fields });
+  const ins = await as('3.2.9999', [{ op_id: oid(), hlc: H(A), table: 'products', row_id: 'p-a00', kind: 'insert',
+    fields: { name: 'x', salePriceMinor: 100, subcategory: 's', futureX: 'f' } }]);
+  assert.equal(ins.body.results[0].status, 'applied');
+
+  //  ساختِ 3.2.290: نه subcategory (از 3.2.300) را می‌شناسد نه futureX
+  const old = await as('3.2.290', [upd({ subcategory: null, futureX: null, name: 'y' }), upd({ futureX: null })]);
+  assert.equal(old.status, 200, JSON.stringify(old.body));
+  assert.deepEqual(old.body.results.map((r) => r.status), ['applied', 'applied']);
+  assert.deepEqual(old.body.results[0].ignored, ['subcategory', 'futureX']);
+  assert.equal(old.body.results[1].reason, 'stale_null_ignored');
+  let row = await rowOf('products', 'p-a00');
+  assert.deepEqual([row.data.name, row.data.subcategory, row.data.futureX], ['y', 's', 'f']);
+
+  await as('3.2.300', [upd({ subcategory: null })]);
+  await as('3.2', [upd({ futureX: null })]);
+  row = await rowOf('products', 'p-a00');
+  assert.deepEqual([row.data.subcategory, row.data.futureX], [null, null]);
+
+  //  نامِ v3 با پسوندِ واحد: `salePriceMinor` همان `salePrice` است که همهٔ ساخت‌ها می‌شناسند؛
+  //  `futureYMinor` ناشناخته می‌ماند
+  await as('3.2.9999', [upd({ futureYMinor: 5 })]);
+  const minor = await as('3.2.290', [upd({ salePriceMinor: null, futureYMinor: null })]);
+  assert.deepEqual(minor.body.results[0].ignored, ['futureYMinor']);
+  row = await rowOf('products', 'p-a00');
+  assert.deepEqual([row.data.salePriceMinor, row.data.futureYMinor], [null, 5]);
+
+  //  نشانِ صریح: ساختِ A00 (`caps`) و وب (`client`) از تور می‌گذرند، هر نسخه‌ای بگویند
+  const marked = (body, ops) => h.api('POST', '/api/sync/v3/push', {
+    token: owner.accessToken, headers: { 'X-App-Version': '3.2.1' }, body: { device_id: A, protocol: 3, ops, ...body },
+  });
+  await marked({ caps: ['a00'] }, [upd({ futureYMinor: null })]);
+  row = await rowOf('products', 'p-a00');
+  assert.equal(row.data.futureYMinor, null);
+});

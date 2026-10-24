@@ -306,6 +306,7 @@ fun TeamScreen(snackbar: SnackbarHostState) {
     Spacer(Modifier.height(18.dp))
 
     /* ---------------- مجوزِ کارمندان و دستگاه‌ها (STF) ---------------- */
+    ApproverSetupSection(shops, snackbar = snackbar)
     MemberPermsSection(shops, canEdit = isOwner, snackbar = snackbar)
     DevicesSection(shops, canEdit = isOwner, snackbar = snackbar)
 
