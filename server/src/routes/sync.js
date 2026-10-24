@@ -60,7 +60,7 @@ router.get('/status', async (req, res) => {
   res.json({
     shopId: req.shopId,
     rev: await sync.currentRev(req.shopId),
-    collections: sync.COLLECTIONS,
+    collections: sync.LEGACY_COLLECTIONS,
     role: req.role,
     subscription: ent.subscription,
     serverTime: now(),

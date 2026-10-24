@@ -162,6 +162,52 @@ test('v1: لایهٔ نقش `safe.move` را از مدیر می‌گیرد؛ op�
   assert.deepEqual(statuses(await push1(manager, 'safe-mgr', [count('mgr-c3', 6000)])), ['applied']);
 });
 
+test('v1: درجِ دوباره روی ردیفِ موجود با محتوای دیگر ویرایش است و رد می‌شود (شاگرد و صاحب)', async () => {
+  const out = op1('rin-o1', { id: 'rin-o1', kind: 'out', amountMinor: 10000, createdAt: at(), reason: 'owner_withdrawal' });
+  const cnt = count('rin-c1', 5000);
+  assert.deepEqual(statuses(await push1(owner, 'safe-own', [count('rin-c0', 50000), out, cnt])), ['applied', 'applied', 'applied']);
+  //  شاگرد «از دخل» را روی ردیفِ برداشتِ صاحب می‌نشاند — ادغامِ v1 ردیف را خراب و از مانده بیرون می‌کرد
+  const overDrop = op1('rin-o1', { id: 'rin-o1', kind: 'from_drawer', amountMinor: 1, createdAt: at(), shiftId: 's', auditId: 'a' });
+  assert.deepEqual(statuses(await push1(staff, 'safe-staff', [overDrop])), ['rejected:safe_append_only']);
+  //  صاحب هم شمارشِ ثبت‌شده را بی‌صدا عوض نمی‌کند
+  const bump = op1('rin-c1', { ...cnt.fields, amountMinor: 99999 });
+  assert.deepEqual(statuses(await push1(owner, 'safe-own', [bump])), ['rejected:safe_append_only']);
+  assert.equal((await rowOf('rin-o1')).data.kind, 'out');
+  assert.equal((await rowOf('rin-o1')).data.amountMinor, 10000);
+  assert.equal((await rowOf('rin-c1')).data.amountMinor, 5000);
+});
+
+test('v1: همان ردیف عیناً (فرستادنِ دوباره پس از بازیابی) بی‌اثر می‌گذرد، حتی از شاگرد', async () => {
+  const cnt = count('rep-c1', 4200, 0);
+  assert.deepEqual(statuses(await push1(owner, 'safe-own', [cnt])), ['applied']);
+  //  opِ تازه، همان محتوا، ترتیبِ دیگرِ کلیدها و `id` در فیلدها
+  const again = { ...cnt, op_id: oid(), fields: { expectedMinor: 0, createdAt: cnt.fields.createdAt, amountMinor: 4200, kind: 'count', id: 'rep-c1' } };
+  assert.deepEqual(statuses(await push1(staff, 'safe-staff-restored', [again])), ['applied']);
+  assert.equal((await rowOf('rep-c1')).data.amountMinor, 4200);
+});
+
+test('v1: دو درجِ یک ردیف در یک دسته — دومی رد می‌شود', async () => {
+  const a = count('two-c1', 3000);
+  const b = op1('two-c1', { ...a.fields, amountMinor: 3001 });
+  const same = { ...a, op_id: oid() };
+  assert.deepEqual(statuses(await push1(owner, 'safe-own', [a, b, same])),
+    ['applied', 'rejected:safe_append_only', 'rejected:safe_append_only']);
+  assert.equal((await rowOf('two-c1')).data.amountMinor, 3000);
+});
+
+test('زمانِ بیش از یک روز جلوتر از سرور رد می‌شود (v1 و v3)؛ تا یک روز پذیرفته است', async () => {
+  const far = Date.now() + safe.MAX_AHEAD_MS + 60_000;
+  const near = Date.now() + safe.MAX_AHEAD_MS - 60_000;
+  const r = await push1(owner, 'safe-own', [
+    op1('fut-1', { id: 'fut-1', kind: 'count', amountMinor: 1, createdAt: far, expectedMinor: 0 }),
+    op1('fut-2', { id: 'fut-2', kind: 'count', amountMinor: 1, createdAt: near, expectedMinor: 0 }),
+  ]);
+  assert.deepEqual(statuses(r), ['rejected:safe_invalid', 'applied']);
+  const v3 = await push3(owner, 'safe-v3-own', [{ op_id: oid(), hlc: H('v3-safe'), table: 'safeEntries', row_id: 'fut-3', kind: 'insert',
+    fields: { kind: 'count', amountMinor: 1, createdAt: far, expectedMinor: 0 } }]);
+  assert.equal(v3.body.results[0].reason, 'safe_invalid', JSON.stringify(v3.body));
+});
+
 test('v3: همان داوری روی opِ بومی', async () => {
   const v3 = (id, fields) => ({ op_id: oid(), hlc: H('v3-safe'), table: 'safeEntries', row_id: id, kind: 'insert', fields });
   const bad = await push3(staff, 'safe-v3-staff', [v3('v3-c1', { kind: 'count', amountMinor: 100, createdAt: at(), expectedMinor: 0 })]);
@@ -172,8 +218,14 @@ test('v3: همان داوری روی opِ بومی', async () => {
   assert.equal(drop3.body.results[0].status, 'applied', JSON.stringify(drop3.body));
   const shape = await push3(owner, 'safe-v3-own', [v3('v3-b1', { kind: 'to_bank', amountMinor: 100, createdAt: at() })]);
   assert.equal(shape.body.results[0].reason, 'safe_invalid');
-  const good = await push3(owner, 'safe-v3-own', [v3('v3-c2', { kind: 'count', amountMinor: 100, createdAt: at(), expectedMinor: 0 })]);
+  const fields = { kind: 'count', amountMinor: 100, createdAt: at(), expectedMinor: 0 };
+  const good = await push3(owner, 'safe-v3-own', [v3('v3-c2', fields)]);
   assert.equal(good.body.results[0].status, 'applied', JSON.stringify(good.body));
+  //  ردیفِ موجود را سیاستِ log ِ خودِ v3 داوری می‌کند: عیناً همان بی‌اثر، دیگری تعارض — حتی از شاگرد
+  const same = await push3(staff, 'safe-v3-staff', [v3('v3-c2', fields)]);
+  assert.notEqual(same.body.results[0].status, 'rejected', JSON.stringify(same.body));
+  const other = await push3(staff, 'safe-v3-staff', [v3('v3-c2', { ...fields, amountMinor: 999 })]);
+  assert.equal(other.body.results[0].status, 'conflict', JSON.stringify(other.body));
 });
 
 test('راهِ قدیمِ /api/sync در گاوصندوق نمی‌نویسد (sync_v1_only)؛ بقیهٔ همان دسته می‌نشیند', async (t) => {
@@ -201,6 +253,13 @@ test('راهِ قدیمِ /api/sync در گاوصندوق نمی‌نویسد (s
     ], url);
   }
   assert.equal(Number((await one('SELECT count(*) AS n FROM shop_safe_entries WHERE shop_id=$1', [shopId])).n), 0);
+  //  راهِ قدیم این مجموعه را نه می‌خواند نه نشان می‌دهد
+  const status = await h.api('GET', '/api/sync/status', { token: owner.accessToken, headers: { 'X-App': 'shop' } });
+  assert.equal(status.status, 200, JSON.stringify(status.body));
+  assert.ok(status.body.collections.includes('products') && !status.body.collections.includes('safeEntries'));
+  const pulled = await h.api('GET', '/api/sync?since=0&deviceId=legacy-pull', { token: owner.accessToken, headers: { 'X-App': 'shop' } });
+  assert.equal(pulled.status, 200, JSON.stringify(pulled.body));
+  assert.ok(!pulled.body.changes.some((c) => c.collection === 'safeEntries'));
 });
 
 test('میان‌افزار فقط دکان است: پمپ و بی‌حساب بی هیچ کاری رد می‌شوند', async () => {

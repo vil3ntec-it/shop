@@ -45,11 +45,14 @@ const TABLES = {
 };
 const COLLECTIONS = Object.keys(TABLES);
 /**
- * مجموعه‌هایی که فقط Sync v1/v3 می‌نویسد، با سنجشِ شکل و مجوزِ خودشان (`safe-ledger.js`).
- * راهِ قدیم آن‌ها را فقط می‌خواند (همیشه خالی)؛ نوشتنش با کدِ `sync_v1_only` رد می‌شود —
- * درِ نوشتنِ بی‌سنجش نمی‌ماند، حتی اگر برنامه‌ها از این جدول نخوانند.
+ * مجموعه‌هایی که فقط Sync v1/v3 دارد، با سنجشِ شکل و مجوزِ خودشان (`safe-ledger.js`).
+ * راهِ قدیم آن‌ها را نه می‌نویسد (هر تغییرش با کدِ `sync_v1_only` برمی‌گردد) نه می‌خواند
+ * و نه در فهرستِ مجموعه‌هایش نشان می‌دهد — درِ بی‌سنجش نمی‌ماند، حتی اگر برنامه‌ها از این
+ * جدول نخوانند. جدول برای هم‌شکلیِ `TABLES` (پلهٔ ۴ِ v1) هست و همیشه خالی است.
  */
 const V1_ONLY = new Set(['safeEntries']);
+/** آنچه راهِ قدیم (`/api/sync`، پنلِ مدیر) می‌بیند */
+const LEGACY_COLLECTIONS = COLLECTIONS.filter((c) => !V1_ONLY.has(c));
 
 const MAX_BATCH = 2000;
 const MAX_RECORD_BYTES = 64 * 1024;
@@ -179,7 +182,7 @@ async function pushChanges(ctx, changes) {
 
 /** ساخت پرس‌وجوی خواندن تفاضلی روی همه‌ی مجموعه‌ها. */
 const PULL_SQL = (() => {
-  const parts = COLLECTIONS.map(col => `
+  const parts = LEGACY_COLLECTIONS.map(col => `
     SELECT '${col}'::text AS collection, id, rev, updated_at, deleted, user_id, device_id, data
       FROM ${TABLES[col]} WHERE shop_id = $1 AND rev > $2`);
   return `${parts.join(' UNION ALL ')} ORDER BY rev ASC LIMIT $3`;
@@ -246,6 +249,6 @@ async function runIdempotent({ shopId, userId, deviceId, operationId }, fn) {
 }
 
 module.exports = {
-  TABLES, COLLECTIONS, V1_ONLY, MAX_BATCH, MAX_LIMIT,
+  TABLES, COLLECTIONS, V1_ONLY, LEGACY_COLLECTIONS, MAX_BATCH, MAX_LIMIT,
   pushChanges, pullChanges, currentRev, runIdempotent,
 };

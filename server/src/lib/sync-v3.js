@@ -436,7 +436,7 @@ async function authorize(c, ctx, op, row, deviceId, origin) {
     return !row || !row.created_by || own ? null : 'delete_not_allowed';
   }
   //  گاوصندوق (PAY-18): فقط درج، شکلِ درست و `safe.move` (جز «از دخل») — `safe-ledger.js`
-  if (op.table === safeLedger.TABLE) return safeLedger.judgeV3(ctx, op);
+  if (op.table === safeLedger.TABLE) return safeLedger.judgeV3(ctx, op, row);
   //  تخفیف، لغوِ فاکتور و برگشت: نقش + دو لایه + «برگهٔ امضاشده» (STF-02/03)
   const need = approvals.needOf(op, row);
   if (need) {

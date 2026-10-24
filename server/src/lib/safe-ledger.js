@@ -4,10 +4,14 @@
  *
  * مانده و تاریخچه را برنامه از روی دفتر حساب می‌کند (`core/safe/SafeCore.kt`)؛ سرور فقط
  * نمی‌گذارد ردیفی بنشیند که:
- *   • فقط‌افزودنی نیست: ویرایش یا حذف ⇒ `safe_append_only` (v3: سیاستِ `log` خودش)؛
+ *   • فقط‌افزودنی نیست: ویرایش یا حذف، یا درجِ دوباره روی ردیفی که هست با محتوای دیگر،
+ *     یا دو درجِ یک ردیف در یک دسته ⇒ `safe_append_only`. v1 درج را روی ردیفِ موجود ادغام
+ *     می‌کند، پس این‌جا `sync_rows` خوانده می‌شود؛ درجِ عیناً همان (فرستادنِ دوباره پس از
+ *     بازیابی) بی‌اثر می‌گذرد — همان `inserted && same` ِ v3. v3 خودش با سیاستِ `log` می‌سنجد؛
  *   • شکلش درست نیست ⇒ `safe_invalid` — همان [check] ِ هسته (`SafeCore.check`)، با بردارِ
- *     مشترکِ `core/test-vectors/safe-v1.json`، به‌علاوهٔ نوعِ JSON. ردیفِ بدشکل خواندنِ کلِ
- *     دفتر را روی برنامه‌ها می‌شکست؛
+ *     مشترکِ `core/test-vectors/safe-v1.json`، به‌علاوهٔ نوعِ JSON و زمانی که بیش از
+ *     [MAX_AHEAD_MS] از ساعتِ سرور جلوتر است. ردیفِ بدشکل خواندنِ کلِ دفتر را روی برنامه‌ها
+ *     می‌شکست، و ردیفِ «آینده» هر شمارشِ بعدی را پیش از خودش می‌انداخت؛
  *   • کاربرش `safe.move` ندارد ⇒ `safe_not_allowed` (نقش + دو لایه، `staff-perms`). تنها
  *     استثنا «از دخل به گاوصندوق» است: پول در دکان می‌ماند و نوشتن بس است.
  *
@@ -34,6 +38,8 @@ const REASONS = Object.freeze({
   out: Object.freeze(['owner_withdrawal', 'petty_expense', OTHER]),
 });
 const TEXT_FIELDS = Object.freeze(['by', 'reason', 'note', 'bagNo', 'shiftId', 'auditId']);
+/** ساعتِ دستگاه تا یک روز جلوتر از سرور پذیرفته است (منطقهٔ زمانیِ غلط، نه بیشتر) */
+const MAX_AHEAD_MS = 24 * 60 * 60 * 1000;
 const MAX_ID = 64;
 const MAX_TEXT = 200;
 const MAX_BAG = 40;
@@ -79,14 +85,23 @@ async function mayMove(ctx) {
   return permCore.allows(ctx.role, await staffPerms.layersFor(ctx.accountId, ctx.role, ctx.userId), PERM);
 }
 
+/** شکل + زمانِ نه‌چندان آینده — null یعنی درست */
+function invalid(row, nowMs) {
+  return check(row) !== null || row.createdAt > nowMs + MAX_AHEAD_MS;
+}
+
+/** محتوای ردیف بی `id` و بی کلیدِ null، با ترتیبِ ثابتِ کلیدها — برای «همان ردیف است؟» */
+function canonical(row) {
+  const out = {};
+  for (const k of Object.keys(row || {}).sort()) if (k !== 'id' && !absent(row[k])) out[k] = row[k];
+  return JSON.stringify(out);
+}
+
 /**
- * داوریِ یک ردیف — null یعنی بنشیند.
- * @param kind  `insert` یا هر کارِ دیگر (v1 `type`، v3 `kind`)
+ * داوریِ درجِ یک ردیفِ تازه (نه ردیفِ موجود) — null یعنی بنشیند.
  * @param allowed  تابعِ تنبلِ [mayMove] تا لایه‌ها یک بار در هر درخواست خوانده شوند
  */
-async function judge(kind, row, allowed) {
-  if (kind !== 'insert') return 'safe_append_only';
-  if (check(row) !== null) return 'safe_invalid';
+async function judgeNew(row, allowed) {
   if (!OPEN_KINDS.includes(row.kind) && !(await allowed())) return 'safe_not_allowed';
   return null;
 }
@@ -111,27 +126,55 @@ async function v1SafeGuard(req, res, next) {
       if (v.ok) mine.push({ i, op: v.op });           //  opِ بدشکل را خودِ v1 با دلیلِ خودش رد می‌کند
     });
     if (!mine.length) return next();
-    //  opِ ثبت‌شده را خودِ v1 «تکراری» جواب می‌دهد — حتی اگر نقش از آن روز عوض شده باشد
+    const acc = [ctx.accountId];
+    //  opِ ثبت‌شدهٔ همین حساب را خودِ v1 «تکراری» جواب می‌دهد — حتی اگر نقش از آن روز عوض شده باشد
     const seen = new Set((await many(
-      'SELECT op_id FROM oplog WHERE op_id = ANY($1::text[])', [mine.map(({ op }) => String(op.op_id))]
+      `SELECT op_id FROM oplog WHERE app='shop' AND account_kind='shop' AND account_id=$1 AND op_id = ANY($2::text[])`,
+      [...acc, mine.map(({ op }) => String(op.op_id))]
     )).map((r) => r.op_id));
+    //  ردیف‌های موجود (حتی پاک‌شده): درجِ v1 روی آن‌ها ادغام می‌شد
+    const existing = new Map((await many(
+      `SELECT row_id, data, deleted_at FROM sync_rows
+        WHERE app='shop' AND account_kind='shop' AND account_id=$1 AND table_name=$2 AND row_id = ANY($3::text[])`,
+      [...acc, TABLE, [...new Set(mine.map(({ op }) => String(op.row_id)))]]
+    )).map((r) => [r.row_id, r]));
     const allowed = once(() => mayMove(ctx));
+    const nowMs = Date.now();
+    const batch = new Set();
     const rejected = new Map();
+    const reject = (i, op, reason) => rejected.set(i, { op_id: String(op.op_id), status: 'rejected', reason });
     for (const { i, op } of mine) {
       if (seen.has(String(op.op_id))) continue;
+      if (op.type !== 'insert') { reject(i, op, 'safe_append_only'); continue; }
       const row = { ...(isPlainObject(op.fields) ? op.fields : {}), id: op.row_id };
-      const reason = await judge(op.type, row, allowed);
-      if (reason) rejected.set(i, { op_id: String(op.op_id), status: 'rejected', reason });
+      if (invalid(row, nowMs)) { reject(i, op, 'safe_invalid'); continue; }
+      if (batch.has(op.row_id)) { reject(i, op, 'safe_append_only'); continue; }
+      batch.add(op.row_id);
+      const cur = existing.get(op.row_id);
+      if (cur) {
+        //  همان ردیف، عیناً ⇒ بی‌اثر می‌گذرد؛ هر چیزِ دیگر (یا ردیفِ پاک‌شده) ویرایش است
+        if (cur.deleted_at !== null || canonical(cur.data) !== canonical(row)) reject(i, op, 'safe_append_only');
+        continue;
+      }
+      const reason = await judgeNew(row, allowed);
+      if (reason) reject(i, op, reason);
     }
     rejectOps(req, res, ops, rejected);
     next();
   } catch (err) { next(err); }
 }
 
-/** همان داوری برای opِ بومیِ v3 (`authorize`ِ `sync-v3.js`؛ opِ رسیده از v1 آن‌جا سنجیده بود) */
-async function judgeV3(ctx, op) {
+/**
+ * همان داوری برای opِ بومیِ v3 (`authorize`ِ `sync-v3.js`؛ opِ رسیده از v1 آن‌جا سنجیده بود).
+ * ردیفِ موجود را سیاستِ `log` ِ خودِ v3 داوری می‌کند: عیناً همان بی‌اثر، دیگری صندوقِ تعارض.
+ * @param existing  ردیفِ فعلیِ v3 (یا null)
+ */
+async function judgeV3(ctx, op, existing) {
+  if (op.kind !== 'insert') return 'safe_append_only';
   const row = { ...(isPlainObject(op.fields) ? op.fields : {}), id: op.row_id };
-  return judge(op.kind, row, () => mayMove(ctx));
+  if (invalid(row, Date.now())) return 'safe_invalid';
+  if (existing) return null;
+  return judgeNew(row, () => mayMove(ctx));
 }
 
-module.exports = { TABLE, PERM, KINDS, REASONS, check, mayMove, v1SafeGuard, judgeV3 };
+module.exports = { TABLE, PERM, KINDS, REASONS, MAX_AHEAD_MS, check, canonical, mayMove, v1SafeGuard, judgeV3 };
