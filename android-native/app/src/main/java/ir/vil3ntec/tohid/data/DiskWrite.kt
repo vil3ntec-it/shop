@@ -67,7 +67,8 @@ object DiskWrite {
     syncDir(dir)
   }
 
-  private fun move(tmp: File, target: File) {
+  /** همان جابه‌جاییِ اتمی که جایگزین می‌کند — برای کوچِ رمز (`AtRest`) */
+  internal fun move(tmp: File, target: File) {
     if (Build.VERSION.SDK_INT >= 26) return Api26.move(tmp, target)
     if (!tmp.renameTo(target)) throw IOException("«${target.name}» روی دیسک جایگزین نشد")
   }
@@ -76,7 +77,7 @@ object DiskWrite {
    *  `fsync`ِ خودِ پوشه تا نامِ تازه هم پس از قطعِ برق بماند. روی ویندوز
    *  پوشه باز نمی‌شود و لازم هم نیست — خطایش نادیده گرفته می‌شود.
    */
-  private fun syncDir(dir: File) {
+  internal fun syncDir(dir: File) {
     if (Build.VERSION.SDK_INT >= 26) runCatching { Api26.syncDir(dir) }
   }
 

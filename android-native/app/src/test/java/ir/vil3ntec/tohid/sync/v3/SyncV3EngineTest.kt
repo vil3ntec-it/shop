@@ -3,8 +3,10 @@ package ir.vil3ntec.tohid.sync.v3
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.Sale
 import ir.vil3ntec.tohid.data.SaleItem
+import ir.vil3ntec.tohid.data.SaleReturn
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.StockMovement
+import ir.vil3ntec.tohid.sync.v1.LedgerDiff
 import ir.vil3ntec.tohid.sync.v1.SyncCommit
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonArray
@@ -44,6 +46,8 @@ class SyncV3EngineTest {
     val requests = ArrayList<String>()
     val pushSizes = ArrayList<Int>()
     val formats = ArrayList<String>()
+    /** A00: آیا هر push نشانِ `caps` داشت */
+    val caps = ArrayList<Boolean>()
     val conflicts = ArrayList<JsonObject>()
     private var seq = 0L
 
@@ -81,6 +85,7 @@ class SyncV3EngineTest {
       }
       val ops = body.getValue("ops").jsonArray.map { it.jsonObject }
       pushSizes += ops.size
+      caps += body.containsKey("caps")
       formats += str(body, "format").ifEmpty { "v3" }
       if (str(body, "format") == "v2") {
         //  سرورِ واقعی ویرایشِ سندِ مالی را به صندوقِ تعارض می‌برد
@@ -204,6 +209,32 @@ class SyncV3EngineTest {
     saleItems = listOf(SaleItem(id = "si1", saleId = "s1", productId = "p1", quantity = 2.0, unitPrice = 115.5, totalPrice = 231.0)),
     stockMovements = listOf(StockMovement(id = "m1", productId = "p1", type = "sale", qty = -2.0)),
   )
+
+  /**
+   *  A00: opی که ساختِ پیش از A00 ساخته و پس از به‌روزرسانی هنوز در صف است بی `caps` می‌رود
+   *  تا تورِ سرور `null` ِ کهنه‌اش را بپالاید؛ op ِ تازهٔ همین ساخت با `caps`.
+   */
+  @Test fun legacyOpsOfAPreA00BuildGoWithoutCaps_newOnesWithCaps() {
+    val server = FakeServer()
+    val a = Device("dev-legacy", server, baseData)
+    assertTrue(a.sync().ok)
+    assertTrue("push ِ همین ساخت نشان دارد", server.caps.all { it })
+    server.caps.clear()
+    a.edit { d -> d.copy(products = d.products.map { it.copy(name = "شیرِ تازه") }) }
+    assertEquals(1, a.engine.record(a.ledger.data))
+    //  همین op را «ساختِ پیش از A00» ساخته بود: سایهٔ بی مهر؛ برنامه به‌روز و دوباره باز شد
+    a.store.meta = a.store.meta!!.copy(shadow = LedgerDiff.unstamped(a.store.meta!!.shadow))
+    a.engine = a.make()
+    a.engine.recover(a.ledger.data)
+    assertTrue(a.store.meta!!.legacyOpsUpTo.isNotEmpty())
+    assertTrue(a.sync(first = false).ok)
+    assertEquals(listOf(false), server.caps)
+    a.edit { d -> d.copy(products = d.products.map { it.copy(name = "شیرِ تازه‌تر") }) }
+    assertEquals(1, a.engine.record(a.ledger.data))
+    assertTrue(a.sync(first = false).ok)
+    assertEquals(listOf(false, true), server.caps)
+    assertEquals("", a.store.meta!!.legacyOpsUpTo)
+  }
 
   @Test fun firstUploadUsesFromLegacyAndOneTxThenSecondDeviceFromSnapshot() {
     val server = FakeServer()
@@ -406,5 +437,60 @@ class SyncV3EngineTest {
     assertEquals("cf1", list.single()["id"]!!.jsonPrimitive.content)
     assertEquals(1, a.engine.status().conflictsOpen)
     assertEquals("conflict", a.engine.status().state)
+  }
+
+  @Test fun oneSaleOfAnySizeIsOneTxButMultiSaleLedgerIsNot() {
+    val server = FakeServer()
+    val a = Device("dev-a", server, ShopData(products = listOf(p1))).also { assertTrue(it.sync().ok) }
+    //  یک فاکتورِ ۶۰قلمی (بیش از سقفِ قدیمِ ۵۰) ⇒ هنوز یک tx: ردِ فاکتور قلم‌ها را هم برمی‌گرداند
+    a.edit { d ->
+      d.copy(
+        sales = d.sales + Sale(id = "big", total = 60.0, finalTotal = 60.0, paidAmount = 60.0),
+        saleItems = d.saleItems + (0 until 60).map {
+          SaleItem(id = "big-$it", saleId = "big", productId = "p1", quantity = 1.0, unitPrice = 1.0, totalPrice = 1.0)
+        },
+      )
+    }
+    assertTrue(a.sync().ok)
+    val docs = server.log.filter { it.rowId == "big" || it.rowId.startsWith("big-") }
+    assertEquals(61, docs.size)
+    assertEquals(1, docs.map { it.tx }.toSet().size)
+    assertTrue(docs.first().tx.startsWith("tx."))
+
+    //  دفترِ چندفاکتوری (نخستین بارگذاری، بازگردانیِ پشتیبان) بیش از ۵۰ op ⇒ سند به سند نیست، بی tx ِ مشترک
+    a.edit { d -> d.copy(sales = d.sales + (0 until 60).map { Sale(id = "bulk-$it", total = 1.0, finalTotal = 1.0, paidAmount = 1.0) }) }
+    assertTrue(a.sync().ok)
+    val bulk = server.log.filter { it.rowId.startsWith("bulk-") }
+    assertEquals(60, bulk.size)
+    //  (هر فاکتورِ قدیمی tx ِ خودش را از `V3Convert` دارد — درج + شمارنده — ولی نه یک tx برای همه)
+    assertTrue(bulk.none { it.tx.startsWith("tx.") })
+    assertEquals(60, bulk.map { it.tx }.toSet().size)
+
+    //  ثبتِ بی سند (۶۰ حرکتِ انبار، مثلِ شمارش) ⇒ هم سند به سند نیست، همان سقفِ ۵۰
+    a.edit { d -> d.copy(stockMovements = d.stockMovements + (0 until 60).map { StockMovement(id = "cnt-$it", productId = "p1", type = "adjustment", qty = 1.0) }) }
+    assertTrue(a.sync().ok)
+    val moves = server.log.filter { it.rowId.startsWith("cnt-") }
+    assertEquals(60, moves.size)
+    assertTrue(moves.none { it.tx.startsWith("tx.") })
+  }
+
+  @Test fun returnRowsGoBeforeTheirCountersInsideTheTx() {
+    val server = FakeServer()
+    val a = Device("dev-a", server, baseData).also { assertTrue(it.sync().ok) }
+    a.edit { d ->
+      d.copy(
+        sales = d.sales.map { if (it.id == "s1") it.copy(debtSettled = 50.0) else it },
+        saleItems = d.saleItems.map { if (it.id == "si1") it.copy(returnedQty = 1.0) else it },
+        saleReturns = d.saleReturns + SaleReturn(id = "r1", saleId = "s1", saleItemId = "si1", productId = "p1", quantity = 1.0, amount = 115.5),
+      )
+    }
+    assertTrue(a.sync().ok)
+    val head = server.log.single { it.rowId == "r1" }
+    val counters = server.log.filter { (it.rowId == "s1" || it.rowId == "si1") && it.kind == "delta" }
+    assertEquals(2, counters.size)
+    //  سرِ برگشت پیش از شمارنده‌هایش، همه یک tx
+    assertTrue(counters.all { it.seq > head.seq })
+    assertTrue(head.tx.startsWith("tx."))
+    assertTrue(counters.all { it.tx == head.tx })
   }
 }

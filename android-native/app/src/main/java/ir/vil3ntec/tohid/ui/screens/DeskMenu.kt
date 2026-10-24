@@ -3,6 +3,7 @@ package ir.vil3ntec.tohid.ui.screens
 import ir.vil3ntec.tohid.ui.AppNav
 import ir.vil3ntec.tohid.core.i18n.StrNav
 import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrShell
 
 /**
  *  منوی کناریِ کامپیوتر، گروه‌بندی‌شده — v3 §۲۰.۳ («منوی پیشنهادیِ
@@ -82,11 +83,13 @@ object DeskMenu {
     ),
     Group(
       StrNav.groupChannels,
-      listOf(
-        page("sale", Str.saleRegister),
-        if (storefrontLive) Item("storefront", StrNav.storefrontMarket) else soon("storefront", StrNav.storefrontMarket),
-        if (deliveryLive) Item("delivery", StrNav.deliveryDeskCourier) else soon("delivery", StrNav.delivery),
-      ),
+      buildList {
+        add(page("sale", Str.saleRegister))
+        //  تخفیف‌ها (PRM) — صاحب و مدیر؛ کلیدِ دکان درونِ همان صفحه است
+        if (canAdmin) add(Item("promos", StrShell.promos))
+        add(if (storefrontLive) Item("storefront", StrNav.storefrontMarket) else soon("storefront", StrNav.storefrontMarket))
+        add(if (deliveryLive) Item("delivery", StrNav.deliveryDeskCourier) else soon("delivery", StrNav.delivery))
+      },
     ),
     Group(
       StrNav.groupAdmin,

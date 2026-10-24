@@ -57,6 +57,7 @@ import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.launch
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrPos
 
 /**
  *  فروش (صندوق).
@@ -82,6 +83,9 @@ fun SaleScreen(
 
   val cart by cartStore.lines.collectAsState()
   val cartDebtorId by cartStore.debtorId.collectAsState()
+  //  PRM: تخفیف‌های خودکار — کلیدِ دکان خاموش ⇒ null و `priced` همان `cart` است
+  val promo = ir.vil3ntec.tohid.ui.PromoLive.rememberOutcome(d, cart)
+  val priced = ir.vil3ntec.tohid.data.PromoEngine.priced(cart, promo)
 
   // کالای حذف‌شده نباید در سبد بماند
   LaunchedEffect(d.products.size, d.debtors.size) { cartStore.prune(d) }
@@ -147,6 +151,15 @@ fun SaleScreen(
     scope.launch { snackbar.showSnackbar(text) }
   }
 
+  //  HW-02/03: چاپِ خودکار یا کشوی پس از فروش که نشد همین‌جا، سرِ صندوق، گفته می‌شود
+  val printNotice by ir.vil3ntec.tohid.print.PrintSpooler.tillNotice
+  LaunchedEffect(printNotice) {
+    printNotice?.let { n ->
+      ir.vil3ntec.tohid.print.PrintSpooler.consumed(n)
+      snackbar.showSnackbar(n.text, duration = SnackbarDuration.Long)
+    }
+  }
+
   /** یک بارکد — چه از دوربین، چه دستی، چه از بارکدخوانِ سخت‌افزاری */
   fun onBarcode(raw: String, skipDedup: Boolean = false, fromPhone: Boolean = false) {
     val code = raw.trim()
@@ -164,6 +177,22 @@ fun SaleScreen(
     //  کار در جریان است؛ دوربین نباید بخوابد
     lastScanAt = System.currentTimeMillis()
     if (!skipDedup && !gate.accept(code)) return
+
+    //  POS-29: برچسبِ ترازو — فقط اگر دکان قاعده‌اش را روشن کرده باشد (پیش‌فرض خاموش)
+    when (val w = ir.vil3ntec.tohid.data.ScaleLabels.match(
+      ir.vil3ntec.tohid.data.ScaleLabels.rules(context), code, index, d.products,
+    )) {
+      null -> Unit
+      is ir.vil3ntec.tohid.data.ScaleLabels.Match.Rejected -> { ScanFeedback.unknown(context); toast(w.message); return }
+      is ir.vil3ntec.tohid.data.ScaleLabels.Match.Weighed -> {
+        val added = SalesEngine.addToCartCapped(cartStore.lines.value, w.product.id, w.quantity, ShopStore.stock(d, w.product.id))
+        cartStore.set(added.cart)
+        selectedId = w.product.id
+        if (added.capped) { ScanFeedback.unknown(context); toast(Str.onlyInStock(w.product.name, "${qty(added.available)} ${w.product.unit}")) }
+        else { ScanFeedback.ok(context); toast(StrPos.weighedAdded(w.product.name, "${qty(w.quantity)} ${w.product.unit}")) }
+        return
+      }
+    }
 
     /*
      *  شناختنِ کالا — کامل، و اگر نشد از نیمهٔ بارکد.
@@ -479,6 +508,22 @@ fun SaleScreen(
             Spacer(Modifier.height(8.dp))
           }
         }
+        //  PRM-18: هر تخفیفِ اعمال‌شده یک ردیف با نامش، و کادرِ کد اگر قاعدهٔ کددار هست
+        if (promo != null && promo.applied.isNotEmpty()) {
+          item(key = "promo-lines") { ir.vil3ntec.tohid.ui.components.pos.PromoLines(promo.applied) }
+        }
+        if (ir.vil3ntec.tohid.ui.PromoLive.snap.value.active && ir.vil3ntec.tohid.ui.PromoLive.snap.value.hasCodes) {
+          item(key = "promo-code") {
+            Panel {
+              ir.vil3ntec.tohid.ui.components.pos.PromoCodeField(
+                codes = promo?.codes.orEmpty(),
+                entered = ir.vil3ntec.tohid.ui.PromoLive.coupons.value,
+                onAdd = { ir.vil3ntec.tohid.ui.PromoLive.addCoupon(it) },
+                onRemove = { ir.vil3ntec.tohid.ui.PromoLive.removeCoupon(it) },
+              )
+            }
+          }
+        }
       }
     }
 
@@ -490,7 +535,7 @@ fun SaleScreen(
       modifier = Modifier.align(Alignment.BottomCenter),
     ) {
       CartBar(
-        total = SalesEngine.cartTotal(d, cart),
+        total = SalesEngine.cartTotal(d, priced),
         debtorName = cartDebtorId?.let { id -> d.debtors.find { it.id == id }?.name },
         debtorNote = cartDebtorId?.let { id -> debtStateText(d, id) },
         onPickDebtor = { pickDebtor = true },
@@ -555,10 +600,13 @@ fun SaleScreen(
   if (checkout) {
     CheckoutDialog(
       d = d,
-      cart = cart,
+      //  جمع و ثبت با قیمتِ پس از تخفیف‌های خودکار (خاموش ⇒ همان سبد)
+      cart = priced,
       presetDebtorId = cartDebtorId,
       onDismiss = { checkout = false },
       busy = cartStore.posting.collectAsState().value,
+      //  برگهٔ تأییدِ تخفیف (S08) به شناسهٔ همین فاکتور بسته است
+      saleKey = remember(cart) { cartStore.saleKey() },
       onConfirm = { options ->
         //  دو ضربهٔ پشتِ سرِ هم پیش از بسته شدنِ پنجره: دومی همان سبدِ قبلی
         //  را دوباره ثبت می‌کرد. `checkout` همان لحظه خوانده می‌شود.
@@ -566,7 +614,7 @@ fun SaleScreen(
         //  POS-14: یک ثبت در هر لحظه با کلیدِ فاکتور؛ سبد فقط پس از نوشتنِ دفتر پاک می‌شود
         scope.launch { when (val posted = cartStore.post(store) { key ->
           SalesEngine.record(
-          d, cart, options,
+          d, priced, options,
           today = ir.vil3ntec.tohid.todayIso(),
           now = System.currentTimeMillis(),
           newId = ::newId,

@@ -98,7 +98,7 @@ async function open(width, ctxOpts = {}) {
   page.on('pageerror', (e) => errors.push(String(e)));
   page.on('console', (m) => { if (/Content Security Policy/i.test(m.text())) violations.push(m.text()); });
   await page.goto(`${base}/store/${slug}`);
-  await page.waitForSelector('#products li', { timeout: 15000 });
+  await page.waitForSelector('#products li[data-id]', { timeout: 15000 });
   return { ctx, page };
 }
 
@@ -110,8 +110,10 @@ ok(await page.evaluate(() => document.fonts.check('16px Vazirmatn') && getComput
 ok((await page.textContent('#store-title')) === 'ویترینِ آزمایشی', 'نامِ ویترین');
 const status = await page.textContent('#store-status');
 ok(/باز است|بسته است|آفلاین|اعلام شده/.test(status) && /اتصال/.test(status), 'وضعیتِ دکان و اتصال دیده می‌شود (۳۱.۱)', status.slice(0, 80));
-ok((await page.locator('#products li').count()) === 2, 'فقط دو کالای منتشرشده — «صابون» نه');
-ok((await page.textContent('#products')).includes('موجودی در حال بررسی است'), 'موجودیِ نامعلوم «موجود» گفته نمی‌شود (۳۲.۳)');
+ok((await page.locator('#products li[data-id]').count()) === 2, 'فقط دو کالای منتشرشده — «صابون» نه');
+//  ۳۲.۳: موجودیِ نامعلوم هرگز «موجود» نیست؛ «در حال بررسی» یک بار بالای کاتالوگ، نه روی هر کارت
+ok(await page.isVisible('#stock-note') && (await page.textContent('#stock-note')).includes('موجودی در حال بررسی است')
+  && !/(^|[\s،.])موجود([\s،.]|$)/.test(await page.textContent('#products')), 'موجودیِ نامعلوم «موجود» گفته نمی‌شود (۳۲.۳)');
 
 for (const w of [320, 360, 768, 1280]) {
   await page.setViewportSize({ width: w, height: 760 });
@@ -121,25 +123,33 @@ for (const w of [320, 360, 768, 1280]) {
 await page.setViewportSize({ width: 360, height: 760 });
 
 await page.fill('#q', 'روغن');
-await page.waitForFunction(() => document.querySelectorAll('#products li').length === 1, null, { timeout: 5000 });
+await page.waitForFunction(() => document.querySelectorAll('#products li[data-id]').length === 1, null, { timeout: 5000 });
 ok(true, 'جست‌وجو');
 await page.fill('#q', 'چیزی‌که‌نیست');
 await page.waitForSelector('#catalog-empty:not([hidden])', { timeout: 5000 });
 ok((await page.textContent('#catalog-empty')).includes('پیدا نشد'), 'صفحهٔ «چیزی پیدا نشد» راه دارد (WEB-06)');
 await page.click('#clear-search');
-await page.waitForFunction(() => document.querySelectorAll('#products li').length === 2, null, { timeout: 5000 });
+await page.waitForFunction(() => document.querySelectorAll('#products li[data-id]').length === 2, null, { timeout: 5000 });
 
 const rice = page.locator('#products li[data-id="rice"]');
 await rice.getByRole('button', { name: /افزودن/ }).click();
-await rice.getByRole('button', { name: /یکی بیشتر/ }).click();
+//  DESIGN v2: کارت −/+ ندارد؛ «یک زدن = یک واحد» و نشانِ تعداد (−/+ فقط در سبد)
+await rice.getByRole('button', { name: /افزودنِ یکی دیگر/ }).click();
+ok((await rice.locator('.p-add').textContent()).includes('۲'), 'نشانِ تعداد روی کارت');
 const oil = page.locator('#products li[data-id="oil"]');
 await oil.getByRole('button', { name: /افزودن/ }).click();
 ok(await page.isVisible('#cart-bar'), 'نوارِ سبد پیدا شد');
 await page.reload();
-await page.waitForSelector('#products li');
+await page.waitForSelector('#products li[data-id]');
 ok((await page.textContent('#open-cart')).includes('۲'), 'سبدِ مهمان با تازه‌سازی می‌ماند (S132)');
 
 await page.click('#open-cart');
+//  نوارِ تیره ⇐ برگهٔ تیرهٔ سبد (ref-5/6) ⇐ «ادامه»
+//  گوشی (۳۶۰): مدلِ مرجعِ r3/r2 — سطحِ روشن بالا می‌رود و سبد روی پایهٔ سیاه است
+await page.waitForFunction(() => document.body.classList.contains('cart-open') || document.getElementById('cart-sheet').classList.contains('on'));
+ok(await page.evaluate(() => document.body.classList.contains('phone-cart') && document.body.classList.contains('cart-open')), 'گوشی: پایهٔ سیاه و سبدِ باز (r2)');
+ok((await page.locator('#sheet-lines li').count()) === 2 && (await page.locator('#sheet-lines .stepper').count()) === 2, 'برگهٔ سبد: اقلام با −/+');
+await page.click('#cart-next');
 await page.waitForSelector('#view-checkout:not([hidden])');
 await page.check('input[name="fulfillment"][value="pickup"]');
 //  ۱۲۰٫۵ × ۲ = ۲۴۱ + ۳۰۰ = ۵۴۱
@@ -163,7 +173,7 @@ if (axeSrc) {
   const v = [];
   for (const hash of ['#/', '#/cart']) {
     await ap.goto(`${base}/store/${slug}${hash}`);
-    await ap.waitForSelector('#products li', { state: 'attached', timeout: 15000 });
+    await ap.waitForSelector('#products li[data-id]', { state: 'attached', timeout: 15000 });
     await ap.waitForTimeout(400);
     await ap.addScriptTag({ content: axeSrc });
     const out = await ap.evaluate(async () => (await window.axe.run(document,
@@ -192,14 +202,99 @@ ok(totals.includes('۵۴۱') && totals.includes('مانده'), 'رسید: مبل
 ok(await page.isVisible('#o-cancel'), 'لغوِ رایگان پیش از قبول (CHK-22) پیدا است');
 ok(/#\/o\/[0-9A-Z]{26}\.[A-Za-z0-9_-]{32}$/.test(page.url()), 'نشانیِ پیگیری توکنِ حدس‌نزدنی دارد (S137)');
 
+const man = await (await fetch(`${base}/store/${slug}/manifest.webmanifest`)).json();
+ok(man.name === 'ویترینِ آزمایشی' && man.start_url === `/store/${slug}` && man.icons.length === 3, 'وب‌اپِ قابلِ نصبِ همین دکان (WEB-14)');
+ok((await fetch(`${base}/store/no-such-store/manifest.webmanifest`)).status === 404, 'manifest ِ ویترینِ ناموجود ⇒ ۴۰۴');
+
+//  سه زبان (دودی): en چپ‌به‌راست و ps راست‌به‌چپ — ویترین، سبد، ثبت؛ axe در هر دو جهت
+for (const [lang, dir, stock, ck] of [['en', 'ltr', 'Stock is being checked', 'Checkout'], ['ps', 'rtl', 'موجودیت لا کتل کېږي', 'فرمایش ثبتول']]) {
+  const lc = await browser.newContext({ viewport: { width: 390, height: 844 }, bypassCSP: Boolean(axeSrc) });
+  const lp = await lc.newPage();
+  lp.on('pageerror', (e) => errors.push(String(e)));
+  await lp.goto(`${base}/store/${slug}?lang=${lang}`);
+  await lp.waitForSelector('#products li[data-id]', { timeout: 15000 });
+  ok((await lp.getAttribute('html', 'dir')) === dir && (await lp.getAttribute('html', 'lang')) === lang, `${lang}: جهت و زبانِ ویترین`);
+  ok((await lp.locator('#products li[data-id]').count()) === 2 && (await lp.textContent('#stock-note')).includes(stock), `${lang}: کاتالوگ و یادداشتِ موجودی`);
+  await lp.locator('#products li[data-id] .p-add').first().click();
+  await lp.goto(`${base}/store/${slug}?lang=${lang}#/checkout`);
+  await lp.waitForSelector('#view-checkout:not([hidden])');
+  ok((await lp.textContent('#view-checkout h1')) === ck, `${lang}: صفحهٔ ثبت`);
+  const over = await lp.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  ok(over <= 0, `${lang}: بی بیرون‌زدگی`, `${over}px`);
+  if (axeSrc) {
+    await lp.addScriptTag({ content: axeSrc });
+    const v = await lp.evaluate(async () => (await window.axe.run(document, { runOnly: ['color-contrast', 'button-name', 'label', 'image-alt', 'link-name'] })).violations.map((x) => x.id));
+    ok(v.length === 0, `دسترس‌پذیری (axe-core): ثبت (${lang})`, v.join(' | '));
+  }
+  await lc.close();
+}
+
+//  ⛔ واژه‌نامه نیامد (شبکه یا ۵۰۰): ویترینِ زنده هرگز کلیدِ خام («od.history»، «ship.free») نشان نمی‌دهد —
+//  HTML ِ فارسی می‌ماند و متنِ ساختهٔ JS از واژه‌های پایهٔ کیت؛ و یک بار دوباره خواسته می‌شود
+const KEYS = Object.keys(JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '..', 'public', 'kit', 'i18n', 'fa.json'), 'utf8')));
+const rawKeys = (pg) => pg.evaluate((keys) => {
+  const set = new Set(keys);
+  const out = [];
+  const words = (s) => String(s || '').split(/[\s،,()«»:—]+/).filter((w) => set.has(w));
+  const tw = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  for (let n = tw.nextNode(); n; n = tw.nextNode()) out.push(...words(n.nodeValue));
+  for (const e of document.querySelectorAll('[aria-label],[placeholder],[title],[alt]')) {
+    for (const a of ['aria-label', 'placeholder', 'title', 'alt']) out.push(...words(e.getAttribute(a)).map((w) => `${a}=${w}`));
+  }
+  out.push(...words(document.title).map((w) => `<title>=${w}`));
+  return out;
+}, KEYS);
+const placedId = (await one(`SELECT id FROM online_orders WHERE shop_id=$1 ORDER BY created_at LIMIT 1`, [shopId])).id;
+const placedToken = require('../src/lib/storefront').tokenOf(shopId, placedId);
+for (const lang of ['fa', 'en']) {
+  const nc = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  let asked = 0;
+  await nc.route('**/kit/i18n/*.json', (r) => { asked++; return r.abort('failed'); });
+  const np = await nc.newPage();
+  np.on('pageerror', (e) => errors.push(String(e)));
+  await np.goto(`${base}/store/${slug}?lang=${lang}`);
+  await np.waitForSelector('#products li[data-id]', { timeout: 15000 });
+  await np.waitForFunction(() => !document.documentElement.hasAttribute('data-i18n'), null, { timeout: 5000 });
+  ok(asked === 2, `بی واژه‌نامه (${lang}): یک بار دوباره خواسته شد`, `${asked} درخواست`);
+  ok(await np.isVisible('#products li[data-id]'), `بی واژه‌نامه (${lang}): صفحه پیداست و کاتالوگ آمد`);
+  const seen = [];
+  seen.push(...await rawKeys(np));
+  await np.locator('#products li[data-id] .p-add').first().click();
+  await np.goto(`${base}/store/${slug}?lang=${lang}#/cart`);
+  await np.waitForTimeout(400);
+  seen.push(...await rawKeys(np));
+  await np.goto(`${base}/store/${slug}?lang=${lang}#/checkout`);
+  await np.waitForSelector('#view-checkout:not([hidden])');
+  seen.push(...await rawKeys(np));
+  ok((await np.textContent('#view-checkout h1')).trim() === 'ثبتِ سفارش', `بی واژه‌نامه (${lang}): متنِ فارسیِ HTML ماند`);
+  await np.goto(`${base}/store/${slug}?lang=${lang}#/o/${encodeURIComponent(placedToken)}`);
+  await np.waitForFunction(() => /\d|[۰-۹]/.test(document.getElementById('o-title').textContent), null, { timeout: 10000 });
+  seen.push(...await rawKeys(np));
+  ok(seen.length === 0, `بی واژه‌نامه (${lang}): هیچ کلیدِ خامی در ویترین، سبد، ثبت و سفارش`, [...new Set(seen)].join(' '));
+  await nc.close();
+}
+//  بارِ نخست نیامد، بارِ دوم آمد ⇒ صفحه همان زبان را دارد
+{
+  const rc = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  let n = 0;
+  await rc.route('**/kit/i18n/*.json', (r) => (++n === 1 ? r.fulfill({ status: 503, body: '' }) : r.continue()));
+  const rp = await rc.newPage();
+  await rp.goto(`${base}/store/${slug}?lang=en`);
+  await rp.waitForSelector('#products li[data-id]', { timeout: 15000 });
+  ok(n === 2 && (await rp.textContent('#stock-note')).includes('Stock is being checked'), 'واژه‌نامه پس از یک شکست، با بارِ دوم آمد', `${n} درخواست`);
+  await rc.close();
+}
+
 await page.goto(`${base}/store/no-such-store`);
 await page.waitForSelector('#view-missing:not([hidden])', { timeout: 10000 });
 ok(true, 'ویترینِ ناموجود: «پیدا نشد»');
 
 ok(violations.length === 0, 'هیچ نقضِ CSP', violations.join(' | '));
 ok(errors.length === 0, 'بی خطای جاوااسکریپت', errors.join(' | '));
-const jsSize = fs.statSync(path.join(import.meta.dirname, '..', 'public', 'store', 'store.js')).size;
-ok(jsSize < 75 * 1024, 'جاوااسکریپتِ صفحه زیرِ ۷۵KB (۳.۱۰)', `${jsSize} بایت، فشرده‌نشده`);
+const jsSize = fs.statSync(path.join(import.meta.dirname, '..', 'public', 'store', 'store.js')).size
+  + fs.statSync(path.join(import.meta.dirname, '..', 'public', 'kit', 'kit.js')).size
+  + fs.statSync(path.join(import.meta.dirname, '..', 'public', 'kit', 'boot.js')).size;
+ok(jsSize < 75 * 1024, 'جاوااسکریپتِ صفحه (آغاز + کیت + ویترین) زیرِ ۷۵KB (۳.۱۰)', `${jsSize} بایت، فشرده‌نشده`);
 
 await ctx.close();
 await browser.close();

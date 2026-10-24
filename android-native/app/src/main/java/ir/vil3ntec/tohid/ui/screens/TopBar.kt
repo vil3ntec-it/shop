@@ -41,6 +41,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
+import ir.vil3ntec.tohid.ui.theme.LightColors
+import ir.vil3ntec.tohid.ui.theme.DarkColors
+import ir.vil3ntec.tohid.ui.theme.Brand
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
@@ -84,7 +88,7 @@ import ir.vil3ntec.tohid.core.i18n.Str
 private val ALERT_ORANGE = Color(0xFFF08A24)
 
 /**
- *  آبیِ سربرگ.
+ *  رنگِ سربرگ — از ۱۴۰۵/۰۷/۲۸ سبزآبیِ برندِ VILL3N (پیش‌تر آبیِ تیره).
  *
  *  ── چرا در تمِ روشن هم آبیِ تیره ────────────────────────────────────
  *  سربرگ تا دیروز هم‌رنگِ زمینه بود: در تمِ روشن یک نوارِ سفید با شش
@@ -96,12 +100,12 @@ private val ALERT_ORANGE = Color(0xFFF08A24)
  *
  *  در شب کمی تیره‌تر است تا کنارِ زمینهٔ سرمه‌ای، پله‌اش زیاد نباشد.
  */
-private val BAR_DAY = listOf(Color(0xFF073E78), Color(0xFF0F62B4), Color(0xFF1E86D6))
-private val BAR_NIGHT = listOf(Color(0xFF04121F), Color(0xFF0B2E52), Color(0xFF11487A))
+private val BAR_DAY = listOf(Brand.deep, lerp(Brand.deep, Brand.primary, 0.5f), Brand.primary)
+private val BAR_NIGHT = listOf(DarkColors.inverse, lerp(DarkColors.inverse, DarkColors.surfaceSelected, 0.5f), DarkColors.surfaceSelected)
 
-/** جوهرِ روی سربرگ — همیشه روشن، چون زیرش همیشه آبیِ تیره است */
-private val BAR_INK = Color(0xFFF4FAFF)
-private val BAR_INK_SOFT = Color(0xFFC7DEF4)
+/** جوهرِ روی سربرگ — همیشه روشن، چون زیرش همیشه سبزآبیِ تیره است */
+private val BAR_INK = LightColors.onInverse
+private val BAR_INK_SOFT = Brand.successSurface
 
 /** نارنجیِ روی آبی — روشن‌تر از `ALERT_ORANGE` که برای زمینهٔ روشن است */
 private val BAR_ALERT = Color(0xFFFFC06A)
@@ -902,7 +906,7 @@ private fun SyncDot() {
 
         AutoSync.lastError?.let {
           Spacer(Modifier.height(8.dp))
-          Text(it, style = MaterialTheme.typography.labelMedium, color = Color(0xFFD64545))
+          Text(it, style = MaterialTheme.typography.labelMedium, color = Shop.colors.danger)
         }
 
         //  تعارض‌ها: خطا نیستند، ولی کاربر باید بداند کدام تغییرش
@@ -1210,7 +1214,7 @@ private fun AlertChip(count: Int, onClick: () -> Unit) {
     }
     if (count > 0) {
       Box(
-        Modifier.size(15.dp).clip(RoundedCornerShape(8.dp)).background(Color(0xFFD8352C)),
+        Modifier.size(15.dp).clip(RoundedCornerShape(8.dp)).background(Shop.colors.button.danger.bg),
         contentAlignment = Alignment.Center,
       ) {
         Text(
@@ -1250,7 +1254,7 @@ private fun BarButton(
     }
     if (badge > 0) {
       Box(
-        Modifier.size(15.dp).clip(RoundedCornerShape(8.dp)).background(Color(0xFFD8352C)),
+        Modifier.size(15.dp).clip(RoundedCornerShape(8.dp)).background(Shop.colors.button.danger.bg),
         contentAlignment = Alignment.Center,
       ) {
         Text(

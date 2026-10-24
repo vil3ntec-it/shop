@@ -33,7 +33,7 @@ fun StatusPill(text: String, tone: PillTone, modifier: Modifier = Modifier) {
     modifier
       .clip(Shape.badge)
       .background(bg)
-      .padding(horizontal = 9.dp, vertical = 3.dp)
+      .padding(horizontal = 10.dp, vertical = 4.dp)
       .semantics { contentDescription = Str.statusOf(text) },
     verticalAlignment = Alignment.CenterVertically,
   ) {

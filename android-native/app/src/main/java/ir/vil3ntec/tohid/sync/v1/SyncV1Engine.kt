@@ -98,12 +98,14 @@ class SyncV1Engine private constructor(context: Context) {
   fun recover(ledger: ShopData) {
     //  Sync v3 پشتِ تنظیمِ هر دستگاه (پیش‌فرض v1) — شرح سرِ `sync/v3/SyncV3Runner.kt`
     if (SyncChoice.isV3(app)) { SyncV3Runner.of(app).recover(ledger); return }
-    if (!commit.pending()) return
-    if (commit.recover(ledger) == SyncCommit.Outcome.MISMATCH) {
+    //  A00: مهرِ سایه پیش از بازیابی خوانده می‌شود؛ سایهٔ بی مهرِ ساختِ پیشین یک بار و پیش از
+    //  نخستین تفاضل درمان، و opهای آن ساخت در صف نشان می‌شوند (شرح سرِ `SyncCommit.start`)
+    val start = commit.start(ledger) { upTo -> state.legacyOpsUpTo = upTo }
+    if (start.outcome == SyncCommit.Outcome.MISMATCH) {
       //  نباید پیش بیاید؛ اگر آمد، دیده شود
       state.lastError = "ژورنالِ همگام‌سازی با سایه نخواند"
     }
-    publish()
+    if (start.outcome != SyncCommit.Outcome.NONE) publish()
   }
 
   /* ==========================================================
@@ -177,35 +179,10 @@ class SyncV1Engine private constructor(context: Context) {
         val device = store.deviceUid
 
         //  صف را تا ته خالی می‌کنیم، دسته‌دسته
-        var guard = 0
-        while (queue.size() > 0 && guard < 500) {
-          guard++
-          val batch = queue.batch()
-          if (batch.isEmpty()) break
-          val out = try {
-            client.push(device, batch, queue.size())
-          } catch (upgrade: SyncV1Client.UpgradeRequired) {
-            //  سرور عقب‌تر است: هیچ opی پاک نمی‌شود
-            state.holding = true
-            state.lastError = upgrade.reason
-            publish()
-            return@withLock Result.failure(upgrade)
-          }
-          state.holding = false
-          state.serverSchema = out.serverSchema
-          state.upgradeAvailable = out.upgradeAvailable
-
-          val accepted = out.results.filter { it.accepted }.map { it.opId }
-          val rejected = out.results.filter { !it.accepted }
-          if (accepted.isNotEmpty()) queue.ack(accepted)
-          if (rejected.isNotEmpty()) {
-            //  ردشده‌ها از صف بیرون می‌روند — وگرنه صف تا ابد قفل
-            //  می‌کند — ولی بی‌صدا نه.
-            val ids = rejected.map { it.opId }.toHashSet()
-            queue.drop(batch.filter { it.opId in ids }, "rejected")
-            queue.ack(ids)
-          }
-          state.lastPushAt = System.currentTimeMillis()
+        try {
+          pushQueue(client, device)
+        } catch (upgrade: SyncV1Client.UpgradeRequired) {
+          return@withLock Result.failure(upgrade)
         }
 
         //  Pull — تا وقتی سرور بگوید چیزِ دیگری هست
@@ -235,6 +212,147 @@ class SyncV1Engine private constructor(context: Context) {
         publish()
       }
     }
+
+  /**
+   *  فرستادنِ صف تا ته، دسته‌دسته — همان حلقهٔ همیشگیِ `runOnce`، جدا تا دفترِ رمزدارِ
+   *  خوانده‌نشده هم بتواند صفش را بفرستد (`pushPending`). صدازننده `gate` را دارد.
+   *
+   *  @throws SyncV1Client.UpgradeRequired سرور عقب‌تر است: هیچ opی پاک نمی‌شود
+   */
+  private suspend fun pushQueue(client: SyncV1Client, device: String) {
+    var guard = 0
+    while (queue.size() > 0 && guard < 500) {
+      guard++
+      val batch = queue.batch()
+      if (batch.isEmpty()) break
+      //  A00: opهای ساختِ پیش از A00 بی `caps` می‌روند تا تورِ سرور null ِ کهنه‌شان را بپالاید
+      val legacy = state.legacyOpsUpTo
+      if (legacy.isNotEmpty() && queue.all().none { LedgerDiff.isLegacyOp(it.opId, legacy) }) state.legacyOpsUpTo = ""
+      val out = try {
+        client.push(device, batch, queue.size(), caps = LedgerDiff.capsFor(batch.map { it.opId }, state.legacyOpsUpTo))
+      } catch (upgrade: SyncV1Client.UpgradeRequired) {
+        //  سرور عقب‌تر است: هیچ opی پاک نمی‌شود
+        state.holding = true
+        state.lastError = upgrade.reason
+        publish()
+        throw upgrade
+      }
+      state.holding = false
+      state.serverSchema = out.serverSchema
+      state.upgradeAvailable = out.upgradeAvailable
+
+      val accepted = out.results.filter { it.accepted }.map { it.opId }
+      val rejected = out.results.filter { !it.accepted }
+      if (accepted.isNotEmpty()) queue.ack(accepted)
+      if (rejected.isNotEmpty()) {
+        //  ردشده‌ها از صف بیرون می‌روند — وگرنه صف تا ابد قفل
+        //  می‌کند — ولی بی‌صدا نه.
+        val ids = rejected.map { it.opId }.toHashSet()
+        queue.drop(batch.filter { it.opId in ids }, "rejected")
+        queue.ack(ids)
+      }
+      state.lastPushAt = System.currentTimeMillis()
+    }
+  }
+
+  /* ==========================================================
+     SEC-01 — دفترِ رمزداری که این دستگاه باز نمی‌کند (بازبینیِ #331)
+     ========================================================== */
+
+  /**
+   *  فقط فرستادنِ صف — بی Pull، بی تفاضل، بی نشاندن.
+   *
+   *  دفترِ رمزدار باز نشد (کلید نیست یا گذرا در دسترس نیست) ولی صفِ opها رمزدار نیست
+   *  (`AtRestScope.syncState`): تغییرهایی که پیش از آن ثبت شده بودند باید به سرور برسند —
+   *  هم برای خودشان، هم چون «بازسازی از سرور» فقط با صفِ خالی انجام می‌شود. pull نه، چون
+   *  نشاندنِ opها روی دفترِ خالیِ حافظه یعنی رونویسیِ دفترِ واقعی.
+   *
+   *  @return چند op هنوز در صف مانده
+   */
+  suspend fun pushPending(): Result<Int> = gate.withLock {
+    if (!Backend.isReady(app) || !Backend.isOnline(app)) { publish(); return@withLock Result.success(queue.size()) }
+    busy = true
+    publish()
+    try {
+      //  opهای ژورنالِ «ثبت» که هنوز به صف نرسیده بودند (همان `op_id`)
+      synchronized(this) { commit.queueRecorded() }
+      pushQueue(SyncV1Client(Backend.api(app)), store.deviceUid)
+      Result.success(queue.size())
+    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+      throw cancelled
+    } catch (error: Throwable) {
+      attempt++
+      state.lastError = error.message ?: "خطای نامشخص"
+      Result.failure(error)
+    } finally {
+      busy = false
+      publish()
+    }
+  }
+
+  /**
+   *  «بازسازی از سرور»: صف اول، بعد Snapshot؛ کناری ⇐ سایه و cursor ⇐ جابه‌جایی — شرح سرِ `SyncRebuild`.
+   *
+   *  @param base از آن فقط بخش‌های بیرون از همگام‌سازی (تنظیمات) برمی‌دارد
+   *  @param files کناری و جابه‌جاییِ دفتر (`ShopStore`)؛ زیرِ قفلِ همین موتور صدا زده می‌شوند
+   *  @throws Exception شبکه یا دیسک؛ تا پیش از `commitShadow` هیچ چیزی عوض نشده است
+   */
+  internal suspend fun rebuildFromServer(base: ShopData, files: SyncRebuild.Staging): SyncRebuild.Outcome = gate.withLock {
+    busy = true
+    publish()
+    try {
+      synchronized(this) { commit.queueRecorded() }
+      val client = SyncV1Client(Backend.api(app))
+      val device = store.deviceUid
+      val out = SyncRebuild(object : SyncRebuild.Io {
+        override fun queued(): Int = queue.size()
+        override suspend fun push() = pushQueue(client, device)
+        override fun shadow(): String = state.shadow
+        override suspend fun snapshot(): JsonObject = client.snapshot()
+        override fun stage(next: ShopData, shadowSha: String) = synchronized(this@SyncV1Engine) { files.stage(next, shadowSha) }
+        override fun commitShadow(shadow: String, cursor: Long) {
+          if (!state.commitShadow(shadow, cursor)) throw java.io.IOException("سایهٔ همگام‌سازی روی دیسک ننشست")
+        }
+        override fun swap() = synchronized(this@SyncV1Engine) { files.swap() }
+      }).run(base)
+      if (out is SyncRebuild.Outcome.Done) {
+        val now = System.currentTimeMillis()
+        state.snapshotAt = now
+        state.reconciledAt = now
+        state.lastOkAt = now
+        state.lastError = ""
+        attempt = 0
+      }
+      out
+    } finally {
+      busy = false
+      publish()
+    }
+  }
+
+  /**
+   *  آیا این حساب روی این دستگاه هرگز با سرور هم‌تراز شده؟ اگر شده، بازیابی بی سرور ممکن نیست:
+   *  ردیفی که در پشتیبان هست و سرور ندارد شاید حذف‌شده باشد و `prepare` زنده‌اش می‌کرد.
+   */
+  fun everSynced(): Boolean = state.cursor > 0 || state.reconciledAt > 0 || state.snapshotAt > 0
+
+  /** اثرِ سایهٔ همین حالا — برای `SyncRebuild.atLoad` */
+  fun shadowSha(): String = SyncRebuild.sha(state.shadow)
+
+  /**
+   *  بی سرور و **هرگز همگام‌نشده**: دفترِ بازیابی‌شده خودش سایه می‌شود ⇐ هیچ op؛ cursor صفر و
+   *  «هم‌ترازی» از نو. کناری و نشان پیش از سایه، جابه‌جایی پس از آن — همان ترتیبِ بازسازی.
+   */
+  @Synchronized
+  internal fun resetTo(ledger: ShopData, files: SyncRebuild.Staging) {
+    val shadow = SyncRebuild.shadowFor(ledger)
+    files.stage(ledger, SyncRebuild.sha(shadow))
+    if (!state.commitShadow(shadow, 0L)) throw java.io.IOException("سایهٔ همگام‌سازی روی دیسک ننشست")
+    state.reconciledAt = 0L
+    state.snapshotAt = 0L
+    files.swap()
+    publish()
+  }
 
   /**
    *  هم‌ترازیِ یک‌باره با سرور — پیش از نخستین دورِ این حساب روی این دستگاه.
@@ -416,8 +534,14 @@ class SyncV1Engine private constructor(context: Context) {
     return runCatching { json.parseToJsonElement(raw) as? JsonObject }.getOrNull()
   }
 
+  /**
+   *  سایهٔ Snapshot (`prepare`، `restoreFromServer`) — ⛔ A00: از درِ مدلِ همین ساخت
+   *  (`LedgerDiff.modelTree`)، مثلِ `SyncV3Engine.shape`. ردیفِ خامِ سرور کلیدهایی دارد که
+   *  دفترِ این ساخت نمی‌تواند نگه دارد؛ اگر در سایه می‌ماندند، پس از به‌روزرسانی به ساختی
+   *  که آن‌ها را می‌شناسد نخستین ذخیرهٔ بی‌ربط همه را `null` می‌فرستاد.
+   */
   private fun writeShadow(tree: JsonObject) {
-    state.shadow = LedgerDiff.shadowOf(tree).toString()
+    state.shadow = LedgerDiff.shadowOf(LedgerDiff.modelTree(tree)).toString()
   }
 
   companion object {

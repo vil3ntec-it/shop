@@ -6,10 +6,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddBox
 import androidx.compose.material.icons.filled.DeleteOutline
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.ViewSidebar
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.data.BarcodeMatch
 import ir.vil3ntec.tohid.data.CartQuery
 import ir.vil3ntec.tohid.data.CartStore
+import ir.vil3ntec.tohid.data.DiscountGate
 import ir.vil3ntec.tohid.data.SalePost
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.SalesEngine
@@ -40,17 +38,20 @@ import ir.vil3ntec.tohid.ui.components.common.ScreenKind
 import ir.vil3ntec.tohid.ui.components.common.ViewMode
 import ir.vil3ntec.tohid.ui.components.common.ViewModeToggle
 import ir.vil3ntec.tohid.ui.components.common.rememberViewMode
-import ir.vil3ntec.tohid.ui.components.pos.BottomActionBar
-import ir.vil3ntec.tohid.ui.components.pos.CategoryRail
+import ir.vil3ntec.tohid.ui.components.pos.CartHeaderAction
+import ir.vil3ntec.tohid.ui.components.pos.CategoryChips
+import ir.vil3ntec.tohid.ui.components.pos.MiniNumberField
+import ir.vil3ntec.tohid.ui.components.pos.PosHintLine
+import ir.vil3ntec.tohid.ui.components.pos.posCardMin
 import ir.vil3ntec.tohid.ui.components.pos.CustomerRow
 import ir.vil3ntec.tohid.ui.components.pos.OrderActions
 import ir.vil3ntec.tohid.ui.components.pos.OrderLineView
 import ir.vil3ntec.tohid.ui.components.pos.OrderLines
 import ir.vil3ntec.tohid.ui.components.pos.OrderPanel
+import ir.vil3ntec.tohid.ui.components.pos.PayPanelDialog
 import ir.vil3ntec.tohid.ui.components.pos.PaymentMethodGrid
 import ir.vil3ntec.tohid.ui.components.pos.PaymentSummary
 import ir.vil3ntec.tohid.ui.components.pos.PosAction
-import ir.vil3ntec.tohid.ui.components.pos.PosBarAction
 import ir.vil3ntec.tohid.ui.components.pos.PosCartOps
 import ir.vil3ntec.tohid.ui.components.pos.PosCatalog
 import ir.vil3ntec.tohid.ui.components.pos.PosEmpty
@@ -61,13 +62,16 @@ import ir.vil3ntec.tohid.ui.components.pos.PosPayments
 import ir.vil3ntec.tohid.ui.components.pos.PosProductCallbacks
 import ir.vil3ntec.tohid.ui.components.pos.PosSearch
 import ir.vil3ntec.tohid.ui.components.pos.PosShot
-import ir.vil3ntec.tohid.ui.components.pos.PosSummary
+import ir.vil3ntec.tohid.ui.components.pos.PromoCodeField
+import ir.vil3ntec.tohid.ui.components.pos.PromoLines
+import ir.vil3ntec.tohid.ui.components.pos.PromoSummary
 import ir.vil3ntec.tohid.ui.components.pos.ProductGrid
 import ir.vil3ntec.tohid.ui.components.pos.ProductTable
 import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.launch
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrPos
 
 /**
  *  صندوقِ فروشِ کامپیوتر — برای صفحه‌کلید و بارکدخوان، نه برای انگشت.
@@ -86,8 +90,10 @@ import ir.vil3ntec.tohid.core.i18n.Str
  *    F9 یا Ctrl+Enter ثبت. F2 مشتری، F4 قلمِ آزاد، F8 چاپِ فاکتورِ آخر،
  *    Esc پاک کردنِ کادر.
  *
- *  چیدمان (VISUAL-DIRECTION §۲، RTL): ستونِ دسته‌ها راست، شبکه یا جدولِ
- *  کالا وسط (نمای کارتی/جدولی — §۱٫۵)، پنلِ سفارش چپ، نوارِ عمل پایین.
+ *  چیدمان — نسخهٔ ۲ (VISUAL-DIRECTION «نسخهٔ ۲»، RTL): کاتالوگ راست و پهن با
+ *  کادرِ اسکن (تنها جست‌وجوی صفحه)، ردیفِ تراشهٔ دسته‌ها و کارت‌ها (یا جدول —
+ *  §۱٫۵)؛ ناحیهٔ «سبد خرید» چپ با رنگِ خودش. زدنِ کارت = افزودن؛ − / + فقط در سبد.
+ *  منوی کناری در صندوق خودبه‌خود فقط‌آیکن است (`AppRoot`).
  *  اجزا در `ui/components/pos/`؛ قاعده‌های خالص در `PosLogic.kt` (آزمون‌دار).
  *  کادرِ اسکن همیشه فوکوس دارد و هر کلیک فوکوس را به آن برمی‌گرداند.
  *
@@ -106,8 +112,15 @@ fun DeskSaleScreen(
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
   val cart by cartStore.lines.collectAsState()
+  //  HW-10: نمایشگرِ مشتری (پنجرهٔ دوم) — فقط وقتی باز است کاری می‌کند
+  val customerOpen by ir.vil3ntec.tohid.hw.CustomerFacing.open
+  LaunchedEffect(cart, d, customerOpen) { ir.vil3ntec.tohid.hw.CustomerFacing.showCart(d, cart) }
   val cartDebtorId by cartStore.debtorId.collectAsState()
   LaunchedEffect(d.products.size, d.debtors.size) { cartStore.prune(d) }
+  //  PRM: تخفیف‌های خودکار — کلیدِ دکان خاموش ⇒ null و `priced` همان `cart` است
+  val promo = ir.vil3ntec.tohid.ui.PromoLive.rememberOutcome(d, cart)
+  val priced = ir.vil3ntec.tohid.data.PromoEngine.priced(cart, promo)
+  val promoSnap = ir.vil3ntec.tohid.ui.PromoLive.snap.value
 
   var query by remember { mutableStateOf("") }
   var hint by remember { mutableStateOf(0) }
@@ -117,9 +130,8 @@ fun DeskSaleScreen(
   var editLine by remember { mutableStateOf<String?>(null) }
   var lastInvoice by remember { mutableStateOf<Pair<ShopData, String>?>(null) }
   var showInvoice by remember { mutableStateOf(false) }
-  //  ستونِ دسته‌ها: null = «همه». در ناحیهٔ باریک ستون تاشونده است
+  //  تراشهٔ دستهٔ انتخابی: null = «همه»
   var category by remember { mutableStateOf<String?>(null) }
-  var railOpen by remember { mutableStateOf(false) }
   var confirmClear by remember { mutableStateOf(false) }
   //  نمای کارتی/جدولی — ترجیحِ همین کاربر روی همین دستگاه (§۱٫۵)
   val view = rememberViewMode("sale", ScreenKind.SALE)
@@ -131,8 +143,12 @@ fun DeskSaleScreen(
   val showPhotos = PhotoPrefs.show.value
   val posting by cartStore.posting.collectAsState()
 
-  val canDiscount = remember { ir.vil3ntec.tohid.data.ShopRole.canDiscount(context) }
+  //  «نیازمند تأیید» هم کادرِ تخفیف را نشان می‌دهد؛ فقط «ممنوع» پنهانش می‌کند (STF-02)
+  val canDiscount = remember { ir.vil3ntec.tohid.data.ShopRole.mayDiscount(context) }
   val blockExpired = remember { ir.vil3ntec.tohid.data.ShopPolicy.blockExpired(context) }
+  //  PAY (v3 A4): پرداختِ ترکیبی — فقط با پرچم؛ F9 پنلِ پرداخت را باز می‌کند، F12 نقدِ دقیق
+  val payV2 = remember { ir.vil3ntec.tohid.data.ShopPolicy.payV2(context) }
+  var payOpen by remember { mutableStateOf(false) }
   val seller = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrDefault("") }
   var payment by remember { mutableStateOf(SalesEngine.Payment.CASH) }
   var discountText by remember { mutableStateOf("") }
@@ -144,6 +160,15 @@ fun DeskSaleScreen(
   fun refocus() { runCatching { searchFocus.requestFocus() } }
 
   fun toast(text: String) { scope.launch { snackbar.showSnackbar(text) } }
+
+  //  HW-02/03: چاپِ خودکار یا کشوی پس از فروش که نشد همین‌جا، سرِ صندوق، گفته می‌شود
+  val printNotice by ir.vil3ntec.tohid.print.PrintSpooler.tillNotice
+  LaunchedEffect(printNotice) {
+    printNotice?.let { n ->
+      ir.vil3ntec.tohid.print.PrintSpooler.consumed(n)
+      snackbar.showSnackbar(n.text, duration = SnackbarDuration.Long)
+    }
+  }
 
   val index = remember(d.products) { ShopStore.barcodeIndex(d) }
 
@@ -170,8 +195,22 @@ fun DeskSaleScreen(
   fun add(product: Product, count: Double) =
     applyAdded(product, SalesEngine.addToCartCapped(cartStore.lines.value, product.id, count, ShopStore.stock(d, product.id)))
 
+  /**
+   *  POS-29: برچسبِ ترازو (فقط اگر دکان قاعده‌اش را روشن کرده باشد) — وزن
+   *  به سبد؛ رقمِ کنترلِ غلط رد. `false` ⇒ برچسبِ ترازو نیست، راهِ همیشگی.
+   */
+  fun scaleLabel(code: String, dd: ShopData): Boolean =
+    when (val m = ir.vil3ntec.tohid.data.ScaleLabels.match(
+      ir.vil3ntec.tohid.data.ScaleLabels.rules(context), code, ShopStore.barcodeIndex(dd), dd.products,
+    )) {
+      null -> false
+      is ir.vil3ntec.tohid.data.ScaleLabels.Match.Rejected -> { ScanFeedback.unknown(context); toast(m.message); true }
+      is ir.vil3ntec.tohid.data.ScaleLabels.Match.Weighed -> { add(m.product, m.quantity); true }
+    }
+
   /** Enter در کادر: بارکدِ کامل ⇐ همان؛ وگرنه پیشنهادِ برجسته (`PosSearch`) */
   fun submit() {
+    if (scaleLabel(query, d)) { query = ""; return }
     when (val hit = PosSearch.resolve(query, index, d.products, matches, hint)) {
       PosHit.None -> Unit
       is PosHit.Inactive -> toast(StrSale.inactive(hit.product.name))
@@ -194,6 +233,7 @@ fun DeskSaleScreen(
   val latestD by rememberUpdatedState(d)
   fun fromScanner(code: String): Boolean {
     val dd = latestD
+    if (scaleLabel(code, dd)) return true
     when (val hit = BarcodeMatch.find(code, ShopStore.barcodeIndex(dd))) {
       is BarcodeMatch.Hit.Product -> dd.products.firstOrNull { it.id == hit.id }?.let {
         if (!it.active) toast(StrSale.inactive(it.name)) else add(it, 1.0)
@@ -225,26 +265,51 @@ fun DeskSaleScreen(
     debtorId = cartDebtorId,
     blockExpired = blockExpired,
   )
-  val totals = SalesEngine.totals(d, cart, checkout)
+  val totals = SalesEngine.totals(d, priced, checkout)
   val discountBad = canDiscount && numberInvalid(discountText)
   val paidBad = payment == SalesEngine.Payment.CREDIT && numberInvalid(paidText)
 
-  fun finish() {
+  //  S08: تخفیفِ بیش از سقف ⇒ «درخواستِ تأیید» با PINِ مدیر — همان تصمیمِ سرور
+  var approval by remember { mutableStateOf<ir.vil3ntec.tohid.core.perm.ApprovalSlip.Slip?>(null) }
+  var askApproval by remember { mutableStateOf(false) }
+  val saleKey = remember(cart) { if (cart.isEmpty()) null else cartStore.saleKey() }
+  val discountDecision = ir.vil3ntec.tohid.data.ShopRole.decide(
+    context, "sales.discount", DiscountGate.req(totals.discount, totals.subtotal),
+  )
+  val gate = DiscountGate.state(discountDecision.decision, saleKey, totals.discount, totals.subtotal, approval)
+
+  /** `settled` = تسویهٔ پنلِ پرداخت (با پرچم)؛ با پرچم و بی آن (F12، Ctrl+Enter) ⇒ نقدِ دقیق */
+  fun finish(settled: ir.vil3ntec.tohid.core.pay.Settlement? = null) {
     if (cart.isEmpty()) { toast(Str.cartEmpty); return }
-    if (discountBad || paidBad) { toast(StrSale.badNumber(if (discountBad) Str.discount else StrSale.received)); return }
-    if (payment == SalesEngine.Payment.CREDIT && cartDebtorId == null) { toast(StrSale.creditNeedsCustomer); pickDebtor = true; return }
+    if (discountBad || (!payV2 && paidBad)) { toast(StrSale.badNumber(if (discountBad) Str.discount else StrSale.received)); return }
+    if (!payV2 && payment == SalesEngine.Payment.CREDIT && cartDebtorId == null) { toast(StrSale.creditNeedsCustomer); pickDebtor = true; return }
+    if (gate == DiscountGate.State.DENIED) { toast(StrPos.discountForbidden); return }
+    if (gate == DiscountGate.State.NEEDS_APPROVAL) { askApproval = true; return }
+    val signed = if (gate == DiscountGate.State.APPROVED) approval?.let(DiscountGate::json) else null
+    val st = if (!payV2) null else settled ?: when (
+      val r = ir.vil3ntec.tohid.data.PayFlow.checkout(
+        ir.vil3ntec.tohid.data.PayFlow.Draft(totals.finalTotal, cash = totals.finalTotal.toBigDecimal().stripTrailingZeros().toPlainString(), customerId = cartDebtorId),
+      )
+    ) {
+      is ir.vil3ntec.tohid.data.PayFlow.Outcome.Ok -> r.value
+      is ir.vil3ntec.tohid.data.PayFlow.Outcome.Bad -> { toast(ir.vil3ntec.tohid.data.PayFlow.message(r.problem)); return }
+    }
+    val sale = checkout.copy(settlement = st, approval = signed)
     //  POS-14: F9ِ پشتِ‌سرِهم یک فروش می‌سازد؛ سبد فقط پس از نوشتنِ دفتر پاک می‌شود
     scope.launch { when (val posted = cartStore.post(store) { key ->
-      SalesEngine.record(d, cart, checkout, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId,
+      SalesEngine.record(d, priced, sale, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId,
       series = ir.vil3ntec.tohid.sync.DocSeries.current(context), saleId = key) }) {
       SalePost.Outcome.Busy -> Unit
       SalePost.Outcome.NotSaved -> toast(SalePost.NOT_SAVED)
       is SalePost.Outcome.Refused -> toast(posted.message)
       is SalePost.Outcome.Done -> {
         val r = posted.ok
-        selected = null; discountText = ""; paidText = ""; payment = SalesEngine.Payment.CASH
+        ir.vil3ntec.tohid.hw.CustomerFacing.sold(r.data.sales.last().finalTotal)
+        selected = null; discountText = ""; paidText = ""; payment = SalesEngine.Payment.CASH; approval = null
+        payOpen = false
         lastInvoice = r.data to r.saleId
-        toast(StrSale.saleRecordedF8(money(r.data.sales.last().finalTotal)))
+        val change = st?.change ?: 0L
+        toast(StrPos.saleRecorded(money(r.data.sales.last().finalTotal)) + (if (change > 0) " — " + StrPos.changeDue(money(ir.vil3ntec.tohid.data.PayFlow.major(change))) else "") + " — " + StrPos.f8Print)
         refocus()
       }
     } }
@@ -272,16 +337,15 @@ fun DeskSaleScreen(
         quantity = line.quantity,
         price = line.unitPrice ?: p?.salePrice ?: 0.0,
         customPrice = line.unitPrice != null,
+        category = p?.category.orEmpty(),
       )
     }
   }
-  //  کاشی و ردیفِ کالا: کلیک ⇐ افزودن (با پیشوندِ «۳*» اگر نوشته شده)، − / + یک پله
+  //  کارت و ردیفِ کالا: زدن ⇐ افزودن (با پیشوندِ «۳*» اگر نوشته شده). − / + فقط در سبد است
   val productCb = PosProductCallbacks(
     stockOf = { ShopStore.stock(d, it) },
     qtyOf = { id -> PosCartOps.qtyOf(cart, id) },
     onAdd = { p -> add(p, parsed.first); query = ""; refocus() },
-    onMinus = { p -> step(p.id, -1); selected = p.id; refocus() },
-    onPlus = { p -> applyAdded(p, PosCartOps.addStep(cartStore.lines.value, p, ShopStore.stock(d, p.id))); refocus() },
   )
   val gridState = rememberLazyGridState()
   val tableState = rememberLazyListState()
@@ -294,14 +358,208 @@ fun DeskSaleScreen(
     val i = cart.indexOfFirst { it.productId == selected }
     if (i >= 0) runCatching { listState.animateScrollToItem(i) }
   }
+  val c = Shop.colors
 
-  Column(
+  /* ─────────── کاتالوگ: کادرِ اسکن (تنها جست‌وجوی صفحه)، تراشهٔ دسته‌ها، کارت‌ها ─────────── */
+  @Composable
+  fun Catalogue(modifier: Modifier) {
+    Column(modifier) {
+      Row(verticalAlignment = Alignment.CenterVertically) {
+        OutlinedTextField(
+          value = query,
+          onValueChange = { query = it },
+          singleLine = true,
+          shape = ir.vil3ntec.tohid.ui.theme.Shape.field,
+          colors = OutlinedTextFieldDefaults.colors(
+            unfocusedContainerColor = c.fieldBg,
+            focusedContainerColor = c.fieldBg,
+            unfocusedBorderColor = c.fieldBorder,
+            focusedBorderColor = c.focus,
+          ),
+          leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null, tint = c.muted) },
+          placeholder = { Text(StrSale.deskSearchHint, maxLines = 1, overflow = TextOverflow.Ellipsis, color = c.muted) },
+          modifier = Modifier
+            .weight(1f)
+            .focusRequester(searchFocus)
+            .onPreviewKeyEvent { e ->
+              if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+              when (PosKeys.field(keyName(e.key), e.isPrimaryModifier, query.isEmpty(), matches.isNotEmpty(), selected != null)) {
+                PosAction.SUBMIT -> { submit(); true }
+                PosAction.HINT_DOWN -> { hint = (hint + 1).coerceAtMost(matches.size - 1); true }
+                PosAction.HINT_UP -> { hint = (hint - 1).coerceAtLeast(0); true }
+                PosAction.ROW_DOWN -> { moveSel(1); true }
+                PosAction.ROW_UP -> { moveSel(-1); true }
+                PosAction.CLEAR_QUERY -> { query = ""; true }
+                PosAction.DELETE_ROW -> { cartStore.set(SalesEngine.setCartQty(cart, selected!!, 0.0)); moveSel(0); true }
+                PosAction.QTY_UP -> { step(selected!!, 1); true }
+                PosAction.QTY_DOWN -> { step(selected!!, -1); true }
+                else -> false
+              }
+            },
+        )
+        Spacer(Modifier.width(10.dp))
+        ViewModeToggle(view)
+      }
+      Spacer(Modifier.height(12.dp))
+      if (term.isNotEmpty()) {
+        //  با عبارت، نتیجه از همهٔ دسته‌هاست — تراشه‌ها جایشان را به همین خط می‌دهند
+        Text(
+          StrSale.resultsAll(shown.size),
+          Modifier.heightIn(min = target).padding(horizontal = 6.dp).wrapContentHeight(Alignment.CenterVertically),
+          style = MaterialTheme.typography.labelLarge, color = c.muted,
+        )
+      } else {
+        CategoryChips(
+          categories = categories,
+          selected = category,
+          onSelect = { category = it; refocus() },
+          target = target,
+          modifier = Modifier.fillMaxWidth(),
+        )
+      }
+      Spacer(Modifier.height(12.dp))
+      BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+        val highlight = if (term.isNotEmpty()) hint else -1
+        when {
+          shown.isEmpty() && term.isNotEmpty() -> PosEmpty(
+            StrSale.noMatch(term),
+            StrSale.noMatchHint,
+          )
+          shown.isEmpty() -> PosEmpty(
+            StrSale.nothingToSell,
+            if (d.products.none { it.active }) StrSale.addItemsHint else StrSale.noActiveInCategory,
+          )
+          view.mode == ViewMode.TABLE -> ProductTable(shown, highlight, target, showPhotos, productCb, tableState, Modifier.fillMaxSize())
+          else -> ProductGrid(
+            shown, highlight, showPhotos, productCb, gridState,
+            minCell = posCardMin(maxWidth, touch = !ir.vil3ntec.tohid.ui.Platform.DESKTOP),
+            modifier = Modifier.fillMaxSize(),
+          )
+        }
+      }
+      //  یادآوریِ کلیدها — باریک و کم‌رنگ؛ فهرستِ کامل در F1
+      PosHintLine(StrPos.keysLineF1)
+    }
+  }
+
+  /* ─────────── ناحیهٔ «سبد خرید» ─────────── */
+  @Composable
+  fun Cart(modifier: Modifier) {
+    OrderPanel(
+      itemCount = cart.size,
+      modifier = modifier,
+      headerActions = {
+        CartHeaderAction(StrSale.freeItemAlt, Icons.Filled.AddBox, KeyMap.SALE_FREE_ITEM.hint) { freeLine = true }
+        CartHeaderAction(StrPos.emptyCart, Icons.Filled.DeleteOutline, null, enabled = cart.isNotEmpty(), danger = true) { confirmClear = true }
+      },
+      customer = {
+        CustomerRow(
+          name = debtor?.name,
+          detail = debtor?.let { debtStateText(d, it.id) },
+          pickHint = KeyMap.SALE_CUSTOMER.hint,
+          target = target,
+          onPick = { pickDebtor = true },
+          onRemove = { cartStore.setDebtor(null); payment = SalesEngine.Payment.CASH; refocus() },
+        )
+      },
+      items = {
+        OrderLines(
+          lines = lineViews,
+          selected = selected,
+          target = target,
+          state = listState,
+          showPhotos = showPhotos,
+          onSelect = { selected = it; refocus() },
+          onEdit = { editLine = it },
+          onMinus = { step(it, -1); refocus() },
+          onPlus = { step(it, 1); refocus() },
+          //  PRM-18: هر تخفیفِ اعمال‌شده یک ردیف با نامش و کادرِ کد — تهِ همان فهرست،
+          //  با اسکرولِ اقلام، تا جای ردیف‌های سبد را نگیرند
+          footer = if (promoSnap.active) {
+            {
+              promo?.let { PromoLines(it.applied) }
+              if (promoSnap.hasCodes) {
+                PromoCodeField(
+                  codes = promo?.codes.orEmpty(),
+                  entered = ir.vil3ntec.tohid.ui.PromoLive.coupons.value,
+                  onAdd = { ir.vil3ntec.tohid.ui.PromoLive.addCoupon(it); refocus() },
+                  onRemove = { ir.vil3ntec.tohid.ui.PromoLive.removeCoupon(it) },
+                  modifier = Modifier.padding(top = 8.dp),
+                )
+              }
+            }
+          } else null,
+        )
+      },
+      summary = {
+        PaymentSummary(PromoSummary.rows(totals, promo), totals.finalTotal) {
+          if (canDiscount) {
+            MiniNumberField(Str.discount, discountText, { discountText = numericInput(it) }, discountBad, "٪")
+            //  S08: تخفیفِ بیش از سقف ⇒ «درخواستِ تأیید» با PINِ مدیر — همان تصمیمِ سرور
+            when (gate) {
+              DiscountGate.State.NEEDS_APPROVAL -> Row(
+                Modifier.fillMaxWidth().padding(top = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+              ) {
+                ir.vil3ntec.tohid.ui.components.common.StatusPill(
+                  StrPos.needsApproval, ir.vil3ntec.tohid.ui.components.common.PillTone.WARNING,
+                )
+                Spacer(Modifier.weight(1f))
+                OutlinedButton(onClick = { askApproval = true }, enabled = !posting) { Text(StrPos.requestApprovalF9) }
+              }
+              DiscountGate.State.APPROVED -> ir.vil3ntec.tohid.ui.components.common.StatusPill(
+                StrPos.approved, ir.vil3ntec.tohid.ui.components.common.PillTone.SUCCESS, Modifier.padding(top = 6.dp),
+              )
+              DiscountGate.State.DENIED -> ir.vil3ntec.tohid.ui.components.common.StatusPill(
+                StrPos.discountForbidden, ir.vil3ntec.tohid.ui.components.common.PillTone.DANGER,
+                Modifier.padding(top = 6.dp),
+              )
+              DiscountGate.State.FREE -> Unit
+            }
+          }
+        }
+      },
+      methods = {
+        if (payV2) {
+          //  PAY (v3 A4): روش‌ها در پنلِ پرداخت‌اند — نقد، کیف پول، کارت، حواله و به حساب
+          Text(
+            StrPos.mixedPayHint,
+            style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted,
+          )
+        } else {
+          PaymentMethodGrid(PosPayments.configured(), payment, target) { m ->
+            if (m.payment != payment) {
+              payment = m.payment
+              if (m.needsCustomer && cartDebtorId == null) pickDebtor = true
+            }
+          }
+          if (payment == SalesEngine.Payment.CREDIT) {
+            MiniNumberField(StrPos.paidNowShort, paidText, { paidText = numericInput(it) }, paidBad, "؋")
+          }
+        }
+      },
+      actions = {
+        OrderActions(
+          postHint = KeyMap.SALE_PAY_PANEL.hint,
+          printHint = KeyMap.SALE_REPRINT.hint,
+          canPost = cart.isNotEmpty(),
+          posting = posting,
+          canPrint = lastInvoice != null,
+          onPost = { if (payV2) payOpen = true else finish() },
+          onPrint = { if (lastInvoice != null) showInvoice = true },
+        )
+      },
+    )
+  }
+
+  BoxWithConstraints(
     Modifier
       .fillMaxSize()
       .onPreviewKeyEvent { e ->
         if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
         when (PosKeys.screen(keyName(e.key), e.isPrimaryModifier)) {
-          PosAction.FINISH -> { finish(); true }
+          PosAction.FINISH -> { if (payV2 && keyName(e.key) == KeyName.F9) { if (cart.isNotEmpty()) payOpen = true } else finish(); true }
           PosAction.CUSTOMER -> { pickDebtor = true; true }
           PosAction.EDIT_ROW -> { selected?.let { editLine = it }; true }
           PosAction.FREE_ITEM -> { freeLine = true; true }
@@ -309,177 +567,27 @@ fun DeskSaleScreen(
           else -> false
         }
       }
-      .padding(12.dp),
+      .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 12.dp),
   ) {
-    BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
-      val railFixed = PosLayout.railFixed(maxWidth.value)
-      val panelWidth = if (maxWidth >= 1200.dp) 380.dp else 340.dp
+    /*
+     *  چیدمان (RTL): کاتالوگ راست و پهن، سبد چپ با پهنای پله‌ای (`PosLayout`).
+     *  ستونِ دسته‌ها و نوارِ دکمه‌های پایین دیگر نیستند. پنجرهٔ باریک (تبلتِ
+     *  ایستاده): سبد زیرِ کاتالوگ.
+     */
+    val w = maxWidth.value
+    if (PosLayout.sideCart(w)) {
       Row(Modifier.fillMaxSize()) {
-        /* ─────────── ستونِ دسته‌ها (راست) ─────────── */
-        if (railFixed || railOpen) {
-          CategoryRail(
-            categories = categories,
-            selected = category,
-            onSelect = { category = it; if (!railFixed) railOpen = false; refocus() },
-            target = target,
-          )
-          Spacer(Modifier.width(12.dp))
-        }
-
-        /* ─────────── کادرِ اسکن و شبکه/جدولِ کالا (وسط) ─────────── */
-        Column(Modifier.weight(1f).fillMaxHeight()) {
-          Row(verticalAlignment = Alignment.CenterVertically) {
-            if (!railFixed) {
-              OutlinedButton(onClick = { railOpen = !railOpen; refocus() }, modifier = Modifier.heightIn(min = target)) {
-                Icon(Icons.Filled.ViewSidebar, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(6.dp))
-                Text(category ?: StrSale.categories, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 120.dp))
-              }
-              Spacer(Modifier.width(8.dp))
-            }
-            OutlinedTextField(
-              value = query,
-              onValueChange = { query = it },
-              singleLine = true,
-              leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-              placeholder = { Text(StrSale.deskSearchHint, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-              modifier = Modifier
-                .weight(1f)
-                .focusRequester(searchFocus)
-                .onPreviewKeyEvent { e ->
-                  if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                  when (PosKeys.field(keyName(e.key), e.isPrimaryModifier, query.isEmpty(), matches.isNotEmpty(), selected != null)) {
-                    PosAction.SUBMIT -> { submit(); true }
-                    PosAction.HINT_DOWN -> { hint = (hint + 1).coerceAtMost(matches.size - 1); true }
-                    PosAction.HINT_UP -> { hint = (hint - 1).coerceAtLeast(0); true }
-                    PosAction.ROW_DOWN -> { moveSel(1); true }
-                    PosAction.ROW_UP -> { moveSel(-1); true }
-                    PosAction.CLEAR_QUERY -> { query = ""; true }
-                    PosAction.DELETE_ROW -> { cartStore.set(SalesEngine.setCartQty(cart, selected!!, 0.0)); moveSel(0); true }
-                    PosAction.QTY_UP -> { step(selected!!, 1); true }
-                    PosAction.QTY_DOWN -> { step(selected!!, -1); true }
-                    else -> false
-                  }
-                },
-            )
-            Spacer(Modifier.width(8.dp))
-            ViewModeToggle(view)
-          }
-          Text(
-            if (term.isNotEmpty()) StrSale.resultsAll(shown.size)
-            else Str.itemsCount(shown.size) + " · " + (category ?: StrSale.allCategories),
-            Modifier.padding(vertical = 6.dp),
-            style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted,
-          )
-          Box(Modifier.weight(1f).fillMaxWidth()) {
-            val highlight = if (term.isNotEmpty()) hint else -1
-            when {
-              shown.isEmpty() && term.isNotEmpty() -> PosEmpty(
-                StrSale.noMatch(term),
-                StrSale.noMatchHint,
-              )
-              shown.isEmpty() -> PosEmpty(
-                StrSale.nothingToSell,
-                if (d.products.none { it.active }) StrSale.addItemsHint else StrSale.noActiveInCategory,
-              )
-              view.mode == ViewMode.TABLE -> ProductTable(shown, highlight, target, productCb, tableState, Modifier.fillMaxSize())
-              else -> ProductGrid(shown, highlight, showPhotos, target, productCb, gridState, Modifier.fillMaxSize())
-            }
-          }
-        }
-
-        Spacer(Modifier.width(12.dp))
-
-        /* ─────────── پنلِ سفارش (چپ) ─────────── */
-        OrderPanel(
-          itemCount = cart.size,
-          width = panelWidth,
-          customer = {
-            CustomerRow(
-              name = debtor?.name,
-              detail = debtor?.let { debtStateText(d, it.id) },
-              pickHint = KeyMap.SALE_CUSTOMER.hint,
-              target = target,
-              onPick = { pickDebtor = true },
-              onRemove = { cartStore.setDebtor(null); payment = SalesEngine.Payment.CASH; refocus() },
-            )
-          },
-          items = {
-            OrderLines(
-              lines = lineViews,
-              selected = selected,
-              target = target,
-              state = listState,
-              onSelect = { selected = it; refocus() },
-              onEdit = { editLine = it },
-              onMinus = { step(it, -1); refocus() },
-              onPlus = { step(it, 1); refocus() },
-            )
-          },
-          summary = {
-            PaymentSummary(PosSummary.rows(totals), totals.finalTotal) {
-              if (canDiscount) {
-                OutlinedTextField(
-                  value = discountText,
-                  onValueChange = { discountText = numericInput(it) },
-                  label = { Text(StrSale.discountPct) },
-                  singleLine = true,
-                  isError = discountBad,
-                  supportingText = if (discountBad) { { Text(StrSale.badNumberShort) } } else null,
-                  modifier = Modifier.fillMaxWidth(),
-                )
-              }
-            }
-          },
-          methods = {
-            PaymentMethodGrid(PosPayments.configured(), payment, target) { m ->
-              if (m.payment != payment) {
-                payment = m.payment
-                if (m.needsCustomer && cartDebtorId == null) pickDebtor = true
-              }
-            }
-            if (payment == SalesEngine.Payment.CREDIT) {
-              Spacer(Modifier.height(8.dp))
-              OutlinedTextField(
-                value = paidText,
-                onValueChange = { paidText = numericInput(it) },
-                label = { Text(StrSale.paidNow) },
-                singleLine = true,
-                isError = paidBad,
-                supportingText = if (paidBad) { { Text(StrSale.badNumberShort) } } else null,
-                modifier = Modifier.fillMaxWidth(),
-              )
-            }
-          },
-          actions = {
-            OrderActions(
-              postHint = KeyMap.SALE_PAY_PANEL.hint,
-              printHint = KeyMap.SALE_REPRINT.hint,
-              canPost = cart.isNotEmpty(),
-              posting = posting,
-              canPrint = lastInvoice != null,
-              onPost = { finish() },
-              onPrint = { if (lastInvoice != null) showInvoice = true },
-            )
-          },
-        )
+        Catalogue(Modifier.weight(1f).fillMaxHeight())
+        Spacer(Modifier.width(16.dp))
+        Cart(Modifier.width(PosLayout.cartWidth(w).dp).fillMaxHeight())
+      }
+    } else {
+      Column(Modifier.fillMaxSize()) {
+        Catalogue(Modifier.weight(1f).fillMaxWidth())
+        Spacer(Modifier.height(12.dp))
+        Cart(Modifier.weight(1f).fillMaxWidth())
       }
     }
-
-    Spacer(Modifier.height(8.dp))
-    /* ─────────── نوارِ عمل (پایین) — فقط کارهای واقعیِ امروز ─────────── */
-    BottomActionBar(
-      actions = listOf(
-        PosBarAction(StrSale.freeItemAlt, Icons.Filled.AddBox, KeyMap.SALE_FREE_ITEM.hint) { freeLine = true },
-        PosBarAction(StrSale.editRow, Icons.Filled.Edit, KeyMap.SALE_EDIT_ROW.hint, enabled = cart.any { it.productId == selected }) {
-          selected?.let { editLine = it }
-        },
-        PosBarAction(StrSale.salesList, Icons.Filled.ReceiptLong, KeyMap.GLOBAL_PAGE6.hint) { ir.vil3ntec.tohid.ui.AppNav.go("sales") },
-        PosBarAction(StrSale.newCart, Icons.Filled.DeleteOutline, null, enabled = cart.isNotEmpty(), danger = true) { confirmClear = true },
-      ),
-      keysLine = StrSale.keysLine,
-      target = target,
-    )
   }
 
   //  خالی کردنِ سبد کارِ پاک‌کننده است ⇐ تأیید، با فوکوسِ پیش‌فرض روی «انصراف» (۵.۱ بند ۱۱)
@@ -533,6 +641,29 @@ fun DeskSaleScreen(
         },
       )
     }
+  }
+  if (askApproval && saleKey != null) {
+    ir.vil3ntec.tohid.ui.components.staff.ApprovalDialog(
+      title = StrPos.approveDiscount,
+      summary = StrPos.discountSummary(money(totals.discount), money(totals.subtotal)) +
+        if (discountDecision.cap == "maxPct") " — " + StrPos.cashierCap(qty(discountDecision.limit ?: 0.0)) else "",
+      shopId = ir.vil3ntec.tohid.data.ShopRole.shopId(context),
+      requesterUserId = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountId }.getOrDefault("") },
+      need = DiscountGate.need(saleKey, totals.discount, totals.subtotal),
+      onApproved = { approval = it; askApproval = false; refocus() },
+      onDismiss = { askApproval = false; refocus() },
+    )
+  }
+  if (payOpen) {
+    PayPanelDialog(
+      total = totals.finalTotal,
+      customerId = cartDebtorId,
+      customerName = debtor?.name,
+      busy = posting,
+      target = target,
+      onDismiss = { payOpen = false; refocus() },
+      onConfirm = { st -> finish(st) },
+    )
   }
   if (showInvoice) lastInvoice?.let { (snap, id) ->
     snap.sales.find { it.id == id }?.let { sale ->

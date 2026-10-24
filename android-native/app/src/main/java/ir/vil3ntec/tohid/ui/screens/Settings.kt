@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PointOfSale
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.ChevronLeft
@@ -77,6 +78,7 @@ import ir.vil3ntec.tohid.ui.theme.ThemeChoice
 import kotlinx.coroutines.launch
 import ir.vil3ntec.tohid.core.i18n.StrSettings
 import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrShell
 
 /**
  *  تنظیمات.
@@ -470,6 +472,34 @@ fun SettingsScreen(
       }
     }
 
+    /* ======================== برگشت و تعویض (RET، پیش‌فرض خاموش) ======================== */
+    item { ReturnSettingsSection() }
+    /* =================== پرداخت و صندوق (PAY، v3 A4) =================== */
+    item {
+      var payV2 by remember { mutableStateOf(ir.vil3ntec.tohid.data.ShopPolicy.payV2(context)) }
+      SettingsSection(
+        icon = Icons.Filled.PointOfSale,
+        title = StrShell.payAndRegister,
+        subtitle = if (payV2) StrShell.payMixed else StrShell.payLegacy,
+        tint = if (payV2) Shop.colors.primary else Shop.colors.muted,
+      ) {
+        Text(
+          StrShell.payNote,
+          style = MaterialTheme.typography.labelSmall,
+          color = Shop.colors.muted2,
+        )
+        Spacer(Modifier.height(8.dp))
+        SegmentedChoice(
+          options = listOf("legacy" to StrShell.payLegacy, "v2" to StrShell.payMixed),
+          selected = if (payV2) "v2" else "legacy",
+          onSelect = {
+            payV2 = it == "v2"
+            ir.vil3ntec.tohid.data.ShopPolicy.setPayV2(context, payV2)
+          },
+        )
+      }
+    }
+
     /* ============================== دوربین ============================== */
     item {
       SettingsSection(
@@ -544,6 +574,9 @@ fun SettingsScreen(
         }
       }
     }
+
+    /* ===================== امنیت (SEC-01) ===================== */
+    item { SecuritySection(store, ::toast) }
 
     /* ========================= رمز حساب ========================= */
     if (signedIn) {
@@ -681,7 +714,8 @@ fun SettingsScreen(
               onClick = {
                 scope.launch {
                   val opened = withContext(Dispatchers.IO) {
-                    runCatching { store.parseBackup(snap.file.readText()).getOrThrow() }
+                    //  نسخهٔ خودکار رونوشتِ دفتر است؛ اگر دفتر رمزدار بود، این هم (SEC-01)
+                    runCatching { store.parseBackup(ir.vil3ntec.tohid.data.AtRest.readText(context, snap.file)).getOrThrow() }
                   }
                   opened
                     .onSuccess { pendingRestore = it; restorePhotos = 0; restoreError = null }

@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.LocalOffer
 import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.ManageSearch
 import androidx.compose.material.icons.filled.Payments
@@ -36,6 +37,7 @@ import androidx.compose.material.icons.filled.WorkspacePremium
 import ir.vil3ntec.tohid.ui.theme.Shop
 import ir.vil3ntec.tohid.core.i18n.StrNav
 import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrShell
 
 /**
  *  بیشتر — وضعیت برنامه، به‌روزرسانی، و راهِ ورود به بخش‌هایی که در
@@ -169,6 +171,14 @@ fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
         tint = Shop.colors.accent,
         subtitle = StrNav.staffSub,
         onClick = { onOpen("team") },
+      )
+      //  تخفیف‌ها (PRM) — صاحب و مدیر؛ کلیدِ دکان پیش‌فرض خاموش است
+      if (canManage) MoreCard(
+        title = StrShell.promos,
+        icon = Icons.Filled.LocalOffer,
+        tint = Shop.colors.success,
+        subtitle = StrShell.promosSub,
+        onClick = { onOpen("promos") },
       )
       /*
        *  پشتیبانی — برای همه، نه فقط صاحب دکان.

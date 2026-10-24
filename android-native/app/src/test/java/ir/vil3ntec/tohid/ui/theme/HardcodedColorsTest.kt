@@ -47,26 +47,27 @@ class HardcodedColorsTest {
    *  رنگِ ثابتِ عمدی — سقفِ شمار در هر فایل. فقط کم شود، زیاد نه.
    */
   private val allowed = mapOf(
-    //  سربرگ: پالتِ روز و شبِ خودش را دارد (BAR_DAY / BAR_NIGHT)
-    "ui/screens/TopBar.kt" to 29,
-    //  تصویرسازیِ صفحهٔ خوش‌آمد و نشانِ طلاییِ VIP — رنگِ برند، نه رنگِ سطح
-    "ui/screens/Welcome.kt" to 14,
-    "ui/screens/WelcomeDecor.kt" to 14,
-    "ui/screens/Vip.kt" to 12,
-    //  پالتِ دسته‌ایِ نمودارِ دونات + آیکونِ «تعدادِ فاکتور» (≥۳:۱ در هر دو تم)
-    "ui/screens/DeskDashboard.kt" to 8,
-    //  ایستگاهِ میانیِ گرادیانِ کارتِ بالای داشبورد
-    "ui/screens/Dashboard.kt" to 1,
+    //  سربرگ: هشدار، قرمزِ «اشتراک رو به پایان»، سبز/قرمزِ روی سربرگ و جرقهٔ طلایی.
+    //  VILL3N (۱۴۰۵/۰۷/۲۸): BAR_DAY/BAR_NIGHT/جوهر و نشانِ شمار به توکن رفتند ⇒ ۲۹ ⇐ ۱۸
+    "ui/screens/TopBar.kt" to 18,
+    //  تصویرسازیِ صفحهٔ خوش‌آمد، نشانِ گوگل و طلای اشتراک — رنگِ برندِ دیگران، نه رنگِ سطح.
+    //  VILL3N: بنفشِ صفحهٔ ورود، آسمان، موج و حباب‌ها و «طلای» بنفشِ VIP از توکن ⇒ ۱۴/۱۴/۱۲ ⇐ ۸/۱/۷
+    "ui/screens/Welcome.kt" to 8,
+    "ui/screens/WelcomeDecor.kt" to 1,
+    "ui/screens/Vip.kt" to 7,
+    //  DeskDashboard: پالتِ دونات از ۱۴۰۵/۰۷/۲۸ از `Shop.colors.chart` (VILL3N) ⇒ از فهرست بیرون
+    //  Dashboard: ایستگاهِ میانیِ گرادیان از ۱۴۰۵/۰۷/۲۸ `Brand.blue` ⇒ از فهرست بیرون
     //  سبزِ واتساپ — رنگِ برندِ همان برنامه
     "ui/screens/Debtors.kt" to 1,
     //  بومِ پیش‌نمایشِ عکسِ کالا (عکسِ پس‌زمینه‌سفید روی بومِ روشن دیده می‌شود)
     "ui/screens/PhotoStudioDialog.kt" to 1,
-    //  متنِ تیره روی دکمهٔ گرادیانِ روشن (همان onPrimary)
-    "ui/screens/Tohid.kt" to 1,
+    //  Tohid: دکمهٔ اصلی از ۱۴۰۵/۰۷/۲۸ جفتِ توکنِ دکمه است ⇒ از فهرست بیرون
     //  روی تصویرِ دوربین — زمینه همیشه تیره است
     "ui/screens/ScanSheet.kt" to 1,
     "ui/screens/Sale.kt" to 1,
     "scan/BarcodeScanner.kt" to 1,
+    //  بازبینیِ عکسِ تازه‌گرفته (دوربینِ راهنما) — بومِ عکس همیشه تیره، متنِ سفید رویش
+    "scan/GuidedCapture.kt" to 1,
     "desk:scan/BarcodeScannerDesk.kt" to 6,
     //  چاپ — کاغذ همیشه سفید است
     "desk:print/ReportPrintDesk.kt" to 1,

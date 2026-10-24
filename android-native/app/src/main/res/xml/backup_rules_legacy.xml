@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- همان قاعده، برای اندرویدِ پیش از ۱۲ -->
+<!-- همان قاعده، برای اندرویدِ پیش از ۱۲ (و همان استثنای SEC-01 در `TohidBackupAgent`) -->
 <full-backup-content>
   <include domain="file" path="." />
   <include domain="sharedpref" path="." />
   <exclude domain="sharedpref" path="tohid-sync.xml" />
   <exclude domain="sharedpref" path="tohid-session.xml" />
   <exclude domain="sharedpref" path="tohid-session-secure.xml" />
+  <exclude domain="sharedpref" path="tohid-staff-pins.xml" />
 </full-backup-content>

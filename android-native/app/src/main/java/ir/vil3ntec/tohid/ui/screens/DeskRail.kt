@@ -10,10 +10,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -22,13 +24,15 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.ui.theme.Shop
+import ir.vil3ntec.tohid.ui.theme.Shape
 import ir.vil3ntec.tohid.core.i18n.StrNav
 import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrShell
 
 /** پهنای منوی کناری — محتوا به همین اندازه از کنار فاصله می‌گیرد */
-val DESK_RAIL_WIDTH = 212.dp
+val DESK_RAIL_WIDTH = 200.dp
 /** حالتِ «فقط آیکن» */
-val DESK_RAIL_COMPACT = 72.dp
+val DESK_RAIL_COMPACT = 68.dp
 
 /** سه حالتِ منو — انتخابِ خودِ کاربر، روی همین دستگاه می‌ماند */
 object RailMode {
@@ -71,21 +75,40 @@ fun DeskRail(
     Modifier
       .width(if (compact) DESK_RAIL_COMPACT else DESK_RAIL_WIDTH)
       .fillMaxHeight()
-      .background(Shop.colors.surface)
+      //  نسخهٔ ۲: ناحیهٔ منو رنگِ خودش را دارد، نه سفیدِ هم‌رنگِ کارت‌ها. VILL3N: «پنلِ کناری
+      //  جدا از محتوا» ⇒ زمینهٔ فرعی + یک خطِ جداکننده رو به محتوا
+      .background(Shop.colors.zoneNav)
+      .railEdge(Shop.colors.divider)
       .verticalScroll(rememberScrollState())
       .padding(vertical = 10.dp, horizontal = 8.dp),
     verticalArrangement = Arrangement.spacedBy(2.dp),
   ) {
-    //  نشانِ برنامه
-    if (!compact) {
-      Row(Modifier.padding(horizontal = 10.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).background(Shop.colors.primary), contentAlignment = Alignment.Center) {
-          Icon(Icons.Filled.Storefront, null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(20.dp))
+    //  کلیدِ بازکردن/جمع‌کردنِ منو — بالای منو، همیشه پیدا (نسخهٔ ۲)؛ انتخاب برای همین صفحه
+    //  می‌ماند (صندوق `desk_rail_pos`، بقیه `desk_rail` — `AppRoot`)
+    val canToggle = mode == RailMode.FULL || mode == RailMode.COMPACT
+    if (compact) {
+      if (canToggle) RailTip(StrShell.openMenu) {
+        Box(
+          Modifier.fillMaxWidth().clip(Shape.button).clickable(onClickLabel = StrShell.openMenu) { onMode(RailMode.FULL) }.padding(vertical = 10.dp),
+          contentAlignment = Alignment.Center,
+        ) { Icon(Icons.Filled.ViewSidebar, contentDescription = StrShell.openMenu, tint = Shop.colors.muted, modifier = Modifier.size(20.dp)) }
+      }
+    } else {
+      //  نشانِ برنامه
+      Row(Modifier.padding(start = 10.dp, top = 10.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(34.dp).clip(Shape.button).background(Shop.colors.brandPrimary), contentAlignment = Alignment.Center) {
+          Icon(Icons.Filled.Storefront, null, tint = Shop.colors.button.primary.text, modifier = Modifier.size(20.dp))
         }
         Spacer(Modifier.width(10.dp))
-        Column {
-          Text(Str.appName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Shop.colors.text)
-          Text(StrNav.shopManagement, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+        Column(Modifier.weight(1f)) {
+          Text(Str.appName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Shop.colors.text, maxLines = 1)
+          Text(StrNav.shopManagement, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted, maxLines = 1)
+        }
+        if (canToggle) RailTip(StrShell.collapseMenuTip) {
+          Box(
+            Modifier.size(32.dp).clip(Shape.button).clickable(onClickLabel = StrShell.collapseMenu) { onMode(RailMode.COMPACT) },
+            contentAlignment = Alignment.Center,
+          ) { Icon(Icons.Filled.ViewCompact, contentDescription = StrShell.collapseMenu, tint = Shop.colors.muted, modifier = Modifier.size(19.dp)) }
         }
       }
     }
@@ -107,10 +130,10 @@ fun DeskRail(
       listOf(RailMode.FULL to Icons.Filled.ViewSidebar, RailMode.COMPACT to Icons.Filled.ViewCompact, RailMode.HIDDEN to Icons.Filled.VisibilityOff).forEach { (m, ic) ->
         Box(
           Modifier.size(30.dp).clip(RoundedCornerShape(8.dp))
-            .background(if (mode == m) Shop.colors.primary.copy(alpha = 0.12f) else Shop.colors.surface.copy(alpha = 0f))
+            .background(if (mode == m) Shop.colors.surfaceSelected else Shop.colors.surface.copy(alpha = 0f))
             .clickable { onMode(m) },
           contentAlignment = Alignment.Center,
-        ) { Icon(ic, null, tint = if (mode == m) Shop.colors.primary else Shop.colors.muted, modifier = Modifier.size(17.dp)) }
+        ) { Icon(ic, null, tint = if (mode == m) Shop.colors.iconActive else Shop.colors.icon, modifier = Modifier.size(17.dp)) }
         Spacer(Modifier.width(4.dp))
       }
     }
@@ -146,39 +169,40 @@ private fun RailSoonItem(label: String, icon: ImageVector) {
 @Composable
 private fun RailItem(id: String, label: String, key: String, icon: ImageVector, selected: Boolean, onPick: (String) -> Unit, compact: Boolean = false, badge: Int = 0) {
   if (compact) {
-    //  فقط آیکن — نام در راهنمای دکمه (برای صفحه‌خوان هم)
-    Box(
+    //  فقط آیکن — همان آیکن و همان ترتیبِ منوی کامل؛ نام در راهنمای هاور و برای صفحه‌خوان
+    RailTip(label) { Box(
       Modifier
         .fillMaxWidth()
-        .clip(RoundedCornerShape(10.dp))
-        .background(if (selected) Shop.colors.primaryTint else Shop.colors.surface.copy(alpha = 0f))
+        .clip(Shape.button)
+        .background(if (selected) Shop.colors.primaryTint else Shop.colors.zoneNav)
         .clickable { onPick(id) }
-        .padding(vertical = 11.dp),
+        .padding(vertical = 10.dp),
       contentAlignment = Alignment.Center,
     ) {
-      Icon(icon, contentDescription = label, tint = if (selected) Shop.colors.primary else Shop.colors.muted, modifier = Modifier.size(21.dp))
-    }
+      Icon(icon, contentDescription = label, tint = if (selected) Shop.colors.iconActive else Shop.colors.icon, modifier = Modifier.size(21.dp))
+    } }
     return
   }
   /*
    *  انتخاب‌شده: زمینهٔ کم‌رنگِ اصلی، متنِ تیرهٔ پررنگ و آیکنِ رنگِ اصلی —
    *  نه متنِ سفید روی رنگِ اصلی (در شب ۲٫۷:۱ بود، زیرِ ۴٫۵:۱).
    */
+  //  نسخهٔ ۲: قرصِ گرد با تهِ رنگِ اصلی و متنِ اصلیِ پررنگ (کنتراست در `BackOfficeContrastTest`)
   Row(
     Modifier
       .fillMaxWidth()
-      .clip(RoundedCornerShape(8.dp))
-      .background(if (selected) Shop.colors.primaryTint else Shop.colors.surface.copy(alpha = 0f))
+      .clip(Shape.chip)
+      .background(if (selected) Shop.colors.primaryTint else Shop.colors.zoneNav)
       .clickable { onPick(id) }
-      .padding(horizontal = 12.dp, vertical = 9.dp),
+      .padding(horizontal = 12.dp, vertical = 8.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
-    Icon(icon, contentDescription = null, tint = if (selected) Shop.colors.primary else Shop.colors.muted, modifier = Modifier.size(19.dp))
+    Icon(icon, contentDescription = null, tint = if (selected) Shop.colors.iconActive else Shop.colors.icon, modifier = Modifier.size(19.dp))
     Spacer(Modifier.width(12.dp))
     Text(
       label,
       style = MaterialTheme.typography.bodyMedium,
-      color = Shop.colors.text,
+      color = if (selected) Shop.colors.primaryDark else Shop.colors.text,
       fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
       maxLines = 1,
       modifier = Modifier.weight(1f),
@@ -187,8 +211,9 @@ private fun RailItem(id: String, label: String, key: String, icon: ImageVector, 
     if (badge > 0) Text(
       badge.toString(),
       style = MaterialTheme.typography.labelSmall,
-      color = MaterialTheme.colorScheme.onError,
-      modifier = Modifier.clip(RoundedCornerShape(10.dp)).background(Shop.colors.danger).padding(horizontal = 7.dp, vertical = 1.dp),
+      //  شمارِ هشدار = هشدارِ واقعی ⇒ همان جفتِ دکمهٔ خطر (#DC2626 + سفید، ۴٫۸:۱) در روز و شب
+      color = Shop.colors.button.danger.text,
+      modifier = Modifier.clip(RoundedCornerShape(10.dp)).background(Shop.colors.button.danger.bg).padding(horizontal = 7.dp, vertical = 1.dp),
     )
   }
 }
@@ -209,6 +234,7 @@ private fun iconOf(id: String): ImageVector = when (id) {
   "settings" -> Icons.Filled.Settings
   "admin" -> Icons.Filled.AdminPanelSettings
   "orders" -> Icons.Filled.ShoppingBasket
+  "promos" -> Icons.Filled.LocalOffer
   "devices" -> Icons.Filled.Devices
   "storefront" -> Icons.Filled.Storefront
   "delivery" -> Icons.Filled.DeliveryDining
@@ -217,4 +243,21 @@ private fun iconOf(id: String): ImageVector = when (id) {
   "soon:storefront" -> Icons.Filled.Storefront
   "soon:delivery" -> Icons.Filled.DeliveryDining
   else -> Icons.Filled.MoreHoriz
+}
+
+/** راهنمای کوچکِ هاور (و نگه‌داشتنِ انگشت) با نامِ بخش — برای منوی فقط‌آیکن */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun RailTip(label: String, content: @Composable () -> Unit) {
+  androidx.compose.material3.TooltipBox(
+    positionProvider = androidx.compose.material3.TooltipDefaults.rememberPlainTooltipPositionProvider(),
+    tooltip = { PlainTooltip { Text(label) } },
+    state = androidx.compose.material3.rememberTooltipState(),
+  ) { content() }
+}
+
+/** خطِ یک‌پیکسلیِ لبهٔ منو رو به محتوا — در راست‌به‌چپ سمتِ چپِ منو */
+private fun Modifier.railEdge(color: androidx.compose.ui.graphics.Color): Modifier = drawBehind {
+  val x = if (layoutDirection == androidx.compose.ui.unit.LayoutDirection.Rtl) 0.5f else size.width - 0.5f
+  drawLine(color, androidx.compose.ui.geometry.Offset(x, 0f), androidx.compose.ui.geometry.Offset(x, size.height), strokeWidth = 1.dp.toPx())
 }

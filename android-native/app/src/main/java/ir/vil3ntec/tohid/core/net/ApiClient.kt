@@ -34,6 +34,11 @@ class ApiClient(
   private val tokens: TokenStorage,
   /** وقتی نشست واقعاً از دست رفت — تا برنامه کاربر را به صفحهٔ ورود ببرد */
   private val onSessionLost: () -> Unit = {},
+  /**
+   *  «رمز را دوباره بزنید» برای کارِ حساس (`reauth_required`) — یک بار
+   *  برای همهٔ مسیرها؛ میزبانش `ui/ReauthHost` است. `ReauthGate` را ببینید.
+   */
+  val reauth: ReauthGate = ReauthGate(),
 ) {
 
   private val refreshLock = Mutex()
@@ -96,6 +101,16 @@ class ApiClient(
   )
 
   /**
+   *  فرستادنِ فایل با PUT — نسخهٔ کوچکِ عکس در بانکِ تصاویر. سرور برای همان
+   *  بایت‌ها همان پاسخ را می‌دهد (یک‌بارنویس)، پس تکرار بی‌خطر است.
+   */
+  suspend fun putBytes(
+    path: String,
+    bytes: ByteArray,
+    contentType: String = "application/octet-stream",
+  ): JsonObject = authorized("PUT", path, null, idempotent = true, raw = RawBody(bytes, contentType))
+
+  /**
    *  گرفتنِ **بایت‌های خام** با توکن (رسانهٔ چتِ دکان) — همان تازه‌سازیِ
    *  یک‌باره‌ی نشستِ پیر که `authorized` دارد.
    */
@@ -121,6 +136,26 @@ class ApiClient(
     body: JsonObject?,
     idempotent: Boolean,
     raw: RawBody? = null,
+  ): JsonObject =
+    try {
+      renewing(method, path, body, idempotent, raw)
+    } catch (failure: ApiFailure) {
+      /*
+       *  کارِ حساس با نشستِ کهنه (۴۰۳ `reauth_required`): سرور پیش از هر
+       *  اثری رد کرده، پس پس از تأییدِ دوبارهٔ کاربر همان درخواست **یک بار**
+       *  دوباره می‌رود — حتی `POST`. بارِ دوم هم رد شد ⇒ همان خطا، بی حلقه.
+       */
+      if (!ReauthGate.applies(failure, path) || !reauth.confirm()) throw failure
+      renewing(method, path, body, idempotent, raw)
+    }
+
+  /** یک درخواستِ توکن‌دار — و اگر توکن پیر بود، یک بار تازه‌سازی و تکرار */
+  private suspend fun renewing(
+    method: String,
+    path: String,
+    body: JsonObject?,
+    idempotent: Boolean,
+    raw: RawBody?,
   ): JsonObject {
     val token = tokens.accessToken ?: throw ApiFailure.SessionExpired()
 

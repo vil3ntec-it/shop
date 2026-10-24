@@ -98,6 +98,8 @@ data class V3Meta(
   val conflictsDirty: Boolean = false,
   val pushBytes: Int = SyncV3Engine.MIN_BYTES,
   val pullBytes: Int = SyncV3Engine.MIN_BYTES,
+  /** A00: بزرگ‌ترین شناسهٔ صف در نخستین شروع پس از ساختِ پیش از A00 — شرح سرِ `SyncCommit.start` */
+  val legacyOpsUpTo: String = "",
 )
 
 /** انبارِ محلی؛ هر `save` یک نوشتنِ اتمی (فایلِ کناری + fsync + جابه‌جایی). */
@@ -205,9 +207,16 @@ internal class SyncV3Engine(
       if (doc) docOps += conv.ops.size
       drafts += Draft(op, V3Entry.V3, conv.ops, "", doc)
     }
-    val tx = if (docOps in 2..TX_GROUP_MAX) "tx.${ops.first().opId}" else null
+    //  یک ثبت = یک سند (فاکتور با قلم‌ها، لغو، برگشتِ یک فاکتور، یک خرید) ⇒ همیشه یک tx، هر اندازه:
+    //  ردِ سند (سقف/تأیید) همه را با هم برمی‌گرداند، وگرنه فاکتورِ ۶۰قلمیِ ردشده قلم و بردش را جا می‌گذاشت.
+    //  بقیه (دفترِ چندفاکتوری: نخستین بارگذاری، بازگردانیِ پشتیبان؛ یا ثبتِ بی سند) ⇒ همان سقفِ [TX_GROUP_MAX]
+    val single = headsOf(drafts.filter { it.doc }.map { it.op }).size == 1
+    val tx = if (docOps >= 2 && (single || docOps <= TX_GROUP_MAX)) "tx.${ops.first().opId}" else null
+    //  درونِ tx سرِ برگشت (ردیف‌های returns) پیش از شمارنده‌هایش (debtSettled ِ فاکتور، returnedQty ِ قلم):
+    //  اگر tx ِ بزرگ ناچار در دو دسته برود، سر در دستهٔ اول داوری می‌شود و دنباله با آن برمی‌گردد
+    val ordered = if (tx == null) drafts else drafts.filter { it.op.table == "returns" } + drafts.filter { it.op.table != "returns" }
     var seq = startSeq
-    val entries = drafts.map { d ->
+    val entries = ordered.map { d ->
       seq += 1
       val v3ops = if (tx != null && d.doc) d.ops.map { JsonObject(it + ("tx" to JsonPrimitive(tx))) } else d.ops
       V3Entry(
@@ -218,6 +227,23 @@ internal class SyncV3Engine(
     return entries to seq
   }
 
+  /**
+   *  «سر»های یک ثبت: هر فاکتور/خریدی که عوض شد، و هر فاکتوری که برگشتی رویش آمد (برگشتِ بی رسید:
+   *  سندِ خودش). یکی ⇒ یک سند.
+   */
+  private fun headsOf(ops: List<SyncOp>): Set<String> = ops.mapNotNullTo(HashSet()) { op ->
+    when (op.table) {
+      "sales", "purchases" -> op.table + "/" + op.rowId
+      "returns" -> if (op.type != SyncOp.INSERT) null else {
+        val f = op.fields
+        val sale = (f?.get("saleId") as? JsonPrimitive)?.content.orEmpty()
+        val doc = (f?.get("docId") as? JsonPrimitive)?.content.orEmpty()
+        if (sale.isNotEmpty()) "sales/$sale" else "returns/" + doc.ifEmpty { op.rowId }
+      }
+      else -> null
+    }
+  }
+
   fun load(): SyncV3Engine {
     meta = store.loadMeta() ?: V3Meta()
     queue = store.loadQueue() ?: V3Queue()
@@ -226,8 +252,12 @@ internal class SyncV3Engine(
   }
 
   /** commitی که برنامه وسطش بسته شد — هنگامِ شروع، با دفترِ روی دیسک */
-  fun recover(onDisk: ShopData): SyncCommit.Outcome =
-    if (commit.pending()) commit.recover(onDisk) else SyncCommit.Outcome.NONE
+  fun recover(onDisk: ShopData): SyncCommit.Outcome {
+    if (!meta.initialized) return if (commit.pending()) commit.recover(onDisk) else SyncCommit.Outcome.NONE
+    //  A00: مهرِ سایه پیش از بازیابی خوانده می‌شود؛ سایهٔ بی مهرِ ساختِ پیشین یک بار و پیش از
+    //  نخستین تفاضل درمان، و opهای آن ساخت در صف نشان می‌شوند (شرح سرِ `SyncCommit.start`)
+    return commit.start(onDisk) { upTo -> save(meta.copy(legacyOpsUpTo = upTo)) }.outcome
+  }
 
   fun queued(): Int = queue.outbox.sumOf { it.size }
   fun rejected(): List<V3Entry> = queue.rejected
@@ -389,9 +419,14 @@ internal class SyncV3Engine(
   suspend fun pushOnce(): V3Step {
     if (meta.upgradeProtocol > 0) return V3Step(ok = false, upgrade = true, stopped = true)
     val b = nextBatch() ?: return V3Step(ok = true)
+    //  A00: opهای ساختِ پیش از A00 بی `caps` می‌روند تا تورِ سرور null ِ کهنه‌شان را بپالاید
+    val legacy = meta.legacyOpsUpTo
+    if (legacy.isNotEmpty() && queue.outbox.none { LedgerDiff.isLegacyOp(it.id, legacy) }) save(meta.copy(legacyOpsUpTo = ""))
+    val caps = LedgerDiff.capsFor(b.entries.map { it.id }, meta.legacyOpsUpTo)
     val body = buildJsonObject {
       put("device_id", JsonPrimitive(deviceId))
       put("protocol", JsonPrimitive(protocol))
+      if (caps) put("caps", LedgerDiff.capsJson())
       put("ops", JsonArray(b.ops))
       //  آنچه پس از همین دسته می‌ماند — نگهبانِ خروجِ سرور (SYN-10) از همین می‌خواند
       put("queued", JsonPrimitive(max(0, queued() - b.ops.size)))
@@ -532,6 +567,7 @@ internal class SyncV3Engine(
     const val MIN_BYTES = 64 * 1024
     const val MAX_BYTES = 256 * 1024
     const val MAX_OPS = 200
+    /** سقفِ tx ِ مشترک فقط برای دفترِ چندفاکتوری؛ یک سند همیشه یک tx است (`toEntries`) */
     const val TX_GROUP_MAX = 50
     const val ROUNDS = 50
     const val MIN_BACKOFF_MS = 2000L

@@ -47,7 +47,8 @@ fun DeskStatusBar(d: ShopData) {
 
   val colors = Shop.colors
   Row(
-    Modifier.fillMaxWidth().height(28.dp).background(colors.surfaceSolid)
+    //  نسخهٔ ۲: نوارِ باریکِ کم‌کنتراست، هم‌رنگِ ناحیهٔ منو و بی خطِ جداکننده
+    Modifier.fillMaxWidth().height(26.dp).background(colors.zoneNav)
       .padding(horizontal = 10.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
@@ -78,13 +79,11 @@ fun DeskStatusBar(d: ShopData) {
     Sep()
     Cell(onClick = { AppNav.go("debtors") }) { Label(Str.debtorsCount(plain(d.debtors.size))) }
     Spacer(Modifier.weight(1f))
-    Cell(onClick = { AppNav.palette.value = true }) { Label(StrNav.searchCtrlK, colors.muted2) }
-    Sep()
+    //  «جست‌وجو Ctrl+K» این‌جا برداشته شد — جست‌وجو فقط یک جا (سربرگ یا کادرِ صندوق)
     Label(ir.vil3ntec.tohid.formatDate(today) + " — " + clock(now))
     Sep()
     Label(Str.version(ir.vil3ntec.tohid.BuildConfig.VERSION_NAME), colors.muted2)
   }
-  Box(Modifier.fillMaxWidth().height(1.dp).background(colors.border))
 }
 
 private fun clock(at: Long): String {

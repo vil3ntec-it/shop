@@ -81,6 +81,9 @@ fun main() {
   scope.launch { store.loadAndSummarize() }
 
   runCatching { ir.vil3ntec.tohid.sync.SavedLogins.purgeTokens(context) }
+  //  HW-09/HW-10: ترازوی سریال و پنجرهٔ دومِ مشتری فقط این‌جا هستند
+  ir.vil3ntec.tohid.hw.HwPlatform.serial = DeskSerial
+  ir.vil3ntec.tohid.hw.CustomerFacing.supported = true
   Motion.load(context)
   ir.vil3ntec.tohid.LocaleChoice.load(context)
 
@@ -136,6 +139,27 @@ fun main() {
       )
       LaunchedEffect(Unit) {
         DesktopNotify.sink = { title, text -> tray.sendNotification(androidx.compose.ui.window.Notification(title, text)) }
+      }
+    }
+
+    //  HW-10: نمایشگرِ مشتری — پنجرهٔ دوم که روی صفحهٔ دوم/نمایشگرِ رو به مشتری کشیده می‌شود
+    val customerOpen by ir.vil3ntec.tohid.hw.CustomerFacing.open
+    if (customerOpen) {
+      Window(
+        onCloseRequest = { ir.vil3ntec.tohid.hw.CustomerFacing.open.value = false },
+        title = "نمایشگرِ مشتری — فروشگاه من",
+        icon = icon,
+        state = rememberWindowState(size = DpSize(800.dp, 600.dp)),
+      ) {
+        val theme = remember {
+          runCatching { ThemeChoice.valueOf(prefs.getString("theme", "SYSTEM")!!) }.getOrDefault(ThemeChoice.SYSTEM)
+        }
+        //  زبان و جهت همان برنامه (ProvideLang): فارسی و پشتو راست‌به‌چپ، انگلیسی چپ‌به‌راست
+        CompositionLocalProvider(LocalContext provides context) {
+          ir.vil3ntec.tohid.ui.ProvideLang {
+            TohidTheme(theme) { ir.vil3ntec.tohid.ui.screens.CustomerDisplayScreen(prefs.getString("store_name", "") ?: "") }
+          }
+        }
       }
     }
 

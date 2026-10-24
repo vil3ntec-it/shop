@@ -1,7 +1,5 @@
 package ir.vil3ntec.tohid.ui.components.common
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
@@ -29,8 +27,10 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.ui.Platform
 import ir.vil3ntec.tohid.ui.screens.Screen
 import ir.vil3ntec.tohid.ui.screens.screenSize
-import ir.vil3ntec.tohid.ui.theme.Shape
 import ir.vil3ntec.tohid.ui.theme.Shop
+import ir.vil3ntec.tohid.ui.theme.SegmentInnerShape
+import ir.vil3ntec.tohid.ui.theme.segmentSelected
+import ir.vil3ntec.tohid.ui.theme.segmentTrack
 import ir.vil3ntec.tohid.core.i18n.Str
 
 /**
@@ -89,13 +89,11 @@ fun rememberViewMode(screen: String, kind: ScreenKind): ViewModeState {
 fun ViewModeToggle(state: ViewModeState, modifier: Modifier = Modifier) {
   if (!state.toggleVisible) return
   val colors = Shop.colors
-  val cell = if (Platform.DESKTOP) 34.dp else 48.dp
+  val cell = if (Platform.DESKTOP) 32.dp else 44.dp
+  //  نسخهٔ ۲: همان شیارِ `SegmentedTabs` — گزینهٔ روشن سفید و برآمده، بی خطِ دور
   Row(
     modifier
-      .clip(Shape.button)
-      .border(1.dp, colors.border, Shape.button)
-      .background(colors.surfaceSolid)
-      .padding(2.dp)
+      .segmentTrack(colors)
       .selectableGroup(),
     verticalAlignment = Alignment.CenterVertically,
   ) {
@@ -104,8 +102,7 @@ fun ViewModeToggle(state: ViewModeState, modifier: Modifier = Modifier) {
       Box(
         Modifier
           .size(cell)
-          .clip(Shape.button)
-          .background(if (on) colors.primaryTint else colors.surfaceSolid)
+          .then(if (on) Modifier.segmentSelected(colors) else Modifier.clip(SegmentInnerShape))
           .selectable(selected = on, role = Role.Tab) { state.set(m) }
           .semantics { contentDescription = label },
         contentAlignment = Alignment.Center,
@@ -113,7 +110,7 @@ fun ViewModeToggle(state: ViewModeState, modifier: Modifier = Modifier) {
         Icon(
           if (m == ViewMode.CARD) Icons.Filled.GridView else Icons.Filled.TableRows,
           contentDescription = null,
-          tint = if (on) colors.primary else colors.muted,
+          tint = if (on) colors.iconActive else colors.icon,
           modifier = Modifier.size(18.dp),
         )
       }

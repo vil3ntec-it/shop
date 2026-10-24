@@ -35,6 +35,8 @@ import ir.vil3ntec.tohid.displayDate
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.qty
 import ir.vil3ntec.tohid.ui.theme.Shop
+import ir.vil3ntec.tohid.ui.theme.softCard
+import ir.vil3ntec.tohid.ui.theme.tabular
 import ir.vil3ntec.tohid.core.i18n.StrHome
 import ir.vil3ntec.tohid.core.i18n.Str
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -88,10 +90,11 @@ fun DeskDashboardScreen(d: ShopData, onOpen: (String) -> Unit, onProduct: (Strin
           Text(
             label,
             Modifier.clip(RoundedCornerShape(18.dp))
-              .background(if (on) Shop.colors.primary else Color.Transparent)
+              .background(if (on) Shop.colors.button.primary.bg else Color.Transparent)
               .clickable { days = n }
               .padding(horizontal = 14.dp, vertical = 6.dp),
-            color = if (on) Color.White else Shop.colors.text,
+            //  گزینهٔ انتخاب‌شده همان جفتِ دکمهٔ اصلی (در شب متنِ تیره روی سبزآبی، نه سفید)
+            color = if (on) Shop.colors.button.primary.text else Shop.colors.text,
             style = MaterialTheme.typography.labelLarge,
           )
         }
@@ -104,16 +107,19 @@ fun DeskDashboardScreen(d: ShopData, onOpen: (String) -> Unit, onProduct: (Strin
       val canSeeMoney = remember { ir.vil3ntec.tohid.data.ShopRole.canSeeMoney(context) }
       HomeKpis(d, onOpen, canSeeMoney, columns = 5)
     } else Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-      KpiCard(Modifier.weight(1f), Icons.Filled.PointOfSale, StrHome.sales, money(b.sales.value), b.sales.changePct, Shop.colors.primary)
+      //  VILL3N: فروش = برند، سود = موفق، شمار = آبیِ اطلاع، میانگین = بنفشِ دادهٔ تکمیلی، طلب = کهربایی
+      //  (قرمز فقط برای هشدارِ واقعی — طلب از مشتری دادهٔ عادیِ دکان است)
+      KpiCard(Modifier.weight(1f), Icons.Filled.PointOfSale, StrHome.sales, money(b.sales.value), b.sales.changePct, Shop.colors.iconActive)
       KpiCard(Modifier.weight(1f), Icons.Filled.TrendingUp, StrHome.grossProfit, money(b.profit.value), b.profit.changePct, Shop.colors.success)
-      KpiCard(Modifier.weight(1f), Icons.Filled.Receipt, StrHome.invoiceCount, b.invoices.value.toInt().toString(), b.invoices.changePct, Color(0xFF7C4DFF))
-      KpiCard(Modifier.weight(1f), Icons.Filled.ShoppingBasket, StrHome.avgInvoice, money(b.avgTicket.value), b.avgTicket.changePct, Shop.colors.warning)
-      KpiCard(Modifier.weight(1f), Icons.Filled.AccountBalanceWallet, StrHome.receivablesCustomers, money(b.receivables), null, Shop.colors.danger) { onOpen("debtors") }
+      KpiCard(Modifier.weight(1f), Icons.Filled.Receipt, StrHome.invoiceCount, b.invoices.value.toInt().toString(), b.invoices.changePct, Shop.colors.info)
+      KpiCard(Modifier.weight(1f), Icons.Filled.ShoppingBasket, StrHome.avgInvoice, money(b.avgTicket.value), b.avgTicket.changePct, Shop.colors.status.needsReview.fg)
+      KpiCard(Modifier.weight(1f), Icons.Filled.AccountBalanceWallet, StrHome.receivablesCustomers, money(b.receivables), null, Shop.colors.warning) { onOpen("debtors") }
     }
 
     /* ۳ ─ نمودار و کارهای سریع */
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.height(300.dp)) {
-      Panel2(Modifier.weight(2.2f).fillMaxHeight(), StrHome.salesAndProfit, (if (days == 1) Str.today else StrHome.pastDays(days)) + " · " + StrHome.todayAmount(money(b.todaySales))) {
+      //  scroll = false: نمودار باید همهٔ ارتفاعِ کارت را بگیرد؛ درونِ ستونِ لغزان ارتفاعش صفر می‌شد و خطِ صاف می‌کشید
+      Panel2(Modifier.weight(2.2f).fillMaxHeight(), StrHome.salesAndProfit, (if (days == 1) Str.today else StrHome.pastDays(days)) + " · " + StrHome.todayAmount(money(b.todaySales)), scroll = false) {
         SalesChart(b.series, Modifier.fillMaxSize())
       }
       Panel2(Modifier.weight(1f).fillMaxHeight(), StrHome.quickActions) {
@@ -134,7 +140,7 @@ fun DeskDashboardScreen(d: ShopData, onOpen: (String) -> Unit, onProduct: (Strin
       AlertPanel(Modifier.weight(1f), StrHome.expiry30, b.expiring.size, Shop.colors.warning,
         b.expiring.map { it.product.id to (it.product.name to if (it.expired) StrHome.expiredQty(qty(it.remaining)) else Str.days(it.daysLeft) + " · " + qty(it.remaining)) }, onProduct)
       AlertPanel(Modifier.weight(1f), Str.overdue60, b.debtOverdue.size, Shop.colors.danger,
-        b.debtOverdue.map { it.debtor.id to (it.debtor.name to money(it.balance) + " · " + Str.days(it.days)) }) { onOpen("debtors") }
+        b.debtOverdue.map { it.debtor.id to (it.debtor.name to money(it.balance) + (it.days?.let { n -> " · " + Str.days(n) } ?: "")) }) { onOpen("debtors") }
     }
 
     /* ۵ ─ فروش‌ها و قرض‌ها */
@@ -169,7 +175,7 @@ fun DeskDashboardScreen(d: ShopData, onOpen: (String) -> Unit, onProduct: (Strin
           val who = s.debtorId?.let { id -> d.debtors.find { it.id == id }?.name } ?: Str.walkIn
           ListRow(
             "#${s.invoiceLabel() ?: "-"} · $who",
-            "${displayDate(s.date)} · ${if (s.paymentMethod == "credit") Str.credit else Str.cash}",
+            "${displayDate(s.date)} · ${ir.vil3ntec.tohid.data.PayFlow.payLabel(s)}",
             "${money(s.finalTotal)} ؋",
           ) { onOpen("sales") }
         }
@@ -180,25 +186,24 @@ fun DeskDashboardScreen(d: ShopData, onOpen: (String) -> Unit, onProduct: (Strin
 
 /* ───────────────────────────── اجزا ───────────────────────────── */
 
-private val CardShape = RoundedCornerShape(16.dp)
+private val CardShape = ir.vil3ntec.tohid.ui.theme.Shape.card
 
 @Composable
-private fun Panel2(modifier: Modifier, title: String, subtitle: String? = null, content: @Composable ColumnScope.() -> Unit) {
-  Surface(color = Shop.colors.surfaceSolid, shape = CardShape, modifier = modifier.border(1.dp, Shop.colors.border, CardShape)) {
-    Column(Modifier.padding(16.dp)) {
-      Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = Shop.colors.text)
-      if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
-      Spacer(Modifier.height(10.dp))
-      Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), content = content)
-    }
+private fun Panel2(modifier: Modifier, title: String, subtitle: String? = null, scroll: Boolean = true, content: @Composable ColumnScope.() -> Unit) {
+  //  نسخهٔ ۲: کارتِ نرم (سایه، گوشهٔ ۱۶، لبهٔ مویی) — نه خطِ دورِ تیره
+  Column(modifier.softCard(Shop.colors, CardShape).padding(16.dp)) {
+    Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = Shop.colors.text)
+    if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
+    Spacer(Modifier.height(10.dp))
+    Column(Modifier.weight(1f).then(if (scroll) Modifier.verticalScroll(rememberScrollState()) else Modifier), content = content)
   }
 }
 
 @Composable
 private fun KpiCard(modifier: Modifier, icon: ImageVector, title: String, value: String, change: Double?, tint: Color, onClick: (() -> Unit)? = null) {
   Surface(
-    color = Shop.colors.surfaceSolid, shape = CardShape,
-    modifier = modifier.border(1.dp, Shop.colors.border, CardShape).then(if (onClick != null) Modifier.clickable { onClick() } else Modifier),
+    color = Shop.colors.surface, shape = CardShape,
+    modifier = modifier.softCard(Shop.colors, CardShape).then(if (onClick != null) Modifier.clickable { onClick() } else Modifier),
   ) {
     Column(Modifier.padding(16.dp)) {
       Row(verticalAlignment = Alignment.CenterVertically) {
@@ -209,7 +214,7 @@ private fun KpiCard(modifier: Modifier, icon: ImageVector, title: String, value:
         Text(title, style = MaterialTheme.typography.bodyMedium, color = Shop.colors.muted)
       }
       Spacer(Modifier.height(10.dp))
-      Text(value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = Shop.colors.text, maxLines = 1)
+      Text(value, style = MaterialTheme.typography.headlineSmall.tabular(), fontWeight = FontWeight.Bold, color = Shop.colors.text, maxLines = 1)
       if (change != null) {
         val up = change >= 0
         Text(
@@ -227,8 +232,8 @@ private fun QuickAction(icon: ImageVector, title: String, hint: String, onClick:
     Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { onClick() }.padding(vertical = 7.dp, horizontal = 6.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
-    Box(Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).background(Shop.colors.primary.copy(alpha = 0.10f)), contentAlignment = Alignment.Center) {
-      Icon(icon, null, tint = Shop.colors.primary, modifier = Modifier.size(19.dp))
+    Box(Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).background(Shop.colors.surfaceSelected), contentAlignment = Alignment.Center) {
+      Icon(icon, null, tint = Shop.colors.iconActive, modifier = Modifier.size(19.dp))
     }
     Spacer(Modifier.width(10.dp))
     Column(Modifier.weight(1f)) {
@@ -265,7 +270,8 @@ private fun AlertPanel(
   rows: List<Pair<String, Pair<String, String>>>,
   onClick: (String) -> Unit,
 ) {
-  Surface(color = Shop.colors.surfaceSolid, shape = CardShape, modifier = modifier.fillMaxHeight().border(1.dp, if (count > 0) tint.copy(alpha = 0.45f) else Shop.colors.border, CardShape)) {
+  //  نسخهٔ ۲: کارتِ نرم؛ معنا را نقطه، نشانِ شمار و رنگِ ردیف‌ها می‌گویند — نه خطِ دورِ رنگی
+  Surface(color = Shop.colors.surface, shape = CardShape, modifier = modifier.fillMaxHeight().softCard(Shop.colors, CardShape)) {
     Column(Modifier.padding(14.dp)) {
       Row(verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(10.dp).clip(CircleShape).background(if (count > 0) tint else Shop.colors.success))
@@ -293,16 +299,16 @@ private fun AlertPanel(
   }
 }
 
-/** نمودارِ ناحیه‌ای: فروش (رنگِ برند) و سود (سبز)، با خطِ پایه و برچسبِ اول/آخر */
+/** نمودارِ ناحیه‌ای: فروش (سریِ ۱، برند) و سود (سریِ ۲)، با خطِ پایه، راهنما و برچسبِ اول/آخر (VILL3N §۱۰) */
 @Composable
 private fun SalesChart(series: List<DashboardEngine.Day>, modifier: Modifier) {
   if (series.isEmpty() || series.all { it.sales == 0.0 }) {
     Box(modifier, contentAlignment = Alignment.Center) { Text(StrHome.noSalesPeriodRecorded, color = Shop.colors.muted) }
     return
   }
-  val brand = Shop.colors.primary
-  val green = Shop.colors.success
-  val grid = Shop.colors.border
+  val brand = Shop.colors.chart.sales
+  val green = Shop.colors.chart.comparison
+  val grid = Shop.colors.chart.grid
   Column(modifier) {
     Row {
       Legend(brand, StrHome.sales)
@@ -349,9 +355,14 @@ private fun Legend(color: Color, label: String) {
   }
 }
 
-private val DonutColors = listOf(
-  Color(0xFF5B3DF5), Color(0xFF00BFA5), Color(0xFFFF9800), Color(0xFFE91E63), Color(0xFF2196F3), Color(0xFF8BC34A), Color(0xFF9E9E9E),
-)
+/**
+ *  رنگِ دسته‌های نمودارِ دایره‌ای — به ترتیبِ سری‌های VILL3N، بی قرمز («قرمز برای دادهٔ عادی نه»):
+ *  شش دستهٔ اول و «بقیه» همیشه خنثی (هفتمین). هر برش برچسبِ نام و درصد دارد.
+ */
+@Composable
+private fun donutColors(): List<Color> = Shop.colors.let { c ->
+  listOf(c.chart.sales, c.chart.comparison, c.brandText, c.chart.costs, c.chart.discount, c.chart.stock, c.chart.neutral)
+}
 
 @Composable
 private fun CategoryDonut(shares: List<DashboardEngine.Share>, modifier: Modifier) {
@@ -360,6 +371,7 @@ private fun CategoryDonut(shares: List<DashboardEngine.Share>, modifier: Modifie
   val top = shares.take(6).toMutableList()
   val rest = shares.drop(6).sumOf { it.revenue }
   if (rest > 0) top += DashboardEngine.Share(StrHome.others, rest)
+  val DonutColors = donutColors()
   Row(modifier, verticalAlignment = Alignment.CenterVertically) {
     Canvas(Modifier.size(150.dp)) {
       var start = -90f

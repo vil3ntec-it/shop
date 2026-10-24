@@ -149,9 +149,21 @@ object PosSummary {
 }
 
 object PosLayout {
-  /** پهنای ناحیهٔ صندوق که از آن به بالا ستونِ دسته‌ها همیشه باز است (کمتر ⇒ تاشونده) */
-  const val RAIL_FIXED_MIN_DP = 900f
-  fun railFixed(widthDp: Float): Boolean = widthDp >= RAIL_FIXED_MIN_DP
+  /*
+   *  نسخهٔ ۲: ستونِ دسته‌ها برداشته شد (دسته‌ها تراشهٔ افقیِ بالای کاتالوگ‌اند).
+   *  آن‌چه با پهنا عوض می‌شود جای سبد است: از ۷۶۰dp به بالا کنارِ کاتالوگ با
+   *  پهنای پله‌ای، کمتر (تبلتِ ایستاده، پنجرهٔ باریک) زیرِ کاتالوگ.
+   */
+  /** پهنای ناحیهٔ صندوق که از آن به بالا سبد کنارِ کاتالوگ است (کمتر ⇒ زیرِ آن) */
+  const val SIDE_CART_MIN_DP = 760f
+  fun sideCart(widthDp: Float): Boolean = widthDp >= SIDE_CART_MIN_DP
+
+  /** پهنای سبدِ کناری: پنجرهٔ پهن ⇒ سبدِ پهن‌تر، ولی کاتالوگ همیشه بیشترِ جا را دارد */
+  fun cartWidth(widthDp: Float): Int = when {
+    widthDp >= 1500f -> 420
+    widthDp >= 1100f -> 372
+    else -> 336
+  }
 
   /** کمینهٔ هدفِ لمس: لمسی ۴۸ (۵.۳)، کامپیوتر ۳۶ (کمینهٔ دکمهٔ کامپیوتر ۳۴ است) */
   fun minTarget(touch: Boolean): Int = if (touch) 48 else 36
