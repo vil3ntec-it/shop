@@ -171,7 +171,7 @@ internal fun HomePullCard(
  *  «صندوق» و «گاوصندوق» هر دو همین شکل را دارند تا ورق خوردن بی‌پرش باشد.
  */
 @Composable
-internal fun PullFace(label: String, amount: Double?, line: String) {
+internal fun PullFace(label: String, amount: Double?, line: String, live: Boolean = true) {
   val p = PhoneV3.colors
   Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
     Text(label, color = p.onBlackMuted, style = v3Text(12, FontWeight.Medium, 17), maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -187,8 +187,11 @@ internal fun PullFace(label: String, amount: Double?, line: String) {
     Spacer(Modifier.height(2.dp))
     Row(verticalAlignment = Alignment.CenterVertically) {
       Text(line, color = p.onBlackMuted, style = v3Text(15, FontWeight.Medium, 22), maxLines = 2, textAlign = TextAlign.Center, modifier = Modifier.weight(1f, fill = false))
-      Spacer(Modifier.width(6.dp))
-      Icon(Icons.Outlined.Autorenew, contentDescription = null, tint = p.onBlackMuted, modifier = Modifier.size(16.dp))
+      //  عددِ زنده (از دفتر، با هر تغییر تازه) — جای‌نگهدار نشانش را ندارد
+      if (live) {
+        Spacer(Modifier.width(6.dp))
+        Icon(Icons.Outlined.Autorenew, contentDescription = null, tint = p.onBlackMuted, modifier = Modifier.size(16.dp))
+      }
     }
   }
 }

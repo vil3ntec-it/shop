@@ -93,7 +93,8 @@ private fun Notices() {
 object ShellShots : GroupShots {
   override val group = "shell"
   override val shots = listOf(
-    Shot("home", route = "home"),
+    //  مسیرِ `home` روی کامپیوتر داشبوردِ کامپیوتر است؛ عکسِ گوشی خودِ خانهٔ نسخهٔ ۳
+    Shot("home", content = { s -> Data(s) { HomeScreen(it, {}, PhoneNav.RESERVE) } }),
     Shot("home-6-alerts", content = { s -> Data(s) { HomeScreen(it, {}, PhoneNav.RESERVE, HomeShot(alerts = SIX)) } }),
     Shot("home-0-alerts", content = { s -> Data(s) { HomeScreen(it, {}, PhoneNav.RESERVE, HomeShot(alerts = emptyList())) } }),
     Shot("home-pull", content = { s -> Data(s) { HomeScreen(it, {}, PhoneNav.RESERVE, HomeShot(pull = true)) } }),

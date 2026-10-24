@@ -10,5 +10,5 @@ import ir.vil3ntec.tohid.core.i18n.StrHome
  */
 @Composable
 internal fun HomeSafeFace() {
-  PullFace(label = StrHome.safe, amount = null, line = StrHome.safeSoon)
+  PullFace(label = StrHome.safe, amount = null, line = StrHome.safeSoon, live = false)
 }
