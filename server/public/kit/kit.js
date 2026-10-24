@@ -12,20 +12,22 @@
   var V = window.VILL3N || { lang: 'fa', dict: Promise.resolve({}) };
   var LANG = K.lang = V.lang;
   var DICT = {};
+  var own = function (o, k) { return Object.prototype.hasOwnProperty.call(o, k); };
+  //  بی واژه‌نامه: واژه‌های پایه (= fa.json، web-i18n)، بقیه خالی؛ کلیدِ خام هرگز
+  K.FB = { 'money': '{n} افغانی', 'cur': 'افغانی', 'sep': '، ', 'err.generic': 'خطا؛ دوباره بزنید.', 'err.rate': 'درخواست‌ها زیاد شد؛ کمی بعد دوباره بزنید.', 'close': 'بستن', 'yes': 'بله', 'no': 'نه', 'add.one': 'افزودنِ {name} به سبد', 'stock.unk': 'موجودی در حال بررسی است', 'stock.out': 'ناموجود', 'st.open': 'باز است', 'st.closed': 'بسته است', 'unit': 'عدد', 'all': 'همه', 'ck.title': 'ثبتِ سفارش', 'ck.sending': 'در حالِ ثبت…', 'cod': 'نقد هنگامِ تحویل', 'free': 'رایگان', 'ship.fee': 'ارسال {fee}', 'ship.free': 'ارسالِ رایگان', 'pickup': 'دریافت از دکان', 'min.order': 'حداقلِ سفارش {m}', 'qty.less': 'یکی کمتر {name}', 'qty.more': 'یکی بیشتر {name}', 'ps.add': 'افزودن به سبد — {p}', 'bar.label': '، {n} قلم، جمع {sum} — باز کردنِ سبد', 'line.label': '{name}، {q}، {sum} — تغییرِ تعداد', 'od.title': 'سفارش', 'od.placed': 'سفارش ثبت شد. دکان آن را بررسی می‌کند؛ همین صفحه وضعیت را نشان می‌دهد.', 'od.no': 'سفارشِ شمارهٔ {n}', 'my.orders': 'سفارش‌های من', 'v.sent': 'کد فرستاده شد.', 'v.ok': 'شماره تأیید شده است.', 'err.bad_phone': 'شمارهٔ موبایل درست نیست.', 'cart.min': 'برای ادامه، سبد به حداقلِ سفارش برسد.', 'order.new': 'ثبت شد — منتظرِ تأییدِ دکان', 'order.accepted': 'دکان قبول کرد', 'order.rejected': 'دکان نپذیرفت', 'order.ready_for_pickup': 'آمادهٔ دریافت از دکان', 'order.out_for_delivery': 'در راه', 'order.delivered': 'تحویل شد', 'order.cancelled': 'لغو شد', 'order.cancelled_by_customer': 'شما لغو کردید', 'ck.submit': 'ثبتِ سفارش — {sum}', 'ck.fee': 'هزینهٔ ارسال', 'ship': 'ارسال', 'p.per': 'هر {unit}', 'acc.orders': 'سفارش‌های من', 'od.sub': 'جمعِ کالاها', 'od.total': 'مبلغِ نهایی', 'od.due': 'مانده (نقد هنگامِ تحویل)' };
   //  رقمِ فارسی برای fa و ps (پشتوی افغانستان همان ۰–۹ و ماهِ خورشیدی)، لاتین برای en
   var LOC = LANG === 'en' ? 'en-GB' : 'fa-AF';
 
   K.$ = function (id) { return document.getElementById(id); };
 
-  /** متنِ همین زبان؛ {نام} با v.نام پر می‌شود. کلیدِ ناموجود ⇒ خودِ کلید (آزمونِ واژه‌نامه نمی‌گذارد). */
+  /** متنِ همین زبان؛ {نام} با v.نام پر می‌شود. کلیدِ ناموجود ⇒ واژهٔ پایه یا ''. */
   K.t = function (key, v) {
     //  مفرد (en/ps): «‎.1‎» وقتی شمار یک است
-    if (v && (v.n === '1' || v.n === '۱') && DICT[key + '.1'] !== undefined) key += '.1';
-    var s = DICT[key];
-    if (s === undefined) s = key;
+    if (v && (v.n === '1' || v.n === '۱') && own(DICT, key + '.1')) key += '.1';
+    var s = own(DICT, key) ? DICT[key] : own(K.FB, key) ? K.FB[key] : '';
     return v ? s.replace(/\{(\w+)\}/g, function (m, k) { return v[k] === undefined ? m : v[k]; }) : s;
   };
-  K.has = function (key) { return DICT[key] !== undefined; };
+  K.has = function (key) { return own(DICT, key); };
 
   /** el('div', { class, text, attrs, on, hidden }, ...children) */
   K.el = function (tag, p) {
@@ -297,7 +299,7 @@
   K.cartMetaKey = function (slug) { return 'store-cart-meta:' + slug; };
 
   // ── وضعیتِ سفارش برای خریدار (همان معنا در همه‌جا) ──
-  K.order = function (st) { return K.has('order.' + st) ? K.t('order.' + st) : st; };
+  K.order = function (st) { return K.t('order.' + st) || st; };
   K.reason = function (r) { return r && K.has('reason.' + r) ? K.t('reason.' + r) : ''; };
   var STOP = ['rejected', 'auto_rejected', 'cancelled_by_customer', 'cancelled', 'returned_to_store', 'restocked'];
   K.orderKind = function (status) {
@@ -406,9 +408,11 @@
   /** متنِ ثابتِ HTML به زبانِ صفحه: data-t (متن)، data-ta (aria-label)، data-tp (placeholder). */
   function translate(root) {
     var all = function (sel, fn) { Array.prototype.forEach.call(root.querySelectorAll(sel), fn); };
-    all('[data-t]', function (x) { x.textContent = K.t(x.getAttribute('data-t')); });
-    all('[data-ta]', function (x) { x.setAttribute('aria-label', K.t(x.getAttribute('data-ta'))); });
-    all('[data-tp]', function (x) { x.setAttribute('placeholder', K.t(x.getAttribute('data-tp'))); });
+    //  کلیدِ نیامده ⇒ متنِ فارسیِ خودِ HTML می‌ماند
+    var tr = function (a, set) { all('[' + a + ']', function (x) { var k = x.getAttribute(a); if (K.has(k)) set(x, K.t(k)); }); };
+    tr('data-t', function (x, s) { x.textContent = s; });
+    tr('data-ta', function (x, s) { x.setAttribute('aria-label', s); });
+    tr('data-tp', function (x, s) { x.setAttribute('placeholder', s); });
   }
   var ready = Promise.all([
     V.dict.then(function (d) { DICT = d || {}; }),

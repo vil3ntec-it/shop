@@ -8,8 +8,10 @@
  *   ۲) سه واژه‌نامه همان کلیدها را دارند (جز شکلِ مفردِ اختیاریِ «‎.1‎»)، و جای‌نگهدارهای
  *      {…} ِ هر متن در سه زبان یکی است.
  *   ۳) en هیچ حرفِ فارسی/پشتو ندارد؛ هیچ متنِ خالی نیست.
- *   ۴) در JS ِ صفحه‌ها هیچ متنِ فارسیِ ثابت نمانده (همه از واژه‌نامه).
+ *   ۴) در JS ِ صفحه‌ها هیچ متنِ فارسیِ ثابت نمانده (همه از واژه‌نامه)، جز واژه‌های پایهٔ
+ *      `K.FB` (وقتی واژه‌نامه نیامد) که باید بی‌کم‌وکاست همان fa.json باشند.
  *   ۵) هر کدِ خطای سرور که صفحه نشان می‌دهد ترجمهٔ خودش را دارد.
+ *   ۶) هر واژه‌نامه زیرِ ۲۰KB (بارِ نخستِ صفحه = JS + واژه‌نامه).
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -89,7 +91,7 @@ test('انگلیسی هیچ حرفِ فارسی/پشتو ندارد؛ فارسی
 
 test('در JS ِ صفحه‌ها متنِ فارسیِ ثابت نمانده', () => {
   for (const f of ['kit/kit.js', 'market/market.js', 'store/store.js']) {
-    const lines = read(f).split('\n').filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).map((l) => l.replace(/\s\/\/.*$/, ''));
+    const lines = read(f).split('\n').filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l) && !/^\s*K\.FB = \{/.test(l)).map((l) => l.replace(/\s\/\/.*$/, ''));
     //  استثنا: نامِ خودِ زبان‌ها در گزینش‌گر و رقم/جداکنندهٔ فارسی (نه متن)
     const hits = lines.filter((l) => [...l.matchAll(/'([^'\\]*)'/g)].some((m) => ARABIC.test(m[1]) && !/^(فارسی|پښتو|[۰-۹٬٫]+)$/.test(m[1])));
     assert.deepEqual(hits, [], `${f}: متنِ ثابت`);
@@ -102,4 +104,20 @@ test('کدهای خطای سرور که صفحه نشان می‌دهد ترجم
     'product_unavailable', 'qty_over_limit', 'below_min_order', 'fulfillment_unavailable', 'bad_address', 'bad_customer',
     'bad_lines', 'store_not_found', 'market_not_found', 'order_not_found', 'cannot_cancel', 'query_too_short', 'bad_location'];
   for (const l of LANGS) for (const c of codes) assert.ok(dict[l][`err.${c}`], `${l}: err.${c}`);
+});
+
+test('واژه‌های پایهٔ K.FB (واژه‌نامه نیامد) همان fa.json‌اند و فقط یک خط', () => {
+  const lines = read('kit/kit.js').split('\n').filter((l) => /^\s*K\.FB = \{/.test(l));
+  assert.equal(lines.length, 1);
+  const fb = Function(`'use strict'; return (${lines[0].replace(/^\s*K\.FB = /, '').replace(/;\s*$/, '')});`)();
+  assert.ok(Object.keys(fb).length >= 30, 'سبد، ثبت و وضعیتِ سفارش را می‌پوشاند');
+  for (const k of ['money', 'ps.add', 'ck.title', 'ck.sending', 'bar.label', 'od.placed', 'order.new', 'err.generic']) assert.ok(fb[k], k);
+  for (const [k, v] of Object.entries(fb)) assert.equal(v, dict.fa[k], `K.FB['${k}'] = fa.json`);
+});
+
+test('هر واژه‌نامه زیرِ ۲۰KB است', () => {
+  for (const l of LANGS) {
+    const n = fs.statSync(path.join(pub, 'kit', 'i18n', `${l}.json`)).size;
+    assert.ok(n <= 20 * 1024, `${l}.json: ${n} بایت`);
+  }
 });

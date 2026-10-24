@@ -48,6 +48,7 @@ process.env.MARKET_GATE_CACHE_MS = '0';
 process.env.MARKET_ELIGIBLE_CACHE_MS = '0';
 process.env.MARKET_FEED_CACHE_MS = '0';
 process.env.RATE_MARKET_SEARCH_BURST_MAX = '100000';
+process.env.RATE_MARKET_FEED_BURST_MAX = '100000';
 
 const { createApp } = require('../src/app');
 const { query, one, newId, now, closeDb } = require('../src/db');
@@ -189,7 +190,18 @@ ok((await page.getAttribute('#sug article.shop-card', 'data-slug')) === lastSlug
 await page.evaluate(() => localStorage.removeItem('vill3n-favs'));
 
 //  «ارزان‌تر از قیمتِ دکان» با قیمتِ آنلاینِ واقعیِ کمتر ⇒ ردیفِ کالا زیرِ دکان‌ها؛ افزودن به سبدِ همان دکان (r3)
+//  ⛔ قیمتِ دفتر فقط با خواستِ صاحبِ دکان (showDeals، پیش‌فرض خاموش)
 await call('PUT', '/api/shop/storefront/products/naan', { published: true, onlinePriceMinor: 1200 }, gb.token);
+const feedUrls = [];
+const onReq = (r) => { if (r.url().includes('/api/market/products')) feedUrls.push(r.url()); };
+page.on('request', onReq);
+await page.reload();
+await page.waitForSelector('#sug article.shop-card');
+await page.waitForTimeout(400);
+ok(await page.isHidden('#deal-sec') && !(await page.content()).includes('p-was'), 'بی خواستِ صاحبِ دکان: نه «ارزان‌تر» و نه قیمتِ دفتر');
+ok(feedUrls.length === 1 && /[?&]only=lists(&|$)/.test(feedUrls[0]) && !/limit=/.test(feedUrls[0]), 'خانه فقط دو فهرست را می‌خواهد (only=lists)', feedUrls.join(' '));
+page.off('request', onReq);
+ok((await call('PUT', '/api/shop/market', { showDeals: true }, gb.token)).status === 200, 'صاحبِ دکان «ارزان‌تر» را روشن کرد');
 await page.reload();
 await page.waitForSelector('#deal li[data-id="naan"]', { timeout: 10000 });
 const order2 = await page.evaluate(() => [...document.querySelectorAll('#feed > section')].filter((s) => !s.hidden).map((s) => s.id));
@@ -206,6 +218,7 @@ await page.keyboard.press('Escape');
 await page.waitForFunction(() => !document.body.classList.contains('cart-open'), null, { timeout: 5000 });
 await page.evaluate((s) => localStorage.removeItem(`store-cart:${s}`), gb.slug);
 await call('PUT', '/api/shop/storefront/products/naan', { published: true, onlinePriceMinor: null }, gb.token);
+await call('PUT', '/api/shop/market', { showDeals: false }, gb.token);
 
 //  همهٔ دکان‌ها
 await page.goto(`${base}/market/#/shops`);

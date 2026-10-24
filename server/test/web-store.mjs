@@ -229,6 +229,62 @@ for (const [lang, dir, stock, ck] of [['en', 'ltr', 'Stock is being checked', 'C
   await lc.close();
 }
 
+//  ⛔ واژه‌نامه نیامد (شبکه یا ۵۰۰): ویترینِ زنده هرگز کلیدِ خام («od.history»، «ship.free») نشان نمی‌دهد —
+//  HTML ِ فارسی می‌ماند و متنِ ساختهٔ JS از واژه‌های پایهٔ کیت؛ و یک بار دوباره خواسته می‌شود
+const KEYS = Object.keys(JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '..', 'public', 'kit', 'i18n', 'fa.json'), 'utf8')));
+const rawKeys = (pg) => pg.evaluate((keys) => {
+  const set = new Set(keys);
+  const out = [];
+  const words = (s) => String(s || '').split(/[\s،,()«»:—]+/).filter((w) => set.has(w));
+  const tw = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  for (let n = tw.nextNode(); n; n = tw.nextNode()) out.push(...words(n.nodeValue));
+  for (const e of document.querySelectorAll('[aria-label],[placeholder],[title],[alt]')) {
+    for (const a of ['aria-label', 'placeholder', 'title', 'alt']) out.push(...words(e.getAttribute(a)).map((w) => `${a}=${w}`));
+  }
+  out.push(...words(document.title).map((w) => `<title>=${w}`));
+  return out;
+}, KEYS);
+const placedId = (await one(`SELECT id FROM online_orders WHERE shop_id=$1 ORDER BY created_at LIMIT 1`, [shopId])).id;
+const placedToken = require('../src/lib/storefront').tokenOf(shopId, placedId);
+for (const lang of ['fa', 'en']) {
+  const nc = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  let asked = 0;
+  await nc.route('**/kit/i18n/*.json', (r) => { asked++; return r.abort('failed'); });
+  const np = await nc.newPage();
+  np.on('pageerror', (e) => errors.push(String(e)));
+  await np.goto(`${base}/store/${slug}?lang=${lang}`);
+  await np.waitForSelector('#products li[data-id]', { timeout: 15000 });
+  await np.waitForFunction(() => !document.documentElement.hasAttribute('data-i18n'), null, { timeout: 5000 });
+  ok(asked === 2, `بی واژه‌نامه (${lang}): یک بار دوباره خواسته شد`, `${asked} درخواست`);
+  ok(await np.isVisible('#products li[data-id]'), `بی واژه‌نامه (${lang}): صفحه پیداست و کاتالوگ آمد`);
+  const seen = [];
+  seen.push(...await rawKeys(np));
+  await np.locator('#products li[data-id] .p-add').first().click();
+  await np.goto(`${base}/store/${slug}?lang=${lang}#/cart`);
+  await np.waitForTimeout(400);
+  seen.push(...await rawKeys(np));
+  await np.goto(`${base}/store/${slug}?lang=${lang}#/checkout`);
+  await np.waitForSelector('#view-checkout:not([hidden])');
+  seen.push(...await rawKeys(np));
+  ok((await np.textContent('#view-checkout h1')).trim() === 'ثبتِ سفارش', `بی واژه‌نامه (${lang}): متنِ فارسیِ HTML ماند`);
+  await np.goto(`${base}/store/${slug}?lang=${lang}#/o/${encodeURIComponent(placedToken)}`);
+  await np.waitForFunction(() => /\d|[۰-۹]/.test(document.getElementById('o-title').textContent), null, { timeout: 10000 });
+  seen.push(...await rawKeys(np));
+  ok(seen.length === 0, `بی واژه‌نامه (${lang}): هیچ کلیدِ خامی در ویترین، سبد، ثبت و سفارش`, [...new Set(seen)].join(' '));
+  await nc.close();
+}
+//  بارِ نخست نیامد، بارِ دوم آمد ⇒ صفحه همان زبان را دارد
+{
+  const rc = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  let n = 0;
+  await rc.route('**/kit/i18n/*.json', (r) => (++n === 1 ? r.fulfill({ status: 503, body: '' }) : r.continue()));
+  const rp = await rc.newPage();
+  await rp.goto(`${base}/store/${slug}?lang=en`);
+  await rp.waitForSelector('#products li[data-id]', { timeout: 15000 });
+  ok(n === 2 && (await rp.textContent('#stock-note')).includes('Stock is being checked'), 'واژه‌نامه پس از یک شکست، با بارِ دوم آمد', `${n} درخواست`);
+  await rc.close();
+}
+
 await page.goto(`${base}/store/no-such-store`);
 await page.waitForSelector('#view-missing:not([hidden])', { timeout: 10000 });
 ok(true, 'ویترینِ ناموجود: «پیدا نشد»');

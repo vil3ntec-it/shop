@@ -77,7 +77,7 @@
     var pills = el('div', { class: 'pills' });
     if (s.isNew) pills.appendChild(el('span', { class: 'pill plain new', text: t('shop.new') }));
     pills.appendChild(K.pill(s.status));
-    var sub = s.tagline || [s.category ? t('cat.' + s.category) : '', s.area].filter(Boolean).join(t('sep'));
+    var sub = s.tagline || [s.category ? catName(s.category, s.categoryLabel) : '', s.area].filter(Boolean).join(t('sep'));
     var closed = s.status && (s.status.badge === 'closed' || s.status.badge === 'offline');
     var card = el('article', { class: 'card shop-card' + (closed ? ' closed' : ''), attrs: { 'data-slug': s.slug } },
       el('div', { class: 'top' }, cover,
@@ -123,12 +123,14 @@
   }
 
   // ── دسته‌ها: یک ردیف تراشه با نشانهٔ رنگی + «همه دسته‌بندی‌ها» (باز کردنِ همه) ──
+  //  بی واژه‌نامه ⇒ نامِ فارسیِ همان دسته از سرور، نه کلید
+  function catName(key, label) { return K.has('cat.' + key) ? t('cat.' + key) : label || ''; }
   function chip(c, on) {
     var k = CAT[c.key] || CAT.other;
     return el('button', {
       class: 'chip', attrs: { type: 'button', 'aria-pressed': String(state.category === c.key), 'data-cat': c.key },
       on: { click: function () { on(c.key); } },
-    }, el('span', { class: 'ico k' + k[1] }, K.icon(k[0])), c.key ? t('cat.' + c.key) : t('all'));
+    }, el('span', { class: 'ico k' + k[1] }, K.icon(k[0])), c.key ? catName(c.key, c.label) : t('all'));
   }
   function renderCats() {
     var cats = [{ key: '' }].concat(state.overview.categories);
@@ -150,7 +152,7 @@
   }
   function catLabel() {
     var c = state.overview.categories.filter(function (x) { return x.key === state.category; })[0];
-    return c ? t('cat.' + c.key) : '';
+    return c ? catName(c.key, c.label) : '';
   }
   function nearQs() { return state.near ? '&lat=' + state.near.lat + '&lng=' + state.near.lng : ''; }
   function catQs() { return state.category ? '&category=' + encodeURIComponent(state.category) : ''; }
@@ -173,12 +175,13 @@
       $('sug-empty-title').textContent = t(state.category ? 'shops.none.cat' : 'shops.none');
       $('home-note').hidden = true;
     });
-    var rows = K.api(API + '/products?limit=1' + catQs()).then(function (r) {
+    //  فقط دو ردیفِ کالا (بی قفسه)؛ نیامدنش (مثلاً ۴۲۹) کارتِ دکان‌ها را پاک نمی‌کند
+    var rows = K.api(API + '/products?only=lists' + catQs()).then(function (r) {
       if (seq !== feedSeq) return;
       $('pop-sec').hidden = fill('pop', r.popular) === 0;
       $('pop-why').textContent = t('pop.why', { d: K.fa(r.windowDays || 30, 0) });
       $('deal-sec').hidden = fill('deal', r.deals) === 0;
-    });
+    }, function () { $('pop-sec').hidden = true; $('deal-sec').hidden = true; });
     return Promise.all([shops, rows]).catch(function (e) {
       if (seq !== feedSeq) return;
       K.clear($('sug'));
@@ -349,7 +352,7 @@
     var end = el('span', { class: 'end' });
     if (o.totalMinor !== undefined && o.totalMinor !== null) end.appendChild(el('span', { text: K.money(o.totalMinor) }));
     if (o.status) end.appendChild(el('span', { class: 'pill ' + K.orderKind(o.status), text: K.order(o.status) }));
-    return el('li', {}, el('a', { class: 'card prow', attrs: { href: '/store/' + encodeURIComponent(o.store.slug) + '#/o/' + o.token } },
+    return el('li', {}, el('a', { class: 'card prow', attrs: { href: '/store/' + encodeURIComponent(o.store.slug) + '#/o/' + encodeURIComponent(o.token) } },
       K.avatar(o.store.title, o.store.accent, o.store.slug, 'sm'),
       el('span', { class: 'grow' }, el('b', { text: o.store.title }),
         el('small', { text: t('od.no', { n: K.fa(o.orderNo, 0) }) + (o.createdAt ? t('sep') + K.when(o.createdAt) : '') })),

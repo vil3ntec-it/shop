@@ -454,7 +454,7 @@
       K.save('store-customer', { name: body.customer.name, addressText: body.address ? body.address.text : '', landmark: body.address ? body.address.landmark : '' });
       cart = {}; quoteNote = ''; saveCart();
       msg.hidden = true;
-      location.hash = '#/o/' + r.order.token;
+      location.hash = '#/o/' + encodeURIComponent(r.order.token);
     }).catch(function (e) {
       var d = e.data || {};
       if (e.code === 'price_changed' && d.quote) {
@@ -569,7 +569,7 @@
       api('/orders/' + encodeURIComponent(token)).then(function (r) {
         renderOrder(r.order, token);
         //  پیگیریِ زنده فقط جلوی چشم و تا سفارش تمام نشده
-        if (FINAL.indexOf(r.order.status) < 0) pollTimer = setTimeout(function () { if (!document.hidden && location.hash === '#/o/' + token) load(); else pollTimer = setTimeout(load, 20000); }, 20000);
+        if (FINAL.indexOf(r.order.status) < 0) pollTimer = setTimeout(function () { if (!document.hidden && location.hash === '#/o/' + encodeURIComponent(token)) load(); else pollTimer = setTimeout(load, 20000); }, 20000);
       }).catch(function (e) {
         $('o-title').textContent = t('od.title');
         K.clear($('o-steps')); K.clear($('o-lines')); K.clear($('o-totals')); K.clear($('o-timeline'));
@@ -610,7 +610,7 @@
         var end = el('span', { class: 'end' });
         if (o.totalMinor !== undefined && o.totalMinor !== null) end.appendChild(el('span', { text: K.money(o.totalMinor) }));
         if (o.status) end.appendChild(el('span', { class: 'pill ' + K.orderKind(o.status), text: K.order(o.status) }));
-        ul.appendChild(el('li', {}, el('a', { class: 'card prow', attrs: { href: '#/o/' + o.token } },
+        ul.appendChild(el('li', {}, el('a', { class: 'card prow', attrs: { href: '#/o/' + encodeURIComponent(o.token) } },
           el('span', { class: 'pimg' }, K.icon('receipt')),
           el('span', { class: 'grow' }, el('b', { text: t('od.no', { n: K.fa(o.orderNo, 0) }) }), el('small', { text: K.when(o.at || o.createdAt) })),
           end)));
@@ -626,7 +626,7 @@
   function route() {
     if (!store) return;
     var h = location.hash || '#/';
-    if (h.indexOf('#/o/') === 0) { closeAll(); return openOrder(h.slice(4)); }
+    if (h.indexOf('#/o/') === 0) { closeAll(); try { return openOrder(decodeURIComponent(h.slice(4))); } catch (e) { return openOrder(''); } }
     clearTimeout(pollTimer);
     if (h === '#/orders') { closeAll(); return openOrders(); }
     if (h === '#/checkout') { closeAll(); return openCheckout(); }
