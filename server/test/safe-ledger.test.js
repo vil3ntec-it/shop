@@ -89,7 +89,10 @@ test('نوعِ JSON: عددِ اعشاری، متن به جای عدد و فیل
 });
 
 test('جدولِ تازه در هر سه فهرست: v1 ِ دکان، پلهٔ ۴ و v3 با سیاستِ log', () => {
-  assert.equal(require('../src/lib/sync').TABLES.safeEntries, 'shop_safe_entries');
+  const legacy = require('../src/lib/sync');
+  assert.ok('safeEntries' in legacy.TABLES, 'فهرستِ سفیدِ v1 ِ دکان');
+  assert.equal(legacy.TABLES.safeEntries, null, 'جدولِ راهِ قدیم ندارد');
+  assert.ok(legacy.V1_ONLY.has('safeEntries') && !legacy.LEGACY_COLLECTIONS.includes('safeEntries'));
   assert.equal(migrations.currentVersion('shop'), 4);
   assert.equal(require('../src/lib/sync-v3-schema').specOf('safeEntries').policy, 'log');
   assert.ok(!syncV1.PUMP_TABLES.includes('safeEntries'), 'جدولِ پمپ نیست');
@@ -177,6 +180,61 @@ test('v1: درجِ دوباره روی ردیفِ موجود با محتوای �
   assert.equal((await rowOf('rin-c1')).data.amountMinor, 5000);
 });
 
+test('v1: نامِ دیگرِ جدول (table_name، safe_entries، SafeEntries) هم از نگهبان می‌گذرد، نه از کنارش', async () => {
+  assert.deepEqual(statuses(await push1(owner, 'safe-own', [count('alt-c1', 5000)])), ['applied']);
+  const DAY = 24 * 60 * 60 * 1000;
+  const r = await push1(staff, 'safe-staff', [
+    //  شاگرد شمارشِ صاحب را با `table_name` عوض می‌کند
+    { op_id: oid(), ts: Date.now(), table_name: 'safeEntries', row_id: 'alt-c1', type: 'insert',
+      fields: { kind: 'count', amountMinor: 1, createdAt: at(), expectedMinor: 0 } },
+    //  خروجِ بزرگ با تاریخِ ده روزِ بعد، با `safe_entries`
+    { op_id: oid(), ts: Date.now(), table: 'safe_entries', row_id: 'alt-o1', type: 'insert',
+      fields: { kind: 'out', amountMinor: 99999900, createdAt: Date.now() + 10 * DAY, reason: 'owner_withdrawal' } },
+    //  شمارشِ تازهٔ شاگرد با `SafeEntries`
+    { op_id: oid(), ts: Date.now(), tableName: 'SafeEntries', row_id: 'alt-c2', type: 'insert',
+      fields: { kind: 'count', amountMinor: 1, createdAt: at(), expectedMinor: 0 } },
+  ]);
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.deepEqual(statuses(r), ['rejected:safe_append_only', 'rejected:safe_invalid', 'rejected:safe_not_allowed']);
+  assert.equal((await rowOf('alt-c1')).data.amountMinor, 5000);
+  assert.equal(await rowOf('alt-o1'), null);
+  assert.equal(await rowOf('alt-c2'), null);
+});
+
+test('v1: دو push ِ هم‌زمان با یک شناسه — فقط یکی می‌نشیند (قفلِ حساب تا پایانِ پاسخ)', async () => {
+  for (let k = 0; k < 5; k++) {
+    const a = count(`race-${k}`, 1000);
+    const b = op1(`race-${k}`, { ...a.fields, amountMinor: 2000 });
+    const [ra, rb] = await Promise.all([push1(owner, 'safe-race-a', [a]), push1(manager, 'safe-race-b', [b])]);
+    const sa = statuses(ra)[0];
+    assert.deepEqual([sa, statuses(rb)[0]].sort(), ['applied', 'rejected:safe_append_only'], `دور ${k}`);
+    assert.equal((await rowOf(`race-${k}`)).data.amountMinor, sa === 'applied' ? 1000 : 2000);
+  }
+});
+
+test('قفلِ حساب: push ِ دوم تا پایانِ پاسخِ اولی می‌ایستد؛ حسابِ دیگر نه', async () => {
+  const { EventEmitter } = require('node:events');
+  const tick = () => new Promise((r) => setTimeout(r, 30));
+  const r1 = new EventEmitter();
+  const r2 = new EventEmitter();
+  const r3 = new EventEmitter();
+  await safe.lockAccount(r1, 'acc-lock-1');
+  let second = false;
+  const p2 = safe.lockAccount(r2, 'acc-lock-1').then(() => { second = true; });
+  await safe.lockAccount(r3, 'acc-lock-2');               //  حسابِ دیگر منتظر نمی‌ماند
+  await tick();
+  assert.equal(second, false, 'تا پاسخِ اول تمام نشده، دومی منتظر است');
+  r1.emit('finish');
+  r1.emit('close');                                       //  آزاد کردنِ دوباره بی‌اثر است
+  await p2;
+  assert.equal(second, true);
+  r2.emit('close');
+  r3.emit('finish');
+  const r4 = new EventEmitter();
+  await safe.lockAccount(r4, 'acc-lock-1');               //  پس از آزاد شدن دوباره گرفتنی است
+  r4.emit('finish');
+});
+
 test('v1: همان ردیف عیناً (فرستادنِ دوباره پس از بازیابی) بی‌اثر می‌گذرد، حتی از شاگرد', async () => {
   const cnt = count('rep-c1', 4200, 0);
   assert.deepEqual(statuses(await push1(owner, 'safe-own', [cnt])), ['applied']);
@@ -221,10 +279,12 @@ test('v3: همان داوری روی opِ بومی', async () => {
   const fields = { kind: 'count', amountMinor: 100, createdAt: at(), expectedMinor: 0 };
   const good = await push3(owner, 'safe-v3-own', [v3('v3-c2', fields)]);
   assert.equal(good.body.results[0].status, 'applied', JSON.stringify(good.body));
-  //  ردیفِ موجود را سیاستِ log ِ خودِ v3 داوری می‌کند: عیناً همان بی‌اثر، دیگری تعارض — حتی از شاگرد
+  //  ردیفِ موجود: عیناً همان بی‌اثر (حتی از شاگرد)؛ محتوای دیگر از صاحب تعارض است و از شاگرد ردِ مجوز
   const same = await push3(staff, 'safe-v3-staff', [v3('v3-c2', fields)]);
   assert.notEqual(same.body.results[0].status, 'rejected', JSON.stringify(same.body));
-  const other = await push3(staff, 'safe-v3-staff', [v3('v3-c2', { ...fields, amountMinor: 999 })]);
+  const staffOther = await push3(staff, 'safe-v3-staff', [v3('v3-c2', { ...fields, amountMinor: 999 })]);
+  assert.equal(staffOther.body.results[0].reason, 'safe_not_allowed', JSON.stringify(staffOther.body));
+  const other = await push3(owner, 'safe-v3-own', [v3('v3-c2', { ...fields, amountMinor: 999 })]);
   assert.equal(other.body.results[0].status, 'conflict', JSON.stringify(other.body));
 });
 
@@ -252,7 +312,6 @@ test('راهِ قدیمِ /api/sync در گاوصندوق نمی‌نویسد (s
       ['safeEntries', `leg-del-${dev}`, 'sync_v1_only'],
     ], url);
   }
-  assert.equal(Number((await one('SELECT count(*) AS n FROM shop_safe_entries WHERE shop_id=$1', [shopId])).n), 0);
   //  راهِ قدیم این مجموعه را نه می‌خواند نه نشان می‌دهد
   const status = await h.api('GET', '/api/sync/status', { token: owner.accessToken, headers: { 'X-App': 'shop' } });
   assert.equal(status.status, 200, JSON.stringify(status.body));

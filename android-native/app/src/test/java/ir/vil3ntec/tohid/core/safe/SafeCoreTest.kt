@@ -13,6 +13,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -99,6 +100,19 @@ class SafeCoreTest {
         }
       }
     }
+  }
+
+  /** جمعِ بیرون از ±(۲^۵۳−۱) خطاست، نه عددِ گردشده (§۲۸.۴)؛ build چنین ردیفی نمی‌سازد */
+  @Test fun sumsStayExact() {
+    val max = SafeCore.MAX_EXACT
+    val rows = listOf(
+      SafeCore.Entry("a", SafeCore.IN, max, 10, reason = "deposit"),
+      SafeCore.Entry("b", SafeCore.IN, 1, 20, reason = "deposit"),
+    )
+    assertThrows(ArithmeticException::class.java) { SafeCore.view(rows) }
+    assertEquals(max, SafeCore.view(rows.take(1)).balanceMinor)
+    val r = SafeCore.build(rows.take(1), SafeCore.Input("c", SafeCore.IN, 1, 30, reason = "deposit"), threshold)
+    assertEquals(SafeCore.Result.Err(SafeCore.Code.INVALID_AMOUNT), r)
   }
 
   /** ردیفِ ساختهٔ build بی‌درنگ در view همان مانده‌ای را می‌دهد که سنجیده شد */

@@ -40,15 +40,16 @@ const TABLES = {
   productCategories: 'product_categories',
   productUnits:      'product_units',
   expenseCategories: 'expense_categories',
-  //  PAY-18 (migrations/118، پلهٔ ۴): گاوصندوق — فقط‌افزودنی؛ شکل و مجوز در `safe-ledger.js`
-  safeEntries:       'shop_safe_entries',
+  //  PAY-18 (پلهٔ ۴): گاوصندوق — فقط در Sync v1/v3 (`sync_rows`)، جدولِ راهِ قدیم ندارد (`V1_ONLY`)؛
+  //  شکل و مجوز در `safe-ledger.js`
+  safeEntries:       null,
 };
 const COLLECTIONS = Object.keys(TABLES);
 /**
- * مجموعه‌هایی که فقط Sync v1/v3 دارد، با سنجشِ شکل و مجوزِ خودشان (`safe-ledger.js`).
- * راهِ قدیم آن‌ها را نه می‌نویسد (هر تغییرش با کدِ `sync_v1_only` برمی‌گردد) نه می‌خواند
- * و نه در فهرستِ مجموعه‌هایش نشان می‌دهد — درِ بی‌سنجش نمی‌ماند، حتی اگر برنامه‌ها از این
- * جدول نخوانند. جدول برای هم‌شکلیِ `TABLES` (پلهٔ ۴ِ v1) هست و همیشه خالی است.
+ * مجموعه‌هایی که فقط Sync v1/v3 دارد، با سنجشِ شکل و مجوزِ خودشان (`safe-ledger.js`). کلیدشان
+ * در `TABLES` است چون همین کلیدها فهرستِ سفیدِ v1 ِ دکان‌اند، ولی جدولِ راهِ قدیم ندارند (`null`).
+ * راهِ قدیم آن‌ها را نه می‌نویسد (هر تغییرش با کدِ `sync_v1_only` برمی‌گردد) نه می‌خواند و نه در
+ * فهرستِ مجموعه‌هایش نشان می‌دهد — درِ بی‌سنجش نمی‌ماند.
  */
 const V1_ONLY = new Set(['safeEntries']);
 /** آنچه راهِ قدیم (`/api/sync`، پنلِ مدیر) می‌بیند */
@@ -105,12 +106,12 @@ async function pushChanges(ctx, changes) {
       const collection = String(raw?.collection || '');
       const table = TABLES[collection];
       const recordId = String(raw?.id || '');
-      if (!table || !recordId || recordId.length > 80) { skipped++; continue; }
       if (V1_ONLY.has(collection)) {
         conflicts.push({ collection, id: recordId, reason: 'sync_v1_only' });
         skipped++;
         continue;
       }
+      if (!table || !recordId || recordId.length > 80) { skipped++; continue; }
 
       const updatedAt = Number(raw.updatedAt) || t;
       const deleted = raw.deleted === true;

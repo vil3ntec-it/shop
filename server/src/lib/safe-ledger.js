@@ -21,7 +21,9 @@
 const permCore = require('./perm-core');
 const { can } = require('./permissions');
 const staffPerms = require('./staff-perms');
-const { many } = require('../db');
+const db = require('../db');
+
+const { many } = db;
 const { rejectOps } = require('./v1-reject');
 
 const TABLE = 'safeEntries';
@@ -106,6 +108,67 @@ async function judgeNew(row, allowed) {
   return null;
 }
 
+/*
+ *  قفلِ هر حساب برای push ِ گاوصندوق — تا پایانِ پاسخ (و پس تراکنشِ push ِ `sync-v1.js`).
+ *  سنجشِ «ردیف هست؟» پیش از تراکنشِ v1 است؛ بی قفل دو push ِ هم‌زمان با یک شناسه هر دو
+ *  «نیست» می‌دیدند و هر دو می‌نشستند. push ِ دوم این‌جا می‌ایستد تا اولی پاسخ بدهد، بعد
+ *  `sync_rows` را می‌خواند. دو لایه: زنجیرهٔ promise در همین فرآیند، و روی PostgreSQL قفلِ
+ *  advisoryِ نشستی روی اتصالِ جدا (برای چند نمونهٔ سرور). کلیدش با قفلِ تراکنشیِ خودِ v1
+ *  (`sync-v1:shop:shop:<حساب>`) فرق دارد، پس بن‌بست نمی‌سازد.
+ */
+const LOCK_TIMEOUT = '15s';
+const chains = new Map();
+
+function localLock(key) {
+  const prev = chains.get(key) || Promise.resolve();
+  let release;
+  const mine = new Promise((r) => { release = r; });
+  const tail = prev.then(() => mine);
+  chains.set(key, tail);
+  return prev.then(() => () => {
+    release();
+    if (chains.get(key) === tail) chains.delete(key);
+  });
+}
+
+async function dbLock(key) {
+  if (db.isPglite()) return async () => {};
+  const client = await db.getPool().connect();
+  try {
+    await client.query(`SET lock_timeout = '${LOCK_TIMEOUT}'`);
+    await client.query('SELECT pg_advisory_lock(hashtext($1))', [key]);
+  } catch (err) {
+    client.release(true);
+    throw err;
+  }
+  return async () => {
+    try {
+      await client.query('SELECT pg_advisory_unlock(hashtext($1))', [key]);
+      await client.query('RESET lock_timeout');
+      client.release();
+    } catch {
+      client.release(true);                          //  اتصالِ خراب بسته می‌شود و قفل با نشست می‌رود
+    }
+  };
+}
+
+/** قفل تا `finish`/`close` ِ همین پاسخ؛ تابعِ برگشتی آزاد می‌کند (یک بار) */
+async function lockAccount(res, accountId) {
+  const key = `safe-v1:shop:${accountId}`;
+  const freeLocal = await localLock(key);
+  let freeDb;
+  try { freeDb = await dbLock(key); } catch (err) { freeLocal(); throw err; }
+  let done = false;
+  const free = () => {
+    if (done) return;
+    done = true;
+    freeDb().finally(freeLocal);
+  };
+  res.once('finish', free);
+  res.once('close', free);
+  return free;
+}
+
 function once(fn) {
   let p = null;
   return () => (p ||= fn());
@@ -121,47 +184,59 @@ async function v1SafeGuard(req, res, next) {
     const { validateOp } = require('./sync-v1');
     const mine = [];
     ops.forEach((raw, i) => {
-      if (!isPlainObject(raw) || raw.table !== TABLE) return;
+      //  v1 نامِ جدول را از `table`/`table_name`/`tableName` می‌گیرد و یک‌دست می‌کند
+      //  (`safe_entries`، `SafeEntries`، …)، پس سنجش روی همان نامِ یک‌دست‌شده است
       const v = validateOp('shop', raw);
-      if (v.ok) mine.push({ i, op: v.op });           //  opِ بدشکل را خودِ v1 با دلیلِ خودش رد می‌کند
+      if (v.ok && v.op.table === TABLE) mine.push({ i, op: v.op });   //  opِ بدشکل را خودِ v1 رد می‌کند
     });
     if (!mine.length) return next();
-    const acc = [ctx.accountId];
-    //  opِ ثبت‌شدهٔ همین حساب را خودِ v1 «تکراری» جواب می‌دهد — حتی اگر نقش از آن روز عوض شده باشد
-    const seen = new Set((await many(
-      `SELECT op_id FROM oplog WHERE app='shop' AND account_kind='shop' AND account_id=$1 AND op_id = ANY($2::text[])`,
-      [...acc, mine.map(({ op }) => String(op.op_id))]
-    )).map((r) => r.op_id));
-    //  ردیف‌های موجود (حتی پاک‌شده): درجِ v1 روی آن‌ها ادغام می‌شد
-    const existing = new Map((await many(
-      `SELECT row_id, data, deleted_at FROM sync_rows
-        WHERE app='shop' AND account_kind='shop' AND account_id=$1 AND table_name=$2 AND row_id = ANY($3::text[])`,
-      [...acc, TABLE, [...new Set(mine.map(({ op }) => String(op.row_id)))]]
-    )).map((r) => [r.row_id, r]));
-    const allowed = once(() => mayMove(ctx));
-    const nowMs = Date.now();
-    const batch = new Set();
-    const rejected = new Map();
-    const reject = (i, op, reason) => rejected.set(i, { op_id: String(op.op_id), status: 'rejected', reason });
-    for (const { i, op } of mine) {
-      if (seen.has(String(op.op_id))) continue;
-      if (op.type !== 'insert') { reject(i, op, 'safe_append_only'); continue; }
-      const row = { ...(isPlainObject(op.fields) ? op.fields : {}), id: op.row_id };
-      if (invalid(row, nowMs)) { reject(i, op, 'safe_invalid'); continue; }
-      if (batch.has(op.row_id)) { reject(i, op, 'safe_append_only'); continue; }
-      batch.add(op.row_id);
-      const cur = existing.get(op.row_id);
-      if (cur) {
-        //  همان ردیف، عیناً ⇒ بی‌اثر می‌گذرد؛ هر چیزِ دیگر (یا ردیفِ پاک‌شده) ویرایش است
-        if (cur.deleted_at !== null || canonical(cur.data) !== canonical(row)) reject(i, op, 'safe_append_only');
-        continue;
-      }
-      const reason = await judgeNew(row, allowed);
-      if (reason) reject(i, op, reason);
+    const free = await lockAccount(res, ctx.accountId);
+    try {
+      await judgeBatch(ctx, ops, mine, req, res);
+    } catch (err) {
+      free();
+      throw err;
     }
-    rejectOps(req, res, ops, rejected);
     next();
   } catch (err) { next(err); }
+}
+
+/** داوریِ opهای گاوصندوقِ یک push، زیرِ قفلِ حساب */
+async function judgeBatch(ctx, ops, mine, req, res) {
+  const acc = [ctx.accountId];
+  //  opِ ثبت‌شدهٔ همین حساب را خودِ v1 «تکراری» جواب می‌دهد — حتی اگر نقش از آن روز عوض شده باشد
+  const seen = new Set((await many(
+    `SELECT op_id FROM oplog WHERE app='shop' AND account_kind='shop' AND account_id=$1 AND op_id = ANY($2::text[])`,
+    [...acc, mine.map(({ op }) => String(op.op_id))]
+  )).map((r) => r.op_id));
+  //  ردیف‌های موجود (حتی پاک‌شده): درجِ v1 روی آن‌ها ادغام می‌شد
+  const existing = new Map((await many(
+    `SELECT row_id, data, deleted_at FROM sync_rows
+      WHERE app='shop' AND account_kind='shop' AND account_id=$1 AND table_name=$2 AND row_id = ANY($3::text[])`,
+    [...acc, TABLE, [...new Set(mine.map(({ op }) => String(op.row_id)))]]
+  )).map((r) => [r.row_id, r]));
+  const allowed = once(() => mayMove(ctx));
+  const nowMs = Date.now();
+  const batch = new Set();
+  const rejected = new Map();
+  const reject = (i, op, reason) => rejected.set(i, { op_id: String(op.op_id), status: 'rejected', reason });
+  for (const { i, op } of mine) {
+    if (seen.has(String(op.op_id))) continue;
+    if (op.type !== 'insert') { reject(i, op, 'safe_append_only'); continue; }
+    const row = { ...(isPlainObject(op.fields) ? op.fields : {}), id: op.row_id };
+    if (invalid(row, nowMs)) { reject(i, op, 'safe_invalid'); continue; }
+    if (batch.has(op.row_id)) { reject(i, op, 'safe_append_only'); continue; }
+    batch.add(op.row_id);
+    const cur = existing.get(op.row_id);
+    if (cur) {
+      //  همان ردیف، عیناً ⇒ بی‌اثر می‌گذرد؛ هر چیزِ دیگر (یا ردیفِ پاک‌شده) ویرایش است
+      if (cur.deleted_at !== null || canonical(cur.data) !== canonical(row)) reject(i, op, 'safe_append_only');
+      continue;
+    }
+    const reason = await judgeNew(row, allowed);
+    if (reason) reject(i, op, reason);
+  }
+  rejectOps(req, res, ops, rejected);
 }
 
 /**
@@ -173,8 +248,10 @@ async function judgeV3(ctx, op, existing) {
   if (op.kind !== 'insert') return 'safe_append_only';
   const row = { ...(isPlainObject(op.fields) ? op.fields : {}), id: op.row_id };
   if (invalid(row, Date.now())) return 'safe_invalid';
-  if (existing) return null;
+  //  عیناً همان (فرستادنِ دوباره) بی‌اثر است؛ محتوای دیگر را v3 به صندوقِ تعارض می‌برد — ولی
+  //  کسی که خودش این کار را ندارد (شاگرد) تعارض هم نمی‌سازد
+  if (existing && canonical(existing.data) === canonical(row)) return null;
   return judgeNew(row, () => mayMove(ctx));
 }
 
-module.exports = { TABLE, PERM, KINDS, REASONS, MAX_AHEAD_MS, check, canonical, mayMove, v1SafeGuard, judgeV3 };
+module.exports = { TABLE, PERM, KINDS, REASONS, MAX_AHEAD_MS, check, canonical, mayMove, lockAccount, v1SafeGuard, judgeV3 };

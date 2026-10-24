@@ -16,13 +16,15 @@ package ir.vil3ntec.tohid.core.safe
  *  کنارِ هم ثبت می‌شوند؛ اختلاف هرگز بی‌صدا یکی نمی‌شود. اختلافِ اکیداً بیش از آستانه
  *  (همان D-18ِ صندوق) دلیل می‌خواهد. اختلاف همیشه از روی دفتر دوباره حساب می‌شود؛ اگر با
  *  `expectedMinor` نخواند، ردیفی دیر رسیده که پیش از شمارش بود ⇒ «نیازمند بررسی».
- *  نخستین شمارشِ دفتر «شمارشِ آغاز» است: پایه را می‌گذارد، اختلاف و دلیل ندارد.
+ *  شمارشی که هیچ ردیفی پیش از آن نیست «شمارشِ آغاز» است: پایه را می‌گذارد، اختلاف و دلیل
+ *  ندارد. اگر پیش از نخستین شمارش ورود یا خروجی ثبت شده باشد، آن شمارش اختلاف دارد و نشانش می‌دهد.
  *
  *  ── شکلِ ردیف ([check]) ───────────────────────────────────────────
  *  همان قاعده را سرور پیش از نشاندن می‌سنجد (`server/src/lib/safe-ledger.js`)؛ هر دو با
  *  `core/test-vectors/safe-v1.json` (بخشِ `shape`). ⛔ یکی را بی دیگری و بردار عوض نکنید.
  *
- *  هر مبلغ `Long` به یک‌صدمِ افغانی، در ±(۲^۵۳−۱). Kotlin خالص است — بی android.*، بی ساعت.
+ *  هر مبلغ `Long` به یک‌صدمِ افغانی، در ±(۲^۵۳−۱)؛ هر جمعِ میانی هم ([add]) — بیرون از بازه
+ *  `ArithmeticException` است، نه عددِ گردشده (§۲۸.۴). Kotlin خالص است — بی android.*، بی ساعت.
  */
 object SafeCore {
 
@@ -94,7 +96,7 @@ object SafeCore {
     val deltaMinor: Long,
     /** مانده پس از همین ردیف */
     val balanceMinor: Long,
-    /** فقط شمارش: اضافه (+) یا کسری (−) نسبت به ماندهٔ دفتر؛ شمارشِ آغاز null */
+    /** فقط شمارش: اضافه (+) یا کسری (−) نسبت به ماندهٔ دفتر؛ شمارشِ آغاز (هیچ ردیفی پیش از آن) null */
     val varianceMinor: Long? = null,
     /**
      *  فقط شمارش: `expectedMinor`ِ ثبت‌شده با ماندهٔ دوباره‌حساب‌شده نمی‌خواند. شمارشِ آغاز
@@ -191,6 +193,13 @@ object SafeCore {
 
   private fun signed(e: Entry): Long = if (e.kind in INFLOW) e.amountMinor else -e.amountMinor
 
+  /** جمعِ دقیق در ±(۲^۵۳−۱) — همان سقفِ عددِ JS؛ دو عددِ در بازه هرگز Long را سرریز نمی‌کنند */
+  private fun add(a: Long, b: Long): Long {
+    val r = a + b
+    if (r > MAX_EXACT || r < -MAX_EXACT) throw ArithmeticException("جمعِ گاوصندوق بیرون از ±(۲^۵۳−۱)")
+    return r
+  }
+
   fun view(entries: List<Entry>): View {
     val (rows, invalid) = usable(entries)
     val lines = ArrayList<Line>(rows.size)
@@ -202,19 +211,19 @@ object SafeCore {
     val review = ArrayList<String>()
     for (e in rows) {
       val line = if (e.kind == COUNT) {
-        val d = e.amountMinor - balance
-        //  شمارشِ آغاز (نخستین شمارش) پایه می‌گذارد؛ اختلاف فقط از شمارشِ دوم به بعد
-        val v = if (last == null) null else d
+        val d = add(e.amountMinor, -balance)
+        //  شمارشِ آغاز (هیچ ردیفی پیش از آن) پایه می‌گذارد؛ هر شمارشِ دیگر اختلاف دارد
+        val v = if (lines.isEmpty()) null else d
         val late = v != null && e.expectedMinor != balance
         if (late) review += e.id
-        varianceTotal += v ?: 0L
+        varianceTotal = add(varianceTotal, v ?: 0L)
         inSince = 0L
         outSince = 0L
         Line(e, d, e.amountMinor, varianceMinor = v, late = late).also { last = it }
       } else {
         val d = signed(e)
-        if (d > 0) inSince += d else outSince -= d
-        Line(e, d, balance + d)
+        if (d > 0) inSince = add(inSince, d) else outSince = add(outSince, -d)
+        Line(e, d, add(balance, d))
       }
       balance = line.balanceMinor
       lines += line
@@ -229,16 +238,17 @@ object SafeCore {
   /** مانده درست پیش از جایگاهِ (`at`، `id`) */
   fun balanceBefore(entries: List<Entry>, at: Long, id: String): Long = stateBefore(usable(entries).first, at, id).first
 
-  /** (مانده، آیا پیش از این جایگاه شمارشی هست) روی ردیف‌های مرتبِ [usable] */
+  /** (مانده، آیا پیش از این جایگاه ردیفی هست) روی ردیف‌های مرتبِ [usable] */
   private fun stateBefore(rows: List<Entry>, at: Long, id: String): Pair<Long, Boolean> {
     val pos = Entry(id, COUNT, 0, at)
     var balance = 0L
-    var counted = false
+    var any = false
     for (e in rows) {
       if (ORDER.compare(e, pos) >= 0) break
-      if (e.kind == COUNT) { balance = e.amountMinor; counted = true } else balance += signed(e)
+      any = true
+      balance = if (e.kind == COUNT) e.amountMinor else add(balance, signed(e))
     }
-    return balance to counted
+    return balance to any
   }
 
   /**
@@ -247,7 +257,7 @@ object SafeCore {
    *    (ساعتِ عقب‌ماندهٔ گوشی ردیف را پیش از شمارشی نمی‌برد که همین‌جا دیده شد).
    *  • تکرارِ همان شناسه با همان محتوا `duplicate`؛ با محتوای دیگر `ID_CONFLICT`.
    *  • خروج بیش از مانده `INSUFFICIENT_FUNDS`؛ اختلافِ شمارش (جز شمارشِ آغاز) بیش از [threshold]
-   *    بی دلیل `REASON_REQUIRED`.
+   *    بی دلیل `REASON_REQUIRED`؛ ورودی که مانده را از ±(۲^۵۳−۱) بیرون ببرد `INVALID_AMOUNT`.
    */
   fun build(entries: List<Entry>, input: Input, threshold: Long): Result<Entry> {
     val id = clean(input.id) ?: return Result.Err(Code.ID_REQUIRED)
@@ -255,7 +265,9 @@ object SafeCore {
     val rows = usable(entries).first
     val prior = entries.firstOrNull { it.id == id }
     val at = prior?.at ?: maxOf(input.at, (rows.lastOrNull()?.at ?: 0L) + 1)
-    val (before, counted) = stateBefore(rows, at, id)
+    val (before, anyBefore) = try { stateBefore(rows, at, id) } catch (_: ArithmeticException) {
+      return Result.Err(Code.INVALID_AMOUNT)
+    }
     val e = Entry(
       id = id, kind = input.kind, amountMinor = input.amountMinor, at = at,
       by = clean(input.by), reason = clean(input.reason), note = clean(input.note), bagNo = clean(input.bagNo),
@@ -269,9 +281,11 @@ object SafeCore {
     }
     if (e.kind == COUNT) {
       val v = e.amountMinor - before
-      if (counted && (if (v < 0) -v else v) > threshold && e.reason == null) return Result.Err(Code.REASON_REQUIRED, varianceMinor = v)
-    } else if (e.kind !in INFLOW && e.amountMinor > before) {
-      return Result.Err(Code.INSUFFICIENT_FUNDS)
+      if (anyBefore && (if (v < 0) -v else v) > threshold && e.reason == null) return Result.Err(Code.REASON_REQUIRED, varianceMinor = v)
+    } else if (e.kind !in INFLOW) {
+      if (e.amountMinor > before) return Result.Err(Code.INSUFFICIENT_FUNDS)
+    } else if (before > MAX_EXACT - e.amountMinor) {
+      return Result.Err(Code.INVALID_AMOUNT)
     }
     return Result.Ok(e)
   }
