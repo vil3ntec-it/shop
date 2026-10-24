@@ -203,6 +203,7 @@ object LedgerEngine {
     val landed = draft.landedCost?.takeIf { it > 0 }
 
     val date = draft.date.ifBlank { today }
+    if (due != null && due < date) return Result.Failed(PurchaseBook.DUE_BEFORE_DATE)
     val unit = draft.unit.ifBlank { product.unit }
     // گِرد کردن دقیقاً همان‌جای نسخهٔ وب است
     val totalAmount = Math.round(draft.quantity * draft.purchasePrice).toDouble()

@@ -28,9 +28,15 @@ import ir.vil3ntec.tohid.ui.theme.Shop
  *  «ثبتِ» برگشت و سررسید فقط وقتی موتورِ تازهٔ موجودی و بها روشن است دیده می‌شود (تنظیمِ دکان).
  */
 
-/** یادآورِ سررسید: فاکتورهای سررسیدگذشته و نزدیک به سررسید؛ چیزی نبود ⇒ هیچ */
+/**
+ *  یادآورِ سررسید: فاکتورهای سررسیدگذشته و نزدیک به سررسید با ماندهٔ **واقعی** (پرداخت‌های بعدی و
+ *  سندهای کسر FIFO روی قدیمی‌ترین فاکتورها، `PurchaseBook.open`)؛ چیزی نبود ⇒ هیچ. مثلِ ثبتِ
+ *  سررسید، فقط وقتی موتورِ تازهٔ موجودی و بها روشن است.
+ */
 @Composable
 fun SupplierDueReminder(d: ShopData, today: String, onOpenSupplier: ((String) -> Unit)? = null) {
+  val on = remember(d.auditLog) { ir.vil3ntec.tohid.data.StockLedger.isOn(d) }
+  if (!on) return
   val late = remember(d, today) { PurchaseBook.overdue(d, today) }
   val soon = remember(d, today) { PurchaseBook.dueSoon(d, today) }
   if (late.isEmpty() && soon.isEmpty()) return
@@ -38,12 +44,13 @@ fun SupplierDueReminder(d: ShopData, today: String, onOpenSupplier: ((String) ->
   Panel(Modifier.fillMaxWidth()) {
     Row(verticalAlignment = Alignment.CenterVertically) {
       Text("سررسیدِ پرداخت به تأمین‌کننده", style = MaterialTheme.typography.titleSmall, color = Shop.colors.text, modifier = Modifier.weight(1f))
-      if (late.isNotEmpty()) StatusPill("${late.size} گذشته — ${money(late.sumOf { it.debt })} ؋", PillTone.DANGER)
+      if (late.isNotEmpty()) StatusPill("${late.size} گذشته — ${money(late.sumOf { it.remaining })} ؋", PillTone.DANGER)
       if (soon.isNotEmpty()) { Spacer(Modifier.width(6.dp)); StatusPill("${soon.size} تا هفتهٔ بعد", PillTone.WARNING) }
     }
     Spacer(Modifier.height(6.dp))
-    (late + soon).take(6).forEach { inv ->
-      val overdue = inv in late
+    (late + soon).take(6).forEach { due ->
+      val inv = due.invoice
+      val overdue = due in late
       Row(
         Modifier.fillMaxWidth().clip(Shape.button)
           .then(if (onOpenSupplier != null) Modifier.clickable { onOpenSupplier(inv.supplierId) } else Modifier)
@@ -54,7 +61,7 @@ fun SupplierDueReminder(d: ShopData, today: String, onOpenSupplier: ((String) ->
           "${names[inv.supplierId] ?: "—"} · ${if (inv.no > 0) "فاکتورِ #${inv.no}" else "خرید"} · سررسید ${formatDate(inv.dueDate ?: "")}",
           style = MaterialTheme.typography.bodySmall, color = Shop.colors.text, modifier = Modifier.weight(1f),
         )
-        Text("${money(inv.debt)} ؋", style = MaterialTheme.typography.bodySmall, color = if (overdue) Shop.colors.danger else Shop.colors.warning)
+        Text("${money(due.remaining)} ؋", style = MaterialTheme.typography.bodySmall, color = if (overdue) Shop.colors.danger else Shop.colors.warning)
       }
     }
   }
@@ -69,8 +76,11 @@ fun SupplierReturnDialog(
   d: ShopData,
   supplierId: String,
   onDismiss: () -> Unit,
-  onSave: (productId: String, quantity: Double, unitPrice: Double, reason: String, date: String) -> Unit,
+  /** `key`: کلیدِ یکتای همین پنجره — دو کلیک یک سند (`PurchaseBook.supplierReturn`) */
+  onSave: (productId: String, quantity: Double, unitPrice: Double, reason: String, date: String, key: String) -> Unit,
 ) {
+  val key = remember { ir.vil3ntec.tohid.sync.v1.Ulid.next() }
+  var saving by remember { mutableStateOf(false) }
   val options = remember(d, supplierId) { PurchaseBook.boughtFrom(d, supplierId) }
   var productId by remember { mutableStateOf(options.firstOrNull()?.id) }
   var amount by remember { mutableStateOf("") }
@@ -125,10 +135,14 @@ fun SupplierReturnDialog(
           Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("انصراف") }
             Button(
-              enabled = productId != null,
+              enabled = productId != null && !saving,
               onClick = {
+                if (saving) return@Button
                 val iso = if (date.isBlank()) "" else ir.vil3ntec.tohid.Jalali.parseTyped(date) ?: "?"
-                onSave(productId ?: return@Button, amount.toDoubleOrNull() ?: 0.0, price.toDoubleOrNull() ?: -1.0, reason, iso)
+                saving = true
+                //  ردشده (دلیلِ خالی، مقدارِ بیش از موجودی…) ⇒ پنجره می‌ماند و دکمه دوباره باز می‌شود
+                onSave(productId ?: return@Button, amount.toDoubleOrNull() ?: 0.0, price.toDoubleOrNull() ?: -1.0, reason, iso, key)
+                saving = false
               },
               modifier = Modifier.weight(1f),
             ) { Text("ثبتِ برگشت") }

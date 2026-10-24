@@ -55,6 +55,8 @@ object PurchaseBook {
   ): Result {
     if (d.suppliers.none { it.id == supplierId }) return Result.Failed("تأمین‌کننده را انتخاب کنید")
     if (landedTotal.isNaN() || landedTotal < 0) return Result.Failed("هزینهٔ جانبی درست نیست")
+    val due = dueDate?.trim()?.ifEmpty { null }
+    if (due != null && due < date.ifBlank { today }) return Result.Failed(DUE_BEFORE_DATE)
     val real = lines.filter { it.productId.isNotBlank() }
     if (real.isEmpty()) return Result.Failed("دست‌کم یک ردیف کالا لازم است")
     real.forEachIndexed { i, l ->
@@ -163,7 +165,7 @@ object PurchaseBook {
   fun suppliers(d: ShopData, today: String = ""): List<SupplierSummary> = d.suppliers.map { s ->
     val mine = d.purchases.filter { it.supplierId == s.id }
     val balance = ShopStore.supplierDebt(d, s.id)
-    val over = if (today.isBlank()) 0.0 else overdue(d, today, s.id).sumOf { it.debt }
+    val over = if (today.isBlank()) 0.0 else overdue(d, today, s.id).sumOf { it.remaining }
     SupplierSummary(
       supplier = s,
       balance = balance,
@@ -177,15 +179,44 @@ object PurchaseBook {
 
   /* ── سررسید و یادآور (PUR-07) ──────────────────────────────────── */
 
-  /** فاکتورهای خریدِ دارای مانده که سررسیدشان پیش از امروز است، قدیمی‌ترین بالا */
-  fun overdue(d: ShopData, today: String, supplierId: String? = null): List<Invoice> =
-    invoices(d, supplierId).filter { !it.isReturn && it.debt > 0.5 && it.dueDate.let { due -> due != null && due < today } }
+  /** فاکتورِ خرید با ماندهٔ **واقعی**اش (پس از پرداخت‌های بعدی و سندهای کسر) */
+  data class Due(val invoice: Invoice, val remaining: Double) {
+    val supplierId: String get() = invoice.supplierId
+    val dueDate: String? get() = invoice.dueDate
+  }
+
+  /**
+   *  ماندهٔ واقعیِ هر فاکتورِ خرید. `Invoice.debt` فقط پرداختِ هنگامِ خرید را می‌بیند؛
+   *  پرداخت‌های بعدی به تأمین‌کننده (`supplierPayments`)، سندهای کسر (برگشت، PUR-08) و
+   *  اضافه‌پرداختِ هر فاکتور به ترتیب روی **قدیمی‌ترین** فاکتورها می‌نشینند (FIFO). پس جمعِ
+   *  مانده‌ها همان `max(0, supplierDebt)` است و یادآورِ سررسید با پرداخت پاک می‌شود.
+   */
+  fun open(d: ShopData, supplierId: String? = null): List<Due> {
+    val out = ArrayList<Due>()
+    invoices(d, supplierId).groupBy { it.supplierId }.forEach { (sid, list) ->
+      val bills = list.filter { !it.isReturn }
+      var credit = d.supplierPayments.filter { it.supplierId == sid }.sumOf { it.amount } +
+        list.filter { it.isReturn }.sumOf { -it.total } +
+        bills.sumOf { (-it.debt).coerceAtLeast(0.0) }
+      bills.sortedWith(compareBy<Invoice> { it.date }.thenBy { it.createdAt }.thenBy { it.key }).forEach { inv ->
+        val debt = inv.debt.coerceAtLeast(0.0)
+        val take = minOf(debt, credit.coerceAtLeast(0.0))
+        credit -= take
+        out += Due(inv, debt - take)
+      }
+    }
+    return out
+  }
+
+  /** فاکتورهای خریدِ دارای ماندهٔ واقعی که سررسیدشان پیش از امروز است، زودترین سررسید بالا */
+  fun overdue(d: ShopData, today: String, supplierId: String? = null): List<Due> =
+    open(d, supplierId).filter { it.remaining > 0.5 && it.dueDate.let { due -> due != null && due < today } }
       .sortedBy { it.dueDate }
 
-  /** فاکتورهای دارای مانده که تا [days] روزِ دیگر سررسید می‌شوند (امروز هم) */
-  fun dueSoon(d: ShopData, today: String, days: Int = 7): List<Invoice> {
+  /** فاکتورهای دارای ماندهٔ واقعی که تا [days] روزِ دیگر سررسید می‌شوند (امروز هم) */
+  fun dueSoon(d: ShopData, today: String, days: Int = 7): List<Due> {
     val limit = ir.vil3ntec.tohid.core.calendar.CivilDays.addDays(today, days) ?: return emptyList()
-    return invoices(d).filter { !it.isReturn && it.debt > 0.5 && it.dueDate.let { due -> due != null && due >= today && due <= limit } }
+    return open(d).filter { it.remaining > 0.5 && it.dueDate.let { due -> due != null && due >= today && due <= limit } }
       .sortedBy { it.dueDate }
   }
 
@@ -220,7 +251,14 @@ object PurchaseBook {
     now: Long,
     newId: () -> String,
     userId: String? = null,
+    /**
+     *  کلیدِ یکتای همین برگشت (پنجره یک بار می‌سازد): شناسهٔ سندِ کسر و ردیف‌هایش از آن
+     *  ساخته می‌شود، پس دو کلیکِ پشتِ‌سرِهم دو سند نمی‌سازد؛ سندِ همین کلید اگر هست ⇒ رد.
+     */
+    key: String? = null,
   ): Result {
+    val k = key?.trim()?.ifEmpty { null }
+    if (k != null && d.purchases.any { it.id == k }) return Result.Failed(ALREADY_RETURNED)
     val supplier = d.suppliers.find { it.id == supplierId } ?: return Result.Failed("تأمین‌کننده را انتخاب کنید")
     val product = d.products.find { it.id == productId } ?: return Result.Failed("کالا را انتخاب کنید")
     if (quantity.isNaN() || quantity <= 0) return Result.Failed("مقدار معتبر وارد کنید")
@@ -232,8 +270,8 @@ object PurchaseBook {
     val day = date.ifBlank { today }
     if (!ir.vil3ntec.tohid.core.stock.StockCore.isoDateOk(day)) return Result.Failed("تاریخ درست نیست")
     val amount = Math.round(quantity * unitPrice).toDouble()
-    val purchaseId = newId()
-    val entryId = newId()
+    val purchaseId = k ?: newId()
+    val entryId = if (k != null) "$k-w" else newId()
     val user = userId?.trim()?.ifEmpty { null }
     val text = "برگشت به «${supplier.name}» — $why"
     return Result.Ok(
@@ -243,7 +281,7 @@ object PurchaseBook {
           notes = text, isAdjustment = true, purchaseId = purchaseId, createdAt = now, adjKind = "supplier_return", userId = user,
         ),
         stockMovements = d.stockMovements + StockMovement(
-          id = newId(), productId = productId, type = "supplier_return", qty = -quantity, date = day, notes = text,
+          id = if (k != null) "$k-m" else newId(), productId = productId, type = "supplier_return", qty = -quantity, date = day, notes = text,
           refId = entryId, createdAt = now, userId = user, reason = why,
         ),
         purchases = d.purchases + Purchase(
@@ -252,13 +290,18 @@ object PurchaseBook {
           paidAmount = 0.0, debt = -amount, warehouseEntryId = entryId, createdAt = now,
         ),
         auditLog = d.auditLog + AuditEntry(
-          id = newId(), type = "supplier_return", date = day, refId = entryId, createdAt = now,
+          id = if (k != null) "$k-a" else newId(), type = "supplier_return", date = day, refId = entryId, createdAt = now,
           notes = "برگشت ${ir.vil3ntec.tohid.qty(quantity)} ${product.unit} «${product.name}» به «${supplier.name}» — سندِ کسرِ ${ir.vil3ntec.tohid.money(amount)} افغانی — دلیل: $why",
         ),
       ),
       0,
     )
   }
+
+  const val ALREADY_RETURNED = "همین برگشت پیش‌تر ثبت شده است"
+
+  /** سررسید پیش از تاریخِ فاکتور معنی ندارد (PUR-07) */
+  const val DUE_BEFORE_DATE = "سررسید نباید پیش از تاریخِ خرید باشد"
 
   data class LedgerLine(
     val row: Int,

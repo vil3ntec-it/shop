@@ -119,6 +119,8 @@ private fun ColumnScope.PurchaseInvoices(d: ShopData, toast: (String) -> Unit) {
   var menu by remember { mutableStateOf(false) }
   var picked by remember { mutableStateOf<String?>(null) }
   val list = remember(d, supplier) { PurchaseBook.invoices(d, supplier) }
+  //  ماندهٔ واقعیِ هر فاکتور (پرداخت‌های بعدی و سندِ کسر FIFO) — برای رنگِ سررسید
+  val remaining = remember(d) { PurchaseBook.open(d).associate { it.invoice.key to it.remaining } }
   val names = remember(d) { d.suppliers.associate { it.id to it.name } }
   val today = ir.vil3ntec.tohid.todayIso()
   val month = today.take(7)
@@ -177,7 +179,7 @@ private fun ColumnScope.PurchaseInvoices(d: ShopData, toast: (String) -> Unit) {
       ) {
         Text(if (inv.isReturn) "برگشت به تأمین‌کننده (سندِ کسر)" else if (inv.no > 0) "فاکتورِ خرید #${inv.no}" else "خرید", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Shop.colors.text)
         inv.dueDate?.takeIf { !inv.isReturn }?.let { due ->
-          Text("سررسید ${formatDate(due)}", style = MaterialTheme.typography.labelSmall, color = if (due < today && inv.debt > 0.5) Shop.colors.danger else Shop.colors.muted)
+          Text("سررسید ${formatDate(due)}", style = MaterialTheme.typography.labelSmall, color = if (due < today && (remaining[inv.key] ?: 0.0) > 0.5) Shop.colors.danger else Shop.colors.muted)
         }
         Text("${names[inv.supplierId] ?: "—"} · ${formatDate(inv.date)}", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
         Spacer(Modifier.height(8.dp))
@@ -517,7 +519,7 @@ private fun ColumnScope.Suppliers(store: ShopStore, d: ShopData, toast: (String)
   var paying by remember(openId) { mutableStateOf(false) }
   var returning by remember(openId) { mutableStateOf(false) }
   var amount by remember(openId) { mutableStateOf("") }
-  val stockOn = ir.vil3ntec.tohid.data.StockLedger.isOn(d)
+  val stockOn = remember(d.auditLog) { ir.vil3ntec.tohid.data.StockLedger.isOn(d) }
   val ledger = remember(d, openId) { PurchaseBook.ledger(d, open.supplier.id) }
   fun sheet() = PurchaseBook.ledgerSheet(d, open.supplier, today)
   Column(
@@ -552,14 +554,14 @@ private fun ColumnScope.Suppliers(store: ShopStore, d: ShopData, toast: (String)
       DeskKpi("جمعِ خرید", "${money(open.bought)} ؋", Shop.colors.primary, Modifier.weight(1f))
       DeskKpi("فاکتورها", "${open.invoices}", Shop.colors.text, Modifier.weight(1f))
       DeskKpi("آخرین خرید", open.lastPurchase?.let { formatDate(it) } ?: "—", Shop.colors.text, Modifier.weight(1f))
-      if (open.overdue > 0.5) DeskKpi("سررسیدگذشته", "${money(open.overdue)} ؋", Shop.colors.danger, Modifier.weight(1f))
+      if (stockOn && open.overdue > 0.5) DeskKpi("سررسیدگذشته", "${money(open.overdue)} ؋", Shop.colors.danger, Modifier.weight(1f))
       if (open.returned > 0.5) DeskKpi("سندِ کسر (برگشت)", "${money(open.returned)} ؋", Shop.colors.success, Modifier.weight(1f))
     }
     if (returning) {
-      SupplierReturnDialog(d, open.supplier.id, onDismiss = { returning = false }) { productId, q, price, reason, date ->
+      SupplierReturnDialog(d, open.supplier.id, onDismiss = { returning = false }) { productId, q, price, reason, date, key ->
         when (val r = PurchaseBook.supplierReturn(
           d, open.supplier.id, productId, q, price, reason, date, today, System.currentTimeMillis(), ::newId,
-          userId = runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrNull(),
+          userId = runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrNull(), key = key,
         )) {
           is PurchaseBook.Result.Failed -> toast(r.message)
           is PurchaseBook.Result.Ok -> { scope.launch { store.save(r.data) }; returning = false; toast("برگشت و سندِ کسر ثبت شد") }

@@ -55,7 +55,7 @@ fun PurchasingScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState)
   var payFor by remember { mutableStateOf<String?>(null) }
   //  برگشت به تأمین‌کننده با سندِ کسر (PUR-08) — فقط وقتی موتورِ تازهٔ موجودی و بها روشن است
   var returnFor by remember { mutableStateOf<String?>(null) }
-  val stockOn = ir.vil3ntec.tohid.data.StockLedger.isOn(d)
+  val stockOn = remember(d.auditLog) { ir.vil3ntec.tohid.data.StockLedger.isOn(d) }
   val context = androidx.compose.ui.platform.LocalContext.current
   var confirmDelete by remember { mutableStateOf<Supplier?>(null) }
 
@@ -148,10 +148,10 @@ fun PurchasingScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState)
   }
 
   returnFor?.let { supplierId ->
-    SupplierReturnDialog(d, supplierId, onDismiss = { returnFor = null }) { productId, q, price, reason, date ->
+    SupplierReturnDialog(d, supplierId, onDismiss = { returnFor = null }) { productId, q, price, reason, date, key ->
       when (val r = ir.vil3ntec.tohid.data.PurchaseBook.supplierReturn(
         d, supplierId, productId, q, price, reason, date, todayIso(), System.currentTimeMillis(), ::newId,
-        userId = runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrNull(),
+        userId = runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrNull(), key = key,
       )) {
         is ir.vil3ntec.tohid.data.PurchaseBook.Result.Failed -> toast(r.message)
         is ir.vil3ntec.tohid.data.PurchaseBook.Result.Ok -> { scope.launch { store.save(r.data) }; toast("برگشت و سندِ کسر ثبت شد"); returnFor = null }

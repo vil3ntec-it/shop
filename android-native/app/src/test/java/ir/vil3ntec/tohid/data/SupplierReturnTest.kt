@@ -103,7 +103,7 @@ class SupplierReturnTest {
     val over = PurchaseBook.overdue(soon, today)
     assertEquals(1, over.size)
     assertEquals("2026-10-10", over.single().dueDate)
-    assertEquals(200.0, over.single().debt, 0.0)
+    assertEquals(200.0, over.single().remaining, 0.0)
     assertEquals(listOf("2026-10-20"), PurchaseBook.dueSoon(soon, today).map { it.dueDate })
     val s1 = PurchaseBook.suppliers(soon, today).first { it.supplier.id == "s1" }
     assertEquals(200.0, s1.overdue, 0.0)
@@ -112,5 +112,68 @@ class SupplierReturnTest {
     val paid = (PurchaseBook.record(d0, "s1", listOf(PurchaseBook.Line("p1", 2.0, 100.0)), 200.0, "2026-09-01", "", today, now + 2, ::newId,
       dueDate = "2026-10-10") as PurchaseBook.Result.Ok).data
     assertTrue(PurchaseBook.overdue(paid, today).isEmpty())
+
+    //  سررسیدِ پیش از تاریخِ فاکتور رد می‌شود — فاکتورِ چندردیفه و خریدِ تکی
+    assertEquals(
+      PurchaseBook.Result.Failed(PurchaseBook.DUE_BEFORE_DATE),
+      PurchaseBook.record(d0, "s1", listOf(PurchaseBook.Line("p1", 1.0, 100.0)), 0.0, "2026-10-12", "", today, now, ::newId, dueDate = "2026-10-11"),
+    )
+    assertEquals(
+      LedgerEngine.Result.Failed(PurchaseBook.DUE_BEFORE_DATE),
+      LedgerEngine.addPurchase(d0, LedgerEngine.PurchaseDraft(supplierId = "s1", productId = "p1", quantity = 1.0, purchasePrice = 1.0,
+        date = "2026-10-12", dueDate = "2026-10-01"), today, now, ::newId),
+    )
+    //  همان روز درست است
+    assertTrue(PurchaseBook.record(d0, "s1", listOf(PurchaseBook.Line("p1", 1.0, 100.0)), 0.0, "2026-10-12", "", today, now, ::newId,
+      dueDate = "2026-10-12") is PurchaseBook.Result.Ok)
+  }
+
+  @Test
+  fun laterPaymentsAndCreditNotesClearRemindersOldestFirst() {
+    //  فاکتورِ الف (۲۰۰، سررسید ۱۰/۰۵) قدیمی‌تر از فاکتورِ ب (۸۰۰، سررسید ۱۰/۱۰)؛ هر دو گذشته
+    var d = shop().let { s -> s.copy(purchases = s.purchases.map { it.copy(dueDate = "2026-10-10") }) }
+    d = (PurchaseBook.record(d, "s1", listOf(PurchaseBook.Line("p1", 2.0, 100.0)), 0.0, "2026-09-01", "", today, now + 2, ::newId,
+      dueDate = "2026-10-05") as PurchaseBook.Result.Ok).data
+    assertEquals(listOf(200.0, 800.0), PurchaseBook.overdue(d, today).map { it.remaining })
+    assertEquals(1000.0, PurchaseBook.suppliers(d, today).first { it.supplier.id == "s1" }.overdue, 0.0)
+
+    //  پرداختِ بعدیِ ۳۰۰ ⇒ اول الف (۲۰۰) کامل، ۱۰۰ از ب
+    d = (LedgerEngine.paySupplier(d, "s1", 300.0, today, "پرداخت", today, now + 3, ::newId) as LedgerEngine.Result.Ok).data
+    val after = PurchaseBook.overdue(d, today)
+    assertEquals(listOf("2026-10-10"), after.map { it.dueDate })
+    assertEquals(700.0, after.single().remaining, 0.0)
+    assertEquals(700.0, ShopStore.supplierDebt(d, "s1"), 0.0)
+
+    //  سندِ کسرِ ۳۰۰ (برگشت) هم همان‌طور روی ب
+    d = (PurchaseBook.supplierReturn(d, "s1", "p1", 3.0, 100.0, "خراب", "", today, now + 4, ::newId) as PurchaseBook.Result.Ok).data
+    assertEquals(400.0, PurchaseBook.overdue(d, today).single().remaining, 0.0)
+    val sum = PurchaseBook.suppliers(d, today).first { it.supplier.id == "s1" }
+    assertEquals(400.0, sum.overdue, 0.0)
+    assertEquals(sum.balance, PurchaseBook.open(d, "s1").sumOf { it.remaining }, 0.0)
+
+    //  تسویه ⇒ یادآور پاک می‌شود
+    d = (LedgerEngine.paySupplier(d, "s1", 400.0, today, "پرداخت", today, now + 5, ::newId) as LedgerEngine.Result.Ok).data
+    assertTrue(PurchaseBook.overdue(d, today).isEmpty())
+    assertTrue(PurchaseBook.dueSoon(d, "2026-10-01").isEmpty())
+    //  تأمین‌کنندهٔ دیگر دست نمی‌خورد
+    d = (LedgerEngine.addPurchase(d, LedgerEngine.PurchaseDraft(supplierId = "s2", productId = "p1", quantity = 1.0, purchasePrice = 50.0,
+      date = "2026-09-01", dueDate = "2026-10-01"), today, now + 6, ::newId) as LedgerEngine.Result.Ok).data
+    assertEquals(listOf("s2" to 50.0), PurchaseBook.overdue(d, today).map { it.supplierId to it.remaining })
+  }
+
+  @Test
+  fun returnKeyMakesDoubleClickOneDocument() {
+    val d = shop()
+    fun ret(from: ShopData, at: Long) =
+      PurchaseBook.supplierReturn(from, "s1", "p1", 1.0, 100.0, "خراب", "", today, at, ::newId, key = "K1")
+    val a = ret(d, now + 1) as PurchaseBook.Result.Ok
+    //  کلیکِ دوم روی همان دفترِ کهنه ⇒ همان شناسه‌ها، پس ذخیرهٔ دوم سندِ دومی نمی‌سازد
+    val b = ret(d, now + 2) as PurchaseBook.Result.Ok
+    fun ids(x: ShopData) = listOf(x.purchases.last().id, x.warehouseEntries.last().id, x.stockMovements.last().id, x.auditLog.last().id)
+    assertEquals(ids(a.data), ids(b.data))
+    assertEquals("K1", a.data.purchases.last().id)
+    //  دفترِ تازه که همان سند را دارد ⇒ رد
+    assertEquals(PurchaseBook.Result.Failed(PurchaseBook.ALREADY_RETURNED), ret(a.data, now + 3))
+    assertEquals(9.0, ShopStore.stock(a.data, "p1"), 0.0)
   }
 }
