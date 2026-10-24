@@ -47,6 +47,7 @@ import ir.vil3ntec.tohid.ui.components.pos.OrderActions
 import ir.vil3ntec.tohid.ui.components.pos.OrderLineView
 import ir.vil3ntec.tohid.ui.components.pos.OrderLines
 import ir.vil3ntec.tohid.ui.components.pos.OrderPanel
+import ir.vil3ntec.tohid.ui.components.pos.PayPanelDialog
 import ir.vil3ntec.tohid.ui.components.pos.PaymentMethodGrid
 import ir.vil3ntec.tohid.ui.components.pos.PaymentSummary
 import ir.vil3ntec.tohid.ui.components.pos.PosAction
@@ -107,6 +108,9 @@ fun DeskSaleScreen(
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
   val cart by cartStore.lines.collectAsState()
+  //  HW-10: نمایشگرِ مشتری (پنجرهٔ دوم) — فقط وقتی باز است کاری می‌کند
+  val customerOpen by ir.vil3ntec.tohid.hw.CustomerFacing.open
+  LaunchedEffect(cart, d, customerOpen) { ir.vil3ntec.tohid.hw.CustomerFacing.showCart(d, cart) }
   val cartDebtorId by cartStore.debtorId.collectAsState()
   LaunchedEffect(d.products.size, d.debtors.size) { cartStore.prune(d) }
   //  PRM: تخفیف‌های خودکار — کلیدِ دکان خاموش ⇒ null و `priced` همان `cart` است
@@ -137,6 +141,9 @@ fun DeskSaleScreen(
 
   val canDiscount = remember { ir.vil3ntec.tohid.data.ShopRole.canDiscount(context) }
   val blockExpired = remember { ir.vil3ntec.tohid.data.ShopPolicy.blockExpired(context) }
+  //  PAY (v3 A4): پرداختِ ترکیبی — فقط با پرچم؛ F9 پنلِ پرداخت را باز می‌کند، F12 نقدِ دقیق
+  val payV2 = remember { ir.vil3ntec.tohid.data.ShopPolicy.payV2(context) }
+  var payOpen by remember { mutableStateOf(false) }
   val seller = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrDefault("") }
   var payment by remember { mutableStateOf(SalesEngine.Payment.CASH) }
   var discountText by remember { mutableStateOf("") }
@@ -148,6 +155,15 @@ fun DeskSaleScreen(
   fun refocus() { runCatching { searchFocus.requestFocus() } }
 
   fun toast(text: String) { scope.launch { snackbar.showSnackbar(text) } }
+
+  //  HW-02/03: چاپِ خودکار یا کشوی پس از فروش که نشد همین‌جا، سرِ صندوق، گفته می‌شود
+  val printNotice by ir.vil3ntec.tohid.print.PrintSpooler.tillNotice
+  LaunchedEffect(printNotice) {
+    printNotice?.let { n ->
+      ir.vil3ntec.tohid.print.PrintSpooler.consumed(n)
+      snackbar.showSnackbar(n.text, duration = SnackbarDuration.Long)
+    }
+  }
 
   val index = remember(d.products) { ShopStore.barcodeIndex(d) }
 
@@ -174,8 +190,22 @@ fun DeskSaleScreen(
   fun add(product: Product, count: Double) =
     applyAdded(product, SalesEngine.addToCartCapped(cartStore.lines.value, product.id, count, ShopStore.stock(d, product.id)))
 
+  /**
+   *  POS-29: برچسبِ ترازو (فقط اگر دکان قاعده‌اش را روشن کرده باشد) — وزن
+   *  به سبد؛ رقمِ کنترلِ غلط رد. `false` ⇒ برچسبِ ترازو نیست، راهِ همیشگی.
+   */
+  fun scaleLabel(code: String, dd: ShopData): Boolean =
+    when (val m = ir.vil3ntec.tohid.data.ScaleLabels.match(
+      ir.vil3ntec.tohid.data.ScaleLabels.rules(context), code, ShopStore.barcodeIndex(dd), dd.products,
+    )) {
+      null -> false
+      is ir.vil3ntec.tohid.data.ScaleLabels.Match.Rejected -> { ScanFeedback.unknown(context); toast(m.message); true }
+      is ir.vil3ntec.tohid.data.ScaleLabels.Match.Weighed -> { add(m.product, m.quantity); true }
+    }
+
   /** Enter در کادر: بارکدِ کامل ⇐ همان؛ وگرنه پیشنهادِ برجسته (`PosSearch`) */
   fun submit() {
+    if (scaleLabel(query, d)) { query = ""; return }
     when (val hit = PosSearch.resolve(query, index, d.products, matches, hint)) {
       PosHit.None -> Unit
       is PosHit.Inactive -> toast("«${hit.product.name}» غیرفعال است")
@@ -198,6 +228,7 @@ fun DeskSaleScreen(
   val latestD by rememberUpdatedState(d)
   fun fromScanner(code: String): Boolean {
     val dd = latestD
+    if (scaleLabel(code, dd)) return true
     when (val hit = BarcodeMatch.find(code, ShopStore.barcodeIndex(dd))) {
       is BarcodeMatch.Hit.Product -> dd.products.firstOrNull { it.id == hit.id }?.let {
         if (!it.active) toast("«${it.name}» غیرفعال است") else add(it, 1.0)
@@ -233,22 +264,35 @@ fun DeskSaleScreen(
   val discountBad = canDiscount && numberInvalid(discountText)
   val paidBad = payment == SalesEngine.Payment.CREDIT && numberInvalid(paidText)
 
-  fun finish() {
+  /** `settled` = تسویهٔ پنلِ پرداخت (با پرچم)؛ با پرچم و بی آن (F12، Ctrl+Enter) ⇒ نقدِ دقیق */
+  fun finish(settled: ir.vil3ntec.tohid.core.pay.Settlement? = null) {
     if (cart.isEmpty()) { toast("سبد خالی است"); return }
-    if (discountBad || paidBad) { toast("عددِ «${if (discountBad) "تخفیف" else "دریافتی"}» درست نیست"); return }
-    if (payment == SalesEngine.Payment.CREDIT && cartDebtorId == null) { toast("فروشِ نسیه مشتری می‌خواهد — F2"); pickDebtor = true; return }
+    if (discountBad || (!payV2 && paidBad)) { toast("عددِ «${if (discountBad) "تخفیف" else "دریافتی"}» درست نیست"); return }
+    if (!payV2 && payment == SalesEngine.Payment.CREDIT && cartDebtorId == null) { toast("فروشِ نسیه مشتری می‌خواهد — F2"); pickDebtor = true; return }
+    val st = if (!payV2) null else settled ?: when (
+      val r = ir.vil3ntec.tohid.data.PayFlow.checkout(
+        ir.vil3ntec.tohid.data.PayFlow.Draft(totals.finalTotal, cash = totals.finalTotal.toBigDecimal().stripTrailingZeros().toPlainString(), customerId = cartDebtorId),
+      )
+    ) {
+      is ir.vil3ntec.tohid.data.PayFlow.Outcome.Ok -> r.value
+      is ir.vil3ntec.tohid.data.PayFlow.Outcome.Bad -> { toast(ir.vil3ntec.tohid.data.PayFlow.message(r.problem)); return }
+    }
+    val sale = checkout.copy(settlement = st)
     //  POS-14: F9ِ پشتِ‌سرِهم یک فروش می‌سازد؛ سبد فقط پس از نوشتنِ دفتر پاک می‌شود
     scope.launch { when (val posted = cartStore.post(store) { key ->
-      SalesEngine.record(d, priced, checkout, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId,
+      SalesEngine.record(d, priced, sale, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId,
       series = ir.vil3ntec.tohid.sync.DocSeries.current(context), saleId = key) }) {
       SalePost.Outcome.Busy -> Unit
       SalePost.Outcome.NotSaved -> toast(SalePost.NOT_SAVED)
       is SalePost.Outcome.Refused -> toast(posted.message)
       is SalePost.Outcome.Done -> {
         val r = posted.ok
+        ir.vil3ntec.tohid.hw.CustomerFacing.sold(r.data.sales.last().finalTotal)
         selected = null; discountText = ""; paidText = ""; payment = SalesEngine.Payment.CASH
+        payOpen = false
         lastInvoice = r.data to r.saleId
-        toast("فروش ${money(r.data.sales.last().finalTotal)} ؋ ثبت شد — F8 چاپ")
+        val change = st?.change ?: 0L
+        toast("فروش ${money(r.data.sales.last().finalTotal)} ؋ ثبت شد" + (if (change > 0) " — پولِ پس: ${money(ir.vil3ntec.tohid.data.PayFlow.major(change))} ؋" else "") + " — F8 چاپ")
         refocus()
       }
     } }
@@ -438,14 +482,22 @@ fun DeskSaleScreen(
         }
       },
       methods = {
-        PaymentMethodGrid(PosPayments.configured(), payment, target) { m ->
-          if (m.payment != payment) {
-            payment = m.payment
-            if (m.needsCustomer && cartDebtorId == null) pickDebtor = true
+        if (payV2) {
+          //  PAY (v3 A4): روش‌ها در پنلِ پرداخت‌اند — نقد، کیف پول، کارت، حواله و به حساب
+          Text(
+            "پرداختِ ترکیبی: F9 پنلِ پرداخت (نقد، کیف پول، کارت، حواله، به حسابِ مشتری) — F12 نقدِ دقیق",
+            style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted,
+          )
+        } else {
+          PaymentMethodGrid(PosPayments.configured(), payment, target) { m ->
+            if (m.payment != payment) {
+              payment = m.payment
+              if (m.needsCustomer && cartDebtorId == null) pickDebtor = true
+            }
           }
-        }
-        if (payment == SalesEngine.Payment.CREDIT) {
-          MiniNumberField("دریافتیِ همین حالا", paidText, { paidText = numericInput(it) }, paidBad, "؋")
+          if (payment == SalesEngine.Payment.CREDIT) {
+            MiniNumberField("دریافتیِ همین حالا", paidText, { paidText = numericInput(it) }, paidBad, "؋")
+          }
         }
       },
       actions = {
@@ -455,7 +507,7 @@ fun DeskSaleScreen(
           canPost = cart.isNotEmpty(),
           posting = posting,
           canPrint = lastInvoice != null,
-          onPost = { finish() },
+          onPost = { if (payV2) payOpen = true else finish() },
           onPrint = { if (lastInvoice != null) showInvoice = true },
         )
       },
@@ -468,7 +520,7 @@ fun DeskSaleScreen(
       .onPreviewKeyEvent { e ->
         if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
         when (PosKeys.screen(keyName(e.key), e.isPrimaryModifier)) {
-          PosAction.FINISH -> { finish(); true }
+          PosAction.FINISH -> { if (payV2 && keyName(e.key) == KeyName.F9) { if (cart.isNotEmpty()) payOpen = true } else finish(); true }
           PosAction.CUSTOMER -> { pickDebtor = true; true }
           PosAction.EDIT_ROW -> { selected?.let { editLine = it }; true }
           PosAction.FREE_ITEM -> { freeLine = true; true }
@@ -550,6 +602,17 @@ fun DeskSaleScreen(
         },
       )
     }
+  }
+  if (payOpen) {
+    PayPanelDialog(
+      total = totals.finalTotal,
+      customerId = cartDebtorId,
+      customerName = debtor?.name,
+      busy = posting,
+      target = target,
+      onDismiss = { payOpen = false; refocus() },
+      onConfirm = { st -> finish(st) },
+    )
   }
   if (showInvoice) lastInvoice?.let { (snap, id) ->
     snap.sales.find { it.id == id }?.let { sale ->

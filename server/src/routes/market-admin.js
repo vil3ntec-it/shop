@@ -5,7 +5,7 @@
  *
  * همان قفل‌های تنظیمِ ویترین (`routes/storefront-admin.js`): کاربرِ دکان،
  * `settings.write` برای نوشتن، پرچمِ ویترین (۴۰۳ `storefront_disabled`) و
- * اشتراکِ نوشتن. خواندن با `data.read`.
+ * اشتراکِ نوشتن. خواندن با `data.read`. `showDeals` (قیمتِ دفتر در بازارچه) فقط صاحبِ دکان.
  */
 const express = require('express');
 const market = require('../lib/market');
@@ -36,12 +36,13 @@ router.get('/', requirePermission('data.read'), needFlag, wrap(async (req, res) 
 }));
 
 router.put('/', requirePermission('settings.write'), needFlag, needWrite, wrap(async (req, res) => {
-  const listing = await market.saveListing(req.shopId, req.body, req.user.id);
+  //  «ارزان‌تر از قیمتِ دکان» قیمتِ فروشِ دفتر را منتشر می‌کند ⇒ فقط صاحبِ دکان (مثلِ «زیرِ بهای خرید»)
+  const listing = await market.saveListing(req.shopId, req.body, req.user.id, { owner: req.role === 'owner' });
   await audit.log({
     shopId: req.shopId, userId: req.user.id, action: 'market.listing',
     targetType: 'storefront', targetId: req.shopId,
     //  موقعیت در سابقه نمی‌نشیند؛ فقط «دارد/ندارد»
-    detail: { listed: listing.listed, category: listing.category, hasLocation: listing.location !== null },
+    detail: { listed: listing.listed, category: listing.category, hasLocation: listing.location !== null, showDeals: listing.showDeals },
     ip: clientIp(req),
   });
   res.json({ listing });
