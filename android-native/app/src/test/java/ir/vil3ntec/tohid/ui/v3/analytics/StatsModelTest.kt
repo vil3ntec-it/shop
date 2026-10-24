@@ -13,7 +13,7 @@ class StatsModelTest {
   private val today = "2026-10-26"
 
   private fun sale(id: String, date: String, total: Double, hour: Int, status: String = "completed") =
-    Sale(id, date = date, total = total, finalTotal = total, status = status, createdAt = hour * 1000L)
+    Sale(id, date = date, total = total, finalTotal = total, status = status, createdAt = hour * 1000L + 1)
 
   @Test
   fun `ستون‌های روز هفت روزِ تا امروزند و جاری آخر`() {
