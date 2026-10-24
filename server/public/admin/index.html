@@ -1165,7 +1165,18 @@
   </section>
 
   <section id="tab-ops" class="hidden">
-    <!-- ماژولِ ops.js — سرویس‌های بیرونی (OPS-04@29) -->
+    <!-- ماژولِ ops.js — نسخهٔ دستگاه‌ها (OPS-04) و سرویس‌های بیرونی (OPS-04@29) -->
+    <div class="panel">
+      <h2>نسخهٔ دستگاه‌ها</h2>
+      <div class="row"><span class="muted" id="ops-ver-checked"></span></div>
+      <div id="ops-ver-msg"></div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>برنامه</th><th>نسخه</th><th>دستگاه</th><th>آخرین دیده‌شدن</th><th>وضعیت</th></tr></thead>
+          <tbody id="ops-versions"></tbody>
+        </table>
+      </div>
+    </div>
     <div class="panel">
       <h2>سرویس‌های بیرونی</h2>
       <div class="row"><span class="muted" id="ops-prov-checked"></span></div>
