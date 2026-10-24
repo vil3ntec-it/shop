@@ -11,6 +11,7 @@ const config = require('../config');
 const v = require('../lib/validate');
 const shops = require('../lib/shops');
 const staffCodes = require('../lib/staff-codes');
+const receiptProfile = require('../lib/receipt-profile');
 const audit = require('../lib/audit');
 const { requireRecentAuth, assertFresh } = require('../lib/reauth');
 
@@ -267,11 +268,19 @@ router.get('/settings', requireShop, async (req, res) => {
 
 router.put('/settings', requireShop, requirePermission('settings.write'), async (req, res) => {
   const data = v.payload(req.body?.settings, { max: 128 * 1024, field: 'تنظیمات' });
+  //  کلیدِ `receipt` (سربرگ و لوگوی فاکتور) فقط از `/api/shop/receipt-profile` نوشته
+  //  می‌شود: این جایگزینیِ کلِ سند نه آن را می‌نویسد نه پاکش می‌کند.
+  const rest = { ...data };
+  delete rest[receiptProfile.KEY];
   const row = await one(
     `INSERT INTO shop_settings (shop_id, data, rev, updated_at) VALUES ($1,$2::jsonb,1,$3)
-     ON CONFLICT (shop_id) DO UPDATE SET data=excluded.data, rev=shop_settings.rev+1, updated_at=excluded.updated_at
+     ON CONFLICT (shop_id) DO UPDATE SET
+       data = CASE WHEN shop_settings.data ? '${receiptProfile.KEY}'
+                   THEN excluded.data || jsonb_build_object('${receiptProfile.KEY}', shop_settings.data->'${receiptProfile.KEY}')
+                   ELSE excluded.data END,
+       rev=shop_settings.rev+1, updated_at=excluded.updated_at
      RETURNING data, rev`,
-    [req.shopId, JSON.stringify(data), now()]
+    [req.shopId, JSON.stringify(rest), now()]
   );
   res.json({ settings: row.data, rev: Number(row.rev) });
 });
