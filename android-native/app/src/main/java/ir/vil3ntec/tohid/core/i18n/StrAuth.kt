@@ -1,7 +1,8 @@
 package ir.vil3ntec.tohid.core.i18n
 
 /**
- *  ورود و ساختِ حساب، کدِ شاگرد و پیوستن به دکان (Welcome، CodeLogin، ShopSetup).
+ *  ورود و ساختِ حساب، کدِ شاگرد و پیوستن به دکان، قفلِ برنامه و تأییدِ دوبارهٔ هویت — گروهِ G1
+ *  (`ui/v3/onboarding`).
  *
  *  ساخته‌شده از جدولِ سه‌زبانه؛ دستی هم ویرایش‌پذیر است. قاعده‌ها سرِ `I18n.kt`.
  *  ترجمه‌های نامطمئن در `docs/i18n-glossary.md` برای بازبینیِ گویشور.
@@ -33,7 +34,6 @@ object StrAuth {
   val signInToAccount: String get() = t("ورود به حساب", "Sign in", "حساب ته ننوځئ")
   val enterPassword: String get() = t("رمز عبور را وارد کنید", "Enter your password", "پټنوم ولیکئ")
   val passwordMin8: String get() = t("رمز باید حداقل ۸ نویسه باشد", "The password must be at least 8 characters", "پټنوم باید لږ تر لږه ۸ توري وي")
-  fun testCode(c: Any): String = t("کد آزمایشی: $c", "Test code: $c", "ازمایښتي کوډ: $c")
   val noVerifyServer: String get() = t("سرورِ این دکان هنوز کدِ تأیید نمی‌فرستد؛ تا وقتی به‌روز نشود، ثبت‌نام از برنامه ممکن نیست.", "This shop's server doesn't send verification codes yet; until it's updated, you can't register from the app.", "د دې دوکان سرور لا د تایید کوډ نه لېږي؛ تر څو چې تازه نه شي، له اپ څخه نوم لیکنه نه کېږي.")
   val signInWithCode: String get() = t("ورود با کد به‌جای رمز", "Sign in with a code instead", "د پټنوم پر ځای په کوډ ننوځئ")
   val previousCodeValid: String get() = t("کد قبلی هنوز معتبر است", "The previous code is still valid", "پخوانی کوډ لا هم د اعتبار وړ دی")
@@ -104,7 +104,6 @@ object StrAuth {
   val setupShop: String get() = t("دکانت را بسازیم", "Let's set up your shop", "راځئ ستاسو دوکان جوړ کړو")
   val setupNote: String get() = td("تا وقتی دکانی ثبت نشده، اطلاعات روی سرور ذخیره نمی‌شود و روی گوشی دوم هم دیده نمی‌شود.", "Until a shop is registered, data isn't saved on the server and won't show on a second phone.", "تر څو چې دوکان ثبت شوی نه وي، معلومات په سرور کې نه خوندي کېږي او په دوهم موبایل کې هم نه ښکاري.", "Until a shop is registered, data isn't saved on the server and won't show on a second device.", "تر څو چې دوکان ثبت شوی نه وي، معلومات په سرور کې نه خوندي کېږي او په دوهمه وسیله کې هم نه ښکاري.")
   val areYouOwner: String get() = t("صاحب دکان هستید؟", "Are you the shop owner?", "ایا د دوکان مالک یاست؟")
-  val shopNameHint: String get() = t("نام دکان — مثلاً «فروشگاه نور»", "Shop name — e.g. “Noor Store”", "د دوکان نوم — لکه «نور پلورنځی»")
   val shopName: String get() = t("نام دکان", "Shop name", "د دوکان نوم")
   val shopNotCreated: String get() = t("دکان ساخته نشد", "The shop couldn't be created", "دوکان جوړ نه شو")
   val createMyShop: String get() = t("دکان من را بساز", "Create my shop", "زما دوکان جوړ کړه")
@@ -112,4 +111,53 @@ object StrAuth {
   val joinFailed: String get() = t("پیوستن به دکان انجام نشد", "Couldn't join the shop", "له دوکان سره یوځای نه شوئ")
   val joinShop: String get() = t("پیوستن به دکان", "Join the shop", "له دوکان سره یوځای شئ")
   val laterThisDevice: String get() = td("بعداً — فعلاً روی همین گوشی کار می‌کنم", "Later — I'll work on this phone for now", "وروسته — اوس په همدې موبایل کار کوم", "Later — I'll work on this computer for now", "وروسته — اوس په همدې کمپیوټر کار کوم")
+
+  // دروازهٔ ورود (نسخهٔ ۳)
+  fun stepOf(n: Any, total: Any): String = t("$n از $total", "$n of $total", "$n له $total")
+  val codeCells: String get() = t("کدِ شش‌رقمی", "6-digit code", "شپږ عددي کوډ")
+  val forgotTitle: String get() = t("بازیابیِ رمز", "Reset password", "د پټنوم بیا جوړول")
+  val forgotSub: String get() = t("ایمیلِ حساب را بنویسید؛ کدِ شش‌رقمی به همان می‌رود.", "Enter your account email and we'll send a 6-digit code to it.", "د حساب ایمیل ولیکئ؛ شپږ عددي کوډ به همغه ته ولېږل شي.")
+  val courierJoin: String get() = t("پیک هستید؟ صفحهٔ ورودِ پیک", "Are you a courier? Courier sign-in", "رسوونکی یاست؟ د رسوونکي ننوتل")
+  val ownerCodeHint: String get() = t("کدی که صاحب دکان داده", "the code from the shop owner", "هغه کوډ چې د دوکان مالک درکړی")
+  val termsShort: String get() = t("شرایط و ضوابط", "Terms and conditions", "شرایط او مقررات")
+
+  // وصل کردنِ گوگل
+  val googleLinkTitle: String get() = t("وصل کردنِ گوگل به حسابِ موجود", "Link Google to your existing account", "ګوګل له موجود حساب سره ونښلوئ")
+  val googleLinkBody: String get() = t("این ایمیل از قبل حساب دارد. برای وصل کردنِ گوگل، رمزِ همان حساب یا کدی را که به ایمیل می‌فرستیم وارد کنید.", "This email already has an account. To link Google, enter that account's password or the code we email you.", "دا ایمیل دمخه حساب لري. د ګوګل نښلولو لپاره د همغه حساب پټنوم یا هغه کوډ ولیکئ چې ایمیل ته یې لېږو.")
+  val emailCode: String get() = t("کدِ ایمیل", "Email code", "د ایمیل کوډ")
+  val thisAccountPassword: String get() = t("رمزِ همین حساب", "This account's password", "د همدې حساب پټنوم")
+  val sendLinkCode: String get() = t("رمز را نمی‌دانم — کد به ایمیل بفرست", "I don't know the password — email me a code", "پټنوم نه پېژنم — ایمیل ته کوډ ولېږئ")
+  val linkCodeSent: String get() = t("کد به همین ایمیل رفت.", "The code went to this email.", "کوډ همدې ایمیل ته ولاړ.")
+  val linkAndSignIn: String get() = t("وصل و ورود", "Link and sign in", "ونښلوئ او ننوځئ")
+  val dontLink: String get() = t("وصل نکن", "Don't link", "مه یې نښلوئ")
+  val codeNotSent: String get() = t("کد فرستاده نشد", "The code wasn't sent", "کوډ ونه لېږل شو")
+  val linkFailed: String get() = t("وصل نشد", "Couldn't link", "ونه نښلېده")
+
+  // ساختِ دکان (نسخهٔ ۳)
+  val ownerChoiceSub: String get() = t("نامِ دکان را بنویسید؛ صاحبش شما می‌شوید", "Name your shop; you'll be its owner", "د دوکان نوم ولیکئ؛ تاسې به یې مالک شئ")
+  val staffChoiceSub: String get() = t("با کدی که صاحبِ دکان داده به همان دکان بپیوندید", "Join with the code the shop owner gave you", "په هغه کوډ یوځای شئ چې د دوکان مالک درکړی")
+  val shopNameExample: String get() = t("مثلاً «فروشگاه نور»", "e.g. “Noor Store”", "لکه «نور پلورنځی»")
+
+  // قفلِ برنامه
+  val lockTitle: String get() = t("رمز برنامه", "App PIN", "د اپ پټنوم")
+  val lockSub: String get() = t("برای باز شدن دکان، رمز را بزنید", "Enter your PIN to open the shop", "د دوکان د خلاصولو لپاره پټنوم ولیکئ")
+  val lockWrong: String get() = t("رمز درست نیست", "Wrong PIN", "پټنوم سم نه دی")
+  val unlockFingerprint: String get() = t("باز کردن با اثر انگشت", "Unlock with fingerprint", "د ګوتې په نښه خلاصول")
+  val lockSetFirst: String get() = t("یک رمز شش رقمی بگذارید", "Set a 6-digit PIN", "شپږ عددي پټنوم کېږدئ")
+  val lockAgain: String get() = t("همان رمز را دوباره بزنید", "Enter the same PIN again", "همغه پټنوم بیا ولیکئ")
+  val lockMismatch: String get() = t("دو بار یکی نبود — از اول", "They didn't match — start again", "دواړه یو شان نه وو — له سره")
+  val lockSetupNote: String get() = td("هر بار که برنامه باز شود همین را می‌خواهد. اطلاعات دکان روی گوشی می‌ماند و این رمز جلوی دستِ دیگران را می‌گیرد.", "The app asks for it every time it opens. Your shop's data stays on the phone and this PIN keeps others out.", "هر ځل چې اپ خلاصېږي همدا غواړي. د دوکان معلومات په موبایل کې پاتې کېږي او دا پټنوم نور لرې ساتي.", "The app asks for it every time it opens. Your shop's data stays on the computer and this PIN keeps others out.", "هر ځل چې اپ خلاصېږي همدا غواړي. د دوکان معلومات په کمپیوټر کې پاتې کېږي او دا پټنوم نور لرې ساتي.")
+  val notNow: String get() = t("فعلاً نه", "Not now", "اوس نه")
+
+  // تأییدِ دوبارهٔ هویت
+  val reauthTitle: String get() = t("تأییدِ دوبارهٔ هویت", "Confirm it's you", "خپل هویت بیا تایید کړئ")
+  val reauthWhy: String get() = t("برای امنیتِ حساب، این کار فقط چند دقیقه پس از ورود ممکن است.", "For your account's security, this is only allowed within a few minutes of signing in.", "د حساب د امنیت لپاره دا کار یوازې له ننوتلو څو دقیقې وروسته کېږي.")
+  val reauthEnterCode: String get() = t("کدی را که برایتان فرستاده شد بزنید.", "Enter the code we sent you.", "هغه کوډ ولیکئ چې درته ولېږل شو.")
+  val reauthEnterPassword: String get() = t("رمزِ حساب را دوباره بزنید.", "Enter your account password again.", "د حساب پټنوم بیا ولیکئ.")
+  val reauthPassword: String get() = t("رمزِ حساب", "Account password", "د حساب پټنوم")
+  val noPasswordSendCode: String get() = t("رمز ندارم — کد بفرست", "I don't have a password — send a code", "پټنوم نه لرم — کوډ ولېږئ")
+  val verifyCode: String get() = t("کدِ تأیید", "Verification code", "د تایید کوډ")
+  val codeSentShort: String get() = t("کد فرستاده شد.", "Code sent.", "کوډ ولېږل شو.")
+  fun codeSentTo(d: Any): String = t("کد به $d فرستاده شد.", "Code sent to $d.", "$d ته کوډ ولېږل شو.")
+  val confirm: String get() = t("تأیید", "Confirm", "تایید")
 }
