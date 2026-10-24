@@ -45,6 +45,8 @@ object StockShots : GroupShots {
     Shot("list-expiring", content = { ListShot(StockDemo.full(), filter = StockFilter.EXPIRING) }),
     Shot("list-nomatch", content = { ListShot(StockDemo.full(), query = "کالای ناموجود") }),
     Shot("list-wide", content = { ListShot(StockDemo.full(), wide = true) }),
+    //  همان مسیر درونِ پوسته (نوارِ پایین، دفترِ نمایشیِ CI) — جای نوار و دکمهٔ شناور (AUDIT-NAV S6)
+    Shot("route-list", route = "stock"),
     Shot("item", content = { ItemShot() }),
     Shot("entry", content = { EntryShot() }),
     Shot("entry-pick", content = { EntryShot(pick = true) }),
