@@ -63,7 +63,7 @@ internal fun RouteScope.DeliveryRoute() {
         onAssign = { o -> nav.open(OnlinePaths.deliveryAssign(o.id)) },
         onAuto = { list -> DeskStore.autoIds.value = list.map { it.id }; nav.open(OnlinePaths.DELIVERY_AUTO) },
         onAct = { m, a -> nav.open(OnlinePaths.missionAction(m.id, a.name)) },
-      ), pad, header)
+      ), pad, header, table = desk)
       DeliveryModel.COURIERS -> CouriersTab(d, cfg, writable, CouriersActions(
         onSettle = { cr -> nav.open(OnlinePaths.courierSheet(cr.id, "settle")) },
         onLedger = { cr -> nav.open(OnlinePaths.courierSheet(cr.id, "ledger")) },

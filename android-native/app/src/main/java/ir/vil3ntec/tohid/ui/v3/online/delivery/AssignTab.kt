@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.v3.online.delivery
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AutoMode
 import androidx.compose.material3.Text
@@ -29,7 +31,9 @@ import ir.vil3ntec.tohid.core.delivery.Mission
 import ir.vil3ntec.tohid.core.i18n.StrOnline
 import ir.vil3ntec.tohid.core.model.OrderDto
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
+import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
 import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
+import ir.vil3ntec.tohid.ui.theme.V3Status
 import ir.vil3ntec.tohid.ui.theme.V3Tone
 import ir.vil3ntec.tohid.ui.v3.V3Button
 import ir.vil3ntec.tohid.ui.v3.V3Card
@@ -50,10 +54,18 @@ class AssignActions(
 /**
  *  برگهٔ «سپردن»: سفارش‌های آمادهٔ بی پیک (نقدِ گرفتنی، «خودکار» و «سپردن…»، و «سپردنِ خودکار (n)»
  *  برای همه با پیکِ دکان) و مأموریت‌های زنده با روش، کرایه، یادداشت‌ها و فقط کارهای مجازِ
- *  `DeskActions` (بی اشتراک ⇐ هیچ کاری).
+ *  `DeskActions` (بی اشتراک ⇐ هیچ کاری). روی کامپیوترِ پهن (`table`) همان دو فهرست جدول با سرستون‌اند.
  */
 @Composable
-internal fun AssignTab(d: DeskData, cfg: DeskConfig, writable: Boolean, actions: AssignActions, pad: PaddingValues, header: @Composable () -> Unit) {
+internal fun AssignTab(
+  d: DeskData,
+  cfg: DeskConfig,
+  writable: Boolean,
+  actions: AssignActions,
+  pad: PaddingValues,
+  header: @Composable () -> Unit,
+  table: Boolean = false,
+) {
   val canAssign = cfg.perms.assign && writable
   val stagger = rememberV3Stagger()
   LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = pad.calculateBottomPadding())) {
@@ -66,18 +78,27 @@ internal fun AssignTab(d: DeskData, cfg: DeskConfig, writable: Boolean, actions:
       }
     }
     if (d.toAssign.isEmpty()) item(key = "ready-empty") { Note(StrOnline.dlNoReady) }
-    else itemsIndexed(d.toAssign, key = { _, o -> "o-" + o.id }) { i, o ->
-      ReadyCard(o, canAssign, actions, Modifier.v3AnimateItem(this).v3Stagger(stagger, "o-" + o.id, i))
+    else {
+      if (table) item(key = "ready-th") { DeskTableHead(READY_COLS) }
+      itemsIndexed(d.toAssign, key = { _, o -> "o-" + o.id }) { i, o ->
+        val m = Modifier.v3AnimateItem(this).v3Stagger(stagger, "o-" + o.id, i)
+        if (table) ReadyRow(o, canAssign, actions, m) else ReadyCard(o, canAssign, actions, m)
+      }
     }
     item(key = "live-head") { SectionHead(StrOnline.dlLiveTitle) {} }
-    missions(d, cfg, writable, actions)
+    missions(d, cfg, writable, actions, table)
   }
 }
 
-private fun LazyListScope.missions(d: DeskData, cfg: DeskConfig, writable: Boolean, actions: AssignActions) {
+private fun LazyListScope.missions(d: DeskData, cfg: DeskConfig, writable: Boolean, actions: AssignActions, table: Boolean) {
   if (d.missions.isEmpty()) item(key = "live-empty") { Note(StrOnline.dlNoLive) }
-  else itemsIndexed(d.missions, key = { _, m -> "m-" + m.id }) { _, m ->
-    MissionCard(m, d, if (writable) DeskActions.of(m, cfg.perms) else emptyList(), { a -> actions.onAct(m, a) }, Modifier.v3AnimateItem(this))
+  else {
+    if (table) item(key = "live-th") { DeskTableHead(MISSION_COLS) }
+    itemsIndexed(d.missions, key = { _, m -> "m-" + m.id }) { _, m ->
+      val acts = if (writable) DeskActions.of(m, cfg.perms) else emptyList()
+      if (table) MissionRow(m, d, acts, { a -> actions.onAct(m, a) }, Modifier.v3AnimateItem(this))
+      else MissionCard(m, d, acts, { a -> actions.onAct(m, a) }, Modifier.v3AnimateItem(this))
+    }
   }
 }
 
@@ -114,6 +135,55 @@ private fun ReadyCard(o: OrderDto, canAssign: Boolean, actions: AssignActions, m
         V3Button(StrOnline.dlAuto, { actions.onAuto(listOf(o)) }, kind = V3ButtonKind.SECONDARY, height = 38.dp)
         Spacer(Modifier.width(8.dp))
         V3Button(StrOnline.dlAssign, { actions.onAssign(o) }, height = 38.dp, haptic = true)
+      }
+    }
+  }
+}
+
+@Composable
+private fun ReadyRow(o: OrderDto, canAssign: Boolean, actions: AssignActions, modifier: Modifier) {
+  val expected = DeliveryModel.expected(o)
+  val landmark = DeliveryModel.landmark(o)
+  DeskTableRow(modifier) {
+    DeskCell(StrOnline.orderNo(o.orderNo), READY_COLS[0], strong = true)
+    DeskCell(o.customer.name, READY_COLS[1])
+    DeskSlot(READY_COLS[2]) { OrderStatusPill(o.status) }
+    DeskCell(landmark.ifEmpty { "—" }, READY_COLS[3], muted = landmark.isEmpty())
+    DeskCell(if (expected > 0) StrOnline.afn(expected) else StrOnline.pay("paid", ""), READY_COLS[4], strong = expected > 0, muted = expected == 0L)
+    DeskSlot(READY_COLS[5], end = true) {
+      if (canAssign) DeskButtons {
+        V3Button(StrOnline.dlAuto, { actions.onAuto(listOf(o)) }, kind = V3ButtonKind.SECONDARY, height = 38.dp)
+        V3Button(StrOnline.dlAssign, { actions.onAssign(o) }, height = 38.dp, haptic = true)
+      }
+    }
+  }
+}
+
+@Composable
+private fun MissionRow(m: Mission, d: DeskData, acts: List<DeskActions.Act>, onAct: (DeskActions.Act) -> Unit, modifier: Modifier) {
+  val c = PhoneV3.colors
+  val notes = DeliveryModel.notes(m)
+  DeskTableRow(modifier) {
+    DeskCell(StrOnline.orderNo(m.orderNo), MISSION_COLS[0], strong = true)
+    DeskCell(m.customerName.ifEmpty { "—" }, MISSION_COLS[1], muted = m.customerName.isEmpty())
+    DeskCell(DeliveryModel.how(m, d), MISSION_COLS[2])
+    DeskSlot(MISSION_COLS[3]) {
+      Column {
+        MissionStatusPill(m.status)
+        if (notes.isNotEmpty()) Text(notes.joinToString(" · "), style = V3Type.caption, color = PhoneV3Roles.status(c, V3Status.WARNING).fg, maxLines = 1, overflow = TextOverflow.Ellipsis)
+      }
+    }
+    DeskCell(if (m.expectedCollectMinor > 0) StrOnline.afn(m.expectedCollectMinor) else "—", MISSION_COLS[4], muted = m.expectedCollectMinor == 0L)
+    DeskCell(if (m.fareMinor > 0) StrOnline.afn(m.fareMinor) else "—", MISSION_COLS[5], muted = m.fareMinor == 0L)
+    DeskSlot(MISSION_COLS[6], end = true) {
+      if (acts.isNotEmpty()) Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        acts.forEach { a ->
+          V3Button(
+            StrOnline.deskAction(a), { onAct(a) },
+            kind = if (DeliveryModel.secondary(a)) V3ButtonKind.SECONDARY else V3ButtonKind.PRIMARY,
+            height = 38.dp, haptic = !DeliveryModel.secondary(a),
+          )
+        }
       }
     }
   }
