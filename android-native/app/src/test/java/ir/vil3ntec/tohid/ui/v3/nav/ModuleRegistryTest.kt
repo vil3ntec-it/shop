@@ -155,7 +155,7 @@ class ModuleRegistryTest {
   }
 
   @Test
-  fun `حالت‌ها: مسیرهای خرید فقط در حالتِ خرید و مسیرهای دکان فقط در دکان`() {
+  fun `حالت‌ها — مسیرهای خرید فقط در حالتِ خرید و مسیرهای دکان فقط در دکان`() {
     val shopper = Access.all(AppMode.SHOPPER)
     assertTrue(table.resolve("shopper/home")!!.allowed(shopper))
     assertFalse(table.resolve("stock")!!.allowed(shopper))
