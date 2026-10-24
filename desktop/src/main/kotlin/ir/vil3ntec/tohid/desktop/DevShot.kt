@@ -23,21 +23,29 @@ object DevShot {
       runCatching {
         val robot = Robot()
         fun win() = Window.getWindows().firstOrNull { it.isShowing }
+        //  فقط خودِ پنجره، نه کلِ نمایشگر — عکسِ ۱۲۸۰×۸۰۰ همان ۱۲۸۰×۸۰۰ است، بی حاشیهٔ سیاه
         fun shot(name: String) {
-          val b = java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment().defaultScreenDevice.defaultConfiguration.bounds
+          val screen = java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment().defaultScreenDevice.defaultConfiguration.bounds
+          val b = win()?.bounds?.intersection(screen)?.takeIf { it.width > 0 && it.height > 0 } ?: screen
           ImageIO.write(robot.createScreenCapture(Rectangle(b.x, b.y, b.width, b.height)), "png", File(dir, "$name.png"))
         }
         val script = System.getProperty("tohid.shot.script")
         if (script.isNullOrBlank()) {
           for (i in 1..count) { Thread.sleep(every); shot("shot-$i") }
         } else {
-          //  فرمان‌ها: wait:ms · click:x,y (روی صفحه) · type:متن · typecmd:فرمانِ پوسته (خروجی‌اش تایپ می‌شود) · key:ENTER|ESCAPE|TAB · shot:نام
+          //  فرمان‌ها: wait:ms · size:w,h (اندازهٔ پنجره) · click:x,y (روی صفحه) · type:متن · typecmd:فرمانِ پوسته (خروجی‌اش تایپ می‌شود) · key:ENTER|ESCAPE|TAB · shot:نام
           Thread.sleep(every)
           repeat(4) { java.awt.EventQueue.invokeAndWait { win()?.setLocation(0, 0) }; Thread.sleep(250) }
           for (cmd in script.split(';').map { it.trim() }.filter { it.isNotEmpty() }) {
             val (op, arg) = cmd.substringBefore(':') to cmd.substringAfter(':', "")
             when (op) {
               "wait" -> Thread.sleep(arg.toLong())
+              //  اندازهٔ پنجره، مثلِ size:1280,800 — برای عکس در چند اندازهٔ واقعیِ مانیتور
+              "size" -> {
+                val (w, h) = arg.split(',').map { it.trim().toInt() }
+                java.awt.EventQueue.invokeAndWait { win()?.setBounds(0, 0, w, h) }
+                Thread.sleep(1200)
+              }
               //  رفتن به یک صفحه با همان مسیرِ میان‌برها (`AppNav`) — بی وابستگی به فوکوسِ صفحه‌کلید
               "go" -> { java.awt.EventQueue.invokeAndWait { ir.vil3ntec.tohid.ui.AppNav.go(arg) }; Thread.sleep(1500) }
               //  Ctrl+کلید، مثلِ ctrl:1
@@ -58,6 +66,8 @@ object DevShot {
               }
               //  «موردِ تازه» در همین صفحه — همان Ctrl+N
               "new" -> { java.awt.EventQueue.invokeAndWait { ir.vil3ntec.tohid.ui.AppNav.addAction.value?.invoke() }; Thread.sleep(1200) }
+              //  تخفیف‌ها: promo:demo — پنج قاعدهٔ نمونه روی دفترِ نمایشی، کلید روشن (`PromoLive.demo`)
+              "promo" -> { java.awt.EventQueue.invokeAndWait { ir.vil3ntec.tohid.ui.PromoLive.demo() }; Thread.sleep(800) }
               "help" -> { java.awt.EventQueue.invokeAndWait { ir.vil3ntec.tohid.ui.AppNav.help.value = arg != "off" }; Thread.sleep(1500) }
               //  محصولات: نما (prodview:card|table) و انتخابِ n ردیفِ اولِ فهرست (prodsel:3 — نوارِ کارِ گروهی)
               "prodview" -> { java.awt.EventQueue.invokeAndWait { ir.vil3ntec.tohid.ui.screens.DeskProductsShot.view.value = arg }; Thread.sleep(1200) }
