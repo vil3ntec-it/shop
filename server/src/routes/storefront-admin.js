@@ -61,12 +61,47 @@ router.put('/', requirePermission('settings.write'), needFlag, needWrite, wrap(a
   res.json({ settings });
 }));
 
-router.post('/presence', requirePermission('settings.write'), needFlag, needWrite, wrap(async (req, res) => {
+//  PRES-10: نامِ دکانِ دیگر در بدنه ⇒ ۴۰۳ (پیش‌تر نادیده گرفته می‌شد و
+//  اعلام روی دکانِ خودِ توکن می‌نشست). خودِ دکان همیشه از عضویت است.
+const SHOP_KEYS = ['shopId', 'shop_id', 'storeId', 'store_id'];
+const claimedShopOf = (req) => {
+  const b = req.body && typeof req.body === 'object' ? req.body : {};
+  return SHOP_KEYS.map((k) => b[k]).find((v) => v !== undefined && v !== null && v !== '');
+};
+const ownShopOnly = (req, res, next) => {
+  const claimed = claimedShopOf(req);
+  if (claimed !== undefined && String(claimed) !== req.shopId) {
+    return next(forbidden('این اعلام برای دکانِ دیگری است', 'foreign_shop'));
+  }
+  next();
+};
+
+router.post('/presence', ownShopOnly, requirePermission('settings.write'), needFlag, needWrite, wrap(async (req, res) => {
   const out = await sf.declarePresence(req.shopId, req.body, {
     userId: req.user.id, deviceId: req.get('x-device') || '',
   });
   res.json(out);
 }));
+
+/**
+ * PRES-10: هر اعلامِ ردشدهٔ کاربرِ واردشده (دکانِ دیگر، بدنهٔ دست‌کاری‌شده،
+ * بی‌اجازه، بی اشتراک، …) در سابقه می‌نشیند و همان خطا برمی‌گردد. بی‌توکن ⇒
+ * ثبت نمی‌شود (سابقه پرِ درخواستِ ناشناس نشود). بدنه خودش نوشته نمی‌شود.
+ */
+router.use('/presence', (err, req, res, next) => {
+  const status = Number(err && err.status);
+  if (req.method !== 'POST' || !req.user || !(status >= 400 && status < 500)) return next(err);
+  const claimed = claimedShopOf(req);
+  audit.log({
+    shopId: req.shopId || '', userId: req.user.id, action: 'storefront.presence_rejected',
+    targetType: 'storefront', targetId: req.shopId || '',
+    detail: {
+      status, reason: String(err.code || ''),
+      ...(claimed !== undefined ? { claimedShop: String(claimed).slice(0, 80) } : {}),
+    },
+    ip: clientIp(req),
+  }).catch(() => {}).then(() => next(err));
+});
 
 //  ── ناحیه‌های ارسال و بازه‌های زمان‌بندی (CHK-06/07/10/12) ─────────────
 const needZones = wrap(async (req, res, next) => {
