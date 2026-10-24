@@ -29,6 +29,11 @@ object ReportCsv {
       "profit" -> profit(d, from, to)
       "expenses" -> expenses(d, from, to)
       "sellers" -> sellers(d, from, to)
+      //  گزارش‌های مشتری (CRM-04، ۱۰، ۰۶، ۱۴) — فقط وقتی `ShopPolicy.crmReports` روشن است دیده می‌شوند
+      "aging" -> CustomerInsight.agingSheet(d, today)
+      "rfm" -> CustomerInsight.rfmSheet(d, today)
+      "duplicates" -> CustomerMerge.duplicatesSheet(d, today)
+      "reminders" -> DebtReminder.dueSheet(d, today)
       else -> stock(d, today)
     }
 
@@ -225,6 +230,10 @@ object ReportCsv {
     "supplier_return" -> "برگشت به تأمین‌کننده"
     "adjustment" -> "اصلاح موجودی"
     "damage" -> "ضایعات"
+    //  انتقال بین محل‌ها (موتورِ تازهٔ موجودی): دو ردیف، خروجیِ منفی و ورودیِ مثبت
+    "transfer_out" -> "انتقالِ خروجی"
+    "transfer_in" -> "انتقالِ ورودی"
+    "transfer" -> "انتقال"
     else -> type
   }
 }

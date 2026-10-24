@@ -70,13 +70,24 @@ object LedgerArchive {
   fun cutoff(now: Long, keepDays: Int = KEEP_DAYS): Long =
     now - keepDays.toLong() * 24L * 60L * 60L * 1000L
 
+  /**
+   *  ردیف‌هایی که هرگز بایگانی نمی‌شوند، هر چه کهنه: دفترِ موجودی و بها (`StockLedger`) **از
+   *  خودِ آن‌ها** حساب می‌شود و از فروش و ورودی دوباره ساخته نمی‌شوند —
+   *   • تنظیمِ دکان (`stock_mode`): بی آن موتور پس از ۴۰۰ روز خودبه‌خود خاموش می‌شد؛
+   *   • «بررسی شد» (`stock_review_ack`): بی آن وظیفه‌های بسته دوباره باز می‌شدند؛
+   *   • انتقال بین محل‌ها: بی آن موجودیِ هر محل غلط می‌شد.
+   *  شمارشان کم است و وزنی ندارند.
+   */
+  fun pinned(m: StockMovement): Boolean = m.type in StockLedger.TRANSFER_TYPES
+  fun pinned(a: AuditEntry): Boolean = a.type == StockLedger.MODE_TYPE || a.type == StockLedger.ACK_TYPE
+
   /** بدونِ دست زدن به چیزی، فقط می‌شمارد */
   fun plan(d: ShopData, now: Long = System.currentTimeMillis(), keepDays: Int = KEEP_DAYS): Plan {
     val edge = cutoff(now, keepDays)
     return Plan(
-      movements = d.stockMovements.count { it.createdAt in 1 until edge },
+      movements = d.stockMovements.count { it.createdAt in 1 until edge && !pinned(it) },
       prices = d.priceHistory.count { it.createdAt in 1 until edge },
-      audits = d.auditLog.count { it.createdAt in 1 until edge },
+      audits = d.auditLog.count { it.createdAt in 1 until edge && !pinned(it) },
     )
   }
 
@@ -93,14 +104,17 @@ object LedgerArchive {
     val edge = cutoff(now, keepDays)
     fun old(at: Long) = at in 1 until edge
 
-    val oldMoves = d.stockMovements.filter { old(it.createdAt) }
+    fun goMove(m: StockMovement) = old(m.createdAt) && !pinned(m)
+    fun goAudit(a: AuditEntry) = old(a.createdAt) && !pinned(a)
+
+    val oldMoves = d.stockMovements.filter(::goMove)
     val oldPrices = d.priceHistory.filter { old(it.createdAt) }
-    val oldAudits = d.auditLog.filter { old(it.createdAt) }
+    val oldAudits = d.auditLog.filter(::goAudit)
 
     val kept = d.copy(
-      stockMovements = d.stockMovements.filterNot { old(it.createdAt) },
+      stockMovements = d.stockMovements.filterNot(::goMove),
       priceHistory = d.priceHistory.filterNot { old(it.createdAt) },
-      auditLog = d.auditLog.filterNot { old(it.createdAt) },
+      auditLog = d.auditLog.filterNot(::goAudit),
     )
     return kept to Archive(oldMoves, oldPrices, oldAudits)
   }
@@ -123,16 +137,19 @@ object LedgerArchive {
         //  بایگانیِ قبلی خوانده و با تازه‌ها یکی می‌شود؛ هیچ ردیفی از بایگانی
         //  بیرون نمی‌رود. ردیفی که از تلاشِ نیمه‌کارهٔ پیشین آن‌جا نشسته،
         //  دوباره اضافه نمی‌شود.
-        val existing = readArchive(context)
-        val merged = Archive(
-          stockMovements = union(existing.stockMovements, fresh.stockMovements) { it.id },
-          priceHistory = union(existing.priceHistory, fresh.priceHistory) { it.id },
-          auditLog = union(existing.auditLog, fresh.auditLog) { it.id },
-        )
-        //  ⛔ اگر بایگانی به دیسک نرسد همین‌جا شکست می‌خورد و دفتر کوتاه نمی‌شود
-        //  — پیش‌تر نتیجهٔ `renameTo` دیده نمی‌شد و روی ویندوز ردیف‌ها از دفتر
-        //  می‌رفتند بی آنکه در بایگانی نشسته باشند (F0-01)
-        DiskWrite.text(file(context), json.encodeToString(merged))
+        //  زیرِ قفلِ کوچِ رمز (SEC-01): کوچ میانِ خواندن و نوشتن نمی‌نشیند
+        synchronized(AtRest.lock) {
+          val existing = readArchive(context)
+          val merged = Archive(
+            stockMovements = union(existing.stockMovements, fresh.stockMovements) { it.id },
+            priceHistory = union(existing.priceHistory, fresh.priceHistory) { it.id },
+            auditLog = union(existing.auditLog, fresh.auditLog) { it.id },
+          )
+          //  ⛔ اگر بایگانی به دیسک نرسد همین‌جا شکست می‌خورد و دفتر کوتاه نمی‌شود
+          //  — پیش‌تر نتیجهٔ `renameTo` دیده نمی‌شد و روی ویندوز ردیف‌ها از دفتر
+          //  می‌رفتند بی آنکه در بایگانی نشسته باشند (F0-01)
+          AtRest.writeText(context, file(context), json.encodeToString(merged))
+        }
       },
       forget = { gone ->
         //  ⛔ سایهٔ Sync v1 — شکستش پرتاب می‌شود و دفتر کوتاه نمی‌شود. پیش‌تر
@@ -184,10 +201,22 @@ object LedgerArchive {
     return old + fresh.filter { id(it) !in have }
   }
 
+  /**
+   *  ⛔ بایگانیِ **رمزداری** که باز نشد پرتاب می‌کند (`AtRestException`)، نه
+   *  «بایگانیِ خالی»: وگرنه فشرده‌سازیِ بعدی بایگانیِ واقعی را با همان چند
+   *  ردیفِ تازه رونویسی می‌کرد. بایگانیِ ساده همان رفتارِ همیشه را دارد.
+   */
   fun readArchive(context: Context): Archive {
     val f = file(context)
     if (!f.exists()) return Archive()
-    return runCatching { json.decodeFromString<Archive>(f.readText()) }.getOrDefault(Archive())
+    val text = try {
+      AtRest.readText(context, f)
+    } catch (e: ir.vil3ntec.tohid.core.atrest.AtRestException) {
+      throw e
+    } catch (e: Exception) {
+      return Archive()
+    }
+    return runCatching { json.decodeFromString<Archive>(text) }.getOrDefault(Archive())
   }
 
   /** اندازهٔ فایلِ بایگانی، برای نشان دادن در تنظیمات */

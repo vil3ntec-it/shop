@@ -249,7 +249,7 @@ private fun NewPurchaseInvoice(
   var paid by remember { mutableStateOf("") }
   var notes by remember { mutableStateOf("") }
   //  موتورِ تازهٔ موجودی (روشن): هزینهٔ جانبیِ کلِ فاکتور (PUR-06) — روی بهای ردیف‌ها پخش می‌شود، نه بدهیِ تأمین‌کننده
-  val stockOn = ir.vil3ntec.tohid.data.StockLedger.isOn(d)
+  val stockOn = remember(d.auditLog) { ir.vil3ntec.tohid.data.StockLedger.isOn(d) }
   var landed by remember { mutableStateOf("") }
   var due by remember { mutableStateOf("") }
   val context = androidx.compose.ui.platform.LocalContext.current
@@ -371,7 +371,7 @@ private fun NewPurchaseInvoice(
         OutlinedTextField(
           landed, { landed = ir.vil3ntec.tohid.numericInput(it) }, singleLine = true,
           label = { Text("هزینهٔ جانبی (؋)") },
-          supportingText = { Text("کرایه، گمرک — روی بهای ردیف‌ها") },
+          supportingText = { Text("کرایه، گمرک — روی بهای ردیف‌ها؛ جدا در «مصارف» ثبتش نکنید") },
           modifier = Modifier.width(190.dp),
         )
         Spacer(Modifier.width(10.dp))

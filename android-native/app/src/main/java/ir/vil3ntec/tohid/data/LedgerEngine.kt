@@ -286,6 +286,9 @@ object LedgerEngine {
           warehouseEntryId = entryId,
           createdAt = now,
           dueDate = due,
+          //  خریدِ تکی: هزینهٔ جانبی روی ردیفِ خرید هم (مثلِ فاکتورِ چندردیفه، `PurchaseBook`)
+          landedCost = landed,
+          landedCostMinor = landed?.let(StockLedger::minor),
         ),
         stockMovements = d.stockMovements + StockMovement(
           id = newId(),

@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data
 
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -139,7 +140,9 @@ class SalePost {
     if (!gate.compareAndSet(false, true)) return Outcome.Busy
     _busy.value = true
     try {
-      return when (val r = record(key)) {
+      //  ساختنِ فروش (با سنجشِ دفترِ موجودی وقتی موتورِ تازه روشن است) بیرون از رشتهٔ صفحه —
+      //  روی دفترِ بزرگ صندوق را قفل نمی‌کند. `record` تابعِ خالص است (`SalesEngine.record`).
+      return when (val r = withContext(Dispatchers.Default) { record(key) }) {
         is SalesEngine.Result.Failed -> Outcome.Refused(r.message)
         //  رفتن از صفحه نباید نوشتن را نصفه بگذارد: یا هر دو، یا هیچ
         is SalesEngine.Result.Ok -> withContext(NonCancellable) {

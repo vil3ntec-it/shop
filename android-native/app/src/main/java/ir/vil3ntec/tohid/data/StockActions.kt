@@ -114,15 +114,25 @@ object StockActions {
     }
     val id = newId()
     val why = reason.trim()
-    val mv = StockMovement(
-      id = id, productId = productId, type = "transfer", qty = q / 1000.0, date = today,
-      notes = why.ifEmpty { "انتقال بین محل‌ها" }, refId = id, createdAt = now,
-      userId = user.trim().ifEmpty { null }, reason = why.ifEmpty { null },
-      locationId = from, toLocationId = dest, lotId = lotId?.takeIf { it.isNotEmpty() },
+    val note = why.ifEmpty { "انتقال بین محل‌ها" }
+    val who = user.trim().ifEmpty { null }
+    val lot = lotId?.takeIf { it.isNotEmpty() }
+    //  دو ردیف، جمعِ صفر (شرح سرِ `StockLedger.TRANSFER_OUT`): سرورِ v3 موجودی را جمعِ همین جدول می‌داند
+    val out = StockMovement(
+      id = id, productId = productId, type = StockLedger.TRANSFER_OUT, qty = -q / 1000.0, date = today,
+      notes = "$note — به ${locationLabel(dest)}", refId = id, createdAt = now,
+      userId = who, reason = why.ifEmpty { null },
+      locationId = from, toLocationId = dest, lotId = lot,
+    )
+    val inn = StockMovement(
+      id = newId(), productId = productId, type = StockLedger.TRANSFER_IN, qty = q / 1000.0, date = today,
+      notes = "$note — از ${locationLabel(from)}", refId = id, createdAt = now,
+      userId = who, reason = why.ifEmpty { null },
+      locationId = dest, lotId = lot,
     )
     return Result.Ok(
       d.copy(
-        stockMovements = d.stockMovements + mv,
+        stockMovements = d.stockMovements + out + inn,
         auditLog = d.auditLog + AuditEntry(
           id = newId(), type = "stock_transfer", date = today, refId = id, createdAt = now,
           notes = "انتقالِ ${ir.vil3ntec.tohid.qty(q / 1000.0)} «${product.name}» از ${locationLabel(from)} به ${locationLabel(dest)}" +
