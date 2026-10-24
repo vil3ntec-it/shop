@@ -45,6 +45,19 @@ sealed class ApiFailure(
 
   internal fun withStatus(code: Int): ApiFailure { status = code; return this }
 
+  /**
+   *  شیءِ کاملِ `error` ِ پاسخ — دادهٔ همراهِ خطا، نه فقط پیام و کد.
+   *
+   *  ثبتِ سفارشِ ویترین با خطا راهِ درست را هم می‌دهد: برگهٔ قیمتِ تازه
+   *  (`price_changed` ⇒ `quote`)، کالاهای ناموجود (`unavailable`)، ناحیه‌ها و
+   *  بازه‌های تازه. بی این، برنامه فقط می‌توانست بگوید «نشد». `null` یعنی
+   *  پاسخ شیءِ `error` نداشت (یا خطا از شبکه بود).
+   */
+  var detail: JsonObject? = null
+    private set
+
+  internal fun withDetail(error: JsonObject?): ApiFailure { detail = error; return this }
+
   /** هنوز نشانی سروری تنظیم نشده — برنامه کاملاً آفلاین کار می‌کند */
   class NotConfigured : ApiFailure("نشانی سرور تنظیم نشده است", "not_configured")
 
@@ -100,6 +113,10 @@ sealed class ApiFailure(
      *  تختِ قدیمی. هر جا از `as?` استفاده شده نه `jsonPrimitive`، چون
      *  دومی روی شیء استثنا پرتاب می‌کند و همان باگِ بالا بود.
      */
+    /** شیءِ `error` ِ پاسخ — یا null */
+    private fun errorObject(body: String?): JsonObject? =
+      runCatching { (json.parseToJsonElement(body ?: "") as? JsonObject)?.get("error") as? JsonObject }.getOrNull()
+
     fun parse(body: String?): Pair<String?, String?> {
       val tree = runCatching { json.parseToJsonElement(body ?: "") as? JsonObject }.getOrNull()
         ?: return null to null
@@ -143,7 +160,7 @@ sealed class ApiFailure(
         status in 400..499 -> Invalid(message, code)
         status in 500..599 -> ServerFault(message, code)
         else -> InvalidResponse("وضعیت $status")
-      }.withStatus(status)
+      }.withStatus(status).withDetail(errorObject(body))
     }
 
     /**

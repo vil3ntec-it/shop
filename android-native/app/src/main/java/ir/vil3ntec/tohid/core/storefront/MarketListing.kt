@@ -174,8 +174,9 @@ class MarketListingRepository(private val api: ApiClient) {
   }
 }
 
+/** دستهٔ دکان؛ `count` فقط در نمای اولِ بازارچه (`GET /market`، شمارِ دکان‌های هر دسته) */
 @Serializable
-data class MarketCategoryDto(val key: String = "", val label: String = "")
+data class MarketCategoryDto(val key: String = "", val label: String = "", val count: Int = 0)
 
 /** درشت، به درجه (سرور یک‌صدم نگه می‌دارد و همان را به خودِ صاحب دکان برمی‌گرداند) */
 @Serializable

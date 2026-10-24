@@ -49,7 +49,6 @@ import ir.vil3ntec.tohid.data.Debtor
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.Sale
 import ir.vil3ntec.tohid.data.SaleItem
-import ir.vil3ntec.tohid.ui.screens.DashboardScreen
 import ir.vil3ntec.tohid.ui.screens.DebtorDetailShot
 import ir.vil3ntec.tohid.ui.screens.DebtorsScreen
 import ir.vil3ntec.tohid.ui.screens.PhoneDebtorsShot
@@ -98,8 +97,10 @@ fun PhonePreviewWindow(store: ShopStore, context: android.content.Context) {
   val dark = requested.removeSuffix("-en").endsWith("-dark")
   val screen = requested.removeSuffix("-en").removeSuffix("-dark")
   DisposableEffect(en) {
+    //  زبانِ برنامه (`LocaleChoice`) پس از بستنِ پیش‌نمایش برمی‌گردد
+    val before = ir.vil3ntec.tohid.core.i18n.I18n.source
     ir.vil3ntec.tohid.core.i18n.I18n.source = { if (en) ir.vil3ntec.tohid.core.i18n.Lang.EN else ir.vil3ntec.tohid.core.i18n.Lang.FA }
-    onDispose { ir.vil3ntec.tohid.core.i18n.I18n.source = { ir.vil3ntec.tohid.core.i18n.Lang.FA } }
+    onDispose { ir.vil3ntec.tohid.core.i18n.I18n.source = before }
   }
   DialogWindow(
     onCloseRequest = { PhonePreview.screen.value = null },
@@ -246,7 +247,8 @@ private fun PhonePreviewContent(screen: String, store: ShopStore, dark: Boolean)
         PhoneV3HomePreview(if (screen == "nav") "v3home" else screen, store)
       } else {
         //  «nav» و هر نامِ ناشناس: خانه با نوارِ پایینِ قرصی
-        Box(Modifier.weight(1f).fillMaxWidth()) { DashboardScreen(data) {} }
+        //  همان مسیرِ `home` (امروز داشبورد، فردا خانهٔ G10) — نه صدا زدنِ مستقیمِ صفحه
+        Box(Modifier.weight(1f).fillMaxWidth()) { ir.vil3ntec.tohid.desktop.shots.V3RoutePreview("home", store, dark) }
         PhoneNavBar(tabs = PREVIEW_TABS, current = "home", onPick = {})
       }
     }

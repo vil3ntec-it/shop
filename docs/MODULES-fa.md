@@ -72,6 +72,7 @@ AppModule(
 | G9 تنظیمات | `ui/v3/settings/SettingsRoutes.kt` | `SettingsModule` |
 | G10 پوسته | `ui/v3/shell/ShellRoutes.kt` | `ShellModule` |
 | خرید | `ui/v3/shopper/ShopperRoutes.kt` | `ShopperModule` |
+| پایه | `ui/v3/nav/FoundationRoutes.kt`، `ui/v3/nav/ScanRoutes.kt` | `FoundationModule`، `ScanModule` (`scan?kind=qr`، هر سه حالت) |
 
 هر مسیرِ NAV-MAP از پیش ثبت است و امروز به صفحهٔ پیشین اشاره می‌کند (یا با `LandOn` روی نزدیک‌ترین صفحه
 می‌نشیند)؛ گروه فقط محتوای مسیرهای خودش را با صفحهٔ تازه عوض می‌کند.
