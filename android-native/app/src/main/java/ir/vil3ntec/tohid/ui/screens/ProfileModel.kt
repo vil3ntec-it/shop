@@ -27,23 +27,9 @@ object ProfileModel {
     serverDays: Int,
     serverTrial: Boolean,
     warnDays: Int,
-  ): Plan {
-    val serverOn = serverActive && serverDays > 0
-    val active = localActive || serverOn
-    val days = when {
-      localActive -> localDays
-      serverOn -> serverDays
-      else -> 0
-    }
-    val trial = !localActive && serverOn && serverTrial
-    return Plan(
-      active = active,
-      expired = localExpired,
-      trial = trial,
-      days = days,
-      urgent = localExpired || (active && days <= warnDays),
-    )
-  }
+  ): Plan = ir.vil3ntec.tohid.ui.v3.account.profile.ProfileHomeModel
+    .plan(localActive, localDays, localExpired, serverActive, serverDays, serverTrial, warnDays)
+    .let { Plan(it.active, it.expired, it.trial, it.days, it.urgent) }
 
   sealed class Notice {
     /** اشتراک تمام شده (یا در مهلتِ پس از پایان) */
