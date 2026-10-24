@@ -3,7 +3,6 @@ package ir.vil3ntec.tohid.core.atrest
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.lang.management.ManagementFactory
 import java.security.SecureRandom
 import javax.crypto.Cipher
 import javax.crypto.SecretKey
@@ -37,18 +36,25 @@ class AtRestBenchTest {
 
   private fun newSeal(plain: ByteArray): ByteArray = AtRestEnvelope.seal(plain, kid, key, random)
 
-  private val threads = ManagementFactory.getThreadMXBean() as? com.sun.management.ThreadMXBean
+  /**
+   *  حافظهٔ گرفته‌شدهٔ همین رشته (HotSpot) — با بازتاب، چون `java.lang.management` در
+   *  classpathِ آزمونِ اندروید (android.jar) نیست. نبود ⇒ `-1` و سنجهٔ حافظه کنار می‌رود.
+   */
+  private fun allocated(): Long = runCatching {
+    val bean = Class.forName("java.lang.management.ManagementFactory").getMethod("getThreadMXBean").invoke(null)
+    val m = Class.forName("com.sun.management.ThreadMXBean").getMethod("getThreadAllocatedBytes", Long::class.javaPrimitiveType)
+    m.invoke(bean, Thread.currentThread().id) as Long
+  }.getOrDefault(-1L)
 
   private class Run(val ms: Double, val allocated: Long)
 
   private fun measure(times: Int, block: () -> Unit): Run {
     repeat(2) { block() } // گرم کردن
-    val id = Thread.currentThread().id
-    val a0 = threads?.getThreadAllocatedBytes(id) ?: -1L
+    val a0 = allocated()
     val t0 = System.nanoTime()
     repeat(times) { block() }
     val ms = (System.nanoTime() - t0) / 1e6 / times
-    val a1 = threads?.getThreadAllocatedBytes(id) ?: -1L
+    val a1 = allocated()
     return Run(ms, if (a0 < 0 || a1 < 0) -1 else (a1 - a0) / times)
   }
 

@@ -127,7 +127,7 @@ class AtRestKeyring(
   @Volatile var setAsideAs: File? = null
     private set
 
-  private val dir: File get() = file.absoluteFile.parentFile
+  private val dir: File get() = file.absoluteFile.parentFile ?: File(".")
 
   /**
    *  نسخهٔ دومِ کلیددان (بازبینیِ #331) — همان بایت‌ها، نوشته با همان کناری + fsync +
