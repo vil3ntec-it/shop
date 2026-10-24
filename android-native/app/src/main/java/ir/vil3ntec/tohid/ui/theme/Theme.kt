@@ -62,8 +62,9 @@ data class ButtonColorSet(
 data class StatusTone(val fg: Color, val bg: Color)
 
 /**
- *  هفت وضعیتِ سفارش — **یک معنا در همه‌جا** (مشتری، دکان، پیک، مدیر؛ VILL3N §۸).
- *  نگاشتِ وضعیت به این هفت در `ui/components/common/OrderStatusTone.kt` است.
+ *  وضعیت‌ها — **یک معنا در همه‌جا** (مشتری، دکان، پیک، مدیر؛ VILL3N §۸، THEME-V2 «رنگ‌های معنایی»).
+ *  نگاشتِ وضعیتِ سفارش در `ui/components/common/OrderStatusTone.kt` است. «در انتظارِ تأیید» و
+ *  «نیازِ بررسی» هر دو بنفش‌اند؛ هشدار (کم‌موجود، سقف، اختلاف، در صف) کهربایی.
  */
 @Immutable
 data class StatusColors(
@@ -81,11 +82,14 @@ data class StatusColors(
   val preparing: StatusTone,
   /** غیرفعال / بسته‌شده */
   val inactive: StatusTone,
+  /** هشدار: کم‌موجود، نزدیکِ انقضا، سقف، اختلاف، در صف (کهربایی) */
+  val warning: StatusTone,
 ) {
   val all: List<Pair<String, StatusTone>>
     get() = listOf(
       "delivered" to delivered, "inDelivery" to inDelivery, "awaitingApproval" to awaitingApproval,
       "cancelled" to cancelled, "needsReview" to needsReview, "preparing" to preparing, "inactive" to inactive,
+      "warning" to warning,
     )
 }
 
@@ -190,6 +194,8 @@ data class ShopColors(
   val heroScrim: Float = 0f,
   /** رنگِ برند روی سطحِ وارونه (کارِ اسنک‌بار، `inversePrimary`ِ متریالِ روز): primaryِ تیرهٔ همان تم */
   val brandOnInverse: Color = brandPrimary,
+  /** سایهٔ سیاهِ زیرِ شیشهٔ سفیدِ تراشه‌های کادرِ بزرگ — برچسبِ ۱۲sp همه‌جای گرادیان ≥ ۴٫۵:۱ */
+  val heroChipShade: Float = 0f,
 ) {
   /** رنگِ همراهِ i (چرخشی) */
   fun accent(i: Int): Color = accents[i.mod(accents.size)]
@@ -223,8 +229,8 @@ data class ShopColors(
   val accent: Color get() = iconActive
   val success: Color get() = status.delivered.fg
   val successTint: Color get() = status.delivered.bg
-  val warning: Color get() = status.awaitingApproval.fg
-  val warningTint: Color get() = status.awaitingApproval.bg
+  val warning: Color get() = status.warning.fg
+  val warningTint: Color get() = status.warning.bg
   val danger: Color get() = status.cancelled.fg
   val dangerTint: Color get() = status.cancelled.bg
   val info: Color get() = status.inDelivery.fg

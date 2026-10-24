@@ -500,7 +500,7 @@ fun DeskSaleScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
               ) {
                 ir.vil3ntec.tohid.ui.components.common.StatusPill(
-                  "نیازمند تأیید", ir.vil3ntec.tohid.ui.components.common.PillTone.WARNING,
+                  "نیازمند تأیید", ir.vil3ntec.tohid.ui.components.common.PillTone.AWAITING,
                 )
                 Spacer(Modifier.weight(1f))
                 OutlinedButton(onClick = { askApproval = true }, enabled = !posting) { Text("درخواستِ تأیید (F9)") }

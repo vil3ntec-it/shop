@@ -205,7 +205,7 @@ fun PaySplitSection(
     )
     if (s != null && s.payments.any { it.status == "pending" }) {
       Spacer(Modifier.height(4.dp))
-      StatusPill("غیرنقد: ثبتِ دستی، در انتظارِ تأیید", PillTone.WARNING)
+      StatusPill("غیرنقد: ثبتِ دستی، در انتظارِ تأیید", PillTone.AWAITING)
     }
   }
   val error = when {

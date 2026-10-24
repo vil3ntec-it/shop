@@ -76,7 +76,7 @@ fun ApprovalDialog(
       Column(Modifier.padding(18.dp).verticalScroll(rememberScrollState())) {
         Text(title, style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
         Spacer(Modifier.height(8.dp))
-        StatusPill("نیازمند تأیید", PillTone.WARNING)
+        StatusPill("نیازمند تأیید", PillTone.AWAITING)
         Spacer(Modifier.height(8.dp))
         Text(summary, style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text)
         Spacer(Modifier.height(14.dp))

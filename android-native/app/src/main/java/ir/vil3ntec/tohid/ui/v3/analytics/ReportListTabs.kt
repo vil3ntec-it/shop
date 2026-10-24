@@ -184,7 +184,7 @@ internal fun ExpiryTab(d: ShopData, today: String, spec: ReportListSpec) {
               trailing = {
                 when {
                   l.expired -> V3StatusPill(V3Status.CANCELLED, StrReports.expired)
-                  l.daysLeft <= near -> V3StatusPill(V3Status.AWAITING, StrReports.daysLeft(l.daysLeft))
+                  l.daysLeft <= near -> V3StatusPill(V3Status.WARNING, StrReports.daysLeft(l.daysLeft))
                   else -> V3StatusPill(V3Status.INACTIVE, StrReports.daysLeft(l.daysLeft))
                 }
               },

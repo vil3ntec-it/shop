@@ -201,7 +201,7 @@ private fun FiguresCard(item: StockItemUi, onCopied: () -> Unit) {
       }
       when (item.level) {
         StockLevel.OUT -> V3StatusPill(V3Status.CANCELLED, StrStock.pillOut)
-        StockLevel.LOW -> V3StatusPill(V3Status.AWAITING, StrStock.pillLow)
+        StockLevel.LOW -> V3StatusPill(V3Status.WARNING, StrStock.pillLow)
         StockLevel.OK -> Unit
       }
     }

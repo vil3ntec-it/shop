@@ -144,6 +144,7 @@ internal fun headline(s: String): String = when (s) {
  */
 internal fun statusTone(s: String, ui: PhoneV3Ui): PhoneV3Tone = when (ir.vil3ntec.tohid.ui.components.common.OrderStatusTone.courier(s)) {
   ir.vil3ntec.tohid.ui.components.common.PillTone.WARNING -> ui.awaiting
+  ir.vil3ntec.tohid.ui.components.common.PillTone.AWAITING -> ui.approval
   ir.vil3ntec.tohid.ui.components.common.PillTone.PREPARING -> ui.preparing
   ir.vil3ntec.tohid.ui.components.common.PillTone.INFO -> ui.delivery
   ir.vil3ntec.tohid.ui.components.common.PillTone.SUCCESS -> ui.success
