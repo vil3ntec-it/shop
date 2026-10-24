@@ -50,7 +50,7 @@ val ProductsModule = AppModule(
   ),
   routes = listOf(
     V3Route(ProductsPaths.LIST, RouteKind.TAB, { Str.products }) {
-      if (Platform.DESKTOP) DeskProductsScreen(
+      if (desk) DeskProductsScreen(
         store = store, d = data, snackbar = snackbar,
         onOpenWarehouse = { id -> nav.open(if (id == null) StockPaths.LIST else StockPaths.item(id)) },
         onOpenProduct = { id -> nav.open(ProductsPaths.item(id)) },

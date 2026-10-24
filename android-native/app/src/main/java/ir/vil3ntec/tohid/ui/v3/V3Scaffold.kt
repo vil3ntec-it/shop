@@ -49,6 +49,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.foundation.layout.heightIn
 import ir.vil3ntec.tohid.core.i18n.StrKit
 import ir.vil3ntec.tohid.ui.screens.MotionSpec
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
@@ -82,8 +89,15 @@ class V3HeaderState {
   var offset by mutableFloatStateOf(0f)
     internal set
 
+  /** بلندیِ واقعیِ عنوانِ درشت (با درشتیِ نوشتهٔ سیستم) — عنوانِ کوچکِ سربرگ از روی همین */
+  var titleMax by mutableFloatStateOf(0f)
+    internal set
+
   /** صفر = باز، یک = جمع */
   val fraction: Float get() = if (max <= 0f) 0f else (-offset / max).coerceIn(0f, 1f)
+
+  /** چقدر از عنوانِ درشت رفته (۰ تا ۱) */
+  val titleFraction: Float get() = if (titleMax <= 0f) 0f else (-offset / titleMax).coerceIn(0f, 1f)
 
   /** آخرین جهتِ پیمایش پایین بود؟ (دکمهٔ شناور جمع می‌شود) */
   var scrolledDown by mutableStateOf(false)
@@ -135,8 +149,10 @@ fun V3Scaffold(
 ) {
   val c = PhoneV3.colors
   val density = LocalDensity.current
-  val maxPx = with(density) { (if (subtitle != null) LARGE_WITH_SUB else LARGE).toPx() }
-  SideEffect { state.max = if (largeTitle) maxPx else 0f }
+  //  پنجرهٔ کوتاه (افقی، دوپاره): عنوانِ درشت نه — همه‌جا برای فهرست (AUDIT-NAV S3)
+  val large = largeTitle && LocalConfiguration.current.screenHeightDp >= COMPACT_HEIGHT
+  //  عنوانِ کوچکِ سربرگ فقط وقتی عوض می‌شود که مرز رد شود — نه هر فریم (AUDIT-NAV F1)
+  val showTitle by remember(large) { derivedStateOf { !large || state.titleFraction > 0.65f } }
   val settle = remember { Animatable(0f) }
   val connection = remember(state) {
     object : NestedScrollConnection {
@@ -166,11 +182,15 @@ fun V3Scaffold(
 
   Box(if (backdrop != null) modifier.fillMaxSize().then(backdrop) else modifier.fillMaxSize().background(c.bg)) {
     Column(Modifier.fillMaxSize().nestedScroll(connection)) {
-      V3HeaderBar(title, onBack, headerActions, showTitle = !largeTitle || state.fraction > 0.65f, divider = if (largeTitle) state.fraction else 1f, transparent = backdrop != null)
-      if (largeTitle) V3LargeTitle(title, subtitle, state, transparent = backdrop != null)
-      if (notice != null) V3NoticeSlot(notice)
-      if (search != null) Box(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 8.dp)) { search() }
-      if (chips != null) Box(Modifier.fillMaxWidth().padding(bottom = 8.dp)) { chips() }
+      V3HeaderBar(title, onBack, headerActions, showTitle = showTitle, divider = { if (large) state.fraction else 1f }, transparent = backdrop != null)
+      //  عنوانِ درشت، پیام‌ها، جست‌وجو و تراشه‌ها با هم جمع می‌شوند تا فهرست جا بگیرد (S3)؛
+      //  بلندی با درشتیِ نوشته اندازه گرفته می‌شود، نه عددِ ثابت (S4)
+      V3Collapsing(state, transparent = backdrop != null) {
+        if (large) V3LargeTitle(title, subtitle, state)
+        if (notice != null) V3NoticeSlot(notice)
+        if (search != null) Box(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 8.dp)) { search() }
+        if (chips != null) Box(Modifier.fillMaxWidth().padding(bottom = 8.dp)) { chips() }
+      }
       Box(Modifier.weight(1f).fillMaxWidth()) {
         content(PaddingValues(bottom = bottomReserve + bottomBarHeight + (if (bottomBar == null) navInset else 0.dp) + 16.dp))
       }
@@ -247,15 +267,15 @@ internal fun V3HeaderBar(
   onBack: (() -> Unit)?,
   actions: List<V3Action>,
   showTitle: Boolean,
-  /** پیدا شدنِ خطِ مویی زیرِ سربرگ (۰ تا ۱) */
-  divider: Float,
+  /** پیدا شدنِ خطِ مویی زیرِ سربرگ (۰ تا ۱) — در رسم خوانده می‌شود، نه در ترکیب */
+  divider: () -> Float,
   /** روی `backdrop` ِ صفحه: بی زمینه */
   transparent: Boolean = false,
 ) {
   val c = PhoneV3.colors
   val alpha by animateFloatAsState(if (showTitle) 1f else 0f, MotionSpec.tweenOf(150), label = "barTitle")
   Column(Modifier.fillMaxWidth().background(if (transparent) Color.Transparent else c.bg).windowInsetsPadding(WindowInsets.statusBars)) {
-    Box(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 16.dp), contentAlignment = Alignment.Center) {
+    Box(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 16.dp), contentAlignment = Alignment.Center) {
       if (onBack != null) Box(Modifier.align(Alignment.CenterStart)) { V3BackButton(onBack) }
       Text(
         title,
@@ -275,32 +295,55 @@ internal fun V3HeaderBar(
         }
       }
     }
-    Box(Modifier.fillMaxWidth().height(1.dp).graphicsLayer { this.alpha = divider }.background(c.hairline))
+    Box(Modifier.fillMaxWidth().height(1.dp).graphicsLayer { this.alpha = divider() }.background(c.hairline))
   }
 }
 
-/** عنوانِ درشتِ جمع‌شونده (و زیرعنوانِ اختیاری) */
+/**
+ *  ناحیهٔ جمع‌شوندهٔ زیرِ سربرگ: بلندیِ طبیعیِ خودش را اندازه می‌گیرد (`state.max`) و با
+ *  پیمایش از بالا بریده می‌شود. `offset` فقط در مرحلهٔ چیدمان خوانده می‌شود — هیچ بازترکیبی
+ *  در هر فریم نیست (AUDIT-NAV F1).
+ */
 @Composable
-private fun V3LargeTitle(title: String, subtitle: String?, state: V3HeaderState, transparent: Boolean = false) {
+private fun V3Collapsing(state: V3HeaderState, transparent: Boolean, content: @Composable () -> Unit) {
   val c = PhoneV3.colors
-  val density = LocalDensity.current
-  val full = if (subtitle != null) LARGE_WITH_SUB else LARGE
-  val visible = with(density) { (full.toPx() + state.offset).coerceAtLeast(0f).toDp() }
-  Box(Modifier.fillMaxWidth().height(visible).background(if (transparent) Color.Transparent else c.bg)) {
-    Column(
-      Modifier
-        .fillMaxWidth()
-        .padding(start = 20.dp, end = 20.dp)
-        .graphicsLayer {
-          alpha = (1f - state.fraction * 1.6f).coerceIn(0f, 1f)
-          translationY = state.offset * 0.35f
-        },
-    ) {
-      Text(title, style = V3Type.largeTitle, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.semantics { heading() })
-      if (subtitle != null) Text(subtitle, style = V3Type.subhead, color = c.inkMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
-    }
+  Column(
+    Modifier
+      .fillMaxWidth()
+      .clipToBounds()
+      .layout { measurable, constraints ->
+        val p = measurable.measure(constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity))
+        val full = p.height
+        if (state.max != full.toFloat()) state.max = full.toFloat()
+        val shown = (full + state.offset.roundToInt()).coerceIn(0, full)
+        layout(p.width, shown) { p.placeRelative(0, shown - full) }
+      }
+      .background(if (transparent) Color.Transparent else c.bg),
+  ) { content() }
+}
+
+/** عنوانِ درشت (و زیرعنوانِ اختیاری) — بلندیِ طبیعی، کم‌رنگ‌شدن و جابه‌جایی فقط در رسم */
+@Composable
+private fun V3LargeTitle(title: String, subtitle: String?, state: V3HeaderState) {
+  val c = PhoneV3.colors
+  Column(
+    Modifier
+      .fillMaxWidth()
+      .heightIn(min = if (subtitle != null) LARGE_WITH_SUB else LARGE)
+      .onSizeChanged { state.titleMax = it.height.toFloat() }
+      .padding(start = 20.dp, end = 20.dp)
+      .graphicsLayer {
+        alpha = (1f - state.titleFraction * 1.6f).coerceIn(0f, 1f)
+        translationY = state.offset * 0.35f
+      },
+  ) {
+    Text(title, style = V3Type.largeTitle, color = c.ink, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.semantics { heading() })
+    if (subtitle != null) Text(subtitle, style = V3Type.subhead, color = c.inkMuted, maxLines = 2, overflow = TextOverflow.Ellipsis)
   }
 }
+
+/** زیرِ این بلندیِ پنجره (dp) عنوانِ درشت نیست */
+private const val COMPACT_HEIGHT = 480
 
 /**
  *  دو ستونِ صفحهٔ پهن (کامپیوتر، تبلتِ افقی): فهرست در آغاز با پهنای ثابت و

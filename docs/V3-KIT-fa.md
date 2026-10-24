@@ -19,7 +19,7 @@
 | `V3TextField(value, onValueChange, label, kind, placeholder?, helper?, error?, required, suffix?, onScan?)` | کادر | `V3FieldKind`: TEXT، NUMBER، MONEY (هزارگان در نمایش، «؋»)، BARCODE (دکمهٔ اسکن)، PHONE، EMAIL، PASSWORD، DATE. خطای درجا زیرِ همان کادر. |
 | `V3SearchField`، `V3ToggleRow`، `V3PickerRow`، `V3DateField`، `V3Toggle` | ورودی‌های دیگر | یک جست‌وجو در هر صفحه. |
 | `V3Chip`، `V3AddChip`، `V3ChipRow`، `V3Segmented(options, selected, onSelect)` | فیلتر و تب | نشانگرِ لغزانِ فنری. |
-| `V3Sheet(onDismiss, title?, dismissible = true) { closer -> }`، `V3ConfirmSheet(...)`، `V3PickerSheet(...)` | برگه | بستن با حرکت: `closer.close { بعد }`. کارِ پاک‌کننده = `V3ConfirmSheet` با متنِ هشدارِ موتور. `dismissible = false` (نمایشِ یک‌بارهٔ کد): زدنِ بیرون، کشیدن و «برگشت» نمی‌بندند، فقط `closer`. |
+| `V3Sheet(onDismiss, title?, dismissible = true) { closer -> }`، `V3ConfirmSheet(...)`، `V3PickerSheet(...)` | برگه | بستن با حرکت: `closer.close { بعد }`. کارِ پاک‌کننده = `V3ConfirmSheet` با متنِ هشدارِ موتور. `dismissible = false` (نمایشِ یک‌بارهٔ کد): زدنِ بیرون، کشیدن و «برگشت» نمی‌بندند، فقط `closer`. محتوا پیمایش می‌شود (`scroll = true`)؛ فهرستِ Lazy درونِ برگه `heightIn(max = …)` می‌خواهد، یا `scroll = false`. |
 | `V3Stat(label, value, format)` + `V3StatGrid` | آمار و پول | شمارندهٔ عدد، عددِ پایانی دقیق. |
 | `V3StatusPill(V3Status, label)` | وضعیتِ سفارش (§۸) | نقطه + برچسب، هفت وضعیت. |
 | `V3InvoiceItems(items: List<V3InvoiceLine>, title?, footer?)` | اقلامِ فاکتور | `V3InvoiceLine(name, detail, total, note?)` با متنِ از پیش قالب‌شده (پول را موتورِ صدازننده می‌سازد)؛ همان کارتِ اقلامِ برگهٔ تراکنشِ قرض‌دار. |
@@ -73,6 +73,13 @@
    دیگر بالای پشته نیست هیچ نمی‌کند — پس `onDismiss` ِ برگه پس از `finish` صفحهٔ صدازننده را نمی‌بندد)، `nav.back()`،
    `nav.replace(...)`، `nav.switchTab(...)`، `nav.openForResult(SalesPaths.scan("stock")) { code -> }` و در مقصد `nav.finish(value)`.
    از هر جا: `LocalV3Nav.current`؛ بیرون از Compose: `AppNav.go(path)`.
+   - پشتهٔ هر تب نگه داشته می‌شود (برگشت به تب ⇐ همان صفحه‌ای که بودید؛ زدنِ دوباره ⇐ ریشهٔ تب).
+   - کامپیوتر/پهن: `nav.open` هم روی پشته می‌نشیند (برگشت جزئیات را جا نمی‌اندازد)؛ پرشِ هم‌سطح فقط
+     `nav.openFromRail` (منوی کناری، فهرستِ فرمان، میان‌برها).
+   - برگشتِ سربرگ: `backOrNull` (ریشهٔ تب بی برگشت). چیدمانِ کامپیوتری در مسیر: `if (desk)`، نه `Platform.DESKTOP`
+     (پیش‌نمایشِ گوشی `LocalDeskLayout = false` می‌دهد تا عکس نسخهٔ گوشی باشد).
+   - پایینِ صفحه را پوسته نگه می‌دارد (`ShellFrame`): نوارِ شناور فقط روی ریشهٔ تب‌ها؛ صفحه `bottomReserve`
+     نمی‌خواهد و نوارِ سیستم را دوباره نمی‌شمارد (`LocalV3SystemBottom.current ?: navigationBars`).
 5. پیوندِ بیرونی: `vill3n://app/<مسیر>` (اعلان‌ها) — `DeepLinks.appLink(path)`. پیوندِ سرد پشته را از زنجیرهٔ `parent` می‌سازد.
 6. دسترسی: `needs = setOf(Need.MANAGE)` و/یا پرچمِ ماژول؛ بی‌دسترسی خودکار صفحهٔ «دسترسی ندارید» با برگشت. متنِ ویژهٔ
    همان صفحه: `V3Route(..., deniedBody = { StrX.why })` (پیش‌فرض `StrKit.noAccessBody`).
