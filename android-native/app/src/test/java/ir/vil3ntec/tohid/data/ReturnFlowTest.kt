@@ -446,4 +446,20 @@ class ReturnFlowTest {
     assertFalse(ReturnFlow.label("01JABCDEFGHJKMNPQRSTVWXYZ0").isBlank())
     assertEquals("R-WXYZ0".length + 1, ReturnFlow.label("01JABCDEFGHJKMNPQRSTVWXYZ0").length)
   }
+
+  @Test fun `QR ِ فاکتورِ نسخهٔ ۲ — نشانیِ عمومی همان فروش را پیدا می‌کند`() {
+    val d = ledger()
+    val token = ir.vil3ntec.tohid.core.receipt.ReceiptTokens.new()
+    val target = d.sales.first()
+    val withToken = d.copy(sales = d.sales.map { if (it.id == target.id) it.copy(receiptToken = token) else it })
+    assertEquals(listOf(target.id), ReturnFlow.find(withToken, "https://api.example.com/r/d2jcj71t/$token").map { it.id })
+    assertEquals(emptyList<Sale>(), ReturnFlow.find(withToken, "https://api.example.com/r/d2jcj71t/${ir.vil3ntec.tohid.core.receipt.ReceiptTokens.new()}"))
+    //  نشانِ همین دکان ⇒ پیدا؛ نشانِ دکانِ دیگر با همان توکن ⇒ هیچ، و «رسیدِ دکانِ دیگر»
+    val url = "https://api.example.com/r/d2jcj71t/$token"
+    assertEquals(listOf(target.id), ReturnFlow.find(withToken, url, shopTag = "d2jcj71t").map { it.id })
+    assertEquals(emptyList<Sale>(), ReturnFlow.find(withToken, url, shopTag = "zzzzzzzz"))
+    assertTrue(ReturnFlow.isForeignReceipt(url, "zzzzzzzz"))
+    assertFalse(ReturnFlow.isForeignReceipt(url, "d2jcj71t"))
+    assertFalse(ReturnFlow.isForeignReceipt("B1-13", "zzzzzzzz"))
+  }
 }
