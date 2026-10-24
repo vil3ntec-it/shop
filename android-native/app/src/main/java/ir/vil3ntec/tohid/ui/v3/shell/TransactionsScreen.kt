@@ -29,6 +29,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.i18n.I18n
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrHome
 import ir.vil3ntec.tohid.data.ShopData
@@ -54,7 +55,8 @@ object TransactionPaths {
 @Composable
 internal fun HomeTransactions(d: ShopData, purchases: Boolean, onOpen: (String) -> Unit, modifier: Modifier = Modifier) {
   val c = PhoneV3.colors
-  val recent = remember(d, purchases) { Transactions.recent(d, purchases = purchases) }
+  //  نوشته‌ها (مشتریِ گذری) در زبانِ همین لحظه
+  val recent = remember(d, purchases, I18n.lang) { Transactions.recent(d, purchases = purchases) }
   val today = ir.vil3ntec.tohid.todayIso()
   var open by remember { mutableStateOf<Transactions.Tx?>(null) }
   val stagger = rememberV3Stagger()
@@ -90,7 +92,7 @@ fun TransactionsScreen(d: ShopData, initialKind: Transactions.Kind?, onOpen: (St
   val kinds = TransactionPaths.kinds(purchases)
   var tab by rememberSaveable { mutableIntStateOf(kinds.indexOf(initialKind).coerceAtLeast(0)) }
   val kind = kinds[tab.coerceIn(0, kinds.lastIndex)]
-  val list = remember(d, kind, purchases) { Transactions.list(d, kind, purchases) }
+  val list = remember(d, kind, purchases, I18n.lang) { Transactions.list(d, kind, purchases) }
   val today = ir.vil3ntec.tohid.todayIso()
   var open by remember { mutableStateOf<Transactions.Tx?>(null) }
   V3Scaffold(

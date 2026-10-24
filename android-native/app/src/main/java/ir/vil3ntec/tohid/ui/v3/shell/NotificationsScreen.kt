@@ -63,7 +63,7 @@ fun NotificationsScreen(d: ShopData, initialTab: String?, onOpen: (String) -> Un
   val feedState by ShopFeed.state
   val events by ShopFeed.events
   //  «دیده‌نشده» همان لحظهٔ باز شدن سنجیده می‌شود تا نقطه‌ها همین بار دیده شوند
-  val seenAtOpen = remember { ShopFeed.seenAt.longValue.coerceAtLeast(0L) }
+  val seenAtOpen = remember { ShopFeed.load(context); ShopFeed.seenAt.longValue.coerceAtLeast(0L) }
   val me by ShopFeed.me
   val now = remember(events) { System.currentTimeMillis() }
   val days = remember(events, seenAtOpen, me, now) {

@@ -21,7 +21,8 @@ fun PhoneSearchScreen(
   initialQuery: String = "",
   bottomReserve: Dp = PhoneNav.RESERVE,
 ) {
-  SearchScreen(d, SearchIndex.sections(), initialQuery, onOpen = onOpen, onScan = {}, onBack = onBack, bottomReserve = bottomReserve)
+  val sections = androidx.compose.runtime.remember { SearchIndex.sections() }
+  SearchScreen(d, sections, initialQuery, onOpen = onOpen, onScan = {}, onBack = onBack, bottomReserve = bottomReserve)
 }
 
 /** دکمهٔ گردِ سفید (r5) — همان `V3IconButton` ِ کیت؛ ویرایشگرِ نوار هنوز با این نام صدایش می‌زند */
