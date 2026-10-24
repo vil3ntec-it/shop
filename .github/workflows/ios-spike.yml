@@ -45,3 +45,8 @@ jobs:
       - name: compileKotlinIosArm64 و iosSimulatorArm64Test
         working-directory: core
         run: ../desktop/gradlew --no-daemon -Pios=true compileKotlinIosArm64 iosSimulatorArm64Test
+      #  گواهِ این‌که آزمون‌ها واقعاً روی شبیه‌ساز اجرا شدند (شمارِ tests/failures)
+      - name: خلاصهٔ آزمون‌های شبیه‌ساز
+        if: always()
+        working-directory: core
+        run: grep -ho '<testsuite [^>]*' build/test-results/iosSimulatorArm64Test/*.xml || echo "گزارشِ آزمون نیست"
