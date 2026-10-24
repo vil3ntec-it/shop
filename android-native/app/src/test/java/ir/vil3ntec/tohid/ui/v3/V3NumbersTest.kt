@@ -25,7 +25,9 @@ class V3NumbersTest {
     }
     assertEquals(0, V3Numbers.toGrouped(raw, 0))
     assertEquals(grouped.length, V3Numbers.toGrouped(raw, raw.length))
-    assertEquals(2, V3Numbers.toGrouped("1234", 1))
+    //  پس از رقمِ اول، پیش از «,» (همان رفتارِ پیش‌فرضِ کادرهای اندروید)
+    assertEquals(1, V3Numbers.toGrouped("1234", 1))
+    assertEquals(3, V3Numbers.toGrouped("1234", 2))
   }
 
   @Test

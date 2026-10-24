@@ -67,6 +67,13 @@ class V3Nav(private val table: RouteTable, val home: String, initial: NavStack) 
     }
   }
 
+  /** برگشت از **همین** مسیر؛ اگر دیگر بالا نیست (نتیجه داده و برداشته شده)، هیچ کاری نمی‌کند */
+  fun backFrom(path: String): Boolean {
+    val g = gate
+    if (g != null) return if (g == RoutePaths.normalize(path)) back() else false
+    return if (stack.isTop(path)) back() else false
+  }
+
   fun back(): Boolean {
     if (gate != null) { gate = null; return true }
     if (stack.canPop) {
