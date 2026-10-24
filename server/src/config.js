@@ -307,6 +307,12 @@ const config = {
     //  بازبینیِ امنیتی: ۳۰۰ ⇒ ۶۰ در ربع ساعت، و سقفِ ضربه‌ای در دقیقه
     marketSearchMax: num(process.env.RATE_MARKET_SEARCH_MAX, 60),
     marketSearchBurstMax: num(process.env.RATE_MARKET_SEARCH_BURST_MAX, 10),
+    //  فاکتورِ عمومی (QRِ هر فاکتور، `/api/receipt`) به‌ازای IP: ربع‌ساعته و ضربه‌ای در دقیقه.
+    //  سقفِ ربع‌ساعته گشاد است: مشتری‌های پشتِ NAT ِ اپراتور یک IP دارند؛ ضربه‌ای تنگ می‌ماند
+    receiptReadMax: num(process.env.RATE_RECEIPT_READ_MAX, 300),
+    receiptReadBurstMax: num(process.env.RATE_RECEIPT_READ_BURST_MAX, 10),
+    //  بارگذاریِ لوگوی فاکتور به‌ازای دکان در شبانه‌روز (لوگوی پیشین پاک می‌شود؛ این سقف بارِ دیسک را می‌بندد)
+    receiptLogoDailyMax: num(process.env.RATE_RECEIPT_LOGO_DAILY_MAX, 20),
   },
 
   /**
