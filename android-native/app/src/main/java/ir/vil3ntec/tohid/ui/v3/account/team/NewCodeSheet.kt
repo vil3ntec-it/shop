@@ -3,6 +3,7 @@ package ir.vil3ntec.tohid.ui.v3.account.team
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -34,7 +35,10 @@ import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
 import ir.vil3ntec.tohid.ui.theme.V3Tone
 import ir.vil3ntec.tohid.ui.v3.V3Button
+import ir.vil3ntec.tohid.ui.v3.V3Chip
+import ir.vil3ntec.tohid.ui.v3.V3ChipRow
 import ir.vil3ntec.tohid.ui.v3.V3FieldKind
+import ir.vil3ntec.tohid.ui.v3.V3Message
 import ir.vil3ntec.tohid.ui.v3.V3Sheet
 import ir.vil3ntec.tohid.ui.v3.V3TextField
 import ir.vil3ntec.tohid.ui.v3.V3Type
@@ -42,6 +46,7 @@ import ir.vil3ntec.tohid.ui.v3.account.AccountPaths
 import ir.vil3ntec.tohid.ui.v3.account.DraftCodeReveal
 import ir.vil3ntec.tohid.ui.v3.account.DraftSelectCard
 import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
+import ir.vil3ntec.tohid.ui.v3.v3Shake
 import kotlinx.coroutines.launch
 
 /** فرمِ «کد پیوستن تازه» در برگه: کارت‌های نقش، چند بار، چند روز، «بساز» */
@@ -52,6 +57,8 @@ internal fun NewCodeContent(
   days: String,
   courierAllowed: Boolean,
   busy: Boolean,
+  /** متنِ ردِ سرور (مثلاً مهلتِ نادرستِ پیک) — درجا، با لرزشِ خطا */
+  error: String?,
   onRole: (String) -> Unit,
   onUses: (String) -> Unit,
   onDays: (String) -> Unit,
@@ -79,7 +86,20 @@ internal fun NewCodeContent(
     Spacer(Modifier.height(6.dp))
     V3TextField(uses, onUses, StrAccount.usesField, kind = V3FieldKind.NUMBER, enabled = role != NewCodeModel.COURIER)
     Spacer(Modifier.height(12.dp))
-    V3TextField(days, onDays, StrAccount.daysField, kind = V3FieldKind.NUMBER)
+    if (role == NewCodeModel.COURIER) {
+      //  پیک فقط مهلتِ ۱ تا ۷ روز دارد (سرور «همیشه» را رد می‌کند)
+      Text(StrAccount.courierExpiry, style = V3Type.subhead, color = c.inkMuted)
+      Spacer(Modifier.height(6.dp))
+      V3ChipRow(contentPadding = PaddingValues(0.dp)) {
+        NewCodeModel.courierDays.forEach { d -> V3Chip(Str.days(d), selected = days == d.toString(), onClick = { onDays(d.toString()) }) }
+      }
+    } else {
+      V3TextField(days, onDays, StrAccount.daysField, kind = V3FieldKind.NUMBER)
+    }
+    if (error != null) {
+      Spacer(Modifier.height(12.dp))
+      V3Message(V3Tone.ERROR, error, Modifier.v3Shake(error))
+    }
     Spacer(Modifier.height(18.dp))
     V3Button(StrAccount.create, onCreate, Modifier.fillMaxWidth(), loading = busy, haptic = true)
   }
@@ -96,14 +116,16 @@ internal fun RouteScope.NewCodeRoute() {
   var uses by rememberSaveable { mutableStateOf("1") }
   var days by rememberSaveable { mutableStateOf("7") }
   var busy by remember { mutableStateOf(false) }
+  var error by remember { mutableStateOf<String?>(null) }
   NewCodeContent(
-    role, uses, days, team.courierAllowed, busy,
-    onRole = { role = it; uses = NewCodeModel.usesAfterPick(it, uses) },
-    onUses = { uses = it },
-    onDays = { days = it },
+    role, uses, days, team.courierAllowed, busy, error,
+    onRole = { role = it; uses = NewCodeModel.usesAfterPick(it, uses); days = NewCodeModel.daysAfterPick(it, days); error = null },
+    onUses = { uses = it; error = null },
+    onDays = { days = it; error = null },
     onCreate = {
       val r = NewCodeModel.request(role, uses, days)
       busy = true
+      error = null
       scope.launch {
         shops.createStaffCode(r.role, r.maxUses, r.days)
           .onSuccess { issued ->
@@ -112,7 +134,8 @@ internal fun RouteScope.NewCodeRoute() {
             nav.replace(AccountPaths.REVEAL)
             TeamSession.scope.launch { team.reload(shops, ShopRole.current(context) == ShopRole.OWNER) }
           }
-          .onFailure { toasts.show(it.userMessage, V3Tone.ERROR) }
+          //  متنِ خودِ سرور (مثلاً «مهلتِ کدِ دعوتِ پیک باید ۱ تا ۷ روز باشد») درجا
+          .onFailure { error = it.userMessage }
         busy = false
       }
     },

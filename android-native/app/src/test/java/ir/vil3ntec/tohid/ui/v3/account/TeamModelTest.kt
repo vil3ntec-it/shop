@@ -59,6 +59,19 @@ class TeamModelTest {
     assertEquals("9", NewCodeModel.usesAfterPick("staff", "9"))
     assertEquals(NewCodeModel.Request("staff", 1, 0), NewCodeModel.request("staff", "x", ""))
     assertEquals(NewCodeModel.Request("manager", 0, 7), NewCodeModel.request("manager", "0", " 7 "))
+    assertEquals(NewCodeModel.Request("staff", 3, 0), NewCodeModel.request("staff", "3", "0"))
+  }
+
+  @Test
+  fun `دعوتِ پیک — یک‌بارمصرف و مهلتِ ۱ تا ۷ روز (سرور «همیشه» را رد می‌کند)`() {
+    assertTrue(NewCodeModel.courierDays.all { it in 1..7 })
+    assertEquals("3", NewCodeModel.daysAfterPick("courier", "0"))
+    assertEquals("3", NewCodeModel.daysAfterPick("courier", "30"))
+    assertEquals("5", NewCodeModel.daysAfterPick("courier", "5"))
+    assertEquals("0", NewCodeModel.daysAfterPick("staff", "0"))
+    assertEquals(NewCodeModel.Request("courier", 1, 3), NewCodeModel.request("courier", "9", "0"))
+    assertEquals(NewCodeModel.Request("courier", 1, 7), NewCodeModel.request("courier", "1", "7"))
+    assertEquals(NewCodeModel.Request("courier", 1, 3), NewCodeModel.request("courier", "1", "8"))
   }
 
   private val catalog = listOf(

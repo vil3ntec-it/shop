@@ -161,6 +161,7 @@ object StrAccount {
   val roleManagerDetail: String get() = t("همه‌کاره جز حذف دکان", "Everything except deleting the shop", "ټول کارونه پرته د دوکان له ړنګولو")
   val roleCourierDetail: String get() = t("فقط مأموریت‌های خودش", "Only their own deliveries", "یوازې خپلې دندې")
   val usesField: String get() = t("چند بار قابل استفاده (۰ = بی‌شمار)", "How many uses (0 = unlimited)", "څو ځله کارول کېږي (۰ = بې حده)")
+  val courierExpiry: String get() = t("مهلتِ کدِ پیک (۱ تا ۷ روز، یک بار مصرف)", "Courier code expiry (1–7 days, single use)", "د رسوونکي د کوډ موده (۱ تر ۷ ورځې، یو ځل)")
   val daysField: String get() = t("تا چند روز معتبر (۰ = همیشه)", "Valid for how many days (0 = always)", "څو ورځې معتبر (۰ = تل)")
   val create: String get() = t("بساز", "Create", "جوړ یې کړه")
   val revealTitle: String get() = t("این کد را به شاگردتان بدهید", "Give this code to your staff", "دا کوډ خپل شاګرد ته ورکړئ")
