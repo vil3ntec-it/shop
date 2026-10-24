@@ -116,6 +116,9 @@ object SalesEngine {
    */
   const val ALREADY_POSTED = "این فاکتور یک بار ثبت شده است و دوباره ثبت نمی‌شود"
 
+  /** `DebtTransaction.kind` ِ «برد»ی که فروشِ نسیه می‌سازد (کنارِ `sale_cancel`/`customer_return`) */
+  const val SALE_CREDIT = "sale_credit"
+
   private val FRACTIONAL_UNITS = setOf("کیلو", "کیلوگرم", "گرم", "لیتر", "میلی‌لیتر", "متر")
 
   fun isFractionalUnit(unit: String): Boolean = unit in FRACTIONAL_UNITS
@@ -427,6 +430,9 @@ object SalesEngine {
         date = today,
         notes = "فروش نسیه — فاکتور #${sale.invoiceLabel()}",
         createdAt = now,
+        //  ساختهٔ سیستم: اگر سرور این فاکتور را (سقفِ تخفیف) رد کند، این «برد» هم با آن برمی‌گردد
+        refId = saleId,
+        kind = SALE_CREDIT,
       )
     }
 
