@@ -1,0 +1,47 @@
+name: ios-spike
+
+#  آزمایشِ امکانِ آیفون: آیا `core` (منطقِ خالص، commonMain) برای iOS کامپایل
+#  می‌شود و آزمون‌هایش روی شبیه‌سازِ iOS سبزند؟ هدف‌های iOS فقط با `-Pios=true`
+#  روشن می‌شوند (core/build.gradle.kts)، پس ساختِ اندروید و کامپیوتر دست نمی‌خورد.
+#  بی رمز، بی امضا، بی انتشار.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'core/**'
+      - '.github/workflows/ios-spike.yml'
+
+concurrency:
+  group: ios-spike-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  ios:
+    name: کامپایلِ core برای iOS و آزمون روی شبیه‌ساز
+    runs-on: macos-latest
+    timeout-minutes: 45
+    env:
+      LC_ALL: en_US.UTF-8
+      LANG: en_US.UTF-8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      #  ابزارهای Kotlin/Native (~/.konan) سنگین‌اند؛ نگه‌شان می‌داریم
+      - uses: actions/cache@v4
+        with:
+          path: ~/.konan
+          key: konan-${{ runner.os }}-${{ hashFiles('core/build.gradle.kts') }}
+      - name: نسخهٔ Xcode
+        run: xcodebuild -version
+      #  core خودش gradlew ندارد؛ همان wrapperِ desktop (Gradle 8.14.3) با `-p`
+      - name: compileKotlinIosArm64 و iosSimulatorArm64Test
+        working-directory: core
+        run: ../desktop/gradlew --no-daemon -Pios=true compileKotlinIosArm64 iosSimulatorArm64Test
