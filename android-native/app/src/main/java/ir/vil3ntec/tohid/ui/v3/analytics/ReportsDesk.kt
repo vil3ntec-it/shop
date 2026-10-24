@@ -50,6 +50,7 @@ import ir.vil3ntec.tohid.ui.screens.DeskFreshReports
 import ir.vil3ntec.tohid.ui.screens.MotionSpec
 import ir.vil3ntec.tohid.ui.screens.MotionTokens
 import ir.vil3ntec.tohid.ui.screens.ReportFresh
+import ir.vil3ntec.tohid.ui.screens.hint
 import ir.vil3ntec.tohid.ui.screens.matches
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Palette
