@@ -191,18 +191,20 @@ internal fun ProductsStatsCard(stats: ProductsListModel.Stats, modifier: Modifie
     Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), verticalAlignment = Alignment.CenterVertically) {
       StatCell(StrProducts.statItems, items.toLong().toString(), null, Modifier.weight(0.8f))
       Box(Modifier.width(1.dp).fillMaxHeight().background(c.hairline))
-      StatCell(StrProducts.statPotential, "${money(profit)} ؋", StrProducts.statPotentialCaption, Modifier.weight(1.2f))
+      //  عددِ میلیاردی در خانه جا شود: اندازهٔ نوشته از عددِ پایانی (نه از شمارنده) تا وسطِ شمارش نپرد
+      val long = money(stats.potentialProfit).length > LONG_FIGURE
+      StatCell(StrProducts.statPotential, "${money(profit)} ؋", StrProducts.statPotentialCaption, Modifier.weight(1.2f), small = long)
     }
   }
 }
 
 @Composable
-private fun StatCell(label: String, value: String, caption: String?, modifier: Modifier) {
+private fun StatCell(label: String, value: String, caption: String?, modifier: Modifier, small: Boolean = false) {
   val c = PhoneV3.colors
   Column(modifier.padding(horizontal = 16.dp)) {
     Text(label, style = V3Type.footnote, color = c.inkMuted, maxLines = 1)
     Spacer(Modifier.height(4.dp))
-    Text(value, style = V3Type.figure, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    Text(value, style = if (small) V3Type.title else V3Type.figure, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
     if (caption != null) Text(caption, style = V3Type.caption, color = c.inkMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
   }
 }
@@ -236,3 +238,6 @@ internal fun Modifier.draftGroupItem(first: Boolean, last: Boolean, radius: Dp =
 /** خطِ میانِ ردیف‌های همان تکه (زیرِ متن، نه زیرِ عکس) */
 @Composable
 internal fun RowDivider() = V3Divider(start = 72.dp)
+
+/** بیش از این نویسه، عددِ آمار با نوشتهٔ کوچک‌تر */
+private const val LONG_FIGURE = 9
