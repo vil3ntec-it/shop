@@ -14,6 +14,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.LocaleChoice
+import ir.vil3ntec.tohid.core.i18n.I18n
 import ir.vil3ntec.tohid.core.i18n.Lang
 import ir.vil3ntec.tohid.core.i18n.StrSettings
 import ir.vil3ntec.tohid.core.text.LocaleFormat
@@ -34,9 +35,16 @@ private const val SAMPLE = 1250.0
 
 private val DIGITS = listOf(LocaleFormat.DIGITS_LATN, LocaleFormat.DIGITS_FA)
 private val SYMBOLS = listOf(LocaleFormat.SYMBOL_WORD, LocaleFormat.SYMBOL_SIGN)
+private val CALENDARS = listOf(I18n.CAL_AUTO, I18n.CAL_SOLAR, I18n.CAL_GREGORIAN)
+
+private fun calendarLabel(c: String): String = when (c) {
+  I18n.CAL_SOLAR -> StrSettings.calSolar
+  I18n.CAL_GREGORIAN -> StrSettings.calGregorian
+  else -> StrSettings.calAuto
+}
 
 /**
- *  `settings/general/digits`: رقمِ صفحه و فاکتور (LOC-05) و نمادِ پول (LOC-07)، با
+ *  `settings/general/digits`: رقمِ صفحه و فاکتور (LOC-05)، تقویمِ نمایش و نمادِ پول (LOC-07)، با
  *  نمونهٔ زندهٔ مبلغ. چیزی که ذخیره و همگام می‌شود همیشه رقمِ لاتین است.
  */
 @Composable
@@ -58,7 +66,13 @@ internal fun RouteScope.DigitsScreen(onBack: (() -> Unit)?) {
       SettingsBlock {
         V3Segmented(DIGITS.map(SettingsIndexModel::digitsLabel), DIGITS.indexOf(digits).coerceAtLeast(0), { LocaleChoice.setDigits(context, DIGITS[it]) })
       }
-      SettingsNote(if (AppLanguage.lang == Lang.EN) StrSettings.digitsEnNote else StrSettings.digitsNote)
+      SettingsNote(if (LocaleChoice.lang == Lang.EN) StrSettings.digitsEnNote else StrSettings.digitsNote)
+    }
+    item(key = "calendar") {
+      SettingsBlock {
+        V3Segmented(CALENDARS.map(::calendarLabel), CALENDARS.indexOf(LocaleChoice.calendar).coerceAtLeast(0), { LocaleChoice.setCalendar(context, CALENDARS[it]) })
+      }
+      SettingsNote(StrSettings.calNote)
     }
     item(key = "symbol") {
       SettingsBlock {

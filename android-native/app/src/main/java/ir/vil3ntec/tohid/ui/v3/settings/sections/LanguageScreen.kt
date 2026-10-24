@@ -33,7 +33,7 @@ import ir.vil3ntec.tohid.ui.v3.settings.SettingsPageFrame
 @Composable
 internal fun RouteScope.LanguageScreen(onBack: (() -> Unit)?) {
   val context = LocalContext.current
-  val lang = AppLanguage.lang
+  val lang = LocaleChoice.lang
   val months = LocaleChoice.months
   SettingsPageFrame(title = SettingsLayout.labelOf("زبان"), onBack = onBack) {
     item(key = "lang") {
@@ -45,7 +45,7 @@ internal fun RouteScope.LanguageScreen(onBack: (() -> Unit)?) {
             tile = false,
             chevron = false,
             trailing = if (l == lang) ({ Check() }) else null,
-            onClick = { if (l != lang) { Haptics.confirm(context); AppLanguage.set(context, l) } },
+            onClick = { if (l != lang) { Haptics.confirm(context); LocaleChoice.setLang(context, l) } },
           )
         }
       }

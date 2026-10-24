@@ -48,7 +48,6 @@ import ir.vil3ntec.tohid.ui.v3.V3Section
 import ir.vil3ntec.tohid.ui.v3.V3Toggle
 import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.ui.v3.nav.SettingsEntry
-import ir.vil3ntec.tohid.ui.v3.settings.sections.AppLanguage
 import ir.vil3ntec.tohid.ui.v3.settings.sections.rememberLockOn
 
 /** خطِ مویی میانِ ردیف‌ها، از زیرِ متن (آیکنِ ۲۴ + فاصله‌ها) */
@@ -73,7 +72,7 @@ internal fun rememberSettingsFacts(theme: ThemeChoice): SettingsFacts {
   return SettingsFacts(
     debtLimit = remember { Watchman.debtLimit(context) },
     theme = theme,
-    lang = AppLanguage.lang,
+    lang = LocaleChoice.lang,
     digits = LocaleChoice.digits,
     symbol = LocaleChoice.symbol,
     lockOn = rememberLockOn(),
