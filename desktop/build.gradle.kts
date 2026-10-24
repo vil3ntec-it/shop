@@ -87,6 +87,9 @@ val replaced = listOf(
   "ui/PressMenu.kt",
   //  «این کامپیوتر است» — اندازه‌ها، پنجره‌ها و نوارهای کامپیوتری (‎ui/Platform.kt‎)
   "ui/Platform.kt",
+  //  بانکِ تصاویر: دوربینِ راهنما فقط گوشی است؛ نامِ فایل از دیسک، نه ContentResolver
+  "scan/GuidedCapture.kt",
+  "data/FileName.kt",
 ).map { "ir/vil3ntec/tohid/$it" }
 
 val generated = layout.buildDirectory.dir("generated/tohid")

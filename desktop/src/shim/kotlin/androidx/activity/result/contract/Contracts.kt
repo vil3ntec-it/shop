@@ -65,6 +65,17 @@ class ActivityResultContracts private constructor() {
     }
   }
 
+  /** چند فایل با یک پنجره (ورودِ گروهیِ عکس) — همان `FileDialog` با چندانتخابی */
+  class GetMultipleContents : ActivityResultContract<String, List<Uri>>() {
+    override fun run(input: String, done: (List<Uri>) -> Unit) {
+      val d = FileDialog(DesktopFiles.owner, "انتخابِ فایل‌ها", FileDialog.LOAD)
+      d.isMultipleMode = true
+      if (input.startsWith("image/")) d.setFilenameFilter { _, name -> DesktopFiles.IMAGE(name.lowercase()) }
+      d.isVisible = true
+      done(d.files?.map(Uri::fromFile) ?: emptyList())
+    }
+  }
+
   class CreateDocument(private val mime: String = "*/*") : ActivityResultContract<String, Uri?>() {
     override fun run(input: String, done: (Uri?) -> Unit) =
       done(DesktopFiles.save("ذخیره", input)?.let(Uri::fromFile))
