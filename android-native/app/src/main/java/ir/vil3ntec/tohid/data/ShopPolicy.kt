@@ -21,4 +21,16 @@ object ShopPolicy {
   fun setBlockExpired(context: Context, on: Boolean) {
     prefs(context).edit().putBoolean(BLOCK_EXPIRED, on).apply()
   }
+
+  /*
+   *  PAY (v3 A4) — «پرداختِ ترکیبی و صندوقِ شیفت» (`PayFlow`). پیش‌فرض **خاموش**:
+   *  فروش همان نقد/نسیه و صندوق همان `CashShift`ِ امروز. فقط روی همین دستگاه.
+   */
+  private const val PAY_V2 = "pay_v2"
+
+  fun payV2(context: Context): Boolean = prefs(context).getBoolean(PAY_V2, false)
+
+  fun setPayV2(context: Context, on: Boolean) {
+    prefs(context).edit().putBoolean(PAY_V2, on).apply()
+  }
 }
