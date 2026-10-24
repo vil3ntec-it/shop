@@ -53,6 +53,8 @@ async function main() {
   //  بی پرچمِ `shop.order_notify` صفش خالی است و کاری نمی‌کند
   const orderNotify = require('./lib/order-notify');
   orderNotify.start();
+  //  ORD-05: زمان‌سنجِ قبولِ سفارشِ ویترین (۱۵ دقیقه؛ فقط سفارشِ مُهرخورده)
+  require('./lib/order-timeout').start();
   //  نسخهٔ schemaی هر بخش از کد به دفتر می‌رود — پنل و مدیر از همان‌جا می‌خوانند
   require('./lib/sync-v1').syncSchemaTable().catch((e) => console.error('[sync] app_schema', e.message));
   //  «چیزی عوض شد» ⇒ دستگاه‌های دیگرِ همان حساب Pull می‌کنند
