@@ -87,7 +87,7 @@ internal fun AuthFlow(ui: AuthUi, env: AuthEnv, act: AuthActions, onClose: (() -
   val back = ui.back()
   //  برگشتِ گوشی/«Esc» ِ کامپیوتر: یک پله؛ در ریشه کارِ صدازننده. صفحهٔ پیک برگشتِ خودش را دارد.
   BackHandler(enabled = ui.step != AuthStep.COURIER && (back != null || onClose != null) && !env.done) {
-    if (back != null) act.edit { back } else onClose?.invoke()
+    if (back != null) act.edit { it.back() ?: it } else onClose?.invoke()
   }
   val stepBack: (() -> Unit)? = when {
     back != null -> ({ act.edit { it.back() ?: it } })

@@ -76,7 +76,7 @@ class AuthController(
   /** «می‌شود به سرور زد یا نه» را پیکربندی می‌گوید — نه چیزی که کاربر تایپ کرده */
   val ready: Boolean get() = AppConfig.isConfigured(context)
 
-  /** خطاهای کادرها هم با هر تغییر پاک می‌شوند */
+  /** هر نوشتن و جابه‌جاییِ صفحه (کادرها، گام‌ها) از همین می‌گذرد — تابعِ خالص روی `AuthUi` */
   override fun edit(change: (AuthUi) -> AuthUi) { ui = change(ui) }
 
   suspend fun loadServerConfig() {
