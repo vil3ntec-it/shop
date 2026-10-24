@@ -150,15 +150,39 @@ async function sinceOf(shopId) {
   return v === null ? null : Math.max(v, deployFloor());
 }
 
+/** لحظهٔ راه‌اندازیِ همین فرایند ([claimFloorsAtStart]) — ۰ یعنی هنوز نه */
+let startedAt = 0;
+/** [claimFloorsAtStart] آن را پیش از هر کاری می‌گذارد؛ آزمون شبیه‌سازیِ «هنوز نرسیده» */
+function markStarted(at) { startedAt = Number.isSafeInteger(at) && at > 0 ? at : 0; }
+
+/** آیا کدِ پیشین سفارشِ این دکان را خودکار کم می‌کرد؟ (یکی از [LEGACY_FLAGS]: خودِ دکان بر `all` جلو می‌افتد) */
+async function legacyFlagged(shopId) {
+  const db = require('../db');
+  const rows = await db.many(
+    'SELECT scope, key, value FROM live_config WHERE key = ANY($1::text[]) AND scope IN ($2, $3)',
+    [[...LEGACY_FLAGS], 'all', String(shopId)]
+  );
+  return LEGACY_FLAGS.some((k) => {
+    let v;
+    for (const r of rows) if (r.key === k && r.scope === 'all') v = decode(r.value);
+    for (const r of rows) if (r.key === k && r.scope !== 'all') v = decode(r.value);
+    return v === true;
+  });
+}
+
 /**
- * برنامه‌ای که «فروشِ تحویل» دارد این دکان را می‌بیند ⇒ کف اگر نیست همین لحظه (زمانِ سرور) گذاشته
- * می‌شود؛ هست ⇒ دست نمی‌خورد (دو دستگاهِ هم‌زمان: نخستین درج می‌ماند). ⇒ کفِ مؤثر.
+ * برنامه‌ای که «فروشِ تحویل» دارد این دکان را می‌بیند ⇒ کف اگر نیست گذاشته می‌شود؛ هست ⇒ دست
+ * نمی‌خورد (دو دستگاهِ هم‌زمان: نخستین درج می‌ماند). ⇒ کفِ مؤثر.
+ * لحظه: دکانی که کدِ پیشین سفارشش را خودکار کم می‌کرد ([legacyFlagged]) ⇒ **لحظهٔ راه‌اندازی**
+ * (اگر کفِ راه‌اندازی به او نرسیده یا شکست خورده بود، تحویلِ میانِ راه‌اندازی و همین config گم
+ * نمی‌شود)؛ بقیه ⇒ همین لحظه (زمانِ سرور).
  */
 async function claimFloor(shopId, by = '') {
   const have = await sinceOf(shopId);
   if (have !== null) return have;
   const db = require('../db');
-  await require('./live-config').setOnce(String(shopId), FLOOR_KEY, Math.max(db.now(), deployFloor()), `app:${String(by || '')}`.slice(0, 80));
+  const at = startedAt && (await legacyFlagged(shopId)) ? startedAt : db.now();
+  await require('./live-config').setOnce(String(shopId), FLOOR_KEY, Math.max(at, deployFloor()), `app:${String(by || '')}`.slice(0, 80));
   return sinceOf(shopId);
 }
 
@@ -174,6 +198,7 @@ const LEGACY_FLAGS = Object.freeze(['shop.orders.ledger', 'shop.catalog']);
 async function claimFloorsAtStart(at) {
   const db = require('../db');
   const t = Math.max(Number.isSafeInteger(at) ? at : db.now(), deployFloor());
+  markStarted(t);
   const rows = await db.many(
     'SELECT scope, key, value FROM live_config WHERE key = ANY($1::text[])', [[...LEGACY_FLAGS, FLOOR_KEY]]
   );
@@ -232,6 +257,34 @@ async function judgeOf(shopId, viewer) {
   };
 }
 
+/** «بررسی شد» ِ صاحب برای ردیفِ بررسی — سطرِ دفترِ ممیزی با هدفِ `<سفارش>:<نوع>` */
+const REVIEW_ACK = 'orders.handover_review_ack';
+/** `before_floor`: ردیفِ `review` ِ سرور؛ `reverse_blocked`: برگشت به دکان پس از «مرجوعیِ» دستی */
+const ACK_KINDS = Object.freeze(['before_floor', 'reverse_blocked']);
+const ackTarget = (orderId, kind) => `${orderId}:${kind}`;
+
+/**
+ * صاحب یا مدیر ردیفِ بررسی را دید و کارش را کرد ⇒ از `review` (و برای `reverse_blocked` از
+ * `reversals`) ِ **همهٔ** دستگاه‌ها برداشته می‌شود و دیگر هیچ کارِ خودکاری برایش نیست. جای نگه‌داری
+ * همان دفترِ ممیزی است (migration ِ تازه نه)؛ تکرار ⇒ همان یک سطر (`once`).
+ */
+async function ackReview(shopId, orderId, kind, actor) {
+  const errors = require('../middleware/errors');
+  //  اول سفارشِ همین دکان (دکانِ دیگر ⇒ ۴۰۴، بی نشت)، بعد نوع
+  const o = await require('./orders').get(shopId, String(orderId || ''), actor);
+  if (!ACK_KINDS.includes(String(kind || ''))) throw errors.badRequest('نوعِ بررسی معتبر نیست', 'bad_kind');
+  const target = ackTarget(o.id, kind);
+  await require('./audit').log({
+    shopId, actorType: 'user', userId: actor && actor.id ? String(actor.id) : '', action: REVIEW_ACK,
+    targetType: 'order_review', targetId: target, detail: { orderId: o.id, orderNo: o.orderNo, kind }, once: true,
+  });
+  const db = require('../db');
+  const done = await db.one('SELECT 1 AS x FROM audit_logs WHERE shop_id=$1 AND action=$2 AND target_id=$3 LIMIT 1',
+    [shopId, REVIEW_ACK, target]);
+  if (!done) throw new errors.ApiError(500, 'ack_not_saved', '«بررسی شد» ذخیره نشد؛ دوباره بزنید');
+  return { orderId: o.id, kind, acked: true };
+}
+
 /** سندهای W ِ قدیمیِ یک سفارش (پنل و آزمون) */
 async function docsOf(run, orderId) {
   const q = typeof run === 'function' ? run : (t, p) => run.query(t, p);
@@ -275,6 +328,9 @@ async function handoverPending(shopId, { since = 0, after = '', orderId = '', li
         AND r.account_id = o.shop_id AND r.table_name='sales' AND r.deleted_at IS NULL AND ${cond}`;
   const noSale = (table) => `NOT EXISTS (${rowsOf(table, "r.row_id IN ('o-' || o.id, 'w-' || o.id)")})`;
   const liveSale = (table) => `EXISTS (${rowsOf(table, "r.row_id = 'o-' || o.id AND COALESCE(r.data->>'status', '') <> 'cancelled'")})`;
+  //  صاحب «بررسی شد» زده ⇒ دیگر نه در review، نه (برای reverse_blocked) در reversals
+  const acked = (kind) => `NOT EXISTS (SELECT 1 FROM audit_logs a WHERE a.shop_id = o.shop_id AND a.action = '${REVIEW_ACK}'
+        AND a.target_id = o.id || ':${kind}')`;
 
   const params = [shopId, HANDED_OVER, OUT_OF_SHOP, from];
   let extra = '';
@@ -310,6 +366,7 @@ async function handoverPending(shopId, { since = 0, after = '', orderId = '', li
        JOIN online_order_events e ON e.order_id = o.id AND e.kind = 'status' AND e.to_status = ANY($2::text[])
       WHERE o.shop_id = $1 AND o.is_test = false AND o.status = ANY($2::text[]) AND o.updated_at >= $3 ${rextra}
         AND (${liveSale('sync_rows')}${v3 ? ` OR ${liveSale('sync_v3_rows')}` : ''})
+        AND ${acked('reverse_blocked')}
       GROUP BY o.id
       ORDER BY 2, 1
       LIMIT ${MAX_PENDING}`,
@@ -325,7 +382,7 @@ async function handoverPending(shopId, { since = 0, after = '', orderId = '', li
        FROM online_orders o
        JOIN online_order_events e ON e.order_id = o.id AND e.kind = 'status' AND e.to_status = ANY($2::text[])
       WHERE o.shop_id = $1 AND o.is_test = false AND o.status = ANY($3::text[]) AND o.updated_at >= $4 ${vextra}
-        AND ${noSale('sync_rows')} ${v3 ? `AND ${noSale('sync_v3_rows')}` : ''}
+        AND ${noSale('sync_rows')} ${v3 ? `AND ${noSale('sync_v3_rows')}` : ''} AND ${acked('before_floor')}
       GROUP BY o.id
      HAVING MIN(e.created_at) < $4 AND MAX(e.created_at) >= $4
       ORDER BY 2, 1
@@ -357,6 +414,6 @@ async function handoverPending(shopId, { since = 0, after = '', orderId = '', li
 
 module.exports = {
   SERIES, ORDER_SERIES, HANDED_OVER, OUT_OF_SHOP, BACK_IN_SHOP, MAX_PENDING, FLOOR_KEY, SALE_CAP, SALE_TABLES,
-  LEGACY_FLAGS, saleIdOf, legacySaleIdOf, chainOf, docsOf, capsOf, capsFor, judgeOf, deployFloor, floorOf, sinceOf,
+  LEGACY_FLAGS, REVIEW_ACK, ACK_KINDS, ackReview, markStarted, saleIdOf, legacySaleIdOf, chainOf, docsOf, capsOf, capsFor, judgeOf, deployFloor, floorOf, sinceOf,
   claimFloor, claimFloorsAtStart, handoverPending,
 };
