@@ -355,13 +355,13 @@ test('سفارش‌های من: فقط با بلیت، فقط همان شمار�
    ۴) سقفِ درخواست و موجودی
    ══════════════════════════════════════════════════════════════════ */
 
-test('سقفِ جست‌وجو به‌ازای IP ⇒ ۴۲۹ (ضربه‌ای: ۱۰ در دقیقه، کنارِ سقفِ ربع‌ساعته)', async () => {
+test('سقفِ جست‌وجو به‌ازای IP ⇒ ۴۲۹ (ضربه‌ای: ۳۰ در دقیقه — امن برای CGNAT ِ اپراتور — کنارِ سقفِ ربع‌ساعته)', async () => {
   await setFlag('all', 'market.directory', true);
   const config = require('../src/config');
-  assert.equal(config.rateLimit.marketSearchBurstMax, 10);
+  assert.equal(config.rateLimit.marketSearchBurstMax, 30);
   const statuses = [];
-  for (let i = 0; i < 11; i++) statuses.push((await h.get(`/api/market/search?q=${encodeURIComponent('برنج')}`)).status);
-  assert.deepEqual(statuses, [...Array(10).fill(200), 429]);
+  for (let i = 0; i < 31; i++) statuses.push((await h.get(`/api/market/search?q=${encodeURIComponent('برنج')}`)).status);
+  assert.deepEqual(statuses, [...Array(30).fill(200), 429]);
   //  فهرست سطلِ خودش را دارد
   assert.equal((await h.get('/api/market/shops')).status, 200);
 });
