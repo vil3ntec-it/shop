@@ -10,9 +10,6 @@ import ir.vil3ntec.tohid.core.model.ShopDeviceDto
 import ir.vil3ntec.tohid.core.model.ShopPermsDto
 import ir.vil3ntec.tohid.core.model.StaffCodeDto
 import ir.vil3ntec.tohid.data.repo.ShopRepository
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 
 /**
  *  دادهٔ کارمندان که چند مسیر با هم می‌خوانند (`team`، `team/members/{id}`، برگه‌های
@@ -58,9 +55,6 @@ internal class TeamData {
 internal object TeamSession {
   val data = TeamData()
 
-  /**
-   *  کارِ برگه‌های تأیید (برداشتن، از کار انداختن) پس از بسته شدنِ برگه ادامه دارد؛
-   *  دامنهٔ خودِ برگه با بسته شدنش لغو می‌شد و درخواست نیمه‌کاره می‌ماند.
-   */
-  val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+  /** کارِ برگه‌ها پس از بسته شدنشان ادامه دارد (`AccountSession.scope`) */
+  val scope get() = ir.vil3ntec.tohid.ui.v3.account.AccountSession.scope
 }

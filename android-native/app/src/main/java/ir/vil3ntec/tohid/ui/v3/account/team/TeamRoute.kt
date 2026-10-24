@@ -128,7 +128,8 @@ internal fun RouteScope.RemoveMemberRoute(id: String) {
           .onFailure { toasts.show(it.userMessage, V3Tone.ERROR) }
       }
       //  از صفحهٔ همان کارمند آمده بود؟ آن صفحه دیگر معنا ندارد
-      if (nav.current.startsWith("team/members/")) back()
+      //  (برگه پیش‌تر بسته شده، پس `nav.back()` نه `back()` ِ همین مسیر)
+      if (nav.current.startsWith("team/members/")) nav.back()
     },
     onDismiss = { back() },
   )

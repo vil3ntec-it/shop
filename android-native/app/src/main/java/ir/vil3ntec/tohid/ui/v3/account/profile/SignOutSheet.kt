@@ -85,7 +85,7 @@ internal class SignOutActions(
  */
 @Composable
 internal fun SignOutContent(ui: SignOutUi, actions: SignOutActions, onDismiss: () -> Unit) {
-  V3Sheet(onDismiss = { if (!ui.busy) onDismiss() }) { closer ->
+  V3Sheet(onDismiss = onDismiss) { closer ->
     AnimatedContent(
       targetState = ui.stage,
       modifier = Modifier.fillMaxWidth().animateContentSize(MotionSpec.sheet()),
@@ -172,7 +172,8 @@ internal fun RouteScope.SignOutRoute() {
 
   fun signOutNow() {
     busy = true
-    scope.launch {
+    //  خروج نیمه‌کاره نمی‌ماند حتی اگر برگه در این میان بسته شود
+    AccountSession.scope.launch {
       runCatching { Backend.auth(context).signOut() }
       SyncStore(context).signOut()
       AccountSession.changed()
