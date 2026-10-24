@@ -235,4 +235,5 @@ object StrHome {
   val drawer: String get() = t("صندوق", "Drawer", "صندوق")
   val safe: String get() = t("گاوصندوق", "Safe", "سېف")
   val safeSoon: String get() = t("شمارش و موجودیِ دقیقِ گاوصندوق به‌زودی همین‌جا", "Count your safe and see its exact balance here — coming soon", "د سېف شمېرنه او دقیقه موجودي ژر دلته")
+  val soon: String get() = t("به‌زودی", "Coming soon", "ژر")
 }

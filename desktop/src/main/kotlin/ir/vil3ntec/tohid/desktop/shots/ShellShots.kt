@@ -97,10 +97,10 @@ object ShellShots : GroupShots {
     Shot("home", content = { s -> Data(s) { HomeScreen(it, {}, PhoneNav.RESERVE) } }),
     Shot("home-6-alerts", content = { s -> Data(s) { HomeScreen(it, {}, PhoneNav.RESERVE, HomeShot(alerts = SIX)) } }),
     Shot("home-0-alerts", content = { s -> Data(s) { HomeScreen(it, {}, PhoneNav.RESERVE, HomeShot(alerts = emptyList())) } }),
-    Shot("home-pull", content = { s -> Data(s) { HomeScreen(it, {}, PhoneNav.RESERVE, HomeShot(pull = true)) } }),
-    Shot("home-pull-safe", content = { s -> Data(s) { HomeScreen(it, {}, PhoneNav.RESERVE, HomeShot(pull = true, pullPage = 1)) } }),
+    Shot("home-drawer", content = { s -> Data(s) { HomeScreen(it, {}, PhoneNav.RESERVE, HomeShot(heroPage = 1)) } }),
+    Shot("home-safe", content = { s -> Data(s) { HomeScreen(it, {}, PhoneNav.RESERVE, HomeShot(heroPage = 2)) } }),
     Shot("home-stats", content = { s -> Data(s) { HomeScreen(it, {}, PhoneNav.RESERVE, HomeShot(page = 1)) } }),
-    Shot("home-big", content = { s -> Data(s) { HomeScreen(it, {}, PhoneNav.RESERVE, HomeShot(big = true, pull = true)) } }),
+    Shot("home-big", content = { s -> Data(s) { HomeScreen(it, {}, PhoneNav.RESERVE, HomeShot(big = true, heroPage = 1)) } }),
     Shot("transactions", route = "transactions"),
     Shot("transaction-sheet", content = { s ->
       Data(s) { d ->

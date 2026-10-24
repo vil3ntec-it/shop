@@ -20,18 +20,17 @@ import ir.vil3ntec.tohid.ui.screens.HomeSections
  *  `alerts` = هشدارهای نمایشی (عکسِ «۶ هشدار»/«بی هشدار»)، `null` یعنی همان دادهٔ واقعی.
  */
 data class HomeShot(
-  val pull: Boolean = false,
+  /** صفحهٔ کادرِ بزرگ: ۰ فروشِ امروز، ۱ صندوق (همان که کشیدن نشان می‌دهد)، ۲ گاوصندوق */
+  val heroPage: Int = 0,
   val page: Int = 0,
   /** نامِ بلندِ دکان و عددهای درشت — آزمونِ جا شدن */
   val big: Boolean = false,
   val alerts: List<HomeAlerts.Alert>? = null,
-  /** رویِ کارتِ کششی: ۰ صندوق، ۱ گاوصندوق */
-  val pullPage: Int = 0,
 ) {
   companion object { val NONE = HomeShot() }
 }
 
-/** هر چیزی که خانه و کارتِ کششی نشان می‌دهند — یک بار به ازای هر دفتر */
+/** هر چیزی که خانه و کادرِ بزرگ نشان می‌دهند — یک بار به ازای هر دفتر */
 data class HomeView(
   val shopName: String,
   val todaySales: Double,

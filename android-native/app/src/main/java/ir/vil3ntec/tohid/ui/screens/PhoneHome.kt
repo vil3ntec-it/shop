@@ -48,7 +48,7 @@ fun PhoneHomeScreen(
   bottomReserve: Dp = PhoneNav.RESERVE,
   shot: PhoneHomeShot = PhoneHomeShot.NONE,
 ) {
-  HomeScreen(d, onOpen, bottomReserve, HomeShot(pull = shot.pull, page = shot.page, big = shot.big))
+  HomeScreen(d, onOpen, bottomReserve, HomeShot(heroPage = if (shot.pull) 1 else 0, page = shot.page, big = shot.big))
 }
 
 /** دو نقطهٔ ورقه‌ها — نقطهٔ فعال کشیده */

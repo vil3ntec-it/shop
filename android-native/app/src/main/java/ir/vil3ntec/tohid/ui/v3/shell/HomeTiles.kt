@@ -1,7 +1,6 @@
 package ir.vil3ntec.tohid.ui.v3.shell
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,21 +37,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.ui.OrdersLive
 import ir.vil3ntec.tohid.ui.screens.HomeSections
+import ir.vil3ntec.tohid.ui.screens.isDark
 import ir.vil3ntec.tohid.ui.screens.v3Text
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
-import ir.vil3ntec.tohid.ui.theme.PhoneV3Palette
 import ir.vil3ntec.tohid.ui.v3.rememberV3Stagger
 import ir.vil3ntec.tohid.ui.v3.v3Pressable
 import ir.vil3ntec.tohid.ui.v3.v3Stagger
-
-/** رنگِ هر کاشی از پالتِ پشتیبانِ VILL3N — ثابت برای هر بخش، نه به ترتیبِ جا */
-internal fun tileHue(id: String): PhoneV3Palette.Hue = when (id) {
-  "products", "receipts", "more" -> PhoneV3Palette.Hue.BRAND
-  "warehouse", "orders" -> PhoneV3Palette.Hue.ORANGE
-  "debtors", "team" -> PhoneV3Palette.Hue.BLUE
-  "expenses", "sales" -> PhoneV3Palette.Hue.PURPLE
-  else -> PhoneV3Palette.Hue.TEAL
-}
 
 /** r7: نشانهٔ پُر و رنگی روی کاشیِ روشن — تنها جای آیکنِ پُرِ رنگی در گوشی */
 internal fun tileIcon(id: String): ImageVector = when (id) {
@@ -70,7 +60,7 @@ internal fun tileIcon(id: String): ImageVector = when (id) {
 }
 
 /**
- *  شبکهٔ ۴×۲ِ «بخش‌ها» (r7) — کاشیِ روشنِ گرد با نشانهٔ رنگی و نام زیرش؛ ورودِ پلکانی
+ *  شبکهٔ ۴×۲ِ «بخش‌ها» (r7) — کاشیِ ۱۴dp با رنگِ همراهِ هر بخش و نام زیرش؛ ورودِ پلکانی
  *  بارِ اول و فشارِ فنری. هر کاشی مسیرِ نوع‌دارِ بخشِ خودش را باز می‌کند.
  */
 @Composable
@@ -83,17 +73,17 @@ internal fun HomeTiles(tiles: List<HomeSections.Tile>, onOpen: (String) -> Unit,
         row.forEachIndexed { c, t ->
           val label = t.label
           Column(Modifier.weight(1f).v3Stagger(stagger, t.id, r * 4 + c), horizontalAlignment = Alignment.CenterHorizontally) {
+            val accent = HomeAccents.ofTile(t.id)
             Box(
-              //  VILL3N §۶: سطحِ درونی روی برگهٔ سفید با مرزِ دیدنی، نه سفید روی سفید
+              //  THEME-V2: هر بخش رنگِ همراهِ خودش — آیکنِ رنگی روی پس‌زمینهٔ نرمِ همان رنگ
               Modifier
                 .v3Pressable(label = label, scale = 0.9f) { onOpen(t.route) }
-                .size(58.dp)
-                .clip(RoundedCornerShape(PhoneV3.tileRadius))
-                .background(p.tile)
-                .border(1.dp, p.hairline, RoundedCornerShape(PhoneV3.tileRadius)),
+                .size(56.dp)
+                .clip(RoundedCornerShape(HomeCardSpec.tile))
+                .background(HomeAccents.soft(p, accent, p.isDark)),
               contentAlignment = Alignment.Center,
             ) {
-              Icon(tileIcon(t.id), contentDescription = null, tint = PhoneV3Palette.glyph(p, tileHue(t.id)), modifier = Modifier.size(28.dp))
+              Icon(tileIcon(t.id), contentDescription = null, tint = HomeAccents.color(p, accent), modifier = Modifier.size(27.dp))
               if (t.id == "orders" && OrdersLive.newCount > 0) Box(
                 Modifier.align(Alignment.TopEnd).padding(8.dp).size(8.dp).clip(CircleShape).background(p.negative),
               )
