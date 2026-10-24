@@ -124,6 +124,7 @@ object OwnerExport {
     "purchaseId" to "شناسهٔ خرید",
     "warehouseEntryId" to "شناسهٔ ورودی انبار",
     "refId" to "شناسهٔ مرجع",
+    "kind" to "علتِ ردیف",
     "purchasePrice" to "قیمت خرید",
     "salePrice" to "قیمت فروش",
     "wholesalePrice" to "قیمت عمده",
