@@ -47,6 +47,12 @@ data class NavStack(val entries: List<String>, val move: Move = Move.NONE) {
   /** برگشتِ یک پله؛ در خانهٔ اول بی‌اثر */
   fun pop(): NavStack = if (canPop) NavStack(entries.dropLast(1), Move.POP) else copy(move = Move.NONE)
 
+  /**
+   *  این مسیر هنوز بالای پشته است؟ «برگشت» از مسیری که دیگر بالا نیست (مثلاً برگهٔ
+   *  اسکن که با `finish` نتیجه داد و برداشته شد) نباید صفحهٔ صدازننده را ببندد.
+   */
+  fun isTop(path: String): Boolean = current == RoutePaths.normalize(path)
+
   /** تبِ تازه: پشته از نو، فقط همان تب */
   fun switchTab(tab: String): NavStack {
     val t = RoutePaths.normalize(tab)

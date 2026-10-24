@@ -5,6 +5,10 @@ import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.PointOfSale
 import androidx.compose.material.icons.outlined.QrCodeScanner
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrKit
 import ir.vil3ntec.tohid.core.nav.MoreGroup
@@ -76,7 +80,9 @@ val SalesModule = AppModule(
     V3Route("sale/keypad/{productId}", RouteKind.SHEET, { Str.sale }, parent = SalesPaths.SALE) { LandOn(SalesPaths.SALE) },
     //  اسکن به‌عنوانِ نتیجه: کد با `finish` به صدازننده برمی‌گردد
     V3Route("scan", RouteKind.SHEET, { Str.sale }, chrome = Chrome.OWN) {
-      BarcodeScanSheet(onDismiss = { back() }, onCode = { code -> nav.finish(code) })
+      //  برگه پس از `onCode` خودش `onDismiss` هم می‌زند: پس از نتیجه، برگشتِ دوم نه
+      var got by remember { mutableStateOf(false) }
+      BarcodeScanSheet(onDismiss = { if (!got) back() }, onCode = { code -> got = true; nav.finish(code) })
     },
     V3Route(SalesPaths.HISTORY, RouteKind.TAB, { Str.salesHistory }) {
       if (Platform.DESKTOP) DeskInvoicesScreen(store, cart, data, snackbar) { nav.switchTab(SalesPaths.SALE) }
