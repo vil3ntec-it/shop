@@ -446,11 +446,28 @@ fun AppRoot(
   LaunchedEffect(railRequest) {
     if (railRequest != null) { setRail(railRequest); AppNav.rail.value = null }
   }
-  /** ☰: ثابت ⇄ آیکن؛ در حالتِ پنهان، منو را روی صفحه باز/بسته می‌کند */
+  /*
+   *  نسخهٔ ۲ — منو در صندوق (تصمیم، بازبینیِ ۱۴۰۵/۰۷/۲۷): صندوق حالتِ منوی **خودش** را
+   *  دارد (`desk_rail_pos`، پیش‌فرض «فقط آیکن») تا کاتالوگ جا بگیرد؛ بقیهٔ صفحه‌ها همان
+   *  انتخابِ کاربر (`desk_rail`، پیش‌فرض «کامل»). همان آیکن‌ها به همان ترتیب، نامِ هر بخش در
+   *  راهنمای هاور، و کلیدِ بازکردن/جمع‌کردنِ بالای منو (و ☰) انتخاب را برای همان صفحه نگه می‌دارد.
+   *  «پنهان» در همه‌جا پنهان است.
+   */
+  val onSale = Platform.DESKTOP && (sub ?: tab) == "sale"
+  var posRail by remember { mutableStateOf(uiPrefs.getString("desk_rail_pos", RailMode.COMPACT) ?: RailMode.COMPACT) }
+  fun setPosRail(m: String) {
+    posRail = m
+    railOverlay = false
+    uiPrefs.edit().putString("desk_rail_pos", m).apply()
+  }
+  val shownRail = if (onSale && railMode != RailMode.HIDDEN) posRail else railMode
+  /** حالتِ منوی همین صفحه را عوض می‌کند (صندوق: `desk_rail_pos`؛ بقیه: `desk_rail`) */
+  fun setShownRail(m: String) { if (onSale && m != RailMode.HIDDEN) setPosRail(m) else setRail(m) }
+  /** ☰: ثابت ⇄ آیکن (برای همین صفحه)؛ در حالتِ پنهان، منو را روی صفحه باز/بسته می‌کند */
   fun onMenuPress() {
-    when (railMode) {
-      RailMode.FULL -> setRail(RailMode.COMPACT)
-      RailMode.COMPACT -> setRail(RailMode.FULL)
+    when (shownRail) {
+      RailMode.FULL -> setShownRail(RailMode.COMPACT)
+      RailMode.COMPACT -> setShownRail(RailMode.FULL)
       else -> railOverlay = !railOverlay
     }
   }
@@ -548,6 +565,7 @@ fun AppRoot(
         onMenu = { onMenuPress() },
         onSearch = { AppNav.palette.value = true },
         onOpen = ::open,
+        page = sub ?: tab,
       ) else
       TohidTopBar(
         title = PAGE_TITLES[sub ?: tab] ?: "فروشگاه من",
@@ -573,8 +591,9 @@ fun AppRoot(
        *  وگرنه کاربر گمان می‌کند دفترش رفته.
        */
       SubscriptionBanner { sub = "myplan" }
-      //  نسخهٔ تازه — بررسیِ خودکار و نصب با یک دکمه (اندروید و کامپیوتر)
-      UpdateBanner()
+      //  نسخهٔ تازه — بررسیِ خودکار و نصب با یک دکمه. کامپیوتر (نسخهٔ ۲): تراشهٔ
+      //  کوچکِ سربرگ (`UpdateChip` در `DeskHeader`)، نه نوارِ تمام‌عرض
+      if (!Platform.DESKTOP) UpdateBanner()
       }
     },
     /*
@@ -651,10 +670,10 @@ fun AppRoot(
         return@Box
       }
 
-      if (wide && railMode != RailMode.HIDDEN) {
+      if (wide && shownRail != RailMode.HIDDEN) {
         val railBoard = remember(data) { ir.vil3ntec.tohid.data.DashboardEngine.board(data, ir.vil3ntec.tohid.todayIso(), 7) }
         DeskRail(
-          current = sub ?: tab, onPick = ::open, compact = railMode == RailMode.COMPACT, mode = railMode, onMode = ::setRail,
+          current = sub ?: tab, onPick = ::open, compact = shownRail == RailMode.COMPACT, mode = shownRail, onMode = ::setShownRail,
           badges = mapOf(
             "products" to railBoard.outOfStock.size + railBoard.lowStock.size,
             "warehouse" to railBoard.expiring.size,
@@ -691,8 +710,8 @@ fun AppRoot(
       }
       val railPad = when {
         !wide -> 0.dp
-        railMode == RailMode.FULL -> DESK_RAIL_WIDTH
-        railMode == RailMode.COMPACT -> DESK_RAIL_COMPACT
+        shownRail == RailMode.FULL -> DESK_RAIL_WIDTH
+        shownRail == RailMode.COMPACT -> DESK_RAIL_COMPACT
         else -> 0.dp
       }
       PageWidth(Modifier.padding(start = railPad)) {
