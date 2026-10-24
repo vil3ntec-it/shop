@@ -136,7 +136,7 @@ object PhoneNav {
     NavCatalog.ACCOUNT -> if (filled) Icons.Filled.Face else Icons.Outlined.Face
     NavCatalog.SCAN -> if (filled) Icons.Filled.QrCodeScanner else Icons.Outlined.QrCodeScanner
     NavCatalog.SETTINGS -> if (filled) Icons.Filled.Settings else Icons.Outlined.Settings
-    else -> Icons.Filled.Menu
+    else -> ir.vil3ntec.tohid.ui.v3.nav.V3Modules.navIcon(id) ?: Icons.Filled.Menu
   }
 
   /** دایرهٔ موردِ فعال — surfaceSelectedِ VILL3N (شکلِ r10: دایرهٔ روشن زیرِ آیکنِ پُر) */

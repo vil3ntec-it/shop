@@ -231,7 +231,8 @@ class HttpEngine(
       if (raw != null) {
         connection.doOutput = true
         connection.setRequestProperty("Content-Type", raw.contentType)
-        raw.headers.forEach { (k, v) -> connection.setRequestProperty(k, v) }
+        //  همان سدِ سرآیندهای درخواست: بدنهٔ خام هم توکن و هویتِ برنامه را عوض نمی‌کند
+        raw.headers.forEach { (k, v) -> if (k.lowercase() !in PROTECTED_HEADERS) connection.setRequestProperty(k, v) }
         connection.setFixedLengthStreamingMode(raw.bytes.size)
         connection.outputStream.use { it.write(raw.bytes) }
       } else if (body != null) {

@@ -38,16 +38,19 @@ object NavCatalog {
   const val SETTINGS = "settings"
   const val MORE = "more"
 
-  /** ترتیبِ فهرستِ ویرایشگر هم همین است */
-  val ALL: List<NavItemDef> = listOf(
+  /**
+   *  موردهای ساخته‌شده — ترتیبِ فهرستِ ویرایشگر هم همین است. مقصدها مسیرهای
+   *  نوع‌دارِ امروزند (`V3Modules`)؛ شناسه‌ها ماندگارند (در چیدمانِ کاربر ذخیره‌اند).
+   */
+  val BUILT_IN: List<NavItemDef> = listOf(
     NavItemDef(SEARCH, "جست‌وجو", "search"),
-    NavItemDef(HOME, "خانه", "dashboard"),
+    NavItemDef(HOME, "خانه", "home"),
     NavItemDef(SALE, "فروش", "sale"),
     NavItemDef(PRODUCTS, "کالاها", "products"),
     NavItemDef(MORE, "بیشتر", "more"),
     NavItemDef(ACCOUNT, "حساب", "profile"),
-    NavItemDef(SCAN, "اسکنِ بارکد", "sale"),
-    NavItemDef(WAREHOUSE, "انبار", "warehouse"),
+    NavItemDef(SCAN, "اسکنِ بارکد", "sale?scan=1"),
+    NavItemDef(WAREHOUSE, "انبار", "stock"),
     NavItemDef(DEBTORS, "قرض‌داران", "debtors"),
     NavItemDef(ORDERS, "سفارش‌ها", "orders"),
     NavItemDef(REPORTS, "گزارش‌ها", "reports"),
@@ -58,9 +61,16 @@ object NavCatalog {
     NavItemDef(SETTINGS, "تنظیمات", "settings"),
   )
 
-  private val byId = ALL.associateBy { it.id }
+  /**
+   *  موردهای نوارِ ماژول‌های تازه (`ModuleEntry` با `Place.NAV`) — پوسته یک بار
+   *  می‌گذارد (`V3Modules`) تا بخشِ تازه بی دست زدن به این فایل در ویرایشگر بیاید.
+   */
+  @Volatile var extras: () -> List<NavItemDef> = { emptyList() }
 
-  fun of(id: String?): NavItemDef? = id?.let { byId[it] }
+  /** همهٔ موردها: ساخته‌شده‌ها و بعد موردهای ماژول‌های تازه */
+  val ALL: List<NavItemDef> get() = BUILT_IN + extras().filter { e -> BUILT_IN.none { it.id == e.id } }
+
+  fun of(id: String?): NavItemDef? = id?.let { i -> ALL.firstOrNull { it.id == i } }
 
   /**
    *  موردهایی که این کاربر می‌تواند باز کند — همان سدهای `AppRoot`/«بیشتر»:
@@ -81,8 +91,21 @@ object NavCatalog {
    *  صفحه است (فروش و اسکن هر دو به «فروش» می‌روند؛ هر کدام که نشسته فعال
    *  می‌شود). صفحه‌ای که در نوار نیست ⇒ هیچ.
    */
-  fun activeFor(layout: NavLayout, route: String?): String? =
-    if (route == null) null else layout.ids.firstOrNull { of(it)?.route == route }
+  fun activeFor(layout: NavLayout, route: String?): String? {
+    val base = route?.substringBefore('?') ?: return null
+    return layout.ids.firstOrNull { of(it)?.route?.substringBefore('?') == base }
+  }
+
+  /**
+   *  موردِ فعالِ نوار از **ریشهٔ پشته** — تبی که صفحه درونش باز شده (AUDIT-NAV N1)، نه
+   *  بالای پشته: `[products, products/42]` ⇐ «محصولات»، `[more, reports]` ⇐ «بیشتر»، برگه روی
+   *  صفحه همان. ریشه‌ای که در نوار نیست (بخشی که از «بیشتر» یا پیوندِ سرد باز شده) ⇐ «بیشتر».
+   *  @param canonical نامِ قدیمی ⇐ مسیرِ امروز (`RouteTable.canonical`)
+   */
+  fun activeForStack(layout: NavLayout, entries: List<String>, canonical: (String) -> String = { it }): String? {
+    val root = entries.firstOrNull() ?: return null
+    return activeFor(layout, canonical(root)) ?: MORE.takeIf { it in layout.ids }
+  }
 }
 
 object NavLayouts {

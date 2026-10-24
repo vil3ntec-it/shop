@@ -85,6 +85,34 @@
         <action android:name="android.intent.action.MAIN" />
         <category android:name="android.intent.category.LAUNCHER" />
       </intent-filter>
+      <!-- پیوندِ درونیِ برنامه: vill3n://app/<مسیر> (اعلان‌ها، میان‌برها) — `DeepLinks` -->
+      <intent-filter>
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+        <data android:scheme="vill3n" android:host="app" />
+      </intent-filter>
+      <!-- ویترینِ دکان (QR): https://<میزبان>/store/<slug> ⇒ حالتِ «خرید». بی autoVerify:
+           مرورگر همچنان پیش‌فرض است و پیوندهای امروزِ سایت دست نمی‌خورند -->
+      <intent-filter>
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+        <data android:scheme="https" />
+        <data android:host="vill3n.top" />
+        <data android:host="*.vill3n.top" />
+        <data android:pathPrefix="/store/" />
+      </intent-filter>
+      <!-- زیردامنهٔ دکان (همان QR ِ سرور): https://<slug>.vill3n.top/ ⇒ حالتِ «خرید». فقط ریشه،
+           تا پنل و API و صفحه‌های دیگر در مرورگر بمانند؛ `ShopperLinks.parse` نام‌های رزرو را رد می‌کند -->
+      <intent-filter>
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+        <data android:scheme="https" />
+        <data android:host="*.vill3n.top" />
+        <data android:path="/" />
+      </intent-filter>
     </activity>
 
     <provider

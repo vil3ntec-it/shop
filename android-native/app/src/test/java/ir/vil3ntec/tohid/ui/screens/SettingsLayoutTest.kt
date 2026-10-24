@@ -86,8 +86,8 @@ class SettingsLayoutTest {
 
   @Test
   fun `پیوندها بخش نیستند، مسیر دارند و Settings_kt همه را می‌کشد`() {
-    assertEquals("nav-editor", SettingsLayout.LINKS[SettingsLayout.NAV_BAR])
-    assertEquals("devices", SettingsLayout.LINKS[SettingsLayout.PRINTER])
+    assertEquals("settings/general/navbar", SettingsLayout.LINKS[SettingsLayout.NAV_BAR])
+    assertEquals("devices?tab=printers", SettingsLayout.LINKS[SettingsLayout.PRINTER])
     SettingsLayout.LINKS.keys.forEach { assertTrue(it !in SettingsLayout.sections) }
     val s = src("Settings.kt")
     val drawn = Regex("""SettingsLink\(SettingsLayout\.([A-Z_]+)\)""").findAll(s).map { it.groupValues[1] }.toSet()

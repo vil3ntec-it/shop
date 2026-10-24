@@ -527,6 +527,8 @@ private fun ProfileRoot(
       }
       Spacer(Modifier.height(if (ownHeader) 0.dp else 12.dp))
       ProfileMenu(menu, onMenu)
+      //  حالتِ برنامه (دکان / پیک / خرید) — فقط حالت‌هایی که این کاربر دارد
+      if (!ir.vil3ntec.tohid.ui.Platform.DESKTOP) ir.vil3ntec.tohid.ui.v3.modes.ModeSwitcher()
       Spacer(Modifier.height(24.dp + bottomReserve))
     }
   }

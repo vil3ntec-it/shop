@@ -57,7 +57,7 @@ fun PhoneV3HomePreview(screen: String, store: ShopStore) {
       verticalArrangement = Arrangement.SpaceEvenly,
     ) {
       listOf(
-        "search" to "جست‌وجو", "dashboard" to "خانه", "sale" to "فروش",
+        "search" to "جست‌وجو", "home" to "خانه", "sale" to "فروش",
         "products" to "کالاها", "more" to "بیشتر", "profile" to "حساب",
       ).forEach { (route, label) ->
         Text("فعال: $label", color = PhoneV3.colors.inkMuted, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(start = 16.dp))
@@ -76,7 +76,7 @@ fun PhoneV3HomePreview(screen: String, store: ShopStore) {
       val renew = if (screen == "v3home-renew") 1 else null
       val reserve = PhoneNav.RESERVE + if (renew != null) PhoneNav.RENEW_RESERVE else 0.dp
       PhoneHomeScreen(data, onOpen = {}, bottomReserve = reserve, shot = shot)
-      PhoneNavBar(layout, "dashboard", onPick = {}, onEdit = null, modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(), renewDays = renew)
+      PhoneNavBar(layout, "home", onPick = {}, onEdit = null, modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(), renewDays = renew)
     }
   } }
 }

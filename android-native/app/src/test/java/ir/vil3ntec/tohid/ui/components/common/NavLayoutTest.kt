@@ -168,10 +168,10 @@ class NavLayoutTest {
   @Test
   fun `موردِ فعال از روی صفحهٔ باز`() {
     val l = NavLayouts.DEFAULT
-    assertEquals(HOME, NavCatalog.activeFor(l, "dashboard"))
+    assertEquals(HOME, NavCatalog.activeFor(l, "home"))
     assertEquals(ACCOUNT, NavCatalog.activeFor(l, "profile"))
     assertEquals(MORE, NavCatalog.activeFor(l, "more"))
-    assertNull(NavCatalog.activeFor(l, "warehouse"))
+    assertNull(NavCatalog.activeFor(l, "stock"))
     //  اسکن و فروش هر دو به «فروش» می‌روند؛ همان که نشسته فعال می‌شود
     val s = NavLayout(SCAN, listOf(HOME, PRODUCTS, MORE), null)
     assertEquals(SCAN, NavCatalog.activeFor(s, "sale"))

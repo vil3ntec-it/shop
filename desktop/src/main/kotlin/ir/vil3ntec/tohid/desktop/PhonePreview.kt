@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -49,7 +50,6 @@ import ir.vil3ntec.tohid.data.Debtor
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.Sale
 import ir.vil3ntec.tohid.data.SaleItem
-import ir.vil3ntec.tohid.ui.screens.DashboardScreen
 import ir.vil3ntec.tohid.ui.screens.DebtorDetailShot
 import ir.vil3ntec.tohid.ui.screens.DebtorsScreen
 import ir.vil3ntec.tohid.ui.screens.PhoneDebtorsShot
@@ -83,7 +83,7 @@ object PhonePreview {
 }
 
 private val PREVIEW_TABS = listOf(
-  NavTab("dashboard", "خانه", Icons.Filled.GridView),
+  NavTab("home", "خانه", Icons.Filled.GridView),
   NavTab("sale", "فروش", Icons.Filled.PointOfSale),
   NavTab("debtors", "قرض‌داران", Icons.Filled.Groups),
   NavTab("products", "محصولات", Icons.Filled.ShoppingBag),
@@ -93,8 +93,16 @@ private val PREVIEW_TABS = listOf(
 @Composable
 fun PhonePreviewWindow(store: ShopStore, context: android.content.Context) {
   val requested = PhonePreview.screen.value ?: return
-  val dark = requested.endsWith("-dark")
-  val screen = requested.removeSuffix("-dark")
+  //  پسوندها: `-dark` تمِ شب، `-en` انگلیسی (چپ‌به‌راست) — به همین ترتیب
+  val en = requested.endsWith("-en")
+  val dark = requested.removeSuffix("-en").endsWith("-dark")
+  val screen = requested.removeSuffix("-en").removeSuffix("-dark")
+  DisposableEffect(en) {
+    //  زبانِ برنامه (`LocaleChoice`) پس از بستنِ پیش‌نمایش برمی‌گردد
+    val before = ir.vil3ntec.tohid.core.i18n.I18n.source
+    ir.vil3ntec.tohid.core.i18n.I18n.source = { if (en) ir.vil3ntec.tohid.core.i18n.Lang.EN else ir.vil3ntec.tohid.core.i18n.Lang.FA }
+    onDispose { ir.vil3ntec.tohid.core.i18n.I18n.source = before }
+  }
   DialogWindow(
     onCloseRequest = { PhonePreview.screen.value = null },
     title = PhonePreview.TITLE,
@@ -108,8 +116,8 @@ fun PhonePreviewWindow(store: ShopStore, context: android.content.Context) {
       LocalConfiguration provides Configuration(390, 844),
     ) {
       TohidTheme(if (dark) ThemeChoice.DARK else ThemeChoice.LIGHT) {
-        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-          PhonePreviewContent(screen, store, dark)
+        CompositionLocalProvider(LocalLayoutDirection provides if (en) LayoutDirection.Ltr else LayoutDirection.Rtl) {
+          key(requested) { PhonePreviewContent(screen, store, dark) }
         }
       }
     }
@@ -121,6 +129,23 @@ private fun PhonePreviewContent(screen: String, store: ShopStore, dark: Boolean)
   val data by store.data.collectAsState()
   val snackbar = remember { SnackbarHostState() }
   Column(Modifier.fillMaxSize().background(Shop.colors.bg)) {
+    //  عکس‌های گروه‌ها (`shots/<Group>Shots.kt`): g:<گروه>:<حالت>
+    if (screen.startsWith("g:")) {
+      val (group, name) = screen.removePrefix("g:").split(':', limit = 2).let { it[0] to it.getOrElse(1) { "" } }
+      val shot = ir.vil3ntec.tohid.desktop.shots.ShotRegistry.find(group, name)
+      Box(Modifier.weight(1f).fillMaxWidth()) {
+        if (shot != null) {
+          DisposableEffect(screen) {
+            shot.prepare()
+            onDispose { shot.cleanup() }
+          }
+          val route = shot.route
+          if (route != null) ir.vil3ntec.tohid.desktop.shots.V3RoutePreview(route, store, dark)
+          else shot.content?.invoke(store)
+        }
+      }
+      return@Column
+    }
     when (screen) {
       //  تنظیماتِ گوشی: گروه‌ها و کارت‌های گرد (`SettingsGroup`)
       "settings" -> Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -168,7 +193,8 @@ private fun PhonePreviewContent(screen: String, store: ShopStore, dark: Boolean)
           MoreShot.scrollToEnd.value = screen == "v3-more-bottom"
           onDispose { MoreShot.scrollToEnd.value = false }
         }
-        key(screen) { PhoneMoreScreen(data, bottomReserve = PhoneNav.RESERVE) {} }
+        //  همان پوستهٔ برنامه: «بیشتر» بی `bottomReserve`، پوسته جای نوار را پایینِ صفحه نگه می‌دارد
+        key(screen) { Box(Modifier.fillMaxSize().padding(bottom = PhoneNav.RESERVE)) { PhoneMoreScreen(data) {} } }
         PhoneNavBar(NavLayouts.DEFAULT, "more", onPick = {}, onEdit = null, modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth())
       }
       //  «حساب من»: کارتِ عکس، نقش، آمار و گروه‌ها
@@ -223,8 +249,9 @@ private fun PhonePreviewContent(screen: String, store: ShopStore, dark: Boolean)
         PhoneV3HomePreview(if (screen == "nav") "v3home" else screen, store)
       } else {
         //  «nav» و هر نامِ ناشناس: خانه با نوارِ پایینِ قرصی
-        Box(Modifier.weight(1f).fillMaxWidth()) { DashboardScreen(data) {} }
-        PhoneNavBar(tabs = PREVIEW_TABS, current = "dashboard", onPick = {})
+        //  همان مسیرِ `home` (امروز داشبورد، فردا خانهٔ G10) — نه صدا زدنِ مستقیمِ صفحه
+        Box(Modifier.weight(1f).fillMaxWidth()) { ir.vil3ntec.tohid.desktop.shots.V3RoutePreview("home", store, dark) }
+        PhoneNavBar(tabs = PREVIEW_TABS, current = "home", onPick = {})
       }
     }
   }
