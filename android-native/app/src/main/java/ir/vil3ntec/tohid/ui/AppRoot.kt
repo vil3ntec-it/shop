@@ -78,6 +78,7 @@ import ir.vil3ntec.tohid.ui.v3.nav.ModuleFlags
 import ir.vil3ntec.tohid.ui.v3.nav.ShellContext
 import ir.vil3ntec.tohid.ui.v3.nav.V3Modules
 import ir.vil3ntec.tohid.ui.v3.nav.V3RouteHost
+import ir.vil3ntec.tohid.ui.v3.nav.ShellFrame
 import ir.vil3ntec.tohid.ui.v3.nav.rememberV3Nav
 import ir.vil3ntec.tohid.ui.v3.products.ProductsPaths
 import ir.vil3ntec.tohid.ui.v3.rememberV3Toasts
@@ -323,9 +324,12 @@ fun AppRoot(
   }
   val current = nav.current
   val base = RoutePaths.normalize(current.substringBefore('?'))
-  //  نوار روی صندوق نیست (نوارِ سبد جایش است)، و در ویرایشگرِ خودش هم پیش‌نمایشِ خودش را دارد
-  val navVisible = phoneNav && base !in NO_NAV && nav.gate == null &&
-    !ir.vil3ntec.tohid.ui.components.pos.PhoneCartUi.sheetOpen.value
+  //  نوار فقط روی ریشهٔ تب‌های خودش (`ShellFrame`)؛ صندوق و ویرایشگرِ نوار هرگز
+  val page = RoutePaths.normalize(nav.page.substringBefore('?'))
+  val navVisible = ShellFrame.navVisible(
+    phone = phoneNav, page = page, barTabs = navRoutes, gate = nav.gate != null,
+    cartOpen = ir.vil3ntec.tohid.ui.components.pos.PhoneCartUi.sheetOpen.value,
+  )
   val navReserve = PhoneNav.RESERVE + (if (renewDays != null) PhoneNav.RENEW_RESERVE else 0.dp)
 
   //  ویترین و میزِ تحویل: فقط وقتی سرور می‌گوید روشن است، بخششان دیده می‌شود
@@ -492,12 +496,7 @@ fun AppRoot(
       }
       //  جای نوارِ شناور: خانه خودش زیرِ نوار می‌کشد؛ صفحهٔ بی‌نوار (صندوق) فقط نوارِ سیستم
       val navInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-      val pageBottom = when {
-        !phoneNav -> 0.dp
-        navVisible && base == "home" -> 0.dp
-        navVisible -> navReserve + navInset
-        else -> navInset
-      }
+      val pageBottom = ShellFrame.pageBottom(phoneNav, navVisible, page, navReserve, navInset)
       CompositionLocalProvider(
         LocalV3Toasts provides toasts,
         //  نوارِ سیستم را پوسته همین‌جا حساب کرده است
@@ -526,5 +525,3 @@ fun AppRoot(
 /** تب‌های کامپیوتر (منوی کناری ریشه‌هایش را هم‌سطح باز می‌کند) */
 private val DESK_TABS = setOf("home", "sale", "debtors", "products", "more")
 
-/** صفحه‌هایی که نوارِ پایینِ گوشی رویشان نمی‌آید */
-private val NO_NAV = setOf("sale", "sale/quick", "settings/general/navbar")

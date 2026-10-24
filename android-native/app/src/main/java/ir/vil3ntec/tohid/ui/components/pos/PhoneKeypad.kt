@@ -137,7 +137,8 @@ private fun KeypadSheet(
   onConfirm: (PhoneKeypadRequest, Double) -> Unit,
 ) {
   val v = PhoneV3.colors
-  val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+  //  پوسته‌ای که خودش نوارِ سیستم را گرفته `LocalV3SystemBottom = 0.dp` می‌دهد (بی دوباره‌شماری)
+  val navBottom = ir.vil3ntec.tohid.ui.v3.LocalV3SystemBottom.current ?: WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
   var text by remember(req.id) { mutableStateOf(if (req.inCart > 0) qty(req.inCart) else "") }
   val value = KeypadInput.value(text)
   val error = if (value > 0) problem(req, value) else null
