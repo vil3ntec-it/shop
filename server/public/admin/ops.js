@@ -158,6 +158,56 @@
     $('ops-chain-super').classList.toggle('hidden', sup);
     $('ops-recon-tools').classList.toggle('hidden', !sup);
     $('ops-recon-super').classList.toggle('hidden', sup);
+    $('ops-abuse-tools').classList.toggle('hidden', !sup);
+    $('ops-abuse-super').classList.toggle('hidden', sup);
+  }
+
+  // ---------- گزارشِ سوءاستفاده — OPS-09 ----------
+  //  با دکمه (دیدنش سابقه می‌نویسد)؛ فقط شمار، نه متنِ شکایت
+  const CAT_FA = {
+    not_delivered: 'نرسید', wrong_item: 'کالای اشتباه', damaged: 'آسیب‌دیده', overcharged: 'گران‌فروشی', fraud: 'کلاه‌برداری',
+    rude: 'بی‌احترامی', other: 'دیگر', counterfeit: 'تقلبی', prohibited: 'ممنوع', misleading: 'گمراه‌کننده',
+    offensive: 'زننده', wrong_price: 'قیمتِ نادرست',
+  };
+  async function loadAbuse() {
+    const out = await call('GET', `/admin/trust/report?days=${encodeURIComponent($('ops-abuse-days').value)}`);
+    const t = out.totals;
+    const cards = $('ops-abuse-totals');
+    cards.innerHTML = '';
+    for (const [label, value] of [['پرونده', t.cases], ['در جریان', t.pending], ['واردشده', t.upheld], ['ردشده', t.dismissed], ['شدید', t.high], ['نشان‌دار', t.flagged]]) {
+      const c = el('div', 'stat');
+      c.appendChild(el('div', 'l', label));
+      c.appendChild(el('div', 'v', fa(value)));
+      cards.appendChild(c);
+    }
+    $('ops-abuse-cats').textContent = out.categories.length
+      ? out.categories.map((c) => `${CAT_FA[c.category] || c.category}: ${fa(c.count)}`).join(' · ')
+      : '';
+    const body = $('ops-abuse');
+    body.innerHTML = '';
+    if (!out.shops.length) {
+      const tr = el('tr');
+      const c = el('td', 'muted', 'در این بازه شکایت یا گزارشی نیست');
+      c.colSpan = 8;
+      tr.appendChild(c);
+      body.appendChild(tr);
+    }
+    for (const r of out.shops) {
+      const tr = el('tr');
+      tr.dataset.shop = r.shopId;
+      tr.appendChild(el('td', '', r.shopName || r.shopId));
+      tr.appendChild(el('td', '', `${fa(r.cases)} (${fa(r.complaints)} شکایت، ${fa(r.reports)} گزارش)`));
+      tr.appendChild(el('td', '', fa(r.pending)));
+      const up = el('td');
+      up.appendChild(el('span', `badge ${r.upheld ? 'b-bad' : 'b-mute'}`, fa(r.upheld)));
+      tr.appendChild(up);
+      tr.appendChild(el('td', '', fa(r.dismissed)));
+      tr.appendChild(el('td', '', fa(r.high)));
+      tr.appendChild(el('td', '', `${fa(r.flagged)} نشان‌دار · ${fa(r.activeSanctions)} جریمهٔ فعال`));
+      tr.appendChild(el('td', '', dateTime(r.lastAt)));
+      body.appendChild(tr);
+    }
+    $('ops-abuse-checked').textContent = `${fa(out.days)} روزِ گذشته${out.truncated ? ' · فهرست بریده شد' : ''}`;
   }
 
   // ---------- تطبیقِ فروشِ آنلاین — E2E-ADM-15 ----------
@@ -236,6 +286,7 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     $('btn-ops-chain').onclick = () => verifyChain().catch((err) => msg($('ops-chain-msg'), err.message, 'bad'));
+    $('btn-ops-abuse').onclick = () => { msg($('ops-abuse-msg'), ''); loadAbuse().catch((err) => msg($('ops-abuse-msg'), err.message, 'bad')); };
     $('btn-ops-recon').onclick = () => { msg($('ops-recon-msg'), ''); loadRecon().catch((err) => msg($('ops-recon-msg'), err.message, 'bad')); };
   });
 
