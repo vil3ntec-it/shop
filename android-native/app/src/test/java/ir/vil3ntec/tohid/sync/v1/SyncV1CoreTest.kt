@@ -302,4 +302,44 @@ class SyncV1CoreTest {
     assertNotNull(body["hash"])
     assertEquals(OpHash.of("debtors", "c-1", "delete", null), (body["hash"] as JsonPrimitive).content)
   }
+
+  /* --------------------- دسته: یک ثبت بریده نمی‌شود --------------------- */
+
+  private fun saveOps(ts: Long, n: Int, tag: String) =
+    (0 until n).map { SyncOp("$tag-$it", ts, "saleItems", "$tag-$it", SyncOp.INSERT, buildJsonObject { put("q", JsonPrimitive(it)) }) }
+
+  @Test
+  fun `سقفِ دسته وسطِ یک ثبت نمی‌افتد — آن ثبت کامل به دستهٔ بعد می‌رود`() {
+    //  ثبتِ اول ۱۵۰ op، ثبتِ دوم (فاکتورِ نسیه با قلم‌ها و بردش) ۸۰ op ⇒ سقفِ ۲۰۰ وسطِ ثبتِ دوم
+    val ops = saveOps(1000, 150, "a") + saveOps(2000, 80, "b")
+    val sizes = ops.map { 10 }
+    val first = OpQueue.cut(ops, sizes, maxOps = 200, maxBytes = 1_000_000)
+    assertEquals(150, first.size)
+    assertTrue(first.all { it.ts == 1000L })
+    //  ثبتی که خودش از سقف بزرگ‌تر است ناچار بریده می‌شود (دستهٔ خالی = صفِ قفل)
+    val big = saveOps(3000, 260, "c")
+    assertEquals(200, OpQueue.cut(big, big.map { 10 }, maxOps = 200, maxBytes = 1_000_000).size)
+    //  سقفِ بایت هم همین‌طور
+    val bytes = OpQueue.cut(ops, sizes, maxOps = 500, maxBytes = 2 + 10 * 170)
+    assertEquals(150, bytes.size)
+    //  ثبت کامل جا شد ⇒ همان دستهٔ همیشه
+    assertEquals(230, OpQueue.cut(ops, sizes, maxOps = 500, maxBytes = 1_000_000).size)
+  }
+
+  @Test
+  fun `در یک ثبت ردیف‌های برگشت پیش از شمارنده‌هایشان می‌روند`() {
+    //  اگر ثبتِ بزرگِ برگشت ناچار بریده شود، سرِ برگشت در دستهٔ اول داوری می‌شود و شمارنده‌ها پشتش
+    val one = empty().copy(
+      sales = listOf(Sale(id = "s1", finalTotal = 900.0)),
+      saleItems = listOf(SaleItem(id = "si1", saleId = "s1", quantity = 3.0)),
+    )
+    val two = one.copy(
+      sales = listOf(Sale(id = "s1", finalTotal = 900.0, debtSettled = 600.0)),
+      saleItems = listOf(SaleItem(id = "si1", saleId = "s1", quantity = 3.0, returnedQty = 2.0)),
+      saleReturns = listOf(ir.vil3ntec.tohid.data.SaleReturn(id = "r1", saleId = "s1", saleItemId = "si1", quantity = 2.0, amount = 600.0)),
+    )
+    val order = LedgerDiff.diff(LedgerDiff.shadowOf(LedgerDiff.toJson(one)), LedgerDiff.toJson(two)).map { it.table }
+    assertEquals(order.toString(), "returns", order.first())
+    assertTrue(order.toString(), order.indexOf("sales") > 0 && order.indexOf("saleItems") > 0)
+  }
 }
