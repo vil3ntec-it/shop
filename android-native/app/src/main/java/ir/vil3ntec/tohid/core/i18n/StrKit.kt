@@ -77,6 +77,9 @@ object StrKit {
   val exampleTitle: String get() = t("ماژولِ نمونه", "Example module", "بېلګه ماډیول")
   val exampleBody: String get() = t("این صفحه نشان می‌دهد ماژولِ تازه چطور با یک فایل و یک خط به برنامه وصل می‌شود.", "This page shows how a new module plugs in with one file and one line.", "دا پاڼه ښيي چې نوی ماډیول څنګه په یوه فایل او یوه کرښه وصلېږي.")
 
+  // تخفیف‌های دکان (PRM)
+  val promos: String get() = t("تخفیف‌ها", "Discounts", "تخفیفونه")
+
   // اسکنِ QR (`scan?kind=qr`، همهٔ حالت‌ها)
   val scanQr: String get() = t("اسکنِ QR", "Scan QR code", "QR سکن کړئ")
   val scanQrHint: String get() = t("کدِ QR را درونِ کادر بگیرید", "Hold the QR code inside the frame", "QR کوډ چوکاټ ته دننه ونیسئ")

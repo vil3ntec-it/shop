@@ -135,10 +135,11 @@ gradle --offline --no-daemon -q -Pdev=true --init-script <scratchpad>/v3f/offlin
 cd <scratchpad>/kt-v3render && gradle --no-daemon -q run --args="<پوشهٔ خروجی> [پیشوندِ نام]"
 ```
 
-راهِ `androidx.collection`: کامپوزِ ۱.۷ در اجرا `androidx.collection` می‌خواهد که فقط روی Google Maven است؛
-`dl.google.com` (همان `google()` ِ گریدل) را پراکسی می‌بندد ولی `https://maven.google.com` باز است. پس در این پروژه
-`repositories { mavenCentral(); maven("https://maven.google.com") }` است و `androidx.collection`/`androidx.annotation` دیگر
-کنار گذاشته یا جایگزین نمی‌شوند (فقط `androidx.lifecycle` و `androidx.arch.core`). صفحهٔ تازه: یک خط در `screens` ِ `Render.kt`.
+⚠️ `androidx.collection`: کامپوزِ ۱.۷ در **اجرا** `androidx.collection` می‌خواهد که فقط روی Google Maven است؛
+`https://maven.google.com` هر فایل را به `dl.google.com` می‌فرستد (۳۰۱) و پراکسیِ این ماشین آن را می‌بندد (۴۰۳).
+پس این‌جا رسمِ بی‌پنجره **اجرا نمی‌شود** (کامپایلش می‌شود)؛ عکسِ واقعی را CI می‌گیرد. هر جا jar ِ
+`collection-jvm` در کش بود (ماشینِ دیگر)، `repositories { mavenCentral(); google() }` و برداشتنِ exclude ِ
+`androidx.collection`/`androidx.annotation` کافی است. صفحهٔ تازه: یک خط در `screens` ِ `Render.kt`.
 
 عکس‌های CI: `desktop-shots` هر `Shot` ِ `desktop/.../shots/<Group>Shots.kt` را با `groupshots:all` می‌گیرد و در شاخهٔ
 `desktop-screenshots` زیرِ `pr/<شاخه>/v3/<گروه>/<حالت>-<light|dark>-<fa|en>.png` (با README ِ هر گروه) می‌گذارد.
