@@ -72,7 +72,9 @@ import ir.vil3ntec.tohid.ui.v3.V3Skeleton
 import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
 import ir.vil3ntec.tohid.ui.v3.rememberV3Stagger
+import ir.vil3ntec.tohid.ui.v3.v3AnimateItem
 import ir.vil3ntec.tohid.ui.v3.v3Pressable
+import ir.vil3ntec.tohid.ui.v3.v3Shake
 import ir.vil3ntec.tohid.ui.v3.v3Stagger
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -102,7 +104,7 @@ internal fun SupportContent(ui: SupportUi, onBack: (() -> Unit)?, onDraft: (Stri
     title = Str.support,
     onBack = onBack,
     largeTitle = false,
-    bottomBar = { DraftComposer(ui.draft, onDraft, SupportModel.canSend(ui.draft, ui.sending), onSend) },
+    bottomBar = { Box(Modifier.v3Shake(ui.error)) { DraftComposer(ui.draft, onDraft, SupportModel.canSend(ui.draft, ui.sending), onSend) } },
   ) { pad ->
     Column(Modifier.fillMaxSize()) {
       Text(StrAccount.supportSubtitle, style = V3Type.footnote, color = c.inkMuted, modifier = Modifier.fillMaxWidth().padding(top = 6.dp), textAlign = TextAlign.Center)
@@ -118,9 +120,9 @@ internal fun SupportContent(ui: SupportUi, onBack: (() -> Unit)?, onDraft: (Stri
         ) {
           itemsIndexed(ui.items, key = { _, it -> it.key }) { i, item ->
             when (item) {
-              //  پیامِ تازه با جابه‌جاییِ نرمِ بقیه می‌آید (animateItem)، بارِ اول پلکانی
-              is SupportModel.Item.Day -> DaySeparator(item.label, Modifier.animateItem())
-              is SupportModel.Item.Bubble -> Bubble(item, Modifier.animateItem().v3Stagger(stagger, item.key, i))
+              //  پیامِ تازه با جابه‌جاییِ نرمِ بقیه می‌آید (`v3AnimateItem`)، بارِ اول پلکانی
+              is SupportModel.Item.Day -> DaySeparator(item.label, Modifier.v3AnimateItem(this))
+              is SupportModel.Item.Bubble -> Bubble(item, Modifier.v3AnimateItem(this).v3Stagger(stagger, item.key, i))
             }
           }
         }

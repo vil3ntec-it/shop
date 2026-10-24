@@ -43,6 +43,7 @@ import ir.vil3ntec.tohid.ui.v3.V3IconButton
 import ir.vil3ntec.tohid.ui.v3.V3Message
 import ir.vil3ntec.tohid.ui.v3.V3PageSwitch
 import ir.vil3ntec.tohid.ui.v3.V3SuccessCheck
+import ir.vil3ntec.tohid.ui.v3.v3Shake
 import ir.vil3ntec.tohid.ui.v3.V3Segmented
 import ir.vil3ntec.tohid.ui.v3.V3Sheet
 import ir.vil3ntec.tohid.ui.v3.V3TextField
@@ -93,7 +94,7 @@ internal fun RedeemContent(ui: RedeemUi, actions: RedeemActions, onDismiss: () -
         if (tab == 0) {
           Text(StrAccount.sixDigitHint, style = V3Type.callout, color = c.inkMuted)
           Spacer(Modifier.height(12.dp))
-          DraftCodeCells(ui.code, actions.code, StrAccount.sixDigitCode)
+          DraftCodeCells(ui.code, actions.code, StrAccount.sixDigitCode, Modifier.v3Shake(ui.result?.takeIf { !it.first }))
           Spacer(Modifier.height(16.dp))
           V3Button(StrAccount.activate, actions.activate, Modifier.fillMaxWidth(), enabled = PlansModel.canRedeem(ui.code, ui.signedIn), loading = ui.busy, haptic = true)
           if (!ui.signedIn) {
@@ -117,7 +118,7 @@ internal fun RedeemContent(ui: RedeemUi, actions: RedeemActions, onDismiss: () -
             V3IconButton(Icons.Outlined.ContentCopy, StrAccount.copyAction, onClick = actions.copyId)
           }
           Spacer(Modifier.height(12.dp))
-          V3TextField(ui.offline, actions.offline, StrAccount.offlineField, singleLine = false)
+          V3TextField(ui.offline, actions.offline, StrAccount.offlineField, Modifier.v3Shake(ui.offlineResult?.takeIf { !it.first }), singleLine = false)
           Spacer(Modifier.height(12.dp))
           V3Button(StrAccount.applyCode, actions.applyOffline, Modifier.fillMaxWidth(), enabled = ui.offline.isNotBlank(), haptic = true)
           V3SuccessCheck(ui.offlineResult?.first == true, Modifier.align(Alignment.CenterHorizontally).padding(top = 12.dp))
@@ -156,7 +157,6 @@ internal fun RouteScope.RedeemRoute() {
           Backend.support(context).redeemVip(ui.code)
             .onSuccess {
               ui = ui.copy(code = "", result = true to it.message.ifBlank { StrAccount.activated })
-              Haptics.success(context)
               //  وضعیتِ اشتراک همان لحظه تازه می‌شود، وگرنه صفحه هنوز «اشتراک ندارید» می‌گفت
               SubscriptionPulse.refresh(context)
               runCatching { HeartbeatCache(context).forget() }
@@ -179,7 +179,6 @@ internal fun RouteScope.RedeemRoute() {
         if (err == null) {
           val active = LicenseGuard.offline(context, store)
           ui = ui.copy(offline = "", offlineActive = active?.payload?.planTitle.orEmpty(), offlineResult = true to PlansModel.offlineOk(active?.daysLeft()))
-          Haptics.success(context)
           AccountSession.changed()
         } else {
           ui = ui.copy(offlineResult = false to err)

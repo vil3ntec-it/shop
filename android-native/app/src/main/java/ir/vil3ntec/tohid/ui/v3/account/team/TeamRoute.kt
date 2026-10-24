@@ -18,11 +18,13 @@ import ir.vil3ntec.tohid.core.i18n.StrAccount
 import ir.vil3ntec.tohid.data.ShopRole
 import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.ui.screens.Haptics
+import ir.vil3ntec.tohid.ui.screens.MotionTokens
 import ir.vil3ntec.tohid.ui.theme.V3Tone
 import ir.vil3ntec.tohid.ui.v3.V3ConfirmSheet
 import ir.vil3ntec.tohid.ui.v3.account.AccountLinks
 import ir.vil3ntec.tohid.ui.v3.account.AccountPaths
 import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private enum class Ask { ROTATE, DISABLE }
@@ -124,7 +126,14 @@ internal fun RouteScope.RemoveMemberRoute(id: String) {
     onConfirm = {
       TeamSession.scope.launch {
         shops.removeMember(id)
-          .onSuccess { toasts.show(StrAccount.memberRemoved, V3Tone.SUCCESS); team.reload(shops, owner) }
+          .onSuccess {
+            toasts.show(StrAccount.memberRemoved, V3Tone.SUCCESS)
+            //  ردیف اول نرم جمع می‌شود، بعد فهرست از سرور
+            team.leaving = team.leaving + id
+            delay(MotionTokens.LONG.toLong())
+            team.reload(shops, owner)
+            team.leaving = team.leaving - id
+          }
           .onFailure { toasts.show(it.userMessage, V3Tone.ERROR) }
       }
       //  از صفحهٔ همان کارمند آمده بود؟ آن صفحه دیگر معنا ندارد

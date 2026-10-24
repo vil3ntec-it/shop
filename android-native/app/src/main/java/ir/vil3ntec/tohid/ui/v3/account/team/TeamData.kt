@@ -35,6 +35,8 @@ internal class TeamData {
   var devices by mutableStateOf<List<ShopDeviceDto>?>(null)
   var error by mutableStateOf<String?>(null)
   var fresh by mutableStateOf<String?>(null)
+  /** کارمندی که همین حالا برداشته شد — ردیفش پیش از خواندنِ دوباره نرم جمع می‌شود (`V3Collapse`) */
+  var leaving by mutableStateOf<Set<String>>(emptySet())
 
   fun member(id: String): MemberDto? = members.firstOrNull { it.id == id }
 

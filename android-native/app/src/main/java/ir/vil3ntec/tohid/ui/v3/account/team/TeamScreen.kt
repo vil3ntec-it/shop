@@ -45,6 +45,7 @@ import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
 import ir.vil3ntec.tohid.ui.theme.V3Status
 import ir.vil3ntec.tohid.ui.theme.V3Tone
 import ir.vil3ntec.tohid.ui.v3.V3Button
+import ir.vil3ntec.tohid.ui.v3.V3Collapse
 import ir.vil3ntec.tohid.ui.v3.V3Divider
 import ir.vil3ntec.tohid.ui.v3.V3EmptyState
 import ir.vil3ntec.tohid.ui.v3.V3Fab
@@ -107,8 +108,12 @@ internal fun TeamContent(team: TeamData, signedIn: Boolean, isOwner: Boolean, ro
             V3Section(TeamModel.staffTitle(team.members.size, team.maxMembers)) {
               if (team.members.isEmpty()) Note(StrAccount.noMembers)
               team.members.map(TeamModel::memberRow).forEachIndexed { i, m ->
-                if (i > 0) V3Divider(start = 64.dp)
-                MemberRowView(m, Modifier.v3Stagger(stagger, "m" + m.id, i), actions)
+                V3Collapse(visible = m.id !in team.leaving) {
+                  Column {
+                    if (i > 0) V3Divider(start = 64.dp)
+                    MemberRowView(m, Modifier.v3Stagger(stagger, "m" + m.id, i), actions)
+                  }
+                }
               }
             }
             V3Section(StrAccount.joinCodes) {

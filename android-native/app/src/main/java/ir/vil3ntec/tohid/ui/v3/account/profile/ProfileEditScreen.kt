@@ -58,6 +58,7 @@ import ir.vil3ntec.tohid.ui.v3.account.AccountFormat
 import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
 import ir.vil3ntec.tohid.ui.v3.rememberV3Stagger
 import ir.vil3ntec.tohid.ui.v3.v3Pressable
+import ir.vil3ntec.tohid.ui.v3.v3Shake
 import ir.vil3ntec.tohid.ui.v3.v3Stagger
 import kotlinx.coroutines.launch
 
@@ -113,7 +114,7 @@ internal fun ProfileEditContent(
     }
 
     V3Section(StrAccount.groupAccount, Modifier.v3Stagger(stagger, "account", 1), padding = PaddingValues(16.dp)) {
-      V3TextField(ui.name, onName, StrAccount.fullName, error = ui.nameError, required = true)
+      V3TextField(ui.name, onName, StrAccount.fullName, Modifier.v3Shake(ui.nameError), error = ui.nameError, required = true)
       Spacer(Modifier.height(14.dp))
       LockedField(Icons.Outlined.AlternateEmail, StrAccount.email, ui.email.ifBlank { StrAccount.emailNone }, ProfileEditModel.emailNote(ui.email), ltr = ui.email.isNotBlank())
       Spacer(Modifier.height(14.dp))
@@ -121,7 +122,7 @@ internal fun ProfileEditContent(
         LockedField(Icons.Outlined.Lock, StrAccount.phone, ui.phone, StrAccount.phoneLocked, ltr = true)
       } else {
         V3TextField(
-          ui.newPhone, onNewPhone, StrAccount.phone,
+          ui.newPhone, onNewPhone, StrAccount.phone, Modifier.v3Shake(ui.phoneError),
           kind = V3FieldKind.PHONE, placeholder = "07XXXXXXXX",
           helper = StrAccount.phoneOnceHelper, error = ui.phoneError,
         )
