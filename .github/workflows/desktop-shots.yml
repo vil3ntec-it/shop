@@ -63,13 +63,18 @@ jobs:
           TOHID_DATA_DIR: ${{ runner.temp }}/tohid-data
         run: |
           mkdir -p "$RUNNER_TEMP/shots"
-          #  ساختِ dev صفحهٔ خوش‌آمد را خودش رد می‌کند (پنجره در گوشهٔ ۰،۰ است)
-          S="wait:6000;shot:00-start;key:ESCAPE;wait:1500;shot:01-dashboard"
+          #  ساختِ دو صفحهٔ خوش‌آمد را خودش رد می‌کند (پنجره در گوشهٔ ۰،۰ است).
+          #  نمایشگر ۱۹۲۰×۱۰۸۰ است و پنجره با size: اندازه می‌گیرد؛ عکس فقط خودِ پنجره است.
+          S="size:1280,800;wait:6000;shot:00-start;key:ESCAPE;wait:1500;shot:01-dashboard"
           S="$S;go:admin;wait:2000;shot:01b-admin-center;move:700,500;scroll:8;wait:600;shot:01c-admin-center-lower"
           S="$S;go:sale;wait:1500;shot:02-sale"
           #  صندوقِ سه‌ستونه با سه قلم (اسکن، «3*» و نام + Enter) و نمای جدولیِ کالا
           S="$S;type:626001007;key:ENTER;type:3*626001003;key:ENTER;type:صابون;key:ENTER;wait:1500;shot:02b-sale-cart"
           S="$S;posview:table;wait:1200;shot:02c-sale-table;posview:card;wait:800"
+          #  POS-12: چند فاکتورِ هم‌زمان — F6 نگه‌داشتن با نام، فاکتورِ دوم، Shift+F6 فهرست، رقم ⇒ همان شماره، Ctrl+PgDn بعدی
+          S="$S;held:on;wait:1000;shot:02d-held-bar;key:F6;wait:1200;shot:02e-held-hold-dialog;type:کریمی;key:ENTER;wait:1500"
+          S="$S;type:626001007;key:ENTER;wait:1200;shot:02f-held-two-open;shift:F6;wait:1200;shot:02g-held-list;key:1;wait:1500;shot:02h-held-resumed"
+          S="$S;ctrl:PAGE_DOWN;wait:1500;shot:02i-held-next;held:off;wait:800"
           S="$S;go:quick;wait:1500;shot:03-quick-sale"
           S="$S;go:debtors;wait:1500;shot:04-debtors"
           S="$S;cust:first;wait:1200;shot:04b-customer-ledger;custtab:1;wait:1000;shot:04c-customer-invoices;custtab:2;wait:1000;shot:04d-customer-items;custtab:0;cust:close"
@@ -77,21 +82,41 @@ jobs:
           S="$S;go:products;wait:1500;shot:06-products-table"
           S="$S;prodsel:3;wait:800;shot:06b-products-bulk-bar;prodview:card;wait:1200;shot:06c-products-cards;prodsel:0;prodview:table;wait:800"
           S="$S;go:sales;wait:1500;shot:07-sales-history-cash-shift"
+          S="$S;ret:first;wait:1500;shot:07b-return-form;ret:none;wait:1500;shot:07c-return-no-receipt;ret:close;wait:800"
           S="$S;go:purchasing;wait:1500;shot:08-purchasing;new:;wait:1200;shot:08b-purchase-invoice-new;key:ESCAPE;wait:800"
           S="$S;go:reports;wait:1500;shot:09-reports"
           S="$S;move:700,500;scroll:8;shot:10-reports-lower"
           S="$S;go:expenses;wait:1500;shot:11-expenses"
           S="$S;go:more;wait:1500;shot:12-more"
           S="$S;go:settings;wait:1500;shot:13-settings"
+          #  دستگاه‌ها (HW): صفحه، پیش‌نمایشِ بی چاپگرِ برگهٔ آزمون، برچسب و برگهٔ A4، و نمایشگرِ مشتری با یک سبد
+          S="$S;go:devices;wait:1500;shot:14-devices;hwshot:receipt;wait:1500;shot:14b-print-preview-receipt;hwshot:close"
+          S="$S;hwshot:label;wait:1200;shot:14c-print-preview-label;hwshot:close;hwshot:a4;wait:1500;shot:14d-print-preview-a4;hwshot:close"
+          S="$S;hwshot:customer;go:sale;wait:1500;type:626001007;key:ENTER;wait:1500;shot:14e-customer-display;hwshot:nocustomer"
           S="$S;go:audit;wait:1500;shot:14-audit-log"
           S="$S;go:team;wait:1500;shot:15-team"
           S="$S;go:devices;wait:1500;shot:15b-devices"
           S="$S;go:vip;wait:1500;shot:15c-subscription-offline-code"
+          #  تخفیف‌ها (PRM): پنج قاعدهٔ نمونه (`PromoLive.demo`)، سبدِ همان ۰۲b با ردیف‌های تخفیف و کادرِ کد، صفحهٔ مدیر و ویرایشگر
+          S="$S;promo:demo;go:sale;wait:1500;shot:20-sale-promos;go:promos;wait:1500;shot:21-promos-table;new:;wait:1200;shot:22-promo-editor;key:ESCAPE;wait:800"
           S="$S;go:dashboard;key:F11;wait:2000;shot:16-fullscreen-dashboard"
           S="$S;help:on;wait:1500;shot:17-shortcuts-F1;help:off"
           S="$S;key:F11;wait:1500;theme:DARK;go:products;wait:1500;shot:18-products-dark;prodsel:2;wait:800;shot:18b-products-dark-bulk;prodsel:0;go:dashboard;wait:1500;shot:19-dashboard-dark;theme:LIGHT"
+          #  مجموعهٔ ثابتِ ظاهر (نسخهٔ ۲): صندوق روز و شب، کالاها، داشبورد و قرض‌داران در دو اندازهٔ واقعی
+          for WH in 1280,800 1920,1080; do
+            N="v2-${WH/,/x}"
+            #  ماوس روی عنوانِ سربرگ (جای بی‌کلیک) — وگرنه کارت یا ردیفِ زیرِ ماوس رنگِ «هاور» می‌گیرد و
+            #  در عکس شبیهِ کارتِ خاموش دیده می‌شود (بازبینیِ ۱۴۰۵/۰۷/۲۷)
+            MX=$(( ${WH%,*} - 120 ))
+            S="$S;size:$WH;wait:1500;move:$MX,30;theme:LIGHT;go:sale;wait:2000;shot:$N-pos-light;posview:table;wait:1200;shot:$N-pos-table-light;posview:card;wait:800"
+            S="$S;theme:DARK;wait:2000;shot:$N-pos-dark;theme:LIGHT;wait:1200"
+            S="$S;go:products;wait:1800;shot:$N-products;go:dashboard;wait:1800;shot:$N-dashboard;go:debtors;wait:1800;shot:$N-debtors"
+          done
+          #  سیستمِ رنگِ VILL3N: صفحه‌هایی که بالا فقط در روز گرفته می‌شوند، در شب هم؛ و سفارش‌ها در هر دو
+          S="$S;size:1280,800;move:1160,30;theme:DARK;wait:1500;go:debtors;wait:1800;shot:vill3n-debtors-dark;go:settings;wait:1800;shot:vill3n-settings-dark"
+          S="$S;go:orders;wait:1800;shot:vill3n-orders-dark;theme:LIGHT;wait:1500;go:orders;wait:1800;shot:vill3n-orders-light"
           export JAVA_TOOL_OPTIONS="-Dtohid.shot=$RUNNER_TEMP/shots -Dtohid.shot.every=9000 -Dtohid.shot.exit=true -Dtohid.shot.script=$S -Dsun.jnu.encoding=UTF-8 -Dfile.encoding=UTF-8"
-          timeout 600 xvfb-run -s "-screen 0 1440x900x24" ./gradlew --no-daemon -q -Pdev=true run || true
+          timeout 780 xvfb-run -s "-screen 0 1920x1080x24" ./gradlew --no-daemon -q -Pdev=true run || true
           ls -la "$RUNNER_TEMP/shots"
           test -n "$(ls "$RUNNER_TEMP/shots")"
 

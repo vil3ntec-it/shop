@@ -161,4 +161,37 @@ class ReleaseFeedTest {
       ReleaseFeed.latestUrl("https://api.example", "tohid-native", "a&b=c", "0f9e"),
     )
   }
+
+  // ── پیش‌نمایش ─────────────────────────────────────────────────────
+
+  private fun preview(tag: String = "tohid-native-preview", label: String = "3.2.17-preview", sums: Boolean = true) =
+    """{"tag_name":"$tag","draft":false,"body":"پیش","assets":[""" +
+      """{"name":"tohid-preview.apk.preview","label":"$label","size":5000000,"browser_download_url":"https://dl.example/tohid-preview.apk.preview"},""" +
+      """{"name":"tohid-preview.zip","size":4900000,"browser_download_url":"https://dl.example/tohid-preview.zip"}""" +
+      (if (sums) "," + asset("SHA256SUMS.txt") else "") + "]}"
+
+  @Test
+  fun `پیش‌نمایش فقط از برچسبِ خودش و با نسخهٔ برچسبِ دارایی`() {
+    val p = ReleaseFeed.previewPick(preview())!!
+    assertEquals("3.2.17-preview", p.version)
+    val apk = p.assets.first { it.name == ReleaseFeed.PREVIEW_ASSET }
+    assertEquals("tohid-preview.apk.preview", apk.name)
+    assertEquals("https://dl.example/tohid-preview.apk.preview", apk.url)
+    assertEquals(5000000L, apk.size)
+    assertTrue(p.hasSums)
+    assertNull(ReleaseFeed.previewPick(preview(tag = "tohid-native")))
+    assertNull(ReleaseFeed.previewPick(preview(tag = "tohid-native-beta")))
+    assertNull(ReleaseFeed.previewPick(preview(label = "")))
+    assertNull(ReleaseFeed.previewPick(preview(sums = false)))
+    //  پایدار هرگز پیش‌نمایش را برنمی‌دارد: نصبی‌اش به `.apk` ختم نمی‌شود
+    assertNull(ReleaseFeed.githubPick(preview(tag = "tohid-native"), "tohid-native"))
+  }
+
+  @Test
+  fun `شمارهٔ ساختِ پیش‌نمایش عددی سنجیده می‌شود`() {
+    assertEquals(17, ReleaseFeed.previewBuild("3.2.17-preview"))
+    assertTrue(ReleaseFeed.previewBuild("3.3.10-preview") > ReleaseFeed.previewBuild("3.2.9-preview"))
+    assertEquals(-1, ReleaseFeed.previewBuild("3.2.17"))
+    assertEquals(-1, ReleaseFeed.previewBuild(""))
+  }
 }

@@ -381,11 +381,24 @@ object StockCore {
    *  نباشد، همان دفترِ ورودی برمی‌گردد. [today] `yyyy-MM-dd` برای انقضا.
    */
   fun apply(book: StockBook, doc: StockDoc, mode: StockMode = StockMode.LOCAL, today: String? = null): Applied {
-    validate(doc)?.let { return Applied(book, StockResult(false, it)) }
+    val (position, result) = step(book.positions, doc, mode, today)
+    return if (position == null) Applied(book, result)
+    else Applied(StockBook(book.positions + (keyOf(doc.productId, doc.warehouseId) to position)), result)
+  }
+
+  /**
+   *  منطقِ یک سند، بی ساختنِ دفترِ تازه: جایگاهِ نوِ همان کالا/انبار، یا null اگر
+   *  سند رد شد (دفتر دست نمی‌خورد). [apply] دفترِ تغییرناپذیر می‌سازد و [replay]
+   *  همه را روی **یک** نقشه می‌نشاند — پیش‌تر replay برای هر سند کلِ نقشهٔ
+   *  جایگاه‌ها را کپی می‌کرد (O(سند × کالا)؛ ۳۴۰ هزار سند روی ۲۰ هزار کالا یعنی
+   *  میلیاردها کپی). نتیجه و ترتیبِ نقشه همان است (PERF، bench/kotlin).
+   */
+  private fun step(positions: Map<String, Position>, doc: StockDoc, mode: StockMode, today: String?): Pair<Position?, StockResult> {
+    validate(doc)?.let { return null to StockResult(false, it) }
     val spec = TYPES.getValue(doc.type)
     val recorded = mode == StockMode.RECORDED
     val key = keyOf(doc.productId, doc.warehouseId)
-    val w = Work(book.positions[key] ?: Position(doc.productId, doc.warehouseId))
+    val w = Work(positions[key] ?: Position(doc.productId, doc.warehouseId))
 
     val result: StockResult = when {
       spec.value -> {
@@ -396,13 +409,13 @@ object StockCore {
       }
       spec.reserve == 1 -> {
         val q = doc.qtyMilli!!
-        if (!recorded) saleShortage(w, q, today)?.let { return Applied(book, it) }
+        if (!recorded) saleShortage(w, q, today)?.let { return null to it }
         w.reserved = add(w.reserved, q)
         StockResult(true)
       }
       spec.reserve == -1 -> {
         val q = doc.qtyMilli!!
-        if (q > w.reserved) return Applied(book, StockResult(false, "release_exceeds_reserved"))
+        if (q > w.reserved) return null to StockResult(false, "release_exceeds_reserved")
         w.reserved -= q
         StockResult(true)
       }
@@ -411,9 +424,9 @@ object StockCore {
         if (signed < 0) outbound(w, doc, -signed, recorded, today) else inbound(w, doc, signed)
       }
     }
-    if (!result.ok) return Applied(book, result)
+    if (!result.ok) return null to result
     if (w.qty > 0) w.lastCost = UnitCost(w.value, w.qty)
-    return Applied(StockBook(book.positions + (key to w.freeze())), result)
+    return w.freeze() to result
   }
 
   private fun outbound(w: Work, doc: StockDoc, q: Long, recorded: Boolean, today: String?): StockResult {
@@ -531,14 +544,16 @@ object StockCore {
 
   /** همهٔ سندها به همان ترتیبِ داده‌شده (سرور: ترتیبِ HLC) */
   fun replay(docs: List<StockDoc>, mode: StockMode = StockMode.LOCAL, today: String? = null): Pair<StockBook, List<StockResult>> {
-    var book = StockBook()
+    //  همان «apply پشتِ سرِ هم»، روی یک نقشهٔ کاری — LinkedHashMap مثلِ `Map + pair` جای
+    //  کلیدِ موجود را نگه می‌دارد و کلیدِ تازه را ته می‌گذارد
+    val positions = LinkedHashMap<String, Position>()
     val results = ArrayList<StockResult>(docs.size)
     for (d in docs) {
-      val a = apply(book, d, mode, today)
-      book = a.book
-      results += a.result
+      val (position, result) = step(positions, d, mode, today)
+      if (position != null) positions[keyOf(d.productId, d.warehouseId)] = position
+      results += result
     }
-    return book to results
+    return StockBook(positions) to results
   }
 
   // ---------------------------------------------------------------- خواندن

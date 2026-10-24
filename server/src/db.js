@@ -54,6 +54,10 @@ function getPool() {
     idleTimeoutMillis: config.db.idleTimeoutMs,
     connectionTimeoutMillis: config.db.connectTimeoutMs,
     ssl: config.db.ssl ? { rejectUnauthorized: false } : undefined,
+    //  اتصالِ بیکار فرآیند را زنده نگه نمی‌دارد. سنجشِ پس‌زمینهٔ `app.js` (هر ۵ ثانیه) اگر
+    //  پس از `closeDb` برسد استخرِ تازه‌ای می‌سازد؛ بی این، اتصالِ آن هرگز ۳۰ ثانیه بیکار
+    //  نمی‌ماند و فرآیند (پرونده‌ای از آزمون‌ها) تا ابد باز می‌ماند. سرور را شنوندهٔ HTTP زنده نگه می‌دارد.
+    allowExitOnIdle: true,
   });
   // یک اتصال خراب نباید کل سرور را بخواباند
   pool.on('error', (err) => console.error('[db] اتصال بیکار خطا داد:', err.message));

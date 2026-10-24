@@ -1,10 +1,13 @@
 package ir.vil3ntec.tohid.data
 
 import android.content.Context
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.concurrent.Callable
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicReference
 
@@ -28,10 +31,15 @@ import java.util.concurrent.atomic.AtomicReference
  *  شرحش سرِ `SaleDraft` است: فروش با `key`ِ همین پیش‌نویس ثبت می‌شود و
  *  پیش‌نویس فقط **پس از** رسیدنِ دفتر به دیسک پاک می‌شود (`post`).
  */
-class CartStore(context: Context) {
+class CartStore(context: Context) : HeldCart {
 
   private val prefs = context.getSharedPreferences("tohid", Context.MODE_PRIVATE)
   private val file = File(context.filesDir, FILE)
+  /** برای چاپ و کشوی پس از فروش (HW-02/03) — هر دو پیش‌فرض خاموش */
+  private val app: Context = context.applicationContext ?: context
+
+  //  رسیدهایی که پیش از بسته شدنِ برنامه در صفِ چاپ ماندند، به ترتیب ادامه پیدا کنند
+  init { runCatching { ir.vil3ntec.tohid.print.PrintSpooler.start(app) } }
 
   private val initial: SaleDraft? = load()
 
@@ -72,19 +80,33 @@ class CartStore(context: Context) {
     }
   }
 
-  fun set(lines: List<SalesEngine.CartLine>) {
+  /** POS-12: جابه‌جاییِ فاکتور در جریان است ⇒ سبد دست نمی‌خورد (`HeldCart.freeze`) */
+  @Volatile private var frozen = false
+
+  /** `false` ⇒ وسطِ جابه‌جاییِ فاکتور بود و چیزی عوض نشد — صفحه باید بگوید (`NOT_ADDED`) */
+  fun set(lines: List<SalesEngine.CartLine>): Boolean {
+    if (frozen) return false
     //  سبدِ خالی کلید ندارد؛ نخستین قلم کلیدِ تازه می‌سازد
     key = if (lines.isEmpty()) null else key ?: newKey()
     _lines.value = lines
     persist()
+    return true
   }
 
-  fun setDebtor(id: String?) {
+  fun setDebtor(id: String?): Boolean {
+    if (frozen) return false
     _debtorId.value = id
     persist()
+    return true
   }
 
-  fun clear() {
+  fun clear(): Boolean {
+    if (frozen) return false
+    wipe()
+    return true
+  }
+
+  private fun wipe() {
     key = null
     _lines.value = emptyList()
     _debtorId.value = null
@@ -100,18 +122,55 @@ class CartStore(context: Context) {
    */
   suspend fun post(store: ShopStore, record: (key: String) -> SalesEngine.Result): SalePost.Outcome {
     //  ضربه‌ای که پس از پایانِ ثبتِ قبلی رسید سبدِ کهنهٔ صفحه را در دست دارد، نه سبدِ تازه را
-    if (_lines.value.isEmpty()) return SalePost.Outcome.Busy
-    return poster.run(saleKey(), record, { store.save(it) }) { done -> if (key == done) clear() }
+    //  POS-12: F9/F12ِ وسطِ جابه‌جاییِ فاکتور ثبت نمی‌شود (سبد نیمه‌جابه‌جا است)
+    if (frozen || _lines.value.isEmpty()) return SalePost.Outcome.Busy
+    val out = poster.run(saleKey(), record, { store.save(it) }) { done -> if (key == done) wipe() }
+    //  فروش ثبت شده و روی دیسک است؛ چاپ پس از آن و جدا از آن (S16: چاپگرِ خاموش فروش را نگه نمی‌دارد)
+    if (out is SalePost.Outcome.Done) {
+      runCatching { ir.vil3ntec.tohid.print.PrintSpooler.afterSale(app, out.ok.data, out.ok.saleId) }
+    }
+    return out
   }
 
   /** پاسخِ پرسشِ بازیابی: `keep` = ادامه با همین ردیف‌ها؛ `null` = دور انداختن */
   fun resolveRecovery(keep: SaleDraft?) {
     _recovered.value = null
-    if (keep == null) { clear(); return }
+    if (keep == null) { wipe(); return }
     key = keep.key ?: key
     _lines.value = keep.cart()
     _debtorId.value = keep.debtorId
     persist()
+  }
+
+  /* ── POS-12: فاکتورهای نگه‌داشته (`HeldInvoiceStore`) ─────────────────── */
+
+  override val busy: Boolean get() = posting.value
+
+  override fun freeze(on: Boolean) { frozen = on }
+
+  override val recovering: Boolean get() = _recovered.value != null
+
+  override fun snapshot(): SaleDraft =
+    SaleDraft.of(if (_lines.value.isEmpty()) null else saleKey(), _lines.value, _debtorId.value, System.currentTimeMillis())
+
+  /**
+   *  سبد را با فاکتورِ دیگری عوض می‌کند (`null` = سبدِ خالی) و تا رسیدنش به
+   *  دیسک صبر می‌کند — جابه‌جاییِ فاکتورها بی این صبر می‌توانست میانِ دو فایل
+   *  فاکتوری را گم کند.
+   */
+  override suspend fun replace(draft: SaleDraft?): Boolean {
+    val lines = draft?.cart().orEmpty()
+    key = if (lines.isEmpty()) null else draft?.key ?: newKey()
+    _lines.value = lines
+    _debtorId.value = draft?.debtorId
+    //  همان نویسندهٔ تک‌رشته‌ای: نوشتن‌های پیشین پیش از این می‌روند و این یکی آخرین حالت را می‌نویسد
+    return withContext(Dispatchers.IO) {
+      runCatching {
+        writer.submit(Callable {
+          runCatching { DiskWrite.text(file, SaleDraftCodec.encode(SaleDraft.of(key, _lines.value, _debtorId.value, System.currentTimeMillis()))) }.isSuccess
+        }).get()
+      }.getOrDefault(false)
+    }
   }
 
   /**
@@ -130,6 +189,8 @@ class CartStore(context: Context) {
 
   companion object {
     const val FILE = "sale-draft.json"
+    /** POS-12 — اسکنی که وسطِ جابه‌جاییِ فاکتور رسید و به سبد نرفت */
+    const val NOT_ADDED = "فاکتور در حالِ جابه‌جایی بود — کالا اضافه نشد؛ دوباره اسکن کنید"
     // همان کلیدِ نسخهٔ وب — فقط برای آوردنِ پیش‌نویسِ نسخهٔ پیش
     private const val LEGACY_KEY = "tohid-shop-draft-cart-v1"
     private const val LEGACY_DEBTOR_KEY = "tohid-shop-draft-cart-debtor"

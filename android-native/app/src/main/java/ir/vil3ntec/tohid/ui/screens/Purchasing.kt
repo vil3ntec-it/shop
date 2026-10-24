@@ -116,7 +116,7 @@ fun PurchasingScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState)
 
     AddFab(
       label = "تأمین‌کننده",
-      containerColor = Shop.colors.primary,
+      containerColor = Shop.colors.button.primary.bg,
       onClick = { supplierForm = SupplierFormState() },
       modifier = Modifier.align(Alignment.BottomStart).padding(16.dp).popIn(),
     )

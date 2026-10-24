@@ -54,7 +54,7 @@ process.env.RATE_BROADCAST_MAX = '10000';
 process.env.OTP_RESEND_SECONDS = '0';
 
 const { createApp } = require('../src/app');
-const { query, one, newId, now, closeDb } = require('../src/db');
+const { query, one, many, newId, now, closeDb } = require('../src/db');
 const migrate = require('../src/migrate');
 const pw = require('../src/lib/password');
 
@@ -190,7 +190,7 @@ const openTab = async (name) => {
 // ── ۲) هر تب باز می‌شود و خطای جاوااسکریپت نمی‌دهد ────────────────
 await step('هر تب بی خطا باز می‌شود', async () => {
   for (const t of ['shops', 'pump', 'users', 'subs', 'sales', 'payments', 'discounts', 'notices',
-    'requests', 'plans', 'support', 'delivery', 'backups', 'health', 'audit']) {
+    'requests', 'plans', 'support', 'delivery', 'backups', 'health', 'ops', 'imgbank', 'audit']) {
     await openTab(t);
   }
   assert.deepEqual(consoleErrors, [], `خطای صفحه: ${consoleErrors.join(' | ')}`);
@@ -741,6 +741,183 @@ await step('همگام‌سازی و امنیت: دستگاه‌ها، خطاه�
   assert.match(csp || '', /script-src 'self'/);
 });
 
+// ── OPS-04@29: سرویسِ آزمایشی «زنده» معرفی نمی‌شود — روشن و تاریک ──
+await step('عملیات: سرویس‌های بیرونی با برچسبِ «آزمایشی»، نه «زنده» (روشن و تاریک)', async () => {
+  const badgeOf = (id) => page.locator(`#ops-providers tr[data-provider="${id}"] .badge`).textContent();
+  const look = () => page.evaluate(() => {
+    const b = document.querySelector('#ops-providers tr[data-provider="sms"] .badge');
+    return { badge: getComputedStyle(b).backgroundColor, body: getComputedStyle(document.body).backgroundColor };
+  });
+  await openTab('ops');
+  await page.waitForFunction(() => document.querySelectorAll('#ops-providers tr').length === 5, null, { timeout: 10_000 });
+  //  هر ردیف همان حالتِ سرور را می‌گوید؛ راهِ «لاگ» همیشه «آزمایشی»
+  const FA = { live: 'زنده', mock: 'آزمایشی', incomplete: 'ناقص', off: 'خاموش', none: 'ندارد', unknown: 'نامعلوم' };
+  const api = await page.evaluate(async () => (await fetch('/api/admin/system/providers', {
+    headers: { Authorization: `Bearer ${sessionStorage.getItem('shop-admin-token')}` },
+  })).json());
+  for (const p of api.providers) {
+    const shown = (await badgeOf(p.id)).trim();
+    assert.equal(shown, FA[p.state], `${p.id}`);
+    if (p.mode === 'log') assert.equal(shown, 'آزمایشی', `${p.id}: راهِ لاگ`);
+  }
+  //  پیامکِ آزمون فقط لاگ است؛ پوش خاموش؛ پرداختِ آنلاین ندارد
+  assert.equal((await badgeOf('sms')).trim(), 'آزمایشی');
+  assert.equal((await badgeOf('push')).trim(), 'خاموش');
+  assert.equal((await badgeOf('payment')).trim(), 'ندارد');
+  assert.match(await page.locator('#ops-prov-msg').textContent(), /آزمایشی/);
+  const light = await look();
+  if (process.env.PANEL_SHOTS) await page.screenshot({ path: `${process.env.PANEL_SHOTS}/ops-04-29-light.png` });
+  await page.emulateMedia({ colorScheme: 'dark' });
+  try {
+    const dark = await look();
+    assert.notEqual(dark.badge, light.badge, 'برچسب در حالتِ تاریک همان رنگِ روشن ماند');
+    assert.notEqual(dark.body, light.body, 'زمینه در حالتِ تاریک عوض نشد');
+    if (process.env.PANEL_SHOTS) await page.screenshot({ path: `${process.env.PANEL_SHOTS}/ops-04-29-dark.png` });
+  } finally {
+    await page.emulateMedia({ colorScheme: 'light' });
+  }
+  //  پیامکِ واقعی که تنظیم شود ⇒ «زنده»؛ و برمی‌گردد
+  const smsSettings = require('../src/lib/sms-settings');
+  await smsSettings.save({ provider: 'sms', url: 'https://sms.panel.test/{to}' });
+  try {
+    await openTab('ops');
+    await page.waitForFunction(() => /زنده/.test(document.querySelector('#ops-providers tr[data-provider="sms"] .badge')?.textContent || ''), null, { timeout: 10_000 });
+    assert.ok(!(await page.locator('#ops-providers').textContent()).includes('sms.panel.test'), 'نشانیِ سرویس در پنل');
+  } finally {
+    await smsSettings.save({ provider: 'log', url: '' });
+  }
+});
+
+// ── IMG-01 / IMG-BANK-01 / IMG-03 / IMG-PRO-09: ورودِ گروهی از پنل، با گزارشِ ردیف و فایل ──
+await step('بانکِ تصاویر: پوشه + CSV از پنل؛ فایلِ جعلی و خراب جدا گزارش می‌شوند و دسته نمی‌خوابد', async () => {
+  const F = require('./image-fixtures');
+  //  پرچمِ خاموش: پیامِ روشن، نه خطا
+  await openTab('imgbank');
+  await page.waitForSelector('#ib-off:not(.hidden)', { timeout: 10_000 });
+  await require('../src/lib/live-config').set('all', 'image_bank.central', true, 'panel-test');
+  await openTab('imgbank');
+  await page.waitForSelector('#ib-on:not(.hidden)', { timeout: 10_000 });
+
+  await page.fill('#ib-lic-source', 'کاتالوگِ تأمین‌کننده');
+  await page.selectOption('#ib-lic-status', 'licensed');
+  await page.check('#ib-lic-commercial');
+  await page.click('#btn-ib-new');
+  await page.waitForSelector('#ib-work:not(.hidden)', { timeout: 10_000 });
+  const batchId = (await page.locator('#ib-batch-id').textContent()).trim();
+  const b = await one('SELECT license_source, license_status, commercial_use FROM image_batches WHERE id=$1', [batchId]);
+  assert.deepEqual([b.license_source, b.license_status, b.commercial_use], ['کاتالوگِ تأمین‌کننده', 'licensed', true]);
+
+  const jpg = (seed) => F.jpeg(800, 600, { seed });
+  await page.setInputFiles('#ib-files', [
+    { name: 'a.jpg', mimeType: 'image/jpeg', buffer: jpg(901) },
+    { name: 'b.jpg', mimeType: 'image/jpeg', buffer: jpg(902) },
+    { name: 'fake.jpg', mimeType: 'image/jpeg', buffer: Buffer.from('MZ' + 'x'.repeat(400)) },
+    { name: 'half.jpg', mimeType: 'image/jpeg', buffer: jpg(903).subarray(0, 50) },
+  ]);
+  await page.click('#btn-ib-upload');
+  await page.waitForFunction(() => /^۴ از ۴ فایل · ۲ ناموفق/.test(document.getElementById('ib-progress').textContent), null, { timeout: 15_000 });
+
+  const csv = ['sku,barcode,name,brand,size,unit,image_path,license_status',
+    'P-1,,کالای یک,برند,1,g,photos/a.jpg,', 'P-2,,کالای دو,برند,2,g,photos/b.jpg,',
+    'P-3,,کالای جعلی,برند,3,g,fake.jpg,', 'P-4,,کالای بی فایل,برند,4,g,none.jpg,'].join('\n');
+  await page.setInputFiles('#ib-csv', { name: 'rows.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) });
+  await page.waitForFunction(() => /۴ ردیف/.test(document.getElementById('ib-csv-info').textContent), null, { timeout: 10_000 });
+  await page.click('#btn-ib-dry');
+  await page.waitForFunction(() => /پیش‌نمایش/.test(document.getElementById('ib-preview-label').textContent), null, { timeout: 10_000 });
+  assert.match(await page.locator('#ib-preview').textContent(), /موفق: ۲.*ناموفق: ۲/);
+  assert.equal((await one('SELECT COUNT(*)::int AS n FROM images WHERE batch_id=$1', [batchId])).n, 0, 'پیش‌نمایش ثبت کرد');
+
+  await page.click('#btn-ib-run');
+  await page.waitForSelector('#ib-rep-rows tr[data-row="4"]', { timeout: 15_000 });
+  //  فقط دو عکسِ سالم، هر دو در pending و منتظرِ بررسی — هیچ‌کدام خودبه‌خود عمومی نه
+  const imgs = await many('SELECT space, status FROM images WHERE batch_id=$1', [batchId]);
+  assert.deepEqual(imgs.map((r) => `${r.space}/${r.status}`), ['pending/NEEDS_REVIEW', 'pending/NEEDS_REVIEW']);
+  //  IMG-03 / IMG-PRO-09: فایل‌های خراب، هر کدام با دلیلِ خودش
+  const fileReason = (n) => page.locator(`#ib-rep-files tr[data-file="${n}"] td:nth-child(2)`).textContent();
+  assert.match(await fileReason('fake.jpg'), /پسوندش جعلی/);
+  assert.match(await fileReason('half.jpg'), /خراب/);
+  const rowReason = (n) => page.locator(`#ib-rep-rows tr[data-row="${n}"] td:nth-child(3)`).textContent();
+  assert.match(await rowReason(4), /پسوندش جعلی/);
+  assert.match(await rowReason(5), /بارگذاری نشده/);
+  assert.match(await page.locator('#ib-rep-counts').textContent(), /موفق: ۲/);
+  assert.match(await page.locator(`#ib-batches tr[data-batch="${batchId}"]`).textContent(), /۲ ناموفق/);
+
+  //  گزارشِ CSV دانلود می‌شود (با توکن، نه نشانیِ باز)
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.click('#btn-ib-csv-out')]);
+  const text = require('node:fs').readFileSync(await dl.path(), 'utf8');
+  assert.match(text, /file_missing/);
+  assert.match(text, /file:fake\.jpg,failed,image_type/);
+  if (process.env.PANEL_SHOTS) await page.screenshot({ path: `${process.env.PANEL_SHOTS}/img-bank-import.png`, fullPage: true });
+
+  //  توقف ⇒ دکمه‌های ورود خاموش؛ ادامه ⇒ دوباره روشن
+  await page.click('#btn-ib-pause');
+  await page.waitForFunction(() => document.getElementById('btn-ib-run').disabled === true, null, { timeout: 10_000 });
+  await page.click('#btn-ib-resume');
+  await page.waitForFunction(() => document.getElementById('btn-ib-run').disabled === false, null, { timeout: 10_000 });
+});
+
+// ── IMG-02 / IMG-PRO-07 / IMG-BANK-17 / IMG-09: صفِ بررسی — مبهم فقط با انتخابِ انسانی ──
+await step('بانکِ تصاویر: تطبیقِ مبهم با دلیل و اندازهٔ هر کالا؛ انتخابِ انسانی وصل می‌کند و ارشد منتشر می‌کند', async () => {
+  const F = require('./image-fixtures');
+  const tok = await page.evaluate(() => sessionStorage.getItem('shop-admin-token'));
+  const api = async (method, path, body, raw) => {
+    const r = await fetch(`${base}/api/admin/image-bank${path}`, {
+      method,
+      headers: { Authorization: `Bearer ${tok}`, 'Content-Type': raw ? 'application/octet-stream' : 'application/json' },
+      body: raw || (body === undefined ? undefined : JSON.stringify(body)),
+    });
+    return { status: r.status, body: await r.json().catch(() => null) };
+  };
+  const ids = {};
+  for (const size of ['1', '5']) {
+    const p = await api('POST', '/products', { name: 'روغن آفتاب', brand: 'زر', size_value: size, size_unit: 'l', sku: `PANEL-OIL-${size}` });
+    assert.equal(p.status, 201, JSON.stringify(p.body));
+    ids[size] = p.body.id;
+  }
+  const b = await api('POST', '/batches', { license_source: 'کاتالوگ', license_status: 'licensed', commercial_use: true });
+  assert.equal((await api('PUT', `/batches/${b.body.id}/files/oil.jpg`, undefined, F.jpeg(800, 600, { seed: 951 }))).body.status, 'ok');
+  const run = await api('POST', `/batches/${b.body.id}/rows`, { csv: 'sku,barcode,name,brand,size,unit,image_path\n,,روغن آفتاب,زر,,,oil.jpg' });
+  const imageId = run.body.rows[0].image_id;
+  assert.equal(run.body.rows[0].status, 'ambiguous');
+
+  await openTab('imgbank');
+  const row = `#ib-review tr[data-image="${imageId}"]`;
+  await page.waitForSelector(row, { timeout: 10_000 });
+  assert.match(await page.locator(`${row} td:nth-child(4)`).textContent(), /مبهم/);
+  assert.match(await page.locator(`${row} td:nth-child(5)`).textContent(), /چند کالای هم‌نام/);
+  assert.match(await page.locator(`${row} td:nth-child(2)`).textContent(), /۲ کالای ممکن/);
+  await page.click(`${row} button`);
+  await page.waitForSelector('#ib-detail:not(.hidden)', { timeout: 10_000 });
+  await page.waitForFunction(() => (document.getElementById('ib-dt-img').getAttribute('src') || '').startsWith('data:image/jpeg'), null, { timeout: 10_000 });
+  //  کالاهای ممکن کنارِ هم با اندازه و SKU (IMG-09، IMG-PRO-07)
+  assert.match(await page.locator(`#ib-dt-cands tr[data-product="${ids['1']}"]`).textContent(), /1 l.*PANEL-OIL-1/);
+  assert.match(await page.locator(`#ib-dt-cands tr[data-product="${ids['5']}"]`).textContent(), /5 l.*PANEL-OIL-5/);
+  //  هنوز وصل نیست و انتشار رد می‌شود (۴۰۹ ِ سرور، پیامِ قرمز؛ ۴۰۹ خطای صفحه نیست)
+  const errorsBefore = consoleErrors.length;
+  page.once('dialog', (d) => d.accept('مجوزِ تأمین‌کننده بررسی شد'));
+  await page.click('#btn-ib-approve');
+  await page.waitForFunction(() => /وصل نیست/.test(document.getElementById('ib-dt-msg').textContent), null, { timeout: 10_000 });
+  assert.equal((await one('SELECT status FROM images WHERE id=$1', [imageId])).status, 'NEEDS_REVIEW');
+  assert.deepEqual(consoleErrors.splice(errorsBefore).filter((m) => !/status of 409/.test(m)), []);
+
+  //  انتخابِ انسانی: «همین کالاست» برای ۵ لیتری
+  page.once('dialog', (d) => d.accept());
+  await page.click(`#ib-dt-cands tr[data-product="${ids['5']}"] button`);
+  await page.waitForFunction(() => /وصل به دستِ مدیر/.test(document.getElementById('ib-dt-reasons').textContent), null, { timeout: 10_000 });
+  const linked = await one('SELECT bank_product_id, match_status, match_reasons FROM images WHERE id=$1', [imageId]);
+  assert.deepEqual([linked.bank_product_id, linked.match_status], [ids['5'], 'exact']);
+  if (process.env.PANEL_SHOTS) await page.screenshot({ path: `${process.env.PANEL_SHOTS}/img-bank-review.png`, fullPage: true });
+
+  //  انتشار با دلیل ⇒ بانکِ عمومی، با سابقه
+  page.once('dialog', (d) => d.accept('مجوزِ تأمین‌کننده بررسی شد'));
+  await page.click('#btn-ib-approve');
+  await page.waitForSelector('#ib-detail.hidden', { state: 'attached', timeout: 10_000 });
+  const done = await one('SELECT space, status FROM images WHERE id=$1', [imageId]);
+  assert.deepEqual([done.space, done.status], ['central', 'APPROVED']);
+  const audit = await one(`SELECT detail FROM audit_logs WHERE action='admin.bank_image_approved' AND target_id=$1`, [imageId]);
+  assert.ok(audit, 'انتشار سابقه نداشت');
+});
+
 // ── F0-27: کانالِ آزمایشی — مدیرِ ارشد از پنل دکان و دستگاه را می‌افزاید ──
 await step('کانالِ آزمایشی: ذخیره در live_config و سابقه؛ شناسهٔ ناجور پیامِ قرمز و بی‌تغییر', async () => {
   await openTab('plans');
@@ -760,7 +937,9 @@ await step('کانالِ آزمایشی: ذخیره در live_config و سابق
   const d = typeof a.detail === 'string' ? JSON.parse(a.detail) : a.detail;
   assert.equal(d.reason, 'آزمونِ پنل');
   assert.equal(d.shops.added, 'shop_panel_1, shop_panel_2');
-  assert.match(await page.textContent('#beta-shops-meta'), /relroot|admin/);
+  //  ⚠️ پیامِ «ذخیره شد» پیش از `loadBeta()` می‌نشیند؛ «آخرین تغییر» پس از GET ِ دوم پر
+  //  می‌شود ⇒ خواندنِ فوری گاهی متنِ کهنه را می‌دید (همان مسابقهٔ زمانی، نه لرزش)
+  await page.waitForFunction(() => /relroot|admin/.test(document.getElementById('beta-shops-meta').textContent), null, { timeout: 10_000 });
 
   await page.fill('#beta-shops', 'bad id!');
   await page.click('#btn-beta-save');
@@ -770,6 +949,10 @@ await step('کانالِ آزمایشی: ذخیره در live_config و سابق
 
 await step('کانالِ آزمایشی: دکمهٔ صفحهٔ دکان همان دکان را می‌افزاید', async () => {
   await openTab('shops');
+  //  ⚠️ صفحهٔ دکانِ گامِ پیش هنوز در DOM است. بی این دو خط، waitForSelector همان دکمهٔ
+  //  کهنه را پیش از رسیدنِ پاسخِ GET ِ دکان می‌گرفت؛ کلیک روی کهنه می‌نشست و رندرِ تازه
+  //  دکمهٔ «به کانالِ آزمایشی» را جایش می‌گذاشت ⇒ انتظار تا ۱۰ ثانیه و قرمز (CIِ #381).
+  await page.evaluate(() => { document.getElementById('shop-detail').classList.add('hidden'); document.getElementById('btn-shop-beta')?.remove(); });
   await page.click('#shops-body tr:first-child button');
   await page.waitForSelector('#shop-detail:not(.hidden) #btn-shop-beta', { timeout: 10_000 });
   const id = (await page.textContent('#shop-id')).trim();
