@@ -50,16 +50,6 @@ import ir.vil3ntec.tohid.ui.v3.v3Pressable
 import ir.vil3ntec.tohid.update.ReleaseFeed
 import ir.vil3ntec.tohid.update.UpdateManager
 
-/**
- *  نوارهای پوسته در جای `notice` ِ `V3Scaffold` (هر TAB/PAGE جز خانه، که همین را کارتِ
- *  هشدار دارد): اشتراک و نسخهٔ تازه. پوسته یک بار `ShellNotice()` را می‌دهد.
- */
-@Composable
-fun ShellNotice() {
-  SubscriptionNotice()
-  UpdateNotice()
-}
-
 private fun openRoute(nav: ir.vil3ntec.tohid.ui.v3.nav.V3Nav?, route: String) {
   if (nav != null) nav.open(route) else AppNav.go(route)
 }

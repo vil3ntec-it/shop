@@ -58,6 +58,7 @@ import ir.vil3ntec.tohid.ui.screens.PhoneStatsPage
 import ir.vil3ntec.tohid.ui.screens.PullCard
 import ir.vil3ntec.tohid.ui.screens.hostWindow
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
+import ir.vil3ntec.tohid.ui.v3.nav.HomePager
 
 /** پهنای تبلتی که خانه را دوستونه می‌کند (shell.md) */
 private val TABLET_SPLIT = 840.dp
@@ -81,7 +82,15 @@ fun HomeScreen(d: ShopData, onOpen: (String) -> Unit, bottomReserve: Dp, shot: H
       HomeTablet(d, view, onOpen, bottomReserve, pages)
       return@BoxWithConstraints
     }
-    val pager = rememberPagerState(initialPage = shot.page.coerceIn(0, pages - 1)) { pages }
+    val pager = rememberPagerState(initialPage = (HomePager.page.value ?: shot.page).coerceIn(0, pages - 1)) { pages }
+    //  پیوندِ `stats?period=` (G6) ورقِ آمار را می‌خواهد ⇐ با فنرِ کیت همان‌جا
+    val wanted = HomePager.page.value
+    LaunchedEffect(wanted, pages) {
+      if (wanted != null) {
+        pager.animateScrollToPage(wanted.coerceIn(0, pages - 1), animationSpec = MotionSpec.sheet())
+        HomePager.page.value = null
+      }
+    }
     val rtl = LocalLayoutDirection.current
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
       //  ورق با انگشت ۱:۱ می‌آید و با سرعتِ رها کردن روی فنرِ کیت می‌نشیند (MOTION-APPLE)
@@ -101,12 +110,13 @@ fun HomeScreen(d: ShopData, onOpen: (String) -> Unit, bottomReserve: Dp, shot: H
 }
 
 /**
- *  ورقهٔ دوم (آمارِ r8) — صاحبِ محتوایش گروهِ گزارش (G6) است؛ تا `HomePager` ِ پایه برسد
+ *  ورقهٔ دوم (آمارِ r8) — محتوا از گروهِ گزارش (G6) با `HomePager.stats`؛ تا G6 ثبتش کند
  *  همان صفحهٔ آمارِ امروز.
  */
 @Composable
 private fun HomeStatsPage(d: ShopData, bottomReserve: Dp, pages: Int, current: Int, big: Boolean) {
-  PhoneStatsPage(d, bottomReserve, pages, current, big = big)
+  val stats = HomePager.stats
+  if (stats != null) stats(bottomReserve, pages, current) else PhoneStatsPage(d, bottomReserve, pages, current, big = big)
 }
 
 @Composable
