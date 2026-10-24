@@ -23,8 +23,10 @@ package ir.vil3ntec.tohid.core.safe
  *  همان قاعده را سرور پیش از نشاندن می‌سنجد (`server/src/lib/safe-ledger.js`)؛ هر دو با
  *  `core/test-vectors/safe-v1.json` (بخشِ `shape`). ⛔ یکی را بی دیگری و بردار عوض نکنید.
  *
- *  هر مبلغ `Long` به یک‌صدمِ افغانی، در ±(۲^۵۳−۱)؛ هر جمعِ میانی هم ([add]) — بیرون از بازه
- *  `ArithmeticException` است، نه عددِ گردشده (§۲۸.۴). Kotlin خالص است — بی android.*، بی ساعت.
+ *  هر مبلغ `Long` به یک‌صدمِ افغانی؛ هر ردیف تا [MAX_AMOUNT] و هر جمعِ میانی در ±(۲^۵۳−۱)
+ *  ([Walk]). ردیفی که جمعی را از آن بازه بیرون ببرد مثلِ ردیفِ بدشکل کنار می‌رود (`invalid`)
+ *  — نه عددِ گردشده (§۲۸.۴)، نه خطایی که خواندنِ کلِ دفتر را بشکند. Kotlin خالص است — بی
+ *  android.*، بی ساعت.
  */
 object SafeCore {
 
@@ -50,6 +52,8 @@ object SafeCore {
   )
 
   const val MAX_EXACT: Long = 9_007_199_254_740_991L
+  /** سقفِ هر ردیف: یک میلیارد افغانی — همان `MAX_AMOUNT_MINOR` ِ بازپرداختِ سرور (`order-refunds.js`) */
+  const val MAX_AMOUNT: Long = 100_000_000_000L
   const val MAX_ID = 64
   const val MAX_TEXT = 200
   const val MAX_BAG = 40
@@ -118,7 +122,7 @@ object SafeCore {
     val negative: Boolean,
     /** شناسهٔ شمارش‌هایی که `late` دارند */
     val needsReview: List<String>,
-    /** ردیف‌هایی که [check] را نمی‌گذرانند (یا شناسهٔ تکراری) — در مانده نیستند */
+    /** ردیف‌هایی که [check] را نمی‌گذرانند، شناسهٔ تکراری، یا جمعی را از ±(۲^۵۳−۱) بیرون می‌بردند — در مانده نیستند */
     val invalid: List<String>,
     /** تازه‌ترین اول */
     val history: List<Line>,
@@ -152,7 +156,7 @@ object SafeCore {
     if (e.id.isBlank()) return Code.ID_REQUIRED
     if (e.kind !in KINDS) return Code.BAD_KIND
     val min = if (e.kind == COUNT) 0L else 1L
-    if (e.amountMinor < min || e.amountMinor > MAX_EXACT) return Code.INVALID_AMOUNT
+    if (e.amountMinor < min || e.amountMinor > MAX_AMOUNT) return Code.INVALID_AMOUNT
     if (e.at <= 0 || e.at > MAX_EXACT) return Code.INVALID_TIME
     if (e.id.length > MAX_ID || tooLong(e.by, MAX_TEXT) || tooLong(e.reason, MAX_TEXT) || tooLong(e.note, MAX_TEXT) ||
       tooLong(e.bagNo, MAX_BAG) || tooLong(e.shiftId, MAX_ID) || tooLong(e.auditId, MAX_ID)
@@ -193,63 +197,78 @@ object SafeCore {
 
   private fun signed(e: Entry): Long = if (e.kind in INFLOW) e.amountMinor else -e.amountMinor
 
-  /** جمعِ دقیق در ±(۲^۵۳−۱) — همان سقفِ عددِ JS؛ دو عددِ در بازه هرگز Long را سرریز نمی‌کنند */
-  private fun add(a: Long, b: Long): Long {
-    val r = a + b
-    if (r > MAX_EXACT || r < -MAX_EXACT) throw ArithmeticException("جمعِ گاوصندوق بیرون از ±(۲^۵۳−۱)")
-    return r
-  }
+  /** جمعِ دقیق در ±(۲^۵۳−۱) — همان سقفِ عددِ JS؛ null یعنی بیرون از بازه. دو عددِ در بازه Long را سرریز نمی‌کنند */
+  private fun sum(a: Long, b: Long): Long? = (a + b).takeIf { it in -MAX_EXACT..MAX_EXACT }
 
-  fun view(entries: List<Entry>): View {
-    val (rows, invalid) = usable(entries)
-    val lines = ArrayList<Line>(rows.size)
+  /**
+   *  یک بار پیمودنِ دفترِ مرتب. هر ردیف یا کامل می‌نشیند یا ([lineOf] = null) با شناسه‌اش در
+   *  [skipped] کنار می‌رود و هیچ عددی را عوض نمی‌کند — پس [view]، [balanceBefore] و [build]
+   *  همیشه یک دفتر می‌بینند.
+   */
+  private class Walk {
+    val lines = ArrayList<Line>()
+    val skipped = ArrayList<String>()
+    val review = ArrayList<String>()
     var balance = 0L
     var last: Line? = null
     var inSince = 0L
     var outSince = 0L
     var varianceTotal = 0L
-    val review = ArrayList<String>()
-    for (e in rows) {
-      val line = if (e.kind == COUNT) {
-        val d = add(e.amountMinor, -balance)
+
+    /** سطرِ [e] روی حالِ فعلی، بی تغییرِ آن؛ null اگر جمعی از ±(۲^۵۳−۱) بیرون برود */
+    fun lineOf(e: Entry): Line? {
+      if (e.kind == COUNT) {
+        val d = sum(e.amountMinor, -balance) ?: return null
         //  شمارشِ آغاز (هیچ ردیفی پیش از آن) پایه می‌گذارد؛ هر شمارشِ دیگر اختلاف دارد
         val v = if (lines.isEmpty()) null else d
-        val late = v != null && e.expectedMinor != balance
-        if (late) review += e.id
-        varianceTotal = add(varianceTotal, v ?: 0L)
+        sum(varianceTotal, v ?: 0L) ?: return null
+        return Line(e, d, e.amountMinor, varianceMinor = v, late = v != null && e.expectedMinor != balance)
+      }
+      val d = signed(e)
+      (if (d > 0) sum(inSince, d) else sum(outSince, -d)) ?: return null
+      return Line(e, d, sum(balance, d) ?: return null)
+    }
+
+    fun step(e: Entry) {
+      val line = lineOf(e) ?: run {
+        skipped += e.id
+        return
+      }
+      if (e.kind == COUNT) {
+        varianceTotal += line.varianceMinor ?: 0L
         inSince = 0L
         outSince = 0L
-        Line(e, d, e.amountMinor, varianceMinor = v, late = late).also { last = it }
-      } else {
-        val d = signed(e)
-        if (d > 0) inSince = add(inSince, d) else outSince = add(outSince, -d)
-        Line(e, d, add(balance, d))
-      }
+        last = line
+        if (line.late) review += e.id
+      } else if (line.deltaMinor > 0) inSince += line.deltaMinor else outSince -= line.deltaMinor
       balance = line.balanceMinor
       lines += line
     }
+  }
+
+  /** پیمودنِ ردیف‌های مرتبِ [usable]، تا پیش از جایگاهِ [until] (اگر داده شود) */
+  private fun walk(rows: List<Entry>, until: Entry? = null): Walk {
+    val w = Walk()
+    for (e in rows) {
+      if (until != null && ORDER.compare(e, until) >= 0) break
+      w.step(e)
+    }
+    return w
+  }
+
+  fun view(entries: List<Entry>): View {
+    val (rows, bad) = usable(entries)
+    val w = walk(rows)
     return View(
-      balanceMinor = balance, lastCount = last, inSinceCountMinor = inSince, outSinceCountMinor = outSince,
-      varianceTotalMinor = varianceTotal, negative = balance < 0, needsReview = review, invalid = invalid,
-      history = lines.asReversed().toList(),
+      balanceMinor = w.balance, lastCount = w.last, inSinceCountMinor = w.inSince, outSinceCountMinor = w.outSince,
+      varianceTotalMinor = w.varianceTotal, negative = w.balance < 0, needsReview = w.review, invalid = bad + w.skipped,
+      history = w.lines.asReversed().toList(),
     )
   }
 
   /** مانده درست پیش از جایگاهِ (`at`، `id`) */
-  fun balanceBefore(entries: List<Entry>, at: Long, id: String): Long = stateBefore(usable(entries).first, at, id).first
-
-  /** (مانده، آیا پیش از این جایگاه ردیفی هست) روی ردیف‌های مرتبِ [usable] */
-  private fun stateBefore(rows: List<Entry>, at: Long, id: String): Pair<Long, Boolean> {
-    val pos = Entry(id, COUNT, 0, at)
-    var balance = 0L
-    var any = false
-    for (e in rows) {
-      if (ORDER.compare(e, pos) >= 0) break
-      any = true
-      balance = if (e.kind == COUNT) e.amountMinor else add(balance, signed(e))
-    }
-    return balance to any
-  }
+  fun balanceBefore(entries: List<Entry>, at: Long, id: String): Long =
+    walk(usable(entries).first, Entry(id, COUNT, 0, at)).balance
 
   /**
    *  سنجش و ساختِ ردیفِ تازه از روی دفترِ همین دستگاه.
@@ -257,7 +276,8 @@ object SafeCore {
    *    (ساعتِ عقب‌ماندهٔ گوشی ردیف را پیش از شمارشی نمی‌برد که همین‌جا دیده شد).
    *  • تکرارِ همان شناسه با همان محتوا `duplicate`؛ با محتوای دیگر `ID_CONFLICT`.
    *  • خروج بیش از مانده `INSUFFICIENT_FUNDS`؛ اختلافِ شمارش (جز شمارشِ آغاز) بیش از [threshold]
-   *    بی دلیل `REASON_REQUIRED`؛ ورودی که مانده را از ±(۲^۵۳−۱) بیرون ببرد `INVALID_AMOUNT`.
+   *    بی دلیل `REASON_REQUIRED`؛ ردیفی که [view] کنارش می‌گذاشت (جمعی بیرون از ±(۲^۵۳−۱))
+   *    `INVALID_AMOUNT`.
    */
   fun build(entries: List<Entry>, input: Input, threshold: Long): Result<Entry> {
     val id = clean(input.id) ?: return Result.Err(Code.ID_REQUIRED)
@@ -265,9 +285,8 @@ object SafeCore {
     val rows = usable(entries).first
     val prior = entries.firstOrNull { it.id == id }
     val at = prior?.at ?: maxOf(input.at, (rows.lastOrNull()?.at ?: 0L) + 1)
-    val (before, anyBefore) = try { stateBefore(rows, at, id) } catch (_: ArithmeticException) {
-      return Result.Err(Code.INVALID_AMOUNT)
-    }
+    val w = walk(rows, Entry(id, COUNT, 0, at))
+    val before = w.balance
     val e = Entry(
       id = id, kind = input.kind, amountMinor = input.amountMinor, at = at,
       by = clean(input.by), reason = clean(input.reason), note = clean(input.note), bagNo = clean(input.bagNo),
@@ -281,12 +300,10 @@ object SafeCore {
     }
     if (e.kind == COUNT) {
       val v = e.amountMinor - before
-      if (anyBefore && (if (v < 0) -v else v) > threshold && e.reason == null) return Result.Err(Code.REASON_REQUIRED, varianceMinor = v)
-    } else if (e.kind !in INFLOW) {
-      if (e.amountMinor > before) return Result.Err(Code.INSUFFICIENT_FUNDS)
-    } else if (before > MAX_EXACT - e.amountMinor) {
-      return Result.Err(Code.INVALID_AMOUNT)
-    }
+      if (w.lines.isNotEmpty() && (if (v < 0) -v else v) > threshold && e.reason == null) return Result.Err(Code.REASON_REQUIRED, varianceMinor = v)
+    } else if (e.kind !in INFLOW && e.amountMinor > before) return Result.Err(Code.INSUFFICIENT_FUNDS)
+    //  ردیفِ تازه پس از همهٔ دیده‌هاست ([at])، پس [w] همان حالی است که view رویش می‌نشاندش
+    if (w.lineOf(e) == null) return Result.Err(Code.INVALID_AMOUNT)
     return Result.Ok(e)
   }
 }

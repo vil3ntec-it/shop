@@ -12,11 +12,13 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { EventEmitter } = require('node:events');
 const h = require('./helpers');
 const { one } = require('../src/db');
 const hlc = require('../src/lib/hlc');
 const syncV1 = require('../src/lib/sync-v1');
 const safe = require('../src/lib/safe-ledger');
+const lock = require('../src/lib/account-lock');
 const migrations = require('../src/lib/sync-v1-migrations');
 
 const ROOT = path.join(__dirname, '..', '..');
@@ -33,6 +35,10 @@ const H = (node) => hlc.format({ wall: Date.now() + (++tick), counter: 0, node }
 
 const push1 = (who, device, ops) => h.api('POST', '/api/sync/v1/push', {
   token: who.accessToken, body: { device_id: device, schema_version: migrations.currentVersion('shop'), ops },
+});
+/** ساختِ A00 به بعد (`caps`): newer-fields کلیدِ null را برنمی‌دارد */
+const pushA00 = (who, device, ops) => h.api('POST', '/api/sync/v1/push', {
+  token: who.accessToken, body: { device_id: device, schema_version: migrations.currentVersion('shop'), caps: ['a00'], ops },
 });
 const push3 = (who, device, ops) => h.api('POST', '/api/sync/v3/push', {
   token: who.accessToken, body: { device_id: device, protocol: 3, ops },
@@ -212,27 +218,166 @@ test('v1: دو push ِ هم‌زمان با یک شناسه — فقط یکی م
   }
 });
 
-test('قفلِ حساب: push ِ دوم تا پایانِ پاسخِ اولی می‌ایستد؛ حسابِ دیگر نه', async () => {
-  const { EventEmitter } = require('node:events');
-  const tick = () => new Promise((r) => setTimeout(r, 30));
-  const r1 = new EventEmitter();
-  const r2 = new EventEmitter();
-  const r3 = new EventEmitter();
-  await safe.lockAccount(r1, 'acc-lock-1');
-  let second = false;
-  const p2 = safe.lockAccount(r2, 'acc-lock-1').then(() => { second = true; });
-  await safe.lockAccount(r3, 'acc-lock-2');               //  حسابِ دیگر منتظر نمی‌ماند
-  await tick();
-  assert.equal(second, false, 'تا پاسخِ اول تمام نشده، دومی منتظر است');
-  r1.emit('finish');
-  r1.emit('close');                                       //  آزاد کردنِ دوباره بی‌اثر است
-  await p2;
-  assert.equal(second, true);
-  r2.emit('close');
-  r3.emit('finish');
-  const r4 = new EventEmitter();
-  await safe.lockAccount(r4, 'acc-lock-1');               //  پس از آزاد شدن دوباره گرفتنی است
-  r4.emit('finish');
+/** پاسخِ ساختگی برای `account-lock`: همان سه چیزی که می‌خواند (`end`، `destroyed`، `close`) */
+function fakeRes() {
+  const r = new EventEmitter();
+  r.destroyed = false;
+  r.writableEnded = false;
+  r.end = function end() { this.writableEnded = true; return this; };
+  return r;
+}
+const pause = (ms = 30) => new Promise((r) => { setTimeout(r, ms); });
+const settled = (p) => {
+  const s = { done: false, value: undefined };
+  p.then((v) => { s.done = true; s.value = v; }, (e) => { s.done = true; s.error = e; });
+  return s;
+};
+/** سقف‌های `account-lock` برای یک آزمون، و برگرداندنشان */
+async function withLimits(over, fn) {
+  const was = { ...lock.limits };
+  Object.assign(lock.limits, over);
+  try { await fn(); } finally { Object.assign(lock.limits, was); }
+}
+
+test('قفلِ حساب: تا پایانِ کارِ گرداننده (res.end) می‌ماند، نه تا قطعِ اتصال؛ حسابِ دیگر منتظر نمی‌ماند', async () => {
+  const r1 = fakeRes();
+  const free1 = await lock.holdFor(r1, 'acc-lock-1');
+  assert.equal(typeof free1, 'function');
+  const r2 = fakeRes();
+  const p2 = settled(lock.holdFor(r2, 'acc-lock-1'));
+  const r3 = fakeRes();
+  assert.equal(typeof await lock.holdFor(r3, 'acc-lock-2'), 'function');
+  //  اتصالِ اولی پس از گرفتنِ قفل قطع می‌شود: گرداننده هنوز کار می‌کند، پس قفل می‌ماند
+  r1.destroyed = true;
+  r1.emit('close');
+  await pause();
+  assert.equal(p2.done, false, 'تا گرداننده پاسخ نداده، دومی منتظر است');
+  r1.end();
+  r1.end();                                                //  آزاد کردنِ دوباره بی‌اثر است
+  await pause(5);
+  assert.equal(p2.done, true);
+  assert.equal(typeof p2.value, 'function');
+  free1();
+  r2.end();
+  r3.end();
+  const r4 = fakeRes();
+  const free4 = await lock.holdFor(r4, 'acc-lock-1');      //  پس از آزاد شدن دوباره گرفتنی است
+  free4();                                                 //  خطای گرداننده پیش از پاسخ: آزاد بی `end`
+  const r5 = fakeRes();
+  assert.equal(typeof await lock.holdFor(r5, 'acc-lock-1'), 'function');
+  r5.end();
+});
+
+test('قفلِ حساب: درخواستی که در صف قطع شد کاری نمی‌کند و نوبتش را پس می‌دهد', async () => {
+  const r1 = fakeRes();
+  await lock.holdFor(r1, 'acc-lock-q');
+  const r2 = fakeRes();
+  const p2 = settled(lock.holdFor(r2, 'acc-lock-q'));
+  r2.emit('close');                                        //  قطع در صف (شنونده پیش از صف ثبت شده بود)
+  const r3 = fakeRes();
+  const p3 = settled(lock.holdFor(r3, 'acc-lock-q'));
+  r1.end();
+  await pause(5);
+  assert.equal(p2.done, true);
+  assert.equal(p2.value, null, 'قطع‌شده قفل نمی‌گیرد');
+  assert.equal(p3.done, true, 'نوبتِ قطع‌شده بی‌درنگ به بعدی می‌رسد');
+  assert.equal(typeof p3.value, 'function');
+  r3.end();
+
+  //  همان از درِ نگهبانِ v1: نه داوری، نه `next`
+  const ctx = { app: 'shop', accountKind: 'shop', accountId: shopId, role: 'owner', userId: 'u' };
+  const held = fakeRes();
+  await safe.hold(held, ctx);
+  const req = { sync: ctx, body: { ops: [count('gone-c1', 100)] } };
+  const before = JSON.stringify(req.body);
+  const res = fakeRes();
+  res.json = () => assert.fail('پاسخ نباید ساخته شود');
+  let called = 0;
+  const guard = safe.v1SafeGuard(req, res, () => { called++; });
+  res.destroyed = true;
+  res.emit('close');
+  held.end();
+  await guard;
+  assert.equal(called, 0);
+  assert.equal(JSON.stringify(req.body), before);
+});
+
+test('قفلِ حساب: سقفِ انتظار ⇒ 503 SAFE_BUSY، و سقفِ سخت قفلِ گیرکرده را آزاد می‌کند', async () => {
+  await withLimits({ WAIT_MS: 40, HOLD_MS: 120 }, async () => {
+    const stuck = fakeRes();
+    await lock.holdFor(stuck, 'acc-lock-t');               //  گرداننده‌ای که هرگز پاسخ نمی‌دهد
+    await assert.rejects(lock.holdFor(fakeRes(), 'acc-lock-t'), (e) => e.status === 503 && e.code === 'SAFE_BUSY');
+    await pause(130);
+    const r = fakeRes();
+    assert.equal(typeof await lock.holdFor(r, 'acc-lock-t'), 'function', 'پس از سقفِ سخت آزاد است');
+    r.end();
+    stuck.end();                                           //  پایانِ دیرِ گیرکرده چیزی را آزاد نمی‌کند
+    const r2 = fakeRes();
+    await lock.holdFor(r2, 'acc-lock-t');
+    r2.end();
+  });
+});
+
+test('v1 و v3 یک قفل دارند: push ِ گاوصندوق تا پایانِ پاسخِ دیگری می‌ایستد؛ push ِ بی گاوصندوق نه', async () => {
+  const ctx = { accountId: shopId };
+  const held = fakeRes();
+  await safe.hold(held, ctx);
+  const v1 = settled(push1(owner, 'safe-lock-v1', [count('lk-c1', 100)]));
+  const v3 = settled(push3(owner, 'safe-lock-v3', [{ op_id: oid(), hlc: H('v3-lock'), table: 'safeEntries', row_id: 'lk-c2', kind: 'insert',
+    fields: { kind: 'count', amountMinor: 100, createdAt: at(), expectedMinor: 0 } }]));
+  const other = await push1(owner, 'safe-lock-other', [{ ...op1('lk-p1', { id: 'lk-p1', name: 'چای' }), table: 'products' }]);
+  assert.equal(other.status, 200, JSON.stringify(other.body));
+  await pause(80);
+  assert.equal(v1.done, false, 'push ِ v1 منتظرِ قفل است');
+  assert.equal(v3.done, false, 'push ِ v3 منتظرِ قفل است');
+  held.end();
+  while (!v1.done || !v3.done) await pause(10);
+  assert.deepEqual(statuses(v1.value), ['applied']);
+  assert.equal(v3.value.body.results[0].status, 'applied', JSON.stringify(v3.value.body));
+});
+
+test('v1: کلیدِ null دیگر راهِ دور زدن نیست — نگهبان پس از newer-fields، و opِ ردشدهٔ validateOp هم safe_invalid', async () => {
+  for (const id of ['nul-c1', 'nul-c2']) assert.deepEqual(statuses(await push1(owner, 'safe-own', [count(id, 50000, 0)])), ['applied']);
+  const junk = () => {
+    const big = { kind: 'out', amountMinor: 777, createdAt: at(), reason: 'owner_withdrawal' };
+    for (let k = 0; k < 3000; k++) big[`k${'x'.repeat(20)}${k}`] = null;
+    return [
+      //  اثرِ انگشتِ غلط + کلیدِ null (newer-fields اثرِ انگشت را از نو می‌سازد)
+      { op_id: oid(), ts: Date.now(), table: 'safeEntries', row_id: 'nul-c1', type: 'update', fields: { amountMinor: 1, junk: null }, hash: '0'.repeat(64) },
+      //  نامِ `$` با null
+      { op_id: oid(), ts: Date.now(), table: 'safeEntries', row_id: 'nul-c2', type: 'update', fields: { amountMinor: 2, $x: null } },
+      //  درجِ «برداشت» از شاگرد با بیش از ۶۴KB کلیدِ null
+      { op_id: oid(), ts: Date.now(), table: 'safe_entries', row_id: 'nul-o1', type: 'insert', fields: big },
+    ];
+  };
+  //  ساختِ پیش از A00 (newer-fields کلیدهای null را برمی‌دارد): نگهبان opِ پاک‌شده را می‌بیند
+  const old = await push1(staff, 'safe-staff-old', junk());
+  assert.deepEqual(statuses(old), ['rejected:safe_append_only', 'rejected:safe_append_only', 'rejected:safe_not_allowed'], JSON.stringify(old.body));
+  //  ساختِ A00 (بی پالایش): opی که validateOp نمی‌پذیرد، همین‌جا رد است
+  const a00 = await pushA00(staff, 'safe-staff-a00', junk());
+  assert.deepEqual(statuses(a00), ['rejected:safe_invalid', 'rejected:safe_invalid', 'rejected:safe_invalid'], JSON.stringify(a00.body));
+  assert.equal((await rowOf('nul-c1')).data.amountMinor, 50000);
+  assert.equal((await rowOf('nul-c2')).data.amountMinor, 50000);
+  assert.equal(await rowOf('nul-o1'), null);
+});
+
+test('v1: بخشی از همان ردیف بی‌اثر می‌گذرد، حتی از شاگرد؛ null روی فیلدِ پر، `id` ِ دیگر یا فیلدِ تازه ویرایش است', async () => {
+  const cnt = count('sub-c1', 4200, 0);
+  assert.deepEqual(statuses(await push1(owner, 'safe-own', [cnt])), ['applied']);
+  //  ساختِ A00: null همان‌طور که فرستاده شد به نگهبان می‌رسد
+  const one = async (fields) => statuses(await pushA00(staff, 'safe-staff-a00', [op1('sub-c1', fields)]))[0];
+  assert.equal(await one({ amountMinor: 4200 }), 'applied');
+  assert.equal(await one({ kind: 'count', note: null, id: 'sub-c1' }), 'applied');
+  assert.equal(await one({ amountMinor: null }), 'rejected:safe_append_only');
+  assert.equal(await one({ amountMinor: 4200, id: 'other' }), 'rejected:safe_append_only');
+  assert.equal(await one({ amountMinor: 4200, note: 'تازه' }), 'rejected:safe_append_only');
+  const live = Object.fromEntries(Object.entries((await rowOf('sub-c1')).data).filter(([, x]) => x !== null));
+  assert.deepEqual(live, cnt.fields);
+  //  ردیفِ تازه با `id` ِ دیگر در فیلدها شکلِ نادرست است
+  const odd = count('sub-c2', 1);
+  odd.fields.id = 'sub-c3';
+  assert.deepEqual(statuses(await push1(owner, 'safe-own', [odd])), ['rejected:safe_invalid']);
+  assert.equal(await rowOf('sub-c2'), null);
 });
 
 test('v1: همان ردیف عیناً (فرستادنِ دوباره پس از بازیابی) بی‌اثر می‌گذرد، حتی از شاگرد', async () => {
@@ -272,8 +417,14 @@ test('v3: همان داوری روی opِ بومی', async () => {
   assert.equal(bad.status, 200, JSON.stringify(bad.body));
   assert.equal(bad.body.results[0].status, 'rejected');
   assert.equal(bad.body.results[0].reason, 'safe_not_allowed');
-  const drop3 = await push3(staff, 'safe-v3-staff', [v3('v3-d1', { kind: 'from_drawer', amountMinor: 100, createdAt: at(), shiftId: 's', auditId: 'a' })]);
+  const dropFields = { kind: 'from_drawer', amountMinor: 100, createdAt: at(), shiftId: 's', auditId: 'a' };
+  const drop3 = await push3(staff, 'safe-v3-staff', [v3('v3-d1', dropFields)]);
   assert.equal(drop3.body.results[0].status, 'applied', JSON.stringify(drop3.body));
+  //  «از دخل» فقط درجِ تازه است: روی ردیفِ موجود شاگرد تعارض نمی‌سازد؛ بخشی از همان بی‌اثر است
+  const dropOther = await push3(staff, 'safe-v3-staff', [v3('v3-d1', { ...dropFields, amountMinor: 5 })]);
+  assert.equal(dropOther.body.results[0].reason, 'safe_not_allowed', JSON.stringify(dropOther.body));
+  const dropPart = await push3(staff, 'safe-v3-staff', [v3('v3-d1', { amountMinor: 100 })]);
+  assert.notEqual(dropPart.body.results[0].status, 'rejected', JSON.stringify(dropPart.body));
   const shape = await push3(owner, 'safe-v3-own', [v3('v3-b1', { kind: 'to_bank', amountMinor: 100, createdAt: at() })]);
   assert.equal(shape.body.results[0].reason, 'safe_invalid');
   const fields = { kind: 'count', amountMinor: 100, createdAt: at(), expectedMinor: 0 };

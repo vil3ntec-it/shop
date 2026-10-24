@@ -23,6 +23,7 @@ const { promisify } = require('util');
 const config = require('../config');
 const sync = require('../lib/sync-v3');
 const newerFields = require('../lib/newer-fields');
+const safeLedger = require('../lib/safe-ledger');
 const { rateLimit } = require('../middleware/ratelimit');
 const { requireSyncAccount, requireSyncWrite } = require('../lib/sync-v1-auth');
 const { forbidden, notFoundHandler } = require('../middleware/errors');
@@ -68,6 +69,9 @@ router.get('/hello', (req, res) => {
 router.post('/push', requireSyncWrite, async (req, res, next) => {
   try {
     const b = req.body || {};
+    //  گاوصندوق (PAY-18): همان قفلِ نگهبانِ v1 تا پایانِ پاسخ — پلِ v3⇒v1 همان `sync_rows` را
+    //  می‌نویسد که آن نگهبان «ردیف هست؟» را از آن می‌خواند (‎lib/safe-ledger.js‎)
+    if (safeLedger.touches(b.ops) && !(await safeLedger.hold(res, req.sync))) return;
     const appVersion = String(req.headers['x-app-version'] || '').slice(0, 32);
     //  A00: `null` ِ ساختِ پیش از A00 برای فیلدی که نمی‌شناسد کنار می‌رود (‎lib/newer-fields.js‎)
     const fl = newerFields.filterOps(b.ops, {

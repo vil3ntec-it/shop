@@ -13,7 +13,6 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -102,17 +101,27 @@ class SafeCoreTest {
     }
   }
 
-  /** جمعِ بیرون از ±(۲^۵۳−۱) خطاست، نه عددِ گردشده (§۲۸.۴)؛ build چنین ردیفی نمی‌سازد */
+  /**
+   *  جمعی که از ±(۲^۵۳−۱) بیرون برود عددِ گردشده نیست (§۲۸.۴) و خواندنِ دفتر را هم نمی‌شکند:
+   *  همان ردیف مثلِ ردیفِ بدشکل کنار می‌رود و build چنین ردیفی نمی‌سازد. با سقفِ هر ردیف
+   *  ([SafeCore.MAX_AMOUNT]) این فقط با ده‌ها هزار ردیف ممکن است.
+   */
   @Test fun sumsStayExact() {
-    val max = SafeCore.MAX_EXACT
-    val rows = listOf(
-      SafeCore.Entry("a", SafeCore.IN, max, 10, reason = "deposit"),
-      SafeCore.Entry("b", SafeCore.IN, 1, 20, reason = "deposit"),
-    )
-    assertThrows(ArithmeticException::class.java) { SafeCore.view(rows) }
-    assertEquals(max, SafeCore.view(rows.take(1)).balanceMinor)
-    val r = SafeCore.build(rows.take(1), SafeCore.Input("c", SafeCore.IN, 1, 30, reason = "deposit"), threshold)
+    val cap = SafeCore.MAX_AMOUNT
+    val fit = (SafeCore.MAX_EXACT / cap).toInt()
+    val rows = (0..fit).map { SafeCore.Entry("i$it", SafeCore.IN, cap, it + 1L, reason = "deposit") }
+    val view = SafeCore.view(rows)
+    assertEquals(listOf("i$fit"), view.invalid)
+    assertEquals(fit * cap, view.balanceMinor)
+    assertEquals(fit * cap, view.inSinceCountMinor)
+    assertEquals(fit, view.history.size)
+    //  خروجِ پس از آن روی همان مانده می‌نشیند
+    val out = SafeCore.Entry("o1", SafeCore.OUT, cap, fit + 10L, reason = "owner_withdrawal")
+    assertEquals((fit - 1) * cap, SafeCore.view(rows + out).balanceMinor)
+    val r = SafeCore.build(rows.dropLast(1), SafeCore.Input("c", SafeCore.IN, cap, 1, reason = "deposit"), threshold)
     assertEquals(SafeCore.Result.Err(SafeCore.Code.INVALID_AMOUNT), r)
+    val ok = SafeCore.build(rows.dropLast(1), SafeCore.Input("c", SafeCore.IN, SafeCore.MAX_EXACT - fit * cap, 1, reason = "deposit"), threshold)
+    assertTrue("$ok", ok is SafeCore.Result.Ok)
   }
 
   /** ردیفِ ساختهٔ build بی‌درنگ در view همان مانده‌ای را می‌دهد که سنجیده شد */

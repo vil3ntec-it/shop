@@ -77,10 +77,11 @@ const { v1NewerFields: shopNewerFields } = require('../lib/newer-fields');
 /*
  *  دکان: گاوصندوق (PAY-18) — opِ `safeEntries` فقط درج، با شکلِ درست و `safe.move`
  *  (جز «از دخل») — ‎lib/safe-ledger.js‎. پمپ و بقیهٔ جدول‌ها بی هیچ کاری از آن رد می‌شوند.
+ *  ⛔ پس از `shopNewerFields`: نگهبان همان opی را می‌بیند که v1 می‌نشاند (کلیدِ null برداشته).
  */
 const { v1SafeGuard: shopSafeGuard } = require('../lib/safe-ledger');
 
-router.post('/push', requireSyncWrite, pumpServicesOnly, shopStaffGuard, shopSafeGuard, shopNewerFields, async (req, res, next) => {
+router.post('/push', requireSyncWrite, pumpServicesOnly, shopStaffGuard, shopNewerFields, shopSafeGuard, async (req, res, next) => {
   try {
     const deviceId = v.id(req.body?.device_id || req.body?.deviceId, {
       field: 'شناسه دستگاه', required: true, max: 64,
