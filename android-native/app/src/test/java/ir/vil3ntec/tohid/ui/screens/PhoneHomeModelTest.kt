@@ -80,7 +80,7 @@ class PhoneHomeModelTest {
     assertTrue(HomeAlerts.build(HomeAlerts.Input(ordersLive = false, newOrders = 3)).isEmpty())
     val a = HomeAlerts.build(HomeAlerts.Input(ordersLive = true, newOrders = 3))
     assertEquals(HomeAlerts.Kind.ORDERS, a.single().kind)
-    assertEquals("orders", a.single().route)
+    assertEquals("orders?tab=new", a.single().route)
   }
 
   @Test
@@ -96,8 +96,37 @@ class PhoneHomeModelTest {
         HomeAlerts.Kind.DEBTS, HomeAlerts.Kind.EXPIRY),
       a.map { it.kind },
     )
-    assertEquals(listOf("orders", "vip", "devices", "products", "debtors", "warehouse"), a.map { it.route })
+    //  «هر کار به کادرِ خودش»: همگام‌سازی ⇐ صفحهٔ همگام‌سازی (نه دستگاه‌های جانبی)، کالا ⇐ همان فیلتر
+    assertEquals(
+      listOf("orders?tab=new", "subscription", "settings/data/sync", "products?filter=out", "debtors?sort=oldest", "stock?filter=expiring"),
+      a.map { it.route },
+    )
+    assertEquals("subscription/plans", a[1].actionRoute)
+    assertEquals("orders?tab=new", a[0].actionRoute)
     assertTrue(a[1].urgent)
+  }
+
+  @Test
+  fun `کالای کم بی تمام‌شده فهرستِ کم را باز می‌کند`() {
+    val a = HomeAlerts.build(HomeAlerts.Input(lowStock = 3)).single()
+    assertEquals("products?filter=low", a.route)
+  }
+
+  @Test
+  fun `خطای همگام‌سازی دلیلِ واقعیِ موتور را می‌گوید`() {
+    val a = HomeAlerts.build(HomeAlerts.Input(sync = HomeAlerts.Sync.ERROR, syncError = "HTTP 503 — سرور در دسترس نیست")).single()
+    assertEquals("HTTP 503 — سرور در دسترس نیست", a.body)
+    assertEquals("settings/data/sync", a.route)
+    val long = HomeAlerts.syncReason("x".repeat(500))
+    assertEquals(HomeAlerts.MAX_ERROR, long.length)
+    assertTrue(long.endsWith("…"))
+    assertEquals(HomeAlerts.build(HomeAlerts.Input(sync = HomeAlerts.Sync.ERROR)).single().body, HomeAlerts.syncReason(""))
+  }
+
+  @Test
+  fun `صفِ بی‌اینترنت هم به صفحهٔ همگام‌سازی می‌رود`() {
+    val a = HomeAlerts.build(HomeAlerts.Input(sync = HomeAlerts.Sync.OFFLINE, queued = 4)).single()
+    assertEquals("settings/data/sync", a.route)
   }
 
   @Test
