@@ -175,4 +175,27 @@ class AtRestDiskTest {
     assertTrue(view.acl.any { it.principal() == view.owner })
     assertTrue("فقط صاحب، SYSTEM و Administrators: $who", who.all { it == view.owner.name || it.endsWith("\\SYSTEM") || it.endsWith("\\Administrators") })
   }
+
+  @Test fun `جابه‌جاییِ بازسازی هنگامِ باز شدن جا نیفتاد — نوشتن بسته می‌ماند و دفترِ قدیم کنارِ سایهٔ تازه ذخیره نمی‌شود`() {
+    assertTrue(runBlocking { open().save(first) }) // دفترِ قدیمِ خواندنی (رمز خاموش)
+    val before = ledger.readBytes()
+    //  نشان با سایهٔ همین حالا می‌خواند ولی کناری خراب است ⇒ جابه‌جایی نمی‌شود
+    File(dir, "shop-data.json.rebuild").writeText("{not json")
+    File(dir, "shop-data.json.rebuild-pending").writeText(SyncV1Engine.of(ctx).shadowSha())
+
+    val store = open()
+    assertEquals(AtRestException.Kind.IO, store.unreadable.value)
+    assertEquals(ShopData(), store.data.value)
+    assertFalse("دفترِ قدیم روی سایهٔ تازه نوشته نمی‌شود", runBlocking { store.save(second) })
+    assertArrayEquals(before, ledger.readBytes())
+    assertTrue("نشان می‌ماند تا «دوباره امتحان» تمامش کند", File(dir, "shop-data.json.rebuild-pending").exists())
+  }
+
+  @Test fun `ACLِ ویندوز با SID — نه نامِ انگلیسیِ SYSTEM و Administrators`() {
+    val file = AtRestKeys.aclCommand("C:\\k\\atrest-kek.key", "PC\\shop", directory = false)
+    assertTrue(file.containsAll(listOf("icacls", "/inheritance:r", "/grant:r", "PC\\shop:F", "*S-1-5-18:F", "*S-1-5-32-544:F")))
+    assertTrue(file.none { it.contains("SYSTEM") || it.contains("Administrators") })
+    val folder = AtRestKeys.aclCommand("C:\\k", "PC\\shop", directory = true)
+    assertTrue(folder.containsAll(listOf("*S-1-5-18:(OI)(CI)F", "*S-1-5-32-544:(OI)(CI)F")))
+  }
 }
