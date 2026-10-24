@@ -272,7 +272,10 @@ router.get('/shops/:id', async (req, res, next) => {
    *  UNION بر شناسه: ردیفی که در هر دو دفتر هست (کوچ) یک بار شمرده می‌شود.
    */
   const counts = {};
-  for (const [col, table] of Object.entries(require('../lib/sync').TABLES)) {
+  //  مجموعه‌های فقط‌v1 (گاوصندوق، `V1_ONLY`) این‌جا شمرده نمی‌شوند — همان فهرستِ راهِ قدیم
+  const { TABLES, LEGACY_COLLECTIONS } = require('../lib/sync');
+  for (const col of LEGACY_COLLECTIONS) {
+    const table = TABLES[col];
     const r = await one(
       `SELECT COUNT(*)::int n FROM (
          SELECT id FROM ${table} WHERE shop_id=$1 AND deleted=false

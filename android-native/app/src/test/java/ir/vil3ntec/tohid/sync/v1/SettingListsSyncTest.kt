@@ -30,7 +30,7 @@ class SettingListsSyncTest {
 
   @Test
   fun `شناسهٔ ردیف همان sha256ِ نام است — یکی با وب و سرور`() {
-    assertEquals(3, LedgerDiff.SCHEMA_VERSION)
+    assertTrue("فهرست‌ها از پلهٔ ۳ می‌روند", LedgerDiff.SCHEMA_VERSION >= 3)
     assertEquals(listOf("productCategories", "productUnits", "expenseCategories"), LedgerDiff.LIST_COLLECTIONS)
     //  از Node: crypto.createHash('sha256').update('نوشیدنی').digest('hex').slice(0, 32)
     assertEquals("4139e35db2389aeade6e2fc223d80108", LedgerDiff.listRowId("نوشیدنی"))

@@ -40,8 +40,19 @@ const TABLES = {
   productCategories: 'product_categories',
   productUnits:      'product_units',
   expenseCategories: 'expense_categories',
+  //  PAY-18 (migrations/118، پلهٔ ۴): گاوصندوق — فقط‌افزودنی؛ شکل و مجوز در `safe-ledger.js`
+  safeEntries:       'shop_safe_entries',
 };
 const COLLECTIONS = Object.keys(TABLES);
+/**
+ * مجموعه‌هایی که فقط Sync v1/v3 دارد، با سنجشِ شکل و مجوزِ خودشان (`safe-ledger.js`).
+ * راهِ قدیم آن‌ها را نه می‌نویسد (هر تغییرش با کدِ `sync_v1_only` برمی‌گردد) نه می‌خواند
+ * و نه در فهرستِ مجموعه‌هایش نشان می‌دهد — درِ بی‌سنجش نمی‌ماند، حتی اگر برنامه‌ها از این
+ * جدول نخوانند. جدول برای هم‌شکلیِ `TABLES` (پلهٔ ۴ِ v1) هست و همیشه خالی است.
+ */
+const V1_ONLY = new Set(['safeEntries']);
+/** آنچه راهِ قدیم (`/api/sync`، پنلِ مدیر) می‌بیند */
+const LEGACY_COLLECTIONS = COLLECTIONS.filter((c) => !V1_ONLY.has(c));
 
 const MAX_BATCH = 2000;
 const MAX_RECORD_BYTES = 64 * 1024;
@@ -95,6 +106,11 @@ async function pushChanges(ctx, changes) {
       const table = TABLES[collection];
       const recordId = String(raw?.id || '');
       if (!table || !recordId || recordId.length > 80) { skipped++; continue; }
+      if (V1_ONLY.has(collection)) {
+        conflicts.push({ collection, id: recordId, reason: 'sync_v1_only' });
+        skipped++;
+        continue;
+      }
 
       const updatedAt = Number(raw.updatedAt) || t;
       const deleted = raw.deleted === true;
@@ -166,7 +182,7 @@ async function pushChanges(ctx, changes) {
 
 /** ساخت پرس‌وجوی خواندن تفاضلی روی همه‌ی مجموعه‌ها. */
 const PULL_SQL = (() => {
-  const parts = COLLECTIONS.map(col => `
+  const parts = LEGACY_COLLECTIONS.map(col => `
     SELECT '${col}'::text AS collection, id, rev, updated_at, deleted, user_id, device_id, data
       FROM ${TABLES[col]} WHERE shop_id = $1 AND rev > $2`);
   return `${parts.join(' UNION ALL ')} ORDER BY rev ASC LIMIT $3`;
@@ -233,6 +249,6 @@ async function runIdempotent({ shopId, userId, deviceId, operationId }, fn) {
 }
 
 module.exports = {
-  TABLES, COLLECTIONS, MAX_BATCH, MAX_LIMIT,
+  TABLES, COLLECTIONS, V1_ONLY, LEGACY_COLLECTIONS, MAX_BATCH, MAX_LIMIT,
   pushChanges, pullChanges, currentRev, runIdempotent,
 };

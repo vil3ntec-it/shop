@@ -40,14 +40,17 @@ object LedgerDiff {
   /**
    *  نسخهٔ Schema — همان عددی که سرور برای `shop` می‌شناسد.
    *  پلهٔ ۳ (F0-04): سه فهرستِ تنظیماتی (`LIST_COLLECTIONS`) هم می‌روند.
+   *  پلهٔ ۴ (PAY-18): گاوصندوق (`safeEntries`). سرور پیش از برنامه مستقر می‌شود؛
+   *  این ساخت روی سرورِ پلهٔ ۳ ۴۲۶ می‌گیرد و opهایش را نگه می‌دارد.
    */
-  const val SCHEMA_VERSION = 3
+  const val SCHEMA_VERSION = 4
 
   val COLLECTIONS = listOf(
     "products", "warehouseEntries", "sales", "saleItems", "returns",
     "debtors", "transactions", "expenses",
     "suppliers", "purchases", "supplierPayments",
     "stockMovements", "priceHistory", "auditLog",
+    "safeEntries",
   )
 
   /**
