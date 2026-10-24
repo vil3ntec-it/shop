@@ -33,6 +33,10 @@ data class CatalogEntryDto(
   val edit: String = "none",
   val display: Boolean = false,
   val defaults: Map<String, String> = emptyMap(),
+  /** «نیازمند تأیید» برایش معنا دارد (برگهٔ امضاشده، STF-02) */
+  val approvable: Boolean = false,
+  /** سقف‌های قابلِ تنظیم: maxPct، maxAmount (Minor) — STF-03 */
+  val caps: List<String> = emptyList(),
 )
 
 @Serializable

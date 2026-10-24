@@ -293,6 +293,34 @@ class ReturnFlowTest {
     assertEquals(mapOf("hesabpay" to 100.0), ReturnFlow.doc(more.data, "w2")!!.split.methods)
   }
 
+  /**
+   *  صندوقِ ترکیبی (`PayFlow.ledgerEvents`، پرچمِ payV2) همان نقدِ دخلِ `CashShift` را می‌دهد: ردیفِ
+   *  نقدِ برگشت = [ReturnFlow.drawerAmount]؛ سهمِ کیف پول/کارت/حواله ردیفِ همان روش است و از دخل
+   *  نیست؛ سهمِ حساب و اعتبار با رسیدِ `customer_return` خنثی می‌شود. عددها دستی‌اند.
+   */
+  @Test
+  fun `صندوقِ ترکیبی — برگشتِ نقد، کیف پول، اعتبار، حساب و ترکیبی همان دخلِ CashShift`() {
+    val d = ledger()
+    fun post(on: ShopData, doc: String, sale: String, item: String, qty: Double, mode: String = ReturnFlow.ORIGINAL, damaged: Boolean = false) =
+      (ReturnFlow.post(on, ReturnFlow.Request(docId = doc, saleId = sale, picks = mapOf(item to ReturnFlow.Pick(qty, if (damaged) ReturnFlow.DAMAGED else ReturnFlow.RESTOCK)), reason = "دیگر", mode = mode), today, now, ::newId) as ReturnFlow.Outcome.Ok).value.data
+    //  دخلِ باز با ۱۰٬۰۰۰ افغانی، همان لحظهٔ برگشت؛ فروش‌های بردار پیش از آن‌اند
+    val open = AuditEntry(id = "sh", type = CashShift.OPEN, createdAt = now, amount = 10_000.0)
+    fun shift(x: ShopData): Map<String, Long> {
+      val r = (PayFlow.report(x, open, null, now) as PayFlow.Outcome.Ok).value
+      assertTrue(r.skipped.toString(), r.skipped.isEmpty())
+      assertEquals("همان CashShift", Math.round(CashShift.totals(x, now, now, 10_000.0).expected * 100), r.report.expected!!["cash"])
+      return r.report.expected!!
+    }
+    assertEquals(1_000_000L - 22_500, shift(post(d, "c", "s13", "i13b", 1.0, ReturnFlow.CASH, damaged = true))["cash"])
+    //  ۵۰۰ به HesabPay پس رفت ⇒ دخل دست نمی‌خورد؛ کیف پول ۵۰۰ کم
+    val wallet = post(d, "w1", "s60", "i60", 2.0)
+    assertEquals(mapOf("cash" to 1_000_000L, "hesabpay" to -50_000L), shift(wallet))
+    //  دومی: HesabPay فقط ۱۰۰ِ مانده، ۴۰۰ نقد از دخل
+    assertEquals(mapOf("cash" to 1_000_000L - 40_000, "hesabpay" to -60_000L), shift(post(wallet, "w2", "s60", "i60", 2.0)))
+    assertEquals(1_000_000L, shift(post(d, "cr", "s30", "i30", 1.0, ReturnFlow.STORE_CREDIT))["cash"])
+    assertEquals(1_000_000L, shift(post(d, "ac", "s20", "i20", 1.0))["cash"])
+  }
+
   @Test
   fun `پرداختِ ترکیبی — همان JSONِ #286 خوانده و بی تغییر نوشته می‌شود`() {
     val s60 = ledger().sales.first { it.id == "s60" }

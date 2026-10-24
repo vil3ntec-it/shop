@@ -93,6 +93,8 @@ object SalesEngine {
     val debtorId: String? = null,
     /** سیاستِ دکان: کالای منقضی فروخته نشود (`ShopPolicy.blockExpired`) */
     val blockExpired: Boolean = false,
+    /** برگهٔ تأییدِ تخفیفِ بیش از سقف (STF-02) — همان‌طور روی فاکتور می‌نشیند */
+    val approval: kotlinx.serialization.json.JsonObject? = null,
     /**
      *  PAY (v3 A4) — تسویهٔ پنلِ پرداختِ ترکیبی (`PayFlow.checkout`)، فقط با پرچمِ
      *  `ShopPolicy.payV2`. `null` (پیش‌فرض) ⇒ همان نقد/نسیهٔ امروز با `payment` و
@@ -381,6 +383,7 @@ object SalesEngine {
       date = today,
       syncStatus = "pending",
       seller = checkout.seller.trim(),
+      approval = checkout.approval,
       //  PAY (v3 A4): فقط با پرچم — فیلدِ تازه؛ بی پرچم `null` و نوشته نمی‌شود
       payments = settled?.payments,
       tenderedMinor = settled?.tenderedMinor,
