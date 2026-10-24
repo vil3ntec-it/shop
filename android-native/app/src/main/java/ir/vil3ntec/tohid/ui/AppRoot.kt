@@ -777,6 +777,7 @@ fun AppRoot(
                 "ظاهر" to androidx.compose.material.icons.Icons.Filled.Palette,
                 "تاریخ و رقم" to androidx.compose.material.icons.Icons.Filled.Event,
                 "کالای منقضی" to androidx.compose.material.icons.Icons.Filled.EventBusy,
+                ir.vil3ntec.tohid.ui.components.pos.HeldInvoicePrefs.SECTION to androidx.compose.material.icons.Icons.Filled.Layers,
                 ir.vil3ntec.tohid.ui.screens.RETURN_SETTINGS_TITLE to androidx.compose.material.icons.Icons.Filled.SwapHoriz,
                 "قفل برنامه" to androidx.compose.material.icons.Icons.Filled.Lock,
                 ir.vil3ntec.tohid.ui.screens.SECURITY_SECTION_TITLE to androidx.compose.material.icons.Icons.Filled.Security,
