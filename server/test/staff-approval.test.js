@@ -279,6 +279,32 @@ test('امضای خامِ WebCrypto (۶۴ بایت) هم پذیرفته است',
   assert.equal(r.body.results[0].status, 'applied', JSON.stringify(r.body));
 });
 
+test('امضای خامِ ۶۴ بایتی که با 0x30 آغاز می‌شود (۱ در ۲۵۶) هم پذیرفته است، نه «DER ِ خراب»', async () => {
+  const approvals = require('../src/lib/staff-approval');
+  //  بردارِ ثابت: کلیدِ عمومی، متن و امضای IEEE P1363 ِ معتبری که بایتِ اولش 0x30 است
+  const spki = 'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAECKVAe+GZdauGSn4TtiCKieNJcXalPH0LF3QvwKKCtEyoppSkebfAA+QPwD19EQ7YngZnz2JOyvTnjyDn/Tb+cQ==';
+  const text = 'tohid-approval-v1|p1363-0x30';
+  const sig = 'MIJQGUP7M4zulHmGfdkk447K72jouGelMY5fjkr92XGUlb/HigMVwATQHWbhdJVO8F8mbeHduQn7DCcbZWB+6w==';
+  assert.equal(Buffer.from(sig, 'base64')[0], 0x30);
+  assert.equal(Buffer.from(sig, 'base64').length, 64);
+  assert.equal(approvals.verifySignature(spki, text, sig), true);
+  assert.equal(approvals.verifySignature(spki, text + '!', sig), false);
+  //  DER همچنان پذیرفته است
+  const { privateKey, publicKey } = crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+  const der = crypto.sign('sha256', Buffer.from(text, 'utf8'), { key: privateKey, dsaEncoding: 'der' }).toString('base64');
+  assert.equal(approvals.verifySignature(publicKey.export({ format: 'der', type: 'spki' }).toString('base64'), text, der), true);
+
+  //  سرتاسری: برگهٔ امضاشده با WebCrypto که امضایش با 0x30 آغاز می‌شود
+  let s;
+  for (let i = 0; i < 20000; i++) {
+    const c = slip(ownerKey, { doc: 'sales/s-web-30', perm: 'sales.discount', pct_bp: 2000, amount: 2000, encoding: 'ieee-p1363' });
+    if (Buffer.from(c.sig, 'base64')[0] === 0x30) { s = c; break; }
+  }
+  assert.ok(s, 'امضای 0x30 پیدا نشد');
+  const r = await push3(manager, 'm-web', [sale('s-web-30', 10000, 2000, { approval: s })]);
+  assert.equal(r.body.results[0].status, 'applied', JSON.stringify(r.body));
+});
+
 test('tx: فروشِ بیش از سقف بی برگه ⇒ کلِ tx برمی‌گردد ولی صندوق می‌ماند', async () => {
   const tx = 'tx-ap-1';
   const s = sale('s-tx-ap', 10000, 3000, { tx });
