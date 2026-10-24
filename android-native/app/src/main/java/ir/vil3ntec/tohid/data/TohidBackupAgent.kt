@@ -48,7 +48,7 @@ class TohidBackupAgent : BackupAgent() {
   }
 
   private companion object {
-    /** همان سه استثنای XML: توکنِ امروز و جای قدیمی‌اش */
-    val EXCLUDED_PREFS = setOf("tohid-sync.xml", "tohid-session.xml", "tohid-session-secure.xml")
+    /** همان استثناهای XML: توکنِ امروز و جای قدیمی‌اش، و PINهای شاگرد (STF-02/04) */
+    val EXCLUDED_PREFS = setOf("tohid-sync.xml", "tohid-session.xml", "tohid-session-secure.xml", "tohid-staff-pins.xml")
   }
 }
