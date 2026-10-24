@@ -23,7 +23,7 @@ object NewCodeModel {
   }
 
   /** مهلت‌هایی که سرور برای دعوتِ پیک می‌پذیرد (`COURIER_INVITE.maxDays` = ۷) */
-  val courierDays: List<Int> = listOf(1, 2, 3, 5, 7)
+  val courierDays: List<Int> = listOf(1, 3, 5, 7)
   const val COURIER_DEFAULT_DAYS = 3
   private const val COURIER_MAX_DAYS = 7
 
