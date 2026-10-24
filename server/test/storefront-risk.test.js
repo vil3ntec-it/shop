@@ -193,7 +193,7 @@ test('PRES-10: اعلامِ دکانِ دیگر یا دست‌کاری‌شده 
   assert.deepEqual(rows.map((r) => [r.status, r.reason]), [
     [403, 'foreign_shop'], [403, 'foreign_shop'], [400, 'bad_mode'], [400, 'bad_number'],
   ]);
-  assert.equal(rows[0].claimedShop, foreign.shopId);
+  assert.ok(rows.every((r) => !JSON.stringify(r).includes(foreign.shopId)), 'شناسهٔ دکانِ دیگر در سابقهٔ این دکان نیست');
   assert.ok(rows.every((r) => r.userId), 'کاربرِ واردشده ثبت شد');
   assert.equal((await rejected(foreign.shopId)).length, 0, 'سابقه زیرِ دکانِ خودِ درخواست‌کننده است');
   //  بدنه و شناسهٔ رویداد در سابقه نیست

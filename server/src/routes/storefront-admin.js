@@ -86,19 +86,17 @@ router.post('/presence', ownShopOnly, requirePermission('settings.write'), needF
 /**
  * PRES-10: هر اعلامِ ردشدهٔ کاربرِ واردشده (دکانِ دیگر، بدنهٔ دست‌کاری‌شده،
  * بی‌اجازه، بی اشتراک، …) در سابقه می‌نشیند و همان خطا برمی‌گردد. بی‌توکن ⇒
- * ثبت نمی‌شود (سابقه پرِ درخواستِ ناشناس نشود). بدنه خودش نوشته نمی‌شود.
+ * ثبت نمی‌شود (سابقه پرِ درخواستِ ناشناس نشود). بدنه و شناسهٔ دکانِ دیگر
+ * نوشته نمی‌شوند.
  */
 router.use('/presence', (err, req, res, next) => {
   const status = Number(err && err.status);
   if (req.method !== 'POST' || !req.user || !(status >= 400 && status < 500)) return next(err);
-  const claimed = claimedShopOf(req);
   audit.log({
     shopId: req.shopId || '', userId: req.user.id, action: 'storefront.presence_rejected',
     targetType: 'storefront', targetId: req.shopId || '',
-    detail: {
-      status, reason: String(err.code || ''),
-      ...(claimed !== undefined ? { claimedShop: String(claimed).slice(0, 80) } : {}),
-    },
+    //  ⛔ شناسهٔ دکانِ دیگر نوشته نمی‌شود: سابقهٔ این دکان را اعضایش می‌بینند
+    detail: { status, reason: String(err.code || '') },
     ip: clientIp(req),
   }).catch(() => {}).then(() => next(err));
 });
