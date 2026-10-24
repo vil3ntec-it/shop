@@ -3,10 +3,8 @@ package ir.vil3ntec.tohid.ui.v3.stock
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -34,12 +32,7 @@ import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrKit
 import ir.vil3ntec.tohid.core.i18n.StrStock
 import ir.vil3ntec.tohid.data.ShopData
-import ir.vil3ntec.tohid.ui.screens.Motion
-import ir.vil3ntec.tohid.ui.screens.MotionSpec
-import ir.vil3ntec.tohid.ui.screens.MotionTokens
-import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
 import ir.vil3ntec.tohid.ui.v3.V3Action
-import ir.vil3ntec.tohid.ui.v3.V3Button
 import ir.vil3ntec.tohid.ui.v3.V3Chip
 import ir.vil3ntec.tohid.ui.v3.V3ChipRow
 import ir.vil3ntec.tohid.ui.v3.V3EmptyState
@@ -107,7 +100,7 @@ fun StockListScreen(
       V3MenuItem(Icons.Outlined.UploadFile, StrStock.menuImport, onClick = actions.import),
       V3MenuItem(Icons.AutoMirrored.Outlined.PlaylistAdd, StrStock.menuBulk, onClick = actions.bulk),
     ),
-    search = if (empty) null else ({ V3SearchField(query, { query = it }, StrStock.searchHint, onScan = actions.scan) }),
+    search = if (empty) null else ({ V3SearchField(query, { query = it }, StrStock.searchHint) }),
     chips = if (empty) null else ({
       FilterChips(overview, filter, categories, category, onFilter = { filterKey = it.key }, onCategory = { category = it })
     }),
@@ -188,13 +181,14 @@ private fun StockList(
   val stagger = rememberV3Stagger()
   LazyColumn(Modifier.fillMaxSize(), contentPadding = contentPadding, verticalArrangement = Arrangement.spacedBy(8.dp)) {
     item(key = "stats") {
-      StockStatsCard(overview.summary, onFilter, Modifier.padding(bottom = 4.dp))
+      StockStatsCard(overview.summary, onFilter, Modifier.padding(bottom = 4.dp).v3Stagger(stagger, "stats", 0))
     }
     if (wide) item(key = "desk-actions") {
-      Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        V3Button(StrStock.menuCount, actions.count, Modifier.weight(1f), kind = V3ButtonKind.NEUTRAL, icon = Icons.AutoMirrored.Outlined.FactCheck, height = 42.dp)
-        V3Button(StrStock.menuBulk, actions.bulk, Modifier.weight(1f), kind = V3ButtonKind.NEUTRAL, icon = Icons.AutoMirrored.Outlined.PlaylistAdd, height = 42.dp)
-        V3Button(StrStock.importTitle, actions.import, Modifier.weight(1f), kind = V3ButtonKind.NEUTRAL, icon = Icons.Outlined.UploadFile, height = 42.dp)
+      //  کامپیوتر: کارهای «…» همین‌جا دیده می‌شوند — تراشهٔ کار با آیکن، با پیمایشِ افقی اگر جا نشد
+      V3ChipRow(contentPadding = PaddingValues(0.dp)) {
+        V3Chip(StrStock.menuCount, selected = false, icon = Icons.AutoMirrored.Outlined.FactCheck, onClick = actions.count)
+        V3Chip(StrStock.menuBulk, selected = false, icon = Icons.AutoMirrored.Outlined.PlaylistAdd, onClick = actions.bulk)
+        V3Chip(StrStock.menuImport, selected = false, icon = Icons.Outlined.UploadFile, onClick = actions.import)
       }
     }
     if (rows.isEmpty()) item(key = "no-match") {
@@ -208,13 +202,7 @@ private fun StockList(
         onOpen = { actions.open(id) },
         onEntry = { actions.entry(id) },
         onAdjust = { actions.adjust(id) },
-        modifier = Modifier
-          .animateItem(
-            fadeInSpec = if (Motion.enabled) MotionSpec.tweenOf(MotionTokens.MEDIUM) else null,
-            placementSpec = if (Motion.enabled) MotionSpec.sheet() else null,
-            fadeOutSpec = if (Motion.enabled) MotionSpec.tweenOf(MotionTokens.SHORT) else null,
-          )
-          .v3Stagger(stagger, id, index),
+        modifier = draftItem().v3Stagger(stagger, id, index),
       )
     }
     item(key = "end") { Spacer(Modifier.height(8.dp)) }

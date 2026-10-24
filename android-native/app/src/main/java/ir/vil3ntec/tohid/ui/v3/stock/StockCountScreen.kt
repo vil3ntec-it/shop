@@ -2,10 +2,6 @@ package ir.vil3ntec.tohid.ui.v3.stock
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -24,6 +20,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -77,6 +74,8 @@ import ir.vil3ntec.tohid.ui.v3.V3Sheet
 import ir.vil3ntec.tohid.ui.v3.V3StatusPill
 import ir.vil3ntec.tohid.ui.v3.V3TextField
 import ir.vil3ntec.tohid.ui.v3.V3Type
+import ir.vil3ntec.tohid.ui.v3.rememberV3Stagger
+import ir.vil3ntec.tohid.ui.v3.v3Stagger
 import ir.vil3ntec.tohid.ui.screens.v3Text
 import androidx.compose.ui.text.font.FontWeight
 
@@ -108,6 +107,7 @@ fun StockCountScreen(
   val lines = remember(data, state) { state.lines(data) }
   val system = remember(data) { CountState.system(data) }
   val rows = remember(data, query) { CountState.rows(data, query) }
+  val stagger = rememberV3Stagger()
   val back = { if (state.dirty) askDiscard = true else onBack() }
   BackHandler(enabled = state.dirty) { askDiscard = true }
 
@@ -144,8 +144,8 @@ fun StockCountScreen(
           failure?.let { V3Message(V3Tone.ERROR, it, Modifier.padding(top = 10.dp)) }
         }
       }
-      items(rows, key = { it.id }) { p ->
-        CountRow(p, system[p.id] ?: 0.0, state, onValue = { v -> state = state.copy(counts = state.counts + (p.id to v)); failure = null })
+      itemsIndexed(rows, key = { _, p -> p.id }) { i, p ->
+        CountRow(p, system[p.id] ?: 0.0, state, draftItem().v3Stagger(stagger, p.id, i)) { v -> state = state.copy(counts = state.counts + (p.id to v)); failure = null }
       }
     }
   }
@@ -160,13 +160,13 @@ fun StockCountScreen(
 }
 
 @Composable
-private fun CountRow(p: Product, system: Double, state: CountState, onValue: (String) -> Unit) {
+private fun CountRow(p: Product, system: Double, state: CountState, modifier: Modifier, onValue: (String) -> Unit) {
   val c = PhoneV3.colors
   val text = state.counts[p.id].orEmpty()
   val invalid = state.invalid(p.id)
   val diff = state.diff(p.id, system)
   val counted = text.isNotBlank() && !invalid
-  V3Card(radius = V3Space.cardRadius, padding = PaddingValues(0.dp)) {
+  V3Card(modifier.draftResize(), radius = V3Space.cardRadius, padding = PaddingValues(0.dp)) {
     V3ListRow(
       title = p.name,
       subtitle = StrStock.systemQty(listOf(qty(system), p.unit).filter { it.isNotBlank() }.joinToString(" ")),
@@ -204,8 +204,8 @@ private fun CountedThumb(p: Product, counted: Boolean) {
     AnimatedVisibility(
       counted,
       modifier = Modifier.align(Alignment.BottomEnd).offset(x = 4.dp, y = 4.dp),
-      enter = scaleIn() + fadeIn(),
-      exit = scaleOut() + fadeOut(),
+      enter = DraftMotion.pop(),
+      exit = DraftMotion.unpop(),
     ) {
       Box(
         Modifier.size(20.dp).clip(CircleShape).background(c.card).padding(2.dp).clip(CircleShape).background(brand.bg)

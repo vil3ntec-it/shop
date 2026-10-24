@@ -1,6 +1,5 @@
 package ir.vil3ntec.tohid.ui.v3.stock
 
-import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -68,6 +67,8 @@ import ir.vil3ntec.tohid.ui.v3.V3StatusPill
 import ir.vil3ntec.tohid.ui.v3.V3SwipeAction
 import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.ui.v3.rememberCountUp
+import ir.vil3ntec.tohid.ui.v3.rememberV3Stagger
+import ir.vil3ntec.tohid.ui.v3.v3Stagger
 import ir.vil3ntec.tohid.ui.v3.v3Pressable
 
 /** کارهای صفحهٔ یک کالا — همه مسیرند، جز حذفِ محصول که پس از تأییدِ همین صفحه می‌آید */
@@ -107,6 +108,7 @@ fun StockItemScreen(
   val p = item.product
   var confirmDelete by remember { mutableStateOf(false) }
   var expanded by rememberSaveable(productId) { mutableStateOf(false) }
+  val stagger = rememberV3Stagger(productId)
 
   V3Scaffold(
     title = p.name,
@@ -122,15 +124,15 @@ fun StockItemScreen(
       Modifier.fillMaxSize(),
       contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = pad.calculateBottomPadding()),
     ) {
-      item(key = "figures") { FiguresCard(item, actions.copied) }
+      item(key = "figures") { Box(Modifier.v3Stagger(stagger, "figures", 0)) { FiguresCard(item, actions.copied) } }
       item(key = "actions") {
-        Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(Modifier.fillMaxWidth().padding(top = 12.dp).v3Stagger(stagger, "actions", 1), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
           V3Button(StrStock.entryAction, { actions.entry(p.id) }, Modifier.weight(1f), icon = Icons.Outlined.MoveToInbox, haptic = true)
           V3Button(StrStock.adjustAction, { actions.adjust(p.id) }, Modifier.weight(1f), kind = V3ButtonKind.SECONDARY, icon = Icons.Outlined.Tune)
         }
       }
       item(key = "entries") {
-        V3Section(StrStock.entriesTitle, modifier = Modifier.animateContentSize()) {
+        V3Section(StrStock.entriesTitle, modifier = Modifier.draftResize().v3Stagger(stagger, "entries", 2)) {
           if (item.entries.isEmpty()) {
             V3ListRow(StrStock.noEntries, icon = Icons.Outlined.MoveToInbox, chevron = false)
           }
@@ -151,7 +153,7 @@ fun StockItemScreen(
         }
       }
       item(key = "movements") {
-        V3Section(null) {
+        V3Section(null, modifier = Modifier.v3Stagger(stagger, "movements", 3)) {
           V3ListRow(StrStock.movementsRow, icon = Icons.Outlined.SwapVert, hue = V3Hue.BLUE, onClick = { actions.movements(p.id) })
         }
         Spacer(Modifier.height(16.dp))

@@ -82,18 +82,20 @@ internal fun ProductPickerList(
         )
       }
       itemsIndexed(shown, key = { _, p -> p.id }) { i, p ->
-        if (i > 0 || onNew != null) V3Divider(start = 64.dp)
         val unit = listOf(qty(ShopStore.stock(data, p.id)), p.unit).filter { it.isNotBlank() }.joinToString(" ")
-        V3ListRow(
-          title = p.name,
-          subtitle = StrStock.inStock(unit),
-          leading = { V3ProductThumb(p.id, p.name, size = 40.dp) },
-          chevron = false,
-          trailing = if (p.id == selectedId) ({
-            Icon(Icons.Outlined.Check, contentDescription = StrKit.selected, tint = PhoneV3Roles.brandText(c), modifier = Modifier.size(20.dp))
-          }) else null,
-          onClick = { onPick(p) },
-        )
+        Column(draftItem()) {
+          if (i > 0 || onNew != null) V3Divider(start = 64.dp)
+          V3ListRow(
+            title = p.name,
+            subtitle = StrStock.inStock(unit),
+            leading = { V3ProductThumb(p.id, p.name, size = 40.dp) },
+            chevron = false,
+            trailing = if (p.id == selectedId) ({
+              Icon(Icons.Outlined.Check, contentDescription = StrKit.selected, tint = PhoneV3Roles.brandText(c), modifier = Modifier.size(20.dp))
+            }) else null,
+            onClick = { onPick(p) },
+          )
+        }
       }
       if (shown.isEmpty()) item(key = "none") {
         Text(StrKit.nothingFound, style = V3Type.callout, color = c.inkMuted, modifier = Modifier.fillMaxWidth().padding(16.dp))

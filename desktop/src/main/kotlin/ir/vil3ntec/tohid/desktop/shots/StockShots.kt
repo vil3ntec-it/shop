@@ -185,7 +185,7 @@ internal object StockDemo {
     entries += WarehouseEntry(id = "e-adj", productId = RICE, units = -2.0, unit = "کیلو", date = shift(today, -1), notes = "کیسه پاره شد", isAdjustment = true, createdAt = 5_000)
     val sum = entries.sumOf { it.units * it.price }
     entries += WarehouseEntry(id = "e-big", productId = "p12", units = 1.0, unit = "عدد", price = (12_345_678 - sum).coerceAtLeast(0.0), date = today, createdAt = 2_000)
-    val sold = listOf("p5" to 3.0, "p14" to 26.0, "p23" to 46.0, "p8" to 29.0, RICE to 20.0)
+    val sold = listOf("p5" to 3.0, "p14" to 2.0, "p23" to 3.0, "p8" to 29.0, RICE to 20.0)
     val sales = sold.mapIndexed { i, _ -> Sale(id = "s$i", invoiceNumber = 1200 + i, date = today, createdAt = 3_000L + i) }
     val items = sold.mapIndexed { i, (id, q) -> SaleItem(id = "i$i", saleId = "s$i", productId = id, quantity = q) }
     val moves = listOf(

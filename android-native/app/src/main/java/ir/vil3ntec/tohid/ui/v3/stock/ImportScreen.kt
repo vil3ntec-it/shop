@@ -37,6 +37,8 @@ import ir.vil3ntec.tohid.ui.v3.V3Message
 import ir.vil3ntec.tohid.ui.v3.V3ProductThumb
 import ir.vil3ntec.tohid.ui.v3.V3Scaffold
 import ir.vil3ntec.tohid.ui.v3.V3Section
+import ir.vil3ntec.tohid.ui.v3.rememberV3Stagger
+import ir.vil3ntec.tohid.ui.v3.v3Stagger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -74,6 +76,7 @@ fun ImportScreen(state: ImportState, onPick: () -> Unit, onSave: (ProductImport.
   val c = PhoneV3.colors
   var failure by remember(state) { mutableStateOf<String?>(null) }
   val plan = (state as? ImportState.Ready)?.plan
+  val stagger = rememberV3Stagger(state)
   V3Scaffold(
     title = StrStock.importTitle,
     onBack = onBack,
@@ -102,13 +105,13 @@ fun ImportScreen(state: ImportState, onPick: () -> Unit, onSave: (ProductImport.
           V3Message(
             if (p.skipped.isEmpty()) V3Tone.SUCCESS else V3Tone.WARNING,
             StrStock.importReady(money(p.drafts.size.toDouble())),
-            Modifier.padding(top = 8.dp),
+            Modifier.padding(top = 8.dp).v3Stagger(stagger, "summary", 0),
             body = p.skipped.takeIf { it.isNotEmpty() }?.let { StrStock.importSkipped(money(it.size.toDouble())) },
           )
           failure?.let { V3Message(V3Tone.ERROR, it, Modifier.padding(top = 10.dp)) }
         }
         if (p.skipped.isNotEmpty()) item(key = "skipped") {
-          V3Section(StrStock.skippedTitle) {
+          V3Section(StrStock.skippedTitle, modifier = Modifier.v3Stagger(stagger, "skipped", 1)) {
             ImportModel.shownSkips(p).forEachIndexed { i, sk ->
               if (i > 0) V3Divider(start = 64.dp)
               V3ListRow(
@@ -126,7 +129,7 @@ fun ImportScreen(state: ImportState, onPick: () -> Unit, onSave: (ProductImport.
           }
         }
         if (p.drafts.isNotEmpty()) item(key = "preview") {
-          V3Section(StrStock.previewTitle) {
+          V3Section(StrStock.previewTitle, modifier = Modifier.v3Stagger(stagger, "preview", 2)) {
             ImportModel.shownDrafts(p).forEachIndexed { i, draft ->
               if (i > 0) V3Divider(start = 64.dp)
               V3ListRow(

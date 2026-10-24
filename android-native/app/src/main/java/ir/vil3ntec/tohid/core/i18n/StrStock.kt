@@ -141,6 +141,9 @@ object StrStock {
   fun adjustTitle(name: Any): String = t("اصلاح موجودی — $name", "Adjust stock — $name", "د موجودي سمون — $name")
   val kindUp: String get() = t("زیاد شد", "Went up", "زیات شو")
   val kindDown: String get() = t("کم شد", "Went down", "کم شو")
+  /** برچسبِ کوتاهِ همان گونه در بخش‌بندیِ سه‌تایی؛ عنوانِ برگه نامِ کاملش را می‌گوید */
+  val kindReturnShort: String get() = t("برگشت", "Return", "ستنول")
+  fun returnTitle(name: Any): String = t("برگشت به تأمین‌کننده — $name", "Return to supplier — $name", "عرضه کوونکي ته ستنول — $name")
   val kindReturn: String get() = t("برگشت به تأمین‌کننده", "Return to supplier", "عرضه کوونکي ته ستنول")
   val reason: String get() = t("دلیل", "Reason", "لامل")
   val reasonHelper: String get() = t("بدون دلیل، فردا معلوم نمی‌شود جنس کجا رفته.", "Without a reason, nobody will know tomorrow where the goods went.", "بې لامله، سبا به معلومه نه وي چې توکي چېرته تللي.")

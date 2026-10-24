@@ -57,10 +57,10 @@ fun AdjustSheet(
   val errors = if (showErrors) form.errors() else emptyMap()
   val unit = product.unit.ifBlank { null }
 
-  DraftFormSheet(StrStock.adjustTitle(product.name), dirty = form.dirty && !saved, onClose = onClose) { sheet ->
+  DraftFormSheet(if (form.choice == AdjustChoice.RETURN) StrStock.returnTitle(product.name) else StrStock.adjustTitle(product.name), dirty = form.dirty && !saved, onClose = onClose) { sheet ->
     if (saved) LaunchedEffect(Unit) { delay(MotionTokens.EMPHASIZED + 150L); sheet.finish(onClose) }
     V3Segmented(
-      listOf(StrStock.kindUp, StrStock.kindDown, StrStock.kindReturn),
+      listOf(StrStock.kindUp, StrStock.kindDown, StrStock.kindReturnShort),
       form.choice.ordinal,
       { form = form.copy(choice = AdjustChoice.entries[it]); failure = null },
     )
@@ -97,7 +97,7 @@ private fun Preview(stock: Double, after: Double?, unit: String) {
   val c = PhoneV3.colors
   Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
     Text(StrStock.stock, style = V3Type.footnote, color = c.inkMuted)
-    AnimatedContent(after, label = "adjustPreview") { next ->
+    AnimatedContent(after, transitionSpec = { DraftMotion.figure() }, label = "adjustPreview") { next ->
       Text(
         if (next == null) listOf(qty(stock), unit).filter { it.isNotBlank() }.joinToString(" ")
         else StrStock.preview(qty(stock), qty(next), unit).trim(),

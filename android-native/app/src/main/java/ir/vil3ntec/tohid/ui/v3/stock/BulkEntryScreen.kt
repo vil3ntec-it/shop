@@ -1,6 +1,5 @@
 package ir.vil3ntec.tohid.ui.v3.stock
 
-import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
@@ -53,6 +52,8 @@ import ir.vil3ntec.tohid.ui.v3.V3PickerRow
 import ir.vil3ntec.tohid.ui.v3.V3Sheet
 import ir.vil3ntec.tohid.ui.v3.V3TextField
 import ir.vil3ntec.tohid.ui.v3.V3Type
+import ir.vil3ntec.tohid.ui.v3.rememberV3Stagger
+import ir.vil3ntec.tohid.ui.v3.v3Stagger
 
 /**
  *  `stock/entry/bulk` — «ورودِ چند قلم» (فرمِ نسخهٔ ۳): تاریخِ همهٔ ردیف‌ها، کارتِ هر ردیف
@@ -79,6 +80,7 @@ fun BulkEntryScreen(
   var pickFor by remember { mutableStateOf<Int?>(null) }
   var menuFor by remember { mutableStateOf<Int?>(null) }
   val unit = BulkEntryState.defaultUnit(data)
+  val stagger = rememberV3Stagger()
   val ready = state.ready
 
   fun change(next: BulkEntryState) { state = next; failure = null }
@@ -109,6 +111,7 @@ fun BulkEntryScreen(
         onPick = { pickFor = row.key },
         onMenu = { menuFor = row.key },
         onScanBarcode = { onScan { code -> change(state.update(row.key) { it.asNew(code) }) } },
+        modifier = Modifier.v3Stagger(stagger, row.key, i),
       )
     }
     Spacer(Modifier.height(12.dp))
@@ -150,10 +153,11 @@ private fun RowCard(
   onPick: () -> Unit,
   onMenu: () -> Unit,
   onScanBarcode: () -> Unit,
+  modifier: Modifier = Modifier,
 ) {
   val c = PhoneV3.colors
   val ring = if (broken) Modifier.border(2.dp, PhoneV3Roles.errorText(c), RoundedCornerShape(V3Space.cardRadius)) else Modifier
-  V3Card(ring.animateContentSize(), radius = V3Space.cardRadius, padding = PaddingValues(start = 14.dp, end = 14.dp, top = 6.dp, bottom = 14.dp)) {
+  V3Card(modifier.then(ring).draftResize(), radius = V3Space.cardRadius, padding = PaddingValues(start = 14.dp, end = 14.dp, top = 6.dp, bottom = 14.dp)) {
     Row(verticalAlignment = Alignment.CenterVertically) {
       Text(StrStock.rowN(money(number.toDouble())), style = V3Type.headline, color = c.ink, modifier = Modifier.weight(1f))
       V3IconButton(Icons.Outlined.MoreHoriz, StrKit.more, size = 38.dp, iconSize = 20.dp, onClick = onMenu)
