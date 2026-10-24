@@ -164,6 +164,7 @@ fun AppRoot(
         state.role?.let { ir.vil3ntec.tohid.data.ShopRole.remember(context, it) }
         //  لایه‌های مجوزِ دکان (STF-01..03) — نبودنش یعنی همان رفتارِ امروزِ نقش
         if (state.hasShop) ir.vil3ntec.tohid.data.ShopRole.rememberPolicy(context, state.policy?.toString())
+        if (state.hasShop) ir.vil3ntec.tohid.data.ShopRole.rememberShopId(context, state.shop?.id)
         //  دکان دارد: مطمئن شویم دفترِ روی گوشی هم مالِ همین دکان است.
         //  اگر حساب از دکانی به دکانِ دیگر رفته باشد، همین‌جا جابه‌جا
         //  می‌شود — وگرنه دفترِ دکانِ قبلی داخلِ دکانِ تازه می‌رفت.
@@ -596,6 +597,8 @@ fun AppRoot(
        *  نمی‌شود و خروجی و چاپ باز می‌مانند؛ همین را هم صریح می‌گوید،
        *  وگرنه کاربر گمان می‌کند دفترش رفته.
        */
+      //  فقط نسخهٔ پیش‌نمایش (`BuildConfig.PREVIEW`)؛ در بقیه هیچ چیز نمی‌کشد
+      PreviewBanner()
       SubscriptionBanner { sub = "myplan" }
       //  نسخهٔ تازه — بررسیِ خودکار و نصب با یک دکمه. کامپیوتر (نسخهٔ ۲): تراشهٔ
       //  کوچکِ سربرگ (`UpdateChip` در `DeskHeader`)، نه نوارِ تمام‌عرض
@@ -752,6 +755,7 @@ fun AppRoot(
                 "ظاهر" to androidx.compose.material.icons.Icons.Filled.Palette,
                 "تاریخ و رقم" to androidx.compose.material.icons.Icons.Filled.Event,
                 "کالای منقضی" to androidx.compose.material.icons.Icons.Filled.EventBusy,
+                ir.vil3ntec.tohid.ui.screens.RETURN_SETTINGS_TITLE to androidx.compose.material.icons.Icons.Filled.SwapHoriz,
                 "قفل برنامه" to androidx.compose.material.icons.Icons.Filled.Lock,
                 "تغییر رمز حساب" to androidx.compose.material.icons.Icons.Filled.Password,
                 "دستگاه‌های وارد شده" to androidx.compose.material.icons.Icons.Filled.Devices,

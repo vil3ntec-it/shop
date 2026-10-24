@@ -199,11 +199,15 @@ function verifySignature(publicKeyB64, text, sigB64) {
   if (!sig.length || sig.length > 80) return false;
   const pk = parsePublicKey(publicKeyB64);
   if (!pk) return false;
-  //  اندروید و JVM امضای DER می‌دهند، WebCrypto امضای خامِ ۶۴ بایتی
-  const dsaEncoding = sig.length === 64 && sig[0] !== 0x30 ? 'ieee-p1363' : 'der';
-  try {
-    return crypto.verify('sha256', Buffer.from(text, 'utf8'), { key: pk.key, dsaEncoding }, sig);
-  } catch { return false; }
+  const data = Buffer.from(text, 'utf8');
+  const verify = (dsaEncoding) => {
+    try { return crypto.verify('sha256', data, { key: pk.key, dsaEncoding }, sig); } catch { return false; }
+  };
+  //  اندروید و JVM امضای DER می‌دهند، WebCrypto امضای خامِ ۶۴ بایتی (IEEE P1363). از بایتِ اول
+  //  نمی‌شود حدس زد: امضای خامی که با 0x30 آغاز می‌شود (۱ در ۲۵۶) شبیهِ DER است. پس ۶۴ بایتی اول
+  //  خام، بعد DER؛ بقیه DER.
+  if (sig.length === 64) return verify('ieee-p1363') || verify('der');
+  return verify('der');
 }
 
 /** لایه‌ها و نقشِ یک عضوِ فعالِ دکان — یا null */
