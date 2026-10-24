@@ -83,7 +83,7 @@
     purchaseId: 'شناسهٔ خرید',
     warehouseEntryId: 'شناسهٔ ورودی انبار',
     refId: 'شناسهٔ مرجع',
-    kind: 'علتِ ردیف',
+    kind: 'نوعِ ردیفِ سیستمی',
     purchasePrice: 'قیمت خرید',
     salePrice: 'قیمت فروش',
     wholesalePrice: 'قیمت عمده',
