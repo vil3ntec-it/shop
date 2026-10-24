@@ -97,6 +97,14 @@ object DevShot {
                 val code = java.awt.event.KeyEvent::class.java.getField("VK_$arg").getInt(null)
                 robot.keyPress(code); robot.keyRelease(code); Thread.sleep(250)
               }
+              //  Shift+کلید، مثلِ shift:F6
+              "shift" -> {
+                val code = java.awt.event.KeyEvent::class.java.getField("VK_$arg").getInt(null)
+                robot.keyPress(java.awt.event.KeyEvent.VK_SHIFT); robot.keyPress(code)
+                robot.keyRelease(code); robot.keyRelease(java.awt.event.KeyEvent.VK_SHIFT); Thread.sleep(400)
+              }
+              //  POS-12: held:on|off — تنظیمِ «چند فاکتورِ هم‌زمان» فقط در همین اجرا (ذخیره نمی‌شود)
+              "held" -> { java.awt.EventQueue.invokeAndWait { ir.vil3ntec.tohid.ui.components.pos.HeldInvoicePrefs.on.value = arg != "off" }; Thread.sleep(800) }
             }
           }
         }

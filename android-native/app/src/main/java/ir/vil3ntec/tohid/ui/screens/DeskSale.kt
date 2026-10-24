@@ -299,11 +299,20 @@ fun DeskSaleScreen(
     if (i >= 0) runCatching { listState.animateScrollToItem(i) }
   }
 
+  //  POS-12: چند فاکتورِ هم‌زمان (تنظیمِ «چند فاکتورِ هم‌زمان»، پیش‌فرض خاموش)
+  val held = ir.vil3ntec.tohid.ui.components.pos.rememberHeldInvoices(
+    cartStore, d, snackbar,
+    extras = { ir.vil3ntec.tohid.data.HeldExtras(discountText) },
+    onSwitched = { x -> discountText = x.discount; paidText = ""; payment = SalesEngine.Payment.CASH; selected = null },
+    onFocusBack = { refocus() },
+  )
+
   Column(
     Modifier
       .fillMaxSize()
       .onPreviewKeyEvent { e ->
         if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+        if (held.onKey(e)) return@onPreviewKeyEvent true
         when (PosKeys.screen(keyName(e.key), e.isPrimaryModifier)) {
           PosAction.FINISH -> { finish(); true }
           PosAction.CUSTOMER -> { pickDebtor = true; true }
@@ -315,6 +324,7 @@ fun DeskSaleScreen(
       }
       .padding(12.dp),
   ) {
+    ir.vil3ntec.tohid.ui.components.pos.HeldInvoiceBar(held, Modifier.padding(bottom = 8.dp))
     BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
       val railFixed = PosLayout.railFixed(maxWidth.value)
       val panelWidth = if (maxWidth >= 1200.dp) 380.dp else 340.dp

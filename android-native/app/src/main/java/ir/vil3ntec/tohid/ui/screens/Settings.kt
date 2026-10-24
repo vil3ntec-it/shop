@@ -466,6 +466,9 @@ fun SettingsScreen(
       }
     }
 
+    /* ===================== چند فاکتورِ هم‌زمان (POS-12) ===================== */
+    item { ir.vil3ntec.tohid.ui.components.pos.HeldInvoiceSettings() }
+
     /* ============================== دوربین ============================== */
     item {
       SettingsSection(

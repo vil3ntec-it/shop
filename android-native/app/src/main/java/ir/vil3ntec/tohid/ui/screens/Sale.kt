@@ -86,6 +86,8 @@ fun SaleScreen(
 
   // کالای حذف‌شده نباید در سبد بماند
   LaunchedEffect(d.products.size, d.debtors.size) { cartStore.prune(d) }
+  //  POS-12: چند فاکتورِ هم‌زمان (تنظیمِ «چند فاکتورِ هم‌زمان»، پیش‌فرض خاموش)؛ تخفیفِ گوشی در پنجرهٔ پرداخت است
+  val held = ir.vil3ntec.tohid.ui.components.pos.rememberHeldInvoices(cartStore, d, snackbar)
 
   var cameraOn by rememberSaveable { mutableStateOf(true) }
   var granted by remember {
@@ -397,6 +399,7 @@ fun SaleScreen(
       }
 
       /* ---------------------------- سبد ---------------------------- */
+      item { ir.vil3ntec.tohid.ui.components.pos.HeldInvoiceBar(held, Modifier.padding(bottom = 8.dp)) }
       item {
         Row(
           Modifier.fillMaxWidth(),
