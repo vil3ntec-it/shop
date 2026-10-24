@@ -8,7 +8,7 @@
  */
 const crypto = require('crypto');
 const { query, one, many, tx, newId, now } = require('../db');
-const config = require('../config');
+const { serverSecret } = require('./server-secret');
 const { forbidden, notFound, conflict, badRequest } = require('../middleware/errors');
 const { can } = require('./permissions');
 
@@ -88,7 +88,7 @@ async function secretKey() {
  * تازه هرگز با این انجام نمی‌شود.
  */
 function legacyKey() {
-  const raw = config.secrets.api || config.secrets.jwt || 'shop-station-read-key';
+  const raw = serverSecret(['api', 'jwt'], 'shop-station-read-key');
   return crypto.createHash('sha256').update(String(raw)).digest();
 }
 
