@@ -258,7 +258,7 @@ fun EntryDialog(
   var batch by remember { mutableStateOf("") }
   var made by remember { mutableStateOf("") }
   //  موتورِ تازهٔ موجودی (روشن): هزینهٔ جانبی (PUR-06) و محل (INV-20)؛ خاموش ⇒ فرمِ امروز
-  val stockOn = ir.vil3ntec.tohid.data.StockLedger.isOn(d)
+  val stockOn = remember(d.auditLog) { ir.vil3ntec.tohid.data.StockLedger.isOn(d) }
   var landed by remember { mutableStateOf("") }
   var location by remember { mutableStateOf(ir.vil3ntec.tohid.data.StockActions.MAIN_LABEL) }
   val context = androidx.compose.ui.platform.LocalContext.current
@@ -421,7 +421,7 @@ fun AdjustDialog(
   onSave: (Double, Boolean, String, WarehouseEngine.AdjustKind, String?) -> Unit,
 ) {
   val product = d.products.find { it.id == productId }
-  val stockOn = ir.vil3ntec.tohid.data.StockLedger.isOn(d)
+  val stockOn = remember(d.auditLog) { ir.vil3ntec.tohid.data.StockLedger.isOn(d) }
   var adjKind by remember { mutableStateOf("other") }
   var kind by remember { mutableStateOf(WarehouseEngine.AdjustKind.ADJUSTMENT) }
   var increase by remember { mutableStateOf(true) }

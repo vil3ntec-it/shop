@@ -49,8 +49,12 @@ products.forEach((p, i) => {
 //  انتقال به انبارِ پشتی — هر دو فیلدِ افزودنی‌اند و موجودیِ موتورِ امروز را عوض نمی‌کنند
 warehouseEntries[0].landedCost = 120;
 warehouseEntries[0].landedCostMinor = 12000;
-stockMovements.push({ id: id('m'), productId: 'p1', type: 'transfer', qty: 10, date: iso(now - 20 * day), notes: 'پر کردنِ انبارِ پشتی',
-  refId: null, createdAt: now - 20 * day, userId: 'علی', reason: 'پر کردنِ انبارِ پشتی', locationId: '', toLocationId: 'انبارِ پشتی' });
+//  انتقال = دو ردیفِ جمعِ صفر (خروجیِ منفی با مقصد، ورودیِ مثبت) — همان که `StockActions.transfer` می‌نویسد
+const trId = id('m');
+stockMovements.push({ id: trId, productId: 'p1', type: 'transfer_out', qty: -10, date: iso(now - 20 * day), notes: 'پر کردنِ انبارِ پشتی',
+  refId: trId, createdAt: now - 20 * day, userId: 'علی', reason: 'پر کردنِ انبارِ پشتی', locationId: '', toLocationId: 'انبارِ پشتی' });
+stockMovements.push({ id: id('m'), productId: 'p1', type: 'transfer_in', qty: 10, date: iso(now - 20 * day), notes: 'پر کردنِ انبارِ پشتی',
+  refId: trId, createdAt: now - 20 * day, userId: 'علی', reason: 'پر کردنِ انبارِ پشتی', locationId: 'انبارِ پشتی' });
 
 const stockLeft = Object.fromEntries(warehouseEntries.map(w => [w.productId, w.units]));
 const debtors = [

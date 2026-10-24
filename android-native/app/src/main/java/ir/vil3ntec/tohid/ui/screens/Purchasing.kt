@@ -385,7 +385,7 @@ private fun PurchaseDialog(
   onSave: (LedgerEngine.PurchaseDraft) -> Unit,
 ) {
   var productId by remember { mutableStateOf<String?>(null) }
-  val stockOn = ir.vil3ntec.tohid.data.StockLedger.isOn(d)
+  val stockOn = remember(d.auditLog) { ir.vil3ntec.tohid.data.StockLedger.isOn(d) }
   var landed by remember { mutableStateOf("") }
   val context = androidx.compose.ui.platform.LocalContext.current
   var quantity by remember { mutableStateOf("") }
@@ -460,6 +460,11 @@ private fun PurchaseDialog(
         if (stockOn) {
           Spacer(Modifier.height(12.dp))
           NumberField(landed, { landed = it }, "هزینهٔ جانبی (کرایه، گمرک) — اختیاری", Modifier.fillMaxWidth())
+          Text(
+            "به بهای همین کالا اضافه می‌شود (میانگینِ موزون)؛ جدا در «مصارف» ثبتش نکنید.",
+            style = MaterialTheme.typography.labelSmall,
+            color = Shop.colors.muted,
+          )
         }
 
         Spacer(Modifier.height(12.dp))

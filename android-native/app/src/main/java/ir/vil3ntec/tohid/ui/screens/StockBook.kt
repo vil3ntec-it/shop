@@ -100,7 +100,7 @@ fun StockBookScreen(
 ) {
   val scope = rememberCoroutineScope()
   val context = LocalContext.current
-  val on = StockLedger.isOn(d)
+  val on = remember(d.auditLog) { StockLedger.isOn(d) }
   val user = remember(context) { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrDefault("") }
   fun toast(t: String) { scope.launch { snackbar.showSnackbar(t) } }
   fun save(next: ShopData, done: String) { scope.launch { store.save(next) }; toast(done) }
@@ -715,7 +715,7 @@ const val STOCK_SETTINGS_TITLE = "موجودی و بها"
 fun StockModeSection(store: ShopStore, d: ShopData) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
-  val on = StockLedger.isOn(d)
+  val on = remember(d.auditLog) { StockLedger.isOn(d) }
   val row = StockLedger.modeRow(d)
   var ask by remember { mutableStateOf<Boolean?>(null) }
   SettingsSection(
@@ -773,7 +773,8 @@ fun StockModeSection(store: ShopStore, d: ShopData) {
 /** فقط وقتی موتور روشن است: ارزش به بهای میانگین، وظیفه‌های باز و سری‌های منقضی؛ زدنِ هر کارت ⇐ «دفترِ موجودی» */
 @Composable
 fun StockStrip(d: ShopData, onOpen: () -> Unit) {
-  if (!StockLedger.isOn(d)) return
+  val on = remember(d.auditLog) { StockLedger.isOn(d) }
+  if (!on) return
   val view by produceState<StockLedger.View?>(null, d) { value = withContext(Dispatchers.Default) { StockLedger.replay(d) } }
   val v = view ?: return
   val stats = remember(v, d) { bookStats(d, v, todayIso()) }

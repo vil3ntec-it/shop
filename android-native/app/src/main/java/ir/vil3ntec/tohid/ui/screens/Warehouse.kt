@@ -60,7 +60,7 @@ fun WarehouseScreen(
   /** «دفترِ موجودی» — فقط وقتی موتورِ تازهٔ موجودی و بها روشن است */
   onStockBook: () -> Unit = {},
 ) {
-  val stockOn = ir.vil3ntec.tohid.data.StockLedger.isOn(d)
+  val stockOn = remember(d.auditLog) { ir.vil3ntec.tohid.data.StockLedger.isOn(d) }
   val scope = rememberCoroutineScope()
 
   var search by rememberSaveable { mutableStateOf("") }
@@ -741,5 +741,9 @@ private fun movementLabel(type: String): String = when (type) {
   "supplier_return" -> "برگشت به تأمین‌کننده"
   "adjustment" -> "اصلاح موجودی"
   "damage" -> "ضایعات"
+  //  انتقال بین محل‌ها (موتورِ تازهٔ موجودی): دو ردیف، خروجیِ منفی و ورودیِ مثبت
+  "transfer_out" -> "انتقالِ خروجی"
+  "transfer_in" -> "انتقالِ ورودی"
+  "transfer" -> "انتقال"
   else -> type
 }

@@ -37,6 +37,18 @@ object StockLedger {
   const val MODE_TYPE = "stock_mode"
   const val ACK_TYPE = "stock_review_ack"
   const val LEGACY_USER = "legacy"
+
+  /*
+   *  انتقال بین محل‌ها = **دو** ردیفِ `stockMovements` با یک `refId`: خروجی (`transfer_out`،
+   *  مقدارِ منفی در مبدأ، با `toLocationId`) و ورودی (`transfer_in`، مثبت در مقصد). جمعِ
+   *  مقدارشان صفر است، چون سرورِ Sync v3 موجودی را جمعِ `qtyMilli` ِ همین جدول می‌داند
+   *  (`sync-v3.js`، `sumMoves`) و انتقالِ تک‌ردیفِ مثبت موجودیِ سرور را زیاد می‌کرد.
+   *  دفتر انتقال را فقط از ردیفِ خروجی می‌سازد؛ `transfer` ِ تک‌ردیفِ پیش‌نمایش هنوز خوانده می‌شود.
+   */
+  const val TRANSFER_OUT = "transfer_out"
+  const val TRANSFER_IN = "transfer_in"
+  const val TRANSFER_LEGACY = "transfer"
+  val TRANSFER_TYPES = setOf(TRANSFER_OUT, TRANSFER_IN, TRANSFER_LEGACY)
   const val MAIN = ""
 
   val ADJ_KINDS = listOf("count", "damage", "expired", "lost", "other", "supplier_return")
@@ -148,15 +160,31 @@ object StockLedger {
   fun events(d: ShopData, only: Set<String>? = null): List<Event> {
     val out = ArrayList<Event>()
     fun want(pid: String) = only == null || pid in only
+    /*
+     *  سنجشِ سبد (`only` ≠ null) سرِ هر ثبتِ فروش صدا می‌شود: نمایه‌ها فقط برای ردیف‌های
+     *  همین کالاها ساخته می‌شوند، نه برای کلِ دفتر (کندیِ صندوق روی دفترِ بزرگ).
+     */
     val moveTypeByRef = HashMap<String, String>()
     val damageRef = HashMap<String, String>()
     for (mv in d.stockMovements) {
+      if (!want(mv.productId)) continue
       if (mv.type == "damage" && mv.createdAt > 0) damageRef.putIfAbsent(mv.productId + "|" + mv.createdAt, mv.refId.orEmpty())
       val r = mv.refId ?: continue
       if (!moveTypeByRef.containsKey(r)) moveTypeByRef[r] = mv.type
     }
+    //  ثبت‌کنندهٔ برگشت (`SaleReturn.by`): با شناسهٔ ردیف (حرکتِ `damage`) و با `docId` ِ سند
+    //  (ردیفِ انبارِ برگشتِ ضایعات یا بی رسید، `WarehouseEntry.refId`، RET #318)
+    val wantRet = HashSet<String>(damageRef.values)
+    for (w in d.warehouseEntries) if (want(w.productId)) w.refId?.let(wantRet::add)
     val returnBy = HashMap<String, String>()
-    for (r in d.saleReturns) r.by?.trim()?.takeIf { it.isNotEmpty() }?.let { returnBy[r.id] = it }
+    if (wantRet.isNotEmpty()) {
+      for (r in d.saleReturns) {
+        val by = r.by?.trim()?.takeIf { it.isNotEmpty() } ?: continue
+        if (r.id in wantRet) returnBy[r.id] = by
+        val doc = r.docId
+        if (doc != null && doc in wantRet) returnBy.putIfAbsent(doc, by)
+      }
+    }
 
     d.warehouseEntries.forEachIndexed { i, w ->
       if (w.productId.isEmpty() || !want(w.productId)) return@forEachIndexed
@@ -165,7 +193,10 @@ object StockLedger {
       val at = atOf(w.createdAt, w.date)
       val id = w.id.ifEmpty { "w#$i" }
       val dmg = if (w.isAdjustment && q < 0 && w.adjKind.isNullOrEmpty() && w.createdAt > 0) damageRef[w.productId + "|" + w.createdAt] else null
-      val user = w.userId?.trim()?.ifEmpty { null } ?: dmg?.let { returnBy[it] } ?: LEGACY_USER
+      val user = w.userId?.trim()?.ifEmpty { null }
+        ?: w.refId?.let { returnBy[it] }
+        ?: dmg?.let { returnBy[it] }
+        ?: LEGACY_USER
       val ref = w.purchaseId.orEmpty().ifEmpty { w.id }
       val loc = w.locationId.orEmpty()
       if (!w.isAdjustment && q > 0) {
@@ -193,7 +224,8 @@ object StockLedger {
     }
 
     d.stockMovements.forEachIndexed { t, x ->
-      if (x.type != "transfer" || x.productId.isEmpty() || !want(x.productId)) return@forEachIndexed
+      //  فقط ردیفِ خروجی (یا تک‌ردیفِ قدیمی)؛ ردیفِ `transfer_in` نیمهٔ دیگرِ همان انتقال است
+      if ((x.type != TRANSFER_OUT && x.type != TRANSFER_LEGACY) || x.productId.isEmpty() || !want(x.productId)) return@forEachIndexed
       val to = x.toLocationId ?: return@forEachIndexed
       val tq = abs(milli(x.qty))
       val from = x.locationId.orEmpty()
@@ -209,14 +241,18 @@ object StockLedger {
       )
     }
 
+    //  فقط فاکتورها و برگشت‌های قلم‌های همین کالاها
+    val items = ArrayList<IndexedValue<SaleItem>>()
+    d.saleItems.forEachIndexed { k, si -> if (si.productId.isNotEmpty() && want(si.productId)) items += IndexedValue(k, si) }
+    val saleIds = if (only == null) null else items.mapTo(HashSet()) { it.value.saleId }
+    val itemIds = if (only == null) null else items.mapTo(HashSet()) { it.value.id.ifEmpty { "si#" + it.index } }
     val saleById = HashMap<String, Sale>()
-    for (s in d.sales) saleById[s.id] = s
+    for (s in d.sales) if (saleIds == null || s.id in saleIds) saleById[s.id] = s
     val retByItem = HashMap<String, MutableList<SaleReturn>>()
-    for (r in d.saleReturns) retByItem.getOrPut(r.saleItemId) { ArrayList() } += r
-    d.saleItems.forEachIndexed { k, si ->
-      if (si.productId.isEmpty() || !want(si.productId)) return@forEachIndexed
+    for (r in d.saleReturns) if (itemIds == null || r.saleItemId in itemIds) retByItem.getOrPut(r.saleItemId) { ArrayList() } += r
+    for ((k, si) in items) {
       val sale = saleById[si.saleId]
-      if (sale != null && sale.status == "cancelled") return@forEachIndexed
+      if (sale != null && sale.status == "cancelled") continue
       val sq = milli(si.quantity)
       val sat = if (sale != null) atOf(sale.createdAt, sale.date) else 1L
       val sday = if (sale != null) dayOf(sale.date, sat) else isoOf(sat)
@@ -230,7 +266,7 @@ object StockLedger {
         out += Event(sid, "sale", "adjustment", sat, sday, si.productId, loc, -sq, seller, si.saleId, reason = "قلمِ منفیِ فاکتور")
       }
       var left = milli(si.returnedQty)
-      if (left <= 0) return@forEachIndexed
+      if (left <= 0) continue
       val mine = (retByItem[sid] ?: emptyList<SaleReturn>()).sortedWith { a, b ->
         val c = atOf(a.createdAt, a.date).compareTo(atOf(b.createdAt, b.date))
         if (c != 0) c else a.id.compareTo(b.id)
@@ -527,7 +563,7 @@ object StockLedger {
   fun locations(d: ShopData): List<String> {
     val set = LinkedHashSet<String>()
     d.warehouseEntries.forEach { it.locationId?.let(set::add) }
-    d.stockMovements.forEach { if (it.type == "transfer") { it.locationId?.let(set::add); it.toLocationId?.let(set::add) } }
+    d.stockMovements.forEach { if (it.type in TRANSFER_TYPES) { it.locationId?.let(set::add); it.toLocationId?.let(set::add) } }
     d.saleItems.forEach { it.locationId?.let(set::add) }
     set.remove(MAIN)
     return listOf(MAIN) + set.sorted()
@@ -588,8 +624,12 @@ object StockLedger {
         cost += a.result.costMinor
         for (p in a.result.picks) picks += LocPick(locOf(a.doc.warehouseId), p.lotId, p.qtyMilli)
       }
-      val pv = productView(View(mapOf(pid to book), emptyList(), emptyList(), emptyList()), pid)
-      out += Check(true, costMinor = cost, unitCostMinor = unitCostMinor(cost, q), unknownCost = cost == 0L && pv.lastCost == null && pv.qtyMilli <= 0, picks = picks)
+      /*
+       *  بهای صفر = «نامعلوم»، نه «رایگان»: ورودِ بی‌بها (اصلاحِ +، انبارگردانی، برگشتِ بی رسید،
+       *  ورودِ ۰) در هسته `lastCost = 0` می‌گذارد و فروش با سودِ دروغ ثبت می‌شد. صداکننده به
+       *  «قیمتِ خریدِ آخرِ کالا» (رفتارِ امروز) برمی‌گردد (`SalesEngine.record`).
+       */
+      out += Check(true, costMinor = cost, unitCostMinor = unitCostMinor(cost, q), unknownCost = q > 0 && cost <= 0L, picks = picks)
     }
     return out
   }

@@ -621,5 +621,9 @@ fun movementLabelOf(type: String): String = when (type) {
   "supplier_return" -> "برگشت به تأمین‌کننده"
   "adjustment" -> "اصلاح موجودی"
   "damage" -> "ضایعات"
+  //  انتقال بین محل‌ها (موتورِ تازهٔ موجودی): دو ردیف، خروجیِ منفی و ورودیِ مثبت
+  "transfer_out" -> "انتقالِ خروجی"
+  "transfer_in" -> "انتقالِ ورودی"
+  "transfer" -> "انتقال"
   else -> type
 }

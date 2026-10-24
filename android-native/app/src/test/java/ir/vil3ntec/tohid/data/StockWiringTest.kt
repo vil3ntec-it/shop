@@ -213,11 +213,26 @@ class StockWiringTest {
     assertTrue(bad is StockActions.Result.Failed)
     assertTrue(StockActions.transfer(d, view, "p1", "", "", 1.0, null, "", "", today, now, ::newId) is StockActions.Result.Failed)
     val ok = StockActions.transfer(d, view, "p1", "", "انبار", 4.0, null, "پشتِ دکان", "کریم", today, now, ::newId) as StockActions.Result.Ok
-    val mv = ok.data.stockMovements.last()
-    assertEquals("transfer", mv.type)
-    assertEquals("", mv.locationId)
-    assertEquals("انبار", mv.toLocationId)
-    assertEquals("کریم", mv.userId)
+    //  دو ردیف با یک `refId`: خروجیِ منفی از مبدأ (با مقصد)، ورودیِ مثبت در مقصد
+    val (out, inn) = ok.data.stockMovements.takeLast(2)
+    assertEquals(StockLedger.TRANSFER_OUT, out.type)
+    assertEquals(-4.0, out.qty, 0.0)
+    assertEquals("", out.locationId)
+    assertEquals("انبار", out.toLocationId)
+    assertEquals("کریم", out.userId)
+    assertEquals(StockLedger.TRANSFER_IN, inn.type)
+    assertEquals(4.0, inn.qty, 0.0)
+    assertEquals("انبار", inn.locationId)
+    assertEquals(out.refId, inn.refId)
+    //  سرورِ Sync v3 موجودی را جمعِ `qty` ِ حرکت‌ها می‌داند (`sumMoves`) ⇒ انتقال آن را عوض نمی‌کند
+    assertEquals(
+      d.stockMovements.filter { it.productId == "p1" }.sumOf { it.qty },
+      ok.data.stockMovements.filter { it.productId == "p1" }.sumOf { it.qty }, 0.0,
+    )
+    //  CSVِ «گردشِ موجودی»: برچسبِ فارسی و علامتِ درست
+    val csv = ReportCsv.of("stock", ok.data, today, today, today).rows.takeLast(2)
+    assertEquals(listOf("انتقالِ خروجی", "-4"), listOf(csv[0][2], csv[0][3]))
+    assertEquals(listOf("انتقالِ ورودی", "4"), listOf(csv[1][2], csv[1][3]))
     assertEquals(ShopStore.stock(d, "p1"), ShopStore.stock(ok.data, "p1"), 0.0)
     val pv = StockLedger.productView(StockLedger.replay(ok.data), "p1")
     assertEquals(listOf("" to 11000L, "انبار" to 4000L), pv.locations.map { it.location to it.qtyMilli })
@@ -261,6 +276,130 @@ class StockWiringTest {
     val acked = StockActions.ack(d, view, listOf("ix"), "کریم", today, now, ::newId)
     assertTrue(StockLedger.replay(acked).tasks.single().acked)
     assertEquals(acked, StockActions.ack(acked, StockLedger.replay(acked), listOf("ix"), "", today, now, ::newId))
+  }
+
+  @Test
+  fun on_legacySingleRowTransferStillReads() {
+    //  پیش‌نمایشِ پیشین یک ردیفِ مثبتِ `transfer` می‌نوشت — هنوز همان انتقال خوانده می‌شود
+    val d = on().let {
+      it.copy(stockMovements = it.stockMovements + StockMovement(
+        id = "mt", productId = "p1", type = "transfer", qty = 3.0, date = today, createdAt = now, locationId = "", toLocationId = "انبار",
+      ))
+    }
+    val pv = StockLedger.productView(StockLedger.replay(d), "p1")
+    assertEquals(listOf("" to 12000L, "انبار" to 3000L), pv.locations.map { it.location to it.qtyMilli })
+  }
+
+  @Test
+  fun on_zeroCostIsUnknownAndFallsBackToLastPurchasePrice() {
+    //  کالایی که فقط با اصلاحِ + (بی‌بها) یا ورودِ ۰ آمده: هسته lastCost = 0 می‌گذارد؛
+    //  فروش نباید بهای صفر (سودِ دروغ) بگیرد ⇒ قیمتِ خریدِ آخرِ کالا، همان رفتارِ امروز
+    val p3 = Product(id = "p3", name = "صابون", unit = "عدد", purchasePrice = 40.0, salePrice = 60.0)
+    val adj = on(base.copy(
+      products = base.products + p3,
+      warehouseEntries = base.warehouseEntries + WarehouseEntry(id = "wa", productId = "p3", units = 5.0, isAdjustment = true, date = today, createdAt = 5000),
+    ))
+    val chk = StockLedger.checkCart(StockLedger.replay(adj), listOf(StockLedger.Line("p3", 1000)), today).single()
+    assertTrue(chk.ok)
+    assertTrue(chk.unknownCost)
+    val r1 = sell(adj, SalesEngine.CartLine("p3", 1.0)) as SalesEngine.Result.Ok
+    assertEquals(40.0, r1.data.saleItems.single().purchasePrice, 0.0)
+
+    val zero = on(base.copy(
+      products = base.products + p3,
+      warehouseEntries = base.warehouseEntries + WarehouseEntry(id = "wz", productId = "p3", units = 5.0, price = 0.0, date = today, createdAt = 5000),
+    ))
+    val r2 = sell(zero, SalesEngine.CartLine("p3", 2.0)) as SalesEngine.Result.Ok
+    assertEquals(40.0, r2.data.saleItems.single().purchasePrice, 0.0)
+    //  بهای معلوم دست نمی‌خورد
+    val r3 = sell(zero, SalesEngine.CartLine("p1", 3.0)) as SalesEngine.Result.Ok
+    assertEquals(113.33, r3.data.saleItems.single().purchasePrice, 0.0)
+  }
+
+  @Test
+  fun on_damagedReturnUserIsTheReturnsBy() {
+    //  برگشتِ ضایعاتِ RET (#318): ردیفِ انبار با adjKind = damage و refId = docId ِ سند
+    val d = on(base.copy(
+      saleReturns = listOf(SaleReturn(id = "r1", saleId = "s0", productId = "p1", quantity = 1.0, docId = "D1", by = "کریم", createdAt = 6000)),
+      warehouseEntries = base.warehouseEntries + WarehouseEntry(
+        id = "wd", productId = "p1", units = -1.0, isAdjustment = true, notes = "ضایعاتِ برگشتی R-1 — شکسته", date = today, createdAt = 6000,
+        adjKind = "damage", refId = "D1",
+      ),
+    ))
+    val row = StockLedger.replay(d).rows.first { it.id == "wd" }
+    assertEquals("damage", row.type)
+    assertEquals("کریم", row.userId)
+    //  همان، وقتی فقط برای همین کالا بازپخش می‌شود (سنجشِ سبد)
+    assertEquals("کریم", StockLedger.replay(d, listOf("p1")).rows.first { it.id == "wd" }.userId)
+  }
+
+  @Test
+  fun on_archiveKeepsModeAcksAndTransfers() {
+    var d = on()
+    d = (StockActions.transfer(d, StockLedger.replay(d), "p1", "", "انبار", 4.0, null, "", "کریم", today, now, ::newId) as StockActions.Result.Ok).data
+    d = d.copy(
+      sales = d.sales + Sale(id = "sx", status = "completed", date = today, createdAt = now + 1000),
+      saleItems = d.saleItems + SaleItem(id = "ix", saleId = "sx", productId = "p1", quantity = 20.0),
+    )
+    d = StockActions.ack(d, StockLedger.replay(d), listOf("ix"), "کریم", today, now + 2000, ::newId)
+    //  همهٔ ردیف‌ها کهنه‌تر از ۴۰۰ روز، به‌علاوهٔ یک حرکتِ عادی که باید برود
+    d = d.copy(
+      stockMovements = d.stockMovements + StockMovement(id = "plain", productId = "p1", type = "sale", qty = -1.0, createdAt = 1000),
+      auditLog = d.auditLog + AuditEntry(id = "a-plain", type = "sale", createdAt = 1000),
+    )
+    val later = now + 500L * 24 * 60 * 60 * 1000
+    val before = StockLedger.replay(d)
+    val (kept, gone) = LedgerArchive.split(d, later)
+    assertEquals(listOf("plain"), gone.stockMovements.map { it.id })
+    assertTrue(gone.auditLog.any { it.id == "a-plain" })
+    assertTrue(gone.auditLog.none { LedgerArchive.pinned(it) })
+    assertEquals(2, kept.auditLog.count { LedgerArchive.pinned(it) })
+    assertEquals(LedgerArchive.Plan(1, 0, gone.auditLog.size), LedgerArchive.plan(d, later))
+    assertTrue(StockLedger.isOn(kept))
+    val after = StockLedger.replay(kept)
+    assertTrue(after.tasks.single().acked)
+    assertEquals(
+      StockLedger.productView(before, "p1").locations,
+      StockLedger.productView(after, "p1").locations,
+    )
+  }
+
+  @Test
+  fun on_saleCheckOnBigLedgerStaysFast() {
+    //  دفترِ بزرگ: ۴۰۰ کالا، ۸۰۰۰۰ قلمِ فروش؛ سنجشِ سبدِ یک‌قلمی فقط همان کالا را می‌دواند
+    val products = (0 until 400).map { Product(id = "b$it", name = "کالا $it", unit = "عدد", purchasePrice = 10.0, salePrice = 20.0) }
+    val entries = products.mapIndexed { i, p -> WarehouseEntry(id = "be$i", productId = p.id, units = 100_000.0, price = 10.0, date = "2026-01-01", createdAt = 100L + i) }
+    val sales = ArrayList<Sale>()
+    val items = ArrayList<SaleItem>()
+    for (k in 0 until 80_000) {
+      if (k % 4 == 0) sales += Sale(id = "bs${k / 4}", status = "completed", date = "2026-06-01", createdAt = 10_000L + k)
+      items += SaleItem(id = "bi$k", saleId = "bs${k / 4}", productId = "b${k % 400}", quantity = 1.0)
+    }
+    val d = on(base.copy(products = base.products + products, warehouseEntries = base.warehouseEntries + entries, sales = sales, saleItems = items))
+    assertTrue(StockLedger.events(d, setOf("b7")).all { it.productId == "b7" })
+    repeat(2) { sell(d, SalesEngine.CartLine("b7", 1.0)) }
+    val t0 = System.nanoTime()
+    repeat(5) { assertTrue(sell(d, SalesEngine.CartLine("b7", 1.0)) is SalesEngine.Result.Ok) }
+    val ms = (System.nanoTime() - t0) / 1_000_000 / 5
+    assertTrue("ثبتِ یک فروش روی دفترِ بزرگ $ms ms طول کشید", ms < 1500)
+  }
+
+  @Test
+  fun on_singlePurchaseCarriesLandedOnPurchaseRow() {
+    val r = LedgerEngine.addPurchase(
+      on(), LedgerEngine.PurchaseDraft(supplierId = "s1", productId = "p1", quantity = 2.0, purchasePrice = 100.0, date = today, landedCost = 30.0),
+      today, now, ::newId,
+    ) as LedgerEngine.Result.Ok
+    val p = r.data.purchases.last()
+    assertEquals(30.0, p.landedCost!!, 0.0)
+    assertEquals(3000L, p.landedCostMinor)
+    assertEquals(3000L, r.data.warehouseEntries.last().landedCostMinor)
+    //  خاموش ⇒ ردیفِ خرید فیلدِ تازه ندارد
+    val off = LedgerEngine.addPurchase(
+      base, LedgerEngine.PurchaseDraft(supplierId = "s1", productId = "p1", quantity = 2.0, purchasePrice = 100.0, date = today),
+      today, now, ::newId,
+    ) as LedgerEngine.Result.Ok
+    assertNull(off.data.purchases.last().landedCost)
   }
 
   @Test
