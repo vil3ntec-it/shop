@@ -141,7 +141,7 @@ fun StockListScreen(
         actions = actions,
         listState = listState,
         stagger = stagger,
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = pad.calculateBottomPadding() + 72.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = pad.calculateBottomPadding() + FAB_CLEARANCE),
         onFilter = { filterKey = it.key },
         onClear = { query = ""; filterKey = StockFilter.ALL.key; category = null },
       )
@@ -161,6 +161,12 @@ fun StockListScreen(
 }
 
 private const val FAB_KEY = "stock-entry-fab"
+
+/**
+ *  جای دکمهٔ شناور زیرِ آخرین ردیف (۵۶ + ۱۶) تا ردیفِ آخر زیرِ «ورود کالا» نماند — نه جای
+ *  نوارِ پایین: آن را پوسته خودش نگه می‌دارد (AUDIT-NAV S1/S6) و `pad` ِ `V3Scaffold` نوارِ سیستم را.
+ */
+private val FAB_CLEARANCE = 72.dp
 
 @Composable
 private fun FilterChips(
