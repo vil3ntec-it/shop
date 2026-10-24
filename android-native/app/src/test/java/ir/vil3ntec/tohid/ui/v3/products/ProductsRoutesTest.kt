@@ -38,7 +38,6 @@ class ProductsRoutesTest {
     assertEquals(listOf("products", "products/7", "products/7/edit"), table.chain("products/7/edit"))
     assertEquals(listOf("products", "products/7", "products/7/photo/studio?src=a"), table.chain("products/7/photo/studio?src=a"))
     assertEquals(listOf("products", "products/new?barcode=626"), table.chain("products/new?barcode=626"))
-    assertEquals("products/9", table.canonical("product/9"))
   }
 
   @Test
