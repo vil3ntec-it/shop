@@ -164,4 +164,16 @@ class ModuleRegistryTest {
     val tabs = V3Modules.entries(Place.NAV, shopper).map { it.route }
     assertEquals(listOf("shopper/home", "shopper/cart", "shopper/orders", "shopper/account"), tabs)
   }
+
+  @Test
+  fun `اسکنِ QR در هر سه حالت؛ اسکنِ بارکدِ فروش همان که بود`() {
+    val qr = table.resolve(ScanPaths.QR)!!
+    assertEquals("scan", qr.module.id)
+    assertEquals(RouteKind.SHEET, qr.route.kind)
+    AppMode.entries.forEach { assertTrue("QR در $it", qr.allowed(Access.all(it))) }
+    val barcode = table.resolve("scan?for=stock")!!
+    assertEquals("scan", barcode.route.pattern)
+    assertTrue(barcode.allowed(all))
+    assertFalse(barcode.allowed(Access.all(AppMode.SHOPPER)))
+  }
 }

@@ -10,9 +10,15 @@ import java.net.URLEncoder
  *  الگو بخش‌های ثابت و `{نام}` دارد (`product/{id}`). یک مسیر با الگو جور است
  *  اگر شمارِ بخش‌ها یکی باشد، بخش‌های ثابت عیناً برابر باشند و هر `{نام}` یک بخشِ
  *  ناخالی بگیرد. پارامترهای پرسش (`?k=v`) هم در `params` می‌نشینند.
+ *
+ *  پرسشِ ثابت در خودِ الگو (`scan?kind=qr`) شرط است: مسیر باید همان مقدار را داشته
+ *  باشد، و هر جفتِ ثابت یک بخشِ ثابت شمرده می‌شود (پس `scan?kind=qr` از `scan` دقیق‌تر است).
  */
 class RoutePattern(val pattern: String) {
   val segments: List<String> = split(pattern)
+
+  /** پرسشِ ثابتِ الگو (`scan?kind=qr` ⇐ kind=qr) */
+  val required: Map<String, String> = if ('?' in pattern) RoutePaths.parse(pattern).second else emptyMap()
 
   init {
     require(segments.isNotEmpty()) { "الگوی خالی" }
@@ -22,11 +28,12 @@ class RoutePattern(val pattern: String) {
   val base: String get() = segments.first()
 
   /** شمارِ بخش‌های ثابت: الگوی دقیق‌تر بر الگوی کلی‌تر پیشی می‌گیرد */
-  val literals: Int get() = segments.count { !isParam(it) }
+  val literals: Int get() = segments.count { !isParam(it) } + required.size
 
   fun match(path: String): RouteMatch? {
     val (parts, query) = RoutePaths.parse(path)
     if (parts.size != segments.size) return null
+    if (required.any { (k, v) -> query[k] != v }) return null
     val params = LinkedHashMap<String, String>()
     segments.forEachIndexed { i, seg ->
       val part = parts[i]
@@ -44,9 +51,10 @@ class RoutePattern(val pattern: String) {
   /** ساختنِ مسیر از الگو — `build("id" to "42")` ⇐ `product/42` */
   fun build(vararg args: Pair<String, String>): String {
     val map = args.toMap()
-    return segments.joinToString("/") { seg ->
+    val path = segments.joinToString("/") { seg ->
       if (isParam(seg)) RoutePaths.encode(map[seg.substring(1, seg.length - 1)] ?: error("پارامترِ «$seg» داده نشد")) else seg
     }
+    return if (required.isEmpty()) path else RoutePaths.withQuery(path, *required.map { (k, v) -> k to v }.toTypedArray())
   }
 
   override fun toString(): String = pattern
