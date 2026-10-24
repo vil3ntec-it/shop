@@ -107,6 +107,7 @@ internal fun RouteScope.NewCodeRoute() {
       scope.launch {
         shops.createStaffCode(r.role, r.maxUses, r.days)
           .onSuccess { issued ->
+            Haptics.success(context)
             team.fresh = issued.code
             nav.replace(AccountPaths.REVEAL)
             TeamSession.scope.launch { team.reload(shops, ShopRole.current(context) == ShopRole.OWNER) }

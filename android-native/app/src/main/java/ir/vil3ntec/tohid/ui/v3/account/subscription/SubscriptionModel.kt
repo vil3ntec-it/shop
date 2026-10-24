@@ -23,6 +23,8 @@ object SubscriptionModel {
     val permanent: Boolean,
     val active: Boolean,
     val days: Int,
+    /** سرخط «N روز مانده» است (شمارنده)، نه «دائمی ✓» یا «تمام شده» */
+    val countsDays: Boolean,
     /** ۰ تا ۱ */
     val progress: Float,
     val tone: Tone,
@@ -65,6 +67,7 @@ object SubscriptionModel {
       permanent = permanent,
       active = active,
       days = days,
+      countsDays = !permanent && !ended,
       progress = if (permanent) 1f else ApiJson.int(sub, "progress").coerceIn(0, 100) / 100f,
       tone = toneOf(ApiJson.text(sub, "color")),
       starts = AccountFormat.date(ApiJson.long(sub, "startsAt")),

@@ -1,6 +1,5 @@
 package ir.vil3ntec.tohid.ui.v3.account.subscription
 
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,7 +39,6 @@ import ir.vil3ntec.tohid.core.net.ApiEndpoints
 import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.sync.v1.HeartbeatCache
 import ir.vil3ntec.tohid.sync.v1.SoftLock
-import ir.vil3ntec.tohid.ui.screens.MotionSpec
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Dark
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
@@ -59,6 +57,10 @@ import ir.vil3ntec.tohid.ui.v3.V3Skeleton
 import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.ui.v3.account.AccountLinks
 import ir.vil3ntec.tohid.ui.v3.account.AccountPaths
+import ir.vil3ntec.tohid.ui.v3.account.DraftProgressBar
+import ir.vil3ntec.tohid.ui.v3.rememberCountUp
+import ir.vil3ntec.tohid.ui.v3.rememberV3Stagger
+import ir.vil3ntec.tohid.ui.v3.v3Stagger
 import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonArray
@@ -82,6 +84,7 @@ internal data class SubscriptionUi(
  */
 @Composable
 internal fun SubscriptionContent(ui: SubscriptionUi, onBack: (() -> Unit)?, onRefresh: () -> Unit, onOpen: (String) -> Unit) {
+  val stagger = rememberV3Stagger(ui.sub != null)
   V3Scaffold(
     title = Str.mySubscription,
     onBack = onBack,
@@ -100,7 +103,7 @@ internal fun SubscriptionContent(ui: SubscriptionUi, onBack: (() -> Unit)?, onRe
           sub == null -> V3EmptyState(Icons.Outlined.CloudOff, StrAccount.nothingYet, body = ui.note.ifBlank { null }, action = StrAccount.refreshFromServer, onAction = onRefresh)
           else -> {
             Spacer(Modifier.height(8.dp))
-            HeroCard(SubscriptionModel.hero(sub))
+            Box(Modifier.v3Stagger(stagger, "hero", 0)) { HeroCard(SubscriptionModel.hero(sub)) }
             when (SubscriptionModel.notice(sub)) {
               SubscriptionModel.Notice.ENDING -> { Spacer(Modifier.height(12.dp)); V3Message(V3Tone.WARNING, StrAccount.warnTitle(SubscriptionModel.hero(sub).days), body = StrAccount.warnBody) }
               SubscriptionModel.Notice.EXPIRED -> { Spacer(Modifier.height(12.dp)); V3Message(V3Tone.ERROR, StrAccount.bannerExpiredTitle, body = StrAccount.expiredBody) }
@@ -111,9 +114,9 @@ internal fun SubscriptionContent(ui: SubscriptionUi, onBack: (() -> Unit)?, onRe
           }
         }
         if (ui.note.isNotBlank() && sub != null) { Spacer(Modifier.height(10.dp)); V3Message(V3Tone.ERROR, ui.note) }
-        Lines(StrAccount.activeDevices, SubscriptionModel.devices(ui.devices), StrAccount.noActiveDevices)
-        Lines(StrAccount.payments, SubscriptionModel.payments(ui.payments), StrAccount.noPayments)
-        Lines(StrAccount.adminNotices, SubscriptionModel.notices(ui.notices), StrAccount.noNotices)
+        Lines(StrAccount.activeDevices, SubscriptionModel.devices(ui.devices), StrAccount.noActiveDevices, Modifier.v3Stagger(stagger, "devices", 1))
+        Lines(StrAccount.payments, SubscriptionModel.payments(ui.payments), StrAccount.noPayments, Modifier.v3Stagger(stagger, "payments", 2))
+        Lines(StrAccount.adminNotices, SubscriptionModel.notices(ui.notices), StrAccount.noNotices, Modifier.v3Stagger(stagger, "notices", 3))
         Spacer(Modifier.height(24.dp))
       }
     }
@@ -121,8 +124,8 @@ internal fun SubscriptionContent(ui: SubscriptionUi, onBack: (() -> Unit)?, onRe
 }
 
 @Composable
-private fun Lines(title: String, lines: List<SubscriptionModel.Line>, empty: String) {
-  V3Section(title) {
+private fun Lines(title: String, lines: List<SubscriptionModel.Line>, empty: String, modifier: Modifier) {
+  V3Section(title, modifier) {
     if (lines.isEmpty()) Text(empty, style = V3Type.callout, color = PhoneV3.colors.inkMuted, modifier = Modifier.padding(16.dp))
     lines.forEachIndexed { i, l ->
       if (i > 0) V3Divider(start = 16.dp)
@@ -143,7 +146,6 @@ private fun HeroCard(h: SubscriptionModel.Hero) {
     SubscriptionModel.Tone.GREY -> V3Status.INACTIVE
   }).fg
   val shape = RoundedCornerShape(V3Space.featuredRadius)
-  val fill by animateFloatAsState(h.progress, MotionSpec.sheet(), label = "period")
   Column(
     Modifier.fillMaxWidth().clip(shape).background(Brush.linearGradient(listOf(c.black, c.blackRaised))).padding(20.dp),
   ) {
@@ -152,11 +154,11 @@ private fun HeroCard(h: SubscriptionModel.Hero) {
       Text(h.plan, style = V3Type.callout, color = c.onBlack, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
     Spacer(Modifier.height(10.dp))
-    Text(h.headline, style = V3Type.largeTitle, color = tone)
+    //  روزِ مانده می‌شمارد (عددِ پایانی دقیق)
+    val shown = rememberCountUp(h.days.toDouble()).toInt()
+    Text(if (h.countsDays) StrAccount.daysLeft(shown) else h.headline, style = V3Type.largeTitle, color = tone)
     Spacer(Modifier.height(12.dp))
-    Box(Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(50)).background(c.onBlack.copy(alpha = 0.16f))) {
-      Box(Modifier.fillMaxWidth(fill.coerceIn(0f, 1f)).fillMaxHeight().clip(RoundedCornerShape(50)).background(tone))
-    }
+    DraftProgressBar(h.progress, tone, c.onBlack.copy(alpha = 0.16f))
     Spacer(Modifier.height(14.dp))
     Row {
       Column(Modifier.weight(1f)) {

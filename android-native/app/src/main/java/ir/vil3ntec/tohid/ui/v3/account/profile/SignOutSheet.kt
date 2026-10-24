@@ -1,10 +1,5 @@
 package ir.vil3ntec.tohid.ui.v3.account.profile
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -43,13 +38,13 @@ import ir.vil3ntec.tohid.sync.AutoSync
 import ir.vil3ntec.tohid.sync.SyncStore
 import ir.vil3ntec.tohid.sync.v1.SyncV1Engine
 import ir.vil3ntec.tohid.sync.v1.SyncV1Worker
-import ir.vil3ntec.tohid.ui.screens.MotionSpec
-import ir.vil3ntec.tohid.ui.screens.MotionTokens
+import ir.vil3ntec.tohid.ui.screens.Haptics
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
 import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
 import ir.vil3ntec.tohid.ui.theme.V3Tone
 import ir.vil3ntec.tohid.ui.v3.V3Button
+import ir.vil3ntec.tohid.ui.v3.V3PageSwitch
 import ir.vil3ntec.tohid.ui.v3.V3Sheet
 import ir.vil3ntec.tohid.ui.v3.V3SheetCloser
 import ir.vil3ntec.tohid.ui.v3.V3Type
@@ -86,12 +81,8 @@ internal class SignOutActions(
 @Composable
 internal fun SignOutContent(ui: SignOutUi, actions: SignOutActions, onDismiss: () -> Unit) {
   V3Sheet(onDismiss = onDismiss) { closer ->
-    AnimatedContent(
-      targetState = ui.stage,
-      modifier = Modifier.fillMaxWidth().animateContentSize(MotionSpec.sheet()),
-      transitionSpec = { fadeIn(MotionSpec.tweenOf(MotionTokens.MEDIUM)) togetherWith fadeOut(MotionSpec.tweenOf(MotionTokens.SHORT)) },
-      label = "signOutStage",
-    ) { stage ->
+    //  مرحله‌ها با همان حرکتِ صفحهٔ کیت می‌روند و بلندیِ برگه با فنر عوض می‌شود
+    V3PageSwitch(ui.stage, depth = { it.ordinal }, modifier = Modifier.fillMaxWidth()) { stage ->
       Column(Modifier.fillMaxWidth()) {
         when (stage) {
           SignOutModel.Stage.CONFIRM -> Step(
@@ -178,6 +169,7 @@ internal fun RouteScope.SignOutRoute() {
       SyncStore(context).signOut()
       AccountSession.changed()
       busy = false
+      Haptics.success(context)
       toasts.show(StrAccount.signedOut, V3Tone.SUCCESS)
       back()
     }

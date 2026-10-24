@@ -24,7 +24,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -116,10 +116,11 @@ internal fun SupportContent(ui: SupportUi, onBack: (() -> Unit)?, onDraft: (Stri
           contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 8.dp, bottom = pad.calculateBottomPadding()),
           verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-          items(ui.items, key = { it.key }) { item ->
+          itemsIndexed(ui.items, key = { _, it -> it.key }) { i, item ->
             when (item) {
-              is SupportModel.Item.Day -> DaySeparator(item.label)
-              is SupportModel.Item.Bubble -> Bubble(item, Modifier.v3Stagger(stagger, item.key, ui.items.indexOf(item)))
+              //  پیامِ تازه با جابه‌جاییِ نرمِ بقیه می‌آید (animateItem)، بارِ اول پلکانی
+              is SupportModel.Item.Day -> DaySeparator(item.label, Modifier.animateItem())
+              is SupportModel.Item.Bubble -> Bubble(item, Modifier.animateItem().v3Stagger(stagger, item.key, i))
             }
           }
         }
@@ -129,9 +130,9 @@ internal fun SupportContent(ui: SupportUi, onBack: (() -> Unit)?, onDraft: (Stri
 }
 
 @Composable
-private fun DaySeparator(label: String) {
+private fun DaySeparator(label: String, modifier: Modifier) {
   val c = PhoneV3.colors
-  Box(Modifier.fillMaxWidth().padding(vertical = 6.dp), contentAlignment = Alignment.Center) {
+  Box(modifier.fillMaxWidth().padding(vertical = 6.dp), contentAlignment = Alignment.Center) {
     Text(label, style = V3Type.caption, color = c.inkMuted, modifier = Modifier.clip(CircleShape).background(c.tile).padding(horizontal = 12.dp, vertical = 4.dp))
   }
 }

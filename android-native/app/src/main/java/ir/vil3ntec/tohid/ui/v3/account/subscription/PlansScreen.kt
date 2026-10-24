@@ -138,8 +138,8 @@ internal fun PlansContent(ui: PlansUi, actions: PlansActions) {
           Text(StrAccount.bazaarNote, style = V3Type.footnote, color = c.inkMuted, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
         }
 
-        Features(StrAccount.freeAlways, PlansModel.freeFeatures, Icons.Outlined.Check)
-        Features(StrAccount.withSubscription, PlansModel.paidFeatures, Icons.Outlined.LockOpen)
+        Features(StrAccount.freeAlways, PlansModel.freeFeatures, Icons.Outlined.Check, Modifier.v3Stagger(stagger, "free", 3))
+        Features(StrAccount.withSubscription, PlansModel.paidFeatures, Icons.Outlined.LockOpen, Modifier.v3Stagger(stagger, "paid", 4))
 
         V3Section(null) {
           V3ListRow(StrAccount.haveCode, subtitle = StrAccount.sixDigitHint, icon = Icons.Outlined.Redeem, hue = V3Hue.BRAND, onClick = { actions.open(AccountPaths.REDEEM) })
@@ -183,9 +183,9 @@ private fun OptionBody(o: PlansModel.Option, currency: String) {
 }
 
 @Composable
-private fun Features(title: String, items: List<String>, icon: androidx.compose.ui.graphics.vector.ImageVector) {
+private fun Features(title: String, items: List<String>, icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier) {
   val c = PhoneV3.colors
-  V3Section(title) {
+  V3Section(title, modifier) {
     items.forEachIndexed { i, f ->
       if (i > 0) V3Divider(start = 52.dp)
       V3ListRow(

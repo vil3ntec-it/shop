@@ -1,6 +1,5 @@
 package ir.vil3ntec.tohid.ui.v3.account.profile
 
-import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -24,7 +23,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -35,7 +33,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -46,8 +43,7 @@ import ir.vil3ntec.tohid.core.i18n.StrAccount
 import ir.vil3ntec.tohid.data.PhotoStore
 import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.sync.SyncStore
-import ir.vil3ntec.tohid.ui.screens.Motion
-import ir.vil3ntec.tohid.ui.screens.MotionSpec
+import ir.vil3ntec.tohid.ui.screens.Haptics
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
 import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
@@ -60,7 +56,9 @@ import ir.vil3ntec.tohid.ui.v3.V3TextField
 import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.ui.v3.account.AccountFormat
 import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
+import ir.vil3ntec.tohid.ui.v3.rememberV3Stagger
 import ir.vil3ntec.tohid.ui.v3.v3Pressable
+import ir.vil3ntec.tohid.ui.v3.v3Stagger
 import kotlinx.coroutines.launch
 
 /** فیلدهای فرمِ «ویرایش حساب و دکان» */
@@ -99,11 +97,10 @@ internal fun ProfileEditContent(
     loading = ui.busy,
     dirty = ui.dirty,
   ) {
-    //  عکس: همان عکسِ کارتِ «حساب من» که با کمی بزرگ‌شدن می‌نشیند
-    val grow = remember { Animatable(if (Motion.enabled) 0.86f else 1f) }
-    LaunchedEffect(Unit) { grow.animateTo(1f, MotionSpec.morph()) }
-    Column(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-      Box(Modifier.graphicsLayer { scaleX = grow.value; scaleY = grow.value }.v3Pressable(label = StrAccount.changePhoto, scale = 0.96f, onClick = onPhoto)) {
+    //  عکس و گروه‌ها با ورودِ پلکانیِ کیت می‌نشینند
+    val stagger = rememberV3Stagger()
+    Column(Modifier.fillMaxWidth().padding(top = 12.dp).v3Stagger(stagger, "photo", 0), horizontalAlignment = Alignment.CenterHorizontally) {
+      Box(Modifier.v3Pressable(label = StrAccount.changePhoto, scale = 0.96f, onClick = onPhoto)) {
         ProfileAvatar(ui.accountId, ui.avatarVersion, 88.dp)
         val pair = PhoneV3Roles.button(c, V3ButtonKind.PRIMARY)
         Box(
@@ -115,7 +112,7 @@ internal fun ProfileEditContent(
       Text(StrAccount.photoLocal, style = V3Type.footnote, color = c.inkMuted, textAlign = TextAlign.Center)
     }
 
-    V3Section(StrAccount.groupAccount, padding = PaddingValues(16.dp)) {
+    V3Section(StrAccount.groupAccount, Modifier.v3Stagger(stagger, "account", 1), padding = PaddingValues(16.dp)) {
       V3TextField(ui.name, onName, StrAccount.fullName, error = ui.nameError, required = true)
       Spacer(Modifier.height(14.dp))
       LockedField(Icons.Outlined.AlternateEmail, StrAccount.email, ui.email.ifBlank { StrAccount.emailNone }, ProfileEditModel.emailNote(ui.email), ltr = ui.email.isNotBlank())
@@ -131,11 +128,11 @@ internal fun ProfileEditContent(
       }
     }
 
-    V3Section(StrAccount.groupShop, padding = PaddingValues(16.dp)) {
+    V3Section(StrAccount.groupShop, Modifier.v3Stagger(stagger, "shop", 2), padding = PaddingValues(16.dp)) {
       V3TextField(ui.shopName, onShopName, StrAccount.shopName, helper = StrAccount.shopNameHelper)
     }
 
-    V3Section(StrAccount.groupMembership) {
+    V3Section(StrAccount.groupMembership, Modifier.v3Stagger(stagger, "member", 3)) {
       V3ListRow(
         StrAccount.memberFor,
         icon = Icons.Outlined.Schedule,
@@ -222,6 +219,7 @@ internal fun RouteScope.ProfileEditRoute() {
               state.accountPhone = done.user.phone.orEmpty()
               name = done.user.name; savedName = done.user.name
               email = done.user.email.orEmpty(); phone = done.user.phone.orEmpty(); claim = ""
+              Haptics.success(context)
               toasts.show(ProfileEditModel.savedMessage(wanted), V3Tone.SUCCESS)
               busy = false
               back()
