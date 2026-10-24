@@ -206,7 +206,9 @@ data class PromoForm(
 
   /**
    *  فرم ⇒ قاعده، روی `base` (شناسه، کانال، شمارِ مصرف و گروه‌ها از همان می‌مانند).
-   *  قاعدهٔ تازه فقط برای صندوق است (`channels = ["pos"]`).
+   *  قاعدهٔ تازه فقط برای صندوق است (`channels = ["pos"]` را خودِ `base` دارد).
+   *  ⛔ هر چه فرم نشان نمی‌دهد دست نمی‌خورد (N2): کانالِ خالی (= همه) خالی می‌ماند،
+   *  و از «قیمتِ ویژه»ی چندکالایی فقط ردیفِ نخست (همان که فرم دارد) عوض می‌شود.
    */
   fun toRule(base: PromoCore.Rule): PromoCore.Rule {
     var s = minutes(start)
@@ -224,10 +226,10 @@ data class PromoForm(
       priority = int(priority, 0),
       code = code.trim(),
       allowBelowCost = allowBelowCost,
-      channels = base.channels.ifEmpty { listOf("pos") },
+      channels = base.channels,
       scope = base.scope.copy(
         categories = categories.sorted(),
-        products = if (kind == "price") emptyList() else products.sorted(),
+        products = if (kind == "price") base.scope.products.takeIf { base.kind == "price" }.orEmpty() else products.sorted(),
         exProducts = exProducts.sorted(),
       ),
       window = PromoCore.Window(
@@ -236,7 +238,12 @@ data class PromoForm(
       ),
       bp = when (kind) { "percent", "bxgy" -> bp(pct); else -> 0 },
       amountMinor = if (kind == "amount") minor(amount) else 0,
-      prices = if (kind == "price" && priceProduct.isNotEmpty()) listOf(PromoCore.Price(priceProduct, minor(priceUnit))) else emptyList(),
+      prices = if (kind != "price") emptyList() else {
+        val first = if (priceProduct.isNotEmpty()) listOf(PromoCore.Price(priceProduct, minor(priceUnit))) else emptyList()
+        //  بقیهٔ کالاهای «قیمتِ ویژه» که فرم نشان نمی‌دهد، همان‌طور که بودند
+        val rest = if (base.kind == "price") base.prices.drop(1).filter { it.productId != priceProduct } else emptyList()
+        first + rest
+      },
       tiers = when (kind) {
         "tiers" -> tierRows.map { (a, b) -> PromoCore.Tier(min = dbl(a)?.let { (it * 1000).roundToLong() } ?: -1, bp = bp(b)) }
         "threshold" -> tierRows.map { (a, b) ->

@@ -101,6 +101,8 @@ object LedgerOwner {
     shopId: String = "",
   ): Result {
     val user = userId.trim()
+    //  S1: تخفیف‌های حافظه مالِ حسابِ قبلی‌اند — هر ورود از نو
+    runCatching { ir.vil3ntec.tohid.ui.PromoLive.reset() }
     if (user.isBlank()) return Result.SAME   // شناسه نداریم؛ چیزی را خراب نمی‌کنیم
     return align(context, store, user, shopId.trim())
   }
@@ -113,6 +115,7 @@ object LedgerOwner {
    */
   suspend fun shopChanged(context: Context, store: ShopStore, shopId: String): Result {
     val user = currentUser(context)
+    runCatching { ir.vil3ntec.tohid.ui.PromoLive.reset() }
     if (user.isBlank()) return Result.SAME
     return align(context, store, user, shopId.trim())
   }

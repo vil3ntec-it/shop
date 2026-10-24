@@ -238,9 +238,10 @@ fun DeskSaleScreen(
     if (discountBad || paidBad) { toast("عددِ «${if (discountBad) "تخفیف" else "دریافتی"}» درست نیست"); return }
     if (payment == SalesEngine.Payment.CREDIT && cartDebtorId == null) { toast("فروشِ نسیه مشتری می‌خواهد — F2"); pickDebtor = true; return }
     //  POS-14: F9ِ پشتِ‌سرِهم یک فروش می‌سازد؛ سبد فقط پس از نوشتنِ دفتر پاک می‌شود
+    //  S2: با تخفیفِ خودکار، نشانِ قیمتِ فهرست و سهمِ هر قاعده روی فاکتور (خاموش ⇒ همان)
     scope.launch { when (val posted = cartStore.post(store) { key ->
-      SalesEngine.record(d, priced, checkout, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId,
-      series = ir.vil3ntec.tohid.sync.DocSeries.current(context), saleId = key) }) {
+      ir.vil3ntec.tohid.data.PromoEngine.stamp(SalesEngine.record(d, priced, checkout, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId,
+      series = ir.vil3ntec.tohid.sync.DocSeries.current(context), saleId = key), promo) }) {
       SalePost.Outcome.Busy -> Unit
       SalePost.Outcome.NotSaved -> toast(SalePost.NOT_SAVED)
       is SalePost.Outcome.Refused -> toast(posted.message)

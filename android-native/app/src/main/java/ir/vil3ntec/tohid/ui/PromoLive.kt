@@ -13,6 +13,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import ir.vil3ntec.tohid.core.net.ApiResult
 import ir.vil3ntec.tohid.core.promo.PromoCore
+import ir.vil3ntec.tohid.data.CartStore
 import ir.vil3ntec.tohid.data.PromoEngine
 import ir.vil3ntec.tohid.data.PromoJson
 import ir.vil3ntec.tohid.data.SalesEngine
@@ -39,6 +40,9 @@ import kotlinx.serialization.json.put
  *  `snap.active` نادرست است و صندوق همان جمعِ امروز را دارد.
  *  ⛔ آفلاین (D-05، بی مهلت): آخرین پاسخِ سرور برای همین حساب روی همین دستگاه
  *  نگه داشته می‌شود و صندوق با همان حساب می‌کند.
+ *  ⛔ هر حال مالِ یک «حساب@دکان» است (`ensure`، S1): حساب یا دکان که عوض شد، عکس،
+ *  کدها، «خوانده شد» و «آخرین تلاش» همان لحظه دور ریخته می‌شوند و صندوق فقط حالِ
+ *  همان حساب را می‌بیند (`PromoEngine.forAccount`).
  */
 object PromoLive {
 
@@ -48,42 +52,90 @@ object PromoLive {
 
   val snap = mutableStateOf(PromoEngine.Snapshot())
 
-  /** کدهای تخفیفِ سبدِ باز — با خالی شدنِ سبد پاک می‌شوند و جایی نوشته نمی‌شوند */
+  /**
+   *  کدهای تخفیفِ سبدِ باز — با پیش‌نویسِ فاکتور (`CartStore`) روی دیسک می‌مانند تا
+   *  پس از بسته شدنِ برنامه برگردند (N3)، و با خالی شدنِ سبد پاک می‌شوند.
+   *  فقط از `setCoupons`/`addCoupon`/`removeCoupon` عوض شوند.
+   */
   val coupons = mutableStateOf<List<String>>(emptyList())
 
   /** فقط ابزارِ عکسِ کامپیوتر (`DevShot`، `promo:demo`) — هیچ‌جای دیگر روشنش نمی‌کند */
   @Volatile var isDemo = false
     private set
 
-  @Volatile private var loaded = false
-  @Volatile private var triedAt = 0L
+  private val bound = PromoEngine.Binding()
+  /** هر `reset` یکی بالا می‌رود تا `Host` و صندوق همان لحظه از نو بخوانند */
+  private val epoch = mutableIntStateOf(0)
   private val lock = Mutex()
   @Volatile private var repo: PromoRepository? = null
+  /** پیش‌نویسِ فاکتورِ برنامه (`AppRoot`) — کدها با آن نوشته می‌شوند */
+  @Volatile private var draft: CartStore? = null
 
   fun repository(context: Context): PromoRepository =
     repo ?: synchronized(this) { repo ?: PromoRepository(Backend.api(context)).also { repo = it } }
 
   private fun prefs(context: Context) = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-  private fun account(context: Context): String =
-    runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountId }.getOrDefault("").orEmpty()
+  /**
+   *  «حساب@دکان»ِ واردشده — همان دو شناسه‌ای که دفتر با آن‌ها جابه‌جا می‌شود
+   *  (`LedgerOwner`): شاگردی که به دکانِ دیگر می‌رود حسابش عوض نمی‌شود، دکانش می‌شود.
+   */
+  private fun account(context: Context): String {
+    val user = runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountId }.getOrDefault("").orEmpty()
+    val shop = runCatching { ir.vil3ntec.tohid.data.LedgerOwner.currentShop(context) }.getOrDefault("")
+    return "$user@$shop"
+  }
+
+  /**
+   *  S1 — حالِ حافظه مالِ حسابِ واردشده است؛ حساب یا دکان عوض شده ⇒ عکس، کدها،
+   *  «خوانده شد» و «آخرین تلاش» همان لحظه صفر (و کدهای پیش‌نویس هم). @return کلیدِ حساب
+   */
+  fun ensure(context: Context): String {
+    val key = account(context)
+    if (isDemo) return key
+    val before = bound.key
+    if (bound.bind(key)) {
+      snap.value = PromoEngine.Snapshot(account = key)
+      coupons.value = emptyList()
+      //  نخستین بار (آغازِ برنامه) کدهای پیش‌نویسِ همین حساب می‌مانند تا برگردند؛
+      //  جابه‌جایی ⇒ فقط از حافظه (فایلِ پیش‌نویس را `LedgerOwner` خودش خالی می‌کند)
+      if (before != null) draft?.forgetCoupons()
+    }
+    return key
+  }
+
+  /**
+   *  S1 — ورود و خروج (`LedgerOwner.signedIn`/`shopChanged`، «خروج از حساب»): عکس،
+   *  کدهای زده‌شده، «خوانده شد» و «آخرین تلاش» همان لحظه صفر؛ نخستین خواندنِ بعد
+   *  نسخهٔ دستگاهِ همان حساب و سپس سرور است — حتی اگر سرور در دسترس نباشد، حالِ
+   *  حسابِ قبلی نمی‌ماند.
+   */
+  fun reset() {
+    if (isDemo) return
+    bound.reset()
+    snap.value = PromoEngine.Snapshot()
+    coupons.value = emptyList()
+    draft?.forgetCoupons()
+    epoch.intValue++
+  }
 
   /** نسخهٔ همین دستگاه — فقط اگر مالِ همین حساب است */
   fun loadCache(context: Context) {
-    if (loaded) return
-    loaded = true
+    val key = ensure(context)
+    if (bound.loaded) return
+    bound.loaded = true
     runCatching {
       val raw = prefs(context).getString(KEY, null) ?: return
       val o = Json.parseToJsonElement(raw).jsonObject
-      if (o["account"]?.jsonPrimitive?.content != account(context)) return
+      if (o["account"]?.jsonPrimitive?.content != key) return
       val data = o["data"] as? JsonObject ?: return
-      snap.value = PromoJson.snapshotOf(data, o["at"]?.jsonPrimitive?.longOrNull ?: 0)
+      if (bound.key == key) snap.value = PromoJson.snapshotOf(data, o["at"]?.jsonPrimitive?.longOrNull ?: 0).copy(account = key)
     }
   }
 
-  private fun saveCache(context: Context, s: PromoEngine.Snapshot) {
+  private fun saveCache(context: Context, key: String, s: PromoEngine.Snapshot) {
     runCatching {
       val o = buildJsonObject {
-        put("account", JsonPrimitive(account(context)))
+        put("account", JsonPrimitive(key))
         put("at", s.at)
         put("data", PromoJson.toJson(s))
       }
@@ -91,59 +143,83 @@ object PromoLive {
     }
   }
 
-  private fun publish(context: Context, s: PromoEngine.Snapshot) {
+  /**
+   *  پاسخِ سرور برای حسابِ [key] ⇒ حالِ تازه. اگر در این میان حساب عوض شده، پاسخ دور
+   *  ریخته می‌شود — نه در حافظه می‌نشیند، نه در نسخهٔ دستگاه.
+   */
+  private fun publish(context: Context, key: String, next: (PromoEngine.Snapshot) -> PromoEngine.Snapshot) {
+    if (bound.key != key) return
+    val s = next(PromoEngine.forAccount(snap.value, key)).copy(account = key)
     snap.value = s
-    saveCache(context, s)
+    saveCache(context, key, s)
   }
 
   /** از سرور؛ ناموفق ⇒ همان نسخهٔ قبلی می‌ماند. @return پیامِ خطا یا null */
   suspend fun refresh(context: Context): String? = lock.withLock {
     if (isDemo) return@withLock null
+    val key = ensure(context)
     loadCache(context)
-    triedAt = System.currentTimeMillis()
-    if (!Backend.isReady(context)) { snap.value = PromoEngine.Snapshot(); return@withLock null }
+    bound.triedAt = System.currentTimeMillis()
+    if (!Backend.isReady(context)) { snap.value = PromoEngine.Snapshot(account = key); return@withLock null }
     when (val r = repository(context).state()) {
-      is ApiResult.Success -> { publish(context, PromoJson.snapshotOf(r.value, System.currentTimeMillis())); null }
+      is ApiResult.Success -> { publish(context, key) { PromoJson.snapshotOf(r.value, System.currentTimeMillis()) }; null }
       is ApiResult.Failure -> r.error.userMessage
     }
   }
 
-  suspend fun setEnabled(context: Context, on: Boolean): String? =
-    when (val r = repository(context).setEnabled(on)) {
-      is ApiResult.Success -> { publish(context, snap.value.copy(enabled = on)); null }
+  suspend fun setEnabled(context: Context, on: Boolean): String? {
+    val key = ensure(context)
+    return when (val r = repository(context).setEnabled(on)) {
+      is ApiResult.Success -> { publish(context, key) { it.copy(enabled = on) }; null }
       is ApiResult.Failure -> r.error.userMessage
     }
+  }
 
-  suspend fun save(context: Context, rule: PromoCore.Rule): String? =
-    when (val r = repository(context).save(rule)) {
+  suspend fun save(context: Context, rule: PromoCore.Rule): String? {
+    val key = ensure(context)
+    return when (val r = repository(context).save(rule)) {
       is ApiResult.Success -> {
-        val saved = r.value
-        val rules = snap.value.rules
-        val next = if (rules.any { it.id == saved.id }) rules.map { if (it.id == saved.id) saved else it } else rules + saved
-        publish(context, snap.value.copy(rules = next))
+        val (saved, rev) = r.value
+        publish(context, key) { cur ->
+          val rules = cur.rules
+          val next = if (rules.any { it.id == saved.id }) rules.map { if (it.id == saved.id) saved else it } else rules + saved
+          cur.copy(rules = next, revs = if (rev > 0) cur.revs + (saved.id to rev) else cur.revs - saved.id)
+        }
         null
       }
       is ApiResult.Failure -> r.error.userMessage
     }
+  }
 
-  suspend fun delete(context: Context, id: String): String? =
-    when (val r = repository(context).delete(id)) {
-      is ApiResult.Success -> { publish(context, snap.value.copy(rules = snap.value.rules.filterNot { it.id == id })); null }
+  suspend fun delete(context: Context, id: String): String? {
+    val key = ensure(context)
+    return when (val r = repository(context).delete(id)) {
+      is ApiResult.Success -> { publish(context, key) { it.copy(rules = it.rules.filterNot { x -> x.id == id }, revs = it.revs - id) }; null }
       is ApiResult.Failure -> r.error.userMessage
     }
+  }
 
-  /** تازه‌سازیِ آرام — یک بار در `AppRoot`؛ فقط وقتی برنامه جلوی چشم است */
+  /**
+   *  تازه‌سازیِ آرام — یک بار در `AppRoot`؛ فقط وقتی برنامه جلوی چشم است.
+   *  @param cartStore پیش‌نویسِ فاکتور: کدهای زده‌شده با آن می‌مانند و از آن برمی‌گردند (N3)
+   */
   @Composable
-  fun Host() {
+  fun Host(cartStore: CartStore) {
     val context = LocalContext.current
     var foreground by remember { mutableStateOf(false) }
     LifecycleEventEffect(Lifecycle.Event.ON_START) { foreground = true }
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { foreground = false }
-    LaunchedEffect(Unit) { loadCache(context) }
-    LaunchedEffect(foreground) {
+    LaunchedEffect(cartStore) {
+      draft = cartStore
+      loadCache(context)
+      //  پیش‌نویس خالی شد (فروش ثبت شد، «سبدِ تازه»، بازیابی رد شد) یا برگشت ⇒ همان کدها
+      cartStore.coupons.collect { if (it != coupons.value) coupons.value = it }
+    }
+    LaunchedEffect(foreground, epoch.intValue) {
       if (!foreground) return@LaunchedEffect
       while (isActive) {
-        if (System.currentTimeMillis() - triedAt > REFRESH_MS) refresh(context)
+        ensure(context)
+        if (System.currentTimeMillis() - bound.triedAt > REFRESH_MS) refresh(context)
         delay(60_000)
       }
     }
@@ -160,9 +236,13 @@ object PromoLive {
    */
   @Composable
   fun rememberOutcome(d: ShopData, cart: List<SalesEngine.CartLine>): PromoEngine.Outcome? {
-    val s = snap.value
+    val context = LocalContext.current
+    //  S1: حالِ حسابِ دیگر هرگز — حتی پیش از آن‌که `ensure` آن را دور بریزد
+    val key = account(context)
+    LaunchedEffect(key, epoch.intValue) { loadCache(context) }
+    val s = if (isDemo) snap.value else PromoEngine.forAccount(snap.value, key)
     val codes = coupons.value
-    LaunchedEffect(cart.isEmpty()) { if (cart.isEmpty() && coupons.value.isNotEmpty()) coupons.value = emptyList() }
+    LaunchedEffect(cart.isEmpty()) { if (cart.isEmpty() && coupons.value.isNotEmpty()) setCoupons(emptyList()) }
     var tick by remember { mutableIntStateOf(0) }
     val timed = s.active && s.rules.any { it.active && (it.window.start >= 0 || it.window.from.isNotEmpty() || it.window.to.isNotEmpty() || it.window.days.isNotEmpty()) }
     LaunchedEffect(timed) {
@@ -182,8 +262,8 @@ object PromoLive {
    */
   fun demo() {
     isDemo = true
-    loaded = true
-    triedAt = System.currentTimeMillis()
+    bound.loaded = true
+    bound.triedAt = System.currentTimeMillis()
     snap.value = PromoEngine.Snapshot(
       enabled = true, manage = true, belowCost = true, at = System.currentTimeMillis(),
       rules = listOf(
@@ -196,11 +276,17 @@ object PromoLive {
     )
   }
 
+  /** کدهای سبد ⇒ حافظه و پیش‌نویسِ فاکتور (N3) */
+  fun setCoupons(codes: List<String>) {
+    coupons.value = codes
+    draft?.setCoupons(codes)
+  }
+
   /** افزودنِ کدی که صندوقدار زد (نرمال‌شده، بی تکرار) */
   fun addCoupon(code: String) {
     val c = PromoCore.normalizeCode(code)
-    if (c.isNotEmpty() && c !in coupons.value) coupons.value = coupons.value + c
+    if (c.isNotEmpty() && c !in coupons.value) setCoupons(coupons.value + c)
   }
 
-  fun removeCoupon(code: String) { coupons.value = coupons.value - code }
+  fun removeCoupon(code: String) = setCoupons(coupons.value - code)
 }

@@ -122,6 +122,31 @@ data class Sale(
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val channel: String? = null,
+  /**
+   *  جمعِ تخفیف‌های خودکارِ این فاکتور به **واحدِ کوچک** (یک‌صدمِ افغانی) — همان
+   *  جمعِ `SaleItem.promo`ِ قلم‌هایش (PRM، `PromoEngine.stamp`). `null` یعنی صندوق
+   *  تخفیفِ خودکار را نسنجید (کلیدِ دکان خاموش، یا ساختِ پیشین)؛ `0` یعنی سنجید و
+   *  چیزی نشد. پول نیست که جمع شود: `total` همین حالا پس از آن است.
+   *  ⛔ مثلِ `series` هرگز `null` نوشته نمی‌شود — فاکتورِ قدیمی بایت‌به‌بایت همان.
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val promoDiscountMinor: Long? = null,
+  /** کدهای تخفیفی که صندوقدار زد (نرمال‌شده) — خالی نوشته نمی‌شود */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val coupons: List<String> = emptyList(),
+)
+
+/**
+ *  سهمِ یک قاعدهٔ تخفیفِ خودکار از یک قلمِ فاکتور — `id` و `rev`ِ قاعده در سرور
+ *  (`/api/shop/promos`) و تخفیفش روی همین قلم به واحدِ کوچک.
+ */
+@Serializable
+data class SalePromo(
+  val id: String = "",
+  val rev: Long = 0,
+  val discountMinor: Long = 0,
 )
 
 /**
@@ -169,6 +194,19 @@ data class SaleItem(
   val purchasePrice: Double = 0.0,
   val totalPrice: Double = 0.0,
   val returnedQty: Double = 0.0,
+  /**
+   *  قیمتِ فهرستِ کالا هنگامِ فروش، پیش از تخفیفِ خودکار و قیمتِ دستی، به **واحدِ
+   *  کوچک** — تا سرور تخفیفِ خودکار (`promo`) را از پایین آوردنِ دستیِ قیمت جدا
+   *  کند. فقط وقتی صندوق تخفیفِ خودکار را سنجید؛ قلمِ آزاد ندارد.
+   *  ⛔ `null` و فهرستِ خالی نوشته نمی‌شوند (`EncodeDefault.NEVER`) — قلمِ قدیمی همان.
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val listPriceMinor: Long? = null,
+  /** تخفیف‌های خودکارِ همین قلم، به ترتیبِ اعمالِ هسته؛ جمعش = تخفیفِ خودکارِ قلم */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val promo: List<SalePromo> = emptyList(),
 )
 
 @Serializable
