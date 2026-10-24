@@ -4,6 +4,7 @@ import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonNames
 
 /**
  *  مدلِ داده — دقیقاً همان چیزی که نسخهٔ وب می‌نویسد.
@@ -132,6 +133,24 @@ data class Sale(
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val approval: kotlinx.serialization.json.JsonObject? = null,
   /**
+   *  PAY (v3 A4) — ردیف‌های پرداختِ ترکیبی (نقد، کیف پول، کارت، حواله، به حساب)، به پول.
+   *  فقط فروشی که با پرچمِ `ShopPolicy.payV2` ثبت شده دارد؛ معنای فیلدهای بالا
+   *  (`paidAmount`، `remaining`، `debtGiven`) همان امروز است، پس برنامهٔ کهنه همان عدد
+   *  را می‌خواند؛ `paymentMethod` برای فروشِ غیرنقد `wallet`/`card`/`transfer`/`mixed` است
+   *  (`PayFlow.legacyMethod`). `null` نوشته نمی‌شود — مثلِ `series`.
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val payments: List<SalePayment>? = null,
+  /** دریافتیِ کل (نقد + غیرنقد)، به پول — فقط با `payments` */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val tenderedMinor: Long? = null,
+  /** پولِ پس (فقط از نقد)، به پول — فقط با `payments` */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val changeMinor: Long? = null,
+  /**
    *  کانالِ فروش (ORD-20): `online` برای فاکتورِ سریِ `W` که سرور هنگامِ
    *  تحویلِ سفارشِ اینترنتی در دفترِ دکان می‌گذارد؛ فاکتورِ صندوق `null`
    *  است (گزارش آن را «حضوری» می‌خواند — `ReportLedger`). مثلِ `series`
@@ -140,6 +159,33 @@ data class Sale(
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val channel: String? = null,
+)
+
+/**
+ *  یک ردیفِ پرداختِ فاکتور (`Sale.payments`) — به پول، نام‌ها همان `PaymentRow`ِ هسته.
+ *  غیرنقد «ثبتِ دستی، در انتظار» است (`status = pending`، `verification = manual`)
+ *  تا تأییدِ قابلِ اتکا برسد (PAY-08)؛ نقد و «به حساب» تأییدشده‌اند.
+ *
+ *  روی سیم مبلغ `amount` است (به پول) — همان `PaymentRow`ِ هسته و ردیفی که سرور روی فاکتورِ
+ *  W می‌گذارد (`order-ledger.js`، #321)؛ `amountMinor`ِ نسخهٔ پیشِ این شاخه هم خوانده می‌شود.
+ *  بی این، فاکتورِ W ِ سرور خواندنِ کلِ دفتر را می‌شکست (فیلدِ اجباریِ گم).
+ */
+@OptIn(ExperimentalSerializationApi::class)
+@Serializable
+data class SalePayment(
+  val method: String,
+  val kind: String,
+  @SerialName("amount")
+  @JsonNames("amountMinor")
+  val amountMinor: Long,
+  val status: String,
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val ref: String? = null,
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val verification: String? = null,
+  /** امانتِ کیست، اگر پول هنوز دستِ دکان نیست — `courier` برای «نقد هنگامِ تحویل»ِ فاکتورِ W */
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val custody: String? = null,
 )
 
 /**
@@ -359,6 +405,28 @@ data class AuditEntry(
   val createdAt: Long = 0,
   /** مبلغِ ردیف — فعلاً فقط صندوق (`shift_open`/`shift_close`)؛ بقیه صفر */
   val amount: Double = 0.0,
+  /*
+   *  PAY (v3 A4) — فقط ردیف‌های صندوقِ پرچم‌دار (`cash_in`، `cash_out`، `no_sale` و
+   *  `shift_close`ِ با شمارش). همان نام‌های رویدادِ pay-core و `ReportLedger`؛
+   *  `null` نوشته نمی‌شود تا ردیف‌های قدیمی op ِ تازه نسازند.
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val by: String? = null,
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val approvedBy: String? = null,
+  /** دلیل: `deposit`/`owner_withdrawal`/`petty_expense`/`other`، دلیلِ کشو بی فروش، یا دلیلِ اختلاف */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val reason: String? = null,
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val note: String? = null,
+  /** گزارشِ Zِ هسته در لحظهٔ بستن (به پول، همان شکلِ JS) — لغوِ بعدی عوضش نمی‌کند */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val z: kotlinx.serialization.json.JsonObject? = null,
 )
 
 /**

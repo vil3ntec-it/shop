@@ -94,6 +94,12 @@ object SalesEngine {
     val blockExpired: Boolean = false,
     /** برگهٔ تأییدِ تخفیفِ بیش از سقف (STF-02) — همان‌طور روی فاکتور می‌نشیند */
     val approval: kotlinx.serialization.json.JsonObject? = null,
+    /**
+     *  PAY (v3 A4) — تسویهٔ پنلِ پرداختِ ترکیبی (`PayFlow.checkout`)، فقط با پرچمِ
+     *  `ShopPolicy.payV2`. `null` (پیش‌فرض) ⇒ همان نقد/نسیهٔ امروز با `payment` و
+     *  `paidAmount`. با آن، `payment` و `paidAmount` نادیده گرفته می‌شوند.
+     */
+    val settlement: ir.vil3ntec.tohid.core.pay.Settlement? = null,
   )
 
   data class Totals(
@@ -323,8 +329,16 @@ object SalesEngine {
 
     val t = totals(d, cart, checkout)
 
+    //  PAY (v3 A4): با پرچم، پرداخت از تسویهٔ هسته می‌آید — همان مبلغِ همین فاکتور، بی ناتمام
+    val settled = checkout.settlement?.let { st ->
+      if (st.total != PayFlow.minor(t.finalTotal)) return Result.Failed(PayFlow.message(PayFlow.Problem("TOTAL_MISMATCH")))
+      if (st.status == "short") return Result.Failed(PayFlow.message(PayFlow.Problem("SHORT", remaining = st.remaining)))
+      PayFlow.saleFields(st)
+    }
+
     // فروشِ نقدی همیشه کامل تسویه می‌شود
-    var paid = if (checkout.payment == Payment.CASH) t.finalTotal else checkout.paidAmount
+    var paid = if (settled != null) settled.paidAmount
+    else if (checkout.payment == Payment.CASH) t.finalTotal else checkout.paidAmount
     if (paid.isNaN() || paid < 0) return Result.Failed("مبلغ پرداختی درست نیست")
     paid = min(paid, t.finalTotal)
     val remaining = max(0.0, t.finalTotal - paid)
@@ -338,11 +352,12 @@ object SalesEngine {
     if (debtorId != null && d.debtors.none { it.id == debtorId }) {
       return Result.Failed("قرض‌دار پیدا نشد")
     }
-    if (checkout.payment == Payment.CREDIT && remaining > 0 && debtorId == null) {
+    val credit = if (settled != null) settled.paymentMethod == "credit" else checkout.payment == Payment.CREDIT
+    if (credit && remaining > 0 && debtorId == null) {
       return Result.Failed("برای فروش نسیه، قرض‌دار را انتخاب کنید")
     }
     //  بدهی فقط از فروشِ نسیه‌ای می‌آید که هنوز تسویه نشده
-    val onCredit = checkout.payment == Payment.CREDIT && remaining > 0
+    val onCredit = credit && remaining > 0
 
     val saleId = saleId?.takeIf { it.isNotBlank() } ?: newId()
     val invoiceNumber = d.nextInvoiceNo
@@ -356,7 +371,7 @@ object SalesEngine {
       discountValue = t.discountValue,
       discount = t.discount,
       finalTotal = t.finalTotal,
-      paymentMethod = if (checkout.payment == Payment.CASH) "cash" else "credit",
+      paymentMethod = settled?.paymentMethod ?: if (checkout.payment == Payment.CASH) "cash" else "credit",
       debtorId = debtorId,
       paidAmount = paid,
       remaining = remaining,
@@ -368,6 +383,10 @@ object SalesEngine {
       syncStatus = "pending",
       seller = checkout.seller.trim(),
       approval = checkout.approval,
+      //  PAY (v3 A4): فقط با پرچم — فیلدِ تازه؛ بی پرچم `null` و نوشته نمی‌شود
+      payments = settled?.payments,
+      tenderedMinor = settled?.tenderedMinor,
+      changeMinor = settled?.changeMinor,
     )
 
     val items = mutableListOf<SaleItem>()
@@ -504,6 +523,9 @@ object SalesEngine {
           date = today,
           notes = "لغو فروش — فاکتور #${sale.invoiceLabel() ?: "0"}",
           createdAt = now,
+          //  ساختهٔ سیستم: پولی به دخل نیامده، فقط بدهی بسته شد (صندوق نمی‌شمارد)
+          refId = sale.id,
+          kind = CashShift.CANCEL_RECEIPT,
         )
         updated = updated.copy(debtSettled = sale.debtSettled + outstanding)
       }
@@ -656,6 +678,9 @@ object SalesEngine {
           date = today,
           notes = "مرجوعی کالا — فاکتور #${sale.invoiceLabel() ?: "0"}",
           createdAt = now,
+          //  ساختهٔ سیستم؛ صندوق آن را کنارِ کمِ کلِ مرجوعی می‌شمارد تا خالص درست بماند
+          refId = sale.id,
+          kind = CashShift.RETURN_RECEIPT,
         )
         updatedSale = updatedSale.copy(debtSettled = sale.debtSettled + settle)
       }
