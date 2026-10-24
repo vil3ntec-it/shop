@@ -42,7 +42,7 @@ val AnalyticsModule = AppModule(
   ),
   routes = listOf(
     V3Route(AnalyticsPaths.REPORTS, RouteKind.TAB, { Str.reportsAlt }) {
-      if (Platform.DESKTOP) DeskReportsScreen(data, snackbar) else ReportsScreen(data)
+      if (desk) DeskReportsScreen(data, snackbar) else ReportsScreen(data)
     },
     //  آمارِ r8 صفحهٔ دومِ خانه است
     V3Route("stats", RouteKind.PAGE, { Str.reports }) { LandOn("home") },

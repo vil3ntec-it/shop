@@ -12,7 +12,6 @@ import ir.vil3ntec.tohid.core.i18n.StrHome
 import ir.vil3ntec.tohid.core.i18n.StrKit
 import ir.vil3ntec.tohid.core.nav.Place
 import ir.vil3ntec.tohid.core.nav.RoutePaths
-import ir.vil3ntec.tohid.ui.Platform
 import ir.vil3ntec.tohid.ui.screens.DeskDashboardScreen
 import ir.vil3ntec.tohid.ui.v3.nav.AppModule
 import ir.vil3ntec.tohid.ui.v3.nav.Chrome
@@ -48,7 +47,7 @@ private fun RouteScope.Search() {
     initialQuery = args.query("q").orEmpty(),
     onOpen = { nav.open(it) },
     onScan = { scanToSearch() },
-    onBack = if (nav.canBack) ({ back() }) else null,
+    onBack = backOrNull,
     //  پوسته پایینِ صفحه (جای نوار + نوارِ سیستم) را خودش نگه می‌دارد (`ShellFrame`)
     bottomReserve = 0.dp,
   )
@@ -68,11 +67,11 @@ val ShellModule = AppModule(
   ),
   routes = listOf(
     V3Route(ShellPaths.HOME, RouteKind.TAB, { Str.home }, aliases = listOf("dashboard"), chrome = Chrome.OWN) {
-      if (Platform.DESKTOP) DeskDashboardScreen(data, { nav.open(it) }) { id -> nav.open(ShellTargets.product(id)) }
+      if (desk) DeskDashboardScreen(data, { nav.open(it) }) { id -> nav.open(ShellTargets.product(id)) }
       else HomeScreen(data, onOpen = { nav.open(it) }, bottomReserve = bottomReserve)
     },
     V3Route("notifications", RouteKind.PAGE, { StrKit.notifications }, parent = ShellPaths.HOME, chrome = Chrome.OWN) {
-      NotificationsScreen(data, args.query("tab"), onOpen = { nav.open(it) }, onBack = if (nav.canBack) ({ back() }) else null)
+      NotificationsScreen(data, args.query("tab"), onOpen = { nav.open(it) }, onBack = backOrNull)
     },
     V3Route("search", RouteKind.TAB, { Str.search }, chrome = Chrome.OWN) { Search() },
     V3Route(TransactionPaths.LIST, RouteKind.PAGE, { StrHome.transactions }, parent = ShellPaths.HOME, chrome = Chrome.OWN) {
@@ -80,13 +79,17 @@ val ShellModule = AppModule(
         data,
         TransactionPaths.kindOf(args.query("kind")),
         onOpen = { nav.open(it) },
-        onBack = if (nav.canBack) ({ back() }) else null,
+        onBack = backOrNull,
         bottomReserve = 0.dp,
       )
     },
     V3Route(ShellPaths.PALETTE, RouteKind.SHEET, { Str.search }, chrome = Chrome.OWN) {
       val sections = remember(access) { allowedSections() }
-      V3Palette(data, sections, onDismiss = { back() }) { hit -> nav.replace(hit.route) }
+      V3Palette(data, sections, onDismiss = { back() }) { hit ->
+        back()
+        //  بخش ⇐ پرش به ریشهٔ همان زنجیره (مثلِ منوی کناری)؛ سند ⇐ رفتن به عمق
+        if (hit.kind == SearchIndex.Kind.SECTION) nav.openFromRail(hit.route) else nav.open(hit.route)
+      }
     },
   ),
 )

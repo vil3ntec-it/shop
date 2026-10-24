@@ -114,6 +114,8 @@ fun PhonePreviewWindow(store: ShopStore, context: android.content.Context) {
       LocalContext provides context,
       LocalView provides remember { android.view.View(context) },
       LocalConfiguration provides Configuration(390, 844),
+      //  پیش‌نمایشِ گوشی: نسخهٔ گوشیِ صفحه‌ها، نه Desk* (AUDIT-NAV N11)
+      ir.vil3ntec.tohid.ui.v3.nav.LocalDeskLayout provides false,
     ) {
       TohidTheme(if (dark) ThemeChoice.DARK else ThemeChoice.LIGHT) {
         CompositionLocalProvider(LocalLayoutDirection provides if (en) LayoutDirection.Ltr else LayoutDirection.Rtl) {
