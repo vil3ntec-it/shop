@@ -51,6 +51,9 @@ class V3Nav(private val table: RouteTable, val home: String, initial: NavStack) 
     private set
 
   val current: String get() = stack.current
+
+  /** صفحهٔ زیرِ برگه‌ها (برگه روی صفحهٔ پیشین است و جایش را نمی‌گیرد) */
+  val page: String get() = stack.entries.lastOrNull { table.resolve(it)?.route?.kind != RouteKind.SHEET } ?: stack.current
   val move: Move get() = stack.move
   val canBack: Boolean get() = stack.canPop || stack.root != home
 

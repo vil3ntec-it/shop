@@ -182,10 +182,10 @@ fun SupportScreen(onBack: () -> Unit) {
           }
         },
         enabled = !sending && draft.isNotBlank(),
-        colors = IconButtonDefaults.filledIconButtonColors(containerColor = colors.primary),
+        colors = IconButtonDefaults.filledIconButtonColors(containerColor = colors.button.primary.bg, contentColor = colors.button.primary.text),
         modifier = Modifier.size(52.dp),
       ) {
-        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "فرستادن", tint = Color.White)
+        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "فرستادن", tint = colors.button.primary.text)
       }
     }
   }

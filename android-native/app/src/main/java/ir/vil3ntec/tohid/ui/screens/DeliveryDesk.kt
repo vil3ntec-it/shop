@@ -93,16 +93,13 @@ internal fun deskStamp(ms: Long?): String {
   return "${j.month}/${j.day} $hh:$mm"
 }
 
-/** وضعیتِ مأموریت: متن + رنگ + نقطه */
+/**
+ *  وضعیتِ مأموریت: متن + رنگ + نقطه. رنگ همان نگاشتِ پیک و سفارش (`OrderStatusTone`،
+ *  هفت توکنِ وضعیتِ VILL3N) — «در راه» این‌جا هم همان آبیِ صفحهٔ پیک و سفارش‌هاست.
+ */
 @Composable
 internal fun MissionPill(status: String) {
-  val tone = when (status) {
-    in DeliveryText.GOOD -> PillTone.SUCCESS
-    in DeliveryText.ATTENTION -> PillTone.WARNING
-    "withdrawn" -> PillTone.NEUTRAL
-    else -> PillTone.NEUTRAL
-  }
-  StatusPill(DeliveryText.status(status), tone)
+  StatusPill(DeliveryText.status(status), ir.vil3ntec.tohid.ui.components.common.OrderStatusTone.courier(status))
 }
 
 /** همهٔ داده‌ای که میز از سرور دارد — یک جا تا شمارش‌ها و برگه‌ها یکی باشند */

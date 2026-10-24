@@ -30,7 +30,7 @@
  */
 const { createHash, randomBytes, randomInt, createHmac } = require('crypto');
 const { query, one, many, newId, now, tx } = require('../db');
-const config = require('../config');
+const { serverSecret } = require('./server-secret');
 const { badRequest, notFound, forbidden, conflict } = require('../middleware/errors');
 
 function hashToken(t) { return createHash('sha256').update(String(t)).digest('hex'); }
@@ -293,7 +293,7 @@ function shape(r) {
 const JOIN_DIGITS = 6;
 
 function joinPepper() {
-  return config.secrets.api || config.secrets.jwt || 'station-join';
+  return serverSecret(['api', 'jwt'], 'station-join');
 }
 function hashJoin(code) {
   return createHmac('sha256', joinPepper()).update(String(code || '').replace(/\D/g, '')).digest('hex');
@@ -408,5 +408,5 @@ async function redeemJoinCode(rawCode, userId) {
 module.exports = {
   register, assertRoom, bySecret, list, revoke, restore, revokeBoundBy, deviceLimitOf, shape, hashToken,
   DEFAULT_MAX_DEVICES,
-  mintJoinCode, redeemJoinCode, JOIN_DIGITS,
+  mintJoinCode, redeemJoinCode, hashJoin, JOIN_DIGITS,
 };
