@@ -88,9 +88,11 @@ private class StaggeredList(private val base: LazyListScope, private val stagger
   override fun item(key: Any?, contentType: Any?, content: @Composable LazyItemScope.() -> Unit) {
     val index = next++
     val id = key ?: index
+    //  بیرونِ لامبدا: نشانگرِ DSL ِ فهرست دسترسی به گیرندهٔ بیرونی را درونِ ردیف نمی‌پذیرد
+    val state = stagger
     base.item(key, contentType) {
       val scope = this
-      Box(Modifier.v3Stagger(stagger, id, index)) { scope.content() }
+      Box(Modifier.v3Stagger(state, id, index)) { scope.content() }
     }
   }
 }
