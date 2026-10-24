@@ -119,7 +119,7 @@ private fun QrScanSheet(onDismiss: () -> Unit, onText: (String) -> Unit) {
             },
             onStatus = { _, _ -> },
             modifier = Modifier.fillMaxSize(),
-            qr = true,
+            qrOnly = true,
           )
         } else {
           Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(24.dp)) {

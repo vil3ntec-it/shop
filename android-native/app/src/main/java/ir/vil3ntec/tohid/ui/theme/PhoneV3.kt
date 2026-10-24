@@ -83,7 +83,7 @@ data class PhoneV3Colors(
       tile = s.surfaceElevated,
       positive = s.status.delivered.fg,
       negative = s.status.cancelled.fg,
-      waiting = s.status.awaitingApproval.fg,
+      waiting = s.status.warning.fg,
       source = s,
     )
   }
@@ -164,12 +164,15 @@ data class PhoneV3Ui(
   val iconActive: Color,
   val success: PhoneV3Tone,
   val delivery: PhoneV3Tone,
+  /** «در صف» / در انتظار (کهربایی، `status.warning`) */
   val awaiting: PhoneV3Tone,
   val cancelled: PhoneV3Tone,
   val preparing: PhoneV3Tone,
   val inactive: PhoneV3Tone,
   /** «نیازِ بررسی» (بنفش) — مثلاً ارسالِ ناموفق */
   val review: PhoneV3Tone,
+  /** «در انتظارِ تأیید» (بنفش) — مثلاً درخواستِ تازهٔ پیک */
+  val approval: PhoneV3Tone,
 ) {
   companion object {
     /** همان `ShopColors` (دکمه‌ها §۷، وضعیت‌ها §۸) — بی HEX ِ خودش */
@@ -183,9 +186,9 @@ data class PhoneV3Ui(
         danger = s.button.danger.bg, onDanger = s.button.danger.text,
         disabledBg = s.button.disabled.bg, disabledFg = s.button.disabled.text,
         iconActive = s.iconActive,
-        success = t(s.status.delivered), delivery = t(s.status.inDelivery), awaiting = t(s.status.awaitingApproval),
+        success = t(s.status.delivered), delivery = t(s.status.inDelivery), awaiting = t(s.status.warning),
         cancelled = t(s.status.cancelled), preparing = t(s.status.preparing), inactive = t(s.status.inactive),
-        review = t(s.status.needsReview),
+        review = t(s.status.needsReview), approval = t(s.status.awaitingApproval),
       )
     }
   }
@@ -311,8 +314,8 @@ private fun debtColors(s: ShopColors, p: PhoneV3Colors, dark: Boolean) = PhoneV3
   settledTint = s.status.delivered.bg,
   pill = s.status.inactive.bg,
   onPill = s.status.inactive.fg,
-  wait = s.status.awaitingApproval.fg,
-  waitTint = s.status.awaitingApproval.bg,
+  wait = s.status.warning.fg,
+  waitTint = s.status.warning.bg,
   info = s.status.inDelivery.fg,
   infoTint = s.status.inDelivery.bg,
 )

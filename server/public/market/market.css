@@ -1,0 +1,53 @@
+/* بازارچه — فقط چیدمانِ این صفحه؛ رنگ و گوشه همه از نشانه‌های /kit/kit.css. */
+.topbar .search-trigger { display: none; }
+@media (max-width: 599px) { .topbar .account { display: none; } }
+@media (min-width: 1024px) {
+  .topbar .search-trigger { display: flex; }
+  .topbar .grow { display: none; }
+  .topbar [data-act="lang"] { margin-inline-start: auto; }
+}
+
+/* ردیفِ دسته‌ها مثلِ مرجع: یک خط، «همه» تیره، «همه دسته‌بندی‌ها» در انتها (باز ⇒ همه، چندخطی) */
+.cat-row { display: flex; align-items: flex-start; gap: var(--s3); }
+.cat-row .chips { flex: 1 1 auto; min-width: 0; margin-inline: 0; padding-inline: 0; flex-wrap: nowrap; overflow-x: auto; }
+.cat-row .chips.open { flex-wrap: wrap; overflow: visible; }
+.cat-row .chip { min-height: 48px; padding-inline: var(--s3) var(--s5); }
+.cat-row .chip[aria-pressed="true"] { padding-inline: var(--s3) var(--s6); }
+.all-cats { flex: none; margin-top: var(--s1); }
+.all-cats[aria-expanded="true"] { border-color: var(--brand); background: var(--selected); }
+@media (max-width: 599px) {
+  .cat-row { margin-inline: calc(var(--s4) * -1); padding-inline-end: var(--s4); }
+  .cat-row .chips { padding-inline-start: var(--s4); }
+  .all-cats span[data-t] { display: none; }
+  .all-cats { padding-inline: var(--s2); }
+}
+/* کامپیوتر: فقط آن‌چه در یک خط جا می‌شود؛ بقیه با «همه دسته‌بندی‌ها» (بی تراشهٔ نیمه‌بریده) */
+@media (min-width: 1024px) { .cat-row .chips:not(.open) { flex-wrap: wrap; max-height: 56px; overflow: hidden; } }
+
+/* سربرگِ بخش مثلِ مرجع: ✦ «دکان‌های پیشنهادی» و «مشاهدهٔ همه ←» */
+.section-head .link { color: var(--link); }
+.section-head .link .arrow { display: inline-flex; }
+[dir="rtl"] .section-head .link .arrow svg { transform: scaleX(-1); }
+[dir="ltr"] .section-head .link .arrow svg { transform: none; }
+#feed > #sug-sec { margin-top: var(--s6); }
+#sug-sec .section-head { margin-bottom: var(--s4); }
+#sug-sec .section-head h2 { font-size: 20px; }
+
+/* کامپیوترِ پهن: «پرفروش» و «ارزان‌تر» زیرِ دکان‌ها و کنارِ هم (وقتی هر دو دادهٔ واقعی دارند) */
+@media (min-width: 1280px) {
+  #feed { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: var(--s6); }
+  #feed > section { grid-column: 1 / -1; min-width: 0; }
+  #feed:has(> #pop-sec:not([hidden])):has(> #deal-sec:not([hidden])) > #pop-sec { grid-column: 1; }
+  #feed:has(> #pop-sec:not([hidden])):has(> #deal-sec:not([hidden])) > #deal-sec { grid-column: 2; }
+  #feed:has(> #pop-sec:not([hidden])):has(> #deal-sec:not([hidden])) .rail.products { grid-auto-columns: calc((100% - 2 * var(--s3)) / 3); }
+}
+
+.side-carts { display: grid; gap: var(--s1); }
+.side-carts .label { padding-inline: var(--s3); margin-bottom: var(--s1); }
+.side-cart { display: flex; align-items: center; gap: var(--s2); padding: var(--s2) var(--s3); border-radius: var(--r-card); color: var(--text); }
+.side-cart:hover { background: var(--surface-2); text-decoration: none; }
+.side-cart b { display: block; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.side-cart small { display: block; color: var(--muted); font-size: 12px; }
+.side-note { margin-top: var(--s4); padding: var(--s3); border-radius: var(--r-card); background: var(--surface-2); border: 1px solid var(--divider); color: var(--muted); font-size: 12.5px; line-height: 1.6; }
+
+#locate2[aria-pressed="true"] { background: var(--selected); border-color: var(--brand); }
