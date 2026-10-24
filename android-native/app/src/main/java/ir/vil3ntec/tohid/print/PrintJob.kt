@@ -27,7 +27,7 @@ object PrintJob {
     val storeName = context.getSharedPreferences("tohid", Context.MODE_PRIVATE).getString("store_name", "") ?: ""
     val file = withContext(Dispatchers.IO) {
       runCatching {
-        val bitmap = Receipt.render(context, d, sale, storeName, 576)
+        val bitmap = Receipt.render(context, d, sale, storeName, 576, qr = receiptQr(context, sale))
         val dir = java.io.File(context.cacheDir, "share").apply { mkdirs(); listFiles()?.forEach { it.delete() } }
         val f = java.io.File(dir, "invoice-${sale.invoiceLabel() ?: "x"}.png")
         f.outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
@@ -62,7 +62,7 @@ object PrintJob {
       .getSharedPreferences("tohid", Context.MODE_PRIVATE)
       .getString("store_name", "") ?: ""
 
-    val bitmap = runCatching { Receipt.render(context, d, sale, storeName, width) }
+    val bitmap = runCatching { Receipt.render(context, d, sale, storeName, width, qr = receiptQr(context, sale)) }
       .getOrElse { return@withContext "فاکتور کشیده نشد: ${it.message ?: "دلیل نامعلوم"}" }
 
     try {
@@ -70,5 +70,58 @@ object PrintJob {
     } finally {
       bitmap.recycle()
     }
+  }
+
+  /** RET-01 — QRِ رسید فقط وقتی «برگشت و تعویضِ تازه» روشن است؛ خاموش ⇒ همان رسیدِ امروز */
+  private fun receiptQr(context: Context, sale: Sale): String? =
+    if (ir.vil3ntec.tohid.data.ReturnSettings.enabled(context) && sale.status != "cancelled") {
+      ir.vil3ntec.tohid.data.ReturnFlow.receiptCode(sale)
+    } else null
+
+  /** RET-12 — چاپِ رسیدِ برگشت؛ برمی‌گرداند: پیامِ خطا، یا null */
+  suspend fun printReturn(
+    context: Context,
+    d: ShopData,
+    docId: String,
+    address: String,
+    width: Int,
+  ): String? = withContext(Dispatchers.IO) {
+    val storeName = context.getSharedPreferences("tohid", Context.MODE_PRIVATE).getString("store_name", "") ?: ""
+    val bitmap = runCatching { Receipt.renderReturn(context, d, docId, storeName, width) }
+      .getOrElse { return@withContext "رسیدِ برگشت کشیده نشد: ${it.message ?: "دلیل نامعلوم"}" }
+    try {
+      ThermalPrinter.print(context, address, bitmap, width)
+    } finally {
+      bitmap.recycle()
+    }
+  }
+
+  /** فرستادنِ رسیدِ برگشت به مشتری — همان راهِ `shareSale` */
+  suspend fun shareReturn(context: Context, d: ShopData, docId: String): String? {
+    val storeName = context.getSharedPreferences("tohid", Context.MODE_PRIVATE).getString("store_name", "") ?: ""
+    val label = ir.vil3ntec.tohid.data.ReturnFlow.label(docId)
+    val file = withContext(Dispatchers.IO) {
+      runCatching {
+        val bitmap = Receipt.renderReturn(context, d, docId, storeName, 576)
+        val dir = java.io.File(context.cacheDir, "share").apply { mkdirs(); listFiles()?.forEach { it.delete() } }
+        val f = java.io.File(dir, "return-$label.png")
+        f.outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+        bitmap.recycle()
+        f
+      }
+    }.getOrElse { return "رسیدِ برگشت ساخته نشد: ${it.message ?: "دلیل نامعلوم"}" }
+    return runCatching {
+      val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.files", file)
+      val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+        type = "image/png"
+        putExtra(android.content.Intent.EXTRA_STREAM, uri)
+        putExtra(android.content.Intent.EXTRA_TEXT, "رسیدِ برگشت $label${if (storeName.isNotBlank()) " — $storeName" else ""}")
+        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+      }
+      context.startActivity(
+        android.content.Intent.createChooser(send, "فرستادنِ رسیدِ برگشت").addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+      )
+      null
+    }.getOrElse { "برنامه‌ای برای فرستادن پیدا نشد" }
   }
 }

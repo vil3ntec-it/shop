@@ -86,6 +86,10 @@ data class WarehouseEntry(
   val batch: String = "",
   /** تاریخِ تولید (اختیاری، `yyyy-MM-dd`) — خالی یعنی ثبت نشده */
   val productionDate: String = "",
+  /** نوعِ اصلاح (INV-04): count · damage · expired · lost · other · supplier_return */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val adjKind: String? = null,
 )
 
 @Serializable
@@ -123,6 +127,15 @@ data class Sale(
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val series: String? = null,
+  /**
+   *  «برگهٔ امضاشده»ی تأییدِ تخفیفِ بیش از سقف (STF-02، بخشِ ۱۰.۱؛
+   *  `core/perm/ApprovalSlip`). سرور با آن تخفیف را می‌پذیرد و سابقه نامِ
+   *  تأییدکننده و دلیل را دارد. فقط وقتی هست که تأیید لازم بوده؛ `null`
+   *  نوشته نمی‌شود (همان دلیلِ `series`).
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val approval: kotlinx.serialization.json.JsonObject? = null,
   /**
    *  PAY (v3 A4) — ردیف‌های پرداختِ ترکیبی (نقد، کیف پول، کارت، حواله، به حساب)، به پول.
    *  فقط فروشی که با پرچمِ `ShopPolicy.payV2` ثبت شده دارد؛ معنای فیلدهای بالا
@@ -237,6 +250,56 @@ data class SaleReturn(
   val reason: String = "",
   val date: String = "",
   val createdAt: Long = 0,
+  /*
+   *  RET (v3 §۶.۸) — فقط برگشتِ پرچم‌دار (`ReturnSettings.enabled`، `ReturnFlow.post`).
+   *  برگشتِ امروز هیچ‌کدام را ندارد و ⛔ `null` نوشته نمی‌شود (`EncodeDefault.NEVER`،
+   *  مثلِ `Sale.series`)، پس ردیفِ قدیمی بایت‌به‌بایت همان می‌ماند.
+   */
+  /** سندِ برگشت: ردیف‌های یک برگشت یک `docId` دارند؛ تکرارِ همان سند دوباره ثبت نمی‌شود */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val docId: String? = null,
+  /** `restock` (به موجودی) | `damaged` (ضایعات) */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val disposition: String? = null,
+  /** حالتِ بازپرداختِ انتخاب‌شده: `original` | `cash` | `store_credit` */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val refund: String? = null,
+  /** سهمِ این ردیف که از بدهیِ بازِ همین فاکتور کم شد (افغانی)؛ بقیه نقد یا اعتبار */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val toAccount: Double? = null,
+  /** سهمِ این ردیف که اعتبارِ فروشگاه شد (افغانی) — به حسابِ `creditTo` */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val toCredit: Double? = null,
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val creditTo: String? = null,
+  /**
+   *  سهمِ این ردیف که به روشِ غیرنقدِ اصلی (کیف پول، کارت، حواله…) پس رفت: شناسهٔ روش ⇒
+   *  افغانی. فقط فاکتورِ با `Sale.payments`؛ این سهم از دخل کم نمی‌شود (`CashShift`).
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val toMethods: Map<String, Double>? = null,
+  /** فقط برگشتِ بی رسید: قیمتِ واحدی که پس داده شد */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val unitPrice: Double? = null,
+  /** ثبت‌کننده و تأییدکننده (برای گزارشِ ضدتقلب) */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val by: String? = null,
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val approvedBy: String? = null,
+  /** تعویض: فاکتورِ تازه‌ای که در همان جریان زده شد */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val exchangeSaleId: String? = null,
   /**
    *  `online` برای مرجوعیِ سرور هنگامِ بازپرداختِ سفارشِ اینترنتی (ORD-20): پولش از راهِ
    *  سفارش برمی‌گردد، نه از دخل (`CashShift`). مرجوعیِ دستگاه `null` است و مثلِ `Sale.channel`

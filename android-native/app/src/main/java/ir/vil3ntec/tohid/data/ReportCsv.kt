@@ -229,6 +229,7 @@ object ReportCsv {
     "customer_return" -> "مرجوعی مشتری"
     "supplier_return" -> "برگشت به تأمین‌کننده"
     "adjustment" -> "اصلاح موجودی"
+    "damage" -> "ضایعات"
     else -> type
   }
 }

@@ -1,0 +1,110 @@
+{
+  "_doc": "بردارهای مرجعِ QRِ فاکتورِ نسخهٔ ۲ (RECEIPT-V2). یک فایل، دو پیاده‌سازی: server/src/lib/receipt-token.js و core/receipt/ReceiptToken.kt. توکن = ۱۲۸ بیتِ تصادفی به ۲۶ نویسهٔ Crockford base32 ِ کوچک (بزرگ‌مرتبه اول، دو بیتِ صفر در سر). نشانِ دکان = ۸ نویسهٔ اولِ همان base32 از sha256(\"vill3n.receipt.shop.v1:\" + shopId). نشانی = <ریشه>/r/<نشان>/<توکن>. مقدارها با پیاده‌سازیِ رشته‌بیتیِ مستقل ساخته و با ماژولِ سرور سنجیده شده‌اند.",
+  "alphabet": "0123456789abcdefghjkmnpqrstvwxyz",
+  "encode": [
+    {
+      "hex": "00000000000000000000000000000000",
+      "token": "00000000000000000000000000"
+    },
+    {
+      "hex": "ffffffffffffffffffffffffffffffff",
+      "token": "7zzzzzzzzzzzzzzzzzzzzzzzzz"
+    },
+    {
+      "hex": "0123456789abcdef0123456789abcdef",
+      "token": "014d2pf2dbsqqg28t5cy4tqkff"
+    },
+    {
+      "hex": "8000000000000000000000000000000f",
+      "token": "4000000000000000000000000f"
+    },
+    {
+      "hex": "7a1c2e9b00ff10ee5d3c4b2a19087766",
+      "token": "3t3gq9p07z23q5tf2b58cggxv6"
+    }
+  ],
+  "normalize": [
+    {
+      "raw": "3t3gq9p07z23q5tf2b58cggxv6",
+      "token": "3t3gq9p07z23q5tf2b58cggxv6"
+    },
+    {
+      "raw": "3T3GQ9P07Z23Q5TF2B58CGGXV6",
+      "token": "3t3gq9p07z23q5tf2b58cggxv6"
+    },
+    {
+      "raw": "  3t3gq9p07z23q5tf2b58cggxv6\n",
+      "token": "3t3gq9p07z23q5tf2b58cggxv6"
+    },
+    {
+      "raw": "8t3gq9p07z23q5tf2b58cggxv6",
+      "token": null
+    },
+    {
+      "raw": "3t3gq9p07z23q5tf2b58cggxv",
+      "token": null
+    },
+    {
+      "raw": "3t3gq9p07z23q5tf2b58cggxv60",
+      "token": null
+    },
+    {
+      "raw": "3t3gq9p07z23q5tf2b58cggxvu",
+      "token": null
+    },
+    {
+      "raw": "3t3gq9p07z23q5tf2b58cggxvi",
+      "token": null
+    },
+    {
+      "raw": "3t3gq9p07z23q5tf2b58cggxvl",
+      "token": null
+    },
+    {
+      "raw": "3t3gq9p07z23q5tf2b58cggxvo",
+      "token": null
+    },
+    {
+      "raw": "",
+      "token": null
+    }
+  ],
+  "tags": [
+    {
+      "shopId": "shp_01JCA00000000000000000000",
+      "tag": "d2jcj71t"
+    },
+    {
+      "shopId": "shop-1",
+      "tag": "4f3j801d"
+    },
+    {
+      "shopId": "دکان",
+      "tag": "6fs0091q"
+    },
+    {
+      "shopId": "S",
+      "tag": "kwyz0ter"
+    }
+  ],
+  "urls": [
+    {
+      "base": "https://api.example.com",
+      "shopId": "shp_01JCA00000000000000000000",
+      "token": "3t3gq9p07z23q5tf2b58cggxv6",
+      "url": "https://api.example.com/r/d2jcj71t/3t3gq9p07z23q5tf2b58cggxv6"
+    },
+    {
+      "base": "https://api.example.com/",
+      "shopId": "shop-1",
+      "token": "3t3gq9p07z23q5tf2b58cggxv6",
+      "url": "https://api.example.com/r/4f3j801d/3t3gq9p07z23q5tf2b58cggxv6"
+    },
+    {
+      "base": "http://192.168.1.10:8080//",
+      "shopId": "S",
+      "token": "00000000000000000000000000",
+      "url": "http://192.168.1.10:8080/r/kwyz0ter/00000000000000000000000000"
+    }
+  ]
+}

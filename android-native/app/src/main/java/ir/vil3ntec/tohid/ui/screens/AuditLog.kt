@@ -118,6 +118,7 @@ private fun auditLabel(type: String): String = when (type) {
   "sale" -> "ثبت فروش"
   "cancel_sale" -> "لغو فروش"
   "return" -> "مرجوعی"
+  "return_no_receipt" -> "برگشتِ بی رسید"
   "purchase" -> "ثبت خرید"
   "customer_payment" -> "پرداخت مشتری"
   "supplier_payment" -> "پرداخت تأمین‌کننده"

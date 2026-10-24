@@ -243,7 +243,7 @@ private fun LockMark() {
  *  صفحه‌کلید وصل دارد هم همان کار را می‌کند.
  */
 @Composable
-private fun Keypad(onDigit: (Char) -> Unit, onBack: () -> Unit) {
+internal fun Keypad(onDigit: (Char) -> Unit, onBack: () -> Unit) {
   val focus = remember { androidx.compose.ui.focus.FocusRequester() }
   LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
   Column(
