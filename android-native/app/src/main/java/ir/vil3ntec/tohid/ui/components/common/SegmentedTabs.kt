@@ -1,7 +1,6 @@
 package ir.vil3ntec.tohid.ui.components.common
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -23,6 +22,9 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.ui.Platform
 import ir.vil3ntec.tohid.ui.theme.Shape
 import ir.vil3ntec.tohid.ui.theme.Shop
+import ir.vil3ntec.tohid.ui.theme.SegmentInnerShape
+import ir.vil3ntec.tohid.ui.theme.segmentSelected
+import ir.vil3ntec.tohid.ui.theme.segmentTrack
 
 /** یک زبانه: شناسه، برچسب و شمار (اختیاری) */
 data class SegmentTab<T>(val id: T, val label: String, val count: Int? = null)
@@ -41,13 +43,11 @@ fun <T> SegmentedTabs(
   modifier: Modifier = Modifier,
 ) {
   val c = Shop.colors
-  val minH = if (Platform.DESKTOP) 30.dp else 44.dp
+  val minH = if (Platform.DESKTOP) 32.dp else 44.dp
+  //  نسخهٔ ۲: شیارِ فرورفته و گزینهٔ سفیدِ برآمده (`segmentTrack`)، بی خطِ دور
   Row(
     modifier
-      .clip(Shape.button)
-      .background(c.bg)
-      .border(1.dp, c.border, Shape.button)
-      .padding(3.dp)
+      .segmentTrack(c)
       .selectableGroup(),
     horizontalArrangement = Arrangement.spacedBy(2.dp),
     verticalAlignment = Alignment.CenterVertically,
@@ -57,10 +57,9 @@ fun <T> SegmentedTabs(
       Box(
         Modifier
           .heightIn(min = minH)
-          .clip(Shape.button)
-          .then(if (on) Modifier.background(c.surfaceSolid).border(1.dp, c.border, Shape.button) else Modifier)
+          .then(if (on) Modifier.segmentSelected(c) else Modifier.clip(SegmentInnerShape))
           .selectable(selected = on, role = Role.Tab) { onSelect(t.id) }
-          .padding(horizontal = 12.dp),
+          .padding(horizontal = 14.dp),
         contentAlignment = Alignment.Center,
       ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
