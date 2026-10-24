@@ -196,14 +196,14 @@ fun ProfileScreen(
           Modifier
             .size(30.dp)
             .clip(CircleShape)
-            .background(colors.primary)
+            .background(colors.button.primary.bg)
             .clickable { pickOpen = true },
           contentAlignment = Alignment.Center,
         ) {
           Icon(
             Icons.Filled.PhotoCamera,
             contentDescription = "عکس حساب",
-            tint = Color.White,
+            tint = colors.button.primary.text,
             modifier = Modifier.size(16.dp),
           )
         }
@@ -247,9 +247,9 @@ fun ProfileScreen(
         Spacer(Modifier.height(12.dp))
         Button(
           onClick = onSignIn,
-          colors = ButtonDefaults.buttonColors(containerColor = colors.primary),
+          colors = ButtonDefaults.buttonColors(containerColor = colors.button.primary.bg, contentColor = colors.button.primary.text),
           modifier = Modifier.fillMaxWidth(),
-        ) { Text("ورود یا ساختنِ حساب", color = Color.White) }
+        ) { Text("ورود یا ساختنِ حساب", color = colors.button.primary.text) }
       }
       return@Column
     }
@@ -370,10 +370,10 @@ fun ProfileScreen(
         }
       },
       enabled = !busy,
-      colors = ButtonDefaults.buttonColors(containerColor = colors.primary),
+      colors = ButtonDefaults.buttonColors(containerColor = colors.button.primary.bg, contentColor = colors.button.primary.text),
       modifier = Modifier.fillMaxWidth(),
     ) {
-      Text(if (busy) "در حال ذخیره…" else "ذخیره تغییرات", color = Color.White)
+      Text(if (busy) "در حال ذخیره…" else "ذخیره تغییرات", color = colors.button.primary.text)
     }
 
     /* ------------------------- دکان ------------------------- */
@@ -427,10 +427,10 @@ fun ProfileScreen(
           .onFailure { toast(it.userText("همگام‌سازی ناموفق بود")) }
       },
       enabled = !syncing,
-      colors = ButtonDefaults.buttonColors(containerColor = colors.primary),
+      colors = ButtonDefaults.buttonColors(containerColor = colors.button.primary.bg, contentColor = colors.button.primary.text),
       modifier = Modifier.fillMaxWidth(),
     ) {
-      Text(if (syncing) "در حال همگام‌سازی…" else "همگام‌سازی حالا", color = Color.White)
+      Text(if (syncing) "در حال همگام‌سازی…" else "همگام‌سازی حالا", color = colors.button.primary.text)
     }
 
     /*

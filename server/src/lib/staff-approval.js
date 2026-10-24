@@ -283,6 +283,7 @@ async function judge(q, ctx, need, slip, { opId, at, deviceId, path, fallback = 
   const detail = {
     perm: need.perm, decision: d.decision, reason_core: d.reason, requester: ctx.userId || '', role: ctx.role || '',
     pct_bp: need.pct_bp ?? null, amount: need.amount ?? (need.record ? need.record.amount : null),
+    ...(need.cumulative != null ? { cumulative: need.cumulative } : {}),
     ...(d.cap ? { cap: d.cap, limit: d.limit } : {}), path: path || 'v3',
   };
   if (d.decision === 'deny') return { reason: DENY_CODE[need.perm], box: 'perm_denied', detail };
@@ -308,7 +309,148 @@ function slipOf(op) {
   return null;
 }
 
-// ---------- راهِ v1 ----------
+// ---------- برگشت: یک سند یک تصمیم؛ سقف تجمعی روی هر فاکتور ----------
+
+function str(v) { return typeof v === 'string' ? v : ''; }
+function fieldsOf(op) { return isPlainObject(op.fields) ? op.fields : {}; }
+function atOf(op) { const v = Number(fieldsOf(op).createdAt); return Number.isFinite(v) && v > 0 ? v : 0; }
+/** مهرِ «ثبت»: `ts` ِ op ِ v1 (هر دو برنامه یک ts برای کلِ یک diff می‌زنند)؛ در نمای v3 دیوارِ HLC */
+function tsOf(op) { const v = Number(op.ts); return Number.isFinite(v) && v > 0 ? v : 0; }
+
+/**
+ * کلیدِ «سندِ برگشت»ِ یک ردیف — ردیف‌هایی که یک برگه و یک تصمیم دارند:
+ *   `docId` (برگشتِ تازه، #318) ⇒ `tx` و همان فاکتور (v3؛ یک ثبت می‌تواند برگشتِ دو فاکتور
+ *   باشد) ⇒ همان فاکتور در همان ثبت (`ts` ِ v1 — برنامهٔ وب برای هر ردیف `createdAt` ِ جدا
+ *   می‌زند ولی کلِ ثبت یک ts دارد) ⇒ خودِ ردیف.
+ */
+function returnDocKey(op) {
+  const f = fieldsOf(op);
+  if (str(f.docId)) return `doc:${f.docId}`;
+  if (str(op.tx)) return `tx:${op.tx}:sale:${str(f.saleId)}`;
+  if (str(f.saleId) && tsOf(op)) return `sale:${f.saleId}@ts:${tsOf(op)}`;
+  return `row:${op.row_id}`;
+}
+
+/**
+ * ردیف‌های برگشتِ یک دسته ⇒ سندها. سندِ برگه `returns/<docId>` است (همان که #318 امضا
+ * می‌خواهد)؛ برگشتِ بی docId همان `returns/<نخستین ردیف>`ِ امروز. برگه از هر ردیفِ سند.
+ * @param {Array<{op, need}>} items  فقط نیازهای `returns.create`، به ترتیبِ دسته
+ * @returns {Map<object, {key, docId, sale, amount, rows, need, slip}>}  op ⇒ سندش
+ */
+function groupReturns(items) {
+  const byKey = new Map();
+  for (const it of items) {
+    const k = returnDocKey(it.op);
+    if (!byKey.has(k)) byKey.set(k, { key: k, rows: [] });
+    byKey.get(k).rows.push(it);
+  }
+  const out = new Map();
+  for (const g of byKey.values()) {
+    const first = g.rows[0].op;
+    g.amount = g.rows.reduce((s, r) => s + int(r.need.amount), 0);
+    g.docId = str(fieldsOf(first).docId);
+    g.sale = str(fieldsOf(first).saleId);
+    g.need = { perm: 'returns.create', doc: `returns/${g.docId || first.row_id}`, req: { amount: g.amount }, amount: g.amount };
+    g.slip = null;
+    for (const r of g.rows) { const s = slipOf(r.op); if (s) { g.slip = s; break; } }
+    for (const r of g.rows) out.set(r.op, g);
+  }
+  return out;
+}
+
+/**
+ * سقفِ برگشت **تجمعیِ هر فاکتور** است (تصمیمِ مدیر): جمعِ همهٔ برگشت‌های آن فاکتور — ثبت‌شده
+ * در سرور از هر دستگاه و هر نقش (برگشتِ صاحب و برگشتِ تأییدشده هم، عمداً: وگرنه یک برگشت
+ * میانِ نقش‌ها یا با یک تأییدِ کوچک تکه می‌شد)، همین دسته، و همین سند — زیرِ سقفِ کاربر.
+ * برگه فقط همین سند را می‌پوشاند (`need.amount`). برگشتِ بی رسید فاکتوری ندارد ⇒ فقط همان سند.
+ */
+function cumulativeNeed(g, before) {
+  if (!g.sale) return g.need;
+  const total = before + g.amount;
+  return { ...g.need, req: { amount: total }, cumulative: total };
+}
+
+/**
+ * جمعِ برگشت‌های ثبت‌شدهٔ یک فاکتور، به پول — از **هر دو** دفتر (v1: `sync_rows`، افغانی؛
+ * v3: `sync_v3_rows`، به پول)، هر ردیف یک بار (پلِ v3⇄v1 همان ردیف را در هر دو می‌گذارد)،
+ * بی برگشتِ حذف‌شده یا لغوشده.
+ * @param q  کلیدِ تراکنشِ push ِ v3 (opهای پیشینِ همین دسته هم دیده می‌شوند) یا null
+ */
+async function returnedTotal(q, ctx, saleId) {
+  const c = q || dbq;
+  const byRow = new Map();
+  const v1 = (await c.query(
+    `SELECT row_id, data->>'amount' AS a FROM sync_rows WHERE app='shop' AND account_kind='shop' AND account_id=$1
+        AND table_name='returns' AND data->>'saleId' = $2 AND deleted_at IS NULL
+        AND COALESCE(data->>'status', '') <> 'cancelled'`, [ctx.accountId, saleId]
+  )).rows;
+  for (const r of v1) byRow.set(r.row_id, int(Number(r.a) * 100));
+  const v3 = (await c.query(
+    `SELECT row_id, data->>'amountMinor' AS a FROM sync_v3_rows WHERE app='shop' AND account_kind='shop' AND account_id=$1
+        AND table_name='returns' AND data->>'saleId' = $2 AND deleted_at IS NULL
+        AND COALESCE(data->>'status', '') <> 'cancelled'`, [ctx.accountId, saleId]
+  )).rows;
+  for (const r of v3) byRow.set(r.row_id, int(r.a));
+  let sum = 0;
+  for (const v of byRow.values()) sum += v;
+  return sum;
+}
+
+/**
+ * کلیدِ قفلِ «سقفِ برگشتِ تجمعی»ِ یک دکان — فقط داخلِ تراکنشِ push ِ v3
+ * (`pg_advisory_xact_lock`، بی اتصالِ جدا، با پایانِ تراکنش آزاد).
+ * ⚠️ محدودیتِ شناخته: v1 قفل نمی‌گیرد (نگهبان بیرون از تراکنشِ v1 است)؛ دو دستگاهِ v1 ِ
+ * هم‌زمان روی یک فاکتور ممکن است هر دو زیرِ سقف بگذرند. هیچ داده‌ای گم نمی‌شود؛ فقط سقف
+ * یک بار بیش از اندازه پذیرفته می‌شود.
+ */
+function returnsLockKey(shopId) { return `staff-returns:${shopId}`; }
+
+/** سندهای برگشتِ یک دستهٔ v3 (opهای سنجیده‌شده، بومی یا مبدلِ v2) — یا null */
+function returnGroupsOf(ops) {
+  const items = [];
+  for (const op of ops) if (op.table === 'returns' && op.kind === 'insert') items.push({ op, need: needOf(op, null) });
+  return items.length ? groupReturns(items) : null;
+}
+
+/**
+ * داوریِ یک‌بارهٔ سندِ برگشتِ v3، با سقفِ تجمعیِ فاکتور: نخستین ردیفی که به داوری برسد، با
+ * op_id ِ نخستین ردیفِ سند (تکرارِ همان دسته «تکرار» است نه بازپخش)؛ بقیه همان نتیجه.
+ */
+function judgeGroup(q, ctx, g, { at, deviceId, path }) {
+  if (!g.decided) {
+    g.decided = (async () => {
+      const before = g.sale ? await returnedTotal(q, ctx, g.sale) : 0;
+      return judge(q, ctx, cumulativeNeed(g, before), g.slip, { opId: g.rows[0].op.op_id, at, deviceId, path });
+    })();
+  }
+  return g.decided;
+}
+
+// ---------- سند و همراه‌هایش ----------
+
+/** صندوق‌هایی که «سندِ ردشده» را برای همراهِ دسته‌های بعد نگه می‌دارند */
+const HOLD_KINDS = Object.freeze(['approval_required', 'approval_rejected', 'perm_denied']);
+/** نگه‌داشتنِ سندِ ردشده برای دستهٔ بعد: فقط صندوقِ باز، فقط همان دستگاه، و حداکثر یک روز */
+const HOLD_TTL_MS = 24 * 60 * 60 * 1000;
+/** دفترِ پایه (نخستین هم‌ترازی): یک ts برای چند سند ⇒ «همان ثبت» با createdAt ِ نزدیک هم */
+const BULK_NEAR_MS = 1000;
+/** نمای v3 (برنامهٔ کهنه بی tx): «همان ثبت» = دیوارِ HLC ِ نزدیک */
+const SAVE_HLC_MS = 1000;
+const SALE_LINKED = new Set(['stockMovements', 'auditLog', 'transactions', 'warehouseEntries']);
+/** جدول‌هایی که همراهِ یک سند در آن‌ها می‌نشیند */
+const LINKABLE = new Set(['saleItems', 'returns', 'stockMovements', 'auditLog', 'transactions', 'warehouseEntries', 'sales']);
+/** همان واژه‌های `DebtTransaction.kind` (#286) برای رسیدِ برگشت */
+const RETURN_KINDS = new Set(['customer_return', 'store_credit']);
+
+/** «سرِ» یک ثبت: فاکتور، خرید، یا سندِ برگشت — برای شناختنِ دفترِ چندسندی زیرِ یک ts */
+function headKey(op) {
+  if (op.table === 'sales' || op.table === 'purchases') return `${op.table}:${op.row_id}`;
+  if (op.table === 'returns' && op.type === 'insert') {
+    const f = fieldsOf(op);
+    return str(f.saleId) ? `sales:${f.saleId}` : `returns:${str(f.docId) || op.row_id}`;
+  }
+  return null;
+}
 
 /** ردیفِ صندوقِ تعارض برای opِ ردشدهٔ v1 (بیرون از تراکنشِ v1) */
 async function boxV1(ctx, op, deviceId, out) {
@@ -332,123 +474,395 @@ async function boxV1(ctx, op, deviceId, out) {
 }
 
 /**
- * opِ `op` همراهِ opِ ردشدهٔ `parent` (با نیازِ `need`) در همین دسته است؟
- *
- * v1 تراکنش ندارد: اگر فقط سرِ سند رد شود و قلم‌ها و حرکتِ انبارش
- * بنشینند، موجودیِ همهٔ دستگاه‌ها بی هیچ فاکتوری کم (یا زیاد) می‌شود. پس
- * ردِ سند همراه‌هایش را هم می‌گیرد — همان «کلِ tx»ِ v3:
- *   فروش (ثبت با تخفیف): قلم‌ها (saleItems.saleId)، حرکتِ انبار و سطرِ
- *     دفترِ کار (stockMovements/auditLog.refId)؛
- *   لغو: حرکتِ «برگشت به انبار»ِ همان لغو (sale_cancel) و سطرِ cancel_sale؛
- *   برگشت: حرکتِ انبارش (refId = شناسهٔ برگشت) و به‌روزرسانیِ همان قلم (returnedQty).
+ * سندِ ردشده ⇒ نشانی‌هایی که همراه‌هایش به آن اشاره می‌کنند.
+ *   sale: فاکتور؛ rows: ردیف‌های برگشت و docId؛ items: قلم‌های برگشت؛ debtor: قرض‌دارِ فاکتور؛
+ *   ts: مهرِ همان ثبت؛ at: createdAt ِ سند (برای لغو، سطرِ cancel_sale ِ همان ثبت) — فقط برای دفترِ پایه.
  */
-function companionOf(parent, need, op) {
-  const s = parent.row_id;
-  const f = isPlainObject(op.fields) ? op.fields : {};
-  if (need.perm === 'sales.discount') {
-    return (op.table === 'saleItems' && f.saleId === s)
-      || ((op.table === 'stockMovements' || op.table === 'auditLog') && f.refId === s);
+function parentOf(perm, ops, index, batch) {
+  const first = ops[0];
+  const f = fieldsOf(first);
+  const p = { perm, index, sale: '', rows: new Set(), items: new Set(), at: 0, debtor: '', ts: tsOf(first), tol: 0, bulk: false };
+  if (perm === 'returns.create') {
+    p.sale = str(f.saleId);
+    for (const o of ops) {
+      const of = fieldsOf(o);
+      p.rows.add(o.row_id);
+      if (str(of.docId)) p.rows.add(of.docId);
+      if (str(of.saleItemId)) p.items.add(of.saleItemId);
+    }
+    p.at = atOf(first);
+    return p;
   }
-  if (need.perm === 'sales.cancel') {
-    return (op.table === 'stockMovements' && f.refId === s && f.type === 'sale_cancel')
-      || (op.table === 'auditLog' && f.refId === s && f.type === 'cancel_sale');
+  p.sale = first.row_id;
+  p.debtor = str(f.debtorId);
+  if (perm === 'sales.discount') p.at = atOf(first);
+  if (perm === 'sales.cancel' && batch) {
+    const a = batch.find((o) => o.table === 'auditLog' && fieldsOf(o).type === 'cancel_sale'
+      && str(fieldsOf(o).refId) === p.sale && tsOf(o) === p.ts);
+    if (a) p.at = atOf(a);
   }
-  if (need.perm === 'returns.create') {
-    const item = isPlainObject(parent.fields) ? parent.fields.saleItemId : '';
-    return (op.table === 'stockMovements' && f.refId === s)
-      || (op.table === 'saleItems' && op.type === 'update' && typeof item === 'string' && item !== '' && op.row_id === item);
+  return p;
+}
+
+/**
+ * «همان ثبت»ِ سند؟ با مهرِ ثبت (`ts` ِ v1، برابر) **و** اگر هر دو createdAt دارند، createdAt ِ
+ * نزدیک (۱ ثانیه) — یک ts می‌تواند دفترِ پایهٔ چندسندی باشد (بازگردانی، نخستین بارگذاری) که
+ * بُرشِ ۲۰۰تایی فقط یک سرش را در این دسته گذاشته. بی createdAt فقط وقتی همان ثبت است که این ts
+ * یک سند بیشتر ندارد. بی مهر ⇒ نه — ردیفی که معلوم نیست مالِ سند است اعمال می‌شود، رد نمی‌شود.
+ */
+function sameSave(p, op) {
+  const t = tsOf(op);
+  if (!p.ts || !t || Math.abs(t - p.ts) > p.tol) return false;
+  const a = atOf(op);
+  if (!p.bulk && (!a || !p.at)) return true;
+  return a > 0 && p.at > 0 && Math.abs(a - p.at) <= BULK_NEAR_MS;
+}
+
+/**
+ * opِ `op` همراهِ سندِ ردشدهٔ `p` است؟ v1 تراکنش ندارد: اگر فقط سرِ سند رد شود و بقیه بنشیند،
+ * موجودی و بدهیِ همهٔ دستگاه‌ها بی هیچ سندی عوض می‌شود — پس ردِ سند همراه‌هایش را هم می‌گیرد:
+ *   فروش (ثبت): هر چه به آن اشاره کند — قلم و برگشت (saleId)، حرکت، دفترِ کار، تراکنش و اصلاحِ
+ *     انبار (refId)؛ فاکتوری که روی سرور نیست همراهش هم یتیم است، از هر ثبتی.
+ *   لغو: حرکتِ sale_cancel، سطرِ cancel_sale و رسیدِ `kind=sale_cancel` — همان ثبت.
+ *   برگشت: حرکت و اصلاحِ انبار و تراکنشی که به ردیف/docId ِ همین برگشت اشاره دارد؛ و در همان ثبت:
+ *     رسیدِ customer_return/store_credit و سطرِ دفترِ کارِ فاکتور، returnedQty ِ قلم و debtSettled ِ فاکتور.
+ *   ردیفِ بی نشانیِ برنامهٔ قدیمی (تراکنش یا اصلاحِ انبارِ بی refId): فقط همان ثبت (`looseOf`).
+ */
+function companionOf(p, op) {
+  const f = fieldsOf(op);
+  const ref = str(f.refId);
+  if (p.perm === 'sales.discount') {
+    if (!p.sale) return false;
+    if (op.table === 'saleItems' || op.table === 'returns') return op.type === 'insert' && str(f.saleId) === p.sale;
+    return SALE_LINKED.has(op.table) && ref === p.sale;
+  }
+  if (p.perm === 'sales.cancel') {
+    if (!p.sale || ref !== p.sale || !sameSave(p, op)) return false;
+    if (op.table === 'stockMovements') return f.type === 'sale_cancel';
+    if (op.table === 'auditLog') return f.type === 'cancel_sale';
+    if (op.table === 'transactions') return f.kind === 'sale_cancel';
+    return false;
+  }
+  if (p.perm === 'returns.create') {
+    const mine = ref !== '' && p.rows.has(ref);
+    const ofSale = ref !== '' && ref === p.sale;
+    if (op.table === 'stockMovements') return mine;
+    if (op.table === 'warehouseEntries') return mine || (ofSale && sameSave(p, op));
+    if (op.table === 'transactions') return mine || (ofSale && RETURN_KINDS.has(str(f.kind)) && sameSave(p, op));
+    if (op.table === 'auditLog') return str(f.type).startsWith('return') && (mine || (ofSale && sameSave(p, op)));
+    if (op.type !== 'update' || !sameSave(p, op)) return false;
+    if (op.table === 'saleItems') return p.items.has(op.row_id) && 'returnedQty' in f;
+    if (op.table === 'sales') return p.sale !== '' && op.row_id === p.sale && 'debtSettled' in f && !('status' in f);
   }
   return false;
 }
 
-/**
- * `authorizeOp`ِ v1 این opِ فروش را حتماً با نقش رد می‌کند؟ همان دو شرطِ
- * خودش (با همان `can`)، فقط برای opی که فیلد دارد — حذف راهِ «حذفِ مالِ
- * خودت» را دارد که به دفتر بسته است، پس این‌جا پیش‌بینی نمی‌شود.
- */
-function v1RoleRejects(role, op) {
-  if (op.table !== 'sales' || op.type === 'delete' || !isPlainObject(op.fields)) return false;
-  const { can } = require('./permissions');
-  return (Number(op.fields.discount) > 0 && !can(role, 'sales.discount'))
-    || (op.fields.status === 'cancelled' && !can(role, 'sales.cancel'));
+/** ردیفِ پولیِ «بی نشانی» (برنامهٔ پیش از refId): تراکنش، یا اصلاحِ انبار */
+function isLoose(op) {
+  const f = fieldsOf(op);
+  if (op.type !== 'insert' || str(f.refId)) return false;
+  return op.table === 'transactions' || (op.table === 'warehouseEntries' && f.isAdjustment === true);
+}
+
+/** ردیفِ بی نشانی مالِ همین سند است؟ فقط در همان ثبت، و با نوع و قرض‌دارِ درست */
+function looseOf(p, op) {
+  if (!isLoose(op) || !sameSave(p, op)) return false;
+  const f = fieldsOf(op);
+  if (op.table === 'transactions') {
+    if (p.perm === 'sales.discount') {
+      return f.type === 'give' && (!p.debtor || !str(f.debtorId) || str(f.debtorId) === p.debtor);
+    }
+    return f.type === 'receive';
+  }
+  return p.perm === 'returns.create';            //  اصلاحِ انبار فقط از برگشت
+}
+
+function belongs(p, op) { return companionOf(p, op) || looseOf(p, op); }
+
+/** opی که خودِ سندِ `p` را عوض می‌کند (همان فاکتور یا همان ردیفِ برگشت) */
+function touchesDoc(p, op) {
+  if (p.perm === 'returns.create') return op.table === 'returns' && p.rows.has(op.row_id);
+  return op.table === 'sales' && op.row_id === p.sale;
 }
 
 /**
- * میان‌افزارِ `POST /api/sync/v1/push` — فقط دکان. پمپ (و هر حسابِ دیگر)
- * بی هیچ کاری رد می‌شود.
+ * `authorizeOp`ِ v1 این opِ فروش را حتماً با نقش رد می‌کند؟ همان دو شرطِ خودش (با همان
+ * `can`) و همان کد؛ حذف راهِ «حذفِ مالِ خودت» را دارد که به دفتر بسته است، پس این‌جا نه.
+ */
+function v1RoleReason(role, op) {
+  if (op.table !== 'sales' || op.type === 'delete' || !isPlainObject(op.fields)) return null;
+  const { can } = require('./permissions');
+  if (Number(op.fields.discount) > 0 && !can(role, 'sales.discount')) return 'discount_not_allowed';
+  if (op.fields.status === 'cancelled' && !can(role, 'sales.cancel')) return 'cancel_not_allowed';
+  return null;
+}
+
+/**
+ * سندهای ردشدهٔ دسته‌های پیشینِ **همین دستگاه** (بُرشِ دسته سند و همراه را جدا کرد):
+ * فقط صندوقِ باز (رسیدگی‌شده/کنارگذاشته آزاد است)، حداکثر یک روز، و فقط سندی که هنوز در هیچ
+ * دفتری (v1 یا v3) ننشسته. نشانی‌ها از `detail` ِ صندوق؛ «همان ثبت» در v1 ts ِ برابر و در v3
+ * دیوارِ HLC ِ نزدیک.
+ * @param ops  opهای v1، یا نمای v1 ِ opهای v3 (`v3View`)
+ */
+async function heldParents(ctx, deviceId, ops, { tol = 0 } = {}) {
+  if (!deviceId) return [];
+  const refs = new Set();
+  const tss = [];
+  for (const op of ops) {
+    if (!LINKABLE.has(op.table)) continue;
+    const f = fieldsOf(op);
+    if (str(f.refId)) refs.add(f.refId);
+    if (str(f.saleId)) refs.add(f.saleId);
+    if (op.table === 'sales' || op.table === 'saleItems' || op.table === 'returns') refs.add(op.row_id);
+    if (tsOf(op)) tss.push(tsOf(op));
+  }
+  if (!refs.size && !tss.length) return [];
+  const lo = tss.length ? tss.reduce((m, t) => Math.min(m, t), Infinity) - Math.max(tol, SAVE_HLC_MS) : 0;
+  const hi = tss.length ? tss.reduce((m, t) => Math.max(m, t), 0) + Math.max(tol, SAVE_HLC_MS) : -1;
+  const rows = await many(
+    `SELECT id, table_name, row_id, detail FROM sync_v3_conflicts
+      WHERE app='shop' AND account_kind='shop' AND account_id=$1 AND kind = ANY($2::text[]) AND status='open'
+        AND loser_device=$3 AND at > $4 AND table_name IN ('sales','returns')
+        AND jsonb_typeof(detail->'refs') = 'array'
+        AND ((detail->'refs') ?| $5::text[]
+          OR (CASE WHEN jsonb_typeof(detail->'ts') = 'number' THEN (detail->>'ts')::numeric END) BETWEEN $6 AND $7)
+      LIMIT 200`,
+    [ctx.accountId, HOLD_KINDS, deviceId, now() - HOLD_TTL_MS, [...refs], lo, hi]
+  );
+  if (!rows.length) return [];
+  const list = (v) => (Array.isArray(v) ? v.filter((x) => typeof x === 'string') : []);
+  const parents = rows.map((r) => {
+    const d = isPlainObject(r.detail) ? r.detail : {};
+    return { perm: str(d.perm), index: -1, held: true, boxId: r.id, sale: str(d.sale), rows: new Set(list(d.rows)),
+      items: new Set(list(d.items)), at: Number(d.at) || 0, debtor: str(d.debtor), ts: Number(d.ts) || 0,
+      tol: d.path === 'v1' ? 0 : SAVE_HLC_MS, bulk: d.bulk === true };
+  });
+  //  سندی که از آن پس نشسته (مثلاً دوباره با برگه، از هر راهی) دیگر کسی را نگه نمی‌دارد
+  const ids = [...new Set(parents.flatMap((p) => (p.perm === 'returns.create' ? [...p.rows] : [p.sale])))];
+  const on = new Map();
+  for (const ledger of ['sync_rows', 'sync_v3_rows']) {
+    const got = await many(
+      `SELECT table_name, row_id, data->>'status' AS status FROM ${ledger}
+        WHERE app='shop' AND account_kind='shop' AND account_id=$1 AND table_name IN ('sales','returns')
+          AND row_id = ANY($2::text[]) AND deleted_at IS NULL`,
+      [ctx.accountId, ids]
+    );
+    for (const r of got) {
+      const k = `${r.table_name}/${r.row_id}`;
+      if (!on.has(k) || r.status === 'cancelled') on.set(k, r.status);
+    }
+  }
+  return parents.filter((p) => {
+    if (p.perm === 'sales.discount') return !!p.sale && !on.has(`sales/${p.sale}`);
+    if (p.perm === 'sales.cancel') return !!p.sale && on.get(`sales/${p.sale}`) !== 'cancelled';
+    if (p.perm === 'returns.create') return ![...p.rows].some((id) => on.has(`returns/${id}`));
+    return false;
+  });
+}
+
+/**
+ * سندِ برگشتِ این دسته دنبالهٔ سندِ برگشتِ ردشده است؟ (همان docId با ردیفِ تازه، یا همان
+ * فاکتور در همان ثبت — بُرشِ دسته یا سندِ دوم در همان ثبت). آن‌گاه جدا داوری نمی‌شود — وگرنه
+ * تکهٔ کوچکش زیرِ سقف می‌گذشت — و با همان رد برمی‌گردد. ردیفِ دوبارهٔ خودِ آن سند (با برگه) نه.
+ */
+function returnOwnerOf(g, parents) {
+  const ids = g.rows.map((r) => r.op.row_id);
+  return parents.find((p) => p.perm === 'returns.create' && !ids.some((id) => p.rows.has(id))
+    && ((g.docId && p.rows.has(g.docId)) || (p.sale !== '' && p.sale === g.sale && sameSave(p, g.rows[0].op)))) || null;
+}
+
+/**
+ * سندِ برگشتِ این دسته دنبالهٔ ثبتی است که بخشی از آن در دستهٔ پیشینِ همین دستگاه **پذیرفته**
+ * شد؟ ثبتِ بزرگ‌تر از یک دسته فقط با یک ts بریده می‌شود (`OpQueue.batch`/`cut`)، پس دنباله همان
+ * ts، همان دستگاه، همان فاکتور (و اگر هست همان docId) را دارد و ردیفی از آن در oplog هست.
+ * تصمیمِ سند همان بخشِ اول است. (docId ِ تکراری روی فاکتورِ دیگر یا با ts ِ دیگر دنباله نیست.)
+ */
+async function acceptedPartOf(ctx, deviceId, g) {
+  const first = g.rows[0].op;
+  const ts = tsOf(first);
+  if (!ts || (!g.docId && !g.sale)) return false;
+  const hit = await one(
+    `SELECT 1 AS x FROM oplog WHERE app='shop' AND account_kind='shop' AND account_id=$1 AND table_name='returns'
+        AND op_type='insert' AND device_id=$2 AND client_ts=$3
+        AND ($4::text = '' OR fields->>'docId' = $4) AND ($5::text = '' OR fields->>'saleId' = $5)
+        AND NOT (row_id = ANY($6::text[])) LIMIT 1`,
+    [ctx.accountId, deviceId, ts, g.docId || '', g.sale || '', g.rows.map((r) => String(r.op.row_id))]
+  );
+  return !!hit;
+}
+
+/** ردیف‌های سندِ پیوسته به سندِ ردشده: نشانی‌هایش به آن اضافه می‌شود (برای همراه‌های بعدی) */
+function absorb(p, g) {
+  for (const r of g.rows) {
+    const f = fieldsOf(r.op);
+    p.rows.add(r.op.row_id);
+    if (str(f.docId)) p.rows.add(f.docId);
+    if (str(f.saleItemId)) p.items.add(f.saleItemId);
+  }
+  if (p.held) p.dirty = true;
+}
+
+/** نشانی‌های تازهٔ سندِ نگه‌داشته در صندوقش */
+async function rememberHeld(p) {
+  const refs = [...new Set([p.sale, ...p.rows, ...p.items].filter(Boolean))].slice(0, 200);
+  await query(
+    `UPDATE sync_v3_conflicts SET detail = detail || $2::jsonb WHERE id=$1`,
+    [p.boxId, JSON.stringify({ refs, rows: [...p.rows].slice(0, 200), items: [...p.items].slice(0, 200) })]
+  );
+}
+
+/**
+ * میان‌افزارِ `POST /api/sync/v1/push` — فقط دکان. پمپ (و هر حسابِ دیگر) و صاحبِ دکان
+ * (همه‌چیز «مجاز»؛ هرگز سندِ ردشده ندارد) بی هیچ پرس‌وجویی رد می‌شوند.
  *
- * opی که تصمیمش allow نیست از دسته بیرون می‌آید و پاسخش در جای خودش
- * «rejected» است؛ همراه‌هایش در همین دسته (`companionOf`) هم با
- * `tx_rejected`. نقشی که پیش‌فرضش deny است (شاگرد برای تخفیف و لغو) به
- * همان `authorizeOp`ِ امروز سپرده می‌شود — رفتار و کدِ خطایش عوض نمی‌شود،
- * فقط همراه‌های opی که آن حتماً رد می‌کند دیگر یتیم نمی‌نشینند.
+ * سندی که تصمیمش allow نیست از دسته بیرون می‌آید و پاسخش در جای خودش «rejected» است:
+ *   • فاکتور (تخفیف/لغو) هر op جدا؛ برگشت هر سند یک بار، با سقفِ تجمعیِ فاکتور (بی قفل —
+ *     محدودیتِ شناختهٔ دو دستگاهِ هم‌زمان: `returnsLockKey`).
+ *   • همراه‌هایش (`companionOf`/`looseOf`) با `tx_rejected` — در همین دسته، یا دسته‌های بعدِ
+ *     همین دستگاه تا وقتی سند ننشسته (`heldParents`). وضعیتِ تازه‌ای نیست: هر برنامه‌ای
+ *     (حتی کهنه) فقط applied/duplicate/rejected می‌بیند؛ ردیفی که معلوم نیست مالِ سند است اعمال می‌شود.
+ *   • نقشی که پیش‌فرضش deny است (شاگرد): همان کدِ `authorizeOp`ِ v1 (discount_not_allowed،
+ *     cancel_not_allowed)، با همراه‌ها و صندوقِ perm_denied (مثلِ v3)؛ با برگه ⇒ approval_needs_v3.
  *
- * opی که op_idاش از پیش در oplog است داوری نمی‌شود: پاسخش «تکراری»ِ خودِ
- * v1 است، حتی اگر سقف از آن پس پایین آمده باشد (پاسخِ گم‌شده و تلاشِ دوباره).
+ * opی که op_idاش از پیش در oplog است داوری نمی‌شود: پاسخش «تکراری»ِ خودِ v1 است، حتی اگر
+ * سقف از آن پس پایین آمده باشد (پاسخِ گم‌شده و تلاشِ دوباره).
  */
 async function v1Guard(req, res, next) {
   const ctx = req.sync;
   if (!ctx || ctx.app !== 'shop' || ctx.accountKind !== 'shop' || !ctx.accountId) return next();
+  if (ctx.role === 'owner') return next();
   try {
     const ops = Array.isArray(req.body?.ops) ? req.body.ops : null;
     if (!ops || !ops.length) return next();
     const { validateOp } = require('./sync-v1');
     const valid = [];
-    const cands = [];
     ops.forEach((raw, i) => {
       const v = validateOp('shop', raw);
-      if (!v.ok) return;                       //  خودِ v1 ردش می‌کند، با دلیلِ خودش
-      valid.push({ i, op: v.op });
-      const need = needOfV1(v.op);
-      if (need) cands.push({ i, op: v.op, need });
+      if (v.ok) valid.push({ i, op: v.op, need: needOfV1(v.op) });   //  نادرست را خودِ v1 رد می‌کند
     });
-    if (!cands.length) return next();
+    const hasNeed = valid.some((x) => x.need);
+    if (!hasNeed && !valid.some((x) => LINKABLE.has(x.op.table))) return next();
+    const deviceId = String(req.body?.device_id || req.body?.deviceId || '').slice(0, 64);
+    const held0 = await heldParents(ctx, deviceId, valid.map((x) => x.op));
+    if (!hasNeed && !held0.length) return next();
     //  op_idِ ثبت‌شده (هر حسابی — op_id در oplog یکتاست) را خودِ v1 جواب می‌دهد:
-    //  «تکراری» برای همین حساب، op_id_taken برای دیگری. نه داوری، نه صندوق.
+    //  «تکراری» برای همین حساب، op_id_taken برای دیگری. نه داوری، نه همراه، نه صندوق.
     const seen = new Set((await many(
       'SELECT op_id FROM oplog WHERE op_id = ANY($1::text[])', [valid.map((x) => String(x.op.op_id))]
     )).map((r) => r.op_id));
-    const deviceId = String(req.body?.device_id || req.body?.deviceId || '').slice(0, 64);
+    const live = valid.filter((x) => !seen.has(String(x.op.op_id)));
+    const liveOps = live.map((x) => x.op);
+    //  دفترِ پایه: چند سند زیرِ یک ts
+    const heads = new Map();
+    for (const op of liveOps) {
+      const h = headKey(op);
+      const t = tsOf(op);
+      if (!h || !t) continue;
+      if (!heads.has(t)) heads.set(t, new Set());
+      heads.get(t).add(h);
+    }
+
     const rejected = new Map();
+    const reject = (x, reason) => rejected.set(x.i, { op_id: String(x.op.op_id || ''), status: 'rejected', reason });
     const parents = [];
-    for (const { i, op, need } of cands) {
-      if (seen.has(String(op.op_id))) continue;
-      const slip = isPlainObject(op.fields) && isPlainObject(op.fields.approval) ? op.fields.approval : null;
-      if (core.defaultMode(ctx.role, need.perm) === 'deny') {
-        //  نقشی که امروز این کار را ندارد (شاگرد): `authorizeOp`ِ v1 (مشترک با پمپ، دست‌نخورده)
-        //  با نقش ردش می‌کند — همان رفتار و کدِ امروز. فقط اگر برگه آورده، دلیلِ روشن‌تر:
-        //  تأییدِ شاگرد فقط از راهِ Sync v3 می‌نشیند.
-        if (!slip) {
-          if (v1RoleRejects(ctx.role, op)) parents.push({ i, op, need });
+
+    //  ۱) سرِ سندها — فاکتور هر op جدا، برگشت هر سند یک بار با سقفِ تجمعیِ فاکتور
+    const groups = groupReturns(live.filter((x) => x.need && x.need.perm === 'returns.create'));
+    const judged = new Set();
+    const tally = new Map();                     //  فاکتور ⇒ جمعِ برگشتِ ثبت‌شده + پذیرفتهٔ همین دسته
+    //  گذرِ اول: دنبالهٔ ثبتی که بخشِ اولش پذیرفته شد — تصمیمِ سند همان بخشِ اول است و مبلغش پیش از
+    //  داوریِ سندهای دیگرِ همین دسته به جمعِ فاکتور می‌رود. فقط سندی که دسته با ts ِ آن شروع می‌شود
+    //  می‌تواند دنباله باشد (بُرش فقط سرِ دسته را دنباله می‌کند) — بی پرس‌وجو برای بقیه.
+    const lead = valid.length ? tsOf(valid[0].op) : 0;
+    const continued = new Set();
+    for (const g of new Set(groups.values())) {
+      if (!lead || tsOf(g.rows[0].op) !== lead || returnOwnerOf(g, held0)) continue;
+      if (!(await acceptedPartOf(ctx, deviceId, g))) continue;
+      continued.add(g);
+      if (g.sale) {
+        if (!tally.has(g.sale)) tally.set(g.sale, await returnedTotal(null, ctx, g.sale));
+        tally.set(g.sale, tally.get(g.sale) + g.amount);
+      }
+    }
+    for (const x of live) {
+      if (!x.need) continue;
+      const g = groups.get(x.op) || null;
+      if (g) {
+        if (judged.has(g)) continue;
+        judged.add(g);
+        //  دنبالهٔ ثبتی که بخشِ اولش پذیرفته شد (گذرِ اول): وگرنه ردیف‌ها و حرکت‌های پذیرفته بی
+        //  شمارنده‌ها و رسیدِ مشترکِ ثبت (پشتِ سرِ همین ردیف‌ها) می‌ماندند
+        if (continued.has(g)) continue;
+        const owner = returnOwnerOf(g, parents.concat(held0));
+        if (owner) {
+          for (const m of g.rows) reject(m, 'tx_rejected');
+          absorb(owner, g);
           continue;
         }
-        const out = {
-          reason: 'approval_needs_v3', box: 'approval_rejected',
-          detail: { perm: need.perm, requester: ctx.userId || '', role: ctx.role || '', path: 'v1', slip_error: 'approval_needs_v3',
-            approver: typeof slip.by === 'string' ? slip.by.slice(0, 80) : '' },
-        };
-        rejected.set(i, { op_id: String(op.op_id || ''), status: 'rejected', reason: out.reason });
-        parents.push({ i, op, need });
-        await boxV1(ctx, op, deviceId, out);
-        continue;
       }
-      const out = await judge(null, ctx, need, slip, {
-        //  opِ بی زمان (برنامهٔ خیلی قدیمی) ⇒ فقط سنجشِ زمان کنار می‌رود؛ برگه هنوز یک‌بارمصرف و بسته به سند است
-        opId: op.op_id, at: Number(op.ts) > 0 ? Number(op.ts) : undefined, deviceId, path: 'v1',
-      });
-      if (!out) continue;
-      rejected.set(i, { op_id: String(op.op_id || ''), status: 'rejected', reason: out.reason });
-      parents.push({ i, op, need });
-      await boxV1(ctx, op, deviceId, out);
+      const members = g ? g.rows : [x];
+      const first = members[0];
+      let need = g ? g.need : x.need;
+      const slip = g ? g.slip : slipOf(x.op);
+      let out;
+      if (core.defaultMode(ctx.role, need.perm) === 'deny') {
+        if (slip) {
+          //  تأییدِ شاگرد فقط از راهِ Sync v3 می‌نشیند (v1ِ پمپ‌مشترک نقش را می‌سنجد)
+          out = { reason: 'approval_needs_v3', box: 'approval_rejected',
+            detail: { perm: need.perm, requester: ctx.userId || '', role: ctx.role || '', path: 'v1', slip_error: 'approval_needs_v3',
+              approver: typeof slip.by === 'string' ? slip.by.slice(0, 80) : '' } };
+        } else {
+          const why = v1RoleReason(ctx.role, first.op);
+          if (!why) continue;                  //  همان امروز: خودِ v1 می‌سنجد (حذفِ مالِ خودت، برگشت)
+          out = { reason: why, box: 'perm_denied',
+            detail: { perm: need.perm, decision: 'deny', requester: ctx.userId || '', role: ctx.role || '', path: 'v1' } };
+        }
+      } else {
+        if (g && g.sale) {
+          if (!tally.has(g.sale)) tally.set(g.sale, await returnedTotal(null, ctx, g.sale));
+          need = cumulativeNeed(g, tally.get(g.sale));
+        }
+        out = await judge(null, ctx, need, slip, {
+          //  opِ بی زمان (برنامهٔ خیلی قدیمی) ⇒ فقط سنجشِ زمان کنار می‌رود؛ برگه هنوز یک‌بارمصرف و بسته به سند است
+          opId: first.op.op_id, at: tsOf(first.op) || undefined, deviceId, path: 'v1',
+        });
+        if (!out) {
+          if (g && g.sale) tally.set(g.sale, tally.get(g.sale) + g.amount);
+          continue;
+        }
+      }
+      for (const m of members) reject(m, out.reason);
+      const p = parentOf(need.perm, members.map((m) => m.op), first.i, liveOps);
+      p.bulk = (heads.get(p.ts)?.size || 0) > 1;
+      p.box = { op: first.op, out };
+      parents.push(p);
     }
-    //  همراه‌های سندِ ردشده با آن برمی‌گردند (op_idِ ثبت‌شده را باز خودِ v1 جواب می‌دهد)
-    for (const p of parents) {
-      for (const { i, op } of valid) {
-        if (i === p.i || rejected.has(i) || seen.has(String(op.op_id)) || !companionOf(p.op, p.need, op)) continue;
-        rejected.set(i, { op_id: String(op.op_id || ''), status: 'rejected', reason: 'tx_rejected' });
+
+    //  ۲) همراه‌ها. سندِ نگه‌داشته‌ای که خودش در همین دسته پذیرفته شد (مثلاً لغوِ درستِ بعدی) کسی را نگه نمی‌دارد
+    const held = held0.filter((p) => !live.some((x) => !rejected.has(x.i) && touchesDoc(p, x.op)));
+    const all = parents.concat(held);
+    if (all.length) {
+      for (const x of live) {
+        if (rejected.has(x.i) || (x.need && x.op.table === 'sales')) continue;   //  فاکتورِ دیگر سندِ خودش است
+        if (all.some((p) => belongs(p, x.op))) reject(x, 'tx_rejected');
       }
     }
     if (!rejected.size) return next();
+
+    for (const p of held0) if (p.dirty) await rememberHeld(p);
+
+    //  ۳) صندوقِ تعارض: هر سندِ ردشده یک ردیف، با نشانی‌هایش (برای همراهِ دستهٔ بعدِ همین دستگاه)
+    for (const p of parents) {
+      const { op, out } = p.box;
+      const detail = {
+        ...out.detail,
+        refs: [...new Set([p.sale, ...p.rows, ...p.items].filter(Boolean))].slice(0, 200),
+        sale: p.sale || undefined, rows: [...p.rows].slice(0, 200), items: [...p.items].slice(0, 200),
+        at: p.at || undefined, debtor: p.debtor || undefined, ts: p.ts || undefined, bulk: p.bulk || undefined,
+      };
+      await boxV1(ctx, op, deviceId, { box: out.box, detail });
+    }
+
     req.body.ops = ops.filter((_, i) => !rejected.has(i));
     const send = res.json.bind(res);
     res.json = (body) => {
@@ -463,6 +877,161 @@ async function v1Guard(req, res, next) {
     };
     next();
   } catch (err) { next(err); }
+}
+
+// ---------- v3 ِ بی tx: همراه‌ها با سندشان یک واحد ----------
+
+/** نمای v1 ِ یک op ِ v3 برای همان قاعده‌های همراه (delta ⇒ update، شمارنده‌ها با نامِ v1، مهر = دیوارِ HLC) */
+function v3View(op) {
+  const f = isPlainObject(op.fields) ? op.fields : {};
+  const fields = { ...f };
+  if ('debtSettledMinor' in f) fields.debtSettled = f.debtSettledMinor;
+  if ('returnedQtyMilli' in f) fields.returnedQty = f.returnedQtyMilli;
+  return { table: op.table, row_id: op.row_id, type: op.kind === 'delta' ? 'update' : op.kind, fields, ts: wallOf(op.hlc) || 0 };
+}
+
+/**
+ * برنامهٔ v3 ِ کهنه برای ثبتِ بزرگ‌تر از ۵۰ op ِ سند tx نمی‌گذاشت ⇒ سرور هر op را جدا اعمال
+ * می‌کرد. این‌جا هر سندِ پولی (فاکتورِ تخفیف‌دار، لغو، برگشت) با همراه‌هایش در همان دسته — با
+ * همان قاعدهٔ v1، «همان ثبت» = دیوارِ HLC ِ نزدیک — یک واحد می‌شود: همه یا هیچ.
+ * @param units  واحدهای `push` ِ v3 (هر واحدِ بی tx یک قلم دارد)
+ * @returns واحدهای تازه (واحدهای بی‌ربط دست‌نخورده، به همان ترتیب)
+ */
+function bundleV3(units, groups) {
+  const entries = [];
+  units.forEach((u, ui) => {
+    if (u.tx || u.broken) return;
+    for (const it of u.items) entries.push({ ui, it, views: it.ops.map(v3View) });
+  });
+  if (entries.length < 2) return units;
+  const parents = [];
+  const seenGroup = new Set();
+  entries.forEach((e, k) => e.it.ops.forEach((op, j) => {
+    let perm = null;
+    if (op.table === 'sales' && op.kind === 'insert' && int(op.fields?.discountMinor) > 0) perm = 'sales.discount';
+    else if (op.table === 'sales' && op.kind === 'cancel') perm = 'sales.cancel';
+    else if (op.table === 'returns' && op.kind === 'insert') perm = 'returns.create';
+    if (!perm) return;
+    let members = [k];
+    let views = [e.views[j]];
+    const g = perm === 'returns.create' && groups ? groups.get(op) : null;
+    if (g) {
+      if (seenGroup.has(g)) return;
+      seenGroup.add(g);
+      members = [];
+      views = [];
+      entries.forEach((e2, k2) => e2.it.ops.forEach((o2, j2) => {
+        if (groups.get(o2) === g) { members.push(k2); views.push(e2.views[j2]); }
+      }));
+    }
+    const p = parentOf(perm, views, k, entries.flatMap((x) => x.views));
+    p.tol = SAVE_HLC_MS;
+    const near = new Set();
+    for (const x of entries) for (const v of x.views) {
+      const h = headKey(v);
+      if (h && v.ts && Math.abs(v.ts - p.ts) <= SAVE_HLC_MS) near.add(h);
+    }
+    p.bulk = near.size > 1;
+    p.members = members;
+    parents.push(p);
+  }));
+  if (!parents.length) return units;
+  const root = entries.map((_, k) => k);
+  const find = (k) => (root[k] === k ? k : (root[k] = find(root[k])));
+  const join = (a, b) => { const x = find(a); const y = find(b); if (x !== y) root[Math.max(x, y)] = Math.min(x, y); };
+  for (const p of parents) {
+    for (const m of p.members) join(p.members[0], m);
+    entries.forEach((e, k) => { if (e.views.some((v) => belongs(p, v))) join(p.members[0], k); });
+  }
+  const byRoot = new Map();
+  entries.forEach((e, k) => {
+    const r = find(k);
+    if (!byRoot.has(r)) byRoot.set(r, []);
+    byRoot.get(r).push(e);
+  });
+  const place = new Map();
+  const drop = new Set();
+  for (const list of byRoot.values()) {
+    if (list.length < 2) continue;
+    const uis = list.map((e) => e.ui);
+    for (const ui of uis) drop.add(ui);
+    place.set(Math.min(...uis), { tx: '', bundled: true, items: list.map((e) => e.it).sort((a, b) => a.i - b.i) });
+  }
+  if (!place.size) return units;
+  return units.flatMap((u, ui) => (place.has(ui) ? [place.get(ui)] : drop.has(ui) ? [] : [u]));
+}
+
+/**
+ * نشانی‌های سندِ ردشدهٔ v3 برای صندوقش (`detail`) — همان شکلِ v1 — تا همراهِ بی tx ِ دستهٔ
+ * بعدِ همین دستگاه هم رد شود (`holdV3Units`).
+ */
+function holdInfoV3(op, groups) {
+  let perm = null;
+  if (op.table === 'sales' && op.kind === 'insert') perm = 'sales.discount';
+  else if (op.table === 'sales' && op.kind === 'cancel') perm = 'sales.cancel';
+  else if (op.table === 'returns' && op.kind === 'insert') perm = 'returns.create';
+  if (!perm) return {};
+  const g = perm === 'returns.create' && groups ? groups.get(op) : null;
+  const p = parentOf(perm, g ? g.rows.map((r) => v3View(r.op)) : [v3View(op)], 0, null);
+  return {
+    refs: [...new Set([p.sale, ...p.rows, ...p.items].filter(Boolean))].slice(0, 200),
+    sale: p.sale || undefined, rows: [...p.rows].slice(0, 200), items: [...p.items].slice(0, 200),
+    at: p.at || undefined, debtor: p.debtor || undefined, ts: p.ts || undefined,
+  };
+}
+
+/**
+ * v3 ِ بی tx (برنامهٔ کهنه): همراهِ سندی که در دستهٔ پیشینِ همین دستگاه رد شد ⇒ واحدش «شکسته»
+ * (`tx_rejected`). همان قاعدهٔ `heldParents`؛ سندی که خودش در همین دسته دوباره آمده آزاد است.
+ * @returns شمارِ واحدهای شکسته
+ */
+async function holdV3Units(ctx, deviceId, units) {
+  //  صاحبِ دکان هرگز رد نمی‌شود و صندوقِ کسِ دیگری (حتی روی همان دستگاه) نگهش نمی‌دارد
+  if (ctx.role === 'owner') return 0;
+  const loose = units.filter((u) => !u.tx && !u.broken && u.items.every((it) => !it.v2));
+  if (!loose.length) return 0;
+  const views = loose.flatMap((u) => u.items.flatMap((it) => it.ops.map(v3View)));
+  const held0 = await heldParents(ctx, deviceId, views, { tol: SAVE_HLC_MS });
+  const held = held0.filter((p) => !views.some((v) => touchesDoc(p, v)));
+  if (!held.length) return 0;
+  let n = 0;
+  for (const u of loose) {
+    const vs = u.items.flatMap((it) => it.ops.map(v3View));
+    if (vs.some((v) => held.some((p) => belongs(p, v)))) { u.broken = true; n++; }
+  }
+  return n;
+}
+
+/**
+ * دنبالهٔ tx ای که سرش در دستهٔ پیشینِ همین دستگاه با سقف/تأیید رد شد (tx ِ بزرگ‌تر از یک
+ * دسته): فقط صندوقِ باز، حداکثر یک روز، و نه وقتی سرِ آن سند از آن پس در دفترِ v3 نشسته.
+ * @returns Set<tx>
+ */
+async function heldTxs(q, ctx, deviceId, txs) {
+  if (!txs.length) return new Map();
+  const rows = (await q.query(
+    `SELECT detail->>'tx' AS tx, loser_op_id, table_name, row_id, detail->>'perm' AS perm FROM sync_v3_conflicts
+      WHERE app='shop' AND account_kind='shop' AND account_id=$1 AND kind = ANY($2::text[]) AND status='open'
+        AND loser_device=$3 AND at > $4 AND detail->>'tx' = ANY($5::text[])`,
+    [ctx.accountId, HOLD_KINDS, deviceId, now() - HOLD_TTL_MS, txs]
+  )).rows;
+  if (!rows.length) return new Map();
+  const ids = [...new Set(rows.map((r) => r.row_id))];
+  const on = new Map((await q.query(
+    `SELECT table_name, row_id, data->>'status' AS status FROM sync_v3_rows
+      WHERE app='shop' AND account_kind='shop' AND account_id=$1 AND table_name IN ('sales','returns')
+        AND row_id = ANY($2::text[]) AND deleted_at IS NULL`,
+    [ctx.accountId, ids]
+  )).rows.map((r) => [`${r.table_name}/${r.row_id}`, r.status]));
+  const out = new Map();
+  for (const r of rows) {
+    const k = `${r.table_name}/${r.row_id}`;
+    const landed = r.perm === 'sales.cancel' ? on.get(k) === 'cancelled' : on.has(k);
+    if (landed) continue;
+    if (!out.has(r.tx)) out.set(r.tx, new Set());
+    out.get(r.tx).add(r.loser_op_id);
+  }
+  return out;
 }
 
 // ---------- سابقه ----------
@@ -491,4 +1060,6 @@ module.exports = {
   ALG, MAX_KEYS_PER_USER, APPROVER_ROLES, DENY_CODE, MESSAGES,
   keyIdOf, parsePublicKey, registerKey, listKeys, revokeKey,
   needOf, needOfV1, verifySignature, acceptSlip, judge, wallOf, slipOf, v1Guard, listApprovals,
+  returnDocKey, groupReturns, returnGroupsOf, judgeGroup, companionOf, bundleV3, HOLD_KINDS,
+  returnsLockKey, returnedTotal, holdInfoV3, holdV3Units, heldTxs,
 };

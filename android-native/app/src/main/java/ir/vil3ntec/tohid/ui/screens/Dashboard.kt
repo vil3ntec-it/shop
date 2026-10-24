@@ -51,6 +51,7 @@ import ir.vil3ntec.tohid.ui.theme.Radius
 import ir.vil3ntec.tohid.ui.theme.Shape
 import ir.vil3ntec.tohid.ui.theme.glassSurface
 import ir.vil3ntec.tohid.ui.theme.Shop
+import ir.vil3ntec.tohid.ui.theme.Brand
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -551,7 +552,7 @@ private fun CategoryBar(name: String, amount: Double, ratio: Float) {
 /** نمودارِ ساده و بی‌کتابخانه — همان روندی که وب می‌کشد */
 @Composable
 private fun TrendChart(values: List<Double>) {
-  val line = Shop.colors.primary
+  val line = Shop.colors.chart.sales
   val fill = Shop.colors.primaryTint
   Canvas(Modifier.fillMaxWidth().height(120.dp)) {
     if (values.isEmpty()) return@Canvas
@@ -771,7 +772,8 @@ fun LetterAvatar(name: String, size: androidx.compose.ui.unit.Dp, radius: androi
     Modifier
       .size(size)
       .clip(RoundedCornerShape(radius))
-      .background(Brush.linearGradient(listOf(colors.primary, colors.accent))),
+      //  VILL3N: پُرِ برند (سبزآبیِ پررنگ ⇐ برند) تا حرفِ سفید در روز و شب ≥ ۴٫۵:۱ بماند
+      .background(Brush.linearGradient(listOf(colors.brandDeep, colors.brandDeep))),
     contentAlignment = Alignment.Center,
   ) {
     Text(
@@ -798,14 +800,14 @@ private fun HeroSalesCard(view: DashboardNumbers) {
       .shadow(
         elevation = 18.dp,
         shape = RoundedCornerShape(Radius.lg),
-        ambientColor = colors.primary,
-        spotColor = colors.primary,
+        ambientColor = colors.glow,
+        spotColor = colors.glow,
       )
       .clip(RoundedCornerShape(Radius.lg))
-      //  بنفش به آبی به نعنایی — سه ایست، نه دو: گذارِ دو رنگه وسطش
-      //  خاکستری می‌زند و کارت کدر می‌شود
+      //  VILL3N: سبزآبیِ پررنگ ⇐ برند ⇐ آبیِ پیوند (پیش‌تر بنفش به آبی به نعنایی). سه ایست،
+      //  نه دو: گذارِ دو رنگه وسطش خاکستری می‌زند. همه در روز و شب همان، چون متن سفید است
       .background(
-        Brush.linearGradient(listOf(colors.primaryDark, colors.primary, Color(0xFF4F8BE8), colors.accent))
+        Brush.linearGradient(listOf(Brand.deep, Brand.primary, Brand.blue))
       )
       .padding(18.dp),
   ) {
