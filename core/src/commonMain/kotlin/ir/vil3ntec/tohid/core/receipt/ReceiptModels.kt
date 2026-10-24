@@ -34,6 +34,8 @@ data class ReceiptInput(
   val debtorName: String? = null,
   /** نشانیِ QR؛ null ⇒ فروشِ بی توکن یا QR ِ خاموش */
   val qrUrl: String? = null,
+  /** «برای دیدنِ این خرید اسکن کنید» زیرِ QR — فقط برای نشانیِ عمومی، نه کدِ داخلیِ برگشت */
+  val qrCaption: Boolean = true,
   /** لوگوی یک‌بیتیِ همین کاغذ (`LogoDither`)؛ null ⇒ بی لوگو */
   val logo: MonoImage? = null,
   /** «نسخهٔ دوم» و مانندِ آن (#300) */

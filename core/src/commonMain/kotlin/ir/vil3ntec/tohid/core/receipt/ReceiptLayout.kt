@@ -75,7 +75,7 @@ object ReceiptLayout {
     /* ------------------------------ QR و پایان ------------------------------ */
     b += ReceiptBlock.Rule()
     input.qrUrl?.let { url ->
-      text(labels.scan, TextStyle.SMALL)
+      if (input.qrCaption) text(labels.scan, TextStyle.SMALL)
       b += ReceiptBlock.Gap(m.gap / 2)
       b += ReceiptBlock.Qr(url, QrCode.encode(url))
       b += ReceiptBlock.Gap(m.gap / 2)

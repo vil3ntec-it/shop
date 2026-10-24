@@ -59,6 +59,8 @@ fun BarcodeScanSheet(
   onDismiss: () -> Unit,
   onCode: (String) -> Unit,
   title: String = "اسکن بارکد",
+  /** RET-01 — QRِ رسید هم خوانده شود */
+  qr: Boolean = false,
 ) {
   val context = LocalContext.current
 
@@ -137,6 +139,7 @@ fun BarcodeScanSheet(
               },
               onStatus = { text, isError -> status = text; statusError = isError },
               modifier = Modifier.fillMaxSize(),
+              qr = qr,
             )
             //  دیگر کادری نیست — فقط خطِ اسکن روی تصویرِ زنده
             ScanLine(

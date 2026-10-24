@@ -64,8 +64,10 @@ object Receipts {
     widthDots: Int,
     copyMark: String? = null,
     fallbackName: String = localName(context),
+    legacyQr: String? = null,
     labels: ReceiptLabels = ReceiptLabels.FA,
   ): ReceiptInput {
+    val publicUrl = publicUrl(context, sale)
     val profile = ReceiptProfileStore.current(context)
     val items = d.saleItems.filter { it.saleId == sale.id }.map { item ->
       LineView(
@@ -96,7 +98,9 @@ object Receipts {
       paid = sale.paidAmount,
       remaining = sale.remaining,
       debtorName = sale.debtorId?.let { id -> d.debtors.find { it.id == id }?.name },
-      qrUrl = publicUrl(context, sale),
+      //  فروشِ نسخهٔ ۲: نشانیِ عمومی؛ فروشِ کهنه با «برگشتِ تازه»: کدِ `TR1:` ِ اسکنرِ برگشت (بی متنِ «اسکن کنید»)
+      qrUrl = publicUrl ?: legacyQr,
+      qrCaption = publicUrl != null,
       logo = ReceiptProfileStore.logoMono(context, widthDots),
       copyMark = copyMark,
     )
@@ -104,20 +108,21 @@ object Receipts {
 
   fun doc(
     context: Context, d: ShopData, sale: Sale, widthDots: Int,
-    copyMark: String? = null, fallbackName: String = localName(context),
-  ): ReceiptDoc = ReceiptLayout.build(input(context, d, sale, widthDots, copyMark, fallbackName), widthDots, format())
+    copyMark: String? = null, fallbackName: String = localName(context), legacyQr: String? = null,
+  ): ReceiptDoc = ReceiptLayout.build(input(context, d, sale, widthDots, copyMark, fallbackName, legacyQr), widthDots, format())
 
   fun mono(
     context: Context, d: ShopData, sale: Sale, widthDots: Int,
-    copyMark: String? = null, fallbackName: String = localName(context),
-  ): MonoImage = ReceiptRaster.compose(doc(context, d, sale, widthDots, copyMark, fallbackName), ReceiptPainter(context))
+    copyMark: String? = null, fallbackName: String = localName(context), legacyQr: String? = null,
+  ): MonoImage = ReceiptRaster.compose(doc(context, d, sale, widthDots, copyMark, fallbackName, legacyQr), ReceiptPainter(context))
 
   fun bitmap(
     context: Context, d: ShopData, sale: Sale, widthDots: Int = SHARE_DOTS,
-    copyMark: String? = null, fallbackName: String = localName(context),
-  ): Bitmap = ThermalPrinter.toBitmap(mono(context, d, sale, widthDots, copyMark, fallbackName))
+    copyMark: String? = null, fallbackName: String = localName(context), legacyQr: String? = null,
+  ): Bitmap = ThermalPrinter.toBitmap(mono(context, d, sale, widthDots, copyMark, fallbackName, legacyQr))
 
-  fun pdf(context: Context, d: ShopData, sale: Sale): ByteArray = ReceiptPdf.single(mono(context, d, sale, SHARE_DOTS))
+  fun pdf(context: Context, d: ShopData, sale: Sale, legacyQr: String? = null): ByteArray =
+    ReceiptPdf.single(mono(context, d, sale, SHARE_DOTS, legacyQr = legacyQr))
 
   /** رقم و نمادِ همین دستگاه (LOC-05، LOC-07) — همان `LocaleText` ِ همه‌جای برنامه */
   fun format(): ReceiptFormat {
