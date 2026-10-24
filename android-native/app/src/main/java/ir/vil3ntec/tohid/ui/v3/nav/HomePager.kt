@@ -3,6 +3,7 @@ package ir.vil3ntec.tohid.ui.v3.nav
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.unit.Dp
+import ir.vil3ntec.tohid.data.ShopData
 
 /**
  *  درزِ خانه ⇄ آمار (G10 ⇄ G6) بی import ِ صفحهٔ گروهِ دیگر:
@@ -12,5 +13,5 @@ import androidx.compose.ui.unit.Dp
  */
 object HomePager {
   val page = mutableStateOf<Int?>(null)
-  var stats: (@Composable (bottomReserve: Dp, pages: Int, current: Int) -> Unit)? = null
+  var stats: (@Composable (d: ShopData, bottomReserve: Dp, pages: Int, current: Int) -> Unit)? = null
 }

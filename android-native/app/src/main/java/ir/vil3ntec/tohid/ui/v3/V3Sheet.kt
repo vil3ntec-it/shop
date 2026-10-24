@@ -28,6 +28,7 @@ import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -79,6 +80,11 @@ fun V3Sheet(
     confirmValueChange = { it != SheetValue.Hidden || canHide || allowHide[0] },
   )
   val scope = rememberCoroutineScope()
+  //  صفحهٔ پشتِ برگه تا ۰٫۹۶ کوچک می‌شود (`v3BehindSheet` ِ پوسته)
+  DisposableEffect(Unit) {
+    V3Depth.sheets.intValue++
+    onDispose { V3Depth.sheets.intValue-- }
+  }
   val closer = remember(state) {
     V3SheetCloser { after ->
       allowHide[0] = true
