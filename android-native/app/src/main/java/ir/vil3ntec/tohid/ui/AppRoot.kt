@@ -184,6 +184,8 @@ fun AppRoot(
   LifecycleEventEffect(Lifecycle.Event.ON_STOP) { ir.vil3ntec.tohid.sync.AutoSync.stopPolling() }
   //  «سفارش‌ها»: فقط اگر سرور برای این دکان روشن گفته، و فقط وقتی برنامه جلوی چشم است
   OrdersLive.Host()
+  //  تخفیف‌های دکان (PRM): پیش‌فرض خاموش؛ نسخهٔ همین دستگاه برای کارِ آفلاین
+  PromoLive.Host()
   LaunchedEffect(loaded) {
     if (loaded) {
       ir.vil3ntec.tohid.sync.AutoSync.now(context, store)
@@ -277,11 +279,26 @@ fun AppRoot(
   }
   val railRequest = AppNav.rail.value
   LaunchedEffect(railRequest) { if (railRequest != null) { setRail(railRequest); AppNav.rail.value = null } }
-  /** ☰: ثابت ⇄ آیکن؛ در حالتِ پنهان، منو را روی صفحه باز/بسته می‌کند */
+  /*
+   *  نسخهٔ ۲ — منو در صندوق (بازبینیِ ۱۴۰۵/۰۷/۲۷): صندوق حالتِ منوی **خودش** را دارد
+   *  (`desk_rail_pos`، پیش‌فرض «فقط آیکن») تا کاتالوگ جا بگیرد؛ بقیهٔ صفحه‌ها همان انتخابِ
+   *  کاربر (`desk_rail`). «پنهان» در همه‌جا پنهان است.
+   */
+  val onSale = Platform.DESKTOP && RoutePaths.base(nav.current) == "sale"
+  var posRail by remember { mutableStateOf(uiPrefs.getString("desk_rail_pos", RailMode.COMPACT) ?: RailMode.COMPACT) }
+  fun setPosRail(m: String) {
+    posRail = m
+    railOverlay = false
+    uiPrefs.edit().putString("desk_rail_pos", m).apply()
+  }
+  val shownRail = if (onSale && railMode != RailMode.HIDDEN) posRail else railMode
+  /** حالتِ منوی همین صفحه را عوض می‌کند (صندوق: `desk_rail_pos`؛ بقیه: `desk_rail`) */
+  fun setShownRail(m: String) { if (onSale && m != RailMode.HIDDEN) setPosRail(m) else setRail(m) }
+  /** ☰: ثابت ⇄ آیکن (برای همین صفحه)؛ در حالتِ پنهان، منو را روی صفحه باز/بسته می‌کند */
   fun onMenuPress() {
-    when (railMode) {
-      RailMode.FULL -> setRail(RailMode.COMPACT)
-      RailMode.COMPACT -> setRail(RailMode.FULL)
+    when (shownRail) {
+      RailMode.FULL -> setShownRail(RailMode.COMPACT)
+      RailMode.COMPACT -> setShownRail(RailMode.FULL)
       else -> railOverlay = !railOverlay
     }
   }
@@ -411,6 +428,7 @@ fun AppRoot(
           onMenu = { onMenuPress() },
           onSearch = { AppNav.palette.value = true },
           onOpen = { nav.open(it) },
+          page = V3Modules.legacyId(current),
         )
         CompositionLocalProvider(ir.vil3ntec.tohid.ui.v3.nav.LocalV3Nav provides nav) { ir.vil3ntec.tohid.ui.v3.shell.ShellNotice() }
       }
@@ -429,10 +447,10 @@ fun AppRoot(
         TohidLoadingState(rows = 5, modifier = Modifier.padding(16.dp))
         return@Box
       }
-      if (wide && railMode != RailMode.HIDDEN) {
+      if (wide && shownRail != RailMode.HIDDEN) {
         val railBoard = remember(data) { ir.vil3ntec.tohid.data.DashboardEngine.board(data, ir.vil3ntec.tohid.todayIso(), 7) }
         DeskRail(
-          current = V3Modules.legacyId(current), onPick = { nav.open(it) }, compact = railMode == RailMode.COMPACT, mode = railMode, onMode = ::setRail,
+          current = V3Modules.legacyId(current), onPick = { nav.open(it) }, compact = shownRail == RailMode.COMPACT, mode = shownRail, onMode = ::setShownRail,
           badges = mapOf(
             "products" to railBoard.outOfStock.size + railBoard.lowStock.size,
             "warehouse" to railBoard.expiring.size,
@@ -461,15 +479,15 @@ fun AppRoot(
         ) {
           Box(Modifier.fillMaxSize().clickable { railOverlay = false }) {
             Box(Modifier.align(Alignment.CenterStart).fillMaxHeight()) {
-              DeskRail(current = V3Modules.legacyId(current), onPick = { nav.open(it); railOverlay = false }, mode = railMode, onMode = ::setRail)
+              DeskRail(current = V3Modules.legacyId(current), onPick = { nav.open(it); railOverlay = false }, mode = shownRail, onMode = ::setShownRail)
             }
           }
         }
       }
       val railPad = when {
         !wide -> 0.dp
-        railMode == RailMode.FULL -> DESK_RAIL_WIDTH
-        railMode == RailMode.COMPACT -> DESK_RAIL_COMPACT
+        shownRail == RailMode.FULL -> DESK_RAIL_WIDTH
+        shownRail == RailMode.COMPACT -> DESK_RAIL_COMPACT
         else -> 0.dp
       }
       //  جای نوارِ شناور: خانه خودش زیرِ نوار می‌کشد؛ صفحهٔ بی‌نوار (صندوق) فقط نوارِ سیستم
