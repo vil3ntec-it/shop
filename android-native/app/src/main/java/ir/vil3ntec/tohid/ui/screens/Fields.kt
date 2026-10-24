@@ -111,6 +111,8 @@ fun DateField(value: String, onValueChange: (String) -> Unit) {
 
   val parsed = remember(text) { Jalali.parseTyped(text) }
   val broken = text.isNotBlank() && parsed == null
+  //  نمونه با همان `formatDate` ِ بقیهٔ صفحه (رقمِ لاتین؛ تنظیمِ رقمِ برنامه با قلم نشانش می‌دهد)
+  val sample = remember { formatDate(todayIso()) }
 
   Text("تاریخ", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
   Spacer(Modifier.height(6.dp))
@@ -121,13 +123,13 @@ fun DateField(value: String, onValueChange: (String) -> Unit) {
         text = latinDigits(raw).filter { c -> c.isDigit() || c == '/' || c == '-' }
         Jalali.parseTyped(text)?.let(onValueChange)
       },
-      placeholder = { Text("۱۴۰۵/۰۶/۰۶") },
+      placeholder = { Text(sample) },
       singleLine = true,
       isError = broken,
       keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
       supportingText = {
         Text(
-          if (broken) "تاریخ خوانده نشد — مثل ۱۴۰۵/۰۶/۰۶ بنویسید" else "تاریخ خورشیدی",
+          if (broken) "تاریخ خوانده نشد — مثل $sample بنویسید" else "تاریخ خورشیدی",
           style = MaterialTheme.typography.labelSmall,
         )
       },
