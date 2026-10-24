@@ -37,6 +37,12 @@ class V3Nav(private val table: RouteTable, val home: String, initial: NavStack) 
   /** چیدمانِ پهن (کامپیوتر/تبلتِ افقی): صفحه‌ها هم‌سطح */
   var wide: Boolean = false
 
+  /**
+   *  تبی که بخش‌های بیرون از نوار زیرش باز می‌شوند (گوشی: «بیشتر»؛ کامپیوتر: خانه). پیوندِ سرد
+   *  به `stock/42` ⇐ `[more, stock, stock/42]`: «بیشتر» فعال است و برگشت به «بیشتر» می‌رود.
+   */
+  var sectionsRoot: String = home
+
   /** پوسته پشتِ دروازه است؟ (پیوندها نگه داشته می‌شوند) */
   var held: Boolean = false
     set(value) {
@@ -131,7 +137,11 @@ class V3Nav(private val table: RouteTable, val home: String, initial: NavStack) 
     val chain = table.chain(path)
     if (chain.isEmpty()) return
     val root = chain.first()
-    val entries = if (isTab(RoutePaths.normalize(root.substringBefore('?'))) || root == home) chain else listOf(home) + chain
+    val entries = when {
+      isTab(RoutePaths.normalize(root.substringBefore('?'))) || root == home -> chain
+      root == sectionsRoot -> chain
+      else -> listOf(sectionsRoot) + chain
+    }
     stack = NavStack(entries.takeLast(NavStack.MAX_DEPTH), Move.PUSH)
   }
 
