@@ -345,11 +345,81 @@ async function sender(destination) {
   return senders[provider] || senders.log;
 }
 
+/*
+ *  ── SEC-06: سقفِ هزینه و ضدِ «SMS pumping» ─────────────────────────────
+ *  فقط وقتی پیامکِ واقعی می‌رود (راهِ ارسال `log` نیست) و فقط برای شماره؛
+ *  ایمیل و `log` هزینه‌ای ندارند. سه سنجهٔ ساعتی از خودِ `otp_codes` (IP و
+ *  مقصد و زمان آن‌جاست؛ نمایه‌های at و destination) و سقفِ روزانهٔ سراسری از
+ *  دفترِ یگانهٔ `sms_usage` (همهٔ هدف‌ها، `lib/sms-usage`):
+ *    - یک IP: بیش از ipPhones شمارهٔ جدا در ساعت ⇒ ۴۲۹ sms_ip_limit
+ *    - یک بلوکِ هزارتایی (شماره بی سه رقمِ آخر): بیش از blockPhones ⇒ sms_prefix_limit
+ *    - شماره‌های بیرون از پیش‌شمارهٔ کشور: بیش از foreignPhones در ساعت ⇒ sms_foreign_limit
+ *    - کلِ سرور: dailyMax پیامکِ پذیرفته در ۲۴ ساعت ⇒ sms_daily_ceiling
+ *  شمارهٔ تکراری (همان مقصد) هرگز به سنجه‌های «شمارهٔ جدا» نمی‌افزاید؛ فاصله
+ *  و سقفِ روزانهٔ هر مقصد کارِ خودش را از پیش دارد. ثابت‌اند، بی متغیرِ محیطی.
+ *  ⛔ مسیرهای پمپ (`senders.sms` ِ مستقیم در vip-codes) این‌جا نمی‌آیند.
+ */
+const SMS_GUARD = Object.freeze({
+  hourMs: 60 * 60 * 1000,
+  ipPhones: 10,
+  blockPhones: 10,
+  blockDigits: 3,
+  foreignPhones: 20,
+  dailyMax: 2000,
+});
+const HOME_CC = process.env.DEFAULT_COUNTRY_CODE || '+93';   // همان پیش‌فرضِ validate.phone
+let ceilingAlertDay = '';
+
+async function distinctPhones(where, params) {
+  const r = await one(
+    `SELECT COUNT(DISTINCT destination)::int AS n FROM otp_codes
+      WHERE created_at > $1 AND destination NOT LIKE '%@%' AND via <> 'log' AND destination <> $2 AND ${where}`,
+    params
+  );
+  return r.n;
+}
+
+async function smsGuard(destination, { ip = '', at = now() } = {}) {
+  const since = at - SMS_GUARD.hourMs;
+  const fresh = !(await one(
+    `SELECT 1 AS x FROM otp_codes WHERE destination = $1 AND created_at > $2 LIMIT 1`, [destination, since]
+  ));
+  if (fresh) {
+    const block = destination.slice(0, -SMS_GUARD.blockDigits);
+    if (ip && await distinctPhones('ip = $3', [since, destination, ip]) >= SMS_GUARD.ipPhones) {
+      throw tooMany('از این شبکه در این ساعت برای شماره‌های زیادی کد خواسته شده است؛ کمی بعد دوباره امتحان کنید', 'sms_ip_limit');
+    }
+    if (await distinctPhones('destination LIKE $3', [since, destination, `${block}%`]) >= SMS_GUARD.blockPhones) {
+      throw tooMany('فرستادنِ کد به این دسته از شماره‌ها فعلاً بسته است؛ کمی بعد دوباره امتحان کنید', 'sms_prefix_limit');
+    }
+    if (!destination.startsWith(HOME_CC)
+        && await distinctPhones('destination NOT LIKE $3', [since, destination, `${HOME_CC}%`]) >= SMS_GUARD.foreignPhones) {
+      throw tooMany('فرستادنِ کد به شماره‌های خارجی فعلاً بسته است؛ کمی بعد دوباره امتحان کنید', 'sms_foreign_limit');
+    }
+  }
+  const sent = await require('./sms-usage').countSince(at - 24 * SMS_GUARD.hourMs, { okOnly: true });
+  if (sent >= SMS_GUARD.dailyMax) {
+    const day = new Date(at).toISOString().slice(0, 10);
+    if (ceilingAlertDay !== day) {
+      ceilingAlertDay = day;
+      console.error(`[otp] ⛔ سقفِ روزانهٔ پیامک (${SMS_GUARD.dailyMax}) پر شد؛ کدِ پیامکی تا ۲۴ ساعت نمی‌رود`);
+    }
+    throw tooMany('سقفِ روزانهٔ پیامکِ سرور پر شده است؛ فعلاً با ایمیل وارد شوید یا بعداً امتحان کنید', 'sms_daily_ceiling');
+  }
+}
+
+/** SEC-06: هر تلاشِ پیامک (نه ایمیل) در دفترِ یگانهٔ sms_usage — شکستش ورود را نمی‌شکند. */
+function recordSms(destination, { shopId = '', app = '', purpose = '', via = '', ok = true } = {}) {
+  if (isEmail(destination)) return Promise.resolve();
+  return require('./sms-usage').record({ shopId, app, purpose, via, ok })
+    .catch((err) => console.error('[otp] دفترِ پیامک ثبت نشد:', err.message));
+}
+
 /**
  * ساخت و فرستادن کد.
  * @param {string} destination شماره یا ایمیل\n * @returns {{sent:boolean, expiresAt:number, resendAfter:number, devCode?:string}}
  */
-async function request(destination, { purpose = 'login', ip = '', app = '' } = {}) {
+async function request(destination, { purpose = 'login', ip = '', app = '', shopId = '' } = {}) {
   const t = now();
 
   // فاصله‌ی ارسال دوباره
@@ -369,6 +439,11 @@ async function request(destination, { purpose = 'login', ip = '', app = '' } = {
   );
   if (n >= config.otp.dailyMax) {
     throw tooMany('امروز درخواست کد برای این نشانی زیاد بوده است', 'otp_daily_limit');
+  }
+
+  //  SEC-06: فقط پیامکِ واقعی (نه ایمیل، نه log)
+  if (!isEmail(destination) && (await sender(destination)) !== senders.log) {
+    await smsGuard(destination, { ip, at: t });
   }
 
   const code = randomCode(config.otp.digits);
@@ -418,6 +493,7 @@ async function request(destination, { purpose = 'login', ip = '', app = '' } = {
     }
   } catch (err) {
     await query('DELETE FROM otp_codes WHERE id=$1', [codeRow]);
+    await recordSms(destination, { shopId, app: sectionOf(app) || '', purpose, via: smsCfg.provider, ok: false });
     console.error('[otp] فرستادن کد نشد:', err.message);
     throw upstream(
       isEmail(destination)
@@ -441,6 +517,7 @@ async function request(destination, { purpose = 'login', ip = '', app = '' } = {
     : smsCfg.provider;
   await query('UPDATE otp_codes SET via=$2, sent_at=$3 WHERE id=$1', [codeRow, String(via || ''), now()])
     .catch(() => {});
+  await recordSms(destination, { shopId, app: sectionOf(app) || '', purpose, via: String(via || '') });
 
   //  `resendSeconds` هم می‌رود چون ساعتِ گوشی ممکن است با سرور جور نباشد.
   //  با ثانیه، برنامه لازم نیست ساعتش را با سرور تنظیم کند.
@@ -622,6 +699,7 @@ async function resend(id) {
   try {
     await send(row.destination, code, message, { app: row.app || '', purpose: row.purpose || 'login' });
   } catch (err) {
+    await recordSms(row.destination, { app: row.app || '', purpose: row.purpose || 'login', via: smsCfg.provider, ok: false });
     return { ok: false, error: 'delivery_failed', message: String(err?.message || err).slice(0, 200) };
   }
 
@@ -631,6 +709,7 @@ async function resend(id) {
   //  ⚠️ `sent_at` جلو می‌رود تا میزِ مدیر بداند آخرین تلاش کِی بود
   await query('UPDATE otp_codes SET via=$2, sent_at=$3 WHERE id=$1', [row.id, String(via || ''), now()])
     .catch(() => {});
+  await recordSms(row.destination, { app: row.app || '', purpose: row.purpose || 'login', via: String(via || '') });
   return { ok: true, via: String(via || '') };
 }
 
@@ -662,6 +741,6 @@ async function reveal(id) {
 }
 
 module.exports = {
-  request, verify, hashCode, senders, isEmail,
+  request, verify, hashCode, senders, isEmail, SMS_GUARD,
   listRequests, requestById, reveal, resend, mask,
 };
