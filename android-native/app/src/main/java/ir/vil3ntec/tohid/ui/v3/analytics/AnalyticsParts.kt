@@ -59,11 +59,17 @@ import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.ui.v3.rememberCountUp
 import ir.vil3ntec.tohid.ui.v3.v3Pressable
 
-/** مبلغ با نشانِ افغانی — همان `money()` ِ برنامه (رقم را قلم به انتخابِ دکان می‌کشد) */
-internal fun afn(v: Double): String = "${money(v)} ؋"
+/**
+ *  مبلغ با نشانِ افغانی — همان `money()` ِ برنامه (رقم را قلم به انتخابِ دکان می‌کشد). منفی با
+ *  «−» و نشانهٔ چپ‌به‌راست (LRM) تا در متنِ راست‌به‌چپ «−۸۰» بماند نه «۸۰−»؛ گردکردن قرینه است
+ *  (−۲۶۲٬۱۱۷٫۵ و ۲۶۲٬۱۱۷٫۵ هر دو ۲۶۲٬۱۱۸).
+ */
+internal fun afn(v: Double): String = if (v < 0) "$LRM−${money(-v)} ؋" else "${money(v)} ؋"
 
 /** مبلغِ کم‌شونده در صورتِ حساب: «−» پیش از عدد، صفر بی نشان */
-internal fun afnMinus(v: Double): String = if (v > 0) "−${afn(v)}" else afn(v)
+internal fun afnMinus(v: Double): String = if (v > 0) afn(-v) else afn(v)
+
+private const val LRM = "\u200E"
 
 /**
  *  سری‌های نمودار به ترتیبِ COLOR-SYSTEM §۱۰ — فقط از نقش‌های تم (بی HEX). قرمز فقط

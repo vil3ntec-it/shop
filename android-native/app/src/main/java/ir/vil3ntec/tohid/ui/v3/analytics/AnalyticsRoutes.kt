@@ -58,7 +58,7 @@ val AnalyticsModule = AppModule(
   ),
   routes = listOf(
     V3Route(AnalyticsPaths.REPORTS, RouteKind.TAB, { Str.reports }, chrome = Chrome.OWN) {
-      if (Platform.DESKTOP) ReportsDesk(data, snackbar)
+      if (Platform.DESKTOP && wide) ReportsDesk(data, snackbar)
       else ReportsScreen(
         d = data, canSeeMoney = canSeeMoney(), tabArg = args.query("tab"), rangeArg = args.query("range"),
         onBack = backOrNull(), bottomReserve = bottomReserve, onOpen = { nav.open(it) },
@@ -66,7 +66,7 @@ val AnalyticsModule = AppModule(
     },
     //  گوشی: صفحهٔ دومِ ورقِ خانه (`HomePager.page = 1`) با همان دوره؛ کامپیوتر ورقِ خانه ندارد ⇒ صفحهٔ خودش
     V3Route("stats", RouteKind.PAGE, { StrReports.statsTitle }, chrome = Chrome.OWN) {
-      if (Platform.DESKTOP) StatsPage(data, canSeeMoney(), args.query("period"), { nav.open(it) }, bottomReserve = 0.dp, embedded = false, onBack = { back() })
+      if (Platform.DESKTOP && wide) StatsPage(data, canSeeMoney(), args.query("period"), { nav.open(it) }, bottomReserve = 0.dp, embedded = false, onBack = { back() })
       else {
         LaunchedEffect(args.path) {
           StatsRequest.period.value = args.query("period")

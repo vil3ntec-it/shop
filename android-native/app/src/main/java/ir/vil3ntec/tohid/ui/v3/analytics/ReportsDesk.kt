@@ -198,9 +198,9 @@ private fun DeskKpis(d: ShopData, rep: DeskRep, from: String, to: String) {
         val r = remember(d, from, to) { ReportEngine.sales(d, from, to) }
         V3Stat(StrReports.netSales, r.net, ::afn, m, hue = V3Hue.BRAND)
         V3Stat(StrReports.invoices, r.count.toDouble(), count, m)
-        V3Stat(if (r.grossProfit < 0) StrReports.grossLoss else StrReports.grossProfit, r.grossProfit, ::afn, m, hue = V3Hue.TEAL)
+        V3Stat(if (r.grossProfit < 0) StrReports.grossLoss else StrReports.grossProfit, kotlin.math.abs(r.grossProfit), ::afn, m, hue = V3Hue.TEAL)
         V3Stat(StrReports.expenses, r.expenses, ::afn, m, hue = V3Hue.PURPLE)
-        V3Stat(if (r.netProfit < 0) StrReports.netLoss else StrReports.netProfit, r.netProfit, ::afn, m, valueColor = if (r.netProfit < 0) PhoneV3.colors.negative else null)
+        V3Stat(if (r.netProfit < 0) StrReports.netLoss else StrReports.netProfit, kotlin.math.abs(r.netProfit), ::afn, m, valueColor = if (r.netProfit < 0) PhoneV3.colors.negative else null)
       }
       DeskRep.PURCHASES -> {
         val r = remember(d, from, to) { ReportEngine.purchases(d, from, to) }
