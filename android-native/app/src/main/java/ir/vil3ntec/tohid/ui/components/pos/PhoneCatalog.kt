@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.components.pos
 
+import ir.vil3ntec.tohid.core.i18n.StrKit
+import ir.vil3ntec.tohid.core.i18n.StrSale
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.Spring
@@ -165,15 +167,15 @@ fun PhoneCatalog(
       Modifier.fillMaxWidth().padding(top = top + 6.dp, start = 4.dp, end = 12.dp).height(44.dp),
       verticalAlignment = Alignment.CenterVertically,
     ) {
-      RoundButton("برگشت", onBack, 40.dp, null) { BackChevron(v.icon) }
+      RoundButton(StrKit.back, onBack, 40.dp, null) { BackChevron(v.icon) }
       Spacer(Modifier.width(2.dp))
       SearchField(search, onSearch, Modifier.weight(1f))
       Spacer(Modifier.width(8.dp))
-      RoundButton(if (scanning) "بستنِ اسکن" else "اسکنِ بارکد", onScan, 44.dp, v.card) {
+      RoundButton(if (scanning) StrSale.closeScan else StrKit.scanBarcode, onScan, 44.dp, v.card) {
         Icon(if (scanning) Icons.Outlined.Close else Icons.Outlined.QrCodeScanner, null, tint = v.icon, modifier = Modifier.size(22.dp))
       }
       Spacer(Modifier.width(6.dp))
-      RoundButton(if (listMode) "نمایِ کاشی" else "نمایِ فهرست", onToggleMode, 44.dp, v.card) {
+      RoundButton(if (listMode) StrSale.gridView else StrSale.listView, onToggleMode, 44.dp, v.card) {
         Icon(if (listMode) Icons.Outlined.GridView else Icons.Outlined.ViewList, null, tint = v.icon, modifier = Modifier.size(22.dp))
       }
     }
@@ -273,7 +275,7 @@ private fun SearchField(value: String, onValueChange: (String) -> Unit, modifier
     Icon(Icons.Outlined.Search, contentDescription = null, tint = v.inkMuted, modifier = Modifier.size(20.dp))
     Spacer(Modifier.width(8.dp))
     Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-      if (value.isEmpty()) Text("نام، بارکد یا کدِ کالا", color = v.inkMuted, fontSize = 14.sp, maxLines = 1)
+      if (value.isEmpty()) Text(StrSale.catalogHint, color = v.inkMuted, fontSize = 14.sp, maxLines = 1)
       BasicTextField(
         value = value,
         onValueChange = onValueChange,
@@ -281,11 +283,11 @@ private fun SearchField(value: String, onValueChange: (String) -> Unit, modifier
         textStyle = TextStyle(color = v.ink, fontSize = 14.sp),
         cursorBrush = SolidColor(v.ink),
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-        modifier = Modifier.fillMaxWidth().semantics { contentDescription = "جستجوی کالا" },
+        modifier = Modifier.fillMaxWidth().semantics { contentDescription = StrSale.searchItems },
       )
     }
     if (value.isNotEmpty()) {
-      RoundButton("پاک کردنِ جستجو", { onValueChange("") }, 36.dp, null) {
+      RoundButton(StrKit.clear, { onValueChange("") }, 36.dp, null) {
         Icon(Icons.Outlined.Close, contentDescription = null, tint = v.icon, modifier = Modifier.size(18.dp))
       }
     } else {
@@ -311,11 +313,11 @@ private fun CategoryChips(
     horizontalArrangement = Arrangement.spacedBy(6.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
-    Chip("همه", selected = category == null, onClick = { onCategory(null) }, onHold = null)
+    Chip(StrSale.allChip, selected = category == null, onClick = { onCategory(null) }, onHold = null)
     categories.forEach { c ->
       Chip(c, selected = category == c, onClick = { onCategory(if (category == c) null else c) }, onHold = { onHold(c) })
     }
-    RoundButton("دستهٔ تازه", onAdd, 32.dp, PhoneV3.colors.card) {
+    RoundButton(StrSale.newCategory, onAdd, 32.dp, PhoneV3.colors.card) {
       Icon(Icons.Outlined.Add, contentDescription = null, tint = PhoneV3.colors.icon, modifier = Modifier.size(16.dp))
     }
   }
@@ -334,7 +336,7 @@ private fun Chip(text: String, selected: Boolean, onClick: () -> Unit, onHold: (
       .border(1.dp, if (selected) v.accent else v.hairline, RoundedCornerShape(percent = 50))
       .combinedClickable(
         role = Role.Tab,
-        onLongClickLabel = if (onHold != null) "حذفِ این دسته" else null,
+        onLongClickLabel = if (onHold != null) StrSale.manageCategory else null,
         onLongClick = onHold,
         onClick = onClick,
       )
@@ -364,7 +366,7 @@ private fun BestsellerRow(items: List<PhoneCatalogItem>, onTap: (PhoneCatalogIte
     horizontalArrangement = Arrangement.spacedBy(6.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
-    Text("پرفروش‌ها", color = v.inkMuted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+    Text(StrSale.bestsellers, color = v.inkMuted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
     items.forEach { b -> key(b.id) {
       val pop = rememberAddPop(b.inCart)
       Row(
@@ -375,7 +377,7 @@ private fun BestsellerRow(items: List<PhoneCatalogItem>, onTap: (PhoneCatalogIte
           .clip(RoundedCornerShape(percent = 50))
           .background(if (b.inCart > 0) v.cart else v.card)
           .border(1.dp, if (b.inCart > 0) v.cart else v.hairline, RoundedCornerShape(percent = 50))
-          .clickable(role = Role.Button, onClickLabel = if (b.weighed) "وزن کردن" else "یکی به سبد") {
+          .clickable(role = Role.Button, onClickLabel = if (b.weighed) StrSale.weigh else StrSale.addOne) {
             if (b.stock > 0) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
             onTap(b)
           }
@@ -445,7 +447,7 @@ private fun ItemThumb(item: PhoneCatalogItem) {
 /** «−» کوچکِ کالای درونِ سبد */
 @Composable
 private fun MinusButton(item: PhoneCatalogItem, size: Dp, onMinus: (PhoneCatalogItem) -> Unit) {
-  RoundButton("یکی کمتر ${item.name}", { onMinus(item) }, size, PhoneV3.colors.bg) {
+  RoundButton(StrSale.oneLess(item.name), { onMinus(item) }, size, PhoneV3.colors.bg) {
     Icon(Icons.Outlined.Remove, contentDescription = null, tint = PhoneV3.colors.icon, modifier = Modifier.size(size * 0.6f))
   }
 }
@@ -489,8 +491,8 @@ fun PhoneTile(
         interactionSource = interaction,
         indication = null,
         role = Role.Button,
-        onClickLabel = if (item.weighed) "وزن کردن" else "یکی به سبد",
-        onLongClickLabel = "نوشتنِ مقدار",
+        onClickLabel = if (item.weighed) StrSale.weigh else StrSale.addOne,
+        onLongClickLabel = StrSale.typeQty,
         onLongClick = { onHold(item) },
         onClick = {
           if (!out) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -499,7 +501,7 @@ fun PhoneTile(
       )
       .semantics(mergeDescendants = true) {
         contentDescription = "${item.name}، $priceText، $stockText" +
-          if (item.inCart > 0) "، ${qty(item.inCart)} در سبد" else ""
+          if (item.inCart > 0) "، ${StrSale.inCartQty(qty(item.inCart))}" else ""
       }
       .padding(8.dp),
   ) {
@@ -599,8 +601,8 @@ fun PhoneListRow(
       }
       .combinedClickable(
         role = Role.Button,
-        onClickLabel = if (item.weighed) "وزن کردن" else "یکی به سبد",
-        onLongClickLabel = "نوشتنِ مقدار",
+        onClickLabel = if (item.weighed) StrSale.weigh else StrSale.addOne,
+        onLongClickLabel = StrSale.typeQty,
         onLongClick = { onHold(item) },
         onClick = {
           if (!out) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)

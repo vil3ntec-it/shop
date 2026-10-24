@@ -5,21 +5,15 @@ import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.PointOfSale
 import androidx.compose.material.icons.outlined.QrCodeScanner
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrKit
+import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.core.nav.MoreGroup
 import ir.vil3ntec.tohid.core.nav.Place
 import ir.vil3ntec.tohid.core.nav.RoutePaths
-import ir.vil3ntec.tohid.ui.Platform
 import ir.vil3ntec.tohid.ui.components.common.PhoneNav
-import ir.vil3ntec.tohid.ui.screens.BarcodeScanSheet
 import ir.vil3ntec.tohid.ui.screens.DeskInvoicesScreen
 import ir.vil3ntec.tohid.ui.screens.DeskSaleScreen
-import ir.vil3ntec.tohid.ui.screens.QuickSaleScreen
 import ir.vil3ntec.tohid.ui.screens.SaleScreen
 import ir.vil3ntec.tohid.ui.screens.SalesHistoryScreen
 import ir.vil3ntec.tohid.ui.screens.VipGate
@@ -31,6 +25,12 @@ import ir.vil3ntec.tohid.ui.v3.nav.ModuleEntry
 import ir.vil3ntec.tohid.ui.v3.nav.RouteKind
 import ir.vil3ntec.tohid.ui.v3.nav.V3Route
 import ir.vil3ntec.tohid.ui.v3.products.ProductsPaths
+import ir.vil3ntec.tohid.ui.v3.sales.cart.FreeLineRoute
+import ir.vil3ntec.tohid.ui.v3.sales.cart.KeypadRoute
+import ir.vil3ntec.tohid.ui.v3.sales.cart.LineRoute
+import ir.vil3ntec.tohid.ui.v3.sales.checkout.CustomerRoute
+import ir.vil3ntec.tohid.ui.v3.sales.quick.QuickSaleRoute
+import ir.vil3ntec.tohid.ui.v3.sales.scan.ScanScreen
 
 /** مسیرهای گروهِ فروش (G5) */
 object SalesPaths {
@@ -38,8 +38,15 @@ object SalesPaths {
   fun sale(scan: Boolean = false) = RoutePaths.withQuery(SALE, "scan" to if (scan) "1" else null)
   const val QUICK = "sale/quick"
   const val CHECKOUT = "sale/checkout"
+  /** انتخابِ مشتری برای نتیجه: شناسه، یا `""` = «بدون قرض‌دار» */
+  fun customer(selected: String? = null) = RoutePaths.withQuery("sale/checkout/customer", "selected" to selected)
+  /** «تعداد و قیمت»ِ ردیفِ `i` ِ سبد */
+  fun line(i: Int) = "sale/line/$i"
+  const val FREE_LINE = "sale/free-line"
+  fun keypad(productId: String) = "sale/keypad/" + RoutePaths.encode(productId)
   /** اسکن برای نتیجه: `nav.openForResult(SalesPaths.scan("stock")) { code -> … }` */
   fun scan(forWhat: String) = RoutePaths.withQuery("scan", "for" to forWhat)
+  const val SCAN_QUICK = "quick"
   const val HISTORY = "sales"
   fun history(filter: String? = null, q: String? = null) = RoutePaths.withQuery(HISTORY, "filter" to filter, "q" to q)
   fun invoice(saleId: String) = "sales/" + RoutePaths.encode(saleId)
@@ -70,19 +77,17 @@ val SalesModule = AppModule(
         }
       }
     },
-    V3Route(SalesPaths.QUICK, RouteKind.PAGE, { Str.pickProduct }, parent = SalesPaths.SALE, aliases = listOf("quick"), chrome = Chrome.OWN) {
-      VipGate(Str.saleRegister) { QuickSaleScreen(store, cart, data, snackbar) { nav.switchTab(SalesPaths.SALE) } }
+    V3Route(SalesPaths.QUICK, RouteKind.PAGE, { StrSale.quickSale }, parent = SalesPaths.SALE, aliases = listOf("quick"), chrome = Chrome.OWN) {
+      VipGate(Str.saleRegister) { QuickSaleRoute() }
     },
     V3Route(SalesPaths.CHECKOUT, RouteKind.SHEET, { Str.sale }, parent = SalesPaths.SALE) { LandOn(SalesPaths.SALE) },
-    V3Route("sale/checkout/customer", RouteKind.SHEET, { Str.sale }, parent = SalesPaths.CHECKOUT) { LandOn(SalesPaths.SALE) },
-    V3Route("sale/line/{i}", RouteKind.SHEET, { Str.sale }, parent = SalesPaths.SALE) { LandOn(SalesPaths.SALE) },
-    V3Route("sale/free-line", RouteKind.SHEET, { Str.sale }, parent = SalesPaths.SALE) { LandOn(SalesPaths.SALE) },
-    V3Route("sale/keypad/{productId}", RouteKind.SHEET, { Str.sale }, parent = SalesPaths.SALE) { LandOn(SalesPaths.SALE) },
-    //  اسکن به‌عنوانِ نتیجه: کد با `finish` به صدازننده برمی‌گردد
-    V3Route("scan", RouteKind.SHEET, { Str.sale }, chrome = Chrome.OWN) {
-      //  برگه پس از `onCode` خودش `onDismiss` هم می‌زند: پس از نتیجه، برگشتِ دوم نه
-      var got by remember { mutableStateOf(false) }
-      BarcodeScanSheet(onDismiss = { if (!got) back() }, onCode = { code -> got = true; nav.finish(code) })
+    V3Route("sale/checkout/customer", RouteKind.SHEET, { StrSale.pickCustomer }, parent = SalesPaths.CHECKOUT, chrome = Chrome.OWN) { CustomerRoute() },
+    V3Route("sale/line/{i}", RouteKind.SHEET, { StrSale.lineDetails }, parent = SalesPaths.SALE, chrome = Chrome.OWN) { LineRoute() },
+    V3Route(SalesPaths.FREE_LINE, RouteKind.SHEET, { StrSale.freeItem }, parent = SalesPaths.SALE, chrome = Chrome.OWN) { FreeLineRoute() },
+    V3Route("sale/keypad/{productId}", RouteKind.SHEET, { StrSale.typeQty }, parent = SalesPaths.SALE, chrome = Chrome.OWN) { KeypadRoute() },
+    //  اسکن به‌عنوانِ نتیجه: کد با `finish` به صدازننده برمی‌گردد (بستن ⇒ null)؛ کامپیوتر بی کادرِ دوربین
+    V3Route("scan", RouteKind.SHEET, { StrKit.scanBarcode }, chrome = Chrome.OWN) {
+      ScanScreen(onCode = { code -> nav.finish(code) }, onClose = { back() }, overlay = !desk)
     },
     V3Route(SalesPaths.HISTORY, RouteKind.TAB, { Str.salesHistory }) {
       if (desk) DeskInvoicesScreen(store, cart, data, snackbar) { nav.switchTab(SalesPaths.SALE) }
@@ -97,7 +102,7 @@ val SalesModule = AppModule(
     V3Route("sales/{saleId}/return", RouteKind.SHEET, { Str.salesHistory }, parent = "sales/{saleId}") { LandOn(SalesPaths.HISTORY) },
     V3Route("sales/{saleId}/cancel", RouteKind.SHEET, { Str.salesHistory }, parent = "sales/{saleId}") { LandOn(SalesPaths.HISTORY) },
     V3Route("sales/{saleId}/fix", RouteKind.SHEET, { Str.salesHistory }, parent = "sales/{saleId}") { LandOn(SalesPaths.HISTORY) },
-    //  پیشنهادِ فاکتورِ نیمه‌کاره خودکار سرِ باز شدن است (`DraftRecoveryPrompt`)
-    V3Route("draft", RouteKind.SHEET, { Str.sale }) { LandOn("home") },
+    //  برگهٔ فاکتورِ نیمه‌کاره را پوسته خودش سرِ باز شدن نشان می‌دهد (`DraftPrompt`)؛ پیوندش به صندوق
+    V3Route("draft", RouteKind.SHEET, { StrSale.draftTitle }) { LandOn(SalesPaths.SALE) },
   ),
 )
