@@ -305,6 +305,8 @@ const config = {
     //  حرف و سقفِ نتیجه سرِ جایشان‌اند.
     marketSearchMax: num(process.env.RATE_MARKET_SEARCH_MAX, 300),
     marketSearchBurstMax: num(process.env.RATE_MARKET_SEARCH_BURST_MAX, 30),
+    //  خانهٔ بازارچه (`/api/market/products`): همان ۳۰ در دقیقه، سطلِ جدا
+    marketFeedBurstMax: num(process.env.RATE_MARKET_FEED_BURST_MAX, 30),
   },
 
   /**
@@ -339,6 +341,8 @@ const config = {
     //  «برشِ» دکان‌های در فهرست (شمارِ کالا، دیدهٔ دستگاه، نمایهٔ جست‌وجو) — یک‌پرواز.
     //  «روشن»، «فعال» و «در فهرست» باز هم در هر درخواست زنده سنجیده می‌شوند.
     eligibleCacheMs: num(process.env.MARKET_ELIGIBLE_CACHE_MS, 30 * 1000),
+    //  خانهٔ بازارچه: «قفسهٔ» کالاهای هر دکان و «پرفروش/ارزان‌تر» ِ سراسری
+    feedCacheMs: num(process.env.MARKET_FEED_CACHE_MS, 60 * 1000),
   },
 
   // CORS_ORIGIN چند دامنه را با کاما می‌پذیرد. برنامه‌ی اندروید به CORS
