@@ -1181,7 +1181,7 @@
   </section>
 
   <section id="tab-imgbank" class="hidden">
-    <!-- ماژولِ image-bank.js — ورودِ گروهی و گزارش (IMG-01، IMG-03، IMG-BANK-01، IMG-PRO-09) -->
+    <!-- ماژولِ image-bank.js — ورودِ گروهی و گزارش (IMG-01، IMG-03، IMG-BANK-01، IMG-PRO-09) و صفِ بررسی (IMG-02، IMG-PRO-07، IMG-BANK-17، IMG-09) -->
     <div class="panel hidden" id="ib-off">
       <h2>بانکِ تصاویر</h2>
       <div class="msg msg-warn">بانکِ مرکزیِ تصاویر روشن نیست (پرچمِ <code>image_bank.central</code>). تا روشن نشود هیچ ورودی پذیرفته نمی‌شود.</div>
@@ -1246,6 +1246,54 @@
             <thead><tr><th>ردیف</th><th>وضعیت</th><th>دلیل</th><th>کد</th></tr></thead>
             <tbody id="ib-rep-rows"></tbody>
           </table>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <h2>صفِ بررسی</h2>
+          <div class="row">
+            <select id="ib-rv-status" style="width:auto;"><option value="NEEDS_REVIEW">در انتظارِ بررسی</option><option value="APPROVED">منتشرشده</option><option value="REJECTED">ردشده</option><option value="ARCHIVED">بایگانی</option></select>
+            <select id="ib-rv-space" style="width:auto;"><option value="pending">در انتظار</option><option value="central">بانکِ عمومی</option></select>
+            <button class="btn btn-sm" id="btn-ib-rv-load">نمایش</button>
+          </div>
+        </div>
+        <div id="ib-rv-msg"></div>
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>عکس</th><th>کالا</th><th>SKU · بارکد</th><th>تطبیق</th><th>دلیلِ تطبیق</th><th>نشان‌ها</th><th>مجوز</th><th></th></tr></thead>
+            <tbody id="ib-review"></tbody>
+          </table>
+        </div>
+        <button class="btn btn-sm btn-ghost hidden" id="btn-ib-rv-more" style="margin-top:10px;">بیشتر</button>
+      </div>
+      <div class="panel hidden" id="ib-detail">
+        <div class="panel-head">
+          <h2>عکسِ <span id="ib-dt-id"></span> — <span id="ib-dt-status"></span></h2>
+          <button class="btn btn-sm btn-ghost" id="btn-ib-dt-close">بستن</button>
+        </div>
+        <div id="ib-dt-msg"></div>
+        <div class="grid grid-2">
+          <div><img id="ib-dt-img" alt="" style="max-width:100%;max-height:320px;border-radius:10px;background:var(--surface-2);"></div>
+          <div>
+            <div class="row"><strong>تطبیق:</strong><span id="ib-dt-match"></span></div>
+            <div class="row" style="margin-top:6px;"><strong>دلیل:</strong><span id="ib-dt-reasons"></span></div>
+            <div class="row" style="margin-top:6px;"><strong>کالا:</strong><span id="ib-dt-product"></span></div>
+            <div class="row" style="margin-top:6px;"><strong>تکراری:</strong><span id="ib-dt-dups" class="muted"></span></div>
+            <div class="row" style="margin-top:12px;">
+              <button class="btn btn-sm" id="btn-ib-approve">تأیید و انتشار</button>
+              <button class="btn btn-sm btn-danger" id="btn-ib-reject">رد</button>
+              <span class="muted hidden" id="ib-dt-super">انتشار و رد فقط با مدیرِ ارشد است.</span>
+            </div>
+          </div>
+        </div>
+        <div class="hidden" id="ib-dt-cands-box">
+          <h2 style="margin-top:14px;">کالاهای ممکن — سامانه حدس نمی‌زند؛ یکی را انتخاب کنید</h2>
+          <div class="table-scroll">
+            <table>
+              <thead><tr><th>نام</th><th>برند</th><th>نوع/طعم</th><th>اندازه</th><th>بسته‌بندی</th><th>SKU · بارکد</th><th></th></tr></thead>
+              <tbody id="ib-dt-cands"></tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>

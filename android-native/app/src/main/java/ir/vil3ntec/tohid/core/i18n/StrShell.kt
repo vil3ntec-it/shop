@@ -53,4 +53,11 @@ object StrShell {
   val previewBuild: String get() = t("نسخهٔ پیش‌نمایش", "Preview build", "د مخکتنې نسخه")
   val gotIt: String get() = t("فهمیدم", "Got it", "پوه شوم")
   val previewNote: String get() = t("پیش‌نمایش است؛ برای دیدن، نه کارِ روزانه.", "This is a preview — for a look, not for daily work.", "دا مخکتنه ده؛ د کتلو لپاره، نه د ورځني کار.")
+
+  // کلیدِ روشن/خاموش و «گزارش‌های مشتری» (کامپیوتر)
+  val switchOn: String get() = t("روشن", "On", "روښانه")
+  val switchOff: String get() = t("خاموش", "Off", "بند")
+  val crmReports: String get() = t("گزارش‌های مشتری", "Customer reports", "د پیرودونکو راپورونه")
+  val crmShownInReports: String get() = t("در «گزارش‌ها» دیده می‌شوند", "Shown under “Reports”", "په «راپورونه» کې ښکاري")
+  val crmNote: String get() = t("چهار زبانهٔ تازه در «گزارش‌ها»: سنِ بدهی (۰–۳۰، ۳۱–۶۰، ۶۱–۹۰، ۹۰+ روز)، تحلیلِ خریدِ مشتریان (RFM)، مشتریانِ تکراری و یادآوریِ امروز. فقط خواندنی‌اند و چیزی در دفتر نمی‌نویسند. در صفحهٔ فعلیِ گزارش‌ها می‌آیند، نه در «گزارشِ تازه». پس از تغییر، «گزارش‌ها» را دوباره باز کنید.", "Four new tabs under “Reports”: debt age (0–30, 31–60, 61–90, 90+ days), customer purchase analysis (RFM), repeat customers and today's reminders. They are read-only and write nothing to the ledger. They appear on the current reports screen, not in “New report”. After changing this, reopen “Reports”.", "په «راپورونه» کې څلور نوې پاڼې: د پور عمر (۰–۳۰، ۳۱–۶۰، ۶۱–۹۰، ۹۰+ ورځې)، د پیرودونکو د پېرود شننه (RFM)، تکراري پیرودونکي او د نن یادونې. یوازې د لوستلو دي او په دفتر کې هېڅ نه لیکي. په اوسني راپورونو پاڼه کې راځي، نه په «نوی راپور» کې. له بدلون وروسته «راپورونه» بیا پرانیزئ.")
 }
