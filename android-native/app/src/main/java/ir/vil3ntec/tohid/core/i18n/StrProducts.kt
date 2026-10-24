@@ -194,7 +194,7 @@ object StrProducts {
   val brightness: String get() = t("روشنایی", "Brightness", "رڼا")
   val rotate: String get() = t("چرخش", "Rotate", "تاوول")
   val reset: String get() = t("پیش‌فرض", "Defaults", "اصلي حالت")
-  val saveRaw: String get() = t("ذخیرهٔ بی ویرایش", "Save without edits", "پرته له سمون خوندي کړئ")
+  val saveRaw: String get() = t("ذخیرهٔ بی ویرایش", "Save as is", "همداسې خوندي")
   val processing: String get() = t("در حالِ ساختن…", "Processing…", "جوړېږي…")
   val unreadable: String get() = t(
     "این عکس خوانده نشد. عکسِ دیگری انتخاب کنید (JPG یا PNG).",
