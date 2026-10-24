@@ -54,7 +54,7 @@ process.env.RATE_BROADCAST_MAX = '10000';
 process.env.OTP_RESEND_SECONDS = '0';
 
 const { createApp } = require('../src/app');
-const { query, one, newId, now, closeDb } = require('../src/db');
+const { query, one, many, newId, now, closeDb } = require('../src/db');
 const migrate = require('../src/migrate');
 const pw = require('../src/lib/password');
 
@@ -190,7 +190,7 @@ const openTab = async (name) => {
 // ── ۲) هر تب باز می‌شود و خطای جاوااسکریپت نمی‌دهد ────────────────
 await step('هر تب بی خطا باز می‌شود', async () => {
   for (const t of ['shops', 'pump', 'users', 'subs', 'sales', 'payments', 'discounts', 'notices',
-    'requests', 'plans', 'support', 'delivery', 'backups', 'health', 'ops', 'audit']) {
+    'requests', 'plans', 'support', 'delivery', 'backups', 'health', 'ops', 'imgbank', 'audit']) {
     await openTab(t);
   }
   assert.deepEqual(consoleErrors, [], `خطای صفحه: ${consoleErrors.join(' | ')}`);
@@ -816,6 +816,74 @@ await step('عملیات: نسخهٔ دستگاه‌ها با هشدارِ قر�
     await plans.setConfig('latest_version_shop', before.latest_version_shop || '');
     await plans.setConfig('min_app_version_shop', before.min_app_version_shop || '');
   }
+});
+
+// ── IMG-01 / IMG-BANK-01 / IMG-03 / IMG-PRO-09: ورودِ گروهی از پنل، با گزارشِ ردیف و فایل ──
+await step('بانکِ تصاویر: پوشه + CSV از پنل؛ فایلِ جعلی و خراب جدا گزارش می‌شوند و دسته نمی‌خوابد', async () => {
+  const F = require('./image-fixtures');
+  //  پرچمِ خاموش: پیامِ روشن، نه خطا
+  await openTab('imgbank');
+  await page.waitForSelector('#ib-off:not(.hidden)', { timeout: 10_000 });
+  await require('../src/lib/live-config').set('all', 'image_bank.central', true, 'panel-test');
+  await openTab('imgbank');
+  await page.waitForSelector('#ib-on:not(.hidden)', { timeout: 10_000 });
+
+  await page.fill('#ib-lic-source', 'کاتالوگِ تأمین‌کننده');
+  await page.selectOption('#ib-lic-status', 'licensed');
+  await page.check('#ib-lic-commercial');
+  await page.click('#btn-ib-new');
+  await page.waitForSelector('#ib-work:not(.hidden)', { timeout: 10_000 });
+  const batchId = (await page.locator('#ib-batch-id').textContent()).trim();
+  const b = await one('SELECT license_source, license_status, commercial_use FROM image_batches WHERE id=$1', [batchId]);
+  assert.deepEqual([b.license_source, b.license_status, b.commercial_use], ['کاتالوگِ تأمین‌کننده', 'licensed', true]);
+
+  const jpg = (seed) => F.jpeg(800, 600, { seed });
+  await page.setInputFiles('#ib-files', [
+    { name: 'a.jpg', mimeType: 'image/jpeg', buffer: jpg(901) },
+    { name: 'b.jpg', mimeType: 'image/jpeg', buffer: jpg(902) },
+    { name: 'fake.jpg', mimeType: 'image/jpeg', buffer: Buffer.from('MZ' + 'x'.repeat(400)) },
+    { name: 'half.jpg', mimeType: 'image/jpeg', buffer: jpg(903).subarray(0, 50) },
+  ]);
+  await page.click('#btn-ib-upload');
+  await page.waitForFunction(() => /^۴ از ۴ فایل · ۲ ناموفق/.test(document.getElementById('ib-progress').textContent), null, { timeout: 15_000 });
+
+  const csv = ['sku,barcode,name,brand,size,unit,image_path,license_status',
+    'P-1,,کالای یک,برند,1,g,photos/a.jpg,', 'P-2,,کالای دو,برند,2,g,photos/b.jpg,',
+    'P-3,,کالای جعلی,برند,3,g,fake.jpg,', 'P-4,,کالای بی فایل,برند,4,g,none.jpg,'].join('\n');
+  await page.setInputFiles('#ib-csv', { name: 'rows.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) });
+  await page.waitForFunction(() => /۴ ردیف/.test(document.getElementById('ib-csv-info').textContent), null, { timeout: 10_000 });
+  await page.click('#btn-ib-dry');
+  await page.waitForFunction(() => /پیش‌نمایش/.test(document.getElementById('ib-preview-label').textContent), null, { timeout: 10_000 });
+  assert.match(await page.locator('#ib-preview').textContent(), /موفق: ۲.*ناموفق: ۲/);
+  assert.equal((await one('SELECT COUNT(*)::int AS n FROM images WHERE batch_id=$1', [batchId])).n, 0, 'پیش‌نمایش ثبت کرد');
+
+  await page.click('#btn-ib-run');
+  await page.waitForSelector('#ib-rep-rows tr[data-row="4"]', { timeout: 15_000 });
+  //  فقط دو عکسِ سالم، هر دو در pending و منتظرِ بررسی — هیچ‌کدام خودبه‌خود عمومی نه
+  const imgs = await many('SELECT space, status FROM images WHERE batch_id=$1', [batchId]);
+  assert.deepEqual(imgs.map((r) => `${r.space}/${r.status}`), ['pending/NEEDS_REVIEW', 'pending/NEEDS_REVIEW']);
+  //  IMG-03 / IMG-PRO-09: فایل‌های خراب، هر کدام با دلیلِ خودش
+  const fileReason = (n) => page.locator(`#ib-rep-files tr[data-file="${n}"] td:nth-child(2)`).textContent();
+  assert.match(await fileReason('fake.jpg'), /پسوندش جعلی/);
+  assert.match(await fileReason('half.jpg'), /خراب/);
+  const rowReason = (n) => page.locator(`#ib-rep-rows tr[data-row="${n}"] td:nth-child(3)`).textContent();
+  assert.match(await rowReason(4), /پسوندش جعلی/);
+  assert.match(await rowReason(5), /بارگذاری نشده/);
+  assert.match(await page.locator('#ib-rep-counts').textContent(), /موفق: ۲/);
+  assert.match(await page.locator(`#ib-batches tr[data-batch="${batchId}"]`).textContent(), /۲ ناموفق/);
+
+  //  گزارشِ CSV دانلود می‌شود (با توکن، نه نشانیِ باز)
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.click('#btn-ib-csv-out')]);
+  const text = require('node:fs').readFileSync(await dl.path(), 'utf8');
+  assert.match(text, /file_missing/);
+  assert.match(text, /file:fake\.jpg,failed,image_type/);
+  if (process.env.PANEL_SHOTS) await page.screenshot({ path: `${process.env.PANEL_SHOTS}/img-bank-import.png`, fullPage: true });
+
+  //  توقف ⇒ دکمه‌های ورود خاموش؛ ادامه ⇒ دوباره روشن
+  await page.click('#btn-ib-pause');
+  await page.waitForFunction(() => document.getElementById('btn-ib-run').disabled === true, null, { timeout: 10_000 });
+  await page.click('#btn-ib-resume');
+  await page.waitForFunction(() => document.getElementById('btn-ib-run').disabled === false, null, { timeout: 10_000 });
 });
 
 // ── F0-27: کانالِ آزمایشی — مدیرِ ارشد از پنل دکان و دستگاه را می‌افزاید ──
