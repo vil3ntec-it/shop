@@ -155,9 +155,9 @@ object MotionSpec {
   /** فشردنِ لمسی */
   fun <T> press(): FiniteAnimationSpec<T> = if (Motion.enabled) spring(dampingRatio = 0.6f, stiffness = 900f) else snap()
 
-  /** جابه‌جاییِ صفحه (لغزش) */
+  /** جابه‌جاییِ صفحه (لغزش) — فنرِ بی‌جهش، پس با برگشتِ وسطِ راه از همان سرعت ادامه می‌دهد */
   val pageOffset: FiniteAnimationSpec<IntOffset>
-    get() = if (Motion.enabled) tween(MotionTokens.LONG, easing = MotionTokens.EmphasizedDecelerate) else snap()
+    get() = if (Motion.enabled) spring(dampingRatio = 0.9f, stiffness = 380f, visibilityThreshold = IntOffset(1, 1)) else snap()
 
   /** بلندیِ سربرگِ جمع‌شونده، وقتی خودش جا می‌افتد */
   val headerSettle: FiniteAnimationSpec<Float>

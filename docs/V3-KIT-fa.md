@@ -34,17 +34,29 @@
 نمونهٔ زندهٔ همه: `ui/v3/gallery/KitGallery.kt` (پیش‌نمایشِ `phone:g:foundation:kit-basics|kit-forms|kit-lists|kit-states`؛
 پسوندِ `-dark` و `-en`؛ همه با `groupshots:foundation`).
 
-## حرکت (همه پشتِ `Motion.enabled`)
+## حرکت (مثلِ اپل، سبک — همه پشتِ `Motion.enabled`)
 
-- واژه‌ها: `MotionTokens` (SHORT 150، MEDIUM 220، LONG 280، EMPHASIZED 350، پلکان ۳۰ms × ۱۰، شمارنده ۶۰۰) و
-  `MotionSpec` (`tweenOf`، `sheet` فنرِ ۰٫۸۵/۳۸۰، `indicator`، `morph`، `press`). عددِ تازه نسازید.
-- جابه‌جاییِ صفحه را پوسته می‌کند (`V3Transitions.page`): رفتن = از سمتِ پایان (RTL: از چپ)، برگشت برعکس، تب = محو.
-  زیرصفحهٔ درونی: `V3PageSwitch(target, depth)`.
-- فهرست به جزئیات: `V3ContainerTransform(selected, list, detail)` و `Modifier.v3Container(key)`.
-- ورودِ پلکانی: `val s = rememberV3Stagger()` و `Modifier.v3Stagger(s, key, index)` (فقط بارِ اول).
-- فشار: `Modifier.v3Pressable(scale = 0.97f ردیف / 0.92f دکمهٔ گرد, haptic)`.
-- عدد: `rememberCountUp(value)`؛ موفقیت: `V3SuccessCheck(visible)`.
-- لرزش: `haptic = true` روی کارِ اصلی/پاک‌کننده؛ `Haptics.success/confirm` برای ثبت و اسکن.
+قاعده (`MOTION-APPLE.md`): فقط APIهای خودِ Compose، فقط `graphicsLayer` (بی چیدمانِ دوباره در هر فریم)، بی Lottie و
+کتابخانهٔ تازه، ۶۰ فریم روی گوشیِ ضعیف: در رسم چیزی نسازید (`remember`/`drawWithCache`)، کلید روی ردیف‌های Lazy،
+`derivedStateOf` برای پیمایش. «کاهشِ حرکت» ⇐ همان حالتِ پایانی، بی‌درنگ. صفحه‌ها کدِ حرکتِ خودشان را نمی‌نویسند؛ فقط این‌ها:
+
+| خواسته | API |
+|---|---|
+| فنرهای قطع‌شدنی (هدفِ تازه از همان سرعت) | `V3Springs.ui()` (۰٫۸۵، جا و اندازه)، `V3Springs.playful()` (۰٫۷، فقط تأییدها)؛ `MotionSpec.sheet/indicator/morph/press`؛ با `animate*AsState`/`Animatable` |
+| واژه‌ها | `MotionTokens` (SHORT 150، MEDIUM 220، LONG 280، EMPHASIZED 350، پلکان ۳۰ms × ۱۰، شمارنده ۶۰۰)؛ عددِ تازه نسازید |
+| رفتن/برگشتِ صفحه | پوسته (`V3Transitions.page`): صفحهٔ تازه تمام‌عرض با فنر از لبهٔ پایان (RTL: چپ)، پیشین ۳۰٪ کنار و کم‌نور (۰٫۷۲)؛ برگشت برعکس؛ تب و کامپیوتر = محو. زیرصفحهٔ درونی: `V3PageSwitch(target, depth)` |
+| برگه پا‌به‌پای انگشت | `V3Sheet` (کشیدن و رهاکردن با سرعتِ همان دست)؛ صفحهٔ پشت خودکار تا ۰٫۹۶ (`v3BehindSheet` در پوسته، `V3Depth`) |
+| ورقِ کارت‌ها | `HorizontalPager` + `Modifier.v3PagerItem(state, page)` (کناری کوچک و کم‌رنگ، با انگشت بزرگ می‌شود) |
+| فشار روی **هر** زدنی | `Modifier.v3Pressable(scale = 0.97f ردیف/کارت، 0.92f آیکن, haptic = کارِ اصلی)` |
+| ورودِ پلکانی | `rememberV3Stagger()` + `Modifier.v3Stagger(s, key, index)` (بارِ اول، ≤۱۰) |
+| در حالِ بار | `V3Skeleton(rows)` (درخششِ فقط‌رسم) |
+| عدد و نمودار | `rememberCountUp(value)`؛ `val p = rememberV3Grow(data)` و بلندی × `p` یا `Modifier.v3GrowFromBaseline { p }` |
+| عنوانِ درشتِ جمع‌شونده | خودِ `V3Scaffold` |
+| کارت ⇐ جزئیات، FAB ⇐ برگه | `V3ContainerTransform(selected, list, detail)` + `Modifier.v3Container(key)` روی هر دو سر. FAB: `selected = if (open) "fab" else null`، `V3Fab(..., modifier = Modifier.v3Container("fab"))` در `list` و سطحِ برگه با همان کلید در `detail` |
+| موفقیت | `V3SuccessCheck(visible, haptic = true)` (فنرِ شاد + کشیدنِ تیک + لرزشِ نرم) |
+| خطا | `Modifier.v3Shake(trigger)` (سه رفت‌وبرگشتِ ۸dp + `Haptics.error`) — `trigger` شمارنده یا پیامِ خطا |
+| آمدن/رفتن/جابه‌جاییِ ردیف | Lazy: `Modifier.v3AnimateItem(this)` (کلید لازم)؛ غیرِ Lazy و «کشیدن برای حذف»: `V3Collapse(visible) { … }` + `LocalV3Toasts.current?.undo(...)` |
+| لرزش | فقط از کیت: `haptic = true`، `Haptics.success/confirm/error`؛ هرگز روی پیمایش |
 
 ## صفحهٔ تازه + مسیر
 
