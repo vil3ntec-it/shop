@@ -167,7 +167,7 @@ object CustomerInsight {
       val raw = s.debtorId?.takeIf { it.isNotBlank() } ?: continue
       val day = ReportDates.epochDay(s.date) ?: continue
       if (day < start || day > end) continue
-      val id = CustomerCrm.resolve(d, raw)
+      val id = CustomerCrm.resolve(names, raw)
       if (names[id]?.let(CustomerCrm::isActive) != true) continue
       val a = acc.getOrPut(id) { Acc() }
       a.first = minOf(a.first, day); a.last = maxOf(a.last, day); a.count++

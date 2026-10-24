@@ -13,16 +13,37 @@ import ir.vil3ntec.tohid.money
  *     عددی از نو ساخته نمی‌شود: ماندهٔ ماندگار = جمعِ دو ماندهٔ پیشین.
  *  ۲) شماره، یادداشت، برچسب، گروه، لیستِ قیمت و سقفِ «تکراری» جاهای خالیِ ماندگار را
  *     پر می‌کنند؛ چیزی از ماندگار پاک نمی‌شود. شماره‌ای که جا نشد به یادداشت می‌رود.
- *     رضایتِ تبلیغ: «نه» ِ صریح از هر کدام برنده است (حقِ «نه» گم نمی‌شود).
+ *     رضایتِ تبلیغ: سخت‌گیرانه‌تر برنده است — «نه» ِ صریح از هر کدام ⇒ نه؛ «بله» فقط وقتی
+ *     هر دو «بله» گفته‌اند؛ وگرنه «نپرسیده» (یعنی نه). ادغام هرگز رضایت نمی‌سازد.
  *  ۳) ردیفِ «تکراری» **پاک نمی‌شود**: نام، شماره و شناسه‌اش می‌ماند با
  *     `mergedInto = ماندگار`. فاکتورِ چاپ‌شده با آن شناسه هنوز پیدا می‌شود.
- *  ۴) یک ردِ `customer_merge` در دفترچهٔ ثبت با شمارِ ردیف‌ها و ماندهٔ منتقل‌شده.
+ *  ۴) یک ردِ `customer_merge` در دفترچهٔ ثبت: `refId` = «تکراری»، شمارِ ردیف‌ها و ماندهٔ
+ *     منتقل‌شده در شرح، و شناسهٔ تک‌تکِ ردیف‌های منتقل‌شده در `refIds` (برای برگرداندن).
  *
  *  ── دستگاهِ آفلاین ────────────────────────────────────────────────────
  *  دستگاهی که پیش از رسیدنِ ادغام روی «تکراری» فروخت، ردیفش با شناسهٔ کهنه می‌رسد.
- *  `sweep` آن‌ها را به ماندگار می‌برد (بی‌خطر و تکرارپذیر).
+ *  `sweep` آن‌ها را به ماندگار می‌برد (بی‌خطر و تکرارپذیر). دو ادغامِ وارونه روی دو
+ *  دستگاه (X در Y و Y در X) حلقه می‌سازند: `sweep` کوچک‌ترین شناسه را دوباره فعال می‌کند.
  */
 object CustomerMerge {
+
+  /**
+   *  حداکثر شناسهٔ ردیف در `refIds` ِ یک رد: هر شناسه با نامِ جدول حدودِ ۵۰ بایت است، پس
+   *  ۴۰۰ تا حدودِ ۲۰KB — زیرِ سقفِ ۶۴KB ِ فیلدهای هر op در Sync v1. بیشتر ⇒ ردِ بعدی.
+   */
+  const val REF_CHUNK = 400
+
+  /** ردِ `customer_merge` — اگر ردیف‌ها بیش از `REF_CHUNK` باشند، چند رد با همان `refId` */
+  private fun trail(refId: String, notes: String, rows: List<String>, today: String, now: Long, newId: () -> String): List<AuditEntry> {
+    val parts = rows.chunked(REF_CHUNK).ifEmpty { listOf(emptyList()) }
+    return parts.mapIndexed { i, part ->
+      AuditEntry(
+        id = newId(), type = "customer_merge", date = today, refId = refId, createdAt = now,
+        notes = if (i == 0) notes else "$notes (ادامهٔ فهرستِ ردیف‌ها، ${i + 1} از ${parts.size})",
+        refIds = part.ifEmpty { null },
+      )
+    }
+  }
 
   /* ------------------------------ پیدا کردن ------------------------------ */
 
@@ -129,7 +150,7 @@ object CustomerMerge {
     val tags = CustomerCrm.normalizeTags(keep.tags.orEmpty() + drop.tags.orEmpty()).ifEmpty { null }
     val consent = when {
       keep.marketingConsent == false || drop.marketingConsent == false -> false
-      keep.marketingConsent == true || drop.marketingConsent == true -> true
+      keep.marketingConsent == true && drop.marketingConsent == true -> true
       else -> null
     }
     return keep.copy(
@@ -177,10 +198,16 @@ object CustomerMerge {
       is Result.Failed -> return r
       is Result.Ok -> r.preview
     }
-    val trace = AuditEntry(
-      id = newId(), type = "customer_merge", date = today, refId = keepId, createdAt = now,
-      notes = "ادغامِ «${p.drop.name}» (${p.drop.id}) در «${p.keep.name}»: ${p.transactions} تراکنش و ${p.sales} فاکتور منتقل شد" +
-        " — ماندهٔ منتقل‌شده ${money(p.dropBalance)} افغانی",
+    val rows = d.transactions.filter { it.debtorId == dropId }.map { "transactions/${it.id}" } +
+      d.sales.filter { it.debtorId == dropId }.map { "sales/${it.id}" }
+    //  ادغامی که رضایتِ ماندگار را عوض کرد (فقط سخت‌گیرانه‌تر) همین‌جا سند دارد
+    val consent = if (p.result.marketingConsent == p.keep.marketingConsent) "" else
+      " — رضایتِ تبلیغ: ${CustomerCrm.consentText(p.keep.marketingConsent)} ⇐ ${CustomerCrm.consentText(p.result.marketingConsent)}"
+    val trace = trail(
+      dropId,
+      "ادغامِ «${p.drop.name}» (${p.drop.id}) در «${p.keep.name}» (${p.keep.id}): ${p.transactions} تراکنش و ${p.sales} فاکتور منتقل شد" +
+        " — ماندهٔ منتقل‌شده ${money(p.dropBalance)} افغانی" + consent,
+      rows, today, now, newId,
     )
     val data = d.copy(
       debtors = d.debtors.map {
@@ -202,6 +229,11 @@ object CustomerMerge {
   /**
    *  ردیف‌های دیررسیده (تراکنش یا فاکتوری که هنوز به مشتریِ ادغام‌شده اشاره می‌کند،
    *  مثلاً از دستگاهِ آفلاین) ⇐ ماندگار. `null` یعنی کاری نبود.
+   *
+   *  حلقهٔ `mergedInto` (دو ادغامِ وارونه روی دو دستگاه) ترمیم می‌شود: کوچک‌ترین شناسهٔ
+   *  حلقه (`CustomerCrm.resolve`) دوباره فعال و بقیه مستقیم به آن؛ همهٔ دستگاه‌ها همین را
+   *  می‌سازند. مقصدِ ناپیدا (ردیفِ ماندگار هنوز نرسیده) دست نمی‌خورد.
+   *  برای هر ماندگار یک ردِ `customer_merge` با `refId` = همان ماندگار و ردیف‌ها در `refIds`.
    */
   fun sweep(
     d: ShopData,
@@ -209,19 +241,38 @@ object CustomerMerge {
     now: Long = System.currentTimeMillis(),
     newId: () -> String = ::auditId,
   ): ShopData? {
-    val merged = d.debtors.filter { !CustomerCrm.isActive(it) }.map { it.id }.toSet()
+    val merged = d.debtors.filter { !CustomerCrm.isActive(it) }
     if (merged.isEmpty()) return null
-    val target = merged.associateWith { CustomerCrm.resolve(d, it) }.filter { (a, b) -> a != b }
-    var tx = 0
-    var sales = 0
-    val transactions = d.transactions.map { t -> target[t.debtorId]?.let { tx++; t.copy(debtorId = it) } ?: t }
-    val salesOut = d.sales.map { s -> s.debtorId?.let(target::get)?.let { sales++; s.copy(debtorId = it) } ?: s }
-    if (tx == 0 && sales == 0) return null
-    val trace = AuditEntry(
-      id = newId(), type = "customer_merge", date = today, createdAt = now,
-      notes = "انتقالِ ردیف‌های دیررسیده به مشتریِ ماندگار: $tx تراکنش و $sales فاکتور",
-    )
-    return d.copy(transactions = transactions, sales = salesOut, auditLog = d.auditLog + trace)
+    val byId = d.debtors.associateBy { it.id }
+    val target = merged.associate { it.id to CustomerCrm.resolve(byId, it.id) }
+    //  سرِ حلقه: ادغام‌شده‌ای که زنجیره‌اش به خودش برمی‌گردد
+    val revive = target.values.toSortedSet().filter { r ->
+      byId[r]?.mergedInto?.takeIf { it.isNotBlank() }?.let { CustomerCrm.resolve(byId, it) } == r
+    }.toSet()
+    val debtors = d.debtors.map { c ->
+      val to = target[c.id]
+      when {
+        c.id in revive -> c.copy(mergedInto = null)
+        to != null && to in revive && c.mergedInto != to -> c.copy(mergedInto = to)
+        else -> c
+      }
+    }
+    val moves = target.filter { (a, b) -> a != b }
+    val moved = sortedMapOf<String, MutableList<String>>()
+    val transactions = d.transactions.map { t ->
+      moves[t.debtorId]?.let { to -> moved.getOrPut(to) { mutableListOf() } += "transactions/${t.id}"; t.copy(debtorId = to) } ?: t
+    }
+    val salesOut = d.sales.map { s ->
+      s.debtorId?.let(moves::get)?.let { to -> moved.getOrPut(to) { mutableListOf() } += "sales/${s.id}"; s.copy(debtorId = to) } ?: s
+    }
+    if (revive.isEmpty() && moved.isEmpty()) return null
+    val trace = (revive + moved.keys).toSortedSet().flatMap { to ->
+      val rows = moved[to].orEmpty()
+      val tx = rows.count { it.startsWith("transactions/") }
+      val head = if (to in revive) "حلقهٔ ادغام ترمیم شد: «${byId.getValue(to).name}» ($to) دوباره فعال است — " else ""
+      trail(to, head + "انتقالِ ردیف‌های دیررسیده به مشتریِ ماندگار: $tx تراکنش و ${rows.size - tx} فاکتور", rows, today, now, newId)
+    }
+    return d.copy(debtors = debtors, transactions = transactions, sales = salesOut, auditLog = d.auditLog + trace)
   }
 
   /* --------------------------------- برگه --------------------------------- */

@@ -451,6 +451,14 @@ data class AuditEntry(
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val z: kotlinx.serialization.json.JsonObject? = null,
+  /**
+   *  ردیف‌هایی که این رد جابه‌جا کرده، هر کدام `جدول/شناسه` (مثلاً `transactions/t1`، `sales/s7`) —
+   *  فعلاً فقط `customer_merge` (CRM-10)، تا ادغام برگشت‌پذیر و دنبال‌کردنی بماند. حداکثر
+   *  `CustomerMerge.REF_CHUNK` در هر رد (سقفِ ۶۴KB ِ هر op). `null` نوشته نمی‌شود.
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val refIds: List<String>? = null,
 )
 
 /**

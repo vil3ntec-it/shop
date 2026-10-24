@@ -139,7 +139,11 @@ class CustomerCrmTest {
     assertEquals("marketing_consent", a.type)
     assertEquals("رضایتِ «احمد» برای پیامِ تبلیغاتی: نپرسیده ⇐ بله — حضوری", a.notes)
     //  همان مقدار ⇒ ردِ دوم نه
-    assertSame(d, ok(CustomerCrm.setMarketingConsent(d, "c1", true, "", "2026-10-19", 3, ::newId)))
+    assertSame(d, ok(CustomerCrm.setMarketingConsent(d, "c1", true, "تلفنی", "2026-10-19", 3, ::newId)))
+    //  «بله» بی منبع سند ندارد ⇒ رد؛ داده دست نمی‌خورد
+    for (blank in listOf("", "   ")) {
+      assertEquals("برای «بله» منبعِ رضایت را بنویسید (مثلاً «حضوری» یا «تلفنی»)", failed(CustomerCrm.setMarketingConsent(d, "c2", true, blank, "2026-10-19", 4, ::newId)))
+    }
 
     d = ok(CustomerCrm.setMarketingConsent(d, "c2", false, "", "2026-10-19", 4, ::newId))
     d = d.copy(debtors = d.debtors + Debtor(id = "c3", name = "بی‌شماره", marketingConsent = true) + Debtor(id = "c4", name = "ادغامی", phone = "+93788000000", marketingConsent = true, mergedInto = "c1"))
@@ -157,7 +161,9 @@ class CustomerCrmTest {
     )
     assertEquals("c", CustomerCrm.resolve(d, "a"))
     assertEquals("c", CustomerCrm.resolve(d, "c"))
-    assertTrue(CustomerCrm.resolve(d, "x") in setOf("x", "y"))
+    //  حلقه ⇒ کوچک‌ترین شناسه، از هر سرش
+    assertEquals("x", CustomerCrm.resolve(d, "x"))
+    assertEquals("x", CustomerCrm.resolve(d, "y"))
     assertEquals("z", CustomerCrm.resolve(d, "z"))
     assertEquals("nope", CustomerCrm.resolve(d, "nope"))
     assertEquals("این مشتری با مشتریِ دیگری ادغام شده است", failed(CustomerCrm.setProfile(d, "a", CustomerCrm.Profile())))

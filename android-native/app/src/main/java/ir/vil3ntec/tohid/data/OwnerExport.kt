@@ -130,6 +130,7 @@ object OwnerExport {
     "purchaseId" to "شناسهٔ خرید",
     "warehouseEntryId" to "شناسهٔ ورودی انبار",
     "refId" to "شناسهٔ مرجع",
+    "refIds" to "ردیف‌های مرتبط",
     "kind" to "نوعِ ردیفِ سیستمی",
     "purchasePrice" to "قیمت خرید",
     "salePrice" to "قیمت فروش",

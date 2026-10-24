@@ -1,5 +1,10 @@
 package ir.vil3ntec.tohid.data
 
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -41,6 +46,35 @@ class CustomerMergeTest {
   )
 
   private fun merged(r: CustomerMerge.Result) = r as CustomerMerge.Result.Ok
+
+  private val json = Json { encodeDefaults = true; ignoreUnknownKeys = true }
+
+  /**
+   *  همگام‌سازیِ فیلدبه‌فیلدِ دو دستگاه از یک پایه (همان قاعدهٔ `LedgerDiff.changedFields`):
+   *  فیلدی که هر دستگاه نسبت به پایه عوض کرد می‌نشیند؛ هم‌فیلد ⇒ دستگاهِ دوم (دیرتر).
+   */
+  private fun syncTwo(base: ShopData, a: ShopData, b: ShopData): ShopData {
+    fun tree(d: ShopData) = json.encodeToJsonElement(ShopData.serializer(), d).jsonObject
+    fun JsonObject.rows(k: String) = (this[k] as JsonArray).map { it.jsonObject }.associateBy { it["id"]!!.jsonPrimitive.content }
+    val t0 = tree(base)
+    val out = t0.toMutableMap()
+    for (k in listOf("debtors", "transactions", "sales", "auditLog")) {
+      val r0 = t0.rows(k)
+      val sides = listOf(tree(a).rows(k), tree(b).rows(k))
+      val ids = LinkedHashSet(r0.keys).apply { sides.forEach { addAll(it.keys) } }
+      out[k] = JsonArray(ids.map { id ->
+        val was = r0[id] ?: JsonObject(emptyMap())
+        val row = was.toMutableMap()
+        for (side in sides) {
+          val now = side[id] ?: continue
+          for ((f, v) in now) if (was[f] != v) row[f] = v
+          for (f in was.keys) if (f !in now) row.remove(f)
+        }
+        JsonObject(row)
+      })
+    }
+    return json.decodeFromJsonElement(ShopData.serializer(), JsonObject(out))
+  }
   private fun failed(r: CustomerMerge.Result) = (r as CustomerMerge.Result.Failed).message
 
   @Test fun `تکراری‌ها — شمارهٔ یکسان قوی و اول، هم‌نامی ضعیف، پرکارتر پیشنهادِ ماندگار`() {
@@ -96,8 +130,9 @@ class CustomerMergeTest {
 
     val a = d.auditLog.single()
     assertEquals("customer_merge", a.type)
-    assertEquals("c2", a.refId)
-    assertEquals("ادغامِ «احمد» (c1) در «احمد کابلی»: 1 تراکنش و 1 فاکتور منتقل شد — ماندهٔ منتقل‌شده 300 افغانی", a.notes)
+    assertEquals("c1", a.refId)                            // مشتریِ ادغام‌شده
+    assertEquals("ادغامِ «احمد» (c1) در «احمد کابلی» (c2): 1 تراکنش و 1 فاکتور منتقل شد — ماندهٔ منتقل‌شده 300 افغانی", a.notes)
+    assertEquals(listOf("transactions/t1", "sales/s7"), a.refIds)
     assertEquals(1, r.preview.transactions)
     assertEquals(900.0, r.preview.balanceAfter, 0.0)
 
@@ -158,6 +193,100 @@ class CustomerMergeTest {
     assertEquals("c2", swept.sales.first { it.id == "sl" }.debtorId)
     assertEquals(970.0, ShopStore.debt(swept, "c2"), 0.0)
     assertEquals("انتقالِ ردیف‌های دیررسیده به مشتریِ ماندگار: 1 تراکنش و 1 فاکتور", swept.auditLog.last().notes)
+    assertEquals("c2", swept.auditLog.last().refId)
+    assertEquals(listOf("transactions/late", "sales/sl"), swept.auditLog.last().refIds)
     assertNull(CustomerMerge.sweep(swept, "2026-10-20", 4, ::newId))
+  }
+
+  @Test fun `ادغام رضایت نمی‌سازد — «بله» فقط وقتی هر دو بله‌اند، و تغییرش در شرحِ رد`() {
+    fun consent(k: Boolean?, x: Boolean?): Boolean? {
+      val d = ShopData(debtors = listOf(Debtor(id = "k", name = "ک", marketingConsent = k), Debtor(id = "x", name = "ت", marketingConsent = x)))
+      return merged(CustomerMerge.preview(d, "k", "x")).preview.result.marketingConsent
+    }
+    assertNull(consent(null, true))
+    assertNull(consent(true, null))
+    assertEquals(true, consent(true, true))
+    assertEquals(false, consent(true, false))
+    assertEquals(false, consent(false, true))
+    assertEquals(false, consent(null, false))
+    assertNull(consent(null, null))
+
+    val d = ShopData(debtors = listOf(
+      Debtor(id = "k", name = "ک", phone = "+93700000001", marketingConsent = true),
+      Debtor(id = "x", name = "ت", phone = "+93700000002"),
+    ))
+    val m = merged(CustomerMerge.merge(d, "k", "x", "2026-10-19", 1, ::newId)).data
+    assertEquals(emptyList<Debtor>(), CustomerCrm.promoRecipients(m))
+    assertTrue(m.auditLog.single().notes.endsWith(" — رضایتِ تبلیغ: بله ⇐ نپرسیده"))
+    val n = merged(CustomerMerge.merge(d, "x", "k", "2026-10-19", 2, ::newId)).data
+    assertEquals(emptyList<Debtor>(), CustomerCrm.promoRecipients(n))
+  }
+
+  @Test fun `دو ادغامِ وارونه روی دو دستگاه — حلقه ترمیم، کوچک‌ترین شناسه می‌ماند، هیچ ردیفی گم یا دوبار نمی‌شود`() {
+    val both = ShopStore.debt(d0, "c1") + ShopStore.debt(d0, "c2")
+    val a = merged(CustomerMerge.merge(d0, "c2", "c1", "2026-10-19", 1, ::newId)).data   // دستگاهِ الف: c1 در c2
+    val b = merged(CustomerMerge.merge(d0, "c1", "c2", "2026-10-19", 2, ::newId)).data   // دستگاهِ ب: c2 در c1
+    val d = syncTwo(d0, a, b)
+    assertEquals("c2", d.debtors.first { it.id == "c1" }.mergedInto)
+    assertEquals("c1", d.debtors.first { it.id == "c2" }.mergedInto)
+    assertEquals(listOf("c3", "c4", "c5"), CustomerCrm.active(d).map { it.id })   // هر دو پنهان شده‌اند
+    assertEquals("c1", CustomerCrm.resolve(d, "c1"))
+    assertEquals("c1", CustomerCrm.resolve(d, "c2"))
+    //  همان دفتر از هر ترتیبِ رسیدن (فقط ترتیبِ ردهای دفترچه فرق دارد)
+    fun ledger(x: ShopData) = CustomerMerge.sweep(x, "2026-10-20", 7) { "z" }!!.let { it.copy(auditLog = it.auditLog.sortedBy { e -> e.notes }) }
+    assertEquals(ledger(d), ledger(syncTwo(d0, b, a)))
+
+    val fixed = CustomerMerge.sweep(d, "2026-10-20", 3, ::newId)!!
+    assertNull(fixed.debtors.first { it.id == "c1" }.mergedInto)
+    assertEquals("c1", fixed.debtors.first { it.id == "c2" }.mergedInto)
+    assertEquals(listOf("c1", "c3", "c4", "c5"), CustomerCrm.active(fixed).map { it.id })
+    assertEquals(listOf("t1", "t2", "t3"), fixed.transactions.filter { it.debtorId == "c1" }.map { it.id }.sorted())
+    assertEquals(listOf("s3", "s7", "s8"), fixed.sales.filter { it.debtorId == "c1" }.map { it.id }.sorted())
+    assertEquals(d0.transactions.map { it.copy(debtorId = "") }, fixed.transactions.map { it.copy(debtorId = "") })
+    assertEquals(d0.sales.map { it.copy(debtorId = null) }, fixed.sales.map { it.copy(debtorId = null) })
+    assertEquals(both, ShopStore.debt(fixed, "c1"), 0.0)
+    assertEquals(0.0, ShopStore.debt(fixed, "c2"), 0.0)
+    val t = fixed.auditLog.last()
+    assertEquals("customer_merge", t.type)
+    assertEquals("c1", t.refId)
+    assertEquals("حلقهٔ ادغام ترمیم شد: «احمد» (c1) دوباره فعال است — انتقالِ ردیف‌های دیررسیده به مشتریِ ماندگار: 1 تراکنش و 1 فاکتور", t.notes)
+    assertEquals(listOf("transactions/t1", "sales/s7"), t.refIds)
+    assertNull(CustomerMerge.sweep(fixed, "2026-10-20", 4, ::newId))
+  }
+
+  @Test fun `حلقهٔ سه‌تایی و دنباله‌اش — همه به کوچک‌ترین شناسهٔ حلقه؛ مقصدِ ناپیدا دست نمی‌خورد`() {
+    val d = ShopData(
+      debtors = listOf(
+        Debtor(id = "q", name = "ق", mergedInto = "r"), Debtor(id = "r", name = "ر", mergedInto = "p"),
+        Debtor(id = "p", name = "پ", mergedInto = "q"), Debtor(id = "t", name = "ت", mergedInto = "q"),
+        Debtor(id = "z", name = "ز", mergedInto = "gone"),
+      ),
+      transactions = listOf(give("tq", "q", 10.0, "2026-10-01"), give("tr", "r", 20.0, "2026-10-01"),
+        give("tp", "p", 30.0, "2026-10-01"), give("tt", "t", 40.0, "2026-10-01"), give("tz", "z", 5.0, "2026-10-01")),
+    )
+    val fixed = CustomerMerge.sweep(d, "2026-10-20", 1, ::newId)!!
+    assertEquals(mapOf("q" to "p", "r" to "p", "p" to null, "t" to "p", "z" to "gone"), fixed.debtors.associate { it.id to it.mergedInto })
+    assertEquals(100.0, ShopStore.debt(fixed, "p"), 0.0)
+    assertEquals("z", fixed.transactions.first { it.id == "tz" }.debtorId)
+    assertEquals(listOf("p"), fixed.auditLog.map { it.refId })
+    assertNull(CustomerMerge.sweep(fixed, "2026-10-20", 2, ::newId))
+  }
+
+  @Test fun `ردیف‌های بسیار ⇒ چند رد با همان refId، هر کدام زیرِ سقفِ op`() {
+    val many = (1..450).map { give("g" + it.toString().padStart(35, '0'), "c1", 1.0, "2026-09-01") }
+    val d = merged(CustomerMerge.merge(d0.copy(transactions = d0.transactions + many), "c2", "c1", "2026-10-19", 1, ::newId)).data
+    val rows = d.auditLog.filter { it.type == "customer_merge" }
+    assertEquals(listOf(CustomerMerge.REF_CHUNK, 52), rows.map { it.refIds!!.size })   // ۴۵۱ تراکنش + ۱ فاکتور
+    assertTrue(rows.all { it.refId == "c1" })
+    assertTrue(rows[1].notes.endsWith("(ادامهٔ فهرستِ ردیف‌ها، 2 از 2)"))
+    assertEquals(452, rows.flatMap { it.refIds!! }.toSet().size)
+    for (r in rows) assertTrue(json.encodeToString(AuditEntry.serializer(), r).toByteArray(Charsets.UTF_8).size < 64 * 1024)
+  }
+
+  @Test fun `یادآوریِ ثبت‌شده برای مشتریِ ادغام‌شده برای ماندگار هم حساب است`() {
+    val d = d0.copy(auditLog = listOf(AuditEntry(id = "r1", type = DebtReminder.TYPE, date = "2026-10-10", refId = "c1")))
+    val m = merged(CustomerMerge.merge(d, "c2", "c1", "2026-10-19", 1, ::newId)).data
+    assertEquals("2026-10-10", DebtReminder.lastReminded(m, "c2"))
+    assertNull(DebtReminder.lastReminded(m, "c5"))
   }
 }

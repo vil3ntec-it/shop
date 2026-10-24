@@ -34,19 +34,27 @@ object CustomerCrm {
   fun active(d: ShopData): List<Debtor> = d.debtors.filter(::isActive)
 
   /**
-   *  شناسهٔ ماندگار: زنجیرهٔ `mergedInto` را دنبال می‌کند (حداکثر ۳۲ گام؛ حلقه یا
-   *  مقصدِ ناپیدا ⇒ آخرین شناسهٔ موجود). شناسهٔ ناپیدا همان برمی‌گردد.
+   *  شناسهٔ ماندگار: زنجیرهٔ `mergedInto` را دنبال می‌کند. مقصدِ ناپیدا ⇒ آخرین شناسهٔ
+   *  موجود؛ شناسهٔ ناپیدا همان برمی‌گردد.
+   *
+   *  حلقه (دو دستگاهِ آفلاین یکی X را در Y و دیگری Y را در X ادغام کرد): **کوچک‌ترین
+   *  شناسهٔ حلقه** — روی هر دستگاه همان، تا `CustomerMerge.sweep` همان را دوباره فعال کند
+   *  و بقیه را به آن ببرد و دو دستگاه به یک نتیجه برسند.
    */
-  fun resolve(d: ShopData, id: String): String {
-    val byId = d.debtors.associateBy { it.id }
+  fun resolve(d: ShopData, id: String): String = resolve(d.debtors.associateBy { it.id }, id)
+
+  /** همان، با نقشهٔ آماده — برای حلقه‌هایی که برای هر ردیف می‌پرسند */
+  fun resolve(byId: Map<String, Debtor>, id: String): String {
+    val path = ArrayList<String>()
     var cur = id
-    val seen = HashSet<String>()
-    repeat(32) {
+    while (true) {
       val next = byId[cur]?.mergedInto?.takeIf { it.isNotBlank() } ?: return cur
-      if (!seen.add(cur) || byId[next] == null) return cur
+      if (byId[next] == null) return cur
+      path += cur
+      val at = path.indexOf(next)
+      if (at >= 0) return path.subList(at, path.size).minOf { it }
       cur = next
     }
-    return cur
   }
 
   /* --------------------------------- تلفن --------------------------------- */
@@ -215,7 +223,8 @@ object CustomerCrm {
 
   /**
    *  رضایت برای پیامِ تبلیغاتی (CRM-12). هر تغییر در دفترچهٔ ثبت با تاریخ و منبع
-   *  (`source`: «حضوری»، «تلفنی»…) می‌ماند — همان سندِ رضایت.
+   *  (`source`: «حضوری»، «تلفنی»…) می‌ماند — همان سندِ رضایت. «بله» بی منبع پذیرفته
+   *  نیست (سند ندارد)؛ «نه» و «نپرسیده» منبع نمی‌خواهند.
    */
   fun setMarketingConsent(
     d: ShopData,
@@ -228,8 +237,9 @@ object CustomerCrm {
   ): DebtorEngine.Result {
     val c = d.debtors.find { it.id == id } ?: return DebtorEngine.Result.Failed("مشتری پیدا نشد")
     if (!isActive(c)) return DebtorEngine.Result.Failed("این مشتری با مشتریِ دیگری ادغام شده است")
-    if (c.marketingConsent == consent) return DebtorEngine.Result.Ok(d, id)
     val from = clean(source).take(60)
+    if (consent == true && from.isEmpty()) return DebtorEngine.Result.Failed("برای «بله» منبعِ رضایت را بنویسید (مثلاً «حضوری» یا «تلفنی»)")
+    if (c.marketingConsent == consent) return DebtorEngine.Result.Ok(d, id)
     val trace = AuditEntry(
       id = newId(), type = "marketing_consent", date = today, refId = id, createdAt = now,
       notes = "رضایتِ «${c.name}» برای پیامِ تبلیغاتی: ${consentText(c.marketingConsent)} ⇐ ${consentText(consent)}" +

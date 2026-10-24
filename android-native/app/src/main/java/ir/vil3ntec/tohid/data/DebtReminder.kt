@@ -86,9 +86,11 @@ object DebtReminder {
     val message: String,
   )
 
-  /** تاریخِ آخرین یادآوریِ ثبت‌شده (yyyy-MM-dd) */
-  fun lastReminded(d: ShopData, debtorId: String): String? =
-    d.auditLog.filter { it.type == TYPE && it.refId == debtorId && it.date.isNotBlank() }.maxOfOrNull { it.date }
+  /** تاریخِ آخرین یادآوریِ ثبت‌شده (yyyy-MM-dd) — یادآوریِ مشتریِ ادغام‌شده در همین یکی هم حساب است */
+  fun lastReminded(d: ShopData, debtorId: String): String? {
+    val ids = d.debtors.filter { it.mergedInto == debtorId }.mapTo(hashSetOf(debtorId)) { it.id }
+    return d.auditLog.filter { it.type == TYPE && it.refId in ids && it.date.isNotBlank() }.maxOfOrNull { it.date }
+  }
 
   private fun daysBetween(from: String, to: String): Long? {
     val a = ReportDates.epochDay(from) ?: return null
