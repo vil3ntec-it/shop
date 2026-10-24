@@ -28,7 +28,6 @@ object StrSettings {
   val invalidBackup: String get() = t("فایل پشتیبان معتبر نیست", "The backup file isn't valid", "د بیک‌اپ دوتنه سمه نه ده")
   val cameraReady: String get() = td("دوربین آماده است — بارکدخوان کار می‌کند", "Camera ready — the scanner works", "کمره چمتو ده — بارکوډ لوستونکی کار کوي", "Barcode scanner ready", "بارکوډ لوستونکی چمتو دی")
   val cameraDenied: String get() = t("بدون اجازهٔ دوربین، بارکدخوان باز نمی‌شود", "Without camera permission, the scanner can't open", "د کمرې له اجازې پرته بارکوډ لوستونکی نه خلاصېږي")
-  val settingsIntro: String get() = t("هشدارها، ظاهر، داده‌ها و پشتیبان — حساب و نام دکان در «حساب من» است", "Alerts, appearance, data and backup — your account and shop name are under “My account”", "خبرتیاوې، بڼه، معلومات او بیک‌اپ — حساب او د دوکان نوم په «زما حساب» کې دي")
 
   // هشدارها
   fun debtFrom(a: Any): String = t("قرض از $a ؋ به بالا", "Debts of $a ؋ or more", "له $a ؋ او زیات پور")
@@ -39,7 +38,6 @@ object StrSettings {
   // ظاهر
   val light: String get() = t("روشن", "Light", "روښانه")
   val dark: String get() = t("تیره", "Dark", "تیاره")
-  val likePhone: String get() = td("مثل گوشی", "Like the phone", "د موبایل په څېر", "Like the system", "د سیستم په څېر")
   val reduceMotionNote: String get() = td("اگر گوشی «کاهش حرکت» یا حالت ذخیرهٔ باتری روشن باشد، انیمیشن‌ها خاموش می‌شوند. با این کلید همیشه روشن می‌مانند.", "If the phone has “Reduce motion” or battery saver on, animations are turned off. With this switch they always stay on.", "که په موبایل کې «حرکت کمول» یا د بیټرۍ د سپما حالت روښانه وي، انیمیشنونه بندېږي. په دې کلي سره تل روښانه پاتې کېږي.", "If the system has “Reduce motion” on, animations are turned off. With this switch they always stay on.", "که سیستم «حرکت کمول» روښانه کړی وي، انیمیشنونه بندېږي. په دې کلي سره تل روښانه پاتې کېږي.")
   val animationsOn: String get() = t("انیمیشن روشن", "Animations on", "انیمیشن روښانه")
   val likePhoneSetting: String get() = td("مثل تنظیم گوشی", "Follow the phone setting", "د موبایل د امستنې په څېر", "Follow the system setting", "د سیستم د امستنې په څېر")
@@ -51,7 +49,6 @@ object StrSettings {
   val dontSell: String get() = t("فروخته نشود", "Don't sell", "ونه پلورل شي")
 
   // دوربین
-  val cameraScanner: String get() = td("دوربین بارکدخوان", "Barcode camera", "د بارکوډ کمره", "Barcode scanner", "بارکوډ لوستونکی")
   val permitted: String get() = t("اجازه داده شده", "Permission granted", "اجازه ورکړل شوې")
   val notPermitted: String get() = t("هنوز اجازه داده نشده", "Permission not granted yet", "لا اجازه نه ده ورکړل شوې")
   val cameraNeeded: String get() = td("برنامه برای اسکن بارکد محصولات به دوربین نیاز دارد.", "The app needs the camera to scan product barcodes.", "اپ د توکو د بارکوډ سکن کولو لپاره کمرې ته اړتیا لري.", "Connect a USB or Bluetooth barcode scanner to the computer; it works like a keyboard and needs no installation. Without a scanner, type the code in the sale box.", "د USB یا بلوتوث بارکوډ لوستونکی کمپیوټر ته وصل کړئ؛ د کیبورډ په څېر کار کوي او نصب ته اړتیا نه لري. بې بارکوډ لوستونکي، کوډ د پلور په بکس کې ولیکئ.")
@@ -149,8 +146,6 @@ object StrSettings {
   val undoFailed: String get() = t("برگرداندن ممکن نشد", "Couldn't undo", "ستنول ونه شول")
   val wipeAll: String get() = t("پاک‌سازی کامل اطلاعات", "Erase all data", "ټول معلومات پاکول")
   val aboutText: String get() = td("فروشگاه من — برنامهٔ اندروید.\nتمام اطلاعات روی همین گوشی ذخیره می‌شود؛ هر چند وقت یک‌بار پشتیبان بگیرید.", "My Shop — Android app.\nAll data is stored on this phone; take a backup every now and then.", "زما دوکان — د اندروید اپ.\nټول معلومات په همدې موبایل کې خوندي کېږي؛ وخت ناوخت بیک‌اپ واخلئ.", "My Shop — computer app.\nAll data is stored on this computer; take a backup every now and then.", "زما دوکان — د کمپیوټر اپ.\nټول معلومات په همدې کمپیوټر کې خوندي کېږي؛ وخت ناوخت بیک‌اپ واخلئ.")
-  val getLatest: String get() = t("دریافت آخرین نسخه", "Get the latest version", "وروستۍ نسخه واخلئ")
-  fun installedVersion(v: Any): String = t("نسخهٔ نصب‌شده: $v", "Installed version: $v", "نصب شوې نسخه: $v")
   val restoreQ: String get() = t("بازیابی اطلاعات؟", "Restore data?", "معلومات بېرته راوګرځول شي؟")
   val restoreWarn: String get() = t("با بازیابی این فایل، تمام اطلاعات فعلی این دستگاه جایگزین می‌شود. یک نسخه از وضعیت فعلی نگه داشته می‌شود تا اگر اشتباه شد، برگردانده شود.", "Restoring this file replaces all current data on this device. A copy of the current state is kept so it can be undone if this was a mistake.", "د دې دوتنې په بېرته راګرځولو سره، د دې وسیلې ټول اوسني معلومات بدلېږي. د اوسني حالت یوه کاپي ساتل کېږي څو که غلطي وه، بېرته وګرځول شي.")
   val warehouseEntries: String get() = t("ورودهای انبار", "Warehouse entries", "د ګدام داخلې")
@@ -169,17 +164,6 @@ object StrSettings {
   val wipeWarn: String get() = t("همه چیز روی این دستگاه پاک می‌شود و برنمی‌گردد. اگر پشتیبان نگرفته‌اید، اول پشتیبان بگیرید.", "Everything on this device will be erased and can't be recovered. If you haven't made a backup, make one first.", "په دې وسیله کې هر څه پاکېږي او بېرته نه راځي. که مو بیک‌اپ نه دی اخیستی، لومړی بیک‌اپ واخلئ.")
   val wiped: String get() = t("تمام اطلاعات پاک شد", "All data erased", "ټول معلومات پاک شول")
   val wipe: String get() = t("پاک کن", "Erase", "پاک یې کړه")
-
-  // اشتراک (برچسبِ وضعیت)
-  val active: String get() = t("فعال", "Active", "فعال")
-  val graceEnded: String get() = t("تمام شده — در مهلت", "Ended — in grace period", "پای ته رسېدلی — په مهلت کې")
-  val ended: String get() = t("تمام شده", "Ended", "پای ته رسېدلی")
-  val notStarted: String get() = t("هنوز شروع نشده", "Not started yet", "لا نه دی پیل شوی")
-  val licenseInvalid: String get() = t("مجوز معتبر نیست", "The license isn't valid", "جواز د اعتبار وړ نه دی")
-  val noSubscription: String get() = t("بدون اشتراک", "No subscription", "ګډون نشته")
-
-  // بخش‌های جمع‌شو
-  val open: String get() = t("باز کردن", "Open", "پرانیستل")
 
   // تاریخ و رقم (LocaleSection)
   val persianDigits: String get() = t("رقمِ فارسی", "Persian digits", "فارسي عددونه")
@@ -395,4 +379,11 @@ object StrSettings {
   val whatToDo: String get() = t("چه کنید", "What to do", "څه وکړئ")
   fun details(x: Any): String = t("جزئیات: $x", "Details: $x", "جزئیات: $x")
   fun queueSize(n: Any): String = t("در صف: $n تغییر", "Queued: $n ${pl(n, "change", "changes")}", "په کتار کې: $n ${pl(n, "بدلون", "بدلونونه")}")
+
+  // تمِ رنگ (THEME-V2: سه تم، فقط روی همین دستگاه)
+  val themeRow: String get() = t("تم", "Theme", "تیم")
+  val themeSky: String get() = t("آسمان", "Sky", "آسمان")
+  val themeOcean: String get() = t("اقیانوس", "Ocean", "سمندر")
+  val themeSunset: String get() = t("غروب", "Sunset", "لمر لوېده")
+  val themeOnDevice: String get() = t("تم فقط روی همین دستگاه عوض می‌شود.", "The theme changes on this device only.", "تیم یوازې په همدې وسیله بدلېږي.")
 }
