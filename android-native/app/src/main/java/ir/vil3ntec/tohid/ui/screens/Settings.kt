@@ -570,6 +570,9 @@ fun SettingsScreen(
       }
     }
 
+    /* ===================== امنیت (SEC-01) ===================== */
+    item { SecuritySection(store, ::toast) }
+
     /* ========================= رمز حساب ========================= */
     if (signedIn) {
       item {
@@ -709,7 +712,8 @@ fun SettingsScreen(
               onClick = {
                 scope.launch {
                   val opened = withContext(Dispatchers.IO) {
-                    runCatching { store.parseBackup(snap.file.readText()).getOrThrow() }
+                    //  نسخهٔ خودکار رونوشتِ دفتر است؛ اگر دفتر رمزدار بود، این هم (SEC-01)
+                    runCatching { store.parseBackup(ir.vil3ntec.tohid.data.AtRest.readText(context, snap.file)).getOrThrow() }
                   }
                   opened
                     .onSuccess { pendingRestore = it; restorePhotos = 0; restoreError = null }
