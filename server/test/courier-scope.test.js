@@ -209,6 +209,61 @@ test('دعوت از صفحهٔ کارمندان ⇒ عضوِ courier، ردیف�
   assert.notEqual(standing.body.role, 'courier');
 });
 
+test('QA #282: دعوتِ پیک یک‌بارمصرف و با مهلت است — maxUses≠۱ و مهلتِ ۰/بیش از ۷ روز رد؛ پیش‌فرض ۷۲ ساعت', async () => {
+  const a = await shopOwner('دعوتِ یک‌بار');
+  await enable(a.shopId);
+  const courierCodes = async () => Number((await one(
+    `SELECT COUNT(*)::int AS n FROM staff_codes WHERE shop_id=$1 AND role='courier'`, [a.shopId])).n);
+
+  //  پیش‌فرض: ۱ بار، ۷۲ ساعت
+  const t0 = Date.now();
+  const d = await h.post('/api/shop/invite', { role: 'courier' }, { token: a.token });
+  assert.equal(d.status, 201, JSON.stringify(d.body));
+  assert.equal(d.body.maxUses, 1);
+  assert.ok(Math.abs(d.body.expiresAt - (t0 + 72 * 3600 * 1000)) < 60_000, `expiresAt=${d.body.expiresAt}`);
+  const row = await one('SELECT max_uses, expires_at FROM staff_codes WHERE id=$1', [d.body.id]);
+  assert.equal(Number(row.max_uses), 1);
+  assert.equal(Number(row.expires_at), d.body.expiresAt);
+
+  //  پیش‌فرضِ برنامهٔ گوشی (۱ بار، ۷ روز) پذیرفته می‌شود
+  const app = await h.post('/api/shop/invite', { role: 'courier', maxUses: 1, expiresInDays: 7 }, { token: a.token });
+  assert.equal(app.status, 201, JSON.stringify(app.body));
+  assert.ok(Math.abs(app.body.expiresAt - (t0 + 7 * 24 * 3600 * 1000)) < 60_000);
+
+  const before = await courierCodes();
+  for (const maxUses of [0, 2, 500, -1, 'abc']) {
+    const r = await h.post('/api/shop/invite', { role: 'courier', maxUses }, { token: a.token });
+    assert.equal(r.status, 400, `maxUses=${maxUses}: ${JSON.stringify(r.body)}`);
+    assert.equal(r.body.error.code, 'courier_invite_single_use');
+    assert.match(r.body.error.message, /پیک/);
+  }
+  for (const expiresInDays of [0, 8, 3650, -2, 'x']) {
+    const r = await h.post('/api/shop/invite', { role: 'courier', expiresInDays }, { token: a.token });
+    assert.equal(r.status, 400, `expiresInDays=${expiresInDays}: ${JSON.stringify(r.body)}`);
+    assert.equal(r.body.error.code, 'courier_invite_expiry');
+  }
+  assert.equal(await courierCodes(), before, 'درخواستِ ردشده کدی نمی‌سازد');
+
+  //  سدِّ دوم در خودِ lib
+  const staffCodes = require('../src/lib/staff-codes');
+  await assert.rejects(staffCodes.create(a.shopId, 'u', { role: 'courier', maxUses: 0, expiresAt: Date.now() + 3600_000 }),
+    (e) => e.code === 'courier_invite_single_use');
+  await assert.rejects(staffCodes.create(a.shopId, 'u', { role: 'courier', maxUses: 1, expiresAt: null }),
+    (e) => e.code === 'courier_invite_expiry');
+
+  //  کد واقعاً یک‌بار است: نفرِ دوم با همان کد پیک نمی‌شود
+  const first = await h.post('/api/auth/staff-login', { code: d.body.code, name: 'پیکِ اول', device: { uid: `once-1-${t0}` } });
+  assert.equal(first.status, 201, JSON.stringify(first.body));
+  const second = await h.post('/api/auth/staff-login', { code: d.body.code, name: 'پیکِ دوم', device: { uid: `once-2-${t0}` } });
+  assert.ok(second.status >= 400 && second.status < 500, `${second.status} ${JSON.stringify(second.body)}`);
+
+  //  رفتارِ حفظ‌شده: دعوتِ شاگرد همچنان می‌تواند بی‌شمار و بی‌مهلت باشد
+  const staff = await h.post('/api/shop/invite', { role: 'staff', maxUses: 0 }, { token: a.token });
+  assert.equal(staff.status, 201, JSON.stringify(staff.body));
+  assert.equal(staff.body.maxUses, 0);
+  assert.equal(staff.body.expiresAt, null);
+});
+
 /* ══════════════════════════════════════════════════════════════════
    ۳) درهای بسته — همان آزمونِ نام‌برده در §۳.۱۱
    ══════════════════════════════════════════════════════════════════ */

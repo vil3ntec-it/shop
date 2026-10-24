@@ -138,13 +138,18 @@ internal fun headline(s: String): String = when (s) {
 }
 
 /** رنگِ وضعیت با همان معنای همه‌جا (سیستمِ رنگ §۸) */
-internal fun statusTone(s: String, ui: PhoneV3Ui): PhoneV3Tone = when (s) {
-  "requested" -> ui.awaiting
-  "assigned", "picked_up" -> ui.preparing
-  "moving", "arrived" -> ui.delivery
-  "delivered" -> ui.success
-  "failed" -> ui.cancelled
-  else -> ui.inactive
+/**
+ *  رنگِ وضعیتِ پیک از همان نگاشتِ مشترک (`OrderStatusTone.courier`) — هر وضعیت همه‌جا یک معنا:
+ *  «گرفتم» آبیِ در راه است نه «آماده‌سازی»، و «ناموفق» بنفشِ «نیازِ بررسی» نه قرمزِ لغو.
+ */
+internal fun statusTone(s: String, ui: PhoneV3Ui): PhoneV3Tone = when (ir.vil3ntec.tohid.ui.components.common.OrderStatusTone.courier(s)) {
+  ir.vil3ntec.tohid.ui.components.common.PillTone.WARNING -> ui.awaiting
+  ir.vil3ntec.tohid.ui.components.common.PillTone.PREPARING -> ui.preparing
+  ir.vil3ntec.tohid.ui.components.common.PillTone.INFO -> ui.delivery
+  ir.vil3ntec.tohid.ui.components.common.PillTone.SUCCESS -> ui.success
+  ir.vil3ntec.tohid.ui.components.common.PillTone.DANGER -> ui.cancelled
+  ir.vil3ntec.tohid.ui.components.common.PillTone.REVIEW -> ui.review
+  ir.vil3ntec.tohid.ui.components.common.PillTone.NEUTRAL -> ui.inactive
 }
 
 internal fun actionLabel(from: String, to: String): String = when (to) {

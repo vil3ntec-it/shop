@@ -129,6 +129,8 @@ android {
     versionCode = 100 + buildNumber
     versionName = "$versionBase.$buildNumber"
     buildConfigField("String", "STORE", "\"$store\"")
+    //  نسخهٔ پیش‌نمایش (buildTypeِ `preview` در پایین) — در debug و release همیشه false
+    buildConfigField("boolean", "PREVIEW", "false")
 
     /*
      *  نشانیِ سرور، در زمانِ ساخت — نه در رابط کاربری.
@@ -277,6 +279,24 @@ android {
       isMinifyEnabled = true
       isShrinkResources = true
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+    }
+    /*
+     *  نسخهٔ پیش‌نمایش — `assemblePreview`، فقط از `tohid-native-preview.yml`.
+     *
+     *  همان release (کلید، سرور، R8، کلیدهای سنجاق‌شده)، ولی بستهٔ جدا
+     *  (`ir.vil3ntec.tohid.preview`): کنارِ برنامهٔ اصلی نصب می‌شود و به داده‌اش
+     *  دست نمی‌زند. versionCode همان «۱۰۰ + buildNumber» است و buildNumber را
+     *  ورک‌فلوِ پیش‌نمایش از شمارهٔ اجرای خودش می‌دهد؛ چون بسته جداست، با
+     *  versionCodeِ انتشار هیچ ربطی ندارد. نام: `src/preview/res/values/strings.xml`.
+     *  به‌روزرسانی فقط از برچسبِ `tohid-native-preview` (`Updater.fromPreview`).
+     */
+    create("preview") {
+      initWith(getByName("release"))
+      applicationIdSuffix = ".preview"
+      versionNameSuffix = "-preview"
+      signingConfig = signingConfigs.getByName("release")
+      buildConfigField("boolean", "PREVIEW", "true")
+      matchingFallbacks += listOf("release")
     }
   }
 

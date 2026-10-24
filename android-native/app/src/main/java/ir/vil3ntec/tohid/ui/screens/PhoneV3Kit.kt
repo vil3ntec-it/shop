@@ -76,7 +76,7 @@ internal fun v3Text(size: Int, weight: FontWeight = FontWeight.Medium, line: Int
 private fun ms(full: Int): Int = if (Motion.enabled) full else 0
 
 /** شب؟ (کارت و زمینهٔ تیره) */
-internal val PhoneV3Colors.isDark: Boolean get() = bg.red < 0.3f
+internal val PhoneV3Colors.isDark: Boolean get() = source.isDark
 
 /** زمینهٔ کاشیِ آیکنِ ردیف (r5): سطحِ درونی، نه رنگی — روز نزدیکِ زمینه، شب `tile` */
 internal val PhoneV3Colors.iconTile: Color get() = if (isDark) tile else lerp(card, bg, 0.9f)

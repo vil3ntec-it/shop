@@ -46,6 +46,8 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import ir.vil3ntec.tohid.ui.theme.DarkColors
+import ir.vil3ntec.tohid.ui.theme.Brand
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -177,11 +179,12 @@ private const val LOCKING = true
  *  است — نشانِ افتخار، لبه‌ی درخشان، دکمه‌ی اصلی — فقط رنگش عوض شد. چون
  *  بیرونِ کامپوز تعریف می‌شوند، مقدارها همان مقدارهای پالت‌اند.
  */
-private val GOLD_PALE = Color(0xFFB9A6FF)
-private val GOLD_SOFT = Color(0xFFA78BFF)
-private val GOLD = Color(0xFF7C5CFF)
-private val GOLD_DEEP = Color(0xFF5B3FE0)
-private val GOLD_INK = Color(0xFFFFFFFF)
+//  ۱۴۰۵/۰۷/۲۸: بنفش ⇐ سبزآبیِ برندِ VILL3N (روشن، سیر، پررنگ) — همان عددهای پالت، نه عددِ تازه
+private val GOLD_PALE = DarkColors.brandText
+private val GOLD_SOFT = DarkColors.brandPrimary
+private val GOLD = Brand.primary
+private val GOLD_DEEP = Brand.deep
+private val GOLD_INK = Color.White
 
 /** خودِ فلز: روشن، سیر، دوباره روشن — نه یک زردِ تخت */
 private val GOLD_SWEEP = Brush.linearGradient(
@@ -507,10 +510,11 @@ fun VipScreen(onDismiss: () -> Unit) {
           verticalAlignment = Alignment.CenterVertically,
         ) {
           Box(
-            Modifier.size(36.dp).clip(RoundedCornerShape(18.dp)).background(colors.warning),
+            Modifier.size(36.dp).clip(RoundedCornerShape(18.dp)).background(colors.status.awaitingApproval.fg),
             contentAlignment = Alignment.Center,
           ) {
-            Icon(Icons.Filled.Lock, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+            //  جفتِ وارونهٔ «در انتظار»: در شب آیکنِ تیره روی کهربایی (سفید روی #FCD34D ۱٫۵:۱ بود)
+            Icon(Icons.Filled.Lock, contentDescription = null, tint = colors.status.awaitingApproval.bg, modifier = Modifier.size(18.dp))
           }
           Spacer(Modifier.width(12.dp))
           Column(Modifier.weight(1f)) {
@@ -1381,127 +1385,9 @@ fun VipGate(label: String, content: @Composable () -> Unit) {
     return
   }
 
-  var sheet by remember { mutableStateOf(false) }
-
-  /*
-   *  صفحهٔ قفل، وسطِ صفحه.
-   *
-   *  قبلاً یک ستونِ تمام‌عرض بود با متن‌های چسبیده به یک لبه؛ روی تبلت
-   *  همه‌چیز به یک کنار می‌رفت و وسطِ صفحه خالی می‌ماند. حالا یک کارتِ
-   *  با پهنای محدود است که وسط می‌ایستد — روی گوشی و تبلت یک‌شکل.
-   */
-  Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
-    Column(
-      Modifier
-        .widthIn(max = 420.dp)
-        .fillMaxWidth()
-        .clip(RoundedCornerShape(Radius.lg))
-        .background(Shop.colors.surface)
-        .border(1.dp, Shop.colors.fieldBorder.copy(alpha = 0.5f), RoundedCornerShape(Radius.lg))
-        .padding(24.dp),
-      horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-      /*
-       *  قفلِ خاکستریِ نفس‌کشنده رفت.
-       *
-       *  این صفحه خبرِ بد نمی‌دهد؛ می‌گوید چه چیزی با اشتراک باز می‌شود.
-       *  پس همان نشانِ صفحه‌ی اشتراک، با یک بار باز شدنِ نرم — نه تپشِ
-       *  همیشگیِ یک قفلِ خاکستری.
-       */
-      var lit by remember { mutableStateOf(false) }
-      LaunchedEffect(Unit) { lit = true }
-      val grow by animateFloatAsState(
-        targetValue = if (lit) 1f else 0.84f,
-        animationSpec = if (Motion.enabled) spring(dampingRatio = 0.6f, stiffness = 320f) else snap(),
-        label = "gateGrow",
-      )
-      Box(
-        Modifier
-          .graphicsLayer { scaleX = grow; scaleY = grow }
-          .size(66.dp)
-          .shadow(20.dp, RoundedCornerShape(22.dp), ambientColor = GOLD, spotColor = GOLD)
-          .clip(RoundedCornerShape(22.dp))
-          .background(Brush.linearGradient(listOf(GOLD_SOFT, GOLD, GOLD_DEEP))),
-        contentAlignment = Alignment.Center,
-      ) {
-        Icon(
-          Icons.Filled.WorkspacePremium,
-          contentDescription = null,
-          tint = Color.White,
-          modifier = Modifier.size(29.dp),
-        )
-      }
-      Spacer(Modifier.height(16.dp))
-      /*
-       *  «حساب نداری» و «اشتراکت تمام شده» دو چیزِ متفاوت‌اند و کارِ
-       *  بعدیِ کاربر هم در هر دو فرق دارد. یک متنِ مشترک برای هر دو،
-       *  کسی را که فقط باید ثبت‌نام کند سرِ صفحهٔ قیمت‌ها می‌فرستاد.
-       */
-      Text(
-        if (!signedIn) "برای «$label» باید حساب بسازید"
-        else "«$label» با اشتراک باز می‌شود",
-        style = MaterialTheme.typography.titleMedium,
-        color = Shop.colors.text,
-        fontWeight = FontWeight.Bold,
-        textAlign = TextAlign.Center,
-      )
-      Spacer(Modifier.height(8.dp))
-      Text(
-        if (!signedIn)
-          "ساختنِ حساب مجانی است و هفت روز آزمایشی دارد — با آن همه‌چیز باز می‌شود. " +
-            "از کلیدِ حساب در بالای صفحه حساب بسازید. بقیهٔ برنامه هم بدونِ حساب باز " +
-            "است: انبار، مصارف، خرید، گزارش‌ها و پشتیبان‌گیری."
-        else
-          "بقیهٔ برنامه — انبار، مصارف، خرید، گزارش‌ها و پشتیبان‌گیری — باز است و همیشه باز می‌ماند.",
-        style = MaterialTheme.typography.bodySmall,
-        color = Shop.colors.muted,
-        textAlign = TextAlign.Center,
-      )
-      Spacer(Modifier.height(20.dp))
-      //  کلید همان صفحهٔ قیمت‌ها را باز می‌کند؛ ساختنِ حساب از سربرگ است
-      //  و متنِ بالا همان را می‌گوید — کلیدی که جای دیگری ببرد، دروغ است
-      GoldButton("اشتراک و قیمت‌ها") { sheet = true }
-    }
-  }
-  if (sheet) VipScreen { sheet = false }
+  //  بازسازیِ VILL3N (G7): همان سدِ بالا، ظاهرِ کیتِ نسخهٔ ۳ — بی طلا؛ کلید به مسیرِ دقیق
+  ir.vil3ntec.tohid.ui.v3.account.subscription.LockedFeature(label, signedIn)
 }
-
-/**
- *  دکمهٔ طلاییِ اشتراک — با همان جرقه‌ای که کارت‌های اشتراک می‌زنند.
- *
- *  دکمهٔ تختِ قبلی کنارِ آن نشانِ متحرک، مرده به نظر می‌رسید: همان کار را
- *  می‌کرد ولی نمی‌گفت که همان چیز است.
- */
-@Composable
-private fun GoldButton(text: String, onClick: () -> Unit) {
-  val press = remember { MutableInteractionSource() }
-  val touched by press.collectIsPressedAsState()
-  Row(
-    Modifier
-      .edgeSparks(touched, GOLD)
-      .clip(RoundedCornerShape(26.dp))
-      .background(
-        Brush.linearGradient(
-          listOf(Color(0xFFF6D36B), Color(0xFFE0A92C), Color(0xFFF8E39A), Color(0xFFD9982A))
-        )
-      )
-      .clickable(interactionSource = press, indication = LocalIndication.current, onClick = onClick)
-      .padding(horizontal = 22.dp, vertical = 13.dp),
-    verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(7.dp),
-  ) {
-    Icon(
-      Icons.Filled.WorkspacePremium,
-      contentDescription = null,
-      tint = Color(0xFF4A3208),
-      modifier = Modifier.size(18.dp),
-    )
-    Text(text, color = Color(0xFF3A2705), fontWeight = FontWeight.Bold)
-  }
-}
-
-
-/* ==================== هیروی صفحه‌ی اشتراک ==================== */
 
 /**
  *  بالای صفحه، پیش از قیمت‌ها: اول بگو چه می‌فروشی.

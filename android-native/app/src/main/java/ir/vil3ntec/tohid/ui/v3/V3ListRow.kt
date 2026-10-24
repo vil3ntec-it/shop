@@ -94,7 +94,9 @@ fun V3IconTile(icon: ImageVector, hue: V3Hue? = null, danger: Boolean = false, s
     hue != null -> PhoneV3Palette.glyph(c, hue)
     else -> c.icon
   }
-  Box(Modifier.size(size).clip(RoundedCornerShape(11.dp)).background(c.iconTile), contentAlignment = Alignment.Center) {
+  //  THEME-V2: آیکنِ رنگی روی پس‌زمینهٔ نرمِ همان رنگ
+  val bg = if (hue != null && !danger) PhoneV3Palette.soft(c, hue) else c.iconTile
+  Box(Modifier.size(size).clip(RoundedCornerShape(12.dp)).background(bg), contentAlignment = Alignment.Center) {
     Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(size * 0.53f))
   }
 }

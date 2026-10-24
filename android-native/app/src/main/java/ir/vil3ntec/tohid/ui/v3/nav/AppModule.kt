@@ -48,6 +48,8 @@ class ModuleEntry(
   val needs: Set<Need> = emptySet(),
   val order: Int = 0,
   val badge: (() -> String?)? = null,
+  /** آیکنِ حالتِ فعال در نوار (پُر)؛ نبود ⇒ همان `icon` */
+  val iconSelected: ImageVector? = null,
 )
 
 /**

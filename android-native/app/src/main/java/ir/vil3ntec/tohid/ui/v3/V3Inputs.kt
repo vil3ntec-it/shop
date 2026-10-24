@@ -44,6 +44,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.heightIn
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrKit
 import ir.vil3ntec.tohid.formatDate
@@ -86,7 +87,7 @@ fun V3SearchField(
       Row(
         Modifier
           .fillMaxWidth()
-          .height(46.dp)
+          .heightIn(min = 46.dp)
           .clip(shape)
           .background(c.card)
           .border(if (focused) 2.dp else 1.dp, ring, shape)

@@ -39,6 +39,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.foundation.layout.heightIn
 import ir.vil3ntec.tohid.ui.screens.MotionSpec
 import ir.vil3ntec.tohid.ui.screens.MotionTokens
 import ir.vil3ntec.tohid.ui.screens.isDark
@@ -69,7 +72,7 @@ fun V3Chip(
   Row(
     modifier
       .v3Pressable(label = label, role = Role.Tab, onClick = onClick)
-      .height(38.dp)
+      .heightIn(min = 38.dp)
       .clip(shape)
       .background(bg)
       .border(1.dp, edge, shape)
@@ -101,7 +104,7 @@ fun V3AddChip(label: String, onClick: () -> Unit) {
   Row(
     Modifier
       .v3Pressable(label = label, onClick = onClick)
-      .height(38.dp)
+      .heightIn(min = 38.dp)
       .clip(shape)
       .background(c.tile)
       .border(1.dp, c.hairline, shape)
@@ -144,7 +147,8 @@ fun V3Segmented(
   BoxWithConstraints(
     modifier
       .fillMaxWidth()
-      .height(40.dp)
+      //  درشتیِ نوشتهٔ سیستم (۱٫۳–۲×): بلندی با آن بزرگ می‌شود، نوشته بیرون نمی‌زند (AUDIT-NAV S4)
+      .height(40.dp * LocalDensity.current.fontScale.coerceAtLeast(1f))
       .clip(track)
       .background(if (c.isDark) c.tile else androidx.compose.ui.graphics.lerp(c.bg, c.hairline, 0.55f))
       .padding(3.dp),
@@ -153,7 +157,7 @@ fun V3Segmented(
     val x by animateDpAsState(w * selected.coerceIn(0, options.lastIndex.coerceAtLeast(0)), MotionSpec.indicator(), label = "segX")
     Box(
       Modifier
-        .offset(x = x)
+        .offset { IntOffset(x.roundToPx(), 0) }
         .width(w)
         .fillMaxHeight()
         .shadow(3.dp, RoundedCornerShape(10.dp), clip = false, ambientColor = c.ink.copy(alpha = 0.12f), spotColor = c.ink.copy(alpha = 0.12f))

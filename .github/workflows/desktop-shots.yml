@@ -63,8 +63,9 @@ jobs:
           TOHID_DATA_DIR: ${{ runner.temp }}/tohid-data
         run: |
           mkdir -p "$RUNNER_TEMP/shots"
-          #  ساختِ dev صفحهٔ خوش‌آمد را خودش رد می‌کند (پنجره در گوشهٔ ۰،۰ است)
-          S="wait:6000;shot:00-start;key:ESCAPE;wait:1500;shot:01-dashboard"
+          #  ساختِ دو صفحهٔ خوش‌آمد را خودش رد می‌کند (پنجره در گوشهٔ ۰،۰ است).
+          #  نمایشگر ۱۹۲۰×۱۰۸۰ است و پنجره با size: اندازه می‌گیرد؛ عکس فقط خودِ پنجره است.
+          S="size:1280,800;wait:6000;shot:00-start;key:ESCAPE;wait:1500;shot:01-dashboard"
           S="$S;go:admin;wait:2000;shot:01b-admin-center;move:700,500;scroll:8;wait:600;shot:01c-admin-center-lower"
           S="$S;go:sale;wait:1500;shot:02-sale"
           #  صندوقِ سه‌ستونه با سه قلم (اسکن، «3*» و نام + Enter) و نمای جدولیِ کالا
@@ -87,6 +88,8 @@ jobs:
           S="$S;go:team;wait:1500;shot:15-team"
           S="$S;go:devices;wait:1500;shot:15b-devices"
           S="$S;go:vip;wait:1500;shot:15c-subscription-offline-code"
+          #  تخفیف‌ها (PRM): پنج قاعدهٔ نمونه (`PromoLive.demo`)، سبدِ همان ۰۲b با ردیف‌های تخفیف و کادرِ کد، صفحهٔ مدیر و ویرایشگر
+          S="$S;promo:demo;go:sale;wait:1500;shot:20-sale-promos;go:promos;wait:1500;shot:21-promos-table;new:;wait:1200;shot:22-promo-editor;key:ESCAPE;wait:800"
           S="$S;go:dashboard;key:F11;wait:2000;shot:16-fullscreen-dashboard"
           S="$S;help:on;wait:1500;shot:17-shortcuts-F1;help:off"
           S="$S;key:F11;wait:1500;theme:DARK;go:products;wait:1500;shot:18-products-dark;prodsel:2;wait:800;shot:18b-products-dark-bulk;prodsel:0;go:dashboard;wait:1500;shot:19-dashboard-dark;theme:LIGHT"
@@ -119,8 +122,24 @@ jobs:
           S="$S;phone:debtors-r9;wait:2500;pshot:phone-v3-debtors-r9;phone:debtors-r9-dark;wait:2500;pshot:phone-v3-debtors-r9-dark;phone:debtors-many-dark;wait:2500;pshot:phone-v3-debtors-many-dark;phone:debtors-many;wait:2500;pshot:phone-v3-debtors-many;move:200,600;scroll:15;wait:1200;pshot:phone-v3-debtors-many-end;phone:debtors-empty;wait:2000;pshot:phone-v3-debtors-empty;phone:debtors-empty-dark;wait:2000;pshot:phone-v3-debtors-empty-dark;phone:off"
           #  حالتِ پیک (phone-v3-courier-*): خانه، مسیر، پیگیری، ارسال، نقدِ من، آمار — روشن و تیره؛ حساب، ورود، تأییدِ نقد — روشن؛ دادهٔ نمایشی
           S="$S;phone:courier-home;wait:1200;pshot:phone-v3-courier-home;phone:courier-home-dark;wait:1200;pshot:phone-v3-courier-home-dark;phone:courier-route;wait:1200;pshot:phone-v3-courier-route;phone:courier-route-dark;wait:1200;pshot:phone-v3-courier-route-dark;phone:courier-track;wait:1200;pshot:phone-v3-courier-track;phone:courier-track-dark;wait:1200;pshot:phone-v3-courier-track-dark;phone:courier-ship;wait:1200;pshot:phone-v3-courier-ship;phone:courier-ship-dark;wait:1200;pshot:phone-v3-courier-ship-dark;phone:courier-cash;wait:1200;pshot:phone-v3-courier-cash;phone:courier-cash-dark;wait:1200;pshot:phone-v3-courier-cash-dark;phone:courier-stats;wait:1200;pshot:phone-v3-courier-stats;phone:courier-stats-dark;wait:1200;pshot:phone-v3-courier-stats-dark;phone:courier-account;wait:1200;pshot:phone-v3-courier-account;phone:courier-join;wait:1200;pshot:phone-v3-courier-join;phone:courier-cod;wait:1200;pshot:phone-v3-courier-cod;phone:off"
+          #  حسابِ یک قرض‌دار (owner-feedback-2): کشوی بسته/باز، فهرستِ بلند، برگهٔ جزئیاتِ ردیف (روز و شب)، بی تراکنش، و برگهٔ «ثبتِ تراکنش» (آخر، چون برگه باز می‌ماند)
+          S="$S;phone:debtor-detail;wait:3000;pshot:phone-v3-debtor-detail;phone:debtor-detail-dark;wait:2500;pshot:phone-v3-debtor-detail-dark;phone:debtor-detail-drawer;wait:3000;pshot:phone-v3-debtor-detail-drawer;phone:debtor-detail-drawer-dark;wait:2500;pshot:phone-v3-debtor-detail-drawer-dark;phone:debtor-detail-long;wait:3000;pshot:phone-v3-debtor-detail-long;phone:debtor-detail-long-dark;wait:2500;pshot:phone-v3-debtor-detail-long-dark;phone:debtor-detail-tx;wait:3500;pshot:phone-v3-debtor-detail-tx;phone:debtor-detail-tx-dark;wait:2500;pshot:phone-v3-debtor-detail-tx-dark;phone:debtor-detail-empty;wait:3000;pshot:phone-v3-debtor-detail-empty;phone:debtor-detail-composer;wait:3500;pshot:phone-v3-debtor-detail-composer;phone:debtor-detail-composer-dark;wait:2500;pshot:phone-v3-debtor-detail-composer-dark;phone:off"
+          #  مجموعهٔ ثابتِ ظاهر (نسخهٔ ۲): صندوق روز و شب، کالاها، داشبورد و قرض‌داران در دو اندازهٔ واقعی
+          for WH in 1280,800 1920,1080; do
+            N="v2-${WH/,/x}"
+            #  ماوس روی عنوانِ سربرگ (جای بی‌کلیک) — وگرنه کارت یا ردیفِ زیرِ ماوس رنگِ «هاور» می‌گیرد و
+            #  در عکس شبیهِ کارتِ خاموش دیده می‌شود (بازبینیِ ۱۴۰۵/۰۷/۲۷)
+            MX=$(( ${WH%,*} - 120 ))
+            S="$S;size:$WH;wait:1500;move:$MX,30;theme:LIGHT;go:sale;wait:2000;shot:$N-pos-light;posview:table;wait:1200;shot:$N-pos-table-light;posview:card;wait:800"
+            S="$S;theme:DARK;wait:2000;shot:$N-pos-dark;theme:LIGHT;wait:1200"
+            S="$S;go:products;wait:1800;shot:$N-products;go:dashboard;wait:1800;shot:$N-dashboard;go:debtors;wait:1800;shot:$N-debtors"
+          done
+          #  سیستمِ رنگِ VILL3N: صفحه‌هایی که بالا فقط در روز گرفته می‌شوند، در شب هم؛ و سفارش‌ها در هر دو
+          S="$S;size:1280,800;move:1160,30;theme:DARK;wait:1500;go:debtors;wait:1800;shot:vill3n-debtors-dark;go:settings;wait:1800;shot:vill3n-settings-dark"
+          S="$S;go:orders;wait:1800;shot:vill3n-orders-dark;theme:LIGHT;wait:1500;go:orders;wait:1800;shot:vill3n-orders-light"
           export JAVA_TOOL_OPTIONS="-Dtohid.shot=$RUNNER_TEMP/shots -Dtohid.shot.every=9000 -Dtohid.shot.exit=true -Dtohid.shot.script=$S -Dsun.jnu.encoding=UTF-8 -Dfile.encoding=UTF-8"
-          timeout 900 xvfb-run -s "-screen 0 1440x900x24" ./gradlew --no-daemon -q -Pdev=true run || true
+          #  هر دو مجموعه (گوشی و نسخهٔ ۲/VILL3N): نمایشگرِ ۱۹۲۰×۱۰۸۰ برای پنجرهٔ بزرگ و مهلتِ بیشتر برای عکس‌های گوشی
+          timeout 1080 xvfb-run -s "-screen 0 1920x1080x24" ./gradlew --no-daemon -q -Pdev=true run || true
           ls -la "$RUNNER_TEMP/shots"
           test -n "$(ls "$RUNNER_TEMP/shots")"
 
@@ -192,6 +211,15 @@ jobs:
             rm -rf "pr/$SAFE" && mkdir -p "pr/$SAFE" && cp "$SHOTS"/*.png "pr/$SAFE/"
             date +%s > "pr/$SAFE/.stamp"
             readme "pr/$SAFE" "عکس‌های شاخهٔ $BR"
+            #  کیت و گروه‌های نسخهٔ ۳ (`groupshots`): pr/<شاخه>/v3/<گروه>/<حالت>-<تم>-<زبان>.png
+            if [ -d "$SHOTS/v3" ]; then
+              cp -r "$SHOTS/v3" "pr/$SAFE/" 2>/dev/null || true
+              for g in "pr/$SAFE"/v3/*/; do
+                if ls "$g"*.png >/dev/null 2>&1; then readme "${g%/}" "نسخهٔ ۳ — $(basename "$g")"; fi
+              done
+              { echo "---"; echo; echo "## نسخهٔ ۳ (هر گروه)"; echo
+                for g in "pr/$SAFE"/v3/*/; do n=$(basename "$g"); echo "- [$n](v3/$n/README.md)"; done; } >> "pr/$SAFE/README.md"
+            fi
             NOW=$(date +%s)
             for d in pr/*/; do
               s=$(cat "$d.stamp" 2>/dev/null || true); [[ "$s" =~ ^[0-9]+$ ]] || s=0

@@ -94,7 +94,7 @@ object SettingsPaths {
 @Composable
 private fun RouteScope.Settings(target: SettingsTarget) {
   CompositionLocalProvider(LocalSettingsTarget provides target) {
-    if (Platform.DESKTOP) DeskSettings(deskSettingsSections()) {
+    if (desk) DeskSettings(deskSettingsSections()) {
       SettingsScreen(store, data, snackbar, theme, onTheme, onBack = { back() }, onUpdates = { nav.open(SettingsPaths.UPDATES) })
     } else SettingsScreen(store, data, snackbar, theme, onTheme, onBack = { back() }, onUpdates = { nav.open(SettingsPaths.UPDATES) })
   }
