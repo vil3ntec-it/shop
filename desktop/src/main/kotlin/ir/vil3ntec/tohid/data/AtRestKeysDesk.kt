@@ -6,6 +6,12 @@ import ir.vil3ntec.tohid.core.atrest.AtRestKek
 import ir.vil3ntec.tohid.desktop.DesktopContext
 import java.io.File
 import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.attribute.AclEntry
+import java.nio.file.attribute.AclEntryFlag
+import java.nio.file.attribute.AclEntryPermission
+import java.nio.file.attribute.AclEntryType
+import java.nio.file.attribute.AclFileAttributeView
 import java.nio.file.attribute.PosixFilePermission
 import java.security.SecureRandom
 import javax.crypto.AEADBadTagException
@@ -24,11 +30,68 @@ import javax.crypto.spec.SecretKeySpec
  *
  *  ⛔ فایلِ کلید فقط هنگامِ **ساختنِ** کلیددان ساخته می‌شود؛ نبودنش هنگامِ
  *  باز کردن یعنی `KEY_MISSING` — هرگز کلیدِ تازه‌ای که دفترِ قبلی را باز نمی‌کند.
+ *
+ *  اجازه‌ها (بازبینیِ #331): مک/لینوکس `600` (پوشه `700`)؛ ویندوز ACLِ «فقط صاحبِ فایل»
+ *  بی ارث از پوشهٔ بالا (`AclFileAttributeView`). نشد ⇒ صفحه راستش را می‌گوید (`note`).
  */
 object AtRestKeys {
 
   const val WHERE: String = "فایلِ کلید در پوشهٔ دادهٔ همین کامپیوتر"
   const val HARDWARE_BACKED: Boolean = false
+
+  /** `true`/`false` پس از نخستین تلاش روی ویندوز؛ `null` یعنی ACL در کار نیست (مک/لینوکس) یا هنوز تلاشی نشده */
+  @Volatile var windowsAcl: Boolean? = null
+    private set
+
+  /** جای کلید و آنچه از آن برمی‌آید — بی تعارف، برای صفحهٔ امنیت */
+  fun note(): String = buildString {
+    append("کلید در فایلی کنارِ داده‌هاست (پوشهٔ keys کنارِ پوشهٔ files در پوشهٔ دادهٔ برنامه)، نه در خودِ ویندوز یا مک. ")
+    append("پس این رمز فقط وقتی کمک می‌کند که پوشهٔ files (دفتر و نسخه‌ها) جدا کپی یا فرستاده شود؛ ")
+    append("هر کس کلِ پوشهٔ داده یا دیسک را داشته باشد، کلید را هم دارد. ")
+    append(
+      when (windowsAcl) {
+        true -> "روی ویندوز فایلِ کلید فقط برای حسابِ ویندوزِ خودتان خواندنی است (ACL)."
+        false -> "روی ویندوز اجازهٔ فایلِ کلید محدود **نشد**؛ هر حسابی که پوشه را می‌خواند، کلید را هم می‌خواند."
+        null -> if (isWindows) "اجازهٔ فایلِ کلید روی ویندوز هنوز سنجیده نشده." else "فایلِ کلید فقط برای حسابِ خودتان خواندنی است (۶۰۰)."
+      },
+    )
+  }
+
+  private val isWindows: Boolean = System.getProperty("os.name").orEmpty().startsWith("Windows", ignoreCase = true)
+
+  /**
+   *  ویندوز: DACLِ تازه با یک ورودی — صاحبِ فایل، همهٔ اجازه‌ها — جای ورودی‌های ارث‌برده.
+   *  @return `null` اگر این سیستم ACL ندارد
+   */
+  internal fun ownerOnlyAcl(p: Path): Boolean? {
+    val view = Files.getFileAttributeView(p, AclFileAttributeView::class.java) ?: return null
+    return runCatching {
+      val entry = AclEntry.newBuilder()
+        .setType(AclEntryType.ALLOW)
+        .setPrincipal(view.owner)
+        .setPermissions(java.util.EnumSet.allOf(AclEntryPermission::class.java))
+        .apply { if (Files.isDirectory(p)) setFlags(AclEntryFlag.FILE_INHERIT, AclEntryFlag.DIRECTORY_INHERIT) }
+        .build()
+      view.acl = listOf(entry)
+      view.acl.size == 1
+    }.getOrDefault(false)
+  }
+
+  private fun restrict(f: File) {
+    val dir = f.absoluteFile.parentFile
+    runCatching {
+      Files.setPosixFilePermissions(f.toPath(), setOf(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE))
+      Files.setPosixFilePermissions(
+        dir.toPath(),
+        setOf(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE, PosixFilePermission.OWNER_EXECUTE),
+      )
+    }
+    if (isWindows) {
+      val fileOk = ownerOnlyAcl(f.toPath())
+      val dirOk = ownerOnlyAcl(dir.toPath())
+      windowsAcl = if (fileOk == null && dirOk == null) null else fileOk == true && dirOk == true
+    }
+  }
 
   fun kek(@Suppress("UNUSED_PARAMETER") context: Context): AtRestKek = FileKek
 
@@ -38,9 +101,13 @@ object AtRestKeys {
 
     private val file: File get() = File(File(DesktopContext.root, "keys"), "atrest-kek.key")
 
+    /** کلیدِ ساختِ پیشین (پیش از ACL) هم یک بار در هر اجرا محدود می‌شود */
+    @Volatile private var restricted = false
+
     private fun existing(): SecretKeySpec? {
       val f = file
       if (!f.isFile) return null
+      if (!restricted) { restricted = true; runCatching { restrict(f) } }
       val bytes = f.readBytes()
       if (bytes.size != 32) throw AtRestException(AtRestException.Kind.KEY_MISSING, "فایلِ کلید خراب است")
       return SecretKeySpec(bytes, "AES")
@@ -48,16 +115,11 @@ object AtRestKeys {
 
     private fun create(): SecretKeySpec {
       val f = file
-      val dir = f.parentFile.apply { mkdirs() }
+      f.parentFile.mkdirs()
       val bytes = ByteArray(32).also { random.nextBytes(it) }
       DiskWrite.bytes(f, bytes)
-      runCatching {
-        Files.setPosixFilePermissions(f.toPath(), setOf(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE))
-        Files.setPosixFilePermissions(
-          dir.toPath(),
-          setOf(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE, PosixFilePermission.OWNER_EXECUTE),
-        )
-      }
+      runCatching { restrict(f) }
+      restricted = true
       return SecretKeySpec(bytes, "AES")
     }
 

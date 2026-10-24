@@ -64,8 +64,15 @@
   -->
   <uses-feature android:name="android.hardware.usb.host" android:required="false" />
 
+  <!--
+    SEC-01: عاملِ پشتیبان فقط وقتی رمزِ دفتر در کار است چیزی کم می‌کند (دفترِ رمزدار،
+    کلیددان و حالِ همگام‌سازی با هم بیرون)؛ خاموش ⇒ همان دو فایلِ قاعده (`TohidBackupAgent`).
+    `fullBackupOnly` یعنی همان پشتیبانِ خودکارِ کامل، نه کلید/مقدارِ قدیمی.
+  -->
   <application
       android:allowBackup="true"
+      android:backupAgent=".data.TohidBackupAgent"
+      android:fullBackupOnly="true"
       android:dataExtractionRules="@xml/backup_rules"
       android:fullBackupContent="@xml/backup_rules_legacy"
       android:icon="@mipmap/ic_launcher"

@@ -94,7 +94,11 @@ class AtRestTest {
       }
     }
 
+    /** اگر پر است: جابه‌جایی به نامی که این را دارد شکست می‌خورد (دیسکِ پر، قفلِ ویندوز) */
+    var failReplaceTo: String? = null
+
     override fun replace(from: File, to: File) {
+      if (failReplaceTo != null && to.name.contains(failReplaceTo!!)) throw java.io.IOException("replace refused")
       Files.move(from.toPath(), to.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
     }
 
@@ -375,5 +379,123 @@ class AtRestTest {
     assertEquals(1, toSealed.already) // فایلِ بیگانه رمزدار است؛ دست نمی‌خورد
     assertTrue(toSealed.ok)
     assertArrayEquals(foreignBefore, foreign.readBytes())
+  }
+
+  /* ------------------------- بازبینیِ #331 ------------------------- */
+
+  @Test fun `کنار گذاشتنِ کلیددانِ ازدست‌رفته نشد — کلیدِ تازه ساخته نمی‌شود و کلیددانِ قبلی بایت‌به‌بایت می‌ماند`() {
+    val kek = TestKek()
+    AtRestCodec(ring(kek = kek)).seal(ledgerJson.toByteArray())
+    val keyring = File(tmp.root, "keyring")
+    val before = keyring.readBytes()
+    val fresh = AtRestKeyring(keyring, TestKek(), io) // KEKِ دیگر ⇒ Lost
+    assertTrue(fresh.state() is AtRestKeyring.State.Lost)
+
+    io.failReplaceTo = ".lost-"
+    assertNull("بی کنار رفتن هیچ کلیدی ساخته نمی‌شود", fresh.forWrite())
+    assertEquals(AtRestException.Kind.KEY_UNAVAILABLE, kinds { AtRestCodec(fresh).seal(byteArrayOf(1)) })
+    assertArrayEquals("کلیددانِ قبلی رونویسی نشد", before, keyring.readBytes())
+    assertFalse(File(tmp.root, "keyring.new").exists())
+
+    io.failReplaceTo = null
+    assertNotNull(fresh.forWrite())
+    assertArrayEquals(before, fresh.setAsideAs!!.readBytes())
+  }
+
+  @Test fun `یک بایتِ خراب در کلیددان — از نسخهٔ دوم باز می‌شود، خراب کنار می‌رود و اصلی درمان می‌شود`() {
+    val kek = TestKek()
+    val sealed = AtRestCodec(ring(kek = kek)).seal(ledgerJson.toByteArray())
+    val keyring = File(tmp.root, "keyring")
+    val good = keyring.readBytes()
+    assertArrayEquals("نسخهٔ دوم همان بایت‌ها", good, File(tmp.root, "keyring" + AtRestKeyring.BACKUP_SUFFIX).readBytes())
+
+    val text = keyring.readText()
+    val i = text.indexOf("wrapped=") + 10
+    keyring.writeText(text.substring(0, i) + (if (text[i] == '0') '1' else '0') + text.substring(i + 1))
+
+    val r = ring(kek = kek)
+    assertTrue(r.state() is AtRestKeyring.State.Ready)
+    assertArrayEquals(ledgerJson.toByteArray(), AtRestCodec(r).open(sealed))
+    assertArrayEquals("اصلی از نسخهٔ دوم برگشت", good, keyring.readBytes())
+    assertTrue("خراب کنار رفت، پاک نشد", tmp.root.listFiles().orEmpty().any { it.name.startsWith("keyring.corrupt-") })
+  }
+
+  @Test fun `نسخهٔ دوم خراب یا نبود — از اصلی باز می‌شود و نسخهٔ دوم از نو نوشته می‌شود`() {
+    val kek = TestKek()
+    val sealed = AtRestCodec(ring(kek = kek)).seal(ledgerJson.toByteArray())
+    val good = File(tmp.root, "keyring").readBytes()
+    val second = File(tmp.root, "keyring" + AtRestKeyring.BACKUP_SUFFIX)
+    second.writeText("garbage")
+    val r = ring(kek = kek)
+    assertArrayEquals(ledgerJson.toByteArray(), AtRestCodec(r).open(sealed))
+    assertArrayEquals(good, second.readBytes())
+
+    assertTrue(second.delete())
+    assertArrayEquals(ledgerJson.toByteArray(), AtRestCodec(ring(kek = kek)).open(sealed))
+    assertArrayEquals(good, second.readBytes())
+  }
+
+  @Test fun `اصلی نیست ولی نسخهٔ دوم هست — همان کلید، نه کلیدِ تازه`() {
+    val kek = TestKek()
+    val sealed = AtRestCodec(ring(kek = kek)).seal(ledgerJson.toByteArray())
+    assertTrue(File(tmp.root, "keyring").delete())
+    val r = ring(kek = kek)
+    assertArrayEquals(ledgerJson.toByteArray(), AtRestCodec(r).open(sealed))
+    assertTrue(File(tmp.root, "keyring").exists())
+  }
+
+  @Test fun `هر دو نسخه خراب — Lost؛ با نوشتن هر دو کنار می‌روند`() {
+    val kek = TestKek()
+    AtRestCodec(ring(kek = kek)).seal(ledgerJson.toByteArray())
+    File(tmp.root, "keyring").writeText("x")
+    File(tmp.root, "keyring" + AtRestKeyring.BACKUP_SUFFIX).writeText("y")
+    val r = ring(kek = kek)
+    assertTrue(r.state() is AtRestKeyring.State.Lost)
+    assertNotNull(r.forWrite())
+    val names = tmp.root.listFiles().orEmpty().map { it.name }
+    assertTrue(names.any { it.startsWith("keyring.lost-") })
+    assertTrue(names.any { it.startsWith("keyring.bak.lost-") })
+  }
+
+  @Test fun `شکستِ همیشگیِ Keystore از گذرا جداست`() {
+    assertTrue(AtRestKeyFailure.isPermanent(java.security.UnrecoverableKeyException("x")))
+    assertTrue(AtRestKeyFailure.isPermanent(java.security.InvalidKeyException("wrapped", java.security.UnrecoverableKeyException())))
+    assertTrue(AtRestKeyFailure.isPermanent(java.security.KeyStoreException("Invalid key blob (internal Keystore code: -33)")))
+    assertTrue(AtRestKeyFailure.isPermanent(java.security.InvalidKeyException("Key permanently invalidated")))
+    assertFalse(AtRestKeyFailure.isPermanent(java.security.KeyStoreException("System error")))
+    assertFalse(AtRestKeyFailure.isPermanent(java.security.ProviderException("Keystore operation failed")))
+    assertFalse(AtRestKeyFailure.isPermanent(IllegalStateException("busy")))
+  }
+
+  @Test fun `صفِ opها و ژورنال‌ها رمز نمی‌شوند؛ با رمزِ روشن، دفتر و حالِ همگام‌سازی با هم از پشتیبانِ اندروید بیرون`() {
+    for (n in listOf("oplog-u1.json", "oplog-u1-dropped.json", "sync-journal-u1.json", "sync-v3-u1/queue.json", "ledger-summary.json", "sale-draft.json")) {
+      assertFalse(n, AtRestScope.sealable(n))
+    }
+    for (n in listOf("shop-data.json", "before-restore.json", "ledger-u1.json", "ledger-archive.json", "auto-backups/auto-14050801-1200.json")) {
+      assertTrue(n, AtRestScope.sealable(n))
+    }
+    //  «هر دو یا هیچ‌کدام»: دفتر، کلیددان، صف، ژورنال و خلاصه با هم بیرون
+    for (n in listOf(
+      "shop-data.json", "ledger-u1.json", "auto-backups/auto-1.json", "atrest/keyring", "atrest/keyring.bak",
+      "oplog-u1.json", "sync-journal-u1.json", "sync-v3-u1/state.json", "ledger-summary.json", "shop-data.json.unreadable-1",
+    )) assertTrue(n, AtRestScope.skipInDeviceBackup(n))
+    for (n in listOf("sale-draft.json", "product-photos/p1.jpg", "chat-outbox/1.json")) assertFalse(n, AtRestScope.skipInDeviceBackup(n))
+    assertTrue("tohid-sync-v1.xml" in AtRestScope.SYNC_PREFS)
+    //  خاموش و بی فایلِ رمزدار ⇒ همان قاعدهٔ XML
+    assertFalse(AtRestScope.activeForBackup(wanted = false, anySealed = false, keyringPresent = false))
+    assertTrue(AtRestScope.activeForBackup(wanted = false, anySealed = true, keyringPresent = false))
+    assertTrue(AtRestScope.activeForBackup(wanted = true, anySealed = false, keyringPresent = false))
+  }
+
+  @Test fun `پاکت در یک بافر — اندازهٔ دقیق و همان قالب`() {
+    val r = ring()
+    val (kid, _) = r.forWrite()!!
+    for (n in listOf(0, 1, 4096, 1 shl 20)) {
+      val plain = ByteArray(n) { (it % 251).toByte() }
+      val sealed = AtRestCodec(r).seal(plain)
+      assertEquals(AtRestEnvelope.MAGIC.size + 2 + kid.length + 12 + n + 16, sealed.size)
+      assertEquals(kid, AtRestEnvelope.keyIdOf(sealed))
+      assertArrayEquals(plain, AtRestCodec(r).open(sealed))
+    }
   }
 }

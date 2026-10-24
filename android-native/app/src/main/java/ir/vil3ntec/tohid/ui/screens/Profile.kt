@@ -110,6 +110,9 @@ fun ProfileScreen(
   //  SYN-10: صفِ پُر ⇒ خروج بسته؛ «خروجِ اجباری» = پشتیبانِ دیدنی + دو تأیید
   var blockSignOut by remember { mutableStateOf(false) }
   var forcedBackup by remember { mutableStateOf<String?>(null) }
+  //  SEC-01: دفترِ رمزدارِ خوانده‌نشده پشتیبانِ پوشه نمی‌دهد ⇒ خروجِ اجباری با دو تأیید، بی پشتیبان
+  val unreadable by store.unreadable.collectAsState()
+  var forceUnreadable by remember { mutableStateOf(false) }
 
   /*
    *  نامِ دکان — همان‌جایی که تنظیمات هم از آن می‌خواند
@@ -499,7 +502,13 @@ fun ProfileScreen(
             Spacer(Modifier.height(8.dp))
             Text(v1.lastError, style = MaterialTheme.typography.labelMedium, color = colors.danger)
           }
-          if (verdict is LogoutGuard.Block) {
+          if (verdict is LogoutGuard.Block && unreadable != null) {
+            //  پشتیبانِ پوشه از دفترِ خوانده‌نشده ساخته نمی‌شود؛ صف را «همین حالا همگام کن» می‌فرستد
+            Spacer(Modifier.height(8.dp))
+            TextButton(enabled = !busy, onClick = { blockSignOut = false; forceUnreadable = true }) {
+              Text(LogoutGuard.FORCE_UNREADABLE, color = colors.danger)
+            }
+          } else if (verdict is LogoutGuard.Block) {
             Spacer(Modifier.height(8.dp))
             TextButton(enabled = !busy, onClick = {
               busy = true
@@ -529,6 +538,26 @@ fun ProfileScreen(
       },
       dismissButton = {
         TextButton(enabled = !busy, onClick = { blockSignOut = false }) { Text(LogoutGuard.STAY, color = colors.muted) }
+      },
+    )
+  }
+
+  if (forceUnreadable) {
+    val pending = (LogoutGuard.decide(v1.queued, AutoSync.pendingCount) as? LogoutGuard.Block)?.pending ?: 0
+    AlertDialog(
+      onDismissRequest = { forceUnreadable = false },
+      containerColor = colors.bg,
+      title = { Text(LogoutGuard.FORCE_TITLE, color = colors.text) },
+      text = { Text(LogoutGuard.forceUnreadableMessage(pending), color = colors.muted) },
+      confirmButton = {
+        TextButton(enabled = !busy, onClick = {
+          forceUnreadable = false
+          //  کلیکِ «خروج بی پشتیبان» تأییدِ اول بود، این دومی است
+          if (LogoutGuard.canForceUnreadable(unreadable != null, confirmations = 2)) signOutNow()
+        }) { Text("باز هم خارج شو", color = colors.danger) }
+      },
+      dismissButton = {
+        TextButton(onClick = { forceUnreadable = false }) { Text(LogoutGuard.STAY, color = colors.muted) }
       },
     )
   }

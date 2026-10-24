@@ -57,7 +57,9 @@ interface AtRestFiles {
  *     اتمی + بازخوانی و بازکردن) بکار می‌رود؛ وگرنه فایلی رمز می‌شد که
  *     کلیدش با قطعِ برق رفته بود.
  *   • کلیددانِ خوانده‌نشده هرگز پاک یا رونویسی نمی‌شود؛ کنار گذاشته
- *     می‌شود (`keyring.lost-<زمان>`).
+ *     می‌شود (`keyring.lost-<زمان>`). کنار نرفت ⇒ کلیدِ تازه هم ساخته نمی‌شود.
+ *   • دو نسخه: `keyring` و `keyring.bak` (همان بایت‌ها). خرابیِ یکی از روی
+ *     دیگری درمان می‌شود؛ نسخهٔ خراب کنار می‌رود (`keyring.corrupt-<زمان>`).
  *   • خطای گذرا (`KEY_UNAVAILABLE`) هرگز کلیدِ تازه نمی‌سازد.
  */
 class AtRestKeyring(
@@ -105,13 +107,18 @@ class AtRestKeyring(
   /**
    *  کلید برای رمز کردن: اگر نیست ساخته می‌شود؛ اگر برای همیشه رفته، کلیددانِ
    *  قبلی کنار می‌رود و کلیدِ تازه ساخته می‌شود.
+   *
+   *  ⛔ اگر کنار گذاشتن نشد، کلیدِ تازه هم ساخته **نمی‌شود** (بازبینیِ #331): وگرنه
+   *  `create` کلیددانِ قدیمی را رونویسی می‌کرد و فایل‌های رمزدارِ قبلی — که شاید
+   *  KEKشان برگردد — برای همیشه بی‌کلید می‌ماندند.
+   *
    *  @return `null` اگر کلید ساخته/باز نشد — صدازننده **ساده** می‌نویسد، نه اینکه نوشتن را بشکند
    */
   fun forWrite(): Pair<String, SecretKey>? = synchronized(lock) {
     when (state()) {
       is State.Ready -> cached?.let { it.kid to it.key }
       is State.None -> create()
-      is State.Lost -> { setAside(); create() }
+      is State.Lost -> if (setAside()) create() else null
       is State.Unavailable -> null
     }
   }
@@ -120,63 +127,131 @@ class AtRestKeyring(
   @Volatile var setAsideAs: File? = null
     private set
 
-  private fun load(): State {
-    if (!file.exists()) return State.None
-    val text = runCatching { String(io.read(file), Charsets.UTF_8) }.getOrElse {
-      return State.Unavailable("کلیددان خوانده نشد: ${it.message}")
+  private val dir: File get() = file.absoluteFile.parentFile
+
+  /**
+   *  نسخهٔ دومِ کلیددان (بازبینیِ #331) — همان بایت‌ها، نوشته با همان کناری + fsync +
+   *  جابه‌جاییِ اتمی. یک بایتِ خراب در یکی دیگر یعنی «همه‌چیز Lost» نیست.
+   */
+  private val second: File get() = File(dir, file.name + BACKUP_SUFFIX)
+
+  /** خواندنِ یک نسخهٔ کلیددان، بی هیچ نوشتنی */
+  private sealed class Copy {
+    object Missing : Copy()
+    class Bad(val reason: String) : Copy()
+    class Busy(val reason: String) : Copy()
+    class Good(val kid: String, val dek: ByteArray, val bytes: ByteArray) : Copy()
+  }
+
+  private fun readCopy(f: File): Copy {
+    if (!f.exists()) return Copy.Missing
+    val bytes = runCatching { io.read(f) }.getOrElse {
+      return Copy.Busy("کلیددان خوانده نشد: ${it.message}")
     }
+    val text = String(bytes, Charsets.UTF_8)
+    if (!text.startsWith(HEADER)) return Copy.Bad("کلیددان خراب است")
     val fields = text.lineSequence().mapNotNull { line ->
       val i = line.indexOf('=')
       if (i <= 0) null else line.substring(0, i).trim() to line.substring(i + 1).trim()
     }.toMap()
-    if (!text.startsWith(HEADER)) return State.Lost("کلیددان خراب است")
     val kid = fields["kid"].orEmpty()
     val kekId = fields["kek"].orEmpty()
     val wrapped = fields["wrapped"]?.let { runCatching { unhex(it) }.getOrNull() }
-    if (kid.isEmpty() || wrapped == null) return State.Lost("کلیددان ناقص است")
-    if (kekId != kek.id) return State.Lost("کلیدِ اصلیِ دستگاه عوض شده ($kekId ⇐ ${kek.id})")
+    if (kid.isEmpty() || wrapped == null) return Copy.Bad("کلیددان ناقص است")
+    if (kekId != kek.id) return Copy.Bad("کلیدِ اصلیِ دستگاه عوض شده ($kekId ⇐ ${kek.id})")
     val dek = try {
       kek.unwrap(wrapped)
     } catch (e: AtRestException) {
-      return if (e.kind == AtRestException.Kind.KEY_UNAVAILABLE) State.Unavailable(e.message ?: "")
-      else State.Lost(e.message ?: "کلیدِ اصلیِ دستگاه نیست")
+      return if (e.kind == AtRestException.Kind.KEY_UNAVAILABLE) Copy.Busy(e.message ?: "")
+      else Copy.Bad(e.message ?: "کلیدِ اصلیِ دستگاه نیست")
     } catch (e: Exception) {
-      return State.Unavailable(e.message ?: e.javaClass.simpleName)
+      return Copy.Busy(e.message ?: e.javaClass.simpleName)
     }
-    if (dek.size != DEK_LEN) return State.Lost("کلیدِ داده اندازهٔ درستی ندارد")
-    cached = Loaded(kid, SecretKeySpec(dek, "AES"))
-    return State.Ready(kid)
+    if (dek.size != DEK_LEN) return Copy.Bad("کلیدِ داده اندازهٔ درستی ندارد")
+    return Copy.Good(kid, dek, bytes)
+  }
+
+  private fun load(): State {
+    val main = readCopy(file)
+    when (main) {
+      is Copy.Good -> {
+        cached = Loaded(main.kid, SecretKeySpec(main.dek, "AES"))
+        //  نسخهٔ دوم نیست یا کهنه است ⇒ از روی نسخهٔ سالم (بی اثر روی نسخهٔ اصلی)
+        runCatching { if (!second.exists() || !io.read(second).contentEquals(main.bytes)) writeCopy(second, main.bytes) }
+        return State.Ready(main.kid)
+      }
+      is Copy.Busy -> return State.Unavailable(main.reason)
+      else -> Unit
+    }
+    return when (val other = readCopy(second)) {
+      is Copy.Good -> {
+        cached = Loaded(other.kid, SecretKeySpec(other.dek, "AES"))
+        //  نسخهٔ اصلی خراب یا نبود ⇒ خرابش کنار می‌رود (هرگز رونویسی نمی‌شود) و از نسخهٔ دوم برمی‌گردد
+        runCatching {
+          val asideOk = !file.exists() || run {
+            io.replace(file, File(dir, "${file.name}.corrupt-${clock()}"))
+            !file.exists()
+          }
+          if (asideOk) writeCopy(file, other.bytes)
+        }
+        State.Ready(other.kid)
+      }
+      is Copy.Busy -> State.Unavailable(other.reason)
+      is Copy.Missing -> if (main is Copy.Bad) State.Lost(main.reason) else State.None
+      is Copy.Bad -> State.Lost((main as? Copy.Bad)?.reason ?: other.reason)
+    }
+  }
+
+  /** کناری + fsync + بازخوانی ⇐ جابه‌جاییِ اتمی ⇐ fsyncِ پوشه */
+  private fun writeCopy(target: File, body: ByteArray) {
+    val tmp = File(dir, target.name + ".new")
+    try {
+      dir.mkdirs()
+      io.writeSynced(tmp, body)
+      if (!io.read(tmp).contentEquals(body)) error("کلیددان درست روی دیسک ننشست")
+      io.replace(tmp, target)
+      io.syncDir(dir)
+    } catch (e: Exception) {
+      runCatching { io.delete(tmp) }
+      throw e
+    }
   }
 
   private fun create(): Pair<String, SecretKey>? {
+    //  ⛔ هیچ کلیددانی (اصلی یا دوم) رونویسی نمی‌شود — فقط پس از کنار رفتنِ هر دو
+    if (file.exists() || second.exists()) return null
     val dek = ByteArray(DEK_LEN).also { random.nextBytes(it) }
     val kid = "k" + hex(ByteArray(8).also { random.nextBytes(it) })
     val wrapped = runCatching { kek.wrap(dek) }.getOrElse { return null }
     val body = "$HEADER\nkid=$kid\nkek=${kek.id}\nwrapped=${hex(wrapped)}\n".toByteArray(Charsets.UTF_8)
-    val tmp = File(file.absoluteFile.parentFile, file.name + ".new")
     return try {
-      file.absoluteFile.parentFile?.mkdirs()
-      io.writeSynced(tmp, body)
       //  ⛔ کلیددانِ روی دیسک باید خودش باز شود، پیش از اینکه کلیدی بکار برود
-      val back = io.read(tmp)
-      if (!back.contentEquals(body)) error("کلیددان درست روی دیسک ننشست")
       if (!kek.unwrap(wrapped).contentEquals(dek)) error("کلیدِ پیچیده باز نشد")
-      io.replace(tmp, file)
-      file.absoluteFile.parentFile?.let { io.syncDir(it) }
+      writeCopy(file, body)
+      //  نسخهٔ دوم: شکستش ساختن را نمی‌شکند؛ `load` بارِ بعد از روی نسخهٔ اصلی می‌سازدش
+      runCatching { writeCopy(second, body) }
       cached = Loaded(kid, SecretKeySpec(dek, "AES"))
       kid to cached!!.key
     } catch (e: Exception) {
-      runCatching { io.delete(tmp) }
       null
     }
   }
 
-  /** کلیددانِ ازدست‌رفته پاک نمی‌شود؛ کنار می‌رود */
-  private fun setAside() {
-    if (!file.exists()) return
-    val aside = File(file.absoluteFile.parentFile, "${file.name}.lost-${clock()}")
-    runCatching { io.replace(file, aside) }.onSuccess { setAsideAs = aside }
+  /**
+   *  کلیددانِ ازدست‌رفته پاک نمی‌شود؛ هر دو نسخه کنار می‌روند.
+   *  @return `false` اگر یکی کنار نرفت — آن‌وقت هیچ کلیدِ تازه‌ای ساخته نمی‌شود
+   */
+  private fun setAside(): Boolean {
+    val at = clock()
+    for (f in listOf(file, second)) {
+      if (!f.exists()) continue
+      val aside = File(dir, "${f.name}.lost-$at")
+      val moved = runCatching { io.replace(f, aside) }.isSuccess && !f.exists() && aside.exists()
+      if (!moved) return false
+      if (f == file) setAsideAs = aside
+    }
     cached = null
+    return true
   }
 
   /** فقط برای آزمون و «بستن و باز کردنِ» برنامه: کلیدِ درونِ حافظه فراموش شود */
@@ -184,6 +259,7 @@ class AtRestKeyring(
 
   companion object {
     const val HEADER = "tohid-atrest-keyring 1"
+    const val BACKUP_SUFFIX = ".bak"
     const val DEK_LEN = 32
 
     fun hex(b: ByteArray): String {

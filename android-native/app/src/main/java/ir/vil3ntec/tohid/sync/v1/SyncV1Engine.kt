@@ -179,38 +179,10 @@ class SyncV1Engine private constructor(context: Context) {
         val device = store.deviceUid
 
         //  صف را تا ته خالی می‌کنیم، دسته‌دسته
-        var guard = 0
-        while (queue.size() > 0 && guard < 500) {
-          guard++
-          val batch = queue.batch()
-          if (batch.isEmpty()) break
-          //  A00: opهای ساختِ پیش از A00 بی `caps` می‌روند تا تورِ سرور null ِ کهنه‌شان را بپالاید
-          val legacy = state.legacyOpsUpTo
-          if (legacy.isNotEmpty() && queue.all().none { LedgerDiff.isLegacyOp(it.opId, legacy) }) state.legacyOpsUpTo = ""
-          val out = try {
-            client.push(device, batch, queue.size(), caps = LedgerDiff.capsFor(batch.map { it.opId }, state.legacyOpsUpTo))
-          } catch (upgrade: SyncV1Client.UpgradeRequired) {
-            //  سرور عقب‌تر است: هیچ opی پاک نمی‌شود
-            state.holding = true
-            state.lastError = upgrade.reason
-            publish()
-            return@withLock Result.failure(upgrade)
-          }
-          state.holding = false
-          state.serverSchema = out.serverSchema
-          state.upgradeAvailable = out.upgradeAvailable
-
-          val accepted = out.results.filter { it.accepted }.map { it.opId }
-          val rejected = out.results.filter { !it.accepted }
-          if (accepted.isNotEmpty()) queue.ack(accepted)
-          if (rejected.isNotEmpty()) {
-            //  ردشده‌ها از صف بیرون می‌روند — وگرنه صف تا ابد قفل
-            //  می‌کند — ولی بی‌صدا نه.
-            val ids = rejected.map { it.opId }.toHashSet()
-            queue.drop(batch.filter { it.opId in ids }, "rejected")
-            queue.ack(ids)
-          }
-          state.lastPushAt = System.currentTimeMillis()
+        try {
+          pushQueue(client, device)
+        } catch (upgrade: SyncV1Client.UpgradeRequired) {
+          return@withLock Result.failure(upgrade)
         }
 
         //  Pull — تا وقتی سرور بگوید چیزِ دیگری هست
@@ -240,6 +212,134 @@ class SyncV1Engine private constructor(context: Context) {
         publish()
       }
     }
+
+  /**
+   *  فرستادنِ صف تا ته، دسته‌دسته — همان حلقهٔ همیشگیِ `runOnce`، جدا تا دفترِ رمزدارِ
+   *  خوانده‌نشده هم بتواند صفش را بفرستد (`pushPending`). صدازننده `gate` را دارد.
+   *
+   *  @throws SyncV1Client.UpgradeRequired سرور عقب‌تر است: هیچ opی پاک نمی‌شود
+   */
+  private suspend fun pushQueue(client: SyncV1Client, device: String) {
+    var guard = 0
+    while (queue.size() > 0 && guard < 500) {
+      guard++
+      val batch = queue.batch()
+      if (batch.isEmpty()) break
+      //  A00: opهای ساختِ پیش از A00 بی `caps` می‌روند تا تورِ سرور null ِ کهنه‌شان را بپالاید
+      val legacy = state.legacyOpsUpTo
+      if (legacy.isNotEmpty() && queue.all().none { LedgerDiff.isLegacyOp(it.opId, legacy) }) state.legacyOpsUpTo = ""
+      val out = try {
+        client.push(device, batch, queue.size(), caps = LedgerDiff.capsFor(batch.map { it.opId }, state.legacyOpsUpTo))
+      } catch (upgrade: SyncV1Client.UpgradeRequired) {
+        //  سرور عقب‌تر است: هیچ opی پاک نمی‌شود
+        state.holding = true
+        state.lastError = upgrade.reason
+        publish()
+        throw upgrade
+      }
+      state.holding = false
+      state.serverSchema = out.serverSchema
+      state.upgradeAvailable = out.upgradeAvailable
+
+      val accepted = out.results.filter { it.accepted }.map { it.opId }
+      val rejected = out.results.filter { !it.accepted }
+      if (accepted.isNotEmpty()) queue.ack(accepted)
+      if (rejected.isNotEmpty()) {
+        //  ردشده‌ها از صف بیرون می‌روند — وگرنه صف تا ابد قفل
+        //  می‌کند — ولی بی‌صدا نه.
+        val ids = rejected.map { it.opId }.toHashSet()
+        queue.drop(batch.filter { it.opId in ids }, "rejected")
+        queue.ack(ids)
+      }
+      state.lastPushAt = System.currentTimeMillis()
+    }
+  }
+
+  /* ==========================================================
+     SEC-01 — دفترِ رمزداری که این دستگاه باز نمی‌کند (بازبینیِ #331)
+     ========================================================== */
+
+  /**
+   *  فقط فرستادنِ صف — بی Pull، بی تفاضل، بی نشاندن.
+   *
+   *  دفترِ رمزدار باز نشد (کلید نیست یا گذرا در دسترس نیست) ولی صفِ opها رمزدار نیست
+   *  (`AtRestScope.syncState`): تغییرهایی که پیش از آن ثبت شده بودند باید به سرور برسند —
+   *  هم برای خودشان، هم چون «بازسازی از سرور» فقط با صفِ خالی انجام می‌شود. pull نه، چون
+   *  نشاندنِ opها روی دفترِ خالیِ حافظه یعنی رونویسیِ دفترِ واقعی.
+   *
+   *  @return چند op هنوز در صف مانده
+   */
+  suspend fun pushPending(): Result<Int> = gate.withLock {
+    if (!Backend.isReady(app) || !Backend.isOnline(app)) { publish(); return@withLock Result.success(queue.size()) }
+    busy = true
+    publish()
+    try {
+      //  opهای ژورنالِ «ثبت» که هنوز به صف نرسیده بودند (همان `op_id`)
+      synchronized(this) { commit.queueRecorded() }
+      pushQueue(SyncV1Client(Backend.api(app)), store.deviceUid)
+      Result.success(queue.size())
+    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+      throw cancelled
+    } catch (error: Throwable) {
+      attempt++
+      state.lastError = error.message ?: "خطای نامشخص"
+      Result.failure(error)
+    } finally {
+      busy = false
+      publish()
+    }
+  }
+
+  /**
+   *  «بازسازی از سرور»: صف اول، بعد Snapshot؛ سایه و cursor پیش از دفتر — شرح سرِ `SyncRebuild`.
+   *
+   *  @param base از آن فقط بخش‌های بیرون از همگام‌سازی (تنظیمات) برمی‌دارد
+   *  @param place دفترِ تازه جای دفترِ خوانده‌نشده، **بی op**؛ ننشست ⇒ پرتاب
+   *  @throws Exception شبکه یا دیسک؛ تا پیش از `commitShadow` هیچ چیزی عوض نشده است
+   */
+  internal suspend fun rebuildFromServer(base: ShopData, place: (ShopData) -> Unit): SyncRebuild.Outcome = gate.withLock {
+    busy = true
+    publish()
+    try {
+      synchronized(this) { commit.queueRecorded() }
+      val client = SyncV1Client(Backend.api(app))
+      val device = store.deviceUid
+      val out = SyncRebuild(object : SyncRebuild.Io {
+        override fun queued(): Int = queue.size()
+        override suspend fun push() = pushQueue(client, device)
+        override suspend fun snapshot(): JsonObject = client.snapshot()
+        override fun commitShadow(shadow: String, cursor: Long) {
+          if (!state.commitShadow(shadow, cursor)) throw java.io.IOException("سایهٔ همگام‌سازی روی دیسک ننشست")
+        }
+        override fun writeLedger(next: ShopData) = synchronized(this@SyncV1Engine) { place(next) }
+      }).run(base)
+      if (out is SyncRebuild.Outcome.Done) {
+        val now = System.currentTimeMillis()
+        state.snapshotAt = now
+        state.reconciledAt = now
+        state.lastOkAt = now
+        state.lastError = ""
+        attempt = 0
+      }
+      out
+    } finally {
+      busy = false
+      publish()
+    }
+  }
+
+  /**
+   *  بی سرور (هنوز وارد نشده یا حسابی نیست): دفترِ بازیابی‌شده خودش سایه می‌شود ⇐ هیچ op؛
+   *  cursor صفر و «هم‌ترازی» از نو، تا پس از ورود `prepare` فقط ردیف‌هایی را بفرستد که سرور
+   *  ندارد (INSERT) و ردیف‌های سرور را بیفزاید — هرگز DELETE. سایه پیش از دفتر می‌نشیند.
+   */
+  @Synchronized
+  fun resetTo(ledger: ShopData) {
+    if (!state.commitShadow(SyncRebuild.shadowFor(ledger), 0L)) throw java.io.IOException("سایهٔ همگام‌سازی روی دیسک ننشست")
+    state.reconciledAt = 0L
+    state.snapshotAt = 0L
+    publish()
+  }
 
   /**
    *  هم‌ترازیِ یک‌باره با سرور — پیش از نخستین دورِ این حساب روی این دستگاه.

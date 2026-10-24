@@ -65,6 +65,21 @@ object LogoutGuard {
   /** خروجِ اجباری فقط با پشتیبانِ نوشته‌شده و دو تأیید. */
   fun canForce(backupWritten: Boolean, confirmations: Int): Boolean = backupWritten && confirmations >= 2
 
+  /**
+   *  SEC-01 (بازبینیِ #331): دفترِ رمزداری که این دستگاه باز نمی‌کند پشتیبانِ پوشه نمی‌دهد
+   *  (متنِ بازش در دست نیست)، پس «خروجِ اجباری» تا ابد بسته می‌ماند. صف اول فرستاده می‌شود
+   *  (`SyncV1Worker` حتی با دفترِ خوانده‌نشده)؛ اگر نشد، خروج با دو تأییدِ روشن باز است —
+   *  فایل‌های رمزدار و صف روی دستگاه کنار می‌مانند و پاک نمی‌شوند.
+   */
+  fun canForceUnreadable(unreadable: Boolean, confirmations: Int): Boolean = unreadable && confirmations >= 2
+
+  const val FORCE_UNREADABLE = "خروج بی پشتیبان…"
+
+  fun forceUnreadableMessage(pending: Int): String =
+    "دفترِ این دستگاه رمزدار است و باز نمی‌شود، پس پشتیبانی از آن نوشته نمی‌شود. " +
+      "$pending تغییر هنوز به سرور نرفته. با خروج، دفترِ رمزدار و صفِ این تغییرها روی همین دستگاه کنار می‌مانند " +
+      "و پاک نمی‌شوند؛ با ورودِ دوباره به همین حساب صف فرستاده می‌شود. باز هم خارج می‌شوید؟"
+
   const val TITLE = "هنوز همه‌چیز به سرور نرفته"
   const val SYNC_NOW = "همین حالا همگام کن"
   const val FORCE = "خروجِ اجباری…"

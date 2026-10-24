@@ -44,10 +44,18 @@ class SyncV1Worker(context: Context, params: WorkerParameters) : CoroutineWorker
 
     val store = ShopStore(app)
     store.load()
-    //  SEC-01: دفترِ رمزدارِ خوانده‌نشده ⇒ این دور همگام نمی‌شود. دفترِ حافظه
-    //  خالی است؛ تفاضل و نشاندنِ opهای سرور روی آن یعنی رونویسیِ دفترِ واقعی.
-    //  با دفترِ ساده (پیش‌فرض) هرگز پیش نمی‌آید.
-    if (store.unreadable.value != null) return Result.success()
+    /*
+     *  SEC-01: دفترِ رمزدارِ خوانده‌نشده ⇒ نه Pull، نه تفاضل: دفترِ حافظه خالی است و نشاندنِ
+     *  opهای سرور روی آن یعنی رونویسیِ دفترِ واقعی. ولی صفِ opها رمزدار نیست — **فرستاده
+     *  می‌شود** (بازبینیِ #331)، تا تغییرهای نرفته گم نشوند و «بازسازی از سرور» و خروج از حساب
+     *  راه داشته باشند. با دفترِ ساده (پیش‌فرض) هرگز پیش نمی‌آید.
+     */
+    if (store.unreadable.value != null) {
+      if (ir.vil3ntec.tohid.sync.v3.SyncChoice.isV3(app)) return Result.success()
+      val engine = SyncV1Engine.of(app)
+      engine.rebind()
+      return if (engine.pushPending().isSuccess) Result.success() else Result.retry()
+    }
     //  Sync v3 پشتِ تنظیمِ هر دستگاه (پیش‌فرض v1): همین کارگر، موتورِ دیگر
     if (ir.vil3ntec.tohid.sync.v3.SyncChoice.isV3(app)) {
       return if (ir.vil3ntec.tohid.sync.v3.SyncV3Runner.of(app).work(store)) Result.success() else Result.retry()

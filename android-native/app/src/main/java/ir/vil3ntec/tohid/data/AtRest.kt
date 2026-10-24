@@ -7,6 +7,7 @@ import ir.vil3ntec.tohid.core.atrest.AtRestException
 import ir.vil3ntec.tohid.core.atrest.AtRestFiles
 import ir.vil3ntec.tohid.core.atrest.AtRestKeyring
 import ir.vil3ntec.tohid.core.atrest.AtRestMigration
+import ir.vil3ntec.tohid.core.atrest.AtRestScope
 import java.io.File
 import java.io.FileOutputStream
 
@@ -22,6 +23,9 @@ import java.io.FileOutputStream
  *  در کلیدِ Keystore روی دیسک است (`AtRestKeyring`).
  *
  *  ── چه چیزی عمداً ساده می‌ماند ──────────────────────────────────────
+ *   • صفِ opها، ژورنال‌ها و سایه/cursorِ همگام‌سازی، `ledger-summary.json` و
+ *     `sale-draft.json` — شرح سرِ `AtRestScope`. صف بی کلید خوانده می‌شود تا
+ *     دفترِ رمزدارِ خوانده‌نشده جلوی رسیدنِ تغییرهای نرفته به سرور را نگیرد.
  *   • پشتیبانی که **بیرون** می‌رود (فایلِ دستی، پوشهٔ قرینه، پشتیبانِ ابری):
  *     از متنِ بازشده ساخته می‌شود. بند ۱۰٫۳: پشتیبانِ دستگاه با کلیدِ دستگاه
  *     رمز نمی‌شود، وگرنه با از دست رفتنِ گوشی پشتیبان هم باز نمی‌شد.
@@ -126,6 +130,8 @@ object AtRest {
     val sealed: Int,
     val plain: Int,
     val sealError: String?,
+    /** فایل‌های کنارگذاشته (`.unreadable-*`، `keyring.lost-*`، …) — پاک نمی‌شوند، فقط فهرست */
+    val leftovers: List<String> = emptyList(),
   )
 
   /** برای صفحهٔ امنیت؛ فقط سرآیندِ فایل‌ها خوانده می‌شود */
@@ -135,7 +141,30 @@ object AtRest {
     val want = wanted(context)
     //  وقتی خاموش است و هیچ فایلِ رمزداری نیست، Keystore اصلاً لمس نمی‌شود
     val key = if (!want && sealed == 0) AtRestKeyring.State.None else keyring(context).state()
-    return Status(want, key, sealed, fs.size - sealed, sealError)
+    return Status(want, key, sealed, fs.size - sealed, sealError, leftovers(context))
+  }
+
+  /** نامِ نسبیِ فایل‌های کنارگذاشته در `filesDir` و `atrest/` */
+  fun leftovers(context: Context): List<String> {
+    val dir = context.applicationContext.filesDir
+    val top = dir.listFiles().orEmpty().filter { it.isFile }.map { it.name }
+    val ring = File(dir, "atrest").listFiles().orEmpty().filter { it.isFile }.map { "atrest/${it.name}" }
+    return (top + ring).filter { AtRestScope.leftover(it) }.sorted()
+  }
+
+  /**
+   *  آیا رمز در کار است (روشن، یا هنوز فایلِ رمزدار یا کلیددانی هست) — تصمیمِ
+   *  `TohidBackupAgent`. فقط تنظیم و سرآیندها؛ Keystore لمس نمی‌شود.
+   */
+  fun activeForBackup(context: Context): Boolean {
+    val dir = context.applicationContext.filesDir
+    val ring = File(File(dir, "atrest"), "keyring")
+    val anySealed = runCatching { files(context).any { AtRestEnvelope.isSealed(it) } }.getOrDefault(true)
+    return AtRestScope.activeForBackup(
+      wanted = wanted(context),
+      anySealed = anySealed,
+      keyringPresent = ring.exists() || File(ring.parentFile, ring.name + AtRestKeyring.BACKUP_SUFFIX).exists(),
+    )
   }
 
   /** نوشتن روی دیسک با همان `DiskWrite` (fsync + جابه‌جاییِ اتمی که روی ویندوز هم جایگزین می‌کند) */

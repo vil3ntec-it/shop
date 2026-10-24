@@ -61,11 +61,24 @@ object AtRestEnvelope {
     val kidBytes = kid.toByteArray(Charsets.US_ASCII)
     require(kidBytes.isNotEmpty() && kidBytes.size <= 255) { "شناسهٔ کلید نامعتبر است" }
     val nonce = ByteArray(NONCE_LEN).also { random.nextBytes(it) }
-    val header = MAGIC + byteArrayOf(VERSION.toByte(), kidBytes.size.toByte()) + kidBytes + nonce
+    val headerLen = MAGIC.size + 2 + kidBytes.size + NONCE_LEN
     val cipher = Cipher.getInstance(TRANSFORM)
     cipher.init(Cipher.ENCRYPT_MODE, key, GCMParameterSpec(TAG_BITS, nonce))
-    cipher.updateAAD(header)
-    return header + cipher.doFinal(plain)
+    /*
+     *  کارایی (بازبینیِ #331): یک بافرِ از پیش‌اندازه‌گرفته — سرآیند و رمزنوشته مستقیم در
+     *  همان. پیش‌تر `doFinal` یک کپیِ کامل و `header + …` کپیِ کاملِ دوم می‌ساخت؛ برای
+     *  دفترِ چند مگابایتی روی گوشیِ کهنه یعنی دو برابر حافظه و زمانِ GC در هر ذخیره.
+     */
+    val out = ByteArray(headerLen + cipher.getOutputSize(plain.size))
+    var at = 0
+    MAGIC.copyInto(out, at); at += MAGIC.size
+    out[at++] = VERSION.toByte()
+    out[at++] = kidBytes.size.toByte()
+    kidBytes.copyInto(out, at); at += kidBytes.size
+    nonce.copyInto(out, at)
+    cipher.updateAAD(out, 0, headerLen)
+    val n = cipher.doFinal(plain, 0, plain.size, out, headerLen)
+    return if (headerLen + n == out.size) out else out.copyOf(headerLen + n)
   }
 
   /**

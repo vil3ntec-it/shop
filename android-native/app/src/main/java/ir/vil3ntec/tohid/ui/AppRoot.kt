@@ -371,17 +371,26 @@ fun AppRoot(
     }
   }
 
-  //  SEC-01: دفترِ رمزدار باز نشد ⇐ نوشتن بسته است (`ShopStore.unreadable`)؛
-  //  پیامِ ماندگار با راهِ «تنظیمات ← امنیت». با دفترِ ساده هرگز پیش نمی‌آید.
+  //  SEC-01: دفترِ رمزدار باز نشد ⇐ نوشتن بسته است (`ShopStore.unreadable`)؛ پنجره با
+  //  «بازسازی از سرور» و راهِ «تنظیمات ← امنیت» (بازبینیِ #331). با دفترِ ساده هرگز پیش نمی‌آید.
   val unreadable by store.unreadable.collectAsState()
-  LaunchedEffect(unreadable) {
-    if (unreadable == null) return@LaunchedEffect
-    snackbar.currentSnackbarData?.dismiss()
-    val r = snackbar.showSnackbar(
-      "دفترِ رمزدارِ این دستگاه باز نشد؛ برای اینکه دفترِ واقعی رونویسی نشود، ثبت بسته است. هیچ چیزی پاک نشده.",
-      actionLabel = "امنیت", duration = SnackbarDuration.Indefinite,
+  var unreadableOpen by remember { mutableStateOf(false) }
+  LaunchedEffect(unreadable) { unreadableOpen = unreadable != null }
+  //  پشتِ قفلِ برنامه نه: پنجره رویِ صفحهٔ قفل باز نمی‌شود
+  if (unreadableOpen && unreadable != null && !(lockStore.enabled && !unlocked)) {
+    ir.vil3ntec.tohid.ui.screens.UnreadableLedgerDialog(
+      store = store,
+      onOpenSecurity = { unreadableOpen = false; AppNav.go("settings") },
+      onDismiss = { unreadableOpen = false },
+      toast = { msg -> scope.launch { snackbar.currentSnackbarData?.dismiss(); snackbar.showSnackbar(msg, duration = SnackbarDuration.Long) } },
     )
-    if (r == SnackbarResult.ActionPerformed) AppNav.go("settings")
+  }
+  //  نتیجهٔ بازیابیِ پشتیبان وقتی دفترِ رمزدار باز نمی‌شود (`ShopStore.notice`)
+  LaunchedEffect(store) {
+    store.notice.collect { msg ->
+      snackbar.currentSnackbarData?.dismiss()
+      snackbar.showSnackbar(msg, duration = SnackbarDuration.Long)
+    }
   }
 
   if (lockStore.enabled && !unlocked) {
