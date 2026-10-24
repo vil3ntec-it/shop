@@ -11,7 +11,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const h = require('./helpers');
-const { query, one, newId, now } = require('../src/db');
+const { query, one, newId, now, tx } = require('../src/db');
 const vd = require('../src/lib/verify-data');
 const cli = require('../scripts/verify-data');
 
@@ -57,7 +57,8 @@ async function cleanShop(label) {
   const made = await h.post('/api/shop', { name: `دکانِ ${label}` }, { token: u.accessToken });
   assert.equal(made.status, 201, JSON.stringify(made.body));
   const o = { token: u.accessToken, shopId: made.body.shop.id };
-  //  دفترِ موجودیِ سرور (shop.catalog) هم روشن: فروش و ورودیِ انبار ⇒ stock_moves، سفارش ⇒ رزرو
+  //  دفترِ موجودیِ سرور (shop.catalog) هم روشن: فروش و ورودیِ انبار ⇒ stock_moves. سفارش دیگر رزرو نمی‌کند
+  //  (تصمیمِ صاحبِ مخزن، #340) ⇒ رزروِ «قدیمی» را `legacyHold` می‌سازد
   await setFlag(o.shopId, 'shop.orders', true);
   await setFlag(o.shopId, 'shop.storefront', true);
   await setFlag(o.shopId, 'shop.catalog', true);
@@ -127,6 +128,8 @@ test('دفترِ سالم: همهٔ بررسی‌ها اجرا می‌شوند �
   const ran = new Set(rep.checks.map((c) => c.id));
   for (const c of vd.listChecks()) assert.ok(ran.has(c.id), `بررسیِ ${c.id} اجرا نشد`);
   //  دفترِ موجودی واقعاً پر است — بررسی‌های sum.stock_* روی دادهٔ واقعیِ برنامه صفرند، نه روی جدولِ خالی
+  await legacyHold(o.shopId);
+  assert.deepEqual((await vd.verify({ shopId: o.shopId })).checks.filter((c) => c.count > 0), [], 'رزروِ قدیمیِ سالم');
   const st = (await query(
     `SELECT (SELECT count(*) FROM stock_moves WHERE shop_id=$1)::int AS moves,
             (SELECT count(*) FROM stock_levels WHERE shop_id=$1 AND on_hand_milli <> 0)::int AS levels,
@@ -142,8 +145,23 @@ test('sum.stock_levels: موجودیِ یک جا دستی عوض شده، بی �
   assert.match(c.samples[0].ref, /^p1\//);
 });
 
+/** رزروِ پیش از #340 (سفارش دیگر رزرو نمی‌کند) با حرکتِ رزروش — همان شکلی که `stock.reserve` می‌نوشت */
+async function legacyHold(shopId) {
+  const stock = require('../src/lib/stock');
+  const t = now();
+  const id = `rsv-${uniq()}`;
+  await tx(async (c) => {
+    await c.query(`INSERT INTO stock_reservations (id, shop_id, order_id, line_no, product_id, branch_id, qty_milli, status, expires_at, created_at)
+                   VALUES ($1,$2,'ord-legacy',1,'p1','',1500,'held',NULL,$3)`, [id, shopId, t]);
+    await stock.insertMove(c, shopId, { productId: 'p1', location: '', type: 'reserve', qtyMilli: 1500, deltaOnHand: 0,
+      deltaReserved: 1500, mode: 'local', source: 'order', sourceKey: `res:${id}:reserve`, refType: 'order',
+      refId: 'ord-legacy', actorType: 'user', actorId: '', reason: 'order', at: t }, t);
+  });
+}
+
 test('sum.stock_reserved: رزروِ باز بی حرکتِ رزرو', async () => {
   const o = await cleanShop('رزرو');
+  await legacyHold(o.shopId);
   await query(`UPDATE stock_reservations SET qty_milli = qty_milli + 1 WHERE shop_id=$1 AND status='held'`, [o.shopId]);
   await expectOnly(o.shopId, 'sum.stock_reserved');
 });

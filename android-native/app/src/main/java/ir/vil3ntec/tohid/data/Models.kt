@@ -146,6 +146,16 @@ data class Sale(
   /** فروشنده — نامِ حسابی که فاکتور را زد (برای گزارشِ فروشِ هر کاربر)؛ خالی یعنی نامعلوم */
   val seller: String = "",
   /**
+   *  سفارشِ آنلاینی که این فروش تحویلِ آن است (`OrderFulfillment`) — شناسه و شمارهٔ سفارش.
+   *  فروشِ صندوق `null` است و `null` نوشته نمی‌شود (`NEVER`)، مثلِ `series`.
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val orderId: String? = null,
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val orderNo: Long? = null,
+  /**
    *  «سری سند»ِ دستگاهی که فاکتور را زد (F0-03)، مثلاً `B1`؛ شمارهٔ نمایشی
    *  `{سری}-{شماره}` می‌شود (`invoiceLabel`). فاکتورِ پیش از سری و فاکتورِ
    *  وب (که بازهٔ خودش را دارد) `null`اند و همان عدد را نشان می‌دهند.
@@ -157,6 +167,15 @@ data class Sale(
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val series: String? = null,
+  /**
+   *  «برگهٔ امضاشده»ی تأییدِ تخفیفِ بیش از سقف (STF-02، بخشِ ۱۰.۱؛
+   *  `core/perm/ApprovalSlip`). سرور با آن تخفیف را می‌پذیرد و سابقه نامِ
+   *  تأییدکننده و دلیل را دارد. فقط وقتی هست که تأیید لازم بوده؛ `null`
+   *  نوشته نمی‌شود (همان دلیلِ `series`).
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val approval: kotlinx.serialization.json.JsonObject? = null,
   /**
    *  PAY (v3 A4) — ردیف‌های پرداختِ ترکیبی (نقد، کیف پول، کارت، حواله، به حساب)، به پول.
    *  فقط فروشی که با پرچمِ `ShopPolicy.payV2` ثبت شده دارد؛ معنای فیلدهای بالا
@@ -216,7 +235,7 @@ data class SalePayment(
 /**
  *  فاکتورِ سفارشِ اینترنتی (سریِ `W`، ORD-20) — سرور آن را هنگامِ تحویل
  *  می‌سازد. صندوق آن را لغو یا «اصلاح در سبد» نمی‌کند (یعنی دوباره نمی‌زند)؛
- *  برگشتِ کاملش از بخشِ «سفارش‌ها» (بازپرداخت) سندِ برگشت می‌سازد.
+ *  فروشی که برنامه هنگامِ تحویلِ سفارش می‌زند (`OrderFulfillment`) هم همین کانال را دارد.
  *  مرجوعیِ قلم‌به‌قلم در دکان مثلِ هر فاکتورِ دیگر مجاز است.
  */
 fun Sale.isOnlineOrder(): Boolean = channel == "online" || series?.trim() == ONLINE_SERIES
@@ -360,6 +379,39 @@ data class Debtor(
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val creditLimit: Double? = null,
+  /*
+   *  پروندهٔ مشتری (CRM-02، ۰۸، ۱۰، ۱۱، ۱۲) — همه اختیاری و همه `null` به معنای «همان رفتارِ همیشه».
+   *  ⛔ هیچ‌کدام `null` نوشته نمی‌شود (`EncodeDefault.NEVER`، مثلِ `creditLimit`): قرض‌دارِ قدیمی
+   *  بایت‌به‌بایت همان می‌ماند و نخستین تفاضلِ Sync v1 برایش op نمی‌سازد. نوشتن فقط از `CustomerCrm`
+   *  و `CustomerMerge`.
+   */
+  /** شمارهٔ دوم (CRM-02) — همان قالبِ `phone` (`LocaleText.phoneForSave`) */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val phone2: String? = null,
+  /** برچسب‌ها (CRM-11) — بی تکرار (با `TextNormalizer.compareKey`)، بی «#» */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val tags: List<String>? = null,
+  /** گروهِ مشتری (CRM-08)، مثلاً «همکار» یا «عمده‌فروش» */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val group: String? = null,
+  /** لیستِ قیمتِ پیش‌فرض (CRM-08): `wholesale` = قیمتِ عمده؛ `null` = خرده (همیشه) */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val priceList: String? = null,
+  /** رضایت برای پیامِ تبلیغاتی (CRM-12): `null` = نپرسیده (یعنی نه)، `false` = صریحاً نه */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val marketingConsent: Boolean? = null,
+  /**
+   *  ادغام‌شده در (CRM-10): شناسهٔ مشتریِ ماندگار. ردیف پاک نمی‌شود (سابقه و شناسه می‌مانند)،
+   *  ولی دیگر «فعال» نیست: `CustomerCrm.active` آن را بیرون می‌گذارد.
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val mergedInto: String? = null,
 )
 
 @Serializable
@@ -538,6 +590,14 @@ data class AuditEntry(
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val z: kotlinx.serialization.json.JsonObject? = null,
+  /**
+   *  ردیف‌هایی که این رد جابه‌جا کرده، هر کدام `جدول/شناسه` (مثلاً `transactions/t1`، `sales/s7`) —
+   *  فعلاً فقط `customer_merge` (CRM-10)، تا ادغام برگشت‌پذیر و دنبال‌کردنی بماند. حداکثر
+   *  `CustomerMerge.REF_CHUNK` در هر رد (سقفِ ۶۴KB ِ هر op). `null` نوشته نمی‌شود.
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val refIds: List<String>? = null,
 )
 
 /**

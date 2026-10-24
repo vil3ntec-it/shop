@@ -94,6 +94,8 @@ object SalesEngine {
     val debtorId: String? = null,
     /** سیاستِ دکان: کالای منقضی فروخته نشود (`ShopPolicy.blockExpired`) */
     val blockExpired: Boolean = false,
+    /** برگهٔ تأییدِ تخفیفِ بیش از سقف (STF-02) — همان‌طور روی فاکتور می‌نشیند */
+    val approval: kotlinx.serialization.json.JsonObject? = null,
     /**
      *  PAY (v3 A4) — تسویهٔ پنلِ پرداختِ ترکیبی (`PayFlow.checkout`)، فقط با پرچمِ
      *  `ShopPolicy.payV2`. `null` (پیش‌فرض) ⇒ همان نقد/نسیهٔ امروز با `payment` و
@@ -411,6 +413,7 @@ object SalesEngine {
       date = today,
       syncStatus = "pending",
       seller = checkout.seller.trim(),
+      approval = checkout.approval,
       //  PAY (v3 A4): فقط با پرچم — فیلدِ تازه؛ بی پرچم `null` و نوشته نمی‌شود
       payments = settled?.payments,
       tenderedMinor = settled?.tenderedMinor,
@@ -596,7 +599,7 @@ object SalesEngine {
   /** جملهٔ هشدارِ پیش از لغو */
   /** پیامِ ردِ لغوِ فاکتورِ سفارشِ اینترنتی */
   const val ONLINE_ORDER_LOCKED =
-    "این فاکتورِ سفارشِ اینترنتی است و از صندوق لغو نمی‌شود؛ برگشتِ کاملش از بخشِ «سفارش‌ها» (بازپرداخت) ثبت می‌شود"
+    "این فاکتورِ سفارشِ اینترنتی است و از صندوق لغو نمی‌شود. کالایی که پیک برگرداند ⇒ همان سفارش را در «سفارش‌ها» «برگشت به دکان» بزنید (فروش خودش لغو می‌شود). «مرجوعی» فقط برای کالایی است که مشتری پس از تحویل پس آورد و پولش را از دخل گرفت"
 
   fun cancelWarning(sale: Sale): String =
     "فروش #${sale.invoiceLabel() ?: "0"} لغو می‌شود و موجودی کالاهای آن به انبار برمی‌گردد. سابقه فروش حذف نمی‌شود."

@@ -3,7 +3,9 @@
  * بانکِ تصاویر — پنلِ مدیر (v3 ۳۷.۳). شرح: ‎lib/image-bank.js‎.
  *
  *   مدیر (هر نقش):  کالای بانک، بارگذاری به pending، ویرایشِ pending، نسخه و
- *                   نسخهٔ کوچک، ورودِ گروهی (دسته، فایل، ردیف‌ها، گزارش)، صف
+ *                   نسخهٔ کوچک، ورودِ گروهی (دسته، فهرستِ دسته‌ها، فایل، ردیف‌ها،
+ *                   گزارش)، صف و `/review` (صف با جزئیات)؛ `/status` (روشن یا نه)
+ *                   حتی با پرچمِ خاموش
  *   مدیرِ ارشد:     تأیید، رد، بایگانی، روشن/خاموش در جست‌وجو — هر بار با
  *                   دلیلِ نوشته و یک ردیفِ سابقه (الگوی ADMIN-CONTROL-PLANE)
  *
@@ -17,6 +19,7 @@ const { requireReason } = require('../lib/admin-access');
 const { requireAdmin, requireSuperAdmin } = require('../middleware/auth');
 const { clientIp } = require('../middleware/ratelimit');
 const { forbidden, notFound, badRequest } = require('../middleware/errors');
+const { many } = require('../db');
 
 const router = express.Router();
 const BASE = '/api/admin/image-bank';
@@ -30,6 +33,16 @@ const num = (x) => {
 };
 
 router.use(requireAdmin);
+
+/**
+ * پنل پیش از هر چیز می‌پرسد بانک روشن است یا نه — بی ۴۰۳، تا زبانهٔ پنل با
+ * پرچمِ خاموش پیامِ روشن بدهد نه خطای قرمز (WP-2، پنلِ بانک).
+ */
+router.get('/status', wrap(async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json({ enabled: await bank.centralEnabled(), rows_max: bank.ROWS_MAX, roles: bank.ROLES, licenses: bank.LICENSES });
+}));
+
 router.use(wrap(async (req, res, next) => {
   if (!(await bank.centralEnabled())) return next(forbidden('بانکِ مرکزیِ تصاویر روشن نیست', 'image_bank_disabled'));
   next();
@@ -71,6 +84,37 @@ router.post('/images', raw, wrap(async (req, res) => {
 
 router.get('/queue', wrap(async (req, res) => {
   res.json(await bank.queue(req.query || {}));
+}));
+
+/**
+ * صفِ بررسی برای پنل (IMG-02، IMG-PRO-07، IMG-BANK-17، IMG-09): همان `queue` با
+ * جزئیاتِ هر عکس — وضعیت و دلیلِ تطبیق، کالای وصل، کالاهای ممکنِ تطبیقِ مبهم
+ * با SKU/بارکد/نوع/اندازه، نشانِ تکراری و کیفیت، مجوز و نشانیِ فایلِ نسخهٔ جاری.
+ * فقط‌خواندنی؛ همان صفحه‌بندیِ `queue` (حداکثر ۵۰).
+ */
+router.get('/review', wrap(async (req, res) => {
+  const q = await bank.queue(req.query || {});
+  const details = await Promise.all(q.items.map((i) => bank.adminDetail(i.id, BASE)));
+  const candIds = [...new Set(details.flatMap((d) => d?.proposal?.candidates || []))].map(String).slice(0, 500);
+  const cands = candIds.length ? await many('SELECT * FROM bank_products WHERE id = ANY($1::text[])', [candIds]) : [];
+  const byId = new Map(cands.map((p) => [p.id, bank.productOut(p)]));
+  res.set('Cache-Control', 'no-store');
+  res.json({
+    items: q.items.map((i, k) => {
+      const d = details[k] || {};
+      const v = (d.versions || []).find((x) => x.version === d.current_version) || {};
+      return {
+        id: i.id, status: i.status, space: i.space, role: i.role, from_shop: i.from_shop, batch_id: i.batch_id,
+        created_at: i.created_at, match_status: d.match_status || '', match_reasons: d.match_reasons || [],
+        quality_flags: i.quality_flags, duplicate_of: i.duplicate_of, license: d.license || null,
+        product: d.product || null,
+        candidates: (d.proposal?.candidates || []).map((id) => byId.get(String(id)) || { id: String(id), missing: true }),
+        version: d.current_version || null,
+        file: v.urls ? { url: v.urls.thumb || v.urls.original, mime: v.mime, width: v.width, height: v.height } : null,
+      };
+    }),
+    next_cursor: q.next_cursor,
+  });
 }));
 
 router.get('/images/:id', wrap(async (req, res) => {
@@ -166,6 +210,21 @@ router.post('/batches/:id/status', wrap(async (req, res) => {
   const out = await bank.batchStatus(req.admin.id, req.params.id, req.body?.status);
   await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.bank_batch_status', targetType: 'image_batch', targetId: out.id, detail: out });
   res.json(out);
+}));
+
+/** دسته‌های اخیر با شمارِ فایل و ردیف — پیشرفتِ دسته در پنل (IMG-01). */
+router.get('/batches', wrap(async (req, res) => {
+  const rows = await many(
+    `SELECT b.id, b.status, b.license_source, b.license_status, b.commercial_use, b.note, b.created_at, b.updated_at,
+            (SELECT COUNT(*)::int FROM image_batch_files f WHERE f.batch_id = b.id) AS files,
+            (SELECT COUNT(*)::int FROM image_batch_files f WHERE f.batch_id = b.id AND f.status = 'failed') AS files_failed,
+            (SELECT COUNT(*)::int FROM image_batch_rows r WHERE r.batch_id = b.id) AS rows,
+            (SELECT COUNT(*)::int FROM image_batch_rows r WHERE r.batch_id = b.id AND r.status = 'failed') AS rows_failed,
+            (SELECT COUNT(*)::int FROM image_batch_rows r WHERE r.batch_id = b.id AND r.status = 'ambiguous') AS rows_ambiguous
+       FROM image_batches b ORDER BY b.created_at DESC, b.id DESC LIMIT 30`
+  );
+  res.set('Cache-Control', 'no-store');
+  res.json({ items: rows.map((r) => ({ ...r, created_at: Number(r.created_at), updated_at: Number(r.updated_at) })) });
 }));
 
 router.get('/batches/:id/report', wrap(async (req, res) => {

@@ -1,0 +1,202 @@
+name: توحید بومی — پیش‌نمایش
+
+#  ⏳ موقت: پیش‌نمایشِ برنامهٔ در حالِ بازسازی روی گوشیِ صاحب‌کار.
+#  برای برداشتن: همین فایل، انتشار و برچسبِ `tohid-native-preview`.
+#
+#  بستهٔ جدا (`ir.vil3ntec.tohid.preview`، buildTypeِ `preview`) کنارِ برنامهٔ
+#  اصلی نصب می‌شود و به داده‌اش دست نمی‌زند. برنامهٔ پیش‌نمایش فقط از
+#  `releases/tags/tohid-native-preview` به‌روز می‌شود (`Updater.fromPreview`).
+#
+#  ⛔ این ورک‌فلو به `tohid-native` و `tohid-native-beta` دست نمی‌زند و روی
+#  انتشارش هیچ `.apk`ی نمی‌گذارد: نسخه‌های قدیمیِ نصب‌شده اولین `.apk` را از
+#  فهرستِ انتشارها برمی‌دارند. نصبیِ اول در `tohid-preview.zip` است.
+
+on:
+  push:
+    branches:
+      - ccr-3a0d593c-ac0jpj-phone-v3
+      - ccr-3a0d593c-ac0jpj-v3-foundation
+    paths:
+      - 'android-native/**'
+      - 'core/**'
+      - '.github/workflows/tohid-native-preview.yml'
+  #  PR فقط ساخته و سنجیده می‌شود (هرگز منتشر نمی‌شود) تا buildTypeِ preview پیش از مرج دیده شود
+  pull_request:
+    paths:
+      - 'android-native/app/build.gradle.kts'
+      - '.github/workflows/tohid-native-preview.yml'
+  workflow_dispatch:
+
+concurrency:
+  #  یک انتشار، یک صف: اجرای تازه اجرای کهنه را لغو می‌کند (PRها جدا)
+  group: tohid-native-preview-${{ github.event_name == 'pull_request' && github.ref || 'publish' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+env:
+  TAG: tohid-native-preview
+
+jobs:
+  build:
+    name: ساخت و انتشارِ پیش‌نمایش
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      #  همان راهِ ورک‌فلوِ انتشار (`tohid-native.yml`)؛ هیچ رازی چاپ نمی‌شود
+      - name: کلیدِ امضا
+        env:
+          KEYSTORE_B64: ${{ secrets.TOHID_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            printf '%s' "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/tohid-release.jks"
+            echo "TOHID_KEYSTORE=$RUNNER_TEMP/tohid-release.jks" >> "$GITHUB_ENV"
+            echo "کلید از secret خوانده شد"
+          else
+            echo "::warning::secret به نام TOHID_KEYSTORE_B64 تنظیم نشده — کلیدِ داخلِ مخزن استفاده می‌شود"
+          fi
+
+      - name: ساختِ نسخهٔ پیش‌نمایش
+        working-directory: android-native
+        env:
+          TOHID_KEYSTORE_PASSWORD: ${{ secrets.TOHID_KEYSTORE_PASSWORD }}
+          TOHID_KEY_ALIAS: ${{ secrets.TOHID_KEY_ALIAS }}
+          TOHID_KEY_PASSWORD: ${{ secrets.TOHID_KEY_PASSWORD }}
+          TOHID_API_BASE: ${{ vars.TOHID_API_BASE }}
+          TOHID_UPDATE_PUBLIC_KEY: ${{ vars.TOHID_UPDATE_PUBLIC_KEY }}
+          TOHID_LICENSE_PUBLIC_KEY: ${{ vars.TOHID_LICENSE_PUBLIC_KEY }}
+        run: gradle --no-daemon assemblePreview -PbuildNumber=${{ github.run_number }}
+
+      #  بسته باید `.preview` باشد (هرگز روی برنامهٔ اصلی ننشیند)، نسخه `-preview`
+      #  و versionCode همان «۱۰۰ + شمارهٔ اجرا» (همیشه رو به بالا)
+      - name: سنجش و بسته‌بندی
+        working-directory: android-native
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.TOHID_UPDATE_SIGNING_KEY }}
+          TOHID_UPDATE_PUBLIC_KEY: ${{ vars.TOHID_UPDATE_PUBLIC_KEY }}
+        run: |
+          set -euo pipefail
+          apk=app/build/outputs/apk/preview/app-preview.apk
+          bt=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -n1)
+          "$bt/apksigner" verify "$apk"
+          badge=$("$bt/aapt" dump badging "$apk" | sed -n '1p')
+          pkg=$(sed -n "s/.* name='\([^']*\)'.*/\1/p" <<<"$badge")
+          code=$(sed -n "s/.* versionCode='\([^']*\)'.*/\1/p" <<<"$badge")
+          ver=$(sed -n "s/.* versionName='\([^']*\)'.*/\1/p" <<<"$badge")
+          echo "بسته: $pkg · نسخه: $ver · versionCode: $code"
+          [ "$pkg" = ir.vil3ntec.tohid.preview ] || { echo "::error::بسته باید ir.vil3ntec.tohid.preview باشد، نه $pkg"; exit 1; }
+          [ "$code" = "$((100 + ${{ github.run_number }}))" ] || { echo "::error::versionCode نادرست: $code"; exit 1; }
+          [[ "$ver" =~ \.[0-9]+-preview$ ]] || { echo "::error::نامِ نسخه باید با preview تمام شود: $ver"; exit 1; }
+          echo "VERSION=$ver" >> "$GITHUB_ENV"
+
+          rm -rf out && mkdir out && cd out
+          cp "../$apk" tohid-preview.apk.preview
+          #  نصبِ اولِ دستی: خودِ apk داخلِ zip (نامِ `.apk` فقط آن‌جا)
+          cp "../$apk" tohid-preview.apk
+          zip -q -j tohid-preview.zip tohid-preview.apk
+          rm tohid-preview.apk
+          sha256sum tohid-preview.apk.preview tohid-preview.zip > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+          #  امضای فهرست، همان قاعدهٔ انتشار (`update/ReleaseSignature.kt`)
+          if [ -n "$UPDATE_SIGNING_KEY" ]; then
+            printf '%s\n' "$UPDATE_SIGNING_KEY" > "$RUNNER_TEMP/update.pem"
+            openssl dgst -sha256 -sign "$RUNNER_TEMP/update.pem" SHA256SUMS.txt | base64 -w0 > SHA256SUMS.txt.sig
+            rm -f "$RUNNER_TEMP/update.pem"
+            echo "فهرست امضا شد"
+          elif [ -n "$TOHID_UPDATE_PUBLIC_KEY" ]; then
+            echo "::error::کلیدِ عمومیِ به‌روزرسانی سنجاق شده ولی secretِ TOHID_UPDATE_SIGNING_KEY نیست"
+            exit 1
+          fi
+          if ls -1 | grep -i '\.apk$'; then echo "::error::هیچ فایلِ .apkی نباید منتشر شود"; exit 1; fi
+          ls -l
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Tohid-Preview
+          path: android-native/out/*
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: انتشار در tohid-native-preview
+        if: ${{ github.event_name != 'pull_request' }}
+        working-directory: android-native/out
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          #  ⛔ فقط همین برچسب
+          [ "$TAG" = tohid-native-preview ] || { echo "::error::برچسبِ نادرست: $TAG"; exit 1; }
+
+          if ! gh api -X PATCH "repos/$REPO/git/refs/tags/$TAG" -f sha="$SHA" -F force=true >/dev/null 2>&1; then
+            gh api -X POST "repos/$REPO/git/refs" -f ref="refs/tags/$TAG" -f sha="$SHA" >/dev/null
+          fi
+
+          cat > "$RUNNER_TEMP/notes.md" <<EOF
+          ## پیش‌نمایشِ برنامهٔ در حالِ بازسازی (موقت)
+
+          فقط برای دیدن، نه کارِ روزانه. کنارِ «فروشگاه من» با نامِ «توحید · پیش‌نمایش» نصب می‌شود و به داده‌اش دست نمی‌زند.
+
+          **نصبِ اول:** [tohid-preview.zip](https://github.com/$REPO/releases/download/$TAG/tohid-preview.zip) را بگیرید، باز کنید و \`tohid-preview.apk\` را نصب کنید. بعد از آن، خودِ برنامه از همین‌جا به‌روز می‌شود.
+
+          ---
+          <sub>نسخهٔ \`$VERSION\` — شاخهٔ \`$BRANCH\` — \`$SHA\`</sub>
+          EOF
+          title="توحید — پیش‌نمایش (موقت)"
+          if gh release view "$TAG" -R "$REPO" >/dev/null 2>&1; then
+            gh release edit "$TAG" -R "$REPO" --prerelease --latest=false --title "$title" --notes-file "$RUNNER_TEMP/notes.md"
+          else
+            gh release create "$TAG" -R "$REPO" --prerelease --latest=false --title "$title" --notes-file "$RUNNER_TEMP/notes.md" --verify-tag
+          fi
+
+          up() {
+            for i in 1 2 3; do
+              if gh release upload "$TAG" "$1" --clobber -R "$REPO"; then return 0; fi
+              echo "::warning::فرستادنِ ${1%%#*} نشد (تلاش $i) — دوباره"
+              sleep $((i * 5))
+            done
+            echo "::error::فرستادنِ ${1%%#*} بعد از سه تلاش نشد"
+            return 1
+          }
+          #  فهرست اول، نصبیِ برنامه آخر: نسخه در labelِ همان نصبی است و با خودِ فایل
+          #  یک‌جا بالا می‌رود، پس هیچ لحظه‌ای شماره‌ای اعلام نمی‌شود که فایلش نیامده
+          up SHA256SUMS.txt
+          if [ -f SHA256SUMS.txt.sig ]; then up SHA256SUMS.txt.sig; fi
+          up tohid-preview.zip
+          up "tohid-preview.apk.preview#$VERSION"
+
+          rel=$(gh api "repos/$REPO/releases/tags/$TAG")
+          names=$(jq -r '.assets[].name' <<<"$rel")
+          for f in tohid-preview.apk.preview tohid-preview.zip SHA256SUMS.txt; do
+            grep -qx "$f" <<<"$names" || { echo "::error::$f روی انتشار نیست"; exit 1; }
+          done
+          label=$(jq -r '.assets[] | select(.name == "tohid-preview.apk.preview") | .label' <<<"$rel")
+          [ "$label" = "$VERSION" ] || { echo "::error::labelِ نصبی «$label» است، نه $VERSION"; exit 1; }
+          [ "$(jq -r '.prerelease' <<<"$rel")" = true ] || { echo "::error::انتشار باید prerelease باشد"; exit 1; }
+
+          #  هر چیزِ دیگری برداشته می‌شود
+          jq -r '.assets[] | "\(.id) \(.name)"' <<<"$rel" | while read -r id name; do
+            case "$name" in
+              tohid-preview.apk.preview|tohid-preview.zip|SHA256SUMS.txt|SHA256SUMS.txt.sig) ;;
+              *) gh api -X DELETE "repos/$REPO/releases/assets/$id" ;;
+            esac
+          done
+          left=$(gh api "repos/$REPO/releases/tags/$TAG" | jq -r '.assets[].name')
+          if grep -qi '\.apk$' <<<"$left"; then
+            echo "::error::انتشارِ پیش‌نمایش نباید فایلِ .apk داشته باشد"; exit 1
+          fi
+          echo "منتشر شد: $VERSION"
+          echo "دانلود: https://github.com/$REPO/releases/download/$TAG/tohid-preview.zip" >> "$GITHUB_STEP_SUMMARY"
