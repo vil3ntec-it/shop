@@ -45,7 +45,8 @@ class MoreLayoutTest {
     val r = routes(staff)
     assertFalse("audit" in r); assertFalse("team" in r); assertFalse("settings" in r)
     assertFalse(staff.any { it.title == MoreLayout.SETTINGS })
-    assertTrue("support" in r && "myplan" in r)
+    //  «اشتراکِ من» (پیش‌تر `myplan`، حالا نامِ قدیمیِ `subscription`)
+    assertTrue("support" in r && "subscription" in r)
   }
 
   @Test
