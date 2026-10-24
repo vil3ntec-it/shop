@@ -1,7 +1,7 @@
 # کیتِ نسخهٔ ۳ (VILL3N) — راهنمای کوتاه
 
-هر صفحهٔ گوشی و کامپیوتر فقط از همین اجزا ساخته می‌شود. رنگ فقط از `PhoneV3` / `PhoneV3Roles`
-(سیستمِ رنگِ VILL3N)، حرکت فقط از `Motion.kt` و `ui/v3/V3Motion.kt`، نوشته فقط از جدول‌های `core/i18n`
+هر صفحهٔ گوشی و کامپیوتر فقط از همین اجزا ساخته می‌شود. رنگ فقط از `PhoneV3` / `PhoneV3Roles` / `PhoneV3Palette`
+(سه تمِ THEME-V2 — پایین)، حرکت فقط از `Motion.kt` و `ui/v3/V3Motion.kt`، نوشته فقط از جدول‌های `core/i18n`
 (`Str*`؛ واژه‌های کیت در `StrKit`). هیچ HEX، هیچ `Shop.colors`، هیچ `Tohid*`، هیچ `AlertDialog(` در صفحه.
 
 کد: `android-native/app/src/main/java/ir/vil3ntec/tohid/ui/v3/` (کیت) و `ui/v3/nav/` (مسیریاب).
@@ -22,6 +22,7 @@
 | `V3Sheet(onDismiss, title?, dismissible = true) { closer -> }`، `V3ConfirmSheet(...)`، `V3PickerSheet(...)` | برگه | بستن با حرکت: `closer.close { بعد }`. کارِ پاک‌کننده = `V3ConfirmSheet` با متنِ هشدارِ موتور. `dismissible = false` (نمایشِ یک‌بارهٔ کد): زدنِ بیرون، کشیدن و «برگشت» نمی‌بندند، فقط `closer`. محتوا پیمایش می‌شود (`scroll = true`)؛ فهرستِ Lazy درونِ برگه `heightIn(max = …)` می‌خواهد، یا `scroll = false`. |
 | `V3Stat(label, value, format)` + `V3StatGrid` | آمار و پول | شمارندهٔ عدد، عددِ پایانی دقیق. |
 | `V3StatusPill(V3Status, label)` | وضعیتِ سفارش (§۸) | نقطه + برچسب، هفت وضعیت. |
+| `V3HeroCard(title, value, label?, caption?, chips: List<V3HeroChip>, pages, page, onBell?, bellDot)` | کادرِ بزرگِ خانه و کادرِ کشیدنی | **یک قالب** برای «فروشِ امروز»، «صندوق»، «گاوصندوق» و کادری که پایین کشیده می‌شود: گرادیانِ تم (۱۳۵°، آینه در RTL)، دو دایرهٔ نرمِ رنگِ همراه، متنِ سفید، تا ۳ تراشهٔ شیشه‌ای (`V3HeroChip(label, icon?) { }`)، زنگ و نشانگرِ صفحه. شعاع ۲۸، بلندیِ ثابتِ ۲۱۲dp (با درشتیِ نوشته تا ×۱٫۳)؛ حاشیهٔ ۱۶ از لبه را صدازننده می‌دهد. |
 | `V3InvoiceItems(items: List<V3InvoiceLine>, title?, footer?)` | اقلامِ فاکتور | `V3InvoiceLine(name, detail, total, note?)` با متنِ از پیش قالب‌شده (پول را موتورِ صدازننده می‌سازد)؛ همان کارتِ اقلامِ برگهٔ تراکنشِ قرض‌دار. |
 | `V3Message(V3Tone, title, body?, action?)` | پیام (§۹) | |
 | `V3EmptyState(icon, title, body?, action?)`، `V3Skeleton(rows)` | خالی / در حالِ بار | به‌جای چرخنده، اسکلت. |
@@ -33,6 +34,26 @@
 
 نمونهٔ زندهٔ همه: `ui/v3/gallery/KitGallery.kt` (پیش‌نمایشِ `phone:g:foundation:kit-basics|kit-forms|kit-lists|kit-states`؛
 پسوندِ `-dark` و `-en`؛ همه با `groupshots:foundation`).
+
+## رنگ و تم (THEME-V2، ۱۴۰۵/۰۸/۰۲)
+
+سه تم × روز و شب در `ui/theme/ShopThemes.kt`: «آسمان» (`SKY`، پیش‌فرض)، «اقیانوس» (`OCEAN`)، «غروب» (`DUSK`).
+صفحه‌ها کاری نمی‌کنند: `PhoneV3.colors`، `PhoneV3.ui`، `PhoneV3Roles`، `PhoneV3Palette` و `PhoneV3Debt` همه از
+`Shop.colors` ِ تمِ جاری ساخته می‌شوند و عوضِ تم بی راه‌اندازیِ دوباره در ۲۵۰ms نرم جابه‌جا می‌شود.
+
+| چه | API | نکته |
+|---|---|---|
+| تمِ جاری | `ThemeStore.theme` (فقط خواندن، `State`) | فقط روی همین دستگاه (`tohid-theme`)، همگام نمی‌شود؛ `load(context)` در `MainActivity` و `Main.kt`. |
+| ردیفِ «تم» در تنظیمات (G9) | `ShopTheme.entries` + `ThemeStore.set(context, t)` | نام‌ها: آسمان / اقیانوس / غروب؛ جدا از «روشن / تیره / خودکار» (`ThemeChoice`). پیش‌نمایش بی ذخیره: `ThemeStore.preview(t)`. |
+| پالتِ یک تم | `shopColors(theme, dark)` | `LightColors`/`DarkColors` همان «آسمان»‌اند. |
+| گرادیانِ کادرِ بزرگ | `Shop.colors.heroGradient` (سه رنگ) + `heroScrim` | فقط برای `V3HeroCard` و ستونِ انتخاب‌شدهٔ نمودار؛ متن رویش همیشه سفید. |
+| رنگِ همراه | `Shop.colors.accent(i)` / `accentSoft(i)` (۱۲٪ روز، ۲۰٪ شب)؛ در کیت `V3Hue` | هفت رنگ به ترتیب: آسمانی، بنفش، مرجانی، کهربایی، نعنایی، صورتی، لیمویی؛ در هر سه تم یکی. سری‌های نمودار (`chart.series`) همین ترتیب‌اند. |
+| رنگِ هر بخش | `V3Modules.hueOf(id)` / `hueOf(entry)` (`HUE_BY_ID`) | ثابت: فروش برند، دریافت نعنایی، ورودِ کالا کهربایی، تاریخچه بنفش، مشتری‌ها/قرض‌دارها مرجانی، مصارف صورتی، گزارش آسمانی، خرید لیمویی. `V3IconTile(icon, hue)` آیکنِ رنگی روی زمینهٔ نرمِ همان رنگ می‌کشد. |
+| گوشه‌ها | `PhoneV3.groupRadius` ۲۰، `PhoneV3.tileRadius` ۱۴، کاشیِ آیکن ۱۲، کادرِ بزرگ ۲۸ | همهٔ کارت‌ها و برگه‌ها از همین؛ عددِ دستی نه. |
+
+رنگ‌های معنایی (موفق، خطر، هشدار، وضعیت‌ها) به تم بستگی ندارند. انحراف‌های ثبت‌شده (کنتراستِ AA) سرِ `ShopThemes.kt`
+و در `Vill3nPaletteTest`؛ عددهای سه تم در `ThemeV2PaletteTest`. وب (`index.html`) همان «آسمان» است (`WebPaletteParityTest`).
+نمونهٔ زنده: `ui/v3/gallery/ThemeGallery.kt` (عکس‌های `groupshots:foundation` ⇐ `theme-sky|ocean|dusk`).
 
 ## حرکت (مثلِ اپل، سبک — همه پشتِ `Motion.enabled`)
 
@@ -115,7 +136,7 @@
 
 ## ساختار و قاعده‌ها
 
-- کیت: `ui/v3/*.kt` (هر جزء یک فایلِ کوچک)؛ نقش‌های رنگ: `ui/theme/PhoneV3Roles.kt`؛ حرکت: `ui/screens/Motion.kt`.
+- کیت: `ui/v3/*.kt` (هر جزء یک فایلِ کوچک)؛ نقش‌های رنگ: `ui/theme/PhoneV3Roles.kt`؛ تم‌ها: `ui/theme/ShopThemes.kt`؛ حرکت: `ui/screens/Motion.kt`.
 - مسیریاب: موتورِ خالص در `core/nav/` (آزمون: `NavCoreTest`)، فهرست و پوسته در `ui/v3/nav/` (آزمون: `ModuleRegistryTest`).
 - جزءِ تازه لازم شد؟ در بستهٔ گروهِ خودتان `internal DraftX` بسازید و در PR بنویسید؛ پایه آن را به کیت می‌برد.
 

@@ -24,10 +24,10 @@ enum class V3Status { DELIVERED, IN_DELIVERY, AWAITING, CANCELLED, REVIEW, PREPA
 enum class V3Tone { SUCCESS, INFO, WARNING, ERROR }
 
 object PhoneV3Roles {
-  private fun dark(c: PhoneV3Colors) = c === PhoneV3Dark
+  private fun dark(c: PhoneV3Colors) = c.source.isDark
 
   /** تنها منبعِ رنگ `ShopColors` است — این‌جا هیچ HEX ِ تازه‌ای نیست (`PhoneV3TokensTest`) */
-  private fun shop(c: PhoneV3Colors): ShopColors = if (dark(c)) DarkColors else LightColors
+  private fun shop(c: PhoneV3Colors): ShopColors = c.source
 
   private fun pair(t: ButtonTone) = V3Pair(fg = t.text, bg = t.bg, border = t.border)
   private fun pair(t: StatusTone) = V3Pair(fg = t.fg, bg = t.bg)

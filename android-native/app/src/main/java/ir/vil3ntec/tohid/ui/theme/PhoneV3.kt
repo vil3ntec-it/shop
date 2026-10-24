@@ -49,6 +49,8 @@ data class PhoneV3Colors(
    *  رنگِ متنِ وضعیتِ «در انتظارِ تأیید»ِ سیستمِ رنگ (§۸)؛ شب روشن‌تر.
    */
   val waiting: Color,
+  /** `ShopColors` ِ همین تم و حالت — نقش‌ها و پالت از همین می‌خوانند */
+  val source: ShopColors,
 ) {
   companion object {
     /**
@@ -70,16 +72,19 @@ data class PhoneV3Colors(
       blackRaised = s.inverseRaised,
       onBlack = s.onInverse,
       onBlackMuted = s.onInverseMuted,
-      accent = LightColors.brandPrimary,
+      //  سطح‌های پُرِ برند با متنِ سفید (سرِ خانه، کارت‌های آمار): سرِ گرادیانِ تم
+      accent = s.heroGradient.first(),
       accentDeep = s.brandDeep,
-      onAccent = LightColors.button.primary.text,
-      cart = DarkColors.button.primary.bg,
-      onCart = DarkColors.button.primary.text,
+      onAccent = Color.White,
+      //  سبد و دکمهٔ اسکن: جفتِ دکمهٔ اصلیِ همین حالت
+      cart = s.button.primary.bg,
+      onCart = s.button.primary.text,
       toggleOn = s.brandPrimary,
       tile = s.surfaceElevated,
       positive = s.status.delivered.fg,
       negative = s.status.cancelled.fg,
       waiting = s.status.awaitingApproval.fg,
+      source = s,
     )
   }
 }
@@ -91,8 +96,20 @@ val PhoneV3Dark: PhoneV3Colors = PhoneV3Colors.from(DarkColors)
 
 object PhoneV3 {
   /** تمِ جاری از روشنیِ زمینهٔ `Shop.colors` — مثلِ `PhoneSheet` */
+  /** رنگ‌های گوشی برای تم و حالتِ جاری (`ThemeStore` × روز/شب) */
   val colors: PhoneV3Colors
-    @Composable get() = of(Shop.colors.bg)
+    @Composable get() = forShop(Shop.colors)
+
+  private var lastShop: ShopColors? = null
+  private var lastColors: PhoneV3Colors = PhoneV3Light
+
+  /** یک خانه حافظه: در گذرِ ۲۵۰msِ تم هر فریم `ShopColors` ِ تازه است، بعدش همان می‌ماند */
+  fun forShop(s: ShopColors): PhoneV3Colors {
+    if (s === LightColors) return PhoneV3Light
+    if (s === DarkColors) return PhoneV3Dark
+    if (s !== lastShop) { lastColors = PhoneV3Colors.from(s); lastShop = s }
+    return lastColors
+  }
 
   fun of(bg: Color): PhoneV3Colors = if (bg.luminance() < 0.5f) PhoneV3Dark else PhoneV3Light
 
@@ -101,9 +118,9 @@ object PhoneV3 {
   /** کارتِ اصلیِ حساب (r4) */
   val cardRadius = 28.dp
   /** کارتِ گروهِ تنظیمات و کادرهای آمار (r4/r5) */
-  val groupRadius = 18.dp
+  val groupRadius = 20.dp
   /** کاشیِ بخش‌ها (r7) */
-  val tileRadius = 16.dp
+  val tileRadius = 14.dp
   /** بلندیِ نوارِ قرصیِ پایین */
   val navHeight = 64.dp
   /** بلندیِ ردیفِ تنظیمات (r5) */
@@ -111,7 +128,13 @@ object PhoneV3 {
 
   /** دکمه‌ها، آیکنِ فعال و رنگِ وضعیت‌ها (سیستمِ رنگِ VILL3N §۷/§۸) برای تمِ جاری */
   val ui: PhoneV3Ui
-    @Composable get() = if (Shop.colors.bg.luminance() < 0.5f) PhoneV3UiDark else PhoneV3UiLight
+    @Composable get() = Shop.colors.let { s ->
+      when {
+        s === LightColors -> PhoneV3UiLight
+        s === DarkColors -> PhoneV3UiDark
+        else -> androidx.compose.runtime.remember(s) { PhoneV3Ui.from(s) }
+      }
+    }
 }
 
 /** یک جفتِ رنگِ وضعیت: متن/آیکن روی زمینهٔ کم‌رنگ — هرگز رنگ بی برچسب */
@@ -154,7 +177,7 @@ data class PhoneV3Ui(
       fun t(x: StatusTone) = PhoneV3Tone(x.fg, x.bg)
       return PhoneV3Ui(
         primary = s.button.primary.bg, onPrimary = s.button.primary.text,
-        primaryOnDark = DarkColors.button.primary.bg, onPrimaryOnDark = DarkColors.button.primary.text,
+        primaryOnDark = s.button.primary.bg, onPrimaryOnDark = s.button.primary.text,
         secondaryBg = s.button.secondary.bg, secondaryFg = s.button.secondary.text, secondaryBorder = s.button.secondary.border,
         neutralBg = s.button.neutral.bg, neutralFg = s.button.neutral.text,
         danger = s.button.danger.bg, onDanger = s.button.danger.text,
@@ -173,22 +196,31 @@ val PhoneV3UiLight: PhoneV3Ui = PhoneV3Ui.from(LightColors)
 val PhoneV3UiDark: PhoneV3Ui = PhoneV3Ui.from(DarkColors)
 
 object PhoneV3Palette {
-  enum class Hue { BRAND, TEAL, BLUE, ORANGE, PURPLE }
+  /**
+   *  رنگِ همراهِ آیکن و کاشی (THEME-V2). نام‌های پیشین هم‌معنیِ تازه‌اند:
+   *  TEAL = MINT، BLUE = SKY، ORANGE = AMBER، PURPLE = VIOLET؛ BRAND = primaryِ تم.
+   */
+  enum class Hue { BRAND, TEAL, BLUE, ORANGE, PURPLE, SKY, VIOLET, CORAL, AMBER, MINT, PINK, LIME }
 
-  private fun shop(c: PhoneV3Colors): ShopColors = if (c === PhoneV3Dark) DarkColors else LightColors
+  private fun shop(c: PhoneV3Colors): ShopColors = c.source
 
-  /** آیکنِ رنگیِ کاشی: روز رنگِ برند/نمودار، شب همان خانواده در روشن‌ترش (از پیام‌ها و وضعیت‌ها) */
-  fun glyph(c: PhoneV3Colors, hue: Hue): Color {
-    val s = shop(c)
-    val dark = c === PhoneV3Dark
-    return when (hue) {
-      Hue.BRAND -> s.brandPrimary
-      Hue.TEAL -> s.chart.stock
-      Hue.BLUE -> if (dark) s.message.info.icon else s.chart.comparison
-      Hue.ORANGE -> if (dark) s.message.warning.icon else s.chart.discount
-      Hue.PURPLE -> if (dark) s.status.needsReview.fg else s.chart.costs
-    }
+  /** شمارهٔ رنگِ همراه (`ShopColors.accent(i)`) برای هر نام؛ BRAND ⇒ null */
+  fun accentIndex(hue: Hue): Int? = when (hue) {
+    Hue.BRAND -> null
+    Hue.SKY, Hue.BLUE -> 0
+    Hue.VIOLET, Hue.PURPLE -> 1
+    Hue.CORAL -> 2
+    Hue.AMBER, Hue.ORANGE -> 3
+    Hue.MINT, Hue.TEAL -> 4
+    Hue.PINK -> 5
+    Hue.LIME -> 6
   }
+
+  /** آیکنِ رنگی */
+  fun glyph(c: PhoneV3Colors, hue: Hue): Color = accentIndex(hue)?.let { shop(c).accent(it) } ?: shop(c).brandPrimary
+
+  /** پس‌زمینهٔ نرمِ همان رنگ (۱۲٪ روز، ۲۰٪ شب) */
+  fun soft(c: PhoneV3Colors, hue: Hue): Color = glyph(c, hue).copy(alpha = if (c.source.isDark) 0.20f else 0.12f)
 
   /** سری‌های نمودار §۱۰ (ShopColors.chart): ۱ فروش، ۲ مقایسه، ۳ هزینه، ۴ تخفیف، ۵ افت، ۶ موجودی، ۷ خنثی */
   fun chartSeries(c: PhoneV3Colors): List<Color> = shop(c).chart.series
@@ -293,7 +325,13 @@ val PhoneV3DebtDark: PhoneV3DebtColors = debtColors(DarkColors, PhoneV3Dark, dar
 object PhoneV3Debt {
   /** تمِ جاری از روشنیِ زمینهٔ `Shop.colors` — مثلِ `PhoneV3.colors` */
   val colors: PhoneV3DebtColors
-    @Composable get() = of(Shop.colors.bg)
+    @Composable get() = Shop.colors.let { s ->
+      when {
+        s === LightColors -> PhoneV3DebtLight
+        s === DarkColors -> PhoneV3DebtDark
+        else -> androidx.compose.runtime.remember(s) { debtColors(s, PhoneV3.forShop(s), s.isDark) }
+      }
+    }
 
   fun of(bg: Color): PhoneV3DebtColors = if (bg.luminance() < 0.5f) PhoneV3DebtDark else PhoneV3DebtLight
 

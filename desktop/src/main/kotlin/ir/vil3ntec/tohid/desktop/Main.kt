@@ -83,6 +83,7 @@ fun main() {
   runCatching { ir.vil3ntec.tohid.sync.SavedLogins.purgeTokens(context) }
   Motion.load(context)
   ir.vil3ntec.tohid.LocaleChoice.load(context)
+  ir.vil3ntec.tohid.ui.theme.ThemeStore.load(context)
 
   var live: LiveSocket? = null
   runCatching {

@@ -19,10 +19,10 @@ import ir.vil3ntec.tohid.ui.screens.Springs
 import androidx.compose.ui.unit.dp
 
 /*
- *  رنگ‌ها — سیستمِ رنگِ VILL3N (دستورِ صاحب محصول، ۱۴۰۵/۰۷/۲۸).
+ *  رنگ‌ها — THEME-V2 (دستورِ صاحب‌کار، ۱۴۰۵/۰۸/۰۲؛ جای سبزِ VILL3N ِ ۱۴۰۵/۰۷/۲۸).
  *
- *  «رنگ‌بندیِ برنامه رو این جوری کن همه جاشو». سبزآبیِ برند (#108B81) جای بنفشِ
- *  پیشین را گرفت؛ زمینه، کارت و سطحِ درونی سه رنگِ جدا با خطِ دورِ دیدنی در روز و
+ *  پایه آبی و سفید، سه تم («آسمان» پیش‌فرض، «اقیانوس»، «غروب») × روز و شب در `ShopThemes.kt`
+ *  (`shopColors(theme, dark)`، `ThemeStore`). زمینه، کارت و سطحِ درونی سه رنگِ جدا با خطِ دورِ دیدنی در روز و
  *  شب دارند. هر رنگ یک **نامِ معنایی** دارد (`background`، `surface`، `textPrimary`،
  *  `brandPrimary`، `status.delivered`…) و صفحه‌ها فقط همین نام‌ها را می‌خوانند —
  *  عوض‌شدنِ روز و شب بی بازنویسیِ صفحه (`HardcodedColorsTest`).
@@ -34,9 +34,9 @@ import androidx.compose.ui.unit.dp
  *   • **رنگ معنا دارد.** سبز: تحویل و موفق · آبی: در راه و اطلاع · کهربایی: در
  *     انتظار و هشدار · قرمز: لغو و خطا (و فقط هشدارِ واقعی) · بنفش: نیازِ بررسی ·
  *     فیروزه‌ای: در آماده‌سازی · خاکستری: غیرفعال. هرگز رنگِ تنها؛ همیشه با متن.
- *   • **متنِ کوچک ≥ ۴٫۵:۱ (WCAG AA).** سبزآبیِ برند روی سفید ۴٫۱۷:۱ است؛ پس برای
- *     پُرکردن، آیکن، نشانگر و عددِ درشت می‌ماند و متنِ کوچک و دکمهٔ پُر از
- *     `brandDeep` (#08665F، ۶٫۸:۱) می‌آیند. جدولِ کاملِ کنتراست در `Vill3nPaletteTest`.
+ *   • **متنِ کوچک ≥ ۴٫۵:۱ (WCAG AA).** primaryِ تم برای پُرکردن، آیکن، نشانگر و عددِ درشت
+ *     است؛ متنِ کوچک و دکمهٔ پُر از `brandDeep` (دکمهٔ اصلیِ تم، مثلاً «آسمان» #1D4ED8) می‌آیند.
+ *     جدولِ کاملِ کنتراستِ هر شش پالت در `Vill3nPaletteTest`، عددهای تم در `ThemeV2PaletteTest`.
  *
  *  نام‌های قدیمی (`bg`، `text`، `muted`، `primary`…) هنوز هستند تا صدها صفحهٔ
  *  موجود بی دست‌خوردن رنگِ تازه بگیرند؛ هر کدام فقط **نامِ دیگرِ** یک توکنِ
@@ -181,7 +181,22 @@ data class ShopColors(
   val auroraOne: Color,
   val auroraTwo: Color,
   val auroraThree: Color,
+  //  ── THEME-V2 ──
+  /** گرادیانِ کادرِ بزرگ (۱۳۵°، سه رنگ) — متن رویش همیشه سفید */
+  val heroGradient: List<Color> = listOf(brandPrimary, brandDeep),
+  /** هفت رنگِ همراه (آیکونِ بخش‌ها، کاشی‌ها، سری‌های نمودار) — در هر سه تم یکی */
+  val accents: List<Color> = ThemeAccents.ALL,
+  /** پردهٔ سیاهِ خوانایی روی کادرِ بزرگ (۰ تا این عدد در جهتِ گرادیان) تا متنِ سفید AA بماند */
+  val heroScrim: Float = 0f,
+  /** رنگِ برند روی سطحِ وارونه (کارِ اسنک‌بار، `inversePrimary`ِ متریالِ روز): primaryِ تیرهٔ همان تم */
+  val brandOnInverse: Color = brandPrimary,
 ) {
+  /** رنگِ همراهِ i (چرخشی) */
+  fun accent(i: Int): Color = accents[i.mod(accents.size)]
+
+  /** پس‌زمینهٔ نرمِ همان رنگ: ۱۲٪ در روشن، ۲۰٪ در تیره */
+  fun accentSoft(i: Int): Color = accent(i).copy(alpha = if (isDark) 0.20f else 0.12f)
+
   /** شب؟ — برای پالت‌هایی که به روز/شب جدا نیاز دارند */
   val isDark: Boolean get() = background.red + background.green + background.blue < 1.5f
 
@@ -228,10 +243,13 @@ data class ShopColors(
  *  دلیلش کنارش نوشته و در `Vill3nPaletteTest` ثبت است.
  */
 
-/** سبزآبیِ برند و رنگ‌های پشتیبان (VILL3N §۳) — همان عدد در روز و شب */
+/**
+ *  رنگ‌های ثابتِ برند برای چند صفحهٔ قدیمی که هنوز از `Shop.colors` نمی‌خوانند (خوش‌آمد، نوارِ بالا، VIP) —
+ *  از THEME-V2 همان «آسمان» (پیش‌فرض)؛ جای سبزآبیِ VILL3N. صفحه‌های تازه از `Shop.colors` می‌خوانند.
+ */
 object Brand {
-  val primary = Color(0xFF108B81)
-  val deep = Color(0xFF08665F)
+  val primary = Color(0xFF2563EB)
+  val deep = Color(0xFF1D4ED8)
   val successSurface = Color(0xFFDDF5EF)
   val blue = Color(0xFF2563EB)
   val blueSurface = Color(0xFFDBEAFE)
@@ -242,138 +260,11 @@ object Brand {
   val neutral = Color(0xFF94A3B8)
 }
 
-val LightColors = ShopColors(
-  background = Color(0xFFF3F6FA),
-  backgroundSubtle = Color(0xFFEAF0F6),
-  surface = Color(0xFFFFFFFF),
-  surfaceElevated = Color(0xFFF8FAFC),
-  surfaceSelected = Color(0xFFE0F2EF),
-  textPrimary = Color(0xFF17212B),
-  textSecondary = Color(0xFF5B687A),
-  textMuted = Color(0xFF7B8798),
-  icon = Color(0xFF64748B),
-  iconActive = Brand.primary,
-  borderCard = Color(0xFFD5DEE9),
-  borderInput = Color(0xFFC5D0DE),
-  divider = Color(0xFFE2E8F0),
-  brandPrimary = Brand.primary,
-  brandDeep = Brand.deep,
-  //  #108B81 روی سفید ۴٫۱۷:۱ ⇒ متنِ کوچک با سبزآبیِ پررنگ (۶٫۸:۱)
-  brandText = Brand.deep,
-  link = Brand.blue,
-  focus = Brand.primary,
-  inverse = Color(0xFF0B1220),
-  inverseRaised = Color(0xFF162235),
-  onInverse = Color(0xFFF1F5F9),
-  onInverseMuted = Color(0xFFB6C2D2),
-  button = ButtonColorSet(
-    /*
-     *  ⚠️ انحراف از فایل: صاحب محصول زمینهٔ #108B81 با متنِ سفید خواسته؛ آن جفت
-     *  ۴٫۱۷:۱ است و برچسبِ ۱۳–۱۴ نقطه‌ایِ دکمه زیرِ ۴٫۵:۱ِ AA می‌ماند. پس دکمهٔ پُر
-     *  `brandDeep` است (۶٫۸:۱). برگرداندن = همین یک خط.
-     */
-    primary = ButtonTone(bg = Brand.deep, text = Color(0xFFFFFFFF), border = Brand.deep),
-    secondary = ButtonTone(bg = Color(0xFFFFFFFF), text = Brand.deep, border = Color(0xFFB8DCD5)),
-    neutral = ButtonTone(bg = Color(0xFFE8EDF3), text = Color(0xFF344256), border = Color(0xFFE8EDF3)),
-    danger = ButtonTone(bg = Color(0xFFDC2626), text = Color(0xFFFFFFFF), border = Color(0xFFDC2626)),
-    disabled = ButtonTone(bg = Color(0xFFE2E8F0), text = Color(0xFF94A3B8), border = Color(0xFFE2E8F0)),
-  ),
-  status = StatusColors(
-    delivered = StatusTone(fg = Color(0xFF15803D), bg = Color(0xFFDCFCE7)),
-    inDelivery = StatusTone(fg = Color(0xFF1D4ED8), bg = Color(0xFFDBEAFE)),
-    awaitingApproval = StatusTone(fg = Color(0xFF92400E), bg = Color(0xFFFEF3C7)),
-    cancelled = StatusTone(fg = Color(0xFFB91C1C), bg = Color(0xFFFEE2E2)),
-    needsReview = StatusTone(fg = Color(0xFF6D28D9), bg = Color(0xFFEDE9FE)),
-    preparing = StatusTone(fg = Color(0xFF0E7490), bg = Color(0xFFCFFAFE)),
-    inactive = StatusTone(fg = Color(0xFF475569), bg = Color(0xFFE2E8F0)),
-  ),
-  message = MessageColors(
-    success = MessageTone(text = Color(0xFF166534), bg = Color(0xFFF0FDF4), icon = Color(0xFF16A34A), border = Color(0xFFBBF7D0)),
-    info = MessageTone(text = Color(0xFF1E40AF), bg = Color(0xFFEFF6FF), icon = Brand.blue, border = Color(0xFFBFDBFE)),
-    warning = MessageTone(text = Color(0xFF92400E), bg = Color(0xFFFFFBEB), icon = Color(0xFFB45309), border = Color(0xFFFDE68A)),
-    error = MessageTone(text = Color(0xFFB91C1C), bg = Color(0xFFFEF2F2), icon = Color(0xFFDC2626), border = Color(0xFFFECACA)),
-  ),
-  chart = ChartColors(
-    sales = Brand.primary, comparison = Brand.blue, costs = Brand.purple, discount = Brand.orange,
-    drop = Brand.red, stock = Brand.teal, neutral = Brand.neutral, grid = Color(0xFFE2E8F0),
-  ),
-  //  0 3px 12px rgba(15,23,42,.06): آلفای ۳۲٪ × آلفای سایهٔ سامانه (~۱۹٪) ≈ ۶٪
-  shadow = Color(0x520F172A),
-  scrim = Color(0x990B1220),
-  glow = Color(0x1F108B81),
-  sheen = Color(0x59FFFFFF),
-  auroraOne = Color(0x4D108B81),
-  auroraTwo = Color(0x3D2563EB),
-  auroraThree = Color(0x3314B8A6),
-)
+/** روزِ پیش‌فرض = «آسمان»ِ روشن (THEME-V2، ۱۴۰۵/۰۸/۰۲؛ جای سبزِ VILL3N). سه تم در `ShopThemes.kt`. */
+val LightColors: ShopColors = SkyLight
 
-/**
- *  شب — کارت (#162235) همیشه از زمینه (#0B1220) جداست و خطِ دورِ خاکستریِ
- *  روشن (#34445A) دارد: «کارت در شب هرگز با زمینه یکی نشود».
- *  رنگ‌هایی که فایل برای شب نداده (زمینهٔ فرعی، شش وضعیت، پیام‌ها، غیرفعال) این‌جا
- *  ساخته شده‌اند: همان رنگ، تیره برای زمینه و روشن برای متن، همه ≥ ۴٫۵:۱.
- */
-val DarkColors = ShopColors(
-  background = Color(0xFF0B1220),
-  //  فایل برای شب ندارد ⇒ همان سطحِ وارونهٔ شب (#050A14): یک پله تیره‌تر از زمینه،
-  //  تا منوی کناری و شیارِ کنترل از کارت (۱٫۲۴:۱) و از محتوا جدا دیده شوند
-  backgroundSubtle = Color(0xFF050A14),
-  surface = Color(0xFF162235),
-  surfaceElevated = Color(0xFF203149),
-  surfaceSelected = Color(0xFF123C3A),
-  textPrimary = Color(0xFFF1F5F9),
-  textSecondary = Color(0xFFB6C2D2),
-  textMuted = Color(0xFF94A3B8),
-  icon = Color(0xFFA3B2C5),
-  iconActive = Color(0xFF6EE7D1),
-  borderCard = Color(0xFF34445A),
-  borderInput = Color(0xFF40516A),
-  divider = Color(0xFF29374A),
-  //  دکمهٔ اصلیِ شب (#19A985) — همان رنگِ پُرِ برند در شب
-  brandPrimary = Color(0xFF19A985),
-  brandDeep = Brand.deep,
-  brandText = Color(0xFF6EE7D1),
-  link = Color(0xFF93C5FD),
-  focus = Color(0xFF6EE7D1),
-  inverse = Color(0xFF050A14),
-  inverseRaised = Color(0xFF162235),
-  onInverse = Color(0xFFF1F5F9),
-  onInverseMuted = Color(0xFFB6C2D2),
-  button = ButtonColorSet(
-    primary = ButtonTone(bg = Color(0xFF19A985), text = Color(0xFF041B15), border = Color(0xFF19A985)),
-    secondary = ButtonTone(bg = Color(0xFF162235), text = Color(0xFF6EE7D1), border = Color(0xFF40516A)),
-    neutral = ButtonTone(bg = Color(0xFF203149), text = Color(0xFFF1F5F9), border = Color(0xFF203149)),
-    danger = ButtonTone(bg = Color(0xFFDC2626), text = Color(0xFFFFFFFF), border = Color(0xFFDC2626)),
-    //  ساخته‌شده: غیرفعالِ شب — کم‌رنگ ولی روی کارت پیدا
-    disabled = ButtonTone(bg = Color(0xFF1B2839), text = Color(0xFF64748B), border = Color(0xFF29374A)),
-  ),
-  status = StatusColors(
-    delivered = StatusTone(fg = Color(0xFF86EFAC), bg = Color(0xFF123C2B)),
-    inDelivery = StatusTone(fg = Color(0xFF93C5FD), bg = Color(0xFF172F57)),
-    awaitingApproval = StatusTone(fg = Color(0xFFFCD34D), bg = Color(0xFF3D2E0E)),
-    cancelled = StatusTone(fg = Color(0xFFFCA5A5), bg = Color(0xFF451A1E)),
-    needsReview = StatusTone(fg = Color(0xFFC4B5FD), bg = Color(0xFF2E2357)),
-    preparing = StatusTone(fg = Color(0xFF67E8F9), bg = Color(0xFF0E3A45)),
-    inactive = StatusTone(fg = Color(0xFFCBD5E1), bg = Color(0xFF273548)),
-  ),
-  message = MessageColors(
-    success = MessageTone(text = Color(0xFF86EFAC), bg = Color(0xFF0F2A1E), icon = Color(0xFF4ADE80), border = Color(0xFF1F5135)),
-    info = MessageTone(text = Color(0xFF93C5FD), bg = Color(0xFF0F1E3A), icon = Color(0xFF60A5FA), border = Color(0xFF1E3A8A)),
-    warning = MessageTone(text = Color(0xFFFCD34D), bg = Color(0xFF2B1F0B), icon = Color(0xFFFBBF24), border = Color(0xFF78350F)),
-    error = MessageTone(text = Color(0xFFFCA5A5), bg = Color(0xFF2D1215), icon = Color(0xFFF87171), border = Color(0xFF7F1D1D)),
-  ),
-  chart = ChartColors(
-    sales = Brand.primary, comparison = Brand.blue, costs = Brand.purple, discount = Brand.orange,
-    drop = Brand.red, stock = Brand.teal, neutral = Brand.neutral, grid = Color(0xFF29374A),
-  ),
-  shadow = Color(0x66000000),
-  scrim = Color(0xCC020509),
-  glow = Color(0x3319A985),
-  sheen = Color(0x1FFFFFFF),
-  auroraOne = Color(0x8C108B81),
-  auroraTwo = Color(0x612563EB),
-  auroraThree = Color(0x5714B8A6),
-)
+/** شبِ پیش‌فرض = «آسمان»ِ تیره */
+val DarkColors: ShopColors = SkyDark
 
 /**
  *  گِردیِ اجزای آماده‌ی متریال.
@@ -427,7 +318,7 @@ enum class ThemeChoice { SYSTEM, LIGHT, DARK }
  *
  *  `primary`ِ متریال هم پُرِ `Button` است و هم متنِ `TextButton`/`OutlinedButton`
  *  و برچسبِ کادرِ متنِ فعال (بیش از ۲۰۰ جا). پس باید هم با متنِ رویش و هم به‌عنوانِ
- *  متن روی سطح ≥ ۴٫۵:۱ باشد ⇒ همان دکمهٔ اصلی (روز #08665F، شب #19A985).
+ *  متن روی سطح ≥ ۴٫۵:۱ باشد ⇒ همان دکمهٔ اصلیِ تم (مثلاً «آسمان»: روز #1D4ED8، شب #60A5FA).
  *  کلید، نشانگر و حلقهٔ تمرکز از همین می‌خوانند.
  */
 fun materialScheme(c: ShopColors) = if (c.isDark) {
@@ -473,7 +364,7 @@ fun materialScheme(c: ShopColors) = if (c.isDark) {
     onPrimary = c.button.primary.text,
     primaryContainer = c.surfaceSelected,
     onPrimaryContainer = c.brandText,
-    inversePrimary = Color(0xFF6EE7D1),
+    inversePrimary = c.brandOnInverse,
     secondary = c.brandText,
     onSecondary = c.button.primary.text,
     secondaryContainer = c.surfaceSelected,
@@ -515,13 +406,28 @@ fun TohidTheme(
     ThemeChoice.DARK -> true
     ThemeChoice.SYSTEM -> isSystemInDarkTheme()
   }
-  val target = if (dark) DarkColors else LightColors
-  //  عوض‌شدنِ روز و شب نباید مثل خاموش‌وروشنِ چراغ باشد: سه رنگِ اصلی
-  //  نرم جابه‌جا می‌شوند و بقیه دنبالشان می‌آیند
-  val bg by animateColorAsState(target.background, Springs.effect, label = "themeBg")
-  val surface by animateColorAsState(target.surface, Springs.effect, label = "themeSurface")
-  val text by animateColorAsState(target.textPrimary, Springs.effect, label = "themeText")
-  val colors = target.copy(background = bg, surface = surface, textPrimary = text)
+  //  تمِ همین دستگاه (`ThemeStore`، پیش‌فرض «آسمان») × روز/شب
+  val target = shopColors(ThemeStore.theme, dark)
+  //  عوض‌شدنِ روز/شب یا تم مثلِ خاموش‌وروشنِ چراغ نیست: رنگ‌های اصلی در ۲۵۰ms نرم جابه‌جا می‌شوند
+  //  و بقیه دنبالشان می‌آیند (THEME-V2)
+  val spec = remember { androidx.compose.animation.core.tween<Color>(250) }
+  val bg by animateColorAsState(target.background, spec, label = "themeBg")
+  val surface by animateColorAsState(target.surface, spec, label = "themeSurface")
+  val surface2 by animateColorAsState(target.surfaceElevated, spec, label = "themeSurface2")
+  val text by animateColorAsState(target.textPrimary, spec, label = "themeText")
+  val brand by animateColorAsState(target.brandPrimary, spec, label = "themeBrand")
+  val brandText by animateColorAsState(target.brandText, spec, label = "themeBrandText")
+  val selected by animateColorAsState(target.surfaceSelected, spec, label = "themeSelected")
+  val button by animateColorAsState(target.button.primary.bg, spec, label = "themeButton")
+  val hero0 by animateColorAsState(target.heroGradient[0], spec, label = "themeHero0")
+  val hero1 by animateColorAsState(target.heroGradient[1], spec, label = "themeHero1")
+  val hero2 by animateColorAsState(target.heroGradient.last(), spec, label = "themeHero2")
+  val colors = target.copy(
+    background = bg, surface = surface, surfaceElevated = surface2, textPrimary = text,
+    brandPrimary = brand, iconActive = brand, focus = brand, brandText = brandText, surfaceSelected = selected,
+    button = target.button.copy(primary = target.button.primary.copy(bg = button, border = button)),
+    heroGradient = listOf(hero0, hero1, hero2),
+  )
   /*
    *  اجزای آمادهٔ متریال — تراشه، دکمه، کادرِ متن — رنگشان را از همین
    *  طرح می‌گیرند. تا وقتی این‌ها را ننویسیم، متریال رنگ‌های پیش‌فرضِ

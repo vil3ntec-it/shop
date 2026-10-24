@@ -59,6 +59,7 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
     // کلیدِ انیمیشن پیش از اولین کشیدنِ صفحه خوانده می‌شود
     Motion.load(applicationContext)
     LocaleChoice.load(applicationContext)
+    ir.vil3ntec.tohid.ui.theme.ThemeStore.load(applicationContext)
     ModeState.load(applicationContext)
 
     /*

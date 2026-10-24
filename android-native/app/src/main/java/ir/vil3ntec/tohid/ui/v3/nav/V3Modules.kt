@@ -58,6 +58,32 @@ object V3Modules {
     }
   }
 
+  /**
+   *  رنگِ همراهِ ثابتِ هر بخش (THEME-V2) — یک جا، تا میان‌برهای خانه، «بیشتر» و هر فهرستِ دیگری
+   *  همان رنگ را نشان دهند: فروش آبی، دریافت نعنایی، ورودِ کالا کهربایی، تاریخچه بنفش، مشتری‌ها مرجانی،
+   *  مصارف صورتی، گزارش آسمانی. بخشی که این‌جا نیست رنگِ ثبت‌شدهٔ خودش (`ModuleEntry.hue`) را دارد.
+   */
+  val HUE_BY_ID: Map<String, ir.vil3ntec.tohid.ui.v3.V3Hue> = mapOf(
+    "sale" to ir.vil3ntec.tohid.ui.v3.V3Hue.BRAND,
+    "scan" to ir.vil3ntec.tohid.ui.v3.V3Hue.BRAND,
+    "receipts" to ir.vil3ntec.tohid.ui.v3.V3Hue.MINT,
+    "warehouse" to ir.vil3ntec.tohid.ui.v3.V3Hue.AMBER,
+    "stock-entry" to ir.vil3ntec.tohid.ui.v3.V3Hue.AMBER,
+    "sales" to ir.vil3ntec.tohid.ui.v3.V3Hue.VIOLET,
+    "history" to ir.vil3ntec.tohid.ui.v3.V3Hue.VIOLET,
+    "debtors" to ir.vil3ntec.tohid.ui.v3.V3Hue.CORAL,
+    "customers" to ir.vil3ntec.tohid.ui.v3.V3Hue.CORAL,
+    "expenses" to ir.vil3ntec.tohid.ui.v3.V3Hue.PINK,
+    "reports" to ir.vil3ntec.tohid.ui.v3.V3Hue.SKY,
+    "purchasing" to ir.vil3ntec.tohid.ui.v3.V3Hue.LIME,
+  )
+
+  fun hueOf(e: ModuleEntry): ir.vil3ntec.tohid.ui.v3.V3Hue? = HUE_BY_ID[e.id] ?: e.hue
+
+  /** رنگِ همراهِ یک شناسه (میان‌برهای خانه که ورودیِ ماژول نیستند هم از همین می‌خوانند) */
+  fun hueOf(id: String): ir.vil3ntec.tohid.ui.v3.V3Hue? =
+    HUE_BY_ID[id] ?: ALL.asSequence().flatMap { it.entries.asSequence() }.firstOrNull { it.id == id }?.hue
+
   /** آیکنِ موردِ نوارِ یک ماژولِ تازه (ساخته‌شده‌ها آیکنِ خودشان را در `PhoneNav` دارند) */
   fun navIcon(id: String, selected: Boolean = false): androidx.compose.ui.graphics.vector.ImageVector? =
     ALL.asSequence().flatMap { it.entries.asSequence() }.firstOrNull { it.id == id && Place.NAV in it.places }
