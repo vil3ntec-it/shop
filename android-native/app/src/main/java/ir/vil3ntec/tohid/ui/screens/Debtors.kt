@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.ui.v3.money.DebtorLedgerModel
+
 import ir.vil3ntec.tohid.data.invoiceLabel
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -109,8 +111,8 @@ fun DebtorsScreen(
   var txFor by remember { mutableStateOf<Pair<String, DebtorEngine.Kind>?>(null) }
   var confirmDelete by remember { mutableStateOf<Debtor?>(null) }
   //  «حذف با برگرداندن»: ردیف/قرض‌دار همین حالا پنهان می‌شود و دفتر فقط وقتی عوض
-  //  می‌شود که «برگرداندن» زده نشود (`DebtorDetailModel.PendingDelete`)
-  var pendingDeletes by remember { mutableStateOf(listOf<DebtorDetailModel.PendingDelete>()) }
+  //  می‌شود که «برگرداندن» زده نشود (`DebtorLedgerModel.PendingDelete`)
+  var pendingDeletes by remember { mutableStateOf(listOf<DebtorLedgerModel.PendingDelete>()) }
   //  جای اسکرولِ فهرست با رفتن به حسابِ یک نفر و برگشتن می‌ماند
   val gridState = rememberLazyGridState()
   //  دفترِ قرض (v3 §22.2-A5): رسیدِ یک ردیف، سررسیدِ یک برد، و بردی که از سقف می‌گذرد
@@ -134,11 +136,11 @@ fun DebtorsScreen(
   }
 
   val latestData = rememberUpdatedState(d)
-  fun deleteResult(data: ShopData, p: DebtorDetailModel.PendingDelete): DebtorEngine.Result = when (p) {
-    is DebtorDetailModel.PendingDelete.Transaction -> DebtorEngine.deleteTransaction(data, p.txId)
-    is DebtorDetailModel.PendingDelete.Debtor -> DebtorEngine.delete(data, p.debtorId)
+  fun deleteResult(data: ShopData, p: DebtorLedgerModel.PendingDelete): DebtorEngine.Result = when (p) {
+    is DebtorLedgerModel.PendingDelete.Transaction -> DebtorEngine.deleteTransaction(data, p.txId)
+    is DebtorLedgerModel.PendingDelete.Debtor -> DebtorEngine.delete(data, p.debtorId)
   }
-  fun commit(p: DebtorDetailModel.PendingDelete) {
+  fun commit(p: DebtorLedgerModel.PendingDelete) {
     pendingDeletes = pendingDeletes - p
     when (val r = deleteResult(latestData.value, p)) {
       is DebtorEngine.Result.Failed -> toast(r.message)
@@ -146,7 +148,7 @@ fun DebtorsScreen(
     }
   }
   /** پنهان کن، پیامِ «برگرداندن» بده؛ بی‌پاسخ ⇒ حذف، «برگرداندن» ⇒ هیچ چیز پاک نشده است */
-  fun deleteLater(p: DebtorDetailModel.PendingDelete, message: String) {
+  fun deleteLater(p: DebtorLedgerModel.PendingDelete, message: String) {
     pendingDeletes = pendingDeletes + p
     scope.launch {
       val answer = snackbar.showSnackbar(message, actionLabel = StrDebtor.undo, duration = SnackbarDuration.Short)
@@ -169,8 +171,8 @@ fun DebtorsScreen(
       }
     }
   }
-  val hiddenTx = DebtorDetailModel.hiddenTx(pendingDeletes)
-  val hiddenDebtors = DebtorDetailModel.hiddenDebtors(pendingDeletes)
+  val hiddenTx = DebtorLedgerModel.hiddenTx(pendingDeletes)
+  val hiddenDebtors = DebtorLedgerModel.hiddenDebtors(pendingDeletes)
 
   //  پیش‌نمایشِ گوشی (`DevShot`): حسابِ یک نفر و برگهٔ ثبت
   val shotOpen = DebtorDetailShot.open.value
@@ -198,7 +200,7 @@ fun DebtorsScreen(
       onCompose = { kind -> txFor = account.debtor.id to kind },
       onEdit = { form = DebtorFormState.of(account.debtor) },
       onDelete = { confirmDelete = account.debtor },
-      onDeleteTx = { deleteLater(DebtorDetailModel.PendingDelete.Transaction(it), StrDebtor.txDeleted) },
+      onDeleteTx = { deleteLater(DebtorLedgerModel.PendingDelete.Transaction(it), StrDebtor.txDeleted) },
       onOpenTx = { receiptFor = it },
       onDue = { dueFor = it },
     )
@@ -426,7 +428,7 @@ fun DebtorsScreen(
       onConfirm = {
         confirmDelete = null
         openId = null
-        deleteLater(DebtorDetailModel.PendingDelete.Debtor(debtor.id), StrDebtor.debtorDeleted(debtor.name))
+        deleteLater(DebtorLedgerModel.PendingDelete.Debtor(debtor.id), StrDebtor.debtorDeleted(debtor.name))
       },
     )
   }
