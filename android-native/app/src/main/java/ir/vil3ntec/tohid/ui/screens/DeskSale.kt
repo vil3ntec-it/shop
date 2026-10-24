@@ -62,7 +62,9 @@ import ir.vil3ntec.tohid.ui.components.pos.PosPayments
 import ir.vil3ntec.tohid.ui.components.pos.PosProductCallbacks
 import ir.vil3ntec.tohid.ui.components.pos.PosSearch
 import ir.vil3ntec.tohid.ui.components.pos.PosShot
-import ir.vil3ntec.tohid.ui.components.pos.PosSummary
+import ir.vil3ntec.tohid.ui.components.pos.PromoCodeField
+import ir.vil3ntec.tohid.ui.components.pos.PromoLines
+import ir.vil3ntec.tohid.ui.components.pos.PromoSummary
 import ir.vil3ntec.tohid.ui.components.pos.ProductGrid
 import ir.vil3ntec.tohid.ui.components.pos.ProductTable
 import ir.vil3ntec.tohid.ui.theme.Shop
@@ -107,6 +109,10 @@ fun DeskSaleScreen(
   val cart by cartStore.lines.collectAsState()
   val cartDebtorId by cartStore.debtorId.collectAsState()
   LaunchedEffect(d.products.size, d.debtors.size) { cartStore.prune(d) }
+  //  PRM: تخفیف‌های خودکار — کلیدِ دکان خاموش ⇒ null و `priced` همان `cart` است
+  val promo = ir.vil3ntec.tohid.ui.PromoLive.rememberOutcome(d, cart)
+  val priced = ir.vil3ntec.tohid.data.PromoEngine.priced(cart, promo)
+  val promoSnap = ir.vil3ntec.tohid.ui.PromoLive.snap.value
 
   var query by remember { mutableStateOf("") }
   var hint by remember { mutableStateOf(0) }
@@ -227,7 +233,7 @@ fun DeskSaleScreen(
     debtorId = cartDebtorId,
     blockExpired = blockExpired,
   )
-  val totals = SalesEngine.totals(d, cart, checkout)
+  val totals = SalesEngine.totals(d, priced, checkout)
   val discountBad = canDiscount && numberInvalid(discountText)
   val paidBad = payment == SalesEngine.Payment.CREDIT && numberInvalid(paidText)
 
@@ -247,7 +253,7 @@ fun DeskSaleScreen(
     val sale = checkout.copy(settlement = st)
     //  POS-14: F9ِ پشتِ‌سرِهم یک فروش می‌سازد؛ سبد فقط پس از نوشتنِ دفتر پاک می‌شود
     scope.launch { when (val posted = cartStore.post(store) { key ->
-      SalesEngine.record(d, cart, sale, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId,
+      SalesEngine.record(d, priced, sale, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId,
       series = ir.vil3ntec.tohid.sync.DocSeries.current(context), saleId = key) }) {
       SalePost.Outcome.Busy -> Unit
       SalePost.Outcome.NotSaved -> toast(SalePost.NOT_SAVED)
@@ -428,10 +434,26 @@ fun DeskSaleScreen(
               onEdit = { editLine = it },
               onMinus = { step(it, -1); refocus() },
               onPlus = { step(it, 1); refocus() },
+              //  PRM-18: هر تخفیفِ اعمال‌شده یک ردیف با نامش و کادرِ کد — تهِ همان فهرست،
+              //  با اسکرولِ اقلام، تا جای ردیف‌های سبد را نگیرند
+              footer = if (promoSnap.active) {
+                {
+                  promo?.let { PromoLines(it.applied) }
+                  if (promoSnap.hasCodes) {
+                    PromoCodeField(
+                      codes = promo?.codes.orEmpty(),
+                      entered = ir.vil3ntec.tohid.ui.PromoLive.coupons.value,
+                      onAdd = { ir.vil3ntec.tohid.ui.PromoLive.addCoupon(it); refocus() },
+                      onRemove = { ir.vil3ntec.tohid.ui.PromoLive.removeCoupon(it) },
+                      modifier = Modifier.padding(top = 8.dp),
+                    )
+                  }
+                }
+              } else null,
             )
           },
           summary = {
-            PaymentSummary(PosSummary.rows(totals), totals.finalTotal) {
+            PaymentSummary(PromoSummary.rows(totals, promo), totals.finalTotal) {
               if (canDiscount) {
                 OutlinedTextField(
                   value = discountText,
