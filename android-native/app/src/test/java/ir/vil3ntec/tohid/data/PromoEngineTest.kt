@@ -55,7 +55,8 @@ class PromoEngineTest {
     assertEquals(SalesEngine.totals(d, cart, checkout), SalesEngine.totals(d, PromoEngine.priced(cart, o), checkout))
     val today = record(cart, checkout)
     val withOff = record(PromoEngine.priced(cart, o), checkout)
-    assertEquals(today.data.sales, withOff.data.sales)
+    //  توکنِ QRِ فاکتور برای هر ثبت تازه است (فاکتورِ نسخهٔ ۲)؛ بقیهٔ فاکتور همان
+    assertEquals(today.data.sales.map { it.copy(receiptToken = null) }, withOff.data.sales.map { it.copy(receiptToken = null) })
     assertEquals(today.data.saleItems, withOff.data.saleItems)
     assertEquals(773.0, today.data.sales.last().total, 0.0)
   }

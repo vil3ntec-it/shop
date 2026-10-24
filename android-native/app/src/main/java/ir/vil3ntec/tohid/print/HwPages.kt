@@ -16,6 +16,7 @@ import ir.vil3ntec.tohid.core.hw.EscPos
 import ir.vil3ntec.tohid.core.hw.EscPosPreview
 import ir.vil3ntec.tohid.core.hw.Labels
 import ir.vil3ntec.tohid.core.hw.MonoImage
+import ir.vil3ntec.tohid.data.ReceiptProfileStore
 import ir.vil3ntec.tohid.data.Sale
 import ir.vil3ntec.tohid.data.ShopData
 import java.io.File
@@ -94,11 +95,11 @@ object HwPages {
     copyMark: String? = null,
   ): ByteArray {
     val profile = printer.profile()
-    val storeName = context.getSharedPreferences("tohid", Context.MODE_PRIVATE).getString("store_name", "") ?: ""
-    val bitmap = Receipt.render(context, d, sale, storeName, profile.paperDots, copyMark)
-    val receipt = try { ThermalPrinter.toMono(bitmap, profile.paperDots) } finally { bitmap.recycle() }
-    val logo = if (profile.logo) logoMono(context, profile.paperDots) else null
-    val page = if (logo != null) stack(profile.paperDots, listOf(logo, receipt), gap = 12) else receipt
+    val receipt = Receipts.mono(context, d, sale, profile.paperDots, copyMark)
+    //  لوگوی دکان از فاکتورِ نسخهٔ ۲ (سربرگِ همگام) خودش در فاکتور است؛ نشانِ محلیِ همین
+    //  دستگاه فقط برای دکانی می‌ماند که هنوز لوگوی همگام ندارد
+    val legacy = if (profile.logo && ReceiptProfileStore.current(context).logoHash == null) logoMono(context, profile.paperDots) else null
+    val page = if (legacy != null) stack(profile.paperDots, listOf(legacy, receipt), gap = 12) else receipt
     return EscPos.document(page, profile, openDrawer)
   }
 

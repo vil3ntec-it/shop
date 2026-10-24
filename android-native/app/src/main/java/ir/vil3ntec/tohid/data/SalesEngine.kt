@@ -4,6 +4,7 @@ import ir.vil3ntec.tohid.money
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToLong
+import ir.vil3ntec.tohid.core.receipt.ReceiptTokens
 
 /**
  *  ثبتِ فروش — همان حسابی که نسخهٔ وب می‌کند.
@@ -362,6 +363,7 @@ object SalesEngine {
       date = today,
       syncStatus = "pending",
       seller = checkout.seller.trim(),
+      receiptToken = ReceiptTokens.new(),
     )
 
     val items = mutableListOf<SaleItem>()

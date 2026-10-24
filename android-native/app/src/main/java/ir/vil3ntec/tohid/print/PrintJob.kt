@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.print
 
 import ir.vil3ntec.tohid.data.invoiceLabel
 import android.content.Context
+import ir.vil3ntec.tohid.data.ReceiptProfileStore
 import ir.vil3ntec.tohid.data.Sale
 import ir.vil3ntec.tohid.data.ShopData
 import kotlinx.coroutines.Dispatchers
@@ -23,22 +24,38 @@ object PrintJob {
    *
    *  @return پیامِ خطا یا null
    */
-  suspend fun shareSale(context: Context, d: ShopData, sale: Sale): String? {
-    val storeName = context.getSharedPreferences("tohid", Context.MODE_PRIVATE).getString("store_name", "") ?: ""
+  suspend fun shareSale(context: Context, d: ShopData, sale: Sale): String? = share(context, sale, "png", "image/png") { file ->
+    val bitmap = Receipts.bitmap(context, d, sale)
+    try {
+      file.outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+    } finally {
+      bitmap.recycle()
+    }
+  }
+
+  /** همان فاکتور به PDF ِ ۸۰ میلی‌متری (فاکتورِ نسخهٔ ۲) */
+  suspend fun sharePdf(context: Context, d: ShopData, sale: Sale): String? = share(context, sale, "pdf", "application/pdf") { file ->
+    file.writeBytes(Receipts.pdf(context, d, sale))
+  }
+
+  private suspend fun share(
+    context: Context,
+    sale: Sale,
+    ext: String,
+    mime: String,
+    write: (java.io.File) -> Unit,
+  ): String? {
+    val storeName = ReceiptProfileStore.current(context).name.ifBlank { Receipts.localName(context) }
     val file = withContext(Dispatchers.IO) {
       runCatching {
-        val bitmap = Receipt.render(context, d, sale, storeName, 576)
         val dir = java.io.File(context.cacheDir, "share").apply { mkdirs(); listFiles()?.forEach { it.delete() } }
-        val f = java.io.File(dir, "invoice-${sale.invoiceLabel() ?: "x"}.png")
-        f.outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
-        bitmap.recycle()
-        f
+        java.io.File(dir, "invoice-${sale.invoiceLabel() ?: "x"}.$ext").also(write)
       }
     }.getOrElse { return "فاکتور ساخته نشد: ${it.message ?: "دلیل نامعلوم"}" }
     return runCatching {
       val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.files", file)
       val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-        type = "image/png"
+        type = mime
         putExtra(android.content.Intent.EXTRA_STREAM, uri)
         putExtra(android.content.Intent.EXTRA_TEXT, "فاکتور #${sale.invoiceLabel() ?: ""}${if (storeName.isNotBlank()) " — $storeName" else ""}")
         addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -58,11 +75,7 @@ object PrintJob {
     address: String,
     width: Int,
   ): String? = withContext(Dispatchers.IO) {
-    val storeName = context
-      .getSharedPreferences("tohid", Context.MODE_PRIVATE)
-      .getString("store_name", "") ?: ""
-
-    val bitmap = runCatching { Receipt.render(context, d, sale, storeName, width) }
+    val bitmap = runCatching { Receipts.bitmap(context, d, sale, width) }
       .getOrElse { return@withContext "فاکتور کشیده نشد: ${it.message ?: "دلیل نامعلوم"}" }
 
     try {
